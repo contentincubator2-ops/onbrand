@@ -77,36 +77,43 @@ const PR_TASK_REF: Record<string, string> = {
 export function prPlaybookFor(taskId: string): string {
   const id = String(taskId ?? "");
   const ref = PR_TASK_REF[id];
-  const P = (s: string) =>
-    `# 本任務 playbook（PR 得獎模式）\n${s}` +
-    (ref ? `\n# 得獎參考（學此可遷移工藝，非抄作品）\n${ref}` : "");
+  // 2026-09-06 (CJ): fallback exemplar per branch. Until now `ref` existed
+  // only on an exact task-id hit, and a brand pack's custom ids are never in
+  // PR_TASK_REF — so those cards got the structure and no case. Each fallback is
+  // resolved from the SAME regex that selected the branch, against this
+  // module's own case pool: no second lookup table to drift, no new claim.
+  const P = (s: string, fallbackKey?: keyof typeof PR_TASK_REF) => {
+    const use = ref ?? (fallbackKey ? PR_TASK_REF[fallbackKey] : undefined);
+    return `# 本任務 playbook（PR 得獎模式）\n${s}` +
+      (use ? `\n# 得獎參考（學此可遷移工藝，非抄作品）\n${use}` : "");
+  };
 
   if (/headline/.test(id))
-    return P("主動語態、動詞優先、最強新聞點在前；中文 20 字內、英文 45 字內；避免形容詞堆砌。");
+    return P("主動語態、動詞優先、最強新聞點在前；中文 20 字內、英文 45 字內；避免形容詞堆砌。", "pr-30-headline");
   if (/lead/.test(id))
-    return P("倒三角第一段：5W 全回答、一句話能獨立轉推；含最強新聞事實＋反直覺角度。");
+    return P("倒三角第一段：5W 全回答、一句話能獨立轉推；含最強新聞事實＋反直覺角度。", "pr-30-lead-paragraph");
   if (/subhead/.test(id))
-    return P("資訊密度優先：壓縮一個次要重點＋輕微機智；不重複標題、不是廢話裝飾。");
+    return P("資訊密度優先：壓縮一個次要重點＋輕微機智；不重複標題、不是廢話裝飾。", "pr-30-subhead");
   if (/news-hook/.test(id))
-    return P("鉤子公式：Timeliness＋Significance＋Human Interest；目標是創造媒體週期，不只一篇報導。");
+    return P("鉤子公式：Timeliness＋Significance＋Human Interest；目標是創造媒體週期，不只一篇報導。", "pr-30-news-hook");
   if (/ceo-quote/.test(id))
-    return P("引言要有立場：刪掉所有「我們很興奮/很榮幸」；每句都必須是可被截取的品牌觀點。");
+    return P("引言要有立場：刪掉所有「我們很興奮/很榮幸」；每句都必須是可被截取的品牌觀點。", "pr-30-ceo-quote");
   if (/boilerplate/.test(id))
-    return P("公司描述 100 字以內；含成立年份、核心服務、具體規模數字；零行銷語言。");
+    return P("公司描述 100 字以內；含成立年份、核心服務、具體規模數字；零行銷語言。", "pr-30-boilerplate");
   if (/fact-sheet/.test(id))
-    return P("一行一事實、表格格式；數字排列順序要說故事；記者複製貼上即可直接引用。");
+    return P("一行一事實、表格格式；數字排列順序要說故事；記者複製貼上即可直接引用。", "pr-30-fact-sheet");
   if (/media-pitch/.test(id))
-    return P("一個 pitch 一個故事角度；第一句個人化（引用記者過去報導）；說明為何該媒體讀者需要知道。");
+    return P("一個 pitch 一個故事角度；第一句個人化（引用記者過去報導）；說明為何該媒體讀者需要知道。", "pr-30-media-pitch");
   if (/spokesperson|qa/.test(id))
-    return P("每個 Q 背後有記者真實疑慮；每個 A 都埋可被引用的新聞點；長度控制在 3 句話以內。");
+    return P("每個 Q 背後有記者真實疑慮；每個 A 都埋可被引用的新聞點；長度控制在 3 句話以內。", "pr-30-spokesperson-qa");
   if (/launch-social/.test(id))
-    return P("社群 PR 文案＝將新聞稿中心主張轉成社群語氣；不是截圖新聞稿；有 share 誘因。");
+    return P("社群 PR 文案＝將新聞稿中心主張轉成社群語氣；不是截圖新聞稿；有 share 誘因。", "pr-30-launch-social");
   if (/news-release|release-full/.test(id))
-    return P("完整新聞稿：Headline→Lead→Subhead→正文（倒三角）→CEO 引言→Boilerplate；每段可獨立截取。");
+    return P("完整新聞稿：Headline→Lead→Subhead→正文（倒三角）→CEO 引言→Boilerplate；每段可獨立截取。", "pr-60-news-release-full");
   if (/launch-toolkit/.test(id))
-    return P("工具包＝一個中心編輯主張＋多格式分發（新聞稿/媒體 pitch/社群/發言人 Q&A）；每件素材都能獨立引發報導。");
+    return P("工具包＝一個中心編輯主張＋多格式分發（新聞稿/媒體 pitch/社群/發言人 Q&A）；每件素材都能獨立引發報導。", "pr-99-launch-toolkit");
   if (/newsjack/.test(id))
-    return P("速度第一（1-2 小時窗口）；品牌關聯性必須真實不勉強；非機會主義式；一條內容、一個清晰品牌角度。");
+    return P("速度第一（1-2 小時窗口）；品牌關聯性必須真實不勉強；非機會主義式；一條內容、一個清晰品牌角度。", "pr-99-newsjack");
 
-  return P("PR 通用：倒三角結構、5W 首段、數字說話、CEO 引言有立場、媒體 pitch 一角度一媒體。");
+  return P("PR 通用：倒三角結構、5W 首段、數字說話、CEO 引言有立場、媒體 pitch 一角度一媒體。", "pr-30-headline");
 }

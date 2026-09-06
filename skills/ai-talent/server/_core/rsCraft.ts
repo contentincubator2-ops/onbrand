@@ -88,40 +88,47 @@ const RS_TASK_REF: Record<string, string> = {
 export function rsPlaybookFor(taskId: string): string {
   const id = String(taskId ?? "");
   const ref = RS_TASK_REF[id];
-  const P = (s: string) =>
-    `# 本任務 playbook（研究策略得獎模式）\n${s}` +
-    (ref ? `\n# 得獎參考（學此可遷移工藝，非抄作品）\n${ref}` : "");
+  // 2026-09-06 (CJ): fallback exemplar per branch. Until now `ref` existed
+  // only on an exact task-id hit, and a brand pack's custom ids are never in
+  // RS_TASK_REF — so those cards got the structure and no case. Each fallback is
+  // resolved from the SAME regex that selected the branch, against this
+  // module's own case pool: no second lookup table to drift, no new claim.
+  const P = (s: string, fallbackKey?: keyof typeof RS_TASK_REF) => {
+    const use = ref ?? (fallbackKey ? RS_TASK_REF[fallbackKey] : undefined);
+    return `# 本任務 playbook（研究策略得獎模式）\n${s}` +
+      (use ? `\n# 得獎參考（學此可遷移工藝，非抄作品）\n${use}` : "");
+  };
 
   if (/persona/.test(id) && !(/suite/.test(id)))
-    return P("Persona 三必要：行為基礎（非人口統計）＋真實引言（訪談語句）＋Anti-persona；一個主要 persona 解決一個核心問題。");
+    return P("Persona 三必要：行為基礎（非人口統計）＋真實引言（訪談語句）＋Anti-persona；一個主要 persona 解決一個核心問題。", "rs-30-persona-draft");
   if (/persona-suite/.test(id))
-    return P("Persona 套組四件：主要 persona＋次要 persona＋Anti-persona＋JTBD 對齊；四件完整才能支撐產品/行銷決策。");
+    return P("Persona 套組四件：主要 persona＋次要 persona＋Anti-persona＋JTBD 對齊；四件完整才能支撐產品/行銷決策。", "rs-60-persona-suite");
   if (/interview/.test(id) && !(/competitive/.test(id)))
-    return P("訪談指南：開放式問題（Tell me about...）＋無引導性＋時間線探索（具體事件不問態度）＋沉默探測預留。");
+    return P("訪談指南：開放式問題（Tell me about...）＋無引導性＋時間線探索（具體事件不問態度）＋沉默探測預留。", "rs-30-persona-draft");
   if (/jtbd/.test(id) && !(/suite/.test(id)))
-    return P("JTBD 指南：聚焦「工作」不在解決方案；三層探索（功能/情感/社會）；Switch interview 完整故事；Forces diagram 四象限。");
+    return P("JTBD 指南：聚焦「工作」不在解決方案；三層探索（功能/情感/社會）；Switch interview 完整故事；Forces diagram 四象限。", "rs-30-persona-draft");
   if (/jtbd-suite/.test(id))
-    return P("JTBD 套組三件：Forces diagram＋時間線訪談腳本＋Switch interview 指南；三件合用才能重建完整購買故事。");
+    return P("JTBD 套組三件：Forces diagram＋時間線訪談腳本＋Switch interview 指南；三件合用才能重建完整購買故事。", "rs-60-jtbd-suite");
   if (/journey-map/.test(id))
-    return P("旅程地圖：以顧客階段為軸（非公司流程）；五欄（行動/情緒/思考/痛點/機會）；情緒曲線可視化讓利害關係人一眼看到最大痛點。");
+    return P("旅程地圖：以顧客階段為軸（非公司流程）；五欄（行動/情緒/思考/痛點/機會）；情緒曲線可視化讓利害關係人一眼看到最大痛點。", "rs-30-journey-map");
   if (/survey/.test(id))
-    return P("問卷設計：問題順序影響框架（從廣到窄）＋選項設計避免錨定（隨機化/中性選項）＋跳題邏輯減少疲勞。");
+    return P("問卷設計：問題順序影響框架（從廣到窄）＋選項設計避免錨定（隨機化/中性選項）＋跳題邏輯減少疲勞。", "rs-30-survey");
   if (/synthesis/.test(id))
-    return P("綜合三步：觀察（what happened）→洞察（why it matters）→HMW（可執行機會）；每個 HMW 必須指向具體設計方向。");
+    return P("綜合三步：觀察（what happened）→洞察（why it matters）→HMW（可執行機會）；每個 HMW 必須指向具體設計方向。", "rs-30-synthesis-template");
   if (/competitive-interview/.test(id))
-    return P("競爭訪談：問「最後選了什麼，為什麼」；時間線重建決策過程；產出可執行的定位洞察，不只是功能比較。");
+    return P("競爭訪談：問「最後選了什麼，為什麼」；時間線重建決策過程；產出可執行的定位洞察，不只是功能比較。", "rs-30-competitive-interview");
   if (/screener/.test(id))
-    return P("Screener 設計：行為篩選勝過人口統計篩選；用具體行為問題排除不符合者；樣本品質決定研究效度。");
+    return P("Screener 設計：行為篩選勝過人口統計篩選；用具體行為問題排除不符合者；樣本品質決定研究效度。", "rs-30-screener");
   if (/usability/.test(id))
-    return P("易用性測試腳本：讓受訪者完成任務，不詢問意見（「你認為這個介面怎麼樣？」一律刪除）；5 人找出 85% 問題。");
+    return P("易用性測試腳本：讓受訪者完成任務，不詢問意見（「你認為這個介面怎麼樣？」一律刪除）；5 人找出 85% 問題。", "rs-30-usability-script");
   if (/consent/.test(id))
-    return P("知情同意書：說明研究目的＋資料用途＋匿名化程度＋退出權利；語言平易近人（非法律文件語氣）。");
+    return P("知情同意書：說明研究目的＋資料用途＋匿名化程度＋退出權利；語言平易近人（非法律文件語氣）。", "rs-30-consent-form");
   if (/discovery-sprint/.test(id))
-    return P("Discovery Sprint 五天：Day1 理解問題→Day2 草繪解決方案→Day3 決策→Day4 原型→Day5 測試；每天有明確 deliverable 和決策門檻。");
+    return P("Discovery Sprint 五天：Day1 理解問題→Day2 草繪解決方案→Day3 決策→Day4 原型→Day5 測試；每天有明確 deliverable 和決策門檻。", "rs-99-discovery-sprint");
   if (/competitor-mapping/.test(id))
-    return P("競爭地圖：Porter Five Forces 結構分析＋Blue Ocean 價值創新軸線；軸線必須是顧客真正在乎的取捨，非公司認為重要的功能。");
+    return P("競爭地圖：Porter Five Forces 結構分析＋Blue Ocean 價值創新軸線；軸線必須是顧客真正在乎的取捨，非公司認為重要的功能。", "rs-99-competitor-mapping");
   if (/competitor-ads/.test(id))
-    return P("競爭廣告分析：投放策略（媒體組合/時間節點/創意演進週期）＋訊息策略（定位主張/受眾假設/情緒觸發）雙軌分析。");
+    return P("競爭廣告分析：投放策略（媒體組合/時間節點/創意演進週期）＋訊息策略（定位主張/受眾假設/情緒觸發）雙軌分析。", "rs-99-competitor-ads");
 
-  return P("研究策略通用：產出必須可執行、洞察必須有行動意涵、行為基礎勝過人口統計基礎、開放式問題不引導答案。");
+  return P("研究策略通用：產出必須可執行、洞察必須有行動意涵、行為基礎勝過人口統計基礎、開放式問題不引導答案。", "rs-30-persona-draft");
 }

@@ -64,14 +64,21 @@ const CW_TASK_REF: Record<string, string> = {
 export function cwPlaybookFor(taskId: string): string {
   const id = String(taskId ?? "");
   const ref = CW_TASK_REF[id];
-  const P = (s: string) =>
-    `# 本任務 playbook（跨平台得獎模式）\n${s}` +
-    (ref ? `\n# 得獎參考（學此可遷移工藝，非抄作品）\n${ref}` : "");
+  // 2026-09-06 (CJ): fallback exemplar per branch. Until now `ref` existed
+  // only on an exact task-id hit, and a brand pack's custom ids are never in
+  // CW_TASK_REF — so those cards got the structure and no case. Each fallback is
+  // resolved from the SAME regex that selected the branch, against this
+  // module's own case pool: no second lookup table to drift, no new claim.
+  const P = (s: string, fallbackKey?: keyof typeof CW_TASK_REF) => {
+    const use = ref ?? (fallbackKey ? CW_TASK_REF[fallbackKey] : undefined);
+    return `# 本任務 playbook（跨平台得獎模式）\n${s}` +
+      (use ? `\n# 得獎參考（學此可遷移工藝，非抄作品）\n${use}` : "");
+  };
 
   if (/crosspost/.test(id))
-    return P("跨貼四平台：TikTok（hook＋聲音＋快節奏）→IG（視覺主張＋情感）→FB（社群感＋完整資訊）→LinkedIn（洞察＋數據＋專業框架）；同一核心主張，四種平台原生語言，不是四個格式轉換。");
+    return P("跨貼四平台：TikTok（hook＋聲音＋快節奏）→IG（視覺主張＋情感）→FB（社群感＋完整資訊）→LinkedIn（洞察＋數據＋專業框架）；同一核心主張，四種平台原生語言，不是四個格式轉換。", "cw-60-crosspost-4platform");
   if (/ab-variants/.test(id))
-    return P("A/B Variants：每個 variant 對應一個清楚的受眾假設（非同一假設的兩個版本）；一次只改一個變數（headline/圖片/CTA 擇一）；記錄每個 variant 測試的假設，不論成敗都是品牌知識。");
+    return P("A/B Variants：每個 variant 對應一個清楚的受眾假設（非同一假設的兩個版本）；一次只改一個變數（headline/圖片/CTA 擇一）；記錄每個 variant 測試的假設，不論成敗都是品牌知識。", "cw-60-ab-variants");
 
-  return P("跨平台通用：平台原生表達（不是複製貼上）、每個平台有自己的母語、A/B 測試一次一個變數、台灣 LINE/FB 仍是最高滲透率優先考量。");
+  return P("跨平台通用：平台原生表達（不是複製貼上）、每個平台有自己的母語、A/B 測試一次一個變數、台灣 LINE/FB 仍是最高滲透率優先考量。", "cw-60-crosspost-4platform");
 }

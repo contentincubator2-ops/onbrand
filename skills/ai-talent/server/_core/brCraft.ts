@@ -80,36 +80,43 @@ const BR_TASK_REF: Record<string, string> = {
 export function brPlaybookFor(taskId: string): string {
   const id = String(taskId ?? "");
   const ref = BR_TASK_REF[id];
-  const P = (s: string) =>
-    `# 本任務 playbook（品牌策略得獎模式）\n${s}` +
-    (ref ? `\n# 得獎參考（學此可遷移工藝，非抄作品）\n${ref}` : "");
+  // 2026-09-06 (CJ): fallback exemplar per branch. Until now `ref` existed
+  // only on an exact task-id hit, and a brand pack's custom ids are never in
+  // BR_TASK_REF — so those cards got the structure and no case. Each fallback is
+  // resolved from the SAME regex that selected the branch, against this
+  // module's own case pool: no second lookup table to drift, no new claim.
+  const P = (s: string, fallbackKey?: keyof typeof BR_TASK_REF) => {
+    const use = ref ?? (fallbackKey ? BR_TASK_REF[fallbackKey] : undefined);
+    return `# 本任務 playbook（品牌策略得獎模式）\n${s}` +
+      (use ? `\n# 得獎參考（學此可遷移工藝，非抄作品）\n${use}` : "");
+  };
 
   if (/positioning/.test(id))
-    return P("定位聲明：For [受眾]，[品牌] is the [類別] that [獨特價值]；心智空間測試：聽到品牌名自動聯想到什麼？定義敵人比描述自己更有力。");
+    return P("定位聲明：For [受眾]，[品牌] is the [類別] that [獨特價值]；心智空間測試：聽到品牌名自動聯想到什麼？定義敵人比描述自己更有力。", "br-30-positioning");
   if (/tagline/.test(id) && !(/suite/.test(id)))
-    return P("3-8 字、動詞框架、五年測試、跨受眾成立；刪掉所有流行詞（innovative/seamless/disruptive）。");
+    return P("3-8 字、動詞框架、五年測試、跨受眾成立；刪掉所有流行詞（innovative/seamless/disruptive）。", "br-30-positioning");
   if (/tagline-suite/.test(id))
-    return P("套組＝一個策略主張的多執行角度；每個 tagline 攻不同受眾但必須出自同一核心定位。");
+    return P("套組＝一個策略主張的多執行角度；每個 tagline 攻不同受眾但必須出自同一核心定位。", "br-60-tagline-suite");
   if (/value-prop/.test(id))
-    return P("價值主張層次：功能利益→情感利益→身分認同；Airbnb 模型：一句橋接兩層。");
+    return P("價值主張層次：功能利益→情感利益→身分認同；Airbnb 模型：一句橋接兩層。", "br-30-value-prop");
   if (/brand-voice/.test(id))
-    return P("具體不通用：列「會說/不會說」的具體例子；禁用詞清單比形容詞清單更有效；一致性測試。");
+    return P("具體不通用：列「會說/不會說」的具體例子；禁用詞清單比形容詞清單更有效；一致性測試。", "br-30-brand-voice");
   if (/manifesto/.test(id))
-    return P("宣言要付出代價：必須讓品牌放棄某些短期利益；從信念出發不從產品出發；受眾是同盟者。");
+    return P("宣言要付出代價：必須讓品牌放棄某些短期利益；從信念出發不從產品出發；受眾是同盟者。", "br-30-manifesto");
   if (/naming/.test(id))
-    return P("音韻美學（音節/母音/聲音意象）＋意義層次（字面/隱喻/情感）＋商標可用性；中文命名加注音結構＋字義聯想＋書寫美感。");
+    return P("音韻美學（音節/母音/聲音意象）＋意義層次（字面/隱喻/情感）＋商標可用性；中文命名加注音結構＋字義聯想＋書寫美感。", "br-30-naming");
   if (/archetype/.test(id))
-    return P("品牌原型定義受眾情感關係；原型轉換需全面行為改變（視覺/語言/產品/通路）；不只換 slogan。");
+    return P("品牌原型定義受眾情感關係；原型轉換需全面行為改變（視覺/語言/產品/通路）；不只換 slogan。", "br-30-archetype");
   if (/competitor-map/.test(id))
-    return P("競爭地圖軸線必須是受眾在乎的價值取捨；透過定義敵人來定義自己；最強定位都有對立面。");
+    return P("競爭地圖軸線必須是受眾在乎的價值取捨；透過定義敵人來定義自己；最強定位都有對立面。", "br-30-competitor-map");
   if (/elevator-pitch/.test(id))
-    return P("90 秒內重新定義品類；工作是讓聽者看到不同競爭地圖；結尾有具體下一步行動。");
+    return P("90 秒內重新定義品類；工作是讓聽者看到不同競爭地圖；結尾有具體下一步行動。", "br-30-elevator-pitch");
   if (/forbidden-words/.test(id))
-    return P("禁用詞清單透過負空間定義品牌個性；每條禁令附上替代方向；越具體越有效。");
+    return P("禁用詞清單透過負空間定義品牌個性；每條禁令附上替代方向；越具體越有效。", "br-30-forbidden-words");
   if (/reposition/.test(id))
-    return P("重定位三件套：新視覺識別＋新聲音＋新平台行為；三者必須同步，任一落後即失效。");
+    return P("重定位三件套：新視覺識別＋新聲音＋新平台行為；三者必須同步，任一落後即失效。", "br-99-reposition-toolkit");
   if (/voice-playbook/.test(id))
-    return P("聲音 playbook＝完整行為指南而非形容詞清單；用真實內容範例教，不只說規則；品牌聲音是成長引擎。");
+    return P("聲音 playbook＝完整行為指南而非形容詞清單；用真實內容範例教，不只說規則；品牌聲音是成長引擎。", "br-99-voice-playbook");
 
-  return P("品牌策略通用：定位先於創意、心智空間先於功能描述、五年測試、具體勝過抽象。");
+  return P("品牌策略通用：定位先於創意、心智空間先於功能描述、五年測試、具體勝過抽象。", "br-30-positioning");
 }

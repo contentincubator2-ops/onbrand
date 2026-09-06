@@ -105,41 +105,48 @@ export const LI_TASK_REF: Record<string, string> = {
 export function liPlaybookFor(taskId: string): string {
   const id = String(taskId ?? "");
   const ref = LI_TASK_REF[id];
-  const P = (s: string) =>
-    `# 本任務 playbook（LI 得獎模式）\n${s}` +
-    (ref ? `\n# 得獎參考（學此可遷移工藝，非抄作品）\n${ref}` : "");
+  // 2026-09-06 (CJ): fallback exemplar per branch. Until now `ref` existed
+  // only on an exact task-id hit, and a brand pack's custom ids are never in
+  // LI_TASK_REF — so those cards got the structure and no case. Each fallback is
+  // resolved from the SAME regex that selected the branch, against this
+  // module's own case pool: no second lookup table to drift, no new claim.
+  const P = (s: string, fallbackKey?: keyof typeof LI_TASK_REF) => {
+    const use = ref ?? (fallbackKey ? LI_TASK_REF[fallbackKey] : undefined);
+    return `# 本任務 playbook（LI 得獎模式）\n${s}` +
+      (use ? `\n# 得獎參考（學此可遷移工藝，非抄作品）\n${use}` : "");
+  };
 
   // ── 30s ───────────────────────────────────────────────────────────────
   if (/insight-post/.test(id))
-    return P("觀點貼文：反共識主張前置→2-3 段具體數據/案例論證→開放問題引留言；第一人稱觀點；「repost 理由」嵌入洞察本身。");
+    return P("觀點貼文：反共識主張前置→2-3 段具體數據/案例論證→開放問題引留言；第一人稱觀點；「repost 理由」嵌入洞察本身。", "li-30-insight-post");
   if (/hook-3/.test(id))
-    return P("Hook 3 種：每變體 1 種策略（反共識/數據反差/個人故事）；8 個字內、不需要前情提要；'See more' 靠前 2 行贏。");
+    return P("Hook 3 種：每變體 1 種策略（反共識/數據反差/個人故事）；8 個字內、不需要前情提要；'See more' 靠前 2 行贏。", "li-30-hook-3");
   if (/article-opener/.test(id))
-    return P("Article 開頭：讀者上週剛經歷的一個具體場景→個人連結（為何我在寫這篇）→這篇的 3 個重點；不要「本文將…」式起手。");
+    return P("Article 開頭：讀者上週剛經歷的一個具體場景→個人連結（為何我在寫這篇）→這篇的 3 個重點；不要「本文將…」式起手。", "li-30-article-opener");
   if (/poll/.test(id))
-    return P("Poll：問題 = 讀者這週正在面對的決策；4 個選項互斥且涵蓋常見分歧；caption 說明為何問（1句）；投票感覺像自我反思。");
+    return P("Poll：問題 = 讀者這週正在面對的決策；4 個選項互斥且涵蓋常見分歧；caption 說明為何問（1句）；投票感覺像自我反思。", "li-30-poll");
   if (/event-invite/.test(id))
-    return P("活動邀請：hook（為何這場有獨特價值）→主題/講者簡介→3 個帶走點→CTA；錨定在「與會者的轉化」，不是活動後勤。");
+    return P("活動邀請：hook（為何這場有獨特價值）→主題/講者簡介→3 個帶走點→CTA；錨定在「與會者的轉化」，不是活動後勤。", "li-30-event-invite");
 
   // ── 共用 newsletter（30s + 60s）──────────────────────────────────────
   if (/newsletter/.test(id))
-    return P("Newsletter：標題 = 具體可測試主張（不是期數）；opener = 讀者的親身場景；每節賺到繼續讀；結尾 1 個具體行動建議。");
+    return P("Newsletter：標題 = 具體可測試主張（不是期數）；opener = 讀者的親身場景；每節賺到繼續讀；結尾 1 個具體行動建議。", "li-30-newsletter");
 
   // ── 共用 document（30s）──────────────────────────────────────────────
   if (/document/.test(id))
-    return P("Document：封面大標含具體數字；每頁 1 個完整論點（標題獨立可讀）；末頁總結 + 行動邀請；每頁賺下一頁的滑動。");
+    return P("Document：封面大標含具體數字；每頁 1 個完整論點（標題獨立可讀）；末頁總結 + 行動邀請；每頁賺下一頁的滑動。", "li-30-document");
 
   // ── 60s ───────────────────────────────────────────────────────────────
   if (/thought-leader/.test(id))
-    return P("思想領袖長文：個人故事 + 產業洞察 + 3 個可帶走的行動點；具體數據嵌入感性敘事；讀完感覺被點撥而非被說服。");
+    return P("思想領袖長文：個人故事 + 產業洞察 + 3 個可帶走的行動點；具體數據嵌入感性敘事；讀完感覺被點撥而非被說服。", "li-60-thought-leader");
   if (/case-study/.test(id))
-    return P("Case Study：客戶是主角；挑戰→解法→量化結果→讀者帶走的洞察；數字具體；品牌是工具不是主詞；去掉所有吹捧語。");
+    return P("Case Study：客戶是主角；挑戰→解法→量化結果→讀者帶走的洞察；數字具體；品牌是工具不是主詞；去掉所有吹捧語。", "li-60-case-study");
 
   // ── 99s ───────────────────────────────────────────────────────────────
   if (/30day-thought/.test(id))
-    return P("30 天思想領袖：1 個一致 POV 從不同角度探索；每週弧：提問→深化→挑戰→結論+新問題；每週至少 1 個互動（poll/Q&A）。");
+    return P("30 天思想領袖：1 個一致 POV 從不同角度探索；每週弧：提問→深化→挑戰→結論+新問題；每週至少 1 個互動（poll/Q&A）。", "li-99-30day-thought-leadership");
   if (/newsletter-quarterly/.test(id))
-    return P("季度 Newsletter 系列：每期錨在 1 個可量化的產業轉變；累積跨期觀點權威；每期最後 1 個具體行動建議；系列標題一致性建立品牌。");
+    return P("季度 Newsletter 系列：每期錨在 1 個可量化的產業轉變；累積跨期觀點權威；每期最後 1 個具體行動建議；系列標題一致性建立品牌。", "li-99-newsletter-quarterly");
 
-  return P("LI 通用：反共識主張前置；具體數據/場景；第一人稱觀點；開放問題引留言；觸發 repost 的洞察銳利度。");
+  return P("LI 通用：反共識主張前置；具體數據/場景；第一人稱觀點；開放問題引留言；觸發 repost 的洞察銳利度。", "li-30-insight-post");
 }

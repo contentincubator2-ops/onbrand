@@ -98,32 +98,38 @@ const EDM_TASK_REF: Record<string, string> = {
 export function edmPlaybookFor(taskId: string): string {
   const id = String(taskId ?? "");
   const ref = EDM_TASK_REF[id];
-  const P = (s: string) =>
-    `# 本任務 playbook（得獎模式）\n${s}` +
-    (ref ? `\n# 得獎參考（學此可遷移工藝，非抄作品）\n${ref}` : "");
+  // 2026-09-06 (CJ): fallback exemplar per branch. Until now `ref` existed
+  // only on an exact task-id hit, and a brand pack's custom ids are never in
+  // EDM_TASK_REF — so those cards got the structure and no case. Fallbacks
+  // reuse cases already cited in this module; no new award claim is made.
+  const P = (s: string, fallbackKey?: keyof typeof EDM_TASK_REF) => {
+    const use = ref ?? (fallbackKey ? EDM_TASK_REF[fallbackKey] : undefined);
+    return `# 本任務 playbook（得獎模式）\n${s}` +
+      (use ? `\n# 得獎參考（學此可遷移工藝，非抄作品）\n${use}` : "");
+  };
   if (/welcome|onboard|invite-opener/.test(id))
-    return P("歡迎/啟用：把這封定位在進度里程碑（設定→核心價值→個人化→專家協助→承諾步驟）。第一封給註冊誘因＋創辦人/品牌故事，建立情感連結。目標是讓對方完成下一步，不是賣東西。");
+    return P("歡迎/啟用：把這封定位在進度里程碑（設定→核心價值→個人化→專家協助→承諾步驟）。第一封給註冊誘因＋創辦人/品牌故事，建立情感連結。目標是讓對方完成下一步，不是賣東西。", "em-30-welcome");
   if (/promo|sale/.test(id))
-    return P("促銷：創意與（食慾/嚮往）視覺感勝過折扣深度；一個 offer 綁一個在地文化鉤子；CTA 導向所有可行管道（線上/門市/禮券）。");
+    return P("促銷：創意與（食慾/嚮往）視覺感勝過折扣深度；一個 offer 綁一個在地文化鉤子；CTA 導向所有可行管道（線上/門市/禮券）。", "em-30-promo");
   if (/drip|nurture/.test(id))
-    return P("培養序列：這封只推進「一個概念或克服一個疑慮」；用行為訊號分眾；像教學不像推銷。");
+    return P("培養序列：這封只推進「一個概念或克服一個疑慮」；用行為訊號分眾；像教學不像推銷。", "em-30-drip");
   if (/abandon|cart|replenish/.test(id))
-    return P("購物車/補貨：以真實狀態觸發；深連結到那個確切品項；可用反映狀態的動態小圖；降低完成門檻。");
+    return P("購物車/補貨：以真實狀態觸發；深連結到那個確切品項；可用反映狀態的動態小圖；降低完成門檻。", "em-30-abandoned-cart");
   if (/re-?engage|win-?back|reactivat/.test(id))
-    return P("喚回/win-back：A/B 兩種價值角度（情感 vs 實惠），版型不變只換訊息；記住「互動」與「轉換」常需不同角度，先選定目標。");
+    return P("喚回/win-back：A/B 兩種價值角度（情感 vs 實惠），版型不變只換訊息；記住「互動」與「轉換」常需不同角度，先選定目標。", "em-30-re-engagement");
   if (/event|webinar/.test(id))
-    return P("活動邀請：主題化互動預覽（議程/路線選擇）＋社群擴散；只有一個報名 CTA。");
+    return P("活動邀請：主題化互動預覽（議程/路線選擇）＋社群擴散；只有一個報名 CTA。", "em-30-event-invite");
   if (/cold|b2b|outreach/.test(id))
-    return P("B2B/陌生開發：用「教育系列」框架不是推銷；鎖定既有關係＋具名角色；每封一個明確 offer。");
+    return P("B2B/陌生開發：用「教育系列」框架不是推銷；鎖定既有關係＋具名角色；每封一個明確 offer。", "em-30-cold-email");
   if (/transactional|receipt|confirm/.test(id))
-    return P("交易信：把它做得有溫度——夾帶帳戶資訊＋動態偏好內容＋輕互動；交易信開信率高，是被低估的營收點。");
+    return P("交易信：把它做得有溫度——夾帶帳戶資訊＋動態偏好內容＋輕互動；交易信開信率高，是被低估的營收點。", "em-30-transactional");
   if (/newsletter|digest/.test(id))
-    return P("電子報：嚴格一期一主題；品牌語氣/視覺一致；聚焦比頻率重要。");
+    return P("電子報：嚴格一期一主題；品牌語氣/視覺一致；聚焦比頻率重要。", "em-60-newsletter-full");
   if (/launch|product|device/.test(id))
-    return P("產品/上市：多觸點動態序列；把承諾門檻往前移；分眾（既有用戶 vs 競品轉移）；主旨與創意主打具名亮點功能。");
+    return P("產品/上市：多觸點動態序列；把承諾門檻往前移；分眾（既有用戶 vs 競品轉移）；主旨與創意主打具名亮點功能。", "em-99-launch-sequence");
   if (/donat|fundrais|non-?profit|charity|giving/.test(id))
-    return P("公益募款：三封情感弧（議題→可消化的數據→領導人/受益者信→捐款）；具體影響數字＋配對捐款；事後感謝信收尾。在地節點不用 Giving Tuesday。");
+    return P("公益募款：三封情感弧（議題→可消化的數據→領導人/受益者信→捐款）；具體影響數字＋配對捐款；事後感謝信收尾。在地節點不用 Giving Tuesday。", "em-30-promo");
   if (/followup|follow-up/.test(id))
-    return P("追蹤信：依上次互動進度給「容易回覆的下一步」；不催促；留下次合作的口。");
-  return P("通用 email：一封一目標一 CTA；情感鉤子→證據→行動；行動裝置優先；主旨短而有利益。");
+    return P("追蹤信：依上次互動進度給「容易回覆的下一步」；不催促；留下次合作的口。", "em-30-drip");
+  return P("通用 email：一封一目標一 CTA；情感鉤子→證據→行動；行動裝置優先；主旨短而有利益。", "em-60-newsletter-full");
 }

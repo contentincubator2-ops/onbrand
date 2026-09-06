@@ -23,10 +23,25 @@
 
 import type { FBTaskTemplate } from "./quickTaskFB";
 
+/**
+ * 官網長文的 postType。
+ *
+ * 2026-09-06：只靠 `web-` 前綴判斷是不夠的 —— 五感十築的官網卡叫 `wg-web-*`
+ * （pack 早於「頻道放第一段」這個命名慣例），三張全部漏接。而 `platform:
+ * "doc"` 又不能單獨當判準，因為同一個 pack 的案例卡與行事曆卡也是 doc。
+ * 真正的判別點是 postType：官網長文 blog，案例卡 research，行事曆卡 calendar。
+ */
+const WEBSITE_POST_TYPES = new Set([
+  "blog", "article", "column", "product-page", "product_desc", "case-study", "faq",
+]);
+
 /** 這是不是品牌自有官網的內容任務？ */
 export function isWebsiteTask(template: FBTaskTemplate): boolean {
   const id = String(template.id ?? "");
-  return id.startsWith("web-");
+  if (id.startsWith("web-")) return true;
+  // 與 isFacebookTask 同一個形狀：前綴命中，或型態命中。原本只有前綴那半，
+  // 是這個模組跟它模仿的對象唯一不一致的地方。
+  return WEBSITE_POST_TYPES.has(String(template.postType ?? ""));
 }
 
 /**

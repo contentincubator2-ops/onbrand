@@ -164,83 +164,90 @@ export const FB_TASK_REF: Record<string, string> = {
 export function fbPlaybookFor(taskId: string): string {
   const id = String(taskId ?? "");
   const ref = FB_TASK_REF[id];
-  const P = (s: string) =>
-    `# 本任務 playbook（FB 得獎模式）\n${s}` +
-    (ref ? `\n# 得獎參考（學此可遷移工藝，非抄作品）\n${ref}` : "");
+  // 2026-09-06 (CJ): fallback exemplar per branch. Until now `ref` existed
+  // only on an exact task-id hit, and a brand pack's custom ids are never in
+  // FB_TASK_REF — so those cards got the structure and no case. Each fallback is
+  // resolved from the SAME regex that selected the branch, against this
+  // module's own case pool: no second lookup table to drift, no new claim.
+  const P = (s: string, fallbackKey?: keyof typeof FB_TASK_REF) => {
+    const use = ref ?? (fallbackKey ? FB_TASK_REF[fallbackKey] : undefined);
+    return `# 本任務 playbook（FB 得獎模式）\n${s}` +
+      (use ? `\n# 得獎參考（學此可遷移工藝，非抄作品）\n${use}` : "");
+  };
 
   // ── 廣告系列 ──────────────────────────────────────────────────────────
   if (/ad-headline/.test(id))
-    return P("廣告標題：≤ 8 字、核心價值主張 + 品牌個性；數字/反差/具體結果開場；不要疑問句；每字都要 earn its place。");
+    return P("廣告標題：≤ 8 字、核心價值主張 + 品牌個性；數字/反差/具體結果開場；不要疑問句；每字都要 earn its place。", "fb-30-ad-headline");
   if (/ad-primary/.test(id))
-    return P("廣告主文：前 3 字決定留不留；痛點→解方→社會證明結構；≤ 125 字最佳；重要資訊不要藏在折疊後。");
+    return P("廣告主文：前 3 字決定留不留；痛點→解方→社會證明結構；≤ 125 字最佳；重要資訊不要藏在折疊後。", "fb-30-ad-primary");
   if (/ad-cta/.test(id))
-    return P("廣告 CTA：結果型動詞（「取得報告」「開始使用」）而非點擊型；CTA 要像一個承諾，不是命令。");
+    return P("廣告 CTA：結果型動詞（「取得報告」「開始使用」）而非點擊型；CTA 要像一個承諾，不是命令。", "fb-30-ad-cta");
   if (/ad-description/.test(id))
-    return P("廣告描述：補充標題的具體細節（時間/錢/誰適合）；不重複主文；每個字都給轉換理由。");
+    return P("廣告描述：補充標題的具體細節（時間/錢/誰適合）；不重複主文；每個字都給轉換理由。", "fb-30-ad-description");
   if (/ad-pack/.test(id))
-    return P("廣告包：3 支覆蓋認知/考慮/轉換漏斗；每支獨立訊息但共用 campaign 主軸；格式差異化（影片/圖片/輪播）。");
+    return P("廣告包：3 支覆蓋認知/考慮/轉換漏斗；每支獨立訊息但共用 campaign 主軸；格式差異化（影片/圖片/輪播）。", "fb-60-ad-pack-3");
   if (/ad-/.test(id))
-    return P("廣告文案：標題抓注意→主文建立信任→CTA 收割；每層獨立工作，不要疊床架屋。");
+    return P("廣告文案：標題抓注意→主文建立信任→CTA 收割；每層獨立工作，不要疊床架屋。", "fb-30-ad-headline");
 
   // ── 60s 系列任務 ──────────────────────────────────────────────────────
   if (/serial/.test(id))
-    return P("連載 3 集：1 情緒弧；集 1 設問/介紹+鉤子，集 2 深化/轉折，集 3 解決+重開循環；每集獨立可看懂但讓人想看下集。");
+    return P("連載 3 集：1 情緒弧；集 1 設問/介紹+鉤子，集 2 深化/轉折，集 3 解決+重開循環；每集獨立可看懂但讓人想看下集。", "fb-60-serial-3");
   if (/viral-rewrite/.test(id))
-    return P("病毒改寫：分析原作為何分享 → 萃取分享機制 → 以品牌素材重建；搭文化便車，不是抄創意；品牌角度給舊事件新理由。");
+    return P("病毒改寫：分析原作為何分享 → 萃取分享機制 → 以品牌素材重建；搭文化便車，不是抄創意；品牌角度給舊事件新理由。", "fb-60-viral-rewrite");
   if (/trend-rewrite/.test(id))
-    return P("趨勢改寫：改 1 個元素讓它變品牌的；不重建從頭、只劫持；時機 > 製作精緻度；說明改了哪個元素 + 為何 timing 對。");
+    return P("趨勢改寫：改 1 個元素讓它變品牌的；不重建從頭、只劫持；時機 > 製作精緻度；說明改了哪個元素 + 為何 timing 對。", "fb-60-trend-rewrite");
   if (/testimonial-rewrite/.test(id))
-    return P("見證改寫：客戶是主角解決真實挑戰；品牌是工具不是主詞；量化結果嵌入感性故事；去掉「我很感謝 X 品牌」這種句子。");
+    return P("見證改寫：客戶是主角解決真實挑戰；品牌是工具不是主詞；量化結果嵌入感性故事；去掉「我很感謝 X 品牌」這種句子。", "fb-60-testimonial-rewrite");
   if (/launch-kit/.test(id))
-    return P("發表套組：1 個中心創意概念跨所有觸點（預告/發表日/後期）；每件內容單獨完整、合起來更強；格式多元化。");
+    return P("發表套組：1 個中心創意概念跨所有觸點（預告/發表日/後期）；每件內容單獨完整、合起來更強；格式多元化。", "fb-60-launch-kit");
   if (/live-suite/.test(id))
-    return P("直播套組：預告→直播錨→事後回顧 3 個生命週期；每個階段有不同的觀眾再參與鉤子；累積跨越直播時間點的觸及。");
+    return P("直播套組：預告→直播錨→事後回顧 3 個生命週期；每個階段有不同的觀眾再參與鉤子；累積跨越直播時間點的觸及。", "fb-60-live-suite");
   if (/album/.test(id))
-    return P("相簿：每張圖賺到下一張點擊；caption 序列建立整體弧線；最後一張 = 故事收束 + CTA。");
+    return P("相簿：每張圖賺到下一張點擊；caption 序列建立整體弧線；最後一張 = 故事收束 + CTA。", "fb-60-album-4");
   if (/carousel/.test(id))
-    return P("輪播：封面承諾 payoff；每張一重點且視覺連貫；末張 CTA + 儲存誘因；5 張 = 完整故事弧。");
+    return P("輪播：封面承諾 payoff；每張一重點且視覺連貫；末張 CTA + 儲存誘因；5 張 = 完整故事弧。", "fb-60-carousel-5");
   if (/pinned-suite/.test(id))
-    return P("置頂套組：品牌永久建構架構；組合回答「我是誰/做什麼/你為何在乎」；視覺一致性讓帳號看起來有策略。");
+    return P("置頂套組：品牌永久建構架構；組合回答「我是誰/做什麼/你為何在乎」；視覺一致性讓帳號看起來有策略。", "fb-60-pinned-suite");
 
   // ── 90s squad 任務（月曆/活動/品牌/分析/直播/危機）────────────────────
   if (/account-reposition/.test(id))
-    return P("帳號重定位：新視覺語言 + 新語氣 + 新互動機制同步推進；每則貼文都是重複新定位的訊號；不是一次爆發而是持續一致的轉型訊號；包含前後對比建議。");
+    return P("帳號重定位：新視覺語言 + 新語氣 + 新互動機制同步推進；每則貼文都是重複新定位的訊號；不是一次爆發而是持續一致的轉型訊號；包含前後對比建議。", "fb-90-account-reposition");
   if (/quarterly-strategy/.test(id))
-    return P("季度策略：1 個一致 POV × 多格式探索；每月主題弧 + 高峰內容；UGC 機制作為季中社群黏著劑；月度數據回顧驅動下季調整建議。");
+    return P("季度策略：1 個一致 POV × 多格式探索；每月主題弧 + 高峰內容；UGC 機制作為季中社群黏著劑；月度數據回顧驅動下季調整建議。", "fb-90-quarterly-strategy");
   if (/monthly-analytics/.test(id))
-    return P("月度分析報告：原始數字→品牌意義解讀→可行動調整建議；每個指標連結明確業務目標；不是數字清單而是決策文件；格式：指標/趨勢/洞察/建議 4 欄。");
+    return P("月度分析報告：原始數字→品牌意義解讀→可行動調整建議；每個指標連結明確業務目標；不是數字清單而是決策文件；格式：指標/趨勢/洞察/建議 4 欄。", "fb-90-monthly-analytics");
   if (/monthly-calendar-promo/.test(id))
-    return P("促銷月曆：懸念→揭示→行動 3 階段鋪陳；不只公告折扣；每週打造有敘事弧的等待報酬；高峰日前 3 天預熱、後 1 天收尾。");
+    return P("促銷月曆：懸念→揭示→行動 3 階段鋪陳；不只公告折扣；每週打造有敘事弧的等待報酬；高峰日前 3 天預熱、後 1 天收尾。", "fb-90-monthly-calendar-promo");
 
   // ── 99s 活動任務 ──────────────────────────────────────────────────────
   if (/30day-calendar/.test(id))
-    return P("30 天月曆：1 個可擁有的主題錨全月；多格式混搭（影片/圖文/故事/直播）；UGC 鼓勵貫穿；每週有一個高峰內容。");
+    return P("30 天月曆：1 個可擁有的主題錨全月；多格式混搭（影片/圖文/故事/直播）；UGC 鼓勵貫穿；每週有一個高峰內容。", "fb-99-30day-calendar");
   if (/14day-countdown|countdown-5day/.test(id))
-    return P("倒數系列：每天獨立 hook + 累積 momentum；給線索/預告/問題讓等待有回報；社群期待本身成為事件。");
+    return P("倒數系列：每天獨立 hook + 累積 momentum；給線索/預告/問題讓等待有回報；社群期待本身成為事件。", "fb-60-countdown-5day");
   if (/launch-toolkit/.test(id))
-    return P("發表工具包：中心創意概念跨所有觸點；前期鋪陳→發表日高峰→長尾延伸；每件內容強化同一個文化主張。");
+    return P("發表工具包：中心創意概念跨所有觸點；前期鋪陳→發表日高峰→長尾延伸；每件內容強化同一個文化主張。", "fb-99-launch-toolkit");
   if (/livestream/.test(id))
-    return P("直播 9 段：前期/中期/後期完整生命週期；每段有獨立觀眾再參與鉤子；直播事件 = 媒體財產，不只是一次播出。");
+    return P("直播 9 段：前期/中期/後期完整生命週期；每段有獨立觀眾再參與鉤子；直播事件 = 媒體財產，不只是一次播出。", "fb-90-livestream-suite");
   if (/crisis/.test(id))
-    return P("危機 playbook：承認→調查→修正→重建 4 階段各有內容策略；語氣從危機管理逐漸回品牌正常溫度；每階段訊息清晰、不模糊。");
+    return P("危機 playbook：承認→調查→修正→重建 4 階段各有內容策略；語氣從危機管理逐漸回品牌正常溫度；每階段訊息清晰、不模糊。", "fb-90-crisis-full");
 
   // ── 通用 ──────────────────────────────────────────────────────────────
   if (/pure-text-hook/.test(id))
-    return P("純文字貼文：不依賴圖片；反共識主張或強烈情緒前置；讀起來像真人說話；觸發「我要分享這個」。");
+    return P("純文字貼文：不依賴圖片；反共識主張或強烈情緒前置；讀起來像真人說話；觸發「我要分享這個」。", "fb-30-pure-text-hook");
   if (/link/.test(id))
-    return P("連結貼文：先給為什麼點的脈絡；讓點擊感覺像延伸自己的想法；不要只說「快來看看」。");
+    return P("連結貼文：先給為什麼點的脈絡；讓點擊感覺像延伸自己的想法；不要只說「快來看看」。", "fb-30-link-caption");
   if (/story/.test(id))
-    return P("Story：3 格微型旅程（吊胃口→揭示→行動）；每格獨立可看懂；互動貼紙（投票/問題）創造參與。");
+    return P("Story：3 格微型旅程（吊胃口→揭示→行動）；每格獨立可看懂；互動貼紙（投票/問題）創造參與。", "fb-30-story-text");
   if (/live/.test(id))
-    return P("直播標題/開場：現在時態的緊迫感；前 10 秒說清楚「為什麼現在要留下來」；互動指令明確。");
+    return P("直播標題/開場：現在時態的緊迫感；前 10 秒說清楚「為什麼現在要留下來」；互動指令明確。", "fb-30-live-title");
   if (/pinned/.test(id))
-    return P("置頂貼文：品牌永久第一印象；2 句定位 + 1 個 CTA；讓陌生訪客 3 秒內知道為何追蹤。");
+    return P("置頂貼文：品牌永久第一印象；2 句定位 + 1 個 CTA；讓陌生訪客 3 秒內知道為何追蹤。", "fb-30-pinned-short");
   if (/countdown/.test(id))
-    return P("倒數貼文：每天是獨立 hook（不只 '-X 天'）；給小線索/預告/問題——讓等待本身有價值。");
+    return P("倒數貼文：每天是獨立 hook（不只 '-X 天'）；給小線索/預告/問題——讓等待本身有價值。", "fb-30-countdown-1day");
   // 2026-05-18 (CJ「60s 所有任務都有注入不重複的得獎工藝嗎」): fb-60-
   // single-full 原本落到通用 fallback（非專屬）。給它專屬 playbook：
   // 單篇完整貼文的勝負在「一個能讓人 AHA 的洞察」+ 多版本各打不同心理鉤。
   if (/single-full/.test(id))
-    return P("單篇完整貼文：核心是 1 個讓人 AHA 的洞察（不是功能清單）；前 2 行＝命運（情緒/反差/具體場景）；中段用一個讀者切身的真實情境承載價值，不要形容詞堆疊；結尾開放問題引發留言；多版本之間心理鉤要彼此不同（情緒/邏輯/敘事/數據/懸念），不可換句話說同一件事。");
-  return P("FB 貼文：前 2 行就是命運；觸發分享的理由嵌入內容；結尾開放問題引留言；可掃讀短句。");
+    return P("單篇完整貼文：核心是 1 個讓人 AHA 的洞察（不是功能清單）；前 2 行＝命運（情緒/反差/具體場景）；中段用一個讀者切身的真實情境承載價值，不要形容詞堆疊；結尾開放問題引發留言；多版本之間心理鉤要彼此不同（情緒/邏輯/敘事/數據/懸念），不可換句話說同一件事。", "fb-60-single-full");
+  return P("FB 貼文：前 2 行就是命運；觸發分享的理由嵌入內容；結尾開放問題引留言；可掃讀短句。", "fb-60-single-full");
 }

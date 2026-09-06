@@ -72,18 +72,25 @@ const KL_TASK_REF: Record<string, string> = {
 export function klPlaybookFor(taskId: string): string {
   const id = String(taskId ?? "");
   const ref = KL_TASK_REF[id];
-  const P = (s: string) =>
-    `# 本任務 playbook（KOL 得獎模式）\n${s}` +
-    (ref ? `\n# 得獎參考（學此可遷移工藝，非抄作品）\n${ref}` : "");
+  // 2026-09-06 (CJ): fallback exemplar per branch. Until now `ref` existed
+  // only on an exact task-id hit, and a brand pack's custom ids are never in
+  // KL_TASK_REF — so those cards got the structure and no case. Each fallback is
+  // resolved from the SAME regex that selected the branch, against this
+  // module's own case pool: no second lookup table to drift, no new claim.
+  const P = (s: string, fallbackKey?: keyof typeof KL_TASK_REF) => {
+    const use = ref ?? (fallbackKey ? KL_TASK_REF[fallbackKey] : undefined);
+    return `# 本任務 playbook（KOL 得獎模式）\n${s}` +
+      (use ? `\n# 得獎參考（學此可遷移工藝，非抄作品）\n${use}` : "");
+  };
 
   if (/invite/.test(id))
-    return P("邀請開場：引用創作者特定作品→說明為何是「他」→說明對創作者的價值→低門檻下一步（進入對話而非談合約）。");
+    return P("邀請開場：引用創作者特定作品→說明為何是「他」→說明對創作者的價值→低門檻下一步（進入對話而非談合約）。", "kl-30-invite-opener");
   if (/brief/.test(id))
-    return P("Brief 三欄：創作自由區（可發揮範疇）＋品牌不可妥協點（2-3 條）＋成效衡量清晰；給靈感不給劇本。");
+    return P("Brief 三欄：創作自由區（可發揮範疇）＋品牌不可妥協點（2-3 條）＋成效衡量清晰；給靈感不給劇本。", "kl-30-influencer-brief");
   if (/pitch-pack/.test(id))
-    return P("Pitch pack 四件：獨特創意概念＋受眾數據契合度＋這個合作的不可複製機制＋ROI 衡量框架。");
+    return P("Pitch pack 四件：獨特創意概念＋受眾數據契合度＋這個合作的不可複製機制＋ROI 衡量框架。", "kl-60-pitch-pack");
   if (/campaign-toolkit/.test(id))
-    return P("Campaign toolkit＝創作者原生執行設計；可複製的挑戰/格式/鉤子讓其他創作者也想參與；品牌存在感足夠不干擾。");
+    return P("Campaign toolkit＝創作者原生執行設計；可複製的挑戰/格式/鉤子讓其他創作者也想參與；品牌存在感足夠不干擾。", "kl-99-campaign-toolkit");
 
-  return P("KOL 通用：創作者優先、真誠不交易、brief 給方向不給劇本、長期關係勝過一次性露出。");
+  return P("KOL 通用：創作者優先、真誠不交易、brief 給方向不給劇本、長期關係勝過一次性露出。", "kl-30-invite-opener");
 }

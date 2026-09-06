@@ -120,49 +120,56 @@ export const YT_TASK_REF: Record<string, string> = {
 export function ytPlaybookFor(taskId: string): string {
   const id = String(taskId ?? "");
   const ref = YT_TASK_REF[id];
-  const P = (s: string) =>
-    `# 本任務 playbook（YouTube 得獎模式）\n${s}` +
-    (ref ? `\n# 得獎參考（學此可遷移工藝，非抄作品）\n${ref}` : "");
+  // 2026-09-06 (CJ): fallback exemplar per branch. Until now `ref` existed
+  // only on an exact task-id hit, and a brand pack's custom ids are never in
+  // YT_TASK_REF — so those cards got the structure and no case. Each fallback is
+  // resolved from the SAME regex that selected the branch, against this
+  // module's own case pool: no second lookup table to drift, no new claim.
+  const P = (s: string, fallbackKey?: keyof typeof YT_TASK_REF) => {
+    const use = ref ?? (fallbackKey ? YT_TASK_REF[fallbackKey] : undefined);
+    return `# 本任務 playbook（YouTube 得獎模式）\n${s}` +
+      (use ? `\n# 得獎參考（學此可遷移工藝，非抄作品）\n${use}` : "");
+  };
 
   // ── 30s ───────────────────────────────────────────────────────────────
   if (/title-strategies/.test(id))
-    return P("標題 5 種：每種策略 1 個（SEO/反差/數字/懸念/直球）；每個 ≤ 60 字元；好奇缺口工程化——主關鍵字前置；加 1 句說明為何選這個切角。");
+    return P("標題 5 種：每種策略 1 個（SEO/反差/數字/懸念/直球）；每個 ≤ 60 字元；好奇缺口工程化——主關鍵字前置；加 1 句說明為何選這個切角。", "yt-30-title-strategies");
   if (/thumbnail-text/.test(id))
-    return P("縮圖大字：3-5 字；補充標題的好奇缺口；高對比色；手機 100px 也秒讀；配合情緒表情旁放置。");
+    return P("縮圖大字：3-5 字；補充標題的好奇缺口；高對比色；手機 100px 也秒讀；配合情緒表情旁放置。", "yt-30-thumbnail-text");
   if (/description-seo/.test(id))
-    return P("Description SEO：前 2 行 searchable hook（含主關鍵字）；後段章節時間戳 + 相關連結 + 5-10 標籤 + 訂閱 CTA；description 是內容不是元數據。");
+    return P("Description SEO：前 2 行 searchable hook（含主關鍵字）；後段章節時間戳 + 相關連結 + 5-10 標籤 + 訂閱 CTA；description 是內容不是元數據。", "yt-30-description-seo");
   if (/chapter-timeline/.test(id))
-    return P("章節時間軸：每個標題 = 獨立搜尋查詢（5-15 字，含具體資訊）；每章 1.5-3 分鐘；章節標題是額外 SEO 關鍵字機會。");
+    return P("章節時間軸：每個標題 = 獨立搜尋查詢（5-15 字，含具體資訊）；每章 1.5-3 分鐘；章節標題是額外 SEO 關鍵字機會。", "yt-30-chapter-timeline");
   if (/opening-hook/.test(id))
-    return P("開場 hook：前 3 秒大膽主張 + 視覺佐證；15 秒內說清楚「看完的回報」；30 秒前建立信任（一個親身驗證的數據）；不要歡迎開場。");
+    return P("開場 hook：前 3 秒大膽主張 + 視覺佐證；15 秒內說清楚「看完的回報」；30 秒前建立信任（一個親身驗證的數據）；不要歡迎開場。", "yt-30-opening-hook");
   if (/end-cta/.test(id))
-    return P("結尾 CTA：放在影片情緒峰值（大揭示後）；推薦主題相連的下一支；感覺像自然延伸；End Screen 卡的文字呼應剛看完的主題。");
+    return P("結尾 CTA：放在影片情緒峰值（大揭示後）；推薦主題相連的下一支；感覺像自然延伸；End Screen 卡的文字呼應剛看完的主題。", "yt-30-end-cta");
 
   // ── 共用 shorts（30s + 60s）──────────────────────────────────────────
   if (/shorts/.test(id))
-    return P("Shorts：垂直 9:16；單一揭示弧；最後 2 秒 = 分享時刻（不是 CTA）；靜音可看懂（字幕補滿）；沒有浪費的幀；前 1 秒就進主題。");
+    return P("Shorts：垂直 9:16；單一揭示弧；最後 2 秒 = 分享時刻（不是 CTA）；靜音可看懂（字幕補滿）；沒有浪費的幀；前 1 秒就進主題。", "yt-30-shorts-script");
 
   // ── 共用 community（30s + 60s）───────────────────────────────────────
   if (/community/.test(id))
-    return P("Community Post：訂閱者優先的幕後線索；1 圖 + 1 個真實問題；留言率比廣播型高 10x；建立發布前/中/後的完整生命週期互動。");
+    return P("Community Post：訂閱者優先的幕後線索；1 圖 + 1 個真實問題；留言率比廣播型高 10x；建立發布前/中/後的完整生命週期互動。", "yt-30-community-post");
 
   // ── 60s ───────────────────────────────────────────────────────────────
   if (/video-package/.test(id))
-    return P("影片製作套組：標題/縮圖/描述/章節/end screen 統一系統；每個元件強化同一支影片的可發現性；缺一則整體 SEO 力打折。");
+    return P("影片製作套組：標題/縮圖/描述/章節/end screen 統一系統；每個元件強化同一支影片的可發現性；缺一則整體 SEO 力打折。", "yt-60-video-package");
   if (/thumbnail-suite/.test(id))
-    return P("縮圖套組：跨 5 支影片的一致視覺語言；好奇缺口公式 + 情緒表情 + 高對比文字；系列辨識度建立訂閱習慣。");
+    return P("縮圖套組：跨 5 支影片的一致視覺語言；好奇缺口公式 + 情緒表情 + 高對比文字；系列辨識度建立訂閱習慣。", "yt-60-thumbnail-suite");
   if (/series-3ep/.test(id))
-    return P("3 集系列：1 個主題 3 個深度層次；每集獨立但累積理解；訂閱 CTA 在第 2 集中段；末集整合 + 下一系列預告。");
+    return P("3 集系列：1 個主題 3 個深度層次；每集獨立但累積理解；訂閱 CTA 在第 2 集中段；末集整合 + 下一系列預告。", "yt-60-series-3ep");
   if (/viral-rewrite/.test(id))
-    return P("病毒改寫：分析原作分享機制（洞察/驚喜/觸動哪種）→ 萃取 → 以自己主題重建；說明分析過程；不抄創意，借機制。");
+    return P("病毒改寫：分析原作分享機制（洞察/驚喜/觸動哪種）→ 萃取 → 以自己主題重建；說明分析過程；不抄創意，借機制。", "yt-60-viral-rewrite");
 
   // ── 99s ───────────────────────────────────────────────────────────────
   if (/series-6ep/.test(id))
-    return P("6 集系列：完整課程感；每集 = 獨立搜尋查詢 + 系列一部分；集集末推薦下一集；末集總結 + 下一系列鉤子；建立「追劇」習慣。");
+    return P("6 集系列：完整課程感；每集 = 獨立搜尋查詢 + 系列一部分；集集末推薦下一集；末集總結 + 下一系列鉤子；建立「追劇」習慣。", "yt-99-series-6ep");
   if (/quarterly/.test(id))
-    return P("季度策略：Evergreen 支柱（長期 SEO）+ 重複系列（訂閱理由）+ 季節時刻（觸及爆發）三種類型的節奏表；每月有 1 個高峰內容。");
+    return P("季度策略：Evergreen 支柱（長期 SEO）+ 重複系列（訂閱理由）+ 季節時刻（觸及爆發）三種類型的節奏表；每月有 1 個高峰內容。", "yt-99-quarterly-strategy");
   if (/premiere/.test(id))
-    return P("Premiere 首映套組：Community Post 預熱（3 天前）→ 計劃首映設定 → 首映 Live Chat 互動腳本 → 首映後 Community 追蹤；把上傳變成一個社群事件。");
+    return P("Premiere 首映套組：Community Post 預熱（3 天前）→ 計劃首映設定 → 首映 Live Chat 互動腳本 → 首映後 Community 追蹤；把上傳變成一個社群事件。", "yt-99-premiere-kit");
 
-  return P("YouTube 通用：標題好奇缺口 + 主關鍵字前置；開場 30 秒建立留下來的理由；章節結構延長觀看時長；End Screen 在情緒峰值。");
+  return P("YouTube 通用：標題好奇缺口 + 主關鍵字前置；開場 30 秒建立留下來的理由；章節結構延長觀看時長；End Screen 在情緒峰值。", "yt-30-title-strategies");
 }

@@ -97,35 +97,42 @@ export const TT_TASK_REF: Record<string, string> = {
 export function ttPlaybookFor(taskId: string): string {
   const id = String(taskId ?? "");
   const ref = TT_TASK_REF[id];
-  const P = (s: string) =>
-    `# 本任務 playbook（TikTok 得獎模式）\n${s}` +
-    (ref ? `\n# 得獎參考（學此可遷移工藝，非抄作品）\n${ref}` : "");
+  // 2026-09-06 (CJ): fallback exemplar per branch. Until now `ref` existed
+  // only on an exact task-id hit, and a brand pack's custom ids are never in
+  // TT_TASK_REF — so those cards got the structure and no case. Each fallback is
+  // resolved from the SAME regex that selected the branch, against this
+  // module's own case pool: no second lookup table to drift, no new claim.
+  const P = (s: string, fallbackKey?: keyof typeof TT_TASK_REF) => {
+    const use = ref ?? (fallbackKey ? TT_TASK_REF[fallbackKey] : undefined);
+    return `# 本任務 playbook（TikTok 得獎模式）\n${s}` +
+      (use ? `\n# 得獎參考（學此可遷移工藝，非抄作品）\n${use}` : "");
+  };
 
   // ── 30s ───────────────────────────────────────────────────────────────
   if (/opening-hook/.test(id))
-    return P("前 3 秒 hook：第 0 秒就進主題；視覺+字幕雙重觸發；好公式：視覺不可能事件或字幕反直覺主張；不要開場白。");
+    return P("前 3 秒 hook：第 0 秒就進主題；視覺+字幕雙重觸發；好公式：視覺不可能事件或字幕反直覺主張；不要開場白。", "tt-30-opening-hook");
   if (/full-script/.test(id))
-    return P("完整腳本：Hook(0-3s)→Payoff Promise(3-8s)→主體 3 點(8-45s)→反差高潮(45-55s)→CTA/loop(55-60s)；每節拍換一件事；結尾可 loop 或留開放問題。");
+    return P("完整腳本：Hook(0-3s)→Payoff Promise(3-8s)→主體 3 點(8-45s)→反差高潮(45-55s)→CTA/loop(55-60s)；每節拍換一件事；結尾可 loop 或留開放問題。", "tt-30-full-script");
   if (/duet/.test(id))
-    return P("Duet 角度：加入相反能量而非相同能量；品牌成為支持角色；反差製造文化張力；說清楚觀眾能接的方向。");
+    return P("Duet 角度：加入相反能量而非相同能量；品牌成為支持角色；反差製造文化張力；說清楚觀眾能接的方向。", "tt-30-duet-angle");
   if (/trend-remix/.test(id))
-    return P("Trend 改編：改 1 個元素讓它變品牌的；不重建從頭；時機 > 完美製作；說明改了哪個元素 + 為何這個 timing。");
+    return P("Trend 改編：改 1 個元素讓它變品牌的；不重建從頭；時機 > 完美製作；說明改了哪個元素 + 為何這個 timing。", "tt-30-trend-remix");
   if (/live/.test(id))
-    return P("Live 開場：前 10 秒說清楚「現在正在發生什麼 + 為何不能重播 + 你能做什麼」；即時互動機制立刻啟動。");
+    return P("Live 開場：前 10 秒說清楚「現在正在發生什麼 + 為何不能重播 + 你能做什麼」；即時互動機制立刻啟動。", "tt-30-live-opening");
 
   // ── 60s ───────────────────────────────────────────────────────────────
   if (/foryou-full/.test(id))
-    return P("完整 TikTok：Hook(0-3s)→Promise(3-8s)→主體 3 點(8-45s)→反差(45-55s)→loop/CTA(55-60s)；每秒有理由存在；靜音看也能懂；至少 1 個可截圖時刻。");
+    return P("完整 TikTok：Hook(0-3s)→Promise(3-8s)→主體 3 點(8-45s)→反差(45-55s)→loop/CTA(55-60s)；每秒有理由存在；靜音看也能懂；至少 1 個可截圖時刻。", "tt-60-foryou-full");
   if (/series/.test(id))
-    return P("3 集系列：集 1 setup + 鉤子，集 2 complication + 深化，集 3 resolution + 重啟循環；角色弧比劇情更重要；每集獨立可看但讓人看下集。");
+    return P("3 集系列：集 1 setup + 鉤子，集 2 complication + 深化，集 3 resolution + 重啟循環；角色弧比劇情更重要；每集獨立可看但讓人看下集。", "tt-60-series-3");
   if (/viral-rewrite/.test(id))
-    return P("病毒改寫：分析原作分享機制（反差/情緒/可截圖哪個）→ 萃取 → 用品牌素材重建；不抄創意，借機制；說明分析過程。");
+    return P("病毒改寫：分析原作分享機制（反差/情緒/可截圖哪個）→ 萃取 → 用品牌素材重建；不抄創意，借機制；說明分析過程。", "tt-60-viral-rewrite");
 
   // ── 99s ───────────────────────────────────────────────────────────────
   if (/30day/.test(id))
-    return P("30 天月曆：1 個可重複 challenge 格式錨全月；每天微調讓社群接棒；KOL 種子第 1 週啟動；品牌參與自己的 challenge；記錄社群反應作為後期內容。");
+    return P("30 天月曆：1 個可重複 challenge 格式錨全月；每天微調讓社群接棒；KOL 種子第 1 週啟動；品牌參與自己的 challenge；記錄社群反應作為後期內容。", "tt-99-30day-foryou");
   if (/trend-week/.test(id))
-    return P("趨勢週：快速反應日曆；識別 emerging trend → 品牌版 → 社群種子 → 記錄反應；每天格式不同（duet/stitch/original）；時機比精緻度更重要。");
+    return P("趨勢週：快速反應日曆；識別 emerging trend → 品牌版 → 社群種子 → 記錄反應；每天格式不同（duet/stitch/original）；時機比精緻度更重要。", "tt-99-trend-week");
 
-  return P("TikTok 通用：1.5 秒 hook、字幕切情緒節拍、可截圖時刻、結尾可 loop 或留開放張力。");
+  return P("TikTok 通用：1.5 秒 hook、字幕切情緒節拍、可截圖時刻、結尾可 loop 或留開放張力。", "tt-30-opening-hook");
 }

@@ -106,23 +106,30 @@ export const IG_TASK_REF: Record<string, string> = {
 export function igPlaybookFor(taskId: string): string {
   const id = String(taskId ?? "");
   const ref = IG_TASK_REF[id];
-  const P = (s: string) =>
-    `# 本任務 playbook（IG 得獎模式）\n${s}` +
-    (ref ? `\n# 得獎參考（學此可遷移工藝，非抄作品）\n${ref}` : "");
+  // 2026-09-06 (CJ): fallback exemplar per branch. Until now `ref` existed
+  // only on an exact task-id hit, and a brand pack's custom ids are never in
+  // IG_TASK_REF — so those cards got the structure and no case. Each fallback is
+  // resolved from the SAME regex that selected the branch, against this
+  // module's own case pool: no second lookup table to drift, no new claim.
+  const P = (s: string, fallbackKey?: keyof typeof IG_TASK_REF) => {
+    const use = ref ?? (fallbackKey ? IG_TASK_REF[fallbackKey] : undefined);
+    return `# 本任務 playbook（IG 得獎模式）\n${s}` +
+      (use ? `\n# 得獎參考（學此可遷移工藝，非抄作品）\n${use}` : "");
+  };
   if (/feed|caption-short/.test(id))
-    return P("單圖/feed：首圖一個視覺主張＋首行 hook；文案先給價值再 CTA；3-8 hashtag 文末。");
+    return P("單圖/feed：首圖一個視覺主張＋首行 hook；文案先給價值再 CTA；3-8 hashtag 文末。", "ig-30-caption-short");
   if (/carousel/.test(id))
-    return P("封面承諾一個 payoff；每張一重點、視覺連貫；末張 CTA＋儲存誘因。");
+    return P("封面承諾一個 payoff；每張一重點、視覺連貫；末張 CTA＋儲存誘因。", "ig-30-carousel-structure");
   if (/reel/.test(id))
-    return P("前 1 秒視覺鉤子＋字卡；3 秒內進主題；結尾可 loop；文案補充不重複畫面。");
+    return P("前 1 秒視覺鉤子＋字卡；3 秒內進主題；結尾可 loop；文案補充不重複畫面。", "ig-30-reel-hook");
   if (/story/.test(id))
-    return P("用互動貼紙（投票/問答/滑桿）；單一訊息；明確下一步（上滑/點貼紙）。");
+    return P("用互動貼紙（投票/問答/滑桿）；單一訊息；明確下一步（上滑/點貼紙）。", "ig-30-story-text");
   if (/bio/.test(id))
-    return P("一句定位＋具體價值＋一個明確 CTA（連結）；可掃讀、有個性、含關鍵字。");
+    return P("一句定位＋具體價值＋一個明確 CTA（連結）；可掃讀、有個性、含關鍵字。", "ig-30-bio-rewrite");
   if (/hashtag/.test(id))
-    return P("3-8 個分層（大流量/中精準/小社群/品牌專屬）、與內容相關、不重複堆砌。");
+    return P("3-8 個分層（大流量/中精準/小社群/品牌專屬）、與內容相關、不重複堆砌。", "ig-30-hashtag-set");
   if (/dm|comment/.test(id))
-    return P("像真人、先共鳴再回應；不模板、不冷淡；一個自然的下一步。");
+    return P("像真人、先共鳴再回應；不模板、不冷淡；一個自然的下一步。", "ig-30-comment-reply");
   if (/countdown/.test(id))
     return P(
       "5天倒數弧 — 每天獨立受眾 + 獨立 USP，不可重複：\n" +
@@ -132,6 +139,6 @@ export function igPlaybookFor(taskId: string): string {
       "參考「Select Registry Stay for the Story」(IAC)：5天分眾升級，每天一個獨立目標。"
     );
   if (/live/.test(id))
-    return P("開場 30 秒講清楚「為什麼留下來」；預告 hook；CTA 互動。");
-  return P("IG 通用：視覺首屏鉤子＋文案首行 hook＋單一 CTA＋分層 hashtag。");
+    return P("開場 30 秒講清楚「為什麼留下來」；預告 hook；CTA 互動。", "ig-30-live-opening");
+  return P("IG 通用：視覺首屏鉤子＋文案首行 hook＋單一 CTA＋分層 hashtag。", "ig-30-caption-short");
 }
