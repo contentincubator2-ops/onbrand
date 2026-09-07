@@ -60,8 +60,8 @@ function getStripe(): Stripe {
 }
 
 const PLAN_LABEL: Record<string, string> = {
-  drop_starter: "OnBrand Starter",
-  drop_pro:     "OnBrand Solo",
+  drop_starter: "OnBrand 基礎",
+  drop_pro:     "OnBrand 專業",
 };
 
 /** Look up the user's billing currency (defaults TWD). */

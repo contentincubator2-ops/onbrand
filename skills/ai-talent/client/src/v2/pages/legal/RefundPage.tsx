@@ -94,8 +94,8 @@ export default function RefundPage() {
             </li>
             <li>
               {isEn
-                ? "Example: paid US$ 3,000 / year (Solo annual, $300×10), used 3 months — monthly equivalent = US$3,000÷12 = US$250; refund = 3,000 − (250 × 3) = US$ 2,250."
-                : "例：年繳 Solo 方案（US$3,000，$300×10），使用 3 個月後申請，每月均攤 US$3,000÷12 = US$250，退還 3,000 - (250×3) = US$2,250（依當日匯率換算 TWD）。"}
+                ? "Example: paid US$ 3,000 / year (Professional annual, $300×10), used 3 months — monthly equivalent = US$3,000÷12 = US$250; refund = 3,000 − (250 × 3) = US$ 2,250."
+                : "例：年繳專業方案（US$3,000，$300×10），使用 3 個月後申請，每月均攤 US$3,000÷12 = US$250，退還 3,000 - (250×3) = US$2,250（依當日匯率換算 TWD）。"}
             </li>
           </ul>
 

@@ -633,11 +633,11 @@ export default function BrandOnboardingWizard({ isOpen, onClose, onComplete }: P
                     {lang === "en" ? "Pick your plan" : "選擇你的方案"}
                   </p>
                   <p style={{ fontSize: 13, color: "#404040", marginBottom: 12, lineHeight: 1.6 }}>
-                    {lang === "en" ? "How many brands will you manage on OnBrand?" : "你計畫在 OnBrand 管理幾個品牌？"}
+                    {lang === "en" ? "Both self-serve plans cover 1 brand. More brands or internal customisation is the enterprise track." : "兩個自助方案都是 1 個品牌；需要多品牌或內部客製，走企業客製版。"}
                   </p>
                   <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                     <button
-                      onClick={() => navigate("/pricing?recommend=solo")}
+                      onClick={() => navigate("/pricing")}
                       style={{
                         padding: "8px 14px", fontSize: 12, fontWeight: 600,
                         borderRadius: 6, cursor: "pointer",
@@ -645,21 +645,19 @@ export default function BrandOnboardingWizard({ isOpen, onClose, onComplete }: P
                         background: "#FFFFFF", color: "#171717",
                       }}
                     >
-                      {lang === "en" ? "Just 1 → Solo $100/mo" : "就 1 個 → Solo NT$3,000/月"}
+                      {lang === "en" ? "Basic → NT$2,250 / mo · 2 seats" : "基礎 → NT$2,250／月 · 2 席"}
                     </button>
-                    <a
-                      href="mailto:sowork@sowork.ai?subject=多品牌方案洽詢"
+                    <button
+                      onClick={() => navigate("/pricing")}
                       style={{
                         padding: "8px 14px", fontSize: 12, fontWeight: 600,
                         borderRadius: 6, cursor: "pointer",
-                        border: "1px solid #D4D4D4",
-                        background: "#FFFFFF", color: "#171717",
-                        textDecoration: "none",
-                        display: "inline-flex", alignItems: "center",
+                        border: "1px solid #171717",
+                        background: "#171717", color: "#FFFFFF",
                       }}
                     >
-                      {lang === "en" ? "2–3 brands → Contact us" : "2–3 個品牌 → 聯繫我們"}
-                    </a>
+                      {lang === "en" ? "Professional → NT$9,000 / mo · 5 seats" : "專業 → NT$9,000／月 · 5 席"}
+                    </button>
                     <a
                       href="mailto:sowork@sowork.ai?subject=企業客製版洽詢"
                       style={{
@@ -671,7 +669,7 @@ export default function BrandOnboardingWizard({ isOpen, onClose, onComplete }: P
                         display: "inline-flex", alignItems: "center",
                       }}
                     >
-                      {lang === "en" ? "4+ → Contact sales" : "4 個以上 → 聯繫業務"}
+                      {lang === "en" ? "Multiple brands → Enterprise, contact us" : "多品牌／客製 → 企業客製版，聯繫我們"}
                     </a>
                   </div>
                   <p style={{ fontSize: 12, color: "#737373", marginTop: 8, fontStyle: "italic" }}>

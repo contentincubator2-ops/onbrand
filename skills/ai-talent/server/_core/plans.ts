@@ -162,17 +162,14 @@ export interface Plan {
 }
 
 export const PLANS: Record<PlanCode, Plan> = {
-  /** OnBrand Starter — entry-level personal plan.
-   *  2026-05-19 (CJ direction「加 Starter 給個人購買者」):
-   *    - 早鳥 US$25/月（永久保價）
-   *    - 標準 US$75/月
-   *    - 1 個品牌 · 50 次執行 / 月（points cap 5,000 ≈ 50 × 60s tasks）
-   *    - 30s + 60s 任務；99s 鎖定（需升級 Solo）
-   *    - 每日 LLM cost cap = $2（fair-use guard）
+  /** OnBrand 基礎 — NT$2,250／月，2 席。
+   *  2026-09-06 Word 價目表：1 個品牌、11 通路選 2（每月可換）、自建卡 3 張、
+   *  可用任務卡 203 張（得獎 99 ＋ 標竿 63 ＋ 平台通則 41）、無成效層；
+   *  執行次數不限、企劃開放（兩級差在能力不在用量）。
    */
   drop_starter: {
     code: "drop_starter",
-    name: "OnBrand Starter",
+    name: "OnBrand 基礎",
     // 2026-07-15 (CJ「取消早鳥優惠，只呈現原價」): early-bird offer CLOSED for
     // new signups — standard price is the only public price. earlyBird* fields
     // are kept ONLY so existing users with the earlyBird DB flag keep their
@@ -209,14 +206,14 @@ export const PLANS: Record<PlanCode, Plan> = {
       eventsPerCycle: 0,
     },
     features: [
-      "1 個品牌 · 1 位用戶",
-      "每月 50 次執行（單篇＋套組任務，每次含所有變體 + 圖）",
-      "AI 圖（Flux / GPT Image-1 / Imagen / Ideogram）",
-      "品牌大腦定位（USP · 語氣 · 受眾）",
+      "1 個品牌 · 2 席",
+      "11 個通路選 2（每月可更換）",
+      "品牌定位 · 自建任務卡 3 張（存入品牌任務庫）",
+      "可用任務卡 203 張：得獎 99 ＋ 標竿 63 ＋ 平台通則 41",
+      "執行次數不限 · 企劃任務開放",
       "電子發票（個人 / B2B）",
-      "深度研究企劃：升級 Solo 解鎖",
     ],
-    highlight: "US$75／月",
+    highlight: "NT$2,250／月 · 2 席",
   },
 
   /** New users get 7 days OR 1000 points (whichever runs out first).
@@ -263,17 +260,15 @@ export const PLANS: Record<PlanCode, Plan> = {
     ],
   },
 
-  /** OnBrand Solo — for one founder, one brand.
-   *  2026-05-14 (CJ pricing pivot):
-   *    - 早鳥 US$100/月（永久保價、現在 13 個 grandfathered 用戶用 lockedPriceTwdMonthly=900 鎖在舊價）
-   *    - 標準 US$300/月
-   *    - 1 個品牌 · 無限文案 + 無限圖 · 影片另計（roadmap）
-   *    - Fair-use: 內部每日 LLM cost cap = $5（UI 不顯示）
-   *    - 改名 / 換品牌：聯繫客服（admin tool reset）
+  /** OnBrand 專業 — NT$9,000／月，5 席。
+   *  2026-09-06 Word 價目表：1 個品牌、11 通路選 5（每月可換）、品牌＋產品 10 個
+   *  ＋活動每月 1 次定位、自建卡 10 張、249 張任務卡（含爆款結構 46 張，每月更新）、
+   *  審核工作流、成效層可加購。5 席是審核工作流的要求：產出者與放行者分開。
+   *  Fair-use: 內部每日 LLM cost cap = $5（UI 不顯示）。
    */
   drop_pro: {
     code: "drop_pro",
-    name: "OnBrand Solo",
+    name: "OnBrand 專業",
     // 2026-07-15 (CJ): early-bird offer closed — see drop_starter note.
     priceTwdMonthly: 9000,                 // NT$9,000 standard monthly
     priceTwdAnnually: 90000,               // NT$90,000 standard annual (×10, 2 months free)
@@ -312,14 +307,14 @@ export const PLANS: Record<PlanCode, Plan> = {
       eventsPerCycle: 1,
     },
     features: [
-      "1 個品牌 · 1 位用戶",
-      "無限文案（單篇 / 套組 / 企劃全任務模板）",
-      "無限 AI 圖（Flux / GPT Image-1 / Imagen / Ideogram）",
-      "電子發票",
-      "影片：roadmap 加購包",
-      "改名 / 換品牌：聯繫客服",
+      "1 個品牌 · 5 席（含審核工作流）",
+      "11 個通路選 5（每月可更換）",
+      "品牌定位 ＋ 產品定位 10 個 ＋ 活動定位每月 1 次 · 自建任務卡 10 張",
+      "可用任務卡 249 張＝203 ＋ 爆款結構卡 46 張（每月更新）",
+      "執行次數不限 · 企劃任務開放",
+      "成效層可加購 · 電子發票",
     ],
-    highlight: "US$300／月",
+    highlight: "NT$9,000／月 · 5 席",
   },
 
 

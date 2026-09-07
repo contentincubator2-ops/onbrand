@@ -170,7 +170,7 @@ export function InfoTab({ brandId, brandName }: { brandId: number | null; brandN
             </>
           ) : (
             <>
-              品牌名稱建立後不能自助修改。Solo 方案包含 <strong>一個品牌</strong> — AI 的語氣、知識、定位都是針對這個名字訓練的。
+              品牌名稱建立後不能自助修改。自助方案（基礎／專業）都只包含 <strong>一個品牌</strong> — AI 的語氣、知識、定位都是針對這個名字訓練的。
               {" "}
               <a href="mailto:sowork@sowork.ai?subject=品牌改名 / 換品牌申請" className="text-primary-600 hover:underline">
                 聯繫客服

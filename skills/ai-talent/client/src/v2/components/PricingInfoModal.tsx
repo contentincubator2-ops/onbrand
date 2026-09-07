@@ -1,7 +1,7 @@
 /**
  * PricingInfoModal — informational pricing card shown inside the app.
- * 2026-05-19. Aligned with PricingPage: Trial → Starter → Solo（Studio／Agency 2026-09-07 下架）.
- * Task counting = per execution run (not per variant/image).
+ * 2026-09-07 對齊 Word 價目表：試用 → 基礎（2 席）→ 專業（5 席）。數字與 PricingPage 同源。
+ * 兩級差在能力不在用量（執行次數都不限）。
  */
 import { Modal, ModalContent, ModalBody, Button } from "@heroui/react";
 import { Sparkles, Mail, ExternalLink } from "lucide-react";
@@ -23,56 +23,56 @@ function getPlans(lang: "zh-TW" | "en") {
       badge: en ? "Now" : "現在",
       detail: en ? "7 days · 1,000 pts" : "7 天 · 1,000 點",
       features: en ? [
-        "All single-post & content-pack templates",
-        "Brand positioning pipeline",
-        "AI images + mockup previews",
+        "Single & pack task cards",
+        "Brand positioning",
+        "AI images + platform previews",
         "Ends when 7 days OR 1,000 pts run out",
       ] : [
-        "單篇與套組全任務模板",
-        "品牌定位 14 步驟流程",
+        "單篇與套組任務卡",
+        "品牌定位",
         "AI 圖 + 全平台預覽",
         "7 天到期或 1,000 點用完即停",
       ],
       cta: null as string | null,
-      highlight: true,
+      highlight: false,
     },
     {
-      name: "OnBrand Starter",
+      name: en ? "OnBrand Basic" : "OnBrand 基礎",
       price: en ? "US$75 / mo" : "NT$2,250 / 月",
-      badge: null as string | null,
-      detail: en ? "50 runs / mo · 1 brand · annual US$750 (×10, 2 months free)" : "每月 50 次執行 · 1 品牌 · 年約 NT$22,500（×10，送 2 個月）",
+      badge: en ? "2 seats" : "2 席",
+      detail: en ? "1 brand · pick 2 of 11 channels (swap monthly)" : "1 個品牌 · 11 個通路選 2（每月可更換）",
       features: en ? [
-        "50 runs / mo (1 run = all variants + images)",
-        "Single & pack templates · brand brain",
-        "E-invoices · cancel anytime",
-        "Deep-research campaigns: Solo only",
+        "Brand positioning · 3 own task cards",
+        "203 task cards: 99 award + 63 benchmark + 41 conventions",
+        "Unlimited runs · campaign tasks included",
+        "No performance layer",
       ] : [
-        "每月 50 次執行（1 次含所有版本 + 圖）",
-        "單篇與套組模板 · 品牌大腦",
-        "電子發票 · 隨時取消",
-        "深度研究企劃：需升級 Solo",
+        "品牌定位 · 自建任務卡 3 張",
+        "可用任務卡 203 張：得獎 99 ＋ 標竿 63 ＋ 平台通則 41",
+        "執行次數不限 · 企劃任務開放",
+        "成效層：無",
       ],
       cta: en ? "See pricing" : "查看定價",
       highlight: false,
     },
     {
-      name: "OnBrand Solo",
+      name: en ? "OnBrand Professional" : "OnBrand 專業",
       price: en ? "US$300 / mo" : "NT$9,000 / 月",
-      badge: en ? "Popular" : "熱門",
-      detail: en ? "Unlimited runs · 1 brand · annual US$3,000 (×10, 2 months free)" : "無限次執行 · 1 品牌 · 年約 NT$90,000（×10，送 2 個月）",
+      badge: en ? "5 seats" : "5 席",
+      detail: en ? "1 brand · pick 5 of 11 channels (swap monthly)" : "1 個品牌 · 11 個通路選 5（每月可更換）",
       features: en ? [
-        "Unlimited runs — single / pack / campaign",
-        "Unlimited AI images",
-        "Deep-research campaign pipeline",
-        "E-invoices · cancel anytime",
+        "Brand + 10 product + monthly campaign positioning · 10 own task cards",
+        "249 task cards = 203 + 46 viral-structure cards (refreshed monthly)",
+        "Unlimited runs · campaign tasks · review workflow",
+        "Performance layer available as add-on",
       ] : [
-        "無限次執行 — 單篇 / 套組 / 企劃全開",
-        "無限 AI 圖",
-        "深度研究企劃流程",
-        "電子發票 · 隨時取消",
+        "品牌 ＋ 產品 10 個 ＋ 活動每月 1 次定位 · 自建任務卡 10 張",
+        "可用任務卡 249 張＝203 ＋ 爆款結構卡 46 張（每月更新）",
+        "執行次數不限 · 企劃任務開放 · 審核工作流",
+        "成效層：可加購",
       ],
       cta: en ? "See pricing" : "查看定價",
-      highlight: false,
+      highlight: true,
     },
   ];
 }
@@ -125,7 +125,7 @@ export default function PricingInfoModal({ isOpen, onClose }: Props) {
                 key={p.name}
                 className={`rounded-2xl border p-4 flex flex-col ${
                   p.highlight
-                    ? "border-violet-300 bg-violet-50/40 ring-2 ring-violet-200"
+                    ? "border-neutral-900 bg-white ring-1 ring-neutral-900"
                     : "border-default-200 bg-white"
                 }`}
               >
@@ -134,7 +134,7 @@ export default function PricingInfoModal({ isOpen, onClose }: Props) {
                   {p.badge && (
                     <span
                       className="text-[12px] font-bold px-2 py-0.5 rounded-full text-white"
-                      style={{ background: p.highlight ? "#7C3AED" : "#059669" }}
+                      style={{ background: "#171717" }}
                     >
                       {p.badge}
                     </span>
@@ -145,7 +145,7 @@ export default function PricingInfoModal({ isOpen, onClose }: Props) {
                 <ul className="text-xs text-default-700 space-y-1.5 mb-4 flex-1">
                   {p.features.map((f, i) => (
                     <li key={i} className="flex items-start gap-1.5">
-                      <span className={`mt-0.5 ${p.highlight ? "text-violet-500" : "text-emerald-500"}`}>✓</span>
+                      <span className="mt-0.5 text-neutral-700">✓</span>
                       <span>{f}</span>
                     </li>
                   ))}
@@ -168,12 +168,12 @@ export default function PricingInfoModal({ isOpen, onClose }: Props) {
             ))}
           </div>
 
-          {/* Task counting note */}
-          <div className="px-5 py-3 bg-amber-50 border-t border-amber-100">
-            <p className="text-xs text-amber-800 leading-relaxed">
+          {/* 兩級差在能力，不在用量 */}
+          <div className="px-5 py-3 bg-neutral-50 border-t border-neutral-200">
+            <p className="text-xs text-neutral-700 leading-relaxed">
               {lang === "en"
-                ? "One run = one task execution, including all variants + images. System failures are automatically refunded."
-                : "一次執行 = 跑一次任務，包含所有版本 + 圖片，系統錯誤自動退回不計次數。"}
+                ? "The two tiers differ in capability, not volume: unlimited runs on both. The difference is channels, viral-structure cards, product and campaign positioning, own task cards, and seats."
+                : "兩級的差別在能力，不在用量：執行次數兩級都不限。差別是通路數、爆款結構卡、產品與活動定位、自建卡張數、席次。"}
             </p>
           </div>
 
@@ -181,8 +181,8 @@ export default function PricingInfoModal({ isOpen, onClose }: Props) {
           <div className="px-5 py-4 bg-default-50 border-t border-default-100 flex items-center justify-between flex-wrap gap-2">
             <p className="text-xs text-default-500 leading-relaxed">
               {lang === "en"
-                ? "Trial plans include a $5/day AI usage limit to prevent accidental overages. Paid plans: $50/day."
-                : "試用期每日 LLM 成本上限 $5 USD（防止誤超支）。付費方案：每日 $50 USD。"}
+                ? "Every plan has a daily fair-use ceiling on AI cost to prevent accidental overages."
+                : "所有方案都有每日合理使用上限，避免誤用超支。"}
             </p>
             <div className="flex gap-2">
               <Button

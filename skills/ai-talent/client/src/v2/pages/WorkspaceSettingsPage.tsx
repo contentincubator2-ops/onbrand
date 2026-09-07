@@ -33,8 +33,8 @@ const ROLE_LABEL_EN: Record<Role, string> = {
 const PLAN_LABEL: Record<string, string> = {
   trial:        "Trial",
   solo:         "Solo",
-  drop_starter: "OnBrand Starter",
-  drop_pro:     "OnBrand Solo",
+  drop_starter: "OnBrand 基礎",
+  drop_pro:     "OnBrand 專業",
   enterprise:   "Enterprise",
 };
 
