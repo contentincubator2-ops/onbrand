@@ -101,8 +101,8 @@ export default function LandingPage() {
     m.setAttribute(
       "content",
       en
-        ? "Lock your brand positioning once. Every caption stays on-brand. Brand Brain · Single/Pack/Campaign · 7-Day Publisher · 207 award-craft tasks."
-        : "鎖定一次品牌定位，每篇貼文自動 on-brand。品牌大腦 · 單篇/套組/企劃 · 七日發布台 · 207 個得獎工藝任務。",
+        ? "Lock your brand positioning once. Every caption stays on-brand. Brand Brain · Single/Pack/Campaign · 7-Day Publisher · 249 task cards, 208 with a stated source."
+        : "鎖定一次品牌定位，每篇貼文自動 on-brand。品牌大腦 · 單篇/套組/企劃 · 七日發布台 · 249 張任務卡，208 張有出處。",
     );
     return () => {
       dead = true;
@@ -114,21 +114,21 @@ export default function LandingPage() {
   const STATS = en
     ? [
         ["16,113", "AI Marketing Agents"],
-        ["207", "Award-Craft Tasks"],
+        ["249", "Task Cards · 208 Sourced"],
         ["711", "Specialized Squads"],
         ["2,526", "Skill Modules"],
         ["60", "Award Cases"],
         ["14", "Steps to Brand Brain"],
-        ["7", "All Channels"],
+        ["11", "Channels"],
       ]
     : [
         ["16,113", "個 AI 行銷專家"],
-        ["207", "個得獎工藝任務"],
+        ["249", "張任務卡 · 208 張有出處"],
         ["711", "個專屬軍團"],
         ["2,526", "個技能模組"],
         ["60", "個得獎案例"],
         ["14", "步建品牌大腦"],
-        ["7", "個全管道平台"],
+        ["11", "個通路"],
       ];
 
   // 4 core USPs (single source of truth; mirrors Login/Register)
@@ -137,13 +137,13 @@ export default function LandingPage() {
         ["01", "Brand Brain", "Lock your positioning once. Every post stays on-brand."],
         ["02", "Content Tiers", "A single post · a content pack · a full campaign."],
         ["03", "7-Day Publisher", "Schedule a whole week across channels in one click."],
-        ["04", "Award-Craft", "207 tasks, each carrying its own award-winning craft."],
+        ["04", "Sourced", "249 task cards — 208 with a stated structural source."],
       ]
     : [
         ["01", "品牌大腦", "鎖定一次品牌定位 · 每篇貼文自動 on-brand"],
         ["02", "三種規格", "單篇內容 · 內容套組 · 完整企劃"],
         ["03", "七日發布台", "一次排好 7 天 × 全平台內容"],
-        ["04", "得獎工藝", "207 個任務，每個內建得獎案例工藝"],
+        ["04", "有出處", "249 張任務卡，208 張說得出結構出處"],
       ];
 
   return (
@@ -261,8 +261,8 @@ export default function LandingPage() {
               style={{ color: C.ink }}
             >
               {en
-                ? "16,113 AI agents × 207 award-craft tasks × your locked Brand Brain"
-                : "16,113 個 AI 專家 × 207 個得獎工藝任務 × 你鎖定的品牌大腦"}
+                ? "16,113 AI agents × 249 sourced task cards × your locked Brand Brain"
+                : "16,113 個 AI 專家 × 249 張有出處的任務卡 × 你鎖定的品牌大腦"}
             </p>
             <p
               className="text-[15px] leading-[1.75] mb-8 max-w-[540px]"
@@ -551,8 +551,8 @@ function FAQSection({ en }: { en: boolean }) {
           a: "OnBrand is the AI product built by SoWork (摘星社群行銷顧問股份有限公司), a Taiwan-based brand marketing consultancy. OnBrand encodes SoWork's accumulated methodology into a self-serve tool.",
         },
         {
-          q: "What does 'award-craft' mean in the 207 tasks?",
-          a: "Every task is mapped to a named, documented campaign and encodes its transferable craft principle. FB ad copy uses Aviation Gin's anti-consensus framing (Cannes Lions Silver). IG Reels script uses Adobe's Unfinished-Film open invitation (IAC Best of Show). EDM subject lines borrow Patagonia's commitment-cost structure. The result reads like an expert wrote it.",
+          q: "What does 'sourced' mean for the 249 task cards?",
+          a: "208 of the 249 task cards state where their structure comes from: 99 are deconstructed from named award-winning work (FB ad copy uses Aviation Gin's anti-consensus framing, Cannes Lions Silver; the IG Reels script uses Adobe's Unfinished-Film open invitation), 63 from named benchmark brands or methodologies, and 46 from real viral content with the spread metric and the month measured. The other 41 are platform conventions — we say plainly they have no source. The publishing check is hard: a card that cannot name its award or produce its numbers fails the automated tests.",
         },
       ]
     : [
@@ -570,7 +570,7 @@ function FAQSection({ en }: { en: boolean }) {
         },
         {
           q: "支援哪些社群與內容平台？",
-          a: "Facebook、Instagram、YouTube、TikTok、Email（EDM）、PR 新聞稿、LinkedIn、品牌策略——共 7 大管道全部支援。每個平台都有對應的得獎工藝案例參考。",
+          a: "Facebook、Instagram、YouTube、TikTok、LinkedIn、Email（EDM）、PR 新聞稿、官網、KOL、品牌策略、受眾——共 11 個通路。每張任務卡都標示出處類型：得獎案例、標竿品牌、爆款結構或平台通則。",
         },
         {
           q: "有免費試用嗎？",
@@ -581,8 +581,8 @@ function FAQSection({ en }: { en: boolean }) {
           a: "OnBrand 是 SoWork（摘星社群行銷顧問股份有限公司）推出的 AI 產品。SoWork 是台灣資深品牌行銷顧問公司，把累積多年的方法論做成 AI 工具，就是 OnBrand。",
         },
         {
-          q: "207 個任務裡的「得獎工藝」是什麼？",
-          a: "每個任務都對應一個真實、有名字的得獎或市場驗證案例——例如 FB 廣告主文用 Aviation Gin（Cannes Lions Silver）的反共識前置；IG Reels 腳本用 Adobe《The Unfinished Film》（IAC Best of Show）的開放邀請；EDM 主旨借 Patagonia 的承諾代價結構。AI 用這些工藝原則寫，輸出讀起來像專家寫的。",
+          q: "任務卡的「出處」是什麼？",
+          a: "249 張任務卡裡有 208 張說得出結構出處：99 張拆自具名得獎作品（例如 FB 廣告主文用 Aviation Gin（Cannes Lions Silver）的反共識前置、IG Reels 腳本用 Adobe《The Unfinished Film》的開放邀請）、63 張拆自具名標竿品牌或方法論、46 張拆自真實爆紅內容並附傳播數字與量測年月。另外 41 張是平台通則，我們明講它沒有出處。上架檢核是硬性的：說不出獎項、交不出數字的卡，自動化測試直接擋掉。",
         },
       ];
 
