@@ -20,6 +20,7 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure } from "../core/trpc";
+import { assertReviewAllowed } from "../core/planGate";
 
 const REVIEW_TYPES = ["internal", "external", "legal", "client"] as const;
 
@@ -65,6 +66,7 @@ export const reviewRouter = router({
       note: z.string().max(1000).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      await assertReviewAllowed(ctx.user!.id);
       const userId = ctx.user!.id;
       const { default: localPool } = await import("../../localDb");
 
@@ -187,6 +189,7 @@ export const reviewRouter = router({
   approve: protectedProcedure
     .input(z.object({ id: z.number() }))
     .mutation(async ({ ctx, input }) => {
+      await assertReviewAllowed(ctx.user!.id);
       const { default: localPool } = await import("../../localDb");
       const [rows]: any = await localPool.execute(
         `SELECT requestedBy, reviewerIds, status FROM mission_review_queue WHERE id = ? LIMIT 1`,
@@ -208,6 +211,7 @@ export const reviewRouter = router({
   requestRevision: protectedProcedure
     .input(z.object({ id: z.number(), note: z.string().min(2).max(1000) }))
     .mutation(async ({ ctx, input }) => {
+      await assertReviewAllowed(ctx.user!.id);
       const { default: localPool } = await import("../../localDb");
       const [rows]: any = await localPool.execute(
         `SELECT requestedBy, reviewerIds FROM mission_review_queue WHERE id = ? LIMIT 1`,

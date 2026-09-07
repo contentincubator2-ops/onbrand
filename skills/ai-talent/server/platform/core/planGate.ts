@@ -16,6 +16,7 @@
  *    內部帳號直接拿 enterprise 額度（與 billingRouter.loadUserPlan 同一條規則，
  *    否則自己人會被自己的閘門擋住）。
  */
+import { TRPCError } from "@trpc/server";
 import { PLANS, type PlanCode, type PlanQuota } from "./plans";
 
 /** 沒選過通路時的預設。FB / IG 是產品主場，排前面。 */
@@ -276,3 +277,19 @@ export function checkCap(used: number, limit: number, noun: string): CapCheck {
     message: `你的方案最多 ${limit} ${noun}（目前 ${used}）。升級後可以增加。`,
   };
 }
+
+/** 審核工作流是專業方案的能力（價目表：專業「其他」列；基礎沒有）。 */
+export const REVIEW_BLOCK_MESSAGE =
+  "審核工作流屬於專業方案（5 席：產出的人與放行的人分開）。升級後可以送審與放行。";
+
+/**
+ * 送審／放行／退回前呼叫。查不到方案（infra 問題）就放行 —— 跟其他閘門一樣
+ * fail-open，寧可讓一次審核過去，也不要因為 DB 抖一下把整個工作流卡死。
+ */
+export async function assertReviewAllowed(userId: number): Promise<void> {
+  let quota: PlanQuota;
+  try { quota = await planQuotaFor(userId); }
+  catch (e) { console.warn("[planGate] assertReviewAllowed: planQuotaFor failed, fail-open", (e as Error)?.message); return; }
+  if (!quota.reviewWorkflow) throw new TRPCError({ code: "FORBIDDEN", message: REVIEW_BLOCK_MESSAGE });
+}
+

@@ -17,6 +17,7 @@ import { useNavigate } from "react-router-dom";
 import { trpc } from "../../../../lib/trpc";
 import { useLang } from "../../../../lib/i18n";
 import { showToastGlobal } from "../../../../components/ui/Toast";
+import { toastWithUpgrade } from "../../lib/upgradeToast";
 import { CheckCircle2, Clock, RotateCcw, Send } from "lucide-react";
 
 export default function ReviewBar({
@@ -39,8 +40,14 @@ export default function ReviewBar({
       setNote("");
       q.refetch?.();
     },
-    onError: (e: any) => showToastGlobal(e?.message ?? (isEn ? "Failed" : "送審失敗")),
+    onError: (e: any) => toastWithUpgrade(e?.message ?? (isEn ? "Failed" : "送審失敗"), isEn),
   });
+  // 2026-09-08 對照價目表：審核工作流是專業方案的能力。基礎方案不顯示送審
+  // 按鈕，而是講清楚這是哪一級的東西 —— 按了才被擋是最差的體驗。
+  const statusQ = (trpc as any).billing?.getStatus?.useQuery
+    ? (trpc as any).billing.getStatus.useQuery(undefined, { staleTime: 60_000, refetchOnWindowFocus: false })
+    : { data: null };
+  const reviewAllowed = (statusQ?.data as any)?.quota?.reviewWorkflow;
 
   // 沒有 missionId 就沒辦法送審（審核是綁在 mission 上的）。
   // 這種產出不顯示這條，而不是顯示一個按了會錯的按鈕。
@@ -92,6 +99,24 @@ export default function ReviewBar({
   }
 
   const wasSentBack = st?.status === "revision_requested";
+
+  if (reviewAllowed === false) {
+    return (
+      <Wrap>
+        <span className="text-[13px] text-default-500">
+          {isEn
+            ? "Review workflow (approval by someone other than the author) is part of the Professional plan."
+            : "審核工作流（作者以外的人放行）屬於專業方案。"}
+        </span>
+        <button
+          onClick={() => navigate("/pricing")}
+          className="ml-auto text-[13px] font-medium text-default-700 underline-offset-2 hover:underline"
+        >
+          {isEn ? "Plans & pricing" : "方案與定價"}
+        </button>
+      </Wrap>
+    );
+  }
 
   return (
     <div className="mb-3 mx-1 rounded-lg border border-default-200 bg-default-50 px-3 py-2">

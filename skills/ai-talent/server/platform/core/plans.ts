@@ -66,6 +66,12 @@ export interface PlanQuota {
   products: number;
   /** 每個計費週期可做幾次活動定位。 */
   eventsPerCycle: number;
+  /**
+   * 2026-09-08 對照價目表：審核工作流列在「專業」的其他項目下，基礎沒有。
+   * 5 席的理由就是它（產出者與放行者分開），所以 2 席的基礎方案不開。
+   * reviewRouter 的 submit／approve／requestRevision 用 assertReviewAllowed 擋。
+   */
+  reviewWorkflow: boolean;
   /** 2026-05-19 (CJ Starter plan) — monthly run limit regardless of task type.
    *  1 run = 1 task execution (all variants + images count as 1 run).
    *  -1 = unlimited. Enforced in executeTask.ts / quickTaskOrchestra.ts.
@@ -200,6 +206,7 @@ export const PLANS: Record<PlanCode, Plan> = {
       viralTaskCards: false,
       products: 0,
       eventsPerCycle: 0,
+      reviewWorkflow: false,
     },
     features: [
       "1 個品牌 · 2 席",
@@ -245,6 +252,7 @@ export const PLANS: Record<PlanCode, Plan> = {
       viralTaskCards: false,
       products: 0,
       eventsPerCycle: 0,
+      reviewWorkflow: false,
     },
     features: [
       "1000 點試用額度（不重置，用完即停）",
@@ -299,6 +307,7 @@ export const PLANS: Record<PlanCode, Plan> = {
       viralTaskCards: true,
       products: 10,
       eventsPerCycle: 1,
+      reviewWorkflow: true,
     },
     features: [
       "1 個品牌 · 5 席（含審核工作流）",
@@ -332,6 +341,7 @@ export const PLANS: Record<PlanCode, Plan> = {
       viralTaskCards: true,
       products: -1,
       eventsPerCycle: -1,
+      reviewWorkflow: true,
     },
     features: [
       "無限額度",

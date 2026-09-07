@@ -210,3 +210,13 @@ describe("方案表本身", () => {
     expect(PLANS.drop_pro.quota.team_members).toBe(5);
   });
 });
+
+describe("審核工作流閘門", () => {
+  it("價目表：審核工作流只在專業（5 席）與企業，基礎（2 席）與試用沒有", () => {
+    expect(PLANS.drop_starter.quota.reviewWorkflow).toBe(false);
+    expect(PLANS.trial.quota.reviewWorkflow).toBe(false);
+    expect(PLANS.drop_pro.quota.reviewWorkflow).toBe(true);
+    expect(PLANS.enterprise.quota.reviewWorkflow).toBe(true);
+  });
+});
+
