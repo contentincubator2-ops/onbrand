@@ -18,7 +18,6 @@
  */
 
 import { appendFileSync, existsSync, readFileSync, writeFileSync } from "fs";
-import { createHash } from "crypto";
 import { invokeLLM, type InvokeParams, type InvokeResult } from "./llm";
 import { deductCredits, checkEnoughCredits } from "./deductCredits";
 import {

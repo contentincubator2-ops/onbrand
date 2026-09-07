@@ -29,13 +29,12 @@ import { useLang } from "../../../lib/i18n";
 import { Avatar, Tooltip } from "@heroui/react";
 import { Brain as LucideBrain } from "lucide-react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faFolderOpen, faUserGroup, faBrain, faWandMagicSparkles, faRocket, faMicrophone, faBookBookmark, faBell, faPlus, faRightFromBracket, faLayerGroup, faGear, faClock, faTrash, faXmark, faCheckDouble, faChevronRight, faCheck, faBuilding, faBoxOpen, faCalendarDays, faCircleInfo, faBriefcase, faShareNodes, faUsers, faLanguage, faPaintBrush, faFont, faMagnifyingGlass, faChevronDown, faCrown, faEnvelope, faBullhorn, faGlobe, faChartLine, faDatabase, faFileLines } from "@fortawesome/free-solid-svg-icons";
+import { faFolderOpen, faBrain, faWandMagicSparkles, faMicrophone, faBookBookmark, faBell, faPlus, faRightFromBracket, faLayerGroup, faGear, faXmark, faCheckDouble, faChevronRight, faCheck, faBoxOpen, faCalendarDays, faCircleInfo, faBriefcase, faShareNodes, faUsers, faLanguage, faPaintBrush, faFont, faMagnifyingGlass, faChevronDown, faEnvelope, faBullhorn, faGlobe, faChartLine, faDatabase, faFileLines } from "@fortawesome/free-solid-svg-icons";
 import {
   faFacebookF, faInstagram, faYoutube, faTiktok, faLinkedinIn,
 } from "@fortawesome/free-brands-svg-icons";
 
 const ICON_W  = 70;   // icon bar — never changes
-const PANEL_W = 210;  // slide panel width
 
 // 2026-05-16 (CJ「進行手機版」): the shell had ZERO mobile breakpoints —
 // pages were fine, the frame wasn't. Single source of truth for "is
@@ -1697,184 +1696,20 @@ function IconNavLink({ item, active, onClick }: { item: NavItem; active: boolean
 ══════════════════════════════════════════════════════════════════ */
 
 /* ── Shared top buttons: 你的方案 + 邀請使用者 ── */
-function PlanInviteButtons({ onNavigate }: { onNavigate: (to: string) => void }) {
-  const { lang } = useLang();
-  const isEn = lang === "en";
-  return (
-    <div style={{ padding: "0 10px 8px", display: "flex", flexDirection: "column", gap: 5, flexShrink: 0 }}>
-      {[
-        // 2026-09-06：這兩個本來指向 /settings/plan 與 /settings/team，
-        // 兩個路由都不存在 —— 側邊欄最顯眼的兩顆按鈕點下去是空的。
-        // 方案看 /settings/account（訂閱與額度條就在那），邀請成員看
-        // /settings/workspace（成員列表／角色／移除／Email 邀請都在那）。
-        { icon: faCrown, label: isEn ? "Your plan" : "你的方案",   to: "/settings/account" },
-        { icon: faUserGroup, label: isEn ? "Invite people" : "邀請使用者", to: "/settings/workspace" },
-      ].map(({ icon, label, to }) => (
-        <button key={label} onClick={() => onNavigate(to)} style={{
-          width: "100%", display: "flex", alignItems: "center", gap: 8,
-          padding: "7px 10px", borderRadius: 8,
-          border: "1px solid #E9E8E6", background: "white",
-          cursor: "pointer", fontSize: 13, fontWeight: 500, color: "#374151",
-          transition: "background 0.1s", textAlign: "left",
-        }}
-          onMouseEnter={e => e.currentTarget.style.background = "#F9F8F6"}
-          onMouseLeave={e => e.currentTarget.style.background = "white"}
-        >
-          <FontAwesomeIcon icon={icon} style={{ fontSize: 12, width: 14, color: "#78716C" }} />
-          {label}
-        </button>
-      ))}
-    </div>
-  );
-}
 
 /* ── Starred items section header ── */
-function StarredHeader() {
-  const { lang } = useLang();
-  return (
-    <div style={{ padding: "10px 14px 6px", display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
-      <span style={{ fontSize: 12, fontWeight: 600, color: "#A8A29E", textTransform: "uppercase", letterSpacing: "0.08em" }}>
-        {lang === "en" ? "Starred items" : "已標記星號的內容"}
-      </span>
-      <button style={{ width: 18, height: 18, borderRadius: 4, border: "none", background: "transparent", cursor: "pointer", color: "#A8A29E", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12 }}>
-        <FontAwesomeIcon icon={faPlus} />
-      </button>
-    </div>
-  );
-}
 
 /* ── Slim nav row (icon + label, active highlight) ── */
-function NavRow({ icon, label, active, onClick }: { icon: any; label: string; active?: boolean; onClick: () => void }) {
-  return (
-    <button onClick={onClick} style={{
-      width: "100%", display: "flex", alignItems: "center", gap: 10,
-      padding: "8px 10px", borderRadius: 8, border: "none",
-      background: active ? "#F4F4F5" : "transparent", // 2026-05-11 (B&W): was lavender
-      cursor: "pointer", textAlign: "left", transition: "background 0.1s", marginBottom: 1,
-    }}
-      onMouseEnter={e => { if (!active) e.currentTarget.style.background = "rgba(0,0,0,0.04)"; }}
-      onMouseLeave={e => { e.currentTarget.style.background = active ? "#EDE9FE" : "transparent"; }}
-    >
-      <FontAwesomeIcon icon={icon} style={{ fontSize: 13, width: 15, flexShrink: 0, color: active ? "#4F46E5" : "#6B7280" }} />
-      <span style={{ fontSize: 13, fontWeight: active ? 600 : 400, color: active ? "#4338CA" : "#374151", flex: 1 }}>
-        {label}
-      </span>
-    </button>
-  );
-}
 
 /* ── Trash button ── */
-function TrashButton({ onNavigate }: { onNavigate: (to: string) => void }) {
-  const { lang } = useLang();
-  return (
-    <div style={{ flexShrink: 0, padding: "6px 10px 14px", borderTop: "1px solid #f3f4f6" }}>
-      <button onClick={() => onNavigate("/trash")} style={{
-        width: "100%", display: "flex", alignItems: "center", gap: 10,
-        padding: "8px 10px", borderRadius: 8, border: "none", background: "none",
-        fontSize: 13, color: "#6b7280", cursor: "pointer", transition: "background 0.1s",
-      }}
-        onMouseEnter={e => e.currentTarget.style.background = "#f9fafb"}
-        onMouseLeave={e => e.currentTarget.style.background = "none"}
-      >
-        <FontAwesomeIcon icon={faTrash} style={{ fontSize: 13, width: 15 }} />
-        {lang === "en" ? "Trash" : "垃圾桶"}
-      </button>
-    </div>
-  );
-}
 
 /* ══════════════════════════════════════════════════════════════════
    SlidePanel — Canva-faithful per-page sidebar content
 ══════════════════════════════════════════════════════════════════ */
 
-function PanelRow({ initial, initialBg, initialColor, label, onClick }: {
-  initial: string; initialBg: string; initialColor: string; label: string; onClick: () => void;
-}) {
-  return (
-    <button onClick={onClick} style={{
-      width: "100%", display: "flex", alignItems: "center", gap: 10,
-      padding: "6px 8px", borderRadius: 8, border: "none", background: "none",
-      cursor: "pointer", textAlign: "left", transition: "background 0.1s",
-    }}
-      onMouseEnter={e => (e.currentTarget.style.background = "#f9fafb")}
-      onMouseLeave={e => (e.currentTarget.style.background = "none")}
-    >
-      <span style={{
-        width: 28, height: 28, borderRadius: 6, background: initialBg, flexShrink: 0,
-        display: "flex", alignItems: "center", justifyContent: "center",
-        fontSize: 12, fontWeight: 700, color: initialColor,
-      }}>
-        {initial}
-      </span>
-      <span style={{ fontSize: 13, color: "#374151", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-        {label}
-      </span>
-    </button>
-  );
-}
-
 /* ══════════════════════════════════════════════════════════════════
    Global scope bar — fixed top-right, always visible across all pages
 ══════════════════════════════════════════════════════════════════ */
-
-function ScopeList({ items, selectedId, color, emptyText, onSelect, onClear }: {
-  items: any[]; selectedId: number | null; color: string;
-  emptyText: string; onSelect: (id: number) => void; onClear?: () => void;
-}) {
-  const { lang } = useLang();
-  if (items.length === 0) {
-    return <p style={{ padding: "16px 12px", fontSize: 13, color: "#9ca3af", textAlign: "center" }}>{emptyText}</p>;
-  }
-  return (
-    <>
-      {onClear && (
-        <button onClick={onClear} style={{
-          width: "100%", padding: "7px 10px", borderRadius: 8, border: "none", background: "none",
-          fontSize: 12, color: "#9ca3af", cursor: "pointer", textAlign: "left", transition: "background 0.1s",
-        }}
-          onMouseEnter={e => (e.currentTarget.style.background = "#f9fafb")}
-          onMouseLeave={e => (e.currentTarget.style.background = "none")}
-        >
-          {lang === "en" ? "✕ Clear selection" : "✕ 清除選擇"}
-        </button>
-      )}
-      {items.map((item: any) => (
-        <button key={item.id} onClick={() => onSelect(item.id)} style={{
-          width: "100%", display: "flex", alignItems: "center", gap: 10,
-          padding: "8px 10px", borderRadius: 10, border: "none", textAlign: "left", cursor: "pointer",
-          background: selectedId === item.id ? `${color}12` : "none",
-          transition: "background 0.1s",
-        }}
-          onMouseEnter={e => { if (selectedId !== item.id) e.currentTarget.style.background = "#f9fafb"; }}
-          onMouseLeave={e => { e.currentTarget.style.background = selectedId === item.id ? `${color}12` : "none"; }}
-        >
-          <span style={{
-            width: 30, height: 30, borderRadius: 8, flexShrink: 0,
-            background: selectedId === item.id ? color : "#f3f4f6",
-            color: selectedId === item.id ? "#fff" : "#6b7280",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            fontSize: 12, fontWeight: 800, transition: "background 0.15s, color 0.15s",
-          }}>
-            {(item.name ?? "?").slice(0, 1).toUpperCase()}
-          </span>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <p style={{ fontSize: 13, fontWeight: 500, color: "#111827", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-              {item.name}
-            </p>
-            {item.description && (
-              <p style={{ fontSize: 12, color: "#9ca3af", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                {item.description}
-              </p>
-            )}
-          </div>
-          {selectedId === item.id && (
-            <FontAwesomeIcon icon={faCheck} style={{ color, fontSize: 13, flexShrink: 0 }} />
-          )}
-        </button>
-      ))}
-    </>
-  );
-}
 
 /* ══════════════════════════════════════════════════════════════════
    Account popup (S button) — Canva-style with sub-panels

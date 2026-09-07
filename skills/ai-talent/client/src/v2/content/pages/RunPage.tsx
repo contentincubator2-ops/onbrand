@@ -504,8 +504,6 @@ export default function RunPage() {
   // fbOauthPending — popup is open; show "✓ 已完成授權" confirm button instead
   // fbPagePickerOpen — page picker shown when user clicks publish
   // fbPages        — pages fetched from Graph API (cached after OAuth)
-  const [fbOauthDone, setFbOauthDone] = useState(false);
-  const [fbOauthPending, setFbOauthPending] = useState(false);
   const [fbPagePickerOpen, setFbPagePickerOpen] = useState(false);
   const [fbPages, setFbPages] = useState<Array<{
     id: string;
@@ -674,7 +672,6 @@ export default function RunPage() {
   // for that platform. After successful authorization, the user can press
   // 直接發 again to publish.
   const getConnectTokenMut = (trpc as any).platformConnect?.getConnectToken?.useMutation?.();
-  const [pipedreamBusy, setPipedreamBusy] = useState(false);
 
   // 2026-05-18 (CJ「Connect account popup blocked」): the Pipedream SDK
   // opens its OAuth popup inside connectAccount(). Browsers block that
@@ -684,9 +681,6 @@ export default function RunPage() {
   // and the SDK module (on hover/focus/mount) so the click handler can
   // call connectAccount with NO awaits in front of it → no popup block.
   // bundle.social connect path — which platforms use it is decided server-side.
-  const bundleProvidersQ    = (trpc as any).bundleConnect?.getProviders?.useQuery?.();
-  const bundleConnectUrlMut = (trpc as any).bundleConnect?.getConnectUrl?.useMutation?.();
-  const bundleUrlRef = React.useRef<Record<string, string | undefined>>({});
 
   const pdSdkRef = React.useRef<any>(null);
   const pdTokenRef = React.useRef<Record<string, {
@@ -698,9 +692,6 @@ export default function RunPage() {
     oauthAppId: string | null;
   }>>({});
   const pdPrefetchingRef = React.useRef<Record<string, boolean>>({});
-  const PLATFORM_LABEL: Record<string, string> = {
-    facebook: "Facebook", instagram: "Instagram", linkedin: "LinkedIn", youtube: "YouTube",
-  };
 
   React.useEffect(() => {
     import("@pipedream/sdk/browser")
@@ -708,33 +699,6 @@ export default function RunPage() {
       .catch(() => { /* retried lazily in prefetch */ });
   }, []);
 
-  const prefetchConnect = React.useCallback(async (platform: "facebook" | "instagram" | "linkedin" | "youtube") => {
-    if (pdPrefetchingRef.current[platform]) return;
-    const cached = pdTokenRef.current[platform];
-    const sdkReady = !!pdSdkRef.current;
-    if (cached && cached.expiresAt - Date.now() > 60_000 && sdkReady) return;
-    pdPrefetchingRef.current[platform] = true;
-    try {
-      if (!pdSdkRef.current) {
-        const m = await import("@pipedream/sdk/browser");
-        pdSdkRef.current = (m as any).PipedreamClient;
-      }
-      const brandIdForToken = (data?.mission?.brandId ?? data?.brand?.id ?? 0) as number;
-      const tk = await getConnectTokenMut?.mutateAsync?.({ platform, brandId: brandIdForToken });
-      if (tk?.token) {
-        pdTokenRef.current[platform] = {
-          token: tk.token,
-          expiresAt: new Date(tk.expiresAt || Date.now() + 300_000).getTime(),
-          appSlug: tk.appSlug,
-          env: tk.env ?? "production",
-          connectLinkUrl: tk.connectLinkUrl ?? "",
-          oauthAppId: tk.oauthAppId ?? null,
-        };
-      }
-    } catch { /* surfaced on click if still cold */ } finally {
-      pdPrefetchingRef.current[platform] = false;
-    }
-  }, [getConnectTokenMut]);
 
   // Synchronous: NO awaits before pd.connectAccount() so the popup keeps
   // the click's user activation. If not warmed yet, warm it and ask the
@@ -759,7 +723,6 @@ export default function RunPage() {
   // the latest mutation without stale closure issues.
   const fbPagesMutRef = useRef<any>(null);
 
-  const fbConnectUrlMut = (trpc as any).publish?.getFacebookConnectUrl?.useMutation?.();
   const fbPagesMut      = (trpc as any).publish?.getFacebookPages?.useMutation?.();
   fbPagesMutRef.current = fbPagesMut;
   const setBrandFbPageMut = (trpc as any).publish?.setBrandFacebookPage?.useMutation?.();

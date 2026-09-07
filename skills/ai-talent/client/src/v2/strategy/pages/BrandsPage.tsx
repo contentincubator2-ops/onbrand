@@ -788,7 +788,6 @@ export default function BrandsPage() {
     scopeMode === "product" ? ((productQuery.data as any)?.name ?? (lang === "en" ? "(Select a product above)" : "（請於右上選擇產品）"))
     : scopeMode === "event" ? ((eventQuery.data as any)?.name ?? (lang === "en" ? "(Select an event above)" : "（請於右上選擇活動）"))
     : (currentBrand?.name ?? (lang === "en" ? "(Select a brand above)" : "（請於右上選擇品牌）"));
-  const brandName = currentBrand?.name ?? (lang === "en" ? "My brand" : "我的品牌");
 
   const brainQuery = (trpc as any).brandBrain?.list?.useQuery
     ? (trpc as any).brandBrain.list.useQuery(
@@ -797,8 +796,6 @@ export default function BrandsPage() {
       )
     : { data: null, isLoading: false };
 
-  const brainEntries: Record<string, any[]> =
-    ((brainQuery.data as any)?.entries as Record<string, any[]>) ?? {};
 
   // Brand asset tiles (visuals — non-positioning).
   // Per CJ: only logo / colors / fonts remain.
