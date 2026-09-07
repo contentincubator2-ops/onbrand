@@ -245,6 +245,7 @@ export default function AccountPage() {
               ["活動定位", q.eventsPerCycle === -1 ? "不限" : `每月 ${q.eventsPerCycle}`],
               ["席次", fmt(q.team_members as number)],
               ["審核工作流", q.reviewWorkflow ? "有" : "專業方案"],
+              ["策略監測", q.strategyMonitoring ? "有" : "專業方案"],
               ["品牌", fmt(q.brands as number)],
             ];
             return (

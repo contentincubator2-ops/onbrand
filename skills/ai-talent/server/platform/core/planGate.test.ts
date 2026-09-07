@@ -220,3 +220,16 @@ describe("審核工作流閘門", () => {
   });
 });
 
+describe("策略監測閘門", () => {
+  it("價目表 2026-09-08：策略監測定義在專業（9,000）與企業，基礎與試用沒有", () => {
+    expect(PLANS.drop_starter.quota.strategyMonitoring).toBe(false);
+    expect(PLANS.trial.quota.strategyMonitoring).toBe(false);
+    expect(PLANS.drop_pro.quota.strategyMonitoring).toBe(true);
+    expect(PLANS.enterprise.quota.strategyMonitoring).toBe(true);
+  });
+  it("專業方案的 features 說得出策略監測，基礎的沒有", () => {
+    expect(PLANS.drop_pro.features.some((f) => f.includes("策略監測"))).toBe(true);
+    expect(PLANS.drop_starter.features.some((f) => f.includes("策略監測"))).toBe(false);
+  });
+});
+

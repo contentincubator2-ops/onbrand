@@ -64,11 +64,13 @@ function getPlans(lang: "zh-TW" | "en") {
         "Brand + 10 product + monthly campaign positioning · 10 own task cards",
         "249 task cards = 203 + 46 viral-structure cards (refreshed monthly)",
         "Unlimited runs · campaign tasks · review workflow",
+        "Strategy monitoring: alerts when your brand, products or competitors shift",
         "Performance preview + real connections as add-on",
       ] : [
         "品牌 ＋ 產品 10 個 ＋ 活動每月 1 次定位 · 自建任務卡 10 張",
         "可用任務卡 249 張＝203 ＋ 爆款結構卡 46 張（每月更新）",
         "執行次數不限 · 企劃任務開放 · 審核工作流",
+        "策略監測：品牌、產品與競爭者有變化時提醒調整",
         "成效層：示意版 ＋ 可加購真實串接",
       ],
       cta: en ? "See pricing" : "查看定價",

@@ -72,6 +72,13 @@ export interface PlanQuota {
    * reviewRouter 的 submit／approve／requestRevision 用 assertReviewAllowed 擋。
    */
   reviewWorkflow: boolean;
+  /**
+   * 2026-09-08 (CJ「策略監測，定義在 9000 的方案」)：為品牌與產品設監測，
+   * 受眾或競爭者有變化時亮出情報並提醒回工作台調整錨點。基礎沒有 ——
+   * 它是「有一組人在替你看市場」的承諾，跟策略工作台同一級。
+   * strategyMonitorRouter 的 setWatch／scanNow 用 assertStrategyMonitoringAllowed 擋。
+   */
+  strategyMonitoring: boolean;
   /** 2026-05-19 (CJ Starter plan) — monthly run limit regardless of task type.
    *  1 run = 1 task execution (all variants + images count as 1 run).
    *  -1 = unlimited. Enforced in executeTask.ts / quickTaskOrchestra.ts.
@@ -207,6 +214,7 @@ export const PLANS: Record<PlanCode, Plan> = {
       products: 0,
       eventsPerCycle: 0,
       reviewWorkflow: false,
+      strategyMonitoring: false,
     },
     features: [
       "1 個品牌 · 2 席",
@@ -255,6 +263,7 @@ export const PLANS: Record<PlanCode, Plan> = {
       products: 0,
       eventsPerCycle: 0,
       reviewWorkflow: false,
+      strategyMonitoring: false,
     },
     features: [
       "1000 點試用額度（不重置，用完即停）",
@@ -269,6 +278,7 @@ export const PLANS: Record<PlanCode, Plan> = {
    *  2026-09-06 Word 價目表：1 個品牌、11 通路選 5（每月可換）、品牌＋產品 10 個
    *  ＋活動每月 1 次定位、自建卡 10 張、249 張任務卡（含爆款結構 46 張，每月更新）、
    *  審核工作流、成效層可加購。5 席是審核工作流的要求：產出者與放行者分開。
+   *  2026-09-08 加：策略監測（品牌、產品與競爭者變化提醒）定義在這一級。
    *  Fair-use: 內部每日 LLM cost cap = $5（UI 不顯示）。
    */
   drop_pro: {
@@ -310,6 +320,7 @@ export const PLANS: Record<PlanCode, Plan> = {
       products: 10,
       eventsPerCycle: 1,
       reviewWorkflow: true,
+      strategyMonitoring: true,
     },
     features: [
       "1 個品牌 · 5 席（含審核工作流）",
@@ -318,6 +329,7 @@ export const PLANS: Record<PlanCode, Plan> = {
       "可用任務卡 249 張＝203 ＋ 爆款結構卡 46 張（每月更新）",
       "執行次數不限 · 企劃任務開放",
       "排程、日曆與 FB／IG 直接發布 · 策略工作台",
+      "策略監測：品牌、產品與競爭者有變化時提醒調整",
       "成效層示意版 ＋ 可加購真實串接 · 電子發票",
     ],
     highlight: "NT$9,000／月 · 5 席",
@@ -345,6 +357,7 @@ export const PLANS: Record<PlanCode, Plan> = {
       products: -1,
       eventsPerCycle: -1,
       reviewWorkflow: true,
+      strategyMonitoring: true,
     },
     features: [
       "無限額度",

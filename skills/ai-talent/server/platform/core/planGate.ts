@@ -293,3 +293,19 @@ export async function assertReviewAllowed(userId: number): Promise<void> {
   if (!quota.reviewWorkflow) throw new TRPCError({ code: "FORBIDDEN", message: REVIEW_BLOCK_MESSAGE });
 }
 
+export const STRATEGY_MONITOR_BLOCK_MESSAGE =
+  "策略監測屬於專業方案（品牌、產品與競爭者有變化時提醒你調整）。升級後可以設定監測與手動掃描。";
+
+/**
+ * 策略監測閘門（2026-09-08，價目表：專業方案的策略層）。
+ * 讀取類的 procedure 不用這支 —— 基礎用戶要看得到「這裡有東西，但要升級」，
+ * 所以 list 回 locked:true 而不是丟錯；只有會花錢的 setWatch／scanNow 才擋。
+ * 與 assertReviewAllowed 同一個 fail-open 原則。
+ */
+export async function assertStrategyMonitoringAllowed(userId: number): Promise<void> {
+  let quota: PlanQuota;
+  try { quota = await planQuotaFor(userId); }
+  catch (e) { console.warn("[planGate] assertStrategyMonitoringAllowed: planQuotaFor failed, fail-open", (e as Error)?.message); return; }
+  if (!quota.strategyMonitoring) throw new TRPCError({ code: "FORBIDDEN", message: STRATEGY_MONITOR_BLOCK_MESSAGE });
+}
+

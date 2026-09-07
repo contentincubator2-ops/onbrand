@@ -127,8 +127,8 @@ export default function PricingPage() {
       monthly: price.pro,
       layers: [
         { label: isEn ? "Strategy" : "策略層", items: isEn
-          ? ["Brand positioning + 10 product positionings + 1 campaign positioning per month", "10 own task cards (saved to your Brand Task Library)", "Strategy workbench (three anchors → content angles)"]
-          : ["品牌定位 ＋ 產品定位 10 個 ＋ 活動定位每月 1 次", "自建任務卡 10 張（存入品牌任務庫）", "策略工作台（三錨點推導內容角度）"] },
+          ? ["Brand positioning + 10 product positionings + 1 campaign positioning per month", "10 own task cards (saved to your Brand Task Library)", "Strategy workbench (three anchors → content angles)", "Strategy monitoring: alerts when your brand, products or competitors shift"]
+          : ["品牌定位 ＋ 產品定位 10 個 ＋ 活動定位每月 1 次", "自建任務卡 10 張（存入品牌任務庫）", "策略工作台（三錨點推導內容角度）", "策略監測：品牌、產品與競爭者有變化時提醒調整"] },
         { label: isEn ? "Content" : "內容層", items: isEn
           ? ["249 task cards = the 203 above + 46 viral-structure cards", "Viral-structure cards refreshed monthly", "Scheduling, calendar and direct publishing to FB / IG"]
           : ["可用任務卡 249 張＝上述 203 張 ＋ 爆款結構卡 46 張", "爆款結構卡每月更新", "排程、日曆與 FB／IG 直接發布"] },
