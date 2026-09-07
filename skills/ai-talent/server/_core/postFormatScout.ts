@@ -21,14 +21,14 @@
  *
  * ── 為什麼沒有 Facebook collector ───────────────────────────────────────
  * Meta 2024-08 關閉 CrowdTangle，接手的 Content Library 僅開放學術單位；
- * Graph API 只給自己管理的粉專。scouts/orchestrator.ts 的 SCOUT_REGISTRY
+ * Graph API 只給自己管理的粉專。（已於 2026-09-08 隨市場數據層移除的）scouts/orchestrator SCOUT_REGISTRY
  * 11 個 scout 沒有任何一個是 FB，opview / meltwater 是 browser_login 且
  * ToS-risk。所以這裡走 **web-grounded 搜尋**（invokeVertexGrounding，
  * 與 perplexityScout tier-1 同一條路），找的是公開報導與整理文章裡談到的
  * 高互動貼文與其結構。
  *
  * ── 絕不編造 ────────────────────────────────────────────────────────────
- * 沿用 marketIntelRouter 的規矩：只回真實、可連結的發現，或誠實地回報沒有。
+ * 沿用（已移除的）marketIntelRouter 的規矩：只回真實、可連結的發現，或誠實地回報沒有。
  *   · 沒有 grounding 憑證 → 整場掃描中止，**不 fallback 到無搜尋的 LLM**。
  *     知識模式的模型答得出東西，但那些 URL 是編的，比沒資料更糟。
  *   · 每個候選至少要有一條可連結的佐證，否則丟掉並計入 dropped。

@@ -37,11 +37,11 @@ import {
   faGear, faClock, faTrash, faXmark, faCheckDouble, faTableColumns,
   faChevronRight, faCheck, faBuilding, faBoxOpen, faCalendarDays,
   faCircleHalfStroke, faCircleInfo, faBorderAll, faDisplay, faBriefcase,
-  faShareNodes, faTrophy, faUsers, faLanguage,
+  faShareNodes, faUsers, faLanguage,
   faUser, faPaintBrush, faFont, faMagnifyingGlass,
-  faTrademark, faChevronDown, faCrown,
+  faChevronDown, faCrown,
   faEnvelope, faBullhorn, faGlobe, faChartLine, faDatabase,
-  faFire, faComments, faFileLines,
+  faFileLines,
 } from "@fortawesome/free-solid-svg-icons";
 import {
   faFacebookF, faInstagram, faYoutube, faTiktok, faLinkedinIn,
@@ -91,10 +91,7 @@ interface NavItem {
 }
 
 // 2026-08-20: 策略 (Strategy) workspace — 品牌大腦's tile strip promoted to
-// a left-rail workspace. Originally gated to a 2-account preview list, kept
-// separate from `isPrivate` below (still sowork@sowork.tw-only, gates the
-// market-intel / performance preview rails which haven't been vetted for
-// accounts outside the sowork.tw team).
+// a left-rail workspace. Originally gated to a 2-account preview list.
 //
 // 2026-08-21 (CJ「所有用戶左方的mission rail上方，都改成策略和內容可切換
 // 的」): graduated from the 2-account preview to every account —
@@ -148,25 +145,8 @@ const CHANNEL_TO_TASK_ROUTE: Record<string, string> = {
  */
 function buildNavItems(lang: "zh-TW" | "en", userEmail?: string | null, currentPath?: string, allowedTaskRoutes?: Set<string> | null): NavItem[] {
   const en = lang === "en";
-  const isPrivate = String(userEmail ?? "").toLowerCase() === "sowork@sowork.tw";
   const isStrategyPreview = isStrategyPreviewEmail(userEmail);
   const isPersonaPreview = isPersonaPreviewEmail(userEmail);
-
-  // In data modes, the main left rail switches meaning. The top-left mode
-  // switcher chooses the workspace; this rail only shows functions inside it.
-  if (isPrivate && currentPath?.startsWith("/market-intel")) {
-    return [
-      { to: "/market-intel/overview", label: en ? "Overview" : "總覽", icon: <FontAwesomeIcon icon={faChartLine} />, matchPrefix: "/market-intel/overview", tooltip: en ? "Market overview" : "市場總覽" },
-      { to: "/market-intel/listen_hotspots", label: en ? "Hotspots" : "市場熱點", icon: <FontAwesomeIcon icon={faFire} />, matchPrefix: "/market-intel/listen_hotspots", tooltip: en ? "Market hotspots" : "市場熱點（蹭熱度）" },
-      { to: "/market-intel/listen_industry", label: en ? "Industry" : "產業討論", icon: <FontAwesomeIcon icon={faComments} />, matchPrefix: "/market-intel/listen_industry", tooltip: en ? "Industry discussion" : "產業討論" },
-      { to: "/market-intel/listen_own", label: en ? "Our Buzz" : "品牌聲量", icon: <FontAwesomeIcon icon={faBullhorn} />, matchPrefix: "/market-intel/listen_own", tooltip: en ? "Our brand buzz" : "自己的品牌聲量" },
-      { to: "/market-intel/listen_competitor", label: en ? "Rivals" : "競品聲量", icon: <FontAwesomeIcon icon={faTrophy} />, matchPrefix: "/market-intel/listen_competitor", tooltip: en ? "Competitor buzz" : "競爭者聲量" },
-      { to: "/market-intel/keywords", label: en ? "Keywords" : "關鍵字", icon: <FontAwesomeIcon icon={faMagnifyingGlass} />, matchPrefix: "/market-intel/keywords", tooltip: en ? "Keyword analysis" : "關鍵字分析" },
-      { to: "/market-intel/geo", label: "GEO", icon: <FontAwesomeIcon icon={faTrademark} />, matchPrefix: "/market-intel/geo", tooltip: en ? "AI visibility (GEO): appearance, share-of-voice, sentiment, cited sources" : "AI 能見度 (GEO)：出現率、聲量佔比、情緒、被引用來源" },
-      { to: "/market-intel/competitors", label: en ? "Competitors" : "競品", icon: <FontAwesomeIcon icon={faDatabase} />, matchPrefix: "/market-intel/competitors", tooltip: en ? "Competitor intelligence" : "競品情報" },
-      { to: "/market-intel/opportunity", label: en ? "Opportunity" : "機會", icon: <FontAwesomeIcon icon={faBrain} />, matchPrefix: "/market-intel/opportunity", tooltip: en ? "Opportunity diagnosis" : "機會診斷" },
-    ];
-  }
 
   // 2026-08-20 (CJ「參考 DEV 環境，將品牌大腦獨立成一個策略區」): 品牌大腦's
   // own tile strip (定位 / 產品 / 活動 / 文字 / 視覺 / 工具 / 基本資料) is
@@ -209,7 +189,9 @@ function buildNavItems(lang: "zh-TW" | "en", userEmail?: string | null, currentP
     ];
   }
 
-  if (isPrivate && currentPath?.startsWith("/performance")) {
+  // 2026-09-08：成效 rail 原本也被 isPrivate 守著 —— 非 sowork 帳號在 /performance
+  // 看到的是內容 rail。成效 9/7 已對所有人開放，rail 跟著開。
+  if (currentPath?.startsWith("/performance")) {
     return [
       { to: "/performance/overview", label: en ? "Overview" : "總覽", icon: <FontAwesomeIcon icon={faChartLine} />, matchPrefix: "/performance/overview", tooltip: en ? "Cross-platform overview" : "跨平台總覽" },
       { to: "/performance/meta", label: "Meta", icon: <FontAwesomeIcon icon={faFacebookF} />, matchPrefix: "/performance/meta", tooltip: "Meta Ads" },
@@ -734,27 +716,22 @@ function IconBar({
     () => buildNavItems(lang, userEmail, currentPath, allowedTaskRoutes),
     [lang, userEmail, currentPath, allowedTaskRoutes],
   );
-  const isPrivatePreview = String(userEmail ?? "").toLowerCase() === "sowork@sowork.tw";
   const isStrategyPreview = isStrategyPreviewEmail(userEmail);
-  // 2026-08-20: 策略 added as a first-class workspace mode alongside the
-  // existing market/content/performance ones. Order follows how the work
-  // actually flows — understand the market, decide the strategy, produce
-  // the content, read the results.
-  const activeWorkspaceMode: "market" | "strategy" | "content" | "performance" =
+  // 2026-08-20: 策略 added as a first-class workspace mode. 2026-09-08 市場
+  // removed with the market-data layer (not on the price list). Order follows
+  // how the work flows — decide the strategy, produce the content, read the results.
+  const activeWorkspaceMode: "strategy" | "content" | "performance" =
     currentPath.startsWith("/performance")
       ? "performance"
-      : currentPath.startsWith("/market-intel")
-        ? "market"
-        : currentPath.startsWith("/brands")
-          ? "strategy"
-          : "content";
-  // 2026-09-07 (CJ「隱藏市場數據層，但用模擬數據為每個品牌製作成效層」)：
-  //   市場 —— 仍只給 sowork.tw 預覽群（路由另有守門，直接打網址也進不去）
+      : currentPath.startsWith("/brands")
+        ? "strategy"
+        : "content";
+  // 2026-09-07 (CJ「隱藏市場數據層，但用模擬數據為每個品牌製作成效層」)；
+  // 2026-09-08 市場數據層整層移除。
   //   成效 —— 開放給所有帳號。畫面是標了「⚠ 模擬資料」的示意版，附三張
   //           資料來源卡片誠實顯示串接狀態；真資料屆時在導入時接。
   //   策略 —— 照舊給 isStrategyPreview；內容一律有。
   const modeOptions = [
-    ...(isPrivatePreview ? [{ id: "market" as const, label: isEn ? "Market" : "市場", icon: faMagnifyingGlass, to: "/market-intel/overview", tip: isEn ? "Market intelligence" : "市場情報" }] : []),
     ...(isStrategyPreview ? [{ id: "strategy" as const, label: isEn ? "Strategy" : "策略", icon: faBrain, to: "/brands", tip: isEn ? "Strategy — brand brain" : "策略 — 品牌大腦" }] : []),
     { id: "content" as const, label: isEn ? "Content" : "內容", icon: faWandMagicSparkles, to: "/tasks/fb", tip: isEn ? "Content production" : "內容產出" },
     { id: "performance" as const, label: isEn ? "Results" : "成效", icon: faChartLine, to: "/performance/overview", tip: isEn ? "Performance (sample data until connected)" : "成效數據（串接前為示意資料）" },
