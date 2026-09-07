@@ -20,7 +20,7 @@ import { recentCatalogCards } from "../../content/core/taskCatalogIndex";
 
 export interface NotificationItem {
   id: string;
-  kind: "positioning_done" | "positioning_failed" | "task_complete" | "festival_upcoming" | "card_published";
+  kind: "positioning_done" | "positioning_failed" | "task_complete" | "festival_upcoming" | "card_published" | "strategy_alert";
   title: string;
   excerpt: string;
   createdAtIso: string;
@@ -37,6 +37,7 @@ const AVATAR_PALETTE: Record<NotificationItem["kind"], { avatar: string; avatarC
   task_complete:      { avatar: "★", avatarColor: "#3b82f6" },  // blue
   festival_upcoming:  { avatar: "🎉", avatarColor: "#f59e0b" }, // amber
   card_published:     { avatar: "＋", avatarColor: "#171717" }, // ink：新卡上架
+  strategy_alert:     { avatar: "◆", avatarColor: "#171717" }, // ink：策略提醒
 };
 
 /** /tasks/:platform 的路由代號。與 PlatformTaskPage 的 ROUTE_TO_PLATFORM 反向。 */
@@ -230,6 +231,32 @@ export const notificationRouter = router({
         }
       } catch (e) {
         console.warn("[notifications] festivals query failed:", (e as Error).message);
+      }
+
+      // 5. 策略提醒（2026-09-08 策略監測，專業方案）：14 天內、還沒看的
+      try {
+        const [rows]: any = await localPool.execute(
+          `SELECT a.id, a.brandId, a.kind, a.title, a.summary, a.createdAt, b.name AS brandName
+             FROM strategy_alerts a LEFT JOIN brands b ON b.id = a.brandId
+            WHERE a.userId = ? AND a.status = 'new' AND a.createdAt > NOW() - INTERVAL 14 DAY
+            ORDER BY a.createdAt DESC LIMIT 10`,
+          [userId],
+        );
+        for (const r of rows as any[]) {
+          const iso = new Date(r.createdAt).toISOString();
+          items.push({
+            id: `sa-${r.id}`,
+            kind: "strategy_alert",
+            title: isEn ? `Strategy alert · ${r.brandName ?? ""}` : `策略提醒 · ${r.brandName ?? ""}`,
+            excerpt: String(r.title ?? "").slice(0, 80),
+            createdAtIso: iso,
+            navUrl: `/brands/edit?b=${r.brandId}&cat=positioning`,
+            unread: new Date(iso) > lastSeen,
+            ...AVATAR_PALETTE.strategy_alert,
+          });
+        }
+      } catch (e) {
+        console.warn("[notifications] strategy_alerts query failed:", (e as Error).message);
       }
 
       // 4. 新任務卡上架（純計算，不打 DB）

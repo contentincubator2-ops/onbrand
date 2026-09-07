@@ -8,6 +8,7 @@
  */
 import { z } from "zod";
 import { router, protectedProcedure } from "../../platform/core/trpc";
+import { parseBrief, fieldsInBrief } from "../core/aiBrief";
 import { invokeLLM } from "../../platform/core/llm";
 import { buildBrandPrefix } from "../core/brandContext";
 import { getBrandRealContent } from "../core/brandRealContent";
@@ -175,6 +176,30 @@ const MAX_ITEMS_PER_BRAND = 50;
 const MAX_BODY_CHARS = 8_000;
 
 export const brandKnowledgeRouter = router({
+  /**
+   * AI 讀到的品牌簡報 —— 每張任務卡開跑前塞進模型的那段字，攤開給用戶看。
+   *
+   * 2026-09-08 (CJ「顯示出幫他把定位化為 AI 讀懂的文字的過程」)。不是另外生一份
+   * 給人看的版本：full／core 就是 buildBrandPrefix 真正回給 orchestra 的字串，
+   * parseBrief 只負責切段與對回欄位。
+   */
+  aiBrief: protectedProcedure
+    .input(z.object({ brandId: z.number(), productId: z.number().optional(), eventId: z.number().optional() }))
+    .query(async ({ ctx, input }) => {
+      const [own]: any = await localPool.execute(
+        `SELECT id FROM brands WHERE id = ? AND userId = ? LIMIT 1`, [input.brandId, ctx.user!.id],
+      );
+      if (!Array.isArray(own) || own.length === 0) return { full: "", core: "", fullChars: 0, coreChars: 0, sections: [], fields: [] };
+      const full = await buildBrandPrefix(input.brandId, input.productId ?? null, input.eventId ?? null, "full");
+      const core = await buildBrandPrefix(input.brandId, input.productId ?? null, input.eventId ?? null, "core");
+      const sections = parseBrief(full);
+      return {
+        full, core,
+        fullChars: [...full.trim()].length, coreChars: [...core.trim()].length,
+        sections, fields: fieldsInBrief(sections),
+      };
+    }),
+
   list: protectedProcedure
     .input(z.object({ brandId: z.number().int().positive() }))
     .query(async ({ ctx, input }) => {

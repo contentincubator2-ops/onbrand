@@ -35,6 +35,8 @@ import { InfoTab as BrandInfoTab, DangerTab as BrandDangerTab, PublishTab as Bra
 import AIPromptsEditor from "../components/positioning/AIPromptsEditor";
 import BrandOnboardingWizard from "../components/onboarding/BrandOnboardingWizard";
 import StrategyWorkbench from "../components/positioning/StrategyWorkbench";
+import AIBriefPanel from "../components/positioning/AIBriefPanel";
+import StrategyAlertsPanel from "../components/positioning/StrategyAlertsPanel";
 import PersonaAgentPanel from "../components/positioning/PersonaAgentPanel";
 import { showToastGlobal } from "../../../components/ui/Toast";
 import { BrandActionChipsRow, BrandTestPanel, usePositioningStatus } from "../components/positioning/BrandActionChips";
@@ -1718,6 +1720,13 @@ export default function BrandsPage() {
                   Persistent persona bar so the workspace feels staffed even
                   when nothing is running. Same line-art style as 定位. */}
               <AgentPersonaBar persona="librarian" brandName={scopeName} mode="idle" />
+              {/* 2026-09-08 (CJ「顯示出幫他把定位化為 AI 讀懂的文字的過程」)：
+                  每張任務卡開跑前塞進模型的那段簡報，攤開來、對回欄位。
+                  「上傳定位文件」是不走 14 步的那條路，從這裡直接跳過去。 */}
+              <AIBriefPanel
+                brandId={activeBrandIdForLocks}
+                onOpenDocs={() => { setCategory("positioning"); setSection("doc" as any); }}
+              />
               <KnowledgeEditor key={`knowledge-${activeBrandIdForLocks ?? 0}`} brandId={activeBrandIdForLocks} />
             </div>
           )}
@@ -1901,6 +1910,12 @@ export default function BrandsPage() {
                           scenarios persist on the event's own positioning;
                           competition/differentiation ground material is
                           borrowed read-only from the parent brand. */}
+                      {/* 2026-09-08 策略監測（專業方案）：品牌、產品與競爭者有變化時
+                          亮出情報，指回下面工作台的哪個錨點。放在工作台正上方，
+                          「回工作台調整」就是往下捲。 */}
+                      {scopeMode === "brand" && activeBrandIdForLocks ? (
+                        <StrategyAlertsPanel brandId={activeBrandIdForLocks} />
+                      ) : null}
                       {(scopeMode === "brand" || scopeMode === "event") && activeBrandIdForLocks ? (
                         <StrategyWorkbench
                           brandId={activeBrandIdForLocks}

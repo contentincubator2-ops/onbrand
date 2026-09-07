@@ -535,6 +535,12 @@ async function runStartupMigrations() {
     const { POST_FORMAT_CANDIDATES_DDL } = await import("./content/core/postFormatStore");
     await db.execute(sql.raw(POST_FORMAT_CANDIDATES_DDL));
     console.log("[migrate] post_format_candidates: OK");
+
+    // 2026-09-08 (CJ「策略監測，定義在 9000 的方案」)：監測清單與策略提醒。
+    const { STRATEGY_WATCH_DDL, STRATEGY_ALERTS_DDL } = await import("./strategy/core/strategyMonitor");
+    await db.execute(sql.raw(STRATEGY_WATCH_DDL));
+    await db.execute(sql.raw(STRATEGY_ALERTS_DDL));
+    console.log("[migrate] strategy_watch / strategy_alerts: OK");
   } catch (err) {
     console.error("[migrate] startup migration error:", err);
   }
@@ -637,6 +643,16 @@ const server = app.listen(PORT, async () => {
       });
     }, 30_000);
     console.log("[productDiscovery] Worker started (30s interval)");
+
+    // 策略監測 worker：每 15 分鐘挑一份到期的監測清單掃一次（每份至少隔 7 天）。
+    // 一拍只掃一份 —— scout 與 LLM 都要錢，寧可慢。
+    const { tickStrategyMonitor } = await import("./strategy/core/strategyMonitor");
+    setInterval(() => {
+      tickStrategyMonitor().catch((e) => {
+        console.error("[strategyMonitor] tick error:", e?.message ?? e);
+      });
+    }, 15 * 60_000);
+    console.log("[strategyMonitor] Worker started (15m interval)");
   }
 
   if (isRuntimeFeatureEnabled("LIVE_BILLING_ENABLED")) {
