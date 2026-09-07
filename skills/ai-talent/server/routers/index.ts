@@ -11,7 +11,6 @@ import { brandBrainRouter } from "./brandBrainRouter";
 import { calendarRouter } from "./calendarRouter";
 import { bundleConnectRouter } from "./bundleConnectRouter";
 import { imageRouter } from "./imageRouter";
-import { projectSyncRouter } from "./projectSyncRouter";
 import { quickTaskRouter } from "./quickTaskRouter";
 import { entityRouter } from "./entityRouter";
 import { productRouter, eventRouter, scopeRouter } from "./scopeRouter";
@@ -67,7 +66,6 @@ export const appRouter = router({
   calendar:      calendarRouter,
   bundleConnect: bundleConnectRouter,
   image:         imageRouter,
-  projectSync:   projectSyncRouter,
   quickTask:     quickTaskRouter,
   entity:        entityRouter,
   product:       productRouter,

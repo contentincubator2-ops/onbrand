@@ -29,13 +29,10 @@ import { createContext } from "./_core/trpc";
 import { authRouter } from "./auth/authRouter";
 import { reportTemplateRouter } from "./routes/reportTemplateRoute";
 import { positioningDocRouter } from "./routes/positioningDocRoute";
-import { a2aStreamRouter } from "./routes/a2aStreamRoute";
 import { slackOAuthRouter } from "./routes/slackOAuthRoute";
-import pmRouter from "./routes/pmRoute";
 import { brandBrainRouter } from "./routes/brandBrainRoute";
 import { exportsRouter } from "./routes/exportsRoute";
 import { missionSquadRouter } from "./routes/missionSquadRoute";
-import { projectSyncCallbackRouter } from "./routes/projectSyncCallbackRoute";
 import { cloudOAuthRouter } from "./routes/cloudOAuthRoute";
 import { squadSearchRouter } from "./routers/squadSearchRouter";
 import { entitySearchRouter } from "./routers/entitySearchRouter";
@@ -45,8 +42,6 @@ import { publicAgentsRoute } from "./routes/publicAgentsRoute";
 import { closeDb, pingDb, pingSoworkDb, getDb } from "./db";
 import { sql } from "drizzle-orm";
 import { appRouter } from "./routers";
-import { startOrchestratorWorker } from "./queue/orchestratorWorker";
-import { startSquadLeaderWorker } from "./queue/squadLeaderWorker";
 import { resumeInterruptedPositioningJobs } from "./_core/positioningJobRunner";
 import { runStartupCleanup } from "./_core/startupCleanup";
 import { recoverStuckDiscoveryJobs, processNextDiscoveryJob } from "./_core/productDiscovery";
@@ -355,16 +350,13 @@ const healthLimiter = rateLimit({ windowMs: 60_000, max: 60, standardHeaders: tr
 app.use("/api/auth", authRouter);
 app.use("/api/report-template", reportTemplateRouter);
 app.use("/api/positioning-doc", positioningDocRouter);
-app.use("/api/a2a", a2aStreamRouter);
 
 // ─── Slack OAuth + Events ─────────────────────────────────────────────────────
 app.use("/slack", slackOAuthRouter);
 // /api/chat removed 2026-05-14 — only v1 MissionChatCore consumed it.
-app.use("/api/pm", pmRouter);
 app.use("/api/brand-brain", brandBrainRouter);
 app.use("/api/exports", exportsRouter);
 app.use("/api/missions", missionSquadRouter);
-app.use("/api/project-sync", projectSyncCallbackRouter);
 app.use("/api/oauth", cloudOAuthRouter);
 app.use("/api/squads/search", squadSearchRouter);
 app.use("/api/entity/search", entitySearchRouter);
@@ -640,9 +632,7 @@ const server = app.listen(PORT, async () => {
   }
   await runStartupMigrations();
   if (isRuntimeFeatureEnabled("BACKGROUND_WORKERS_ENABLED")) {
-    startOrchestratorWorker();
     console.log("[A2A] Orchestrator Worker started");
-    startSquadLeaderWorker();
     console.log("[A2A] Squad Leader Worker started");
     // STAB-4: Re-queue any positioning jobs that were in-flight when pm2
     // was last restarted (status='pending'|'running' but no process running them).
