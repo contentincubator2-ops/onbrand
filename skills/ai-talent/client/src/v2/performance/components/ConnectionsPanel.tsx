@@ -17,8 +17,8 @@
  * 單色、13–14px，照全站紀律。
  */
 import React from "react";
-import { trpc } from "../../../../lib/trpc";
-import { useLang } from "../../../../lib/i18n";
+import { trpc } from "../../../lib/trpc";
+import { useLang } from "../../../lib/i18n";
 import { CheckCircle2, Circle, Wrench, Megaphone, ShoppingBag, FileText } from "lucide-react";
 
 type Conn = {

@@ -17,10 +17,10 @@ import { useParams, useSearchParams } from "react-router-dom";
 import {
   BarChart3, FileText, LineChart, Megaphone, MousePointerClick, Search, ShoppingBag, Target,
 } from "lucide-react";
-import PerformanceDashboard from "../components/performance/PerformanceDashboard";
-import ConnectionsPanel from "../components/performance/ConnectionsPanel";
-import { setMockBrandSeed } from "../components/performance/perfMockData";
-import FanpageMonthlyReport from "../components/performance/FanpageMonthlyReport";
+import PerformanceDashboard from "../components/PerformanceDashboard";
+import ConnectionsPanel from "../components/ConnectionsPanel";
+import { setMockBrandSeed } from "../components/perfMockData";
+import FanpageMonthlyReport from "../components/FanpageMonthlyReport";
 
 type Source = {
   id: string;
