@@ -17,7 +17,6 @@ import PositioningNotificationCenter from "../../components/PositioningNotificat
 import ScopeSwitchOverlay from "../../components/ScopeSwitchOverlay";
 import PricingInfoModal from "../../components/PricingInfoModal";
 import TrialCountdownBar from "../../components/TrialCountdownBar";
-import WorkspacePill from "../../components/WorkspacePill";
 // 2026-05-11 (CJ「節慶日曆 + 自動提醒」)
 import SupportDrawer from "../../components/SupportDrawer";
 // 2026-06-12 (CJ「Mia 細緻化 + 不要自動跳出」): unread-nudge state lives in
@@ -544,13 +543,6 @@ export default function ShellLayout() {
       }}>
         {/* 2026-05-10 trial countdown bar */}
         <TrialCountdownBar />
-        {/* 2026-05-12 workspace switcher pill — disabled with agency invite
-            UI per CJ「先移除 agency 邀請團隊的設計」. Re-enable when team/agency
-            tier launches.
-        <div className="flex justify-end px-4 pt-2">
-          <WorkspacePill />
-        </div>
-        */}
         {/* FestivalGlobalNudge removed 2026-06-15 — CJ: banner is distracting
             and the /99s deep-link route returns 404. Festival prep handled
             through normal task picker instead. */}
