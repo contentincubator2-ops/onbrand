@@ -7,7 +7,7 @@
 import React from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { Chip, Skeleton } from "@heroui/react";
+import { Skeleton } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { useLang } from "../../../../lib/i18n";
 

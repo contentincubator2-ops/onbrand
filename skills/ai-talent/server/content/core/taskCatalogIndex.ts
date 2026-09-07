@@ -38,7 +38,7 @@ import { MULTI_60S_TASKS } from "./quickTaskMulti60";
 import { ALL_99S_TASKS } from "./quickTask100";
 import { ALL_99S_SQUADS } from "./quickTask100Squads";
 import { WEBSITE_30S_TASKS } from "./quickTaskWebsite";
-import { resolveTaskSource, type TaskSource } from "./taskSource";
+import { type TaskSource } from "./taskSource";
 import { sourceForTemplate } from "./craftSource";
 
 /** 前端 channel 列使用的平台代號。 */

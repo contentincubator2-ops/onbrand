@@ -2,7 +2,6 @@
  * 退費條款 — OnBrand Refund Policy.
  * 2026-05-10.
  */
-import React from "react";
 import { Link } from "react-router-dom";
 import { useLang } from "../../../../lib/i18n";
 

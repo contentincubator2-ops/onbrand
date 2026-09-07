@@ -14,7 +14,6 @@
  *   • Authentic post chrome: degree badge, follow CTA, more-options (…)
  *   • ImageGenSlot replaces static skeleton in image area (3-step visual flow)
  */
-import React from "react";
 import { Avatar, Button, Chip, Divider, Skeleton, User } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faLinkedin } from "@fortawesome/free-brands-svg-icons";

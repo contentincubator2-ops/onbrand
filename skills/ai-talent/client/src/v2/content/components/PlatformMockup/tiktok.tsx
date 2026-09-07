@@ -3,7 +3,6 @@
  * PR2.2: foryou, profile (carousel/live still fall to foryou)
  * Reference: SashenJayathilaka/TIK-TOK-Clone (MIT)
  */
-import React from "react";
 import { Avatar, Button, Skeleton } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faTiktok } from "@fortawesome/free-brands-svg-icons";

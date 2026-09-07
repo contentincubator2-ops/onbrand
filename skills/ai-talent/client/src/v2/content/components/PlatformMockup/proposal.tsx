@@ -20,10 +20,8 @@
  *                    yt-quarterly, li-newsletter, etc.)
  *   PersonaCard    → persona-draft / journey-map / competitive-interview
  */
-import React from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { Divider } from "@heroui/react";
 import { type MockupFields } from "./shared";
 
 // ─── shared palette ──────────────────────────────────────────────────────────

@@ -19,12 +19,7 @@ import { trpc } from "../../../lib/trpc";
 import { useLang } from "../../../lib/i18n";
 import type { ShellOutletCtx } from "../../app/shell/ShellLayout";
 import { isStrategyPreviewEmail, isPersonaPreviewEmail } from "../../app/shell/ShellLayout";
-import {
-  Avatar, Button, Card, CardBody, CardHeader, Chip, Divider,
-  Dropdown, DropdownTrigger, DropdownMenu, DropdownItem,
-  Skeleton, Tabs, Tab,
-  Input, Textarea, Spinner, Select, SelectItem, CheckboxGroup, Checkbox,
-} from "@heroui/react";
+import { Avatar, Button, Card, CardBody, Chip, Input, Textarea, Spinner, Select, SelectItem, CheckboxGroup, Checkbox } from "@heroui/react";
 import SegmentEditor from "../components/positioning/SegmentEditor";
 import ThinkingOverlay from "../components/positioning/ThinkingOverlay";
 import PipelineRunner, { type PipelineState } from "../components/positioning/PipelineRunner";
@@ -35,7 +30,6 @@ import PromptLibrary from "../components/positioning/PromptLibrary";
 import BrandAssetEditor, { type AssetKey } from "../components/positioning/BrandAssetEditor";
 import KnowledgeEditor from "../components/positioning/KnowledgeEditor";
 import PositioningDocPanel from "../components/positioning/PositioningDocPanel";
-import BrandMessageBar from "../components/positioning/BrandMessageBar";
 import InlineAssetCard from "../components/positioning/InlineAssetCard";
 import { InfoTab as BrandInfoTab, DangerTab as BrandDangerTab, PublishTab as BrandPublishTab } from "../components/positioning/BrandSettingsSheet";
 import AIPromptsEditor from "../components/positioning/AIPromptsEditor";
@@ -46,33 +40,12 @@ import { showToastGlobal } from "../../../components/ui/Toast";
 import { BrandActionChipsRow, BrandTestPanel, usePositioningStatus } from "../components/positioning/BrandActionChips";
 import AddEntityModal, { type AddEntityTab } from "../components/AddEntityModal";
 import ProductDetailModal from "../components/positioning/ProductDetailModal";
-import { EntityStats } from "../components/EntityStats";
 // Notion-style line icons
-import {
-  Target as LucideTarget, Type as LucideType, Palette as LucidePalette,
-  Lock as LucideLock, Unlock as LucideUnlock, Play as LucidePlay,
-  RotateCcw as LucideRotate, BookOpen as LucideBook,
-  Sparkles, Link2 as LucideLink, Bot as LucideRobotIcon,
-  Share2 as LucideShare,
-  Quote as LucideQuote, Shield as LucideShield, Type as LucideTypeIcon,
-  Pencil as LucidePencil, Award as LucideAward, Package as LucidePackage,
-  Hash as LucideHash, MessageCircle as LucideMessage,
-  FileText as LucideFileText,
-  IdCard as LucideIdCard, Trash2 as LucideTrash,
-} from "lucide-react";
+import { Target as LucideTarget, Type as LucideType, Palette as LucidePalette, Lock as LucideLock, Play as LucidePlay, RotateCcw as LucideRotate, BookOpen as LucideBook, Sparkles, Bot as LucideRobotIcon, Quote as LucideQuote, Shield as LucideShield, Type as LucideTypeIcon, Pencil as LucidePencil, Award as LucideAward, Package as LucidePackage, Hash as LucideHash, MessageCircle as LucideMessage, FileText as LucideFileText, IdCard as LucideIdCard, Trash2 as LucideTrash } from "lucide-react";
 import { SCOPE_SEGMENTS, type SegmentSpec } from "../lib/positioningSchema";
 import { pipelineFor, type PipelineStepSpec } from "../lib/positioningPipeline";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import {
-  faChevronDown, faPlus, faCloudArrowUp, faShapes,
-  faPalette, faFont, faQuoteLeft, faBullseye, faUsers,
-  faImage, faIcons, faChartPie, faImages, faPenNib, faShieldHalved,
-  faFolderOpen, faUserPlus, faCrown, faPlay, faLock, faLockOpen,
-  faBookOpen, faTableList, faRobot, faTrademark, faBox, faCalendarDay,
-  faRocket, faBullhorn,
-  faWandSparkles, faEllipsis, faCircleInfo,
-  faMagnifyingGlass, faGear, faCheck, faUserCircle,
-} from "@fortawesome/free-solid-svg-icons";
+import { faPlus, faPalette, faFont, faQuoteLeft, faBullseye, faUsers, faImage, faIcons, faChartPie, faImages, faPenNib, faShieldHalved, faFolderOpen, faLock, faLockOpen, faBookOpen, faTableList, faRobot, faBox, faRocket, faBullhorn, faWandSparkles, faGear } from "@fortawesome/free-solid-svg-icons";
 
 // Sub-nav id format:
 //   "asset:<key>"   — non-positioning brand assets (準則 / 標誌 / etc.)
@@ -84,20 +57,12 @@ interface SubNavItem { id: SectionId; label: string; badge?: string; group?: str
 
 // Brand has positioning segments + visual/asset entries.
 // Per CJ: 圖像/圖示/圖表/品牌範本/準則/照片/所有資產 all removed.
-const BRAND_ASSET_SUBNAV: SubNavItem[] = [
-  { id: "asset:logo",   label: "標誌",     group: "visuals" },
-  { id: "asset:colors", label: "顏色",     group: "visuals" },
-  { id: "asset:fonts",  label: "字型",     group: "visuals" },
-];
 
 // Event-specific subnav additions (CJ direction 2026-04-29):
 // - settings page lets user edit metadata (brand / name / period /
 //   productIds) post-creation — previously only set at create time.
 // - 視覺資產 deferred to a later round (event posters / videos go through
 //   MediaGenFlow per the visual-step rule, not stored as static assets).
-const EVENT_SETTINGS_SUBNAV: SubNavItem[] = [
-  { id: "settings", label: "設定（品牌 / 期間 / 產品）", group: "settings" },
-];
 
 // Tile colors (HeroUI semantic-100 backgrounds + matching tone)
 type Tone = "primary" | "secondary" | "success" | "warning" | "danger" | "default";
@@ -145,19 +110,6 @@ export default function BrandsPage() {
   // Navigate the editor to a specific entity by writing ?p= / ?e= (replaces
   // the old setScope({productId/eventId}) which the brand-only global scope
   // no longer supports).
-  const goToEntity = React.useCallback(
-    (kind: "brand" | "product" | "event", id: number | null) => {
-      setSearchParams((prev) => {
-        const sp = new URLSearchParams(prev);
-        sp.delete("p");
-        sp.delete("e");
-        if (kind === "product" && id) sp.set("p", String(id));
-        if (kind === "event" && id) sp.set("e", String(id));
-        return sp;
-      }, { replace: true });
-    },
-    [setSearchParams],
-  );
 
   // Add entity modal (新增品牌 / 產品 / 活動)
   const [addModal, setAddModal] = useState<{ open: boolean; tab: AddEntityTab }>({ open: false, tab: "brand" });
@@ -180,7 +132,6 @@ export default function BrandsPage() {
     } catch { /* no-op */ }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  const [onboardingHint, setOnboardingHint] = useState<string | undefined>(undefined);
 
   // Tab locks (定位 / 文字 / 視覺) — fetched per-brand
   const activeBrandIdForLocks = scope?.brandId ?? brandId ?? null;
@@ -621,27 +572,6 @@ export default function BrandsPage() {
   // Each segment becomes its own sub-nav entry (id = "seg:<segmentId>"),
   // alongside 速查卡 / AI 指令庫 / brand assets (brand only).
   const segments = scopeMode === "none" ? [] : SCOPE_SEGMENTS[scopeMode];
-  const SUBNAV: SubNavItem[] = useMemo(() => {
-    const items: SubNavItem[] = [];
-    items.push({ id: "card",    label: lang === "en" ? "Cheat sheet" : "速查卡",     group: "doc" });
-    items.push({ id: "prompts", label: lang === "en" ? "AI prompts"  : "AI 指令庫",  group: "doc" });
-    for (const s of segments) {
-      items.push({
-        id: `seg:${s.id}`,
-        label: `${s.num} ${s.title}`,
-        group: "segments",
-      });
-    }
-    if (scopeMode === "brand") {
-      items.push({ id: "asset:logo",   label: lang === "en" ? "Logo"   : "標誌", group: "visuals" });
-      items.push({ id: "asset:colors", label: lang === "en" ? "Colors" : "顏色", group: "visuals" });
-      items.push({ id: "asset:fonts",  label: lang === "en" ? "Fonts"  : "字型", group: "visuals" });
-    }
-    if (scopeMode === "event") {
-      items.push({ id: "settings", label: lang === "en" ? "Campaign settings" : "設定（品牌 / 期間 / 產品）", group: "settings" });
-    }
-    return items;
-  }, [scopeMode, segments, lang]);
 
   // ── Navigation ────────────────────────────────────────────────────────────
   // `cat` URL param drives the large category. After 2026-05-07 restructure,
@@ -858,16 +788,7 @@ export default function BrandsPage() {
     scopeMode === "product" ? ((productQuery.data as any)?.name ?? (lang === "en" ? "(Select a product above)" : "（請於右上選擇產品）"))
     : scopeMode === "event" ? ((eventQuery.data as any)?.name ?? (lang === "en" ? "(Select an event above)" : "（請於右上選擇活動）"))
     : (currentBrand?.name ?? (lang === "en" ? "(Select a brand above)" : "（請於右上選擇品牌）"));
-  const scopeIcon =
-    scopeMode === "product" ? faBox
-    : scopeMode === "event" ? faCalendarDay
-    : faTrademark;
-  const scopeEyebrow =
-    scopeMode === "product" ? "PRODUCT"
-    : scopeMode === "event" ? "EVENT"
-    : "BRAND";
   const brandName = currentBrand?.name ?? (lang === "en" ? "My brand" : "我的品牌");
-  const brandInitial = brandName.charAt(0).toUpperCase();
 
   const brainQuery = (trpc as any).brandBrain?.list?.useQuery
     ? (trpc as any).brandBrain.list.useQuery(
@@ -878,15 +799,9 @@ export default function BrandsPage() {
 
   const brainEntries: Record<string, any[]> =
     ((brainQuery.data as any)?.entries as Record<string, any[]>) ?? {};
-  const cnt = (cat: string) => brainEntries[cat]?.length ?? 0;
 
   // Brand asset tiles (visuals — non-positioning).
   // Per CJ: only logo / colors / fonts remain.
-  const TILES: Tile[] = [
-    { id: "asset:logo",   label: "標誌", icon: faPenNib,  tone: "default", ready: true },
-    { id: "asset:colors", label: "顏色", icon: faPalette, tone: "default", ready: true },
-    { id: "asset:fonts",  label: "字型", icon: faFont,    tone: "default", ready: true },
-  ];
 
   // (tiles and onTileClick replaced by category === "visual" inline rendering)
 
@@ -964,11 +879,6 @@ export default function BrandsPage() {
     : null;
 
   const utils = (trpc as any).useUtils?.() ?? null;
-  const saveMutation = (trpc as any).scope?.savePositioning?.useMutation
-    ? (trpc as any).scope.savePositioning.useMutation({
-        onSuccess: () => utils?.scope?.active?.invalidate?.(),
-      })
-    : null;
 
   // Phase 6 — call pipeline.runStep tRPC, server hits OpenClaw gateway
   // (web_search) until budget met, persists conclusion + sources scoped
@@ -2706,77 +2616,6 @@ function TabActionBar({
 }
 
 /* ─────────────────────────── PositioningBrainBar ─────────────────────
- *
- * Mirrors the /theater BrainBar visual language: a strategist agent's
- * portrait inside a line-art frame + a speech bubble showing live
- * thinking text from the positioning pipeline.
- *
- * Always renders with the same agent (Claire Hsu — same chief strategist
- * as Theater). Future: swap per pipeline step's assigned agent.
- */
-function PositioningBrainBar({ thinking }: {
-  thinking: {
-    segmentTarget: string;
-    text: string;
-    phase: string | null;
-    startedAt: number | null;
-    stepNum: number;
-    stepTotal: number;
-    stepTitle: string;
-  };
-}) {
-  const { lang } = useLang();
-  // Typewriter-feel: just render text plain (server already streams it).
-  return (
-    <div
-      className="sticky top-0 z-30 w-full border-b border-neutral-200 backdrop-blur-md"
-      style={{ background: "#7C3AED08" }}
-    >
-      <div className="max-w-[1400px] mx-auto px-6 py-3 flex items-center gap-4">
-        <div
-          className="flex-shrink-0 w-14 h-14 rounded-2xl bg-white flex items-center justify-center"
-          style={{ border: "2px solid #111", boxShadow: "3px 3px 0 #7C3AED66" }}
-        >
-          <span style={{ fontSize: 22 }}>🧠</span>
-        </div>
-        <div
-          className="relative flex-1 bg-white px-4 py-2.5 rounded-2xl"
-          style={{ border: "2px solid #111", boxShadow: "3px 3px 0 #7C3AED33" }}
-        >
-          <div
-            className="absolute left-[-8px] top-5 w-4 h-4 bg-white"
-            style={{
-              borderLeft: "2px solid #111",
-              borderBottom: "2px solid #111",
-              transform: "rotate(45deg)",
-            }}
-          />
-          <div className="text-tiny text-neutral-700 mb-0.5 flex items-center gap-2">
-            <span className="font-semibold text-neutral-800">
-              {lang === "en" ? `Step ${thinking.stepNum} / ${thinking.stepTotal}` : `步驟 ${thinking.stepNum} / ${thinking.stepTotal}`}
-            </span>
-            <span>·</span>
-            <span>{thinking.stepTitle}</span>
-            {thinking.phase && (
-              <>
-                <span>·</span>
-                <span className="text-neutral-900 font-semibold">{thinking.phase}</span>
-              </>
-            )}
-          </div>
-          <p className="text-small text-neutral-900 leading-snug">
-            {thinking.text || (lang === "en" ? "Analyzing…" : "正在分析…")}
-            <span
-              className="inline-block w-[2px] h-[14px] ml-0.5 align-middle bg-neutral-900"
-              style={{ animation: "blink 1s steps(2) infinite" }}
-            />
-          </p>
-        </div>
-      </div>
-      <style>{`@keyframes blink { 50% { opacity: 0 } }`}</style>
-    </div>
-  );
-}
 
 /* ─────────────────────────── PositioningGrid ───────────────────────── */
 // 品牌定位的 card grid — 速查卡/指令庫 + segments 分組顯示
@@ -4104,40 +3943,6 @@ function PromptLibraryView({ scopeMode, data, scopeName }: { scopeMode: string; 
 }
 
 /* ─────────────────────────── BrandAssetTile ─────────────────────────── */
-
-function BrandAssetTile({ tile, onClick }: { tile: Tile; onClick: () => void }) {
-  const { lang } = useLang();
-  return (
-    <Card
-      isPressable
-      isHoverable
-      onPress={onClick}
-      shadow="sm"
-      radius="lg"
-      className={`overflow-hidden bg-${tile.tone}-100`}
-    >
-      <CardBody className="aspect-[4/3] items-center justify-center relative p-0">
-        <FontAwesomeIcon
-          icon={tile.icon}
-          className={`text-7xl text-${tile.tone}-600/70`}
-        />
-        {tile.count != null && tile.count > 0 && (
-          <Chip size="sm" variant="flat" className="absolute top-3 right-3 bg-content1/80 backdrop-blur-md">
-            {tile.count}
-          </Chip>
-        )}
-        {!tile.ready && (
-          <Chip size="sm" variant="flat" className="absolute top-3 right-3 bg-content1/80 backdrop-blur-md text-default-700">
-            {lang === "en" ? "Coming soon" : "即將推出"}
-          </Chip>
-        )}
-      </CardBody>
-      <div className="px-4 py-3 bg-content1">
-        <p className="text-small font-medium text-foreground">{tile.label}</p>
-      </div>
-    </Card>
-  );
-}
 
 /* ─────────────────────── Event Settings Panel ───────────────────────
  * CJ direction 2026-04-29: post-creation event editing — brand picker,

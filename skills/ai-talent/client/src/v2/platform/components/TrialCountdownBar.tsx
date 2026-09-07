@@ -6,7 +6,6 @@
  * 2026-05-18 (CJ dual-limit): also shows points balance. Trial stops when
  * EITHER the 7 days OR the 1000 points run out (whichever comes first).
  */
-import React from "react";
 import { Link } from "react-router-dom";
 import { trpc } from "../../../lib/trpc";
 import { useLang } from "../../../lib/i18n";

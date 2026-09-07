@@ -6,13 +6,9 @@
  *   blog      — blog article post
  *   product   — e-commerce product page
  */
-import React from "react";
-import { Button, Chip, Divider, Skeleton } from "@heroui/react";
+import { Button, Chip, Skeleton } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import {
-  faGlobe, faImages, faArrowRight, faCheck, faStar,
-  faMagnifyingGlass, faBarsStaggered, faCirclePlay,
-} from "@fortawesome/free-solid-svg-icons";
+import { faGlobe, faImages, faArrowRight, faCheck, faStar, faCirclePlay } from "@fortawesome/free-solid-svg-icons";
 import { type MockupFields, MockupHeader, handleOf } from "./shared";
 
 /* ─────────────── Landing Page ─────────────── */

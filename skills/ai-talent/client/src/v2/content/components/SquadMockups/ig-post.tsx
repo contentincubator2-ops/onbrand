@@ -10,7 +10,6 @@
  * Yes — this wraps IGFeed/IGCarousel from ../PlatformMockup/instagram
  * rather than reinventing the IG post UI.
  */
-import React from "react";
 import { Chip } from "@heroui/react";
 import { IGFeed, IGCarousel } from "../PlatformMockup/instagram";
 import type { MockupFields } from "../PlatformMockup/shared";

@@ -19,22 +19,7 @@ import { nanoid } from "nanoid";
 import { eq } from "drizzle-orm";
 import { getDb } from "../../db";
 import { users } from "../../../drizzle/schema";
-import {
-  getUserByEmail,
-  createUser,
-  verifyUserEmail,
-  setEmailVerificationToken,
-  getUserByEmailVerificationToken,
-  getUserByPasswordResetToken,
-  setPasswordResetToken,
-  updateUserPassword,
-  updateLastLoginIp,
-  updatePreferredLang,
-  verifyEmailPassword,
-  upsertGoogleUser,
-  deleteUserById,
-  EMAIL_VERIFICATION_EXPIRY_MS,
-} from "./usersDb";
+import { getUserByEmail, createUser, verifyUserEmail, setEmailVerificationToken, getUserByEmailVerificationToken, getUserByPasswordResetToken, setPasswordResetToken, updateUserPassword, updateLastLoginIp, updatePreferredLang, verifyEmailPassword, upsertGoogleUser, EMAIL_VERIFICATION_EXPIRY_MS } from "./usersDb";
 import { sendEmailVerification, sendPasswordReset } from "./emailService";
 import { getJwtSecret } from "../core/env";
 

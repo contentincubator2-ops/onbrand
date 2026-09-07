@@ -7,7 +7,6 @@
  *   - marketplace: Flowbite Blocks application/product-cards
  *   - event:       Flowbite Blocks marketing/events (date block + venue)
  */
-import React from "react";
 import { Avatar, Button, Skeleton, User } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faFacebook } from "@fortawesome/free-brands-svg-icons";
@@ -17,7 +16,7 @@ import {
   faBookmark, faLocationDot, faCalendarDays, faUserGroup,
   faChevronRight, faArrowRight, faThumbtack,
 } from "@fortawesome/free-solid-svg-icons";
-import { type MockupFields, MockupHeader, MarkdownText, dicebear, titleEchoesCaption, ImageGenSlot, SHOW_IMAGE_STYLE_OVERLAY } from "./shared";
+import { type MockupFields, MockupHeader, MarkdownText, dicebear, ImageGenSlot, SHOW_IMAGE_STYLE_OVERLAY } from "./shared";
 import { useLang } from "../../../../lib/i18n";
 import { parseAdCopy, shortenAdCta } from "../../lib/parseAdCopy";
 

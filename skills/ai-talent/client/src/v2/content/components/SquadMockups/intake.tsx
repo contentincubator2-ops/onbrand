@@ -18,7 +18,6 @@
  *   The mockup must show a visible "正在讀取..." loading state while the agent
  *   reads the selected context object, then populate the data once ready.
  */
-import React from "react";
 import {
   Input, Textarea, Select, SelectItem, CheckboxGroup, Checkbox,
   Button, Chip, Spinner,

@@ -16,7 +16,7 @@
  * Route: /admin/squads
  */
 import React from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 import {
   Card, CardBody, Button, Input, Select, SelectItem, Chip, Avatar,
   Modal, ModalContent, ModalHeader, ModalBody, ModalFooter,

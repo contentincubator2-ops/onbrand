@@ -2,12 +2,11 @@
  * 服務條款 — OnBrand Terms of Service.
  * 2026-05-10. 由 SoWork 法律顧問 review 後正式版替換 (TODO).
  */
-import React from "react";
 import { Link } from "react-router-dom";
 import { useLang } from "../../../../lib/i18n";
 
 export default function TermsPage() {
-  const { t, lang } = useLang();
+  const { lang } = useLang();
   const isEn = lang === "en";
 
   return (

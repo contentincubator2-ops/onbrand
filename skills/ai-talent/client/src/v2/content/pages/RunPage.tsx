@@ -30,10 +30,7 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 import {
 } from "@fortawesome/free-brands-svg-icons";
-import {
-  Pencil, MessageCircle, Image as LucideImage, Video,
-  Wand2, Users as LucideUsers, Save, Copy as LucideCopy,
-} from "lucide-react";
+import { Pencil, MessageCircle, Image as LucideImage, Wand2, Users as LucideUsers, Copy as LucideCopy } from "lucide-react";
 import { trpc } from "../../../lib/trpc";
 import { showToastGlobal } from "../../../components/ui/Toast";
 import { PlatformMockup } from "../components/PlatformMockup";
@@ -543,7 +540,6 @@ export default function RunPage() {
   const [imageModel, setImageModel] = useState<string>("gpt-image-2");
   /** Video gen state — async job, polled for status. */
   /** 2026-05-12: user-selected video model for 改影片 dropdown. */
-  const [videoModel, setVideoModel] = useState<string>("auto");
   /** 2026-05-12 Phase 1 — picked template category for the 改圖 picker. */
   const [templateCategory, setTemplateCategory] = useState<string>("");
   /** 2026-05-19 (CJ「某個影片 title 產出腳本」): inline script generation modal. */
@@ -630,12 +626,6 @@ export default function RunPage() {
     onError: (e) => showToastGlobal(
       lang === "en" ? `Schedule failed: ${e.message}` : `排程失敗：${e.message}`
     ),
-  });
-  const statusMut = trpc.output.updateStatus.useMutation({
-    onSuccess: () => {
-      showToastGlobal(t("run_saved_to_mission"));
-      utils.output.getById.invalidate({ id });
-    },
   });
   // 2026-05-09 (P3): regen single variant
   const regenMut = (trpc as any).quickTask?.regenerateVariant?.useMutation
@@ -749,98 +739,6 @@ export default function RunPage() {
   // Synchronous: NO awaits before pd.connectAccount() so the popup keeps
   // the click's user activation. If not warmed yet, warm it and ask the
   // user to tap again (never attempt a popup that will be blocked).
-  const openPipedreamConnect = (platform: "facebook" | "instagram" | "linkedin" | "youtube") => {
-    if (pipedreamBusy) return;
-
-    // bundle.social path: a hosted portal in a new tab, no Pipedream SDK.
-    // YouTube is never routed here — getProviders only covers fb/ig/li.
-    if (bundleProvidersQ?.data?.[platform] === "bundle") {
-      const brandId = data?.mission?.brandId ?? data?.brand?.id ?? 0;
-      if (!brandId) return;
-      const url = bundleUrlRef.current[platform];
-      if (!url) {
-        void bundleConnectUrlMut?.mutateAsync?.({
-          brandId,
-          platform,
-          redirectUrl: window.location.href,
-        }).then((r: any) => {
-          if (r?.url) bundleUrlRef.current[platform] = r.url;
-        }).catch(() => { /* retried on next tap */ });
-        showToastGlobal(
-          lang === "en"
-            ? "Preparing authorization — please tap again in a moment."
-            : "正在準備授權，請稍候 1-2 秒再點一次"
-        );
-        return;
-      }
-      // Portal links are single-use.
-      delete bundleUrlRef.current[platform];
-      window.open(url, "_blank", "noopener");
-      showToastGlobal(
-        lang === "en"
-          ? "Complete the authorization in the new tab, then return here."
-          : "請在新分頁完成授權後回到此頁"
-      );
-      return;
-    }
-
-    const tk = pdTokenRef.current[platform];
-    const Ctor = pdSdkRef.current;
-    if (!Ctor || !tk || tk.expiresAt - Date.now() < 30_000) {
-      prefetchConnect(platform);
-      showToastGlobal(
-        lang === "en"
-          ? "Preparing authorization — please tap again in a moment."
-          : "正在準備授權，請稍候 1-2 秒再點一次"
-      );
-      return;
-    }
-    setPipedreamBusy(true);
-    try {
-      const pd = new Ctor({
-        projectEnvironment: tk.env as "production" | "development",
-        externalUserId: `sowork-brand-${(data?.mission?.brandId ?? data?.brand?.id ?? 0)}`,
-        tokenCallback: async () => ({
-          token: tk.token,
-          expiresAt: new Date(tk.expiresAt),
-          connectLinkUrl: tk.connectLinkUrl,
-        }),
-      });
-      pd.connectAccount({
-        app: tk.appSlug,
-        oauthAppId: tk.oauthAppId ?? undefined,
-        onSuccess: () => {
-          showToastGlobal(
-            lang === "en"
-              ? `${PLATFORM_LABEL[platform]} connected ✓ Ready to publish`
-              : `已授權 ${PLATFORM_LABEL[platform]} ✓ 現在可以發布`
-          );
-          setPipedreamBusy(false);
-          // token consumed — refresh for a possible next connect
-          delete pdTokenRef.current[platform];
-          prefetchConnect(platform);
-        },
-        onError: (err: any) => {
-          setPipedreamBusy(false);
-          showToastGlobal(
-            lang === "en" ? `Authorization failed: ${String(err).slice(0, 120)}` : `授權失敗：${String(err).slice(0, 120)}`
-          );
-        },
-        onClose: ({ successful }: any) => {
-          setPipedreamBusy(false);
-          if (!successful) {
-            delete pdTokenRef.current[platform];
-            prefetchConnect(platform);
-          }
-        },
-      });
-    } catch (e: any) {
-      setPipedreamBusy(false);
-      showToastGlobal(
-        lang === "en" ? `Authorization failed: ${String(e?.message ?? e).slice(0, 120)}` : `授權失敗：${String(e?.message ?? e).slice(0, 120)}`
-      );
-    }
-  };
 
   // 2026-05-18 (CJ「toast 叫我點下方連接 Facebook 按鈕，但根本沒有那顆」):
   // for Facebook there was ONLY the 直接發 button — no connect button —
@@ -854,13 +752,8 @@ export default function RunPage() {
         { enabled: fbBrandId > 0, refetchOnWindowFocus: false, staleTime: 15_000 },
       )
     : { data: null };
-  const fbConnected = !!(fbStatusQuery?.data as any)?.connected;
 
   // 2026-05-30: brand-scoped platform connection status (for polling)
-  const platformsQRun = (trpc as any).publish?.getConnectedPlatforms?.useQuery?.(
-    { brandId: fbBrandId },
-    { enabled: fbBrandId > 0, refetchOnWindowFocus: false, staleTime: 20_000 },
-  );
 
   // fbPagesMutRef: ref so connectFacebookViaUrl's async retry loop can call
   // the latest mutation without stale closure issues.
@@ -891,59 +784,6 @@ export default function RunPage() {
   }) ?? { mutateAsync: async () => {}, isPending: false };
 
   // Uses Pipedream SDK iframe — window.open popup throws "Must be inside iframe"
-  const connectFacebookViaUrl = () => {
-    (async () => {
-      try {
-        const r = await fbConnectUrlMut?.mutateAsync?.({ brandId: fbBrandId });
-        if (!r?.token) {
-          showToastGlobal(lang === "en" ? "Couldn't get auth token — contact sowork@sowork.ai" : "無法取得授權 token — 請聯絡 sowork@sowork.ai");
-          return;
-        }
-        const { createFrontendClient } = await import("@pipedream/sdk/browser");
-        const pd = createFrontendClient({
-          externalUserId: `sowork-brand-${fbBrandId}`,
-          tokenCallback: async () => ({ token: r.token, expiresAt: new Date(Date.now() + 300_000), connectLinkUrl: "" } as any),
-        });
-        setFbOauthPending(true);
-        pd.connectAccount({
-          token: r.token,
-          app: "facebook_pages",
-          oauthAppId: r.oauthAppId ?? undefined,
-          onSuccess: async () => {
-            setFbOauthPending(false);
-            setFbOauthDone(true);
-            // Poll getFacebookPages with backoff for Pipedream propagation delay
-            for (let i = 0; i < 10; i++) {
-              await new Promise<void>(res => setTimeout(res, i === 0 ? 1500 : 2000));
-              try {
-                const pages = await fbPagesMutRef.current?.mutateAsync?.({
-                  brandId: fbBrandId,
-                  waitForPropagation: false,
-                });
-                const readyPages = (pages?.pages ?? [])
-                  .filter((page: any) => page.publishReady !== false);
-                if (readyPages.length > 0) {
-                  setFbPages(readyPages);
-                  setFbPagePickerOpen(true);
-                  return;
-                }
-              } catch { /* keep retrying */ }
-            }
-          },
-          onError: (err: any) => {
-            setFbOauthPending(false);
-            showToastGlobal(lang === "en" ? `Authorization failed: ${err?.message ?? "Unknown"}` : `授權失敗：${err?.message ?? "未知錯誤"}`);
-          },
-          onClose: (status: any) => {
-            if (!status?.successful) setFbOauthPending(false);
-          },
-        });
-      } catch (e: any) {
-        setFbOauthPending(false);
-        showToastGlobal(lang === "en" ? `Authorization failed: ${String(e?.message ?? e).slice(0, 120)}` : `授權失敗：${String(e?.message ?? e).slice(0, 120)}`);
-      }
-    })();
-  };
 
   const imageGenMut = (trpc as any).image?.generate?.useMutation
     ? (trpc as any).image.generate.useMutation({

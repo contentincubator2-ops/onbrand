@@ -15,7 +15,7 @@
  *
  * Gated by adminProcedure server-side — non-admins get FORBIDDEN.
  */
-import React, { useState } from "react";
+import { useState } from "react";
 import { trpc } from "../../../lib/trpc";
 import { AlertTriangle, ExternalLink, RefreshCw, Check, X, Package } from "lucide-react";
 

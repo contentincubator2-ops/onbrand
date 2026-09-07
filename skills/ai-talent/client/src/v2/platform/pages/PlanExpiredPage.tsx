@@ -5,7 +5,6 @@
  * when trial ends. RequireAuthV2 checks this and redirects here so
  * users see a clear upgrade path rather than confusing 403 errors.
  */
-import React from "react";
 import { useNavigate } from "react-router-dom";
 import { useLang as useLanguage } from "../../../lib/i18n";
 

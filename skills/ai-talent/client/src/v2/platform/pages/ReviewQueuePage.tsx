@@ -12,7 +12,7 @@
  * 字級從 13px 起跳。2026-09-06 已把介面地板抬到 12px，這頁是新的，
  * 不貼著地板寫。
  */
-import React, { useState } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { trpc } from "../../../lib/trpc";
 import { useLang } from "../../../lib/i18n";

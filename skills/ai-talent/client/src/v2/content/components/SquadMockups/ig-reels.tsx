@@ -8,7 +8,6 @@
  * Per CJ correction 2026-05-02: don't duplicate IG chrome — IGReels
  * already handles the 9:16 phone-frame, action stack, audio bar.
  */
-import React from "react";
 import { Chip } from "@heroui/react";
 import { IGReels } from "../PlatformMockup/instagram";
 import type { MockupFields } from "../PlatformMockup/shared";

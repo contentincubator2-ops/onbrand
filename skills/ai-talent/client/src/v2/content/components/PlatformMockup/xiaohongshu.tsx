@@ -6,21 +6,17 @@
  *   video    — 影片筆記 (short video note)
  *   search   — 搜索結果卡片 (search result card)
  */
-import React from "react";
-import { Avatar, Chip, Skeleton } from "@heroui/react";
+import { Avatar, Skeleton } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faHeart, faComment, faStar, faShare,
   faLocationDot, faSearch, faMagnifyingGlass,
   faPlay, faEllipsis,
 } from "@fortawesome/free-solid-svg-icons";
-import { type MockupFields, MockupHeader, dicebear, handleOf, MarkdownText } from "./shared";
+import { type MockupFields, MockupHeader, MarkdownText } from "./shared";
 
 /* XHS brand red */
 const XHS_RED = "#FF2442";
-const XHS_DARK = "#1A1A1A";
-const XHS_GRAY = "#9B9B9B";
-const XHS_BG   = "#F5F5F5";
 
 /* ─────────────── XHS Avatar helper ─────────────── */
 const xhsAvatar = (name: string) =>
@@ -33,7 +29,6 @@ export function XHSNote({
   liveTitle, liveCaption, liveDescription, liveHashtags, liveImageDesc, liveCta,
 }: MockupFields) {
   const brand   = brandName ?? "品牌帳號";
-  const handle  = handleOf(brandName);
   const tags    = liveHashtags ?? ["品牌", "生活", "推薦"];
 
   return (

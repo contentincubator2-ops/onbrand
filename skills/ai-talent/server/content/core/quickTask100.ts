@@ -18,7 +18,6 @@
  * caption_writer prompts.
  */
 import type { FBTaskTemplate, OrchestraConfig } from "./quickTaskFB";
-import type { TaskSource } from "./taskSource";
 
 const TONE_100 = `
 語氣要求：自然、有 hook、不官腔。
@@ -1216,11 +1215,10 @@ ${TONE_100}`,
 // ─── Orchestra configs ──────────────────────────────────────────────────
 // Image directors per channel
 const MANDY = 220887, NANCY = 180170, NINA = 180157, ANNA = 180165; // Mandy → Claire Chen (977 char)
-const ZEYU = 60071, NATHAN = 60062, BR_IMG = 60030, RS_IMG = 24;
+const ZEYU = 60071, BR_IMG = 60030;
 // 2026-05-08: per-task unique image directors for 100s tier
 const TT100_IMG2 = 220896; // Brian Chen — Digital Experience Designer
 const LI100_IMG2 = 210018; // Zach Ko — AI Design Thinking Consultant (IDEO)
-const EM100_IMG2 = 210019; // Sophia Liao — AI Digital Experience Strategist (McKinsey)
 const BR100_IMG2 = 39;     // Tom Hsu — Marketing Designer
 
 const fb100Common = {

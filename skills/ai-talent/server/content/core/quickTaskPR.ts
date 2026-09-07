@@ -4,7 +4,6 @@
  * image_director = Vincent Chu (60011, PR Strategist Tech) — repurposed.
  */
 import type { FBTaskTemplate, OrchestraConfig } from "./quickTaskFB";
-import type { TaskSource } from "./taskSource";
 
 // 2026-05-17 (CJ「參考 PR 獎項得獎工藝，強化所有新聞稿任務」):
 // shared earned-media craft prepended to every PR task. Distilled from

@@ -2,7 +2,7 @@
  * /settings/account — subscription, password, invoices, data export.
  * 2026-05-10. CJ direction「除了金流，今天都做完」.
  */
-import React, { useState } from "react";
+import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { trpc } from "../../../lib/trpc";
 import { showToastGlobal } from "../../../components/ui/Toast";
@@ -13,7 +13,6 @@ import { ChevronLeft, Download, Trash2, AlertTriangle } from "lucide-react";
 export default function AccountPage() {
   const navigate = useNavigate();
   const { t, lang } = useLang();
-  const utils = trpc.useUtils();
   const statusQuery = (trpc as any).billing?.getStatus?.useQuery
     ? (trpc as any).billing.getStatus.useQuery()
     : { data: null, refetch: () => {} };

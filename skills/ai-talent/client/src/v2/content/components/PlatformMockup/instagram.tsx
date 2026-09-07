@@ -10,7 +10,6 @@
  *   - story: justinTsugranes/project_instagram-stories-ui-tailwind (MIT)
  *   - reel: 9:16 + side rail pattern from SashenJayathilaka/TIK-TOK-Clone (MIT)
  */
-import React from "react";
 import {
   Avatar, AvatarGroup, Button, Skeleton,
 } from "@heroui/react";
@@ -18,11 +17,7 @@ import {
 // (none needed beyond instagram itself)
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faInstagram } from "@fortawesome/free-brands-svg-icons";
-import {
-  faHeart, faComment, faPaperPlane, faBookmark, faImages, faCircleCheck,
-  faMusic, faChevronLeft, faXmark, faVolumeHigh, faTableCellsLarge,
-  faVideo, faTag, faUserGroup, faEye, faShoppingBag,
-} from "@fortawesome/free-solid-svg-icons";
+import { faHeart, faComment, faPaperPlane, faBookmark, faImages, faCircleCheck, faMusic, faChevronLeft, faXmark, faVolumeHigh, faTableCellsLarge, faVideo, faTag, faUserGroup, faEye } from "@fortawesome/free-solid-svg-icons";
 import {
   type MockupFields, MockupHeader, StoryRingAvatar, VerticalActionRail,
   dicebear, handleOf, SlotContent, MarkdownText, ImageGenSlot,

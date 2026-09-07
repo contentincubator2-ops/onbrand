@@ -6,8 +6,7 @@
  *   tweet   — single tweet card (light/dark)
  *   thread  — thread of tweets
  */
-import React from "react";
-import { Avatar, Button, Chip, Divider, Skeleton } from "@heroui/react";
+import { Avatar, Chip, Divider, Skeleton } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faXTwitter } from "@fortawesome/free-brands-svg-icons";
 import {
@@ -21,7 +20,6 @@ import { type MockupFields, MockupHeader, dicebear, MarkdownText } from "./share
 export function XTweet({ title, brandName, variantLabel, liveCaption, liveHashtags, liveImageDesc }: MockupFields) {
   const brand = brandName ?? "Your Brand";
   const handle = brand.toLowerCase().replace(/\s+/g, "_");
-  const hasImage = !!liveImageDesc;
 
   return (
     <div className="w-full max-w-[520px] mx-auto">

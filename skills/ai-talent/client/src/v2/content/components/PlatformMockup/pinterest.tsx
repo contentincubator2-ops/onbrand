@@ -6,7 +6,6 @@
  *   board    — board / masonry grid view (desktop MacBook frame)
  *   story-pin — idea pin / story format (fullscreen mobile)
  */
-import React from "react";
 import { Avatar, Skeleton } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
@@ -17,7 +16,6 @@ import {
 import { type MockupFields, MockupHeader, handleOf } from "./shared";
 
 const PIN_RED    = "#E60023";
-const PIN_DARK   = "#111111";
 const PIN_GRAY   = "#767676";
 const PIN_BORDER = "#E0E0E0";
 const PIN_BG     = "#EFEFEF";

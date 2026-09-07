@@ -37,7 +37,7 @@ import { isWuganVoiceTemplate, validateWuganVoice, repairWuganVoice, buildWuganV
 import { extractYouTubeId, fetchYouTubeContext, formatYouTubeContextForPrompt } from "./youtubeContext";
 import { fetchViralPatterns, formatViralPatternsForPrompt } from "./socialListeningScout";
 import { buildBrandPrefix as buildBrandContext, enforceBrandRulesOnText, enforceBrandRulesOnTextWithReport } from "../../strategy/core/brandContext";
-import { isEmailTask, isEmailBodyTask, EDM_CRAFT_RUBRIC, edmPlaybookFor } from "./edmCraft";
+import { isEmailBodyTask, EDM_CRAFT_RUBRIC, edmPlaybookFor } from "./edmCraft";
 import { isInstagramTask, isInstagramBodyTask, IG_CRAFT_RUBRIC, igPlaybookFor } from "./igCraft";
 import { resolveTierVariantShape } from "./tierVariantShape";
 import { isFacebookBodyTask, FB_CRAFT_RUBRIC, fbPlaybookFor } from "./fbCraft";
@@ -53,7 +53,7 @@ import { loadBrandKnowledgeForPrompt } from "../../strategy/routers/brandKnowled
 import { getBrandRealContent } from "../../strategy/core/brandRealContent";
 import { resolveAgentId } from "./agentAssignments";
 import { getCopywritingMasterPrompt, type MarketCode, type PlatformCode } from "./copywritingMaster";
-import { getBrandMarket, DEFAULT_BRAND_MARKET, type BrandMarket } from "../../strategy/core/brandMarket";
+import { getBrandMarket, DEFAULT_BRAND_MARKET } from "../../strategy/core/brandMarket";
 import type { FBTaskTemplate, OrchestraConfig } from "./quickTaskFB";
 import localPool from "../../localDb";
 
@@ -1583,7 +1583,7 @@ async function callStrategist(args: {
   deliverable?: string;
   unit?: string;
 }): Promise<string> {
-  const { strategistPersona, template, brandPrefix, urlContext, userMsg, postLabels } = args;
+  const { strategistPersona, brandPrefix, urlContext, userMsg, postLabels } = args;
   const deliverable = args.deliverable ?? "FB 系列貼文";
   const unit = args.unit ?? "篇";
   const system =
@@ -2012,7 +2012,6 @@ export async function runOrchestra(args: {
   // config already fully specifies its own shape (ONE variant + N cards)
   // and its own variantLabels/extras — same exemption philosophy as the
   // router's "isPack" clamp skip in quickTaskRouter's central 60s rule.
-  const isCardsConfig = (args.config.cardsPerVariant ?? 0) > 1;
   const tier: OrchestraTier = args.tier ?? "30s";
   if (tier === "60s" || tier === "99s") {
     // 2026-08-22 (CJ 驗收 ig-60-live-suite「6 段流程表只回 5 段」): this used to

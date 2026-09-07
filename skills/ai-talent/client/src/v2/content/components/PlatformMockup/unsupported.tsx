@@ -10,13 +10,9 @@
  * step list with their output types so the user can verify squad fit
  * regardless of mockup faithfulness.
  */
-import React from "react";
 import { Card, CardBody, Chip, Divider } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import {
-  faInstagram, faFacebook, faLinkedin, faYoutube, faTiktok,
-  faXTwitter, faLine, faPinterest, faSpotify,
-} from "@fortawesome/free-brands-svg-icons";
+import { faInstagram, faFacebook, faLinkedin, faYoutube, faTiktok, faXTwitter, faLine, faPinterest } from "@fortawesome/free-brands-svg-icons";
 import {
   faClock, faNewspaper, faWandMagicSparkles, faChevronRight,
   faEnvelope, faGlobe, faBullhorn, faLayerGroup,

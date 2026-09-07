@@ -15,14 +15,14 @@
  *
  * Auto-shown when user has 0 brands (replaces the simple empty state).
  */
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { trpc } from "../../../../lib/trpc";
 import { useLang } from "../../../../lib/i18n";
 import { logActivation } from "../../../platform/lib/activationTelemetry";
 import { Modal, ModalContent, ModalBody, Button, Input, Select, SelectItem, Autocomplete, AutocompleteItem } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faTrademark, faGlobe, faArrowRight, faCheck, faWandMagicSparkles, faLanguage } from "@fortawesome/free-solid-svg-icons";
+import { faTrademark, faGlobe, faArrowRight, faCheck, faLanguage } from "@fortawesome/free-solid-svg-icons";
 import { faFacebook } from "@fortawesome/free-brands-svg-icons";
 import RunningAgentCarousel from "../../../content/components/quickTask/RunningAgentCarousel";
 import { COUNTRIES, getCountry } from "../../../../lib/countries";
@@ -200,7 +200,6 @@ export default function BrandOnboardingWizard({ isOpen, onClose, onComplete }: P
     if (createdBrandId) onComplete(createdBrandId);
   };
 
-  const handleSkipToFinish = () => setStep(4);
 
   return (
     <Modal

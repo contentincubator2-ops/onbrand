@@ -6,7 +6,6 @@
  *
  * Ratios MUST sum to 100. UI shows running total + warning if drift.
  */
-import React from "react";
 import { Input, Textarea, Chip, Progress } from "@heroui/react";
 import { SectionHeader, NotionCard, EmptyHint, type SquadMockupCommonProps } from "./shared";
 

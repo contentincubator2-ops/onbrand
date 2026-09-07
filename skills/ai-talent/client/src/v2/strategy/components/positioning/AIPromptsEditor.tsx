@@ -21,7 +21,7 @@ import { useLang } from "../../../../lib/i18n";
 import { Card, CardBody, Textarea, Button } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faFacebook, faInstagram, faYoutube, faTiktok, faLinkedin, faThreads } from "@fortawesome/free-brands-svg-icons";
-import { faRobot, faEnvelope, faNewspaper, faSave, faCheck } from "@fortawesome/free-solid-svg-icons";
+import { faRobot, faEnvelope, faNewspaper, faCheck } from "@fortawesome/free-solid-svg-icons";
 import { Sparkles } from "lucide-react";
 
 const PLATFORMS: Array<{ id: string; label: string; icon: any; tone: string }> = [
@@ -53,7 +53,6 @@ export default function AIPromptsEditor({ brandId }: { brandId: number | null })
   const stored: Record<string, PromptValue> = (positioning._aiPrompts ?? {}) as Record<string, PromptValue>;
 
   const [drafts, setDrafts] = useState<Record<string, PromptValue>>(stored);
-  const dirtyRef = { current: new Set<string>() };
   const [savingPlatform, setSavingPlatform] = useState<string | null>(null);
   const [saved, setSaved] = useState<string | null>(null);
   const [filling, setFilling] = useState<string | null>(null);

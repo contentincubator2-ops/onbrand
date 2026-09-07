@@ -13,10 +13,7 @@ import React from "react";
 import { useLang } from "../../../../lib/i18n";
 import { Card, CardBody, Chip, Divider } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import {
-  faQuoteLeft, faShieldHalved, faUsers, faTrademark, faBox, faCalendarDay,
-  faBullseye, faChartLine, faRocket, faMessage, faPodcast,
-} from "@fortawesome/free-solid-svg-icons";
+import { faQuoteLeft, faShieldHalved, faUsers, faTrademark, faBox, faCalendarDay, faBullseye, faChartLine, faRocket, faMessage } from "@fortawesome/free-solid-svg-icons";
 
 interface SpeedCardProps {
   scopeMode: "brand" | "product" | "event";

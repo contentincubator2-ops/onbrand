@@ -5,7 +5,6 @@
  * squad-mockup-specific sections (per-slide arc tagging, caption,
  * hashtags). Avoids duplicating FB chrome.
  */
-import React from "react";
 import { Chip } from "@heroui/react";
 import { FBCarousel } from "../PlatformMockup/facebook";
 import type { MockupFields } from "../PlatformMockup/shared";

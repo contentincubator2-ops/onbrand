@@ -6,8 +6,7 @@
  *   richmenu    — Rich Menu interactive panel
  *   card        — Flex Message card (product / event / coupon)
  */
-import React from "react";
-import { Avatar, Button, Chip, Divider, Skeleton } from "@heroui/react";
+import { Avatar, Skeleton } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faLine } from "@fortawesome/free-brands-svg-icons";
 import { faImages, faBell, faQrcode, faArrowRight, faGift } from "@fortawesome/free-solid-svg-icons";

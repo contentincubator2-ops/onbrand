@@ -8,7 +8,6 @@
  * progress-bars + DM input + heart/share icons all live in IGStories
  * (PlatformMockup/instagram.tsx).
  */
-import React from "react";
 import { Chip } from "@heroui/react";
 import { IGStories } from "../PlatformMockup/instagram";
 import type { MockupFields } from "../PlatformMockup/shared";

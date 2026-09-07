@@ -540,7 +540,6 @@ export const squadTemplateRouter = router({
       const scopeId   = input.scopeId   ?? input.brandId   ?? undefined;
       let scopeLabel = "未綁定 scope";
       let scopeContext = "";
-      let resolvedBrandId: number | null = null;
       if (scopeKind && scopeId) {
         if (scopeKind === "brand") {
           const [r] = await localPool.execute(
@@ -549,7 +548,6 @@ export const squadTemplateRouter = router({
           ) as any[];
           const row = (r as any[])?.[0];
           if (row) {
-            resolvedBrandId = Number(row.id);
             scopeLabel = `品牌：${row.name}${row.industry ? `（${row.industry}）` : ""}`;
             const pos = parseJsonField(row.positioning);
             scopeContext = formatPositioningContext(pos, row.description);
@@ -564,7 +562,6 @@ export const squadTemplateRouter = router({
           ) as any[];
           const row = (r as any[])?.[0];
           if (row) {
-            resolvedBrandId = row.brandId ? Number(row.brandId) : null;
             scopeLabel = `產品：${row.name}（隸屬品牌「${row.brandName ?? "—"}」）`;
             const productPos = parseJsonField(row.positioning);
             const brandPos = parseJsonField(row.brandPositioning);
@@ -584,7 +581,6 @@ export const squadTemplateRouter = router({
           ) as any[];
           const row = (r as any[])?.[0];
           if (row) {
-            resolvedBrandId = row.brandId ? Number(row.brandId) : null;
             const period = row.startAt ? `${String(row.startAt).split("T")[0]} ~ ${String(row.endAt ?? "").split("T")[0]}` : "（無日期）";
             scopeLabel = `活動：${row.name}（隸屬品牌「${row.brandName ?? "—"}」，期間 ${period}）`;
             const eventPos = parseJsonField(row.positioning);

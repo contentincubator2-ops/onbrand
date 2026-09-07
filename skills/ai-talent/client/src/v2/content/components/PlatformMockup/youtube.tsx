@@ -7,14 +7,10 @@
  *   - shorts:     9:16 + side rail from SashenJayathilaka/TIK-TOK-Clone
  *   - watch:      ShakirFarhan/Youtube-Clone src/pages/Watch
  */
-import React from "react";
 import { Avatar, Button, Divider, Skeleton, User } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faYoutube } from "@fortawesome/free-brands-svg-icons";
-import {
-  faVideo, faThumbsUp, faThumbsDown, faComment, faShareNodes,
-  faMusic, faImages, faDownload, faBell, faScissors,
-} from "@fortawesome/free-solid-svg-icons";
+import { faThumbsUp, faThumbsDown, faComment, faShareNodes, faMusic, faImages, faDownload, faBell, faScissors } from "@fortawesome/free-solid-svg-icons";
 import { type MockupFields, MockupHeader, dicebear, MarkdownText, ImageGenSlot } from "./shared";
 import { useLang } from "../../../../lib/i18n";
 

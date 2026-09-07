@@ -7,7 +7,6 @@
  * play / pause / skip controls, and emits onWriteSegment(segmentId, value)
  * when each step completes.
  */
-import React from "react";
 import { Card, CardBody, Button, Chip, Progress } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faPlay, faPause, faForward, faStop, faWandSparkles, faCheck } from "@fortawesome/free-solid-svg-icons";

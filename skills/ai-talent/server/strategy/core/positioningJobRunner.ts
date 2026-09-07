@@ -522,7 +522,6 @@ async function runPipelineDetached(args: {
   }
 
   // Build adjacency: id → step
-  const stepMap = new Map(args.steps.map((s) => [s.id, s]));
   const completed = new Set<string>();
   const outputs: Record<string, any> = {};
   let currentStepNum = 0;

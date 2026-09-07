@@ -16,7 +16,6 @@
  *   LIAdMockup         — sponsored / lead-gen ad copy
  *   LIEventMockup      — event promotion
  */
-import React from "react";
 import { Chip } from "@heroui/react";
 import {
   LIFeed, LIArticle, LINewsletter, LIPoll, LIDocument,

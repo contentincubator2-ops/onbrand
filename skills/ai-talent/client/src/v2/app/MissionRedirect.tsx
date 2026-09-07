@@ -13,7 +13,6 @@
  * Why: PickerWorkspace was the old workflow runner. Modern UX shows
  * users their result mockup directly with an edit panel beside it.
  */
-import React from "react";
 import { Navigate, useParams } from "react-router-dom";
 import { trpc } from "../../lib/trpc";
 

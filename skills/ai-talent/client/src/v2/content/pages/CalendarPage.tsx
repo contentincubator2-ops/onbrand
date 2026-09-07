@@ -92,7 +92,7 @@ function formatLocalDatetimeInput(d: Date): string {
 /* ═══════════════════════════════════════════════════════════════ */
 export default function CalendarPage() {
   const navigate = useNavigate();
-  const { t, lang } = useLang();
+  const { lang } = useLang();
   const ctx = useOutletContext<ShellOutletCtx>();
   const brandId = (ctx?.brandId as number | null) ?? null;
   const brandName = useMemo(() => {

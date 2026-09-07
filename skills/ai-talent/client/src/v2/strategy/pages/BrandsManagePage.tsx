@@ -16,7 +16,7 @@
  * Editor (current /brands content) moves to /brands/edit?b=:id
  */
 import React, { useState, useEffect } from "react";
-import { Link, Navigate, useNavigate, useSearchParams } from "react-router-dom";
+import { Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import { trpc } from "../../../lib/trpc";
 import { useOutletContext } from "react-router-dom";
 import type { ShellOutletCtx } from "../../app/shell/ShellLayout";

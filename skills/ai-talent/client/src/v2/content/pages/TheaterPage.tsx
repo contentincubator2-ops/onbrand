@@ -1405,10 +1405,6 @@ export default function TheaterPage() {
 
   // ── Phase 3a: inline edit + 修改規則 modal ──────────────────────
   /** Inline edit handler — user committed new caption text directly */
-  const editCellCaption = (key: CellKey, newCaption: string) => {
-    if (!newCaption.trim()) return;
-    updateCell(key, { caption: newCaption.trim() });
-  };
 
   /** Run-scope rules: applied to all future cells in this run only.
    *  Persistent across cells in the run; cleared on stop / new run. */
@@ -1439,29 +1435,6 @@ export default function TheaterPage() {
   const [scheduleAt, setScheduleAt] = useState<string>("");
   const [scheduleDraft, setScheduleDraft] = useState<string>("");
 
-  const openScheduleModal = (key: CellKey, platform: TheaterPlatform, date: string, caption: string, imageUrl?: string | null) => {
-    const pad = (n: number) => String(n).padStart(2, "0");
-    // If the cell date is today or in the past, default to the next full hour
-    // (at least 5 min ahead) so the server's "must be future" guard never fires
-    // on submit without the user intentionally picking a past time.
-    const cellMidnight = new Date(`${date}T00:00`);
-    const now = new Date();
-    const todayMidnight = new Date(now);
-    todayMidnight.setHours(0, 0, 0, 0);
-    let defaultAt: string;
-    if (cellMidnight <= todayMidnight) {
-      // Today (or past date) — pick next round hour ≥ 5 min from now
-      const next = new Date(now.getTime() + 5 * 60_000);
-      next.setMinutes(0, 0, 0);
-      next.setTime(next.getTime() + 60 * 60_000); // advance to next hour
-      defaultAt = `${next.getFullYear()}-${pad(next.getMonth() + 1)}-${pad(next.getDate())}T${pad(next.getHours())}:00`;
-    } else {
-      defaultAt = `${date}T09:00`;
-    }
-    setScheduleAt(defaultAt);
-    setScheduleDraft(caption);
-    setScheduleModal({ key, platform, date, caption, imageUrl });
-  };
   const closeScheduleModal = () => setScheduleModal(null);
 
   const submitSchedule = async () => {
@@ -1494,12 +1467,6 @@ export default function TheaterPage() {
   const [ruleText, setRuleText] = useState("");
   const [ruleScope, setRuleScope] = useState<"post" | "run" | "brand">("post");
 
-  const openRuleModal = (key: CellKey) => {
-    const platform = key.split("::")[0] as TheaterPlatform;
-    setRuleModal({ key, platform });
-    setRuleText("");
-    setRuleScope("post");
-  };
   const closeRuleModal = () => { setRuleModal(null); setRuleText(""); };
   const submitRule = async () => {
     if (!ruleModal || !ruleText.trim()) return;

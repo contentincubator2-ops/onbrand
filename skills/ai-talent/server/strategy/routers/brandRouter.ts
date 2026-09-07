@@ -1,7 +1,7 @@
 import { getBrandPositioning, getBrandPositioningById } from "../core/positioningBridge";
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
-import { router, protectedProcedure, publicProcedure } from "../../platform/core/trpc";
+import { router, protectedProcedure } from "../../platform/core/trpc";
 import { executeTenStepAnalysis, getLatestJobForBrand } from "../positioning";
 import {
   analyzeBrandPositioning,
@@ -10,7 +10,7 @@ import {
   analyzeBrandCompetitors,
 } from "../core/brandEngine";
 import { getDb } from "../../db";
-import { userApiKeys, missions } from "../../../drizzle/schema";
+import { userApiKeys } from "../../../drizzle/schema";
 import { eq, and, sql } from "drizzle-orm";
 import { invokeLLM } from "../../platform/core/llm";
 import { assertBrandOwner } from "../../platform/core/brandAuth";
@@ -1033,7 +1033,6 @@ export const brandRouter = router({
       });
 
       const matched: any[] = [];
-      const industry = input.industry ?? "";
 
       // 每個任務類型找最適合的 agent
       const taskQueries: Record<string, string> = {

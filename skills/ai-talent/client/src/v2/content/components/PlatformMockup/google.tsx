@@ -7,7 +7,6 @@
  *   display  — banner / display ad (image + headline + CTA)
  *   pmax     — Performance Max card (multiple assets)
  */
-import React from "react";
 import { Button, Chip, Divider, Skeleton } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faGoogle } from "@fortawesome/free-brands-svg-icons";

@@ -9,7 +9,6 @@
  *   - Hand-composed SVG (no external asset) so it stays color-tunable
  *     and inline-cacheable.
  */
-import React from "react";
 
 export default function LandingHeroIllustration({ en }: { en: boolean }) {
   const ink = "#0F0F0E";

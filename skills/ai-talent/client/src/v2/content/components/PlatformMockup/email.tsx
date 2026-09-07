@@ -6,7 +6,6 @@
  *   edm      — full HTML email (header + hero + body + CTA + footer)
  *   newsletter — simpler single-column editorial
  */
-import React from "react";
 import { Button, Chip, Divider, Skeleton } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faEnvelope, faArrowRight, faAt, faInbox } from "@fortawesome/free-solid-svg-icons";

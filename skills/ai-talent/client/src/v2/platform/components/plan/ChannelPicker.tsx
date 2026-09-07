@@ -11,7 +11,7 @@
  *
  * 無限方案（企業版）不顯示這一區：沒有東西要選。
  */
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { trpc } from "../../../../lib/trpc";
 import { useLang } from "../../../../lib/i18n";
 import { showToastGlobal } from "../../../../components/ui/Toast";

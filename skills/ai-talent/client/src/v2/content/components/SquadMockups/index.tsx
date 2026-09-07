@@ -5,16 +5,15 @@
  * `mockupVariant` in its JSON. Squad runner / step preview reads that
  * string and routes to the right component here.
  */
-import React from "react";
 import type { SquadMockupVariant } from "./shared";
 import { IntakeFormMockup, type IntakeFormData } from "./intake";
 import { PillarTableMockup, type PillarRow } from "./pillar";
-import { CalendarGridMockup, type CalendarEntry } from "./calendar";
+import { CalendarGridMockup } from "./calendar";
 import { FBPostBriefMockup, type PostBrief } from "./brief";
-import { FBCarouselMockup, type CarouselDeck, type CarouselSlide } from "./carousel";
-import { FBReelsMockup, type ReelsScript, type ReelsShot } from "./reels";
-import { IGPostBriefMockup, type IGPostData, type IGPostBrief } from "./ig-post";
-import { IGStoryMockup, type IGStorySeries, type IGStorySlide, type StorySticker, type StickerKind } from "./ig-story";
+import { FBCarouselMockup, type CarouselDeck } from "./carousel";
+import { FBReelsMockup, type ReelsScript } from "./reels";
+import { IGPostBriefMockup, type IGPostData } from "./ig-post";
+import { IGStoryMockup, type IGStorySeries } from "./ig-story";
 import { IGReelsMockup, type IGReelsScript } from "./ig-reels";
 import { QAReportMockup, type QAReport } from "./qa";
 import { ResearchPanelMockup, type ResearchData } from "./research";

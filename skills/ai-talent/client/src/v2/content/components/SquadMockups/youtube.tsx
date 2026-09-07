@@ -10,7 +10,6 @@
  *   YTPremiereMockup   — premiere event brief
  *   YTLiveMockup       — live stream run-of-show
  */
-import React from "react";
 import { Chip } from "@heroui/react";
 import {
   YTVideoCard, YTShorts, YTCommunity, YTPremiere, YTLive,

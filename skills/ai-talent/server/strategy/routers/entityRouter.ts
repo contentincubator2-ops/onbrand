@@ -18,7 +18,7 @@ import { router, protectedProcedure } from "../../platform/core/trpc";
 import localPool from "../../localDb";
 import { getSoworkDb } from "../../db";
 import { soworkAgents } from "../../platform/core/_schemas/soworkAgents";
-import { eq, sql } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 
 // ── HeroUI semantic palette (single source of truth, mirrors client tokens.ts) ──
 type HeroUIColor =

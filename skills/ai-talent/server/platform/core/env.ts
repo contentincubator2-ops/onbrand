@@ -42,7 +42,6 @@ const envSchema = z.object({
   AZURE_POSITION_API_KEY:   z.string().optional(),
   AZURE_POSITION_ENDPOINT:  z.string().url().optional(),
   AZURE_POSITION_MODEL:     z.string().optional(),
-  GOOGLE_VERTEX_API_KEY:    z.string().optional(),
   // 2026-08-21: real ASR wiring (persona-agent training for caption-less
   // video/audio). llm.ts's PROVIDERS["azure-canada"] already templated a
   // baseUrl off this endpoint, but read it via `(ENV as any)` — the key was
@@ -55,25 +54,9 @@ const envSchema = z.object({
   HERMES_API_URL:  z.string().url().optional(),
   HERMES_API_KEY:  z.string().optional(),   // Bearer token set in hermes-api.service
 
-  // Azure Search
-  AZURE_SEARCH_ENDPOINT:   z.string().url().optional(),
-  AZURE_SEARCH_API_KEY:    z.string().optional(),
-  AZURE_SEARCH_INDEX_NAME: z.string().default("brand-knowledge"),
-
-  // OAuth — optional for deployments that don't use them
-  OAUTH_SERVER_URL:    z.string().optional(),
-  OWNER_OPEN_ID:       z.string().optional(),
-  VITE_APP_ID:         z.string().optional(),
-
   // Social OAuth — optional
-  TWITTER_CLIENT_ID:     z.string().optional(),
-  TWITTER_CLIENT_SECRET: z.string().optional(),
   GOOGLE_CLIENT_ID:      z.string().optional(),
   GOOGLE_CLIENT_SECRET:  z.string().optional(),
-  META_APP_ID:           z.string().optional(),
-  META_APP_SECRET:       z.string().optional(),
-  SHOPIFY_CLIENT_ID:     z.string().optional(),
-  SHOPIFY_CLIENT_SECRET: z.string().optional(),
   // 2026-08-21 (CJ「很多人，影音就是放在google drive, one drive」— persona
   // agent cloud-file connect): native OAuth, reuses GOOGLE_CLIENT_ID/SECRET
   // above (same Google Cloud project — just needs Drive API enabled + this
@@ -87,11 +70,8 @@ const envSchema = z.object({
   EMAIL_FROM:        z.string().optional(),
   TAVILY_API_KEY:    z.string().optional(),
 
-  // AI Video Generation
-  // FAL_API_KEY removed 2026-05-05 — fal.ai disabled site-wide.
-  PIAPI_KEY:            z.string().optional(), // PiAPI aggregator (Flux Pro / Kling / Runway / SDXL …)
-  ELEVENLABS_API_KEY:   z.string().optional(), // ElevenLabs TTS
-  CREATOMATE_API_KEY:   z.string().optional(), // Creatomate video composition
+  // AI image generation（影片生成 2026-09-08 移除）
+  PIAPI_KEY:            z.string().optional(), // PiAPI aggregator (Flux / Ideogram / SDXL)
 
   // App
   PORT: z.coerce.number().default(3101),

@@ -15,9 +15,9 @@
  *
  * Gated by adminProcedure server-side — non-admins get FORBIDDEN.
  */
-import React, { useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { trpc } from "../../../lib/trpc";
-import { AlertTriangle, CheckCircle2, ChevronRight, RefreshCw, X } from "lucide-react";
+import { AlertTriangle, CheckCircle2, ChevronRight, RefreshCw } from "lucide-react";
 
 type ResolvedFilter = "unresolved" | "resolved" | "all";
 type WindowOpt = "24h" | "7d";

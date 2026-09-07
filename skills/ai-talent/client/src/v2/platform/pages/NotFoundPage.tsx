@@ -5,7 +5,6 @@
  * for all unknown routes. This page tells users clearly what happened
  * and gives them recovery paths.
  */
-import React from "react";
 import { useNavigate } from "react-router-dom";
 import { useLang as useLanguage } from "../../../lib/i18n";
 

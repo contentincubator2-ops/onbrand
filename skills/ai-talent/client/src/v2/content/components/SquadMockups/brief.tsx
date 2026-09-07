@@ -8,7 +8,6 @@
  *   - CTA chip
  *   - image direction (visual brief — feeds MediaGenFlow if approved)
  */
-import React from "react";
 import { Card, CardBody, Chip, Textarea, Input } from "@heroui/react";
 import { SectionHeader, NotionCard, EmptyHint, type SquadMockupCommonProps } from "./shared";
 

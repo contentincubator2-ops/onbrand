@@ -12,7 +12,6 @@ import { createCipheriv, createDecipheriv, randomBytes, createHash } from "crypt
 
 const ALGORITHM = "aes-256-gcm";
 const IV_LENGTH = 12;   // 96-bit IV — GCM standard
-const KEY_LENGTH = 32;  // 256-bit key
 
 // ─── Key Management ──────────────────────────────────────────────────────────
 

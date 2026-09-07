@@ -2,7 +2,6 @@
  * 隱私政策 — OnBrand Privacy Policy (PDPA-compliant).
  * 2026-05-10. 由法律顧問 review 正式版替換 (TODO).
  */
-import React from "react";
 import { Link } from "react-router-dom";
 import { useLang } from "../../../../lib/i18n";
 

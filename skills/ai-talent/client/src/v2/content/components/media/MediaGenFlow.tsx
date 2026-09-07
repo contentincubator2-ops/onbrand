@@ -10,16 +10,10 @@
  * lands straight at Step 3 with a textarea to paste their own prompt.
  */
 import React from "react";
-import {
-  Card, CardBody, CardHeader, Chip, Button, Tooltip, Tabs, Tab, Textarea,
-  Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Spinner, Divider,
-} from "@heroui/react";
+import { Card, CardBody, Chip, Button, Tooltip, Textarea, Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Spinner, Divider } from "@heroui/react";
 import { trpc } from "../../../../lib/trpc";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import {
-  faPalette, faWandSparkles, faImage, faCheck, faCopy, faArrowRight,
-  faPenNib, faRotate, faForward,
-} from "@fortawesome/free-solid-svg-icons";
+import { faPalette, faImage, faCheck, faCopy, faArrowRight, faPenNib, faRotate, faForward } from "@fortawesome/free-solid-svg-icons";
 import {
   availableModels, type MediaKind, type MediaModel,
 } from "../../lib/mediaModels";

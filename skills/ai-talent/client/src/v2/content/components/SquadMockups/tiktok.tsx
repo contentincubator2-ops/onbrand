@@ -9,7 +9,6 @@
  *   TTCarouselMockup  — photo carousel post
  *   TTLiveMockup      — live stream run-of-show
  */
-import React from "react";
 import { Chip } from "@heroui/react";
 import { TTForYou, TTCarousel, TTLive } from "../PlatformMockup/tiktok";
 import type { MockupFields } from "../PlatformMockup/shared";

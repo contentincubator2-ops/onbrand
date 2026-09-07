@@ -21,8 +21,6 @@ import { randomUUID } from "node:crypto";
 import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure, singleFlightPerUser } from "../../platform/core/trpc";
 import { callModel, type ModelProvider } from "../../platform/core/multiModelRouter";
-import { getDb } from "../../db";
-import { sql } from "drizzle-orm";
 import { ContentKindSchema } from "../core/outputContentEnvelope";
 import {
   assertGenericRegenerationAllowed,
@@ -926,15 +924,14 @@ const TASK_LABEL_EN: Record<string, string> = {
 };
 // 2026-05-05 quick-task pivot
 import { quickTaskOutputSpec, parseQuickTaskOutput, type QuickTaskOutput } from "../core/quickTaskOutput";
-import { FB_30S_TASKS, listAllFBTasks } from "../core/quickTaskFB";
-import { FB_60S_TASKS_V2, FB_60S_ORCHESTRA, getFB60OrchestraConfig, getFB60Template } from "../core/quickTaskFB60";
+import { listAllFBTasks } from "../core/quickTaskFB";
+import { FB_60S_TASKS_V2, getFB60OrchestraConfig, getFB60Template } from "../core/quickTaskFB60";
 import { IG_60S_TASKS, getIG60OrchestraConfig, getIG60Template } from "../core/quickTaskIG60";
 import { YT_60S_TASKS, getYT60OrchestraConfig, getYT60Template } from "../core/quickTaskYT60";
 import { MULTI_60S_TASKS, getMulti60OrchestraConfig, getMulti60Template } from "../core/quickTaskMulti60";
-import { ALL_99S_TASKS, get99Template, get99OrchestraConfig } from "../core/quickTask100";
+import { ALL_99S_TASKS, get99Template } from "../core/quickTask100";
 import { ALL_99S_SQUADS } from "../core/quickTask100Squads";
 import { is99sOrchestraListed, platformOfTaskId } from "../core/taskCatalogIndex";
-import { resolveTaskSource } from "../core/taskSource";
 import {
   planQuotaFor, resolveChannels, filterTasksByPlan, daysUntilSwap, isUnlimited,
   loadBrandPositioning, assertTaskAllowed, type TaskGateInfo,
@@ -960,22 +957,19 @@ import {
   buildIgStrategyPublicSlots,
   type IgStrategyPrivateArtifact,
 } from "../core/igStrategyPublicSynthesis";
-import {
-  assertIgStrategyPublicCampaignSafe,
-  synthesizeIgStrategyPublicSlots,
-} from "../core/igStrategyPublicGeneration";
-import { IG_30S_TASKS, getIGOrchestraConfig } from "../core/quickTaskIG";
-import { YT_30S_TASKS, getYTOrchestraConfig } from "../core/quickTaskYT";
-import { TT_30S_TASKS, getTTOrchestraConfig } from "../core/quickTaskTikTok";
-import { LI_30S_TASKS, getLIOrchestraConfig } from "../core/quickTaskLI";
-import { EMAIL_30S_TASKS, getEmailOrchestraConfig } from "../core/quickTaskEmail";
-import { PR_30S_TASKS, getPROrchestraConfig } from "../core/quickTaskPR";
-import { BRAND_30S_TASKS, getBrandOrchestraConfig } from "../core/quickTaskBrand";
-import { RESEARCH_30S_TASKS, getResearchOrchestraConfig } from "../core/quickTaskResearch";
+import { synthesizeIgStrategyPublicSlots } from "../core/igStrategyPublicGeneration";
+import { IG_30S_TASKS } from "../core/quickTaskIG";
+import { YT_30S_TASKS } from "../core/quickTaskYT";
+import { TT_30S_TASKS } from "../core/quickTaskTikTok";
+import { LI_30S_TASKS } from "../core/quickTaskLI";
+import { EMAIL_30S_TASKS } from "../core/quickTaskEmail";
+import { PR_30S_TASKS } from "../core/quickTaskPR";
+import { BRAND_30S_TASKS } from "../core/quickTaskBrand";
+import { RESEARCH_30S_TASKS } from "../core/quickTaskResearch";
 // 2026-05-12 (CJ「KOL 提供說法不提供名單」)
 import { KOL_30S_TASKS } from "../core/quickTaskKOL";
 // 2026-08-29 官網頻道 (web-)：品牌自己的部落格長文 / 品牌專欄 / 案例 / 產品頁。
-import { WEBSITE_30S_TASKS, getWebsiteOrchestraConfig } from "../core/quickTaskWebsite";
+import { WEBSITE_30S_TASKS } from "../core/quickTaskWebsite";
 // 2026-08-29 per-brand 任務包。有 pack 的品牌，頻道與卡片完全由 pack 決定。
 import { resolveBrandPack, expandPackCards, packNavForBrand } from "../../strategy/core/brandPacks";
 // 2026-09-02: task id → template + config 的唯一解析點。這條鏈本來在這個檔案
@@ -2267,7 +2261,6 @@ ${polishTemplate.polishHint}`
         const aid = Number(step.assignedAgentId);
         const a = agentMap[aid];
         const agentName = a?.name ?? step.assignedAgentName ?? "Squad Agent";
-        const agentTitle = a?.title ?? "";
 
         const persona = a
           ? `你是 ${a.name}，${a.title}。${a.specialty ? `\n專長：${a.specialty}。` : ""}${a.methodology ? `\n方法論：${a.methodology}。` : ""}`

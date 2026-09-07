@@ -7,16 +7,10 @@
  *   deck      — presentation slide deck
  */
 import React from "react";
-import { Avatar, Button, Chip, Divider, Skeleton } from "@heroui/react";
+import { Button, Skeleton } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import {
-  faNewspaper, faCalendarDays, faBuilding, faEnvelope, faPhone,
-  faChalkboard, faChevronLeft, faChevronRight, faImages,
-  faCircle, faExpand,
-} from "@fortawesome/free-solid-svg-icons";
-import { type MockupFields, MockupHeader, dicebear, MarkdownText, titleEchoesCaption } from "./shared";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
+import { faNewspaper, faChalkboard, faChevronLeft, faChevronRight, faImages, faExpand } from "@fortawesome/free-solid-svg-icons";
+import { type MockupFields, MockupHeader, MarkdownText, titleEchoesCaption } from "./shared";
 
 /* ─────────────── Press Release ───────────────
  *

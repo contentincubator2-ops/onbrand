@@ -6,7 +6,6 @@
  *   show     — show/channel page with episode list
  *   audiogram — square audiogram social card (for sharing on IG/FB/TW)
  */
-import React from "react";
 import { Avatar, Skeleton } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
@@ -15,7 +14,7 @@ import {
   faHeadphones, faMicrophone, faShare,
   faVolumeHigh, faWaveSquare,
 } from "@fortawesome/free-solid-svg-icons";
-import { type MockupFields, MockupHeader, handleOf } from "./shared";
+import { type MockupFields, MockupHeader } from "./shared";
 
 const POD_GREEN   = "#1DB954";  /* Spotify green — widely understood as "podcast play" */
 const POD_DARK    = "#121212";

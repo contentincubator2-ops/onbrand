@@ -325,7 +325,7 @@ export async function upsertGoogleUser(db: DB, data: {
 
   // Create new user
   const openId = nanoid(16);
-  const rows = await db
+  await db
     .insert(users)
     .values({
       openId,

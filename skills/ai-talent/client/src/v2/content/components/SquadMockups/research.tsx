@@ -7,7 +7,6 @@
  *   - Conclusion summary (key findings)
  *   - Budget meter (X/8 URLs · Y/12000 chars)
  */
-import React from "react";
 import { Chip, Progress, Card, CardBody, Spinner } from "@heroui/react";
 import { SectionHeader, NotionCard, EmptyHint, type SquadMockupCommonProps } from "./shared";
 

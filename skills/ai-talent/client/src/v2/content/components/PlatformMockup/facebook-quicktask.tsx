@@ -6,14 +6,10 @@
  * All read MockupFields (especially liveImageStyle for the placeholder
  * style-direction text — actual image gen happens later in MediaGenFlow).
  */
-import React from "react";
 import { Avatar, Button, Skeleton, User } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faFacebook } from "@fortawesome/free-brands-svg-icons";
-import {
-  faImages, faComment, faShare, faVideo, faHeart, faXmark,
-  faUserGroup, faCircle, faStar, faThumbtack, faReply, faChartColumn,
-} from "@fortawesome/free-solid-svg-icons";
+import { faImages, faComment, faShare, faHeart, faXmark, faUserGroup, faCircle, faStar, faThumbtack, faReply, faChartColumn } from "@fortawesome/free-solid-svg-icons";
 import { type MockupFields, MockupHeader, MarkdownText, dicebear, ImageGenSlot } from "./shared";
 import { FBFeed } from "./facebook";
 import { useLang } from "../../../../lib/i18n";

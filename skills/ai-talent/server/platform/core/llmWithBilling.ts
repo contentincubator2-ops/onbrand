@@ -27,13 +27,7 @@ import {
   usdToCredits,
   type TokenLogInput,
 } from "./tokenLedger";
-import {
-  withTimeout,
-  LLM_HARD_TIMEOUT_MS,
-  DAILY_USD_CAP_TRIAL,
-  DAILY_USD_CAP_SOLO,
-  MIN_CREDITS_TO_RUN,
-} from "./timeout";
+import { withTimeout, LLM_HARD_TIMEOUT_MS, DAILY_USD_CAP_TRIAL, MIN_CREDITS_TO_RUN } from "./timeout";
 import localPool from "../../localDb";
 
 /**
@@ -130,10 +124,6 @@ export async function preflightCostCheck(userId: number): Promise<{ ok: true } |
   return { ok: true };
 }
 
-/** Hash an API key before storing it — prevents plaintext key storage in logs/DB/disk */
-function hashApiKey(apiKey: string): string {
-  return createHash("sha256").update(apiKey).digest("hex").slice(0, 16);
-}
 
 export interface InvokeLLMWithBillingOptions extends Omit<InvokeParams, "provider" | "model"> {
   /** LLM provider (e.g. "openai", "google", "zhipu") */

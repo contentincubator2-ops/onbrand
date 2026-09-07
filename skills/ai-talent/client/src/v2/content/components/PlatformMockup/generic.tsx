@@ -1,4 +1,3 @@
-import React from "react";
 import { Card, CardBody, Divider, Skeleton } from "@heroui/react";
 import { faNewspaper } from "@fortawesome/free-solid-svg-icons";
 import { type MockupFields, MockupHeader, MarkdownText, titleEchoesCaption } from "./shared";

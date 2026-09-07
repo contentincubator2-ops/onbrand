@@ -52,7 +52,6 @@ const STANDARDS_TABLE = TEN_STANDARDS
   .map((s) => `・${s.name}：${s.core}。禁忌：${s.taboo}。`)
   .join("\n");
 
-const STANDARDS_LINE = TEN_STANDARDS.map((s) => s.name).join("、");
 
 /**
  * 每月各類型的產出篇數，供行事曆卡決定要產幾篇摘要。

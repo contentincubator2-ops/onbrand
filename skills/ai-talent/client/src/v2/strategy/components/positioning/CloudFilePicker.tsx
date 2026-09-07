@@ -7,7 +7,7 @@
  * popup (server/routes/cloudOAuthRoute.ts), which postMessages the result
  * back here rather than navigating the whole app away and back.
  */
-import React, { useEffect, useState } from "react";
+import { useState } from "react";
 import { trpc } from "../../../../lib/trpc";
 import { useLang } from "../../../../lib/i18n";
 import { showToastGlobal } from "../../../../components/ui/Toast";

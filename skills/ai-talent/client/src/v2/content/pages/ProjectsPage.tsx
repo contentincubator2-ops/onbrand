@@ -77,7 +77,7 @@ function brandColor(seed: string): string {
 
 export default function ProjectsPage() {
   const navigate = useNavigate();
-  const { t, lang } = useLang();
+  const { lang } = useLang();
   const ctx = useOutletContext<ShellOutletCtx>();
   const shellBrands = ctx?.brands ?? [];
   const shellBrandId = ctx?.brandId ?? null;

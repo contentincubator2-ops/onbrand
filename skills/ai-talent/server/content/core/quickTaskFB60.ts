@@ -278,15 +278,10 @@ const MANDY    = 220887;  // Claire Chen — Brand Visual Designer (977 char, wa
 // 2026-05-08 (CJ direction): per-task unique image directors for FB 60s
 const FB60_DIR_LUKE   = 220734; // Luke Hsu — Quantitative Research Designer
 const FB60_DIR_REINA  = 220736; // Reina Yang — Quantitative Research Designer
-const FB60_DIR_BLAKE  = 220737; // Blake Yeh — Quantitative Research Designer
 const FB60_DIR_RUTH   = 220739; // Ruth Chou — Quantitative Research Designer
 const FB60_DIR_UMA    = 220740; // Uma Tsai — Quantitative Research Designer
 const FB60_DIR_JUSTIN = 220756; // Justin Huang — Insights Storyteller
 const FB60_DIR_PAUL   = 220757; // Paul Hsu — Insights Storyteller
-const FB60_DIR_FRED   = 220758; // Fred Hung — Insights Storyteller
-const FB60_DIR_CHLOE_Y= 220759; // Chloe Yang — Insights Storyteller
-const FB60_DIR_WENDY  = 220760; // Wendy Cheng — Insights Storyteller
-const FB60_DIR_LYDIA  = 220723; // Lydia Tsai — Decision Design Consultant
 const FB60_DIR_DREW   = 220726; // Drew Chen — Decision Design Consultant
 
 export const FB_60S_ORCHESTRA: Record<string, OrchestraConfig> = {

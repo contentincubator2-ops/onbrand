@@ -21,7 +21,6 @@
  *   podcast:      episode, show, audiogram
  *   generic:      generic
  */
-import React from "react";
 import type { MockupVariant } from "../../lib/inferMockup";
 import type { MockupFields } from "./shared";
 import {

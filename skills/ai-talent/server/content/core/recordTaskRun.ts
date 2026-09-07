@@ -380,7 +380,6 @@ export async function recordTaskRun(rawArgs: RecordArgs): Promise<{ missionId: n
 
     let oRes: any = null;
     let lastError: any = null;
-    let succeededTier: string | null = null;
     // 2026-05-14: progress defaults to 'done' (single-write callers), or
     // 'caption_ready' for the new async path (caller will UPDATE to 'done'
     // when image gen + QA finish in the background).
@@ -393,7 +392,6 @@ export async function recordTaskRun(rawArgs: RecordArgs): Promise<{ missionId: n
            VALUES (?, ?, ?, ?, ?, ?, 'draft', ?, ?, NOW(), NOW())`,
           [missionId, a.platform, a.outputType, a.title, a.content, a.metadata, version, progress],
         );
-        succeededTier = a.tier;
         if (a.tier !== "normal") {
           console.warn(`[recordTaskRun] INSERT recovered at tier=${a.tier}`, {
             missionId,

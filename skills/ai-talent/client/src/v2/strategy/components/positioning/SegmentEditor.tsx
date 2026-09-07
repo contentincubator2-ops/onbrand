@@ -9,7 +9,6 @@
  * Top-right of the segment header shows a "由 {agent} 幫我填寫" button —
  * Phase 5 stub: alert until Phase 6 wires the agent runner.
  */
-import React from "react";
 import { Card, CardBody, CardHeader, Button, Input, Textarea, Chip, Tooltip } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faRobot, faPlus, faXmark, faWandSparkles } from "@fortawesome/free-solid-svg-icons";

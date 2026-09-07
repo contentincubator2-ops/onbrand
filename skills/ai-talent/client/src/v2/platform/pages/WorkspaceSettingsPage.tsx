@@ -41,7 +41,6 @@ const PLAN_LABEL: Record<string, string> = {
 export default function WorkspaceSettingsPage() {
   const navigate = useNavigate();
   const { lang } = useLang();
-  const ROLE_LABEL = lang === "en" ? ROLE_LABEL_EN : ROLE_LABEL_ZH;
   const [selectedId, setSelectedId] = useState<number | null>(null);
 
   const listQ = (trpc as any).tenant?.listMine?.useQuery

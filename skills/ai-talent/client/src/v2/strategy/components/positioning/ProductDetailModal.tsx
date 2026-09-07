@@ -12,7 +12,7 @@
  * 儲存透過 product.upsert 將 positioning JSON patch 回 DB。
  */
 
-import React, { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef } from "react";
 import { trpc } from "../../../../lib/trpc";
 import { useLang } from "../../../../lib/i18n";
 import { X, Plus, Trash2, RefreshCw, Sparkles } from "lucide-react";

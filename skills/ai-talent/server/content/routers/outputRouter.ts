@@ -688,9 +688,7 @@ export const outputRouter = router({
       if (input.toolEditUrl !== undefined) parts.push("u");
       if (input.toolUrlExpiresAt !== undefined) parts.push("e");
       if (parts.length > 0) {
-        const _unused = parts;
         // Build and execute raw update using drizzle sql tag
-        const setClauses = parts.map((p, i) => p).join(", ");
         // fallback: use db.update with explicit fields
         const updateObj: Record<string, any> = {};
         if (input.deliverableLevel !== undefined) (updateObj as any).deliverableLevel = input.deliverableLevel;

@@ -400,7 +400,6 @@ export const theaterRouter = router({
       }));
 
       // 3) Build scheduling agent prompt
-      const pad = (s: string) => s ? `\n${s}` : "";
       const productList = input.selectedProducts.length > 0
         ? input.selectedProducts.map((p) =>
             `- ${p.name}${p.usp ? `（${p.usp}）` : ""}`
@@ -945,12 +944,6 @@ ${allRules.map((r, i) => `${i + 1}. ${r}`).join("\n")}`
 
       // Phase 1: hook + cta enforcement. Pre-allocated by runStart so two
       // consecutive cells on the same platform never share the same hook.
-      const hookInstruction = input.hook
-        ? `\n【今日 Hook 類型 — 強制執行】\n${HOOK_PLAYBOOK[input.hook]}\n禁止用其他 hook 類型開場。`
-        : "";
-      const ctaInstruction = input.cta
-        ? `\n【今日 CTA 意圖 — 強制執行】\n${CTA_PLAYBOOK[input.cta]}\n禁止用其他 CTA 結尾。`
-        : "";
 
       // 2026-05-12: anti-template list from cells already rendered in this run.
       // We pass up to 12 prior opening fragments and explicitly forbid both

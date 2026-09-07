@@ -149,8 +149,6 @@ export const pipelineRouter = router({
       const research = (positioning._research as any) ?? {};
 
       // Fetch the entity name + industry for context.
-      const table = input.kind === "brand" ? "brands"
-                  : input.kind === "product" ? "products" : "events";
       const [rows]: any = await localPool.execute(
         // For events `industry` doesn't apply — fetch startAt/endAt instead.
         // Brand has industry, product/event don't (events have date range).

@@ -5,7 +5,6 @@
  * via the same scope.savePositioning mutation. Per CJ direction these
  * are user-supplied (no LLM auto-fill); 圖像/圖示/圖表 are dropped.
  */
-import React from "react";
 import { useLang } from "../../../../lib/i18n";
 import {
   Card, CardBody, CardHeader, Chip, Input, Textarea, Button, Tooltip,

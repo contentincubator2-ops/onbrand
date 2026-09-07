@@ -11,8 +11,7 @@
  */
 
 import { getDb, getSoworkDb } from "../../db";
-import { missionResources } from "../../../drizzle/schema";
-import { eq, sql } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 import { getEmbedding, cosineSimilarity } from "../../platform/core/embedding";
 
 export interface MissionComputeInput {

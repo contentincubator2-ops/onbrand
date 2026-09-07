@@ -7,7 +7,6 @@
  *   3. Per-event integration check (was each event peak covered correctly?)
  *   4. Per-item checklist with accept / 退回 button
  */
-import React from "react";
 import { Chip, Progress, Button } from "@heroui/react";
 import { SectionHeader, NotionCard, EmptyHint, type SquadMockupCommonProps } from "./shared";
 

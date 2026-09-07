@@ -15,7 +15,7 @@
  * Successful create → invalidates the relevant list queries so the
  * brand picker / scope options refresh immediately.
  */
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { trpc } from "../../../lib/trpc";
 import { useLang } from "../../../lib/i18n";
 import { Modal, ModalBody, ModalContent, ModalFooter, ModalHeader, Button, Input, Textarea, Select, SelectItem, Autocomplete, AutocompleteItem } from "@heroui/react";
