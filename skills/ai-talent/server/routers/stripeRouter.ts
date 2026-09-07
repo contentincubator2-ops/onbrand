@@ -1,6 +1,6 @@
 /**
- * stripeRouter — Stripe Checkout Sessions for subscriptions + one-time
- * top-up packs. Replaces the deprecated ecpayRouter.
+ * stripeRouter — Stripe Checkout Sessions for subscriptions.
+ * Replaces the deprecated ecpayRouter. 加值包 2026-09-07 下架（CJ「不留下機制」）。
  *
  * 2026-05-14 (CJ「我們使用 Stripe」).
  *
@@ -21,14 +21,12 @@
  *  APP_URL                 — https://onbrand.sowork.ai
  *
  * ─── Flow ──────────────────────────────────────────────────
- *  1. Frontend calls stripe.createCheckout (subscription) or
- *     stripe.createTopupCheckout (one-time). Server creates a Checkout
+ *  1. Frontend calls stripe.createCheckout (subscription). Server creates a Checkout
  *     Session and returns { url }. Frontend does window.location = url.
  *  2. User pays on Stripe-hosted page.
  *  3. Stripe POSTs to /api/stripe/webhook. We verify signature, look up
  *     our local `invoices` row by session.id, mark paid, and either:
- *       - subscription → bump workspaces.planEndsAt
- *       - topup        → pointsService.addPoints()
+ *       - subscription → bump workspaces.planEndsAt + users.planEndsAt
  *  4. User is redirected to success_url (/settings/account?paid=1).
  *
  * ─── Idempotency ───────────────────────────────────────────
@@ -191,103 +189,6 @@ export const stripeRouter = router({
       return { url: session.url, sessionId: session.id };
     }),
 
-  /** One-time top-up: 1000 / 5000 / 10000 points. */
-  createTopupCheckout: protectedProcedure
-    .input(z.object({
-      packId: z.enum(["small", "medium", "large"]),
-    }))
-    .mutation(async ({ ctx, input }) => {
-      const stripe = getStripe();
-      const appUrl = process.env.APP_URL ?? "https://onbrand.sowork.ai";
-      const { TOPUP_PACKS, toStripeUnitAmount, topupAmountIn } = await import("../_core/plans");
-      const { getUsdToTwd } = await import("../_core/fx");
-      const pack = TOPUP_PACKS[input.packId];
-      if (!pack) throw new TRPCError({ code: "BAD_REQUEST", message: "Unknown topup pack" });
-
-      const currency = await getUserCurrency(ctx.user.id);
-      const rate = await getUsdToTwd();
-      const { amount } = topupAmountIn(pack, currency, rate);
-
-      const { default: localPool } = await import("../localDb");
-      const tempTradeNo = `pending_topup_${Date.now()}_${ctx.user.id}`;
-      const [r]: any = await localPool.execute(
-        `INSERT INTO invoices
-            (userId, merchantTradeNo, amount, amountTwd, packType, pointsGranted, currency, status, createdAt)
-         VALUES (?, ?, ?, ?, 'topup', ?, ?, 'pending', NOW(3))`,
-        [ctx.user.id, tempTradeNo, amount, amount, pack.points, currency],
-      );
-      const invoiceId = (r as any).insertId;
-
-      const session = await stripe.checkout.sessions.create({
-        mode: "payment",
-        payment_method_types: ["card"],
-        line_items: [{
-          quantity: 1,
-          price_data: {
-            currency: currency.toLowerCase(),
-            product_data: {
-              name: currency === "TWD"
-                ? `OnBrand 點數加購 · ${pack.labelZh}`
-                : `OnBrand Top-up · ${pack.labelEn}`,
-              description: currency === "TWD"
-                ? `${pack.points.toLocaleString()} 點 · 永不過期`
-                : `${pack.points.toLocaleString()} points · never expire`,
-            },
-            unit_amount: toStripeUnitAmount(amount, currency),
-          },
-        }],
-        customer_email: (ctx.user as any).email ?? undefined,
-        client_reference_id: String(invoiceId),
-        // 2026-05-16 (CJ「只用 Stripe」): one-time top-up — payment mode
-        // doesn't auto-invoice, so explicitly enable it + collect 統編.
-        billing_address_collection: "required",
-        tax_id_collection: { enabled: true },
-        invoice_creation: { enabled: true },
-        metadata: {
-          invoiceId: String(invoiceId),
-          userId: String(ctx.user.id),
-          packType: "topup",
-          packId: pack.id,
-          pointsGranted: String(pack.points),
-          currency,
-        },
-        success_url: `${appUrl}/settings/account?paid=1&topup=ok`,
-        cancel_url:  `${appUrl}/settings/account?topup=canceled`,
-      });
-
-      await localPool.execute(
-        `UPDATE invoices SET merchantTradeNo = ? WHERE id = ?`,
-        [session.id, invoiceId],
-      );
-
-      return { url: session.url, sessionId: session.id };
-    }),
-
-  /** List top-up packs in the caller's billing currency at today's FX rate. */
-  listTopupPacks: protectedProcedure.query(async ({ ctx }) => {
-    const { TOPUP_PACKS, topupAmountIn } = await import("../_core/plans");
-    const { getUsdToTwd } = await import("../_core/fx");
-    const currency = await getUserCurrency(ctx.user.id);
-    const rate = await getUsdToTwd();
-    return {
-      currency,
-      usdToTwd: rate,
-      packs: Object.values(TOPUP_PACKS).map((p) => {
-        const { amount, perPoint } = topupAmountIn(p, currency, rate);
-        return {
-          id: p.id,
-          points: p.points,
-          labelZh: p.labelZh,
-          labelEn: p.labelEn,
-          discountPct: p.discountPct,
-          amount,
-          perPoint,
-          currency,
-        };
-      }),
-    };
-  }),
-
   /** Frontend can poll this after redirect to confirm status. */
   getInvoiceStatus: protectedProcedure
     .input(z.object({ sessionId: z.string().min(1).max(255) }))
@@ -413,23 +314,10 @@ export async function handleStripeWebhook(rawBody: Buffer, signature: string): P
   }
 
   if (invoice.packType === "topup") {
-    const pts = Number(invoice.pointsGranted) || 0;
-    if (pts > 0) {
-      try {
-        const { addPoints } = await import("../_core/pointsService");
-        await addPoints(invoice.userId, pts, "topup", `stripe:${sessionId}`);
-      } catch (err) {
-        console.error("[stripe.webhook] addPoints failed", { sessionId, err });
-        await logFailedWebhook({
-          eventId: event.id,
-          sessionId,
-          eventType: event.type,
-          reason: `addPoints failed: ${(err as Error)?.message ?? err}`.slice(0, 200),
-          userId: invoice.userId,
-        });
-        return { ok: false, message: "failed to credit points" };
-      }
-    }
+    // 加值包 2026-09-07 下架（CJ「不留下機制」）。若還有舊的 pending topup
+    // invoice 此刻才付款完成，不發點數、也不能走下面的訂閱分支（它會拿
+    // null planCode 去改 users）—— 只 ack 並留下紀錄，人工退款。
+    console.warn("[stripe.webhook] topup invoice paid after packs were retired; not crediting", { sessionId, invoiceId: invoice.id });
   } else {
     // Subscription — extend planEndsAt.
     const isAnnual = invoice.billingCycle === "annual";

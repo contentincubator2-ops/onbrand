@@ -15,7 +15,7 @@
  *   - getBalance(userId) → { balance, nextRefillAt, plan }
  *   - assertPoints(userId, action) → throws TRPCError if insufficient
  *   - deductPoints(userId, action, entity) → updates balance + logs txn
- *   - addPoints(userId, kind, amount, reason) → admin/topup credits
+ *   - addPoints(userId, kind, amount, reason) → admin grant / refund
  *   - refillIfDue(userId) → no-op if not due; otherwise refills + logs
  */
 import { TRPCError } from "@trpc/server";
@@ -155,7 +155,7 @@ export async function assertPoints(userId: number, action: PointAction): Promise
     };
     throw new TRPCError({
       code: "FORBIDDEN",
-      message: `點數不足 — 還剩 ${u.pointsBalance} 點，這個動作（${labelMap[action]}）需要 ${cost} 點。請等月初補滿，或加購點數。`,
+      message: `點數不足 — 還剩 ${u.pointsBalance} 點，這個動作（${labelMap[action]}）需要 ${cost} 點。請等下個週期補滿，或升級方案。`,
     });
   }
   return cost;

@@ -67,30 +67,6 @@ const authAwareFetch: typeof fetch = async (input, init) => {
       window.location.replace("/login");
     }
   }
-  // 2026-05-14 (CJ「加值點數方案」): when any mutation fails with
-  // "點數不足", auto-open the top-up modal (any page → /settings/account?topup=1).
-  // Clone the body once, peek for the magic substring, never block the
-  // original response.
-  if (typeof window !== "undefined" && res.ok) {
-    try {
-      const cloned = res.clone();
-      cloned.text().then((bodyText) => {
-        if (bodyText && bodyText.includes("點數不足")) {
-          const w = window as any;
-          if (!w.__topupRedirecting) {
-            w.__topupRedirecting = true;
-            setTimeout(() => { w.__topupRedirecting = false; }, 3000);
-            const here = window.location.pathname;
-            if (here !== "/settings/account") {
-              window.location.assign("/settings/account?topup=1");
-            } else {
-              window.dispatchEvent(new CustomEvent("onbrand:open-topup"));
-            }
-          }
-        }
-      }).catch(() => {});
-    } catch {}
-  }
   // 2026-05-09 (CJ direction「根除 HTML/JSON 錯誤」): when nginx upstream
   // times out (60s) or pm2 is restarting, the proxy returns an HTML error
   // page instead of JSON. tRPC then crashes parsing it ('Unexpected token

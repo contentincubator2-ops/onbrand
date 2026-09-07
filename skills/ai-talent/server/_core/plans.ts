@@ -74,25 +74,6 @@ export interface PlanQuota {
   runsPerCycle: number;
 }
 
-/** 2026-05-14: top-up packs (加購點數). Volume discount — bigger pack
- *  = better per-point rate. Same point unit as plan allocation; topup
- *  points NEVER expire (vs monthly refill which resets balance). */
-// 2026-05-14 (CJ「美金為準，每天匯率動」+「定價不蠶食訂閱」).
-// USD is the only source of truth; TWD derives via fx.getUsdToTwd().
-//
-// Anchor: Solo 標準訂閱 = $50/3000pt = $0.0167/pt; Solo 早鳥 = $0.0100/pt.
-// Topup is positioned as「不訂閱也能用」溢價 + 量大有折，但 best price
-// only matches early-bird subscription — never beats it. This keeps
-// recurring revenue safe.
-//   small  $15  / 1000pt = $0.0150/pt  (≈ standard sub, 0% off)
-//   medium $60  / 5000pt = $0.0120/pt  (20% off small)
-//   large  $100 / 10000pt = $0.0100/pt (33% off small, == early-bird sub)
-export const TOPUP_PACKS = {
-  small:  { id: "small",  points: 1000,  usdAmount: 15,  usdPerPoint: 0.0150, discountPct: 0,  labelZh: "小份",  labelEn: "Small" },
-  medium: { id: "medium", points: 5000,  usdAmount: 60,  usdPerPoint: 0.0120, discountPct: 20, labelZh: "中份",  labelEn: "Medium" },
-  large:  { id: "large",  points: 10000, usdAmount: 100, usdPerPoint: 0.0100, discountPct: 33, labelZh: "大份",  labelEn: "Large" },
-} as const;
-export type TopupPackId = keyof typeof TOPUP_PACKS;
 
 /**
  * 2026-05-14 (CJ「TWD + USD 雙幣」): currency derives from
@@ -127,19 +108,6 @@ export function inferBillingCountryFromAcceptLanguage(header: string | null | un
 export function toStripeUnitAmount(amount: number, currency: Currency): number {
   // Both TWD and USD: multiply by 100 to convert to smallest unit
   return Math.round(amount * 100);
-}
-
-/** Resolve a top-up pack's amount in the caller's currency at the live rate. */
-export function topupAmountIn(
-  pack: { usdAmount: number; usdPerPoint: number },
-  currency: Currency,
-  usdToTwd: number,
-): { amount: number; perPoint: number } {
-  if (currency === "USD") return { amount: pack.usdAmount, perPoint: pack.usdPerPoint };
-  return {
-    amount: Math.round(pack.usdAmount * usdToTwd),
-    perPoint: Math.round(pack.usdPerPoint * usdToTwd * 100) / 100,
-  };
 }
 
 /** Format a price for display. Always shows the user's currency. */
