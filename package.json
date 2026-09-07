@@ -21,6 +21,7 @@
     "nanoid": "^5.1.9"
   },
   "devDependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0",
     "@types/bcrypt": "^6.0.0"
   }
 }
