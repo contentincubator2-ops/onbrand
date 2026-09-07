@@ -30,14 +30,8 @@ import { authRouter } from "./auth/authRouter";
 import { reportTemplateRouter } from "./routes/reportTemplateRoute";
 import { positioningDocRouter } from "./routes/positioningDocRoute";
 import { slackOAuthRouter } from "./routes/slackOAuthRoute";
-import { brandBrainRouter } from "./routes/brandBrainRoute";
-import { exportsRouter } from "./routes/exportsRoute";
-import { missionSquadRouter } from "./routes/missionSquadRoute";
 import { cloudOAuthRouter } from "./routes/cloudOAuthRoute";
-import { squadSearchRouter } from "./routers/squadSearchRouter";
-import { entitySearchRouter } from "./routers/entitySearchRouter";
 import { manusRouter } from "./routers/manusRouter";
-import { missionStepStreamRouter } from "./routes/missionStepStreamRoute";
 import { publicAgentsRoute } from "./routes/publicAgentsRoute";
 import { closeDb, pingDb, pingSoworkDb, getDb } from "./db";
 import { sql } from "drizzle-orm";
@@ -354,14 +348,8 @@ app.use("/api/positioning-doc", positioningDocRouter);
 // ─── Slack OAuth + Events ─────────────────────────────────────────────────────
 app.use("/slack", slackOAuthRouter);
 // /api/chat removed 2026-05-14 — only v1 MissionChatCore consumed it.
-app.use("/api/brand-brain", brandBrainRouter);
-app.use("/api/exports", exportsRouter);
-app.use("/api/missions", missionSquadRouter);
 app.use("/api/oauth", cloudOAuthRouter);
-app.use("/api/squads/search", squadSearchRouter);
-app.use("/api/entity/search", entitySearchRouter);
 app.use("/api/manus", manusRouter);
-app.use("/api/missions", missionStepStreamRouter);
 
 // ─── Public agent showcase (no auth required by default) ─────────────────────
 app.use(publicAgentsRoute);
