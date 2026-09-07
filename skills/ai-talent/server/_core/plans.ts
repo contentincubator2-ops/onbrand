@@ -19,7 +19,7 @@
 
 // 2026-05-11 — multi-tier for $1M ARR strategy. Solo / Team / Agency
 // split (CJ「Team / Agency 方案是 $1M 真正的槓桿」).
-export type PlanCode = "trial" | "drop_starter" | "drop_pro" | "drop_team" | "drop_agency" | "enterprise";
+export type PlanCode = "trial" | "drop_starter" | "drop_pro" | "enterprise";
 
 export interface PlanQuota {
   /** -1 means unlimited */
@@ -322,93 +322,6 @@ export const PLANS: Record<PlanCode, Plan> = {
     highlight: "US$300／月",
   },
 
-  /** OnBrand Studio — for solo brand owners managing 2-3 brands.
-   *  2026-05-14 (CJ pricing pivot — replaces old drop_team Team plan):
-   *    - 早鳥 US$250/月
-   *    - 標準 US$750/月
-   *    - 最多 3 個品牌（self-serve 切換、不用聯繫客服）
-   *    - 1 位用戶（5 user seats 是 Q3+ roadmap）
-   *    - Fair-use: 內部每日 LLM cost cap = $15
-   */
-  drop_team: {
-    code: "drop_team",
-    name: "OnBrand Studio",
-    priceTwdMonthly: 22500,                 // standard (US$750 @ 30)
-    priceTwdAnnually: 225000,
-    earlyBirdPriceTwdMonthly: 7500,         // early-bird (US$250 @ 30)
-    standardPriceTwdMonthly: 22500,
-    priceUsdMonthly: 750,                   // standard US$750
-    priceUsdAnnually: 7500,                 // 10× monthly
-    earlyBirdPriceUsdMonthly: 250,          // early-bird US$250
-    standardPriceUsdMonthly: 750,
-    trialDays: 0,
-    quota: {
-      task_30s: -1, task_60s: -1, task_99s: -1, image_gen: -1,
-      video_gen: 0,                // 影片暫時下架
-      brands: 3,                   // ← Studio = 最多 3 個品牌
-      fb_publish: -1,
-      team_members: 1,             // 5 user seats 是 Q3+ roadmap
-      multi_client: true,
-      pointsPerCycle: -1,          // 無限文案 + 無限圖（fair-use daily $15 cap）
-      pointsCycleDays: 30,
-      runsPerCycle: -1,            // Studio: unlimited runs
-      platforms: -1,
-      platformSwapDays: 0,
-      ownTaskCards: -1,
-      viralTaskCards: true,
-      products: -1,
-      eventsPerCycle: -1,
-    },
-    features: [
-      "最多 3 個品牌（自助切換）",
-      "每個品牌都是 Solo 規格（無限文案 + 圖）",
-      "FB / IG 直接發布 + 排程（無限）",
-      "跨品牌切換、跨品牌數據比較",
-      "電子發票（B2B）",
-      "1 位用戶（多 user seats 是 roadmap）",
-    ],
-    highlight: "適合 Solo 多品牌主 / 內部工作室",
-    prioritySupport: false,
-  },
-
-  /** OnBrand Agency — unlimited users, white label, API access. */
-  drop_agency: {
-    code: "drop_agency",
-    name: "OnBrand Agency · 代理商",
-    priceTwdMonthly: 14990,
-    priceTwdAnnually: 149900,
-    priceUsdMonthly: 469,
-    priceUsdAnnually: 4690,
-    trialDays: 0,
-    quota: {
-      task_30s: -1, task_60s: -1, task_99s: -1, image_gen: -1,
-      video_gen: 150,
-      brands: -1,
-      fb_publish: -1,
-      team_members: -1,
-      multi_client: true,
-      // Agency plan = 50,000 pts/month (~17× solo, 3× team)
-      pointsPerCycle: 50000,
-      pointsCycleDays: 30,
-      runsPerCycle: -1,
-      platforms: -1,
-      platformSwapDays: 0,
-      ownTaskCards: -1,
-      viralTaskCards: true,
-      products: -1,
-      eventsPerCycle: -1,
-    },
-    features: [
-      "無限用戶 · 無限品牌",
-      "White Label（換 logo + 公司名）",
-      "API 存取（接你自己的 workflow）",
-      "優先客服 + 1 對 1 onboarding",
-      "OnBrand Team 全部功能",
-    ],
-    whiteLabel: true,
-    apiAccess: true,
-    prioritySupport: true,
-  },
 
   /** Enterprise — quote-based, contact sales. */
   enterprise: {
@@ -445,6 +358,9 @@ export const PLANS: Record<PlanCode, Plan> = {
 };
 
 export function getPlan(code: PlanCode | string): Plan {
+  // 2026-09-07 Studio／Agency 方案下架（CJ「沒有 studio agency 方案了」）。
+  // 舊資料若還存著這兩個 code，當專業方案處理，不要掉回 trial。
+  if (code === "drop_team" || code === "drop_agency") return PLANS.drop_pro;
   return PLANS[code as PlanCode] ?? PLANS.trial;
 }
 

@@ -661,7 +661,7 @@ export default function BrandOnboardingWizard({ isOpen, onClose, onComplete }: P
                       {lang === "en" ? "2–3 brands → Contact us" : "2–3 個品牌 → 聯繫我們"}
                     </a>
                     <a
-                      href="mailto:sowork@sowork.ai?subject=Agency 方案洽詢"
+                      href="mailto:sowork@sowork.ai?subject=企業客製版洽詢"
                       style={{
                         padding: "8px 14px", fontSize: 12, fontWeight: 600,
                         borderRadius: 6, cursor: "pointer",

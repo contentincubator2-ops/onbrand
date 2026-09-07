@@ -217,7 +217,7 @@ export const tenantRouter = router({
     }),
 
   /** Update workspace metadata (name, white-label). Owner only.
-   *  White-label fields gated to drop_agency / enterprise plans. */
+   *  White-label fields gated to the enterprise plan（Agency 方案 2026-09-07 下架）. */
   update: protectedProcedure
     .input(z.object({
       workspaceId: z.number().int().positive(),
@@ -237,10 +237,10 @@ export const tenantRouter = router({
           [input.workspaceId],
         );
         const plan = (wsRow as any[])[0]?.planCode;
-        if (plan !== "drop_agency" && plan !== "enterprise") {
+        if (plan !== "enterprise") {
           throw new TRPCError({
             code: "PRECONDITION_FAILED",
-            message: "White Label 需要 OnBrand Agency 方案以上",
+            message: "White Label 屬於企業版，由 SoWork 導入時設定",
           });
         }
       }

@@ -102,16 +102,10 @@ export async function preflightCostCheck(userId: number): Promise<{ ok: true } |
       [userId],
     );
     const planCode = (pRows as any[])[0]?.planCode ?? "trial";
-    const { DAILY_USD_CAP_SOLO, DAILY_USD_CAP_STUDIO } = await import("./_core/timeout");
-    const cap =
-      planCode === "drop_team" ? DAILY_USD_CAP_STUDIO :
-      planCode === "drop_pro"  ? DAILY_USD_CAP_SOLO :
-      DAILY_USD_CAP_TRIAL;
+    const { DAILY_USD_CAP_SOLO } = await import("./_core/timeout");
+    const cap = planCode === "drop_pro" ? DAILY_USD_CAP_SOLO : DAILY_USD_CAP_TRIAL;
     if (total >= cap) {
-      const planLabel =
-        planCode === "drop_team" ? "Studio" :
-        planCode === "drop_pro"  ? "Solo" :
-        "試用";
+      const planLabel = planCode === "drop_pro" ? "專業" : "試用";
       return { ok: false, reason: `今日 LLM 成本已達 ${planLabel} 方案上限（$${total.toFixed(2)} / $${cap}）。明天 24 小時後重置，或聯繫業務洽詢 Agency 方案。` };
     }
   } catch {/* daily-cap check best-effort; don't block on DB transient */}

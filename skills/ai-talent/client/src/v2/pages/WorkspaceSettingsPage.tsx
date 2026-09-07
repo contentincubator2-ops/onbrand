@@ -1,12 +1,12 @@
 /**
- * /settings/workspace — Team / Agency workspace management.
- * 2026-05-12. CJ direction「Team / Agency 方案 + 多客戶 workspace 都要完成」.
+ * /settings/workspace — 團隊 workspace 管理（專業方案 5 席）。
+ * 2026-05-12 起建；2026-09-07 Studio／Agency 方案下架，CJ「workspace 就是現在的 5 人團隊方案」。
  *
  * Lists workspaces the user belongs to. For each:
  *   - members (with role + remove/setRole controls for owners)
  *   - brand list (with brand-scoping for viewers)
  *   - invite-by-email form
- *   - white-label name/logo (Agency tier only)
+ *   - white-label name/logo (enterprise only)
  */
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -35,8 +35,6 @@ const PLAN_LABEL: Record<string, string> = {
   solo:         "Solo",
   drop_starter: "OnBrand Starter",
   drop_pro:     "OnBrand Solo",
-  drop_team:    "OnBrand Studio",
-  drop_agency:  "OnBrand Agency",
   enterprise:   "Enterprise",
 };
 
@@ -174,7 +172,7 @@ function WorkspaceDetail({ detail, onChanged }: { detail: any; onChanged: () => 
   const [wlName, setWlName] = useState(ws.whiteLabelName ?? "");
   const [wlLogo, setWlLogo] = useState(ws.whiteLabelLogo ?? "");
 
-  const canWhiteLabel = ws.planCode === "drop_agency" || ws.planCode === "enterprise";
+  const canWhiteLabel = ws.planCode === "enterprise";
 
   return (
     <div className="space-y-6">
@@ -340,7 +338,7 @@ function WorkspaceDetail({ detail, onChanged }: { detail: any; onChanged: () => 
         )}
       </section>
 
-      {/* White label (Agency+ only) */}
+      {/* White label (enterprise only) */}
       {isOwner && (
         <section className={`bg-white border rounded-xl p-6 ${canWhiteLabel ? "border-neutral-200" : "border-neutral-100 opacity-60"}`}>
           <h3 className="text-base font-semibold text-neutral-900 mb-1">White Label</h3>
@@ -350,8 +348,8 @@ function WorkspaceDetail({ detail, onChanged }: { detail: any; onChanged: () => 
                 ? "Use your own name and logo — client-facing reports rebrand automatically."
                 : "用你自己的公司名和 logo，給客戶看的工作報表會自動換成你的品牌。")
               : (lang === "en"
-                ? "Upgrade to OnBrand Agency to unlock (your logo + name on client views)"
-                : "升級 OnBrand Agency 解鎖（用你的 logo + 公司名給客戶看）")}
+                ? "Enterprise only — set up with SoWork during onboarding (your logo + name on client views)"
+                : "企業版功能 — 由 SoWork 導入時設定（用你的 logo + 公司名給客戶看）")}
           </p>
           <div className="space-y-3 max-w-md">
             <div>

@@ -62,8 +62,6 @@ function getStripe(): Stripe {
 const PLAN_LABEL: Record<string, string> = {
   drop_starter: "OnBrand Starter",
   drop_pro:     "OnBrand Solo",
-  drop_team:    "OnBrand Studio",
-  drop_agency:  "OnBrand Agency",
 };
 
 /** Look up the user's billing currency (defaults TWD). */
@@ -82,7 +80,7 @@ export const stripeRouter = router({
   /** Subscription checkout — monthly or annual. */
   createCheckout: protectedProcedure
     .input(z.object({
-      planCode: z.enum(["drop_starter", "drop_pro", "drop_agency"]),
+      planCode: z.enum(["drop_starter", "drop_pro"]),
       workspaceId: z.number().int().positive(),
       annual: z.boolean().default(false),
     }))
@@ -334,7 +332,7 @@ export async function handleStripeWebhook(rawBody: Buffer, signature: string): P
     // NOT workspaces.*. Without this the customer pays and stays on the
     // trial plan (300 pts, planStatus='trial') — they get nothing.
     // Flipping users.planCode to a paid plan auto-unlocks unlimited
-    // points (drop_pro/drop_team pointsPerCycle = -1 → refillIfDue
+    // points (drop_pro pointsPerCycle = -1 → refillIfDue
     // bypass), so no explicit points grant is needed here.
     await localPool.execute(
       `UPDATE users

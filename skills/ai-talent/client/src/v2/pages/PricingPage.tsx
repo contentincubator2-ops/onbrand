@@ -1,5 +1,5 @@
 /**
- * Pricing page — 3 tiers: Starter / Solo / Studio + Agency contact card.
+ * Pricing page — 兩個自助方案 + 企業客製版聯繫卡（Studio／Agency 2026-09-07 下架）。
  * 2026-05-19. CJ direction: add Starter at US$25 early / US$75 std.
  * Task counting = per execution run (all variants + images in one run = 1 use).
  */
@@ -169,7 +169,7 @@ export default function PricingPage() {
               backgroundClip: "text",
             }}
           >
-            {isEn ? "From solo creator to full agency — one toolkit" : "從個人創作者到整個 Agency — 一套工具"}
+            {isEn ? "From one marketer to a five-seat team — one brand task library" : "從一個人到五人團隊 — 同一套品牌任務庫"}
           </h1>
           <p
             className="mx-auto text-default-700"
@@ -322,21 +322,21 @@ export default function PricingPage() {
           ))}
         </div>
 
-        {/* Agency / Enterprise */}
+        {/* 企業客製版 */}
         <div className="bg-neutral-50 rounded-xl p-6 flex items-center justify-between flex-wrap gap-3 max-w-3xl mx-auto">
           <div>
             <p className="text-[12px] font-semibold uppercase tracking-[0.22em] text-neutral-600 mb-1">
-              AGENCY · CUSTOM
+              ENTERPRISE · CUSTOM
             </p>
-            <p className="text-base font-semibold text-neutral-900">{isEn ? "Agency / Enterprise" : "Agency / 企業版"}</p>
+            <p className="text-base font-semibold text-neutral-900">{isEn ? "Enterprise" : "企業客製版"}</p>
             <p className="text-sm text-neutral-700 mt-1 max-w-xl">
               {isEn
-                ? "Unlimited brands · multi-user seats · white label · API access · priority support — pricing tailored to your team"
-                : "無限品牌 · 多 user seats · White Label · API access · 優先客服 — 依團隊規模客製報價"}
+                ? "Custom task cards, brand brain and your internal SKILLs · performance layer and e-commerce reporting · setup fee + monthly, quoted per company"
+                : "客製任務卡、品牌大腦與貴公司內部 SKILL · 成效層與電商營運報告 · 建置費 + 月費，依公司報價"}
             </p>
           </div>
           <a
-            href={isEn ? "mailto:sowork@sowork.ai?subject=Agency / Enterprise inquiry" : "mailto:sowork@sowork.ai?subject=Agency 方案洽詢"}
+            href={isEn ? "mailto:sowork@sowork.ai?subject=Enterprise inquiry" : "mailto:sowork@sowork.ai?subject=企業客製版洽詢"}
             className="px-4 py-2 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-white text-sm font-medium"
           >
             {isEn ? "Talk to sales →" : "聯繫業務 →"}

@@ -23,11 +23,9 @@ export const LLM_HARD_TIMEOUT_MS = 90_000;
 /** Daily cost cap per user (USD). Plan-aware fair-use caps.
  *  Trial =  $3 (tight; pushes upgrade)
  *  Solo  =  $5 (typical light/medium user fits well under)
- *  Studio = $15 (3 brands × $5 budget per brand)
- *  Enterprise / agency = unlimited (preflightCostCheck bypasses) */
+ *  Enterprise = unlimited (preflightCostCheck bypasses) */
 export const DAILY_USD_CAP_TRIAL  = 3;
 export const DAILY_USD_CAP_SOLO   = 5;
-export const DAILY_USD_CAP_STUDIO = 15;
 
 /** Pre-flight credits floor — refuse new LLM calls if wallet under this. */
 export const MIN_CREDITS_TO_RUN = 10;

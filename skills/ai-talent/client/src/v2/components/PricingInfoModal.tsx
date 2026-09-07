@@ -1,6 +1,6 @@
 /**
  * PricingInfoModal — informational pricing card shown inside the app.
- * 2026-05-19. Aligned with PricingPage: Trial → Starter → Solo → Studio → Agency.
+ * 2026-05-19. Aligned with PricingPage: Trial → Starter → Solo（Studio／Agency 2026-09-07 下架）.
  * Task counting = per execution run (not per variant/image).
  */
 import { Modal, ModalContent, ModalBody, Button } from "@heroui/react";
