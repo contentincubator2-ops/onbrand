@@ -19,9 +19,9 @@ import {
   intakeExtraFields as clientExtra,
   intakePrimaryRequired as clientPrimaryRequired,
   missingRequiredInputs as clientMissing,
-} from "../../../client/src/v2/lib/taskIntake";
+} from "../../../client/src/v2/content/lib/taskIntake";
 import * as serverModule from "./taskIntake";
-import * as clientModule from "../../../client/src/v2/lib/taskIntake";
+import * as clientModule from "../../../client/src/v2/content/lib/taskIntake";
 import { resolveTaskTemplateSync } from "./taskRegistry";
 
 const CASES: any[] = [

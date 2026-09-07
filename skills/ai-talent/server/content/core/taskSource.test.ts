@@ -20,7 +20,7 @@ import { buildTaskCatalogIndex } from "./taskCatalogIndex";
 import { sourceAgeMonths } from "./taskSource";
 
 const CLIENT_VOCAB = path.resolve(
-  __dirname, "../../../client/src/v2/lib/sourceVocabulary.ts",
+  __dirname, "../../../client/src/v2/content/lib/sourceVocabulary.ts",
 );
 
 describe("taskSource ↔ sourceVocabulary 同步", () => {

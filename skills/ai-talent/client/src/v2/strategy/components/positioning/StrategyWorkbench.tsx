@@ -1,0 +1,708 @@
+/**
+ * StrategyWorkbench — 品牌大腦策略工作台（P1，2026-07-28 CJ「開工」）.
+ *
+ * 三個輸入槽（受眾 × 競爭組 × 主打優勢）→「重新推導」→ 四區看板：
+ * 🎯 甜蜜點（含 need←gap←ours 推導鏈＋各自長出的標語）／⚔️ 基本籌碼／
+ * 🚫 對手地盤／💤 自嗨區。受眾與競品 chip 可下鑽原始研究面板。
+ *
+ * 設計紀律（CJ）：圖示一律單色線條；色彩只留功能語意——甜蜜點區橙框、
+ * 推導鏈紅（對手缺口）／綠（我方能力）底線。
+ *
+ * P1 =選擇＋單次推導＋情境儲存（positioning._workbench）；
+ * P2 情境比較／套用回寫、深挖此點在後續 phase。
+ */
+import React, { useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { trpc } from "../../../../lib/trpc";
+import { showToastGlobal } from "../../../../components/ui/Toast";
+
+/* 單色線條 icon（stroke currentColor） */
+const Ic = ({ d, vb = "0 0 24 24" }: { d: string; vb?: string }) => (
+  <svg viewBox={vb} style={{ width: 13, height: 13, verticalAlign: -2 }}
+       fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+    {d.split("|").map((p, i) => <path key={i} d={p} />)}
+  </svg>
+);
+const IC = {
+  user:   "M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8|M4 21c0-4 3.5-7 8-7s8 3 8 7",
+  target: "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18|M12 16.5a4.5 4.5 0 1 0 0-9 4.5 4.5 0 0 0 0 9|M12 13a1 1 0 1 0 0-2 1 1 0 0 0 0 2",
+  gem:    "M12 3l7 6-7 12L5 9z|M5 9h14",
+  redo:   "M20 11a8 8 0 1 0-2.3 6|M20 5v6h-6",
+  search: "M10.5 17a6.5 6.5 0 1 0 0-13 6.5 6.5 0 0 0 0 13|M15.5 15.5L21 21",
+  close:  "M6 6l12 12|M18 6L6 18",
+};
+
+type Chip = {
+  key: string; label: string; value: string; drill?: "audience" | "competitor";
+  /** 自訂研究產物（受眾 alternates 的痛點/需求等），下鑽面板用 */
+  extra?: { pains?: string[]; needs?: string[]; note?: string };
+};
+
+export default function StrategyWorkbench({
+  brandId, eventId, positioning, lang, locked,
+}: {
+  brandId: number;
+  /** 2026-07-29 (「穩定了」— generalize workbench to events): when set, the
+   *  workbench operates on the EVENT's own positioning (scenarios persist
+   *  on events.positioning._workbench, not the brand's). `brandId` stays
+   *  required even in event scope — it's the parent brand the server
+   *  borrows competition/differentiation ground material from. */
+  eventId?: number | null;
+  positioning: Record<string, any>;
+  lang: "zh-TW" | "en";
+  /** 2026-08-21 (CJ「鎖定後，策略工作檯就會只留下最後定案的，變成下方的
+   *  文字就好」): tabLocks.positioning — the caller only passes this true
+   *  for brand scope (events have no lock of their own). When true, all the
+   *  editable chrome (anchor chips, ＋新增, 重新推導, 深挖/套用 buttons)
+   *  disappears; only the finalized scenario's board renders, as plain
+   *  read-only text. The server now enforces this too (workbenchRouter's
+   *  derive/applyScenario/researchItem all reject while locked) — this is
+   *  the matching UI so a locked brand doesn't dangle controls that would
+   *  just fail. */
+  locked?: boolean;
+}) {
+  const en = lang === "en";
+  const isEvent = !!eventId;
+  const scopeArgs = isEvent ? { brandId, eventId: eventId! } : { brandId };
+  const navigate = useNavigate();
+  const utils = (trpc as any).useUtils?.();
+  const deriveMut = (trpc as any).workbench?.derive?.useMutation?.();
+  const digMut = (trpc as any).workbench?.digSpot?.useMutation?.();
+  const applyMut = (trpc as any).workbench?.applyScenario?.useMutation?.();
+  const [digging, setDigging] = useState<number | null>(null);
+  // 2026-07-29 (CJ「品牌工具、黃金圈等應該跟著策略工作台變動」): apply now
+  // cascades — brand: 差異化/黃金圈/語氣/標語評分/AI 指令庫；event: 訊息架構/
+  // 創意概念 — regenerate as a positioning job; poll it so the user sees
+  // progress and the page below refreshes when the downstream is consistent
+  // with the applied scenario.
+  const [cascading, setCascading] = useState(false);
+  const cascadeQ = (trpc as any).positioningJobs?.getStatusBatch?.useQuery?.(
+    { entityKind: isEvent ? "event" : "brand", entityIds: [isEvent ? eventId! : brandId] },
+    { enabled: cascading, refetchInterval: 4000 },
+  );
+  React.useEffect(() => {
+    if (!cascading) return;
+    const row = (cascadeQ?.data ?? [])[0];
+    if (!row) return;
+    if (row.status === "done" || row.status === "failed") {
+      setCascading(false);
+      utils?.scope?.active?.invalidate?.();
+      showToastGlobal(
+        row.status === "done"
+          ? (en ? "✓ Downstream regenerated — the page now follows the applied scenario" : "✓ 下游重生完成——差異化、黃金圈、語氣與 AI 指令庫已跟上套用的情境")
+          : (en ? "Downstream regeneration failed — retry apply" : "下游重生失敗，請再套用一次"),
+        row.status === "done" ? "success" : undefined,
+      );
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cascading, cascadeQ?.data]);
+  const cascadeRow = cascading ? (cascadeQ?.data ?? [])[0] : null;
+
+  const aud = positioning?.audience ?? {};
+  const compRows: any[] = Array.isArray(positioning?.competition?.direct) ? positioning.competition.direct : [];
+  const diff = positioning?.differentiation ?? {};
+
+  // 2026-07-29 (CJ「按重新推導說我缺目標族群——系統應該直接抓定位書的內容
+  // 定義目標族群」): canonical audience segment missing ≠ no audience. Fall
+  // back through the positioning book's own definitions: legacy string
+  // shape → brands.targetAudience column (定位書欄位, brand.get already
+  // derives it from segment/interim when the column is empty).
+  const audSegmentEmpty = !aud.primary && !aud.secondary;
+  const brandQ = (trpc as any).brand?.get?.useQuery?.(
+    { id: brandId },
+    { enabled: !isEvent && !!brandId && audSegmentEmpty, refetchOnWindowFocus: false },
+  );
+  const audienceChips: Chip[] = useMemo(() => {
+    const out: Chip[] = [];
+    if (aud.primary) out.push({ key: "primary", label: en ? "Primary audience" : "主受眾", value: String(aud.primary), drill: "audience" });
+    if (aud.secondary) out.push({ key: "secondary", label: en ? "Secondary audience" : "次受眾", value: String(aud.secondary), drill: "audience" });
+    if (out.length === 0 && typeof positioning?.audience === "string" && positioning.audience.trim()) {
+      out.push({ key: "primary", label: en ? "Audience" : "受眾", value: positioning.audience.trim(), drill: "audience" });
+    }
+    const bookTa = typeof brandQ?.data?.targetAudience === "string" ? brandQ.data.targetAudience.trim() : "";
+    if (out.length === 0 && bookTa) {
+      out.push({ key: "book", label: en ? "Positioning-book audience" : "定位書受眾", value: bookTa, drill: "audience" });
+    }
+    // 2026-07-29 (CJ「讓用戶可以新增…AI 再針對該新增的部分進行研究」):
+    // user-added audiences live in audience.alternates（researchItem 產物）。
+    const alts: any[] = Array.isArray(aud.alternates) ? aud.alternates : [];
+    alts.forEach((a, i) => out.push({
+      key: `alt${i}`,
+      label: String(a?.label ?? (en ? `Custom ${i + 1}` : `自訂受眾 ${i + 1}`)),
+      value: String(a?.narrative ?? a?.label ?? ""),
+      drill: "audience",
+      extra: { pains: a?.pains ?? [], needs: a?.needs ?? [], note: en ? "user-added · AI researched" : "用戶新增・AI 已研究" },
+    }));
+    return out;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [aud.primary, aud.secondary, aud.alternates, brandQ?.data?.targetAudience, en]);
+
+  const competitorChips: Chip[] = useMemo(
+    () => compRows.map((c: any, i: number) => ({
+      key: `c${i}`, label: String(c?.name ?? `競品 ${i + 1}`), value: String(c?.name ?? ""), drill: "competitor" as const,
+    })),
+    [compRows],
+  );
+
+  const advantageChips: Chip[] = useMemo(() => {
+    const out: Chip[] = [];
+    if (diff.functional) out.push({ key: "functional", label: en ? "Functional edge" : "功能差異化", value: String(diff.functional) });
+    if (diff.emotional) out.push({ key: "emotional", label: en ? "Emotional edge" : "情感差異化", value: String(diff.emotional) });
+    if (diff.summary && out.length === 0) out.push({ key: "summary", label: en ? "Differentiation" : "差異化總結", value: String(diff.summary) });
+    // 用戶新增優勢（researchItem 產物）— differentiation.custom
+    const custom: any[] = Array.isArray(diff.custom) ? diff.custom : [];
+    custom.forEach((a, i) => out.push({
+      key: `cust${i}`,
+      label: String(a?.label ?? (en ? `Custom ${i + 1}` : `自訂優勢 ${i + 1}`)),
+      value: String(a?.statement ?? a?.label ?? ""),
+    }));
+    return out;
+  }, [diff.functional, diff.emotional, diff.summary, diff.custom, en]);
+
+  // 2026-07-29: ＋新增 → AI 研究 → 落地 canonical 研究資料
+  const researchMut = (trpc as any).workbench?.researchItem?.useMutation?.();
+  const [adding, setAdding] = useState<null | "audience" | "competitor" | "advantage">(null);
+  const [addText, setAddText] = useState("");
+  const submitResearch = (kind: "audience" | "competitor" | "advantage") => {
+    const v = addText.trim();
+    if (v.length < 2) return;
+    researchMut?.mutate?.({ ...scopeArgs, kind, value: v.slice(0, 160) }, {
+      onSuccess: (r: any) => {
+        if (r?.ok) {
+          showToastGlobal(en ? "✓ Researched and added" : "✓ AI 已完成研究並加入選項（可點入查看）", "success");
+          setAdding(null); setAddText("");
+          utils?.scope?.active?.invalidate?.();
+        } else showToastGlobal(r?.error ?? (en ? "Research failed" : "研究失敗，請再試一次"));
+      },
+      onError: () => showToastGlobal(en ? "Research failed" : "研究失敗，請再試一次"),
+    });
+  };
+  const AddControl = ({ kind, placeholder }: { kind: "audience" | "competitor" | "advantage"; placeholder: string }) => (
+    adding === kind ? (
+      <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+        <input
+          autoFocus
+          value={addText}
+          onChange={(e) => setAddText(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter") submitResearch(kind); if (e.key === "Escape") { setAdding(null); setAddText(""); } }}
+          placeholder={placeholder}
+          disabled={researchMut?.isPending}
+          style={{ fontSize: 12, padding: "4px 12px", borderRadius: 999, border: "1.5px solid #2A2630", outline: "none", width: 200, background: "#fff" }}
+        />
+        <span onClick={() => submitResearch(kind)}
+              style={{ fontSize: 12.5, fontWeight: 800, background: researchMut?.isPending ? "#8A8494" : "#2A2630", color: "#fff", borderRadius: 8, padding: "4px 12px", cursor: researchMut?.isPending ? "wait" : "pointer", whiteSpace: "nowrap" }}>
+          {researchMut?.isPending ? (en ? "Researching…" : "AI 研究中…") : (en ? "Research" : "AI 研究")}
+        </span>
+      </span>
+    ) : (
+      <span onClick={() => { setAdding(kind); setAddText(""); }}
+            style={{ fontSize: 12, fontWeight: 600, padding: "4px 13px", borderRadius: 999, border: "1.5px dashed #C9C4BC", color: "#A8A29E", background: "transparent", cursor: "pointer" }}>
+        ＋ {en ? "Add" : "新增"}
+      </span>
+    )
+  );
+
+  const scenarios: any[] = Array.isArray(positioning?._workbench?.scenarios) ? positioning._workbench.scenarios : [];
+  const appliedId: string | null = positioning?._workbench?.appliedId ?? null;
+  const [activeName, setActiveName] = useState<string | null>(null);
+  const active = scenarios.find((s) => s?.name === (activeName ?? "")) ??
+    (activeName ? null : scenarios[scenarios.length - 1] ?? null);
+
+  const [selAudience, setSelAudience] = useState<string>("primary");
+  // fallback chip（如「定位書受眾」）出現時，選取狀態跟著落到既有的第一顆
+  React.useEffect(() => {
+    if (audienceChips.length > 0 && !audienceChips.some((c) => c.key === selAudience)) {
+      setSelAudience(audienceChips[0]!.key);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [audienceChips.map((c) => c.key).join(",")]);
+  const [selComp, setSelComp] = useState<Set<string>>(() => new Set(competitorChips.slice(0, 2).map((c) => c.key)));
+  const [selAdv, setSelAdv] = useState<Set<string>>(() => new Set(advantageChips.map((c) => c.key)));
+  const [drill, setDrill] = useState<{ kind: "audience" | "competitor"; key: string } | null>(null);
+  const [collapsed, setCollapsed] = useState(false);
+
+  // P2: switching to a stored scenario restores its slot selection so the
+  // slots always show what THIS scenario was derived from.
+  const restoreSelection = (scn: any) => {
+    const sel = scn?.selection;
+    if (!sel) return;
+    const audKey = audienceChips.find((c) => c.value === sel.audience)?.key;
+    if (audKey) setSelAudience(audKey);
+    if (Array.isArray(sel.competitors)) {
+      const keys = competitorChips.filter((c) => sel.competitors.includes(c.value)).map((c) => c.key);
+      if (keys.length > 0) setSelComp(new Set(keys));
+    }
+    if (Array.isArray(sel.advantages)) {
+      const keys = advantageChips.filter((c) => sel.advantages.some((a: string) => c.value.startsWith(a.slice(0, 30)))).map((c) => c.key);
+      if (keys.length > 0) setSelAdv(new Set(keys));
+    }
+  };
+  const nextScenarioName = () => {
+    const letters = "ABCDEFGH";
+    for (const ch of letters) {
+      const name = `情境 ${ch}`;
+      if (!scenarios.some((s) => s?.name === name)) return name;
+    }
+    return `情境 ${letters[scenarios.length % letters.length]}`;
+  };
+
+  // 2026-07-29 (CJ「策略工作台消失了，應該要補回來」— 媽爹講故事帳號):
+  // the old null-gate hid the ENTIRE workbench whenever audience or
+  // competition segments were missing/legacy-shaped — silently, so the
+  // new presentation looked "gone". The workbench is the page's decision
+  // layer: always render on brand scope, and when research is missing,
+  // SAY which piece and point at the fix (跑下方對應段落 / 重新校對).
+  const missingResearch: string[] = [];
+  if (audienceChips.length === 0) missingResearch.push(en ? "Audience research" : "目標受眾");
+  if (competitorChips.length === 0) missingResearch.push(en ? "Competitive landscape" : "競爭格局分析");
+  if (advantageChips.length === 0) missingResearch.push(en ? "Differentiation" : "品牌差異化戰略");
+
+  const toggle = (set: Set<string>, key: string, min = 1) => {
+    const next = new Set(set);
+    if (next.has(key)) { if (next.size > min) next.delete(key); } else next.add(key);
+    return next;
+  };
+
+  const runDerive = () => {
+    if (missingResearch.length > 0) {
+      showToastGlobal(en
+        ? `Research missing: ${missingResearch.join(" / ")} — run positioning below first`
+        : `還缺研究資料：${missingResearch.join("／")}——先到下方段落補齊或按「重新校對」`);
+      return;
+    }
+    const audienceText = audienceChips.find((c) => c.key === selAudience)?.value ?? audienceChips[0]!.value;
+    const competitors = competitorChips.filter((c) => selComp.has(c.key)).map((c) => c.value);
+    const advantages = advantageChips.filter((c) => selAdv.has(c.key)).map((c) => c.value.slice(0, 200));
+    if (competitors.length === 0 || advantages.length === 0) {
+      showToastGlobal(en ? "Pick at least one competitor and one advantage" : "請至少選一個競爭者與一個優勢");
+      return;
+    }
+    const name = activeName ?? active?.name ?? "情境 A";
+    deriveMut?.mutate?.(
+      { ...scopeArgs, scenarioName: name, selection: { audience: audienceText.slice(0, 600), competitors, advantages } },
+      {
+        onSuccess: (r: any) => {
+          if (r?.ok) {
+            showToastGlobal(en ? "Derivation complete" : "✓ 推導完成，看板已更新", "success");
+            setActiveName(r.scenario?.name ?? name);
+            utils?.scope?.active?.invalidate?.();
+          } else {
+            showToastGlobal(r?.error ?? (en ? "Derivation failed" : "推導失敗，請再試一次"));
+          }
+        },
+        onError: (e: any) => showToastGlobal((typeof e?.message === "string" ? e.message : null) ?? (en ? "Derivation failed" : "推導失敗，請再試一次")),
+      },
+    );
+  };
+
+  const derived = active?.derived as undefined | {
+    spots: Array<{
+      lane: string; title: string; need: string; gap: string; ours: string;
+      tagline?: { zh: string; en?: string };
+      dig?: { scenes?: Array<{ scene: string; mot: string }>; contentAngles?: string[]; risks?: string[] };
+    }>;
+    stakes: Array<{ title: string; note?: string }>;
+    rivalTurf: Array<{ title: string; note?: string }>;
+    vanity: Array<{ title: string; note?: string }>;
+    currentTaglineSpot?: string | null;
+  };
+
+  const S = {
+    chip: (on: boolean): React.CSSProperties => ({
+      fontSize: 12, fontWeight: 600, padding: "4px 13px", borderRadius: 999, cursor: "pointer",
+      border: `1.5px solid ${on ? "#2A2630" : "#D9D5CD"}`,
+      background: on ? "#2A2630" : "#FAF9F6", color: on ? "#fff" : "#6E6878",
+    }),
+    zoneCard: { background: "#fff", borderRadius: 10, padding: "9px 13px", marginBottom: 8, boxShadow: "0 1px 2px rgba(0,0,0,.06)" } as React.CSSProperties,
+    act: { fontSize: 12, fontWeight: 700, border: "1.5px solid #C9C4BC", color: "#2A2630", borderRadius: 8, padding: "3px 10px", background: "#fff", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 5 } as React.CSSProperties,
+  };
+
+  const drillAudience = drill?.kind === "audience" ? audienceChips.find((c) => c.key === drill.key) : null;
+  const drillComp = drill?.kind === "competitor"
+    ? compRows[Number(drill.key.slice(1))] ?? null
+    : null;
+
+  return (
+    <div style={{ margin: "0 0 28px", border: "1.5px solid #C9C4BC", borderRadius: 14, background: "#FCFBF9", position: "relative" }}>
+      {/* header */}
+      <div onClick={() => setCollapsed(!collapsed)}
+           style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 18px", cursor: "pointer" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <span style={{ fontSize: 14, fontWeight: 800 }}><Ic d={IC.target} /> {en ? "Strategy Workbench" : "策略工作台"}</span>
+          {locked ? (
+            <span style={{ fontSize: 12, fontWeight: 800, letterSpacing: ".05em", border: "1px solid #2A2630", borderRadius: 5, padding: "1px 8px", color: "#2A2630", background: "#F0EEEA" }}>
+              🔒 {en ? "LOCKED · FINAL" : "已鎖定・定案"}
+            </span>
+          ) : (
+            <span style={{ fontSize: 12, fontWeight: 800, letterSpacing: ".1em", border: "1px solid #C9C4BC", borderRadius: 5, padding: "1px 6px", color: "#8A8494" }}>BETA</span>
+          )}
+          <span style={{ fontSize: 12.5, color: "#8A8494" }}>
+            {locked
+              ? (en ? "finalized — editing is closed" : "已定案，這裡改為唯讀")
+              : (en ? "consumer wants × rivals can't × we can" : "消費者想要 × 競爭者無法 × 我們能提供")}
+          </span>
+          {cascadeRow && (
+            <span style={{ fontSize: 12, fontWeight: 800, border: "1.5px solid #2A2630", borderRadius: 999, padding: "2px 10px", animation: "pulse 1.5s infinite" }}>
+              {en ? `Regenerating downstream ${cascadeRow.currentStep}/${cascadeRow.totalSteps}` : `下游重生中 ${cascadeRow.currentStep}/${cascadeRow.totalSteps}`}
+            </span>
+          )}
+        </div>
+        <span style={{ fontSize: 12, color: "#8A8494" }}>{collapsed ? "▸" : "▾"}</span>
+      </div>
+      {collapsed ? null : (
+      <div style={{ padding: "0 18px 16px" }}>
+        {!locked && (<>
+        {/* 缺研究資料 → 明確指路，不再無聲隱藏 */}
+        {missingResearch.length > 0 && (
+          <div style={{
+            display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap",
+            border: "1.5px dashed #C9C4BC", borderRadius: 12, background: "#FCFBF9",
+            padding: "10px 14px", marginBottom: 12, fontSize: 12.5,
+          }}>
+            <b>{en ? "Research needed before deriving:" : "推導前還缺這些研究資料："}</b>
+            {missingResearch.map((m) => (
+              <span key={m} style={{ border: "1.5px solid #2A2630", borderRadius: 999, padding: "2px 12px", fontWeight: 700, fontSize: 12.5 }}>{m}</span>
+            ))}
+            <span style={{ color: "#8A8494", fontSize: 12.5 }}>
+              {en
+                ? "Fill them in the acts below, or hit re-calibrate to run the positioning pipeline."
+                : "到下方對應段落補齊，或在品牌設定按「重新校對」讓 AI 定位管線補跑——完成後這裡就能選錨點推導。"}
+            </span>
+          </div>
+        )}
+        {/* P2 情境分頁 */}
+        <div style={{ display: "flex", gap: 6, marginBottom: 10, flexWrap: "wrap" }}>
+          {scenarios.map((s) => (
+            <span key={s.id}
+                  onClick={() => { setActiveName(s.name); restoreSelection(s); }}
+                  style={{
+                    fontSize: 12.5, fontWeight: 700, padding: "4px 13px", borderRadius: 8, cursor: "pointer",
+                    border: `1.5px solid ${active?.id === s.id ? "#2A2630" : "#D9D5CD"}`,
+                    background: active?.id === s.id ? "#2A2630" : "#fff",
+                    color: active?.id === s.id ? "#fff" : "#6E6878",
+                  }}>
+              {s.name}{appliedId === s.id ? (en ? " · applied" : " · 已套用") : ""}
+            </span>
+          ))}
+          <span onClick={() => setActiveName(nextScenarioName())}
+                style={{ fontSize: 12.5, fontWeight: 700, padding: "4px 13px", borderRadius: 8, cursor: "pointer", border: "1.5px dashed #C9C4BC", color: "#A8A29E", background: "transparent" }}>
+            ＋ {en ? "New scenario" : "新情境"}
+          </span>
+          {activeName && !scenarios.some((s) => s.name === activeName) && (
+            <span style={{ fontSize: 12, color: "#8A8494", alignSelf: "center" }}>
+              {en ? `“${activeName}” — pick anchors and derive` : `「${activeName}」尚未推導——選好錨點按「重新推導」`}
+            </span>
+          )}
+        </div>
+        {/* 輸入槽 */}
+        <div style={{ background: "#fff", border: "1px solid #E5E1DA", borderRadius: 12, padding: "10px 14px 12px", marginBottom: 14 }}>
+          {[
+            { icon: IC.user, label: en ? "Audience" : "目標受眾", hint: en ? "click chip to view research" : "點 chip 名稱可查原始研究", body: (
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}>
+                {audienceChips.map((c) => (
+                  <span key={c.key} style={S.chip(selAudience === c.key)}>
+                    <span onClick={() => setSelAudience(c.key)}>{selAudience === c.key ? "✓ " : ""}{c.label}・{c.value.slice(0, 18)}…</span>
+                    <span onClick={(e) => { e.stopPropagation(); setDrill({ kind: "audience", key: c.key }); }}
+                          style={{ marginLeft: 6, fontSize: 12.5, opacity: .8, borderBottom: "1px dotted currentColor" }}>
+                      {en ? "research ↗" : "查看研究 ↗"}
+                    </span>
+                  </span>
+                ))}
+                <AddControl kind="audience" placeholder={en ? "e.g. dads of preschoolers" : "例：幼兒園孩子的爸爸"} />
+              </div>
+            )},
+            { icon: IC.target, label: en ? "Competitor set" : "競爭組合", hint: en ? "multi-select" : "可多選；點名稱可查競品研究", body: (
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}>
+                {competitorChips.map((c) => (
+                  <span key={c.key} style={S.chip(selComp.has(c.key))}>
+                    <span onClick={() => setSelComp(toggle(selComp, c.key))}>{selComp.has(c.key) ? "✓ " : ""}{c.label}</span>
+                    <span onClick={(e) => { e.stopPropagation(); setDrill({ kind: "competitor", key: c.key }); }}
+                          style={{ marginLeft: 6, fontSize: 12.5, opacity: .8, borderBottom: "1px dotted currentColor" }}>↗</span>
+                  </span>
+                ))}
+                <AddControl kind="competitor" placeholder={en ? "competitor name" : "例：小牛頓有聲書"} />
+              </div>
+            )},
+            { icon: IC.gem, label: en ? "Lead advantages" : "主打優勢", hint: en ? "from differentiation" : "取自差異化資產", body: (
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}>
+                {advantageChips.map((c) => (
+                  <span key={c.key} style={S.chip(selAdv.has(c.key))} onClick={() => setSelAdv(toggle(selAdv, c.key))}>
+                    {selAdv.has(c.key) ? "✓ " : ""}{c.label}・{c.value.slice(0, 16)}…
+                  </span>
+                ))}
+                <AddControl kind="advantage" placeholder={en ? "e.g. real dad's voice" : "例：真實爸爸親聲錄製"} />
+              </div>
+            )},
+          ].map((row, i) => (
+            <div key={i} style={{ display: "flex", gap: 12, alignItems: "flex-start", padding: "7px 0", borderTop: i > 0 ? "1px dashed #EFEDE8" : "none" }}>
+              <div style={{ flex: "none", width: 118, fontSize: 12, fontWeight: 800, paddingTop: 4 }}>
+                <Ic d={row.icon} /> {row.label}
+                <div style={{ fontWeight: 500, fontSize: 12.5, color: "#A8A29E" }}>{row.hint}</div>
+              </div>
+              <div style={{ flex: 1 }}>{row.body}</div>
+            </div>
+          ))}
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, marginTop: 10, paddingTop: 10, borderTop: "1px solid #EFEDE8" }}>
+            <p style={{ fontSize: 12, color: "#8A8494", margin: 0 }}>
+              {en ? "Changing any slot re-derives only the downstream (gaps → sweet spots → taglines), ~30s."
+                  : "改動任一選擇後按「重新推導」— 只重算下游（需求缺口 → 甜蜜點 → 標語），約 30 秒，結果存入情境。"}
+            </p>
+            <button onClick={runDerive} disabled={deriveMut?.isPending}
+                    style={{ flex: "none", fontSize: 12.5, fontWeight: 800, background: deriveMut?.isPending ? "#8A8494" : "#2A2630", color: "#fff", border: "none", borderRadius: 10, padding: "8px 18px", cursor: deriveMut?.isPending ? "wait" : "pointer" }}>
+              <Ic d={IC.redo} /> {deriveMut?.isPending ? (en ? "Deriving…" : "推導中…約 30 秒") : (en ? "Derive" : "重新推導")}
+            </button>
+          </div>
+        </div>
+        </>)}
+
+        {/* 看板 */}
+        {!derived ? (
+          <div style={{ textAlign: "center", padding: "26px 0 18px", color: "#8A8494", fontSize: 12.5 }}>
+            {locked
+              ? (en ? "Locked — no finalized scenario on record." : "已鎖定，但尚無定案的情境紀錄。")
+              : (en ? "Pick your anchors above and hit Derive — the four-zone board renders here."
+                     : "選好上方三個錨點後按「重新推導」——四區策略看板會出現在這裡。")}
+          </div>
+        ) : (
+          <div style={{ display: "grid", gridTemplateColumns: "1.35fr 1fr", gap: 12 }}>
+            {/* 甜蜜點（大區，含標語） */}
+            <div style={{ gridRow: "span 2", background: "#FDF1EC", border: "2px solid #E8542F", borderRadius: 13, padding: "13px 14px 8px" }}>
+              <div style={{ fontSize: 13.5, fontWeight: 800 }}>{en ? "Sweet spots" : "甜蜜點"}
+                <span style={{ fontSize: 12.5, fontWeight: 600, color: "#8A8494", marginLeft: 8 }}>
+                  {en ? "she wants · rivals can't · we can" : "她要・所選對手沒有・我們有 → 差異化主軸"}
+                </span>
+              </div>
+              <div style={{ fontSize: 12.5, color: "#8A8494", marginBottom: 9 }}>{en ? "All copy firepower goes here" : "文案與活動的火力集中區"}</div>
+              {derived.spots.map((s, i) => (
+                <div key={i} style={{ ...S.zoneCard, borderLeft: "4px solid #E8542F" }}>
+                  <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: ".1em", color: "#E8542F", display: "flex", alignItems: "center", gap: 8 }}>
+                    <span>SPOT {i + 1} · {s.lane === "function" ? (en ? "FUNCTION" : "功能") : (en ? "EMOTION" : "情感")}</span>
+                    {(s as any).official && (
+                      <span style={{ background: "#2A2630", color: "#fff", borderRadius: 5, padding: "1px 8px", letterSpacing: ".06em" }}>
+                        {en ? "FROM POSITIONING BOOK" : "定位書原點"}
+                      </span>
+                    )}
+                  </div>
+                  <div style={{ fontWeight: 800, fontSize: 13.5, margin: "2px 0 3px" }}>{s.title}</div>
+                  <div style={{ fontSize: 12.5, color: "#6E6878", lineHeight: 1.65 }}>
+                    {s.need}
+                    <span style={{ color: "#C9C4BC", padding: "0 4px" }}>←</span>
+                    <b style={{ color: "#2A2630", borderBottom: "2px solid #D9A5A3", fontWeight: 700 }}>{s.gap}</b>
+                    <span style={{ color: "#C9C4BC", padding: "0 4px" }}>←</span>
+                    <b style={{ color: "#2A2630", borderBottom: "2px solid #9CC3AB", fontWeight: 700 }}>{s.ours}</b>
+                  </div>
+                  {s.tagline?.zh && (
+                    <div style={{ marginTop: 7, paddingTop: 7, borderTop: "1px dashed #F0DFD6", display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
+                      <span style={{ fontSize: 12, fontWeight: 800, color: "#8A8494" }}>{en ? (isEvent ? "SMP FROM THIS SPOT" : "TAGLINE FROM THIS SPOT") : (isEvent ? "此點長出的 SMP" : "此點長出的標語")}</span>
+                      <span style={{ fontWeight: 800, fontSize: 14 }}>{s.tagline.zh}</span>
+                      {s.tagline.en && <span style={{ fontSize: 12, color: "#8A8494", fontStyle: "italic" }}>{s.tagline.en}</span>}
+                      {derived.currentTaglineSpot && derived.currentTaglineSpot === s.title && (
+                        <span style={{ fontSize: 12.5, fontWeight: 800, background: "#2A2630", color: "#fff", borderRadius: 5, padding: "1px 7px" }}>
+                          {en ? (isEvent ? "current SMP origin" : "current tagline origin") : (isEvent ? "現行 SMP 來源" : "現行標語來源")}
+                        </span>
+                      )}
+                    </div>
+                  )}
+                  {/* P2 spot actions: 深挖 / 套用此標語(SMP) — hidden once locked (server rejects both anyway) */}
+                  {!locked && (
+                  <div style={{ display: "flex", gap: 7, marginTop: 8 }}>
+                    <span style={{ ...S.act, background: "#2A2630", borderColor: "#2A2630", color: "#fff", opacity: digging === i ? .6 : 1 }}
+                          onClick={() => {
+                            if (digging !== null || !active?.id) return;
+                            setDigging(i);
+                            digMut?.mutate?.({ ...scopeArgs, scenarioId: active.id, spotIndex: i }, {
+                              onSuccess: (r: any) => {
+                                setDigging(null);
+                                if (r?.ok) { showToastGlobal(en ? "Deep-dive ready" : "✓ 深挖完成", "success"); utils?.scope?.active?.invalidate?.(); }
+                                else showToastGlobal(r?.error ?? (en ? "Deep-dive failed" : "深挖失敗，請再試一次"));
+                              },
+                              onError: () => { setDigging(null); showToastGlobal(en ? "Deep-dive failed" : "深挖失敗，請再試一次"); },
+                            });
+                          }}>
+                      <Ic d={IC.search} />{digging === i ? (en ? "Digging…" : "深挖中…") : (en ? "Deep-dive" : "深挖此點")}
+                    </span>
+                    {s.tagline?.zh && (() => { const tagZh = s.tagline!.zh; return (
+                      <span style={S.act}
+                            onClick={() => {
+                              if (!active?.id) return;
+                              const confirmMsg = en
+                                ? (isEvent
+                                    ? `Apply this scenario?\n· audience anchor ← selected audience\n· SMP ←「${tagZh}」\n· downstream regenerates (messaging / creative), ~1-2 min`
+                                    : `Apply this scenario?\n· audience anchor ← selected audience\n· main tagline ←「${tagZh}」\n· downstream regenerates (differentiation / golden circle / voice / tagline score / AI prompts ×8), ~1-2 min`)
+                                : (isEvent
+                                    ? `套用此情境為正式定位？\n· 受眾錨點 ← 本情境所選受眾\n· SMP ←「${tagZh}」\n· 下游同步重生：訊息架構、創意概念，約 1-2 分鐘\n之後所有文案任務都以此為準。`
+                                    : `套用此情境為正式定位？\n· 受眾錨點 ← 本情境所選受眾\n· 主標語 ←「${tagZh}」\n· 下游同步重生：差異化、黃金圈、語氣、標語評分、AI 指令庫（8 平台人設），約 1-2 分鐘\n之後所有文案任務與定位重跑都以此為準。`);
+                              if (!window.confirm(confirmMsg)) return;
+                              applyMut?.mutate?.({ ...scopeArgs, scenarioId: active.id, taglineSpotIndex: i }, {
+                                onSuccess: (r: any) => {
+                                  if (r?.ok) {
+                                    showToastGlobal(en
+                                      ? "Applied — downstream regenerating…"
+                                      : (isEvent ? "✓ 已套用——下游（訊息架構／創意概念）重生中…" : "✓ 已套用——下游（差異化／黃金圈／語氣／AI 指令庫）重生中…"), "success");
+                                    if (r.cascade) setCascading(true);
+                                    utils?.scope?.active?.invalidate?.();
+                                  }
+                                  else showToastGlobal(r?.error ?? (en ? "Apply failed" : "套用失敗"));
+                                },
+                                onError: () => showToastGlobal(en ? "Apply failed" : "套用失敗"),
+                              });
+                            }}>
+                        {en ? (isEvent ? "Apply + set SMP" : "Apply + set tagline") : (isEvent ? "套用定位＋設此 SMP" : "套用定位＋設此標語")}
+                      </span>
+                    ); })()}
+                  </div>
+                  )}
+                  {/* P2 dig accordion */}
+                  {s.dig && (
+                    <div style={{ marginTop: 8, background: "#FBF7F4", borderRadius: 9, padding: "9px 12px", fontSize: 12.5, color: "#4A4552" }}>
+                      {Array.isArray(s.dig.scenes) && s.dig.scenes.length > 0 && (<>
+                        <div style={{ fontSize: 12.5, fontWeight: 800, letterSpacing: ".12em", color: "#A8A29E" }}>{en ? "SCENES & MOT" : "場景與關鍵時刻"}</div>
+                        <ul style={{ margin: "3px 0 7px", paddingLeft: 16 }}>
+                          {s.dig.scenes.map((sc: any, j: number) => <li key={j} style={{ margin: "2px 0" }}>{sc.scene} — <b>{sc.mot}</b></li>)}
+                        </ul>
+                      </>)}
+                      {Array.isArray(s.dig.contentAngles) && s.dig.contentAngles.length > 0 && (<>
+                        <div style={{ fontSize: 12.5, fontWeight: 800, letterSpacing: ".12em", color: "#A8A29E" }}>
+                          {en ? "CONTENT ANGLES — click to open as a task topic" : "內容角度（點一下 → 帶著題目開任務）"}
+                        </div>
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, margin: "4px 0 7px" }}>
+                          {s.dig.contentAngles.map((a: string, j: number) => (
+                            <span key={j}
+                                  // 2026-08-11: carry WHICH spot this angle came
+                                  // from (sid/si), so the produced content can be
+                                  // attributed to an audience later. Only the
+                                  // reference travels — the server resolves the
+                                  // labels from the stored scenario.
+                                  onClick={() => navigate(
+                                    `/tasks/fb?b=${brandId}${isEvent ? `&e=${eventId}` : ""}` +
+                                    `&topic=${encodeURIComponent(a)}` +
+                                    (active?.id ? `&sid=${encodeURIComponent(active.id)}&si=${i}` : ""),
+                                  )}
+                                  title={en ? "Open the task wall with this topic prefilled" : "帶著這個題目前往任務牆，點任一任務即自動填入"}
+                                  style={{ fontSize: 12, border: "1px solid #2A2630", borderRadius: 999, padding: "2px 10px", background: "#fff", cursor: "pointer", fontWeight: 600 }}>
+                              {a} ↗
+                            </span>
+                          ))}
+                        </div>
+                      </>)}
+                      {Array.isArray(s.dig.risks) && s.dig.risks.length > 0 && (<>
+                        <div style={{ fontSize: 12.5, fontWeight: 800, letterSpacing: ".12em", color: "#A8A29E" }}>{en ? "RISKS" : "風險與對手反應"}</div>
+                        <ul style={{ margin: "3px 0 0", paddingLeft: 16 }}>
+                          {s.dig.risks.map((rk: string, j: number) => <li key={j} style={{ margin: "2px 0" }}>{rk}</li>)}
+                        </ul>
+                      </>)}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+            {/* 基本籌碼 */}
+            <div style={{ background: "#EEF1F6", border: "1.5px solid #C6CEDD", borderRadius: 13, padding: "13px 14px 6px" }}>
+              <div style={{ fontSize: 13, fontWeight: 800 }}>{en ? "Table stakes" : "基本籌碼"}
+                <span style={{ fontSize: 12.5, fontWeight: 600, color: "#8A8494", marginLeft: 8 }}>{en ? "must match, never lead" : "她要・對手也有 → 跟上，不當主軸"}</span>
+              </div>
+              <ul style={{ margin: "6px 0 8px", paddingLeft: 18, fontSize: 12, color: "#4A4552" }}>
+                {derived.stakes.map((z, i) => <li key={i} style={{ margin: "3px 0" }}><b>{z.title}</b>{z.note ? ` — ${z.note}` : ""}</li>)}
+              </ul>
+            </div>
+            {/* 對手地盤 */}
+            <div style={{ background: "#FBF6F5", border: "1.5px solid #DFC0BE", borderRadius: 13, padding: "13px 14px 6px" }}>
+              <div style={{ fontSize: 13, fontWeight: 800 }}>{en ? "Rival turf" : "對手地盤"}
+                <span style={{ fontSize: 12.5, fontWeight: 600, color: "#8A8494", marginLeft: 8 }}>{en ? "real demand we concede" : "她要・對手強 → 策略性不跟"}</span>
+              </div>
+              <ul style={{ margin: "6px 0 8px", paddingLeft: 18, fontSize: 12, color: "#4A4552" }}>
+                {derived.rivalTurf.map((z, i) => <li key={i} style={{ margin: "3px 0" }}><b>{z.title}</b>{z.note ? ` — ${z.note}` : ""}</li>)}
+              </ul>
+            </div>
+            {/* 自嗨區 */}
+            <div style={{ gridColumn: "1 / -1", background: "#F4F3F0", border: "1.5px dashed #C9C4BC", borderRadius: 13, padding: "11px 14px 4px" }}>
+              <div style={{ fontSize: 13, fontWeight: 800 }}>{en ? "Vanity zone" : "自嗨區"}
+                <span style={{ fontSize: 12.5, fontWeight: 600, color: "#8A8494", marginLeft: 8 }}>{en ? "we love it, she doesn't care" : "我們想講・她無感 → 停止直說，轉化再用"}</span>
+              </div>
+              <ul style={{ margin: "6px 0 8px", paddingLeft: 18, fontSize: 12, color: "#4A4552" }}>
+                {derived.vanity.map((z, i) => <li key={i} style={{ margin: "3px 0" }}><b>{z.title}</b>{z.note ? ` — ${z.note}` : ""}</li>)}
+              </ul>
+            </div>
+          </div>
+        )}
+      </div>
+      )}
+
+      {/* 下鑽面板 */}
+      {drill && (
+        <div style={{ position: "absolute", top: 8, right: 8, bottom: 8, width: "min(430px, 82%)", background: "#fff", border: "1.5px solid #C9C4BC", borderRadius: 13, boxShadow: "-6px 0 22px rgba(0,0,0,.10)", overflowY: "auto", zIndex: 30 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "11px 16px", borderBottom: "1px solid #EFEDE8", position: "sticky", top: 0, background: "#fff" }}>
+            <div style={{ fontWeight: 800, fontSize: 13.5 }}>
+              {drill.kind === "audience"
+                ? (en ? "Audience research" : `${drillAudience?.label ?? "受眾"}・原始研究資料`)
+                : (en ? "Competitor research" : `競品・${String(drillComp?.name ?? "")}`)}
+              <div style={{ fontWeight: 500, fontSize: 12, color: "#A8A29E" }}>
+                {en ? "why the AI says what it says" : "AI 憑什麼這樣說——可回查的研究內容"}
+              </div>
+            </div>
+            <span onClick={() => setDrill(null)} style={{ cursor: "pointer", color: "#A8A29E" }}><Ic d={IC.close} /></span>
+          </div>
+          <div style={{ padding: "12px 16px 16px", fontSize: 12.5, color: "#4A4552" }}>
+            {drill.kind === "audience" ? (() => {
+              // 自訂受眾（alternates）帶自己的痛點/需求；canonical 受眾用全域段
+              const dx = drillAudience?.extra;
+              const dPains: any[] = dx?.pains?.length ? dx.pains : (Array.isArray(aud.pains) ? aud.pains : []);
+              const dNeeds: any[] = dx?.needs?.length ? dx.needs : (Array.isArray(aud.needs) ? aud.needs : []);
+              const showMatrix = !dx && Array.isArray(aud.matrix) && aud.matrix.length > 0;
+              return (
+              <>
+                {dx?.note && (
+                  <div style={{ fontSize: 12.5, fontWeight: 700, color: "#8A8494", marginBottom: 6 }}>{dx.note}</div>
+                )}
+                <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: ".12em", color: "#A8A29E", marginBottom: 4 }}>{en ? "NARRATIVE" : "完整敘事"}</div>
+                <p style={{ lineHeight: 1.75 }}>{drillAudience?.value}</p>
+                {dPains.length > 0 && (<>
+                  <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: ".12em", color: "#A8A29E", margin: "12px 0 4px" }}>{en ? "PAINS" : "痛點"}</div>
+                  <ul style={{ paddingLeft: 18 }}>{dPains.map((p: any, i: number) => <li key={i}>{String(p)}</li>)}</ul>
+                </>)}
+                {dNeeds.length > 0 && (<>
+                  <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: ".12em", color: "#A8A29E", margin: "12px 0 4px" }}>{en ? "NEEDS" : "需求"}</div>
+                  <ul style={{ paddingLeft: 18 }}>{dNeeds.map((p: any, i: number) => <li key={i}>{String(p)}</li>)}</ul>
+                </>)}
+                {showMatrix && (<>
+                  <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: ".12em", color: "#A8A29E", margin: "12px 0 4px" }}>{en ? "EMOTIONAL MATRIX" : "情感需求矩陣"}</div>
+                  <table style={{ borderCollapse: "collapse", width: "100%", fontSize: 12.5 }}>
+                    <tbody>
+                      {aud.matrix.slice(0, 6).map((m: any, i: number) => (
+                        <tr key={i} style={{ borderBottom: "1px solid #F5F3EF" }}>
+                          <td style={{ padding: "3px 8px 3px 0" }}>{String(m?.dim ?? "")}</td>
+                          <td style={{ padding: "3px 8px 3px 0", fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>{String(m?.primary ?? "")}</td>
+                          <td style={{ padding: "3px 0", color: "#8A8494" }}>{String(m?.weight ?? "")}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </>)}
+              </>
+              );
+            })() : drillComp ? (
+              <>
+                {[
+                  [en ? "POSITION" : "市場地位", drillComp.position],
+                  [en ? "TONE" : "品牌調性", drillComp.tone],
+                  [en ? "WEAKNESS (OUR OPENING)" : "弱點（我們的機會）", drillComp.weakness],
+                  [en ? "OUR EDGE" : "我方差異點", drillComp.ourEdge],
+                ].map(([t, v], i) => v ? (
+                  <div key={i}>
+                    <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: ".12em", color: "#A8A29E", margin: i > 0 ? "12px 0 4px" : "0 0 4px" }}>{String(t)}</div>
+                    <p style={{ lineHeight: 1.7 }}>{String(v)}</p>
+                  </div>
+                ) : null)}
+              </>
+            ) : null}
+            <div style={{ background: "#F7F6F3", borderRadius: 10, padding: "8px 12px", marginTop: 14, fontSize: 12, color: "#6E6878" }}>
+              <b style={{ color: "#2A2630" }}>{en ? "Sources: " : "資料來源："}</b>
+              {en ? "brand handbook · website crawl · positioning pipeline (official-audience anchored)"
+                  : "品牌手冊（官方定義）・官網／社群爬取・定位管線推導（官方客群錨定）"}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

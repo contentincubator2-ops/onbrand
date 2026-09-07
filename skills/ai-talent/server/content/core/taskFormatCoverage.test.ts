@@ -26,7 +26,7 @@ import {
   EM_FORMAT_TABS, EM_TASK_FORMAT_MAP, EM_UNMAPPED_BY_DESIGN,
   PR_FORMAT_TABS, PR_TASK_FORMAT_MAP, PR_UNMAPPED_BY_DESIGN,
   WEB_FORMAT_TABS, WEB_TASK_FORMAT_MAP, WEB_UNMAPPED_BY_DESIGN,
-} from "../../../client/src/v2/lib/taskFormats";
+} from "../../../client/src/v2/content/lib/taskFormats";
 
 interface PlatformSpec {
   platform: CatalogPlatform;

@@ -11,7 +11,7 @@
  * （同 taskFormatCoverage.test.ts）。
  */
 import { describe, it, expect } from "vitest";
-import { shapeValue } from "../../../client/src/v2/lib/taskContextResolver";
+import { shapeValue } from "../../../client/src/v2/content/lib/taskContextResolver";
 
 /** 品牌 2840 positioning.values 的真實形狀。 */
 const REAL_VALUES = {

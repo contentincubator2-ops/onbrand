@@ -15,7 +15,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useLang } from "../../lib/i18n";
-import { logActivation } from "../../v2/lib/activationTelemetry";
+import { logActivation } from "../../v2/platform/lib/activationTelemetry";
 
 // SoWork.ai design tokens
 const C = {

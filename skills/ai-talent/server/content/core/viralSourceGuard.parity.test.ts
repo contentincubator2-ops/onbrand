@@ -8,7 +8,7 @@
  */
 import { describe, it, expect } from "vitest";
 import { checkViralSource as serverCheck } from "./viralSourceGuard";
-import { checkViralSource as clientCheck } from "../../../client/src/v2/lib/viralSourceGuard";
+import { checkViralSource as clientCheck } from "../../../client/src/v2/content/lib/viralSourceGuard";
 
 const CASES: Array<string | null | undefined> = [
   "", "   ", "  　 ", null, undefined,

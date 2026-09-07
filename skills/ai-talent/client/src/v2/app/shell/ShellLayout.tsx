@@ -12,19 +12,19 @@ import { createPortal } from "react-dom";
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import { trpc } from "../../../lib/trpc";
 import { useScopeState, type ScopeState } from "./ScopeBar";
-import AddEntityModal, { type AddEntityTab } from "../../components/AddEntityModal";
-import PositioningNotificationCenter from "../../components/PositioningNotificationCenter";
-import ScopeSwitchOverlay from "../../components/ScopeSwitchOverlay";
-import PricingInfoModal from "../../components/PricingInfoModal";
-import TrialCountdownBar from "../../components/TrialCountdownBar";
+import AddEntityModal, { type AddEntityTab } from "../../strategy/components/AddEntityModal";
+import PositioningNotificationCenter from "../../platform/components/PositioningNotificationCenter";
+import ScopeSwitchOverlay from "../../platform/components/ScopeSwitchOverlay";
+import PricingInfoModal from "../../platform/components/PricingInfoModal";
+import TrialCountdownBar from "../../platform/components/TrialCountdownBar";
 // 2026-05-11 (CJ「節慶日曆 + 自動提醒」)
-import SupportDrawer from "../../components/SupportDrawer";
+import SupportDrawer from "../../platform/components/SupportDrawer";
 // 2026-06-12 (CJ「Mia 細緻化 + 不要自動跳出」): unread-nudge state lives in
 // sessionStorage; this hook surfaces the count for the avatar badge and
 // the drain function for the drawer.
-import { useUnreadNudges, fireNudge } from "../../components/mia/miaNudges";
-import type { QueuedNudge } from "../../components/mia/miaNudges";
-import OnBrandLogo from "../../components/OnBrandLogo";
+import { useUnreadNudges, fireNudge } from "../../platform/components/mia/miaNudges";
+import type { QueuedNudge } from "../../platform/components/mia/miaNudges";
+import OnBrandLogo from "../../platform/components/OnBrandLogo";
 import { showToastGlobal } from "../../../components/ui/Toast";
 import { useLang } from "../../../lib/i18n";
 import { Avatar, Tooltip } from "@heroui/react";

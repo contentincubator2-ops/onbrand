@@ -38,12 +38,12 @@ import { LanguageProvider } from "../../lib/i18n";
 // RegisterPage, is split out so anonymous landing visitors don't pay
 // for them. The brief Suspense flash on /auth/login is acceptable —
 // LoginPage itself shows an authChecking spinner anyway.
-import LandingPage from "../pages/LandingPage";
+import LandingPage from "../platform/pages/LandingPage";
 import RequireAuthV2 from "./RequireAuthV2";
 import ShellLayout from "./shell/ShellLayout";
 import MissionRedirect from "./MissionRedirect";
-import ConnectionsRedirect from "../pages/ConnectionsRedirect";
-import NotFoundPage from "../pages/NotFoundPage";
+import ConnectionsRedirect from "../platform/pages/ConnectionsRedirect";
+import NotFoundPage from "../platform/pages/NotFoundPage";
 
 // ── Lazy (route-split chunks) ────────────────────────────────────────────
 // Auth pages — heaviest among public surfaces (Google OAuth SVG, form
@@ -56,36 +56,36 @@ const ResetPasswordPage = React.lazy(() => import("../../pages/auth/ResetPasswor
 const OnboardingWizard = React.lazy(() => import("../../pages/OnboardingWizard"));
 
 // Protected app surface — never loaded by anonymous visitors
-const TheaterPage = React.lazy(() => import("../pages/TheaterPage"));
-const PlatformTaskPage = React.lazy(() => import("../pages/PlatformTaskPage"));
-const DataWorkspacePage = React.lazy(() => import("../pages/DataWorkspacePage"));
-const RunPage = React.lazy(() => import("../pages/RunPage"));
-const ProjectsPage = React.lazy(() => import("../pages/ProjectsPage"));
-const BrandsPage = React.lazy(() => import("../pages/BrandsPage"));
-const BrandsManagePage = React.lazy(() => import("../pages/BrandsManagePage"));
-const BrandSettingsPage = React.lazy(() => import("../pages/BrandSettingsPage"));
-const SquadLabPage = React.lazy(() => import("../pages/admin/SquadLabPage"));
-const CalendarPage = React.lazy(() => import("../pages/CalendarPage"));
-const AccountPage = React.lazy(() => import("../pages/AccountPage"));
-const WorkspaceSettingsPage = React.lazy(() => import("../pages/WorkspaceSettingsPage"));
-const ReviewQueuePage = React.lazy(() => import("../pages/ReviewQueuePage"));
-const ChangelogPage = React.lazy(() => import("../pages/ChangelogPage"));
+const TheaterPage = React.lazy(() => import("../content/pages/TheaterPage"));
+const PlatformTaskPage = React.lazy(() => import("../content/pages/PlatformTaskPage"));
+const DataWorkspacePage = React.lazy(() => import("../performance/pages/DataWorkspacePage"));
+const RunPage = React.lazy(() => import("../content/pages/RunPage"));
+const ProjectsPage = React.lazy(() => import("../content/pages/ProjectsPage"));
+const BrandsPage = React.lazy(() => import("../strategy/pages/BrandsPage"));
+const BrandsManagePage = React.lazy(() => import("../strategy/pages/BrandsManagePage"));
+const BrandSettingsPage = React.lazy(() => import("../strategy/pages/BrandSettingsPage"));
+const SquadLabPage = React.lazy(() => import("../platform/pages/admin/SquadLabPage"));
+const CalendarPage = React.lazy(() => import("../content/pages/CalendarPage"));
+const AccountPage = React.lazy(() => import("../platform/pages/AccountPage"));
+const WorkspaceSettingsPage = React.lazy(() => import("../platform/pages/WorkspaceSettingsPage"));
+const ReviewQueuePage = React.lazy(() => import("../platform/pages/ReviewQueuePage"));
+const ChangelogPage = React.lazy(() => import("../platform/pages/ChangelogPage"));
 
 // Admin (heaviest — adminProcedure-gated, almost never needed by general traffic)
-const AdminErrorsPage = React.lazy(() => import("../pages/AdminErrorsPage"));
-const AdminDashboardPage = React.lazy(() => import("../pages/AdminDashboardPage"));
-const AdminPostFormatsPage = React.lazy(() => import("../pages/AdminPostFormatsPage"));
-const AdminUserDetailPage = React.lazy(() => import("../pages/AdminUserDetailPage"));
-const AdminSupportPage = React.lazy(() => import("../pages/AdminSupportPage"));
+const AdminErrorsPage = React.lazy(() => import("../platform/pages/AdminErrorsPage"));
+const AdminDashboardPage = React.lazy(() => import("../platform/pages/AdminDashboardPage"));
+const AdminPostFormatsPage = React.lazy(() => import("../platform/pages/AdminPostFormatsPage"));
+const AdminUserDetailPage = React.lazy(() => import("../platform/pages/AdminUserDetailPage"));
+const AdminSupportPage = React.lazy(() => import("../platform/pages/AdminSupportPage"));
 // 2026-06-21 (CJ「TTFV dashboard」)
-const AdminActivationPage = React.lazy(() => import("../pages/AdminActivationPage"));
+const AdminActivationPage = React.lazy(() => import("../platform/pages/AdminActivationPage"));
 
 // Public-but-not-first-paint (legal / pricing / plan-expired)
-const PricingPage = React.lazy(() => import("../pages/PricingPage"));
-const TermsPage = React.lazy(() => import("../pages/legal/TermsPage"));
-const PrivacyPage = React.lazy(() => import("../pages/legal/PrivacyPage"));
-const RefundPage = React.lazy(() => import("../pages/legal/RefundPage"));
-const PlanExpiredPage = React.lazy(() => import("../pages/PlanExpiredPage"));
+const PricingPage = React.lazy(() => import("../platform/pages/PricingPage"));
+const TermsPage = React.lazy(() => import("../platform/pages/legal/TermsPage"));
+const PrivacyPage = React.lazy(() => import("../platform/pages/legal/PrivacyPage"));
+const RefundPage = React.lazy(() => import("../platform/pages/legal/RefundPage"));
+const PlanExpiredPage = React.lazy(() => import("../platform/pages/PlanExpiredPage"));
 
 // ── Suspense fallback — cream-themed minimal loader matching SoWork.ai ──
 function RouteFallback() {
