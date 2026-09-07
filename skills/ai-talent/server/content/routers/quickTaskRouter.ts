@@ -939,7 +939,9 @@ import {
 import { defaultTray, storedTray, MAX_TRAY } from "../core/taskTray";
 import { buildTaskCatalogIndex } from "../core/taskCatalogIndex";
 
-import { sourceForTemplate } from "../core/craftSource";
+import { sourceForTemplate, ALL_CRAFT_REFS } from "../core/craftSource";
+import { taskCardAddedAt } from "../core/taskCardDates";
+import { evergreenRationaleFor } from "../core/evergreenRationale";
 import { normalizeTaskId, legacyTaskId } from "../../platform/core/tierCompat";
 import {
   checkViralSource,
@@ -1079,6 +1081,44 @@ function gateInfoFor(taskId: string): TaskGateInfo {
 }
 
 export const quickTaskRouter = router({
+  /**
+   * 一張卡的「憑什麼」：用途、出處、模型實際被餵的參考、長青的背後邏輯、
+   * 需要的輸入、上架日、方案。給 CardDetailDrawer 用。
+   *
+   * 2026-09-08 (CJ「任務卡可以點選看出處…加上日期」)。走 resolveTaskTemplate，
+   * 所以自建卡與品牌任務包的卡也查得到；craftRef 只有全域目錄有。
+   */
+  cardDetail: protectedProcedure
+    .input(z.object({ taskId: z.string().min(1).max(80) }))
+    .query(async ({ input }) => {
+      const t: any = await resolveTaskTemplate(input.taskId);
+      if (!t) throw new TRPCError({ code: "NOT_FOUND", message: `找不到任務卡 ${input.taskId}` });
+      const pick = (v: unknown, k: "zh" | "en"): string =>
+        typeof v === "string" ? v : (v && typeof v === "object" && k in (v as any) ? String((v as any)[k] ?? "") : "");
+      const source = sourceForTemplate(t);
+      const id = String(t.id);
+      return {
+        id,
+        platform: platformOfTaskId(id),
+        tier: String(t.tier ?? "30s"),
+        postType: String(t.postType ?? "feed"),
+        labelZh: pick(t.label, "zh"),
+        labelEn: pick(t.label, "en"),
+        descriptionZh: pick(t.description, "zh"),
+        descriptionEn: pick(t.description, "en"),
+        source,
+        /** 得獎／標竿：模型實際被餵的那一則參考（craftSource 的來源）。 */
+        craftRef: source.type === "award" || source.type === "benchmark" ? (ALL_CRAFT_REFS[id] ?? null) : null,
+        /** 長青：背後邏輯。 */
+        rationale: source.type === "evergreen" ? evergreenRationaleFor(id) : null,
+        addedAt: taskCardAddedAt(id),
+        inputs: Array.isArray(t.inputs)
+          ? t.inputs.map((i: any) => ({ key: String(i.key), label: String(i.label ?? i.key), required: !!i.required }))
+          : [],
+        planTier: source.type === "viral" ? "pro" : "basic",
+      };
+    }),
+
   list: protectedProcedure.query(() => {
     return Object.values(TASKS).map((t) => ({
       id: t.id,
@@ -1521,6 +1561,14 @@ export const quickTaskRouter = router({
           }))
       : [];
     const tasks: any[] = [...ownCards, ...baseTasks];
+    // 2026-09-08 上架日：目錄卡從 git 歷史查，自建卡用它自己的 createdAt。
+    // 前台靠這個標「新上架」與「本月新卡 N 張」，日期只有一個來源。
+    for (const t of tasks) {
+      if (t.addedAt !== undefined) continue;
+      t.addedAt = t.ownCardId
+        ? (typeof t.createdAt === "string" ? t.createdAt.slice(0, 10) : null)
+        : taskCardAddedAt(String(t.id));
+    }
     // 60s production-package universal team agent IDs (used by orchestra)
     // Emma Zhang / Helen Sung / David Wang / Sophie Ho / Jordan Hayes / Mandy / Nancy / Nina / Anna / Zeyu / Nathan
     const UNIVERSAL_60S_IDS = [30005, 180163, 30003, 60012, 239184, 180170, 180157, 180165, 60071, 60062];

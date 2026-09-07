@@ -27,6 +27,7 @@
     "db:analyze-squads": "tsx scripts/analyze-existing-squads.ts",
     "db:audit-squads": "tsx scripts/audit-squads.ts",
     "db:audit-fb-personas": "tsx scripts/audit-fb-agent-personas.ts",
+    "cards:dates": "tsx scripts/gen-task-card-dates.ts",
     "db:cleanup-legacy": "tsx scripts/cleanup-legacy-squads.ts",
     "db:list-needing-patch": "tsx scripts/list-squads-needing-patch.ts",
     "db:patch-workspace": "tsx scripts/patch-squads-workspace.ts",

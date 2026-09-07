@@ -40,6 +40,7 @@ import { ALL_99S_SQUADS } from "./quickTask100Squads";
 import { WEBSITE_30S_TASKS } from "./quickTaskWebsite";
 import { type TaskSource } from "./taskSource";
 import { sourceForTemplate } from "./craftSource";
+import { taskCardAddedAt } from "./taskCardDates";
 
 /** 前端 channel 列使用的平台代號。 */
 export type CatalogPlatform =
@@ -67,6 +68,12 @@ export interface CatalogTask {
    * 所以 client 不必自己補預設。定義見 taskSource.ts。
    */
   source: TaskSource;
+  /**
+   * 2026-09-08 — 上架日（YYYY-MM-DD），id 第一次進 git 的日期，由
+   * scripts/gen-task-card-dates.ts 產生。目錄卡一定有值（drift test 鎖住）；
+   * 型別留 null 是給自建卡那條路走的。
+   */
+  addedAt: string | null;
 }
 
 /**
@@ -127,6 +134,7 @@ function toTask(t: any, platform: CatalogPlatform, tier: string): CatalogTask {
     labelEn: pick(t.label, "en"),
     // 未標記的卡一律回長青公式 —— 前台永遠拿得到一個值，不必自己補預設。
     source: sourceForTemplate(t),
+    addedAt: taskCardAddedAt(String(t.id)),
   };
 }
 
@@ -175,4 +183,16 @@ export function buildTaskCatalogIndex(): CatalogTask[] {
 /** 單一平台的任務卡。 */
 export function tasksForPlatform(platform: CatalogPlatform): CatalogTask[] {
   return buildTaskCatalogIndex().filter((t) => t.platform === platform);
+}
+
+/**
+ * 最近 `days` 天內上架的目錄卡，新到舊。「本月新卡」與通知都走這裡，
+ * 所以「新」的定義只有一個。
+ */
+export function recentCatalogCards(days: number, now: Date = new Date()): CatalogTask[] {
+  const cutoff = new Date(now.getTime() - days * 86_400_000).toISOString().slice(0, 10);
+  const today = now.toISOString().slice(0, 10);
+  return buildTaskCatalogIndex()
+    .filter((t) => !!t.addedAt && t.addedAt >= cutoff && t.addedAt <= today)
+    .sort((a, b) => (b.addedAt ?? "").localeCompare(a.addedAt ?? ""));
 }

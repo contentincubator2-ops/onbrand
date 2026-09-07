@@ -16,10 +16,11 @@
 import { z } from "zod";
 import { router, protectedProcedure } from "../core/trpc";
 import localPool from "../../localDb";
+import { recentCatalogCards } from "../../content/core/taskCatalogIndex";
 
 export interface NotificationItem {
   id: string;
-  kind: "positioning_done" | "positioning_failed" | "task_complete" | "festival_upcoming";
+  kind: "positioning_done" | "positioning_failed" | "task_complete" | "festival_upcoming" | "card_published";
   title: string;
   excerpt: string;
   createdAtIso: string;
@@ -35,7 +36,56 @@ const AVATAR_PALETTE: Record<NotificationItem["kind"], { avatar: string; avatarC
   positioning_failed: { avatar: "!", avatarColor: "#ef4444" },  // red
   task_complete:      { avatar: "★", avatarColor: "#3b82f6" },  // blue
   festival_upcoming:  { avatar: "🎉", avatarColor: "#f59e0b" }, // amber
+  card_published:     { avatar: "＋", avatarColor: "#171717" }, // ink：新卡上架
 };
+
+/** /tasks/:platform 的路由代號。與 PlatformTaskPage 的 ROUTE_TO_PLATFORM 反向。 */
+const PLATFORM_ROUTE: Record<string, string> = {
+  facebook: "fb", instagram: "ig", linkedin: "li", youtube: "yt", tiktok: "tt",
+  email: "email", pr: "pr", website: "web", case: "case", calendar: "calendar",
+};
+const PLATFORM_ZH: Record<string, string> = {
+  facebook: "FB", instagram: "IG", linkedin: "LinkedIn", youtube: "YouTube", tiktok: "TikTok",
+  email: "Email", pr: "新聞稿", brand: "品牌", audience: "受眾研究", kol: "KOL", website: "官網",
+};
+
+/**
+ * 4. 新任務卡上架（30 天內），同一天的合成一則。
+ *
+ * 2026-09-08 (CJ「有新的任務卡上架時，他也可以收到通知，亮出節奏」)。
+ * 日期來自 git 歷史（taskCardDates），不是另外維護的公告；所以只要卡真的
+ * 進了 repo，這則通知就會自己出現，沒有人需要記得發。
+ */
+export function cardPublishedItems(now: Date, lastSeen: Date, isEn: boolean): NotificationItem[] {
+  const byDay = new Map<string, Map<string, number>>();
+  for (const c of recentCatalogCards(30, now)) {
+    const day = c.addedAt!;
+    const m = byDay.get(day) ?? new Map<string, number>();
+    m.set(c.platform, (m.get(c.platform) ?? 0) + 1);
+    byDay.set(day, m);
+  }
+  const out: NotificationItem[] = [];
+  for (const [day, perPlatform] of byDay) {
+    const total = [...perPlatform.values()].reduce((a, b) => a + b, 0);
+    const ranked = [...perPlatform.entries()].sort((a, b) => b[1] - a[1]);
+    const iso = `${day}T00:00:00.000Z`;
+    const summary = ranked
+      .map(([p, n]) => `${isEn ? p : (PLATFORM_ZH[p] ?? p)} ${n}`)
+      .join(" · ");
+    const firstRoutable = ranked.find(([p]) => PLATFORM_ROUTE[p])?.[0];
+    out.push({
+      id: `card-${day}`,
+      kind: "card_published",
+      title: isEn ? `${total} new task cards` : `新任務卡上架 · ${total} 張`,
+      excerpt: summary.slice(0, 80),
+      createdAtIso: iso,
+      navUrl: firstRoutable ? `/tasks/${PLATFORM_ROUTE[firstRoutable]}?new=1` : "/tasks/fb?new=1",
+      unread: new Date(iso) > lastSeen,
+      ...AVATAR_PALETTE.card_published,
+    });
+  }
+  return out;
+}
 
 function fmtRelative(iso: string, isEn: boolean): string {
   const d = new Date(iso);
@@ -181,6 +231,10 @@ export const notificationRouter = router({
       } catch (e) {
         console.warn("[notifications] festivals query failed:", (e as Error).message);
       }
+
+      // 4. 新任務卡上架（純計算，不打 DB）
+      try { items.push(...cardPublishedItems(new Date(), lastSeen, isEn)); }
+      catch (e) { console.warn("[notifications] card_published failed:", (e as Error).message); }
 
       // Sort by createdAt DESC, slice to limit
       items.sort((a, b) => b.createdAtIso.localeCompare(a.createdAtIso));

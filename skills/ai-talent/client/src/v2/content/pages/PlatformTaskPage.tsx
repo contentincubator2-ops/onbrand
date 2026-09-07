@@ -56,6 +56,7 @@ import {
   faFacebookF, faInstagram, faYoutube, faTiktok, faLinkedinIn,
 } from "@fortawesome/free-brands-svg-icons";
 import RunningAgentCarousel from "../components/quickTask/RunningAgentCarousel";
+import CardDetailDrawer, { isRecentCard } from "../components/quickTask/CardDetailDrawer";
 import ChannelPicker from "../../platform/components/plan/ChannelPicker";
 import TaskPicker from "../../platform/components/plan/TaskPicker";
 
@@ -534,6 +535,9 @@ function PlatformTaskPageInner() {
 
   // Search
   const [searchQuery, setSearchQuery] = useState("");
+  // 2026-09-08 卡片詳情（出處與說明）與「只看新卡」。通知點進來帶 ?new=1。
+  const [detailTaskId, setDetailTaskId] = useState<string | null>(null);
+  const [onlyNew, setOnlyNew] = useState<boolean>(() => searchParams.get("new") === "1");
 
   // Task modal state
   const [activeTask, setActiveTask] = useState<FBTaskCard | null>(null);
@@ -936,6 +940,9 @@ function PlatformTaskPageInner() {
         list = list.filter((task) => task.tier === activeTier);
       }
     }
+    if (onlyNew) {
+      list = list.filter((task) => isRecentCard((task as any).addedAt));
+    }
     if (searchQuery.trim()) {
       list = list.filter((task) =>
         matchTaskWithSynonyms({
@@ -950,13 +957,13 @@ function PlatformTaskPageInner() {
     // 托盤模式：只擺挑過的那幾張。有搜尋或篩選時自動退出托盤（那時使用者
     // 是在找東西，不是在用日常的那幾張）。
     const filtering = searchQuery.trim().length > 0
-      || activeSource !== "all" || activeTier !== "all";
+      || activeSource !== "all" || activeTier !== "all" || onlyNew;
     if (!showAllTasks && !filtering && trayIds.length) {
       const inTray = new Set(trayIds);
       list = list.filter((task) => inTray.has(task.id));
     }
     return list;
-  }, [allTasks, platform, activeTier, activeSource, activeFormat, activeIGFormat, activeLIFormat, activeYTFormat, activeTTFormat, activeEMFormat, activePRFormat, activeWEBFormat, activePackFormat, packChannel, searchQuery, showAllTasks, trayIds]);
+  }, [allTasks, platform, activeTier, activeSource, activeFormat, activeIGFormat, activeLIFormat, activeYTFormat, activeTTFormat, activeEMFormat, activePRFormat, activeWEBFormat, activePackFormat, packChannel, searchQuery, showAllTasks, trayIds, onlyNew]);
 
   const totalForPlatform = useMemo(
     () => allTasks.filter((task) => inferPlatform(task) === platform).length,
@@ -2007,9 +2014,31 @@ function PlatformTaskPageInner() {
                   {lang === "en" ? "Tap to make — answer one quick question first." : "按下即產出，先回答 1 個關鍵問題"}
                 </p>
               </div>
-              <Chip size="sm" variant="flat" color="secondary">
-                {lang === "en" ? `${visibleTasks.length} tasks` : `${visibleTasks.length} 件`}
-              </Chip>
+              <div className="flex items-center gap-2">
+                {/* 2026-09-08 亮出節奏：這個通路 30 天內上架了幾張。有新卡才顯示，
+                    沒有就不佔位 —— 「本月新卡 0 張」只會提醒用戶我們沒動。 */}
+                {(() => {
+                  const fresh = platformTasks.filter((t) => isRecentCard((t as any).addedAt)).length;
+                  if (!fresh && !onlyNew) return null;
+                  return (
+                    <button
+                      onClick={() => { setOnlyNew((v) => !v); if (!onlyNew) setShowAllTasks(true); }}
+                      className="rounded-full border px-2.5 py-0.5 text-[12px] font-medium transition"
+                      style={onlyNew
+                        ? { borderColor: "#171717", background: "#171717", color: "#fff" }
+                        : { borderColor: "#171717", background: "#fff", color: "#171717" }}
+                      title={lang === "en" ? "Cards published in the last 30 days" : "最近 30 天上架的卡"}
+                    >
+                      {onlyNew
+                        ? (lang === "en" ? "Showing new cards · back to all" : "只看新卡 · 回全部")
+                        : (lang === "en" ? `${fresh} new this month` : `本月新卡 ${fresh} 張`)}
+                    </button>
+                  );
+                })()}
+                <Chip size="sm" variant="flat" color="secondary">
+                  {lang === "en" ? `${visibleTasks.length} tasks` : `${visibleTasks.length} 件`}
+                </Chip>
+              </div>
             </div>
 
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
@@ -2123,6 +2152,28 @@ function PlatformTaskPageInner() {
                           </span>
                         );
                       })()}
+                      {/* 2026-09-08 出處與說明：點開看這張卡憑什麼、什麼時候用、上架日。
+                          用 span 而不是巢狀 button（button 不能包 button）。 */}
+                      <div className="flex items-center gap-2 text-[12px]">
+                        <span
+                          role="button"
+                          tabIndex={0}
+                          className="text-neutral-500 underline-offset-2 hover:underline hover:text-neutral-800"
+                          onClick={(e) => { e.stopPropagation(); setDetailTaskId(task.id); }}
+                          onKeyDown={(e) => {
+                            if (e.key !== "Enter" && e.key !== " ") return;
+                            e.preventDefault(); e.stopPropagation(); setDetailTaskId(task.id);
+                          }}
+                        >
+                          {lang === "en" ? "Source & notes" : "出處與說明"}
+                        </span>
+                        {isRecentCard((task as any).addedAt) && (
+                          <span className="rounded-full border border-neutral-900 px-1.5 py-px text-[11px] text-neutral-900">
+                            {lang === "en" ? "New" : "新上架"}
+                            {(task as any).addedAt ? ` · ${String((task as any).addedAt).slice(5).replace("-", "/")}` : ""}
+                          </span>
+                        )}
+                      </div>
                       {(task as any).methodology && (
                         <span className="text-[12px] text-default-400 italic">📚 {(task as any).methodology}</span>
                       )}
@@ -2199,6 +2250,16 @@ function PlatformTaskPageInner() {
         )}
       </div>
 
+      <CardDetailDrawer
+        taskId={detailTaskId}
+        lang={lang}
+        onClose={() => setDetailTaskId(null)}
+        onRun={(id) => {
+          const t = allTasks.find((x: any) => x.id === id);
+          setDetailTaskId(null);
+          if (t) openTask(t as any);
+        }}
+      />
       <TaskPicker
         open={pickerOpen}
         onClose={() => setPickerOpen(false)}
