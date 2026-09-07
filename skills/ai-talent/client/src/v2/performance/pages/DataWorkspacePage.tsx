@@ -13,7 +13,8 @@
  * 資料來源的串接狀態；真資料在導入（電商營運報告加購）時接。
  */
 import React from "react";
-import { useParams, useSearchParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { trpc } from "../../../lib/trpc";
 import {
   BarChart3, FileText, LineChart, Megaphone, MousePointerClick, Search, ShoppingBag, Target,
 } from "lucide-react";
@@ -102,6 +103,42 @@ function AgentLine({ agent }: { agent: AgentRef }) {
   return <>{agent.name} <span style={{ color: "#9ca3af" }}>#{agent.id}</span><br /><span style={{ color: "#9ca3af" }}>{agent.title}</span></>;
 }
 
+/**
+ * 2026-09-08（CJ「基礎方案的成效層做示意，用模擬數據吸引用戶升級」）：
+ * 示意儀表板對兩級都開，但上面那條提示照方案講不同的話 ——
+ *   基礎／試用 → 升級專業才能加購真實串接
+ *   專業       → 直接加購電商營運報告
+ *   企業       → 不顯示（真資料在導入時接）
+ */
+function PlanNudge() {
+  const navigate = useNavigate();
+  const q = (trpc as any).billing?.getStatus?.useQuery
+    ? (trpc as any).billing.getStatus.useQuery(undefined, { staleTime: 60_000, refetchOnWindowFocus: false })
+    : { data: null };
+  const code: string | undefined = (q?.data as any)?.planCode;
+  if (!code || code === "enterprise") return null;
+  const isPro = code === "drop_pro";
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", border: "1px solid #e5e7eb", borderRadius: 16, background: "#fff", padding: "12px 16px", marginBottom: 14 }}>
+      <div style={{ minWidth: 0, flex: 1, fontSize: 13, color: "#374151", lineHeight: 1.6 }}>
+        <span style={{ fontWeight: 700, color: INK }}>這一頁是示意版。</span>
+        {isPro
+          ? " 加購電商營運報告（NT$48,000 建置 ＋ NT$25,000／月），SoWork 在導入時接上粉專、廣告帳號與電商後台的真實資料。"
+          : " 下面全部是模擬數據 —— 這是接上真資料之後你會看到的樣子。真實串接屬於專業方案的加購項目。"}
+      </div>
+      {isPro ? (
+        <a href="mailto:sowork@sowork.ai?subject=電商營運報告加購" style={{ fontSize: 13, fontWeight: 600, color: "#fff", background: INK, borderRadius: 8, padding: "8px 12px", textDecoration: "none", whiteSpace: "nowrap" }}>
+          聯繫 SoWork 加購
+        </a>
+      ) : (
+        <button onClick={() => navigate("/pricing")} style={{ fontSize: 13, fontWeight: 600, color: "#fff", background: INK, border: 0, borderRadius: 8, padding: "8px 12px", cursor: "pointer", whiteSpace: "nowrap" }}>
+          升級專業方案
+        </button>
+      )}
+    </div>
+  );
+}
+
 export default function DataWorkspacePage() {
   const { sourceId } = useParams<{ sourceId?: string }>();
   const [searchParams] = useSearchParams();
@@ -141,6 +178,7 @@ export default function DataWorkspacePage() {
             </div>
           </div>
 
+          <PlanNudge />
           {/* 粉絲團月報有自己的流程（上傳版型 → 跨月解析 → 體檢報告），不是
               PerformanceDashboard 那種模擬儀表板，所以整頁換掉而不是疊加。 */}
           {active.id === "fanpage_monthly" && <FanpageMonthlyReport />}

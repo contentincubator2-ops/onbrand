@@ -107,9 +107,11 @@ export default function PricingPage() {
           ? ["Brand positioning", "3 own task cards (saved to your Brand Task Library)"]
           : ["品牌定位", "自建任務卡 3 張（存入品牌任務庫）"] },
         { label: isEn ? "Content" : "內容層", items: isEn
-          ? ["203 task cards: 99 award-winning + 63 benchmark + 41 platform conventions"]
-          : ["可用任務卡 203 張：得獎案例 99 ＋ 標竿品牌 63 ＋ 平台通則 41"] },
-        { label: isEn ? "Performance" : "成效層", items: [isEn ? "Not included" : "無"], muted: true },
+          ? ["203 task cards: 99 award-winning + 63 benchmark + 41 platform conventions", "Scheduling, calendar and direct publishing to FB / IG"]
+          : ["可用任務卡 203 張：得獎案例 99 ＋ 標竿品牌 63 ＋ 平台通則 41", "排程、日曆與 FB／IG 直接發布"] },
+        { label: isEn ? "Performance" : "成效層", items: isEn
+          ? ["Preview with simulated data — real connections are a Professional add-on"]
+          : ["示意版：用模擬數據先看見成效層的樣子", "真實串接屬專業方案的加購項目"], muted: true },
         { label: isEn ? "Also" : "其他", items: isEn
           ? ["Unlimited runs", "Campaign tasks included"]
           : ["執行次數不限", "企劃任務開放"] },
@@ -125,12 +127,12 @@ export default function PricingPage() {
       monthly: price.pro,
       layers: [
         { label: isEn ? "Strategy" : "策略層", items: isEn
-          ? ["Brand positioning + 10 product positionings + 1 campaign positioning per month", "10 own task cards (saved to your Brand Task Library)"]
-          : ["品牌定位 ＋ 產品定位 10 個 ＋ 活動定位每月 1 次", "自建任務卡 10 張（存入品牌任務庫）"] },
+          ? ["Brand positioning + 10 product positionings + 1 campaign positioning per month", "10 own task cards (saved to your Brand Task Library)", "Strategy workbench (three anchors → content angles)"]
+          : ["品牌定位 ＋ 產品定位 10 個 ＋ 活動定位每月 1 次", "自建任務卡 10 張（存入品牌任務庫）", "策略工作台（三錨點推導內容角度）"] },
         { label: isEn ? "Content" : "內容層", items: isEn
-          ? ["249 task cards = the 203 above + 46 viral-structure cards", "Viral-structure cards refreshed monthly"]
-          : ["可用任務卡 249 張＝上述 203 張 ＋ 爆款結構卡 46 張", "爆款結構卡每月更新"] },
-        { label: isEn ? "Performance" : "成效層", items: [isEn ? "Available as add-on (see below)" : "可加購（見下方加購）"] },
+          ? ["249 task cards = the 203 above + 46 viral-structure cards", "Viral-structure cards refreshed monthly", "Scheduling, calendar and direct publishing to FB / IG"]
+          : ["可用任務卡 249 張＝上述 203 張 ＋ 爆款結構卡 46 張", "爆款結構卡每月更新", "排程、日曆與 FB／IG 直接發布"] },
+        { label: isEn ? "Performance" : "成效層", items: [isEn ? "Preview + real connections as an add-on (see below)" : "示意版 ＋ 可加購真實串接（見下方加購）"] },
         { label: isEn ? "Also" : "其他", items: isEn
           ? ["Unlimited runs", "Campaign tasks included", "Review workflow"]
           : ["執行次數不限", "企劃任務開放", "審核工作流"] },
@@ -281,10 +283,15 @@ export default function PricingPage() {
             ? "The two tiers differ in capability, not volume: runs are unlimited on both and campaign tasks are open on both. The difference is channels, viral-structure cards, product and campaign positioning, own task cards, and seats."
             : "兩級的差別在能力，不在用量：執行次數兩級都不限，企劃任務兩級都開放。差別是通路數、爆款結構卡、產品與活動定位、自建卡張數、席次。"}
         </p>
+        <p className="text-sm text-neutral-800 mt-3 max-w-3xl mx-auto leading-relaxed">
+          {isEn
+            ? "Both tiers see the performance layer as a preview on simulated data — what you would see once real data is connected. Real connections are a Professional add-on: see the value first, then decide whether to pay for real data."
+            : "成效層兩級都看得到示意版：用模擬數據把「接上真資料之後你會看到什麼」先擺在眼前。真實串接是專業方案的加購項目——先看見價值，再決定要不要為真資料付費。"}
+        </p>
         <p className="text-center text-xs text-neutral-500 mt-3 max-w-3xl mx-auto">
           {isEn
-            ? "Both plans include a 7-day free trial · No credit card to start · Cancel anytime"
-            : "兩個方案均含 7 天免費試用 · 開始不需信用卡 · 隨時取消"}
+            ? "Both plans include: project history, festival reminders, in-app support (Mia), 7-day free trial · No credit card to start · Cancel anytime"
+            : "兩級皆含：專案歷史、節慶提醒、站內客服 Mia、7 天免費試用 · 開始不需信用卡 · 隨時取消"}
         </p>
 
         {/* 5 席 */}
