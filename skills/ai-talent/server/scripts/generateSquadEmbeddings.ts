@@ -19,7 +19,7 @@
 import * as crypto from "crypto";
 import * as dotenv from "dotenv";
 import localPool from "../localDb.js";
-import { getEmbedding } from "../_core/embedding.js";
+import { getEmbedding } from "../platform/core/embedding.js";
 
 dotenv.config({ path: ".env" });
 

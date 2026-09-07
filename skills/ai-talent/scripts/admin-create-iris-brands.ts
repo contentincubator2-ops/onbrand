@@ -19,9 +19,9 @@
 import * as dotenv from "dotenv";
 dotenv.config();
 import localPool from "../server/localDb";
-import { startPositioningJob } from "../server/_core/positioningJobRunner";
-import { buildBrandPositioningSteps } from "../server/_core/positioningSteps";
-import { enqueueProductDiscovery, looksLikeNonProduct } from "../server/_core/productDiscovery";
+import { startPositioningJob } from "../server/strategy/core/positioningJobRunner";
+import { buildBrandPositioningSteps } from "../server/strategy/core/positioningSteps";
+import { enqueueProductDiscovery, looksLikeNonProduct } from "../server/strategy/core/productDiscovery";
 
 const OWNER_EMAIL = "sowork@sowork.tw";
 const WEBSITE = "https://www.iris.com.tw/";

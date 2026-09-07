@@ -18,12 +18,12 @@
 import { SignJWT } from "jose";
 import "./../server/bootstrap-env";
 import localPool from "../server/localDb";
-import { getJwtSecret } from "../server/_core/env";
-import { resolveTask, resolveTaskTemplateSync } from "../server/_core/taskRegistry";
-import { intakeExtraFields } from "../server/_core/taskIntake";
-import { KOL_30S_TASKS } from "../server/_core/quickTaskKOL";
-import { WEBSITE_30S_TASKS } from "../server/_core/quickTaskWebsite";
-import { PACKS } from "../server/_core/brandPacks";
+import { getJwtSecret } from "../server/platform/core/env";
+import { resolveTask, resolveTaskTemplateSync } from "../server/content/core/taskRegistry";
+import { intakeExtraFields } from "../server/content/core/taskIntake";
+import { KOL_30S_TASKS } from "../server/content/core/quickTaskKOL";
+import { WEBSITE_30S_TASKS } from "../server/content/core/quickTaskWebsite";
+import { PACKS } from "../server/strategy/core/brandPacks";
 
 const BASE = process.env.PROBE_BASE ?? "http://127.0.0.1:3101";
 

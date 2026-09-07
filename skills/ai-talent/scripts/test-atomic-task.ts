@@ -11,7 +11,7 @@
  */
 import "dotenv/config";
 import mysql from "mysql2/promise";
-import { callLLM } from "../server/_core/llmRouter";
+import { callLLM } from "../server/platform/core/llmRouter";
 
 const TASK_SLUG  = process.env.TASK_SLUG  ?? "fb-single-post-text";
 const BRAND_NAME = process.env.BRAND_NAME ?? "Pokémon GO";

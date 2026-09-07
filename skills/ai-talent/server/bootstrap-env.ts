@@ -5,7 +5,7 @@
  * SEC-B-03 root cause (2026-05-05): ESM evaluates all imports' bodies
  * depth-first, BEFORE the importing file's own top-level code. So putting
  * `dotenvConfig({...})` as a top-level statement in index.ts runs AFTER
- * `import { ENV } from "./_core/env"` has already triggered env.ts's zod
+ * `import { ENV } from "./platform/core/env"` has already triggered env.ts's zod
  * validation — at which point process.env.JWT_SECRET is still empty (no
  * shell source-d .env present after PM2 daemon-restart) and env.ts exits.
  *

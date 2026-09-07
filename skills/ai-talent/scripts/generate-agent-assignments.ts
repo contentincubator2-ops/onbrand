@@ -41,32 +41,32 @@ const __dirnameSafe = (() => {
 //   media: imageDirector / videoDirector (per gen request)
 //   extras (60s/100s): replyWriter, timingAdvisor, followupWriter, etc.
 
-import { FB_30S_TASKS } from "../server/_core/quickTaskFB";
-import { IG_30S_TASKS } from "../server/_core/quickTaskIG";
-import { YT_30S_TASKS } from "../server/_core/quickTaskYT";
-import { TT_30S_TASKS } from "../server/_core/quickTaskTikTok";
-import { LI_30S_TASKS } from "../server/_core/quickTaskLI";
-import { EMAIL_30S_TASKS } from "../server/_core/quickTaskEmail";
-import { PR_30S_TASKS } from "../server/_core/quickTaskPR";
-import { BRAND_30S_TASKS, BRAND_30S_ORCHESTRA } from "../server/_core/quickTaskBrand";
-import { RESEARCH_30S_TASKS, RESEARCH_30S_ORCHESTRA } from "../server/_core/quickTaskResearch";
-import { FB_60S_TASKS_V2 } from "../server/_core/quickTaskFB60";
-import { IG_60S_TASKS } from "../server/_core/quickTaskIG60";
-import { YT_60S_TASKS } from "../server/_core/quickTaskYT60";
-import { MULTI_60S_TASKS } from "../server/_core/quickTaskMulti60";
-import { ALL_99S_TASKS, ALL_99S_ORCHESTRA } from "../server/_core/quickTask100";
+import { FB_30S_TASKS } from "../server/content/core/quickTaskFB";
+import { IG_30S_TASKS } from "../server/content/core/quickTaskIG";
+import { YT_30S_TASKS } from "../server/content/core/quickTaskYT";
+import { TT_30S_TASKS } from "../server/content/core/quickTaskTikTok";
+import { LI_30S_TASKS } from "../server/content/core/quickTaskLI";
+import { EMAIL_30S_TASKS } from "../server/content/core/quickTaskEmail";
+import { PR_30S_TASKS } from "../server/content/core/quickTaskPR";
+import { BRAND_30S_TASKS, BRAND_30S_ORCHESTRA } from "../server/content/core/quickTaskBrand";
+import { RESEARCH_30S_TASKS, RESEARCH_30S_ORCHESTRA } from "../server/content/core/quickTaskResearch";
+import { FB_60S_TASKS_V2 } from "../server/content/core/quickTaskFB60";
+import { IG_60S_TASKS } from "../server/content/core/quickTaskIG60";
+import { YT_60S_TASKS } from "../server/content/core/quickTaskYT60";
+import { MULTI_60S_TASKS } from "../server/content/core/quickTaskMulti60";
+import { ALL_99S_TASKS, ALL_99S_ORCHESTRA } from "../server/content/core/quickTask100";
 
 // Configs (with extras / strategist / specialty info)
-import { FB_30S_ORCHESTRA } from "../server/_core/quickTaskFB";
-import { IG_30S_ORCHESTRA } from "../server/_core/quickTaskIG";
-import { YT_30S_ORCHESTRA } from "../server/_core/quickTaskYT";
-import { TT_30S_ORCHESTRA } from "../server/_core/quickTaskTikTok";
-import { LI_30S_ORCHESTRA } from "../server/_core/quickTaskLI";
-import { EMAIL_30S_ORCHESTRA } from "../server/_core/quickTaskEmail";
-import { FB_60S_ORCHESTRA } from "../server/_core/quickTaskFB60";
-import { IG_60S_ORCHESTRA } from "../server/_core/quickTaskIG60";
-import { YT_60S_ORCHESTRA } from "../server/_core/quickTaskYT60";
-import { MULTI_60S_ORCHESTRA } from "../server/_core/quickTaskMulti60";
+import { FB_30S_ORCHESTRA } from "../server/content/core/quickTaskFB";
+import { IG_30S_ORCHESTRA } from "../server/content/core/quickTaskIG";
+import { YT_30S_ORCHESTRA } from "../server/content/core/quickTaskYT";
+import { TT_30S_ORCHESTRA } from "../server/content/core/quickTaskTikTok";
+import { LI_30S_ORCHESTRA } from "../server/content/core/quickTaskLI";
+import { EMAIL_30S_ORCHESTRA } from "../server/content/core/quickTaskEmail";
+import { FB_60S_ORCHESTRA } from "../server/content/core/quickTaskFB60";
+import { IG_60S_ORCHESTRA } from "../server/content/core/quickTaskIG60";
+import { YT_60S_ORCHESTRA } from "../server/content/core/quickTaskYT60";
+import { MULTI_60S_ORCHESTRA } from "../server/content/core/quickTaskMulti60";
 
 interface AgentRow {
   id: number;
@@ -232,7 +232,7 @@ async function main() {
   // assigned agent slots so the planning room can show distinct agents
   // for every step.
   try {
-    const { ALL_99S_SQUADS } = await import("../server/_core/quickTask100Squads");
+    const { ALL_99S_SQUADS } = await import("../server/content/core/quickTask100Squads");
     for (const sq of ALL_99S_SQUADS) {
       const platform = (sq as any).platform ?? inferPlatformFromTaskId(sq.id);
       const hint = `${sq.label ?? ""} ${sq.methodology ?? ""}`;
@@ -249,7 +249,7 @@ async function main() {
 
   // Positioning workflow steps (brand / product / event = ~24 steps total)
   try {
-    const { buildBrandPositioningSteps, buildProductPositioningSteps, buildEventPositioningSteps } = await import("../server/_core/positioningSteps");
+    const { buildBrandPositioningSteps, buildProductPositioningSteps, buildEventPositioningSteps } = await import("../server/strategy/core/positioningSteps");
     const allPosSteps = [
       ...buildBrandPositioningSteps({}).map((s: any) => ({ id: s.id, kind: "brand", platform: "generic" })),
       ...buildProductPositioningSteps({}).map((s: any) => ({ id: s.id, kind: "product", platform: "generic" })),

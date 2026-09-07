@@ -14,7 +14,7 @@
 import * as dotenv from "dotenv";
 dotenv.config();
 import localPool from "../server/localDb";
-import { generateAiPromptForPlatform } from "../server/routers/brandKnowledgeRouter";
+import { generateAiPromptForPlatform } from "../server/strategy/routers/brandKnowledgeRouter";
 
 const OWNER_EMAIL = "lucas.lai@sowork.tw";
 const BRAND_NAME = "Pokémon GO";

@@ -21,9 +21,9 @@
 import { SignJWT } from "jose";
 import "./../server/bootstrap-env";
 import localPool from "../server/localDb";
-import { getJwtSecret } from "../server/_core/env";
-import { resolveTask } from "../server/_core/taskRegistry";
-import { getBrandTaskCard, registerBrandTaskCardSource } from "../server/_core/brandTaskCards";
+import { getJwtSecret } from "../server/platform/core/env";
+import { resolveTask } from "../server/content/core/taskRegistry";
+import { getBrandTaskCard, registerBrandTaskCardSource } from "../server/strategy/core/brandTaskCards";
 
 // probe 是獨立的 node process。`taskRegistry` 的 SOURCES 是模組層狀態，server
 // process 靠 routers/index.ts → brandTaskCardRouter 的 side-effect 帶進來；

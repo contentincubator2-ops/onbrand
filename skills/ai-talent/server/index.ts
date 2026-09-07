@@ -8,7 +8,7 @@
 // SEC-B-03 (2026-05-05): load .env via a side-effect module that runs
 // BEFORE any other import. Putting dotenvConfig() as a top-level statement
 // here doesn't work — ESM evaluates all imports depth-first, so
-// `import { ENV } from "./_core/env"` lower in this file would trigger
+// `import { ENV } from "./platform/core/env"` lower in this file would trigger
 // env.ts's zod validation BEFORE the dotenv call ran. The only way to
 // guarantee .env is loaded first is from a side-effect module imported
 // at the top.
@@ -23,24 +23,24 @@ import { rateLimit } from "express-rate-limit";
 import helmet from "helmet";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 // existsSync already imported at top for env path resolution
-import { ENV } from "./_core/env";
-import { getBillingRetryQueueLength, flushBillingRetryQueue, loadBillingFallbackLog } from "./llmWithBilling";
-import { createContext } from "./_core/trpc";
-import { authRouter } from "./auth/authRouter";
-import { reportTemplateRouter } from "./routes/reportTemplateRoute";
-import { positioningDocRouter } from "./routes/positioningDocRoute";
-import { slackOAuthRouter } from "./routes/slackOAuthRoute";
-import { cloudOAuthRouter } from "./routes/cloudOAuthRoute";
-import { manusRouter } from "./routers/manusRouter";
-import { publicAgentsRoute } from "./routes/publicAgentsRoute";
+import { ENV } from "./platform/core/env";
+import { getBillingRetryQueueLength, flushBillingRetryQueue, loadBillingFallbackLog } from "./platform/core/llmWithBilling";
+import { createContext } from "./platform/core/trpc";
+import { authRouter } from "./platform/auth/authRouter";
+import { reportTemplateRouter } from "./performance/routes/reportTemplateRoute";
+import { positioningDocRouter } from "./strategy/routes/positioningDocRoute";
+import { slackOAuthRouter } from "./platform/routes/slackOAuthRoute";
+import { cloudOAuthRouter } from "./platform/routes/cloudOAuthRoute";
+import { manusRouter } from "./platform/routers/manusRouter";
+import { publicAgentsRoute } from "./platform/routes/publicAgentsRoute";
 import { closeDb, pingDb, pingSoworkDb, getDb } from "./db";
 import { sql } from "drizzle-orm";
 import { appRouter } from "./routers";
-import { resumeInterruptedPositioningJobs } from "./_core/positioningJobRunner";
-import { runStartupCleanup } from "./_core/startupCleanup";
-import { recoverStuckDiscoveryJobs, processNextDiscoveryJob } from "./_core/productDiscovery";
-import { computeMissionResources } from "./missionResourceComputer";
-import { getDisabledRuntimeFeatures, isRuntimeFeatureEnabled } from "./_core/runtimeSafety";
+import { resumeInterruptedPositioningJobs } from "./strategy/core/positioningJobRunner";
+import { runStartupCleanup } from "./platform/core/startupCleanup";
+import { recoverStuckDiscoveryJobs, processNextDiscoveryJob } from "./strategy/core/productDiscovery";
+import { computeMissionResources } from "./content/core/missionResourceComputer";
+import { getDisabledRuntimeFeatures, isRuntimeFeatureEnabled } from "./platform/core/runtimeSafety";
 
 const app = express();
 
@@ -145,7 +145,7 @@ app.post(
     }
     try {
       const signature = req.header("stripe-signature") ?? "";
-      const { handleStripeWebhook } = await import("./routers/stripeRouter");
+      const { handleStripeWebhook } = await import("./platform/routers/stripeRouter");
       const result = await handleStripeWebhook(req.body as Buffer, signature);
       if (result.ok) {
         res.status(200).json({ received: true });
@@ -532,7 +532,7 @@ async function runStartupMigrations() {
     // 2026-08-23 (CJ「安排定期任務掃描當地熱門的 facebook 貼文，補充為 task」):
     // 每月排程掃出來的貼文形式候選佇列。DDL 的來源在 _core/postFormatStore.ts，
     // 那裡也寫了為什麼去重不看 status（否則被否決的形式每月復活）。
-    const { POST_FORMAT_CANDIDATES_DDL } = await import("./_core/postFormatStore");
+    const { POST_FORMAT_CANDIDATES_DDL } = await import("./content/core/postFormatStore");
     await db.execute(sql.raw(POST_FORMAT_CANDIDATES_DDL));
     console.log("[migrate] post_format_candidates: OK");
   } catch (err) {

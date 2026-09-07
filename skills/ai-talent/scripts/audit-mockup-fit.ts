@@ -12,7 +12,7 @@
 import "dotenv/config";
 import { writeFileSync } from "fs";
 import mysql from "mysql2/promise";
-import { callLLM } from "../server/_core/llmRouter";
+import { callLLM } from "../server/platform/core/llmRouter";
 
 const KNOWN_VARIANTS = [
   "IntakeFormMockup",

@@ -12,7 +12,7 @@
 import "dotenv/config";
 import mysql from "mysql2/promise";
 import assignmentsData from "../data/agent-assignments.json" with { type: "json" };
-import { getCopywritingMasterPrompt } from "../server/_core/copywritingMaster";
+import { getCopywritingMasterPrompt } from "../server/content/core/copywritingMaster";
 
 const TASK_ID = "fb-30-caption-short";
 const BRAND_NAME = "桂冠營養研究室";

@@ -31,7 +31,7 @@
  */
 import { createPool, type Pool } from "mysql2/promise";
 import * as dotenv from "dotenv";
-import { invokeLLM } from "../server/_core/llm.js";
+import { invokeLLM } from "../server/platform/core/llm.js";
 dotenv.config();
 
 interface SquadRow {

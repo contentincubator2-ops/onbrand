@@ -17,7 +17,7 @@
  * soworkAnalysis content.
  */
 import localPool from "../server/localDb";
-import { invokeLLM } from "../server/_core/llm";
+import { invokeLLM } from "../server/platform/core/llm";
 
 interface BrandRow {
   id: number;

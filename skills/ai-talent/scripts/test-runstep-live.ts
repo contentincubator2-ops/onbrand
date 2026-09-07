@@ -12,7 +12,7 @@
  */
 import "dotenv/config";
 import mysql from "mysql2/promise";
-import { callLLM } from "../server/_core/llmRouter";
+import { callLLM } from "../server/platform/core/llmRouter";
 
 const SQUAD_ID = Number(process.env.SQUAD_ID ?? 726);
 const STEP_INDEX = Number(process.env.STEP_INDEX ?? 1);

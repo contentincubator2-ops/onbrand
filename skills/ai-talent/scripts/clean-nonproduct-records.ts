@@ -13,7 +13,7 @@
 import * as dotenv from "dotenv";
 dotenv.config();
 import { createPool } from "mysql2/promise";
-import { looksLikeNonProduct } from "../server/_core/productDiscovery";
+import { looksLikeNonProduct } from "../server/strategy/core/productDiscovery";
 
 async function main() {
   const doDelete = process.argv.includes("--delete");

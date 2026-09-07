@@ -23,10 +23,10 @@
  * 未達標時 exit 1，可以直接當開卡前的閘門。
  */
 
-import { FB_30S_TASKS, labelZh } from "../server/_core/quickTaskFB";
-import { FB_60S_TASKS_V2 } from "../server/_core/quickTaskFB60";
-import { ALL_99S_SQUADS } from "../server/_core/quickTask100Squads";
-import { ALL_99S_TASKS } from "../server/_core/quickTask100";
+import { FB_30S_TASKS, labelZh } from "../server/content/core/quickTaskFB";
+import { FB_60S_TASKS_V2 } from "../server/content/core/quickTaskFB60";
+import { ALL_99S_SQUADS } from "../server/content/core/quickTask100Squads";
+import { ALL_99S_TASKS } from "../server/content/core/quickTask100";
 
 /** CJ 2026-08-23：FB 貼文任務的 agent system prompt 下限。 */
 export const MIN_PERSONA_CHARS = 2200;

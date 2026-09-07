@@ -1,47 +1,47 @@
-import { router } from "../_core/trpc";
-import { brandRouter } from "./brandRouter";
-import { creditsRouter } from "./creditsRouter";
-import { notificationRouter } from "./notificationRouter";
-import { supportRouter } from "./supportRouter";
-import { agentRouter } from "./agentRouter";
-import { missionRouter } from "./missionRouter";
-import { outputRouter } from "./outputRouter";
-import { squadTemplateRouter } from "./squadTemplateRouter";
-import { brandBrainRouter } from "./brandBrainRouter";
-import { calendarRouter } from "./calendarRouter";
-import { bundleConnectRouter } from "./bundleConnectRouter";
-import { imageRouter } from "./imageRouter";
-import { quickTaskRouter } from "./quickTaskRouter";
-import { entityRouter } from "./entityRouter";
-import { productRouter, eventRouter, scopeRouter } from "./scopeRouter";
-import { pipelineRouter } from "./pipelineRouter";
-import { postFormatRouter } from "./postFormatRouter";
-import { mediaRouter } from "./mediaRouter";
-import { platformConnectRouter } from "./platformConnectRouter";
-import { theaterRouter } from "./theaterRouter";
-import { positioningJobsRouter } from "./positioningJobsRouter";
-import { positioningDocsRouter } from "./positioningDocsRouter";
-import { brandTaskCardRouter } from "./brandTaskCardRouter";
-import { workbenchRouter } from "./workbenchRouter";
-import { brandKnowledgeRouter } from "./brandKnowledgeRouter";
-import { personaAgentRouter } from "./personaAgentRouter";
-import { cloudDriveRouter } from "./cloudDriveRouter";
-import { publishRouter } from "./publishRouter";
-import { billingRouter } from "./billingRouter";
-import { opsRouter } from "./opsRouter";
-import { adminStatsRouter } from "./adminStatsRouter";
+import { router } from "../platform/core/trpc";
+import { brandRouter } from "../strategy/routers/brandRouter";
+import { creditsRouter } from "../platform/routers/creditsRouter";
+import { notificationRouter } from "../platform/routers/notificationRouter";
+import { supportRouter } from "../platform/routers/supportRouter";
+import { agentRouter } from "../content/routers/agentRouter";
+import { missionRouter } from "../content/routers/missionRouter";
+import { outputRouter } from "../content/routers/outputRouter";
+import { squadTemplateRouter } from "../content/routers/squadTemplateRouter";
+import { brandBrainRouter } from "../strategy/routers/brandBrainRouter";
+import { calendarRouter } from "../content/routers/calendarRouter";
+import { bundleConnectRouter } from "../platform/routers/bundleConnectRouter";
+import { imageRouter } from "../content/routers/imageRouter";
+import { quickTaskRouter } from "../content/routers/quickTaskRouter";
+import { entityRouter } from "../strategy/routers/entityRouter";
+import { productRouter, eventRouter, scopeRouter } from "../strategy/routers/scopeRouter";
+import { pipelineRouter } from "../strategy/routers/pipelineRouter";
+import { postFormatRouter } from "../content/routers/postFormatRouter";
+import { mediaRouter } from "../content/routers/mediaRouter";
+import { platformConnectRouter } from "../platform/routers/platformConnectRouter";
+import { theaterRouter } from "../content/routers/theaterRouter";
+import { positioningJobsRouter } from "../strategy/routers/positioningJobsRouter";
+import { positioningDocsRouter } from "../strategy/routers/positioningDocsRouter";
+import { brandTaskCardRouter } from "../strategy/routers/brandTaskCardRouter";
+import { workbenchRouter } from "../strategy/routers/workbenchRouter";
+import { brandKnowledgeRouter } from "../strategy/routers/brandKnowledgeRouter";
+import { personaAgentRouter } from "../strategy/routers/personaAgentRouter";
+import { cloudDriveRouter } from "../platform/routers/cloudDriveRouter";
+import { publishRouter } from "../content/routers/publishRouter";
+import { billingRouter } from "../platform/routers/billingRouter";
+import { opsRouter } from "../platform/routers/opsRouter";
+import { adminStatsRouter } from "../platform/routers/adminStatsRouter";
 // 2026-05-11 (CJ「Team / Agency 方案 + 多客戶 workspace」): multi-tenant container.
-import { reviewRouter } from "./reviewRouter";
-import { performanceRouter } from "./performanceRouter";
-import { tenantRouter } from "./tenantRouter";
+import { reviewRouter } from "../platform/routers/reviewRouter";
+import { performanceRouter } from "../performance/routers/performanceRouter";
+import { tenantRouter } from "../platform/routers/tenantRouter";
 // 2026-05-14 (CJ「我們使用 Stripe」): Stripe Checkout + webhook.
-import { stripeRouter } from "./stripeRouter";
+import { stripeRouter } from "../platform/routers/stripeRouter";
 // 2026-05-11 (CJ「節慶日曆 + 自動提醒」): proactive festival nudges.
-import { festivalRouter } from "./festivalRouter";
+import { festivalRouter } from "../content/routers/festivalRouter";
 // 2026-05-12 (CJ「Phase 1 prompt library」): Nano-Banana 175 image-prompt templates.
-import { promptTemplateRouter } from "./promptTemplateRouter";
+import { promptTemplateRouter } from "../content/routers/promptTemplateRouter";
 // 2026-06-21 (CJ「按 riverflow 標準」brand DNA): auto-extracted brand color palette.
-import { brandColorsRouter } from "./brandColorsRouter";
+import { brandColorsRouter } from "../strategy/routers/brandColorsRouter";
 
 // 2026-05-14: removed 28 dead routers — none of them had any v2 callers
 // after the v1 frontend deletion. See git history (commit before this)

@@ -5,7 +5,7 @@
 import {
   createAgentMessage, parseAgentMessage, safeParseAgentMessage,
   legacyRowToAgentMessage,
-} from "../server/_core/agentMessage";
+} from "../server/content/core/agentMessage";
 
 let pass = 0, fail = 0;
 const t = (name: string, ok: boolean, detail?: string) => {

@@ -28,7 +28,7 @@ import "dotenv/config";
 import { existsSync, writeFileSync, mkdirSync, statSync } from "fs";
 import { join } from "path";
 import mysql from "mysql2/promise";
-import { callLLM } from "../server/_core/llmRouter";
+import { callLLM } from "../server/platform/core/llmRouter";
 
 const COVERS_DIR = process.env.COVERS_DIR ?? "/opt/marketing-os/covers";
 const COVERS_URL_PREFIX = process.env.COVERS_URL_PREFIX ?? "/static/covers";

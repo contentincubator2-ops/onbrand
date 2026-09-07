@@ -3,7 +3,7 @@
  *
  * Use from any page:
  *
- *   import { fireNudge } from "../components/mia/miaNudges";
+ *   import { fireNudge } from "./miaNudges";
  *
  *   onGenerationDone(() => fireNudge("theater.generation_done"));
  *

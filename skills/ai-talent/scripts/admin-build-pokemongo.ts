@@ -28,9 +28,9 @@
 import * as dotenv from "dotenv";
 dotenv.config();
 import localPool from "../server/localDb";
-import { startPositioningJob } from "../server/_core/positioningJobRunner";
-import { buildEventPositioningSteps } from "../server/_core/positioningSteps";
-import { generateAiPromptForPlatform } from "../server/routers/brandKnowledgeRouter";
+import { startPositioningJob } from "../server/strategy/core/positioningJobRunner";
+import { buildEventPositioningSteps } from "../server/strategy/core/positioningSteps";
+import { generateAiPromptForPlatform } from "../server/strategy/routers/brandKnowledgeRouter";
 
 const OWNER_EMAIL = "lucas.lai@sowork.tw";
 const BRAND_NAME = "Pokémon GO";

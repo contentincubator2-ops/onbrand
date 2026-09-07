@@ -22,7 +22,7 @@
 import "dotenv/config";
 import { writeFileSync } from "fs";
 import mysql from "mysql2/promise";
-import { callLLM } from "../server/_core/llmRouter";
+import { callLLM } from "../server/platform/core/llmRouter";
 
 const BRAND_NAME = process.env.BRAND_NAME ?? "Pokémon GO";
 const EVENT_NAME_HINT = process.env.EVENT_NAME ?? "單首龍經典社群日";

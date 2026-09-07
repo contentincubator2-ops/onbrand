@@ -16,7 +16,7 @@ import {
   getOrCreateSquadSession,
   listPhaseSessions,
   ensurePhaseSessions,
-} from "../server/_core/squadSessionManager";
+} from "../server/content/core/squadSessionManager";
 
 async function describe(table: string) {
   const [cols] = await localPool.execute(
