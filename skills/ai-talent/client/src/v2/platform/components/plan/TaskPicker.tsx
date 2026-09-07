@@ -27,7 +27,7 @@ export interface PickerTask {
 }
 
 export default function TaskPicker({
-  open, onClose, tasks, selected, maxTray, viralLocked, onSave, saving,
+  open, onClose, tasks, selected, maxTray, viralLocked, onSave, saving, onDetail,
 }: {
   open: boolean;
   onClose: () => void;
@@ -37,6 +37,8 @@ export default function TaskPicker({
   viralLocked: number;
   onSave: (ids: string[]) => void;
   saving?: boolean;
+  /** 2026-09-08：選卡時也能先看這張卡的出處與說明（開 CardDetailDrawer）。 */
+  onDetail?: (id: string) => void;
 }) {
   const { lang } = useLang();
   const isEn = lang === "en";
@@ -141,6 +143,20 @@ export default function TaskPicker({
                         <span className="mt-0.5 block truncate text-[13px] text-neutral-500">
                           {sourcePillText(src, lang)}
                         </span>
+                        {onDetail && (
+                          <span
+                            role="button"
+                            tabIndex={0}
+                            className="mt-1 inline-block text-[12px] font-medium text-neutral-800 underline underline-offset-2"
+                            onClick={(e) => { e.stopPropagation(); onDetail(t.id); }}
+                            onKeyDown={(e) => {
+                              if (e.key !== "Enter" && e.key !== " ") return;
+                              e.preventDefault(); e.stopPropagation(); onDetail(t.id);
+                            }}
+                          >
+                            {lang === "en" ? "Source & notes" : "出處與說明"}
+                          </span>
+                        )}
                       </span>
                     </button>
                   );

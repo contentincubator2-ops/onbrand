@@ -2139,9 +2139,18 @@ function PlatformTaskPageInner() {
                         // 墨色深淺與邊框，字級也從 10px 提到 12px。
                         return (
                           <span
-                            className="inline-flex items-center self-start rounded-full border px-2 py-0.5 max-w-full"
+                            role="button"
+                            tabIndex={0}
+                            className="inline-flex items-center self-start rounded-full border px-2 py-0.5 max-w-full cursor-pointer hover:border-neutral-800"
                             style={{ borderColor: "#E5E5E5", background: "#FFFFFF" }}
                             title={sourceTooltip(src, lang)}
+                            // 2026-09-08 (CJ「在 dev 還看不到出處說明」)：出處 pill 本身就能點開詳情，
+                            // 不必找下面那行小字。
+                            onClick={(e) => { e.stopPropagation(); setDetailTaskId(task.id); }}
+                            onKeyDown={(e) => {
+                              if (e.key !== "Enter" && e.key !== " ") return;
+                              e.preventDefault(); e.stopPropagation(); setDetailTaskId(task.id);
+                            }}
                           >
                             <span
                               className="text-[12px] font-medium truncate"
@@ -2158,7 +2167,7 @@ function PlatformTaskPageInner() {
                         <span
                           role="button"
                           tabIndex={0}
-                          className="text-neutral-500 underline-offset-2 hover:underline hover:text-neutral-800"
+                          className="font-medium text-neutral-800 underline underline-offset-2 hover:text-neutral-950"
                           onClick={(e) => { e.stopPropagation(); setDetailTaskId(task.id); }}
                           onKeyDown={(e) => {
                             if (e.key !== "Enter" && e.key !== " ") return;
@@ -2269,6 +2278,7 @@ function PlatformTaskPageInner() {
         viralLocked={trayData?.viralLocked ?? 0}
         saving={setTrayMut?.isPending}
         onSave={(ids) => setTrayMut?.mutate?.({ brandId: brandId ?? 0, platform, taskIds: ids })}
+        onDetail={(id) => setDetailTaskId(id)}
       />
 
       {/* ─── Task modal (intake + running countdown) ───────────────────── */}
