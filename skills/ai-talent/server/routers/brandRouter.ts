@@ -293,8 +293,8 @@ export const brandRouter = router({
               throw new TRPCError({
                 code: "FORBIDDEN",
                 message: cap === 1
-                  ? `您的方案（${plan.name}）只支援 1 個品牌。需要管理多個品牌請升級到 Studio（3 個品牌），或聯繫業務洽詢 Agency 方案。`
-                  : `您的方案（${plan.name}）最多 ${cap} 個品牌。升級到 Agency 方案以支援更多品牌，或聯繫業務洽詢。`,
+                  ? `您的方案（${plan.name}）只支援 1 個品牌。需要管理多個品牌屬於企業客製版，請聯繫業務洽詢。`
+                  : `您的方案（${plan.name}）最多 ${cap} 個品牌。需要更多品牌屬於企業客製版，請聯繫業務洽詢。`,
               });
             }
           }
