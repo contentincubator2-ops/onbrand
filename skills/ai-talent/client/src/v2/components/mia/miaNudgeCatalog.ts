@@ -674,18 +674,6 @@ export const NUDGE_CATALOG = {
     },
   },
 
-  "media.first_video_generated": {
-    id: "media.first_video_generated",
-    message: {
-      "zh-TW":
-        "🎥 短影片出來了。如果配音不夠像你的品牌——「設定 → 語音模型」可以選不同調性。" +
-        "想再加字幕 / BGM，按右上「後製」可以一鍵套品牌色 + 字體。",
-      en:
-        "🎥 Short video ready. If the voiceover doesn't feel on-brand, " +
-        "Settings → Voice model has alternatives. For captions / BGM, " +
-        "'Post-production' (top-right) applies your brand colors + fonts.",
-    },
-  },
 
   // ─── Discovery / learning loop ────────────────────────────────────────
 

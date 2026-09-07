@@ -12,7 +12,7 @@
  *   "soon"   — listed for visibility but disabled in UI
  */
 
-export type MediaKind = "image" | "video";
+export type MediaKind = "image";
 export type MediaStatus = "ready" | "manual" | "soon";
 /** Which backend route serves this model. */
 export type MediaProvider =
@@ -218,144 +218,7 @@ export const IMAGE_MODELS: MediaModel[] = [
   },
 ];
 
-// ── Video ────────────────────────────────────────────────────────────────
-export const VIDEO_MODELS: MediaModel[] = [
-  {
-    id: "google/veo-3",
-    name: "Veo 3",
-    vendor: "Google",
-    provider: "google-gemini",
-    kind: "video",
-    status: "ready", // VERIFIED — GEMINI_API_KEY works, model available
-    strengths: "高解析、影片長度可達 30+ 秒、聲音 + 字幕同步生成",
-    costEstimateUsd: 0.50,
-    durationSecEstimate: 180,
-    formats: ["8s", "16s", "1080p"],
-    tags: ["cinematic", "audio-sync", "premium"],
-  },
-  {
-    id: "google/veo-3-fast",
-    name: "Veo 3 Fast",
-    vendor: "Google",
-    provider: "google-gemini",
-    kind: "video",
-    status: "ready",
-    strengths: "Veo 3 快速版，價格 / 速度更佳",
-    costEstimateUsd: 0.25,
-    durationSecEstimate: 60,
-    formats: ["8s", "1080p"],
-    tags: ["fast", "social-reel"],
-  },
-  // fal/seedance-v1-5-lite removed 2026-05-05 — fal.ai removed site-wide.
-  // Use Hailuo t2v / piapi/kling-v2-master for video instead.
-  {
-    id: "hailuo/i2v",
-    name: "Hailuo i2v (MiniMax)",
-    vendor: "MiniMax",
-    provider: "minimax-direct",
-    kind: "video",
-    status: "soon", // MiniMax key rejected
-    strengths: "從靜態圖延伸動態（image-to-video），人臉動作自然",
-    costEstimateUsd: 0.15,
-    durationSecEstimate: 60,
-    formats: ["6s", "720p"],
-    tags: ["i2v", "asian-face"],
-  },
-  {
-    id: "hailuo/t2v",
-    name: "Hailuo t2v (MiniMax)",
-    vendor: "MiniMax",
-    provider: "minimax-direct",
-    kind: "video",
-    status: "soon", // MiniMax key rejected
-    strengths: "純文字生影片，國風 / 寫實 / 動畫風格皆強",
-    costEstimateUsd: 0.18,
-    durationSecEstimate: 75,
-    formats: ["6s", "720p"],
-    tags: ["t2v", "chinese-style"],
-  },
-  // ── PiAPI aggregator video (62a5ff21…) ──
-  {
-    id: "piapi/kling-v2-master",
-    name: "Kling v2 Master",
-    vendor: "Kuaishou via PiAPI",
-    provider: "piapi",
-    kind: "video",
-    status: "ready",
-    strengths: "東方臉孔 / 國風場景頂級，運鏡 + 動作流暢度業界第一",
-    costEstimateUsd: 0.35,
-    durationSecEstimate: 120,
-    formats: ["5s", "10s", "1080p"],
-    tags: ["t2v", "asian-face", "cinematic", "chinese-style"],
-  },
-  {
-    id: "piapi/kling-v1-6-i2v",
-    name: "Kling v1.6 i2v",
-    vendor: "Kuaishou via PiAPI",
-    provider: "piapi",
-    kind: "video",
-    status: "ready",
-    strengths: "靜態 KV → 動態廣告（image-to-video）首選，把 logo / 海報動起來",
-    costEstimateUsd: 0.20,
-    durationSecEstimate: 90,
-    formats: ["5s", "10s", "1080p"],
-    tags: ["i2v", "kv-animate", "ad-banner"],
-  },
-  {
-    id: "piapi/runway-gen-4",
-    name: "Runway Gen-4",
-    vendor: "Runway via PiAPI",
-    provider: "piapi",
-    kind: "video",
-    status: "ready",
-    strengths: "鏡頭運動 / cinematic 質感最自然，廣告短片首選",
-    costEstimateUsd: 0.50,
-    durationSecEstimate: 150,
-    formats: ["5s", "10s", "1080p"],
-    tags: ["cinematic", "camera-motion", "ad-film"],
-  },
-  {
-    id: "piapi/runway-gen-4-turbo",
-    name: "Runway Gen-4 Turbo",
-    vendor: "Runway via PiAPI",
-    provider: "piapi",
-    kind: "video",
-    status: "ready",
-    strengths: "Runway 快速版，社群短影音批量生成",
-    costEstimateUsd: 0.25,
-    durationSecEstimate: 60,
-    formats: ["5s", "1080p"],
-    tags: ["fast", "social-reel"],
-  },
-  {
-    id: "piapi/pika-v2",
-    name: "Pika v2",
-    vendor: "Pika Labs via PiAPI",
-    provider: "piapi",
-    kind: "video",
-    status: "ready",
-    strengths: "風格化動畫 / 二次元 / 卡通質感",
-    costEstimateUsd: 0.18,
-    durationSecEstimate: 75,
-    formats: ["3s", "5s", "720p", "1080p"],
-    tags: ["stylized", "anime", "cartoon"],
-  },
-  {
-    id: "piapi/hedra-character-3",
-    name: "Hedra Character 3",
-    vendor: "Hedra via PiAPI",
-    provider: "piapi",
-    kind: "video",
-    status: "ready",
-    strengths: "對嘴 / 數位人 / talking head，從照片 + 音訊生成代言人影片",
-    costEstimateUsd: 0.30,
-    durationSecEstimate: 120,
-    formats: ["up-to-30s", "720p"],
-    tags: ["lipsync", "digital-human", "spokesperson"],
-  },
-];
-
-export const ALL_MODELS = [...IMAGE_MODELS, ...VIDEO_MODELS];
+export const ALL_MODELS = [...IMAGE_MODELS];
 
 export function modelsByKind(kind: MediaKind): MediaModel[] {
   return ALL_MODELS.filter((m) => m.kind === kind);

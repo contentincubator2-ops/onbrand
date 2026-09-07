@@ -27,7 +27,6 @@ export interface PlanQuota {
   task_60s: number;
   task_99s: number;
   image_gen: number;
-  video_gen: number;
   brands: number;
   fb_publish: number;
   /** 2026-05-11 — max members in this workspace plan (1 = solo only). */
@@ -129,8 +128,6 @@ export const POINT_COSTS = {
   image_gpt:      100,   // OpenAI gpt-image-1 — premium
   image_imagen:    50,   // Google Imagen — middle
   image_ideogram:  50,   // PiAPI Ideogram (text-in-image)
-  // video pulled per CJ direction; keep cost defined for when re-enabled
-  video_clip:    1500,   // 1 PiAPI Kling 5s clip
 } as const;
 export type PointAction = keyof typeof POINT_COSTS;
 
@@ -188,7 +185,6 @@ export const PLANS: Record<PlanCode, Plan> = {
       task_60s:   -1,
       task_99s:   -1,  // 2026-09-06：企劃解鎖。功能限制全拿掉，差異改放在通路數與爆款卡
       image_gen:  -1,  // images included in the run count
-      video_gen:   0,
       brands:      1,
       fb_publish: -1,
       team_members: 2,
@@ -235,7 +231,6 @@ export const PLANS: Record<PlanCode, Plan> = {
       task_60s: -1,
       task_99s: -1,
       image_gen: -1,
-      video_gen: 0,                // video still hard-disabled
       brands: 1,
       fb_publish: -1,
       team_members: 1,
@@ -286,7 +281,6 @@ export const PLANS: Record<PlanCode, Plan> = {
       task_60s: -1,
       task_99s: -1,
       image_gen: -1,
-      video_gen: 0,                // 影片暫時下架（roadmap 加購包）
       brands: 1,                   // ← Solo = 1 個品牌
       fb_publish: -1,
       // 2026-09-06：專業版 5 席。理由是審核工作流 —— 產出的人與放行的人
@@ -326,7 +320,7 @@ export const PLANS: Record<PlanCode, Plan> = {
     priceTwdAnnually: -1,
     trialDays: 0,
     quota: {
-      task_30s: -1, task_60s: -1, task_99s: -1, image_gen: -1, video_gen: -1,
+      task_30s: -1, task_60s: -1, task_99s: -1, image_gen: -1,
       brands: -1, fb_publish: -1, team_members: -1, multi_client: true,
       // Enterprise = unlimited points (-1 == bypass check)
       pointsPerCycle: -1,

@@ -1,12 +1,12 @@
 /**
- * mediaRouter — 3-step image / video generation flow.
+ * mediaRouter — 3-step image generation flow（影片生成 2026-09-08 移除）.
  *
  * Per CJ direction 2026-04-29:
  *   Step 1  proposeDirection(brief, kind) — agent suggests 3-5 design
  *           directions (構圖/色彩/情緒/腳本) for user to pick.
  *   Step 2  craftPrompt(direction, kind, modelId)
  *           — agent writes the actual AI prompt (English for image
- *           models, scene-by-scene for video).
+ *           models).
  *   Step 3  generate(prompt, modelId, options)
  *           — dispatches to the chosen provider (gpt-image / Imagen /
  *           Hailuo / Seedance / etc.) and returns the asset URL/b64.
@@ -31,7 +31,7 @@ function isProviderKeyError(text: string): boolean {
 import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure } from "../_core/trpc";
 import { callLLM } from "../_core/llmRouter";
-import { dispatchGenerate, checkJob, type GenOptions } from "../_core/mediaGen";
+import { dispatchGenerate, type GenOptions } from "../_core/mediaGen";
 import localPool from "../localDb";
 import { probeImageUrl } from "../_core/imageFetch";
 
@@ -71,7 +71,7 @@ async function filterUsableProductImages<T extends { imageUrl: string }>(items: 
 export const mediaRouter = router({
   proposeDirection: protectedProcedure
     .input(z.object({
-      kind: z.enum(["image", "video"]),
+      kind: z.enum(["image"]),
       brief: z.string().min(2).max(2000),
       brandContext: z.string().optional(),
       audienceContext: z.string().optional(),
@@ -80,10 +80,7 @@ export const mediaRouter = router({
     }))
     .mutation(async ({ input }) => {
       const count = input.count ?? 4;
-      const isVideo = input.kind === "video";
-      const dimensionList = isVideo
-        ? "構圖 / 色彩 / 情緒 / 鏡頭與分鏡 / 風格參考"
-        : "構圖 / 色彩 / 情緒 / 視覺風格 / 風格參考";
+      const dimensionList = "構圖 / 色彩 / 情緒 / 視覺風格 / 風格參考";
       const sys = `你是 SoWork 視覺策略顧問。任務：為使用者的 brief 提出 ${count} 個截然不同的設計方向，讓使用者挑選。
 
 輸出嚴格 JSON：
@@ -97,7 +94,7 @@ export const mediaRouter = router({
       "palette": "色彩策略（含主色、輔色、Hex 範例）50-80 字",
       "mood": "情緒氛圍 30-50 字",
       "styleRef": "風格參考（攝影 / 插畫 / 3D / 拼貼 / 寫實 / 動畫）+ 知名案例 30-80 字",
-${isVideo ? '      "shotList": "分鏡腳本 3-5 個鏡頭，每個 1-2 句說明",\n' : ""}      "rationale": "為何這個方向適合本 brief（與品牌調性 / 受眾的關聯）50-100 字"
+      "rationale": "為何這個方向適合本 brief（與品牌調性 / 受眾的關聯）50-100 字"
     }
   ]
 }
@@ -107,7 +104,7 @@ ${isVideo ? '      "shotList": "分鏡腳本 3-5 個鏡頭，每個 1-2 句說�
       const user = `Brief：${input.brief}
 ${input.brandContext ? `品牌語境：${input.brandContext}` : ""}
 ${input.audienceContext ? `受眾：${input.audienceContext}` : ""}
-類型：${isVideo ? "影片" : "圖片"}
+類型：圖片
 請提出 ${count} 個跨度大的視覺方向（${dimensionList}）。`;
 
       try {
@@ -130,17 +127,16 @@ ${input.audienceContext ? `受眾：${input.audienceContext}` : ""}
   // ── Step 2 — craft AI prompt from approved direction ────────────────────
   craftPrompt: protectedProcedure
     .input(z.object({
-      kind: z.enum(["image", "video"]),
+      kind: z.enum(["image"]),
       direction: z.any(),         // the picked direction object
       brief: z.string(),
       modelId: z.string(),        // helps tailor wording (some models prefer English)
     }))
     .mutation(async ({ input }) => {
-      const isVideo = input.kind === "video";
       const sys = `你是 SoWork AI prompt 工程師。根據已批准的設計方向 + brief，寫一段適合送給「${input.modelId}」的 prompt。
 
 規則：
-- ${isVideo ? "影片 prompt 用英文，分鏡逐句寫；包含鏡頭、動作、節奏、色調、情緒。" : "圖片 prompt 用英文（accentuated style + composition + lighting + colour + mood + camera/lens hint）。"}
+- 圖片 prompt 用英文（accentuated style + composition + lighting + colour + mood + camera/lens hint）。
 - 中文摘要：另附 50-150 字繁體中文摘要說明這個 prompt 想表達什麼。
 - 不寫 negative prompt（除非 brief 明確要求避開某些元素）。
 - 輸出嚴格 JSON：{"promptEn": "...", "summaryZh": "..."}`;
@@ -170,7 +166,7 @@ ${input.audienceContext ? `受眾：${input.audienceContext}` : ""}
   // ── Step 3 — real media generation via dispatchGenerate ────────────────
   generate: protectedProcedure
     .input(z.object({
-      kind: z.enum(["image", "video"]),
+      kind: z.enum(["image"]),
       modelId: z.string(),
       promptEn: z.string().min(2).max(8000),
       brandId: z.number().nullable().optional(),
@@ -276,32 +272,5 @@ ${input.audienceContext ? `受眾：${input.audienceContext}` : ""}
         } catch { /* skip malformed rows */ }
       }
       return { products: await filterUsableProductImages(products) };
-    }),
-
-  /** Poll an async generation (video) by taskId. */
-  checkJob: protectedProcedure
-    .input(z.object({
-      modelId: z.string(),
-      taskId: z.string(),
-    }))
-    .query(async ({ input }) => {
-      try {
-        const res = await checkJob(input.modelId, input.taskId);
-        return {
-          ok: res.status === "ready",
-          status: res.status,
-          url: res.url,
-          taskId: res.taskId,
-          message: res.errorMsg ? redactProviderSecrets(res.errorMsg) : "",
-        };
-      } catch (e) {
-        throw new TRPCError({
-          code: "INTERNAL_SERVER_ERROR",
-          message: (() => {
-            const msg = redactProviderSecrets(e instanceof Error ? e.message : String(e));
-            return isProviderKeyError(msg) ? "AI 圖片服務的金鑰異常，SoWork 已收到通知正在處理。" : msg;
-          })(),
-        });
-      }
     }),
 });

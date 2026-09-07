@@ -679,18 +679,12 @@ export const YT_30S_ORCHESTRA: Record<string, OrchestraConfig> = {
     variantLabels: ["純文字觀點", "民調型", "預告倒數型"],
     captionMinChars: 100, captionMaxChars: 400,
   },
-  // 2026-08-01: YT 第一個 runVideoGen=true 的設定，複製 tt-30-product-hero
-  // 那一組已驗證的紀律 — variants/images=2（其他卡是 3），imageQualitySteps
-  // 拉到 8（會被放大成整支影片的第一格，draft 品質會讓全片看起來很糟）。
+  // 2026-09-08：原 YT 唯一影片卡，影片生成移除後只剩靜圖；沿用 2 變體＋
+  // imageQualitySteps 8 的紀律。
   "yt-30-shorts-clip": {
     variants: 2, images: 2, runImageGen: true, imageDirectorId: YT_DIR_IRIS,
     aspectRatio: "9:16", fluxSize: "portrait_9_16", imageQualitySteps: 8,
     variantLabels: ["質感特寫", "情境動態"], captionMinChars: 60, captionMaxChars: 120,
-    runVideoGen: true, videoDurationSec: 5,
-    videoMotionHint:
-      "Slow cinematic push-in with gentle parallax, soft light drifting across " +
-      "the frame. Steady camera, minimal motion — built to hold attention in " +
-      "the first 1-2 seconds of a Short.",
   },
 
   // ── 爆款結構卡 ────────────────────────────────────────────────────

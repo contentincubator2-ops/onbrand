@@ -447,8 +447,6 @@ export const en = {
   run_revert:              "Revert",
   run_image_make:          "Generate",
   run_image_busy:          "Generating…",
-  run_video_make:          "Generate a {n}s storyboard",
-  run_video_busy:          "Queuing…",
   run_publish_fb:          "Publish to Facebook",
   run_authorize_ig:        "Connect Instagram",
   run_authorize_li:        "Connect LinkedIn",

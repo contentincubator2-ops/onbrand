@@ -17,7 +17,7 @@ import {
 import { trpc } from "../../../lib/trpc";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
-  faPalette, faWandSparkles, faImage, faVideo, faCheck, faCopy, faArrowRight,
+  faPalette, faWandSparkles, faImage, faCheck, faCopy, faArrowRight,
   faPenNib, faRotate, faForward,
 } from "@fortawesome/free-solid-svg-icons";
 import {
@@ -32,7 +32,7 @@ interface MediaGenFlowProps {
   initialBrief?: string;
   brandContext?: string;
   audienceContext?: string;
-  /** image | video — drives model list + prompt phrasing. */
+  /** 只剩 image（影片生成 2026-09-08 移除）。 */
   kind?: MediaKind;
   /** Brand id for downstream generate dispatch. */
   brandId?: number | null;
@@ -147,7 +147,7 @@ export default function MediaGenFlow({
         direction: d,
         brief: brief.trim(),
         // 2026-05-05: fal removed; default video → piapi/kling-v2-master
-        modelId: modelHint ?? (kind === "video" ? "piapi/kling-v2-master" : "openai/gpt-image-1"),
+        modelId: modelHint ?? "openai/gpt-image-1",
       });
       setPromptEn(String(res?.promptEn ?? ""));
       setSummaryZh(String(res?.summaryZh ?? ""));
@@ -306,8 +306,8 @@ export default function MediaGenFlow({
   const header = (
     <>
       <Chip size="sm" variant="flat" color="default" className="uppercase tracking-wider self-start"
-        startContent={<FontAwesomeIcon icon={kind === "video" ? faVideo : faImage} className="text-tiny ml-1" />}>
-        {kind === "video" ? (lang === "en" ? "Video gen" : "影片生成") : (lang === "en" ? "Image gen" : "圖像生成")}
+        startContent={<FontAwesomeIcon icon={faImage} className="text-tiny ml-1" />}>
+        {lang === "en" ? "Image gen" : "圖像生成"}
       </Chip>
       <h2 className="text-medium font-semibold">{lang === "en" ? "3-step visual gen flow" : "三步視覺產出流程"}</h2>
       <PhaseStepper phase={phase} />
@@ -436,7 +436,6 @@ function DirectionsPhase({
             <Pair label={lang === "en" ? "Palette" : "色彩"}>{d.palette}</Pair>
             <Pair label={lang === "en" ? "Mood" : "情緒"}>{d.mood}</Pair>
             <Pair label={lang === "en" ? "Style ref" : "風格參考"}>{d.styleRef}</Pair>
-            {kind === "video" && d.shotList && <Pair label={lang === "en" ? "Shots" : "分鏡"}>{d.shotList}</Pair>}
             <Pair label={lang === "en" ? "Why this fits" : "為什麼這方向適合"}>{d.rationale}</Pair>
             <Button size="sm" color="primary" radius="md" className="self-end mt-2"
               endContent={<FontAwesomeIcon icon={faArrowRight} className="text-tiny" />}

@@ -730,32 +730,18 @@ export const TT_30S_ORCHESTRA: Record<string, OrchestraConfig> = {
   "tt-30-comment-reply":     { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["同感式", "幽默式", "反問式"], captionMinChars: 30, captionMaxChars: 80 },
   "tt-30-live-opening":      { variants: 3, images: 3, runImageGen: false, imageDirectorId: TT_DIR_GRANT, aspectRatio: "9:16", fluxSize: "portrait_9_16", imageQualitySteps: 4, variantLabels: ["懸念", "互動", "直球"], captionMinChars: 100, captionMaxChars: 300 },
 
-  // ── Tier 1 影片卡 ────────────────────────────────────────────────────
-  // 這四張是全站唯一 runVideoGen=true 的設定。三個刻意的選擇：
-  //
-  // variants/images = 2（其他卡都是 3）：每個 variant 要跑一支 Kling i2v，
-  //   實測一支 ~150 秒且要真金白銀。2 支平行 ≈ 一樣的牆鐘時間但成本砍
-  //   三分之一。少而好，不是多而濫。
-  // runImageGen=true：影片的第一格就是這張靜圖，靜圖必須真的算出來。
-  // imageQualitySteps 提高到 8：這張圖會被放大成整支影片的基底，
-  //   draft 品質的圖會讓整支片看起來很糟。
+  // ── Tier 1 產品卡（原影片卡）──────────────────────────
+  // 2026-09-08 影片生成移除（不在價目表上），這四張只出靜圖。沿用原本的
+  // 紀律：variants/images = 2、imageQualitySteps 8 —— 圖是主角，少而好。
   "tt-30-product-hero": {
     variants: 2, images: 2, runImageGen: true, imageDirectorId: ANNA_ID,
     aspectRatio: "9:16", fluxSize: "portrait_9_16", imageQualitySteps: 8,
     variantLabels: ["質感特寫", "情境使用"], captionMinChars: 60, captionMaxChars: 120,
-    runVideoGen: true, videoDurationSec: 10,
-    videoMotionHint:
-      "Slow cinematic push-in on the product with gentle parallax. Soft light " +
-      "drifts across the surface. The product stays perfectly still and intact.",
   },
   "tt-30-product-asmr": {
     variants: 2, images: 2, runImageGen: true, imageDirectorId: ANNA_ID,
     aspectRatio: "9:16", fluxSize: "portrait_9_16", imageQualitySteps: 8,
     variantLabels: ["材質特寫", "開箱瞬間"], captionMinChars: 40, captionMaxChars: 90,
-    runVideoGen: true, videoDurationSec: 5,
-    videoMotionHint:
-      "Extreme macro close-up. Very slow drift across the product surface, " +
-      "emphasising texture and tactile detail. Shallow depth of field, minimal motion.",
   },
   "tt-30-text-hook-card": {
     variants: 2, images: 2, runImageGen: true, imageDirectorId: TT_DIR_YUNA,
@@ -767,13 +753,8 @@ export const TT_30S_ORCHESTRA: Record<string, OrchestraConfig> = {
     // 實測：120 → 3-6 行（正常）；60 → 永遠 1 行，改幾次 prompt 都沒用。
     // 4 行 × 6-12 字 ＋ 換行 ≈ 27-51 字，設 90 留餘裕且避開 ≤60 陷阱。
     variantLabels: ["直球", "共鳴"], captionMinChars: 24, captionMaxChars: 90,
-    runVideoGen: true, videoDurationSec: 5,
-    // 這支的畫面是「給字卡當底」的，所以刻意要求幾乎不動、構圖留白 ——
-    // 疊字是之後在 output 層做的（模型畫不出正確中文字，見 NO-TEXT 政策）。
-    videoMotionHint:
-      "Very subtle slow zoom on a clean, uncluttered background with generous " +
-      "empty space in the upper third. Almost no motion — this is a backdrop " +
-      "for text that is overlaid later. Nothing enters or leaves the frame.",
+    // 這支的畫面是「給字卡當底」的，構圖留白；疊字在 output 層做
+    // （模型畫不出正確中文字，見 NO-TEXT 政策）。
   },
   // 分鏡表：variants=1（分鏡是「一份」文件，不是多個版本可選），
   // cardsPerVariant=5 讓拆分器切成 5 格、每格自己一張圖。
@@ -787,21 +768,11 @@ export const TT_30S_ORCHESTRA: Record<string, OrchestraConfig> = {
     holdForImages: true,
   },
 
-  // 2026-07-29 修正：這張卡原本是壞的 —— 一張靜圖 + 一句 motion prompt
-  // 只能呈現「一個狀態」，所以產出的片根本沒有對比，卻叫 before/after。
-  // 改用 Kling 的 image_tail_url：頭格＝使用前，尾格＝使用後（由
-  // videoTailHint 生第二張圖），模型在同一顆連續鏡頭裡內插過去。
-  // variantLabels 也跟著改 —— 兩個變體是兩種「切角」，不是前後兩半。
+  // 2026-09-08：影片生成移除後，這張卡只出兩張靜圖；兩個變體是兩種「切角」。
   "tt-30-before-after": {
     variants: 2, images: 2, runImageGen: true, imageDirectorId: TT_DIR_GRANT,
     aspectRatio: "9:16", fluxSize: "portrait_9_16", imageQualitySteps: 8,
     variantLabels: ["睡前場景", "日常場景"], captionMinChars: 60, captionMaxChars: 120,
-    runVideoGen: true, videoDurationSec: 5,
-    videoMotionHint:
-      "One continuous shot, steady camera, no hard cut and no scene change.",
-    videoTailHint:
-      "同一個場景、同一個機位，但呈現「使用之後」的狀態：緊繃與混亂被平靜取代，" +
-      "光線更柔和、空間更整齊、人物神情放鬆。不要換場景、不要換人、不要出現文字。",
   },
 
   // ── 爆款結構卡 ────────────────────────────────────────────────────

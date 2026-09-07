@@ -68,7 +68,7 @@ import { useLang } from "../../lib/i18n";
 import { fireNudge } from "../components/mia/miaNudges";
 import ReviewBar from "../components/review/ReviewBar";
 
-type Mode = "edit" | "chat" | "image" | "video" | "agent" | "regen" | "rewrite" | "publish";
+type Mode = "edit" | "chat" | "image" | "agent" | "regen" | "rewrite" | "publish";
 
 /* 2026-07-07 (CJ「參數儀表板 technical data 客戶看不懂，乾脆換成可以選擇
  * 不同 agent 幫他重寫」): the settings/telemetry panel is gone from the
@@ -131,10 +131,6 @@ interface VariantData {
   imageFallbackUsed?: boolean;
   imageUrl?: string | null;
   imageStatus?: string;
-  // 2026-07-29 Tier-1 TikTok 影片卡 — 非影片任務一律 undefined
-  videoUrl?: string | null;
-  videoStatus?: string;
-  videoPosterUrl?: string | null;
   qa?: any;
   extras?: any;
   // 2026-05-18 (CJ): carousel / album — N cards, each its own image
@@ -168,7 +164,6 @@ function sanitizeCaption(s: unknown): string {
 
 function normalizeVariantData(v: any): VariantData {
   const img = v?.image ?? {};
-  const vid = v?.video ?? {};
   return {
     id: typeof v?.id === "string" ? v.id : undefined,
     label: v?.label,
@@ -183,9 +178,6 @@ function normalizeVariantData(v: any): VariantData {
     imageModelId: v?.imageModelId ?? img.modelId ?? undefined,
     imageRequestedModelId: v?.imageRequestedModelId ?? img.requestedModelId ?? undefined,
     imageFallbackUsed: v?.imageFallbackUsed ?? img.fallbackUsed ?? undefined,
-    videoUrl: v?.videoUrl ?? vid.url ?? null,
-    videoStatus: v?.videoStatus ?? vid.status ?? undefined,
-    videoPosterUrl: v?.videoPosterUrl ?? vid.posterUrl ?? null,
     qa: v?.qa,
     extras: v?.extras,
     cards: Array.isArray(v?.cards) ? v.cards : undefined,
@@ -550,8 +542,6 @@ export default function RunPage() {
    *  2026-06-15: default gpt-image-2 across all platforms. */
   const [imageModel, setImageModel] = useState<string>("gpt-image-2");
   /** Video gen state — async job, polled for status. */
-  const [videoDuration, setVideoDuration] = useState<number>(30);
-  const [videoJobId, setVideoJobId] = useState<number | null>(null);
   /** 2026-05-12: user-selected video model for 改影片 dropdown. */
   const [videoModel, setVideoModel] = useState<string>("auto");
   /** 2026-05-12 Phase 1 — picked template category for the 改圖 picker. */
@@ -955,62 +945,6 @@ export default function RunPage() {
     })();
   };
 
-  // Video gen — async pipeline. Spawn job, poll for status until ready.
-  // 2026-05-12 (CJ「我要改成只給腳本 — C」): storyboard mode replaces full
-  // video gen. Calls video.generateStoryboard which returns a script with
-  // one Flux Schnell reference image per scene. ~30-90 seconds end-to-end.
-  const videoGenMut = (trpc as any).video?.generateStoryboard?.useMutation
-    ? (trpc as any).video.generateStoryboard.useMutation({
-        onSuccess: (r: any) => {
-          setVideoJobId(r.jobId);
-          showToastGlobal(
-            lang === "en"
-              ? `Storyboard generating #${r.jobId} — done in ~1 minute`
-              : `故事板生成中 #${r.jobId} — 約 1 分鐘內完成`
-          );
-        },
-        onError: (e: any) => showToastGlobal(
-          lang === "en" ? `Storyboard failed to start: ${e?.message ?? e}` : `故事板啟動失敗：${e?.message ?? e}`
-        ),
-      })
-    : { mutate: () => {}, isPending: false };
-  const videoStatusQuery = (trpc as any).video?.status?.useQuery
-    ? (trpc as any).video.status.useQuery(
-        { jobId: videoJobId ?? 0 },
-        // Poll faster than full-video mode since storyboard is ~30-90s
-        { enabled: !!videoJobId, refetchInterval: 5_000, refetchOnWindowFocus: false },
-      )
-    : { data: null };
-  const videoStatus = (videoStatusQuery?.data ?? null) as any;
-  const videoUrl: string | null = videoStatus?.videoUrl ?? null;
-  // Parse script JSON for storyboard scene rendering
-  const storyboardScenes: Array<{
-    sceneIndex: number; durationSec: number; visualPrompt: string;
-    narration: string; cameraMove: string; imageUrl?: string | null;
-  }> = useMemo(() => {
-    const s = videoStatus?.script;
-    if (!s) return [];
-    try {
-      const obj = typeof s === "string" ? JSON.parse(s) : s;
-      return Array.isArray(obj?.scenes) ? obj.scenes : [];
-    } catch { return []; }
-  }, [videoStatus?.script]);
-  const storyboardTitle: string = useMemo(() => {
-    const s = videoStatus?.script;
-    if (!s) return "";
-    try {
-      const obj = typeof s === "string" ? JSON.parse(s) : s;
-      return String(obj?.title ?? "");
-    } catch { return ""; }
-  }, [videoStatus?.script]);
-  const videoStatusLabel: string =
-    !videoStatus ? (lang === "en" ? "Checking…" : "查詢中…") :
-    videoStatus.status === "pending" ? (lang === "en" ? `Queued (${videoStatus.progress ?? 0}%)` : `排隊中 (${videoStatus.progress ?? 0}%)`) :
-    videoStatus.status === "processing" ? (lang === "en" ? `Generating (${videoStatus.progress ?? 0}%)` : `生成中 (${videoStatus.progress ?? 0}%)`) :
-    videoStatus.status === "running" ? (lang === "en" ? `Generating (${videoStatus.progress ?? 0}%)` : `生成中 (${videoStatus.progress ?? 0}%)`) :
-    videoStatus.status === "completed" ? (lang === "en" ? "Done ✓" : "完成 ✓") :
-    videoStatus.status === "failed" ? (lang === "en" ? `Failed: ${videoStatus.errorMessage ?? "?"}` : `失敗：${videoStatus.errorMessage ?? "?"}`) :
-    String(videoStatus.status);
   const imageGenMut = (trpc as any).image?.generate?.useMutation
     ? (trpc as any).image.generate.useMutation({
         onSuccess: async (r: any) => {
@@ -1570,9 +1504,8 @@ export default function RunPage() {
 
   // P4: pre-fill image / video prompt when entering that mode or switching
   // variant. 2026-05-12 (CJ「按下改圖/改影片，應該要有預設的提示詞」).
-  // imagePrompt state is reused for video — different seed format per mode.
   useEffect(() => {
-    if (mode !== "image" && mode !== "video") return;
+    if (mode !== "image") return;
 
     const cap = String(slide?.caption ?? "").trim();
 
@@ -1620,18 +1553,6 @@ export default function RunPage() {
           `光線：自然柔光，從窗戶斜進來的暖色調。\n` +
           `氛圍：寫實、生活感、不刻意擺拍。\n` +
           `風格：摹片風（不要過度修圖、不要 3D 渲染感），會自動套用品牌色彩 / 調性。`
-        : "";
-      setImagePrompt(seed);
-      return;
-    }
-
-    // Video: 3-beat storyboard seed (hook → main shot → text overlay/CTA)
-    if (mode === "video") {
-      const seed = subject
-        ? `開頭 3 秒（開場鉤）：${subject} —— 鏡頭抓住一個吸睛瞬間。\n` +
-          `中段（10-20 秒）：產品 / 場景特寫 + 一個具體動作（手部、表情、物件接觸）。\n` +
-          `結尾（3-5 秒）：字卡呼應文案核心，3-8 字。可配「定格 + 留白」收尾。\n` +
-          `風格：自然光、節奏穩、不刻意配音、字卡簡潔。`
         : "";
       setImagePrompt(seed);
       return;
@@ -2254,9 +2175,6 @@ export default function RunPage() {
                 liveImageStyle={slide.imageStyle}
                 liveImageUrl={slide.imageUrl ?? undefined}
                 liveImageStatus={slide.imageStatus as any}
-                liveVideoUrl={slide.videoUrl ?? undefined}
-                liveVideoStatus={slide.videoStatus as any}
-                liveVideoPoster={slide.videoPosterUrl ?? undefined}
                 liveCards={slide.cards as any}
                 overlayTitle={mockupVariant?.platform === "youtube" ? overlayTitle : undefined}
                 onGenerateImage={isStrategyPlanning
@@ -2312,15 +2230,9 @@ export default function RunPage() {
                 download ICON floating over the mockup (top-right), instead
                 of a separate button below. fetch→blob forces a real save
                 (cross-origin PiAPI/storage); falls back to a new tab. */}
-            {/* 2026-07-29: on a Tier-1 video task the deliverable is the mp4,
-                not the still — prefer the clip when one rendered. */}
-            {((slide?.videoUrl && slide?.videoStatus === "ready") ||
-              (slide?.imageUrl && slide?.imageStatus === "ready")) && (() => {
-              const isVideo = !!(slide?.videoUrl && slide?.videoStatus === "ready");
-              const dlUrl = (isVideo ? slide!.videoUrl : slide!.imageUrl) as string;
-              const dlLabel = isVideo
-                ? (lang === "en" ? "Download video" : "下載影片")
-                : (lang === "en" ? "Download image" : "下載圖片");
+            {(slide?.imageUrl && slide?.imageStatus === "ready") && (() => {
+              const dlUrl = slide!.imageUrl as string;
+              const dlLabel = lang === "en" ? "Download image" : "下載圖片";
               return (
               <button
                 title={dlLabel}
@@ -2333,9 +2245,9 @@ export default function RunPage() {
                     const obj = URL.createObjectURL(blob);
                     const a = document.createElement("a");
                     a.href = obj;
-                    const safe = (data?.title ?? (isVideo ? "video" : "image")).replace(/[^\w一-龥-]+/g, "_").slice(0, 40);
-                    const ext = (blob.type.split("/")[1] || (isVideo ? "mp4" : "png")).split("+")[0];
-                    a.download = `${safe || (isVideo ? "video" : "image")}.${ext}`;
+                    const safe = (data?.title ?? "image").replace(/[^\w一-龥-]+/g, "_").slice(0, 40);
+                    const ext = (blob.type.split("/")[1] || "png").split("+")[0];
+                    a.download = `${safe || "image"}.${ext}`;
                     a.click();
                     URL.revokeObjectURL(obj);
                   } catch {
@@ -2643,11 +2555,6 @@ export default function RunPage() {
               {hasImageSlot && (
                 <ToolbarBtn icon={LucideImage}   label={lang === "en" ? "Redo image" : "改圖"}          active={mode==="image"} onClick={() => setMode("image")} />
               )}
-              {/* 2026-05-12 (CJ「影片功能我想要先拿掉，現在看起來不穩」):
-                  hide 改影片 entry. The /trpc/video.* router still exists
-                  so existing video jobs continue to render, but new
-                  generation entry point is closed until stability work. */}
-              {/* <ToolbarBtn icon={Video}         label={lang === "en" ? "Redo video" : "改影片"}        active={mode==="video"} onClick={() => setMode("video")} /> */}
               <Divider />
               {/* Agent avatars — click to see that agent's thinking */}
               <Tooltip content={lang === "en" ? "Caption agent — see thinking" : "撰寫者 — 看思考過程"}>
@@ -3178,149 +3085,6 @@ export default function RunPage() {
                   )}
                   {missingRealProductSelection && (
                     <p className="text-[12px] text-warning-700">⚠ {lang === "en" ? "Choose a valid product photo from this brand" : "已勾選使用真實產品圖，請先從目前品牌選擇有效產品圖"}</p>
-                  )}
-                </>
-              )}
-              {mode === "video" && (
-                <>
-                  <p className="text-tiny font-semibold">{lang === "en" ? "Generate storyboard" : "生成影片故事板"}</p>
-                  {/* 2026-05-12 (CJ「我要改成只給腳本 — C」):
-                      Storyboard mode = 腳本 + 每個 scene 配 Flux 參考圖。
-                      用戶可拿這份 brief 自己拍 / 給拍攝團隊。 */}
-                  <div className="bg-secondary-50 border border-secondary-200 rounded-lg p-2 text-[12px] text-secondary-700">
-                    {lang === "en"
-                      ? "Step 1: Describe what the video should show (we'll also use this caption as context)"
-                      : "第 1 步：寫影片想呈現什麼（會自動帶入這篇的文案當補充）"}
-                  </div>
-                  <Textarea
-                    label={lang === "en" ? "Video brief" : "影片指令"}
-                    placeholder={lang === "en"
-                      ? "e.g. Open with a 3-sec kitchen hook, then a closeup of steaming soup, with the title card 'Too busy? Get protein anyway'"
-                      : "例：開頭 3 秒抓住觀眾的廚房畫面，接著鏡頭帶到一碗冒煙的健力湯，配上「忙到沒時間，也能餐餐補蛋白」的字卡"}
-                    value={imagePrompt /* 重用 imagePrompt 也存影片指令 */}
-                    onChange={(e) => setImagePrompt(e.target.value)}
-                    minRows={3}
-                    maxRows={6}
-                    description={lang === "en"
-                      ? "Can be blank — we'll use this variant's caption as the topic"
-                      : "可空白 — 留空就用此變體的文案當題目"}
-                    autoFocus
-                  />
-                  <div className="bg-secondary-50 border border-secondary-200 rounded-lg p-2 text-[12px] text-secondary-700">
-                    {lang === "en"
-                      ? "Step 2: Pick video length"
-                      : "Step 2：選影片長度（決定分鏡數量）"}
-                  </div>
-                  <div className="flex gap-1.5">
-                    {(["15", "30", "60"] as const).map((d) => (
-                      <button
-                        key={d}
-                        onClick={() => setVideoDuration(Number(d))}
-                        className={`flex-1 px-2 py-1.5 text-tiny rounded border transition ${
-                          videoDuration === Number(d)
-                            ? "bg-secondary text-white border-secondary"
-                            : "bg-white text-default-700 border-default-200 hover:border-secondary"
-                        }`}
-                      >{d}s</button>
-                    ))}
-                  </div>
-                  <div className="bg-secondary-50 border border-secondary-200 rounded-lg p-2 text-[12px] text-secondary-700 mt-2">
-                    {lang === "en"
-                      ? "Step 3: Generate storyboard (~1 min — script + one reference image per scene)"
-                      : "Step 3：生成故事板（約 1 分鐘 — 腳本 + 每個 scene 一張參考圖）"}
-                  </div>
-                  <Button
-                    color="secondary" fullWidth
-                    isLoading={videoGenMut.isPending}
-                    isDisabled={videoGenMut.isPending || !slide?.caption?.trim()}
-                    onPress={() => {
-                      const topic = (imagePrompt.trim() || (slide?.caption ?? "").slice(0, 200)).trim();
-                      if (!topic) {
-                        showToastGlobal(
-                          lang === "en"
-                            ? "Fill in the video brief, or pick a variant that has a caption"
-                            : "請先填影片指令，或這個版本要有文案"
-                        );
-                        return;
-                      }
-                      videoGenMut.mutate({
-                        topic,
-                        platform: (mockupVariant?.platform === "youtube" ? "youtube"
-                          : mockupVariant?.platform === "tiktok" ? "tiktok"
-                          : mockupVariant?.platform === "instagram" ? "instagram"
-                          : "youtube") as any,
-                        language: "zh-TW" as any,
-                        duration: videoDuration,
-                        style: "professional" as any,
-                        brandId: data.brand?.id,
-                      });
-                    }}
-                  >
-                    {videoGenMut.isPending
-                      ? (lang === "en" ? "Starting…" : "啟動中…")
-                      : t("run_video_make", { n: videoDuration })}
-                  </Button>
-                  {videoJobId && (
-                    <div className="bg-default-50 rounded-lg p-2.5 text-[12px] space-y-2 border border-secondary-200 mt-2">
-                      <p className="font-semibold flex items-center gap-2">
-                        {lang === "en" ? `Storyboard #${videoJobId}` : `故事板 #${videoJobId}`}
-                        <span className={`text-[12px] px-2 py-0.5 rounded-full ${
-                          videoStatus?.status === "completed" ? "bg-success-100 text-success-800" :
-                          videoStatus?.status === "failed" ? "bg-danger-100 text-danger-800" :
-                          "bg-warning-100 text-warning-800"
-                        }`}>{videoStatusLabel}</span>
-                      </p>
-                      {videoStatus?.status === "failed" && (
-                        <p className="text-[12px] text-danger-700 leading-relaxed">
-                          {typeof videoStatus?.errorMessage === "string" ? videoStatus.errorMessage : (lang === "en" ? "Unknown error" : "未知錯誤")}
-                        </p>
-                      )}
-                      {storyboardTitle && (
-                        <p className="text-xs font-semibold text-default-800 mt-1">{storyboardTitle}</p>
-                      )}
-                      {storyboardScenes.length > 0 && (
-                        <div className="space-y-3 mt-1">
-                          {storyboardScenes.map((scene, i) => (
-                            <div key={i} className="border border-default-200 rounded-lg overflow-hidden bg-white">
-                              {scene.imageUrl ? (
-                                <img src={scene.imageUrl} alt={`scene ${i + 1}`} className="w-full h-auto" />
-                              ) : (
-                                <div className="w-full aspect-video bg-default-100 flex items-center justify-center text-[12px] text-default-400">
-                                  {lang === "en"
-                                    ? "(Reference image not generated / failed)"
-                                    : "（此 scene 參考圖尚未產出 / 失敗）"}
-                                </div>
-                              )}
-                              <div className="p-2 space-y-1">
-                                <p className="text-[12px] font-semibold text-secondary-700">
-                                  Scene {i + 1} · {typeof scene.durationSec === "number" ? scene.durationSec : (scene.durationSec ?? "?")}s · {typeof scene.cameraMove === "string" ? scene.cameraMove : "static"}
-                                </p>
-                                <p className="text-[12px] text-default-700 leading-snug">
-                                  <span className="text-default-500">{lang === "en" ? "Visual: " : "畫面："}</span>{typeof scene.visualPrompt === "string" ? scene.visualPrompt : ""}
-                                </p>
-                                <p className="text-[12px] text-default-700 leading-snug">
-                                  <span className="text-default-500">{lang === "en" ? "Voiceover: " : "旁白："}</span>{typeof scene.narration === "string" ? scene.narration : ""}
-                                </p>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                      {videoStatus?.status === "completed" && storyboardScenes.length > 0 && (
-                        <Button
-                          size="sm" variant="flat" fullWidth
-                          onPress={() => {
-                            const text = storyboardScenes.map((s, i) =>
-                              `Scene ${i + 1} (${s.durationSec}s, ${s.cameraMove}):\n` +
-                              `${lang === "en" ? "Visual" : "畫面"}: ${s.visualPrompt}\n` +
-                              `${lang === "en" ? "Voiceover" : "旁白"}: ${s.narration}\n`
-                            ).join("\n");
-                            navigator.clipboard.writeText(text);
-                            showToastGlobal(lang === "en" ? "Script copied" : "已複製腳本");
-                          }}
-                        >{lang === "en" ? "Copy full script" : "複製整份腳本"}</Button>
-                      )}
-                    </div>
                   )}
                 </>
               )}

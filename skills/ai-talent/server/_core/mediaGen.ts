@@ -4,8 +4,7 @@
  * Each adapter takes (prompt, options) and returns a normalized result:
  *   { url?, b64?, taskId?, status: "ready"|"submitted"|"failed", errorMsg? }
  *
- * Sync image providers return ready immediately. Async video providers
- * return submitted + taskId; client polls media.checkJob.
+ * All providers are sync image providers and return ready inline（影片生成 2026-09-08 移除）.
  *
  * Generated assets are persisted to /opt/onbrand/covers/
  * media-<id>.png (same dir as squad covers / agent avatars) and a
@@ -72,16 +71,6 @@ export interface GenOptions {
   quality?: "low" | "medium" | "high";
   /** Brand id — used for filename + audit. */
   brandId?: number | null;
-  /** 2026-07-29: clip length for video models (Kling accepts 5 or 10).
-   *  Previously hardcoded to 5 in every buildInput, so 10s clips were
-   *  impossible. Ignored by image models. */
-  durationSec?: 5 | 10;
-  /** Negative motion/content hint for video models that support it. */
-  videoNegativePrompt?: string;
-  /** 2026-07-29: i2v END frame (Kling `image_tail_url`). With imageUrl as the
-   *  start frame, the model interpolates start → end in ONE continuous shot.
-   *  This is what makes a real before/after possible without compositing. */
-  imageTailUrl?: string;
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────
@@ -326,120 +315,14 @@ async function genFalFluxSchnell(_opts: GenOptions): Promise<GenResult> {
 
 // (Original fal.ai bodies removed 2026-05-05 — see git history for reference.)
 
-// ── 6. Hailuo t2v / i2v (async, returns taskId) ──────────────────────────
-async function submitHailuoVideo(opts: GenOptions, mode: "t2v" | "i2v"): Promise<GenResult> {
-  const key = process.env.HAILUO_API_KEY ?? process.env.MINIMAX_API_KEY ?? "";
-  if (!key) throw new Error("HAILUO_API_KEY missing");
-  const model = mode === "i2v" ? "I2V-01-Director" : "T2V-01";
-  const body: any = { model, prompt: opts.prompt };
-  if (mode === "i2v" && opts.imageUrl) body.first_frame_image = opts.imageUrl;
-  const resp = await fetch("https://api.minimax.chat/v1/video_generation", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-    signal: AbortSignal.timeout(30_000),
-  });
-  if (!resp.ok) {
-    const t = await resp.text();
-    throw new Error(`MiniMax video ${resp.status}: ${t.slice(0, 200)}`);
-  }
-  const data: any = await resp.json();
-  const taskId = data?.task_id;
-  if (!taskId) throw new Error("MiniMax: no task_id");
-  return { status: "submitted", modelId: `hailuo/${mode}`, taskId, meta: { model } };
-}
-
-async function pollHailuoVideo(taskId: string): Promise<GenResult> {
-  const key = process.env.HAILUO_API_KEY ?? process.env.MINIMAX_API_KEY ?? "";
-  if (!key) throw new Error("HAILUO_API_KEY missing");
-  const resp = await fetch(`https://api.minimax.chat/v1/query/video_generation?task_id=${taskId}`, {
-    headers: { Authorization: `Bearer ${key}` },
-    signal: AbortSignal.timeout(30_000),
-  });
-  if (!resp.ok) {
-    const t = await resp.text();
-    throw new Error(`MiniMax query ${resp.status}: ${t.slice(0, 200)}`);
-  }
-  const data: any = await resp.json();
-  const status = data?.status;
-  if (status === "Success") {
-    const fileUrl = data?.file_id ? `https://api.minimax.chat/v1/files/retrieve_content?file_id=${data.file_id}` : data?.video_url;
-    if (!fileUrl) throw new Error("MiniMax: no video url in success");
-    const localUrl = await downloadAndSave(fileUrl, "vid");
-    return { status: "ready", modelId: "hailuo/video", url: localUrl, taskId };
-  }
-  if (status === "Failed") {
-    return { status: "failed", modelId: "hailuo/video", taskId, errorMsg: data?.error ?? "unknown" };
-  }
-  return { status: "submitted", modelId: "hailuo/video", taskId, meta: { progressStatus: status } };
-}
-
-// ── 7. Google Veo 3 (async-poll via Gemini long-running operations) ─────
-async function submitVeo3(opts: GenOptions, fast = false): Promise<GenResult> {
-  const key = process.env.GEMINI_API_KEY ?? process.env.GOOGLE_AI_API_KEY ?? process.env.GOOGLE_API_KEY ?? "";
-  if (!key) throw new Error("GEMINI_API_KEY missing");
-  // 2026-07-29: veo-3.0-*-001 404s ("not found for API version v1beta") — the
-  // 3.0 ids were retired. Verified live against ListModels: the only models
-  // exposing predictLongRunning are veo-3.1-{generate,fast-generate,
-  // lite-generate}-preview. Veo was therefore broken for every caller.
-  const model = fast ? "veo-3.1-fast-generate-preview" : "veo-3.1-generate-preview";
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:predictLongRunning?key=${key}`;
-  const resp = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      instances: [{ prompt: opts.prompt, ...(opts.imageUrl ? { image: { imageUri: opts.imageUrl } } : {}) }],
-      parameters: { aspectRatio: opts.aspectRatio === "9:16" ? "9:16" : "16:9" },
-    }),
-    signal: AbortSignal.timeout(60_000),
-  });
-  if (!resp.ok) {
-    const t = redactProviderSecrets(await resp.text());
-    throw new Error(`Veo submit ${resp.status}: ${t.slice(0, 200)}`);
-  }
-  const data: any = await resp.json();
-  const opName = data?.name; // operations/<id>
-  if (!opName) throw new Error("Veo: no operation name");
-  return { status: "submitted", modelId: `google/veo-3${fast ? "-fast" : ""}`, taskId: opName, meta: { model } };
-}
-
-async function pollVeo3(taskId: string): Promise<GenResult> {
-  const key = process.env.GEMINI_API_KEY ?? process.env.GOOGLE_AI_API_KEY ?? process.env.GOOGLE_API_KEY ?? "";
-  if (!key) throw new Error("GEMINI_API_KEY missing");
-  const url = `https://generativelanguage.googleapis.com/v1beta/${taskId}?key=${key}`;
-  const resp = await fetch(url, { signal: AbortSignal.timeout(30_000) });
-  if (!resp.ok) {
-    const t = redactProviderSecrets(await resp.text());
-    throw new Error(`Veo poll ${resp.status}: ${t.slice(0, 200)}`);
-  }
-  const data: any = await resp.json();
-  if (!data?.done) {
-    return { status: "submitted", modelId: "google/veo-3", taskId };
-  }
-  if (data?.error) {
-    return { status: "failed", modelId: "google/veo-3", taskId, errorMsg: JSON.stringify(data.error).slice(0, 200) };
-  }
-  const videoUri = data?.response?.generateVideoResponse?.generatedSamples?.[0]?.video?.uri
-    ?? data?.response?.predictions?.[0]?.video?.uri
-    ?? data?.response?.predictions?.[0]?.uri;
-  if (!videoUri) {
-    return { status: "failed", modelId: "google/veo-3", taskId, errorMsg: "no videoUri in response" };
-  }
-  // videoUri usually requires the API key appended for auth download
-  const downloadUrl = videoUri.includes("?") ? `${videoUri}&key=${key}` : `${videoUri}?key=${key}`;
-  const localUrl = await downloadAndSave(downloadUrl, "vid");
-  return { status: "ready", modelId: "google/veo-3", url: localUrl, taskId };
-}
-
-// ── 8. PiAPI unified aggregator (Kling / Runway / Pika / Ideogram / FLUX / Hedra) ─
+// ── 8. PiAPI unified aggregator (Ideogram / FLUX / SDXL) ─
 //
 // PiAPI exposes one POST /api/v1/task endpoint that takes {model, task_type, input}
 // and returns {data: {task_id, status}}. We poll GET /api/v1/task/{task_id} until
 // status === "completed" (or "failed"). Auth via x-api-key header.
 //
-// Image task_types finish in seconds (we await in-line). Video task_types can
-// take 1–3 min so we return "submitted" + taskId for the client to poll via
-// media.checkJob.
+// Image task_types finish in seconds (we await in-line). 2026-09-08：影片模型
+// （Kling／Runway／Pika／Hedra）隨影片生成功能移除。
 const PIAPI_BASE = process.env.PIAPI_BASE_URL ?? "https://api.piapi.ai/api/v1";
 
 interface PiapiSpec {
@@ -514,81 +397,6 @@ const PIAPI_MAP: Record<string, PiapiSpec> = {
       aspect_ratio: o.aspectRatio ?? "1:1",
     }),
   },
-  "piapi/kling-v2-master": {
-    model: "kling",
-    task_type: "video_generation",
-    sync: false,
-    buildInput: (o) => ({
-      prompt: o.prompt,
-      duration: 5,
-      aspect_ratio: o.aspectRatio ?? "16:9",
-      version: "2.0-master",
-      mode: "pro",
-    }),
-  },
-  "piapi/kling-v1-6-i2v": {
-    model: "kling",
-    task_type: "video_generation",
-    sync: false,
-    buildInput: (o) => ({
-      prompt: o.prompt,
-      image_url: o.imageUrl,            // i2v start frame
-      duration: o.durationSec ?? 5,
-      aspect_ratio: o.aspectRatio ?? "16:9",
-      version: "1.6",
-      // 2026-07-29 (verified against a version×mode matrix): image_tail_url is
-      // rejected with "failed to validate input" in std mode on EVERY version
-      // (1.5/1.6/2.1/2.5/2.6) and accepted in pro mode on every version. So a
-      // tail frame forces pro. Pro costs more than std — that's the price of
-      // a real before/after, and it only applies to tail-frame clips.
-      mode: o.imageTailUrl ? "pro" : "std",
-      ...(o.imageTailUrl ? { image_tail_url: o.imageTailUrl } : {}),
-      ...(o.videoNegativePrompt ? { negative_prompt: o.videoNegativePrompt } : {}),
-    }),
-  },
-  "piapi/runway-gen-4": {
-    model: "runway",
-    task_type: "video_generation",
-    sync: false,
-    buildInput: (o) => ({
-      prompt: o.prompt,
-      version: "gen4",
-      duration: 5,
-      aspect_ratio: o.aspectRatio ?? "16:9",
-    }),
-  },
-  "piapi/runway-gen-4-turbo": {
-    model: "runway",
-    task_type: "video_generation",
-    sync: false,
-    buildInput: (o) => ({
-      prompt: o.prompt,
-      version: "gen4-turbo",
-      duration: 5,
-      aspect_ratio: o.aspectRatio ?? "16:9",
-    }),
-  },
-  "piapi/pika-v2": {
-    model: "pika",
-    task_type: "video_generation",
-    sync: false,
-    buildInput: (o) => ({
-      prompt: o.prompt,
-      version: "2.0",
-      duration: 5,
-      aspect_ratio: o.aspectRatio ?? "16:9",
-    }),
-  },
-  "piapi/hedra-character-3": {
-    model: "hedra",
-    task_type: "character",
-    sync: false,
-    buildInput: (o) => ({
-      prompt: o.prompt,
-      image_url: o.imageUrl,            // photo of the spokesperson
-      // audio_url is optional — caller passes via opts.meta if present
-    }),
-  },
 };
 
 async function piapiSubmit(modelId: string, opts: GenOptions): Promise<{ taskId: string }> {
@@ -656,8 +464,7 @@ async function piapiPoll(modelId: string, taskId: string): Promise<GenResult> {
     if (!remoteUrl) {
       return { status: "failed", modelId, taskId, errorMsg: `PiAPI: no output url. body=${JSON.stringify(inner).slice(0, 200)}` };
     }
-    const isVideo = modelId.includes("kling") || modelId.includes("runway") || modelId.includes("pika") || modelId.includes("hedra");
-    const localUrl = await downloadAndSave(remoteUrl, isVideo ? "vid" : "img");
+    const localUrl = await downloadAndSave(remoteUrl, "img");
     return { status: "ready", modelId, url: localUrl, taskId, meta: { remoteUrl } };
   }
   if (status === "failed" || status === "error") {
@@ -666,7 +473,7 @@ async function piapiPoll(modelId: string, taskId: string): Promise<GenResult> {
   return { status: "submitted", modelId, taskId, meta: { progressStatus: status } };
 }
 
-/** Sync image: submit + inline-poll up to 90s. Async video: just submit. */
+/** Sync image: submit + inline-poll up to 120s. */
 async function genPiapi(modelId: string, opts: GenOptions): Promise<GenResult> {
   const spec = PIAPI_MAP[modelId];
   if (!spec) return { status: "failed", modelId, errorMsg: `PiAPI: unknown modelId ${modelId}` };
@@ -685,7 +492,7 @@ async function genPiapi(modelId: string, opts: GenOptions): Promise<GenResult> {
 
 // ── Dispatcher ────────────────────────────────────────────────────────────
 export async function dispatchGenerate(modelId: string, opts: GenOptions): Promise<GenResult> {
-  // PiAPI catch-all (10 models) — handle before the explicit switch
+  // PiAPI catch-all (image models) — handle before the explicit switch
   if (modelId.startsWith("piapi/")) return genPiapi(modelId, opts);
   // Atlas Cloud — registered in mediaModels but endpoint not yet wired
   if (modelId.startsWith("atlas/")) {
@@ -710,16 +517,6 @@ export async function dispatchGenerate(modelId: string, opts: GenOptions): Promi
     case "hailuo/image":           return genHailuoImage(opts);
     case "fal/flux-dev":           return genFalFlux(opts);
     case "fal/flux-schnell":       return genFalFluxSchnell(opts);
-    case "hailuo/t2v":             return submitHailuoVideo(opts, "t2v");
-    case "hailuo/i2v":             return submitHailuoVideo(opts, "i2v");
-    case "google/veo-3":           return submitVeo3(opts, false);
-    case "google/veo-3-fast":      return submitVeo3(opts, true);
-    case "fal/seedance-v1-5-lite":
-      return {
-        status: "failed",
-        modelId,
-        errorMsg: "Seedance routed via existing videoService.ts; mediaGen Phase 2.5 will unify.",
-      };
     case "midjourney/v7":
       return {
         status: "failed",
@@ -733,16 +530,4 @@ export async function dispatchGenerate(modelId: string, opts: GenOptions): Promi
         errorMsg: `Unknown modelId: ${modelId}`,
       };
   }
-}
-
-export async function checkJob(modelId: string, taskId: string): Promise<GenResult> {
-  if (modelId.startsWith("piapi/")) return piapiPoll(modelId, taskId);
-  if (modelId.startsWith("hailuo/")) return pollHailuoVideo(taskId);
-  if (modelId.startsWith("google/veo-3")) return pollVeo3(taskId);
-  return {
-    status: "failed",
-    modelId,
-    taskId,
-    errorMsg: `checkJob not implemented for ${modelId}`,
-  };
 }

@@ -27,7 +27,6 @@ import { ENV } from "./_core/env";
 import { getBillingRetryQueueLength, flushBillingRetryQueue, loadBillingFallbackLog } from "./llmWithBilling";
 import { createContext } from "./_core/trpc";
 import { authRouter } from "./auth/authRouter";
-import { exportRouter } from "./routes/exportRoute";
 import { reportTemplateRouter } from "./routes/reportTemplateRoute";
 import { positioningDocRouter } from "./routes/positioningDocRoute";
 import { a2aStreamRouter } from "./routes/a2aStreamRoute";
@@ -354,7 +353,6 @@ const healthLimiter = rateLimit({ windowMs: 60_000, max: 60, standardHeaders: tr
 
 // ─── Auth routes (SEC-1) ─────────────────────────────────────────────────────
 app.use("/api/auth", authRouter);
-app.use("/api/export", exportRouter);
 app.use("/api/report-template", reportTemplateRouter);
 app.use("/api/positioning-doc", positioningDocRouter);
 app.use("/api/a2a", a2aStreamRouter);

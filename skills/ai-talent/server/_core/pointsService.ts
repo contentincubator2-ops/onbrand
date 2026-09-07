@@ -151,7 +151,6 @@ export async function assertPoints(userId: number, action: PointAction): Promise
       image_gpt:       "GPT 高品質圖",
       image_imagen:    "Imagen 圖片",
       image_ideogram:  "Ideogram 圖片",
-      video_clip:      "影片片段",
     };
     throw new TRPCError({
       code: "FORBIDDEN",

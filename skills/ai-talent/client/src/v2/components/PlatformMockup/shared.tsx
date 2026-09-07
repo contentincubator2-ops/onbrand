@@ -297,17 +297,6 @@ export interface MockupFields {
   liveImageUrl?: string;
   liveImageStatus?: "ready" | "failed" | "skipped" | "timeout";
   /**
-   * 2026-07-29 (Tier-1 TikTok 影片任務卡): a REAL generated clip. When
-   * status is "ready" the mockup plays the mp4 in the media slot instead of
-   * the still. `liveVideoPoster` is the frame it was animated from, shown
-   * while the clip buffers — and it's also why a failed clip still looks
-   * right: the still is already there.
-   * Undefined for every non-video task, so existing mockups are untouched.
-   */
-  liveVideoUrl?: string;
-  liveVideoStatus?: "ready" | "failed" | "skipped" | "timeout" | "pending";
-  liveVideoPoster?: string;
-  /**
    * 2026-07-07 (CJ「廣告主圖點此生成沒反應」bug): the image placeholders
    * literally say「點此生成」but were dead text with no handler. Host
    * page (RunPage) passes this callback to open its image-generation

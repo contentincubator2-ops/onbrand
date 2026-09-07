@@ -76,7 +76,7 @@ async function loadUserPlan(userId: number): Promise<{
  * recordQuotaUsage() so the count increments.
  *
  * Quota counting uses usage_log rows with kind values:
- *   task_30s | task_60s | task_99s | image_gen | video_gen
+ *   task_30s | task_60s | task_99s | image_gen
  * tagged at the task entry point. Window = current calendar month
  * (Asia/Taipei, but we accept server-local for simplicity).
  */
@@ -85,7 +85,6 @@ const QUOTA_KIND_TO_LOG: Record<string, string | null> = {
   task_60s: "task_60s",
   task_99s: "task_99s",
   image_gen: "image_gen",
-  video_gen: "video_gen",
   brands: null,         // counted from brands table directly, not log
   fb_publish: null,     // unlimited on all paid plans; skip
   team_members: null,   // checked in tenantRouter.invite()
@@ -144,7 +143,6 @@ export async function assertWithinPlan(
       task_60s: "60 秒任務",
       task_99s: "99 秒任務",
       image_gen: "AI 圖片",
-      video_gen: "AI 影片",
     };
     throw new TRPCError({
       code: "FORBIDDEN",
@@ -160,7 +158,7 @@ export async function assertWithinPlan(
  */
 export async function recordQuotaUsage(
   userId: number,
-  kind: "task_30s" | "task_60s" | "task_99s" | "image_gen" | "video_gen",
+  kind: "task_30s" | "task_60s" | "task_99s" | "image_gen",
   entityKind: string | null = null,
   entityId: number | null = null,
 ): Promise<void> {
@@ -216,12 +214,12 @@ export const billingRouter = router({
       const [usageRows]: any = await localPool.execute(
         `SELECT kind, COUNT(*) AS used FROM usage_log
           WHERE userId = ? AND ts >= ?
-            AND kind IN ('task_30s','task_60s','task_99s','image_gen','video_gen')
+            AND kind IN ('task_30s','task_60s','task_99s','image_gen')
           GROUP BY kind`,
         [ctx.user!.id, monthStart],
       );
       const usage: Record<string, number> = {
-        task_30s: 0, task_60s: 0, task_99s: 0, image_gen: 0, video_gen: 0,
+        task_30s: 0, task_60s: 0, task_99s: 0, image_gen: 0,
       };
       for (const r of usageRows as any[]) {
         usage[r.kind] = Number(r.used ?? 0);

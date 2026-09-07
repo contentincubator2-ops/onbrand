@@ -440,8 +440,6 @@ export const zh = {
   run_revert:              "還原",
   run_image_make:          "立即產圖",
   run_image_busy:          "產圖中…",
-  run_video_make:          "生成 {n} 秒故事板",
-  run_video_busy:          "排入佇列…",
   run_publish_fb:          "直接發 Facebook",
   run_authorize_ig:        "一鍵授權 Instagram",
   run_authorize_li:        "一鍵授權 LinkedIn",

@@ -3,7 +3,6 @@ import { brandRouter } from "./brandRouter";
 import { creditsRouter } from "./creditsRouter";
 import { notificationRouter } from "./notificationRouter";
 import { supportRouter } from "./supportRouter";
-import { videoRouter } from "./videoRouter";
 import { agentRouter } from "./agentRouter";
 import { missionRouter } from "./missionRouter";
 import { outputRouter } from "./outputRouter";
@@ -60,7 +59,6 @@ export const appRouter = router({
   credits:       creditsRouter,
   notifications: notificationRouter,
   support:       supportRouter,
-  video:         videoRouter,
   agent:         agentRouter,
   mission:       missionRouter,
   output:        outputRouter,

@@ -862,37 +862,6 @@ export interface OrchestraConfig {
    */
   imageModelOverride?: string;
   /**
-   * 2026-07-29 (CJ「模仿 TikTok 產品影片類型」Tier 1): animate each rendered
-   * image into a short vertical clip (image-to-video). Tier 1 formats are
-   * deliberately FACELESS (product hero / ASMR / before-after) because
-   * lip-sync is unavailable — see mediaGen PIAPI_MAP notes. Requires
-   * runImageGen=true: the video's first frame IS the generated image, so
-   * real-product fidelity (Nano Banana subject compositing) carries through.
-   *
-   * Kling i2v takes ~150s per clip, which EXCEEDS every sync tier budget —
-   * video tasks must run through the async (onCheckpoint) path so the user
-   * gets captions immediately and clips land in the same row later.
-   */
-  runVideoGen?: boolean;
-  /** i2v model id. Default piapi/kling-v1-6-i2v. */
-  videoModel?: string;
-  /** Clip length in seconds (Kling accepts 5 or 10). Default 5. */
-  videoDurationSec?: 5 | 10;
-  /** English camera/motion direction appended to the i2v prompt. */
-  videoMotionHint?: string;
-  /**
-   * 2026-07-29: makes a REAL before/after possible. When set, the orchestra
-   * renders a SECOND still per variant — the same scene in its "after" state,
-   * described by this hint — and feeds it to Kling as the end frame
-   * (image_tail_url). The model then interpolates before → after in one
-   * continuous shot.
-   *
-   * Without this, a single still animated by a single motion prompt can only
-   * ever show ONE state, so a "before/after" card silently shipped a clip
-   * that never actually contrasted anything.
-   */
-  videoTailHint?: string;
-  /**
    * 2026-08-29：這張卡的 caption 生成逾時上限（毫秒）。不給就用 orchestra
    * 的預設 40s。
    *
