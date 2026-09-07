@@ -671,7 +671,6 @@ export default function RunPage() {
   // On '尚未連接' error, automatically open the Pipedream Connect popup
   // for that platform. After successful authorization, the user can press
   // 直接發 again to publish.
-  const getConnectTokenMut = (trpc as any).platformConnect?.getConnectToken?.useMutation?.();
 
   // 2026-05-18 (CJ「Connect account popup blocked」): the Pipedream SDK
   // opens its OAuth popup inside connectAccount(). Browsers block that
@@ -683,15 +682,6 @@ export default function RunPage() {
   // bundle.social connect path — which platforms use it is decided server-side.
 
   const pdSdkRef = React.useRef<any>(null);
-  const pdTokenRef = React.useRef<Record<string, {
-    token: string;
-    expiresAt: number;
-    appSlug: string;
-    env: string;
-    connectLinkUrl: string;
-    oauthAppId: string | null;
-  }>>({});
-  const pdPrefetchingRef = React.useRef<Record<string, boolean>>({});
 
   React.useEffect(() => {
     import("@pipedream/sdk/browser")

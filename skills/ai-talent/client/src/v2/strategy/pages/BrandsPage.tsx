@@ -789,12 +789,6 @@ export default function BrandsPage() {
     : scopeMode === "event" ? ((eventQuery.data as any)?.name ?? (lang === "en" ? "(Select an event above)" : "（請於右上選擇活動）"))
     : (currentBrand?.name ?? (lang === "en" ? "(Select a brand above)" : "（請於右上選擇品牌）"));
 
-  const brainQuery = (trpc as any).brandBrain?.list?.useQuery
-    ? (trpc as any).brandBrain.list.useQuery(
-        { brandId: brandId ?? 0 },
-        { enabled: !!brandId, refetchOnWindowFocus: false }
-      )
-    : { data: null, isLoading: false };
 
 
   // Brand asset tiles (visuals — non-positioning).
