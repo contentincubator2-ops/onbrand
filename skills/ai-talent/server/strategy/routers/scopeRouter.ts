@@ -63,8 +63,15 @@ function productMetaDescription(name: string, url: string, price?: string): stri
     : `「${name}」。商品頁：${url}`;
 }
 
-/** Detached metadata fill. Each JSON_SET value is guarded in SQL so a manual
- * edit or positioning step that lands while the fetch is in flight wins. */
+/**
+ * Detached metadata fill. Each JSON_SET value is guarded in SQL so a manual
+ * edit or positioning step that lands while the fetch is in flight wins.
+ *
+ * 2026-09-10 (CJ「所有品牌／產品的照片都應該由用戶上傳」)：imageUrl 拿掉了——
+ * 這支原本會把單頁抓到的 og:image 寫進 positioning.imageUrl，跟 CJ 的決定
+ * 直接衝突。price／productUrl／description 是不同的訊號（不是「爬圖片」），
+ * 繼續保留；skip 條件也從「有圖有價」改成只看「有價」。
+ */
 async function backfillProductMeta(args: {
   productId: number;
   userId: number;
@@ -73,14 +80,13 @@ async function backfillProductMeta(args: {
 }): Promise<void> {
   const website = [args.positioning.productUrl, args.positioning.website]
     .find((value) => typeof value === "string" && value.trim())?.trim();
-  if (!website || (args.positioning.imageUrl && args.positioning.price)) return;
+  if (!website || args.positioning.price) return;
 
   try {
     const meta = await fetchProductMeta(website);
     const price = meta.price ? formatProductPrice(meta.price, meta.currency) : undefined;
     const description = productMetaDescription(meta.name ?? args.productName, website, price);
     const candidates: Array<[string, string | undefined]> = [
-      ["imageUrl", meta.imageUrl],
       ["price", price],
       ["productUrl", website],
       ["description", description],

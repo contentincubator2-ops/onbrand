@@ -5059,8 +5059,9 @@ function BrandPaletteHero({
           ? (en ? "Extract the palette first (Extract from products)." : "請先按「從產品圖萃取」取得色彩。")
           : reason === "no_subject_image"
             ? (en
-                ? "No usable image found — fill in the brand website or add a product with an image, then retry."
-                : "找不到可用的圖片素材 — 請先填品牌官網網址（基本資料頁）或新增一個有圖片的產品，再試一次。")
+                // 2026-09-10：不再爬官網湊圖，改指向上傳
+                ? "No usable photo found — upload a photo to the brand or a product (Settings tab), then retry."
+                : "找不到可用的照片 — 請先到「設定」上傳一張品牌或產品照片，再試一次。")
             : String(reason);
         setBrandVisual({ variants: null, error: msg });
       }
@@ -5195,8 +5196,8 @@ function BrandPaletteHero({
       {extractMut?.data?.ok === false && extractMut.data.reason === "no_product_images" && (
         <p style={{ fontSize: 12, color: "#92400E", marginBottom: 10 }}>
           {en
-            ? "No product images available yet. Add a website URL or import products first, then come back."
-            : "目前還沒有產品圖。請先填入官網或匯入產品，再回來這裡。"}
+            ? "No photos yet. Upload a photo to a product or to the brand's photo library (Settings tab), then come back."
+            : "目前還沒有照片。請先到「設定」上傳一張產品照片或品牌照片，再回來這裡。"}
         </p>
       )}
 
@@ -5544,8 +5545,8 @@ function BrandEntityGrid({
                                   : "品牌色彩還沒萃取。請先到「視覺」tab 按「從產品圖萃取」。")
                               : reason === "product_has_no_image" || reason === "no_subject_image"
                                 ? (en
-                                    ? "No usable image found — this product has no image and the brand website yielded none. Add a product image or fill in the website first."
-                                    : "找不到可用圖片 — 這個產品沒有圖片，官網也抓不到素材。請先補產品圖或到基本資料頁填官網網址。")
+                                    ? "No usable photo found — this product has no photo, and neither does the brand's photo library. Upload one first."
+                                    : "找不到可用照片 — 這個產品沒有照片，品牌照片庫也沒有。請先上傳一張。")
                                 : reason;
                             setVariantState({ productId: item.id, productName: item.name, variants: null, error: msg });
                           }

@@ -199,34 +199,8 @@ export async function scrapeWebsiteImages(
   return collected.slice(0, cap);
 }
 
-/**
- * Best-effort match of a product name against scraped images using alt
- * text and URL slug tokens. Returns the matched image URL or null.
- * Conservative: a wrong image on a product card is worse than none.
- */
-export function matchImageToProduct(
-  productName: string,
-  images: ScrapedImage[],
-): string | null {
-  const name = productName.trim().toLowerCase();
-  if (!name) return null;
-
-  // 1. alt-text containment (CJK names match well here)
-  for (const img of images) {
-    const alt = img.alt?.trim().toLowerCase();
-    if (alt && (alt.includes(name) || name.includes(alt)) && alt.length >= 2) {
-      return img.url;
-    }
-  }
-
-  // 2. URL slug token overlap (latin names)
-  const tokens = name.split(/[\s\-_/]+/).filter((t) => t.length >= 3);
-  if (tokens.length > 0) {
-    for (const img of images) {
-      const urlLower = img.url.toLowerCase();
-      const hits = tokens.filter((t) => urlLower.includes(t)).length;
-      if (hits >= Math.max(1, Math.ceil(tokens.length / 2))) return img.url;
-    }
-  }
-  return null;
-}
+// 2026-09-10 (CJ「所有品牌／產品的照片都應該由用戶上傳」)：matchImageToProduct
+// （把掃到的圖配對到掃到的產品名）已移除——那是這支檔案唯一「把圖寫進產品」
+// 的用途，其餘（extractMetaImages／extractImgTags／scrapeWebsiteImages）仍
+// 保留，因為 productDiscovery.ts 的 SPA 命名 fallback 還要靠 alt 文字辨識
+// 產品名（不是靠圖片本身）。

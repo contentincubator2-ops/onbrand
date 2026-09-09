@@ -18,9 +18,15 @@
  */
 import localPool from "../../localDb";
 import { invokeLLM } from "../../platform/core/llm";
-// 2026-07-01 (CJ「跟 riverflow 一樣」): image scraping + name-matching so
-// discovered products carry a real imageUrl inside their positioning JSON.
-import { scrapeWebsiteImages, matchImageToProduct, type ScrapedImage } from "./websiteImageScraper";
+// 2026-07-01 (CJ「跟 riverflow 一樣」): image scraping originally also fed a
+// name→imageUrl match so discovered products carried a scraped photo.
+// 2026-09-10 (CJ「所有品牌／產品的照片都應該由用戶上傳」): that write is gone
+// — matchImageToProduct is no longer called, and no product record here ever
+// gets an imageUrl from the web again. scrapeWebsiteImages() stays: its alt
+// text is still the only signal productsFromImageAlts() has for naming
+// products on JS-rendered storefronts (lativ-style SPAs) where the text
+// crawl finds nothing — that's a naming fallback, not an image source.
+import { scrapeWebsiteImages, type ScrapedImage } from "./websiteImageScraper";
 
 const MAX_PRODUCTS = 50;
 const POSITION_DELAY_MS = 2_000;
@@ -244,10 +250,10 @@ async function runDiscoveryJob(job: {
           [p.name.slice(0, 255), job.id],
         );
 
-        // Alt-fallback products carry their image directly; LLM-extracted
-        // ones get best-effort matched against the scraped pool.
-        const matchedImage = p.imageUrl
-          ?? (scrapedImages.length > 0 ? matchImageToProduct(p.name, scrapedImages) : null);
+        // 2026-09-10 (CJ「所有品牌／產品的照片都應該由用戶上傳」)：這裡以前會
+        // 把掃到／配對到的圖片寫進 positioning.imageUrl。不再做——發現產品仍然
+        // 有用（省得使用者一個個手打名字），但圖片一律等使用者自己上傳
+        // （AssetPhotoGallery / assetPhotoRouter），這裡不寫這格。
 
         // Create product record if not already exists
         const slug = toSlug(p.name);
@@ -259,22 +265,8 @@ async function runDiscoveryJob(job: {
         let productId: number;
         if ((existing as any[]).length > 0) {
           productId = (existing as any[])[0].id;
-          // Backfill imageUrl on re-scan if the product doesn't have one yet.
-          // JSON_SET on NULL-guarded positioning avoids read-modify-write.
-          if (matchedImage) {
-            await localPool.execute(
-              `UPDATE products
-                 SET positioning = JSON_SET(COALESCE(positioning, '{}'), '$.imageUrl',
-                       COALESCE(JSON_UNQUOTE(JSON_EXTRACT(positioning, '$.imageUrl')), ?))
-               WHERE id = ?`,
-              [matchedImage, productId],
-            ).catch((e) => log(`imageUrl backfill failed for "${p.name}": ${e?.message ?? e}`));
-          }
         } else {
-          const posJson = JSON.stringify({
-            description: p.description,
-            ...(matchedImage ? { imageUrl: matchedImage } : {}),
-          });
+          const posJson = JSON.stringify({ description: p.description });
           const [ins]: any = await localPool.execute(
             `INSERT INTO products (userId, brandId, slug, name, positioning)
              VALUES (?, ?, ?, ?, ?)`,

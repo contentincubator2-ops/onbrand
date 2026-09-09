@@ -26,8 +26,8 @@ import {
   composeBrandedProductImage,
   type Layout,
 } from "../../content/core/brandedComposer";
-import { scrapeWebsiteImages } from "../core/websiteImageScraper";
 import { probeImageUrl } from "../../content/core/imageFetch";
+import { listPhotos } from "../core/assetPhotos";
 
 // ── Zod ────────────────────────────────────────────────────────────────
 
@@ -121,6 +121,15 @@ async function loadBrandProductImageUrls(
   return usable.slice(0, cap);
 }
 
+/**
+ * 品牌照片庫（AssetPhotoGallery 上傳的，見 assetPhotos.ts）——2026-09-10
+ * 起，沒有產品圖時的合法後備來源，取代原本爬品牌官網湊圖的做法。
+ */
+async function loadBrandPhotoUrls(brandId: number, cap = 30): Promise<string[]> {
+  const photos = await listPhotos("brand", brandId);
+  return photos.slice(0, cap).map((p) => p.url);
+}
+
 interface StoredBrandColors extends BrandPalette {
   userLocked?: boolean;
 }
@@ -188,28 +197,14 @@ export const brandColorsRouter = router({
         }
       }
 
-      let urls = await loadBrandProductImageUrls(input.brandId, userId, 30);
-
-      // 2026-07-01 (CJ「跟 riverflow 一樣」): products rarely carry images
-      // yet (productDiscovery is text-first). Riverflow's actual flow is
-      // URL → images → palette, so when the product path is dry, scrape
-      // the brand website directly. This makes extraction work minutes
-      // after brand creation with zero manual steps.
-      if (urls.length === 0) {
-        const [brandRows]: any = await localPool.execute(
-          `SELECT website FROM brands WHERE id = ? AND userId = ? LIMIT 1`,
-          [input.brandId, userId],
-        );
-        const website: string | null = (brandRows as any[])[0]?.website ?? null;
-        if (website && /^https?:\/\//.test(website)) {
-          try {
-            const scraped = await scrapeWebsiteImages(website, 30);
-            urls = scraped.map((s) => s.url);
-          } catch (e) {
-            console.warn(`[brandColors] website scrape failed for brand ${input.brandId}:`, (e as Error).message);
-          }
-        }
-      }
+      // 2026-09-10 (CJ「所有品牌／產品的照片都應該由用戶上傳」)：這裡以前在
+      // 產品沒圖時會直接爬品牌官網湊圖（2026-07-01「跟 riverflow 一樣」的
+      // 決定）。改成不爬——沒有產品圖或品牌照片庫的圖，就老實回
+      // no_product_images，UI 走既有的空狀態 CTA（上傳一張）。
+      const urls = [
+        ...await loadBrandProductImageUrls(input.brandId, userId, 30),
+        ...await loadBrandPhotoUrls(input.brandId, 30),
+      ].slice(0, 30);
 
       if (urls.length === 0) {
         return {
@@ -391,26 +386,12 @@ export const brandColorsRouter = router({
         subjectImageUrl = "";
       }
 
-      // Fallback: no usable product image → scrape the brand website (same source
-      // extractForBrand already uses for 色號, so if colors worked this works).
+      // 2026-09-10 (CJ「所有品牌／產品的照片都應該由用戶上傳」)：不再爬品牌
+      // 官網湊主體圖。沒有產品圖時改看品牌照片庫（AssetPhotoGallery 上傳的，
+      // 見 loadBrandPhotoUrls）——同樣是使用者自己上傳的真實照片，不是爬來的。
       if (!subjectImageUrl) {
-        try {
-          const [wRows]: any = await localPool.execute(
-            `SELECT website FROM brands WHERE id = ? AND userId = ? LIMIT 1`,
-            [resolvedBrandId, userId],
-          );
-          const website = (wRows as any[])[0]?.website;
-          if (typeof website === "string" && website.trim()) {
-            const { scrapeWebsiteImages } = await import("../core/websiteImageScraper");
-            const imgs = await scrapeWebsiteImages(website, 8);
-            for (const img of imgs) {
-              if (await probeImageUrl(img.url, 8_000)) {
-                subjectImageUrl = img.url;
-                break;
-              }
-            }
-          }
-        } catch { /* fall through to the reason below */ }
+        const brandPhotos = await loadBrandPhotoUrls(resolvedBrandId, 5);
+        subjectImageUrl = brandPhotos[0] ?? "";
       }
       if (!subjectImageUrl) {
         return { ok: false as const, reason: "no_subject_image" as const };
