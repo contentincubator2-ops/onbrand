@@ -238,4 +238,71 @@ Rules:
       if (all.length && all[0].brandId) await assertBrandOwner(ctx.user.id, all[0].brandId);
       return all;
     }),
+
+  /**
+   * 2026-09-10（避開產品變形計畫，步驟 1-2）：產品照片放進 AI 生成的照片級
+   * 場景——產品像素從頭到尾沒有被任何生圖模型碰過（見 productSceneComposer.ts
+   * 開頭的說明），只有背景是 AI 生的。跟 generate 一樣走點數與
+   * generated_images 記錄，這樣才計費、可歷史查詢，跟既有生圖體驗一致。
+   */
+  generateProductScene: protectedProcedure
+    .input(z.object({
+      brandId: z.number().int().positive(),
+      productImageUrl: z.string().url().max(2048),
+      scenePrompt: z.string().max(600).optional(),
+      decisionId: z.number().int().positive().optional(),
+      optionId: z.number().int().positive().optional(),
+      width: z.number().int().min(256).max(2048).optional(),
+      height: z.number().int().min(256).max(2048).optional(),
+    }))
+    .mutation(async ({ input, ctx }) => {
+      if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED" });
+      await assertBrandOwner(ctx.user.id, input.brandId);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+      const { assertPoints, deductPoints } = await import("../../platform/core/pointsService");
+      const imageAction = imageActionForRequest({}); // 背景是普通文字生圖，不帶 subjectImageUrl → image_flux
+      await assertPoints(ctx.user.id, imageAction);
+      await deductPoints(ctx.user.id, imageAction, { kind: "brand", id: input.brandId });
+
+      const [ins] = (await db.execute(sql`
+        INSERT INTO generated_images (brandId, decisionId, optionId, provider, model, prompt, sizeSpec, status)
+        VALUES (${input.brandId}, ${input.decisionId ?? null}, ${input.optionId ?? null},
+                'composite', 'product-scene-v1', ${input.scenePrompt ?? ""}, ${`${input.width ?? 1080}x${input.height ?? 1080}`}, 'pending')
+      `)) as any;
+      const id = Number(ins?.insertId ?? 0);
+
+      try {
+        const { composeProductScene } = await import("../core/productSceneComposer");
+        const scene = await composeProductScene({
+          brandId: input.brandId,
+          productImageUrl: input.productImageUrl,
+          scenePrompt: input.scenePrompt,
+          width: input.width,
+          height: input.height,
+        });
+
+        const { writeGeneratedImage } = await import("../core/generatedImageStore");
+        const url = await writeGeneratedImage(input.brandId, scene.pngBuffer);
+
+        await db.execute(sql`
+          UPDATE generated_images SET url = ${url}, prompt = ${scene.backgroundPrompt}, status = 'ready', errorMsg = NULL
+          WHERE id = ${id}
+        `);
+        await reconcileImageCharge({
+          userId: ctx.user.id, prepaidAction: imageAction,
+          result: { status: "ready", provider: "composite", model: "product-scene-v1" },
+        });
+        return {
+          id, url, status: "ready" as const,
+          hadCutout: scene.hadCutout, usedFallbackBackground: scene.usedFallbackBackground,
+        };
+      } catch (error: any) {
+        const msg = String(error?.message ?? error).slice(0, 400);
+        await db.execute(sql`UPDATE generated_images SET status = 'failed', errorMsg = ${msg} WHERE id = ${id}`);
+        await reconcileImageCharge({ userId: ctx.user.id, prepaidAction: imageAction, result: { status: "failed" } });
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `合成失敗：${msg}` });
+      }
+    }),
 });

@@ -264,6 +264,14 @@ app.use(coversPrefix, express.static(coversDir, {
 const assetPhotoUrlPrefix = process.env.ASSET_PHOTO_URL_PREFIX ?? "/static/asset-photos";
 app.use(assetPhotoUrlPrefix, express.static(ASSET_PHOTO_STORAGE_ROOT, { maxAge: "7d", immutable: false }));
 
+// 2026-09-10（避開產品變形計畫）：productSceneComposer 本機合成的 PNG（不是
+// provider 回傳的 URL），同一套模式伺服。
+const generatedImageUrlPrefix = process.env.GENERATED_IMAGE_URL_PREFIX ?? "/static/generated-images";
+app.use(generatedImageUrlPrefix, express.static(
+  process.env.GENERATED_IMAGE_DIR ?? join(process.cwd(), "storage", "generated-images"),
+  { maxAge: "7d", immutable: false },
+));
+
 const publicDir = join(process.cwd(), "public");
 if (existsSync(publicDir)) {
   // Assets (hashed filenames) — cache 1 year
