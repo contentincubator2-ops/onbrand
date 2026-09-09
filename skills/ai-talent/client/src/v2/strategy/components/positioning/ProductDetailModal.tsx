@@ -16,6 +16,7 @@ import { useEffect, useState, useRef } from "react";
 import { trpc } from "../../../../lib/trpc";
 import { useLang } from "../../../../lib/i18n";
 import { X, Plus, Trash2, RefreshCw, Sparkles } from "lucide-react";
+import AssetPhotoGallery from "./AssetPhotoGallery";
 
 interface PromotionPeriod {
   label: string;      // e.g. "母親節" "年終特賣"
@@ -172,20 +173,6 @@ export default function ProductDetailModal({ productId, brandId, onClose, onRepo
       setTimeout(() => setSaved(false), 2000);
     },
   });
-  const updateImageMut = (trpc as any).product?.updateImageUrl?.useMutation?.({
-    onSuccess: () => {
-      productQ?.refetch?.();
-      onImageUpdated?.();
-      setImageDirty(false);
-      setImageError("");
-      setImageSaved(true);
-      setTimeout(() => setImageSaved(false), 2000);
-    },
-    onError: (error: any) => {
-      setImageError(String(error?.message ?? (en ? "Image URL is not usable" : "圖片網址無法使用")));
-    },
-  });
-
   // Editable state
   const [tagline, setTagline] = useState("");
   const [audience, setAudience] = useState("");
@@ -193,10 +180,6 @@ export default function ProductDetailModal({ productId, brandId, onClose, onRepo
   const [preferred, setPreferred] = useState<string[]>([]);
   const [forbidden, setForbidden] = useState<string[]>([]);
   const [periods, setPeriods] = useState<PromotionPeriod[]>([]);
-  const [imageUrl, setImageUrl] = useState("");
-  const [imageDirty, setImageDirty] = useState(false);
-  const [imageSaved, setImageSaved] = useState(false);
-  const [imageError, setImageError] = useState("");
   const [saved, setSaved] = useState(false);
   const [dirty, setDirty] = useState(false);
   const initialised = useRef(false);
@@ -223,7 +206,6 @@ export default function ProductDetailModal({ productId, brandId, onClose, onRepo
     setPreferred(Array.isArray(pos.preferredWords) ? pos.preferredWords : []);
     setForbidden(Array.isArray(pos.forbiddenWords) ? pos.forbiddenWords : []);
     setPeriods(Array.isArray(pos.promotionPeriods) ? pos.promotionPeriods : []);
-    setImageUrl(typeof pos.imageUrl === "string" ? pos.imageUrl : "");
   }, [product]);
 
   // Mark dirty when user edits
@@ -350,49 +332,24 @@ export default function ProductDetailModal({ productId, brandId, onClose, onRepo
               {en ? "Edit & Refine" : "手動編輯與精修"}
             </p>
 
-            {/* Canonical product image — saved independently so the server can
-                validate bytes and JSON_SET only this field without replacing
-                the rest of positioning. */}
+            {/*
+              2026-09-10 (CJ「允許用戶上傳照片到品牌或個別產品。我們的 AI 不用
+              再從網站爬產品照片了」)：貼網址改成真的上傳。主圖仍然鏡射進
+              positioning.imageUrl（server 端做，見 assetPhotos.ts），所以
+              onImageUpdated 這個既有 callback 還是要接著呼叫，讓外層的
+              「產品縮圖」跟著刷新。
+            */}
             <div>
               <label className="block text-xs font-semibold text-neutral-600 mb-1.5">
-                {en ? "Product image URL" : "產品圖片網址"}
+                {en ? "Product photos" : "產品照片"}
               </label>
-              <div className="flex gap-2">
-                <input
-                  type="url"
-                  value={imageUrl}
-                  onChange={(e) => {
-                    setImageUrl(e.target.value);
-                    setImageDirty(true);
-                    setImageSaved(false);
-                    setImageError("");
-                  }}
-                  placeholder="https://example.com/product.jpg"
-                  className="flex-1 text-sm px-3 py-2 border border-neutral-200 rounded-lg focus:outline-none focus:border-indigo-400"
-                />
-                <button
-                  onClick={() => {
-                    const next = imageUrl.trim();
-                    if (!next.startsWith("https://")) {
-                      setImageError(en ? "The image URL must start with https://" : "圖片網址必須以 https:// 開頭");
-                      return;
-                    }
-                    updateImageMut?.mutate?.({ id: productId, imageUrl: next });
-                  }}
-                  disabled={!imageDirty || updateImageMut?.isPending}
-                  className="px-3 py-2 rounded-lg bg-indigo-600 text-white text-xs font-semibold disabled:opacity-40"
-                >
-                  {updateImageMut?.isPending
-                    ? (en ? "Checking…" : "驗證中…")
-                    : imageSaved ? (en ? "Saved ✓" : "已更新 ✓")
-                    : (en ? "Check & save" : "驗證並更新")}
-                </button>
-              </div>
-              <p className={`text-[12px] mt-1.5 ${imageError ? "text-red-600" : "text-neutral-400"}`}>
-                {imageError || (en
-                  ? "Must be a public HTTPS URL that returns a raster image; SVG and HTML pages are rejected."
-                  : "必須是可公開存取、直接回傳點陣圖片的 HTTPS 網址；不接受 SVG 或網頁。")}
-              </p>
+              <AssetPhotoGallery
+                brandId={brandId}
+                scope="product"
+                scopeId={productId}
+                scopeLabel={en ? "this product" : "這個產品"}
+                onChange={() => { productQ?.refetch?.(); onImageUpdated?.(); }}
+              />
             </div>
 
             {/* Tagline */}

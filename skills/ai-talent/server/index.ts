@@ -29,6 +29,7 @@ import { createContext } from "./platform/core/trpc";
 import { authRouter } from "./platform/auth/authRouter";
 import { reportTemplateRouter } from "./performance/routes/reportTemplateRoute";
 import { positioningDocRouter } from "./strategy/routes/positioningDocRoute";
+import { assetPhotoRouter as assetPhotoUploadRoute, STORAGE_ROOT as ASSET_PHOTO_STORAGE_ROOT } from "./strategy/routes/assetPhotoRoute";
 import { slackOAuthRouter } from "./platform/routes/slackOAuthRoute";
 import { cloudOAuthRouter } from "./platform/routes/cloudOAuthRoute";
 import { manusRouter } from "./platform/routers/manusRouter";
@@ -258,6 +259,11 @@ app.use(coversPrefix, express.static(coversDir, {
   },
 }));
 
+// 2026-09-10 (CJ「允許用戶上傳照片到品牌或個別產品」)：用戶自己上傳的品牌／
+// 產品照片，本機硬碟＋靜態伺服，跟上面 coversDir 同一套模式。
+const assetPhotoUrlPrefix = process.env.ASSET_PHOTO_URL_PREFIX ?? "/static/asset-photos";
+app.use(assetPhotoUrlPrefix, express.static(ASSET_PHOTO_STORAGE_ROOT, { maxAge: "7d", immutable: false }));
+
 const publicDir = join(process.cwd(), "public");
 if (existsSync(publicDir)) {
   // Assets (hashed filenames) — cache 1 year
@@ -344,6 +350,7 @@ const healthLimiter = rateLimit({ windowMs: 60_000, max: 60, standardHeaders: tr
 app.use("/api/auth", authRouter);
 app.use("/api/report-template", reportTemplateRouter);
 app.use("/api/positioning-doc", positioningDocRouter);
+app.use("/api/asset-photo", assetPhotoUploadRoute);
 
 // ─── Slack OAuth + Events ─────────────────────────────────────────────────────
 app.use("/slack", slackOAuthRouter);
@@ -532,6 +539,10 @@ async function runStartupMigrations() {
     // 2026-08-23 (CJ「安排定期任務掃描當地熱門的 facebook 貼文，補充為 task」):
     // 每月排程掃出來的貼文形式候選佇列。DDL 的來源在 _core/postFormatStore.ts，
     // 那裡也寫了為什麼去重不看 status（否則被否決的形式每月復活）。
+    const { ASSET_PHOTO_DDL } = await import("./strategy/core/assetPhotos");
+    await db.execute(sql.raw(ASSET_PHOTO_DDL));
+    console.log("[migrate] asset_photos: OK");
+
     const { POST_FORMAT_CANDIDATES_DDL } = await import("./content/core/postFormatStore");
     await db.execute(sql.raw(POST_FORMAT_CANDIDATES_DDL));
     console.log("[migrate] post_format_candidates: OK");

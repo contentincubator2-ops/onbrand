@@ -961,6 +961,31 @@ export const brandRouter = router({
       }
     }),
 
+  /**
+   * 2026-09-10 (CJ「允許用戶上傳照片到品牌或個別產品」)：logo 也可以手動上傳，
+   * 不必只靠 FB 粉專抓。實際位元組走 /api/asset-photo/upload（跟品牌照片庫
+   * 同一支），這裡只是把上傳完拿到的 URL 指定成 logoUrl —— 跟
+   * fetchFacebookAvatar 寫 logoUrl 的最後一步同一套。
+   */
+  setLogo: protectedProcedure
+    .input(z.object({ brandId: z.number(), logoUrl: z.string().min(1).max(500) }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const { brands } = await import("../../../drizzle/schema");
+      try {
+        await assertBrandOwner(input.brandId, ctx.user.id);
+      } catch {
+        throw new TRPCError({ code: "FORBIDDEN", message: "你沒有這個品牌的編輯權限" });
+      }
+      if (!input.logoUrl.startsWith("/static/asset-photos/")) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "logoUrl 必須是剛上傳的照片網址" });
+      }
+      await db.update(brands).set({ logoUrl: input.logoUrl })
+        .where(and(eq(brands.id, input.brandId), eq(brands.userId, ctx.user.id)));
+      return { ok: true, logoUrl: input.logoUrl };
+    }),
+
   runOnboarding: protectedProcedure
     .input(z.object({
       brandName: z.string().min(1),

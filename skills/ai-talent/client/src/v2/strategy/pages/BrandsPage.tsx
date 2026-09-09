@@ -13,7 +13,7 @@
  *
  * No max-width container anywhere — extends to viewport edges.
  */
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useRef } from "react";
 import { useNavigate, useOutletContext, useSearchParams } from "react-router-dom";
 import { trpc } from "../../../lib/trpc";
 import { useLang } from "../../../lib/i18n";
@@ -30,6 +30,7 @@ import PromptLibrary from "../components/positioning/PromptLibrary";
 import BrandAssetEditor, { type AssetKey } from "../components/positioning/BrandAssetEditor";
 import KnowledgeEditor from "../components/positioning/KnowledgeEditor";
 import PositioningDocPanel from "../components/positioning/PositioningDocPanel";
+import AssetPhotoGallery from "../components/positioning/AssetPhotoGallery";
 import InlineAssetCard from "../components/positioning/InlineAssetCard";
 import { InfoTab as BrandInfoTab, DangerTab as BrandDangerTab, PublishTab as BrandPublishTab } from "../components/positioning/BrandSettingsSheet";
 import AIPromptsEditor from "../components/positioning/AIPromptsEditor";
@@ -4135,6 +4136,14 @@ function EventSettingsPanel({
  * 大頭貼 + 換一張. Used in BrandsPage settings tab.
  */
 function BrandLogoSettings({ brandId, brandName }: { brandId: number; brandName: string | null }) {
+  // 2026-09-10 (CJ「允許用戶上傳照片到品牌或個別產品」)：logo 也可以自己
+  // 上傳，不必只靠 FB 粉專抓——單張圖，走 /api/asset-photo/upload 後把
+  // 拿到的網址指定成 logoUrl（brand.setLogo），跟品牌照片庫共用同一支
+  // 上傳端點，但這裡不用 AssetPhotoGallery（那是多張照片庫的元件），
+  // logo 只有一張、也不需要「刪除／設主圖」這些操作。
+  const setLogoMut = (trpc as any).brand?.setLogo?.useMutation?.();
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+  const logoFileRef = useRef<HTMLInputElement>(null);
   const { lang } = useLang();
   const brandQuery = (trpc as any).brand?.get?.useQuery
     ? (trpc as any).brand.get.useQuery({ id: brandId }, { refetchOnWindowFocus: false, enabled: brandId > 0 })
@@ -4158,6 +4167,33 @@ function BrandLogoSettings({ brandId, brandName }: { brandId: number; brandName:
     } catch (e: any) {
       setErr(e?.message ?? String(e));
     } finally { setBusy(false); }
+  };
+
+  const uploadLogo = async (file: File | undefined) => {
+    if (!file) return;
+    setUploadingLogo(true); setErr(null); setOkMsg(null);
+    try {
+      const res = await fetch("/api/asset-photo/upload", {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "content-type": file.type || "application/octet-stream",
+          "x-brand-id": String(brandId), "x-scope": "brand", "x-scope-id": String(brandId),
+          "x-filename": encodeURIComponent(file.name),
+        },
+        body: file,
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json?.error ?? `HTTP ${res.status}`);
+      await setLogoMut?.mutateAsync?.({ brandId, logoUrl: json.photo.url });
+      setOkMsg(lang === "en" ? "Logo updated" : "logo 已更新");
+      await brandQuery.refetch?.();
+    } catch (e: any) {
+      setErr(e?.message ?? String(e));
+    } finally {
+      setUploadingLogo(false);
+      if (logoFileRef.current) logoFileRef.current.value = "";
+    }
   };
 
   return (
@@ -4216,6 +4252,31 @@ function BrandLogoSettings({ brandId, brandName }: { brandId: number; brandName:
           {okMsg && <span className="text-tiny text-success-600">✓ {okMsg}</span>}
           {err && <span className="text-tiny text-danger-600">{err}</span>}
         </div>
+      </div>
+
+      <div className="space-y-2 border border-default-200 rounded-medium p-4">
+        <p className="text-small font-medium">{lang === "en" ? "Or upload your own" : "或自己上傳"}</p>
+        <p className="text-tiny text-default-700">
+          {lang === "en" ? "PNG / JPEG / WebP, up to 15MB. Overwrites your current logo." : "PNG／JPEG／WebP，上限 15MB。會覆蓋現有 logo。"}
+        </p>
+        <Button size="sm" variant="flat" isLoading={uploadingLogo} onPress={() => logoFileRef.current?.click()}>
+          {lang === "en" ? "Choose file" : "選擇檔案"}
+        </Button>
+        <input
+          ref={logoFileRef} type="file" hidden
+          accept="image/png,image/jpeg,image/webp,image/gif,image/bmp"
+          onChange={(e) => void uploadLogo(e.target.files?.[0])}
+        />
+      </div>
+
+      <div className="pt-2">
+        <h3 className="text-medium font-semibold">{lang === "en" ? "Brand photo library" : "品牌照片庫"}</h3>
+        <p className="text-tiny text-default-700 mt-1 mb-3">
+          {lang === "en"
+            ? "Real photos of the brand — materials, storefront, packaging — used as reference for on-brand image generation and color extraction. We no longer scrape these from your website."
+            : "品牌的真實照片——材質、門市、包裝——用來當 on-brand 生圖與取色的參考。我們不再從網站爬這些圖了。"}
+        </p>
+        <AssetPhotoGallery brandId={brandId} scope="brand" scopeId={brandId} scopeLabel={lang === "en" ? "this brand" : "這個品牌"} />
       </div>
     </div>
   );
