@@ -94,36 +94,62 @@ export function productPlacement(
 }
 
 /**
- * 從去背圖的 alpha 通道算陰影：取 alpha 當形狀 → 模糊 → 往下偏一點 →
- * 壓成半透明黑。形狀跟著產品輪廓走，不會是一個跟產品對不上的橢圓。
+ * 陰影：量產品「底部一小段」的不透明範圍當接地寬度，畫一個模糊橢圓。
+ *
+ * 2026-09-10 自己側測抓到的 bug，記在這裡免得又寫回去：原本的做法是把整個
+ * 產品的 alpha 遮罩垂直壓扁（resize 到很矮的高度）湊出一條陰影帶。垂直壓扁
+ * 一個瓶蓋＋瓶身寬窄不一的形狀，會把「瓶蓋很窄」跟「瓶身比較寬」這些不同
+ * 高度的不透明區段疊到同一批輸出列上，結果幾乎每一欄都疊到「某個高度有
+ * 不透明」，壓完變成一塊近乎實心的矩形——側測用真的 QA 圖跑過一次，陰影
+ * 位置整個是一塊方塊，不是貼著瓶身的柔和陰影，肉眼看就知道不對。
+ *
+ * 改成只取底部貼地那段（12% 高度）的不透明寬度，畫一個橢圓再模糊——形狀
+ * 不會逐像素跟著瓶身輪廓走，但保證是一個乾淨的橢圓陰影，不會變成方塊。
  */
 async function renderShadow(
   cutout: Buffer, placement: { left: number; top: number; width: number; height: number },
   canvasW: number, canvasH: number,
 ): Promise<Buffer | null> {
   try {
-    const alpha = await sharp(cutout)
+    const { data, info } = await sharp(cutout)
       .resize(placement.width, placement.height, { fit: "fill" })
       .ensureAlpha()
       .extractChannel("alpha")
-      .toBuffer();
-    const shadowShape = await sharp(alpha)
-      .blur(Math.max(4, Math.round(placement.width * 0.03)))
-      .toBuffer();
-    // alpha-only 圖轉成半透明黑：用它當 mask 蓋在一塊黑色矩形上。
-    const black = await sharp({
-      create: { width: placement.width, height: placement.height, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0.38 } },
-    }).png().toBuffer();
-    const shadow = await sharp(black)
-      .composite([{ input: shadowShape, blend: "dest-in" }])
-      .png().toBuffer();
-    // 貼在畫布上：稍微往下、往右偏移，並壓扁成薄薄一層（乘法縮放高度）貼地。
-    const offsetY = Math.round(placement.height * 0.06);
-    const flat = await sharp(shadow)
-      .resize(placement.width, Math.max(8, Math.round(placement.height * 0.22)), { fit: "fill" })
-      .toBuffer();
-    return await sharp({ create: { width: canvasW, height: canvasH, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } })
-      .composite([{ input: flat, left: placement.left, top: placement.top + placement.height - Math.round(placement.height * 0.22) + offsetY }])
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+    const w = info.width, h = info.height;
+    const sampleBand = Math.max(1, Math.round(h * 0.12)); // 底部 12%——貼地那段的寬度才是陰影該有的寬度
+    let minX = w, maxX = -1;
+    for (let y = Math.max(0, h - sampleBand); y < h; y++) {
+      const row = y * w;
+      for (let x = 0; x < w; x++) {
+        if (data[row + x]! > 40) {
+          if (x < minX) minX = x;
+          if (x > maxX) maxX = x;
+        }
+      }
+    }
+    if (maxX < minX) return null; // 底部整段透明（懸浮物件之類）——沒有陰影比錯的陰影好
+
+    const footprintW = Math.max(24, maxX - minX);
+    const centerX = placement.left + Math.round((minX + maxX) / 2);
+    const shadowW = Math.round(footprintW * 1.15);
+    const shadowH = Math.max(10, Math.round(shadowW * 0.22));
+    // 2026-09-10 自己側測抓到的第三個 bug：baseY 原本算在產品底部「往上」2%，
+    // 幾乎跟產品自己的底邊重疊。橢圓中心在那個位置，等於陰影一大半被畫在產品
+    // 底下（後面 composite 順序是背景→陰影→產品，產品蓋在上面），只有橢圓
+    // 邊緣模糊到快消失的那一小截露在產品外面，肉眼幾乎看不到——側測比對
+    // 「合成後的圖」跟「純背景」在陰影該有的位置幾乎沒有差異，才發現陰影中心
+    // 根本沒露出來過。改成往「產品底邊下方」推，橢圓大半段留在產品外面。
+    const bottomEdge = placement.top + placement.height;
+    const baseY = bottomEdge + Math.round(shadowH * 0.14);
+
+    const svg =
+      `<svg xmlns="http://www.w3.org/2000/svg" width="${canvasW}" height="${canvasH}">` +
+      `<ellipse cx="${centerX}" cy="${baseY}" rx="${Math.round(shadowW / 2)}" ry="${Math.round(shadowH / 2)}" fill="black" opacity="0.32"/>` +
+      `</svg>`;
+    return await sharp(Buffer.from(svg))
+      .blur(Math.max(6, Math.round(shadowW * 0.08)))
       .png().toBuffer();
   } catch {
     return null; // 陰影是加分，算不出來就沒有陰影，不影響主流程
@@ -134,13 +160,22 @@ export async function composeProductScene(input: SceneComposeInput): Promise<Sce
   const width = input.width ?? 1080;
   const height = input.height ?? 1080;
 
-  // 1. 產品去背
+  // 1. 產品去背，再裁到「真的有東西」的範圍。
+  //
+  // 2026-09-10 自己側測抓到的第二個 bug：Replicate 回來的去背圖是跟原圖同一張
+  // 畫布（背景變透明，但畫布尺寸不變）——原始照片如果拍的時候產品沒有塞滿整個
+  // 畫面（很常見，電商圖常常四周留白），去背圖就會帶著一大圈透明留白。後面的
+  // 縮放／置中／陰影全部是照這個畫布的寬高去算的，留白算進去，產品在合成後會
+  // 縮得比預期小，陰影的「底部一小段」還可能整段落在留白裡（側測就是踩到這個：
+  // 陰影完全不見了，因為採樣的底部 12% 全部是透明的，不是產品本體）。trim()
+  // 一律先做，把留白裁掉，兩個問題一次解決。
   const cutout = await removeProductBackground(input.productImageUrl);
-  const productMeta = await sharp(cutout.pngBuffer).metadata();
+  const trimmedCutoutBuffer = await sharp(cutout.pngBuffer).trim().png().toBuffer().catch(() => cutout.pngBuffer);
+  const productMeta = await sharp(trimmedCutoutBuffer).metadata();
   const pW = productMeta.width ?? width;
   const pH = productMeta.height ?? height;
   const placement = productPlacement(width, height, pW, pH);
-  const productLayer = await sharp(cutout.pngBuffer)
+  const productLayer = await sharp(trimmedCutoutBuffer)
     .resize(placement.width, placement.height, { fit: "inside", withoutEnlargement: true })
     .png().toBuffer();
   const productLayerMeta = await sharp(productLayer).metadata();
@@ -177,7 +212,7 @@ export async function composeProductScene(input: SceneComposeInput): Promise<Sce
   }
 
   // 3. 合成：背景 → 陰影 → 產品
-  const shadow = await renderShadow(cutout.pngBuffer, placement, width, height);
+  const shadow = await renderShadow(trimmedCutoutBuffer, placement, width, height);
   const layers: Array<{ input: Buffer; left: number; top: number }> = [];
   if (shadow) layers.push({ input: shadow, left: 0, top: 0 });
   layers.push({ input: productLayer, left: actualLeft, top: actualTop });
