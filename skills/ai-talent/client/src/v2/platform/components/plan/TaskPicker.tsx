@@ -27,7 +27,7 @@ export interface PickerTask {
 }
 
 export default function TaskPicker({
-  open, onClose, tasks, selected, maxTray, viralLocked, onSave, saving, onDetail,
+  open, onClose, tasks, selected, maxTray, viralLocked, onSave, saving, onDetail, categoryLabel,
 }: {
   open: boolean;
   onClose: () => void;
@@ -39,6 +39,13 @@ export default function TaskPicker({
   saving?: boolean;
   /** 2026-09-08：選卡時也能先看這張卡的出處與說明（開 CardDetailDrawer）。 */
   onDetail?: (id: string) => void;
+  /**
+   * 2026-09-09 (CJ「若僅在 facebook 貼文的類別中新增，就只要出現 facebook
+   * 貼文類別的任務即可」)：現在 `tasks` 已經是「目前這個分類」的卡，不是整個
+   * 通路的卡。有值時把分類名亮出來，讓使用者知道自己挑的範圍是被縮小過的，
+   * 不是這個通路的全部。
+   */
+  categoryLabel?: string | null;
 }) {
   const { lang } = useLang();
   const isEn = lang === "en";
@@ -85,6 +92,11 @@ export default function TaskPicker({
               {isEn
                 ? `Pick the cards you use often. ${draft.length} / ${maxTray} selected.`
                 : `挑你常用的卡，平常就只擺這幾張。已選 ${draft.length} / ${maxTray}。`}
+              {categoryLabel && (
+                <span className="ml-1.5 rounded-full border border-neutral-300 px-2 py-0.5 text-[12px] text-neutral-600">
+                  {isEn ? `In: ${categoryLabel}` : `分類：${categoryLabel}`}
+                </span>
+              )}
             </p>
           </div>
           <button onClick={onClose} className="rounded-lg p-1.5 text-neutral-400 hover:bg-neutral-100">

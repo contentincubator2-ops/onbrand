@@ -884,8 +884,17 @@ function PlatformTaskPageInner() {
     return (trayData.fallback ?? []).filter((id) => visible.has(id));
   }, [trayData, platformTasks]);
 
-  const visibleTasks = useMemo(() => {
-    let list = allTasks.filter((task) => inferPlatform(task) === platform);
+  /**
+   * 這個通路「目前這個分類」的卡 —— 只套用分類分頁（貼文／連結貼文／廣告…，
+   * 或沒有分頁的通路走來源＋長度），不套搜尋／新卡／托盤。
+   *
+   * 2026-09-09 (CJ「新增任務卡時，若僅在 facebook 貼文的類別中新增，就只要出現
+   * facebook 貼文類別的任務即可」)：抽成獨立一份，因為「新增任務卡」的選卡器
+   * 要吃同一份 —— 之前它收的是整個通路 50 張，跟畫面上正在看哪個分類無關，
+   * 選卡器與畫面對不起來。
+   */
+  const categoryTasks = useMemo(() => {
+    let list = platformTasks;
     if (platform === "facebook") {
       // Format-based filter for FB
       if (activeFormat !== "all") {
@@ -940,6 +949,24 @@ function PlatformTaskPageInner() {
         list = list.filter((task) => task.tier === activeTier);
       }
     }
+    return list;
+  }, [platformTasks, platform, activeTier, activeSource, activeFormat, activeIGFormat, activeLIFormat, activeYTFormat, activeTTFormat, activeEMFormat, activePRFormat, activeWEBFormat, activePackFormat, packChannel]);
+
+  /** 目前選的分類分頁顯示名；「全部」或沒有分頁分類的通路回 null。 */
+  const activeCategoryLabel: string | null = packChannel
+    ? (activePackFormat !== "all" ? activePackFormat : null)
+    : platform === "facebook" ? (activeFormat !== "all" ? activeFormat : null)
+    : platform === "instagram" ? (activeIGFormat !== "all" ? activeIGFormat : null)
+    : platform === "linkedin" ? (activeLIFormat !== "all" ? activeLIFormat : null)
+    : platform === "youtube" ? (activeYTFormat !== "all" ? activeYTFormat : null)
+    : platform === "tiktok" ? (activeTTFormat !== "all" ? activeTTFormat : null)
+    : platform === "email" ? (activeEMFormat !== "all" ? activeEMFormat : null)
+    : platform === "pr" ? (activePRFormat !== "all" ? activePRFormat : null)
+    : platform === "website" ? (activeWEBFormat !== "all" ? activeWEBFormat : null)
+    : null;
+
+  const visibleTasks = useMemo(() => {
+    let list = categoryTasks;
     if (onlyNew) {
       list = list.filter((task) => isRecentCard((task as any).addedAt));
     }
@@ -963,7 +990,7 @@ function PlatformTaskPageInner() {
       list = list.filter((task) => inTray.has(task.id));
     }
     return list;
-  }, [allTasks, platform, activeTier, activeSource, activeFormat, activeIGFormat, activeLIFormat, activeYTFormat, activeTTFormat, activeEMFormat, activePRFormat, activeWEBFormat, activePackFormat, packChannel, searchQuery, showAllTasks, trayIds, onlyNew]);
+  }, [categoryTasks, activeSource, activeTier, searchQuery, showAllTasks, trayIds, onlyNew]);
 
   const totalForPlatform = useMemo(
     () => allTasks.filter((task) => inferPlatform(task) === platform).length,
@@ -2224,9 +2251,9 @@ function PlatformTaskPageInner() {
                     {lang === "en" ? "Add task card" : "新增任務卡"}
                   </span>
                   <span className="px-4 text-center text-[13px] text-neutral-400">
-                    {lang === "en"
-                      ? "Browse by source — viral, evergreen, award…"
-                      : "依來源挑選 — 爆款、長青、得獎案例…"}
+                    {activeCategoryLabel
+                      ? (lang === "en" ? `Within “${activeCategoryLabel}” only` : `只在「${activeCategoryLabel}」分類裡挑`)
+                      : (lang === "en" ? "Browse by source — viral, evergreen, award…" : "依來源挑選 — 爆款、長青、得獎案例…")}
                   </span>
                 </button>
               )}
@@ -2272,7 +2299,8 @@ function PlatformTaskPageInner() {
       <TaskPicker
         open={pickerOpen}
         onClose={() => setPickerOpen(false)}
-        tasks={platformTasks as any[]}
+        tasks={categoryTasks as any[]}
+        categoryLabel={activeCategoryLabel}
         selected={trayIds}
         maxTray={trayData?.maxTray ?? 12}
         viralLocked={trayData?.viralLocked ?? 0}
