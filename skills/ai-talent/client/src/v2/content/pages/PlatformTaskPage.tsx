@@ -1991,12 +1991,60 @@ function PlatformTaskPageInner() {
         ) : visibleTasks.length === 0 ? (
           <Card>
             <CardBody className="text-center text-default-500 py-12">
-              <FontAwesomeIcon icon={faMagnifyingGlass} className="text-2xl mb-2 text-default-300" />
-              <p>
-                {searchQuery.trim()
-                  ? (lang === "en" ? `No tasks match "${searchQuery}"` : `沒有匹配 "${searchQuery}" 的任務`)
-                  : (lang === "en" ? "No tasks in this tier yet — coming soon." : "這個層級還沒有任務，即將上線")}
-              </p>
+              {searchQuery.trim() ? (
+                <>
+                  <FontAwesomeIcon icon={faMagnifyingGlass} className="text-2xl mb-2 text-default-300" />
+                  <p>{lang === "en" ? `No tasks match "${searchQuery}"` : `沒有匹配 "${searchQuery}" 的任務`}</p>
+                </>
+              ) : categoryTasks.length === 0 ? (
+                /**
+                 * 2026-09-10 (CJ「若該類別當中，沒有任何預設的任務卡，請直接顯示
+                 * 新增任務卡的按鈕，而非即將上線。因為新增當中，至少可以讓用戶
+                 * 自己創造新的任務卡」)：這個分類真的一張預設卡都沒有——不是
+                 * 卡被托盤／搜尋濾掉了，是 categoryTasks 本身是空的。「即將上線」
+                 * 是死路；「新增任務卡」至少讓用戶當場自己建一張。
+                 */
+                <>
+                  <FontAwesomeIcon icon={faPlus} className="text-2xl mb-2 text-default-300" />
+                  <p className="font-semibold mb-1">
+                    {lang === "en"
+                      ? `No preset cards in ${activeCategoryLabel ?? meta.label} yet`
+                      : `「${activeCategoryLabel ?? meta.labelZh}」目前還沒有預設任務卡`}
+                  </p>
+                  {COMPOSER_CHANNELS.has(platform) && brandId ? (
+                    <>
+                      <p className="text-tiny text-default-400 mb-3">
+                        {lang === "en" ? "You can still create your own." : "你可以自己建一張。"}
+                      </p>
+                      <Button
+                        size="sm"
+                        color="primary"
+                        variant="shadow"
+                        startContent={<FontAwesomeIcon icon={faPlus} />}
+                        onPress={() => { setResumeCardId(null); setComposerOpen(true); }}
+                      >
+                        {lang === "en" ? "New card" : "新增任務卡"}
+                      </Button>
+                    </>
+                  ) : (
+                    <p className="text-tiny text-default-400">
+                      {lang === "en" ? "Coming soon." : "即將上線。"}
+                    </p>
+                  )}
+                </>
+              ) : (
+                // 分類本身有卡，只是這裡只擺常用的那幾張、剛好都不在這個分類——
+                // 不是沒有卡，是托盤沒挑到，該做的是看全部，不是「即將上線」。
+                <>
+                  <FontAwesomeIcon icon={faMagnifyingGlass} className="text-2xl mb-2 text-default-300" />
+                  <p className="mb-3">
+                    {lang === "en" ? "None of your saved cards are in this category." : "常用清單裡沒有這個分類的卡。"}
+                  </p>
+                  <Button size="sm" variant="flat" onPress={() => setShowAllTasks(true)}>
+                    {lang === "en" ? "Show all" : "看全部"}
+                  </Button>
+                </>
+              )}
             </CardBody>
           </Card>
         ) : (
