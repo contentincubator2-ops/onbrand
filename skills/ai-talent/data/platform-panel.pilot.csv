@@ -1,0 +1,37 @@
+# platform-panel.pilot — 2026-09-10 的試點名單（TW + JP，獨立電商）
+#
+# 這是**試點**，不是正式母體：每格 N < 30，只用來驗證「市場會不會改變形狀」。
+# 結論是會：TW 的獨立電商 FB(75%) > IG(63%)，JP 是 IG(100%) >> FB(40%)。
+#
+# 同一天市場收斂到 TW / US，JP 那幾行改成註解 —— 解析器現在會拒收非焦點
+# 市場的代號。數字留在上面這段註解裡，因為那是「市場會改變形狀」的證據。
+#
+# 註解掉的那幾行是量測失敗的（網址猜錯或被擋），留著是為了不要有人再加一次。
+# 正式名單請從開店平台的商店目錄取（CYBERBIZ / SHOPLINE / BASE / STORES…），
+# 那才拿得到「跟客戶同規模」的品牌。
+#
+market,model,name,url
+# TW,dtc-web,鮮乳坊,https://www.freshmilkshop.com   ← 2026-09 量測失敗（fetch failed），網址待補
+TW,dtc-web,印花樂,https://www.inblooom.com
+TW,dtc-web,綠藤生機,https://www.greenvines.com.tw
+TW,dtc-web,茶籽堂,https://www.chatzutang.com
+TW,dtc-web,好日子,https://www.agooday.com
+TW,dtc-web,掌生穀粒,https://www.greeninhand.com
+TW,dtc-web,甘樂文創,https://www.thecan.com.tw
+TW,dtc-web,小茶栽堂,https://www.zenique.net
+# TW,dtc-web,阿舍食堂,https://www.ashefood.com   ← 2026-09 量測失敗（fetch failed），網址待補
+# TW,dtc-web,吉品養生,https://www.jipin.com.tw   ← 2026-09 量測失敗（fetch failed），網址待補
+TW,dtc-web,里仁,https://www.leezen.com.tw
+# TW,dtc-web,天素堂,https://www.tiensutang.com.tw   ← 2026-09 量測失敗（fetch failed），網址待補
+# JP,dtc-web,COHINA,https://cohina.net   ← 2026-09-10 市場收斂到 TW/US，JP 已不在焦點市場（保留紀錄）
+# JP,dtc-web,FABRIC TOKYO,https://fabric-tokyo.com   ← 2026-09-10 市場收斂到 TW/US，JP 已不在焦點市場（保留紀錄）
+# JP,dtc-web,FUJIMI,https://fujimi.me   ← 2026-09 量測失敗（HTTP 403），網址待補
+# JP,dtc-web,ZENB,https://zenb.jp   ← 2026-09-10 市場收斂到 TW/US，JP 已不在焦點市場（保留紀錄）
+# JP,dtc-web,BULK HOMME,https://bulk.co.jp   ← 2026-09-10 市場收斂到 TW/US，JP 已不在焦點市場（保留紀錄）
+# JP,dtc-web,MEDULLA,https://medulla.co.jp   ← 2026-09-10 市場收斂到 TW/US，JP 已不在焦點市場（保留紀錄）
+# JP,dtc-web,BASE FOOD,https://basefood.co.jp   ← 2026-09-10 市場收斂到 TW/US，JP 已不在焦點市場（保留紀錄）
+# JP,dtc-web,Minimal,https://mini-mal.tokyo   ← 2026-09-10 市場收斂到 TW/US，JP 已不在焦點市場（保留紀錄）
+# JP,dtc-web,KINS,https://yourkins.com   ← 2026-09-10 市場收斂到 TW/US，JP 已不在焦點市場（保留紀錄）
+# JP,dtc-web,SHIRO,https://shiro-shiro.jp   ← 2026-09-10 市場收斂到 TW/US，JP 已不在焦點市場（保留紀錄）
+# JP,dtc-web,Aesop Japan,https://www.aesop.com   ← 2026-09 量測失敗（HTTP 403），網址待補
+# JP,dtc-web,土屋鞄,https://www.tsuchiya-kaban.jp   ← 2026-09-10 市場收斂到 TW/US，JP 已不在焦點市場（保留紀錄）
