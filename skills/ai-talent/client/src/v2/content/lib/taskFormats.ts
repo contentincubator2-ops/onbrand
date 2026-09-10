@@ -188,77 +188,105 @@ export const FB_UNMAPPED_BY_DESIGN = new Set<string>([
 ]);
 
 // ── Format category config (IG) ─────────────────────────────────────────────
+/**
+ * 2026-09-11：比照 FB（1d0849e2）把自創與半吊子的用語換成 Instagram 真實用語。
+ *
+ *   Feed 貼文     → 貼文（Instagram 就叫貼文；"Feed" 是我們混進來的英文）
+ *   Carousel 輪播 → 輪播（不必並列英文）
+ *   Story 限時    → 限時動態（「限時」是口語縮寫）
+ *   Live 直播     → 直播
+ *   個人頁        → 個人檔案（Instagram 繁中官方用詞）
+ *   互動 / 工具   → 拆成 留言 ＋ 私訊（Instagram 官方是「Direct 訊息（私訊）」）
+ *   策略 / 月曆   → 移除。7 張策略卡依它們**交付什麼**歸位，見下
+ *
+ * 與 FB 同一條原則：形式軸只描述交付物的形式，「這是一個月的企劃」由 tier
+ * 承擔。IG 的 postType 其實已經記著交付形式，所以這次的對應就是照 postType
+ * 走：feed→貼文、live→直播、reel→Reels、story→限時動態、carousel→輪播、
+ * profile→個人檔案。ig-99-live-first 是 live、ig-99-save-worthy 是 carousel，
+ * 它們本來就不該跟其他策略卡擠在同一格。
+ *
+ * Instagram 沒有對應詞的 3 張放 IG_UNMAPPED_BY_DESIGN，不硬塞。
+ */
 export type IGActiveFormat =
-  | "all" | "Feed 貼文" | "Reels" | "Carousel 輪播"
-  | "Story 限時" | "Live 直播" | "個人頁" | "互動 / 工具" | "策略 / 月曆";
+  | "all" | "貼文" | "輪播" | "Reels" | "限時動態"
+  | "直播" | "個人檔案" | "留言" | "私訊";
 
 export const IG_FORMAT_TABS: { id: IGActiveFormat; label: string; labelEn: string }[] = [
-  { id: "all",            label: "全部",          labelEn: "All"                  },
-  { id: "Feed 貼文",      label: "Feed 貼文",     labelEn: "Feed Posts"           },
-  { id: "Reels",          label: "Reels",         labelEn: "Reels"                },
-  { id: "Carousel 輪播",  label: "Carousel 輪播", labelEn: "Carousel"             },
-  { id: "Story 限時",     label: "Story 限時",    labelEn: "Stories"              },
-  { id: "Live 直播",      label: "Live 直播",     labelEn: "Live"                 },
-  { id: "個人頁",         label: "個人頁",        labelEn: "Profile"              },
-  { id: "互動 / 工具",    label: "互動 / 工具",   labelEn: "Engagement & Tools"   },
-  { id: "策略 / 月曆",    label: "策略 / 月曆",   labelEn: "Strategy & Calendar"  },
+  { id: "all",        label: "全部",       labelEn: "All"      },
+  { id: "貼文",       label: "貼文",       labelEn: "Posts"    },
+  { id: "輪播",       label: "輪播",       labelEn: "Carousel" },
+  // 官方譯名是「連續短片」，但使用者實際講 Reels —— 與 FB 同一個取捨。
+  { id: "Reels",      label: "Reels",      labelEn: "Reels"    },
+  { id: "限時動態",   label: "限時動態",   labelEn: "Stories"  },
+  { id: "直播",       label: "直播",       labelEn: "Live"     },
+  { id: "個人檔案",   label: "個人檔案",   labelEn: "Profile"  },
+  { id: "留言",       label: "留言",       labelEn: "Comments" },
+  { id: "私訊",       label: "私訊",       labelEn: "Direct"   },
 ];
 
 export const IG_TASK_FORMAT_MAP: Record<string, IGActiveFormat> = {
-  // 爆款結構卡（2026-09-05）
-  "ig-30-feed-single-object":        "Feed 貼文",
-  "ig-30-reel-brand-event":          "Reels",
-  "ig-30-carousel-proof-set":        "Carousel 輪播",
-  "ig-30-story-one-action":          "Story 限時",
-  "ig-30-profile-self-insert":       "個人頁",
-  "ig-30-live-host-relay":           "Live 直播",
-  "ig-30-post-platform-firstday":    "互動 / 工具",
-  // Feed 貼文
-  "ig-30-caption-short":         "Feed 貼文",
-  "ig-30-pure-text-hook":        "Feed 貼文",
-  "ig-30-hashtag-set":           "Feed 貼文",
-  "ig-60-feed-full":             "Feed 貼文",
-  "ig-60-countdown-5day":        "Feed 貼文",
-  "ig-60-serial-3":              "Feed 貼文",
-  "ig-60-viral-rewrite":         "Feed 貼文",
-  "ig-60-testimonial-rewrite":   "Feed 貼文",
-  // Reels
+  // ── 貼文 ──────────────────────────────────────────────────────────────
+  "ig-30-caption-short":         "貼文",
+  "ig-30-feed-single-object":    "貼文",
+  "ig-30-pure-text-hook":        "貼文",
+  "ig-60-countdown-5day":        "貼文",
+  "ig-60-feed-full":             "貼文",
+  "ig-60-serial-3":              "貼文",
+  "ig-60-testimonial-rewrite":   "貼文",
+  "ig-60-viral-rewrite":         "貼文",
+  // 2026-09-11：五張 ig-99 策略卡原本在自創的「策略 / 月曆」。它們交付的是
+  // 一個月的貼文（風格與選題不同而已），所以歸貼文；「這是企劃」由 tier 說。
+  "ig-99-document":              "貼文",
+  "ig-99-monthly-calendar":      "貼文",
+  "ig-99-radical-transparency":  "貼文",
+  "ig-99-visual-story":          "貼文",
+  "ig-99-youtility":             "貼文",
+
+  // ── 輪播 ──────────────────────────────────────────────────────────────
+  "ig-30-carousel-proof-set":    "輪播",
+  "ig-30-carousel-structure":    "輪播",
+  "ig-60-carousel-7":            "輪播",
+  "ig-99-save-worthy":           "輪播",
+
+  // ── Reels ─────────────────────────────────────────────────────────────
+  "ig-30-reel-brand-event":      "Reels",
   "ig-30-reel-hook":             "Reels",
   "ig-30-reel-script-full":      "Reels",
   "ig-60-reel-full":             "Reels",
-  // Carousel 輪播
-  "ig-30-carousel-structure":    "Carousel 輪播",
-  "ig-60-carousel-7":            "Carousel 輪播",
-  "ig-99-save-worthy":           "Carousel 輪播",
-  // Story 限時
-  "ig-30-story-text":            "Story 限時",
-  "ig-30-story-repost-strategy": "Story 限時",
-  "ig-60-story-3frame":          "Story 限時",
-  // Live 直播
-  "ig-30-live-opening":          "Live 直播",
-  "ig-60-live-suite":            "Live 直播",
-  "ig-60-live-event":            "Live 直播",
-  "ig-60-live-founder":          "Live 直播",
-  "ig-60-live-versus":            "Live 直播",
-  "ig-60-live-comeback":          "Live 直播",
-  "ig-60-live-collab-drop":       "Live 直播",
-  "ig-60-live-first-ever":        "Live 直播",
-  "ig-60-live-behind-scenes":     "Live 直播",
-  "ig-60-live-crew":              "Live 直播",
-  // 個人頁
-  "ig-30-bio-rewrite":           "個人頁",
-  "ig-60-highlight-suite":       "個人頁",
-  // 互動 / 工具
-  "ig-30-comment-reply":         "互動 / 工具",
-  "ig-30-dm-script":             "互動 / 工具",
-  "ig-30-threads-cross-post":    "互動 / 工具",
-  // 策略 / 月曆
-  "ig-99-monthly-calendar":      "策略 / 月曆",
-  "ig-99-youtility":             "策略 / 月曆",
-  "ig-99-visual-story":          "策略 / 月曆",
-  "ig-99-live-first":            "策略 / 月曆",
-  "ig-99-document":              "策略 / 月曆",
-  "ig-99-radical-transparency":  "策略 / 月曆",
+
+  // ── 限時動態 ──────────────────────────────────────────────────────────
+  "ig-30-story-one-action":      "限時動態",
+  "ig-30-story-repost-strategy": "限時動態",
+  "ig-30-story-text":            "限時動態",
+  "ig-60-story-3frame":          "限時動態",
+
+  // ── 直播 ──────────────────────────────────────────────────────────────
+  // IG 直播卡有 12 張，是這個平台最厚的一格 —— 原本有一張（live-first）被
+  // 分到「策略 / 月曆」，看不出來直播其實是我們最有供給的形式。
+  "ig-30-live-host-relay":       "直播",
+  "ig-30-live-opening":          "直播",
+  "ig-60-live-behind-scenes":    "直播",
+  "ig-60-live-collab-drop":      "直播",
+  "ig-60-live-comeback":         "直播",
+  "ig-60-live-crew":             "直播",
+  "ig-60-live-event":            "直播",
+  "ig-60-live-first-ever":       "直播",
+  "ig-60-live-founder":          "直播",
+  "ig-60-live-suite":            "直播",
+  "ig-60-live-versus":           "直播",
+  "ig-99-live-first":            "直播",
+
+  // ── 個人檔案 ──────────────────────────────────────────────────────────
+  // 限時動態精選就長在個人檔案上，所以精選卡歸這裡，不另開一格。
+  "ig-30-bio-rewrite":           "個人檔案",
+  "ig-30-profile-self-insert":   "個人檔案",
+  "ig-60-highlight-suite":       "個人檔案",
+
+  // ── 留言 ──────────────────────────────────────────────────────────────
+  "ig-30-comment-reply":         "留言",
+
+  // ── 私訊 ──────────────────────────────────────────────────────────────
+  "ig-30-dm-script":             "私訊",
 };
 
 // ── Format category config (LI) ─────────────────────────────────────────────
@@ -544,7 +572,21 @@ export const WEB_TASK_FORMAT_MAP: Record<string, WEBActiveFormat> = {
 export const WEB_UNMAPPED_BY_DESIGN = new Set<string>([]);
 
 /** IG: 目前沒有刻意不分類的卡。新卡不想進 pill 就加進來。 */
-export const IG_UNMAPPED_BY_DESIGN = new Set<string>([]);
+/**
+ * 刻意不進形式分類的卡（只在「全部」出現）。
+ *
+ * 2026-09-11：這 3 張不是 Instagram 的貼文形式。
+ *   主題標籤 30 個套組 —— 是貼文的元件，不是貼文（與 FB 的 hashtag 卡同樣處理）
+ *   IG → Threads 兩張   —— 交付物是 Threads 貼文。Threads 是另一個 app，
+ *                          把它塞進任何一個 Instagram 形式都是說謊。
+ *
+ * Threads 之後若要有自己的通路，這兩張就是第一批卡。
+ */
+export const IG_UNMAPPED_BY_DESIGN = new Set<string>([
+  "ig-30-hashtag-set",
+  "ig-30-post-platform-firstday",
+  "ig-30-threads-cross-post",
+]);
 
 /** LI: 目前沒有刻意不分類的卡。新卡不想進 pill 就加進來。 */
 export const LI_UNMAPPED_BY_DESIGN = new Set<string>([]);

@@ -281,15 +281,15 @@ caption 結構：
     id: "ig-30-story-repost-strategy",
     tier: "30s",
     postType: "story",
-    label: { en: "IG Story 24h Repost Strategy", zh: "IG 限動 24h 後重發策略" },
-    description: { en: "What follows the 24h expiry (highlights / feed remix / new Story)", zh: "限動失效後該怎麼接（精選 / 改編 feed / 新限動）" },
+    label: { en: "IG Story 24h Repost Strategy", zh: "IG 限時動態 24h 後重發策略" },
+    description: { en: "What follows the 24h expiry (highlights / feed remix / new Story)", zh: "限時動態失效後該怎麼接（精選 / 改編 feed / 新限時動態）" },
     agent_id: 220751, // Jake Chou — Insights Storyteller
     skill_slug: "insights-storyteller",
-    primary_question: "原本那則限動是什麼內容？",
-    primary_input: { key: "original_story", placeholder: "貼上限動文字 / 主題", type: "textarea" },
-    inputs: [{ key: "original_story", label: "原限動內容", type: "textarea", required: true }],
-    systemPrompt: `產出限動 24h 失效後的重發策略。
-本則固定走「{label}」這一條路徑（精選封面型＝精選到 Highlight：給「分類名稱」+「封面圖建議」+「保留哪些 sticker」；Feed 改編型＝改編成 Feed Post：給「caption 節錄」+「視覺改造方向」；後續限動型＝發後續限動：給「下一則限動文字」+「sticker 建議」+「掛 stories link / mention」），必須與其他變體明顯不同，嚴禁混用或寫成通用版。
+    primary_question: "原本那則限時動態是什麼內容？",
+    primary_input: { key: "original_story", placeholder: "貼上限時動態文字 / 主題", type: "textarea" },
+    inputs: [{ key: "original_story", label: "原限時動態內容", type: "textarea", required: true }],
+    systemPrompt: `產出限時動態 24h 失效後的重發策略。
+本則固定走「{label}」這一條路徑（精選封面型＝精選到 Highlight：給「分類名稱」+「封面圖建議」+「保留哪些 sticker」；Feed 改編型＝改編成 Feed Post：給「caption 節錄」+「視覺改造方向」；後續限時動態型＝發後續限時動態：給「下一則限時動態文字」+「sticker 建議」+「掛 stories link / mention」），必須與其他變體明顯不同，嚴禁混用或寫成通用版。
 
 直接給可動作的內容（不要寫「思考一下要不要…」這種廢話）。
 另外給 image_style_direction.summary（路徑 1 / 2 用，aspect_ratio="9:16"）。`,
@@ -442,7 +442,7 @@ caption 結構：
     id: "ig-30-story-one-action",
     tier: "30s",
     postType: "story",
-    label: { en: "Story: One Frame, One Action", zh: "IG 限動：一個畫面一個動作" },
+    label: { en: "Story: One Frame, One Action", zh: "IG 限時動態：一個畫面一個動作" },
     description: { en: "Strip the frame to a single act", zh: "畫面只留一件事，讓人立刻動手" },
     agent_id: 180170,              // Nancy Yeh — Social Media Visual Designer
     skill_slug: "brand-story",
@@ -454,7 +454,7 @@ caption 結構：
       takeaway:
         "畫面上只留一個可以互動的東西，看的人就沒有第二個選項——猶豫是被多餘元素製造出來的。",
     },
-    primary_question: "你希望看到限動的人，現在立刻做什麼？",
+    primary_question: "你希望看到限時動態的人，現在立刻做什麼？",
     primary_input: { key: "topic", placeholder: "例：掃碼領券 / 投票選口味 / 私訊關鍵字", type: "textarea" },
     inputs: [
       { key: "topic", label: "希望對方立刻做的那一個動作", type: "textarea", required: true },
@@ -479,9 +479,9 @@ caption 結構：
     id: "ig-30-profile-self-insert",
     tier: "30s",
     postType: "profile",
-    label: { en: "Profile: Let Fans Put Themselves In", zh: "IG 個人頁：讓粉絲把自己放進來" },
+    label: { en: "Profile: Let Fans Put Themselves In", zh: "IG 個人檔案：讓粉絲把自己放進來" },
     description: { en: "Turn brand visuals into a template fans can wear", zh: "把品牌視覺變成粉絲可以套用的模板" },
-    agent_id: 180168,              // 沿用 IG 個人頁現役 agent
+    agent_id: 180168,              // 沿用 IG 個人檔案現役 agent
     skill_slug: "link-in-bio",
     source: {
       type: "viral",
@@ -496,7 +496,7 @@ caption 結構：
     inputs: [
       { key: "topic", label: "可以被粉絲套用的視覺元素", type: "textarea", required: true },
     ],
-    systemPrompt: `你要設計一組「讓粉絲把自己放進品牌視覺」的 IG 個人頁內容。
+    systemPrompt: `你要設計一組「讓粉絲把自己放進品牌視覺」的 IG 個人檔案內容。
 
 要產出三件東西：
 1. 一句可被套用的稱號句型，中間留空給粉絲自己填（例：「我是＿＿＿的第 ＿ 號常客」）。
@@ -504,7 +504,7 @@ caption 結構：
 3. 三組精選封面的命名，讓粉絲一眼看出哪一格是放自己的。
 
 硬規則：
-- 句型要短到能塞進限動疊字，而且填空處不超過兩個。
+- 句型要短到能塞進限時動態疊字，而且填空處不超過兩個。
 - 不要要求粉絲下載任何東西才能參加。
 - bio 不要放公司介紹，放參加方式。
 - 稱號不能有優劣之分，不要製造階級。`,
@@ -670,7 +670,7 @@ export const IG_30S_ORCHESTRA: Record<string, OrchestraConfig> = {
   "ig-30-story-repost-strategy": {
     variants: 3, images: 3, runImageGen: false,
     imageDirectorId: RACHEL_ID, aspectRatio: "9:16", fluxSize: "portrait_9_16", imageQualitySteps: 4,
-    variantLabels: ["精選封面型", "Feed 改編型", "後續限動型"],
+    variantLabels: ["精選封面型", "Feed 改編型", "後續限時動態型"],
     captionMinChars: 100, captionMaxChars: 400,
   },
   "ig-30-threads-cross-post": {
