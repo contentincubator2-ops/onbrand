@@ -65,8 +65,18 @@ export interface GenOptions {
   aspectRatio?: "1:1" | "4:3" | "3:4" | "16:9" | "9:16";
   /** Image size when provider supports explicit pixels. */
   size?: "1024x1024" | "1024x1536" | "1536x1024" | "1024x1792" | "1792x1024";
-  /** For i2v: source image URL. */
+  /** For i2v: source image URL. Also doubles as the MODEL/person photo for
+   *  garment try-on (piapi/kling-try-on) — see garmentImageUrl below. */
   imageUrl?: string;
+  /**
+   * 2026-09-10（CJ「model 跟衣服要分開的」）：服飾上身用——衣服的照片，跟
+   * 上面 imageUrl（真人模特照）是兩張分開的圖，不是同一張裁出來的。
+   * 只有 piapi/kling-try-on 用得到。
+   */
+  garmentImageUrl?: string;
+  /** 這件衣服要套在 model_input 的哪個部位。預設 "dress"（單件連身/上下合一）。
+   *  Kling 的 API 規則：dress_input 不能跟 upper_input/lower_input 混用。 */
+  garmentSlot?: "dress" | "upper" | "lower";
   /** Quality / detail level (provider-dependent). */
   quality?: "low" | "medium" | "high";
   /** Brand id — used for filename + audit. */
@@ -396,6 +406,35 @@ const PIAPI_MAP: Record<string, PiapiSpec> = {
       ...(o.negativePrompt ? { negative_prompt: o.negativePrompt } : {}),
       aspect_ratio: o.aspectRatio ?? "1:1",
     }),
+  },
+  /**
+   * 2026-09-10（CJ「model 跟衣服要分開的」，避開產品變形計畫的服飾分支）：
+   * 服飾上身——衣服（garmentImageUrl）跟真人模特（imageUrl）是兩張分開的圖，
+   * 各自的像素都不重畫，Kling 只負責「把這件衣服穿到這個人身上」這個合成
+   * 動作。這是原本 2026-07-24 決議裡「Phase 2b：PiAPI Kling AI Try-On」，
+   * 之前沒有真的接上；同一批 2026-09-08 影片生成清理只刪了 Kling 的
+   * 「文字/圖片生片」task_type，這支圖片級 API 是分開的端點，沒有被動到。
+   *
+   * 跟 productSceneComposer.ts 的分工：那支是「產品換背景，產品像素不重畫」；
+   * 這支是「衣服穿到人身上，衣服與人的像素個別由 Kling 處理，不是我們合成
+   * 出來的」——服飾上身這個動作本身必然是生成式的（沒有「剪貼」這回事），
+   * 保真的重點在「別把兩者的身份互相污染」（衣服不能被套錯版型、人不能被
+   * 換臉），不是像素級不變形。
+   *
+   * $0.07/張（PiAPI 官網報價，2026-09 查證）。API 規則：dress_input 跟
+   * upper_input/lower_input 不能同時給，所以 buildInput 只送一種。
+   */
+  "piapi/kling-try-on": {
+    model: "kling",
+    task_type: "ai_try_on",
+    sync: true,
+    buildInput: (o) => {
+      if (!o.imageUrl) throw new Error("piapi/kling-try-on: 缺少 model_input（真人模特照）");
+      if (!o.garmentImageUrl) throw new Error("piapi/kling-try-on: 缺少衣服照片（garmentImageUrl）");
+      const slot = o.garmentSlot ?? "dress";
+      const garmentField = slot === "upper" ? "upper_input" : slot === "lower" ? "lower_input" : "dress_input";
+      return { model_input: o.imageUrl, [garmentField]: o.garmentImageUrl, batch_size: 1 };
+    },
   },
 };
 

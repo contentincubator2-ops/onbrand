@@ -305,4 +305,65 @@ Rules:
         throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `合成失敗：${msg}` });
       }
     }),
+
+  /**
+   * 2026-09-10（CJ「model 跟衣服要分開的」）：服飾上身——衣服（garmentImageUrl，
+   * 通常是產品照片庫裡的那件）穿到一張真人模特照（modelImageUrl，通常是品牌
+   * 照片庫裡的模特／繆思）身上。兩張圖各自的身份不互相污染：衣服不是這支自己
+   * 合成的（走 PiAPI Kling 的 ai_try_on，見 mediaGen.ts 的說明），保真的重點
+   * 跟 generateProductScene 不同——那支是「像素不重畫」，這支是「別把兩者的
+   * 身份搞混」。
+   *
+   * 計費暫時掛在 image_imagen 這個既有級距（PiAPI 官網報價 $0.07/張，跟這個
+   * 級距的既有點數換算是否對得上，之後可能要調——這是先求有再求準）。
+   */
+  generateGarmentTryOn: protectedProcedure
+    .input(z.object({
+      brandId: z.number().int().positive(),
+      garmentImageUrl: z.string().url().max(2048),
+      modelImageUrl: z.string().url().max(2048),
+      garmentSlot: z.enum(["dress", "upper", "lower"]).default("dress"),
+      decisionId: z.number().int().positive().optional(),
+      optionId: z.number().int().positive().optional(),
+    }))
+    .mutation(async ({ input, ctx }) => {
+      if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED" });
+      await assertBrandOwner(ctx.user.id, input.brandId);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+      const { assertPoints, deductPoints } = await import("../../platform/core/pointsService");
+      const imageAction = imageActionForRequest({ modelChoice: "imagen-3" }); // → image_imagen
+      await assertPoints(ctx.user.id, imageAction);
+      await deductPoints(ctx.user.id, imageAction, { kind: "brand", id: input.brandId });
+
+      const [ins] = (await db.execute(sql`
+        INSERT INTO generated_images (brandId, decisionId, optionId, provider, model, prompt, sizeSpec, status)
+        VALUES (${input.brandId}, ${input.decisionId ?? null}, ${input.optionId ?? null},
+                'piapi', 'kling-try-on', ${`garment:${input.garmentSlot}`}, '1024x1024', 'pending')
+      `)) as any;
+      const id = Number(ins?.insertId ?? 0);
+
+      try {
+        const { dispatchGenerate } = await import("../core/mediaGen");
+        const r = await dispatchGenerate("piapi/kling-try-on", {
+          prompt: "",
+          imageUrl: input.modelImageUrl,
+          garmentImageUrl: input.garmentImageUrl,
+          garmentSlot: input.garmentSlot,
+          brandId: input.brandId,
+        });
+        if (r.status !== "ready" || !r.url) {
+          throw new Error(r.errorMsg ?? "kling try-on returned no image");
+        }
+        await db.execute(sql`UPDATE generated_images SET url = ${r.url}, status = 'ready', errorMsg = NULL WHERE id = ${id}`);
+        await reconcileImageCharge({ userId: ctx.user.id, prepaidAction: imageAction, result: { status: "ready", provider: "piapi", model: "kling-try-on" } });
+        return { id, url: r.url, status: "ready" as const };
+      } catch (error: any) {
+        const msg = String(error?.message ?? error).slice(0, 400);
+        await db.execute(sql`UPDATE generated_images SET status = 'failed', errorMsg = ${msg} WHERE id = ${id}`);
+        await reconcileImageCharge({ userId: ctx.user.id, prepaidAction: imageAction, result: { status: "failed" } });
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `服飾上身失敗：${msg}` });
+      }
+    }),
 });

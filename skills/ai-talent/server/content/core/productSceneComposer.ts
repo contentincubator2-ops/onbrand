@@ -30,6 +30,14 @@
  * 陰影是確定性算出來的（模糊＋位移＋調暗 alpha 遮罩），不是叫 AI 畫陰影——
  * 這樣陰影的形狀保證跟產品輪廓對得上，Photoroom 的「AI Shadow」也是同一個
  * 原理（自然陰影，不是另一張生成圖）。
+ *
+ * ── 不適用：真人模特穿著商品的照片 ──────────────────────────────────────
+ * 2026-09-10（CJ 看過用 IRIS Girls 真人模特照跑過的側測後：「model 跟衣服要
+ * 分開的」）：這支是設計給「靜物」的——瓶罐、盒裝、單一物件放在桌面上。如果
+ * 輸入的照片是「真人模特穿著這件衣服」，去背會把整個人連衣服一起裁下來，
+ * 變成把「人」跟「衣服」焊在一起搬到新場景，不是我們要的「保留衣服本身」。
+ * 服飾類商品要走 mediaGen.ts 的 piapi/kling-try-on（imageRouter.generateGarmentTryOn）
+ * ——衣服的照片跟真人模特照是兩張分開的輸入，各自的身份不互相污染。
  */
 import sharp from "sharp";
 import { removeProductBackground } from "./productImageCutout";

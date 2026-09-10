@@ -162,4 +162,78 @@ describe("mediaGen image provider request contracts", () => {
 
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
+
+  // 2026-09-10 (CJ「model 跟衣服要分開的」)：garment try-on 送給 PiAPI Kling
+  // 的兩張圖必須各自進對的欄位——衣服跟模特的身份不能在請求層就先搞混。
+  describe("piapi/kling-try-on", () => {
+    beforeEach(() => {
+      vi.stubEnv("PIAPI_KEY", "test-piapi-key");
+    });
+
+    function stubSubmitThenPoll(extraInputAssertions?: (input: any) => void) {
+      const fetchMock = vi.fn()
+        .mockImplementationOnce(async (_url: string, opts: any) => {
+          const body = JSON.parse(String(opts.body));
+          expect(body.model).toBe("kling");
+          expect(body.task_type).toBe("ai_try_on");
+          extraInputAssertions?.(body.input);
+          return new Response(JSON.stringify({ data: { task_id: "tryon-task-1" } }), { status: 200 });
+        })
+        .mockImplementationOnce(async () => new Response(JSON.stringify({
+          data: { status: "completed", output: { image_url: "https://cdn.piapi.ai/tryon-result.png" } },
+        }), { status: 200 }));
+      vi.stubGlobal("fetch", fetchMock);
+      fetchImageBufferMock.mockResolvedValue({ buffer: Buffer.from("tryon-image"), mime: "image/png" });
+      return fetchMock;
+    }
+
+    it("puts the model photo in model_input and the garment in dress_input by default", async () => {
+      stubSubmitThenPoll((input) => {
+        expect(input.model_input).toBe("https://cdn.example.com/model.jpg");
+        expect(input.dress_input).toBe("https://cdn.example.com/garment.jpg");
+        expect(input.upper_input).toBeUndefined();
+        expect(input.lower_input).toBeUndefined();
+      });
+
+      await expect(dispatchGenerate("piapi/kling-try-on", {
+        prompt: "",
+        imageUrl: "https://cdn.example.com/model.jpg",
+        garmentImageUrl: "https://cdn.example.com/garment.jpg",
+      })).resolves.toMatchObject({ status: "ready" });
+    });
+
+    it("routes garmentSlot upper/lower to the matching field, never dress_input", async () => {
+      stubSubmitThenPoll((input) => {
+        expect(input.upper_input).toBe("https://cdn.example.com/garment.jpg");
+        expect(input.dress_input).toBeUndefined();
+      });
+
+      await expect(dispatchGenerate("piapi/kling-try-on", {
+        prompt: "",
+        imageUrl: "https://cdn.example.com/model.jpg",
+        garmentImageUrl: "https://cdn.example.com/garment.jpg",
+        garmentSlot: "upper",
+      })).resolves.toMatchObject({ status: "ready" });
+    });
+
+    it("rejects (no network call) when the model photo is missing — caller (imageRouter) turns this into a friendly error", async () => {
+      const fetchMock = vi.fn();
+      vi.stubGlobal("fetch", fetchMock);
+      await expect(dispatchGenerate("piapi/kling-try-on", {
+        prompt: "",
+        garmentImageUrl: "https://cdn.example.com/garment.jpg",
+      })).rejects.toThrow(/model_input/);
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it("rejects (no network call) when the garment photo is missing", async () => {
+      const fetchMock = vi.fn();
+      vi.stubGlobal("fetch", fetchMock);
+      await expect(dispatchGenerate("piapi/kling-try-on", {
+        prompt: "",
+        imageUrl: "https://cdn.example.com/model.jpg",
+      })).rejects.toThrow(/衣服照片/);
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+  });
 });
