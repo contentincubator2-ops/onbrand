@@ -141,10 +141,19 @@ describe("FB 迴歸案例（這次修的核心）", () => {
     }
   });
 
-  it("跨平台的 cw-* 工具落在 FB 頁時有分類（不然只在「全部」看得到）", () => {
-    // platformOfTaskId 對未知前綴 fallback 成 facebook，與 router 一致
+  it("跨平台的 cw-* 工具落在 FB 頁時有被決定過（分類，或明確不分類）", () => {
+    // platformOfTaskId 對未知前綴 fallback 成 facebook，與 router 一致。
+    //
+    // 2026-09-10：原本要求「必須有分類」。當時 FB 有一個自創的「互動 / 工具」
+    // pill 可以收它們；CJ 要求把自創分類換成 Facebook 真實用語之後那一格
+    // 沒了，而 cw-* 是跨平台工具、本來就不是 Facebook 的貼文形式，硬塞進
+    // 任何一個真實分類都是說謊。
+    //
+    // 所以斷言改成「被決定過」—— 這才是這支測試真正要防的事（默默漏掉），
+    // 而不是「一定要有 pill」。二選一都可以，未做決定才是 bug。
     for (const id of ["cw-60-crosspost-4platform", "cw-60-ab-variants"]) {
-      expect(FB_TASK_FORMAT_MAP[id], id).toBeTruthy();
+      const decided = !!FB_TASK_FORMAT_MAP[id] || FB_UNMAPPED_BY_DESIGN.has(id);
+      expect(decided, `${id} 既沒有分類也不在 FB_UNMAPPED_BY_DESIGN`).toBe(true);
     }
   });
 });

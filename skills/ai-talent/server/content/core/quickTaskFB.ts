@@ -382,7 +382,7 @@ caption 欄位就放這「一個」primary text 本身，不要編號、不要�
     id: "fb-30-pinned-short",
     tier: "30s",
     postType: "pinned",
-    label: { en: "FB Pinned-Post Short Copy", zh: "FB 釘選貼文短文案" },
+    label: { en: "FB Pinned-Post Short Copy", zh: "FB 置頂貼文短文案" },
     description: { en: "Pinned-post copy: who we are + why follow us", zh: "粉專置頂用，講清楚「我們是誰」「為什麼追蹤」" },
     agent_id: 60024,             // Jason Gong | Tech Brand Social Copywriter
     skill_slug: "fb-copywriting",
@@ -391,9 +391,9 @@ caption 欄位就放這「一個」primary text 本身，不要編號、不要�
     inputs: [
       { key: "brand_focus", label: "想讓新訪客知道什麼？", type: "textarea", required: true },
     ],
-    systemPrompt: `產出 FB 釘選貼文文案（150-250 字）。
+    systemPrompt: `產出 FB 置頂貼文文案（150-250 字）。
 結構：① 1 句強烈定位（我們在做什麼，誰受惠）② 3 個具體價值點（用 emoji 條列）③ CTA 引導追蹤 / 點連結。
-釘選會留很久，文案不要寫時效性內容（"最新"、"本月" 都不要）。
+置頂會留很久，文案不要寫時效性內容（"最新"、"本月" 都不要）。
 另外給配圖 style_direction.summary。`,
     preferredModel: "qwen",
     maxTokens: 500,
@@ -669,7 +669,7 @@ caption 直接列出這 10-15 個 hashtag 本身（每個 # 前綴 + 空格分�
     id: "fb-30-story-serial-event",
     tier: "30s",
     postType: "story",
-    label: { en: "Story: Serialise One Event", zh: "FB 限動：把一件事拆成連續劇" },
+    label: { en: "Story: Serialise One Event", zh: "FB 限時動態：把一件事拆成連續劇" },
     description: { en: "Each frame leaves an unanswered question", zh: "每則留一個過夜的問題" },
     agent_id: 30002,              // Sarah Liu — AI Brand Story CMO
     skill_slug: "fb-copywriting",
@@ -706,7 +706,7 @@ caption 直接列出這 10-15 個 hashtag 本身（每個 # 前綴 + 空格分�
     id: "fb-30-pinned-stance",
     tier: "30s",
     postType: "pinned",
-    label: { en: "Pinned: Brand Stance", zh: "FB 釘選：品牌立場宣言" },
+    label: { en: "Pinned: Brand Stance", zh: "FB 置頂：品牌立場宣言" },
     description: { en: "The line you are willing to pay for", zh: "願意付代價的那一句話" },
     agent_id: 60024,              // 沿用 fb-30-pinned-short 的 agent
     skill_slug: "fb-copywriting",
@@ -716,7 +716,7 @@ caption 直接列出這 10-15 個 hashtag 本身（每個 # 前綴 + 空格分�
       metric: "單日社群聲量 +1,400%、270 萬則品牌提及",
       asOf: "2018-09",
       takeaway:
-        "立場要讓一部分人不同意才算立場；釘選的是你願意為它付代價的那句話。",
+        "立場要讓一部分人不同意才算立場；置頂的是你願意為它付代價的那句話。",
     },
     primary_question: "你們有什麼主張，是會讓一部分客人不同意的？",
     primary_input: { key: "topic", placeholder: "例：我們不做折扣 / 我們只用台灣種的 / 我們拒接這類案子", type: "textarea" },

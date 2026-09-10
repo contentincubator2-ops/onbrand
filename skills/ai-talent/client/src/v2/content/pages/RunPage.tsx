@@ -1561,7 +1561,10 @@ export default function RunPage() {
     // proposal-spec 文件。labels 同時涵蓋 squad step 名與新 orchestra 標籤。
     if (/合作\s*Brief|Brief（附件）|資料包|brand\s*brief/i.test(lbl)) return v("generic", "proposal-spec");
     if (/邀約主信|邀請開場|主信|報價回應|議價|追蹤信|後續追蹤|follow-?up|收尾感謝|發布後感謝|結案感謝/i.test(lbl)) return v("email", "dm");
-    if (/已釘選|釘選主文|^釘選/i.test(lbl)) return v("facebook", "pinned");
+    // 2026-09-10 顯示字改成「置頂」之後，這條**必須兩個都收**：
+    // mission_outputs 裡已經存著大量「釘選…」的舊 variantLabel，只認新字
+    // 會讓那些既有產出改用 feed 版型，而且不會有任何地方報錯。
+    if (/已釘選|釘選主文|^釘選|已置頂|置頂主文|^置頂/i.test(lbl)) return v("facebook", "pinned");
     if (/常見問答|常見問題|FAQ|Q&A|問答集/i.test(lbl)) return v("facebook", "qa");
     if (/關於我們|about us/i.test(lbl)) return v("facebook", "about");
     if (/代表案例|客戶成功|case study/i.test(lbl)) return v("facebook", "feed");

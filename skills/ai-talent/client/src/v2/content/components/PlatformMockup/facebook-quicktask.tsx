@@ -321,9 +321,9 @@ export function FBPinned(props: MockupFields) {
     <div className="relative">
       <div className="absolute -top-2 left-4 z-10 bg-default-900 text-white text-tiny px-2 py-1 rounded-full flex items-center gap-1 shadow-md">
         <FontAwesomeIcon icon={faThumbtack} className="text-[10px]" />
-        <span className="font-semibold">{lang === "en" ? "Pinned post" : "釘選貼文"}</span>
+        <span className="font-semibold">{lang === "en" ? "Pinned post" : "置頂貼文"}</span>
       </div>
-      <FBFeed {...props} variantLabel={`${props.variantLabel ?? ""}${lang === "en" ? " (Pinned)" : "（釘選）"}`.trim()} />
+      <FBFeed {...props} variantLabel={`${props.variantLabel ?? ""}${lang === "en" ? " (Pinned)" : "（置頂）"}`.trim()} />
     </div>
   );
 }

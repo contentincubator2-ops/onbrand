@@ -26,101 +26,133 @@
  * 這一步先把「漂了也沒人知道」改成「漂了就紅」。
  */
 
+/**
+ * 2026-09-10 (CJ「我要移除自創的類別名稱，例如多媒體、月曆、互動，改成
+ * Facebook 真實用語。釘選貼文也改成置頂貼文」)
+ *
+ * ── 改了什麼 ─────────────────────────────────────────────────────────
+ *   多媒體      → 拆成 相簿 / Reels / 限時動態（Meta 是三個不同的東西，
+ *                 我們把它們併成一個自己發明的詞）
+ *   釘選貼文    → 置頂貼文（Facebook 繁中官方用「置頂」）
+ *   輪播 Carousel → 輪播（Meta 繁中就叫輪播，不需要並列英文）
+ *   活動 / 系列 → 活動（「系列」是我們的概念，交給 tier 承擔）
+ *   月曆 / 策略 → 移除。裡面 2 張是「交付貼文的企劃」→ 歸貼文；
+ *                 3 張（帳號定位 / 季策略 / 月報）不是貼文形式 → 不分類
+ *   互動 / 工具 → 拆成 留言（Facebook 有）＋ 不分類（主題標籤、跨平台工具）
+ *
+ * ── 一條原則 ─────────────────────────────────────────────────────────
+ * 形式軸只描述**交付物的形式**，數量與規劃層次由 tier（單篇／套組／企劃）
+ * 承擔。所以 30 天行事曆歸「貼文」—— 它交付的就是貼文，只是一次 30 篇。
+ * 這樣「貼文」會變成最大的一格（15 張），那是誠實的：Facebook 自己也沒有
+ * 把貼文再往下分類。
+ *
+ * ── Facebook 沒有對應詞的卡不要硬塞 ──────────────────────────────────
+ * 帳號定位、季策略、月成效報告、主題標籤組、跨平台工具 —— 這五類不是
+ * Facebook 的貼文形式。放進 FB_UNMAPPED_BY_DESIGN（只在「全部」出現），
+ * 不要為它們發明一個聽起來像 Facebook 的詞。那正是這次要移除的東西。
+ *
+ * 廣告先保留單一分類。Meta 的廣告是「目標 × 版位 × 格式」三層，而我們只有
+ * 6 張廣告卡且全部是欄位卡（標題／主文案／說明／CTA），照搬 6 個行銷活動
+ * 目標會有 4 個空分類 —— 開分類要出得了貨，這是 Amazon 與 X 的教訓。
+ */
 export type FBActiveFormat =
-  | "all" | "貼文" | "連結貼文" | "廣告" | "輪播 Carousel"
-  | "多媒體" | "直播" | "釘選貼文" | "活動 / 系列" | "月曆 / 策略" | "互動 / 工具";
+  | "all" | "貼文" | "連結貼文" | "相簿" | "輪播" | "Reels"
+  | "限時動態" | "直播" | "置頂貼文" | "活動" | "留言" | "廣告";
 
 export const FB_FORMAT_TABS: { id: FBActiveFormat; label: string; labelEn: string }[] = [
-  { id: "all",            label: "全部",          labelEn: "All"                },
-  { id: "貼文",           label: "貼文",          labelEn: "Posts"              },
-  { id: "連結貼文",       label: "連結貼文",      labelEn: "Link Posts"         },
-  { id: "廣告",           label: "廣告",          labelEn: "Ads"                },
-  { id: "輪播 Carousel",  label: "輪播 Carousel", labelEn: "Carousel"           },
-  { id: "多媒體",         label: "多媒體",        labelEn: "Media"              },
-  { id: "直播",           label: "直播",          labelEn: "Live"               },
-  { id: "釘選貼文",       label: "釘選貼文",      labelEn: "Pinned Posts"       },
-  { id: "活動 / 系列",    label: "活動 / 系列",   labelEn: "Events & Series"    },
-  { id: "月曆 / 策略",    label: "月曆 / 策略",   labelEn: "Calendar & Strategy"},
-  { id: "互動 / 工具",    label: "互動 / 工具",   labelEn: "Engagement & Tools" },
+  { id: "all",        label: "全部",       labelEn: "All"         },
+  // 順序照粉絲專頁發布工具：先貼文，再各種形式，互動類在後。
+  { id: "貼文",       label: "貼文",       labelEn: "Posts"       },
+  { id: "連結貼文",   label: "連結貼文",   labelEn: "Link Posts"  },
+  { id: "相簿",       label: "相簿",       labelEn: "Albums"      },
+  { id: "輪播",       label: "輪播",       labelEn: "Carousel"    },
+  // Meta 繁中官方譯名是「連續短片」，但台灣行銷人與使用者實際都講 Reels。
+  // 這裡選使用者認得的那個 —— 認得出來比字面正確重要。
+  { id: "Reels",      label: "Reels",      labelEn: "Reels"       },
+  { id: "限時動態",   label: "限時動態",   labelEn: "Stories"     },
+  { id: "直播",       label: "直播",       labelEn: "Live"        },
+  { id: "置頂貼文",   label: "置頂貼文",   labelEn: "Pinned Posts"},
+  { id: "活動",       label: "活動",       labelEn: "Events"      },
+  { id: "留言",       label: "留言",       labelEn: "Comments"    },
+  // 廣告放最後 —— 它是另一個軸（Meta 的廣告管理員），不是貼文形式。
+  { id: "廣告",       label: "廣告",       labelEn: "Ads"         },
 ];
 
 export const FB_TASK_FORMAT_MAP: Record<string, FBActiveFormat> = {
-  // 爆款結構卡（2026-09-05）
-  "fb-30-ad-viral-monologue":      "廣告",
-  "fb-30-reel-self-roast":         "多媒體",
-  "fb-30-carousel-data-recap":     "輪播 Carousel",
-  "fb-30-album-period-recap":      "多媒體",
-  "fb-30-story-serial-event":      "多媒體",
-  "fb-30-pinned-stance":           "釘選貼文",
-  "fb-30-comment-signal-boost":    "互動 / 工具",
-  "fb-30-event-challenge":         "活動 / 系列",
   // ── 貼文 ──────────────────────────────────────────────────────────────
+  // 最大的一格，而且應該是。Facebook 自己也沒有把貼文再往下分類；
+  // 「幾篇」與「是不是企劃」由 tier 表示，不是形式。
   "fb-30-caption-short":          "貼文",
   "fb-30-pure-text-hook":         "貼文",
   "fb-60-single-full":            "貼文",
-  // 2026-08-23：改寫類三張本質上就是貼文（差別在素材來源：爆款 / 客戶
-  // 見證 / 時事），退役前沒有 fb-90 對應，是這次新判的。
+  // 改寫類：差別在素材來源（爆款 / 客戶見證 / 時事），交付物都是單篇貼文。
   "fb-99-viral-rewrite":          "貼文",
   "fb-99-testimonial-rewrite":    "貼文",
   "fb-99-trend-rewrite":          "貼文",
-  // 同上，方法論驅動但交付物就是單篇貼文
+  // 方法論驅動，交付物仍是貼文。
   "fb-99-offer-first":            "貼文",
   "fb-99-magnetic-marketing":     "貼文",
+  // 2026-09-10：以下六張原本散在「活動 / 系列」與「月曆 / 策略」。它們交付
+  // 的都是貼文（連載 3 篇、倒數 5 / 14 天、30 天行事曆、發表會劇本），
+  // 只是篇數不同 —— 那是 tier 的事，不是形式的事。
+  "fb-99-serial-3":               "貼文",
+  "fb-30-countdown-1day":         "貼文",
+  "fb-60-countdown-5day":         "貼文",
+  "fb-99-14day-countdown":        "貼文",
+  "fb-99-30day-calendar":         "貼文",
+  "fb-99-monthly-calendar-promo": "貼文",
+  "fb-99-mass-control":           "貼文",
 
   // ── 連結貼文 ──────────────────────────────────────────────────────────
   "fb-30-link-caption":           "連結貼文",
   "fb-60-link-full":              "連結貼文",
 
-  // ── 廣告 ──────────────────────────────────────────────────────────────
-  "fb-30-ad-headline":            "廣告",
-  "fb-30-ad-primary":             "廣告",
-  "fb-30-ad-cta":                 "廣告",
-  "fb-30-ad-description":         "廣告",
-  "fb-60-ad-pack-3":              "廣告",
+  // ── 相簿 ──────────────────────────────────────────────────────────────
+  "fb-60-album-4":                "相簿",
+  "fb-30-album-period-recap":     "相簿",
 
-  // ── 輪播 Carousel ─────────────────────────────────────────────────────
-  // 接手已退役的 fb-90-carousel-10frame。這個 pill 先前 count===0 完全不
-  // 渲染，等於兩張輪播卡沒有入口。
-  "fb-99-carousel-5":             "輪播 Carousel",
-  "fb-99-carousel-cvo":           "輪播 Carousel",
+  // ── 輪播 ──────────────────────────────────────────────────────────────
+  "fb-99-carousel-5":             "輪播",
+  "fb-99-carousel-cvo":           "輪播",
+  "fb-30-carousel-data-recap":    "輪播",
 
-  // ── 多媒體（Album + Reels + Story）─────────────────────────────────────
-  "fb-60-album-4":                "多媒體",
-  "fb-30-story-text":             "多媒體",
-  "fb-99-reels-script":           "多媒體",   // 接手 fb-90-reels-full
+  // ── Reels ─────────────────────────────────────────────────────────────
+  // 2025-06 起 Meta 把 Facebook 所有影片統一成 Reels，所以 FB 沒有獨立的
+  // 「影片貼文」分類 —— 影片類一律歸這裡。
+  "fb-99-reels-script":           "Reels",
+  "fb-30-reel-self-roast":        "Reels",
+
+  // ── 限時動態 ──────────────────────────────────────────────────────────
+  "fb-30-story-text":             "限時動態",
+  "fb-30-story-serial-event":     "限時動態",
 
   // ── 直播 ──────────────────────────────────────────────────────────────
   "fb-30-live-title":             "直播",
   "fb-60-live-suite":             "直播",
 
-  // ── 釘選貼文 ──────────────────────────────────────────────────────────
-  "fb-30-pinned-short":           "釘選貼文",
-  "fb-60-pinned-suite":           "釘選貼文",
+  // ── 置頂貼文 ──────────────────────────────────────────────────────────
+  "fb-30-pinned-short":           "置頂貼文",
+  "fb-60-pinned-suite":           "置頂貼文",
+  "fb-30-pinned-stance":          "置頂貼文",
 
-  // ── 活動 / 系列 ───────────────────────────────────────────────────────
-  "fb-30-countdown-1day":         "活動 / 系列",
-  "fb-60-countdown-5day":         "活動 / 系列",
-  "fb-60-launch-kit":             "活動 / 系列",
-  "fb-99-14day-countdown":        "活動 / 系列",  // 接手 fb-90-countdown-series
-  "fb-99-mass-control":           "活動 / 系列",  // 大型發表會劇本 ≈ 舊 fb-90-event-launch
-  "fb-99-serial-3":               "活動 / 系列",  // 3 篇連載＝系列
+  // ── 活動 ──────────────────────────────────────────────────────────────
+  // 只留真的以「活動」為主體的兩張。倒數與發表會劇本交付的是貼文，見上。
+  "fb-30-event-challenge":        "活動",
+  "fb-60-launch-kit":             "活動",
 
-  // ── 月曆 / 策略 ───────────────────────────────────────────────────────
-  // 這個 pill 先前四個 key 全是死的 fb-90-*，count===0 直接不渲染。
-  "fb-99-30day-calendar":         "月曆 / 策略",
-  "fb-99-monthly-calendar-promo": "月曆 / 策略",
-  "fb-99-account-reposition":     "月曆 / 策略",
-  "fb-99-quarterly-strategy":     "月曆 / 策略",
-  "fb-99-monthly-analytics":      "月曆 / 策略",
+  // ── 留言 ──────────────────────────────────────────────────────────────
+  "fb-30-comment-reply":          "留言",
+  "fb-30-comment-signal-boost":   "留言",
 
-  // ── 互動 / 工具 ───────────────────────────────────────────────────────
-  "fb-30-comment-reply":          "互動 / 工具",
-  "fb-30-hashtag-set":            "互動 / 工具",
-  // 2026-08-23: cw-* 是跨平台工具，因為 id 前綴沒有對應規則，在 router 裡
-  // fallback 成 facebook（與 platformOfTaskId 一致），所以實際出現在 FB 頁。
-  // 它們不是 FB 的貼文「形式」，歸到工具類（與 hashtag-set / comment-reply 同性質）。
-  "cw-60-crosspost-4platform":    "互動 / 工具",
-  "cw-60-ab-variants":            "互動 / 工具",
+  // ── 廣告 ──────────────────────────────────────────────────────────────
+  // 這 6 張全部是「廣告的欄位」（標題／主文案／說明／CTA／完整包／腳本），
+  // 跟 Meta 的廣告層一致，但那是第五層。要按行銷活動目標分類得先補卡。
+  "fb-30-ad-headline":            "廣告",
+  "fb-30-ad-primary":             "廣告",
+  "fb-30-ad-cta":                 "廣告",
+  "fb-30-ad-description":         "廣告",
+  "fb-60-ad-pack-3":              "廣告",
+  "fb-30-ad-viral-monologue":     "廣告",
 };
 
 /**
@@ -133,7 +165,27 @@ export const FB_TASK_FORMAT_MAP: Record<string, FBActiveFormat> = {
  * —— 它們根本不會出現在清單裡，給分類等於再造一批死 key（正是這次要修的
  * 病）。哪天 allowlist 放行了，測試 ② 會逼你回來做決定。
  */
-export const FB_UNMAPPED_BY_DESIGN = new Set<string>([]);
+/**
+ * 刻意不進形式分類的卡（只在「全部」出現）。
+ *
+ * 2026-09-10：這五類**不是 Facebook 的貼文形式**，硬塞進任何一格都是說謊，
+ * 而替它們發明一個聽起來像 Facebook 的詞正是這次要移除的東西。
+ *
+ *   帳號定位 / 季策略 / 月成效報告 —— 交付物是文件與報告，不是貼文
+ *   主題標籤建議組                 —— 是貼文的元件，不是貼文
+ *   跨平台一稿四發 / A/B 雙版本     —— 工具，而且不專屬 Facebook
+ *
+ * 後續選項（不在這次範圍）：把前三張搬到 brand 或規劃型頻道，那裡的產出
+ * 形狀本來就是文件。搬頻道比改標籤動得多，所以先只改使用者看到的這一層。
+ */
+export const FB_UNMAPPED_BY_DESIGN = new Set<string>([
+  "fb-99-account-reposition",
+  "fb-99-quarterly-strategy",
+  "fb-99-monthly-analytics",
+  "fb-30-hashtag-set",
+  "cw-60-crosspost-4platform",
+  "cw-60-ab-variants",
+]);
 
 // ── Format category config (IG) ─────────────────────────────────────────────
 export type IGActiveFormat =

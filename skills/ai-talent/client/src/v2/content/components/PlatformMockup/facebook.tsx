@@ -36,11 +36,13 @@ export function FBFeed({ title, brandName, brandLogoUrl, variantLabel, liveCapti
       <MockupHeader icon={faFacebook} label="Facebook" variantLabel={variantLabel} />
       <div className="bg-content1 border border-divider rounded-xl overflow-hidden shadow-lg">
         {/* 2026-05-18 (CJ「釘選主文應該有個 PIN」): FB pinned-post chrome
-            — the small "📌 已釘選貼文" row FB shows above a pinned post. */}
+            2026-09-10 (CJ「釘選貼文也改成置頂貼文」): 顯示字改為 Facebook
+            繁中官方用語「置頂貼文」。CJ 原話保留在上一行當紀錄。
+            — the small "📌 置頂貼文" row FB shows above a pinned post. */}
         {pinned && (
           <div className="px-4 pt-3 pb-1 flex items-center gap-1.5 text-tiny text-default-500 font-medium border-b border-divider/60">
             <FontAwesomeIcon icon={faThumbtack} className="text-[11px] -rotate-45" />
-            {lang === "en" ? "Pinned post" : "已釘選貼文"}
+            {lang === "en" ? "Pinned post" : "置頂貼文"}
           </div>
         )}
         <div className="px-4 py-3 flex items-center gap-3">
