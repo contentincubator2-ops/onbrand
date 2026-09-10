@@ -35,6 +35,7 @@ import {
   EM_FORMAT_TABS, EM_TASK_FORMAT_MAP, type EMActiveFormat,
   PR_FORMAT_TABS, PR_TASK_FORMAT_MAP, type PRActiveFormat,
   WEB_FORMAT_TABS, WEB_TASK_FORMAT_MAP, type WEBActiveFormat,
+  adFormatText,
 } from "../lib/taskFormats";
 import type { ShellOutletCtx } from "../../app/shell/ShellLayout";
 import { buildContextChips, resolveDerive } from "../lib/taskContextResolver";
@@ -2238,6 +2239,22 @@ function PlatformTaskPageInner() {
                               {sourcePillText(src, lang)}
                             </span>
                           </span>
+                        );
+                      })()}
+                      {/* 2026-09-11 (CJ「還是沒有直接打開，就可以看到那些廣告形式的文字」)：
+                          Meta 的四種廣告格式（圖像／影片／輪播／精選集）在產品裡一個字都沒
+                          出現過。它不能當 pill 分類 —— 我們 6 張廣告卡全是欄位卡（標題／
+                          主要文字／說明／行動呼籲），一組標題四種格式都能用，硬分會變成
+                          三個空分類。所以印在卡片上當屬性：使用者打開頁面就看得到 Meta 的
+                          用語，而我們沒有謊稱每種格式都有專屬的卡。
+                          只有 adFormats 有值的卡才渲染這一行 —— 259 張裡目前只有 6 張。 */}
+                      {(() => {
+                        const fmt = adFormatText((task as any).adFormats, lang);
+                        if (!fmt) return null;
+                        return (
+                          <p className="text-[12px] text-default-500">
+                            {lang === "en" ? "Ad formats: " : "適用格式："}{fmt}
+                          </p>
                         );
                       })()}
                       {/* 2026-09-08 出處與說明：點開看這張卡憑什麼、什麼時候用、上架日。

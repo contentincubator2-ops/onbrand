@@ -240,6 +240,8 @@ ${FB60_TONE}`,
     id: "fb-60-ad-pack-3",
     tier: "60s", postType: "ad",
     label: { en: "FB Full Ad Pack A/B/C", zh: "FB 廣告完整包 A/B/C" },
+    // 完整包給的是三組文案（含主要文字與配圖方向），四種格式都用得上。
+    adFormats: ["image", "video", "carousel", "collection"],
     description: { en: "3 standalone ads (emotional / rational / contrast), each with full caption + 3 image styles", zh: "3 個獨立廣告（情感 / 理性 / 反差切角），每個含完整 caption + 3 張配圖風格" },
     agent_id: 224179, // Lorenzo Dela Rosa — Social Media Strategist Health PH (1145 char)
     skill_slug: "fb-ad-copy",

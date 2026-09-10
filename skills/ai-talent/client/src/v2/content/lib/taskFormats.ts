@@ -166,6 +166,34 @@ export const FB_TASK_FORMAT_MAP: Record<string, FBActiveFormat> = {
  * 病）。哪天 allowlist 放行了，測試 ② 會逼你回來做決定。
  */
 /**
+ * Meta 廣告格式的顯示名。
+ *
+ * 2026-09-11 (CJ「還是沒有直接打開，就可以看到那些廣告形式的文字」)
+ *
+ * 識別碼在 server（quickTaskFB.ts 的 AdFormat），顯示名在這裡 —— 與
+ * taskSource / tierVocabulary 同一套分工。client 不 import server（跨邊界
+ * 規則），所以這裡是各自宣告的一份，鍵值必須跟 AdFormat 對得上。
+ *
+ * 四種是 Meta ads-guide 導覽列的全部，不是我們歸納的。
+ */
+export const AD_FORMAT_LABELS: Record<string, { zh: string; en: string }> = {
+  image:      { zh: "圖像",   en: "Image"      },
+  video:      { zh: "影片",   en: "Video"      },
+  carousel:   { zh: "輪播",   en: "Carousel"   },
+  collection: { zh: "精選集", en: "Collection" },
+};
+
+/** 卡片上那一行「適用格式：圖像 · 影片 · 輪播 · 精選集」。沒有就回 null。 */
+export function adFormatText(formats: unknown, lang: string): string | null {
+  if (!Array.isArray(formats) || formats.length === 0) return null;
+  const names = formats
+    .map((f) => AD_FORMAT_LABELS[String(f)])
+    .filter(Boolean)
+    .map((l) => (lang === "en" ? l!.en : l!.zh));
+  return names.length ? names.join(" · ") : null;
+}
+
+/**
  * 刻意不進形式分類的卡（只在「全部」出現）。
  *
  * 2026-09-10：這五類**不是 Facebook 的貼文形式**，硬塞進任何一格都是說謊，

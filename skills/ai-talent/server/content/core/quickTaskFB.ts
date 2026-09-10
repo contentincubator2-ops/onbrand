@@ -53,6 +53,15 @@ export interface TaskInput {
   derive?: InputDerive;
 }
 
+/**
+ * Meta 的廣告格式。就這四種 —— 來源是 facebook.com/business/ads-guide 的
+ * 導覽列，不是我們歸納的。
+ *
+ * 「即時體驗」（Instant Experience）刻意不列：它是點擊後的全螢幕著陸體驗，
+ * 包在上面四種之外，不是並列的第五種格式。
+ */
+export type AdFormat = "image" | "video" | "carousel" | "collection";
+
 export interface FBTaskTemplate {
   id: string;                              // e.g. "fb-30-caption-short"
   tier: "30s" | "60s" | "90s" | "99s";
@@ -85,6 +94,25 @@ export interface FBTaskTemplate {
    * 卡片會把它印在 pill 上，答不出來比不標更傷。
    */
   source?: TaskSource;
+  /**
+   * 2026-09-11 (CJ「還是沒有直接打開，就可以看到那些廣告形式的文字」)
+   *
+   * 這張廣告卡產出的東西可以用在 Meta 的哪幾種廣告格式。
+   *
+   * ── 為什麼是屬性而不是分類 ───────────────────────────────────────
+   * Meta 的廣告格式只有四種（圖像／影片／輪播／精選集，見 ads-guide 導覽列），
+   * 但我們的 6 張廣告卡全部是**欄位卡**：標題、主要文字、說明、行動呼籲。
+   * 一組標題四種格式都能用 —— 它不屬於任何一種格式，而是跨全部。
+   *
+   * 所以格式不能當 pill 分類（那會變成三個空分類，違反「開分類要出得了貨」），
+   * 但它應該印在卡片上，因為使用者打開頁面時要看得到 Meta 的用語。
+   * 只有真的綁定單一格式的卡才會只填一個（例如一鏡到底腳本＝影片）。
+   *
+   * 識別碼用英文，顯示名在 client/src/v2/content/lib/taskFormats.ts ——
+   * 與 taskSource / tierVocabulary 同一套分工：識別碼永不改名，顯示名隨時
+   * 可改而且只改一個地方。
+   */
+  adFormats?: AdFormat[];
   primary_question?: string;
   primary_input?: { key: string; placeholder?: string; type: "text" | "textarea"; derive?: InputDerive };
   inputs: TaskInput[];
@@ -271,6 +299,8 @@ output: caption 放回覆文，description 放原始用戶留言（用於 mockup
     tier: "30s",
     postType: "ad",
     label: { en: "FB Ad Headlines ×5", zh: "FB 廣告標題 5 種" },
+    adFormats: ["image", "video", "carousel", "collection"],
+
     description: { en: "5 ad headlines from different angles (under 25 chars) — paste straight into Ads Manager", zh: "5 種切角的廣告標題（25 字內），直接複製到 Ads Manager 用" },
     agent_id: 239023,             // Ellis Yeh — VP Breakthrough Advertising（Eugene Schwartz headline 大師）
     skill_slug: "fb-ad-copy",
@@ -299,8 +329,10 @@ caption 欄位就放這「一個」headline 本身，不要解釋、不要前綴
     id: "fb-30-ad-primary",
     tier: "30s",
     postType: "ad",
-    label: { en: "FB Ad Primary Text ×5", zh: "FB 廣告主文案 5 種" },
-    description: { en: "5 primary texts in different voices (80-150 words) for different audience psychologies", zh: "5 種口吻的廣告主內文（80-150 字），對應不同受眾心理" },
+    label: { en: "FB Ad Primary Text ×5", zh: "FB 廣告主要文字 5 種" },
+    adFormats: ["image", "video", "carousel", "collection"],
+
+    description: { en: "5 primary texts in different voices (80-150 words) for different audience psychologies", zh: "5 種口吻的廣告主要文字（80-150 字），對應不同受眾心理" },
     agent_id: 224114,             // Bùi Thị Thu — Social Media Strategist eCommerce (1160 char)
     skill_slug: "fb-ad-copy",
     primary_question: "這檔廣告的主題 / 產品 / 受眾？",
@@ -329,6 +361,8 @@ caption 欄位就放這「一個」primary text 本身，不要編號、不要�
     tier: "30s",
     postType: "ad",
     label: { en: "FB Ad CTAs ×5", zh: "FB 廣告行動呼籲 5 種" },
+    adFormats: ["image", "video", "carousel", "collection"],
+
     description: { en: "5 CTA button texts + when to use each", zh: "5 個 CTA 按鈕文字 + 每個 CTA 的搭配情境建議" },
     agent_id: 239024,             // Emerson Huang — VP Customer Value Optimization（funnel CTA）
     skill_slug: "fb-ad-copy",
@@ -357,8 +391,11 @@ caption 欄位就放這「一個」primary text 本身，不要編號、不要�
     id: "fb-30-ad-description",
     tier: "30s",
     postType: "ad",
-    label: { en: "FB Link-Ad Descriptions ×5", zh: "FB 連結廣告說明文字 5 種" },
-    description: { en: "Link-ad description (under 30 chars), 5 angles", zh: "連結廣告下方 description（30 字內），5 種切入角度" },
+    label: { en: "FB Link-Ad Descriptions ×5", zh: "FB 廣告說明 5 種（連結廣告）" },
+    // 精選集沒有「說明」這一欄，所以只列三種。
+    adFormats: ["image", "video", "carousel"],
+
+    description: { en: "Link-ad description (under 30 chars), 5 angles", zh: "連結廣告的「說明」欄（30 字內），5 種切入角度" },
     agent_id: 224054,             // Mei Xin Ho — Social Media Strategist Health SG (1148 char)
     skill_slug: "fb-ad-copy",
     primary_question: "連結要導向哪？產品頁 / 活動頁 / 文章 / app 下載？",
@@ -520,6 +557,9 @@ caption 直接列出這 10-15 個 hashtag 本身（每個 # 前綴 + 空格分�
     tier: "30s",
     postType: "ad",
     label: { en: "Self-Roast Ad Monologue", zh: "FB 廣告：一鏡到底自嘲腳本" },
+    // 唯一綁定單一格式的廣告卡 —— 它產出的是影片腳本。
+    adFormats: ["video"],
+
     description: { en: "Opens with your own worst review", zh: "用自家最常被嫌的那一點開場" },
     agent_id: 224114,              // Ivy Kuo — FB Ad Copy
     skill_slug: "fb-ad-copy",
