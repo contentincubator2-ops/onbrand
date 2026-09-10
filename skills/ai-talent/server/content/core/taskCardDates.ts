@@ -5,7 +5,7 @@
  * `npm run cards:dates` 重新產生並一起 commit；taskCardDates.test.ts 會確認
  * 目錄裡每一張卡都查得到日期。
  *
- * 產生時間：2026-09-07，453 個 id。
+ * 產生時間：2026-09-10，463 個 id。
  */
 export const TASK_CARD_DATES: Record<string, string> = {
   "apply": "2026-04-26",
@@ -428,6 +428,16 @@ export const TASK_CARD_DATES: Record<string, string> = {
   "wg-web-longform": "2026-08-29",
   "wg-web-meetten": "2026-08-29",
   "write": "2026-04-26",
+  "x-30-build-in-public": "2026-09-10",
+  "x-30-data-hook": "2026-09-10",
+  "x-30-hot-take": "2026-09-10",
+  "x-30-industry-reply": "2026-09-10",
+  "x-30-launch": "2026-09-10",
+  "x-30-thread-howto": "2026-09-10",
+  "x-30-thread-listicle": "2026-09-10",
+  "x-30-thread-story": "2026-09-10",
+  "x-30-thread-teardown": "2026-09-10",
+  "x-30-tip": "2026-09-10",
   "yt-100-premiere-kit": "2026-05-06",
   "yt-100-quarterly-strategy": "2026-05-06",
   "yt-100-series-6ep": "2026-05-06",
