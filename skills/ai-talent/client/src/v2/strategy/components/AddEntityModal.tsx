@@ -21,7 +21,8 @@ import { useLang } from "../../../lib/i18n";
 import { Modal, ModalBody, ModalContent, ModalFooter, ModalHeader, Button, Input, Textarea, Select, SelectItem, Autocomplete, AutocompleteItem } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faRocket, faCubes, faCalendarDays } from "@fortawesome/free-solid-svg-icons";
-import { COUNTRIES, getCountry } from "../../../lib/countries";
+// 2026-09-10 (CJ 市場收斂): 見 BrandOnboardingWizard 的同一則說明。
+import { marketOptions, getCountry } from "../../../lib/countries";
 
 // 2026-07-18 (CJ 多市場): same list as BrandOnboardingWizard — common
 // languages first; the selected country's native language is auto-added.
@@ -305,7 +306,7 @@ export function AddEntityModal({ isOpen, onClose, initialTab = "brand", defaultB
                     defaultSelectedKey={brandCountry}
                     onSelectionChange={(key) => { if (key) handleBrandCountryChange(String(key)); }}
                   >
-                    {COUNTRIES.map((c) => (
+                    {marketOptions(brandCountry).map((c) => (
                       <AutocompleteItem key={c.code} textValue={`${c.emoji} ${lang === "en" ? c.name : (c.nameZh ?? c.name)} (${c.code})`}>
                         <div className="flex items-center gap-2">
                           <span className="text-base">{c.emoji}</span>

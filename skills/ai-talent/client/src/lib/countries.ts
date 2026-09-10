@@ -200,3 +200,56 @@ export function getCountryDisplayName(code: string, lang: "zh-TW" | "en"): strin
 export const COUNTRY_MAP: Record<string, CountryOption> = Object.fromEntries(
   COUNTRIES.map(c => [c.code, c])
 );
+
+// ─────────────────────────────────────────────────────────────────────
+// 焦點市場
+// ─────────────────────────────────────────────────────────────────────
+
+/**
+ * 2026-09-10 (CJ「我先做台灣跟美國就好，其他市場都可以先砍掉，要做得很細緻，
+ * 很精準」)
+ *
+ * 當天稍早先收到 14 個（台灣與中國出口量較大的市場），同一天決定再收到 2 個。
+ * 理由是深度：14 個市場每個都做得半吊子，不如兩個做到精準。
+ *
+ * ── 這個決定順帶解掉一個問題 ──────────────────────────────────────────
+ * 14 個版本裡有 5 個（馬來西亞 ms、越南 vi、印尼 id、巴西 pt、阿聯酋 ar）在
+ * server 端沒有 master persona —— copywritingMaster.resolveMarketCode 對它們
+ * 回 null，prompt 會整塊省略人設，而畫面上不會有任何提示。加拿大則會默默
+ * 落到 en-US。收到 TW / US 之後這條全部消失：
+ *
+ *   台灣 zh-TW → MarketCode "zh-TW" ✅
+ *   美國 en    → MarketCode "en-US" ✅
+ *
+ * 兩個都有完整人設。要再開市場之前，先確認 copywritingMaster 有對應的
+ * MarketCode，否則就是開一個沒有人設的市場。
+ *
+ * ── COUNTRIES 為什麼保持完整 ─────────────────────────────────────────
+ *   COUNTRIES     解析用。getCountry / getCountryDisplayName 仍要認得舊資料
+ *                 的市場代號，砍掉會讓既有品牌的市場欄位變成空白，等於逼
+ *                 他改市場。
+ *   FOCUS_MARKETS 選單用。新品牌只能從這 2 個裡選。
+ */
+export const FOCUS_MARKET_CODES = ["TW", "US"] as const;
+
+export type FocusMarketCode = typeof FOCUS_MARKET_CODES[number];
+
+/** 選單用的焦點市場，順序即顯示順序。 */
+export const FOCUS_MARKETS: CountryOption[] = FOCUS_MARKET_CODES
+  .map(code => COUNTRY_MAP[code])
+  .filter((c): c is CountryOption => !!c);
+
+/**
+ * 市場選單的選項。
+ *
+ * `current` 是這個品牌目前存著的市場代號。它若不在焦點市場裡（舊資料選了
+ * 日本、泰國…），就補在最後並保持可選 —— 否則使用者一打開設定就會看到市場
+ * 欄位是空的，而他根本沒動過。這條在收到 2 個市場之後更重要：先前選過其他
+ * 市場的品牌不該因為我們縮範圍就被清空。
+ */
+export function marketOptions(current?: string | null): CountryOption[] {
+  const cur = (current ?? "").trim().toUpperCase();
+  if (!cur || FOCUS_MARKET_CODES.includes(cur as FocusMarketCode)) return FOCUS_MARKETS;
+  const extra = COUNTRY_MAP[cur];
+  return extra ? [...FOCUS_MARKETS, extra] : FOCUS_MARKETS;
+}
