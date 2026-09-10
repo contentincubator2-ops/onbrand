@@ -119,6 +119,63 @@ async function backfillProductMeta(args: {
 }
 
 // ── product router ─────────────────────────────────────────────────────────
+/** onboarding 一次最多收幾個商品頁網址。刻意訂低 —— 這不是批次匯入工具，
+ *  是「先設定幾個優先產品」。要大量匯入走產品頁的批次功能。 */
+const MAX_INTAKE_URLS = 8;
+
+/** 產品數量級距。純粹用來推薦方案（products 額度：基礎 0、專業 10），
+ *  不需要爬任何東西就答得出來 —— 這是 CJ 偏好問級距而非掃描的理由。 */
+export const PRODUCT_COUNT_BANDS = ["none", "1-3", "4-10", "11-30", "31-100", "100+"] as const;
+export type ProductCountBand = typeof PRODUCT_COUNT_BANDS[number];
+
+export interface ProductImportResult {
+  url: string;
+  /** 抓到的中介資料層級。none = 什麼都讀不到，前端要退回手填。 */
+  source: "jsonld" | "og" | "title" | "none" | "unsafe";
+  /** source 不是 none/unsafe，也就是至少讀到名稱。 */
+  readable: boolean;
+  name?: string;
+  price?: string;
+  description?: string;
+  productId?: number;
+  /** 沒建產品的原因。plan = 方案沒有產品定位；quota = 額度用完。 */
+  skipped?: "plan" | "quota" | "error";
+  error?: string;
+}
+
+/** 與 client autoSlug 同一套規則（小寫、去音標、非字母數字換成 -、加亂碼尾）。 */
+function slugFromName(name: string): string {
+  const base = name.toLowerCase().trim()
+    .normalize("NFKD").replace(/[̀-ͯ]/g, "")
+    .replace(/[^a-z0-9-]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, 80);
+  return `${base || "product"}-${Math.random().toString(36).slice(2, 6)}`;
+}
+
+/** 單一網址：先過 SSRF 白名單，再抓中介資料。任何失敗都回結果，不 throw ——
+ *  一個網址壞掉不該讓整批匯入失敗（onboarding 每一步都要能繼續）。 */
+async function importOneProductUrl(args: { url: string }): Promise<ProductImportResult> {
+  const { url } = args;
+  try {
+    await assertUrlSafe(url);
+  } catch {
+    // 內網位址、非 http(s)、DNS 解析不到 —— 一律不抓，也不要回報細節。
+    return { url, source: "unsafe", readable: false };
+  }
+  const meta = await fetchProductMeta(url);
+  const readable = meta.source !== "none" && !!meta.name;
+  return {
+    url,
+    source: meta.source,
+    readable,
+    ...(meta.name ? { name: meta.name } : {}),
+    ...(meta.price ? { price: formatProductPrice(meta.price, meta.currency) } : {}),
+    ...(meta.description ? { description: meta.description.slice(0, 500) } : {}),
+  };
+}
+
 export const productRouter = router({
   list: protectedProcedure
     .input(z.object({ brandId: z.number().nullable().optional() }).optional())
@@ -245,6 +302,147 @@ export const productRouter = router({
         [input.imageUrl, input.id, userId],
       );
       return { ok: true as const, imageUrl: input.imageUrl };
+    }),
+
+  /**
+   * importFromUrls — 從商品頁網址逐頁匯入產品。onboarding 第 2 步用。
+   *
+   * 2026-09-10 (CJ「因為官網掃描的功能，持續不穩定，所以我還是偏好問產品
+   * 數量，或是他可以貼上幾個優先設定的產品網址」)
+   *
+   * ── 為什麼不用 productDiscovery ───────────────────────────────────
+   * productDiscovery 是**全站爬**（crawlWebsite → LLM 抽最多 50 個產品）。
+   * 同日實測 8 個商品頁：Shopify 站（gymshark）有完整 JSON-LD Product，
+   * 而 Amazon 對 bot 回 404、自架 SPA 回 200 但只有 1KB 空殼。成敗由對方
+   * 站台的技術棧決定，不是我們能修的 —— 所以不要在 onboarding 賭它。
+   *
+   * 這支走 fetchProductMeta 的**單頁**路徑（JSON-LD → OG tag → title 三層
+   * cascade），而且它會自報是哪一層抓到的（meta.source）。前端直接顯示那
+   * 個層級，抓不到就退回手填 —— 不假裝抓到了。
+   *
+   * ── 額度為 0 時為什麼還是收下網址 ────────────────────────────────
+   * products 額度：試用 0、基礎 0、專業 10。硬建會被 upsert 的 checkCap
+   * 擋掉並丟 BAD_REQUEST，於是 onboarding 在基礎方案上必定失敗。
+   *
+   * 所以額度為 0 時**只存不建**：網址與抓到的中介資料寫進
+   * brands.positioning.__productIntake，回傳 skipped:"plan"。升級後可以
+   * 一鍵匯入，而且這是一個誠實的升級鉤子 —— 我們已經替他讀好了，只是
+   * 他的方案還沒有產品定位。
+   *
+   * 存法沿用 __channels / __tray / brandTaskCards 同一套 positioning.<key>
+   * 慣例，不開新欄位、不需要 migration。
+   */
+  importFromUrls: protectedProcedure
+    .input(z.object({
+      brandId: z.number().int().positive(),
+      /** 商品頁網址，一行一個。上限刻意訂低 —— onboarding 不是批次匯入工具。 */
+      urls: z.array(z.string().trim().min(1)).max(MAX_INTAKE_URLS).default([]),
+      /** 產品數量級距。問這個是為了推薦方案，不需要爬任何東西就答得出來。 */
+      countBand: z.enum(PRODUCT_COUNT_BANDS).optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const userId = ctx.user!.id;
+      const brand = await row<{ id: number; positioning: any }>(
+        `SELECT id, positioning FROM brands WHERE id = ? AND userId = ? LIMIT 1`,
+        [input.brandId, userId],
+      );
+      if (!brand) throw new TRPCError({ code: "NOT_FOUND", message: "找不到這個品牌" });
+
+      // 正規化 + 去重。同一個網址貼兩次只算一次。
+      const seen = new Set<string>();
+      const urls: string[] = [];
+      for (const raw of input.urls) {
+        const u = raw.trim();
+        if (!u) continue;
+        const withScheme = /^https?:\/\//i.test(u) ? u : `https://${u}`;
+        const key = withScheme.replace(/\/+$/, "").toLowerCase();
+        if (seen.has(key)) continue;
+        seen.add(key);
+        urls.push(withScheme);
+      }
+
+      const pQuota = await planQuotaFor(userId);
+      const canCreate = isUnlimited(pQuota.products) || pQuota.products > 0;
+      let remaining = isUnlimited(pQuota.products) ? Number.MAX_SAFE_INTEGER : pQuota.products;
+      if (canCreate && !isUnlimited(pQuota.products)) {
+        const used = await row<{ n: number }>(
+          `SELECT COUNT(*) AS n FROM products WHERE userId = ? AND brandId = ?`,
+          [userId, input.brandId],
+        );
+        remaining = Math.max(0, pQuota.products - Number(used?.n ?? 0));
+      }
+
+      const results: ProductImportResult[] = [];
+      // 併發 3。對象是別人的站，這裡不需要更快。
+      const queue = [...urls];
+      const worker = async () => {
+        while (queue.length) {
+          const url = queue.shift();
+          if (!url) break;
+          results.push(await importOneProductUrl({ url }));
+        }
+      };
+      await Promise.all([worker(), worker(), worker()]);
+      // 併發會打亂順序，還原成使用者貼上的順序 —— 畫面要對得上他的輸入。
+      results.sort((a, b) => urls.indexOf(a.url) - urls.indexOf(b.url));
+
+      // 建產品。額度不足的照樣留在 intake 裡，只是不建。
+      for (const r of results) {
+        if (!r.readable) continue;
+        if (!canCreate || remaining <= 0) {
+          r.skipped = canCreate ? "quota" : "plan";
+          continue;
+        }
+        const name = (r.name ?? "").trim() || r.url;
+        try {
+          const [ins]: any = await localPool.execute(
+            `INSERT INTO products (userId, brandId, slug, name, positioning) VALUES (?, ?, ?, ?, ?)`,
+            [
+              userId,
+              input.brandId,
+              slugFromName(name),
+              name.slice(0, 255),
+              JSON.stringify({
+                productUrl: r.url,
+                ...(r.price ? { price: r.price } : {}),
+                ...(r.description ? { description: r.description } : {}),
+              }),
+            ],
+          );
+          r.productId = Number(ins?.insertId ?? 0) || undefined;
+          if (r.productId) remaining -= 1;
+        } catch (e: any) {
+          r.skipped = "error";
+          r.error = String(e?.message ?? e).slice(0, 200);
+        }
+      }
+
+      // intake 一律留檔（含級距與逐一結果），升級後可以直接匯入。
+      const intake = {
+        countBand: input.countBand ?? null,
+        capturedAt: new Date().toISOString(),
+        urls: results.map((r) => ({
+          url: r.url,
+          name: r.name ?? null,
+          price: r.price ?? null,
+          source: r.source,
+          productId: r.productId ?? null,
+        })),
+      };
+      await localPool.execute(
+        `UPDATE brands
+            SET positioning = JSON_SET(COALESCE(positioning, JSON_OBJECT()), '$.__productIntake', CAST(? AS JSON))
+          WHERE id = ? AND userId = ?`,
+        [JSON.stringify(intake), input.brandId, userId],
+      );
+
+      return {
+        results,
+        created: results.filter((r) => r.productId).length,
+        /** true = 讀到了但方案不給建。前端據此顯示升級提示，不是錯誤。 */
+        pendingUpgrade: results.some((r) => r.skipped === "plan"),
+        productQuota: pQuota.products,
+      };
     }),
 
   remove: protectedProcedure

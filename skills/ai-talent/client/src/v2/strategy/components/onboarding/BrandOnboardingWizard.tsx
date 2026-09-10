@@ -20,12 +20,14 @@ import { useNavigate } from "react-router-dom";
 import { trpc } from "../../../../lib/trpc";
 import { useLang } from "../../../../lib/i18n";
 import { logActivation } from "../../../platform/lib/activationTelemetry";
-import { Modal, ModalContent, ModalBody, Button, Input, Select, SelectItem, Autocomplete, AutocompleteItem } from "@heroui/react";
+import { Modal, ModalContent, ModalBody, Button, Input, Textarea, Select, SelectItem, Autocomplete, AutocompleteItem } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faTrademark, faGlobe, faArrowRight, faCheck, faLanguage } from "@fortawesome/free-solid-svg-icons";
+import { faTrademark, faGlobe, faArrowRight, faCheck, faLanguage, faCubes } from "@fortawesome/free-solid-svg-icons";
 import { faFacebook } from "@fortawesome/free-brands-svg-icons";
 import RunningAgentCarousel from "../../../content/components/quickTask/RunningAgentCarousel";
-import { COUNTRIES, getCountry } from "../../../../lib/countries";
+// 2026-09-10 (CJ 市場收斂): 選單只列 14 個焦點市場；getCountry 仍讀完整
+// COUNTRIES，舊資料的市場代號才不會變成空白。見 countries.ts marketOptions。
+import { marketOptions, getCountry } from "../../../../lib/countries";
 
 const INDUSTRIES_ZH = [
   "AI / 科技軟體",
@@ -61,6 +63,45 @@ const INDUSTRIES_EN = [
   "Other",
 ];
 
+/**
+ * 產品數量級距。與 server PRODUCT_COUNT_BANDS 同一組值（跨邊界不 import，
+ * 值錯掉的話 zod enum 會直接擋下來，不會默默寫進一個無效級距）。
+ *
+ * 2026-09-10 (CJ「因為官網掃描的功能，持續不穩定，所以我還是偏好問產品數量」)
+ * 問級距不需要爬任何東西，而且它決定的是方案推薦：products 額度基礎 0、
+ * 專業 10，所以「11–30」這種答案本身就是一個升級訊號。
+ */
+const PRODUCT_BANDS: Array<{ code: string; zh: string; en: string }> = [
+  { code: "none",   zh: "還沒有產品",   en: "No products yet" },
+  { code: "1-3",    zh: "1–3 個",      en: "1-3" },
+  { code: "4-10",   zh: "4–10 個",     en: "4-10" },
+  { code: "11-30",  zh: "11–30 個",    en: "11-30" },
+  { code: "31-100", zh: "31–100 個",   en: "31-100" },
+  { code: "100+",   zh: "100 個以上",  en: "100+" },
+];
+
+/**
+ * 抓取結果的顯示層級。直接對映 fetchProductMeta 的 meta.source ——
+ * 不做美化，抓不到就說抓不到，讓使用者知道要手填。
+ */
+const SOURCE_BADGE: Record<string, { mark: string; zh: string; en: string; color: string }> = {
+  jsonld: { mark: "✓", zh: "已讀到商品資料",   en: "Product data read",  color: "#15803D" },
+  og:     { mark: "✓", zh: "已讀到頁面資料",   en: "Page data read",     color: "#15803D" },
+  title:  { mark: "△", zh: "只讀到標題",       en: "Title only",         color: "#B45309" },
+  none:   { mark: "✗", zh: "讀不到，請手動填", en: "Unreadable",         color: "#B91C1C" },
+  unsafe: { mark: "✗", zh: "網址無法存取",     en: "URL not reachable",  color: "#B91C1C" },
+};
+
+interface ProductImportRow {
+  url: string;
+  source: string;
+  readable: boolean;
+  name?: string;
+  price?: string;
+  productId?: number;
+  skipped?: string;
+}
+
 interface Props {
   isOpen: boolean;
   onClose?: () => void;
@@ -88,6 +129,13 @@ export default function BrandOnboardingWizard({ isOpen, onClose, onComplete }: P
   const [industry, setIndustry] = useState<string>("");
   const [website, setWebsite] = useState("");
   const [fbUrl, setFbUrl] = useState("");
+  // 2026-09-10 產品 intake。兩格都可以跳過 —— onboarding 每一步都要能繼續。
+  const [productBand, setProductBand] = useState<string>("");
+  const [productUrlsText, setProductUrlsText] = useState("");
+  const [productImport, setProductImport] = useState<
+    { state: "idle" } | { state: "running"; count: number }
+    | { state: "done"; rows: ProductImportRow[]; created: number; pendingUpgrade: boolean }
+  >({ state: "idle" });
   const [targetCountry, setTargetCountry] = useState<string>("TW");
   const [outputLanguage, setOutputLanguage] = useState<string>("zh-TW");
   const [err, setErr] = useState<string | null>(null);
@@ -105,6 +153,7 @@ export default function BrandOnboardingWizard({ isOpen, onClose, onComplete }: P
       setStep(1);
       setCreatedBrandId(null);
       setName(""); setIndustry(""); setWebsite(""); setFbUrl("");
+      setProductBand(""); setProductUrlsText(""); setProductImport({ state: "idle" });
       setTargetCountry("TW"); setOutputLanguage("zh-TW"); setErr(null);
     }
   }, [isOpen]);
@@ -113,6 +162,7 @@ export default function BrandOnboardingWizard({ isOpen, onClose, onComplete }: P
   const updateConnMut = (trpc as any).brand?.updateConnections?.useMutation?.();
   const startPositioningMut = (trpc as any).positioningJobs?.start?.useMutation?.();
   const runInterimMut = (trpc as any).positioningJobs?.runInterim?.useMutation?.();
+  const importProductsMut = (trpc as any).product?.importFromUrls?.useMutation?.();
 
   const handleCreateAndAdvance = async () => {
     if (!name.trim()) { setErr(lang === "en" ? "Brand name is required" : "請輸入品牌名稱"); return; }
@@ -143,6 +193,36 @@ export default function BrandOnboardingWizard({ isOpen, onClose, onComplete }: P
             socialLinks,
           });
         } catch {/* non-fatal */}
+      }
+
+      // 2026-09-10 產品 intake。**刻意不 await** —— 最多 8 個網址 × 10 秒
+      // timeout，await 會把 onboarding 卡在別人的站台上。結果回來時寫進
+      // state，第 3 步的等待畫面順便把它顯示出來。
+      const productUrls = productUrlsText
+        .split(/[\n,\s]+/)
+        .map((u) => u.trim())
+        .filter(Boolean)
+        .slice(0, 8);
+      if (productUrls.length > 0 || productBand) {
+        setProductImport(productUrls.length ? { state: "running", count: productUrls.length } : { state: "idle" });
+        importProductsMut?.mutateAsync?.({
+          brandId: newId,
+          urls: productUrls,
+          ...(productBand ? { countBand: productBand } : {}),
+        })
+          .then((res: any) => {
+            if (!productUrls.length) return;
+            setProductImport({
+              state: "done",
+              rows: (res?.results ?? []) as ProductImportRow[],
+              created: Number(res?.created ?? 0),
+              pendingUpgrade: !!res?.pendingUpgrade,
+            });
+          })
+          .catch(() => {
+            // 匯入失敗不該擋住定位 —— 使用者稍後可在產品頁重貼。
+            setProductImport({ state: "idle" });
+          });
       }
 
       // 2026-06-21 (CJ「TTFV from 38min」): activation refactor.
@@ -408,7 +488,7 @@ export default function BrandOnboardingWizard({ isOpen, onClose, onComplete }: P
                         ? "AI adapts copy style and platforms"
                         : "AI 依市場調整文案風格與平台"}
                     >
-                      {COUNTRIES.map((c) => (
+                      {marketOptions(targetCountry).map((c) => (
                         <AutocompleteItem key={c.code} textValue={`${c.emoji} ${lang === "en" ? c.name : (c.nameZh ?? c.name)} (${c.code})`}>
                           <div className="flex items-center gap-2">
                             <span className="text-base">{c.emoji}</span>
@@ -474,6 +554,35 @@ export default function BrandOnboardingWizard({ isOpen, onClose, onComplete }: P
                     value={fbUrl}
                     onValueChange={setFbUrl}
                     startContent={<FontAwesomeIcon icon={faFacebook} style={{ color: "#1877F2" }} className="text-tiny" />}
+                  />
+
+                  {/* 2026-09-10 產品 intake。兩格都可空白 —— 跳過的代價寫在
+                      description 裡，不藏在錯誤訊息裡。 */}
+                  <Select
+                    label={lang === "en" ? "How many products? (optional)" : "產品數量（可選）"}
+                    selectedKeys={productBand ? [productBand] : []}
+                    onSelectionChange={(keys) => setProductBand(String(Array.from(keys)[0] ?? ""))}
+                    description={lang === "en"
+                      ? "Used to recommend a plan — product positioning is on the Professional tier"
+                      : "用來推薦方案 —— 產品定位屬於專業方案"}
+                    startContent={<FontAwesomeIcon icon={faCubes} className="text-default-400 text-tiny" />}
+                  >
+                    {PRODUCT_BANDS.map((b) => (
+                      <SelectItem key={b.code}>{lang === "en" ? b.en : b.zh}</SelectItem>
+                    ))}
+                  </Select>
+                  <Textarea
+                    label={lang === "en" ? "Priority product pages (optional)" : "優先設定的產品網址（可選）"}
+                    placeholder={lang === "en"
+                      ? "One product page URL per line, up to 8"
+                      : "一行一個商品頁網址，最多 8 個"}
+                    value={productUrlsText}
+                    onValueChange={setProductUrlsText}
+                    minRows={2}
+                    maxRows={5}
+                    description={lang === "en"
+                      ? "We read each page directly (no site-wide crawl) and tell you exactly what we got"
+                      : "我們逐頁讀取（不做全站掃描），並明確告訴你每一頁讀到什麼"}
                   />
                 </div>
 
@@ -544,6 +653,64 @@ export default function BrandOnboardingWizard({ isOpen, onClose, onComplete }: P
                   progressPct={50}
                   elapsedText={lang === "en" ? "Building express brain…" : "建立品牌大腦初版中…"}
                 />
+
+                {/* 2026-09-10 產品讀取結果。顯示 fetchProductMeta 的層級，
+                    不美化 —— 讀不到就寫讀不到，使用者才知道要手填。 */}
+                {productImport.state !== "idle" && (
+                  <div style={{ marginTop: 18, borderTop: "1px solid #E5E5E5", paddingTop: 14 }}>
+                    <p style={{
+                      fontSize: 12, fontWeight: 700, color: "#525252",
+                      letterSpacing: "0.18em", textTransform: "uppercase", marginBottom: 10,
+                    }}>
+                      {lang === "en" ? "Product pages" : "產品網址讀取"}
+                    </p>
+                    {productImport.state === "running" && (
+                      <p style={{ fontSize: 13, color: "#525252" }}>
+                        {lang === "en"
+                          ? `Reading ${productImport.count} product page(s)…`
+                          : `正在讀取 ${productImport.count} 個商品頁…`}
+                      </p>
+                    )}
+                    {productImport.state === "done" && (
+                      <>
+                        {productImport.rows.map((r) => {
+                          const badge = SOURCE_BADGE[r.source] ?? SOURCE_BADGE.none;
+                          return (
+                            <div key={r.url} style={{
+                              display: "flex", alignItems: "baseline", gap: 8,
+                              fontSize: 13, lineHeight: 1.7, color: "#404040",
+                            }}>
+                              <span style={{ color: badge.color, fontWeight: 700 }}>{badge.mark}</span>
+                              <span style={{ flex: 1, minWidth: 0 }}>
+                                <span style={{ fontWeight: 600 }}>
+                                  {r.name || r.url.replace(/^https?:\/\//, "").slice(0, 44)}
+                                </span>
+                                {r.price ? <span style={{ color: "#525252" }}> · {r.price}</span> : null}
+                              </span>
+                              <span style={{ fontSize: 12, color: badge.color, whiteSpace: "nowrap" }}>
+                                {lang === "en" ? badge.en : badge.zh}
+                              </span>
+                            </div>
+                          );
+                        })}
+                        {productImport.pendingUpgrade && (
+                          <p style={{ fontSize: 12, color: "#B45309", marginTop: 8, lineHeight: 1.6 }}>
+                            {lang === "en"
+                              ? "Saved for you — product positioning is on the Professional tier, so these import the moment you upgrade."
+                              : "已替你存下來 —— 產品定位屬於專業方案，升級後這幾個會直接匯入。"}
+                          </p>
+                        )}
+                        {!productImport.pendingUpgrade && productImport.created > 0 && (
+                          <p style={{ fontSize: 12, color: "#525252", marginTop: 8 }}>
+                            {lang === "en"
+                              ? `${productImport.created} product(s) created.`
+                              : `已建立 ${productImport.created} 個產品。`}
+                          </p>
+                        )}
+                      </>
+                    )}
+                  </div>
+                )}
               </div>
             )}
 

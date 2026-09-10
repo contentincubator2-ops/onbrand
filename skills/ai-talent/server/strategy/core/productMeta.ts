@@ -10,7 +10,20 @@ export interface ProductMeta {
 }
 
 const FETCH_TIMEOUT_MS = 10_000;
-const MAX_HTML_BYTES = 1024 * 1024;
+/**
+ * 2026-09-10 — 從 1MB 提到 4MB。
+ *
+ * 1MB 的後果不是「截斷」而是**整頁丟掉**（readHtml 超過上限直接回 null），
+ * 而 Shopify 的商品頁常態 1.5–2.5MB。當天實測：
+ *
+ *   gymshark.com/products/…   2.1MB → 原本 source:"none"（其實有完整 Product JSON-LD）
+ *   allbirds.com/products/…   1.8MB → 原本 source:"none"
+ *
+ * 也就是說「官網抓取不穩」在最主流的獨立電商平台上，成因是我們自己的上限，
+ * 不是對方的站。4MB 是實測 Shopify / WooCommerce 商品頁的安全水位；
+ * onboarding 一次最多 8 個網址、併發 3，最壞情況約 12MB 常駐，可接受。
+ */
+const MAX_HTML_BYTES = 4 * 1024 * 1024;
 const MAX_REDIRECTS = 5;
 
 function decodeHtml(value: string): string {
@@ -129,12 +142,18 @@ function extractTitle(html: string): string | undefined {
   return cleanText(html.match(/<title\b[^>]*>([\s\S]*?)<\/title\s*>/i)?.[1]);
 }
 
+/**
+ * 讀取回應內容，最多 MAX_HTML_BYTES。
+ *
+ * 2026-09-10 兩處修正，都是「部分好過沒有」：
+ *
+ * ① 超過上限時回**已讀到的部分**，不再回 null。整頁丟掉等於這個網址完全
+ *    讀不到；而 name / og / JSON-LD 幾乎都在文件前段，讀到 4MB 還沒看到的
+ *    機率遠低於「因為第 4MB+1 個 byte 而放棄整頁」。
+ * ② 不再用 content-length 提前放棄。宣告長度超標時照樣讀到上限為止 ——
+ *    理由同上，而且 content-length 在 chunked 回應裡根本不存在。
+ */
 async function readHtml(response: Response): Promise<string | null> {
-  const declaredLength = Number(response.headers.get("content-length") ?? 0);
-  if (declaredLength > MAX_HTML_BYTES) {
-    await response.body?.cancel();
-    return null;
-  }
   const reader = response.body?.getReader();
   if (!reader) return null;
   const chunks: Uint8Array[] = [];
@@ -144,16 +163,18 @@ async function readHtml(response: Response): Promise<string | null> {
       const { done, value } = await reader.read();
       if (done) break;
       if (!value) continue;
-      total += value.byteLength;
-      if (total > MAX_HTML_BYTES) {
-        await reader.cancel();
-        return null;
-      }
       chunks.push(value);
+      total += value.byteLength;
+      if (total >= MAX_HTML_BYTES) {
+        // 讀滿就停，但保留已讀的部分。
+        await reader.cancel();
+        break;
+      }
     }
   } finally {
     reader.releaseLock();
   }
+  if (total === 0) return null;
   return Buffer.concat(chunks.map((chunk) => Buffer.from(chunk)), total).toString("utf8");
 }
 
