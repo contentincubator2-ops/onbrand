@@ -20,7 +20,7 @@ import { Check, Lock, RefreshCw } from "lucide-react";
 
 const LABEL_ZH: Record<string, string> = {
   facebook: "Facebook", instagram: "Instagram", youtube: "YouTube",
-  tiktok: "TikTok", linkedin: "LinkedIn", email: "Email",
+  tiktok: "TikTok", linkedin: "LinkedIn", x: "X", email: "Email",
   website: "官網", pr: "新聞稿", brand: "品牌", audience: "受眾研究", kol: "KOL",
 };
 const ALL = Object.keys(LABEL_ZH);

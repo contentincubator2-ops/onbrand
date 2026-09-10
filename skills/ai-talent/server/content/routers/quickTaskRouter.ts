@@ -972,6 +972,7 @@ import { RESEARCH_30S_TASKS } from "../core/quickTaskResearch";
 import { KOL_30S_TASKS } from "../core/quickTaskKOL";
 // 2026-08-29 官網頻道 (web-)：品牌自己的部落格長文 / 品牌專欄 / 案例 / 產品頁。
 import { WEBSITE_30S_TASKS } from "../core/quickTaskWebsite";
+import { X_30S_TASKS } from "../core/quickTaskX";
 // 2026-08-29 per-brand 任務包。有 pack 的品牌，頻道與卡片完全由 pack 決定。
 import { resolveBrandPack, expandPackCards, packNavForBrand } from "../../strategy/core/brandPacks";
 // 2026-09-02: task id → template + config 的唯一解析點。這條鏈本來在這個檔案
@@ -1428,6 +1429,12 @@ export const quickTaskRouter = router({
       kind: "fast" as const,
       platform: "website",
     }));
+    // 2026-09-10 X 通路。
+    const xTasks = X_30S_TASKS.map((t) => ({
+      ...t,
+      kind: "fast" as const,
+      platform: "x",
+    }));
     const kolTasks = KOL_30S_TASKS.map((t) => ({
       ...t,
       kind: "fast" as const,
@@ -1528,7 +1535,7 @@ export const quickTaskRouter = router({
       ...fbTasks, ...fb60Tasks, ...ig60Tasks, ...yt60Tasks, ...multi60Tasks,
       ...tasks100,
       ...igTasks, ...ytTasks, ...ttTasks, ...liTasks, ...emTasks, ...prTasks, ...brTasks, ...rsTasks, ...kolTasks,
-      ...webTasks,
+      ...webTasks, ...xTasks,
       ...mediaTasks,
     ];
 

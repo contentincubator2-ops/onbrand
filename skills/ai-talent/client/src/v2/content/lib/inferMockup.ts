@@ -297,7 +297,10 @@ const PLATFORM_KEYWORDS: Array<[Platform, string[]]> = [
   ["instagram",   ["instagram", "ig-", "ig_", " ig ", "reels", "stories", "ugc", "kol", "influencer"]],
   ["facebook",    ["facebook", "fb-", "fb_", " fb ", "meta-fb", "messenger"]],
   ["linkedin",    ["linkedin", "li-", "b2b-social", "company-page"]],
-  ["twitter",     ["twitter", "x.com", "tweet", "x-platform"]],
+  // 2026-09-10 X 通路上線：任務卡 id 是 x-30-*，上面四個關鍵字都命不中
+  // （"tweet" 只在 x-30-... 不含 tweet 字樣時失效）。用 "x-30" 而不是 "x-"
+  // 是因為這裡是 substring 比對 —— "x-" 會命中任何含 x- 的 id。
+  ["twitter",     ["twitter", "x.com", "tweet", "x-platform", "x-30"]],
   // ── Owned/paid channels ────────────────────────────────────────────────
   ["email",       ["email", "edm", "newsletter", "mailer", "enewsletter", "email-marketing", "email-automation"]],
   ["google",      ["google", "google-ads", "gads", "pmax", "performance-max", "search-ad", "display-ad", "shopping-ad", "sem"]],
@@ -392,7 +395,9 @@ const FORMAT_RULES: FormatRule[] = [
   { format: "search-ad",   keywords: ["search-ad", "text-ad", "keyword-ad", "sem"],      platforms: ["google"] },
 
   // ── 12. Twitter / X ───────────────────────────────────────────────────────
-  { format: "thread",  keywords: ["twitter-thread", "x-thread"],  platforms: ["twitter"] },
+  // 2026-09-10 加 "thread"：卡 id 是 x-30-thread-howto，命不中 "x-thread"。
+  // 這條 platforms 限定 twitter，所以加一個這麼通用的字不會誤傷其他頻道。
+  { format: "thread",  keywords: ["twitter-thread", "x-thread", "thread"],  platforms: ["twitter"] },
   { format: "tweet",   keywords: ["tweet", "x-post"],              platforms: ["twitter"] },
 
   // ── 13. LINE ──────────────────────────────────────────────────────────────

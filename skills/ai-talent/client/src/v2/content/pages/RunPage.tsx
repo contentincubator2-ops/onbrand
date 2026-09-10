@@ -1429,6 +1429,9 @@ export default function RunPage() {
       // 2026-08-29 官網頻道。web:blog / web:product-page / web:landing 三個
       // mockup 元件早就實作並註冊了，缺的只是這條前綴對應。
       web: "web",
+      // 2026-09-10 X 通路。mockup 那側的 key 仍是 "twitter:"（XTweet /
+      // XThread 早就註冊了），所以 x → twitter，不是 x → x。
+      x: "twitter",
     };
     const formatFromTaskId = (id: string): string => {
       // 2026-08-29 官網 (web-)：跟 pr- / em- 同樣的理由——先用前綴決斷，
@@ -1438,6 +1441,13 @@ export default function RunPage() {
         if (id.includes("product")) return "product-page";
         if (id.includes("landing")) return "landing";
         return "blog";
+      }
+      // 2026-09-10 X (x-)：跟 web- / pr- / em- 同樣的理由 —— 前綴先決斷，
+      // 否則下面的關鍵字掃描會誤傷。x-30-thread-listicle 會被 "list" 之外
+      // 的規則放過，但 x-30-thread-story 會被 story 規則搶成 IG Stories，
+      // x-30-hot-take 則會落到 "feed"。X 只有兩個 mockup，判斷就這兩條。
+      if (id.startsWith("x-")) {
+        return id.includes("thread") ? "thread" : "tweet";
       }
       // 2026-05-16 (CJ「pr-30-lead-paragraph mockup 格式不對」):
       // press (pr-) + email (em-) each have ONE mockup family. Decide

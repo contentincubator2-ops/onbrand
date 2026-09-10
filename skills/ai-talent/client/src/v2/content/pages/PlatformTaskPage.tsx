@@ -92,6 +92,9 @@ const ROUTE_TO_PLATFORM: Record<string, string> = {
   pr:    "pr",
   // 2026-08-29 官網頻道。路由是 /tasks/web，平台代號是 website。
   web:   "website",
+  // 2026-09-10 X 通路。路由與平台代號同名，所以這條看起來多餘 —— 但
+  // ROUTE_TO_PLATFORM 是白名單，缺這一行 /tasks/x 會解析不到平台。
+  x:     "x",
   // 素材與規劃頻道。目前只有品牌任務包會用到，全域目錄沒有卡 ——
   // 沒有包的品牌走到這兩個路由會看到空清單，側邊欄也不會有入口。
   case:     "case",
@@ -842,6 +845,7 @@ function PlatformTaskPageInner() {
       : task.id?.startsWith("em-") ? "email"
       : task.id?.startsWith("pr-") ? "pr"
       : task.id?.startsWith("web-") ? "website"
+      : task.id?.startsWith("x-") ? "x"
       : task.id?.startsWith("br-") ? "brand"
       : task.id?.startsWith("rs-") ? "audience"
       : "facebook");

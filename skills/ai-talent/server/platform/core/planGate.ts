@@ -22,6 +22,10 @@ import { PLANS, type PlanCode, type PlanQuota } from "./plans";
 /** 沒選過通路時的預設。FB / IG 是產品主場，排前面。 */
 const DEFAULT_PLATFORM_ORDER = [
   "facebook", "instagram", "youtube", "tiktok", "linkedin",
+  // 2026-09-10 X 通路加在社群段的末尾，不動前五個 —— 這個陣列的順序決定
+  // 「沒選過通路的品牌預設開哪幾個」，把 x 插到前面會讓既有品牌的預設值
+  // 悄悄改變（基礎方案只取前 2 個）。
+  "x",
   "email", "website", "pr", "brand", "audience", "kol",
 ];
 

@@ -38,6 +38,7 @@ import { MULTI_60S_TASKS } from "./quickTaskMulti60";
 import { ALL_99S_TASKS } from "./quickTask100";
 import { ALL_99S_SQUADS } from "./quickTask100Squads";
 import { WEBSITE_30S_TASKS } from "./quickTaskWebsite";
+import { X_30S_TASKS } from "./quickTaskX";
 import { type TaskSource } from "./taskSource";
 import { sourceForTemplate } from "./craftSource";
 import { taskCardAddedAt } from "./taskCardDates";
@@ -49,6 +50,11 @@ export type CatalogPlatform =
   // 2026-08-29：品牌自己的官網（部落格長文 / 品牌專欄 / 案例 / 產品頁）。
   // 在這之前官網內容只能硬塞進 pr- 或 br-，然後拿到新聞稿版型。
   | "website"
+  // 2026-09-10 (CJ「補上 X 通路」)：X（原 Twitter）。mockup twitter:tweet /
+  // twitter:thread 早就實作註冊了，這次補的是 server 端的任務定義。
+  // 代號用 "x" 而不是 "twitter" —— 平台自己已經改名，而 mockup 那側的
+  // "twitter:" 前綴屬於顯示層的既有 key，不動它（改名要付 migration 的錢）。
+  | "x"
   // 2026-08-29：素材與規劃型頻道，目前只由品牌任務包使用，全域目錄沒有卡。
   //   case     — 案例庫（查找 / 去重 / 提報），持續累積的素材
   //   calendar — 內容行事曆（產出當月各類型的篇數與摘要）
@@ -115,6 +121,7 @@ export function platformOfTaskId(id: string): CatalogPlatform {
   if (id.startsWith("rs-")) return "audience";
   if (id.startsWith("kl-")) return "kol";
   if (id.startsWith("web-")) return "website";
+  if (id.startsWith("x-")) return "x";
   return "facebook";
 }
 
@@ -159,6 +166,7 @@ export function buildTaskCatalogIndex(): CatalogTask[] {
   for (const t of RESEARCH_30S_TASKS) out.push(toTask(t, "audience", "30s"));
   for (const t of KOL_30S_TASKS) out.push(toTask(t, "kol", "30s"));
   for (const t of WEBSITE_30S_TASKS) out.push(toTask(t, "website", "30s"));
+  for (const t of X_30S_TASKS) out.push(toTask(t, "x", "30s"));
 
   // 60s
   for (const t of FB_60S_TASKS_V2) out.push(toTask(t, "facebook", "60s"));
