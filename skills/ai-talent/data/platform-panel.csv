@@ -1,0 +1,58 @@
+# platform-panel — 正式量測名單（收集中）
+#
+# 用法：npm run measure:panel -- --panel data/platform-panel.csv
+# 規則與市場／模式代號見 data/platform-panel.example.csv
+#
+# ── 收集進度 ──────────────────────────────────────────────────────────
+#   TW / dtc-web   16 / 30
+#   US / dtc-web    0 / 30
+#   TW / b2b        0 / 30
+#   US / b2b        0 / 30
+#
+# ── 名單來源與偏誤（必讀）────────────────────────────────────────────
+#
+# ① SHOPLINE 精選商家（shopline.tw/showcase → 名字 → 搜尋解析官網）
+#    偏誤：平台「精選」的客戶規模高於該平台中位數。不是大品牌，但也不是
+#    最小的那一群。標在下面每一行的來源欄。
+#
+# ② 手動挑選的台灣中小型自營品牌（第一版試點，2026-09-10）
+#
+# 開店平台目錄本身**不外連商家官網**（實測：SHOPLINE showcase 只有 10 家且
+# 全部連到 blog.shopline.tw 的案例文章；政府獎項站 403 / DNS 失敗）。所以
+# 流程一定是「目錄 → 品牌名 → 搜尋解析官網」，一個品牌一次搜尋。
+#
+# 可規模化的線索：SHOPLINE 案例文章的網址是固定樣式
+#   blog.shopline.tw/merchant-showcase-<品牌代號>/
+# 抓那個樣式比抓 tag 頁有用（tag 頁的連結多是 feed 與分類頁）。
+#
+market,model,name,url
+# ── TW / dtc-web ─────────────────────────────────────────────────────
+# 來源②：手動挑選
+TW,dtc-web,印花樂,https://www.inblooom.com
+TW,dtc-web,綠藤生機,https://www.greenvines.com.tw
+TW,dtc-web,茶籽堂,https://www.chatzutang.com
+TW,dtc-web,好日子,https://www.agooday.com
+TW,dtc-web,掌生穀粒,https://www.greeninhand.com
+TW,dtc-web,甘樂文創,https://www.thecan.com.tw
+TW,dtc-web,小茶栽堂,https://www.zenique.net
+TW,dtc-web,里仁,https://www.leezen.com.tw
+# 來源①：SHOPLINE 精選商家（名字經搜尋解析為官網，2026-09-10）
+TW,dtc-web,歸毛家族,https://www.goodmofamily.com
+TW,dtc-web,AROMASE 艾瑪絲,https://www.aromase.com.tw
+TW,dtc-web,農純鄉,https://shop.nongchunxiang.com.tw
+TW,dtc-web,三統漢菓子,https://www.suntone1979.com
+TW,dtc-web,好好生醫,https://www.betterbio.com.tw
+TW,dtc-web,飛航模飾,https://www.flightmodeshh.com.tw
+TW,dtc-web,GUXON 古尚,https://www.guxon.com.tw
+TW,dtc-web,簡單 JAN DAN,https://www.jandancare.com
+# 待解析：Hank Max、Desire Shop（名字太通用，搜尋解析不到唯一官網）
+#
+# ── US / dtc-web ─────────────────────────────────────────────────────
+# 待收。來源候選：Shopify 商店目錄
+#
+# ── TW / b2b ─────────────────────────────────────────────────────────
+# 待收。來源：小巨人獎（中小企業級，data.gov.tw 開放資料有公司名、無網址）
+# ⚠️ 不要用年度大獎的得獎名單 —— 大企業每個平台都掛，量出來沒有鑑別力。
+#
+# ── US / b2b ─────────────────────────────────────────────────────────
+# 待收。
