@@ -109,6 +109,10 @@ function AgentLine({ agent }: { agent: AgentRef }) {
  *   基礎／試用 → 升級專業才能加購真實串接
  *   專業       → 直接加購電商營運報告
  *   企業       → 不顯示（真資料在導入時接）
+ *
+ * 2026-09-13（FDE 定位）：文案從「付費解鎖」改成「這是我們重點投資的方向，
+ * 專業方案優先體驗」——跟對外敘事一致（成效數據回饋是私人預覽、募資後的
+ * 主要產品投資標的，不是單純的加購功能）。
  */
 function PlanNudge() {
   const navigate = useNavigate();
@@ -121,10 +125,10 @@ function PlanNudge() {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", border: "1px solid #e5e7eb", borderRadius: 16, background: "#fff", padding: "12px 16px", marginBottom: 14 }}>
       <div style={{ minWidth: 0, flex: 1, fontSize: 13, color: "#374151", lineHeight: 1.6 }}>
-        <span style={{ fontWeight: 700, color: INK }}>這一頁是示意版。</span>
+        <span style={{ fontWeight: 700, color: INK }}>這一頁是早期預覽版。</span>
         {isPro
           ? " 加購電商營運報告（NT$48,000 建置 ＋ NT$25,000／月），SoWork 在導入時接上粉專、廣告帳號與電商後台的真實資料。"
-          : " 下面全部是模擬數據 —— 這是接上真資料之後你會看到的樣子。真實串接屬於專業方案的加購項目。"}
+          : " 下面全部是模擬數據 —— 這是接上真資料之後你會看到的樣子。真實串接是我們目前最重點的投資方向，專業方案可以優先加購搶先體驗。"}
       </div>
       {isPro ? (
         <a href="mailto:sowork@sowork.ai?subject=電商營運報告加購" style={{ fontSize: 13, fontWeight: 600, color: "#fff", background: INK, borderRadius: 8, padding: "8px 12px", textDecoration: "none", whiteSpace: "nowrap" }}>

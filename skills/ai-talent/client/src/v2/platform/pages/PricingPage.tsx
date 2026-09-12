@@ -110,8 +110,8 @@ export default function PricingPage() {
           ? ["203 task cards: 99 award-winning + 63 benchmark + 41 platform conventions", "Scheduling, calendar and direct publishing to FB / IG"]
           : ["可用任務卡 203 張：得獎案例 99 ＋ 標竿品牌 63 ＋ 平台通則 41", "排程、日曆與 FB／IG 直接發布"] },
         { label: isEn ? "Performance" : "成效層", items: isEn
-          ? ["Preview with simulated data — real connections are a Professional add-on"]
-          : ["示意版：用模擬數據先看見成效層的樣子", "真實串接屬專業方案的加購項目"], muted: true },
+          ? ["Early preview on simulated data — real connections are our top investment focus; Professional gets priority access"]
+          : ["早期預覽：用模擬數據先看見成效層的樣子", "真實串接是我們目前最重點的投資方向，專業方案優先加購"], muted: true },
         { label: isEn ? "Also" : "其他", items: isEn
           ? ["Unlimited runs", "Campaign tasks included"]
           : ["執行次數不限", "企劃任務開放"] },
@@ -132,7 +132,7 @@ export default function PricingPage() {
         { label: isEn ? "Content" : "內容層", items: isEn
           ? ["249 task cards = the 203 above + 46 viral-structure cards", "Viral-structure cards refreshed monthly", "Scheduling, calendar and direct publishing to FB / IG"]
           : ["可用任務卡 249 張＝上述 203 張 ＋ 爆款結構卡 46 張", "爆款結構卡每月更新", "排程、日曆與 FB／IG 直接發布"] },
-        { label: isEn ? "Performance" : "成效層", items: [isEn ? "Preview + real connections as an add-on (see below)" : "示意版 ＋ 可加購真實串接（見下方加購）"] },
+        { label: isEn ? "Performance" : "成效層", items: [isEn ? "Early preview + priority access to real connections (see below)" : "早期預覽 ＋ 優先加購真實串接（見下方加購）"] },
         { label: isEn ? "Also" : "其他", items: isEn
           ? ["Unlimited runs", "Campaign tasks included", "Review workflow"]
           : ["執行次數不限", "企劃任務開放", "審核工作流"] },
@@ -285,8 +285,8 @@ export default function PricingPage() {
         </p>
         <p className="text-sm text-neutral-800 mt-3 max-w-3xl mx-auto leading-relaxed">
           {isEn
-            ? "Both tiers see the performance layer as a preview on simulated data — what you would see once real data is connected. Real connections are a Professional add-on: see the value first, then decide whether to pay for real data."
-            : "成效層兩級都看得到示意版：用模擬數據把「接上真資料之後你會看到什麼」先擺在眼前。真實串接是專業方案的加購項目——先看見價值，再決定要不要為真資料付費。"}
+            ? "Both tiers see the performance layer as an early preview on simulated data — what you would see once real data is connected. Real-data connections are our top product investment right now; Professional gets priority access as we build it out."
+            : "成效層兩級都看得到早期預覽：用模擬數據把「接上真資料之後你會看到什麼」先擺在眼前。真實串接是我們目前最重點的產品投資方向，專業方案可以優先加購搶先體驗。"}
         </p>
         <p className="text-center text-xs text-neutral-500 mt-3 max-w-3xl mx-auto">
           {isEn

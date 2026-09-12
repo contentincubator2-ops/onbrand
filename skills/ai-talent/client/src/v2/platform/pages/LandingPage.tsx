@@ -228,7 +228,7 @@ export default function LandingPage() {
                 color: C.orangeDark,
               }}
             >
-              {en ? "AI-Powered Brand Brain" : "AI 驅動的品牌大腦"}
+              {en ? "Marketing's Forward Deployed Engineer" : "行銷界的 Forward Deployed Engineer"}
             </div>
 
             {/* Hero headline — heavy, two-line stacked */}
@@ -261,16 +261,16 @@ export default function LandingPage() {
               style={{ color: C.ink }}
             >
               {en
-                ? "16,113 AI agents × 249 sourced task cards × your locked Brand Brain"
-                : "16,113 個 AI 專家 × 249 張有出處的任務卡 × 你鎖定的品牌大腦"}
+                ? "Agent: 16,113 AI experts · Skill: 249 sourced task cards · Data: your locked Brand Brain"
+                : "Agent：16,113 個 AI 專家 · Skill：249 張有出處的任務卡 · Data：你鎖定的品牌大腦"}
             </p>
             <p
               className="text-[15px] leading-[1.75] mb-8 max-w-[540px]"
               style={{ color: C.muted }}
             >
               {en
-                ? "OnBrand isn't another one-click AI generator. SoWork's 14-step Brand Positioning Method writes your Why, TA, Differentiation and Voice into a Brand Brain. Set it once. Every channel — Facebook, Instagram, YouTube, TikTok, Email, PR — stays on-brand automatically."
-                : "OnBrand 不是另一個「AI 一鍵生成」工具。SoWork 14 步品牌定位法把你的 WHY、TA、差異化、Voice 全部寫進品牌大腦。鎖定一次，所有平台（FB、IG、YouTube、TikTok、EDM、PR）都自動跟著你的調性走。"}
+                ? "OnBrand isn't another one-click AI generator. SoWork's 14-step Brand Positioning Method writes your Why, TA, Differentiation and Voice into a Brand Brain. Set it once. Every channel — Facebook, Instagram, YouTube, TikTok, Email, PR — stays on-brand automatically. We don't hand you content — we deploy your strategy to every touchpoint."
+                : "OnBrand 不是另一個「AI 一鍵生成」工具。SoWork 14 步品牌定位法把你的 WHY、TA、差異化、Voice 全部寫進品牌大腦。鎖定一次，所有平台（FB、IG、YouTube、TikTok、EDM、PR）都自動跟著你的調性走。我們給你的不是內容，是把你的品牌策略部署到每一個接觸點。"}
             </p>
 
             {/* CTAs — primary orange + secondary ghost */}
