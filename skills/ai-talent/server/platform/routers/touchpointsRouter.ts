@@ -26,9 +26,13 @@ export const touchpointsRouter = router({
     }),
 
   /**
-   * 首頁「三層總覽」用的彙總：內容與部署（touchpoints coverage）＋
-   * 策略層現況（定位是否鎖定、幾則新的策略提醒）。成效層的模擬數據留在
-   * 前端算（跟成效工作台同一份 perfMockData，不在這裡重算一次）。
+   * 首頁「策略 → 內容 → 成效」工作流用的彙總。
+   *
+   * 2026-09-14（CJ「沒有將策略落實到內容層乃至於串接到成效層的感覺…策略層是，
+   * 品牌定位有了，產品定位是否還須補齊」）：從「彙總數字」改成「缺口清單」——
+   * 策略層回品牌定位狀態＋每個產品是否補齊定位＋最新的策略提醒本文（不只是
+   * 則數），前端才能畫出真正的 mission tray，而不是一個抽象的百分比。
+   * 成效層的模擬數據留在前端算（跟成效工作台同一份 perfMockData，不重算）。
    */
   homeSummary: protectedProcedure
     .input(z.object({ brandId: z.number() }))
@@ -40,11 +44,19 @@ export const touchpointsRouter = router({
         [input.brandId],
       );
       const positioningStatus = (brandRows as any[])[0]?.positioningStatus ?? null;
+      const [productRows]: any = await localPool.execute(
+        `SELECT id, name, (positioning IS NOT NULL AND JSON_LENGTH(positioning) > 0) AS hasPositioning
+           FROM products WHERE brandId = ? AND userId = ? LIMIT 50`,
+        [input.brandId, ctx.user!.id],
+      );
+      const products = (productRows as any[]).map((p) => ({
+        id: Number(p.id), name: String(p.name ?? ""), hasPositioning: !!p.hasPositioning,
+      }));
       const [alertRows]: any = await localPool.execute(
-        `SELECT COUNT(*) AS n FROM strategy_alerts WHERE brandId = ? AND status = 'new'`,
+        `SELECT id, title, summary FROM strategy_alerts WHERE brandId = ? AND status = 'new' ORDER BY createdAt DESC LIMIT 3`,
         [input.brandId],
       );
-      const strategyAlertsNewCount = Number((alertRows as any[])[0]?.n ?? 0);
-      return { coverage, positioningStatus, strategyAlertsNewCount };
+      const strategyAlerts = (alertRows as any[]).map((a) => ({ id: Number(a.id), title: String(a.title ?? ""), summary: String(a.summary ?? "") }));
+      return { coverage, positioningStatus, products, strategyAlerts };
     }),
 });

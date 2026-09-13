@@ -560,6 +560,12 @@ async function runStartupMigrations() {
     await db.execute(sql.raw(STRATEGY_WATCH_DDL));
     await db.execute(sql.raw(STRATEGY_ALERTS_DDL));
     console.log("[migrate] strategy_watch / strategy_alerts: OK");
+
+    // 2026-09-14（CJ「選定一個競爭者，對比接觸點跟策略訴求差異」）：
+    // 具名競爭者的逐接觸點比對快照（14 天內快取，不重跑研究）。
+    const { COMPETITOR_SNAPSHOT_DDL } = await import("./strategy/core/competitorSnapshot");
+    await db.execute(sql.raw(COMPETITOR_SNAPSHOT_DDL));
+    console.log("[migrate] competitor_snapshots: OK");
   } catch (err) {
     console.error("[migrate] startup migration error:", err);
   }

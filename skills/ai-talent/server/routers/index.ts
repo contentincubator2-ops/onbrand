@@ -26,6 +26,7 @@ import { workbenchRouter } from "../strategy/routers/workbenchRouter";
 import { assetPhotoRouter } from "../strategy/routers/assetPhotoRouter";
 import { strategyMonitorRouter } from "../strategy/routers/strategyMonitorRouter";
 import { touchpointsRouter } from "../platform/routers/touchpointsRouter";
+import { competitorRouter } from "../strategy/routers/competitorRouter";
 import { brandKnowledgeRouter } from "../strategy/routers/brandKnowledgeRouter";
 import { personaAgentRouter } from "../strategy/routers/personaAgentRouter";
 import { cloudDriveRouter } from "../platform/routers/cloudDriveRouter";
@@ -69,6 +70,7 @@ export const appRouter = router({
   assetPhoto:    assetPhotoRouter,
   strategyMonitor: strategyMonitorRouter,
   touchpoints:   touchpointsRouter,
+  competitor:    competitorRouter,
   calendar:      calendarRouter,
   bundleConnect: bundleConnectRouter,
   image:         imageRouter,
