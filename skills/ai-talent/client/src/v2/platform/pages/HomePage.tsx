@@ -101,7 +101,9 @@ export default function HomePage() {
   const touchpoints = coverage?.touchpoints ?? [];
   const competitors: string[] = competitorListQ.data?.competitors ?? [];
   const snapshot = competitorSnapshotQ.data;
-  const channelFinding = (id: string) => snapshot?.channels?.find((c: any) => c.channel === id);
+  const activeCompetitorChannels: any[] = snapshot?.channels?.filter((c: any) => c.active === "yes") ?? [];
+  const unknownChannelCount = snapshot?.channels?.filter((c: any) => c.active === "unknown").length ?? 0;
+  const contentChannelCount = snapshot?.channels?.length ?? 0;
 
   return (
     <div style={{ maxWidth: 880, margin: "0 auto", padding: "1.5rem 1.5rem 3rem" }}>
@@ -180,27 +182,48 @@ export default function HomePage() {
 
       {/* ── 內容層 ─────────────────────────────────────────────────────── */}
       <TrayHeader badge={en ? "Content" : "內容層"} color={LAYER_COLORS.content} caption={en ? "Strategy landed as a workflow at each touchpoint" : "策略落地到每個接觸點的工作流"} />
+
+      {competitorName && snapshot && (
+        activeCompetitorChannels.length > 0 ? (
+          <div style={{ border: "1px solid #fde68a", background: "#fffbeb", borderRadius: 12, padding: "10px 14px", marginBottom: 8 }}>
+            <p style={{ fontSize: 12, fontWeight: 600, color: "#b45309", margin: "0 0 6px" }}>
+              {en ? `${competitorName} is active where you might want to follow up:` : `${competitorName} 有活躍，你可以考慮跟進：`}
+            </p>
+            {activeCompetitorChannels.map((c: any) => {
+              const t = touchpoints.find((tp: any) => tp.id === c.channel);
+              return (
+                <div key={c.channel} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: "#92400e", padding: "4px 0" }}>
+                  <FontAwesomeIcon icon={TOUCHPOINT_ICON[c.channel]} style={{ fontSize: 13 }} />
+                  <span style={{ flex: 1 }}>{t ? (en ? t.labelEn : t.label) : c.channel}</span>
+                  {c.formats.length > 0 && <span>{c.formats.map((f: string) => (en ? FORMAT_LABEL[f]?.en : FORMAT_LABEL[f]?.zh) ?? f).join("、")}</span>}
+                  <button onClick={() => TOUCHPOINT_ROUTE[c.channel] && navigate(TOUCHPOINT_ROUTE[c.channel])} style={{ fontSize: 11, padding: "3px 8px", border: "1px solid #fde68a", borderRadius: 6, background: "#fff", cursor: "pointer" }}>
+                    {en ? "Go create" : "現在就做"}
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <p style={{ fontSize: 12, color: "#9ca3af", margin: "0 0 8px" }}>
+            {unknownChannelCount === contentChannelCount
+              ? (en ? `No public evidence found for ${competitorName} on any channel yet — common for smaller competitors, not proof they're inactive.` : `這次沒有查到 ${competitorName} 在任何通路的公開活躍證據——常見於規模較小的競爭者，不代表對方真的沒在做。`)
+              : (en ? `No touchpoints where ${competitorName} is active and you aren't.` : `沒有發現 ${competitorName} 活躍、而你還沒經營的通路。`)}
+          </p>
+        )
+      )}
+
       <Tray>
-        {touchpoints.map((t: any) => {
-          const finding = channelFinding(t.id);
-          return (
-            <TrayRow
-              key={t.id}
-              faIcon={TOUCHPOINT_ICON[t.id]}
-              label={en ? t.labelEn : t.label}
-              status={t.deployStatus === "connected" ? (en ? "Auto-deployed" : "已自動部署") : (en ? "Manual" : "手動貼上")}
-              statusColor={t.deployStatus === "connected" ? "#059669" : "#9ca3af"}
-              onClick={() => TOUCHPOINT_ROUTE[t.id] && navigate(TOUCHPOINT_ROUTE[t.id])}
-              extra={finding && finding.active !== "unknown" ? (
-                <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 6, background: finding.active === "yes" ? "#fffbeb" : "#f3f4f6", color: finding.active === "yes" ? "#b45309" : "#9ca3af" }}>
-                  {finding.active === "yes"
-                    ? `${competitorName} ${en ? "active" : "活躍"}${finding.formats.length ? `：${finding.formats.map((f: string) => (en ? FORMAT_LABEL[f]?.en : FORMAT_LABEL[f]?.zh) ?? f).join("、")}` : ""}`
-                    : `${competitorName} ${en ? "not active" : "未活躍"}`}
-                </span>
-              ) : undefined}
-            />
-          );
-        })}
+        {touchpoints.map((t: any) => (
+          <TrayRow
+            key={t.id}
+            faIcon={TOUCHPOINT_ICON[t.id]}
+            label={en ? t.labelEn : t.label}
+            status={t.deployStatus === "connected" ? (en ? "Auto-deployed" : "已自動部署") : (en ? "Manual copy-paste" : "手動貼上")}
+            statusColor={t.deployStatus === "connected" ? "#059669" : "#9ca3af"}
+            cta={en ? "Open workflow" : "打開工作流"}
+            onClick={() => TOUCHPOINT_ROUTE[t.id] && navigate(TOUCHPOINT_ROUTE[t.id])}
+          />
+        ))}
       </Tray>
 
       <ArrowDown />
@@ -299,12 +322,16 @@ function TrayRow(props: {
   icon?: any; faIcon?: any; iconColor?: string; label: string;
   status: string; statusColor: string; cta?: string; onClick?: () => void; extra?: React.ReactNode;
 }) {
+  // 2026-09-14（CJ「手動貼上的按鈕，只是轉連結到任務卡列表，有點奇怪」）：
+  // 狀態文字（已自動部署／手動貼上）不該同時是隱形按鈕——一個 row 只能是
+  // 「純狀態、整列可點」或「狀態 + 一顆有動詞的按鈕」，不能兩者都做同一件事。
+  const rowClickable = !!props.onClick && !props.cta;
   return (
     <div
-      onClick={props.onClick}
+      onClick={rowClickable ? props.onClick : undefined}
       style={{
         display: "flex", alignItems: "center", gap: 10, padding: "10px 14px",
-        borderBottom: "1px solid #f3f4f6", cursor: props.onClick ? "pointer" : "default",
+        borderBottom: "1px solid #f3f4f6", cursor: rowClickable ? "pointer" : "default",
       }}
     >
       <FontAwesomeIcon icon={props.faIcon ?? props.icon} style={{ fontSize: 15, color: props.iconColor ?? "#9ca3af", width: 18 }} />
@@ -312,7 +339,7 @@ function TrayRow(props: {
       {props.extra}
       {props.status && <span style={{ fontSize: 12, color: props.statusColor }}>{props.status}</span>}
       {props.cta && (
-        <button onClick={(e) => { e.stopPropagation(); props.onClick?.(); }} style={{ fontSize: 11, padding: "3px 8px", border: "1px solid #e5e7eb", borderRadius: 6, background: "#fff", cursor: "pointer" }}>
+        <button onClick={props.onClick} style={{ fontSize: 11, padding: "3px 8px", border: "1px solid #e5e7eb", borderRadius: 6, background: "#fff", cursor: "pointer" }}>
           {props.cta}
         </button>
       )}
