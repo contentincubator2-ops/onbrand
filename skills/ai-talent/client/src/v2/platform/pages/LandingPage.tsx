@@ -11,7 +11,7 @@
  *     - Subtle dot-grid background texture
  *     - Black stats bar at bottom with tabular numerals
  *
- * Auth-check: logged-in users redirect to /theater.
+ * Auth-check: logged-in users redirect to /home.
  */
 import React from "react";
 import { Link, useNavigate } from "react-router-dom";
@@ -84,7 +84,7 @@ export default function LandingPage() {
         let brandCount = 1;
         try { brandCount = Number((await r.json())?.brandCount ?? 1); } catch {}
         if (dead) return;
-        navigate(brandCount > 0 ? "/theater" : "/brands?all=1", { replace: true });
+        navigate(brandCount > 0 ? "/home" : "/brands?all=1", { replace: true });
       })
       .catch(() => {});
     document.title = en

@@ -25,6 +25,7 @@ import { brandTaskCardRouter } from "../strategy/routers/brandTaskCardRouter";
 import { workbenchRouter } from "../strategy/routers/workbenchRouter";
 import { assetPhotoRouter } from "../strategy/routers/assetPhotoRouter";
 import { strategyMonitorRouter } from "../strategy/routers/strategyMonitorRouter";
+import { touchpointsRouter } from "../platform/routers/touchpointsRouter";
 import { brandKnowledgeRouter } from "../strategy/routers/brandKnowledgeRouter";
 import { personaAgentRouter } from "../strategy/routers/personaAgentRouter";
 import { cloudDriveRouter } from "../platform/routers/cloudDriveRouter";
@@ -67,6 +68,7 @@ export const appRouter = router({
   brandBrain:    brandBrainRouter,
   assetPhoto:    assetPhotoRouter,
   strategyMonitor: strategyMonitorRouter,
+  touchpoints:   touchpointsRouter,
   calendar:      calendarRouter,
   bundleConnect: bundleConnectRouter,
   image:         imageRouter,

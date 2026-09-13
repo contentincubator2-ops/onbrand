@@ -56,6 +56,7 @@ const ResetPasswordPage = React.lazy(() => import("../../pages/auth/ResetPasswor
 const OnboardingWizard = React.lazy(() => import("../../pages/OnboardingWizard"));
 
 // Protected app surface — never loaded by anonymous visitors
+const HomePage = React.lazy(() => import("../platform/pages/HomePage"));
 const TheaterPage = React.lazy(() => import("../content/pages/TheaterPage"));
 const PlatformTaskPage = React.lazy(() => import("../content/pages/PlatformTaskPage"));
 const DataWorkspacePage = React.lazy(() => import("../performance/pages/DataWorkspacePage"));
@@ -284,7 +285,7 @@ export default function AppV2() {
           path="/onboarding"
           element={
             <RequireAuthV2>
-              <OnboardingWizard onComplete={() => (window.location.href = "/theater")} />
+              <OnboardingWizard onComplete={() => (window.location.href = "/home")} />
             </RequireAuthV2>
           }
         />
@@ -320,6 +321,7 @@ export default function AppV2() {
           {/* 2026-05-12 (CJ「不想要變成 modal，想跟品牌頁面一樣」): full-page
               brand settings (replaces the modal sheet for direct navigation). */}
           <Route path="/brands/settings" element={<BrandSettingsPage />} />
+          <Route path="/home"      element={<HomePage />} />
           <Route path="/theater"   element={<TheaterPage />} />
           <Route path="/m/:missionId" element={<MissionRedirect />} />
           <Route path="/b/:brandId/:workspace/m/:missionId" element={<MissionRedirect />} />

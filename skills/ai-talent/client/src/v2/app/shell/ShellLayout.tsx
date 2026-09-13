@@ -29,7 +29,7 @@ import { useLang } from "../../../lib/i18n";
 import { Avatar, Tooltip } from "@heroui/react";
 import { Brain as LucideBrain } from "lucide-react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faFolderOpen, faBrain, faWandMagicSparkles, faMicrophone, faBookBookmark, faBell, faPlus, faRightFromBracket, faLayerGroup, faGear, faXmark, faCheckDouble, faChevronRight, faCheck, faBoxOpen, faCalendarDays, faCircleInfo, faBriefcase, faShareNodes, faUsers, faLanguage, faPaintBrush, faFont, faMagnifyingGlass, faChevronDown, faEnvelope, faBullhorn, faGlobe, faChartLine, faDatabase, faFileLines } from "@fortawesome/free-solid-svg-icons";
+import { faFolderOpen, faBrain, faWandMagicSparkles, faMicrophone, faBookBookmark, faBell, faPlus, faRightFromBracket, faLayerGroup, faGear, faXmark, faCheckDouble, faChevronRight, faCheck, faBoxOpen, faCalendarDays, faCircleInfo, faBriefcase, faShareNodes, faUsers, faLanguage, faPaintBrush, faFont, faMagnifyingGlass, faChevronDown, faEnvelope, faBullhorn, faGlobe, faChartLine, faDatabase, faFileLines, faHouse } from "@fortawesome/free-solid-svg-icons";
 import {
   faFacebookF, faInstagram, faYoutube, faTiktok, faLinkedinIn, faXTwitter,
 } from "@fortawesome/free-brands-svg-icons";
@@ -193,6 +193,10 @@ function buildNavItems(lang: "zh-TW" | "en", userEmail?: string | null, currentP
   }
 
   const items: NavItem[] = [
+    // 2026-09-13（FDE 定位重整）：首頁改成部署覆蓋率總覽，取代「登入就直接
+    // 進某個內容通路」——見 client/src/v2/platform/pages/HomePage.tsx。
+    { to: "/home", label: en ? "Home" : "首頁", icon: <FontAwesomeIcon icon={faHouse} />, matchPrefix: "/home",
+      tooltip: en ? "Deployment coverage overview" : "部署覆蓋率總覽" },
     // ── Platform tier (primary content creation entry points) ──────────────
     { to: "/tasks/fb",    label: "Facebook",  icon: <FontAwesomeIcon icon={faFacebookF} />,  matchPrefix: "/tasks/fb",
       tooltip: en ? "Facebook posts, ads, stories, live copy" : "Facebook 貼文 / 廣告 / 限時 / 直播文案" },
@@ -788,7 +792,7 @@ function IconBar({
             <OnBrandLogo
               glyphOnly
               size={32}
-              onClick={() => onNavigate("/tasks/fb")}
+              onClick={() => onNavigate("/home")}
               style={{ padding: 4, borderRadius: 8 }}
             />
           </span>
