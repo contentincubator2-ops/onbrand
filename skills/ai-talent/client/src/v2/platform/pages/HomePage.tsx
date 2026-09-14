@@ -9,12 +9,13 @@
  *   內容層：每個接觸點的工作流是已建立還是手動貼上
  *   成效層：哪些接觸點已經串接、看得到成效（早期預覽）
  *
- * 競爭者對比是套在這三層上的一個篩選鏡頭，不是第四層（CJ「不要變成廣泛的
- * 同行業競爭標竿比對…而是選定一個競爭者」）：選單資料來源是品牌定位文件
- * 裡列的具名競爭者（competitorRouter.list），選了誰，內容層才會標註「這個
- * 通路對方有沒有公開活躍」，策略層才會標註「策略訴求跟對方有何差異」——
- * 這是 web 情報 + LLM 歸納的研究快照（competitorRouter.snapshot），查不到
- * 證據一律誠實顯示「不明」，不能瞎猜（見 competitorSnapshot.ts 的規則）。
+ * 2026-09-15（CJ「這一頁還要從長計議…先改到一個簡單版本，策略層逐步修改」）：
+ * 拿掉了競爭者比對這個篩選鏡頭——需要爬蟲精度才準的「這個通路對方有沒有
+ * 活躍」查不到什麼有用的東西，CJ 判斷現階段做不出可靠版本，先回到單純呈現
+ * 「我們自己的策略→內容接觸點現況」。競爭者比對的後端
+ * （server/strategy/core/competitorSnapshot.ts + competitorRouter.ts）保留在
+ * repo 裡沒有刪，已經寫好也測試過，只是先不接進這一頁；之後若有更可靠的
+ * 研究方法（例如先解析出對方社群帳號再做針對性查詢）可以直接接回來。
  *
  * 成效層的數字沿用成效工作台同一份 perfMockData（模擬數據，不重算一次）。
  * 「你的團隊」這個新頁面還沒建，這裡先不放連結，避免死連結。
@@ -44,12 +45,6 @@ const TOUCHPOINT_ROUTE: Record<string, string> = {
   youtube: "/tasks/yt", tiktok: "/tasks/tt", x: "/tasks/x",
   email: "/tasks/email", pr: "/tasks/pr", website: "/tasks/web",
 };
-const FORMAT_LABEL: Record<string, { en: string; zh: string }> = {
-  organic_post: { en: "organic posts", zh: "自然貼文" },
-  live: { en: "livestreams", zh: "直播" },
-  stories: { en: "stories/reels", zh: "限動/短影音" },
-  ads: { en: "ads", zh: "廣告" },
-};
 
 const LAYER_COLORS = { strategy: "#2563eb", content: "#059669", performance: "#b45309" };
 
@@ -59,19 +54,10 @@ export default function HomePage() {
   const en = lang === "en";
   const [scope] = useScopeState();
   const brandId = scope.brandId;
-  const [competitorName, setCompetitorName] = React.useState<string>("");
 
   const summaryQ = (trpc as any).touchpoints.homeSummary.useQuery(
     { brandId: brandId ?? 0 },
     { enabled: !!brandId, staleTime: 30_000 },
-  );
-  const competitorListQ = (trpc as any).competitor.list.useQuery(
-    { brandId: brandId ?? 0 },
-    { enabled: !!brandId, staleTime: 60_000 },
-  );
-  const competitorSnapshotQ = (trpc as any).competitor.snapshot.useQuery(
-    { brandId: brandId ?? 0, competitorName },
-    { enabled: !!brandId && !!competitorName },
   );
   const notifQ = (trpc as any).notifications.list.useQuery(
     { limit: 3, lang: en ? "en" : "zh-TW" },
@@ -99,47 +85,19 @@ export default function HomePage() {
   const missingProducts = products.filter((p) => !p.hasPositioning);
   const strategyAlerts: Array<{ id: number; title: string; summary: string }> = summaryQ.data?.strategyAlerts ?? [];
   const touchpoints = coverage?.touchpoints ?? [];
-  const competitors: string[] = competitorListQ.data?.competitors ?? [];
-  const snapshot = competitorSnapshotQ.data;
-  const activeCompetitorChannels: any[] = snapshot?.channels?.filter((c: any) => c.active === "yes") ?? [];
-  const unknownChannelCount = snapshot?.channels?.filter((c: any) => c.active === "unknown").length ?? 0;
-  const contentChannelCount = snapshot?.channels?.length ?? 0;
 
   return (
     <div style={{ maxWidth: 880, margin: "0 auto", padding: "1.5rem 1.5rem 3rem" }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "1.5rem", flexWrap: "wrap", gap: 10 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "1.5rem" }}>
         <h1 style={{ fontSize: 20, fontWeight: 600, margin: 0 }}>{en ? "Deployment workflow" : "策略落地工作流"}</h1>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <label style={{ fontSize: 12, color: "#6b7280" }}>{en ? "Compare vs" : "對比競爭者"}</label>
-          <select
-            value={competitorName}
-            onChange={(e) => setCompetitorName(e.target.value)}
-            style={{ fontSize: 12, padding: "5px 8px", border: "1px solid #e5e7eb", borderRadius: 6, background: "#fff" }}
-          >
-            <option value="">{en ? "None" : "未選擇"}</option>
-            {competitors.map((c) => <option key={c} value={c}>{c}</option>)}
-          </select>
-          <button
-            onClick={() => navigate("/theater")}
-            style={{ fontSize: 13, padding: "6px 12px", border: "1px solid #e5e7eb", borderRadius: 8, background: "#fff", cursor: "pointer" }}
-          >
-            <FontAwesomeIcon icon={faBell} style={{ marginRight: 6, color: "#9ca3af" }} />
-            {en ? "Notifications" : "通知"}
-          </button>
-        </div>
+        <button
+          onClick={() => navigate("/theater")}
+          style={{ fontSize: 13, padding: "6px 12px", border: "1px solid #e5e7eb", borderRadius: 8, background: "#fff", cursor: "pointer" }}
+        >
+          <FontAwesomeIcon icon={faBell} style={{ marginRight: 6, color: "#9ca3af" }} />
+          {en ? "Notifications" : "通知"}
+        </button>
       </div>
-
-      {competitorName && competitorSnapshotQ.isLoading && (
-        <p style={{ fontSize: 12, color: "#9ca3af", margin: "0 0 12px" }}>
-          {en ? `Researching ${competitorName}…` : `正在研究 ${competitorName}…`}
-        </p>
-      )}
-      {snapshot && (
-        <p style={{ fontSize: 11, color: "#9ca3af", margin: "0 0 12px" }}>
-          {en ? "Research snapshot" : "研究快照"} · {new Date(snapshot.researchedAt).toLocaleDateString(en ? "en-US" : "zh-TW")}
-          {en ? " — a web-research summary, not live tracking." : "——網路情報整理，不是即時追蹤。"}
-        </p>
-      )}
 
       {/* ── 策略層 ─────────────────────────────────────────────────────── */}
       <TrayHeader badge={en ? "Strategy" : "策略層"} color={LAYER_COLORS.strategy} caption={en ? "How complete is this brand's strategy" : "這個品牌的策略齊備度"} />
@@ -165,53 +123,12 @@ export default function HomePage() {
         {strategyAlerts.map((a) => (
           <TrayRow key={a.id} icon={faBell} iconColor="#2563eb" label={a.title} status={en ? "New" : "新提醒"} statusColor="#2563eb" onClick={() => navigate("/brands")} />
         ))}
-        {competitorName && (
-          snapshot?.strategyDiff?.confidence === "known" ? (
-            <TrayRow
-              icon={faBell} iconColor="#2563eb"
-              label={en ? `vs ${competitorName}: ${snapshot.strategyDiff.difference}` : `對比 ${competitorName}：${snapshot.strategyDiff.difference}`}
-              status={en ? "Detail" : "詳情"} statusColor="#2563eb"
-            />
-          ) : competitorSnapshotQ.data ? (
-            <TrayRow icon={faTriangleExclamation} iconColor="#9ca3af" label={en ? `Not enough public info to compare strategy vs ${competitorName}` : `沒有足夠公開資訊可比對 ${competitorName} 的策略訴求`} status="" statusColor="#9ca3af" />
-          ) : null
-        )}
       </Tray>
 
       <ArrowDown />
 
       {/* ── 內容層 ─────────────────────────────────────────────────────── */}
       <TrayHeader badge={en ? "Content" : "內容層"} color={LAYER_COLORS.content} caption={en ? "Strategy landed as a workflow at each touchpoint" : "策略落地到每個接觸點的工作流"} />
-
-      {competitorName && snapshot && (
-        activeCompetitorChannels.length > 0 ? (
-          <div style={{ border: "1px solid #fde68a", background: "#fffbeb", borderRadius: 12, padding: "10px 14px", marginBottom: 8 }}>
-            <p style={{ fontSize: 12, fontWeight: 600, color: "#b45309", margin: "0 0 6px" }}>
-              {en ? `${competitorName} is active where you might want to follow up:` : `${competitorName} 有活躍，你可以考慮跟進：`}
-            </p>
-            {activeCompetitorChannels.map((c: any) => {
-              const t = touchpoints.find((tp: any) => tp.id === c.channel);
-              return (
-                <div key={c.channel} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: "#92400e", padding: "4px 0" }}>
-                  <FontAwesomeIcon icon={TOUCHPOINT_ICON[c.channel]} style={{ fontSize: 13 }} />
-                  <span style={{ flex: 1 }}>{t ? (en ? t.labelEn : t.label) : c.channel}</span>
-                  {c.formats.length > 0 && <span>{c.formats.map((f: string) => (en ? FORMAT_LABEL[f]?.en : FORMAT_LABEL[f]?.zh) ?? f).join("、")}</span>}
-                  <button onClick={() => TOUCHPOINT_ROUTE[c.channel] && navigate(TOUCHPOINT_ROUTE[c.channel])} style={{ fontSize: 11, padding: "3px 8px", border: "1px solid #fde68a", borderRadius: 6, background: "#fff", cursor: "pointer" }}>
-                    {en ? "Go create" : "現在就做"}
-                  </button>
-                </div>
-              );
-            })}
-          </div>
-        ) : (
-          <p style={{ fontSize: 12, color: "#9ca3af", margin: "0 0 8px" }}>
-            {unknownChannelCount === contentChannelCount
-              ? (en ? `No public evidence found for ${competitorName} on any channel yet — common for smaller competitors, not proof they're inactive.` : `這次沒有查到 ${competitorName} 在任何通路的公開活躍證據——常見於規模較小的競爭者，不代表對方真的沒在做。`)
-              : (en ? `No touchpoints where ${competitorName} is active and you aren't.` : `沒有發現 ${competitorName} 活躍、而你還沒經營的通路。`)}
-          </p>
-        )
-      )}
-
       <Tray>
         {touchpoints.map((t: any) => (
           <TrayRow
@@ -320,7 +237,7 @@ function ArrowDown() {
 
 function TrayRow(props: {
   icon?: any; faIcon?: any; iconColor?: string; label: string;
-  status: string; statusColor: string; cta?: string; onClick?: () => void; extra?: React.ReactNode;
+  status: string; statusColor: string; cta?: string; onClick?: () => void;
 }) {
   // 2026-09-14（CJ「手動貼上的按鈕，只是轉連結到任務卡列表，有點奇怪」）：
   // 狀態文字（已自動部署／手動貼上）不該同時是隱形按鈕——一個 row 只能是
@@ -336,7 +253,6 @@ function TrayRow(props: {
     >
       <FontAwesomeIcon icon={props.faIcon ?? props.icon} style={{ fontSize: 15, color: props.iconColor ?? "#9ca3af", width: 18 }} />
       <span style={{ fontSize: 13, flex: 1 }}>{props.label}</span>
-      {props.extra}
       {props.status && <span style={{ fontSize: 12, color: props.statusColor }}>{props.status}</span>}
       {props.cta && (
         <button onClick={props.onClick} style={{ fontSize: 11, padding: "3px 8px", border: "1px solid #e5e7eb", borderRadius: 6, background: "#fff", cursor: "pointer" }}>
