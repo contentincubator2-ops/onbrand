@@ -55,6 +55,19 @@ const ForgotPasswordPage = React.lazy(() => import("../../pages/auth/ForgotPassw
 const ResetPasswordPage = React.lazy(() => import("../../pages/auth/ResetPasswordPage"));
 const OnboardingWizard = React.lazy(() => import("../../pages/OnboardingWizard"));
 
+// 2026-09-16 (Dallas show): Sales Hub concept demo — own shell, English-first.
+const HubShell = React.lazy(() => import("../hub/HubShell"));
+const HubOverviewPage = React.lazy(() => import("../hub/pages/HubOverviewPage"));
+const HubStrategyPage = React.lazy(() => import("../hub/pages/HubStrategyPage"));
+const HubContentPage = React.lazy(() => import("../hub/pages/HubContentPage"));
+const HubRepsPage = React.lazy(() => import("../hub/pages/HubRepsPage"));
+const HubPerformancePage = React.lazy(() => import("../hub/pages/HubPerformancePage"));
+const HubRepViewPage = React.lazy(() => import("../hub/pages/HubRepViewPage"));
+const HubScanPage = React.lazy(() => import("../hub/pages/ScanPage"));
+const HubLiffWritePage = React.lazy(() => import("../hub/pages/LiffWritePage"));
+const HubLiffSharePage = React.lazy(() => import("../hub/pages/LiffSharePage"));
+const isHubHost = typeof window !== "undefined" && window.location.hostname.startsWith("experthub.");
+
 // Protected app surface — never loaded by anonymous visitors
 const HomePage = React.lazy(() => import("../platform/pages/HomePage"));
 const TheaterPage = React.lazy(() => import("../content/pages/TheaterPage"));
@@ -267,7 +280,21 @@ export default function AppV2() {
         {/* 2026-05-16 (CJ「主打品牌定位鎖定」): public marketing landing
             at /. Cold traffic used to hit /auth/login directly (funnel
             leak). LandingPage self-redirects authed users to /theater. */}
-        <Route path="/" element={<LandingPage />} />
+        <Route path="/" element={isHubHost ? <Navigate to="/hub" replace /> : <LandingPage />} />
+
+        {/* Sales Hub — public: tracked-link landing + LIFF pages opened inside LINE */}
+        <Route path="/scan/:code" element={<HubScanPage />} />
+        <Route path="/liff/write" element={<HubLiffWritePage />} />
+        <Route path="/liff/share" element={<HubLiffSharePage />} />
+        {/* Sales Hub — HQ / marketing admin */}
+        <Route element={<RequireAuthV2><HubShell /></RequireAuthV2>}>
+          <Route path="/hub" element={<HubOverviewPage />} />
+          <Route path="/hub/strategy" element={<HubStrategyPage />} />
+          <Route path="/hub/content" element={<HubContentPage />} />
+          <Route path="/hub/reps" element={<HubRepsPage />} />
+          <Route path="/hub/performance" element={<HubPerformancePage />} />
+          <Route path="/hub/rep-view" element={<HubRepViewPage />} />
+        </Route>
 
         {/* 2026-05-10: Public legal + pricing pages (no auth required so
             unregistered prospects can read T&C / Privacy / Refund + see pricing) */}

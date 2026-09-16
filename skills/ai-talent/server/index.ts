@@ -33,6 +33,7 @@ import { assetPhotoRouter as assetPhotoUploadRoute, STORAGE_ROOT as ASSET_PHOTO_
 import { slackOAuthRouter } from "./platform/routes/slackOAuthRoute";
 import { cloudOAuthRouter } from "./platform/routes/cloudOAuthRoute";
 import { manusRouter } from "./platform/routers/manusRouter";
+import { hubLineWebhookHandler, hubPublicRouter } from "./platform/routes/hubRoutes";
 import { publicAgentsRoute } from "./platform/routes/publicAgentsRoute";
 import { closeDb, pingDb, pingSoworkDb, getDb } from "./db";
 import { sql } from "drizzle-orm";
@@ -62,7 +63,8 @@ app.use(helmet({
       // 'unsafe-inline' / 'unsafe-eval' tracked as S-05 in SECURITY-AUDIT.md
       // — needed by Vite + HeroUI runtime; migration to nonce-based CSP is
       // a separate workstream.
-      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://*.pipedream.com"],
+      // 2026-09-16 (Sales Hub demo): LIFF SDK for the rep pages opened inside LINE.
+      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://*.pipedream.com", "https://static.line-scdn.net"],
       // 2026-05-14 (CJ console screenshot): allow Google Fonts stylesheet
       // load. fonts.googleapis.com serves the CSS, fonts.gstatic.com serves
       // the actual font files (woff2). Without these, the CSP blocks the
@@ -83,6 +85,8 @@ app.use(helmet({
         "'self'",
         "https://marketing-os.sowork.ai", "https://onbrand.sowork.ai", "https://drop.sowork.ai",
         "https://api.pipedream.com", "https://*.pipedream.com", "https://*.pipedream.net",
+        "https://experthub.onbrand.sowork.ai",
+        "https://api.line.me", "https://access.line.me", "https://liffsdk.line-scdn.net", "https://*.line-scdn.net",
       ],
       frameSrc: ["'self'", "https://pipedream.com", "https://*.pipedream.com"],
     },
@@ -159,6 +163,10 @@ app.post(
     }
   },
 );
+
+// 2026-09-16 (Sales Hub demo): LINE webhook signature is an HMAC over the raw
+// body, so it needs the same before-express.json() mount as Stripe.
+app.post("/line/webhook", express.raw({ type: "*/*", limit: "1mb" }), hubLineWebhookHandler);
 
 // SEC-B-08 (2026-05-04): cap JSON body size. Per-field check below is the
 // real DoS protection; body limit just caps overall request size.
@@ -271,6 +279,10 @@ app.use(generatedImageUrlPrefix, express.static(
   process.env.GENERATED_IMAGE_DIR ?? join(process.cwd(), "storage", "generated-images"),
   { maxAge: "7d", immutable: false },
 ));
+
+// Sales Hub: /r/:code (tracked links), /mcp and /api/hub/scan — GET /r and
+// /mcp must win over the SPA fallback below.
+app.use(hubPublicRouter);
 
 const publicDir = join(process.cwd(), "public");
 if (existsSync(publicDir)) {
@@ -650,6 +662,15 @@ const server = app.listen(PORT, async () => {
     console.warn(`[safety] disabled runtime features: ${disabledFeatures.join(", ")}`);
   }
   await runStartupMigrations();
+  // Own try: runStartupMigrations stops at its first failure, and the hub
+  // tables must exist even on a fresh demo database.
+  try {
+    const { ensureHubTables } = await import("./platform/core/hub/hubDdl");
+    await ensureHubTables();
+    console.log("[migrate] hub_*: OK");
+  } catch (err) {
+    console.error("[migrate] hub tables failed:", err);
+  }
   if (isRuntimeFeatureEnabled("BACKGROUND_WORKERS_ENABLED")) {
     console.log("[A2A] Orchestrator Worker started");
     console.log("[A2A] Squad Leader Worker started");

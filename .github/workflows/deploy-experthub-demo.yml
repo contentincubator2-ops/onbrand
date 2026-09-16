@@ -1,0 +1,244 @@
+name: Deploy — ExpertHub Sales Hub demo
+
+# 2026-09-16 (CJ, Dallas show): the Sales Hub concept demo runs on the dev VM
+# as its OWN process (pm2 onbrand-experthub, port 3201), its OWN database
+# (experthub_demo, schema cloned from mos_db) and its OWN host
+# (experthub.onbrand.sowork.ai). dev.onbrand.sowork.ai (pm2 onbrand-dev, 3101)
+# is untouched, so pushes to dev can't break the booth and vice versa.
+#
+# Push-triggered on purpose: workflow_dispatch only works for workflows that
+# exist on the default branch.
+
+on:
+  push:
+    branches: [release/experthub-demo]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: experthub-demo-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-24.04
+    environment: dev
+    env:
+      LOCAL_DB_HOST: localhost
+      LOCAL_DB_USER: test
+      LOCAL_DB_PASSWORD: test
+      LOCAL_DB_NAME: test
+      JWT_SECRET: ci-test-secret-at-least-32-chars-long
+      NODE_ENV: test
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: |
+            skills/ai-talent/package-lock.json
+            skills/ai-talent/client/package-lock.json
+
+      - name: Install dependencies
+        run: |
+          npm ci --legacy-peer-deps --prefix skills/ai-talent
+          npm ci --legacy-peer-deps --prefix skills/ai-talent/client
+
+      - name: Type check
+        run: |
+          npm run typecheck --prefix skills/ai-talent
+          cd skills/ai-talent/client && npx tsc --noEmit
+
+      - name: Boundary guard — client/server
+        run: ./scripts/check-client-server-boundary.sh
+
+      - name: Test server
+        run: npm test --prefix skills/ai-talent
+
+      - name: Build frontend
+        run: npm run build --prefix skills/ai-talent/client -- --outDir ../public --emptyOutDir
+
+      - name: Package release
+        run: |
+          rm -rf skills/ai-talent/client/node_modules
+          tar --exclude=.git --exclude='*/.env' --exclude='scripts/env-provision' \
+            -czf "$RUNNER_TEMP/experthub-release.tgz" .
+          test -s "$RUNNER_TEMP/experthub-release.tgz"
+
+      - name: Stage demo secrets
+        env:
+          LINE_CHANNEL_SECRET: ${{ secrets.LINE_CHANNEL_SECRET }}
+          LINE_CHANNEL_ACCESS_TOKEN: ${{ secrets.LINE_CHANNEL_ACCESS_TOKEN }}
+          LINE_LIFF_ID: ${{ secrets.LINE_LIFF_ID }}
+          LINE_LOGIN_CHANNEL_ID: ${{ secrets.LINE_LOGIN_CHANNEL_ID }}
+          HUB_HERMES_URL: ${{ secrets.HUB_HERMES_URL }}
+          HUB_HERMES_PROFILES: ${{ secrets.HUB_HERMES_PROFILES }}
+          HUB_ADMIN_EMAIL: ${{ secrets.HUB_ADMIN_EMAIL }}
+          HUB_ADMIN_PASSWORD: ${{ secrets.HUB_ADMIN_PASSWORD }}
+        run: |
+          umask 077
+          app="$RUNNER_TEMP/experthub-secrets.env"; admin="$RUNNER_TEMP/experthub-admin.env"
+          : > "$app"; : > "$admin"
+          for k in LINE_CHANNEL_SECRET LINE_CHANNEL_ACCESS_TOKEN LINE_LIFF_ID LINE_LOGIN_CHANNEL_ID HUB_HERMES_URL HUB_HERMES_PROFILES; do
+            v="${!k}"; if [ -n "$v" ]; then printf '%s=%s\n' "$k" "$v" >> "$app"; fi
+          done
+          # Admin credentials never go into the app's .env — only into the one-off admin script run.
+          for k in HUB_ADMIN_EMAIL HUB_ADMIN_PASSWORD; do
+            v="${!k}"; if [ -n "$v" ]; then printf "export %s='%s'\n" "$k" "${v//\'/\'\\\'\'}" >> "$admin"; fi
+          done
+          echo "app secrets staged: $(cut -d= -f1 "$app" | tr '\n' ' ')"
+          echo "admin login staged: $([ -s "$admin" ] && echo yes || echo no)"
+
+      - name: Configure SSH
+        env:
+          VM_SSH_PRIVATE_KEY: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          VM_SSH_HOST_KEY: ${{ secrets.VM_SSH_HOST_KEY }}
+        run: |
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$VM_SSH_PRIVATE_KEY" > ~/.ssh/onbrand-dev && chmod 600 ~/.ssh/onbrand-dev
+          printf '%s\n' "$VM_SSH_HOST_KEY" > ~/.ssh/known_hosts && chmod 600 ~/.ssh/known_hosts
+
+      - name: Upload
+        env:
+          VM_HOST: ${{ secrets.VM_HOST }}
+          VM_USER: ${{ secrets.VM_USER }}
+        run: |
+          scp -i ~/.ssh/onbrand-dev "$RUNNER_TEMP/experthub-release.tgz" "$VM_USER@$VM_HOST:/tmp/experthub-release-${GITHUB_SHA}.tgz"
+          scp -i ~/.ssh/onbrand-dev "$RUNNER_TEMP/experthub-secrets.env" "$VM_USER@$VM_HOST:/tmp/experthub-secrets.env"
+          scp -i ~/.ssh/onbrand-dev "$RUNNER_TEMP/experthub-admin.env" "$VM_USER@$VM_HOST:/tmp/experthub-admin.env"
+
+      - name: Activate on dev VM
+        env:
+          VM_HOST: ${{ secrets.VM_HOST }}
+          VM_USER: ${{ secrets.VM_USER }}
+        run: |
+          ssh -i ~/.ssh/onbrand-dev "$VM_USER@$VM_HOST" "RELEASE_SHA='${GITHUB_SHA}' bash -s" <<'REMOTE'
+          set -euo pipefail
+          HOST=experthub.onbrand.sowork.ai
+          app_root=/opt/onbrand-demo
+          release="$app_root/releases/$RELEASE_SHA"
+          current="$app_root/current"
+          archive="/tmp/experthub-release-$RELEASE_SHA.tgz"
+          env_file="$app_root/shared/.env"
+          trap 'rm -f /tmp/experthub-secrets.env /tmp/experthub-admin.env' EXIT
+
+          echo "════ VM capacity ════"
+          nproc; free -m; df -h / | tail -1
+          docker --version 2>/dev/null || echo "docker: not installed"
+          pm2 ls 2>/dev/null | grep -E "online|stopped|errored" || true
+          echo "public ip: $(curl -s --max-time 5 https://api.ipify.org || echo unknown)"
+
+          sudo mkdir -p "$app_root/releases" "$app_root/shared"
+          sudo chown -R "$(id -un)":"$(id -gn)" "$app_root"
+          mkdir -p "$release" && tar -xzf "$archive" -C "$release" && rm -f "$archive"
+          ai="$release/skills/ai-talent"
+          test -f "$ai/public/index.html"
+
+          echo "════ env ════"
+          if [ ! -f "$env_file" ]; then
+            test -f /opt/onbrand/shared/.env
+            grep -vE '^(LOCAL_DB_NAME|DB_NAME|PORT|BACKGROUND_WORKERS_ENABLED|HUB_PUBLIC_BASE_URL|CORS_ORIGIN|APP_URL|JWT_SECRET)=' /opt/onbrand/shared/.env > "$env_file"
+            {
+              echo "LOCAL_DB_NAME=experthub_demo"
+              echo "DB_NAME=experthub_demo"
+              echo "BACKGROUND_WORKERS_ENABLED=false"
+              echo "HUB_PUBLIC_BASE_URL=https://$HOST"
+              echo "CORS_ORIGIN=https://$HOST"
+              echo "APP_URL=https://$HOST"
+              echo "JWT_SECRET=$(openssl rand -hex 32)"
+            } >> "$env_file"
+            echo "created $env_file from the dev env"
+          fi
+          if [ -s /tmp/experthub-secrets.env ]; then
+            while IFS= read -r line; do
+              key="${line%%=*}"; [ -n "$key" ] || continue
+              grep -vE "^${key}=" "$env_file" > "$env_file.tmp" || true
+              mv "$env_file.tmp" "$env_file"
+              printf '%s\n' "$line" >> "$env_file"
+              echo "set $key"
+            done < /tmp/experthub-secrets.env
+          fi
+          chmod 600 "$env_file"
+          ln -sfn "$env_file" "$ai/.env"
+          mkdir -p "$app_root/shared/storage"; rm -rf "$ai/storage"; ln -s "$app_root/shared/storage" "$ai/storage"
+
+          echo "════ database ════"
+          dbu="$(grep -E '^LOCAL_DB_USER=' "$env_file" | tail -1 | cut -d= -f2-)"
+          sudo mysql -e "CREATE DATABASE IF NOT EXISTS experthub_demo CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"
+          sudo mysql -e "GRANT ALL PRIVILEGES ON experthub_demo.* TO '${dbu}'@'localhost'" 2>/dev/null \
+            || sudo mysql -e "GRANT ALL PRIVILEGES ON experthub_demo.* TO '${dbu}'@'%'"
+          sudo mysql -e "FLUSH PRIVILEGES"
+          n="$(sudo mysql -N -e "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='experthub_demo'")"
+          if [ "$n" -lt 20 ]; then
+            echo "cloning schema from mos_db (structure only, no data)"
+            sudo mysqldump --no-data --skip-triggers --no-tablespaces mos_db | sudo mysql experthub_demo
+          fi
+
+          cd "$ai"
+          ./node_modules/.bin/tsx scripts/migrate.ts || echo "migrate reported errors — continuing (schema cloned from mos_db)"
+          ./node_modules/.bin/tsx scripts/hub-seed.ts --samples --backfill
+          if [ -s /tmp/experthub-admin.env ]; then
+            ( . /tmp/experthub-admin.env && ./node_modules/.bin/tsx scripts/hub-admin.ts )
+          else
+            echo "HUB_ADMIN_EMAIL / HUB_ADMIN_PASSWORD not set — no admin login yet"
+          fi
+
+          echo "════ process ════"
+          previous="$(readlink -f "$current" 2>/dev/null || true)"
+          ln -sfn "$release" "$current"
+          start() {
+            pm2 delete onbrand-experthub >/dev/null 2>&1 || true
+            NODE_ENV=production PORT=3201 TRUST_PROXY=1 \
+              pm2 start "$current/skills/ai-talent/node_modules/.bin/tsx" \
+                --name onbrand-experthub --cwd "$current/skills/ai-talent" --update-env -- server/index.ts
+          }
+          start
+          if ! timeout 90 bash -c 'until curl -s http://127.0.0.1:3201/health | grep -q "\"db\":\"ok\""; do sleep 3; done'; then
+            pm2 logs onbrand-experthub --lines 80 --nostream || true
+            if [ -n "$previous" ] && [ -d "$previous" ] && [ "$previous" != "$release" ]; then ln -sfn "$previous" "$current"; start; fi
+            exit 1
+          fi
+          pm2 save --force
+
+          echo "════ nginx ════"
+          if [ -d /etc/nginx/sites-available ]; then
+            site="/etc/nginx/sites-available/$HOST"; link="/etc/nginx/sites-enabled/$HOST"
+          else
+            site="/etc/nginx/conf.d/$HOST.conf"; link=""
+          fi
+          if [ ! -f "$site" ]; then
+            printf '%s\n' \
+              'server {' \
+              '  listen 80;' \
+              '  server_name experthub.onbrand.sowork.ai;' \
+              '  client_max_body_size 10m;' \
+              '  location / {' \
+              '    proxy_pass http://127.0.0.1:3201;' \
+              '    proxy_http_version 1.1;' \
+              '    proxy_set_header Host $host;' \
+              '    proxy_set_header X-Real-IP $remote_addr;' \
+              '    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;' \
+              '    proxy_set_header X-Forwarded-Proto $scheme;' \
+              '    proxy_read_timeout 120s;' \
+              '    proxy_send_timeout 120s;' \
+              '  }' \
+              '}' | sudo tee "$site" >/dev/null
+            if [ -n "$link" ]; then sudo ln -sfn "$site" "$link"; fi
+            sudo nginx -t && sudo systemctl reload nginx
+            echo "nginx site created"
+          fi
+          resolved="$(getent hosts "$HOST" | awk '{print $1}' | head -1 || true)"
+          myip="$(curl -s --max-time 5 https://api.ipify.org || true)"
+          if sudo test -d "/etc/letsencrypt/live/$HOST"; then
+            echo "certificate present"
+          elif [ -n "$resolved" ] && [ "$resolved" = "$myip" ]; then
+            sudo certbot --nginx -d "$HOST" --non-interactive --agree-tos --register-unsafely-without-email --redirect
+          else
+            echo "⚠ DNS for $HOST resolves to '${resolved:-nothing}', this VM is '$myip' — HTTPS will be issued on the next deploy after the A record exists"
+          fi
+          curl -s -o /dev/null -w "local via nginx: %{http_code}\n" -H "Host: $HOST" http://127.0.0.1/health || true
+          echo "deployed $RELEASE_SHA"
+          REMOTE

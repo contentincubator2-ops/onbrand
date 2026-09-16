@@ -1,0 +1,271 @@
+/**
+ * Sales Hub tRPC router (`hub.*`).
+ *
+ * admin.*  HQ / marketing web app — adminProcedure (role admin or company domain).
+ * rep.*    the rep's LIFF pages. Identity is a LINE ID token verified server-side,
+ *          or an admin session impersonating a rep for the booth simulator.
+ */
+
+import { TRPCError } from "@trpc/server";
+import { z } from "zod";
+import { join } from "node:path";
+import { adminProcedure, publicProcedure, router } from "../core/trpc";
+import {
+  exec,
+  getOrg,
+  getRep,
+  getRepByLineUser,
+  issueBindCode,
+  issueMcpToken,
+  listFacts,
+  listSkills,
+  listSolutions,
+  logEvent,
+  q,
+  type HubRep,
+} from "../core/hub/hubStore";
+import { POLICY_PACKS, publicPack } from "../../content/core/hub/policyPacks";
+
+const channel = z.enum(["linkedin", "facebook", "instagram", "line"]);
+
+async function isAdminUser(userId: number | undefined): Promise<boolean> {
+  if (!userId) return false;
+  const [u] = await q(`SELECT role, email FROM users WHERE id = ? LIMIT 1`, [userId]);
+  return Boolean(u && (u.role === "admin" || /@sowork\.(tw|ai)$/i.test(String(u.email ?? ""))));
+}
+
+const repIdentity = z.object({
+  idToken: z.string().min(10).optional(),
+  repId: z.number().int().positive().optional(),
+});
+
+/** LIFF ID token → rep, or admin session + repId (simulator). */
+async function resolveRep(ctx: { user: { id: number } | null }, input: z.infer<typeof repIdentity>): Promise<HubRep> {
+  if (input.idToken) {
+    const clientId = process.env.LINE_LOGIN_CHANNEL_ID;
+    if (!clientId) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "LINE login is not configured" });
+    const res = await fetch("https://api.line.me/oauth2/v2.1/verify", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ id_token: input.idToken, client_id: clientId }),
+    });
+    const body: any = await res.json().catch(() => ({}));
+    if (!res.ok || !body?.sub) throw new TRPCError({ code: "UNAUTHORIZED", message: "LINE session expired — reopen from the LINE menu" });
+    const rep = await getRepByLineUser(body.sub);
+    if (!rep) throw new TRPCError({ code: "FORBIDDEN", message: "This LINE account isn't linked to a rep yet — send your binding code to the bot." });
+    return rep;
+  }
+  if (input.repId && (await isAdminUser(ctx.user?.id))) {
+    const rep = await getRep(input.repId);
+    if (rep) return rep;
+  }
+  throw new TRPCError({ code: "UNAUTHORIZED", message: "Open this page from the LINE menu" });
+}
+
+const adminRouter = router({
+  overview: adminProcedure.query(async () => {
+    const org = await getOrg();
+    const { getOverview } = await import("../../performance/core/hub/hubStats");
+    return { org: { name: org.name, disclaimer: org.disclaimer }, overview: await getOverview(org.id) };
+  }),
+
+  feed: adminProcedure.input(z.object({ sinceId: z.number().int().min(0).default(0) })).query(async ({ input }) => {
+    const org = await getOrg();
+    const { getLiveFeed } = await import("../../performance/core/hub/hubStats");
+    return getLiveFeed(org.id, input.sinceId);
+  }),
+
+  strategy: adminProcedure.query(async () => {
+    const org = await getOrg();
+    const [solutions, facts] = await Promise.all([listSolutions(org.id), listFacts(org.id)]);
+    return { positioning: org.positioning, solutions, facts, disclaimer: org.disclaimer };
+  }),
+
+  content: adminProcedure.query(async () => {
+    const org = await getOrg();
+    const skills = await listSkills(org.id);
+    const usage = await q(`SELECT skill_id, COUNT(*) n FROM hub_posts WHERE org_id = ? GROUP BY skill_id`, [org.id]);
+    return {
+      skills: skills.map((s) => ({ ...s, uses: Number(usage.find((u) => u.skill_id === s.id)?.n ?? 0) })),
+      packs: [publicPack(POLICY_PACKS.TW), publicPack(POLICY_PACKS.US)],
+    };
+  }),
+
+  approveSkill: adminProcedure.input(z.object({ skillId: z.number().int() })).mutation(async ({ ctx, input }) => {
+    const org = await getOrg();
+    const [u] = await q(`SELECT email FROM users WHERE id = ?`, [ctx.user.id]);
+    await exec(
+      `UPDATE hub_skills SET status = 'approved', version = version + 1, approved_by = ?, approved_at = NOW(3) WHERE id = ? AND org_id = ?`,
+      [u?.email ?? "admin", input.skillId, org.id],
+    );
+    await logEvent(org.id, null, "skill_approved", `skill #${input.skillId}`);
+    return { ok: true };
+  }),
+
+  reps: adminProcedure.query(async () => {
+    const org = await getOrg();
+    const { getLeaderboard } = await import("../../performance/core/hub/hubStats");
+    const board = await getLeaderboard(org.id);
+    const codes = await q(`SELECT id, bind_code, mcp_token_hash IS NOT NULL has_mcp FROM hub_reps WHERE org_id = ?`, [org.id]);
+    return board.map((r) => {
+      const c = codes.find((x) => x.id === r.id);
+      return { ...r, bindCode: c?.bind_code ?? null, hasMcpToken: Boolean(c?.has_mcp) };
+    });
+  }),
+
+  issueBindCode: adminProcedure.input(z.object({ repId: z.number().int() })).mutation(async ({ input }) => {
+    return { code: await issueBindCode(input.repId) };
+  }),
+
+  performance: adminProcedure.query(async () => {
+    const org = await getOrg();
+    const stats = await import("../../performance/core/hub/hubStats");
+    const [leaderboard, channels, recentPosts] = await Promise.all([
+      stats.getLeaderboard(org.id), stats.getChannelBreakdown(org.id), stats.getRecentPosts(org.id, 40),
+    ]);
+    return { leaderboard, channels, recentPosts };
+  }),
+
+  posts: adminProcedure.input(z.object({ limit: z.number().int().min(1).max(100).default(30) })).query(async ({ input }) => {
+    const org = await getOrg();
+    const { getRecentPosts } = await import("../../performance/core/hub/hubStats");
+    return getRecentPosts(org.id, input.limit);
+  }),
+
+  simulatorMenu: adminProcedure
+    .input(z.object({ repId: z.number().int(), action: z.enum(["write", "featured", "lookup", "share", "stats", "ask"]) }))
+    .mutation(async ({ input }) => {
+      const bot = await import("../core/hub/lineBot");
+      return bot.handleMenu(await bot.simulatorContext(input.repId), input.action);
+    }),
+
+  simulatorPostback: adminProcedure
+    .input(z.object({ repId: z.number().int(), data: z.string().max(300) }))
+    .mutation(async ({ input }) => {
+      const bot = await import("../core/hub/lineBot");
+      return bot.handlePostback(await bot.simulatorContext(input.repId), input.data);
+    }),
+
+  simulatorSay: adminProcedure
+    .input(z.object({ repId: z.number().int(), text: z.string().min(1).max(2000) }))
+    .mutation(async ({ input }) => {
+      const bot = await import("../core/hub/lineBot");
+      return bot.handleText(await bot.simulatorContext(input.repId), input.text);
+    }),
+
+  integrations: adminProcedure.query(async () => {
+    const { hermesStatus } = await import("../core/hub/hermesBridge");
+    return {
+      line: {
+        messaging: Boolean(process.env.LINE_CHANNEL_SECRET && process.env.LINE_CHANNEL_ACCESS_TOKEN),
+        liff: Boolean(process.env.LINE_LIFF_ID),
+        login: Boolean(process.env.LINE_LOGIN_CHANNEL_ID),
+        liffId: process.env.LINE_LIFF_ID ?? null,
+      },
+      hermes: hermesStatus(),
+      writerModel: process.env.HUB_WRITER_MODEL || "claude-sonnet-5",
+    };
+  }),
+
+  setupRichMenu: adminProcedure.mutation(async () => {
+    const { setupRichMenu } = await import("../core/hub/lineBot");
+    const image = process.env.HUB_RICHMENU_IMAGE || join(process.cwd(), "server", "platform", "assets", "hub-richmenu.jpg");
+    return setupRichMenu(image);
+  }),
+
+  /** A stable, post-less link per rep for the booth QR ("scan and watch the dashboard"). */
+  boothLink: adminProcedure.input(z.object({ repId: z.number().int() })).query(async ({ input }) => {
+    const org = await getOrg();
+    const rep = await getRep(input.repId);
+    if (!rep) throw new TRPCError({ code: "NOT_FOUND" });
+    const [existing] = await q(`SELECT code FROM hub_links WHERE rep_id = ? AND channel = 'booth' LIMIT 1`, [rep.id]);
+    let code = existing?.code as string | undefined;
+    if (!code) {
+      const { createLink } = await import("../core/hub/hubStore");
+      code = await createLink(org.id, rep.id, "booth");
+    }
+    const { publicBaseUrl } = await import("../core/hub/hubStore");
+    const [c] = await q(`SELECT COUNT(*) n FROM hub_clicks WHERE code = ?`, [code]);
+    return { code, url: `${publicBaseUrl()}/r/${code}`, qrPath: `/r/${code}/qr.svg`, clicks: Number(c?.n ?? 0), repName: rep.name };
+  }),
+
+  issueMcpToken: adminProcedure.input(z.object({ repId: z.number().int() })).mutation(async ({ input }) => {
+    return { token: await issueMcpToken(input.repId) };
+  }),
+});
+
+const repRouter = router({
+  session: publicProcedure.input(repIdentity).query(async ({ ctx, input }) => {
+    const rep = await resolveRep(ctx as any, input);
+    const org = await getOrg();
+    const [solutions, skills] = await Promise.all([listSolutions(org.id), listSkills(org.id)]);
+    return {
+      rep: { id: rep.id, name: rep.name, title: rep.title, market: rep.market, avatarSeed: rep.avatarSeed },
+      disclaimer: org.disclaimer,
+      solutions: solutions.map((s) => ({
+        id: s.id, slug: s.slug, nameEn: s.nameEn, nameZh: s.nameZh, vendor: s.vendor, featured: s.featured,
+        summaryEn: s.summaryEn, summaryZh: s.summaryZh,
+      })),
+      skills: skills
+        .filter((s) => s.status === "approved" && s.markets.includes(rep.market))
+        .map((s) => ({ slug: s.slug, nameEn: s.nameEn, nameZh: s.nameZh, channels: s.channels })),
+      pack: publicPack(POLICY_PACKS[rep.market]),
+    };
+  }),
+
+  generate: publicProcedure
+    .input(repIdentity.extend({
+      solutionId: z.number().int(),
+      channel,
+      skillSlug: z.string().max(80).optional(),
+      angle: z.string().max(600).optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const rep = await resolveRep(ctx as any, input);
+      const { generateRepPost } = await import("../../content/core/hub/generateRepPost");
+      return generateRepPost({
+        repId: rep.id, solutionId: input.solutionId, channel: input.channel,
+        skillSlug: input.skillSlug ?? null, angle: input.angle ?? null,
+        source: input.idToken ? "line" : "simulator",
+      });
+    }),
+
+  checkDraft: publicProcedure
+    .input(repIdentity.extend({ text: z.string().min(1).max(5000) }))
+    .mutation(async ({ ctx, input }) => {
+      const rep = await resolveRep(ctx as any, input);
+      const { checkOwnDraft } = await import("../../content/core/hub/generateRepPost");
+      return checkOwnDraft({ repId: rep.id, text: input.text });
+    }),
+
+  post: publicProcedure
+    .input(repIdentity.extend({ postId: z.number().int() }))
+    .query(async ({ ctx, input }) => {
+      const rep = await resolveRep(ctx as any, input);
+      const [p] = await q(
+        `SELECT id, caption, first_draft, channel, short_code, compliance, verdict FROM hub_posts WHERE id = ? AND rep_id = ? LIMIT 1`,
+        [input.postId, rep.id],
+      );
+      if (!p) throw new TRPCError({ code: "NOT_FOUND" });
+      return {
+        id: p.id, caption: p.caption, firstDraft: p.first_draft as string | null, channel: p.channel, shortCode: p.short_code, verdict: p.verdict,
+        trackedLink: p.short_code ? `${(await import("../core/hub/hubStore")).publicBaseUrl()}/r/${p.short_code}` : null,
+        compliance: typeof p.compliance === "string" ? JSON.parse(p.compliance) : p.compliance,
+      };
+    }),
+
+  markShared: publicProcedure
+    .input(repIdentity.extend({ postId: z.number().int(), url: z.string().url().max(500).optional() }))
+    .mutation(async ({ ctx, input }) => {
+      const rep = await resolveRep(ctx as any, input);
+      await exec(
+        `UPDATE hub_posts SET status = ?, shared_at = COALESCE(shared_at, NOW(3)), post_url = COALESCE(?, post_url) WHERE id = ? AND rep_id = ?`,
+        [input.url ? "reported" : "shared", input.url ?? null, input.postId, rep.id],
+      );
+      const org = await getOrg();
+      await logEvent(org.id, rep.id, input.url ? "post_reported" : "post_shared", `post #${input.postId}`);
+      return { ok: true };
+    }),
+});
+
+export const hubRouter = router({ admin: adminRouter, rep: repRouter });
