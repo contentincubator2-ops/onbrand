@@ -16,7 +16,7 @@
  * Auth gate is unchanged — RequireAuth still wraps protected routes.
  */
 import React from "react";
-import { Routes, Route, Navigate } from "react-router-dom";
+import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { LanguageProvider } from "../../lib/i18n";
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -67,6 +67,16 @@ const HubScanPage = React.lazy(() => import("../hub/pages/ScanPage"));
 const HubLiffWritePage = React.lazy(() => import("../hub/pages/LiffWritePage"));
 const HubLiffSharePage = React.lazy(() => import("../hub/pages/LiffSharePage"));
 const isHubHost = typeof window !== "undefined" && window.location.hostname.startsWith("experthub.");
+
+// 2026-09-16 (CJ「login 之後找不到 experthub」): on the demo host, login lands on
+// /theater like the rest of OnBrand. Anything outside the demo's own routes
+// goes to /hub instead, so the booth never shows the OnBrand app.
+const HUB_HOST_PATHS = ["/hub", "/scan/", "/liff/", "/auth/", "/login", "/plan-expired"];
+function HubHostGuard() {
+  const { pathname } = useLocation();
+  if (!isHubHost || HUB_HOST_PATHS.some((p) => pathname === p || pathname.startsWith(p))) return null;
+  return <Navigate to="/hub" replace />;
+}
 
 // Protected app surface — never loaded by anonymous visitors
 const HomePage = React.lazy(() => import("../platform/pages/HomePage"));
@@ -268,6 +278,7 @@ export default function AppV2() {
     <AppErrorBoundary>
     <LanguageProvider>
       <React.Suspense fallback={<RouteFallback />}>
+      <HubHostGuard />
       <Routes>
         {/* Auth — unchanged */}
         <Route path="/auth/login" element={<LoginPage />} />
