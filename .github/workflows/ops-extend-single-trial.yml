@@ -1,0 +1,88 @@
+name: "Ops — Extend one user's trial end date (single account, no plan change)"
+
+# 2026-09-16: CJ asked to push out ONE account's usage window to a specific
+# date, without touching plan tier. Neither existing tool fits:
+#   - admin-grant-plan.yml also sets planCode + planStatus='active' (a paid
+#     upgrade, not just a later expiry — wrong for a still-trial account).
+#   - op-extend-existing-trials-2026-05-16.yml is a global bulk op across
+#     EVERY trial user, not scoped to one email.
+# This only moves users.planEndsAt (and workspaces.planEndsAt, kept in sync
+# for the same reason admin-grant-plan.yml keeps them in sync — billing UI
+# reads workspaces.*, enforcement reads users.*). planCode/planStatus are
+# left exactly as they are.
+
+on:
+  workflow_dispatch:
+    inputs:
+      email:
+        description: "User email (must already be registered)"
+        required: true
+        type: string
+      ends_at:
+        description: "New trial end date, 'YYYY-MM-DD' (granted through end of that day) or full 'YYYY-MM-DD HH:MM:SS'"
+        required: true
+        type: string
+
+jobs:
+  extend:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Extend trial end date for one user
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          TARGET_EMAIL: ${{ inputs.email }}
+          NEW_ENDS: ${{ inputs.ends_at }}
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 60s
+          envs: TARGET_EMAIL,NEW_ENDS
+          script: |
+            set +e
+            source /opt/onbrand/app/skills/ai-talent/.env 2>/dev/null || true
+            H="${LOCAL_DB_HOST:-127.0.0.1}"; U="${LOCAL_DB_USER:-mos_user}"
+            P="${LOCAL_DB_PASSWORD}"; D="${LOCAL_DB_NAME:-mos_db}"
+            Q() { mysql -h"$H" -u"$U" -p"$P" "$D" -e "$1"; }
+            E=$(printf "%s" "$TARGET_EMAIL" | sed "s/'/''/g")
+
+            if printf "%s" "$NEW_ENDS" | grep -Eq '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'; then
+              if [ "$(date -d "$NEW_ENDS" +%F 2>/dev/null)" != "$NEW_ENDS" ]; then
+                echo "❌ ends_at is not a real calendar date: $NEW_ENDS"; exit 1
+              fi
+              ENDS_SQL="'$NEW_ENDS 23:59:59'"
+            elif printf "%s" "$NEW_ENDS" | grep -Eq '^[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}$'; then
+              if [ "$(date -d "$NEW_ENDS" +'%F %T' 2>/dev/null)" != "$NEW_ENDS" ]; then
+                echo "❌ ends_at is not a real calendar datetime: $NEW_ENDS"; exit 1
+              fi
+              ENDS_SQL="'$NEW_ENDS'"
+            else
+              echo "❌ ends_at must be 'YYYY-MM-DD' or 'YYYY-MM-DD HH:MM:SS' — got: $NEW_ENDS"
+              exit 1
+            fi
+
+            N=$(mysql -h"$H" -u"$U" -p"$P" "$D" -N -e "SELECT COUNT(*) FROM users WHERE email='$E'")
+            if [ "$N" != "1" ]; then
+              echo "❌ Found $N users with email $TARGET_EMAIL — aborting (need exactly 1)."
+              exit 1
+            fi
+
+            echo "===== BEFORE ====="
+            Q "SELECT id, email, planCode, planStatus, planEndsAt, isActive FROM users WHERE email='$E'\G"
+
+            echo "===== APPLY (ends: $NEW_ENDS) ====="
+            Q "START TRANSACTION;
+               UPDATE users SET planEndsAt=$ENDS_SQL WHERE email='$E';
+               UPDATE workspaces SET planEndsAt=$ENDS_SQL
+                WHERE ownerUserId=(SELECT id FROM users WHERE email='$E');
+               COMMIT;"
+            if [ $? -ne 0 ]; then
+              echo "❌ APPLY failed — transaction not committed, no partial changes."
+              exit 1
+            fi
+
+            echo "===== AFTER ====="
+            Q "SELECT id, email, planCode, planStatus, planEndsAt, isActive FROM users WHERE email='$E'\G"
+            Q "SELECT id, slug, planCode, planStatus, planEndsAt FROM workspaces
+               WHERE ownerUserId=(SELECT id FROM users WHERE email='$E');"
+            echo "✓ $TARGET_EMAIL trial extended to $NEW_ENDS (plan/status unchanged)"
