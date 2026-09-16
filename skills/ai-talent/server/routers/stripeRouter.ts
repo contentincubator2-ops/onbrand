@@ -62,8 +62,8 @@ function getStripe(): Stripe {
 }
 
 const PLAN_LABEL: Record<string, string> = {
-  drop_starter: "OnBrand Starter",
-  drop_pro:     "OnBrand Solo",
+  drop_starter: "OnBrand 基礎版",
+  drop_pro:     "OnBrand 專業版",
   drop_team:    "OnBrand Studio",
   drop_agency:  "OnBrand Agency",
 };

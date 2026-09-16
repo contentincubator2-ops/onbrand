@@ -143,7 +143,7 @@ export interface Plan {
   code: PlanCode;
   name: string;
   priceTwdMonthly: number;     // NTD per month (effective default = current sticker)
-  priceTwdAnnually: number;    // NTD per year (discounted)
+  priceTwdAnnually: number;    // NTD per year
   /** 2026-05-12 (CJ「老用戶永遠保 900」): early-bird vs standard.
    *  priceTwdMonthly is set to the CURRENT (early-bird) price so anyone
    *  not flagged earlyBird falls through to standardPriceTwdMonthly.
@@ -167,53 +167,51 @@ export interface Plan {
 }
 
 export const PLANS: Record<PlanCode, Plan> = {
-  /** OnBrand Starter — entry-level personal plan.
+  /** OnBrand 基礎版.
    *  2026-05-19 (CJ direction「加 Starter 給個人購買者」):
    *    - 早鳥 US$25/月（永久保價）
    *    - 標準 US$75/月
-   *    - 1 個品牌 · 50 次執行 / 月（points cap 5,000 ≈ 50 × 60s tasks）
-   *    - 30s + 60s 任務；99s 鎖定（需升級 Solo）
+   *    - 1 個品牌 · 2 席 · 執行次數不限
    *    - 每日 LLM cost cap = $2（fair-use guard）
    */
   drop_starter: {
     code: "drop_starter",
-    name: "OnBrand Starter",
+    name: "OnBrand 基礎版",
     // 2026-07-15 (CJ「取消早鳥優惠，只呈現原價」): early-bird offer CLOSED for
     // new signups — standard price is the only public price. earlyBird* fields
     // are kept ONLY so existing users with the earlyBird DB flag keep their
-    // grandfathered rate (永久保價 promise). Annual = standard ×10 (2 mo free).
+    // grandfathered rate (永久保價 promise). New standard annual = ×12.
     priceTwdMonthly:         2250,   // NT$2,250 standard
-    priceTwdAnnually:       22500,   // NT$22,500 standard annual (×10, 2 months free)
+    priceTwdAnnually:       27000,   // NT$27,000 standard annual (×12)
     earlyBirdPriceTwdMonthly: 750,   // grandfathered only — offer closed 2026-07-15
     standardPriceTwdMonthly: 2250,
     priceUsdMonthly:          75,    // standard US$75
-    priceUsdAnnually:        750,    // standard annual US$750 (×10, 2 months free)
+    priceUsdAnnually:        900,    // standard annual US$900 (×12)
     earlyBirdPriceUsdMonthly: 25,    // grandfathered only — offer closed 2026-07-15
     standardPriceUsdMonthly:  75,
     trialDays: 0,
     quota: {
-      task_30s:   -1,  // run-gated via runsPerCycle; no per-type cap
+      task_30s:   -1,
       task_60s:   -1,
-      task_99s:    0,  // 99s locked on Starter (upgrade to Solo to unlock)
-      image_gen:  -1,  // images included in the run count
+      task_99s:   -1,
+      image_gen:  -1,
       video_gen:   0,
       brands:      1,
       fb_publish: -1,
-      team_members: 1,
+      team_members: 2,
       multi_client: false,
-      // Starter uses run-count gating (runsPerCycle), not points.
-      // pointsPerCycle = -1 bypasses point check; runsPerCycle enforces the 50-run limit.
+      // No point or run-count gate on the approved 基礎版.
       pointsPerCycle: -1,
       pointsCycleDays: 30,
-      runsPerCycle: 50,  // 50 executions/month; 1 run = all variants + images
+      runsPerCycle: -1,
     },
     features: [
-      "1 個品牌 · 1 位用戶",
-      "每月 50 次執行（單篇＋套組任務，每次含所有變體 + 圖）",
-      "AI 圖（Flux / GPT Image-1 / Imagen / Ideogram）",
-      "品牌大腦定位（USP · 語氣 · 受眾）",
-      "電子發票（個人 / B2B）",
-      "深度研究企劃：升級 Solo 解鎖",
+      "1 個品牌 · 2 席 · 執行次數不限",
+      "品牌定位與自建任務卡 3 張",
+      "11 個通路選 2 個（每月可更換）",
+      "可用任務卡 203 張",
+      "企劃任務開放",
+      "無成效加值功能",
     ],
     highlight: "US$75／月",
   },
@@ -256,25 +254,25 @@ export const PLANS: Record<PlanCode, Plan> = {
     ],
   },
 
-  /** OnBrand Solo — for one founder, one brand.
+  /** OnBrand 專業版.
    *  2026-05-14 (CJ pricing pivot):
    *    - 早鳥 US$100/月（永久保價、現在 13 個 grandfathered 用戶用 lockedPriceTwdMonthly=900 鎖在舊價）
    *    - 標準 US$300/月
-   *    - 1 個品牌 · 無限文案 + 無限圖 · 影片另計（roadmap）
+   *    - 1 個品牌 · 5 席 · 執行次數不限
    *    - Fair-use: 內部每日 LLM cost cap = $5（UI 不顯示）
    *    - 改名 / 換品牌：聯繫客服（admin tool reset）
    */
   drop_pro: {
     code: "drop_pro",
-    name: "OnBrand Solo",
+    name: "OnBrand 專業版",
     // 2026-07-15 (CJ): early-bird offer closed — see drop_starter note.
     priceTwdMonthly: 9000,                 // NT$9,000 standard monthly
-    priceTwdAnnually: 90000,               // NT$90,000 standard annual (×10, 2 months free)
+    priceTwdAnnually: 108000,              // NT$108,000 standard annual (×12)
     earlyBirdPriceTwdMonthly: 3000,        // grandfathered only — offer closed 2026-07-15
     standardPriceTwdMonthly: 9000,
     // 2026-05-14 (CJ Solo pivot): USD is the canonical price.
     priceUsdMonthly: 300,                  // standard US$300
-    priceUsdAnnually: 3000,                // standard annual US$3,000 (×10, 2 months free)
+    priceUsdAnnually: 3600,                // standard annual US$3,600 (×12)
     earlyBirdPriceUsdMonthly: 100,         // grandfathered only — offer closed 2026-07-15
     standardPriceUsdMonthly: 300,
     trialDays: 0,
@@ -285,24 +283,24 @@ export const PLANS: Record<PlanCode, Plan> = {
       task_99s: -1,
       image_gen: -1,
       video_gen: 0,                // 影片暫時下架（roadmap 加購包）
-      brands: 1,                   // ← Solo = 1 個品牌
+      brands: 1,
       fb_publish: -1,
-      team_members: 1,
+      team_members: 5,
       multi_client: false,
       // 2026-05-14 (CJ「無限文案 + 無限圖」): pointsPerCycle = -1 means
       // points gating is bypassed. Daily LLM cost cap (preflightCostCheck
       // → $5/day) is the real fair-use guard for abuse cases.
       pointsPerCycle: -1,
       pointsCycleDays: 30,
-      runsPerCycle: -1,   // Solo: unlimited runs
+      runsPerCycle: -1,
     },
     features: [
-      "1 個品牌 · 1 位用戶",
-      "無限文案（單篇 / 套組 / 企劃全任務模板）",
-      "無限 AI 圖（Flux / GPT Image-1 / Imagen / Ideogram）",
-      "電子發票",
-      "影片：roadmap 加購包",
-      "改名 / 換品牌：聯繫客服",
+      "1 個品牌 · 5 席 · 執行次數不限",
+      "品牌／產品／活動定位與自建任務卡 10 張",
+      "11 個通路選 5 個（每月可更換）",
+      "可用任務卡 249 張與爆款結構卡每月更新",
+      "企劃任務開放與審核工作流",
+      "可額外加購成效加值功能",
     ],
     highlight: "US$300／月",
   },

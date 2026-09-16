@@ -5,10 +5,16 @@
  */
 import React from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Check } from "lucide-react";
+import { Check, X } from "lucide-react";
 import { trpc } from "../../lib/trpc";
 import { showToastGlobal } from "../../components/ui/Toast";
 import { useLang } from "../../lib/i18n";
+
+type PricingFeature = {
+  label: string;
+  section?: boolean;
+  included?: boolean;
+};
 
 export default function PricingPage() {
   const navigate = useNavigate();
@@ -43,111 +49,89 @@ export default function PricingPage() {
   const r = (usd: number) => Math.round(usd * usdToTwd);
 
   // ─── Pricing truth ─────────────────────────────────────────────────────────
-  // 2026-07-15 (CJ「取消早鳥優惠，只呈現原價」): early-bird offer is CLOSED
-  // for new signups — display standard price only. Existing flagged users keep
-  // their locked price via getEffectivePrice (server-side, untouched here).
-  // Annual = monthly ×10 (2 months free) in both currencies.
-  // USD:  Starter US$75/mo · US$750/yr   ·  Solo US$300/mo · US$3,000/yr
-  // TWD:  Starter NT$2,250/mo · NT$22,500/yr · Solo NT$9,000/mo · NT$90,000/yr
+  // 2026-09-09 approved public pricing: annual billing is 12 monthly payments
+  // with no annual discount. Existing grandfathered customers remain governed
+  // by the server-side effective-price rules.
+  // USD: Basic US$75/mo · US$900/yr · Professional US$300/mo · US$3,600/yr
+  // TWD: Basic NT$2,250/mo · NT$27,000/yr · Professional NT$9,000/mo · NT$108,000/yr
   const defaults = currency === "USD"
     ? {
-        starterStd: 75,   starterAnnual: 750,
-        soloStd:   300,   soloAnnual:   3000,
+        starterStd: 75,   starterAnnual: 900,
+        soloStd:   300,   soloAnnual:   3600,
       }
     : {
-        starterStd: 2250, starterAnnual: 22500,
-        soloStd:   9000,  soloAnnual:   90000,
+        starterStd: 2250, starterAnnual: 27000,
+        soloStd:   9000,  soloAnnual:   108000,
       };
 
   const TIERS = [
     {
       code: "drop_starter",
-      name: "OnBrand Starter",
-      sub: isEn ? "50 runs / mo · 1 brand · text + images" : "每月 50 次執行 · 1 個品牌 · 文案 + 圖",
+      name: "OnBrand 基礎版",
+      sub: "1 個品牌 · 2 席 · 執行次數不限",
       monthly:         defaults.starterStd,
       annual:          defaults.starterAnnual,
       standardMonthly: defaults.starterStd,
       isEarlyBird: false,
-      members: isEn ? "1 brand · 1 user" : "1 個品牌 · 1 位用戶",
-      features: isEn ? [
-        "50 runs / month (each run = all variants + images)",
-        "Single-post & content-pack task templates",
-        "AI images (Flux / GPT Image-1 / Imagen / Ideogram)",
-        "Brand brain positioning (USP · voice · audience)",
-        "E-invoices (personal / B2B)",
-        "Deep-research campaigns — available on Solo and above",
-      ] : [
-        "每月 50 次執行（每次含所有文案變體 + 圖）",
-        "單篇與套組全任務模板",
-        "AI 圖（Flux / GPT Image-1 / Imagen / Ideogram）",
-        "品牌大腦定位（USP · 語氣 · 受眾）",
-        "電子發票（個人 / B2B）",
-        "深度研究企劃：升級 Solo 解鎖",
-      ],
+      members: "2 席",
+      features: [
+        { label: "策略層", section: true },
+        { label: "品牌定位", included: true },
+        { label: "自建任務卡 3 張（存入品牌任務庫）", included: true },
+        { label: "內容層", section: true },
+        { label: "11 個通路選 2 個（每月可更換）", included: true },
+        { label: "可用任務卡 203 張：得獎案例 99＋標竿品牌 63＋平台通則 41", included: true },
+        { label: "其他", section: true },
+        { label: "企劃任務開放", included: true },
+        { label: "無成效加值功能", included: false },
+      ] satisfies PricingFeature[],
       cta: isEn ? "Start 7-day trial" : "開始 7 天試用",
       highlight: false,
       highlightLabel: undefined as string | undefined,
       annualNote: isEn
-        ? "Billed annually — US$750/yr (2 months free)"
+        ? "Billed annually — US$900/yr (12 months)"
         : currency === "TWD"
-          ? "年繳 NT$22,500（每月平均 NT$1,875，省 NT$4,500）"
-          : "年繳 US$750（每月平均 US$62.5，送 2 個月）",
-      annualSavePct: 17,
+          ? "年繳 NT$27,000（12 個月）"
+          : "年繳 US$900（12 個月）",
+      annualSavePct: 0,
     },
     {
       code: "drop_pro",
-      name: "OnBrand Solo",
-      sub: isEn ? "Unlimited runs · 1 brand · text + images" : "無限次執行 · 1 個品牌 · 文案 + 圖",
+      name: "OnBrand 專業版",
+      sub: "1 個品牌 · 5 席 · 執行次數不限",
       monthly:         defaults.soloStd,
       annual:          defaults.soloAnnual,
       standardMonthly: defaults.soloStd,
       isEarlyBird: false,
-      members: isEn ? "1 brand · 1 user" : "1 個品牌 · 1 位用戶",
-      features: isEn ? [
-        "Unlimited runs (single / pack / campaign — all templates)",
-        "Unlimited AI images (Flux / GPT Image-1 / Imagen / Ideogram)",
-        "Deep-research campaign pipeline",
-        "E-invoices (personal / B2B)",
-        "Video generation — coming soon",
-        "Brand rename or swap — contact support",
-      ] : [
-        "無限次執行（單篇 / 套組 / 企劃全任務模板）",
-        "無限 AI 圖（Flux / GPT Image-1 / Imagen / Ideogram）",
-        "深度研究企劃流程",
-        "電子發票（個人 / B2B）",
-        "影片生成：roadmap 加購包",
-        "改名 / 換品牌：聯繫客服",
-      ],
+      members: "5 席",
+      features: [
+        { label: "策略層", section: true },
+        { label: "品牌定位＋產品定位 10 個＋活動定位每月 1 次", included: true },
+        { label: "自建任務卡 10 張（存入品牌任務庫）", included: true },
+        { label: "內容層", section: true },
+        { label: "11 個通路選 5 個（每月可更換）", included: true },
+        { label: "可用任務卡 249 張＝上述 203 張＋爆款結構卡 46 張", included: true },
+        { label: "爆款結構卡每月更新", included: true },
+        { label: "其他", section: true },
+        { label: "企劃任務開放｜審核工作流", included: true },
+        { label: "可額外加購成效加值功能", included: true },
+      ] satisfies PricingFeature[],
       cta: isEn ? "Start 7-day trial" : "開始 7 天試用",
       highlight: true,
       highlightLabel: isEn ? "MOST POPULAR" : "最多人選",
       annualNote: isEn
-        ? "Billed annually — US$3,000/yr (~US$250/mo, 2 months free)"
+        ? "Billed annually — US$3,600/yr (12 months)"
         : currency === "TWD"
-          ? "年繳 NT$90,000（每月平均 NT$7,500，省 NT$18,000）"
-          : "年繳 US$3,000（每月平均 US$250，送 2 個月）",
-      annualSavePct: 17,
+          ? "年繳 NT$108,000（12 個月）"
+          : "年繳 US$3,600（12 個月）",
+      annualSavePct: 0,
     },
   ];
 
-  const faq: [string, string][] = isEn ? [
-    ["What counts as a 'run' in Starter?", "One run = one task execution, no matter how many variants or images are generated. If a content-pack task produces 5 caption variants + 5 images, that still counts as 1 run. System failures are automatically refunded — unsatisfied with the output and re-running counts as a new run."],
-    ["What happens when my trial ends?", "Trial stops when EITHER the 7 days OR your 1,000 trial points run out — whichever comes first. We'll email you 1 day before expiry. After that, your account becomes read-only — you can still sign in and view history, but can't produce new content."],
-    ["Can I cancel anytime?", "Yes. Hit Cancel in Account settings whenever you want. You'll keep access until the current period ends, then no more charges."],
-    ["Do Starter's 50 runs roll over?", "No. The 50 runs reset on the 1st of each month. Annual plans also reset monthly on the 1st."],
-    ["Can I upgrade from Starter to Solo later?", "Yes — upgrade any time in Account settings. The change takes effect immediately and billing switches to the Solo rate."],
-    ["Who owns the output?", "You do. We claim zero rights. Use it commercially, remix it, resell it — it's all yours."],
-    ["Can I get a company invoice?", "Yes. Add your tax ID + company name in Account settings → Invoice info, and the next charge will auto-issue a B2B e-invoice."],
-    ["What's the difference between Single, Pack, and Campaign tasks?", "Single = one fast output (1 variant). Pack = 5 variants + 5 images generated in parallel. Campaign = deep-research pipeline with live web data, competitive analysis, and full content strategy (Solo+ only)."],
-  ] : [
-    ["Starter 的「50 次執行」是什麼意思？", "一次執行 = 跑一次任務，不管產出幾個變體或圖片都算 1 次。例如套組任務產出 5 份文案 + 5 張圖，仍算 1 次。系統錯誤自動退回；對輸出不滿意而主動重跑，算新的 1 次。"],
-    ["試用期過了會怎樣？", "試用在「7 天到期」或「1,000 試用點數用完」時停止，先到先停。到期前 1 天會 email 通知。若沒升級，帳號切到唯讀模式（仍能登入查歷史，但無法產出新內容）。"],
-    ["可以中途取消嗎？", "可以，隨時於「帳號設定」取消。當期到期前仍能正常使用，到期後不再扣款。"],
-    ["Starter 的 50 次用不完會累積嗎？", "不會，每月 1 號重置。年費方案每月 1 號也重置（不累積）。"],
-    ["之後可以從 Starter 升級到 Solo 嗎？", "可以，隨時在帳號設定升級，立即生效並改按 Solo 費率計費。"],
-    ["產出的內容版權歸誰？", "全部歸您。我們不主張任何權利，可商用、二次創作、轉售。"],
-    ["能開公司發票嗎？", "可以。在「帳號設定 → 發票資訊」填統編 + 公司名，下次扣款自動開立 B2B 三聯式電子發票。"],
-    ["單篇 / 套組 / 企劃任務有什麼差別？", "單篇 = 單一快速輸出（1 個變體）。套組 = 5 個文案變體 + 5 張圖並行產出。企劃 = 附帶即時網路研究、競品分析、完整內容策略的深度研究流程（Solo 以上才有）。"],
+  const faq: [string, string][] = [
+    ["「執行次數不限」是什麼意思？", "兩個自助方案均不限制任務執行次數；差異在通路數、任務卡範圍、定位能力、自建卡張數、席次與審核工作流。"],
+    ["兩個方案最大的差別是什麼？", "基礎版提供品牌定位、2 個通路與 203 張任務卡；專業版增加產品／活動定位、5 個通路、爆款結構卡、5 席與審核工作流。"],
+    ["策略顧問導入與 AI 自動化報告可以單獨購買嗎？", "兩項加購均需搭配 OnBrand 專業版。AI 自動化報告的標準範圍為 1 品牌、1 市場、20 品項內。"],
   ];
 
   // 2026-07-15 (CJ): early-bird banner removed — offer closed, standard price only.
@@ -157,7 +141,7 @@ export default function PricingPage() {
         {/* Header */}
         <div className="text-center mb-10">
           <p className="text-[10px] font-semibold uppercase tracking-[0.25em] text-neutral-600 mb-3">
-            PRICING · CHOOSE YOUR SCALE
+            方案與報價
           </p>
           <h1
             className="font-semibold tracking-tight leading-tight mb-3"
@@ -169,7 +153,7 @@ export default function PricingPage() {
               backgroundClip: "text",
             }}
           >
-            {isEn ? "From solo creator to full agency — one toolkit" : "從個人創作者到整個 Agency — 一套工具"}
+            從個人創作者到完整團隊 — 一套工具
           </h1>
           <p
             className="mx-auto text-default-700"
@@ -199,7 +183,7 @@ export default function PricingPage() {
                 annual ? "bg-white text-neutral-900 shadow-sm" : "text-neutral-600"
               }`}
             >
-              {isEn ? "Yearly" : "年繳"} <span className="text-xs text-emerald-600 ml-1">{isEn ? "2 months free" : "送 2 個月"}</span>
+              {isEn ? "Yearly" : "年繳"} <span className="text-xs text-emerald-600 ml-1">{isEn ? "12 months" : "12 個月"}</span>
             </button>
           </div>
         </div>
@@ -239,9 +223,7 @@ export default function PricingPage() {
               <div className="flex items-baseline gap-1.5 mt-3">
                 <span className="text-3xl font-bold text-neutral-900 tabular-nums">
                   {annual
-                    ? (currency === "USD"
-                        ? tier.annual.toLocaleString()
-                        : (tier.annual / 1000).toLocaleString() + "K")
+                    ? tier.annual.toLocaleString()
                     : tier.monthly.toLocaleString()}
                 </span>
                 <span className="text-sm text-neutral-700">
@@ -268,16 +250,18 @@ export default function PricingPage() {
                 {tier.members}
               </p>
               <ul className="space-y-2 text-sm text-neutral-800 mt-4 mb-6 flex-1">
-                {tier.features.map((f) => (
-                  <li key={f} className="flex items-start gap-2">
-                    <Check
-                      size={14}
-                      className={`mt-0.5 flex-shrink-0 ${f.includes("roadmap") || f.includes("upgrade") || f.includes("升級") ? "text-neutral-400" : "text-neutral-900"}`}
-                      strokeWidth={2.5}
-                    />
-                    <span className={f.includes("roadmap") || f.includes("upgrade") || f.includes("升級") ? "text-neutral-400" : ""}>
-                      {f}
-                    </span>
+                {tier.features.map((feature) => feature.section ? (
+                  <li key={feature.label} className="pt-2 first:pt-0 text-[11px] font-bold tracking-[0.12em] text-neutral-500">
+                    {feature.label}
+                  </li>
+                ) : (
+                  <li key={feature.label} className="flex items-start gap-2">
+                    {feature.included === false ? (
+                      <X size={14} className="mt-0.5 flex-shrink-0 text-neutral-400" strokeWidth={2.5} />
+                    ) : (
+                      <Check size={14} className="mt-0.5 flex-shrink-0 text-neutral-900" strokeWidth={2.5} />
+                    )}
+                    <span className={feature.included === false ? "text-neutral-500" : ""}>{feature.label}</span>
                   </li>
                 ))}
               </ul>
@@ -322,21 +306,20 @@ export default function PricingPage() {
           ))}
         </div>
 
-        {/* Agency / Enterprise */}
+        {/* Professional-plan add-ons */}
         <div className="bg-neutral-50 rounded-xl p-6 flex items-center justify-between flex-wrap gap-3 max-w-3xl mx-auto">
           <div>
             <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-neutral-600 mb-1">
-              AGENCY · CUSTOM
+              專業方案限定加購
             </p>
-            <p className="text-base font-semibold text-neutral-900">{isEn ? "Agency / Enterprise" : "Agency / 企業版"}</p>
-            <p className="text-sm text-neutral-700 mt-1 max-w-xl">
-              {isEn
-                ? "Unlimited brands · multi-user seats · white label · API access · priority support — pricing tailored to your team"
-                : "無限品牌 · 多 user seats · White Label · API access · 優先客服 — 依團隊規模客製報價"}
-            </p>
+            <p className="text-base font-semibold text-neutral-900">策略顧問導入／AI 自動化報告</p>
+            <ul className="text-sm text-neutral-700 mt-2 max-w-xl space-y-1 list-disc pl-5">
+              <li>策略顧問導入 NT$80,000（一次性，含客製任務卡 8 張；第 9 張起 NT$25,000／張）。</li>
+              <li>AI 自動化報告 NT$48,000 建置＋NT$25,000／月維運；品項 21–50 起依級距加購。</li>
+            </ul>
           </div>
           <a
-            href={isEn ? "mailto:sowork@sowork.ai?subject=Agency / Enterprise inquiry" : "mailto:sowork@sowork.ai?subject=Agency 方案洽詢"}
+            href="mailto:sowork@sowork.ai?subject=OnBrand 加購服務洽詢"
             className="px-4 py-2 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-white text-sm font-medium"
           >
             {isEn ? "Talk to sales →" : "聯繫業務 →"}
@@ -347,12 +330,12 @@ export default function PricingPage() {
         <p className="text-center text-xs text-neutral-500 mt-4 max-w-3xl mx-auto">
           {isEn
             ? "All plans include 7-day free trial · No credit card required to start · Cancel anytime"
-            : "所有方案均含 7 天免費試用 · 開始不需信用卡 · 隨時取消"}
+            : "所有方案均含 7 天免費試用 · 開始不需信用卡 · 隨時取消\n本頁價格均為未稅價；報價有效期 30 日。實際導入範圍以簽約工作說明書為準。"}
         </p>
 
         {/* FAQ */}
         <div className="mt-16 text-left max-w-2xl mx-auto space-y-6">
-          <h2 className="text-2xl font-bold text-neutral-900 text-center mb-8">{isEn ? "FAQ" : "常見問題"}</h2>
+          <h2 className="text-2xl font-bold text-neutral-900 text-center mb-8">常見問題</h2>
           {faq.map(([q, a]) => (
             <details key={q} className="border border-neutral-200 rounded-lg p-4">
               <summary className="cursor-pointer font-medium text-neutral-900">{q}</summary>
