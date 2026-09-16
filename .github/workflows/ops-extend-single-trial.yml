@@ -6,10 +6,20 @@ name: "Ops — Extend one user's trial end date (single account, no plan change)
 #     upgrade, not just a later expiry — wrong for a still-trial account).
 #   - op-extend-existing-trials-2026-05-16.yml is a global bulk op across
 #     EVERY trial user, not scoped to one email.
-# This only moves users.planEndsAt (and workspaces.planEndsAt, kept in sync
-# for the same reason admin-grant-plan.yml keeps them in sync — billing UI
-# reads workspaces.*, enforcement reads users.*). planCode/planStatus are
-# left exactly as they are.
+# This moves users.planEndsAt (and workspaces.planEndsAt, kept in sync for
+# the same reason admin-grant-plan.yml keeps them in sync — billing UI
+# reads workspaces.*, the billing chokepoint in llmWithBilling.ts reads
+# users.*). planCode is left exactly as it is.
+#
+# planStatus is the one exception, and only in one direction: if it is
+# currently 'expired', it is reset to 'trial'. Discovered 2026-09-16 —
+# RequireAuthV2.tsx has its OWN gate, separate from llmWithBilling.ts's
+# date-based check, that redirects to /plan-expired purely on
+# `planStatus === "expired"` regardless of planEndsAt (comment: "auto-heal
+# sets planStatus='expired' when trial ends"). Extending planEndsAt alone
+# does not clear that flag, so the account stays locked out at the router
+# even though the billing chokepoint would now allow it. An 'active' (paid)
+# user's planStatus is never touched by this.
 
 on:
   workflow_dispatch:
@@ -73,7 +83,8 @@ jobs:
             echo "===== APPLY (ends: $NEW_ENDS) ====="
             Q "START TRANSACTION;
                UPDATE users SET planEndsAt=$ENDS_SQL WHERE email='$E';
-               UPDATE workspaces SET planEndsAt=$ENDS_SQL
+               UPDATE users SET planStatus='trial' WHERE email='$E' AND planStatus='expired';
+               UPDATE workspaces SET planEndsAt=$ENDS_SQL, planStatus=IF(planStatus='expired','trial',planStatus)
                 WHERE ownerUserId=(SELECT id FROM users WHERE email='$E');
                COMMIT;"
             if [ $? -ne 0 ]; then
