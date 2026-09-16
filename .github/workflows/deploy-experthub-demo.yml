@@ -203,6 +203,15 @@ jobs:
           fi
           pm2 save --force
 
+          # The dev VM disk was 95% full on the first deploy; each release carries
+          # its own node_modules. Keep only the live release and the previous one.
+          keep_current="$(readlink -f "$current")"; keep_previous="${previous:-}"
+          for dir in "$app_root"/releases/*; do
+            [ -d "$dir" ] || continue
+            if [ "$dir" != "$keep_current" ] && [ "$dir" != "$keep_previous" ]; then rm -rf "$dir"; echo "pruned $(basename "$dir")"; fi
+          done
+          df -h / | tail -1
+
           echo "════ nginx ════"
           if [ -d /etc/nginx/sites-available ]; then
             site="/etc/nginx/sites-available/$HOST"; link="/etc/nginx/sites-enabled/$HOST"
