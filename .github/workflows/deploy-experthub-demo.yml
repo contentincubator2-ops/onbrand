@@ -115,7 +115,8 @@ jobs:
           VM_HOST: ${{ secrets.VM_HOST }}
           VM_USER: ${{ secrets.VM_USER }}
         run: |
-          ssh -i ~/.ssh/onbrand-dev "$VM_USER@$VM_HOST" "RELEASE_SHA='${GITHUB_SHA}' bash -s" <<'REMOTE'
+          # HQ login = the existing sowork@sowork.tw dev account (CJ 2026-09-16), copied DB-to-DB.
+          ssh -i ~/.ssh/onbrand-dev "$VM_USER@$VM_HOST" "RELEASE_SHA='${GITHUB_SHA}' HUB_ADMIN_COPY_EMAIL='sowork@sowork.tw' bash -s" <<'REMOTE'
           set -euo pipefail
           HOST=experthub.onbrand.sowork.ai
           app_root=/opt/onbrand-demo
@@ -182,9 +183,8 @@ jobs:
           ./node_modules/.bin/tsx scripts/hub-seed.ts --samples --backfill
           if [ -s /tmp/experthub-admin.env ]; then
             ( . /tmp/experthub-admin.env && ./node_modules/.bin/tsx scripts/hub-admin.ts )
-          else
-            echo "HUB_ADMIN_EMAIL / HUB_ADMIN_PASSWORD not set — no admin login yet"
           fi
+          ./node_modules/.bin/tsx scripts/hub-admin-copy.ts
 
           echo "════ process ════"
           previous="$(readlink -f "$current" 2>/dev/null || true)"

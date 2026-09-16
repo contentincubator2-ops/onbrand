@@ -130,7 +130,7 @@ export default function Architecture({ integrations }: { integrations?: HubInteg
           title="Hermes Agent"
           subtitle="Nous Research · one profile per rep"
           lines={["Private memory per rep", "Company skills (read-only)", "Calls OnBrand via MCP with the rep's own token"]}
-          pills={i ? <StatusPill ok={i.hermes.configured} on={`Configured · ${i.hermes.profiles} profile${i.hermes.profiles === 1 ? "" : "s"}`} off="Fallback: OnBrand LLM" /> : null}
+          pills={i ? <StatusPill ok={i.hermes.configured} on={`Configured · ${i.hermes.profiles} profile${i.hermes.profiles === 1 ? "" : "s"}`} off="Integration ready · this demo answers via OnBrand's LLM" /> : null}
         />
       </div>
 
