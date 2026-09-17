@@ -10,10 +10,10 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faMagnifyingGlass, faPlus } from "@fortawesome/free-solid-svg-icons";
 import { trpc } from "../../../../lib/trpc";
 import { ErrorNote, Loading, cx } from "../../ui";
-import { useT } from "../../lang";
+import { useHubLang, useT } from "../../lang";
+import { tierAccent, tierLabel } from "../../../platform/lib/tierVocabulary";
 import {
   CHANNEL_META,
-  SINGLE_TIER_COLOR,
   agentAvatar,
   agentFor,
   isChannel,
@@ -26,6 +26,7 @@ type MarketFilter = "all" | "TW" | "US";
 export default function HubTasksPage() {
   const { channel } = useParams();
   const t = useT();
+  const { lang } = useHubLang();
   const navigate = useNavigate();
   const content = trpc.hub.admin.content.useQuery(undefined, { staleTime: 30_000 });
   const reps = trpc.hub.admin.reps.useQuery(undefined, { staleTime: 60_000 });
@@ -174,9 +175,9 @@ export default function HubTasksPage() {
                     <Avatar src={agentAvatar(agent.name)} name={agent.name} isBordered color="default" className="h-20 w-20 ring-2 ring-white/60" />
                     <span
                       className="absolute right-2 top-2 rounded-full px-2 py-0.5 font-bold text-white shadow-sm"
-                      style={{ background: approved ? SINGLE_TIER_COLOR : "#a3a3a3", fontSize: 12, letterSpacing: "0.06em" }}
+                      style={{ background: approved ? tierAccent("30s") : "#a3a3a3", fontSize: 12, letterSpacing: "0.06em" }}
                     >
-                      {approved ? t("Single post", "單篇") : t("Draft", "草稿")}
+                      {approved ? tierLabel("30s", lang) : t("Draft", "草稿")}
                     </span>
                     <div className="absolute left-2 top-2 flex h-5 w-5 items-center justify-center rounded-full" style={{ background: meta.color }}>
                       <FontAwesomeIcon icon={meta.icon} className="text-white" style={{ fontSize: 12 }} />
@@ -248,8 +249,8 @@ export default function HubTasksPage() {
                   {t(active.nameEn, active.nameZh)}
                   <span className="ml-2 font-normal text-default-500">· {agentFor(active.slug).name}</span>
                 </p>
-                <span className="shrink-0 rounded-full px-2 py-0.5 text-[12px] font-bold text-white shadow-sm" style={{ background: SINGLE_TIER_COLOR }}>
-                  {t("Single post", "單篇")}
+                <span className="shrink-0 rounded-full px-2 py-0.5 text-[12px] font-bold text-white shadow-sm" style={{ background: tierAccent("30s") }}>
+                  {tierLabel("30s", lang)}
                 </span>
               </ModalHeader>
               <ModalBody>

@@ -17,8 +17,6 @@ export const CHANNEL_META: Record<HubChannel, { label: string; color: string; ic
 
 export const isChannel = (c: string | undefined): c is HubChannel => !!c && c in CHANNEL_META;
 
-/** Single tier colour from OnBrand's tierVocabulary (單篇). */
-export const SINGLE_TIER_COLOR = "#00b4bc";
 
 /** The "agent" each writing skill is presented as, like OnBrand's task-card agents. */
 export const SKILL_AGENTS: Record<string, { name: string; roleEn: string; roleZh: string }> = {
