@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  applySwaps,
+  termPattern,
   buildReport,
   findIssues,
   findPercentMentions,
@@ -130,6 +132,34 @@ describe("Chinese repairs keep the clauses that were fine", () => {
     expect(text).toContain("價格實惠的電子簽核");
     expect(text).not.toMatch(/NT\$499|50%|中華電信/);
     expect(text).toContain(LINK);
+  });
+});
+
+describe("marketing's wording lists", () => {
+  const ctx: ComplianceContext = {
+    ...twCtx,
+    extraClaims: [[termPattern("秒殺"), "熱門"]],
+    swaps: [["便宜", "價格實惠"]],
+  };
+  const usWith: ComplianceContext = { ...usCtx, extraClaims: [[termPattern("game-changer"), "practical step"]], swaps: [["vendor", "software partner"]] };
+
+  it("blocks a banned word marketing added, like a legal claim", () => {
+    const post = `我在華碩服務。秒殺方案來了！\n${LINK}`;
+    expect(findIssues(post, ctx).map((i) => i.rule)).toEqual(["claims"]);
+    const { text } = repairPost(post, ctx);
+    expect(text).toContain("熱門方案");
+    expect(findIssues(text, ctx)).toEqual([]);
+  });
+
+  it("matches Latin terms on word boundaries, case-insensitively", () => {
+    expect(findIssues(`I work at ASUS. A real Game-Changer.\n${LINK}`, usWith).map((i) => i.rule)).toEqual(["claims"]);
+    expect(findIssues(`I work at ASUS. Our game-changers list.\n${LINK}`, usWith)).toEqual([]);
+  });
+
+  it("applies preferred-word swaps and reports them", () => {
+    const { text, applied } = applySwaps(`I work at ASUS. Pick the right vendor.\n${LINK}`, usWith);
+    expect(text).toContain("right software partner");
+    expect(applied).toEqual([{ from: "vendor", to: "software partner" }]);
   });
 });
 

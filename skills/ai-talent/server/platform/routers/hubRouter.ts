@@ -81,6 +81,54 @@ const adminRouter = router({
     return { positioning: org.positioning, solutions, facts, disclaimer: org.disclaimer };
   }),
 
+  wording: adminProcedure.query(async () => {
+    const org = await getOrg();
+    const { listWording } = await import("../core/hub/hubStore");
+    const { POLICY_PACKS: packs, publicPack: view } = await import("../../content/core/hub/policyPacks");
+    return {
+      items: await listWording(org.id),
+      // Legal claim rules live in code (policy packs) — shown read-only beside marketing's list.
+      legal: { TW: view(packs.TW).blockedWording, US: view(packs.US).blockedWording },
+    };
+  }),
+
+  addWording: adminProcedure
+    .input(z.object({
+      market: z.enum(["TW", "US"]),
+      kind: z.enum(["preferred", "swap", "banned"]),
+      term: z.string().trim().min(1).max(120),
+      replacement: z.string().trim().max(160).optional(),
+      note: z.string().trim().max(300).optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      if (input.kind === "swap" && !input.replacement) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "A swap needs the word to use instead" });
+      }
+      const org = await getOrg();
+      const [u] = await q(`SELECT email FROM users WHERE id = ?`, [ctx.user.id]);
+      await exec(
+        `INSERT INTO hub_wording (org_id, market, kind, term, replacement, note, added_by) VALUES (?, ?, ?, ?, ?, ?, ?)
+         ON DUPLICATE KEY UPDATE replacement = VALUES(replacement), note = VALUES(note), added_by = VALUES(added_by)`,
+        [org.id, input.market, input.kind, input.term, input.replacement || null, input.note || null, u?.email ?? "admin"],
+      );
+      await logEvent(org.id, null, "wording_added", `${input.kind} · ${input.market} · ${input.term}`);
+      return { ok: true };
+    }),
+
+  removeWording: adminProcedure.input(z.object({ id: z.number().int() })).mutation(async ({ input }) => {
+    const org = await getOrg();
+    const [w] = await q(`SELECT kind, market, term FROM hub_wording WHERE id = ? AND org_id = ?`, [input.id, org.id]);
+    await exec(`DELETE FROM hub_wording WHERE id = ? AND org_id = ?`, [input.id, org.id]);
+    if (w) await logEvent(org.id, null, "wording_removed", `${w.kind} · ${w.market} · ${w.term}`);
+    return { ok: true };
+  }),
+
+  regulations: adminProcedure.query(async () => {
+    const org = await getOrg();
+    const { listRegulations } = await import("../core/hub/hubStore");
+    return listRegulations(org.id);
+  }),
+
   content: adminProcedure.query(async () => {
     const org = await getOrg();
     const skills = await listSkills(org.id);
@@ -124,6 +172,45 @@ const adminRouter = router({
       stats.getLeaderboard(org.id), stats.getChannelBreakdown(org.id), stats.getRecentPosts(org.id, 40),
     ]);
     return { leaderboard, channels, recentPosts };
+  }),
+
+  /** One post for the content run page (mockup + compliance). */
+  post: adminProcedure.input(z.object({ postId: z.number().int() })).query(async ({ input }) => {
+    const org = await getOrg();
+    const [p] = await q(
+      `SELECT p.*, r.name rep_name, r.title rep_title, r.market rep_market, r.avatar_seed,
+              s.name_en solution_en, s.name_zh solution_zh, s.vendor, k.slug skill_slug, k.name_en skill_en, k.name_zh skill_zh
+         FROM hub_posts p
+         JOIN hub_reps r ON r.id = p.rep_id
+         LEFT JOIN hub_solutions s ON s.id = p.solution_id
+         LEFT JOIN hub_skills k ON k.id = p.skill_id
+        WHERE p.id = ? AND p.org_id = ? LIMIT 1`,
+      [input.postId, org.id],
+    );
+    if (!p) throw new TRPCError({ code: "NOT_FOUND" });
+    const { publicBaseUrl } = await import("../core/hub/hubStore");
+    const [c] = await q(`SELECT COUNT(*) n FROM hub_clicks WHERE code = ?`, [p.short_code]);
+    return {
+      id: p.id as number,
+      channel: p.channel as "linkedin" | "facebook" | "instagram" | "line",
+      market: p.market as "TW" | "US",
+      caption: p.caption as string,
+      firstDraft: p.first_draft as string | null,
+      angle: p.angle as string | null,
+      compliance: typeof p.compliance === "string" ? JSON.parse(p.compliance) : p.compliance,
+      verdict: p.verdict as string,
+      status: p.status as string,
+      source: p.source as string,
+      model: p.model as string | null,
+      latencyMs: p.latency_ms as number | null,
+      isDemo: Boolean(p.is_demo),
+      createdAt: p.created_at as string,
+      trackedLink: p.short_code ? `${publicBaseUrl()}/r/${p.short_code}` : null,
+      clicks: Number(c?.n ?? 0),
+      rep: { id: p.rep_id as number, name: p.rep_name as string, title: p.rep_title as string, market: p.rep_market as string, avatarSeed: p.avatar_seed as string },
+      solution: p.solution_id ? { id: p.solution_id as number, nameEn: p.solution_en as string, nameZh: p.solution_zh as string, vendor: p.vendor as string } : null,
+      skill: p.skill_id ? { slug: p.skill_slug as string, nameEn: p.skill_en as string, nameZh: p.skill_zh as string } : null,
+    };
   }),
 
   posts: adminProcedure.input(z.object({ limit: z.number().int().min(1).max(100).default(30) })).query(async ({ input }) => {

@@ -19,6 +19,10 @@ export interface ComplianceContext {
   /** Percentages a post may quote, each valid only next to one of its anchors. */
   approvedPercents: Array<{ value: number; anchors: string[] }>;
   trackedLink: string;
+  /** Marketing's banned words (strategy tray) — enforced exactly like the pack's legal claim rules. */
+  extraClaims?: Array<[RegExp, string]>;
+  /** Marketing's preferred-word swaps, applied after the checks (not a compliance failure). */
+  swaps?: Array<[string, string]>;
 }
 
 export interface ComplianceIssue {
@@ -45,6 +49,8 @@ export interface ComplianceReport {
   issuesCaught: number;
   attempts: number;
   checks: ComplianceCheck[];
+  /** Preferred-wording swaps applied to the final post. */
+  wording?: Array<{ from: string; to: string }>;
 }
 
 // ── detection helpers ───────────────────────────────────────────────────────
@@ -102,9 +108,33 @@ function hasDisclosure(text: string, pack: PolicyPack): boolean {
   return pack.disclosurePatterns.some((re) => re.test(text));
 }
 
-function claimHits(text: string, pack: PolicyPack): string[] {
+const claimRules = (ctx: ComplianceContext): Array<[RegExp, string]> => [
+  ...ctx.pack.claimReplacements,
+  ...(ctx.extraClaims ?? []),
+];
+
+/** A plain term from the wording table as a matcher: word-bounded and case-insensitive for Latin terms. */
+export function termPattern(term: string): RegExp {
+  const escaped = term.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return /^[\x00-\x7F]+$/.test(term) ? new RegExp(`\\b${escaped}\\b`, "gi") : new RegExp(escaped, "g");
+}
+
+export function applySwaps(text: string, ctx: ComplianceContext): { text: string; applied: Array<{ from: string; to: string }> } {
+  const applied: Array<{ from: string; to: string }> = [];
+  let out = text;
+  for (const [from, to] of ctx.swaps ?? []) {
+    const re = termPattern(from);
+    if (re.test(out)) {
+      out = out.replace(termPattern(from), to);
+      applied.push({ from, to });
+    }
+  }
+  return { text: out, applied };
+}
+
+function claimHits(text: string, ctx: ComplianceContext): string[] {
   const hits: string[] = [];
-  for (const [re] of pack.claimReplacements) {
+  for (const [re] of claimRules(ctx)) {
     const flags = re.flags.includes("g") ? re.flags : `${re.flags}g`;
     const matches = text.match(new RegExp(re.source, flags));
     if (matches) hits.push(...matches);
@@ -162,7 +192,7 @@ export function findIssues(caption: string, ctx: ComplianceContext): ComplianceI
     });
   }
 
-  const claims = claimHits(caption, pack);
+  const claims = claimHits(caption, ctx);
   if (claims.length) {
     issues.push({ rule: "claims", detail: `Absolute or guaranteed wording: ${claims.join(", ")}`, evidence: claims });
   }
@@ -234,9 +264,9 @@ export function repairPost(caption: string, ctx: ComplianceContext): RepairResul
   let text = caption;
 
   // claims first — "100%" is both a claim and an unsourced statistic.
-  const claims = claimHits(text, pack);
+  const claims = claimHits(text, ctx);
   if (claims.length) {
-    for (const [re, replacement] of pack.claimReplacements) {
+    for (const [re, replacement] of claimRules(ctx)) {
       const flags = re.flags.includes("g") ? re.flags : `${re.flags}g`;
       text = text.replace(new RegExp(re.source, flags), replacement);
     }

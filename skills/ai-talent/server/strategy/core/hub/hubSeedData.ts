@@ -320,3 +320,115 @@ export const HUB_REPS: SeedRep[] = [
   { market: "US", name: "Priya Patel", title: "Solutions Sales Lead", team: "North America · Partners", seed: "priya", networkSize: 3920, linkedin: "connected", instagram: "connected", facebook: "none", consent: true },
   { market: "US", name: "Marcus Reed", title: "Account Executive", team: "North America · SMB", seed: "marcus", networkSize: 1210, linkedin: "pending", instagram: "none", facebook: "none", consent: true },
 ];
+
+// ── wording (strategy tray: preferred terms · word swaps · banned words) ─────
+
+export interface SeedWording {
+  market: "TW" | "US";
+  kind: "preferred" | "swap" | "banned";
+  term: string;
+  replacement?: string;
+  note?: string;
+}
+
+export const HUB_WORDING: SeedWording[] = [
+  // preferred — what the brand says; goes into every writing prompt
+  { market: "TW", kind: "preferred", term: "先診斷、再媒合", note: "Core promise — use when explaining how ExpertHub works" },
+  { market: "TW", kind: "preferred", term: "數位轉型夥伴", note: "How we describe ExpertHub's role" },
+  { market: "TW", kind: "preferred", term: "精選方案", note: "Solutions are curated, not a directory" },
+  { market: "TW", kind: "preferred", term: "在地軟體夥伴", note: "ISVs are Taiwan partners" },
+  { market: "TW", kind: "preferred", term: "免費線上診斷", note: "The call to action" },
+  { market: "US", kind: "preferred", term: "diagnose-first", note: "Core promise" },
+  { market: "US", kind: "preferred", term: "curated software partners", note: "Solutions are curated, not a directory" },
+  { market: "US", kind: "preferred", term: "free online diagnosis", note: "The call to action" },
+  { market: "US", kind: "preferred", term: "implementation support", note: "We stay after the match" },
+  // swaps — applied to every post after the compliance checks
+  { market: "TW", kind: "swap", term: "便宜", replacement: "價格實惠", note: "Avoid sounding like a discount pitch" },
+  { market: "TW", kind: "swap", term: "系統商", replacement: "軟體夥伴", note: "Partners, not vendors" },
+  { market: "TW", kind: "swap", term: "廠商", replacement: "合作夥伴", note: "Partners, not vendors" },
+  { market: "TW", kind: "swap", term: "限時搶購", replacement: "歡迎了解", note: "No pressure selling" },
+  { market: "US", kind: "swap", term: "cheap", replacement: "affordable", note: "Avoid sounding like a discount pitch" },
+  { market: "US", kind: "swap", term: "vendor", replacement: "software partner", note: "Partners, not vendors" },
+  { market: "US", kind: "swap", term: "buy now", replacement: "learn more", note: "No pressure selling" },
+  // banned — company list on top of the legal rules in the policy packs; blocking
+  { market: "TW", kind: "banned", term: "秒殺", replacement: "熱門", note: "Scarcity pressure" },
+  { market: "TW", kind: "banned", term: "業界最強", replacement: "值得參考", note: "Unsubstantiated superlative" },
+  { market: "TW", kind: "banned", term: "包你", replacement: "協助你", note: "Implied guarantee" },
+  { market: "TW", kind: "banned", term: "立即見效", replacement: "逐步看到成效", note: "Outcome promise" },
+  { market: "US", kind: "banned", term: "game-changer", replacement: "practical step", note: "Hype" },
+  { market: "US", kind: "banned", term: "revolutionary", replacement: "new", note: "Hype" },
+  { market: "US", kind: "banned", term: "instant results", replacement: "measurable progress", note: "Outcome promise" },
+  { market: "US", kind: "banned", term: "no-brainer", replacement: "worth a look", note: "Pressure" },
+];
+
+// ── regulation updates (strategy tray) ──────────────────────────────────────
+
+export interface SeedRegulation {
+  market: "TW" | "US";
+  authority: string;
+  title: string;
+  summary: string;
+  impact: string;
+  rules: Array<"disclosure" | "price" | "claims" | "evidence" | "competitors" | "link">;
+  status: "applied" | "review" | "monitoring";
+  effective_on: string | null;
+  published_on: string | null;
+  source_url: string;
+}
+
+export const HUB_REGULATIONS: SeedRegulation[] = [
+  {
+    market: "US", authority: "Federal Trade Commission",
+    title: "Consumer Reviews and Testimonials Rule (16 CFR Part 465) takes effect",
+    summary: "Bans fake reviews and testimonials, buying reviews, and insiders — including officers and employees — writing reviews or testimonials without clearly disclosing the relationship. Civil penalties apply.",
+    impact: "Reps may not post reviews of company solutions; any testimonial-style post must carry the employee disclosure.",
+    rules: ["disclosure", "claims"], status: "applied",
+    effective_on: "2024-10-21", published_on: "2024-08-22",
+    source_url: "https://www.ftc.gov/news-events/news/press-releases/2024/08/federal-trade-commission-announces-final-rule-banning-fake-reviews-testimonials",
+  },
+  {
+    market: "US", authority: "Federal Trade Commission",
+    title: "Endorsement Guides revised — employee endorsements",
+    summary: "The revised Guides add an example on employee endorsements: employers can limit liability by training employees and, where they know about the endorsements, monitoring them. A material connection includes employment.",
+    impact: "Disclosure is mandatory in every rep post; HQ monitoring (this dashboard) documents the training-and-monitoring program.",
+    rules: ["disclosure"], status: "applied",
+    effective_on: "2023-06-29", published_on: "2023-06-29",
+    source_url: "https://www.ftc.gov/news-events/news/press-releases/2023/06/federal-trade-commission-announces-updated-advertising-guides-combat-deceptive-reviews-endorsements",
+  },
+  {
+    market: "TW", authority: "公平交易委員會 Fair Trade Commission",
+    title: "公平交易法第 21 條案件處理原則修正 — social media groups and sales talk count as advertising",
+    summary: "The amended handling principles list social media, messaging-app group chats and salespeople's pitches as ways of making representations to the public.",
+    impact: "Posts reps share to LINE groups are held to the same accuracy rules as ads: approved prices and sourced statistics only.",
+    rules: ["price", "evidence", "claims"], status: "applied",
+    effective_on: "2025-07-01", published_on: "2025-07-01",
+    source_url: "https://www.ftc.gov.tw/internet/main/doc/docDetail.aspx?uid=165&docid=13937",
+  },
+  {
+    market: "TW", authority: "公平交易委員會 Fair Trade Commission",
+    title: "網路廣告案件處理原則修正 — frequent sellers online are advertisers",
+    summary: "Bloggers and influencers who frequently post to sell are treated as advertisers and must clearly disclose conditions and limits.",
+    impact: "Reps posting regularly about solutions are covered; conditions such as \"starting at\" and contract terms must stay in the post.",
+    rules: ["price", "disclosure"], status: "applied",
+    effective_on: "2023-02-21", published_on: "2023-02-21",
+    source_url: "https://law.ftc.gov.tw/law/LawContent.aspx?id=GL000222",
+  },
+  {
+    market: "TW", authority: "公平交易委員會 Fair Trade Commission",
+    title: "薦證廣告規範說明 — employees must disclose their relationship",
+    summary: "An endorser whose relationship with the advertiser isn't expected by the public must disclose it; the guidance's example is an employee recommending the employer's product online.",
+    impact: "Every Taiwan post carries 「我在華碩服務」 or the standard disclosure line.",
+    rules: ["disclosure"], status: "applied",
+    effective_on: "2016-01-19", published_on: "2016-01-19",
+    source_url: "https://www.ftc.gov.tw/internet/main/doc/docDetail.aspx?uid=165&docid=13021",
+  },
+  {
+    market: "TW", authority: "個人資料保護委員會 PDPC (preparatory office)",
+    title: "個人資料保護法 amendment promulgated — effective date not yet set",
+    summary: "Adds breach-notification duties for private companies and creates an independent regulator.",
+    impact: "Rep social-account data and consent records need a breach-response owner before the amendment takes effect.",
+    rules: [], status: "monitoring",
+    effective_on: null, published_on: "2025-11-11",
+    source_url: "https://www.pdpc.gov.tw/News_Content/20/1001/",
+  },
+];

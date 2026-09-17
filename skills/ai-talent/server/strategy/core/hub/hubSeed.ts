@@ -11,7 +11,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { ensureHubTables } from "../../../platform/core/hub/hubDdl";
 import { exec, getOrg, listReps, listSolutions, q, ymd } from "../../../platform/core/hub/hubStore";
-import { HUB_FACTS, HUB_ORG, HUB_REPS, HUB_SKILLS } from "./hubSeedData";
+import { HUB_FACTS, HUB_ORG, HUB_REGULATIONS, HUB_REPS, HUB_SKILLS, HUB_WORDING } from "./hubSeedData";
 
 const here = dirname(fileURLToPath(import.meta.url));
 
@@ -44,7 +44,7 @@ export async function seedHub(opts: { reset?: boolean } = {}) {
   if (opts.reset) {
     const [org] = await q(`SELECT id FROM hub_org WHERE slug = ?`, [HUB_ORG.slug]);
     if (org) {
-      for (const t of ["hub_events", "hub_metrics", "hub_clicks", "hub_links", "hub_posts", "hub_skills", "hub_facts", "hub_reps"]) {
+      for (const t of ["hub_events", "hub_metrics", "hub_clicks", "hub_links", "hub_posts", "hub_skills", "hub_facts", "hub_reps", "hub_wording", "hub_regulations"]) {
         await exec(`DELETE FROM ${t} WHERE org_id = ?`, [org.id]);
       }
       await exec(`DELETE p FROM hub_prices p JOIN hub_solutions s ON s.id = p.solution_id WHERE s.org_id = ?`, [org.id]);
@@ -77,6 +77,23 @@ export async function seedHub(opts: { reset?: boolean } = {}) {
          markets = VALUES(markets), skill_md = VALUES(skill_md)`,
       [org.id, s.slug, s.name_en, s.name_zh, JSON.stringify(s.channels), JSON.stringify(s.markets), s.skill_md, s.status,
        s.status === "approved" ? "Marketing · Content Lead" : null, s.status === "approved" ? new Date() : null],
+    );
+  }
+
+  // Wording: insert-only, so terms marketing adds or removes at the booth survive redeploys.
+  for (const w of HUB_WORDING) {
+    await exec(
+      `INSERT IGNORE INTO hub_wording (org_id, market, kind, term, replacement, note, added_by) VALUES (?, ?, ?, ?, ?, ?, 'Marketing · Brand Lead')`,
+      [org.id, w.market, w.kind, w.term, w.replacement ?? null, w.note ?? null],
+    );
+  }
+
+  await exec(`DELETE FROM hub_regulations WHERE org_id = ?`, [org.id]);
+  for (const r of HUB_REGULATIONS) {
+    await exec(
+      `INSERT INTO hub_regulations (org_id, market, authority, title, summary, impact, rules, status, effective_on, published_on, source_url)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [org.id, r.market, r.authority, r.title, r.summary, r.impact, JSON.stringify(r.rules), r.status, r.effective_on, r.published_on, r.source_url],
     );
   }
 
@@ -117,7 +134,10 @@ export async function seedHub(opts: { reset?: boolean } = {}) {
     );
   }
 
-  return { orgId: org.id, facts: HUB_FACTS.length, skills: HUB_SKILLS.length, solutions: solutions.length, reps: HUB_REPS.length };
+  return {
+    orgId: org.id, facts: HUB_FACTS.length, skills: HUB_SKILLS.length, solutions: solutions.length,
+    reps: HUB_REPS.length, wording: HUB_WORDING.length, regulations: HUB_REGULATIONS.length,
+  };
 }
 
 // ── synthetic history ───────────────────────────────────────────────────────

@@ -8,10 +8,12 @@
  */
 
 import {
+  applySwaps,
   buildReport,
   describeIssuesForRetry,
   findIssues,
   repairPost,
+  termPattern,
   type ComplianceContext,
   type ComplianceReport,
 } from "./complianceContract";
@@ -25,6 +27,7 @@ import {
   listFacts,
   listSkills,
   listSolutions,
+  listWording,
   logEvent,
   publicBaseUrl,
   q,
@@ -32,6 +35,7 @@ import {
   type HubOrg,
   type HubRep,
   type HubSolution,
+  type HubWording,
 } from "../../../platform/core/hub/hubStore";
 
 export type HubChannel = "linkedin" | "facebook" | "instagram" | "line";
@@ -82,18 +86,36 @@ export function complianceContextFor(args: {
   market: string;
   solutions: HubSolution[];
   facts: HubFact[];
+  wording: HubWording[];
   trackedLink: string;
 }): ComplianceContext {
   const quotable = args.facts.filter((f) => f.confidence !== "needs_verification");
   const amounts = new Set<number>();
   for (const s of args.solutions) for (const p of s.prices) if (p.amount != null) amounts.add(p.amount);
   for (const f of quotable) for (const a of f.figures.amounts ?? []) amounts.add(a);
+  const mine = args.wording.filter((w) => w.market === args.market);
   return {
     pack: packFor(args.market),
     approvedAmounts: [...amounts],
     approvedPercents: quotable.flatMap((f) => f.figures.percents ?? []),
     trackedLink: args.trackedLink,
+    extraClaims: mine.filter((w) => w.kind === "banned").map((w) => [termPattern(w.term), w.replacement ?? ""] as [RegExp, string]),
+    swaps: mine.filter((w) => w.kind === "swap" && w.replacement).map((w) => [w.term, w.replacement as string] as [string, string]),
   };
+}
+
+function wordingPrompt(wording: HubWording[], market: string, zh: boolean): string {
+  const mine = wording.filter((w) => w.market === market);
+  const preferred = mine.filter((w) => w.kind === "preferred").map((w) => w.term);
+  const banned = mine.filter((w) => w.kind === "banned").map((w) => w.term);
+  const swaps = mine.filter((w) => w.kind === "swap").map((w) => `${w.term} → ${w.replacement}`);
+  if (!preferred.length && !banned.length && !swaps.length) return "";
+  return [
+    zh ? "## 品牌用詞（行銷部維護）" : "## Brand wording (maintained by marketing)",
+    preferred.length ? `${zh ? "優先使用" : "Prefer"}: ${preferred.join("、")}` : "",
+    swaps.length ? `${zh ? "改用" : "Say instead"}: ${swaps.join("；")}` : "",
+    banned.length ? `${zh ? "禁用詞" : "Never use"}: ${banned.join("、")}` : "",
+  ].filter(Boolean).join("\n");
 }
 
 function buildMessages(args: {
@@ -101,12 +123,13 @@ function buildMessages(args: {
   rep: HubRep;
   solution: HubSolution;
   facts: HubFact[];
+  wording: HubWording[];
   skillMd: string;
   channel: HubChannel;
   angle: string | null;
   trackedLink: string;
 }) {
-  const { org, rep, solution, facts, skillMd, channel, angle, trackedLink } = args;
+  const { org, rep, solution, facts, wording, skillMd, channel, angle, trackedLink } = args;
   const pack = packFor(rep.market);
   const zh = pack.language === "zh-TW";
   const pos = org.positioning ?? {};
@@ -115,6 +138,7 @@ function buildMessages(args: {
 
   const system = [
     pack.promptRules,
+    wordingPrompt(wording, rep.market, zh),
     "",
     zh ? "## 品牌定位（ExpertHub）" : "## Brand positioning (ExpertHub)",
     pick(pos.oneLiner),
@@ -191,7 +215,9 @@ export async function generateRepPost(input: GeneratePostInput): Promise<Generat
   const rep = await getRep(input.repId);
   if (!rep) throw new Error(`rep ${input.repId} not found`);
   const org = await getOrg();
-  const [solutions, facts, skills] = await Promise.all([listSolutions(org.id), listFacts(org.id), listSkills(org.id)]);
+  const [solutions, facts, skills, wording] = await Promise.all([
+    listSolutions(org.id), listFacts(org.id), listSkills(org.id), listWording(org.id),
+  ]);
   const solution = solutions.find((s) => s.id === input.solutionId);
   if (!solution) throw new Error(`solution ${input.solutionId} not found`);
 
@@ -204,9 +230,9 @@ export async function generateRepPost(input: GeneratePostInput): Promise<Generat
 
   const shortCode = await createLink(org.id, rep.id, input.channel);
   const trackedLink = `${publicBaseUrl()}/r/${shortCode}`;
-  const ctx = complianceContextFor({ market: rep.market, solutions, facts, trackedLink });
+  const ctx = complianceContextFor({ market: rep.market, solutions, facts, wording, trackedLink });
   const { system, user } = buildMessages({
-    org, rep, solution, facts, skillMd: skill.skillMd, channel: input.channel,
+    org, rep, solution, facts, wording, skillMd: skill.skillMd, channel: input.channel,
     angle: input.angle?.trim() || null, trackedLink,
   });
 
@@ -223,9 +249,11 @@ export async function generateRepPost(input: GeneratePostInput): Promise<Generat
     model = retry.model;
     afterRetryIssues = findIssues(current, ctx);
   }
-  const { text: repaired, fixes } = afterRetryIssues.length ? repairPost(current, ctx) : { text: current, fixes: {} };
+  const { text: fixed, fixes } = afterRetryIssues.length ? repairPost(current, ctx) : { text: current, fixes: {} };
+  // Preferred wording last, so a swap can't reintroduce a phrase the checks removed.
+  const { text: repaired, applied: wordingApplied } = applySwaps(fixed, ctx);
   const finalIssues = findIssues(repaired, ctx);
-  const compliance = buildReport({ ctx, firstDraftIssues, afterRetryIssues, finalIssues, fixes, attempts });
+  const compliance = { ...buildReport({ ctx, firstDraftIssues, afterRetryIssues, finalIssues, fixes, attempts }), wording: wordingApplied };
   const latencyMs = Date.now() - started;
 
   const { insertId: postId } = await exec(
@@ -254,15 +282,19 @@ export async function checkOwnDraft(args: { repId: number; text: string }) {
   const rep = await getRep(args.repId);
   if (!rep) throw new Error(`rep ${args.repId} not found`);
   const org = await getOrg();
-  const [solutions, facts] = await Promise.all([listSolutions(org.id), listFacts(org.id)]);
+  const [solutions, facts, wording] = await Promise.all([listSolutions(org.id), listFacts(org.id), listWording(org.id)]);
   const [link] = await q(`SELECT code FROM hub_links WHERE rep_id = ? AND post_id IS NULL ORDER BY created_at DESC LIMIT 1`, [rep.id]);
   const code = link?.code ?? (await createLink(org.id, rep.id, null));
   const trackedLink = `${publicBaseUrl()}/r/${code}`;
-  const ctx = complianceContextFor({ market: rep.market, solutions, facts, trackedLink });
+  const ctx = complianceContextFor({ market: rep.market, solutions, facts, wording, trackedLink });
   const firstDraftIssues = findIssues(args.text, ctx);
-  const { text, fixes } = firstDraftIssues.length ? repairPost(args.text, ctx) : { text: args.text, fixes: {} };
+  const { text: fixed, fixes } = firstDraftIssues.length ? repairPost(args.text, ctx) : { text: args.text, fixes: {} };
+  const { text, applied: wordingApplied } = applySwaps(fixed, ctx);
   const finalIssues = findIssues(text, ctx);
-  const compliance = buildReport({ ctx, firstDraftIssues, afterRetryIssues: firstDraftIssues, finalIssues, fixes, attempts: 0 });
+  const compliance = {
+    ...buildReport({ ctx, firstDraftIssues, afterRetryIssues: firstDraftIssues, finalIssues, fixes, attempts: 0 }),
+    wording: wordingApplied,
+  };
   await logEvent(org.id, rep.id, "draft_checked", `${compliance.verdict}${compliance.issuesCaught ? ` (${compliance.issuesCaught} caught)` : ""}`);
   return { original: args.text, fixed: text, compliance, trackedLink };
 }

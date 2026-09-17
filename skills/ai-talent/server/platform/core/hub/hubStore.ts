@@ -247,6 +247,58 @@ export async function listSkills(orgId: number): Promise<HubSkill[]> {
   }));
 }
 
+// ── wording & regulations ───────────────────────────────────────────────────
+
+export interface HubWording {
+  id: number;
+  market: "TW" | "US";
+  kind: "preferred" | "swap" | "banned";
+  term: string;
+  replacement: string | null;
+  note: string | null;
+  addedBy: string | null;
+  createdAt: string;
+}
+
+export async function listWording(orgId: number, market?: string): Promise<HubWording[]> {
+  const rows = await q(
+    `SELECT * FROM hub_wording WHERE org_id = ? ${market ? "AND market = ?" : ""} ORDER BY kind, created_at DESC`,
+    market ? [orgId, market] : [orgId],
+  );
+  return rows.map((w) => ({
+    id: w.id, market: w.market, kind: w.kind, term: w.term, replacement: w.replacement, note: w.note,
+    addedBy: w.added_by, createdAt: w.created_at,
+  }));
+}
+
+export interface HubRegulation {
+  id: number;
+  market: "TW" | "US";
+  authority: string;
+  title: string;
+  summary: string;
+  impact: string;
+  rules: string[];
+  status: "applied" | "review" | "monitoring";
+  effectiveOn: string | null;
+  publishedOn: string | null;
+  sourceUrl: string;
+}
+
+export async function listRegulations(orgId: number): Promise<HubRegulation[]> {
+  const rows = await q(
+    `SELECT * FROM hub_regulations WHERE org_id = ? ORDER BY COALESCE(effective_on, published_on) DESC`,
+    [orgId],
+  );
+  return rows.map((r) => ({
+    id: r.id, market: r.market, authority: r.authority, title: r.title, summary: r.summary, impact: r.impact,
+    rules: json(r.rules, []), status: r.status,
+    effectiveOn: r.effective_on ? ymd(r.effective_on) : null,
+    publishedOn: r.published_on ? ymd(r.published_on) : null,
+    sourceUrl: r.source_url,
+  }));
+}
+
 // ── links, clicks, events ───────────────────────────────────────────────────
 
 export async function createLink(orgId: number, repId: number, channel: string | null): Promise<string> {

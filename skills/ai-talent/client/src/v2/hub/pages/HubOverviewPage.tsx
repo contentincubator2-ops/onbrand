@@ -110,7 +110,7 @@ export default function HubOverviewPage() {
               <SectionTitle title="Caught before posting" hint="Policy rules a first draft tripped — fixed or held before anything went live." />
               <BarList items={rules} unit="catches" />
               <Link
-                to="/hub/content"
+                to="/hub/content/policies"
                 className="mt-4 inline-flex items-center gap-1 text-[12px] font-medium text-stone-600 hover:text-stone-900"
               >
                 See the policy packs <ArrowRight className="h-3.5 w-3.5" aria-hidden />

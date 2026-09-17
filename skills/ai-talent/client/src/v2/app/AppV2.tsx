@@ -58,11 +58,22 @@ const OnboardingWizard = React.lazy(() => import("../../pages/OnboardingWizard")
 // 2026-09-16 (Dallas show): Sales Hub concept demo — own shell, English-first.
 const HubShell = React.lazy(() => import("../hub/HubShell"));
 const HubOverviewPage = React.lazy(() => import("../hub/pages/HubOverviewPage"));
-const HubStrategyPage = React.lazy(() => import("../hub/pages/HubStrategyPage"));
-const HubContentPage = React.lazy(() => import("../hub/pages/HubContentPage"));
 const HubRepsPage = React.lazy(() => import("../hub/pages/HubRepsPage"));
-const HubPerformancePage = React.lazy(() => import("../hub/pages/HubPerformancePage"));
 const HubRepViewPage = React.lazy(() => import("../hub/pages/HubRepViewPage"));
+const HubStrategyBrandPage = React.lazy(() => import("../hub/pages/strategy/StrategyBrandPage"));
+const HubStrategyProductsPage = React.lazy(() => import("../hub/pages/strategy/StrategyProductsPage"));
+const HubStrategyPreferredPage = React.lazy(() => import("../hub/pages/strategy/StrategyPreferredPage"));
+const HubStrategyBannedPage = React.lazy(() => import("../hub/pages/strategy/StrategyBannedPage"));
+const HubStrategyRegulationsPage = React.lazy(() => import("../hub/pages/strategy/StrategyRegulationsPage"));
+const HubStrategyFactsPage = React.lazy(() => import("../hub/pages/strategy/StrategyFactsPage"));
+const HubTasksPage = React.lazy(() => import("../hub/pages/content/HubTasksPage"));
+const HubRunPage = React.lazy(() => import("../hub/pages/content/HubRunPage"));
+const HubContentSkillsPage = React.lazy(() => import("../hub/pages/content/ContentSkillsPage"));
+const HubContentCheckerPage = React.lazy(() => import("../hub/pages/content/ContentCheckerPage"));
+const HubContentPoliciesPage = React.lazy(() => import("../hub/pages/content/ContentPoliciesPage"));
+const HubPerformancePage = React.lazy(() => import("../hub/pages/HubPerformancePage"));
+const HubPerformanceLeaderboardPage = React.lazy(() => import("../hub/pages/performance/PerformanceLeaderboardPage"));
+const HubPerformancePostsPage = React.lazy(() => import("../hub/pages/performance/PerformancePostsPage"));
 const HubScanPage = React.lazy(() => import("../hub/pages/ScanPage"));
 const HubLiffWritePage = React.lazy(() => import("../hub/pages/LiffWritePage"));
 const HubLiffSharePage = React.lazy(() => import("../hub/pages/LiffSharePage"));
@@ -299,12 +310,29 @@ export default function AppV2() {
         <Route path="/liff/share" element={<HubLiffSharePage />} />
         {/* Sales Hub — HQ / marketing admin */}
         <Route element={<RequireAuthV2><HubShell /></RequireAuthV2>}>
+          {/* 總管理 HQ */}
           <Route path="/hub" element={<HubOverviewPage />} />
-          <Route path="/hub/strategy" element={<HubStrategyPage />} />
-          <Route path="/hub/content" element={<HubContentPage />} />
           <Route path="/hub/reps" element={<HubRepsPage />} />
-          <Route path="/hub/performance" element={<HubPerformancePage />} />
           <Route path="/hub/rep-view" element={<HubRepViewPage />} />
+          {/* 策略 Strategy tray */}
+          <Route path="/hub/strategy" element={<Navigate to="/hub/strategy/brand" replace />} />
+          <Route path="/hub/strategy/brand" element={<HubStrategyBrandPage />} />
+          <Route path="/hub/strategy/products" element={<HubStrategyProductsPage />} />
+          <Route path="/hub/strategy/preferred" element={<HubStrategyPreferredPage />} />
+          <Route path="/hub/strategy/banned" element={<HubStrategyBannedPage />} />
+          <Route path="/hub/strategy/regulations" element={<HubStrategyRegulationsPage />} />
+          <Route path="/hub/strategy/facts" element={<HubStrategyFactsPage />} />
+          {/* 內容 Content tray */}
+          <Route path="/hub/content" element={<Navigate to="/hub/tasks/facebook" replace />} />
+          <Route path="/hub/tasks/:channel" element={<HubTasksPage />} />
+          <Route path="/hub/run/:postId" element={<HubRunPage />} />
+          <Route path="/hub/content/skills" element={<HubContentSkillsPage />} />
+          <Route path="/hub/content/checker" element={<HubContentCheckerPage />} />
+          <Route path="/hub/content/policies" element={<HubContentPoliciesPage />} />
+          {/* 成效 Results tray */}
+          <Route path="/hub/performance" element={<HubPerformancePage />} />
+          <Route path="/hub/performance/leaderboard" element={<HubPerformanceLeaderboardPage />} />
+          <Route path="/hub/performance/posts" element={<HubPerformancePostsPage />} />
         </Route>
 
         {/* 2026-05-10: Public legal + pricing pages (no auth required so

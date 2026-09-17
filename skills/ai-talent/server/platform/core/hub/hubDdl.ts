@@ -193,6 +193,39 @@ export const HUB_DDL: string[] = [
     created_at      DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     INDEX idx_org_created (org_id, created_at)
   ) ${TAIL}`,
+
+  // Strategy tray: preferred terms, word swaps and company-banned words.
+  // Legal claim rules stay in the policy packs (code); this is what marketing
+  // edits day to day, and the compliance check reads it on every post.
+  `CREATE TABLE IF NOT EXISTS hub_wording (
+    id              INT          NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    org_id          INT          NOT NULL,
+    market          VARCHAR(2)   NOT NULL,
+    kind            VARCHAR(12)  NOT NULL,
+    term            VARCHAR(120) NOT NULL,
+    replacement     VARCHAR(160) NULL,
+    note            VARCHAR(300) NULL,
+    added_by        VARCHAR(160) NULL,
+    created_at      DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    UNIQUE KEY uq_term (org_id, market, kind, term),
+    INDEX idx_org (org_id)
+  ) ${TAIL}`,
+
+  `CREATE TABLE IF NOT EXISTS hub_regulations (
+    id              INT          NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    org_id          INT          NOT NULL,
+    market          VARCHAR(2)   NOT NULL,
+    authority       VARCHAR(160) NOT NULL,
+    title           VARCHAR(300) NOT NULL,
+    summary         TEXT         NOT NULL,
+    impact          TEXT         NOT NULL,
+    rules           JSON         NULL,
+    status          VARCHAR(12)  NOT NULL,
+    effective_on    DATE         NULL,
+    published_on    DATE         NULL,
+    source_url      VARCHAR(500) NOT NULL,
+    INDEX idx_org (org_id)
+  ) ${TAIL}`,
 ];
 
 export async function ensureHubTables(): Promise<void> {
