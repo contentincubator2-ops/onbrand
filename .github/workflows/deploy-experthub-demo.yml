@@ -12,6 +12,10 @@ name: Deploy — ExpertHub Sales Hub demo
 on:
   push:
     branches: [release/experthub-demo]
+    # 2026-09-18: ops/** is how the probe job is triggered. Redeploying the
+    # booth demo just because someone ran a health check is pure risk.
+    paths-ignore:
+      - "ops/**"
 
 permissions:
   contents: read

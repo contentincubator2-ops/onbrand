@@ -1,0 +1,83 @@
+name: "OP — ExpertHub demo probe (read-mostly)"
+
+# Runs scripts/hub-probe.ts against the live demo database on the dev VM, so we
+# know the Dallas booth demo actually works before standing in front of it.
+# workflow_dispatch is unavailable off the default branch, so this is triggered
+# the same way the other ops jobs are: touch the trigger file and push.
+#
+# The probe cleans up every row it writes (see the script's Cleanup section).
+# Put "--generate" in ops/experthub-probe/TRIGGER to also write one real post
+# through the LLM; leave it out for a free, instant run.
+
+on:
+  push:
+    branches: [release/experthub-demo]
+    paths:
+      - "ops/experthub-probe/**"
+
+permissions:
+  contents: read
+
+# Shares the deploy's group on purpose: if a deploy is mid-flight, the probe
+# waits for it instead of reading a half-swapped release.
+concurrency:
+  group: experthub-demo-deploy
+  cancel-in-progress: false
+
+jobs:
+  probe:
+    runs-on: ubuntu-24.04
+    environment: dev
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read trigger options
+        id: opts
+        run: |
+          flags="$(grep -oE '\-\-generate' ops/experthub-probe/TRIGGER 2>/dev/null | head -1 || true)"
+          echo "flags=$flags" >> "$GITHUB_OUTPUT"
+          echo "probe flags: ${flags:-none}"
+
+      - name: Configure SSH
+        env:
+          VM_SSH_PRIVATE_KEY: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          VM_SSH_HOST_KEY: ${{ secrets.VM_SSH_HOST_KEY }}
+        run: |
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$VM_SSH_PRIVATE_KEY" > ~/.ssh/onbrand-dev && chmod 600 ~/.ssh/onbrand-dev
+          printf '%s\n' "$VM_SSH_HOST_KEY" > ~/.ssh/known_hosts && chmod 600 ~/.ssh/known_hosts
+
+      - name: Probe the demo
+        env:
+          VM_HOST: ${{ secrets.VM_HOST }}
+          VM_USER: ${{ secrets.VM_USER }}
+          FLAGS: ${{ steps.opts.outputs.flags }}
+        run: |
+          ssh -i ~/.ssh/onbrand-dev "$VM_USER@$VM_HOST" "PROBE_FLAGS='${FLAGS}' bash -s" <<'REMOTE'
+          set -uo pipefail
+          ai=/opt/onbrand-demo/current/skills/ai-talent
+
+          echo "════ host ════"
+          df -h / | tail -1
+          pm2 ls 2>/dev/null | grep -E "onbrand-experthub" || echo "pm2: onbrand-experthub NOT RUNNING"
+          echo "release: $(readlink -f /opt/onbrand-demo/current)"
+          echo "releases kept: $(ls -1 /opt/onbrand-demo/releases 2>/dev/null | wc -l)  ($(du -sh /opt/onbrand-demo/releases 2>/dev/null | cut -f1))"
+
+          echo ""
+          echo "════ health ════"
+          curl -s --max-time 10 http://127.0.0.1:3201/health || echo "health endpoint did not answer"
+          echo ""
+          for path in /for-sales /hub /login; do
+            code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 "http://127.0.0.1:3201$path")"
+            echo "  $path -> $code"
+          done
+
+          echo ""
+          echo "════ probe ════"
+          cd "$ai" || exit 20
+          ./node_modules/.bin/tsx scripts/hub-probe.ts $PROBE_FLAGS
+          status=$?
+          echo "probe exit: $status"
+          exit $status
+          REMOTE
