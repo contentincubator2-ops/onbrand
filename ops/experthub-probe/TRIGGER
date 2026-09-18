@@ -2,4 +2,4 @@ ExpertHub demo probe trigger.
 Edit this file and push to release/experthub-demo to run it.
 Add --generate on the line below to also write one real post through the LLM.
 
-run 1: 2026-09-18 --generate
+run 2: 2026-09-18 (no --generate; looking at the disk)

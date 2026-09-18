@@ -65,6 +65,16 @@ jobs:
           echo "releases kept: $(ls -1 /opt/onbrand-demo/releases 2>/dev/null | wc -l)  ($(du -sh /opt/onbrand-demo/releases 2>/dev/null | cut -f1))"
 
           echo ""
+          echo "════ what is using the disk ════"
+          sudo du -xh --max-depth=1 / 2>/dev/null | sort -rh | head -12
+          echo "  --- /opt ---"
+          sudo du -xh --max-depth=2 /opt 2>/dev/null | sort -rh | head -12
+          echo "  --- pm2 logs ---"
+          du -sh ~/.pm2/logs 2>/dev/null || true
+          echo "  --- mysql ---"
+          sudo du -sh /var/lib/mysql 2>/dev/null || true
+
+          echo ""
           echo "════ health ════"
           curl -s --max-time 10 http://127.0.0.1:3201/health || echo "health endpoint did not answer"
           echo ""

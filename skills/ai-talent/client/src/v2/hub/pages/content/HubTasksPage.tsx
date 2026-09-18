@@ -73,6 +73,8 @@ export default function HubTasksPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeSlug, eligibleReps.length]);
 
+  const pendingPack = (content.data?.packs ?? []).find((p) => p.market === rep?.market) ?? null;
+
   if (!ch || !meta) return <Navigate to="/hub/tasks/facebook" replace />;
 
   const solutions = [...(strategy.data?.solutions ?? [])].sort((a, b) => Number(b.featured) - Number(a.featured));
@@ -306,9 +308,32 @@ export default function HubTasksPage() {
                         )}
                   </p>
                   {generate.isPending ? (
-                    <div className="flex items-center gap-2 rounded-lg border border-orange-200 bg-orange-50 px-3 py-2 text-[13px] text-orange-800">
-                      <span className="h-2 w-2 animate-pulse rounded-full bg-orange-500" />
-                      {t("Writing and checking company policy… (about 15 s)", "撰寫中，並檢查公司政策…（約 15 秒）")}
+                    // 2026-09-18 (Dallas booth): the wait is ~10-15 s of dead air
+                    // on stage. Show the rules the post has to clear — the list is
+                    // static on purpose, no faked per-step progress.
+                    <div className="rounded-lg border border-orange-200 bg-orange-50 px-3 py-2.5 text-[13px] text-orange-900">
+                      <div className="flex items-center gap-2 font-medium">
+                        <span className="h-2 w-2 animate-pulse rounded-full bg-orange-500" />
+                        {t("Writing and checking company policy… (about 15 s)", "撰寫中，並檢查公司政策…（約 15 秒）")}
+                      </div>
+                      {pendingPack ? (
+                        <>
+                          <p className="mt-2 text-[12px] text-orange-800">
+                            {t(
+                              `Every draft has to clear these ${pendingPack.rules.length} checks — ${pendingPack.authority}:`,
+                              `每一篇初稿都要通過這 ${pendingPack.rules.length} 道檢查——${pendingPack.authority}：`,
+                            )}
+                          </p>
+                          <ol className="mt-1.5 grid gap-1 sm:grid-cols-2">
+                            {pendingPack.rules.map((r, i) => (
+                              <li key={r.id} className="flex gap-1.5 text-[12px] leading-relaxed text-orange-800">
+                                <span className="tabular-nums opacity-60">{i + 1}.</span>
+                                <span>{r.title}</span>
+                              </li>
+                            ))}
+                          </ol>
+                        </>
+                      ) : null}
                     </div>
                   ) : null}
                   <ErrorNote error={generate.error} />
