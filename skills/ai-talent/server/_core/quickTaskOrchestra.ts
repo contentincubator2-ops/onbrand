@@ -631,6 +631,61 @@ function stripCaptionPreamble(caption: string): string {
 //
 // Each single-variant call is tiny (~150-300 tokens) so it never truncates.
 
+/* ── 主題優先序 ──────────────────────────────────────────────────────────────
+ *
+ * 2026-09-18 (CJ 回報 LINE 產出「完全忽略我給的主題」，兩次都重現)。
+ *
+ * 根因：buildBrandPrefix 送出的第一行是
+ *     [品牌已鎖定屬性 — 最高優先級，所有產出都要符合]
+ * 而品牌區塊被放在整個 system prompt 的**最後**（最新＝最有份量），使用者的
+ * 主題卻只是 user message 裡的一行。對抗它的「主題優先序」規則在此之前**只有
+ * 抓到 URL 時才存在** —— 見 brandSection 上方 2026-05-06 的註解：當時發現的是
+ * 同一個病（汽車影片被寫成 Shopee 導購），但只醫了 URL 那一半。
+ *
+ * 打字輸入主題的那一半沒被發現，是因為它不會壞得很明顯：產出仍然通順、仍然
+ * 完全符合品牌語氣，只是在講品牌自己而不是使用者要的那件事。看起來像「文案
+ * 寫得還行」，不像 bug。
+ *
+ * 修法刻意不弱化「鎖定屬性」那句話 —— 它撐著禁用詞與 tagline 合規，是產出不
+ * 走鐘的原因。改成明確劃清範圍：鎖定屬性管**怎麼講**，使用者輸入管**講什麼**。
+ */
+
+/** userMsg 的形狀是 "[topic] 內容"；只有欄位標籤沒有內容時等同沒給主題。 */
+export function hasUserSuppliedTopic(userMsg: string | null | undefined): boolean {
+  const t = (userMsg ?? "").trim();
+  if (!t || t === "(no extra inputs)") return false;
+  return t.replace(/\[[^\]]*\]/g, "").trim().length > 0;
+}
+
+export function buildSubjectRule(args: {
+  hasUrl: boolean;
+  userMsg: string;
+  /** 配圖 brief 用的短版 */
+  visual?: boolean;
+}): string {
+  const { hasUrl, userMsg, visual } = args;
+  if (hasUrl) {
+    return visual
+      ? `視覺主題=URL 抓到的影片 / 文章內容。**不要**把品牌主商品畫進視覺。\n`
+      : `\n【主題優先序 — 最重要】\n` +
+        `本次任務的「主題」=上面 URL 抓到的內容。品牌不是主題。\n` +
+        `caption 必須具體呼應 URL 內容（提到影片裡的事件、數字、名稱、人事物），不要寫通用模板，不要繞回品牌主商品。\n` +
+        `即使 URL 主題與品牌領域完全無關，也必須直接以 URL 主題撰寫貼文，不要硬扯品牌。\n` +
+        `嚴禁輸出提問、澄清請求、說明、免責聲明、或任何非貼文內容。\n` +
+        `素材不足時，以標題與描述推論主題撰寫；不得臆造具體數據或事件細節。\n` +
+        `一律使用品牌目標市場語言輸出。\n`;
+  }
+  if (!hasUserSuppliedTopic(userMsg)) return "";
+  return visual
+    ? `視覺主題=使用者在 user message 寫的那件事，不是品牌主商品。\n`
+    : `\n【主題優先序 — 最重要】\n` +
+      `本次任務的「主題」= user message 裡使用者寫的內容。品牌不是主題。\n` +
+      `caption 必須具體呼應使用者寫的那件事 —— 他提到的人、事、時間、名稱、情境要出現在文裡。\n` +
+      `下方〈品牌〉區塊標示的「最高優先級」指的是**怎麼講**（語氣 / 用詞 / 受眾 / 禁忌），不是**講什麼**。\n` +
+      `使用者已經指定主題時，嚴禁把它改寫成品牌的通用介紹文或品牌價值宣傳。\n`;
+}
+
+
 async function callOneVariant(args: {
   template: FBTaskTemplate;
   config: OrchestraConfig;
@@ -708,15 +763,7 @@ async function callOneVariant(args: {
         brandPrefix
       : ""
     : `\n# 品牌語氣參考\n${brandPrefix}`;
-  const subjectRule = hasUrl
-    ? `\n【主題優先序 — 最重要】\n` +
-      `本次任務的「主題」=上面 URL 抓到的內容。品牌不是主題。\n` +
-      `caption 必須具體呼應 URL 內容（提到影片裡的事件、數字、名稱、人事物），不要寫通用模板，不要繞回品牌主商品。\n` +
-      `即使 URL 主題與品牌領域完全無關，也必須直接以 URL 主題撰寫貼文，不要硬扯品牌。\n` +
-      `嚴禁輸出提問、澄清請求、說明、免責聲明、或任何非貼文內容。\n` +
-      `素材不足時，以標題與描述推論主題撰寫；不得臆造具體數據或事件細節。\n` +
-      `一律使用品牌目標市場語言輸出。\n`
-    : "";
+  const subjectRule = buildSubjectRule({ hasUrl, userMsg });
 
   const strategistSection = strategistAnchor
     ? `\n# 系列敘事框架（由 strategist 規劃 — 必須遵循）\n${strategistAnchor}\n` +
@@ -1234,9 +1281,7 @@ async function callOneBrief(args: {
 }): Promise<string> {
   const { config, label, imagePersona, brandPrefix, urlContext, userMsg } = args;
   const hasUrl = urlContext.length > 0;
-  const subjectRule = hasUrl
-    ? `視覺主題=URL 抓到的影片 / 文章內容。**不要**把品牌主商品畫進視覺。\n`
-    : "";
+  const subjectRule = buildSubjectRule({ hasUrl, userMsg, visual: true });
   // 2026-05-17 (CJ「IG 視覺也要得獎工藝」): IG-family tasks get the
   // 【視覺 craft】 portion of the IG rubric so style direction follows
   // award-grade composition + correct aspect ratio + brand visual
