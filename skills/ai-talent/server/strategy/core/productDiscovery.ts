@@ -332,7 +332,12 @@ async function finishJob(
   );
 }
 
-async function crawlWebsite(url: string): Promise<string> {
+/**
+ * 2026-09-19: exported for boothPositioning — 小定位 summarises the very same
+ * pages this already fetches, so it reuses the crawl instead of writing a
+ * second one. Behaviour is otherwise unchanged.
+ */
+export async function crawlWebsite(url: string): Promise<string> {
   // Strip common homepage file paths so suffixes attach to the domain root.
   // e.g. https://www.laurel.com.tw/index.php → https://www.laurel.com.tw
   const normalize = (u: string): string => {
@@ -348,13 +353,18 @@ async function crawlWebsite(url: string): Promise<string> {
   ];
   const chunks: string[] = [];
 
-  for (const suffix of suffixes) {
+  // 2026-09-19: was a sequential for-loop. Eleven pages at a 6 s timeout each
+  // is up to a minute before the extractor even starts, and the booth chat
+  // flow can't wait that long. Same requests, same output order, four in
+  // flight so we don't hammer one domain.
+  const CONCURRENCY = 4;
+  const fetchOne = async (suffix: string): Promise<string | null> => {
     try {
       const res = await fetch(`${base}${suffix}`, {
         signal: AbortSignal.timeout(6_000),
         headers: { "User-Agent": "OnBrand/1.0 (brand intelligence crawler)" },
       });
-      if (!res.ok) continue;
+      if (!res.ok) return null;
       const html = await res.text();
       // Strip scripts/styles, keep text content
       const text = html
@@ -366,8 +376,13 @@ async function crawlWebsite(url: string): Promise<string> {
         .replace(/\s+/g, " ")
         .trim()
         .slice(0, 4000);  // 4000 per page → faster LLM processing
-      if (text.length > 200) chunks.push(`[${base}${suffix}]\n${text}`);
-    } catch { /* skip unavailable pages */ }
+      return text.length > 200 ? `[${base}${suffix}]\n${text}` : null;
+    } catch { return null; /* skip unavailable pages */ }
+  };
+
+  for (let i = 0; i < suffixes.length; i += CONCURRENCY) {
+    const batch = await Promise.all(suffixes.slice(i, i + CONCURRENCY).map(fetchOne));
+    for (const chunk of batch) if (chunk) chunks.push(chunk);
   }
   return chunks.join("\n\n").slice(0, 12000);  // 12000 total → ~30s LLM response time
 }
@@ -459,7 +474,7 @@ ${candidates.map((c) => `${c.idx}. ${c.alt}`).join("\n")}
       setTimeout(() => reject(new Error("productsFromImageAlts LLM timeout after 60s")), 60_000),
     );
     const result = await Promise.race([llmCall, timeout]);
-    const text = String((result as any)?.content ?? (result as any)?.text ?? "").trim();
+    const text = String((result as any)?.choices?.[0]?.message?.content ?? "").trim();
     const start = text.indexOf("[");
     const end = text.lastIndexOf("]");
     if (start === -1 || end === -1) throw new Error("no JSON array in alt-fallback LLM response");
@@ -526,7 +541,7 @@ description 可以很短或直接用產品分類代替。
   );
   const result = await Promise.race([llmCall, timeout]);
 
-  const text = String((result as any)?.content ?? (result as any)?.text ?? "").trim();
+  const text = String((result as any)?.choices?.[0]?.message?.content ?? "").trim();
   // Use throw instead of return [] so all non-product paths fall through to regex
   try {
     const start = text.indexOf("[");
