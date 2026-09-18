@@ -2,6 +2,8 @@
  * Sales Hub — non-tRPC HTTP surface.
  *
  *   POST /line/webhook        LINE Messaging API (raw body; mount before express.json)
+ *   GET  /whatsapp/webhook    Meta subscription handshake (echoes hub.challenge)
+ *   POST /whatsapp/webhook    WhatsApp Cloud API (raw body, same reason as LINE)
  *   GET  /r/:code             tracked short link → logs the click → /scan/:code
  *   GET  /r/:code/qr.svg      QR for the booth
  *   GET  /api/hub/scan/:code  public attribution card for the scan page
@@ -29,6 +31,7 @@ import {
   type HubRep,
 } from "../core/hub/hubStore";
 import { processLineEvent, verifyLineSignature } from "../core/hub/lineBot";
+import { parseInbound, verifySubscription, verifyWhatsAppSignature } from "../core/hub/whatsappBot";
 
 // ── LINE webhook ────────────────────────────────────────────────────────────
 
@@ -44,6 +47,53 @@ export async function hubLineWebhookHandler(req: Request, res: Response) {
   try { payload = JSON.parse(raw.toString("utf8")); } catch { return; }
   for (const event of payload?.events ?? []) {
     void processLineEvent(event);
+  }
+}
+
+// ── WhatsApp webhook ────────────────────────────────────────────────────────
+
+/**
+ * 2026-09-19 (CJ「WhatsApp 的 Meta 送件今天開始」)。
+ *
+ * Meta 在你把 callback URL 填進去的當下就會打 GET 過來要 challenge，答不出來
+ * 就不讓你存檔——所以這條路由必須先存在，設定才做得下去。對話邏輯還沒接上，
+ * 現在收到訊息只記一筆 event；接上之後這裡改成呼叫 handleText / handlePostback。
+ */
+export function hubWhatsAppVerifyHandler(req: Request, res: Response) {
+  const challenge = verifySubscription(req.query as Record<string, unknown>);
+  if (challenge === null) {
+    res.status(403).send("verification failed");
+    return;
+  }
+  res.status(200).send(challenge);
+}
+
+export async function hubWhatsAppWebhookHandler(req: Request, res: Response) {
+  const raw = req.body as Buffer;
+  if (!Buffer.isBuffer(raw) || !verifyWhatsAppSignature(raw, req.header("x-hub-signature-256"))) {
+    res.status(401).json({ error: "bad signature" });
+    return;
+  }
+  // 先回 200。Meta 對慢的 webhook 會重送，重送就會變成重複回覆。
+  res.status(200).json({ ok: true });
+
+  let payload: any;
+  try { payload = JSON.parse(raw.toString("utf8")); } catch { return; }
+
+  for (const inbound of parseInbound(payload)) {
+    void (async () => {
+      try {
+        const org = await getOrg();
+        await logEvent(
+          org.id,
+          null,
+          "whatsapp_inbound",
+          `${inbound.name ?? inbound.from}: ${(inbound.postback ?? inbound.text).slice(0, 120)}`,
+        );
+      } catch (e: any) {
+        console.error("[whatsapp.webhook]", e?.message ?? e);
+      }
+    })();
   }
 }
 

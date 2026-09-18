@@ -33,7 +33,12 @@ import { assetPhotoRouter as assetPhotoUploadRoute, STORAGE_ROOT as ASSET_PHOTO_
 import { slackOAuthRouter } from "./platform/routes/slackOAuthRoute";
 import { cloudOAuthRouter } from "./platform/routes/cloudOAuthRoute";
 import { manusRouter } from "./platform/routers/manusRouter";
-import { hubLineWebhookHandler, hubPublicRouter } from "./platform/routes/hubRoutes";
+import {
+  hubLineWebhookHandler,
+  hubPublicRouter,
+  hubWhatsAppVerifyHandler,
+  hubWhatsAppWebhookHandler,
+} from "./platform/routes/hubRoutes";
 import { publicAgentsRoute } from "./platform/routes/publicAgentsRoute";
 import { closeDb, pingDb, pingSoworkDb, getDb } from "./db";
 import { sql } from "drizzle-orm";
@@ -167,6 +172,12 @@ app.post(
 // 2026-09-16 (Sales Hub demo): LINE webhook signature is an HMAC over the raw
 // body, so it needs the same before-express.json() mount as Stripe.
 app.post("/line/webhook", express.raw({ type: "*/*", limit: "1mb" }), hubLineWebhookHandler);
+
+// 2026-09-19: WhatsApp Cloud API. X-Hub-Signature-256 is an HMAC over the raw
+// body too, so it needs the same before-express.json() mount. The GET is
+// Meta's subscription handshake and carries no body.
+app.get("/whatsapp/webhook", hubWhatsAppVerifyHandler);
+app.post("/whatsapp/webhook", express.raw({ type: "*/*", limit: "1mb" }), hubWhatsAppWebhookHandler);
 
 // SEC-B-08 (2026-05-04): cap JSON body size. Per-field check below is the
 // real DoS protection; body limit just caps overall request size.
