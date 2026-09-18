@@ -56,6 +56,7 @@ const ResetPasswordPage = React.lazy(() => import("../../pages/auth/ResetPasswor
 const OnboardingWizard = React.lazy(() => import("../../pages/OnboardingWizard"));
 
 // 2026-09-16 (Dallas show): Sales Hub concept demo — own shell, English-first.
+const ForSalesPage = React.lazy(() => import("../platform/pages/ForSalesPage"));
 const HubShell = React.lazy(() => import("../hub/HubShell"));
 const HubOverviewPage = React.lazy(() => import("../hub/pages/HubOverviewPage"));
 const HubRepsPage = React.lazy(() => import("../hub/pages/HubRepsPage"));
@@ -82,7 +83,7 @@ const isHubHost = typeof window !== "undefined" && window.location.hostname.star
 // 2026-09-16 (CJ「login 之後找不到 experthub」): on the demo host, login lands on
 // /theater like the rest of OnBrand. Anything outside the demo's own routes
 // goes to /hub instead, so the booth never shows the OnBrand app.
-const HUB_HOST_PATHS = ["/hub", "/scan/", "/liff/", "/auth/", "/login", "/plan-expired"];
+const HUB_HOST_PATHS = ["/hub", "/scan/", "/liff/", "/auth/", "/login", "/plan-expired", "/for-sales"];
 function HubHostGuard() {
   const { pathname } = useLocation();
   if (!isHubHost || HUB_HOST_PATHS.some((p) => pathname === p || pathname.startsWith(p))) return null;
@@ -338,6 +339,8 @@ export default function AppV2() {
         {/* 2026-05-10: Public legal + pricing pages (no auth required so
             unregistered prospects can read T&C / Privacy / Refund + see pricing) */}
         <Route path="/pricing" element={<PricingPage />} />
+        {/* 2026-09-18 (CJ「面對行銷人的 onbrand，以及面對銷售的 onbrand」): 業務版分眾頁 */}
+        <Route path="/for-sales" element={<ForSalesPage />} />
         <Route path="/terms" element={<TermsPage />} />
         <Route path="/privacy" element={<PrivacyPage />} />
         <Route path="/refund" element={<RefundPage />} />

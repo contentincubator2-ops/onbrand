@@ -512,6 +512,27 @@ export default function PricingPage() {
           ))}
         </div>
 
+        {/* 2026-09-18 (CJ「面對行銷人的 onbrand，以及面對銷售的 onbrand」):
+            入口到業務版分眾頁。平台費同一份，所以放在方案頁最自然。 */}
+        <div className="mt-16 border border-neutral-900 px-6 py-5 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <div className="text-sm font-semibold text-neutral-900">
+              {isEn ? "Sales teams post too" : "業務也要發文？"}
+            </div>
+            <p className="text-sm text-neutral-600 mt-0.5">
+              {isEn
+                ? "OnBrand for Sales gives every rep a policy-checked post and a tracked link — same brand brain, one platform fee."
+                : "OnBrand 業務版讓每位業務都能發出通過政策檢查的貼文，並附專屬追蹤連結——同一個品牌大腦，平台費只收一份。"}
+            </p>
+          </div>
+          <Link
+            to="/for-sales"
+            className="px-4 py-2 rounded-lg border border-neutral-900 text-sm font-medium text-neutral-900 hover:bg-neutral-900 hover:text-white"
+          >
+            {isEn ? "See the sales edition →" : "看業務版 →"}
+          </Link>
+        </div>
+
         {/* Footer */}
         <div className="mt-20 pt-8 border-t border-neutral-200 text-xs text-neutral-500 space-x-4">
           <Link to="/terms" className="hover:text-neutral-900">{t("footer_terms")}</Link>

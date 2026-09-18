@@ -57,7 +57,7 @@ const authAwareFetch: typeof fetch = async (input, init) => {
     // legal pages fire background tRPC queries (notifications, plan info…)
     // that 401 for anonymous visitors — that must NOT hard-bounce them to
     // /login. Only redirect when the visitor is on a PROTECTED route.
-    const PUBLIC_PATHS = ["/", "/pricing", "/terms", "/privacy", "/refund", "/plan-expired", "/login"];
+    const PUBLIC_PATHS = ["/", "/pricing", "/for-sales", "/terms", "/privacy", "/refund", "/plan-expired", "/login"];
     const path = window.location.pathname;
     const isPublic = PUBLIC_PATHS.includes(path) || path.startsWith("/auth/") || path.startsWith("/scan/") || path.startsWith("/liff/");
     const w = window as any;
