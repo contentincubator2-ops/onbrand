@@ -80,13 +80,19 @@ jobs:
           LINE_LOGIN_CHANNEL_ID: ${{ secrets.LINE_LOGIN_CHANNEL_ID }}
           HUB_HERMES_URL: ${{ secrets.HUB_HERMES_URL }}
           HUB_HERMES_PROFILES: ${{ secrets.HUB_HERMES_PROFILES }}
+          WHATSAPP_TOKEN: ${{ secrets.WHATSAPP_TOKEN }}
+          WHATSAPP_PHONE_NUMBER_ID: ${{ secrets.WHATSAPP_PHONE_NUMBER_ID }}
+          WHATSAPP_APP_SECRET: ${{ secrets.WHATSAPP_APP_SECRET }}
+          WHATSAPP_VERIFY_TOKEN: ${{ secrets.WHATSAPP_VERIFY_TOKEN }}
           HUB_ADMIN_EMAIL: ${{ secrets.HUB_ADMIN_EMAIL }}
           HUB_ADMIN_PASSWORD: ${{ secrets.HUB_ADMIN_PASSWORD }}
         run: |
           umask 077
           app="$RUNNER_TEMP/experthub-secrets.env"; admin="$RUNNER_TEMP/experthub-admin.env"
           : > "$app"; : > "$admin"
-          for k in LINE_CHANNEL_SECRET LINE_CHANNEL_ACCESS_TOKEN LINE_LIFF_ID LINE_LOGIN_CHANNEL_ID HUB_HERMES_URL HUB_HERMES_PROFILES; do
+          for k in LINE_CHANNEL_SECRET LINE_CHANNEL_ACCESS_TOKEN LINE_LIFF_ID LINE_LOGIN_CHANNEL_ID \
+                   HUB_HERMES_URL HUB_HERMES_PROFILES \
+                   WHATSAPP_TOKEN WHATSAPP_PHONE_NUMBER_ID WHATSAPP_APP_SECRET WHATSAPP_VERIFY_TOKEN; do
             v="${!k}"; if [ -n "$v" ]; then printf '%s=%s\n' "$k" "$v" >> "$app"; fi
           done
           # Admin credentials never go into the app's .env — only into the one-off admin script run.
