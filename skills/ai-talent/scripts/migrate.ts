@@ -2511,6 +2511,23 @@ async function main() {
     `);
     console.log("[migrate] brand_integrations: OK");
 
+    // 2026-09-18 LINE OA 引導流程的 session。
+    // 一個 LINE 使用者同時只在一個流程裡，所以 lineUserId 就是主鍵 ——
+    // 按了「FB文案」又改按「IG文案」，意思是換一個，不是並行兩個。
+    // 記憶體的 Map 會在每次部署後蒸發，使用者正在打字時發版就會收到一份
+    // 莫名其妙的選單；部署是常態不是例外，所以存資料庫。
+    await conn.execute(`
+      CREATE TABLE IF NOT EXISTS line_sessions (
+        lineUserId  VARCHAR(64)  NOT NULL PRIMARY KEY,
+        flowId      VARCHAR(40)  NOT NULL,
+        step        VARCHAR(40)  NOT NULL,
+        data        JSON         NULL,
+        updatedAt   DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3)
+                    ON UPDATE CURRENT_TIMESTAMP(3)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+    console.log("[migrate] line_sessions: OK");
+
     console.log("[migrate] All migrations applied successfully.");
   } finally {
     conn.release();

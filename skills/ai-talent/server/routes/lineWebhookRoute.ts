@@ -9,13 +9,12 @@
  * 知識庫／人設）注進系統提示。所以只要帶對 brandId，LINE 產的稿子跟網站上產的
  * 是同一條路徑、同一套規範 —— 這是刻意不在這裡另開一條捷徑的原因。
  *
- * ── 為什麼沒有 session 狀態 ────────────────────────────────────────────────
- * 直覺作法是「按 rich menu → 記住他選了哪張卡 → 等他下一則訊息當主題」，那需要
- * 一份 per-user 的待辦狀態（記憶體會在每次部署後蒸發，DB 則要開表）。
- * 改用 LINE 自己的能力：rich menu 的 postback 可以帶 inputOption:"openKeyboard"
- * 與 fillInText，按下去會直接在輸入框填好「FB貼文：」並開鍵盤。使用者接著打主題
- * 送出，我們收到的是一則自帶前綴的文字訊息 —— 任務與主題在同一則裡，伺服器
- * 完全無狀態。少一張表、少一類「跨部署掉單」的 bug。
+ * ── 為什麼有 session 狀態 ──────────────────────────────────────────────────
+ * 第一版沒有：rich menu 用 postback + fillInText 預填「FB貼文：」，使用者接著
+ * 打主題，一則訊息講完，伺服器不必記任何事。改掉是因為 hermes 的慣例是
+ * rich menu 用 message 動作（送出固定文字），而且上線順序是文字回覆先通、
+ * rich menu 最後上。message 動作送出「FB文案」之後，她貼的內容沒有前綴，
+ * 就得記住她走到哪一步。完整理由見 _core/lineFlows.ts 的檔頭。
  *
  * ── 為什麼 reply 完還要 push ───────────────────────────────────────────────
  * LINE 要求 webhook 幾秒內回 200，replyToken 約一分鐘失效；任務要跑 30–130 秒。
@@ -24,7 +23,14 @@
 import { Router, type Request, type Response } from "express";
 import {
   verifyLineSignature, replyMessage, pushMessage, textMessages, imageMessages,
+  withQuickReply,
 } from "../_core/lineClient";
+import {
+  FLOWS, findFlowByTrigger, findFlowById, findPendingTrigger,
+  startFlow, advanceFlow, menuText, menuChoices,
+  type Flow,
+} from "../_core/lineFlows";
+import { getSession, setSession, clearSession } from "../_core/lineSessions";
 
 export const lineWebhookRouter = Router();
 const router = lineWebhookRouter;
@@ -43,47 +49,23 @@ function binding(): { brandId: number; userId: number } | null {
   return { brandId, userId };
 }
 
-/* ── rich menu 六格 ──────────────────────────────────────────────────────────
- * key 就是 fillInText 的前綴，使用者送出的訊息長這樣：
- *   「FB貼文：中元普渡怎麼跟孩子解釋」
- * 前綴比對用全形冒號與半形冒號都收 —— 手機輸入法會自己換。 */
-export interface MenuEntry { label: string; taskId: string; tier: "30s" | "60s" }
-
-export const LINE_MENU: MenuEntry[] = [
-  { label: "FB貼文",   taskId: "fb-30-caption-short",  tier: "30s" },
-  { label: "IG貼文",   taskId: "ig-30-caption-short",  tier: "30s" },
-  { label: "IG輪播",   taskId: "ig-60-carousel-7",     tier: "60s" },
-  { label: "限時動態", taskId: "ig-30-story-text",     tier: "30s" },
-  { label: "節慶文",   taskId: "fb-30-countdown-1day", tier: "30s" },
-  { label: "廣告文案", taskId: "fb-30-ad-primary",     tier: "30s" },
-];
-
-/** 「FB貼文：主題」→ { entry, topic }。認不出來回 null，由呼叫端給說明。 */
-export function parseCommand(text: string): { entry: MenuEntry; topic: string } | null {
-  const t = (text ?? "").trim();
-  if (!t) return null;
-  for (const entry of LINE_MENU) {
-    for (const sep of ["：", ":"]) {
-      const prefix = `${entry.label}${sep}`;
-      if (t.startsWith(prefix)) {
-        return { entry, topic: t.slice(prefix.length).trim() };
-      }
-    }
-  }
-  return null;
-}
-
-function helpText(): string {
-  return [
-    "請從下方選單挑一種內容，點下去會幫你把開頭填好，再接著打主題就好。",
-    "",
-    ...LINE_MENU.map((m) => `・${m.label}：（例）中元普渡怎麼跟孩子解釋`),
-  ].join("\n");
-}
+/* ── 流程 ───────────────────────────────────────────────────────────────────
+ * 選單、觸發語、引導句、推進規則全部在 _core/lineFlows.ts（純函式、離線可測）。
+ * 這裡只負責把它接上 LINE 的訊息與 session 儲存。
+ *
+ * 2026-09-18：第一版是 postback + fillInText 的無狀態設計，改掉的原因見
+ * lineFlows.ts 的檔頭 —— hermes 的慣例是 rich menu 用 message 動作、
+ * 文字回覆先通、rich menu 最後上。 */
 
 /* ── 跑任務 ──────────────────────────────────────────────────────────────── */
 
-async function runAndPush(lineUserId: string, entry: MenuEntry, topic: string): Promise<void> {
+async function runAndPush(
+  lineUserId: string,
+  flow: Flow,
+  taskId: string,
+  tier: "30s" | "60s",
+  inputs: Record<string, string>,
+): Promise<void> {
   const bind = binding();
   if (!bind) {
     await pushMessage(lineUserId, textMessages("系統尚未完成品牌綁定，請聯絡我們。"));
@@ -91,7 +73,7 @@ async function runAndPush(lineUserId: string, entry: MenuEntry, topic: string): 
   }
   try {
     // 額度閘門走跟網站同一支 —— 試用到期、餘額不足在這裡就會被擋，
-    // 而且訊息是既有那套中文說明，不必另外寫一份。
+    // 訊息也是既有那套中文說明，不必另外寫一份。
     const { preflightCostCheck } = await import("../llmWithBilling");
     const guard = await preflightCostCheck(bind.userId);
     if (!guard.ok) {
@@ -100,35 +82,44 @@ async function runAndPush(lineUserId: string, entry: MenuEntry, topic: string): 
     }
 
     const { resolveTaskForRun } = await import("../routers/quickTaskRouter");
-    const { template, config } = await resolveTaskForRun(entry.taskId);
+    const { template, config } = await resolveTaskForRun(taskId);
     const { runOrchestra } = await import("../_core/quickTaskOrchestra");
 
     const result = await runOrchestra({
-      template,
-      config,
-      inputs: { topic },
+      template, config, inputs,
       brandId: bind.brandId,
       userId: bind.userId,
-      tier: entry.tier,
+      tier,
     });
 
     const first = result.variants?.[0];
     if (!first?.caption) {
-      await pushMessage(lineUserId, textMessages(
-        `這次沒有產出成功${result.errors?.length ? `（${result.errors[0]}）` : ""}，再試一次或換個說法。`,
+      // 失敗就說失敗。hermes 的規矩：a source failure is reported,
+      // never filled with made-up content —— 產不出來時不要塞一段像樣的東西。
+      await pushMessage(lineUserId, withQuickReply(
+        textMessages(
+          `這次沒有產出成功${result.errors?.length ? `（${result.errors[0]}）` : ""}。` +
+          `
+可以再試一次，或換個說法多給一點背景。`,
+        ),
+        menuChoices(),
       ));
       return;
     }
 
-    // 文案 + 圖。多卡任務（輪播）把每張卡的圖都送出去，卡的文字本來就已經
-    // 在 caption 裡，不重覆貼一次。LINE 一次最多 5 則，lineClient 會截斷。
     const caption = [first.caption, (first.hashtags ?? []).join(" ")]
       .filter(Boolean).join("\n\n");
+    // 配圖建議：orchestra 本來就會同時產出視覺 brief，之前沒推出來。
+    // IG 那格特別需要 —— CJ 要的是「文案加上圖片的建議」。
+    const brief = (first.image?.style ?? "").trim();
     const urls = (first.cards?.length ? first.cards.map((c) => c.image?.url) : [first.image?.url]);
-    await pushMessage(lineUserId, [
+
+    await pushMessage(lineUserId, withQuickReply([
       ...textMessages(caption),
+      ...(brief ? textMessages(`📷 配圖建議
+${brief}`) : []),
       ...imageMessages(urls),
-    ]);
+    ], menuChoices()));
   } catch (e: any) {
     console.error("[line] run failed:", e?.message ?? e);
     await pushMessage(lineUserId, textMessages("產出時出了點問題，請再試一次。"))
@@ -136,54 +127,83 @@ async function runAndPush(lineUserId: string, entry: MenuEntry, topic: string): 
   }
 }
 
-/* ── webhook ─────────────────────────────────────────────────────────────── */
+/* ── 事件處理 ────────────────────────────────────────────────────────────── */
 
 async function handleEvent(ev: any): Promise<void> {
   const lineUserId = ev?.source?.userId;
   if (!lineUserId) return;
 
-  // rich menu 若設成 postback（而不是 fillInText），data 會是 task=<id>。
-  // 兩種都接，這樣選單之後改設定不必動程式。
-  if (ev.type === "postback") {
-    const data = String(ev.postback?.data ?? "");
-    const taskId = data.startsWith("task=") ? data.slice(5) : "";
-    const entry = LINE_MENU.find((m) => m.taskId === taskId);
-    if (entry && ev.replyToken) {
-      await replyMessage(ev.replyToken, textMessages(
-        `好，${entry.label}。請直接打主題，例如「中元普渡怎麼跟孩子解釋」。`,
-      ));
-    }
-    return;
-  }
+  const reply = async (text: string, choices = menuChoices()) => {
+    if (!ev.replyToken) return;
+    await replyMessage(ev.replyToken, withQuickReply(textMessages(text), choices))
+      .catch((e) => console.error("[line] reply failed:", e?.message ?? e));
+  };
 
-  if (ev.type === "follow" && ev.replyToken) {
-    await replyMessage(ev.replyToken, textMessages(`歡迎！\n\n${helpText()}`));
+  if (ev.type === "follow") {
+    await clearSession(lineUserId);
+    await reply(`歡迎！我可以幫你把想法整理成貼文。
+
+${menuText()}`);
     return;
   }
 
   if (ev.type !== "message" || ev.message?.type !== "text") return;
+  const text = String(ev.message.text ?? "");
 
-  const parsed = parseCommand(String(ev.message.text ?? ""));
-  if (!parsed) {
-    if (ev.replyToken) await replyMessage(ev.replyToken, textMessages(helpText()));
-    return;
-  }
-  if (!parsed.topic) {
-    if (ev.replyToken) {
-      await replyMessage(ev.replyToken, textMessages(
-        `「${parsed.entry.label}：」後面接著打主題就可以了，例如「${parsed.entry.label}：中元普渡怎麼跟孩子解釋」。`,
-      ));
+  // 觸發語永遠優先於進行中的流程 —— 她按「IG文案」就是要換一個，
+  // 不是要把「IG文案」四個字當成 FB 貼文的素材。
+  const started = findFlowByTrigger(text);
+  if (started) {
+    const a = startFlow(started);
+    if (a.kind === "ask") {
+      await setSession(lineUserId, started.id, a.nextStep, {});
+      await reply(a.prompt, a.choices ?? []);
     }
     return;
   }
 
-  // reply 先回，任務在背景跑 —— 這兩件事不能對調，replyToken 等不到任務跑完。
+  // 選單上有、但還沒做好的格子 —— 誠實講「還沒開」，不要讓她以為按鈕壞了。
+  const pending = findPendingTrigger(text);
+  if (pending) {
+    await reply(`「${pending.trigger}」還在做：${pending.note}。
+
+現在可以用的是下面這些。`);
+    return;
+  }
+
+  const session = await getSession(lineUserId);
+  if (!session) {
+    await reply(menuText());
+    return;
+  }
+  const flow = findFlowById(session.flowId);
+  if (!flow) {
+    // 流程被改版拿掉了，舊 session 沒有去處。清掉重來，不要靜默卡住。
+    await clearSession(lineUserId);
+    await reply(menuText());
+    return;
+  }
+
+  const a = advanceFlow(flow, session.step, text, session.data);
+  if (a.kind === "retry") {
+    await reply(a.prompt, a.choices ?? []);
+    return;
+  }
+  if (a.kind === "ask") {
+    await setSession(lineUserId, flow.id, a.nextStep, session.data);
+    await reply(a.prompt, a.choices ?? []);
+    return;
+  }
+
+  // 收齊了。先回一句「正在寫」再跑 —— replyToken 等不到任務跑完（約一分鐘），
+  // 結果只能用 push 送。順序不能對調。
+  await clearSession(lineUserId);
   if (ev.replyToken) {
     await replyMessage(ev.replyToken, textMessages(
-      `收到，正在用媽爹的品牌設定寫「${parsed.topic}」的${parsed.entry.label}，大約一分鐘。`,
+      `收到，正在用媽爹的品牌設定寫${flow.trigger}，大約一分鐘。`,
     )).catch((e) => console.error("[line] reply failed:", e?.message ?? e));
   }
-  await runAndPush(lineUserId, parsed.entry, parsed.topic);
+  await runAndPush(lineUserId, flow, a.taskId, a.tier, a.inputs);
 }
 
 router.post("/webhook", async (req: Request, res: Response) => {
@@ -237,6 +257,6 @@ router.get("/health", async (_req, res) => {
     bound: !!bind,
     brandId: bind?.brandId ?? null,
     brandName,
-    menu: LINE_MENU.map((m) => m.label),
+    flows: FLOWS.map((f) => f.trigger),
   });
 });

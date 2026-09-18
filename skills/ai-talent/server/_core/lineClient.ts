@@ -78,6 +78,28 @@ export async function pushMessage(to: string, messages: LineMessage[]): Promise<
   await call("/message/push", { to, messages: capped(messages) });
 }
 
+/**
+ * 把 quick reply 掛到「最後一則」訊息上。
+ *
+ * LINE 只認最後一則訊息的 quickReply —— 掛在前面幾則會被安靜忽略，
+ * 按鈕就不會出現，而且 API 不會報錯。這是很容易踩到又很難查的坑。
+ *
+ * 上限 13 個；標籤 ≤ 20 字（超過 LINE 會整批退回，見 hermes 的慣例）。
+ */
+export function withQuickReply(
+  messages: LineMessage[],
+  choices: Array<{ label: string; send: string }>,
+): LineMessage[] {
+  if (messages.length === 0 || choices.length === 0) return messages;
+  const items = choices.slice(0, 13).map((c) => ({
+    type: "action",
+    action: { type: "message", label: c.label.slice(0, 20), text: c.send },
+  }));
+  const out = [...messages];
+  out[out.length - 1] = { ...(out[out.length - 1] as any), quickReply: { items } };
+  return out;
+}
+
 /** LINE 單則文字上限 5000 字；超過就切成多則（最多 5 則，等於 25000 字）。 */
 export function textMessages(text: string): LineTextMessage[] {
   const t = (text ?? "").trim();

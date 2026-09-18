@@ -1,20 +1,26 @@
 name: Admin — Build & register the LINE rich menu
 
-# 2026-09-18：產六格選單圖 → 建立 rich menu → 上傳圖 → 設為所有使用者的預設。
+# 2026-09-18：把設計稿的六格綁上可點區域 → 建立 rich menu → 上傳 → 設為預設。
+# 圖由 CJ 自己設計；這支只做「圖以外的另一半」，因為區域與動作只能透過
+# Messaging API 設定，在 LINE 後台上傳圖片是綁不上動作的。
 #
 # 為什麼在 CI 跑而不是本機跑：註冊要用 channel access token，那支只存在 GitHub
 # repository secret 與 VM 的 .env 裡。在 CI 跑，憑證不必落到任何人的筆電上，
 # 也不會有「誰的機器上還留著一份」的問題。圖在 runner 上現產，repo 裡不放二進位檔。
 #
 # 手動觸發（不用 push），因為這會直接改變所有好友看到的選單。
-# 改選單內容：編輯 scripts/line/richmenu.py 的 CELLS，並同步
-# server/routes/lineWebhookRoute.ts 的 LINE_MENU（label 必須逐字相同），再跑這支。
+# 改選單內容：編輯 scripts/line/richmenu.py 的 CELL_LABELS，並同步
+# server/_core/lineFlows.ts 的 trigger / PENDING_TRIGGERS（逐字相同），再跑這支。
 
 on:
   workflow_dispatch:
     inputs:
+      image_path:
+        description: "設計稿在 repo 裡的路徑（例：assets/line/richmenu.png）"
+        required: true
+        type: string
       dry_run:
-        description: "只產圖不註冊（圖會留在 artifact 供檢查）"
+        description: "只檢查圖與座標，不註冊"
         type: boolean
         default: false
 
@@ -25,13 +31,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install CJK font + Pillow
-        # 沒有中文字型的話 PIL 會把每個中文字畫成豆腐方塊，而且不會報錯 ——
-        # 腳本裡因此有一道硬檢查，找不到字型就直接停，不交出壞圖。
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq fonts-noto-cjk
-          python -m pip install --quiet --upgrade pillow
+      - name: Install Pillow
+        run: python -m pip install --quiet --upgrade pillow
 
       - name: Build (and register) the rich menu
         env:
@@ -42,15 +43,12 @@ jobs:
             echo "✗ 尚未設定 repository secret LINE_CHANNEL_ACCESS_TOKEN"
             exit 1
           fi
+          IMG="${{ inputs.image_path }}"
+          [ -f "$IMG" ] || { echo "✗ 找不到設計稿：$IMG"; exit 1; }
           if [ "${{ inputs.dry_run }}" = "true" ]; then
-            python scripts/line/richmenu.py --out richmenu.jpg --dry-run
+            python scripts/line/richmenu.py --image "$IMG" --dry-run
           else
-            python scripts/line/richmenu.py --out richmenu.jpg
+            python scripts/line/richmenu.py --image "$IMG"
           fi
 
-      - name: Keep the image for inspection
-        uses: actions/upload-artifact@v4
-        with:
-          name: richmenu
-          path: richmenu.jpg
-          retention-days: 7
+

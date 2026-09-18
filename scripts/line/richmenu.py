@@ -1,24 +1,37 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-媽爹講故事 LINE OA 的六格 rich menu —— 產圖 + 註冊 + 設為預設。
+媽爹講故事 LINE OA 六格 rich menu —— 綁定可點區域、註冊、設為預設。
 
-2026-09-18 (CJ「我還沒做 rich menu，我該如何設計六格的 rich menu?」).
+2026-09-18。圖由 CJ 自己設計（AI文宣助理，六格 + 標題帶 + logo），
+這支腳本負責圖以外的另一半：**把六個可點區域和動作綁上去**。
 
-為什麼不用 LINE 官方帳號管理後台做：
-  後台那個拖拉編輯器只給「連結 / 優惠券 / 文字」三種動作，其中「文字」是按下去
-  立刻送出。我們要的是 postback + inputOption:"openKeyboard" + fillInText ——
-  按下去在輸入框「預填」前綴再跳鍵盤，讓使用者接著打主題，一則訊息同時帶著
-  「要做什麼」與「要寫什麼」。伺服器因此完全不需要 per-user 狀態
-  （見 server/routes/lineWebhookRoute.ts 的說明）。那個動作型別只有
-  Messaging API 的 rich menu 有，所以這支腳本存在。
+在 LINE 官方帳號後台上傳圖片，那六格是不會有任何動作的 —— 區域座標與動作
+只能透過 Messaging API 設定。這就是這支腳本存在的理由。
 
-fillInText 必須與 lineWebhookRoute.ts 的 LINE_MENU 標籤「逐字相符」，
-否則按鈕送出的前綴會解析不出任務。CELLS 是這件事的唯一來源，兩邊都照它。
+## 動作型別：message，不是 postback
 
-用法（需要 LINE_CHANNEL_ACCESS_TOKEN）：
-  python scripts/line/richmenu.py --out richmenu.jpg --dry-run   # 只產圖，不呼叫 API
-  python scripts/line/richmenu.py                                 # 產圖 + 註冊 + 設預設
+照 hermes-candidate-linebot-starter 的架構慣例：
+
+    "The Rich Menu is a start surface, not a side-effect button bank.
+     Use `message` actions for initial visible flows unless postback
+     handling has been fully tested."
+
+按下去送出一則固定文字（「FB文案」），伺服器收到後回一句引導 —— 引導式流程
+在 server/_core/lineFlows.ts。message 動作的好處是完全可觀察：她送了什麼、
+我們收到什麼，在對話紀錄裡一目了然，出問題時查得動。
+
+## 座標怎麼來的
+
+圖的上方約 28.5% 是標題帶（AI文宣助理 + logo），六格在下方排成 2 列 × 3 欄。
+所以區域**不是**整張圖的 2×3 均分。標題帶本身不綁動作 —— 點到那裡沒反應，
+這是對的，它不是按鈕。
+
+TITLE_BAND 可以用 --title-band 微調，不必改程式。
+
+用法：
+  python scripts/line/richmenu.py --image menu.png --dry-run   # 只檢查，不呼叫 API
+  python scripts/line/richmenu.py --image menu.png             # 註冊 + 設為預設
 """
 
 import argparse
@@ -26,118 +39,50 @@ import io
 import json
 import os
 import sys
+import urllib.error
 import urllib.request
 
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image
 
-# ── 版面 ──────────────────────────────────────────────────────────────────────
-# 六格只能是 2 列 × 3 欄。另一個官方尺寸 2500×843 切六格每格只有 416px 寬，
-# 放三四個中文字加一行說明會擠爆。
+# LINE 只接受這幾個尺寸，其中六格版面只有 2500×1686 放得下。
 MENU_W, MENU_H = 2500, 1686
 COLS, ROWS = 3, 2
-CELL_W = MENU_W // COLS          # 833（最後一欄補到 834）
-CELL_H = MENU_H // ROWS          # 843
 
-# ── 配色 ──────────────────────────────────────────────────────────────────────
-# 依 OnBrand 設計系統：色彩只承擔功能，不做裝飾。六格一律中性卡片，
-# 只有序號標記用一個暖色 accent（讓使用者知道這六格是同一組工具）。
-BG        = (250, 250, 249)   # 卡片底
-PAGE      = (231, 229, 228)   # 格線／外緣
-INK       = (28, 25, 23)      # 主要文字
-MUTED     = (120, 113, 108)   # 說明文字
-ACCENT    = (234, 88, 12)     # OnBrand 橘，只用在標記
+# 標題帶占整張圖高度的比例（AI文宣助理 + logo 那一條）。
+TITLE_BAND = 0.285
 
-FONT_PATHS = [
-    "C:/Windows/Fonts/msjhbd.ttc",                              # 微軟正黑體 Bold
-    "C:/Windows/Fonts/msjh.ttc",
-    "/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc",      # ubuntu runner
-    "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
-    "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc",
-    "/System/Library/Fonts/PingFang.ttc",                       # macOS
+# 順序 = 圖上的閱讀順序：上排左→右，下排左→右。
+# 文字必須與圖上、以及 lineFlows.ts 的 trigger / PENDING_TRIGGERS 逐字相同 ——
+# message 動作送出的就是這幾個字，對不上就等於按鈕沒反應。
+CELL_LABELS = [
+    "蹭熱點", "FB文案", "IG文案",
+    "活動宣傳", "LINE推播", "故事推廣",
 ]
 
 
-class Cell:
-    def __init__(self, label: str, task_id: str, hint: str):
-        self.label = label      # ＝ fillInText 前綴（不含冒號）
-        self.task_id = task_id
-        self.hint = hint
+def load_and_fit(path: str) -> bytes:
+    """
+    把設計稿變成 LINE 收得下的圖：2500×1686、JPEG、1MB 以內。
 
+    比例不同時用「填滿後置中裁切」而不是直接拉伸 —— 拉伸會讓字變形，
+    而且六格的邊界會跟這裡算出來的座標對不上。裁切只會切掉最外圈的留白。
+    """
+    img = Image.open(path).convert("RGB")
+    src_ratio = img.width / img.height
+    dst_ratio = MENU_W / MENU_H
+    if abs(src_ratio - dst_ratio) > 0.001:
+        print(f"  原圖 {img.width}×{img.height}（比例 {src_ratio:.3f}），"
+              f"目標 {MENU_W}×{MENU_H}（{dst_ratio:.3f}）→ 置中裁切")
+        if src_ratio > dst_ratio:          # 太寬 → 裁左右
+            new_w = int(img.height * dst_ratio)
+            left = (img.width - new_w) // 2
+            img = img.crop((left, 0, left + new_w, img.height))
+        else:                              # 太高 → 裁上下
+            new_h = int(img.width / dst_ratio)
+            top = (img.height - new_h) // 2
+            img = img.crop((0, top, img.width, top + new_h))
+    img = img.resize((MENU_W, MENU_H), Image.LANCZOS)
 
-# 改這裡就等於改選單。動完要同步 lineWebhookRoute.ts 的 LINE_MENU，
-# 兩邊的 label 必須逐字相同。
-CELLS = [
-    Cell("FB貼文",   "fb-30-caption-short",  "單篇臉書貼文"),
-    Cell("IG貼文",   "ig-30-caption-short",  "單篇 IG 貼文"),
-    Cell("IG輪播",   "ig-60-carousel-7",     "七張卡講完一個故事"),
-    Cell("限時動態", "ig-30-story-text",     "限動文字 + 互動貼圖"),
-    Cell("節慶文",   "fb-30-countdown-1day", "節慶 / 倒數應景文"),
-    Cell("廣告文案", "fb-30-ad-primary",     "投放用的主文案"),
-]
-
-
-def load_font(size: int, bold: bool = False) -> ImageFont.FreeTypeFont:
-    for path in FONT_PATHS:
-        if bold and "Bold" not in path and "bd" not in path:
-            continue
-        try:
-            return ImageFont.truetype(path, size)
-        except Exception:
-            pass
-    for path in FONT_PATHS:
-        try:
-            return ImageFont.truetype(path, size)
-        except Exception:
-            pass
-    # 沒有中文字型就會畫成一排豆腐方塊，與其交出一張壞圖不如直接停下來。
-    raise SystemExit(
-        "找不到中文字型。ubuntu runner 請先 apt-get install -y fonts-noto-cjk。"
-    )
-
-
-def centered(draw: ImageDraw.ImageDraw, text: str, font, cx: int, y: int, fill):
-    l, t, r, b = draw.textbbox((0, 0), text, font=font)
-    draw.text((cx - (r - l) / 2, y), text, font=font, fill=fill)
-    return b - t
-
-
-def build_image() -> Image.Image:
-    img = Image.new("RGB", (MENU_W, MENU_H), PAGE)
-    draw = ImageDraw.Draw(img)
-
-    f_label = load_font(96, bold=True)
-    f_hint = load_font(44)
-    f_mark = load_font(40, bold=True)
-
-    GAP = 6  # 格線寬度：用底色透出來當分隔，不畫線，版面比較乾淨
-    for i, cell in enumerate(CELLS):
-        col, row = i % COLS, i // COLS
-        x0 = col * CELL_W + (GAP if col > 0 else 0)
-        y0 = row * CELL_H + (GAP if row > 0 else 0)
-        x1 = (col + 1) * CELL_W if col < COLS - 1 else MENU_W
-        y1 = (row + 1) * CELL_H if row < ROWS - 1 else MENU_H
-        draw.rectangle([x0, y0, x1, y1], fill=BG)
-
-        cx = (x0 + x1) // 2
-
-        # 左上角的小序號標記 —— 唯一用到 accent 的地方，功能是「這六格是一組」
-        mx, my = x0 + 56, y0 + 56
-        draw.ellipse([mx, my, mx + 56, my + 56], fill=ACCENT)
-        l, t, r, b = draw.textbbox((0, 0), str(i + 1), font=f_mark)
-        draw.text((mx + 28 - (r - l) / 2, my + 28 - (b - t) / 2 - t),
-                  str(i + 1), font=f_mark, fill=(255, 255, 255))
-
-        # 標籤 + 說明，垂直置中
-        block_h = 96 + 28 + 44
-        ty = y0 + (y1 - y0 - block_h) // 2
-        centered(draw, cell.label, f_label, cx, ty, INK)
-        centered(draw, cell.hint, f_hint, cx, ty + 96 + 28, MUTED)
-
-    return img
-
-
-def to_jpeg_bytes(img: Image.Image) -> bytes:
-    """LINE 的上限是 1MB。從高品質往下降，第一個過關的就用。"""
     for q in (92, 86, 80, 72, 64):
         buf = io.BytesIO()
         img.save(buf, format="JPEG", quality=q, optimize=True)
@@ -145,28 +90,26 @@ def to_jpeg_bytes(img: Image.Image) -> bytes:
         if len(data) <= 1_000_000:
             print(f"  JPEG quality={q}, {len(data)/1024:.0f} KB")
             return data
-    raise SystemExit("壓不到 1MB 以下 —— 版面太複雜，請簡化。")
+    raise SystemExit("壓不到 1MB 以下 —— 請把圖的細節簡化一點。")
 
 
-def areas() -> list:
-    """六格的可點區域。座標是相對整張圖的像素，與 build_image 的切法一致。"""
+def areas(title_band: float) -> list:
+    """六格的可點區域。標題帶不綁動作。"""
+    top = int(MENU_H * title_band)
+    grid_h = MENU_H - top
+    cell_h = grid_h // ROWS
+    cell_w = MENU_W // COLS
     out = []
-    for i, cell in enumerate(CELLS):
+    for i, label in enumerate(CELL_LABELS):
         col, row = i % COLS, i // COLS
-        x = col * CELL_W
-        y = row * CELL_H
-        w = (MENU_W - x) if col == COLS - 1 else CELL_W
-        h = (MENU_H - y) if row == ROWS - 1 else CELL_H
+        x = col * cell_w
+        y = top + row * cell_h
+        w = (MENU_W - x) if col == COLS - 1 else cell_w
+        h = (MENU_H - y) if row == ROWS - 1 else cell_h
         out.append({
             "bounds": {"x": x, "y": y, "width": w, "height": h},
-            "action": {
-                "type": "postback",
-                "data": f"task={cell.task_id}",
-                # 這兩個欄位就是整個設計的樞紐：預填前綴 + 直接跳鍵盤。
-                # 少了它們，使用者按下去只會送出一則沒有主題的空指令。
-                "inputOption": "openKeyboard",
-                "fillInText": f"{cell.label}：",
-            },
+            # message 動作：按下去送出這幾個字，伺服器回一句引導。
+            "action": {"type": "message", "label": label[:20], "text": label},
         })
     return out
 
@@ -189,30 +132,33 @@ def api(path: str, payload: bytes, content_type: str, host: str = "https://api.l
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--out", default="richmenu.jpg", help="產出的圖檔路徑")
-    ap.add_argument("--dry-run", action="store_true", help="只產圖，不呼叫 LINE API")
+    ap.add_argument("--image", required=True, help="設計稿（png / jpg 皆可）")
+    ap.add_argument("--title-band", type=float, default=TITLE_BAND,
+                    help=f"標題帶占的高度比例，預設 {TITLE_BAND}")
+    ap.add_argument("--dry-run", action="store_true", help="只檢查圖與座標，不呼叫 API")
     args = ap.parse_args()
 
-    print("1. 產圖")
-    img = build_image()
-    data = to_jpeg_bytes(img)
-    with open(args.out, "wb") as f:
-        f.write(data)
-    print(f"   → {args.out}")
+    print("1. 處理圖片")
+    data = load_and_fit(args.image)
+
+    spec = areas(args.title_band)
+    print("2. 可點區域")
+    for a, label in zip(spec, CELL_LABELS):
+        b = a["bounds"]
+        print(f"   {label:6} x={b['x']:5} y={b['y']:5} {b['width']}×{b['height']}")
 
     if args.dry_run:
-        print("\n--dry-run：未呼叫 API。區域設定：")
-        print(json.dumps(areas(), ensure_ascii=False, indent=2))
+        print("\n--dry-run：未呼叫 API。")
         return
 
-    print("2. 建立 rich menu")
+    print("3. 建立 rich menu")
     body = {
         "size": {"width": MENU_W, "height": MENU_H},
-        # 預設收合：使用者要讀的是一整篇長文案，選單開著會吃掉半個螢幕。
+        # 預設收合：她要讀的是一整篇長文案，選單開著會吃掉半個螢幕。
         "selected": False,
-        "name": f"momdad-6cell-{len(CELLS)}",
-        "chatBarText": "選內容",
-        "areas": areas(),
+        "name": "momdad-ai-assistant-6",
+        "chatBarText": "選功能",
+        "areas": spec,
     }
     created = api("/v2/bot/richmenu",
                   json.dumps(body, ensure_ascii=False).encode("utf-8"),
@@ -222,19 +168,18 @@ def main() -> None:
         raise SystemExit(f"沒拿到 richMenuId：{created}")
     print(f"   → {rid}")
 
-    print("3. 上傳圖片")
+    print("4. 上傳圖片")
     # 圖片走 api-data.line.me，不是 api.line.me —— 打錯 host 會回 404。
     api(f"/v2/bot/richmenu/{rid}/content", data, "image/jpeg",
         host="https://api-data.line.me")
     print("   → ok")
 
-    print("4. 設為所有使用者的預設選單")
+    print("5. 設為所有使用者的預設選單")
     api(f"/v2/bot/user/all/richmenu/{rid}", b"", "application/json")
     print("   → ok")
 
     print(f"\n✓ 完成。richMenuId={rid}")
-    print("  舊的選單不會自動刪除（LINE 允許多個並存，只是預設換成新的）。")
-    print("  要清掉舊的：GET /v2/bot/richmenu/list 找出來，再 DELETE /v2/bot/richmenu/{id}")
+    print("  照 hermes 的 launch gate：現在要用真帳號逐一點過六格才算數。")
 
 
 if __name__ == "__main__":
