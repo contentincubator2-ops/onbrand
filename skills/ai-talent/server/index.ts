@@ -30,6 +30,7 @@ import { authRouter } from "./auth/authRouter";
 import { exportRouter } from "./routes/exportRoute";
 import { a2aStreamRouter } from "./routes/a2aStreamRoute";
 import { slackOAuthRouter } from "./routes/slackOAuthRoute";
+import { lineWebhookRouter } from "./routes/lineWebhookRoute";
 import pmRouter from "./routes/pmRoute";
 import { brandBrainRouter } from "./routes/brandBrainRoute";
 import { exportsRouter } from "./routes/exportsRoute";
@@ -169,6 +170,12 @@ app.post(
     }
   },
 );
+
+// 2026-09-18 LINE OA webhook — 同樣必須搶在 express.json() 之前。
+// LINE 的簽章是對「原始 body 位元組」做 HMAC-SHA256：一旦 json 先解析過，
+// 再 stringify 回去的鍵序與空白都可能不同，驗簽就永遠失敗（跟上面 Stripe
+// 那條是同一個坑）。掛在這裡讓 express.raw() 贏得第一次讀取。
+app.use("/line", express.raw({ type: "*/*", limit: "1mb" }), lineWebhookRouter);
 
 // SEC-B-08 (2026-05-04): cap JSON body size. Per-field check below is the
 // real DoS protection; body limit just caps overall request size.

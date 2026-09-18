@@ -1053,6 +1053,55 @@ const runSquadAutoSingleFlight = singleFlightPerUser({
   maxConcurrent: RUN_SQUAD_AUTO_MAX_CONCURRENT_PER_USER,
 });
 
+/**
+ * taskId → { template, config }，全站唯一一份查表順序。
+ *
+ * 2026-09-18：抽出來的原因是 LINE webhook（server/routes/lineWebhookRoute.ts）
+ * 也要從 taskId 跑任務，而它不是 tRPC procedure，拿不到這裡的閉包。與其在
+ * webhook 裡再手抄一份這條 20 段的 ?? 鏈（這個 repo 已經有六份手抄的變體，
+ * 更新時漏掉其中一份就是「某個平台的新任務卡在某條路徑上找不到」的老 bug），
+ * 不如就地匯出。dev 分支上這件事已經收斂成 taskRegistry，等對齊時這支會被它取代。
+ *
+ * 順序有意義：60s 的 template + config 必須「成對」存在才算命中，否則落回 30s
+ * 池 —— 有些 taskId 在兩邊都有同名項目，只取其一會配出不成對的組合。
+ */
+export async function resolveTaskForRun(
+  rawTaskId: string,
+): Promise<{ template: any; config: any }> {
+  const taskId = normalizeTaskId(rawTaskId);
+  const tier60Template =
+    getFB60Template(taskId) ?? getIG60Template(taskId) ??
+    getYT60Template(taskId) ?? getMulti60Template(taskId);
+  const tier60Config =
+    getFB60OrchestraConfig(taskId) ?? getIG60OrchestraConfig(taskId) ??
+    getYT60OrchestraConfig(taskId) ?? getMulti60OrchestraConfig(taskId);
+  if (tier60Template && tier60Config) {
+    return { template: tier60Template, config: tier60Config };
+  }
+  const template =
+    FB_30S_TASKS.find((t) => t.id === taskId) ??
+    IG_30S_TASKS.find((t) => t.id === taskId) ??
+    YT_30S_TASKS.find((t) => t.id === taskId) ??
+    TT_30S_TASKS.find((t) => t.id === taskId) ??
+    LI_30S_TASKS.find((t) => t.id === taskId) ??
+    EMAIL_30S_TASKS.find((t) => t.id === taskId) ??
+    PR_30S_TASKS.find((t) => t.id === taskId) ??
+    BRAND_30S_TASKS.find((t) => t.id === taskId) ??
+    RESEARCH_30S_TASKS.find((t) => t.id === taskId) ??
+    KOL_30S_TASKS.find((t) => t.id === taskId) ??
+    WEBSITE_30S_TASKS.find((t) => t.id === taskId) ??
+    findPackTemplate(taskId);
+  if (!template) throw new Error(`Unknown task id: ${taskId}`);
+  const { getOrchestraConfig: _getFB } = await import("../_core/quickTaskFB");
+  const config =
+    _getFB(taskId) ?? getIGOrchestraConfig(taskId) ?? getYTOrchestraConfig(taskId) ??
+    getTTOrchestraConfig(taskId) ?? getLIOrchestraConfig(taskId) ?? getEmailOrchestraConfig(taskId) ??
+    getPROrchestraConfig(taskId) ?? getBrandOrchestraConfig(taskId) ?? getResearchOrchestraConfig(taskId) ??
+    getKOLOrchestraConfig(taskId) ?? getWebsiteOrchestraConfig(taskId) ?? findPackOrchestraConfig(taskId);
+  if (!config) throw new Error(`No config for: ${taskId}`);
+  return { template, config };
+}
+
 export const quickTaskRouter = router({
   list: protectedProcedure.query(() => {
     return Object.values(TASKS).map((t) => ({
@@ -1508,37 +1557,8 @@ export const quickTaskRouter = router({
       const scope = { productId: input.productId ?? null, eventId: input.eventId ?? null };
 
       // Pick template + config (same priority chain as before).
-      const tier60Template =
-        getFB60Template(input.taskId) ?? getIG60Template(input.taskId) ??
-        getYT60Template(input.taskId) ?? getMulti60Template(input.taskId);
-      const tier60Config =
-        getFB60OrchestraConfig(input.taskId) ?? getIG60OrchestraConfig(input.taskId) ??
-        getYT60OrchestraConfig(input.taskId) ?? getMulti60OrchestraConfig(input.taskId);
-      let template: any = null; let config: any = null;
-      if (tier60Template && tier60Config) {
-        template = tier60Template; config = tier60Config;
-      } else {
-        template =
-          FB_30S_TASKS.find((t) => t.id === input.taskId) ??
-          IG_30S_TASKS.find((t) => t.id === input.taskId) ??
-          YT_30S_TASKS.find((t) => t.id === input.taskId) ??
-          TT_30S_TASKS.find((t) => t.id === input.taskId) ??
-          LI_30S_TASKS.find((t) => t.id === input.taskId) ??
-          EMAIL_30S_TASKS.find((t) => t.id === input.taskId) ??
-          PR_30S_TASKS.find((t) => t.id === input.taskId) ??
-          BRAND_30S_TASKS.find((t) => t.id === input.taskId) ??
-          RESEARCH_30S_TASKS.find((t) => t.id === input.taskId) ??
-          KOL_30S_TASKS.find((t) => t.id === input.taskId) ??
-          WEBSITE_30S_TASKS.find((t) => t.id === input.taskId) ??
-        findPackTemplate(input.taskId);
-        if (!template) throw new Error(`Unknown task id: ${input.taskId}`);
-        const { getOrchestraConfig: _getFB } = await import("../_core/quickTaskFB");
-        config =
-          _getFB(input.taskId) ?? getIGOrchestraConfig(input.taskId) ?? getYTOrchestraConfig(input.taskId) ??
-          getTTOrchestraConfig(input.taskId) ?? getLIOrchestraConfig(input.taskId) ?? getEmailOrchestraConfig(input.taskId) ??
-          getPROrchestraConfig(input.taskId) ?? getBrandOrchestraConfig(input.taskId) ?? getResearchOrchestraConfig(input.taskId) ?? getKOLOrchestraConfig(input.taskId) ?? getWebsiteOrchestraConfig(input.taskId) ?? findPackOrchestraConfig(input.taskId);
-        if (!config) throw new Error(`No config for: ${input.taskId}`);
-      }
+      const { template, config: resolvedConfig } = await resolveTaskForRun(input.taskId);
+      let config: any = resolvedConfig;
 
       // ── Input validation — BEFORE the cost guard / points deduction ──────
       // 2026-08-23 (CJ「tt-60-viral-rewrite 沒給爆款連結或主題時要出現錯誤提醒」):

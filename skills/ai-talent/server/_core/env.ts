@@ -81,6 +81,15 @@ const envSchema = z.object({
   MICROSOFT_CLIENT_ID:     z.string().optional(),
   MICROSOFT_CLIENT_SECRET: z.string().optional(),
 
+  // 2026-09-18 LINE Official Account（媽爹講故事）。憑證走 admin-write-line-secrets.yml
+  // 從 GitHub secret 寫進 VM .env，不經過對話也不進 repo。
+  // BIND_* 是這個 OA 代表哪一個品牌／用哪個帳號計費；沒設就整條路不服務，
+  // 不預設 fallback —— 錯的 brandId 會安靜地用別人的品牌大腦寫稿。
+  LINE_CHANNEL_ACCESS_TOKEN: z.string().optional(),
+  LINE_CHANNEL_SECRET:       z.string().optional(),
+  LINE_BIND_BRAND_ID:        z.string().optional(),
+  LINE_BIND_USER_ID:         z.string().optional(),
+
   // External services — optional
   RESEND_API_KEY:    z.string().optional(),
   SENDGRID_API_KEY:  z.string().optional(),
