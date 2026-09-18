@@ -31,6 +31,7 @@ import { exportRouter } from "./routes/exportRoute";
 import { a2aStreamRouter } from "./routes/a2aStreamRoute";
 import { slackOAuthRouter } from "./routes/slackOAuthRoute";
 import { lineWebhookRouter } from "./routes/lineWebhookRoute";
+import { agentApiRouter } from "./routes/agentApiRoute";
 import pmRouter from "./routes/pmRoute";
 import { brandBrainRouter } from "./routes/brandBrainRoute";
 import { exportsRouter } from "./routes/exportsRoute";
@@ -372,6 +373,9 @@ app.use("/api/exports", exportsRouter);
 app.use("/api/missions", missionSquadRouter);
 app.use("/api/project-sync", projectSyncCallbackRouter);
 app.use("/api/oauth", cloudOAuthRouter);
+// 2026-09-18：給 Hermes（同一台 VM）呼叫的任務 API。Bearer 金鑰 + 品牌白名單，
+// 計費對象由 brands.userId 決定而不是呼叫端指定。見 routes/agentApiRoute.ts。
+app.use("/api/agent", agentApiRouter);
 app.use("/api/squads/search", squadSearchRouter);
 app.use("/api/entity/search", entitySearchRouter);
 app.use("/api/manus", manusRouter);

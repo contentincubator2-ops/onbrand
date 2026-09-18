@@ -90,6 +90,13 @@ const envSchema = z.object({
   LINE_BIND_BRAND_ID:        z.string().optional(),
   LINE_BIND_USER_ID:         z.string().optional(),
 
+  // 2026-09-18 給 Hermes 呼叫的任務 API。沒設 AGENT_API_KEY 就整條路 503，
+  // 不是「不驗證直接開放」—— 這條 API 能花錢產內容。
+  // AGENT_API_BRAND_IDS 是逗號分隔的品牌白名單，沒設就一個都不允許：
+  // 金鑰外流時，沒有白名單等於可以把帳記到任何品牌頭上。
+  AGENT_API_KEY:        z.string().optional(),
+  AGENT_API_BRAND_IDS:  z.string().optional(),
+
   // External services — optional
   RESEND_API_KEY:    z.string().optional(),
   SENDGRID_API_KEY:  z.string().optional(),
