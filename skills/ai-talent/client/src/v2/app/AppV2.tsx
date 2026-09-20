@@ -76,6 +76,7 @@ const HubPerformancePage = React.lazy(() => import("../hub/pages/HubPerformanceP
 const HubPerformanceLeaderboardPage = React.lazy(() => import("../hub/pages/performance/PerformanceLeaderboardPage"));
 const HubPerformancePostsPage = React.lazy(() => import("../hub/pages/performance/PerformancePostsPage"));
 const HubScanPage = React.lazy(() => import("../hub/pages/ScanPage"));
+const BoothStylePage = React.lazy(() => import("../hub/pages/BoothStylePage"));
 const HubLiffWritePage = React.lazy(() => import("../hub/pages/LiffWritePage"));
 const HubLiffSharePage = React.lazy(() => import("../hub/pages/LiffSharePage"));
 const isHubHost = typeof window !== "undefined" && window.location.hostname.startsWith("experthub.");
@@ -83,7 +84,7 @@ const isHubHost = typeof window !== "undefined" && window.location.hostname.star
 // 2026-09-16 (CJ「login 之後找不到 experthub」): on the demo host, login lands on
 // /theater like the rest of OnBrand. Anything outside the demo's own routes
 // goes to /hub instead, so the booth never shows the OnBrand app.
-const HUB_HOST_PATHS = ["/hub", "/scan/", "/liff/", "/auth/", "/login", "/plan-expired", "/for-sales"];
+const HUB_HOST_PATHS = ["/hub", "/scan/", "/liff/", "/booth/", "/auth/", "/login", "/plan-expired", "/for-sales"];
 function HubHostGuard() {
   const { pathname } = useLocation();
   if (!isHubHost || HUB_HOST_PATHS.some((p) => pathname === p || pathname.startsWith(p))) return null;
@@ -307,6 +308,8 @@ export default function AppV2() {
 
         {/* Sales Hub — public: tracked-link landing + LIFF pages opened inside LINE */}
         <Route path="/scan/:code" element={<HubScanPage />} />
+        {/* 展場訪客貼自己文章的地方。網址裡的 token 就是身分，不需要登入。 */}
+        <Route path="/booth/style/:token" element={<BoothStylePage />} />
         <Route path="/liff/write" element={<HubLiffWritePage />} />
         <Route path="/liff/share" element={<HubLiffSharePage />} />
         {/* Sales Hub — HQ / marketing admin */}

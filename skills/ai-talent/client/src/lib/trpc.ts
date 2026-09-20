@@ -59,7 +59,7 @@ const authAwareFetch: typeof fetch = async (input, init) => {
     // /login. Only redirect when the visitor is on a PROTECTED route.
     const PUBLIC_PATHS = ["/", "/pricing", "/for-sales", "/terms", "/privacy", "/refund", "/plan-expired", "/login"];
     const path = window.location.pathname;
-    const isPublic = PUBLIC_PATHS.includes(path) || path.startsWith("/auth/") || path.startsWith("/scan/") || path.startsWith("/liff/");
+    const isPublic = PUBLIC_PATHS.includes(path) || path.startsWith("/auth/") || path.startsWith("/scan/") || path.startsWith("/liff/") || path.startsWith("/booth/");
     const w = window as any;
     if (!isPublic && !w.__authRedirecting) {
       w.__authRedirecting = true;

@@ -39,6 +39,7 @@ import {
   hubWhatsAppVerifyHandler,
   hubWhatsAppWebhookHandler,
 } from "./platform/routes/hubRoutes";
+import { boothPublicRouter } from "./platform/routes/boothRoutes";
 import { publicAgentsRoute } from "./platform/routes/publicAgentsRoute";
 import { closeDb, pingDb, pingSoworkDb, getDb } from "./db";
 import { sql } from "drizzle-orm";
@@ -294,6 +295,9 @@ app.use(generatedImageUrlPrefix, express.static(
 // Sales Hub: /r/:code (tracked links), /mcp and /api/hub/scan — GET /r and
 // /mcp must win over the SPA fallback below.
 app.use(hubPublicRouter);
+// 2026-09-19: booth MCP + the style page API. Same mount point rationale as the
+// hub router — /mcp/booth is GET-shadowed by the SPA fallback further down.
+app.use(boothPublicRouter);
 
 const publicDir = join(process.cwd(), "public");
 if (existsSync(publicDir)) {
@@ -681,6 +685,14 @@ const server = app.listen(PORT, async () => {
     console.log("[migrate] hub_*: OK");
   } catch (err) {
     console.error("[migrate] hub tables failed:", err);
+  }
+  // Same reason as above: the booth flow has to work on a fresh demo database.
+  try {
+    const { ensureBoothTables } = await import("./platform/core/booth/boothStore");
+    await ensureBoothTables();
+    console.log("[migrate] booth_*: OK");
+  } catch (err) {
+    console.error("[migrate] booth tables failed:", err);
   }
   if (isRuntimeFeatureEnabled("BACKGROUND_WORKERS_ENABLED")) {
     console.log("[A2A] Orchestrator Worker started");
