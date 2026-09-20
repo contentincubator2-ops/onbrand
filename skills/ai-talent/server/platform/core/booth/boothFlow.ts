@@ -86,6 +86,8 @@ export async function createBrandBrain(args: {
   visitorId: number;
   company: string;
   website: string;
+  /** 展場在達拉斯，所以預設英文。Hermes 依對話語言覆寫。 */
+  language?: "en-US" | "zh-TW";
 }): Promise<CreateBrainResult> {
   const visitor = await loadVisitor(args.visitorId);
   const company = args.company.trim().slice(0, 200);
@@ -123,6 +125,19 @@ export async function createBrandBrain(args: {
     );
   } catch (e: any) {
     console.error("[booth] brand_members seed failed:", e?.message ?? e);
+  }
+
+  // 沒設市場的品牌會落到 brandMarket 的預設值 TW / zh-TW —— 那會讓一家美國
+  // 公司拿到中文貼文（第一次實測就是這樣：GoPro 收到一篇中文的）。
+  // 欄位是 2026-07-17 多市場那次加的；萬一環境還沒有，不該讓整個品牌建不起來。
+  const language = args.language ?? "en-US";
+  try {
+    await localPool.execute(
+      `UPDATE brands SET targetCountry = ?, outputLanguage = ? WHERE id = ?`,
+      [language === "zh-TW" ? "TW" : "US", language, brandId],
+    );
+  } catch (e: any) {
+    console.warn("[booth] could not set brand market:", e?.message ?? e);
   }
 
   await updateVisitor(visitor.id, { brandId, company, website });
@@ -316,7 +331,86 @@ export async function publishStyleWhenReady(args: {
   return false;
 }
 
-// ── 5. 目前狀態（Hermes 每回合先問這個，才知道走到哪） ──────────────────────
+// ── 5. 照他的寫法寫一篇 ─────────────────────────────────────────────────────
+
+export interface WritePostResult {
+  topic: string;
+  caption: string;
+  chars: number;
+  /** 落在從範例量出來的字數區間內嗎 —— 這就是「像不像」的驗收標準。 */
+  inRange: boolean;
+  expected: { minChars: number; maxChars: number };
+  say: string;
+}
+
+/**
+ * 用他自己的寫法，寫一篇關於他自己產品的貼文。
+ *
+ * 走 brandTaskCard.dryRun 而不是正式執行：試寫不會 recordTaskRun，訪客的
+ * /projects 不會被展場產生的半成品塞滿，而且它會回「有沒有落在字數區間」
+ * —— 那正是這張卡的驗收標準。
+ *
+ * 沒給題目就挑一個剛剛盤出來的產品。展場上這一步最有說服力的不是「AI 會寫」，
+ * 是「它寫的是**你的**產品、用**你的**寫法」，所以預設值一定要是他的東西。
+ */
+export async function writePost(args: { visitorId: number; topic?: string }): Promise<WritePostResult> {
+  const visitor = await loadVisitor(args.visitorId);
+  if (!visitor.brandId || !visitor.userId) throw new BoothError("No brand yet — call create_brand_brain first.");
+
+  const { listBrandTaskCards } = await import("../../../strategy/core/brandTaskCards");
+  const [card] = await listBrandTaskCards(visitor.brandId);
+  if (!card) {
+    throw new BoothError(
+      "I haven't learned how they write yet.",
+      "Send them the link from get_style_link and wait until get_state says ready_to_write.",
+    );
+  }
+  if (card.status !== "ready") {
+    throw new BoothError(
+      card.status === "failed"
+        ? `Learning their style failed: ${card.lastError ?? "unknown error"}`
+        : "Still working out how they write — give it another moment.",
+      card.status === "failed" ? "Ask them to paste a different post." : "Poll get_state until it says ready_to_write.",
+    );
+  }
+
+  const topic = (args.topic ?? "").trim() || (await defaultTopic(visitor.brandId, visitor.company));
+  if (!topic) throw new BoothError("I need something to write about.", "Ask them which product to start with.");
+
+  const { appRouter } = await import("../../../routers");
+  const caller = appRouter.createCaller({ user: { id: visitor.userId } } as any);
+  const r = await caller.brandTaskCard.dryRun({
+    brandId: visitor.brandId,
+    cardId: card.id,
+    inputs: { topic },
+  });
+
+  return {
+    topic,
+    caption: r.caption,
+    chars: r.chars,
+    inRange: r.inRange,
+    expected: r.expected,
+    // 字數超出區間目前不是硬擋的——orchestra 只有在上限 ≤60 字時才真的截斷，
+    // 其餘只是把「字數 N-M 字」寫進 prompt 當軟性要求。英文品牌特別容易超，
+    // 因為區間是從字元數量出來的，而模型寫英文時把「字」當成 word 在抓。
+    // 所以這裡不假裝有擋到，而是給 Hermes 一個真的可用的下一步。
+    say: r.inRange
+      ? `Here's a post about ${topic}, written the way they write — ${r.chars} characters, inside the ${r.expected.minChars}-${r.expected.maxChars} range measured from their own sample.`
+      : `Here's a post about ${topic}. It came out at ${r.chars} characters, against the ${r.expected.minChars}-${r.expected.maxChars} their own sample suggested. Say so rather than glossing over it — and if they want it tighter, call write_post again with the topic plus something like "keep it to about ${Math.round(r.expected.maxChars / 6)} words".`,
+  };
+}
+
+/** 挑一個他自己的產品當題目；還沒盤到就退回公司名。 */
+async function defaultTopic(brandId: number, company: string | null): Promise<string> {
+  const [rows]: any = await localPool.execute(
+    `SELECT name FROM products WHERE brandId = ? ORDER BY id LIMIT 1`,
+    [brandId],
+  );
+  return String((rows as any[])[0]?.name ?? company ?? "").trim();
+}
+
+// ── 6. 目前狀態（Hermes 每回合先問這個，才知道走到哪） ──────────────────────
 
 export interface BoothState {
   visitorId: number;

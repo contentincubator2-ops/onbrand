@@ -26,6 +26,7 @@ import {
   getQuickPulse,
   publishStyleWhenReady,
   styleLink,
+  writePost,
 } from "../core/booth/boothFlow";
 import { ensureBoothTables, getVisitorById, upsertVisitor } from "../core/booth/boothStore";
 
@@ -86,15 +87,17 @@ async function buildBoothMcpServer() {
     {
       description:
         "Start a brand brain from a company name and website. Returns immediately; the site crawl and "
-        + "product inventory run in the background. Safe to call twice — the same visitor keeps one brand.",
+        + "product inventory run in the background. Safe to call twice — the same visitor keeps one brand. "
+        + "Set `language` to whatever the visitor is speaking — it decides what language their posts come out in.",
       inputSchema: {
         visitor_id: z.number().int().positive(),
         company: z.string().min(1).max(200),
         website: z.string().min(3).max(500),
+        language: z.enum(["en-US", "zh-TW"]).optional(),
       },
     },
-    async ({ visitor_id, company, website }) =>
-      guard(() => createBrandBrain({ visitorId: visitor_id, company, website })),
+    async ({ visitor_id, company, website, language }) =>
+      guard(() => createBrandBrain({ visitorId: visitor_id, company, website, language })),
   );
 
   server.registerTool(
@@ -134,6 +137,22 @@ async function buildBoothMcpServer() {
       inputSchema: { visitor_id: z.number().int().positive() },
     },
     async ({ visitor_id }) => guard(() => styleLink({ visitorId: visitor_id })),
+  );
+
+  server.registerTool(
+    "write_post",
+    {
+      description:
+        "Write one post in the visitor's own style, about their own product. Leave `topic` out and it picks "
+        + "a product we found on their site. Only works once get_state says ready_to_write. Takes 15-30 seconds. "
+        + "Returns whether the post landed inside the length range measured from their own writing — if it "
+        + "didn't, say so rather than glossing over it.",
+      inputSchema: {
+        visitor_id: z.number().int().positive(),
+        topic: z.string().max(400).optional(),
+      },
+    },
+    async ({ visitor_id, topic }) => guard(() => writePost({ visitorId: visitor_id, topic })),
   );
 
   server.registerTool(
