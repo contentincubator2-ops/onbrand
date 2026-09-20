@@ -2081,6 +2081,26 @@ ${polishTemplate.polishHint}`
       }
     }),
 
+  // 2026-09-16（CJ「要讓用戶可以有地方，輸入原文後改寫就好」）：不用先挑任務卡、
+  // 不用先示範三則貼文——貼上一整段既有文案，直接改寫成品牌調性版本。
+  // 邏輯在 server/content/core/rewriteDraft.ts（診斷→改寫→CTA 三段內部接力，
+  // 只回最終結果，不需要前端驅動多次呼叫）。
+  rewriteDraft: protectedProcedure
+    .input(z.object({
+      material: z.string().min(20).max(8000),
+      audience: z.string().max(120).optional(),
+      brandId: z.number().optional(),
+    }))
+    .mutation(async ({ input }) => {
+      const { rewriteDraft: run } = await import("../core/rewriteDraft");
+      try {
+        const result = await run(input);
+        return { ...result, ok: true as const };
+      } catch (e: any) {
+        return { rewritten: "", cta: "", whatChanged: "", ok: false as const, error: e?.message ?? String(e) };
+      }
+    }),
+
   // 2026-05-19 (CJ「想對某個影片 title 產出腳本或分鏡」): inline script
   // generation for a specific YT video title. User picks a title from the
   // yt-99-quarterly-strategy "12 影片 title" tab → modal calls this to

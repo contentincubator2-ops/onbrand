@@ -43,6 +43,7 @@ import { getStrategyPublicGenerationState } from "../lib/strategyContentEnvelope
 import { checkViralSource, platformLabelForTask, taskNeedsViralSource } from "../lib/viralSourceGuard";
 import { intakeExtraFields, missingRequiredInputs, type IntakeField } from "../lib/taskIntake";
 import TaskCardComposer, { type ComposerChannel } from "../../strategy/components/taskCard/TaskCardComposer";
+import RewriteDraftModal from "../components/quickTask/RewriteDraftModal";
 import {
   Avatar, Button, Card, CardBody, Chip, Input, Modal, ModalBody,
   ModalContent, ModalFooter, ModalHeader, Textarea,
@@ -555,6 +556,7 @@ function PlatformTaskPageInner() {
   // 2026-09-04 (CJ「加任務卡的符號，要在 facebook, instagram 等等頁面中，
   // 比較明顯的右上方」): 自建任務卡的入口。
   const [composerOpen, setComposerOpen] = useState(false);
+  const [rewriteOpen, setRewriteOpen] = useState(false);
   const [resumeCardId, setResumeCardId] = useState<string | null>(null);
   const [running, setRunning] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -1452,17 +1454,30 @@ function PlatformTaskPageInner() {
             沒選品牌就只顯示提示不給按 —— 卡是掛在品牌下面的，先問「哪個品牌」
             比按下去才說「請先選品牌」好。 */}
         {COMPOSER_CHANNELS.has(platform) && (
-          <div className="absolute top-6 right-6 z-20">
+          <div className="absolute top-6 right-6 z-20 flex items-center gap-2">
             {brandId ? (
-              <Button
-                size="sm"
-                color="primary"
-                variant="shadow"
-                startContent={<FontAwesomeIcon icon={faPlus} />}
-                onPress={() => { setResumeCardId(null); setComposerOpen(true); }}
-              >
-                {lang === "en" ? "New card" : "新增任務卡"}
-              </Button>
+              <>
+                {/* 2026-09-16（CJ「要讓用戶可以有地方，輸入原文後改寫就好」）：
+                    跟新增任務卡是姊妹動作，放在同一個角落——新增任務卡是教會
+                    AI 一種新寫法，這顆按鈕只改這一篇，貼上就結束。 */}
+                <Button
+                  size="sm"
+                  variant="flat"
+                  startContent={<FontAwesomeIcon icon={faWandMagicSparkles} />}
+                  onPress={() => setRewriteOpen(true)}
+                >
+                  {lang === "en" ? "Rewrite my text" : "貼上原文改寫"}
+                </Button>
+                <Button
+                  size="sm"
+                  color="primary"
+                  variant="shadow"
+                  startContent={<FontAwesomeIcon icon={faPlus} />}
+                  onPress={() => { setResumeCardId(null); setComposerOpen(true); }}
+                >
+                  {lang === "en" ? "New card" : "新增任務卡"}
+                </Button>
+              </>
             ) : (
               <Chip size="sm" variant="flat" className="text-default-500">
                 {lang === "en" ? "Pick a brand to add a card" : "選擇品牌後可新增任務卡"}
@@ -2831,6 +2846,12 @@ function PlatformTaskPageInner() {
         channelLabel={lang === "en" ? meta.label : meta.labelZh}
         initialCardId={resumeCardId}
         onPublished={() => { void listQuery?.refetch?.(); void ownCardsQuery?.refetch?.(); }}
+      />
+
+      <RewriteDraftModal
+        isOpen={rewriteOpen}
+        onClose={() => setRewriteOpen(false)}
+        brandId={brandId ?? null}
       />
     </div>
   );

@@ -30,7 +30,7 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 import {
 } from "@fortawesome/free-brands-svg-icons";
-import { Pencil, MessageCircle, Image as LucideImage, Wand2, Users as LucideUsers, Copy as LucideCopy } from "lucide-react";
+import { Pencil, MessageCircle, Image as LucideImage, Wand2, Users as LucideUsers, Copy as LucideCopy, BookOpen } from "lucide-react";
 import { trpc } from "../../../lib/trpc";
 import { showToastGlobal } from "../../../components/ui/Toast";
 import { PlatformMockup } from "../components/PlatformMockup";
@@ -60,12 +60,13 @@ import { findValidRunProductSelection, type RunProductImage } from "../lib/runPr
 import { pickImagePromptSeed } from "../lib/imagePromptSeed";
 import { buildAllDayIcs, downloadIcs } from "../lib/ics";
 import { parseRunOfShow } from "../lib/runOfShow";
+import { sourceLabel, sourceWhy } from "../lib/sourceVocabulary";
 import { tierLabel } from "../../platform/lib/tierVocabulary";
 import { useLang } from "../../../lib/i18n";
 import { fireNudge } from "../../platform/components/mia/miaNudges";
 import ReviewBar from "../../platform/components/review/ReviewBar";
 
-type Mode = "edit" | "chat" | "image" | "agent" | "regen" | "rewrite" | "publish";
+type Mode = "edit" | "chat" | "image" | "agent" | "regen" | "rewrite" | "publish" | "source";
 
 /* 2026-07-07 (CJ「參數儀表板 technical data 客戶看不懂，乾脆換成可以選擇
  * 不同 agent 幫他重寫」): the settings/telemetry panel is gone from the
@@ -389,6 +390,17 @@ export default function RunPage() {
 
   const [activeIdx, setActiveIdx] = useState(0);
   const [activeContentKind, setActiveContentKind] = useState<RunContentKind>("legacy");
+
+  // 2026-09-16（CJ「完成後，旁邊的文字框，呈現出如何思考這篇文章的邏輯」）：
+  // 不讓 AI 事後幫自己編理由（不可靠、容易是合理化）——顯示這張卡真實登記
+  // 過的出處（得獎案例／標竿品牌／爆款結構的具體來源＋拆解結論，evergreen
+  // 則是平台通則的既有理由）。跟報價頁「249 張任務卡中 208 張可追溯結構
+  // 出處」是同一件事，只是第一次真的顯示給跑完任務的人看。
+  const sourceTaskId = String(data?.mission?.taskId ?? "");
+  const cardDetailQ = trpc.quickTask.cardDetail.useQuery(
+    { taskId: sourceTaskId },
+    { enabled: !!sourceTaskId },
+  );
 
   // ── Mia contextual nudges for RunPage ────────────────────────────────
   // Fires when output first loads: tells user what they can do right now
@@ -2395,6 +2407,7 @@ export default function RunPage() {
               )}
               {/* 2026-07-07 (CJ「參數儀表板客戶看不懂 → 換成選不同 agent 重寫」) */}
               <ToolbarBtn icon={LucideUsers}   label={lang === "en" ? "Rewrite by agent" : "換人重寫"}   active={mode==="rewrite"}  onClick={() => setMode("rewrite")} />
+              <ToolbarBtn icon={BookOpen}      label={lang === "en" ? "Why it's written this way" : "為什麼這樣寫"} active={mode==="source"} onClick={() => setMode("source")} />
               <Divider />
               <ToolbarBtn icon={LucideCopy}    label={lang === "en" ? "Copy caption" : "複製文案"}       onClick={onCopy} highlight={copied} />
               {/* 2026-05-11 (CJ feedback「存 Mission 不要出現在工具列，只要在下方」):
@@ -2998,6 +3011,42 @@ export default function RunPage() {
                       <div className="bg-danger-50 border border-danger-200 rounded p-2 text-[12px] text-danger-700">
                         ⚠ {md.errors.slice(0, 2).join(" · ")}
                       </div>
+                    )}
+                  </>
+                );
+              })()}
+              {mode === "source" && (() => {
+                const detail: any = cardDetailQ.data;
+                if (cardDetailQ.isLoading) {
+                  return <p className="text-[12px] text-default-500">{lang === "en" ? "Loading…" : "載入中…"}</p>;
+                }
+                if (!detail) {
+                  return <p className="text-[12px] text-default-500">{lang === "en" ? "Source info unavailable for this task." : "這個任務目前拿不到出處資訊。"}</p>;
+                }
+                const src = detail.source ?? { type: "evergreen" };
+                return (
+                  <>
+                    <p className="text-tiny font-semibold">{sourceLabel(src.type, lang, { long: true })}</p>
+                    <p className="text-[12px] text-default-500 leading-relaxed">{sourceWhy(src.type, lang)}</p>
+                    <div className="bg-default-50 rounded-lg p-2.5 text-[12px] leading-relaxed space-y-1.5">
+                      {src.short && (
+                        <p><span className="font-semibold">{lang === "en" ? "Source: " : "具體出處："}</span>{src.short}</p>
+                      )}
+                      {src.metric && (
+                        <p><span className="font-semibold">{lang === "en" ? "Evidence: " : "傳播證據："}</span>{src.metric}{src.asOf ? (lang === "en" ? ` (measured ${src.asOf})` : `（${src.asOf} 量測）`) : ""}</p>
+                      )}
+                      {src.takeaway && (
+                        <p><span className="font-semibold">{lang === "en" ? "Structural takeaway: " : "拆解結論："}</span>{src.takeaway}</p>
+                      )}
+                      {detail.rationale && (
+                        <p className="whitespace-pre-wrap text-default-800">{detail.rationale}</p>
+                      )}
+                    </div>
+                    {detail.craftRef && (
+                      <details className="text-[12px]">
+                        <summary className="cursor-pointer text-default-500 select-none">{lang === "en" ? "Reference material used" : "實際參考的原始素材"}</summary>
+                        <p className="whitespace-pre-wrap text-default-700 mt-1.5 max-h-56 overflow-y-auto bg-default-50 rounded-lg p-2.5">{detail.craftRef}</p>
+                      </details>
                     )}
                   </>
                 );
