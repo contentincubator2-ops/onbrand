@@ -566,6 +566,11 @@ async function runStartupMigrations() {
     const { COMPETITOR_SNAPSHOT_DDL } = await import("./strategy/core/competitorSnapshot");
     await db.execute(sql.raw(COMPETITOR_SNAPSHOT_DDL));
     console.log("[migrate] competitor_snapshots: OK");
+
+    // 2026-09-21（CJ「把『可加購成效層』接上真正的購買路徑」）：加購申請。
+    const { ADDON_REQUESTS_DDL } = await import("./platform/core/addonRequests");
+    await db.execute(sql.raw(ADDON_REQUESTS_DDL));
+    console.log("[migrate] addon_requests: OK");
   } catch (err) {
     console.error("[migrate] startup migration error:", err);
   }

@@ -32,6 +32,7 @@ import { personaAgentRouter } from "../strategy/routers/personaAgentRouter";
 import { cloudDriveRouter } from "../platform/routers/cloudDriveRouter";
 import { publishRouter } from "../content/routers/publishRouter";
 import { billingRouter } from "../platform/routers/billingRouter";
+import { addonRouter } from "../platform/routers/addonRouter";
 import { opsRouter } from "../platform/routers/opsRouter";
 import { adminStatsRouter } from "../platform/routers/adminStatsRouter";
 // 2026-05-11 (CJ「Team / Agency 方案 + 多客戶 workspace」): multi-tenant container.
@@ -93,6 +94,7 @@ export const appRouter = router({
   cloudDrive:      cloudDriveRouter,
   publish:         publishRouter,
   billing:         billingRouter,
+  addon:           addonRouter,
   ops:             opsRouter,
   adminStats:      adminStatsRouter,
   review:          reviewRouter,

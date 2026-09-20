@@ -22,6 +22,7 @@ import PerformanceDashboard from "../components/PerformanceDashboard";
 import ConnectionsPanel from "../components/ConnectionsPanel";
 import { setMockBrandSeed } from "../components/perfMockData";
 import FanpageMonthlyReport from "../components/FanpageMonthlyReport";
+import AddonRequestModal from "../../platform/components/AddonRequestModal";
 
 type Source = {
   id: string;
@@ -116,6 +117,7 @@ function AgentLine({ agent }: { agent: AgentRef }) {
  */
 function PlanNudge() {
   const navigate = useNavigate();
+  const [addonOpen, setAddonOpen] = React.useState(false);
   const q = (trpc as any).billing?.getStatus?.useQuery
     ? (trpc as any).billing.getStatus.useQuery(undefined, { staleTime: 60_000, refetchOnWindowFocus: false })
     : { data: null };
@@ -131,14 +133,15 @@ function PlanNudge() {
           : " 下面全部是模擬數據 —— 這是接上真資料之後你會看到的樣子。真實串接是我們目前最重點的投資方向，專業方案可以優先加購搶先體驗。"}
       </div>
       {isPro ? (
-        <a href="mailto:sowork@sowork.ai?subject=電商營運報告加購" style={{ fontSize: 13, fontWeight: 600, color: "#fff", background: INK, borderRadius: 8, padding: "8px 12px", textDecoration: "none", whiteSpace: "nowrap" }}>
-          聯繫 SoWork 加購
-        </a>
+        <button onClick={() => setAddonOpen(true)} style={{ fontSize: 13, fontWeight: 600, color: "#fff", background: INK, border: 0, borderRadius: 8, padding: "8px 12px", cursor: "pointer", whiteSpace: "nowrap" }}>
+          申請加購
+        </button>
       ) : (
         <button onClick={() => navigate("/pricing")} style={{ fontSize: 13, fontWeight: 600, color: "#fff", background: INK, border: 0, borderRadius: 8, padding: "8px 12px", cursor: "pointer", whiteSpace: "nowrap" }}>
           升級專業方案
         </button>
       )}
+      {isPro && <AddonRequestModal isOpen={addonOpen} onClose={() => setAddonOpen(false)} />}
     </div>
   );
 }

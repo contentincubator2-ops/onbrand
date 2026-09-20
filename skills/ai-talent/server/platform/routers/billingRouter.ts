@@ -19,7 +19,7 @@ import { router, protectedProcedure } from "../core/trpc";
 import { TRPCError } from "@trpc/server";
 import { PLANS, getPlan, type PlanCode } from "../core/plans";
 
-async function loadUserPlan(userId: number): Promise<{
+export async function loadUserPlan(userId: number): Promise<{
   planCode: PlanCode;
   planStatus: string;
   planEndsAt: Date | null;

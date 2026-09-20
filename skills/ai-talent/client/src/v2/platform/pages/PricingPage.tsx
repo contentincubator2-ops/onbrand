@@ -15,6 +15,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { trpc } from "../../../lib/trpc";
 import { showToastGlobal } from "../../../components/ui/Toast";
 import { useLang } from "../../../lib/i18n";
+import AddonRequestModal from "../components/AddonRequestModal";
 
 type Layer = { label: string; items: string[]; muted?: boolean };
 
@@ -76,6 +77,7 @@ export default function PricingPage() {
   const statusLoading = statusQuery?.isLoading ?? false;
 
   const isEn = lang === "en";
+  const [addonOpen, setAddonOpen] = React.useState(false);
 
   const checkoutMut = (trpc as any).stripe?.createCheckout?.useMutation
     ? (trpc as any).stripe.createCheckout.useMutation({
@@ -396,6 +398,23 @@ export default function PricingPage() {
                 [isEn ? "200+ / multi-store" : "200 以上／多商店", isEn ? "quoted per project" : "專案報價", isEn ? "quoted per project" : "專案報價"],
               ]}
             />
+            {/* 2026-09-21（CJ「把『可加購成效層』接上真正的購買路徑」）：這張卡原本
+                只有說明、沒有任何入口。範圍要先確認資料權限與工作說明書，所以是
+                「申請」不是「結帳」——見 AddonRequestModal。 */}
+            <div className="mt-5 flex items-center gap-3 flex-wrap">
+              <button
+                onClick={() => {
+                  if (!status && !statusLoading) { navigate("/auth/register"); return; }
+                  setAddonOpen(true);
+                }}
+                className="px-4 py-2 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-white text-sm font-medium"
+              >
+                {isEn ? "Request this add-on →" : "申請加購 →"}
+              </button>
+              <span className="text-xs text-neutral-500">
+                {isEn ? "Sales confirms scope and a statement of work with you before anything is billed." : "業務會先跟你確認範圍與工作說明書，簽約後才開始計費。"}
+              </span>
+            </div>
           </div>
         </div>
 
@@ -511,6 +530,8 @@ export default function PricingPage() {
             </details>
           ))}
         </div>
+
+        <AddonRequestModal isOpen={addonOpen} onClose={() => setAddonOpen(false)} />
 
         {/* Footer */}
         <div className="mt-20 pt-8 border-t border-neutral-200 text-xs text-neutral-500 space-x-4">
