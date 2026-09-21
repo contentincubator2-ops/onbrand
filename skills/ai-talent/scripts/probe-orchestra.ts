@@ -111,9 +111,17 @@ import { ALL_99S_TASKS, ALL_99S_ORCHESTRA as ORCH_100 } from "../server/_core/qu
     if (process.env.FULL && v.caption) {
       console.log(v.caption.split("\n").map((l) => `      | ${l}`).join("\n"));
     }
-    if (v.image?.url) console.log(`      image[${v.image.status}]: ${v.image.url}`);
+    // 2026-09-21 (CJ「生圖，正式環境的生圖，都採用 gpt image 2」): print WHICH model
+    // answered. Without it the only way to tell a gpt-image-2 image from a Flux
+    // fallback was reading the PNG's dimensions — which is how months of
+    // silent fallbacks went unnoticed.
+    const modelNote = (img: any) =>
+      img?.modelId
+        ? ` [${img.modelId}${img.fallbackUsed ? ` ← FALLBACK from ${img.requestedModelId ?? "?"}` : ""}]`
+        : "";
+    if (v.image?.url) console.log(`      image[${v.image.status}]${modelNote(v.image)}: ${v.image.url}`);
     else if (v.image?.status && v.image.status !== "skipped") {
-      console.log(`      image[${v.image.status}]: ${v.image.errorMsg ?? "no url"}`);
+      console.log(`      image[${v.image.status}]${modelNote(v.image)}: ${v.image.errorMsg ?? "no url"}`);
     }
     // Storyboard / carousel cards — each card carries its own image, and a
     // board with missing frames is the failure mode that matters here.
@@ -123,7 +131,7 @@ import { ALL_99S_TASKS, ALL_99S_ORCHESTRA as ORCH_100 } from "../server/_core/qu
       v.cards.forEach((c: any, j: number) => {
         console.log(
           `        [${j + 1}] ${String(c?.headline ?? "").slice(0, 30)} — ` +
-          (c?.image?.url ? c.image.url : `${c?.image?.status ?? "?"}: ${c?.image?.errorMsg ?? "no url"}`),
+          (c?.image?.url ? `${c.image.url}${modelNote(c.image)}` : `${c?.image?.status ?? "?"}${modelNote(c?.image)}: ${c?.image?.errorMsg ?? "no url"}`),
         );
       });
     }
