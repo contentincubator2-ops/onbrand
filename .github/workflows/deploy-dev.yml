@@ -94,6 +94,36 @@ jobs:
           printf '%s\n' "$VM_SSH_HOST_KEY" > ~/.ssh/known_hosts
           chmod 600 ~/.ssh/known_hosts
 
+      # 2026-09-22：每次部署都留一份 ~250MB 的完整 release，從來沒清過——dev VM 累積了 157 份（48GB），
+      # 硬碟 100%：先是解壓縮死在 "No space left on device"，接著連上傳 tarball 都寫不進 /tmp，新版本上不去
+      # （有健康檢查回滾所以站還活著，但之後的每個修正都被擋在外面）。
+      # 只留最新 5 份加上目前 symlink 的那份（回滾目標）；舊的都能從 git 重建。
+      # 這一步必須在「上傳」之前：磁碟滿的時候，清理要發生在任何需要空間的動作之前（上傳也算）。
+      - name: Prune old releases on dev VM (before upload)
+        if: github.ref == 'refs/heads/dev'
+        env:
+          VM_HOST: ${{ secrets.VM_HOST }}
+          VM_USER: ${{ secrets.VM_USER }}
+        run: |
+          ssh -i ~/.ssh/onbrand-dev "$VM_USER@$VM_HOST" bash -s <<'REMOTE'
+          set -euo pipefail
+          app_root=/opt/onbrand
+          keep_recent=5
+          running="$(readlink -f "$app_root/current" 2>/dev/null || true)"
+          echo "disk before prune: $(df -h / | awk 'NR==2 {print $4 " free (" $5 " used)"}')"
+          # 失敗的上傳留下的半截 tarball（一小時以上沒動過的）
+          find /tmp -maxdepth 1 -name 'onbrand-release-*.tgz' -mmin +60 -delete 2>/dev/null || true
+          removed=0
+          while IFS= read -r old_release; do
+            if [ -n "$old_release" ] && [ "$old_release" != "$running" ]; then
+              rm -rf "$old_release"
+              removed=$((removed + 1))
+            fi
+          done < <(find "$app_root/releases" -mindepth 1 -maxdepth 1 -type d -printf '%T@ %p\n' | sort -rn | tail -n +$((keep_recent + 1)) | cut -d' ' -f2-)
+          echo "pruned $removed old release(s); running release kept: ${running:-none}"
+          echo "disk after prune: $(df -h / | awk 'NR==2 {print $4 " free (" $5 " used)"}')"
+          REMOTE
+
       - name: Upload release to dev VM
         if: github.ref == 'refs/heads/dev'
         env:
@@ -123,23 +153,6 @@ jobs:
 
           test -f "$app_root/shared/.env"
           test -s "$archive"
-
-          # 2026-09-22：每次部署都留一份 ~250MB 的完整 release，從來沒清過——dev VM 累積了 157 份（48GB），
-          # 硬碟 100%，解壓縮就死在 "No space left on device"，新版本上不去（有健康檢查回滾所以站還活著，
-          # 但之後的每個修正都被擋在外面）。只留最新 5 份加上目前正在跑的那份；舊的都能從 git 重建。
-          # 先清再解壓縮：磁碟滿的時候，清理必須發生在需要空間的動作之前。
-          keep_recent=5
-          running="$(readlink -f "$current" 2>/dev/null || true)"
-          echo "disk before prune: $(df -h / | awk 'NR==2 {print $4 " free (" $5 " used)"}')"
-          removed=0
-          while IFS= read -r old_release; do
-            if [ -n "$old_release" ] && [ "$old_release" != "$running" ] && [ "$old_release" != "$release" ]; then
-              rm -rf "$old_release"
-              removed=$((removed + 1))
-            fi
-          done < <(find "$app_root/releases" -mindepth 1 -maxdepth 1 -type d -printf '%T@ %p\n' | sort -rn | tail -n +$((keep_recent + 1)) | cut -d' ' -f2-)
-          echo "pruned $removed old release(s); disk after: $(df -h / | awk 'NR==2 {print $4 " free (" $5 " used)"}')"
-
           mkdir -p "$release"
           tar -xzf "$archive" -C "$release"
           rm -f "$archive"
