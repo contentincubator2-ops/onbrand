@@ -27,6 +27,7 @@ import {
   resolveProductSubjectReference,
 } from "./productSubjectPolicy";
 import { isLocalUploadPath, probeImageUrl } from "./imageFetch";
+import { angleVisualLens, angleWritingBlock, checkAngle } from "./variantAngles";
 import { findFirstUrl, fetchUrlSummary, formatUrlSummaryForPrompt, type UrlSummary } from "./urlContext";
 import { detectNonDeliverable } from "./captionSanity";
 import { isAdCopyTemplate, extractRequestedUrl, buildAdCopyRule, validateAdCopy, repairAdCopy } from "./adCopyContract";
@@ -731,6 +732,8 @@ async function callOneVariant(args: {
   isZhTW: boolean;
   /** Ad-copy tasks: landing URL the user typed (deterministically extracted); null = none. */
   requestedUrl?: string | null;
+  /** Labels of ALL versions written in parallel (this one included) — so each call knows what it must differ from. */
+  siblingLabels?: readonly string[];
 }): Promise<{ label: string; caption: string; hashtags?: string[] }> {
   const { template, config, label, captionPersona, brandPrefix, urlContext, userMsg, inputKeys, agentAiModel, strategistAnchor, market, isZhTW } = args;
   const adCopy = isAdCopyTemplate(template);
@@ -752,6 +755,7 @@ async function callOneVariant(args: {
   const filledSystemPrompt = template.systemPrompt
     .replace(/\{label\}/g, label)
     .replace(/\{today\}/g, todayStr);
+  const angleBlock = angleWritingBlock(label, { siblings: args.siblingLabels, taskSystemPrompt: template.systemPrompt });
 
   // 2026-05-16 (CJ「一句話 brand brief 變成長文改寫 — 指令太短還是
   // agent 不準？」root cause): a single soft "字數 X-Y 字" line gets
@@ -1004,6 +1008,10 @@ async function callOneVariant(args: {
     craftLocaleNote +
     strategistSection +
     `\n\n【本次任務】只寫 1 個變體：**${label}**。\n` +
+    // 2026-09-22 (CJ「命名跟內文的版本設計，應該要有直接關係」)：版本名稱不再只是一個詞——
+    // 通用切角（情感／理性／數據／故事／懸念／反差）在 variantAngles.ts 有明確定義；
+    // 任務自己的 systemPrompt 已經提到這個名稱的，維持任務自己的寫法。
+    angleBlock +
     `${lengthHint}\n\n` +
     `【角色 vs 主角 — 重要】\n` +
     `上面的「角色」只是給你**寫作口吻**參考。**主角永遠是用戶或用戶輸入的內容**（在 user message + URL context）。\n` +
@@ -1147,13 +1155,14 @@ async function callOneVariant(args: {
   let adCopyIssue = ""; // ad-copy contract violation from the previous attempt
   let wuganVoiceIssue = ""; // 五感十築句型合約：上一次的違反內容
   let shotListIssue = ""; // shot-list contract violation from the previous attempt
+  let angleIssue = ""; // 版本切角違反（目前只驗數據版有數字）
   while (attempt < 2) {
     attempt++;
     try {
       // 2nd attempt: append explicit reminder to user msg, lowering model
       // creativity and forcing strict JSON.
       const userMsgWithReminder = attempt === 2
-        ? `${userMsg}\n\n[REMINDER] ${shotListIssue ? `上次回應違反分格腳本合約：${shotListIssue}。請照【分格腳本合約】重寫：至少 3 格，每格四行「畫面/動作/聲音/字卡」齊全，全篇不要 hashtag。` : adCopyIssue ? `上次回應違反廣告格式合約：${adCopyIssue}。請照【廣告格式合約】重寫。` : wuganVoiceIssue ? wuganVoiceIssue : "上次回應沒給可解析、可交付的 caption。"}請嚴格回覆 {"caption":"...","hashtags":[]} JSON，第一個字元就是 {，不要任何 markdown / 前言 / 解釋。不得要求澄清，不得輸出審議過程、選項評估、自述工作原則、處理步驟或輸入欄位內部名稱；來源抓不到內容時就依 URL 標題、描述與主題直接寫，絕不說明抓取失敗。caption 只能放最終成品。`
+        ? `${userMsg}\n\n[REMINDER] ${shotListIssue ? `上次回應違反分格腳本合約：${shotListIssue}。請照【分格腳本合約】重寫：至少 3 格，每格四行「畫面/動作/聲音/字卡」齊全，全篇不要 hashtag。` : adCopyIssue ? `上次回應違反廣告格式合約：${adCopyIssue}。請照【廣告格式合約】重寫。` : wuganVoiceIssue ? wuganVoiceIssue : angleIssue ? `上次回應不符合「${label}」的切角：${angleIssue}。請照【版本切角】重寫。` : "上次回應沒給可解析、可交付的 caption。"}請嚴格回覆 {"caption":"...","hashtags":[]} JSON，第一個字元就是 {，不要任何 markdown / 前言 / 解釋。不得要求澄清，不得輸出審議過程、選項評估、自述工作原則、處理步驟或輸入欄位內部名稱；來源抓不到內容時就依 URL 標題、描述與主題直接寫，絕不說明抓取失敗。caption 只能放最終成品。`
         : userMsg;
       const r = await Promise.race([
         callModel(
@@ -1238,6 +1247,15 @@ async function callOneVariant(args: {
             // JSON 外殼殘骸。
             return { label, caption: normalized, hashtags: [] };
           }
+          // 版本名稱要對得上內文：數據版一定要用數字開場，沒有就帶著原因重寫一次。
+          // 最後一次照實出貨（不為了切角把整個變體弄成空白）。
+          const angleMiss = checkAngle(label, caption, template.systemPrompt);
+          if (angleMiss && attempt < 2) {
+            lastErr = new Error(`angle miss for ${label}: ${angleMiss}`);
+            angleIssue = angleMiss;
+            console.warn(`[callOneVariant] attempt ${attempt} angle miss for ${label}: ${angleMiss}`);
+            continue;
+          }
           // dev 2026-08: strip draft-leak lines / internal snake_case keys
           // from the shipped caption. Only on this path — the contract
           // branches above return formats whose markers this would eat.
@@ -1277,7 +1295,7 @@ async function callCaptionWriter(args: {
   // Promise.allSettled so one failure doesn't kill the others.
   const settled = await Promise.allSettled(
     labels.map((label) =>
-      callOneVariant({ ...args, label }),
+      callOneVariant({ ...args, label, siblingLabels: labels }),
     ),
   );
   return settled.map((s, i) =>
@@ -1321,12 +1339,9 @@ async function callOneBrief(args: {
   // visuals converged. Give each label a CONCRETELY different visual
   // lens (subject framing / scene / composition / palette) and an
   // explicit must-differ rule so the set diverges.
+  // 通用切角（情感／理性／故事／數據／懸念／反差）的視覺鏡頭跟文案寫法一起定義在
+  // variantAngles.ts（同一張表），這裡只留倒數系列這種「只有畫面用得到」的日期鏡頭。
   const labelLens: Record<string, string> = {
-    "情感版": "聚焦人物表情與肢體情緒、特寫、暖色光、淺景深",
-    "理性版": "簡潔資訊式構圖、幾何排版、冷調、留白、產品/介面為主體",
-    "故事版": "敘事場景、環境帶入、中景、自然光、生活感瞬間",
-    "數據版": "視覺化數字/圖表元素、強對比、單一焦點、現代極簡",
-    "懸念版": "局部遮蔽/未揭曉的構圖、戲劇光影、暗調、引發好奇",
     // 5天倒數系列 — 視覺隨日期升溫，第1天最強衝擊
     "第5天": "開闊介紹性構圖，品牌主視覺清晰，色彩溫和友善，傳遞「初次見面」的第一印象感",
     "第4天": "聚焦產品或服務核心細節，特寫鏡頭展示差異化，乾淨背景突出主體優勢",
@@ -1334,7 +1349,7 @@ async function callOneBrief(args: {
     "第2天": "視覺緊迫感，高對比搶眼色彩，強調限時或獨家元素，色調比前幾天更飽和",
     "第1天": "最強視覺衝擊，戲劇光影與高飽和對比色，最終倒數的緊張感，聚焦單一明確行動",
   };
-  const lens = labelLens[label] ?? `緊扣「${label}」的獨特視覺概念，與其他版本明顯不同`;
+  const lens = angleVisualLens(label) ?? labelLens[label] ?? `緊扣「${label}」的獨特視覺概念，與其他版本明顯不同`;
   // 2026-08-23 (CJ 驗收 ig-60-live-event 的 7 段圖): run-of-show 任務的 label
   // 開頭是流程時間碼（"03:00-10:00 第一波衝刺" / "T-24h 預熱宣告"），視覺總監
   // 把它讀成一天中的時刻，於是「03:00」畫成凌晨檯燈、「10:00-18:00」畫成正午
