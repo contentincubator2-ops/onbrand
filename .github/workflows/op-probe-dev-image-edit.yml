@@ -62,8 +62,10 @@ jobs:
           fi
 
           if [ "$MODE" = "angles" ]; then
-            echo "--- 情感版／理性版／數據版：真實模型跑一次 fb-30-caption-short ---"
-            cd "$AI" && ./node_modules/.bin/tsx scripts/probe-variant-angles.ts 2>&1 | tail -90
+            echo "--- 情感版／理性版／數據版：真實模型跑兩次 fb-30-caption-short（第二次素材有價格與時數，看數字有沒有被編）---"
+            cd "$AI" && ./node_modules/.bin/tsx scripts/probe-variant-angles.ts 2>&1 | tail -60
+            echo; echo "=========== 第二次：換一組有價格的素材 ==========="
+            TASK_INPUT='洛蒙德湖系列 No. 01：空間噴霧 100ml 售價 NT$1,280；擴香 200ml 售價 NT$1,680；香氛蠟燭 180g 燃燒約 40 小時，售價 NT$980。' ./node_modules/.bin/tsx scripts/probe-variant-angles.ts 2>&1 | tail -40
             exit 0
           fi
 
