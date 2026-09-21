@@ -3,6 +3,7 @@
  * 2026-09-07 對齊 Word 價目表：試用 → 基礎（2 席）→ 專業（5 席）。數字與 PricingPage 同源。
  * 兩級差在能力不在用量（執行次數都不限）。
  */
+import { CATALOG } from "../lib/catalogFigures";
 import { Modal, ModalContent, ModalBody, Button } from "@heroui/react";
 import { Sparkles, Mail, ExternalLink } from "lucide-react";
 import { Link } from "react-router-dom";
@@ -40,15 +41,15 @@ function getPlans(lang: "zh-TW" | "en") {
       name: en ? "OnBrand Basic" : "OnBrand 基礎",
       price: en ? "US$75 / mo" : "NT$2,250 / 月",
       badge: en ? "2 seats" : "2 席",
-      detail: en ? "1 brand · pick 2 of 11 channels (swap monthly)" : "1 個品牌 · 11 個通路選 2（每月可更換）",
+      detail: en ? `1 brand · pick 2 of ${CATALOG.channels} channels (swap monthly)` : `1 個品牌 · ${CATALOG.channels} 個通路選 2（每月可更換）`,
       features: en ? [
         "Brand positioning · 3 own task cards",
-        "203 task cards: 99 award + 63 benchmark + 41 conventions",
+        `${CATALOG.basic} task cards: ${CATALOG.award} award + ${CATALOG.benchmark} benchmark + ${CATALOG.evergreen} conventions`,
         "Unlimited runs · campaign tasks included",
         "Performance layer: early preview (simulated data)",
       ] : [
         "品牌定位 · 自建任務卡 3 張",
-        "可用任務卡 203 張：得獎 99 ＋ 標竿 63 ＋ 平台通則 41",
+        `可用任務卡 ${CATALOG.basic} 張：得獎 ${CATALOG.award} ＋ 標竿 ${CATALOG.benchmark} ＋ 平台通則 ${CATALOG.evergreen}`,
         "執行次數不限 · 企劃任務開放",
         "成效層：早期預覽（模擬數據）",
       ],
@@ -59,16 +60,16 @@ function getPlans(lang: "zh-TW" | "en") {
       name: en ? "OnBrand Professional" : "OnBrand 專業",
       price: en ? "US$300 / mo" : "NT$9,000 / 月",
       badge: en ? "5 seats" : "5 席",
-      detail: en ? "1 brand · pick 5 of 11 channels (swap monthly)" : "1 個品牌 · 11 個通路選 5（每月可更換）",
+      detail: en ? `1 brand · pick 5 of ${CATALOG.channels} channels (swap monthly)` : `1 個品牌 · ${CATALOG.channels} 個通路選 5（每月可更換）`,
       features: en ? [
         "Brand + 10 product + monthly campaign positioning · 10 own task cards",
-        "249 task cards = 203 + 46 viral-structure cards (refreshed monthly)",
+        `${CATALOG.total} task cards = ${CATALOG.basic} + ${CATALOG.viral} viral-structure cards (refreshed monthly)`,
         "Unlimited runs · campaign tasks · review workflow",
         "Strategy monitoring: alerts when your brand, products or competitors shift",
         "Performance: early preview + priority access to real connections",
       ] : [
         "品牌 ＋ 產品 10 個 ＋ 活動每月 1 次定位 · 自建任務卡 10 張",
-        "可用任務卡 249 張＝203 ＋ 爆款結構卡 46 張（每月更新）",
+        `可用任務卡 ${CATALOG.total} 張＝${CATALOG.basic} ＋ 爆款結構卡 ${CATALOG.viral} 張（每月更新）`,
         "執行次數不限 · 企劃任務開放 · 審核工作流",
         "策略監測：品牌、產品與競爭者有變化時提醒調整",
         "成效層：早期預覽 ＋ 優先加購真實串接",

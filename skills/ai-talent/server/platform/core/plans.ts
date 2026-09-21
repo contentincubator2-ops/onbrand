@@ -16,6 +16,7 @@
  *
  * Heavy-use cost @ 80% caps: ~$13 USD, vs US$25 early-bird → ~48% margin (Solo US$100 → ~87%).
  */
+import { CATALOG_FIGURES } from "./catalogFigures";
 
 // 2026-05-11 — multi-tier for $1M ARR strategy. Solo / Team / Agency
 // split (CJ「Team / Agency 方案是 $1M 真正的槓桿」).
@@ -173,8 +174,8 @@ export interface Plan {
 
 export const PLANS: Record<PlanCode, Plan> = {
   /** OnBrand 基礎 — NT$2,250／月，2 席。
-   *  2026-09-06 Word 價目表：1 個品牌、11 通路選 2（每月可換）、自建卡 3 張、
-   *  可用任務卡 203 張（得獎 99 ＋ 標竿 63 ＋ 平台通則 41）、成效層示意版；
+   *  2026-09-06 Word 價目表：1 個品牌、12 通路選 2（每月可換）、自建卡 3 張、
+   *  可用任務卡 213 張（得獎 99 ＋ 標竿 63 ＋ 平台通則 51；2026-09-21 對齊實際目錄）、成效層示意版；
    *  執行次數不限、企劃開放（兩級差在能力不在用量）。
    */
   drop_starter: {
@@ -218,9 +219,9 @@ export const PLANS: Record<PlanCode, Plan> = {
     },
     features: [
       "1 個品牌 · 2 席",
-      "11 個通路選 2（每月可更換）",
+      `${CATALOG_FIGURES.channels} 個通路選 2（每月可更換）`,
       "品牌定位 · 自建任務卡 3 張（存入品牌任務庫）",
-      "可用任務卡 203 張：得獎 99 ＋ 標竿 63 ＋ 平台通則 41",
+      `可用任務卡 ${CATALOG_FIGURES.basic} 張：得獎 ${CATALOG_FIGURES.award} ＋ 標竿 ${CATALOG_FIGURES.benchmark} ＋ 平台通則 ${CATALOG_FIGURES.evergreen}`,
       "執行次數不限 · 企劃任務開放",
       "排程、日曆與 FB／IG 直接發布",
       "成效層早期預覽（模擬數據）；真實串接是重點投資方向，專業方案優先加購",
@@ -275,8 +276,8 @@ export const PLANS: Record<PlanCode, Plan> = {
   },
 
   /** OnBrand 專業 — NT$9,000／月，5 席。
-   *  2026-09-06 Word 價目表：1 個品牌、11 通路選 5（每月可換）、品牌＋產品 10 個
-   *  ＋活動每月 1 次定位、自建卡 10 張、249 張任務卡（含爆款結構 46 張，每月更新）、
+   *  2026-09-06 Word 價目表：1 個品牌、12 通路選 5（每月可換）、品牌＋產品 10 個
+   *  ＋活動每月 1 次定位、自建卡 10 張、259 張任務卡（含爆款結構 46 張，每月更新）、
    *  審核工作流、成效層可加購。5 席是審核工作流的要求：產出者與放行者分開。
    *  2026-09-08 加：策略監測（品牌、產品與競爭者變化提醒）定義在這一級。
    *  Fair-use: 內部每日 LLM cost cap = $5（UI 不顯示）。
@@ -324,9 +325,9 @@ export const PLANS: Record<PlanCode, Plan> = {
     },
     features: [
       "1 個品牌 · 5 席（含審核工作流）",
-      "11 個通路選 5（每月可更換）",
+      `${CATALOG_FIGURES.channels} 個通路選 5（每月可更換）`,
       "品牌定位 ＋ 產品定位 10 個 ＋ 活動定位每月 1 次 · 自建任務卡 10 張",
-      "可用任務卡 249 張＝203 ＋ 爆款結構卡 46 張（每月更新）",
+      `可用任務卡 ${CATALOG_FIGURES.total} 張＝${CATALOG_FIGURES.basic} ＋ 爆款結構卡 ${CATALOG_FIGURES.viral} 張（每月更新）`,
       "執行次數不限 · 企劃任務開放",
       "排程、日曆與 FB／IG 直接發布 · 策略工作台",
       "策略監測：品牌、產品與競爭者有變化時提醒調整",

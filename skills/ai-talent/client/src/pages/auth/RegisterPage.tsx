@@ -12,6 +12,7 @@
  * who click a landing-page "免費試用" CTA.
  */
 
+import { CATALOG } from "../../v2/platform/lib/catalogFigures";
 import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useLang } from "../../lib/i18n";
@@ -248,13 +249,13 @@ export default function RegisterPage() {
         ["01", "Brand Brain", "Lock your positioning once. Every post stays on-brand."],
         ["02", "Content Tiers", "A single post · a content pack · a full campaign."],
         ["03", "7-Day Publisher", "Schedule a whole week across channels in one click."],
-        ["04", "Sourced", "249 task cards — 208 with a stated structural source."],
+        ["04", "Sourced", `${CATALOG.total} task cards — ${CATALOG.sourced} with a stated structural source.`],
       ]
     : [
         ["01", "品牌大腦", "鎖定一次品牌定位 · 每篇貼文自動 on-brand"],
         ["02", "三種規格", "單篇內容 · 內容套組 · 完整企劃"],
         ["03", "七日發布台", "一次排好 7 天 × 全平台內容"],
-        ["04", "有出處", "249 張任務卡，208 張說得出結構出處"],
+        ["04", "有出處", `${CATALOG.total} 張任務卡，${CATALOG.sourced} 張說得出結構出處`],
       ];
 
   return (
