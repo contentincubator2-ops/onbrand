@@ -1,0 +1,74 @@
+name: "Op — Probe product-faithful image gen (gpt-image-2 /images/edits)"
+
+# 2026-09-21 (CJ「生圖，正式環境的生圖，都採用 gpt image 2」).
+#
+# PR #182 moved 產品保真（使用真實產品圖）from Nano Banana to gpt-image-2's
+# /v1/images/edits surface. op-probe-openai-image.yml only ever exercises
+# /generations, so nothing proved the EDIT surface works on this key — and the
+# failure mode is quiet: the caller just falls back to Nano Banana, i.e. the
+# old behaviour, so prod would look fine while the instruction was not in
+# effect.
+#
+# Runs the DEPLOYED adapter (not a curl replica) against a real product photo
+# picked from the prod DB, so the request shape under test is exactly what the
+# app sends. Read-mostly: it writes one generated PNG into the covers dir,
+# the same as any generation, and touches no DB row.
+
+on:
+  workflow_dispatch:
+    inputs:
+      brand_id:
+        description: "Brand id to take a product photo from (blank = any brand that has one)"
+        required: false
+        type: string
+
+jobs:
+  probe:
+    runs-on: [self-hosted, linux, vm-onbrand]
+    timeout-minutes: 12
+    steps:
+      - name: Generate from a real product photo
+        env:
+          BRAND_ID: ${{ inputs.brand_id }}
+        run: |
+          set -e
+          cd /opt/onbrand/app/skills/ai-talent
+          set -a
+          source .env 2>/dev/null || true
+          set +a
+
+          WHERE="p.imageUrl IS NOT NULL AND p.imageUrl <> ''"
+          if [ -n "$BRAND_ID" ]; then WHERE="$WHERE AND p.brandId = $BRAND_ID"; fi
+          ROW=$(mysql -h"${LOCAL_DB_HOST:-127.0.0.1}" -u"${LOCAL_DB_USER:-mos_user}" \
+            -p"${LOCAL_DB_PASSWORD}" "${LOCAL_DB_NAME:-mos_db}" -N -s \
+            -e "SELECT p.brandId, p.id, p.imageUrl FROM products p WHERE $WHERE ORDER BY p.id DESC LIMIT 1")
+          if [ -z "$ROW" ]; then echo "No product with an image found — nothing to probe."; exit 0; fi
+          echo "product row: $ROW"
+          export PROBE_IMAGE_URL=$(echo "$ROW" | awk '{print $3}')
+          export PROBE_BRAND_ID=$(echo "$ROW" | awk '{print $1}')
+
+          node --import tsx -e '
+            const { dispatchGenerate } = await import("./server/_core/mediaGen.ts");
+            const imageUrl = process.env.PROBE_IMAGE_URL;
+            console.log("reference:", imageUrl);
+            const t0 = Date.now();
+            try {
+              const r = await dispatchGenerate("openai/gpt-image-2", {
+                prompt: "Place the referenced product on a sunlit marble kitchen counter, soft morning light, shallow depth of field. Reproduce the product exactly as shown. No text anywhere in the image.",
+                imageUrl,
+                aspectRatio: "1:1",
+                brandId: Number(process.env.PROBE_BRAND_ID),
+              });
+              console.log(`edits result: status=${r.status} model=${r.modelId} ${((Date.now()-t0)/1000).toFixed(1)}s`);
+              console.log("url:", r.url ?? "(none)", r.errorMsg ? `err=${r.errorMsg}` : "");
+              if (r.url) {
+                const { statSync } = await import("fs");
+                const path = "/opt/onbrand/covers/" + r.url.split("/").pop();
+                const { width, height } = await (await import("sharp")).default(path).metadata();
+                console.log(`saved ${path} ${width}x${height} ${statSync(path).size} bytes`);
+              }
+            } catch (e) {
+              console.log(`edits THREW after ${((Date.now()-t0)/1000).toFixed(1)}s: ${e?.message ?? e}`);
+              process.exitCode = 1;
+            }
+          '
