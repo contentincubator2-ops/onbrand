@@ -131,7 +131,7 @@ export const POINT_COSTS = {
   task_60s:        60,
   task_99s:        99,
   image_flux:      30,   // PiAPI Flux Schnell — default
-  image_gpt:      100,   // OpenAI gpt-image-1 — premium
+  image_gpt:      100,   // OpenAI gpt-image-2 — premium (incl. product-faithful edits)
   image_imagen:    50,   // Google Imagen — middle
   image_ideogram:  50,   // PiAPI Ideogram (text-in-image)
   // video pulled per CJ direction; keep cost defined for when re-enabled

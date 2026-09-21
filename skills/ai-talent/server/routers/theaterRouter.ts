@@ -5,7 +5,7 @@
  *
  *   runStart    : load brand positioning → derive USP pool + chief opening
  *   generateCell: per-cell caption (one LLM call, platform-tuned prompt)
- *   generateImage: per-cell Flux image (PiAPI flux-schnell, square)
+ *   generateImage: per-cell image (OpenAI gpt-image-2, Flux Schnell fallback)
  *
  * Frontend orchestrates pacing (2 caption workers + 1 image worker). The
  * router stays stateless so retries are trivial and one stuck cell never
@@ -1305,21 +1305,27 @@ ${cleaned}
           palette: await loadBrandPaletteHexes(input.brandId),
         });
       }
-      // Model selection: prefer piapi/flux-schnell (fast + cheap); fall back
-      // to openai/gpt-image-2 (CJ 2026-09-01: the designated OpenAI image
-      // model) when PIAPI_KEY is absent so Theater images
-      // still work when only OPENAI_API_KEY is configured.
+      // Model selection: openai/gpt-image-2 is the primary, Flux Schnell the
+      // reliability fallback.
+      // 2026-09-21 (CJ「生圖，正式環境的生圖，都採用 gpt image 2」): this used
+      // to prefer piapi/flux-schnell whenever a PiAPI key existed — which is
+      // always, in production — so Theater was the one surface that never
+      // reached gpt-image-2. Inverted: gpt-image-2 first, and Flux only steps
+      // in when OpenAI fails (or has no key), so a provider hiccup still never
+      // blanks a cell.
       const hasPiapiKey = !!(process.env.PIAPI_KEY ?? process.env.PIAPI_API_KEY);
-      const primaryModel = hasPiapiKey ? "piapi/flux-schnell" : "openai/gpt-image-2";
-      // Helper: attempt OpenAI gpt-image-2 as fallback
-      const tryOpenAIFallback = async (): Promise<{ ok: true; imageUrl: string; brief: string } | null> => {
-        if (primaryModel === "openai/gpt-image-2" || !(process.env.OPENAI_API_KEY ?? "")) return null;
+      const hasOpenAIKey = !!(process.env.OPENAI_API_KEY ?? "");
+      const primaryModel = hasOpenAIKey ? "openai/gpt-image-2" : "piapi/flux-schnell";
+      // Helper: attempt the other provider when the primary can't deliver.
+      const tryFallbackModel = async (): Promise<{ ok: true; imageUrl: string; brief: string } | null> => {
+        const fallbackModel = primaryModel === "openai/gpt-image-2" ? "piapi/flux-schnell" : "openai/gpt-image-2";
+        if (fallbackModel === "piapi/flux-schnell" ? !hasPiapiKey : !hasOpenAIKey) return null;
         try {
-          console.warn(`[theater.generateImage] ${primaryModel} failed, falling back to openai/gpt-image-2`);
-          const r2 = await dispatchGenerate("openai/gpt-image-2", { prompt: brief, aspectRatio: aspect as any, brandId: input.brandId });
+          console.warn(`[theater.generateImage] ${primaryModel} failed, falling back to ${fallbackModel}`);
+          const r2 = await dispatchGenerate(fallbackModel, { prompt: brief, aspectRatio: aspect as any, brandId: input.brandId });
           if (r2.status === "ready" && r2.url) return { ok: true as const, imageUrl: r2.url, brief };
         } catch (e2) {
-          console.error(`[theater.generateImage] openai fallback also failed:`, e2);
+          console.error(`[theater.generateImage] ${fallbackModel} fallback also failed:`, e2);
         }
         return null;
       };
@@ -1332,14 +1338,15 @@ ${cleaned}
         if (r.status === "ready" && r.url) {
           return { ok: true as const, imageUrl: r.url, brief };
         }
-        // Primary returned non-ready — try OpenAI fallback
-        const fallback = await tryOpenAIFallback();
+        // Primary returned non-ready — try the other provider
+        const fallback = await tryFallbackModel();
         if (fallback) return fallback;
         return { ok: false as const, imageUrl: null, brief, error: r.errorMsg ?? `image gen ${r.status}` };
       } catch (e: any) {
-        // Primary THREW (e.g. PiAPI HTTP 500 insufficient credits) — still try OpenAI fallback
+        // Primary THREW (e.g. OpenAI safety block, PiAPI insufficient
+        // credits) — still try the other provider
         console.error(`[theater.generateImage] ${primaryModel} threw:`, e?.message ?? e);
-        const fallback = await tryOpenAIFallback();
+        const fallback = await tryFallbackModel();
         if (fallback) return fallback;
         return { ok: false as const, imageUrl: null, brief, error: String(e?.message ?? e) };
       }

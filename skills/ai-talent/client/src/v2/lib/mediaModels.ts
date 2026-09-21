@@ -7,13 +7,22 @@
  * offer". Server-side adapters are wired in mediaRouter.
  *
  * Status:
- *   "ready"  — backend has integration, picker can dispatch
- *   "manual" — no API integration, user copies prompt to external tool
- *   "soon"   — listed for visibility but disabled in UI
+ *   "ready"   — backend has integration, picker can dispatch
+ *   "manual"  — no API integration, user copies prompt to external tool
+ *   "soon"    — listed for visibility but disabled in UI
+ *   "retired" — adapter still wired server-side (old rows keep resolving)
+ *               but the picker must never offer it again
+ *
+ * 2026-09-21 (CJ「生圖，正式環境的生圖，都採用 gpt image 2」): the image
+ * picker offers openai/gpt-image-2 and nothing else. The other image adapters
+ * stay wired in mediaGen's dispatch — Flux Schnell is still the server-side
+ * reliability fallback, Nano Banana the product-subject one, and variants that
+ * stored an older model id must keep rendering. They are simply no longer
+ * offered as a choice. Video models are untouched.
  */
 
 export type MediaKind = "image" | "video";
-export type MediaStatus = "ready" | "manual" | "soon";
+export type MediaStatus = "ready" | "manual" | "soon" | "retired";
 /** Which backend route serves this model. */
 export type MediaProvider =
   | "openai"
@@ -47,6 +56,23 @@ export interface MediaModel {
 // ── Image ────────────────────────────────────────────────────────────────
 export const IMAGE_MODELS: MediaModel[] = [
   {
+    // 2026-09-21 (CJ「生圖，正式環境的生圖，都採用 gpt image 2」): the only
+    // image model the picker offers. Text-to-image via /images/generations and
+    // real-product compositing via /images/edits, so it
+    // covers what Nano Banana used to be kept around for.
+    id: "openai/gpt-image-2",
+    name: "GPT Image 2",
+    vendor: "OpenAI",
+    provider: "openai",
+    kind: "image",
+    status: "ready",
+    strengths: "prompt 服從性最強、品牌語境理解最佳；也能帶真實產品圖做保真合成",
+    costEstimateUsd: 0.04,
+    durationSecEstimate: 15,
+    formats: ["1024×1024", "1024×1536", "1536×1024"],
+    tags: ["brand-kv", "editorial", "prompt-fidelity", "product-staging", "subject-reference", "ecommerce-edit", "realism"],
+  },
+  {
     // 2026-07-25 (CJ product-faithful gen): Gemini 2.5 Flash Image —
     // subject-reference compositing. Feed the REAL product photo and it
     // places it into the prompted scene while preserving the product
@@ -56,7 +82,7 @@ export const IMAGE_MODELS: MediaModel[] = [
     vendor: "Google",
     provider: "google-gemini",
     kind: "image",
-    status: "ready",
+    status: "retired", // 2026-09-21: picker offers gpt-image-2 only (adapter stays wired)
     strengths: "真實產品置入最強 — 保留產品原貌與標籤，光影自然融合場景；也可純文字生圖",
     costEstimateUsd: 0.04,
     durationSecEstimate: 15,
@@ -69,7 +95,7 @@ export const IMAGE_MODELS: MediaModel[] = [
     vendor: "OpenAI",
     provider: "openai",
     kind: "image",
-    status: "ready",
+    status: "retired", // 2026-09-21: picker offers gpt-image-2 only (adapter stays wired)
     strengths: "高 prompt 服從性、品牌語境理解最佳，適合品牌主視覺、編輯封面",
     costEstimateUsd: 0.04,
     durationSecEstimate: 12,
@@ -153,7 +179,7 @@ export const IMAGE_MODELS: MediaModel[] = [
     vendor: "Black Forest Labs via PiAPI",
     provider: "piapi",
     kind: "image",
-    status: "ready",
+    status: "retired", // 2026-09-21: picker offers gpt-image-2 only (adapter stays wired)
     strengths: "FLUX 商業版，廣告 KV / banner 質感最強",
     costEstimateUsd: 0.05,
     durationSecEstimate: 10,
@@ -166,7 +192,7 @@ export const IMAGE_MODELS: MediaModel[] = [
     vendor: "Black Forest Labs via PiAPI",
     provider: "piapi",
     kind: "image",
-    status: "ready",
+    status: "retired", // 2026-09-21: picker offers gpt-image-2 only (adapter stays wired)
     strengths: "極致寫實、人像細節，適合 lifestyle / 真人代言情境",
     costEstimateUsd: 0.04,
     durationSecEstimate: 10,
@@ -211,7 +237,7 @@ export const IMAGE_MODELS: MediaModel[] = [
     vendor: "Midjourney",
     provider: "manual",
     kind: "image",
-    status: "manual",
+    status: "retired", // 2026-09-21: picker offers gpt-image-2 only (adapter stays wired)
     strengths: "藝術性、構圖質感最強；無 API，需手動貼到 Discord",
     durationSecEstimate: 60,
     tags: ["premium", "artistic", "brand-kv"],
@@ -365,10 +391,10 @@ export function findModel(id: string): MediaModel | undefined {
   return ALL_MODELS.find((m) => m.id === id);
 }
 
-/** Filter models by status (default: only "ready" + "manual" — hides "soon"). */
+/** Filter models the picker may offer: "ready" + "manual" only. */
 export function availableModels(kind?: MediaKind): MediaModel[] {
   return ALL_MODELS.filter(
-    (m) => (!kind || m.kind === kind) && m.status !== "soon",
+    (m) => (!kind || m.kind === kind) && m.status !== "soon" && m.status !== "retired",
   );
 }
 

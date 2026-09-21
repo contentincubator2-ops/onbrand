@@ -110,7 +110,7 @@ export async function captionToBilingualVisualBrief(args: VisualBriefArgs): Prom
   const identity = args.brandIdentity;
   // 2026-08-19 (#80 客訴「勾選真實產品後再產圖，出現錯誤中文字」):
   // subject mode permits only text already visible on the attached product.
-  // Keep text-shaped brand identity out of the model brief so Nano Banana
+  // Keep text-shaped brand identity out of the model brief so the image model
   // cannot turn a Chinese brand name into invented labels or watermarks.
   const brandLine = args.subjectMode
     ? "(unknown)"

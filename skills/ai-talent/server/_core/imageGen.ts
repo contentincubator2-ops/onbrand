@@ -159,9 +159,10 @@ export interface ImageGenInput {
   /** 2026-05-12: user-selected model. "auto" or undefined = env default. */
   modelChoice?: ImageModelChoice;
   /** 2026-07-25 (CJ product-faithful gen): URL of the REAL product photo.
-   *  When set, generation routes to Nano Banana subject-reference with the
-   *  PRODUCT-FIDELITY guard, and does NOT fall back to text-only providers
-   *  on failure — a hallucinated product is worse than a failed run. */
+   *  When set, generation routes to gpt-image-2 subject-reference
+   *  (/images/edits) with the PRODUCT-FIDELITY guard, and
+   *  does NOT fall back to text-only providers on failure — a hallucinated
+   *  product is worse than a failed run. */
   subjectImageUrl?: string;
 }
 
@@ -174,7 +175,7 @@ export interface ImageGenResult {
   status: "ready" | "failed";
   /** User scene prompt after optional CJK→English translation, before guards/context. */
   effectivePrompt: string;
-  /** User selection before provider fallback (or nano-banana in subject mode). */
+  /** User selection before provider fallback (always gpt-image-2 in subject mode). */
   requestedModel: string;
   /** True when the returned image came from a fallback, not the requested/default primary. */
   usedFallback: boolean;
@@ -284,12 +285,14 @@ async function runOpenAI(
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) throw new Error("OPENAI_API_KEY not set");
   // 2026-09-01 (CJ「open ai 我指定使用 gpt image 2」): gpt-image-2 is the
-  // designated OpenAI image model. IMAGE_GEN_MODEL_OPENAI is unset on the VM,
-  // so this literal — not the env — was what actually ran, and it was still
-  // gpt-image-1 despite imageRouter's comment calling gpt-image-2 the global
-  // default. Verified openable on the current key before the switch
-  // (op-probe-openai-image: HTTP 200, 17.5s).
-  const model = modelOverride || process.env.IMAGE_GEN_MODEL_OPENAI || "gpt-image-2";
+  // designated OpenAI image model. Verified openable on the current key
+  // before the switch (op-probe-openai-image: HTTP 200, 17.5s).
+  // 2026-09-21 (CJ「正式環境的生圖，都採用 gpt image 2」): the
+  // IMAGE_GEN_MODEL_OPENAI env read is gone. It was unset on the VM, so it
+  // never chose the model — it only left a way for a stale .env line to
+  // silently downgrade every production image back to gpt-image-1. Callers
+  // that genuinely want another OpenAI model pass modelOverride explicitly.
+  const model = modelOverride || "gpt-image-2";
 
   const res = await fetch("https://api.openai.com/v1/images/generations", {
     method: "POST",
@@ -484,42 +487,60 @@ export async function generateImage(input: ImageGenInput): Promise<ImageGenResul
   `)) as any;
   const id = Number(ins?.insertId ?? 0);
 
-  // 2026-07-25 product-faithful: subject-reference runs ONLY on Nano Banana.
-  // No fallback to text-only providers — they can't see the real product,
-  // and a hallucinated product violates the fidelity bar. Fail loudly.
+  // 2026-07-25 product-faithful: a subject-reference run never falls back to a
+  // text-only provider — it can't see the real product, and a hallucinated
+  // product violates the fidelity bar.
+  // 2026-09-21 (CJ「生圖，正式環境的生圖，都採用 gpt image 2」): the primary is
+  // gpt-image-2 via /images/edits instead of Nano Banana.
+  // Nano Banana stays behind it as the fallback — not a relaxation of the
+  // policy above: it is the OTHER model that receives the real product photo,
+  // so falling back to it keeps the product real. Anything text-only stays out.
   if (input.subjectImageUrl) {
-    try {
-      const { dispatchGenerate } = await import("./mediaGen");
-      const aspect = size === "1536x1024" ? "16:9" : size === "1024x1536" ? "9:16" : "1:1";
-      const r = await dispatchGenerate("google/nano-banana", {
-        prompt: promptText,
-        imageUrl: input.subjectImageUrl,
-        aspectRatio: aspect as any,
-        brandId: input.brandId,
-        // The blanket NO_TEXT_NEGATIVE_PROMPT can't be used here — it would
-        // fight the real product's own label. Mirror-only, matching what
-        // mediaRouter.generate already passes on this same path.
-        negativePrompt: NO_MIRROR_NEGATIVE_PROMPT,
-      });
-      // TODO: Add post-generation vision validation/retry for product fidelity;
-      // prompt arbitration reduces conflicts but cannot prove output compliance.
-      if (r.status === "ready" && r.url) {
-        await db.execute(sql`
-          UPDATE generated_images
-          SET provider = 'google', model = 'nano-banana', url = ${r.url},
-              status = 'ready', errorMsg = NULL
-          WHERE id = ${id}
-        `);
-        return { id, provider: "google", model: "nano-banana", url: r.url, b64: null, status: "ready", effectivePrompt, requestedModel: "nano-banana", usedFallback: false };
+    const { dispatchGenerate } = await import("./mediaGen");
+    const aspect = size === "1536x1024" ? "16:9" : size === "1024x1536" ? "9:16" : "1:1";
+    const subjectModels = ["openai/gpt-image-2", "google/nano-banana"] as const;
+    const errors: string[] = [];
+    for (const modelId of subjectModels) {
+      const provider: ImageProvider = modelId.startsWith("openai/") ? "openai" : "google";
+      const model = modelId.split("/")[1]!;
+      try {
+        const r = await dispatchGenerate(modelId, {
+          prompt: promptText,
+          imageUrl: input.subjectImageUrl,
+          aspectRatio: aspect as any,
+          brandId: input.brandId,
+          // The blanket NO_TEXT_NEGATIVE_PROMPT can't be used here — it would
+          // fight the real product's own label. Mirror-only, matching what
+          // mediaRouter.generate already passes on this same path. (OpenAI has
+          // no negative_prompt field; its guard rides in promptText.)
+          negativePrompt: NO_MIRROR_NEGATIVE_PROMPT,
+        });
+        // TODO: Add post-generation vision validation/retry for product fidelity;
+        // prompt arbitration reduces conflicts but cannot prove output compliance.
+        if (r.status === "ready" && r.url) {
+          await db.execute(sql`
+            UPDATE generated_images
+            SET provider = ${provider}, model = ${model}, url = ${r.url},
+                status = 'ready', errorMsg = NULL
+            WHERE id = ${id}
+          `);
+          return {
+            id, provider, model, url: r.url, b64: null, status: "ready",
+            effectivePrompt, requestedModel: "gpt-image-2",
+            usedFallback: modelId !== subjectModels[0],
+          };
+        }
+        errors.push(`${model}: ${r.errorMsg ?? "returned no image"}`);
+      } catch (e: any) {
+        errors.push(`${model}: ${String(e?.message ?? e).slice(0, 200)}`);
       }
-      const msg = redactProviderSecrets(r.errorMsg ?? "nano-banana returned no image");
-      await db.execute(sql`UPDATE generated_images SET status='failed', errorMsg=${msg} WHERE id=${id}`);
-      return { id, provider: "google", model: "nano-banana", url: null, b64: null, status: "failed", effectivePrompt, requestedModel: "nano-banana", usedFallback: false, errorMsg: msg };
-    } catch (e: any) {
-      const msg = redactProviderSecrets(`nano-banana: ${String(e?.message ?? e).slice(0, 400)}`).slice(0, 240);
-      await db.execute(sql`UPDATE generated_images SET status='failed', errorMsg=${msg} WHERE id=${id}`);
-      return { id, provider: "google", model: "nano-banana", url: null, b64: null, status: "failed", effectivePrompt, requestedModel: "nano-banana", usedFallback: false, errorMsg: msg };
     }
+    const msg = redactProviderSecrets(errors.join("\n")).slice(0, 240);
+    await db.execute(sql`UPDATE generated_images SET status='failed', errorMsg=${msg} WHERE id=${id}`);
+    return {
+      id, provider: "openai", model: "gpt-image-2", url: null, b64: null, status: "failed",
+      effectivePrompt, requestedModel: "gpt-image-2", usedFallback: false, errorMsg: msg,
+    };
   }
 
   const primary = (process.env.IMAGE_GEN_PROVIDER_PRIMARY || "openai") as ImageProvider;

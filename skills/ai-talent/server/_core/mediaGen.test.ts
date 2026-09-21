@@ -162,4 +162,58 @@ describe("mediaGen image provider request contracts", () => {
 
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
+
+  // 2026-09-21 (CJ「生圖，正式環境的生圖，都採用 gpt image 2」): a reference
+  // photo used to force the whole product-faithful path onto Nano Banana,
+  // because this adapter silently ignored opts.imageUrl and generated a
+  // text-to-image scene with no product in it.
+  it("sends a reference photo to the OpenAI edits surface, not generations", async () => {
+    fetchImageBufferMock.mockResolvedValue({
+      buffer: Buffer.from("real-product-bytes"),
+      mime: "image/png",
+    });
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({
+      data: [{ b64_json: "aW1hZ2U=" }],
+    }), { status: 200, headers: { "content-type": "application/json" } }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(dispatchGenerate("openai/gpt-image-2", {
+      prompt: "product on a marble counter",
+      aspectRatio: "1:1",
+      imageUrl: "https://example.com/product.png",
+    })).resolves.toMatchObject({ status: "ready", modelId: "openai/gpt-image-2" });
+
+    expect(String(fetchMock.mock.calls[0]![0])).toBe("https://api.openai.com/v1/images/edits");
+    const form = fetchMock.mock.calls[0]![1]?.body as FormData;
+    expect(form).toBeInstanceOf(FormData);
+    expect(form.get("model")).toBe("gpt-image-2");
+    expect(form.get("size")).toBe("1024x1024");
+    // The reference file rides as image[] — the form the 2026-09-21 probe on
+    // the funded key actually verified.
+    expect(form.get("image[]")).toBeInstanceOf(Blob);
+    // Measured on that same key: input_fidelity is rejected with a 400, and
+    // quality is the 5x-slower trap. Neither may creep back in.
+    expect(form.get("input_fidelity")).toBeNull();
+    expect(form.get("quality")).toBeNull();
+    expect(fetchImageBufferMock).toHaveBeenCalledWith(
+      "https://example.com/product.png",
+      { timeoutMs: 30_000 },
+    );
+  });
+
+  it("fails loudly on a reference image type the edits surface cannot accept", async () => {
+    fetchImageBufferMock.mockResolvedValue({
+      buffer: Buffer.from("not-an-image"),
+      mime: "text/html",
+    });
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(dispatchGenerate("openai/gpt-image-2", {
+      prompt: "product scene",
+      imageUrl: "https://example.com/expired-link",
+    })).rejects.toThrow(/unsupported reference image type text\/html/);
+
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
 });

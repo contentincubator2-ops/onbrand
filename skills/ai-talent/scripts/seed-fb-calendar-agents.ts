@@ -1,7 +1,7 @@
 /**
  * seed-fb-calendar-agents.ts
  *
- * One-shot script: generate 5 Notion-style avatars via OpenAI gpt-image-1
+ * One-shot script: generate 5 Notion-style avatars via OpenAI gpt-image-2
  * and INSERT 5 new agents into the `agents` table for the FB Monthly
  * Calendar squad (Joe Pulizzi Content Pillar method).
  *
@@ -144,7 +144,8 @@ async function genAvatarBase(prompt: string, savePath: string): Promise<void> {
     method: "POST",
     headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
     body: JSON.stringify({
-      model: "gpt-image-1",
+      // 2026-09-21 (CJ「生圖，正式環境的生圖，都採用 gpt image 2」).
+      model: "gpt-image-2",
       prompt: fullPrompt,
       size: "1024x1024",
       quality: "high",

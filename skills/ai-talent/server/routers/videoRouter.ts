@@ -114,13 +114,15 @@ export const videoRouter = router({
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
-      // 2026-05-14: points-based. Storyboard = ~6 Flux Schnell images,
-      // gate ONLY the entry call here (1 image's worth, 30 pts); the
-      // worker pre-spends the rest as it goes. Future improvement:
-      // pre-debit 180 pts upfront and refund unused.
+      // 2026-05-14: points-based. Storyboard = ~6 images, gate ONLY the entry
+      // call here (1 image's worth); the worker pre-spends the rest as it goes.
+      // Future improvement: pre-debit the whole run upfront and refund unused.
+      // 2026-09-21 (CJ「生圖，正式環境的生圖，都採用 gpt image 2」): the frames
+      // run on gpt-image-2 now, so "1 image's worth" is the gpt tier (100),
+      // not the Flux tier (30).
       const { assertPoints, deductPoints } = await import("../_core/pointsService");
-      await assertPoints(ctx.user.id, "image_flux");
-      await deductPoints(ctx.user.id, "image_flux", { kind: "brand", id: input.brandId ?? null });
+      await assertPoints(ctx.user.id, "image_gpt");
+      await deductPoints(ctx.user.id, "image_gpt", { kind: "brand", id: input.brandId ?? null });
 
       const [result] = await db.insert(videoJobs).values({
         userId:   ctx.user.id,

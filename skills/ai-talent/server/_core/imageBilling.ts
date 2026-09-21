@@ -16,11 +16,19 @@ export function imageActionForRequest(input: {
   subjectImageUrl?: string;
   modelChoice?: string;
 }): ImagePointAction {
-  if (input.subjectImageUrl) return "image_imagen";
-  if (input.modelChoice === "gpt-image-1" || input.modelChoice === "gpt-image-2") return "image_gpt";
+  // 2026-09-21 (CJ「生圖，正式環境的生圖，都採用 gpt image 2」): subject
+  // mode runs gpt-image-2 /images/edits now, not Nano Banana. Pre-authorizing
+  // the old image_imagen tier (50) would under-charge a 100-point generation —
+  // imageRefundAmount never bills the difference upward, it only refunds.
+  if (input.subjectImageUrl) return "image_gpt";
+  if (input.modelChoice === "flux-schnell" || input.modelChoice === "flux-realism") return "image_flux";
   if (input.modelChoice === "imagen-3") return "image_imagen";
   if (input.modelChoice === "ideogram-v3") return "image_ideogram";
-  return "image_flux";
+  // "auto" / undefined / gpt-image-* — the production default is gpt-image-2,
+  // so the default pre-authorization is the gpt tier. It used to fall through
+  // to image_flux (30), which under-charged every default request by 70 points
+  // from the day gpt-image-2 became the default.
+  return "image_gpt";
 }
 
 export function imageActionForActualResult(result: BillableImageResult): ImagePointAction {

@@ -129,6 +129,12 @@ async function genOpenAIImage(opts: GenOptions, model: "gpt-image-1" | "gpt-imag
   // size isn't given (the orchestra passes aspectRatio, not size). Without
   // this a 16:9 thumbnail would default to a 1024x1024 square.
   const size = sizeForAspectRatio(opts);
+  // 2026-09-21 (CJ「生圖，正式環境的生圖，都採用 gpt image 2」): product-faithful
+  // runs were the one path this adapter could not serve — it ignored
+  // opts.imageUrl, so 「使用真實產品圖」 had to route to Nano Banana. The
+  // /images/edits surface takes the real product photo as a reference, so
+  // gpt-image-2 covers subject mode too now.
+  if (opts.imageUrl) return await genOpenAIImageEdit(opts, model, size, key);
   const resp = await fetch("https://api.openai.com/v1/images/generations", {
     method: "POST",
     headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
@@ -155,6 +161,51 @@ async function genOpenAIImage(opts: GenOptions, model: "gpt-image-1" | "gpt-imag
   const data: any = await resp.json();
   const b64 = data?.data?.[0]?.b64_json;
   if (!b64) throw new Error("OpenAI no b64");
+  return { status: "ready", modelId: `openai/${model}`, url: saveB64(b64, "img") };
+}
+
+/**
+ * OpenAI /v1/images/edits — reference-image ("subject") generation.
+ *
+ * Measured on the funded key 2026-09-21: the edits surface returns a usable
+ * composite in 16–24s with the product's large label text preserved (it is
+ * NOT pixel-perfect — small print can drift). Two parameters are deliberately
+ * absent: `input_fidelity` is rejected with a 400 on this account, and
+ * `quality` is the 5x-slower trap documented on the generations call above.
+ * The file field is sent as `image[]`, the form the same probe verified.
+ */
+async function genOpenAIImageEdit(
+  opts: GenOptions,
+  model: "gpt-image-1" | "gpt-image-2",
+  size: NonNullable<GenOptions["size"]>,
+  key: string,
+): Promise<GenResult> {
+  const { buffer, mime } = await fetchImageBuffer(opts.imageUrl!, { timeoutMs: 30_000 });
+  // /images/edits accepts png / jpeg / webp only, and rejects anything else
+  // with a 400 that reads like a prompt problem. Name the real cause.
+  if (!/^image\/(png|jpe?g|webp)$/i.test(mime)) {
+    throw new Error(`OpenAI edits: unsupported reference image type ${mime}`);
+  }
+  const ext = /png/i.test(mime) ? "png" : /webp/i.test(mime) ? "webp" : "jpg";
+  const form = new FormData();
+  form.append("model", model);
+  form.append("prompt", opts.prompt);
+  form.append("size", size);
+  form.append("n", "1");
+  form.append("image[]", new Blob([new Uint8Array(buffer)], { type: mime }), `reference.${ext}`);
+  const resp = await fetch("https://api.openai.com/v1/images/edits", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${key}` },
+    body: form,
+    signal: AbortSignal.timeout(180_000),
+  });
+  if (!resp.ok) {
+    const t = await resp.text();
+    throw new Error(`OpenAI edits ${resp.status}: ${t.slice(0, 200)}`);
+  }
+  const data: any = await resp.json();
+  const b64 = data?.data?.[0]?.b64_json;
+  if (!b64) throw new Error("OpenAI edits no b64");
   return { status: "ready", modelId: `openai/${model}`, url: saveB64(b64, "img") };
 }
 

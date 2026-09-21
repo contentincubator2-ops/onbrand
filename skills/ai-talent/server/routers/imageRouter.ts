@@ -3,7 +3,7 @@
  *
  * UI flow: user clicks "Generate Image" on a FB/IG content card →
  * we resolve brand visual context from the upstream decision chain →
- * call gpt-image-1 (fallback Imagen 3) → persist result → return URL / b64.
+ * call gpt-image-2 (fallback Flux Schnell) → persist result → return URL / b64.
  */
 
 import { z } from "zod";
@@ -51,7 +51,7 @@ export const imageRouter = router({
         size: size.optional(),
         modelChoice: modelChoice.optional(),
         /** 2026-07-25 (CJ product-faithful gen): real product photo URL —
-         *  routes to Nano Banana subject-reference with the fidelity guard. */
+         *  routes to gpt-image-2 subject-reference with the fidelity guard. */
         subjectImageUrl: z.string().url().max(2048).optional(),
         overrideBrandContext: z
           .object({

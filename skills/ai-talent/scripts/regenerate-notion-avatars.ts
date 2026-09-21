@@ -7,7 +7,7 @@
  *                              task_catalog rows (squads' crews + atomic
  *                              agents). ~10-20 images.
  *   AGENTS=all               — every agent in DB. WARNING: ~14k agents,
- *                              gpt-image-1 cost ~$0.04 each = thousands
+ *                              gpt-image-2 cost ~$0.04 each = thousands
  *                              of dollars. Don't run blindly.
  *   AGENTS=ids:1,2,3         — explicit comma-separated ID list.
  *
@@ -21,7 +21,7 @@
  * via a single callLLM round-trip — keeps each avatar distinctive
  * without us hand-writing 14k prompts.
  *
- * Pipeline per agent: gpt-image-1 1024 → sharp resize → 64/128/256/512
+ * Pipeline per agent: gpt-image-2 1024 → sharp resize → 64/128/256/512
  * variants. avatarUrl in DB → /static/covers/agent-<slug>.png.
  */
 import "dotenv/config";
@@ -63,7 +63,8 @@ async function genAvatarBase(prompt: string, savePath: string, bgHex: string): P
     method: "POST",
     headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
     body: JSON.stringify({
-      model: "gpt-image-1", prompt: fullPrompt,
+      // 2026-09-21 (CJ「生圖，正式環境的生圖，都採用 gpt image 2」).
+      model: "gpt-image-2", prompt: fullPrompt,
       size: "1024x1024", quality: "high", n: 1,
     }),
     signal: AbortSignal.timeout(180_000),
@@ -179,7 +180,7 @@ async function main() {
   if (limit) agents = agents.slice(0, limit);
   console.log(`[regenerate-notion-avatars] mode=${mode}, force=${force}, ${agents.length} agent(s)\n`);
   if (mode === "all" && agents.length > 100 && !process.env.I_KNOW_THE_COST) {
-    console.warn(`✗ AGENTS=all selected ${agents.length} agents. gpt-image-1 cost ~$0.04 ea = ~$${(agents.length * 0.04).toFixed(0)}.`);
+    console.warn(`✗ AGENTS=all selected ${agents.length} agents. gpt-image-2 cost ~$0.04 ea = ~$${(agents.length * 0.04).toFixed(0)}.`);
     console.warn(`  Set I_KNOW_THE_COST=1 to actually run, or use LIMIT=10 to sample first.`);
     await pool.end(); process.exit(1);
   }
