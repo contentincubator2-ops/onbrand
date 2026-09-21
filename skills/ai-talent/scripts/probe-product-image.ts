@@ -15,6 +15,7 @@
 import mysql from "mysql2/promise";
 import { statSync } from "fs";
 import { dispatchGenerate } from "../server/_core/mediaGen";
+import { fetchImageBuffer } from "../server/_core/imageFetch";
 
 /** Same candidate keys as mediaRouter.listProductImages — keep them in step. */
 function productImageUrl(positioning: unknown): string | null {
@@ -50,13 +51,28 @@ const [rows] = await conn.execute(
 ) as any;
 await conn.end();
 
+// A stored photo URL can be long dead (91APP links expire), and the app hides
+// those with the same check — so skip them here too instead of reporting the
+// dead link as a generation failure.
 let picked: { id: number; brandId: number; name: string; url: string } | null = null;
+let candidates = 0;
+let dead = 0;
 for (const row of rows as any[]) {
   const url = productImageUrl(row.positioning);
-  if (url) { picked = { id: Number(row.id), brandId: Number(row.brandId), name: String(row.name ?? ""), url }; break; }
+  if (!url) continue;
+  candidates += 1;
+  try {
+    await fetchImageBuffer(url, { timeoutMs: 15_000 });
+  } catch {
+    dead += 1;
+    continue;
+  }
+  picked = { id: Number(row.id), brandId: Number(row.brandId), name: String(row.name ?? ""), url };
+  break;
 }
+console.log(`scanned ${(rows as any[]).length} products, ${candidates} with a photo, ${dead} dead link(s) skipped`);
 if (!picked) {
-  console.log(`No product with a usable photo among ${(rows as any[]).length} rows — nothing to probe.`);
+  console.log("No product with a REACHABLE photo — nothing to probe.");
   process.exit(0);
 }
 console.log(`product #${picked.id} (brand ${picked.brandId}) ${picked.name}`);
