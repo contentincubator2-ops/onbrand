@@ -26,7 +26,7 @@ import {
   PRODUCT_SUBJECT_UNAVAILABLE_ERROR,
   resolveProductSubjectReference,
 } from "./productSubjectPolicy";
-import { probeImageUrl } from "./imageFetch";
+import { isLocalUploadPath, probeImageUrl } from "./imageFetch";
 import { findFirstUrl, fetchUrlSummary, formatUrlSummaryForPrompt, type UrlSummary } from "./urlContext";
 import { detectNonDeliverable } from "./captionSanity";
 import { isAdCopyTemplate, extractRequestedUrl, buildAdCopyRule, validateAdCopy, repairAdCopy } from "./adCopyContract";
@@ -1726,7 +1726,7 @@ async function loadProductImageUrl(brandId?: number | null, productId?: number |
         : null,
     ];
     for (const c of candidates) {
-      if (typeof c === "string" && /^https?:\/\//.test(c) && await probeImageUrl(c, 8_000)) return c;
+      if (typeof c === "string" && (/^https?:\/\//.test(c) || isLocalUploadPath(c)) && await probeImageUrl(c, 8_000)) return c;
     }
     return null;
   } catch {

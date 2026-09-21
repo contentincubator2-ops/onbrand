@@ -14,6 +14,7 @@ import { router, protectedProcedure } from "../../platform/core/trpc";
 import { getDb } from "../../db";
 import { sql } from "drizzle-orm";
 import { generateImage, resolveBrandVisualContext } from "../core/imageGen";
+import { isLocalUploadPath } from "../core/imageFetch";
 import { assertBrandOwner } from "../../platform/core/brandAuth";
 import { imageActionForRequest, reconcileImageCharge } from "../../platform/core/imageBilling";
 import {
@@ -69,7 +70,9 @@ export const imageRouter = router({
         /** 2026-07-25 (CJ product-faithful gen): real product photo URL —
          *  sent as the reference image (gpt-image-2 edits, or Nano Banana when
          *  picked) with the fidelity guard. */
-        subjectImageUrl: z.string().url().max(2048).optional(),
+        subjectImageUrl: z.string().max(2048)
+          .refine((v) => /^https?:\/\/\S+$/.test(v) || isLocalUploadPath(v), { message: "subjectImageUrl must be an http(s) URL or an uploaded product photo" })
+          .optional(),
         overrideBrandContext: z
           .object({
             positioning: z.string().optional(),

@@ -34,7 +34,7 @@ import { callLLM } from "../../platform/core/llmRouter";
 import { type GenOptions } from "../core/mediaGen";
 import { generateStillImage } from "../core/stillImageModels";
 import localPool from "../../localDb";
-import { probeImageUrl } from "../core/imageFetch";
+import { isLocalUploadPath, probeImageUrl } from "../core/imageFetch";
 
 const PRODUCT_IMAGE_CACHE_TTL_MS = 5 * 60_000;
 const PRODUCT_IMAGE_CACHE_MAX_ENTRIES = 1_000;
@@ -255,7 +255,8 @@ ${input.audienceContext ? `受眾：${input.audienceContext}` : ""}
             Array.isArray(p?._assets?.photos) ? (typeof p._assets.photos[0] === "string" ? p._assets.photos[0] : p._assets.photos[0]?.url) : null,
           ];
           for (const c of candidates) {
-            if (typeof c === "string" && /^https?:\/\//.test(c)) {
+            // 用戶上傳的照片是相對路徑（/static/asset-photos/…），不是 http(s)——也要收。
+            if (typeof c === "string" && (/^https?:\/\//.test(c) || isLocalUploadPath(c))) {
               products.push({ productId: Number(row.id), name: String(row.name ?? ""), imageUrl: c });
               break;
             }

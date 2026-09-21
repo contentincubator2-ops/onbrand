@@ -1,3 +1,5 @@
+import { promises as fs } from "fs";
+import { join } from "path";
 import { assertUrlSafe } from "./urlGuard";
 
 const DEFAULT_TIMEOUT_MS = 10_000;
@@ -53,6 +55,30 @@ export function detectRasterImageMime(bytes: Uint8Array): string | null {
     if (brand === "avif" || brand === "avis") return "image/avif";
   }
   return null;
+}
+
+/**
+ * 用戶自己上傳的產品／品牌照片（asset_photos）存的是相對路徑 `/static/asset-photos/<scope>/<id>/<檔名>`，
+ * 不是 http(s) 網址。2026-09-22（CJ「右方缺乏了用產品圖生圖的選項」）：三個「找產品圖」的地方都要求
+ * `https?://`，於是上傳的照片全被丟掉，選項整個不出現。這裡把它認成合法來源，而且直接從本機硬碟讀，
+ * 不繞公開網址回打自己（那條路要靠伺服器能連到自己的公開網域，不可靠）。
+ *
+ * 只認相對路徑＋固定三段結構＋不含 `..`，所以碰不到硬碟上的其他檔案；別的主機上長得一樣的
+ * 路徑是絕對網址，不會走這條。
+ */
+export function localUploadFile(url: unknown): string | null {
+  if (typeof url !== "string") return null;
+  const prefix = (process.env.ASSET_PHOTO_URL_PREFIX ?? "/static/asset-photos").replace(/\/+$/, "");
+  if (!url.startsWith(prefix + "/")) return null;
+  const m = url.slice(prefix.length + 1).match(/^(brand|product)\/(\d+)\/([A-Za-z0-9][A-Za-z0-9._-]*)$/);
+  if (!m || m[3]!.includes("..")) return null;
+  const root = process.env.ASSET_PHOTO_DIR ?? join(process.cwd(), "storage", "asset-photos");
+  return join(root, m[1]!, m[2]!, m[3]!);
+}
+
+/** Is this a photo the user uploaded to us (readable from local disk)? */
+export function isLocalUploadPath(url: unknown): boolean {
+  return localUploadFile(url) !== null;
 }
 
 function invalidImageBytes(): InvalidImageResponseError {
@@ -155,6 +181,16 @@ export async function fetchImageBuffer(
 ): Promise<{ buffer: Buffer; mime: string }> {
   const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   const maxBytes = options.maxBytes ?? DEFAULT_MAX_BYTES;
+  const local = localUploadFile(url);
+  if (local) {
+    let buffer: Buffer;
+    try { buffer = await fs.readFile(local); }
+    catch { throw new InvalidImageResponseError("產品圖片連結已失效：找不到上傳的照片檔"); }
+    if (buffer.length > maxBytes) throw new InvalidImageResponseError("產品圖片連結已失效：圖片檔案過大");
+    const localMime = detectRasterImageMime(buffer);
+    if (!localMime) throw invalidImageBytes();
+    return { buffer, mime: localMime };
+  }
   const { response } = await fetchImageResponse(url, timeoutMs);
   const declaredLength = Number(response.headers.get("content-length") ?? 0);
   if (declaredLength > maxBytes) {
@@ -169,6 +205,17 @@ export async function fetchImageBuffer(
 
 /** Validate status + final content type without downloading the whole body. */
 export async function probeImageUrl(url: string, timeoutMs = 5_000): Promise<boolean> {
+  const local = localUploadFile(url);
+  if (local) {
+    try {
+      const handle = await fs.open(local, "r");
+      try {
+        const head = Buffer.alloc(IMAGE_SIGNATURE_BYTES);
+        const { bytesRead } = await handle.read(head, 0, IMAGE_SIGNATURE_BYTES, 0);
+        return detectRasterImageMime(head.subarray(0, bytesRead)) !== null;
+      } finally { await handle.close(); }
+    } catch { return false; }
+  }
   try {
     const { response } = await fetchImageResponse(url, timeoutMs);
     const prefix = await readImagePrefix(response);

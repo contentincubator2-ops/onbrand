@@ -8,7 +8,7 @@
  * AI 生成不是像素級保真——標籤小字、瓶蓋顏色都可能跟原照片有出入。所以結果永遠跟原照片並排，
  * 並明講這件事；每一張做過的圖都留在這次視窗裡，可以隨時選回來。
  */
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { trpc } from "../../../../lib/trpc";
 import { useLang } from "../../../../lib/i18n";
 
@@ -56,7 +56,6 @@ export default function ProductSceneModal({
   }, [photos, photoUrl]);
 
   const generateMut = (trpc as any).image.generate.useMutation();
-  const absolute = useMemo(() => (photoUrl ? new URL(photoUrl, window.location.origin).href : ""), [photoUrl]);
   const generic = label("暫時無法處理，請再試一次。", "Something went wrong. Please try again.");
 
   function run(model: Model) {
@@ -66,7 +65,7 @@ export default function ProductSceneModal({
     generateMut.mutate({
       brandId,
       prompt: scene.trim() || DEFAULT_SCENE,
-      subjectImageUrl: absolute,
+      subjectImageUrl: photoUrl,
       modelChoice: model,
       size,
     }, {
