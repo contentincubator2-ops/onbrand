@@ -40,7 +40,8 @@
  * ——衣服的照片跟真人模特照是兩張分開的輸入，各自的身份不互相污染。
  */
 import sharp from "sharp";
-import { removeProductBackground } from "./productImageCutout";
+import { obtainCutout } from "./reliableCutout";
+import type { CutoutIssue } from "./cutoutQuality";
 import { generateImage } from "./imageGen";
 import { fetchImageBuffer } from "./imageFetch";
 
@@ -52,13 +53,34 @@ export interface SceneComposeInput {
   scenePrompt?: string;
   width?: number;
   height?: number;
+  /** 用戶在預覽步驟確認過的去背圖（我們自己存的 PNG）。有的話不再呼叫去背服務。 */
+  approvedCutout?: Buffer;
+  /** 用戶選擇直接用 AI 重繪版（不去背）。 */
+  skipCutout?: boolean;
 }
 
+/**
+ * 這張圖是怎麼出的：
+ *   composite            去背＋合成，產品像素沒被重畫（預設，最精準）
+ *   generative           拿不到可用的去背時，改走 Nano Banana 帶參考圖重繪（產品細節可能有差異）
+ *   original-on-backdrop 連重繪也失敗時，把原照片整張放在中性背景上（保證有圖出）
+ */
+export type SceneMethod = "composite" | "generative" | "original-on-backdrop";
+
 export interface SceneComposeResult {
+  method: SceneMethod;
+  /** 去背嘗試次數（用戶確認過的去背圖為 0）。 */
+  attempts: number;
+  /** 去背檢查發現的問題（軟性提醒），沒問題是空陣列。 */
+  qaIssues: CutoutIssue[];
+  /** 遮罩有軟性問題，建議用戶看一眼。 */
+  needsReview: boolean;
+  /** 沒走 composite 的原因：no_cutout_service／cutout_failed／cutout_unusable／user_choice。 */
+  fallbackReason?: string;
   pngBuffer: Buffer;
   /** 背景生成時實際用的 prompt（含守則）——存進 caption/telemetry 用。 */
   backgroundPrompt: string;
-  /** 產品那層是不是真的去背了（false=去背服務不可用，退回原圖裁切）。 */
+  /** 只有 method === "composite" 才是 true（產品像素沒被重畫）。 */
   hadCutout: boolean;
   /** 背景生成失敗時用中性色塊墊底而不是整個拋錯——寧可素一點也不要失敗。 */
   usedFallbackBackground: boolean;
@@ -164,12 +186,84 @@ async function renderShadow(
   }
 }
 
+async function composeWithoutCutout(
+  input: SceneComposeInput, width: number, height: number,
+): Promise<{ pngBuffer: Buffer; method: SceneMethod; backgroundPrompt: string }> {
+  const sceneText = (input.scenePrompt ?? "").trim() || DEFAULT_SCENE;
+
+  // 備援一：帶參考圖的重繪（PRODUCT_FAITHFUL 守則由 generateImage 在有 subjectImageUrl 時自動加）。
+  // 不精準，但至少是這個產品；失敗就往下一層，不丟錯。
+  try {
+    const gen = await generateImage({
+      brandId: input.brandId,
+      prompt: `A photorealistic product photograph of the product in the reference image, placed in this scene: ${sceneText}.`,
+      subjectImageUrl: input.productImageUrl,
+      size: width >= height ? (width === height ? "1024x1024" : "1536x1024") : "1024x1536",
+    });
+    let buf: Buffer | null = null;
+    if (gen.status === "ready" && gen.url) buf = (await fetchImageBuffer(gen.url, { timeoutMs: 15_000 })).buffer;
+    else if (gen.status === "ready" && gen.b64) buf = Buffer.from(gen.b64, "base64");
+    if (buf) {
+      return {
+        pngBuffer: await sharp(buf).resize(width, height, { fit: "cover" }).png().toBuffer(),
+        method: "generative",
+        backgroundPrompt: gen.effectivePrompt || sceneText,
+      };
+    }
+  } catch (e) {
+    console.warn("[productSceneComposer] faithful generation failed, using original-on-backdrop:", (e as Error).message);
+  }
+
+  // 備援二：原照片整張放在中性背景上。沒有去背、沒有場景，但保證有圖、產品一個像素都沒動。
+  // 連原照片都讀不到才會丟錯——那是照片本身的問題，不是去背的問題。
+  const { buffer } = await fetchImageBuffer(input.productImageUrl, { timeoutMs: 15_000 });
+  const meta = await sharp(buffer).metadata();
+  const placement = productPlacement(width, height, meta.width ?? width, meta.height ?? height);
+  const layer = await sharp(buffer)
+    .resize(placement.width, placement.height, { fit: "inside", withoutEnlargement: true })
+    .png().toBuffer();
+  const layerMeta = await sharp(layer).metadata();
+  const backdrop = await sharp({
+    create: { width, height, channels: 4, background: { r: 244, g: 243, b: 240, alpha: 1 } },
+  }).png().toBuffer();
+  const pngBuffer = await sharp(backdrop).composite([{
+    input: layer,
+    left: placement.left + Math.round((placement.width - (layerMeta.width ?? placement.width)) / 2),
+    top: placement.top + Math.round((placement.height - (layerMeta.height ?? placement.height)) / 2),
+  }]).png().toBuffer();
+  return { pngBuffer, method: "original-on-backdrop", backgroundPrompt: sceneText };
+}
+
 export async function composeProductScene(input: SceneComposeInput): Promise<SceneComposeResult> {
   const width = input.width ?? 1080;
   const height = input.height ?? 1080;
 
-  // 1. 產品去背，再裁到「真的有東西」的範圍。
-  //
+  // 1. 去背。2026-09-21（CJ「失敗立刻重新嘗試，不能出現錯誤」）：去背由 obtainCutout
+  //    負責重試與檢查；仍然拿不到可用的去背時，走 composeWithoutCutout 出圖，
+  //    而不是把失敗丟給用戶、也不是悄悄把整張原圖當成「去背成功」貼上去。
+  let cutoutBuf: Buffer | null = input.approvedCutout ?? null;
+  let attempts = 0;
+  let qaIssues: CutoutIssue[] = [];
+  let needsReview = false;
+  let fallbackReason: string | undefined = input.skipCutout ? "user_choice" : undefined;
+
+  if (!cutoutBuf && !input.skipCutout) {
+    const out = await obtainCutout(input.productImageUrl);
+    attempts = out.attempts;
+    qaIssues = out.issues;
+    if (out.ok) { cutoutBuf = out.pngBuffer; needsReview = out.needsReview; }
+    else fallbackReason = out.reason;
+  }
+
+  if (!cutoutBuf) {
+    const fb = await composeWithoutCutout(input, width, height);
+    return {
+      pngBuffer: fb.pngBuffer, backgroundPrompt: fb.backgroundPrompt,
+      hadCutout: false, usedFallbackBackground: false,
+      method: fb.method, attempts, qaIssues, needsReview: false, fallbackReason,
+    };
+  }
+
   // 2026-09-10 自己側測抓到的第二個 bug：Replicate 回來的去背圖是跟原圖同一張
   // 畫布（背景變透明，但畫布尺寸不變）——原始照片如果拍的時候產品沒有塞滿整個
   // 畫面（很常見，電商圖常常四周留白），去背圖就會帶著一大圈透明留白。後面的
@@ -177,8 +271,7 @@ export async function composeProductScene(input: SceneComposeInput): Promise<Sce
   // 縮得比預期小，陰影的「底部一小段」還可能整段落在留白裡（側測就是踩到這個：
   // 陰影完全不見了，因為採樣的底部 12% 全部是透明的，不是產品本體）。trim()
   // 一律先做，把留白裁掉，兩個問題一次解決。
-  const cutout = await removeProductBackground(input.productImageUrl);
-  const trimmedCutoutBuffer = await sharp(cutout.pngBuffer).trim().png().toBuffer().catch(() => cutout.pngBuffer);
+  const trimmedCutoutBuffer = await sharp(cutoutBuf).trim().png().toBuffer().catch(() => cutoutBuf!);
   const productMeta = await sharp(trimmedCutoutBuffer).metadata();
   const pW = productMeta.width ?? width;
   const pH = productMeta.height ?? height;
@@ -227,5 +320,8 @@ export async function composeProductScene(input: SceneComposeInput): Promise<Sce
 
   const pngBuffer = await sharp(backgroundBuffer).composite(layers).png().toBuffer();
 
-  return { pngBuffer, backgroundPrompt, hadCutout: cutout.hadAlpha, usedFallbackBackground };
+  return {
+    pngBuffer, backgroundPrompt, hadCutout: true, usedFallbackBackground,
+    method: "composite", attempts, qaIssues, needsReview,
+  };
 }

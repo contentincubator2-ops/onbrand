@@ -17,6 +17,7 @@ import { trpc } from "../../../../lib/trpc";
 import { useLang } from "../../../../lib/i18n";
 import { X, Plus, Trash2, RefreshCw, Sparkles } from "lucide-react";
 import AssetPhotoGallery from "./AssetPhotoGallery";
+import ProductSceneModal from "./ProductSceneModal";
 
 interface PromotionPeriod {
   label: string;      // e.g. "母親節" "年終特賣"
@@ -149,6 +150,7 @@ function PeriodRow({
 export default function ProductDetailModal({ productId, brandId, onClose, onReposition, onImageUpdated }: Props) {
   const { lang } = useLang();
   const en = lang === "en";
+  const [sceneOpen, setSceneOpen] = useState(false);
 
   // Fetch product
   const productQ = (trpc as any).product?.get?.useQuery?.(
@@ -350,6 +352,17 @@ export default function ProductDetailModal({ productId, brandId, onClose, onRepo
                 scopeLabel={en ? "this product" : "這個產品"}
                 onChange={() => { productQ?.refetch?.(); onImageUpdated?.(); }}
               />
+              {/* 2026-09-21：產品保真生圖的入口——這條 API 之前沒有任何畫面在用。 */}
+              <button
+                type="button"
+                onClick={() => setSceneOpen(true)}
+                className="mt-2 text-xs font-semibold px-3 py-1.5 rounded-lg border border-neutral-200 hover:border-neutral-400 text-neutral-800"
+              >
+                {en ? "Make a scene from these photos" : "用這些照片做場景圖"}
+              </button>
+              {sceneOpen && (
+                <ProductSceneModal brandId={brandId} productId={productId} onClose={() => setSceneOpen(false)} />
+              )}
             </div>
 
             {/* Tagline */}

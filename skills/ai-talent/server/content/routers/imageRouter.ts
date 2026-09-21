@@ -240,6 +240,37 @@ Rules:
     }),
 
   /**
+   * 2026-09-21（CJ「讓用戶參與過程」＋「失敗立刻重新嘗試，不能出現錯誤」）：先把去背
+   * 做出來給用戶看，確認了才合成。去背服務失敗會自動重試（reliableCutout），
+   * 仍拿不到可用的去背時回 ok:false + willUseFallback，前端告訴用戶「這張會改用
+   * AI 重繪版」——這裡永遠不丟錯，出圖那一步也有備援，用戶不會卡在錯誤畫面。
+   * 預覽不扣點（去背一次約 US$0.0023）；要合成時才走 generateProductScene 計費。
+   */
+  previewProductCutout: protectedProcedure
+    .input(z.object({
+      brandId: z.number().int().positive(),
+      productImageUrl: z.string().url().max(2048),
+    }))
+    .mutation(async ({ input, ctx }) => {
+      if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED" });
+      await assertBrandOwner(ctx.user.id, input.brandId);
+      const { obtainCutout } = await import("../core/reliableCutout");
+      const out = await obtainCutout(input.productImageUrl);
+      if (!out.ok) {
+        return {
+          ok: false as const, attempts: out.attempts, reason: out.reason, issues: out.issues,
+          willUseFallback: true as const,
+        };
+      }
+      const { writeGeneratedImage } = await import("../core/generatedImageStore");
+      const cutoutUrl = await writeGeneratedImage(input.brandId, out.pngBuffer);
+      return {
+        ok: true as const, attempts: out.attempts, issues: out.issues,
+        needsReview: out.needsReview, cutoutUrl,
+      };
+    }),
+
+  /**
    * 2026-09-10（避開產品變形計畫，步驟 1-2）：產品照片放進 AI 生成的照片級
    * 場景——產品像素從頭到尾沒有被任何生圖模型碰過（見 productSceneComposer.ts
    * 開頭的說明），只有背景是 AI 生的。跟 generate 一樣走點數與
@@ -254,6 +285,10 @@ Rules:
       optionId: z.number().int().positive().optional(),
       width: z.number().int().min(256).max(2048).optional(),
       height: z.number().int().min(256).max(2048).optional(),
+      /** previewProductCutout 回傳、用戶確認過的去背圖網址。 */
+      approvedCutoutUrl: z.string().max(300).optional(),
+      /** 用戶選擇直接用 AI 重繪版（不去背）。 */
+      useGenerative: z.boolean().optional(),
     }))
     .mutation(async ({ input, ctx }) => {
       if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED" });
@@ -275,12 +310,19 @@ Rules:
 
       try {
         const { composeProductScene } = await import("../core/productSceneComposer");
+        const { readGeneratedImage } = await import("../core/generatedImageStore");
+        // 用戶確認過的去背圖：只認我們自己存的檔（見 readGeneratedImage），讀不到就當沒有、走自動去背。
+        const approvedCutout = input.approvedCutoutUrl && !input.useGenerative
+          ? await readGeneratedImage(input.brandId, input.approvedCutoutUrl)
+          : null;
         const scene = await composeProductScene({
           brandId: input.brandId,
           productImageUrl: input.productImageUrl,
           scenePrompt: input.scenePrompt,
           width: input.width,
           height: input.height,
+          approvedCutout: approvedCutout ?? undefined,
+          skipCutout: input.useGenerative,
         });
 
         const { writeGeneratedImage } = await import("../core/generatedImageStore");
@@ -297,6 +339,8 @@ Rules:
         return {
           id, url, status: "ready" as const,
           hadCutout: scene.hadCutout, usedFallbackBackground: scene.usedFallbackBackground,
+          method: scene.method, attempts: scene.attempts, qaIssues: scene.qaIssues,
+          needsReview: scene.needsReview, fallbackReason: scene.fallbackReason ?? null,
         };
       } catch (error: any) {
         const msg = String(error?.message ?? error).slice(0, 400);

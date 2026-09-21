@@ -21,3 +21,19 @@ export async function writeGeneratedImage(brandId: number, pngBuffer: Buffer): P
   await fs.writeFile(join(dir, fileName), pngBuffer);
   return `${URL_PREFIX}/${brandId}/${fileName}`;
 }
+
+/**
+ * 讀回「我們自己存的」PNG。只認 URL_PREFIX/<brandId>/<檔名>.png 這個形狀，且 brandId 必須
+ * 對得上——否則回 null。呼叫端拿到的網址來自用戶端，不能讓它指到任意檔案。
+ */
+export async function readGeneratedImage(brandId: number, url: string): Promise<Buffer | null> {
+  const prefix = `${URL_PREFIX}/${brandId}/`;
+  if (typeof url !== "string" || !url.startsWith(prefix)) return null;
+  const name = url.slice(prefix.length);
+  if (!/^[A-Za-z0-9-]+\.png$/.test(name)) return null;
+  try {
+    return await fs.readFile(join(GENERATED_IMAGE_STORAGE_ROOT, String(brandId), name));
+  } catch {
+    return null;
+  }
+}
