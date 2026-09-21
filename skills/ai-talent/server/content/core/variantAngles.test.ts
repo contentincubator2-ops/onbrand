@@ -84,6 +84,48 @@ describe("checkAngle：數據版一定要用數字開場（唯一能機器驗證
     expect(issue).toContain("數字");
   });
 
+  // 第一次真實跑出來的問題：「7 片蘇格蘭風景裡，洛蒙德湖排在第 1 號」——有數字，但 7 是編的。
+  describe("數字必須對得回素材，不能是杜撰的統計", () => {
+    const SOURCE = "洛蒙德湖系列首支登場：No. 01 洛蒙德湖，有空間噴霧、擴香、香氛蠟燭三種使用方式。";
+
+    it("開頭的數字不在素材裡、也不是這篇自己列的數量 → 要求重寫，並點名那個數字", () => {
+      const issue = checkAngle("數據版", "7 片蘇格蘭風景裡，洛蒙德湖排在第 1 號。", "", SOURCE);
+      expect(issue).toContain("「7」");
+      expect(issue).toContain("杜撰");
+    });
+
+    it.each([
+      "3 種方式，把洛蒙德湖的安靜帶回家。",        // 這篇自己列出的數量（種）
+      "No. 01 洛蒙德湖，是這個系列的第 1 支。",     // 01 在素材裡
+      "5 分鐘，讓房間從白天切換成夜晚。",           // 小量的時間計量
+    ])("素材裡有、或是這篇自己數出來的量 → 通過：%s", (caption) => {
+      expect(checkAngle("數據版", caption, "", SOURCE)).toBeNull();
+    });
+
+    it("大的量詞數字（不是素材裡的）也算杜撰：「90%」「1200 位」", () => {
+      expect(checkAngle("數據版", "90% 的人回到家都會先開燈。", "", SOURCE)).toContain("杜撰");
+      expect(checkAngle("數據版", "1200 位客人都說過同一句話。", "", SOURCE)).toContain("杜撰");
+    });
+
+    it("整個數字才算數：素材裡有 17 或 2027，不能替 7 背書；01 與 1 是同一個數字", () => {
+      const source = "成立於 2017 年，門市 17 間。No. 01 系列。";
+      expect(checkAngle("數據版", "7 片風景裡排第一。", "", source)).toContain("杜撰");
+      expect(checkAngle("數據版", "17 間門市，都收得到這一支。", "", source)).toBeNull();
+      expect(checkAngle("數據版", "No. 1 洛蒙德湖，剛登場。", "", source)).toBeNull();
+    });
+
+    it("沒有給素材時只驗「有沒有數字」，不亂判", () => {
+      expect(checkAngle("數據版", "7 片蘇格蘭風景裡，洛蒙德湖排在第 1 號。")).toBeNull();
+    });
+  });
+
+  it("理性版禁止比喻與擬人，要求用直述判斷句", () => {
+    const block = angleWritingBlock("理性版");
+    expect(block).toContain("不用比喻、擬人與詩意修辭");
+    expect(block).toContain("適合");
+    expect(block).toContain("代價是");
+  });
+
   it("其他切角不做機器判斷（不假裝能評語氣）", () => {
     for (const label of ["情感版", "理性版", "故事版", "懸念版", "反差版"]) {
       expect(checkAngle(label, "一句沒有數字的話")).toBeNull();

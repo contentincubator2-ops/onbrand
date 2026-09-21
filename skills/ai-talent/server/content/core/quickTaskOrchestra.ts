@@ -1249,7 +1249,8 @@ async function callOneVariant(args: {
           }
           // 版本名稱要對得上內文：數據版一定要用數字開場，沒有就帶著原因重寫一次。
           // 最後一次照實出貨（不為了切角把整個變體弄成空白）。
-          const angleMiss = checkAngle(label, caption, template.systemPrompt);
+          // 數字必須對得回素材：用戶輸入、抓到的網址內容、品牌資料。
+          const angleMiss = checkAngle(label, caption, template.systemPrompt, [userMsg, urlContext, brandPrefix].join("\n"));
           if (angleMiss && attempt < 2) {
             lastErr = new Error(`angle miss for ${label}: ${angleMiss}`);
             angleIssue = angleMiss;
