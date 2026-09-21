@@ -236,7 +236,7 @@ function synthesizeStages(elapsedMs: number, tier: string, lang: string): any[] 
   if (isProd) stages.push(mk("strategist", L("Strategist 規劃敘事弧", "Strategist maps the narrative arc"), preEnd, stratEnd));
   stages.push(mk("caption", L("文案寫手 撰寫版本", "Caption writer drafts variants"), capStart, capEnd));
   stages.push(mk("brief", L("視覺指導寫風格指示", "Image director writes the visual brief"), capStart, capEnd));
-  stages.push(mk("gen", L("Flux 生圖", "Flux paints the image"), capEnd, genEnd));
+  stages.push(mk("gen", L("AI 生圖", "AI paints the image"), capEnd, genEnd));
   if (isProd) {
     stages.push(mk("extras", L("留言模板 / 發文時段 / 跟進", "Reply templates · timing · follow-up"), capEnd, extrasEnd));
     stages.push(mk("qa", L("Jordan Hayes 審核", "Jordan Hayes reviews"), extrasEnd, qaEnd));

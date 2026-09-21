@@ -8,8 +8,8 @@
  *           — agent writes the actual AI prompt (English for image
  *           models).
  *   Step 3  generate(prompt, modelId, options)
- *           — dispatches to the chosen provider (gpt-image / Imagen /
- *           Hailuo / Seedance / etc.) and returns the asset URL/b64.
+ *           — runs the chosen model (GPT Image 2, or Nano Banana when picked)
+ *           via generateStillImage and returns the asset URL.
  *
  * Users can skip steps 1 and 2 (per CJ "不一定要走完三步") — they may
  * call generate() directly with a hand-crafted prompt + model choice.
@@ -31,7 +31,8 @@ function isProviderKeyError(text: string): boolean {
 import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure } from "../../platform/core/trpc";
 import { callLLM } from "../../platform/core/llmRouter";
-import { dispatchGenerate, type GenOptions } from "../core/mediaGen";
+import { type GenOptions } from "../core/mediaGen";
+import { generateStillImage } from "../core/stillImageModels";
 import localPool from "../../localDb";
 import { probeImageUrl } from "../core/imageFetch";
 
@@ -163,10 +164,11 @@ ${input.audienceContext ? `受眾：${input.audienceContext}` : ""}
       }
     }),
 
-  // ── Step 3 — real media generation via dispatchGenerate ────────────────
+  // ── Step 3 — image generation via generateStillImage (gpt-image-2 / Nano Banana) ──
   generate: protectedProcedure
     .input(z.object({
       kind: z.enum(["image"]),
+      /** "openai/gpt-image-2" (default) or "google/nano-banana". Any retired id resolves to gpt-image-2. */
       modelId: z.string(),
       promptEn: z.string().min(2).max(8000),
       brandId: z.number().nullable().optional(),
@@ -189,8 +191,7 @@ ${input.audienceContext ? `受眾：${input.audienceContext}` : ""}
       // instead — the real product's own label must remain letter-perfect,
       // so the blanket text-suppression negative is NOT sent.
       const {
-        NO_TEXT_PROMPT_BLOCK, NO_TEXT_NEGATIVE_PROMPT, PRODUCT_FAITHFUL_PROMPT_BLOCK,
-        NO_MIRROR_PROMPT_BLOCK, NO_MIRROR_NEGATIVE_PROMPT,
+        NO_TEXT_PROMPT_BLOCK, PRODUCT_FAITHFUL_PROMPT_BLOCK, NO_MIRROR_PROMPT_BLOCK,
       } = await import("../core/imageGen");
       const isImage = input.kind === "image";
       const isProductSubject = isImage && input.subjectMode === "product" && !!input.imageUrl;
@@ -198,38 +199,28 @@ ${input.audienceContext ? `受眾：${input.audienceContext}` : ""}
         prompt: isProductSubject
           ? `${input.promptEn}\n\n${PRODUCT_FAITHFUL_PROMPT_BLOCK}\n\n${NO_MIRROR_PROMPT_BLOCK}`
           : isImage ? `${input.promptEn}\n\n${NO_TEXT_PROMPT_BLOCK}\n\n${NO_MIRROR_PROMPT_BLOCK}` : input.promptEn,
-        negativePrompt: !isImage ? undefined : isProductSubject ? NO_MIRROR_NEGATIVE_PROMPT : NO_TEXT_NEGATIVE_PROMPT,
         aspectRatio: input.aspectRatio,
         size: input.size,
         imageUrl: input.imageUrl,
         quality: input.quality,
         brandId: input.brandId ?? null,
       };
-      try {
-        const res = await dispatchGenerate(input.modelId, opts);
-        return {
-          ok: res.status === "ready",
-          status: res.status,
-          modelId: res.modelId,
-          url: res.url,
-          taskId: res.taskId,
-          message: res.errorMsg
-            ? (isProviderKeyError(res.errorMsg)
-                ? "AI 圖片服務的金鑰異常，SoWork 已收到通知正在處理。"
-                : redactProviderSecrets(res.errorMsg))
-            : (res.status === "ready"   ? "生成完成"
-            : res.status === "submitted" ? "已提交，等候生成（請稍後輪詢）"
-            : "生成失敗"),
-        };
-      } catch (e) {
-        throw new TRPCError({
-          code: "INTERNAL_SERVER_ERROR",
-          message: (() => {
-            const msg = redactProviderSecrets(e instanceof Error ? e.message : String(e));
-            return isProviderKeyError(msg) ? "AI 圖片服務的金鑰異常，SoWork 已收到通知正在處理。" : msg;
-          })(),
-        });
-      }
+      // One model, retried once, never swapped. A failure is a normal result
+      // (ok:false + canSwitchTo) so the UI can offer「改用 Nano Banana」.
+      const res = await generateStillImage(input.modelId, opts, { attemptTimeoutMs: 60_000 });
+      return {
+        ok: res.status === "ready",
+        status: res.status,
+        modelId: res.modelId,
+        url: res.url,
+        canSwitchTo: res.canSwitchTo,
+        failureKind: res.failureKind,
+        message: res.errorMsg
+          ? (isProviderKeyError(res.errorMsg)
+              ? "AI 圖片服務的金鑰異常，SoWork 已收到通知正在處理。"
+              : redactProviderSecrets(res.errorMsg))
+          : "生成完成",
+      };
     }),
 
   /**

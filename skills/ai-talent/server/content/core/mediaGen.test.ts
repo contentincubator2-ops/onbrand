@@ -25,23 +25,6 @@ describe("mediaGen image provider request contracts", () => {
     vi.stubEnv("GOOGLE_AI_API_KEY", "");
     vi.stubEnv("GOOGLE_API_KEY", "");
     vi.stubEnv("OPENAI_API_KEY", "test-openai-key");
-    vi.stubEnv("AZURE_IMAGE_API_KEY", "test-azure-key");
-    vi.stubEnv("HAILUO_API_KEY", "test-hailuo-key");
-  });
-
-  it("sends the requested portrait ratio to Imagen 4", async () => {
-    const fetchMock = vi.fn(async () => new Response(JSON.stringify({
-      predictions: [{ bytesBase64Encoded: "aW1hZ2U=" }],
-    }), { status: 200, headers: { "content-type": "application/json" } }));
-    vi.stubGlobal("fetch", fetchMock);
-
-    await expect(dispatchGenerate("google/imagen-4-default", {
-      prompt: "portrait scene",
-      aspectRatio: "9:16",
-    })).resolves.toMatchObject({ status: "ready" });
-
-    const body = JSON.parse(String(fetchMock.mock.calls[0]![1]?.body));
-    expect(body.parameters).toMatchObject({ sampleCount: 1, aspectRatio: "9:16" });
   });
 
   // 2026-09-01: quality="high" made gpt-image-2 take 73.8s instead of 14.1s
@@ -79,9 +62,56 @@ describe("mediaGen image provider request contracts", () => {
     expect(body.quality).toBe("low");
   });
 
+  // 2026-09-21（CJ「不論是否有產品圖，都只用 gpt image 2」）：有參考圖走 /images/edits，
+  // 實測同一張香水瓶照片標籤文字完整；gpt-image-2 不吃 input_fidelity（400）。
+  describe("openai/gpt-image-2 with a reference photo", () => {
+    const ok = () => new Response(JSON.stringify({ data: [{ b64_json: "aW1hZ2U=" }] }), { status: 200 });
+
+    it("posts multipart to /images/edits with the photo as image[], and never sends input_fidelity or quality", async () => {
+      fetchImageBufferMock.mockResolvedValue({ buffer: Buffer.from("not-a-real-image"), mime: "image/webp" });
+      const fetchMock = vi.fn(async () => ok());
+      vi.stubGlobal("fetch", fetchMock);
+
+      await expect(dispatchGenerate("openai/gpt-image-2", {
+        prompt: "put this bottle on a mossy rock", aspectRatio: "16:9",
+        imageUrl: "https://example.com/bottle.webp",
+      })).resolves.toMatchObject({ status: "ready", modelId: "openai/gpt-image-2" });
+
+      const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+      expect(url).toBe("https://api.openai.com/v1/images/edits");
+      expect((init.headers as Record<string, string>).Authorization).toBe("Bearer test-openai-key");
+      expect((init.headers as Record<string, string>)["Content-Type"]).toBeUndefined(); // fetch sets the multipart boundary
+      const form = init.body as FormData;
+      expect(form.get("model")).toBe("gpt-image-2");
+      expect(form.get("prompt")).toBe("put this bottle on a mossy rock");
+      expect(form.get("size")).toBe("1536x1024");
+      expect(form.get("n")).toBe("1");
+      expect(form.has("input_fidelity")).toBe(false);
+      expect(form.has("quality")).toBe(false);
+      const file = form.get("image[]") as File;
+      expect(file.name).toBe("reference.webp");
+      expect(file.type).toBe("image/webp");
+    });
+
+    it("still sends an explicitly requested quality", async () => {
+      fetchImageBufferMock.mockResolvedValue({ buffer: Buffer.from("x"), mime: "image/png" });
+      const fetchMock = vi.fn(async () => ok());
+      vi.stubGlobal("fetch", fetchMock);
+      await dispatchGenerate("openai/gpt-image-2", { prompt: "p", imageUrl: "https://e/x.png", quality: "medium" });
+      expect(((fetchMock.mock.calls[0] as any)[1].body as FormData).get("quality")).toBe("medium");
+    });
+
+    it("surfaces the provider error (e.g. no credits) instead of hiding it", async () => {
+      fetchImageBufferMock.mockResolvedValue({ buffer: Buffer.from("x"), mime: "image/png" });
+      vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ error: { message: "You have no credits remaining." } }), { status: 429 })));
+      await expect(dispatchGenerate("openai/gpt-image-2", { prompt: "p", imageUrl: "https://e/x.png" }))
+        .rejects.toThrow(/OpenAI 429.*no credits/);
+    });
+  });
+
   it.each([
     ["openai/gpt-image-2", "4:3", "1536x1024"],
-    ["azure/gpt-image-2", "3:4", "1024x1536"],
+    ["openai/gpt-image-2", "3:4", "1024x1536"],
   ] as const)("maps %s ratio %s to supported size %s", async (modelId, aspectRatio, expectedSize) => {
     const fetchMock = vi.fn(async () => new Response(JSON.stringify({
       data: [{ b64_json: "aW1hZ2U=" }],
@@ -97,46 +127,17 @@ describe("mediaGen image provider request contracts", () => {
     expect(body.size).toBe(expectedSize);
   });
 
-  it("validates a provider's remote image before persisting it", async () => {
-    const fetchMock = vi.fn(async () => new Response(JSON.stringify({
-      data: { image_urls: ["https://cdn.example.com/generated.png"] },
-    }), { status: 200, headers: { "content-type": "application/json" } }));
-    fetchImageBufferMock.mockResolvedValue({
-      buffer: Buffer.from("valid-image"),
-      mime: "image/png",
-    });
+  // 2026-09-21 (CJ「其他的 MODEL 都不需要了」): only gpt-image-2, Nano Banana and the
+  // garment try-on task have adapters. A retired id must fail loudly, not run something else.
+  it.each([
+    "openai/gpt-image-1", "azure/gpt-image-2", "google/imagen-4-default", "hailuo/image",
+    "fal/flux-dev", "piapi/flux-schnell", "piapi/flux-realism", "piapi/ideogram-v3", "piapi/sd-3-5-large",
+  ])("has no adapter for the retired model %s", async (modelId) => {
+    const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
-
-    await expect(dispatchGenerate("hailuo/image", { prompt: "scene" }))
-      .resolves.toMatchObject({ status: "ready" });
-
-    expect(fetchImageBufferMock).toHaveBeenCalledWith(
-      "https://cdn.example.com/generated.png",
-      { timeoutMs: 60_000 },
-    );
-    expect(writeFileSyncMock).toHaveBeenCalledOnce();
-  });
-
-  it("uses GEMINI_API_KEY_POOL for Imagen and rotates past a quota-exhausted key", async () => {
-    vi.stubEnv("GEMINI_API_KEY", "");
-    vi.stubEnv("GEMINI_API_KEY_POOL", "quota-key,working-key");
-    const fetchMock = vi.fn()
-      .mockResolvedValueOnce(new Response(JSON.stringify({
-        error: { status: "RESOURCE_EXHAUSTED" },
-      }), { status: 429, headers: { "content-type": "application/json" } }))
-      .mockResolvedValueOnce(new Response(JSON.stringify({
-        predictions: [{ bytesBase64Encoded: "aW1hZ2U=" }],
-      }), { status: 200, headers: { "content-type": "application/json" } }));
-    vi.stubGlobal("fetch", fetchMock);
-
-    await expect(dispatchGenerate("google/imagen-4-default", {
-      prompt: "scene",
-      aspectRatio: "1:1",
-    })).resolves.toMatchObject({ status: "ready" });
-
-    expect(fetchMock).toHaveBeenCalledTimes(2);
-    expect(String(fetchMock.mock.calls[0]![0])).toContain("key=quota-key");
-    expect(String(fetchMock.mock.calls[1]![0])).toContain("key=working-key");
+    await expect(dispatchGenerate(modelId, { prompt: "scene" }))
+      .resolves.toMatchObject({ status: "failed", errorMsg: `Unknown modelId: ${modelId}` });
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it("rotates Nano Banana keys on quota exhaustion without text-to-image fallback", async () => {
@@ -200,6 +201,10 @@ describe("mediaGen image provider request contracts", () => {
         imageUrl: "https://cdn.example.com/model.jpg",
         garmentImageUrl: "https://cdn.example.com/garment.jpg",
       })).resolves.toMatchObject({ status: "ready" });
+
+      // 供應商回來的圖要先驗證是真的圖，才存檔
+      expect(fetchImageBufferMock).toHaveBeenCalledWith("https://cdn.piapi.ai/tryon-result.png", { timeoutMs: 60_000 });
+      expect(writeFileSyncMock).toHaveBeenCalledOnce();
     });
 
     it("routes garmentSlot upper/lower to the matching field, never dress_input", async () => {

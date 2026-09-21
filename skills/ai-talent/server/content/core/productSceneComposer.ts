@@ -202,7 +202,6 @@ async function composeWithoutCutout(
     });
     let buf: Buffer | null = null;
     if (gen.status === "ready" && gen.url) buf = (await fetchImageBuffer(gen.url, { timeoutMs: 15_000 })).buffer;
-    else if (gen.status === "ready" && gen.b64) buf = Buffer.from(gen.b64, "base64");
     if (buf) {
       return {
         pngBuffer: await sharp(buf).resize(width, height, { fit: "cover" }).png().toBuffer(),
@@ -297,8 +296,6 @@ export async function composeProductScene(input: SceneComposeInput): Promise<Sce
     if (gen.status === "ready" && gen.url) {
       const { buffer } = await fetchImageBuffer(gen.url, { timeoutMs: 15_000 });
       backgroundBuffer = await sharp(buffer).resize(width, height, { fit: "cover" }).png().toBuffer();
-    } else if (gen.status === "ready" && gen.b64) {
-      backgroundBuffer = await sharp(Buffer.from(gen.b64, "base64")).resize(width, height, { fit: "cover" }).png().toBuffer();
     } else {
       throw new Error(gen.errorMsg ?? "background generation failed");
     }

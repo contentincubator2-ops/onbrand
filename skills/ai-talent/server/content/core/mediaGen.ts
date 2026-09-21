@@ -1,6 +1,8 @@
 /**
  * mediaGen — provider adapters for the 3-step media flow's Step 3.
  *
+ * Adapters: OpenAI gpt-image-2, Google Nano Banana, and PiAPI Kling try-on
+ * (garment on a model — a separate feature, not a picker option).
  * Each adapter takes (prompt, options) and returns a normalized result:
  *   { url?, b64?, taskId?, status: "ready"|"submitted"|"failed", errorMsg? }
  *
@@ -57,10 +59,6 @@ export interface GenResult {
 
 export interface GenOptions {
   prompt: string;
-  /** Negative prompt (things to exclude). Passed to providers that support a
-   *  real negative_prompt field (PiAPI Flux / SDXL / Ideogram). Far more
-   *  effective than in-prompt negatives — used to suppress hallucinated text. */
-  negativePrompt?: string;
   /** Aspect ratio hint — provider-specific mapping. */
   aspectRatio?: "1:1" | "4:3" | "3:4" | "16:9" | "9:16";
   /** Image size when provider supports explicit pixels. */
@@ -117,17 +115,25 @@ function sizeForAspectRatio(opts: GenOptions): NonNullable<GenOptions["size"]> {
   return "1024x1024";
 }
 
-// ── 1. OpenAI gpt-image-1 / gpt-image-2 ──────────────────────────────────
+// ── 1. OpenAI gpt-image-2 ────────────────────────────────────────────────
 // 2026-09-01 (CJ「open ai 我指定使用 gpt image 2」): gpt-image-2 is the
-// designated OpenAI image model, so it is the default here too. Callers that
-// want the older one must now name it explicitly.
-async function genOpenAIImage(opts: GenOptions, model: "gpt-image-1" | "gpt-image-2" = "gpt-image-2"): Promise<GenResult> {
+// designated OpenAI image model. 2026-09-21: it is now the ONLY OpenAI image
+// model here — gpt-image-1 was slower (58s vs 24s on the same photo),
+// ~9x the tokens, and garbled the label text.
+const OPENAI_IMAGE_MODEL = "gpt-image-2";
+
+async function genOpenAIImage(opts: GenOptions): Promise<GenResult> {
+  const model = OPENAI_IMAGE_MODEL;
   const key = process.env.OPENAI_API_KEY ?? "";
   if (!key) throw new Error("OPENAI_API_KEY missing");
   // Derive an OpenAI-supported size from the aspect ratio when an explicit
   // size isn't given (the orchestra passes aspectRatio, not size). Without
   // this a 16:9 thumbnail would default to a 1024x1024 square.
   const size = sizeForAspectRatio(opts);
+  // 2026-09-21（CJ「不論是否有產品圖，都只用 gpt image 2 生成」）：有參考圖（產品照）就走
+  // /images/edits，沒有才是 /images/generations。dev VM 上用同一張香水瓶照片實測過：
+  // gpt-image-2 編輯端點 24 秒、標籤文字完整；不吃 input_fidelity（400），也不需要。
+  if (opts.imageUrl) return genOpenAIImageEdit(opts, key, size);
   const resp = await fetch("https://api.openai.com/v1/images/generations", {
     method: "POST",
     headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
@@ -157,36 +163,46 @@ async function genOpenAIImage(opts: GenOptions, model: "gpt-image-1" | "gpt-imag
   return { status: "ready", modelId: `openai/${model}`, url: saveB64(b64, "img") };
 }
 
-// ── 2. Azure gpt-image-2 (existing pattern, reuse) ───────────────────────
-async function genAzureImage2(opts: GenOptions): Promise<GenResult> {
-  const key = process.env.AZURE_IMAGE_API_KEY ?? process.env.GPT ?? "";
-  const endpoint = (
-    process.env.AZURE_IMAGE_ENDPOINT
-    ?? "https://proj-claude-sweden-resource.cognitiveservices.azure.com"
-  ).replace(/\/+$/, "");
-  const deployment = process.env.AZURE_IMAGE_DEPLOYMENT ?? "gpt-image-2";
-  if (!key) throw new Error("AZURE_IMAGE_API_KEY missing");
-  const url = `${endpoint}/openai/deployments/${deployment}/images/generations?api-version=2024-02-01`;
-  const resp = await fetch(url, {
+/**
+ * 帶參考圖的 gpt-image-2：multipart 送 /v1/images/edits，`image[]` 放產品照。
+ * 照片先縮到最長邊 2048（用戶上傳最大 15MB，token 與時間都跟圖片大小成正比）；
+ * sharp 處理不了就送原始位元組，不因為縮圖失敗而讓整張圖失敗。
+ * 不送 quality（實測 high 慢 5 倍且沒更好，見 genOpenAIImage 的說明）、不送
+ * input_fidelity（gpt-image-2 回 400 不支援）。
+ */
+async function genOpenAIImageEdit(opts: GenOptions, key: string, size: string): Promise<GenResult> {
+  const { buffer, mime } = await fetchImageBuffer(opts.imageUrl!, { timeoutMs: 30_000 });
+  let bytes: Buffer = buffer;
+  let type = mime;
+  try {
+    const sharp = (await import("sharp")).default;
+    bytes = await sharp(buffer).rotate().resize(2048, 2048, { fit: "inside", withoutEnlargement: true }).png().toBuffer();
+    type = "image/png";
+  } catch { /* 保留原始位元組 */ }
+
+  const form = new FormData();
+  form.append("model", OPENAI_IMAGE_MODEL);
+  form.append("prompt", opts.prompt);
+  form.append("size", size);
+  form.append("n", "1");
+  if (opts.quality) form.append("quality", opts.quality);
+  const ext = type === "image/png" ? "png" : type === "image/webp" ? "webp" : "jpg";
+  form.append("image[]", new Blob([new Uint8Array(bytes)], { type }), `reference.${ext}`);
+
+  const resp = await fetch("https://api.openai.com/v1/images/edits", {
     method: "POST",
-    headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-    body: JSON.stringify({
-      prompt: opts.prompt,
-      size: sizeForAspectRatio(opts),
-      quality: opts.quality ?? "low",
-      output_format: "png",
-      n: 1,
-    }),
+    headers: { Authorization: `Bearer ${key}` },
+    body: form,
     signal: AbortSignal.timeout(180_000),
   });
   if (!resp.ok) {
     const t = await resp.text();
-    throw new Error(`Azure ${resp.status}: ${t.slice(0, 200)}`);
+    throw new Error(`OpenAI ${resp.status}: ${t.slice(0, 200)}`);
   }
   const data: any = await resp.json();
   const b64 = data?.data?.[0]?.b64_json;
-  if (!b64) throw new Error("Azure no b64");
-  return { status: "ready", modelId: "azure/gpt-image-2", url: saveB64(b64, "img") };
+  if (!b64) throw new Error("OpenAI no b64");
+  return { status: "ready", modelId: `openai/${OPENAI_IMAGE_MODEL}`, url: saveB64(b64, "img") };
 }
 
 // ── 2.5 Google Gemini 2.5 Flash Image（Nano Banana）— image edit / subject
@@ -241,98 +257,15 @@ Output aspect ratio: ${opts.aspectRatio}.` : "";
   throw new Error(errors.join("\n") || "NanoBanana failed");
 }
 
-// ── 3. Google Imagen 4 (current available model on the account) ──────────
-async function genImagen4(opts: GenOptions, variant: "fast" | "default" | "ultra" = "default"): Promise<GenResult> {
-  const keys = googleApiKeyPool();
-  if (!keys.length) throw new Error("GEMINI_API_KEY missing");
-  const model = variant === "fast" ? "imagen-4.0-fast-generate-001"
-              : variant === "ultra" ? "imagen-4.0-ultra-generate-001"
-              : "imagen-4.0-generate-001";
-  const errors: string[] = [];
-  for (const key of keys) {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:predict?key=${key}`;
-    const resp = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        instances: [{ prompt: opts.prompt }],
-        parameters: { sampleCount: 1, aspectRatio: opts.aspectRatio ?? "1:1" },
-      }),
-      signal: AbortSignal.timeout(120_000),
-    });
-    if (!resp.ok) {
-      const t = redactProviderSecrets(await resp.text());
-      const error = `Imagen ${resp.status}: ${t.slice(0, 200)}`;
-      errors.push(error);
-      if (isRetryableGoogleKeyError(`${resp.status} ${t}`)) continue;
-      throw new Error(error);
-    }
-    const data: any = await resp.json();
-    const b64 = data?.predictions?.[0]?.bytesBase64Encoded;
-    if (!b64) throw new Error("Imagen no b64");
-    return { status: "ready", modelId: `google/imagen-4-${variant}`, url: saveB64(b64, "img") };
-  }
-  throw new Error(errors.join("\n") || "Imagen failed");
-}
-
-// ── 4. Hailuo / MiniMax image ────────────────────────────────────────────
-async function genHailuoImage(opts: GenOptions): Promise<GenResult> {
-  const key = process.env.HAILUO_API_KEY ?? process.env.MINIMAX_API_KEY ?? "";
-  if (!key) throw new Error("HAILUO_API_KEY missing");
-  // MiniMax image_generation endpoint
-  const resp = await fetch("https://api.minimax.chat/v1/image_generation", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-    body: JSON.stringify({
-      model: "image-01",
-      prompt: opts.prompt,
-      aspect_ratio: opts.aspectRatio ?? "1:1",
-      response_format: "url",
-      n: 1,
-    }),
-    signal: AbortSignal.timeout(120_000),
-  });
-  if (!resp.ok) {
-    const t = await resp.text();
-    throw new Error(`MiniMax ${resp.status}: ${t.slice(0, 200)}`);
-  }
-  const data: any = await resp.json();
-  const remoteUrl = data?.data?.image_urls?.[0] ?? data?.data?.[0]?.url;
-  if (!remoteUrl) throw new Error("MiniMax no image url");
-  const localUrl = await downloadAndSave(remoteUrl, "img");
-  return { status: "ready", modelId: "hailuo/image", url: localUrl, meta: { remoteUrl } };
-}
-
-// ── 5. fal.ai FLUX.1 dev ──────────────────────────────────────────────────
-// ── DISABLED 2026-05-05 ──────────────────────────────────────────────────
-// fal.ai removed site-wide per CJ direction (billing dispute irrecoverable).
-// Use piapi/flux-pro for image gen and azure/gpt-image-2 for high-quality.
-// Function bodies kept as failed stubs so any stray caller fails loudly.
-async function genFalFlux(_opts: GenOptions): Promise<GenResult> {
-  return {
-    status: "failed",
-    modelId: "fal/flux-dev",
-    errorMsg: "fal.ai removed site-wide 2026-05-05. Use piapi/flux-pro or azure/gpt-image-2.",
-  };
-}
-async function genFalFluxSchnell(_opts: GenOptions): Promise<GenResult> {
-  return {
-    status: "failed",
-    modelId: "fal/flux-schnell",
-    errorMsg: "fal.ai removed site-wide 2026-05-05. Use piapi/flux-pro or azure/gpt-image-2.",
-  };
-}
-
-// (Original fal.ai bodies removed 2026-05-05 — see git history for reference.)
-
-// ── 8. PiAPI unified aggregator (Ideogram / FLUX / SDXL) ─
+// ── 3. PiAPI — garment try-on only ─
 //
 // PiAPI exposes one POST /api/v1/task endpoint that takes {model, task_type, input}
 // and returns {data: {task_id, status}}. We poll GET /api/v1/task/{task_id} until
 // status === "completed" (or "failed"). Auth via x-api-key header.
 //
 // Image task_types finish in seconds (we await in-line). 2026-09-08：影片模型
-// （Kling／Runway／Pika／Hedra）隨影片生成功能移除。
+// （Kling／Runway／Pika／Hedra）隨影片生成功能移除。2026-09-21：Flux／Ideogram／SDXL
+// 隨「只留 gpt-image-2 + Nano Banana」移除；這裡只剩服飾上身（不是一般生圖選項）。
 const PIAPI_BASE = process.env.PIAPI_BASE_URL ?? "https://api.piapi.ai/api/v1";
 
 interface PiapiSpec {
@@ -347,66 +280,6 @@ interface PiapiSpec {
 }
 
 const PIAPI_MAP: Record<string, PiapiSpec> = {
-  "piapi/flux-pro": {
-    // 2026-05-05: PiAPI deprecated "Qubico/flux1-pro" model id. The verified
-    // working FLUX endpoint via PiAPI is Qubico/flux1-schnell (4-step, fast).
-    // We keep the public id "piapi/flux-pro" for backward compatibility and
-    // route it under the schnell model.
-    model: "Qubico/flux1-schnell",
-    task_type: "txt2img",
-    sync: true,
-    buildInput: (o) => ({
-      prompt: o.prompt,
-      width:  o.aspectRatio === "9:16" ? 768  : o.aspectRatio === "16:9" ? 1344 : 1024,
-      height: o.aspectRatio === "9:16" ? 1344 : o.aspectRatio === "16:9" ? 768  : 1024,
-    }),
-  },
-  "piapi/flux-schnell": {
-    model: "Qubico/flux1-schnell",
-    task_type: "txt2img",
-    sync: true,
-    buildInput: (o) => ({
-      prompt: o.prompt,
-      ...(o.negativePrompt ? { negative_prompt: o.negativePrompt } : {}),
-      width:  o.aspectRatio === "9:16" ? 768  : o.aspectRatio === "16:9" ? 1344 : 1024,
-      height: o.aspectRatio === "9:16" ? 1344 : o.aspectRatio === "16:9" ? 768  : 1024,
-    }),
-  },
-  "piapi/flux-realism": {
-    model: "Qubico/flux1-dev",
-    task_type: "txt2img-lora",
-    sync: true,
-    buildInput: (o) => ({
-      prompt: o.prompt,
-      ...(o.negativePrompt ? { negative_prompt: o.negativePrompt } : {}),
-      lora_settings: [{ lora_type: "realism", lora_strength: 1.0 }],
-    }),
-  },
-  "piapi/ideogram-v3": {
-    // PiAPI namespaces Ideogram under Qubico (verified 2026-04-29 — bare
-    // "ideogram" returns 400 invalid model).
-    model: "Qubico/ideogram",
-    task_type: "txt2img",
-    sync: true,
-    buildInput: (o) => ({
-      prompt: o.prompt,
-      ...(o.negativePrompt ? { negative_prompt: o.negativePrompt } : {}),
-      aspect_ratio: o.aspectRatio ?? "1:1",
-      style_type: "AUTO",
-      magic_prompt_option: "AUTO",
-    }),
-  },
-  "piapi/sd-3-5-large": {
-    // PiAPI uses Qubico namespace for Stability AI as well.
-    model: "Qubico/sdxl",
-    task_type: "txt2img",
-    sync: true,
-    buildInput: (o) => ({
-      prompt: o.prompt,
-      ...(o.negativePrompt ? { negative_prompt: o.negativePrompt } : {}),
-      aspect_ratio: o.aspectRatio ?? "1:1",
-    }),
-  },
   /**
    * 2026-09-10（CJ「model 跟衣服要分開的」，避開產品變形計畫的服飾分支）：
    * 服飾上身——衣服（garmentImageUrl）跟真人模特（imageUrl）是兩張分開的圖，
@@ -530,38 +403,18 @@ async function genPiapi(modelId: string, opts: GenOptions): Promise<GenResult> {
 }
 
 // ── Dispatcher ────────────────────────────────────────────────────────────
+/**
+ * The only image models this dispatches (CJ 2026-09-21「只留 NANO BANANA 跟
+ * GPT IMAGE 2」): gpt-image-2, Nano Banana, and the garment try-on task.
+ * Callers that generate a still image go through stillImageModels.ts, which
+ * decides WHICH of the first two runs and owns the retry — this stays a plain
+ * "run exactly this model" switch.
+ */
 export async function dispatchGenerate(modelId: string, opts: GenOptions): Promise<GenResult> {
-  // PiAPI catch-all (image models) — handle before the explicit switch
-  if (modelId.startsWith("piapi/")) return genPiapi(modelId, opts);
-  // Atlas Cloud — registered in mediaModels but endpoint not yet wired
-  if (modelId.startsWith("atlas/")) {
-    return {
-      status: "failed",
-      modelId,
-      errorMsg: "Atlas Cloud media adapter not yet wired. Run scripts/verify-piapi.ts first to confirm endpoint shape.",
-    };
-  }
-
   switch (modelId) {
-    case "openai/gpt-image-1":     return genOpenAIImage(opts, "gpt-image-1");
-    case "openai/gpt-image-2":     return genOpenAIImage(opts, "gpt-image-2");
+    case "openai/gpt-image-2":     return genOpenAIImage(opts);
     case "google/nano-banana":     return genNanoBanana(opts);
-    case "azure/gpt-image-2":      return genAzureImage2(opts);
-    // Imagen 4 (real model on account). Removed legacy imagen-3 /
-    // imagen-4 alias cases 2026-04-30 — client registry uses explicit
-    // -default / -fast / -ultra suffixes only.
-    case "google/imagen-4-default": return genImagen4(opts, "default");
-    case "google/imagen-4-fast":    return genImagen4(opts, "fast");
-    case "google/imagen-4-ultra":   return genImagen4(opts, "ultra");
-    case "hailuo/image":           return genHailuoImage(opts);
-    case "fal/flux-dev":           return genFalFlux(opts);
-    case "fal/flux-schnell":       return genFalFluxSchnell(opts);
-    case "midjourney/v7":
-      return {
-        status: "failed",
-        modelId,
-        errorMsg: "Midjourney has no API. Copy the prompt to Discord manually.",
-      };
+    case "piapi/kling-try-on":     return genPiapi(modelId, opts);
     default:
       return {
         status: "failed",

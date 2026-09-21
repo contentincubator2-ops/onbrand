@@ -138,10 +138,8 @@ export const POINT_COSTS = {
   task_30s:        30,
   task_60s:        60,
   task_99s:        99,
-  image_flux:      30,   // PiAPI Flux Schnell — default
-  image_gpt:      100,   // OpenAI gpt-image-1 — premium
-  image_imagen:    50,   // Google Imagen — middle
-  image_ideogram:  50,   // PiAPI Ideogram (text-in-image)
+  image_gpt:      100,   // OpenAI gpt-image-2 — the default for every image
+  image_imagen:    50,   // Google Nano Banana — only when the user picks it
 } as const;
 export type PointAction = keyof typeof POINT_COSTS;
 

@@ -313,6 +313,7 @@ function PlatformCell({
   onRedo,
   onCopy,
   onEdit,
+  onRetryImage,
 }: {
   platform: TheaterPlatform;
   state: CellState;
@@ -325,6 +326,8 @@ function PlatformCell({
   onRedo?: () => void;
   onCopy?: () => void;
   onEdit?: () => void;
+  /** Re-make just this cell's image with exactly this model (the user picks; nothing switches on its own). */
+  onRetryImage?: (model: "gpt-image-2" | "nano-banana") => void;
 }) {
   const { t, lang } = useLang();
   const meta = PLATFORM_META[platform];
@@ -432,10 +435,22 @@ function PlatformCell({
           )}
           {/* Image generation failed — show retry hint instead of empty space */}
           {isDone && state.imageError && !state.imageUrl && (
-            <div className="absolute bottom-2 left-0 right-0 flex justify-center">
+            <div className="absolute bottom-2 left-0 right-0 flex justify-center items-center gap-1.5 flex-wrap px-1">
               <span className="text-[12px] text-amber-600 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5">
                 ⚠️ {t("theater_image_failed")}
               </span>
+              {onRetryImage && (
+                <>
+                  <button type="button" onClick={() => onRetryImage("gpt-image-2")}
+                    className="text-[12px] text-neutral-700 bg-white border border-neutral-300 hover:bg-neutral-50 rounded-full px-2 py-0.5">
+                    {lang === "en" ? "Try again" : "再試一次"}
+                  </button>
+                  <button type="button" onClick={() => onRetryImage("nano-banana")}
+                    className="text-[12px] text-neutral-700 bg-white border border-neutral-300 hover:bg-neutral-50 rounded-full px-2 py-0.5">
+                    {lang === "en" ? "Use Nano Banana" : "改用 Nano Banana"}
+                  </button>
+                </>
+              )}
             </div>
           )}
           {isWriting && !caption && (
@@ -1337,6 +1352,26 @@ export default function TheaterPage() {
     });
   };
 
+  // 2026-09-21 (CJ「不行的時候，再讓用戶選 NANO BANANA」): re-make one cell's image with the model
+  // the user picked. The caption stays; a failure keeps the cell's retry buttons.
+  const retryCellImage = async (key: CellKey, platform: TheaterPlatform, model: "gpt-image-2" | "nano-banana") => {
+    const caption = cells.get(key)?.caption;
+    if (!brandId || !caption) return;
+    updateCell(key, { status: "imaging", imageError: false });
+    try {
+      const img: any = await generateImageMut.mutateAsync({
+        brandId, platform, caption, brandTagline: cellMeta.get(key)?.brandTagline ?? null, modelChoice: model,
+      });
+      updateCell(key, {
+        status: "done", imageUrl: img.ok ? img.imageUrl : null, imageError: !img.ok,
+        imagePrompt: img.brief ?? undefined, doneAt: Date.now(),
+      });
+    } catch (e) {
+      console.error("[theater] cell image retry failed:", key, e);
+      updateCell(key, { status: "done", imageUrl: null, imageError: true });
+    }
+  };
+
   // ── Per-cell redo: re-runs caption + image with stored meta ───────────
   const redoCell = async (key: CellKey, platform: TheaterPlatform) => {
     if (!brandId) return;
@@ -1981,6 +2016,7 @@ export default function TheaterPage() {
                       brandLogoUrl={(ctx?.brands ?? []).find((b: any) => b.id === brandId)?.logoUrl ?? null}
                       onCopy={() => copyCaption(key)}
                       onRedo={() => redoCell(key, p)}
+                      onRetryImage={(model) => retryCellImage(key, p, model)}
                       onEdit={() => openEditModal(key, p, d.date, d.label)}
                         />
                       {/* Platform connection status chip on done cells — always visible */}

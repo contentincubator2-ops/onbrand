@@ -12,7 +12,7 @@ import {
   resolveOutputContent,
   updateOutputContent,
 } from "../core/outputContentEnvelope";
-import { applyVariantImageUpdate } from "../core/variantImageUpdate";
+import { applyVariantImageUpdate, selectVariantImageVersion } from "../core/variantImageUpdate";
 
 /** Escape HTML special characters to prevent stored XSS in previewHtml */
 function escapeHtml(s: string): string {
@@ -259,10 +259,9 @@ export const outputRouter = router({
       prompt: z.string().max(8000).optional(),
       /** Human-editable Traditional Chinese counterpart of `prompt`. */
       promptZh: z.string().max(4000).optional(),
-      /** Actual provider model, plus the user's requested selection for fallback transparency. */
+      /** The model that produced the image, and the one the user asked for (always the same — no auto swap). */
       modelId: z.string().max(200).optional(),
       requestedModelId: z.string().max(200).optional(),
-      fallbackUsed: z.boolean().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const { default: localPool } = await import("../../localDb");
@@ -287,6 +286,43 @@ export const outputRouter = router({
         contentKind: updated.resolved.kind,
         contentIndex: updated.resolved.index,
       };
+    }),
+
+  /**
+   * 2026-09-21 (CJ「換一個 MODEL 生了圖，不滿意以後，又想要用回去上一張圖」): make an image
+   * this variant already had current again. Pure pointer move — nothing is
+   * generated, no points are spent, and the image being left stays selectable.
+   * The server looks the version up in the variant's own history, so a client
+   * can't slip an arbitrary URL in through this call.
+   */
+  selectVariantImageVersion: protectedProcedure
+    .input(z.object({
+      id: z.number(),
+      ...contentSelectorFields,
+      imageUrl: z.string().min(1).max(10_000_000),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const { default: localPool } = await import("../../localDb");
+      const [rows]: any = await localPool.execute(
+        `SELECT o.content
+         FROM mission_outputs o JOIN missions m ON m.id = o.missionId
+         WHERE o.id = ? AND m.userId = ? LIMIT 1`,
+        [input.id, ctx.user.id],
+      );
+      const row = (rows as any[])[0];
+      if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "Output not found or not yours" });
+      let found = true;
+      const updated = updateOutputContent(row.content, input, (item) => {
+        const next = selectVariantImageVersion(item, input.imageUrl);
+        if (!next) { found = false; return item; }
+        return next;
+      });
+      if (!found) throw new TRPCError({ code: "NOT_FOUND", message: "這張圖不在這個版本的歷史裡" });
+      await localPool.execute(
+        `UPDATE mission_outputs SET content = ?, updatedAt = NOW() WHERE id = ?`,
+        [updated.content, input.id],
+      );
+      return { ok: true };
     }),
 
   /**

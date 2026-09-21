@@ -16,7 +16,8 @@ import { composeProductScene } from "./productSceneComposer";
 
 const W = 400;
 let redCutout: Buffer;      // 透明底、中間一顆純紅圓
-let greenBgB64: string;     // 純綠背景
+let greenBg: Buffer;        // 純綠背景（生圖服務回傳的網址對應到這張）
+const GEN_URL = "https://gen.example/bg.png";
 let orangePhoto: Buffer;    // 沒去背的原照片：純橘色
 
 async function centerPixel(png: Buffer, x: number, y: number) {
@@ -28,13 +29,14 @@ async function centerPixel(png: Buffer, x: number, y: number) {
 beforeAll(async () => {
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="300" height="300"><circle cx="150" cy="150" r="140" fill="rgb(200,30,30)"/></svg>`;
   redCutout = await sharp(Buffer.from(svg)).png().toBuffer();
-  greenBgB64 = (await sharp({ create: { width: 512, height: 512, channels: 3, background: { r: 20, g: 160, b: 40 } } }).png().toBuffer()).toString("base64");
+  greenBg = await sharp({ create: { width: 512, height: 512, channels: 3, background: { r: 20, g: 160, b: 40 } } }).png().toBuffer();
   orangePhoto = await sharp({ create: { width: 300, height: 300, channels: 3, background: { r: 240, g: 140, b: 20 } } }).png().toBuffer();
 });
 
 beforeEach(() => {
   obtainMock.mockReset(); genMock.mockReset(); fetchMock.mockReset();
-  fetchMock.mockResolvedValue({ buffer: orangePhoto, mime: "image/png" });
+  // 生圖模型現在一律回傳網址（存成檔案），合成器再抓下來；其餘網址是產品原照片。
+  fetchMock.mockImplementation(async (url: string) => ({ buffer: url === GEN_URL ? greenBg : orangePhoto, mime: "image/png" }));
 });
 
 const base = { brandId: 1, productImageUrl: "https://x/p.jpg", width: W, height: W };
@@ -44,7 +46,7 @@ const cutoutFails = (reason: string, issues: string[] = []) =>
 describe("去背成功 → composite", () => {
   it("回報 composite，並把去背檢查的提醒帶出來", async () => {
     obtainMock.mockResolvedValue({ ok: true, pngBuffer: redCutout, attempts: 2, issues: ["cropped_at_edge"], needsReview: true });
-    genMock.mockResolvedValue({ status: "ready", b64: greenBgB64 });
+    genMock.mockResolvedValue({ status: "ready", url: GEN_URL });
     const r = await composeProductScene(base);
     expect(r).toMatchObject({ method: "composite", hadCutout: true, attempts: 2, needsReview: true, qaIssues: ["cropped_at_edge"] });
     expect(genMock).toHaveBeenCalledOnce();
@@ -53,14 +55,14 @@ describe("去背成功 → composite", () => {
 
   it("產品像素不被改動：產品中心是純紅，背景仍是純綠", async () => {
     obtainMock.mockResolvedValue({ ok: true, pngBuffer: redCutout, attempts: 1, issues: [], needsReview: false });
-    genMock.mockResolvedValue({ status: "ready", b64: greenBgB64 });
+    genMock.mockResolvedValue({ status: "ready", url: GEN_URL });
     const r = await composeProductScene(base);
     expect(await centerPixel(r.pngBuffer, W / 2, Math.round(W * 0.55))).toEqual([200, 30, 30]);
     expect(await centerPixel(r.pngBuffer, 5, 5)).toEqual([20, 160, 40]);
   });
 
   it("用戶確認過的去背圖：不再呼叫去背服務", async () => {
-    genMock.mockResolvedValue({ status: "ready", b64: greenBgB64 });
+    genMock.mockResolvedValue({ status: "ready", url: GEN_URL });
     const r = await composeProductScene({ ...base, approvedCutout: redCutout });
     expect(obtainMock).not.toHaveBeenCalled();
     expect(r).toMatchObject({ method: "composite", attempts: 0, needsReview: false });
@@ -70,7 +72,7 @@ describe("去背成功 → composite", () => {
 describe("去背拿不到 → 一定有圖出，不丟錯", () => {
   it("備援一：帶產品參考圖的重繪（generative），並記下原因與嘗試次數", async () => {
     cutoutFails("cutout_failed");
-    genMock.mockResolvedValue({ status: "ready", b64: greenBgB64, effectivePrompt: "used prompt" });
+    genMock.mockResolvedValue({ status: "ready", url: GEN_URL, effectivePrompt: "used prompt" });
     const r = await composeProductScene({ ...base, scenePrompt: "wooden table" });
     expect(r).toMatchObject({ method: "generative", hadCutout: false, attempts: 3, fallbackReason: "cutout_failed" });
     expect(genMock.mock.calls[0]![0].subjectImageUrl).toBe("https://x/p.jpg");
@@ -95,7 +97,7 @@ describe("去背拿不到 → 一定有圖出，不丟錯", () => {
   });
 
   it("用戶選擇 AI 重繪版：不呼叫去背服務，原因是 user_choice", async () => {
-    genMock.mockResolvedValue({ status: "ready", b64: greenBgB64 });
+    genMock.mockResolvedValue({ status: "ready", url: GEN_URL });
     const r = await composeProductScene({ ...base, skipCutout: true });
     expect(obtainMock).not.toHaveBeenCalled();
     expect(r).toMatchObject({ method: "generative", fallbackReason: "user_choice" });

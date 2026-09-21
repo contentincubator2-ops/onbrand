@@ -331,7 +331,7 @@ export default function AccountPage() {
                     { key: "task_30s",   label: tierLabel("30s", lang) },
                     { key: "task_60s",   label: tierLabel("60s", lang) },
                     { key: "task_99s",   label: tierLabel("99s", lang) },
-                    { key: "image_flux", label: lang === "en" ? "AI image"      : "AI 圖片" },
+                    { key: "image_gpt",  label: lang === "en" ? "AI image"      : "AI 圖片" },
                   ].map(({ key, label }) => (
                     <div key={key} className="bg-neutral-50 rounded-lg px-3 py-2">
                       <div className="text-neutral-500 text-[12px]">{label}</div>

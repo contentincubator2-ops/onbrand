@@ -3,7 +3,9 @@
  *
  * UI flow: user clicks "Generate Image" on a FB/IG content card →
  * we resolve brand visual context from the upstream decision chain →
- * call gpt-image-1 (fallback Imagen 3) → persist result → return URL / b64.
+ * call gpt-image-2 (or Nano Banana when the user picks it) → persist → return URL.
+ * A failure comes back as a normal `status: "failed"` result (never a thrown
+ * error) so the client can offer "改用 Nano Banana" — see stillImageModels.ts.
  */
 
 import { z } from "zod";
@@ -26,17 +28,31 @@ import {
 // procedures now share this one list so they can't drift apart again.
 const channel = z.enum(["fb", "ig", "linkedin", "youtube", "tiktok", "email", "pr"]);
 const size = z.enum(["1024x1024", "1024x1536", "1536x1024"]);
-// 2026-05-12 (CJ「給用戶選 image model」): user-facing model picker.
-// 2026-06-15: added gpt-image-2 (OpenAI latest, now the global default).
-const modelChoice = z.enum([
-  "auto",
-  "flux-schnell",
-  "gpt-image-1",
-  "gpt-image-2",
-  "flux-realism",
-  "ideogram-v3",
-  "imagen-3",
-]);
+// 2026-09-21 (CJ「只留 NANO BANANA 跟 GPT IMAGE 2 兩個選項」): the picker has two
+// choices. The input stays a plain string so a stale browser tab that still
+// sends a retired id ("flux-schnell", "gpt-image-1", …) is mapped by
+// resolveStillImageModel instead of failing validation.
+const modelChoice = z.string().max(40);
+
+/**
+ * Human-readable reason for a failed image, in the words a user can act on.
+ * Raw provider text is scrubbed of keys and only appended for non-auth errors.
+ */
+function friendlyImageFailure(kind: string | undefined, rawError: string | undefined): string {
+  const raw = String(rawError ?? "unknown")
+    .replace(/api_key:[A-Za-z0-9_\-]+/g, "api_key:[REDACTED]")
+    .replace(/key=([A-Za-z0-9_\-]+)/g, "key=[REDACTED]")
+    .replace(/AIza[0-9A-Za-z_\-]{20,}/g, "[REDACTED_GOOGLE_KEY]")
+    .replace(/sk-[A-Za-z0-9_\-]{16,}/g, "[REDACTED_KEY]");
+  const headline =
+    kind === "content_policy" ? "這個 prompt 被 AI 的內容政策擋下了（常見原因：提到版權角色或品牌）。可以改寫 prompt，或改用 Nano Banana 試試。"
+    : kind === "quota"        ? "AI 圖片額度暫時不足，已通知 SoWork 團隊。"
+    : kind === "auth"         ? "AI 圖片服務的金鑰異常，SoWork 已收到通知正在處理。"
+    : kind === "rate_limit"   ? "AI 圖片服務目前忙碌（速率限制）。已自動重試一次仍未成功，可以稍後再試。"
+    : kind === "timeout"      ? "生圖逾時。已自動重試一次仍未成功。"
+    : "這次沒有生成成功。已自動重試一次仍未成功。";
+  return kind === "auth" || kind === "quota" ? headline : `${headline}\n\n[技術細節] ${raw.slice(0, 300)}`;
+}
 
 export const imageRouter = router({
   generate: protectedProcedure
@@ -51,7 +67,8 @@ export const imageRouter = router({
         size: size.optional(),
         modelChoice: modelChoice.optional(),
         /** 2026-07-25 (CJ product-faithful gen): real product photo URL —
-         *  routes to Nano Banana subject-reference with the fidelity guard. */
+         *  sent as the reference image (gpt-image-2 edits, or Nano Banana when
+         *  picked) with the fidelity guard. */
         subjectImageUrl: z.string().url().max(2048).optional(),
         overrideBrandContext: z
           .object({
@@ -75,9 +92,8 @@ export const imageRouter = router({
         });
       }
       const { modelPrompt, displayPrompt } = normalizedPrompt;
-      // 2026-05-14: per-model image point cost.
-      // Flux (default) = 30 pts ≈ 30s task; gpt-image-1 premium = 100 pts;
-      // Imagen/Ideogram middle = 50 pts.
+      // Per-model image point cost: gpt-image-2 (default) = 100 pts,
+      // Nano Banana (only when picked) = 50 pts. Prepaid, refunded in full on failure.
       const { assertPoints, deductPoints } = await import("../../platform/core/pointsService");
       const imageAction = imageActionForRequest(input);
       await assertPoints(ctx.user.id, imageAction);
@@ -115,35 +131,15 @@ export const imageRouter = router({
         prepaidAction: imageAction,
         result,
       });
-      // 2026-05-12: surface actual provider failures to the client.
-      // Previously a failed result still returned 200 with url:null, leading
-      // to the misleading "產圖完成但沒拿到 URL/b64" toast.
+      // A failed generation is NOT thrown: the client needs `canSwitchTo` to show
+      // the "改用 Nano Banana" button (the user decides — we never swap models).
+      // The charge was already refunded in full by reconcileImageCharge above.
       if (result.status === "failed") {
-        // 2026-05-14: translate raw provider errors into human-readable
-        // Chinese messages so users know what to do, not just what broke.
-        const raw = String(result.errorMsg ?? "unknown")
-          .replace(/api_key:[A-Za-z0-9_\-]+/g, "api_key:[REDACTED]")
-          .replace(/key=([A-Za-z0-9_\-]+)/g, "key=[REDACTED]")
-          .replace(/AIza[0-9A-Za-z_\-]{20,}/g, "[REDACTED_GOOGLE_KEY]");
-        let friendly = "生圖失敗，請稍後再試";
-        const isProviderKeyError = /key|unauthorized|api_key|permission_denied|suspended|consumer|forbidden|403/i.test(raw);
-        if (/safety system|content_policy|rejected by the safety|moderation/i.test(raw)) {
-          friendly = "OpenAI 的內容政策擋下了這個 prompt（常見原因：提到版權角色如 Pokémon / Disney / 寶可夢）。已嘗試切換到 Flux 但也失敗。建議修改 prompt — 把角色名稱換成形容（例：「圓滾滾的卡通生物」）。";
-        } else if (/quota|insufficient.*credit|balance/i.test(raw)) {
-          friendly = "AI 圖片額度暫時不足，已通知 SoWork 團隊。";
-        } else if (/rate.?limit|429/i.test(raw)) {
-          friendly = "AI 圖片服務速率限制中，請等 30 秒再試。";
-        } else if (/timeout|timed out/i.test(raw)) {
-          friendly = "生圖超時（>60 秒）。建議用 Flux Schnell 模型（最快 5-10 秒）。";
-        } else if (isProviderKeyError) {
-          friendly = "AI 圖片服務的金鑰異常，SoWork 已收到通知正在處理。";
-        }
-        throw new TRPCError({
-          code: "INTERNAL_SERVER_ERROR",
-          message: isProviderKeyError
-            ? friendly
-            : `${friendly}\n\n[技術細節] ${raw.slice(0, 300)}`,
-        });
+        return {
+          ...result,
+          normalizedDisplayPrompt: displayPrompt,
+          friendlyMessage: friendlyImageFailure(result.failureKind, result.errorMsg),
+        };
       }
       return { ...result, normalizedDisplayPrompt: displayPrompt };
     }),
@@ -153,7 +149,7 @@ export const imageRouter = router({
    * Reads the caption + brand context → asks the LLM to produce a
    * concise, model-ready image generation prompt in English.
    * The client can then drop this into the imagePrompt textarea and
-   * generate with any model (GPT, Flux, Imagen, etc.).
+   * generate with GPT Image 2 or Nano Banana.
    */
   promptFromCaption: protectedProcedure
     .input(z.object({
@@ -297,7 +293,7 @@ Rules:
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
 
       const { assertPoints, deductPoints } = await import("../../platform/core/pointsService");
-      const imageAction = imageActionForRequest({}); // 背景是普通文字生圖，不帶 subjectImageUrl → image_flux
+      const imageAction = imageActionForRequest({}); // 背景走 gpt-image-2 → image_gpt
       await assertPoints(ctx.user.id, imageAction);
       await deductPoints(ctx.user.id, imageAction, { kind: "brand", id: input.brandId });
 
@@ -377,7 +373,7 @@ Rules:
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
 
       const { assertPoints, deductPoints } = await import("../../platform/core/pointsService");
-      const imageAction = imageActionForRequest({ modelChoice: "imagen-3" }); // → image_imagen
+      const imageAction = imageActionForRequest({ modelChoice: "nano-banana" }); // → image_imagen（50 點級距）
       await assertPoints(ctx.user.id, imageAction);
       await deductPoints(ctx.user.id, imageAction, { kind: "brand", id: input.brandId });
 

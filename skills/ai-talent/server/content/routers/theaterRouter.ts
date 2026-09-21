@@ -5,7 +5,7 @@
  *
  *   runStart    : load brand positioning → derive USP pool + chief opening
  *   generateCell: per-cell caption (one LLM call, platform-tuned prompt)
- *   generateImage: per-cell Flux image (PiAPI flux-schnell, square)
+ *   generateImage: per-cell image (gpt-image-2; Nano Banana only when the user picks it)
  *
  * Frontend orchestrates pacing (2 caption workers + 1 image worker). The
  * router stays stateless so retries are trivial and one stuck cell never
@@ -24,9 +24,9 @@ import { resolveAgentId } from "../core/agentAssignments";
 import { loadAgent, aiModelToProvider } from "../core/quickTaskOrchestra";
 import { invokeLLM } from "../../platform/core/llm";
 import { captionToVisualBrief, loadBrandPaletteHexes } from "../core/visualBrief";
-import { NO_TEXT_PROMPT_BLOCK, NO_TEXT_NEGATIVE_PROMPT, PRODUCT_FAITHFUL_PROMPT_BLOCK, NO_MIRROR_PROMPT_BLOCK } from "../core/imageGen";
+import { NO_TEXT_PROMPT_BLOCK, PRODUCT_FAITHFUL_PROMPT_BLOCK, NO_MIRROR_PROMPT_BLOCK } from "../core/imageGen";
 import { withUserLLMSlot } from "../../platform/core/userLLMSemaphore";
-import { dispatchGenerate } from "../core/mediaGen";
+import { generateStillImage } from "../core/stillImageModels";
 import { fetchViralPatterns, type ViralPatterns } from "../core/socialListeningScout";
 import { buildTheaterCraftBlock } from "../core/theaterCraftRef";
 import localPool from "../../localDb";
@@ -1286,9 +1286,10 @@ ${cleaned}
     })),
 
   /**
-   * Generate the cell's hero image via PiAPI flux-schnell. ~6-12s.
+   * Generate the cell's hero image with gpt-image-2 (Nano Banana only when the
+   * caller passes modelChoice: "nano-banana" — the「改用 Nano Banana」button).
    * Caption is converted into a visual brief first (cheap LLM call), then
-   * sent to Flux.
+   * sent to the model. One same-model retry; no silent model swap.
    */
   generateImage: protectedProcedure
     .input(z.object({
@@ -1306,6 +1307,8 @@ ${cleaned}
        *  uploaded material could never reach image generation regardless of
        *  what the client did. */
       subjectImageUrl: z.string().url().optional(),
+      /** "nano-banana" only when the user chose it after gpt-image-2 failed. Anything else = gpt-image-2. */
+      modelChoice: z.string().max(40).optional(),
     }))
     .mutation(async ({ ctx, input }) => withUserLLMSlot(ctx.user.id, async () => {
       const aspect = input.platform === "youtube" ? "16:9"
@@ -1336,9 +1339,8 @@ ${cleaned}
       // name that slipped into the brief got baked on as a fake wordmark/logo
       // (小安素→「Nutrion」, Adidas→NIKE). Append the same NO-TEXT guard the
       // orchestra uses so gpt-image/imagen (which ignore negative_prompt) still
-      // get the directive, and pass NO_TEXT_NEGATIVE_PROMPT for flux/SDXL. The
-      // auto-brief gets the positive block; a user's customPrompt is left as
-      // typed but still backed by the negative prompt.
+      // get the directive (neither model takes a negative_prompt). The
+      // auto-brief gets the positive block; a user's customPrompt is left as typed.
       // 2026-08-12 (C9): subjectMode swaps the blanket NO-TEXT rule for the
       // product-fidelity guard (it would otherwise strip the real product's
       // own printed label) — mirrors imageGen.ts / genOneImage exactly.
@@ -1349,67 +1351,24 @@ ${cleaned}
           ? `${brief}\n\n${PRODUCT_FAITHFUL_PROMPT_BLOCK}\n\n${NO_MIRROR_PROMPT_BLOCK}`
           : `${brief}\n\n${NO_TEXT_PROMPT_BLOCK}`;
 
-      // 2026-08-12 (C9): product-faithful gen policy (same as imageGen.ts) —
-      // a hallucinated product is worse than a failed run, so subject mode
-      // routes ONLY through Nano Banana with no fallback to text-to-image
-      // providers (they can't see the real product and would invent one).
-      if (subjectMode) {
-        try {
-          const r = await dispatchGenerate("google/nano-banana", {
-            prompt: imagePrompt,
-            imageUrl: input.subjectImageUrl,
-            aspectRatio: aspect as any,
-            brandId: input.brandId,
-          } as any);
-          if (r.status === "ready" && r.url) {
-            return { ok: true as const, imageUrl: r.url, brief };
-          }
-          return { ok: false as const, imageUrl: null, brief, error: r.errorMsg ?? `nano-banana ${r.status}` };
-        } catch (e: any) {
-          console.error(`[theater.generateImage] nano-banana threw:`, e?.message ?? e);
-          return { ok: false as const, imageUrl: null, brief, error: String(e?.message ?? e) };
-        }
+      // 2026-09-21: one path for every image (CJ「不論是否有產品圖，都只用 gpt image 2
+      // 生成」) — a reference photo makes gpt-image-2 use the image-edit endpoint.
+      // Failure is a result, not a throw, so the cell can offer「改用 Nano Banana」.
+      const out = await generateStillImage(input.modelChoice, {
+        prompt: imagePrompt,
+        aspectRatio: aspect as any,
+        brandId: input.brandId,
+        ...(subjectMode ? { imageUrl: input.subjectImageUrl } : {}),
+      }, { attemptTimeoutMs: 60_000 });
+      if (out.status === "ready" && out.url) {
+        return { ok: true as const, imageUrl: out.url, brief };
       }
-
-      // Model selection: prefer piapi/flux-schnell (fast + cheap); fall back
-      // to openai/gpt-image-2 (CJ 2026-09-01: the designated OpenAI image
-      // model) when PIAPI_KEY is absent so Theater images
-      // still work when only OPENAI_API_KEY is configured.
-      const hasPiapiKey = !!(process.env.PIAPI_KEY ?? process.env.PIAPI_API_KEY);
-      const primaryModel = hasPiapiKey ? "piapi/flux-schnell" : "openai/gpt-image-2";
-      // Helper: attempt OpenAI gpt-image-2 as fallback
-      const tryOpenAIFallback = async (): Promise<{ ok: true; imageUrl: string; brief: string } | null> => {
-        if (primaryModel === "openai/gpt-image-2" || !(process.env.OPENAI_API_KEY ?? "")) return null;
-        try {
-          console.warn(`[theater.generateImage] ${primaryModel} failed, falling back to openai/gpt-image-2`);
-          const r2 = await dispatchGenerate("openai/gpt-image-2", { prompt: imagePrompt, aspectRatio: aspect as any, brandId: input.brandId, negativePrompt: NO_TEXT_NEGATIVE_PROMPT } as any);
-          if (r2.status === "ready" && r2.url) return { ok: true as const, imageUrl: r2.url, brief };
-        } catch (e2) {
-          console.error(`[theater.generateImage] openai fallback also failed:`, e2);
-        }
-        return null;
+      console.error(`[theater.generateImage] ${out.modelId} failed (${out.failureKind}): ${out.errorMsg}`);
+      return {
+        ok: false as const, imageUrl: null, brief,
+        error: out.errorMsg ?? `${out.modelId} returned no image`,
+        canSwitchTo: out.canSwitchTo,
       };
-      try {
-        const r = await dispatchGenerate(primaryModel, {
-          prompt: imagePrompt,
-          aspectRatio: aspect as any,
-          brandId: input.brandId,
-          negativePrompt: NO_TEXT_NEGATIVE_PROMPT,
-        } as any);
-        if (r.status === "ready" && r.url) {
-          return { ok: true as const, imageUrl: r.url, brief };
-        }
-        // Primary returned non-ready — try OpenAI fallback
-        const fallback = await tryOpenAIFallback();
-        if (fallback) return fallback;
-        return { ok: false as const, imageUrl: null, brief, error: r.errorMsg ?? `image gen ${r.status}` };
-      } catch (e: any) {
-        // Primary THREW (e.g. PiAPI HTTP 500 insufficient credits) — still try OpenAI fallback
-        console.error(`[theater.generateImage] ${primaryModel} threw:`, e?.message ?? e);
-        const fallback = await tryOpenAIFallback();
-        if (fallback) return fallback;
-        return { ok: false as const, imageUrl: null, brief, error: String(e?.message ?? e) };
-      }
     })),
 
   // ─── Brand caption rules CRUD (Phase 3a) ────────────────────────────

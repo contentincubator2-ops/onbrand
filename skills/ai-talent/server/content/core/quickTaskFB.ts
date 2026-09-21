@@ -894,14 +894,6 @@ export interface OrchestraConfig {
   fluxSize: "square_hd" | "landscape_4_3" | "portrait_9_16" | "landscape_16_9" | null;
   imageQualitySteps: number; // Flux Schnell: 4 default, 8 for higher quality
   /**
-   * 2026-07-07 (CJ): per-task image-model override for genOneImage's primary
-   * attempt. When set (e.g. "azure/gpt-image-2"), that model is tried first
-   * instead of the imagen-4 default; flux-schnell stays the reliability
-   * fallback. Used to lock YT thumbnail/video backgrounds to gpt-image-2
-   * (best prompt adherence for clean, text-free 16:9 backgrounds).
-   */
-  imageModelOverride?: string;
-  /**
    * 2026-08-29：這張卡的 caption 生成逾時上限（毫秒）。不給就用 orchestra
    * 的預設 40s。
    *

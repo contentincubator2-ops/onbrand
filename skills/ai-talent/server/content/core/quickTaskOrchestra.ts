@@ -4,18 +4,17 @@
  * For each FB 30s task we run, in parallel:
  *   1. caption_writer (existing template agent) → 1 LLM call → N caption variants
  *   2. image_director (Mandy Cheng / 239184)   → 1 LLM call → N image briefs
- *   3. flux-schnell × N                          → parallel image gen
+ *   3. gpt-image-2 × N                           → parallel image gen
+ *      (one same-model retry; a failed image carries canSwitchTo so the UI can
+ *      offer Nano Banana — see stillImageModels.ts)
  *
  * URL fetch + persona loads + brand context all kick off at t=0 alongside.
  *
- * Hard ceiling 20 seconds wall-clock. Per-image budget 7s. If an image
- * doesn't make it, the variant ships with image.status="timeout" and the UI
- * shows a "補完中" chip — orchestra never blocks the whole carousel.
- *
- * Cost ~$0.017 / orchestra (1 LLM call ×2 + Flux Schnell ×5 @ $0.003).
+ * (The original 20-second / 7s-per-image ceiling and Flux cost figures no
+ * longer apply — the tier budgets below are the live numbers.)
  */
 import { callModel, type ModelProvider } from "../../platform/core/multiModelRouter";
-import { dispatchGenerate } from "./mediaGen";
+import { GPT_IMAGE_2, generateStillImage, type StillImageChoice } from "./stillImageModels";
 import {
   captionToBilingualVisualBrief,
   loadBrandIdentityForImage,
@@ -66,13 +65,9 @@ import localPool from "../../localDb";
 const HARD_BUDGET_MS  = 100_000; // 30s tier
 const HARD_BUDGET_60S = 130_000; // 60s tier
 const HARD_BUDGET_99S= 150_000; // 100s tier
-// 2026-05-13 (CJ「30~99秒的圖都生成不了」): PiAPI Flux Schnell takes 8–15s
-// in practice (poll loop adds 1s minimum between checks). The previous
-// 10s budget timed out almost every generation — variants came back with
-// status:"timeout" and thumbnailUrl ended up null. Bumped to 45s so a
-// typical 12s gen lands well within budget; per-tier hard budget still
-// caps the overall job. Variants run in parallel so wall time stays low.
-const PER_IMAGE_MS    = 45_000;
+// Per-attempt ceiling for one image (gpt-image-2 measures 14–24s; a 5-image YT
+// run finished inside 35s). genOneImage makes at most two same-model attempts.
+const PRIMARY_IMAGE_CAP_MS = 35_000;
 const LLM_BUDGET_MS   = 40_000;
 // 2026-05-18 (CJ「想辦法加速」): the strategist anchor runs SEQUENTIALLY
 // before captions (captions depend on it), so its budget is dead time on
@@ -117,13 +112,14 @@ export interface OrchestraVariant {
     prompt?: string | null;
     /** Traditional Chinese equivalent shown and edited in RunPage. */
     promptZh?: string | null;
-    /** Actual provider model and whether the primary silently fell back. */
+    /** The model that ran — always the one requested; there is no automatic swap. */
     modelId?: string | null;
     requestedModelId?: string | null;
-    fallbackUsed?: boolean;
     url: string | null;
     status: "ready" | "failed" | "skipped" | "timeout";
     errorMsg?: string;
+    /** Set on a failed gpt-image-2 image: the UI may offer this model. It is never run automatically. */
+    canSwitchTo?: StillImageChoice;
   };
   /**
    * 2026-05-18 (CJ「carousel 一個貼文還是只出現一張圖」): a carousel /
@@ -141,10 +137,10 @@ export interface OrchestraVariant {
       promptZh?: string | null;
       modelId?: string | null;
       requestedModelId?: string | null;
-      fallbackUsed?: boolean;
       url: string | null;
       status: "ready" | "failed" | "skipped" | "timeout" | "pending";
       errorMsg?: string;
+      canSwitchTo?: StillImageChoice;
     };
   }>;
   /**
@@ -1770,8 +1766,7 @@ async function genOneImage(
       prompt: null,
       promptZh: null,
       modelId: null,
-      requestedModelId: "google/nano-banana",
-      fallbackUsed: false,
+      requestedModelId: GPT_IMAGE_2,
       url: null,
       status: "failed",
       errorMsg: PRODUCT_SUBJECT_UNAVAILABLE_ERROR,
@@ -1795,20 +1790,13 @@ async function genOneImage(
     });
     modelPrompt = visualBrief.prompt;
     displayPromptZh = visualBrief.promptZh;
-    // 2026-05-18 (CJ「目前的圖很不行，最好的生圖模型是什麼」): quick-task
-    // images were hardcoded to piapi/flux-schnell — the fastest/lowest-
-    // quality Flux tier (draft-grade, weak prompt adherence). Upgrade the
-    // default to Google Imagen 4 (best quality/speed balance for branded
-    // marketing visuals, robust prompt adherence, fewer safety false-
-    // positives than gpt-image-1). Flux Schnell stays as the reliability
-    // fallback so a provider hiccup never blanks the card.
     const aspect = (config.aspectRatio === "1.91:1" ? "16:9" : config.aspectRatio) as any;
     // 2026-07-07 (CJ「YT 縮圖出現不是國字的國字」): image models hallucinate
     // garbled CJK text, worst under 16:9 thumbnail framing. The real title is
     // overlaid in the mockup/output layer, so this image must be a CLEAN,
-    // text-free background. Append a dominant NO-TEXT directive to the positive
-    // prompt (imagen-4 has no negative_prompt field) AND pass a real
-    // negative_prompt (honoured by the flux-schnell fallback + SDXL/Ideogram).
+    // text-free background. gpt-image-2 and Nano Banana take no negative_prompt
+    // field, so the dominant NO-TEXT directive in the positive prompt
+    // (buildImageGuardBlock) is the whole mechanism.
     // 2026-07-27 (CJ「鏡子裡的她，跟實際的髮型或頭的轉向不同」): mirror /
     // reflective-surface compositions are a well-known failure mode for
     // every text-to-image model — they cannot keep a reflection physically
@@ -1820,11 +1808,7 @@ async function genOneImage(
     // used to carry its own paraphrase of the fidelity guard, so tightening
     // imageGen's copy left this path on the old, looser wording. Import the
     // shared constant — one guard, one place to fix it.
-    const {
-      PRODUCT_FAITHFUL_PROMPT_BLOCK,
-      NO_MIRROR_PROMPT_BLOCK,
-      NO_MIRROR_NEGATIVE_PROMPT,
-    } = await import("./imageGen");
+    const { PRODUCT_FAITHFUL_PROMPT_BLOCK, NO_MIRROR_PROMPT_BLOCK } = await import("./imageGen");
     const promptNoText = `${modelPrompt}\n\n${buildImageGuardBlock({
       subjectMode,
       productFaithfulBlock: PRODUCT_FAITHFUL_PROMPT_BLOCK,
@@ -1833,110 +1817,44 @@ async function genOneImage(
     const opts = {
       prompt: promptNoText,
       aspectRatio: aspect,
-      // 2026-09-01: quality is read only by the OpenAI and Azure adapters, and
-      // forcing "high" made gpt-image-2 take 73.8s instead of 14.1s for a
-      // SMALLER image — past the cap below, so every openai-pinned task fell
-      // back to Flux. Let each adapter use its own default.
+      // quality is deliberately unset: forcing "high" made gpt-image-2 take
+      // 73.8s instead of 14.1s for a SMALLER image (measured 2026-09-01).
       ...(args.subjectImageUrl ? { imageUrl: args.subjectImageUrl } : {}),
-      // Product-subject mode can't send the blanket text-suppression negative —
-      // it would fight the real product's own printed label. Mirror-only there,
-      // matching imageGen.ts and mediaRouter.generate.
-      negativePrompt: subjectMode
-        ? NO_MIRROR_NEGATIVE_PROMPT
-        : "text, letters, words, numbers, chinese characters, japanese characters, " +
-          "korean characters, cjk, title, headline, caption, subtitle, label, badge, " +
-          "sticker, signage, watermark, signature, logo, typography, gibberish glyphs, " +
-          "fake characters, writing, mirror, reflection, reflective surface",
     };
-    const tryModel = async (modelId: string, label: string, capMs: number) =>
-      Promise.race([
-        dispatchGenerate(modelId, opts),
-        timeoutPromise<never>(capMs, label),
-      ]);
-    // 2026-05-18 (CJ「現在沒有產出圖了」regression): the imagen primary +
-    // flux fallback were each capped at PER_IMAGE_MS (45s) → worst case
-    // 90s, blowing the ~30-60s background budget so the card never
-    // resolved. Cap the imagen attempt tight (25s); if it fails/slow,
-    // the proven Flux Schnell fallback still finishes inside budget.
-    // 2026-05-18 (CJ「想辦法加速」): Imagen 4 normally returns < 18s;
-    // capping the primary attempt tighter means a slow Imagen falls back
-    // to the proven (faster) Flux sooner. Saves up to ~7s/image on the
-    // slow path — directly shortens the hold-for-images wait.
-    // 2026-08-31 (CJ「圖片的模型，是否突然都不能使用了」): imagen-4 is GONE
-    // from this key's ListModels — every :predict answers 404 NOT_FOUND — so
-    // the primary attempt below could only ever burn the cap and fall back.
-    // Nano Banana (gemini-2.5-flash-image) IS on the key and does plain
-    // text-to-image, so it takes over as the primary; the cap keeps its old
-    // job of handing slow runs to Flux Schnell inside the task budget.
-    // 2026-09-01 (CJ「我要執行走 gpt-image 2」): gpt-image-2 is now the primary
-    // for every auto-generated image, not just the YT cards that pinned it.
-    // Measured 14.1s at 1536x1024 once the harmful quality="high" was dropped,
-    // and a 5-image YT run finished all five inside a 35s cap — so the cap is
-    // 35s across the board now rather than 18s for the default path and 35s
-    // for overrides. The old 18s existed for Imagen 4, which no longer exists
-    // on this key at all. Flux Schnell stays the reliability fallback.
-    const PRIMARY_IMAGE_CAP_MS = 35_000;
-    // 2026-07-27: subjectMode always routes through Nano Banana (image-edit,
-    // not text-to-image) — it's the only model here that takes a subject
-    // reference photo, so「使用真實產品圖」must not follow the primary above.
-    const primaryModel = subjectMode ? "google/nano-banana" : (config.imageModelOverride ?? "openai/gpt-image-2");
-    const primaryCapMs = PRIMARY_IMAGE_CAP_MS;
-    let r;
-    let fallbackUsed = false;
-    try {
-      r = await tryModel(primaryModel, primaryModel, primaryCapMs);
-      if (!(r.status === "ready" && r.url)) throw new Error(r.errorMsg ?? `${primaryModel} no url`);
-    } catch (e: any) {
-      // 2026-09-01: this catch used to swallow the reason entirely, so a
-      // pinned model that never ran was indistinguishable from one that ran
-      // fine — the openai/gpt-image-2 timeout below was only found by
-      // measuring the PNG dimensions of the delivered image. Say what failed.
-      console.warn(
-        `[genOneImage] primary ${primaryModel} failed after ${primaryCapMs}ms cap — ` +
-        `${String(e?.message ?? e).slice(0, 200)}`,
-      );
-      // 2026-07-25 product-faithful gen policy (imageGen.ts): a hallucinated
-      // product is worse than a failed run — do NOT fall back to text-to-image
-      // when a real product photo was requested, it would silently ship a
-      // fake product. Non-product runs keep the proven Flux Schnell fallback.
-      if (subjectMode) {
-        return {
-          style: prompt,
-          prompt: modelPrompt,
-          promptZh: displayPromptZh,
-          modelId: primaryModel,
-          requestedModelId: primaryModel,
-          fallbackUsed: false,
-          url: null,
-          status: "failed",
-          errorMsg: String(e?.message ?? e),
-        };
-      }
-      fallbackUsed = true;
-      r = await tryModel("piapi/flux-schnell", "piapi-flux-schnell", PER_IMAGE_MS);
-    }
-    if (r.status === "ready" && r.url) {
+    // 2026-09-21 (CJ「不論是否有產品圖，都只用 gpt image 2 生成，不行的時候，再讓用戶選
+    // NANO BANANA」): gpt-image-2 for every task image — a product photo just makes
+    // it use the image-edit endpoint. One same-model retry, then a FAILED image
+    // that carries canSwitchTo so RunPage can offer「改用 Nano Banana」. No Flux
+    // fallback, no per-task model pin: silently shipping a picture from a model
+    // the user never chose is what this replaces.
+    // Per-attempt cap 35s (5 YT images finished inside it when measured); two
+    // attempts stay inside the 100s tier budget with the brief stage.
+    const out = await generateStillImage(GPT_IMAGE_2, opts, { attemptTimeoutMs: PRIMARY_IMAGE_CAP_MS });
+    if (out.status === "ready" && out.url) {
       return {
         style: prompt,
         prompt: modelPrompt,
         promptZh: displayPromptZh,
-        modelId: r.modelId,
-        requestedModelId: primaryModel,
-        fallbackUsed,
-        url: r.url,
+        modelId: out.modelId,
+        requestedModelId: out.modelId,
+        url: out.url,
         status: "ready",
       };
     }
+    console.warn(
+      `[genOneImage] ${out.modelId} failed after ${out.attempts} attempt(s) (${out.failureKind}) — ` +
+      `${String(out.errorMsg ?? "").slice(0, 200)}`,
+    );
     return {
       style: prompt,
       prompt: modelPrompt,
       promptZh: displayPromptZh,
-      modelId: r.modelId,
-      requestedModelId: primaryModel,
-      fallbackUsed,
+      modelId: out.modelId,
+      requestedModelId: out.modelId,
       url: null,
       status: "failed",
-      errorMsg: r.errorMsg ?? "no url returned",
+      errorMsg: out.errorMsg ?? "no url returned",
+      canSwitchTo: out.canSwitchTo,
     };
   } catch (e: any) {
     const msg = String(e?.message ?? e);
@@ -2689,14 +2607,13 @@ export async function runOrchestra(args: {
     }
 
     // ── Stage 3: parallel image gen — only when runImageGen=true ───────
-    // 30s tier: runImageGen=false → briefs are written but no Flux call.
+    // 30s tier: runImageGen=false → briefs are written but no image model is called.
     // The carousel renders style direction text in the mockup image slot;
     // user clicks "用此風格生圖" per variant to opt into MediaGenFlow.
     const willRender = args.config.runImageGen && args.config.images > 0;
     const stGen = willRender
-      // The primary is usually Imagen, can be GPT/Nano Banana, and may fall
-      // back to Flux. Per-image modelId records the actual provider; keep the
-      // stage label provider-neutral instead of claiming every image was Flux.
+      // Every image is gpt-image-2 (one same-model retry, no swap); the per-image
+      // modelId records which model ran. Keep the stage label model-neutral.
       ? stage("gen", `平行生圖 ×${args.config.images}`)
       : null;
 
@@ -2833,8 +2750,8 @@ export async function runOrchestra(args: {
         // (threw before push, or was skipped in an error path). Use "skipped"
         // rather than "failed" so the mockup shows a neutral "tap to generate"
         // state instead of a red "generation failed" error the user didn't trigger.
-        // Actual failures (both Imagen + Flux returned errors) already push
-        // an explicit {status:"failed"} into images[i] above.
+        // Actual failures (gpt-image-2 failed twice) already push an explicit
+        // {status:"failed", canSwitchTo} into images[i] above.
         image: images[i] ?? { style: briefs[i] ?? null, url: null, status: "skipped" },
       });
     }

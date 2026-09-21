@@ -111,6 +111,15 @@ const REWRITE_AGENTS: Array<{
   },
 ];
 
+interface ImageVersionView {
+  url: string;
+  prompt?: string | null;
+  promptZh?: string | null;
+  modelId?: string | null;
+  requestedModelId?: string | null;
+  savedAt?: string;
+}
+
 interface VariantData {
   id?: string;
   label: string;
@@ -126,7 +135,11 @@ interface VariantData {
   imagePromptZh?: string;
   imageModelId?: string;
   imageRequestedModelId?: string;
-  imageFallbackUsed?: boolean;
+  /** Why a failed image failed, and whether the UI may offer Nano Banana (never run automatically). */
+  imageErrorMsg?: string;
+  imageCanSwitchTo?: "nano-banana";
+  /** Earlier images of this slot, newest first — selectable without regenerating. */
+  imageVersions?: ImageVersionView[];
   imageUrl?: string | null;
   imageStatus?: string;
   qa?: any;
@@ -141,7 +154,6 @@ interface VariantData {
       promptZh?: string | null;
       modelId?: string | null;
       requestedModelId?: string | null;
-      fallbackUsed?: boolean;
       url: string | null;
       status: string;
       errorMsg?: string;
@@ -175,7 +187,10 @@ function normalizeVariantData(v: any): VariantData {
     imagePromptZh: v?.imagePromptZh ?? img.promptZh ?? undefined,
     imageModelId: v?.imageModelId ?? img.modelId ?? undefined,
     imageRequestedModelId: v?.imageRequestedModelId ?? img.requestedModelId ?? undefined,
-    imageFallbackUsed: v?.imageFallbackUsed ?? img.fallbackUsed ?? undefined,
+    imageErrorMsg: typeof img.errorMsg === "string" ? img.errorMsg : undefined,
+    imageCanSwitchTo: (v?.image?.canSwitchTo ?? img.canSwitchTo) === "nano-banana" ? "nano-banana" : undefined,
+    imageVersions: Array.isArray(v?.imageVersions) ? v.imageVersions
+      : Array.isArray(img.versions) ? img.versions : undefined,
     qa: v?.qa,
     extras: v?.extras,
     cards: Array.isArray(v?.cards) ? v.cards : undefined,
@@ -548,6 +563,11 @@ export default function RunPage() {
   /** 2026-05-12: user-selected image model for 改圖 dropdown.
    *  2026-06-15: default gpt-image-2 across all platforms. */
   const [imageModel, setImageModel] = useState<string>("gpt-image-2");
+  /** 2026-09-21: a failed generation is a result, not a thrown error, so the UI can offer
+   *  「改用 Nano Banana」 (the user decides; nothing switches automatically). */
+  const [imageFailure, setImageFailure] = useState<{
+    message: string; canSwitchTo?: "nano-banana"; model?: string;
+  } | null>(null);
   /** Video gen state — async job, polled for status. */
   /** 2026-05-12: user-selected video model for 改影片 dropdown. */
   /** 2026-05-12 Phase 1 — picked template category for the 改圖 picker. */
@@ -753,65 +773,68 @@ export default function RunPage() {
   const imageGenMut = (trpc as any).image?.generate?.useMutation
     ? (trpc as any).image.generate.useMutation({
         onSuccess: async (r: any) => {
-          // 2026-05-10: image.generate returns either {url} (Flux/Leonardo) or
-          // {b64} (OpenAI gpt-image-1). Normalize to a usable image source —
-          // for b64 we wrap as data: URL so <img> tag renders directly.
-          let imageSrc = r?.imageUrl ?? r?.url ?? r?.publicUrl ?? null;
-          if (!imageSrc && typeof r?.b64 === "string" && r.b64.length > 100) {
-            imageSrc = `data:image/png;base64,${r.b64}`;
-          }
-          if (imageSrc && updateImageMut) {
-            const target = imageMutationTargetRef.current;
-            if (!target) {
-              showToastGlobal(lang === "en" ? "Image target was lost — please try again" : "找不到原本的圖片位置，請重試");
-              return;
-            }
-            try {
-              await updateImageMut.mutateAsync({
-                id,
-                ...target.locator,
-                imageUrl: imageSrc,
-                prompt: r?.effectivePrompt ?? target.promptZh,
-                promptZh: r?.normalizedDisplayPrompt ?? target.promptZh,
-                modelId: r?.model ?? undefined,
-                requestedModelId: r?.requestedModel ?? undefined,
-                fallbackUsed: r?.usedFallback ?? false,
-              });
-            } catch {
-              // updateImageMut.onError already shows the persistence error.
-              imageMutationTargetRef.current = null;
-              return;
-            }
+          // A failed generation comes back as a normal result (status "failed") carrying
+          // canSwitchTo — the server already retried the same model once and refunded the points.
+          if (r?.status === "failed" || !r?.url) {
             imageMutationTargetRef.current = null;
-            const actualModel = String(r?.model ?? "").trim();
-            const requestedModel = String(r?.requestedModel ?? "").trim();
-            const modelNote = actualModel
-              ? r?.usedFallback
-                ? (lang === "en"
-                    ? ` — used ${actualModel} fallback (requested ${requestedModel || "auto"})`
-                    : ` — 實際使用 ${actualModel} fallback（原選 ${requestedModel || "自動"}）`)
-                : (lang === "en" ? ` — ${actualModel}` : ` — 實際使用 ${actualModel}`)
-              : "";
-            showToastGlobal(lang === "en" ? `Image ready ✓${modelNote}` : `已產圖 ✓${modelNote}`);
-          } else {
-            // 2026-05-12: server should TRPCError on failure now; this branch
-            // only reaches if a provider returned success-shaped but empty
-            // data. Include any returned errorMsg if present.
-            const detail = sanitizeProviderErrorForToast(r?.errorMsg ?? r?.message ?? "").slice(0, 200);
+            const detail = sanitizeProviderErrorForToast(r?.friendlyMessage ?? r?.errorMsg ?? r?.message ?? "").slice(0, 400);
+            setImageFailure({ message: detail, canSwitchTo: r?.canSwitchTo, model: r?.model });
             showToastGlobal(
-              detail
-                ? (lang === "en" ? `Image failed: ${detail}` : `產圖失敗：${detail}`)
-                : (lang === "en"
-                    ? "Image finished but API returned no URL (please contact support)"
-                    : "產圖完成但 API 沒回傳圖片網址（請聯絡客服）")
+              r?.canSwitchTo
+                ? (lang === "en" ? "Image failed — retry, or switch to Nano Banana below" : "這次沒有產出圖 — 可以再試一次，或改用 Nano Banana")
+                : (lang === "en" ? "Image failed — please try again" : "這次沒有產出圖，請再試一次")
             );
+            return;
           }
+          setImageFailure(null);
+          const target = imageMutationTargetRef.current;
+          if (!target) {
+            showToastGlobal(lang === "en" ? "Image target was lost — please try again" : "找不到原本的圖片位置，請重試");
+            return;
+          }
+          if (!updateImageMut) return;
+          try {
+            await updateImageMut.mutateAsync({
+              id,
+              ...target.locator,
+              imageUrl: r.url,
+              prompt: r?.effectivePrompt ?? target.promptZh,
+              promptZh: r?.normalizedDisplayPrompt ?? target.promptZh,
+              modelId: r?.model ?? undefined,
+              requestedModelId: r?.requestedModel ?? undefined,
+            });
+          } catch {
+            // updateImageMut.onError already shows the persistence error.
+            imageMutationTargetRef.current = null;
+            return;
+          }
+          imageMutationTargetRef.current = null;
+          const actualModel = String(r?.model ?? "").trim();
+          showToastGlobal(
+            lang === "en"
+              ? `Image ready ✓${actualModel ? ` — ${actualModel}` : ""} (the previous image is kept — switch back anytime)`
+              : `已產圖 ✓${actualModel ? ` — ${actualModel}` : ""}（前一張圖有保留，隨時可以切回去）`
+          );
         },
         onError: (e: any) => {
           imageMutationTargetRef.current = null;
           const detail = sanitizeProviderErrorForToast(e?.message ?? e);
           showToastGlobal(lang === "en" ? `Image failed: ${detail}` : `產圖失敗：${detail}`);
         },
+      })
+    : { mutate: () => {}, isPending: false };
+
+  // 2026-09-21 (CJ「生成過的圖，要讓用戶可以選選用」): switching back to an earlier image is a pointer
+  // move on the server — nothing is regenerated and no points are spent.
+  const selectVersionMut = (trpc as any).output?.selectVariantImageVersion?.useMutation
+    ? (trpc as any).output.selectVariantImageVersion.useMutation({
+        onSuccess: () => {
+          utils.output.getById.invalidate({ id });
+          showToastGlobal(lang === "en" ? "Switched back ✓ (no regeneration)" : "已切回這張圖 ✓（不用重新生成）");
+        },
+        onError: (e: any) => showToastGlobal(
+          lang === "en" ? `Couldn't switch image: ${String(e?.message ?? e).slice(0, 120)}` : `切換圖片失敗：${String(e?.message ?? e).slice(0, 120)}`
+        ),
       })
     : { mutate: () => {}, isPending: false };
 
@@ -839,6 +862,55 @@ export default function RunPage() {
     setUseRealProduct(false);
     setPickedRunProduct(null);
   }, [id, data?.brand?.id]);
+
+  // A different variant is a different image slot — its failure notice is not ours.
+  React.useEffect(() => { setImageFailure(null); }, [id, activeIdx]);
+
+  /** Generate (or regenerate) the current variant's image with exactly `model`. Used by the
+   *  panel's 產圖 button and by the failure banner's 再試一次 / 改用 Nano Banana. */
+  const startImageGen = (model: string, promptText: string) => {
+    if (!data?.brand?.id) {
+      showToastGlobal(
+        lang === "en"
+          ? "This run isn't linked to a brand, can't generate"
+          : "此 run 沒有綁定品牌，無法產圖"
+      );
+      return;
+    }
+    if (useRealProduct && !validRunProduct) {
+      showToastGlobal(
+        lang === "en"
+          ? "Select a product photo from this brand before generating"
+          : "請先從目前品牌選擇有效的產品圖，再進行產圖"
+      );
+      return;
+    }
+    setImageFailure(null);
+    setImageModel(model);
+    imageMutationTargetRef.current = {
+      locator: getRunContentMutationLocator(selectedContentKind, activeIdx),
+      promptZh: promptText,
+    };
+    imageGenMut.mutate({
+      brandId: data.brand.id,
+      prompt: promptText,
+      // image.generate expects short codes: fb / ig / linkedin / youtube / tiktok / threads / line / email / press
+      channel: (
+        mockupVariant?.platform === "facebook"  ? "fb" :
+        mockupVariant?.platform === "instagram" ? "ig" :
+        mockupVariant?.platform === "linkedin"  ? "linkedin" :
+        mockupVariant?.platform === "youtube"   ? "youtube" :
+        mockupVariant?.platform === "tiktok"    ? "tiktok" :
+        "fb"
+      ) as any,
+      modelChoice: model,
+      size: getIgPublicVariantImageSize(selectedContentKind, variants[activeIdx]?.format),
+      // TODO: send productId and resolve the brand-owned image
+      // server-side. This hotfix intentionally closes the gap
+      // with current-brand client validation only.
+      ...(realProductMode ? { subjectImageUrl: validRunProduct!.imageUrl } : {}),
+    });
+  };
 
   // 2026-06-15: generate image prompt from the current variant's caption.
   const captionToPromptMut = (trpc as any).image?.promptFromCaption?.useMutation
@@ -2000,6 +2072,38 @@ export default function RunPage() {
                   : () => { manualImageRef.current = true; setMode("image"); }}
                 componentSlot={componentSlot}
               />
+              {/* 2026-09-21 (CJ「不行的時候，再讓用戶選 NANO BANANA」): gpt-image-2 failed even after the
+                  automatic same-model retry. Say so plainly and let the USER pick — nothing switches on
+                  its own. Also covers a failed manual attempt (imageFailure). */}
+              {!isStrategyPlanning && (slide.imageStatus === "failed" || imageFailure) && !imageGenMut.isPending && (() => {
+                const canNano = (imageFailure?.canSwitchTo ?? slide.imageCanSwitchTo) === "nano-banana";
+                const reason = imageFailure?.message || sanitizeProviderErrorForToast(slide.imageErrorMsg ?? "");
+                const promptText = imagePrompt.trim()
+                  || pickImagePromptSeed({ imagePromptZh: slide.imagePromptZh, imagePrompt: slide.imagePrompt, imageStyle: slide.imageStyle })
+                  || String(slide.caption ?? "").slice(0, 300);
+                return (
+                  <div className="mx-4 mt-3 rounded-lg border border-warning-300 bg-warning-50 px-3 py-2.5 space-y-2">
+                    <p className="text-tiny font-semibold text-warning-800">
+                      {lang === "en"
+                        ? "The image wasn't generated (GPT Image 2 was retried once automatically)."
+                        : "這張圖沒有產出成功（GPT Image 2 已自動重試一次）。"}
+                    </p>
+                    {reason && <p className="text-[12px] text-warning-700 whitespace-pre-line leading-relaxed">{reason.slice(0, 300)}</p>}
+                    <div className="flex gap-2 flex-wrap">
+                      <Button size="sm" color="secondary" variant="flat" isDisabled={!promptText}
+                        onPress={() => startImageGen("gpt-image-2", promptText)}>
+                        {lang === "en" ? "Try GPT Image 2 again" : "再試一次（GPT Image 2）"}
+                      </Button>
+                      {canNano && (
+                        <Button size="sm" color="secondary" variant="bordered" isDisabled={!promptText}
+                          onPress={() => startImageGen("nano-banana", promptText)}>
+                          {lang === "en" ? "Try Nano Banana instead" : "改用 Nano Banana"}
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })()}
               </>
               ) : null;
             })()}
@@ -2788,8 +2892,8 @@ export default function RunPage() {
                         <span className="text-tiny font-semibold">📦 {lang === "en" ? "Use real product photo" : "使用真實產品圖"}</span>
                         <span className="text-[12px] text-default-500">
                           {lang === "en"
-                            ? "Composites the actual product (Nano Banana; model picker below is ignored)"
-                            : "把真實產品原貌合成進場景 — 自動用 Nano Banana 保真模型，下方模型選擇不適用"}
+                            ? "Uses your real product photo as the base (GPT Image 2 edits it; pick Nano Banana below if you prefer)"
+                            : "以真實產品照為基準生圖 — 預設 GPT Image 2 依照片編輯；想換 Nano Banana 可在下方自行選擇"}
                         </span>
                       </label>
                       {useRealProduct && (
@@ -2815,15 +2919,14 @@ export default function RunPage() {
                   )}
                   <div className="bg-secondary-50 border border-secondary-200 rounded-lg p-2 text-[12px] text-secondary-700 mt-2">
                     {lang === "en"
-                      ? "Step 3: Pick a model (each is best for a different style)"
-                      : "Step 3：選用哪個模型（不同模型擅長不同風格）"}
+                      ? "Step 3: Model — GPT Image 2 by default; try Nano Banana if it doesn't work out"
+                      : "Step 3：模型 — 預設 GPT Image 2；不行再換 Nano Banana"}
                   </div>
                   <label className="block text-tiny text-default-600 -mb-1">{lang === "en" ? "AI model" : "AI 模型"}</label>
                   <select
                     value={imageModel}
                     onChange={(e) => setImageModel(e.target.value)}
-                    disabled={realProductMode}
-                    className="w-full text-xs border border-default-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:border-secondary disabled:opacity-50"
+                    className="w-full text-xs border border-default-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:border-secondary"
                   >
                     {RUN_IMAGE_MODEL_OPTIONS.map((option) => (
                       <option key={option.value} value={option.value}>
@@ -2832,68 +2935,21 @@ export default function RunPage() {
                     ))}
                   </select>
                   {slide?.imageModelId && (
-                    <p className={`text-[12px] ${slide.imageFallbackUsed ? "text-warning-700" : "text-default-500"}`}>
-                      {lang === "en" ? "Current image model: " : "目前圖片實際模型："}
+                    <p className="text-[12px] text-default-500">
+                      {lang === "en" ? "Current image model: " : "目前這張圖的模型："}
                       <span className="font-mono">{slide.imageModelId}</span>
-                      {slide.imageFallbackUsed && (
-                        <>
-                          {lang === "en" ? " (fallback from " : "（fallback，原選 "}
-                          <span className="font-mono">{slide.imageRequestedModelId || "auto"}</span>
-                          {lang === "en" ? ")" : "）"}
-                        </>
-                      )}
                     </p>
                   )}
                   <div className="bg-secondary-50 border border-secondary-200 rounded-lg p-2 text-[12px] text-secondary-700 mt-2">
                     {lang === "en"
-                      ? "Step 4: Hit the button to make a new image (replaces the current one)"
-                      : "Step 4：按下面按鈕，會用你的指令重新產圖（蓋掉目前的圖）"}
+                      ? "Step 4: Hit the button to make a new image (the current one is kept — switch back below)"
+                      : "Step 4：按下面按鈕，會用你的指令重新產圖（目前的圖會保留，可在下方切回去）"}
                   </div>
                   <Button
                     color="secondary" fullWidth
                     isLoading={imageGenMut.isPending}
                     isDisabled={imageGenMut.isPending || !imagePrompt.trim() || !data.brand?.id || missingRealProductSelection}
-                    onPress={() => {
-                      if (!data.brand?.id) {
-                        showToastGlobal(
-                          lang === "en"
-                            ? "This run isn't linked to a brand, can't generate"
-                            : "此 run 沒有綁定品牌，無法產圖"
-                        );
-                        return;
-                      }
-                      if (useRealProduct && !validRunProduct) {
-                        showToastGlobal(
-                          lang === "en"
-                            ? "Select a product photo from this brand before generating"
-                            : "請先從目前品牌選擇有效的產品圖，再進行產圖"
-                        );
-                        return;
-                      }
-                      imageMutationTargetRef.current = {
-                        locator: getRunContentMutationLocator(selectedContentKind, activeIdx),
-                        promptZh: imagePrompt,
-                      };
-                      imageGenMut.mutate({
-                        brandId: data.brand.id,
-                        prompt: imagePrompt,
-                        // image.generate expects short codes: fb / ig / linkedin / youtube / tiktok / threads / line / email / press
-                        channel: (
-                          mockupVariant?.platform === "facebook"  ? "fb" :
-                          mockupVariant?.platform === "instagram" ? "ig" :
-                          mockupVariant?.platform === "linkedin"  ? "linkedin" :
-                          mockupVariant?.platform === "youtube"   ? "youtube" :
-                          mockupVariant?.platform === "tiktok"    ? "tiktok" :
-                          "fb"
-                        ) as any,
-                        modelChoice: imageModel as any,
-                        size: getIgPublicVariantImageSize(selectedContentKind, variants[activeIdx]?.format),
-                        // TODO: send productId and resolve the brand-owned image
-                        // server-side. This hotfix intentionally closes the gap
-                        // with current-brand client validation only.
-                        ...(realProductMode ? { subjectImageUrl: validRunProduct!.imageUrl } : {}),
-                      });
-                    }}
+                    onPress={() => startImageGen(imageModel, imagePrompt)}
                   >
                     {imageGenMut.isPending
                       ? (lang === "en" ? "Generating… (~15-30s)" : "產圖中…（約 15–30 秒）")
@@ -2904,6 +2960,53 @@ export default function RunPage() {
                   )}
                   {missingRealProductSelection && (
                     <p className="text-[12px] text-warning-700">⚠ {lang === "en" ? "Choose a valid product photo from this brand" : "已勾選使用真實產品圖，請先從目前品牌選擇有效產品圖"}</p>
+                  )}
+                  {imageFailure && !imageGenMut.isPending && (
+                    <div className="rounded-lg border border-warning-300 bg-warning-50 px-3 py-2.5 space-y-2">
+                      <p className="text-[12px] text-warning-800 whitespace-pre-line leading-relaxed">{imageFailure.message}</p>
+                      {imageFailure.canSwitchTo === "nano-banana" && (
+                        <Button
+                          size="sm" color="secondary" variant="flat"
+                          isDisabled={imageGenMut.isPending || !imagePrompt.trim() || missingRealProductSelection}
+                          onPress={() => startImageGen("nano-banana", imagePrompt)}
+                        >
+                          {lang === "en" ? "Try Nano Banana instead" : "改用 Nano Banana"}
+                        </Button>
+                      )}
+                    </div>
+                  )}
+                  {/* 2026-09-21: every earlier image of this slot stays selectable — switching is free. */}
+                  {(slide?.imageVersions?.length ?? 0) > 0 && (
+                    <div className="space-y-1.5">
+                      <p className="text-[12px] font-semibold text-default-700">
+                        {lang === "en" ? "Earlier images — click to switch back (no regeneration)" : "之前的圖 — 點一下切回去（不用重新生成）"}
+                      </p>
+                      <div className="flex gap-2 flex-wrap">
+                        {slide?.imageUrl && slide?.imageStatus === "ready" && (
+                          <div className="relative w-16 h-16 rounded-md overflow-hidden border-2 border-secondary" title={lang === "en" ? "In use" : "使用中"}>
+                            <img src={slide.imageUrl} alt="" className="w-full h-full object-cover" />
+                            <span className="absolute bottom-0 inset-x-0 bg-secondary text-white text-[9px] leading-3.5 text-center">{lang === "en" ? "In use" : "使用中"}</span>
+                          </div>
+                        )}
+                        {slide!.imageVersions!.map((v) => (
+                          <button
+                            key={v.url}
+                            type="button"
+                            disabled={selectVersionMut.isPending}
+                            onClick={() => selectVersionMut.mutate({
+                              id, ...getRunContentMutationLocator(selectedContentKind, activeIdx), imageUrl: v.url,
+                            })}
+                            title={`${v.modelId ?? ""}${v.promptZh ? `\n${v.promptZh}` : ""}`.slice(0, 200)}
+                            className="relative w-16 h-16 rounded-md overflow-hidden border-2 border-transparent hover:border-secondary transition disabled:opacity-50"
+                          >
+                            <img src={v.url} alt="" className="w-full h-full object-cover" />
+                            <span className="absolute bottom-0 inset-x-0 bg-black/55 text-white text-[9px] leading-3.5 text-center truncate px-0.5">
+                              {String(v.modelId ?? "").replace(/^(openai|google)\//, "") || (lang === "en" ? "earlier" : "先前")}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
                   )}
                 </>
               )}

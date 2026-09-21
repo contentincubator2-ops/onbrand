@@ -1,8 +1,9 @@
 /**
  * imageGen — Decision AI publish-gate image generation service.
  *
- * Primary:  OpenAI gpt-image-2 (best prompt adherence, brand-context friendly)
- * Fallback: Google gemini image surface (Imagen is gone from this key tier)
+ * gpt-image-2 for everything (with or without a product photo); Nano Banana
+ * only when the user picks it. One same-model retry, no silent model swap —
+ * the policy lives in stillImageModels.ts.
  *
  * Every generation is persisted to `generated_images` for auditability and
  * linked back to the originating decision/option.
@@ -15,8 +16,16 @@ import { getDb } from "../../db";
 import { sql } from "drizzle-orm";
 import { loadLineage } from "../../strategy/core/decisionBridge";
 import { translateImagePromptToEnglish } from "./imagePromptTranslation";
+import {
+  NANO_BANANA,
+  generateStillImage,
+  resolveStillImageModel,
+  toStillImageChoice,
+  type ImageFailureKind,
+  type StillImageChoice,
+} from "./stillImageModels";
 
-export type ImageProvider = "openai" | "google" | "stability" | "piapi";
+export type ImageProvider = "openai" | "google";
 export type ImageSize = "1024x1024" | "1024x1536" | "1536x1024";
 
 /**
@@ -93,50 +102,18 @@ export const NO_MIRROR_PROMPT_BLOCK =
   "never stay physically consistent with the subject's actual pose/hair/" +
   "head angle. Show the subject directly instead.";
 
-export const NO_TEXT_NEGATIVE_PROMPT =
-  "text, letters, words, numbers, chinese characters, japanese characters, " +
-  "korean characters, cjk, title, headline, caption, subtitle, label, badge, " +
-  "sticker, signage, watermark, signature, logo, typography, gibberish glyphs, " +
-  "fake characters, writing, packaging text, product label text, mirror, " +
-  "reflection, reflective surface";
-
 /**
- * Mirror-only negative prompt for product-subject mode, where the blanket
- * NO_TEXT_NEGATIVE_PROMPT can't be used (it would fight the real product
- * label's text). See NO_MIRROR_PROMPT_BLOCK.
+ * User-facing model choice. Only two exist (CJ 2026-09-21); "auto" and every
+ * retired id (flux-*, ideogram-v3, gpt-image-1, …) are still ACCEPTED as input
+ * so stale tabs and stored variants keep resolving — see resolveStillImageModel.
  */
-export const NO_MIRROR_NEGATIVE_PROMPT = "mirror, reflection, reflective surface";
-
-// 2026-05-12 (CJ「改圖要給用戶選 model」): user-facing model IDs.
-// "auto" = use IMAGE_GEN_PROVIDER_PRIMARY env (currently openai).
-// Other values map to specific providers in generateImage's switch.
-export type ImageModelChoice =
-  | "auto"
-  | "flux-schnell"      // PiAPI Flux Schnell — fast (5-10s), 4-step
-  | "gpt-image-1"       // OpenAI gpt-image-1 — strong realism
-  | "gpt-image-2"       // OpenAI gpt-image-2 — latest, higher quality
-  | "flux-realism"      // PiAPI Flux Dev with realism LoRA
-  | "ideogram-v3"       // PiAPI Ideogram — strongest at text-in-image
-  | "imagen-3";         // Google Imagen 3
+export type ImageModelChoice = StillImageChoice | "auto";
 
 function redactProviderSecrets(text: string): string {
   return String(text)
     .replace(/api_key:[A-Za-z0-9_\-]+/g, "api_key:[REDACTED]")
     .replace(/key=([A-Za-z0-9_\-]+)/g, "key=[REDACTED]")
     .replace(/AIza[0-9A-Za-z_\-]{20,}/g, "[REDACTED_GOOGLE_KEY]");
-}
-
-function googleApiKeys(): string[] {
-  return Array.from(new Set([
-    ...(process.env.GEMINI_API_KEY_POOL ?? "").split(","),
-    process.env.GEMINI_API_KEY ?? "",
-    process.env.GOOGLE_AI_API_KEY ?? "",
-    process.env.GOOGLE_API_KEY ?? "",
-  ].map((value) => value.trim()).filter(Boolean)));
-}
-
-function isRetryableGoogleKeyError(text: string): boolean {
-  return /suspended|permission_denied|api[_ ]key|consumer|unauthorized|forbidden|403|429|rate.?limit|quota|resource_exhausted/i.test(text);
 }
 
 export interface BrandVisualContext {
@@ -156,29 +133,29 @@ export interface ImageGenInput {
   channel?: "fb" | "ig" | "linkedin" | "youtube" | "tiktok" | "email" | "pr";
   size?: ImageSize;
   brandContext?: BrandVisualContext;
-  /** 2026-05-12: user-selected model. "auto" or undefined = env default. */
-  modelChoice?: ImageModelChoice;
+  /** User-selected model. "auto" / undefined = gpt-image-2. Nano Banana only when asked for. */
+  modelChoice?: ImageModelChoice | (string & {});
   /** 2026-07-25 (CJ product-faithful gen): URL of the REAL product photo.
-   *  When set, generation routes to Nano Banana subject-reference with the
-   *  PRODUCT-FIDELITY guard, and does NOT fall back to text-only providers
-   *  on failure — a hallucinated product is worse than a failed run. */
+   *  Sent as the reference image (gpt-image-2 edits endpoint, or Nano Banana
+   *  when the user picked it) with the PRODUCT-FIDELITY guard. There is no
+   *  text-only fallback — a hallucinated product is worse than a failed run. */
   subjectImageUrl?: string;
 }
 
 export interface ImageGenResult {
   id: number;
   provider: ImageProvider;
-  model: string;
+  /** The model that ran — always the one requested, never a substitute. */
+  model: StillImageChoice;
   url: string | null;
-  b64: string | null;
   status: "ready" | "failed";
   /** User scene prompt after optional CJK→English translation, before guards/context. */
   effectivePrompt: string;
-  /** User selection before provider fallback (or nano-banana in subject mode). */
-  requestedModel: string;
-  /** True when the returned image came from a fallback, not the requested/default primary. */
-  usedFallback: boolean;
+  requestedModel: StillImageChoice;
   errorMsg?: string;
+  failureKind?: ImageFailureKind;
+  /** Set when gpt-image-2 failed: the UI may OFFER this; the server never runs it on its own. */
+  canSwitchTo?: StillImageChoice;
 }
 
 function channelSize(channel?: string): ImageSize {
@@ -276,195 +253,6 @@ function buildPrompt(input: ImageGenInput): string {
   return lines.join("\n");
 }
 
-async function runOpenAI(
-  promptText: string,
-  size: ImageSize,
-  modelOverride?: string,
-): Promise<{ url: string | null; b64: string | null; model: string }> {
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) throw new Error("OPENAI_API_KEY not set");
-  // 2026-09-01 (CJ「open ai 我指定使用 gpt image 2」): gpt-image-2 is the
-  // designated OpenAI image model. IMAGE_GEN_MODEL_OPENAI is unset on the VM,
-  // so this literal — not the env — was what actually ran, and it was still
-  // gpt-image-1 despite imageRouter's comment calling gpt-image-2 the global
-  // default. Verified openable on the current key before the switch
-  // (op-probe-openai-image: HTTP 200, 17.5s).
-  const model = modelOverride || process.env.IMAGE_GEN_MODEL_OPENAI || "gpt-image-2";
-
-  const res = await fetch("https://api.openai.com/v1/images/generations", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model,
-      prompt: promptText,
-      size,
-      n: 1,
-    }),
-    signal: AbortSignal.timeout(180_000),
-  });
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`OpenAI image gen ${res.status}: ${text.slice(0, 300)}`);
-  }
-  const json: any = await res.json();
-  const item = json?.data?.[0] ?? {};
-  if (!item.url && !item.b64_json) throw new Error("OpenAI image gen returned no image");
-  return { url: item.url ?? null, b64: item.b64_json ?? null, model };
-}
-
-function aspectForSize(size: ImageSize): string {
-  return size === "1536x1024" ? "16:9" : size === "1024x1536" ? "9:16" : "1:1";
-}
-
-/**
- * 2026-08-31 (CJ「圖片的模型，是否突然都不能使用了」): ListModels on the prod
- * key now returns NO imagen model at all — imagen-3.0-* AND imagen-4.0-*
- * both answer 404 NOT_FOUND for :predict — while gemini-2.5-flash-image /
- * gemini-3-pro-image / gemini-3.1-flash-image ARE listed. Google moved image
- * generation off the Imagen predict surface for this key tier, which took the
- * whole "google" fallback down with it: OpenAI (429 no credits) → Google (404)
- * → PiAPI Flux was the only path still producing pictures.
- *
- * The gemini image surface is generateContent + responseModalities, not
- * predict, so it needs its own request shape. Same wire format genNanoBanana
- * (mediaGen) already uses.
- */
-const GEMINI_IMAGE_FALLBACK_MODEL = "gemini-2.5-flash-image";
-
-async function runGeminiImage(
-  promptText: string,
-  size: ImageSize,
-  model: string,
-): Promise<{ url: string | null; b64: string | null; model: string }> {
-  const keys = googleApiKeys();
-  if (!keys.length) throw new Error("GEMINI_API_KEY not set");
-  // flash-image takes no size parameter — the aspect ratio goes in-prompt.
-  const prompt = `${promptText}\n\nOutput aspect ratio: ${aspectForSize(size)}.`;
-  const errors: string[] = [];
-  for (const apiKey of keys) {
-    const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{ role: "user", parts: [{ text: prompt }] }],
-          generationConfig: { responseModalities: ["IMAGE"] },
-        }),
-        signal: AbortSignal.timeout(120_000),
-      }
-    );
-    if (!res.ok) {
-      const text = redactProviderSecrets(await res.text());
-      const error = `Google ${model} ${res.status}: ${text.slice(0, 300)}`;
-      errors.push(error);
-      if (isRetryableGoogleKeyError(`${res.status} ${text}`)) continue;
-      throw new Error(error);
-    }
-    const json: any = await res.json();
-    const parts: any[] = json?.candidates?.[0]?.content?.parts ?? [];
-    const part = parts.find((p) => p?.inlineData?.data || p?.inline_data?.data);
-    const b64 = part?.inlineData?.data ?? part?.inline_data?.data ?? null;
-    // A success-shaped response with no image part must throw, not return a
-    // null url — otherwise the caller writes status=ready and stops falling
-    // back (see the runOpenAI empty-response fix).
-    if (!b64) {
-      const finish = json?.candidates?.[0]?.finishReason ?? "no image part";
-      throw new Error(`Google ${model} returned no image (${finish})`);
-    }
-    return { url: null, b64, model };
-  }
-  throw new Error(errors.join("\n") || `Google ${model} failed`);
-}
-
-async function runGoogleImagen(
-  promptText: string,
-  size: ImageSize
-): Promise<{ url: string | null; b64: string | null; model: string }> {
-  const model = process.env.IMAGE_GEN_MODEL_GOOGLE || GEMINI_IMAGE_FALLBACK_MODEL;
-  if (!model.startsWith("imagen-")) return runGeminiImage(promptText, size, model);
-  try {
-    return await runImagenPredict(promptText, size, model);
-  } catch (e: any) {
-    // A key without Imagen access answers 404 NOT_FOUND for every imagen
-    // model. A stale IMAGE_GEN_MODEL_GOOGLE=imagen-* pinned in an old .env
-    // must not take the Google fallback down again — hand off to the gemini
-    // surface instead. Any other failure (quota, safety, network) still
-    // propagates so the caller's PiAPI fallback runs.
-    if (!/\b404\b|NOT_FOUND/i.test(String(e?.message ?? e))) throw e;
-    return await runGeminiImage(promptText, size, GEMINI_IMAGE_FALLBACK_MODEL);
-  }
-}
-
-async function runImagenPredict(
-  promptText: string,
-  size: ImageSize,
-  model: string,
-): Promise<{ url: string | null; b64: string | null; model: string }> {
-  const keys = googleApiKeys();
-  if (!keys.length) throw new Error("GEMINI_API_KEY not set");
-  const aspect = aspectForSize(size);
-  const errors: string[] = [];
-  for (const apiKey of keys) {
-    const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${model}:predict?key=${apiKey}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          instances: [{ prompt: promptText }],
-          parameters: { sampleCount: 1, aspectRatio: aspect },
-        }),
-        signal: AbortSignal.timeout(120_000),
-      }
-    );
-    if (!res.ok) {
-      const text = redactProviderSecrets(await res.text());
-      const error = `Google Imagen ${res.status}: ${text.slice(0, 300)}`;
-      errors.push(error);
-      if (isRetryableGoogleKeyError(`${res.status} ${text}`)) continue;
-      throw new Error(error);
-    }
-    const json: any = await res.json();
-    const b64 =
-      json?.predictions?.[0]?.bytesBase64Encoded ??
-      json?.predictions?.[0]?.image?.bytesBase64Encoded ??
-      null;
-    if (!b64) throw new Error("Google Imagen returned no image");
-    return { url: null, b64, model };
-  }
-  throw new Error(errors.join("\n") || "Google Imagen failed");
-}
-
-// 2026-05-12: PiAPI bridge for user-selectable image models.
-// Imports dispatchGenerate from mediaGen which handles PiAPI submit + poll.
-async function runPiapi(
-  prompt: string,
-  size: ImageSize,
-  modelId: string,
-): Promise<{ url: string | null; b64: string | null; model: string }> {
-  const { dispatchGenerate } = await import("./mediaGen");
-  // Map our 1024x1024 / 1024x1536 / 1536x1024 sizes to PiAPI aspect ratios
-  const aspect: "1:1" | "9:16" | "16:9" =
-    size === "1024x1536" ? "9:16" :
-    size === "1536x1024" ? "16:9" : "1:1";
-  // 2026-07-07: Flux/SDXL/Ideogram ignore in-prompt "no text" but honour a
-  // real negative_prompt. Suppress the hallucinated (garbled CJK) text baked
-  // into thumbnails — the real title is overlaid in the mockup layer.
-  const r = await dispatchGenerate(modelId, {
-    prompt,
-    aspectRatio: aspect,
-    negativePrompt: NO_TEXT_NEGATIVE_PROMPT,
-  });
-  if (r.status !== "ready" || !r.url) {
-    throw new Error(`PiAPI ${modelId}: ${r.errorMsg ?? `status=${r.status}`}`);
-  }
-  return { url: r.url, b64: null, model: r.modelId };
-}
-
 export async function generateImage(input: ImageGenInput): Promise<ImageGenResult> {
   const db = await getDb();
   if (!db) throw new Error("DB unavailable");
@@ -474,145 +262,45 @@ export async function generateImage(input: ImageGenInput): Promise<ImageGenResul
   const effectivePrompt = translated.prompt;
   const promptText = buildPrompt({ ...input, prompt: effectivePrompt });
 
+  const modelId = resolveStillImageModel(input.modelChoice);
+  const choice = toStillImageChoice(modelId);
+  const provider: ImageProvider = modelId === NANO_BANANA ? "google" : "openai";
+
   // Pre-insert a pending row so we can retrieve it even if provider crashes.
   const [ins] = (await db.execute(sql`
     INSERT INTO generated_images
       (brandId, decisionId, optionId, provider, model, prompt, sizeSpec, status)
     VALUES
       (${input.brandId}, ${input.decisionId ?? null}, ${input.optionId ?? null},
-       ${"openai"}, ${"pending"}, ${promptText}, ${size}, 'pending')
+       ${provider}, ${choice}, ${promptText}, ${size}, 'pending')
   `)) as any;
   const id = Number(ins?.insertId ?? 0);
 
-  // 2026-07-25 product-faithful: subject-reference runs ONLY on Nano Banana.
-  // No fallback to text-only providers — they can't see the real product,
-  // and a hallucinated product violates the fidelity bar. Fail loudly.
-  if (input.subjectImageUrl) {
-    try {
-      const { dispatchGenerate } = await import("./mediaGen");
-      const aspect = size === "1536x1024" ? "16:9" : size === "1024x1536" ? "9:16" : "1:1";
-      const r = await dispatchGenerate("google/nano-banana", {
-        prompt: promptText,
-        imageUrl: input.subjectImageUrl,
-        aspectRatio: aspect as any,
-        brandId: input.brandId,
-        // The blanket NO_TEXT_NEGATIVE_PROMPT can't be used here — it would
-        // fight the real product's own label. Mirror-only, matching what
-        // mediaRouter.generate already passes on this same path.
-        negativePrompt: NO_MIRROR_NEGATIVE_PROMPT,
-      });
-      // TODO: Add post-generation vision validation/retry for product fidelity;
-      // prompt arbitration reduces conflicts but cannot prove output compliance.
-      if (r.status === "ready" && r.url) {
-        await db.execute(sql`
-          UPDATE generated_images
-          SET provider = 'google', model = 'nano-banana', url = ${r.url},
-              status = 'ready', errorMsg = NULL
-          WHERE id = ${id}
-        `);
-        return { id, provider: "google", model: "nano-banana", url: r.url, b64: null, status: "ready", effectivePrompt, requestedModel: "nano-banana", usedFallback: false };
-      }
-      const msg = redactProviderSecrets(r.errorMsg ?? "nano-banana returned no image");
-      await db.execute(sql`UPDATE generated_images SET status='failed', errorMsg=${msg} WHERE id=${id}`);
-      return { id, provider: "google", model: "nano-banana", url: null, b64: null, status: "failed", effectivePrompt, requestedModel: "nano-banana", usedFallback: false, errorMsg: msg };
-    } catch (e: any) {
-      const msg = redactProviderSecrets(`nano-banana: ${String(e?.message ?? e).slice(0, 400)}`).slice(0, 240);
-      await db.execute(sql`UPDATE generated_images SET status='failed', errorMsg=${msg} WHERE id=${id}`);
-      return { id, provider: "google", model: "nano-banana", url: null, b64: null, status: "failed", effectivePrompt, requestedModel: "nano-banana", usedFallback: false, errorMsg: msg };
-    }
-  }
+  // One request → the model the user asked for (default gpt-image-2), retried
+  // once on a transient failure, never swapped. The reference photo (when
+  // there is one) rides along to whichever of the two models runs.
+  const outcome = await generateStillImage(modelId, {
+    prompt: promptText,
+    size,
+    aspectRatio: size === "1536x1024" ? "16:9" : size === "1024x1536" ? "9:16" : "1:1",
+    imageUrl: input.subjectImageUrl,
+    brandId: input.brandId,
+  }, { attemptTimeoutMs: 60_000 });
 
-  const primary = (process.env.IMAGE_GEN_PROVIDER_PRIMARY || "openai") as ImageProvider;
-  const fallback = (process.env.IMAGE_GEN_PROVIDER_FALLBACK || "google") as ImageProvider;
-
-  // 2026-05-12: model choice override. When user picks a specific model,
-  // it becomes "primary" and the env default becomes "fallback".
-  const choice = input.modelChoice ?? "auto";
-  const requestedModel = choice;
-  let effectivePrimary: ImageProvider = primary;
-  let primaryModelId: string | null = null;
-  switch (choice) {
-    case "flux-schnell":   effectivePrimary = "piapi";  primaryModelId = "piapi/flux-schnell"; break;
-    case "gpt-image-1":    effectivePrimary = "openai"; primaryModelId = "gpt-image-1"; break;
-    case "gpt-image-2":    effectivePrimary = "openai"; primaryModelId = "gpt-image-2"; break;
-    case "flux-realism":   effectivePrimary = "piapi";  primaryModelId = "piapi/flux-realism"; break;
-    case "ideogram-v3":    effectivePrimary = "piapi";  primaryModelId = "piapi/ideogram-v3"; break;
-    case "imagen-3":       effectivePrimary = "google"; break;
-    case "auto":
-    default:               /* keep env default */ break;
-  }
-
-  const run = async (p: ImageProvider, modelId?: string | null) => {
-    if (p === "openai") return await runOpenAI(promptText, size, modelId ?? undefined);
-    if (p === "google") return await runGoogleImagen(promptText, size);
-    if (p === "piapi")  return await runPiapi(promptText, size, modelId ?? "piapi/flux-schnell");
-    throw new Error(`Provider ${p} not implemented`);
-  };
-
-  let provider: ImageProvider = effectivePrimary;
-  let out: { url: string | null; b64: string | null; model: string } | null = null;
-  let errorMsg: string | undefined;
-  let usedFallback = false;
-  try {
-    out = await run(effectivePrimary, primaryModelId);
-  } catch (e: any) {
-    errorMsg = `${effectivePrimary}: ${e?.message ?? e}`;
-    // 2026-05-14 (CJ「生圖生不出來」— Pokémon 角色被 OpenAI safety
-    // system 拒絕): when the primary failure is a content-policy /
-    // safety-system block, jump STRAIGHT to PiAPI Flux Schnell instead
-    // of the env default fallback. Flux has the loosest content policy
-    // and is the most likely to succeed for branded characters.
-    const isSafetyBlock = /safety system|content_policy|rejected by the safety|content policy|moderation/i.test(errorMsg);
-    // Build a 2-step fallback list:
-    //   1) preferred fallback (PiAPI if safety-block, else env default)
-    //   2) other half of the env default
-    const fallbacks: Array<{ p: ImageProvider; modelId?: string | null }> = isSafetyBlock
-      ? [{ p: "piapi", modelId: "piapi/flux-schnell" }, { p: fallback }, { p: primary }]
-      : [{ p: effectivePrimary === fallback ? primary : fallback }, { p: "piapi", modelId: "piapi/flux-schnell" }];
-    // De-duplicate (skip the one we already tried)
-    const tried = new Set<string>([`${effectivePrimary}:${primaryModelId ?? ""}`]);
-    for (const fb of fallbacks) {
-      const key = `${fb.p}:${fb.modelId ?? ""}`;
-      if (tried.has(key)) continue;
-      tried.add(key);
-      try {
-        out = await run(fb.p, fb.modelId);
-        provider = fb.p;
-        usedFallback = true;
-        break;
-      } catch (e2: any) {
-        errorMsg = `${errorMsg}\n${fb.p}: ${String(e2?.message ?? e2).slice(0, 200)}`;
-      }
-    }
-  }
-
-  if (out) {
+  if (outcome.status === "ready" && outcome.url) {
     await db.execute(sql`
       UPDATE generated_images
-      SET provider = ${provider}, model = ${out.model},
-          url = ${out.url}, b64DataKey = ${out.b64 ? `inline:${id}` : null},
-          status = 'ready', errorMsg = NULL
+      SET url = ${outcome.url}, status = 'ready', errorMsg = NULL
       WHERE id = ${id}
     `);
-    return { id, provider, model: out.model, url: out.url, b64: out.b64, status: "ready", effectivePrompt, requestedModel, usedFallback };
+    return { id, provider, model: choice, url: outcome.url, status: "ready", effectivePrompt, requestedModel: choice };
   }
-  const safeErrorMsg = redactProviderSecrets(errorMsg ?? "unknown").slice(0, 800);
-  await db.execute(sql`
-    UPDATE generated_images
-    SET status = 'failed', errorMsg = ${safeErrorMsg}
-    WHERE id = ${id}
-  `);
+
+  const errorMsg = redactProviderSecrets(outcome.errorMsg ?? "unknown").slice(0, 800);
+  await db.execute(sql`UPDATE generated_images SET status = 'failed', errorMsg = ${errorMsg} WHERE id = ${id}`);
   return {
-    id,
-    provider: primary,
-    model: "unknown",
-    url: null,
-    b64: null,
-    status: "failed",
-    effectivePrompt,
-    requestedModel,
-    usedFallback: false,
-    errorMsg: safeErrorMsg,
+    id, provider, model: choice, url: null, status: "failed", effectivePrompt, requestedModel: choice,
+    errorMsg, failureKind: outcome.failureKind, canSwitchTo: outcome.canSwitchTo,
   };
 }
 

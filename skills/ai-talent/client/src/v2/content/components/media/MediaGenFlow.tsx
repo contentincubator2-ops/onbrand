@@ -4,7 +4,7 @@
  * Per CJ direction 2026-04-29:
  *   Step 1  Design direction proposal (3-5 cards) → user picks / edits
  *   Step 2  AI prompt crafted from picked direction (English + 中文摘要)
- *   Step 3  Model picker (gpt-image / Imagen / Hailuo / Seedance / etc.)
+ *   Step 3  Model picker (GPT Image 2 — the default — or Nano Banana; nothing switches automatically)
  *
  * User can SKIP step 1 and/or 2 by using the "直接給指令" shortcut —
  * lands straight at Step 3 with a textarea to paste their own prompt.
@@ -15,7 +15,7 @@ import { trpc } from "../../../../lib/trpc";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faPalette, faImage, faCheck, faCopy, faArrowRight, faPenNib, faRotate, faForward } from "@fortawesome/free-solid-svg-icons";
 import {
-  availableModels, type MediaKind, type MediaModel,
+  IMAGE_MODELS, NANO_BANANA_ID, GPT_IMAGE_2_ID, findModel, type MediaKind, type MediaModel,
 } from "../../lib/mediaModels";
 import { useLang } from "../../../../lib/i18n";
 
@@ -61,6 +61,9 @@ interface Direction {
   rationale: string;
 }
 
+interface GeneratedImage { url: string; modelId: string }
+interface GenResultView { ok: boolean; message?: string; url?: string; canSwitchTo?: "nano-banana" }
+
 export default function MediaGenFlow({
   open, onClose, initialBrief = "", brandContext, audienceContext,
   kind = "image", brandId, inline = false, preferredModelTags, onComplete,
@@ -76,13 +79,16 @@ export default function MediaGenFlow({
   const [promptEn, setPromptEn]     = React.useState("");
   const [summaryZh, setSummaryZh]   = React.useState("");
   const [pickedModel, setPickedModel] = React.useState<MediaModel | null>(null);
-  const [genResult, setGenResult]     = React.useState<{ ok: boolean; message?: string; url?: string } | null>(null);
+  const [genResult, setGenResult]     = React.useState<GenResultView | null>(null);
+  // 2026-09-21 (CJ「生成過的圖，要讓用戶可以選選用」): every image made in this flow stays
+  // selectable — switching model and not liking the result must never cost the earlier one.
+  const [history, setHistory]         = React.useState<GeneratedImage[]>([]);
+  const [usedUrl, setUsedUrl]         = React.useState<string | null>(null);
 
   // 2026-07-25 (CJ product-faithful gen「📦 使用真實產品圖」): brands with
-  // real product photos (IRIS/Iris Girls seeded from 91APP) can composite
-  // the ACTUAL product instead of an AI-imagined one. When enabled, the
-  // generation runs on Nano Banana (subject-reference) with the fidelity
-  // guard — see project_product_faithful_imagegen quality bar.
+  // real product photos (IRIS/Iris Girls seeded from 91APP) can use the ACTUAL
+  // product instead of an AI-imagined one. When enabled the photo is sent with
+  // the fidelity guard to whichever model is picked (GPT Image 2 by default).
   const productImagesQ = (trpc as any).media?.listProductImages?.useQuery?.(
     { brandId: brandId ?? 0 },
     { enabled: !!brandId && kind === "image", refetchOnWindowFocus: false, staleTime: 60_000 },
@@ -100,6 +106,7 @@ export default function MediaGenFlow({
       setDirections([]); setPickedDir(null);
       setPromptEn(""); setSummaryZh("");
       setPickedModel(null); setGenResult(null);
+      setHistory([]); setUsedUrl(null);
       setErr(null); setBusy(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -140,8 +147,7 @@ export default function MediaGenFlow({
         kind,
         direction: d,
         brief: brief.trim(),
-        // 2026-05-05: fal removed; default video → piapi/kling-v2-master
-        modelId: modelHint ?? "openai/gpt-image-1",
+        modelId: modelHint ?? GPT_IMAGE_2_ID,
       });
       setPromptEn(String(res?.promptEn ?? ""));
       setSummaryZh(String(res?.summaryZh ?? ""));
@@ -160,13 +166,6 @@ export default function MediaGenFlow({
 
   const onPickModel = async (m: MediaModel) => {
     setPickedModel(m);
-    if (m.status === "manual") {
-      // copy to clipboard, signal manual workflow
-      try { await navigator.clipboard.writeText(promptEn); } catch { /* */ }
-      setGenResult({ ok: true, message: lang === "en" ? `Prompt copied. Paste it into ${m.name} (no API).` : `指令已複製。請手動貼到 ${m.name}（無 API）。` });
-      setPhase("model");
-      return;
-    }
     if (!generateMutation) {
       setGenResult({ ok: false, message: lang === "en" ? "media.generate not deployed yet" : "media.generate 尚未部署" });
       setPhase("model");
@@ -174,31 +173,40 @@ export default function MediaGenFlow({
     }
     setBusy(true); setErr(null);
     try {
-      // Product mode routes to Nano Banana (the only wired subject-reference
-      // model) regardless of the picked card, with the real photo attached.
-      const effectiveModelId = productMode ? "google/nano-banana" : m.id;
+      // The picked card is the model that runs — a product photo does not change
+      // that (GPT Image 2 takes it through its image-edit endpoint).
       const res: any = await generateMutation.mutateAsync({
-        kind, modelId: effectiveModelId, promptEn, brandId,
+        kind, modelId: m.id, promptEn, brandId,
         ...(productMode ? { imageUrl: pickedProduct!.imageUrl, subjectMode: "product" as const } : {}),
       });
       setGenResult({
         ok: !!res?.ok,
-        message: res?.message ?? (res?.ok ? (lang === "en" ? "Generated" : "生成完成") : (lang === "en" ? "Phase 2 will wire this provider" : "Phase 2 將接入此 provider")),
+        message: res?.message ?? (res?.ok ? (lang === "en" ? "Generated" : "生成完成") : (lang === "en" ? "Generation failed" : "生成失敗")),
         url: res?.url,
+        canSwitchTo: res?.canSwitchTo,
       });
-      // Notify the squad-runner so it can attach the URL to the active step.
-      if (res?.ok && res?.url && onComplete) {
-        onComplete({ url: String(res.url), modelId: effectiveModelId, promptEn });
+      if (res?.ok && res?.url) {
+        const url = String(res.url);
+        setHistory((h) => [{ url, modelId: m.id }, ...h.filter((x) => x.url !== url)]);
+        setUsedUrl(url);
+        // Notify the squad-runner so it can attach the URL to the active step.
+        onComplete?.({ url, modelId: m.id, promptEn });
       }
     } catch (e: any) {
       setGenResult({ ok: false, message: e?.message ?? String(e) });
     } finally { setBusy(false); }
   };
 
+  /** Use an earlier image again — no regeneration. */
+  const onUseHistory = (img: GeneratedImage) => {
+    setUsedUrl(img.url);
+    onComplete?.({ url: img.url, modelId: img.modelId, promptEn });
+  };
+
   // Available models, with preferred-tag matches floated to the top.
   // Each model gets a derived `_recommended` flag for the chip.
   const models = React.useMemo(() => {
-    const all = availableModels(kind);
+    const all = IMAGE_MODELS.filter((m) => m.kind === kind);
     if (!preferredModelTags?.length) return all.map((m) => ({ ...m, _recommended: false }));
     const tagSet = new Set(preferredModelTags.map((t) => t.toLowerCase()));
     const score = (m: MediaModel) => {
@@ -232,8 +240,8 @@ export default function MediaGenFlow({
         />
       )}
       {/* 2026-07-25 (CJ product-faithful gen): real-product subject picker —
-          shown when the brand has products with photos. When on, generation
-          routes to Nano Banana with the real photo + fidelity guard. */}
+          shown when the brand has products with photos. When on, the photo goes
+          to the picked model with the fidelity guard. */}
       {kind === "image" && (phase === "prompt" || phase === "model") && productImages.length > 0 && (
         <div className="rounded-lg border border-default-200 bg-default-50 px-3 py-2.5">
           <label className="flex items-center gap-2 cursor-pointer flex-wrap">
@@ -248,8 +256,8 @@ export default function MediaGenFlow({
             <span className="text-small font-medium">📦 {lang === "en" ? "Use real product photo" : "使用真實產品圖"}</span>
             <span className="text-tiny text-default-500">
               {lang === "en"
-                ? "Composite the actual product into the scene (auto-routes to Nano Banana)"
-                : "把真實產品原貌合成進場景 — 自動改用 Nano Banana 產品保真模型"}
+                ? "Use the actual product photo as the base (GPT Image 2 edits it; Nano Banana if you pick it)"
+                : "以真實產品照為基準生圖 — GPT Image 2 會依這張照片編輯；想換 Nano Banana 可自行選擇"}
             </span>
           </label>
           {useProduct && (
@@ -290,6 +298,9 @@ export default function MediaGenFlow({
           onPick={onPickModel}
           genResult={genResult}
           busy={busy}
+          history={history}
+          usedUrl={usedUrl}
+          onUseHistory={onUseHistory}
         />
       )}
       {busy && <div className="flex items-center gap-2 text-tiny text-default-500"><Spinner size="sm" /> {lang === "en" ? "Working…" : "處理中…"}</div>}
@@ -491,24 +502,29 @@ function PromptPhase({
 }
 
 function ModelPhase({
-  models, promptEn, pickedModel, onPick, genResult, busy,
+  models, promptEn, pickedModel, onPick, genResult, busy, history, usedUrl, onUseHistory,
 }: {
   models: Array<MediaModel & { _recommended?: boolean }>;
   promptEn: string;
   pickedModel: MediaModel | null;
   onPick: (m: MediaModel) => void;
-  genResult: { ok: boolean; message?: string; url?: string } | null;
+  genResult: GenResultView | null;
   busy: boolean;
+  history: GeneratedImage[];
+  usedUrl: string | null;
+  onUseHistory: (img: GeneratedImage) => void;
 }) {
   const { lang } = useLang();
   return (
     <>
       <p className="text-small text-default-500">
-        {lang === "en" ? "Each model has different strengths. Pick the one that fits your direction:" : "每個模型擅長的不同。挑一個最符合你方向的："}
+        {lang === "en"
+          ? "GPT Image 2 is the default. If it doesn't work out, you can try Nano Banana — nothing switches on its own, and every image you make stays below to reuse."
+          : "預設用 GPT Image 2。不行的話可以改試 Nano Banana——不會自動換，做過的每張圖都會留在下面，隨時選回來用。"}
       </p>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
         {models.map((m) => {
-          const disabled = m.status === "soon" || busy;
+          const disabled = busy;
           const isPicked = pickedModel?.id === m.id;
           return (
             <Card
@@ -528,9 +544,6 @@ function ModelPhase({
                       </Chip>
                     )}
                   </div>
-                  {m.status === "ready" && <Chip size="sm" variant="flat" color="success">{lang === "en" ? "Ready" : "可用"}</Chip>}
-                  {m.status === "manual" && <Chip size="sm" variant="flat" color="warning">{lang === "en" ? "Manual copy" : "手動複製"}</Chip>}
-                  {m.status === "soon" && <Chip size="sm" variant="flat" color="default">{lang === "en" ? "Coming soon" : "尚未串接"}</Chip>}
                 </div>
                 <p className="text-tiny text-default-500">{m.vendor}</p>
                 <p className="text-tiny text-default-600 leading-relaxed">{m.strengths}</p>
@@ -546,8 +559,8 @@ function ModelPhase({
       </div>
       {genResult && (
         <Card shadow="none" className={`border ${genResult.ok ? "border-success-200 bg-success-50" : "border-warning-200 bg-warning-50"}`}>
-          <CardBody className="p-3">
-            <p className="text-small font-medium">
+          <CardBody className="p-3 gap-2">
+            <p className="text-small font-medium whitespace-pre-line">
               {genResult.ok ? <FontAwesomeIcon icon={faCheck} className="text-success mr-2" /> : null}
               {typeof genResult.message === "string" ? genResult.message : ""}
             </p>
@@ -556,8 +569,48 @@ function ModelPhase({
                 {genResult.url}
               </a>
             )}
+            {/* gpt-image-2 failed (after one automatic retry): offer — never auto-run — the other model. */}
+            {!genResult.ok && genResult.canSwitchTo === "nano-banana" && (() => {
+              const nano = findModel(NANO_BANANA_ID);
+              return nano ? (
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Button size="sm" color="primary" variant="flat" isDisabled={busy} onPress={() => onPick(nano)}>
+                    {lang === "en" ? "Try Nano Banana instead" : "改用 Nano Banana"}
+                  </Button>
+                  <span className="text-tiny text-default-500">
+                    {lang === "en" ? "Your earlier images stay available below." : "先前做過的圖都還在下面，可以隨時選回來。"}
+                  </span>
+                </div>
+              ) : null;
+            })()}
           </CardBody>
         </Card>
+      )}
+      {history.length > 0 && (
+        <div className="space-y-1.5">
+          <p className="text-tiny text-default-500">
+            {lang === "en" ? "Images made in this session — pick one to use" : "這次做過的圖 — 選一張使用"}
+          </p>
+          <div className="flex gap-2 flex-wrap">
+            {history.map((img) => {
+              const used = img.url === usedUrl;
+              return (
+                <button
+                  key={img.url}
+                  type="button"
+                  onClick={() => onUseHistory(img)}
+                  title={`${findModel(img.modelId)?.name ?? img.modelId}`}
+                  className={`relative w-20 h-20 rounded-md overflow-hidden border-2 transition ${used ? "border-primary" : "border-transparent hover:border-default-300"}`}
+                >
+                  <img src={img.url} alt="" className="w-full h-full object-cover" />
+                  <span className="absolute bottom-0 inset-x-0 bg-black/55 text-white text-[10px] leading-4 text-center truncate px-1">
+                    {used ? (lang === "en" ? "In use" : "使用中") : (findModel(img.modelId)?.name.split("（")[0] ?? "")}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
       )}
       <div className="flex items-center justify-end">
         <Tooltip content={lang === "en" ? "Copy prompt" : "複製指令"}>

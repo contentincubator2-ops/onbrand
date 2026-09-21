@@ -1,10 +1,9 @@
 import { addPoints, costOf } from "./pointsService";
 import type { PointAction } from "./plans";
+import { NANO_BANANA, resolveStillImageModel } from "../../content/core/stillImageModels";
 
-export type ImagePointAction = Extract<
-  PointAction,
-  "image_flux" | "image_gpt" | "image_imagen" | "image_ideogram"
->;
+/** One tier per still-image model: gpt-image-2 (default) and Nano Banana (user's choice). */
+export type ImagePointAction = Extract<PointAction, "image_gpt" | "image_imagen">;
 
 export interface BillableImageResult {
   status: "ready" | "failed";
@@ -12,33 +11,22 @@ export interface BillableImageResult {
   model?: string;
 }
 
-export function imageActionForRequest(input: {
-  subjectImageUrl?: string;
-  modelChoice?: string;
-}): ImagePointAction {
-  if (input.subjectImageUrl) return "image_imagen";
-  if (input.modelChoice === "gpt-image-1" || input.modelChoice === "gpt-image-2") return "image_gpt";
-  if (input.modelChoice === "imagen-3") return "image_imagen";
-  if (input.modelChoice === "ideogram-v3") return "image_ideogram";
-  return "image_flux";
+/**
+ * The model that will run decides the tier — and the model that runs is always
+ * the one requested (there is no automatic model swap), so what we prepay is
+ * what we keep. A reference photo does not change the tier: gpt-image-2 takes
+ * it through the edit endpoint.
+ */
+export function imageActionForRequest(input: { modelChoice?: string }): ImagePointAction {
+  return resolveStillImageModel(input.modelChoice) === NANO_BANANA ? "image_imagen" : "image_gpt";
 }
 
-export function imageActionForActualResult(result: BillableImageResult): ImagePointAction {
-  const identity = `${result.provider ?? ""}/${result.model ?? ""}`.toLowerCase();
-  if (identity.includes("ideogram")) return "image_ideogram";
-  if (identity.includes("gpt-image")) return "image_gpt";
-  if (identity.includes("imagen") || identity.includes("nano-banana")) return "image_imagen";
-  return "image_flux";
-}
-
+/** Failed generations are refunded in full; a ready one keeps its prepaid charge. */
 export function imageRefundAmount(
   prepaidAction: ImagePointAction,
   result: BillableImageResult,
 ): number {
-  const prepaid = costOf(prepaidAction);
-  if (result.status === "failed") return prepaid;
-  const actual = costOf(imageActionForActualResult(result));
-  return Math.max(0, prepaid - actual);
+  return result.status === "failed" ? costOf(prepaidAction) : 0;
 }
 
 type RefundPoints = typeof addPoints;
@@ -56,12 +44,7 @@ export async function reconcileImageCharge(args: {
   const amount = imageRefundAmount(args.prepaidAction, args.result);
   if (amount <= 0) return 0;
   try {
-    await (args.refundPoints ?? addPoints)(
-      args.userId,
-      amount,
-      "refund",
-      args.result.status === "failed" ? "image_generation_failed" : "image_fallback_difference",
-    );
+    await (args.refundPoints ?? addPoints)(args.userId, amount, "refund", "image_generation_failed");
     return amount;
   } catch (error) {
     console.error("[imageBilling] refund failed:", error instanceof Error ? error.message : String(error));

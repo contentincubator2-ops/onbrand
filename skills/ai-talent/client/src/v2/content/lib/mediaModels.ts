@@ -1,29 +1,17 @@
 /**
- * mediaModels — registry of available image / video AI models.
+ * mediaModels — the still-image models the picker offers.
  *
- * Per CJ direction 2026-04-29: every image/video output goes through a
- * 3-step flow — design direction proposal → user approval → prompt + model
- * picker. This file is the single source for "what models can the picker
- * offer". Server-side adapters are wired in mediaRouter.
+ * 2026-09-21 (CJ「我建議，我們就只留 NANO BANANA 跟 GPT IMAGE 2 兩個選項……其他的 MODEL 都不需要了」):
+ * exactly two. GPT Image 2 is the default for everything (with or without a
+ * product photo); Nano Banana is the alternative the user picks — typically
+ * after GPT Image 2 fails. There is no automatic switching between them.
  *
- * Status:
- *   "ready"  — backend has integration, picker can dispatch
- *   "manual" — no API integration, user copies prompt to external tool
- *   "soon"   — listed for visibility but disabled in UI
+ * Mirrors server/content/core/stillImageModels.ts (the ids must match; a
+ * server test reads this file to keep the two lists in step).
  */
 
 export type MediaKind = "image";
-export type MediaStatus = "ready" | "manual" | "soon";
-/** Which backend route serves this model. */
-export type MediaProvider =
-  | "openai"
-  | "azure-openai"
-  | "google-gemini"
-  | "minimax-direct"
-  | "fal-direct"
-  | "piapi"        // 62a5ff21… aggregator: kling / runway / pika / ideogram / hedra / flux pro / sd3.5 / topaz
-  | "atlas-cloud"  // apikey-aa7918… aggregator
-  | "manual";      // user copies prompt to external tool (Midjourney Discord)
+export type MediaProvider = "openai" | "google-gemini";
 
 export interface MediaModel {
   id: string;
@@ -31,7 +19,6 @@ export interface MediaModel {
   vendor: string;
   provider: MediaProvider;
   kind: MediaKind;
-  status: MediaStatus;
   /** Short marketing strap — what this model is best at. */
   strengths: string;
   /** Rough cost estimate per generation (USD). */
@@ -40,220 +27,41 @@ export interface MediaModel {
   durationSecEstimate?: number;
   /** Aspect ratios / resolutions the picker exposes. */
   formats?: string[];
-  /** Tags help squad-runner auto-pick by need: "logo" | "realism" | "asian-face" | "cinematic" | "lipsync" | "vector" | etc. */
+  /** Tags help squad-runner auto-pick by need: "realism" | "product-staging" | etc. */
   tags?: string[];
 }
+
+export const GPT_IMAGE_2_ID = "openai/gpt-image-2";
+export const NANO_BANANA_ID = "google/nano-banana";
 
 // ── Image ────────────────────────────────────────────────────────────────
 export const IMAGE_MODELS: MediaModel[] = [
   {
-    // 2026-07-25 (CJ product-faithful gen): Gemini 2.5 Flash Image —
-    // subject-reference compositing. Feed the REAL product photo and it
-    // places it into the prompted scene while preserving the product
-    // (quality bar = Photoroom Product Staging / imagine.art).
-    id: "google/nano-banana",
-    name: "Nano Banana（產品保真）",
+    id: GPT_IMAGE_2_ID,
+    name: "GPT Image 2（預設）",
+    vendor: "OpenAI",
+    provider: "openai",
+    kind: "image",
+    strengths: "預設用它：prompt 服從性高、光影自然；上傳產品照時會以產品照為基準編輯，保留標籤與外觀",
+    costEstimateUsd: 0.04,
+    durationSecEstimate: 20,
+    formats: ["1024×1024", "1024×1536", "1536×1024"],
+    tags: ["brand-kv", "editorial", "ecommerce-edit", "prompt-fidelity", "product-staging", "realism"],
+  },
+  {
+    id: NANO_BANANA_ID,
+    name: "Nano Banana",
     vendor: "Google",
     provider: "google-gemini",
     kind: "image",
-    status: "ready",
-    strengths: "真實產品置入最強 — 保留產品原貌與標籤，光影自然融合場景；也可純文字生圖",
+    strengths: "GPT Image 2 不行時的替代選項：風格與構圖不同，也吃產品照。只有你選它才會用",
     costEstimateUsd: 0.04,
     durationSecEstimate: 15,
     formats: ["1:1", "4:3", "16:9", "9:16"],
     tags: ["product-staging", "subject-reference", "ecommerce-edit", "realism"],
   },
-  {
-    id: "openai/gpt-image-1",
-    name: "GPT Image 1",
-    vendor: "OpenAI",
-    provider: "openai",
-    kind: "image",
-    status: "ready",
-    strengths: "高 prompt 服從性、品牌語境理解最佳，適合品牌主視覺、編輯封面",
-    costEstimateUsd: 0.04,
-    durationSecEstimate: 12,
-    formats: ["1024×1024", "1024×1536", "1536×1024"],
-    tags: ["brand-kv", "editorial", "ecommerce-edit", "prompt-fidelity"],
-  },
-  {
-    id: "azure/gpt-image-2",
-    name: "GPT Image 2 (Azure)",
-    vendor: "Azure OpenAI",
-    provider: "azure-openai",
-    kind: "image",
-    status: "soon", // VERIFY: 401 with current AZURE_IMAGE_API_KEY — needs key refresh
-    strengths: "與 GPT Image 1 同核心，走 Azure 配額；squad cover / agent avatar 用此",
-    costEstimateUsd: 0.013,
-    durationSecEstimate: 15,
-    formats: ["1024×1024"],
-    tags: ["system-asset", "avatar"],
-  },
-  {
-    id: "google/imagen-4-fast",
-    name: "Imagen 4 Fast",
-    vendor: "Google",
-    provider: "google-gemini",
-    kind: "image",
-    // 2026-08-31: ListModels on the prod GEMINI_API_KEY returns no imagen
-    // model at all — :predict answers 404 NOT_FOUND for every Imagen 4
-    // variant. Needs a billing-enabled Google AI Studio / Vertex key.
-    status: "soon",
-    strengths: "快速生成、攝影寫實，Gemini API 直接整合",
-    costEstimateUsd: 0.02,
-    durationSecEstimate: 5,
-    formats: ["1024×1024"],
-    tags: ["realism", "fast"],
-  },
-  {
-    id: "google/imagen-4-default",
-    name: "Imagen 4",
-    vendor: "Google",
-    provider: "google-gemini",
-    kind: "image",
-    status: "soon", // 2026-08-31: 404 NOT_FOUND — see imagen-4-fast above
-    strengths: "標準品質，攝影寫實 / 真人場景強",
-    costEstimateUsd: 0.04,
-    durationSecEstimate: 12,
-    formats: ["1024×1024", "1024×1792", "1792×1024"],
-    tags: ["realism", "lifestyle", "portrait"],
-  },
-  {
-    id: "google/imagen-4-ultra",
-    name: "Imagen 4 Ultra",
-    vendor: "Google",
-    provider: "google-gemini",
-    kind: "image",
-    status: "soon", // 2026-08-31: 404 NOT_FOUND — see imagen-4-fast above
-    strengths: "最高品質，細節與光影最佳，適合品牌主視覺",
-    costEstimateUsd: 0.08,
-    durationSecEstimate: 25,
-    formats: ["1024×1024", "1792×1024", "1024×1792"],
-    tags: ["brand-kv", "premium", "realism"],
-  },
-  {
-    id: "hailuo/image",
-    name: "Hailuo (MiniMax) Image",
-    vendor: "MiniMax",
-    provider: "minimax-direct",
-    kind: "image",
-    status: "soon", // VERIFY: HAILUO_API_KEY + MINIMAX_API_KEY both rejected (status 2049). Need fresh keys.
-    strengths: "亞洲臉孔、東方審美 / 中文文字呈現較好",
-    costEstimateUsd: 0.02,
-    durationSecEstimate: 10,
-    formats: ["1024×1024", "1024×1792"],
-    tags: ["asian-face", "chinese-text"],
-  },
-  // fal/flux-dev removed 2026-05-05 — fal.ai account permanently disabled.
-  // Use piapi/flux-pro (below) for the same FLUX family.
-  // ── PiAPI aggregator (62a5ff21…) ──
-  {
-    id: "piapi/flux-pro",
-    name: "FLUX Pro",
-    vendor: "Black Forest Labs via PiAPI",
-    provider: "piapi",
-    kind: "image",
-    status: "ready",
-    strengths: "FLUX 商業版，廣告 KV / banner 質感最強",
-    costEstimateUsd: 0.05,
-    durationSecEstimate: 10,
-    formats: ["1024×1024", "1024×1792", "1792×1024"],
-    tags: ["brand-kv", "ad-banner", "premium"],
-  },
-  {
-    id: "piapi/flux-realism",
-    name: "FLUX Realism",
-    vendor: "Black Forest Labs via PiAPI",
-    provider: "piapi",
-    kind: "image",
-    status: "ready",
-    strengths: "極致寫實、人像細節，適合 lifestyle / 真人代言情境",
-    costEstimateUsd: 0.04,
-    durationSecEstimate: 10,
-    formats: ["1024×1024", "1024×1792"],
-    tags: ["realism", "portrait", "lifestyle"],
-  },
-  {
-    id: "piapi/ideogram-v3",
-    name: "Ideogram v3",
-    vendor: "Ideogram via PiAPI",
-    provider: "piapi",
-    kind: "image",
-    status: "soon", // VERIFY 2026-04-29: PiAPI rejected both "ideogram" and "Qubico/ideogram" with 400 invalid model. Need exact model identifier from PiAPI dashboard.
-    strengths: "字體 / 標誌 / 海報文字合成最強，logo 設計首選",
-    costEstimateUsd: 0.04,
-    durationSecEstimate: 12,
-    formats: ["1024×1024", "1024×1792", "1792×1024"],
-    tags: ["logo", "typography", "poster"],
-  },
-  {
-    id: "piapi/sd-3-5-large",
-    name: "Stable Diffusion 3.5 Large",
-    vendor: "Stability AI via PiAPI",
-    provider: "piapi",
-    kind: "image",
-    status: "soon", // VERIFY 2026-04-29: pending exact PiAPI model identifier — try Qubico/sdxl first.
-    strengths: "開源 LoRA 生態最廣，風格化 / 二次元 / 客製化訓練",
-    costEstimateUsd: 0.02,
-    durationSecEstimate: 8,
-    formats: ["1024×1024"],
-    tags: ["stylized", "lora", "anime"],
-  },
-  // Atlas Cloud entry retired — probe-atlas.ts confirmed 2026-04-29 that
-  // Atlas exposes /v1/models (LLM list incl. DeepSeek-V3) but
-  // /v1/images/generations returns 400 "not found". Atlas is LLM-only.
-  // Image-gen via Atlas should be considered out of scope; for Recraft v3
-  // we'll route through PiAPI if/when they add it. Atlas key stays in
-  // .env for future llmRouter integration.
-  {
-    id: "midjourney/v7",
-    name: "Midjourney v7",
-    vendor: "Midjourney",
-    provider: "manual",
-    kind: "image",
-    status: "manual",
-    strengths: "藝術性、構圖質感最強；無 API，需手動貼到 Discord",
-    durationSecEstimate: 60,
-    tags: ["premium", "artistic", "brand-kv"],
-  },
 ];
 
-export const ALL_MODELS = [...IMAGE_MODELS];
-
-export function modelsByKind(kind: MediaKind): MediaModel[] {
-  return ALL_MODELS.filter((m) => m.kind === kind);
-}
-
 export function findModel(id: string): MediaModel | undefined {
-  return ALL_MODELS.find((m) => m.id === id);
-}
-
-/** Filter models by status (default: only "ready" + "manual" — hides "soon"). */
-export function availableModels(kind?: MediaKind): MediaModel[] {
-  return ALL_MODELS.filter(
-    (m) => (!kind || m.kind === kind) && m.status !== "soon",
-  );
-}
-
-/**
- * Pick models matching a need-tag (e.g. "logo", "cinematic", "asian-face").
- * Returns ready models first, then manual, sorted by tag-match strength.
- * Used by squad-runner to pre-select recommended models for a visual step.
- */
-export function modelsForTag(tag: string, kind?: MediaKind): MediaModel[] {
-  return availableModels(kind)
-    .filter((m) => m.tags?.includes(tag))
-    .sort((a, b) => {
-      const score = (m: MediaModel) => (m.status === "ready" ? 0 : 1);
-      return score(a) - score(b);
-    });
-}
-
-/** Group available models by provider — useful for the picker UI. */
-export function modelsByProvider(kind?: MediaKind): Record<MediaProvider, MediaModel[]> {
-  const out = {} as Record<MediaProvider, MediaModel[]>;
-  for (const m of availableModels(kind)) {
-    (out[m.provider] = out[m.provider] ?? []).push(m);
-  }
-  return out;
+  return IMAGE_MODELS.find((m) => m.id === id);
 }

@@ -319,10 +319,8 @@ export const billingRouter = router({
             task_30s: 30,
             task_60s: 60,
             task_99s: 99,
-            image_flux: 30,
             image_gpt: 100,
             image_imagen: 50,
-            image_ideogram: 50,
           },
         },
         // Legacy quota object kept for back-compat (some old UI reads it)
