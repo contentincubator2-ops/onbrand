@@ -338,7 +338,11 @@ export async function generateStoryboardAsync(
     const script = await generateScript(input);
     await updateJob(jobId, { script, progress: 25 });
 
-    // Step 2: For each scene, generate a reference image (parallel Flux Schnell)
+    // Step 2: For each scene, generate a reference image (parallel)
+    // 2026-09-21 (CJ「生圖，正式環境的生圖，都採用 gpt image 2」): storyboard
+    // frames were hardcoded to Flux Schnell. gpt-image-2 is the primary here
+    // too; Flux stays the per-scene fallback so one refusal can't blank a frame
+    // (this job is async with progress, so the slower model costs no UX).
     const { dispatchGenerate } = await import("../_core/mediaGen");
     const isVertical = input.platform === "instagram" || input.platform === "tiktok";
     const aspect = (isVertical ? "9:16" : "16:9") as "9:16" | "16:9";
@@ -348,21 +352,25 @@ export async function generateStoryboardAsync(
 
     await Promise.all(
       script.scenes.map(async (scene, idx) => {
-        try {
-          const r = await dispatchGenerate("piapi/flux-schnell", {
-            // Flux likes English prompts; visualPrompt is already English from the LLM.
-            // Append a "no text" guard so the reference frame isn't cluttered with words.
-            prompt: `${scene.visualPrompt}, no text overlays, no captions, editorial photography`.slice(0, 800),
-            aspectRatio: aspect,
-            brandId: 0,
-          });
-          if (r.status === "ready" && r.url) {
-            sceneImages[idx] = r.url;
-          } else if (r.status === "failed") {
-            console.warn(`[storyboard] scene ${idx} image failed: ${r.errorMsg}`);
+        // visualPrompt is already English from the LLM. Append a "no text"
+        // guard so the reference frame isn't cluttered with words.
+        const framePrompt = `${scene.visualPrompt}, no text overlays, no captions, editorial photography`.slice(0, 800);
+        const renderFrame = async (modelId: string) => await dispatchGenerate(modelId, {
+          prompt: framePrompt,
+          aspectRatio: aspect,
+          brandId: 0,
+        });
+        for (const modelId of ["openai/gpt-image-2", "piapi/flux-schnell"]) {
+          try {
+            const r = await renderFrame(modelId);
+            if (r.status === "ready" && r.url) {
+              sceneImages[idx] = r.url;
+              break;
+            }
+            console.warn(`[storyboard] scene ${idx} image failed on ${modelId}: ${r.errorMsg}`);
+          } catch (e: any) {
+            console.warn(`[storyboard] scene ${idx} image exception on ${modelId}: ${e?.message ?? e}`);
           }
-        } catch (e: any) {
-          console.warn(`[storyboard] scene ${idx} image exception: ${e?.message ?? e}`);
         }
       })
     );

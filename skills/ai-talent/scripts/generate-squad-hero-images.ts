@@ -2,11 +2,11 @@
  * generate-squad-hero-images.ts
  *
  * For every active squad without a hero_image_url, generate a 3D pastel
- * mockup illustration via OpenAI gpt-image-1 and save it as a PNG.
+ * mockup illustration via OpenAI gpt-image-2 and save it as a PNG.
  *
  * Pipeline per squad:
  *   1. Build a prompt from {layer, name, methodology author/year, tier}.
- *   2. Call OpenAI Images API (gpt-image-1, 1024x1024, b64).
+ *   2. Call OpenAI Images API (gpt-image-2, 1024x1024, b64).
  *   3. Decode base64 → write to /opt/marketing-os/app/public/squad-hero/{slug}.png
  *   4. UPDATE squads SET hero_image_url = '/squad-hero/{slug}.png',
  *                        hero_image_prompt = '<prompt used>'
@@ -54,7 +54,8 @@ const OUT_DIR = flag("out") ||
 
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 const OPENAI_BASE = process.env.OPENAI_BASE_URL || "https://api.openai.com";
-const MODEL = process.env.OPENAI_IMAGE_MODEL || "gpt-image-1";
+// 2026-09-21 (CJ「生圖，正式環境的生圖，都採用 gpt image 2」): these assets land in production too.
+const MODEL = process.env.OPENAI_IMAGE_MODEL || "gpt-image-2";
 
 const LAYER_THEME: Record<string, string> = {
   L1: "abstract brand monogram, geometric symbol of identity, archetypal motif",

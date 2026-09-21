@@ -87,8 +87,8 @@ export default function MediaGenFlow({
   // 2026-07-25 (CJ product-faithful gen「📦 使用真實產品圖」): brands with
   // real product photos (IRIS/Iris Girls seeded from 91APP) can composite
   // the ACTUAL product instead of an AI-imagined one. When enabled, the
-  // generation runs on Nano Banana (subject-reference) with the fidelity
-  // guard — see project_product_faithful_imagegen quality bar.
+  // generation runs on gpt-image-2 subject-reference (/images/edits) with the
+  // fidelity guard — see project_product_faithful_imagegen quality bar.
   const productImagesQ = (trpc as any).media?.listProductImages?.useQuery?.(
     { brandId: brandId ?? 0 },
     { enabled: !!brandId && kind === "image", refetchOnWindowFocus: false, staleTime: 60_000 },
@@ -147,7 +147,7 @@ export default function MediaGenFlow({
         direction: d,
         brief: brief.trim(),
         // 2026-05-05: fal removed; default video → piapi/kling-v2-master
-        modelId: modelHint ?? (kind === "video" ? "piapi/kling-v2-master" : "openai/gpt-image-1"),
+        modelId: modelHint ?? (kind === "video" ? "piapi/kling-v2-master" : "openai/gpt-image-2"),
       });
       setPromptEn(String(res?.promptEn ?? ""));
       setSummaryZh(String(res?.summaryZh ?? ""));
@@ -180,9 +180,10 @@ export default function MediaGenFlow({
     }
     setBusy(true); setErr(null);
     try {
-      // Product mode routes to Nano Banana (the only wired subject-reference
-      // model) regardless of the picked card, with the real photo attached.
-      const effectiveModelId = productMode ? "google/nano-banana" : m.id;
+      // Product mode routes to the subject-reference surface regardless of the
+      // picked card, with the real photo attached. 2026-09-21: that is
+      // gpt-image-2 /images/edits now, not Nano Banana.
+      const effectiveModelId = productMode ? "openai/gpt-image-2" : m.id;
       const res: any = await generateMutation.mutateAsync({
         kind, modelId: effectiveModelId, promptEn, brandId,
         ...(productMode ? { imageUrl: pickedProduct!.imageUrl, subjectMode: "product" as const } : {}),
@@ -239,7 +240,7 @@ export default function MediaGenFlow({
       )}
       {/* 2026-07-25 (CJ product-faithful gen): real-product subject picker —
           shown when the brand has products with photos. When on, generation
-          routes to Nano Banana with the real photo + fidelity guard. */}
+          routes to gpt-image-2 /images/edits with the real photo + fidelity guard. */}
       {kind === "image" && (phase === "prompt" || phase === "model") && productImages.length > 0 && (
         <div className="rounded-lg border border-default-200 bg-default-50 px-3 py-2.5">
           <label className="flex items-center gap-2 cursor-pointer flex-wrap">
@@ -254,8 +255,8 @@ export default function MediaGenFlow({
             <span className="text-small font-medium">📦 {lang === "en" ? "Use real product photo" : "使用真實產品圖"}</span>
             <span className="text-tiny text-default-500">
               {lang === "en"
-                ? "Composite the actual product into the scene (auto-routes to Nano Banana)"
-                : "把真實產品原貌合成進場景 — 自動改用 Nano Banana 產品保真模型"}
+                ? "Composite the actual product into the scene (GPT Image 2 reference mode)"
+                : "把真實產品原貌合成進場景 — 自動改用 GPT Image 2 產品保真模式"}
             </span>
           </label>
           {useProduct && (

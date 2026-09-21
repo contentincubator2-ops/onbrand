@@ -1726,8 +1726,9 @@ async function genOneImage(
     content: string; style: string | null; platform?: string; palette?: Array<{ hex: string; role: string }>;
     brandIdentity?: BrandIdentityForImage | null;
     /** 2026-07-27 (CJ「合成圖也套用真實產品圖片」): real product photo URL —
-     *  when set, routes to Nano Banana subject-reference compositing instead
-     *  of text-to-image, mirroring the manual RunPage「使用真實產品圖」panel. */
+     *  when set, routes to gpt-image-2 subject-reference compositing (OpenAI
+     *  /images/edits) instead of text-to-image, mirroring the manual RunPage
+     *  「使用真實產品圖」panel. */
     subjectImageUrl?: string | null;
     /** True when the run is product-scoped even if its stored photo is broken. */
     subjectImageRequired?: boolean;
@@ -1743,7 +1744,7 @@ async function genOneImage(
       prompt: null,
       promptZh: null,
       modelId: null,
-      requestedModelId: "google/nano-banana",
+      requestedModelId: "openai/gpt-image-2",
       fallbackUsed: false,
       url: null,
       status: "failed",
@@ -1849,11 +1850,17 @@ async function genOneImage(
     // for overrides. The old 18s existed for Imagen 4, which no longer exists
     // on this key at all. Flux Schnell stays the reliability fallback.
     const PRIMARY_IMAGE_CAP_MS = 35_000;
-    // 2026-07-27: subjectMode always routes through Nano Banana (image-edit,
-    // not text-to-image) — it's the only model here that takes a subject
-    // reference photo, so「使用真實產品圖」must not follow the primary above.
-    const primaryModel = subjectMode ? "google/nano-banana" : (config.imageModelOverride ?? "openai/gpt-image-2");
-    const primaryCapMs = PRIMARY_IMAGE_CAP_MS;
+    // 2026-07-27: subjectMode routes through the subject-reference surface
+    // (image-edit, not text-to-image), so「使用真實產品圖」must not follow a
+    // per-task imageModelOverride — an override naming a text-only model
+    // would silently ship a hallucinated product.
+    // 2026-09-21 (CJ「生圖，正式環境的生圖，都採用 gpt image 2」): that surface
+    // is gpt-image-2 /images/edits now, not Nano Banana. Subject mode has no
+    // fallback by policy, so give it the full PER_IMAGE_MS — an edit measured
+    // 16–24s on the funded key, slower than a plain generation, and a tight cap
+    // here means no product image at all rather than a slower one.
+    const primaryModel = subjectMode ? "openai/gpt-image-2" : (config.imageModelOverride ?? "openai/gpt-image-2");
+    const primaryCapMs = subjectMode ? PER_IMAGE_MS : PRIMARY_IMAGE_CAP_MS;
     let r;
     let fallbackUsed = false;
     try {
@@ -1872,21 +1879,15 @@ async function genOneImage(
       // product is worse than a failed run — do NOT fall back to text-to-image
       // when a real product photo was requested, it would silently ship a
       // fake product. Non-product runs keep the proven Flux Schnell fallback.
-      if (subjectMode) {
-        return {
-          style: prompt,
-          prompt: modelPrompt,
-          promptZh: displayPromptZh,
-          modelId: primaryModel,
-          requestedModelId: primaryModel,
-          fallbackUsed: false,
-          url: null,
-          status: "failed",
-          errorMsg: String(e?.message ?? e),
-        };
-      }
+      // 2026-09-21 (CJ「生圖，正式環境的生圖，都採用 gpt image 2」): subject mode
+      // now has a fallback of its own — Nano Banana, the OTHER model that gets
+      // the real product photo. That keeps the policy above intact (the product
+      // stays real) while gpt-image-2 leads, instead of one OpenAI hiccup
+      // leaving a product card with no image at all.
       fallbackUsed = true;
-      r = await tryModel("piapi/flux-schnell", "piapi-flux-schnell", PER_IMAGE_MS);
+      r = subjectMode
+        ? await tryModel("google/nano-banana", "google-nano-banana", PER_IMAGE_MS)
+        : await tryModel("piapi/flux-schnell", "piapi-flux-schnell", PER_IMAGE_MS);
     }
     if (r.status === "ready" && r.url) {
       return {

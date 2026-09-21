@@ -551,7 +551,10 @@ export default function RunPage() {
   const [overlayTitle, setOverlayTitle] = useState<string>("");
   const overlaySeededRef = useRef<string | null>(null);
   /** 2026-05-12: user-selected image model for 改圖 dropdown.
-   *  2026-06-15: default gpt-image-2 across all platforms. */
+   *  2026-06-15: default gpt-image-2 across all platforms.
+   *  2026-09-21 (CJ「正式環境的生圖，都採用 gpt image 2」): gpt-image-2 is
+   *  now the only option in RUN_IMAGE_MODEL_OPTIONS, so this is also the only
+   *  value the dropdown can hold. */
   const [imageModel, setImageModel] = useState<string>("gpt-image-2");
   /** Video gen state — async job, polled for status. */
   const [videoDuration, setVideoDuration] = useState<number>(30);
@@ -1083,8 +1086,9 @@ export default function RunPage() {
   // 2026-07-25 (CJ product-faithful gen「📦 使用真實產品圖」— 改圖面板入口):
   // this is the panel the mockup's 點此手動生圖 opens, so the product picker
   // must live HERE (MediaGenFlow got it first, but that flow isn't on this
-  // click path). When on, image.generate routes to Nano Banana with the
-  // real photo + fidelity guard (see project_product_faithful_imagegen).
+  // click path). When on, image.generate routes to gpt-image-2 subject mode
+  // (/images/edits) with the real photo + fidelity guard — see
+  // project_product_faithful_imagegen.
   const runProductImagesQ = (trpc as any).media?.listProductImages?.useQuery?.(
     { brandId: data?.brand?.id ?? 0 },
     { enabled: !!data?.brand?.id, refetchOnWindowFocus: false, staleTime: 60_000 },
@@ -3026,8 +3030,8 @@ export default function RunPage() {
                         <span className="text-tiny font-semibold">📦 {lang === "en" ? "Use real product photo" : "使用真實產品圖"}</span>
                         <span className="text-[10px] text-default-500">
                           {lang === "en"
-                            ? "Composites the actual product (Nano Banana; model picker below is ignored)"
-                            : "把真實產品原貌合成進場景 — 自動用 Nano Banana 保真模型，下方模型選擇不適用"}
+                            ? "Composites the actual product (GPT Image 2 reference mode)"
+                            : "把真實產品原貌合成進場景 — 用 GPT Image 2 的產品保真模式"}
                         </span>
                       </label>
                       {useRealProduct && (
@@ -3053,8 +3057,8 @@ export default function RunPage() {
                   )}
                   <div className="bg-secondary-50 border border-secondary-200 rounded-lg p-2 text-[11px] text-secondary-700 mt-2">
                     {lang === "en"
-                      ? "Step 3: Pick a model (each is best for a different style)"
-                      : "Step 3：選用哪個模型（不同模型擅長不同風格）"}
+                      ? "Step 3: Model — production image gen runs on GPT Image 2"
+                      : "Step 3：模型 — 正式環境的生圖一律使用 GPT Image 2"}
                   </div>
                   <label className="block text-tiny text-default-600 -mb-1">{lang === "en" ? "AI model" : "AI 模型"}</label>
                   <select

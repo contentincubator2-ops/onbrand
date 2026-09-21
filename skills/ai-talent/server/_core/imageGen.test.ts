@@ -33,7 +33,7 @@ describe("generateImage provider validation", () => {
     vi.stubEnv("IMAGE_GEN_MODEL_GOOGLE", "");
     dispatchGenerateMock.mockResolvedValue({
       status: "ready",
-      modelId: "google/nano-banana",
+      modelId: "openai/gpt-image-2",
       url: "/uploads/generated/product.png",
     });
   });
@@ -159,6 +159,56 @@ describe("generateImage provider validation", () => {
     expect(result).toMatchObject({ status: "ready", provider: "piapi", usedFallback: true });
   });
 
+  // 2026-09-21 (CJ「生圖，正式環境的生圖，都採用 gpt image 2」): a product run
+  // may only fall back to the OTHER model that SEES the real product. Falling
+  // back to text-to-image would silently ship a hallucinated product — the
+  // whole reason this path had no fallback before.
+  it("falls back from gpt-image-2 to Nano Banana, never to text-to-image", async () => {
+    dispatchGenerateMock.mockReset();
+    dispatchGenerateMock
+      .mockResolvedValueOnce({ status: "failed", modelId: "openai/gpt-image-2", errorMsg: "edits 400" })
+      .mockResolvedValueOnce({
+        status: "ready",
+        modelId: "google/nano-banana",
+        url: "/uploads/generated/product.png",
+      });
+
+    await expect(generateImage({
+      brandId: 1,
+      prompt: "product on a marble counter",
+      subjectImageUrl: "https://example.com/product.png",
+    })).resolves.toMatchObject({
+      status: "ready",
+      provider: "google",
+      model: "nano-banana",
+      requestedModel: "gpt-image-2",
+      usedFallback: true,
+    });
+
+    expect(dispatchGenerateMock.mock.calls.map(([modelId]) => modelId))
+      .toEqual(["openai/gpt-image-2", "google/nano-banana"]);
+    for (const [, options] of dispatchGenerateMock.mock.calls) {
+      expect(options.imageUrl).toBe("https://example.com/product.png");
+    }
+  });
+
+  it("reports both subject models in the error when neither can deliver", async () => {
+    dispatchGenerateMock.mockReset();
+    dispatchGenerateMock
+      .mockResolvedValueOnce({ status: "failed", modelId: "openai/gpt-image-2", errorMsg: "edits 400" })
+      .mockRejectedValueOnce(new Error("NanoBanana no image (IMAGE_SAFETY)"));
+
+    const result = await generateImage({
+      brandId: 1,
+      prompt: "product on a marble counter",
+      subjectImageUrl: "https://example.com/product.png",
+    });
+
+    expect(result.status).toBe("failed");
+    expect(result.errorMsg).toContain("gpt-image-2: edits 400");
+    expect(result.errorMsg).toContain("nano-banana: NanoBanana no image");
+  });
+
   it("puts product-reference arbitration before a conflicting scene prompt", async () => {
     const conflictingScene = "A woman wearing a fitted beige shirt with black trousers";
 
@@ -166,10 +216,15 @@ describe("generateImage provider validation", () => {
       brandId: 1,
       prompt: conflictingScene,
       subjectImageUrl: "https://example.com/real-brown-top.png",
-    })).resolves.toMatchObject({ status: "ready", model: "nano-banana" });
+    })).resolves.toMatchObject({ status: "ready", model: "gpt-image-2" });
 
     expect(dispatchGenerateMock).toHaveBeenCalledOnce();
-    const [, options] = dispatchGenerateMock.mock.calls[0]!;
+    // 2026-09-21 (CJ「生圖，正式環境的生圖，都採用 gpt image 2」): subject
+    // mode used to be pinned to google/nano-banana — the ONE path that did not
+    // run on gpt-image-2.
+    const [subjectModelId, options] = dispatchGenerateMock.mock.calls[0]!;
+    expect(subjectModelId).toBe("openai/gpt-image-2");
+    expect(options.imageUrl).toBe("https://example.com/real-brown-top.png");
     const prompt = String(options.prompt);
     expect(prompt).toContain("attached reference image is the sole source of truth");
     expect(prompt).toContain("ignore that conflicting text and follow the reference image");

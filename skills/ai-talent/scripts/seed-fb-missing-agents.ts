@@ -6,7 +6,7 @@
  *   2. fb-performance-analyst   → fixes squad #730 steps 1+2 (marginal)
  *
  * Each agent is created with:
- *   - Notion-style avatar via gpt-image-1 + sharp resize variants
+ *   - Notion-style avatar via gpt-image-2 + sharp resize variants
  *   - Full bio/specialty/skills/methodology
  *   - INSERT into agents table (idempotent: skips if slug exists)
  *
@@ -100,7 +100,8 @@ async function genAvatarBase(prompt: string, savePath: string, bgHex: string): P
     method: "POST",
     headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
     body: JSON.stringify({
-      model: "gpt-image-1", prompt: fullPrompt,
+      // 2026-09-21 (CJ「生圖，正式環境的生圖，都採用 gpt image 2」).
+      model: "gpt-image-2", prompt: fullPrompt,
       size: "1024x1024", quality: "high", n: 1,
     }),
     signal: AbortSignal.timeout(180_000),

@@ -526,10 +526,12 @@ export interface OrchestraConfig {
   imageQualitySteps: number; // Flux Schnell: 4 default, 8 for higher quality
   /**
    * 2026-07-07 (CJ): per-task image-model override for genOneImage's primary
-   * attempt. When set (e.g. "azure/gpt-image-2"), that model is tried first
-   * instead of the imagen-4 default; flux-schnell stays the reliability
-   * fallback. Used to lock YT thumbnail/video backgrounds to gpt-image-2
-   * (best prompt adherence for clean, text-free 16:9 backgrounds).
+   * attempt. When set, that model is tried first instead of the default;
+   * flux-schnell stays the reliability fallback.
+   * 2026-09-21 (CJ「正式環境的生圖，都採用 gpt image 2」): the default IS
+   * openai/gpt-image-2 now, so an override is only needed to name something
+   * else — and product-subject runs ignore it outright (a text-only model
+   * would ship a hallucinated product).
    */
   imageModelOverride?: string;
   /**
@@ -538,7 +540,7 @@ export interface OrchestraConfig {
    * deliberately FACELESS (product hero / ASMR / before-after) because
    * lip-sync is unavailable — see mediaGen PIAPI_MAP notes. Requires
    * runImageGen=true: the video's first frame IS the generated image, so
-   * real-product fidelity (Nano Banana subject compositing) carries through.
+   * real-product fidelity (gpt-image-2 subject compositing) carries through.
    *
    * Kling i2v takes ~150s per clip, which EXCEEDS every sync tier budget —
    * video tasks must run through the async (onCheckpoint) path so the user

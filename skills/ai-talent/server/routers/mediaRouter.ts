@@ -31,7 +31,7 @@ function isProviderKeyError(text: string): boolean {
 import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure } from "../_core/trpc";
 import { callLLM } from "../_core/llmRouter";
-import { dispatchGenerate, checkJob, type GenOptions } from "../_core/mediaGen";
+import { dispatchGenerate, checkJob, type GenOptions, type GenResult } from "../_core/mediaGen";
 import localPool from "../localDb";
 import { probeImageUrl } from "../_core/imageFetch";
 
@@ -209,8 +209,35 @@ ${input.audienceContext ? `受眾：${input.audienceContext}` : ""}
         quality: input.quality,
         brandId: input.brandId ?? null,
       };
+      // 2026-09-21 (CJ「生圖，正式環境的生圖，都採用 gpt image 2」): in
+      // product-subject mode the model is chosen by policy (gpt-image-2
+      // /images/edits), not by the card the user clicked — so a failure there
+      // falls back to the other model that SEES the real product instead of
+      // handing the user an error. Text-to-image is never in this list: it
+      // would ship a hallucinated product.
+      const subjectFallbacks = isProductSubject && input.modelId.startsWith("openai/")
+        ? ["google/nano-banana"]
+        : [];
+      let res: GenResult | null = null;
+      let thrown: unknown = null;
+      for (const modelId of [input.modelId, ...subjectFallbacks]) {
+        try {
+          res = await dispatchGenerate(modelId, opts);
+          thrown = null;
+          if (res.status === "ready" && res.url) break;
+          if (subjectFallbacks.length) {
+            console.warn(`[media.generate] ${modelId} returned ${res.status}: ${res.errorMsg ?? "no url"}`);
+          }
+        } catch (e) {
+          res = null;
+          thrown = e;
+          if (subjectFallbacks.length) {
+            console.warn(`[media.generate] ${modelId} threw: ${e instanceof Error ? e.message : String(e)}`);
+          }
+        }
+      }
       try {
-        const res = await dispatchGenerate(input.modelId, opts);
+        if (!res) throw thrown ?? new Error("生成失敗");
         return {
           ok: res.status === "ready",
           status: res.status,

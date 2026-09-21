@@ -133,7 +133,7 @@ export default function ImageSlotFlow({
     try {
       const res: any = await craftMutation.mutateAsync({
         kind, direction: d, brief: brief.trim(),
-        modelId: kind === "video" ? "piapi/kling-v2-master" : "openai/gpt-image-1",
+        modelId: kind === "video" ? "piapi/kling-v2-master" : "openai/gpt-image-2",
       });
       setPromptEn(String(res?.promptEn ?? ""));
     } catch (e: any) {
