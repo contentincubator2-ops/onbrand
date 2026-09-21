@@ -12,6 +12,7 @@ name: "Ops (DEV) — probe gpt-image-2 image edit with a real product photo"
 #
 # 用法（這個 repo 的 dev 探測慣例：改這個檔案再 push，就會觸發）：
 #   PROBE_MODE=list  → 把最近上傳的 30 張產品／品牌照片縮圖拉回來，用來認出要用哪一張
+#   PROBE_MODE=diagnose → 比對「GitHub secret 的 key」與「dev VM .env 的 key」的指紋（不印 key），各打一次最小生圖呼叫，並列出 dev 最近的生圖失敗與點數
 #   PROBE_MODE=edit  → 用 PROBE_PHOTO 跑兩個變體（自然提示詞對照 vs 上線用的 PRODUCT_FAITHFUL 提示詞），把結果圖拉回來
 on:
   push:
@@ -25,7 +26,7 @@ jobs:
     environment: dev
     timeout-minutes: 20
     env:
-      PROBE_MODE: edit
+      PROBE_MODE: diagnose
       PROBE_PHOTO: "/opt/onbrand/shared/storage/asset-photos/product/261/1789987951094-5w8aw5.webp"
       SSH_KEY: ${{ secrets.VM_SSH_PRIVATE_KEY }}
       PROBE_OPENAI_KEY: ${{ secrets.OPEN_API_KEY }}
@@ -41,10 +42,66 @@ jobs:
           rm -rf /tmp/probe; mkdir -p /tmp/probe/thumbs /tmp/probe/out
           cd "$AI"
           envval() { grep -m1 "^$1=" .env | cut -d= -f2- | sed 's/^"//; s/"$//' | sed "s/^'//; s/'$//"; }
+          SECRET_KEY="${KEY:-}"; VM_KEY="$(envval OPENAI_API_KEY)"
           if [ -n "${KEY:-}" ]; then echo "openai key source: GitHub secret OPEN_API_KEY"; else export KEY="$(envval OPENAI_API_KEY)"; echo "openai key source: VM .env"; fi
           echo "host=$(hostname)  node=$(node -v)  app=$(readlink -f /opt/onbrand/current)"
           echo "IMAGE_GEN_MODEL_OPENAI=$(envval IMAGE_GEN_MODEL_OPENAI)  IMAGE_GEN_PROVIDER_PRIMARY=$(envval IMAGE_GEN_PROVIDER_PRIMARY)"
           [ -z "$KEY" ] && echo "OPENAI_API_KEY missing on the dev VM"
+
+          if [ "$MODE" = "diagnose" ]; then
+            cat > /tmp/probe/diag.js <<'JS'
+          const crypto = require("crypto");
+          const cp = require("child_process");
+          const fp = (k) => k ? { len: k.length, prefix: k.slice(0, 7), sha8: crypto.createHash("sha256").update(k).digest("hex").slice(0, 8) } : null;
+          const redact = (t) => String(t).replace(/sk-[A-Za-z0-9_*\-]{6,}/g, "[key]");
+          const secret = process.env.SECRET_KEY || "", vm = process.env.VM_KEY || "";
+          console.log("GitHub secret OPEN_API_KEY :", JSON.stringify(fp(secret)));
+          console.log("dev VM .env OPENAI_API_KEY :", JSON.stringify(fp(vm)));
+          console.log("same key?", secret && vm ? secret === vm : "n/a");
+          try {
+            const j = JSON.parse(cp.execSync("pm2 jlist", { encoding: "utf8", maxBuffer: 64e6 }));
+            for (const p of j) {
+              const e = p.pm2_env || {};
+              if (/onbrand/.test(p.name)) console.log("pm2", p.name, "status=" + e.status, "restarts=" + e.restart_time, "uptimeStart=" + new Date(e.pm_uptime || 0).toISOString(), "OPENAI_API_KEY=" + JSON.stringify(fp(e.OPENAI_API_KEY || "")), "IMAGE_GEN_MODEL_OPENAI=" + (e.IMAGE_GEN_MODEL_OPENAI || null));
+            }
+          } catch (e) { console.log("pm2 read failed:", redact(e.message).slice(0, 120)); }
+          async function tryKey(name, key) {
+            if (!key) { console.log(name, "-> no key"); return; }
+            const t0 = Date.now();
+            try {
+              const r = await fetch("https://api.openai.com/v1/images/generations", {
+                method: "POST", headers: { Authorization: "Bearer " + key, "Content-Type": "application/json" },
+                body: JSON.stringify({ model: "gpt-image-2", prompt: "a plain white square", size: "1024x1024", quality: "low", n: 1 }),
+                signal: AbortSignal.timeout(90000),
+              });
+              const b = await r.json().catch(() => ({}));
+              const ok = b && b.data && b.data[0] && b.data[0].b64_json;
+              console.log(name, "-> HTTP", r.status, ok ? "IMAGE OK" : "", b.error ? ("code=" + b.error.code + " type=" + b.error.type + " msg=" + redact(b.error.message).slice(0, 220)) : "", (Date.now() - t0) + "ms");
+            } catch (e) { console.log(name, "-> FAILED", redact(e.message).slice(0, 120)); }
+          }
+          (async () => {
+            await tryKey("call with GitHub-secret key", secret);
+            if (vm && vm !== secret) await tryKey("call with dev-VM .env key ", vm);
+            try {
+              const mysql = require("/opt/onbrand/current/skills/ai-talent/node_modules/mysql2/promise");
+              const c = await mysql.createConnection({ host: process.env.DB_HOST || "localhost", port: +(process.env.DB_PORT || 3306), user: process.env.DB_USER || "mos_user", password: process.env.DB_PASS, database: process.env.DB_NAME || "mos_db" });
+              const [rows] = await c.execute("SELECT id, provider, model, status, LEFT(errorMsg, 200) AS err FROM generated_images ORDER BY id DESC LIMIT 8");
+              console.log("--- latest generated_images ---");
+              for (const r of rows) console.log(r.id, r.provider, r.model, r.status, redact(r.err || ""));
+              try {
+                const [u] = await c.execute("SELECT id, planCode, pointsBalance FROM users ORDER BY id DESC LIMIT 6");
+                console.log("--- users (id, plan, points) ---");
+                for (const r of u) console.log(r.id, r.planCode, r.pointsBalance);
+              } catch (e) { console.log("users query failed:", redact(e.message).slice(0, 100)); }
+              await c.end();
+            } catch (e) { console.log("db read failed:", redact(e.message).slice(0, 140)); }
+          })();
+          JS
+            DB_HOST="$(envval LOCAL_DB_HOST)" DB_PORT="$(envval LOCAL_DB_PORT)" DB_USER="$(envval LOCAL_DB_USER)" DB_PASS="$(envval LOCAL_DB_PASSWORD)" DB_NAME="$(envval LOCAL_DB_NAME)" SECRET_KEY="$SECRET_KEY" VM_KEY="$VM_KEY" node /tmp/probe/diag.js
+            echo "--- recent app log lines about images (dev pm2) ---"
+            pm2 logs --nostream --lines 500 2>&1 | grep -iE "genOneImage|OpenAI|quota|insufficient|generateImage|image.generate" | sed -E 's/sk-[A-Za-z0-9_*-]{6,}/[key]/g' | tail -14
+            exit 0
+          fi
 
           if [ "$MODE" = "list" ]; then
             find "$STORE" -type f -printf '%T@ %s %p\n' 2>/dev/null | sort -nr | head -30 > /tmp/probe/manifest.txt
