@@ -27,7 +27,7 @@ jobs:
     environment: dev
     timeout-minutes: 20
     env:
-      PROBE_MODE: angles
+      PROBE_MODE: disk
       PROBE_PHOTO: "/opt/onbrand/shared/storage/asset-photos/product/261/1789987951094-5w8aw5.webp"
       SSH_KEY: ${{ secrets.VM_SSH_PRIVATE_KEY }}
       PROBE_OPENAI_KEY: ${{ secrets.OPEN_API_KEY }}
@@ -48,6 +48,18 @@ jobs:
           echo "host=$(hostname)  node=$(node -v)  app=$(readlink -f /opt/onbrand/current)"
           echo "IMAGE_GEN_MODEL_OPENAI=$(envval IMAGE_GEN_MODEL_OPENAI)  IMAGE_GEN_PROVIDER_PRIMARY=$(envval IMAGE_GEN_PROVIDER_PRIMARY)"
           [ -z "$KEY" ] && echo "OPENAI_API_KEY missing on the dev VM"
+
+          if [ "$MODE" = "disk" ]; then
+            echo "--- df ---"; df -h / /opt /tmp 2>&1 | head -8
+            echo "--- inodes ---"; df -i / 2>&1 | tail -2
+            echo "--- /opt/onbrand top-level sizes ---"; du -sh /opt/onbrand/* 2>/dev/null | sort -rh | head -12
+            echo "--- releases (newest first): size + name ---"
+            ls -1dt /opt/onbrand/releases/* 2>/dev/null | head -40 | while read d; do echo "$(du -sh "$d" 2>/dev/null | cut -f1)  $(basename "$d")  $( [ "$(readlink -f /opt/onbrand/current)" = "$d" ] && echo '<= CURRENT')"; done
+            echo "release count: $(ls -1d /opt/onbrand/releases/* 2>/dev/null | wc -l)"
+            echo "--- other big dirs ---"; du -sh /var/log /var/lib/docker /home /root /var/cache /tmp 2>/dev/null | sort -rh | head -8
+            echo "--- pm2 logs ---"; du -sh ~/.pm2/logs 2>/dev/null
+            exit 0
+          fi
 
           if [ "$MODE" = "angles" ]; then
             echo "--- 情感版／理性版／數據版：真實模型跑一次 fb-30-caption-short ---"
