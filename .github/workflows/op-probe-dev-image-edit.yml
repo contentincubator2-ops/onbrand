@@ -28,6 +28,7 @@ jobs:
       PROBE_MODE: edit
       PROBE_PHOTO: "/opt/onbrand/shared/storage/asset-photos/product/261/1789987951094-5w8aw5.webp"
       SSH_KEY: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+      PROBE_OPENAI_KEY: ${{ secrets.OPEN_API_KEY }}
       VM_HOST: ${{ secrets.VM_HOST }}
       VM_USER: ${{ secrets.VM_USER }}
     steps:
@@ -40,13 +41,10 @@ jobs:
           rm -rf /tmp/probe; mkdir -p /tmp/probe/thumbs /tmp/probe/out
           cd "$AI"
           envval() { grep -m1 "^$1=" .env | cut -d= -f2- | sed 's/^"//; s/"$//' | sed "s/^'//; s/'$//"; }
-          export KEY="$(envval OPENAI_API_KEY)"
-          export AZKEY="$(envval AZURE_IMAGE_API_KEY)"; [ -z "$AZKEY" ] && export AZKEY="$(envval GPT)"
-          export AZEP="$(envval AZURE_IMAGE_ENDPOINT)"; export AZDEP="$(envval AZURE_IMAGE_DEPLOYMENT)"
+          if [ -n "${KEY:-}" ]; then echo "openai key source: GitHub secret OPEN_API_KEY"; else export KEY="$(envval OPENAI_API_KEY)"; echo "openai key source: VM .env"; fi
           echo "host=$(hostname)  node=$(node -v)  app=$(readlink -f /opt/onbrand/current)"
           echo "IMAGE_GEN_MODEL_OPENAI=$(envval IMAGE_GEN_MODEL_OPENAI)  IMAGE_GEN_PROVIDER_PRIMARY=$(envval IMAGE_GEN_PROVIDER_PRIMARY)"
           [ -z "$KEY" ] && echo "OPENAI_API_KEY missing on the dev VM"
-          [ -z "$AZKEY" ] && echo "Azure image key missing on the dev VM"
 
           if [ "$MODE" = "list" ]; then
             find "$STORE" -type f -printf '%T@ %s %p\n' 2>/dev/null | sort -nr | head -30 > /tmp/probe/manifest.txt
@@ -76,22 +74,18 @@ jobs:
           const sharp = require("/opt/onbrand/current/skills/ai-talent/node_modules/sharp");
           const fs = require("fs");
           const PHOTO = process.env.PHOTO;
-          const AZKEY = process.env.AZKEY || "";
-          const AZEP = (process.env.AZEP || "https://proj-claude-sweden-resource.cognitiveservices.azure.com").replace(/\/+$/, "");
-          const AZDEP = process.env.AZDEP || "gpt-image-2";
+          const KEY = process.env.KEY || "";
           const PROMPT =
             "Place this exact perfume bottle on a mossy rock at the edge of Loch Lomond in Scotland, " +
             "late morning sunlight, calm lake and green mountains in the background, purple heather in the foreground. " +
             "Photorealistic commercial product photography with natural lighting, realistic reflections, and light refracting " +
             "through the glass. Keep the bottle exactly as in the photo: the cut-glass pattern, the round wooden cap, " +
             "and the label text and layout must not change.";
-          console.log("azure key present: " + (!!AZKEY) + "  endpoint host: " + new URL(AZEP).host + "  deployment: " + AZDEP);
-          const headers = { Authorization: "Bearer " + AZKEY, "api-key": AZKEY };
-          const base = AZEP + "/openai/deployments/" + AZDEP + "/images/";
+          console.log("openai key present: " + (KEY.length > 0));
           const VARIANTS = [
-            { id: "Z", label: "azure generations (liveness, low)", kind: "gen", url: base + "generations?api-version=2024-02-01" },
-            { id: "D", label: "azure edits", kind: "edit", url: base + "edits?api-version=2025-04-01-preview", extra: {} },
-            { id: "E", label: "azure edits + input_fidelity=high", kind: "edit", url: base + "edits?api-version=2025-04-01-preview", extra: { input_fidelity: "high" } },
+            { id: "A", model: "gpt-image-2", label: "gpt-image-2 edits", extra: {} },
+            { id: "B", model: "gpt-image-2", label: "gpt-image-2 edits + input_fidelity=high", extra: { input_fidelity: "high" } },
+            { id: "C", model: "gpt-image-1", label: "gpt-image-1 edits + input_fidelity=high (control)", extra: { input_fidelity: "high" } },
           ];
           (async () => {
             const input = await sharp(PHOTO).rotate().resize(2048, 2048, { fit: "inside", withoutEnlargement: true }).png().toBuffer();
@@ -101,20 +95,17 @@ jobs:
             for (const v of VARIANTS) {
               const t0 = Date.now();
               try {
-                let init;
-                if (v.kind === "gen") {
-                  init = { method: "POST", headers: { ...headers, "Content-Type": "application/json" },
-                    body: JSON.stringify({ prompt: "a red circle on a white background", size: "1024x1024", quality: "low", output_format: "png", n: 1 }) };
-                } else {
-                  const form = new FormData();
-                  form.append("prompt", PROMPT);
-                  form.append("size", "1536x1024");
-                  form.append("n", "1");
-                  for (const [k, val] of Object.entries(v.extra)) form.append(k, val);
-                  form.append("image", new Blob([input], { type: "image/png" }), "product.png");
-                  init = { method: "POST", headers, body: form };
-                }
-                const res = await fetch(v.url, { ...init, signal: AbortSignal.timeout(170000) });
+                const form = new FormData();
+                form.append("model", v.model);
+                form.append("prompt", PROMPT);
+                form.append("size", "1536x1024");
+                form.append("n", "1");
+                for (const [k, val] of Object.entries(v.extra)) form.append(k, val);
+                form.append("image[]", new Blob([input], { type: "image/png" }), "product.png");
+                const res = await fetch("https://api.openai.com/v1/images/edits", {
+                  method: "POST", headers: { Authorization: "Bearer " + KEY }, body: form,
+                  signal: AbortSignal.timeout(170000),
+                });
                 const ms = Date.now() - t0;
                 const body = await res.json().catch(() => ({}));
                 const b64 = body && body.data && body.data[0] && body.data[0].b64_json;
@@ -140,7 +131,10 @@ jobs:
           mkdir -p ~/.ssh out
           printf '%s\n' "$SSH_KEY" > ~/.ssh/id && chmod 600 ~/.ssh/id
           SSH_OPTS="-i $HOME/.ssh/id -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR"
-          ssh $SSH_OPTS "$VM_USER@$VM_HOST" "MODE='$PROBE_MODE' PHOTO='$PROBE_PHOTO' bash -s" < remote.sh | tee out/log.txt
+          {
+            if [ -n "$PROBE_OPENAI_KEY" ]; then printf 'export KEY=%q\n' "$PROBE_OPENAI_KEY"; fi
+            cat remote.sh
+          } | ssh $SSH_OPTS "$VM_USER@$VM_HOST" "MODE='$PROBE_MODE' PHOTO='$PROBE_PHOTO' bash -s" | tee out/log.txt
           scp -r $SSH_OPTS "$VM_USER@$VM_HOST:/tmp/probe/." out/ || true
           ssh $SSH_OPTS "$VM_USER@$VM_HOST" 'rm -rf /tmp/probe' || true
           ls -la out out/thumbs out/out 2>/dev/null | head -60
