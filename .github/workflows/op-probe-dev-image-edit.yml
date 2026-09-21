@@ -25,8 +25,8 @@ jobs:
     environment: dev
     timeout-minutes: 20
     env:
-      PROBE_MODE: list
-      PROBE_PHOTO: ""
+      PROBE_MODE: edit
+      PROBE_PHOTO: "/opt/onbrand/shared/storage/asset-photos/product/261/1789987951094-5w8aw5.webp"
       SSH_KEY: ${{ secrets.VM_SSH_PRIVATE_KEY }}
       VM_HOST: ${{ secrets.VM_HOST }}
       VM_USER: ${{ secrets.VM_USER }}
