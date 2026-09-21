@@ -12,7 +12,7 @@ name: "Ops (DEV) — probe gpt-image-2 image edit with a real product photo"
 #
 # 用法（這個 repo 的 dev 探測慣例：改這個檔案再 push，就會觸發）：
 #   PROBE_MODE=list  → 把最近上傳的 30 張產品／品牌照片縮圖拉回來，用來認出要用哪一張
-#   PROBE_MODE=edit  → 用 PROBE_PHOTO 那個檔案跑三個變體，把結果圖拉回來
+#   PROBE_MODE=edit  → 用 PROBE_PHOTO 跑兩個變體（自然提示詞對照 vs 上線用的 PRODUCT_FAITHFUL 提示詞），把結果圖拉回來
 on:
   push:
     branches: [dev]
@@ -81,11 +81,20 @@ jobs:
             "Photorealistic commercial product photography with natural lighting, realistic reflections, and light refracting " +
             "through the glass. Keep the bottle exactly as in the photo: the cut-glass pattern, the round wooden cap, " +
             "and the label text and layout must not change.";
+          const FAITHFUL = "PRODUCT REFERENCE OVERRIDES ALL CONFLICTING TEXT \u2014 the attached reference image is the sole source of truth for the product or garment. If any scene text conflicts with the reference image about the product, clothing, color, style, cut, shape, proportions, material, pattern, details, label, or logo, ignore that conflicting text and follow the reference image. Use scene text only for the environment, lighting, composition, pose, and atmosphere; never replace the referenced product or garment with one described by the scene. PRODUCT FIDELITY \u2014 the attached image is the REAL product; this is the most important rule: reproduce the product EXACTLY as shown \u2014 identical shape, proportions, materials, colors, and every printed label, logo and text on the product itself must remain letter-perfect and unaltered. Do NOT redraw, restyle, re-color or re-label the product. Place it naturally into the scene: lighting direction consistent with the environment, correct perspective and scale, realistic contact shadows and reflections \u2014 it must look photographed in place, never pasted on. TEXT \u2014 closed rule: the ONLY characters allowed anywhere in the output are the ones already visibly printed on the attached product photo, copied pixel-for-pixel. Do not invent, extend, translate, re-letter or repeat them. Do NOT render or repeat the brand name anywhere except where it is already printed on the product itself. Do not add a watermark (including large translucent or tiled brand marks), signage, captions, badges, stickers or any Chinese / Japanese / Korean characters elsewhere in the frame \u2014 not on the background, surfaces, props, or as an overlay. If the attached photo itself carries a watermark, leave it out. Every surface other than the product is blank.";
+          const MIRROR = "Do NOT include a mirror, reflective surface, reflection, or any shot composed as \"person looking at their own reflection\" \u2014 reflections never stay physically consistent with the subject's actual pose/hair/head angle. Show the subject directly instead.";
+          const SCENE = "Place the perfume bottle on a mossy rock at the edge of Loch Lomond in Scotland, late morning sunlight, calm lake and green mountains in the background, purple heather in the foreground.";
+          // The exact text imageGen.buildPrompt() sends when a product photo is attached (no brand context).
+          const FAITHFUL_PROMPT = [
+            FAITHFUL, "",
+            "Scene (environment, lighting, composition, pose, and atmosphere only):", SCENE, "",
+            MIRROR, "",
+            "Rendering: editorial product photography, natural light, realistic contact shadows, clean composition, no watermarks.",
+          ].join("\n");
           console.log("openai key present: " + (KEY.length > 0));
           const VARIANTS = [
-            { id: "A", model: "gpt-image-2", label: "gpt-image-2 edits", extra: {} },
-            { id: "B", model: "gpt-image-2", label: "gpt-image-2 edits + input_fidelity=high", extra: { input_fidelity: "high" } },
-            { id: "C", model: "gpt-image-1", label: "gpt-image-1 edits + input_fidelity=high (control)", extra: { input_fidelity: "high" } },
+            { id: "A", model: "gpt-image-2", label: "control: natural prompt", prompt: PROMPT, extra: {} },
+            { id: "F", model: "gpt-image-2", label: "production prompt (PRODUCT_FAITHFUL block + scene)", prompt: FAITHFUL_PROMPT, extra: {} },
           ];
           (async () => {
             const input = await sharp(PHOTO).rotate().resize(2048, 2048, { fit: "inside", withoutEnlargement: true }).png().toBuffer();
@@ -97,7 +106,7 @@ jobs:
               try {
                 const form = new FormData();
                 form.append("model", v.model);
-                form.append("prompt", PROMPT);
+                form.append("prompt", v.prompt);
                 form.append("size", "1536x1024");
                 form.append("n", "1");
                 for (const [k, val] of Object.entries(v.extra)) form.append(k, val);
