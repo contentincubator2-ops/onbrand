@@ -1,0 +1,140 @@
+name: "Ops (DEV) — probe gpt-image-2 image edit with a real product photo"
+
+# 2026-09-21 (CJ「直接用 chatgpt image 2 的 model 應該就可以了，你試試看」).
+#
+# 我們所有呼叫 OpenAI 的地方都是 /v1/images/generations（純文字），不能帶產品照片；
+# 帶真實產品照的生圖一律走 Nano Banana。ChatGPT 那張自然的圖是「產品照片＋提示詞」
+# 一起送進圖片編輯端點的結果。這裡用 DEV VM 上的金鑰、同一張產品照片，實際打
+# /v1/images/edits，看 gpt-image-2 的結果跟 ChatGPT 網頁版差多少。
+#
+# 只在 DEV VM 跑（environment: dev）。不寫任何 .env、不動應用程式資料；只在 /tmp/probe
+# 產生檔案，跑完拉回 artifact 並刪除。金鑰只在 VM 上讀取，不印出。
+#
+# 用法（這個 repo 的 dev 探測慣例：改這個檔案再 push，就會觸發）：
+#   PROBE_MODE=list  → 把最近上傳的 30 張產品／品牌照片縮圖拉回來，用來認出要用哪一張
+#   PROBE_MODE=edit  → 用 PROBE_PHOTO 那個檔案跑三個變體，把結果圖拉回來
+on:
+  push:
+    branches: [dev]
+    paths:
+      - '.github/workflows/op-probe-dev-image-edit.yml'
+
+jobs:
+  probe:
+    runs-on: ubuntu-24.04
+    environment: dev
+    timeout-minutes: 20
+    env:
+      PROBE_MODE: list
+      PROBE_PHOTO: ""
+      SSH_KEY: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+      VM_HOST: ${{ secrets.VM_HOST }}
+      VM_USER: ${{ secrets.VM_USER }}
+    steps:
+      - name: Write the remote script
+        run: |
+          cat > remote.sh <<'EOS'
+          set -u
+          AI=/opt/onbrand/current/skills/ai-talent
+          STORE=/opt/onbrand/shared/storage/asset-photos
+          rm -rf /tmp/probe; mkdir -p /tmp/probe/thumbs /tmp/probe/out
+          cd "$AI"
+          envval() { grep -m1 "^$1=" .env | cut -d= -f2- | sed 's/^"//; s/"$//' | sed "s/^'//; s/'$//"; }
+          export KEY="$(envval OPENAI_API_KEY)"
+          echo "host=$(hostname)  node=$(node -v)  app=$(readlink -f /opt/onbrand/current)"
+          echo "IMAGE_GEN_MODEL_OPENAI=$(envval IMAGE_GEN_MODEL_OPENAI)  IMAGE_GEN_PROVIDER_PRIMARY=$(envval IMAGE_GEN_PROVIDER_PRIMARY)"
+          if [ -z "$KEY" ]; then echo "OPENAI_API_KEY missing on the dev VM"; exit 0; fi
+
+          if [ "$MODE" = "list" ]; then
+            find "$STORE" -type f -printf '%T@ %s %p\n' 2>/dev/null | sort -nr | head -30 > /tmp/probe/manifest.txt
+            echo "--- newest uploaded photos (n, size, path) ---"
+            awk '{printf "%02d  %9d  %s\n", NR-1, $2, $3}' /tmp/probe/manifest.txt
+            cat > /tmp/probe/thumbs.js <<'JS'
+          const sharp = require("/opt/onbrand/current/skills/ai-talent/node_modules/sharp");
+          const fs = require("fs");
+          (async () => {
+            const lines = fs.readFileSync("/tmp/probe/manifest.txt", "utf8").trim().split("\n");
+            for (let i = 0; i < lines.length; i++) {
+              const p = lines[i].split(" ").slice(2).join(" ");
+              try {
+                await sharp(p).rotate().resize(260, 260, { fit: "inside" }).jpeg({ quality: 70 })
+                  .toFile("/tmp/probe/thumbs/" + String(i).padStart(2, "0") + ".jpg");
+              } catch (e) { console.log("thumb failed", i, String(e.message).slice(0, 80)); }
+            }
+          })();
+          JS
+            node /tmp/probe/thumbs.js
+            exit 0
+          fi
+
+          echo "photo: $PHOTO"
+          test -f "$PHOTO" || { echo "photo not found"; exit 0; }
+          cat > /tmp/probe/edit.js <<'JS'
+          const sharp = require("/opt/onbrand/current/skills/ai-talent/node_modules/sharp");
+          const fs = require("fs");
+          const KEY = process.env.KEY, PHOTO = process.env.PHOTO;
+          const PROMPT =
+            "Place this exact perfume bottle on a mossy rock at the edge of Loch Lomond in Scotland, " +
+            "late morning sunlight, calm lake and green mountains in the background, purple heather in the foreground. " +
+            "Photorealistic commercial product photography with natural lighting, realistic reflections, and light refracting " +
+            "through the glass. Keep the bottle exactly as in the photo: the cut-glass pattern, the round wooden cap, " +
+            "and the label text and layout must not change.";
+          const VARIANTS = [
+            { id: "A", model: "gpt-image-2", extra: {} },
+            { id: "B", model: "gpt-image-2", extra: { input_fidelity: "high" } },
+            { id: "C", model: "gpt-image-1", extra: { input_fidelity: "high" } },
+          ];
+          (async () => {
+            const input = await sharp(PHOTO).rotate().resize(2048, 2048, { fit: "inside", withoutEnlargement: true }).png().toBuffer();
+            fs.writeFileSync("/tmp/probe/out/input.png", input);
+            const meta = await sharp(input).metadata();
+            console.log("input " + meta.width + "x" + meta.height + " " + input.length + " bytes");
+            for (const v of VARIANTS) {
+              const form = new FormData();
+              form.append("model", v.model);
+              form.append("prompt", PROMPT);
+              form.append("size", "1536x1024");
+              form.append("n", "1");
+              for (const [k, val] of Object.entries(v.extra)) form.append(k, val);
+              form.append("image[]", new Blob([input], { type: "image/png" }), "product.png");
+              const t0 = Date.now();
+              try {
+                const res = await fetch("https://api.openai.com/v1/images/edits", {
+                  method: "POST", headers: { Authorization: "Bearer " + KEY }, body: form,
+                  signal: AbortSignal.timeout(170000),
+                });
+                const ms = Date.now() - t0;
+                const body = await res.json().catch(() => ({}));
+                const b64 = body && body.data && body.data[0] && body.data[0].b64_json;
+                if (b64) {
+                  fs.writeFileSync("/tmp/probe/out/" + v.id + ".png", Buffer.from(b64, "base64"));
+                  console.log(v.id + " " + v.model + " " + JSON.stringify(v.extra) + "  HTTP " + res.status + "  " + ms + "ms  IMAGE OK  usage=" + JSON.stringify(body.usage || null));
+                } else {
+                  const msg = (body && body.error && body.error.message) || JSON.stringify(body).slice(0, 200);
+                  console.log(v.id + " " + v.model + " " + JSON.stringify(v.extra) + "  HTTP " + res.status + "  " + ms + "ms  ERROR — " + String(msg).slice(0, 220));
+                }
+              } catch (e) {
+                console.log(v.id + " " + v.model + "  FAILED after " + (Date.now() - t0) + "ms — " + String(e.message).slice(0, 160));
+              }
+            }
+          })();
+          JS
+            node /tmp/probe/edit.js
+          EOS
+
+      - name: Run on the DEV VM and pull results back
+        run: |
+          set -u
+          mkdir -p ~/.ssh out
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/id && chmod 600 ~/.ssh/id
+          SSH_OPTS="-i $HOME/.ssh/id -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR"
+          ssh $SSH_OPTS "$VM_USER@$VM_HOST" "MODE='$PROBE_MODE' PHOTO='$PROBE_PHOTO' bash -s" < remote.sh | tee out/log.txt
+          scp -r $SSH_OPTS "$VM_USER@$VM_HOST:/tmp/probe/." out/ || true
+          ssh $SSH_OPTS "$VM_USER@$VM_HOST" 'rm -rf /tmp/probe' || true
+          ls -la out out/thumbs out/out 2>/dev/null | head -60
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: probe-${{ github.run_id }}
+          path: out
+          retention-days: 3
