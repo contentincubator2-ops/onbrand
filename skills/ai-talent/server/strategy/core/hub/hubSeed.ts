@@ -103,9 +103,9 @@ export async function seedHub(opts: { reset?: boolean } = {}) {
     const { seedBrandAssets } = await import("./brandAssetSeed");
     const r = await seedBrandAssets(org.id).catch((e) => {
       console.warn("[hub-seed] brand assets skipped:", e?.message ?? e);
-      return { added: 0, skipped: 0 };
+      return { added: 0, skipped: 0, removed: 0 };
     });
-    console.log(`[hub-seed] brand assets: +${r.added} added, ${r.skipped} left alone`);
+    console.log(`[hub-seed] brand assets: +${r.added} added, ${r.skipped} left alone, ${r.removed} stale removed`);
   }
 
   const solutions = loadSolutionSeeds();

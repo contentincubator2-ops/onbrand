@@ -2,4 +2,4 @@ ExpertHub demo probe trigger.
 Edit this file and push to release/experthub-demo to run it.
 Add --generate on the line below to also write one real post through the LLM.
 
-run 5: 2026-09-22 (expanded brand demo data)
+run 6: 2026-09-23 (stale quiet window cleaned up)

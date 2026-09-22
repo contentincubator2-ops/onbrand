@@ -207,8 +207,34 @@ function naturalKey(kind: BrandAssetKind, payload: Record<string, any>): string 
  * 逐筆比對：seedKey 或自然鍵命中就跳過，都沒有才寫入。
  * 新增的種子會補進去，展場上改過的內容不會被蓋掉。
  */
-export async function seedBrandAssets(orgId: number): Promise<{ added: number; skipped: number }> {
+/**
+ * 2026-09-22 一次性清理。
+ *
+ * 第一版的緘默期標籤是「Q3 earnings quiet period (demo window)」，第二版把
+ * 「(demo window)」拿掉了。自然鍵是標籤，所以改名之後舊那一列認不出來，於是
+ * 同一段區間被插了兩次，而且兩段都生效。
+ *
+ * 教訓記在這裡：**已經種下去的資料，自然鍵欄位不能改**——要改就得同時把舊的
+ * 收掉。這段在舊標籤絕跡之後可以直接刪掉。
+ */
+const STALE_LABELS = ["Q3 earnings quiet period (demo window)"];
+
+async function removeStale(orgId: number): Promise<number> {
+  const { removeBrandAsset } = await import("./brandAssets");
+  const existing = await listBrandAssets(orgId, "quiet");
+  let removed = 0;
+  for (const a of existing) {
+    if (STALE_LABELS.includes(String(a.payload.label ?? "").trim())) {
+      await removeBrandAsset(orgId, a.id);
+      removed++;
+    }
+  }
+  return removed;
+}
+
+export async function seedBrandAssets(orgId: number): Promise<{ added: number; skipped: number; removed: number }> {
   await ensureBrandAssetTable();
+  const removed = await removeStale(orgId);
   const existing = await listBrandAssets(orgId);
   const seen = new Set<string>();
   for (const a of existing) {
@@ -229,5 +255,5 @@ export async function seedBrandAssets(orgId: number): Promise<{ added: number; s
     if (nk) seen.add(nk);
     added++;
   }
-  return { added, skipped };
+  return { added, skipped, removed };
 }
