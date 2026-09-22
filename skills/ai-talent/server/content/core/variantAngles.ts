@@ -183,6 +183,25 @@ export function sanitizeAngleLabel(raw: unknown, fallback: string): string {
   return s && s.length <= 12 ? s : fallback;
 }
 
+const ORDINAL_MARK: Record<number, string> = { 2: "②", 3: "③", 4: "④", 5: "⑤", 6: "⑥" };
+
+/**
+ * pickOwnAngle's three parallel, isolated calls sometimes converge on the SAME self-chosen name —
+ * real run: a fragrance brand had all three call it 「情感版」 (once) and 「儀式版」 (another run).
+ * That's not necessarily a wrong judgment — three independent writers agreeing the product only
+ * really supports one angle is a legitimate outcome — but identical version-pill tabs on screen read
+ * as a bug. This is display-only de-duplication: it never touches the caption, only the label a
+ * repeat lands on, in place.
+ */
+export function dedupeAngleLabels(results: Array<{ label: string }>): void {
+  const seen = new Map<string, number>();
+  for (const r of results) {
+    const count = (seen.get(r.label) ?? 0) + 1;
+    seen.set(r.label, count);
+    if (count > 1) r.label = `${r.label}${ORDINAL_MARK[count] ?? count}`;
+  }
+}
+
 /** Units for counts the writer can legitimately produce by counting what the post itself lists. */
 const COUNTABLE = /^\s*(種|步|個|款|項|招|點|分鐘|天|次|件|包|入|瓶|色)/;
 

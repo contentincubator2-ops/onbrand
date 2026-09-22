@@ -27,7 +27,7 @@ import {
   resolveProductSubjectReference,
 } from "./productSubjectPolicy";
 import { isLocalUploadPath, probeImageUrl } from "./imageFetch";
-import { angleVisualLens, angleWritingBlock, checkAngle, pickOwnAngleBlock, sanitizeAngleLabel } from "./variantAngles";
+import { angleVisualLens, angleWritingBlock, checkAngle, dedupeAngleLabels, pickOwnAngleBlock, sanitizeAngleLabel } from "./variantAngles";
 import { findFirstUrl, fetchUrlSummary, formatUrlSummaryForPrompt, type UrlSummary } from "./urlContext";
 import { detectNonDeliverable } from "./captionSanity";
 import { isAdCopyTemplate, extractRequestedUrl, buildAdCopyRule, validateAdCopy, repairAdCopy } from "./adCopyContract";
@@ -1313,11 +1313,15 @@ async function callCaptionWriter(args: {
       callOneVariant({ ...args, label, siblingLabels: labels }),
     ),
   );
-  return settled.map((s, i) =>
+  const results = settled.map((s, i) =>
     s.status === "fulfilled"
       ? s.value
       : { label: labels[i] ?? `版本 ${i + 1}`, caption: "", hashtags: undefined },
   );
+  // 2026-09-22 實測（金安德森香氛）：pickOwnAngle 的三個獨立判斷常常選到同一個名字（三篇都叫「情感
+  // 版」）——內容其實不同，但畫面上三個一樣的版本頁籤會讓人以為壞了。只調整顯示用的名字，不動內容。
+  if (args.config.pickOwnAngle) dedupeAngleLabels(results);
+  return results;
 }
 
 // ── Image director LLM call ─────────────────────────────────────────────
@@ -1375,12 +1379,19 @@ async function callOneBrief(args: {
       `絕對不要據此畫成凌晨 / 清晨 / 正午 / 深夜的光線或氛圍，也不要畫時鐘、沙漏、倒數計時器。` +
       `視覺要呼應這一段「正在做的事」（例如：正在拆箱、正在看留言、正在展示成分表）。\n`
     : "";
+  // 2026-09-22（CJ「不應該將所有產品都規定為情感版、理性版還有數據版」）：pickOwnAngle 任務的文案
+  // 是自己判斷切角、寫完才回報名稱的——這支視覺 brief 是獨立的另一次呼叫，並不知道文案最後選了什麼
+  // 名字，如果還照「${label}」（config 的固定備用名）當「務必照此走」的硬性視覺切角，畫面說明可能
+  // 對不上文案實際寫出來的東西。pickOwnAngle 時改成跟文案同一種自由判斷，不綁定某個固定角度。
+  const angleLensLine = config.pickOwnAngle
+    ? `這一支的視覺方向請你自己判斷最適合這個產品/主題的畫面（不用對應到固定的情感/理性/數據等分類，那是文案那邊另一支獨立判斷的結果，兩邊不會事先對齊）。\n`
+    : `此版本的視覺切角（務必照此走，不要寫成通用品牌圖）：${lens}。\n`;
   const system =
     imagePersona +
-    `任務：寫 1 條**繁體中文**視覺方向描述，呼應「${label}」這個口吻。\n` +
+    `任務：寫 1 條**繁體中文**視覺方向描述${config.pickOwnAngle ? "" : `，呼應「${label}」這個口吻`}。\n` +
     timecodeNote +
-    `此版本的視覺切角（務必照此走，不要寫成通用品牌圖）：${lens}。\n` +
-    `這是一組多版本中的「${label}」，**必須與其他版本在主體、場景、構圖、色調上明顯不同**，不可雷同。\n` +
+    angleLensLine +
+    `這是一組多版本中的一篇，**必須與其他版本在主體、場景、構圖、色調上明顯不同**，不可雷同。\n` +
     `比例：${config.aspectRatio ?? "1:1"}\n` +
     igVisualBlock +
     subjectRule +

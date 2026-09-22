@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { angleFor, angleVisualLens, angleWritingBlock, checkAngle, pickOwnAngleBlock, sanitizeAngleLabel } from "./variantAngles";
+import { angleFor, angleVisualLens, angleWritingBlock, checkAngle, dedupeAngleLabels, pickOwnAngleBlock, sanitizeAngleLabel } from "./variantAngles";
 
 describe("版本名稱 = 版本設計", () => {
   it("每個通用切角都有寫法定義，而且定義裡點名了自己的名稱", () => {
@@ -181,5 +181,37 @@ describe("sanitizeAngleLabel：模型自報的名稱要先洗過才能上畫面"
     expect(sanitizeAngleLabel(undefined, "情感版")).toBe("情感版");
     expect(sanitizeAngleLabel(null, "情感版")).toBe("情感版");
     expect(sanitizeAngleLabel("這其實是一整句話不是一個版本名稱喔", "情感版")).toBe("情感版");
+  });
+});
+
+// 2026-09-22 實測：三篇獨立判斷常常收斂到同一個名字（三篇都叫「情感版」）——內容不同，但畫面上
+// 版本頁籤全部同名看起來像壞掉。dedupeAngleLabels 只調整顯示用的名字，不動內容判斷本身。
+describe("dedupeAngleLabels：畫面上不重複名字，但不動內容", () => {
+  it("實測那組（三篇都叫「情感版」）：後面兩篇加上序號區分", () => {
+    const results = [{ label: "情感版" }, { label: "情感版" }, { label: "情感版" }];
+    dedupeAngleLabels(results);
+    expect(results.map((r) => r.label)).toEqual(["情感版", "情感版②", "情感版③"]);
+  });
+
+  it("本來就不同的名字完全不動", () => {
+    const results = [{ label: "情感版" }, { label: "理性版" }, { label: "嗅覺版" }];
+    dedupeAngleLabels(results);
+    expect(results.map((r) => r.label)).toEqual(["情感版", "理性版", "嗅覺版"]);
+  });
+
+  it("只有部分重複時，只調整重複的那幾個", () => {
+    const results = [{ label: "情感版" }, { label: "理性版" }, { label: "情感版" }];
+    dedupeAngleLabels(results);
+    expect(results.map((r) => r.label)).toEqual(["情感版", "理性版", "情感版②"]);
+  });
+
+  it("caption 內容不受影響——只動 label 欄位", () => {
+    const results = [
+      { label: "情感版", caption: "第一篇" },
+      { label: "情感版", caption: "第二篇" },
+    ];
+    dedupeAngleLabels(results);
+    expect(results[0]!.caption).toBe("第一篇");
+    expect(results[1]!.caption).toBe("第二篇");
   });
 });
