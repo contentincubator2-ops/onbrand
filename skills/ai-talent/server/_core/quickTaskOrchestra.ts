@@ -242,6 +242,96 @@ export interface OrchestraResult {
  *  / azure-northcentral (DeepSeek-V3.2/R1). Others fall back to qwen.
  *  Exported so theaterRouter (and other places) can derive provider from
  *  agent.aiModel consistently. */
+/**
+ * What the run has actually produced so far.
+ *
+ * 2026-09-22 (CJ「請繼續做」): the hard-budget branch used to FABRICATE its
+ * result — N labels, every caption "", every image "timeout" — so a run that
+ * had already written five captions and generated ten images reported five
+ * empty variants and saved nothing (`hasUsableVariant=false`). The work was
+ * done and paid for; only the reporting threw it away. The orchestra now
+ * publishes each milestone here so the timeout branch can ship what landed.
+ */
+export interface OrchestraProgress {
+  captions: Array<{ label?: string; caption?: string; hashtags?: string[] } | null>;
+  images: Array<OrchestraVariant["image"] | undefined>;
+}
+
+/**
+ * Assemble whatever finished before the tier's hard budget ran out.
+ *
+ * Note what this deliberately does NOT do: the full variant loop's cosmetic
+ * transforms (hook/body merge, placeholder stripping, zh-TW voice gate). Brand
+ * rules already ran inside the caption pipeline, so what ships here is
+ * brand-safe; it just misses the polish. A slightly rough caption the user can
+ * read beats five blank ones.
+ */
+export function buildBudgetExceededResult(args: {
+  taskId: string;
+  labels: string[];
+  variantCount: number;
+  tierBudgetMs: number;
+  progress: OrchestraProgress;
+  stages: OrchestraStage[];
+  dedupe?: (caption: string) => string;
+}): OrchestraResult {
+  const variants: OrchestraVariant[] = [];
+  for (let i = 0; i < args.variantCount; i++) {
+    const done = args.progress.captions[i] ?? null;
+    const raw = (done?.caption ?? "").trim();
+    const caption = raw && args.dedupe ? args.dedupe(raw) : raw;
+    variants.push({
+      label: done?.label ?? args.labels[i] ?? `版本 ${i + 1}`,
+      caption,
+      hashtags: done?.hashtags ?? [],
+      image: args.progress.images[i] ?? { style: null, url: null, status: "timeout" },
+    });
+  }
+  const kept = variants.filter((v) => v.caption.length > 0).length;
+  return {
+    taskId: args.taskId,
+    totalLatencyMs: args.tierBudgetMs,
+    fetchedUrl: null,
+    captionAgent: null,
+    imageAgent: null,
+    variants,
+    stages: args.stages,
+    ok: kept > 0,
+    errors: [
+      `orchestra: hard ${Math.round(args.tierBudgetMs / 1000)}s budget exceeded` +
+      (kept > 0 ? `（已完成 ${kept}/${args.variantCount} 篇，先交付）` : ""),
+    ],
+  };
+}
+
+/**
+ * How long one image may take, given what is left of the task's budget.
+ *
+ * 2026-09-22 (CJ「請繼續做」): the caps were fixed numbers — 35s for the
+ * primary, then up to 45s for the Flux fallback. With ~60s of the 99s tier's
+ * 150s already spent on captions, a slow image could start a 35s attempt and
+ * then an 80s-deep fallback, and the whole run died at the hard budget with
+ * nothing shipped. Derive the caps from the time that actually remains, and
+ * don't start work that cannot finish: a skipped image is a card without a
+ * picture, a doomed image is a task without captions.
+ */
+export function imageCapsForRemaining(
+  remainingMs: number,
+  opts: { primaryCapMs: number; fallbackCapMs: number; minUsefulMs?: number },
+): { skip: boolean; primaryCapMs: number; fallbackCapMs: number } {
+  const minUseful = opts.minUsefulMs ?? 8_000;
+  if (!Number.isFinite(remainingMs)) {
+    return { skip: false, primaryCapMs: opts.primaryCapMs, fallbackCapMs: opts.fallbackCapMs };
+  }
+  if (remainingMs < minUseful) return { skip: true, primaryCapMs: 0, fallbackCapMs: 0 };
+  const primaryCapMs = Math.min(opts.primaryCapMs, remainingMs);
+  const left = remainingMs - primaryCapMs;
+  // Only promise a fallback when there is enough time for it to produce
+  // something; otherwise the fallback just eats the assembly window.
+  const fallbackCapMs = left >= minUseful ? Math.min(opts.fallbackCapMs, left) : 0;
+  return { skip: false, primaryCapMs, fallbackCapMs };
+}
+
 export function aiModelToProvider(aiModel: string | null | undefined): ModelProvider {
   // 2026-05-16 (CJ「剛剛的決定似乎不好」→ Option B, FINAL): Taiwan-only
   // product, no Chinese models (qwen/zhipu emit Simplified + mainland
@@ -1734,6 +1824,8 @@ async function genOneImage(
     subjectImageRequired?: boolean;
   },
   config: OrchestraConfig,
+  /** Epoch ms the whole task must be done by; undefined = no task budget. */
+  deadlineAt?: number,
 ): Promise<OrchestraVariant["image"]> {
   const prompt = args.style ?? ""; // returned as `style` — what the UI shows
   const source = (args.content || args.style || "").trim();
@@ -1807,6 +1899,9 @@ async function genOneImage(
     const opts = {
       prompt: promptNoText,
       aspectRatio: aspect,
+      // Lets the image-slot queue drop a request whose task has already run
+      // out of budget, instead of billing an image nobody will see.
+      ...(deadlineAt ? { deadlineAt } : {}),
       // 2026-09-01: quality is read only by the OpenAI and Azure adapters, and
       // forcing "high" made gpt-image-2 take 73.8s instead of 14.1s for a
       // SMALLER image — past the cap below, so every openai-pinned task fell
@@ -1860,7 +1955,27 @@ async function genOneImage(
     // 16–24s on the funded key, slower than a plain generation, and a tight cap
     // here means no product image at all rather than a slower one.
     const primaryModel = subjectMode ? "openai/gpt-image-2" : (config.imageModelOverride ?? "openai/gpt-image-2");
-    const primaryCapMs = subjectMode ? PER_IMAGE_MS : PRIMARY_IMAGE_CAP_MS;
+    const caps = imageCapsForRemaining(
+      deadlineAt ? deadlineAt - Date.now() : Number.POSITIVE_INFINITY,
+      {
+        primaryCapMs: subjectMode ? PER_IMAGE_MS : PRIMARY_IMAGE_CAP_MS,
+        fallbackCapMs: PER_IMAGE_MS,
+      },
+    );
+    if (caps.skip) {
+      return {
+        style: prompt,
+        prompt: modelPrompt,
+        promptZh: displayPromptZh,
+        modelId: null,
+        requestedModelId: primaryModel,
+        fallbackUsed: false,
+        url: null,
+        status: "skipped",
+        errorMsg: "任務預算已用盡，略過生圖（文案照常交付）",
+      };
+    }
+    const primaryCapMs = caps.primaryCapMs;
     let r;
     let fallbackUsed = false;
     try {
@@ -1884,10 +1999,25 @@ async function genOneImage(
       // the real product photo. That keeps the policy above intact (the product
       // stays real) while gpt-image-2 leads, instead of one OpenAI hiccup
       // leaving a product card with no image at all.
+      if (caps.fallbackCapMs <= 0) {
+        // No room left in the task budget for a second attempt — say so
+        // instead of starting one that will be cut mid-flight.
+        return {
+          style: prompt,
+          prompt: modelPrompt,
+          promptZh: displayPromptZh,
+          modelId: null,
+          requestedModelId: primaryModel,
+          fallbackUsed: false,
+          url: null,
+          status: "failed",
+          errorMsg: `${String(e?.message ?? e).slice(0, 160)}（預算不足，未再試備援）`,
+        };
+      }
       fallbackUsed = true;
       r = subjectMode
-        ? await tryModel("google/nano-banana", "google-nano-banana", PER_IMAGE_MS)
-        : await tryModel("piapi/flux-schnell", "piapi-flux-schnell", PER_IMAGE_MS);
+        ? await tryModel("google/nano-banana", "google-nano-banana", caps.fallbackCapMs)
+        : await tryModel("piapi/flux-schnell", "piapi-flux-schnell", caps.fallbackCapMs);
     }
     if (r.status === "ready" && r.url) {
       return {
@@ -2170,6 +2300,13 @@ export async function runOrchestra(args: {
   let persistedMissionId: number | null = null;
 
   // Wrap in 20s hard budget
+  // Mutable view of what has actually landed — read by the hard-budget branch
+  // below so a run that ran out of time still ships its finished work.
+  const progress: OrchestraProgress = { captions: [], images: [] };
+  // Image work must finish before the hard budget, with room left to assemble
+  // and persist the result — otherwise the images land in a run that reports
+  // nothing. 6s of headroom, measured against the same clock as tierBudget.
+  const imageDeadlineAt = startedAt + tierBudget - 6_000;
   const orchestra = (async (): Promise<OrchestraResult> => {
     // ── Stage 1: parallel pre-work (URL fetch, persona loads, brand) ──
     const stPre = stage("pre", "URL / persona / brand");
@@ -2484,6 +2621,8 @@ export async function runOrchestra(args: {
     }
     // expose brandFixes to caller via the return shape (attached lower)
     (captions as any).__brandFixes = brandFixes;
+    // 2026-09-22: hand the hard-budget branch something real to ship.
+    progress.captions = captions as OrchestraProgress["captions"];
 
     // ── EDM craft self-check: 7 維度產出後守門 (2026-05-17) ──
     // Email body tasks only. Cheap deterministic gate (spam-trigger
@@ -2804,11 +2943,13 @@ export async function runOrchestra(args: {
             brandIdentity,
             subjectImageUrl: productSubject.imageUrl,
             subjectImageRequired: productSubject.required,
-          }, args.config)))
+          }, args.config, imageDeadlineAt)))
       : briefs.length
         ? briefs.map((b) => ({ style: b, url: null, status: "skipped" as const }))
         : Array.from({ length: args.config.images }, () => ({ style: null, url: null, status: "skipped" as const }));
 
+    // 2026-09-22: hand the hard-budget branch the images that landed.
+    progress.images = images;
     if (stGen) {
       const ok = images.filter((i) => i.status === "ready").length;
       stGen.status = ok > 0 ? "done" : "failed";
@@ -2855,6 +2996,7 @@ export async function runOrchestra(args: {
                     subjectImageRequired: productSubject.required,
                   },
                   args.config,
+                  imageDeadlineAt,
                 )
               : Promise.resolve(null),
           ),
@@ -3056,6 +3198,7 @@ export async function runOrchestra(args: {
               subjectImageRequired: productSubject.required,
             },
             args.config,
+            imageDeadlineAt,
           )),
         );
         variants[0].cards = cardSpecs.map((c, idx) => ({
@@ -3235,22 +3378,15 @@ export async function runOrchestra(args: {
       orchestra,
       new Promise<OrchestraResult>((resolve) =>
         setTimeout(() => {
-          resolve({
+          resolve(buildBudgetExceededResult({
             taskId: args.template.id,
-            totalLatencyMs: tierBudget,
-            fetchedUrl: null,
-            captionAgent: null,
-            imageAgent: null,
-            variants: args.config.variantLabels.slice(0, args.config.variants).map((l) => ({
-              label: l,
-              caption: "",
-              hashtags: [],
-              image: { style: null, url: null, status: "timeout" },
-            })),
+            labels: args.config.variantLabels,
+            variantCount: args.config.variants,
+            tierBudgetMs: tierBudget,
+            progress,
             stages,
-            ok: false,
-            errors: [`orchestra: hard ${Math.round(tierBudget / 1000)}s budget exceeded`],
-          });
+            dedupe: deduplicateInternalCaption,
+          }));
         }, tierBudget),
       ),
     ]);

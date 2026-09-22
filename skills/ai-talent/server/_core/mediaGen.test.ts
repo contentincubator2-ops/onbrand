@@ -14,7 +14,7 @@ vi.mock("./imageFetch", () => ({
   fetchImageBuffer: fetchImageBufferMock,
 }));
 
-import { dispatchGenerate } from "./mediaGen";
+import { dispatchGenerate, imageSlotStats, withImageSlot } from "./mediaGen";
 
 describe("mediaGen image provider request contracts", () => {
   beforeEach(() => {
@@ -215,5 +215,54 @@ describe("mediaGen image provider request contracts", () => {
     })).rejects.toThrow(/unsupported reference image type text\/html/);
 
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+  // 2026-09-22 (CJ「請繼續做」): a 99s carousel fires 6–30 image requests at
+  // once. Unbounded, each one crawls past genOneImage's cap and the task dies
+  // at its hard budget; four at a time keeps every call in its fast range.
+  it("never runs more OpenAI image calls at once than the slot limit", async () => {
+    vi.stubEnv("OPENAI_IMAGE_CONCURRENCY", "2");
+    let running = 0;
+    let peak = 0;
+    const release: Array<() => void> = [];
+    const jobs = Array.from({ length: 5 }, () => withImageSlot(async () => {
+      running += 1;
+      peak = Math.max(peak, running);
+      await new Promise<void>((resolve) => release.push(resolve));
+      running -= 1;
+      return "done";
+    }));
+
+    // Let the first wave start, then drain one at a time.
+    await new Promise((r) => setTimeout(r, 0));
+    while (release.length) {
+      release.shift()!();
+      await new Promise((r) => setTimeout(r, 0));
+    }
+
+    await expect(Promise.all(jobs)).resolves.toHaveLength(5);
+    expect(peak).toBe(2);
+    expect(imageSlotStats()).toMatchObject({ active: 0, queued: 0 });
+  });
+
+  it("drops a queued image whose task already ran out of budget", async () => {
+    vi.stubEnv("OPENAI_IMAGE_CONCURRENCY", "1");
+    const ran: string[] = [];
+    let releaseFirst: () => void = () => {};
+    const first = withImageSlot(async () => {
+      ran.push("first");
+      await new Promise<void>((resolve) => { releaseFirst = resolve; });
+      return "first";
+    });
+    await new Promise((r) => setTimeout(r, 0));
+
+    // This one waits behind `first` with a deadline that has already passed.
+    const late = withImageSlot(async () => { ran.push("late"); return "late"; }, Date.now() - 1);
+    releaseFirst();
+
+    await expect(first).resolves.toBe("first");
+    await expect(late).rejects.toThrow(/outlived the task budget/);
+    // The point: no API call was made for the abandoned one.
+    expect(ran).toEqual(["first"]);
+    expect(imageSlotStats()).toMatchObject({ active: 0, queued: 0 });
   });
 });
