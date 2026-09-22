@@ -28,9 +28,13 @@ jobs:
   probe:
     runs-on: ubuntu-24.04
     environment: dev
-    timeout-minutes: 12
+    # 等待上限 15 分鐘 + 探針本身（--generate 約 1 分鐘），留足餘裕。
+    timeout-minutes: 30
     steps:
+      # 需要完整歷史才能比對這次推送動了哪些路徑（見下面那一步）。
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Read trigger options
         id: opts
@@ -38,6 +42,35 @@ jobs:
           flags="$(grep -oE '\-\-generate' ops/experthub-probe/TRIGGER 2>/dev/null | head -1 || true)"
           echo "flags=$flags" >> "$GITHUB_OUTPUT"
           echo "probe flags: ${flags:-none}"
+
+      # 2026-09-23 (CJ「探針等部署後再跑」)。
+      #
+      # 兩支工作流程共用 concurrency group，會排隊，但 GitHub 不保證誰先。實際
+      # 上探針搶先跑了兩次，量到的是上一個版本（12 個方案的那次回報 8 個），
+      # 每次都得再推一次空的 trigger 重跑。
+      #
+      # 判斷「這次推送有沒有同時觸發部署」不必查 API：deploy 的 paths-ignore 是
+      # ops/**，所以只要看這次推送有沒有動到 ops/ 以外的檔案就知道。
+      - name: Does this push also deploy?
+        id: gate
+        run: |
+          before="${{ github.event.before }}"
+          if [ -z "$before" ] || [ "$before" = "0000000000000000000000000000000000000000" ] \
+             || ! git cat-file -e "$before^{commit}" 2>/dev/null; then
+            # 算不出來就當成會部署 —— 等待本來就有上限，寧可多等也不要又量到舊版。
+            echo "deploys=yes" >> "$GITHUB_OUTPUT"
+            echo "can't resolve the previous commit; assuming a deploy is coming"
+            exit 0
+          fi
+          changed="$(git diff --name-only "$before" "${{ github.sha }}" | grep -v '^ops/' || true)"
+          if [ -n "$changed" ]; then
+            echo "deploys=yes" >> "$GITHUB_OUTPUT"
+            echo "this push touches code, so a deploy is running:"
+            printf '%s\n' "$changed" | head -10
+          else
+            echo "deploys=no" >> "$GITHUB_OUTPUT"
+            echo "ops-only push — nothing to wait for"
+          fi
 
       - name: Configure SSH
         env:
@@ -47,6 +80,27 @@ jobs:
           install -d -m 700 ~/.ssh
           printf '%s\n' "$VM_SSH_PRIVATE_KEY" > ~/.ssh/onbrand-dev && chmod 600 ~/.ssh/onbrand-dev
           printf '%s\n' "$VM_SSH_HOST_KEY" > ~/.ssh/known_hosts && chmod 600 ~/.ssh/known_hosts
+
+      # 等到 VM 上的 current 指向這一次的 commit 為止。比「睡個幾分鐘」精確：
+      # 它等的是這個版本真的上線，不是等一段猜出來的時間。
+      - name: Wait for this commit to be live
+        if: steps.gate.outputs.deploys == 'yes'
+        env:
+          VM_HOST: ${{ secrets.VM_HOST }}
+          VM_USER: ${{ secrets.VM_USER }}
+        run: |
+          for i in $(seq 1 60); do
+            live="$(ssh -i ~/.ssh/onbrand-dev -o ConnectTimeout=10 "$VM_USER@$VM_HOST" \
+                      'readlink -f /opt/onbrand-demo/current 2>/dev/null || true' | tr -d '\r')"
+            case "$live" in
+              *"${GITHUB_SHA}") echo "live after ${i} check(s): $live"; exit 0 ;;
+            esac
+            [ "$i" = 1 ] && echo "waiting for ${GITHUB_SHA:0:8}; currently live: ${live:-unknown}"
+            sleep 15
+          done
+          # 超時不當成失敗：部署可能真的壞了，那是 deploy 那支工作流程要回報的事。
+          # 但要把「我量的是哪一版」講清楚，不要讓結果看起來像是新版的。
+          echo "::warning::gave up waiting after 15 min — the probe below measured whatever release is live, not ${GITHUB_SHA:0:8}"
 
       - name: Probe the demo
         env:
