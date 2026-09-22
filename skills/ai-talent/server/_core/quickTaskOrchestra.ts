@@ -2745,6 +2745,67 @@ export async function runOrchestra(args: {
     }
     // expose brandFixes to caller via the return shape (attached lower)
     (captions as any).__brandFixes = brandFixes;
+
+    // ── Carousel cards, started here rather than after Stage 3.6 ────────
+    // 2026-09-22 (CJ「把卡片階段也改成『第一張卡就緒就開生』」): measured on
+    // prod, the card phase ran 47.8s → 104.6s of a 150s budget — ~57s, the
+    // single longest stretch of the run, and it was the part that got cut when
+    // the budget blew. It only ever needed ONE thing: variant 0's caption,
+    // which is brand-clean right here at ~20s. It used to wait for the whole
+    // variants loop (every variant image included) before even asking for the
+    // split. Note the split itself is one LLM call returning all N cards, so
+    // there is no earlier moment than "cards arrived" to start the images on.
+    const cardsN = args.config.cardsPerVariant ?? 0;
+    const eagerCards = cardsN > 1 && (captions?.[0]?.caption ?? "").trim()
+      ? (async () => {
+          try {
+            // 2026-08-01: yt-60-storyboard's primary input key is
+            // "topic_or_script", not "topic"/"context" — widen the fallback
+            // chain so the splitter still gets a topic line instead of blank.
+            const topic = (
+              args.inputs["topic"] ?? args.inputs["context"] ??
+              args.inputs["topic_or_script"] ?? args.inputs["topic_or_url"] ?? ""
+            ).trim();
+            const cardSpecs = await callCarouselCards({
+              // The variants loop applies its cosmetic passes later; dedupe is
+              // the one that changes what a splitter reads, so apply it here
+              // too and the cards stay in step with the delivered caption.
+              caption: deduplicateInternalCaption((captions[0]?.caption ?? "").trim()),
+              topic,
+              n: cardsN,
+              brandPrefix,
+              imagePersona: imageLoad.persona,
+              aspectRatio: args.config.aspectRatio ?? "1:1",
+              kind: args.config.cardsKind ?? "carousel",
+            });
+            const deps = await imageDeps;
+            const cardImages = await Promise.all(
+              cardSpecs.map((c) => genOneImage(
+                // Theater standard: each card's own text is the caption source.
+                // 2026-08-02 (CJ「產品圖似乎跟他原本的不同」): cards must carry
+                // the same subjectImageUrl wiring as the variant images, or
+                // every card invents its own product.
+                {
+                  content: `${c.headline}\n${c.body}`.trim(),
+                  style: c.imageBrief,
+                  platform: args.template.id.split("-")[0],
+                  palette: deps.palette,
+                  brandIdentity: deps.identity,
+                  subjectImageUrl: deps.subject.imageUrl,
+                  subjectImageRequired: deps.subject.required,
+                },
+                args.config,
+                imageDeadlineAt,
+              )),
+            );
+            return { cardSpecs, cardImages };
+          } catch (e: any) {
+            // Never reject: this promise is created eagerly and awaited much
+            // later, and an unhandled rejection is fatal in Node.
+            return { error: String(e?.message ?? e).slice(0, 160) } as const;
+          }
+        })()
+      : null;
     // 2026-09-22: hand the hard-budget branch something real to ship.
     progress.captions = captions as OrchestraProgress["captions"];
 
@@ -3265,49 +3326,18 @@ export async function runOrchestra(args: {
     // 2026-05-18 (CJ「carousel 一個貼文還是只出現一張圖」): when the task
     // is a multi-card deliverable, split the post into N cards and render
     // one image per card, attached to the (single) variant as cards[].
-    const cardsN = args.config.cardsPerVariant ?? 0;
-    if (cardsN > 1 && variants[0]?.caption) {
-      try {
-        // 2026-08-01: yt-60-storyboard's primary input key is
-        // "topic_or_script", not "topic"/"context" — widen the fallback
-        // chain so the splitter still gets a topic line instead of blank.
-        const topic = (
-          args.inputs["topic"] ?? args.inputs["context"] ??
-          args.inputs["topic_or_script"] ?? args.inputs["topic_or_url"] ?? ""
-        ).trim();
-        const cardSpecs = await callCarouselCards({
-          caption: variants[0].caption,
-          topic,
-          n: cardsN,
-          brandPrefix,
-          imagePersona: imageLoad.persona,
-          aspectRatio: args.config.aspectRatio ?? "1:1",
-          kind: args.config.cardsKind ?? "carousel",
-        });
-        const cardImages = await Promise.all(
-          cardSpecs.map((c) => genOneImage(
-            // Theater standard: each card's own text is the caption source.
-            // 2026-08-02 (CJ「產品圖似乎跟他原本的不同」): this block skipped
-            // the subjectImageUrl wiring Stage 3 already does above (line
-            // ~2382) — every card was pure text-to-image, so the model
-            // invented its own product instead of compositing the real one.
-            {
-              content: `${c.headline}\n${c.body}`.trim(),
-              style: c.imageBrief,
-              platform: args.template.id.split("-")[0],
-              palette: brandPalette,
-              brandIdentity,
-              subjectImageUrl: productSubject.imageUrl,
-              subjectImageRequired: productSubject.required,
-            },
-            args.config,
-            imageDeadlineAt,
-          )),
-        );
-        variants[0].cards = cardSpecs.map((c, idx) => ({
+    // The split and its images were started right after the brand pass; all
+    // that is left here is attaching them to the variant.
+    // Same guard as before: no caption, no cards.
+    if (eagerCards && variants[0]?.caption) {
+      const done = await eagerCards;
+      if ("error" in done) {
+        errors.push(`carousel cards: ${done.error}`);
+      } else {
+        variants[0].cards = done.cardSpecs.map((c, idx) => ({
           headline: c.headline,
           body: c.body,
-          image: cardImages[idx] ?? {
+          image: done.cardImages[idx] ?? {
             style: c.imageBrief,
             prompt: null,
             url: null,
@@ -3316,8 +3346,6 @@ export async function runOrchestra(args: {
         }));
         const okCards = (variants[0].cards ?? []).filter((c) => c.image.status === "ready").length;
         if (okCards === 0) errors.push("carousel: 卡片圖全部生成失敗");
-      } catch (e: any) {
-        errors.push(`carousel cards: ${String(e?.message ?? e).slice(0, 160)}`);
       }
     }
 
