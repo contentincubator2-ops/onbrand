@@ -251,6 +251,31 @@ async function main() {
     }
   }
 
+  // ── Brand assets (CJ 2026-09-22) ────────────────────────────────────────────
+  section("Brand assets");
+  try {
+    const { listBrandAssets, approvedDestinations, activeQuietPeriods } = await import("../server/strategy/core/hub/brandAssets");
+    const assets = await listBrandAssets(org.id);
+    const byKind: Record<string, number> = {};
+    for (const a of assets) byKind[a.kind] = (byKind[a.kind] ?? 0) + 1;
+    check(assets.length > 0, "brand assets seeded", JSON.stringify(byKind));
+
+    const dests = await approvedDestinations(org.id);
+    check(dests.length > 0, "approved destinations reach the writer", dests.map((d) => d.label).join(", "));
+    const badUrl = dests.filter((d) => !/^https?:\/\//.test(d.url)).map((d) => d.label);
+    check(badUrl.length === 0, "every destination is an absolute URL", badUrl.join(", "));
+
+    const quiet = await activeQuietPeriods(org.id);
+    check(quiet.length > 0, "a quiet period is in effect today", quiet.map((q2) => `${q2.label} ${q2.startsOn}->${q2.endsOn}`).join("; "));
+    const past = await activeQuietPeriods(org.id, "2020-01-01");
+    check(past.length === 0, "the same window is inactive on an old date", `${past.length} active`);
+
+    // 客戶白名單刻意留空 —— 編一筆就等於編造客戶關係。
+    check((byKind.customer ?? 0) === 0, "customer whitelist is deliberately empty", `${byKind.customer ?? 0} entries`);
+  } catch (e: any) {
+    bad("brand assets", e?.message ?? String(e));
+  }
+
   // ── 6. Tracked links ────────────────────────────────────────────────────────
   section("Tracked links");
   const repForLink = await getRep(reps[0].id);
