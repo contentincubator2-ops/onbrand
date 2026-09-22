@@ -152,7 +152,7 @@ ${KOL_TONE}`,
     postType: "generic",
     label: { en: "KOL: Start With Who Already Mentions You", zh: "KOL：先找已經在提你的人" },
     description: { en: "Catch the organic post first", zh: "接住自發內容，比開發新合作快" },
-    agent_id: 30015,              // 沿用同 postType 現役卡
+    agent_id: 30015, // 沿用同 postType 現役卡
     skill_slug: "kol-outreach",
     source: {
       type: "viral",
@@ -191,7 +191,7 @@ ${KOL_TONE}`,
     postType: "press",
     label: { en: "Kit: Make a Template Anyone Can Wear", zh: "KOL 素材包：做成人人套得上的模板" },
     description: { en: "Let creators put themselves in it", zh: "讓合作對象把自己放進去" },
-    agent_id: 220920,              // 沿用同 postType 現役卡
+    agent_id: 220920, // 沿用同 postType 現役卡
     skill_slug: "kol-outreach",
     source: {
       type: "viral",
@@ -229,22 +229,19 @@ ${KOL_TONE}`,
 export const KOL_30S_ORCHESTRA: Record<string, OrchestraConfig> = {
   "kl-30-invite-opener": {
     variants: 3, images: 0, runImageGen: false, imageDirectorId: 60030,
-    aspectRatio: "1:1", fluxSize: "square_hd", imageQualitySteps: 4,
-    variantLabels: ["真誠版", "互惠版", "新聞點切入版"],
+    aspectRatio: "1:1", variantLabels: ["真誠版", "互惠版", "新聞點切入版"],
     captionMinChars: 180, captionMaxChars: 320,
     extras: { replyTemplates: 0, postingTime: false, followupPost: false },
   },
   "kl-30-influencer-brief": {
     variants: 3, images: 0, runImageGen: false, imageDirectorId: 60030,
-    aspectRatio: "1:1", fluxSize: "square_hd", imageQualitySteps: 4,
-    variantLabels: ["完整正式版", "精簡重點版", "活動主題版"],
+    aspectRatio: "1:1", variantLabels: ["完整正式版", "精簡重點版", "活動主題版"],
     captionMinChars: 700, captionMaxChars: 3200,
     extras: { replyTemplates: 0, postingTime: false, followupPost: false },
   },
   "kl-30-followup": {
     variants: 3, images: 0, runImageGen: false, imageDirectorId: 60030,
-    aspectRatio: "1:1", fluxSize: "square_hd", imageQualitySteps: 4,
-    variantLabels: ["輕觸版", "推進版", "收尾版"],
+    aspectRatio: "1:1", variantLabels: ["輕觸版", "推進版", "收尾版"],
     captionMinChars: 60, captionMaxChars: 150,
     extras: { replyTemplates: 0, postingTime: false, followupPost: false },
   },
@@ -252,14 +249,12 @@ export const KOL_30S_ORCHESTRA: Record<string, OrchestraConfig> = {
   // ── 爆款結構卡 ────────────────────────────────────────────────────
   "kl-30-catch-organic-fan": {
     variants: 3, images: 0, runImageGen: false, imageDirectorId: null,
-    aspectRatio: null, fluxSize: null, imageQualitySteps: 0,
-    variantLabels: ["回禮版", "放大版", "長期版"],
+    aspectRatio: null, variantLabels: ["回禮版", "放大版", "長期版"],
     captionMinChars: 250, captionMaxChars: 550,
   },
   "kl-30-fan-template-kit": {
     variants: 3, images: 0, runImageGen: false, imageDirectorId: null,
-    aspectRatio: null, fluxSize: null, imageQualitySteps: 0,
-    variantLabels: ["模板版", "句型版", "濾鏡版"],
+    aspectRatio: null, variantLabels: ["模板版", "句型版", "濾鏡版"],
     captionMinChars: 300, captionMaxChars: 700,
   },
 };

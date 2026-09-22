@@ -297,8 +297,6 @@ const CLEAN = {
   captionMinChars: 200,
   captionMaxChars: 500,
   aspectRatio: "9:16" as const,
-  fluxSize: "portrait_9_16" as const,
-  imageQualitySteps: 4,
   runImageGen: true,
 };
 

@@ -167,7 +167,7 @@ ${LI_TONE}`,
     postType: "feed",
     label: { en: "Feed: Name What Your Stance Costs", zh: "LI 貼文：講出這個立場讓你少賺多少" },
     description: { en: "Prove the stance with what you gave up", zh: "用放棄的東西證明主張是真的" },
-    agent_id: 30018,              // 沿用同 postType 現役卡
+    agent_id: 30018, // 沿用同 postType 現役卡
     skill_slug: "linkedin-b2b",
     source: {
       type: "viral",
@@ -205,7 +205,7 @@ ${LI_TONE}`,
     postType: "article",
     label: { en: "Article: Publish the Post-Mortem", zh: "LI 長文：把出包寫成公開檢討" },
     description: { en: "Tell it before someone else does", zh: "錯誤自己講完，比被別人講完好" },
-    agent_id: 180172,              // 沿用同 postType 現役卡
+    agent_id: 180172, // 沿用同 postType 現役卡
     skill_slug: "thought-leadership",
     source: {
       type: "viral",
@@ -245,7 +245,7 @@ ${LI_TONE}`,
     postType: "document",
     label: { en: "Document: A Deck Made of Evidence", zh: "LI 文件：用實例組成的證據簡報" },
     description: { en: "One sample per page; reader draws the conclusion", zh: "每頁一個實例，結論留給讀者" },
-    agent_id: 220862,              // 沿用同 postType 現役卡
+    agent_id: 220862, // 沿用同 postType 現役卡
     skill_slug: "narrative-editor",
     source: {
       type: "viral",
@@ -284,7 +284,7 @@ ${LI_TONE}`,
     postType: "newsletter",
     label: { en: "Newsletter: Let Readers Recruit Readers", zh: "LI 電子報：讓訂閱者幫你招訂閱者" },
     description: { en: "Make forwarding worth something", zh: "把轉寄變成有回報的動作" },
-    agent_id: 180009,              // 沿用同 postType 現役卡
+    agent_id: 180009, // 沿用同 postType 現役卡
     skill_slug: "newsletter-editor",
     source: {
       type: "viral",
@@ -321,7 +321,7 @@ ${LI_TONE}`,
     postType: "poll",
     label: { en: "Poll: Put Something on the Line", zh: "LI 投票：開一個你願意兌現的條件" },
     description: { en: "The result obliges you to act", zh: "投票結果會讓你真的要做某件事" },
-    agent_id: 180173,              // 沿用同 postType 現役卡
+    agent_id: 180173, // 沿用同 postType 現役卡
     skill_slug: "linkedin-engagement",
     source: {
       type: "viral",
@@ -361,46 +361,41 @@ const LI_DIR_DAWN  = 220725; // Dawn Su — Decision Design Consultant
 const LI_DIR_GLEN  = 220729; // Glen Liu — Decision Design Consultant
 const LI_DIR_TONY  = 220728; // Tony Chiang — Decision Design Consultant
 export const LI_30S_ORCHESTRA: Record<string, OrchestraConfig> = {
-  "li-30-insight-post":   { variants: 3, images: 3, runImageGen: false, imageDirectorId: ZEYU_ID, aspectRatio: "1.91:1", fluxSize: "landscape_4_3", imageQualitySteps: 4, variantLabels: ["反共識", "數據驅動", "個人故事"], captionMinChars: 150, captionMaxChars: 350 },
-  "li-30-hook-3":         { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["反共識", "數據反差", "個人故事"], captionMinChars: 30, captionMaxChars: 80 },
-  "li-30-article-opener": { variants: 3, images: 3, runImageGen: false, imageDirectorId: LI_DIR_TODD, aspectRatio: "1.91:1", fluxSize: "landscape_4_3", imageQualitySteps: 4, variantLabels: ["場景式", "個人連結", "重點預告"], captionMinChars: 150, captionMaxChars: 300 },
-  "li-30-poll":           { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["策略選擇", "經驗分歧", "未來預測"], captionMinChars: 80, captionMaxChars: 200 },
-  "li-30-event-invite":   { variants: 3, images: 3, runImageGen: false, imageDirectorId: LI_DIR_DAWN, aspectRatio: "1.91:1", fluxSize: "landscape_4_3", imageQualitySteps: 4, variantLabels: ["專業敘述", "故事邀請", "稀缺感"], captionMinChars: 120, captionMaxChars: 300 },
-  "li-30-dm-intro":       { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["求教式", "共同點", "價值交換"], captionMinChars: 80, captionMaxChars: 150 },
-  "li-30-comment":        { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["補充經驗", "不同觀點", "提問擴展"], captionMinChars: 50, captionMaxChars: 150 },
-  "li-30-headline":       { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["職稱+價值", "結果型", "個性型"], captionMinChars: 30, captionMaxChars: 120 },
-  "li-30-newsletter":     { variants: 3, images: 3, runImageGen: false, imageDirectorId: LI_DIR_GLEN, aspectRatio: "1.91:1", fluxSize: "landscape_4_3", imageQualitySteps: 4, variantLabels: ["數據驅動", "故事性", "問題式"], captionMinChars: 150, captionMaxChars: 300 },
-  "li-30-document":       { variants: 3, images: 3, runImageGen: false, imageDirectorId: LI_DIR_TONY, aspectRatio: "1:1", fluxSize: "square_hd", imageQualitySteps: 4, variantLabels: ["教學清單型", "故事型", "反差型"], captionMinChars: 400, captionMaxChars: 1500 },
+  "li-30-insight-post":   { variants: 3, images: 3, runImageGen: false, imageDirectorId: ZEYU_ID, aspectRatio: "1.91:1",variantLabels: ["反共識", "數據驅動", "個人故事"], captionMinChars: 150, captionMaxChars: 350 },
+  "li-30-hook-3":         { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null,variantLabels: ["反共識", "數據反差", "個人故事"], captionMinChars: 30, captionMaxChars: 80 },
+  "li-30-article-opener": { variants: 3, images: 3, runImageGen: false, imageDirectorId: LI_DIR_TODD, aspectRatio: "1.91:1",variantLabels: ["場景式", "個人連結", "重點預告"], captionMinChars: 150, captionMaxChars: 300 },
+  "li-30-poll":           { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null,variantLabels: ["策略選擇", "經驗分歧", "未來預測"], captionMinChars: 80, captionMaxChars: 200 },
+  "li-30-event-invite":   { variants: 3, images: 3, runImageGen: false, imageDirectorId: LI_DIR_DAWN, aspectRatio: "1.91:1",variantLabels: ["專業敘述", "故事邀請", "稀缺感"], captionMinChars: 120, captionMaxChars: 300 },
+  "li-30-dm-intro":       { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null,variantLabels: ["求教式", "共同點", "價值交換"], captionMinChars: 80, captionMaxChars: 150 },
+  "li-30-comment":        { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null,variantLabels: ["補充經驗", "不同觀點", "提問擴展"], captionMinChars: 50, captionMaxChars: 150 },
+  "li-30-headline":       { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null,variantLabels: ["職稱+價值", "結果型", "個性型"], captionMinChars: 30, captionMaxChars: 120 },
+  "li-30-newsletter":     { variants: 3, images: 3, runImageGen: false, imageDirectorId: LI_DIR_GLEN, aspectRatio: "1.91:1",variantLabels: ["數據驅動", "故事性", "問題式"], captionMinChars: 150, captionMaxChars: 300 },
+  "li-30-document":       { variants: 3, images: 3, runImageGen: false, imageDirectorId: LI_DIR_TONY, aspectRatio: "1:1",variantLabels: ["教學清單型", "故事型", "反差型"], captionMinChars: 400, captionMaxChars: 1500 },
 
   // ── 爆款結構卡 ────────────────────────────────────────────────────
   "li-30-feed-cost-of-stance": {
     variants: 3, images: 0, runImageGen: false, imageDirectorId: null,
-    aspectRatio: null, fluxSize: null, imageQualitySteps: 0,
-    variantLabels: ["數字版", "故事版", "拒絕清單版"],
+    aspectRatio: null, variantLabels: ["數字版", "故事版", "拒絕清單版"],
     captionMinChars: 250, captionMaxChars: 550,
   },
   "li-30-article-own-the-failure": {
     variants: 3, images: 0, runImageGen: false, imageDirectorId: null,
-    aspectRatio: null, fluxSize: null, imageQualitySteps: 0,
-    variantLabels: ["時間軸版", "根因版", "賠償版"],
+    aspectRatio: null, variantLabels: ["時間軸版", "根因版", "賠償版"],
     captionMinChars: 600, captionMaxChars: 1200,
   },
   "li-30-document-proof-deck": {
     variants: 3, images: 0, runImageGen: false, imageDirectorId: null,
-    aspectRatio: null, fluxSize: null, imageQualitySteps: 0,
-    variantLabels: ["樣本版", "對照版", "時間序版"],
+    aspectRatio: null, variantLabels: ["樣本版", "對照版", "時間序版"],
     captionMinChars: 350, captionMaxChars: 800,
   },
   "li-30-newsletter-referral-loop": {
     variants: 3, images: 0, runImageGen: false, imageDirectorId: null,
-    aspectRatio: null, fluxSize: null, imageQualitySteps: 0,
-    variantLabels: ["轉寄誘因版", "專屬解鎖版", "共同署名版"],
+    aspectRatio: null, variantLabels: ["轉寄誘因版", "專屬解鎖版", "共同署名版"],
     captionMinChars: 350, captionMaxChars: 750,
   },
   "li-30-poll-public-wager": {
     variants: 3, images: 0, runImageGen: false, imageDirectorId: null,
-    aspectRatio: null, fluxSize: null, imageQualitySteps: 0,
-    variantLabels: ["門檻版", "二選一版", "公開挑戰版"],
+    aspectRatio: null, variantLabels: ["門檻版", "二選一版", "公開挑戰版"],
     captionMinChars: 100, captionMaxChars: 260,
   },
 };

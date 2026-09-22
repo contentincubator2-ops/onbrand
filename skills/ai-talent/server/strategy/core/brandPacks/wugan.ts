@@ -208,8 +208,7 @@ function card(
 function textConfig(labels: string[], min: number, max: number): OrchestraConfig {
   return {
     variants: labels.length, images: 0, runImageGen: false, imageDirectorId: null,
-    aspectRatio: null, fluxSize: null, imageQualitySteps: 0,
-    variantLabels: labels, captionMinChars: min, captionMaxChars: max,
+    aspectRatio: null, variantLabels: labels, captionMinChars: min, captionMaxChars: max,
   };
 }
 

@@ -199,7 +199,7 @@ export const FB_30S_TASKS: FBTaskTemplate[] = [
     postType: "feed",
     label: { en: "FB Short Post", zh: "FB 短貼文" },
     description: { en: "100-200-word post with an opening hook + CTA", zh: "100-200 字圖文貼文，含開場吸引句 + 行動呼籲" },
-    agent_id: 30020,              // Iris Yi — Social Media Manager (2001 char persona)
+    agent_id: 30020, // Iris Yi — Social Media Manager (2001 char persona)
     skill_slug: "fb-copywriting",
     primary_question: "今天這篇貼文要講什麼？可以貼網址（會自動讀取）、原文、或主題描述",
     primary_input: { key: "topic", placeholder: "例：https://your-blog.com/article  /  春季新品上市  /  母親節活動", type: "textarea" },
@@ -220,7 +220,7 @@ ${FB_TONE_SUFFIX}
     postType: "feed",
     label: { en: "FB Text-Only Openers ×3", zh: "FB 純文字開場句 3 種" },
     description: { en: "3 openers in different voices, spliced onto your existing draft", zh: "3 種不同口吻的開場句，自動接上你原本的貼文內容" },
-    agent_id: 224079,             // Kavitha Nair — Social Media Strategist (1191 char)
+    agent_id: 224079, // Kavitha Nair — Social Media Strategist (1191 char)
     skill_slug: "hook-writing",
     primary_question: "貼上你原本要發的貼文 / 文章內容，我會幫你寫 5 種不同口吻的開場接上去",
     primary_input: { key: "article_body", placeholder: "貼上完整的貼文內文（hook 會接在最前面）", type: "textarea" },
@@ -254,7 +254,7 @@ ${FB_TONE_SUFFIX}`,
     postType: "feed",
     label: { en: "FB Link Post", zh: "FB 連結貼文" },
     description: { en: "Intro copy for link shares (with OG-preview anticipation)", zh: "分享網址時的引言文（含 OG 預覽期待）" },
-    agent_id: 60021,              // Tina Ji — Facebook/Instagram Social Copywriter
+    agent_id: 60021, // Tina Ji — Facebook/Instagram Social Copywriter
     skill_slug: "social-copy",
     primary_question: "貼上你要分享的連結網址",
     primary_input: { key: "url", placeholder: "https://...", type: "text" },
@@ -275,7 +275,7 @@ ${FB_TONE_SUFFIX}`,
     postType: "comment",
     label: { en: "FB Comment Reply (General)", zh: "FB 留言回覆（一般）" },
     description: { en: "On-brand replies to positive / neutral comments", zh: "正面 / 中性留言的品牌回覆" },
-    agent_id: 180162,             // Jason Peng | Social Media Copywriter
+    agent_id: 180162, // Jason Peng | Social Media Copywriter
     skill_slug: "social-copy",
     primary_question: "貼上原始用戶留言，或留言所在的貼文連結",
     primary_input: { key: "user_comment", placeholder: "用戶說了什麼？整段留言貼進來", type: "textarea" },
@@ -302,7 +302,7 @@ output: caption 放回覆文，description 放原始用戶留言（用於 mockup
     adFormats: ["image", "video", "carousel", "collection"],
 
     description: { en: "5 ad headlines from different angles (under 25 chars) — paste straight into Ads Manager", zh: "5 種切角的廣告標題（25 字內），直接複製到 Ads Manager 用" },
-    agent_id: 239023,             // Ellis Yeh — VP Breakthrough Advertising（Eugene Schwartz headline 大師）
+    agent_id: 239023, // Ellis Yeh — VP Breakthrough Advertising（Eugene Schwartz headline 大師）
     skill_slug: "fb-ad-copy",
     primary_question: "這檔廣告主推什麼？產品 / 賣點 / 受眾簡述",
     primary_input: { key: "product_focus", placeholder: "例：母親節健力餐高蛋白系列，給沒時間煮飯的職業媽媽", type: "textarea" },
@@ -333,7 +333,7 @@ caption 欄位就放這「一個」headline 本身，不要解釋、不要前綴
     adFormats: ["image", "video", "carousel", "collection"],
 
     description: { en: "5 primary texts in different voices (80-150 words) for different audience psychologies", zh: "5 種口吻的廣告主要文字（80-150 字），對應不同受眾心理" },
-    agent_id: 224114,             // Bùi Thị Thu — Social Media Strategist eCommerce (1160 char)
+    agent_id: 224114, // Bùi Thị Thu — Social Media Strategist eCommerce (1160 char)
     skill_slug: "fb-ad-copy",
     primary_question: "這檔廣告的主題 / 產品 / 受眾？",
     primary_input: { key: "topic", placeholder: "例：健力餐母親節組合，職業媽媽 35-50 歲", type: "textarea" },
@@ -364,7 +364,7 @@ caption 欄位就放這「一個」primary text 本身，不要編號、不要�
     adFormats: ["image", "video", "carousel", "collection"],
 
     description: { en: "5 CTA button texts + when to use each", zh: "5 個 CTA 按鈕文字 + 每個 CTA 的搭配情境建議" },
-    agent_id: 239024,             // Emerson Huang — VP Customer Value Optimization（funnel CTA）
+    agent_id: 239024, // Emerson Huang — VP Customer Value Optimization（funnel CTA）
     skill_slug: "fb-ad-copy",
     // 2026-05-18 (CJ「只給一個但承諾五個 + 需要產品與動作才寫得有意義」):
     // variants 1→5 (one CTA per variant). 30s 表單只送一個 input → 用單
@@ -396,7 +396,7 @@ caption 欄位就放這「一個」primary text 本身，不要編號、不要�
     adFormats: ["image", "video", "carousel"],
 
     description: { en: "Link-ad description (under 30 chars), 5 angles", zh: "連結廣告的「說明」欄（30 字內），5 種切入角度" },
-    agent_id: 224054,             // Mei Xin Ho — Social Media Strategist Health SG (1148 char)
+    agent_id: 224054, // Mei Xin Ho — Social Media Strategist Health SG (1148 char)
     skill_slug: "fb-ad-copy",
     primary_question: "連結要導向哪？產品頁 / 活動頁 / 文章 / app 下載？",
     primary_input: { key: "link_purpose", placeholder: "例：導到健力餐 14 包組合產品頁", type: "textarea" },
@@ -421,7 +421,7 @@ caption 欄位就放這「一個」primary text 本身，不要編號、不要�
     postType: "pinned",
     label: { en: "FB Pinned-Post Short Copy", zh: "FB 置頂貼文短文案" },
     description: { en: "Pinned-post copy: who we are + why follow us", zh: "粉專置頂用，講清楚「我們是誰」「為什麼追蹤」" },
-    agent_id: 60024,             // Jason Gong | Tech Brand Social Copywriter
+    agent_id: 60024, // Jason Gong | Tech Brand Social Copywriter
     skill_slug: "fb-copywriting",
     primary_question: "想讓第一次來粉專的人，3 秒內知道你做什麼？",
     primary_input: { key: "brand_focus", placeholder: "我們是誰、做什麼、為什麼值得追蹤", type: "textarea" },
@@ -442,7 +442,7 @@ caption 欄位就放這「一個」primary text 本身，不要編號、不要�
     postType: "story",
     label: { en: "FB Story Copy", zh: "FB 限時動態文案" },
     description: { en: "9:16 ephemeral copy + overlay headline", zh: "9:16 ephemeral 配文 + overlay 主標" },
-    agent_id: 30002,              // Sarah Liu — AI Brand Story CMO
+    agent_id: 30002, // Sarah Liu — AI Brand Story CMO
     skill_slug: "fb-copywriting",
     primary_question: "今天的 Story 想說什麼？",
     primary_input: { key: "topic", placeholder: "例：幕後花絮 / 限時優惠 / 提問 sticker", type: "textarea" },
@@ -468,7 +468,7 @@ caption 欄位就放這「一個」primary text 本身，不要編號、不要�
     postType: "feed", // pre-live announcement post is feed-shaped
     label: { en: "FB Live Title + Teaser", zh: "FB 直播標題 + 預告短文" },
     description: { en: "Teaser caption for 1-2 hours before going live", zh: "直播開始前 1-2 小時的預告 caption" },
-    agent_id: 180150,             // Brian Lin — Influencer Marketing Manager (live promotion expert)
+    agent_id: 180150, // Brian Lin — Influencer Marketing Manager (live promotion expert)
     skill_slug: "social-copy",
     // 2026-05-18 (CJ「直播一開始的問題，是否也要提示要提供直播時間」):
     // 30s 表單只送單一 primary input，原本 inputs[] 的 live_time 永遠
@@ -499,7 +499,7 @@ output: title 放 8-15 字直播標題（具體有 hook，不要 "今晚直播"�
     postType: "feed",
     label: { en: "FB Hashtag Set", zh: "FB 主題標籤建議組" },
     description: { en: "10-15 tiered hashtags (core / mid / long-tail)", zh: "10-15 個分層 hashtag（核心 / 中型 / 長尾）" },
-    agent_id: 220583,             // Hsin-Yi Weng — IG/FB Marketing Specialist（hashtag 在地化）
+    agent_id: 220583, // Hsin-Yi Weng — IG/FB Marketing Specialist（hashtag 在地化）
     skill_slug: "fb-best-practices",
     primary_question: "貼文主題或品牌產業是？",
     primary_input: { key: "topic", placeholder: "例：手沖咖啡 / B2B SaaS / 母嬰用品", type: "textarea" },
@@ -528,7 +528,7 @@ caption 直接列出這 10-15 個 hashtag 本身（每個 # 前綴 + 空格分�
     postType: "feed",
     label: { en: "FB Event-Countdown Hype Line", zh: "FB 活動倒數一句造勢" },
     description: { en: "A single N-days-left countdown post (one in a series)", zh: "倒數 N 天的單篇推文（系列中的一篇）" },
-    agent_id: 180159,             // Claire Hsu — fb-countdown-series lead
+    agent_id: 180159, // Claire Hsu — fb-countdown-series lead
     skill_slug: "social-media-manager",
     // 2026-05-10 (CJ audit B-01 fix): 原本 inputs 有 2 個 required 欄位
     // (event_name + days_left)，但 UI 只 render primary_input 那一個 →
@@ -561,7 +561,7 @@ caption 直接列出這 10-15 個 hashtag 本身（每個 # 前綴 + 空格分�
     adFormats: ["video"],
 
     description: { en: "Opens with your own worst review", zh: "用自家最常被嫌的那一點開場" },
-    agent_id: 224114,              // Ivy Kuo — FB Ad Copy
+    agent_id: 224114, // Ivy Kuo — FB Ad Copy
     skill_slug: "fb-ad-copy",
     source: {
       type: "viral",
@@ -599,7 +599,7 @@ caption 直接列出這 10-15 個 hashtag 本身（每個 # 前綴 + 空格分�
     postType: "reel",
     label: { en: "Reel: Act Out the Bad Review", zh: "FB Reels：把負評演出來" },
     description: { en: "Short-video script built from real complaints", zh: "拿客訴原句當台詞的短影音腳本" },
-    agent_id: 60033,              // 沿用短影音腳本 agent
+    agent_id: 60033, // 沿用短影音腳本 agent
     skill_slug: "short-video-script",
     source: {
       type: "viral",
@@ -636,7 +636,7 @@ caption 直接列出這 10-15 個 hashtag 本身（每個 # 前綴 + 空格分�
     postType: "carousel",
     label: { en: "Carousel: Data as a Shareable Scorecard", zh: "FB 多卡：把數據變成想分享的成績單" },
     description: { en: "One number per card, last card is the flex", zh: "一張卡一個數字，最後一張讓人想貼出去" },
-    agent_id: 180148,              // 沿用 fb-99-carousel-5 的 agent
+    agent_id: 180148, // 沿用 fb-99-carousel-5 的 agent
     skill_slug: "social-copy",
     source: {
       type: "viral",
@@ -674,7 +674,7 @@ caption 直接列出這 10-15 個 hashtag 本身（每個 # 前綴 + 空格分�
     postType: "album",
     label: { en: "Album: Period Recap Set", zh: "FB 相簿：一段期間的回顧圖組" },
     description: { en: "Each image stands alone; together they are proof", zh: "每張各自成立，整組是一段時間的證據" },
-    agent_id: 60068,              // 沿用 fb-60-album-4 的 agent
+    agent_id: 60068, // 沿用 fb-60-album-4 的 agent
     skill_slug: "social-copy",
     source: {
       type: "viral",
@@ -711,7 +711,7 @@ caption 直接列出這 10-15 個 hashtag 本身（每個 # 前綴 + 空格分�
     postType: "story",
     label: { en: "Story: Serialise One Event", zh: "FB 限時動態：把一件事拆成連續劇" },
     description: { en: "Each frame leaves an unanswered question", zh: "每則留一個過夜的問題" },
-    agent_id: 30002,              // Sarah Liu — AI Brand Story CMO
+    agent_id: 30002, // Sarah Liu — AI Brand Story CMO
     skill_slug: "fb-copywriting",
     source: {
       type: "viral",
@@ -748,7 +748,7 @@ caption 直接列出這 10-15 個 hashtag 本身（每個 # 前綴 + 空格分�
     postType: "pinned",
     label: { en: "Pinned: Brand Stance", zh: "FB 置頂：品牌立場宣言" },
     description: { en: "The line you are willing to pay for", zh: "願意付代價的那一句話" },
-    agent_id: 60024,              // 沿用 fb-30-pinned-short 的 agent
+    agent_id: 60024, // 沿用 fb-30-pinned-short 的 agent
     skill_slug: "fb-copywriting",
     source: {
       type: "viral",
@@ -786,7 +786,7 @@ caption 直接列出這 10-15 個 hashtag 本身（每個 # 前綴 + 空格分�
     postType: "comment",
     label: { en: "Comment: Turn One Reply Into an Event", zh: "FB 留言：把一則留言變成事件" },
     description: { en: "Give the commenter a challenge others join", zh: "給留言者一個大家想加入的挑戰" },
-    agent_id: 180162,              // 沿用 fb-30-comment-reply 的 agent
+    agent_id: 180162, // 沿用 fb-30-comment-reply 的 agent
     skill_slug: "social-copy",
     source: {
       type: "viral",
@@ -824,7 +824,7 @@ caption 直接列出這 10-15 個 hashtag 本身（每個 # 前綴 + 空格分�
     postType: "event",
     label: { en: "Event: Participation Challenge", zh: "FB 活動：參與式挑戰貼文" },
     description: { en: "Learn it in 10s, look good doing it", zh: "動作要 10 秒學得會、拍起來有面子" },
-    agent_id: 30016,              // 沿用 fb-60-launch-kit 的 agent
+    agent_id: 30016, // 沿用 fb-60-launch-kit 的 agent
     skill_slug: "fb-copywriting",
     source: {
       type: "viral",
@@ -867,13 +867,17 @@ caption 直接列出這 10-15 個 hashtag 本身（每個 # 前綴 + 空格分�
 //   - variants:           how many caption deliverables (3 or 5)
 //   - images:             how many real-generated images (0, 1, or 5)
 //   - imageDirectorId:    agent that writes the visual briefs (null = no images)
-//   - aspectRatio:        Flux Schnell aspect ratio
-//   - fluxSize:           explicit pixel size for the image_size param
-//   - imageQualitySteps:  inference steps (4 = fast, 8 = higher quality for 釘選)
+//   - aspectRatio:        image aspect ratio (fed to genOneImage / gpt-image-2)
 //   - variantLabels:      口吻 names — drives the LLM's variant slots + UI chips
 //
 // Tasks not listed (4, 5, 9 — 留言/客訴/hashtag) need no image gen — orchestra
 // just runs caption_writer and skips image_director entirely.
+//
+// 2026-09-22: `fluxSize` (Flux's own pixel-size enum) and `imageQualitySteps`
+// (Flux's inference-step count) were dropped from here — dead fields once the
+// image policy became gpt-image-2 / Nano Banana only (see stillImageModels.ts,
+// variantAngles.ts); nothing has read them since. `aspectRatio` is the only
+// size hint genOneImage still uses.
 
 export interface OrchestraConfig {
   variants: number;
@@ -883,16 +887,25 @@ export interface OrchestraConfig {
    * 2026-05-05 (CJ direction): 30s tier returns style direction text only,
    * no real image generation. The "用此風格生圖" button below each variant
    * lets the user opt into MediaGenFlow when they actually want a render.
-   * - false → image_director writes briefs, Flux is NOT called (default 30s)
-   * - true  → image_director writes briefs + Flux Schnell renders them
+   * - false → image_director writes briefs, no image model is called (default 30s)
+   * - true  → image_director writes briefs + gpt-image-2 renders them
    *
    * 60s tier auto-overrides this to true (real images = key differentiator).
    */
   runImageGen: boolean;
   imageDirectorId: number | null;
   aspectRatio: "1:1" | "1.91:1" | "9:16" | "16:9" | null;
-  fluxSize: "square_hd" | "landscape_4_3" | "portrait_9_16" | "landscape_16_9" | null;
-  imageQualitySteps: number; // Flux Schnell: 4 default, 8 for higher quality
+  /**
+   * 2026-09-22 (CJ「不應該將所有產品都規定為情感版、理性版還有數據版……香氛產品用數據版，好奇怪」):
+   * a small number of GENERIC, apply-to-any-product tasks (fb-30-caption-short 等) hard-assigned the
+   * same three names to every brand regardless of fit — a fragrance forced into 數據版 has to invent
+   * a number just to obey the label. When true, `variantLabels` becomes a FALLBACK only (used if the
+   * model doesn't return a usable one): each variant's own LLM call decides its own angle for THIS
+   * product/topic and reports it back (see pickOwnAngleBlock in variantAngles.ts). Tasks with
+   * task-specific labels (e.g. 「反問式/數字式/反差式」, already defined by their own systemPrompt) are
+   * unaffected either way — leave this unset/false for them.
+   */
+  pickOwnAngle?: boolean;
   /**
    * 2026-08-29：這張卡的 caption 生成逾時上限（毫秒）。不給就用 orchestra
    * 的預設 40s。
@@ -1068,8 +1081,10 @@ export const FB_30S_ORCHESTRA: Record<string, OrchestraConfig> = {
     runImageGen: false,
     imageDirectorId: MANDY_ID,
     aspectRatio: "1:1",
-    fluxSize: "square_hd",
-    imageQualitySteps: 4,
+    // 2026-09-22 (CJ「香氛產品用數據版，好奇怪」): this generic "FB 短貼文" card applies to every
+    // brand/product, so the angle is no longer pre-assigned — see OrchestraConfig.pickOwnAngle.
+    // variantLabels stays only as the fallback if a call doesn't return a usable self-chosen label.
+    pickOwnAngle: true,
     variantLabels: ["情感版", "理性版", "數據版"],
     captionMinChars: 100,
     captionMaxChars: 200,
@@ -1080,8 +1095,6 @@ export const FB_30S_ORCHESTRA: Record<string, OrchestraConfig> = {
     runImageGen: false,
     imageDirectorId: RITA_ID,
     aspectRatio: "1.91:1",
-    fluxSize: "landscape_4_3",
-    imageQualitySteps: 4,
     variantLabels: ["反問式", "數字式", "反差式"],
     // 2026-05-18: now a full post (hook + cleaned body), not a 60-char hook.
     captionMinChars: 150,
@@ -1093,8 +1106,6 @@ export const FB_30S_ORCHESTRA: Record<string, OrchestraConfig> = {
     runImageGen: false,
     imageDirectorId: KAREN_ID,
     aspectRatio: "1.91:1",
-    fluxSize: "landscape_4_3",
-    imageQualitySteps: 4,
     variantLabels: ["資訊式", "故事式", "問題式"],
     captionMinChars: 80,
     captionMaxChars: 150,
@@ -1105,8 +1116,6 @@ export const FB_30S_ORCHESTRA: Record<string, OrchestraConfig> = {
     runImageGen: false,
     imageDirectorId: null,
     aspectRatio: null,
-    fluxSize: null,
-    imageQualitySteps: 0,
     variantLabels: ["溫暖式", "專業式", "反問式"],
     captionMinChars: 30,
     captionMaxChars: 80,
@@ -1119,8 +1128,6 @@ export const FB_30S_ORCHESTRA: Record<string, OrchestraConfig> = {
     runImageGen: false,
     imageDirectorId: null,
     aspectRatio: null,
-    fluxSize: null,
-    imageQualitySteps: 0,
     variantLabels: ["痛點挑戰", "數據驚奇", "反問引發", "情境共鳴", "結果承諾"],
     captionMinChars: 6,
     captionMaxChars: 30,
@@ -1131,8 +1138,6 @@ export const FB_30S_ORCHESTRA: Record<string, OrchestraConfig> = {
     runImageGen: false,
     imageDirectorId: null,
     aspectRatio: null,
-    fluxSize: null,
-    imageQualitySteps: 0,
     variantLabels: ["故事式", "數據式", "反差式", "見證式", "簡短直球"],
     captionMinChars: 60,
     captionMaxChars: 220,
@@ -1143,8 +1148,6 @@ export const FB_30S_ORCHESTRA: Record<string, OrchestraConfig> = {
     runImageGen: false,
     imageDirectorId: null,
     aspectRatio: null,
-    fluxSize: null,
-    imageQualitySteps: 0,
     variantLabels: ["急迫感", "利益強調", "軟性邀請", "對話感", "直接動作"],
     captionMinChars: 6,
     captionMaxChars: 90,
@@ -1155,8 +1158,6 @@ export const FB_30S_ORCHESTRA: Record<string, OrchestraConfig> = {
     runImageGen: false,
     imageDirectorId: null,
     aspectRatio: null,
-    fluxSize: null,
-    imageQualitySteps: 0,
     variantLabels: ["數據", "利益強調", "信任強化", "急迫感", "簡短直白"],
     captionMinChars: 6,
     captionMaxChars: 40,
@@ -1167,8 +1168,6 @@ export const FB_30S_ORCHESTRA: Record<string, OrchestraConfig> = {
     runImageGen: false,
     imageDirectorId: ANGEL_ID,
     aspectRatio: "1.91:1",
-    fluxSize: "landscape_4_3",
-    imageQualitySteps: 8,
     variantLabels: ["功能訴求", "情感訴求", "故事訴求"],
     captionMinChars: 150,
     captionMaxChars: 250,
@@ -1179,8 +1178,6 @@ export const FB_30S_ORCHESTRA: Record<string, OrchestraConfig> = {
     runImageGen: false,
     imageDirectorId: OWEN_ID,
     aspectRatio: "9:16",
-    fluxSize: "portrait_9_16",
-    imageQualitySteps: 4,
     variantLabels: ["驚喜式", "親密式", "教學式"],
     captionMinChars: 30,
     captionMaxChars: 60,
@@ -1191,8 +1188,6 @@ export const FB_30S_ORCHESTRA: Record<string, OrchestraConfig> = {
     runImageGen: false,
     imageDirectorId: YUTING_ID,
     aspectRatio: "16:9",
-    fluxSize: "landscape_16_9",
-    imageQualitySteps: 4,
     variantLabels: ["懸念式", "數據式", "直球式"],
     captionMinChars: 8,
     captionMaxChars: 25,
@@ -1203,8 +1198,6 @@ export const FB_30S_ORCHESTRA: Record<string, OrchestraConfig> = {
     runImageGen: false,
     imageDirectorId: null,
     aspectRatio: null,
-    fluxSize: null,
-    imageQualitySteps: 0,
     variantLabels: ["曝光導向 (20)", "品牌導向 (8)", "利基導向 (12)"],
     captionMinChars: 0,
     captionMaxChars: 600,
@@ -1215,8 +1208,6 @@ export const FB_30S_ORCHESTRA: Record<string, OrchestraConfig> = {
     runImageGen: false,
     imageDirectorId: JAKE_ID,
     aspectRatio: "1:1",
-    fluxSize: "square_hd",
-    imageQualitySteps: 4,
     variantLabels: ["焦慮式", "FOMO式", "期待式"],
     captionMinChars: 60,
     captionMaxChars: 120,
@@ -1229,8 +1220,6 @@ export const FB_30S_ORCHESTRA: Record<string, OrchestraConfig> = {
     runImageGen: false,
     imageDirectorId: MANDY_ID,
     aspectRatio: "1.91:1",
-    fluxSize: "landscape_4_3",
-    imageQualitySteps: 4,
     variantLabels: ["自嘲開場", "反話術開場", "老闆親上陣"],
     captionMinChars: 150,
     captionMaxChars: 350,
@@ -1241,8 +1230,6 @@ export const FB_30S_ORCHESTRA: Record<string, OrchestraConfig> = {
     runImageGen: false,
     imageDirectorId: MANDY_ID,
     aspectRatio: "9:16",
-    fluxSize: "portrait_9_16",
-    imageQualitySteps: 4,
     variantLabels: ["直接照念", "誇張演出", "反問觀眾"],
     captionMinChars: 100,
     captionMaxChars: 250,
@@ -1253,8 +1240,6 @@ export const FB_30S_ORCHESTRA: Record<string, OrchestraConfig> = {
     runImageGen: false,
     imageDirectorId: MANDY_ID,
     aspectRatio: "1:1",
-    fluxSize: "square_hd",
-    imageQualitySteps: 4,
     variantLabels: ["成就感版", "反差版", "排名版"],
     captionMinChars: 200,
     captionMaxChars: 450,
@@ -1265,8 +1250,6 @@ export const FB_30S_ORCHESTRA: Record<string, OrchestraConfig> = {
     runImageGen: false,
     imageDirectorId: MANDY_ID,
     aspectRatio: "1:1",
-    fluxSize: "square_hd",
-    imageQualitySteps: 4,
     variantLabels: ["時序版", "主題版", "人物版"],
     captionMinChars: 200,
     captionMaxChars: 400,
@@ -1277,8 +1260,6 @@ export const FB_30S_ORCHESTRA: Record<string, OrchestraConfig> = {
     runImageGen: false,
     imageDirectorId: MANDY_ID,
     aspectRatio: "9:16",
-    fluxSize: "portrait_9_16",
-    imageQualitySteps: 4,
     variantLabels: ["懸念版", "倒數版", "共同決定版"],
     captionMinChars: 150,
     captionMaxChars: 320,
@@ -1289,8 +1270,6 @@ export const FB_30S_ORCHESTRA: Record<string, OrchestraConfig> = {
     runImageGen: false,
     imageDirectorId: MANDY_ID,
     aspectRatio: "1.91:1",
-    fluxSize: "landscape_4_3",
-    imageQualitySteps: 4,
     variantLabels: ["宣言版", "拒絕版", "承諾版"],
     captionMinChars: 180,
     captionMaxChars: 350,
@@ -1301,8 +1280,6 @@ export const FB_30S_ORCHESTRA: Record<string, OrchestraConfig> = {
     runImageGen: false,
     imageDirectorId: MANDY_ID,
     aspectRatio: "1:1",
-    fluxSize: "square_hd",
-    imageQualitySteps: 4,
     variantLabels: ["開條件版", "抬價版", "拉旁人版"],
     captionMinChars: 40,
     captionMaxChars: 120,
@@ -1313,8 +1290,6 @@ export const FB_30S_ORCHESTRA: Record<string, OrchestraConfig> = {
     runImageGen: false,
     imageDirectorId: MANDY_ID,
     aspectRatio: "1.91:1",
-    fluxSize: "landscape_4_3",
-    imageQualitySteps: 4,
     variantLabels: ["指名接力版", "曬成果版", "限時共創版"],
     captionMinChars: 200,
     captionMaxChars: 400,

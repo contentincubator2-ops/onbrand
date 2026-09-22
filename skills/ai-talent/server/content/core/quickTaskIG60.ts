@@ -473,26 +473,25 @@ ${IG_TONE}`,
 // ─── Orchestra configs ──────────────────────────────────────────────────────
 
 export const IG_60S_ORCHESTRA: Record<string, OrchestraConfig> = {
+  // 2026-09-22 (CJ「香氛產品用數據版，好奇怪」): generic post-for-any-product card — angle is no
+  // longer pre-assigned, see OrchestraConfig.pickOwnAngle. variantLabels is the fallback only.
   "ig-60-feed-full": {
-    variants: 5, images: 5, runImageGen: true, imageDirectorId: NANCY,
-    aspectRatio: "1:1", fluxSize: "square_hd", imageQualitySteps: 4,
-    variantLabels: ["情感版", "理性版", "故事版", "數據版", "懸念版"],
+    variants: 5, images: 5, runImageGen: true, imageDirectorId: NANCY, pickOwnAngle: true,
+    aspectRatio: "1:1", variantLabels: ["情感版", "理性版", "故事版", "數據版", "懸念版"],
     captionMinChars: 120, captionMaxChars: 250,
     extras: { replyTemplates: 5, postingTime: true, followupPost: true },
   },
 
   "ig-60-reel-full": {
     variants: 5, images: 5, runImageGen: true, imageDirectorId: IG60_DIR_ANGEL,
-    aspectRatio: "9:16", fluxSize: "portrait_9_16", imageQualitySteps: 4,
-    variantLabels: ["教學版", "故事版", "反差版", "節奏版", "懸念版"],
+    aspectRatio: "9:16", variantLabels: ["教學版", "故事版", "反差版", "節奏版", "懸念版"],
     captionMinChars: 200, captionMaxChars: 400,
     extras: { replyTemplates: 5, postingTime: true, followupPost: true },
   },
 
   "ig-60-carousel-7": {
     variants: 5, images: 5, runImageGen: true, imageDirectorId: IG60_DIR_OWEN,
-    aspectRatio: "1:1", fluxSize: "square_hd", imageQualitySteps: 4,
-    variantLabels: ["教學式", "清單式", "故事式", "對比式", "金句式"],
+    aspectRatio: "1:1", variantLabels: ["教學式", "清單式", "故事式", "對比式", "金句式"],
     captionMinChars: 150, captionMaxChars: 250,
     strategistAgentId: 222308, // Hsin-Yi Wu — Email Marketing & CRM Strategist (1415 char)
     extras: { replyTemplates: 5, postingTime: true, followupPost: true, narrativeArc: true },
@@ -500,8 +499,7 @@ export const IG_60S_ORCHESTRA: Record<string, OrchestraConfig> = {
 
   "ig-60-story-3frame": {
     variants: 3, images: 3, runImageGen: true, imageDirectorId: IG60_DIR_RITA,
-    aspectRatio: "9:16", fluxSize: "portrait_9_16", imageQualitySteps: 4,
-    variantLabels: ["前情鋪陳", "重點揭曉", "CTA 收束"],
+    aspectRatio: "9:16", variantLabels: ["前情鋪陳", "重點揭曉", "CTA 收束"],
     captionMinChars: 30, captionMaxChars: 60,
     postLabels: ["前情鋪陳", "重點揭曉", "CTA 收束"],
     extras: { postsCount: 3, replyTemplates: 5, postingTime: true, followupPost: true },
@@ -509,8 +507,7 @@ export const IG_60S_ORCHESTRA: Record<string, OrchestraConfig> = {
 
   "ig-60-countdown-5day": {
     variants: 5, images: 5, runImageGen: true, imageDirectorId: IG60_DIR_KAREN,
-    aspectRatio: "1:1", fluxSize: "square_hd", imageQualitySteps: 4,
-    variantLabels: ["第5天", "第4天", "第3天", "第2天", "第1天"],
+    aspectRatio: "1:1", variantLabels: ["第5天", "第4天", "第3天", "第2天", "第1天"],
     captionMinChars: 80, captionMaxChars: 130,
     strategistAgentId: 224084, // Michelle Lim — Social Media Strategist Beauty MY (1178 char)
     postLabels: ["第5天（認知）", "第4天（差異化）", "第3天（信任）", "第2天（誘因）", "第1天（最後衝刺）"],
@@ -519,8 +516,7 @@ export const IG_60S_ORCHESTRA: Record<string, OrchestraConfig> = {
 
   "ig-60-highlight-suite": {
     variants: 5, images: 5, runImageGen: true, imageDirectorId: IG60_DIR_NELSON,
-    aspectRatio: "9:16", fluxSize: "portrait_9_16", imageQualitySteps: 8,
-    variantLabels: ["About", "商品", "FAQ", "客評", "案例"],
+    aspectRatio: "9:16", variantLabels: ["About", "商品", "FAQ", "客評", "案例"],
     captionMinChars: 30, captionMaxChars: 60,
     postLabels: ["About", "商品", "FAQ", "客評", "案例"],
     extras: { postsCount: 5, highlightCovers: 5, replyTemplates: 5, postingTime: true, followupPost: true },
@@ -531,8 +527,7 @@ export const IG_60S_ORCHESTRA: Record<string, OrchestraConfig> = {
   // 不要結構化卡片 / 首行 hook）蓋掉，也順帶關掉 IG craft 產後改寫。
   "ig-60-live-suite": {
     variants: 6, images: 6, runImageGen: true, imageDirectorId: IG60_DIR_TODD,
-    aspectRatio: "9:16", fluxSize: "portrait_9_16", imageQualitySteps: 4,
-    variantLabels: ["00:00-03:00 黃金開場", "03:00-10:00 主軸切入", "10:00-18:00 深度互動", "18:00-23:00 高潮／優惠公布", "23:00-28:00 限時催單", "28:00-30:00 收尾預告"],
+    aspectRatio: "9:16", variantLabels: ["00:00-03:00 黃金開場", "03:00-10:00 主軸切入", "10:00-18:00 深度互動", "18:00-23:00 高潮／優惠公布", "23:00-28:00 限時催單", "28:00-30:00 收尾預告"],
     captionMinChars: 200, captionMaxChars: 500,
     strategistAgentId: 60034, // Ethan Tsai — Travel Short Video Scriptwriter (942 char)
     postLabels: ["00:00-03:00 黃金開場", "03:00-10:00 主軸切入", "10:00-18:00 深度互動", "18:00-23:00 高潮／優惠公布", "23:00-28:00 限時催單", "28:00-30:00 收尾預告"],
@@ -547,8 +542,7 @@ export const IG_60S_ORCHESTRA: Record<string, OrchestraConfig> = {
   // 2026-08-23 (CJ「做成不同任務卡」): 事件型 —— 7 段，含開播前那一段。
   "ig-60-live-event": {
     variants: 7, images: 7, runImageGen: true, imageDirectorId: IG60_DIR_LYDIA,
-    aspectRatio: "9:16", fluxSize: "portrait_9_16", imageQualitySteps: 4,
-    variantLabels: ["T-24h 預熱宣告", "00:00-03:00 目標宣告", "03:00-10:00 第一波衝刺", "10:00-18:00 內容填充", "18:00-24:00 臨門一腳", "24:00-28:00 達標兌現", "28:00-30:00 下一個目標"],
+    aspectRatio: "9:16", variantLabels: ["T-24h 預熱宣告", "00:00-03:00 目標宣告", "03:00-10:00 第一波衝刺", "10:00-18:00 內容填充", "18:00-24:00 臨門一腳", "24:00-28:00 達標兌現", "28:00-30:00 下一個目標"],
     captionMinChars: 200, captionMaxChars: 500,
     strategistAgentId: 60007, // Ryan Yu — Growth + campaign-orch
     postLabels: ["T-24h 預熱宣告", "00:00-03:00 目標宣告", "03:00-10:00 第一波衝刺", "10:00-18:00 內容填充", "18:00-24:00 臨門一腳", "24:00-28:00 達標兌現", "28:00-30:00 下一個目標"],
@@ -563,8 +557,7 @@ export const IG_60S_ORCHESTRA: Record<string, OrchestraConfig> = {
   // 創辦人型 —— 5 段，收尾是邀請不是催單，所以沒有催單段。
   "ig-60-live-founder": {
     variants: 5, images: 5, runImageGen: true, imageDirectorId: IG60_DIR_DREW,
-    aspectRatio: "9:16", fluxSize: "portrait_9_16", imageQualitySteps: 4,
-    variantLabels: ["00:00-04:00 起源故事", "04:00-10:00 為什麼是我", "10:00-20:00 事前徵集提問", "20:00-26:00 最難的三題", "26:00-30:00 邀請與下一步"],
+    aspectRatio: "9:16", variantLabels: ["00:00-04:00 起源故事", "04:00-10:00 為什麼是我", "10:00-20:00 事前徵集提問", "20:00-26:00 最難的三題", "26:00-30:00 邀請與下一步"],
     captionMinChars: 200, captionMaxChars: 500,
     strategistAgentId: 180006, // Grace Wu — Brand Storyteller
     postLabels: ["00:00-04:00 起源故事", "04:00-10:00 為什麼是我", "10:00-20:00 事前徵集提問", "20:00-26:00 最難的三題", "26:00-30:00 邀請與下一步"],
@@ -578,8 +571,7 @@ export const IG_60S_ORCHESTRA: Record<string, OrchestraConfig> = {
 
   "ig-60-serial-3": {
     variants: 3, images: 3, runImageGen: true, imageDirectorId: IG60_DIR_DAWN,
-    aspectRatio: "1:1", fluxSize: "square_hd", imageQualitySteps: 4,
-    variantLabels: ["第 1 集", "第 2 集", "第 3 集"],
+    aspectRatio: "1:1", variantLabels: ["第 1 集", "第 2 集", "第 3 集"],
     captionMinChars: 150, captionMaxChars: 250,
     strategistAgentId: 30020, // Iris Yi — Social Media Manager (2001 char)
     postLabels: ["第 1 集", "第 2 集", "第 3 集"],
@@ -588,8 +580,7 @@ export const IG_60S_ORCHESTRA: Record<string, OrchestraConfig> = {
 
   "ig-60-viral-rewrite": {
     variants: 5, images: 5, runImageGen: true, imageDirectorId: IG60_DIR_BRIAN,
-    aspectRatio: "1:1", fluxSize: "square_hd", imageQualitySteps: 4,
-    variantLabels: ["保結構式", "情感放大式", "反差式", "數據式", "故事式"],
+    aspectRatio: "1:1", variantLabels: ["保結構式", "情感放大式", "反差式", "數據式", "故事式"],
     captionMinChars: 150, captionMaxChars: 300,
     strategistAgentId: 180155, // Grace Liao — Social Media Advertising Specialist (1594 char)
     specialtyAgentId: 180605,  // Jason Lee — SVP & General Counsel (compare/claims review)
@@ -598,8 +589,7 @@ export const IG_60S_ORCHESTRA: Record<string, OrchestraConfig> = {
 
   "ig-60-testimonial-rewrite": {
     variants: 5, images: 5, runImageGen: true, imageDirectorId: IG60_DIR_PENNY,
-    aspectRatio: "1:1", fluxSize: "square_hd", imageQualitySteps: 4,
-    variantLabels: ["故事式", "對比式", "數據式", "情感式", "簡短式"],
+    aspectRatio: "1:1", variantLabels: ["故事式", "對比式", "數據式", "情感式", "簡短式"],
     captionMinChars: 150, captionMaxChars: 250,
     strategistAgentId: 220754, // Kurt Chen
     specialtyAgentId: 180559,  // Deborah Williams — VP & Chief Legal Officer

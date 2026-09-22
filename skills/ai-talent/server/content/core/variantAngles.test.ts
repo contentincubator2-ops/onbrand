@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { angleFor, angleVisualLens, angleWritingBlock, checkAngle } from "./variantAngles";
+import { angleFor, angleVisualLens, angleWritingBlock, checkAngle, pickOwnAngleBlock, sanitizeAngleLabel } from "./variantAngles";
 
 describe("版本名稱 = 版本設計", () => {
   it("每個通用切角都有寫法定義，而且定義裡點名了自己的名稱", () => {
@@ -130,5 +130,56 @@ describe("checkAngle：數據版一定要用數字開場（唯一能機器驗證
     for (const label of ["情感版", "理性版", "故事版", "懸念版", "反差版"]) {
       expect(checkAngle(label, "一句沒有數字的話")).toBeNull();
     }
+  });
+});
+
+// 2026-09-22（CJ「不應該將所有產品都規定為情感版、理性版還有數據版……香氛產品用數據版，好奇怪」）：
+// 幾張泛用任務卡不再預先指定角度，改由每篇自己判斷、自己回報名稱。
+describe("pickOwnAngleBlock：不指定角度，寫手自己判斷再回報名稱", () => {
+  it("明講這次不指定角度，並點名『香氛硬套數據版』這個具體反例", () => {
+    const block = pickOwnAngleBlock({ index: 1, total: 3 });
+    expect(block).toContain("這次不指定角度");
+    expect(block).toContain("由你判斷");
+    expect(block).toContain("香氛");
+    expect(block).toContain("數據版");
+  });
+
+  it("列出六個通用切角當參考，但明講可以不用、可以自創", () => {
+    const block = pickOwnAngleBlock({ index: 1, total: 3 });
+    for (const name of ["情感版", "理性版", "故事版", "數據版", "懸念版", "反差版"]) {
+      expect(block).toContain(name);
+    }
+    expect(block).toContain("可以自創更合適的切角");
+  });
+
+  it("第一篇不用避開別人，第二篇以後才提醒避開最安全的第一選擇", () => {
+    expect(pickOwnAngleBlock({ index: 1, total: 3 })).not.toContain("盡量避開");
+    expect(pickOwnAngleBlock({ index: 2, total: 3 })).toContain("盡量避開");
+    expect(pickOwnAngleBlock({ index: 3, total: 3 })).toContain("另外還有 2 篇");
+  });
+
+  it("要求輸出多帶一個 label 欄位，且數字仍要能查證", () => {
+    const block = pickOwnAngleBlock({ index: 1, total: 3 });
+    expect(block).toContain('"label"');
+    expect(block).toContain("不准杜撰統計");
+  });
+});
+
+describe("sanitizeAngleLabel：模型自報的名稱要先洗過才能上畫面", () => {
+  it("正常名稱原樣保留", () => {
+    expect(sanitizeAngleLabel("嗅覺版", "情感版")).toBe("嗅覺版");
+  });
+
+  it("去掉模型常見的包裹符號（引號、書名號、方括號）", () => {
+    expect(sanitizeAngleLabel("「嗅覺版」", "情感版")).toBe("嗅覺版");
+    expect(sanitizeAngleLabel("『決策版』", "情感版")).toBe("決策版");
+    expect(sanitizeAngleLabel("[場景版]", "情感版")).toBe("場景版");
+  });
+
+  it("空字串、非字串、或長到不像一個版本名稱 → 落回 fallback", () => {
+    expect(sanitizeAngleLabel("", "情感版")).toBe("情感版");
+    expect(sanitizeAngleLabel(undefined, "情感版")).toBe("情感版");
+    expect(sanitizeAngleLabel(null, "情感版")).toBe("情感版");
+    expect(sanitizeAngleLabel("這其實是一整句話不是一個版本名稱喔", "情感版")).toBe("情感版");
   });
 });

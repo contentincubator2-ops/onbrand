@@ -271,15 +271,15 @@ export function redactFactLeaks(skill: string, leaks: string[]): string {
 const CHANNEL_OUTPUT: Record<string, { platform: FBTaskTemplate["outputDefaults"]["platform"]; post_type: string }> = {
   facebook:  { platform: "facebook",  post_type: "feed" },
   instagram: { platform: "instagram", post_type: "feed" },
-  threads:   { platform: "threads",   post_type: "feed" },
+  threads:   { platform: "threads", post_type: "feed" },
   linkedin:  { platform: "linkedin",  post_type: "feed" },
-  tiktok:    { platform: "tiktok",    post_type: "foryou" },
-  youtube:   { platform: "youtube",   post_type: "video" },
-  email:     { platform: "email",     post_type: "edm" },
-  pr:        { platform: "press",     post_type: "release" },
+  tiktok:    { platform: "tiktok", post_type: "foryou" },
+  youtube:   { platform: "youtube", post_type: "video" },
+  email:     { platform: "email", post_type: "edm" },
+  pr:        { platform: "press", post_type: "release" },
   // 官網長文用 "doc"：mission_outputs.platform 的 enum 沒有 "web"，
   // recordTaskRun 的 SAFE_PLATFORMS 會把未知值默默降級成 "other"。
-  website:   { platform: "doc",       post_type: "article" },
+  website:   { platform: "doc", post_type: "article" },
 };
 
 function outputDefaultsFor(channel: string): FBTaskTemplate["outputDefaults"] {
@@ -329,8 +329,6 @@ export function cardConfig(card: BrandTaskCard): OrchestraConfig {
     runImageGen: false,
     imageDirectorId: null,
     aspectRatio: null,
-    fluxSize: null,
-    imageQualitySteps: 0,
     variantLabels: Array.from({ length: n }, (_, i) => `版本 ${i + 1}`),
     captionMinChars: card.measured.minChars || undefined,
     captionMaxChars: card.measured.maxChars || undefined,

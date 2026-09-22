@@ -1223,7 +1223,6 @@ const BR100_IMG2 = 39;     // Tom Hsu — Marketing Designer
 
 const fb100Common = {
   runImageGen: true, imageDirectorId: MANDY,
-  imageQualitySteps: 4,
   extras: { replyTemplates: 5, postingTime: true, followupPost: true, narrativeArc: true },
 };
 
@@ -1245,8 +1244,7 @@ export const FB_99S_ORCHESTRA: Record<string, OrchestraConfig> = {
     ...fb100Common,
     variants: 5, images: 0, runImageGen: false,
     imageDirectorId: null as any,
-    aspectRatio: null as any, fluxSize: null as any,
-    variantLabels: ["理念WHY", "產品", "節慶", "UGC見證", "權威觀點"],
+    aspectRatio: null as any, variantLabels: ["理念WHY", "產品", "節慶", "UGC見證", "權威觀點"],
     captionMinChars: 200, captionMaxChars: 4000,
     scoutKind: "festivals", // 抓即時節慶供「節慶」支柱使用（已有 18s 上限）
     calendarMerge: true,
@@ -1256,8 +1254,7 @@ export const FB_99S_ORCHESTRA: Record<string, OrchestraConfig> = {
     ...fb100Common,
     variants: 5, images: 0, runImageGen: false,
     imageDirectorId: null as any,
-    aspectRatio: null as any, fluxSize: null as any,
-    variantLabels: ["產品促銷", "急迫限時", "節慶檔期", "UGC見證", "理念WHY"],
+    aspectRatio: null as any, variantLabels: ["產品促銷", "急迫限時", "節慶檔期", "UGC見證", "理念WHY"],
     captionMinChars: 200, captionMaxChars: 4000,
     scoutKind: "festivals",
     calendarMerge: true,
@@ -1267,8 +1264,7 @@ export const FB_99S_ORCHESTRA: Record<string, OrchestraConfig> = {
     ...fb100Common,
     // single version (one carousel), 5 cards each with its own image
     variants: 1, images: 1,
-    aspectRatio: "1:1", fluxSize: "square_hd",
-    variantLabels: ["輪播版本"],
+    aspectRatio: "1:1", variantLabels: ["輪播版本"],
     captionMinChars: 150, captionMaxChars: 250,
     strategistAgentId: 180030, // Kevin Lin — Content Strategy
     cardsPerVariant: 5,
@@ -1277,8 +1273,7 @@ export const FB_99S_ORCHESTRA: Record<string, OrchestraConfig> = {
   },
   "fb-99-viral-rewrite": {
     ...fb100Common, variants: 5, images: 5,
-    aspectRatio: "1:1", fluxSize: "square_hd",
-    variantLabels: ["保結構式", "情感放大式", "反差式", "數據式", "故事式"],
+    aspectRatio: "1:1", variantLabels: ["保結構式", "情感放大式", "反差式", "數據式", "故事式"],
     captionMinChars: 200, captionMaxChars: 400,
     strategistAgentId: 180142, // Kevin Liu — Social Listening
     specialtyAgentId: 220504,  // Cheng-Tse Liao — Compare Editor
@@ -1288,8 +1283,7 @@ export const FB_99S_ORCHESTRA: Record<string, OrchestraConfig> = {
   },
   "fb-99-testimonial-rewrite": {
     ...fb100Common, variants: 5, images: 5,
-    aspectRatio: "1:1", fluxSize: "square_hd",
-    variantLabels: ["故事式", "對比式", "數據式", "情感式", "簡短式"],
+    aspectRatio: "1:1", variantLabels: ["故事式", "對比式", "數據式", "情感式", "簡短式"],
     captionMinChars: 200, captionMaxChars: 350,
     strategistAgentId: 220754, // Kurt Chen — Insights Storyteller
     specialtyAgentId: 180855,  // Jason Evans — Risk & Compliance
@@ -1298,8 +1292,7 @@ export const FB_99S_ORCHESTRA: Record<string, OrchestraConfig> = {
   },
   "fb-99-trend-rewrite": {
     ...fb100Common, variants: 5, images: 5,
-    aspectRatio: "1:1", fluxSize: "square_hd",
-    variantLabels: ["評論式", "幽默式", "資訊式", "立場式", "中立式"],
+    aspectRatio: "1:1", variantLabels: ["評論式", "幽默式", "資訊式", "立場式", "中立式"],
     captionMinChars: 150, captionMaxChars: 300,
     strategistAgentId: 90011, // Mark Davis — Public Affairs
     specialtyAgentId: 220959, // Trend Researcher — Timing Advisor
@@ -1309,8 +1302,7 @@ export const FB_99S_ORCHESTRA: Record<string, OrchestraConfig> = {
   },
   "fb-99-serial-3": {
     ...fb100Common, variants: 3, images: 3,
-    aspectRatio: "1:1", fluxSize: "square_hd",
-    variantLabels: ["第 1 集", "第 2 集", "第 3 集"],
+    aspectRatio: "1:1", variantLabels: ["第 1 集", "第 2 集", "第 3 集"],
     captionMinChars: 200, captionMaxChars: 350,
     strategistAgentId: 220863, // Nelson Chen — Narrative Editor
     postLabels: ["第 1 集", "第 2 集", "第 3 集"],
@@ -1319,8 +1311,7 @@ export const FB_99S_ORCHESTRA: Record<string, OrchestraConfig> = {
   },
   "fb-99-14day-countdown": {
     ...fb100Common, variants: 7, images: 7,
-    aspectRatio: "1:1", fluxSize: "square_hd",
-    variantLabels: ["倒數第 7 天", "倒數第 6 天", "倒數第 5 天", "倒數第 4 天", "倒數第 3 天", "倒數第 2 天", "最後 1 天"],
+    aspectRatio: "1:1", variantLabels: ["倒數第 7 天", "倒數第 6 天", "倒數第 5 天", "倒數第 4 天", "倒數第 3 天", "倒數第 2 天", "最後 1 天"],
     captionMinChars: 80, captionMaxChars: 130,
     strategistAgentId: 60013, // Kevin Kan — SEO Content Strategist
     postLabels: ["倒數第 7 天", "倒數第 6 天", "倒數第 5 天", "倒數第 4 天", "倒數第 3 天", "倒數第 2 天", "最後 1 天"],
@@ -1331,8 +1322,7 @@ export const FB_99S_ORCHESTRA: Record<string, OrchestraConfig> = {
     // 2026-05-18 (CJ「launch-toolkit 加總覽」): first variant = 活動總覽
     // (one-page campaign plan doc), then the 8 posts.
     ...fb100Common, variants: 9, images: 9,
-    aspectRatio: "1:1", fluxSize: "square_hd",
-    variantLabels: ["活動總覽", "預告 1", "預告 2", "預告 3", "當日", "即時 1", "即時 2", "事後", "IG 跨平台"],
+    aspectRatio: "1:1", variantLabels: ["活動總覽", "預告 1", "預告 2", "預告 3", "當日", "即時 1", "即時 2", "事後", "IG 跨平台"],
     captionMinChars: 150, captionMaxChars: 300,
     strategistAgentId: 60002, // Ethan Chiang — DTC E-commerce Brand Strategist
     postLabels: ["活動總覽", "預告 1", "預告 2", "預告 3", "當日", "即時 1", "即時 2", "事後", "IG 跨平台"],
@@ -1341,8 +1331,7 @@ export const FB_99S_ORCHESTRA: Record<string, OrchestraConfig> = {
   },
   "fb-99-livestream-9seg": {
     ...fb100Common, variants: 9, images: 9,
-    aspectRatio: "16:9", fluxSize: "landscape_16_9",
-    variantLabels: ["預告", "開場宣告", "爆點 1", "爆點 2", "爆點 3", "爆點 4", "爆點 5", "結尾", "Reel 剪輯"],
+    aspectRatio: "16:9", variantLabels: ["預告", "開場宣告", "爆點 1", "爆點 2", "爆點 3", "爆點 4", "爆點 5", "結尾", "Reel 剪輯"],
     captionMinChars: 80, captionMaxChars: 200,
     strategistAgentId: 224091, // Nurul Huda — Email & CRM Strategist eCommerce MY (1250 char)
     postLabels: ["預告", "開場宣告", "爆點 1", "爆點 2", "爆點 3", "爆點 4", "爆點 5", "結尾", "Reel 剪輯"],
@@ -1351,8 +1340,7 @@ export const FB_99S_ORCHESTRA: Record<string, OrchestraConfig> = {
   },
   "fb-99-crisis-playbook": {
     ...fb100Common, variants: 7, images: 0, runImageGen: false, imageDirectorId: null as any,
-    aspectRatio: null as any, fluxSize: null as any,
-    variantLabels: ["偵測警示", "第一份聲明", "24h 更新", "48h 更新", "72h 更新", "1 週 follow-up", "媒體 talking points"],
+    aspectRatio: null as any, variantLabels: ["偵測警示", "第一份聲明", "24h 更新", "48h 更新", "72h 更新", "1 週 follow-up", "媒體 talking points"],
     captionMinChars: 200, captionMaxChars: 400,
     strategistAgentId: 90011,
     specialtyAgentId: 180630, // Shirley Sanchez — Global Affairs & General Counsel (2355 char)
@@ -1364,7 +1352,6 @@ export const FB_99S_ORCHESTRA: Record<string, OrchestraConfig> = {
 
 const ig100Common = {
   runImageGen: true, imageDirectorId: NANCY,
-  imageQualitySteps: 4,
   extras: { replyTemplates: 5, postingTime: true, followupPost: true, narrativeArc: true },
 };
 
@@ -1376,8 +1363,7 @@ const ig100Common = {
 export const IG_99S_ORCHESTRA: Record<string, OrchestraConfig> = {
   "ig-99-30day-calendar": {
     ...ig100Common, variants: 4, images: 4,
-    aspectRatio: "1:1", fluxSize: "square_hd",
-    variantLabels: ["第 1 週", "第 2 週", "第 3 週", "第 4 週"],
+    aspectRatio: "1:1", variantLabels: ["第 1 週", "第 2 週", "第 3 週", "第 4 週"],
     captionMinChars: 400, captionMaxChars: 800,
     strategistAgentId: 60008, // Fiona Hsieh — Social Media Marketing Strategist (Beauty)
     postLabels: ["第 1 週", "第 2 週", "第 3 週", "第 4 週"],
@@ -1386,8 +1372,7 @@ export const IG_99S_ORCHESTRA: Record<string, OrchestraConfig> = {
   },
   "ig-99-reel-series-6": {
     ...ig100Common, variants: 6, images: 6,
-    aspectRatio: "9:16", fluxSize: "portrait_9_16",
-    variantLabels: ["第 1 集", "第 2 集", "第 3 集", "第 4 集", "第 5 集", "第 6 集"],
+    aspectRatio: "9:16", variantLabels: ["第 1 集", "第 2 集", "第 3 集", "第 4 集", "第 5 集", "第 6 集"],
     captionMinChars: 250, captionMaxChars: 500,
     strategistAgentId: 180162, // Jason Peng — Social Media Copywriter (1440 char)
     postLabels: ["第 1 集", "第 2 集", "第 3 集", "第 4 集", "第 5 集", "第 6 集"],
@@ -1396,8 +1381,7 @@ export const IG_99S_ORCHESTRA: Record<string, OrchestraConfig> = {
   },
   "ig-99-account-reposition": {
     ...ig100Common, variants: 5, images: 5,
-    aspectRatio: "1:1", fluxSize: "square_hd",
-    variantLabels: ["新 Bio", "Highlight 套組", "Launch Post 1-3", "Launch Post 4-6", "Launch Post 7-9"],
+    aspectRatio: "1:1", variantLabels: ["新 Bio", "Highlight 套組", "Launch Post 1-3", "Launch Post 4-6", "Launch Post 7-9"],
     captionMinChars: 250, captionMaxChars: 500,
     strategistAgentId: 60005, // Aaron Pei — B2B Tech Brand Marketing (1181 char)
     postLabels: ["新 Bio", "Highlight 套組", "Launch Post 1-3", "Launch Post 4-6", "Launch Post 7-9"],
@@ -1416,8 +1400,7 @@ export const IG_99S_ORCHESTRA: Record<string, OrchestraConfig> = {
   "ig-99-save-worthy": {
     ...ig100Common,
     variants: 7, images: 5,
-    aspectRatio: "1:1", fluxSize: "square_hd", imageQualitySteps: 4,
-    variantLabels: ["Slide 1", "Slide 2", "Slide 3", "Slide 4", "Slide 5", "主題研究", "指標追蹤"],
+    aspectRatio: "1:1", variantLabels: ["Slide 1", "Slide 2", "Slide 3", "Slide 4", "Slide 5", "主題研究", "指標追蹤"],
     captionMinChars: 60, captionMaxChars: 320,
     postLabels: ["Slide 1", "Slide 2", "Slide 3", "Slide 4", "Slide 5", "主題研究", "指標追蹤"],
     scoutKind: "viral",
@@ -1427,7 +1410,6 @@ export const IG_99S_ORCHESTRA: Record<string, OrchestraConfig> = {
 
 const yt100Common = {
   runImageGen: true, imageDirectorId: NINA,
-  imageQualitySteps: 8,
   extras: { replyTemplates: 5, postingTime: true, followupPost: true, narrativeArc: true },
 };
 
@@ -1438,8 +1420,7 @@ const yt100Common = {
 export const YT_99S_ORCHESTRA: Record<string, OrchestraConfig> = {
   "yt-99-series-6ep": {
     ...yt100Common, variants: 6, images: 6,
-    aspectRatio: "16:9", fluxSize: "landscape_16_9",
-    variantLabels: ["EP1", "EP2", "EP3", "EP4", "EP5", "EP6"],
+    aspectRatio: "16:9", variantLabels: ["EP1", "EP2", "EP3", "EP4", "EP5", "EP6"],
     captionMinChars: 500, captionMaxChars: 1000,
     strategistAgentId: 90002, // Darren Freeman — Creative Excellence Director (2348 char)
     postLabels: ["EP1", "EP2", "EP3", "EP4", "EP5", "EP6"],
@@ -1448,8 +1429,7 @@ export const YT_99S_ORCHESTRA: Record<string, OrchestraConfig> = {
   },
   "yt-99-quarterly-strategy": {
     ...yt100Common, variants: 4, images: 4,
-    aspectRatio: "16:9", fluxSize: "landscape_16_9",
-    // 2026-05-19 (CJ): reorder tabs + remove Competitor 分析 (5→4 tabs)
+    aspectRatio: "16:9", // 2026-05-19 (CJ): reorder tabs + remove Competitor 分析 (5→4 tabs)
     variantLabels: ["即時趨勢報告", "內容支柱", "12 影片 title", "Community 月曆"],
     captionMinChars: 300, captionMaxChars: 600,
     strategistAgentId: 30001, // Alex Chen — AI Growth Hacker CMO (1831 char)
@@ -1459,8 +1439,7 @@ export const YT_99S_ORCHESTRA: Record<string, OrchestraConfig> = {
   },
   "yt-99-premiere-kit": {
     ...yt100Common, variants: 4, images: 4,
-    aspectRatio: "16:9", fluxSize: "landscape_16_9",
-    variantLabels: ["Trailer 腳本", "Community 倒數 ×5", "直播配套", "精華剪輯指南"],
+    aspectRatio: "16:9", variantLabels: ["Trailer 腳本", "Community 倒數 ×5", "直播配套", "精華剪輯指南"],
     captionMinChars: 200, captionMaxChars: 400,
     strategistAgentId: 90022, // Andy Gallagher — Head of Creative & Media (1464 char)
     postLabels: ["Trailer 腳本", "Community 倒數 ×5", "直播配套", "精華剪輯指南"],
@@ -1485,17 +1464,14 @@ export const MULTI_99S_ORCHESTRA: Record<string, OrchestraConfig> = {
   "kl-99-campaign-toolkit": {
     variants: 8, images: 0, runImageGen: false,
     imageDirectorId: null as any,
-    aspectRatio: null as any, fluxSize: null as any,
-    imageQualitySteps: 4,
-    variantLabels: ["邀請開場", "brand brief 模板", "報價回應", "brief 確認", "拍攝期追蹤", "上稿確認", "結案感謝", "結案數據要求"],
+    aspectRatio: null as any, variantLabels: ["邀請開場", "brand brief 模板", "報價回應", "brief 確認", "拍攝期追蹤", "上稿確認", "結案感謝", "結案數據要求"],
     captionMinChars: 400, captionMaxChars: 900,
     postLabels: ["邀請開場", "brand brief 模板", "報價回應", "brief 確認", "拍攝期追蹤", "上稿確認", "結案感謝", "結案數據要求"],
     extras: { postsCount: 8 },
   },
   "tt-99-30day-foryou": {
     variants: 4, images: 4, runImageGen: true, imageDirectorId: ANNA,
-    aspectRatio: "9:16", fluxSize: "portrait_9_16", imageQualitySteps: 4,
-    variantLabels: ["第 1 週", "第 2 週", "第 3 週", "第 4 週"],
+    aspectRatio: "9:16", variantLabels: ["第 1 週", "第 2 週", "第 3 週", "第 4 週"],
     captionMinChars: 300, captionMaxChars: 700,
     strategistAgentId: 90015, // Sonia Belgacem — Global Client Service Manager, Creative Excellence (1547 char)
     postLabels: ["第 1 週", "第 2 週", "第 3 週", "第 4 週"],
@@ -1504,8 +1480,7 @@ export const MULTI_99S_ORCHESTRA: Record<string, OrchestraConfig> = {
   },
   "tt-99-trend-week": {
     variants: 7, images: 7, runImageGen: true, imageDirectorId: TT100_IMG2,
-    aspectRatio: "9:16", fluxSize: "portrait_9_16", imageQualitySteps: 4,
-    variantLabels: ["Day 1", "Day 2", "Day 3", "Day 4", "Day 5", "Day 6", "Day 7"],
+    aspectRatio: "9:16", variantLabels: ["Day 1", "Day 2", "Day 3", "Day 4", "Day 5", "Day 6", "Day 7"],
     captionMinChars: 200, captionMaxChars: 400,
     postLabels: ["Day 1", "Day 2", "Day 3", "Day 4", "Day 5", "Day 6", "Day 7"],
     scoutKind: "trending", // 追熱點 → 抓即時時事
@@ -1513,8 +1488,7 @@ export const MULTI_99S_ORCHESTRA: Record<string, OrchestraConfig> = {
   },
   "li-99-30day-thought-leadership": {
     variants: 4, images: 4, runImageGen: true, imageDirectorId: ZEYU,
-    aspectRatio: "1.91:1", fluxSize: "landscape_4_3", imageQualitySteps: 4,
-    variantLabels: ["第 1 週", "第 2 週", "第 3 週", "第 4 週"],
+    aspectRatio: "1.91:1", variantLabels: ["第 1 週", "第 2 週", "第 3 週", "第 4 週"],
     captionMinChars: 400, captionMaxChars: 800,
     postLabels: ["第 1 週", "第 2 週", "第 3 週", "第 4 週"],
     scoutKind: "news", // thought-leadership → 抓產業最新
@@ -1522,8 +1496,7 @@ export const MULTI_99S_ORCHESTRA: Record<string, OrchestraConfig> = {
   },
   "li-99-newsletter-quarterly": {
     variants: 4, images: 4, runImageGen: true, imageDirectorId: LI100_IMG2,
-    aspectRatio: "1.91:1", fluxSize: "landscape_4_3", imageQualitySteps: 4,
-    variantLabels: ["第 1 期", "第 2 期", "第 3 期", "第 4 期"],
+    aspectRatio: "1.91:1", variantLabels: ["第 1 期", "第 2 期", "第 3 期", "第 4 期"],
     captionMinChars: 400, captionMaxChars: 800,
     strategistAgentId: 180015, // Kevin Lin — Content Strategy Director
     postLabels: ["第 1 期", "第 2 期", "第 3 期", "第 4 期"],
@@ -1542,8 +1515,7 @@ export const MULTI_99S_ORCHESTRA: Record<string, OrchestraConfig> = {
     // fallback removed; (3) bodyText strip also covers parenthesised inline
     // CTA hints; (4) _stripMetaPrefix() safety ensures "主旨：" never leaks.
     variants: 4, images: 0, runImageGen: false, imageDirectorId: null as any,
-    aspectRatio: null as any, fluxSize: null as any, imageQualitySteps: 0,
-    variantLabels: ["第 1 週", "第 2 週", "第 3 週", "第 4 週"],
+    aspectRatio: null as any, variantLabels: ["第 1 週", "第 2 週", "第 3 週", "第 4 週"],
     captionMinChars: 200, captionMaxChars: 500,
     postLabels: ["第 1 週", "第 2 週", "第 3 週", "第 4 週"],
     disableScout: true,
@@ -1559,8 +1531,7 @@ export const MULTI_99S_ORCHESTRA: Record<string, OrchestraConfig> = {
     // Email sequences don't need AI hero images per-email; hero image can be added
     // via 改配圖 after the fact. Disabling image gen makes all 7 captions reliable.
     variants: 7, images: 0, runImageGen: false, imageDirectorId: null as any,
-    aspectRatio: null as any, fluxSize: null as any, imageQualitySteps: 0,
-    variantLabels: ["預告 1", "預告 2", "上線", "提醒 1", "提醒 2", "最後機會", "後續"],
+    aspectRatio: null as any, variantLabels: ["預告 1", "預告 2", "上線", "提醒 1", "提醒 2", "最後機會", "後續"],
     captionMinChars: 200, captionMaxChars: 500,
     postLabels: ["預告 1", "預告 2", "上線", "提醒 1", "提醒 2", "最後機會", "後續"],
     disableScout: true,
@@ -1572,8 +1543,7 @@ export const MULTI_99S_ORCHESTRA: Record<string, OrchestraConfig> = {
     // 不含「Q&A」「FAQ」「常見問答」任一 token，不會觸發 facebook:qa 路由，
     // 但保留「問答」的語意讓使用者看懂。systemPrompt 的格式規定也同步更新。
     variants: 5, images: 0, runImageGen: false, imageDirectorId: null as any,
-    aspectRatio: null as any, fluxSize: null as any, imageQualitySteps: 0,
-    variantLabels: ["新聞稿", "採訪問答", "媒體聯絡", "後續追蹤", "Spokesperson talking"],
+    aspectRatio: null as any, variantLabels: ["新聞稿", "採訪問答", "媒體聯絡", "後續追蹤", "Spokesperson talking"],
     // 2026-05-19: raised from 300/700 — press releases need full structure
     // (headline + dateline + 3-para body + quote + boilerplate + contacts ≈ 1500-2500 chars).
     // Old 700-char cap was truncating output mid-sentence → "助力..." incomplete headline.
@@ -1585,8 +1555,7 @@ export const MULTI_99S_ORCHESTRA: Record<string, OrchestraConfig> = {
   "pr-99-newsjack": {
     // pool of 6 distinct trend-hooks; RunPage >4 = 「再給我幾個」.
     variants: 6, images: 0, runImageGen: false, imageDirectorId: null as any,
-    aspectRatio: null as any, fluxSize: null as any, imageQualitySteps: 0,
-    // 2026-05-19 (CJ 驗收 #4 P2「B/D/E 同質、都是趨勢模糊型」): generic
+    aspectRatio: null as any, // 2026-05-19 (CJ 驗收 #4 P2「B/D/E 同質、都是趨勢模糊型」): generic
     // 「時事 A/B」labels gave the per-variant fanout zero category steering
     // → 模型對每個都吐「行銷科技演進」這種趨勢氛圍。改成「類別 lens」
     // labels，每個變體被釘在一個不同的時事類別上，逼出多樣性。
@@ -1598,8 +1567,7 @@ export const MULTI_99S_ORCHESTRA: Record<string, OrchestraConfig> = {
   // pr-99-crisis-toolkit orchestra config removed.
   "br-99-reposition-toolkit": {
     variants: 5, images: 5, runImageGen: true, imageDirectorId: BR_IMG,
-    aspectRatio: "1:1", fluxSize: "square_hd", imageQualitySteps: 4,
-    variantLabels: ["Positioning", "Tagline 5 套", "Voice guide", "Visual direction", "5 應用範例"],
+    aspectRatio: "1:1", variantLabels: ["Positioning", "Tagline 5 套", "Voice guide", "Visual direction", "5 應用範例"],
     captionMinChars: 300, captionMaxChars: 600,
     strategistAgentId: 180038, // Daniel Wu — D2C Strategy Manager
     postLabels: ["Positioning", "Tagline 5 套", "Voice guide", "Visual direction", "5 應用範例"],
@@ -1608,8 +1576,7 @@ export const MULTI_99S_ORCHESTRA: Record<string, OrchestraConfig> = {
   },
   "br-99-voice-playbook": {
     variants: 4, images: 4, runImageGen: true, imageDirectorId: BR100_IMG2,
-    aspectRatio: "1:1", fluxSize: "square_hd", imageQualitySteps: 4,
-    variantLabels: ["8 應用情境", "Do/Don't", "5 範例", "跨平台適配"],
+    aspectRatio: "1:1", variantLabels: ["8 應用情境", "Do/Don't", "5 範例", "跨平台適配"],
     captionMinChars: 400, captionMaxChars: 700,
     postLabels: ["8 應用情境", "Do/Don't", "5 範例", "跨平台適配"],
     scoutKind: "viral",
@@ -1617,8 +1584,7 @@ export const MULTI_99S_ORCHESTRA: Record<string, OrchestraConfig> = {
   },
   "rs-99-discovery-sprint": {
     variants: 5, images: 0, runImageGen: false, imageDirectorId: null as any,
-    aspectRatio: null as any, fluxSize: null as any, imageQualitySteps: 0,
-    variantLabels: ["Day 1 訪綱", "Day 2-3 Personas", "Day 4 JTBD map", "Day 5 Synthesis", "行動建議"],
+    aspectRatio: null as any, variantLabels: ["Day 1 訪綱", "Day 2-3 Personas", "Day 4 JTBD map", "Day 5 Synthesis", "行動建議"],
     captionMinChars: 400, captionMaxChars: 700,
     postLabels: ["Day 1 訪綱", "Day 2-3 Personas", "Day 4 JTBD map", "Day 5 Synthesis", "行動建議"],
     scoutKind: "news",
@@ -1626,8 +1592,7 @@ export const MULTI_99S_ORCHESTRA: Record<string, OrchestraConfig> = {
   },
   "rs-99-competitor-mapping": {
     variants: 5, images: 0, runImageGen: false, imageDirectorId: null as any,
-    aspectRatio: null as any, fluxSize: null as any, imageQualitySteps: 0,
-    variantLabels: ["市場 overview", "競品 deep dive ×5", "定位 map", "Opportunity gaps", "推薦策略"],
+    aspectRatio: null as any, variantLabels: ["市場 overview", "競品 deep dive ×5", "定位 map", "Opportunity gaps", "推薦策略"],
     captionMinChars: 300, captionMaxChars: 600,
     postLabels: ["市場 overview", "競品 deep dive ×5", "定位 map", "Opportunity gaps", "推薦策略"],
     scoutKind: "news",

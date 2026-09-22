@@ -173,7 +173,7 @@ ${BRAND_TONE}`,
     postType: "generic",
     label: { en: "Stance: Write a Line Some Will Reject", zh: "品牌主張：寫一句會有人不同意的話" },
     description: { en: "If everyone agrees, it isn't a stance", zh: "人人點頭的主張不是主張" },
-    agent_id: 220869,              // 沿用同 postType 現役卡
+    agent_id: 220869, // 沿用同 postType 現役卡
     skill_slug: "tagline-creative",
     source: {
       type: "viral",
@@ -211,7 +211,7 @@ ${BRAND_TONE}`,
     postType: "press",
     label: { en: "Statement: Put the Price in the Statement", zh: "品牌聲明：把代價寫進聲明裡" },
     description: { en: "Attach what you gave up", zh: "對外聲明附上你放棄了什麼" },
-    agent_id: 60002,              // 沿用同 postType 現役卡
+    agent_id: 60002, // 沿用同 postType 現役卡
     skill_slug: "brand-strategy",
     source: {
       type: "viral",
@@ -250,28 +250,26 @@ const YATING_ID = 220872;
 export const BRAND_30S_ORCHESTRA: Record<string, OrchestraConfig> = {
   // 2026-05-09 audit fix: 5 variants (was 3) to match label「5 種候選」, +
   // strict 6-15 char range to force tagline-shape output, not paragraphs.
-  "br-30-tagline":          { variants: 5, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["功能訴求", "情感訴求", "反差訴求", "智慧訴求", "行動訴求"], captionMinChars: 6, captionMaxChars: 18 },
-  "br-30-value-prop":       { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["We help...", "X 不再 Y", "唯一 X"], captionMinChars: 50, captionMaxChars: 200 },
-  "br-30-brand-voice":      { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["專業派", "親民派", "玩味派"], captionMinChars: 200, captionMaxChars: 500 },
-  "br-30-archetype":        { variants: 3, images: 3, runImageGen: false, imageDirectorId: YATING_ID, aspectRatio: "1:1", fluxSize: "square_hd", imageQualitySteps: 4, variantLabels: ["Hero/Magician 類", "Sage/Caregiver 類", "Outlaw/Jester 類"], captionMinChars: 300, captionMaxChars: 700 },
-  "br-30-positioning":      { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["TA 聚焦", "差異化聚焦", "結果聚焦"], captionMinChars: 100, captionMaxChars: 400 },
-  "br-30-elevator-pitch":   { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["問題切入", "故事切入", "數據切入"], captionMinChars: 150, captionMaxChars: 300 },
-  "br-30-manifesto":        { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["立場式", "對抗式", "邀請式"], captionMinChars: 100, captionMaxChars: 250 },
-  "br-30-forbidden-words":  { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["過時 buzzword", "競品用語", "業界陳腔"], captionMinChars: 200, captionMaxChars: 700 },
-  "br-30-naming":           { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["描述型", "暗喻型", "創造詞型"], captionMinChars: 200, captionMaxChars: 800 },
-  "br-30-competitor-map":   { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["價格 vs 功能", "大眾 vs 利基", "工具 vs 文化"], captionMinChars: 300, captionMaxChars: 900 },
+  "br-30-tagline":          { variants: 5, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null,variantLabels: ["功能訴求", "情感訴求", "反差訴求", "智慧訴求", "行動訴求"], captionMinChars: 6, captionMaxChars: 18 },
+  "br-30-value-prop":       { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null,variantLabels: ["We help...", "X 不再 Y", "唯一 X"], captionMinChars: 50, captionMaxChars: 200 },
+  "br-30-brand-voice":      { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null,variantLabels: ["專業派", "親民派", "玩味派"], captionMinChars: 200, captionMaxChars: 500 },
+  "br-30-archetype":        { variants: 3, images: 3, runImageGen: false, imageDirectorId: YATING_ID, aspectRatio: "1:1",variantLabels: ["Hero/Magician 類", "Sage/Caregiver 類", "Outlaw/Jester 類"], captionMinChars: 300, captionMaxChars: 700 },
+  "br-30-positioning":      { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null,variantLabels: ["TA 聚焦", "差異化聚焦", "結果聚焦"], captionMinChars: 100, captionMaxChars: 400 },
+  "br-30-elevator-pitch":   { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null,variantLabels: ["問題切入", "故事切入", "數據切入"], captionMinChars: 150, captionMaxChars: 300 },
+  "br-30-manifesto":        { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null,variantLabels: ["立場式", "對抗式", "邀請式"], captionMinChars: 100, captionMaxChars: 250 },
+  "br-30-forbidden-words":  { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null,variantLabels: ["過時 buzzword", "競品用語", "業界陳腔"], captionMinChars: 200, captionMaxChars: 700 },
+  "br-30-naming":           { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null,variantLabels: ["描述型", "暗喻型", "創造詞型"], captionMinChars: 200, captionMaxChars: 800 },
+  "br-30-competitor-map":   { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null,variantLabels: ["價格 vs 功能", "大眾 vs 利基", "工具 vs 文化"], captionMinChars: 300, captionMaxChars: 900 },
 
   // ── 爆款結構卡 ────────────────────────────────────────────────────
   "br-30-stance-manifesto": {
     variants: 3, images: 0, runImageGen: false, imageDirectorId: null,
-    aspectRatio: null, fluxSize: null, imageQualitySteps: 0,
-    variantLabels: ["宣言版", "對立版", "承諾版"],
+    aspectRatio: null, variantLabels: ["宣言版", "對立版", "承諾版"],
     captionMinChars: 200, captionMaxChars: 450,
   },
   "br-30-stance-cost-statement": {
     variants: 3, images: 0, runImageGen: false, imageDirectorId: null,
-    aspectRatio: null, fluxSize: null, imageQualitySteps: 0,
-    variantLabels: ["數字版", "時間表版", "公開承諾版"],
+    aspectRatio: null, variantLabels: ["數字版", "時間表版", "公開承諾版"],
     captionMinChars: 250, captionMaxChars: 600,
   },
 };

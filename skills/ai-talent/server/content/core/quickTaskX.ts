@@ -484,60 +484,50 @@ X 上的上線公告最常見的失敗是「從我們的角度講」：我們很
 export const X_30S_ORCHESTRA: Record<string, OrchestraConfig> = {
   "x-30-hot-take": {
     variants: 3, images: 0, runImageGen: false, imageDirectorId: null,
-    aspectRatio: null, fluxSize: null, imageQualitySteps: 0,
-    variantLabels: ["直說版", "代價版", "對照版"],
+    aspectRatio: null, variantLabels: ["直說版", "代價版", "對照版"],
     captionMinChars: 40, captionMaxChars: 260,
   },
   "x-30-data-hook": {
     variants: 3, images: 0, runImageGen: false, imageDirectorId: null,
-    aspectRatio: null, fluxSize: null, imageQualitySteps: 0,
-    variantLabels: ["落差版", "時間版", "換算版"],
+    aspectRatio: null, variantLabels: ["落差版", "時間版", "換算版"],
     captionMinChars: 40, captionMaxChars: 260,
   },
   "x-30-build-in-public": {
     variants: 3, images: 0, runImageGen: false, imageDirectorId: null,
-    aspectRatio: null, fluxSize: null, imageQualitySteps: 0,
-    variantLabels: ["單次版", "對照版", "可借用版"],
+    aspectRatio: null, variantLabels: ["單次版", "對照版", "可借用版"],
     captionMinChars: 40, captionMaxChars: 260,
   },
   "x-30-industry-reply": {
     variants: 3, images: 0, runImageGen: false, imageDirectorId: null,
-    aspectRatio: null, fluxSize: null, imageQualitySteps: 0,
-    variantLabels: ["實務版", "被影響的人版", "長期版"],
+    aspectRatio: null, variantLabels: ["實務版", "被影響的人版", "長期版"],
     captionMinChars: 40, captionMaxChars: 260,
   },
   "x-30-launch": {
     variants: 3, images: 0, runImageGen: false, imageDirectorId: null,
-    aspectRatio: null, fluxSize: null, imageQualitySteps: 0,
-    variantLabels: ["落差版", "情境版", "一句版"],
+    aspectRatio: null, variantLabels: ["落差版", "情境版", "一句版"],
     captionMinChars: 30, captionMaxChars: 260,
   },
   "x-30-tip": {
     variants: 3, images: 0, runImageGen: false, imageDirectorId: null,
-    aspectRatio: null, fluxSize: null, imageQualitySteps: 0,
-    variantLabels: ["直接教版", "破除誤解版", "踩坑版"],
+    aspectRatio: null, variantLabels: ["直接教版", "破除誤解版", "踩坑版"],
     captionMinChars: 40, captionMaxChars: 260,
   },
 
   "x-30-thread-howto": {
     variants: 1, images: 0, runImageGen: false, imageDirectorId: null,
-    aspectRatio: null, fluxSize: null, imageQualitySteps: 0,
-    variantLabels: ["教學串"], captionMinChars: 500, captionMaxChars: 1600,
+    aspectRatio: null, variantLabels: ["教學串"], captionMinChars: 500, captionMaxChars: 1600,
   },
   "x-30-thread-story": {
     variants: 1, images: 0, runImageGen: false, imageDirectorId: null,
-    aspectRatio: null, fluxSize: null, imageQualitySteps: 0,
-    variantLabels: ["敘事串"], captionMinChars: 600, captionMaxChars: 1800,
+    aspectRatio: null, variantLabels: ["敘事串"], captionMinChars: 600, captionMaxChars: 1800,
   },
   "x-30-thread-teardown": {
     variants: 1, images: 0, runImageGen: false, imageDirectorId: null,
-    aspectRatio: null, fluxSize: null, imageQualitySteps: 0,
-    variantLabels: ["拆解串"], captionMinChars: 600, captionMaxChars: 1800,
+    aspectRatio: null, variantLabels: ["拆解串"], captionMinChars: 600, captionMaxChars: 1800,
   },
   "x-30-thread-listicle": {
     variants: 1, images: 0, runImageGen: false, imageDirectorId: null,
-    aspectRatio: null, fluxSize: null, imageQualitySteps: 0,
-    variantLabels: ["清單串"], captionMinChars: 600, captionMaxChars: 1800,
+    aspectRatio: null, variantLabels: ["清單串"], captionMinChars: 600, captionMaxChars: 1800,
   },
 };
 

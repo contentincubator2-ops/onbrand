@@ -382,7 +382,7 @@ ${PR_TONE}`,
     postType: "press-release",
     label: { en: "Release: Build a Place, Not a Message", zh: "新聞稿：把一個實體場景變成新聞" },
     description: { en: "Reporters need something to photograph", zh: "記者要拍得到東西才會來" },
-    agent_id: 29,              // 沿用同 postType 現役卡
+    agent_id: 29, // 沿用同 postType 現役卡
     skill_slug: "press-release",
     source: {
       type: "viral",
@@ -421,7 +421,7 @@ ${PR_TONE}`,
     postType: "press",
     label: { en: "Media: Say It All Before They Ask", zh: "媒體關係：出事時先把話講完" },
     description: { en: "Take the story back with self-deprecation", zh: "用自嘲換回主導權的回應包" },
-    agent_id: 223197,              // 沿用同 postType 現役卡
+    agent_id: 223197, // 沿用同 postType 現役卡
     skill_slug: "pr-writing",
     source: {
       type: "viral",
@@ -462,29 +462,27 @@ export const PR_30S_ORCHESTRA: Record<string, OrchestraConfig> = {
   // POOL of 8 distinct-angle headlines in one run. RunPage surfaces 3,
   // 「再給我幾個標題」reveals the rest from this already-persisted pool —
   // zero extra cost/latency. captionMax tightened to one-line headline.
-  "pr-30-headline":           { variants: 8, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["事實式", "受影響者視角", "對比式", "反問式", "數據衝擊", "時機式", "引述式", "懸念式"], captionMinChars: 12, captionMaxChars: 42 },
-  "pr-30-subhead":            { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["影響面", "規模延伸", "時程感"], captionMinChars: 30, captionMaxChars: 80 },
-  "pr-30-lead-paragraph":     { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["事實密度型", "影響面型", "故事感型"], captionMinChars: 70, captionMaxChars: 180 },
-  "pr-30-ceo-quote":          { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["願景式", "客戶價值", "市場觀察"], captionMinChars: 1800, captionMaxChars: 3200 },
-  "pr-30-boilerplate":        { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["產品導向", "規模導向", "里程碑導向"], captionMinChars: 150, captionMaxChars: 300 },
-  "pr-30-fact-sheet":         { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["產品優先", "公司優先", "市場優先"], captionMinChars: 280, captionMaxChars: 1400 },
-  "pr-30-media-pitch":        { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["共同議題切入", "獨家數據切入", "採訪邀請切入"], captionMinChars: 100, captionMaxChars: 250 },
-  "pr-30-spokesperson-qa":    { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["防禦型", "透明型", "主動引導"], captionMinChars: 300, captionMaxChars: 1000 },
-  "pr-30-launch-social":      { variants: 3, images: 3, runImageGen: false, imageDirectorId: VINCENT_ID, aspectRatio: "1.91:1", fluxSize: "landscape_4_3", imageQualitySteps: 4, variantLabels: ["FB 口吻", "LinkedIn 口吻", "Threads 口吻"], captionMinChars: 100, captionMaxChars: 250 },
+  "pr-30-headline":           { variants: 8, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null,variantLabels: ["事實式", "受影響者視角", "對比式", "反問式", "數據衝擊", "時機式", "引述式", "懸念式"], captionMinChars: 12, captionMaxChars: 42 },
+  "pr-30-subhead":            { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null,variantLabels: ["影響面", "規模延伸", "時程感"], captionMinChars: 30, captionMaxChars: 80 },
+  "pr-30-lead-paragraph":     { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null,variantLabels: ["事實密度型", "影響面型", "故事感型"], captionMinChars: 70, captionMaxChars: 180 },
+  "pr-30-ceo-quote":          { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null,variantLabels: ["願景式", "客戶價值", "市場觀察"], captionMinChars: 1800, captionMaxChars: 3200 },
+  "pr-30-boilerplate":        { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null,variantLabels: ["產品導向", "規模導向", "里程碑導向"], captionMinChars: 150, captionMaxChars: 300 },
+  "pr-30-fact-sheet":         { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null,variantLabels: ["產品優先", "公司優先", "市場優先"], captionMinChars: 280, captionMaxChars: 1400 },
+  "pr-30-media-pitch":        { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null,variantLabels: ["共同議題切入", "獨家數據切入", "採訪邀請切入"], captionMinChars: 100, captionMaxChars: 250 },
+  "pr-30-spokesperson-qa":    { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null,variantLabels: ["防禦型", "透明型", "主動引導"], captionMinChars: 300, captionMaxChars: 1000 },
+  "pr-30-launch-social":      { variants: 3, images: 3, runImageGen: false, imageDirectorId: VINCENT_ID, aspectRatio: "1.91:1",variantLabels: ["FB 口吻", "LinkedIn 口吻", "Threads 口吻"], captionMinChars: 100, captionMaxChars: 250 },
   // 8-angle pool; RunPage pool mode (>4) gives 再給我幾個 reveal-more.
-  "pr-30-news-hook":          { variants: 8, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["Reframe 換框架", "Newsjack 借時事", "反直覺數據", "人的故事", "產業意義", "對比衝突", "首次/之最", "在地連結"], captionMinChars: 80, captionMaxChars: 400 },
+  "pr-30-news-hook":          { variants: 8, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null,variantLabels: ["Reframe 換框架", "Newsjack 借時事", "反直覺數據", "人的故事", "產業意義", "對比衝突", "首次/之最", "在地連結"], captionMinChars: 80, captionMaxChars: 400 },
 
   // ── 爆款結構卡 ────────────────────────────────────────────────────
   "pr-30-stunt-release": {
     variants: 3, images: 0, runImageGen: false, imageDirectorId: null,
-    aspectRatio: null, fluxSize: null, imageQualitySteps: 0,
-    variantLabels: ["場景版", "限時版", "開放參觀版"],
+    aspectRatio: null, variantLabels: ["場景版", "限時版", "開放參觀版"],
     captionMinChars: 400, captionMaxChars: 900,
   },
   "pr-30-media-own-mistake": {
     variants: 3, images: 0, runImageGen: false, imageDirectorId: null,
-    aspectRatio: null, fluxSize: null, imageQualitySteps: 0,
-    variantLabels: ["自嘲版", "時間軸版", "第三方查核版"],
+    aspectRatio: null, variantLabels: ["自嘲版", "時間軸版", "第三方查核版"],
     captionMinChars: 350, captionMaxChars: 800,
   },
 };

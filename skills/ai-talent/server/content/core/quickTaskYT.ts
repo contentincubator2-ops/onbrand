@@ -315,7 +315,7 @@ image_style_direction.summary 給這支片開場畫面的視覺風格（構圖�
     postType: "video",
     label: { en: "Video: Turn the Claim Into a Live Test", zh: "YT 影片：把宣稱做成一場實測" },
     description: { en: "Prove the spec instead of stating it", zh: "不講規格，當場證明給人看" },
-    agent_id: 224000,              // 沿用同 postType 現役卡
+    agent_id: 224000, // 沿用同 postType 現役卡
     skill_slug: "youtube-content",
     source: {
       type: "viral",
@@ -352,7 +352,7 @@ image_style_direction.summary 給這支片開場畫面的視覺風格（構圖�
     postType: "premiere",
     label: { en: "Premiere: Make the Wait a Party", zh: "YT 首映：把等待變成聚會" },
     description: { en: "The waiting room is the content", zh: "首映前的聊天室就是內容" },
-    agent_id: 223995,              // 沿用同 postType 現役卡
+    agent_id: 223995, // 沿用同 postType 現役卡
     skill_slug: "shorts-scriptwriter",
     source: {
       type: "viral",
@@ -389,7 +389,7 @@ image_style_direction.summary 給這支片開場畫面的視覺風格（構圖�
     postType: "watch",
     label: { en: "Watch: Show People Their Own Gap", zh: "YT 長片：讓當事人看見自己的落差" },
     description: { en: "An experiment that changes the subject on camera", zh: "設計一個讓受訪者當場改變的實驗" },
-    agent_id: 24,              // 沿用同 postType 現役卡
+    agent_id: 24, // 沿用同 postType 現役卡
     skill_slug: "youtube-publisher",
     source: {
       type: "viral",
@@ -427,7 +427,7 @@ image_style_direction.summary 給這支片開場畫面的視覺風格（構圖�
     postType: "shorts",
     label: { en: "Shorts: Make the Sound the Logo", zh: "YT Shorts：用聲音當記憶點" },
     description: { en: "Recognisable with the screen off", zh: "關掉畫面也認得出來的短片" },
-    agent_id: 60030,              // 沿用同 postType 現役卡
+    agent_id: 60030, // 沿用同 postType 現役卡
     skill_slug: "youtube-shorts-automation",
     source: {
       type: "viral",
@@ -464,7 +464,7 @@ image_style_direction.summary 給這支片開場畫面的視覺風格（構圖�
     postType: "storyboard",
     label: { en: "Storyboard: One Take Through the Company", zh: "YT 分鏡：一鏡到底走完全公司" },
     description: { en: "One continuous shot that explains the business", zh: "用一個連續鏡頭把整個生意講完" },
-    agent_id: 210220,              // 沿用同 postType 現役卡
+    agent_id: 210220, // 沿用同 postType 現役卡
     skill_slug: "youtube-content",
     source: {
       type: "viral",
@@ -503,7 +503,7 @@ image_style_direction.summary 給這支片開場畫面的視覺風格（構圖�
     postType: "thumbnail",
     label: { en: "Thumbnail: Leave One Thing on Screen", zh: "YT 縮圖：畫面上只留一個東西" },
     description: { en: "So bare it survives the scroll", zh: "極簡到滑動時無法忽略" },
-    agent_id: 36,              // 沿用同 postType 現役卡
+    agent_id: 36, // 沿用同 postType 現役卡
     skill_slug: "youtube-thumbnail",
     source: {
       type: "viral",
@@ -540,7 +540,7 @@ image_style_direction.summary 給這支片開場畫面的視覺風格（構圖�
     postType: "community",
     label: { en: "Community: Make Channel News Everyone's News", zh: "YT 社群：把頻道的事變成大家的事" },
     description: { en: "Let subscribers decide what happens next", zh: "讓訂閱者決定接下來發生什麼" },
-    agent_id: 180186,              // 沿用同 postType 現役卡
+    agent_id: 180186, // 沿用同 postType 現役卡
     skill_slug: "youtube-publisher",
     source: {
       type: "viral",
@@ -577,7 +577,7 @@ image_style_direction.summary 給這支片開場畫面的視覺風格（構圖�
     postType: "video-card",
     label: { en: "Card: One Card, One Action", zh: "YT 資訊卡：一張卡只要一個動作" },
     description: { en: "No second option while the card is up", zh: "卡片出現時，畫面上不要有第二個選擇" },
-    agent_id: 30014,              // 沿用同 postType 現役卡
+    agent_id: 30014, // 沿用同 postType 現役卡
     skill_slug: "youtube-publisher",
     source: {
       type: "viral",
@@ -621,119 +621,100 @@ const YT_DIR_ROSS = 220733; // Ross Chou — Quantitative Research Designer
 export const YT_30S_ORCHESTRA: Record<string, OrchestraConfig> = {
   "yt-30-title-strategies": {
     variants: 3, images: 3, runImageGen: false,
-    imageDirectorId: YU_CHENG_ID, aspectRatio: "16:9", fluxSize: "landscape_16_9", imageQualitySteps: 4,
-    variantLabels: ["SEO 友善", "反差 + 數字", "懸念式"],
+    imageDirectorId: YU_CHENG_ID, aspectRatio: "16:9", variantLabels: ["SEO 友善", "反差 + 數字", "懸念式"],
     captionMinChars: 200, captionMaxChars: 600,
   },
   "yt-30-thumbnail-text": {
     variants: 3, images: 3, runImageGen: false,
-    imageDirectorId: YT_DIR_ERIC, aspectRatio: "16:9", fluxSize: "landscape_16_9", imageQualitySteps: 4,
-    variantLabels: ["大字震撼型", "人臉表情型", "對比拼貼型"],
+    imageDirectorId: YT_DIR_ERIC, aspectRatio: "16:9", variantLabels: ["大字震撼型", "人臉表情型", "對比拼貼型"],
     captionMinChars: 100, captionMaxChars: 400,
   },
   "yt-30-description-seo": {
     variants: 3, images: 0, runImageGen: false,
-    imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0,
-    variantLabels: ["關鍵字密集型", "故事敘述型", "清單導向型"],
+    imageDirectorId: null, aspectRatio: null, variantLabels: ["關鍵字密集型", "故事敘述型", "清單導向型"],
     captionMinChars: 400, captionMaxChars: 1500,
   },
   "yt-30-chapter-timeline": {
     variants: 3, images: 0, runImageGen: false,
-    imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0,
-    variantLabels: ["精簡 5 章", "標準 8 章", "細緻 12 章"],
+    imageDirectorId: null, aspectRatio: null, variantLabels: ["精簡 5 章", "標準 8 章", "細緻 12 章"],
     captionMinChars: 100, captionMaxChars: 1200,
   },
   "yt-30-shorts-script": {
     variants: 3, images: 3, runImageGen: false,
-    imageDirectorId: YT_DIR_IRIS, aspectRatio: "9:16", fluxSize: "portrait_9_16", imageQualitySteps: 4,
-    variantLabels: ["教學型", "故事型", "反差型"],
+    imageDirectorId: YT_DIR_IRIS, aspectRatio: "9:16", variantLabels: ["教學型", "故事型", "反差型"],
     captionMinChars: 300, captionMaxChars: 1000,
   },
   "yt-30-opening-hook": {
     variants: 3, images: 3, runImageGen: false,
-    imageDirectorId: YT_DIR_ROSS, aspectRatio: "16:9", fluxSize: "landscape_16_9", imageQualitySteps: 4,
-    variantLabels: ["懸念式", "數字 / 反差", "直球觀點"],
+    imageDirectorId: YT_DIR_ROSS, aspectRatio: "16:9", variantLabels: ["懸念式", "數字 / 反差", "直球觀點"],
     captionMinChars: 150, captionMaxChars: 700,
   },
   "yt-30-end-cta": {
     variants: 3, images: 0, runImageGen: false,
-    imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0,
-    variantLabels: ["訂閱導向", "下集導向", "留言互動導向"],
+    imageDirectorId: null, aspectRatio: null, variantLabels: ["訂閱導向", "下集導向", "留言互動導向"],
     captionMinChars: 150, captionMaxChars: 600,
   },
   "yt-30-comment-reply": {
     variants: 3, images: 0, runImageGen: false,
-    imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0,
-    variantLabels: ["溫暖式", "幽默式", "深度回應"],
+    imageDirectorId: null, aspectRatio: null, variantLabels: ["溫暖式", "幽默式", "深度回應"],
     captionMinChars: 30, captionMaxChars: 150,
   },
   "yt-30-pinned-comment": {
     variants: 3, images: 0, runImageGen: false,
-    imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0,
-    variantLabels: ["提問式", "補充式", "反差式"],
+    imageDirectorId: null, aspectRatio: null, variantLabels: ["提問式", "補充式", "反差式"],
     captionMinChars: 80, captionMaxChars: 200,
   },
   "yt-30-community-post": {
     variants: 3, images: 0, runImageGen: false,
-    imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0,
-    variantLabels: ["純文字觀點", "民調型", "預告倒數型"],
+    imageDirectorId: null, aspectRatio: null, variantLabels: ["純文字觀點", "民調型", "預告倒數型"],
     captionMinChars: 100, captionMaxChars: 400,
   },
   // 2026-09-08：原 YT 唯一影片卡，影片生成移除後只剩靜圖；沿用 2 變體＋
   // imageQualitySteps 8 的紀律。
   "yt-30-shorts-clip": {
     variants: 2, images: 2, runImageGen: true, imageDirectorId: YT_DIR_IRIS,
-    aspectRatio: "9:16", fluxSize: "portrait_9_16", imageQualitySteps: 8,
-    variantLabels: ["質感特寫", "情境動態"], captionMinChars: 60, captionMaxChars: 120,
+    aspectRatio: "9:16", variantLabels: ["質感特寫", "情境動態"], captionMinChars: 60, captionMaxChars: 120,
   },
 
   // ── 爆款結構卡 ────────────────────────────────────────────────────
   "yt-30-live-test-demo": {
     variants: 3, images: 3, runImageGen: false, imageDirectorId: YU_CHENG_ID,
-    aspectRatio: "9:16", fluxSize: "portrait_9_16", imageQualitySteps: 4,
-    variantLabels: ["實測版", "對照組版", "素人挑戰版"],
+    aspectRatio: "9:16", variantLabels: ["實測版", "對照組版", "素人挑戰版"],
     captionMinChars: 400, captionMaxChars: 900,
   },
   "yt-30-premiere-countdown-room": {
     variants: 3, images: 3, runImageGen: false, imageDirectorId: YU_CHENG_ID,
-    aspectRatio: "9:16", fluxSize: "portrait_9_16", imageQualitySteps: 4,
-    variantLabels: ["倒數版", "解謎版", "應援版"],
+    aspectRatio: "9:16", variantLabels: ["倒數版", "解謎版", "應援版"],
     captionMinChars: 350, captionMaxChars: 750,
   },
   "yt-30-watch-mirror-test": {
     variants: 3, images: 3, runImageGen: false, imageDirectorId: YU_CHENG_ID,
-    aspectRatio: "9:16", fluxSize: "portrait_9_16", imageQualitySteps: 4,
-    variantLabels: ["雙描述版", "盲測版", "時間差版"],
+    aspectRatio: "9:16", variantLabels: ["雙描述版", "盲測版", "時間差版"],
     captionMinChars: 500, captionMaxChars: 1100,
   },
   "yt-30-shorts-sound-brand": {
     variants: 3, images: 3, runImageGen: false, imageDirectorId: YU_CHENG_ID,
-    aspectRatio: "9:16", fluxSize: "portrait_9_16", imageQualitySteps: 4,
-    variantLabels: ["原創旋律版", "招牌音效版", "口號節奏版"],
+    aspectRatio: "9:16", variantLabels: ["原創旋律版", "招牌音效版", "口號節奏版"],
     captionMinChars: 150, captionMaxChars: 400,
   },
   "yt-30-storyboard-one-take": {
     variants: 3, images: 3, runImageGen: false, imageDirectorId: YU_CHENG_ID,
-    aspectRatio: "9:16", fluxSize: "portrait_9_16", imageQualitySteps: 4,
-    variantLabels: ["動線版", "交接版", "逆向版"],
+    aspectRatio: "9:16", variantLabels: ["動線版", "交接版", "逆向版"],
     captionMinChars: 400, captionMaxChars: 900,
   },
   "yt-30-thumbnail-one-object": {
     variants: 3, images: 3, runImageGen: false, imageDirectorId: YU_CHENG_ID,
-    aspectRatio: "9:16", fluxSize: "portrait_9_16", imageQualitySteps: 4,
-    variantLabels: ["單一主體版", "反常版", "留白版"],
+    aspectRatio: "9:16", variantLabels: ["單一主體版", "反常版", "留白版"],
     captionMinChars: 100, captionMaxChars: 280,
   },
   "yt-30-community-cliffhanger": {
     variants: 3, images: 3, runImageGen: false, imageDirectorId: YU_CHENG_ID,
-    aspectRatio: "9:16", fluxSize: "portrait_9_16", imageQualitySteps: 4,
-    variantLabels: ["投票版", "求救版", "公開帳本版"],
+    aspectRatio: "9:16", variantLabels: ["投票版", "求救版", "公開帳本版"],
     captionMinChars: 120, captionMaxChars: 300,
   },
   "yt-30-videocard-single-action": {
     variants: 3, images: 3, runImageGen: false, imageDirectorId: YU_CHENG_ID,
-    aspectRatio: "9:16", fluxSize: "portrait_9_16", imageQualitySteps: 4,
-    variantLabels: ["停頓版", "懸念版", "補完版"],
+    aspectRatio: "9:16", variantLabels: ["停頓版", "懸念版", "補完版"],
     captionMinChars: 80, captionMaxChars: 220,
   },
 };

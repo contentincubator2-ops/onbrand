@@ -152,30 +152,26 @@ const YT60_DIR_UMA   = 220740; // Uma Tsai — Quantitative Research Designer
 export const YT_60S_ORCHESTRA: Record<string, OrchestraConfig> = {
   "yt-60-video-package": {
     variants: 5, images: 5, runImageGen: true, imageDirectorId: NINA_FALLBACK,
-    aspectRatio: "16:9", fluxSize: "landscape_16_9", imageQualitySteps: 8,
-    variantLabels: ["教學版", "故事版", "數據版", "懸念版", "對比版"],
+    aspectRatio: "16:9", variantLabels: ["教學版", "故事版", "數據版", "懸念版", "對比版"],
     captionMinChars: 400, captionMaxChars: 800,
     extras: { replyTemplates: 5, postingTime: true, followupPost: true },
   },
   "yt-60-shorts-script": {
     variants: 5, images: 5, runImageGen: true, imageDirectorId: YT60_DIR_LUKE,
-    aspectRatio: "9:16", fluxSize: "portrait_9_16", imageQualitySteps: 4,
-    variantLabels: ["教學版", "反差版", "揭密版", "節奏版", "懸念版"],
+    aspectRatio: "9:16", variantLabels: ["教學版", "反差版", "揭密版", "節奏版", "懸念版"],
     captionMinChars: 300, captionMaxChars: 500,
     strategistAgentId: 60033, // Yawen Yeh — E-commerce Short Video Scriptwriter (845 char)
     extras: { replyTemplates: 5, postingTime: true, followupPost: true, narrativeArc: true },
   },
   "yt-60-thumbnail-suite": {
     variants: 5, images: 5, runImageGen: true, imageDirectorId: YT60_DIR_REINA,
-    aspectRatio: "16:9", fluxSize: "landscape_16_9", imageQualitySteps: 8,
-    variantLabels: ["數字式", "反問式", "反差式", "誇張式", "懸念式"],
+    aspectRatio: "16:9", variantLabels: ["數字式", "反問式", "反差式", "誇張式", "懸念式"],
     captionMinChars: 30, captionMaxChars: 50,
     extras: { replyTemplates: 5, postingTime: true, followupPost: true },
   },
   "yt-60-series-3ep": {
     variants: 3, images: 3, runImageGen: true, imageDirectorId: YT60_DIR_BLAKE,
-    aspectRatio: "16:9", fluxSize: "landscape_16_9", imageQualitySteps: 8,
-    variantLabels: ["第 1 集", "第 2 集", "第 3 集"],
+    aspectRatio: "16:9", variantLabels: ["第 1 集", "第 2 集", "第 3 集"],
     captionMinChars: 350, captionMaxChars: 700,
     strategistAgentId: 30014, // Nina Liu — YouTube Script Creator (1929 char)
     postLabels: ["第 1 集", "第 2 集", "第 3 集"],
@@ -183,15 +179,13 @@ export const YT_60S_ORCHESTRA: Record<string, OrchestraConfig> = {
   },
   "yt-60-community-post": {
     variants: 5, images: 5, runImageGen: true, imageDirectorId: YT60_DIR_RUTH,
-    aspectRatio: "1:1", fluxSize: "square_hd", imageQualitySteps: 4,
-    variantLabels: ["投票式", "圖片式", "文字式", "問答式", "預告式"],
+    aspectRatio: "1:1", variantLabels: ["投票式", "圖片式", "文字式", "問答式", "預告式"],
     captionMinChars: 80, captionMaxChars: 200,
     extras: { replyTemplates: 5, postingTime: true, followupPost: true },
   },
   "yt-60-viral-rewrite": {
     variants: 5, images: 5, runImageGen: true, imageDirectorId: YT60_DIR_UMA,
-    aspectRatio: "16:9", fluxSize: "landscape_16_9", imageQualitySteps: 4,
-    variantLabels: ["保結構式", "情感放大式", "反差式", "數據式", "故事式"],
+    aspectRatio: "16:9", variantLabels: ["保結構式", "情感放大式", "反差式", "數據式", "故事式"],
     captionMinChars: 350, captionMaxChars: 700,
     strategistAgentId: 180158, // Oliver Fang — Social Media Analytics Specialist (1697 char)
     specialtyAgentId: 180591, // Samantha Anderson — General Counsel (2199 char)
@@ -207,8 +201,7 @@ export const YT_60S_ORCHESTRA: Record<string, OrchestraConfig> = {
   // 讓拆卡的 LLM 用「鏡頭語言」而非輪播的 Hook→CTA 廣告文案語言拆解。
   "yt-60-storyboard": {
     variants: 1, images: 1, runImageGen: true, imageDirectorId: YT60_DIR_REINA,
-    aspectRatio: "16:9", fluxSize: "landscape_16_9", imageQualitySteps: 8,
-    variantLabels: ["分鏡完整版"],
+    aspectRatio: "16:9", variantLabels: ["分鏡完整版"],
     captionMinChars: 300, captionMaxChars: 1000,
     cardsPerVariant: 5,
     cardsKind: "storyboard",

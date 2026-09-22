@@ -27,7 +27,7 @@ import {
   resolveProductSubjectReference,
 } from "./productSubjectPolicy";
 import { isLocalUploadPath, probeImageUrl } from "./imageFetch";
-import { angleVisualLens, angleWritingBlock, checkAngle } from "./variantAngles";
+import { angleVisualLens, angleWritingBlock, checkAngle, pickOwnAngleBlock, sanitizeAngleLabel } from "./variantAngles";
 import { findFirstUrl, fetchUrlSummary, formatUrlSummaryForPrompt, type UrlSummary } from "./urlContext";
 import { detectNonDeliverable } from "./captionSanity";
 import { isAdCopyTemplate, extractRequestedUrl, buildAdCopyRule, validateAdCopy, repairAdCopy } from "./adCopyContract";
@@ -755,7 +755,13 @@ async function callOneVariant(args: {
   const filledSystemPrompt = template.systemPrompt
     .replace(/\{label\}/g, label)
     .replace(/\{today\}/g, todayStr);
-  const angleBlock = angleWritingBlock(label, { siblings: args.siblingLabels, taskSystemPrompt: template.systemPrompt });
+  // 2026-09-22 (CJ「不應該將所有產品都規定為情感版、理性版還有數據版……香氛產品用數據版，好奇怪」):
+  // a handful of generic, apply-to-any-product tasks (pickOwnAngle) don't get a pre-assigned label at
+  // all — the writer picks whichever angle fits THIS product and reports its own choice back (see
+  // extractCaption's "label" field below). Everything else keeps the existing fixed-label behaviour.
+  const angleBlock = config.pickOwnAngle
+    ? pickOwnAngleBlock({ index: Math.max(1, (args.siblingLabels?.indexOf(label) ?? -1) + 1), total: config.variants })
+    : angleWritingBlock(label, { siblings: args.siblingLabels, taskSystemPrompt: template.systemPrompt });
 
   // 2026-05-16 (CJ「一句話 brand brief 變成長文改寫 — 指令太短還是
   // agent 不準？」root cause): a single soft "字數 X-Y 字" line gets
@@ -1007,10 +1013,11 @@ async function callOneVariant(args: {
     cwBlock +
     craftLocaleNote +
     strategistSection +
-    `\n\n【本次任務】只寫 1 個變體：**${label}**。\n` +
-    // 2026-09-22 (CJ「命名跟內文的版本設計，應該要有直接關係」)：版本名稱不再只是一個詞——
-    // 通用切角（情感／理性／數據／故事／懸念／反差）在 variantAngles.ts 有明確定義；
-    // 任務自己的 systemPrompt 已經提到這個名稱的，維持任務自己的寫法。
+    // 2026-09-22 (CJ「不應該將所有產品都規定為情感版、理性版還有數據版」)：pickOwnAngle 任務
+    // 不先報一個固定名稱——角度由 angleBlock（pickOwnAngleBlock）自己決定；其餘任務維持原本
+    // 「只寫 1 個變體：**理性版**」的固定指定，通用切角的寫法定義在 variantAngles.ts，任務自己的
+    // systemPrompt 已經提到這個名稱的，維持任務自己的寫法。
+    (config.pickOwnAngle ? `\n\n【本次任務】只寫這組貼文裡的 1 篇。\n` : `\n\n【本次任務】只寫 1 個變體：**${label}**。\n`) +
     angleBlock +
     `${lengthHint}\n\n` +
     `【角色 vs 主角 — 重要】\n` +
@@ -1019,7 +1026,7 @@ async function callOneVariant(args: {
     `不要寫「我是 ___」、「___ 專家，幫 ___ 做 ___」、不要把你的姓名（例如 #NinaYeh / @JanetChang）寫成 hashtag、@mention 或 caption 內任何形式。\n` +
     subjectRule +
     `\n【格式要求 — 重要】\n` +
-    `- caption 欄位**絕對不要**寫「${typeof template.label === "string" ? template.label : (template.label?.zh ?? template.label?.en ?? template.id)}」、「${label}」或任務 / label 名稱。\n` +
+    `- caption 欄位**絕對不要**寫「${typeof template.label === "string" ? template.label : (template.label?.zh ?? template.label?.en ?? template.id)}」${config.pickOwnAngle ? "、你自選的版本名稱本身" : `、「${label}」`}或任務 / label 名稱。\n` +
     `- caption 欄位**絕對不要**夾雜視覺描述、英文 prompt、「image_style:」、「visual:」等技術註記。圖片風格由另一位 agent 獨立處理，這裡只放最終發到平台的純文字內容。\n` +
     `- 用自然斷行（兩個 newline 分段）。**不要**用「｜」全形管道符號當分隔線。\n` +
     `- emoji 點綴用就好，不要每段開頭都塞 emoji。\n` +
@@ -1042,7 +1049,9 @@ async function callOneVariant(args: {
     `   ✓ 好：「晚上 8 點打開冰箱，看到剩半盒...」（場景畫面不需來源）\n` +
     `3. 場景也想不出 → 用「對話起手式」：「我跟一位 [TA 角色] 聊到...」「上週客人說了一句話讓我想很久...」\n\n` +
     `輸出嚴格 JSON 物件（不是陣列）：\n` +
-    `{"caption":"<完整貼文>","hashtags":["..."]}\n` +
+    (config.pickOwnAngle
+      ? `{"label":"<你自選的版本名稱>","caption":"<完整貼文>","hashtags":["..."]}\n`
+      : `{"caption":"<完整貼文>","hashtags":["..."]}\n`) +
     `第一個字元就是 {。不要 markdown code fence、不要前言。\n` +
     brandSection +
     (hasUrl ? `\n# URL 抓到的內容（本次主題來源 — 必須以此為主）\n${urlContext}` : "");
@@ -1093,12 +1102,14 @@ async function callOneVariant(args: {
   //   L2: any object with a string field that looks like the caption
   //   L3: raw text (strip code fences) if it's substantial Chinese/English
   //       — better to ship usable copy than fail the variant entirely.
-  const extractCaption = (raw: string, parsed: any): { caption: string; hashtags?: string[] } => {
+  const extractCaption = (raw: string, parsed: any): { caption: string; hashtags?: string[]; label?: string } => {
     // L1: standard shape
     if (typeof parsed?.caption === "string" && parsed.caption.trim().length > 0) {
       return {
         caption: parsed.caption.trim(),
         hashtags: Array.isArray(parsed?.hashtags) ? parsed.hashtags.slice(0, 15).map(String) : undefined,
+        // Only meaningful when config.pickOwnAngle asked for it; harmless (ignored) otherwise.
+        label: typeof parsed?.label === "string" ? parsed.label.trim() : undefined,
       };
     }
     // L2: alternate keys (LLM sometimes uses "content", "text", "post", "貼文")
@@ -1161,8 +1172,9 @@ async function callOneVariant(args: {
     try {
       // 2nd attempt: append explicit reminder to user msg, lowering model
       // creativity and forcing strict JSON.
+      const reminderJsonShape = config.pickOwnAngle ? `{"label":"...","caption":"...","hashtags":[]}` : `{"caption":"...","hashtags":[]}`;
       const userMsgWithReminder = attempt === 2
-        ? `${userMsg}\n\n[REMINDER] ${shotListIssue ? `上次回應違反分格腳本合約：${shotListIssue}。請照【分格腳本合約】重寫：至少 3 格，每格四行「畫面/動作/聲音/字卡」齊全，全篇不要 hashtag。` : adCopyIssue ? `上次回應違反廣告格式合約：${adCopyIssue}。請照【廣告格式合約】重寫。` : wuganVoiceIssue ? wuganVoiceIssue : angleIssue ? `上次回應不符合「${label}」的切角：${angleIssue}。請照【版本切角】重寫。` : "上次回應沒給可解析、可交付的 caption。"}請嚴格回覆 {"caption":"...","hashtags":[]} JSON，第一個字元就是 {，不要任何 markdown / 前言 / 解釋。不得要求澄清，不得輸出審議過程、選項評估、自述工作原則、處理步驟或輸入欄位內部名稱；來源抓不到內容時就依 URL 標題、描述與主題直接寫，絕不說明抓取失敗。caption 只能放最終成品。`
+        ? `${userMsg}\n\n[REMINDER] ${shotListIssue ? `上次回應違反分格腳本合約：${shotListIssue}。請照【分格腳本合約】重寫：至少 3 格，每格四行「畫面/動作/聲音/字卡」齊全，全篇不要 hashtag。` : adCopyIssue ? `上次回應違反廣告格式合約：${adCopyIssue}。請照【廣告格式合約】重寫。` : wuganVoiceIssue ? wuganVoiceIssue : angleIssue ? `上次回應不符合你選的切角設計：${angleIssue}。請照【版本切角】重寫（可以沿用同一個 label，也可以換一個更貼切的）。` : "上次回應沒給可解析、可交付的 caption。"}請嚴格回覆 ${reminderJsonShape} JSON，第一個字元就是 {，不要任何 markdown / 前言 / 解釋。不得要求澄清，不得輸出審議過程、選項評估、自述工作原則、處理步驟或輸入欄位內部名稱；來源抓不到內容時就依 URL 標題、描述與主題直接寫，絕不說明抓取失敗。caption 只能放最終成品。`
         : userMsg;
       const r = await Promise.race([
         callModel(
@@ -1247,20 +1259,22 @@ async function callOneVariant(args: {
             // JSON 外殼殘骸。
             return { label, caption: normalized, hashtags: [] };
           }
-          // 版本名稱要對得上內文：數據版一定要用數字開場，沒有就帶著原因重寫一次。
-          // 最後一次照實出貨（不為了切角把整個變體弄成空白）。
-          // 數字必須對得回素材：用戶輸入、抓到的網址內容、品牌資料。
-          const angleMiss = checkAngle(label, caption, template.systemPrompt, [userMsg, urlContext, brandPrefix].join("\n"));
+          // 版本名稱要對得上內文：pickOwnAngle 任務用模型自己回報的 label（falls back to the
+          // config default if it didn't return one usable）；其他任務仍是原本指定的 label。
+          // 數據版一定要用數字開場，沒有就帶著原因重寫一次；數字必須對得回素材。最後一次照實出貨
+          // （不為了切角把整個變體弄成空白）。
+          const effectiveLabel = config.pickOwnAngle ? sanitizeAngleLabel(out.label, label) : label;
+          const angleMiss = checkAngle(effectiveLabel, caption, template.systemPrompt, [userMsg, urlContext, brandPrefix].join("\n"));
           if (angleMiss && attempt < 2) {
-            lastErr = new Error(`angle miss for ${label}: ${angleMiss}`);
+            lastErr = new Error(`angle miss for ${effectiveLabel}: ${angleMiss}`);
             angleIssue = angleMiss;
-            console.warn(`[callOneVariant] attempt ${attempt} angle miss for ${label}: ${angleMiss}`);
+            console.warn(`[callOneVariant] attempt ${attempt} angle miss for ${effectiveLabel}: ${angleMiss}`);
             continue;
           }
           // dev 2026-08: strip draft-leak lines / internal snake_case keys
           // from the shipped caption. Only on this path — the contract
           // branches above return formats whose markers this would eat.
-          return { label, caption: sanitizeCaption(caption), hashtags: out.hashtags };
+          return { label: effectiveLabel, caption: sanitizeCaption(caption), hashtags: out.hashtags };
         }
         lastErr = new Error(`non-deliverable caption for ${label} (${sanity.reason}) — raw[0:200]: ${lastRaw.slice(0, 200)}`);
         console.warn(`[callOneVariant] attempt ${attempt} rejected for ${label} (${sanity.reason}): ${lastRaw.slice(0, 300)}`);

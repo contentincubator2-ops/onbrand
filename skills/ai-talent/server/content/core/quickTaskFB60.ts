@@ -24,10 +24,10 @@ import type { FBTaskTemplate, OrchestraConfig } from "./quickTaskFB";
 
 // Universal team IDs (used by orchestra; no need to repeat per-task)
 export const FB60_UNIVERSAL = {
-  hashtagAgentId: 30012,    // Mia Su — Meta Ads Specialist (2034 char)
-  replyAgentId: 180163,     // Helen Sung
+  hashtagAgentId: 30012, // Mia Su — Meta Ads Specialist (2034 char)
+  replyAgentId: 180163, // Helen Sung
   schedulerAgentId: 30003,  // David Wang
-  followupAgentId: 60012,   // Sophie Ho
+  followupAgentId: 60012, // Sophie Ho
   imageDirectorId: 220887,  // Claire Chen — Brand Visual Designer (977 char)
 } as const;
 
@@ -297,8 +297,9 @@ export const FB_60S_ORCHESTRA: Record<string, OrchestraConfig> = {
     runImageGen: true,
     imageDirectorId: MANDY,
     aspectRatio: "1:1",
-    fluxSize: "square_hd",
-    imageQualitySteps: 4,
+    // 2026-09-22 (CJ「香氛產品用數據版，好奇怪」): generic post-for-any-product card — angle is
+    // no longer pre-assigned, see OrchestraConfig.pickOwnAngle. variantLabels is the fallback only.
+    pickOwnAngle: true,
     variantLabels: ["情感版", "理性版", "故事版", "數據版", "懸念版"],
     captionMinChars: 200,
     captionMaxChars: 400,
@@ -313,8 +314,6 @@ export const FB_60S_ORCHESTRA: Record<string, OrchestraConfig> = {
     runImageGen: true,
     imageDirectorId: FB60_DIR_LUKE,
     aspectRatio: "1.91:1",
-    fluxSize: "landscape_4_3",
-    imageQualitySteps: 4,
     variantLabels: ["資訊式", "故事式", "問題式", "懸念式", "數據式"],
     captionMinChars: 100,
     captionMaxChars: 200,
@@ -333,8 +332,6 @@ export const FB_60S_ORCHESTRA: Record<string, OrchestraConfig> = {
     runImageGen: true,
     imageDirectorId: FB60_DIR_REINA,
     aspectRatio: "1:1",
-    fluxSize: "square_hd",
-    imageQualitySteps: 4,
     variantLabels: ["相簿版"],
     captionMinChars: 200,
     captionMaxChars: 300,
@@ -357,8 +354,6 @@ export const FB_60S_ORCHESTRA: Record<string, OrchestraConfig> = {
     runImageGen: true,
     imageDirectorId: FB60_DIR_RUTH,
     aspectRatio: "1:1",
-    fluxSize: "square_hd",
-    imageQualitySteps: 4,
     variantLabels: ["Day 5", "Day 4", "Day 3", "Day 2", "Day 1"],
     captionMinChars: 80,
     captionMaxChars: 130,
@@ -377,8 +372,6 @@ export const FB_60S_ORCHESTRA: Record<string, OrchestraConfig> = {
     runImageGen: true,
     imageDirectorId: FB60_DIR_UMA,
     aspectRatio: "1:1",
-    fluxSize: "square_hd",
-    imageQualitySteps: 4,
     variantLabels: ["預告 1", "預告 2", "當日", "事後"],
     captionMinChars: 150,
     captionMaxChars: 250,
@@ -397,8 +390,6 @@ export const FB_60S_ORCHESTRA: Record<string, OrchestraConfig> = {
     runImageGen: true,
     imageDirectorId: FB60_DIR_JUSTIN,
     aspectRatio: "16:9",
-    fluxSize: "landscape_16_9",
-    imageQualitySteps: 4,
     variantLabels: ["預告", "開場宣告", "爆點 1", "爆點 2", "爆點 3", "精華回顧"],
     captionMinChars: 80,
     captionMaxChars: 200,
@@ -417,8 +408,6 @@ export const FB_60S_ORCHESTRA: Record<string, OrchestraConfig> = {
     runImageGen: true,
     imageDirectorId: FB60_DIR_PAUL,
     aspectRatio: "1:1",
-    fluxSize: "square_hd",
-    imageQualitySteps: 8,
     variantLabels: ["釘選主文", "常見問答 FAQ", "關於我們 About", "代表案例（客戶成功故事）"],
     captionMinChars: 200,
     captionMaxChars: 500,
@@ -447,8 +436,6 @@ export const FB_60S_ORCHESTRA: Record<string, OrchestraConfig> = {
     runImageGen: true,
     imageDirectorId: FB60_DIR_DREW,
     aspectRatio: "1:1",
-    fluxSize: "square_hd",
-    imageQualitySteps: 4,
     variantLabels: ["情感切角", "理性切角", "反差切角"],
     captionMinChars: 150,
     captionMaxChars: 300,

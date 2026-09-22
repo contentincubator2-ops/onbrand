@@ -283,7 +283,7 @@ A：直接回答，2–4 句。先給答案，再補理由。
     postType: "blog",
     label: { en: "Long-form: Open the Books", zh: "官網長文：把成本和取捨攤開來寫" },
     description: { en: "Publish the ugly numbers yourself", zh: "把難看的數字自己寫出來" },
-    agent_id: 220751,              // 沿用同 postType 現役卡
+    agent_id: 220751, // 沿用同 postType 現役卡
     skill_slug: "website-longform",
     source: {
       type: "viral",
@@ -323,7 +323,7 @@ A：直接回答，2–4 句。先給答案，再補理由。
     postType: "product-page",
     label: { en: "Product Page: Talk, Don't Pitch", zh: "產品頁：用講話的方式賣東西" },
     description: { en: "One person, one take, no spec sheet", zh: "一個人把話講完，沒有規格表" },
-    agent_id: 238853,              // 沿用同 postType 現役卡
+    agent_id: 238853, // 沿用同 postType 現役卡
     skill_slug: "product-page",
     source: {
       type: "viral",
@@ -371,41 +371,34 @@ A：直接回答，2–4 句。先給答案，再補理由。
 export const WEBSITE_30S_ORCHESTRA: Record<string, OrchestraConfig> = {
   "web-30-longform": {
     variants: 1, images: 0, runImageGen: false, imageDirectorId: null,
-    aspectRatio: null, fluxSize: null, imageQualitySteps: 0,
-    variantLabels: ["官網長文"], captionMinChars: 1200, captionMaxChars: 2400,
+    aspectRatio: null, variantLabels: ["官網長文"], captionMinChars: 1200, captionMaxChars: 2400,
   },
   "web-30-column": {
     variants: 1, images: 0, runImageGen: false, imageDirectorId: null,
-    aspectRatio: null, fluxSize: null, imageQualitySteps: 0,
-    variantLabels: ["品牌專欄"], captionMinChars: 1400, captionMaxChars: 2800,
+    aspectRatio: null, variantLabels: ["品牌專欄"], captionMinChars: 1400, captionMaxChars: 2800,
   },
   "web-30-case-study": {
     variants: 1, images: 0, runImageGen: false, imageDirectorId: null,
-    aspectRatio: null, fluxSize: null, imageQualitySteps: 0,
-    variantLabels: ["案例深度"], captionMinChars: 1600, captionMaxChars: 3000,
+    aspectRatio: null, variantLabels: ["案例深度"], captionMinChars: 1600, captionMaxChars: 3000,
   },
   "web-30-product-desc": {
     variants: 1, images: 0, runImageGen: false, imageDirectorId: null,
-    aspectRatio: null, fluxSize: null, imageQualitySteps: 0,
-    variantLabels: ["產品頁"], captionMinChars: 600, captionMaxChars: 1400,
+    aspectRatio: null, variantLabels: ["產品頁"], captionMinChars: 600, captionMaxChars: 1400,
   },
   "web-30-product-faq": {
     variants: 1, images: 0, runImageGen: false, imageDirectorId: null,
-    aspectRatio: null, fluxSize: null, imageQualitySteps: 0,
-    variantLabels: ["常見問答"], captionMinChars: 600, captionMaxChars: 1800,
+    aspectRatio: null, variantLabels: ["常見問答"], captionMinChars: 600, captionMaxChars: 1800,
   },
 
   // ── 爆款結構卡 ────────────────────────────────────────────────────
   "web-30-longform-open-books": {
     variants: 3, images: 0, runImageGen: false, imageDirectorId: null,
-    aspectRatio: null, fluxSize: null, imageQualitySteps: 0,
-    variantLabels: ["成本版", "取捨版", "失敗紀錄版"],
+    aspectRatio: null, variantLabels: ["成本版", "取捨版", "失敗紀錄版"],
     captionMinChars: 1200, captionMaxChars: 2400,
   },
   "web-30-product-page-plain-talk": {
     variants: 3, images: 0, runImageGen: false, imageDirectorId: null,
-    aspectRatio: null, fluxSize: null, imageQualitySteps: 0,
-    variantLabels: ["口語版", "比價版", "反話術版"],
+    aspectRatio: null, variantLabels: ["口語版", "比價版", "反話術版"],
     captionMinChars: 500, captionMaxChars: 1000,
   },
 };

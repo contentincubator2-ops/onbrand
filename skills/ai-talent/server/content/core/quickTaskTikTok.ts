@@ -596,7 +596,7 @@ ${TT_SUFFIX}`,
     postType: "live",
     label: { en: "Live: Swap Hosts, Not Just Products", zh: "TikTok 直播：換人比換品更留人" },
     description: { en: "Every segment opens like it's the first", zh: "每一段都當成新的開場" },
-    agent_id: 60073,              // 沿用同 postType 現役卡
+    agent_id: 60073, // 沿用同 postType 現役卡
     skill_slug: "live-script",
     source: {
       type: "viral",
@@ -633,7 +633,7 @@ ${TT_SUFFIX}`,
     postType: "profile",
     label: { en: "Profile: Build the Flaw Into the Persona", zh: "TikTok 帳號：把缺點寫進人設" },
     description: { en: "Own the joke people already make", zh: "用大家已經在笑的事當帳號主題" },
-    agent_id: 220949,              // 沿用同 postType 現役卡
+    agent_id: 220949, // 沿用同 postType 現役卡
     skill_slug: "tiktok-strategist",
     source: {
       type: "viral",
@@ -670,7 +670,7 @@ ${TT_SUFFIX}`,
     postType: "storyboard",
     label: { en: "Storyboard: Catch What Fans Already Filmed", zh: "TikTok 分鏡：接住素人已經拍好的東西" },
     description: { en: "Don't start a trend; continue someone's", zh: "不自己起梗，去續拍別人的" },
-    agent_id: 180167,              // 沿用同 postType 現役卡
+    agent_id: 180167, // 沿用同 postType 現役卡
     skill_slug: "tiktok-content",
     source: {
       type: "viral",
@@ -708,45 +708,42 @@ const ANNA_ID      = 180165; // Anna Tseng (主場)
 const TT_DIR_YUNA  = 220721; // Yuna Chiang — Decision Design Consultant
 const TT_DIR_GRANT = 220722; // Grant Yu — Decision Design Consultant
 export const TT_30S_ORCHESTRA: Record<string, OrchestraConfig> = {
-  "tt-30-opening-hook":      { variants: 3, images: 3, runImageGen: false, imageDirectorId: ANNA_ID, aspectRatio: "9:16", fluxSize: "portrait_9_16", imageQualitySteps: 4, variantLabels: ["懸念", "反差", "直球"], captionMinChars: 30, captionMaxChars: 100 },
-  "tt-30-full-script":       { variants: 3, images: 3, runImageGen: false, imageDirectorId: TT_DIR_YUNA, aspectRatio: "9:16", fluxSize: "portrait_9_16", imageQualitySteps: 4, variantLabels: ["教學型", "故事型", "反差型"], captionMinChars: 200, captionMaxChars: 800 },
-  "tt-30-caption-rhythm":    { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["標準", "極簡", "強調式"], captionMinChars: 100, captionMaxChars: 600 },
+  "tt-30-opening-hook":      { variants: 3, images: 3, runImageGen: false, imageDirectorId: ANNA_ID, aspectRatio: "9:16",variantLabels: ["懸念", "反差", "直球"], captionMinChars: 30, captionMaxChars: 100 },
+  "tt-30-full-script":       { variants: 3, images: 3, runImageGen: false, imageDirectorId: TT_DIR_YUNA, aspectRatio: "9:16",variantLabels: ["教學型", "故事型", "反差型"], captionMinChars: 200, captionMaxChars: 800 },
+  "tt-30-caption-rhythm":    { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null,variantLabels: ["標準", "極簡", "強調式"], captionMinChars: 100, captionMaxChars: 600 },
 
   // ── 高互動機制腳本卡（2026-08-23）────────────────────────────────────
   // images:0 / runImageGen:false —— 交付物是「照著拍的分格腳本」，配圖幫不上
   // 忙，而且用戶會想連試好幾種機制，每張卡都要便宜。
   // captionMaxChars 放到 1200：一格 5 行 × 4-6 格，壓太緊模型會把格子合併，
   // 就退回散文了。下限 400 則是防止只寫兩格交差。
-  "tt-30-visual-illusion":   { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["一秒變身", "借位錯覺", "倒放回原"], captionMinChars: 500, captionMaxChars: 1000 },
-  "tt-30-process-payoff":    { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["製作過程", "整理復原", "組裝完成"], captionMinChars: 500, captionMaxChars: 1000 },
-  "tt-30-beat-sync":         { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["多品項快切", "情境輪播", "安靜→爆點"], captionMinChars: 500, captionMaxChars: 1000 },
-  "tt-30-scale-reveal":      { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["細節拉到全景", "一鏡到底走位", "數量堆疊"], captionMinChars: 500, captionMaxChars: 1000 },
-  "tt-30-real-reaction":     { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["第一次使用", "旁人被吸引", "素人真實回饋"], captionMinChars: 500, captionMaxChars: 1000 },
-  "tt-30-bio-rewrite":       { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["專家定位", "個性風格", "結果導向"], captionMinChars: 50, captionMaxChars: 80 },
-  "tt-30-hashtag-set":       { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["fyp 大流量", "精準利基", "趨勢搭便車"], captionMinChars: 0, captionMaxChars: 400 },
-  "tt-30-caption-description":{ variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["懸念", "直球", "反差"], captionMinChars: 50, captionMaxChars: 100 },
-  "tt-30-duet-angle":        { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["共鳴反應", "專業補充", "反差吐槽"], captionMinChars: 50, captionMaxChars: 200 },
-  "tt-30-trend-remix":       { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["產業共鳴版", "反差版", "教育型"], captionMinChars: 80, captionMaxChars: 300 },
-  "tt-30-comment-reply":     { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["同感式", "幽默式", "反問式"], captionMinChars: 30, captionMaxChars: 80 },
-  "tt-30-live-opening":      { variants: 3, images: 3, runImageGen: false, imageDirectorId: TT_DIR_GRANT, aspectRatio: "9:16", fluxSize: "portrait_9_16", imageQualitySteps: 4, variantLabels: ["懸念", "互動", "直球"], captionMinChars: 100, captionMaxChars: 300 },
+  "tt-30-visual-illusion":   { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null,variantLabels: ["一秒變身", "借位錯覺", "倒放回原"], captionMinChars: 500, captionMaxChars: 1000 },
+  "tt-30-process-payoff":    { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null,variantLabels: ["製作過程", "整理復原", "組裝完成"], captionMinChars: 500, captionMaxChars: 1000 },
+  "tt-30-beat-sync":         { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null,variantLabels: ["多品項快切", "情境輪播", "安靜→爆點"], captionMinChars: 500, captionMaxChars: 1000 },
+  "tt-30-scale-reveal":      { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null,variantLabels: ["細節拉到全景", "一鏡到底走位", "數量堆疊"], captionMinChars: 500, captionMaxChars: 1000 },
+  "tt-30-real-reaction":     { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null,variantLabels: ["第一次使用", "旁人被吸引", "素人真實回饋"], captionMinChars: 500, captionMaxChars: 1000 },
+  "tt-30-bio-rewrite":       { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null,variantLabels: ["專家定位", "個性風格", "結果導向"], captionMinChars: 50, captionMaxChars: 80 },
+  "tt-30-hashtag-set":       { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null,variantLabels: ["fyp 大流量", "精準利基", "趨勢搭便車"], captionMinChars: 0, captionMaxChars: 400 },
+  "tt-30-caption-description":{ variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null,variantLabels: ["懸念", "直球", "反差"], captionMinChars: 50, captionMaxChars: 100 },
+  "tt-30-duet-angle":        { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null,variantLabels: ["共鳴反應", "專業補充", "反差吐槽"], captionMinChars: 50, captionMaxChars: 200 },
+  "tt-30-trend-remix":       { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null,variantLabels: ["產業共鳴版", "反差版", "教育型"], captionMinChars: 80, captionMaxChars: 300 },
+  "tt-30-comment-reply":     { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null,variantLabels: ["同感式", "幽默式", "反問式"], captionMinChars: 30, captionMaxChars: 80 },
+  "tt-30-live-opening":      { variants: 3, images: 3, runImageGen: false, imageDirectorId: TT_DIR_GRANT, aspectRatio: "9:16",variantLabels: ["懸念", "互動", "直球"], captionMinChars: 100, captionMaxChars: 300 },
 
   // ── Tier 1 產品卡（原影片卡）──────────────────────────
   // 2026-09-08 影片生成移除（不在價目表上），這四張只出靜圖。沿用原本的
   // 紀律：variants/images = 2、imageQualitySteps 8 —— 圖是主角，少而好。
   "tt-30-product-hero": {
     variants: 2, images: 2, runImageGen: true, imageDirectorId: ANNA_ID,
-    aspectRatio: "9:16", fluxSize: "portrait_9_16", imageQualitySteps: 8,
-    variantLabels: ["質感特寫", "情境使用"], captionMinChars: 60, captionMaxChars: 120,
+    aspectRatio: "9:16", variantLabels: ["質感特寫", "情境使用"], captionMinChars: 60, captionMaxChars: 120,
   },
   "tt-30-product-asmr": {
     variants: 2, images: 2, runImageGen: true, imageDirectorId: ANNA_ID,
-    aspectRatio: "9:16", fluxSize: "portrait_9_16", imageQualitySteps: 8,
-    variantLabels: ["材質特寫", "開箱瞬間"], captionMinChars: 40, captionMaxChars: 90,
+    aspectRatio: "9:16", variantLabels: ["材質特寫", "開箱瞬間"], captionMinChars: 40, captionMaxChars: 90,
   },
   "tt-30-text-hook-card": {
     variants: 2, images: 2, runImageGen: true, imageDirectorId: TT_DIR_YUNA,
-    aspectRatio: "9:16", fluxSize: "portrait_9_16", imageQualitySteps: 8,
-    // ⚠️ captionMaxChars 絕對不能設 ≤60。orchestra 的 lengthHint 有一條隱藏
+    aspectRatio: "9:16", // ⚠️ captionMaxChars 絕對不能設 ≤60。orchestra 的 lengthHint 有一條隱藏
     // 耦合：captionMaxChars <= 60 會注入一段【嚴格字數 — 最高優先】，內容
     // 明講「只能是 1 句，不分段」—— 那是為了 headline/一句話這種微任務寫的，
     // 但它的優先級蓋過任務 prompt，會把字卡的 4 行強制壓成 1 行。
@@ -761,8 +758,7 @@ export const TT_30S_ORCHESTRA: Record<string, OrchestraConfig> = {
   // holdForImages 確保 5 格畫面都到齊才收工 —— 缺格的分鏡表沒有意義。
   "tt-30-storyboard": {
     variants: 1, images: 1, runImageGen: true, imageDirectorId: ANNA_ID,
-    aspectRatio: "9:16", fluxSize: "portrait_9_16", imageQualitySteps: 8,
-    variantLabels: ["分鏡完整版"], captionMinChars: 300, captionMaxChars: 1000,
+    aspectRatio: "9:16", variantLabels: ["分鏡完整版"], captionMinChars: 300, captionMaxChars: 1000,
     cardsPerVariant: 5,
     cardsKind: "storyboard",
     holdForImages: true,
@@ -771,27 +767,23 @@ export const TT_30S_ORCHESTRA: Record<string, OrchestraConfig> = {
   // 2026-09-08：影片生成移除後，這張卡只出兩張靜圖；兩個變體是兩種「切角」。
   "tt-30-before-after": {
     variants: 2, images: 2, runImageGen: true, imageDirectorId: TT_DIR_GRANT,
-    aspectRatio: "9:16", fluxSize: "portrait_9_16", imageQualitySteps: 8,
-    variantLabels: ["睡前場景", "日常場景"], captionMinChars: 60, captionMaxChars: 120,
+    aspectRatio: "9:16", variantLabels: ["睡前場景", "日常場景"], captionMinChars: 60, captionMaxChars: 120,
   },
 
   // ── 爆款結構卡 ────────────────────────────────────────────────────
   "tt-30-live-relay-host": {
     variants: 3, images: 3, runImageGen: false, imageDirectorId: ANNA_ID,
-    aspectRatio: "9:16", fluxSize: "portrait_9_16", imageQualitySteps: 4,
-    variantLabels: ["接力版", "雙人對打版", "顧客上場版"],
+    aspectRatio: "9:16", variantLabels: ["接力版", "雙人對打版", "顧客上場版"],
     captionMinChars: 300, captionMaxChars: 600,
   },
   "tt-30-profile-self-aware": {
     variants: 3, images: 3, runImageGen: false, imageDirectorId: ANNA_ID,
-    aspectRatio: "9:16", fluxSize: "portrait_9_16", imageQualitySteps: 4,
-    variantLabels: ["自嘲版", "對嗆版", "擺爛版"],
+    aspectRatio: "9:16", variantLabels: ["自嘲版", "對嗆版", "擺爛版"],
     captionMinChars: 150, captionMaxChars: 350,
   },
   "tt-30-storyboard-catch-wave": {
     variants: 3, images: 3, runImageGen: false, imageDirectorId: ANNA_ID,
-    aspectRatio: "9:16", fluxSize: "portrait_9_16", imageQualitySteps: 4,
-    variantLabels: ["續拍版", "致敬版", "回禮版"],
+    aspectRatio: "9:16", variantLabels: ["續拍版", "致敬版", "回禮版"],
     captionMinChars: 250, captionMaxChars: 550,
   },
 };

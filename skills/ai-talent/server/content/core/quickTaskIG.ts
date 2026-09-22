@@ -330,7 +330,7 @@ caption 結構：
     postType: "feed",
     label: { en: "Feed: One Image, One Idea", zh: "IG 貼文：一張圖只講一件事" },
     description: { en: "Simple enough that anyone can join in", zh: "極簡到人人都能參與的單圖貼文" },
-    agent_id: 180166,              // 沿用 IG feed 現役 agent
+    agent_id: 180166, // 沿用 IG feed 現役 agent
     skill_slug: "instagram-copywriting",
     source: {
       type: "viral",
@@ -367,7 +367,7 @@ caption 結構：
     postType: "reel",
     label: { en: "Reel: Put Your Mascot in Trouble", zh: "IG Reels：讓吉祥物／人格出事" },
     description: { en: "Give your brand persona real stakes", zh: "把品牌人格丟進一個真的有後果的事件" },
-    agent_id: 60029,              // 沿用 IG Reel 現役 agent
+    agent_id: 60029, // 沿用 IG Reel 現役 agent
     skill_slug: "short-video-scriptwriter",
     source: {
       type: "viral",
@@ -407,7 +407,7 @@ caption 結構：
     postType: "carousel",
     label: { en: "Carousel: Let the Evidence Speak", zh: "IG 輪播：讓證據自己說話" },
     description: { en: "A set of real samples; the conclusion writes itself", zh: "蒐集來的實例排成一組，結論不用寫" },
-    agent_id: 224159,              // 沿用 IG 輪播現役 agent
+    agent_id: 224159, // 沿用 IG 輪播現役 agent
     skill_slug: "carousel-copywriter",
     source: {
       type: "viral",
@@ -444,7 +444,7 @@ caption 結構：
     postType: "story",
     label: { en: "Story: One Frame, One Action", zh: "IG 限時動態：一個畫面一個動作" },
     description: { en: "Strip the frame to a single act", zh: "畫面只留一件事，讓人立刻動手" },
-    agent_id: 180170,              // Nancy Yeh — Social Media Visual Designer
+    agent_id: 180170, // Nancy Yeh — Social Media Visual Designer
     skill_slug: "brand-story",
     source: {
       type: "viral",
@@ -481,7 +481,7 @@ caption 結構：
     postType: "profile",
     label: { en: "Profile: Let Fans Put Themselves In", zh: "IG 個人檔案：讓粉絲把自己放進來" },
     description: { en: "Turn brand visuals into a template fans can wear", zh: "把品牌視覺變成粉絲可以套用的模板" },
-    agent_id: 180168,              // 沿用 IG 個人檔案現役 agent
+    agent_id: 180168, // 沿用 IG 個人檔案現役 agent
     skill_slug: "link-in-bio",
     source: {
       type: "viral",
@@ -518,7 +518,7 @@ caption 結構：
     postType: "live",
     label: { en: "Live: Multi-Host Relay", zh: "IG 直播：多主持接力帶貨" },
     description: { en: "Swap hosts every 10 minutes so no one leaves", zh: "每 10 分鐘換人，觀眾沒有離開的空檔" },
-    agent_id: 60072,              // 沿用 IG 直播現役 agent
+    agent_id: 60072, // 沿用 IG 直播現役 agent
     skill_slug: "live-shopping-script",
     source: {
       type: "viral",
@@ -555,7 +555,7 @@ caption 結構：
     postType: "post",
     label: { en: "Threads: Day-One Account Opening", zh: "IG→Threads：新平台第一天怎麼開帳" },
     description: { en: "Move your existing audience in one move", zh: "把既有粉絲一次帶過去的開場組" },
-    agent_id: 60022,              // 沿用 Threads 改寫現役 agent
+    agent_id: 60022, // 沿用 Threads 改寫現役 agent
     skill_slug: "threads-copywriter",
     source: {
       type: "viral",
@@ -603,80 +603,67 @@ const RACHEL_ID = 220913; // Rachel Lin — Senior UX/UI Designer
 export const IG_30S_ORCHESTRA: Record<string, OrchestraConfig> = {
   "ig-30-caption-short": {
     variants: 3, images: 3, runImageGen: false,
-    imageDirectorId: NANCY_ID, aspectRatio: "1:1", fluxSize: "square_hd", imageQualitySteps: 4,
-    variantLabels: ["生活感版", "品牌感版", "問句式"],
+    imageDirectorId: NANCY_ID, aspectRatio: "1:1", variantLabels: ["生活感版", "品牌感版", "問句式"],
     captionMinChars: 80, captionMaxChars: 150,
   },
   "ig-30-pure-text-hook": {
     variants: 3, images: 3, runImageGen: false,
-    imageDirectorId: NELSON_ID, aspectRatio: "1:1", fluxSize: "square_hd", imageQualitySteps: 4,
-    variantLabels: ["反問式", "數字式", "反差式"],
+    imageDirectorId: NELSON_ID, aspectRatio: "1:1", variantLabels: ["反問式", "數字式", "反差式"],
     captionMinChars: 30, captionMaxChars: 60,
   },
   "ig-30-reel-hook": {
     variants: 3, images: 3, runImageGen: false,
-    imageDirectorId: YAHUI_ID, aspectRatio: "9:16", fluxSize: "portrait_9_16", imageQualitySteps: 4,
-    variantLabels: ["懸念開場", "反差開場", "直接挑釁"],
+    imageDirectorId: YAHUI_ID, aspectRatio: "9:16", variantLabels: ["懸念開場", "反差開場", "直接挑釁"],
     captionMinChars: 30, captionMaxChars: 80,
   },
   "ig-30-reel-script-full": {
     variants: 3, images: 3, runImageGen: false,
-    imageDirectorId: REED_ID, aspectRatio: "9:16", fluxSize: "portrait_9_16", imageQualitySteps: 4,
-    variantLabels: ["教學型", "故事型", "反差型"],
+    imageDirectorId: REED_ID, aspectRatio: "9:16", variantLabels: ["教學型", "故事型", "反差型"],
     captionMinChars: 200, captionMaxChars: 600,
   },
   "ig-30-story-text": {
     variants: 3, images: 3, runImageGen: false,
-    imageDirectorId: SEAN_ID, aspectRatio: "9:16", fluxSize: "portrait_9_16", imageQualitySteps: 4,
-    variantLabels: ["驚奇式", "提問式", "幕後式"],
+    imageDirectorId: SEAN_ID, aspectRatio: "9:16", variantLabels: ["驚奇式", "提問式", "幕後式"],
     captionMinChars: 30, captionMaxChars: 80,
   },
   "ig-30-carousel-structure": {
     variants: 3, images: 3, runImageGen: false,
-    imageDirectorId: KURT_ID, aspectRatio: "1:1", fluxSize: "square_hd", imageQualitySteps: 4,
-    variantLabels: ["教學清單型", "故事型", "反差型"],
+    imageDirectorId: KURT_ID, aspectRatio: "1:1", variantLabels: ["教學清單型", "故事型", "反差型"],
     captionMinChars: 400, captionMaxChars: 1500,
   },
   "ig-30-bio-rewrite": {
     variants: 3, images: 0, runImageGen: false,
-    imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0,
-    variantLabels: ["專家定位", "個性風格", "結果導向"],
+    imageDirectorId: null, aspectRatio: null, variantLabels: ["專家定位", "個性風格", "結果導向"],
     captionMinChars: 80, captionMaxChars: 150,
   },
   "ig-30-hashtag-set": {
     variants: 3, images: 0, runImageGen: false,
-    imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0,
-    variantLabels: ["曝光導向 (20)", "品牌導向 (8)", "利基導向 (12)"],
+    imageDirectorId: null, aspectRatio: null, variantLabels: ["曝光導向 (20)", "品牌導向 (8)", "利基導向 (12)"],
     captionMinChars: 0, captionMaxChars: 600,
   },
   "ig-30-comment-reply": {
     variants: 3, images: 0, runImageGen: false,
-    imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0,
-    variantLabels: ["溫暖式", "幽默式", "邀請式"],
+    imageDirectorId: null, aspectRatio: null, variantLabels: ["溫暖式", "幽默式", "邀請式"],
     captionMinChars: 30, captionMaxChars: 80,
   },
   "ig-30-dm-script": {
     variants: 3, images: 0, runImageGen: false,
-    imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0,
-    variantLabels: ["詢價回覆", "售後安撫", "合作回覆"],
+    imageDirectorId: null, aspectRatio: null, variantLabels: ["詢價回覆", "售後安撫", "合作回覆"],
     captionMinChars: 60, captionMaxChars: 150,
   },
   "ig-30-live-opening": {
     variants: 3, images: 3, runImageGen: false,
-    imageDirectorId: DALE_ID, aspectRatio: "16:9", fluxSize: "landscape_16_9", imageQualitySteps: 4,
-    variantLabels: ["懸念式", "互動式", "直球式"],
+    imageDirectorId: DALE_ID, aspectRatio: "16:9", variantLabels: ["懸念式", "互動式", "直球式"],
     captionMinChars: 100, captionMaxChars: 300,
   },
   "ig-30-story-repost-strategy": {
     variants: 3, images: 3, runImageGen: false,
-    imageDirectorId: RACHEL_ID, aspectRatio: "9:16", fluxSize: "portrait_9_16", imageQualitySteps: 4,
-    variantLabels: ["精選封面型", "Feed 改編型", "後續限時動態型"],
+    imageDirectorId: RACHEL_ID, aspectRatio: "9:16", variantLabels: ["精選封面型", "Feed 改編型", "後續限時動態型"],
     captionMinChars: 100, captionMaxChars: 400,
   },
   "ig-30-threads-cross-post": {
     variants: 3, images: 0, runImageGen: false,
-    imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0,
-    variantLabels: ["觀點式", "提問式", "故事縮短"],
+    imageDirectorId: null, aspectRatio: null, variantLabels: ["觀點式", "提問式", "故事縮短"],
     captionMinChars: 100, captionMaxChars: 400,
   },
 
@@ -687,8 +674,6 @@ export const IG_30S_ORCHESTRA: Record<string, OrchestraConfig> = {
     runImageGen: false,
     imageDirectorId: NANCY_ID,
     aspectRatio: "1:1",
-    fluxSize: "square_hd",
-    imageQualitySteps: 4,
     variantLabels: ["極簡版", "邀請版", "紀錄版"],
     captionMinChars: 80,
     captionMaxChars: 200,
@@ -699,8 +684,6 @@ export const IG_30S_ORCHESTRA: Record<string, OrchestraConfig> = {
     runImageGen: false,
     imageDirectorId: NANCY_ID,
     aspectRatio: "9:16",
-    fluxSize: "portrait_9_16",
-    imageQualitySteps: 4,
     variantLabels: ["出事版", "求救版", "反轉版"],
     captionMinChars: 120,
     captionMaxChars: 280,
@@ -711,8 +694,6 @@ export const IG_30S_ORCHESTRA: Record<string, OrchestraConfig> = {
     runImageGen: false,
     imageDirectorId: NANCY_ID,
     aspectRatio: "1:1",
-    fluxSize: "square_hd",
-    imageQualitySteps: 4,
     variantLabels: ["實例版", "對照版", "統計版"],
     captionMinChars: 200,
     captionMaxChars: 450,
@@ -723,8 +704,6 @@ export const IG_30S_ORCHESTRA: Record<string, OrchestraConfig> = {
     runImageGen: false,
     imageDirectorId: NANCY_ID,
     aspectRatio: "9:16",
-    fluxSize: "portrait_9_16",
-    imageQualitySteps: 4,
     variantLabels: ["純動作版", "倒數版", "選一個版"],
     captionMinChars: 30,
     captionMaxChars: 90,
@@ -735,8 +714,6 @@ export const IG_30S_ORCHESTRA: Record<string, OrchestraConfig> = {
     runImageGen: false,
     imageDirectorId: NANCY_ID,
     aspectRatio: "1:1",
-    fluxSize: "square_hd",
-    imageQualitySteps: 4,
     variantLabels: ["模板版", "稱號版", "會員版"],
     captionMinChars: 100,
     captionMaxChars: 260,
@@ -747,8 +724,6 @@ export const IG_30S_ORCHESTRA: Record<string, OrchestraConfig> = {
     runImageGen: false,
     imageDirectorId: NANCY_ID,
     aspectRatio: "9:16",
-    fluxSize: "portrait_9_16",
-    imageQualitySteps: 4,
     variantLabels: ["接力版", "對打版", "顧客上場版"],
     captionMinChars: 250,
     captionMaxChars: 550,
@@ -759,8 +734,6 @@ export const IG_30S_ORCHESTRA: Record<string, OrchestraConfig> = {
     runImageGen: false,
     imageDirectorId: NANCY_ID,
     aspectRatio: "1:1",
-    fluxSize: "square_hd",
-    imageQualitySteps: 4,
     variantLabels: ["搬家版", "限定版", "先搶版"],
     captionMinChars: 120,
     captionMaxChars: 300,

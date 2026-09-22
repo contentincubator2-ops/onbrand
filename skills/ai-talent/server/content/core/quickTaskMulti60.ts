@@ -105,23 +105,20 @@ ${TONE("TikTok")}`,
 export const TT_60S_ORCHESTRA: Record<string, OrchestraConfig> = {
   "tt-60-foryou-full": {
     variants: 5, images: 5, runImageGen: true, imageDirectorId: TT_IMG,
-    aspectRatio: "9:16", fluxSize: "portrait_9_16", imageQualitySteps: 4,
-    variantLabels: ["教學版", "反差版", "揭密版", "節奏版", "懸念版"],
+    aspectRatio: "9:16", variantLabels: ["教學版", "反差版", "揭密版", "節奏版", "懸念版"],
     captionMinChars: 300, captionMaxChars: 500,
     extras: { replyTemplates: 5, postingTime: true, followupPost: true },
   },
   "tt-60-series-3": {
     variants: 3, images: 3, runImageGen: true, imageDirectorId: TT_IMG2,
-    aspectRatio: "9:16", fluxSize: "portrait_9_16", imageQualitySteps: 4,
-    variantLabels: ["第 1 集", "第 2 集", "第 3 集"],
+    aspectRatio: "9:16", variantLabels: ["第 1 集", "第 2 集", "第 3 集"],
     captionMinChars: 300, captionMaxChars: 450,
     strategistAgentId: 30007, postLabels: ["第 1 集", "第 2 集", "第 3 集"], // Chloe Chen — Short Video Strategy PM (2036 char)
     extras: { postsCount: 3, narrativeArc: true, replyTemplates: 5, postingTime: true, followupPost: true },
   },
   "tt-60-viral-rewrite": {
     variants: 5, images: 5, runImageGen: true, imageDirectorId: TT_IMG3,
-    aspectRatio: "9:16", fluxSize: "portrait_9_16", imageQualitySteps: 4,
-    variantLabels: ["保結構式", "情感放大式", "反差式", "數據式", "故事式"],
+    aspectRatio: "9:16", variantLabels: ["保結構式", "情感放大式", "反差式", "數據式", "故事式"],
     captionMinChars: 300, captionMaxChars: 650,
     strategistAgentId: 180151, specialtyAgentId: 180643, // Lisa Chang — Social Media Analyst (1715) + Amanda Adams — Chief Legal
     extras: { compareTable: true, replyTemplates: 5, postingTime: true, followupPost: true },
@@ -269,22 +266,19 @@ ${TONE("LinkedIn")}`,
 export const LI_60S_ORCHESTRA: Record<string, OrchestraConfig> = {
   "li-60-thought-leader": {
     variants: 5, images: 5, runImageGen: true, imageDirectorId: LI_IMG,
-    aspectRatio: "1:1", fluxSize: "square_hd", imageQualitySteps: 4,
-    variantLabels: ["反共識版", "案例版", "數據版", "故事版", "預測版"],
+    aspectRatio: "1:1", variantLabels: ["反共識版", "案例版", "數據版", "故事版", "預測版"],
     captionMinChars: 400, captionMaxChars: 900,
     extras: { replyTemplates: 5, postingTime: true, followupPost: true },
   },
   "li-60-newsletter": {
     variants: 3, images: 3, runImageGen: true, imageDirectorId: LI_IMG2,
-    aspectRatio: "1.91:1", fluxSize: "landscape_4_3", imageQualitySteps: 4,
-    variantLabels: ["教學版", "觀點版", "趨勢版"],
+    aspectRatio: "1.91:1", variantLabels: ["教學版", "觀點版", "趨勢版"],
     captionMinChars: 600, captionMaxChars: 1300,
     extras: { replyTemplates: 5, postingTime: true, followupPost: true },
   },
   "li-60-case-study": {
     variants: 5, images: 5, runImageGen: true, imageDirectorId: LI_IMG3,
-    aspectRatio: "1.91:1", fluxSize: "landscape_4_3", imageQualitySteps: 4,
-    variantLabels: ["故事式", "對比式", "數據式", "情感式", "簡短式"],
+    aspectRatio: "1.91:1", variantLabels: ["故事式", "對比式", "數據式", "情感式", "簡短式"],
     captionMinChars: 200, captionMaxChars: 700,
     specialtyAgentId: 180657, // Michael Adams — EVP & Chief Legal Officer
     extras: { legalAssistant: true, replyTemplates: 5, postingTime: true, followupPost: true },
@@ -343,23 +337,20 @@ ${TONE("Email")}`,
 export const EMAIL_60S_ORCHESTRA: Record<string, OrchestraConfig> = {
   "em-60-newsletter-full": {
     variants: 5, images: 5, runImageGen: true, imageDirectorId: EM_IMG,
-    aspectRatio: "1.91:1", fluxSize: "landscape_4_3", imageQualitySteps: 4,
-    variantLabels: ["教學版", "故事版", "數據版", "趨勢版", "懸念版"],
+    aspectRatio: "1.91:1", variantLabels: ["教學版", "故事版", "數據版", "趨勢版", "懸念版"],
     captionMinChars: 300, captionMaxChars: 600,
     extras: { replyTemplates: 5, postingTime: true, followupPost: true },
   },
   "em-60-promo-sequence": {
     variants: 3, images: 3, runImageGen: true, imageDirectorId: EM_IMG2,
-    aspectRatio: "1.91:1", fluxSize: "landscape_4_3", imageQualitySteps: 4,
-    variantLabels: ["預告", "開賣", "最後機會"],
+    aspectRatio: "1.91:1", variantLabels: ["預告", "開賣", "最後機會"],
     captionMinChars: 300, captionMaxChars: 500,
     strategistAgentId: 222209, postLabels: ["預告", "開賣", "最後機會"], // Chang Hui-Wen — Email Automation Strategist (1324 char)
     extras: { postsCount: 3, narrativeArc: true, replyTemplates: 5, postingTime: true, followupPost: true },
   },
   "em-60-onboarding-3": {
     variants: 3, images: 3, runImageGen: true, imageDirectorId: EM_IMG3,
-    aspectRatio: "1.91:1", fluxSize: "landscape_4_3", imageQualitySteps: 4,
-    variantLabels: ["D0 歡迎", "D3 教學", "D7 邀請"],
+    aspectRatio: "1.91:1", variantLabels: ["D0 歡迎", "D3 教學", "D7 邀請"],
     captionMinChars: 300, captionMaxChars: 500,
     strategistAgentId: 180005, postLabels: ["D0 歡迎", "D3 教學", "D7 邀請"], // David Lee — Content Strategy Director
     extras: { postsCount: 3, narrativeArc: true, replyTemplates: 5, postingTime: true, followupPost: true },
@@ -390,8 +381,7 @@ export const PR_60S_TASKS: FBTaskTemplate[] = [
 export const PR_60S_ORCHESTRA: Record<string, OrchestraConfig> = {
   "pr-60-news-release-full": {
     variants: 5, images: 5, runImageGen: true, imageDirectorId: PR_IMG,
-    aspectRatio: "1.91:1", fluxSize: "landscape_4_3", imageQualitySteps: 4,
-    variantLabels: ["標準版", "成就版", "里程碑版", "事件版", "宣言版"],
+    aspectRatio: "1.91:1", variantLabels: ["標準版", "成就版", "里程碑版", "事件版", "宣言版"],
     captionMinChars: 400, captionMaxChars: 700,
     extras: { replyTemplates: 5, postingTime: true, followupPost: true },
   },
@@ -455,24 +445,21 @@ export const BRAND_60S_TASKS: FBTaskTemplate[] = [
 export const BRAND_60S_ORCHESTRA: Record<string, OrchestraConfig> = {
   "br-60-tagline-suite": {
     variants: 5, images: 5, runImageGen: true, imageDirectorId: BR_IMG,
-    aspectRatio: "1:1", fluxSize: "square_hd", imageQualitySteps: 4,
-    variantLabels: ["英雄式", "智者式", "創造者式", "照顧者式", "反叛者式"],
+    aspectRatio: "1:1", variantLabels: ["英雄式", "智者式", "創造者式", "照顧者式", "反叛者式"],
     captionMinChars: 50, captionMaxChars: 200,
     strategistAgentId: 60001, // Vivian Shen — Omnichannel Marketing Strategist
     extras: { replyTemplates: 3, postingTime: true, followupPost: true },
   },
   "br-60-value-prop": {
     variants: 5, images: 5, runImageGen: true, imageDirectorId: BR_IMG2,
-    aspectRatio: "1:1", fluxSize: "square_hd", imageQualitySteps: 4,
-    variantLabels: ["問題導向", "解法導向", "結果導向", "對比導向", "情感導向"],
+    aspectRatio: "1:1", variantLabels: ["問題導向", "解法導向", "結果導向", "對比導向", "情感導向"],
     captionMinChars: 100, captionMaxChars: 200,
     strategistAgentId: 60003, // Marcus Han — Media & Brand Integration Strategist
     extras: { replyTemplates: 3, postingTime: true, followupPost: true },
   },
   "br-60-brand-voice": {
     variants: 5, images: 5, runImageGen: true, imageDirectorId: BR_IMG3,
-    aspectRatio: "1:1", fluxSize: "square_hd", imageQualitySteps: 4,
-    variantLabels: ["專業版", "親切版", "簡潔版", "故事版", "幽默版"],
+    aspectRatio: "1:1", variantLabels: ["專業版", "親切版", "簡潔版", "故事版", "幽默版"],
     captionMinChars: 100, captionMaxChars: 200,
     extras: { replyTemplates: 3, postingTime: true, followupPost: true },
   },
@@ -531,22 +518,19 @@ export const RESEARCH_60S_TASKS: FBTaskTemplate[] = [
 export const RESEARCH_60S_ORCHESTRA: Record<string, OrchestraConfig> = {
   "rs-60-interview-guide": {
     variants: 3, images: 3, runImageGen: true, imageDirectorId: RS_IMG,
-    aspectRatio: "1:1", fluxSize: "square_hd", imageQualitySteps: 4,
-    variantLabels: ["探索式", "驗證式", "發散式"],
+    aspectRatio: "1:1", variantLabels: ["探索式", "驗證式", "發散式"],
     captionMinChars: 300, captionMaxChars: 500,
     extras: { replyTemplates: 3, postingTime: false, followupPost: false },
   },
   "rs-60-persona-suite": {
     variants: 5, images: 5, runImageGen: true, imageDirectorId: RS_IMG2,
-    aspectRatio: "1:1", fluxSize: "square_hd", imageQualitySteps: 4,
-    variantLabels: ["主要使用者", "次要使用者", "決策者", "影響者", "邊緣使用者"],
+    aspectRatio: "1:1", variantLabels: ["主要使用者", "次要使用者", "決策者", "影響者", "邊緣使用者"],
     captionMinChars: 300, captionMaxChars: 500,
     extras: { replyTemplates: 3, postingTime: false, followupPost: false },
   },
   "rs-60-jtbd-suite": {
     variants: 5, images: 5, runImageGen: true, imageDirectorId: RS_IMG3,
-    aspectRatio: "1:1", fluxSize: "square_hd", imageQualitySteps: 4,
-    variantLabels: ["功能性 Job", "情感性 Job", "社交性 Job", "替代性 Job", "意外性 Job"],
+    aspectRatio: "1:1", variantLabels: ["功能性 Job", "情感性 Job", "社交性 Job", "替代性 Job", "意外性 Job"],
     captionMinChars: 80, captionMaxChars: 150,
     extras: { replyTemplates: 3, postingTime: false, followupPost: false },
   },
@@ -677,15 +661,13 @@ export const KOL_60S_TASKS: FBTaskTemplate[] = [
 export const CROSS_60S_ORCHESTRA: Record<string, OrchestraConfig> = {
   "cw-60-crosspost-4platform": {
     variants: 4, images: 4, runImageGen: true, imageDirectorId: CW_IMG,
-    aspectRatio: "1:1", fluxSize: "square_hd", imageQualitySteps: 4,
-    variantLabels: ["FB 版", "IG 版", "Threads 版", "LinkedIn 版"],
+    aspectRatio: "1:1", variantLabels: ["FB 版", "IG 版", "Threads 版", "LinkedIn 版"],
     captionMinChars: 60, captionMaxChars: 400,
     extras: { replyTemplates: 0, postingTime: true, followupPost: false },
   },
   "cw-60-ab-variants": {
     variants: 2, images: 2, runImageGen: true, imageDirectorId: CW_IMG,
-    aspectRatio: "1:1", fluxSize: "square_hd", imageQualitySteps: 4,
-    variantLabels: ["A 版", "B 版"],
+    aspectRatio: "1:1", variantLabels: ["A 版", "B 版"],
     captionMinChars: 150, captionMaxChars: 350,
     extras: { replyTemplates: 0, postingTime: true, followupPost: false },
   },
@@ -693,8 +675,7 @@ export const CROSS_60S_ORCHESTRA: Record<string, OrchestraConfig> = {
 export const KOL_60S_ORCHESTRA: Record<string, OrchestraConfig> = {
   "kl-60-pitch-pack": {
     variants: 5, images: 0, runImageGen: false, imageDirectorId: KOL_IMG,
-    aspectRatio: "1:1", fluxSize: "square_hd", imageQualitySteps: 4,
-    variantLabels: ["邀約主信", "合作 Brief（附件）", "報價回應", "追蹤信", "發布後感謝信"],
+    aspectRatio: "1:1", variantLabels: ["邀約主信", "合作 Brief（附件）", "報價回應", "追蹤信", "發布後感謝信"],
     captionMinChars: 120, captionMaxChars: 900,
     extras: { replyTemplates: 0, postingTime: false, followupPost: false },
   },

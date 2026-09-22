@@ -173,7 +173,7 @@ ${RES_TONE}`,
     postType: "generic",
     label: { en: "Research: Design a Visible Gap", zh: "用戶研究：設計一個看得見落差的實驗" },
     description: { en: "Put two versions side by side", zh: "讓兩個版本並排，落差自己出現" },
-    agent_id: 210303,              // 沿用同 postType 現役卡
+    agent_id: 210303, // 沿用同 postType 現役卡
     skill_slug: "ux-research",
     source: {
       type: "viral",
@@ -212,7 +212,7 @@ ${RES_TONE}`,
     postType: "press",
     label: { en: "Findings: Give the Data Back", zh: "研究發表：把數據還給每個使用者" },
     description: { en: "Aggregates don't travel; personal numbers do", zh: "總量沒人轉，個人化數字才會" },
-    agent_id: 90043,              // 沿用同 postType 現役卡
+    agent_id: 90043, // 沿用同 postType 現役卡
     skill_slug: "user-research",
     source: {
       type: "viral",
@@ -249,28 +249,26 @@ ${RES_TONE}`,
 
 const JOCHING_ID = 220530;
 export const RESEARCH_30S_ORCHESTRA: Record<string, OrchestraConfig> = {
-  "rs-30-interview-guide":      { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["JTBD 框架", "5 Whys 框架", "旅程地圖式"], captionMinChars: 400, captionMaxChars: 1000 },
-  "rs-30-persona-draft":        { variants: 3, images: 3, runImageGen: false, imageDirectorId: JOCHING_ID, aspectRatio: "1:1", fluxSize: "square_hd", imageQualitySteps: 4, variantLabels: ["主流 segment", "新興 segment", "邊緣 segment"], captionMinChars: 300, captionMaxChars: 700 },
-  "rs-30-survey":               { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["NPS-led", "Decision-journey", "Brand-tracking"], captionMinChars: 500, captionMaxChars: 1200 },
-  "rs-30-journey-map":          { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["新客視角", "回購客視角", "流失客視角"], captionMinChars: 500, captionMaxChars: 1200 },
-  "rs-30-competitive-interview":{ variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["Win 訪", "Loss 訪", "Mixed 訪"], captionMinChars: 400, captionMaxChars: 800 },
-  "rs-30-jtbd-guide":           { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["Functional job", "Emotional job", "Social job"], captionMinChars: 400, captionMaxChars: 800 },
-  "rs-30-synthesis-template":   { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["Affinity mapping", "Themes-evidence", "How-might-we"], captionMinChars: 400, captionMaxChars: 1000 },
-  "rs-30-consent-form":         { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["精簡版", "完整版", "兒童 / 老人友善"], captionMinChars: 300, captionMaxChars: 800 },
-  "rs-30-usability-script":     { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["First-impression 重", "Task completion 重", "Error recovery 重"], captionMinChars: 500, captionMaxChars: 1200 },
-  "rs-30-screener":             { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null, fluxSize: null, imageQualitySteps: 0, variantLabels: ["Broader quota", "Strict quota", "Mixed quota"], captionMinChars: 300, captionMaxChars: 700 },
+  "rs-30-interview-guide":      { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null,variantLabels: ["JTBD 框架", "5 Whys 框架", "旅程地圖式"], captionMinChars: 400, captionMaxChars: 1000 },
+  "rs-30-persona-draft":        { variants: 3, images: 3, runImageGen: false, imageDirectorId: JOCHING_ID, aspectRatio: "1:1",variantLabels: ["主流 segment", "新興 segment", "邊緣 segment"], captionMinChars: 300, captionMaxChars: 700 },
+  "rs-30-survey":               { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null,variantLabels: ["NPS-led", "Decision-journey", "Brand-tracking"], captionMinChars: 500, captionMaxChars: 1200 },
+  "rs-30-journey-map":          { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null,variantLabels: ["新客視角", "回購客視角", "流失客視角"], captionMinChars: 500, captionMaxChars: 1200 },
+  "rs-30-competitive-interview":{ variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null,variantLabels: ["Win 訪", "Loss 訪", "Mixed 訪"], captionMinChars: 400, captionMaxChars: 800 },
+  "rs-30-jtbd-guide":           { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null,variantLabels: ["Functional job", "Emotional job", "Social job"], captionMinChars: 400, captionMaxChars: 800 },
+  "rs-30-synthesis-template":   { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null,variantLabels: ["Affinity mapping", "Themes-evidence", "How-might-we"], captionMinChars: 400, captionMaxChars: 1000 },
+  "rs-30-consent-form":         { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null,variantLabels: ["精簡版", "完整版", "兒童 / 老人友善"], captionMinChars: 300, captionMaxChars: 800 },
+  "rs-30-usability-script":     { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null,variantLabels: ["First-impression 重", "Task completion 重", "Error recovery 重"], captionMinChars: 500, captionMaxChars: 1200 },
+  "rs-30-screener":             { variants: 3, images: 0, runImageGen: false, imageDirectorId: null, aspectRatio: null,variantLabels: ["Broader quota", "Strict quota", "Mixed quota"], captionMinChars: 300, captionMaxChars: 700 },
 
   // ── 爆款結構卡 ────────────────────────────────────────────────────
   "rs-30-gap-experiment": {
     variants: 3, images: 0, runImageGen: false, imageDirectorId: null,
-    aspectRatio: null, fluxSize: null, imageQualitySteps: 0,
-    variantLabels: ["雙描述版", "盲測版", "前後測版"],
+    aspectRatio: null, variantLabels: ["雙描述版", "盲測版", "前後測版"],
     captionMinChars: 500, captionMaxChars: 1100,
   },
   "rs-30-personal-data-story": {
     variants: 3, images: 0, runImageGen: false, imageDirectorId: null,
-    aspectRatio: null, fluxSize: null, imageQualitySteps: 0,
-    variantLabels: ["個人換算版", "對照版", "時間成本版"],
+    aspectRatio: null, variantLabels: ["個人換算版", "對照版", "時間成本版"],
     captionMinChars: 400, captionMaxChars: 900,
   },
 };
