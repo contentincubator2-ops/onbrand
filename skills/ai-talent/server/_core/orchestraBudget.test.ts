@@ -63,22 +63,18 @@ describe("hard-budget result assembly", () => {
 });
 
 describe("image caps derived from the remaining budget", () => {
-  const opts = { primaryCapMs: 35_000, fallbackCapMs: 45_000 };
+  const opts = { primaryCapMs: 35_000 };
 
-  it("keeps the configured caps when there is no task budget", () => {
+  it("keeps the configured cap when there is no task budget", () => {
     expect(imageCapsForRemaining(Number.POSITIVE_INFINITY, opts))
-      .toEqual({ skip: false, primaryCapMs: 35_000, fallbackCapMs: 45_000 });
+      .toEqual({ skip: false, primaryCapMs: 35_000 });
   });
 
-  it("shrinks the primary attempt to what is left", () => {
-    // 20s left: attempt for 20s, and don't promise a fallback that cannot run.
-    expect(imageCapsForRemaining(20_000, opts))
-      .toEqual({ skip: false, primaryCapMs: 20_000, fallbackCapMs: 0 });
-  });
-
-  it("keeps a fallback when the leftover is still useful", () => {
-    expect(imageCapsForRemaining(60_000, opts))
-      .toEqual({ skip: false, primaryCapMs: 35_000, fallbackCapMs: 25_000 });
+  // 2026-09-23 (CJ「備援要禁掉」): there is no second attempt to reserve time
+  // for any more — the one attempt simply gets whatever is left.
+  it("shrinks the attempt to what is left", () => {
+    expect(imageCapsForRemaining(20_000, opts)).toEqual({ skip: false, primaryCapMs: 20_000 });
+    expect(imageCapsForRemaining(60_000, opts)).toEqual({ skip: false, primaryCapMs: 35_000 });
   });
 
   // A doomed image is worse than no image: it eats the window the run needs to
