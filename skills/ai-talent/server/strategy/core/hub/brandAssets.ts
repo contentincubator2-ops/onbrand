@@ -119,6 +119,18 @@ export async function approvedDestinations(orgId: number): Promise<Array<{ label
     .filter((d) => d.label && d.url);
 }
 
+/** 公司與產品的寫法規範，寫進 prompt 讓模型逐字照用。 */
+export async function namingRules(orgId: number): Promise<Array<{ term: string; wrong: string; note: string }>> {
+  const rows = await listBrandAssets(orgId, "identity");
+  return rows
+    .map((r) => ({
+      term: String(r.payload.term ?? "").trim(),
+      wrong: String(r.payload.wrong ?? "").trim(),
+      note: String(r.payload.note ?? "").trim(),
+    }))
+    .filter((r) => r.term);
+}
+
 export interface ActiveQuietPeriod {
   label: string;
   startsOn: string;

@@ -89,8 +89,8 @@ export const BRAND_ASSET_SPECS: KindSpec[] = [
     tag: ["Naming", "寫法"],
     name: ["How to write our name", "公司與產品的寫法"],
     measure: [
-      "Each rule becomes a preferred-wording entry, so every draft is checked against it automatically. Legal takes trademark form seriously; reps get it wrong every time.",
-      "每一條都會變成一筆正面用詞，每篇初稿自動比對。法務對商標寫法是認真的，而業務百分之百會寫錯。",
+      "Every rule here is handed to the writer verbatim before it drafts. It is a prompt-level instruction, not yet a deterministic check — add the same term to Preferred wording if you want it enforced after the fact.",
+      "每一條都會在動筆前原樣交給 AI。目前是寫作指令層的要求，**還不是確定性檢查**——要事後也擋，就把同一個詞也加進正面用詞。",
     ],
     empty: [
       "No naming rules yet — expect \"Asus\", \"Expert Hub\" and a missing ® in the field.",

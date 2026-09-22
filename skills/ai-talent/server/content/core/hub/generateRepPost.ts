@@ -128,10 +128,11 @@ function buildMessages(args: {
   channel: HubChannel;
   angle: string | null;
   trackedLink: string;
+  identity: Array<{ term: string; wrong: string; note: string }>;
   destinations: Array<{ label: string; url: string; useWhen: string }>;
   quietPeriods: Array<{ label: string; startsOn: string; endsOn: string; topics: string[] }>;
 }) {
-  const { org, rep, solution, facts, wording, skillMd, channel, angle, trackedLink, destinations, quietPeriods } = args;
+  const { org, rep, solution, facts, wording, skillMd, channel, angle, trackedLink, identity, destinations, quietPeriods } = args;
   const pack = packFor(rep.market);
   const zh = pack.language === "zh-TW";
   const pos = org.positioning ?? {};
@@ -181,6 +182,18 @@ function buildMessages(args: {
     `${rep.name}, ${rep.title} (${rep.team})`,
     "",
     zh ? `## 專屬追蹤連結（放在結尾）\n${trackedLink}` : `## Tracked link (put it at the end)\n${trackedLink}`,
+    // 公司與產品的寫法。法務對商標形式是認真的，而這是模型最常無聲寫錯的地方
+    // （Asus、Expert Hub）。目前是 prompt 層的要求，還沒有確定性檢查——卡面上
+    // 的說明必須跟這件事一致，不能寫成「自動比對」。
+    ...(identity.length
+      ? [
+          "",
+          zh ? "## 公司與產品的正確寫法（逐字照用）" : "## HOW TO WRITE OUR NAMES (use these exact forms)",
+          ...identity.map((i) =>
+            `- ${i.term}${i.wrong ? zh ? `（不要寫成 ${i.wrong}）` : ` (never ${i.wrong})` : ""}${i.note ? ` — ${i.note}` : ""}`,
+          ),
+        ]
+      : []),
     // 2026-09-22 (CJ 品牌頁): 核准的導流目的地。沒有這張清單，模型就會自己挑
     // 一個連結——通常是去年那個已經下架的活動頁。
     ...(destinations.length
@@ -258,15 +271,16 @@ export async function generateRepPost(input: GeneratePostInput): Promise<Generat
   const shortCode = await createLink(org.id, rep.id, input.channel);
   const trackedLink = `${publicBaseUrl()}/r/${shortCode}`;
   const ctx = complianceContextFor({ market: rep.market, solutions, facts, wording, trackedLink });
-  const { approvedDestinations, activeQuietPeriods } = await import("../../../strategy/core/hub/brandAssets");
+  const { approvedDestinations, activeQuietPeriods, namingRules } = await import("../../../strategy/core/hub/brandAssets");
   // 品牌資料是選填的：表還沒建或一筆都沒填，就當成沒有這兩段，不該讓寫作失敗。
-  const [destinations, quietPeriods] = await Promise.all([
+  const [identity, destinations, quietPeriods] = await Promise.all([
+    namingRules(org.id).catch(() => []),
     approvedDestinations(org.id).catch(() => []),
     activeQuietPeriods(org.id).catch(() => []),
   ]);
   const { system, user } = buildMessages({
     org, rep, solution, facts, wording, skillMd: skill.skillMd, channel: input.channel,
-    angle: input.angle?.trim() || null, trackedLink, destinations, quietPeriods,
+    angle: input.angle?.trim() || null, trackedLink, identity, destinations, quietPeriods,
   });
 
   const first = await callWriter(system, user);
