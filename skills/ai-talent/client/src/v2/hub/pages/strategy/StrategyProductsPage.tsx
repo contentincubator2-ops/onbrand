@@ -1,7 +1,7 @@
 import React from "react";
 import { trpc } from "../../../../lib/trpc";
 import { ErrorNote, Loading, PageHeader } from "../../ui";
-import StratCatalog from "../../components/strat-catalog";
+import StratProductCards from "../../components/strat-product-cards";
 import { useT } from "../../lang";
 
 export default function StrategyProductsPage() {
@@ -18,7 +18,7 @@ export default function StrategyProductsPage() {
         )}
       />
       {strategy.isLoading ? <Loading /> : <ErrorNote error={strategy.error} />}
-      {strategy.data ? <StratCatalog solutions={strategy.data.solutions} /> : null}
+      {strategy.data ? <StratProductCards solutions={strategy.data.solutions} /> : null}
     </div>
   );
 }

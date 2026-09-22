@@ -5,23 +5,58 @@
     "name_en": "ASUS DaaS (Device as a Service)",
     "vendor": "華碩電腦 ASUS",
     "category": "it_devices",
-    "industries": ["all_industries"],
+    "industries": [
+      "all_industries"
+    ],
     "featured": true,
     "summary_zh": "企業透過租賃合約，以固定月費取得 ASUS 商用設備與維護支援，免去一次性大筆採購，設備汰換也更有彈性。",
     "summary_en": "Businesses lease ASUS commercial devices with maintenance support for a fixed monthly fee, avoiding large upfront purchases and gaining flexibility in refresh cycles.",
     "features": [
-      { "zh": "降低一次性購置電腦的成本", "en": "Lower upfront PC purchase cost" },
-      { "zh": "把採購支出轉為固定月租", "en": "Turns hardware spend into a fixed monthly fee" },
-      { "zh": "租賃專案可依需求彈性客製", "en": "Lease plans tailored to needs" },
-      { "zh": "提供維護服務，減輕管理負擔", "en": "Maintenance included to reduce management burden" },
-      { "zh": "涵蓋完整的設備生命週期管理", "en": "Full device lifecycle management" }
+      {
+        "zh": "降低一次性購置電腦的成本",
+        "en": "Lower upfront PC purchase cost"
+      },
+      {
+        "zh": "把採購支出轉為固定月租",
+        "en": "Turns hardware spend into a fixed monthly fee"
+      },
+      {
+        "zh": "租賃專案可依需求彈性客製",
+        "en": "Lease plans tailored to needs"
+      },
+      {
+        "zh": "提供維護服務，減輕管理負擔",
+        "en": "Maintenance included to reduce management burden"
+      },
+      {
+        "zh": "涵蓋完整的設備生命週期管理",
+        "en": "Full device lifecycle management"
+      }
     ],
     "audience_zh": "各產業想降低設備採購門檻、以月費管理電腦的企業",
     "audience_en": "Businesses in any industry that want to avoid upfront hardware costs and manage PCs on a monthly fee",
     "prices": [
-      { "plan_zh": "商用筆電租賃方案（標準辦公型，36 期）", "plan_en": "Business laptop lease (standard office, 36-month term)", "amount": 1065, "billing": "month", "starts_from": true },
-      { "plan_zh": "商用桌機租賃方案（固定工位型，36 期）", "plan_en": "Business desktop lease (fixed workstation, 36-month term)", "amount": 925, "billing": "month", "starts_from": true },
-      { "plan_zh": "商用顯示器租賃方案（辦公擴充型，36 期）", "plan_en": "Business monitor lease (office expansion, 36-month term)", "amount": 100, "billing": "month", "starts_from": true }
+      {
+        "plan_zh": "商用筆電租賃方案（標準辦公型，36 期）",
+        "plan_en": "Business laptop lease (standard office, 36-month term)",
+        "amount": 1065,
+        "billing": "month",
+        "starts_from": true
+      },
+      {
+        "plan_zh": "商用桌機租賃方案（固定工位型，36 期）",
+        "plan_en": "Business desktop lease (fixed workstation, 36-month term)",
+        "amount": 925,
+        "billing": "month",
+        "starts_from": true
+      },
+      {
+        "plan_zh": "商用顯示器租賃方案（辦公擴充型，36 期）",
+        "plan_en": "Business monitor lease (office expansion, 36-month term)",
+        "amount": 100,
+        "billing": "month",
+        "starts_from": true
+      }
     ],
     "source_url": "https://experthub.asus.com/solution/detail/232"
   },
@@ -31,19 +66,39 @@
     "name_en": "ASUS AIS Smart Scheduling & Dispatch",
     "vendor": "華碩電腦 ASUS",
     "category": "ai_ops",
-    "industries": ["manufacturing"],
+    "industries": [
+      "manufacturing"
+    ],
     "summary_zh": "為智慧工廠設計，串接 ERP、MES、設備與現場報工資料，即時掌握工單、產能、物料、人力與設備狀態，由 AI 自動排出最佳派工計畫。",
     "summary_en": "Built for smart factories: connects ERP, MES, equipment and shop-floor reporting to track orders, capacity, materials, staff and machines in real time, then uses AI to generate optimized dispatch plans.",
     "features": [
-      { "zh": "AI 排程與派工最佳化", "en": "AI scheduling and optimized dispatching" },
-      { "zh": "與 ERP、MES 系統整合", "en": "Integrates with ERP and MES" },
-      { "zh": "即時滾動重排程", "en": "Real-time rolling rescheduling" },
-      { "zh": "甘特圖視覺化管理", "en": "Gantt-chart visual management" }
+      {
+        "zh": "AI 排程與派工最佳化",
+        "en": "AI scheduling and optimized dispatching"
+      },
+      {
+        "zh": "與 ERP、MES 系統整合",
+        "en": "Integrates with ERP and MES"
+      },
+      {
+        "zh": "即時滾動重排程",
+        "en": "Real-time rolling rescheduling"
+      },
+      {
+        "zh": "甘特圖視覺化管理",
+        "en": "Gantt-chart visual management"
+      }
     ],
     "audience_zh": "導入智慧工廠的製造業者",
     "audience_en": "Manufacturers building smart factories",
     "prices": [
-      { "plan_zh": "客製化", "plan_en": "Custom", "amount": null, "billing": "quote", "starts_from": false }
+      {
+        "plan_zh": "客製化",
+        "plan_en": "Custom",
+        "amount": null,
+        "billing": "quote",
+        "starts_from": false
+      }
     ],
     "source_url": "https://experthub.asus.com/solution/detail/335"
   },
@@ -53,21 +108,47 @@
     "name_en": "Zynkr AI Sales Follow-up",
     "vendor": "思坊引擎",
     "category": "sales_crm",
-    "industries": ["all_industries"],
+    "industries": [
+      "all_industries"
+    ],
     "featured": true,
     "summary_zh": "以 AI 將聯絡人、公司與交易集中到同一工作區，提供名片自動建檔、客戶背景調查、交易提醒與自動擬稿，支援繁中與英文。",
     "summary_en": "An AI workspace for contacts, companies and deals, with business-card capture, client background research, deal reminders and auto-drafted follow-ups, in Traditional Chinese and English.",
     "features": [
-      { "zh": "AI 一鍵查清客戶背景", "en": "AI researches a client's background in one click" },
-      { "zh": "提醒每次該做的跟進，不漏接", "en": "Reminders so no follow-up is missed" },
-      { "zh": "一分鐘內擬好跟進信", "en": "Follow-up emails drafted in about a minute" },
-      { "zh": "名片拍照即可建檔", "en": "Snap a business card to add a contact" }
+      {
+        "zh": "AI 一鍵查清客戶背景",
+        "en": "AI researches a client's background in one click"
+      },
+      {
+        "zh": "提醒每次該做的跟進，不漏接",
+        "en": "Reminders so no follow-up is missed"
+      },
+      {
+        "zh": "一分鐘內擬好跟進信",
+        "en": "Follow-up emails drafted in about a minute"
+      },
+      {
+        "zh": "名片拍照即可建檔",
+        "en": "Snap a business card to add a contact"
+      }
     ],
     "audience_zh": "小團隊與一人公司",
     "audience_en": "Small teams and solo businesses",
     "prices": [
-      { "plan_zh": "導入版", "plan_en": "Onboarding Edition", "amount": 18000, "billing": "year", "starts_from": false },
-      { "plan_zh": "專業版", "plan_en": "Professional", "amount": null, "billing": "quote", "starts_from": false }
+      {
+        "plan_zh": "導入版",
+        "plan_en": "Onboarding Edition",
+        "amount": 18000,
+        "billing": "year",
+        "starts_from": false
+      },
+      {
+        "plan_zh": "專業版",
+        "plan_en": "Professional",
+        "amount": null,
+        "billing": "quote",
+        "starts_from": false
+      }
     ],
     "source_url": "https://experthub.asus.com/solution/detail/301"
   },
@@ -77,22 +158,55 @@
     "name_en": "Lightning Order",
     "vendor": "碩豐數位科技",
     "category": "ecommerce_ordering",
-    "industries": ["retail_ecommerce", "food_beverage"],
+    "industries": [
+      "retail_ecommerce",
+      "food_beverage"
+    ],
     "featured": true,
     "summary_zh": "給中小型餐飲店的輕量接單方案，整合各點餐通路，只需出單印表機加手機 App 就能管理訂單，並支援顧客線上多元支付。",
     "summary_en": "A lightweight ordering solution for small food businesses: all ordering channels in one place, run from a phone app and a receipt printer, with online payments for customers.",
     "features": [
-      { "zh": "不用 POS 機，手機加連網印表機即可營業", "en": "No POS terminal needed — a phone and a networked printer are enough" },
-      { "zh": "顧客掃 QR Code 自助點餐", "en": "Customers self-order by scanning a QR code" },
-      { "zh": "內用、外帶、自取與外送訂單集中管理", "en": "Dine-in, takeaway, pickup and delivery orders in one place" },
-      { "zh": "串接 LINE 的會員集點", "en": "LINE-connected loyalty points" }
+      {
+        "zh": "不用 POS 機，手機加連網印表機即可營業",
+        "en": "No POS terminal needed — a phone and a networked printer are enough"
+      },
+      {
+        "zh": "顧客掃 QR Code 自助點餐",
+        "en": "Customers self-order by scanning a QR code"
+      },
+      {
+        "zh": "內用、外帶、自取與外送訂單集中管理",
+        "en": "Dine-in, takeaway, pickup and delivery orders in one place"
+      },
+      {
+        "zh": "串接 LINE 的會員集點",
+        "en": "LINE-connected loyalty points"
+      }
     ],
     "audience_zh": "快餐店、夜市小吃、市集攤位、餐車、飲料甜點店",
     "audience_en": "Quick-service restaurants, night-market stalls, food trucks, drink and dessert shops",
     "prices": [
-      { "plan_zh": "開店基礎版", "plan_en": "Store Basic", "amount": 799, "billing": "month", "starts_from": false },
-      { "plan_zh": "全通路 PRO 版", "plan_en": "Omnichannel PRO", "amount": 999, "billing": "month", "starts_from": false },
-      { "plan_zh": "連網出單印表機", "plan_en": "Networked receipt printer", "amount": 5500, "billing": "one_time", "starts_from": false }
+      {
+        "plan_zh": "開店基礎版",
+        "plan_en": "Store Basic",
+        "amount": 799,
+        "billing": "month",
+        "starts_from": false
+      },
+      {
+        "plan_zh": "全通路 PRO 版",
+        "plan_en": "Omnichannel PRO",
+        "amount": 999,
+        "billing": "month",
+        "starts_from": false
+      },
+      {
+        "plan_zh": "連網出單印表機",
+        "plan_en": "Networked receipt printer",
+        "amount": 5500,
+        "billing": "one_time",
+        "starts_from": false
+      }
     ],
     "source_url": "https://experthub.asus.com/solution/detail/243"
   },
@@ -102,22 +216,54 @@
     "name_en": "GogoForm e-Approvals",
     "vendor": "英特內軟體",
     "category": "workflow_forms",
-    "industries": ["all_industries"],
+    "industries": [
+      "all_industries"
+    ],
     "featured": true,
     "summary_zh": "把請假、採購、費用申請與內部審核搬到線上，每張表單都有紀錄、簽核進度隨時可追蹤。",
     "summary_en": "Moves leave requests, purchasing, expense claims and internal reviews online, so every form is recorded and every approval step is trackable.",
     "features": [
-      { "zh": "紙本表單轉為線上表單", "en": "Paper forms become online forms" },
-      { "zh": "依部門與職級自動跑簽核流程", "en": "Approval routing by department and job level" },
-      { "zh": "簽核紀錄完整保存可查詢", "en": "Complete, searchable approval records" },
-      { "zh": "手機也能隨時簽核", "en": "Approve from your phone, anywhere" }
+      {
+        "zh": "紙本表單轉為線上表單",
+        "en": "Paper forms become online forms"
+      },
+      {
+        "zh": "依部門與職級自動跑簽核流程",
+        "en": "Approval routing by department and job level"
+      },
+      {
+        "zh": "簽核紀錄完整保存可查詢",
+        "en": "Complete, searchable approval records"
+      },
+      {
+        "zh": "手機也能隨時簽核",
+        "en": "Approve from your phone, anywhere"
+      }
     ],
     "audience_zh": "需要電子簽核的小型團隊到成長型企業",
     "audience_en": "Small teams to growing companies that need e-approvals",
     "prices": [
-      { "plan_zh": "一般", "plan_en": "Standard", "amount": 1000, "billing": "month", "starts_from": false },
-      { "plan_zh": "VIP", "plan_en": "VIP", "amount": 1600, "billing": "month", "starts_from": false },
-      { "plan_zh": "吃到飽", "plan_en": "Unlimited", "amount": 5500, "billing": "month", "starts_from": false }
+      {
+        "plan_zh": "一般",
+        "plan_en": "Standard",
+        "amount": 1000,
+        "billing": "month",
+        "starts_from": false
+      },
+      {
+        "plan_zh": "VIP",
+        "plan_en": "VIP",
+        "amount": 1600,
+        "billing": "month",
+        "starts_from": false
+      },
+      {
+        "plan_zh": "吃到飽",
+        "plan_en": "Unlimited",
+        "amount": 5500,
+        "billing": "month",
+        "starts_from": false
+      }
     ],
     "source_url": "https://experthub.asus.com/solution/detail/271"
   },
@@ -127,20 +273,50 @@
     "name_en": "AUTOPOS Chain Restaurant Management",
     "vendor": "碩豐數位科技",
     "category": "retail_pos",
-    "industries": ["food_beverage", "retail_lifestyle_services"],
+    "industries": [
+      "food_beverage",
+      "retail_lifestyle_services"
+    ],
     "summary_zh": "雲端一站式管理平台，不只是收銀，更協助品牌複製成功模式、管理加盟並深耕顧客關係。",
     "summary_en": "A cloud all-in-one platform that goes beyond checkout: replicate what works across stores, manage franchises and deepen customer relationships.",
     "features": [
-      { "zh": "連鎖門市管理", "en": "Chain store management" },
-      { "zh": "總部加盟管理", "en": "Franchise management for HQ" },
-      { "zh": "會員與行銷整合", "en": "Integrated membership and marketing" }
+      {
+        "zh": "連鎖門市管理",
+        "en": "Chain store management"
+      },
+      {
+        "zh": "總部加盟管理",
+        "en": "Franchise management for HQ"
+      },
+      {
+        "zh": "會員與行銷整合",
+        "en": "Integrated membership and marketing"
+      }
     ],
     "audience_zh": "經營連鎖或加盟體系的餐飲品牌",
     "audience_en": "Food brands running chain or franchise operations",
     "prices": [
-      { "plan_zh": "標準版系統", "plan_en": "Standard system", "amount": 1900, "billing": "month", "starts_from": false },
-      { "plan_zh": "電子發票", "plan_en": "E-invoice add-on", "amount": 800, "billing": "month", "starts_from": false },
-      { "plan_zh": "外送串接", "plan_en": "Delivery-platform integration", "amount": 600, "billing": "month", "starts_from": false }
+      {
+        "plan_zh": "標準版系統",
+        "plan_en": "Standard system",
+        "amount": 1900,
+        "billing": "month",
+        "starts_from": false
+      },
+      {
+        "plan_zh": "電子發票",
+        "plan_en": "E-invoice add-on",
+        "amount": 800,
+        "billing": "month",
+        "starts_from": false
+      },
+      {
+        "plan_zh": "外送串接",
+        "plan_en": "Delivery-platform integration",
+        "amount": 600,
+        "billing": "month",
+        "starts_from": false
+      }
     ],
     "source_url": "https://experthub.asus.com/solution/detail/250"
   },
@@ -150,19 +326,39 @@
     "name_en": "EzBiz AI Smart E-commerce",
     "vendor": "台灣好農科技",
     "category": "marketing",
-    "industries": ["retail_ecommerce"],
+    "industries": [
+      "retail_ecommerce"
+    ],
     "summary_zh": "整合貼文、圖文、文案、SEO 與合規五組 AI 引擎，一鍵產出商品介紹與社群文案，並含訂單、庫存與會員管理。",
     "summary_en": "Five AI engines for posts, images, copy, SEO and compliance generate product and social copy in one click, plus order, inventory and member management.",
     "features": [
-      { "zh": "AI 產生行銷文案", "en": "AI-generated marketing copy" },
-      { "zh": "協助製作圖文素材", "en": "Helps produce image assets" },
-      { "zh": "SEO 內容優化", "en": "SEO content optimization" },
-      { "zh": "內容合規檢查", "en": "Content compliance checks" }
+      {
+        "zh": "AI 產生行銷文案",
+        "en": "AI-generated marketing copy"
+      },
+      {
+        "zh": "協助製作圖文素材",
+        "en": "Helps produce image assets"
+      },
+      {
+        "zh": "SEO 內容優化",
+        "en": "SEO content optimization"
+      },
+      {
+        "zh": "內容合規檢查",
+        "en": "Content compliance checks"
+      }
     ],
     "audience_zh": "想經營網路商店與自動化行銷的品牌",
     "audience_en": "Brands running online stores that want automated marketing",
     "prices": [
-      { "plan_zh": "基礎版", "plan_en": "Basic", "amount": 100000, "billing": "year", "starts_from": false }
+      {
+        "plan_zh": "基礎版",
+        "plan_en": "Basic",
+        "amount": 100000,
+        "billing": "year",
+        "starts_from": false
+      }
     ],
     "source_url": "https://experthub.asus.com/solution/detail/247"
   },
@@ -172,20 +368,254 @@
     "name_en": "EywaLink-AIoT Smart Factory Assistant",
     "vendor": "日峰科技",
     "category": "manufacturing",
-    "industries": ["manufacturing"],
+    "industries": [
+      "manufacturing"
+    ],
     "summary_zh": "針對人才斷層、新舊混牌設備、資安與救火式管理等痛點，以設備全面串接、地端資料處理與 AI 異常偵測改善。",
     "summary_en": "Addresses talent gaps, mixed legacy equipment, security and firefighting-style management with full equipment connectivity, on-premises data and AI anomaly detection.",
     "features": [
-      { "zh": "以高資安規格整合跨廠設備", "en": "Connects equipment across sites to high security standards" },
-      { "zh": "無紙化即時報工", "en": "Paperless real-time work reporting" },
-      { "zh": "主動偵測設備異常", "en": "Proactive anomaly detection" },
-      { "zh": "資料於地端處理", "en": "Data processed on-premises" }
+      {
+        "zh": "以高資安規格整合跨廠設備",
+        "en": "Connects equipment across sites to high security standards"
+      },
+      {
+        "zh": "無紙化即時報工",
+        "en": "Paperless real-time work reporting"
+      },
+      {
+        "zh": "主動偵測設備異常",
+        "en": "Proactive anomaly detection"
+      },
+      {
+        "zh": "資料於地端處理",
+        "en": "Data processed on-premises"
+      }
     ],
     "audience_zh": "面臨人才斷層與新舊設備整合的製造業者",
     "audience_en": "Manufacturers facing talent gaps and mixed legacy equipment",
     "prices": [
-      { "plan_zh": "基礎版", "plan_en": "Basic", "amount": 100000, "billing": "one_time", "starts_from": false }
+      {
+        "plan_zh": "基礎版",
+        "plan_en": "Basic",
+        "amount": 100000,
+        "billing": "one_time",
+        "starts_from": false
+      }
     ],
     "source_url": "https://experthub.asus.com/solution/detail/207"
+  },
+  {
+    "slug": "carbon-footprint-14067",
+    "name_zh": "14067 產品碳足跡系統",
+    "name_en": "ISO 14067 Product Carbon Footprint",
+    "vendor": "數位開創國際股份有限公司",
+    "category": "esg_carbon",
+    "industries": [
+      "manufacturing"
+    ],
+    "summary_zh": "協助企業做產品生命週期碳排放分析，拆解原物料、製造、配送、使用、廢棄各階段的碳排熱點，回應國際客戶對單一產品碳足跡的要求。",
+    "summary_en": "Product-level lifecycle carbon analysis that breaks emissions down by raw material, manufacturing, distribution, use and disposal — so a supplier can answer a European customer asking for one product's footprint, not the company total.",
+    "features": [
+      {
+        "zh": "無縫對接 14064 廠區數據，免重複建置",
+        "en": "Connects to existing ISO 14064 site data — no re-entry"
+      },
+      {
+        "zh": "專屬 LCI 生命週期盤查資料，非套用罐頭數據，每筆可追溯",
+        "en": "Builds your own LCI inventory rather than canned factors; every figure is traceable"
+      },
+      {
+        "zh": "自動視覺化拆解各階段碳排熱點",
+        "en": "Visualises the hotspot at each lifecycle stage"
+      },
+      {
+        "zh": "多產品、多料號同步盤查與比對",
+        "en": "Runs and compares several products and part numbers at once"
+      }
+    ],
+    "audience_zh": "需要回應國際品牌客戶碳足跡要求的製造與加工業",
+    "audience_en": "Manufacturers being asked for product-level carbon data by international brand customers",
+    "prices": [
+      {
+        "plan_zh": "系統訂閱方案（不限碳足跡產品及帳號數量）",
+        "plan_en": "System subscription (unlimited products and seats)",
+        "amount": 300000,
+        "billing": "year",
+        "starts_from": true
+      }
+    ],
+    "source_url": "https://experthub.asus.com/solution/detail/321",
+    "featured": false
+  },
+  {
+    "slug": "powerarena-hop",
+    "name_zh": "人力產線 AI 視覺優化管理（PowerArena HOP）",
+    "name_en": "PowerArena HOP — AI vision for labour-intensive lines",
+    "vendor": "百威雷科技有限公司",
+    "category": "manufacturing_ai_vision",
+    "industries": [
+      "manufacturing"
+    ],
+    "summary_zh": "用 AI 可視化生產作業，24/7 擷取工站影像與週期時間，找出瓶頸工序、確認 SOP 遵守，為線平衡與製程品管提供資料基礎。",
+    "summary_en": "Makes a labour-intensive line visible: 24/7 station footage and cycle times, AI line-balance analysis, and an alert when an operation drifts from the SOP.",
+    "features": [
+      {
+        "zh": "AI 線平衡分析，即時找出瓶頸工序",
+        "en": "AI line-balance analysis that surfaces the bottleneck station"
+      },
+      {
+        "zh": "AI 防錯防呆：偏離標準作業程序即時警示",
+        "en": "Flags a deviation from the SOP as it happens"
+      },
+      {
+        "zh": "24/7 全時生產檢視，建立生產履歷",
+        "en": "Round-the-clock capture builds a production record"
+      },
+      {
+        "zh": "影像回溯與追蹤，快速定位問題根源",
+        "en": "Replay the footage to find the root cause"
+      }
+    ],
+    "audience_zh": "勞力密集產線的製造與加工業",
+    "audience_en": "Manufacturers running labour-intensive assembly lines",
+    "prices": [
+      {
+        "plan_zh": "Starter 入門版（含一次性硬體與系統設定）",
+        "plan_en": "Starter (includes one-time hardware and setup)",
+        "amount": 30000,
+        "billing": "one_time",
+        "starts_from": true
+      },
+      {
+        "plan_zh": "Professional 專業版",
+        "plan_en": "Professional",
+        "amount": 120000,
+        "billing": "one_time",
+        "starts_from": true
+      },
+      {
+        "plan_zh": "Enterprise 企業版（完整地端 AI、多廠區）",
+        "plan_en": "Enterprise (full on-prem AI, multi-site)",
+        "amount": 170000,
+        "billing": "one_time",
+        "starts_from": true
+      }
+    ],
+    "source_url": "https://experthub.asus.com/solution/detail/220",
+    "featured": false
+  },
+  {
+    "slug": "premier-support",
+    "name_zh": "Premier Support 技術支援服務",
+    "name_en": "Premier Support — points-based IT support",
+    "vendor": "自由系統股份有限公司",
+    "category": "it_services",
+    "industries": [
+      "all_industries"
+    ],
+    "summary_zh": "採點數制的跨領域技術支援，企業依需求把點數用在架構調整、故障排除與資安事件處理，補足 IT 人力與技術缺口。",
+    "summary_en": "A points pool a company draws on for architecture work, troubleshooting and security incidents — instead of hiring for every skill it occasionally needs.",
+    "features": [
+      {
+        "zh": "彈性點數使用機制，依實際需求消耗",
+        "en": "Points are spent on what actually comes up"
+      },
+      {
+        "zh": "涵蓋雲端、地端、資安與顧問服務",
+        "en": "Covers cloud, on-prem, security and advisory"
+      },
+      {
+        "zh": "支援 5x8 與 7x24 服務等級",
+        "en": "5x8 or 7x24 service levels"
+      },
+      {
+        "zh": "支援架構調整、緊急事件與顧問型需求",
+        "en": "Architecture changes, emergencies and advisory work"
+      }
+    ],
+    "audience_zh": "IT 人力不足、需要跨領域即時支援的企業",
+    "audience_en": "Companies without the in-house breadth to cover cloud, on-prem and security",
+    "prices": [
+      {
+        "plan_zh": "點數標準包（內含 180 點）",
+        "plan_en": "Standard pack (180 points)",
+        "amount": 306000,
+        "billing": "one_time",
+        "starts_from": false
+      },
+      {
+        "plan_zh": "點數加購包（內含 60 點，須先購買標準包）",
+        "plan_en": "Top-up pack (60 points, requires the standard pack)",
+        "amount": 102000,
+        "billing": "one_time",
+        "starts_from": false
+      }
+    ],
+    "source_url": "https://experthub.asus.com/solution/detail/256",
+    "featured": false
+  },
+  {
+    "slug": "altabots-ai-agent",
+    "name_zh": "AltaBots.ai AI Agent（AI 數據分析助手）",
+    "name_en": "AltaBots.ai AI Agent — ask your database a question",
+    "vendor": "數據立諮詢顧問有限公司",
+    "category": "data_analytics",
+    "industries": [
+      "all_industries"
+    ],
+    "summary_zh": "企業級 AI Agent 平台，用 Text2SQL 讓管理層以自然語言直接查資料庫，自動產出統計、圖表與結構化報告；以 RAG 讓每個數字可追溯。",
+    "summary_en": "Managers ask a question in plain language; Text2SQL turns it into a query, runs it, and returns charts and a written report. RAG keeps every figure traceable to its source.",
+    "features": [
+      {
+        "zh": "Text2SQL：用問的查數據，不必排隊等 IT 拉報表",
+        "en": "Text2SQL — no queue for a report"
+      },
+      {
+        "zh": "報告自動化，月報產出從小時級縮短至分鐘級",
+        "en": "Scheduled reports drop from hours to minutes"
+      },
+      {
+        "zh": "RAG 技術杜絕 AI 幻覺，每個數字有憑有據",
+        "en": "RAG keeps every number tied to its source"
+      },
+      {
+        "zh": "通過 ISO 27001，具 RBAC 權限與 PII 匿名化，支援地端部署",
+        "en": "ISO 27001 certified, RBAC, PII anonymisation, on-prem option"
+      }
+    ],
+    "audience_zh": "報表產出卡在 IT、需要自助查詢與例行報告自動化的企業",
+    "audience_en": "Teams whose reporting is bottlenecked on IT",
+    "prices": [
+      {
+        "plan_zh": "SAAS 啟動版（單一資料庫）",
+        "plan_en": "SaaS Starter (single database)",
+        "amount": 330000,
+        "billing": "year",
+        "starts_from": true
+      },
+      {
+        "plan_zh": "SAAS 商業版（多資料源、報告自動化）",
+        "plan_en": "SaaS Business (multi-source, automated reporting)",
+        "amount": 540000,
+        "billing": "year",
+        "starts_from": true
+      },
+      {
+        "plan_zh": "公有雲私有化部署 Lite",
+        "plan_en": "Private-cloud deployment (Lite)",
+        "amount": null,
+        "billing": "quote",
+        "starts_from": false
+      },
+      {
+        "plan_zh": "落地部署 標準版",
+        "plan_en": "On-premise (Standard)",
+        "amount": null,
+        "billing": "quote",
+        "starts_from": false
+      }
+    ],
+    "source_url": "https://experthub.asus.com/solution/detail/317",
+    "featured": false
   }
 ]

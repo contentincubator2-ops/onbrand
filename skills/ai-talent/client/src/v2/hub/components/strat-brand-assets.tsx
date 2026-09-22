@@ -27,6 +27,7 @@ import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter } from "@herou
 import { trpc } from "../../../lib/trpc";
 import { ErrorNote, Loading } from "../ui";
 import { useT } from "../lang";
+import CardShell, { CARD_GRID } from "./card-shell";
 
 type Kind = "destination" | "identity" | "account" | "customer" | "quiet";
 
@@ -186,57 +187,28 @@ export default function BrandAssetCards() {
         {t("What the writer draws on, and who keeps it current", "AI 從哪裡取用，以及誰在維護")}
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+      <div className={CARD_GRID}>
         {BRAND_ASSET_SPECS.map((s) => {
           const mine = items.filter((a) => a.kind === s.kind);
-          const Icon = s.icon;
+          // 緘默期正在生效的時候，徽章改成紅色的「生效中」—— 那是這張卡最重要的狀態。
           const live = s.kind === "quiet" && activeQuiet.length > 0;
           return (
-            <button
+            <CardShell
               key={s.kind}
-              type="button"
               onClick={() => setOpenKind(s.kind)}
-              className="group flex flex-col overflow-hidden rounded-2xl text-left transition hover:scale-[1.02] hover:shadow-lg"
-              style={{ border: "1px solid rgba(0,0,0,0.07)", background: "white" }}
+              accent={live ? "#DC2626" : s.accent}
+              icon={s.icon}
+              tag={live ? t("IN EFFECT", "生效中") : t(s.tag[0], s.tag[1])}
+              name={t(s.name[0], s.name[1])}
+              measure={t(s.measure[0], s.measure[1])}
+              detail={mine.length ? s.summary(mine[0]!) : t(s.empty[0], s.empty[1])}
+              action={t("Edit", "編輯")}
             >
-              <div
-                className="relative flex flex-col items-center justify-center px-3"
-                style={{ height: 130, background: "#F5F4F2", borderBottom: "1px solid rgba(0,0,0,0.06)" }}
-              >
-                <div className="text-[30px] font-bold leading-none tabular-nums text-stone-900">{mine.length}</div>
-                <div className="mt-1.5 line-clamp-2 text-center text-[11px] leading-tight text-stone-500">
-                  {mine.length === 1 ? t("entry", "筆") : t("entries", "筆")}
-                </div>
-                <div
-                  className="absolute left-2 top-2 flex h-5 w-5 items-center justify-center rounded-full"
-                  style={{ background: s.accent }}
-                >
-                  <Icon className="h-3 w-3 text-white" aria-hidden />
-                </div>
-                <span
-                  className="absolute right-2 top-2 rounded-full px-2 py-0.5 font-bold text-white shadow-sm"
-                  style={{ background: live ? "#DC2626" : s.accent, fontSize: 11, letterSpacing: "0.06em" }}
-                >
-                  {live ? t("IN EFFECT", "生效中") : t(s.tag[0], s.tag[1])}
-                </span>
+              <div className="text-[30px] font-bold leading-none tabular-nums text-stone-900">{mine.length}</div>
+              <div className="mt-1.5 line-clamp-2 text-center text-[11px] leading-tight text-stone-500">
+                {mine.length === 1 ? t("entry", "筆") : t("entries", "筆")}
               </div>
-
-              <div className="flex flex-1 flex-col gap-1.5 p-3">
-                <div className="text-small font-semibold text-neutral-900">{t(s.name[0], s.name[1])}</div>
-                <p className="text-tiny leading-relaxed text-default-500">
-                  <span className="font-medium text-neutral-600">{t("How it's kept: ", "口徑：")}</span>
-                  {t(s.measure[0], s.measure[1])}
-                </p>
-                <div>
-                  <span className="inline-flex rounded-lg border px-2 py-1 text-[12px] leading-relaxed text-neutral-600">
-                    {mine.length ? s.summary(mine[0]!) : t(s.empty[0], s.empty[1])}
-                  </span>
-                </div>
-                <div className="mt-auto flex items-center gap-2 border-t border-neutral-100 pt-2">
-                  <span className="truncate text-[12px] text-neutral-600">{t("Edit", "編輯")}</span>
-                </div>
-              </div>
-            </button>
+            </CardShell>
           );
         })}
       </div>

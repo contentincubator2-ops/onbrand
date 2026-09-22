@@ -28,7 +28,6 @@
 import { Link } from "react-router-dom";
 import {
   Activity,
-  ArrowRight,
   BadgeCheck,
   ClipboardList,
   FileClock,
@@ -39,6 +38,7 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useT } from "../lang";
+import CardShell, { CARD_GRID } from "./card-shell";
 import { fmt } from "../ui";
 import { DailyBars } from "../charts";
 import { BarList } from "./ov-BarList";
@@ -197,77 +197,6 @@ export const HQ_FUNCTIONS: FunctionCard[] = [
   },
 ];
 
-/** 卡片外框。七張數字卡與兩張圖表卡共用，免得兩邊各自漂移。 */
-function CardShell({
-  to,
-  accent,
-  icon: Icon,
-  tag,
-  name,
-  measure,
-  detail,
-  bandHeight = 130,
-  children,
-}: {
-  to: string;
-  accent: string;
-  icon: LucideIcon;
-  tag: string;
-  name: string;
-  measure: string;
-  detail: string;
-  bandHeight?: number;
-  children: React.ReactNode;
-}) {
-  const t = useT();
-  return (
-    <Link
-      to={to}
-      className="group flex flex-col overflow-hidden rounded-2xl text-left transition hover:scale-[1.02] hover:shadow-lg"
-      style={{ border: "1px solid rgba(0,0,0,0.07)", background: "white" }}
-    >
-      <div
-        className="relative flex flex-col items-center justify-center px-3"
-        style={{ height: bandHeight, background: "#F5F4F2", borderBottom: "1px solid rgba(0,0,0,0.06)" }}
-      >
-        {children}
-        <div
-          className="absolute left-2 top-2 flex h-5 w-5 items-center justify-center rounded-full"
-          style={{ background: accent }}
-        >
-          <Icon className="h-3 w-3 text-white" aria-hidden />
-        </div>
-        <span
-          className="absolute right-2 top-2 rounded-full px-2 py-0.5 font-bold text-white shadow-sm"
-          style={{ background: accent, fontSize: 11, letterSpacing: "0.06em" }}
-        >
-          {tag}
-        </span>
-      </div>
-
-      <div className="flex flex-1 flex-col gap-1.5 p-3">
-        <div className="text-small font-semibold text-neutral-900">{name}</div>
-        <p className="text-tiny leading-relaxed text-default-500">
-          <span className="font-medium text-neutral-600">{t("How it's counted: ", "口徑：")}</span>
-          {measure}
-        </p>
-        <div>
-          <span className="inline-flex rounded-lg border px-2 py-1 text-[12px] leading-relaxed text-neutral-600">
-            {detail}
-          </span>
-        </div>
-        <div className="mt-auto flex items-center gap-2 border-t border-neutral-100 pt-2">
-          <span className="truncate text-[12px] text-neutral-600">{t("Open", "打開")}</span>
-          <ArrowRight
-            className="ml-auto h-3.5 w-3.5 shrink-0 text-neutral-400 transition-transform group-hover:translate-x-0.5"
-            aria-hidden
-          />
-        </div>
-      </div>
-    </Link>
-  );
-}
-
 /**
  * 原本這兩塊是頁面下方的兩張 Card（每日長條圖 + 規則排行）。
  * 2026-09-22 CJ：「連底下的 post activity、caught before posting 都變成卡片式」。
@@ -361,7 +290,7 @@ export default function FunctionCards({
       <div className="mb-3 text-[12px] font-medium uppercase tracking-wide text-stone-500">
         {t("What this answers, and how it's counted", "這套系統回答什麼，以及怎麼算的")}
       </div>
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+      <div className={CARD_GRID}>
         {HQ_FUNCTIONS.map((f) => {
           const hero = f.hero(overview);
           const measure = f.measure(overview);
