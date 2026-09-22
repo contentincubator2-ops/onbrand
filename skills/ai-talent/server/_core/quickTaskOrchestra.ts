@@ -315,6 +315,25 @@ export function buildBudgetExceededResult(args: {
  * don't start work that cannot finish: a skipped image is a card without a
  * picture, a doomed image is a task without captions.
  */
+/**
+ * One-shot slot a producer fills and a consumer awaits.
+ *
+ * One-shot is the whole point: the per-variant writers fill a slot the moment
+ * that variant lands, and a liveness sweep fills every slot again once the
+ * batch resolves. The sweep must never overwrite a real value with the batch's
+ * (identical, or on a partial failure emptier) copy.
+ */
+export function deferredSlot<T>(): { promise: Promise<T>; resolve: (value: T) => void; settled: () => boolean } {
+  let resolve!: (value: T) => void;
+  let done = false;
+  const promise = new Promise<T>((r) => { resolve = r; });
+  return {
+    promise,
+    resolve: (value: T) => { if (!done) { done = true; resolve(value); } },
+    settled: () => done,
+  };
+}
+
 export function imageCapsForRemaining(
   remainingMs: number,
   opts: { primaryCapMs: number; fallbackCapMs: number; minUsefulMs?: number },
@@ -1340,13 +1359,23 @@ async function callCaptionWriter(args: {
   market?: MarketCode | null;
   isZhTW: boolean;
   requestedUrl?: string | null;
+  /** 2026-09-22 (CJ「把生圖改成第一篇文案完成就開始」): fired per variant as it
+   *  lands, so image work can start on variant 0 while variant 4 is still
+   *  being written. */
+  onEach?: (index: number, value: { label: string; caption: string; hashtags?: string[] }) => void;
 }): Promise<Array<{ label: string; caption: string; hashtags?: string[] }>> {
   const labels = args.config.variantLabels.slice(0, args.config.variants);
   // Parallel fanout — each variant in its own LLM call.
   // Promise.allSettled so one failure doesn't kill the others.
   const settled = await Promise.allSettled(
-    labels.map((label) =>
-      callOneVariant({ ...args, label }),
+    labels.map((label, i) =>
+      callOneVariant({ ...args, label }).then((v) => {
+        args.onEach?.(i, v);
+        return v;
+      }, (e) => {
+        args.onEach?.(i, { label: labels[i] ?? `版本 ${i + 1}`, caption: "", hashtags: undefined });
+        throw e;
+      }),
     ),
   );
   return settled.map((s, i) =>
@@ -1468,6 +1497,8 @@ async function callImageDirector(args: {
   brandPrefix: string;
   urlContext: string;
   userMsg: string;
+  /** Fired per brief as it lands — see callCaptionWriter.onEach. */
+  onEach?: (index: number, value: string) => void;
 }): Promise<string[]> {
   const { config } = args;
   if (!config.imageDirectorId || config.images === 0) return [];
@@ -1475,7 +1506,13 @@ async function callImageDirector(args: {
   // Per-variant fanout — same reliability mechanism as caption_writer.
   const labels = config.variantLabels.slice(0, config.images);
   const settled = await Promise.allSettled(
-    labels.map((label) => callOneBrief({ ...args, label })),
+    labels.map((label, i) => callOneBrief({ ...args, label }).then((b) => {
+      args.onEach?.(i, b);
+      return b;
+    }, (e) => {
+      args.onEach?.(i, `（${labels[i] ?? `brief ${i + 1}`} brief 生成失敗 — 請點「用此風格生圖」自己描述）`);
+      throw e;
+    })),
   );
   return settled.map((s, i) =>
     s.status === "fulfilled" ? s.value : `（${labels[i] ?? `brief ${i + 1}`} brief 生成失敗 — 請點「用此風格生圖」自己描述）`,
@@ -2500,6 +2537,82 @@ export async function runOrchestra(args: {
       ? stage("brief", `${imageLoad.meta?.name ?? "Mandy Cheng"} 寫 ${args.config.images} 條視覺 brief`)
       : null;
 
+    // ── Per-variant image start ───────────────────────────────────────
+    // 2026-09-22 (CJ「把生圖改成第一篇文案完成就開始」): image work used to wait
+    // for the SLOWEST caption — all N captions, then all N brand-rule passes,
+    // and only then the image fanout. On the 99s carousel that left the image
+    // phase starting ~60s in, against a 150s wall. Each image now starts as
+    // soon as ITS caption and ITS brief exist.
+    //
+    // What this trades: the image seed is the caption as the writer produced
+    // it, before the brand-rule pass may rewrite a banned word. The image is a
+    // text-free visual derived from the caption's gist, so a word substitution
+    // does not change it — and the non-deliverable gate below is applied
+    // eagerly, so a caption that is about to be blanked still produces the
+    // same "skipped" image it did before.
+    const variantCount = args.config.variants;
+    const captionSlots = Array.from({ length: variantCount }, () => deferredSlot<{ label?: string; caption?: string } | null>());
+    const briefSlots = Array.from({ length: variantCount }, () => deferredSlot<string | null>());
+    const willRender = (args.config.runImageGen || !!args.config.runVideoGen) && args.config.images > 0;
+    // Brand palette / identity / product photo are DB reads that do not depend
+    // on the captions — start them now so the first finished caption doesn't
+    // then wait on them. (Loaded once per run, shared by every image.)
+    const imageDeps = (async () => {
+      try {
+        const [palette, identity, subjectUrl] = await Promise.all([
+          loadBrandPaletteHexes(args.brandId),
+          loadBrandIdentityForImage(args.brandId),
+          willRender ? loadProductImageUrl(args.brandId, args.productId) : Promise.resolve(null),
+        ]);
+        return { palette, identity, subject: resolveProductSubjectReference(args.productId, subjectUrl) };
+      } catch (e) {
+        // These promises are created eagerly and awaited later, so a rejection
+        // would land as an unhandled rejection (fatal in Node) instead of a
+        // failed run. An image without the brand palette still beats that.
+        console.warn("[orchestra] image deps failed:", (e as Error)?.message);
+        return {
+          palette: [] as Array<{ hex: string; role: string }>,
+          identity: null as BrandIdentityForImage | null,
+          subject: resolveProductSubjectReference(args.productId, null),
+        };
+      }
+    })();
+    // The primary is usually gpt-image-2 and may fall back; per-image modelId
+    // records the actual provider, so keep the stage label provider-neutral.
+    // Created here, not after the captions, so its clock starts when the images
+    // actually do.
+    const stGen = willRender ? stage("gen", `平行生圖 ×${args.config.images}`) : null;
+    const eagerImages = willRender && args.config.imageDirectorId
+      ? Array.from({ length: args.config.images }, (_, i) => (async (): Promise<OrchestraVariant["image"]> => {
+          const [cap, brief, deps] = await Promise.all([
+            captionSlots[i]!.promise,
+            briefSlots[i]!.promise,
+            imageDeps,
+          ]);
+          // null brief = the director call failed outright; that used to mean
+          // "no image at all", and it still does.
+          if (brief === null) return { style: null, url: null, status: "skipped" as const };
+          const text = (cap?.caption ?? "").trim();
+          const usable = text && !detectNonDeliverable(text, {
+            isZhTW: brandMarket.isZhTW,
+            structured: !!args.config.calendarMerge,
+            inputKeys,
+          });
+          return await genOneImage({
+            content: usable ? text : "",
+            style: brief,
+            platform: args.template.id.split("-")[0],
+            palette: deps.palette,
+            brandIdentity: deps.identity,
+            subjectImageUrl: deps.subject.imageUrl,
+            subjectImageRequired: deps.subject.required,
+          }, args.config, imageDeadlineAt);
+        })().catch((e): OrchestraVariant["image"] => ({
+          style: null, prompt: null, promptZh: null, url: null,
+          status: "failed", errorMsg: String((e as Error)?.message ?? e).slice(0, 200),
+        })))
+      : null;
+
     const [captions, briefs] = await Promise.all([
       callCaptionWriter({
         template: args.template,
@@ -2514,6 +2627,7 @@ export async function runOrchestra(args: {
         market: brandMarket.marketCode, // 2026-07-17 多市場
         isZhTW: brandMarket.isZhTW,
         requestedUrl,
+        onEach: (i, v) => captionSlots[i]?.resolve(v),
       }).then((c) => { stCap.status = "done"; stCap.completedAt = Date.now() - startedAt; return c; }).catch((e) => {
         stCap.status = "failed";
         stCap.completedAt = Date.now() - startedAt;
@@ -2528,6 +2642,7 @@ export async function runOrchestra(args: {
             brandPrefix,
             urlContext,
             userMsg,
+            onEach: (i, b) => briefSlots[i]?.resolve(b),
           }).then((b) => { if (stImg) { stImg.status = "done"; stImg.completedAt = Date.now() - startedAt; } return b; }).catch((e) => {
             if (stImg) { stImg.status = "failed"; stImg.completedAt = Date.now() - startedAt; }
             errors.push(`brief: ${String(e?.message ?? e)}`);
@@ -2535,6 +2650,15 @@ export async function runOrchestra(args: {
           })
         : Promise.resolve<string[]>([]),
     ]);
+
+    // Liveness: a writer that threw before reporting a variant would leave its
+    // slot unresolved and the matching image awaiting it forever. Settle every
+    // slot with the batch's own answer — resolve() is one-shot, so slots that
+    // already reported keep their earlier (and identical) value.
+    for (let i = 0; i < variantCount; i++) {
+      captionSlots[i]?.resolve(Array.isArray(captions) ? (captions[i] ?? null) : null);
+      briefSlots[i]?.resolve(briefs[i] ?? null);
+    }
 
     // ── Caption post-validation ─────────────────────────────────────────
     // CJ QA:「FB 廣告 Headline 5 種：輸入籠統時 AI 回傳一大段要求澄清的
@@ -2911,39 +3035,18 @@ export async function runOrchestra(args: {
     // 2026-07-29: a video task's clip is its still animated, so video always
     // implies rendering the still — otherwise runVideoGen would silently
     // produce nothing (every image "skipped" → every clip skipped).
-    const willRender = (args.config.runImageGen || !!args.config.runVideoGen) && args.config.images > 0;
-    const stGen = willRender
-      // The primary is usually Imagen, can be GPT/Nano Banana, and may fall
-      // back to Flux. Per-image modelId records the actual provider; keep the
-      // stage label provider-neutral instead of claiming every image was Flux.
-      ? stage("gen", `平行生圖 ×${args.config.images}`)
-      : null;
-
     const taskPlatform = args.template.id.split("-")[0];
     // 2026-07-19: brand palette loaded once per run → injected into every
     // image brief so generated visuals carry the brand color scheme.
-    const brandPalette = await loadBrandPaletteHexes(args.brandId);
-    const brandIdentity = await loadBrandIdentityForImage(args.brandId);
-    // 2026-07-27 (CJ「合成圖也套用真實產品圖片」): when this run is scoped
-    // to a specific product, fetch its real photo once so every variant's
-    // image composites the actual product — same fidelity bar as the manual
-    // RunPage「使用真實產品圖」panel. Brand-level (no productId) runs are
-    // unaffected — there's no single product to anchor to.
-    const loadedSubjectImageUrl = willRender ? await loadProductImageUrl(args.brandId, args.productId) : null;
-    const productSubject = resolveProductSubjectReference(args.productId, loadedSubjectImageUrl);
-    const images: OrchestraVariant["image"][] = willRender && briefs.length
-      ? await Promise.all(briefs.map((b, i) =>
-          // Theater standard: prompt derives from the variant's CAPTION;
-          // the Chinese brief is display-only (style).
-          genOneImage({
-            content: captions[i]?.caption ?? "",
-            style: b,
-            platform: taskPlatform,
-            palette: brandPalette,
-            brandIdentity,
-            subjectImageUrl: productSubject.imageUrl,
-            subjectImageRequired: productSubject.required,
-          }, args.config, imageDeadlineAt)))
+    // 2026-07-27 (CJ「合成圖也套用真實產品圖片」): when this run is scoped to a
+    // specific product, its real photo rides along so every variant composites
+    // the actual product. Both are loaded by imageDeps above, which starts
+    // while the captions are still being written.
+    const { palette: brandPalette, identity: brandIdentity, subject: productSubject } = await imageDeps;
+    // The per-variant pipeline started each of these the moment its caption and
+    // brief landed; here we just collect them.
+    const images: OrchestraVariant["image"][] = eagerImages
+      ? await Promise.all(eagerImages)
       : briefs.length
         ? briefs.map((b) => ({ style: b, url: null, status: "skipped" as const }))
         : Array.from({ length: args.config.images }, () => ({ style: null, url: null, status: "skipped" as const }));
