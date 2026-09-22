@@ -78,6 +78,9 @@ export interface GenOptions {
   durationSec?: 5 | 10;
   /** Negative motion/content hint for video models that support it. */
   videoNegativePrompt?: string;
+  /** Epoch ms the caller must be done by. Used to drop a queued image request
+   *  instead of paying for one nobody is waiting for any more. */
+  deadlineAt?: number;
   /** 2026-07-29: i2v END frame (Kling `image_tail_url`). With imageUrl as the
    *  start frame, the model interpolates start → end in ONE continuous shot.
    *  This is what makes a real before/after possible without compositing. */
@@ -118,11 +121,60 @@ function sizeForAspectRatio(opts: GenOptions): NonNullable<GenOptions["size"]> {
   return "1024x1024";
 }
 
+/**
+ * Process-wide limit on concurrent OpenAI image requests.
+ *
+ * 2026-09-22 (CJ「請繼續做」): a 99s carousel fires 6–30 image requests at once.
+ * Solo, gpt-image-2 answers in 9–14s; inside that burst every call crawls past
+ * genOneImage's cap, the run falls back to Flux, and the task then dies at its
+ * hard budget with nothing shipped. Four at a time keeps each call in its fast
+ * range — the phase finishes SOONER than the unbounded burst did, not later.
+ *
+ * Process-local on purpose: pm2 runs one app process, and a queue that spans
+ * requests is exactly what stops two concurrent tasks from stampeding.
+ */
+function imageSlotLimit(): number {
+  const raw = Number(process.env.OPENAI_IMAGE_CONCURRENCY);
+  return Number.isFinite(raw) && raw > 0 ? Math.floor(raw) : 4;
+}
+let activeImageCalls = 0;
+const imageSlotQueue: Array<() => void> = [];
+
+export async function withImageSlot<T>(run: () => Promise<T>, deadlineAt?: number): Promise<T> {
+  if (activeImageCalls >= imageSlotLimit()) {
+    await new Promise<void>((resolve) => imageSlotQueue.push(resolve));
+    // The wait may have outlived the caller. Generating now would bill an
+    // image that nothing is waiting for, so hand the slot on instead.
+    if (deadlineAt !== undefined && Date.now() >= deadlineAt) {
+      const next = imageSlotQueue.shift();
+      if (next) next();
+      throw new Error("image slot wait outlived the task budget");
+    }
+  }
+  activeImageCalls += 1;
+  try {
+    return await run();
+  } finally {
+    activeImageCalls -= 1;
+    const next = imageSlotQueue.shift();
+    if (next) next();
+  }
+}
+
+/** Test/diagnostic view of the queue. */
+export function imageSlotStats(): { active: number; queued: number; limit: number } {
+  return { active: activeImageCalls, queued: imageSlotQueue.length, limit: imageSlotLimit() };
+}
+
 // ── 1. OpenAI gpt-image-1 / gpt-image-2 ──────────────────────────────────
 // 2026-09-01 (CJ「open ai 我指定使用 gpt image 2」): gpt-image-2 is the
 // designated OpenAI image model, so it is the default here too. Callers that
 // want the older one must now name it explicitly.
 async function genOpenAIImage(opts: GenOptions, model: "gpt-image-1" | "gpt-image-2" = "gpt-image-2"): Promise<GenResult> {
+  return await withImageSlot(() => genOpenAIImageCall(opts, model), opts.deadlineAt);
+}
+
+async function genOpenAIImageCall(opts: GenOptions, model: "gpt-image-1" | "gpt-image-2"): Promise<GenResult> {
   const key = process.env.OPENAI_API_KEY ?? "";
   if (!key) throw new Error("OPENAI_API_KEY missing");
   // Derive an OpenAI-supported size from the aspect ratio when an explicit
