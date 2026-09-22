@@ -13,6 +13,7 @@ name: "Ops (DEV) — probe gpt-image-2 image edit with a real product photo"
 # 用法（這個 repo 的 dev 探測慣例：改這個檔案再 push，就會觸發）：
 #   PROBE_MODE=list  → 把最近上傳的 30 張產品／品牌照片縮圖拉回來，用來認出要用哪一張
 #   PROBE_MODE=angles → 在 dev VM 用真實模型跑 fb-30-caption-short，印出三個版本全文（驗證版本名稱與內文切角對得上）
+#   PROBE_MODE=livegen → 用網站實際的 generateStillImage 生一張圖（不繞過 dispatchGenerate，端到端驗證 key）
 #   PROBE_MODE=diagnose → 比對「GitHub secret 的 key」與「dev VM .env 的 key」的指紋（不印 key），各打一次最小生圖呼叫，並列出 dev 最近的生圖失敗與點數
 #   PROBE_MODE=edit  → 用 PROBE_PHOTO 跑兩個變體（自然提示詞對照 vs 上線用的 PRODUCT_FAITHFUL 提示詞），把結果圖拉回來
 on:
@@ -27,7 +28,7 @@ jobs:
     environment: dev
     timeout-minutes: 20
     env:
-      PROBE_MODE: diagnose
+      PROBE_MODE: livegen
       PROBE_PHOTO: "/opt/onbrand/shared/storage/asset-photos/product/261/1789987951094-5w8aw5.webp"
       SSH_KEY: ${{ secrets.VM_SSH_PRIVATE_KEY }}
       PROBE_OPENAI_KEY: ${{ secrets.OPEN_API_KEY }}
@@ -67,6 +68,12 @@ jobs:
             echo; echo "=========== 第二次：換一組有價格的素材 ==========="
             TASK_INPUT='洛蒙德湖系列 No. 01：空間噴霧 100ml 售價 NT$1,280；擴香 200ml 售價 NT$1,680；香氛蠟燭 180g 燃燒約 40 小時，售價 NT$980。' ./node_modules/.bin/tsx scripts/probe-variant-angles.ts 2>&1 | tail -40
             exit 0
+          fi
+
+          if [ "$MODE" = "livegen" ]; then
+            echo "--- 真的用網站的程式碼路徑（generateStillImage）生一張圖，驗證這個 process 讀到的 key 能不能用 ---"
+            cd "$AI" && ./node_modules/.bin/tsx scripts/probe-live-image-gen.ts 2>&1 | tail -30
+            exit $?
           fi
 
           if [ "$MODE" = "diagnose" ]; then
