@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { buildBudgetExceededResult, imageCapsForRemaining } from "./quickTaskOrchestra";
+import { buildBudgetExceededResult, deferredSlot, imageCapsForRemaining } from "./quickTaskOrchestra";
 
 describe("hard-budget result assembly", () => {
   const stages: any[] = [];
@@ -86,5 +86,31 @@ describe("image caps derived from the remaining budget", () => {
   it("skips generation outright when barely any time is left", () => {
     expect(imageCapsForRemaining(3_000, opts).skip).toBe(true);
     expect(imageCapsForRemaining(-5_000, opts).skip).toBe(true);
+  });
+});
+
+// 2026-09-22 (CJ「把生圖改成第一篇文案完成就開始」): each image waits on its own
+// caption slot, and a liveness sweep settles every slot once the batch
+// resolves so nothing can wait forever. The sweep must not clobber what a
+// writer already reported.
+describe("per-variant slots", () => {
+  it("keeps the first value and ignores later fills", async () => {
+    const slot = deferredSlot<string | null>();
+
+    slot.resolve("caption from the writer");
+    slot.resolve(null); // the liveness sweep, after a partial batch failure
+
+    await expect(slot.promise).resolves.toBe("caption from the writer");
+    expect(slot.settled()).toBe(true);
+  });
+
+  it("unblocks a waiter that the writer never reported", async () => {
+    const slot = deferredSlot<string | null>();
+    const waiter = slot.promise;
+
+    expect(slot.settled()).toBe(false);
+    slot.resolve(null); // liveness sweep
+
+    await expect(waiter).resolves.toBeNull();
   });
 });
