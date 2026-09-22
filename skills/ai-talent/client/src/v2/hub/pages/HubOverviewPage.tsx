@@ -1,6 +1,6 @@
 import React from "react";
 import { Link } from "react-router-dom";
-import { ArrowRight, BarChart3, Compass, PenLine } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { trpc } from "../../../lib/trpc";
 import { DailyBars } from "../charts";
 import { Card, ErrorNote, Loading, PageHeader, SectionTitle, Stat, fmt } from "../ui";
@@ -8,6 +8,7 @@ import { BarList } from "../components/ov-BarList";
 import { LiveTag } from "../components/ov-LiveTag";
 import BoothQrCard from "../components/ov-BoothQrCard";
 import LiveFeed from "../components/ov-LiveFeed";
+import FunctionCards from "../components/ov-FunctionCards";
 
 const RULE_LABELS: Record<string, string> = {
   disclosure: "Missing employee disclosure",
@@ -17,30 +18,6 @@ const RULE_LABELS: Record<string, string> = {
   competitors: "Competitor comparison",
   link: "Untracked link",
 };
-
-const LAYERS = [
-  {
-    to: "/hub/strategy",
-    icon: Compass,
-    name: "Strategy",
-    line: "What reps may say",
-    body: "Approved solutions, current prices and sourced facts — the only material the AI writes from.",
-  },
-  {
-    to: "/hub/content",
-    icon: PenLine,
-    name: "Content & policy",
-    line: "How they say it, checked",
-    body: "Marketing-approved writing skills plus Taiwan and US policy packs, applied to every draft.",
-  },
-  {
-    to: "/hub/performance",
-    icon: BarChart3,
-    name: "Performance",
-    line: "What it earned",
-    body: "Clicks, impressions and leads, each labelled with how far you can trust the number.",
-  },
-];
 
 export default function HubOverviewPage() {
   const q = trpc.hub.admin.overview.useQuery();
@@ -97,6 +74,8 @@ export default function HubOverviewPage() {
             />
           </div>
 
+          <FunctionCards overview={o} />
+
           <div className="grid gap-4 lg:grid-cols-3">
             <Card className="min-w-0 lg:col-span-2">
               <SectionTitle title="Posting activity" hint={`Daily, last ${days} days. Hover a bar for the exact count.`} />
@@ -127,31 +106,6 @@ export default function HubOverviewPage() {
         </div>
       </div>
 
-      <section aria-label="Three layers" className="pt-2">
-        <div className="mb-3 text-[12px] font-medium uppercase tracking-wide text-stone-500">Three layers, one system</div>
-        <div className="grid gap-3 md:grid-cols-3">
-          {LAYERS.map((l, i) => (
-            <Link
-              key={l.to}
-              to={l.to}
-              className="group flex min-w-0 flex-col rounded-xl border border-stone-200 bg-white p-4 transition-colors hover:border-stone-300 hover:bg-stone-50"
-            >
-              <div className="flex items-center justify-between gap-2">
-                <span className="inline-flex items-center gap-2 text-[14px] font-semibold text-stone-900">
-                  <span className="flex h-6 w-6 items-center justify-center rounded-md bg-stone-100 text-stone-600">
-                    <l.icon className="h-3.5 w-3.5" aria-hidden />
-                  </span>
-                  <span className="text-stone-400 tabular-nums">{i + 1}</span>
-                  {l.name}
-                </span>
-                <ArrowRight className="h-4 w-4 text-stone-400 transition-transform group-hover:translate-x-0.5" aria-hidden />
-              </div>
-              <div className="mt-2 text-[13px] font-medium text-stone-700">{l.line}</div>
-              <p className="mt-1 text-[12px] leading-relaxed text-stone-500">{l.body}</p>
-            </Link>
-          ))}
-        </div>
-      </section>
     </div>
   );
 }
