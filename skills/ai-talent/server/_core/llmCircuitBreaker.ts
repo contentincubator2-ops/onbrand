@@ -24,6 +24,7 @@ interface ProviderStats {
   state: State;
   recentResults: boolean[];   // true=ok, false=fail; rolling window of N
   openedAt: number;           // when state went OPEN (for cooloff)
+  halfOpenAt: number;         // when the in-flight probe was let through
   consecutiveFailures: number;
 }
 
@@ -31,13 +32,23 @@ const WINDOW_SIZE = 8;            // last N calls considered
 const FAILURE_THRESHOLD = 0.625;  // ≥5 of last 8 failures → OPEN
 const MIN_CALLS_TO_TRIP = 4;      // need 4 calls in window before tripping
 const COOLOFF_MS = 30_000;        // 30s before HALF_OPEN probe
+/**
+ * 2026-09-21 (CJ「修 LLM cascade」): a HALF_OPEN probe whose outcome never gets
+ * recorded used to wedge the provider off FOREVER — shouldAttempt returned
+ * false for every later call and nothing could move the state on. That happens
+ * whenever the probe's promise is abandoned rather than settled: the orchestra
+ * cutting a variant at its budget, a request the client gave up on, a worker
+ * killed mid-call. Give the probe a deadline so a provider can always come
+ * back on its own.
+ */
+const HALF_OPEN_TIMEOUT_MS = 60_000;
 
 const stats = new Map<string, ProviderStats>();
 
 function getStats(provider: string): ProviderStats {
   let s = stats.get(provider);
   if (!s) {
-    s = { state: "CLOSED", recentResults: [], openedAt: 0, consecutiveFailures: 0 };
+    s = { state: "CLOSED", recentResults: [], openedAt: 0, halfOpenAt: 0, consecutiveFailures: 0 };
     stats.set(provider, s);
   }
   return s;
@@ -51,12 +62,19 @@ export function shouldAttempt(provider: string): boolean {
     // Cooloff elapsed? Move to HALF_OPEN so we let ONE call through.
     if (Date.now() - s.openedAt >= COOLOFF_MS) {
       s.state = "HALF_OPEN";
+      s.halfOpenAt = Date.now();
       return true;
     }
     return false;
   }
   // HALF_OPEN: we've already let one probe through; until it returns,
-  // suppress further calls. Probe result determines next state.
+  // suppress further calls. Probe result determines next state — unless the
+  // probe never reported back, in which case let a fresh one through rather
+  // than skipping this provider for the rest of the process's life.
+  if (Date.now() - s.halfOpenAt >= HALF_OPEN_TIMEOUT_MS) {
+    s.halfOpenAt = Date.now();
+    return true;
+  }
   return false;
 }
 
@@ -69,6 +87,7 @@ export function recordOutcome(provider: string, success: boolean): void {
 
   if (s.state === "HALF_OPEN") {
     s.state = success ? "CLOSED" : "OPEN";
+    s.halfOpenAt = 0;
     if (!success) s.openedAt = Date.now();
     return;
   }
@@ -123,10 +142,11 @@ const PERMANENT_COOLOFF_MS = 60 * 60 * 1_000; // 1 hour
 export function permanentFail(provider: string): void {
   const s = getStats(provider);
   s.state = "OPEN";
-  s.openedAt = Date.now() - (COOLOFF_MS) + PERMANENT_COOLOFF_MS; // openedAt = now - 30s + 60min
-  // Effectively: cooloff won't expire until (openedAt + COOLOFF_MS) = now + ~60min
-  // Simpler: just set openedAt far in the future offset
+  // shouldAttempt reopens at openedAt + COOLOFF_MS, so dating openedAt into the
+  // future is what buys the full hour. (This used to be assigned twice, the
+  // first one dead — same value, but it read like a bug.)
   s.openedAt = Date.now() + PERMANENT_COOLOFF_MS - COOLOFF_MS;
+  s.halfOpenAt = 0;
   s.consecutiveFailures = 99;
   s.recentResults = Array(WINDOW_SIZE).fill(false);
   console.warn(`[llmCircuitBreaker] provider=${provider} → OPEN (permanent, 1h cooloff)`);

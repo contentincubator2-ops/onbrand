@@ -670,9 +670,74 @@ function getFallbackChain(): string[] {
 }
 
 function isRetryableLLMError(msg: string): boolean {
-  // Billing / availability / rate-limit signals — keep going down the chain
-  return /credit\s*balance|insufficient|quota|rate.?limit|429|401|402|403|400|404|5\d\d|deployment\s*not\s*found|temporarily.*unavail|connection.*reset|ECONNRESET|ETIMEDOUT|fetch\s*failed/i
+  // Billing / availability / rate-limit signals — keep going down the chain.
+  // 2026-09-21: attempt timeouts belong here too, or a hung vendor reads as a
+  // "hard error" and the chain logs it as unexpected.
+  return /credit\s*balance|insufficient|quota|rate.?limit|429|401|402|403|400|404|5\d\d|deployment\s*not\s*found|temporarily.*unavail|connection.*reset|ECONNRESET|ETIMEDOUT|fetch\s*failed|attempt\s*timeout|timed?\s*out|aborted/i
     .test(msg);
+}
+
+/**
+ * Errors that a retry 30 seconds later cannot fix: wrong key, no credit,
+ * missing deployment or model, disabled account. They earn the 1-hour circuit
+ * instead of the 30s cooloff — otherwise the cascade pays one probe RTT every
+ * 30s, forever, on a vendor nobody has fixed yet.
+ *
+ * Deliberately NOT here: 429, 5xx and timeouts. Those are transient and must
+ * keep the short cooloff so a recovered vendor comes back quickly.
+ *
+ * `access denied` / `good standing` is qwen's shape, measured on prod
+ * 2026-09-21: DashScope answers `400 Bad Request – {"error":{"message":"Access
+ * denied, please make sure your account is in good standing…"}}`. It is an
+ * account-level block, not a bad request — but because it arrives as a 400 the
+ * breaker only gave it the 30s cooloff, so one 99s task re-probed it SEVEN
+ * times. Cheap each time, but it is pure noise in every log and it is the
+ * reason "N failed providers" looked alarming.
+ */
+const PERMANENT_LLM_ERROR_RE =
+  /DeploymentNotFound|deployment\s*not\s*found|ResourceNotFound|credit\s*balance|insufficient[_\s]*(quota|credit|fund)|invalid[_\s]*api[_\s]*key|invalid[_\s-]*x-api-key|authentication[_\s]*(error|failed)|unauthorized|permission[_\s]*denied|access\s*denied|good\s*standing|\b40[13]\b|model.*(not\s*found|does\s*not\s*exist)|account.*(suspended|disabled|deactivated)/i;
+
+/**
+ * One provider attempt has to give the turn back quickly.
+ *
+ * 2026-09-21 (CJ「修 LLM cascade」): not one provider fetch had a timeout, so a
+ * vendor that accepted the connection and then hung held the whole task. A
+ * cascade without a per-attempt deadline is not a cascade — it is a single
+ * point of failure with extra steps: a 99s orchestra run lost its entire 150s
+ * budget that way (captions 0 chars, images never ran) while the log only said
+ * "succeeded with anthropic after 1 failed providers".
+ *
+ * The timer guards time-to-response-headers and is cleared the moment fetch
+ * resolves, so a streaming body can keep arriving afterwards.
+ */
+// Read per call, not once at import: an ops change to LLM_ATTEMPT_TIMEOUT_MS
+// takes effect on the next request instead of the next restart.
+function attemptTimeoutMs(): number {
+  const raw = Number(process.env.LLM_ATTEMPT_TIMEOUT_MS);
+  return Number.isFinite(raw) && raw > 0 ? Math.max(50, raw) : 20_000;
+}
+
+async function fetchProvider(
+  url: string,
+  init: RequestInit,
+  opts: { label: string; caller?: AbortSignal; timeoutMs?: number },
+): Promise<Response> {
+  const budget = opts.timeoutMs ?? attemptTimeoutMs();
+  const ctl = new AbortController();
+  let timedOut = false;
+  const timer = setTimeout(() => { timedOut = true; ctl.abort(); }, budget);
+  const relayAbort = () => ctl.abort();
+  opts.caller?.addEventListener("abort", relayAbort, { once: true });
+  try {
+    return await fetch(url, { ...init, signal: ctl.signal });
+  } catch (e: any) {
+    if (timedOut) throw new Error(`${opts.label} attempt timeout after ${budget}ms`);
+    if (opts.caller?.aborted) throw new Error(`${opts.label} aborted by caller`);
+    throw e;
+  } finally {
+    clearTimeout(timer);
+    opts.caller?.removeEventListener("abort", relayAbort);
+  }
 }
 
 export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
@@ -701,15 +766,24 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
   const { shouldAttempt, recordOutcome } = await import("./llmCircuitBreaker");
 
   const errors: string[] = [];
+  // 2026-09-21 (CJ「修 LLM cascade」): count attempts and breaker skips
+  // separately. The old summary said "after N failed providers" where N counted
+  // free skips too, so a cascade that cost nothing read exactly like one that
+  // burned an RTT per call — which is how a 150s budget blowout got blamed on
+  // the wrong thing.
+  let attempted = 0;
+  let skipped = 0;
   for (const provider of chain) {
     // Skip providers whose key isn't configured
     const cfg = PROVIDER_CONFIG[provider];
     if (!cfg || !cfg.getKey()) continue;
     // Skip if circuit breaker is OPEN for this provider
     if (!shouldAttempt(provider)) {
+      skipped += 1;
       errors.push(`${provider}: SKIPPED (circuit OPEN)`);
       continue;
     }
+    attempted += 1;
     try {
       // When falling to a non-pinned provider, drop the pinned model so each
       // provider uses its own defaultModel (e.g. "claude-sonnet-4-6" doesn't
@@ -737,8 +811,11 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
         recordOutcome(provider, false);
         continue;
       }
-      if (errors.length > 0) {
-        console.warn(`[invokeLLM] succeeded with ${provider} after ${errors.length} failed providers`);
+      if (attempted > 1 || skipped > 0) {
+        console.warn(
+          `[invokeLLM] succeeded with ${provider} after ${attempted - 1} failed attempt(s)` +
+          `, ${skipped} skipped by breaker`,
+        );
       }
       recordOutcome(provider, true);
       return out;
@@ -749,7 +826,7 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
       // transient — retrying in 30s is pointless and burns RTTs under load.
       // Open the circuit for 1 hour so the cascade skips this provider
       // entirely until a human fixes the configuration.
-      const isPermanent = /DeploymentNotFound|deployment.*not.*found|ResourceNotFound/i.test(msg);
+      const isPermanent = PERMANENT_LLM_ERROR_RE.test(msg);
       if (isPermanent) {
         const { permanentFail } = await import("./llmCircuitBreaker");
         permanentFail(provider);
@@ -883,7 +960,7 @@ async function invokeLLMOnce(params: InvokeParams): Promise<InvokeResult> {
     if (systemPrompt) anthropicPayload.system = systemPrompt;
 
     const apiUrl = `${config.baseUrl}/messages`;
-    const r = await fetch(apiUrl, {
+    const r = await fetchProvider(apiUrl, {
       method: "POST",
       headers: {
         "content-type": "application/json",
@@ -891,7 +968,7 @@ async function invokeLLMOnce(params: InvokeParams): Promise<InvokeResult> {
         "anthropic-version": "2023-06-01",
       },
       body: JSON.stringify(anthropicPayload),
-    });
+    }, { label: `${providerKey}/${model}`, caller: params.signal });
     if (!r.ok) {
       const txt = await r.text();
       // 2026-05-12: removed the inner Anthropic→Azure Kimi-K2.5 fallback.
@@ -985,15 +1062,14 @@ async function invokeLLMOnce(params: InvokeParams): Promise<InvokeResult> {
       ? { "api-key": apiKey }
       : { authorization: `Bearer ${apiKey}` };
 
-  const response = await fetch(apiUrl, {
+  const response = await fetchProvider(apiUrl, {
     method: "POST",
-    signal: params.signal,
     headers: {
       "content-type": "application/json",
       ...authHeaders,
     },
     body: JSON.stringify(payload),
-  });
+  }, { label: `${providerKey}/${model}`, caller: params.signal });
 
   if (!response.ok) {
     const errorText = await response.text();
@@ -1057,7 +1133,7 @@ async function* anthropicStream(
     .map((m) => (typeof m.content === "string" ? m.content : ""))
     .join("\n");
 
-  const response = await fetch("https://api.anthropic.com/v1/messages", {
+  const response = await fetchProvider("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
       "x-api-key": key,
@@ -1074,7 +1150,7 @@ async function* anthropicStream(
         content: typeof m.content === "string" ? m.content : JSON.stringify(m.content),
       })),
     }),
-  });
+  }, { label: `anthropic-stream/${model}` });
 
   if (!response.ok) {
     const t = await response.text();
@@ -1162,14 +1238,14 @@ export async function* invokeLLMStream(params: InvokeParams): AsyncGenerator<str
     ? { "api-key": apiKey }
     : { authorization: `Bearer ${apiKey}` };
 
-  const response = await fetch(apiUrl, {
+  const response = await fetchProvider(apiUrl, {
     method: "POST",
     headers: {
       "content-type": "application/json",
       ...streamAuthHeaders,
     },
     body: JSON.stringify(payload),
-  });
+  }, { label: `${providerKey}-stream/${model}`, caller: params.signal });
 
   if (!response.ok) {
     const errorText = await response.text();
@@ -1198,11 +1274,11 @@ export async function* invokeLLMStream(params: InvokeParams): AsyncGenerator<str
           max_tokens: params.maxTokens ?? params.max_tokens ?? 4000,
           stream: true,
         };
-        const fbResp = await fetch(fbUrl, {
+        const fbResp = await fetchProvider(fbUrl, {
           method: "POST",
           headers: { "api-key": foundryKey, "content-type": "application/json" },
           body: JSON.stringify(fbPayload),
-        });
+        }, { label: `azure-foundry-stream/${fbModel}` });
         if (!fbResp.ok) {
           const fbErr = await fbResp.text();
           throw new Error(`All stream providers failed. Anthropic: ${primaryErr.slice(0, 120)} | Azure Foundry: ${fbErr.slice(0, 120)}`);
