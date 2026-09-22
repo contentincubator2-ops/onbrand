@@ -87,6 +87,14 @@ import { ALL_99S_TASKS, ALL_99S_ORCHESTRA as ORCH_100 } from "../server/_core/qu
   console.log(`  captionAgent=${result.captionAgent?.name ?? "none"}`);
   console.log(`  imageAgent=${result.imageAgent?.name ?? "none"}`);
   console.log(`  variants=${result.variants.length}`);
+  // 2026-09-22: where the wall-clock actually goes. Without this the only way
+  // to locate a budget blowout was guessing from log timestamps.
+  for (const st of result.stages ?? []) {
+    const span = typeof st.completedAt === "number"
+      ? `${(st.startedAt / 1000).toFixed(1)}s → ${(st.completedAt / 1000).toFixed(1)}s (${((st.completedAt - st.startedAt) / 1000).toFixed(1)}s)`
+      : `${(st.startedAt / 1000).toFixed(1)}s → unfinished`;
+    console.log(`  stage ${st.key.padEnd(12)} ${st.status.padEnd(8)} ${span}  ${st.label}`);
+  }
 
   let pass = 0;
   let fail = 0;
