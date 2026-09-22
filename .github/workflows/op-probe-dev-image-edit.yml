@@ -27,7 +27,7 @@ jobs:
     environment: dev
     timeout-minutes: 20
     env:
-      PROBE_MODE: angles
+      PROBE_MODE: diagnose
       PROBE_PHOTO: "/opt/onbrand/shared/storage/asset-photos/product/261/1789987951094-5w8aw5.webp"
       SSH_KEY: ${{ secrets.VM_SSH_PRIVATE_KEY }}
       PROBE_OPENAI_KEY: ${{ secrets.OPEN_API_KEY }}
