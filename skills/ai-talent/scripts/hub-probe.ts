@@ -270,8 +270,17 @@ async function main() {
     const past = await activeQuietPeriods(org.id, "2020-01-01");
     check(past.length === 0, "the same window is inactive on an old date", `${past.length} active`);
 
-    // 客戶白名單刻意留空 —— 編一筆就等於編造客戶關係。
-    check((byKind.customer ?? 0) === 0, "customer whitelist is deliberately empty", `${byKind.customer ?? 0} entries`);
+    // 2026-09-22 (CJ「我只要你寫進入模擬的資料就好」): 客戶白名單改成填虛構客戶。
+    // 顧慮只對真實公司名成立，所以驗的是「每一筆都標示了是示範／虛構」。
+    const customers = assets.filter((a) => a.kind === "customer");
+    check(customers.length > 0, "customer whitelist has demo entries", `${customers.length}`);
+    const unlabelled = customers
+      .filter((c) => !/示範|虛構|demo|fictional/i.test(String(c.payload.permission ?? "")))
+      .map((c) => String(c.payload.name ?? "?"));
+    check(unlabelled.length === 0, "every customer is labelled as a demo entry", unlabelled.join(", "));
+
+    // 三段緘默期只有一段該生效 —— 那正是這張卡要示範的行為。
+    check((byKind.quiet ?? 0) >= 3 && quiet.length === 1, "several windows on file, exactly one in effect", `${byKind.quiet ?? 0} on file, ${quiet.length} active`);
   } catch (e: any) {
     bad("brand assets", e?.message ?? String(e));
   }
