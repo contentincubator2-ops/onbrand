@@ -578,8 +578,9 @@ export const IG_60S_ORCHESTRA: Record<string, OrchestraConfig> = {
     extras: { postsCount: 3, narrativeArc: true, replyTemplates: 5, postingTime: true, followupPost: true },
   },
 
+  // 2026-09-22（CJ「其他有混用的，也請檢查」）：跟 fb-99-viral-rewrite 同一個問題（見那支的說明）。
   "ig-60-viral-rewrite": {
-    variants: 5, images: 5, runImageGen: true, imageDirectorId: IG60_DIR_BRIAN,
+    variants: 5, images: 5, runImageGen: true, imageDirectorId: IG60_DIR_BRIAN, pickOwnAngle: true,
     aspectRatio: "1:1", variantLabels: ["保結構式", "情感放大式", "反差式", "數據式", "故事式"],
     captionMinChars: 150, captionMaxChars: 300,
     strategistAgentId: 180155, // Grace Liao — Social Media Advertising Specialist (1594 char)
@@ -587,8 +588,9 @@ export const IG_60S_ORCHESTRA: Record<string, OrchestraConfig> = {
     extras: { compareTable: true, replyTemplates: 5, postingTime: true, followupPost: true },
   },
 
+  // 2026-09-22（CJ「其他有混用的，也請檢查」）：跟 fb-99-testimonial-rewrite 同一個問題（見那支的說明）。
   "ig-60-testimonial-rewrite": {
-    variants: 5, images: 5, runImageGen: true, imageDirectorId: IG60_DIR_PENNY,
+    variants: 5, images: 5, runImageGen: true, imageDirectorId: IG60_DIR_PENNY, pickOwnAngle: true,
     aspectRatio: "1:1", variantLabels: ["故事式", "對比式", "數據式", "情感式", "簡短式"],
     captionMinChars: 150, captionMaxChars: 250,
     strategistAgentId: 220754, // Kurt Chen

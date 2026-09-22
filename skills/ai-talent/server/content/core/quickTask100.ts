@@ -1271,8 +1271,11 @@ export const FB_99S_ORCHESTRA: Record<string, OrchestraConfig> = {
     holdForImages: true,
     extras: { replyTemplates: 5, postingTime: true, followupPost: true },
   },
+  // 2026-09-22（CJ「其他有混用的，也請檢查」）：貼上「任何」爆款內容改寫的通用工具，5 個角度的
+  // systemPrompt 完全沒有各自的說明（跟 tt-60-viral-rewrite 那支有「各版本改寫角度」逐條說明不同），
+  // 「數據式」在爆款是純情緒／哏圖時一樣會被迫硬套——跟已修的 fb-30-caption-short 同一種問題。
   "fb-99-viral-rewrite": {
-    ...fb100Common, variants: 5, images: 5,
+    ...fb100Common, variants: 5, images: 5, pickOwnAngle: true,
     aspectRatio: "1:1", variantLabels: ["保結構式", "情感放大式", "反差式", "數據式", "故事式"],
     captionMinChars: 200, captionMaxChars: 400,
     strategistAgentId: 180142, // Kevin Liu — Social Listening
@@ -1281,8 +1284,11 @@ export const FB_99S_ORCHESTRA: Record<string, OrchestraConfig> = {
     holdForImages: true,
     extras: { ...fb100Common.extras, compareTable: true },
   },
+  // 2026-09-22（CJ「其他有混用的，也請檢查」）：貼上「任何」客戶見證改寫，見證未必有可用數字（例如
+  // 純情緒感受），「數據式」一樣可能被迫硬套；跟 li-60-case-study 不同——那支是 B2B 案例（幾乎必有
+  // 指標）且有專屬的「數字 Verbatim 保護協議」，這支沒有同等的任務專屬說明，先一起改掉。
   "fb-99-testimonial-rewrite": {
-    ...fb100Common, variants: 5, images: 5,
+    ...fb100Common, variants: 5, images: 5, pickOwnAngle: true,
     aspectRatio: "1:1", variantLabels: ["故事式", "對比式", "數據式", "情感式", "簡短式"],
     captionMinChars: 200, captionMaxChars: 350,
     strategistAgentId: 220754, // Kurt Chen — Insights Storyteller

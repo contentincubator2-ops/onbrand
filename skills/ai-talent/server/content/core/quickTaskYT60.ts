@@ -183,8 +183,9 @@ export const YT_60S_ORCHESTRA: Record<string, OrchestraConfig> = {
     captionMinChars: 80, captionMaxChars: 200,
     extras: { replyTemplates: 5, postingTime: true, followupPost: true },
   },
+  // 2026-09-22（CJ「其他有混用的，也請檢查」）：跟 fb-99-viral-rewrite 同一個問題（見那支的說明）。
   "yt-60-viral-rewrite": {
-    variants: 5, images: 5, runImageGen: true, imageDirectorId: YT60_DIR_UMA,
+    variants: 5, images: 5, runImageGen: true, imageDirectorId: YT60_DIR_UMA, pickOwnAngle: true,
     aspectRatio: "16:9", variantLabels: ["保結構式", "情感放大式", "反差式", "數據式", "故事式"],
     captionMinChars: 350, captionMaxChars: 700,
     strategistAgentId: 180158, // Oliver Fang — Social Media Analytics Specialist (1697 char)
