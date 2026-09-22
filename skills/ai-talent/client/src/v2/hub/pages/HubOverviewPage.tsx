@@ -1,34 +1,24 @@
 import React from "react";
-import { Link } from "react-router-dom";
-import { ArrowRight } from "lucide-react";
 import { trpc } from "../../../lib/trpc";
-import { DailyBars } from "../charts";
-import { Card, ErrorNote, Loading, PageHeader, SectionTitle, Stat, fmt } from "../ui";
-import { BarList } from "../components/ov-BarList";
+import { ErrorNote, Loading, PageHeader, Stat, fmt } from "../ui";
 import { LiveTag } from "../components/ov-LiveTag";
 import BoothQrCard from "../components/ov-BoothQrCard";
 import LiveFeed from "../components/ov-LiveFeed";
 import FunctionCards from "../components/ov-FunctionCards";
 
-const RULE_LABELS: Record<string, string> = {
-  disclosure: "Missing employee disclosure",
-  price: "Unapproved price",
-  claims: "Absolute / guaranteed claims",
-  evidence: "Unsourced statistic",
-  competitors: "Competitor comparison",
-  link: "Untracked link",
+const RULE_LABELS: Record<string, [en: string, zh: string]> = {
+  disclosure: ["Missing employee disclosure", "缺少任職揭露"],
+  price: ["Unapproved price", "未核准價格"],
+  claims: ["Absolute / guaranteed claims", "絕對或保證用語"],
+  evidence: ["Unsourced statistic", "沒有出處的數據"],
+  competitors: ["Competitor comparison", "點名競品比較"],
+  link: ["Untracked link", "沒有追蹤的連結"],
 };
 
 export default function HubOverviewPage() {
   const q = trpc.hub.admin.overview.useQuery();
   const o = q.data?.overview;
   const days = o?.windowDays ?? 21;
-
-  const rules = o
-    ? Array.from(new Set([...Object.keys(RULE_LABELS), ...Object.keys(o.compliance.caughtByRule)]))
-        .map((id) => ({ key: id, label: RULE_LABELS[id] ?? id, value: Number(o.compliance.caughtByRule[id] ?? 0) }))
-        .sort((a, b) => b.value - a.value)
-    : [];
 
   return (
     <div className="space-y-4">
@@ -74,28 +64,8 @@ export default function HubOverviewPage() {
             />
           </div>
 
-          <FunctionCards overview={o} />
-
-          <div className="grid gap-4 lg:grid-cols-3">
-            <Card className="min-w-0 lg:col-span-2">
-              <SectionTitle title="Posting activity" hint={`Daily, last ${days} days. Hover a bar for the exact count.`} />
-              <div className="grid gap-6 sm:grid-cols-2">
-                <DailyBars label="Posts per day" color="#2a78d6" height={180} data={o.series.map((d) => ({ date: d.date, value: d.posts }))} />
-                <DailyBars label="Tracked clicks per day" color="#52514e" height={180} data={o.series.map((d) => ({ date: d.date, value: d.clicks }))} />
-              </div>
-            </Card>
-
-            <Card className="min-w-0">
-              <SectionTitle title="Caught before posting" hint="Policy rules a first draft tripped — fixed or held before anything went live." />
-              <BarList items={rules} unit="catches" />
-              <Link
-                to="/hub/content/policies"
-                className="mt-4 inline-flex items-center gap-1 text-[12px] font-medium text-stone-600 hover:text-stone-900"
-              >
-                See the policy packs <ArrowRight className="h-3.5 w-3.5" aria-hidden />
-              </Link>
-            </Card>
-          </div>
+          {/* 2026-09-22 (CJ): 每日活動與規則排行也收進卡片牆了，見 ov-FunctionCards。 */}
+          <FunctionCards overview={o} ruleLabels={RULE_LABELS} />
         </>
       ) : null}
 

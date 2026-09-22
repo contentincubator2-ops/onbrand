@@ -27,6 +27,7 @@
  */
 import { Link } from "react-router-dom";
 import {
+  Activity,
   ArrowRight,
   BadgeCheck,
   ClipboardList,
@@ -39,12 +40,15 @@ import {
 import type { LucideIcon } from "lucide-react";
 import { useT } from "../lang";
 import { fmt } from "../ui";
+import { DailyBars } from "../charts";
+import { BarList } from "./ov-BarList";
 
 type Overview = {
   windowDays: number;
+  series: Array<{ date: string; posts: number; clicks: number; impressions: number }>;
   reps: { total: number; consented: number; lineBound: number; activeThisWeek: number };
   posts: { total: number; shared: number; live: number };
-  compliance: { clean: number; autoFixed: number; needsReview: number; issuesCaught: number };
+  compliance: { clean: number; autoFixed: number; needsReview: number; issuesCaught: number; caughtByRule: Record<string, number> };
   growth: { clicks: number; liveClicks: number; byGrade: Record<string, { impressions: number; engagements: number; leads: number }> };
 };
 
@@ -193,7 +197,163 @@ export const HQ_FUNCTIONS: FunctionCard[] = [
   },
 ];
 
-export default function FunctionCards({ overview }: { overview: Overview }) {
+/** 卡片外框。七張數字卡與兩張圖表卡共用，免得兩邊各自漂移。 */
+function CardShell({
+  to,
+  accent,
+  icon: Icon,
+  tag,
+  name,
+  measure,
+  detail,
+  bandHeight = 130,
+  children,
+}: {
+  to: string;
+  accent: string;
+  icon: LucideIcon;
+  tag: string;
+  name: string;
+  measure: string;
+  detail: string;
+  bandHeight?: number;
+  children: React.ReactNode;
+}) {
+  const t = useT();
+  return (
+    <Link
+      to={to}
+      className="group flex flex-col overflow-hidden rounded-2xl text-left transition hover:scale-[1.02] hover:shadow-lg"
+      style={{ border: "1px solid rgba(0,0,0,0.07)", background: "white" }}
+    >
+      <div
+        className="relative flex flex-col items-center justify-center px-3"
+        style={{ height: bandHeight, background: "#F5F4F2", borderBottom: "1px solid rgba(0,0,0,0.06)" }}
+      >
+        {children}
+        <div
+          className="absolute left-2 top-2 flex h-5 w-5 items-center justify-center rounded-full"
+          style={{ background: accent }}
+        >
+          <Icon className="h-3 w-3 text-white" aria-hidden />
+        </div>
+        <span
+          className="absolute right-2 top-2 rounded-full px-2 py-0.5 font-bold text-white shadow-sm"
+          style={{ background: accent, fontSize: 11, letterSpacing: "0.06em" }}
+        >
+          {tag}
+        </span>
+      </div>
+
+      <div className="flex flex-1 flex-col gap-1.5 p-3">
+        <div className="text-small font-semibold text-neutral-900">{name}</div>
+        <p className="text-tiny leading-relaxed text-default-500">
+          <span className="font-medium text-neutral-600">{t("How it's counted: ", "口徑：")}</span>
+          {measure}
+        </p>
+        <div>
+          <span className="inline-flex rounded-lg border px-2 py-1 text-[12px] leading-relaxed text-neutral-600">
+            {detail}
+          </span>
+        </div>
+        <div className="mt-auto flex items-center gap-2 border-t border-neutral-100 pt-2">
+          <span className="truncate text-[12px] text-neutral-600">{t("Open", "打開")}</span>
+          <ArrowRight
+            className="ml-auto h-3.5 w-3.5 shrink-0 text-neutral-400 transition-transform group-hover:translate-x-0.5"
+            aria-hidden
+          />
+        </div>
+      </div>
+    </Link>
+  );
+}
+
+/**
+ * 原本這兩塊是頁面下方的兩張 Card（每日長條圖 + 規則排行）。
+ * 2026-09-22 CJ：「連底下的 post activity、caught before posting 都變成卡片式」。
+ *
+ * 跟上面七張只差一件事：頭部色塊放的是圖不是一個數字，所以高 150 而不是 130。
+ * 外框、徽章、口徑行、footer 全部同一份 CardShell —— 兩種卡不會各自漂移。
+ *
+ * 規則卡只放前四條，其餘留給政策包頁。卡片是摘要、細節在目的地，這也是內容層
+ * 任務卡的規矩。
+ */
+function WideCards({ overview, ruleLabels }: { overview: Overview; ruleLabels: Record<string, [string, string]> }) {
+  const t = useT();
+  const rules = Object.entries(overview.compliance.caughtByRule)
+    .map(([id, n]) => ({ key: id, label: t(ruleLabels[id]?.[0] ?? id, ruleLabels[id]?.[1] ?? id), value: Number(n) }))
+    .sort((a, b) => b.value - a.value);
+  const shown = rules.slice(0, 4);
+
+  return (
+    <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
+      <CardShell
+        to="/hub/performance"
+        accent="#2a78d6"
+        icon={Activity}
+        bandHeight={200}
+        tag={t("Trend", "趨勢")}
+        name={t("Daily activity", "每日活動")}
+        measure={t(
+          `Posts are counted on the day they were created, clicks on the day the link was followed. Every day in the ${overview.windowDays}-day window is drawn — a flat stretch means nobody posted, not missing data.`,
+          `貼文算在產出那一天，點擊算在連結被點開那一天。${overview.windowDays} 天的每一天都會畫出來——平的那一段是真的沒人發文，不是資料缺漏。`,
+        )}
+        detail={t(
+          `${fmt(overview.posts.total)} posts · ${fmt(overview.growth.clicks)} clicks over ${overview.windowDays} days`,
+          `${overview.windowDays} 天內 ${fmt(overview.posts.total)} 篇貼文 · ${fmt(overview.growth.clicks)} 次點擊`,
+        )}
+      >
+        <div className="grid w-full grid-cols-2 gap-3 px-1">
+          <DailyBars
+            label={t("Posts per day", "每日貼文")}
+            color="#2a78d6"
+            height={120}
+            data={overview.series.map((d) => ({ date: d.date, value: d.posts }))}
+          />
+          <DailyBars
+            label={t("Clicks per day", "每日點擊")}
+            color="#52514e"
+            height={120}
+            data={overview.series.map((d) => ({ date: d.date, value: d.clicks }))}
+          />
+        </div>
+      </CardShell>
+
+      <CardShell
+        to="/hub/content/policies"
+        accent="#DC2626"
+        icon={ShieldAlert}
+        bandHeight={200}
+        tag={t("Risk", "風險")}
+        name={t("Which rule caught it", "是哪一條攔下的")}
+        measure={t(
+          "One count per post per rule, taken from the first draft. A post that trips two rules appears under both, so these add up to more than the number of posts.",
+          "以初稿為準，一篇貼文在一條規則底下算一次。一篇踩到兩條就會在兩條底下各出現一次，所以加起來會比貼文數多。",
+        )}
+        detail={t(
+          `Top ${shown.length} of ${rules.length} rules · the rest are on the policy pack page`,
+          `${rules.length} 條裡的前 ${shown.length} 條 · 其餘在政策包頁`,
+        )}
+      >
+        <div className="w-full px-1">
+          {shown.length ? (
+            <BarList items={shown} unit={t("catches", "次")} />
+          ) : (
+            <div className="text-[12px] text-stone-500">{t("Nothing caught yet.", "目前沒有攔下任何一篇。")}</div>
+          )}
+        </div>
+      </CardShell>
+    </div>
+  );
+}
+
+export default function FunctionCards({
+  overview,
+  ruleLabels,
+}: {
+  overview: Overview;
+  ruleLabels: Record<string, [string, string]>;
+}) {
   const t = useT();
 
   return (
@@ -206,59 +366,27 @@ export default function FunctionCards({ overview }: { overview: Overview }) {
           const hero = f.hero(overview);
           const measure = f.measure(overview);
           const detail = f.detail(overview);
-          const Icon = f.icon;
           return (
-            <Link
+            <CardShell
               key={f.key}
               to={f.to}
-              className="group flex flex-col overflow-hidden rounded-2xl text-left transition hover:scale-[1.02] hover:shadow-lg"
-              style={{ border: "1px solid rgba(0,0,0,0.07)", background: "white" }}
+              accent={f.accent}
+              icon={f.icon}
+              tag={t(f.tag[0], f.tag[1])}
+              name={t(f.name[0], f.name[1])}
+              measure={t(measure[0], measure[1])}
+              detail={t(detail[0], detail[1])}
             >
-              <div
-                className="relative flex flex-col items-center justify-center px-3"
-                style={{ height: 130, background: "#F5F4F2", borderBottom: "1px solid rgba(0,0,0,0.06)" }}
-              >
-                <div className="text-[30px] font-bold leading-none tabular-nums text-stone-900">{hero.value}</div>
-                <div className="mt-1.5 line-clamp-2 text-center text-[11px] leading-tight text-stone-500">
-                  {t(hero.label[0], hero.label[1])}
-                </div>
-                <div
-                  className="absolute left-2 top-2 flex h-5 w-5 items-center justify-center rounded-full"
-                  style={{ background: f.accent }}
-                >
-                  <Icon className="h-3 w-3 text-white" aria-hidden />
-                </div>
-                <span
-                  className="absolute right-2 top-2 rounded-full px-2 py-0.5 font-bold text-white shadow-sm"
-                  style={{ background: f.accent, fontSize: 11, letterSpacing: "0.06em" }}
-                >
-                  {t(f.tag[0], f.tag[1])}
-                </span>
+              <div className="text-[30px] font-bold leading-none tabular-nums text-stone-900">{hero.value}</div>
+              <div className="mt-1.5 line-clamp-2 text-center text-[11px] leading-tight text-stone-500">
+                {t(hero.label[0], hero.label[1])}
               </div>
-
-              <div className="flex flex-1 flex-col gap-1.5 p-3">
-                <div className="text-small font-semibold text-neutral-900">{t(f.name[0], f.name[1])}</div>
-                <p className="text-tiny leading-relaxed text-default-500">
-                  <span className="font-medium text-neutral-600">{t("How it's counted: ", "口徑：")}</span>
-                  {t(measure[0], measure[1])}
-                </p>
-                <div>
-                  <span className="inline-flex rounded-lg border px-2 py-1 text-[12px] leading-relaxed text-neutral-600">
-                    {t(detail[0], detail[1])}
-                  </span>
-                </div>
-                <div className="mt-auto flex items-center gap-2 border-t border-neutral-100 pt-2">
-                  <span className="truncate text-[12px] text-neutral-600">{t("Open", "打開")}</span>
-                  <ArrowRight
-                    className="ml-auto h-3.5 w-3.5 shrink-0 text-neutral-400 transition-transform group-hover:translate-x-0.5"
-                    aria-hidden
-                  />
-                </div>
-              </div>
-            </Link>
+            </CardShell>
           );
         })}
       </div>
+
+      <WideCards overview={overview} ruleLabels={ruleLabels} />
     </section>
   );
 }
