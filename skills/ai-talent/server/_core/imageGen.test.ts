@@ -38,18 +38,15 @@ describe("generateImage provider validation", () => {
     });
   });
 
-  it("falls back instead of reporting ready when OpenAI returns no image", async () => {
-    const fetchMock = vi.fn()
-      .mockResolvedValueOnce(new Response(JSON.stringify({ data: [{}] }), {
-        status: 200,
-        headers: { "content-type": "application/json" },
-      }))
-      .mockResolvedValueOnce(new Response(JSON.stringify({
-        candidates: [{ content: { parts: [{ inlineData: { data: "aW1hZ2U=" } }] } }],
-      }), {
-        status: 200,
-        headers: { "content-type": "application/json" },
-      }));
+  // 2026-09-23 (CJ「備援要禁掉」): every one of these used to assert a
+  // fallback — OpenAI → Google → PiAPI Flux, and subject mode → Nano Banana.
+  // Production images are gpt-image-2 or they are a visible failure, so the
+  // tests now guard the opposite property: nothing else may ever be called.
+  it("reports a failure instead of reaching for another model", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ data: [{}] }), {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    }));
     vi.stubGlobal("fetch", fetchMock);
 
     const result = await generateImage({
@@ -58,23 +55,39 @@ describe("generateImage provider validation", () => {
       modelChoice: "gpt-image-2",
     });
 
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock).toHaveBeenCalledOnce();
+    expect(String(fetchMock.mock.calls[0]![0])).toContain("api.openai.com");
     expect(result).toMatchObject({
-      status: "ready",
-      provider: "google",
-      b64: "aW1hZ2U=",
+      status: "failed",
+      provider: "openai",
       requestedModel: "gpt-image-2",
-      usedFallback: true,
+      usedFallback: false,
     });
-    expect(fetchMock.mock.calls[0]![1]?.signal).toBeInstanceOf(AbortSignal);
-    expect(fetchMock.mock.calls[1]![1]?.signal).toBeInstanceOf(AbortSignal);
   });
 
-  // 2026-09-01 (CJ「open ai 我指定使用 gpt image 2」): IMAGE_GEN_MODEL_OPENAI is
-  // unset on the VM, so the literal default in runOpenAI is what actually
-  // reaches OpenAI — it must be gpt-image-2, not the older model.
-  it("sends gpt-image-2 when nothing overrides the OpenAI model", async () => {
-    vi.stubEnv("IMAGE_GEN_MODEL_OPENAI", "");
+  // A content-policy refusal was the one case that jumped STRAIGHT to Flux,
+  // because Flux's policy is loosest. That is exactly the silent substitution
+  // CJ asked to stop; imageRouter turns this into a readable message instead.
+  it("does not reroute a safety block to another provider", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      error: { message: "Your request was rejected by the safety system" },
+    }), { status: 400, headers: { "content-type": "application/json" } }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await generateImage({ brandId: 1, prompt: "Pikachu holding a drink" });
+
+    expect(fetchMock).toHaveBeenCalledOnce();
+    expect(dispatchGenerateMock).not.toHaveBeenCalled();
+    expect(result.status).toBe("failed");
+    expect(result.errorMsg).toMatch(/safety system/i);
+  });
+
+  // 2026-09-01 (CJ「open ai 我指定使用 gpt image 2」): the literal default in
+  // runOpenAI is what reaches OpenAI.
+  // 2026-09-21 (CJ「正式環境的生圖，都採用 gpt image 2」): stub the env to the
+  // value the .env template actually ships (gpt-image-1) — it must NOT win.
+  it("sends gpt-image-2 even when the .env pins the older model", async () => {
+    vi.stubEnv("IMAGE_GEN_MODEL_OPENAI", "gpt-image-1");
     const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
       data: [{ b64_json: "aW1hZ2U=" }],
     }), { status: 200, headers: { "content-type": "application/json" } }));
@@ -87,126 +100,46 @@ describe("generateImage provider validation", () => {
     expect(body.model).toBe("gpt-image-2");
   });
 
-  it("rotates manual Google generation past a quota-exhausted pooled key", async () => {
-    vi.stubEnv("GEMINI_API_KEY", "");
-    vi.stubEnv("GEMINI_API_KEY_POOL", "quota-key,working-key");
-    const fetchMock = vi.fn()
-      .mockResolvedValueOnce(new Response(JSON.stringify({
-        error: { status: "RESOURCE_EXHAUSTED" },
-      }), { status: 429, headers: { "content-type": "application/json" } }))
-      .mockResolvedValueOnce(new Response(JSON.stringify({
-        candidates: [{ content: { parts: [{ inlineData: { data: "aW1hZ2U=" } }] } }],
+  // Old variants still carry ids the picker no longer offers. They must be
+  // accepted (no 400 for an old client) and run gpt-image-2 anyway.
+  it.each(["auto", "flux-schnell", "flux-realism", "ideogram-v3", "imagen-3"] as const)(
+    "collapses the legacy choice %s onto gpt-image-2",
+    async (modelChoice) => {
+      const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+        data: [{ b64_json: "aW1hZ2U=" }],
       }), { status: 200, headers: { "content-type": "application/json" } }));
-    vi.stubGlobal("fetch", fetchMock);
+      vi.stubGlobal("fetch", fetchMock);
+
+      const result = await generateImage({ brandId: 1, prompt: "scene", modelChoice });
+
+      expect(fetchMock).toHaveBeenCalledOnce();
+      expect(String(fetchMock.mock.calls[0]![0])).toContain("api.openai.com");
+      expect(JSON.parse(String(fetchMock.mock.calls[0]![1]?.body)).model).toBe("gpt-image-2");
+      expect(result).toMatchObject({ status: "ready", requestedModel: modelChoice });
+    },
+  );
+
+  it("fails a product-reference run rather than handing it to Nano Banana", async () => {
+    dispatchGenerateMock.mockReset();
+    dispatchGenerateMock.mockResolvedValue({
+      status: "failed",
+      modelId: "openai/gpt-image-2",
+      errorMsg: "edits 400",
+    });
 
     const result = await generateImage({
       brandId: 1,
-      prompt: "A clean studio scene",
-      modelChoice: "imagen-3",
+      prompt: "product on a marble counter",
+      subjectImageUrl: "https://example.com/product.png",
     });
 
-    expect(result).toMatchObject({ status: "ready", provider: "google" });
-    expect(fetchMock).toHaveBeenCalledTimes(2);
-  });
-
-  // 2026-08-31 (CJ「圖片的模型，是否突然都不能使用了」): the prod key lost the
-  // Imagen predict surface entirely, so an .env still pinning an imagen model
-  // would otherwise take the whole Google fallback down.
-  it("hands a 404 imagen model off to the gemini image surface", async () => {
-    vi.stubEnv("IMAGE_GEN_MODEL_GOOGLE", "imagen-4.0-generate-001");
-    const fetchMock = vi.fn()
-      .mockResolvedValueOnce(new Response(JSON.stringify({
-        error: {
-          code: 404,
-          message: "models/imagen-4.0-generate-001 is not found for API version v1beta",
-          status: "NOT_FOUND",
-        },
-      }), { status: 404, headers: { "content-type": "application/json" } }))
-      .mockResolvedValueOnce(new Response(JSON.stringify({
-        candidates: [{ content: { parts: [{ inlineData: { data: "aW1hZ2U=" } }] } }],
-      }), { status: 200, headers: { "content-type": "application/json" } }));
-    vi.stubGlobal("fetch", fetchMock);
-
-    const result = await generateImage({
-      brandId: 1,
-      prompt: "A clean studio scene",
-      modelChoice: "imagen-3",
-    });
-
+    expect(dispatchGenerateMock.mock.calls.map(([modelId]) => modelId)).toEqual(["openai/gpt-image-2"]);
     expect(result).toMatchObject({
-      status: "ready",
-      provider: "google",
-      model: "gemini-2.5-flash-image",
+      status: "failed",
+      model: "gpt-image-2",
+      usedFallback: false,
     });
-    expect(String(fetchMock.mock.calls[0]![0])).toContain("imagen-4.0-generate-001:predict");
-    expect(String(fetchMock.mock.calls[1]![0])).toContain("gemini-2.5-flash-image:generateContent");
-  });
-
-  it("falls back instead of reporting ready when the gemini surface returns no image part", async () => {
-    // A success-shaped response carrying only a text part must not be written
-    // as ready — that is the bug that stopped the fallback chain for OpenAI.
-    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
-      candidates: [{ finishReason: "IMAGE_OTHER", content: { parts: [{ text: "no image" }] } }],
-    }), { status: 200, headers: { "content-type": "application/json" } }));
-    vi.stubGlobal("fetch", fetchMock);
-
-    const result = await generateImage({
-      brandId: 1,
-      prompt: "A clean studio scene",
-      modelChoice: "imagen-3",
-    });
-
-    expect(result).toMatchObject({ status: "ready", provider: "piapi", usedFallback: true });
-  });
-
-  // 2026-09-21 (CJ「生圖，正式環境的生圖，都採用 gpt image 2」): a product run
-  // may only fall back to the OTHER model that SEES the real product. Falling
-  // back to text-to-image would silently ship a hallucinated product — the
-  // whole reason this path had no fallback before.
-  it("falls back from gpt-image-2 to Nano Banana, never to text-to-image", async () => {
-    dispatchGenerateMock.mockReset();
-    dispatchGenerateMock
-      .mockResolvedValueOnce({ status: "failed", modelId: "openai/gpt-image-2", errorMsg: "edits 400" })
-      .mockResolvedValueOnce({
-        status: "ready",
-        modelId: "google/nano-banana",
-        url: "/uploads/generated/product.png",
-      });
-
-    await expect(generateImage({
-      brandId: 1,
-      prompt: "product on a marble counter",
-      subjectImageUrl: "https://example.com/product.png",
-    })).resolves.toMatchObject({
-      status: "ready",
-      provider: "google",
-      model: "nano-banana",
-      requestedModel: "gpt-image-2",
-      usedFallback: true,
-    });
-
-    expect(dispatchGenerateMock.mock.calls.map(([modelId]) => modelId))
-      .toEqual(["openai/gpt-image-2", "google/nano-banana"]);
-    for (const [, options] of dispatchGenerateMock.mock.calls) {
-      expect(options.imageUrl).toBe("https://example.com/product.png");
-    }
-  });
-
-  it("reports both subject models in the error when neither can deliver", async () => {
-    dispatchGenerateMock.mockReset();
-    dispatchGenerateMock
-      .mockResolvedValueOnce({ status: "failed", modelId: "openai/gpt-image-2", errorMsg: "edits 400" })
-      .mockRejectedValueOnce(new Error("NanoBanana no image (IMAGE_SAFETY)"));
-
-    const result = await generateImage({
-      brandId: 1,
-      prompt: "product on a marble counter",
-      subjectImageUrl: "https://example.com/product.png",
-    });
-
-    expect(result.status).toBe("failed");
-    expect(result.errorMsg).toContain("gpt-image-2: edits 400");
-    expect(result.errorMsg).toContain("nano-banana: NanoBanana no image");
+    expect(result.errorMsg).toContain("edits 400");
   });
 
   it("puts product-reference arbitration before a conflicting scene prompt", async () => {

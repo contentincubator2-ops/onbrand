@@ -5,7 +5,7 @@
  *
  *   runStart    : load brand positioning → derive USP pool + chief opening
  *   generateCell: per-cell caption (one LLM call, platform-tuned prompt)
- *   generateImage: per-cell image (OpenAI gpt-image-2, Flux Schnell fallback)
+ *   generateImage: per-cell image (OpenAI gpt-image-2, no fallback)
  *
  * Frontend orchestrates pacing (2 caption workers + 1 image worker). The
  * router stays stateless so retries are trivial and one stuck cell never
@@ -1305,30 +1305,12 @@ ${cleaned}
           palette: await loadBrandPaletteHexes(input.brandId),
         });
       }
-      // Model selection: openai/gpt-image-2 is the primary, Flux Schnell the
-      // reliability fallback.
-      // 2026-09-21 (CJ「生圖，正式環境的生圖，都採用 gpt image 2」): this used
-      // to prefer piapi/flux-schnell whenever a PiAPI key existed — which is
-      // always, in production — so Theater was the one surface that never
-      // reached gpt-image-2. Inverted: gpt-image-2 first, and Flux only steps
-      // in when OpenAI fails (or has no key), so a provider hiccup still never
-      // blanks a cell.
-      const hasPiapiKey = !!(process.env.PIAPI_KEY ?? process.env.PIAPI_API_KEY);
-      const hasOpenAIKey = !!(process.env.OPENAI_API_KEY ?? "");
-      const primaryModel = hasOpenAIKey ? "openai/gpt-image-2" : "piapi/flux-schnell";
-      // Helper: attempt the other provider when the primary can't deliver.
-      const tryFallbackModel = async (): Promise<{ ok: true; imageUrl: string; brief: string } | null> => {
-        const fallbackModel = primaryModel === "openai/gpt-image-2" ? "piapi/flux-schnell" : "openai/gpt-image-2";
-        if (fallbackModel === "piapi/flux-schnell" ? !hasPiapiKey : !hasOpenAIKey) return null;
-        try {
-          console.warn(`[theater.generateImage] ${primaryModel} failed, falling back to ${fallbackModel}`);
-          const r2 = await dispatchGenerate(fallbackModel, { prompt: brief, aspectRatio: aspect as any, brandId: input.brandId });
-          if (r2.status === "ready" && r2.url) return { ok: true as const, imageUrl: r2.url, brief };
-        } catch (e2) {
-          console.error(`[theater.generateImage] ${fallbackModel} fallback also failed:`, e2);
-        }
-        return null;
-      };
+      // 2026-09-21: Theater used to prefer piapi/flux-schnell whenever a PiAPI
+      // key existed — which is always, in production — so it was the one
+      // surface that never reached gpt-image-2.
+      // 2026-09-23 (CJ「備援要禁掉」): and now there is no other model to reach.
+      // A cell either gets its gpt-image-2 image or shows the failure.
+      const primaryModel = "openai/gpt-image-2";
       try {
         const r = await dispatchGenerate(primaryModel, {
           prompt: brief,
@@ -1338,16 +1320,9 @@ ${cleaned}
         if (r.status === "ready" && r.url) {
           return { ok: true as const, imageUrl: r.url, brief };
         }
-        // Primary returned non-ready — try the other provider
-        const fallback = await tryFallbackModel();
-        if (fallback) return fallback;
         return { ok: false as const, imageUrl: null, brief, error: r.errorMsg ?? `image gen ${r.status}` };
       } catch (e: any) {
-        // Primary THREW (e.g. OpenAI safety block, PiAPI insufficient
-        // credits) — still try the other provider
         console.error(`[theater.generateImage] ${primaryModel} threw:`, e?.message ?? e);
-        const fallback = await tryFallbackModel();
-        if (fallback) return fallback;
         return { ok: false as const, imageUrl: null, brief, error: String(e?.message ?? e) };
       }
     })),

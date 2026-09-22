@@ -336,19 +336,12 @@ export function deferredSlot<T>(): { promise: Promise<T>; resolve: (value: T) =>
 
 export function imageCapsForRemaining(
   remainingMs: number,
-  opts: { primaryCapMs: number; fallbackCapMs: number; minUsefulMs?: number },
-): { skip: boolean; primaryCapMs: number; fallbackCapMs: number } {
+  opts: { primaryCapMs: number; minUsefulMs?: number },
+): { skip: boolean; primaryCapMs: number } {
   const minUseful = opts.minUsefulMs ?? 8_000;
-  if (!Number.isFinite(remainingMs)) {
-    return { skip: false, primaryCapMs: opts.primaryCapMs, fallbackCapMs: opts.fallbackCapMs };
-  }
-  if (remainingMs < minUseful) return { skip: true, primaryCapMs: 0, fallbackCapMs: 0 };
-  const primaryCapMs = Math.min(opts.primaryCapMs, remainingMs);
-  const left = remainingMs - primaryCapMs;
-  // Only promise a fallback when there is enough time for it to produce
-  // something; otherwise the fallback just eats the assembly window.
-  const fallbackCapMs = left >= minUseful ? Math.min(opts.fallbackCapMs, left) : 0;
-  return { skip: false, primaryCapMs, fallbackCapMs };
+  if (!Number.isFinite(remainingMs)) return { skip: false, primaryCapMs: opts.primaryCapMs };
+  if (remainingMs < minUseful) return { skip: true, primaryCapMs: 0 };
+  return { skip: false, primaryCapMs: Math.min(opts.primaryCapMs, remainingMs) };
 }
 
 export function aiModelToProvider(aiModel: string | null | undefined): ModelProvider {
@@ -1994,10 +1987,7 @@ async function genOneImage(
     const primaryModel = subjectMode ? "openai/gpt-image-2" : (config.imageModelOverride ?? "openai/gpt-image-2");
     const caps = imageCapsForRemaining(
       deadlineAt ? deadlineAt - Date.now() : Number.POSITIVE_INFINITY,
-      {
-        primaryCapMs: subjectMode ? PER_IMAGE_MS : PRIMARY_IMAGE_CAP_MS,
-        fallbackCapMs: PER_IMAGE_MS,
-      },
+      { primaryCapMs: subjectMode ? PER_IMAGE_MS : PRIMARY_IMAGE_CAP_MS },
     );
     if (caps.skip) {
       return {
@@ -2014,7 +2004,6 @@ async function genOneImage(
     }
     const primaryCapMs = caps.primaryCapMs;
     let r;
-    let fallbackUsed = false;
     try {
       r = await tryModel(primaryModel, primaryModel, primaryCapMs);
       if (!(r.status === "ready" && r.url)) throw new Error(r.errorMsg ?? `${primaryModel} no url`);
@@ -2027,34 +2016,22 @@ async function genOneImage(
         `[genOneImage] primary ${primaryModel} failed after ${primaryCapMs}ms cap — ` +
         `${String(e?.message ?? e).slice(0, 200)}`,
       );
-      // 2026-07-25 product-faithful gen policy (imageGen.ts): a hallucinated
-      // product is worse than a failed run — do NOT fall back to text-to-image
-      // when a real product photo was requested, it would silently ship a
-      // fake product. Non-product runs keep the proven Flux Schnell fallback.
-      // 2026-09-21 (CJ「生圖，正式環境的生圖，都採用 gpt image 2」): subject mode
-      // now has a fallback of its own — Nano Banana, the OTHER model that gets
-      // the real product photo. That keeps the policy above intact (the product
-      // stays real) while gpt-image-2 leads, instead of one OpenAI hiccup
-      // leaving a product card with no image at all.
-      if (caps.fallbackCapMs <= 0) {
-        // No room left in the task budget for a second attempt — say so
-        // instead of starting one that will be cut mid-flight.
-        return {
-          style: prompt,
-          prompt: modelPrompt,
-          promptZh: displayPromptZh,
-          modelId: null,
-          requestedModelId: primaryModel,
-          fallbackUsed: false,
-          url: null,
-          status: "failed",
-          errorMsg: `${String(e?.message ?? e).slice(0, 160)}（預算不足，未再試備援）`,
-        };
-      }
-      fallbackUsed = true;
-      r = subjectMode
-        ? await tryModel("google/nano-banana", "google-nano-banana", caps.fallbackCapMs)
-        : await tryModel("piapi/flux-schnell", "piapi-flux-schnell", caps.fallbackCapMs);
+      // 2026-09-23 (CJ「備援要禁掉」): no cross-model fallback. Generation runs
+      // on gpt-image-2 or it does not run — a card without a picture is honest,
+      // a card quietly drawn by another model is not. (The previous policy kept
+      // Flux Schnell for text-to-image and Nano Banana for product photos; both
+      // are gone. The adapters stay wired for the manual paths.)
+      return {
+        style: prompt,
+        prompt: modelPrompt,
+        promptZh: displayPromptZh,
+        modelId: null,
+        requestedModelId: primaryModel,
+        fallbackUsed: false,
+        url: null,
+        status: "failed",
+        errorMsg: String(e?.message ?? e).slice(0, 200),
+      };
     }
     if (r.status === "ready" && r.url) {
       return {
@@ -2063,7 +2040,7 @@ async function genOneImage(
         promptZh: displayPromptZh,
         modelId: r.modelId,
         requestedModelId: primaryModel,
-        fallbackUsed,
+        fallbackUsed: false,
         url: r.url,
         status: "ready",
       };
@@ -2074,7 +2051,7 @@ async function genOneImage(
       promptZh: displayPromptZh,
       modelId: r.modelId,
       requestedModelId: primaryModel,
-      fallbackUsed,
+      fallbackUsed: false,
       url: null,
       status: "failed",
       errorMsg: r.errorMsg ?? "no url returned",

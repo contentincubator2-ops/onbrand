@@ -340,9 +340,9 @@ export async function generateStoryboardAsync(
 
     // Step 2: For each scene, generate a reference image (parallel)
     // 2026-09-21 (CJ「生圖，正式環境的生圖，都採用 gpt image 2」): storyboard
-    // frames were hardcoded to Flux Schnell. gpt-image-2 is the primary here
-    // too; Flux stays the per-scene fallback so one refusal can't blank a frame
-    // (this job is async with progress, so the slower model costs no UX).
+    // frames were hardcoded to Flux Schnell; gpt-image-2 is the model now.
+    // 2026-09-23 (CJ「備援要禁掉」): and the only one — a scene without a
+    // reference frame is better than one drawn by a model we did not choose.
     const { dispatchGenerate } = await import("../_core/mediaGen");
     const isVertical = input.platform === "instagram" || input.platform === "tiktok";
     const aspect = (isVertical ? "9:16" : "16:9") as "9:16" | "16:9";
@@ -360,17 +360,12 @@ export async function generateStoryboardAsync(
           aspectRatio: aspect,
           brandId: 0,
         });
-        for (const modelId of ["openai/gpt-image-2", "piapi/flux-schnell"]) {
-          try {
-            const r = await renderFrame(modelId);
-            if (r.status === "ready" && r.url) {
-              sceneImages[idx] = r.url;
-              break;
-            }
-            console.warn(`[storyboard] scene ${idx} image failed on ${modelId}: ${r.errorMsg}`);
-          } catch (e: any) {
-            console.warn(`[storyboard] scene ${idx} image exception on ${modelId}: ${e?.message ?? e}`);
-          }
+        try {
+          const r = await renderFrame("openai/gpt-image-2");
+          if (r.status === "ready" && r.url) sceneImages[idx] = r.url;
+          else console.warn(`[storyboard] scene ${idx} image failed: ${r.errorMsg}`);
+        } catch (e: any) {
+          console.warn(`[storyboard] scene ${idx} image exception: ${e?.message ?? e}`);
         }
       })
     );

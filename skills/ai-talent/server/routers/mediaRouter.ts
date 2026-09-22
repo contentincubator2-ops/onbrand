@@ -209,33 +209,18 @@ ${input.audienceContext ? `受眾：${input.audienceContext}` : ""}
         quality: input.quality,
         brandId: input.brandId ?? null,
       };
-      // 2026-09-21 (CJ「生圖，正式環境的生圖，都採用 gpt image 2」): in
-      // product-subject mode the model is chosen by policy (gpt-image-2
-      // /images/edits), not by the card the user clicked — so a failure there
-      // falls back to the other model that SEES the real product instead of
-      // handing the user an error. Text-to-image is never in this list: it
-      // would ship a hallucinated product.
-      const subjectFallbacks = isProductSubject && input.modelId.startsWith("openai/")
-        ? ["google/nano-banana"]
-        : [];
+      // 2026-09-23 (CJ「備援要禁掉」): whatever the caller picked is what runs.
+      // Product mode is routed to gpt-image-2 by policy upstream, and when that
+      // fails the user sees the failure and can retry — nothing is silently
+      // redrawn by another model.
       let res: GenResult | null = null;
       let thrown: unknown = null;
-      for (const modelId of [input.modelId, ...subjectFallbacks]) {
-        try {
-          res = await dispatchGenerate(modelId, opts);
-          thrown = null;
-          if (res.status === "ready" && res.url) break;
-          if (subjectFallbacks.length) {
-            console.warn(`[media.generate] ${modelId} returned ${res.status}: ${res.errorMsg ?? "no url"}`);
-          }
-        } catch (e) {
-          res = null;
-          thrown = e;
-          if (subjectFallbacks.length) {
-            console.warn(`[media.generate] ${modelId} threw: ${e instanceof Error ? e.message : String(e)}`);
-          }
-        }
+      try {
+        res = await dispatchGenerate(input.modelId, opts);
+      } catch (e) {
+        thrown = e;
       }
+
       try {
         if (!res) throw thrown ?? new Error("生成失敗");
         return {
