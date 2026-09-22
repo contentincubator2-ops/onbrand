@@ -128,8 +128,10 @@ function buildMessages(args: {
   channel: HubChannel;
   angle: string | null;
   trackedLink: string;
+  destinations: Array<{ label: string; url: string; useWhen: string }>;
+  quietPeriods: Array<{ label: string; startsOn: string; endsOn: string; topics: string[] }>;
 }) {
-  const { org, rep, solution, facts, wording, skillMd, channel, angle, trackedLink } = args;
+  const { org, rep, solution, facts, wording, skillMd, channel, angle, trackedLink, destinations, quietPeriods } = args;
   const pack = packFor(rep.market);
   const zh = pack.language === "zh-TW";
   const pos = org.positioning ?? {};
@@ -179,6 +181,31 @@ function buildMessages(args: {
     `${rep.name}, ${rep.title} (${rep.team})`,
     "",
     zh ? `## 專屬追蹤連結（放在結尾）\n${trackedLink}` : `## Tracked link (put it at the end)\n${trackedLink}`,
+    // 2026-09-22 (CJ 品牌頁): 核准的導流目的地。沒有這張清單，模型就會自己挑
+    // 一個連結——通常是去年那個已經下架的活動頁。
+    ...(destinations.length
+      ? [
+          "",
+          zh
+            ? "## 核准的導流目的地（除了上面的追蹤連結，只能出現這幾個網址）"
+            : "## APPROVED DESTINATIONS (besides the tracked link above, no other URL may appear)",
+          ...destinations.map((d) => `- ${d.label}: ${d.url}${d.useWhen ? `（${d.useWhen}）` : ""}`),
+        ]
+      : []),
+    // 緘默期是唯一一條依日期開關的規則 —— 政策包那六條是靜態的，表達不了。
+    ...(quietPeriods.length
+      ? [
+          "",
+          zh
+            ? "## 緘默期生效中 —— 最高優先，牴觸時以這一段為準"
+            : "## QUIET PERIOD IN EFFECT — highest priority, overrides anything that conflicts",
+          ...quietPeriods.map((p) =>
+            zh
+              ? `${p.label}（${p.startsOn} 至 ${p.endsOn}）：不得提及 ${p.topics.join("、") || "營收、成長率、未公開的案子、任何預測"}。`
+              : `${p.label} (${p.startsOn} to ${p.endsOn}): do not mention ${p.topics.join(", ") || "revenue, growth rates, unannounced deals or any forecast"}.`,
+          ),
+        ]
+      : []),
     ...(angle ? ["", zh ? `## 業務的想法（不違反政策的前提下照做）\n${angle}` : `## Rep's note (follow it unless it conflicts with policy)\n${angle}`] : []),
   ].join("\n");
 
@@ -231,9 +258,15 @@ export async function generateRepPost(input: GeneratePostInput): Promise<Generat
   const shortCode = await createLink(org.id, rep.id, input.channel);
   const trackedLink = `${publicBaseUrl()}/r/${shortCode}`;
   const ctx = complianceContextFor({ market: rep.market, solutions, facts, wording, trackedLink });
+  const { approvedDestinations, activeQuietPeriods } = await import("../../../strategy/core/hub/brandAssets");
+  // 品牌資料是選填的：表還沒建或一筆都沒填，就當成沒有這兩段，不該讓寫作失敗。
+  const [destinations, quietPeriods] = await Promise.all([
+    approvedDestinations(org.id).catch(() => []),
+    activeQuietPeriods(org.id).catch(() => []),
+  ]);
   const { system, user } = buildMessages({
     org, rep, solution, facts, wording, skillMd: skill.skillMd, channel: input.channel,
-    angle: input.angle?.trim() || null, trackedLink,
+    angle: input.angle?.trim() || null, trackedLink, destinations, quietPeriods,
   });
 
   const first = await callWriter(system, user);

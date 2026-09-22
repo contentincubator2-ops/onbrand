@@ -97,6 +97,17 @@ export async function seedHub(opts: { reset?: boolean } = {}) {
     );
   }
 
+  // 2026-09-22 (CJ 品牌頁): 操作性品牌資料。只在該類別還完全沒資料時寫入，
+  // 所以展場上手改過的內容不會被下一次部署的 hub-seed 蓋掉。
+  {
+    const { seedBrandAssets } = await import("./brandAssetSeed");
+    const r = await seedBrandAssets(org.id).catch((e) => {
+      console.warn("[hub-seed] brand assets skipped:", e?.message ?? e);
+      return { added: 0, skipped: 0 };
+    });
+    console.log(`[hub-seed] brand assets: +${r.added} added, ${r.skipped} left alone`);
+  }
+
   const solutions = loadSolutionSeeds();
   for (const s of solutions) {
     await exec(

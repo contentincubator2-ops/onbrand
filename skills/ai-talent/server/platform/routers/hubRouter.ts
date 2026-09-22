@@ -123,6 +123,46 @@ const adminRouter = router({
     return { ok: true };
   }),
 
+  /**
+   * 品牌頁的操作性資料（導流目的地／識別寫法／官方帳號／客戶白名單／緘默期）。
+   * 五類共用一組 CRUD —— 它們的差別只在表單欄位，那是前端的事。
+   */
+  brandAssets: adminProcedure.query(async () => {
+    const org = await getOrg();
+    const { ensureBrandAssetTable, listBrandAssets, activeQuietPeriods } = await import("../../strategy/core/hub/brandAssets");
+    await ensureBrandAssetTable();
+    return {
+      items: await listBrandAssets(org.id),
+      // 頁面要能一眼看出「現在正在緘默期」，那是整張卡最重要的狀態。
+      activeQuiet: await activeQuietPeriods(org.id),
+    };
+  }),
+
+  saveBrandAsset: adminProcedure
+    .input(z.object({
+      kind: z.enum(["destination", "identity", "account", "customer", "quiet"]),
+      id: z.number().int().positive().nullable().default(null),
+      payload: z.record(z.string(), z.any()),
+    }))
+    .mutation(async ({ input }) => {
+      const org = await getOrg();
+      const { ensureBrandAssetTable, saveBrandAsset } = await import("../../strategy/core/hub/brandAssets");
+      await ensureBrandAssetTable();
+      const id = await saveBrandAsset({ orgId: org.id, kind: input.kind, id: input.id, payload: input.payload });
+      await logEvent(org.id, null, "brand_asset_saved", `${input.kind} #${id}`);
+      return { id };
+    }),
+
+  removeBrandAsset: adminProcedure
+    .input(z.object({ id: z.number().int().positive() }))
+    .mutation(async ({ input }) => {
+      const org = await getOrg();
+      const { removeBrandAsset } = await import("../../strategy/core/hub/brandAssets");
+      await removeBrandAsset(org.id, input.id);
+      await logEvent(org.id, null, "brand_asset_removed", `#${input.id}`);
+      return { ok: true };
+    }),
+
   regulations: adminProcedure.query(async () => {
     const org = await getOrg();
     const { listRegulations } = await import("../core/hub/hubStore");
