@@ -1,7 +1,7 @@
 name: "Ops (DEV) — probe gpt-image-2 image edit with a real product photo"
 
 # 2026-09-21 (CJ「直接用 chatgpt image 2 的 model 應該就可以了，你試試看」).
-# (re-triggered after the deploy carrying probe-live-image-gen.ts landed)
+# (re-triggered after the deploy carrying dedupeAngleLabels / brief-consistency fix landed)
 #
 # 我們所有呼叫 OpenAI 的地方都是 /v1/images/generations（純文字），不能帶產品照片；
 # 帶真實產品照的生圖一律走 Nano Banana。ChatGPT 那張自然的圖是「產品照片＋提示詞」
