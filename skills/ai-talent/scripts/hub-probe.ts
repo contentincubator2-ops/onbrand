@@ -300,6 +300,57 @@ async function main() {
     bad("fact push settings", e?.message ?? String(e));
   }
 
+  // ── 推播佇列與逐類退訂（CJ 2026-09-23） ───────────────────────────────────
+  //
+  // 這一段是唯一會對外送訊息的功能，所以驗的重點是**不該送的一定不會送**。
+  // 探針不按送出——那是人的動作。
+  try {
+    const pq = await import("../server/strategy/core/hub/pushQueue");
+    const { listReps } = await import("../server/platform/core/hub/hubStore");
+    const repRows = await listReps(org.id);
+
+    // 退訂比「技術上送得到」優先：退訂的人就算綁了帳號也不該收到。
+    const withLine = { id: 1, name: "bound", lineUserId: "U1" };
+    const both = pq.buildRecipients({ audience: [1], reps: [withLine], optedOut: new Set([1]) });
+    check(both[0]?.blockedBy === "opted_out", "opting out beats having an account", String(both[0]?.blockedBy));
+
+    // 沒綁 LINE 的人會出現在清單上，但標成送不到 —— 不是靜默消失。
+    const unbound = repRows.filter((r: any) => !r.lineUserId);
+    const shown = pq.buildRecipients({
+      audience: repRows.map((r: any) => r.id),
+      reps: repRows.map((r: any) => ({ id: r.id, name: r.name, lineUserId: r.lineUserId })),
+      optedOut: new Set(),
+    });
+    check(shown.length === repRows.length, "the queue lists everyone, reachable or not", `${shown.length}/${repRows.length}`);
+    check(
+      shown.filter((r) => !r.deliverable).length === unbound.length,
+      "everyone without a LINE binding is marked undeliverable",
+      `${unbound.length} of ${repRows.length} reps have no LINE account`,
+    );
+    if (unbound.length === repRows.length) {
+      notes.push("no rep has a LINE binding yet — pressing send would deliver nothing");
+    }
+
+    // 每一則推播都要帶退訂指示。沒有退訂就不該有推播。
+    const sample = pq.pushText({
+      statement: "測試", sourceName: "來源", expiresOn: "2026-09-29", kindLabel: "補助方案", zh: true,
+    });
+    check(sample.includes("停止補助方案"), "every push carries its own opt-out line", "present");
+    check(sample.includes("出處：來源"), "every push carries its source", "present");
+
+    // 退訂的文字解析：認錯一個比漏認一個糟。
+    check(pq.parseOptOut("停止補助").kind === "subsidy", "a plain opt-out reply is understood", "停止補助 → subsidy");
+    check(pq.parseOptOut("停止").kind === null, "an opt-out with no category is not guessed", "asks which one");
+    check(pq.parseOptOut("幫我寫一篇補助的貼文").intent === null, "an ordinary message is left alone", "not an opt-out");
+
+    const optOuts = await pq.listOptOuts(org.id);
+    check(true, "current opt-outs", optOuts.length ? optOuts.map((o) => `${o.repId}:${o.kind}`).join(", ") : "none");
+    const log = await pq.listPushLog(org.id, 5);
+    check(Array.isArray(log), "push log reads back", `${log.length} recent`);
+  } catch (e: any) {
+    bad("push queue", e?.message ?? String(e));
+  }
+
   // ── 市場消息的產業配對（CJ 2026-09-23） ───────────────────────────────────
   //
   // 這一段算的是**誰會收到哪則消息**。算錯的後果不是畫面難看：標錯產業 → 業務

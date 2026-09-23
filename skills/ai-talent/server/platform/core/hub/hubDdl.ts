@@ -313,6 +313,42 @@ export const HUB_DDL: string[] = [
     UNIQUE KEY uq_row (org_id, entity, entity_id)
   ) ${TAIL}`,
 
+  /**
+   * 逐類退訂（CJ 2026-09-23「退訂就只針對該類訊息退訂」）。
+   *
+   * 一個業務可能很需要補助消息，但不想收市場統計。全有全無的退訂會讓他為了
+   * 擋掉一種而關掉全部 —— 然後補助也錯過了。所以鍵是 (rep, kind)。
+   *
+   * 沒有列 = 沒退訂。退訂是稀疏的，不需要替每個人每一類都存一列。
+   */
+  `CREATE TABLE IF NOT EXISTS hub_push_optouts (
+    id              INT          NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    org_id          INT          NOT NULL,
+    rep_id          INT          NOT NULL,
+    kind            VARCHAR(20)  NOT NULL,
+    created_at      DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    UNIQUE KEY uq_rep_kind (org_id, rep_id, kind)
+  ) ${TAIL}`,
+
+  /**
+   * 送出紀錄。**每一次送出都要留下來，成功失敗都要。**
+   *
+   * 推播是對外的動作，收不回來。「到底有沒有送給他」這個問題一定會被問，而且
+   * 通常是在出事的時候問。成功的紀錄證明送了，失敗的紀錄證明試過而且為什麼沒成。
+   */
+  `CREATE TABLE IF NOT EXISTS hub_push_log (
+    id              INT          NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    org_id          INT          NOT NULL,
+    fact_id         INT          NOT NULL,
+    rep_id          INT          NOT NULL,
+    actor           VARCHAR(160) NOT NULL,
+    ok              TINYINT      NOT NULL DEFAULT 0,
+    detail          VARCHAR(400) NULL,
+    created_at      DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    INDEX idx_org (org_id, created_at),
+    INDEX idx_fact (org_id, fact_id)
+  ) ${TAIL}`,
+
   `CREATE TABLE IF NOT EXISTS hub_approvers (
     id              INT          NOT NULL AUTO_INCREMENT PRIMARY KEY,
     org_id          INT          NOT NULL,

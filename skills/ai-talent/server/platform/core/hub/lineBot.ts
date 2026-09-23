@@ -240,6 +240,53 @@ export async function handleText(ctx: BotContext, text: string): Promise<BotMess
     return [{ type: "text", text: T(rep, "已記錄！追蹤連結的點擊會即時算進「我的成效」。", "Recorded! Clicks on your tracked link count toward My results in real time.") }];
   }
 
+  /**
+   * 逐類退訂（CJ 2026-09-23「退訂就只針對該類訊息退訂」）。
+   *
+   * 擺在 askAssistant 之前，因為「停止補助」丟給 AI 助理只會得到一段解釋，
+   * 而業務要的是那件事真的停下來。**退訂必須是確定性的，不能經過模型。**
+   *
+   * 說了「停止」但沒講哪一類的時候不猜——回問。認錯一個退訂比漏認一個糟得多：
+   * 漏認他會再講一次，認錯他會以為退掉了卻還一直收到，然後就不再相信退訂。
+   */
+  {
+    const { parseOptOut, optOut, optIn } = await import("../../../strategy/core/hub/pushQueue");
+    const { kind, intent } = parseOptOut(trimmed);
+    if (intent) {
+      const org = await getOrg();
+      const LABELS: Record<string, [string, string]> = {
+        market: ["市場統計", "market updates"], subsidy: ["補助方案", "subsidies"],
+        platform: ["平台事實", "platform news"], competitor: ["競品情報", "competitor intel"],
+        regulation: ["法規", "regulation updates"],
+      };
+      if (!kind) {
+        return [{
+          type: "text",
+          text: T(rep,
+            "要停止哪一類？回覆「停止補助」「停止市場統計」「停止法規」「停止平台事實」其中一種。",
+            'Which category? Reply "stop subsidies", "stop market updates", "stop regulation updates" or "stop platform news".'),
+        }];
+      }
+      const label = LABELS[kind] ?? [kind, kind];
+      if (intent === "stop") {
+        await optOut(org.id, rep.id, kind);
+        await logEvent(org.id, rep.id, "push_opted_out", kind);
+        return [{
+          type: "text",
+          text: T(rep,
+            `好，${label[0]}不會再推給你了。想恢復就回覆「恢復${label[0]}」。`,
+            `Done — no more ${label[1]}. Reply "resume ${label[1]}" to turn them back on.`),
+        }];
+      }
+      await optIn(org.id, rep.id, kind);
+      await logEvent(org.id, rep.id, "push_opted_in", kind);
+      return [{
+        type: "text",
+        text: T(rep, `${label[0]}恢復推送了。`, `${label[1]} are back on.`),
+      }];
+    }
+  }
+
   if (mode === "ask" || trimmed.length > 0) {
     const { askAssistant } = await import("./hermesBridge");
     const org = await getOrg();

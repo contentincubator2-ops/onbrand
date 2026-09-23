@@ -323,6 +323,159 @@ const adminRouter = router({
       return { ok: true, changed: changes.length };
     }),
 
+  /**
+   * 今天該送什麼、給誰（CJ 2026-09-23「總部看過清單再按」）。
+   *
+   * **只算，不送。** 送出是另一支 mutation，由人按下去。送不到的人也會列出來
+   * 並寫明原因——按下送出之後才發現「其實只送到兩個人」，那個清單就沒有意義。
+   */
+  pushQueue: adminProcedure.query(async () => {
+    const org = await getOrg();
+    const { routeFacts } = await import("../../strategy/core/hub/factRouting");
+    const { readPushSettings, dueToday } = await import("../../strategy/core/hub/factPush");
+    const { buildRecipients, listOptOuts, listPushLog } = await import("../../strategy/core/hub/pushQueue");
+    const { listReps } = await import("../core/hub/hubStore");
+
+    const [facts, reps] = await Promise.all([listFacts(org.id), listReps(org.id)]);
+    const today = new Date().toISOString().slice(0, 10);
+    const routing = routeFacts(facts as any, reps as any, today);
+    const pushRows = await q(
+      `SELECT id, push_cadence, push_audience, push_last_at FROM hub_facts WHERE org_id = ?`,
+      [org.id],
+    );
+    const pushById = new Map(pushRows.map((r: any) => [r.id, readPushSettings(r)]));
+
+    const opts = await listOptOuts(org.id);
+    const entries = [] as any[];
+    for (const f of facts as any[]) {
+      const settings = pushById.get(f.id) ?? { cadence: "off" as const, audience: [], lastPushedAt: null };
+      const r = routing[f.id];
+      const due = dueToday({
+        settings, autoAudience: r?.repIds ?? [], expiresOn: f.expiresOn ?? null,
+        forwardable: Boolean(r?.forwardable), today,
+      });
+      if (!due.due) continue;
+      const optedOut = new Set(opts.filter((o) => o.kind === f.kind).map((o) => o.repId));
+      const recipients = buildRecipients({
+        audience: due.audience,
+        reps: reps.map((x: any) => ({ id: x.id, name: x.name, lineUserId: x.lineUserId })),
+        optedOut,
+      });
+      entries.push({
+        factId: f.id, kind: f.kind, market: f.market,
+        title: { en: f.statementEn, zh: f.statementZh },
+        reason: due.reason,
+        recipients,
+        deliverable: recipients.filter((x) => x.deliverable).length,
+      });
+    }
+    return { today, entries, optOuts: opts, recent: await listPushLog(org.id, 40) };
+  }),
+
+  /**
+   * 送出（CJ 按的那一下）。
+   *
+   * 逐則、逐人送。**一個人失敗不會中斷其他人**，而且成功失敗都留紀錄——
+   * 推播是收不回來的動作，「到底有沒有送給他」一定會被問，通常是在出事的時候。
+   */
+  sendPush: adminProcedure
+    .input(z.object({ factIds: z.array(z.number().int().positive()).min(1).max(50) }))
+    .mutation(async ({ ctx, input }) => {
+      const org = await getOrg();
+      const [u] = await q(`SELECT email FROM users WHERE id = ?`, [ctx.user.id]);
+      const actor = String(u?.email ?? "admin");
+      const { routeFacts } = await import("../../strategy/core/hub/factRouting");
+      const { readPushSettings, dueToday } = await import("../../strategy/core/hub/factPush");
+      const { buildRecipients, listOptOuts, logPush, pushText } = await import("../../strategy/core/hub/pushQueue");
+      const { listReps } = await import("../core/hub/hubStore");
+      const { linePush } = await import("../core/hub/lineBot");
+
+      const [facts, reps] = await Promise.all([listFacts(org.id), listReps(org.id)]);
+      const today = new Date().toISOString().slice(0, 10);
+      const routing = routeFacts(facts as any, reps as any, today);
+      const pushRows = await q(
+        `SELECT id, push_cadence, push_audience, push_last_at FROM hub_facts WHERE org_id = ?`,
+        [org.id],
+      );
+      const pushById = new Map(pushRows.map((r: any) => [r.id, readPushSettings(r)]));
+      const opts = await listOptOuts(org.id);
+      const repById = new Map(reps.map((r: any) => [r.id, r]));
+
+      const KIND_ZH: Record<string, string> = {
+        market: "市場統計", subsidy: "補助方案", platform: "平台事實",
+        competitor: "競品情報", regulation: "法規",
+      };
+
+      let sent = 0;
+      let failed = 0;
+      let skipped = 0;
+      for (const id of input.factIds) {
+        const f: any = (facts as any[]).find((x) => x.id === id);
+        if (!f) { skipped++; continue; }
+        const settings = pushById.get(id) ?? { cadence: "off" as const, audience: [], lastPushedAt: null };
+        const r = routing[id];
+        // 重新判斷一次，不信前端送來的「這則該送」—— 清單可能已經放了一陣子，
+        // 而過期的補助在這段時間裡就過期了。
+        const due = dueToday({
+          settings, autoAudience: r?.repIds ?? [], expiresOn: f.expiresOn ?? null,
+          forwardable: Boolean(r?.forwardable), today,
+        });
+        if (!due.due) { skipped++; continue; }
+
+        const optedOut = new Set(opts.filter((o) => o.kind === f.kind).map((o) => o.repId));
+        const recipients = buildRecipients({
+          audience: due.audience,
+          reps: reps.map((x: any) => ({ id: x.id, name: x.name, lineUserId: x.lineUserId })),
+          optedOut,
+        });
+        const zh = f.market === "TW";
+        const text = pushText({
+          statement: zh ? f.statementZh : f.statementEn,
+          sourceName: f.sourceName,
+          expiresOn: f.expiresOn ?? null,
+          kindLabel: zh ? (KIND_ZH[f.kind] ?? f.kind) : f.kind,
+          zh,
+        });
+
+        for (const rec of recipients) {
+          if (!rec.deliverable) {
+            await logPush({ orgId: org.id, factId: id, repId: rec.repId, actor, ok: false, detail: rec.blockedBy });
+            continue;
+          }
+          const lineId = repById.get(rec.repId)?.lineUserId;
+          try {
+            await linePush(String(lineId), [{ kind: "text", text }] as any);
+            await logPush({ orgId: org.id, factId: id, repId: rec.repId, actor, ok: true });
+            sent++;
+          } catch (e: any) {
+            await logPush({ orgId: org.id, factId: id, repId: rec.repId, actor, ok: false, detail: String(e?.message ?? e).slice(0, 300) });
+            failed++;
+          }
+        }
+        await exec(`UPDATE hub_facts SET push_last_at = NOW(3) WHERE id = ? AND org_id = ?`, [id, org.id]);
+        await logEvent(org.id, null, "market_intel_pushed", `#${id} · ${recipients.filter((x) => x.deliverable).length} recipient(s)`);
+      }
+      return { sent, failed, skipped };
+    }),
+
+  /** 逐類退訂／恢復。後台也能代為操作（業務打電話來說「別再寄了」）。 */
+  setPushOptOut: adminProcedure
+    .input(z.object({
+      repId: z.number().int().positive(),
+      kind: z.enum(["market", "subsidy", "platform", "competitor", "regulation"]),
+      optedOut: z.boolean(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const org = await getOrg();
+      const [u] = await q(`SELECT email FROM users WHERE id = ?`, [ctx.user.id]);
+      const { optOut, optIn } = await import("../../strategy/core/hub/pushQueue");
+      if (input.optedOut) await optOut(org.id, input.repId, input.kind);
+      else await optIn(org.id, input.repId, input.kind);
+      await logEvent(org.id, input.repId, input.optedOut ? "push_opted_out" : "push_opted_in",
+        `${input.kind} · by ${String(u?.email ?? "admin")}`);
+      return { ok: true };
+    }),
+
   wording: adminProcedure.query(async () => {
     const org = await getOrg();
     const { listWording } = await import("../core/hub/hubStore");

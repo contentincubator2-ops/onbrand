@@ -19,6 +19,7 @@ import React from "react";
 import { trpc } from "../../../../lib/trpc";
 import { ErrorNote, Loading, PageHeader, cx } from "../../ui";
 import StratFactCards from "../../components/strat-fact-cards";
+import PushQueue from "../../components/push-queue";
 import { SectionLabel } from "../../components/wording-shared";
 import { useT } from "../../lang";
 
@@ -129,11 +130,13 @@ export default function StrategyFactsPage() {
             ) : null}
           </div>
 
-          {/* 誠實地講清楚這一頁到哪裡為止。 */}
+          <PushQueue onSent={() => void q.refetch()} />
+
+          {/* 誠實地講清楚這一頁的邊界在哪裡。 */}
           <p className="mt-6 text-[11.5px] leading-relaxed text-neutral-500">
             {t(
-              "This page works out who should receive what. It does not send anything yet — pushing messages to real people is a separate decision, and it needs an opt-out before it goes live.",
-              "這一頁算出「誰該收到什麼」，但還沒有真的送出去。推播是會送訊息給真實的人的動作，那是另一個決定，而且上線前要先有退訂機制。",
+              "Nothing is sent on a schedule — someone at HQ presses send. Reps can stop a single category from the LINE bot (「stop subsidies」) without losing the rest.",
+              "沒有任何東西是排程自動送的——由總部的人按下送出。業務可以在 LINE 上單獨停掉某一類（回覆「停止補助」），不會連其他類一起關掉。",
             )}
           </p>
         </>

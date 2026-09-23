@@ -2,4 +2,4 @@ ExpertHub demo probe trigger.
 Edit this file and push to release/experthub-demo to run it.
 Add --generate on the line below to also write one real post through the LLM.
 
-run 30: 2026-09-23 (ops-only: confirm the wording log backlog is cleared)
+run 31: 2026-09-24 --generate (push queue + per-category opt-out)
