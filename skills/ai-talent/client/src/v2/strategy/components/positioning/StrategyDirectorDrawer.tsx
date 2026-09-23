@@ -1,18 +1,25 @@
 /**
  * StrategyDirectorDrawer — 全域常駐的「策略總監」入口。
  *
- * 2026-09-23（CJ 三則連續指示）：
+ * 2026-09-23（CJ 連續指示，位置經過一次修正）：
  *   「用戶還可以看這個策略總監的背景，或是要換其他的策略總監。要達到每
  *   一頁都能這樣，你要重新思考使用者體驗」
- *   「我不喜歡你現在擺放策略總監的位置。我喜歡在右上方的位置，而且要
- *   表明自己是專為他設計的策略總監」
+ *   「我不喜歡你現在擺放策略總監的位置。我喜歡在右上方的位置」（第一版）
+ *   → 後來改口：「我不喜歡將策略總監放在右上方，我偏好放在右下方，然後
+ *   隱藏起mia」——現在是右下角，Mia 的頭像已在 ShellLayout.tsx 隱藏
+ *   （{false && (...)}，客服後端跟次要入口都還在，只是拿掉最顯眼的浮動
+ *   頭像，兩個角色不用搶同一個位置）。
+ *   「現在的互動方式不好，我按一段文字後，一送出它的視窗就縮小」——根因
+ *   是訊息區沒有固定高度，純內容撐開：還沒送出訊息時顯示的「問我任何
+ *   問題」介紹文字比較長，送出第一則訊息後這段文字被換成（通常比較短的）
+ *   對話氣泡，整個容器因此看起來「縮小」了。修法是訊息區改固定高度（見
+ *   StrategyDirectorChat.tsx），不再讓容器高度跟著內容量伸縮。
  *   人設數量：「2-3位，從mos_db選擇」（mos_db 金鑰目前未設定，先用一份
  *   手寫預設人設頂著框架，見 strategistPersonas.ts 的說明）
  *
- * 跟 Mia（ShellLayout.tsx 裡的 SupportDrawer，右下角、紫色圓點）刻意分開：
- * 客服跟策略顧問是兩件不同的事，合併只會讓兩邊互相干擾（見這輪討論的
- * 取捨紀錄）。這裡改放右上角、黑白線條 B&W 風格（呼應 AgentPersonaBar／
- * PipelineThinkingPanel 那套「4A 代理商」視覺語言，不是 Mia 的漸層紫）。
+ * 黑白線條 B&W 風格（呼應 AgentPersonaBar／PipelineThinkingPanel 那套
+ * 「4A 代理商」視覺語言，跟 Mia 的漸層紫刻意不同——就算現在同一個角落，
+ * 一眼也看得出是不同角色）。
  *
  * 全域可見的前提是「有品牌在 scope 裡」——沒有品牌時不出現（沒有品牌可以
  * 聊策略，硬要出現只會是空殼）。brandId 來自 ShellLayout 自己的全域
@@ -56,8 +63,10 @@ export default function StrategyDirectorDrawer({ brandId }: { brandId: number | 
         aria-label={en ? "Open your Strategy Director" : "打開你的策略總監"}
         title={en ? "Your Strategy Director — built for this brand" : "你的策略總監——為這個品牌而設計"}
         style={{
-          position: "fixed", top: 20, right: 20, zIndex: 50,
-          width: 52, height: 52, borderRadius: "50%",
+          // 2026-09-23：右下角（Mia 原本的位置——她的頭像已隱藏），不再是
+          // 右上角。
+          position: "fixed", bottom: 20, right: 20, zIndex: 50,
+          width: 56, height: 56, borderRadius: "50%",
           background: "white", border: "2px solid #111",
           boxShadow: open ? "3px 3px 0 rgba(17,17,17,0.4)" : "3px 3px 0 rgba(17,17,17,0.22)",
           display: "flex", alignItems: "center", justifyContent: "center",
@@ -76,7 +85,10 @@ export default function StrategyDirectorDrawer({ brandId }: { brandId: number | 
 
       {open && (
         <div style={{
-          position: "fixed", top: 80, right: 20, zIndex: 50,
+          // 2026-09-23：從右上角改成右下角、從launcher往上長（bottom 錨定），
+          // 而不是從上往下長——這樣面板的底邊永遠貼著 launcher，整串內容
+          // 變長時是往上推，不會讓人覺得位置在跳動。
+          position: "fixed", bottom: 84, right: 20, zIndex: 50,
           width: "min(400px, calc(100vw - 40px))",
           display: "flex", flexDirection: "column", gap: 8,
         }}>

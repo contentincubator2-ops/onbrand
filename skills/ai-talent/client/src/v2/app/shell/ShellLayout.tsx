@@ -550,7 +550,12 @@ export default function ShellLayout() {
       {/* 2026-05-13 (CJ「實作 Layer 2: Mia chat drawer」): Notion-style
           avatar opens an in-page chat drawer (SupportDrawer). Mia is an
           LLM-backed customer success agent with session context. If she
-          can't help, "我要找真人 →" inside the drawer opens a ticket. */}
+          can't help, "我要找真人 →" inside the drawer opens a ticket.
+          2026-09-23（CJ「隱藏起mia」，右下角讓給策略總監）：頭像先隱藏——
+          不是刪掉整個客服功能，onOpenSupport 這條次要入口（設定選單裡）
+          還在，支援工單後端也沒動，只是拿掉這顆最顯眼的浮動頭像，避免
+          跟策略總監在同一個角落搶位置。要恢復就把 false 改回 true。 */}
+      {false && (
       <button
         onClick={() => {
           // Drain the queue at open-time so pending nudges render as Mia
@@ -647,6 +652,7 @@ export default function ShellLayout() {
           }
         `}</style>
       </button>
+      )}
       <SupportDrawer
         open={supportOpen}
         onClose={() => { setSupportOpen(false); setDrainedNudges([]); }}

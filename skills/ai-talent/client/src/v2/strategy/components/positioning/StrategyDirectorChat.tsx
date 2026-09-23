@@ -90,9 +90,15 @@ export default function StrategyDirectorChat({
     <div style={{
       border: "2px solid #111", borderRadius: 18, background: "#fff",
       boxShadow: "4px 4px 0 rgba(17,17,17,0.15)",
-      display: "flex", flexDirection: "column", maxHeight: 440,
+      display: "flex", flexDirection: "column",
+      // 2026-09-23（CJ「我按一段文字後，一送出它的視窗就縮小」）：改成
+      // 固定 height（不是 maxHeight）——根因是舊版只靠內容撐開高度，
+      // 空狀態的介紹文字比訊息氣泡還高，送出第一則訊息後介紹文字消失、
+      // 容器就跟著縮小。固定高度後，不管訊息多寡，外框永遠一樣大，只有
+      // 裡面的訊息區自己捲動。
+      height: 440,
     }}>
-      <div ref={bodyRef} style={{ flex: 1, overflowY: "auto", padding: "14px 16px", display: "flex", flexDirection: "column", gap: 10, minHeight: 160 }}>
+      <div ref={bodyRef} style={{ flex: 1, overflowY: "auto", padding: "14px 16px", display: "flex", flexDirection: "column", gap: 10 }}>
         {messages.length === 0 && !convQ?.isLoading && (
           <p style={{ fontSize: 13, color: "#737373", fontStyle: "italic", margin: 0 }}>
             {en
