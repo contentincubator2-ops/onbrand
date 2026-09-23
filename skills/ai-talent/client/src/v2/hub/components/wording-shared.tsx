@@ -10,7 +10,7 @@
  */
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import type { inferRouterOutputs } from "@trpc/server";
-import { Plus, X } from "lucide-react";
+import { AlertTriangle, Plus, X } from "lucide-react";
 import type { AppRouter } from "../../../../../server/routers";
 import { trpc } from "../../../lib/trpc";
 import { cx } from "../ui";
@@ -312,6 +312,162 @@ export function AssetCardFrame({
       {hint ? <p className="mb-2 text-[12px] leading-snug text-stone-500">{hint}</p> : null}
       <div className="flex min-w-0 flex-1 flex-col">{children}</div>
     </div>
+  );
+}
+
+// ── 量出來的效力 ────────────────────────────────────────────────────────────
+
+export type WordingUsage = WordingData["measured"]["usage"][number];
+export type WordingConflict = WordingData["conflicts"][number];
+
+/**
+ * 一條規則實際上有沒有在作用，做成一個小數字掛在規則旁邊。
+ *
+ * 2026-09-23 (CJ「優化這一頁」)。這一頁原本兩張卡並排、長得一模一樣，看起來
+ * 是同一種東西——但推薦用詞只是寫進指令的請求（模型可以不理），替換對照是
+ * 確定性字串替換（一定會發生）。一個是期望，一個是保證。
+ *
+ * 與其把文案改得更小心，不如把真實數字放上去：推薦用詞顯示「實際出現在幾篇」，
+ * 替換對照顯示「實際觸發過幾次」。0 就顯示 0。
+ */
+export function UsageChip({ usage, kind }: { usage?: WordingUsage; kind: WordingKind }) {
+  const t = useT();
+  if (!usage) return null;
+
+  // 這條規則建立之後還沒有實際貼文，就沒有東西可以量。說「還沒量到」，
+  // 不要顯示 0 —— 0 看起來像「這條規則沒有用」，那是兩回事。
+  if (!usage.posts) {
+    return (
+      <Chip
+        tone="on"
+        title={t(
+          "No real post has been written since this rule was added, so there is nothing to measure yet. Demo history is excluded on purpose.",
+          "這條規則加入之後還沒有實際貼文，所以還沒有東西可以量。展示用的歷史貼文刻意不算。",
+        )}
+      >
+        {t("not measured yet", "尚未量到")}
+      </Chip>
+    );
+  }
+
+  if (kind === "swap") {
+    if (usage.leaked > 0) {
+      return (
+        <Chip tone="bad" title={t(
+          "The swap ran but the original word is still in the final post — check the case and word boundaries.",
+          "替換跑過了，但原字還留在最終貼文裡——檢查大小寫或字界。",
+        )}>
+          {t(`${usage.leaked} not replaced`, `${usage.leaked} 篇沒換掉`)}
+        </Chip>
+      );
+    }
+    return (
+      <Chip
+        tone={usage.hits ? "on" : "off"}
+        title={t(
+          `Fired on ${usage.hits} of the ${usage.posts} real posts written since this swap was added. Never firing may simply mean the writer never uses that word.`,
+          `在這組替換加入之後的 ${usage.posts} 篇實際貼文裡，觸發了 ${usage.hits} 篇。沒觸發過不一定是壞事——可能模型本來就不會那樣寫。`,
+        )}
+      >
+        {usage.hits ? t(`fired ${usage.hits}×`, `觸發 ${usage.hits} 次`) : t("never fired", "沒觸發過")}
+      </Chip>
+    );
+  }
+
+  if (kind === "banned") {
+    return (
+      <Chip
+        tone={usage.hits ? "bad" : "on"}
+        title={t("A banned word should never survive into a post.", "禁用詞不該留在任何一篇貼文裡。")}
+      >
+        {usage.hits ? t(`${usage.hits} got through`, `${usage.hits} 篇漏掉`) : t("none got through", "沒有漏掉")}
+      </Chip>
+    );
+  }
+
+  // preferred：一定要有分母。「出現 3 次」在 5 篇跟在 300 篇裡是兩回事。
+  return (
+    <Chip
+      tone={usage.hits ? "on" : "off"}
+      title={t(
+        `Appeared in ${usage.hits} of the ${usage.posts} real posts written since this term was added. The writer is asked to use it, not forced — this is the only way to know whether it does.`,
+        `在這個用詞加入之後的 ${usage.posts} 篇實際貼文裡，出現了 ${usage.hits} 篇。指令是「請優先使用」不是強制，所以這是唯一能知道模型有沒有照做的方法。`,
+      )}
+    >
+      {`${usage.hits}/${usage.posts}`}
+    </Chip>
+  );
+}
+
+function Chip({ children, tone, title }: { children: React.ReactNode; tone: "on" | "off" | "bad"; title?: string }) {
+  return (
+    <span
+      title={title}
+      className={cx(
+        "shrink-0 rounded-full px-1.5 py-[1px] text-[11px] font-medium tabular-nums",
+        tone === "bad" && "bg-red-100 text-red-800",
+        tone === "on" && "bg-stone-100 text-stone-600",
+        tone === "off" && "bg-amber-100 text-amber-800",
+      )}
+    >
+      {children}
+    </span>
+  );
+}
+
+/** 「以最近 N 篇回頭量」——沒有這一行，上面那些數字不知道是從哪來的。 */
+export function MeasuredNote({ measured, market }: { measured: WordingData["measured"]; market: Market }) {
+  const t = useT();
+  const n = measured.byMarket[market] ?? 0;
+  if (!n) {
+    return (
+      <span className="text-[12px] text-stone-500">
+        {t(
+          "Nothing measured yet: no real post in this market. Demo history is excluded — it is one sample caption copied, so counting it would invent evidence.",
+          "還沒有東西可以量：這個市場還沒有實際貼文。展示用的歷史不算——它是同一篇範例複製出來的，拿來當證據等於無中生有。",
+        )}
+      </span>
+    );
+  }
+  return (
+    <span className="text-[12px] text-stone-500">
+      {t(
+        `Counts come from the ${n} real posts in this market (demo history excluded).`,
+        `數字來自這個市場的 ${n} 篇實際貼文（不含展示用歷史）。`,
+      )}
+    </span>
+  );
+}
+
+/**
+ * 互相打架的規則。
+ *
+ * 只在真的有東西的時候出現——沒問題的時候顯示一行綠字，因為「查過了、沒事」
+ * 跟「沒有查」是兩回事，而空白看起來像後者。
+ */
+export function ConflictPanel({ conflicts }: { conflicts: WordingConflict[] }) {
+  const t = useT();
+  const { lang } = useHubLang();
+  if (!conflicts.length) {
+    return (
+      <div className="flex items-center gap-1.5 text-[12px] text-stone-600">
+        <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" aria-hidden />
+        {t("Checked: no rule here contradicts another.", "已檢查：這些規則之間沒有互相牴觸。")}
+      </div>
+    );
+  }
+  return (
+    <ul className="space-y-1.5">
+      {conflicts.map((c, i) => (
+        <li
+          key={i}
+          className="flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 px-2.5 py-2 text-[12.5px] leading-relaxed text-amber-900"
+        >
+          <AlertTriangle size={13} className="mt-0.5 shrink-0" aria-hidden />
+          <span>{lang === "zh" ? c.zh : c.en}</span>
+        </li>
+      ))}
+    </ul>
   );
 }
 

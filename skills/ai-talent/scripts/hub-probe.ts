@@ -106,6 +106,40 @@ async function main() {
     check(w.length > 0, `wording lists (${market})`, `${w.length}`);
   }
 
+  // ── 用詞規範的效力量測（CJ 2026-09-23「優化這一頁」） ─────────────────────
+  //
+  // 正面用詞那一頁現在每條規則旁邊掛一個數字。數字是斷言，要驗。特別是分母：
+  // 拿展示用的歷史貼文（同一篇範例複製 88 份）去算，每個詞不是 0/88 就是 88/88,
+  // 那是複製出來的假象。所以量測只算 is_demo = 0。
+  try {
+    const { measureWording, findWordingConflicts } = await import("../server/strategy/core/hub/wordingUsage");
+    const all = await listWording(org.id);
+    const measured = await measureWording(org.id, all);
+
+    const missing = all.filter((w) => !measured.usage[w.id]);
+    check(missing.length === 0, "every wording rule got measured", missing.map((w) => w.term).join(", ") || `${all.length} rules`);
+
+    const [{ demo = 0, real = 0 } = {} as any] = await q<{ demo: number; real: number }>(
+      `SELECT SUM(is_demo = 1) AS demo, SUM(is_demo = 0) AS real FROM hub_posts WHERE org_id = ?`,
+      [org.id],
+    );
+    const counted = Object.values(measured.byMarket).reduce((a, b) => a + b, 0);
+    check(
+      counted === Number(real),
+      "the denominator counts real posts only, not demo history",
+      `counted ${counted}, real ${real}, demo ${demo}`,
+    );
+
+    // hits 永遠不能大於 posts —— 比率大於 1 的數字會讓整頁失去可信度。
+    const impossible = Object.values(measured.usage).filter((u) => u.hits > u.posts);
+    check(impossible.length === 0, "no rule reports more hits than posts", impossible.map((u) => `#${u.id} ${u.hits}/${u.posts}`).join(", ") || "ok");
+
+    const conflicts = findWordingConflicts(all);
+    check(true, "wording conflicts", conflicts.length ? conflicts.map((c) => `${c.market}:${c.kind}`).join(", ") : "none — the seeded rules agree with each other");
+  } catch (e: any) {
+    bad("wording usage", e?.message ?? String(e));
+  }
+
   const reps = await q(`SELECT id, name, market, line_user_id FROM hub_reps WHERE org_id = ? ORDER BY id`, [org.id]);
   check(reps.length > 0, "reps", `${reps.length}`);
   const markets = new Set(reps.map((r: any) => r.market));

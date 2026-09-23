@@ -85,10 +85,21 @@ const adminRouter = router({
     const org = await getOrg();
     const { listWording } = await import("../core/hub/hubStore");
     const { POLICY_PACKS: packs, publicPack: view } = await import("../../content/core/hub/policyPacks");
+    const { measureWording, findWordingConflicts } = await import("../../strategy/core/hub/wordingUsage");
+    const items = await listWording(org.id);
     return {
-      items: await listWording(org.id),
+      items,
       // Legal claim rules live in code (policy packs) — shown read-only beside marketing's list.
       legal: { TW: view(packs.TW).blockedWording, US: view(packs.US).blockedWording },
+      /**
+       * 2026-09-23 (CJ「優化這一頁」)。每一條規則實際上有沒有在作用。
+       *
+       * 「推薦用詞」是寫進指令的請求，模型可以不照做，而且沒有任何地方檢查——
+       * 那張卡跟旁邊「一定會發生」的替換對照長得一模一樣。與其把文案改得更小心，
+       * 不如把真實數字放上去。
+       */
+      measured: await measureWording(org.id, items),
+      conflicts: findWordingConflicts(items),
     };
   }),
 
