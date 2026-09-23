@@ -21,6 +21,7 @@ import { ExtLink, categoryLabel, priceLabel, type Solution } from "./strat-share
 import { useT } from "../lang";
 import { trpc } from "../../../lib/trpc";
 import { CreateSolutionModal, EditLog, EditSolutionModal, PendingPanel } from "./strat-product-edit";
+import { ProfileView, type SolutionProfile } from "./product-profile";
 
 /** 這個方案最低的那個有數字的核准價，沒有就回 null。 */
 function lowestPrice(s: Solution) {
@@ -232,6 +233,13 @@ function SolutionModal({
               </ul>
             </div>
           ) : null}
+
+          <div className="mt-4">
+            <div className="mb-1.5 text-[12px] font-semibold text-neutral-700">
+              {t("Product profile", "產品資料")}
+            </div>
+            <ProfileView profile={(s.profile ?? {}) as SolutionProfile} />
+          </div>
 
           {s.audienceEn ? (
             <div className="mt-3">

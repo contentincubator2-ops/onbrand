@@ -31,6 +31,7 @@
  * 記過一次（review 核准不擋任何東西，作者還能自己核准）。
  */
 import localPool from "../../../localDb";
+import { normaliseProfile, profileToText, type SolutionProfile } from "./solutionProfile";
 
 const TAIL = "ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci";
 
@@ -49,7 +50,7 @@ export type EditableField = (typeof EDITABLE_FIELDS)[number];
  * 結構化欄位：特色與價格。它們是陣列，逐欄比對沒有意義，所以正規化成一行一筆
  * 的文字再比——紀錄看得懂，審核的人也看得出哪一行動了。
  */
-export const STRUCTURED_FIELDS = ["features", "prices"] as const;
+export const STRUCTURED_FIELDS = ["features", "prices", "profile"] as const;
 export type StructuredField = (typeof STRUCTURED_FIELDS)[number];
 
 export interface FeatureRow { en: string; zh: string }
@@ -89,6 +90,9 @@ const DDL = [
   `ALTER TABLE hub_solutions ADD COLUMN updated_by VARCHAR(160) NULL`,
   `ALTER TABLE hub_solutions ADD COLUMN updated_at DATETIME(3) NULL`,
   `ALTER TABLE hub_solutions ADD COLUMN created_by VARCHAR(160) NULL`,
+  // 2026-09-23 (CJ 的四組 B2B 欄位)。十一個欄位 × 中英 = 二十二欄太多，
+  // 而且清單還會長，所以一個 JSON 欄位，鍵值是 PROFILE_KEYS。
+  `ALTER TABLE hub_solutions ADD COLUMN profile JSON NULL`,
 ];
 
 const TABLES = [
@@ -250,10 +254,11 @@ export async function proposeEdit(args: {
   proposed: Partial<Record<EditableField, string>>;
   features?: FeatureRow[];
   prices?: PriceRow[];
+  profile?: SolutionProfile;
   note?: string;
 }): Promise<{ changed: number }> {
   const [rows]: any = await localPool.execute(
-    `SELECT ${EDITABLE_FIELDS.join(", ")}, features FROM hub_solutions WHERE id = ? AND org_id = ? LIMIT 1`,
+    `SELECT ${EDITABLE_FIELDS.join(", ")}, features, profile FROM hub_solutions WHERE id = ? AND org_id = ? LIMIT 1`,
     [args.solutionId, args.orgId],
   );
   const current = (rows as any[])[0];
@@ -280,6 +285,15 @@ export async function proposeEdit(args: {
     }
   }
 
+  if (args.profile) {
+    const from = profileToText(normaliseProfile(parseJson(current.profile)));
+    const to = profileToText(normaliseProfile(args.profile));
+    if (from !== to) {
+      changes.push({ field: "profile", from, to });
+      payload.profile = normaliseProfile(args.profile);
+    }
+  }
+
   if (!changes.length) return { changed: 0 };
 
   await localPool.execute(
@@ -302,7 +316,7 @@ export async function approveEdit(args: {
   actor: string;
 }): Promise<{ applied: number }> {
   const [rows]: any = await localPool.execute(
-    `SELECT pending, pending_by, ${EDITABLE_FIELDS.join(", ")}, features FROM hub_solutions WHERE id = ? AND org_id = ? LIMIT 1`,
+    `SELECT pending, pending_by, ${EDITABLE_FIELDS.join(", ")}, features, profile FROM hub_solutions WHERE id = ? AND org_id = ? LIMIT 1`,
     [args.solutionId, args.orgId],
   );
   const row = (rows as any[])[0];
@@ -329,6 +343,16 @@ export async function approveEdit(args: {
     });
     sets.push("features = ?");
     params.push(JSON.stringify(pending.features));
+  }
+
+  if (pending.profile) {
+    changes.push({
+      field: "profile",
+      from: profileToText(normaliseProfile(parseJson(row.profile))),
+      to: profileToText(normaliseProfile(pending.profile)),
+    });
+    sets.push("profile = ?");
+    params.push(JSON.stringify(normaliseProfile(pending.profile)));
   }
 
   if (sets.length) {

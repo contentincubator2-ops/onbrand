@@ -162,6 +162,7 @@ export interface HubSolution {
   sourceUrl: string | null;
   featured: boolean;
   isAsus: boolean;
+  profile: Record<string, { en: string; zh: string; source?: string }>;
   pending: Record<string, string> | null;
   pendingBy: string | null;
   pendingAt: string | null;
@@ -188,6 +189,7 @@ export async function listSolutions(orgId: number): Promise<HubSolution[]> {
     isAsus: Boolean(s.is_asus),
     // 2026-09-23 (CJ 編輯／核准): 待審提案不套用到正式欄位，只帶給後台看。
     // 業務與 AI 讀到的永遠是已核准的版本 —— 那正是核准這件事的意義。
+    profile: json(s.profile, {}) as Record<string, { en: string; zh: string; source?: string }>,
     pending: json(s.pending, null) as Record<string, string> | null,
     pendingBy: s.pending_by ?? null,
     pendingAt: s.pending_at ? new Date(s.pending_at).toISOString() : null,

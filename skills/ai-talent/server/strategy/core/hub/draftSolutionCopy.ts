@@ -79,3 +79,77 @@ ${notes.slice(0, 2000)}
 
   return { summaryZh, summaryEn, model: String(res.model ?? "unknown"), notice: NOTICE };
 }
+
+/**
+ * 替某一個 profile 欄位補寫內容。
+ *
+ * 2026-09-23 (CJ「每個欄位，優先讓用戶填寫，但可增加 AI 補充的功能」)。
+ *
+ * 跟上面那支同一條紀律：**只用手上已經有的東西**——這個產品已經核准的簡介、
+ * 特色、價格，加上使用者自己打的筆記。不去查、不補規格、不生認證編號。
+ *
+ * 這一點在規格欄位上比簡介更要緊：編一個「支援 PCIe 5.0」或「已取得
+ * AEC-Q100」出來，是替一家真實的供應商捏造技術宣稱。所以模型答不出來的時候，
+ * 規定它回空字串，而不是填一段像樣的廢話。
+ */
+export async function draftProfileField(args: {
+  fieldKey: string;
+  ask: string;
+  solutionName: string;
+  vendor: string;
+  summary: string;
+  features: string[];
+  prices: string[];
+  notes: string;
+}): Promise<{ en: string; zh: string; model: string; notice: { en: string; zh: string } }> {
+  const bullets = (rows: string[]) => rows.map((r) => `- ${r}`).join("\n");
+  const context = [
+    `方案：${args.solutionName}`,
+    `供應商：${args.vendor}`,
+    args.summary ? `已核准的簡介：${args.summary}` : "",
+    args.features.length ? `已核准的特色：\n${bullets(args.features)}` : "",
+    args.prices.length ? `已核准的價格：\n${bullets(args.prices)}` : "",
+    args.notes.trim() ? `同事的筆記：\n${args.notes.trim().slice(0, 1500)}` : "",
+  ].filter(Boolean).join("\n\n");
+
+  const prompt = `你在幫一份 B2B 方案目錄補一個欄位。
+
+要補的欄位：${args.ask}
+
+你手上的全部資料：
+"""
+${context}
+"""
+
+輸出 JSON：{ "en": "...", "zh": "..." }
+
+規則（第一條最重要）：
+1. **只能根據上面那段資料寫。** 不要查、不要補、不要推測。上面沒提到的規格、
+   數字、認證、版本、日期、客戶名稱，一律不准出現。你不認識這個產品。
+2. **寫不出來就回空字串。** 上面的資料撐不起這個欄位（例如要你寫認證但完全沒
+   提到任何認證），兩個語言都回 ""。編一段像樣的廢話比留白糟得多——這份資料
+   會被業務拿去跟客戶講。
+3. 寫得出來的話，每種語言 40-100 字，條列或短句都可以，不要行銷腔。
+4. 只輸出 JSON。`;
+
+  const res = await invokeLLM({
+    provider: "anthropic",
+    messages: [{ role: "user", content: prompt }],
+    maxTokens: 700,
+  });
+  const text = String(res.choices?.[0]?.message?.content ?? "").trim();
+  const start = text.indexOf("{");
+  const end = text.lastIndexOf("}");
+  if (start === -1 || end === -1) throw new Error("The writer didn't return anything usable — try again.");
+  const parsed = JSON.parse(text.slice(start, end + 1)) as { en?: string; zh?: string };
+
+  return {
+    en: String(parsed.en ?? "").trim(),
+    zh: String(parsed.zh ?? "").trim(),
+    model: String(res.model ?? "unknown"),
+    notice: {
+      en: "Written only from this product's approved content and your notes. If it came back empty, there wasn't enough to go on — that's the honest answer.",
+      zh: "只根據這個產品已核准的內容與你的筆記寫。如果回空的，代表資料不足以支撐這一欄——那是誠實的答案。",
+    },
+  };
+}

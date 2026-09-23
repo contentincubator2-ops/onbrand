@@ -182,6 +182,13 @@ const adminRouter = router({
         billing: z.enum(["month", "year", "one_time", "quote"]),
         startsFrom: z.boolean(),
       })).max(12).optional(),
+      // 2026-09-23 CJ 的四組 B2B 欄位。鍵值由 solutionProfile.PROFILE_KEYS 決定，
+      // 這裡收下整包再由 normaliseProfile 把不認識的鍵丟掉。
+      profile: z.record(z.string(), z.object({
+        en: z.string().max(2000),
+        zh: z.string().max(2000),
+        source: z.enum(["listing", "demo"]).optional(),
+      })).optional(),
       note: z.string().max(400).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
@@ -191,7 +198,7 @@ const adminRouter = router({
       const [u] = await q(`SELECT email FROM users WHERE id = ? LIMIT 1`, [ctx.user.id]);
       const r = await m.proposeEdit({
         orgId: org.id, solutionId: input.solutionId, actor: String(u?.email ?? `user:${ctx.user.id}`),
-        proposed: input.fields, features: input.features, prices: input.prices, note: input.note,
+        proposed: input.fields, features: input.features, prices: input.prices, profile: input.profile, note: input.note,
       });
       await logEvent(org.id, null, "solution_edit_proposed", `#${input.solutionId} · ${r.changed} field(s)`);
       return r;
@@ -263,6 +270,42 @@ const adminRouter = router({
       const { draftSolutionCopy } = await import("../../strategy/core/hub/draftSolutionCopy");
       try {
         return await draftSolutionCopy(input);
+      } catch (e: any) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: String(e?.message ?? e) });
+      }
+    }),
+
+  /** 替某一個 profile 欄位補寫。只用這個產品已核准的內容 + 使用者的筆記。 */
+  draftProfileField: adminProcedure
+    .input(z.object({
+      solutionId: z.number().int().positive(),
+      fieldKey: z.string().max(40),
+      notes: z.string().max(2000).default(""),
+      language: z.enum(["zh-TW", "en-US"]).default("zh-TW"),
+    }))
+    .mutation(async ({ input }) => {
+      const org = await getOrg();
+      const { profileField } = await import("../../strategy/core/hub/solutionProfile");
+      const field = profileField(input.fieldKey);
+      if (!field) throw new TRPCError({ code: "BAD_REQUEST", message: `Unknown field '${input.fieldKey}'.` });
+
+      const sol = (await listSolutions(org.id)).find((s) => s.id === input.solutionId);
+      if (!sol) throw new TRPCError({ code: "NOT_FOUND", message: "Solution not found." });
+
+      const zh = input.language === "zh-TW";
+      const { formatPrice: fmtPrice } = await import("../core/hub/hubStore");
+      const { draftProfileField } = await import("../../strategy/core/hub/draftSolutionCopy");
+      try {
+        return await draftProfileField({
+          fieldKey: field.key,
+          ask: zh ? field.ask[1] : field.ask[0],
+          solutionName: zh ? sol.nameZh : sol.nameEn,
+          vendor: sol.vendor,
+          summary: zh ? sol.summaryZh : sol.summaryEn,
+          features: sol.features.map((f: any) => (zh ? f.zh : f.en)).filter(Boolean),
+          prices: sol.prices.map((p) => fmtPrice(p, input.language)),
+          notes: input.notes,
+        });
       } catch (e: any) {
         throw new TRPCError({ code: "BAD_REQUEST", message: String(e?.message ?? e) });
       }

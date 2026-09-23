@@ -19,6 +19,7 @@ import { trpc } from "../../../lib/trpc";
 import { ErrorNote } from "../ui";
 import { useT } from "../lang";
 import type { Solution } from "./strat-shared";
+import { ProfileEditor, type SolutionProfile } from "./product-profile";
 
 const BILLINGS = ["month", "year", "one_time", "quote"] as const;
 type Billing = (typeof BILLINGS)[number];
@@ -64,12 +65,15 @@ export default function EditSolutionModal({
   const [draft, setDraft] = useState(original);
   const [features, setFeatures] = useState<FeatureRow[]>(originalFeatures);
   const [prices, setPrices] = useState<PriceRow[]>(originalPrices);
+  const originalProfile: SolutionProfile = (s.profile ?? {}) as SolutionProfile;
+  const [profile, setProfile] = useState<SolutionProfile>(originalProfile);
   const [note, setNote] = useState("");
 
   const dirty =
     Object.entries(draft).some(([k, v]) => String(v).trim() !== String((original as any)[k]).trim()) ||
     !sameFeatures(features, originalFeatures) ||
-    !samePrices(prices, originalPrices);
+    !samePrices(prices, originalPrices) ||
+    JSON.stringify(profile) !== JSON.stringify(originalProfile);
 
   const set = (k: keyof typeof draft, v: string) => setDraft({ ...draft, [k]: v });
 
@@ -220,6 +224,16 @@ export default function EditSolutionModal({
             ) : null}
           </Section>
 
+          <Section
+            title={t("Product profile", "產品資料")}
+            hint={t(
+              "Four groups a technical buyer works through. Fields marked internal-only never reach a post — the reason is on each one.",
+              "技術決策者會逐項確認的四組。標示「僅供內部」的欄位永遠不會進貼文，每一欄都寫了理由。",
+            )}
+          >
+            <ProfileEditor solutionId={s.id} profile={profile} onChange={setProfile} />
+          </Section>
+
           <Field
             wide
             label={t("Why (goes in the record)", "修改原因（會留在紀錄裡）")}
@@ -244,6 +258,7 @@ export default function EditSolutionModal({
                 prices: prices
                   .filter((p) => p.planEn.trim() || p.planZh.trim())
                   .map((p) => ({ ...p, amount: p.billing === "quote" ? null : p.amount })),
+                profile,
                 note: note.trim() || undefined,
               });
               onSaved();

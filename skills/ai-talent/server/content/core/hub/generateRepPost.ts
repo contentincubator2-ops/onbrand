@@ -18,6 +18,7 @@ import {
   type ComplianceReport,
 } from "./complianceContract";
 import { packFor } from "./policyPacks";
+import { normaliseProfile, postSafeProfileLines } from "../../../strategy/core/hub/solutionProfile";
 import {
   createLink,
   exec,
@@ -138,6 +139,7 @@ function buildMessages(args: {
   const pos = org.positioning ?? {};
   const pick = (o: any) => (o ? (zh ? o.zh : o.en) : "");
   const quotable = facts.filter((f) => f.confidence !== "needs_verification" && f.kind !== "competitor" && f.kind !== "regulation");
+  const profileLines = postSafeProfileLines(normaliseProfile((solution as any).profile), zh);
 
   const system = [
     pack.promptRules,
@@ -171,6 +173,10 @@ function buildMessages(args: {
     zh ? solution.summaryZh : solution.summaryEn,
     ...(solution.features.length ? [zh ? "特色：" : "Features:", ...solution.features.map((f) => `- ${zh ? f.zh : f.en}`)] : []),
     ...(solution.audienceZh || solution.audienceEn ? [`${zh ? "適合" : "Best for"}: ${zh ? solution.audienceZh : solution.audienceEn}`] : []),
+    // 2026-09-23: 產品 profile 只送 postSafe 的欄位。USP 是競品比較（政策包會
+    // 拿掉）、roadmap 是未公開功能（緘默期在擋）、ROI 的數字要有出處、智財保障
+    // 是合約承諾 —— 那四個欄位業務要知道，但貼文不能寫，所以連 prompt 都不給。
+    ...(profileLines.length ? ["", zh ? "## 產品資料（可公開的部分）" : "## Product profile (the publishable parts)", ...profileLines] : []),
     "",
     zh ? "## 核准價目表（只能引用這些）" : "## APPROVED PRICE LIST (quote only these)",
     prices,

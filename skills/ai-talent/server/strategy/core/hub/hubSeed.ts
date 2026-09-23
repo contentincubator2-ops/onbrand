@@ -133,6 +133,22 @@ export async function seedHub(opts: { reset?: boolean } = {}) {
     }
   }
 
+  // 2026-09-23 (CJ「DEMO 頁面請都先幫我寫好」): 產品 profile。
+  // 只在該方案還沒有 profile 時寫入——展場上改過的不會被下次部署蓋掉。
+  {
+    const { SOLUTION_PROFILES, fallbackProfile } = await import("./solutionProfileSeed");
+    const { normaliseProfile } = await import("./solutionProfile");
+    let filled = 0;
+    for (const row of await q(`SELECT id, slug, name_en, name_zh, profile FROM hub_solutions WHERE org_id = ?`, [org.id])) {
+      const existing = normaliseProfile(typeof row.profile === "string" ? JSON.parse(row.profile || "{}") : row.profile);
+      if (Object.keys(existing).length) continue;
+      const seed = SOLUTION_PROFILES[row.slug] ?? fallbackProfile(row.name_en, row.name_zh);
+      await exec(`UPDATE hub_solutions SET profile = ? WHERE id = ?`, [JSON.stringify(normaliseProfile(seed)), row.id]);
+      filled++;
+    }
+    console.log(`[hub-seed] solution profiles: ${filled} filled`);
+  }
+
   const existingReps = await listReps(org.id);
   for (const r of HUB_REPS) {
     if (existingReps.some((e) => e.avatarSeed === r.seed)) continue;
