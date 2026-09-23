@@ -97,6 +97,49 @@ async function main() {
   const uncited = facts.filter((f) => !f.sourceUrl || !f.sourceName).map((f) => f.id);
   check(uncited.length === 0, "every fact carries a citation", uncited.length ? `missing: ${uncited.join(",")}` : "");
 
+  // ── 市場消息的產業配對（CJ 2026-09-23） ───────────────────────────────────
+  //
+  // 這一段算的是**誰會收到哪則消息**。算錯的後果不是畫面難看：標錯產業 → 業務
+  // 收不到補助 → 他的客戶錯過申請期限。所以逐條驗，而且獨立重算一次。
+  try {
+    const { routeFacts, perRepCounts, unreachable } = await import("../server/strategy/core/hub/factRouting");
+    const { unknownIndustries, INDUSTRIES, ALL_INDUSTRIES } = await import("../server/strategy/core/hub/industries");
+    const { listReps } = await import("../server/platform/core/hub/hubStore");
+    const repRows = await listReps(org.id);
+    const today = new Date().toISOString().slice(0, 10);
+
+    // 標籤打錯字是唯一會靜默失效的錯 —— 比對不到就是比對不到，不會有人收到錯的。
+    const badFactTags = facts.flatMap((f: any) => unknownIndustries(f.industries ?? []).map((i: string) => `#${f.id}:${i}`));
+    const badRepTags = repRows.flatMap((r: any) => unknownIndustries(r.industries ?? []).map((i: string) => `${r.name}:${i}`));
+    check(badFactTags.length === 0, "every fact's industry tag is in the vocabulary", badFactTags.join(", ") || `${INDUSTRIES.length} + ${ALL_INDUSTRIES}`);
+    check(badRepTags.length === 0, "every rep's industry tag is in the vocabulary", badRepTags.join(", ") || `${repRows.length} reps tagged`);
+
+    const tagged = repRows.filter((r: any) => (r.industries ?? []).length > 0);
+    check(tagged.length === repRows.length, "every rep says which industries they cover", `${tagged.length}/${repRows.length}`);
+
+    const routing = routeFacts(facts as any, repRows as any, today);
+    const orphans = unreachable(facts as any, routing);
+    check(orphans.length === 0, "no live, forwardable fact reaches nobody", orphans.map((f: any) => `#${f.id}`).join(", ") || "all routed");
+
+    // 市場不能跨 —— 台灣的補助出現在美國業務手機上是很難解釋的錯。
+    const crossed = Object.entries(routing).flatMap(([id, info]: any) => {
+      const f: any = facts.find((x: any) => String(x.id) === id);
+      return info.repIds.filter((rid: number) => repRows.find((r: any) => r.id === rid)?.market !== f?.market).map(() => `#${id}`);
+    });
+    check(crossed.length === 0, "routing never crosses markets", crossed.join(", ") || "TW stays TW, US stays US");
+
+    // 過期的絕對不能還在推。這一條錯了，業務會替我們向客戶道歉。
+    const expiredStillSent = facts.filter((f: any) => f.expiresOn && f.expiresOn < today && routing[f.id]?.forwardable);
+    check(expiredStillSent.length === 0, "nothing past its deadline is still being sent", expiredStillSent.map((f: any) => `#${f.id}`).join(", ") || "ok");
+
+    const counts = perRepCounts(routing, repRows as any);
+    const zero = counts.filter((c) => c.count === 0);
+    check(true, "items each rep receives", counts.map((c) => `${c.name.split(" ")[0]}:${c.count}`).join(" "));
+    if (zero.length) notes.push(`${zero.length} rep(s) would receive nothing: ${zero.map((c) => c.name).join(", ")}`);
+  } catch (e: any) {
+    bad("fact routing", e?.message ?? String(e));
+  }
+
   const approved = skills.filter((s) => s.status === "approved");
   check(approved.length > 0, "approved writing skills", `${approved.length}/${skills.length}`);
   check(regs.length > 0, "regulation entries", `${regs.length}`);

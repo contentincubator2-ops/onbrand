@@ -79,6 +79,8 @@ export interface HubRep {
   instagramStatus: string;
   facebookStatus: string;
   networkSize: number;
+  /** 這位業務負責哪些產業的客戶。市場消息靠這一欄找到人。 */
+  industries: string[];
   isDemo: boolean;
 }
 
@@ -86,7 +88,8 @@ const toRep = (r: any): HubRep => ({
   id: r.id, orgId: r.org_id, market: r.market, name: r.name, title: r.title, team: r.team,
   avatarSeed: r.avatar_seed, lineUserId: r.line_user_id, bindCode: r.bind_code,
   consentAt: r.consent_at, linkedinStatus: r.linkedin_status, instagramStatus: r.instagram_status,
-  facebookStatus: r.facebook_status, networkSize: r.network_size, isDemo: Boolean(r.is_demo),
+  facebookStatus: r.facebook_status, networkSize: r.network_size,
+  industries: json(r.industries, []), isDemo: Boolean(r.is_demo),
 });
 
 export async function listReps(orgId: number): Promise<HubRep[]> {
@@ -229,6 +232,10 @@ export interface HubFact {
   sourceUrl: string;
   publishedOn: string | null;
   confidence: "official" | "secondary" | "needs_verification";
+  /** 這則消息跟哪些產業的客戶有關。空的 = 不分產業。 */
+  industries: string[];
+  /** 申請／適用截止日。過了就不再推給業務。null = 沒有期限。 */
+  expiresOn: string | null;
 }
 
 export async function listFacts(orgId: number): Promise<HubFact[]> {
@@ -236,6 +243,9 @@ export async function listFacts(orgId: number): Promise<HubFact[]> {
     id: f.id, kind: f.kind, market: f.market, statementEn: f.statement_en, statementZh: f.statement_zh,
     figures: json(f.figures, {}), sourceName: f.source_name, sourceUrl: f.source_url,
     publishedOn: f.published_on ? ymd(f.published_on) : null, confidence: f.confidence,
+    // 2026-09-23 (CJ「市場消息要匹配到客戶行業標籤，推播給對應的業務」)。
+    industries: json(f.industries, []),
+    expiresOn: f.expires_on ? ymd(f.expires_on) : null,
   }));
 }
 

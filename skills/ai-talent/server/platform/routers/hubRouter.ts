@@ -81,6 +81,33 @@ const adminRouter = router({
     return { positioning: org.positioning, solutions, facts, disclaimer: org.disclaimer };
   }),
 
+  /**
+   * 市場數據那一頁（CJ 2026-09-23：市場消息要匹配客戶產業，推給對應的業務）。
+   *
+   * **刻意是一支新的查詢，不是把 `strategy` 的回傳形狀改掉。** 今天早上才因為
+   * 把 `regulations` 從陣列改成物件，讓還開著舊分頁的人吃到
+   * 「s.filter is not a function」。`strategy` 有五個地方在讀，動它的形狀等於
+   * 同時在五個地方埋同一顆雷。新增欄位是安全的，換形狀不是。
+   */
+  marketFacts: adminProcedure.query(async () => {
+    const org = await getOrg();
+    const { routeFacts, perRepCounts, unreachable, isQuotable } = await import(
+      "../../strategy/core/hub/factRouting"
+    );
+    const { listReps } = await import("../core/hub/hubStore");
+    const [facts, reps] = await Promise.all([listFacts(org.id), listReps(org.id)]);
+    const today = new Date().toISOString().slice(0, 10);
+    const routing = routeFacts(facts as any, reps as any, today);
+    return {
+      today,
+      facts: facts.map((f: any) => ({ ...f, quotable: isQuotable(f) })),
+      reps: reps.map((r: any) => ({ id: r.id, name: r.name, market: r.market, team: r.team, industries: r.industries })),
+      routing,
+      perRep: perRepCounts(routing, reps as any),
+      unreachable: unreachable(facts as any, routing).map((f) => f.id),
+    };
+  }),
+
   wording: adminProcedure.query(async () => {
     const org = await getOrg();
     const { listWording } = await import("../core/hub/hubStore");

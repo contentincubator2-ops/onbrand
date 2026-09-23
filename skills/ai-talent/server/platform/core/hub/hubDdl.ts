@@ -312,6 +312,21 @@ export const HUB_ALTERS: string[] = [
   `ALTER TABLE hub_regulations ADD COLUMN change_zh VARCHAR(400) NULL`,
   `ALTER TABLE hub_regulations ADD COLUMN summary_zh TEXT NULL`,
   `ALTER TABLE hub_regulations ADD COLUMN impact_zh TEXT NULL`,
+
+  /**
+   * 2026-09-23 (CJ「每個市場消息，應該要匹配到公司的客戶行業標籤，這樣才能推播
+   * 給對應的業務，讓業務轉給客戶」)。
+   *
+   * 市場消息從「可以引用的數字白名單」變成「可以轉給客戶的情報」，需要兩件事：
+   * 標產業（送給誰）、標截止日（還能不能送）。產業標籤沿用 hub_solutions 那一組
+   * 值，字彙表在 strategy/core/hub/industries.ts。
+   *
+   * expires_on 之所以必要：補助有申請期限，而**過期的補助推出去比不推更糟**
+   * —— 業務轉給客戶、客戶去申請才發現結束了，那是業務要自己吞的難堪。
+   */
+  `ALTER TABLE hub_facts ADD COLUMN industries JSON NULL`,
+  `ALTER TABLE hub_facts ADD COLUMN expires_on DATE NULL`,
+  `ALTER TABLE hub_reps ADD COLUMN industries JSON NULL`,
 ];
 
 export async function ensureHubTables(): Promise<void> {

@@ -67,6 +67,16 @@ export interface SeedFact {
   source_name: string;
   source_url: string;
   published_on: string | null;
+  /**
+   * 這則消息跟哪些產業的客戶有關（CJ 2026-09-23）。值用 industries.ts 的字彙表。
+   * 空的或 ["all_industries"] = 不分產業。
+   */
+  industries: string[];
+  /**
+   * 申請／適用的截止日。過了就不再推播，也不在「可以轉給客戶」的清單裡。
+   * null = 沒有期限（市場統計、法規大多是這種）。
+   */
+  expires_on: string | null;
   /** Only official / secondary facts are quotable; needs_verification is HQ-only. */
   confidence: "official" | "secondary" | "needs_verification";
 }
@@ -80,6 +90,7 @@ export const HUB_FACTS: SeedFact[] = [
     source_name: "MOEA — 2025 White Paper on SMEs (2024 data)",
     source_url: "https://www.moea.gov.tw/Mns/populace/news/News.aspx?kind=1&menu_id=40&news_id=121491",
     published_on: "2025-12-26", confidence: "official",
+    industries: ["all_industries"], expires_on: null,
   },
   {
     kind: "market", market: "TW",
@@ -89,6 +100,7 @@ export const HUB_FACTS: SeedFact[] = [
     source_name: "2025 White Paper on SMEs, as summarised by TESA",
     source_url: "https://www.tesa.center/blog/posts/20251227",
     published_on: "2025-12-27", confidence: "secondary",
+    industries: ["all_industries"], expires_on: null,
   },
   {
     kind: "market", market: "TW",
@@ -98,6 +110,7 @@ export const HUB_FACTS: SeedFact[] = [
     source_name: "MIC survey via UDN Money",
     source_url: "https://money.udn.com/money/story/5612/9742404",
     published_on: "2026-09-08", confidence: "secondary",
+    industries: ["all_industries"], expires_on: null,
   },
   {
     kind: "subsidy", market: "TW",
@@ -107,6 +120,7 @@ export const HUB_FACTS: SeedFact[] = [
     source_name: "Storm Media; smebiz.org.tw",
     source_url: "https://www.smebiz.org.tw/project-tenacity.php",
     published_on: null, confidence: "secondary",
+    industries: ["retail_ecommerce", "food_beverage", "retail_lifestyle_services"], expires_on: null,
   },
   {
     kind: "subsidy", market: "TW",
@@ -116,6 +130,7 @@ export const HUB_FACTS: SeedFact[] = [
     source_name: "Search summaries — not yet verified against the official notice",
     source_url: "https://www.ida.gov.tw/",
     published_on: null, confidence: "needs_verification",
+    industries: ["manufacturing"], expires_on: "2026-09-29",
   },
   {
     kind: "platform", market: "TW",
@@ -125,6 +140,7 @@ export const HUB_FACTS: SeedFact[] = [
     source_name: "ASUS Pressroom",
     source_url: "https://press.asus.com/news/press-releases/asus-experthub-smb-digital-transformation/",
     published_on: "2026-07-16", confidence: "official",
+    industries: ["all_industries"], expires_on: null,
   },
   {
     kind: "platform", market: "TW",
@@ -134,6 +150,7 @@ export const HUB_FACTS: SeedFact[] = [
     source_name: "cnyes via Yahoo Finance TW",
     source_url: "https://tw.stock.yahoo.com/news/%E8%8F%AF%E7%A2%A9%E6%8E%A8asus-experthub%E5%B9%B3%E5%8F%B0%E6%90%B6%E6%94%BB%E8%BD%89%E5%9E%8B%E7%B4%85%E5%88%A9-%E7%9B%AE%E6%A8%99%E7%AA%81%E7%A0%B4%E5%95%86%E7%94%A840-%E5%B8%82%E5%8D%A0%E5%A4%A9%E8%8A%B1%E6%9D%BF-103410671.html",
     published_on: "2026-07-16", confidence: "secondary",
+    industries: ["all_industries"], expires_on: null,
   },
   {
     kind: "competitor", market: "TW",
@@ -143,6 +160,7 @@ export const HUB_FACTS: SeedFact[] = [
     source_name: "Chunghwa Telecom; Taiwan Mobile",
     source_url: "https://opbiz.tw/index.html",
     published_on: null, confidence: "secondary",
+    industries: ["all_industries"], expires_on: null,
   },
   {
     kind: "regulation", market: "TW",
@@ -152,6 +170,7 @@ export const HUB_FACTS: SeedFact[] = [
     source_name: "Fair Trade Commission (Taiwan)",
     source_url: "https://www.ftc.gov.tw/internet/main/doc/docDetail.aspx?uid=165&docid=13021",
     published_on: "2016-01-19", confidence: "official",
+    industries: ["all_industries"], expires_on: null,
   },
   {
     kind: "regulation", market: "US",
@@ -161,6 +180,7 @@ export const HUB_FACTS: SeedFact[] = [
     source_name: "FTC — Endorsement Guides: What People Are Asking",
     source_url: "https://www.ftc.gov/business-guidance/resources/ftcs-endorsement-guides-what-people-are-asking",
     published_on: "2023-06-29", confidence: "official",
+    industries: ["all_industries"], expires_on: null,
   },
 ];
 
@@ -304,21 +324,29 @@ export interface SeedRep {
   instagram: "connected" | "none";
   facebook: "self_report" | "none";
   consent: boolean;
+  /**
+   * 這位業務負責哪些產業的客戶（CJ 2026-09-23）。市場消息靠這一欄找到人。
+   * 值用 industries.ts 的字彙表；["all_industries"] = 什麼都收。
+   *
+   * 示範資料。分配的依據是台灣各區的產業樣貌（中南部製造業為主、北部商業與
+   * 服務業為主）與通路職位（通路經理跨產業），不是真實的人事資料。
+   */
+  industries: string[];
 }
 
 /** Fictional reps for the demo. */
 export const HUB_REPS: SeedRep[] = [
-  { market: "TW", name: "陳怡君 Amy Chen", title: "Senior Account Manager", team: "North · Commercial", seed: "amy", networkSize: 1840, linkedin: "connected", instagram: "connected", facebook: "self_report", consent: true },
-  { market: "TW", name: "林志豪 Kevin Lin", title: "Account Manager", team: "North · Commercial", seed: "kevin", networkSize: 960, linkedin: "connected", instagram: "none", facebook: "self_report", consent: true },
-  { market: "TW", name: "王雅婷 Tina Wang", title: "Channel Partner Manager", team: "North · Channel", seed: "tina", networkSize: 2310, linkedin: "connected", instagram: "connected", facebook: "self_report", consent: true },
-  { market: "TW", name: "張家瑋 Jay Chang", title: "Account Manager", team: "Central · Commercial", seed: "jay", networkSize: 740, linkedin: "pending", instagram: "none", facebook: "self_report", consent: true },
-  { market: "TW", name: "黃詩涵 Grace Huang", title: "Solutions Consultant", team: "Central · Commercial", seed: "grace", networkSize: 1320, linkedin: "connected", instagram: "connected", facebook: "self_report", consent: true },
-  { market: "TW", name: "吳承恩 Leo Wu", title: "Account Manager", team: "South · Commercial", seed: "leo", networkSize: 610, linkedin: "none", instagram: "none", facebook: "self_report", consent: true },
-  { market: "TW", name: "劉佳穎 Joyce Liu", title: "Senior Account Manager", team: "South · Commercial", seed: "joyce", networkSize: 1580, linkedin: "connected", instagram: "none", facebook: "self_report", consent: true },
-  { market: "TW", name: "蔡宗翰 Hank Tsai", title: "Channel Partner Manager", team: "South · Channel", seed: "hank", networkSize: 890, linkedin: "none", instagram: "none", facebook: "none", consent: false },
-  { market: "US", name: "Jordan Miller", title: "Partner Development Manager", team: "North America · Partners", seed: "jordan", networkSize: 2750, linkedin: "connected", instagram: "none", facebook: "none", consent: true },
-  { market: "US", name: "Priya Patel", title: "Solutions Sales Lead", team: "North America · Partners", seed: "priya", networkSize: 3920, linkedin: "connected", instagram: "connected", facebook: "none", consent: true },
-  { market: "US", name: "Marcus Reed", title: "Account Executive", team: "North America · SMB", seed: "marcus", networkSize: 1210, linkedin: "pending", instagram: "none", facebook: "none", consent: true },
+  { market: "TW", name: "陳怡君 Amy Chen", title: "Senior Account Manager", team: "North · Commercial", seed: "amy", networkSize: 1840, linkedin: "connected", instagram: "connected", facebook: "self_report", consent: true, industries: ["retail_ecommerce", "retail_lifestyle_services"] },
+  { market: "TW", name: "林志豪 Kevin Lin", title: "Account Manager", team: "North · Commercial", seed: "kevin", networkSize: 960, linkedin: "connected", instagram: "none", facebook: "self_report", consent: true, industries: ["food_beverage", "retail_lifestyle_services"] },
+  { market: "TW", name: "王雅婷 Tina Wang", title: "Channel Partner Manager", team: "North · Channel", seed: "tina", networkSize: 2310, linkedin: "connected", instagram: "connected", facebook: "self_report", consent: true, industries: ["all_industries"] },
+  { market: "TW", name: "張家瑋 Jay Chang", title: "Account Manager", team: "Central · Commercial", seed: "jay", networkSize: 740, linkedin: "pending", instagram: "none", facebook: "self_report", consent: true, industries: ["manufacturing"] },
+  { market: "TW", name: "黃詩涵 Grace Huang", title: "Solutions Consultant", team: "Central · Commercial", seed: "grace", networkSize: 1320, linkedin: "connected", instagram: "connected", facebook: "self_report", consent: true, industries: ["manufacturing", "retail_ecommerce"] },
+  { market: "TW", name: "吳承恩 Leo Wu", title: "Account Manager", team: "South · Commercial", seed: "leo", networkSize: 610, linkedin: "none", instagram: "none", facebook: "self_report", consent: true, industries: ["manufacturing", "food_beverage"] },
+  { market: "TW", name: "劉佳穎 Joyce Liu", title: "Senior Account Manager", team: "South · Commercial", seed: "joyce", networkSize: 1580, linkedin: "connected", instagram: "none", facebook: "self_report", consent: true, industries: ["manufacturing"] },
+  { market: "TW", name: "蔡宗翰 Hank Tsai", title: "Channel Partner Manager", team: "South · Channel", seed: "hank", networkSize: 890, linkedin: "none", instagram: "none", facebook: "none", consent: false, industries: ["all_industries"] },
+  { market: "US", name: "Jordan Miller", title: "Partner Development Manager", team: "North America · Partners", seed: "jordan", networkSize: 2750, linkedin: "connected", instagram: "none", facebook: "none", consent: true, industries: ["all_industries"] },
+  { market: "US", name: "Priya Patel", title: "Solutions Sales Lead", team: "North America · Partners", seed: "priya", networkSize: 3920, linkedin: "connected", instagram: "connected", facebook: "none", consent: true, industries: ["all_industries"] },
+  { market: "US", name: "Marcus Reed", title: "Account Executive", team: "North America · SMB", seed: "marcus", networkSize: 1210, linkedin: "pending", instagram: "none", facebook: "none", consent: true, industries: ["retail_ecommerce", "food_beverage"] },
 ];
 
 // ── wording (strategy tray: preferred terms · word swaps · banned words) ─────

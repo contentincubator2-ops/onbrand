@@ -63,9 +63,11 @@ export async function seedHub(opts: { reset?: boolean } = {}) {
   await exec(`DELETE FROM hub_facts WHERE org_id = ?`, [org.id]);
   for (const f of HUB_FACTS) {
     await exec(
-      `INSERT INTO hub_facts (org_id, kind, market, statement_en, statement_zh, figures, source_name, source_url, published_on, confidence)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [org.id, f.kind, f.market, f.statement_en, f.statement_zh, JSON.stringify(f.figures), f.source_name, f.source_url, f.published_on, f.confidence],
+      `INSERT INTO hub_facts (org_id, kind, market, statement_en, statement_zh, figures, source_name, source_url,
+         published_on, confidence, industries, expires_on)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [org.id, f.kind, f.market, f.statement_en, f.statement_zh, JSON.stringify(f.figures), f.source_name, f.source_url,
+       f.published_on, f.confidence, JSON.stringify(f.industries ?? []), f.expires_on ?? null],
     );
   }
 
@@ -157,10 +159,10 @@ export async function seedHub(opts: { reset?: boolean } = {}) {
     if (existingReps.some((e) => e.avatarSeed === r.seed)) continue;
     await exec(
       `INSERT INTO hub_reps (org_id, market, name, title, team, avatar_seed, consent_at, linkedin_status, instagram_status,
-         facebook_status, network_size, is_demo)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`,
+         facebook_status, network_size, industries, is_demo)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`,
       [org.id, r.market, r.name, r.title, r.team, r.seed, r.consent ? new Date(Date.now() - 30 * 86_400_000) : null,
-       r.linkedin, r.instagram, r.facebook, r.networkSize],
+       r.linkedin, r.instagram, r.facebook, r.networkSize, JSON.stringify(r.industries ?? [])],
     );
   }
 
