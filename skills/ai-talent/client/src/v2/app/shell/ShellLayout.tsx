@@ -29,7 +29,7 @@ import { useLang } from "../../../lib/i18n";
 import { Avatar, Tooltip } from "@heroui/react";
 import { Brain as LucideBrain } from "lucide-react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faFolderOpen, faBrain, faWandMagicSparkles, faMicrophone, faBookBookmark, faBell, faPlus, faRightFromBracket, faLayerGroup, faGear, faXmark, faCheckDouble, faChevronRight, faCheck, faBoxOpen, faCalendarDays, faCircleInfo, faBriefcase, faShareNodes, faUsers, faLanguage, faPaintBrush, faFont, faMagnifyingGlass, faChevronDown, faEnvelope, faBullhorn, faGlobe, faChartLine, faDatabase, faFileLines, faHouse } from "@fortawesome/free-solid-svg-icons";
+import { faFolderOpen, faBrain, faWandMagicSparkles, faMicrophone, faBookBookmark, faBell, faPlus, faRightFromBracket, faLayerGroup, faGear, faXmark, faCheckDouble, faChevronRight, faCheck, faBoxOpen, faCalendarDays, faCircleInfo, faBriefcase, faShareNodes, faUsers, faLanguage, faPaintBrush, faFont, faMagnifyingGlass, faChevronDown, faEnvelope, faBullhorn, faGlobe, faChartLine, faDatabase, faFileLines, faHouse, faRobot } from "@fortawesome/free-solid-svg-icons";
 import {
   faFacebookF, faInstagram, faYoutube, faTiktok, faLinkedinIn, faXTwitter,
 } from "@fortawesome/free-brands-svg-icons";
@@ -230,6 +230,12 @@ function buildNavItems(lang: "zh-TW" | "en", userEmail?: string | null, currentP
     { to: "/calendar",  label: en ? "Calendar" : "日曆",     icon: <FontAwesomeIcon icon={faCalendarDays} />,
       tooltip: en ? "Calendar view — all scheduled and published posts" : "月曆視圖 — 已排程 + 已發布內容" },
     { to: "/theater",   label: en ? "7-Day Publisher" : "七日發布台",   icon: <FontAwesomeIcon icon={faBookBookmark} /> },
+    // 2026-09-23（CJ「AI指令庫，做成另一個mission tray」）：原本是品牌定位頁
+    // 「武器化工具」底下的一張卡片，升格成獨立頂層目的地。不加 /tasks/
+    // 前綴，所以不受 allowedTaskRoutes 任務包過濾——跟 /theater、/projects
+    // 一樣，每個品牌都看得到。
+    { to: "/ai-prompts", label: en ? "AI Prompts" : "AI 指令庫", icon: <FontAwesomeIcon icon={faRobot} />,
+      tooltip: en ? "Ready-to-copy prompts for ChatGPT / Claude / Gemini / Midjourney" : "現成的 ChatGPT / Claude / Gemini / Midjourney 指令範本" },
     // 品牌大腦 — keep per CJ direction (no Brand Strategy / Research in nav).
     // 2026-08-20: for the 策略 preview it moved OUT of this rail and became
     // the 策略 workspace (its sections are now rail entries there), so

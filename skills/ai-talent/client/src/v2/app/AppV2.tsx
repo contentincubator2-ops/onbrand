@@ -65,6 +65,9 @@ const ProjectsPage = React.lazy(() => import("../content/pages/ProjectsPage"));
 const BrandsPage = React.lazy(() => import("../strategy/pages/BrandsPage"));
 const BrandsManagePage = React.lazy(() => import("../strategy/pages/BrandsManagePage"));
 const BrandSettingsPage = React.lazy(() => import("../strategy/pages/BrandSettingsPage"));
+// 2026-09-23（CJ「AI指令庫，做成另一個mission tray」）：從品牌定位頁「武器化
+// 工具」的卡片升格成獨立頂層目的地，跟 /theater、/projects 同一個模子。
+const AiPromptLibraryPage = React.lazy(() => import("../strategy/pages/AiPromptLibraryPage"));
 const SquadLabPage = React.lazy(() => import("../platform/pages/admin/SquadLabPage"));
 const CalendarPage = React.lazy(() => import("../content/pages/CalendarPage"));
 const AccountPage = React.lazy(() => import("../platform/pages/AccountPage"));
@@ -323,6 +326,8 @@ export default function AppV2() {
           <Route path="/brands/settings" element={<BrandSettingsPage />} />
           <Route path="/home"      element={<HomePage />} />
           <Route path="/theater"   element={<TheaterPage />} />
+          {/* 2026-09-23（CJ「AI指令庫，做成另一個mission tray」）*/}
+          <Route path="/ai-prompts" element={<AiPromptLibraryPage />} />
           <Route path="/m/:missionId" element={<MissionRedirect />} />
           <Route path="/b/:brandId/:workspace/m/:missionId" element={<MissionRedirect />} />
           <Route path="/admin/squads" element={<SquadLabPage />} />

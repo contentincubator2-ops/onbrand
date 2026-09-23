@@ -48,7 +48,7 @@ import { Target as LucideTarget, Type as LucideType, Palette as LucidePalette, L
 import { SCOPE_SEGMENTS, type SegmentSpec } from "../lib/positioningSchema";
 import { pipelineFor, type PipelineStepSpec } from "../lib/positioningPipeline";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faPlus, faPalette, faFont, faQuoteLeft, faBullseye, faUsers, faImage, faIcons, faChartPie, faImages, faPenNib, faShieldHalved, faFolderOpen, faLock, faLockOpen, faBookOpen, faTableList, faRobot, faBox, faRocket, faBullhorn, faWandSparkles, faGear, faStickyNote, faTrash } from "@fortawesome/free-solid-svg-icons";
+import { faPlus, faPalette, faFont, faQuoteLeft, faBullseye, faUsers, faImage, faIcons, faChartPie, faImages, faPenNib, faShieldHalved, faFolderOpen, faLock, faLockOpen, faBookOpen, faTableList, faBox, faRocket, faBullhorn, faWandSparkles, faGear, faStickyNote, faTrash } from "@fortawesome/free-solid-svg-icons";
 
 // Sub-nav id format:
 //   "asset:<key>"   — non-positioning brand assets (準則 / 標誌 / etc.)
@@ -1427,6 +1427,22 @@ export default function BrandsPage() {
             </Tooltip>
           </div>
 
+          {/* 2026-09-23 (CJ「標語要出現在最上面的品牌名字底下」): tagline 搬
+              回標題正下方，獨立一行——BrandMessageBar 移除時（2026-05-11）
+              tagline 預覽是跟著搜尋列一起拿掉的，這次單獨補回來，不用搜尋
+              列的殼。沒填標語就不顯示，不留空行。 */}
+          {(() => {
+            const zh = positioningSegmentData?.tagline?.zhTagline;
+            const enTag = positioningSegmentData?.tagline?.enTagline;
+            const t = lang === "en" ? (enTag || zh) : (zh || enTag);
+            if (!t) return null;
+            return (
+              <p className="mb-1" style={{ fontSize: 15, fontWeight: 600, color: "#525252", letterSpacing: "0.02em" }}>
+                {t}
+              </p>
+            );
+          })()}
+
           {/* 2026-05-11 (CJ「搜尋 BAR 不需要了」): BrandMessageBar removed.
               Manifesto subtitle above already carries the value-prop;
               tagline preview lived in the bar redundantly. Kept the import
@@ -2704,9 +2720,9 @@ function PositioningGrid({
   // 是自己的 grid 容器裡塞滿 3 張，行行都缺角。10 個 segment 重新分成 3 幕
   // 各 3 張——goldenCircle 從「策略結晶」搬到「自我探索」跟起源／價值觀放
   // 一起（WHY 信念本來就該扎根在起源與價值觀，敘事上比跟差異化放一起更
-  // 合理，不只是為了湊數）；taglineScore 從這裡搬到 toolsBlock（它是「檢查
-  // 標語好不好」的品質把關輸出，跟速查卡／AI 指令庫本來就是同一類「定位
-  // 產出物」，語意上更合適，同時讓 tools 那排也補滿 3 張）。
+  // 合理，不只是為了湊數）。taglineScore 不再是獨立卡片（同一天 CJ 決定
+  // 「武器化工具」整區只留 AI 指令庫、其他都不需要，taglineScore 的資料
+  // 還在，只是暫時沒有專屬卡片入口）。
   const BRAND_ACTS: Array<{ label: { zh: string; en: string }; q: { zh: string; en: string }; ids: string[] }> = [
     { label: { zh: "第一幕・市場與競爭研究", en: "Act 1 · Market & competitive research" },
       q: { zh: "她缺什麼？誰已經在滿足她、缺口在哪？—— 定位不是從「我是誰」開始，是先看懂她，再看懂戰場。", en: "What does she lack, and who's already trying to serve her? Positioning starts with her and the battlefield, not with us." },
@@ -2770,64 +2786,11 @@ function PositioningGrid({
     core: faBullseye, positioning: faBullseye, smp: faWandSparkles,
   };
 
-  // Tools block — for brand scope it renders LAST (positioning outputs);
-  // other scopes keep it first (unchanged behaviour).
-  const toolsBlock = (
-      <div>
-        <SectionLabel
-          label={scopeMode === "brand"
-            ? (lang === "en" ? "Weaponized tools" : "武器化工具")
-            : (lang === "en" ? "Brand tools" : "品牌工具")}
-          intro={scopeMode === "brand"
-            ? (lang === "en" ? "The positioning, packaged for daily use — cheat sheet, tagline score, and AI prompt library." : "把定位變成武器 —— 速查卡、標語評分與 AI 指令庫都是前面幾幕的輸出物，日常產文案時被引用。")
-            : undefined}
-        />
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-          {(() => {
-            // 速查卡：把品牌定位精華（tagline / golden-circle why / differentiation）
-            // 直接濃縮成一張預覽，使用者不必點進去也能掃到品牌精神。
-            const cardPreview = buildBrandCheatPreview(segmentData);
-            return (
-              <PositioningCard
-                label={lang === "en" ? "Cheat sheet" : "速查卡"}
-                icon={faTableList}
-                onClick={() => onSelect("card")}
-                preview={cardPreview.node}
-                hasContent={cardPreview.hasContent}
-              />
-            );
-          })()}
-          {/* 2026-09-23：taglineScore 從「表達幕」搬過來——它是「標語好不好」
-              的品質把關輸出，語意上跟速查卡／AI 指令庫同一類，也讓這排補滿
-              3 張。只有品牌 scope 有這個 segment（product/event 沒有）。 */}
-          {scopeMode === "brand" && (() => {
-            const { node: preview, hasContent } = renderSegmentPreview("taglineScore", segmentData?.taglineScore, lang);
-            return (
-              <PositioningCard
-                label={lang === "en" ? "Tagline score" : "標語評分"}
-                icon={faChartPie}
-                onClick={() => onSelect("seg:taglineScore")}
-                preview={preview}
-                hasContent={hasContent}
-              />
-            );
-          })()}
-          {(() => {
-            // AI 指令庫：voice + 禁區 + tone 詞庫合成的一張預覽。
-            const promptsPreview = buildPromptsPreview(segmentData, lang);
-            return (
-              <PositioningCard
-                label={lang === "en" ? "AI prompts" : "AI 指令庫"}
-                icon={faRobot}
-                onClick={() => onSelect("prompts")}
-                preview={promptsPreview.node}
-                hasContent={promptsPreview.hasContent}
-              />
-            );
-          })()}
-        </div>
-      </div>
-  );
+  // 2026-09-23（CJ「武器化工具裡面，我只需要留下AI指令庫，其他都不需要。
+  // AI指令庫，做成另一個mission tray」）：這裡原本的「武器化工具」區塊
+  // （速查卡／標語評分／AI 指令庫三張卡）整個拿掉——速查卡跟標語評分不再
+  // 顯示成卡片，AI 指令庫升格成獨立頂層目的地（見 AiPromptLibraryPage.tsx
+  // + ShellLayout.tsx 左側 rail 的 /ai-prompts）。
 
   const segFilled = (sid: string) => {
     const v = segmentData?.[sid];
@@ -2839,8 +2802,6 @@ function PositioningGrid({
 
   return (
     <div style={{ padding: "8px 0 24px", display: "flex", flexDirection: "column", gap: 36 }}>
-      {scopeMode !== "brand" && toolsBlock}
-
       {/* ── Brand scope: four-act strategy narrative ── */}
       {brandActGroups && brandActGroups.map((group) => (
         <div key={group.label}>
@@ -2863,6 +2824,7 @@ function PositioningGrid({
                   hasContent={hasContent}
                   rationale={lang === "en" ? (s.rationaleEn ?? s.rationale) : s.rationale}
                   sourceLabel={lang === "en" ? "SoWork positioning method" : "SoWork 品牌定位法"}
+                  headline={segmentHeadline(s.id, segVal)}
                 />
               );
             })}
@@ -2898,6 +2860,7 @@ function PositioningGrid({
                   hasContent={hasContent}
                   rationale={lang === "en" ? (s.rationaleEn ?? s.rationale) : s.rationale}
                   sourceLabel={lang === "en" ? "SoWork positioning method" : "SoWork 品牌定位法"}
+                  headline={segmentHeadline(s.id, segVal)}
                 />
               );
             })}
@@ -2937,6 +2900,7 @@ function PositioningGrid({
               }
               onDelete={onDeleteCustomSegment ? () => onDeleteCustomSegment(seg.id) : undefined}
               sourceLabel={lang === "en" ? "From your document" : "來自你的定位文件"}
+              headline={seg.fields[0]?.value ? truncate(seg.fields[0].value, 50) : undefined}
             />
           ))}
           <button
@@ -2951,10 +2915,6 @@ function PositioningGrid({
           </button>
         </div>
       </div>
-
-      {/* Brand scope: tools land at the END — they're the positioning's
-          outputs, the natural finale of the narrative. */}
-      {scopeMode === "brand" && toolsBlock}
 
       {/* 2026-05-11 (CJ 4A discipline): removed gradient purple FAB.
           New tasks are launched via top-bar / hero, not a decorative
@@ -3001,6 +2961,77 @@ function TagRow({ items, max = 4 }: { items: string[]; max?: number }) {
       )}
     </span>
   );
+}
+
+/**
+ * 2026-09-23（CJ「卡片上的縮圖，要怎麼樣，才能更具有意義，現在感覺是隨興
+ * 出來的圖，是否要改成文字？」）：卡片 header 原本一律放一顆概念 icon——
+ * 對定位卡來說，icon 只能代表「這是哪一格」，代表不了「這個品牌在這格寫了
+ * 什麼」。改成直接抓這個 segment 自己最有代表性的一小段真實內容，當成
+ * pull-quote 放大顯示——每張卡的縮圖因此變成獨一無二、屬於這個品牌自己的
+ * 文字，不是套版圖示。回傳 null（還沒填）時 PositioningCard 照舊退回 icon，
+ * 空卡片不會看起來壞掉。刻意跟 renderSegmentPreview 分開：這裡要純文字、
+ * 更短（header 空間比 body 小很多），不需要 renderSegmentPreview 那套
+ * 多行/列表的豐富排版。
+ */
+function segmentHeadline(segId: string, v: any): string | null {
+  if (v == null) return null;
+  if (typeof v === "string") { const t = truncate(v.trim(), 50); return t || null; }
+  if (typeof v !== "object") return null;
+  switch (segId) {
+    case "goldenCircle": {
+      const why = firstTruthy(v.why);
+      return why ? truncate(why, 50) : null;
+    }
+    case "tagline": {
+      const t = firstTruthy(v.zhTagline, v.enTagline);
+      return t ? `「${truncate(t, 40)}」` : null;
+    }
+    case "origin": {
+      const story = firstTruthy(v.story);
+      return story ? truncate(story, 50) : null;
+    }
+    case "values": {
+      const first = Array.isArray(v.items) ? v.items.find((x: any) => x?.label) : null;
+      return first ? truncate(String(first.label), 30) : null;
+    }
+    case "audience": {
+      const p = firstTruthy(v.primary, v.primaryAudience);
+      return p ? truncate(p, 50) : null;
+    }
+    case "competition": {
+      const first = Array.isArray(v.direct) ? v.direct.find((x: any) => x?.name) : null;
+      if (first) return truncate(String(first.name), 30);
+      const intensity = firstTruthy(v.intensity);
+      return intensity ? truncate(intensity, 40) : null;
+    }
+    case "differentiation": {
+      const t = firstTruthy(v.discriminator, v.summary);
+      return t ? truncate(t, 50) : null;
+    }
+    case "trends": {
+      const first = Array.isArray(v.favorable) ? v.favorable.find((x: any) => x?.name) : null;
+      return first ? truncate(String(first.name), 40) : null;
+    }
+    case "voice": {
+      const arche = isFilledArr(v.archetypes) ? v.archetypes[0] : null;
+      return arche ? truncate(String(arche), 30) : null;
+    }
+    case "core": {
+      const t = firstTruthy(v.oneLineValueProp, v.coreStatement, v.zhTagline);
+      return t ? truncate(t, 50) : null;
+    }
+    case "smp": {
+      const t = firstTruthy(v.singleMindedProposition);
+      return t ? truncate(t, 50) : null;
+    }
+  }
+  const cand = firstTruthy(
+    v.summary, v.statement, v.text, v.story, v.body, v.description,
+    v.primary, v.primaryAudience, v.coreMessage, v.creativeTheme,
+    v.coreStatement, v.briefSummary, v.businessGoal,
+  );
+  return cand ? truncate(cand, 50) : null;
 }
 
 /** Smart preview per segment. Returns React node + whether considered filled. */
@@ -3253,70 +3284,10 @@ function renderSegmentPreview(segId: string, v: any, lang: "zh-TW" | "en" = "zh-
   return { node: null, hasContent: false };
 }
 
-/** 速查卡 preview — composes tagline + WHY + differentiation summary. */
-function buildBrandCheatPreview(seg?: Record<string, any>): { node: React.ReactNode | null; hasContent: boolean } {
-  if (!seg) return { node: null, hasContent: false };
-  const tagline = firstTruthy(seg.tagline?.zhTagline);
-  const why = firstTruthy(seg.goldenCircle?.why);
-  const diff = firstTruthy(seg.differentiation?.summary, seg.differentiation?.emotional);
-  if (!tagline && !why && !diff) return { node: null, hasContent: false };
-  return {
-    node: (
-      <span>
-        {tagline && (
-          <span style={{ display: "block", color: "#171717", fontWeight: 600, fontFamily: "system-ui", fontSize: 13, marginBottom: 4 }}>
-            「{truncate(tagline, 40)}」
-          </span>
-        )}
-        {why && (
-          <span style={{ display: "block", fontSize: 12, marginBottom: 2 }}>
-            <span style={{ color: "#525252", fontFamily: "system-ui", marginRight: 4 }}>WHY</span>
-            {truncate(why, 70)}
-          </span>
-        )}
-        {diff && (
-          <span style={{ display: "block", fontSize: 12 }}>
-            <span style={{ color: "#525252", fontFamily: "system-ui", marginRight: 4 }}>EDGE</span>
-            {truncate(diff, 70)}
-          </span>
-        )}
-      </span>
-    ),
-    hasContent: true,
-  };
-}
-
-/** AI 指令庫 preview — composes voice archetype + tone + forbidden words. */
-function buildPromptsPreview(seg?: Record<string, any>, lang: "zh-TW" | "en" = "zh-TW"): { node: React.ReactNode | null; hasContent: boolean } {
-  if (!seg) return { node: null, hasContent: false };
-  const arche = isFilledArr(seg.voice?.archetypes) ? seg.voice.archetypes : null;
-  const tone = isFilledArr(seg.voice?.tone) ? seg.voice.tone : null;
-  const forbid = isFilledArr(seg.voice?.forbidden) ? seg.voice.forbidden : null;
-  if (!arche && !tone && !forbid) return { node: null, hasContent: false };
-  return {
-    node: (
-      <span>
-        {arche && (
-          <span style={{ display: "block", marginBottom: 4, fontSize: 12 }}>
-            <span style={{ color: "#525252", fontFamily: "system-ui", marginRight: 4 }}>{lang === "en" ? "Archetype" : "原型"}</span>
-            {arche.slice(0, 2).join(" / ")}
-          </span>
-        )}
-        {tone && (
-          <span style={{ display: "block", marginBottom: 4 }}>
-            <TagRow items={tone} max={5} />
-          </span>
-        )}
-        {forbid && (
-          <span style={{ display: "block", fontSize: 12, color: "#B45309", fontFamily: "system-ui" }}>
-            {lang === "en" ? "Avoid · " : "禁區 · "}{forbid.slice(0, 3).join(lang === "en" ? ", " : "、")}{forbid.length > 3 ? `+${forbid.length - 3}` : ""}
-          </span>
-        )}
-      </span>
-    ),
-    hasContent: true,
-  };
-}
+// 2026-09-23：buildBrandCheatPreview / buildPromptsPreview 移除——兩者都只
+// 服務已經拿掉的「武器化工具」卡片預覽（速查卡／AI 指令庫），現在沒有任何
+// call site。SpeedCardView／PromptLibraryView 兩條 section 路由本身還在
+// （沒被要求整個拿掉這兩個功能，只是卡片入口先收起來），沒有牽動它們。
 
 /* ────────────────── PositioningCompletionBridge ──────────────────
    Renders right after the 14-step pipeline finishes — closes the loop
@@ -3664,7 +3635,7 @@ function AssetCard({ label, icon, bg, onClick, preview, hasContent, rationale, o
      硬套會是編出來的資訊，寧可不做。
    ─────────────────────────────────────────────────────────────────────── */
 function PositioningCard({
-  label, icon, onClick, preview, hasContent, rationale, onDelete, sourceLabel,
+  label, icon, onClick, preview, hasContent, rationale, onDelete, sourceLabel, headline,
 }: {
   label: string; icon: any; onClick: () => void;
   preview?: React.ReactNode;
@@ -3673,6 +3644,10 @@ function PositioningCard({
   onDelete?: () => void;
   /** Small "where this came from" pill, echoing content layer's source pill. */
   sourceLabel?: string;
+  /** 2026-09-23：這個 segment 自己最有代表性的一小段真實內容（見
+   *  segmentHeadline()）。有值時取代 header 裡的概念 icon，用品牌自己的
+   *  文字當縮圖；沒有（通常代表還沒填）就退回 icon，避免空卡片看起來壞掉。 */
+  headline?: string | null;
 }) {
   const { lang } = useLang();
   const m = label.match(/^([\d.]+)\s+(.+)$/);
@@ -3720,12 +3695,24 @@ function PositioningCard({
             <FontAwesomeIcon icon={faTrash} style={{ fontSize: 11 }} />
           </button>
         )}
-        <div style={{
-          width: 58, height: 58, borderRadius: "50%", background: "#fff",
-          border: "1px solid #D4D4D4", display: "flex", alignItems: "center", justifyContent: "center",
-        }}>
-          <FontAwesomeIcon icon={icon} style={{ fontSize: 21, color: hasContent ? "#171717" : "#A3A3A3" }} />
-        </div>
+        {headline ? (
+          <p style={{
+            margin: 0, padding: "0 18px", textAlign: "center",
+            fontFamily: '"Source Serif Pro", "Noto Serif TC", Georgia, serif',
+            fontSize: 14.5, fontWeight: 600, color: "#171717", lineHeight: 1.4,
+            display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical",
+            overflow: "hidden",
+          }}>
+            {headline}
+          </p>
+        ) : (
+          <div style={{
+            width: 58, height: 58, borderRadius: "50%", background: "#fff",
+            border: "1px solid #D4D4D4", display: "flex", alignItems: "center", justifyContent: "center",
+          }}>
+            <FontAwesomeIcon icon={icon} style={{ fontSize: 21, color: hasContent ? "#171717" : "#A3A3A3" }} />
+          </div>
+        )}
         <span style={{
           position: "absolute", bottom: 8, right: 8,
           fontSize: 10, fontWeight: 600, color: "#fff",
