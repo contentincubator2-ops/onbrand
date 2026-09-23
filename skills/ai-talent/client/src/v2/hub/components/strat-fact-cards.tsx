@@ -24,7 +24,42 @@ import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter } from "@herou
 import { trpc } from "../../../lib/trpc";
 import { ErrorNote } from "../ui";
 import CardShell, { CARD_GRID } from "./card-shell";
+import { StrategyEditButton, StrategyLog, StrategyPendingPanel, type EditField } from "./strategy-editor";
 import { useT, useHubLang } from "../lang";
+
+const FACT_FIELDS: EditField[] = [
+  { name: "statement_zh", label: ["Statement (ZH)", "內容（中）"], multiline: true },
+  { name: "statement_en", label: ["Statement (EN)", "內容（英）"], multiline: true },
+  { name: "source_name", label: ["Source", "出處名稱"] },
+  { name: "source_url", label: ["Source URL", "出處網址"] },
+  {
+    name: "expires_on", label: ["Deadline", "截止日"], date: true,
+    hint: [
+      "Once it passes, this stops being pushed to anyone — sending an expired subsidy is worse than sending nothing.",
+      "過了這一天就不再推給任何人——推送過期的補助比不推更糟。",
+    ],
+  },
+  {
+    name: "confidence", label: ["Verification", "查證狀態"],
+    options: [
+      { value: "official", label: ["Official source", "官方來源"] },
+      { value: "secondary", label: ["Secondary source", "次級來源"] },
+      { value: "needs_verification", label: ["Not verified yet", "尚未查證"] },
+    ],
+    hint: [
+      "Not verified means it is neither pushed to reps nor accepted by the compliance check.",
+      "標成「尚未查證」代表它既不推播，合規檢查也不會接受它的數字。",
+    ],
+  },
+];
+
+const FACT_FIELD_LABELS: Record<string, [string, string]> = {
+  statement_zh: ["Statement (ZH)", "內容（中）"], statement_en: ["Statement (EN)", "內容（英）"],
+  source_name: ["Source", "出處名稱"], source_url: ["Source URL", "出處網址"],
+  expires_on: ["Deadline", "截止日"], confidence: ["Verification", "查證狀態"],
+  industries: ["Customer industries", "客戶產業"],
+  push_cadence: ["Push frequency", "推播頻率"], push_audience: ["Push recipients", "推播對象"],
+};
 
 export const KIND_LABELS: Record<string, [string, string]> = {
   market: ["Market", "市場統計"],
@@ -247,6 +282,8 @@ function FactModal({
         </ModalHeader>
 
         <ModalBody>
+          <StrategyPendingPanel entity="fact" entityId={fact.id} fieldLabel={factFieldLabel(t)} onDone={onChanged} />
+
           {routing?.unknownIndustries.length ? (
             <Warn>
               {t(
@@ -311,6 +348,8 @@ function FactModal({
 
           <PushEditor fact={fact} routing={routing} allReps={allReps} onChanged={onChanged} />
 
+          <StrategyLog entity="fact" entityId={fact.id} fieldLabel={factFieldLabel(t)} />
+
           <div className="mt-4">
             <div className="mb-1.5 flex items-center gap-1.5 text-[12px] font-semibold text-neutral-700">
               <BadgeCheck size={13} aria-hidden />
@@ -357,6 +396,16 @@ function FactModal({
         </ModalBody>
 
         <ModalFooter className="justify-between">
+          <StrategyEditButton
+            entity="fact" entityId={fact.id} fields={FACT_FIELDS}
+            current={{
+              statement_zh: fact.statementZh, statement_en: fact.statementEn,
+              source_name: fact.sourceName, source_url: fact.sourceUrl,
+              expires_on: fact.expiresOn ?? "", confidence: fact.confidence,
+            }}
+            title={["Edit this market item", "編輯這則市場消息"]}
+            onChanged={onChanged}
+          />
           <a
             href={fact.sourceUrl}
             target="_blank"
@@ -528,4 +577,12 @@ function PushEditor({
       </p>
     </div>
   );
+}
+
+/** 欄位名 → 看得懂的標籤。待審面板與紀錄共用。 */
+function factFieldLabel(t: (en: string, zh: string) => string) {
+  return (f: string) => {
+    const l = FACT_FIELD_LABELS[f];
+    return l ? t(l[0], l[1]) : f;
+  };
 }

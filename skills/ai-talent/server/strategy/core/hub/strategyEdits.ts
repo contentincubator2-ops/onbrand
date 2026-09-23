@@ -21,8 +21,20 @@
  * 審核一段內容的時候，「哪裡變了」比「現在長怎樣」重要得多。這一點在產品那邊
  * 已經證明有效，這裡照搬。
  */
-import localPool from "../../../localDb";
 import { isEditableField, strategyEntity } from "./strategyRegistry";
+
+/**
+ * 資料庫連線是延遲載入的，不是頂層 import。
+ *
+ * 這一支裡最值得測的東西（diffStrategyFields —— 通用編輯層唯一的安全邊界）
+ * 完全不碰資料庫。頂層 import localDb 會讓整個模組在沒有 DB 密碼的環境載入
+ * 失敗，於是那些純函式就一條都測不到。solutionEdits 與 brandAssets 就是這樣
+ * 在本機永遠紅著的。
+ */
+async function db() {
+  const { default: localPool } = await import("../../../localDb");
+  return localPool;
+}
 
 export type StrategyAction = "created" | "edited" | "approved" | "rejected" | "removed";
 
@@ -68,7 +80,7 @@ export async function logStrategyEdit(args: {
   changes?: Array<{ field: string; from: string; to: string }>;
   note?: string | null;
 }): Promise<void> {
-  await localPool.execute(
+  await (await db()).execute(
     `INSERT INTO hub_strategy_edits (org_id, entity, entity_id, actor, action, changes, note)
      VALUES (?, ?, ?, ?, ?, ?, ?)`,
     [args.orgId, args.entity, args.entityId, args.actor, args.action,
@@ -84,7 +96,7 @@ export async function listStrategyEdits(
   const params: any[] = [orgId];
   if (filter.entity) { where.push("entity = ?"); params.push(filter.entity); }
   if (filter.entityId) { where.push("entity_id = ?"); params.push(filter.entityId); }
-  const [rows]: any = await localPool.execute(
+  const [rows]: any = await (await db()).execute(
     `SELECT id, entity, entity_id, actor, action, changes, note, created_at
        FROM hub_strategy_edits WHERE ${where.join(" AND ")} ORDER BY id DESC LIMIT ${PAGE}`,
     params,
@@ -137,5 +149,209 @@ function safeJson(s: string): any {
     return Array.isArray(v) ? v : [];
   } catch {
     return [];
+  }
+}
+
+// ── 提案 / 核准 ──────────────────────────────────────────────────────────────
+
+/**
+ * 待審提案。一筆資料同時只會有一份（uniq key），跟產品那邊的規則一樣。
+ *
+ * 為什麼不像產品那樣在每張表加一個 pending 欄位：那要再改三張表，而且每加一種
+ * 資料就要再改一次。提案本來就是「暫時的、跟資料本體無關的東西」，放在自己的
+ * 表裡更誠實——正式欄位在核准之前完全不動，這也正是核准的意義。
+ */
+export const STRATEGY_PENDING_DDL = `CREATE TABLE IF NOT EXISTS hub_strategy_pending (
+  id          INT          NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  org_id      INT          NOT NULL,
+  entity      VARCHAR(24)  NOT NULL,
+  entity_id   INT          NOT NULL,
+  changes     JSON         NOT NULL,
+  proposed_by VARCHAR(160) NOT NULL,
+  proposed_at DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  note        VARCHAR(400) NULL,
+  UNIQUE KEY uq_row (org_id, entity, entity_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`;
+
+export interface PendingEdit {
+  entity: string;
+  entityId: number;
+  changes: Array<{ field: string; from: string; to: string }>;
+  proposedBy: string;
+  proposedAt: string;
+  note: string | null;
+}
+
+export async function listPending(orgId: number, entity?: string): Promise<PendingEdit[]> {
+  const [rows]: any = entity
+    ? await (await db()).execute(
+        `SELECT * FROM hub_strategy_pending WHERE org_id = ? AND entity = ? ORDER BY id DESC`,
+        [orgId, entity],
+      )
+    : await (await db()).execute(`SELECT * FROM hub_strategy_pending WHERE org_id = ? ORDER BY id DESC`, [orgId]);
+  return (rows as any[]).map((r) => ({
+    entity: r.entity, entityId: r.entity_id,
+    changes: typeof r.changes === "string" ? safeJson(r.changes) : (r.changes ?? []),
+    proposedBy: r.proposed_by,
+    proposedAt: new Date(r.proposed_at).toISOString(),
+    note: r.note ?? null,
+  }));
+}
+
+/** 讀出這一筆現在的值，不管它存在欄位還是 JSON 裡。 */
+async function readCurrent(orgId: number, entity: string, entityId: number): Promise<Record<string, any> | null> {
+  const spec = strategyEntity(entity);
+  if (!spec) throw new Error(`unknown strategy entity: ${entity}`);
+  const [rows]: any = await (await db()).execute(
+    `SELECT * FROM ${spec.table} WHERE id = ? AND org_id = ? LIMIT 1`,
+    [entityId, orgId],
+  );
+  const row = (rows as any[])[0];
+  if (!row) return null;
+  if (spec.storage.kind === "columns") return row;
+  const raw = row[spec.storage.column];
+  const payload = typeof raw === "string" ? safeObject(raw) : (raw ?? {});
+  return payload;
+}
+
+/**
+ * 提出修改。**正式欄位完全不動。**
+ *
+ * 不需要核准的種類（用詞）直接套用，因為那一頁承諾即時生效。需要核准的存進
+ * 待審表，等人核准才合併過去。
+ */
+export async function proposeStrategyEdit(args: {
+  orgId: number;
+  entity: string;
+  entityId: number;
+  actor: string;
+  proposed: Record<string, any>;
+  note?: string | null;
+}): Promise<{ applied: boolean; changes: Array<{ field: string; from: string; to: string }>; rejected: string[] }> {
+  const current = await readCurrent(args.orgId, args.entity, args.entityId);
+  if (!current) throw new Error("That entry is gone — someone may have removed it.");
+
+  const { changes, rejected } = diffStrategyFields(args.entity, current, args.proposed);
+  if (rejected.length) throw new Error(`These fields cannot be edited here: ${rejected.join(", ")}`);
+  if (!changes.length) return { applied: false, changes: [], rejected: [] };
+
+  if (!requiresApproval(args.entity)) {
+    await applyChanges(args.orgId, args.entity, args.entityId, changes);
+    await logStrategyEdit({ ...args, entityId: args.entityId, action: "edited", changes, note: args.note });
+    return { applied: true, changes, rejected: [] };
+  }
+
+  await (await db()).execute(
+    `INSERT INTO hub_strategy_pending (org_id, entity, entity_id, changes, proposed_by, note)
+     VALUES (?, ?, ?, ?, ?, ?)
+     ON DUPLICATE KEY UPDATE changes = VALUES(changes), proposed_by = VALUES(proposed_by),
+       proposed_at = CURRENT_TIMESTAMP(3), note = VALUES(note)`,
+    [args.orgId, args.entity, args.entityId, JSON.stringify(changes), args.actor, args.note ?? null],
+  );
+  await logStrategyEdit({ ...args, entityId: args.entityId, action: "edited", changes, note: args.note });
+  return { applied: false, changes, rejected: [] };
+}
+
+/**
+ * 核准並合併。
+ *
+ * 提案人不能核准自己的提案 —— repo 裡踩過一次「review 核准不擋任何東西」。
+ */
+export async function approveStrategyEdit(args: {
+  orgId: number;
+  entity: string;
+  entityId: number;
+  actor: string;
+}): Promise<{ applied: number }> {
+  const [rows]: any = await (await db()).execute(
+    `SELECT changes, proposed_by FROM hub_strategy_pending WHERE org_id = ? AND entity = ? AND entity_id = ? LIMIT 1`,
+    [args.orgId, args.entity, args.entityId],
+  );
+  const row = (rows as any[])[0];
+  if (!row) throw new Error("There is nothing waiting for approval here.");
+  if (String(row.proposed_by ?? "").toLowerCase() === args.actor.toLowerCase()) {
+    throw new Error("You proposed this change — someone else has to approve it.");
+  }
+  const changes = typeof row.changes === "string" ? safeJson(row.changes) : (row.changes ?? []);
+  await applyChanges(args.orgId, args.entity, args.entityId, changes);
+  await (await db()).execute(
+    `DELETE FROM hub_strategy_pending WHERE org_id = ? AND entity = ? AND entity_id = ?`,
+    [args.orgId, args.entity, args.entityId],
+  );
+  await logStrategyEdit({ ...args, action: "approved", changes });
+  return { applied: changes.length };
+}
+
+export async function rejectStrategyEdit(args: {
+  orgId: number;
+  entity: string;
+  entityId: number;
+  actor: string;
+  note?: string | null;
+}): Promise<void> {
+  const [rows]: any = await (await db()).execute(
+    `SELECT changes FROM hub_strategy_pending WHERE org_id = ? AND entity = ? AND entity_id = ? LIMIT 1`,
+    [args.orgId, args.entity, args.entityId],
+  );
+  const row = (rows as any[])[0];
+  if (!row) throw new Error("There is nothing waiting for approval here.");
+  await (await db()).execute(
+    `DELETE FROM hub_strategy_pending WHERE org_id = ? AND entity = ? AND entity_id = ?`,
+    [args.orgId, args.entity, args.entityId],
+  );
+  await logStrategyEdit({
+    ...args, action: "rejected",
+    changes: typeof row.changes === "string" ? safeJson(row.changes) : (row.changes ?? []),
+    note: args.note,
+  });
+}
+
+/**
+ * 把已核准的改動寫進去。
+ *
+ * 欄位名只可能來自 editableFields（proposeStrategyEdit 已經擋過），所以拼進
+ * SQL 是安全的 —— 但仍然在這裡再擋一次，因為這支是 exported 的，之後可能有
+ * 別的呼叫端，而「上游已經檢查過」是最容易在重構中失效的假設。
+ */
+async function applyChanges(
+  orgId: number,
+  entity: string,
+  entityId: number,
+  changes: Array<{ field: string; to: string }>,
+): Promise<void> {
+  const spec = strategyEntity(entity);
+  if (!spec) throw new Error(`unknown strategy entity: ${entity}`);
+  const safe = changes.filter((c) => isEditableField(entity, c.field));
+  if (!safe.length) return;
+
+  if (spec.storage.kind === "columns") {
+    await (await db()).execute(
+      `UPDATE ${spec.table} SET ${safe.map((c) => `\`${c.field}\` = ?`).join(", ")} WHERE id = ? AND org_id = ?`,
+      [...safe.map((c) => c.to), entityId, orgId],
+    );
+    return;
+  }
+
+  // JSON 儲存：讀出來、合併、寫回去。整個 payload 換掉，所以沒動到的鍵要保留。
+  const col = spec.storage.column;
+  const [rows]: any = await (await db()).execute(
+    `SELECT \`${col}\` AS payload FROM ${spec.table} WHERE id = ? AND org_id = ? LIMIT 1`,
+    [entityId, orgId],
+  );
+  const raw = (rows as any[])[0]?.payload;
+  const payload = typeof raw === "string" ? safeObject(raw) : (raw ?? {});
+  for (const c of safe) payload[c.field] = c.to;
+  await (await db()).execute(
+    `UPDATE ${spec.table} SET \`${col}\` = ? WHERE id = ? AND org_id = ?`,
+    [JSON.stringify(payload), entityId, orgId],
+  );
+}
+
+function safeObject(s: string): Record<string, any> {
+  try {
+    const v = JSON.parse(s);
+    return v && typeof v === "object" && !Array.isArray(v) ? v : {};
+  } catch {
+    return {};
   }
 }

@@ -161,6 +161,87 @@ const adminRouter = router({
       return { indexed: all.length, summary: summarise(records), records };
     }),
 
+  /**
+   * 策略層任何一筆資料的修改（CJ 2026-09-23「每一個 mission tray，內容的任務
+   * 卡片都是可以被用戶編輯，並且會有權限和紀錄的」）。
+   *
+   * 五個 tray 共用同一支。可以改哪些欄位由 strategyRegistry 的白名單決定——
+   * 沒有白名單，一個通用編輯介面就等於「任意欄位寫入」，呼叫端可以改 org_id
+   * 把資料搬到別的組織去。
+   */
+  editStrategyItem: adminProcedure
+    .input(z.object({
+      entity: z.enum(["brand_asset", "solution", "wording", "regulation", "fact"]),
+      entityId: z.number().int().positive(),
+      changes: z.record(z.string().max(40), z.union([z.string().max(4000), z.number(), z.boolean(), z.null()])),
+      note: z.string().max(400).optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const org = await getOrg();
+      const [u] = await q(`SELECT email FROM users WHERE id = ?`, [ctx.user.id]);
+      const m = await import("../../strategy/core/hub/strategyEdits");
+      try {
+        const r = await m.proposeStrategyEdit({
+          orgId: org.id, entity: input.entity, entityId: input.entityId,
+          actor: String(u?.email ?? "admin"), proposed: input.changes as any, note: input.note ?? null,
+        });
+        if (r.changes.length) {
+          await logEvent(org.id, null, r.applied ? "strategy_edited" : "strategy_proposed",
+            `${input.entity}#${input.entityId} · ${r.changes.length} field(s)`);
+        }
+        return r;
+      } catch (e: any) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: String(e?.message ?? e) });
+      }
+    }),
+
+  approveStrategyItem: adminProcedure
+    .input(z.object({
+      entity: z.enum(["brand_asset", "solution", "wording", "regulation", "fact"]),
+      entityId: z.number().int().positive(),
+      decision: z.enum(["approve", "reject"]),
+      note: z.string().max(400).optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const org = await getOrg();
+      const [u] = await q(`SELECT email, role FROM users WHERE id = ? LIMIT 1`, [ctx.user.id]);
+      const email = String(u?.email ?? "");
+      // 權限沿用既有的核准名單，不另外發明一套。
+      const edits = await import("../../strategy/core/hub/solutionEdits");
+      if (!(await edits.canApprove(org.id, email, u?.role === "admin"))) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "You are not on the approver list for this organisation." });
+      }
+      const m = await import("../../strategy/core/hub/strategyEdits");
+      try {
+        if (input.decision === "reject") {
+          await m.rejectStrategyEdit({ orgId: org.id, entity: input.entity, entityId: input.entityId, actor: email, note: input.note ?? null });
+          await logEvent(org.id, null, "strategy_rejected", `${input.entity}#${input.entityId}`);
+          return { applied: 0 };
+        }
+        const r = await m.approveStrategyEdit({ orgId: org.id, entity: input.entity, entityId: input.entityId, actor: email });
+        await logEvent(org.id, null, "strategy_approved", `${input.entity}#${input.entityId} · ${r.applied} field(s)`);
+        return r;
+      } catch (e: any) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: String(e?.message ?? e) });
+      }
+    }),
+
+  /** 待審清單。不給 entity 就是整個策略層的。 */
+  strategyPending: adminProcedure
+    .input(z.object({ entity: z.string().max(24).optional() }).optional())
+    .query(async ({ ctx, input }) => {
+      const org = await getOrg();
+      const [u] = await q(`SELECT email, role FROM users WHERE id = ? LIMIT 1`, [ctx.user.id]);
+      const email = String(u?.email ?? "");
+      const edits = await import("../../strategy/core/hub/solutionEdits");
+      const m = await import("../../strategy/core/hub/strategyEdits");
+      return {
+        me: email,
+        canApprove: await edits.canApprove(org.id, email, u?.role === "admin"),
+        pending: await m.listPending(org.id, input?.entity),
+      };
+    }),
+
   /** 策略層任何一筆資料的變更紀錄。五個 tray 共用。 */
   strategyHistory: adminProcedure
     .input(z.object({ entity: z.string().max(24).optional(), entityId: z.number().int().positive().optional() }).optional())

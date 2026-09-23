@@ -286,6 +286,25 @@ export const HUB_DDL: string[] = [
     INDEX idx_entity (org_id, entity, entity_id)
   ) ${TAIL}`,
 
+  /**
+   * 待審提案（CJ 2026-09-23「會有權限和紀錄」）。一筆資料同時只有一份。
+   *
+   * 不學產品那樣在每張表加 pending 欄位 —— 那要再改三張表，而且每多一種資料
+   * 就要再改一次。提案本來就是暫時的、跟資料本體無關的東西，放自己的表裡更
+   * 誠實：正式欄位在核准之前完全不動，那正是核准的意義。
+   */
+  `CREATE TABLE IF NOT EXISTS hub_strategy_pending (
+    id              INT          NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    org_id          INT          NOT NULL,
+    entity          VARCHAR(24)  NOT NULL,
+    entity_id       INT          NOT NULL,
+    changes         JSON         NOT NULL,
+    proposed_by     VARCHAR(160) NOT NULL,
+    proposed_at     DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    note            VARCHAR(400) NULL,
+    UNIQUE KEY uq_row (org_id, entity, entity_id)
+  ) ${TAIL}`,
+
   `CREATE TABLE IF NOT EXISTS hub_approvers (
     id              INT          NOT NULL AUTO_INCREMENT PRIMARY KEY,
     org_id          INT          NOT NULL,

@@ -62,6 +62,16 @@ export interface StrategyEntity {
   requiresApproval: boolean;
   /** 使用者可以改的欄位。通用編輯層只認這份清單。 */
   editableFields: string[];
+  /**
+   * 改動要寫到哪裡去。
+   *
+   * 大部分資料的欄位就是資料表的欄位，但**品牌資料不是**——它的 label / value /
+   * 日期全都在一個 JSON 的 payload 欄位裡。通用的 UPDATE 必須知道這個差別，
+   * 否則它會去寫一個不存在的欄位然後失敗（或更糟，靜默地什麼都沒改）。
+   *
+   * 這個欄位存在本身就是在說：別假裝五種資料長得一樣。
+   */
+  storage: { kind: "columns" } | { kind: "json"; column: string };
 }
 
 /**
@@ -80,6 +90,7 @@ export const STRATEGY_ENTITIES: StrategyEntity[] = [
     labelEn: "Brand", labelZh: "品牌",
     requiresApproval: true,
     editableFields: ["label", "value", "note", "starts_on", "ends_on"],
+    storage: { kind: "json", column: "payload" },
   },
   {
     id: "solution", table: "hub_solutions",
@@ -90,18 +101,21 @@ export const STRATEGY_ENTITIES: StrategyEntity[] = [
       "summary_en", "summary_zh", "audience_en", "audience_zh",
       "source_url", "featured", "features", "prices", "profile",
     ],
+    storage: { kind: "columns" },
   },
   {
     id: "wording", table: "hub_wording",
     labelEn: "Wording", labelZh: "用詞",
     requiresApproval: false,
     editableFields: ["term", "replacement"],
+    storage: { kind: "columns" },
   },
   {
     id: "regulation", table: "hub_regulations",
     labelEn: "Regulations", labelZh: "法規",
     requiresApproval: true,
     editableFields: ["name_en", "name_zh", "change_en", "change_zh", "status", "effective_on", "rules"],
+    storage: { kind: "columns" },
   },
   {
     id: "fact", table: "hub_facts",
@@ -111,6 +125,7 @@ export const STRATEGY_ENTITIES: StrategyEntity[] = [
       "statement_en", "statement_zh", "source_name", "source_url",
       "industries", "expires_on", "confidence", "push_audience", "push_cadence",
     ],
+    storage: { kind: "columns" },
   },
 ];
 

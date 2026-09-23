@@ -135,6 +135,75 @@ async function main() {
     bad("strategy index", e?.message ?? String(e));
   }
 
+  // ── 通用編輯／核准／紀錄（CJ 2026-09-23「每一個 mission tray…權限和紀錄」） ──
+  //
+  // 真的跑一次「提案 → 正式欄位沒變 → 核准 → 正式欄位變了」。這一段驗的是核准
+  // 這件事有沒有作用——如果提案當下就寫進正式欄位，那個核准按鈕就只是裝飾，
+  // 而這個 repo 踩過一次那個坑。
+  try {
+    const m = await import("../server/strategy/core/hub/strategyEdits");
+    const { strategyEntity, STRATEGY_ENTITIES } = await import("../server/strategy/core/hub/strategyRegistry");
+
+    // 每一種資料的資料表都要真的存在，否則那個 tray 的編輯是個永遠會炸的按鈕。
+    const missingTables: string[] = [];
+    for (const e of STRATEGY_ENTITIES) {
+      const [row] = await q(
+        `SELECT COUNT(*) AS n FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ?`,
+        [e.table],
+      );
+      if (!Number(row?.n)) missingTables.push(`${e.id}→${e.table}`);
+    }
+    check(missingTables.length === 0, "every strategy entity points at a real table", missingTables.join(", ") || `${STRATEGY_ENTITIES.length} tables`);
+
+    const [reg] = await q(`SELECT id, name_zh FROM hub_regulations WHERE org_id = ? ORDER BY id LIMIT 1`, [org.id]);
+    if (reg) {
+      const original = String(reg.name_zh ?? "");
+      const probed = `${original} (probe)`;
+      try {
+        const r = await m.proposeStrategyEdit({
+          orgId: org.id, entity: "regulation", entityId: reg.id,
+          actor: "hub-probe-author", proposed: { name_zh: probed },
+        });
+        check(!r.applied && r.changes.length === 1, "a proposal does not apply itself", `applied=${r.applied} changes=${r.changes.length}`);
+
+        const [mid] = await q(`SELECT name_zh FROM hub_regulations WHERE id = ?`, [reg.id]);
+        check(String(mid?.name_zh ?? "") === original, "the live value is untouched while it waits", `still "${String(mid?.name_zh ?? "").slice(0, 24)}"`);
+
+        // 作者不能核准自己的提案。
+        let selfApproved = false;
+        try {
+          await m.approveStrategyEdit({ orgId: org.id, entity: "regulation", entityId: reg.id, actor: "hub-probe-author" });
+          selfApproved = true;
+        } catch { /* 預期 */ }
+        check(!selfApproved, "the author cannot approve their own proposal", selfApproved ? "IT LET THEM" : "blocked");
+
+        await m.approveStrategyEdit({ orgId: org.id, entity: "regulation", entityId: reg.id, actor: "hub-probe-approver" });
+        const [after] = await q(`SELECT name_zh FROM hub_regulations WHERE id = ?`, [reg.id]);
+        check(String(after?.name_zh ?? "") === probed, "approving applies the change", `now "${String(after?.name_zh ?? "").slice(0, 30)}"`);
+
+        // 白名單：不在 editableFields 裡的欄位要被擋，不是靜默忽略。
+        let wrote = false;
+        try {
+          await m.proposeStrategyEdit({
+            orgId: org.id, entity: "regulation", entityId: reg.id,
+            actor: "hub-probe-author", proposed: { org_id: 999999 } as any,
+          });
+          wrote = true;
+        } catch { /* 預期 */ }
+        check(!wrote, "a field outside the whitelist is refused", wrote ? "IT ACCEPTED org_id" : "refused");
+      } finally {
+        // 還原，並清掉探針留下的紀錄與提案。
+        await exec(`UPDATE hub_regulations SET name_zh = ? WHERE id = ? AND org_id = ?`, [original, reg.id, org.id]);
+        await exec(`DELETE FROM hub_strategy_pending WHERE org_id = ? AND entity = 'regulation' AND entity_id = ?`, [org.id, reg.id]);
+        await exec(`DELETE FROM hub_strategy_edits WHERE org_id = ? AND actor LIKE 'hub-probe-%'`, [org.id]);
+      }
+      const [restored] = await q(`SELECT name_zh FROM hub_regulations WHERE id = ?`, [reg.id]);
+      check(String(restored?.name_zh ?? "") === String(reg.name_zh ?? ""), "probe left the regulation as it found it", "restored");
+    }
+  } catch (e: any) {
+    bad("generic strategy editing", e?.message ?? String(e));
+  }
+
   // ── 推播設定（CJ 2026-09-23「由建置該消息的用戶設定群組與頻率」） ──────────
   try {
     const { readPushSettings, dueToday, CADENCES } = await import("../server/strategy/core/hub/factPush");

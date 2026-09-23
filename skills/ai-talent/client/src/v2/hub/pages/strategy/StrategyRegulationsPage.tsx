@@ -116,7 +116,7 @@ export default function StrategyRegulationsPage() {
               "由總部逐市場追蹤。每張卡上的狀態是人工維護的；系統自動檢查的只有「它指名的檢查存不存在」。",
             )}
           />
-          <StratRegulationCards items={list} coverage={coverage as any} />
+          <StratRegulationCards items={list} coverage={coverage as any} onChanged={() => void q.refetch()} />
           {!list.length ? (
             <p className="text-[13px] text-neutral-500">{t("No updates for this market.", "這個市場沒有法規更新。")}</p>
           ) : null}

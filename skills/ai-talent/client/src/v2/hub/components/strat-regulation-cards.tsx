@@ -20,7 +20,35 @@ import React, { useState } from "react";
 import { AlertTriangle, CheckCircle2, Clock, ExternalLink, Eye, Scale } from "lucide-react";
 import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter } from "@heroui/react";
 import CardShell, { CARD_GRID } from "./card-shell";
+import { StrategyEditButton, StrategyLog, StrategyPendingPanel, type EditField } from "./strategy-editor";
 import { useT } from "../lang";
+
+/** 這一種資料的欄位長什麼樣。通用編輯器只管機制，欄位由這裡定義。 */
+const REG_FIELDS: EditField[] = [
+  { name: "name_zh", label: ["Name (ZH)", "法規名稱（中）"] },
+  { name: "name_en", label: ["Name (EN)", "法規名稱（英）"] },
+  { name: "change_zh", label: ["What changed (ZH)", "這次改了什麼（中）"], multiline: true },
+  { name: "change_en", label: ["What changed (EN)", "這次改了什麼（英）"], multiline: true },
+  {
+    name: "status", label: ["Status", "狀態"],
+    options: [
+      { value: "applied", label: ["Applied", "已套用"] },
+      { value: "review", label: ["In legal review", "法務審閱中"] },
+      { value: "monitoring", label: ["Watching", "追蹤中"] },
+    ],
+    hint: [
+      "This is maintained by hand — marking it applied does not change the policy pack.",
+      "這一欄是人工維護的——標成「已套用」不會真的去改政策包。",
+    ],
+  },
+  { name: "effective_on", label: ["Effective date", "生效日"], date: true },
+];
+
+const REG_FIELD_LABELS: Record<string, [string, string]> = {
+  name_zh: ["Name (ZH)", "法規名稱（中）"], name_en: ["Name (EN)", "法規名稱（英）"],
+  change_zh: ["What changed (ZH)", "這次改了什麼（中）"], change_en: ["What changed (EN)", "這次改了什麼（英）"],
+  status: ["Status", "狀態"], effective_on: ["Effective date", "生效日"], rules: ["Checks", "對應的檢查"],
+};
 
 export const RULE_LABELS: Record<string, [string, string]> = {
   disclosure: ["Employee disclosure", "揭露員工身分"],
@@ -81,9 +109,11 @@ function statusTag(t: (en: string, zh: string) => string, status: string) {
 export default function StratRegulationCards({
   items,
   coverage,
+  onChanged,
 }: {
   items: Regulation[];
   coverage: Record<number, Coverage>;
+  onChanged?: () => void;
 }) {
   const t = useT();
   const [openId, setOpenId] = useState<number | null>(null);
@@ -124,7 +154,7 @@ export default function StratRegulationCards({
       </div>
 
       {active ? (
-        <RegulationModal reg={active} cov={coverage[active.id]} onClose={() => setOpenId(null)} />
+        <RegulationModal reg={active} cov={coverage[active.id]} onChanged={onChanged} onClose={() => setOpenId(null)} />
       ) : null}
     </div>
   );
@@ -183,8 +213,14 @@ function RegulationBand({ reg, cov }: { reg: Regulation; cov?: Coverage }) {
   );
 }
 
-function RegulationModal({ reg, cov, onClose }: { reg: Regulation; cov?: Coverage; onClose: () => void }) {
+function RegulationModal({ reg, cov, onChanged, onClose }: {
+  reg: Regulation; cov?: Coverage; onChanged?: () => void; onClose: () => void;
+}) {
   const t = useT();
+  const fieldLabel = (f: string) => {
+    const l = REG_FIELD_LABELS[f];
+    return l ? t(l[0], l[1]) : f;
+  };
   return (
     <Modal isOpen size="2xl" scrollBehavior="inside" onClose={onClose}>
       <ModalContent>
@@ -207,6 +243,8 @@ function RegulationModal({ reg, cov, onClose }: { reg: Regulation; cov?: Coverag
         </ModalHeader>
 
         <ModalBody>
+          <StrategyPendingPanel entity="regulation" entityId={reg.id} fieldLabel={fieldLabel} onDone={onChanged} />
+
           {cov?.overdueDays != null ? (
             <Warn>
               {t(
@@ -267,6 +305,8 @@ function RegulationModal({ reg, cov, onClose }: { reg: Regulation; cov?: Coverag
             ) : null}
           </div>
 
+          <StrategyLog entity="regulation" entityId={reg.id} fieldLabel={fieldLabel} />
+
           {/* 這句必須在。綠色的「已套用」標籤沒有被任何東西驗證過。 */}
           <p className="mt-4 text-[11.5px] leading-relaxed text-neutral-500">
             {t(
@@ -277,6 +317,16 @@ function RegulationModal({ reg, cov, onClose }: { reg: Regulation; cov?: Coverag
         </ModalBody>
 
         <ModalFooter className="justify-between">
+          <StrategyEditButton
+            entity="regulation" entityId={reg.id} fields={REG_FIELDS}
+            current={{
+              name_zh: reg.nameZh, name_en: reg.nameEn,
+              change_zh: reg.changeZh, change_en: reg.changeEn,
+              status: reg.status, effective_on: reg.effectiveOn ?? "",
+            }}
+            title={["Edit this rule change", "編輯這則法規更新"]}
+            onChanged={onChanged}
+          />
           <a
             href={reg.sourceUrl}
             target="_blank"
