@@ -14,7 +14,7 @@ vi.mock("./imageFetch", () => ({
   fetchImageBuffer: fetchImageBufferMock,
 }));
 
-import { dispatchGenerate, imageSlotStats, withImageSlot } from "./mediaGen";
+import { dispatchGenerate, imageSlotStats, isRetriableImageError, withImageSlot } from "./mediaGen";
 
 describe("mediaGen image provider request contracts", () => {
   beforeEach(() => {
@@ -264,5 +264,29 @@ describe("mediaGen image provider request contracts", () => {
     // The point: no API call was made for the abandoned one.
     expect(ran).toEqual(["first"]);
     expect(imageSlotStats()).toMatchObject({ active: 0, queued: 0 });
+  });
+  // 2026-09-23 (CJ「把同模型重試補上」): with the cross-model fallbacks gone,
+  // the only second chance is the same model — so what counts as "worth
+  // retrying" has to be right, and it lives in ONE place for all five callers.
+  it.each([
+    "openai/gpt-image-2 exceeded 35000ms",
+    "OpenAI 429: Rate limit reached for images",
+    "OpenAI 500: The server had an error",
+    "OpenAI 503: overloaded",
+    "fetch failed",
+    "ETIMEDOUT",
+  ])("retries a timing failure: %s", (msg) => {
+    expect(isRetriableImageError(msg)).toBe(true);
+  });
+
+  it.each([
+    "Your request was rejected by the safety system",
+    "OpenAI 400: content_policy_violation",
+    "Your credit balance is too low to access the API",
+    "OpenAI 401: Incorrect API key provided",
+    "Access denied, please make sure your account is in good standing",
+    "OpenAI edits: unsupported reference image type text/html",
+  ])("does not retry a request-shaped failure: %s", (msg) => {
+    expect(isRetriableImageError(msg)).toBe(false);
   });
 });

@@ -31,7 +31,7 @@ function isProviderKeyError(text: string): boolean {
 import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure } from "../_core/trpc";
 import { callLLM } from "../_core/llmRouter";
-import { dispatchGenerate, checkJob, type GenOptions, type GenResult } from "../_core/mediaGen";
+import { dispatchGenerate, checkJob, isRetriableImageError, type GenOptions, type GenResult } from "../_core/mediaGen";
 import localPool from "../localDb";
 import { probeImageUrl } from "../_core/imageFetch";
 
@@ -217,8 +217,19 @@ ${input.audienceContext ? `受眾：${input.audienceContext}` : ""}
       let thrown: unknown = null;
       try {
         res = await dispatchGenerate(input.modelId, opts);
+        // 2026-09-23 (CJ「把同模型重試補上」): same model, once, timing only.
+        if (!(res.status === "ready" && res.url) && isRetriableImageError(res.errorMsg ?? "")) {
+          console.warn(`[media.generate] retrying ${input.modelId} once — ${String(res.errorMsg).slice(0, 160)}`);
+          res = await dispatchGenerate(input.modelId, opts);
+        }
       } catch (e) {
-        thrown = e;
+        const firstMsg = e instanceof Error ? e.message : String(e);
+        if (isRetriableImageError(firstMsg)) {
+          console.warn(`[media.generate] retrying ${input.modelId} once — ${firstMsg.slice(0, 160)}`);
+          try { res = await dispatchGenerate(input.modelId, opts); } catch (e2) { thrown = e2; }
+        } else {
+          thrown = e;
+        }
       }
 
       try {
