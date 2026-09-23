@@ -14,8 +14,11 @@
  *
  * 處理方式不是把文案寫得更小心（那只是換個說法繼續含糊），是**把真實數字放
  * 上去**：每一條規則旁邊顯示它在實際產出的貼文裡作用了幾次。推薦用詞顯示
- * 「出現在幾篇」，替換對照顯示「觸發過幾次」。作用不到的就顯示 0——那是這一頁
- * 最有用的一個數字，因為它指出哪幾條是紙上規則。
+ * 「出現在幾篇」，替換對照顯示「觸發過幾次」。0 是這一頁最有用的數字，因為它
+ * 指出哪幾條是紙上規則。
+ *
+ * 但分母是 0 的時候顯示「尚未量到」而不是 0 —— 那兩件事長得像，意思相反。
+ * 分母只算實際貼文（不含展示用歷史）也只算規則建立之後的，理由見 wordingUsage.ts。
  *
  * 再加一段「規則之間有沒有打架」，因為這裡真的有一個會讓貼文變成不合格的組合
  * （替換把禁用詞寫回去，而替換排在修補之後）。詳見 wordingUsage.ts。
@@ -61,6 +64,15 @@ export default function StrategyPreferredPage() {
   };
   // 牴觸是逐市場算的（禁用詞在別的分頁維護，但規則之間的衝突要一起看）。
   const marketConflicts = (query.data?.conflicts ?? []).filter((c) => c.market === market);
+  /**
+   * 這個市場一篇實際貼文都還沒有的時候，就不要掛二十四個一模一樣的「尚未量到」。
+   * 上面那行說明講一次就夠，逐條再講一次只是噪音。
+   *
+   * 有實際貼文之後才逐條掛 —— 那時候「這一條尚未量到」才是有意義的資訊
+   * （代表這條規則比現有的貼文還新）。
+   */
+  const measuredHere = (query.data?.measured.byMarket[market] ?? 0) > 0;
+  const usageOf = (id: number) => (measuredHere ? query.data?.measured.usage[id] : undefined);
 
   const [term, setTerm] = useState("");
   const [termNote, setTermNote] = useState("");
@@ -102,8 +114,8 @@ export default function StrategyPreferredPage() {
               title={t("Preferred terms", "推薦用詞")}
               // 「怎麼衡量」而不是「為什麼放這個」—— 跟總管理的卡同一條紀律。
               hint={t(
-                "Written into the prompt as a request. Nothing enforces it, so each term shows how many of the last posts actually contain it.",
-                "以「請優先使用」寫進指令，沒有任何地方強制。所以每個詞旁邊是它實際出現在最近幾篇貼文裡。",
+                "Written into the prompt as a request. Nothing enforces it, so each term carries the share of real posts that actually contain it.",
+                "以「請優先使用」寫進指令，沒有任何地方強制。所以每個詞旁邊掛的是它實際出現在多少篇貼文裡。",
               )}
               filled={preferred.length > 0}
             >
@@ -116,7 +128,7 @@ export default function StrategyPreferredPage() {
                       className="inline-flex items-center gap-1 rounded-full border border-[#D4D4D4] bg-white py-0.5 pl-2.5 pr-1 text-[13px] text-[#171717]"
                     >
                       {w.term}
-                      <UsageChip usage={query.data?.measured.usage[w.id]} kind="preferred" />
+                      <UsageChip usage={usageOf(w.id)} kind="preferred" />
                       <RemoveButton label={t(`Remove ${w.term}`, `移除 ${w.term}`)} onClick={() => actions.remove(w.id)} disabled={actions.removingId === w.id} />
                     </span>
                   ))
@@ -148,8 +160,8 @@ export default function StrategyPreferredPage() {
               right={<CountChip>{t(`${swaps.length} swaps`, `${swaps.length} 組`)}</CountChip>}
               title={t("Word swaps", "替換對照")}
               hint={t(
-                "A string replacement on the finished text — the model is not involved, so it cannot be ignored. Each row shows how many of the last posts it actually fired on.",
-                "直接對完稿做字串替換，不經過模型，所以不可能被忽略。每一列旁邊是它實際在最近幾篇裡觸發過。",
+                "A string replacement on the finished text — the model is not involved, so it cannot be ignored. Each row carries how many real posts it actually fired on.",
+                "直接對完稿做字串替換，不經過模型，所以不可能被忽略。每一列旁邊掛的是它實際觸發過幾次。",
               )}
               filled={swaps.length > 0}
             >
@@ -161,7 +173,7 @@ export default function StrategyPreferredPage() {
                       <ArrowRight size={12} className="shrink-0 text-stone-400" aria-hidden />
                       <span className="text-[13px] font-medium text-[#171717]">{w.replacement}</span>
                       {w.note ? <span className="min-w-0 flex-1 truncate text-[12px] text-stone-400">{w.note}</span> : <span className="flex-1" />}
-                      <UsageChip usage={query.data?.measured.usage[w.id]} kind="swap" />
+                      <UsageChip usage={usageOf(w.id)} kind="swap" />
                       <RemoveButton label={t(`Remove ${w.term}`, `移除 ${w.term}`)} onClick={() => actions.remove(w.id)} disabled={actions.removingId === w.id} />
                     </li>
                   ))
