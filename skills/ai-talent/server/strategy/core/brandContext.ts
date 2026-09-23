@@ -265,6 +265,15 @@ function buildBrandCoreDigest(positioning: any): string {
   if (posOneLiner) lines.push(`定位：${String(posOneLiner).slice(0, 120)}`);
   const tone = Array.isArray(positioning.voice?.tone) ? positioning.voice.tone.slice(0, 5).join("、") : "";
   if (tone) lines.push(`語氣：${tone}`);
+  // 2026-09-23（缺口稽核 — CJ「品牌定位內容是否為 AI 能清楚解析的格式」）：
+  // 核心價值觀是「為什麼」層次的判斷準則，短任務也用得上，只放標籤（不放
+  // 說明），跟語氣關鍵詞同一個精簡等級——完整版（含說明）在 full mode 的
+  // contextBlock 裡。belief5Layers / competition 屬於策略深挖，留給 full
+  // mode，不進這份精簡 digest。
+  const values = Array.isArray(positioning.values?.items)
+    ? positioning.values.items.filter((v: any) => v?.label).slice(0, 5).map((v: any) => v.label).join("、")
+    : "";
+  if (values) lines.push(`核心價值觀：${values}`);
   const aud = firstSentence(positioning.audience?.primary, 100);
   if (aud) lines.push(`主受眾：${aud}`);
   const diff = firstSentence(positioning.differentiation?.emotional, 110)
@@ -471,6 +480,46 @@ export async function buildBrandPrefix(
       // 引用證據撐起主張，不是只複述一句總結。
       if (d && typeof d === "object" && d.discriminator) contextBlock.push(`【唯一致勝理由】${String(d.discriminator).slice(0, 100)}`);
       if (d && typeof d === "object" && d.reasonToBelieve) contextBlock.push(`【支撐證據】${String(d.reasonToBelieve).slice(0, 300)}`);
+    }
+    // 2026-09-23（缺口稽核）：values / origin.belief5Layers / competition 三個
+    // segment 原本就在 schema 裡、writer 也會生成內容，但三個 reader 都沒讀過
+    // ——tableRows 型態被 pushFrom() 直接跳過，也沒有手動補寫。使用者填了這幾
+    // 格，AI 寫文案時完全看不到。這裡補上，跟 discriminator/reasonToBelieve
+    // 走同一條「發現落差 → brandContext + aiBrief + positioningDocs 三處同步」
+    // 的路。只挑對文案最有用的子欄位（競爭的 indirect / trends / matrix 這類
+    // 純策略規劃用的表格，仍刻意不塞進 prompt，避免稀釋品牌前綴）。
+    if (positioning?.values?.items && Array.isArray(positioning.values.items)) {
+      const vals = positioning.values.items
+        .filter((v: any) => v?.label)
+        .slice(0, 5)
+        .map((v: any) => (v.body ? `${v.label}（${String(v.body).slice(0, 60)}）` : v.label))
+        .join("、");
+      if (vals) contextBlock.push(`【核心價值觀】${vals}`);
+    }
+    if (positioning?.origin?.belief5Layers && Array.isArray(positioning.origin.belief5Layers)) {
+      const layers = positioning.origin.belief5Layers
+        .filter((l: any) => l?.body)
+        .slice(0, 5)
+        .map((l: any) => String(l.body).slice(0, 90))
+        .join(" → ");
+      if (layers) contextBlock.push(`【信念五層深挖】${layers}`);
+    }
+    if (positioning?.competition && typeof positioning.competition === "object") {
+      const comp = positioning.competition;
+      if (comp.intensity) contextBlock.push(`【競爭強度】${String(comp.intensity).slice(0, 150)}`);
+      if (Array.isArray(comp.direct) && comp.direct.length) {
+        const d2 = comp.direct
+          .slice(0, 3)
+          .map((x: any) => {
+            const edge = x.ourEdge ? `我方優勢：${String(x.ourEdge).slice(0, 60)}`
+              : x.weakness ? `對方弱點：${String(x.weakness).slice(0, 60)}` : "";
+            return [x.name, edge].filter(Boolean).join(" — ");
+          })
+          .filter(Boolean)
+          .join("；");
+        if (d2) contextBlock.push(`【直接競品】${d2}`);
+      }
+      if (comp.map) contextBlock.push(`【競爭定位地圖】${String(comp.map).slice(0, 200)}`);
     }
     // 用戶自己上傳的品牌定位文件裡，我們沒有對應欄位可放、但他要求照樣帶進來
     // 的段落。放在 contextBlock 最後 —— 它是補充，不該蓋過上面那些鎖定屬性。

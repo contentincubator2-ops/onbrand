@@ -121,8 +121,13 @@ export interface PromptField {
   label: string;
   /** 缺這格，產出會少什麼。落差報告直接顯示這句。 */
   cost: string;
-  /** 值的形狀 —— 對映提案要照這個產。 */
-  shape: "text" | "list" | "pairs";
+  /**
+   * 值的形狀 —— 對映提案要照這個產。
+   * "table"：tableRows 型態、每列多個具名欄位（例如 {label,body}／
+   * {name,ourEdge,weakness}）——2026-09-23 缺口稽核新增，之前這個形狀完全
+   * 沒有登錄過，所以底下三個 segment 的表格欄位從來沒被任何 reader 讀取。
+   */
+  shape: "text" | "list" | "pairs" | "table";
 }
 
 /** 品牌：與 brandContext.ts buildBrandPrefix 的 BLOCK 1–4 一一對應。 */
@@ -142,6 +147,13 @@ export const BRAND_PROMPT_FIELDS: PromptField[] = [
   { path: "differentiation.summary", label: "差異化總結",  shape: "text", cost: "說不出你跟競品差在哪，只能講自己好" },
   { path: "differentiation.discriminator",  label: "唯一致勝理由", shape: "text", cost: "沒有一個最尖銳的理由，文案的 hook 會含糊、什麼優點都提一點" },
   { path: "differentiation.reasonToBelieve", label: "支撐證據",   shape: "text", cost: "主張沒有證據撐腰，AI 只能跟著複述空話，讀者也不會信" },
+  // 2026-09-23（缺口稽核）：這三個 segment 一直都在 schema、writer 也一直有
+  // 生內容，但沒有任何 reader 讀過——見 brandContext.ts 同日的補丁。
+  { path: "values.items",           label: "核心價值觀",   shape: "table", cost: "AI 看得到語氣關鍵詞，看不到品牌做事方式的判斷準則，文案容易只是換句話說的行銷腔" },
+  { path: "origin.belief5Layers",   label: "信念五層深挖", shape: "table", cost: "起源故事只剩一段短敘事，最本質的情緒動機那層挖不出來" },
+  { path: "competition.intensity",  label: "競爭強度",     shape: "text", cost: "差異化文案不知道市場現在多擁擠，力道抓不準" },
+  { path: "competition.direct",     label: "直接競品",     shape: "table", cost: "說得出自己好，說不出好在哪裡贏了誰——差異化退回空話" },
+  { path: "competition.map",        label: "競爭定位地圖", shape: "text", cost: "定位文案沒有「相對於誰」的座標，容易變成自說自話" },
 ];
 
 /** 產品：對應 PRODUCT_SEGMENTS 的 canonical 欄位。 */

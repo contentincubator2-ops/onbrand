@@ -35,10 +35,20 @@ import {
   coverageOf, readPath, customSegmentsOf, type PromptField,
 } from "./positioningDocs";
 
-/** 依欄位宣告的形狀塞一個好認的哨兵值。 */
+/**
+ * 依欄位宣告的形狀塞一個好認的哨兵值。
+ *
+ * "table" 形狀底下實際有好幾種不同欄位名（values.items 讀 label/body、
+ * competition.direct 讀 name/ourEdge/weakness……），這個產生器不知道呼叫的
+ * 是哪一條 path，所以哨兵值把 token 塞進所有可能的欄位名——不管 reader
+ * 實際讀哪一個 key，都找得到 token。
+ */
 function sentinelFor(f: PromptField, token: string): any {
   if (f.shape === "text") return token;
   if (f.shape === "list") return [token];
+  if (f.shape === "table") {
+    return [{ label: token, body: token, name: token, layer: token, ourEdge: token, weakness: token, position: token, tone: token }];
+  }
   return [{ generic: "一般說法", ours: token }];
 }
 

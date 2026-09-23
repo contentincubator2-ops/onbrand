@@ -59,6 +59,12 @@ export const LABEL_TO_FIELD: Record<string, string> = {
   // 永遠是個問號。
   "唯一致勝理由": "differentiation.discriminator",
   "支撐證據": "differentiation.reasonToBelieve",
+  // 2026-09-23（缺口稽核）：跟 brandContext.ts 新補的 contextBlock 標籤逐字對上。
+  "核心價值觀": "values.items",
+  "信念五層深挖": "origin.belief5Layers",
+  "競爭強度": "competition.intensity",
+  "直接競品": "competition.direct",
+  "競爭定位地圖": "competition.map",
   "品牌定位文件補充": "_sourceDocs",
   // 產品
   "產品名稱": "product.name",
