@@ -1262,6 +1262,42 @@ async function main() {
     `);
     console.log("[migrate] support_* (conversations/messages/tickets): OK");
 
+    // ── strategist chat tables (策略總監對話 — 2026-09-23) ──────────────
+    // CJ「要怎麼設計，可以讓策略總監可以提供用戶，用對話的方式，問策略總監
+    // 有關於策略的問題？然後，策略總監也可以引導進行策略監測和健檢？」
+    // Same two-table shape as support_conversations/support_messages
+    // (mirrored deliberately — see strategistChatRouter.ts's header comment
+    // for why this is a dedicated table pair instead of a positioning._xxx
+    // JSON field: conversations are unbounded/append-only over the brand's
+    // whole lifetime, unlike the small bounded structures — _workbench,
+    // _aiPrompts, _customSegments — that live inside positioning JSON).
+    // No tickets/escalation table — that's Mia's job, not the strategist's.
+    await conn.execute(`
+      CREATE TABLE IF NOT EXISTS strategist_conversations (
+        id          INT          NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        userId      INT          NOT NULL,
+        brandId     INT          NOT NULL,
+        status      VARCHAR(16)  NOT NULL DEFAULT 'open',  -- open|closed
+        createdAt   DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+        updatedAt   DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+        KEY idx_user_brand (userId, brandId, updatedAt)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+    await conn.execute(`
+      CREATE TABLE IF NOT EXISTS strategist_messages (
+        id              INT          NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        conversationId  INT          NOT NULL,
+        role            VARCHAR(16)  NOT NULL,            -- 'user' | 'strategist'
+        content         MEDIUMTEXT   NOT NULL,
+        contextSnapshot JSON         NULL,                -- actions offered on this message
+        createdAt       DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+        KEY idx_conv (conversationId, createdAt),
+        CONSTRAINT fk_strategist_msg_conv FOREIGN KEY (conversationId)
+          REFERENCES strategist_conversations(id) ON DELETE CASCADE
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+    console.log("[migrate] strategist_* (conversations/messages): OK");
+
     // ── 2026-05-08 (P1-3): UNIQUE index on users.email ──────────────────
     // Race-safe register — concurrent POST /api/auth/register with the
     // same email should produce ONE user, not two. The check-then-insert

@@ -36,6 +36,7 @@ import { InfoTab as BrandInfoTab, DangerTab as BrandDangerTab, PublishTab as Bra
 import AIPromptsEditor from "../components/positioning/AIPromptsEditor";
 import BrandOnboardingWizard from "../components/onboarding/BrandOnboardingWizard";
 import StrategyWorkbench from "../components/positioning/StrategyWorkbench";
+import StrategyDirectorChat from "../components/positioning/StrategyDirectorChat";
 import AIBriefPanel from "../components/positioning/AIBriefPanel";
 import StrategyAlertsPanel from "../components/positioning/StrategyAlertsPanel";
 import PersonaAgentPanel from "../components/positioning/PersonaAgentPanel";
@@ -1925,6 +1926,20 @@ export default function BrandsPage() {
                             locked={!!tabLocks.positioning}
                             onLockToggle={() => handleLockToggle("positioning")}
                           />
+                          {/* 2026-09-23（CJ「要怎麼設計，可以讓策略總監可以提供
+                              用戶，用對話的方式，問策略總監有關於策略的問題？
+                              然後，策略總監也可以引導進行策略監測和健檢？」）：
+                              真的能聊的對話面板，取代原本只是靜態一句話的
+                              speech bubble。點總監建議的按鈕只是打開對應面板，
+                              不直接觸發掃描/健檢。只有品牌 scope 有 brandId
+                              可用（product/event 的策略總監對話之後再議）。 */}
+                          {scopeMode === "brand" && activeBrandIdForLocks && (
+                            <StrategyDirectorChat
+                              brandId={activeBrandIdForLocks}
+                              onOpenMonitor={() => setActiveStrategyTool("monitor")}
+                              onOpenHealthCheck={() => setActiveStrategyTool("healthcheck")}
+                            />
+                          )}
                         </>
                       )}
                     </>

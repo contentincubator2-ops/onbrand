@@ -23,6 +23,7 @@ import { positioningJobsRouter } from "../strategy/routers/positioningJobsRouter
 import { positioningDocsRouter } from "../strategy/routers/positioningDocsRouter";
 import { brandTaskCardRouter } from "../strategy/routers/brandTaskCardRouter";
 import { workbenchRouter } from "../strategy/routers/workbenchRouter";
+import { strategistChatRouter } from "../strategy/routers/strategistChatRouter";
 import { assetPhotoRouter } from "../strategy/routers/assetPhotoRouter";
 import { strategyMonitorRouter } from "../strategy/routers/strategyMonitorRouter";
 import { touchpointsRouter } from "../platform/routers/touchpointsRouter";
@@ -89,6 +90,7 @@ export const appRouter = router({
   positioningDocs: positioningDocsRouter,
   brandTaskCard:   brandTaskCardRouter,
   workbench: workbenchRouter,
+  strategistChat: strategistChatRouter,
   brandKnowledge:  brandKnowledgeRouter,
   personaAgent:    personaAgentRouter,
   cloudDrive:      cloudDriveRouter,
