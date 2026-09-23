@@ -122,6 +122,30 @@ function sizeForAspectRatio(opts: GenOptions): NonNullable<GenOptions["size"]> {
 }
 
 /**
+ * Is this image failure worth one more attempt on the SAME model?
+ *
+ * 2026-09-23 (CJ「把同模型重試補上」): the cross-model fallbacks are gone —
+ * a failed image now stays failed — so the only second chance left is asking
+ * gpt-image-2 again. That pays off for the failures that are about timing
+ * (rate limits, 5xx, a slow response that blew our own cap) and is pure waste,
+ * or worse, for the ones about the request itself: a content-policy refusal
+ * will refuse identically, and a billing or key problem cannot fix itself
+ * between two calls a second apart.
+ *
+ * Classification lives here, once, so the five call sites cannot drift apart.
+ */
+export function isRetriableImageError(message: string): boolean {
+  const msg = String(message ?? "");
+  // Never retry: the answer will not change.
+  if (/safety system|content[_ ]policy|moderation|rejected by the safety|不宜|violat/i.test(msg)) return false;
+  if (/credit\s*balance|insufficient[_\s]*(quota|credit|fund)|billing|payment/i.test(msg)) return false;
+  if (/invalid[_\s]*api[_\s]*key|unauthorized|authentication|\b40[13]\b|access denied|good standing/i.test(msg)) return false;
+  if (/unsupported reference image type|no b64|missing/i.test(msg)) return false;
+  // Worth another go: timing, load, transport.
+  return /429|rate.?limit|too many requests|timeout|timed?\s*out|exceeded \d+ms|ECONNRESET|ETIMEDOUT|fetch failed|socket|network|\b5\d\d\b|overloaded|try again/i.test(msg);
+}
+
+/**
  * Process-wide limit on concurrent OpenAI image requests.
  *
  * 2026-09-22 (CJ「請繼續做」): a 99s carousel fires 6–30 image requests at once.

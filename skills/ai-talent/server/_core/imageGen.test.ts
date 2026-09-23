@@ -11,7 +11,11 @@ vi.mock("../db", () => ({
 
 vi.mock("./decisionBridge", () => ({ loadLineage: vi.fn(async () => []) }));
 
-vi.mock("./mediaGen", () => ({
+vi.mock("./mediaGen", async (importOriginal) => ({
+  // Keep the real classifier: the retry decision is part of what these tests
+  // assert, and mocking it away would make "no fallback" pass for the wrong
+  // reason.
+  ...(await importOriginal<typeof import("./mediaGen")>()),
   dispatchGenerate: dispatchGenerateMock,
 }));
 
@@ -140,6 +144,62 @@ describe("generateImage provider validation", () => {
       usedFallback: false,
     });
     expect(result.errorMsg).toContain("edits 400");
+  });
+
+  // 2026-09-23 (CJ「把同模型重試補上」): with no fallback left, a rate limit or
+  // a slow response has to get a second chance at the SAME model — otherwise
+  // "no fallback" just means "one flaky call decides the image".
+  it("retries the same model once on a rate limit, then succeeds", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        error: { message: "Rate limit reached for images" },
+      }), { status: 429, headers: { "content-type": "application/json" } }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        data: [{ b64_json: "aW1hZ2U=" }],
+      }), { status: 200, headers: { "content-type": "application/json" } }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await generateImage({ brandId: 1, prompt: "A clean studio scene" });
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    // Same model both times — a retry, not a substitution.
+    for (const call of fetchMock.mock.calls) {
+      expect(String(call[0])).toContain("api.openai.com");
+      expect(JSON.parse(String(call[1]?.body)).model).toBe("gpt-image-2");
+    }
+    expect(result).toMatchObject({ status: "ready", provider: "openai", usedFallback: false });
+  });
+
+  it("retries at most once and then reports the failure", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      error: { message: "Rate limit reached for images" },
+    }), { status: 429, headers: { "content-type": "application/json" } }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await generateImage({ brandId: 1, prompt: "A clean studio scene" });
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(result.status).toBe("failed");
+    expect(result.errorMsg).toContain("重試後");
+  });
+
+  it("retries a product-reference run on the same edits surface", async () => {
+    dispatchGenerateMock.mockReset();
+    dispatchGenerateMock
+      .mockResolvedValueOnce({ status: "failed", modelId: "openai/gpt-image-2", errorMsg: "429 rate limit" })
+      .mockResolvedValueOnce({
+        status: "ready", modelId: "openai/gpt-image-2", url: "/uploads/generated/product.png",
+      });
+
+    const result = await generateImage({
+      brandId: 1,
+      prompt: "product on a marble counter",
+      subjectImageUrl: "https://example.com/product.png",
+    });
+
+    expect(dispatchGenerateMock.mock.calls.map(([modelId]) => modelId))
+      .toEqual(["openai/gpt-image-2", "openai/gpt-image-2"]);
+    expect(result).toMatchObject({ status: "ready", model: "gpt-image-2" });
   });
 
   it("puts product-reference arbitration before a conflicting scene prompt", async () => {

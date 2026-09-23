@@ -24,7 +24,7 @@ import { loadAgent, aiModelToProvider } from "../_core/quickTaskOrchestra";
 import { invokeLLM } from "../_core/llm";
 import { captionToVisualBrief, loadBrandPaletteHexes } from "../_core/visualBrief";
 import { withUserLLMSlot } from "../_core/userLLMSemaphore";
-import { dispatchGenerate } from "../_core/mediaGen";
+import { dispatchGenerate, isRetriableImageError } from "../_core/mediaGen";
 import { fetchViralPatterns, type ViralPatterns } from "../_core/socialListeningScout";
 import { buildTheaterCraftBlock } from "../_core/theaterCraftRef";
 import localPool from "../localDb";
@@ -1311,12 +1311,18 @@ ${cleaned}
       // 2026-09-23 (CJ「備援要禁掉」): and now there is no other model to reach.
       // A cell either gets its gpt-image-2 image or shows the failure.
       const primaryModel = "openai/gpt-image-2";
+      const runCell = async () => await dispatchGenerate(primaryModel, {
+        prompt: brief,
+        aspectRatio: aspect as any,
+        brandId: input.brandId,
+      });
       try {
-        const r = await dispatchGenerate(primaryModel, {
-          prompt: brief,
-          aspectRatio: aspect as any,
-          brandId: input.brandId,
-        });
+        let r = await runCell();
+        // 2026-09-23 (CJ「把同模型重試補上」): same model, once, timing only.
+        if (!(r.status === "ready" && r.url) && isRetriableImageError(r.errorMsg ?? "")) {
+          console.warn(`[theater.generateImage] retrying ${primaryModel} once — ${String(r.errorMsg).slice(0, 160)}`);
+          r = await runCell();
+        }
         if (r.status === "ready" && r.url) {
           return { ok: true as const, imageUrl: r.url, brief };
         }

@@ -15,6 +15,7 @@ import { getDb } from "../db";
 import { sql } from "drizzle-orm";
 import { loadLineage } from "./decisionBridge";
 import { translateImagePromptToEnglish } from "./imagePromptTranslation";
+import { isRetriableImageError } from "./mediaGen";
 
 export type ImageProvider = "openai" | "google" | "stability" | "piapi";
 export type ImageSize = "1024x1024" | "1024x1536" | "1536x1024";
@@ -349,8 +350,10 @@ export async function generateImage(input: ImageGenInput): Promise<ImageGenResul
         usedFallback: false, errorMsg: safe,
       };
     };
-    try {
-      const r = await dispatchGenerate("openai/gpt-image-2", {
+    // 2026-09-23 (CJ「把同模型重試補上」): one retry, same model, only for the
+    // failures that are about timing. A refusal or a billing block will answer
+    // the same way a second later.
+    const runEdit = async () => await dispatchGenerate("openai/gpt-image-2", {
         prompt: promptText,
         imageUrl: input.subjectImageUrl,
         aspectRatio: aspect as any,
@@ -361,6 +364,12 @@ export async function generateImage(input: ImageGenInput): Promise<ImageGenResul
         // no negative_prompt field; its guard rides in promptText.)
         negativePrompt: NO_MIRROR_NEGATIVE_PROMPT,
       });
+    try {
+      let r = await runEdit();
+      if (!(r.status === "ready" && r.url) && isRetriableImageError(r.errorMsg ?? "")) {
+        console.warn(`[imageGen] retrying product-reference gpt-image-2 once — ${String(r.errorMsg).slice(0, 160)}`);
+        r = await runEdit();
+      }
       // TODO: Add post-generation vision validation/retry for product fidelity;
       // prompt arbitration reduces conflicts but cannot prove output compliance.
       if (r.status === "ready" && r.url) {
@@ -400,7 +409,18 @@ export async function generateImage(input: ImageGenInput): Promise<ImageGenResul
   try {
     out = await runOpenAI(promptText, size, primaryModelId);
   } catch (e: any) {
-    errorMsg = `openai: ${e?.message ?? e}`;
+    const firstMsg = String(e?.message ?? e);
+    // 2026-09-23 (CJ「把同模型重試補上」): same model, once, timing failures only.
+    if (isRetriableImageError(firstMsg)) {
+      try {
+        console.warn(`[imageGen] retrying ${primaryModelId} once — ${firstMsg.slice(0, 160)}`);
+        out = await runOpenAI(promptText, size, primaryModelId);
+      } catch (retryError: any) {
+        errorMsg = `openai: ${firstMsg} / 重試後：${String(retryError?.message ?? retryError)}`;
+      }
+    } else {
+      errorMsg = `openai: ${firstMsg}`;
+    }
   }
 
   if (out) {

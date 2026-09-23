@@ -361,7 +361,13 @@ export async function generateStoryboardAsync(
           brandId: 0,
         });
         try {
-          const r = await renderFrame("openai/gpt-image-2");
+          const { isRetriableImageError } = await import("../_core/mediaGen");
+          let r = await renderFrame("openai/gpt-image-2");
+          // 2026-09-23 (CJ「把同模型重試補上」): same model, once, timing only.
+          if (!(r.status === "ready" && r.url) && isRetriableImageError(r.errorMsg ?? "")) {
+            console.warn(`[storyboard] scene ${idx} retrying once — ${String(r.errorMsg).slice(0, 160)}`);
+            r = await renderFrame("openai/gpt-image-2");
+          }
           if (r.status === "ready" && r.url) sceneImages[idx] = r.url;
           else console.warn(`[storyboard] scene ${idx} image failed: ${r.errorMsg}`);
         } catch (e: any) {

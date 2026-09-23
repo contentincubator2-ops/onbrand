@@ -15,7 +15,7 @@
  * Cost ~$0.017 / orchestra (1 LLM call ×2 + Flux Schnell ×5 @ $0.003).
  */
 import { callModel, type ModelProvider } from "./multiModelRouter";
-import { dispatchGenerate, checkJob } from "./mediaGen";
+import { dispatchGenerate, checkJob, isRetriableImageError } from "./mediaGen";
 import {
   captionToBilingualVisualBrief,
   loadBrandIdentityForImage,
@@ -2003,24 +2003,12 @@ async function genOneImage(
       };
     }
     const primaryCapMs = caps.primaryCapMs;
-    let r;
-    try {
-      r = await tryModel(primaryModel, primaryModel, primaryCapMs);
-      if (!(r.status === "ready" && r.url)) throw new Error(r.errorMsg ?? `${primaryModel} no url`);
-    } catch (e: any) {
-      // 2026-09-01: this catch used to swallow the reason entirely, so a
-      // pinned model that never ran was indistinguishable from one that ran
-      // fine — the openai/gpt-image-2 timeout below was only found by
-      // measuring the PNG dimensions of the delivered image. Say what failed.
-      console.warn(
-        `[genOneImage] primary ${primaryModel} failed after ${primaryCapMs}ms cap — ` +
-        `${String(e?.message ?? e).slice(0, 200)}`,
-      );
-      // 2026-09-23 (CJ「備援要禁掉」): no cross-model fallback. Generation runs
-      // on gpt-image-2 or it does not run — a card without a picture is honest,
-      // a card quietly drawn by another model is not. (The previous policy kept
-      // Flux Schnell for text-to-image and Nano Banana for product photos; both
-      // are gone. The adapters stay wired for the manual paths.)
+    // 2026-09-23 (CJ「備援要禁掉」): no cross-model fallback — generation runs
+    // on gpt-image-2 or it does not run. A card without a picture is honest; a
+    // card quietly drawn by another model is not.
+    const failedImage = (msg: string, firstMsg?: string): OrchestraVariant["image"] => {
+      const detail = firstMsg && firstMsg !== msg ? `${firstMsg} / 重試後：${msg}` : msg;
+      console.warn(`[genOneImage] ${primaryModel} failed${firstMsg ? " (after one retry)" : ""} — ${detail.slice(0, 200)}`);
       return {
         style: prompt,
         prompt: modelPrompt,
@@ -2030,8 +2018,33 @@ async function genOneImage(
         fallbackUsed: false,
         url: null,
         status: "failed",
-        errorMsg: String(e?.message ?? e).slice(0, 200),
+        errorMsg: detail.slice(0, 200),
       };
+    };
+    let r;
+    try {
+      r = await tryModel(primaryModel, primaryModel, primaryCapMs);
+      if (!(r.status === "ready" && r.url)) throw new Error(r.errorMsg ?? `${primaryModel} no url`);
+    } catch (firstError: any) {
+      // 2026-09-23 (CJ「把同模型重試補上」): one more go at the SAME model when
+      // the failure was about timing, and only if the task's budget can still
+      // pay for it. Never a different model — see failedImage above.
+      const firstMsg = String(firstError?.message ?? firstError);
+      const retryCaps = imageCapsForRemaining(
+        deadlineAt ? deadlineAt - Date.now() : Number.POSITIVE_INFINITY,
+        { primaryCapMs: subjectMode ? PER_IMAGE_MS : PRIMARY_IMAGE_CAP_MS },
+      );
+      if (isRetriableImageError(firstMsg) && !retryCaps.skip) {
+        try {
+          console.warn(`[genOneImage] retrying ${primaryModel} once — ${firstMsg.slice(0, 160)}`);
+          r = await tryModel(primaryModel, primaryModel, retryCaps.primaryCapMs);
+          if (!(r.status === "ready" && r.url)) throw new Error(r.errorMsg ?? `${primaryModel} no url`);
+        } catch (retryError: any) {
+          return failedImage(String(retryError?.message ?? retryError), firstMsg);
+        }
+      } else {
+        return failedImage(firstMsg);
+      }
     }
     if (r.status === "ready" && r.url) {
       return {
