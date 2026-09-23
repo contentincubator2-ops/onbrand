@@ -166,6 +166,34 @@ export async function seedHub(opts: { reset?: boolean } = {}) {
     );
   }
 
+  /**
+   * 既有業務的產業標籤回填（CJ 2026-09-23）。
+   *
+   * 上面那個迴圈刻意跳過已存在的業務，而且必須繼續跳過——業務身上帶著展場現場
+   * 綁定的 LINE 帳號（line_user_id / bind_code / mcp_token_hash / consent_at），
+   * 重新插入會把綁定弄丟。
+   *
+   * 但那也表示新增的 industries 欄位對既有的人永遠是 NULL，而**沒標產業的人
+   * 會收到全部的消息**——配對等於沒有作用。探針抓到的就是這個（0/11 有標，
+   * 每位台灣業務都收到一模一樣的 7 則）。
+   *
+   * 所以只補那一欄，而且只在它還是空的時候補：展場上手動改過的分工不會被
+   * 下一次部署蓋掉。
+   */
+  {
+    let filled = 0;
+    for (const r of HUB_REPS) {
+      const { affectedRows } = await exec(
+        `UPDATE hub_reps SET industries = ?
+          WHERE org_id = ? AND avatar_seed = ?
+            AND (industries IS NULL OR JSON_LENGTH(industries) = 0)`,
+        [JSON.stringify(r.industries ?? []), org.id, r.seed],
+      );
+      filled += affectedRows;
+    }
+    console.log(`[hub-seed] rep industry coverage: ${filled} backfilled`);
+  }
+
   return {
     orgId: org.id, facts: HUB_FACTS.length, skills: HUB_SKILLS.length, solutions: solutions.length,
     reps: HUB_REPS.length, wording: HUB_WORDING.length, regulations: HUB_REGULATIONS.length,
