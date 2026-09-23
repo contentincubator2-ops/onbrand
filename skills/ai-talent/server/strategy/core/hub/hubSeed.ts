@@ -91,9 +91,12 @@ export async function seedHub(opts: { reset?: boolean } = {}) {
   await exec(`DELETE FROM hub_regulations WHERE org_id = ?`, [org.id]);
   for (const r of HUB_REGULATIONS) {
     await exec(
-      `INSERT INTO hub_regulations (org_id, market, authority, title, summary, impact, rules, status, effective_on, published_on, source_url)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [org.id, r.market, r.authority, r.title, r.summary, r.impact, JSON.stringify(r.rules), r.status, r.effective_on, r.published_on, r.source_url],
+      `INSERT INTO hub_regulations (org_id, market, authority, title, name_en, name_zh, change_en, change_zh,
+         summary, summary_zh, impact, impact_zh, rules, status, effective_on, published_on, source_url)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [org.id, r.market, r.authority, r.title, r.name.en, r.name.zh, r.change.en, r.change.zh,
+       r.summary, r.summaryZh, r.impact, r.impactZh, JSON.stringify(r.rules), r.status,
+       r.effective_on, r.published_on, r.source_url],
     );
   }
 

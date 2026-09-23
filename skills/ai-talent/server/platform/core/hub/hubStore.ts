@@ -289,9 +289,18 @@ export interface HubRegulation {
   id: number;
   market: "TW" | "US";
   authority: string;
+  /** 完整官方名稱。只在 modal 裡出現。 */
   title: string;
+  /** 卡片標題：法規叫什麼，不含這次改了什麼。 */
+  nameEn: string;
+  nameZh: string;
+  /** 卡片第二行：這次改了什麼，一句話。 */
+  changeEn: string;
+  changeZh: string;
   summary: string;
+  summaryZh: string;
   impact: string;
+  impactZh: string;
   rules: string[];
   status: "applied" | "review" | "monitoring";
   effectiveOn: string | null;
@@ -306,6 +315,11 @@ export async function listRegulations(orgId: number): Promise<HubRegulation[]> {
   );
   return rows.map((r) => ({
     id: r.id, market: r.market, authority: r.authority, title: r.title, summary: r.summary, impact: r.impact,
+    // 2026-09-23：卡片用短名 + 一句話的變動摘要；完整標題與全文留給 modal。
+    // 舊資料沒有這幾欄，所以一律退回舊欄位，不會變成空卡片。
+    nameEn: r.name_en || r.title, nameZh: r.name_zh || r.title,
+    changeEn: r.change_en || r.summary, changeZh: r.change_zh || r.summary_zh || r.summary,
+    summaryZh: r.summary_zh || r.summary, impactZh: r.impact_zh || r.impact,
     rules: json(r.rules, []), status: r.status,
     effectiveOn: r.effective_on ? ymd(r.effective_on) : null,
     publishedOn: r.published_on ? ymd(r.published_on) : null,

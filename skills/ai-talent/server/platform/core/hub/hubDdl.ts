@@ -299,6 +299,19 @@ export const HUB_ALTERS: string[] = [
   `ALTER TABLE hub_solutions ADD COLUMN created_by VARCHAR(160) NULL`,
   // 十一個 B2B 欄位 × 中英 = 二十二欄太多，而且清單還會長，所以一個 JSON。
   `ALTER TABLE hub_solutions ADD COLUMN profile JSON NULL`,
+
+  /**
+   * 2026-09-23 (CJ「要有更新日期，法規名稱還要最近修改的摘要，按下去才看到
+   * 完整的法規」)。原本 title 一欄同時裝法規名稱與這次改了什麼，還中英文混在
+   * 一起，六張卡並排就是一面文字牆。拆成短名 + 一句話的變動摘要，完整的留給
+   * modal。順便補上中文版的 summary / impact —— 台灣的讀者不該被迫讀英文法規摘要。
+   */
+  `ALTER TABLE hub_regulations ADD COLUMN name_en VARCHAR(200) NULL`,
+  `ALTER TABLE hub_regulations ADD COLUMN name_zh VARCHAR(200) NULL`,
+  `ALTER TABLE hub_regulations ADD COLUMN change_en VARCHAR(400) NULL`,
+  `ALTER TABLE hub_regulations ADD COLUMN change_zh VARCHAR(400) NULL`,
+  `ALTER TABLE hub_regulations ADD COLUMN summary_zh TEXT NULL`,
+  `ALTER TABLE hub_regulations ADD COLUMN impact_zh TEXT NULL`,
 ];
 
 export async function ensureHubTables(): Promise<void> {

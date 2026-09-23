@@ -366,9 +366,25 @@ export const HUB_WORDING: SeedWording[] = [
 export interface SeedRegulation {
   market: "TW" | "US";
   authority: string;
+  /**
+   * 完整官方名稱。只在 modal 裡出現。
+   *
+   * 2026-09-23 (CJ「法規的部分，看起來格式很亂，要有更新日期，法規名稱還要最近
+   * 修改的摘要，按下去才看到完整的法規」)：卡片上原本放的就是這一欄，而它是
+   * 「中文法規名 — 英文變動說明」黏在一起的長句。六張卡並排就成了一面文字牆。
+   * 現在卡片只放 name（短名）＋ change（一句話講改了什麼），完整的留給 modal。
+   */
   title: string;
+  /** 卡片上的短名。就是法規本身叫什麼，不含這次改了什麼。 */
+  name: { en: string; zh: string };
+  /** 卡片上的第二行：這次改了什麼。一句話。 */
+  change: { en: string; zh: string };
   summary: string;
+  /** summary 的中文版。台灣的讀者不該被迫讀英文法規摘要。 */
+  summaryZh: string;
   impact: string;
+  /** impact 的中文版。 */
+  impactZh: string;
   rules: Array<"disclosure" | "price" | "claims" | "evidence" | "competitors" | "link">;
   status: "applied" | "review" | "monitoring";
   effective_on: string | null;
@@ -380,8 +396,15 @@ export const HUB_REGULATIONS: SeedRegulation[] = [
   {
     market: "US", authority: "Federal Trade Commission",
     title: "Consumer Reviews and Testimonials Rule (16 CFR Part 465) takes effect",
+    name: { en: "Consumer Reviews and Testimonials Rule", zh: "消費者評論與薦證規則（16 CFR Part 465）" },
+    change: {
+      en: "Insiders — including employees — may not write reviews without disclosing the relationship.",
+      zh: "內部人（含員工）不得在未揭露關係的情況下撰寫評論。",
+    },
     summary: "Bans fake reviews and testimonials, buying reviews, and insiders — including officers and employees — writing reviews or testimonials without clearly disclosing the relationship. Civil penalties apply.",
+    summaryZh: "禁止不實評論與薦證、禁止購買評論，並禁止內部人（包含主管與員工）在未清楚揭露關係的情況下撰寫評論或薦證。違反者有民事罰則。",
     impact: "Reps may not post reviews of company solutions; any testimonial-style post must carry the employee disclosure.",
+    impactZh: "業務不得發表對公司方案的評論；任何帶有推薦語氣的貼文都必須附上員工身分揭露。",
     rules: ["disclosure", "claims"], status: "applied",
     effective_on: "2024-10-21", published_on: "2024-08-22",
     source_url: "https://www.ftc.gov/news-events/news/press-releases/2024/08/federal-trade-commission-announces-final-rule-banning-fake-reviews-testimonials",
@@ -389,8 +412,15 @@ export const HUB_REGULATIONS: SeedRegulation[] = [
   {
     market: "US", authority: "Federal Trade Commission",
     title: "Endorsement Guides revised — employee endorsements",
+    name: { en: "Endorsement Guides", zh: "薦證廣告指引（Endorsement Guides）" },
+    change: {
+      en: "Adds an employee-endorsement example; employment itself counts as a material connection.",
+      zh: "新增員工薦證的案例；僱傭關係本身就構成必須揭露的重大關聯。",
+    },
     summary: "The revised Guides add an example on employee endorsements: employers can limit liability by training employees and, where they know about the endorsements, monitoring them. A material connection includes employment.",
+    summaryZh: "修訂後的指引新增員工薦證的案例：雇主可以透過教育訓練，以及在知悉薦證存在時加以監督，來降低責任。重大關聯包含僱傭關係。",
     impact: "Disclosure is mandatory in every rep post; HQ monitoring (this dashboard) documents the training-and-monitoring program.",
+    impactZh: "每一篇業務貼文都必須揭露；總部的監督機制（就是這個後台）本身即為「教育訓練與監督」的紀錄。",
     rules: ["disclosure"], status: "applied",
     effective_on: "2023-06-29", published_on: "2023-06-29",
     source_url: "https://www.ftc.gov/news-events/news/press-releases/2023/06/federal-trade-commission-announces-updated-advertising-guides-combat-deceptive-reviews-endorsements",
@@ -398,8 +428,15 @@ export const HUB_REGULATIONS: SeedRegulation[] = [
   {
     market: "TW", authority: "公平交易委員會 Fair Trade Commission",
     title: "公平交易法第 21 條案件處理原則修正 — social media groups and sales talk count as advertising",
+    name: { en: "Fair Trade Act §21 handling principles", zh: "公平交易法第 21 條案件處理原則" },
+    change: {
+      en: "Social posts, messaging-app groups and a salesperson's pitch now count as advertising.",
+      zh: "社群貼文、通訊軟體群組與業務口頭推銷，都算是對外的廣告表示。",
+    },
     summary: "The amended handling principles list social media, messaging-app group chats and salespeople's pitches as ways of making representations to the public.",
+    summaryZh: "修正後的處理原則，把社群媒體、通訊軟體群組對話，以及業務人員的推銷話術，都列為對公眾為表示的方式。",
     impact: "Posts reps share to LINE groups are held to the same accuracy rules as ads: approved prices and sourced statistics only.",
+    impactZh: "業務分享到 LINE 群組的貼文，適用與廣告相同的真實性要求：只能用核准價格與有出處的數據。",
     rules: ["price", "evidence", "claims"], status: "applied",
     effective_on: "2025-07-01", published_on: "2025-07-01",
     source_url: "https://www.ftc.gov.tw/internet/main/doc/docDetail.aspx?uid=165&docid=13937",
@@ -407,8 +444,15 @@ export const HUB_REGULATIONS: SeedRegulation[] = [
   {
     market: "TW", authority: "公平交易委員會 Fair Trade Commission",
     title: "網路廣告案件處理原則修正 — frequent sellers online are advertisers",
+    name: { en: "Online advertising handling principles", zh: "網路廣告案件處理原則" },
+    change: {
+      en: "People who post to sell often are treated as advertisers and must state conditions and limits.",
+      zh: "經常發文銷售的人被視為廣告主，必須明確揭示條件與限制。",
+    },
     summary: "Bloggers and influencers who frequently post to sell are treated as advertisers and must clearly disclose conditions and limits.",
+    summaryZh: "經常發文從事銷售的部落客與網紅被視為廣告主，必須清楚揭露交易條件與限制。",
     impact: "Reps posting regularly about solutions are covered; conditions such as \"starting at\" and contract terms must stay in the post.",
+    impactZh: "經常發文介紹方案的業務也在適用範圍內；「起」這類價格條件與合約期間必須留在貼文裡。",
     rules: ["price", "disclosure"], status: "applied",
     effective_on: "2023-02-21", published_on: "2023-02-21",
     source_url: "https://law.ftc.gov.tw/law/LawContent.aspx?id=GL000222",
@@ -416,8 +460,15 @@ export const HUB_REGULATIONS: SeedRegulation[] = [
   {
     market: "TW", authority: "公平交易委員會 Fair Trade Commission",
     title: "薦證廣告規範說明 — employees must disclose their relationship",
+    name: { en: "Endorsement advertising guidance", zh: "薦證廣告規範說明" },
+    change: {
+      en: "An endorser the public would not expect to be connected must say so — the example is an employee.",
+      zh: "公眾不會預期有關係的薦證者必須揭露關係，而它舉的例子就是員工。",
+    },
     summary: "An endorser whose relationship with the advertiser isn't expected by the public must disclose it; the guidance's example is an employee recommending the employer's product online.",
+    summaryZh: "薦證者與廣告主之間存在公眾無法合理預期的關係時，必須揭露；規範說明所舉的例子，正是員工在網路上推薦自家公司產品。",
     impact: "Every Taiwan post carries 「我在華碩服務」 or the standard disclosure line.",
+    impactZh: "每一篇台灣市場的貼文都會帶上「我在華碩服務」或標準揭露句。",
     rules: ["disclosure"], status: "applied",
     effective_on: "2016-01-19", published_on: "2016-01-19",
     source_url: "https://www.ftc.gov.tw/internet/main/doc/docDetail.aspx?uid=165&docid=13021",
@@ -425,8 +476,15 @@ export const HUB_REGULATIONS: SeedRegulation[] = [
   {
     market: "TW", authority: "個人資料保護委員會 PDPC (preparatory office)",
     title: "個人資料保護法 amendment promulgated — effective date not yet set",
+    name: { en: "Personal Data Protection Act amendment", zh: "個人資料保護法修正" },
+    change: {
+      en: "Adds breach-notification duties for private companies and creates an independent regulator.",
+      zh: "新增民間企業的外洩通報義務，並設立獨立的主管機關。",
+    },
     summary: "Adds breach-notification duties for private companies and creates an independent regulator.",
+    summaryZh: "新增民間企業發生個資外洩時的通報義務，並成立獨立的個資保護主管機關。",
     impact: "Rep social-account data and consent records need a breach-response owner before the amendment takes effect.",
+    impactZh: "在修正條文生效之前，業務社群帳號資料與同意紀錄需要指定一位外洩應變負責人。",
     rules: [], status: "monitoring",
     effective_on: null, published_on: "2025-11-11",
     source_url: "https://www.pdpc.gov.tw/News_Content/20/1001/",

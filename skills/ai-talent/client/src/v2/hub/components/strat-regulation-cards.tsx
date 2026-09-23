@@ -36,8 +36,14 @@ export interface Regulation {
   market: string;
   authority: string;
   title: string;
+  nameEn: string;
+  nameZh: string;
+  changeEn: string;
+  changeZh: string;
   summary: string;
+  summaryZh: string;
   impact: string;
+  impactZh: string;
   rules: string[];
   status: string;
   effectiveOn: string | null;
@@ -51,6 +57,19 @@ export interface Coverage {
   unknown: string[];
   overdueDays: number | null;
   daysUntil: number | null;
+}
+
+/**
+ * 卡片底下那一行的主管機關。
+ *
+ * 資料庫裡存的是「公平交易委員會 Fair Trade Commission」這種中英並列的長字串，
+ * 直接放會折行，六張卡就高低不齊。取一邊就好——顯示語言決定取哪一邊。
+ */
+function shortAuthority(r: Regulation): string {
+  // 中英並列的字串一律是「中文在前，英文在後」，所以取開頭那段非拉丁字元就對了。
+  // 純英文的機關名（Federal Trade Commission）沒有開頭中文，整串照用。
+  const lead = r.authority.match(/^[^A-Za-z]+/)?.[0]?.trim();
+  return `${r.market} · ${lead || r.authority}`;
 }
 
 function statusTag(t: (en: string, zh: string) => string, status: string) {
@@ -85,18 +104,18 @@ export default function StratRegulationCards({
               accent={overdue ? "#B91C1C" : broken ? "#C2410C" : r.status === "applied" ? "#15803D" : "#525252"}
               icon={overdue || broken ? AlertTriangle : r.status === "applied" ? CheckCircle2 : Eye}
               tag={overdue ? t("OVERDUE", "逾期未套用") : statusTag(t, r.status)}
-              name={r.title}
-              // 第二行講「這條法規對業務貼文做了什麼」，不是法規本身在講什麼。
-              measure={r.impact}
+              // 2026-09-23 (CJ「要有更新日期，法規名稱還要最近修改的摘要，按下去
+              // 才看到完整的法規」)：卡片只放三件事——日期（色塊）、法規名稱、
+              // 這次改了什麼。原本這裡放的是「中文法規名 — 英文變動說明」黏成的
+              // 長標題，六張並排就成了一面文字牆。完整的名稱與全文移到 modal。
+              name={t(r.nameEn, r.nameZh)}
+              measure={t(r.changeEn, r.changeZh)}
               measureLabel={null}
               clampMeasure={3}
-              detail={
-                <span>
-                  {r.market} · {r.authority}
-                  {c?.known.length ? ` · ${t(`${c.known.length} checks`, `${c.known.length} 項檢查`)}` : ""}
-                </span>
-              }
-              action={t("Read it and what it changed", "看原文與它改了什麼")}
+              // 只留主管機關的短名。原本這一行是「市場 · 全名 · N 項檢查」，
+              // 會折成兩行，六張卡的高度就參差不齊（而且 "1 checks" 單複數是壞的）。
+              detail={<span>{shortAuthority(r)}</span>}
+              action={t("Read the full rule", "看完整法規")}
             >
               <RegulationBand reg={r} cov={c} />
             </CardShell>
@@ -132,9 +151,9 @@ function RegulationBand({ reg, cov }: { reg: Regulation; cov?: Coverage }) {
   if (cov?.daysUntil != null) {
     return (
       <>
-        <div className="text-[30px] font-bold leading-none tabular-nums text-stone-900">{cov.daysUntil}</div>
+        <div className="text-[19px] font-bold leading-none tabular-nums text-stone-900">{reg.effectiveOn}</div>
         <div className="mt-1.5 text-center text-[11px] leading-tight text-stone-500">
-          {t("days until it takes effect", "天後生效")}
+          {t(`takes effect in ${cov.daysUntil} days`, `${cov.daysUntil} 天後生效`)}
         </div>
       </>
     );
@@ -158,7 +177,7 @@ function RegulationBand({ reg, cov }: { reg: Regulation; cov?: Coverage }) {
     <>
       <div className="text-[19px] font-bold leading-none tabular-nums text-stone-900">{reg.effectiveOn}</div>
       <div className="mt-1.5 text-center text-[11px] leading-tight text-stone-500">
-        {t("in effect, applied to the policy pack", "已生效，且已套用至政策包")}
+        {t("in effect since", "起生效")}
       </div>
     </>
   );
@@ -176,7 +195,9 @@ function RegulationModal({ reg, cov, onClose }: { reg: Regulation; cov?: Coverag
             </span>
             <span className="text-[12px] font-normal text-neutral-500">{reg.authority}</span>
           </div>
-          <span className="text-[16px] font-semibold leading-snug">{reg.title}</span>
+          <span className="text-[16px] font-semibold leading-snug">{t(reg.nameEn, reg.nameZh)}</span>
+          {/* 完整官方名稱只在這裡出現 —— 它太長，放不進卡片。 */}
+          <span className="text-[12px] font-normal leading-relaxed text-neutral-600">{reg.title}</span>
           <span className="text-[12px] font-normal tabular-nums text-neutral-500">
             {reg.effectiveOn
               ? t(`Effective ${reg.effectiveOn}`, `生效 ${reg.effectiveOn}`)
@@ -195,14 +216,15 @@ function RegulationModal({ reg, cov, onClose }: { reg: Regulation; cov?: Coverag
             </Warn>
           ) : null}
 
-          <p className="text-[13px] leading-relaxed text-neutral-700">{reg.summary}</p>
+          <div className="mb-1 text-[12px] font-semibold text-neutral-700">{t("What changed", "這次改了什麼")}</div>
+          <p className="text-[13px] leading-relaxed text-neutral-700">{t(reg.summary, reg.summaryZh)}</p>
 
           <div className="mt-3 rounded-lg border border-orange-100 bg-orange-50/60 p-3">
             <div className="flex items-center gap-1.5 text-[12px] font-semibold text-orange-900">
               <Scale size={13} aria-hidden />
               {t("What it changes for a rep post", "它對業務貼文改了什麼")}
             </div>
-            <p className="mt-1 text-[13px] leading-relaxed text-neutral-800">{reg.impact}</p>
+            <p className="mt-1 text-[13px] leading-relaxed text-neutral-800">{t(reg.impact, reg.impactZh)}</p>
           </div>
 
           <div className="mt-4">

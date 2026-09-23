@@ -175,6 +175,44 @@ function autoReloadOnce(): boolean {
   return false;
 }
 
+/**
+ * 這個分頁載入的是不是已經被換掉的版本。
+ *
+ * 2026-09-23：CJ 在法規頁看到「s.filter is not a function」。不是偶發，是**版本
+ * 錯位**：他的分頁在部署前就開著，舊的 StrategyRegulationsPage chunk 已經在記憶體
+ * 裡，而伺服器上的 API 已經換成新的回傳形狀（陣列 → `{items, coverage}`）。
+ * 舊程式碼 `const all = q.data ?? []` 拿到的是物件，`all.filter` 自然不存在。
+ *
+ * 上面那個 isChunkLoadError 蓋不到這一種：chunk 沒有載入失敗，它老早就載好了。
+ * 壞掉的是**資料**，而且錯誤看起來跟一般的程式 bug 一模一樣。
+ *
+ * 所以要一個能分辨兩者的訊號，而不是猜。最準的訊號就是：**伺服器現在發的
+ * index.html 裡，還有沒有這個分頁當初載入的那支進入點檔案。**沒有 → 版本換過了
+ * → 重新整理一定能修好。有 → 那是真的 bug，不該把它洗掉。
+ *
+ * 不需要任何建置期的版本號插值：Vite 的進入點檔名本身就帶內容雜湊。
+ */
+function currentEntryFile(): string | null {
+  try {
+    const s = document.querySelector('script[type="module"][src]') as HTMLScriptElement | null;
+    return s?.src.split("/").pop() ?? null;
+  } catch {
+    return null;
+  }
+}
+
+async function buildHasChanged(): Promise<boolean> {
+  const mine = currentEntryFile();
+  if (!mine) return false;
+  try {
+    const html = await fetch("/index.html", { cache: "no-store" }).then((r) => (r.ok ? r.text() : ""));
+    // 抓不到就當作沒換 —— 網路不通不該觸發重新整理迴圈。
+    return html.length > 0 && !html.includes(mine);
+  } catch {
+    return false;
+  }
+}
+
 class AppErrorBoundary extends React.Component<
   { children: React.ReactNode },
   { error: Error | null }
@@ -184,6 +222,10 @@ class AppErrorBoundary extends React.Component<
   componentDidCatch(error: Error, info: React.ErrorInfo) {
     // Stale-chunk auto-recovery: hard-reload once on deployment-induced 404.
     if (isChunkLoadError(error) && autoReloadOnce()) return;
+    // 版本錯位的自動復原：這個分頁載入的進入點已經不在伺服器發的 index.html 裡，
+    // 代表部署過了，重新整理一定能修好。查得到就重整一次，查不到就照常往下走
+    // （回報 + 顯示錯誤畫面），因為那時候它就是一個真的 bug。
+    void buildHasChanged().then((stale) => { if (stale) autoReloadOnce(); });
     // eslint-disable-next-line no-console
     console.error("[AppV2] render error:", error, info);
     // 2026-05-11 — auto-report to the Sentry-lite error_log table so the
@@ -285,11 +327,55 @@ class AppErrorBoundary extends React.Component<
   }
 }
 
+/**
+ * 「新版本已上線」的小提示。
+ *
+ * 2026-09-23：錯誤邊界現在會在版本錯位時自動重新整理，但那是**事後**——使用者
+ * 還是會先看到一瞬間的紅色錯誤畫面。展場上那一瞬間就夠難看了。
+ *
+ * 所以在它壞掉之前先問一次。刻意不自動重整：使用者可能正在打字或填表單，
+ * 替他重整會弄丟東西。給一個按鈕，他自己決定什麼時候。
+ */
+function NewBuildNotice() {
+  const { pathname } = useLocation();
+  const [stale, setStale] = React.useState(false);
+  const lastCheck = React.useRef(0);
+
+  React.useEffect(() => {
+    if (stale) return;
+    // 每次換頁查一次，但最多 60 秒一次 —— 這是一個 HTML 檔，不是免費，但也不貴。
+    if (Date.now() - lastCheck.current < 60_000) return;
+    lastCheck.current = Date.now();
+    let alive = true;
+    void buildHasChanged().then((changed) => { if (alive && changed) setStale(true); });
+    return () => { alive = false; };
+  }, [pathname, stale]);
+
+  if (!stale) return null;
+  return (
+    <button
+      type="button"
+      onClick={() => window.location.reload()}
+      style={{
+        position: "fixed", right: 16, bottom: 16, zIndex: 9999,
+        display: "inline-flex", alignItems: "center", gap: 8,
+        background: "#171717", color: "white", border: "none",
+        borderRadius: 999, padding: "8px 14px", fontSize: 13, fontWeight: 500,
+        boxShadow: "0 4px 14px rgba(0,0,0,0.18)", cursor: "pointer",
+      }}
+    >
+      <span style={{ width: 6, height: 6, borderRadius: 999, background: "#4ADE80" }} aria-hidden />
+      新版本已上線 · 點這裡重新整理
+    </button>
+  );
+}
+
 export default function AppV2() {
   return (
     <AppErrorBoundary>
     <LanguageProvider>
       <React.Suspense fallback={<RouteFallback />}>
+      <NewBuildNotice />
       <HubHostGuard />
       <Routes>
         {/* Auth — unchanged */}

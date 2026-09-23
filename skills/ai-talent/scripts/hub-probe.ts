@@ -120,6 +120,19 @@ async function main() {
 
     check(Object.keys(cov).length === regs.length, "every regulation got covered", `${Object.keys(cov).length}/${regs.length}`);
 
+    // 2026-09-23 (CJ「要有更新日期，法規名稱還要最近修改的摘要」)。卡片上的
+    // 名稱與摘要是新欄位，靠部署時的 seed 填。profile 那次就是 seed 沒跑成功、
+    // 探針也沒量，結果我回報「已完成」而畫面是空的。這次先量。
+    const thin = regs.filter((r) => !r.nameZh || !r.nameEn || !r.changeZh || !r.changeEn);
+    check(thin.length === 0, "every regulation has a short name and a what-changed line", thin.map((r) => `#${r.id}`).join(", ") || `${regs.length} filled`);
+
+    // 短名不該還是那句「中文法規名 — 英文變動說明」的長標題。
+    const stillLong = regs.filter((r) => r.nameZh === r.title || r.nameZh.length > 60);
+    check(stillLong.length === 0, "the card name is a short name, not the full title", stillLong.map((r) => `#${r.id}`).join(", ") || "ok");
+
+    const noZh = regs.filter((r) => !r.summaryZh || !r.impactZh);
+    check(noZh.length === 0, "every regulation reads in Chinese too", noZh.map((r) => `#${r.id}`).join(", ") || `${regs.length} bilingual`);
+
     const broken = brokenMappings(cov);
     check(
       broken.length === 0,
