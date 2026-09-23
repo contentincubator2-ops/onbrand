@@ -2755,12 +2755,6 @@ function PositioningGrid({
     // product / event fallbacks
     core: faBullseye, positioning: faBullseye, smp: faWandSparkles,
   };
-  // 2026-05-11 (CJ「最後品牌定位的呈現方式，也可以很 4A 廣告代理商嗎」):
-  // dropped the pastel BG_CYCLE. Cards are pure white with a 1px neutral
-  // border + serif eyebrow, matching the editorial discipline of the
-  // brain panel above. Filled segments get a subtle darker accent on
-  // the left edge instead of decorative tints.
-  const BG_CYCLE = ["#FFFFFF"];
 
   // Tools block — for brand scope it renders LAST (positioning outputs);
   // other scopes keep it first (unchanged behaviour).
@@ -2780,10 +2774,9 @@ function PositioningGrid({
             // 直接濃縮成一張預覽，使用者不必點進去也能掃到品牌精神。
             const cardPreview = buildBrandCheatPreview(segmentData);
             return (
-              <AssetCard
+              <PositioningCard
                 label={lang === "en" ? "Cheat sheet" : "速查卡"}
                 icon={faTableList}
-                bg="#FFFFFF"
                 onClick={() => onSelect("card")}
                 preview={cardPreview.node}
                 hasContent={cardPreview.hasContent}
@@ -2794,10 +2787,9 @@ function PositioningGrid({
             // AI 指令庫：voice + 禁區 + tone 詞庫合成的一張預覽。
             const promptsPreview = buildPromptsPreview(segmentData, lang);
             return (
-              <AssetCard
+              <PositioningCard
                 label={lang === "en" ? "AI prompts" : "AI 指令庫"}
                 icon={faRobot}
-                bg="#FFFFFF"
                 onClick={() => onSelect("prompts")}
                 preview={promptsPreview.node}
                 hasContent={promptsPreview.hasContent}
@@ -2833,15 +2825,15 @@ function PositioningGrid({
               const segVal = segmentData?.[s.id];
               const { node: preview, hasContent } = renderSegmentPreview(s.id, segVal, lang);
               return (
-                <AssetCard
+                <PositioningCard
                   key={s.id}
                   label={`${num} ${lang === "en" ? (s.titleEn ?? s.title) : s.title}`}
                   icon={ICONS[s.id] ?? faBookOpen}
-                  bg="#FFFFFF"
                   onClick={() => onSelect(`seg:${s.id}`)}
                   preview={preview}
                   hasContent={hasContent}
                   rationale={lang === "en" ? (s.rationaleEn ?? s.rationale) : s.rationale}
+                  sourceLabel={lang === "en" ? "SoWork positioning method" : "SoWork 品牌定位法"}
                 />
               );
             })}
@@ -2868,15 +2860,15 @@ function PositioningGrid({
               const segVal = segmentData?.[s.id];
               const { node: preview, hasContent } = renderSegmentPreview(s.id, segVal, lang);
               return (
-                <AssetCard
+                <PositioningCard
                   key={s.id}
                   label={`${s.num} ${lang === "en" ? (s.titleEn ?? s.title) : s.title}`}
                   icon={ICONS[s.id] ?? faBookOpen}
-                  bg={BG_CYCLE[(gi * 4 + si) % BG_CYCLE.length]!}
                   onClick={() => onSelect(`seg:${s.id}`)}
                   preview={preview}
                   hasContent={hasContent}
                   rationale={lang === "en" ? (s.rationaleEn ?? s.rationale) : s.rationale}
+                  sourceLabel={lang === "en" ? "SoWork positioning method" : "SoWork 品牌定位法"}
                 />
               );
             })}
@@ -2898,11 +2890,10 @@ function PositioningGrid({
         />
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
           {(customSegments ?? []).map((seg) => (
-            <AssetCard
+            <PositioningCard
               key={seg.id}
               label={seg.title}
               icon={faStickyNote}
-              bg="#FFFFFF"
               onClick={() => onSelect("doc")}
               hasContent
               preview={
@@ -2916,6 +2907,7 @@ function PositioningGrid({
                 </ul>
               }
               onDelete={onDeleteCustomSegment ? () => onDeleteCustomSegment(seg.id) : undefined}
+              sourceLabel={lang === "en" ? "From your document" : "來自你的定位文件"}
             />
           ))}
           <button
@@ -3618,6 +3610,136 @@ function AssetCard({ label, icon, bg, onClick, preview, hasContent, rationale, o
           {lang === "en" ? "Empty — tap to start" : "尚未填寫 — 點擊開始"}
         </span>
       )}
+    </div>
+  );
+}
+
+/* ─────────────────────────── PositioningCard ───────────────────────────
+   2026-09-23 (CJ 看到自訂卡片後：「我們首先，先將品牌定位的卡片，改成跟
+   內容層一致的呈現方式」— 貼了 PlatformTaskPage.tsx 的任務卡截圖當參照)。
+   AssetCard 只把外殼（圓角/hover）改了一輪，內部排版還是原本的純文字編輯
+   卡；這支才是真的照 content 層任務卡的解剖結構重做，只用在 PositioningGrid
+   （固定 segment、自訂卡片、速查卡/AI 指令庫），品牌視覺資產格（logo/
+   調色盤）繼續用原本的 AssetCard，不在這次範圍內：
+   - 上方灰底 header block（PlatformTaskPage 是置中大頭貼，這裡沒有「人」
+     可以當頭貼，換成置中的圓形 icon徽章 —— 概念的頭貼）
+   - 左上角編號徽章（對應 content 卡的平台徽章位置，一樣是純資訊不是裝飾）
+   - 右下角一律顯示「已填寫／未填寫」深色膠囊（對應 content 卡的「上次
+     使用」膠囊位置與樣式，換成定位卡真正有意義的狀態）
+   - 自訂卡片的刪除鈕移到 header block 右上角，對應 content 卡「自己的卡」
+     編輯鈕的位置
+   - 內文下方一顆「出處」膠囊（對應 content 卡的來源標籤 + 「出處與說明」
+     連結）：固定 segment 一律標「SoWork 品牌定位法」，自訂卡片標「來自你
+     的定位文件」，速查卡/AI 指令庫（純輸出物，沒有方法論出處）不顯示。
+   - 不做的：agent 頭像 + 具名掛名的頁尾列——定位卡沒有「誰寫的」這個概念，
+     硬套會是編出來的資訊，寧可不做。
+   ─────────────────────────────────────────────────────────────────────── */
+function PositioningCard({
+  label, icon, onClick, preview, hasContent, rationale, onDelete, sourceLabel,
+}: {
+  label: string; icon: any; onClick: () => void;
+  preview?: React.ReactNode;
+  hasContent?: boolean;
+  rationale?: string;
+  onDelete?: () => void;
+  /** Small "where this came from" pill, echoing content layer's source pill. */
+  sourceLabel?: string;
+}) {
+  const { lang } = useLang();
+  const m = label.match(/^([\d.]+)\s+(.+)$/);
+  const eyebrow = m ? m[1] : "";
+  const titleText = m ? m[2] : label;
+
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={onClick}
+      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onClick(); } }}
+      title={rationale}
+      className="group relative flex flex-col text-left cursor-pointer overflow-hidden transition-all duration-150 rounded-2xl border border-neutral-200 hover:border-neutral-900 hover:shadow-lg hover:scale-[1.02] bg-white"
+    >
+      {/* Header block — content 卡是置中大頭貼 + 平台徽章；定位卡沒有「人」，
+          換成置中的概念 icon，其餘位置語意照搬（左上角資訊徽章、右上角
+          「自己的卡」動作、右下角狀態膠囊）。 */}
+      <div style={{
+        height: 100, background: "#F5F4F2", borderBottom: "1px solid rgba(0,0,0,0.06)",
+        position: "relative", display: "flex", alignItems: "center", justifyContent: "center",
+        flexShrink: 0,
+      }}>
+        {eyebrow && (
+          <span style={{
+            position: "absolute", top: 8, left: 8,
+            fontSize: 10, fontWeight: 700, color: "#fff", background: "#171717",
+            borderRadius: 5, padding: "2px 6px", letterSpacing: "0.05em",
+            fontVariantNumeric: "tabular-nums",
+          }}>
+            {eyebrow}
+          </span>
+        )}
+        {onDelete && (
+          <button
+            type="button"
+            aria-label={lang === "en" ? "Delete card" : "刪除卡片"}
+            onClick={(e) => { e.stopPropagation(); onDelete(); }}
+            className="absolute top-1.5 right-1.5 z-10 opacity-0 group-hover:opacity-100 transition-opacity rounded-full p-1.5 bg-white/85 hover:bg-white"
+            style={{ color: "#525252" }}
+          >
+            <FontAwesomeIcon icon={faTrash} style={{ fontSize: 11 }} />
+          </button>
+        )}
+        <div style={{
+          width: 52, height: 52, borderRadius: "50%", background: "#fff",
+          border: "1px solid #E5E5E5", display: "flex", alignItems: "center", justifyContent: "center",
+        }}>
+          <FontAwesomeIcon icon={icon} style={{ fontSize: 18, color: hasContent ? "#171717" : "#A3A3A3" }} />
+        </div>
+        <span style={{
+          position: "absolute", bottom: 8, right: 8,
+          fontSize: 10, fontWeight: 600, color: "#fff",
+          background: hasContent ? "rgba(23,23,23,0.75)" : "rgba(115,115,115,0.6)",
+          borderRadius: 999, padding: "2px 8px", letterSpacing: "0.05em",
+        }}>
+          {hasContent ? (lang === "en" ? "Filled" : "已填寫") : (lang === "en" ? "Empty" : "未填寫")}
+        </span>
+      </div>
+
+      {/* Body */}
+      <div style={{ padding: 12, display: "flex", flexDirection: "column", gap: 6, flex: 1 }}>
+        <h3 style={{ fontSize: 13.5, fontWeight: 600, color: "#171717", margin: 0, lineHeight: 1.3 }}>
+          {titleText}
+        </h3>
+        {preview ? (
+          <div style={{
+            fontSize: 12, lineHeight: 1.55, color: "#525252",
+            fontFamily: '"Source Serif Pro", "Noto Serif TC", Georgia, serif',
+            overflow: "hidden", maxHeight: 56,
+          }}>
+            {preview}
+          </div>
+        ) : rationale ? (
+          <p style={{
+            fontSize: 12, lineHeight: 1.5, color: "#525252", fontStyle: "italic", margin: 0,
+            fontFamily: '"Source Serif Pro", "Noto Serif TC", Georgia, serif',
+            overflow: "hidden", maxHeight: 56,
+          }}>
+            {rationale}
+          </p>
+        ) : (
+          <span style={{ fontSize: 12, color: "#A3A3A3" }}>
+            {lang === "en" ? "Tap to start" : "點擊開始"}
+          </span>
+        )}
+        {sourceLabel && (
+          <span style={{
+            display: "inline-flex", alignSelf: "flex-start", alignItems: "center",
+            borderRadius: 999, border: "1px solid #E5E5E5", background: "#fff",
+            padding: "2px 9px", fontSize: 10.5, color: "#525252", marginTop: 2,
+          }}>
+            {sourceLabel}
+          </span>
+        )}
+      </div>
     </div>
   );
 }
