@@ -48,7 +48,7 @@ import { Target as LucideTarget, Type as LucideType, Palette as LucidePalette, L
 import { SCOPE_SEGMENTS, type SegmentSpec } from "../lib/positioningSchema";
 import { pipelineFor, type PipelineStepSpec } from "../lib/positioningPipeline";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faPlus, faPalette, faFont, faQuoteLeft, faBullseye, faUsers, faImage, faIcons, faChartPie, faImages, faPenNib, faShieldHalved, faFolderOpen, faLock, faLockOpen, faBookOpen, faTableList, faRobot, faBox, faRocket, faBullhorn, faWandSparkles, faGear } from "@fortawesome/free-solid-svg-icons";
+import { faPlus, faPalette, faFont, faQuoteLeft, faBullseye, faUsers, faImage, faIcons, faChartPie, faImages, faPenNib, faShieldHalved, faFolderOpen, faLock, faLockOpen, faBookOpen, faTableList, faRobot, faBox, faRocket, faBullhorn, faWandSparkles, faGear, faStickyNote, faTrash } from "@fortawesome/free-solid-svg-icons";
 
 // Sub-nav id format:
 //   "asset:<key>"   — non-positioning brand assets (準則 / 標誌 / etc.)
@@ -870,6 +870,24 @@ export default function BrandsPage() {
     scopeMode === "brand" ? (scope?.brandId ?? brandId)
     : scopeMode === "product" ? scope?.productId
     : scopeMode === "event" ? scope?.eventId
+    : null;
+
+  // 2026-09-23 (CJ「請將自訂卡片加到品牌頁面」): 自訂卡片（從上傳/貼上的定位文件
+  // 建立、套不進固定 10/6/11 個 schema 欄位的卡片，例如「品牌願景」）原本只在
+  // 「我的定位文件」子頁面看得到。這裡另外查一次 coverage，把 customSegments
+  // 餵給 PositioningGrid，讓它們跟固定欄位卡片一起出現在主要總覽。
+  const positioningCoverageQuery = (trpc as any).positioningDocs?.coverage?.useQuery
+    ? (trpc as any).positioningDocs.coverage.useQuery(
+        { scope: scopeMode === "none" ? "brand" : scopeMode, scopeId: targetId ?? 0 },
+        { enabled: !!targetId && scopeMode !== "none", refetchOnWindowFocus: false }
+      )
+    : { data: null, refetch: () => {} };
+  const customPositioningSegments: { id: string; title: string; fields: { key: string; label: string; value: string }[] }[] =
+    positioningCoverageQuery.data?.customSegments ?? [];
+  const removeCustomSegmentMut = (trpc as any).positioningDocs?.removeCustomSegment?.useMutation
+    ? (trpc as any).positioningDocs.removeCustomSegment.useMutation({
+        onSuccess: () => positioningCoverageQuery.refetch?.(),
+      })
     : null;
 
   const utils = (trpc as any).useUtils?.() ?? null;
@@ -1934,6 +1952,16 @@ export default function BrandsPage() {
                         segments={segments}
                         onSelect={setSection}
                         segmentData={positioningSegmentData}
+                        customSegments={customPositioningSegments}
+                        onDeleteCustomSegment={(segmentId) => {
+                          const msg = lang === "en" ? "Delete this card?" : "確定要刪除這張卡片嗎？";
+                          if (!confirm(msg)) return;
+                          removeCustomSegmentMut?.mutate({
+                            scope: scopeMode === "none" ? "brand" : scopeMode,
+                            scopeId: targetId ?? 0,
+                            segmentId,
+                          });
+                        }}
                       />
                     </>
                   )}
@@ -2627,13 +2655,20 @@ function TabActionBar({
 /* ─────────────────────────── PositioningGrid ───────────────────────── */
 // 品牌定位的 card grid — 速查卡/指令庫 + segments 分組顯示
 function PositioningGrid({
-  scopeMode, segments, onSelect, segmentData,
+  scopeMode, segments, onSelect, segmentData, customSegments, onDeleteCustomSegment,
 }: {
   scopeMode: "brand" | "product" | "event" | "none";
   segments: import("../lib/positioningSchema").SegmentSpec[];
   onSelect: (section: string) => void;
   /** Map of segment id → its current content (top-level positioning keys). */
   segmentData?: Record<string, any>;
+  /** 2026-09-23: cards the user built from an uploaded/pasted positioning doc
+   *  that don't map onto any fixed schema segment (e.g. 「品牌願景」). Full
+   *  management (create from a document, delete) lives in PositioningDocPanel
+   *  ("我的定位文件"); shown here too so they sit alongside the fixed
+   *  segments instead of being hidden in a sub-page. */
+  customSegments?: { id: string; title: string; fields: { key: string; label: string; value: string }[] }[];
+  onDeleteCustomSegment?: (segmentId: string) => void;
 }) {
   const { lang } = useLang();
   const groupLabels: Record<string, { zh: string; en: string }> = {
@@ -2739,7 +2774,7 @@ function PositioningGrid({
             ? (lang === "en" ? "The positioning, packaged for daily use — cheat sheet and AI prompt library." : "把定位變成武器 —— 速查卡與 AI 指令庫是前五幕的輸出物，日常產文案時被引用。")
             : undefined}
         />
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14 }}>
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
           {(() => {
             // 速查卡：把品牌定位精華（tagline / golden-circle why / differentiation）
             // 直接濃縮成一張預覽，使用者不必點進去也能掃到品牌精神。
@@ -2793,7 +2828,7 @@ function PositioningGrid({
             counter={`${group.segs.filter(({ spec }) => segFilled(spec.id)).length} / ${group.segs.length}`}
             intro={group.intro}
           />
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14 }}>
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
             {group.segs.map(({ spec: s, num }) => {
               const segVal = segmentData?.[s.id];
               const { node: preview, hasContent } = renderSegmentPreview(s.id, segVal, lang);
@@ -2828,7 +2863,7 @@ function PositioningGrid({
             }).length} / ${group.segs.length}`}
             intro={SOWORK_GROUP_INTRO[group.prefix]?.[lang === "en" ? "en" : "zh"]}
           />
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14 }}>
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
             {group.segs.map((s, si) => {
               const segVal = segmentData?.[s.id];
               const { node: preview, hasContent } = renderSegmentPreview(s.id, segVal, lang);
@@ -2848,6 +2883,53 @@ function PositioningGrid({
           </div>
         </div>
       ))}
+
+      {/* ── 自訂卡片 — 從上傳/貼上的定位文件建立、套不進上面任何固定欄位的內容
+          （例如「品牌願景」）。跟固定 segment 卡片同一套視覺，永遠顯示（就算目前
+          0 張）讓使用者發現這個功能，虛線卡是進入點 —— 完整的建立/確認流程在
+          「我的定位文件」("doc")，這裡不重做一次上傳/AI 提案的 UI。 ── */}
+      <div>
+        <SectionLabel
+          label={lang === "en" ? "Your cards" : "自訂卡片"}
+          counter={customSegments && customSegments.length > 0 ? String(customSegments.length) : undefined}
+          intro={lang === "en"
+            ? "Content that didn't fit any fixed field above — built from an uploaded document or a pasted AI conversation. Read by every task just like the fields above."
+            : "套不進上面固定欄位的內容 —— 從上傳的定位文件或貼上的 AI 對話建立，一樣會被每次任務執行讀到。"}
+        />
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+          {(customSegments ?? []).map((seg) => (
+            <AssetCard
+              key={seg.id}
+              label={seg.title}
+              icon={faStickyNote}
+              bg="#FFFFFF"
+              onClick={() => onSelect("doc")}
+              hasContent
+              preview={
+                <ul style={{ margin: 0, padding: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: 4 }}>
+                  {seg.fields.slice(0, 4).map((f) => (
+                    <li key={f.key}>
+                      <strong style={{ color: "#171717", fontWeight: 600 }}>{f.label}：</strong>
+                      {truncate(f.value, 60)}
+                    </li>
+                  ))}
+                </ul>
+              }
+              onDelete={onDeleteCustomSegment ? () => onDeleteCustomSegment(seg.id) : undefined}
+            />
+          ))}
+          <button
+            onClick={() => onSelect("doc")}
+            className="flex flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-neutral-300 text-neutral-500 hover:border-neutral-900 hover:text-neutral-900 transition-colors"
+            style={{ minHeight: 124, padding: 16 }}
+          >
+            <FontAwesomeIcon icon={faPlus} style={{ fontSize: 16 }} />
+            <span style={{ fontSize: 12.5, fontWeight: 600 }}>
+              {lang === "en" ? "Add a card" : "新增卡片"}
+            </span>
+          </button>
+        </div>
+      </div>
 
       {/* Brand scope: tools land at the END — they're the positioning's
           outputs, the natural finale of the narrative. */}
@@ -3326,9 +3408,12 @@ function SectionLabel({ label, counter, intro }: { label: string; counter?: stri
         </span>
         <div style={{ flex: 1, height: 1, background: "#D4D4D4" }} />
         {counter && (
+          // 2026-09-23：改成小圓角計數 chip（跟 content 層任務卡格頭的計數
+          // Chip 呼應），純灰階、不上色 —— 只是換個容器，不違反「不要彩色」。
           <span style={{
-            fontSize: 12, fontWeight: 500, color: "#525252",
-            letterSpacing: "0.15em", fontVariantNumeric: "tabular-nums",
+            fontSize: 11.5, fontWeight: 600, color: "#525252",
+            letterSpacing: "0.1em", fontVariantNumeric: "tabular-nums",
+            background: "#F5F5F5", borderRadius: 999, padding: "3px 10px",
           }}>
             {counter}
           </span>
@@ -3383,21 +3468,32 @@ const SOWORK_GROUP_INTRO: Record<string, { zh: string; en: string }> = {
 
 /* ─────────────────────────── AssetCard ───────────────────────────
    2026-05-11 (CJ「最後品牌定位的呈現方式，也可以很 4A 廣告代理商」)
-   Redesigned for editorial discipline:
-   - Pure white, 1px neutral border, no shadow at rest
+   Editorial discipline that's still true:
    - 14×14 thin icon top-left, no decorative pill background
    - Eyebrow line "01.1 GOLDEN CIRCLE" in 9px uppercase tracking
    - Title in 13.5px sans, preview in serif body
    - Filled state: black 1px left edge bar — like a margin annotation
-   - Hover: border → black, no scale/shadow circus
+   - Color stays functional only (monochrome ink/border states), never
+     decorative — same rule PlatformTaskPage.tsx enforces on its own cards.
+
+   2026-09-23 (CJ「重新根據 content 層的卡片呈現方式，優化品牌定位頁面的呈現
+   方式」): the physical shell now matches PlatformTaskPage.tsx's task-card
+   shell — rounded-2xl (was 8px), hover:scale+shadow (was "no scale/shadow
+   circus"; that 05-11 call is superseded by this direct instruction),
+   border→black hover kept via Tailwind instead of JS mouse handlers. The
+   typographic/monochrome discipline above is unaffected — content still
+   has no image/avatar and no per-card color coding.
    ───────────────────────────────────────────────────────────────── */
-function AssetCard({ label, icon, bg, onClick, preview, hasContent, rationale }: {
+function AssetCard({ label, icon, bg, onClick, preview, hasContent, rationale, onDelete }: {
   label: string; icon: any; bg: string; onClick: () => void;
   preview?: React.ReactNode;
   hasContent?: boolean;
   /** Optional methodology rationale shown below the title — explains
    *  WHY this step matters in the SoWork brand positioning method. */
   rationale?: string;
+  /** 2026-09-23: only custom-segment cards pass this. Renders a small
+   *  trash affordance that appears on hover, top-right. */
+  onDelete?: () => void;
 }) {
   const { lang } = useLang();
   // Split "1.1 Golden Circle" → eyebrow "1.1" + title "Golden Circle".
@@ -3409,23 +3505,38 @@ function AssetCard({ label, icon, bg, onClick, preview, hasContent, rationale }:
   const titleText = m ? m[2] : label;
 
   return (
-    <button
+    // A plain <button> can't validly contain the nested delete <button>
+    // below (interactive content inside interactive content) — div+role
+    // keeps the same click/keyboard behaviour for the existing call sites
+    // while making room for the delete affordance on custom-segment cards.
+    <div
+      role="button"
+      tabIndex={0}
       onClick={onClick}
+      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onClick(); } }}
       title={rationale}
-      className="group relative text-left transition-colors"
+      className="group relative text-left cursor-pointer transition-all duration-150 rounded-2xl border border-neutral-300 hover:border-neutral-900 hover:shadow-lg hover:scale-[1.02]"
       style={{
         display: "flex", flexDirection: "column", gap: 10,
         padding: "16px 16px 14px",
         background: bg,
-        border: "1px solid #D4D4D4",
-        borderRadius: 8,
-        cursor: "pointer", width: "100%",
+        width: "100%",
         minHeight: preview ? 140 : 124,
         position: "relative",
       }}
-      onMouseEnter={(e) => { e.currentTarget.style.borderColor = "#171717"; }}
-      onMouseLeave={(e) => { e.currentTarget.style.borderColor = "#D4D4D4"; }}
     >
+      {onDelete && (
+        <button
+          type="button"
+          aria-label={lang === "en" ? "Delete card" : "刪除卡片"}
+          onClick={(e) => { e.stopPropagation(); onDelete(); }}
+          className="absolute top-2 right-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity rounded-full p-1.5 hover:bg-neutral-100"
+          style={{ color: "#737373" }}
+        >
+          <FontAwesomeIcon icon={faTrash} style={{ fontSize: 11 }} />
+        </button>
+      )}
+
       {/* Filled accent — 1px black left edge bar */}
       {hasContent && (
         <span
@@ -3507,7 +3618,7 @@ function AssetCard({ label, icon, bg, onClick, preview, hasContent, rationale }:
           {lang === "en" ? "Empty — tap to start" : "尚未填寫 — 點擊開始"}
         </span>
       )}
-    </button>
+    </div>
   );
 }
 
