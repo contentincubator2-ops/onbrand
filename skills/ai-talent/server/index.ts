@@ -33,6 +33,7 @@ import { assetPhotoRouter as assetPhotoUploadRoute, STORAGE_ROOT as ASSET_PHOTO_
 import { slackOAuthRouter } from "./platform/routes/slackOAuthRoute";
 import { cloudOAuthRouter } from "./platform/routes/cloudOAuthRoute";
 import { manusRouter } from "./platform/routers/manusRouter";
+import { mosAgentsMcpRouter } from "./platform/routers/mosAgentsMcpRouter";
 import { publicAgentsRoute } from "./platform/routes/publicAgentsRoute";
 import { closeDb, pingDb, pingSoworkDb, getDb } from "./db";
 import { sql } from "drizzle-orm";
@@ -357,6 +358,10 @@ app.use("/slack", slackOAuthRouter);
 // /api/chat removed 2026-05-14 — only v1 MissionChatCore consumed it.
 app.use("/api/oauth", cloudOAuthRouter);
 app.use("/api/manus", manusRouter);
+// 2026-09-23：內部用的遠端 MCP 端點（見 mosAgentsMcpRouter.ts 檔頭）——
+// 刻意不掛在 /api/manus 底下、不用 X-Manus-Key，路徑也沒有寫進任何公開
+// 文件／openapi.json。
+app.use("/api/mcp/mos-agents", mosAgentsMcpRouter);
 
 // ─── Public agent showcase (no auth required by default) ─────────────────────
 app.use(publicAgentsRoute);
