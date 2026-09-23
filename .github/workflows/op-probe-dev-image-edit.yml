@@ -1,5 +1,5 @@
 name: "Ops (DEV) — probe gpt-image-2 image edit with a real product photo"
-# re-trigger 2026-09-23 03:15 UTC — first trigger raced ahead of this same push's own deploy
+# re-trigger 2026-09-23 05:16 UTC — workbench-healthcheck probe raced ahead of its own deploy again
 
 # 2026-09-21 (CJ「直接用 chatgpt image 2 的 model 應該就可以了，你試試看」).
 # (re-triggered after the deploy carrying dedupeAngleLabels / brief-consistency fix landed)
