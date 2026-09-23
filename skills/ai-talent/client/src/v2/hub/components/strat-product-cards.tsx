@@ -60,15 +60,18 @@ export default function StratProductCards({ solutions }: { solutions: Solution[]
               icon={s.featured ? Star : Boxes}
               tag={s.featured ? t("Featured", "精選") : categoryLabel(s.category)}
               name={s.nameEn}
-              measure={t(
-                `Listed by ${s.vendor} on ASUS ExpertHub; the prices here are the ones published on that page. A rep quoting anything else has it removed before the post exists.`,
-                `由${s.vendor}刊登在 ASUS ExpertHub，這裡的價格就是那一頁上公布的。業務報了別的數字，在貼文成形之前就會被拿掉。`,
-              )}
+              // 2026-09-23 (CJ「產品的卡片，就不出現 how it count，而是這個產品的
+              // 簡單介紹」)。這一頁的讀者要先知道這是什麼東西；價格哪裡來的
+              // 寫在下面那個說明框，點進去 modal 還有原始頁面連結。
+              measure={t(s.summaryEn, s.summaryZh)}
+              measureLabel={null}
+              clampMeasure={3}
               detail={
                 <span>
                   {s.prices.length
                     ? t(`${s.prices.length} approved plan(s)`, `${s.prices.length} 個核准方案`)
                     : t("No approved price — reps can't quote one", "沒有核准價格，業務不能報價")}
+                  {` · ${t("from", "來源")} ${s.vendor}`}
                   {listedOn ? ` · ${t("listed", "上架")} ${formatDay(listedOn)}` : ""}
                 </span>
               }

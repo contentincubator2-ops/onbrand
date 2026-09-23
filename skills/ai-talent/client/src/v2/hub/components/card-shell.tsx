@@ -26,8 +26,18 @@ export interface CardShellProps {
   icon: LucideIcon;
   tag: string;
   name: string;
-  /** 這個數字／這份資料的口徑。不是「為什麼重要」。 */
+  /**
+   * 第二行。在總管理與品牌頁是「口徑」（這個數字怎麼算的、這份資料誰維護），
+   * 在產品頁就是產品本身的簡介——那一頁的讀者要先知道這是什麼東西。
+   */
   measure: string;
+  /**
+   * 第二行前面那個粗體標籤。傳 null 就不顯示，整行當成一般敘述。
+   * 2026-09-23 (CJ「產品的卡片，就不出現 how it count，而是這個產品的簡單介紹」)。
+   */
+  measureLabel?: string | null;
+  /** 簡介可以截行（卡高才會齊）；口徑不行——截一半等於沒寫。 */
+  clampMeasure?: number;
   detail: React.ReactNode;
   /** 底部那一列的動詞，預設「打開」。 */
   action?: string;
@@ -44,6 +54,8 @@ export default function CardShell({
   tag,
   name,
   measure,
+  measureLabel,
+  clampMeasure,
   detail,
   action,
   bandHeight = 130,
@@ -74,8 +86,13 @@ export default function CardShell({
 
       <div className="flex flex-1 flex-col gap-1.5 p-3">
         <div className="text-small font-semibold text-neutral-900">{name}</div>
-        <p className="text-tiny leading-relaxed text-default-500">
-          <span className="font-medium text-neutral-600">{t("How it's counted: ", "口徑：")}</span>
+        <p
+          className="text-tiny leading-relaxed text-default-500"
+          style={clampMeasure ? { display: "-webkit-box", WebkitLineClamp: clampMeasure, WebkitBoxOrient: "vertical", overflow: "hidden" } : undefined}
+        >
+          {measureLabel === null ? null : (
+            <span className="font-medium text-neutral-600">{measureLabel ?? t("How it's counted: ", "口徑：")}</span>
+          )}
           {measure}
         </p>
         <div>

@@ -18,11 +18,15 @@ on:
 permissions:
   contents: read
 
-# Shares the deploy's group on purpose: if a deploy is mid-flight, the probe
-# waits for it instead of reading a half-swapped release.
+# 2026-09-23: 本來跟 deploy 共用 group，想讓部署中的時候探針排隊等。但加了
+# 「等這次 commit 上線」那一步之後，共用 group 變成**死結**：探針佔著位子等
+# 部署，部署在後面排隊等探針放手，結果等滿 15 分鐘逾時（實測過一次）。
+#
+# 排序現在由那個等待步驟負責，而且比排隊精確——它等的是這個版本真的上線。
+# 所以探針要有自己的 group。cancel-in-progress 開著：新的探針蓋掉還在等的舊的。
 concurrency:
-  group: experthub-demo-deploy
-  cancel-in-progress: false
+  group: experthub-probe
+  cancel-in-progress: true
 
 jobs:
   probe:
