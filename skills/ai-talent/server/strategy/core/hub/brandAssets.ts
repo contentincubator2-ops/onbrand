@@ -105,11 +105,28 @@ export async function removeBrandAsset(orgId: number, id: number): Promise<void>
   await localPool.execute(`DELETE FROM hub_brand_assets WHERE id = ? AND org_id = ?`, [id, orgId]);
 }
 
+/**
+ * 這一筆核准了沒有。
+ *
+ * 2026-09-23 (CJ「會有權限和紀錄」)：品牌資料裡有幾類是安全關鍵的——核准的
+ * 導流目的地、可以提的客戶名單。**新增一筆沒人看過的目的地就立刻生效，等於
+ * 業務會被指引到一個沒有人審過的網址。**
+ *
+ * 預設值刻意是 true：既有的種子資料與展場上已經在用的內容沒有這個旗標，
+ * 硬把它們當成未核准，會讓寫作端瞬間少掉一半素材。只有經由介面新增的才會被
+ * 明確標成 false，等人核准。
+ *
+ * 換句話說：這個旗標只往嚴格的方向走，不會回頭把既有內容關掉。
+ */
+export function isApproved(payload: Record<string, any> | null | undefined): boolean {
+  return (payload as any)?.approved !== false;
+}
+
 // ── 給寫作端用的兩個讀取器 ───────────────────────────────────────────────
 
 /** 核准的導流目的地，寫進 prompt 讓 AI 只從這幾個裡面挑。 */
 export async function approvedDestinations(orgId: number): Promise<Array<{ label: string; url: string; useWhen: string }>> {
-  const rows = await listBrandAssets(orgId, "destination");
+  const rows = (await listBrandAssets(orgId, "destination")).filter((r) => isApproved(r.payload));
   return rows
     .map((r) => ({
       label: String(r.payload.label ?? "").trim(),
@@ -121,7 +138,7 @@ export async function approvedDestinations(orgId: number): Promise<Array<{ label
 
 /** 公司與產品的寫法規範，寫進 prompt 讓模型逐字照用。 */
 export async function namingRules(orgId: number): Promise<Array<{ term: string; wrong: string; note: string }>> {
-  const rows = await listBrandAssets(orgId, "identity");
+  const rows = (await listBrandAssets(orgId, "identity")).filter((r) => isApproved(r.payload));
   return rows
     .map((r) => ({
       term: String(r.payload.term ?? "").trim(),
@@ -149,6 +166,15 @@ export interface ActiveQuietPeriod {
  * 而且不會被時區推掉一天（這個坑在 hubStore.ymd 已經踩過一次）。
  */
 export async function activeQuietPeriods(orgId: number, today = localToday()): Promise<ActiveQuietPeriod[]> {
+  /**
+   * 2026-09-23：**緘默期刻意不過核准閘門**，跟其他品牌資料相反。
+   *
+   * 那幾類是「可以做什麼」——可以連去哪個網址、可以提哪個客戶。沒核准就先不算數，
+   * 錯的方向是少講幾句，安全。
+   *
+   * 緘默期是「不可以做什麼」。沒核准就先不生效的話，錯的方向是**在財報靜默期
+   * 照常發文**——那是這一整套要防的事。限制立刻生效，許可才等核准。
+   */
   const rows = await listBrandAssets(orgId, "quiet");
   return rows.map(toQuietPeriod).filter((p) => isQuietOn(p, today));
 }

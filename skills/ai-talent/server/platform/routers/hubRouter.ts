@@ -218,6 +218,34 @@ const adminRouter = router({
           await logEvent(org.id, null, "strategy_rejected", `${input.entity}#${input.entityId}`);
           return { applied: 0 };
         }
+        /**
+         * 品牌資料還有第二種待核准：**新增的那一筆**。它沒有提案（提案是掛在
+         * 既有資料上的），而是以 approved:false 的狀態存在。核准它＝把旗標
+         * 翻成 true，寫作端才讀得到。
+         */
+        if (input.entity === "brand_asset") {
+          const pend = await m.listPending(org.id, "brand_asset");
+          if (!pend.some((p) => p.entityId === input.entityId)) {
+            const ba = await import("../../strategy/core/hub/brandAssets");
+            const [row] = await q(`SELECT payload FROM hub_brand_assets WHERE id = ? AND org_id = ?`, [input.entityId, org.id]);
+            if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "That brand entry is gone." });
+            const payload = typeof row.payload === "string" ? JSON.parse(row.payload || "{}") : (row.payload ?? {});
+            if (ba.isApproved(payload)) {
+              throw new TRPCError({ code: "BAD_REQUEST", message: "There is nothing waiting for approval here." });
+            }
+            await exec(
+              `UPDATE hub_brand_assets SET payload = ? WHERE id = ? AND org_id = ?`,
+              [JSON.stringify({ ...payload, approved: true }), input.entityId, org.id],
+            );
+            await m.logStrategyEdit({
+              orgId: org.id, entity: "brand_asset", entityId: input.entityId, actor: email, action: "approved",
+              changes: [{ field: "approved", from: "false", to: "true" }],
+            });
+            await logEvent(org.id, null, "strategy_approved", `brand_asset#${input.entityId} · new entry`);
+            return { applied: 1 };
+          }
+        }
+
         const r = await m.approveStrategyEdit({ orgId: org.id, entity: input.entity, entityId: input.entityId, actor: email });
         await logEvent(org.id, null, "strategy_approved", `${input.entity}#${input.entityId} · ${r.applied} field(s)`);
         return r;
@@ -630,21 +658,68 @@ const adminRouter = router({
       id: z.number().int().positive().nullable().default(null),
       payload: z.record(z.string(), z.any()),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
       const org = await getOrg();
       const { ensureBrandAssetTable, saveBrandAsset } = await import("../../strategy/core/hub/brandAssets");
+      const edits = await import("../../strategy/core/hub/strategyEdits");
       await ensureBrandAssetTable();
-      const id = await saveBrandAsset({ orgId: org.id, kind: input.kind, id: input.id, payload: input.payload });
+      const [u] = await q(`SELECT email FROM users WHERE id = ?`, [ctx.user.id]);
+      const actor = String(u?.email ?? "admin");
+
+      /**
+       * 2026-09-23 (CJ「會有權限和紀錄」)。
+       *
+       * 改既有的一筆 → 走通用提案層，**正式內容不動**，等核准。
+       * 新增一筆 → 直接建立，但標成未核准（approved: false）。寫作端讀不到它，
+       *   直到有人核准為止。
+       *
+       * 為什麼新增不能也走提案：提案是掛在「某一筆既有資料」上的，還不存在的
+       * 東西沒有東西可以掛。所以改成「存在但還沒生效」——這也比較誠實，行銷部
+       * 看得到自己加了什麼、卡在哪裡。
+       */
+      if (input.id) {
+        try {
+          const r = await edits.proposeStrategyEdit({
+            orgId: org.id, entity: "brand_asset", entityId: input.id,
+            actor, proposed: input.payload as any,
+          });
+          await logEvent(org.id, null, r.applied ? "brand_asset_saved" : "brand_asset_proposed",
+            `${input.kind} #${input.id} · ${r.changes.length} field(s)`);
+          return { id: input.id, pending: !r.applied && r.changes.length > 0, changes: r.changes.length };
+        } catch (e: any) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: String(e?.message ?? e) });
+        }
+      }
+
+      const id = await saveBrandAsset({
+        orgId: org.id, kind: input.kind, id: null,
+        // 緘默期是限制不是許可，立刻生效（見 brandAssets.activeQuietPeriods）。
+        payload: input.kind === "quiet" ? input.payload : { ...input.payload, approved: false },
+      });
+      await edits.logStrategyEdit({
+        orgId: org.id, entity: "brand_asset", entityId: id, actor, action: "created",
+        note: input.kind === "quiet" ? null : "awaiting approval before the writer can use it",
+      });
       await logEvent(org.id, null, "brand_asset_saved", `${input.kind} #${id}`);
-      return { id };
+      return { id, pending: input.kind !== "quiet", changes: 0 };
     }),
 
   removeBrandAsset: adminProcedure
     .input(z.object({ id: z.number().int().positive() }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
       const org = await getOrg();
       const { removeBrandAsset } = await import("../../strategy/core/hub/brandAssets");
+      const [u] = await q(`SELECT email FROM users WHERE id = ?`, [ctx.user.id]);
+      // 刪掉之前先記下它是什麼 —— 紀錄留著，但資料不在了，光有 id 沒人看得懂。
+      const [row] = await q(`SELECT kind, payload FROM hub_brand_assets WHERE id = ? AND org_id = ?`, [input.id, org.id]);
+      const payload = row ? (typeof row.payload === "string" ? JSON.parse(row.payload || "{}") : row.payload ?? {}) : {};
       await removeBrandAsset(org.id, input.id);
+      const m = await import("../../strategy/core/hub/strategyEdits");
+      await m.logStrategyEdit({
+        orgId: org.id, entity: "brand_asset", entityId: input.id,
+        actor: String(u?.email ?? "admin"), action: "removed",
+        note: row ? `${row.kind}: ${String(payload.label ?? payload.term ?? payload.name ?? "").slice(0, 80)}` : null,
+      });
       await logEvent(org.id, null, "brand_asset_removed", `#${input.id}`);
       return { ok: true };
     }),

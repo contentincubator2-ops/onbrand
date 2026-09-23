@@ -689,6 +689,26 @@ async function main() {
     // 顧慮只對真實公司名成立，所以驗的是「每一筆都標示了是示範／虛構」。
     const customers = assets.filter((a) => a.kind === "customer");
     check(customers.length > 0, "customer whitelist has demo entries", `${customers.length}`);
+
+    // 2026-09-23 (CJ「會有權限和紀錄」)。品牌資料的核准閘門。
+    //
+    // 這裡有一個刻意的不對稱要驗：**許可等核准，限制立刻生效。** 導流目的地是
+    // 「可以連去哪」，沒核准就先不算數（少講幾句，安全）；緘默期是「不可以發文」，
+    // 沒核准就先不生效的話，錯的方向是在財報靜默期照常發文——那是這整套要防的事。
+    const { isApproved } = await import("../server/strategy/core/hub/brandAssets");
+    const unapproved = assets.filter((a) => !isApproved(a.payload));
+    check(true, "brand entries waiting for approval",
+      unapproved.length ? unapproved.map((a) => `${a.kind}#${a.id}`).join(", ") : "none — everything seeded is live");
+
+    // 既有種子資料沒有這個旗標，一定要被當成已核准，否則寫作端會瞬間少掉素材。
+    const seededLive = assets.filter((a) => a.payload?.approved === undefined);
+    check(seededLive.every((a) => isApproved(a.payload)),
+      "an entry with no approval flag counts as approved", `${seededLive.length} legacy rows stay live`);
+
+    // 未核准的目的地不該出現在寫作端。
+    const destLabels = new Set(dests.map((d) => d.label));
+    const leaked = assets.filter((a) => a.kind === "destination" && !isApproved(a.payload) && destLabels.has(String(a.payload.label ?? "")));
+    check(leaked.length === 0, "an unapproved destination never reaches the writer", leaked.map((a) => `#${a.id}`).join(", ") || "ok");
     const unlabelled = customers
       .filter((c) => !/示範|虛構|demo|fictional/i.test(String(c.payload.permission ?? "")))
       .map((c) => String(c.payload.name ?? "?"));

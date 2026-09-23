@@ -28,6 +28,7 @@ import { trpc } from "../../../lib/trpc";
 import { ErrorNote, Loading } from "../ui";
 import { useT } from "../lang";
 import CardShell, { CARD_GRID } from "./card-shell";
+import { StrategyLog, StrategyPendingPanel } from "./strategy-editor";
 
 type Kind = "destination" | "identity" | "account" | "customer" | "quiet";
 
@@ -288,8 +289,22 @@ function AssetModal({
           {items.length ? (
             <ul className="divide-y divide-neutral-100 rounded-lg border border-neutral-200">
               {items.map((a) => (
-                <li key={a.id} className="flex items-start gap-3 p-3">
+                <li key={a.id} className="p-3">
+                  <StrategyPendingPanel
+                    entity="brand_asset" entityId={a.id}
+                    fieldLabel={(f) => {
+                      const spec2 = spec.fields.find((x) => x.key === f);
+                      return spec2 ? t(spec2.label[0], spec2.label[1]) : f;
+                    }}
+                    onDone={onChanged}
+                  />
+                  <div className="flex items-start gap-3">
                   <div className="min-w-0 flex-1">
+                    {a.payload?.approved === false ? (
+                      <div className="mb-1 inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-900">
+                        {t("waiting for approval — the writer cannot use it yet", "等待核准——寫作時還不會用到它")}
+                      </div>
+                    ) : null}
                     {spec.fields.map((f) => {
                       const v = a.payload[f.key];
                       const text = Array.isArray(v) ? v.join("、") : String(v ?? "");
@@ -302,6 +317,9 @@ function AssetModal({
                       );
                     })}
                   </div>
+                  {a.payload?.approved === false ? (
+                    <ApproveNewEntry id={a.id} onDone={onChanged} />
+                  ) : null}
                   <button
                     type="button"
                     onClick={() => startEdit(a)}
@@ -321,6 +339,7 @@ function AssetModal({
                   >
                     <Trash2 className="h-3.5 w-3.5" aria-hidden />
                   </button>
+                  </div>
                 </li>
               ))}
             </ul>
@@ -365,6 +384,17 @@ function AssetModal({
           </div>
         </ModalBody>
 
+        <div className="px-6">
+          <StrategyLog
+            entity="brand_asset"
+            fieldLabel={(f) => {
+              const spec2 = spec.fields.find((x) => x.key === f);
+              if (spec2) return t(spec2.label[0], spec2.label[1]);
+              return f === "approved" ? t("Approval", "核准狀態") : f;
+            }}
+          />
+        </div>
+
         <ModalFooter>
           {editingId ? (
             <button
@@ -390,5 +420,26 @@ function AssetModal({
         </ModalFooter>
       </ModalContent>
     </Modal>
+  );
+}
+
+/** 新增但還沒核准的那一筆。核准＝把 approved 旗標翻成 true，寫作端才讀得到。 */
+function ApproveNewEntry({ id, onDone }: { id: number; onDone: () => void }) {
+  const t = useT();
+  const q = trpc.hub.admin.strategyPending.useQuery({ entity: "brand_asset" }, { staleTime: 10_000 });
+  const act = trpc.hub.admin.approveStrategyItem.useMutation();
+  if (!q.data?.canApprove) return null;
+  return (
+    <button
+      type="button"
+      disabled={act.isPending}
+      onClick={async () => {
+        await act.mutateAsync({ entity: "brand_asset", entityId: id, decision: "approve" });
+        onDone();
+      }}
+      className="shrink-0 rounded-md bg-green-700 px-2 py-1 text-[12px] font-medium text-white disabled:opacity-50"
+    >
+      {act.isPending ? t("Approving…", "核准中…") : t("Approve", "核准")}
+    </button>
   );
 }
