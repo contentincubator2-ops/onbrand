@@ -226,11 +226,67 @@ export const HUB_DDL: string[] = [
     source_url      VARCHAR(500) NOT NULL,
     INDEX idx_org (org_id)
   ) ${TAIL}`,
+
+  // 產品描述的編輯提案與紀錄。邏輯在 strategy/core/hub/solutionEdits.ts，
+  // 但 schema 放這裡——見下面 HUB_ALTERS 的說明。
+  `CREATE TABLE IF NOT EXISTS hub_solution_edits (
+    id              INT          NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    org_id          INT          NOT NULL,
+    solution_id     INT          NOT NULL,
+    actor           VARCHAR(160) NOT NULL,
+    action          VARCHAR(16)  NOT NULL,
+    changes         JSON         NULL,
+    note            VARCHAR(400) NULL,
+    created_at      DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    INDEX idx_solution (solution_id, created_at),
+    INDEX idx_org (org_id, created_at)
+  ) ${TAIL}`,
+
+  `CREATE TABLE IF NOT EXISTS hub_approvers (
+    id              INT          NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    org_id          INT          NOT NULL,
+    email           VARCHAR(160) NOT NULL,
+    added_by        VARCHAR(160) NULL,
+    created_at      DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    UNIQUE KEY uq_org_email (org_id, email)
+  ) ${TAIL}`,
+];
+
+/**
+ * 後來補上的欄位。
+ *
+ * 2026-09-23：這幾個 ALTER 本來住在 solutionEdits.ts，由 tRPC procedure 懶載入
+ * 時才跑。結果是 **部署直接掛掉**：hub-seed.ts 在部署時跑，早於任何一個請求，
+ * 讀到 `SELECT ... profile FROM hub_solutions` 就噴 Unknown column，`set -e`
+ * 中止，連 symlink 都沒切——站上跑的還是上一版，而部署只在 log 裡紅一行。
+ *
+ * 教訓不是「seed 要記得先呼叫那支 DDL」，是 **schema 不該由請求路徑負責建立**。
+ * 所以搬到這裡：ensureHubTables() 在伺服器啟動時跑，也在 seed 最前面跑，
+ * 兩條進入點共用同一份定義。
+ */
+export const HUB_ALTERS: string[] = [
+  // 提案欄位掛在方案本身：一個方案同時間只會有一份待審提案。
+  `ALTER TABLE hub_solutions ADD COLUMN pending JSON NULL`,
+  `ALTER TABLE hub_solutions ADD COLUMN pending_by VARCHAR(160) NULL`,
+  `ALTER TABLE hub_solutions ADD COLUMN pending_at DATETIME(3) NULL`,
+  `ALTER TABLE hub_solutions ADD COLUMN updated_by VARCHAR(160) NULL`,
+  `ALTER TABLE hub_solutions ADD COLUMN updated_at DATETIME(3) NULL`,
+  `ALTER TABLE hub_solutions ADD COLUMN created_by VARCHAR(160) NULL`,
+  // 十一個 B2B 欄位 × 中英 = 二十二欄太多，而且清單還會長，所以一個 JSON。
+  `ALTER TABLE hub_solutions ADD COLUMN profile JSON NULL`,
 ];
 
 export async function ensureHubTables(): Promise<void> {
   const { default: localPool } = await import("../../../localDb");
   for (const ddl of HUB_DDL) {
     await localPool.execute(ddl);
+  }
+  // ALTER 沒有 IF NOT EXISTS，重跑一定會噴 duplicate column —— 那是預期的。
+  for (const ddl of HUB_ALTERS) {
+    await localPool.execute(ddl).catch((e: any) => {
+      if (!/duplicate column/i.test(String(e?.message ?? ""))) {
+        console.warn("[hubDdl] alter:", e?.message ?? e);
+      }
+    });
   }
 }

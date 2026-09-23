@@ -267,6 +267,37 @@ async function main() {
     const missing = need.filter((c) => !have.has(c));
     check(missing.length === 0, "approval columns exist on hub_solutions", missing.join(", ") || need.length + " present");
 
+    // 2026-09-23：這一段是被一次事故逼出來的。profile 欄位的 DDL 原本掛在請求
+    // 路徑上，部署時的 seed 讀不到它，整個部署中止，站上留在上一版——而探針
+    // 全綠，因為它根本沒有量過 profile。沒被量到的東西就是沒有上線。
+    check(have.has("profile"), "profile column exists on hub_solutions", have.has("profile") ? "present" : "MISSING — the seed will abort the deploy");
+
+    const { normaliseProfile, postSafeProfileLines, PROFILE_FIELDS } = await import("../server/strategy/core/hub/solutionProfile");
+    const profileRows = await q<{ slug: string; profile: any }>(
+      `SELECT slug, profile FROM hub_solutions WHERE org_id = ?`,
+      [org.id],
+    );
+    const blank = profileRows
+      .filter((r) => {
+        const p = normaliseProfile(typeof r.profile === "string" ? JSON.parse(r.profile || "{}") : r.profile);
+        return Object.keys(p).length === 0;
+      })
+      .map((r) => r.slug);
+    check(
+      blank.length === 0 && profileRows.length > 0,
+      "every solution has a filled profile",
+      blank.length ? `blank: ${blank.join(", ")}` : `${profileRows.length}/${profileRows.length}`,
+    );
+
+    // 不可進貼文的欄位（競品比較、未公布藍圖、ROI、專利賠償）不能從這支流出去。
+    const sampleRaw = profileRows.find((r) => r.profile)?.profile;
+    if (sampleRaw) {
+      const sample = normaliseProfile(typeof sampleRaw === "string" ? JSON.parse(sampleRaw) : sampleRaw);
+      const lines = postSafeProfileLines(sample, false).join("\n");
+      const leaked = PROFILE_FIELDS.filter((f) => !f.postSafe && sample[f.key]?.en && lines.includes(sample[f.key]!.en.slice(0, 40)));
+      check(leaked.length === 0, "post-unsafe profile fields stay out of the writer", leaked.map((f) => f.key).join(", ") || `${PROFILE_FIELDS.filter((f) => !f.postSafe).length} held back`);
+    }
+
     const approvers = await m.listApprovers(org.id);
     check(true, "approver list", approvers.length ? approvers.map((a) => a.email).join(", ") : "empty — falls back to platform admins");
 

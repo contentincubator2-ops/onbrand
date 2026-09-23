@@ -33,8 +33,6 @@
 import localPool from "../../../localDb";
 import { normaliseProfile, profileToText, type SolutionProfile } from "./solutionProfile";
 
-const TAIL = "ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci";
-
 /**
  * 純文字／布林欄位。2026-09-23 CJ「編輯的功能，要可以編輯產品現在呈現的每個
  * 欄位」，所以從原本的六個擴到涵蓋卡片與 modal 上看得到的全部。
@@ -82,54 +80,19 @@ export function pricesToText(rows: PriceRow[]): string {
 
 export type EditAction = "created" | "edited" | "approved" | "rejected" | "withdrawn";
 
-const DDL = [
-  // 提案欄位掛在方案本身：一個方案同時間只會有一份待審提案，不需要另一張表。
-  `ALTER TABLE hub_solutions ADD COLUMN pending JSON NULL`,
-  `ALTER TABLE hub_solutions ADD COLUMN pending_by VARCHAR(160) NULL`,
-  `ALTER TABLE hub_solutions ADD COLUMN pending_at DATETIME(3) NULL`,
-  `ALTER TABLE hub_solutions ADD COLUMN updated_by VARCHAR(160) NULL`,
-  `ALTER TABLE hub_solutions ADD COLUMN updated_at DATETIME(3) NULL`,
-  `ALTER TABLE hub_solutions ADD COLUMN created_by VARCHAR(160) NULL`,
-  // 2026-09-23 (CJ 的四組 B2B 欄位)。十一個欄位 × 中英 = 二十二欄太多，
-  // 而且清單還會長，所以一個 JSON 欄位，鍵值是 PROFILE_KEYS。
-  `ALTER TABLE hub_solutions ADD COLUMN profile JSON NULL`,
-];
-
-const TABLES = [
-  `CREATE TABLE IF NOT EXISTS hub_solution_edits (
-    id           INT          NOT NULL AUTO_INCREMENT PRIMARY KEY,
-    org_id       INT          NOT NULL,
-    solution_id  INT          NOT NULL,
-    actor        VARCHAR(160) NOT NULL,
-    action       VARCHAR(16)  NOT NULL,
-    /** 這次動到哪些欄位，每個欄位的前後值。審核的人要看得到差異。 */
-    changes      JSON         NULL,
-    note         VARCHAR(400) NULL,
-    created_at   DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
-    INDEX idx_solution (solution_id, created_at),
-    INDEX idx_org (org_id, created_at)
-  ) ${TAIL}`,
-
-  `CREATE TABLE IF NOT EXISTS hub_approvers (
-    id         INT          NOT NULL AUTO_INCREMENT PRIMARY KEY,
-    org_id     INT          NOT NULL,
-    email      VARCHAR(160) NOT NULL,
-    added_by   VARCHAR(160) NULL,
-    created_at DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
-    UNIQUE KEY uq_org_email (org_id, email)
-  ) ${TAIL}`,
-];
-
+/**
+ * 這裡用到的資料表與欄位（hub_solution_edits、hub_approvers、hub_solutions 上
+ * 那七個後加的欄位）**定義在 platform/core/hub/hubDdl.ts**，不在這裡。
+ *
+ * 原因是 2026-09-23 的一次部署失敗：schema 原本由這支的懶載入負責，只有 tRPC
+ * 請求會觸發，而 hub-seed.ts 在部署時就要讀 `profile` 欄位——部署直接中止，
+ * 站上留在上一版。schema 屬於啟動路徑，不屬於請求路徑。
+ *
+ * 這支保留同名函式，是因為 router 有七處在呼叫；它現在就是 ensureHubTables()。
+ */
 export async function ensureSolutionEditTables(): Promise<void> {
-  for (const ddl of TABLES) await localPool.execute(ddl);
-  // ALTER 沒有 IF NOT EXISTS，重跑會噴 duplicate column —— 那是預期的，吞掉。
-  for (const ddl of DDL) {
-    await localPool.execute(ddl).catch((e: any) => {
-      if (!/duplicate column/i.test(String(e?.message ?? ""))) {
-        console.warn("[solutionEdits] ddl:", e?.message ?? e);
-      }
-    });
-  }
+  const { ensureHubTables } = await import("../../../platform/core/hub/hubDdl");
+  await ensureHubTables();
 }
 
 // ── 核准權限 ─────────────────────────────────────────────────────────────
