@@ -16,7 +16,12 @@
  *   StrategyDirectorChat.tsx），不再讓容器高度跟著內容量伸縮。
  *   人設數量：「2-3位，從mos_db選擇」（mos_db 金鑰目前未設定，先用一份
  *   手寫預設人設頂著框架，見 strategistPersonas.ts 的說明）
+ *   「右下方的策略總監，應該要有個小標籤，顯示它是策略總監，這樣，用戶
+ *   才會懂得問他」——單靠圓形頭像 + hover title 不夠，使用者不會主動
+ *   hover 去發現。改成頭像左邊常駐一顆文字標籤（面板收合時才顯示，展開
+ *   後面板抬頭本來就有名字，標籤會跟面板重疊所以隱藏）。
  *
+
  * 黑白線條 B&W 風格（呼應 AgentPersonaBar／PipelineThinkingPanel 那套
  * 「4A 代理商」視覺語言，跟 Mia 的漸層紫刻意不同——就算現在同一個角落，
  * 一眼也看得出是不同角色）。
@@ -58,30 +63,45 @@ export default function StrategyDirectorDrawer({ brandId }: { brandId: number | 
 
   return (
     <>
-      <button
-        onClick={() => setOpen((v) => !v)}
-        aria-label={en ? "Open your Strategy Director" : "打開你的策略總監"}
-        title={en ? "Your Strategy Director — built for this brand" : "你的策略總監——為這個品牌而設計"}
-        style={{
-          // 2026-09-23：右下角（Mia 原本的位置——她的頭像已隱藏），不再是
-          // 右上角。
-          position: "fixed", bottom: 20, right: 20, zIndex: 50,
-          width: 56, height: 56, borderRadius: "50%",
-          background: "white", border: "2px solid #111",
-          boxShadow: open ? "3px 3px 0 rgba(17,17,17,0.4)" : "3px 3px 0 rgba(17,17,17,0.22)",
-          display: "flex", alignItems: "center", justifyContent: "center",
-          cursor: "pointer", padding: 0, overflow: "visible",
-          transition: "box-shadow 0.15s",
-        }}
-      >
-        <img src={avatarUrl} alt={persona.name} style={{ width: "100%", height: "100%", borderRadius: "50%", display: "block" }} />
+      <div style={{
+        // 2026-09-23：右下角（Mia 原本的位置——她的頭像已隱藏），不再是
+        // 右上角。標籤 + 頭像用同一個 fixed row 排版，標籤在左、頭像在右
+        // （row 靠 right:20 貼齊，順序自然就是標籤先出現在頭像左邊）。
+        position: "fixed", bottom: 20, right: 20, zIndex: 50,
+        display: "flex", alignItems: "center", gap: 8,
+      }}>
         {!open && (
-          <span aria-hidden style={{
-            position: "absolute", bottom: 2, right: 2, width: 11, height: 11,
-            borderRadius: "50%", background: "#10b981", border: "2px solid white",
-          }} />
+          <div aria-hidden style={{
+            fontSize: 12.5, fontWeight: 700, color: "#171717", whiteSpace: "nowrap",
+            background: "#fff", border: "2px solid #111", borderRadius: 999,
+            padding: "6px 12px", boxShadow: "2px 2px 0 rgba(17,17,17,0.22)",
+          }}>
+            {en ? "Strategy Director" : "策略總監"}
+          </div>
         )}
-      </button>
+        <button
+          onClick={() => setOpen((v) => !v)}
+          aria-label={en ? "Open your Strategy Director" : "打開你的策略總監"}
+          title={en ? "Your Strategy Director — built for this brand" : "你的策略總監——為這個品牌而設計"}
+          style={{
+            position: "relative", flexShrink: 0,
+            width: 56, height: 56, borderRadius: "50%",
+            background: "white", border: "2px solid #111",
+            boxShadow: open ? "3px 3px 0 rgba(17,17,17,0.4)" : "3px 3px 0 rgba(17,17,17,0.22)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            cursor: "pointer", padding: 0, overflow: "visible",
+            transition: "box-shadow 0.15s",
+          }}
+        >
+          <img src={avatarUrl} alt={persona.name} style={{ width: "100%", height: "100%", borderRadius: "50%", display: "block" }} />
+          {!open && (
+            <span aria-hidden style={{
+              position: "absolute", bottom: 2, right: 2, width: 11, height: 11,
+              borderRadius: "50%", background: "#10b981", border: "2px solid white",
+            }} />
+          )}
+        </button>
+      </div>
 
       {open && (
         <div style={{
