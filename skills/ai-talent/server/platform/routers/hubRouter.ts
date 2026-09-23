@@ -334,6 +334,7 @@ const adminRouter = router({
     const { routeFacts } = await import("../../strategy/core/hub/factRouting");
     const { readPushSettings, dueToday } = await import("../../strategy/core/hub/factPush");
     const { buildRecipients, listOptOuts, listPushLog } = await import("../../strategy/core/hub/pushQueue");
+    type QueueEntry = import("../../strategy/core/hub/pushQueue").QueueEntry;
     const { listReps } = await import("../core/hub/hubStore");
 
     const [facts, reps] = await Promise.all([listFacts(org.id), listReps(org.id)]);
@@ -346,7 +347,9 @@ const adminRouter = router({
     const pushById = new Map(pushRows.map((r: any) => [r.id, readPushSettings(r)]));
 
     const opts = await listOptOuts(org.id);
-    const entries = [] as any[];
+    // 明確的型別，不是 any[] —— 這支的回傳形狀會一路流到前端，用 any 會讓
+    // 前端的每個 map 參數都變成隱含 any，而 client 的 tsconfig 是擋這個的。
+    const entries: QueueEntry[] = [];
     for (const f of facts as any[]) {
       const settings = pushById.get(f.id) ?? { cadence: "off" as const, audience: [], lastPushedAt: null };
       const r = routing[f.id];
