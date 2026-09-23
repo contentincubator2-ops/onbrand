@@ -83,52 +83,52 @@ jobs:
           echo "::add-mask::$NEW_JWT"
 
           cat > "$ENV" << ENVEOF
-# Rebuilt by ops-rebuild-env @ $(date -Iseconds)
-# NOTE: JWT_SECRET is newly generated — all users will need to re-login
+          # Rebuilt by ops-rebuild-env @ $(date -Iseconds)
+          # NOTE: JWT_SECRET is newly generated — all users will need to re-login
 
-NODE_ENV=production
-PORT=3101
-APP_URL=https://onbrand.sowork.ai
-CORS_ORIGIN=https://onbrand.sowork.ai,https://marketing-os.sowork.ai
-EMAIL_FROM=noreply@sowork.ai
+          NODE_ENV=production
+          PORT=3101
+          APP_URL=https://onbrand.sowork.ai
+          CORS_ORIGIN=https://onbrand.sowork.ai,https://marketing-os.sowork.ai
+          EMAIL_FROM=noreply@sowork.ai
 
-JWT_SECRET=${NEW_JWT}
+          JWT_SECRET=${NEW_JWT}
 
-# Stripe
-STRIPE_SECRET_KEY=${SK}
-STRIPE_WEBHOOK_SECRET=${WS}
+          # Stripe
+          STRIPE_SECRET_KEY=${SK}
+          STRIPE_WEBHOOK_SECRET=${WS}
 
-# Email
-RESEND_API_KEY=${RK}
+          # Email
+          RESEND_API_KEY=${RK}
 
-# LLM — Anthropic
-ANTHROPIC_API_KEY=${ANT:-$CLAUDE1}
-CLAUDE_API_KEY_DEFAULT=${CLAUDE1}
-ANTHROPIC_API_KEY_BACKUP_1=${CLAUDE2}
+          # LLM — Anthropic
+          ANTHROPIC_API_KEY=${ANT:-$CLAUDE1}
+          CLAUDE_API_KEY_DEFAULT=${CLAUDE1}
+          ANTHROPIC_API_KEY_BACKUP_1=${CLAUDE2}
 
-# LLM — OpenAI
-OPENAI_API_KEY=${OAI:-$GPT1}
-OPENAI_API_KEY_BACKUP_1=${GPT2}
+          # LLM — OpenAI
+          OPENAI_API_KEY=${OAI:-$GPT1}
+          OPENAI_API_KEY_BACKUP_1=${GPT2}
 
-# LLM — Google
-GEMINI_API_KEY=${GEM}
-GOOGLE_API_KEY=${GEM}
+          # LLM — Google
+          GEMINI_API_KEY=${GEM}
+          GOOGLE_API_KEY=${GEM}
 
-# LLM — DeepSeek
-DEEPSEEK_API_KEY=${DSK}
+          # LLM — DeepSeek
+          DEEPSEEK_API_KEY=${DSK}
 
-# LLM — Perplexity
-PERPLEXITY_API_KEY=${PPX}
+          # LLM — Perplexity
+          PERPLEXITY_API_KEY=${PPX}
 
-# Image
-FAL_API_KEY=${FAL}
-FAL_AI_API_KEY=${FAL}
+          # Image
+          FAL_API_KEY=${FAL}
+          FAL_AI_API_KEY=${FAL}
 
-# Azure
-AZURE_CLAUDE_SWEDEN_API_KEY=${AZU}
-AZURE_CLAUDE_SWEDEN_ENDPOINT=https://proj-claude-sweden-resource.services.ai.azure.com/
-AZURE_FOUNDRY_API_KEY=${AZF}
-ENVEOF
+          # Azure
+          AZURE_CLAUDE_SWEDEN_API_KEY=${AZU}
+          AZURE_CLAUDE_SWEDEN_ENDPOINT=https://proj-claude-sweden-resource.services.ai.azure.com/
+          AZURE_FOUNDRY_API_KEY=${AZF}
+          ENVEOF
 
           echo "✓ Created fresh .env ($(wc -l < "$ENV") lines)"
           echo ""

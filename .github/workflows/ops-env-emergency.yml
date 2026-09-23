@@ -35,27 +35,27 @@ jobs:
             NEW_JWT=$(openssl rand -base64 64 | tr -d '\n=' | head -c 86)
             echo "::add-mask::$NEW_JWT"
             cat > "$ENV" << EOF
-NODE_ENV=production
-PORT=3101
-APP_URL=https://onbrand.sowork.ai
-CORS_ORIGIN=https://onbrand.sowork.ai,https://marketing-os.sowork.ai
-EMAIL_FROM=noreply@sowork.ai
-JWT_SECRET=${NEW_JWT}
-STRIPE_SECRET_KEY=${SK}
-STRIPE_WEBHOOK_SECRET=${WS}
-RESEND_API_KEY=${RK}
-ANTHROPIC_API_KEY=${ANT:-${CLAUDE1}}
-CLAUDE_API_KEY_DEFAULT=${CLAUDE1}
-OPENAI_API_KEY=${OAI}
-GEMINI_API_KEY=${GEM}
-GOOGLE_API_KEY=${GEM}
-DEEPSEEK_API_KEY=${DSK}
-PERPLEXITY_API_KEY=${PPX}
-FAL_API_KEY=${FAL}
-FAL_AI_API_KEY=${FAL}
-AZURE_CLAUDE_SWEDEN_API_KEY=${AZU}
-AZURE_CLAUDE_SWEDEN_ENDPOINT=https://proj-claude-sweden-resource.services.ai.azure.com/
-EOF
+          NODE_ENV=production
+          PORT=3101
+          APP_URL=https://onbrand.sowork.ai
+          CORS_ORIGIN=https://onbrand.sowork.ai,https://marketing-os.sowork.ai
+          EMAIL_FROM=noreply@sowork.ai
+          JWT_SECRET=${NEW_JWT}
+          STRIPE_SECRET_KEY=${SK}
+          STRIPE_WEBHOOK_SECRET=${WS}
+          RESEND_API_KEY=${RK}
+          ANTHROPIC_API_KEY=${ANT:-${CLAUDE1}}
+          CLAUDE_API_KEY_DEFAULT=${CLAUDE1}
+          OPENAI_API_KEY=${OAI}
+          GEMINI_API_KEY=${GEM}
+          GOOGLE_API_KEY=${GEM}
+          DEEPSEEK_API_KEY=${DSK}
+          PERPLEXITY_API_KEY=${PPX}
+          FAL_API_KEY=${FAL}
+          FAL_AI_API_KEY=${FAL}
+          AZURE_CLAUDE_SWEDEN_API_KEY=${AZU}
+          AZURE_CLAUDE_SWEDEN_ENDPOINT=https://proj-claude-sweden-resource.services.ai.azure.com/
+          EOF
             echo "Created .env with $(wc -l < "$ENV") lines"
           fi
           MOS=/opt/marketing-os/app/skills/ai-talent/.env
