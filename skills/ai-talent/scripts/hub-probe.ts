@@ -189,6 +189,45 @@ async function main() {
       `${beforeAgain?.n} → ${afterAgain?.n}`,
     );
 
+    /**
+     * 上面那兩條在 demo 資料庫上是 "0 of 0" —— 這裡從來沒有人透過介面改過產品
+     * 或用詞，所以舊表是空的。那證明了搬遷不會重複執行，但**沒有證明它真的會
+     * 搬**。空資料上跑過的搬遷等於沒跑過。
+     *
+     * 所以自己種一筆舊紀錄進去，跑一次，確認它到了新表而且欄位對得上，再清掉。
+     */
+    const legacyProbeId = 990000 + (Date.now() % 9000);
+    try {
+      await exec(
+        `INSERT INTO hub_wording_edits (id, org_id, wording_id, actor, action, market, kind, term, changes)
+         VALUES (?, ?, NULL, 'hub-probe-legacy', 'added', 'TW', 'preferred', 'probe-legacy-term', ?)`,
+        [legacyProbeId, org.id, JSON.stringify([{ field: "term", from: "", to: "probe-legacy-term" }])],
+      );
+      const moved = await m.migrateLegacyEdits(org.id);
+      check(moved.wording >= 1, "the migration actually moves a legacy row", `moved ${moved.wording}`);
+
+      const [landed] = await q(
+        `SELECT actor, action, label, changes FROM hub_strategy_edits
+          WHERE org_id = ? AND entity = 'wording' AND legacy_id = ? LIMIT 1`,
+        [org.id, legacyProbeId],
+      );
+      check(landed != null, "the moved row is findable by its legacy id", landed ? "found" : "MISSING");
+      check(String(landed?.label ?? "") === "probe-legacy-term", "the old `term` column lands in `label`", String(landed?.label ?? "(none)"));
+      // 舊表的 "added" 要在搬遷時對齊成 "created"，資料裡只留一套詞彙。
+      check(String(landed?.action ?? "") === "created", "the old verb is translated, not copied", String(landed?.action ?? "(none)"));
+
+      const again = await m.migrateLegacyEdits(org.id);
+      check(again.wording === 0, "re-running does not duplicate the moved row", `second pass moved ${again.wording}`);
+    } finally {
+      await exec(`DELETE FROM hub_wording_edits WHERE id = ? AND org_id = ?`, [legacyProbeId, org.id]);
+      await exec(`DELETE FROM hub_strategy_edits WHERE org_id = ? AND legacy_id = ?`, [org.id, legacyProbeId]);
+    }
+    const [leftover2] = await q(
+      `SELECT COUNT(*) AS n FROM hub_strategy_edits WHERE org_id = ? AND actor = 'hub-probe-legacy'`,
+      [org.id],
+    );
+    check(Number(leftover2?.n) === 0, "probe left no legacy test rows behind", `${leftover2?.n} rows`);
+
     const [reg] = await q(`SELECT id, name_zh FROM hub_regulations WHERE org_id = ? ORDER BY id LIMIT 1`, [org.id]);
     if (reg) {
       const original = String(reg.name_zh ?? "");
