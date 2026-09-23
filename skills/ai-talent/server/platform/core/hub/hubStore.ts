@@ -162,6 +162,11 @@ export interface HubSolution {
   sourceUrl: string | null;
   featured: boolean;
   isAsus: boolean;
+  pending: Record<string, string> | null;
+  pendingBy: string | null;
+  pendingAt: string | null;
+  updatedBy: string | null;
+  updatedAt: string | null;
   prices: HubPrice[];
 }
 
@@ -181,6 +186,13 @@ export async function listSolutions(orgId: number): Promise<HubSolution[]> {
     summaryZh: s.summary_zh, features: json(s.features, []), audienceEn: s.audience_en,
     audienceZh: s.audience_zh, sourceUrl: s.source_url, featured: Boolean(s.featured),
     isAsus: Boolean(s.is_asus),
+    // 2026-09-23 (CJ 編輯／核准): 待審提案不套用到正式欄位，只帶給後台看。
+    // 業務與 AI 讀到的永遠是已核准的版本 —— 那正是核准這件事的意義。
+    pending: json(s.pending, null) as Record<string, string> | null,
+    pendingBy: s.pending_by ?? null,
+    pendingAt: s.pending_at ? new Date(s.pending_at).toISOString() : null,
+    updatedBy: s.updated_by ?? null,
+    updatedAt: s.updated_at ? new Date(s.updated_at).toISOString() : null,
     prices: prices.filter((p) => p.solution_id === s.id).map((p) => ({
       id: p.id, planEn: p.plan_en, planZh: p.plan_zh, amount: p.amount, currency: p.currency,
       billing: p.billing, startsFrom: Boolean(p.starts_from),

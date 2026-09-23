@@ -18,7 +18,7 @@ export default function StrategyProductsPage() {
         )}
       />
       {strategy.isLoading ? <Loading /> : <ErrorNote error={strategy.error} />}
-      {strategy.data ? <StratProductCards solutions={strategy.data.solutions} /> : null}
+      {strategy.data ? <StratProductCards solutions={strategy.data.solutions} onChanged={() => void strategy.refetch()} /> : null}
     </div>
   );
 }

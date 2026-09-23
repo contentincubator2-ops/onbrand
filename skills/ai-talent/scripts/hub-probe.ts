@@ -251,6 +251,50 @@ async function main() {
     }
   }
 
+  // ── Product editing / approval (CJ 2026-09-23) ──────────────────────────────
+  section("Product editing");
+  try {
+    const m = await import("../server/strategy/core/hub/solutionEdits");
+    await m.ensureSolutionEditTables();
+
+    // 這幾個欄位是「核准才生效」的前提 —— 少一個，編輯就會直接蓋掉正式內容。
+    const cols = await q<{ COLUMN_NAME: string }>(
+      `SELECT COLUMN_NAME FROM information_schema.columns
+        WHERE table_schema = DATABASE() AND table_name = 'hub_solutions'`,
+    );
+    const have = new Set(cols.map((c) => String(c.COLUMN_NAME)));
+    const need = ["pending", "pending_by", "pending_at", "updated_by", "updated_at", "created_by"];
+    const missing = need.filter((c) => !have.has(c));
+    check(missing.length === 0, "approval columns exist on hub_solutions", missing.join(", ") || need.length + " present");
+
+    const approvers = await m.listApprovers(org.id);
+    check(true, "approver list", approvers.length ? approvers.map((a) => a.email).join(", ") : "empty — falls back to platform admins");
+
+    // 名單空的時候只有管理員能核准；有名單的時候只認名單。兩條都驗。
+    const adminCan = await m.canApprove(org.id, "nobody@example.com", true);
+    const strangerCan = await m.canApprove(org.id, "nobody@example.com", false);
+    if (approvers.length === 0) {
+      check(adminCan && !strangerCan, "empty list falls back to platform admins only", `admin=${adminCan} stranger=${strangerCan}`);
+    } else {
+      check(!strangerCan, "a non-approver cannot approve", `stranger=${strangerCan}`);
+    }
+
+    // diff 是審核的人唯一看得到的東西，算錯就是審了個假的差異。
+    const noChange = m.diffFields({ name_en: "A", summary_en: "B" }, { name_en: "  A  " });
+    check(noChange.length === 0, "whitespace-only edit is not a change", `${noChange.length}`);
+    const realChange = m.diffFields({ name_en: "A", summary_en: "B" }, { summary_en: "C" });
+    check(
+      realChange.length === 1 && realChange[0]?.from === "B" && realChange[0]?.to === "C",
+      "a real edit carries both sides",
+      JSON.stringify(realChange),
+    );
+
+    const edits = await m.listEdits(org.id, undefined, 5);
+    check(Array.isArray(edits), "edit log reads back", `${edits.length} recent`);
+  } catch (e: any) {
+    bad("product editing", e?.message ?? String(e));
+  }
+
   // ── Brand assets (CJ 2026-09-22) ────────────────────────────────────────────
   section("Brand assets");
   try {

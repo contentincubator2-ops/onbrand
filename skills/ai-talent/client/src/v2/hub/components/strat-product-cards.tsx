@@ -14,11 +14,13 @@
  * 核准清單，業務寫「$0」就會通過價格檢查。
  */
 import React, { useState } from "react";
-import { Boxes, ExternalLink, Star } from "lucide-react";
+import { Boxes, Clock, ExternalLink, History, Plus, Star } from "lucide-react";
 import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter } from "@heroui/react";
 import CardShell, { CARD_GRID } from "./card-shell";
 import { ExtLink, categoryLabel, priceLabel, type Solution } from "./strat-shared";
 import { useT } from "../lang";
+import { trpc } from "../../../lib/trpc";
+import { CreateSolutionModal, EditLog, EditSolutionModal, PendingPanel } from "./strat-product-edit";
 
 /** 這個方案最低的那個有數字的核准價，沒有就回 null。 */
 function lowestPrice(s: Solution) {
@@ -27,12 +29,17 @@ function lowestPrice(s: Solution) {
   return withAmount.reduce((a, b) => (Number(a.amount) <= Number(b.amount) ? a : b));
 }
 
-export default function StratProductCards({ solutions }: { solutions: Solution[] }) {
+export default function StratProductCards({ solutions, onChanged }: { solutions: Solution[]; onChanged?: () => void }) {
   const t = useT();
   const [openId, setOpenId] = useState<number | null>(null);
+  const [creating, setCreating] = useState(false);
   const active = solutions.find((s) => s.id === openId) ?? null;
 
+  const editing = trpc.hub.admin.solutionEditing.useQuery(undefined, { staleTime: 30_000 });
+  const refresh = () => { onChanged?.(); void editing.refetch(); };
+
   const quoteOnly = solutions.filter((s) => !lowestPrice(s)).length;
+  const awaiting = solutions.filter((s) => s.pending && Object.keys(s.pending).length).length;
 
   return (
     <div className="min-w-0">
@@ -46,6 +53,17 @@ export default function StratProductCards({ solutions }: { solutions: Solution[]
             `${solutions.length} 個方案 · ${quoteOnly} 個沒有可以報的價格`,
           )}
         </span>
+        {awaiting ? (
+          <span className="inline-flex items-center gap-1 rounded-full bg-orange-100 px-2 py-0.5 text-[12px] font-medium text-orange-800">
+            <Clock className="h-3 w-3" aria-hidden />
+            {t(`${awaiting} waiting for approval`, `${awaiting} 筆等待核准`)}
+          </span>
+        ) : null}
+        {editing.data && !editing.data.canApprove ? (
+          <span className="text-[11.5px] text-stone-400">
+            {t("You can edit, but not approve.", "你可以編輯，但不能核准。")}
+          </span>
+        ) : null}
       </div>
 
       <div className={CARD_GRID}>
@@ -57,9 +75,15 @@ export default function StratProductCards({ solutions }: { solutions: Solution[]
             <CardShell
               key={s.id}
               onClick={() => setOpenId(s.id)}
-              accent={s.featured ? "#EA580C" : "#0369A1"}
-              icon={s.featured ? Star : Boxes}
-              tag={s.featured ? t("Featured", "精選") : categoryLabel(s.category)}
+              accent={s.pending && Object.keys(s.pending).length ? "#C2410C" : s.featured ? "#EA580C" : "#0369A1"}
+              icon={s.pending && Object.keys(s.pending).length ? Clock : s.featured ? Star : Boxes}
+              tag={
+                s.pending && Object.keys(s.pending).length
+                  ? t("PENDING", "待核准")
+                  : s.featured
+                    ? t("Featured", "精選")
+                    : categoryLabel(s.category)
+              }
               name={s.nameEn}
               // 2026-09-23 (CJ「產品的卡片，就不出現 how it count，而是這個產品的
               // 簡單介紹」)。這一頁的讀者要先知道這是什麼東西；價格哪裡來的
@@ -107,15 +131,54 @@ export default function StratProductCards({ solutions }: { solutions: Solution[]
             </CardShell>
           );
         })}
+
+        <button
+          type="button"
+          onClick={() => setCreating(true)}
+          className="flex min-h-[200px] flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-neutral-300 bg-white text-neutral-500 transition hover:border-neutral-500 hover:text-neutral-800"
+        >
+          <Plus className="h-5 w-5" aria-hidden />
+          <span className="text-[13px] font-medium">{t("Add a product", "新增產品")}</span>
+        </button>
       </div>
 
-      {active ? <SolutionModal s={active} onClose={() => setOpenId(null)} /> : null}
+      {active ? (
+        <SolutionModal
+          s={active}
+          canApprove={Boolean(editing.data?.canApprove)}
+          me={editing.data?.me ?? ""}
+          onClose={() => setOpenId(null)}
+          onChanged={refresh}
+        />
+      ) : null}
+      {creating ? (
+        <CreateSolutionModal onClose={() => setCreating(false)} onCreated={() => { setCreating(false); refresh(); }} />
+      ) : null}
     </div>
   );
 }
 
-function SolutionModal({ s, onClose }: { s: Solution; onClose: () => void }) {
+function SolutionModal({
+  s, canApprove, me, onClose, onChanged,
+}: { s: Solution; canApprove: boolean; me: string; onClose: () => void; onChanged: () => void }) {
   const t = useT();
+  const [editing, setEditing] = useState(false);
+  const [showLog, setShowLog] = useState(false);
+  const history = trpc.hub.admin.solutionHistory.useQuery(
+    { solutionId: s.id },
+    { enabled: showLog, staleTime: 10_000 },
+  );
+
+  if (editing) {
+    return (
+      <EditSolutionModal
+        s={s}
+        onClose={() => setEditing(false)}
+        onSaved={() => { setEditing(false); onChanged(); onClose(); }}
+      />
+    );
+  }
+
   return (
     <Modal isOpen size="2xl" scrollBehavior="inside" onClose={onClose}>
       <ModalContent>
@@ -128,6 +191,8 @@ function SolutionModal({ s, onClose }: { s: Solution; onClose: () => void }) {
         </ModalHeader>
 
         <ModalBody>
+          <PendingPanel s={s} canApprove={canApprove} me={me} onDone={() => { onChanged(); onClose(); }} />
+
           <p className="text-[13px] leading-relaxed text-neutral-700">{s.summaryEn}</p>
           <p lang="zh-Hant" className="text-[13px] leading-relaxed text-neutral-500">{s.summaryZh}</p>
 
@@ -175,6 +240,32 @@ function SolutionModal({ s, onClose }: { s: Solution; onClose: () => void }) {
               <p lang="zh-Hant" className="text-[12px] text-neutral-500">{s.audienceZh}</p>
             </div>
           ) : null}
+          <div className="mt-4">
+            <button
+              type="button"
+              onClick={() => setShowLog((v) => !v)}
+              className="inline-flex items-center gap-1.5 text-[12.5px] font-medium text-neutral-600 hover:text-neutral-900"
+            >
+              <History className="h-3.5 w-3.5" aria-hidden />
+              {showLog ? t("Hide change record", "收起變更紀錄") : t("Change record — who changed what, when", "變更紀錄——誰在什麼時候改了什麼")}
+            </button>
+            {showLog ? (
+              <div className="mt-2">
+                {history.isLoading ? (
+                  <p className="text-[13px] text-neutral-500">{t("Loading…", "載入中…")}</p>
+                ) : (
+                  <EditLog history={history.data?.history ?? []} />
+                )}
+              </div>
+            ) : null}
+          </div>
+
+          {s.updatedBy ? (
+            <p className="mt-3 text-[11.5px] text-neutral-400">
+              {t("Last approved change by", "最後一次核准的變更")} {s.updatedBy}
+              {s.updatedAt ? ` · ${new Date(s.updatedAt).toLocaleString()}` : ""}
+            </p>
+          ) : null}
         </ModalBody>
 
         <ModalFooter className="justify-between">
@@ -183,14 +274,23 @@ function SolutionModal({ s, onClose }: { s: Solution; onClose: () => void }) {
               <ExternalLink className="h-3.5 w-3.5" aria-hidden />
             </ExtLink>
           ) : <span />}
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-lg px-4 py-2 text-[13px] font-semibold text-white"
-            style={{ background: "#F97316" }}
-          >
-            {t("Close", "關閉")}
-          </button>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => setEditing(true)}
+              className="rounded-lg border border-neutral-300 px-3 py-2 text-[13px] text-neutral-700 hover:bg-neutral-50"
+            >
+              {t("Edit description", "編輯描述")}
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-lg px-4 py-2 text-[13px] font-semibold text-white"
+              style={{ background: "#F97316" }}
+            >
+              {t("Close", "關閉")}
+            </button>
+          </div>
         </ModalFooter>
       </ModalContent>
     </Modal>

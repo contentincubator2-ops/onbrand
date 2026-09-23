@@ -127,6 +127,149 @@ const adminRouter = router({
    * 品牌頁的操作性資料（導流目的地／識別寫法／官方帳號／客戶白名單／緘默期）。
    * 五類共用一組 CRUD —— 它們的差別只在表單欄位，那是前端的事。
    */
+  /**
+   * 產品描述的編輯／核准／紀錄（CJ 2026-09-23）。
+   *
+   * 編輯不直接改正式欄位——提案存在 pending，核准才合併過去。業務與 AI 讀到的
+   * 永遠是已核准的版本，否則「核准」就只是個沒有作用的按鈕。
+   */
+  solutionEditing: adminProcedure.query(async ({ ctx }) => {
+    const org = await getOrg();
+    const m = await import("../../strategy/core/hub/solutionEdits");
+    await m.ensureSolutionEditTables();
+    const [u] = await q(`SELECT email, role FROM users WHERE id = ? LIMIT 1`, [ctx.user.id]);
+    const email = String(u?.email ?? "");
+    return {
+      me: email,
+      canApprove: await m.canApprove(org.id, email, u?.role === "admin"),
+      approvers: await m.listApprovers(org.id),
+      history: await m.listEdits(org.id, undefined, 60),
+    };
+  }),
+
+  solutionHistory: adminProcedure
+    .input(z.object({ solutionId: z.number().int().positive() }))
+    .query(async ({ input }) => {
+      const org = await getOrg();
+      const m = await import("../../strategy/core/hub/solutionEdits");
+      await m.ensureSolutionEditTables();
+      return { history: await m.listEdits(org.id, input.solutionId, 50) };
+    }),
+
+  editSolution: adminProcedure
+    .input(z.object({
+      solutionId: z.number().int().positive(),
+      fields: z.object({
+        name_en: z.string().max(160).optional(),
+        name_zh: z.string().max(160).optional(),
+        summary_en: z.string().max(4000).optional(),
+        summary_zh: z.string().max(4000).optional(),
+        audience_en: z.string().max(300).optional(),
+        audience_zh: z.string().max(300).optional(),
+      }),
+      note: z.string().max(400).optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const org = await getOrg();
+      const m = await import("../../strategy/core/hub/solutionEdits");
+      await m.ensureSolutionEditTables();
+      const [u] = await q(`SELECT email FROM users WHERE id = ? LIMIT 1`, [ctx.user.id]);
+      const r = await m.proposeEdit({
+        orgId: org.id, solutionId: input.solutionId, actor: String(u?.email ?? `user:${ctx.user.id}`),
+        proposed: input.fields, note: input.note,
+      });
+      await logEvent(org.id, null, "solution_edit_proposed", `#${input.solutionId} · ${r.changed} field(s)`);
+      return r;
+    }),
+
+  approveSolutionEdit: adminProcedure
+    .input(z.object({ solutionId: z.number().int().positive() }))
+    .mutation(async ({ ctx, input }) => {
+      const org = await getOrg();
+      const m = await import("../../strategy/core/hub/solutionEdits");
+      await m.ensureSolutionEditTables();
+      const [u] = await q(`SELECT email, role FROM users WHERE id = ? LIMIT 1`, [ctx.user.id]);
+      const email = String(u?.email ?? "");
+      if (!(await m.canApprove(org.id, email, u?.role === "admin"))) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "You are not on the approver list for this organisation." });
+      }
+      try {
+        const r = await m.approveEdit({ orgId: org.id, solutionId: input.solutionId, actor: email });
+        await logEvent(org.id, null, "solution_edit_approved", `#${input.solutionId} · ${r.applied} field(s)`);
+        return r;
+      } catch (e: any) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: String(e?.message ?? e) });
+      }
+    }),
+
+  rejectSolutionEdit: adminProcedure
+    .input(z.object({ solutionId: z.number().int().positive(), note: z.string().max(400).optional() }))
+    .mutation(async ({ ctx, input }) => {
+      const org = await getOrg();
+      const m = await import("../../strategy/core/hub/solutionEdits");
+      await m.ensureSolutionEditTables();
+      const [u] = await q(`SELECT email, role FROM users WHERE id = ? LIMIT 1`, [ctx.user.id]);
+      const email = String(u?.email ?? "");
+      if (!(await m.canApprove(org.id, email, u?.role === "admin"))) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "You are not on the approver list for this organisation." });
+      }
+      await m.rejectEdit({ orgId: org.id, solutionId: input.solutionId, actor: email, note: input.note });
+      await logEvent(org.id, null, "solution_edit_rejected", `#${input.solutionId}`);
+      return { ok: true };
+    }),
+
+  createSolution: adminProcedure
+    .input(z.object({
+      nameEn: z.string().min(2).max(160),
+      nameZh: z.string().min(1).max(160),
+      vendor: z.string().min(2).max(160),
+      category: z.string().min(2).max(80),
+      summaryEn: z.string().min(20).max(4000),
+      summaryZh: z.string().min(10).max(4000),
+      sourceUrl: z.string().max(500).optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const org = await getOrg();
+      const m = await import("../../strategy/core/hub/solutionEdits");
+      await m.ensureSolutionEditTables();
+      const [u] = await q(`SELECT email FROM users WHERE id = ? LIMIT 1`, [ctx.user.id]);
+      const r = await m.createSolution({ orgId: org.id, actor: String(u?.email ?? `user:${ctx.user.id}`), ...input });
+      await logEvent(org.id, null, "solution_created", `${input.nameEn} — ${input.vendor}`);
+      return r;
+    }),
+
+  draftSolutionCopy: adminProcedure
+    .input(z.object({
+      name: z.string().max(160).default(""),
+      vendor: z.string().max(160).default(""),
+      notes: z.string().min(15).max(2000),
+    }))
+    .mutation(async ({ input }) => {
+      const { draftSolutionCopy } = await import("../../strategy/core/hub/draftSolutionCopy");
+      try {
+        return await draftSolutionCopy(input);
+      } catch (e: any) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: String(e?.message ?? e) });
+      }
+    }),
+
+  setApprover: adminProcedure
+    .input(z.object({ email: z.string().email().max(160).optional(), removeId: z.number().int().positive().optional() }))
+    .mutation(async ({ ctx, input }) => {
+      const org = await getOrg();
+      const m = await import("../../strategy/core/hub/solutionEdits");
+      await m.ensureSolutionEditTables();
+      const [u] = await q(`SELECT email, role FROM users WHERE id = ? LIMIT 1`, [ctx.user.id]);
+      // 誰能改核准名單？只有平台管理員 —— 否則任何人都能把自己加進去，
+      // 這個閘門就等於不存在。
+      if (u?.role !== "admin") {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Only a platform admin can change the approver list." });
+      }
+      if (input.removeId) await m.removeApprover(org.id, input.removeId);
+      else if (input.email) await m.addApprover(org.id, input.email, String(u?.email ?? ""));
+      return { approvers: await m.listApprovers(org.id) };
+    }),
+
   brandAssets: adminProcedure.query(async () => {
     const org = await getOrg();
     const { ensureBrandAssetTable, listBrandAssets, activeQuietPeriods } = await import("../../strategy/core/hub/brandAssets");
