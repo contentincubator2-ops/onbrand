@@ -438,7 +438,20 @@ const adminRouter = router({
   regulations: adminProcedure.query(async () => {
     const org = await getOrg();
     const { listRegulations } = await import("../core/hub/hubStore");
-    return listRegulations(org.id);
+    const { coverRegulations } = await import("../../strategy/core/hub/regulationCoverage");
+    const items = await listRegulations(org.id);
+    /**
+     * 2026-09-23：每條法規上掛的「已套用至政策包」是**手動維護的欄位**，
+     * 沒有任何東西驗證政策包真的跟著改了。完整驗證做不到（那是人的判斷），
+     * 但有一半驗得動：法規指名的那幾項檢查，政策包裡到底有沒有。
+     * 詳見 regulationCoverage.ts。
+     */
+    const packRuleIds = {
+      TW: POLICY_PACKS.TW.rules.map((r) => r.id),
+      US: POLICY_PACKS.US.rules.map((r) => r.id),
+    };
+    const today = new Date().toISOString().slice(0, 10);
+    return { items, coverage: coverRegulations(items, packRuleIds, today), today };
   }),
 
   content: adminProcedure.query(async () => {

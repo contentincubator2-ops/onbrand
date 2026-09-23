@@ -101,6 +101,46 @@ async function main() {
   check(approved.length > 0, "approved writing skills", `${approved.length}/${skills.length}`);
   check(regs.length > 0, "regulation entries", `${regs.length}`);
 
+  // ── 法規卡上的數字（CJ 2026-09-23「regulation update，請同樣使用任務卡」） ──
+  //
+  // 每張卡上掛著「已套用至政策包」。那是**手動維護的欄位**，沒有東西驗證政策包
+  // 真的跟著改了。驗得動的是另一半：法規指名的檢查在政策包裡存不存在。對不上就
+  // 是死對應——法規卡寫著「影響：核准價格」，政策包裡卻沒有這項檢查。
+  try {
+    const { coverRegulations, overdueCount, brokenMappings } = await import(
+      "../server/strategy/core/hub/regulationCoverage"
+    );
+    const { POLICY_PACKS } = await import("../server/content/core/hub/policyPacks");
+    const packRuleIds = {
+      TW: POLICY_PACKS.TW.rules.map((r) => r.id),
+      US: POLICY_PACKS.US.rules.map((r) => r.id),
+    };
+    const today = new Date().toISOString().slice(0, 10);
+    const cov = coverRegulations(regs as any, packRuleIds, today);
+
+    check(Object.keys(cov).length === regs.length, "every regulation got covered", `${Object.keys(cov).length}/${regs.length}`);
+
+    const broken = brokenMappings(cov);
+    check(
+      broken.length === 0,
+      "every check a regulation names exists in its policy pack",
+      broken.length ? broken.map((b) => `#${b.id}: ${b.unknown.join(",")}`).join("; ") : "no dead mappings",
+    );
+
+    // 逾期的算法獨立重算一次 —— 這是整頁唯一會變紅的數字，算錯比不算更糟。
+    const recount = regs.filter((r) => r.status !== "applied" && r.effectiveOn && r.effectiveOn <= today).length;
+    check(overdueCount(cov) === recount, "the overdue count agrees with a plain recount", `${overdueCount(cov)} vs ${recount}`);
+    if (overdueCount(cov)) {
+      notes.push(`${overdueCount(cov)} regulation(s) in force but not marked applied`);
+    }
+
+    // 沒有生效日的那些不該冒出天數 —— 那會憑空生出一個期限。
+    const phantom = regs.filter((r) => !r.effectiveOn && (cov[r.id]?.overdueDays != null || cov[r.id]?.daysUntil != null));
+    check(phantom.length === 0, "a rule with no effective date gets no countdown", phantom.map((r) => `#${r.id}`).join(", ") || "ok");
+  } catch (e: any) {
+    bad("regulation coverage", e?.message ?? String(e));
+  }
+
   for (const market of ["TW", "US"]) {
     const w = await listWording(org.id, market);
     check(w.length > 0, `wording lists (${market})`, `${w.length}`);
@@ -231,7 +271,7 @@ async function main() {
       ["overview", () => caller.hub.admin.overview(), (r) => r && typeof r === "object", (r) => JSON.stringify(r).slice(0, 90)],
       ["strategy", () => caller.hub.admin.strategy(), (r) => r?.solutions?.length > 0, (r) => `${r?.solutions?.length} solutions, ${r?.facts?.length} facts`],
       ["wording", () => caller.hub.admin.wording(), (r) => r?.items?.length > 0 && !!r?.legal?.TW && !!r?.legal?.US, (r) => `${r?.items?.length} editable, legal packs TW+US`],
-      ["regulations", () => caller.hub.admin.regulations(), (r) => Array.isArray(r) ? r.length > 0 : r?.items?.length > 0, (r) => `${(Array.isArray(r) ? r : r?.items ?? []).length}`],
+      ["regulations", () => caller.hub.admin.regulations(), (r) => r?.items?.length > 0 && !!r?.coverage, (r) => `${r?.items?.length} updates, coverage for ${Object.keys(r?.coverage ?? {}).length}`],
       ["content", () => caller.hub.admin.content(), (r) => !!r, (r) => `${r?.skills?.length ?? 0} skills`],
       ["reps", () => caller.hub.admin.reps(), (r) => Array.isArray(r) ? r.length > 0 : r?.reps?.length > 0, (r) => `${(Array.isArray(r) ? r : r?.reps ?? []).length}`],
       ["performance", () => caller.hub.admin.performance(), (r) => !!r, (r) => JSON.stringify(r).slice(0, 90)],
