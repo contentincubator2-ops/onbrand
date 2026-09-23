@@ -59,8 +59,11 @@ function noteText(note: string | null, en: boolean): string {
 }
 
 const splitList = (s: string): string[] => s.split(/[,，、\n]/).map((x) => x.trim()).filter(Boolean);
-const btnGhost = "rounded-full border border-neutral-900 px-3 py-1 text-[12px] font-medium text-neutral-900 transition hover:bg-neutral-900 hover:text-white";
-const btnGhostDisabled = "rounded-full border border-neutral-300 px-3 py-1 text-[12px] font-medium text-neutral-400";
+// 2026-09-23 (CJ「策略監測的按鈕再小一點，我想讓底下的策略卡片更明顯」)：
+// 監測清單／立即掃描縮小一號——這張卡是輔助功能，不該跟下面的定位卡片
+// 搶視覺重量。
+const btnGhost = "rounded-full border border-neutral-900 px-2.5 py-0.5 text-[11px] font-medium text-neutral-900 transition hover:bg-neutral-900 hover:text-white";
+const btnGhostDisabled = "rounded-full border border-neutral-300 px-2.5 py-0.5 text-[11px] font-medium text-neutral-400";
 
 export default function StrategyAlertsPanel({ brandId }: { brandId: number }) {
   const { lang } = useLang();
@@ -117,7 +120,7 @@ export default function StrategyAlertsPanel({ brandId }: { brandId: number }) {
                 : "替你盯著品牌、產品與競爭者；有變化時亮出情報，指回該調整的錨點。專業方案內含。"}
             </p>
           </div>
-          <button onClick={() => navigate("/pricing")} className="rounded-full bg-neutral-900 px-3.5 py-1.5 text-[12.5px] font-medium text-white hover:bg-neutral-800">
+          <button onClick={() => navigate("/pricing")} className="rounded-full bg-neutral-900 px-3 py-1 text-[11.5px] font-medium text-white hover:bg-neutral-800">
             {en ? "See the Professional plan" : "看專業方案"}
           </button>
         </div>

@@ -140,6 +140,8 @@ export const BRAND_PROMPT_FIELDS: PromptField[] = [
   { path: "audience.primary",       label: "主受眾",       shape: "text", cost: "文案沒有對象，會寫成對所有人說話（等於對沒有人說話）" },
   { path: "audience.painPoints",    label: "受眾痛點",     shape: "list", cost: "hook 抓不到痛點，開場句會變成自我介紹" },
   { path: "differentiation.summary", label: "差異化總結",  shape: "text", cost: "說不出你跟競品差在哪，只能講自己好" },
+  { path: "differentiation.discriminator",  label: "唯一致勝理由", shape: "text", cost: "沒有一個最尖銳的理由，文案的 hook 會含糊、什麼優點都提一點" },
+  { path: "differentiation.reasonToBelieve", label: "支撐證據",   shape: "text", cost: "主張沒有證據撐腰，AI 只能跟著複述空話，讀者也不會信" },
 ];
 
 /** 產品：對應 PRODUCT_SEGMENTS 的 canonical 欄位。 */

@@ -270,6 +270,10 @@ function buildBrandCoreDigest(positioning: any): string {
   const diff = firstSentence(positioning.differentiation?.emotional, 110)
     || firstSentence(positioning.differentiation?.functional, 110);
   if (diff) lines.push(`核心差異：${diff}`);
+  // 2026-09-23：discriminator 是唯一一條、比 summary 更尖銳的致勝理由——
+  // 短任務尤其需要一句夠尖的 hook，值得跟標語同級放進精簡 digest。
+  const discriminator = positioning.differentiation?.discriminator;
+  if (discriminator) lines.push(`致勝理由：${String(discriminator).slice(0, 60)}`);
   const story = firstSentence(positioning.origin?.story, 110);
   if (story) lines.push(`品牌故事精華：${story}`);
   const pref = Array.isArray(a.preferred_terms?.items)
@@ -463,6 +467,10 @@ export async function buildBrandPrefix(
       const d = positioning.differentiation;
       if (typeof d === "string") contextBlock.push(`【差異化】${d.slice(0, 300)}`);
       else if (d.summary) contextBlock.push(`【差異化】${String(d.summary).slice(0, 300)}`);
+      // 2026-09-23：唯一致勝理由跟支撐證據分開列——長任務有空間讓 AI 真的
+      // 引用證據撐起主張，不是只複述一句總結。
+      if (d && typeof d === "object" && d.discriminator) contextBlock.push(`【唯一致勝理由】${String(d.discriminator).slice(0, 100)}`);
+      if (d && typeof d === "object" && d.reasonToBelieve) contextBlock.push(`【支撐證據】${String(d.reasonToBelieve).slice(0, 300)}`);
     }
     // 用戶自己上傳的品牌定位文件裡，我們沒有對應欄位可放、但他要求照樣帶進來
     // 的段落。放在 contextBlock 最後 —— 它是補充，不該蓋過上面那些鎖定屬性。

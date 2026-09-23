@@ -2693,27 +2693,30 @@ function PositioningGrid({
     "8": { zh: "品牌個性", en: "Brand personality" },
   };
   // 2026-07-28 (CJ「定位的呈現沒有邏輯性…看起來沒有策略感」→ mockup 定案):
-  // brand scope reorders into a four-act STRATEGY NARRATIVE — research →
-  // synthesis → expression → tools — each act titled by the question it
-  // answers. Display numbers follow the acts (data/segment ids untouched);
-  // the tools group moves to the END (they're positioning OUTPUTS, not the
-  // opening). Product/event keep the original num-prefix grouping.
+  // brand scope reorders into a STRATEGY NARRATIVE — research → synthesis →
+  // expression → tools — each act titled by the question it answers.
+  // Display numbers follow the acts (data/segment ids untouched); the tools
+  // group moves to the END (they're positioning OUTPUTS, not the opening).
+  // Product/event keep the original num-prefix grouping.
+  //
+  // 2026-09-23（CJ「目前第一排是一張卡片，第二排有兩張卡片，版面都沒有排
+  // 整齊，我想要每一排都是三張卡片」）：原本 5 幕（1/2/2/2/3 張）沒有一幕
+  // 是自己的 grid 容器裡塞滿 3 張，行行都缺角。10 個 segment 重新分成 3 幕
+  // 各 3 張——goldenCircle 從「策略結晶」搬到「自我探索」跟起源／價值觀放
+  // 一起（WHY 信念本來就該扎根在起源與價值觀，敘事上比跟差異化放一起更
+  // 合理，不只是為了湊數）；taglineScore 從這裡搬到 toolsBlock（它是「檢查
+  // 標語好不好」的品質把關輸出，跟速查卡／AI 指令庫本來就是同一類「定位
+  // 產出物」，語意上更合適，同時讓 tools 那排也補滿 3 張）。
   const BRAND_ACTS: Array<{ label: { zh: string; en: string }; q: { zh: string; en: string }; ids: string[] }> = [
-    { label: { zh: "第一幕・市場研究", en: "Act 1 · Market research" },
-      q: { zh: "她缺什麼？—— 定位不是從「我是誰」開始，是從「她缺什麼」開始。", en: "What does she lack? Positioning starts with her, not us." },
-      ids: ["audience"] },
-    { label: { zh: "第二幕・競爭研究", en: "Act 2 · Competitive research" },
-      q: { zh: "誰已經在滿足她？缺口在哪？—— 看完這幕，白空間自然浮現。", en: "Who serves her already — and where are the gaps?" },
-      ids: ["competition", "trends"] },
-    { label: { zh: "第三幕・自我探索", en: "Act 3 · Self discovery" },
-      q: { zh: "憑什麼是我們？—— 起源與價值觀是填補缺口的資格證明。", en: "Why us? Origin and values are our proof of qualification." },
-      ids: ["origin", "values"] },
-    { label: { zh: "第四幕・策略結晶", en: "Act 4 · Strategy" },
-      q: { zh: "所以，我們是誰 —— 差異化與 WHY 是前三幕研究的結論，不是開場白。", en: "So, who we are — the conclusion of the research, not a slogan." },
-      ids: ["differentiation", "goldenCircle"] },
-    { label: { zh: "第五幕・表達系統", en: "Act 5 · Expression" },
-      q: { zh: "用一句話、一種聲音說出來 —— 標語與語氣把策略變成日常可執行的文字。", en: "Say it in one line, one voice." },
-      ids: ["tagline", "taglineScore", "voice"] },
+    { label: { zh: "第一幕・市場與競爭研究", en: "Act 1 · Market & competitive research" },
+      q: { zh: "她缺什麼？誰已經在滿足她、缺口在哪？—— 定位不是從「我是誰」開始，是先看懂她，再看懂戰場。", en: "What does she lack, and who's already trying to serve her? Positioning starts with her and the battlefield, not with us." },
+      ids: ["audience", "competition", "trends"] },
+    { label: { zh: "第二幕・自我探索", en: "Act 2 · Self discovery" },
+      q: { zh: "憑什麼是我們？—— 起源、價值觀與信念一起回答「為什麼是我們」，三者本來就是同一件事。", en: "Why us? Origin, values, and belief answer 'why us' together — they were never three separate things." },
+      ids: ["origin", "values", "goldenCircle"] },
+    { label: { zh: "第三幕・策略表達", en: "Act 3 · Strategy & expression" },
+      q: { zh: "所以，我們該說什麼、怎麼說 —— 差異化是前兩幕的結論，標語與語氣把它變成日常可執行的文字。", en: "So what do we say, and how — differentiation is the conclusion of the first two acts; tagline and voice turn it into words you use every day." },
+      ids: ["differentiation", "tagline", "voice"] },
   ];
   const brandActGroups = React.useMemo(() => {
     if (scopeMode !== "brand") return null;
@@ -2776,7 +2779,7 @@ function PositioningGrid({
             ? (lang === "en" ? "Weaponized tools" : "武器化工具")
             : (lang === "en" ? "Brand tools" : "品牌工具")}
           intro={scopeMode === "brand"
-            ? (lang === "en" ? "The positioning, packaged for daily use — cheat sheet and AI prompt library." : "把定位變成武器 —— 速查卡與 AI 指令庫是前五幕的輸出物，日常產文案時被引用。")
+            ? (lang === "en" ? "The positioning, packaged for daily use — cheat sheet, tagline score, and AI prompt library." : "把定位變成武器 —— 速查卡、標語評分與 AI 指令庫都是前面幾幕的輸出物，日常產文案時被引用。")
             : undefined}
         />
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
@@ -2791,6 +2794,21 @@ function PositioningGrid({
                 onClick={() => onSelect("card")}
                 preview={cardPreview.node}
                 hasContent={cardPreview.hasContent}
+              />
+            );
+          })()}
+          {/* 2026-09-23：taglineScore 從「表達幕」搬過來——它是「標語好不好」
+              的品質把關輸出，語意上跟速查卡／AI 指令庫同一類，也讓這排補滿
+              3 張。只有品牌 scope 有這個 segment（product/event 沒有）。 */}
+          {scopeMode === "brand" && (() => {
+            const { node: preview, hasContent } = renderSegmentPreview("taglineScore", segmentData?.taglineScore, lang);
+            return (
+              <PositioningCard
+                label={lang === "en" ? "Tagline score" : "標語評分"}
+                icon={faChartPie}
+                onClick={() => onSelect("seg:taglineScore")}
+                preview={preview}
+                hasContent={hasContent}
               />
             );
           })()}
@@ -3668,7 +3686,10 @@ function PositioningCard({
       onClick={onClick}
       onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onClick(); } }}
       title={rationale}
-      className="group relative flex flex-col text-left cursor-pointer overflow-hidden transition-all duration-150 rounded-2xl border border-neutral-200 hover:border-neutral-900 hover:shadow-lg hover:scale-[1.02] bg-white"
+      // 2026-09-23 (CJ「策略監測的按鈕再小一點，我想讓底下的策略卡片更明顯」)：
+      // 邊框加深一級（neutral-200→300）＋常駐 shadow-sm，卡片在白底頁面上
+      // 不用 hover 就有存在感，跟同時縮小的策略監測按鈕形成對比。
+      className="group relative flex flex-col text-left cursor-pointer overflow-hidden transition-all duration-150 rounded-2xl border border-neutral-300 shadow-sm hover:border-neutral-900 hover:shadow-lg hover:scale-[1.02] bg-white"
     >
       {/* Header block — content 卡是置中大頭貼 + 平台徽章；定位卡沒有「人」，
           換成置中的概念 icon，其餘位置語意照搬（左上角資訊徽章、右上角
@@ -3700,10 +3721,10 @@ function PositioningCard({
           </button>
         )}
         <div style={{
-          width: 52, height: 52, borderRadius: "50%", background: "#fff",
-          border: "1px solid #E5E5E5", display: "flex", alignItems: "center", justifyContent: "center",
+          width: 58, height: 58, borderRadius: "50%", background: "#fff",
+          border: "1px solid #D4D4D4", display: "flex", alignItems: "center", justifyContent: "center",
         }}>
-          <FontAwesomeIcon icon={icon} style={{ fontSize: 18, color: hasContent ? "#171717" : "#A3A3A3" }} />
+          <FontAwesomeIcon icon={icon} style={{ fontSize: 21, color: hasContent ? "#171717" : "#A3A3A3" }} />
         </div>
         <span style={{
           position: "absolute", bottom: 8, right: 8,
@@ -3717,7 +3738,7 @@ function PositioningCard({
 
       {/* Body */}
       <div style={{ padding: 12, display: "flex", flexDirection: "column", gap: 6, flex: 1 }}>
-        <h3 style={{ fontSize: 13.5, fontWeight: 600, color: "#171717", margin: 0, lineHeight: 1.3 }}>
+        <h3 style={{ fontSize: 14.5, fontWeight: 700, color: "#171717", margin: 0, lineHeight: 1.3 }}>
           {titleText}
         </h3>
         {preview ? (

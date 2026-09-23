@@ -332,14 +332,23 @@ items 3-5 條，彼此互補不重複。`,
         const comp = c.prevOutputs.competition?.competition;
         const aud  = c.prevOutputs.audience?.audience;
         return {
+          // 2026-09-23（CJ「比對國際品牌的品牌定位書，目前的欄位是否有需要
+          // 修改之處」→ 對照 P&G/Unilever Brand Key 的 8 box 模型）：Brand
+          // Key 刻意把「Benefits」（可以有好幾條，summary 已經在做這件事）
+          // 跟「Discriminator」（只能有一條，比 benefits 更尖銳的單一理由）
+          // 分成兩個獨立欄位——含混在一起，定位容易變成「什麼都好」而不是
+          // 「一個記得住的理由」。「Reason to Believe」則是 Brand Key 專門
+          // 用來擋「自己講自己好」的欄位：一句主張沒有證據支撐，AI 寫文案
+          // 時也只會跟著複述空話。兩個新欄位都要求「沒有就留空」——編出來
+          // 的證據比沒有證據更糟。
           differentiation: await callJSON(c, "differentiation", sys,
             `${brandCtx(c)}\n\n基於競爭格局與目標受眾，制定品牌差異化戰略：
 競爭格局：${JSON.stringify(comp || {}).slice(0, 1500)}
 主受眾：${(aud?.primary || "").slice(0, 600)}
 
 輸出 JSON，鍵名固定如下：
-{"emotional":"情感差異化（為什麼愛我，100-200字）","functional":"功能差異化（為什麼選我，100-200字）","summary":"差異化總結句（一句話品牌定位）"}`,
-            { emotional: "", functional: "", summary: "" }, 1200),
+{"emotional":"情感差異化（為什麼愛我，100-200字）","functional":"功能差異化（為什麼選我，100-200字）","summary":"差異化總結句（一句話品牌定位）","discriminator":"單一最尖銳的選擇理由（比 summary 更聚焦、只能有一個，≤40字；找不出比 summary 更尖銳的就留空）","reasonToBelieve":"支撐上述主張的具體證據——數據/專利/得獎/創辦人資歷/客戶實證等（沒有真實證據就留空，不可編造）"}`,
+            { emotional: "", functional: "", summary: "", discriminator: "", reasonToBelieve: "" }, 1300),
         };
       },
     },

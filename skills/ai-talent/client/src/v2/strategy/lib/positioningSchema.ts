@@ -190,6 +190,14 @@ export const BRAND_SEGMENTS: SegmentSpec[] = [
       { key: "emotional",  label: "情感差異化",  type: "textarea" },
       { key: "functional", label: "功能差異化",  type: "textarea" },
       { key: "summary",    label: "差異化總結",  type: "textarea" },
+      // 2026-09-23（CJ「比對國際品牌的品牌定位書」→ P&G/Unilever Brand Key
+      // 8-box 模型）：discriminator 跟 reason to believe 是 Brand Key 裡
+      // 刻意跟 benefits/summary 分開的兩格——一個逼你只挑一條最尖銳的理由
+      // 而不是含混的好幾條，一個逼你的主張要有證據，不能只是自己說好。
+      { key: "discriminator",  label: "唯一致勝理由（比總結更尖銳，只能一條）", type: "text",
+        hint: "跟差異化總結不同：這格只能有一個，是所有理由裡最尖銳、最讓人選你而非競品的那一個" },
+      { key: "reasonToBelieve", label: "支撐證據（Reason to Believe）", type: "textarea",
+        hint: "數據、專利、得獎、創辦人資歷、客戶實證等——沒有真的證據就留空，不要編" },
     ],
   },
   {

@@ -54,6 +54,11 @@ export const LABEL_TO_FIELD: Record<string, string> = {
   "主要受眾": "audience.primary",
   "受眾痛點": "audience.painPoints",
   "差異化": "differentiation.summary",
+  // 2026-09-23：跟 brandContext.ts 的 contextBlock 標籤逐字對上——寫進簡報
+  // 用什麼標籤，這裡就要認得同一個標籤，否則這兩格「有沒有進簡報」對用戶
+  // 永遠是個問號。
+  "唯一致勝理由": "differentiation.discriminator",
+  "支撐證據": "differentiation.reasonToBelieve",
   "品牌定位文件補充": "_sourceDocs",
   // 產品
   "產品名稱": "product.name",
