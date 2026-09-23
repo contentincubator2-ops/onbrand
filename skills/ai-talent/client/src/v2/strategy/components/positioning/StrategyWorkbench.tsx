@@ -69,6 +69,15 @@ export default function StrategyWorkbench({
   const deriveMut = (trpc as any).workbench?.derive?.useMutation?.();
   const digMut = (trpc as any).workbench?.digSpot?.useMutation?.();
   const applyMut = (trpc as any).workbench?.applyScenario?.useMutation?.();
+  // 2026-09-23 (CJ「用戶先自己填完…如果需要我們幫忙做品牌健檢，可以用
+  // SoWork 14 步方法論掃描後，highlight 跟他原先推論有差異之處…讓用戶自己
+  // 決定是否要修改」): 獨立健檢——不看使用者選了什麼，用研究證據（起源／
+  // 價值觀／趨勢）重新判斷三個錨點，跟使用者的選擇比對，一致/不一致都存
+  // 進 positioning._workbench.healthCheck，不動 canonical 欄位。
+  const healthCheckMut = (trpc as any).workbench?.healthCheck?.useMutation?.();
+  const dismissHealthCheckMut = (trpc as any).workbench?.dismissHealthCheckFinding?.useMutation?.();
+  const [checkingHealth, setCheckingHealth] = useState(false);
+  const [openFinding, setOpenFinding] = useState<null | "audience" | "competition" | "differentiation">(null);
   const [digging, setDigging] = useState<number | null>(null);
   // 2026-07-29 (CJ「品牌工具、黃金圈等應該跟著策略工作台變動」): apply now
   // cascades — brand: 差異化/黃金圈/語氣/標語評分/AI 指令庫；event: 訊息架構/
@@ -204,6 +213,13 @@ export default function StrategyWorkbench({
 
   const scenarios: any[] = Array.isArray(positioning?._workbench?.scenarios) ? positioning._workbench.scenarios : [];
   const appliedId: string | null = positioning?._workbench?.appliedId ?? null;
+  const healthCheck = positioning?._workbench?.healthCheck as
+    | { checkedAt: string; findings: Array<{ anchor: "audience" | "competition" | "differentiation"; agrees: boolean; currentValue: string; suggestedValue?: string; rationale?: string }>; dismissed?: string[] }
+    | undefined;
+  const hcDismissed = new Set(healthCheck?.dismissed ?? []);
+  const findingFor = (anchor: "audience" | "competition" | "differentiation") =>
+    healthCheck?.findings?.find((f) => f.anchor === anchor && f.agrees === false && !hcDismissed.has(anchor));
+  const liveFindingsCount = (["audience", "competition", "differentiation"] as const).filter((a) => findingFor(a)).length;
   const [activeName, setActiveName] = useState<string | null>(null);
   const active = scenarios.find((s) => s?.name === (activeName ?? "")) ??
     (activeName ? null : scenarios[scenarios.length - 1] ?? null);
@@ -219,7 +235,11 @@ export default function StrategyWorkbench({
   const [selComp, setSelComp] = useState<Set<string>>(() => new Set(competitorChips.slice(0, 2).map((c) => c.key)));
   const [selAdv, setSelAdv] = useState<Set<string>>(() => new Set(advantageChips.map((c) => c.key)));
   const [drill, setDrill] = useState<{ kind: "audience" | "competitor"; key: string } | null>(null);
-  const [collapsed, setCollapsed] = useState(false);
+  // 2026-09-23 (CJ「策略工作臺也可以縮小版面，變成一個策略健檢就好」):
+  // 預設收合——工作台從「主要內容」降級成「輔助工具」，跟方法論 tooltip
+  // 那次同一個方向。有未讀健檢落差時 header 仍會露出警訊數字（見下方
+  // liveFindingsCount），所以收合不等於使用者看不到需要注意的東西。
+  const [collapsed, setCollapsed] = useState(true);
 
   // P2: switching to a stored scenario restores its slot selection so the
   // slots always show what THIS scenario was derived from.
@@ -295,6 +315,64 @@ export default function StrategyWorkbench({
     );
   };
 
+  const runHealthCheck = () => {
+    if (missingResearch.length > 0) {
+      showToastGlobal(en
+        ? `Research missing: ${missingResearch.join(" / ")} — run positioning below first`
+        : `還缺研究資料：${missingResearch.join("／")}——先到下方對應段落補齊`);
+      return;
+    }
+    const audienceText = audienceChips.find((c) => c.key === selAudience)?.value ?? audienceChips[0]?.value ?? "";
+    const competitors = competitorChips.filter((c) => selComp.has(c.key)).map((c) => c.value);
+    const advantages = advantageChips.filter((c) => selAdv.has(c.key)).map((c) => c.value.slice(0, 200));
+    if (!audienceText || competitors.length === 0 || advantages.length === 0) {
+      showToastGlobal(en ? "Pick at least one competitor and one advantage first" : "請先選好三個錨點，至少各一項");
+      return;
+    }
+    setCheckingHealth(true);
+    healthCheckMut?.mutate?.(
+      { ...scopeArgs, selection: { audience: audienceText.slice(0, 600), competitors, advantages } },
+      {
+        onSuccess: (r: any) => {
+          setCheckingHealth(false);
+          if (r?.ok) {
+            const diverged = (r.findings ?? []).filter((f: any) => !f.agrees).length;
+            showToastGlobal(
+              diverged > 0
+                ? (en ? `Health check done — ${diverged} anchor(s) worth a second look` : `✓ 健檢完成——${diverged} 個錨點值得再看一眼`)
+                : (en ? "Health check done — everything matches" : "✓ 健檢完成——三個錨點都跟獨立判斷一致"),
+              "success",
+            );
+            utils?.scope?.active?.invalidate?.();
+          } else showToastGlobal(r?.error ?? (en ? "Health check failed" : "健檢失敗，請再試一次"));
+        },
+        onError: () => { setCheckingHealth(false); showToastGlobal(en ? "Health check failed" : "健檢失敗，請再試一次"); },
+      },
+    );
+  };
+
+  /** 「採用建議」——不直接覆寫使用者的選擇（那是覆寫，不是提議），而是走
+   *  既有的 researchItem：把 AI 建議的版本當成一個新選項研究並加進去，
+   *  使用者自己在上面勾選才算數。加入成功後這個 anchor 的警訊就撤掉。 */
+  const adoptSuggestion = (anchor: "audience" | "competition" | "differentiation", value: string) => {
+    const kindMap = { audience: "audience", competition: "competitor", differentiation: "advantage" } as const;
+    researchMut?.mutate?.({ ...scopeArgs, kind: kindMap[anchor], value: value.slice(0, 160) }, {
+      onSuccess: (r: any) => {
+        if (r?.ok) {
+          showToastGlobal(en ? "✓ Added as a new option — pick it above if you agree" : "✓ 已加入選項——覺得有道理的話可以在上面勾選它", "success");
+          dismissHealthCheckMut?.mutate?.({ ...scopeArgs, anchor });
+          setOpenFinding(null);
+          utils?.scope?.active?.invalidate?.();
+        } else showToastGlobal(r?.error ?? (en ? "Failed" : "失敗，請再試一次"));
+      },
+      onError: () => showToastGlobal(en ? "Failed" : "失敗，請再試一次"),
+    });
+  };
+  const dismissFinding = (anchor: "audience" | "competition" | "differentiation") => {
+    dismissHealthCheckMut?.mutate?.({ ...scopeArgs, anchor }, { onSuccess: () => utils?.scope?.active?.invalidate?.() });
+    setOpenFinding(null);
+  };
+
   const derived = active?.derived as undefined | {
     spots: Array<{
       lane: string; title: string; need: string; gap: string; ours: string;
@@ -328,7 +406,10 @@ export default function StrategyWorkbench({
       <div onClick={() => setCollapsed(!collapsed)}
            style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 18px", cursor: "pointer" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <span style={{ fontSize: 14, fontWeight: 800 }}><Ic d={IC.target} /> {en ? "Strategy Workbench" : "策略工作台"}</span>
+          {/* 2026-09-23 (CJ「變成一個策略健檢就好」): 折疊時的主標籤換成
+              「策略健檢」——工作台本體（三錨點挑選＋四區看板）還在，只是
+              從主要內容退成輔助工具，跟「方法論」縮成 tooltip 同一個方向。 */}
+          <span style={{ fontSize: 14, fontWeight: 800 }}><Ic d={IC.target} /> {en ? "Strategy Health Check" : "策略健檢"}</span>
           {locked ? (
             <span style={{ fontSize: 12, fontWeight: 800, letterSpacing: ".05em", border: "1px solid #2A2630", borderRadius: 5, padding: "1px 8px", color: "#2A2630", background: "#F0EEEA" }}>
               🔒 {en ? "LOCKED · FINAL" : "已鎖定・定案"}
@@ -341,6 +422,13 @@ export default function StrategyWorkbench({
               ? (en ? "finalized — editing is closed" : "已定案，這裡改為唯讀")
               : (en ? "consumer wants × rivals can't × we can" : "消費者想要 × 競爭者無法 × 我們能提供")}
           </span>
+          {/* 折疊時也要看得到「有東西值得注意」——不然收合等於使用者永遠
+              看不到健檢結果，除非剛好想到要點開。 */}
+          {liveFindingsCount > 0 && (
+            <span style={{ fontSize: 12, fontWeight: 800, border: "1.5px solid #E8542F", borderRadius: 999, padding: "2px 10px", color: "#E8542F", background: "#FDF1EC" }}>
+              ⚠ {en ? `${liveFindingsCount} anchor${liveFindingsCount > 1 ? "s" : ""} to review` : `${liveFindingsCount} 個錨點待複查`}
+            </span>
+          )}
           {cascadeRow && (
             <span style={{ fontSize: 12, fontWeight: 800, border: "1.5px solid #2A2630", borderRadius: 999, padding: "2px 10px", animation: "pulse 1.5s infinite" }}>
               {en ? `Regenerating downstream ${cascadeRow.currentStep}/${cascadeRow.totalSteps}` : `下游重生中 ${cascadeRow.currentStep}/${cascadeRow.totalSteps}`}
@@ -397,7 +485,7 @@ export default function StrategyWorkbench({
         {/* 輸入槽 */}
         <div style={{ background: "#fff", border: "1px solid #E5E1DA", borderRadius: 12, padding: "10px 14px 12px", marginBottom: 14 }}>
           {[
-            { icon: IC.user, label: en ? "Audience" : "目標受眾", hint: en ? "click chip to view research" : "點 chip 名稱可查原始研究", body: (
+            { icon: IC.user, label: en ? "Audience" : "目標受眾", anchor: "audience" as const, hint: en ? "click chip to view research" : "點 chip 名稱可查原始研究", body: (
               <div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}>
                 {audienceChips.map((c) => (
                   <span key={c.key} style={S.chip(selAudience === c.key)}>
@@ -411,7 +499,7 @@ export default function StrategyWorkbench({
                 <AddControl kind="audience" placeholder={en ? "e.g. dads of preschoolers" : "例：幼兒園孩子的爸爸"} />
               </div>
             )},
-            { icon: IC.target, label: en ? "Competitor set" : "競爭組合", hint: en ? "multi-select" : "可多選；點名稱可查競品研究", body: (
+            { icon: IC.target, label: en ? "Competitor set" : "競爭組合", anchor: "competition" as const, hint: en ? "multi-select" : "可多選；點名稱可查競品研究", body: (
               <div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}>
                 {competitorChips.map((c) => (
                   <span key={c.key} style={S.chip(selComp.has(c.key))}>
@@ -423,7 +511,7 @@ export default function StrategyWorkbench({
                 <AddControl kind="competitor" placeholder={en ? "competitor name" : "例：小牛頓有聲書"} />
               </div>
             )},
-            { icon: IC.gem, label: en ? "Lead advantages" : "主打優勢", hint: en ? "from differentiation" : "取自差異化資產", body: (
+            { icon: IC.gem, label: en ? "Lead advantages" : "主打優勢", anchor: "differentiation" as const, hint: en ? "from differentiation" : "取自差異化資產", body: (
               <div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}>
                 {advantageChips.map((c) => (
                   <span key={c.key} style={S.chip(selAdv.has(c.key))} onClick={() => setSelAdv(toggle(selAdv, c.key))}>
@@ -433,24 +521,77 @@ export default function StrategyWorkbench({
                 <AddControl kind="advantage" placeholder={en ? "e.g. real dad's voice" : "例：真實爸爸親聲錄製"} />
               </div>
             )},
-          ].map((row, i) => (
-            <div key={i} style={{ display: "flex", gap: 12, alignItems: "flex-start", padding: "7px 0", borderTop: i > 0 ? "1px dashed #EFEDE8" : "none" }}>
-              <div style={{ flex: "none", width: 118, fontSize: 12, fontWeight: 800, paddingTop: 4 }}>
-                <Ic d={row.icon} /> {row.label}
-                <div style={{ fontWeight: 500, fontSize: 12.5, color: "#A8A29E" }}>{row.hint}</div>
+          ].map((row, i) => {
+            const finding = findingFor(row.anchor);
+            return (
+            <div key={i} style={{ padding: "7px 0", borderTop: i > 0 ? "1px dashed #EFEDE8" : "none" }}>
+              <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
+                <div style={{ flex: "none", width: 118, fontSize: 12, fontWeight: 800, paddingTop: 4 }}>
+                  <Ic d={row.icon} /> {row.label}
+                  <div style={{ fontWeight: 500, fontSize: 12.5, color: "#A8A29E" }}>{row.hint}</div>
+                </div>
+                <div style={{ flex: 1 }}>
+                  {row.body}
+                  {/* 2026-09-23：健檢發現這個錨點跟獨立判斷不一致——警訊符號，
+                      使用者自己決定要不要看、要不要採用建議。 */}
+                  {finding && (
+                    <span
+                      onClick={() => setOpenFinding(openFinding === row.anchor ? null : row.anchor)}
+                      style={{
+                        display: "inline-flex", alignItems: "center", gap: 5, marginTop: 6,
+                        fontSize: 12, fontWeight: 700, color: "#E8542F", cursor: "pointer",
+                        border: "1.5px solid #E8542F", borderRadius: 999, padding: "2px 11px", background: "#FDF1EC",
+                      }}>
+                      ⚠ {en ? "AI health check disagrees" : "AI 健檢跟這項不一致"} {openFinding === row.anchor ? "▾" : "▸"}
+                    </span>
+                  )}
+                </div>
               </div>
-              <div style={{ flex: 1 }}>{row.body}</div>
+              {finding && openFinding === row.anchor && (
+                <div style={{ marginLeft: 130, marginTop: 6, background: "#FDF1EC", border: "1.5px solid #E8542F", borderRadius: 10, padding: "10px 13px", fontSize: 12.5 }}>
+                  {finding.rationale && (
+                    <p style={{ margin: "0 0 6px", color: "#6E6878", lineHeight: 1.6 }}>{finding.rationale}</p>
+                  )}
+                  {finding.suggestedValue && (
+                    <p style={{ margin: "0 0 8px" }}>
+                      <span style={{ fontWeight: 800, color: "#2A2630" }}>{en ? "AI's independent read: " : "AI 獨立判斷："}</span>
+                      {finding.suggestedValue}
+                    </p>
+                  )}
+                  <div style={{ display: "flex", gap: 8 }}>
+                    {finding.suggestedValue && (
+                      <span onClick={() => adoptSuggestion(row.anchor, finding.suggestedValue!)}
+                            style={{ ...S.act, background: "#2A2630", borderColor: "#2A2630", color: "#fff" }}>
+                        {en ? "Add as an option" : "採用建議（加入選項）"}
+                      </span>
+                    )}
+                    <span onClick={() => dismissFinding(row.anchor)} style={S.act}>
+                      {en ? "Keep my pick" : "維持原選擇"}
+                    </span>
+                  </div>
+                </div>
+              )}
             </div>
-          ))}
+            );
+          })}
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, marginTop: 10, paddingTop: 10, borderTop: "1px solid #EFEDE8" }}>
             <p style={{ fontSize: 12, color: "#8A8494", margin: 0 }}>
               {en ? "Changing any slot re-derives only the downstream (gaps → sweet spots → taglines), ~30s."
                   : "改動任一選擇後按「重新推導」— 只重算下游（需求缺口 → 甜蜜點 → 標語），約 30 秒，結果存入情境。"}
             </p>
-            <button onClick={runDerive} disabled={deriveMut?.isPending}
-                    style={{ flex: "none", fontSize: 12.5, fontWeight: 800, background: deriveMut?.isPending ? "#8A8494" : "#2A2630", color: "#fff", border: "none", borderRadius: 10, padding: "8px 18px", cursor: deriveMut?.isPending ? "wait" : "pointer" }}>
-              <Ic d={IC.redo} /> {deriveMut?.isPending ? (en ? "Deriving…" : "推導中…約 30 秒") : (en ? "Derive" : "重新推導")}
-            </button>
+            <div style={{ display: "flex", gap: 8, flex: "none" }}>
+              {/* 2026-09-23：健檢是選配動作——用戶先自己選好三個錨點，覺得
+                  需要我們幫忙覆核時才按，不會自動跑。 */}
+              <button onClick={runHealthCheck} disabled={checkingHealth}
+                      title={en ? "Independently re-derive the three anchors from research evidence and compare against your picks" : "不看你的選擇，只憑研究證據獨立判斷三個錨點，再跟你的選擇比對"}
+                      style={{ fontSize: 12.5, fontWeight: 800, background: "#fff", color: "#2A2630", border: "1.5px solid #2A2630", borderRadius: 10, padding: "8px 16px", cursor: checkingHealth ? "wait" : "pointer" }}>
+                {checkingHealth ? (en ? "Checking…" : "健檢中…約 20 秒") : (en ? "AI health check" : "AI 健檢")}
+              </button>
+              <button onClick={runDerive} disabled={deriveMut?.isPending}
+                      style={{ fontSize: 12.5, fontWeight: 800, background: deriveMut?.isPending ? "#8A8494" : "#2A2630", color: "#fff", border: "none", borderRadius: 10, padding: "8px 18px", cursor: deriveMut?.isPending ? "wait" : "pointer" }}>
+                <Ic d={IC.redo} /> {deriveMut?.isPending ? (en ? "Deriving…" : "推導中…約 30 秒") : (en ? "Derive" : "重新推導")}
+              </button>
+            </div>
           </div>
         </div>
         </>)}

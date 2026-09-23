@@ -70,6 +70,22 @@ export type SpotDig = {
   risks: string[];
 };
 
+/**
+ * 2026-09-23 (CJ「用戶先自己填完…如果需要我們幫忙做品牌健檢，可以用 SoWork
+ * 14 步方法論掃描後，highlight 跟他原先推論有差異之處…讓用戶自己決定是否
+ * 要修改」): 健檢——不看使用者目前選了什麼錨點，獨立判斷 SoWork 方法論會
+ * 建議的受眾/競爭/優勢版本，再跟使用者的選擇比對。一致是常見且正常的結果
+ * （跟 strategyMonitor.ts 的「沒有變化就回空陣列，不要硬找」同一種紀律）。
+ */
+export type HealthCheckAnchor = "audience" | "competition" | "differentiation";
+export type HealthCheckFinding = {
+  anchor: HealthCheckAnchor;
+  agrees: boolean;
+  currentValue: string;
+  suggestedValue?: string;
+  rationale?: string;
+};
+
 async function loadBrandPositioning(brandId: number, userId: number): Promise<{ name: string; pos: any } | null> {
   const [rows]: any = await localPool.execute(
     `SELECT name, positioning FROM brands WHERE id = ? AND userId = ? LIMIT 1`,
@@ -684,5 +700,131 @@ scenes 3 個、contentAngles 4-6 個、risks 2-3 個。全部必須緊扣這個�
         await saveScopedPositioning({ entityKind: "brand", entityId: scope.brandId, brandId: scope.brandId }, userId, bPos);
       }
       return { ok: true as const, kind: input.kind, item };
+    }),
+
+  /**
+   * 健檢掃描——獨立（不看使用者選擇）判斷 SoWork 方法論會建議的三個錨點，
+   * 跟使用者目前的選擇比對，回傳每個錨點「一致／不一致＋建議版本」。
+   * 只寫 positioning._workbench.healthCheck（唯讀提示），不碰 canonical
+   * audience/competition/differentiation 欄位——研究證據不覆寫的同一條規矩。
+   */
+  healthCheck: protectedProcedure
+    .input(z.object({ ...scopeSchema, selection: selectionSchema }))
+    .mutation(async ({ ctx, input }) => {
+      const userId = ctx.user!.id;
+      const scope = toScope(input);
+      await assertScopeUnlocked(scope, userId);
+      const loaded = await loadScopedPositioning(scope, userId);
+      if (!loaded) throw new TRPCError({ code: "NOT_FOUND", message: `${scope.entityKind} not found` });
+      const { pos } = loaded;
+      const brandPos = scope.entityKind === "event"
+        ? (await loadBrandPositioning(scope.brandId, userId))?.pos ?? {}
+        : pos;
+
+      // 稽核的立足點——跟三個錨點本身無關的「研究證據」段落，讓獨立判斷
+      // 真的是從零推導，不是把使用者的選擇讀回去再複述一次。
+      const origin = String(brandPos.origin?.story ?? "").slice(0, 400);
+      const values = JSON.stringify(brandPos.values?.items ?? []).slice(0, 300);
+      const trendsRaw = brandPos.trends;
+      const trends = trendsRaw && typeof trendsRaw === "object" ? JSON.stringify(trendsRaw).slice(0, 300) : "";
+
+      const sys = `你是獨立的品牌策略稽核顧問，繁體中文。任務：先不看使用者目前選了什麼錨點，只憑下方的品牌研究資料（起源／價值觀／趨勢），獨立判斷 SoWork 品牌定位法會建議的目標受眾、競爭組合、主打優勢分別是什麼樣貌。判斷完之後，才跟使用者目前的選擇比對，逐項看是否有「重要到值得使用者重新考慮」的落差。
+
+【最重要的規則】一致是常見且正常的結果，不要為了顯得有用而硬找差異——沒有實質落差就明講一致（agrees: true），並簡短說明為什麼一致。只有真的看出方向性分歧時才 agrees: false 並給出你的建議版本。只輸出 JSON，第一字元就是 {。
+
+【品牌研究資料——你的獨立判斷依據】
+起源故事：${origin || "（無記錄）"}
+核心價值觀：${values === "[]" ? "（無記錄）" : values}
+市場趨勢：${trends || "（無記錄）"}
+
+【使用者目前的選擇——判斷完再拿來比對，不是拿來抄】
+目標受眾：${input.selection.audience}
+競爭組合：${input.selection.competitors.join("、")}
+主打優勢：${input.selection.advantages.join("、")}
+
+輸出 JSON：
+{
+  "findings": [
+    { "anchor": "audience", "agrees": true|false, "suggestedValue": "若不一致，你獨立判斷的版本（≤200字）；一致則空字串", "rationale": "為什麼（≤80字）——一致也要講理由，不一致要講差在哪" },
+    { "anchor": "competition", "agrees": true|false, "suggestedValue": "…", "rationale": "…" },
+    { "anchor": "differentiation", "agrees": true|false, "suggestedValue": "…", "rationale": "…" }
+  ]
+}
+三個 anchor 各出現恰好一次，順序固定為 audience、competition、differentiation。`;
+
+      const { invokeLLM } = await import("../../platform/core/llm");
+      const r = await Promise.race([
+        invokeLLM({
+          messages: [{ role: "system", content: sys }, { role: "user", content: "請執行獨立健檢。" }],
+          maxTokens: 1200,
+        }),
+        new Promise<never>((_, rej) => setTimeout(() => rej(new Error("LLM timeout")), 35_000)),
+      ]);
+      const raw = r.choices[0]?.message?.content;
+      const text = typeof raw === "string" ? raw : "";
+      try {
+        const inTok = r.usage?.prompt_tokens ?? 0;
+        const outTok = r.usage?.completion_tokens ?? 0;
+        await localPool.execute(
+          `INSERT INTO usage_log (userId, entityKind, entityId, kind, model, inputTokens, outputTokens, costUsd)
+                VALUES (?, ?, ?, 'workbench_healthcheck', ?, ?, ?, ?)`,
+          [userId, scope.entityKind, scope.entityId, r.model || "anthropic/claude-haiku-4-5", inTok, outTok,
+           (inTok * 1.0 + outTok * 5.0) / 1_000_000],
+        );
+      } catch { /* non-fatal */ }
+
+      const m = text.match(/```(?:json)?\s*([\s\S]*?)```/);
+      const jt = m ? m[1]!.trim() : text.trim();
+      let parsed: any = null;
+      try { parsed = JSON.parse(jt); } catch {
+        const s = jt.indexOf("{");
+        if (s >= 0) { try { parsed = JSON.parse(jt.slice(s)); } catch {} }
+      }
+      const rawFindings: any[] = Array.isArray(parsed?.findings) ? parsed.findings : [];
+      const currentByAnchor: Record<HealthCheckAnchor, string> = {
+        audience: input.selection.audience,
+        competition: input.selection.competitors.join("、"),
+        differentiation: input.selection.advantages.join("、"),
+      };
+      const anchors: HealthCheckAnchor[] = ["audience", "competition", "differentiation"];
+      const findings: HealthCheckFinding[] = anchors.map((anchor) => {
+        const f = rawFindings.find((x) => x?.anchor === anchor);
+        const agrees = f ? f.agrees !== false : true; // 解析失敗一律當「一致」，不要無中生有警訊
+        const suggestedValue = !agrees && typeof f?.suggestedValue === "string" ? f.suggestedValue.trim().slice(0, 200) : undefined;
+        return {
+          anchor,
+          agrees: agrees || !suggestedValue, // 沒有建議版本就不构成可行動的落差，視為一致
+          currentValue: currentByAnchor[anchor],
+          ...(suggestedValue ? { suggestedValue } : {}),
+          rationale: typeof f?.rationale === "string" ? f.rationale.trim().slice(0, 120) : undefined,
+        };
+      });
+
+      const wb = (pos._workbench && typeof pos._workbench === "object") ? pos._workbench : {};
+      const prevDismissed: string[] = Array.isArray(wb.healthCheck?.dismissed) ? wb.healthCheck.dismissed : [];
+      pos._workbench = {
+        ...wb,
+        healthCheck: { checkedAt: new Date().toISOString(), findings, dismissed: prevDismissed },
+      };
+      await saveScopedPositioning(scope, userId, pos);
+      return { ok: true as const, findings };
+    }),
+
+  /** 使用者看過某個錨點的健檢提醒後，選擇「維持原選擇」——不改變任何
+   *  positioning 資料，只是讓警訊符號不再顯示，直到下一次健檢掃描。 */
+  dismissHealthCheckFinding: protectedProcedure
+    .input(z.object({ ...scopeSchema, anchor: z.enum(["audience", "competition", "differentiation"]) }))
+    .mutation(async ({ ctx, input }) => {
+      const userId = ctx.user!.id;
+      const scope = toScope(input);
+      const loaded = await loadScopedPositioning(scope, userId);
+      if (!loaded) throw new TRPCError({ code: "NOT_FOUND", message: `${scope.entityKind} not found` });
+      const { pos } = loaded;
+      const wb = (pos._workbench && typeof pos._workbench === "object") ? pos._workbench : {};
+      const hc = (wb.healthCheck && typeof wb.healthCheck === "object") ? wb.healthCheck : { findings: [], dismissed: [] };
+      const dismissed = Array.from(new Set([...(Array.isArray(hc.dismissed) ? hc.dismissed : []), input.anchor]));
+      pos._workbench = { ...wb, healthCheck: { ...hc, dismissed } };
+      await saveScopedPositioning(scope, userId, pos);
+      return { ok: true as const };
     }),
 });
