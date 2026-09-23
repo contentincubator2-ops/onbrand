@@ -58,6 +58,28 @@ function pushSourceDoc(lines: string[], pos: any, label: string): void {
 ${text}`);
 }
 
+/**
+ * 2026-09-23（CJ「品牌定位…也可以自訂新增欄位」）：使用者自己開的定位卡片
+ * （positioning._customSegments[]，例如「品牌願景」）—— 跟固定欄位一樣要進
+ * prompt，不然這張卡就只是畫面上的裝飾，違背了「定位是所有任務的上游」這件事。
+ * 每張卡最多帶 3 格，總長度設上限（跟 pushSourceDoc 的補充段落同一個道理：
+ * prompt 本來就吃不下太多字，塞多了只會稀釋品牌前綴）。
+ */
+function pushCustomSegments(lines: string[], pos: any): void {
+  const segs = Array.isArray(pos?._customSegments) ? pos._customSegments : [];
+  for (const s of segs) {
+    const title = String(s?.title ?? "").trim();
+    const fields = Array.isArray(s?.fields) ? s.fields : [];
+    if (!title || fields.length === 0) continue;
+    const body = fields
+      .slice(0, 3)
+      .map((f: any) => `${String(f?.label ?? "").trim()}：${String(f?.value ?? "").trim()}`)
+      .filter((l: string) => l !== "：")
+      .join("；");
+    if (body) lines.push(`【${title}】${body.slice(0, 500)}`);
+  }
+}
+
 // Cache key includes optional product/event so different scopes don't collide.
 const CACHE = new Map<string, { prefix: string; expiresAt: number }>();
 const TTL_MS = 60_000; // 1-minute cache — brand_brain edits become visible quickly
@@ -445,6 +467,7 @@ export async function buildBrandPrefix(
     // 用戶自己上傳的品牌定位文件裡，我們沒有對應欄位可放、但他要求照樣帶進來
     // 的段落。放在 contextBlock 最後 —— 它是補充，不該蓋過上面那些鎖定屬性。
     pushSourceDoc(contextBlock, positioning, "品牌定位文件補充");
+    pushCustomSegments(contextBlock, positioning);
 
     // ── 2026-05-11 (CJ): product + event positioning overlays ──
     let productSection = "";
@@ -481,6 +504,7 @@ export async function buildBrandPrefix(
                 ["marketing.tone",           "產品語氣",     200],
               ]);
               pushSourceDoc(lines, pp, "產品定位文件補充");
+              pushCustomSegments(lines, pp);
             }
           }
           productSection = "\n[本次產出聚焦的產品 — 必須圍繞此產品撰寫]\n" + lines.map(l => `- ${l}`).join("\n") + "\n";
@@ -528,6 +552,7 @@ export async function buildBrandPrefix(
                 ["creative.creativeTheme",         "創意主題",     200],
               ]);
               pushSourceDoc(lines, ep, "活動定位文件補充");
+              pushCustomSegments(lines, ep);
             }
           }
           eventSection = "\n[本次產出對應的活動 — 必須提及活動 / 時程 / 主軸]\n" + lines.map(l => `- ${l}`).join("\n") + "\n";

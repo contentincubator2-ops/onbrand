@@ -46,6 +46,67 @@ export interface AppliedDocRecord {
   injectedContext: string;
 }
 
+/**
+ * 2026-09-23 (CJ「品牌定位、產品定位…也想 content 一樣的卡片式，也可以自訂新增欄位」)。
+ *
+ * 固定的 10（品牌）/6（產品）/11（活動）個 segment 是 schema 寫死的，使用者不能自己開新的。
+ * `_customSegments[]` 是那個缺口的填補：對映提案（positioningDocsRouter.propose）遇到「明顯是
+ * 定位內容，但套不進任何一個固定欄位」的段落時，會建議開一張新卡；使用者確認後才真的建立
+ * （見 createCustomSegment）——跟固定欄位的「提案，不是自動套用」是同一條規矩。
+ *
+ * 存放位置、讀寫模式都比照 `_sourceDocs[]`/`_taskCards[]`：per-scope 的 JSON 陣列，
+ * 淺層 read-modify-write，不整包覆蓋（別的背景流程可能同時在寫別的 segment）。
+ */
+export interface CustomSegmentField {
+  key: string;
+  label: string;
+  value: string;
+}
+
+export interface CustomSegment {
+  id: string;
+  title: string;
+  fields: CustomSegmentField[];
+  createdAt: string;
+  /** 這張卡是從哪份上傳/貼上的文件建立的；使用者自己手動建的則是 null。 */
+  sourceDocId: string | null;
+}
+
+export const MAX_CUSTOM_SEGMENTS = 12;
+export const MAX_CUSTOM_SEGMENT_FIELDS = 8;
+export const MAX_CUSTOM_SEGMENT_TITLE_CHARS = 24;
+export const MAX_CUSTOM_SEGMENT_FIELD_VALUE_CHARS = 600;
+
+export function customSegmentsOf(pos: Record<string, any>): CustomSegment[] {
+  return Array.isArray(pos?._customSegments) ? pos._customSegments : [];
+}
+
+/** 新增一張自訂卡。超過上限就丟掉最舊的一張——跟 `_sourceDocs[]` 同一個做法。 */
+export async function addCustomSegment(args: {
+  scope: PositioningScope; id: number; userId: number; segment: CustomSegment;
+}): Promise<CustomSegment[]> {
+  let saved: CustomSegment[] = [];
+  await patchPositioning(args.scope, args.id, args.userId, (cur) => {
+    const list = [...customSegmentsOf(cur), args.segment];
+    if (list.length > MAX_CUSTOM_SEGMENTS) list.splice(0, list.length - MAX_CUSTOM_SEGMENTS);
+    saved = list;
+    return { ...cur, _customSegments: list };
+  });
+  return saved;
+}
+
+export async function removeCustomSegment(args: {
+  scope: PositioningScope; id: number; userId: number; segmentId: string;
+}): Promise<CustomSegment[]> {
+  let saved: CustomSegment[] = [];
+  await patchPositioning(args.scope, args.id, args.userId, (cur) => {
+    const list = customSegmentsOf(cur).filter((s) => s.id !== args.segmentId);
+    saved = list;
+    return { ...cur, _customSegments: list };
+  });
+  return saved;
+}
+
 export const MAX_DOCS_PER_SCOPE = 8;
 /** 進 prompt 的補充段落上限。prompt 本來就只吃得下幾千字，塞 120K 只會
  *  把品牌前綴稀釋掉，還每跑一張卡付一次錢。 */

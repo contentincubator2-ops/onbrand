@@ -38,12 +38,22 @@ interface Proposal {
   path: string; label: string; shape: PromptField["shape"];
   value: any; fromHeading: string; quote: string; overwrites: any;
 }
+interface SuggestedSegment {
+  title: string; fromHeading: string;
+  fields: { label: string; value: string }[];
+}
 interface ProposeResult {
   docId: string; docName: string; sectionCount: number;
   proposals: Proposal[];
   unmapped: { index: number; heading: string; chars: number }[];
   missing: PromptField[];
+  suggestedSegments: SuggestedSegment[];
   total: number;
+}
+interface CustomSegment {
+  id: string; title: string;
+  fields: { key: string; label: string; value: string }[];
+  createdAt: string; sourceDocId: string | null;
 }
 
 const ACCEPT = ".docx,.pptx,.pdf,.md,.markdown,.txt,.html,.htm";
@@ -94,6 +104,7 @@ export default function PositioningDocPanel({
       // 會覆蓋既有值的那幾格另外標紅，讓用戶只需要盯那些。
       setAccepted(new Set(r.proposals.map((p) => p.path)));
       setInject(new Set(r.unmapped.map((u) => u.index)));
+      setCreatedTitles(new Set());
       setBusy(null);
     },
     onError: (e: any) => { setError(e?.message ?? "對映失敗"); setBusy(null); },
@@ -102,6 +113,18 @@ export default function PositioningDocPanel({
   const applyMut = (trpc as any).positioningDocs?.applyMapping?.useMutation?.({
     onSuccess: () => { setReview(null); setBusy(null); coverageQuery.refetch?.(); },
     onError: (e: any) => { setError(e?.message ?? "套用失敗"); setBusy(null); },
+  }) ?? null;
+
+  // 2026-09-23（CJ「品牌定位…也可以自訂新增欄位，或是輸入 chatgpt 對不同產品或品牌的討論」）：
+  // propose() 對套不進固定欄位、但自成一塊的內容提議開新卡；使用者逐張確認才真的建立。
+  const [createdTitles, setCreatedTitles] = React.useState<Set<string>>(new Set());
+  const createSegmentMut = (trpc as any).positioningDocs?.createCustomSegment?.useMutation?.({
+    onSuccess: (_r: any, vars: any) => { setCreatedTitles((prev) => new Set(prev).add(vars.title)); setBusy(null); coverageQuery.refetch?.(); },
+    onError: (e: any) => { setError(e?.message ?? "建立卡片失敗"); setBusy(null); },
+  }) ?? null;
+  const removeSegmentMut = (trpc as any).positioningDocs?.removeCustomSegment?.useMutation?.({
+    onSuccess: () => { setBusy(null); coverageQuery.refetch?.(); },
+    onError: (e: any) => { setError(e?.message ?? "刪除失敗"); setBusy(null); },
   }) ?? null;
 
   if (!scopeId) {
@@ -113,6 +136,7 @@ export default function PositioningDocPanel({
   const missing: PromptField[] = coverageQuery.data?.missing ?? [];
   const total = coverageQuery.data?.total ?? 0;
   const applied = coverageQuery.data?.applied ?? null;
+  const customSegments: CustomSegment[] = coverageQuery.data?.customSegments ?? [];
 
   async function post(url: string, init: RequestInit): Promise<any> {
     const r = await fetch(url, { credentials: "include", ...init });
@@ -310,6 +334,59 @@ export default function PositioningDocPanel({
           </div>
         )}
 
+        {review.suggestedSegments.length > 0 && (
+          <div className="rounded-medium border border-primary-200 bg-primary-50/40 p-4">
+            <p className="text-small font-semibold text-primary-800">
+              {en ? "This looks like its own topic — new cards?" : "這幾段看起來是獨立的主題 — 要開新卡嗎？"}
+            </p>
+            <p className="text-tiny text-default-600 mt-0.5 mb-3">
+              {en
+                ? "This content doesn't fit any existing field. Each proposed card below is quoted verbatim from your document, same as the fields above — nothing invented."
+                : "這些內容套不進任何現有欄位。下面每張提議卡片的內容都是逐字引用你的文件，跟上面的欄位一樣沒有任何一句是編的。"}
+            </p>
+            <div className="flex flex-col gap-3">
+              {review.suggestedSegments.map((s, i) => {
+                const done = createdTitles.has(s.title);
+                return (
+                  <div key={i} className={`rounded-medium border p-3 ${done ? "border-success-300 bg-success-50/40" : "border-divider bg-content1"}`}>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-small font-semibold">{s.title}</span>
+                      {s.fromHeading && <Chip size="sm" variant="flat">{en ? "from" : "來自"}「{s.fromHeading}」</Chip>}
+                      {done && (
+                        <Chip size="sm" color="success" variant="flat" startContent={<Check size={11} />}>
+                          {en ? "created" : "已建立"}
+                        </Chip>
+                      )}
+                    </div>
+                    <ul className="mt-1.5 flex flex-col gap-0.5">
+                      {s.fields.map((f, j) => (
+                        <li key={j} className="text-tiny text-default-700">
+                          <span className="font-semibold">{f.label}：</span>{f.value}
+                        </li>
+                      ))}
+                    </ul>
+                    {!done && (
+                      <Button
+                        size="sm" className="mt-2" color="primary" variant="flat"
+                        isLoading={busy === `newcard:${i}`}
+                        onPress={() => {
+                          setBusy(`newcard:${i}`);
+                          createSegmentMut?.mutate({
+                            scope: scopeMode, scopeId, docId: review.docId,
+                            title: s.title, fields: s.fields,
+                          });
+                        }}
+                      >
+                        {en ? "Create this card" : "建立這張卡"}
+                      </Button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {review.missing.length > 0 && (
           <div className="rounded-medium border border-warning-200 bg-warning-50/50 p-4">
             <p className="text-small font-semibold text-warning-800">
@@ -362,8 +439,8 @@ export default function PositioningDocPanel({
         <p className="text-medium font-semibold">{en ? "Your own positioning document" : `你自己的${scopeLabel}定位文件`}</p>
         <p className="text-small text-default-700 mt-1">
           {en
-            ? "Upload the positioning you already have, in whatever format you wrote it. It's kept verbatim and shown by your own structure — you don't have to answer our questions."
-            : `上傳你已經在用的${scopeLabel}定位，格式照你自己的。原文會逐字保留、按你自己的段落呈現 —— 不需要把我們設的題目填完。`}
+            ? "Upload the positioning you already have, in whatever format you wrote it — or paste a whole ChatGPT / Claude / Gemini conversation where you already worked this out with AI. It's kept verbatim and shown by your own structure — you don't have to answer our questions."
+            : `上傳你已經在用的${scopeLabel}定位，格式照你自己的——或直接貼上你之前跟 ChatGPT / Claude / Gemini 討論過的整段對話。原文會逐字保留、按你自己的段落呈現 —— 不需要把我們設的題目填完。`}
         </p>
       </div>
 
@@ -416,6 +493,40 @@ export default function PositioningDocPanel({
         )}
       </div>
 
+      {/* 2026-09-23：使用者自己開的定位卡片（從文件/對話串裡提議、確認建立的），跟固定
+          欄位一樣真的會進 prompt（見 brandContext.pushCustomSegments）。 */}
+      {customSegments.length > 0 && (
+        <div className="rounded-medium border border-divider bg-content1 p-4">
+          <p className="text-small font-semibold">{en ? "Your own cards" : "你自己的卡片"}</p>
+          <p className="text-tiny text-default-500 mt-0.5 mb-3">
+            {en ? "Same as the fields above — these are read on every task run too." : "跟上面的固定欄位一樣，每次跑任務都會被讀到。"}
+          </p>
+          <div className="flex flex-col gap-2">
+            {customSegments.map((s) => (
+              <div key={s.id} className="rounded-medium border border-divider p-3 flex gap-3 items-start">
+                <div className="min-w-0 flex-1">
+                  <span className="text-small font-semibold">{s.title}</span>
+                  <ul className="mt-1 flex flex-col gap-0.5">
+                    {s.fields.map((f) => (
+                      <li key={f.key} className="text-tiny text-default-700">
+                        <span className="font-semibold">{f.label}：</span>{f.value}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+                <Button
+                  size="sm" variant="light" isIconOnly className="shrink-0"
+                  isLoading={busy === `rmseg:${s.id}`}
+                  onPress={() => { setBusy(`rmseg:${s.id}`); setError(null); removeSegmentMut?.mutate({ scope: scopeMode, scopeId, segmentId: s.id }); }}
+                >
+                  <Trash2 size={14} className="text-danger-500" />
+                </Button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* 上傳 / 貼上 */}
       <div className="flex flex-wrap gap-2 items-center">
         <input
@@ -438,7 +549,9 @@ export default function PositioningDocPanel({
         <div className="flex flex-col gap-2">
           <Textarea
             minRows={6} value={pasteText} onValueChange={setPasteText}
-            placeholder={en ? "Paste your positioning here — headings and paragraphs are kept." : "把你的定位貼在這裡 —— 標題與段落會照原樣保留。"}
+            placeholder={en
+              ? "Paste your positioning here — a document, or a whole AI chat log. Headings and paragraphs are kept."
+              : "把你的定位貼在這裡 —— 可以是一份文件，也可以是整段 AI 對話紀錄。標題與段落會照原樣保留。"}
           />
           <div className="flex gap-2">
             <Button size="sm" color="primary" isLoading={busy === "paste"} isDisabled={pasteText.trim().length < 40} onPress={() => void onPaste()}>

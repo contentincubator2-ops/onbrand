@@ -32,7 +32,7 @@ vi.mock("../../localDb", () => ({
 import { buildBrandPrefix } from "./brandContext";
 import {
   BRAND_PROMPT_FIELDS, PRODUCT_PROMPT_FIELDS, EVENT_PROMPT_FIELDS,
-  coverageOf, readPath, type PromptField,
+  coverageOf, readPath, customSegmentsOf, type PromptField,
 } from "./positioningDocs";
 
 /** 依欄位宣告的形狀塞一個好認的哨兵值。 */
@@ -192,5 +192,79 @@ describe("coverageOf", () => {
       expect(new Set(paths).size).toBe(paths.length);
       for (const p of paths) expect(p.split(".")).toHaveLength(2);
     }
+  });
+});
+
+// 2026-09-23（CJ「品牌定位…也可以自訂新增欄位，或是輸入 chatgpt 針對不同產品或品牌的討論」）：
+// 使用者自己開的定位卡片（_customSegments[]）要跟固定欄位一樣真的進 prompt，不然只是裝飾。
+describe("customSegmentsOf", () => {
+  it("讀不到就回空陣列，不是 undefined／丟例外", () => {
+    expect(customSegmentsOf({})).toEqual([]);
+    expect(customSegmentsOf({ _customSegments: "not-an-array" })).toEqual([]);
+  });
+
+  it("讀得到就原樣回傳", () => {
+    const segs = [{ id: "s1", title: "品牌願景", fields: [], createdAt: "", sourceDocId: null }];
+    expect(customSegmentsOf({ _customSegments: segs })).toBe(segs);
+  });
+});
+
+describe("自訂卡片會進 buildBrandPrefix（跟固定欄位同一條規矩：畫面上有的東西一定要進得了 prompt）", () => {
+  it("品牌的自訂卡片標題與欄位值都出現在品牌前綴裡", async () => {
+    const brandId = freshId();
+    rowsFor.brand = [{
+      id: brandId, name: "測試品牌",
+      positioning: {
+        _customSegments: [{
+          id: "s1", title: "CUSTOMTITLEZZ",
+          fields: [{ key: "why", label: "為什麼", value: "CUSTOMVALUEZZ" }],
+          createdAt: "", sourceDocId: null,
+        }],
+      },
+    }];
+
+    const prefix = await buildBrandPrefix(brandId);
+
+    expect(prefix).toContain("CUSTOMTITLEZZ");
+    expect(prefix).toContain("CUSTOMVALUEZZ");
+  });
+
+  it("產品與活動的自訂卡片也各自進得了對應區塊", async () => {
+    const brandId = freshId();
+    rowsFor.brand = [{ id: brandId, name: "測試品牌", positioning: {} }];
+    rowsFor.product = [{
+      name: "測試產品",
+      positioning: { _customSegments: [{ id: "p1", title: "PRODCARDZZ", fields: [{ key: "a", label: "A", value: "PRODVALZZ" }], createdAt: "", sourceDocId: null }] },
+    }];
+    rowsFor.event = [{
+      name: "測試活動", startAt: null, endAt: null,
+      positioning: { _customSegments: [{ id: "e1", title: "EVENTCARDZZ", fields: [{ key: "a", label: "A", value: "EVENTVALZZ" }], createdAt: "", sourceDocId: null }] },
+    }];
+
+    const productPrefix = await buildBrandPrefix(brandId, 601);
+    expect(productPrefix).toContain("PRODCARDZZ");
+    expect(productPrefix).toContain("PRODVALZZ");
+
+    const eventPrefix = await buildBrandPrefix(brandId, null, 602);
+    expect(eventPrefix).toContain("EVENTCARDZZ");
+    expect(eventPrefix).toContain("EVENTVALZZ");
+  });
+
+  it("沒有標題或沒有欄位的殘缺卡片不會被塞進 prompt（例如寫壞的資料）", async () => {
+    const brandId = freshId();
+    rowsFor.brand = [{
+      id: brandId, name: "測試品牌",
+      positioning: { _customSegments: [{ id: "s1", title: "", fields: [{ key: "a", label: "A", value: "SHOULDNOTAPPEARZZ" }], createdAt: "", sourceDocId: null }] },
+    }];
+
+    const prefix = await buildBrandPrefix(brandId);
+    expect(prefix).not.toContain("SHOULDNOTAPPEARZZ");
+  });
+
+  it("沒有自訂卡片時不會多印出任何東西", async () => {
+    const brandId = freshId();
+    rowsFor.brand = [{ id: brandId, name: "測試品牌", positioning: { _customSegments: [] } }];
+    const prefix = await buildBrandPrefix(brandId);
+    expect(prefix).not.toContain("undefined");
   });
 });

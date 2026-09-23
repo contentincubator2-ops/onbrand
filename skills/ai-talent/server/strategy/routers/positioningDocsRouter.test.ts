@@ -18,7 +18,7 @@ import { positioningDocsRouter } from "./positioningDocsRouter";
 describe("positioningDocsRouter", () => {
   it("router 建得起來，而且沒有用到 tRPC 保留字", () => {
     const names = Object.keys((positioningDocsRouter as any)._def.procedures);
-    expect(names.sort()).toEqual(["applyMapping", "coverage", "propose"]);
+    expect(names.sort()).toEqual(["applyMapping", "coverage", "createCustomSegment", "propose", "removeCustomSegment"]);
   });
 
   it("procedure 名稱不可以撞 Function.prototype 上的東西", () => {
