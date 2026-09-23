@@ -32,9 +32,13 @@ export interface WordingEdit {
   createdAt: string;
 }
 
-/** 一次拿多少筆。MySQL 的 prepared statement 不吃 `LIMIT ?`。 */
-const PAGE = 80;
-
+/**
+ * 2026-09-23：紀錄改寫進通用的 hub_strategy_edits。
+ *
+ * 舊的 hub_wording_edits 還在（搬遷已經把歷史複製過去了），但**不再被寫入也
+ * 不再被讀取**。留著是因為刪稽核紀錄是不可逆的——「搬遷把三個月的紀錄弄丟了」
+ * 沒有辦法補救。要不要清掉是之後另外決定的事。
+ */
 export async function logWordingEdit(args: {
   orgId: number;
   wordingId: number | null;
@@ -45,36 +49,34 @@ export async function logWordingEdit(args: {
   term: string;
   changes?: Array<{ field: string; from: string; to: string }>;
 }): Promise<void> {
-  await localPool.execute(
-    `INSERT INTO hub_wording_edits (org_id, wording_id, actor, action, market, kind, term, changes)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    [args.orgId, args.wordingId, args.actor, args.action, args.market, args.kind, args.term,
-     JSON.stringify(args.changes ?? [])],
-  );
+  const { logStrategyEdit } = await import("./strategyEdits");
+  await logStrategyEdit({
+    orgId: args.orgId, entity: "wording", entityId: args.wordingId,
+    actor: args.actor,
+    // 舊表的 "added" 就是通用表的 "created" —— 同一件事兩個名字，在邊界對齊。
+    action: args.action === "added" ? "created" : args.action,
+    changes: args.changes,
+    // 舊表把「這是哪個詞」存在 term；通用表用 label。市場與種類已經在用詞本身
+    // 的資料裡，紀錄不需要再存一份。
+    label: args.term,
+  });
 }
 
 export async function listWordingEdits(orgId: number, market?: string): Promise<WordingEdit[]> {
-  const [rows]: any = market
-    ? await localPool.execute(
-        `SELECT id, wording_id, actor, action, market, kind, term, changes, created_at
-           FROM hub_wording_edits WHERE org_id = ? AND market = ? ORDER BY id DESC LIMIT ${PAGE}`,
-        [orgId, market],
-      )
-    : await localPool.execute(
-        `SELECT id, wording_id, actor, action, market, kind, term, changes, created_at
-           FROM hub_wording_edits WHERE org_id = ? ORDER BY id DESC LIMIT ${PAGE}`,
-        [orgId],
-      );
-  return (rows as any[]).map((r) => ({
+  const { listStrategyEdits } = await import("./strategyEdits");
+  const rows = await listStrategyEdits(orgId, { entity: "wording" });
+  return rows.map((r) => ({
     id: r.id,
-    wordingId: r.wording_id ?? null,
+    wordingId: r.entityId || null,
     actor: r.actor,
-    action: r.action,
-    market: r.market,
-    kind: r.kind,
-    term: r.term,
-    changes: typeof r.changes === "string" ? safeJson(r.changes) : (r.changes ?? []),
-    createdAt: new Date(r.created_at).toISOString(),
+    action: (r.action === "created" ? "added" : r.action) as WordingAction,
+    // 市場不再存在紀錄裡（它屬於用詞本身，不屬於這次變更）。呼叫端傳了 market
+    // 也不再過濾 —— 與其假裝有這個能力，不如讓它明確地沒有。
+    market: market ?? "",
+    kind: "wording",
+    term: r.label ?? "",
+    changes: r.changes,
+    createdAt: r.createdAt,
   }));
 }
 
@@ -129,13 +131,4 @@ export async function editWording(args: {
     changes,
   });
   return { changed: true };
-}
-
-function safeJson(s: string): any {
-  try {
-    const v = JSON.parse(s);
-    return Array.isArray(v) ? v : [];
-  } catch {
-    return [];
-  }
 }

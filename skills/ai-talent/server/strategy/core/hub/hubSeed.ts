@@ -194,6 +194,19 @@ export async function seedHub(opts: { reset?: boolean } = {}) {
     console.log(`[hub-seed] rep industry coverage: ${filled} backfilled`);
   }
 
+  /**
+   * 2026-09-23：把產品與用詞的舊紀錄表併進通用的 hub_strategy_edits。
+   *
+   * 每次部署都跑，但靠 (org_id, entity, legacy_id) 的唯一鍵只會搬一次——
+   * **一次性的腳本最後總是會被跑第二次**，與其靠紀律不如靠資料庫。
+   * 舊表留著不刪：刪稽核紀錄是不可逆的。
+   */
+  {
+    const { migrateLegacyEdits } = await import("./strategyEdits");
+    const moved = await migrateLegacyEdits(org.id);
+    console.log(`[hub-seed] legacy edit history: +${moved.solutions} solution, +${moved.wording} wording`);
+  }
+
   return {
     orgId: org.id, facts: HUB_FACTS.length, skills: HUB_SKILLS.length, solutions: solutions.length,
     reps: HUB_REPS.length, wording: HUB_WORDING.length, regulations: HUB_REGULATIONS.length,

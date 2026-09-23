@@ -155,6 +155,40 @@ async function main() {
     }
     check(missingTables.length === 0, "every strategy entity points at a real table", missingTables.join(", ") || `${STRATEGY_ENTITIES.length} tables`);
 
+    // 2026-09-23 搬遷：舊的兩張紀錄表併進 hub_strategy_edits。
+    // 驗「沒有弄丟」比驗「搬過去了」重要 —— 稽核紀錄少一筆是補不回來的。
+    for (const [table, entity, idCol] of [
+      ["hub_solution_edits", "solution", "solution_id"],
+      ["hub_wording_edits", "wording", "wording_id"],
+    ] as const) {
+      const [exists] = await q(
+        `SELECT COUNT(*) AS n FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ?`,
+        [table],
+      );
+      if (!Number(exists?.n)) continue;
+      const [old] = await q(`SELECT COUNT(*) AS n FROM ${table} WHERE org_id = ?`, [org.id]);
+      const [moved] = await q(
+        `SELECT COUNT(*) AS n FROM hub_strategy_edits WHERE org_id = ? AND entity = ? AND legacy_id IS NOT NULL`,
+        [org.id, entity],
+      );
+      check(
+        Number(moved?.n) >= Number(old?.n),
+        `every ${entity} history row was carried over`,
+        `${moved?.n} of ${old?.n} legacy rows`,
+      );
+      void idCol;
+    }
+
+    // 搬遷可以重複執行：再跑一次不該長出任何東西。
+    const [beforeAgain] = await q(`SELECT COUNT(*) AS n FROM hub_strategy_edits WHERE org_id = ?`, [org.id]);
+    await m.migrateLegacyEdits(org.id);
+    const [afterAgain] = await q(`SELECT COUNT(*) AS n FROM hub_strategy_edits WHERE org_id = ?`, [org.id]);
+    check(
+      Number(beforeAgain?.n) === Number(afterAgain?.n),
+      "running the migration twice adds nothing",
+      `${beforeAgain?.n} → ${afterAgain?.n}`,
+    );
+
     const [reg] = await q(`SELECT id, name_zh FROM hub_regulations WHERE org_id = ? ORDER BY id LIMIT 1`, [org.id]);
     if (reg) {
       const original = String(reg.name_zh ?? "");

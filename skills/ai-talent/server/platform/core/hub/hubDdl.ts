@@ -282,8 +282,16 @@ export const HUB_DDL: string[] = [
     changes         JSON         NULL,
     note            VARCHAR(400) NULL,
     created_at      DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    /** 這一筆在當下叫什麼。資料刪掉之後，光有 id 沒人看得懂。 */
+    label           VARCHAR(200) NULL,
+    /**
+     * 從舊紀錄表搬過來時的原始 id。搭配下面的唯一鍵，讓搬遷可以重複執行
+     * （每次部署都跑，但只會搬一次）—— 一次性的腳本最後總是會被跑第二次。
+     */
+    legacy_id       INT          NULL,
     INDEX idx_org (org_id, created_at),
-    INDEX idx_entity (org_id, entity, entity_id)
+    INDEX idx_entity (org_id, entity, entity_id),
+    UNIQUE KEY uq_legacy (org_id, entity, legacy_id)
   ) ${TAIL}`,
 
   /**
@@ -380,6 +388,11 @@ export const HUB_ALTERS: string[] = [
   `ALTER TABLE hub_facts ADD COLUMN push_audience JSON NULL`,
   `ALTER TABLE hub_facts ADD COLUMN push_cadence VARCHAR(20) NULL`,
   `ALTER TABLE hub_facts ADD COLUMN push_last_at DATETIME(3) NULL`,
+
+  // 2026-09-23：通用紀錄表併入舊的兩張表所需要的欄位（見 hubSeed 的搬遷段）。
+  `ALTER TABLE hub_strategy_edits ADD COLUMN label VARCHAR(200) NULL`,
+  `ALTER TABLE hub_strategy_edits ADD COLUMN legacy_id INT NULL`,
+  `ALTER TABLE hub_strategy_edits ADD UNIQUE KEY uq_legacy (org_id, entity, legacy_id)`,
 ];
 
 export async function ensureHubTables(): Promise<void> {
@@ -387,10 +400,11 @@ export async function ensureHubTables(): Promise<void> {
   for (const ddl of HUB_DDL) {
     await localPool.execute(ddl);
   }
-  // ALTER 沒有 IF NOT EXISTS，重跑一定會噴 duplicate column —— 那是預期的。
+  // ALTER 沒有 IF NOT EXISTS，重跑一定會噴。欄位是 "Duplicate column name"，
+  // 索引是 "Duplicate key name" —— 兩種都是預期的，其他的要吵出來。
   for (const ddl of HUB_ALTERS) {
     await localPool.execute(ddl).catch((e: any) => {
-      if (!/duplicate column/i.test(String(e?.message ?? ""))) {
+      if (!/duplicate (column|key) name/i.test(String(e?.message ?? ""))) {
         console.warn("[hubDdl] alter:", e?.message ?? e);
       }
     });

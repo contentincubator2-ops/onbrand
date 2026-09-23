@@ -165,6 +165,12 @@ export interface EditRecord {
   createdAt: string;
 }
 
+/**
+ * 2026-09-23：紀錄改寫進通用的 hub_strategy_edits。
+ *
+ * 舊的 hub_solution_edits 還在（搬遷已經把歷史複製過去了），但不再被寫入也不再
+ * 被讀取。留著是因為刪稽核紀錄不可逆。
+ */
 export async function logEdit(args: {
   orgId: number;
   solutionId: number;
@@ -173,33 +179,28 @@ export async function logEdit(args: {
   changes?: Array<{ field: string; from: string; to: string }>;
   note?: string | null;
 }): Promise<void> {
-  await localPool.execute(
-    `INSERT INTO hub_solution_edits (org_id, solution_id, actor, action, changes, note) VALUES (?, ?, ?, ?, ?, ?)`,
-    [args.orgId, args.solutionId, args.actor, args.action, JSON.stringify(args.changes ?? []), args.note ?? null],
-  );
+  const { logStrategyEdit } = await import("./strategyEdits");
+  await logStrategyEdit({
+    orgId: args.orgId, entity: "solution", entityId: args.solutionId,
+    actor: args.actor,
+    // 產品的 "created" / "withdrawn" 跟通用表對齊：後者沒有 withdrawn，
+    // 語意上等於作者自己退回，記成 rejected。
+    action: (args.action === "withdrawn" ? "rejected" : args.action) as any,
+    changes: args.changes, note: args.note,
+  });
 }
 
 export async function listEdits(orgId: number, solutionId?: number, limit = 50): Promise<EditRecord[]> {
-  const cap = Math.max(1, Math.min(200, Math.floor(limit)));
-  const [rows]: any = solutionId
-    ? await localPool.execute(
-        `SELECT id, solution_id, actor, action, changes, note, created_at FROM hub_solution_edits
-          WHERE org_id = ? AND solution_id = ? ORDER BY id DESC LIMIT ${cap}`,
-        [orgId, solutionId],
-      )
-    : await localPool.execute(
-        `SELECT id, solution_id, actor, action, changes, note, created_at FROM hub_solution_edits
-          WHERE org_id = ? ORDER BY id DESC LIMIT ${cap}`,
-        [orgId],
-      );
-  return (rows as any[]).map((r) => ({
+  const { listStrategyEdits } = await import("./strategyEdits");
+  const rows = await listStrategyEdits(orgId, { entity: "solution", entityId: solutionId });
+  return rows.slice(0, Math.max(1, Math.min(200, Math.floor(limit)))).map((r) => ({
     id: r.id,
-    solutionId: r.solution_id,
+    solutionId: r.entityId,
     actor: r.actor,
-    action: r.action,
-    changes: typeof r.changes === "string" ? safeJson(r.changes) : (r.changes ?? []),
-    note: r.note ?? null,
-    createdAt: new Date(r.created_at).toISOString(),
+    action: r.action as EditAction,
+    changes: r.changes,
+    note: r.note,
+    createdAt: r.createdAt,
   }));
 }
 

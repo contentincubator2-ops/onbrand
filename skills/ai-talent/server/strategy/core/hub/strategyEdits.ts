@@ -46,6 +46,7 @@ export interface StrategyEdit {
   action: StrategyAction;
   changes: Array<{ field: string; from: string; to: string }>;
   note: string | null;
+  label: string | null;
   createdAt: string;
 }
 
@@ -79,12 +80,14 @@ export async function logStrategyEdit(args: {
   action: StrategyAction;
   changes?: Array<{ field: string; from: string; to: string }>;
   note?: string | null;
+  /** 這一筆在當下叫什麼。資料刪掉之後，光有 id 沒人看得懂。 */
+  label?: string | null;
 }): Promise<void> {
   await (await db()).execute(
-    `INSERT INTO hub_strategy_edits (org_id, entity, entity_id, actor, action, changes, note)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO hub_strategy_edits (org_id, entity, entity_id, actor, action, changes, note, label)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
     [args.orgId, args.entity, args.entityId, args.actor, args.action,
-     JSON.stringify(args.changes ?? []), args.note ?? null],
+     JSON.stringify(args.changes ?? []), args.note ?? null, args.label ?? null],
   );
 }
 
@@ -97,7 +100,7 @@ export async function listStrategyEdits(
   if (filter.entity) { where.push("entity = ?"); params.push(filter.entity); }
   if (filter.entityId) { where.push("entity_id = ?"); params.push(filter.entityId); }
   const [rows]: any = await (await db()).execute(
-    `SELECT id, entity, entity_id, actor, action, changes, note, created_at
+    `SELECT id, entity, entity_id, actor, action, changes, note, label, created_at
        FROM hub_strategy_edits WHERE ${where.join(" AND ")} ORDER BY id DESC LIMIT ${PAGE}`,
     params,
   );
@@ -105,6 +108,7 @@ export async function listStrategyEdits(
     id: r.id, entity: r.entity, entityId: r.entity_id ?? 0, actor: r.actor, action: r.action,
     changes: typeof r.changes === "string" ? safeJson(r.changes) : (r.changes ?? []),
     note: r.note ?? null,
+    label: r.label ?? null,
     createdAt: new Date(r.created_at).toISOString(),
   }));
 }
@@ -354,4 +358,61 @@ function safeObject(s: string): Record<string, any> {
   } catch {
     return {};
   }
+}
+
+// ── 舊紀錄表的搬遷 ──────────────────────────────────────────────────────────
+
+/**
+ * 把 hub_solution_edits 與 hub_wording_edits 併進 hub_strategy_edits。
+ *
+ * 2026-09-23：這是收斂的最後一步。三張表記同一件事（誰在什麼時候改了什麼），
+ * 而且每加一種資料就要再開一張——那正是為什麼要有通用層。
+ *
+ * ── 可以重複執行 ─────────────────────────────────────────────────────
+ * 每次部署都會跑，但靠 (org_id, entity, legacy_id) 的唯一鍵只會搬一次。
+ * **一次性的腳本最後總是會被跑第二次**，與其靠紀律不如靠資料庫。
+ *
+ * ── 舊表不刪 ─────────────────────────────────────────────────────────
+ * 搬完之後舊表不再被讀也不再被寫，但**留著**。刪資料是不可逆的，而且這是
+ * 稽核紀錄——「搬遷把三個月的紀錄弄丟了」是沒有辦法補救的那種錯。要不要清掉
+ * 是之後另外決定的事，不是搬遷順便做的。
+ */
+export async function migrateLegacyEdits(orgId: number): Promise<{ solutions: number; wording: number }> {
+  const pool = await db();
+  const out = { solutions: 0, wording: 0 };
+
+  const hasTable = async (name: string) => {
+    const [rows]: any = await pool.execute(
+      `SELECT COUNT(*) AS n FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ?`,
+      [name],
+    );
+    return Number((rows as any[])[0]?.n ?? 0) > 0;
+  };
+
+  if (await hasTable("hub_solution_edits")) {
+    const [r]: any = await pool.execute(
+      `INSERT IGNORE INTO hub_strategy_edits
+         (org_id, entity, entity_id, actor, action, changes, note, created_at, legacy_id)
+       SELECT org_id, 'solution', solution_id, actor, action, changes, note, created_at, id
+         FROM hub_solution_edits WHERE org_id = ?`,
+      [orgId],
+    );
+    out.solutions = Number(r?.affectedRows ?? 0);
+  }
+
+  if (await hasTable("hub_wording_edits")) {
+    // 用詞的舊表把「這是哪個詞」存在自己的 term 欄位；通用表用 label。
+    const [r]: any = await pool.execute(
+      `INSERT IGNORE INTO hub_strategy_edits
+         (org_id, entity, entity_id, actor, action, changes, label, created_at, legacy_id)
+       SELECT org_id, 'wording', wording_id, actor,
+              CASE action WHEN 'added' THEN 'created' ELSE action END,
+              changes, term, created_at, id
+         FROM hub_wording_edits WHERE org_id = ?`,
+      [orgId],
+    );
+    out.wording = Number(r?.affectedRows ?? 0);
+  }
+
+  return out;
 }
