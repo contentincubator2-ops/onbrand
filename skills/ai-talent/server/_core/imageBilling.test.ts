@@ -80,3 +80,9 @@ describe("image charge reconciliation", () => {
     })).resolves.toBe(0);
   });
 });
+
+
+it("charges the selected Nano Banana tier with or without a product reference", () => {
+  expect(imageActionForRequest({ modelChoice: "nano-banana" })).toBe("image_imagen");
+  expect(imageActionForRequest({ modelChoice: "nano-banana", subjectImageUrl: "https://example.com/product.jpg" })).toBe("image_imagen");
+});

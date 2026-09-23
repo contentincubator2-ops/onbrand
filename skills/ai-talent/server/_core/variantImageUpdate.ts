@@ -1,5 +1,6 @@
 export interface VariantImageUpdateInput {
   imageUrl: string;
+  cardIndex?: number;
   style?: string;
   prompt?: string;
   promptZh?: string;
@@ -18,6 +19,14 @@ export function applyVariantImageUpdate(
   item: Record<string, any>,
   input: VariantImageUpdateInput,
 ): Record<string, any> {
+  if (input.cardIndex !== undefined) {
+    const { cardIndex, ...imageInput } = input;
+    if (!Number.isInteger(cardIndex) || cardIndex < 0 || !Array.isArray(item.cards) || !item.cards[cardIndex]) {
+      throw new Error("Image card not found");
+    }
+    return { ...item, cards: item.cards.map((card: any, index: number) =>
+      index === cardIndex ? applyVariantImageUpdate(card, imageInput) : card) };
+  }
   const currentImage = item.image && typeof item.image === "object" && !Array.isArray(item.image)
     ? item.image
     : {};
@@ -49,6 +58,8 @@ export function applyVariantImageUpdate(
       ...currentImage,
       url: input.imageUrl,
       status: "ready",
+      errorMsg: undefined,
+      canSwitchTo: undefined,
       style,
       prompt,
       promptZh,

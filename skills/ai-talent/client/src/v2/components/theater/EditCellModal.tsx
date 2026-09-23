@@ -9,6 +9,7 @@
  *   - Image preview + prompt editor + 重新產圖
  *   - 送到行事曆: inline datetime picker → trpc.theater.scheduleCell
  */
+import { ImageRetryActions } from "../media/ImageRetryActions";
 import { useState, useRef, useEffect } from "react";
 import { Spinner } from "@heroui/react";
 import type { TheaterPlatform } from "../../config/theaterCast";
@@ -183,7 +184,7 @@ export default function EditCellModal({
   };
 
   // ── 重新產圖 ──────────────────────────────────────────────────────────────
-  const handleRegenImage = async () => {
+  const handleRegenImage = async (modelChoice: "gpt-image-2" | "nano-banana" = "gpt-image-2") => {
     if (imaging) return;
     setImaging(true);
     setImageError(null);
@@ -194,6 +195,7 @@ export default function EditCellModal({
         caption,
         brandTagline,
         customPrompt: imagePrompt.trim() || undefined,
+        modelChoice,
       });
       if (r?.ok && r?.imageUrl) {
         setImageUrl(r.imageUrl);
@@ -488,14 +490,14 @@ export default function EditCellModal({
                   className="w-full text-[12px] px-2.5 py-2 border border-neutral-200 rounded-xl resize-none focus:outline-none focus:border-indigo-400 transition"
                 />
                 <button
-                  onClick={handleRegenImage}
+                  onClick={() => handleRegenImage()}
                   disabled={imaging}
                   className="flex items-center gap-1.5 text-[12px] font-medium px-3 py-1.5 rounded-lg bg-amber-50 text-amber-700 hover:bg-amber-100 disabled:opacity-40 transition"
                 >
                   {imaging ? <Spinner size="sm" color="current" /> : <span>🎨</span>}
                   {en ? "Regenerate image" : "重新產圖"}
                 </button>
-                {imageError && <p className="text-[11px] text-danger-600">{imageError}</p>}
+                {imageError && <ImageRetryActions en={en} disabled={imaging} label={imageError} onRetry={model => handleRegenImage(model)} />}
               </div>
             </div>
           </section>

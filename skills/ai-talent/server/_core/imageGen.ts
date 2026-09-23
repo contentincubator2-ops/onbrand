@@ -16,6 +16,7 @@ import { sql } from "drizzle-orm";
 import { loadLineage } from "./decisionBridge";
 import { translateImagePromptToEnglish } from "./imagePromptTranslation";
 import { isRetriableImageError } from "./mediaGen";
+import { generateStillImage } from "./stillImageModels";
 
 export type ImageProvider = "openai" | "google" | "stability" | "piapi";
 export type ImageSize = "1024x1024" | "1024x1536" | "1536x1024";
@@ -112,6 +113,7 @@ export const NO_MIRROR_NEGATIVE_PROMPT = "mirror, reflection, reflective surface
 // "auto" = use IMAGE_GEN_PROVIDER_PRIMARY env (currently openai).
 // Other values map to specific providers in generateImage's switch.
 export type ImageModelChoice =
+  | "nano-banana"     // Explicit user choice only; never an automatic fallback
   | "auto"
   | "flux-schnell"      // PiAPI Flux Schnell — fast (5-10s), 4-step
   | "gpt-image-1"       // OpenAI gpt-image-1 — strong realism
@@ -330,6 +332,23 @@ export async function generateImage(input: ImageGenInput): Promise<ImageGenResul
        ${"openai"}, ${"pending"}, ${promptText}, ${size}, 'pending')
   `)) as any;
   const id = Number(ins?.insertId ?? 0);
+
+  // Nano Banana runs only after an explicit choice. Preserve the same prompt,
+  // dimensions and real product reference; never substitute it on GPT failure.
+  if (input.modelChoice === "nano-banana") {
+    const result = await generateStillImage("nano-banana", {
+      prompt: promptText, aspectRatio: aspectForSize(size) as any,
+      imageUrl: input.subjectImageUrl, brandId: input.brandId,
+    });
+    const errorMsg = result.errorMsg ? redactProviderSecrets(result.errorMsg).slice(0, 800) : undefined;
+    await db.execute(sql`UPDATE generated_images SET provider='google', model='nano-banana',
+      url=${result.url ?? null}, status=${result.status}, errorMsg=${errorMsg ?? null} WHERE id=${id}`);
+    return {
+      id, provider: "google", model: "nano-banana", requestedModel: "nano-banana",
+      status: result.status, url: result.url ?? null, b64: null,
+      effectivePrompt, usedFallback: false, errorMsg,
+    };
+  }
 
   // 2026-07-25 product-faithful: a subject-reference run never falls back to a
   // text-only provider — it can't see the real product, and a hallucinated

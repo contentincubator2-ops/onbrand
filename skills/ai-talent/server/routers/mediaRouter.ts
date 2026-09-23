@@ -31,6 +31,7 @@ function isProviderKeyError(text: string): boolean {
 import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure } from "../_core/trpc";
 import { callLLM } from "../_core/llmRouter";
+import { generateStillImage } from "../_core/stillImageModels";
 import { dispatchGenerate, checkJob, isRetriableImageError, type GenOptions, type GenResult } from "../_core/mediaGen";
 import localPool from "../localDb";
 import { probeImageUrl } from "../_core/imageFetch";
@@ -209,6 +210,14 @@ ${input.audienceContext ? `受眾：${input.audienceContext}` : ""}
         quality: input.quality,
         brandId: input.brandId ?? null,
       };
+      if (isImage) {
+        const result = await generateStillImage(input.modelId, opts);
+        return {
+          ok: result.status === "ready", status: result.status, modelId: result.modelId,
+          url: result.url, canSwitchTo: result.canSwitchTo,
+          message: result.status === "ready" ? "生成完成" : "圖片生成失敗，請重試或選擇其他模型。",
+        };
+      }
       // 2026-09-23 (CJ「備援要禁掉」): whatever the caller picked is what runs.
       // Product mode is routed to gpt-image-2 by policy upstream, and when that
       // fails the user sees the failure and can retry — nothing is silently

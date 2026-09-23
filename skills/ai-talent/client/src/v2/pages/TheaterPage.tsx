@@ -313,6 +313,7 @@ function PlatformCell({
   onRedo,
   onCopy,
   onEdit,
+  onRetryImage,
 }: {
   platform: TheaterPlatform;
   state: CellState;
@@ -325,6 +326,7 @@ function PlatformCell({
   onRedo?: () => void;
   onCopy?: () => void;
   onEdit?: () => void;
+  onRetryImage?: (model: "gpt-image-2" | "nano-banana") => void;
 }) {
   const { t, lang } = useLang();
   const meta = PLATFORM_META[platform];
@@ -432,10 +434,14 @@ function PlatformCell({
           )}
           {/* Image generation failed — show retry hint instead of empty space */}
           {isDone && state.imageError && !state.imageUrl && (
-            <div className="absolute bottom-2 left-0 right-0 flex justify-center">
+            <div className="absolute bottom-2 left-0 right-0 flex justify-center flex-wrap gap-1">
               <span className="text-[10px] text-amber-600 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5">
                 ⚠️ {t("theater_image_failed")}
               </span>
+              {onRetryImage && <>
+                <button type="button" className="text-xs bg-white border rounded px-2" onClick={() => onRetryImage("gpt-image-2")}>{lang === "en" ? "Retry" : "重試"}</button>
+                <button type="button" className="text-xs bg-white border rounded px-2" onClick={() => onRetryImage("nano-banana")}>{lang === "en" ? "Use Nano Banana" : "改用 Nano Banana"}</button>
+              </>}
             </div>
           )}
           {isWriting && !caption && (
@@ -1337,6 +1343,28 @@ export default function TheaterPage() {
     });
   };
 
+  const imageRetriesRef = useRef(new Set<CellKey>());
+  const retryCellImage = async (key: CellKey, platform: TheaterPlatform, model: "gpt-image-2" | "nano-banana") => {
+    const caption = cells.get(key)?.caption;
+    if (!brandId || !caption || imageRetriesRef.current.has(key)) return;
+    imageRetriesRef.current.add(key);
+    updateCell(key, { status: "imaging", imageError: false });
+    try {
+      const img: any = await generateImageMut.mutateAsync({
+        brandId, platform, caption, brandTagline: cellMeta.get(key)?.brandTagline ?? null, modelChoice: model,
+      });
+      if (lastBrandIdRef.current !== brandId) return;
+      updateCell(key, {
+        status: "done", imageUrl: img.ok ? img.imageUrl : null, imageError: !img.ok,
+        imagePrompt: img.brief ?? undefined, doneAt: Date.now(),
+      });
+    } catch (e) {
+      if (lastBrandIdRef.current !== brandId) return;
+      console.error("[theater] cell image retry failed:", key, e);
+      updateCell(key, { status: "done", imageUrl: null, imageError: true });
+    } finally { imageRetriesRef.current.delete(key); }
+  };
+
   // ── Per-cell redo: re-runs caption + image with stored meta ───────────
   const redoCell = async (key: CellKey, platform: TheaterPlatform) => {
     if (!brandId) return;
@@ -2014,6 +2042,7 @@ export default function TheaterPage() {
                       brandLogoUrl={(ctx?.brands ?? []).find((b: any) => b.id === brandId)?.logoUrl ?? null}
                       onCopy={() => copyCaption(key)}
                       onRedo={() => redoCell(key, p)}
+                      onRetryImage={(model) => retryCellImage(key, p, model)}
                       onEdit={() => openEditModal(key, p, d.date, d.label)}
                         />
                       {/* Platform connection status chip on done cells — always visible */}

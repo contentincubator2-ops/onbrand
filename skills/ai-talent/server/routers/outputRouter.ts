@@ -240,6 +240,7 @@ export const outputRouter = router({
   updateVariantImage: protectedProcedure
     .input(z.object({
       id: z.number(),
+      cardIndex: z.number().int().nonnegative().optional(),
       ...contentSelectorFields,
       // 2026-05-10: accept either http(s) URL OR data: URL (b64 inline
       // image from OpenAI gpt-image-1 which doesn't return a URL).

@@ -226,3 +226,14 @@ describe("generateImage provider validation", () => {
       .toBeLessThan(prompt.indexOf(conflictingScene));
   });
 });
+
+
+describe("explicit Nano Banana choice", () => {
+  it.each([undefined, "https://example.com/product.png"])("honors the choice with reference %s", async (subjectImageUrl) => {
+    executeMock.mockResolvedValue([{ insertId: 8 }]);
+    dispatchGenerateMock.mockResolvedValue({ status: "ready", url: "/static/nano.png", modelId: "google/nano-banana" });
+    const result = await generateImage({ brandId: 1, prompt: "A studio scene", modelChoice: "nano-banana", subjectImageUrl });
+    expect(dispatchGenerateMock).toHaveBeenLastCalledWith("google/nano-banana", expect.objectContaining({ imageUrl: subjectImageUrl }));
+    expect(result).toMatchObject({ status: "ready", model: "nano-banana", provider: "google", usedFallback: false });
+  });
+});

@@ -3,7 +3,7 @@
  *
  * UI flow: user clicks "Generate Image" on a FB/IG content card →
  * we resolve brand visual context from the upstream decision chain →
- * call gpt-image-2 (fallback Flux Schnell) → persist result → return URL / b64.
+ * call the selected GPT Image 2 / Nano Banana model → persist → return image or recoverable failure.
  */
 
 import { z } from "zod";
@@ -29,6 +29,7 @@ const size = z.enum(["1024x1024", "1024x1536", "1536x1024"]);
 // 2026-05-12 (CJ「給用戶選 image model」): user-facing model picker.
 // 2026-06-15: added gpt-image-2 (OpenAI latest, now the global default).
 const modelChoice = z.enum([
+  "nano-banana",
   "auto",
   "flux-schnell",
   "gpt-image-1",
@@ -115,35 +116,15 @@ export const imageRouter = router({
         prepaidAction: imageAction,
         result,
       });
-      // 2026-05-12: surface actual provider failures to the client.
-      // Previously a failed result still returned 200 with url:null, leading
-      // to the misleading "產圖完成但沒拿到 URL/b64" toast.
+      // A provider failure is recoverable UI state. Points were refunded above.
+      // Auth / input / ownership errors still throw before reaching this result.
       if (result.status === "failed") {
-        // 2026-05-14: translate raw provider errors into human-readable
-        // Chinese messages so users know what to do, not just what broke.
-        const raw = String(result.errorMsg ?? "unknown")
-          .replace(/api_key:[A-Za-z0-9_\-]+/g, "api_key:[REDACTED]")
-          .replace(/key=([A-Za-z0-9_\-]+)/g, "key=[REDACTED]")
-          .replace(/AIza[0-9A-Za-z_\-]{20,}/g, "[REDACTED_GOOGLE_KEY]");
-        let friendly = "生圖失敗，請稍後再試";
-        const isProviderKeyError = /key|unauthorized|api_key|permission_denied|suspended|consumer|forbidden|403/i.test(raw);
-        if (/safety system|content_policy|rejected by the safety|moderation/i.test(raw)) {
-          friendly = "OpenAI 的內容政策擋下了這個 prompt（常見原因：提到版權角色如 Pokémon / Disney / 寶可夢）。已嘗試切換到 Flux 但也失敗。建議修改 prompt — 把角色名稱換成形容（例：「圓滾滾的卡通生物」）。";
-        } else if (/quota|insufficient.*credit|balance/i.test(raw)) {
-          friendly = "AI 圖片額度暫時不足，已通知 SoWork 團隊。";
-        } else if (/rate.?limit|429/i.test(raw)) {
-          friendly = "AI 圖片服務速率限制中，請等 30 秒再試。";
-        } else if (/timeout|timed out/i.test(raw)) {
-          friendly = "生圖超時（>60 秒）。建議用 Flux Schnell 模型（最快 5-10 秒）。";
-        } else if (isProviderKeyError) {
-          friendly = "AI 圖片服務的金鑰異常，SoWork 已收到通知正在處理。";
-        }
-        throw new TRPCError({
-          code: "INTERNAL_SERVER_ERROR",
-          message: isProviderKeyError
-            ? friendly
-            : `${friendly}\n\n[技術細節] ${raw.slice(0, 300)}`,
-        });
+        return {
+          ...result,
+          errorMsg: "圖片生成失敗，請重試或選擇其他模型。",
+          canSwitchTo: input.modelChoice === "nano-banana" ? undefined : "nano-banana" as const,
+          normalizedDisplayPrompt: displayPrompt,
+        };
       }
       return { ...result, normalizedDisplayPrompt: displayPrompt };
     }),

@@ -24,7 +24,7 @@ import { loadAgent, aiModelToProvider } from "../_core/quickTaskOrchestra";
 import { invokeLLM } from "../_core/llm";
 import { captionToVisualBrief, loadBrandPaletteHexes } from "../_core/visualBrief";
 import { withUserLLMSlot } from "../_core/userLLMSemaphore";
-import { dispatchGenerate, isRetriableImageError } from "../_core/mediaGen";
+import { generateStillImage } from "../_core/stillImageModels";
 import { fetchViralPatterns, type ViralPatterns } from "../_core/socialListeningScout";
 import { buildTheaterCraftBlock } from "../_core/theaterCraftRef";
 import localPool from "../localDb";
@@ -1280,6 +1280,7 @@ ${cleaned}
       brandTagline: z.string().nullable().optional(),
       /** User-supplied prompt override — skips the LLM brief synthesis step. */
       customPrompt: z.string().max(1000).optional(),
+      modelChoice: z.enum(["gpt-image-2", "nano-banana"]).optional(),
     }))
     .mutation(async ({ ctx, input }) => withUserLLMSlot(ctx.user.id, async () => {
       const aspect = input.platform === "youtube" ? "16:9"
@@ -1305,32 +1306,14 @@ ${cleaned}
           palette: await loadBrandPaletteHexes(input.brandId),
         });
       }
-      // 2026-09-21: Theater used to prefer piapi/flux-schnell whenever a PiAPI
-      // key existed — which is always, in production — so it was the one
-      // surface that never reached gpt-image-2.
-      // 2026-09-23 (CJ「備援要禁掉」): and now there is no other model to reach.
-      // A cell either gets its gpt-image-2 image or shows the failure.
-      const primaryModel = "openai/gpt-image-2";
-      const runCell = async () => await dispatchGenerate(primaryModel, {
-        prompt: brief,
-        aspectRatio: aspect as any,
-        brandId: input.brandId,
+      const r = await generateStillImage(input.modelChoice, {
+        prompt: brief, aspectRatio: aspect as any, brandId: input.brandId,
       });
-      try {
-        let r = await runCell();
-        // 2026-09-23 (CJ「把同模型重試補上」): same model, once, timing only.
-        if (!(r.status === "ready" && r.url) && isRetriableImageError(r.errorMsg ?? "")) {
-          console.warn(`[theater.generateImage] retrying ${primaryModel} once — ${String(r.errorMsg).slice(0, 160)}`);
-          r = await runCell();
-        }
-        if (r.status === "ready" && r.url) {
-          return { ok: true as const, imageUrl: r.url, brief };
-        }
-        return { ok: false as const, imageUrl: null, brief, error: r.errorMsg ?? `image gen ${r.status}` };
-      } catch (e: any) {
-        console.error(`[theater.generateImage] ${primaryModel} threw:`, e?.message ?? e);
-        return { ok: false as const, imageUrl: null, brief, error: String(e?.message ?? e) };
-      }
+      return {
+        ok: r.status === "ready", imageUrl: r.url ?? null, brief,
+        modelId: r.modelId, canSwitchTo: r.canSwitchTo,
+        error: r.status === "failed" ? "圖片生成失敗，請重試或選擇其他模型。" : undefined,
+      };
     })),
 
   // ─── Brand caption rules CRUD (Phase 3a) ────────────────────────────
