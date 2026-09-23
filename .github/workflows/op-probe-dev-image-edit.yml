@@ -17,6 +17,7 @@ name: "Ops (DEV) — probe gpt-image-2 image edit with a real product photo"
 #   PROBE_MODE=angles → 在 dev VM 用真實模型跑 fb-30-caption-short，印出三個版本全文（驗證版本名稱與內文切角對得上）
 #   PROBE_MODE=taskcard → 貼一段假 ChatGPT 對話，驗「自建任務卡：貼整串對話 → 抽出成品 → 反推 SKILL → 上架」全鏈
 #   PROBE_MODE=positioning-thread → 貼一段假 ChatGPT 定位討論，驗「propose 對映固定欄位 + 願景套不進固定欄位時提議自訂卡片 → createCustomSegment → buildBrandPrefix 真的讀得到」全鏈
+#   PROBE_MODE=workbench-healthcheck → 策略工作台「AI 健檢」：明顯不搭的錨點應該被判不一致且附建議、品牌自己的錨點不應該被硬挑出三個都有問題、dismiss 只影響單一 anchor、canonical 欄位不被覆寫
 #   PROBE_MODE=livegen → 用網站實際的 generateStillImage 生一張圖（不繞過 dispatchGenerate，端到端驗證 key）
 #   PROBE_MODE=diagnose → 比對「GitHub secret 的 key」與「dev VM .env 的 key」的指紋（不印 key），各打一次最小生圖呼叫，並列出 dev 最近的生圖失敗與點數
 #   PROBE_MODE=edit  → 用 PROBE_PHOTO 跑兩個變體（自然提示詞對照 vs 上線用的 PRODUCT_FAITHFUL 提示詞），把結果圖拉回來
@@ -32,7 +33,7 @@ jobs:
     environment: dev
     timeout-minutes: 20
     env:
-      PROBE_MODE: positioning-thread
+      PROBE_MODE: workbench-healthcheck
       PROBE_PHOTO: "/opt/onbrand/shared/storage/asset-photos/product/261/1789987951094-5w8aw5.webp"
       SSH_KEY: ${{ secrets.VM_SSH_PRIVATE_KEY }}
       PROBE_OPENAI_KEY: ${{ secrets.OPEN_API_KEY }}
@@ -83,6 +84,12 @@ jobs:
           if [ "$MODE" = "positioning-thread" ]; then
             echo "--- 貼上整串 ChatGPT 定位討論 → propose 對映固定欄位 + 願景提議自訂卡片 → createCustomSegment → buildBrandPrefix ---"
             cd "$AI" && ./node_modules/.bin/tsx scripts/probe-positioning-doc-thread.ts 2>&1 | tail -100
+            exit $?
+          fi
+
+          if [ "$MODE" = "workbench-healthcheck" ]; then
+            echo "--- 策略工作台 AI 健檢：不搭的錨點要挑得出不一致＋給建議、自己的錨點不硬挑問題、dismiss 只影響單一 anchor、canonical 欄位不被覆寫 ---"
+            cd "$AI" && ./node_modules/.bin/tsx scripts/probe-workbench-healthcheck.ts 2>&1 | tail -100
             exit $?
           fi
 
