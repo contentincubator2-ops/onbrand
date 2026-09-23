@@ -19,7 +19,7 @@ import { trpc } from "../../../lib/trpc";
 import { useLang } from "../../../lib/i18n";
 import type { ShellOutletCtx } from "../../app/shell/ShellLayout";
 import { isStrategyPreviewEmail, isPersonaPreviewEmail } from "../../app/shell/ShellLayout";
-import { Avatar, Button, Card, CardBody, Chip, Input, Textarea, Spinner, Select, SelectItem, CheckboxGroup, Checkbox, Tooltip } from "@heroui/react";
+import { Avatar, Button, Card, CardBody, Chip, Input, Textarea, Spinner, Select, SelectItem, CheckboxGroup, Checkbox } from "@heroui/react";
 import SegmentEditor from "../components/positioning/SegmentEditor";
 import ThinkingOverlay from "../components/positioning/ThinkingOverlay";
 import PipelineRunner, { type PipelineState } from "../components/positioning/PipelineRunner";
@@ -40,11 +40,11 @@ import AIBriefPanel from "../components/positioning/AIBriefPanel";
 import StrategyAlertsPanel from "../components/positioning/StrategyAlertsPanel";
 import PersonaAgentPanel from "../components/positioning/PersonaAgentPanel";
 import { showToastGlobal } from "../../../components/ui/Toast";
-import { BrandActionChipsRow, BrandTestPanel, usePositioningStatus } from "../components/positioning/BrandActionChips";
+import { BrandActionChipsRow, usePositioningStatus } from "../components/positioning/BrandActionChips";
 import AddEntityModal, { type AddEntityTab } from "../components/AddEntityModal";
 import ProductDetailModal from "../components/positioning/ProductDetailModal";
 // Notion-style line icons
-import { Target as LucideTarget, Type as LucideType, Palette as LucidePalette, Lock as LucideLock, Play as LucidePlay, RotateCcw as LucideRotate, BookOpen as LucideBook, Sparkles, Bot as LucideRobotIcon, Quote as LucideQuote, Shield as LucideShield, Type as LucideTypeIcon, Pencil as LucidePencil, Award as LucideAward, Package as LucidePackage, Hash as LucideHash, MessageCircle as LucideMessage, FileText as LucideFileText, IdCard as LucideIdCard, Trash2 as LucideTrash, Info as LucideInfo } from "lucide-react";
+import { Target as LucideTarget, Type as LucideType, Palette as LucidePalette, Lock as LucideLock, Play as LucidePlay, RotateCcw as LucideRotate, BookOpen as LucideBook, Sparkles, Bot as LucideRobotIcon, Quote as LucideQuote, Shield as LucideShield, Type as LucideTypeIcon, Pencil as LucidePencil, Award as LucideAward, Package as LucidePackage, Hash as LucideHash, MessageCircle as LucideMessage, FileText as LucideFileText, IdCard as LucideIdCard, Trash2 as LucideTrash } from "lucide-react";
 import { SCOPE_SEGMENTS, type SegmentSpec } from "../lib/positioningSchema";
 import { pipelineFor, type PipelineStepSpec } from "../lib/positioningPipeline";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
@@ -116,8 +116,6 @@ export default function BrandsPage() {
 
   // Add entity modal (新增品牌 / 產品 / 活動)
   const [addModal, setAddModal] = useState<{ open: boolean; tab: AddEntityTab }>({ open: false, tab: "brand" });
-  // Inline test panel (試寫 expand below kicker row)
-  const [testPanelOpen, setTestPanelOpen] = useState(false);
   // 2026-05-08: onboarding wizard for first-time users (no brands yet).
   const [onboardingOpen, setOnboardingOpen] = useState(false);
   // 2026-09-23（CJ「在看到品牌定位卡片之上，有太多按鈕了…問用戶是否需要
@@ -1388,56 +1386,19 @@ export default function BrandsPage() {
             Removed gradient emblem + gradient title. Editorial
             typography: tiny eyebrow, large bold title, subtle stats. */}
         <div className="relative z-10 flex flex-col items-center text-center max-w-[1100px] mx-auto">
-          {/* Eyebrow */}
-          <p className="text-[12px] font-semibold uppercase tracking-[0.25em] text-neutral-600 mb-3">
-            BRAND
-          </p>
-
-          {/* Plain title — no gradient, no emblem. Just typography. */}
-          {/* 2026-09-23 (CJ「靠上面的內容，sowork定位方法論，是否縮小，在旁邊，
-              變成輔助工具？」— 頁面「有點複雜」): 2026-05-11 那次把方法論寫成
-              兩段置中大字（manifesto + includes 清單），佔掉標題正下方一大塊
-              版面。這次縮成標題旁邊一顆小 badge，hover 才看到完整說明——資訊
-              還在，但從「主要內容」降級成「輔助工具」，比較符合現在真正的
-              主要內容（下面的卡片）。 */}
-          <div className="flex items-center justify-center gap-2 mb-5">
-            <h1
-              className="font-bold tracking-tight leading-none text-neutral-900"
-              style={{ fontSize: "clamp(1.75rem, 3vw, 2.5rem)" }}
-            >
-              {scopeName}
-            </h1>
-            <Tooltip
-              placement="right"
-              content={
-                <div style={{ maxWidth: 260, padding: 4 }}>
-                  <p style={{
-                    fontFamily: '"Source Serif Pro", "Noto Serif TC", Georgia, serif',
-                    fontStyle: "italic", fontSize: 12.5, lineHeight: 1.6, margin: 0, marginBottom: 6, color: "#171717",
-                  }}>
-                    {lang === "en"
-                      ? "The SoWork Brand Positioning Method · lock who you are first, then every post knows what to say"
-                      : "SoWork 品牌定位法 · 先鎖定你是誰，AI 才知道每篇文章要說什麼"}
-                  </p>
-                  <p style={{ fontSize: 11.5, lineHeight: 1.5, margin: 0, color: "#737373" }}>
-                    <span style={{ fontWeight: 600, color: "#525252", marginRight: 4 }}>{lang === "en" ? "Includes:" : "包含："}</span>
-                    {lang === "en"
-                      ? "14-step positioning · Copy / visual / knowledge assets · AI prompt library"
-                      : "14 步定位 · 文字 / 視覺 / 知識資產 · AI 指令庫"}
-                  </p>
-                </div>
-              }
-            >
-              <button
-                type="button"
-                aria-label={lang === "en" ? "About the SoWork positioning method" : "關於 SoWork 品牌定位法"}
-                className="inline-flex items-center gap-1 rounded-full border border-neutral-200 px-2 py-1 text-[11px] text-neutral-500 hover:border-neutral-400 hover:text-neutral-700 transition-colors shrink-0"
-              >
-                <LucideInfo size={12} />
-                {lang === "en" ? "Method" : "方法論"}
-              </button>
-            </Tooltip>
-          </div>
+          {/* 2026-09-23 (CJ「header太亂了。金安德森香氛留大標題就好」)：拿掉
+              「BRAND」眉標（本來就寫死不分 brand/product/event，產品頁看了
+              也是「BRAND」，本身還算是個小 bug）跟旁邊的「方法論」小 badge
+              ——說明文字（SoWork 品牌定位法／14 步定位…）沒有不見，搬進
+              策略總監的系統提示詞了（見 strategistChatRouter.ts），使用者
+              直接問策略總監就有，不用再靠這裡一顆 hover 才看得到的按鈕。
+              現在只剩最單純的大標題。 */}
+          <h1
+            className="font-bold tracking-tight leading-none text-neutral-900 mb-5"
+            style={{ fontSize: "clamp(1.75rem, 3vw, 2.5rem)" }}
+          >
+            {scopeName}
+          </h1>
 
           {/* 2026-09-23 (CJ「標語要出現在最上面的品牌名字底下」): tagline 搬
               回標題正下方，獨立一行——BrandMessageBar 移除時（2026-05-11）
@@ -1555,12 +1516,10 @@ export default function BrandsPage() {
           </div>
           )}
 
-          {/* Kicker row — BRAND WORKSPACE pill + action chips (試寫 / 定案) */}
+          {/* 2026-09-23 (CJ「移除試寫功能」)：KickerRow 現在只剩定案按鈕
+              ——「BRAND WORKSPACE」跟品牌名稱都跟上面的大標題重複，一併拿掉。 */}
           <KickerRow
             brandId={activeBrandIdForLocks}
-            scopeName={scopeName}
-            testOpen={testPanelOpen}
-            onToggleTest={() => setTestPanelOpen((v) => !v)}
             scopeMode={scopeMode}
             scopeEntityId={
               scopeMode === "product" ? (scope?.productId ?? null)
@@ -1571,14 +1530,6 @@ export default function BrandsPage() {
         </div>
       </div>
       )}{/* end scopeBrands.length > 0 hero */}
-
-      {/* Inline test panel — slides below the hero, pushes tab content
-          down. Stays open until user closes via × or 收起試寫. */}
-      <BrandTestPanel
-        brandId={activeBrandIdForLocks}
-        open={testPanelOpen}
-        onClose={() => setTestPanelOpen(false)}
-      />
 
       {/* 2026-05-11 (CJ「大腦區感覺也重複了」): the floating
           PositioningBrainBar duplicated the new in-page
@@ -4754,16 +4705,15 @@ function PositioningTopRow({
 }
 
 /* ─────────────────────────── KickerRow ───────────────────────────────
-   Tiny grey row sitting under the tiles, matches /30s "tier signature".
-   BRAND WORKSPACE pill + brand name + 試寫 chip + 定案 chip.
+   2026-09-23 (CJ「header太亂了…移除試寫功能」)：拿掉「BRAND WORKSPACE」
+   紫色 pill 跟重複的品牌/產品名稱（上面大標題已經有了）——現在只剩定案
+   按鈕，不再需要 testOpen/onToggleTest（試寫功能整個移除，見
+   BrandActionChips.tsx 的 BrandActionChipsRow）。
    ───────────────────────────────────────────────────────────────────── */
 function KickerRow({
-  brandId, scopeName, testOpen, onToggleTest, scopeMode, scopeEntityId,
+  brandId, scopeMode, scopeEntityId,
 }: {
   brandId: number | null;
-  scopeName: string;
-  testOpen: boolean;
-  onToggleTest: () => void;
   /** BUG-3 fix: pass the current scope so status reflects the right entity. */
   scopeMode: "brand" | "product" | "event" | "none";
   scopeEntityId: number | null;
@@ -4772,25 +4722,10 @@ function KickerRow({
   // the hook stays valid; the enabled guard (entityId=null) will skip the query.
   const resolvedKind = (scopeMode === "none" ? "brand" : scopeMode) as "brand" | "product" | "event";
   const resolvedId   = scopeMode === "brand" ? brandId : scopeEntityId;
-  const { status, isRunning } = usePositioningStatus(resolvedKind, resolvedId);
+  const { status } = usePositioningStatus(resolvedKind, resolvedId);
   return (
     <div className="mt-4 flex items-center gap-2 text-tiny text-default-600 flex-wrap justify-center">
-      <span
-        className="px-2 py-0.5 rounded-full text-white font-semibold tracking-widest"
-        style={{ background: "#7C3AED", fontSize: 12, letterSpacing: "0.15em" }}
-      >
-        BRAND WORKSPACE
-      </span>
-      <span>·</span>
-      <span className="text-default-600">{scopeName}</span>
-      <span className="text-default-500 mx-1">|</span>
-      <BrandActionChipsRow
-        brandId={brandId}
-        expanded={testOpen}
-        onToggle={onToggleTest}
-        status={status}
-        isRunning={isRunning}
-      />
+      <BrandActionChipsRow brandId={brandId} status={status} />
     </div>
   );
 }

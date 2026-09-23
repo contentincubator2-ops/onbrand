@@ -20,8 +20,16 @@
  *   才會懂得問他」——單靠圓形頭像 + hover title 不夠，使用者不會主動
  *   hover 去發現。改成頭像左邊常駐一顆文字標籤（面板收合時才顯示，展開
  *   後面板抬頭本來就有名字，標籤會跟面板重疊所以隱藏）。
+ *   「品牌策略總監擅長於品牌，而產品策略總監，應該另外找一個背景有產品
+ *   策略經驗的agent」——STRATEGIST_PERSONAS 拆成品牌／產品兩位（見
+ *   strategistPersonas.ts），這裡依目前 URL 的 `p`（product id）參數判斷
+ *   現在是不是在看某個產品，自動選對的人當預設；使用者仍可以用下拉選單
+ *   手動換人，換的選擇分品牌/產品各自記在 localStorage，不會互相蓋掉。
+ *   「agent的背景⋯要直接從mos_db抓取真實描述」——實測 mos-agents MCP
+ *   仍缺 MOS_MANUS_API_KEY（不是我能解決的），兩位人設的 name/bio 目前
+ *   都是誠實的佔位資料（`isPlaceholder: true`），背景面板會顯示一句
+ *   提醒，不會假裝是真的。
  *
-
  * 黑白線條 B&W 風格（呼應 AgentPersonaBar／PipelineThinkingPanel 那套
  * 「4A 代理商」視覺語言，跟 Mia 的漸層紫刻意不同——就算現在同一個角落，
  * 一眼也看得出是不同角色）。
@@ -36,26 +44,48 @@
  * BrandsPage.tsx 的 activeStrategyTool 初始化邏輯）。
  */
 import React from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useLang } from "../../../../lib/i18n";
-import { STRATEGIST_PERSONAS, getPersona } from "../../lib/strategistPersonas";
+import { STRATEGIST_PERSONAS, getPersona, defaultPersonaForScope } from "../../lib/strategistPersonas";
 import StrategyDirectorChat from "./StrategyDirectorChat";
 
-const PERSONA_STORAGE_KEY = "sowork.strategistPersona";
+/** 品牌／產品各自記自己選過的人，互不覆蓋——見檔頭 2026-09-23 第二次註記。 */
+const personaStorageKey = (scopeMode: "brand" | "product") => `sowork.strategistPersona.${scopeMode}`;
 
 export default function StrategyDirectorDrawer({ brandId }: { brandId: number | null }) {
   const { lang } = useLang();
   const en = lang === "en";
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  // 全域 scope 只有品牌（見 project_scope_model 記憶）；產品/活動是 URL
+  // 帶的 per-page 參數，這裡直接讀 `p`，不需要 ShellLayout 額外接線，
+  // 也自然會隨著路由切換即時更新。
+  const urlProductId = searchParams.get("p");
+  const scopeMode: "brand" | "product" = urlProductId ? "product" : "brand";
+
   const [open, setOpen] = React.useState(false);
   const [showBio, setShowBio] = React.useState(false);
   const [personaId, setPersonaId] = React.useState<string>(() => {
-    try { return localStorage.getItem(PERSONA_STORAGE_KEY) ?? "default"; } catch { return "default"; }
+    try { return localStorage.getItem(personaStorageKey(scopeMode)) ?? defaultPersonaForScope(scopeMode).id; }
+    catch { return defaultPersonaForScope(scopeMode).id; }
   });
+  // scope 變了（例如從品牌定位頁換到某個產品定位頁）就重新選一次預設人選
+  // ——不然使用者會一直看到上一個 scope 選過的人，即使沒手動換過。
+  const prevScopeRef = React.useRef(scopeMode);
+  React.useEffect(() => {
+    if (prevScopeRef.current === scopeMode) return;
+    prevScopeRef.current = scopeMode;
+    try {
+      setPersonaId(localStorage.getItem(personaStorageKey(scopeMode)) ?? defaultPersonaForScope(scopeMode).id);
+    } catch {
+      setPersonaId(defaultPersonaForScope(scopeMode).id);
+    }
+  }, [scopeMode]);
+
   const persona = getPersona(personaId);
   const choosePersona = (id: string) => {
     setPersonaId(id);
-    try { localStorage.setItem(PERSONA_STORAGE_KEY, id); } catch { /* noop */ }
+    try { localStorage.setItem(personaStorageKey(scopeMode), id); } catch { /* noop */ }
   };
   const avatarUrl = `https://api.dicebear.com/7.x/notionists/svg?seed=${encodeURIComponent(persona.avatarSeed)}`;
 
@@ -154,12 +184,21 @@ export default function StrategyDirectorDrawer({ brandId }: { brandId: number | 
               </div>
             </div>
             {showBio && (
-              <p style={{
-                marginTop: 10, paddingTop: 10, borderTop: "1px solid #EFEDE8",
-                fontSize: 12.5, lineHeight: 1.65, color: "#404040",
-              }}>
-                {persona.bio}
-              </p>
+              <div style={{ marginTop: 10, paddingTop: 10, borderTop: "1px solid #EFEDE8" }}>
+                {persona.isPlaceholder && (
+                  <p style={{
+                    fontSize: 11, lineHeight: 1.5, color: "#92400E", background: "#FEF3C7",
+                    borderRadius: 8, padding: "6px 9px", marginTop: 0, marginBottom: 8,
+                  }}>
+                    {en
+                      ? "⚠ Placeholder profile — not yet a real background from mos_db (pending API access)."
+                      : "⚠ 這是佔位資料，還不是從 mos_db 抓來的真實背景（等 API 金鑰設定後補上）。"}
+                  </p>
+                )}
+                <p style={{ fontSize: 12.5, lineHeight: 1.65, color: "#404040", margin: 0 }}>
+                  {persona.bio}
+                </p>
+              </div>
             )}
           </div>
 
