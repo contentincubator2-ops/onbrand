@@ -17,7 +17,7 @@ import React, { useState } from "react";
 import { Boxes, ExternalLink, Star } from "lucide-react";
 import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter } from "@heroui/react";
 import CardShell, { CARD_GRID } from "./card-shell";
-import { ExtLink, categoryLabel, formatDay, priceLabel, type Solution } from "./strat-shared";
+import { ExtLink, categoryLabel, priceLabel, type Solution } from "./strat-shared";
 import { useT } from "../lang";
 
 /** 這個方案最低的那個有數字的核准價，沒有就回 null。 */
@@ -38,12 +38,12 @@ export default function StratProductCards({ solutions }: { solutions: Solution[]
     <div className="min-w-0">
       <div className="mb-3 flex flex-wrap items-baseline gap-x-3 gap-y-1">
         <span className="text-[12px] font-medium uppercase tracking-wide text-stone-500">
-          {t("What reps may quote, and where the number came from", "業務能報什麼價，以及那個數字哪裡來的")}
+          {t("Prices a rep may quote — anything else is removed before the post exists", "業務能報的價格——其他數字在貼文成形之前就會被拿掉")}
         </span>
         <span className="text-[12px] text-stone-400">
           {t(
-            `${solutions.length} solutions · ${quoteOnly} quote-only`,
-            `${solutions.length} 個方案 · ${quoteOnly} 個只有客製化報價`,
+            `${solutions.length} solutions · ${quoteOnly} with no quotable price`,
+            `${solutions.length} 個方案 · ${quoteOnly} 個沒有可以報的價格`,
           )}
         </span>
       </div>
@@ -51,7 +51,8 @@ export default function StratProductCards({ solutions }: { solutions: Solution[]
       <div className={CARD_GRID}>
         {solutions.map((s) => {
           const low = lowestPrice(s);
-          const listedOn = s.prices.map((p) => p.effectiveFrom).filter(Boolean).sort()[0];
+          // 只數「有數字、而且不是客製化報價」的那幾檔 —— 那才是業務真的能說出口的。
+          const quotable = s.prices.filter((p) => p.amount != null && p.billing !== "quote").length;
           return (
             <CardShell
               key={s.id}
@@ -66,13 +67,19 @@ export default function StratProductCards({ solutions }: { solutions: Solution[]
               measure={t(s.summaryEn, s.summaryZh)}
               measureLabel={null}
               clampMeasure={3}
+              // 2026-09-23 (CJ「請釐清這個意思：1 approved plans from xxx」)。
+              // 原本寫「1 approved plan(s) · from 數位開創國際」，三個地方都模糊：
+              // approved 沒說誰核准的、from 讀起來像方案出自誰、單複數還壞掉。
+              // 現在直接說那個數字代表什麼（業務可以報幾個價），以及誰刊登的。
               detail={
                 <span>
-                  {s.prices.length
-                    ? t(`${s.prices.length} approved plan(s)`, `${s.prices.length} 個核准方案`)
-                    : t("No approved price — reps can't quote one", "沒有核准價格，業務不能報價")}
-                  {` · ${t("from", "來源")} ${s.vendor}`}
-                  {listedOn ? ` · ${t("listed", "上架")} ${formatDay(listedOn)}` : ""}
+                  {quotable
+                    ? t(
+                        `${quotable} ${quotable === 1 ? "price" : "prices"} a rep may quote`,
+                        `業務可以報 ${quotable} 個價格`,
+                      )
+                    : t("No price a rep may state", "沒有可以報的價格")}
+                  {` · ${t(`listed by ${s.vendor}`, `由${s.vendor}刊登`)}`}
                 </span>
               }
               action={t("See the full entry", "看完整資料")}
