@@ -95,18 +95,124 @@ const adminRouter = router({
       "../../strategy/core/hub/factRouting"
     );
     const { listReps } = await import("../core/hub/hubStore");
+    const { readPushSettings, dueToday } = await import("../../strategy/core/hub/factPush");
     const [facts, reps] = await Promise.all([listFacts(org.id), listReps(org.id)]);
     const today = new Date().toISOString().slice(0, 10);
     const routing = routeFacts(facts as any, reps as any, today);
+
+    // 推播欄位不在 listFacts 的投影裡（它是給合規引擎用的），所以單獨讀。
+    const pushRows = await q(
+      `SELECT id, push_cadence, push_audience, push_last_at FROM hub_facts WHERE org_id = ?`,
+      [org.id],
+    );
+    const pushById = new Map(pushRows.map((r: any) => [r.id, readPushSettings(r)]));
+
     return {
       today,
-      facts: facts.map((f: any) => ({ ...f, quotable: isQuotable(f) })),
+      facts: facts.map((f: any) => {
+        const push = pushById.get(f.id) ?? { cadence: "off" as const, audience: [], lastPushedAt: null };
+        const r = routing[f.id];
+        return {
+          ...f,
+          quotable: isQuotable(f),
+          push,
+          due: dueToday({
+            settings: push,
+            autoAudience: r?.repIds ?? [],
+            expiresOn: f.expiresOn ?? null,
+            forwardable: Boolean(r?.forwardable),
+            today,
+          }),
+        };
+      }),
       reps: reps.map((r: any) => ({ id: r.id, name: r.name, market: r.market, team: r.team, industries: r.industries })),
       routing,
       perRep: perRepCounts(routing, reps as any),
       unreachable: unreachable(facts as any, routing).map((f) => f.id),
     };
   }),
+
+  /**
+   * 策略層的統一檢索（CJ 2026-09-23「get data ready for AI」）。
+   *
+   * 五種資料投影成同一個形狀，讓 agent 一次下條件就收斂到幾筆，而不是把整個
+   * 策略層讀進上下文再自己篩。回傳先給 summary 再給內容 —— agent 要先知道
+   * 「這個條件撈到什麼樣的東西」才決定要不要換條件再問一次。
+   */
+  searchStrategy: adminProcedure
+    .input(z.object({
+      entity: z.array(z.enum(["brand_asset", "solution", "wording", "regulation", "fact"])).optional(),
+      market: z.enum(["TW", "US"]).optional(),
+      industries: z.array(z.string().max(64)).max(10).optional(),
+      kind: z.array(z.string().max(40)).max(10).optional(),
+      status: z.array(z.string().max(40)).max(10).optional(),
+      liveOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+      withSource: z.boolean().optional(),
+      quotableOnly: z.boolean().optional(),
+      text: z.string().max(200).optional(),
+      limit: z.number().int().min(1).max(200).optional(),
+    }).optional())
+    .query(async ({ input }) => {
+      const org = await getOrg();
+      const { buildStrategyIndex } = await import("../../strategy/core/hub/strategyIndex");
+      const { filterStrategy, summarise } = await import("../../strategy/core/hub/strategyRegistry");
+      const all = await buildStrategyIndex(org.id);
+      const records = filterStrategy(all, (input ?? {}) as any);
+      return { indexed: all.length, summary: summarise(records), records };
+    }),
+
+  /** 策略層任何一筆資料的變更紀錄。五個 tray 共用。 */
+  strategyHistory: adminProcedure
+    .input(z.object({ entity: z.string().max(24).optional(), entityId: z.number().int().positive().optional() }).optional())
+    .query(async ({ input }) => {
+      const org = await getOrg();
+      const { listStrategyEdits } = await import("../../strategy/core/hub/strategyEdits");
+      return { history: await listStrategyEdits(org.id, input ?? {}) };
+    }),
+
+  /**
+   * 一則市場消息的推播設定（CJ 2026-09-23「由建置該消息的用戶，設定推播的
+   * 銷售業務員群組還有頻率」）。
+   *
+   * 要核准嗎？不。推播設定改的是「誰會收到」，不是「內容講什麼」——而且設錯
+   * 的後果是可逆的（關掉就停）。內容本身的修改才走核准。
+   */
+  setFactPush: adminProcedure
+    .input(z.object({
+      factId: z.number().int().positive(),
+      cadence: z.enum(["off", "once", "weekly", "before_deadline"]),
+      audience: z.array(z.number().int().positive()).max(200),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const org = await getOrg();
+      const [u] = await q(`SELECT email FROM users WHERE id = ?`, [ctx.user.id]);
+      const actor = String(u?.email ?? "admin");
+      const [before] = await q(
+        `SELECT push_cadence, push_audience FROM hub_facts WHERE id = ? AND org_id = ?`,
+        [input.factId, org.id],
+      );
+      if (!before) throw new TRPCError({ code: "NOT_FOUND", message: "That market item is gone." });
+
+      await exec(
+        `UPDATE hub_facts SET push_cadence = ?, push_audience = ? WHERE id = ? AND org_id = ?`,
+        [input.cadence, JSON.stringify(input.audience), input.factId, org.id],
+      );
+
+      const { logStrategyEdit } = await import("../../strategy/core/hub/strategyEdits");
+      const changes: Array<{ field: string; from: string; to: string }> = [];
+      const oldCadence = String(before.push_cadence ?? "off");
+      if (oldCadence !== input.cadence) changes.push({ field: "push_cadence", from: oldCadence, to: input.cadence });
+      const oldAudience = JSON.stringify(
+        typeof before.push_audience === "string" ? JSON.parse(before.push_audience || "[]") : (before.push_audience ?? []),
+      );
+      const newAudience = JSON.stringify(input.audience);
+      if (oldAudience !== newAudience) changes.push({ field: "push_audience", from: oldAudience, to: newAudience });
+      if (changes.length) {
+        await logStrategyEdit({ orgId: org.id, entity: "fact", entityId: input.factId, actor, action: "edited", changes });
+        await logEvent(org.id, null, "fact_push_changed", `#${input.factId} · ${input.cadence}`);
+      }
+      return { ok: true, changed: changes.length };
+    }),
 
   wording: adminProcedure.query(async () => {
     const org = await getOrg();

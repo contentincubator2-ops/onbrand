@@ -89,7 +89,7 @@ export default function StrategyFactsPage() {
               "兩種用途，門檻不一樣：可以轉給客戶的要對客戶有用而且還沒過期；可以寫進貼文的要有查證過的數字。一則消息可以是其中之一、兩者、或都不是。",
             )}
           />
-          <StratFactCards facts={facts as any} routing={routing} reps={q.data.reps as any} />
+          <StratFactCards facts={facts as any} routing={routing} reps={q.data.reps as any} onChanged={() => void q.refetch()} />
 
           <div className="mt-7">
             <SectionLabel

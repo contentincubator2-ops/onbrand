@@ -21,6 +21,8 @@
 import React, { useState } from "react";
 import { AlertTriangle, BadgeCheck, CalendarClock, ExternalLink, Quote, Send, Users } from "lucide-react";
 import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter } from "@heroui/react";
+import { trpc } from "../../../lib/trpc";
+import { ErrorNote } from "../ui";
 import CardShell, { CARD_GRID } from "./card-shell";
 import { useT, useHubLang } from "../lang";
 
@@ -59,6 +61,8 @@ export interface Fact {
   industries: string[];
   expiresOn: string | null;
   quotable: boolean;
+  push: { cadence: string; audience: number[]; lastPushedAt: string | null };
+  due: { due: boolean; audience: number[]; reason: string };
 }
 
 export interface Routing {
@@ -82,10 +86,12 @@ export default function StratFactCards({
   facts,
   routing,
   reps,
+  onChanged,
 }: {
   facts: Fact[];
   routing: Record<number, Routing>;
   reps: RepRow[];
+  onChanged?: () => void;
 }) {
   const t = useT();
   const [openId, setOpenId] = useState<number | null>(null);
@@ -151,6 +157,8 @@ export default function StratFactCards({
           fact={active}
           routing={routing[active.id]}
           reps={reps.filter((r) => routing[active.id]?.repIds.includes(r.id))}
+          allReps={reps}
+          onChanged={onChanged}
           onClose={() => setOpenId(null)}
         />
       ) : null}
@@ -201,11 +209,13 @@ function FactBand({ fact, routing, reach }: { fact: Fact; routing?: Routing; rea
 }
 
 function FactModal({
-  fact, routing, reps, onClose,
+  fact, routing, reps, allReps, onChanged, onClose,
 }: {
   fact: Fact;
   routing?: Routing;
   reps: RepRow[];
+  allReps: RepRow[];
+  onChanged?: () => void;
   onClose: () => void;
 }) {
   const t = useT();
@@ -299,6 +309,8 @@ function FactModal({
             )}
           </div>
 
+          <PushEditor fact={fact} routing={routing} allReps={allReps} onChanged={onChanged} />
+
           <div className="mt-4">
             <div className="mb-1.5 flex items-center gap-1.5 text-[12px] font-semibold text-neutral-700">
               <BadgeCheck size={13} aria-hidden />
@@ -371,6 +383,149 @@ function Warn({ children }: { children: React.ReactNode }) {
     <div className="flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 p-2.5 text-[12.5px] leading-relaxed text-amber-900">
       <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
       <span>{children}</span>
+    </div>
+  );
+}
+
+/**
+ * 推播設定 —— 建立這則消息的人自己決定送給誰、多久送一次。
+ *
+ * 2026-09-23 (CJ「由建置該消息的用戶，設定推播的銷售業務員群組還有頻率」)。
+ *
+ * 指名的名單優先於產業自動比對，但**不能繞過時效**：過期的消息即使指名了也
+ * 不送（factPush.dueToday 擋著）。理由跟自動比對那邊一樣——業務轉給客戶、
+ * 客戶去申請才發現結束了。
+ *
+ * 這個設定改的是「誰會收到」，不是「內容講什麼」，而且設錯是可逆的（關掉就
+ * 停），所以**不走核准**，但會留紀錄。
+ */
+const CADENCES: Array<{ id: string; en: string; zh: string }> = [
+  { id: "off", en: "Not pushed", zh: "不推播" },
+  { id: "once", en: "Once", zh: "推一次" },
+  { id: "weekly", en: "Weekly while open", zh: "有效期間每週" },
+  { id: "before_deadline", en: "Before the deadline", zh: "接近截止日" },
+];
+
+function PushEditor({
+  fact, routing, allReps, onChanged,
+}: {
+  fact: Fact;
+  routing?: Routing;
+  allReps: RepRow[];
+  onChanged?: () => void;
+}) {
+  const t = useT();
+  const save = trpc.hub.admin.setFactPush.useMutation();
+  const [cadence, setCadence] = useState(fact.push?.cadence ?? "off");
+  const [audience, setAudience] = useState<number[]>(fact.push?.audience ?? []);
+  const named = audience.length > 0;
+  const auto = routing?.repIds ?? [];
+  const effective = named ? audience : auto;
+  // 同市場的業務才列得出來 —— 台灣的補助指名給美國的業務是沒有意義的。
+  const candidates = allReps.filter((r) => r.market === fact.market);
+
+  const dirty = cadence !== (fact.push?.cadence ?? "off")
+    || JSON.stringify([...audience].sort()) !== JSON.stringify([...(fact.push?.audience ?? [])].sort());
+
+  return (
+    <div className="mt-4 rounded-lg border border-neutral-200 p-3">
+      <div className="flex items-center gap-1.5 text-[12px] font-semibold text-neutral-700">
+        <Send size={13} aria-hidden />
+        {t("Push to reps", "推播給業務")}
+      </div>
+
+      <div className="mt-2 flex flex-wrap gap-1.5">
+        {CADENCES.map((c) => {
+          const on = cadence === c.id;
+          const useless = c.id === "before_deadline" && !fact.expiresOn;
+          return (
+            <button
+              key={c.id}
+              type="button"
+              disabled={useless}
+              onClick={() => setCadence(c.id)}
+              title={useless ? t("This item has no deadline.", "這則消息沒有截止日。") : undefined}
+              className={
+                "rounded-full border px-2.5 py-1 text-[12.5px] transition " +
+                (on ? "border-neutral-900 bg-neutral-900 text-white"
+                   : useless ? "cursor-not-allowed border-neutral-200 text-neutral-300"
+                   : "border-neutral-300 text-neutral-700 hover:border-neutral-500")
+              }
+            >
+              {t(c.en, c.zh)}
+            </button>
+          );
+        })}
+      </div>
+
+      {cadence !== "off" ? (
+        <div className="mt-3">
+          <div className="text-[12px] font-medium text-neutral-700">
+            {named
+              ? t(`Named recipients (${audience.length})`, `指名的業務（${audience.length} 位）`)
+              : t(`Automatic by industry (${auto.length})`, `依產業自動比對（${auto.length} 位）`)}
+          </div>
+          <p className="mt-0.5 text-[11.5px] leading-relaxed text-neutral-500">
+            {t(
+              "Leave everyone unticked to keep matching by customer industry. Tick anyone and only they receive it.",
+              "全部不勾＝繼續依客戶產業自動比對；只要勾了人，就只有被勾的人收到。",
+            )}
+          </p>
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {candidates.map((r) => {
+              const on = audience.includes(r.id);
+              const wouldAuto = auto.includes(r.id);
+              return (
+                <button
+                  key={r.id}
+                  type="button"
+                  onClick={() => setAudience((prev) => (on ? prev.filter((x) => x !== r.id) : [...prev, r.id]))}
+                  className={
+                    "rounded-full border px-2.5 py-1 text-[12.5px] transition " +
+                    (on ? "border-sky-700 bg-sky-50 text-sky-900"
+                       : wouldAuto ? "border-neutral-300 text-neutral-700 hover:border-neutral-500"
+                       : "border-dashed border-neutral-300 text-neutral-400 hover:border-neutral-500")
+                  }
+                  title={wouldAuto ? undefined : t("Not matched by industry — ticking adds them anyway.", "產業沒比對到——勾了就會加進來。")}
+                >
+                  {r.name.split(" ")[0]}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      ) : null}
+
+      {/* 設定完之後，直接說今天會不會送、不送的話為什麼。 */}
+      <p className="mt-2.5 text-[11.5px] leading-relaxed text-neutral-500">
+        {fact.due?.due
+          ? t(`Due today — ${effective.length} recipient(s).`, `今天該送——${effective.length} 位收件者。`)
+          : t(`Not due today (${fact.due?.reason ?? "off"}).`, `今天不送（${fact.due?.reason ?? "未設定"}）。`)}
+      </p>
+
+      <div className="mt-2 flex items-center gap-2">
+        <button
+          type="button"
+          disabled={!dirty || save.isPending}
+          onClick={async () => {
+            await save.mutateAsync({ factId: fact.id, cadence: cadence as any, audience });
+            onChanged?.();
+          }}
+          className="rounded-lg bg-neutral-900 px-3 py-1.5 text-[12.5px] font-medium text-white disabled:opacity-40"
+        >
+          {save.isPending ? t("Saving…", "儲存中…") : t("Save push settings", "儲存推播設定")}
+        </button>
+        {dirty ? <span className="text-[11.5px] text-neutral-500">{t("unsaved", "尚未儲存")}</span> : null}
+      </div>
+      <ErrorNote error={save.error} />
+
+      {/* 誠實：算得出來，還沒接上發送。 */}
+      <p className="mt-2 text-[11.5px] leading-relaxed text-amber-800">
+        {t(
+          "Nothing is actually sent yet. This decides who would receive it and when — delivery needs an opt-out first.",
+          "目前還不會真的送出去。這裡決定的是「誰會收到、什麼時候」——實際發送要先有退訂機制。",
+        )}
+      </p>
     </div>
   );
 }

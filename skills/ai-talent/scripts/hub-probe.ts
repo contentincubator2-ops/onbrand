@@ -97,6 +97,67 @@ async function main() {
   const uncited = facts.filter((f) => !f.sourceUrl || !f.sourceName).map((f) => f.id);
   check(uncited.length === 0, "every fact carries a citation", uncited.length ? `missing: ${uncited.join(",")}` : "");
 
+  // ── 策略層的統一檢索（CJ 2026-09-23「get data ready for AI」） ─────────────
+  //
+  // 這一段驗的是「agent 下條件撈得到對的東西」。它壞掉的方式很安靜：投影漏掉
+  // 一種資料，agent 只是撈不到，不會報錯——然後它會拿殘缺的資料去寫東西。
+  try {
+    const { buildStrategyIndex } = await import("../server/strategy/core/hub/strategyIndex");
+    const { filterStrategy, STRATEGY_ENTITIES } = await import("../server/strategy/core/hub/strategyRegistry");
+    const index = await buildStrategyIndex(org.id);
+    check(index.length > 0, "strategy index builds", `${index.length} records`);
+
+    // 五種資料都要投影得出來。少一種＝那個 tray 對 AI 不存在。
+    const seen = new Set(index.map((r) => r.entity));
+    const missing = STRATEGY_ENTITIES.filter((e) => !seen.has(e.id)).map((e) => e.id);
+    check(missing.length === 0, "every strategy tray is in the index", missing.join(", ") ||
+      STRATEGY_ENTITIES.map((e) => `${e.id}:${index.filter((r) => r.entity === e.id).length}`).join(" "));
+
+    // 每一筆都要有標題，否則 agent 撈到一筆空的，還是會拿去用。
+    const untitled = index.filter((r) => !r.title.en.trim() && !r.title.zh.trim());
+    check(untitled.length === 0, "no record is title-less", untitled.map((r) => `${r.entity}#${r.id}`).join(", ") || "all titled");
+
+    // 可引用的一定要有出處。這是 AI 拿資料去寫東西之前唯一的擋板。
+    const quotableNoSource = index.filter((r) => r.quotable && !r.source);
+    check(quotableNoSource.length === 0, "everything quotable carries a source",
+      quotableNoSource.map((r) => `${r.entity}#${r.id}`).join(", ") || `${index.filter((r) => r.quotable).length} quotable`);
+
+    // 實際跑一次 agent 會下的那種條件。
+    const today = new Date().toISOString().slice(0, 10);
+    const twManufacturing = filterStrategy(index, {
+      market: "TW", industries: ["manufacturing"], liveOn: today, withSource: true,
+    });
+    check(twManufacturing.length > 0, "a realistic agent query returns something",
+      `TW + manufacturing + live + sourced → ${twManufacturing.length}`);
+    const narrowed = filterStrategy(index, { entity: ["fact"], quotableOnly: true, limit: 5 });
+    check(narrowed.length <= 5, "the limit is honoured", `${narrowed.length} rows`);
+  } catch (e: any) {
+    bad("strategy index", e?.message ?? String(e));
+  }
+
+  // ── 推播設定（CJ 2026-09-23「由建置該消息的用戶設定群組與頻率」） ──────────
+  try {
+    const { readPushSettings, dueToday, CADENCES } = await import("../server/strategy/core/hub/factPush");
+    const rows = await q(`SELECT id, push_cadence, push_audience, push_last_at, expires_on FROM hub_facts WHERE org_id = ?`, [org.id]);
+    check(rows.length > 0, "push settings columns exist", `${rows.length} rows readable`);
+
+    const bad2 = rows.filter((r: any) => r.push_cadence && !(CADENCES as readonly string[]).includes(String(r.push_cadence)));
+    check(bad2.length === 0, "no unknown cadence is stored", bad2.map((r: any) => `#${r.id}:${r.push_cadence}`).join(", ") || "ok");
+
+    // 過期的東西即使被指名也不能送。這一條錯了，業務要替我們向客戶道歉。
+    const today = new Date().toISOString().slice(0, 10);
+    const leaks = rows.filter((r: any) => {
+      const s = readPushSettings(r);
+      if (s.cadence === "off") return false;
+      const exp = r.expires_on ? new Date(r.expires_on).toISOString().slice(0, 10) : null;
+      return dueToday({ settings: s, autoAudience: [1], expiresOn: exp, forwardable: true, today }).due
+        && exp != null && exp < today;
+    });
+    check(leaks.length === 0, "nothing expired would still be pushed", leaks.map((r: any) => `#${r.id}`).join(", ") || "ok");
+  } catch (e: any) {
+    bad("fact push settings", e?.message ?? String(e));
+  }
+
   // ── 市場消息的產業配對（CJ 2026-09-23） ───────────────────────────────────
   //
   // 這一段算的是**誰會收到哪則消息**。算錯的後果不是畫面難看：標錯產業 → 業務

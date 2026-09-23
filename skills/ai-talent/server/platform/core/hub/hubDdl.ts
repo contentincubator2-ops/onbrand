@@ -267,6 +267,25 @@ export const HUB_DDL: string[] = [
     INDEX idx_wording (wording_id)
   ) ${TAIL}`,
 
+  /**
+   * 策略層通用的變更紀錄（CJ 2026-09-23「每一個 mission tray…會有權限和紀錄」）。
+   * 邏輯在 strategy/core/hub/strategyEdits.ts；schema 放這裡，跟其他表一樣
+   * 在啟動時建立 —— 今天早上才因為把 schema 掛在請求路徑上弄壞一次部署。
+   */
+  `CREATE TABLE IF NOT EXISTS hub_strategy_edits (
+    id              INT          NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    org_id          INT          NOT NULL,
+    entity          VARCHAR(24)  NOT NULL,
+    entity_id       INT          NULL,
+    actor           VARCHAR(160) NOT NULL,
+    action          VARCHAR(16)  NOT NULL,
+    changes         JSON         NULL,
+    note            VARCHAR(400) NULL,
+    created_at      DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    INDEX idx_org (org_id, created_at),
+    INDEX idx_entity (org_id, entity, entity_id)
+  ) ${TAIL}`,
+
   `CREATE TABLE IF NOT EXISTS hub_approvers (
     id              INT          NOT NULL AUTO_INCREMENT PRIMARY KEY,
     org_id          INT          NOT NULL,
@@ -327,6 +346,21 @@ export const HUB_ALTERS: string[] = [
   `ALTER TABLE hub_facts ADD COLUMN industries JSON NULL`,
   `ALTER TABLE hub_facts ADD COLUMN expires_on DATE NULL`,
   `ALTER TABLE hub_reps ADD COLUMN industries JSON NULL`,
+
+  /**
+   * 2026-09-23 (CJ「要做推播，是由建置該消息的用戶，設定推播的銷售業務員群組
+   * 還有頻率」)。
+   *
+   * 推播設定掛在消息本身，不另外開一張表：一則消息只有一組推播設定，而且
+   * 建立消息的人就是設定的人——分開存會讓「這則到底有沒有在推」要查兩個地方。
+   *
+   * push_audience：業務 id 清單。空 = 用產業標籤自動比對（預設行為）。
+   *                指名之後就以指名的為準——建立消息的人比自動比對更清楚。
+   * push_cadence：off / once / weekly / before_deadline。
+   */
+  `ALTER TABLE hub_facts ADD COLUMN push_audience JSON NULL`,
+  `ALTER TABLE hub_facts ADD COLUMN push_cadence VARCHAR(20) NULL`,
+  `ALTER TABLE hub_facts ADD COLUMN push_last_at DATETIME(3) NULL`,
 ];
 
 export async function ensureHubTables(): Promise<void> {
