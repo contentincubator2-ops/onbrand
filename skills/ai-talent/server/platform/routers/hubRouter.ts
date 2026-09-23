@@ -159,14 +159,29 @@ const adminRouter = router({
   editSolution: adminProcedure
     .input(z.object({
       solutionId: z.number().int().positive(),
+      // 2026-09-23 (CJ「編輯的功能，要可以編輯產品現在呈現的每個欄位」)。
       fields: z.object({
         name_en: z.string().max(160).optional(),
         name_zh: z.string().max(160).optional(),
+        vendor: z.string().max(160).optional(),
+        category: z.string().max(80).optional(),
         summary_en: z.string().max(4000).optional(),
         summary_zh: z.string().max(4000).optional(),
         audience_en: z.string().max(300).optional(),
         audience_zh: z.string().max(300).optional(),
+        source_url: z.string().max(500).optional(),
+        featured: z.string().max(1).optional(),
       }),
+      features: z.array(z.object({ en: z.string().max(400), zh: z.string().max(400) })).max(20).optional(),
+      prices: z.array(z.object({
+        planEn: z.string().max(120),
+        planZh: z.string().max(120),
+        // 一個明確的 null 代表「客製化報價」。0 絕對不能當成價格存進去 ——
+        // 0 進了核准金額清單，業務寫「$0」就會通過價格檢查。
+        amount: z.number().int().min(1).max(100_000_000).nullable(),
+        billing: z.enum(["month", "year", "one_time", "quote"]),
+        startsFrom: z.boolean(),
+      })).max(12).optional(),
       note: z.string().max(400).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
@@ -176,7 +191,7 @@ const adminRouter = router({
       const [u] = await q(`SELECT email FROM users WHERE id = ? LIMIT 1`, [ctx.user.id]);
       const r = await m.proposeEdit({
         orgId: org.id, solutionId: input.solutionId, actor: String(u?.email ?? `user:${ctx.user.id}`),
-        proposed: input.fields, note: input.note,
+        proposed: input.fields, features: input.features, prices: input.prices, note: input.note,
       });
       await logEvent(org.id, null, "solution_edit_proposed", `#${input.solutionId} · ${r.changed} field(s)`);
       return r;

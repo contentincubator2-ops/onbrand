@@ -23,10 +23,16 @@ import type { Solution } from "./strat-shared";
 const FIELD_LABELS: Record<string, [en: string, zh: string]> = {
   name_en: ["Name (EN)", "名稱（英）"],
   name_zh: ["Name (ZH)", "名稱（中）"],
+  vendor: ["Vendor", "供應商"],
+  category: ["Category", "分類"],
   summary_en: ["Summary (EN)", "簡介（英）"],
   summary_zh: ["Summary (ZH)", "簡介（中）"],
   audience_en: ["Best for (EN)", "適合（英）"],
   audience_zh: ["Best for (ZH)", "適合（中）"],
+  source_url: ["Source URL", "資料來源網址"],
+  featured: ["Featured", "精選"],
+  features: ["Features", "方案特色"],
+  prices: ["Prices", "價格"],
 };
 
 export function fieldLabel(t: (en: string, zh: string) => string, key: string): string {
@@ -102,16 +108,29 @@ export function PendingPanel({
         {s.pendingAt ? ` · ${new Date(s.pendingAt).toLocaleString()}` : ""}
       </div>
       <div className="mt-2 space-y-1">
-        {Object.entries(s.pending).map(([field, to]) => (
-          <div key={field} className="text-[12.5px] leading-relaxed">
-            <span className="text-orange-900/60">{fieldLabel(t, field)}: </span>
-            <span className="text-red-700 line-through">
-              {String((s as any)[camel(field)] ?? "") || t("(empty)", "（空白）")}
-            </span>
-            <span className="mx-1 text-orange-900/50">→</span>
-            <span className="font-medium text-green-800">{String(to) || t("(empty)", "（空白）")}</span>
-          </div>
-        ))}
+        {Object.entries(s.pending).map(([field, to]) => {
+          // features / prices 存的是陣列，逐行顯示才看得出哪一列動了。
+          const structured = field === "features" || field === "prices";
+          const before = structured ? describe(field, (s as any)[field]) : String((s as any)[camel(field)] ?? "");
+          const after = structured ? describe(field, to) : String(to ?? "");
+          return (
+            <div key={field} className="text-[12.5px] leading-relaxed">
+              <span className="text-orange-900/60">{fieldLabel(t, field)}: </span>
+              {structured ? (
+                <div className="mt-0.5 grid gap-1 sm:grid-cols-2">
+                  <pre className="whitespace-pre-wrap rounded bg-red-50 p-1.5 text-[11.5px] text-red-800">{before || t("(empty)", "（空白）")}</pre>
+                  <pre className="whitespace-pre-wrap rounded bg-green-50 p-1.5 text-[11.5px] text-green-900">{after || t("(empty)", "（空白）")}</pre>
+                </div>
+              ) : (
+                <>
+                  <span className="text-red-700 line-through">{before || t("(empty)", "（空白）")}</span>
+                  <span className="mx-1 text-orange-900/50">→</span>
+                  <span className="font-medium text-green-800">{after || t("(empty)", "（空白）")}</span>
+                </>
+              )}
+            </div>
+          );
+        })}
       </div>
 
       <ErrorNote error={approve.error ?? reject.error} />
@@ -154,77 +173,22 @@ export function PendingPanel({
 
 const camel = (k: string) => k.replace(/_([a-z])/g, (_m, c) => c.toUpperCase());
 
-/** 編輯一個既有產品的文字。存檔＝送出審核。 */
-export function EditSolutionModal({ s, onClose, onSaved }: { s: Solution; onClose: () => void; onSaved: () => void }) {
-  const t = useT();
-  const edit = trpc.hub.admin.editSolution.useMutation();
-  const [draft, setDraft] = useState({
-    name_en: s.nameEn ?? "",
-    name_zh: s.nameZh ?? "",
-    summary_en: s.summaryEn ?? "",
-    summary_zh: s.summaryZh ?? "",
-    audience_en: s.audienceEn ?? "",
-    audience_zh: s.audienceZh ?? "",
-  });
-  const [note, setNote] = useState("");
-
-  const dirty = Object.entries(draft).some(
-    ([k, v]) => String(v).trim() !== String((s as any)[camel(k)] ?? "").trim(),
-  );
-
-  return (
-    <Modal isOpen size="2xl" scrollBehavior="inside" onClose={() => !edit.isPending && onClose()}>
-      <ModalContent>
-        <ModalHeader className="flex flex-col gap-0.5">
-          <span className="text-[16px] font-semibold">{t("Edit description", "編輯描述")}</span>
-          <span className="text-[12px] font-normal text-neutral-500">
-            {t(
-              "Changes don't go live until someone else approves them. Prices are not editable here.",
-              "改完不會立刻生效，要別人核准才會。價格不在這裡改。",
-            )}
-          </span>
-        </ModalHeader>
-        <ModalBody>
-          <div className="grid gap-3 sm:grid-cols-2">
-            {(["name_en", "name_zh"] as const).map((f) => (
-              <Field key={f} label={fieldLabel(t, f)} value={draft[f]} onChange={(v) => setDraft({ ...draft, [f]: v })} />
-            ))}
-            {(["summary_en", "summary_zh"] as const).map((f) => (
-              <Field key={f} wide rows={5} label={fieldLabel(t, f)} value={draft[f]} onChange={(v) => setDraft({ ...draft, [f]: v })} />
-            ))}
-            {(["audience_en", "audience_zh"] as const).map((f) => (
-              <Field key={f} label={fieldLabel(t, f)} value={draft[f]} onChange={(v) => setDraft({ ...draft, [f]: v })} />
-            ))}
-            <Field
-              wide
-              label={t("Why (goes in the record)", "修改原因（會留在紀錄裡）")}
-              value={note}
-              onChange={setNote}
-            />
-          </div>
-          <ErrorNote error={edit.error} />
-        </ModalBody>
-        <ModalFooter>
-          <button type="button" onClick={onClose} disabled={edit.isPending} className="rounded-lg px-3 py-2 text-[13px] text-neutral-600 hover:bg-neutral-100 disabled:opacity-50">
-            {t("Cancel", "取消")}
-          </button>
-          <button
-            type="button"
-            disabled={!dirty || edit.isPending}
-            onClick={async () => {
-              await edit.mutateAsync({ solutionId: s.id, fields: draft, note: note.trim() || undefined });
-              onSaved();
-            }}
-            className="rounded-lg px-4 py-2 text-[13px] font-semibold text-white disabled:opacity-50"
-            style={{ background: "#F97316" }}
-          >
-            {edit.isPending ? t("Sending…", "送出中…") : t("Send for approval", "送出審核")}
-          </button>
-        </ModalFooter>
-      </ModalContent>
-    </Modal>
-  );
+/** 陣列欄位的一行一筆可讀形式。跟伺服器端 featuresToText / pricesToText 同一種格式。 */
+function describe(field: string, v: any): string {
+  const rows = Array.isArray(v) ? v : [];
+  if (field === "features") {
+    return rows.map((r: any) => `${String(r?.en ?? "").trim()} | ${String(r?.zh ?? "").trim()}`).join("\n");
+  }
+  return rows
+    .map((r: any) => {
+      const amt = r?.amount == null || r?.billing === "quote" ? "quote" : String(r.amount);
+      return `${String(r?.planEn ?? "").trim()} | ${String(r?.planZh ?? "").trim()} | ${amt} | ${r?.billing ?? "quote"}${r?.startsFrom ? " | from" : ""}`;
+    })
+    .join("\n");
 }
+
+// 編輯 modal 搬到自己的檔案 —— 欄位擴到全部之後它比這裡其他東西加起來還長。
+export { default as EditSolutionModal } from "./edit-modal-body";
 
 /** 新增產品。AI 只改寫你打的粗稿，不會去查也不會補。 */
 export function CreateSolutionModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {

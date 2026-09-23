@@ -12,10 +12,15 @@
  * 業務與 AI 讀到的永遠是已核准的版本。這跟寫作技能（hub_skills 的 status /
  * approved_by / approved_at）是同一個模子。
  *
- * ── 為什麼價格不在可編輯範圍 ─────────────────────────────────────────
- * CJ 說的是「產品的描述內容，包括產品和簡介」。價格另外一條路：它是合規引擎
- * 唯一認的數字，改價要連帶處理「引用舊價的貼文變成過期」，不是一個文字編輯
- * 框該順手做的事。這支只動文字。
+ * ── 價格也可以編輯了，但走的是版本，不是覆寫 ────────────────────────
+ * 2026-09-23 CJ「編輯的功能，要可以編輯產品現在呈現的每個欄位」——包含價格。
+ * 我原本把它排除在外，理由是改價會讓引用舊價的貼文變成過期。那個顧慮還在，
+ * 處理方式是**不覆寫**：核准的時候把舊價的 effective_to 設成昨天、插入一筆
+ * 今天生效的新價。hub_prices 本來就是這樣設計的（effective_from / effective_to），
+ * 只是先前沒有任何地方真的用到它。
+ *
+ * 誠實地說清楚目前的極限：**「引用舊價的貼文自動標記為過期」還沒有實作**。
+ * 價格的歷史留住了，所以之後要回頭算得出來；但今天改價不會去回標既有貼文。
  *
  * ── 核准權限 ────────────────────────────────────────────────────────
  * hub_approvers 列出可以核准的人。**刻意允許這張表是空的**：空的時候退回
@@ -29,9 +34,50 @@ import localPool from "../../../localDb";
 
 const TAIL = "ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci";
 
-/** 可以被編輯的欄位。價格不在內，理由見檔頭。 */
-export const EDITABLE_FIELDS = ["name_en", "name_zh", "summary_en", "summary_zh", "audience_en", "audience_zh"] as const;
+/**
+ * 純文字／布林欄位。2026-09-23 CJ「編輯的功能，要可以編輯產品現在呈現的每個
+ * 欄位」，所以從原本的六個擴到涵蓋卡片與 modal 上看得到的全部。
+ */
+export const EDITABLE_FIELDS = [
+  "name_en", "name_zh", "vendor", "category",
+  "summary_en", "summary_zh", "audience_en", "audience_zh",
+  "source_url", "featured",
+] as const;
 export type EditableField = (typeof EDITABLE_FIELDS)[number];
+
+/**
+ * 結構化欄位：特色與價格。它們是陣列，逐欄比對沒有意義，所以正規化成一行一筆
+ * 的文字再比——紀錄看得懂，審核的人也看得出哪一行動了。
+ */
+export const STRUCTURED_FIELDS = ["features", "prices"] as const;
+export type StructuredField = (typeof STRUCTURED_FIELDS)[number];
+
+export interface FeatureRow { en: string; zh: string }
+export interface PriceRow {
+  planEn: string;
+  planZh: string;
+  amount: number | null;
+  billing: "month" | "year" | "one_time" | "quote";
+  startsFrom: boolean;
+}
+
+/** 一行一筆的可讀形式。diff 與紀錄都用這個。 */
+export function featuresToText(rows: FeatureRow[]): string {
+  return rows
+    .map((r) => `${String(r?.en ?? "").trim()} | ${String(r?.zh ?? "").trim()}`)
+    .filter((l) => l !== " | ")
+    .join("\n");
+}
+
+export function pricesToText(rows: PriceRow[]): string {
+  return rows
+    .map((r) => {
+      const amt = r?.amount == null || r?.billing === "quote" ? "quote" : String(r.amount);
+      return `${String(r?.planEn ?? "").trim()} | ${String(r?.planZh ?? "").trim()} | ${amt} | ${r?.billing ?? "quote"}${r?.startsFrom ? " | from" : ""}`;
+    })
+    .filter((l) => !l.startsWith(" |  | "))
+    .join("\n");
+}
 
 export type EditAction = "created" | "edited" | "approved" | "rejected" | "withdrawn";
 
@@ -182,24 +228,60 @@ export function diffFields(
   return out;
 }
 
+/** 目前生效中的價格，轉成編輯器與 diff 用的形狀。 */
+export async function currentPrices(solutionId: number): Promise<PriceRow[]> {
+  const [rows]: any = await localPool.execute(
+    `SELECT plan_en, plan_zh, amount, billing, starts_from FROM hub_prices
+      WHERE solution_id = ? AND effective_from <= CURDATE() AND (effective_to IS NULL OR effective_to >= CURDATE())
+      ORDER BY id`,
+    [solutionId],
+  );
+  return (rows as any[]).map((r) => ({
+    planEn: r.plan_en, planZh: r.plan_zh,
+    amount: r.amount == null ? null : Number(r.amount),
+    billing: r.billing, startsFrom: Boolean(r.starts_from),
+  }));
+}
+
 export async function proposeEdit(args: {
   orgId: number;
   solutionId: number;
   actor: string;
   proposed: Partial<Record<EditableField, string>>;
+  features?: FeatureRow[];
+  prices?: PriceRow[];
   note?: string;
 }): Promise<{ changed: number }> {
   const [rows]: any = await localPool.execute(
-    `SELECT ${EDITABLE_FIELDS.join(", ")} FROM hub_solutions WHERE id = ? AND org_id = ? LIMIT 1`,
+    `SELECT ${EDITABLE_FIELDS.join(", ")}, features FROM hub_solutions WHERE id = ? AND org_id = ? LIMIT 1`,
     [args.solutionId, args.orgId],
   );
   const current = (rows as any[])[0];
   if (!current) throw new Error("solution not found");
 
-  const changes = diffFields(current, args.proposed);
+  const changes: Array<{ field: string; from: string; to: string }> = diffFields(current, args.proposed);
+  const payload: Record<string, any> = Object.fromEntries(changes.map((c) => [c.field, c.to]));
+
+  // 結構化欄位比「一行一筆」的文字形式 —— 紀錄看得懂，也看得出哪一行動了。
+  if (args.features) {
+    const from = featuresToText(parseJson(current.features) ?? []);
+    const to = featuresToText(args.features);
+    if (from !== to) {
+      changes.push({ field: "features", from, to });
+      payload.features = args.features;
+    }
+  }
+  if (args.prices) {
+    const from = pricesToText(await currentPrices(args.solutionId));
+    const to = pricesToText(args.prices);
+    if (from !== to) {
+      changes.push({ field: "prices", from, to });
+      payload.prices = args.prices;
+    }
+  }
+
   if (!changes.length) return { changed: 0 };
 
-  const payload = Object.fromEntries(changes.map((c) => [c.field, c.to]));
   await localPool.execute(
     `UPDATE hub_solutions SET pending = ?, pending_by = ?, pending_at = NOW(3) WHERE id = ? AND org_id = ?`,
     [JSON.stringify(payload), args.actor, args.solutionId, args.orgId],
@@ -208,13 +290,19 @@ export async function proposeEdit(args: {
   return { changed: changes.length };
 }
 
+function parseJson(v: any): any {
+  if (v == null) return null;
+  if (typeof v !== "string") return v;
+  try { return JSON.parse(v); } catch { return null; }
+}
+
 export async function approveEdit(args: {
   orgId: number;
   solutionId: number;
   actor: string;
 }): Promise<{ applied: number }> {
   const [rows]: any = await localPool.execute(
-    `SELECT pending, pending_by, ${EDITABLE_FIELDS.join(", ")} FROM hub_solutions WHERE id = ? AND org_id = ? LIMIT 1`,
+    `SELECT pending, pending_by, ${EDITABLE_FIELDS.join(", ")}, features FROM hub_solutions WHERE id = ? AND org_id = ? LIMIT 1`,
     [args.solutionId, args.orgId],
   );
   const row = (rows as any[])[0];
@@ -227,20 +315,52 @@ export async function approveEdit(args: {
     throw new Error("You proposed this change — someone else has to approve it.");
   }
 
-  const changes = diffFields(row, pending);
-  const sets = Object.keys(pending)
-    .filter((k) => (EDITABLE_FIELDS as readonly string[]).includes(k))
-    .map((k) => `${k} = ?`);
-  const params = Object.keys(pending)
-    .filter((k) => (EDITABLE_FIELDS as readonly string[]).includes(k))
-    .map((k) => String(pending[k] ?? ""));
-  if (!sets.length) return { applied: 0 };
+  const changes: Array<{ field: string; from: string; to: string }> = diffFields(row, pending);
+
+  const scalars = Object.keys(pending).filter((k) => (EDITABLE_FIELDS as readonly string[]).includes(k));
+  const sets = scalars.map((k) => `${k} = ?`);
+  const params = scalars.map((k) => String(pending[k] ?? ""));
+
+  if (pending.features) {
+    changes.push({
+      field: "features",
+      from: featuresToText(parseJson(row.features) ?? []),
+      to: featuresToText(pending.features),
+    });
+    sets.push("features = ?");
+    params.push(JSON.stringify(pending.features));
+  }
+
+  if (sets.length) {
+    await localPool.execute(
+      `UPDATE hub_solutions SET ${sets.join(", ")}, updated_by = ?, updated_at = NOW(3) WHERE id = ? AND org_id = ?`,
+      [...params, args.actor, args.solutionId, args.orgId],
+    );
+  }
+
+  // 價格走版本不走覆寫：舊的收在昨天，新的從今天生效。這樣歷史留得住，
+  // 「這篇貼文當時引用的價格是不是還有效」以後算得出來。
+  if (pending.prices) {
+    const before = pricesToText(await currentPrices(args.solutionId));
+    await localPool.execute(
+      `UPDATE hub_prices SET effective_to = DATE_SUB(CURDATE(), INTERVAL 1 DAY)
+        WHERE solution_id = ? AND (effective_to IS NULL OR effective_to >= CURDATE())`,
+      [args.solutionId],
+    );
+    for (const p of pending.prices as PriceRow[]) {
+      const quote = p.billing === "quote" || p.amount == null;
+      await localPool.execute(
+        `INSERT INTO hub_prices (solution_id, plan_en, plan_zh, amount, currency, billing, starts_from, effective_from, source_url)
+         VALUES (?, ?, ?, ?, 'TWD', ?, ?, CURDATE(), NULL)`,
+        [args.solutionId, p.planEn, p.planZh, quote ? null : p.amount, p.billing, p.startsFrom ? 1 : 0],
+      );
+    }
+    changes.push({ field: "prices", from: before, to: pricesToText(pending.prices as PriceRow[]) });
+  }
 
   await localPool.execute(
-    `UPDATE hub_solutions SET ${sets.join(", ")}, pending = NULL, pending_by = NULL, pending_at = NULL,
-            updated_by = ?, updated_at = NOW(3)
-      WHERE id = ? AND org_id = ?`,
-    [...params, args.actor, args.solutionId, args.orgId],
+    `UPDATE hub_solutions SET pending = NULL, pending_by = NULL, pending_at = NULL WHERE id = ? AND org_id = ?`,
+    [args.solutionId, args.orgId],
   );
   await logEdit({ orgId: args.orgId, solutionId: args.solutionId, actor: args.actor, action: "approved", changes });
   return { applied: changes.length };
