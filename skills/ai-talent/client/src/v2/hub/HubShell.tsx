@@ -13,7 +13,7 @@ import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import type { IconDefinition } from "@fortawesome/fontawesome-svg-core";
 import {
-  faBan,
+  faQuoteLeft,
   faBookOpen,
   faBoxOpen,
   faBrain,
@@ -29,7 +29,6 @@ import {
   faRightFromBracket,
   faScaleBalanced,
   faShieldHalved,
-  faThumbsUp,
   faTrophy,
   faUsers,
   faWandMagicSparkles,
@@ -88,8 +87,8 @@ const LAYERS: Array<{ id: LayerId; icon: IconDefinition; zh: string; en: string;
     items: [
       { to: "/hub/strategy/brand", icon: faBrain, zh: "品牌", en: "Brand" },
       { to: "/hub/strategy/products", icon: faBoxOpen, zh: "產品", en: "Products" },
-      { to: "/hub/strategy/preferred", icon: faThumbsUp, zh: "正面用詞", en: "Preferred wording" },
-      { to: "/hub/strategy/banned", icon: faBan, zh: "禁用詞", en: "Banned words" },
+      // 2026-09-23 (CJ「可用詞和禁用詞都集合在同一個 mission tray」)。
+      { to: "/hub/strategy/wording", icon: faQuoteLeft, zh: "用詞", en: "Wording" },
       { to: "/hub/strategy/regulations", icon: faScaleBalanced, zh: "法規更新", en: "Regulation updates" },
       { to: "/hub/strategy/facts", icon: faDatabase, zh: "市場數據", en: "Market facts" },
     ],

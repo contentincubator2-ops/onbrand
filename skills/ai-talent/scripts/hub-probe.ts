@@ -137,6 +137,49 @@ async function main() {
 
     const conflicts = findWordingConflicts(all);
     check(true, "wording conflicts", conflicts.length ? conflicts.map((c) => `${c.market}:${c.kind}`).join(", ") : "none — the seeded rules agree with each other");
+
+    // 2026-09-23 (CJ「只要寫使用詞、禁用詞，可以編輯，不需要寫為什麼。仍然要有
+    // 編輯歷史」)。沒有理由欄，所以紀錄就是理由——它壞掉的話，這份清單就變成
+    // 一堆沒有人知道為什麼存在的字。真的跑一次新增→編輯→刪除。
+    const we = await import("../server/strategy/core/hub/wordingEdits");
+    const probeTerm = `probe-word-${Date.now()}`;
+    let probeId: number | null = null;
+    try {
+      await exec(
+        `INSERT INTO hub_wording (org_id, market, kind, term, added_by) VALUES (?, 'TW', 'preferred', ?, 'hub-probe')`,
+        [org.id, probeTerm],
+      );
+      const [row] = await q(`SELECT id FROM hub_wording WHERE org_id = ? AND term = ? LIMIT 1`, [org.id, probeTerm]);
+      probeId = row?.id ?? null;
+      await we.logWordingEdit({
+        orgId: org.id, wordingId: probeId, actor: "hub-probe", action: "added",
+        market: "TW", kind: "preferred", term: probeTerm,
+      });
+
+      const renamed = `${probeTerm}-v2`;
+      const r = await we.editWording({ orgId: org.id, id: probeId!, actor: "hub-probe", term: renamed, replacement: null });
+      check(r.changed, "editing a word in place reports a change", `changed=${r.changed}`);
+
+      // 前後一樣就不該留紀錄 —— 紀錄的價值全在稀少。
+      const again = await we.editWording({ orgId: org.id, id: probeId!, actor: "hub-probe", term: renamed, replacement: null });
+      check(!again.changed, "a no-op edit leaves no record", `changed=${again.changed}`);
+
+      const log = await we.listWordingEdits(org.id, "TW");
+      const mine2 = log.filter((h) => h.term.startsWith("probe-word-"));
+      check(mine2.length === 2, "the record has the add and the edit, and nothing else", `${mine2.length} entries`);
+      const edited = mine2.find((h) => h.action === "edited");
+      check(
+        edited?.changes?.[0]?.from === probeTerm && edited?.changes?.[0]?.to === renamed,
+        "the record carries both sides of the change",
+        JSON.stringify(edited?.changes ?? []),
+      );
+      check(Boolean(edited?.actor), "the record says who did it", edited?.actor ?? "(nobody)");
+    } finally {
+      if (probeId) await exec(`DELETE FROM hub_wording WHERE id = ? AND org_id = ?`, [probeId, org.id]);
+      await exec(`DELETE FROM hub_wording_edits WHERE org_id = ? AND term LIKE 'probe-word-%'`, [org.id]);
+    }
+    const leftover = await q(`SELECT id FROM hub_wording WHERE org_id = ? AND term LIKE 'probe-word-%'`, [org.id]);
+    check(leftover.length === 0, "probe left the wording lists as it found them", `${leftover.length} rows`);
   } catch (e: any) {
     bad("wording usage", e?.message ?? String(e));
   }

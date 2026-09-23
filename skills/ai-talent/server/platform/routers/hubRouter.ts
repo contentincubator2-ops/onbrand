@@ -117,20 +117,77 @@ const adminRouter = router({
       }
       const org = await getOrg();
       const [u] = await q(`SELECT email FROM users WHERE id = ?`, [ctx.user.id]);
+      const actor = String(u?.email ?? "admin");
       await exec(
         `INSERT INTO hub_wording (org_id, market, kind, term, replacement, note, added_by) VALUES (?, ?, ?, ?, ?, ?, ?)
          ON DUPLICATE KEY UPDATE replacement = VALUES(replacement), note = VALUES(note), added_by = VALUES(added_by)`,
-        [org.id, input.market, input.kind, input.term, input.replacement || null, input.note || null, u?.email ?? "admin"],
+        [org.id, input.market, input.kind, input.term, input.replacement || null, input.note || null, actor],
       );
       await logEvent(org.id, null, "wording_added", `${input.kind} · ${input.market} · ${input.term}`);
+      // 2026-09-23 (CJ「仍然要有編輯歷史」)。查回 id 才記，因為 ON DUPLICATE KEY
+      // 的情況下 insertId 不可靠。
+      const m = await import("../../strategy/core/hub/wordingEdits");
+      const [row] = await q(
+        `SELECT id FROM hub_wording WHERE org_id = ? AND market = ? AND kind = ? AND term = ? LIMIT 1`,
+        [org.id, input.market, input.kind, input.term],
+      );
+      await m.logWordingEdit({
+        orgId: org.id, wordingId: row?.id ?? null, actor, action: "added",
+        market: input.market, kind: input.kind, term: input.term,
+      });
       return { ok: true };
     }),
 
-  removeWording: adminProcedure.input(z.object({ id: z.number().int() })).mutation(async ({ input }) => {
+  /**
+   * 就地修改一筆用詞（CJ 2026-09-23「可以編輯」）。
+   * 原本只能新增與刪除，所以改一個錯字要刪掉重打 —— 而那會在紀錄裡留下
+   * 「刪除 + 新增」兩筆，看不出那其實是同一件事。
+   */
+  editWording: adminProcedure
+    .input(z.object({
+      id: z.number().int().positive(),
+      term: z.string().trim().min(1).max(120),
+      replacement: z.string().trim().max(160).optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const org = await getOrg();
+      const [u] = await q(`SELECT email FROM users WHERE id = ?`, [ctx.user.id]);
+      const m = await import("../../strategy/core/hub/wordingEdits");
+      try {
+        const r = await m.editWording({
+          orgId: org.id, id: input.id, actor: String(u?.email ?? "admin"),
+          term: input.term, replacement: input.replacement ?? null,
+        });
+        if (r.changed) await logEvent(org.id, null, "wording_edited", `#${input.id} · ${input.term}`);
+        return r;
+      } catch (e: any) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: String(e?.message ?? e) });
+      }
+    }),
+
+  wordingHistory: adminProcedure
+    .input(z.object({ market: z.enum(["TW", "US"]).optional() }).optional())
+    .query(async ({ input }) => {
+      const org = await getOrg();
+      const m = await import("../../strategy/core/hub/wordingEdits");
+      return { history: await m.listWordingEdits(org.id, input?.market) };
+    }),
+
+  removeWording: adminProcedure.input(z.object({ id: z.number().int() })).mutation(async ({ ctx, input }) => {
     const org = await getOrg();
+    const [u] = await q(`SELECT email FROM users WHERE id = ?`, [ctx.user.id]);
     const [w] = await q(`SELECT kind, market, term FROM hub_wording WHERE id = ? AND org_id = ?`, [input.id, org.id]);
     await exec(`DELETE FROM hub_wording WHERE id = ? AND org_id = ?`, [input.id, org.id]);
-    if (w) await logEvent(org.id, null, "wording_removed", `${w.kind} · ${w.market} · ${w.term}`);
+    if (w) {
+      await logEvent(org.id, null, "wording_removed", `${w.kind} · ${w.market} · ${w.term}`);
+      // 紀錄留著 wording_id，即使那一筆已經不存在 —— 「誰把這個字拿掉的」
+      // 是最常被問的問題，而那正好是資料已經刪掉的時候。
+      const m = await import("../../strategy/core/hub/wordingEdits");
+      await m.logWordingEdit({
+        orgId: org.id, wordingId: input.id, actor: String(u?.email ?? "admin"), action: "removed",
+        market: String(w.market), kind: String(w.kind), term: String(w.term),
+      });
+    }
     return { ok: true };
   }),
 

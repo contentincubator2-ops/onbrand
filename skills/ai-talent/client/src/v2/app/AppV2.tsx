@@ -63,8 +63,7 @@ const HubRepsPage = React.lazy(() => import("../hub/pages/HubRepsPage"));
 const HubRepViewPage = React.lazy(() => import("../hub/pages/HubRepViewPage"));
 const HubStrategyBrandPage = React.lazy(() => import("../hub/pages/strategy/StrategyBrandPage"));
 const HubStrategyProductsPage = React.lazy(() => import("../hub/pages/strategy/StrategyProductsPage"));
-const HubStrategyPreferredPage = React.lazy(() => import("../hub/pages/strategy/StrategyPreferredPage"));
-const HubStrategyBannedPage = React.lazy(() => import("../hub/pages/strategy/StrategyBannedPage"));
+const HubStrategyWordingPage = React.lazy(() => import("../hub/pages/strategy/StrategyWordingPage"));
 const HubStrategyRegulationsPage = React.lazy(() => import("../hub/pages/strategy/StrategyRegulationsPage"));
 const HubStrategyFactsPage = React.lazy(() => import("../hub/pages/strategy/StrategyFactsPage"));
 const HubTasksPage = React.lazy(() => import("../hub/pages/content/HubTasksPage"));
@@ -322,8 +321,11 @@ export default function AppV2() {
           <Route path="/hub/strategy" element={<Navigate to="/hub/strategy/brand" replace />} />
           <Route path="/hub/strategy/brand" element={<HubStrategyBrandPage />} />
           <Route path="/hub/strategy/products" element={<HubStrategyProductsPage />} />
-          <Route path="/hub/strategy/preferred" element={<HubStrategyPreferredPage />} />
-          <Route path="/hub/strategy/banned" element={<HubStrategyBannedPage />} />
+          <Route path="/hub/strategy/wording" element={<HubStrategyWordingPage />} />
+          {/* 2026-09-23：正面用詞與禁用詞併成一個 tray。舊網址導過去，不留死連結
+              —— 這兩個位址被分享過，包括 CJ 自己貼過的那一個。 */}
+          <Route path="/hub/strategy/preferred" element={<Navigate to="/hub/strategy/wording" replace />} />
+          <Route path="/hub/strategy/banned" element={<Navigate to="/hub/strategy/wording" replace />} />
           <Route path="/hub/strategy/regulations" element={<HubStrategyRegulationsPage />} />
           <Route path="/hub/strategy/facts" element={<HubStrategyFactsPage />} />
           {/* 內容 Content tray */}

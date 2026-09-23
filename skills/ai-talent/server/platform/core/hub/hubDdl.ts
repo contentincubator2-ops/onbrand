@@ -242,6 +242,31 @@ export const HUB_DDL: string[] = [
     INDEX idx_org (org_id, created_at)
   ) ${TAIL}`,
 
+  /**
+   * 用詞規範的變更紀錄（CJ 2026-09-23「仍然要有編輯歷史」）。
+   *
+   * 跟 hub_solution_edits 同一個形狀，但**沒有核准流程**：用詞是即時生效的
+   * （加一個字，業務寫的下一篇就擋得到），硬加一道核准會讓那個承諾變成謊話。
+   * 所以這裡只記錄發生過什麼，不攔。
+   *
+   * wording_id 不設外鍵：刪掉的那一筆，紀錄還要留著——不然「誰把這個字拿掉的」
+   * 這個最常被問的問題剛好查不到。
+   */
+  `CREATE TABLE IF NOT EXISTS hub_wording_edits (
+    id              INT          NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    org_id          INT          NOT NULL,
+    wording_id      INT          NULL,
+    actor           VARCHAR(160) NOT NULL,
+    action          VARCHAR(16)  NOT NULL,
+    market          VARCHAR(2)   NOT NULL,
+    kind            VARCHAR(12)  NOT NULL,
+    term            VARCHAR(120) NOT NULL,
+    changes         JSON         NULL,
+    created_at      DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    INDEX idx_org (org_id, created_at),
+    INDEX idx_wording (wording_id)
+  ) ${TAIL}`,
+
   `CREATE TABLE IF NOT EXISTS hub_approvers (
     id              INT          NOT NULL AUTO_INCREMENT PRIMARY KEY,
     org_id          INT          NOT NULL,
