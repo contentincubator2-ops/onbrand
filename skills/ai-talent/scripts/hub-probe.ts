@@ -475,7 +475,14 @@ async function main() {
       check(Boolean(edited?.actor), "the record says who did it", edited?.actor ?? "(nobody)");
     } finally {
       if (probeId) await exec(`DELETE FROM hub_wording WHERE id = ? AND org_id = ?`, [probeId, org.id]);
+      // 2026-09-23：紀錄搬家之後，logWordingEdit 寫的是 hub_strategy_edits。
+      // 這裡原本只清舊表，所以探針的列一次次累積（第二次跑就變 4 筆，上面那條
+      // 「剛好兩筆」的檢查就紅了）。**清理要跟著寫入的地方走。**
       await exec(`DELETE FROM hub_wording_edits WHERE org_id = ? AND term LIKE 'probe-word-%'`, [org.id]);
+      await exec(
+        `DELETE FROM hub_strategy_edits WHERE org_id = ? AND entity = 'wording' AND label LIKE 'probe-word-%'`,
+        [org.id],
+      );
     }
     const leftover = await q(`SELECT id FROM hub_wording WHERE org_id = ? AND term LIKE 'probe-word-%'`, [org.id]);
     check(leftover.length === 0, "probe left the wording lists as it found them", `${leftover.length} rows`);
