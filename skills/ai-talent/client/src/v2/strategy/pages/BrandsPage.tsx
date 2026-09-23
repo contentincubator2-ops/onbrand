@@ -19,7 +19,7 @@ import { trpc } from "../../../lib/trpc";
 import { useLang } from "../../../lib/i18n";
 import type { ShellOutletCtx } from "../../app/shell/ShellLayout";
 import { isStrategyPreviewEmail, isPersonaPreviewEmail } from "../../app/shell/ShellLayout";
-import { Avatar, Button, Card, CardBody, Chip, Input, Textarea, Spinner, Select, SelectItem, CheckboxGroup, Checkbox } from "@heroui/react";
+import { Avatar, Button, Card, CardBody, Chip, Input, Textarea, Spinner, Select, SelectItem, CheckboxGroup, Checkbox, Tooltip } from "@heroui/react";
 import SegmentEditor from "../components/positioning/SegmentEditor";
 import ThinkingOverlay from "../components/positioning/ThinkingOverlay";
 import PipelineRunner, { type PipelineState } from "../components/positioning/PipelineRunner";
@@ -44,7 +44,7 @@ import { BrandActionChipsRow, BrandTestPanel, usePositioningStatus } from "../co
 import AddEntityModal, { type AddEntityTab } from "../components/AddEntityModal";
 import ProductDetailModal from "../components/positioning/ProductDetailModal";
 // Notion-style line icons
-import { Target as LucideTarget, Type as LucideType, Palette as LucidePalette, Lock as LucideLock, Play as LucidePlay, RotateCcw as LucideRotate, BookOpen as LucideBook, Sparkles, Bot as LucideRobotIcon, Quote as LucideQuote, Shield as LucideShield, Type as LucideTypeIcon, Pencil as LucidePencil, Award as LucideAward, Package as LucidePackage, Hash as LucideHash, MessageCircle as LucideMessage, FileText as LucideFileText, IdCard as LucideIdCard, Trash2 as LucideTrash } from "lucide-react";
+import { Target as LucideTarget, Type as LucideType, Palette as LucidePalette, Lock as LucideLock, Play as LucidePlay, RotateCcw as LucideRotate, BookOpen as LucideBook, Sparkles, Bot as LucideRobotIcon, Quote as LucideQuote, Shield as LucideShield, Type as LucideTypeIcon, Pencil as LucidePencil, Award as LucideAward, Package as LucidePackage, Hash as LucideHash, MessageCircle as LucideMessage, FileText as LucideFileText, IdCard as LucideIdCard, Trash2 as LucideTrash, Info as LucideInfo } from "lucide-react";
 import { SCOPE_SEGMENTS, type SegmentSpec } from "../lib/positioningSchema";
 import { pipelineFor, type PipelineStepSpec } from "../lib/positioningPipeline";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
@@ -1382,39 +1382,50 @@ export default function BrandsPage() {
           </p>
 
           {/* Plain title — no gradient, no emblem. Just typography. */}
-          <h1
-            className="font-bold tracking-tight leading-none text-neutral-900 mb-3"
-            style={{ fontSize: "clamp(1.75rem, 3vw, 2.5rem)" }}
-          >
-            {scopeName}
-          </h1>
-
-          {/* 2026-05-11 (reviewer feedback「方法論本身是隱形的」):
-              replaced tech-spec stats (X 方法論・Y 技能・Z Agents) with a
-              one-line methodology manifesto. Engine stats moved to admin /
-              about page. Manifesto makes the methodology→content causality
-              the headline, not "we have N things". */}
-          {/* Canonical subtitle — same rendering as /30s · /60s · /99s · /theater · /projects · /missions. */}
-          <p
-            className="mt-3 mx-auto text-default-700"
-            style={{
-              fontFamily: '"Source Serif Pro", "Noto Serif TC", Georgia, serif',
-              fontStyle: "italic", fontSize: 14, lineHeight: 1.7, maxWidth: 640,
-            }}
-          >
-            {lang === "en"
-              ? "The SoWork Brand Positioning Method · lock who you are first, then every post knows what to say"
-              : "SoWork 品牌定位法 · 先鎖定你是誰，AI 才知道每篇文章要說什麼"}
-          </p>
-          <p
-            className="mt-2 mb-5 mx-auto text-default-700"
-            style={{ fontSize: 12, lineHeight: 1.55, maxWidth: 640, letterSpacing: "0.02em" }}
-          >
-            <span style={{ fontWeight: 600, color: "#171717", marginRight: 6 }}>{lang === "en" ? "Includes:" : "包含："}</span>
-            {lang === "en"
-              ? "14-step positioning · Copy / visual / knowledge assets · AI prompt library"
-              : "14 步定位 · 文字 / 視覺 / 知識資產 · AI 指令庫"}
-          </p>
+          {/* 2026-09-23 (CJ「靠上面的內容，sowork定位方法論，是否縮小，在旁邊，
+              變成輔助工具？」— 頁面「有點複雜」): 2026-05-11 那次把方法論寫成
+              兩段置中大字（manifesto + includes 清單），佔掉標題正下方一大塊
+              版面。這次縮成標題旁邊一顆小 badge，hover 才看到完整說明——資訊
+              還在，但從「主要內容」降級成「輔助工具」，比較符合現在真正的
+              主要內容（下面的卡片）。 */}
+          <div className="flex items-center justify-center gap-2 mb-5">
+            <h1
+              className="font-bold tracking-tight leading-none text-neutral-900"
+              style={{ fontSize: "clamp(1.75rem, 3vw, 2.5rem)" }}
+            >
+              {scopeName}
+            </h1>
+            <Tooltip
+              placement="right"
+              content={
+                <div style={{ maxWidth: 260, padding: 4 }}>
+                  <p style={{
+                    fontFamily: '"Source Serif Pro", "Noto Serif TC", Georgia, serif',
+                    fontStyle: "italic", fontSize: 12.5, lineHeight: 1.6, margin: 0, marginBottom: 6, color: "#171717",
+                  }}>
+                    {lang === "en"
+                      ? "The SoWork Brand Positioning Method · lock who you are first, then every post knows what to say"
+                      : "SoWork 品牌定位法 · 先鎖定你是誰，AI 才知道每篇文章要說什麼"}
+                  </p>
+                  <p style={{ fontSize: 11.5, lineHeight: 1.5, margin: 0, color: "#737373" }}>
+                    <span style={{ fontWeight: 600, color: "#525252", marginRight: 4 }}>{lang === "en" ? "Includes:" : "包含："}</span>
+                    {lang === "en"
+                      ? "14-step positioning · Copy / visual / knowledge assets · AI prompt library"
+                      : "14 步定位 · 文字 / 視覺 / 知識資產 · AI 指令庫"}
+                  </p>
+                </div>
+              }
+            >
+              <button
+                type="button"
+                aria-label={lang === "en" ? "About the SoWork positioning method" : "關於 SoWork 品牌定位法"}
+                className="inline-flex items-center gap-1 rounded-full border border-neutral-200 px-2 py-1 text-[11px] text-neutral-500 hover:border-neutral-400 hover:text-neutral-700 transition-colors shrink-0"
+              >
+                <LucideInfo size={12} />
+                {lang === "en" ? "Method" : "方法論"}
+              </button>
+            </Tooltip>
+          </div>
 
           {/* 2026-05-11 (CJ「搜尋 BAR 不需要了」): BrandMessageBar removed.
               Manifesto subtitle above already carries the value-prop;
