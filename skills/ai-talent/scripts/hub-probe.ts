@@ -119,15 +119,16 @@ async function main() {
     const missing = all.filter((w) => !measured.usage[w.id]);
     check(missing.length === 0, "every wording rule got measured", missing.map((w) => w.term).join(", ") || `${all.length} rules`);
 
-    const [{ demo = 0, real = 0 } = {} as any] = await q<{ demo: number; real: number }>(
-      `SELECT SUM(is_demo = 1) AS demo, SUM(is_demo = 0) AS real FROM hub_posts WHERE org_id = ?`,
+    // `real` 是 MySQL 的保留字（REAL 是資料型別），不能當欄位別名。
+    const [{ demo_posts = 0, live_posts = 0 } = {} as any] = await q<{ demo_posts: number; live_posts: number }>(
+      `SELECT SUM(is_demo = 1) AS demo_posts, SUM(is_demo = 0) AS live_posts FROM hub_posts WHERE org_id = ?`,
       [org.id],
     );
     const counted = Object.values(measured.byMarket).reduce((a, b) => a + b, 0);
     check(
-      counted === Number(real),
+      counted === Number(live_posts),
       "the denominator counts real posts only, not demo history",
-      `counted ${counted}, real ${real}, demo ${demo}`,
+      `counted ${counted}, real ${live_posts}, demo ${demo_posts}`,
     );
 
     // hits 永遠不能大於 posts —— 比率大於 1 的數字會讓整頁失去可信度。
