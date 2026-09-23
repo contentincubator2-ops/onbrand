@@ -19,6 +19,9 @@ import PricingInfoModal from "../../platform/components/PricingInfoModal";
 import TrialCountdownBar from "../../platform/components/TrialCountdownBar";
 // 2026-05-11 (CJ「節慶日曆 + 自動提醒」)
 import SupportDrawer from "../../platform/components/SupportDrawer";
+// 2026-09-23（CJ「在每一頁派一個常駐的顧問…我喜歡在右上方的位置」）：
+// 跟 Mia（客服，右下角）刻意分開的第二個全域常駐入口。
+import StrategyDirectorDrawer from "../../strategy/components/positioning/StrategyDirectorDrawer";
 // 2026-06-12 (CJ「Mia 細緻化 + 不要自動跳出」): unread-nudge state lives in
 // sessionStorage; this hook surfaces the count for the avatar badge and
 // the drain function for the drawer.
@@ -651,6 +654,7 @@ export default function ShellLayout() {
         pendingNudges={drainedNudges}
         onNudgesConsumed={() => setDrainedNudges([])}
       />
+      <StrategyDirectorDrawer brandId={brandId} />
 
       {/* Bottom-left toast feed for background positioning pipeline completions */}
       <PositioningNotificationCenter />

@@ -190,15 +190,78 @@ function parseActions(raw: string): { clean: string; actions: StrategistAction[]
   return { clean: clean.replace(/\n{3,}/g, "\n\n").trim(), actions: actions.slice(0, 1) };
 }
 
+/**
+ * 2026-09-23（CJ「策略總監也可以...主動發問」）：新對話第一次開啟時，與其
+ * 讓使用者面對一個空面板，不如讓總監先開口——用「品牌現在缺什麼」決定
+ * 開場白，不叫 LLM（省一次呼叫，也不會因為 LLM 亂猜而失真）：沒做過健檢
+ * 就建議健檢，有未讀的策略監測提醒就提一下，兩者都沒有就給一句帶品牌
+ * 名字的一般問候。只在對話「第一次建立、還沒有任何訊息」時算一次，之後
+ * 不會每次開面板都重講一次開場白。
+ */
+async function buildProactiveOpening(brandId: number, userId: number, brandName: string, en: boolean):
+  Promise<{ content: string; actions: StrategistAction[] }> {
+  try {
+    const [rows]: any = await localPool.execute(
+      `SELECT JSON_UNQUOTE(JSON_EXTRACT(positioning, '$._workbench.healthCheck.checkedAt')) AS hcCheckedAt
+         FROM brands WHERE id = ? AND userId = ? LIMIT 1`,
+      [brandId, userId],
+    );
+    const hcDone = !!(rows as any[])[0]?.hcCheckedAt && (rows as any[])[0].hcCheckedAt !== "null";
+    if (!hcDone) {
+      return {
+        content: en
+          ? `Hi, I'm ${brandName}'s Strategy Director. You haven't run a Strategy Health Check yet — want me to take you there? I'll independently read your brand's own research and see if it agrees with what you picked in the workbench.`
+          : `嗨，我是${brandName}的策略總監。你還沒做過策略健檢——要我帶你去看看嗎？我會獨立看一次品牌自己的研究資料，看跟你在工作台選的是不是一致。`,
+        actions: [{ kind: "open_healthcheck", label: en ? "Take me there" : "帶我去看看" }],
+      };
+    }
+    // brandId（不是 scope/scopeId）——這樣品牌底下的產品層提醒也算得到，
+    // 跟 idx_strategy_alerts_brand 這個既有索引對得上。
+    const [alertRows]: any = await localPool.execute(
+      `SELECT COUNT(*) AS c FROM strategy_alerts WHERE brandId = ? AND status = 'new'`,
+      [brandId],
+    );
+    const unread = Number((alertRows as any[])[0]?.c ?? 0);
+    if (unread > 0) {
+      return {
+        content: en
+          ? `Hi, I'm ${brandName}'s Strategy Director. There ${unread === 1 ? "is" : "are"} ${unread} unread strategy alert${unread === 1 ? "" : "s"} waiting — want to take a look?`
+          : `嗨，我是${brandName}的策略總監。有 ${unread} 則策略監測提醒還沒看——要看一下嗎？`,
+        actions: [{ kind: "open_monitor", label: en ? "Show me" : "看一下" }],
+      };
+    }
+  } catch { /* non-fatal — fall through to generic greeting */ }
+  return {
+    content: en
+      ? `Hi, I'm ${brandName}'s Strategy Director. Ask me anything about this brand's positioning — or I can point you to Strategy Monitoring or a Health Check.`
+      : `嗨，我是${brandName}的策略總監。問我任何跟這個品牌定位有關的問題，或者我可以帶你去看看策略監測或做一次健檢。`,
+    actions: [],
+  };
+}
+
 export const strategistChatRouter = router({
-  /** 取得（或建立）這個品牌的開放對話串 + 歷史訊息，聊天面板開啟時呼叫一次。 */
+  /** 取得（或建立）這個品牌的開放對話串 + 歷史訊息，聊天面板開啟時呼叫一次。
+   *  全新對話（還沒有任何訊息）會先幫使用者寫好一則開場白——見
+   *  buildProactiveOpening()。 */
   getConversation: protectedProcedure
     .input(z.object({ brandId: z.number().int().positive() }))
     .query(async ({ ctx, input }) => {
       const userId = ctx.user!.id;
       await assertBrandOwned(input.brandId, userId);
       const conversationId = await ensureOpenConversation(userId, input.brandId);
-      const messages = await loadMessages(conversationId, 60);
+      let messages = await loadMessages(conversationId, 60);
+      if (messages.length === 0) {
+        const [brandRows]: any = await localPool.execute(
+          `SELECT name FROM brands WHERE id = ? AND userId = ? LIMIT 1`, [input.brandId, userId],
+        );
+        const brandName = (brandRows as any[])[0]?.name ?? "";
+        const opening = await buildProactiveOpening(input.brandId, userId, brandName, false);
+        await insertMessage({
+          conversationId, role: "strategist", content: opening.content,
+          contextSnapshot: opening.actions.length > 0 ? { actions: opening.actions } : undefined,
+        });
+        messages = await loadMessages(conversationId, 60);
+      }
       return {
         conversationId,
         messages: messages.map((m) => ({

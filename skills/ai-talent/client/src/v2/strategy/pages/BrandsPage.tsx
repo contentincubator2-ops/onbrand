@@ -36,7 +36,6 @@ import { InfoTab as BrandInfoTab, DangerTab as BrandDangerTab, PublishTab as Bra
 import AIPromptsEditor from "../components/positioning/AIPromptsEditor";
 import BrandOnboardingWizard from "../components/onboarding/BrandOnboardingWizard";
 import StrategyWorkbench from "../components/positioning/StrategyWorkbench";
-import StrategyDirectorChat from "../components/positioning/StrategyDirectorChat";
 import AIBriefPanel from "../components/positioning/AIBriefPanel";
 import StrategyAlertsPanel from "../components/positioning/StrategyAlertsPanel";
 import PersonaAgentPanel from "../components/positioning/PersonaAgentPanel";
@@ -49,7 +48,7 @@ import { Target as LucideTarget, Type as LucideType, Palette as LucidePalette, L
 import { SCOPE_SEGMENTS, type SegmentSpec } from "../lib/positioningSchema";
 import { pipelineFor, type PipelineStepSpec } from "../lib/positioningPipeline";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faPlus, faPalette, faFont, faQuoteLeft, faBullseye, faUsers, faImage, faIcons, faChartPie, faImages, faPenNib, faShieldHalved, faFolderOpen, faLock, faLockOpen, faBookOpen, faTableList, faBox, faRocket, faBullhorn, faWandSparkles, faGear, faStickyNote, faTrash, faUserTie, faSatelliteDish, faStethoscope } from "@fortawesome/free-solid-svg-icons";
+import { faPlus, faPalette, faFont, faQuoteLeft, faBullseye, faUsers, faImage, faIcons, faChartPie, faImages, faPenNib, faShieldHalved, faFolderOpen, faLock, faLockOpen, faBookOpen, faTableList, faBox, faRocket, faBullhorn, faWandSparkles, faGear, faStickyNote, faTrash, faSatelliteDish, faStethoscope } from "@fortawesome/free-solid-svg-icons";
 
 // Sub-nav id format:
 //   "asset:<key>"   — non-positioning brand assets (準則 / 標誌 / etc.)
@@ -121,13 +120,18 @@ export default function BrandsPage() {
   const [testPanelOpen, setTestPanelOpen] = useState(false);
   // 2026-05-08: onboarding wizard for first-time users (no brands yet).
   const [onboardingOpen, setOnboardingOpen] = useState(false);
-  // 2026-09-23（CJ「在看到品牌定位卡片之上，有太多按鈕了…策略總監化為一個
-  // ICON。問用戶是否需要策略監測或健檢，若需要，才會啟動」）：策略總監／
-  // 策略監測／策略健檢三個區塊原本一律展開、疊在卡片正上方。改成一排小
-  // icon，預設全部收起——點了才等於「使用者說需要」，才真的渲染那個區塊
-  // （不是只是視覺收合，未點開時那些元件根本不掛載）。一次只開一個，
-  // 避免點開兩三個之後又疊回原本的擁擠。
-  const [activeStrategyTool, setActiveStrategyTool] = useState<null | "strategist" | "monitor" | "healthcheck">(null);
+  // 2026-09-23（CJ「在看到品牌定位卡片之上，有太多按鈕了…問用戶是否需要
+  // 策略監測或健檢，若需要，才會啟動」）：策略監測／策略健檢兩個區塊
+  // 原本一律展開、疊在卡片正上方。改成一排小 icon，預設全部收起——點了
+  // 才等於「使用者說需要」，才真的渲染那個區塊（不是只是視覺收合，未點開
+  // 時那些元件根本不掛載）。一次只開一個。（策略總監本身已經搬到全域
+  // 右上角常駐入口，見 StrategyDirectorDrawer.tsx，這裡不再重複。）
+  // 也讀 ?tool= —— 全域總監的「引導進行」按鈕會帶著這個參數導過來，讓
+  // 這一頁自動展開對應面板，不用使用者自己再點一次 icon。
+  const [activeStrategyTool, setActiveStrategyTool] = useState<null | "monitor" | "healthcheck">(() => {
+    const t = searchParams.get("tool");
+    return t === "monitor" || t === "healthcheck" ? t : null;
+  });
   // 2026-05-30 (CJ「modal 移除」): ?tab= deep-links now navigate to the
   // corresponding main-workspace category instead of opening a modal.
   React.useEffect(() => {
@@ -1852,23 +1856,14 @@ export default function BrandsPage() {
                       Idle: show lock toolbar + tile grid (normal view).
                       Running / Paused: show ONLY the brain panel.
                       Done: brain panel above + tiles below (so user sees results immediately). */}
-                  {/* 2026-09-23（CJ「在看到品牌定位卡片之上，有太多按鈕了…
-                      策略總監化為一個ICON。問用戶是否需要策略監測或健檢，
-                      若需要，才會啟動」）：策略總監／策略監測／策略健檢
-                      三個原本各自整區展開的區塊，收成一排小 icon——點了才
-                      算「使用者說需要」，對應的區塊才真的掛載。一次只開
-                      一個。 */}
-                  {(pipeline.status === "idle" || pipeline.status === "done") && (
+                  {/* 2026-09-23（CJ 三則連續指示，見 StrategyDirectorDrawer.tsx
+                      的完整脈絡）：策略總監從這裡的展開式 icon 搬成全域右上角
+                      常駐入口，這裡不再重複——策略監測／策略健檢兩個 icon
+                      留著（它們開的是這一頁本來就有的面板，全域總監只是
+                      「引導過去」）。PositioningTopRow（重新套用14步）恢復
+                      成一律顯示，不再需要先點總監 icon 才看得到。 */}
+                  {(pipeline.status === "idle" || pipeline.status === "done") && (scopeMode === "brand" || scopeMode === "event") && (
                     <div className="flex items-center gap-2 mb-1">
-                      {pipeline.status === "idle" && (
-                        <StrategyToolIcon
-                          id="strategist"
-                          active={activeStrategyTool === "strategist"}
-                          onClick={() => setActiveStrategyTool(activeStrategyTool === "strategist" ? null : "strategist")}
-                          icon={faUserTie}
-                          label={lang === "en" ? "Strategy Director" : "策略總監"}
-                        />
-                      )}
                       {scopeMode === "brand" && activeBrandIdForLocks && (
                         <StrategyToolIcon
                           id="monitor"
@@ -1878,7 +1873,7 @@ export default function BrandsPage() {
                           label={lang === "en" ? "Strategy Monitoring" : "策略監測"}
                         />
                       )}
-                      {(scopeMode === "brand" || scopeMode === "event") && activeBrandIdForLocks && (
+                      {activeBrandIdForLocks && (
                         <StrategyToolIcon
                           id="healthcheck"
                           active={activeStrategyTool === "healthcheck"}
@@ -1891,58 +1886,17 @@ export default function BrandsPage() {
                   )}
 
                   {pipeline.status === "idle" && (
-                    <>
-                      {activeStrategyTool === "strategist" && (
-                        <>
-                          {/* Persistent strategist persona bar even when idle —
-                              the workspace always feels staffed by a 4A-style
-                              strategy lead, who introduces the SoWork 品牌定位 method. */}
-                          <AgentPersonaBar
-                            persona="strategist"
-                            brandName={scopeName}
-                            mode="idle"
-                            message={
-                              scopeMode === "product"
-                                ? (lang === "en"
-                                    ? "Positioning this product — 6 steps from audience pain to a unique selling angle that powers all copy and visuals."
-                                    : "為這個產品做定位 — 6 步從族群痛點推導出獨家賣點，作為文案 / 視覺的依據。")
-                              : scopeMode === "event"
-                                ? (lang === "en"
-                                    ? "Positioning this campaign — 11 steps from background and audience to an SMP (single-minded proposition), then messaging and creative."
-                                    : "為這場活動做定位 — 11 步從背景與受眾推導出 SMP（單一核心命題），再展開訊息架構與創意。")
-                              : (lang === "en"
-                                  ? "I'll run the 14-step SoWork Brand Positioning Method to lock in who you are and who you're here for — every piece of content flows from this."
-                                  : "我會用SoWork 品牌定位法的 14 步幫你鎖定「你是誰、為誰而存在」 — 鎖定後，所有內容都會以此為基礎產出。")
-                            }
-                          />
-                          <PositioningTopRow
-                            // 2026-05-13 (CJ「按了套用活動定位框架時，出現Event not found」):
-                            // pass the scope-aware entity id, not the brand id.
-                            // When scope is event/product, server looks up
-                            // events.id = entityId — passing brandId here
-                            // mismatched and returned "not found".
-                            brandId={targetId as number | null}
-                            scopeMode={scopeMode}
-                            locked={!!tabLocks.positioning}
-                            onLockToggle={() => handleLockToggle("positioning")}
-                          />
-                          {/* 2026-09-23（CJ「要怎麼設計，可以讓策略總監可以提供
-                              用戶，用對話的方式，問策略總監有關於策略的問題？
-                              然後，策略總監也可以引導進行策略監測和健檢？」）：
-                              真的能聊的對話面板，取代原本只是靜態一句話的
-                              speech bubble。點總監建議的按鈕只是打開對應面板，
-                              不直接觸發掃描/健檢。只有品牌 scope 有 brandId
-                              可用（product/event 的策略總監對話之後再議）。 */}
-                          {scopeMode === "brand" && activeBrandIdForLocks && (
-                            <StrategyDirectorChat
-                              brandId={activeBrandIdForLocks}
-                              onOpenMonitor={() => setActiveStrategyTool("monitor")}
-                              onOpenHealthCheck={() => setActiveStrategyTool("healthcheck")}
-                            />
-                          )}
-                        </>
-                      )}
-                    </>
+                    <PositioningTopRow
+                      // 2026-05-13 (CJ「按了套用活動定位框架時，出現Event not found」):
+                      // pass the scope-aware entity id, not the brand id.
+                      // When scope is event/product, server looks up
+                      // events.id = entityId — passing brandId here
+                      // mismatched and returned "not found".
+                      brandId={targetId as number | null}
+                      scopeMode={scopeMode}
+                      locked={!!tabLocks.positioning}
+                      onLockToggle={() => handleLockToggle("positioning")}
+                    />
                   )}
 
                   {scopeMode !== "none" && pipelineSteps.length > 0 && pipeline.status !== "idle" && (
