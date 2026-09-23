@@ -48,7 +48,7 @@ import { Target as LucideTarget, Type as LucideType, Palette as LucidePalette, L
 import { SCOPE_SEGMENTS, type SegmentSpec } from "../lib/positioningSchema";
 import { pipelineFor, type PipelineStepSpec } from "../lib/positioningPipeline";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faPlus, faPalette, faFont, faQuoteLeft, faBullseye, faUsers, faImage, faIcons, faChartPie, faImages, faPenNib, faShieldHalved, faFolderOpen, faLock, faLockOpen, faBookOpen, faTableList, faBox, faRocket, faBullhorn, faWandSparkles, faGear, faStickyNote, faTrash } from "@fortawesome/free-solid-svg-icons";
+import { faPlus, faPalette, faFont, faQuoteLeft, faBullseye, faUsers, faImage, faIcons, faChartPie, faImages, faPenNib, faShieldHalved, faFolderOpen, faLock, faLockOpen, faBookOpen, faTableList, faBox, faRocket, faBullhorn, faWandSparkles, faGear, faStickyNote, faTrash, faUserTie, faSatelliteDish, faStethoscope } from "@fortawesome/free-solid-svg-icons";
 
 // Sub-nav id format:
 //   "asset:<key>"   — non-positioning brand assets (準則 / 標誌 / etc.)
@@ -120,6 +120,13 @@ export default function BrandsPage() {
   const [testPanelOpen, setTestPanelOpen] = useState(false);
   // 2026-05-08: onboarding wizard for first-time users (no brands yet).
   const [onboardingOpen, setOnboardingOpen] = useState(false);
+  // 2026-09-23（CJ「在看到品牌定位卡片之上，有太多按鈕了…策略總監化為一個
+  // ICON。問用戶是否需要策略監測或健檢，若需要，才會啟動」）：策略總監／
+  // 策略監測／策略健檢三個區塊原本一律展開、疊在卡片正上方。改成一排小
+  // icon，預設全部收起——點了才等於「使用者說需要」，才真的渲染那個區塊
+  // （不是只是視覺收合，未點開時那些元件根本不掛載）。一次只開一個，
+  // 避免點開兩三個之後又疊回原本的擁擠。
+  const [activeStrategyTool, setActiveStrategyTool] = useState<null | "strategist" | "monitor" | "healthcheck">(null);
   // 2026-05-30 (CJ「modal 移除」): ?tab= deep-links now navigate to the
   // corresponding main-workspace category instead of opening a modal.
   React.useEffect(() => {
@@ -1844,40 +1851,82 @@ export default function BrandsPage() {
                       Idle: show lock toolbar + tile grid (normal view).
                       Running / Paused: show ONLY the brain panel.
                       Done: brain panel above + tiles below (so user sees results immediately). */}
+                  {/* 2026-09-23（CJ「在看到品牌定位卡片之上，有太多按鈕了…
+                      策略總監化為一個ICON。問用戶是否需要策略監測或健檢，
+                      若需要，才會啟動」）：策略總監／策略監測／策略健檢
+                      三個原本各自整區展開的區塊，收成一排小 icon——點了才
+                      算「使用者說需要」，對應的區塊才真的掛載。一次只開
+                      一個。 */}
+                  {(pipeline.status === "idle" || pipeline.status === "done") && (
+                    <div className="flex items-center gap-2 mb-1">
+                      {pipeline.status === "idle" && (
+                        <StrategyToolIcon
+                          id="strategist"
+                          active={activeStrategyTool === "strategist"}
+                          onClick={() => setActiveStrategyTool(activeStrategyTool === "strategist" ? null : "strategist")}
+                          icon={faUserTie}
+                          label={lang === "en" ? "Strategy Director" : "策略總監"}
+                        />
+                      )}
+                      {scopeMode === "brand" && activeBrandIdForLocks && (
+                        <StrategyToolIcon
+                          id="monitor"
+                          active={activeStrategyTool === "monitor"}
+                          onClick={() => setActiveStrategyTool(activeStrategyTool === "monitor" ? null : "monitor")}
+                          icon={faSatelliteDish}
+                          label={lang === "en" ? "Strategy Monitoring" : "策略監測"}
+                        />
+                      )}
+                      {(scopeMode === "brand" || scopeMode === "event") && activeBrandIdForLocks && (
+                        <StrategyToolIcon
+                          id="healthcheck"
+                          active={activeStrategyTool === "healthcheck"}
+                          onClick={() => setActiveStrategyTool(activeStrategyTool === "healthcheck" ? null : "healthcheck")}
+                          icon={faStethoscope}
+                          label={lang === "en" ? "Strategy Health Check" : "策略健檢"}
+                        />
+                      )}
+                    </div>
+                  )}
+
                   {pipeline.status === "idle" && (
                     <>
-                      {/* Persistent strategist persona bar even when idle —
-                          the workspace always feels staffed by a 4A-style
-                          strategy lead, who introduces the SoWork 品牌定位 method. */}
-                      <AgentPersonaBar
-                        persona="strategist"
-                        brandName={scopeName}
-                        mode="idle"
-                        message={
-                          scopeMode === "product"
-                            ? (lang === "en"
-                                ? "Positioning this product — 6 steps from audience pain to a unique selling angle that powers all copy and visuals."
-                                : "為這個產品做定位 — 6 步從族群痛點推導出獨家賣點，作為文案 / 視覺的依據。")
-                          : scopeMode === "event"
-                            ? (lang === "en"
-                                ? "Positioning this campaign — 11 steps from background and audience to an SMP (single-minded proposition), then messaging and creative."
-                                : "為這場活動做定位 — 11 步從背景與受眾推導出 SMP（單一核心命題），再展開訊息架構與創意。")
-                          : (lang === "en"
-                              ? "I'll run the 14-step SoWork Brand Positioning Method to lock in who you are and who you're here for — every piece of content flows from this."
-                              : "我會用SoWork 品牌定位法的 14 步幫你鎖定「你是誰、為誰而存在」 — 鎖定後，所有內容都會以此為基礎產出。")
-                        }
-                      />
-                      <PositioningTopRow
-                        // 2026-05-13 (CJ「按了套用活動定位框架時，出現Event not found」):
-                        // pass the scope-aware entity id, not the brand id.
-                        // When scope is event/product, server looks up
-                        // events.id = entityId — passing brandId here
-                        // mismatched and returned "not found".
-                        brandId={targetId as number | null}
-                        scopeMode={scopeMode}
-                        locked={!!tabLocks.positioning}
-                        onLockToggle={() => handleLockToggle("positioning")}
-                      />
+                      {activeStrategyTool === "strategist" && (
+                        <>
+                          {/* Persistent strategist persona bar even when idle —
+                              the workspace always feels staffed by a 4A-style
+                              strategy lead, who introduces the SoWork 品牌定位 method. */}
+                          <AgentPersonaBar
+                            persona="strategist"
+                            brandName={scopeName}
+                            mode="idle"
+                            message={
+                              scopeMode === "product"
+                                ? (lang === "en"
+                                    ? "Positioning this product — 6 steps from audience pain to a unique selling angle that powers all copy and visuals."
+                                    : "為這個產品做定位 — 6 步從族群痛點推導出獨家賣點，作為文案 / 視覺的依據。")
+                              : scopeMode === "event"
+                                ? (lang === "en"
+                                    ? "Positioning this campaign — 11 steps from background and audience to an SMP (single-minded proposition), then messaging and creative."
+                                    : "為這場活動做定位 — 11 步從背景與受眾推導出 SMP（單一核心命題），再展開訊息架構與創意。")
+                              : (lang === "en"
+                                  ? "I'll run the 14-step SoWork Brand Positioning Method to lock in who you are and who you're here for — every piece of content flows from this."
+                                  : "我會用SoWork 品牌定位法的 14 步幫你鎖定「你是誰、為誰而存在」 — 鎖定後，所有內容都會以此為基礎產出。")
+                            }
+                          />
+                          <PositioningTopRow
+                            // 2026-05-13 (CJ「按了套用活動定位框架時，出現Event not found」):
+                            // pass the scope-aware entity id, not the brand id.
+                            // When scope is event/product, server looks up
+                            // events.id = entityId — passing brandId here
+                            // mismatched and returned "not found".
+                            brandId={targetId as number | null}
+                            scopeMode={scopeMode}
+                            locked={!!tabLocks.positioning}
+                            onLockToggle={() => handleLockToggle("positioning")}
+                          />
+                        </>
+                      )}
                     </>
                   )}
 
@@ -1957,12 +2006,13 @@ export default function BrandsPage() {
                           competition/differentiation ground material is
                           borrowed read-only from the parent brand. */}
                       {/* 2026-09-08 策略監測（專業方案）：品牌、產品與競爭者有變化時
-                          亮出情報，指回下面工作台的哪個錨點。放在工作台正上方，
-                          「回工作台調整」就是往下捲。 */}
-                      {scopeMode === "brand" && activeBrandIdForLocks ? (
+                          亮出情報，指回下面工作台的哪個錨點。
+                          2026-09-23：不再一律展開——只有上面的 icon row 被點開
+                          （activeStrategyTool）才掛載，見同一天的 CJ 指示。 */}
+                      {activeStrategyTool === "monitor" && scopeMode === "brand" && activeBrandIdForLocks ? (
                         <StrategyAlertsPanel brandId={activeBrandIdForLocks} />
                       ) : null}
-                      {(scopeMode === "brand" || scopeMode === "event") && activeBrandIdForLocks ? (
+                      {activeStrategyTool === "healthcheck" && (scopeMode === "brand" || scopeMode === "event") && activeBrandIdForLocks ? (
                         <StrategyWorkbench
                           brandId={activeBrandIdForLocks}
                           eventId={scopeMode === "event" ? (scope?.eventId ?? null) : null}
@@ -2942,6 +2992,37 @@ const firstTruthy = (...xs: any[]): string | null => {
 const isFilledArr = (a: any) => Array.isArray(a) && a.some((x: any) =>
   typeof x === "string" ? x.trim() : x != null,
 );
+
+/**
+ * 2026-09-23（CJ「在看到品牌定位卡片之上，有太多按鈕了…策略總監化為一個
+ * ICON。問用戶是否需要策略監測或健檢，若需要，才會啟動」）：策略總監／
+ * 策略監測／策略健檢三個區塊的統一收合入口——單色線條圖示 + 文字標籤的
+ * 小圓角按鈕，點下去才等於「使用者說需要」，對應區塊才真的掛載（不是
+ * 只是 CSS 收合，未點開時 StrategyAlertsPanel/StrategyWorkbench 的查詢
+ * 都不會發出）。active 狀態純用墨色深淺分，不上色——跟這個頁面其餘卡片
+ * 同一套紀律。
+ */
+function StrategyToolIcon({
+  active, onClick, icon, label,
+}: { id: string; active: boolean; onClick: () => void; icon: any; label: string }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={label}
+      aria-label={label}
+      aria-pressed={active}
+      className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-[12.5px] font-medium transition-colors ${
+        active
+          ? "bg-neutral-900 border-neutral-900 text-white"
+          : "bg-white border-neutral-300 text-neutral-600 hover:border-neutral-900 hover:text-neutral-900"
+      }`}
+    >
+      <FontAwesomeIcon icon={icon} style={{ fontSize: 12 }} />
+      {label}
+    </button>
+  );
+}
 
 /** Render mini list of tokens (used for arrays). */
 function TagRow({ items, max = 4 }: { items: string[]; max?: number }) {
