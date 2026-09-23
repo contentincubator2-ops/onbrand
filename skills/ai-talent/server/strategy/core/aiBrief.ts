@@ -77,6 +77,15 @@ export const LABEL_TO_FIELD: Record<string, string> = {
   "使用者感受": "product.value.userFeeling",
   "獨家賣點": "product.competition.uniqueUsp",
   "產品語氣": "product.marketing.tone",
+  // 2026-09-23（缺口稽核）：跟 brandContext.ts 產品區塊新補的標籤逐字對上。
+  "產品英文標語": "product.core.enTagline",
+  "主要情緒價值": "product.value.primaryEmotion",
+  "產品個性": "product.value.personality",
+  "次級賣點": "product.competition.rareUsp",
+  "普遍賣點": "product.competition.commonUsp",
+  "競品": "product.competition.competitors",
+  "溝通風格": "product.marketing.style",
+  "關鍵詞彙": "product.marketing.keywords",
   "產品定位文件補充": "product._sourceDocs",
   // 活動
   "活動名稱": "event.name",

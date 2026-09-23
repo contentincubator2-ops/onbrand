@@ -167,6 +167,16 @@ export const PRODUCT_PROMPT_FIELDS: PromptField[] = [
   { path: "value.userFeeling",      label: "使用者感受",   shape: "text", cost: "情緒層的文案沒有依據" },
   { path: "competition.uniqueUsp",  label: "獨家賣點",     shape: "text", cost: "差異化退回「品質好、服務佳」這種所有人都能說的話" },
   { path: "marketing.tone",         label: "產品語氣",     shape: "text", cost: "產品線的語氣差異消失，全部聽起來一樣" },
+  // 2026-09-23（缺口稽核）：跟品牌 values/belief5Layers/competition 同一批
+  // 發現——writer 一直都會產出，這個 reader 沒跟著讀。只挑高價值欄位。
+  { path: "core.enTagline",          label: "產品英文標語", shape: "text", cost: "英文／雙語產品任務會自己編一句英文主張" },
+  { path: "value.primaryEmotion",    label: "主要情緒價值", shape: "text", cost: "產品文案的情緒訴求沒有依據，只能寫功能" },
+  { path: "value.personality",       label: "產品個性",     shape: "text", cost: "產品口吻會跟品牌調性完全一樣，感受不到這支產品的個性" },
+  { path: "competition.rareUsp",     label: "次級賣點",     shape: "text", cost: "賣點只剩一條最強的，缺乏第二層論述" },
+  { path: "competition.commonUsp",   label: "普遍賣點",     shape: "text", cost: "不知道哪些賣點市場已經飽和，容易重複大家都在講的話" },
+  { path: "competition.competitors", label: "競品",         shape: "table", cost: "差異化文案不知道具體在對比誰，只能講自己好" },
+  { path: "marketing.style",         label: "溝通風格",     shape: "text", cost: "產品文案的敘事方式沒有指引，跟品牌調性混在一起" },
+  { path: "marketing.keywords",      label: "關鍵詞彙",     shape: "list", cost: "沒有指定用詞，文案容易漏掉這支產品該強調的字眼" },
 ];
 
 /** 活動：對應 EVENT_SEGMENTS 的 canonical 欄位。 */

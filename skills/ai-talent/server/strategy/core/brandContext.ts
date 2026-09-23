@@ -552,14 +552,37 @@ export async function buildBrandPrefix(
               pushFrom(lines, pp, [
                 ["core.coreStatement",       "產品核心定位", 400],
                 ["core.zhTagline",           "產品 Slogan",  100],
+                // 2026-09-23（缺口稽核 — 同一套手法再對一次產品定位）：
+                // writer（positioningSteps.ts buildProductPositioningSteps）
+                // 一直都會產出以下欄位，但這個 reader 沒跟著讀，等於白寫。
+                // 只挑高價值的（跟品牌那次一樣的判準：直接影響文案語氣/賣點
+                // 論述的才補，pricing/channel 這類純策略規劃欄位不補）。
+                ["core.enTagline",           "產品英文標語", 100],
                 ["core.oneLineValueProp",    "一句話價值主張", 200],
                 ["audience.primary",         "產品目標客群", 250],
                 ["audience.pains",           "客群痛點",     250],
                 ["value.coreFunctions",      "核心功能",     250],
+                ["value.primaryEmotion",     "主要情緒價值", 150],
+                ["value.personality",        "產品個性",     150],
                 ["value.userFeeling",        "使用者感受",   200],
                 ["competition.uniqueUsp",    "獨家賣點",     300],
+                ["competition.rareUsp",      "次級賣點",     200],
+                ["competition.commonUsp",    "普遍賣點",     200],
                 ["marketing.tone",           "產品語氣",     200],
+                ["marketing.style",          "溝通風格",     200],
+                ["marketing.keywords",       "關鍵詞彙",     200],
               ]);
+              // competitors 是 tableRows（[{name,position}]），pushFrom 對物件
+              // 陣列沒有安全的單行寫法，手動摘要——跟品牌 competition.direct
+              // 同一招。
+              if (pp?.competition?.competitors && Array.isArray(pp.competition.competitors)) {
+                const comps = pp.competition.competitors
+                  .filter((c: any) => c?.name)
+                  .slice(0, 3)
+                  .map((c: any) => (c.position ? `${c.name}（${String(c.position).slice(0, 40)}）` : c.name))
+                  .join("、");
+                if (comps) lines.push(`【競品】${comps.slice(0, 250)}`);
+              }
               pushSourceDoc(lines, pp, "產品定位文件補充");
               pushCustomSegments(lines, pp);
             }
