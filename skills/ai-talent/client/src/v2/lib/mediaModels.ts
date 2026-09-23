@@ -13,12 +13,8 @@
  *   "retired" — adapter still wired server-side (old rows keep resolving)
  *               but the picker must never offer it again
  *
- * 2026-09-21 (CJ「生圖，正式環境的生圖，都採用 gpt image 2」): the image
- * picker offers openai/gpt-image-2 and nothing else. The other image adapters
- * stay wired in mediaGen's dispatch — Flux Schnell is still the server-side
- * reliability fallback, Nano Banana the product-subject one, and variants that
- * stored an older model id must keep rendering. They are simply no longer
- * offered as a choice. Video models are untouched.
+ * GPT Image 2 is the default; Nano Banana is an explicit user choice.
+ * Retired adapters and video models remain unchanged.
  */
 
 export type MediaKind = "image" | "video";
@@ -78,11 +74,11 @@ export const IMAGE_MODELS: MediaModel[] = [
     // places it into the prompted scene while preserving the product
     // (quality bar = Photoroom Product Staging / imagine.art).
     id: "google/nano-banana",
-    name: "Nano Banana（產品保真）",
+    name: "Nano Banana",
     vendor: "Google",
     provider: "google-gemini",
     kind: "image",
-    status: "retired", // 2026-09-21: picker offers gpt-image-2 only (adapter stays wired)
+    status: "ready", // Explicit user-selected alternative; never automatic
     strengths: "真實產品置入最強 — 保留產品原貌與標籤，光影自然融合場景；也可純文字生圖",
     costEstimateUsd: 0.04,
     durationSecEstimate: 15,

@@ -38,6 +38,8 @@ import {
 } from "lucide-react";
 import { trpc } from "../../lib/trpc";
 import { showToastGlobal } from "../../components/ui/Toast";
+import { ImageRetryActions } from "../components/media/ImageRetryActions";
+import { failedImageSlots, type RetryImageModel } from "../lib/imageRetry";
 import { PlatformMockup } from "../components/PlatformMockup";
 import type { MockupVariant } from "../lib/inferMockup";
 import { getStrategyPresentationMockup } from "../lib/strategyPresentation";
@@ -133,6 +135,7 @@ interface VariantData {
   imageFallbackUsed?: boolean;
   imageUrl?: string | null;
   imageStatus?: string;
+  imageErrorMsg?: string;
   // 2026-07-29 Tier-1 TikTok 影片卡 — 非影片任務一律 undefined
   videoUrl?: string | null;
   videoStatus?: string;
@@ -179,6 +182,7 @@ function normalizeVariantData(v: any): VariantData {
     hashtags: v?.hashtags ?? [],
     imageUrl: v?.imageUrl ?? img.url ?? null,
     imageStatus: v?.imageStatus ?? img.status ?? undefined,
+    imageErrorMsg: v?.imageErrorMsg ?? img.errorMsg ?? undefined,
     imageStyle: v?.imageStyle ?? img.style ?? undefined,
     imagePrompt: v?.imagePrompt ?? img.prompt ?? undefined,
     imagePromptZh: v?.imagePromptZh ?? img.promptZh ?? undefined,
@@ -544,7 +548,7 @@ export default function RunPage() {
   /** P4: human-editable image instruction — prefers the Chinese counterpart
    *  and falls back through model prompt → art direction → local template. */
   const [imagePrompt, setImagePrompt] = useState<string>("");
-  const imageMutationTargetRef = useRef<{ locator: RunContentMutationLocator; promptZh: string } | null>(null);
+  const imageMutationTargetRef = useRef<{ locator: RunContentMutationLocator; promptZh: string; outputId: number; cardIndex?: number } | null>(null);
   /** 2026-07-07 (CJ): user-editable thumbnail title text overlaid on the (now
    *  text-free) AI thumbnail. Seeded from the variant title/caption, editable
    *  in the right panel; passed to the YT mockup as overlayTitle. */
@@ -556,6 +560,9 @@ export default function RunPage() {
    *  now the only option in RUN_IMAGE_MODEL_OPTIONS, so this is also the only
    *  value the dropdown can hold. */
   const [imageModel, setImageModel] = useState<string>("gpt-image-2");
+  const [imageFailure, setImageFailure] = useState<{
+    outputId: number; selectionKey: string; prompt: string; cardIndex?: number; canSwitch: boolean;
+  } | null>(null);
   /** Video gen state — async job, polled for status. */
   const [videoDuration, setVideoDuration] = useState<number>(30);
   const [videoJobId, setVideoJobId] = useState<number | null>(null);
@@ -1021,6 +1028,16 @@ export default function RunPage() {
   const imageGenMut = (trpc as any).image?.generate?.useMutation
     ? (trpc as any).image.generate.useMutation({
         onSuccess: async (r: any) => {
+          if (r?.status === "failed") {
+            const target = imageMutationTargetRef.current;
+            if (target) setImageFailure({
+              outputId: target.outputId, selectionKey: getMutationLocatorSelectionKey(target.locator),
+              prompt: target.promptZh, cardIndex: target.cardIndex,
+              canSwitch: r.canSwitchTo === "nano-banana",
+            });
+            imageMutationTargetRef.current = null;
+            return;
+          }
           // 2026-05-10: image.generate returns either {url} (Flux/Leonardo) or
           // {b64} (OpenAI gpt-image-1). Normalize to a usable image source —
           // for b64 we wrap as data: URL so <img> tag renders directly.
@@ -1036,8 +1053,9 @@ export default function RunPage() {
             }
             try {
               await updateImageMut.mutateAsync({
-                id,
+                id: target.outputId,
                 ...target.locator,
+                cardIndex: target.cardIndex,
                 imageUrl: imageSrc,
                 prompt: r?.effectivePrompt ?? target.promptZh,
                 promptZh: r?.normalizedDisplayPrompt ?? target.promptZh,
@@ -1051,6 +1069,7 @@ export default function RunPage() {
               return;
             }
             imageMutationTargetRef.current = null;
+            setImageFailure(null);
             const actualModel = String(r?.model ?? "").trim();
             const requestedModel = String(r?.requestedModel ?? "").trim();
             const modelNote = actualModel
@@ -1062,6 +1081,7 @@ export default function RunPage() {
               : "";
             showToastGlobal(lang === "en" ? `Image ready ✓${modelNote}` : `已產圖 ✓${modelNote}`);
           } else {
+            imageMutationTargetRef.current = null;
             // 2026-05-12: server should TRPCError on failure now; this branch
             // only reaches if a provider returned success-shaped but empty
             // data. Include any returned errorMsg if present.
@@ -1877,6 +1897,38 @@ export default function RunPage() {
   if (!id || isNaN(id)) {
     return <div className="p-12 text-center text-default-500">{lang === "en" ? "Invalid run ID" : "無效的 run ID"}</div>;
   }
+  const startImageGen = (model: RetryImageModel, prompt: string, cardIndex?: number, recovering = false) => {
+    if (imageGenMut.isPending || imageMutationTargetRef.current || !prompt.trim()) return;
+    if (!data?.brand?.id) return;
+    const scopedProductId = recovering ? (data as any).product?.id : undefined;
+    const reference = realProductMode ? validRunProduct
+      : scopedProductId ? runProductImages.find(p => p.productId === scopedProductId) : undefined;
+    if ((useRealProduct || scopedProductId) && !reference) {
+      manualImageRef.current = true;
+      setMode("image");
+      showToastGlobal(lang === "en" ? "Select a valid product photo before retrying" : "請先選擇有效的產品圖，再重試產圖");
+      return;
+    }
+    setImageModel(model);
+    setImageFailure(null);
+    imageMutationTargetRef.current = {
+      locator: getRunContentMutationLocator(selectedContentKind, activeIdx),
+      promptZh: prompt, outputId: id, cardIndex,
+    };
+    imageGenMut.mutate({
+      brandId: data.brand.id, prompt, modelChoice: model,
+      channel: (
+        mockupVariant?.platform === "facebook" ? "fb" :
+        mockupVariant?.platform === "instagram" ? "ig" :
+        mockupVariant?.platform === "linkedin" ? "linkedin" :
+        mockupVariant?.platform === "youtube" ? "youtube" :
+        mockupVariant?.platform === "tiktok" ? "tiktok" : "fb"
+      ) as any,
+      size: getIgPublicVariantImageSize(selectedContentKind, variants[activeIdx]?.format),
+      ...(reference ? { subjectImageUrl: reference.imageUrl } : {}),
+    });
+  };
+
   if (isLoading) {
     return <div className="p-12 flex justify-center"><Spinner size="lg" /></div>;
   }
@@ -2268,6 +2320,24 @@ export default function RunPage() {
                   : () => { manualImageRef.current = true; setMode("image"); }}
                 componentSlot={componentSlot}
               />
+              {!isStrategyPlanning && (() => {
+                const failure = imageFailure?.outputId === id && imageFailure.selectionKey === activeSelectionKey ? imageFailure : null;
+                const slots = failedImageSlots(slide).filter(slot => !failure || slot.cardIndex !== failure.cardIndex);
+                return <div className="mx-4 mt-3 space-y-2">
+                  {failure && <ImageRetryActions en={lang === "en"}
+                    disabled={imageGenMut.isPending || !data.brand?.id || missingRealProductSelection}
+                    canSwitch={failure.canSwitch}
+                    label={lang === "en" ? "Image generation failed. Choose a model to retry." : "圖片生成失敗，請選擇模型重試。"}
+                    onRetry={model => startImageGen(model, failure.prompt, failure.cardIndex, true)} />}
+                  {slots.map(slot => <ImageRetryActions key={slot.cardIndex ?? "cover"} en={lang === "en"}
+                    disabled={imageGenMut.isPending || !data.brand?.id || !slot.prompt || missingRealProductSelection}
+                    label={slot.cardIndex == null
+                      ? (lang === "en" ? "The cover image was not generated." : "主圖尚未生成成功。")
+                      : (lang === "en" ? `Image ${slot.cardIndex + 1} failed.` : `第 ${slot.cardIndex + 1} 張圖片生成失敗。`)}
+                    onRetry={model => startImageGen(model, slot.prompt, slot.cardIndex, true)} />)}
+                </div>;
+              })()}
+
               </>
               ) : null;
             })()}
@@ -3057,14 +3127,14 @@ export default function RunPage() {
                   )}
                   <div className="bg-secondary-50 border border-secondary-200 rounded-lg p-2 text-[11px] text-secondary-700 mt-2">
                     {lang === "en"
-                      ? "Step 3: Model — production image gen runs on GPT Image 2"
-                      : "Step 3：模型 — 正式環境的生圖一律使用 GPT Image 2"}
+                      ? "Step 3: Model — GPT Image 2 by default; Nano Banana if you choose"
+                      : "Step 3：模型 — 預設 GPT Image 2，也可自行選擇 Nano Banana"}
                   </div>
                   <label className="block text-tiny text-default-600 -mb-1">{lang === "en" ? "AI model" : "AI 模型"}</label>
                   <select
                     value={imageModel}
                     onChange={(e) => setImageModel(e.target.value)}
-                    disabled={realProductMode}
+                    disabled={imageGenMut.isPending}
                     className="w-full text-xs border border-default-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:border-secondary disabled:opacity-50"
                   >
                     {RUN_IMAGE_MODEL_OPTIONS.map((option) => (
@@ -3095,47 +3165,7 @@ export default function RunPage() {
                     color="secondary" fullWidth
                     isLoading={imageGenMut.isPending}
                     isDisabled={imageGenMut.isPending || !imagePrompt.trim() || !data.brand?.id || missingRealProductSelection}
-                    onPress={() => {
-                      if (!data.brand?.id) {
-                        showToastGlobal(
-                          lang === "en"
-                            ? "This run isn't linked to a brand, can't generate"
-                            : "此 run 沒有綁定品牌，無法產圖"
-                        );
-                        return;
-                      }
-                      if (useRealProduct && !validRunProduct) {
-                        showToastGlobal(
-                          lang === "en"
-                            ? "Select a product photo from this brand before generating"
-                            : "請先從目前品牌選擇有效的產品圖，再進行產圖"
-                        );
-                        return;
-                      }
-                      imageMutationTargetRef.current = {
-                        locator: getRunContentMutationLocator(selectedContentKind, activeIdx),
-                        promptZh: imagePrompt,
-                      };
-                      imageGenMut.mutate({
-                        brandId: data.brand.id,
-                        prompt: imagePrompt,
-                        // image.generate expects short codes: fb / ig / linkedin / youtube / tiktok / threads / line / email / press
-                        channel: (
-                          mockupVariant?.platform === "facebook"  ? "fb" :
-                          mockupVariant?.platform === "instagram" ? "ig" :
-                          mockupVariant?.platform === "linkedin"  ? "linkedin" :
-                          mockupVariant?.platform === "youtube"   ? "youtube" :
-                          mockupVariant?.platform === "tiktok"    ? "tiktok" :
-                          "fb"
-                        ) as any,
-                        modelChoice: imageModel as any,
-                        size: getIgPublicVariantImageSize(selectedContentKind, variants[activeIdx]?.format),
-                        // TODO: send productId and resolve the brand-owned image
-                        // server-side. This hotfix intentionally closes the gap
-                        // with current-brand client validation only.
-                        ...(realProductMode ? { subjectImageUrl: validRunProduct!.imageUrl } : {}),
-                      });
-                    }}
+                    onPress={() => startImageGen(imageModel as RetryImageModel, imagePrompt)}
                   >
                     {imageGenMut.isPending
                       ? (lang === "en" ? "Generating… (~15-30s)" : "產圖中…（約 15–30 秒）")

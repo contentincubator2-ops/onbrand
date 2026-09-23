@@ -20,6 +20,7 @@ export function imageActionForRequest(input: {
   // mode runs gpt-image-2 /images/edits now, not Nano Banana. Pre-authorizing
   // the old image_imagen tier (50) would under-charge a 100-point generation —
   // imageRefundAmount never bills the difference upward, it only refunds.
+  if (input.modelChoice === "nano-banana") return "image_imagen";
   if (input.subjectImageUrl) return "image_gpt";
   if (input.modelChoice === "flux-schnell" || input.modelChoice === "flux-realism") return "image_flux";
   if (input.modelChoice === "imagen-3") return "image_imagen";

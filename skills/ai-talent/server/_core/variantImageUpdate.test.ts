@@ -58,3 +58,25 @@ describe("applyVariantImageUpdate", () => {
     expect(result.imagePrompt).toBe("legacy model prompt");
   });
 });
+
+
+describe("repairing an individual carousel/storyboard image", () => {
+  it("updates only the selected frame and clears its old failure", () => {
+    const original = { image: { url: "/static/cover.png", status: "ready" }, cards: [
+      { headline: "Keep", image: { url: "/static/first.png", status: "ready" } },
+      { headline: "Repair", image: { url: null, status: "failed", errorMsg: "timeout", canSwitchTo: "nano-banana" } },
+    ] };
+    const result = applyVariantImageUpdate(original, { cardIndex: 1, imageUrl: "/static/fixed.png", modelId: "nano-banana" });
+    expect(result.image).toEqual(original.image);
+    expect(result.cards[0]).toEqual(original.cards[0]);
+    expect(result.cards[1].image).toMatchObject({ url: "/static/fixed.png", status: "ready", modelId: "nano-banana" });
+    expect(result.cards[1].image.errorMsg).toBeUndefined();
+    expect(result.cards[1].image.canSwitchTo).toBeUndefined();
+    expect(original.cards[1].image.status).toBe("failed");
+  });
+  it("rejects an invalid frame instead of overwriting the cover", () => {
+    for (const cardIndex of [-1, 0, 2, 0.5]) {
+      expect(() => applyVariantImageUpdate({ cards: [] }, { cardIndex, imageUrl: "/static/a.png" })).toThrow("Image card not found");
+    }
+  });
+});

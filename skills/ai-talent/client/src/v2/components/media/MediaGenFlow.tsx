@@ -82,7 +82,7 @@ export default function MediaGenFlow({
   const [promptEn, setPromptEn]     = React.useState("");
   const [summaryZh, setSummaryZh]   = React.useState("");
   const [pickedModel, setPickedModel] = React.useState<MediaModel | null>(null);
-  const [genResult, setGenResult]     = React.useState<{ ok: boolean; message?: string; url?: string } | null>(null);
+  const [genResult, setGenResult]     = React.useState<{ ok: boolean; message?: string; url?: string; canSwitchTo?: "nano-banana" } | null>(null);
 
   // 2026-07-25 (CJ product-faithful gen「📦 使用真實產品圖」): brands with
   // real product photos (IRIS/Iris Girls seeded from 91APP) can composite
@@ -180,10 +180,8 @@ export default function MediaGenFlow({
     }
     setBusy(true); setErr(null);
     try {
-      // Product mode routes to the subject-reference surface regardless of the
-      // picked card, with the real photo attached. 2026-09-21: that is
-      // gpt-image-2 /images/edits now, not Nano Banana.
-      const effectiveModelId = productMode ? "openai/gpt-image-2" : m.id;
+      // Keep the chosen model even with a product reference. No silent fallback.
+      const effectiveModelId = m.id;
       const res: any = await generateMutation.mutateAsync({
         kind, modelId: effectiveModelId, promptEn, brandId,
         ...(productMode ? { imageUrl: pickedProduct!.imageUrl, subjectMode: "product" as const } : {}),
@@ -192,6 +190,7 @@ export default function MediaGenFlow({
         ok: !!res?.ok,
         message: res?.message ?? (res?.ok ? (lang === "en" ? "Generated" : "生成完成") : (lang === "en" ? "Phase 2 will wire this provider" : "Phase 2 將接入此 provider")),
         url: res?.url,
+        canSwitchTo: res?.canSwitchTo,
       });
       // Notify the squad-runner so it can attach the URL to the active step.
       if (res?.ok && res?.url && onComplete) {
@@ -505,7 +504,7 @@ function ModelPhase({
   promptEn: string;
   pickedModel: MediaModel | null;
   onPick: (m: MediaModel) => void;
-  genResult: { ok: boolean; message?: string; url?: string } | null;
+  genResult: { ok: boolean; message?: string; url?: string; canSwitchTo?: "nano-banana" } | null;
   busy: boolean;
 }) {
   const { lang } = useLang();
@@ -559,6 +558,12 @@ function ModelPhase({
               {genResult.ok ? <FontAwesomeIcon icon={faCheck} className="text-success mr-2" /> : null}
               {typeof genResult.message === "string" ? genResult.message : ""}
             </p>
+            {!genResult.ok && genResult.canSwitchTo === "nano-banana" && (
+              <Button isDisabled={busy} onPress={() => {
+                const nano = models.find(m => m.id === "google/nano-banana");
+                if (nano) onPick(nano);
+              }}>{lang === "en" ? "Use Nano Banana" : "改用 Nano Banana"}</Button>
+            )}
             {genResult.url && (
               <a href={genResult.url} target="_blank" rel="noopener noreferrer" className="text-tiny text-primary truncate">
                 {genResult.url}
