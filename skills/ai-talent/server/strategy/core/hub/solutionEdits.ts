@@ -97,12 +97,37 @@ export async function ensureSolutionEditTables(): Promise<void> {
 
 // ── 核准權限 ─────────────────────────────────────────────────────────────
 
-export async function listApprovers(orgId: number): Promise<Array<{ id: number; email: string; addedBy: string | null }>> {
+export interface Approver {
+  id: number;
+  email: string;
+  addedBy: string | null;
+  /**
+   * 這個 email 在系統裡有沒有帳號。
+   *
+   * 2026-09-23 加的，因為名單是純文字比對：打錯一個字母，那一列看起來好好的，
+   * 但那個人永遠登不進來、也就永遠核准不了任何東西。而且名單只要非空就會把
+   * 平台管理員擋在外面——一個打錯的 email 可以讓整個組織沒有人能核准。
+   * 這件事必須在畫面上看得到，不能等到有人按不下核准才發現。
+   */
+  hasLogin: boolean;
+}
+
+export async function listApprovers(orgId: number): Promise<Approver[]> {
   const [rows]: any = await localPool.execute(
     `SELECT id, email, added_by FROM hub_approvers WHERE org_id = ? ORDER BY email`,
     [orgId],
   );
-  return (rows as any[]).map((r) => ({ id: r.id, email: r.email, addedBy: r.added_by ?? null }));
+  const list = (rows as any[]).map((r) => ({ id: r.id, email: r.email, addedBy: r.added_by ?? null }));
+  if (!list.length) return [];
+
+  // 分開查而不是 LEFT JOIN LOWER(u.email)：欄位是 utf8mb4_unicode_ci（不分大小寫），
+  // 所以 IN 直接命中 email 的索引；包一層 LOWER() 反而會讓索引用不到。
+  const [users]: any = await localPool.execute(
+    `SELECT email FROM users WHERE email IN (${list.map(() => "?").join(", ")})`,
+    list.map((a) => a.email),
+  );
+  const known = new Set((users as any[]).map((u) => String(u.email).trim().toLowerCase()));
+  return list.map((a) => ({ ...a, hasLogin: known.has(a.email) }));
 }
 
 export async function addApprover(orgId: number, email: string, addedBy: string): Promise<void> {

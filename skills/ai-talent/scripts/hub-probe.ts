@@ -310,6 +310,42 @@ async function main() {
       check(!strangerCan, "a non-approver cannot approve", `stranger=${strangerCan}`);
     }
 
+    // 2026-09-23 (CJ「做核准人名單的管理 UI」)。
+    //
+    // 那個 modal 上寫了三句警告，每一句都是對後端行為的斷言。文案寫得再清楚，
+    // 如果行為其實不是那樣，就是把使用者騙進一個錯誤的心智模型。所以這裡真的
+    // 加一個人進去量，量完拿掉。
+    //
+    // 只在名單本來就是空的時候跑 —— 不去動展場現場真的設好的設定。
+    if (approvers.length === 0) {
+      const ghost = `probe-ghost-${Date.now()}@example.invalid`;
+      try {
+        await m.addApprover(org.id, ghost, "hub-probe");
+        const after = await m.listApprovers(org.id);
+        const row = after.find((a) => a.email === ghost);
+
+        // 警告三：email 打錯的那一列要看得出來沒有帳號。
+        check(row != null && row.hasLogin === false, "an address with no account is flagged", `hasLogin=${row?.hasLogin}`);
+
+        // 警告一：名單一有人，平台管理員就不再能核准 —— modal 上那句
+        //「會把核准權從所有平台管理員手上拿走」講的就是這個。
+        const adminNow = await m.canApprove(org.id, "nobody@example.com", true);
+        check(!adminNow, "one entry takes approval away from platform admins", `admin=${adminNow}`);
+
+        // 而名單上的人可以（大小寫不影響）。
+        const ghostCan = await m.canApprove(org.id, ghost.toUpperCase(), false);
+        check(ghostCan, "someone on the list can approve, case-insensitively", `listed=${ghostCan}`);
+      } finally {
+        const after = await m.listApprovers(org.id);
+        for (const a of after.filter((x) => x.email.startsWith("probe-ghost-"))) {
+          await m.removeApprover(org.id, a.id);
+        }
+      }
+      const restored = await m.listApprovers(org.id);
+      check(restored.length === 0, "probe left the approver list as it found it", `${restored.length} rows`);
+      check(await m.canApprove(org.id, "nobody@example.com", true), "removing the last entry hands approval back to admins", "admin=true");
+    }
+
     // diff 是審核的人唯一看得到的東西，算錯就是審了個假的差異。
     const noChange = m.diffFields({ name_en: "A", summary_en: "B" }, { name_en: "  A  " });
     check(noChange.length === 0, "whitespace-only edit is not a change", `${noChange.length}`);

@@ -142,6 +142,9 @@ const adminRouter = router({
     return {
       me: email,
       canApprove: await m.canApprove(org.id, email, u?.role === "admin"),
+      // 只有平台管理員能改核准名單。前端要據此決定顯示表單還是唯讀清單——
+      // 後端照樣會擋（setApprover 自己有檢查），這只是不要給看得到卻按不動的按鈕。
+      isPlatformAdmin: u?.role === "admin",
       approvers: await m.listApprovers(org.id),
       history: await m.listEdits(org.id, undefined, 60),
     };

@@ -21,6 +21,7 @@ import { ExtLink, categoryLabel, priceLabel, type Solution } from "./strat-share
 import { useT } from "../lang";
 import { trpc } from "../../../lib/trpc";
 import { CreateSolutionModal, EditLog, EditSolutionModal, PendingPanel } from "./strat-product-edit";
+import { ApproverButton } from "./strat-approvers";
 import { ProfileView, type SolutionProfile } from "./product-profile";
 
 /** 這個方案最低的那個有數字的核准價，沒有就回 null。 */
@@ -64,6 +65,16 @@ export default function StratProductCards({ solutions, onChanged }: { solutions:
           <span className="text-[11.5px] text-stone-400">
             {t("You can edit, but not approve.", "你可以編輯，但不能核准。")}
           </span>
+        ) : null}
+        {/* 核准名單放在「N 筆等待核准」旁邊，因為那是唯一會讓人想問「那誰能核准」
+            的地方。名單本身是組織層級的設定，不屬於任何一張產品卡。 */}
+        {editing.data ? (
+          <ApproverButton
+            approvers={editing.data.approvers}
+            isPlatformAdmin={Boolean(editing.data.isPlatformAdmin)}
+            me={editing.data.me}
+            onChanged={refresh}
+          />
         ) : null}
       </div>
 
