@@ -2,4 +2,4 @@ ExpertHub demo probe trigger.
 Edit this file and push to release/experthub-demo to run it.
 Add --generate on the line below to also write one real post through the LLM.
 
-run 32: 2026-09-24 --generate (push queue, after fixing the client typecheck gap)
+run 33: 2026-09-24 --generate (WhatsApp BSUID support)

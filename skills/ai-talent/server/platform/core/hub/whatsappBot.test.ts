@@ -9,6 +9,10 @@ import {
   toWhatsAppMessages,
   verifySubscription,
   verifyWhatsAppSignature,
+  recipientFields,
+  isBsuid,
+  bsuidCountry,
+  parseIdentityChanges,
 } from "./whatsappBot";
 import { createHmac } from "node:crypto";
 
@@ -215,5 +219,149 @@ describe("verifySubscription", () => {
     expect(verifySubscription({ "hub.mode": "unsubscribe", "hub.verify_token": "tok", "hub.challenge": "1234" })).toBeNull();
     vi.stubEnv("WHATSAPP_VERIFY_TOKEN", "");
     expect(verifySubscription({ "hub.mode": "subscribe", "hub.verify_token": "", "hub.challenge": "1234" })).toBeNull();
+  });
+});
+
+// ── BSUID（Meta 2026-09-24 文件）────────────────────────────────────────────
+//
+// 這一組全部圍繞同一件事：**電話號碼可能不存在。** 使用者啟用 username 之後，
+// webhook 裡只保證有 BSUID。整合如果以電話號碼為主鍵，那些人的訊息就處理不了，
+// 而文件明說沒有補救措施。
+
+describe("recipientFields", () => {
+  it("sends a phone number as `to`", () => {
+    expect(recipientFields({ phone: "16505551234" })).toEqual({ to: "16505551234" });
+  });
+
+  it("sends a BSUID as `recipient`", () => {
+    expect(recipientFields({ bsuid: "US.13491208655302741918" })).toEqual({
+      recipient: "US.13491208655302741918",
+    });
+  });
+
+  // 兩個都帶是刻意的：帶了電話號碼才會繼續在 webhook 裡收到電話號碼。
+  it("sends both when both are known", () => {
+    expect(recipientFields({ phone: "16505551234", bsuid: "US.134912086553027419" })).toEqual({
+      to: "16505551234",
+      recipient: "US.134912086553027419",
+    });
+  });
+
+  it("refuses to build a request with no recipient at all", () => {
+    expect(() => recipientFields({})).toThrow(/phone number or a BSUID/);
+    expect(() => recipientFields({ phone: null, bsuid: null })).toThrow();
+  });
+
+  it("still accepts a bare phone string, so existing callers keep working", () => {
+    expect(recipientFields("16505551234")).toEqual({ to: "16505551234" });
+  });
+});
+
+describe("isBsuid / bsuidCountry", () => {
+  it("accepts the documented shapes", () => {
+    expect(isBsuid("US.13491208655302741918")).toBe(true);
+    expect(isBsuid("TW.ENT.11815799212886844830")).toBe(true);
+  });
+
+  it("rejects things that are not BSUIDs", () => {
+    expect(isBsuid("16505551234")).toBe(false);      // 電話號碼
+    expect(isBsuid("us.123")).toBe(false);           // 國碼要大寫
+    expect(isBsuid("USA.123")).toBe(false);          // 兩碼
+    expect(isBsuid("US.")).toBe(false);              // 沒有識別碼
+    expect(isBsuid(undefined)).toBe(false);
+  });
+
+  it("reads the country code, which is the only locale hint when there is no phone number", () => {
+    expect(bsuidCountry("TW.13491208655302741918")).toBe("TW");
+    expect(bsuidCountry("US.ENT.118157992128868")).toBe("US");
+    expect(bsuidCountry("16505551234")).toBeNull();
+  });
+});
+
+describe("parseInbound with usernames", () => {
+  const wrap = (value: any) => ({ entry: [{ changes: [{ value, field: "messages" }] }] });
+
+  it("reads a message from someone whose phone number is not in the payload", () => {
+    const [msg] = parseInbound(wrap({
+      contacts: [{
+        profile: { name: "Sheena Nelson", username: "realsheenanelson" },
+        user_id: "US.13491208655302741918",
+      }],
+      messages: [{
+        from_user_id: "US.13491208655302741918",
+        id: "wamid.X", timestamp: "1749416383",
+        type: "text", text: { body: "Does it come in another color?" },
+      }],
+    }));
+    expect(msg.from).toBeNull();
+    expect(msg.userId).toBe("US.13491208655302741918");
+    expect(msg.username).toBe("realsheenanelson");
+    // 名字要對得上 —— 用 BSUID 比對聯絡人，不是電話號碼。
+    expect(msg.name).toBe("Sheena Nelson");
+    expect(msg.text).toBe("Does it come in another color?");
+  });
+
+  it("still reads a message that does carry a phone number", () => {
+    const [msg] = parseInbound(wrap({
+      contacts: [{ profile: { name: "Pablo" }, wa_id: "16505551234", user_id: "US.abc123" }],
+      messages: [{
+        from: "16505551234", from_user_id: "US.abc123",
+        id: "wamid.Y", timestamp: "1749416383", type: "text", text: { body: "hi" },
+      }],
+    }));
+    expect(msg.from).toBe("16505551234");
+    expect(msg.userId).toBe("US.abc123");
+    expect(msg.name).toBe("Pablo");
+    expect(msg.username).toBeNull();
+  });
+
+  it("picks up a parent BSUID when the portfolio has them enabled", () => {
+    const [msg] = parseInbound(wrap({
+      contacts: [{ profile: { name: "P" }, user_id: "US.abc", parent_user_id: "US.ENT.xyz" }],
+      messages: [{
+        from_user_id: "US.abc", from_parent_user_id: "US.ENT.xyz",
+        id: "wamid.Z", timestamp: "1", type: "text", text: { body: "hi" },
+      }],
+    }));
+    expect(msg.parentUserId).toBe("US.ENT.xyz");
+  });
+});
+
+describe("parseIdentityChanges", () => {
+  // 沒有處理的話，換過號碼的人會安靜地變成聯絡不到。
+  it("reads a user_id_update webhook", () => {
+    const [c] = parseIdentityChanges({
+      entry: [{ changes: [{ field: "user_id_update", value: {
+        user_id_update: [{
+          detail: "User id for X has been updated.",
+          user_id: { previous: "US.old", current: "US.new" },
+          parent_user_id: { previous: "US.ENT.old", current: "US.ENT.new" },
+        }],
+      } }] }],
+    });
+    expect(c).toEqual({
+      previous: "US.old", current: "US.new",
+      parentPrevious: "US.ENT.old", parentCurrent: "US.ENT.new",
+    });
+  });
+
+  it("reads the system message form too", () => {
+    const [c] = parseIdentityChanges({
+      entry: [{ changes: [{ field: "messages", value: {
+        messages: [{
+          type: "system", id: "wamid.S", timestamp: "1",
+          system: { body: "User Pablo changed from US.old to US.new", type: "user_changed_user_id", user_id: "US.new" },
+        }],
+      } }] }],
+    });
+    expect(c.current).toBe("US.new");
+    // 舊值只存在於一句自由文字裡。不從那裡挖 —— 挖錯會改到別人的綁定。
+    expect(c.previous).toBeNull();
+  });
+
+  it("ignores ordinary messages", () => {
+    expect(parseIdentityChanges({
+      entry: [{ changes: [{ value: { messages: [{ type: "text", text: { body: "hi" } }] } }] }],
+    })).toEqual([]);
   });
 });

@@ -55,15 +55,15 @@ function replyButton(a: Extract<BotAction, { kind: "postback" }>) {
 }
 
 /** 一則純文字，必要時附上網址行。 */
-function textMessage(to: string, body: string, extraLines: string[] = []) {
+function textMessage(to: Record<string, string>, body: string, extraLines: string[] = []) {
   const full = [body, ...extraLines].filter(Boolean).join("\n");
-  return { messaging_product: "whatsapp", to, type: "text", text: { preview_url: true, body: clip(full, LIMIT.text) } };
+  return { messaging_product: "whatsapp", ...to, type: "text", text: { preview_url: true, body: clip(full, LIMIT.text) } };
 }
 
-function buttonMessage(to: string, body: string, buttons: Array<Extract<BotAction, { kind: "postback" }>>, header?: string, footer?: string) {
+function buttonMessage(to: Record<string, string>, body: string, buttons: Array<Extract<BotAction, { kind: "postback" }>>, header?: string, footer?: string) {
   return {
     messaging_product: "whatsapp",
-    to,
+    ...to,
     type: "interactive",
     interactive: {
       type: "button",
@@ -76,14 +76,14 @@ function buttonMessage(to: string, body: string, buttons: Array<Extract<BotActio
 }
 
 function listMessage(
-  to: string,
+  to: Record<string, string>,
   body: string,
   rows: Array<{ id: string; title: string; description?: string }>,
   opts: { header?: string; footer?: string; buttonLabel: string },
 ) {
   return {
     messaging_product: "whatsapp",
-    to,
+    ...to,
     type: "interactive",
     interactive: {
       type: "list",
@@ -104,10 +104,10 @@ function listMessage(
   };
 }
 
-function ctaMessage(to: string, body: string, action: Extract<BotAction, { kind: "uri" }>, header?: string) {
+function ctaMessage(to: Record<string, string>, body: string, action: Extract<BotAction, { kind: "uri" }>, header?: string) {
   return {
     messaging_product: "whatsapp",
-    to,
+    ...to,
     type: "interactive",
     interactive: {
       type: "cta_url",
@@ -126,7 +126,7 @@ function cardBody(card: BotCard): string {
 }
 
 /** 一張卡片 → 一則 WhatsApp 訊息。挑哪一種型別全看按鈕長什麼樣。 */
-function renderCard(to: string, card: BotCard, listButtonLabel: string) {
+function renderCard(to: Record<string, string>, card: BotCard, listButtonLabel: string) {
   const postbacks = card.buttons.filter(isPostback);
   const uris = card.buttons.filter(isUri);
   const body = cardBody(card) || card.title;
@@ -155,11 +155,63 @@ function renderCard(to: string, card: BotCard, listButtonLabel: string) {
  * BotMessage[] → Cloud API payload[]。一則進、一則出，順序不變，所以
  * handleMenu / handleText 完全不必知道自己在哪個通道上。
  */
+/**
+ * 收件人。**電話號碼是可選的。**
+ *
+ * 2026-09-24（Meta 的 BSUID 文件）：使用者一旦啟用 username，他的電話號碼就
+ * 不會出現在 webhook 裡。永遠會有的是 BSUID（`user_id`）。所以整個整合的主鍵
+ * 必須是 BSUID，電話號碼只是「有的話比較方便」的附加資料。
+ *
+ * 送訊息時兩個都可以帶，**電話號碼優先**（文件明講）。我們兩個都帶，因為
+ * 帶了電話號碼才會繼續在 webhook 裡收到電話號碼（30 天回看條件）。
+ */
+export interface WhatsAppRecipient {
+  /** 電話號碼。可能沒有。 */
+  phone?: string | null;
+  /** BSUID 或 parent BSUID。 */
+  bsuid?: string | null;
+}
+
+/**
+ * 轉成 API 要的欄位。`to` = 電話，`recipient` = BSUID。
+ *
+ * 兩個都沒有就丟例外，不要送出一個沒有收件人的請求——那會得到一個很難讀的
+ * Meta 錯誤，而真正的問題是我們自己在更早之前就把身分弄丟了。
+ */
+export function recipientFields(r: WhatsAppRecipient | string): Record<string, string> {
+  const rec: WhatsAppRecipient = typeof r === "string" ? { phone: r } : r;
+  const out: Record<string, string> = {};
+  if (rec.phone) out.to = String(rec.phone);
+  if (rec.bsuid) out.recipient = String(rec.bsuid);
+  if (!out.to && !out.recipient) {
+    throw new Error("WhatsApp recipient needs a phone number or a BSUID — both were empty.");
+  }
+  return out;
+}
+
+/**
+ * 這個字串是不是 BSUID。
+ *
+ * 格式是「兩碼 ISO 國碼 + 句點 + 最多 128 個英數字」，parent BSUID 在國碼後面
+ * 多一段 `ENT.`。**整串都要用**——文件明講漏掉或改動國碼、句點、英數字都會讓
+ * 請求失敗，所以這裡不做任何正規化，只判斷。
+ */
+export function isBsuid(v: unknown): boolean {
+  return typeof v === "string" && /^[A-Z]{2}\.(ENT\.)?[A-Za-z0-9]{1,128}$/.test(v);
+}
+
+/** BSUID 開頭那兩碼國碼。使用者沒有電話號碼的時候，這是唯一的地區線索。 */
+export function bsuidCountry(v: string): string | null {
+  const m = /^([A-Z]{2})\./.exec(String(v ?? ""));
+  return m?.[1] ?? null;
+}
+
 export function toWhatsAppMessages(
   messages: BotMessage[],
-  to: string,
+  to: WhatsAppRecipient | string,
   opts: { listButtonLabel?: string } = {},
 ): Array<Record<string, unknown>> {
+  const target = recipientFields(to);
   const listButtonLabel = opts.listButtonLabel ?? "Choose";
   const out: Array<Record<string, unknown>> = [];
 
@@ -171,30 +223,30 @@ export function toWhatsAppMessages(
 
       const [onlyUri] = uris;
       if (postbacks.length === 0 && uris.length === 1 && onlyUri) {
-        out.push(ctaMessage(to, m.text, onlyUri));
+        out.push(ctaMessage(target, m.text, onlyUri));
       } else if (postbacks.length > 0 && postbacks.length <= LIMIT.buttons) {
-        out.push(buttonMessage(to, [m.text, ...linkLines(uris)].filter(Boolean).join("\n"), postbacks));
+        out.push(buttonMessage(target, [m.text, ...linkLines(uris)].filter(Boolean).join("\n"), postbacks));
       } else if (postbacks.length > LIMIT.buttons) {
         out.push(listMessage(
-          to,
+          target,
           [m.text, ...linkLines(uris)].filter(Boolean).join("\n"),
           postbacks.map((a) => ({ id: a.data, title: a.label })),
           { buttonLabel: listButtonLabel },
         ));
       } else {
-        out.push(textMessage(to, m.text, linkLines(uris)));
+        out.push(textMessage(target, m.text, linkLines(uris)));
       }
       continue;
     }
 
     if (m.type === "card") {
-      out.push(renderCard(to, m.card, listButtonLabel));
+      out.push(renderCard(target, m.card, listButtonLabel));
       continue;
     }
 
     // carousel：WhatsApp 沒有對應物。每張卡一列，選了哪一列再回該卡的內容。
     out.push(listMessage(
-      to,
+      target,
       m.cards[0]?.subtitle ?? m.cards[0]?.title ?? "",
       m.cards.map((c) => ({
         id: c.buttons.find(isPostback)?.data ?? c.title,
@@ -210,7 +262,20 @@ export function toWhatsAppMessages(
 // ── 進來的事件 ───────────────────────────────────────────────────────────────
 
 export interface WhatsAppInbound {
-  from: string;
+  /**
+   * 寄件人的電話號碼。**可能是 null。**
+   *
+   * 2026-09-24（Meta BSUID 文件）：使用者啟用 username 之後，除非我們最近
+   * 30 天內跟他互動過或他在聯絡簿裡，否則 `from` / `wa_id` 都不會出現。
+   * 所以這一欄不能拿來當主鍵，只能當附加資料。
+   */
+  from: string | null;
+  /** BSUID。**永遠有**，不管對方有沒有啟用 username。這才是主鍵。 */
+  userId: string | null;
+  /** parent BSUID，只有啟用跨商業檔案的情況才有。 */
+  parentUserId: string | null;
+  /** 對方的 username，只有他啟用了才有。 */
+  username: string | null;
   messageId: string;
   /** 使用者打的字，或他按的那顆鈕的標題。 */
   text: string;
@@ -232,11 +297,20 @@ export function parseInbound(body: any): WhatsAppInbound[] {
       const value = change?.value;
       const contacts: any[] = value?.contacts ?? [];
       for (const msg of value?.messages ?? []) {
-        const name = contacts.find((c) => c?.wa_id === msg?.from)?.profile?.name ?? null;
+        // 用 BSUID 對聯絡人，不要用電話號碼 —— 電話號碼可能兩邊都沒有，
+        // 那樣就永遠對不上，名字與 username 會整個掉。
+        const userId = msg?.from_user_id ? String(msg.from_user_id) : null;
+        const contact =
+          contacts.find((c) => userId && String(c?.user_id ?? "") === userId) ??
+          contacts.find((c) => msg?.from && String(c?.wa_id ?? "") === String(msg.from)) ??
+          null;
         const base = {
-          from: String(msg.from ?? ""),
+          from: msg?.from ? String(msg.from) : null,
+          userId,
+          parentUserId: msg?.from_parent_user_id ? String(msg.from_parent_user_id) : null,
+          username: contact?.profile?.username ? String(contact.profile.username) : null,
           messageId: String(msg.id ?? ""),
-          name,
+          name: contact?.profile?.name ? String(contact.profile.name) : null,
           timestamp: Number(msg.timestamp ?? 0) * 1000,
         };
         if (msg.type === "text") {
@@ -315,7 +389,11 @@ async function send(payload: Record<string, unknown>): Promise<void> {
  * 依序送出。WhatsApp 沒有 LINE 那種 reply token，每一則都是主動送出，
  * 而且同一個收件人要照順序送，不能 Promise.all——會亂序。
  */
-export async function whatsappSend(to: string, messages: BotMessage[], opts?: { listButtonLabel?: string }): Promise<void> {
+export async function whatsappSend(
+  to: WhatsAppRecipient | string,
+  messages: BotMessage[],
+  opts?: { listButtonLabel?: string },
+): Promise<void> {
   for (const payload of toWhatsAppMessages(messages, to, opts ?? {})) {
     await send(payload);
   }
@@ -324,4 +402,62 @@ export async function whatsappSend(to: string, messages: BotMessage[], opts?: { 
 /** 已讀，讓對方看到我們收到了——長工作要跑的時候特別需要。 */
 export async function whatsappMarkRead(messageId: string): Promise<void> {
   await send({ messaging_product: "whatsapp", status: "read", message_id: messageId });
+}
+
+// ── 身分變更 ────────────────────────────────────────────────────────────────
+
+export interface WhatsAppIdentityChange {
+  /** 舊的 BSUID，如果 payload 有帶。 */
+  previous: string | null;
+  /** 新的 BSUID。 */
+  current: string;
+  parentPrevious: string | null;
+  parentCurrent: string | null;
+}
+
+/**
+ * 使用者換了電話號碼 → BSUID 會重新產生。
+ *
+ * 2026-09-24（Meta BSUID 文件）：這件事會用兩種方式通知——`user_id_update`
+ * webhook，以及 type 為 `user_changed_user_id` 的系統訊息。**沒有處理的話，
+ * 已經綁定的人會安靜地變成聯絡不到**：舊的 BSUID 從此送不出去，而新的 BSUID
+ * 我們認不得，看起來就是一個全新的陌生人。
+ *
+ * 兩種來源都解析，因為文件兩邊都會送，而漏掉一種的代價是一樣的。
+ */
+export function parseIdentityChanges(body: any): WhatsAppIdentityChange[] {
+  const out: WhatsAppIdentityChange[] = [];
+  for (const entry of body?.entry ?? []) {
+    for (const change of entry?.changes ?? []) {
+      const value = change?.value;
+
+      // user_id_update webhook
+      for (const u of value?.user_id_update ?? []) {
+        const current = u?.user_id?.current ? String(u.user_id.current) : "";
+        if (!current) continue;
+        out.push({
+          previous: u?.user_id?.previous ? String(u.user_id.previous) : null,
+          current,
+          parentPrevious: u?.parent_user_id?.previous ? String(u.parent_user_id.previous) : null,
+          parentCurrent: u?.parent_user_id?.current ? String(u.parent_user_id.current) : null,
+        });
+      }
+
+      // 系統訊息（type: user_changed_user_id）
+      for (const msg of value?.messages ?? []) {
+        if (msg?.type !== "system" || msg?.system?.type !== "user_changed_user_id") continue;
+        const current = msg?.system?.user_id ? String(msg.system.user_id) : "";
+        if (!current) continue;
+        out.push({
+          // 系統訊息沒有結構化的舊值，只有一句 body。不從自由文字裡挖舊 id——
+          // 挖錯會把別人的綁定改掉，比認不得這一筆糟得多。
+          previous: null,
+          current,
+          parentPrevious: null,
+          parentCurrent: msg?.system?.parent_user_id ? String(msg.system.parent_user_id) : null,
+        });
+      }
+    }
+  }
+  return out;
 }

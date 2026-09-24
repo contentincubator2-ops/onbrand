@@ -88,7 +88,7 @@ export async function hubWhatsAppWebhookHandler(req: Request, res: Response) {
           org.id,
           null,
           "whatsapp_inbound",
-          `${inbound.name ?? inbound.from}: ${(inbound.postback ?? inbound.text).slice(0, 120)}`,
+          `${inbound.name ?? inbound.username ?? inbound.from ?? inbound.userId ?? "unknown"}: ${(inbound.postback ?? inbound.text).slice(0, 120)}`,
         );
       } catch (e: any) {
         console.error("[whatsapp.webhook]", e?.message ?? e);
