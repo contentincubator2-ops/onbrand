@@ -70,6 +70,21 @@ const AGENTS: any[] = [
     specialtySummary: null, methodology: null,
   },
   {
+    // 產品頁的兩位固定人選（方法論族：slug 沒有產業/語系段）
+    id: 900010, slug: "value-proposition-canvas-vp-canvas-strategist", name: "Chia-Sen Hsu", name_zh: "許家森",
+    title: "VP of Value Proposition", title_zh: "產品價值主張副總裁", industry: null,
+    avatarUrl: "", bio_zh: "Osterwalder VPC 實踐者。", bio: null, bio_en: null,
+    experienceDetail: "【經驗亮點】 VP Canvas 重構", specialty: "價值主張圖、顧客輪廓、痛點解方",
+    specialtySummary: null, methodology: "【價值主張圖】右半顧客輪廓、左半價值地圖，逐條對齊。",
+  },
+  {
+    id: 900011, slug: "kano-product-positioning-kano-strategist", name: "Ya-Ting Li", name_zh: "李雅婷",
+    title: "VP of Kano Product Strategy", title_zh: "Kano 產品策略副總裁", industry: null,
+    avatarUrl: "", bio_zh: "Kano Model 認證實踐者。", bio: null, bio_en: null,
+    experienceDetail: null, specialty: "Kano 模型、品質要素分類、投資排序",
+    specialtySummary: null, methodology: "【Kano 模型】當然/一元/魅力/無差異/反轉五類品質要素。",
+  },
+  {
     // 匯入失敗的那種——文字欄位全是樣板句。
     id: 900005, slug: "brand_strategy-broken-tw-0005", name: "Broken Row", name_zh: "資料壞掉",
     title: "Brand Strategist", title_zh: "品牌策略師｜損壞", industry: "tech",
@@ -125,7 +140,7 @@ vi.mock("../../localDb.js", () => ({
   },
 }));
 
-const { sanitizeProse, listDirectorsForBrand, getDirectorByAgentId, searchDirectors, industryCodeOf, STRATEGIST_ROLES } =
+const { sanitizeProse, listDirectorsForBrand, getDirectorByAgentId, searchDirectors, industryCodeOf, rolesFor } =
   await import("./strategistDirectory");
 
 beforeEach(() => { calls.length = 0; });
@@ -182,8 +197,8 @@ describe("industryCodeOf", () => {
 describe("listDirectorsForBrand", () => {
   it("三個角色各出一位，帶著自己的角度標籤與招牌問題", async () => {
     const list = await listDirectorsForBrand(null);
-    expect(list).toHaveLength(STRATEGIST_ROLES.length);
-    expect(list.map((d) => d.roleId)).toEqual(STRATEGIST_ROLES.map((r) => r.id));
+    expect(list).toHaveLength(rolesFor("brand").length);
+    expect(list.map((d) => d.roleId)).toEqual(rolesFor("brand").map((r) => r.id));
     // 招牌問題三組互不相同——換人時問題要跟著換，這是「換了一位真的不一樣
     // 的人」在 UI 上唯一看得出來的線索之一。
     const sets = list.map((d) => d.signatureQuestions.join("|"));
@@ -258,11 +273,60 @@ describe("對不上產業時的備用人選", () => {
   });
 });
 
+// 2026-09-24（CJ「產品定位就用你推薦的那三位人選」）
+describe("產品頁的三個角色", () => {
+  it("產品 scope 回的是產品那三個角色，不是品牌那三個", async () => {
+    const list = await listDirectorsForBrand("食品飲料", "product");
+    expect(list.map((d) => d.roleId)).toEqual(["product_value_prop", "product_kano", "product_pricing"]);
+  });
+
+  it("方法論族那兩位是固定人選：不比產業、也不標 fallback、不附備用", async () => {
+    // 同一位不管品牌產業是什麼都一樣——他們本來就沒有產業分身。
+    for (const industry of ["食品飲料", "美妝保養", "建設開發 / 不動產"]) {
+      const list = await listDirectorsForBrand(industry, "product");
+      const vp = list.find((d) => d.roleId === "product_value_prop")!;
+      const kano = list.find((d) => d.roleId === "product_kano")!;
+      expect(vp.agentId).toBe(900010);
+      expect(kano.agentId).toBe(900011);
+      for (const d of [vp, kano]) {
+        expect(d.isFallback).toBe(false);      // 「沒有你產業的人選」對他們不成立
+        expect(d.alternatives).toEqual([]);
+      }
+    }
+  });
+
+  it("定價那位照品牌產業挑（有產業分身的角色照舊）", async () => {
+    const hit = await listDirectorsForBrand("食品飲料", "product");
+    const pricing = hit.find((d) => d.roleId === "product_pricing")!;
+    expect(pricing.agentId).toBe(900007);      // pricing_strategy-food-tw-0007
+    expect(pricing.isFallback).toBe(false);
+
+    const miss = await listDirectorsForBrand("建設開發 / 不動產", "product");
+    const fallbackPricing = miss.find((d) => d.roleId === "product_pricing")!;
+    expect(fallbackPricing.isFallback).toBe(true);
+    expect(fallbackPricing.alternatives.length).toBeGreaterThan(0);
+  });
+
+  it("產品三位的招牌問題互不相同，也跟品牌那三位不同", async () => {
+    const product = await listDirectorsForBrand("食品飲料", "product");
+    const brand = await listDirectorsForBrand("食品飲料", "brand");
+    const sets = product.map((d) => d.signatureQuestions.join("|"));
+    expect(new Set(sets).size).toBe(sets.length);
+    for (const q of sets) expect(brand.map((d) => d.signatureQuestions.join("|"))).not.toContain(q);
+  });
+});
+
 describe("getDirectorByAgentId", () => {
   it("認得的 id 回那一位，roleId 依 slug 前綴判定", async () => {
     const d = await getDirectorByAgentId(900003, null);
     expect(d?.name).toBe("張建宇");
     expect(d?.roleId).toBe("pricing_value");
+  });
+
+  it("固定人選的 slug 要對到產品角色，不是落回第一個品牌角色", async () => {
+    const d = await getDirectorByAgentId(900011, "食品飲料");
+    expect(d?.roleId).toBe("product_kano");
+    expect(d?.isFallback).toBe(false);
   });
 
   it("不存在的 id 回 null（呼叫端自己退回預設，不會假裝找到人）", async () => {

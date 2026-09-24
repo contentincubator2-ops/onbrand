@@ -83,16 +83,29 @@ export interface StrategistDirector {
   isFallback: boolean;
 }
 
-export type StrategistRoleId = "brand_positioning" | "pricing_value" | "consumer_behavior";
+export type StrategistRoleId =
+  | "brand_positioning" | "pricing_value" | "consumer_behavior"
+  | "product_value_prop" | "product_kano" | "product_pricing";
+
+/** 品牌頁與產品頁各有自己的三個角色（CJ 2026-09-24 定案，見 STRATEGIST_ROLES）。 */
+export type StrategistScope = "brand" | "product";
 
 interface StrategistRole {
   id: StrategistRoleId;
+  scope: StrategistScope;
   label: string;
   labelEn: string;
-  /** mos_db slug 前綴——這個角色的 cohort。 */
-  slugPrefix: string;
-  /** 找不到品牌產業對得上的人時，用這一位（mos_db 真實 id，繁中、資料完整）。 */
-  fallbackSlug: string;
+  /**
+   * 2026-09-24：兩種挑人方式。
+   * - 產業 cohort（slugPrefix + fallbackSlug）：這批 agent 每個產業一位，依品牌
+   *   產業挑，對不上退回 fallback 並附備用人選。
+   * - 固定人選（fixedSlug）：方法論族（JTBD／Kano／VPC…）**沒有產業分身**，
+   *   一個框架就一位，所以不做產業比對、也沒有「備用人選」——那句「沒有你產業
+   *   的人選」對他們不成立，硬套只會講一句不實的話。
+   */
+  slugPrefix?: string;
+  fallbackSlug?: string;
+  fixedSlug?: string;
   /** 寫進 system prompt 的角度指示——讓三位真的答得不一樣。 */
   promptAngle: string;
   /** 使用者不知道能問什麼時，面板上直接給的問題（CJ:「每位總監各自的招牌問題」）。 */
@@ -101,13 +114,22 @@ interface StrategistRole {
 }
 
 /**
- * 固定三個角色。要換角色/換預設人選就改這裡——刻意集中在一個常數，
- * 不散落在各處（跟 project_per_brand_task_tray 那次「查表鏈手抄六處」的
- * 教訓同一個理由）。
+ * 角色定義表。要換角色/換預設人選就改這裡——刻意集中在一個常數，不散落在
+ * 各處（跟 project_per_brand_task_tray 那次「查表鏈手抄六處」的教訓同一個理由）。
+ *
+ * 品牌頁三個（2026-09-23）＋產品頁三個（2026-09-24）。
+ *
+ * 產品頁那三位是面試選出來的，不是照職稱挑的：20 位候選人（行銷職能族 10 位、
+ * 產品定位方法論族 10 位）拿同一份真實品牌資料回答同一題，17 位的第一步都是
+ * 「對熱賣品的老客推組合＋小折扣」。真正給出不同做法的只有三位，CJ 選了其中
+ * 兩位（價值主張＝直接去問客戶為什麼不買、Kano＝判斷每個品項在組合裡是什麼
+ * 角色），加上定價（唯一動價格結構的角度）。面試逐字稿見
+ * scripts/interview-product-directors.ts 與當時的 workflow 執行紀錄。
  */
 export const STRATEGIST_ROLES: StrategistRole[] = [
   {
     id: "brand_positioning",
+    scope: "brand",
     label: "品牌定位",
     labelEn: "Brand Positioning",
     slugPrefix: "brand_strategy-",
@@ -128,6 +150,7 @@ export const STRATEGIST_ROLES: StrategistRole[] = [
   },
   {
     id: "pricing_value",
+    scope: "brand",
     label: "定價與價值",
     labelEn: "Pricing & Value",
     slugPrefix: "pricing_strategy-",
@@ -148,6 +171,7 @@ export const STRATEGIST_ROLES: StrategistRole[] = [
   },
   {
     id: "consumer_behavior",
+    scope: "brand",
     label: "消費者行為",
     labelEn: "Consumer Behavior",
     slugPrefix: "ux_researcher-",
@@ -166,7 +190,82 @@ export const STRATEGIST_ROLES: StrategistRole[] = [
       "How do I know whether my message actually lands?",
     ],
   },
+
+  // ── 產品頁（2026-09-24，CJ：「產品定位就用你推薦的那三位人選」）────────
+  {
+    id: "product_value_prop",
+    scope: "product",
+    label: "產品價值主張",
+    labelEn: "Value Proposition",
+    // 方法論族沒有產業分身，所以是固定人選。
+    fixedSlug: "value-proposition-canvas-vp-canvas-strategist",
+    promptAngle:
+      "你看事情的角度是價值主張圖（Osterwalder VPC）：右半是顧客輪廓（顧客任務、痛點、獲益，而且要排序），"
+      + "左半是價值地圖（產品與服務、痛點解方、獲益創造），兩邊要逐條對得上。"
+      + "被問到「賣不動」的問題，你的第一反應是「先去問客人為什麼不買」，而不是先調價或先投廣告——"
+      + "你相信沒有對齊證據之前的所有解法都是猜的。連不到任何痛點的賣點，你會直接說那是自嗨功能。",
+    signatureQuestions: [
+      "這個產品解決的痛點，是我客人最痛的那一個嗎？",
+      "我的賣點裡，有哪幾個其實沒對到任何痛點？",
+      "想知道客人為什麼不買，我該問哪幾個問題？",
+    ],
+    signatureQuestionsEn: [
+      "Is the pain this product solves actually my customers' worst one?",
+      "Which of my selling points don't map to any real pain?",
+      "What should I ask customers to find out why they don't buy?",
+    ],
+  },
+  {
+    id: "product_kano",
+    scope: "product",
+    label: "Kano 產品策略",
+    labelEn: "Kano Analysis",
+    fixedSlug: "kano-product-positioning-kano-strategist",
+    promptAngle:
+      "你看事情的角度是 Kano 模型：把每個功能或品項分成當然品質（沒有會爆炸）、一元品質（越好越滿意）、"
+      + "魅力品質（驚喜、差異化來源）、無差異品質（做了也沒感覺）、反轉品質（你以為加分其實扣分）。"
+      + "被問到產品組合的問題，你會先判斷「這個品項在組合裡是什麼角色」，再談該不該投資——"
+      + "你也會提醒魅力品質會隨時間退化成當然品質，所以要定期重測。",
+    signatureQuestions: [
+      "這個產品的哪些點是必備、哪些才是驚喜？",
+      "我該把資源放在哪個功能上，哪些做了也沒人在意？",
+      "我的賣點是不是已經變成同業標配了？",
+    ],
+    signatureQuestionsEn: [
+      "Which attributes here are must-be, and which are the delighters?",
+      "Where should I invest — and what would nobody notice?",
+      "Has my selling point already become table stakes?",
+    ],
+  },
+  {
+    id: "product_pricing",
+    scope: "product",
+    label: "定價與組合",
+    labelEn: "Pricing & Bundling",
+    // 這個角色有產業分身，所以照品牌產業挑（食品飲料品牌會拿到食品飲料的定價策略師）。
+    slugPrefix: "pricing_strategy-",
+    fallbackSlug: "pricing_strategy-ecom-tw-9298",
+    promptAngle:
+      "你看事情的角度是這支產品的價格與組合結構：競爭定價、心理定價（錨點、損失厭惡）、價格彈性、"
+      + "組合包與加價購、訂閱制、漲價的溝通方式。被問到「某個品項賣不動」，你想的是用價格結構讓它被試到"
+      + "（例如用熱賣品帶新品破冰），而不是單純打折——折扣會傷定位，破冰不會。",
+    signatureQuestions: [
+      "這支產品的價格帶對嗎？跟誰比？",
+      "要不要做組合包？怎麼配才不傷定位？",
+      "賣不動的品項，該降價還是換賣法？",
+    ],
+    signatureQuestionsEn: [
+      "Is this product's price band right — and right against whom?",
+      "Should I bundle it, and how without hurting positioning?",
+      "For a slow mover: cut the price, or change how it's sold?",
+    ],
+  },
 ];
+
+/** 某個頁面（scope）用的角色。 */
+export function rolesFor(scope: StrategistScope): StrategistRole[] {
+  return STRATEGIST_ROLES.filter((r) => r.scope === scope);
+}
 
 export function getRole(roleId: string | null | undefined): StrategistRole {
   return STRATEGIST_ROLES.find((r) => r.id === roleId) ?? STRATEGIST_ROLES[0]!;
@@ -294,6 +393,7 @@ export function industryCodeOf(industry: string | null | undefined): string | nu
  * 一律限制 -tw-：這是繁中使用者看的人設，簡中／東南亞那批的敘述語言不同。
  */
 async function findByIndustry(role: StrategistRole, industry: string | null): Promise<any | null> {
+  if (!role.slugPrefix) return null;          // 固定人選的角色不比產業
   const code = industryCodeOf(industry);
   if (code) {
     const [rows]: any = await localPool.execute(
@@ -357,7 +457,7 @@ async function findSameIndustryOtherLocale(
         AND slug NOT LIKE ?
       ORDER BY CHAR_LENGTH(COALESCE(experienceDetail, '')) DESC, id ASC
       LIMIT ${safe}`,
-    [`${role.slugPrefix}${code}-%`, `${role.slugPrefix}${code}-tw-%`],
+    [`${role.slugPrefix ?? ""}${code}-%`, `${role.slugPrefix ?? ""}${code}-tw-%`],
   );
   return (rows as any[]) ?? [];
 }
@@ -379,7 +479,7 @@ async function findRoleOtherIndustryTw(
         AND slug <> ?
       ORDER BY CHAR_LENGTH(COALESCE(experienceDetail, '')) DESC, id ASC
       LIMIT ${safe * 6}`,
-    [`${role.slugPrefix}%`, excludeSlug],
+    [`${role.slugPrefix ?? ""}%`, excludeSlug],
   );
   // 一個產業只留一位。這批 agent 每個產業有好幾位、彼此差異極小，照「經歷長度」
   // 排下來很容易三位都是同一個產業（實測不動產拿到兩位醫療器材/醫美）——那等於
@@ -406,21 +506,33 @@ async function findRoleOtherIndustryTw(
  *      自己挑一個最接近的。
  * 對得上產業的那一位不附備用：他就是最好的答案，多給選項只是雜訊。
  */
-export async function listDirectorsForBrand(industry: string | null): Promise<StrategistDirector[]> {
+export async function listDirectorsForBrand(
+  industry: string | null, scope: StrategistScope = "brand",
+): Promise<StrategistDirector[]> {
   const out: StrategistDirector[] = [];
   const code = industryCodeOf(industry);
-  for (const role of STRATEGIST_ROLES) {
+  for (const role of rolesFor(scope)) {
+    // 固定人選（方法論族）：沒有產業分身，也沒有備用人選——「沒有你產業的
+    // 人選」這句話對他們不成立。
+    if (role.fixedSlug) {
+      const fixed = await findBySlug(role.fixedSlug);
+      if (fixed) out.push(toDirector(fixed, role, false));
+      continue;
+    }
+
     const matched = await findByIndustry(role, industry);
     if (matched) { out.push(toDirector(matched, role, false)); continue; }
 
-    const fallback = await findBySlug(role.fallbackSlug);
+    const fallbackSlug = role.fallbackSlug;
+    if (!fallbackSlug) continue;
+    const fallback = await findBySlug(fallbackSlug);
     if (!fallback) continue;
 
     const altRows: any[] = [];
     if (code) altRows.push(...await findSameIndustryOtherLocale(role, code, 3));
     if (altRows.length < 3) {
       const seen = new Set([String(fallback.slug), ...altRows.map((r) => String(r.slug))]);
-      for (const r of await findRoleOtherIndustryTw(role, role.fallbackSlug, 5)) {
+      for (const r of await findRoleOtherIndustryTw(role, fallbackSlug, 5)) {
         if (altRows.length >= 3) break;
         if (seen.has(String(r.slug))) continue;
         altRows.push(r);
@@ -439,7 +551,9 @@ export async function getDirectorByAgentId(
   const row = await findAgentById(agentId);
   if (!row) return null;
   const slug = String(row.slug ?? "");
-  const role = STRATEGIST_ROLES.find((r) => slug.startsWith(r.slugPrefix)) ?? STRATEGIST_ROLES[0]!;
+  const role = STRATEGIST_ROLES.find((r) => r.fixedSlug === slug)
+    ?? STRATEGIST_ROLES.find((r) => r.slugPrefix && slug.startsWith(r.slugPrefix))
+    ?? STRATEGIST_ROLES[0]!;
   // 從「換更多人選」搜來的人不屬於這三個角色的 cohort，roleId 會落在
   // 第一個角色上——這只影響 promptAngle 用哪一段，不影響顯示的真實資料。
   //
@@ -447,7 +561,7 @@ export async function getDirectorByAgentId(
   // 產業段），否則「怎麼挑的」跟「UI 怎麼說明」會各講一套。使用者自己從
   // 搜尋挑的人不標 fallback——那是他主動選的，不是我們替他退而求其次。
   const code = industryCodeOf(industry);
-  const isOneOfRoleCohort = slug.startsWith(role.slugPrefix);
+  const isOneOfRoleCohort = !!role.slugPrefix && slug.startsWith(role.slugPrefix);
   const isFallback = !!code && isOneOfRoleCohort && !slug.includes(`-${code}-`);
   return toDirector(row, role, isFallback);
 }
@@ -472,7 +586,9 @@ export async function searchDirectors(search: string, limit = 12): Promise<Strat
   );
   return (rows as any[]).map((row) => {
     const slug = String(row.slug ?? "");
-    const role = STRATEGIST_ROLES.find((r) => slug.startsWith(r.slugPrefix)) ?? STRATEGIST_ROLES[0]!;
+    const role = STRATEGIST_ROLES.find((r) => r.fixedSlug === slug)
+      ?? STRATEGIST_ROLES.find((r) => r.slugPrefix && slug.startsWith(r.slugPrefix))
+      ?? STRATEGIST_ROLES[0]!;
     return toDirector(row, role, false);
   });
 }

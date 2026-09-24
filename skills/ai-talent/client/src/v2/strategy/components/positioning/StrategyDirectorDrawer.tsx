@@ -31,10 +31,11 @@
  *    一小段」。理由見 StrategyDirectorPicker.tsx 的檔頭：小抽屜裡塞不下
  *    「一位有經歷的顧問」，而且高度會跳。
  *
- * 3. 產品頁面的人選還沒決定（CJ:「我們先決定品牌策略師，等等再決定產品頁面
- *    的策略人選」），所以這一輪產品頁面暫時共用同一組品牌角度的人選——這比
- *    留著原本那位標著「⚠ 這是佔位資料」的假產品總監誠實。下一輪要做的是在
- *    STRATEGIST_ROLES 加上產品向的角色（scope 欄位），不是回頭改這裡。
+ * 3. 產品頁面有自己的三個角色（2026-09-24 定案，CJ:「產品定位就用你推薦的
+ *    那三位人選」）：產品價值主張（Osterwalder VPC）／Kano 產品策略／定價與
+ *    組合。URL 有 ?p= 就是產品頁，scope 跟著切，連 localStorage 的「選過誰」
+ *    也分開記——兩組角色不同，共用一個 key 會讓產品頁掛著品牌定位總監。
+ *    角色定義在 server 的 STRATEGIST_ROLES，這裡不再有任何人選知識。
  *
  * 黑白線條 B&W 風格（呼應 AgentPersonaBar／PipelineThinkingPanel 那套
  * 「4A 代理商」視覺語言，跟 Mia 的漸層紫刻意不同——就算現在同一個角落，
@@ -72,6 +73,9 @@ export default function StrategyDirectorDrawer({ brandId }: { brandId: number | 
   const [searchParams] = useSearchParams();
   const urlProductId = Number(searchParams.get("p"));
   const productId = Number.isFinite(urlProductId) && urlProductId > 0 ? urlProductId : null;
+  // 2026-09-24（CJ「產品定位就用你推薦的那三位人選」）：產品頁是另一組角色
+  // （產品價值主張／Kano 產品策略／定價與組合），所以 scope 跟著 URL 走。
+  const scope: "brand" | "product" = productId ? "product" : "brand";
 
   const [open, setOpen] = React.useState(false);
   const [view, setView] = React.useState<View>("chat");
@@ -86,12 +90,12 @@ export default function StrategyDirectorDrawer({ brandId }: { brandId: number | 
   // 把存起來的那個 id 一起送給後端，後端會把那一位附在名單後面——前端不必自己
   // 維護第二份名單，重新整理之後選擇也還在。
   const storedAgentId = React.useMemo(
-    () => (brandId ? readStoredDirector(brandId) : null),
-    [brandId],
+    () => (brandId ? readStoredDirector(brandId, scope) : null),
+    [brandId, scope],
   );
   const listQ = (trpc as any).strategistChat?.listDirectors?.useQuery
     ? (trpc as any).strategistChat.listDirectors.useQuery(
-        { brandId: brandId ?? 0, ...(storedAgentId ? { includeAgentId: storedAgentId } : {}) },
+        { brandId: brandId ?? 0, scope, ...(storedAgentId ? { includeAgentId: storedAgentId } : {}) },
         { enabled: !!brandId, refetchOnWindowFocus: false, staleTime: 5 * 60_000 },
       )
     : { data: null, isLoading: false };
@@ -117,12 +121,14 @@ export default function StrategyDirectorDrawer({ brandId }: { brandId: number | 
     if (!brandId || directors.length === 0) return;
     setAgentId((prev) => {
       if (prev && directors.some((d) => d.agentId === prev)) return prev;
-      const stored = readStoredDirector(brandId);
+      const stored = readStoredDirector(brandId, scope);
       if (stored && directors.some((d) => d.agentId === stored)) return stored;
       return directors[0]!.agentId;
     });
-  }, [brandId, directors]);
-  React.useEffect(() => { setAgentId(null); setPickedExtra(null); setView("chat"); }, [brandId]);
+  }, [brandId, directors, scope]);
+  // 換品牌、或在品牌頁/產品頁之間切換，都要重選一次預設人選——那是兩組
+  // 不同的角色，沿用上一組的選擇會變成「產品頁掛著品牌定位總監」。
+  React.useEffect(() => { setAgentId(null); setPickedExtra(null); setView("chat"); }, [brandId, scope]);
 
   const current = React.useMemo(
     () => directors.find((d) => d.agentId === agentId) ?? null,
@@ -132,7 +138,7 @@ export default function StrategyDirectorDrawer({ brandId }: { brandId: number | 
   const pick = (d: StrategistDirector) => {
     setPickedExtra(d);          // 搜尋來的人先留在本地，下一次 listDirectors 會正式帶回來
     setAgentId(d.agentId);
-    if (brandId) writeStoredDirector(brandId, d.agentId);
+    if (brandId) writeStoredDirector(brandId, d.agentId, scope);
     setView("chat");
   };
 

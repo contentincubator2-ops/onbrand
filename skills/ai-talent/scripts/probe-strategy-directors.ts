@@ -15,7 +15,7 @@
 import localPool from "../server/localDb.js";
 import { buildBrandCatalogBlock } from "../server/strategy/core/brandCatalog.js";
 import { buildBrandPrefix } from "../server/strategy/core/brandContext.js";
-import { listDirectorsForBrand, searchDirectors, industryCodeOf, STRATEGIST_ROLES } from "../server/strategy/core/strategistDirectory.js";
+import { listDirectorsForBrand, searchDirectors, industryCodeOf, rolesFor } from "../server/strategy/core/strategistDirectory.js";
 
 function line(s = "") { console.log(s); }
 
@@ -37,7 +37,8 @@ function show(label: string, directors: Awaited<ReturnType<typeof listDirectorsF
 
 async function main() {
   const argBrand = Number(process.argv[2]);
-  line(`角色定義：${STRATEGIST_ROLES.map((r) => `${r.label}(${r.slugPrefix})`).join("、")}`);
+  line(`品牌頁角色：${rolesFor("brand").map((r) => `${r.label}(${r.slugPrefix ?? r.fixedSlug})`).join("、")}`);
+  line(`產品頁角色：${rolesFor("product").map((r) => `${r.label}(${r.slugPrefix ?? r.fixedSlug})`).join("、")}`);
   line();
 
   // 1) 幾個真實品牌——優先用指令列指定的，否則挑最近更新、有填產業的幾個。
@@ -56,6 +57,12 @@ async function main() {
       `品牌 #${b.id} ${b.name}｜industry = ${JSON.stringify(b.industry)} → 產業代碼 ${industryCodeOf(b.industry) ?? "(對不到)"}`,
       await listDirectorsForBrand(b.industry),
     );
+  }
+
+  // 1b) 產品頁那三位（2026-09-24）：兩位固定人選 + 一位依產業挑。
+  line();
+  for (const b of brands.slice(0, 2)) {
+    show(`品牌 #${b.id} ${b.name}｜**產品頁** scope`, await listDirectorsForBrand(b.industry, "product"));
   }
 
   // 2) 產業命中 vs 對不上，各示範一次——證明兩條路都真的會走到。

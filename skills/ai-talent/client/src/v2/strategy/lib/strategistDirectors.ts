@@ -36,18 +36,24 @@ export interface StrategistDirector {
   isFallback: boolean;
 }
 
-/** 記住使用者在這個品牌選過誰——per-brand，不要一個品牌換人把全部品牌都換掉。 */
-const directorStorageKey = (brandId: number) => `sowork.strategyDirector.brand.${brandId}`;
+/**
+ * 記住使用者選過誰——per-brand 而且 per-scope。
+ * 2026-09-24：品牌頁與產品頁是兩組不同的角色（產品頁＝價值主張／Kano／定價），
+ * 共用一個 key 的話，在產品頁換人會把品牌頁的選擇也蓋掉。
+ */
+export type StrategistScope = "brand" | "product";
+const directorStorageKey = (brandId: number, scope: StrategistScope) =>
+  `sowork.strategyDirector.${scope}.${brandId}`;
 
-export function readStoredDirector(brandId: number): number | null {
+export function readStoredDirector(brandId: number, scope: StrategistScope = "brand"): number | null {
   try {
-    const v = Number(localStorage.getItem(directorStorageKey(brandId)));
+    const v = Number(localStorage.getItem(directorStorageKey(brandId, scope)));
     return Number.isFinite(v) && v > 0 ? v : null;
   } catch { return null; }
 }
 
-export function writeStoredDirector(brandId: number, agentId: number): void {
-  try { localStorage.setItem(directorStorageKey(brandId), String(agentId)); } catch { /* noop */ }
+export function writeStoredDirector(brandId: number, agentId: number, scope: StrategistScope = "brand"): void {
+  try { localStorage.setItem(directorStorageKey(brandId, scope), String(agentId)); } catch { /* noop */ }
 }
 
 /**

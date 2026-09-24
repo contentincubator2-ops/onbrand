@@ -38,7 +38,7 @@ import localPool from "../../localDb";
 import { callModel } from "../../platform/core/multiModelRouter";
 import {
   listDirectorsForBrand, getDirectorByAgentId, searchDirectors as searchDirectoryAgents,
-  getRole, type StrategistDirector,
+  getRole, type StrategistDirector, type StrategistScope,
 } from "../core/strategistDirectory";
 import { buildBrandPrefix } from "../core/brandContext";
 import { buildBrandCatalogBlock } from "../core/brandCatalog";
@@ -427,18 +427,24 @@ export const strategistChatRouter = router({
        * 額外名單，重新整理之後也還在（localStorage 只存 id）。
        */
       includeAgentId: z.number().int().positive().optional(),
+      /**
+       * 2026-09-24（CJ「產品定位就用你推薦的那三位人選」）：品牌頁與產品頁
+       * 各有自己的三個角色。前端在產品頁（URL 有 ?p=）會送 "product"。
+       */
+      scope: z.enum(["brand", "product"]).optional(),
     }))
     .query(async ({ ctx, input }) => {
       const userId = ctx.user!.id;
       await assertBrandOwned(input.brandId, userId);
       const industry = await brandIndustry(input.brandId, userId);
-      const directors = await listDirectorsForBrand(industry);
+      const scope: StrategistScope = input.scope ?? "brand";
+      const directors = await listDirectorsForBrand(industry, scope);
       if (input.includeAgentId && !directors.some((d) => d.agentId === input.includeAgentId)) {
         const extra = await getDirectorByAgentId(input.includeAgentId, industry);
         // 查不到就當作沒選過（mos_db 那一列可能被移除了），不要塞一個空殼進去。
         if (extra) directors.push(extra);
       }
-      return { brandIndustry: industry, directors };
+      return { brandIndustry: industry, scope, directors };
     }),
 
   /** 「換更多人選」：在 mos_db 的 strategy 層 agent 裡搜。 */
@@ -457,6 +463,8 @@ export const strategistChatRouter = router({
       // 2026-09-23：每位總監一串獨立對話，所以要指定是哪一位。沒給的話
       // （舊前端）退回這個品牌的第一位，不會炸。
       agentId: z.number().int().positive().optional(),
+      /** 沒給 agentId 時，要從哪一組角色取第一位當預設。 */
+      scope: z.enum(["brand", "product"]).optional(),
     }))
     .query(async ({ ctx, input }) => {
       const userId = ctx.user!.id;
@@ -464,7 +472,7 @@ export const strategistChatRouter = router({
       const industry = await brandIndustry(input.brandId, userId);
       const director = input.agentId
         ? await getDirectorByAgentId(input.agentId, industry)
-        : (await listDirectorsForBrand(industry))[0] ?? null;
+        : (await listDirectorsForBrand(industry, input.scope ?? "brand"))[0] ?? null;
       if (!director) throw new TRPCError({ code: "NOT_FOUND", message: "strategy director not found" });
 
       const conversationId = await ensureOpenConversation(userId, input.brandId, director.agentId, director.slug);
