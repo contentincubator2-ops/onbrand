@@ -65,6 +65,13 @@ export interface StrategistDirector {
   /** 方法論框架（mos_db 原文，這批 agent 多半沒有）。 */
   methodology: string | null;
   industry: string | null;
+  /** 從 slug 推出來的語系段（tw/cn/sea/en/my/sg/th…）。UI 用它誠實標示「這位的資料是哪個市場的」。 */
+  locale: string | null;
+  /**
+   * 2026-09-24（CJ「服飾 → fallback、不動產 → 對不到…這各狀況要提共備用的人選」）：
+   * 對不上產業時的備用人選。只有 primary 會帶，備用人選自己不再往下長。
+   */
+  alternatives: StrategistDirector[];
   /** 這位是用哪個角色的條件找到的。 */
   roleId: StrategistRoleId;
   roleLabel: string;
@@ -189,7 +196,16 @@ export function sanitizeProse(raw: unknown): string | null {
   return cleaned;
 }
 
-function toDirector(row: any, role: StrategistRole, isFallback: boolean): StrategistDirector {
+/** slug 的語系段：`brand_strategy-fashion-cn-7197` → "cn"。 */
+function localeOf(slug: string): string | null {
+  const m = /^[a-z_]+-[a-z0-9_]+-([a-z]+)-/.exec(slug);
+  return m ? m[1]! : null;
+}
+
+function toDirector(
+  row: any, role: StrategistRole, isFallback: boolean,
+  alternatives: StrategistDirector[] = [],
+): StrategistDirector {
   return {
     agentId: Number(row.id),
     slug: String(row.slug ?? ""),
@@ -201,6 +217,8 @@ function toDirector(row: any, role: StrategistRole, isFallback: boolean): Strate
     specialty: sanitizeProse(row.specialty) ?? sanitizeProse(row.specialtySummary),
     methodology: sanitizeProse(row.methodology),
     industry: typeof row.industry === "string" ? row.industry : null,
+    locale: localeOf(String(row.slug ?? "")),
+    alternatives,
     roleId: role.id,
     roleLabel: role.label,
     roleLabelEn: role.labelEn,
@@ -314,16 +332,84 @@ async function findAgentById(agentId: number): Promise<any | null> {
 }
 
 /**
+ * 同一個產業、但不是繁中的人選（cn / sea / en / my / sg / th…）。
+ *
+ * 2026-09-24（CJ「服飾 → fallback、不動產 → 對不到…這各狀況要提共備用的人選」）：
+ * 實測「服飾」在 tw 這批確實沒有人，但 cn/sea/en 有 6 位真的做服飾的（而且 bio
+ * 是中文）。與其丟一位電商顧問給服飾品牌、還不給第二個選擇，不如把這些人當
+ * 備用列出來，語系標清楚讓使用者自己決定——「同產業但別的市場」通常比
+ * 「同市場但別的產業」有用。
+ */
+async function findSameIndustryOtherLocale(
+  role: StrategistRole, code: string, limit: number,
+): Promise<any[]> {
+  const safe = Math.max(1, Math.min(5, Math.floor(limit)));
+  const [rows]: any = await localPool.execute(
+    `SELECT ${DIRECTOR_FIELDS} FROM agents
+      WHERE ${AVAILABLE}
+        AND slug LIKE ?
+        AND slug NOT LIKE ?
+      ORDER BY CHAR_LENGTH(COALESCE(experienceDetail, '')) DESC, id ASC
+      LIMIT ${safe}`,
+    [`${role.slugPrefix}${code}-%`, `${role.slugPrefix}${code}-tw-%`],
+  );
+  return (rows as any[]) ?? [];
+}
+
+/**
+ * 同角色、繁中、但別的產業的人選——給「產業完全對不到」的品牌用
+ * （實測：不動產、文具在 cohort 裡根本沒有對應產業）。
+ * 讓使用者自己挑一個最接近的，比我們替他猜一個誠實。
+ */
+async function findRoleOtherIndustryTw(
+  role: StrategistRole, excludeSlug: string, limit: number,
+): Promise<any[]> {
+  const safe = Math.max(1, Math.min(5, Math.floor(limit)));
+  const [rows]: any = await localPool.execute(
+    `SELECT ${DIRECTOR_FIELDS} FROM agents
+      WHERE ${AVAILABLE}
+        AND slug LIKE ?
+        AND slug LIKE '%-tw-%'
+        AND slug <> ?
+      ORDER BY CHAR_LENGTH(COALESCE(experienceDetail, '')) DESC, id ASC
+      LIMIT ${safe}`,
+    [`${role.slugPrefix}%`, excludeSlug],
+  );
+  return (rows as any[]) ?? [];
+}
+
+/**
  * 這個品牌的三位策略總監。一定回三位（每個角色一位）；某個角色連預設人選
  * 都查不到（mos_db 資料被改動過）就跳過那一位，不塞假的頂替。
+ *
+ * 產業對不上時（isFallback）會附上備用人選，兩種來源依序取：
+ *   1. 同產業、別的語系——「你的產業真的有人，只是不是繁中的」；
+ *   2. 同角色、繁中、別的產業——連產業代碼都對不到時（不動產那種），讓使用者
+ *      自己挑一個最接近的。
+ * 對得上產業的那一位不附備用：他就是最好的答案，多給選項只是雜訊。
  */
 export async function listDirectorsForBrand(industry: string | null): Promise<StrategistDirector[]> {
   const out: StrategistDirector[] = [];
+  const code = industryCodeOf(industry);
   for (const role of STRATEGIST_ROLES) {
     const matched = await findByIndustry(role, industry);
     if (matched) { out.push(toDirector(matched, role, false)); continue; }
+
     const fallback = await findBySlug(role.fallbackSlug);
-    if (fallback) out.push(toDirector(fallback, role, true));
+    if (!fallback) continue;
+
+    const altRows: any[] = [];
+    if (code) altRows.push(...await findSameIndustryOtherLocale(role, code, 3));
+    if (altRows.length < 3) {
+      const seen = new Set([String(fallback.slug), ...altRows.map((r) => String(r.slug))]);
+      for (const r of await findRoleOtherIndustryTw(role, role.fallbackSlug, 5)) {
+        if (altRows.length >= 3) break;
+        if (seen.has(String(r.slug))) continue;
+        altRows.push(r);
+      }
+    }
+    const alternatives = altRows.map((r) => toDirector(r, role, true));
+    out.push(toDirector(fallback, role, true, alternatives));
   }
   return out;
 }

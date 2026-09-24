@@ -23,6 +23,10 @@ export interface StrategistDirector {
   specialty: string | null;
   methodology: string | null;
   industry: string | null;
+  /** slug 的語系段（tw/cn/sea/en/my/sg/th）——UI 誠實標示「這位的資料是哪個市場的」。 */
+  locale: string | null;
+  /** 對不上產業時的備用人選（只有 primary 會帶）。 */
+  alternatives: StrategistDirector[];
   roleId: string;
   roleLabel: string;
   roleLabelEn: string;
@@ -44,6 +48,24 @@ export function readStoredDirector(brandId: number): number | null {
 
 export function writeStoredDirector(brandId: number, agentId: number): void {
   try { localStorage.setItem(directorStorageKey(brandId), String(agentId)); } catch { /* noop */ }
+}
+
+/**
+ * 語系標籤。2026-09-24（CJ「服飾 → fallback、不動產 → 對不到…這各狀況要提共
+ * 備用的人選」）：備用人選常常是「同產業但別的市場」，市場一定要標出來——
+ * 使用者才知道這位顧問的產業經驗是在哪裡累積的，而不是以為他就是台灣的。
+ */
+export function localeLabelOf(locale: string | null | undefined, en: boolean): string | null {
+  switch (locale) {
+    case "tw":  return null;                       // 繁中是預設，不用特別標
+    case "cn":  return en ? "China market" : "中國市場";
+    case "sea": return en ? "SE Asia" : "東南亞市場";
+    case "en":  return en ? "English-language" : "英文市場";
+    case "my":  return en ? "Malaysia" : "馬來西亞市場";
+    case "sg":  return en ? "Singapore" : "新加坡市場";
+    case "th":  return en ? "Thailand" : "泰國市場";
+    default:    return null;
+  }
 }
 
 export function signatureQuestionsOf(d: StrategistDirector | null | undefined, en: boolean): string[] {

@@ -45,6 +45,31 @@ const AGENTS: any[] = [
     specialtySummary: null, methodology: null,
   },
   {
+    // 服飾：tw 沒有人，但 cn 有——備用人選的第一種來源（同產業、別語系）。
+    id: 900006, slug: "brand_strategy-fashion-cn-0006", name: "Wu Xinyue", name_zh: "吳欣悅",
+    title: "Brand Strategist", title_zh: "品牌策略師｜服裝時尚", industry: "fashion",
+    avatarUrl: "", bio_zh: "服裝時尚品牌策略。", bio: null, bio_en: null,
+    experienceDetail: "【工作經歷】 2021-至今｜服裝時尚行銷", specialty: "服裝時尚品牌定位",
+    specialtySummary: null, methodology: null,
+  },
+  {
+    // 定價／UX 兩個角色各再補一位繁中、但別的產業的人——「產業完全對不到」時
+    // 的備用人選就是從這裡來的。真實 cohort 每個角色有 10-12 個產業，假資料
+    // 原本一個角色只有一位（就是預設那位），排除掉就沒人可挑了。
+    id: 900007, slug: "pricing_strategy-food-tw-0007", name: "Chih-Ming Su", name_zh: "蘇志明",
+    title: "Pricing Strategist – 食品飲料", title_zh: "定價策略師｜食品飲料", industry: "food",
+    avatarUrl: "", bio_zh: "食品飲料定價策略。", bio: null, bio_en: null,
+    experienceDetail: "【工作經歷】 2022-至今｜食品飲料行銷", specialty: "競爭定價分析",
+    specialtySummary: null, methodology: null,
+  },
+  {
+    id: 900008, slug: "ux_researcher-beauty-tw-0008", name: "Hsin-Jung Chu", name_zh: "朱欣蓉",
+    title: "UX Researcher – 美妝保養", title_zh: "UX 研究員｜美妝保養", industry: "beauty",
+    avatarUrl: "", bio_zh: "美妝保養用戶研究。", bio: null, bio_en: null,
+    experienceDetail: "【工作經歷】 2023-至今｜美妝保養研究", specialty: "A/B 測試規劃",
+    specialtySummary: null, methodology: null,
+  },
+  {
     // 匯入失敗的那種——文字欄位全是樣板句。
     id: 900005, slug: "brand_strategy-broken-tw-0005", name: "Broken Row", name_zh: "資料壞掉",
     title: "Brand Strategist", title_zh: "品牌策略師｜損壞", industry: "tech",
@@ -69,6 +94,18 @@ vi.mock("../../localDb.js", () => ({
       if (/layer = 'strategy'/.test(sql)) {
         const kw = String(params[0] ?? "").replace(/%/g, "");
         return [AGENTS.filter((a) => `${a.name_zh}${a.title_zh}${a.specialty ?? ""}`.includes(kw))];
+      }
+      // 備用人選①：同產業、排除 tw（slug LIKE ? AND slug NOT LIKE ?）
+      if (/slug NOT LIKE \?/.test(sql)) {
+        const want = String(params[0] ?? "").replace(/%/g, "");
+        const notTw = String(params[1] ?? "").replace(/%/g, "");
+        return [AGENTS.filter((a) => a.slug.startsWith(want) && !a.slug.startsWith(notTw))];
+      }
+      // 備用人選②：同角色、繁中、排除預設那一位（slug <> ?）
+      if (/slug <> \?/.test(sql)) {
+        const want = String(params[0] ?? "").replace(/%/g, "");
+        const exclude = String(params[1] ?? "");
+        return [AGENTS.filter((a) => a.slug.startsWith(want) && a.slug.includes("-tw-") && a.slug !== exclude)];
       }
       // 角色 + 產業代碼查詢（主要路徑）：唯一參數是 'brand_strategy-beauty-tw-%'
       if (/slug LIKE \?\s*\n\s*ORDER BY/.test(sql)) {
@@ -168,10 +205,14 @@ describe("listDirectorsForBrand", () => {
     expect(brand.isFallback).toBe(true);
   });
 
-  it("產業字串太短（1 個字或空白）不拿去查，直接用預設人選", async () => {
-    await listDirectorsForBrand(" ");
-    // 一個角色一次 slug 查詢即可，不應該出現 slug LIKE 的產業查詢
-    expect(calls.some((c) => /slug LIKE \?/.test(c.sql))).toBe(false);
+  it("產業字串太短（1 個字或空白）不拿去比對，直接用預設人選", async () => {
+    const list = await listDirectorsForBrand(" ");
+    // 不該拿空字串去比職稱／專長（那會比到全部）。
+    // 2026-09-24：原本這裡斷言「完全不出現 slug LIKE 查詢」，那個假設在加了
+    // 備用人選之後過期了——即使沒填產業，現在也會去撈同角色的其他人當備用。
+    // 真正要守的是「沒有拿空字串去做產業比對」，所以改看那條兩段式查詢。
+    expect(calls.some((c) => /title_zh LIKE \?/.test(c.sql))).toBe(false);
+    for (const d of list) expect(d.isFallback).toBe(true);
   });
 
   it("顯示欄位優先繁中；bio_zh 沒有就退到 bio，不會變成空白", async () => {
@@ -180,6 +221,40 @@ describe("listDirectorsForBrand", () => {
     expect(brand.name).toBe("潘建宇");
     expect(brand.title).toBe("品牌策略師｜電商 / DTC");
     expect(brand.bio).toBe("Brand strategist for DTC.");
+  });
+});
+
+// 2026-09-24（CJ「服飾 → fallback、不動產 → 對不到…這各狀況要提共備用的人選」）
+describe("對不上產業時的備用人選", () => {
+  it("同產業、別語系的人要被列為備用（服飾在 tw 沒人，但 cn 有）", async () => {
+    const list = await listDirectorsForBrand("服飾");
+    const brand = list.find((d) => d.roleId === "brand_positioning")!;
+    expect(brand.isFallback).toBe(true);
+    expect(brand.alternatives.map((a) => a.agentId)).toContain(900006);
+    const alt = brand.alternatives.find((a) => a.agentId === 900006)!;
+    expect(alt.locale).toBe("cn");          // UI 要能誠實標「這位是簡中市場的」
+  });
+
+  it("產業代碼完全對不到（不動產）也要有備用——同角色、繁中、別的產業", async () => {
+    const list = await listDirectorsForBrand("建設開發 / 不動產（住宅建案品牌）");
+    for (const d of list) {
+      expect(d.isFallback).toBe(true);
+      expect(d.alternatives.length).toBeGreaterThan(0);
+      // 備用不能把預設那一位再列一次
+      expect(d.alternatives.some((a) => a.agentId === d.agentId)).toBe(false);
+    }
+  });
+
+  it("產業對得上的那一位不附備用（他就是答案，多給選項只是雜訊）", async () => {
+    const list = await listDirectorsForBrand("美妝保養");
+    const brand = list.find((d) => d.roleId === "brand_positioning")!;
+    expect(brand.isFallback).toBe(false);
+    expect(brand.alternatives).toEqual([]);
+  });
+
+  it("備用人選自己不再往下長第二層", async () => {
+    const list = await listDirectorsForBrand("服飾");
+    for (const d of list) for (const a of d.alternatives) expect(a.alternatives).toEqual([]);
   });
 });
 

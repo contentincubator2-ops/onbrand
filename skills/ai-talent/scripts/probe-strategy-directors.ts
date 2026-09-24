@@ -27,6 +27,11 @@ function show(label: string, directors: Awaited<ReturnType<typeof listDirectorsF
     line(`      專長：${(d.specialty ?? "(無)").slice(0, 70)}`);
     line(`      經歷：${(d.experience ?? "(無)").replace(/\n/g, " / ").slice(0, 90)}`);
     line(`      招牌問題：${d.signatureQuestions[0] ?? "(無)"}`);
+    if (d.alternatives.length > 0) {
+      line(`      備用人選：${d.alternatives.map((a) => `${a.name}（${a.title}${a.locale && a.locale !== "tw" ? `・${a.locale}` : ""}）`).join("、")}`);
+    } else if (d.isFallback) {
+      line(`      備用人選：(無)`);
+    }
   }
 }
 

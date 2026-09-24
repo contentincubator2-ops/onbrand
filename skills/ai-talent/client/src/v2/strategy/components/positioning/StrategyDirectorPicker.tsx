@@ -27,7 +27,7 @@ import React from "react";
 import { Search, ArrowLeft, Check } from "lucide-react";
 import { trpc } from "../../../../lib/trpc";
 import { useLang } from "../../../../lib/i18n";
-import { type StrategistDirector, avatarSrcOf, roleLabelOf, signatureQuestionsOf } from "../../lib/strategistDirectors";
+import { type StrategistDirector, avatarSrcOf, roleLabelOf, signatureQuestionsOf, localeLabelOf } from "../../lib/strategistDirectors";
 
 const CARD = {
   border: "1.5px solid #E5E5E5", borderRadius: 12, background: "#fff",
@@ -103,6 +103,40 @@ export function DirectorRoster({
                   <div style={{ fontSize: 11.5, color: "#525252", marginTop: 4, lineHeight: 1.5,
                     display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
                     {d.specialty}
+                  </div>
+                )}
+                {/* 2026-09-24（CJ「服飾 → fallback、不動產 → 對不到…這各狀況要提共
+                    備用的人選」）：對不上產業時只丟一位預設顧問、還不給第二個選擇，
+                    使用者只能接受或放棄。這裡把 server 算好的備用人選列出來——
+                    第一種是「同產業但別的市場」（服飾在繁中沒人，但中國/東南亞有），
+                    第二種是「同角色繁中但別的產業」（不動產那種完全對不到的）。 */}
+                {d.isFallback && d.alternatives.length > 0 && (
+                  <div style={{ marginTop: 7, paddingTop: 7, borderTop: "1px dashed #E5E5E5" }}>
+                    <div style={{ fontSize: 10.5, color: "#a3a3a3", fontWeight: 700, marginBottom: 4 }}>
+                      {en ? "No match for your industry — backups:" : "沒有你產業的繁中人選，備用："}
+                    </div>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
+                      {d.alternatives.map((alt) => {
+                        const loc = localeLabelOf(alt.locale, en);
+                        return (
+                          <button
+                            key={alt.agentId}
+                            onClick={() => onPick(alt)}
+                            title={alt.title}
+                            style={{
+                              fontSize: 11, border: "1px solid #D4D4D4", borderRadius: 999,
+                              padding: "3px 9px", background: "#fff", color: "#404040", cursor: "pointer",
+                              maxWidth: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                            }}
+                          >
+                            {alt.name}
+                            <span style={{ color: "#a3a3a3" }}>
+                              {"　"}{alt.title.replace(/^[^｜|]*[｜|]\s*/, "")}{loc ? `・${loc}` : ""}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
                 )}
                 <div style={{ display: "flex", gap: 6, marginTop: 7 }}>
@@ -192,8 +226,12 @@ export function DirectorProfile({
             border: "1px solid #E5E5E5", borderRadius: 8, padding: "7px 9px", margin: 0,
           }}>
             {en
-              ? "No director matched this brand's industry, so this is the default pick for this angle. Search below the roster to find one in your industry."
-              : "沒有找到跟這個品牌產業對得上的人選，這位是這個角度的預設人選。想找你產業的，可以在人選列表下方搜尋。"}
+              ? (director.alternatives.length > 0
+                  ? "No director matched this brand's industry, so this is the default pick for this angle — the roster lists backups (same industry in another market, or another industry in Traditional Chinese)."
+                  : "No director matched this brand's industry, so this is the default pick for this angle. Search below the roster to find one in your industry.")
+              : (director.alternatives.length > 0
+                  ? "沒有跟這個品牌產業對得上的繁中人選，這位是這個角度的預設人選——人選列表裡有列備用（同產業但別的市場，或繁中但別的產業）。"
+                  : "沒有找到跟這個品牌產業對得上的人選，這位是這個角度的預設人選。想找你產業的，可以在人選列表下方搜尋。")}
           </p>
         )}
         {director.bio && <Section title={en ? "About" : "簡介"} body={director.bio} />}
