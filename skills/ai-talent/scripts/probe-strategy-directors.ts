@@ -13,7 +13,7 @@
  *   ./node_modules/.bin/tsx scripts/probe-strategy-directors.ts 2992
  */
 import localPool from "../server/localDb.js";
-import { listDirectorsForBrand, searchDirectors, STRATEGIST_ROLES } from "../server/strategy/core/strategistDirectory.js";
+import { listDirectorsForBrand, searchDirectors, industryCodeOf, STRATEGIST_ROLES } from "../server/strategy/core/strategistDirectory.js";
 
 function line(s = "") { console.log(s); }
 
@@ -45,7 +45,10 @@ async function main() {
   line(`真實品牌 ${brands.length} 個：`);
   for (const b of brands) {
     line();
-    show(`品牌 #${b.id} ${b.name}｜industry = ${JSON.stringify(b.industry)}`, await listDirectorsForBrand(b.industry));
+    show(
+      `品牌 #${b.id} ${b.name}｜industry = ${JSON.stringify(b.industry)} → 產業代碼 ${industryCodeOf(b.industry) ?? "(對不到)"}`,
+      await listDirectorsForBrand(b.industry),
+    );
   }
 
   // 2) 產業命中 vs 對不上，各示範一次——證明兩條路都真的會走到。

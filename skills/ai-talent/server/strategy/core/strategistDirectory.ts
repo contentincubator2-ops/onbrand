@@ -213,12 +213,76 @@ function toDirector(row: any, role: StrategistRole, isFallback: boolean): Strate
 const AVAILABLE = "reviewStatus = 'approved' AND isAvailable = 1";
 
 /**
- * 找這個角色在「使用者品牌的產業」裡的人。品牌的 industry 是自由文字
- * （沒有固定選項清單），所以不另外維護一張關鍵字對照表——直接拿這串文字
- * 去 LIKE 比 agent 的職稱/專長，因為這批 agent 的職稱本來就寫著產業名
- * （「品牌策略師｜電商 / DTC」）。對不上就回 null，由呼叫端退回預設人選。
+ * 品牌產業（自由文字）→ mos_db cohort 的產業代碼。
+ *
+ * 2026-09-23 第一版是「直接拿品牌的 industry 去 LIKE 比 agent 的職稱」，
+ * 想法是這批 agent 職稱本來就寫著產業名，不必維護對照表。**在真實資料上
+ * 幾乎全部落空**（op-probe-strategy-directors 實跑 dev 5 個品牌，5 個全部
+ * fallback）。兩個原因：
+ *   1. 品牌自己填的字跟 agent 職稱用詞不同：「服飾」vs「服裝時尚」、
+ *      「冷凍即食料理 / 生鮮宅配電商」vs「食品飲料」。
+ *   2. 有些 cohort 成員的 title_zh 根本沒寫產業（實測 brand_strategy 的
+ *      beauty/food/pharma 那幾位職稱只寫「品牌策略師」）。
+ * 所以改成兩段：先用這張表把中文產業詞對到 cohort 的產業代碼，再拿代碼去
+ * 比 **slug**（slug 一定帶產業段，例如 brand_strategy-beauty-tw-8146），
+ * 比職稱可靠得多。
+ *
+ * 表只有一份、只在這裡（memory 的教訓：同一件事兩個不同步的關鍵字比對器
+ * 遲早會各自漂移）。沒對到就退回預設人選——cohort 沒有那個產業的人時
+ * （例如服飾/時尚在 tw 這批沒有、不動產完全沒有）誠實 fallback，不硬塞
+ * 一個不相干的產業顧問。
+ * 關鍵字刻意由長到短比：「保健食品」要先於「食品」命中，否則保健品牌會被
+ * 歸到食品飲料。
+ */
+const INDUSTRY_KEYWORDS: Array<[string, string[]]> = [
+  ["health",     ["保健食品", "保健", "健康食品", "營養補充", "膠原", "益生菌", "supplement"]],
+  ["medical",    ["醫療器材", "醫美", "醫療", "診所", "牙醫", "醫學", "clinic", "aesthetic"]],
+  ["pharma",     ["製藥", "藥品", "藥廠", "處方", "pharma"]],
+  ["beauty",     ["美妝", "保養", "彩妝", "護膚", "美容", "香氛", "beauty", "skincare", "cosmetic"]],
+  ["food",       ["食品", "飲料", "餐飲", "冷凍", "生鮮", "料理", "烘焙", "食材", "咖啡", "茶飲", "餐廳", "food", "beverage", "restaurant"]],
+  // fashion：三個 cohort 目前都沒有 -tw- 的人（實測 dev），所以對到也會
+  // 落空、走 fallback。留著是為了將來補了人就自動生效，不是現在有效。
+  ["fashion",    ["服飾", "服裝", "時尚", "鞋款", "配件", "apparel", "fashion"]],
+  ["retail_o2o", ["實體零售", "門市", "零售", "百貨", "連鎖店", "o2o", "retail"]],
+  ["ecom",       ["電商", "dtc", "d2c", "網購", "購物網", "網路商店", "ecommerce", "e-commerce", "shopify"]],
+  ["b2b_saas",   ["b2b saas", "saas", "軟體服務", "雲端服務", "訂閱軟體"]],
+  ["b2b_mfg",    ["製造", "工業", "代工", "oem", "odm", "零組件", "模具", "工廠", "manufacturing"]],
+  ["education",  ["教育", "補習", "課程", "學習", "培訓", "edtech", "education"]],
+  ["fintech",    ["金融科技", "金融", "保險", "支付", "銀行", "證券", "fintech"]],
+  ["travel",     ["旅遊", "觀光", "飯店", "旅宿", "民宿", "旅行", "travel", "hotel", "hospitality"]],
+  ["martech",    ["martech", "行銷科技", "廣告科技", "adtech"]],
+  ["hr_tech",     ["人資", "招募", "人力資源", "hr tech", "hrtech"]],
+];
+
+export function industryCodeOf(industry: string | null | undefined): string | null {
+  const raw = (industry ?? "").trim().toLowerCase();
+  if (raw.length < 2) return null;
+  for (const [code, words] of INDUSTRY_KEYWORDS) {
+    for (const w of words) if (raw.includes(w)) return code;
+  }
+  return null;
+}
+
+/**
+ * 找這個角色在「使用者品牌的產業」裡的人。兩條路都試：先用產業代碼比 slug
+ * （主要路徑），再退一步用原字串比職稱/專長（品牌剛好填了跟職稱一樣的詞時
+ * 會中，例如「美妝保養」）。都沒有就回 null，由呼叫端退回預設人選。
+ * 一律限制 -tw-：這是繁中使用者看的人設，簡中／東南亞那批的敘述語言不同。
  */
 async function findByIndustry(role: StrategistRole, industry: string | null): Promise<any | null> {
+  const code = industryCodeOf(industry);
+  if (code) {
+    const [rows]: any = await localPool.execute(
+      `SELECT ${DIRECTOR_FIELDS} FROM agents
+        WHERE ${AVAILABLE}
+          AND slug LIKE ?
+        ORDER BY CHAR_LENGTH(COALESCE(experienceDetail, '')) DESC, id ASC
+        LIMIT 1`,
+      [`${role.slugPrefix}${code}-tw-%`],
+    );
+    const hit = (rows as any[])[0];
+    if (hit) return hit;
+  }
   const q = (industry ?? "").trim();
   if (q.length < 2) return null;
   const like = `%${q}%`;
@@ -274,9 +338,13 @@ export async function getDirectorByAgentId(
   const role = STRATEGIST_ROLES.find((r) => slug.startsWith(r.slugPrefix)) ?? STRATEGIST_ROLES[0]!;
   // 從「換更多人選」搜來的人不屬於這三個角色的 cohort，roleId 會落在
   // 第一個角色上——這只影響 promptAngle 用哪一段，不影響顯示的真實資料。
-  const matchedIndustry = (industry ?? "").trim();
-  const isFallback = matchedIndustry.length >= 2
-    && !`${row.title_zh ?? ""}${row.title ?? ""}${row.specialty ?? ""}`.includes(matchedIndustry);
+  //
+  // isFallback 的判斷跟 findByIndustry 用同一個依據（產業代碼 vs slug 的
+  // 產業段），否則「怎麼挑的」跟「UI 怎麼說明」會各講一套。使用者自己從
+  // 搜尋挑的人不標 fallback——那是他主動選的，不是我們替他退而求其次。
+  const code = industryCodeOf(industry);
+  const isOneOfRoleCohort = slug.startsWith(role.slugPrefix);
+  const isFallback = !!code && isOneOfRoleCohort && !slug.includes(`-${code}-`);
   return toDirector(row, role, isFallback);
 }
 

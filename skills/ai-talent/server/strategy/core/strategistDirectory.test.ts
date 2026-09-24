@@ -70,7 +70,12 @@ vi.mock("../../localDb.js", () => ({
         const kw = String(params[0] ?? "").replace(/%/g, "");
         return [AGENTS.filter((a) => `${a.name_zh}${a.title_zh}${a.specialty ?? ""}`.includes(kw))];
       }
-      // 角色 + 產業查詢：第一個參數是 slug 前綴，其餘是產業關鍵字
+      // 角色 + 產業代碼查詢（主要路徑）：唯一參數是 'brand_strategy-beauty-tw-%'
+      if (/slug LIKE \?\s*\n\s*ORDER BY/.test(sql)) {
+        const pat = String(params[0] ?? "").replace(/%/g, "");
+        return [AGENTS.filter((a) => a.slug.startsWith(pat))];
+      }
+      // 角色 + 原字串比職稱（退一步的路徑）：第一個參數是 slug 前綴，其餘是產業關鍵字
       if (/slug LIKE \?/.test(sql)) {
         const prefix = String(params[0] ?? "").replace(/%/g, "");
         const kw = String(params[1] ?? "").replace(/%/g, "");
@@ -83,7 +88,7 @@ vi.mock("../../localDb.js", () => ({
   },
 }));
 
-const { sanitizeProse, listDirectorsForBrand, getDirectorByAgentId, searchDirectors, STRATEGIST_ROLES } =
+const { sanitizeProse, listDirectorsForBrand, getDirectorByAgentId, searchDirectors, industryCodeOf, STRATEGIST_ROLES } =
   await import("./strategistDirectory");
 
 beforeEach(() => { calls.length = 0; });
@@ -109,6 +114,31 @@ describe("sanitizeProse", () => {
     expect(sanitizeProse("  短  ")).toBeNull();
     expect(sanitizeProse(null)).toBeNull();
     expect(sanitizeProse(42)).toBeNull();
+  });
+});
+
+describe("industryCodeOf", () => {
+  // 這幾個字串全部來自 dev 真實品牌的 industry 欄位（op-probe-strategy-directors
+  // 實跑結果）——第一版只比字面時這些全部落空，所以這裡用真字串當測資。
+  it("真實品牌填的產業字串要對到 cohort 的產業代碼", () => {
+    expect(industryCodeOf("冷凍即食料理 / 生鮮宅配電商")).toBe("food");
+    expect(industryCodeOf("美妝保養")).toBe("beauty");
+    expect(industryCodeOf("色彩文具")).toBeNull();
+    expect(industryCodeOf("建設開發 / 不動產（住宅建案品牌）")).toBeNull();
+  });
+
+  it("長關鍵字先命中：保健食品是 health 不是 food", () => {
+    expect(industryCodeOf("保健食品")).toBe("health");
+    expect(industryCodeOf("食品飲料")).toBe("food");
+    expect(industryCodeOf("醫療器材 / 醫美")).toBe("medical");
+    expect(industryCodeOf("製藥")).toBe("pharma");
+  });
+
+  it("英文與大小寫也要吃得下，太短或空的回 null", () => {
+    expect(industryCodeOf("B2B SaaS")).toBe("b2b_saas");
+    expect(industryCodeOf("Beauty & Skincare")).toBe("beauty");
+    expect(industryCodeOf(" ")).toBeNull();
+    expect(industryCodeOf(null)).toBeNull();
   });
 });
 
