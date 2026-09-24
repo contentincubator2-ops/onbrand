@@ -1,0 +1,40 @@
+name: Ops (DEV) — probe the three Strategy Directors (read-only)
+
+# 2026-09-23：驗證「品牌策略總監三個人選」在真實 mos_db 上挑得到人。
+# mock 測試守的是規則，這支守的是資料——真實 agents 表裡有沒有那些人、
+# 品牌的 industry 欄位實際長什麼樣、LIKE 比對打不打得到。
+#
+# environment: dev 才會把 SSH 目標換成 DEV VM；prod 目標會讀到另一個資料庫、
+# 「證明」錯的事情。path-scoped push 讓它可以從分支跑，不必碰 main。
+on:
+  push:
+    paths:
+      - '.github/workflows/op-probe-strategy-directors.yml'
+  workflow_dispatch:
+    inputs:
+      brandId:
+        description: '只看某一個品牌（留空＝自動挑最近更新、有填產業的 5 個）'
+        required: false
+
+jobs:
+  probe:
+    runs-on: ubuntu-24.04
+    environment: dev
+    timeout-minutes: 6
+    steps:
+      - name: Resolve the three directors against the DEV database
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 5m
+          script: |
+            set -e
+            cd /opt/onbrand/current/skills/ai-talent
+            set -a; source .env 2>/dev/null; set +a
+            echo "host=$(hostname)  app=$(readlink -f /opt/onbrand/current)"
+            echo "db=${LOCAL_DB_NAME:-mos_db}@${LOCAL_DB_HOST:-127.0.0.1}"
+            echo "commit=$(git -C /opt/onbrand/current rev-parse --short HEAD 2>/dev/null || echo '?')"
+            echo "----------------------------------------------------------"
+            ./node_modules/.bin/tsx scripts/probe-strategy-directors.ts ${{ github.event.inputs.brandId }}
