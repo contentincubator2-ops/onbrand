@@ -1,0 +1,36 @@
+name: Ops (DEV) — interview the product-page director candidates
+
+# 2026-09-24（CJ「接下來是產品頁的人選，請列出十個候選名單，我想針對懶得煮的
+# 問題，要怎麼解決，只有牛舌賣得動的問題，進行面試」）：拿真實品牌資料，讓
+# 10 位候選人各自回答同一題，答案原樣印出來給人評。
+#
+# 會呼叫 LLM（10 次），所以只用 workflow_dispatch，不掛 push——不要有人改別的
+# 檔案就順手燒 10 次模型呼叫。
+on:
+  workflow_dispatch:
+    inputs:
+      brandId:
+        description: '用哪個品牌的資料面試（預設 2972 懶得煮的Tom老闆）'
+        required: false
+        default: '2972'
+
+jobs:
+  interview:
+    runs-on: ubuntu-24.04
+    environment: dev
+    timeout-minutes: 15
+    steps:
+      - name: Run the interview against the DEV database
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 14m
+          script: |
+            set -e
+            cd /opt/onbrand/current/skills/ai-talent
+            set -a; source .env 2>/dev/null; set +a
+            echo "host=$(hostname)  app=$(readlink -f /opt/onbrand/current)"
+            echo "----------------------------------------------------------"
+            ./node_modules/.bin/tsx scripts/interview-product-directors.ts ${{ github.event.inputs.brandId }}
