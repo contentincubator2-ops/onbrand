@@ -196,6 +196,12 @@ export function sanitizeProse(raw: unknown): string | null {
   return cleaned;
 }
 
+/** slug 的產業段：`brand_strategy-fashion-cn-7197` → "fashion"。 */
+function industrySegmentOf(slug: string): string | null {
+  const m = /^[a-z_]+-([a-z0-9_]+)-[a-z]+-/.exec(slug);
+  return m ? m[1]! : null;
+}
+
 /** slug 的語系段：`brand_strategy-fashion-cn-7197` → "cn"。 */
 function localeOf(slug: string): string | null {
   const m = /^[a-z_]+-[a-z0-9_]+-([a-z]+)-/.exec(slug);
@@ -372,10 +378,22 @@ async function findRoleOtherIndustryTw(
         AND slug LIKE '%-tw-%'
         AND slug <> ?
       ORDER BY CHAR_LENGTH(COALESCE(experienceDetail, '')) DESC, id ASC
-      LIMIT ${safe}`,
+      LIMIT ${safe * 6}`,
     [`${role.slugPrefix}%`, excludeSlug],
   );
-  return (rows as any[]) ?? [];
+  // 一個產業只留一位。這批 agent 每個產業有好幾位、彼此差異極小，照「經歷長度」
+  // 排下來很容易三位都是同一個產業（實測不動產拿到兩位醫療器材/醫美）——那等於
+  // 只給了兩個選擇。三位分屬不同產業，使用者才挑得到「最接近我的那個」。
+  const seenIndustry = new Set<string>();
+  const out: any[] = [];
+  for (const r of (rows as any[]) ?? []) {
+    const ind = industrySegmentOf(String(r.slug ?? ""));
+    if (!ind || seenIndustry.has(ind)) continue;
+    seenIndustry.add(ind);
+    out.push(r);
+    if (out.length >= safe) break;
+  }
+  return out;
 }
 
 /**
