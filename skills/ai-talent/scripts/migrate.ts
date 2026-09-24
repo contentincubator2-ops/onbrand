@@ -1298,6 +1298,39 @@ async function main() {
     `);
     console.log("[migrate] strategist_* (conversations/messages): OK");
 
+    // ── strategist_conversations.agentId（2026-09-23 第三輪）────────────
+    // CJ「品牌策略總監的三個人選」＋「每位一串獨立對話」：換一位總監＝換
+    // 一串對話，各自記各自的歷史。所以對話串要記住是哪一位 mos_db agent
+    // 在談——不是只記在訊息上，因為 ensureOpenConversation 是用 (userId,
+    // brandId) 找現有對話，沒有 agentId 的話三位總監會共用同一串。
+    // agentSlug 一起存是為了「mos_db 的 id 被換掉時還看得出原本是誰」，
+    // 只是紀錄用，查詢一律用 agentId。
+    {
+      const wantsCol = async (col: string) => {
+        const [r]: any = await conn.execute(
+          `SELECT 1 FROM information_schema.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'strategist_conversations'
+              AND COLUMN_NAME = ? LIMIT 1`, [col],
+        );
+        return (r as any[]).length === 0;
+      };
+      if (await wantsCol("agentId")) {
+        await conn.execute(`ALTER TABLE strategist_conversations ADD COLUMN agentId INT NULL`);
+        await conn.execute(
+          `CREATE INDEX idx_strategist_conv_agent ON strategist_conversations(userId, brandId, agentId)`,
+        );
+        console.log("[migrate] strategist_conversations.agentId: added");
+      } else {
+        console.log("[migrate] strategist_conversations.agentId: already exists, skipped");
+      }
+      if (await wantsCol("agentSlug")) {
+        await conn.execute(`ALTER TABLE strategist_conversations ADD COLUMN agentSlug VARCHAR(191) NULL`);
+        console.log("[migrate] strategist_conversations.agentSlug: added");
+      } else {
+        console.log("[migrate] strategist_conversations.agentSlug: already exists, skipped");
+      }
+    }
+
     // ── 2026-05-08 (P1-3): UNIQUE index on users.email ──────────────────
     // Race-safe register — concurrent POST /api/auth/register with the
     // same email should produce ONE user, not two. The check-then-insert

@@ -11,7 +11,9 @@ import { strategistChatRouter } from "./strategistChatRouter";
 describe("strategistChatRouter", () => {
   it("router 建得起來，而且沒有用到 tRPC 保留字", () => {
     const names = Object.keys((strategistChatRouter as any)._def.procedures);
-    expect(names.sort()).toEqual(["getConversation", "sendMessage"]);
+    // 2026-09-23：加了 listDirectors / searchDirectors（三位真實 mos_db
+    // 策略總監的人選清單與搜尋，見 strategistDirectory.ts）。
+    expect(names.sort()).toEqual(["getConversation", "listDirectors", "searchDirectors", "sendMessage"]);
   });
 
   it("procedure 名稱不可以撞 Function.prototype 上的東西", () => {

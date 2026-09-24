@@ -36,6 +36,10 @@ import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure } from "../../platform/core/trpc";
 import localPool from "../../localDb";
 import { callModel } from "../../platform/core/multiModelRouter";
+import {
+  listDirectorsForBrand, getDirectorByAgentId, searchDirectors as searchDirectoryAgents,
+  getRole, type StrategistDirector,
+} from "../core/strategistDirectory";
 
 // ── per-user rate limit（跟 supportRouter 同一套數字，同一個理由：LLM 呼叫要花錢）──
 type RateState = { hourCount: number; hourReset: number; minCount: number; minReset: number };
@@ -62,29 +66,59 @@ async function assertBrandOwned(brandId: number, userId: number): Promise<void> 
   }
 }
 
-async function ensureOpenConversation(userId: number, brandId: number): Promise<number> {
+/**
+ * 2026-09-23（CJ「每位一串獨立對話」）：對話串是 (userId, brandId, agentId)
+ * 三個一組，不再是 (userId, brandId)——換一位總監就換一串對話，各自記各自的
+ * 歷史，A 的回答不會混進 B 的口吻裡。
+ *
+ * agentId IS NULL 的那一串是這個欄位加上去之前留下的舊對話（那時所有人共用
+ * 一串）。不硬把它指給某一位總監——那等於替使用者決定「你以前是在跟誰講話」，
+ * 而那個答案我們並不知道。舊對話就留在原地，使用者選了任何一位總監都是開新
+ * 的一串，舊的不會被看到也不會被刪。
+ */
+async function ensureOpenConversation(userId: number, brandId: number, agentId: number, agentSlug: string): Promise<number> {
   const [rows]: any = await localPool.execute(
     `SELECT id FROM strategist_conversations
-      WHERE userId = ? AND brandId = ? AND status = 'open'
+      WHERE userId = ? AND brandId = ? AND agentId = ? AND status = 'open'
       ORDER BY updatedAt DESC LIMIT 1`,
-    [userId, brandId],
+    [userId, brandId, agentId],
   );
   const existing = (rows as any[])[0]?.id;
   if (existing) return Number(existing);
   const [ins]: any = await localPool.execute(
-    `INSERT INTO strategist_conversations (userId, brandId, status) VALUES (?, ?, 'open')`,
-    [userId, brandId],
+    `INSERT INTO strategist_conversations (userId, brandId, agentId, agentSlug, status) VALUES (?, ?, ?, ?, 'open')`,
+    [userId, brandId, agentId, agentSlug.slice(0, 191)],
   );
   return Number(ins?.insertId ?? 0);
 }
 
 async function loadConversation(conversationId: number, userId: number) {
   const [rows]: any = await localPool.execute(
-    `SELECT id, userId, brandId, status FROM strategist_conversations
+    `SELECT id, userId, brandId, agentId, status FROM strategist_conversations
       WHERE id = ? AND userId = ? LIMIT 1`,
     [conversationId, userId],
   );
   return (rows as any[])[0] ?? null;
+}
+
+/** 品牌的產業——決定三位總監從 mos_db 的哪個產業挑人。 */
+async function brandIndustry(brandId: number, userId: number): Promise<string | null> {
+  const [rows]: any = await localPool.execute(
+    `SELECT industry FROM brands WHERE id = ? AND userId = ? LIMIT 1`, [brandId, userId],
+  );
+  const v = (rows as any[])[0]?.industry;
+  return typeof v === "string" && v.trim() ? v.trim() : null;
+}
+
+/**
+ * 對話串上記的那一位總監。查不到（agentId 是 NULL 的舊對話，或 mos_db 的
+ * 那一列被移除了）就回 null，呼叫端退回「沒有指定人設」的通用提示詞——
+ * 不是隨便指派一位頂替，那會讓使用者看到的名字跟實際回答的人設對不上。
+ */
+async function directorForConversation(conv: any, userId: number): Promise<StrategistDirector | null> {
+  const agentId = Number(conv?.agentId ?? 0);
+  if (!agentId) return null;
+  return await getDirectorByAgentId(agentId, await brandIndustry(Number(conv.brandId), userId));
 }
 
 async function loadMessages(conversationId: number, limit = 100) {
@@ -176,24 +210,73 @@ const STRATEGIST_SYSTEM_PROMPT = `你是 OnBrand 的策略總監，繁體中文�
 一顆按鈕，不是這串文字本身），標記後面接的是按鈕上要顯示的字（≤12字）：
   <<action:open_monitor>>看看外部有什麼變化
   <<action:open_healthcheck>>帶我去做健檢
-沒有工具幫得上忙就正常聊天，不要為了用而用、硬塞標記。一次最多建議一個。`;
+沒有工具幫得上忙就正常聊天，不要為了用而用、硬塞標記。一次最多建議一個。
+
+回答的最後面，另外附上 2 個使用者接下來可以追問你的問題，每個一行、格式是
+  <<ask>>問題（≤20字，用使用者的口吻寫，不是你的口吻）
+這兩個問題要是「從你剛才這段回答自然會長出來的下一題」，不是換個話題的
+通用問句；也要是你這個角度答得出來的。真的沒有值得追問的就不要附。`;
+
+/**
+ * 2026-09-23（CJ「品牌策略總監的三個人選」）：人設不再是一段寫死的文字，
+ * 而是 mos_db 那一位 agent 的真實資料——名字、職稱、【工作經歷】、專長，
+ * 原樣放進系統提示裡。三位總監因此真的會答得不一樣：不只是換頭像，連
+ * 「他是誰、做過什麼、從哪個角度看事情」都換了。
+ *
+ * director 是 null（agentId 還沒寫進去的舊對話）時退回通用提示詞，不硬
+ * 指派一位——見 directorForConversation() 的說明。
+ */
+function buildSystemPrompt(director: StrategistDirector | null, brandCtx: string): string {
+  const parts = [STRATEGIST_SYSTEM_PROMPT];
+  if (director) {
+    const role = getRole(director.roleId);
+    const persona: string[] = [
+      `[你是誰]`,
+      `你叫${director.name}，職稱是${director.title}。以第一人稱用這個身分說話，不要自稱「AI」或「助理」。`,
+      role.promptAngle,
+    ];
+    if (director.specialty) persona.push(`你的專長：${director.specialty}`);
+    if (director.experience) persona.push(`你的經歷：\n${director.experience}`);
+    if (director.methodology) persona.push(`你慣用的方法論：\n${director.methodology.slice(0, 800)}`);
+    persona.push(
+      `經歷裡沒寫到的事不要編（不要編客戶名字、數字、年份）。使用者問你「你是誰/你做過什麼」`
+      + `就照上面這些講，講不出來的部分就說沒有這段資料。`,
+    );
+    parts.push(persona.join("\n"));
+  }
+  if (brandCtx) parts.push(`[品牌定位摘要]\n${brandCtx}\n[/品牌定位摘要]`);
+  return parts.join("\n\n");
+}
 
 const ACTION_RE = /<<action:([a-z_0-9]+)>>\s*([^\n<]*)/gi;
+/** 2026-09-23（CJ「對話中持續出現的追問建議」）：回答末尾附的下一題。 */
+const ASK_RE = /<<ask>>\s*([^\n<]*)/gi;
 export type StrategistAction =
   | { kind: "open_monitor"; label: string }
   | { kind: "open_healthcheck"; label: string };
 
-function parseActions(raw: string): { clean: string; actions: StrategistAction[] } {
-  if (!raw) return { clean: "", actions: [] };
+function parseActions(raw: string): { clean: string; actions: StrategistAction[]; followUps: string[] } {
+  if (!raw) return { clean: "", actions: [], followUps: [] };
   const actions: StrategistAction[] = [];
-  const clean = raw.replace(ACTION_RE, (_full, kind: string, label: string) => {
+  const followUps: string[] = [];
+  let clean = raw.replace(ACTION_RE, (_full, kind: string, label: string) => {
     const trimmedLabel = (label ?? "").trim().slice(0, 24) || _full;
     const lower = kind.toLowerCase();
     if (lower === "open_monitor") actions.push({ kind: "open_monitor", label: trimmedLabel });
     else if (lower === "open_healthcheck") actions.push({ kind: "open_healthcheck", label: trimmedLabel });
     return "";
   });
-  return { clean: clean.replace(/\n{3,}/g, "\n\n").trim(), actions: actions.slice(0, 1) };
+  clean = clean.replace(ASK_RE, (_full, q: string) => {
+    const text = (q ?? "").trim().slice(0, 60);
+    // 空的、或只剩標點的就不要——寧可少一顆膠囊，也不要一顆點了沒意義的。
+    if (text.replace(/[\s。，、？?!！]/g, "").length >= 4) followUps.push(text);
+    return "";
+  });
+  return {
+    clean: clean.replace(/\n{3,}/g, "\n\n").trim(),
+    actions: actions.slice(0, 1),
+    followUps: followUps.slice(0, 3),
+  };
 }
 
 /**
@@ -204,8 +287,16 @@ function parseActions(raw: string): { clean: string; actions: StrategistAction[]
  * 名字的一般問候。只在對話「第一次建立、還沒有任何訊息」時算一次，之後
  * 不會每次開面板都重講一次開場白。
  */
-async function buildProactiveOpening(brandId: number, userId: number, brandName: string, en: boolean):
-  Promise<{ content: string; actions: StrategistAction[] }> {
+async function buildProactiveOpening(
+  brandId: number, userId: number, brandName: string, en: boolean, director: StrategistDirector | null,
+): Promise<{ content: string; actions: StrategistAction[] }> {
+  // 2026-09-23：開場白用這位總監自己的名字跟角度自我介紹——三位人選各自
+  // 一串對話，開場就該看得出來現在是誰在講話（而不是三串都寫「策略總監」）。
+  const en_ = en;
+  const who = director
+    ? (en_ ? `${director.name}, ${brandName}'s ${director.roleLabelEn} director` : `${director.name}，${brandName}的${director.roleLabel}總監`)
+    : (en_ ? `${brandName}'s Strategy Director` : `${brandName}的策略總監`);
+  const hi = en_ ? `Hi, I'm ${who}.` : `嗨，我是${who}。`;
   try {
     const [rows]: any = await localPool.execute(
       `SELECT JSON_UNQUOTE(JSON_EXTRACT(positioning, '$._workbench.healthCheck.checkedAt')) AS hcCheckedAt
@@ -216,8 +307,8 @@ async function buildProactiveOpening(brandId: number, userId: number, brandName:
     if (!hcDone) {
       return {
         content: en
-          ? `Hi, I'm ${brandName}'s Strategy Director. You haven't run a Strategy Health Check yet — want me to take you there? I'll independently read your brand's own research and see if it agrees with what you picked in the workbench.`
-          : `嗨，我是${brandName}的策略總監。你還沒做過策略健檢——要我帶你去看看嗎？我會獨立看一次品牌自己的研究資料，看跟你在工作台選的是不是一致。`,
+          ? `${hi} You haven't run a Strategy Health Check yet — want me to take you there? I'll independently read your brand's own research and see if it agrees with what you picked in the workbench.`
+          : `${hi}你還沒做過策略健檢——要我帶你去看看嗎？我會獨立看一次品牌自己的研究資料，看跟你在工作台選的是不是一致。`,
         actions: [{ kind: "open_healthcheck", label: en ? "Take me there" : "帶我去看看" }],
       };
     }
@@ -231,37 +322,75 @@ async function buildProactiveOpening(brandId: number, userId: number, brandName:
     if (unread > 0) {
       return {
         content: en
-          ? `Hi, I'm ${brandName}'s Strategy Director. There ${unread === 1 ? "is" : "are"} ${unread} unread strategy alert${unread === 1 ? "" : "s"} waiting — want to take a look?`
-          : `嗨，我是${brandName}的策略總監。有 ${unread} 則策略監測提醒還沒看——要看一下嗎？`,
+          ? `${hi} There ${unread === 1 ? "is" : "are"} ${unread} unread strategy alert${unread === 1 ? "" : "s"} waiting — want to take a look?`
+          : `${hi}有 ${unread} 則策略監測提醒還沒看——要看一下嗎？`,
         actions: [{ kind: "open_monitor", label: en ? "Show me" : "看一下" }],
       };
     }
   } catch { /* non-fatal — fall through to generic greeting */ }
   return {
     content: en
-      ? `Hi, I'm ${brandName}'s Strategy Director. Ask me anything about this brand's positioning — or I can point you to Strategy Monitoring or a Health Check.`
-      : `嗨，我是${brandName}的策略總監。問我任何跟這個品牌定位有關的問題，或者我可以帶你去看看策略監測或做一次健檢。`,
+      ? `${hi} Ask me anything about this brand's strategy from my angle — or I can point you to Strategy Monitoring or a Health Check.`
+      : `${hi}${director ? `我看的是${director.roleLabel}這一塊，` : ""}問我任何跟這個品牌策略有關的問題，或者我可以帶你去看看策略監測或做一次健檢。`,
     actions: [],
   };
 }
 
+/** 訊息上的 contextSnapshot 是 JSON 欄位，驅動可能回字串也可能回物件。 */
+function snapshotOf(raw: any): any {
+  if (!raw) return {};
+  try { return (typeof raw === "string" ? JSON.parse(raw) : raw) ?? {}; } catch { return {}; }
+}
+
 export const strategistChatRouter = router({
-  /** 取得（或建立）這個品牌的開放對話串 + 歷史訊息，聊天面板開啟時呼叫一次。
-   *  全新對話（還沒有任何訊息）會先幫使用者寫好一則開場白——見
-   *  buildProactiveOpening()。 */
-  getConversation: protectedProcedure
+  /**
+   * 這個品牌的三位策略總監（真實 mos_db agent）。2026-09-23：UI 不再有任何
+   * 寫死的人設——名字/職稱/經歷/專長全部從這裡來，見 strategistDirectory.ts。
+   */
+  listDirectors: protectedProcedure
     .input(z.object({ brandId: z.number().int().positive() }))
     .query(async ({ ctx, input }) => {
       const userId = ctx.user!.id;
       await assertBrandOwned(input.brandId, userId);
-      const conversationId = await ensureOpenConversation(userId, input.brandId);
+      const industry = await brandIndustry(input.brandId, userId);
+      const directors = await listDirectorsForBrand(industry);
+      return { brandIndustry: industry, directors };
+    }),
+
+  /** 「換更多人選」：在 mos_db 的 strategy 層 agent 裡搜。 */
+  searchDirectors: protectedProcedure
+    .input(z.object({ search: z.string().min(1).max(60), limit: z.number().int().min(1).max(30).optional() }))
+    .query(async ({ input }) => {
+      return { directors: await searchDirectoryAgents(input.search, input.limit ?? 12) };
+    }),
+
+  /** 取得（或建立）這個品牌 × 這位總監的開放對話串 + 歷史訊息，聊天面板開啟時呼叫一次。
+   *  全新對話（還沒有任何訊息）會先幫使用者寫好一則開場白——見
+   *  buildProactiveOpening()。 */
+  getConversation: protectedProcedure
+    .input(z.object({
+      brandId: z.number().int().positive(),
+      // 2026-09-23：每位總監一串獨立對話，所以要指定是哪一位。沒給的話
+      // （舊前端）退回這個品牌的第一位，不會炸。
+      agentId: z.number().int().positive().optional(),
+    }))
+    .query(async ({ ctx, input }) => {
+      const userId = ctx.user!.id;
+      await assertBrandOwned(input.brandId, userId);
+      const industry = await brandIndustry(input.brandId, userId);
+      const director = input.agentId
+        ? await getDirectorByAgentId(input.agentId, industry)
+        : (await listDirectorsForBrand(industry))[0] ?? null;
+      if (!director) throw new TRPCError({ code: "NOT_FOUND", message: "strategy director not found" });
+
+      const conversationId = await ensureOpenConversation(userId, input.brandId, director.agentId, director.slug);
       let messages = await loadMessages(conversationId, 60);
       if (messages.length === 0) {
         const [brandRows]: any = await localPool.execute(
           `SELECT name FROM brands WHERE id = ? AND userId = ? LIMIT 1`, [input.brandId, userId],
         );
         const brandName = (brandRows as any[])[0]?.name ?? "";
-        const opening = await buildProactiveOpening(input.brandId, userId, brandName, false);
+        const opening = await buildProactiveOpening(input.brandId, userId, brandName, false, director);
         await insertMessage({
           conversationId, role: "strategist", content: opening.content,
           contextSnapshot: opening.actions.length > 0 ? { actions: opening.actions } : undefined,
@@ -270,13 +399,16 @@ export const strategistChatRouter = router({
       }
       return {
         conversationId,
-        messages: messages.map((m) => ({
-          id: m.id, role: m.role, content: m.content,
-          actions: m.contextSnapshot
-            ? (() => { try { return (typeof m.contextSnapshot === "string" ? JSON.parse(m.contextSnapshot) : m.contextSnapshot)?.actions ?? []; } catch { return []; } })()
-            : [],
-          createdAt: m.createdAt,
-        })),
+        director,
+        messages: messages.map((m) => {
+          const snap = snapshotOf(m.contextSnapshot);
+          return {
+            id: m.id, role: m.role, content: m.content,
+            actions: snap.actions ?? [],
+            followUps: snap.followUps ?? [],
+            createdAt: m.createdAt,
+          };
+        }),
       };
     }),
 
@@ -304,9 +436,12 @@ export const strategistChatRouter = router({
       const userMsgId = await insertMessage({ conversationId: input.conversationId, role: "user", content: input.content });
 
       const brandCtx = await gatherBrandContext(input.brandId, userId);
+      // 2026-09-23：人設來自這串對話記住的那一位 mos_db agent——所以三位
+      // 總監答出來的東西真的不一樣（名字、經歷、看事情的角度都換了）。
+      const director = await directorForConversation(conv, userId);
       const history = await loadMessages(input.conversationId);
       const llmMessages = [
-        { role: "system" as const, content: STRATEGIST_SYSTEM_PROMPT + (brandCtx ? `\n\n[品牌定位摘要]\n${brandCtx}\n[/品牌定位摘要]` : "") },
+        { role: "system" as const, content: buildSystemPrompt(director, brandCtx) },
         ...history.slice(-10).map((m) => ({
           role: (m.role === "user" ? "user" : "assistant") as "user" | "assistant",
           content: m.content,
@@ -322,15 +457,17 @@ export const strategistChatRouter = router({
       }
       if (!replyRaw) replyRaw = "這題我答不太上來，換個問法試試？";
 
-      const { clean, actions } = parseActions(replyRaw);
+      const { clean, actions, followUps } = parseActions(replyRaw);
       const strategistMsgId = await insertMessage({
         conversationId: input.conversationId, role: "strategist", content: clean,
-        contextSnapshot: actions.length > 0 ? { actions } : undefined,
+        contextSnapshot: (actions.length > 0 || followUps.length > 0) ? { actions, followUps } : undefined,
       });
 
       return {
         userMessage: { id: userMsgId, role: "user" as const, content: input.content },
-        strategistMessage: { id: strategistMsgId, role: "strategist" as const, content: clean, actions },
+        strategistMessage: {
+          id: strategistMsgId, role: "strategist" as const, content: clean, actions, followUps,
+        },
       };
     }),
 });
