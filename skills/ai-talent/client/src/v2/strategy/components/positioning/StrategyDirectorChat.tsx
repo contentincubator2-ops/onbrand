@@ -33,11 +33,13 @@ type StrategistAction = { kind: "open_monitor" | "open_healthcheck"; label: stri
 type ChatMessage = { id: number; role: string; content: string; actions?: StrategistAction[]; followUps?: string[] };
 
 export default function StrategyDirectorChat({
-  brandId, agentId, director, height, onOpenMonitor, onOpenHealthCheck,
+  brandId, agentId, productId, director, height, onOpenMonitor, onOpenHealthCheck,
 }: {
   brandId: number;
   /** 哪一位總監——每位一串獨立對話，所以這個值變了就要整串重載。 */
   agentId: number | null;
+  /** 使用者現在正在看的產品（URL 的 ?p=）；後端會把那個產品的完整定位加進 prompt。 */
+  productId: number | null;
   director: StrategistDirector | null;
   /** 跟 roster / profile 檢視等高，避免切換檢視時面板高度跳動。 */
   height: number;
@@ -95,7 +97,7 @@ export default function StrategyDirectorChat({
     setSending(true);
     if (text === undefined) setInput("");
     setMessages((prev) => [...prev, { id: Date.now(), role: "user", content }]);
-    sendMut?.mutate?.({ conversationId, brandId, content }, {
+    sendMut?.mutate?.({ conversationId, brandId, content, ...(productId ? { productId } : {}) }, {
       onSuccess: (r: any) => {
         setSending(false);
         if (r?.strategistMessage) {

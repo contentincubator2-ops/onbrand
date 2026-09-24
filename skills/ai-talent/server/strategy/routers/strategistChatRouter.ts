@@ -40,6 +40,8 @@ import {
   listDirectorsForBrand, getDirectorByAgentId, searchDirectors as searchDirectoryAgents,
   getRole, type StrategistDirector,
 } from "../core/strategistDirectory";
+import { buildBrandPrefix } from "../core/brandContext";
+import { buildBrandCatalogBlock } from "../core/brandCatalog";
 
 // ── per-user rate limit（跟 supportRouter 同一套數字，同一個理由：LLM 呼叫要花錢）──
 type RateState = { hourCount: number; hourReset: number; minCount: number; minReset: number };
@@ -154,10 +156,58 @@ async function insertMessage(args: {
   return Number(ins?.insertId ?? 0);
 }
 
-/** 品牌定位摘要——讓總監真的答得出具體問題，不是空話。跟 supportRouter 的
- *  gatherSessionContext 同一種做法（直接 SQL 抓幾個關鍵欄位），但這裡的
- *  角色是「策略顧問」，抓的欄位更完整（受眾/競爭/差異化/標語/語氣）。 */
-async function gatherBrandContext(brandId: number, userId: number): Promise<string> {
+/**
+ * 品牌完整資料——讓總監真的答得出具體問題，不是空話。
+ *
+ * 2026-09-23（CJ「我希望每一個頁面駐守的總監，都能先讀取該品牌完整的資料，
+ * 包括品牌、產品列表等內容，不會出現：不行，我這裡沒有讀取你產品列表的
+ * 功能。」）：原本這裡是手寫 SQL 抓 6 個定位欄位（標語 / WHY / 受眾 /
+ * 差異化 / 健檢時間），產品與活動一個字都沒有，所以使用者問「我有哪些
+ * 產品」時，模型只能照實說它看不到——那不是模型客氣，是 prompt 裡真的
+ * 沒有。
+ *
+ * 改成三段接起來：
+ *   1. buildBrandPrefix()——既有的 canonical 品牌大腦入口（定位各段、語氣、
+ *      禁用/偏好詞、市場脈絡）。刻意重用而不是自己再抓一次：同一件事有兩份
+ *      各自維護的組裝邏輯遲早會漂移（memory 的 taskRegistry 教訓）。使用者
+ *      現在正在看某個產品時把 productId 一起傳進去，那個產品的完整定位也會
+ *      進來。
+ *   2. buildBrandCatalogBlock()——整份產品／活動清單（brandCatalog.ts）。
+ *   3. 策略總監自己要用的兩個狀態：上次健檢時間、未讀監測提醒數。
+ */
+async function gatherBrandContext(brandId: number, userId: number, productId?: number | null): Promise<string> {
+  const ctx: string[] = [];
+
+  // 1) canonical 品牌大腦。失敗不致命——後面兩段還是有價值。
+  try {
+    const prefix = await buildBrandPrefix(brandId, productId ?? null, null, "full");
+    if (prefix && prefix.trim()) ctx.push(prefix.trim());
+  } catch { /* non-fatal */ }
+
+  // 2) 產品／活動清單
+  try {
+    const catalog = await buildBrandCatalogBlock(brandId, userId);
+    if (catalog) ctx.push(catalog);
+  } catch { /* non-fatal */ }
+
+  // 3) 策略總監專屬狀態（健檢／監測）——這兩件事是他的職責，要知道現況才
+  //    建議得準。
+  try {
+    const [alertRows]: any = await localPool.execute(
+      `SELECT COUNT(*) AS c FROM strategy_alerts WHERE brandId = ? AND status = 'new'`, [brandId],
+    );
+    const unread = Number((alertRows as any[])[0]?.c ?? 0);
+    ctx.push(unread > 0 ? `【策略監測】有 ${unread} 則提醒還沒看` : `【策略監測】沒有未讀提醒`);
+  } catch { /* non-fatal */ }
+
+  const legacy = await gatherBrandBasics(brandId, userId);
+  if (legacy) ctx.push(legacy);
+  return ctx.join("\n\n");
+}
+
+/** 品牌最關鍵的幾個定位欄位 + 健檢狀態。buildBrandPrefix 整段失敗時，這段
+ *  仍然讓總監答得出最基本的問題（標語、受眾、差異化）。 */
+async function gatherBrandBasics(brandId: number, userId: number): Promise<string> {
   const ctx: string[] = [];
   try {
     const [rows]: any = await localPool.execute(
@@ -188,11 +238,24 @@ async function gatherBrandContext(brandId: number, userId: number): Promise<stri
 
 const STRATEGIST_SYSTEM_PROMPT = `你是 OnBrand 的策略總監，繁體中文，口語、直接、不要客套、不要講「親愛的」。
 
+【你手上有什麼】（2026-09-23，CJ 明確要求）
+這則對話的最後面附了這個品牌的完整資料：品牌定位各段、語氣與禁用/偏好詞、
+市場脈絡、**整份產品列表**、**整份活動列表**、策略監測未讀數、上次健檢時間。
+所以：
+- **絕對不要說「我沒有讀取你產品列表的功能」「我看不到你的產品」這類話**。
+  你看得到，就在下面。使用者問「我有哪些產品」就直接照清單回答。
+- 清單上寫「尚未建立」「尚未填寫」是**資料真的是空的**，不是你讀不到。這種
+  時候要講清楚是哪一格還沒填、填了會有什麼差別，而不是說自己沒有權限或功能。
+- 清單上寫「讀取時發生錯誤」才是真的拿不到，那就照實說這一輪拿不到，不要猜
+  產品名字。
+- 資料裡沒有的東西（例如某個產品的銷售數字）就說沒有這項資料，不要編——
+  「沒有這項資料」跟「我沒有這個功能」也是兩句不同的話，講前者。
+
 你的職責有三件事：
-1. 回答用戶關於這個品牌策略的問題——定位、受眾、競爭、差異化、標語、語氣，
-   任何策略相關的疑問都可以問你。根據下方的品牌定位摘要具體回答，講得出
-   「為什麼」，不要講空泛的行銷場面話。摘要沒提到的東西，誠實說你不知道，
-   不要編。
+1. 回答用戶關於這個品牌策略的問題——定位、受眾、競爭、差異化、標語、語氣、
+   產品組合，任何策略相關的疑問都可以問你。根據下方的品牌資料具體回答，
+   講得出「為什麼」，不要講空泛的行銷場面話。資料沒提到的東西，誠實說沒有
+   這項資料，不要編。
 2. 用戶問「這是什麼方法論」「SoWork 定位法是什麼」「這個系統是怎麼運作的」
    這類問題，用自己的話講清楚（不用照抄），核心事實是：SoWork 品牌定位法
    ——先鎖定你是誰，AI 才知道每篇文章要說什麼；包含 14 步定位、文字／
@@ -417,6 +480,8 @@ export const strategistChatRouter = router({
       conversationId: z.number().int().positive(),
       brandId: z.number().int().positive(),
       content: z.string().min(1).max(2000),
+      /** 使用者目前在看的產品（URL 的 ?p=）——有的話那個產品的完整定位會進 prompt。 */
+      productId: z.number().int().positive().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const userId = ctx.user!.id;
@@ -435,7 +500,9 @@ export const strategistChatRouter = router({
 
       const userMsgId = await insertMessage({ conversationId: input.conversationId, role: "user", content: input.content });
 
-      const brandCtx = await gatherBrandContext(input.brandId, userId);
+      // 使用者現在正在看某個產品時（URL 的 ?p=），把那個產品的完整定位
+      // 也一起帶進來——常駐總監要能接得上「我現在看的這個產品」。
+      const brandCtx = await gatherBrandContext(input.brandId, userId, input.productId ?? null);
       // 2026-09-23：人設來自這串對話記住的那一位 mos_db agent——所以三位
       // 總監答出來的東西真的不一樣（名字、經歷、看事情的角度都換了）。
       const director = await directorForConversation(conv, userId);

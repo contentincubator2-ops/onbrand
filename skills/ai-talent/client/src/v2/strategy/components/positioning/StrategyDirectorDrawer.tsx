@@ -47,7 +47,7 @@
  * 帶著 ?tool= 參數——BrandsPage 讀到這個參數會自動展開對應的面板。
  */
 import React from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { trpc } from "../../../../lib/trpc";
 import { useLang } from "../../../../lib/i18n";
 import {
@@ -65,6 +65,13 @@ export default function StrategyDirectorDrawer({ brandId }: { brandId: number | 
   const { lang } = useLang();
   const en = lang === "en";
   const navigate = useNavigate();
+  // 2026-09-23（CJ「每一個頁面駐守的總監，都能先讀取該品牌完整的資料」）：
+  // 使用者正在看某個產品時（URL 的 ?p=），把產品 id 一起送給後端，那個產品
+  // 的完整定位會進 prompt。品牌大腦與整份產品清單則是後端一律附上，不靠
+  // 這個參數——所以就算不在產品頁，總監也答得出「我有哪些產品」。
+  const [searchParams] = useSearchParams();
+  const urlProductId = Number(searchParams.get("p"));
+  const productId = Number.isFinite(urlProductId) && urlProductId > 0 ? urlProductId : null;
 
   const [open, setOpen] = React.useState(false);
   const [view, setView] = React.useState<View>("chat");
@@ -248,6 +255,7 @@ export default function StrategyDirectorDrawer({ brandId }: { brandId: number | 
             <StrategyDirectorChat
               brandId={brandId}
               agentId={agentId}
+              productId={productId}
               director={current}
               height={PANEL_HEIGHT}
               onOpenMonitor={() => { setOpen(false); navigate(`/brands/edit?b=${brandId}&cat=positioning&tool=monitor`); }}

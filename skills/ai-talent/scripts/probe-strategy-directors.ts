@@ -13,6 +13,8 @@
  *   ./node_modules/.bin/tsx scripts/probe-strategy-directors.ts 2992
  */
 import localPool from "../server/localDb.js";
+import { buildBrandCatalogBlock } from "../server/strategy/core/brandCatalog.js";
+import { buildBrandPrefix } from "../server/strategy/core/brandContext.js";
 import { listDirectorsForBrand, searchDirectors, industryCodeOf, STRATEGIST_ROLES } from "../server/strategy/core/strategistDirectory.js";
 
 function line(s = "") { console.log(s); }
@@ -57,7 +59,25 @@ async function main() {
   line();
   show("industry = 色彩文具（預期全部 fallback）", await listDirectorsForBrand("色彩文具"));
 
-  // 3)「換更多人選」搜尋
+  // 3) 總監實際看得到的品牌資料——CJ「不會出現：不行，我這裡沒有讀取你
+  //    產品列表的功能」。把會進 prompt 的那一段原文印出來，是驗證這件事
+  //    唯一誠實的方法（跑 LLM 問一次只能證明那一次的回答）。
+  line();
+  for (const b of brands.slice(0, 2)) {
+    const [ownerRows]: any = await localPool.execute(`SELECT userId FROM brands WHERE id = ? LIMIT 1`, [b.id]);
+    const userId = Number((ownerRows as any[])[0]?.userId ?? 0);
+    const catalog = await buildBrandCatalogBlock(b.id, userId);
+    let prefixLen = -1;
+    try { prefixLen = (await buildBrandPrefix(b.id, null, null, "full")).length; } catch { /* 印 -1 代表失敗 */ }
+    line(`── 品牌 #${b.id} ${b.name}（userId ${userId}）進 prompt 的資料 ──`);
+    line(`   品牌大腦 buildBrandPrefix 長度：${prefixLen} 字`);
+    line(catalog.split("
+").map((l) => `   ${l}`).join("
+").slice(0, 1600));
+    line();
+  }
+
+  // 4)「換更多人選」搜尋
   line();
   for (const kw of ["定價", "美妝", "B2B"]) {
     const found = await searchDirectors(kw, 5);
