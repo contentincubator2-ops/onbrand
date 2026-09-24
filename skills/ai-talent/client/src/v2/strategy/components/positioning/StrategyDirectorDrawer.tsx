@@ -52,7 +52,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { trpc } from "../../../../lib/trpc";
 import { useLang } from "../../../../lib/i18n";
 import {
-  type StrategistDirector, avatarSrcOf, roleLabelOf, readStoredDirector, writeStoredDirector,
+  type StrategistDirector, avatarSrcOf, roleLabelOf, readStoredDirector, writeStoredDirector, scopeFromUrl,
 } from "../../lib/strategistDirectors";
 import StrategyDirectorChat from "./StrategyDirectorChat";
 import { DirectorRoster, DirectorProfile } from "./StrategyDirectorPicker";
@@ -73,9 +73,11 @@ export default function StrategyDirectorDrawer({ brandId }: { brandId: number | 
   const [searchParams] = useSearchParams();
   const urlProductId = Number(searchParams.get("p"));
   const productId = Number.isFinite(urlProductId) && urlProductId > 0 ? urlProductId : null;
-  // 2026-09-24（CJ「產品定位就用你推薦的那三位人選」）：產品頁是另一組角色
-  // （產品價值主張／Kano 產品策略／定價與組合），所以 scope 跟著 URL 走。
-  const scope: "brand" | "product" = productId ? "product" : "brand";
+  // 2026-09-24（CJ「產品定位就用你推薦的那三位人選」＋「右下方還是寫著策略總監，
+  // 沒有更換成產品的專家」）：產品情境用另一組角色（產品價值主張／Kano／定價與
+  // 組合）。判斷規則在 scopeFromUrl——**產品清單頁（cat=products）也算**，
+  // 不是只有單一產品頁（?p=）。
+  const scope = scopeFromUrl({ p: searchParams.get("p"), cat: searchParams.get("cat") });
 
   const [open, setOpen] = React.useState(false);
   const [view, setView] = React.useState<View>("chat");
@@ -163,13 +165,22 @@ export default function StrategyDirectorDrawer({ brandId }: { brandId: number | 
             background: "#fff", border: "2px solid #111", borderRadius: 999,
             padding: "6px 12px", boxShadow: "2px 2px 0 rgba(17,17,17,0.22)",
           }}>
-            {en ? "Strategy Director" : "策略總監"}
+            {/* 2026-09-24：標籤也跟著 scope 換字。CJ 在產品清單頁看到的是
+                「策略總監」＋一位品牌策略師，兩個訊號都說「這不是產品專家」；
+                人換了、標籤沒換的話，收合狀態下還是看不出來切過。 */}
+            {scope === "product"
+              ? (en ? "Product Strategy" : "產品策略總監")
+              : (en ? "Strategy Director" : "策略總監")}
           </div>
         )}
         <button
           onClick={() => setOpen((v) => !v)}
           aria-label={en ? "Open your Strategy Director" : "打開你的策略總監"}
-          title={en ? "Your Strategy Director — built for this brand" : "你的策略總監——為這個品牌而設計"}
+          title={
+            scope === "product"
+              ? (en ? "Your product strategy directors — value proposition, Kano, pricing" : "你的產品策略總監——價值主張、Kano、定價與組合")
+              : (en ? "Your Strategy Director — built for this brand" : "你的策略總監——為這個品牌而設計")
+          }
           style={{
             position: "relative", flexShrink: 0,
             width: 56, height: 56, borderRadius: "50%",

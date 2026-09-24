@@ -74,6 +74,24 @@ export function localeLabelOf(locale: string | null | undefined, en: boolean): s
   }
 }
 
+/**
+ * 這個頁面該用哪一組策略總監。
+ *
+ * 2026-09-24（CJ：「右下方，還是寫著策略總監，沒有更換成產品的專家」——他當時
+ * 站在**產品清單頁**）：第一版只看 URL 的 `?p=`（單一產品頁）就切 scope，結果
+ * 產品清單頁（`cat=products`）還是掛著品牌定位總監。產品清單頁從頭到尾在談產品，
+ * 卻配一位品牌策略師，那就是答非所問。
+ *
+ * 規則寫成函式而不是散在元件裡的條件式，是因為「哪些頁面算產品情境」之後一定
+ * 還會長（產品變體、產品任務…），散著寫就會有兩套不同步的判斷。
+ */
+export function scopeFromUrl(params: { p?: string | null; cat?: string | null }): StrategistScope {
+  const pid = Number(params.p);
+  if (Number.isFinite(pid) && pid > 0) return "product";   // 單一產品頁
+  if ((params.cat ?? "") === "products") return "product"; // 產品清單頁
+  return "brand";
+}
+
 export function signatureQuestionsOf(d: StrategistDirector | null | undefined, en: boolean): string[] {
   if (!d) return [];
   const list = en ? d.signatureQuestionsEn : d.signatureQuestions;
