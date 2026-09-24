@@ -4,9 +4,13 @@ name: Ops (DEV) — interview the product-page director candidates
 # 問題，要怎麼解決，只有牛舌賣得動的問題，進行面試」）：拿真實品牌資料，讓
 # 10 位候選人各自回答同一題，答案原樣印出來給人評。
 #
-# 會呼叫 LLM（10 次），所以只用 workflow_dispatch，不掛 push——不要有人改別的
-# 檔案就順手燒 10 次模型呼叫。
+# 會呼叫 LLM（10 次）。push 觸發刻意只綁自己這個檔案：改別的檔案不會順手燒
+# 10 次模型呼叫，但這個檔案本身存在於 dev 才註冊得到 workflow_dispatch
+# （GitHub 的 dispatch 需要 workflow 先被跑過／存在於預設分支）。
 on:
+  push:
+    paths:
+      - '.github/workflows/op-interview-product-directors.yml'
   workflow_dispatch:
     inputs:
       brandId:
