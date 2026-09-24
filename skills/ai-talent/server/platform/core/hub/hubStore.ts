@@ -112,6 +112,15 @@ export async function bindLineUser(code: string, lineUserId: string): Promise<Hu
   if (!row) return null;
   await exec(`UPDATE hub_reps SET line_user_id = NULL WHERE line_user_id = ?`, [lineUserId]);
   await exec(`UPDATE hub_reps SET line_user_id = ?, bind_code = NULL, consent_at = COALESCE(consent_at, NOW(3)) WHERE id = ?`, [lineUserId, row.id]);
+  // 2026-09-24：同時寫進通路身分對照表。LINE 的權威來源目前還是上面那一欄，
+  // 這裡是雙寫，讓新結構先被真實流量走過再切換讀取——不要拿展場正在用的
+  // 綁定去換一個還沒被驗過的結構。
+  try {
+    const { linkIdentity } = await import("./channelIdentity");
+    await linkIdentity({ orgId: row.org_id, repId: row.id, channel: "line", externalId: lineUserId });
+  } catch (e: any) {
+    console.warn("[bindLineUser] identity mirror:", e?.message ?? e);
+  }
   return getRep(row.id);
 }
 

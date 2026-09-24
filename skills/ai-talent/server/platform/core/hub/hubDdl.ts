@@ -349,6 +349,34 @@ export const HUB_DDL: string[] = [
     INDEX idx_fact (org_id, fact_id)
   ) ${TAIL}`,
 
+  /**
+   * 各通路的身分對照（2026-09-24，依 WhatsApp 工程師建議）。
+   *
+   * 不把 BSUID 加在 hub_reps 上，因為**它會變**：使用者換手機號碼，Meta 就
+   * 重新產生一個。欄位式的儲存只能覆寫，舊值消失——而「這個人以前是哪個 id」
+   * 正好是出事時唯一能查的線索。對照表可以把舊的標記退役而不是刪掉。
+   *
+   * external_id 用 VARCHAR(255)：BSUID 最長 131（parent BSUID 135），刻意不卡
+   * 在剛好的長度，多留的空間幾乎沒有成本，而且不用再改第二次。
+   *
+   * 我們只有一個商業組合，所以不存 parent BSUID —— 那是給「母帳號底下多個組合
+   * 共用同一個用戶 ID」用的。
+   */
+  `CREATE TABLE IF NOT EXISTS hub_channel_identities (
+    id              INT          NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    org_id          INT          NOT NULL,
+    rep_id          INT          NOT NULL,
+    channel         VARCHAR(16)  NOT NULL,
+    external_id     VARCHAR(255) NOT NULL,
+    wa_id           VARCHAR(32)  NULL,
+    username        VARCHAR(64)  NULL,
+    retired_at      DATETIME(3)  NULL,
+    created_at      DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    updated_at      DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+    UNIQUE KEY uq_channel_external (org_id, channel, external_id),
+    INDEX idx_rep (org_id, rep_id)
+  ) ${TAIL}`,
+
   `CREATE TABLE IF NOT EXISTS hub_approvers (
     id              INT          NOT NULL AUTO_INCREMENT PRIMARY KEY,
     org_id          INT          NOT NULL,

@@ -300,6 +300,65 @@ async function main() {
     bad("fact push settings", e?.message ?? String(e));
   }
 
+  // ── 通路身分對照（2026-09-24，WhatsApp 工程師的建議） ─────────────────────
+  //
+  // 重點是「BSUID 會變」這件事有沒有被正確處理。換 id 的時候如果只是覆寫，
+  // 舊值就消失了——而「這個人以前是哪個 id」正好是出事時唯一能查的線索。
+  try {
+    const ci = await import("../server/platform/core/hub/channelIdentity");
+
+    // 欄位長度：BSUID 最長 131、parent 135。沿用 VARCHAR(64) 會被截斷，
+    // 而截斷過的 BSUID 送出去一定失敗。
+    const [col] = await q<{ CHARACTER_MAXIMUM_LENGTH: number }>(
+      `SELECT CHARACTER_MAXIMUM_LENGTH FROM information_schema.columns
+        WHERE table_schema = DATABASE() AND table_name = 'hub_channel_identities' AND column_name = 'external_id'`,
+    );
+    check(
+      Number(col?.CHARACTER_MAXIMUM_LENGTH ?? 0) >= 135,
+      "external_id is long enough for a parent BSUID",
+      `VARCHAR(${col?.CHARACTER_MAXIMUM_LENGTH ?? "?"}) — BSUID is up to 131, parent 135`,
+    );
+
+    const [rep] = await q(`SELECT id FROM hub_reps WHERE org_id = ? ORDER BY id LIMIT 1`, [org.id]);
+    if (rep) {
+      const first = `TW.probe${Date.now()}`;
+      const second = `TW.probe${Date.now()}b`;
+      try {
+        await ci.linkIdentity({ orgId: org.id, repId: rep.id, channel: "whatsapp", externalId: first, waId: "886900000000" });
+        const found = await ci.findRepByExternalId(org.id, "whatsapp", first);
+        check(found?.repId === rep.id, "a channel id resolves to its rep", `#${found?.repId}`);
+
+        // 不帶電話號碼的那種 webhook 不該把我們已經知道的號碼清掉。
+        // 「不知道」跟「沒有」是兩件事。
+        await ci.linkIdentity({ orgId: org.id, repId: rep.id, channel: "whatsapp", externalId: first, waId: null });
+        const kept = await ci.findRepByExternalId(org.id, "whatsapp", first);
+        check(kept?.waId === "886900000000", "a payload without a phone number does not erase the one we had", String(kept?.waId));
+
+        // BSUID 輪替：舊的退役但留著，新的接到同一位業務。
+        const rot = await ci.rotateExternalId({ orgId: org.id, channel: "whatsapp", previous: first, current: second });
+        check(rot.linked && rot.repId === rep.id, "a changed BSUID stays attached to the same rep", `linked=${rot.linked}`);
+        const after = await ci.findRepByExternalId(org.id, "whatsapp", second);
+        check(after?.repId === rep.id, "the new id resolves", `#${after?.repId}`);
+        check((await ci.findRepByExternalId(org.id, "whatsapp", first)) === null, "the old id stops resolving", "retired");
+        const history = (await ci.listIdentities(org.id, rep.id)).filter((i) => i.externalId === first);
+        check(history.length === 1 && history[0]?.retiredAt != null, "the old id is retired, not deleted", "history kept");
+
+        // 認不得的舊 id 要回報，不要靜默當成成功。
+        const orphan = await ci.rotateExternalId({ orgId: org.id, channel: "whatsapp", previous: "TW.nosuchid", current: "TW.whatever" });
+        check(!orphan.linked, "an unknown previous id is reported, not silently linked", `linked=${orphan.linked}`);
+      } finally {
+        await exec(
+          `DELETE FROM hub_channel_identities WHERE org_id = ? AND external_id LIKE 'TW.probe%' OR external_id IN ('TW.nosuchid','TW.whatever')`,
+          [org.id],
+        );
+      }
+      const leftover3 = await q(`SELECT id FROM hub_channel_identities WHERE org_id = ? AND external_id LIKE 'TW.%'`, [org.id]);
+      check(leftover3.length === 0, "probe left no identity rows behind", `${leftover3.length} rows`);
+    }
+  } catch (e: any) {
+    bad("channel identity", e?.message ?? String(e));
+  }
+
   // ── 推播佇列與逐類退訂（CJ 2026-09-23） ───────────────────────────────────
   //
   // 這一段是唯一會對外送訊息的功能，所以驗的重點是**不該送的一定不會送**。

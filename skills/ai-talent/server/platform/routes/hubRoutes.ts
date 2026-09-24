@@ -31,7 +31,7 @@ import {
   type HubRep,
 } from "../core/hub/hubStore";
 import { processLineEvent, verifyLineSignature } from "../core/hub/lineBot";
-import { parseInbound, verifySubscription, verifyWhatsAppSignature } from "../core/hub/whatsappBot";
+import { parseIdentityChanges, parseInbound, verifySubscription, verifyWhatsAppSignature } from "../core/hub/whatsappBot";
 
 // ── LINE webhook ────────────────────────────────────────────────────────────
 
@@ -79,6 +79,35 @@ export async function hubWhatsAppWebhookHandler(req: Request, res: Response) {
 
   let payload: any;
   try { payload = JSON.parse(raw.toString("utf8")); } catch { return; }
+
+  /**
+   * BSUID 變更（使用者換手機號碼）。**要先於訊息處理**：同一包 payload 裡可能
+   * 既有變更通知又有新 id 寄來的訊息，順序反了就會先把新 id 當成陌生人。
+   *
+   * 沒有處理的話，已經綁定的人會安靜地變成聯絡不到——舊 id 送不出去，新 id
+   * 我們認不得。
+   */
+  void (async () => {
+    for (const change of parseIdentityChanges(payload)) {
+      try {
+        const org = await getOrg();
+        const { rotateExternalId } = await import("../core/hub/channelIdentity");
+        if (!change.previous) {
+          // 系統訊息沒有結構化的舊值，接不上。記下來讓人看得到，不要猜。
+          await logEvent(org.id, null, "whatsapp_id_changed",
+            `new BSUID ${change.current} — no previous id in the payload, needs re-binding`);
+          continue;
+        }
+        const r = await rotateExternalId({
+          orgId: org.id, channel: "whatsapp", previous: change.previous, current: change.current,
+        });
+        await logEvent(org.id, r.repId, "whatsapp_id_changed",
+          r.linked ? `${change.previous} → ${change.current}` : `${change.current} — unknown previous id`);
+      } catch (e: any) {
+        console.error("[whatsapp.identity]", e?.message ?? e);
+      }
+    }
+  })();
 
   for (const inbound of parseInbound(payload)) {
     void (async () => {

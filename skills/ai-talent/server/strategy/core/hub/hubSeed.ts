@@ -202,6 +202,16 @@ export async function seedHub(opts: { reset?: boolean } = {}) {
    * 舊表留著不刪：刪稽核紀錄是不可逆的。
    */
   {
+    // 2026-09-24：LINE 綁定鏡射進通路身分對照表。可重複執行。
+    const { backfillLineIdentities } = await import("../../../platform/core/hub/channelIdentity");
+    const n = await backfillLineIdentities(org.id).catch((e) => {
+      console.warn("[hub-seed] line identity backfill skipped:", e?.message ?? e);
+      return 0;
+    });
+    console.log(`[hub-seed] channel identities: +${n} line`);
+  }
+
+  {
     const { migrateLegacyEdits } = await import("./strategyEdits");
     const moved = await migrateLegacyEdits(org.id);
     console.log(`[hub-seed] legacy edit history: +${moved.solutions} solution, +${moved.wording} wording`);
