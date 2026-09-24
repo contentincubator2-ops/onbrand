@@ -71,9 +71,7 @@ async function main() {
     try { prefixLen = (await buildBrandPrefix(b.id, null, null, "full")).length; } catch { /* 印 -1 代表失敗 */ }
     line(`── 品牌 #${b.id} ${b.name}（userId ${userId}）進 prompt 的資料 ──`);
     line(`   品牌大腦 buildBrandPrefix 長度：${prefixLen} 字`);
-    line(catalog.split("
-").map((l) => `   ${l}`).join("
-").slice(0, 1600));
+    line(catalog.split(String.fromCharCode(10)).map((l) => `   ${l}`).join(String.fromCharCode(10)).slice(0, 1600));
     line();
   }
 
