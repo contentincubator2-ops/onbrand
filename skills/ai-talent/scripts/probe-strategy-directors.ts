@@ -83,6 +83,10 @@ async function main() {
   }
 
   await localPool.end();
+  // buildBrandPrefix 走的是 drizzle 的 getDb()，那條連線池這裡關不到，
+  // 不強制結束的話行程會掛著直到 SSH command_timeout（實測：內容全印完了，
+  // workflow 卻算失敗）。這是唯讀 probe，印完就可以直接收工。
+  process.exit(0);
 }
 
 main().catch((e) => { console.error("probe failed:", e); process.exit(1); });
