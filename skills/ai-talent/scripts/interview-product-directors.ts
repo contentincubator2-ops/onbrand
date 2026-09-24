@@ -24,8 +24,29 @@ import { buildBrandPrefix } from "../server/strategy/core/brandContext.js";
 import { buildBrandCatalogBlock } from "../server/strategy/core/brandCatalog.js";
 import { callModel } from "../server/platform/core/multiModelRouter.js";
 
-/** 候選名單——10 位真實 mos_db agent，涵蓋「產品賣不動」會用到的不同專業。 */
-const CANDIDATES: Array<{ id: number; why: string }> = [
+/**
+ * 2026-09-24 第二輪（CJ「沒有專長於產品定位的人嗎?」）：第一輪那十位全是
+ * 「行銷職能」（PMM/定價/CRM/歸因…），漏掉了 mos_db 裡真正以**產品定位方法論**
+ * 命名的那一族（238xxx–239xxx，134 位「策略副總裁」：JTBD／Kano／VPC／FAB／
+ * 品類設計／PMF／Dunford…）。這一族的資料特性跟產業族相反——方法論很明確，
+ * 但幾乎都沒有【工作經歷】（只有 #238853 有）。兩族各面試一輪才比得出來。
+ */
+const PANELS: Record<string, Array<{ id: number; why: string }>> = {
+  // 產品定位方法論族
+  positioning: [
+    { id: 238853, why: "產品價值主張副總裁 —— Osterwalder VPC（這族唯一有工作經歷的）" },
+    { id: 238857, why: "Kano 產品策略副總裁 —— 必備/魅力/無差異，直接解釋為什麼某些品項不動" },
+    { id: 239174, why: "JTBD 產品定位副總裁 —— 牛舌被「雇用」來完成什麼工作" },
+    { id: 238855, why: "JTBD 產品策略副總裁 —— 同框架另一位，比較答案穩定度" },
+    { id: 238856, why: "FAB 產品定位副總裁 —— 規格翻譯成銷售話術（商品頁寫法）" },
+    { id: 238854, why: "產品利益階梯副總裁 —— Means-End，成分→功能→情感" },
+    { id: 238861, why: "PMF 產品驗證副總裁 —— 其他品項是不是根本沒有 PMF" },
+    { id: 238845, why: "品類設計策略副總裁 —— Play Bigger，你在賣牛舌還是賣「懶得煮」" },
+    { id: 238864, why: "Dunford 定位策略副總裁 —— Obviously Awesome，定位的正統" },
+    { id: 238878, why: "Segmentation 策略副總裁 —— 分眾，不同品項給不同人" },
+  ],
+  // 第一輪：行銷職能族（食品/電商 繁中，經歷厚但專長欄位多為 cohort 複製）
+  marketing: [
   { id: 222877, why: "產品行銷經理（PMM）—— 產品 GTM 本業" },
   { id: 222873, why: "定價策略師 —— 組合包／搭售／訂閱結構" },
   { id: 223399, why: "CRM Lifecycle —— 買過牛舌的人怎麼帶到第二品項" },
@@ -36,7 +57,8 @@ const CANDIDATES: Array<{ id: number; why: string }> = [
   { id: 223930, why: "品牌策略師 —— 「懶得煮＝牛舌店」的定位風險" },
   { id: 223909, why: "再行銷策略師 —— 既有客戶的第二次購買" },
   { id: 222875, why: "RevOps 收入營運 —— 客單價與毛利結構" },
-];
+  ],
+};
 
 const QUESTION = `我的商品裡只有「牛舌」賣得動，其他品項幾乎沒有人買。我該怎麼辦？
 
@@ -73,6 +95,13 @@ function personaPrompt(a: any, brandBlock: string): string {
 
 async function main() {
   const brandId = Number(process.argv[2] || 2972);   // 預設：懶得煮的Tom老闆
+  const panelName = String(process.argv[3] || "marketing");
+  const CANDIDATES = PANELS[panelName];
+  if (!CANDIDATES) {
+    console.error(`沒有這組名單：${panelName}（可用：${Object.keys(PANELS).join(" / ")}）`);
+    process.exit(1);
+  }
+  console.log(`面試名單：${panelName}（${CANDIDATES.length} 位）`);
   const [brandRows]: any = await localPool.execute(
     `SELECT id, name, userId, industry FROM brands WHERE id = ? LIMIT 1`, [brandId],
   );

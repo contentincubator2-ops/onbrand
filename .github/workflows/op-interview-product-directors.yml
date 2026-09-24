@@ -17,6 +17,10 @@ on:
         description: '用哪個品牌的資料面試（預設 2972 懶得煮的Tom老闆）'
         required: false
         default: '2972'
+      panel:
+        description: '面試哪一組名單：marketing（行銷職能族）或 positioning（產品定位方法論族）'
+        required: false
+        default: 'positioning'
 
 jobs:
   interview:
@@ -37,4 +41,4 @@ jobs:
             set -a; source .env 2>/dev/null; set +a
             echo "host=$(hostname)  app=$(readlink -f /opt/onbrand/current)"
             echo "----------------------------------------------------------"
-            ./node_modules/.bin/tsx scripts/interview-product-directors.ts ${{ github.event.inputs.brandId }}
+            ./node_modules/.bin/tsx scripts/interview-product-directors.ts "${{ github.event.inputs.brandId || '2972' }}" "${{ github.event.inputs.panel || 'positioning' }}"
