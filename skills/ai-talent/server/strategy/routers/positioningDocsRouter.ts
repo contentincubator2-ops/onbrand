@@ -28,7 +28,7 @@ import {
   type PositioningScope, type PromptField, type AppliedDocRecord, type CustomSegment,
   loadPositioning, sourceDocsOf, appliedDocOf, coverageOf, applyMapping,
   promptFieldsFor, MAX_INJECTED_CHARS,
-  customSegmentsOf, addCustomSegment, removeCustomSegment,
+  customSegmentsOf, addCustomSegment, removeCustomSegment, updateCustomSegment,
   MAX_CUSTOM_SEGMENTS, MAX_CUSTOM_SEGMENT_FIELDS,
   MAX_CUSTOM_SEGMENT_TITLE_CHARS, MAX_CUSTOM_SEGMENT_FIELD_VALUE_CHARS,
 } from "../core/positioningDocs";
@@ -413,6 +413,44 @@ ${targets}
       };
       const list = await addCustomSegment({ scope: input.scope, id: input.scopeId, userId, segment });
       return { ok: true, segment, segments: list };
+    }),
+
+  /**
+   * 改一張自訂卡的標題／內容。
+   *
+   * 2026-09-24（CJ「按下新增卡片時，只是要她編輯該卡片的標題和內容，內容可以
+   * 打字或是直接上傳文件」）：自訂卡在這之前只能建立與刪除，改一個字要刪掉重建。
+   * 欄位上限與 createCustomSegment 同一組常數——同一種資料不該有兩套規則。
+   */
+  updateCustomSegment: protectedProcedure
+    .input(scopeInput.omit({ brandId: true }).extend({
+      segmentId: z.string(),
+      title: z.string().min(1).max(MAX_CUSTOM_SEGMENT_TITLE_CHARS),
+      fields: z.array(z.object({
+        label: z.string().min(1).max(40),
+        value: z.string().min(1).max(MAX_CUSTOM_SEGMENT_FIELD_VALUE_CHARS),
+      })).min(1).max(MAX_CUSTOM_SEGMENT_FIELDS),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const userId = ctx.user!.id;
+      await assertScope(userId, input.scope, input.scopeId);
+      const pos = await loadPositioning(input.scope, input.scopeId, userId);
+      if (!customSegmentsOf(pos).some((s) => s.id === input.segmentId)) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "找不到這張卡片" });
+      }
+      const seenKeys = new Set<string>();
+      const fields = input.fields.map((f, i) => {
+        let key = f.label.toLowerCase().replace(/[^a-z0-9一-鿿]+/g, "_").replace(/^_+|_+$/g, "");
+        if (!key) key = `field_${i + 1}`;
+        while (seenKeys.has(key)) key = `${key}_${i + 1}`;
+        seenKeys.add(key);
+        return { key, label: f.label.trim(), value: f.value.trim() };
+      });
+      const list = await updateCustomSegment({
+        scope: input.scope, id: input.scopeId, userId,
+        segmentId: input.segmentId, title: input.title.trim(), fields,
+      });
+      return { ok: true, segments: list };
     }),
 
   /** 使用者建錯了、或想重來——刪掉一張自訂卡。固定欄位沒有對應動作，那些是 schema 的一部分。 */

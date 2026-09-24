@@ -18,7 +18,10 @@ import { positioningDocsRouter } from "./positioningDocsRouter";
 describe("positioningDocsRouter", () => {
   it("router 建得起來，而且沒有用到 tRPC 保留字", () => {
     const names = Object.keys((positioningDocsRouter as any)._def.procedures);
-    expect(names.sort()).toEqual(["applyMapping", "coverage", "createCustomSegment", "propose", "removeCustomSegment"]);
+    // 2026-09-24：加了 updateCustomSegment（自訂卡片可以改標題/內容，不必刪掉重建）。
+    expect(names.sort()).toEqual([
+      "applyMapping", "coverage", "createCustomSegment", "propose", "removeCustomSegment", "updateCustomSegment",
+    ]);
   });
 
   it("procedure 名稱不可以撞 Function.prototype 上的東西", () => {

@@ -30,6 +30,7 @@ import PromptLibrary from "../components/positioning/PromptLibrary";
 import BrandAssetEditor, { type AssetKey } from "../components/positioning/BrandAssetEditor";
 import KnowledgeEditor from "../components/positioning/KnowledgeEditor";
 import PositioningDocPanel from "../components/positioning/PositioningDocPanel";
+import CustomCardEditor, { type EditableCard } from "../components/positioning/CustomCardEditor";
 import AssetPhotoGallery from "../components/positioning/AssetPhotoGallery";
 import InlineAssetCard from "../components/positioning/InlineAssetCard";
 import { InfoTab as BrandInfoTab, DangerTab as BrandDangerTab, PublishTab as BrandPublishTab } from "../components/positioning/BrandSettingsSheet";
@@ -899,6 +900,10 @@ export default function BrandsPage() {
         onSuccess: () => positioningCoverageQuery.refetch?.(),
       })
     : null;
+  // 2026-09-24（CJ「按下新增卡片時，只是要她編輯該卡片的標題和內容」）：
+  // 自訂卡片的編輯器開在這一層——scopeMode / targetId / coverage 的 refetch
+  // 都在這裡，編輯器本身只管一張卡。null = 沒開。
+  const [editingCard, setEditingCard] = React.useState<EditableCard | null>(null);
 
   const utils = (trpc as any).useUtils?.() ?? null;
 
@@ -1984,6 +1989,16 @@ export default function BrandsPage() {
                             segmentId,
                           });
                         }}
+                        onEditCustomSegment={(segmentId) => {
+                          const seg = segmentId
+                            ? (customPositioningSegments ?? []).find((x: any) => x.id === segmentId)
+                            : null;
+                          setEditingCard(
+                            seg
+                              ? { id: seg.id, title: seg.title, fields: seg.fields.map((f: any) => ({ label: f.label, value: f.value })) }
+                              : { id: null, title: "", fields: [] },
+                          );
+                        }}
                       />
                     </>
                   )}
@@ -2566,6 +2581,18 @@ export default function BrandsPage() {
           }
         }}
       />
+
+      {/* 2026-09-24：自訂定位卡片的編輯器（標題 + 內容，可從檔案帶入）。
+          掛在這一層是因為 scopeMode / targetId / coverage 的 refetch 都在這裡；
+          PositioningGrid 只負責「哪一張卡被點了」。 */}
+      <CustomCardEditor
+        open={!!editingCard}
+        card={editingCard}
+        scopeMode={scopeMode === "none" ? "brand" : scopeMode}
+        scopeId={targetId ?? null}
+        onClose={() => setEditingCard(null)}
+        onSaved={() => positioningCoverageQuery.refetch?.()}
+      />
     </main>
   );
 }
@@ -2683,7 +2710,7 @@ function TabActionBar({
 /* ─────────────────────────── PositioningGrid ───────────────────────── */
 // 品牌定位的 card grid — 速查卡/指令庫 + segments 分組顯示
 function PositioningGrid({
-  scopeMode, segments, onSelect, segmentData, customSegments, onDeleteCustomSegment,
+  scopeMode, segments, onSelect, segmentData, customSegments, onDeleteCustomSegment, onEditCustomSegment,
 }: {
   scopeMode: "brand" | "product" | "event" | "none";
   segments: import("../lib/positioningSchema").SegmentSpec[];
@@ -2697,6 +2724,9 @@ function PositioningGrid({
    *  segments instead of being hidden in a sub-page. */
   customSegments?: { id: string; title: string; fields: { key: string; label: string; value: string }[] }[];
   onDeleteCustomSegment?: (segmentId: string) => void;
+  /** 2026-09-24（CJ「按下新增卡片時，只是要她編輯該卡片的標題和內容」）：
+   *  開卡片編輯器。傳 null = 新增一張；傳 id = 編輯那一張。 */
+  onEditCustomSegment?: (segmentId: string | null) => void;
 }) {
   const { lang } = useLang();
   const groupLabels: Record<string, { zh: string; en: string }> = {
@@ -2887,7 +2917,9 @@ function PositioningGrid({
               key={seg.id}
               label={seg.title}
               icon={faStickyNote}
-              onClick={() => onSelect("doc")}
+              // 2026-09-24：點自己的卡片就是要改它的內容，不是跳去「我的定位
+              // 文件」那一整套上傳/對映流程（那裡也沒有「編輯這張卡」這個動作）。
+              onClick={() => onEditCustomSegment?.(seg.id)}
               hasContent
               preview={
                 <ul style={{ margin: 0, padding: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: 4 }}>
@@ -2905,7 +2937,11 @@ function PositioningGrid({
             />
           ))}
           <button
-            onClick={() => onSelect("doc")}
+            // 2026-09-24（CJ「按下新增卡片時，只是要她編輯該卡片的標題和內容，
+            // 內容可以打字或是直接上傳文件」）：原本按下去是跳到「我的定位文件」
+            // ——那是「上傳整份定位書 → AI 對映固定欄位」的流程，跟「我要自己
+            // 加一張卡」是兩件事，而且那一頁根本沒有「新增卡片」這個動作。
+            onClick={() => onEditCustomSegment?.(null)}
             className="flex flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-neutral-300 text-neutral-500 hover:border-neutral-900 hover:text-neutral-900 transition-colors"
             style={{ minHeight: 124, padding: 16 }}
           >

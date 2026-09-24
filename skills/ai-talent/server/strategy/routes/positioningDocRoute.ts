@@ -246,6 +246,58 @@ positioningDocRouter.post(
   },
 );
 
+// ── extract-text（只抽文字，不落地）──────────────────────────────────────────
+// 2026-09-24（CJ「按下新增卡片時…內容可以打字或是直接上傳文件」）：自訂卡片的
+// 編輯器需要「把一份檔案的文字倒進這張卡的內容欄」，但那**不是**上傳一份定位
+// 文件——上傳文件會進 _sourceDocs、會出現在「我的定位文件」清單、會走 AI 對映
+// 提案那一整套流程。一張卡片只是要那份檔案的純文字。
+//
+// 所以這條路只做三件事：存成暫存檔 → 跑同一支抽取器 → 刪掉暫存檔，回純文字。
+// 刻意重用 extractFile()（不另寫解析），但刻意不呼叫 registerDoc()（不落地）。
+positioningDocRouter.post(
+  "/extract-text",
+  express.raw({ type: () => true, limit: MAX_BYTES }),
+  async (req: Request, res: Response) => {
+    const ctx = await resolveScope(req, res, "headers");
+    if (!ctx) return;
+
+    const body = req.body as Buffer;
+    if (!Buffer.isBuffer(body) || body.length === 0) {
+      res.status(400).json({ error: "檔案是空的" }); return;
+    }
+    const fileName = safeName(String(req.headers["x-filename"] ?? "card.txt"));
+    const ext = extOf(fileName);
+    if (!ALLOWED_EXT.includes(ext)) {
+      res.status(400).json({ error: `不支援 ${ext || "(無副檔名)"} — 可用 ${ALLOWED_EXT.join(" / ")}` });
+      return;
+    }
+    if ((ext === ".docx" || ext === ".pptx") && !(body[0] === 0x50 && body[1] === 0x4b)) {
+      res.status(400).json({ error: `${ext} 的 zip 檔頭不對 — 檔案可能損毀或副檔名寫錯` }); return;
+    }
+    if (ext === ".pdf" && body.subarray(0, 5).toString("latin1") !== "%PDF-") {
+      res.status(400).json({ error: "PDF 檔頭不對 — 檔案可能損毀或副檔名寫錯" }); return;
+    }
+
+    const dir = scopeDir(ctx.scope, ctx.scopeId);
+    assertInsideStorage(dir);
+    await fs.mkdir(dir, { recursive: true });
+    const target = join(dir, `tmp-card-${randomUUID()}${ext}`);
+    assertInsideStorage(target);
+    await fs.writeFile(target, body);
+    try {
+      const doc = await extractFile(target);
+      res.json({ ok: true, name: fileName, chars: doc.chars, text: doc.text });
+    } catch (err: any) {
+      const msg = String(err?.stderr || err?.message || err).slice(0, 800);
+      console.error("[positioning-doc/extract-text] extract failed:", msg);
+      res.status(400).json({ error: "文件讀不出內容", detail: msg });
+    } finally {
+      // 不管成功失敗都要刪——這條路的定義就是「不留檔」。
+      await fs.unlink(target).catch(() => {});
+    }
+  },
+);
+
 // ── paste（沒有檔案，直接貼文字）─────────────────────────────────────────────
 positioningDocRouter.post("/paste", express.json({ limit: "8mb" }), async (req, res) => {
   const ctx = await resolveScope(req, res, "body");

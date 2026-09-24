@@ -95,6 +95,30 @@ export async function addCustomSegment(args: {
   return saved;
 }
 
+/**
+ * 改一張已經存在的自訂卡（標題／欄位）。
+ *
+ * 2026-09-24（CJ「按下新增卡片時，只是要她編輯該卡片的標題和內容，內容可以打字
+ * 或是直接上傳文件」）：在這之前自訂卡只能「建立」跟「刪除」，沒有修改——想改
+ * 一個字就得刪掉重建，連帶 id 與建立時間都會換掉。卡片是使用者自己寫的東西，
+ * 改字是最基本的動作，不該用刪除重建來代替。
+ *
+ * 保留原本的 id / createdAt / sourceDocId：這張卡還是同一張，只是內容被編輯過。
+ */
+export async function updateCustomSegment(args: {
+  scope: PositioningScope; id: number; userId: number;
+  segmentId: string; title: string; fields: CustomSegmentField[];
+}): Promise<CustomSegment[]> {
+  let saved: CustomSegment[] = [];
+  await patchPositioning(args.scope, args.id, args.userId, (cur) => {
+    const list = customSegmentsOf(cur).map((s) =>
+      s.id === args.segmentId ? { ...s, title: args.title, fields: args.fields } : s);
+    saved = list;
+    return { ...cur, _customSegments: list };
+  });
+  return saved;
+}
+
 export async function removeCustomSegment(args: {
   scope: PositioningScope; id: number; userId: number; segmentId: string;
 }): Promise<CustomSegment[]> {
