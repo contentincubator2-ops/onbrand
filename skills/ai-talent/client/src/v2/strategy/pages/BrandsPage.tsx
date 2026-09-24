@@ -48,7 +48,7 @@ import { Target as LucideTarget, Type as LucideType, Palette as LucidePalette, L
 import { SCOPE_SEGMENTS, type SegmentSpec } from "../lib/positioningSchema";
 import { pipelineFor, type PipelineStepSpec } from "../lib/positioningPipeline";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faPlus, faPalette, faFont, faQuoteLeft, faBullseye, faUsers, faImage, faIcons, faChartPie, faImages, faPenNib, faShieldHalved, faFolderOpen, faLock, faLockOpen, faBookOpen, faTableList, faBox, faRocket, faBullhorn, faWandSparkles, faGear, faStickyNote, faTrash, faSatelliteDish, faStethoscope } from "@fortawesome/free-solid-svg-icons";
+import { faPlus, faPalette, faFont, faQuoteLeft, faBullseye, faUsers, faImage, faIcons, faChartPie, faImages, faPenNib, faShieldHalved, faFolderOpen, faLock, faLockOpen, faBookOpen, faTableList, faBox, faRocket, faBullhorn, faWandSparkles, faGear, faStickyNote, faTrash, faSatelliteDish, faStethoscope, faFileArrowUp } from "@fortawesome/free-solid-svg-icons";
 
 // Sub-nav id format:
 //   "asset:<key>"   — non-positioning brand assets (準則 / 標誌 / etc.)
@@ -1813,8 +1813,22 @@ export default function BrandsPage() {
                       留著（它們開的是這一頁本來就有的面板，全域總監只是
                       「引導過去」）。PositioningTopRow（重新套用14步）恢復
                       成一律顯示，不再需要先點總監 icon 才看得到。 */}
-                  {(pipeline.status === "idle" || pipeline.status === "done") && (scopeMode === "brand" || scopeMode === "event") && (
-                    <div className="flex items-center gap-2 mb-1">
+                  {/* 2026-09-23（CJ「套用SoWork定位法的按鈕，跟策略監測的按鈕大小
+                      樣式都相同，就可以。而我看起來，還缺乏一個功能，是上傳自己的
+                      定位資料(PDF OR WORD OR 對話文字)，也可以作在跟策略監測的相同
+                      位置」）：原本是兩排——上排兩顆小 pill（監測/健檢），下排一顆
+                      大黑按鈕（套用定位法）。同一層級的三件事長得不一樣，看起來像
+                      「有一個比較重要」，但它們其實是並列的入口。現在收成同一排
+                      pill，PositioningTopRow 的按鈕也改成同樣的 pill 樣式。
+
+                      上傳定位資料這顆是新的入口，但不是新功能——PositioningDocPanel
+                      （section="doc"）本來就做得完整（PDF/Word 上傳、貼 ChatGPT 對話
+                      串、AI 提案對映、落差表），只是躲在左側欄「我的定位文件」裡，
+                      使用者在這一頁看不到，以為沒有這個功能。這裡只是把它拉出來。
+                      （跟定位卡片下方的「新增卡片」不同：那是新增單一欄位卡片，
+                      不是上傳整份定位書——CJ 特別點出這兩件事不要混為一談。） */}
+                  {(pipeline.status === "idle" || pipeline.status === "done") && scopeMode !== "none" && (
+                    <div className="flex items-center gap-2 mb-1 flex-wrap">
                       {scopeMode === "brand" && activeBrandIdForLocks && (
                         <StrategyToolIcon
                           id="monitor"
@@ -1824,7 +1838,7 @@ export default function BrandsPage() {
                           label={lang === "en" ? "Strategy Monitoring" : "策略監測"}
                         />
                       )}
-                      {activeBrandIdForLocks && (
+                      {(scopeMode === "brand" || scopeMode === "event") && activeBrandIdForLocks && (
                         <StrategyToolIcon
                           id="healthcheck"
                           active={activeStrategyTool === "healthcheck"}
@@ -1833,21 +1847,32 @@ export default function BrandsPage() {
                           label={lang === "en" ? "Strategy Health Check" : "策略健檢"}
                         />
                       )}
+                      <StrategyToolIcon
+                        id="doc"
+                        active={false}
+                        onClick={() => setSection("doc" as any)}
+                        icon={faFileArrowUp}
+                        label={lang === "en" ? "Upload your positioning doc" : "上傳定位資料"}
+                        // 格式以 PositioningDocPanel 的 ACCEPT 為準（.docx/.pptx/
+                        // .pdf/.md/.txt/.html）＋貼對話文字，不要在這裡承諾它吃不了的。
+                        title={lang === "en"
+                          ? "Upload your own positioning doc (Word / PPT / PDF / Markdown / txt / html) — or paste a ChatGPT conversation"
+                          : "上傳你自己的定位文件（Word / PPT / PDF / Markdown / txt / html），或直接貼 ChatGPT 對話文字"}
+                      />
+                      {pipeline.status === "idle" && (
+                        <PositioningTopRow
+                          // 2026-05-13 (CJ「按了套用活動定位框架時，出現Event not found」):
+                          // pass the scope-aware entity id, not the brand id.
+                          // When scope is event/product, server looks up
+                          // events.id = entityId — passing brandId here
+                          // mismatched and returned "not found".
+                          brandId={targetId as number | null}
+                          scopeMode={scopeMode}
+                          locked={!!tabLocks.positioning}
+                          onLockToggle={() => handleLockToggle("positioning")}
+                        />
+                      )}
                     </div>
-                  )}
-
-                  {pipeline.status === "idle" && (
-                    <PositioningTopRow
-                      // 2026-05-13 (CJ「按了套用活動定位框架時，出現Event not found」):
-                      // pass the scope-aware entity id, not the brand id.
-                      // When scope is event/product, server looks up
-                      // events.id = entityId — passing brandId here
-                      // mismatched and returned "not found".
-                      brandId={targetId as number | null}
-                      scopeMode={scopeMode}
-                      locked={!!tabLocks.positioning}
-                      onLockToggle={() => handleLockToggle("positioning")}
-                    />
                   )}
 
                   {scopeMode !== "none" && pipelineSteps.length > 0 && pipeline.status !== "idle" && (
@@ -2923,13 +2948,15 @@ const isFilledArr = (a: any) => Array.isArray(a) && a.some((x: any) =>
  * 同一套紀律。
  */
 function StrategyToolIcon({
-  active, onClick, icon, label,
-}: { id: string; active: boolean; onClick: () => void; icon: any; label: string }) {
+  active, onClick, icon, label, title,
+}: { id: string; active: boolean; onClick: () => void; icon: any; label: string;
+     /** 需要比標籤講更多時（例如「上傳定位資料」要說明吃哪些格式）。預設用 label。 */
+     title?: string }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      title={label}
+      title={title ?? label}
       aria-label={label}
       aria-pressed={active}
       className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-[12.5px] font-medium transition-colors ${
@@ -4643,15 +4670,22 @@ function PositioningTopRow({
 
   return (
     <>
-      {/* Auto-定位 + status row */}
-      <div className="flex items-center gap-3 flex-wrap mb-3">
+      {/* Auto-定位 + status row。
+          2026-09-23（CJ「套用SoWork定位法的按鈕，跟策略監測的按鈕大小樣式都相同，
+          就可以」）：原本是一顆 px-4 py-2 的黑色實心按鈕，跟同一排的策略監測／
+          策略健檢兩顆描邊 pill 不同量級。三件事是並列的入口，長得不一樣只會讓人
+          以為有一個比較重要。改成跟 StrategyToolIcon 同一組 class（rounded-full /
+          border / px-3 py-1.5 / text-[12.5px]）——那邊是 12.5px + icon 12，這裡照抄，
+          兩邊要一起改才不會又各長各的。
+          外層的 mb-3 也拿掉：現在它被包在工具列那一排裡面，間距由那一排統一給。 */}
+      <div className="flex items-center gap-2 flex-wrap">
         <button
           onClick={handleAuto}
           disabled={!brandId || !entityKind || locked || isRunning || startMut?.isPending}
-          className={`flex items-center gap-2 text-sm font-semibold px-4 py-2 rounded-lg transition ${
-            isRunning ? "bg-neutral-100 text-neutral-700 cursor-wait border border-neutral-200"
-            : locked ? "bg-neutral-100 text-neutral-600 cursor-not-allowed"
-            : "bg-neutral-900 text-white hover:bg-neutral-800 cursor-pointer"
+          className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-[12.5px] font-medium transition-colors ${
+            isRunning ? "bg-neutral-100 border-neutral-200 text-neutral-700 cursor-wait"
+            : locked ? "bg-neutral-100 border-neutral-200 text-neutral-400 cursor-not-allowed"
+            : "bg-white border-neutral-300 text-neutral-600 hover:border-neutral-900 hover:text-neutral-900 cursor-pointer"
           }`}
           title={
             locked
@@ -4663,7 +4697,7 @@ function PositioningTopRow({
                     : `自動填寫所有定位欄位（共 ${totalSteps} 步，背景執行，最多重試 5 次）`)
           }
         >
-          <Sparkles size={14} className={isRunning ? "animate-pulse" : ""} />
+          <Sparkles size={12} className={isRunning ? "animate-pulse" : ""} />
           {buttonLabel}
         </button>
 
