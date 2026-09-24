@@ -306,7 +306,7 @@ async function findBySlug(slug: string): Promise<any | null> {
   return (rows as any[])[0] ?? null;
 }
 
-export async function findAgentById(agentId: number): Promise<any | null> {
+async function findAgentById(agentId: number): Promise<any | null> {
   const [rows]: any = await localPool.execute(
     `SELECT ${DIRECTOR_FIELDS} FROM agents WHERE id = ? AND ${AVAILABLE} LIMIT 1`, [agentId],
   );

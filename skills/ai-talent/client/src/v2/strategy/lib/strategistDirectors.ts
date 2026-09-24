@@ -33,7 +33,7 @@ export interface StrategistDirector {
 }
 
 /** 記住使用者在這個品牌選過誰——per-brand，不要一個品牌換人把全部品牌都換掉。 */
-export const directorStorageKey = (brandId: number) => `sowork.strategyDirector.brand.${brandId}`;
+const directorStorageKey = (brandId: number) => `sowork.strategyDirector.brand.${brandId}`;
 
 export function readStoredDirector(brandId: number): number | null {
   try {

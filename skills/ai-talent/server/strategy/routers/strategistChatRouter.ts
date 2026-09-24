@@ -179,9 +179,10 @@ async function gatherBrandContext(brandId: number, userId: number, productId?: n
   const ctx: string[] = [];
 
   // 1) canonical 品牌大腦。失敗不致命——後面兩段還是有價值。
+  let hasPrefix = false;
   try {
     const prefix = await buildBrandPrefix(brandId, productId ?? null, null, "full");
-    if (prefix && prefix.trim()) ctx.push(prefix.trim());
+    if (prefix && prefix.trim()) { ctx.push(prefix.trim()); hasPrefix = true; }
   } catch { /* non-fatal */ }
 
   // 2) 產品／活動清單
@@ -200,8 +201,13 @@ async function gatherBrandContext(brandId: number, userId: number, productId?: n
     ctx.push(unread > 0 ? `【策略監測】有 ${unread} 則提醒還沒看` : `【策略監測】沒有未讀提醒`);
   } catch { /* non-fatal */ }
 
-  const legacy = await gatherBrandBasics(brandId, userId);
-  if (legacy) ctx.push(legacy);
+  // 4) 只有在品牌大腦整段拿不到時才補這幾個關鍵欄位。品牌大腦裡本來就有標語／
+  //    受眾／差異化，兩段都放等於同樣的事實在 prompt 裡講兩遍——多花錢，也會
+  //    讓模型以為那是兩個不同的來源。
+  if (!hasPrefix) {
+    const basics = await gatherBrandBasics(brandId, userId);
+    if (basics) ctx.push(basics);
+  }
   return ctx.join("\n\n");
 }
 
@@ -411,12 +417,27 @@ export const strategistChatRouter = router({
    * 寫死的人設——名字/職稱/經歷/專長全部從這裡來，見 strategistDirectory.ts。
    */
   listDirectors: protectedProcedure
-    .input(z.object({ brandId: z.number().int().positive() }))
+    .input(z.object({
+      brandId: z.number().int().positive(),
+      /**
+       * 2026-09-24（自我 debug）：使用者從「換更多人選」搜尋挑的人不在這三位
+       * 裡面。前端原本只認這三位，所以挑了之後 current 是 null——畫面變成
+       * 「找不到可用的策略總監」，那顆「找他聊」等於沒作用。
+       * 解法是讓伺服器把「他選過的那一位」一起回來：前端不需要自己維護一份
+       * 額外名單，重新整理之後也還在（localStorage 只存 id）。
+       */
+      includeAgentId: z.number().int().positive().optional(),
+    }))
     .query(async ({ ctx, input }) => {
       const userId = ctx.user!.id;
       await assertBrandOwned(input.brandId, userId);
       const industry = await brandIndustry(input.brandId, userId);
       const directors = await listDirectorsForBrand(industry);
+      if (input.includeAgentId && !directors.some((d) => d.agentId === input.includeAgentId)) {
+        const extra = await getDirectorByAgentId(input.includeAgentId, industry);
+        // 查不到就當作沒選過（mos_db 那一列可能被移除了），不要塞一個空殼進去。
+        if (extra) directors.push(extra);
+      }
       return { brandIndustry: industry, directors };
     }),
 

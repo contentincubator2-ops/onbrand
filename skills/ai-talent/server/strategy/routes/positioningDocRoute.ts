@@ -246,6 +246,9 @@ positioningDocRouter.post(
   },
 );
 
+/** 回給卡片編輯器的文字上限——卡片本身只吃 600 字，多的只是讓人看得到差距。 */
+const EXTRACT_TEXT_MAX_CHARS = 20_000;
+
 // ── extract-text（只抽文字，不落地）──────────────────────────────────────────
 // 2026-09-24（CJ「按下新增卡片時…內容可以打字或是直接上傳文件」）：自訂卡片的
 // 編輯器需要「把一份檔案的文字倒進這張卡的內容欄」，但那**不是**上傳一份定位
@@ -286,7 +289,9 @@ positioningDocRouter.post(
     await fs.writeFile(target, body);
     try {
       const doc = await extractFile(target);
-      res.json({ ok: true, name: fileName, chars: doc.chars, text: doc.text });
+      // 一張卡片只吃 600 字，整包回傳沒有意義（一份 PDF 可能上萬字）。
+      // chars 回真實長度，前端才講得出「這份有 3,200 字，只帶入前 600 字」。
+      res.json({ ok: true, name: fileName, chars: doc.chars, text: String(doc.text ?? "").slice(0, EXTRACT_TEXT_MAX_CHARS) });
     } catch (err: any) {
       const msg = String(err?.stderr || err?.message || err).slice(0, 800);
       console.error("[positioning-doc/extract-text] extract failed:", msg);

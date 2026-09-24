@@ -82,13 +82,33 @@ export default function StrategyDirectorDrawer({ brandId }: { brandId: number | 
   // 不等使用者點開才查：收合狀態那顆頭像就是「你的策略總監長這樣」，
   // 先查好才不會出現「點開之後頭像才換人」。三支 indexed SELECT 而已，
   // 再加 staleTime 讓同一個品牌在頁面之間切換不重查。
+  // 2026-09-24（自我 debug）：使用者可能從「換更多人選」挑了不在這三位裡面的人。
+  // 把存起來的那個 id 一起送給後端，後端會把那一位附在名單後面——前端不必自己
+  // 維護第二份名單，重新整理之後選擇也還在。
+  const storedAgentId = React.useMemo(
+    () => (brandId ? readStoredDirector(brandId) : null),
+    [brandId],
+  );
   const listQ = (trpc as any).strategistChat?.listDirectors?.useQuery
     ? (trpc as any).strategistChat.listDirectors.useQuery(
-        { brandId: brandId ?? 0 },
+        { brandId: brandId ?? 0, ...(storedAgentId ? { includeAgentId: storedAgentId } : {}) },
         { enabled: !!brandId, refetchOnWindowFocus: false, staleTime: 5 * 60_000 },
       )
     : { data: null, isLoading: false };
-  const directors: StrategistDirector[] = listQ?.data?.directors ?? [];
+  // useMemo 綁在 data 上：`?? []` 每次 render 都是新陣列，下面那些以 directors
+  // 當 dependency 的 effect 會因此每次 render 都重跑一遍。
+  const fetched: StrategistDirector[] = React.useMemo(
+    () => listQ?.data?.directors ?? [],
+    [listQ?.data],
+  );
+  // 這一輪剛從搜尋挑的人——後端要等下一次查詢才會帶他回來，中間這段時間得先
+  // 靠這個 state 撐著，不然按下「找他聊」會瞬間變成「找不到策略總監」。
+  const [pickedExtra, setPickedExtra] = React.useState<StrategistDirector | null>(null);
+  const directors: StrategistDirector[] = React.useMemo(() => (
+    pickedExtra && !fetched.some((d) => d.agentId === pickedExtra.agentId)
+      ? [...fetched, pickedExtra]
+      : fetched
+  ), [fetched, pickedExtra]);
 
   // 選過的人記在 localStorage（per brand）。三位人選回來之後才決定目前是誰：
   // 存過的那位還在名單裡就用他，否則用第一位。換品牌時 brandId 會變，這個
@@ -102,7 +122,7 @@ export default function StrategyDirectorDrawer({ brandId }: { brandId: number | 
       return directors[0]!.agentId;
     });
   }, [brandId, directors]);
-  React.useEffect(() => { setAgentId(null); setView("chat"); }, [brandId]);
+  React.useEffect(() => { setAgentId(null); setPickedExtra(null); setView("chat"); }, [brandId]);
 
   const current = React.useMemo(
     () => directors.find((d) => d.agentId === agentId) ?? null,
@@ -110,6 +130,7 @@ export default function StrategyDirectorDrawer({ brandId }: { brandId: number | 
   );
 
   const pick = (d: StrategistDirector) => {
+    setPickedExtra(d);          // 搜尋來的人先留在本地，下一次 listDirectors 會正式帶回來
     setAgentId(d.agentId);
     if (brandId) writeStoredDirector(brandId, d.agentId);
     setView("chat");

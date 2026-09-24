@@ -57,8 +57,6 @@ import { faPlus, faPalette, faFont, faQuoteLeft, faBullseye, faUsers, faImage, f
 //   "card" / "prompts" / "all"
 type SectionId = string;
 
-interface SubNavItem { id: SectionId; label: string; badge?: string; group?: string; }
-
 // Brand has positioning segments + visual/asset entries.
 // Per CJ: 圖像/圖示/圖表/品牌範本/準則/照片/所有資產 all removed.
 
@@ -67,17 +65,6 @@ interface SubNavItem { id: SectionId; label: string; badge?: string; group?: str
 //   productIds) post-creation — previously only set at create time.
 // - 視覺資產 deferred to a later round (event posters / videos go through
 //   MediaGenFlow per the visual-step rule, not stored as static assets).
-
-// Tile colors (HeroUI semantic-100 backgrounds + matching tone)
-type Tone = "primary" | "secondary" | "success" | "warning" | "danger" | "default";
-interface Tile {
-  id: SectionId;
-  label: string;
-  icon: any;
-  tone: Tone;
-  count?: number;
-  ready: boolean;
-}
 
 export default function BrandsPage() {
   const { t, lang } = useLang();
@@ -1692,7 +1679,6 @@ export default function BrandsPage() {
             ].map(item => (
               <VisualNavItem
                 key={item.id}
-                id={item.id}
                 label={item.label}
                 badge={(item as any).badge}
                 active={section === item.id}
@@ -1836,7 +1822,6 @@ export default function BrandsPage() {
                     <div className="flex items-center gap-2 mb-1 flex-wrap">
                       {scopeMode === "brand" && activeBrandIdForLocks && (
                         <StrategyToolIcon
-                          id="monitor"
                           active={activeStrategyTool === "monitor"}
                           onClick={() => setActiveStrategyTool(activeStrategyTool === "monitor" ? null : "monitor")}
                           icon={faSatelliteDish}
@@ -1845,7 +1830,6 @@ export default function BrandsPage() {
                       )}
                       {(scopeMode === "brand" || scopeMode === "event") && activeBrandIdForLocks && (
                         <StrategyToolIcon
-                          id="healthcheck"
                           active={activeStrategyTool === "healthcheck"}
                           onClick={() => setActiveStrategyTool(activeStrategyTool === "healthcheck" ? null : "healthcheck")}
                           icon={faStethoscope}
@@ -1853,7 +1837,6 @@ export default function BrandsPage() {
                         />
                       )}
                       <StrategyToolIcon
-                        id="doc"
                         active={false}
                         onClick={() => setSection("doc" as any)}
                         icon={faFileArrowUp}
@@ -1874,7 +1857,6 @@ export default function BrandsPage() {
                           brandId={targetId as number | null}
                           scopeMode={scopeMode}
                           locked={!!tabLocks.positioning}
-                          onLockToggle={() => handleLockToggle("positioning")}
                         />
                       )}
                     </div>
@@ -2864,7 +2846,7 @@ function PositioningGrid({
       ))}
 
       {/* ── Segment groups (product / event — unchanged) ── */}
-      {!brandActGroups && groupedSegs.map((group, gi) => (
+      {!brandActGroups && groupedSegs.map((group) => (
         <div key={group.label}>
           <SectionLabel
             label={group.label}
@@ -2878,7 +2860,7 @@ function PositioningGrid({
             intro={SOWORK_GROUP_INTRO[group.prefix]?.[lang === "en" ? "en" : "zh"]}
           />
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-            {group.segs.map((s, si) => {
+            {group.segs.map((s) => {
               const segVal = segmentData?.[s.id];
               const { node: preview, hasContent } = renderSegmentPreview(s.id, segVal, lang);
               return (
@@ -2991,7 +2973,7 @@ const isFilledArr = (a: any) => Array.isArray(a) && a.some((x: any) =>
  */
 function StrategyToolIcon({
   active, onClick, icon, label, title,
-}: { id: string; active: boolean; onClick: () => void; icon: any; label: string;
+}: { active: boolean; onClick: () => void; icon: any; label: string;
      /** 需要比標籤講更多時（例如「上傳定位資料」要說明吃哪些格式）。預設用 label。 */
      title?: string }) {
   return (
@@ -3930,8 +3912,8 @@ function previewForAsset(assetKey: string, value: any, lang: "zh-TW" | "en" = "z
 
 /* ─────────────────────────── VisualNavItem ─────────────────────────── */
 // Sidebar item for visual assets — shows hover-reveal + button, purple badge for 最新.
-function VisualNavItem({ id, label, badge, active, onClick }: {
-  id: string; label: string; badge?: string; active: boolean; onClick: () => void;
+function VisualNavItem({ label, badge, active, onClick }: {
+  label: string; badge?: string; active: boolean; onClick: () => void;
 }) {
   const [hovered, setHovered] = React.useState(false);
   return (
@@ -4624,12 +4606,11 @@ function BrandLogoSettings({ brandId, brandName }: { brandId: number; brandName:
    runner with retry × 5 + parallel waves + cost tracking).
    ───────────────────────────────────────────────────────────────────── */
 function PositioningTopRow({
-  brandId, scopeMode, locked, onLockToggle,
+  brandId, scopeMode, locked,
 }: {
   brandId: number | null;
   scopeMode: "brand"|"product"|"event"|"none";
   locked: boolean;
-  onLockToggle: () => void;
 }) {
   const { lang } = useLang();
   // 2026-05-08: hooks must be called unconditionally (Rules of Hooks).
@@ -4787,8 +4768,9 @@ function PositioningTopRow({
 
       {/* CJ 2026-05-08: removed duplicate wide lock bar from inside
           PositioningTopRow — the legacy lock bar above the body
-          (BrandsPage.tsx:856) already covers all 3 tabs. The
-          onLockToggle prop is kept for API compatibility but unused. */}
+          (BrandsPage.tsx:856) already covers all 3 tabs.
+          2026-09-24：連帶把當時保留的 onLockToggle prop 也拿掉了——留著一個
+          永遠不會被呼叫的 callback，只會讓下一個人以為這裡按了會鎖定。 */}
     </>
   );
 }
