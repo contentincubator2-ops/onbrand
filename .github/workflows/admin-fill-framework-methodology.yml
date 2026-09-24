@@ -1,0 +1,52 @@
+name: Admin (DEV) — fill framework agents' methodology + case studies
+
+# 2026-09-24（CJ「幫這族補資料（在 mos_db 寫入方法論全文與代表案例，走 admin
+# workflow）」）：方法論族（238xxx–239xxx）的 methodology 只有一個關鍵字、
+# experienceDetail 是空的，「查看背景」面板對他們顯示不出東西。
+#
+# 這支寫入 10 位產品定位方法論顧問的方法論全文與代表案例。
+# 代表案例只寫「有出處的公開經典案例」與「明確標示為方法論示例」的內容——
+# 不編客戶戰績（mos_db 既有那批「創勢行銷 轉換率提升 63%」式的合成案例就是
+# 反例）。
+#
+# 預設 dryRun=true：先看要改什麼，確認後再用 dryRun=false 真的寫。
+on:
+  push:
+    paths:
+      - '.github/workflows/admin-fill-framework-methodology.yml'
+  workflow_dispatch:
+    inputs:
+      dryRun:
+        description: 'true = 只印不寫；false = 實際寫入 mos_db'
+        required: false
+        default: 'true'
+      force:
+        description: 'true = 連已經有內容的欄位也覆蓋（預設只補空的）'
+        required: false
+        default: 'false'
+
+jobs:
+  fill:
+    runs-on: ubuntu-24.04
+    environment: dev
+    timeout-minutes: 8
+    steps:
+      - name: Write methodology + case studies into mos_db (DEV)
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 7m
+          script: |
+            set -e
+            cd /opt/onbrand/current/skills/ai-talent
+            set -a; source .env 2>/dev/null; set +a
+            echo "host=$(hostname)  app=$(readlink -f /opt/onbrand/current)"
+            echo "db=${LOCAL_DB_NAME:-mos_db}@${LOCAL_DB_HOST:-127.0.0.1}"
+            echo "----------------------------------------------------------"
+            ARGS=""
+            if [ "${{ github.event.inputs.dryRun || 'true' }}" = "true" ]; then ARGS="$ARGS --dry-run"; fi
+            if [ "${{ github.event.inputs.force || 'false' }}" = "true" ]; then ARGS="$ARGS --force"; fi
+            echo "args: ${ARGS:-(實際寫入，只補空的)}"
+            ./node_modules/.bin/tsx scripts/fill-framework-agent-methodology.ts $ARGS
