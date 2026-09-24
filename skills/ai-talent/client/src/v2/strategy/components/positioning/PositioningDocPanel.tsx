@@ -70,11 +70,14 @@ function renderValue(v: any): string {
 }
 
 export default function PositioningDocPanel({
-  scopeMode, scopeId, scopeName,
+  scopeMode, scopeId, scopeName, onBackToOverview,
 }: {
   scopeMode: Scope;
   scopeId: number | null;
   scopeName: string;
+  /** 2026-09-23（CJ「我寫入四格後，也沒有儲存或回到品牌頁面的按鈕。會迷路」）：
+   *  寫入完成後的出口。沒傳的話完成畫面只會少那顆按鈕，不會壞。 */
+  onBackToOverview?: () => void;
 }) {
   const { lang } = useLang();
   const en = lang === "en";
@@ -110,8 +113,20 @@ export default function PositioningDocPanel({
     onError: (e: any) => { setError(e?.message ?? "對映失敗"); setBusy(null); },
   }) ?? null;
 
+  // 2026-09-23（CJ「會迷路」）：原本寫入成功只是 setReview(null) 靜靜跳回主
+  // 畫面——沒有任何「寫進去了」的回饋，也沒有出口。改成先停在一個完成畫面，
+  // 明講寫了幾格、其餘幾格維持原樣，並給兩條路（回總覽 / 留下來再上傳）。
+  const [doneInfo, setDoneInfo] = React.useState<{ written: number; missing: number; total: number; injected: number } | null>(null);
   const applyMut = (trpc as any).positioningDocs?.applyMapping?.useMutation?.({
-    onSuccess: () => { setReview(null); setBusy(null); coverageQuery.refetch?.(); },
+    onSuccess: () => {
+      setDoneInfo({
+        written: review ? review.proposals.filter((p) => accepted.has(p.path)).length : accepted.size,
+        missing: review?.missing.length ?? 0,
+        total: review?.total ?? 0,
+        injected: inject.size,
+      });
+      setReview(null); setBusy(null); coverageQuery.refetch?.();
+    },
     onError: (e: any) => { setError(e?.message ?? "套用失敗"); setBusy(null); },
   }) ?? null;
 
@@ -231,6 +246,55 @@ export default function PositioningDocPanel({
               )}
             </div>
           ))}
+        </div>
+      </div>
+    );
+  }
+
+  // ── 寫入完成 ───────────────────────────────────────────────────────────
+  // 2026-09-23（CJ「我寫入四格後，也沒有儲存或回到品牌頁面的按鈕。會迷路」）：
+  // 「寫入」就是儲存（applyMapping 直接寫進 positioning，沒有第二個儲存步驟），
+  // 所以這裡要做的不是再加一顆儲存鈕，而是講清楚「已經存好了」並給出口。
+  if (doneInfo) {
+    return (
+      <div className="flex flex-col gap-4">
+        <div className="rounded-medium border border-success-200 bg-success-50/60 p-5">
+          <div className="flex items-center gap-2">
+            <Check size={16} className="text-success-700" />
+            <p className="text-medium font-semibold text-success-800">
+              {doneInfo.written > 0
+                ? (en ? `Saved — ${doneInfo.written} fields written` : `已寫入並存檔：${doneInfo.written} 格`)
+                : (en ? `Saved — extra context only` : `已存檔：這次沒有寫入欄位，只留了補充脈絡`)}
+            </p>
+          </div>
+          <p className="text-small text-default-700 mt-2">
+            {en
+              ? `These ${doneInfo.written} fields are now part of your ${scopeLabel} brain — every task run reads them from here on. `
+                + (doneInfo.missing > 0
+                    ? `The other ${doneInfo.missing} of ${doneInfo.total} weren't in this document and were left untouched.`
+                    : "")
+              : `這 ${doneInfo.written} 格已經存進${scopeLabel}大腦，之後每次跑任務都會讀到。`
+                + (doneInfo.missing > 0
+                    ? `${doneInfo.total} 格裡其餘的 ${doneInfo.missing} 格這份文件沒有寫到，維持原樣沒有被動到——不用現在處理。`
+                    : "")}
+          </p>
+          {doneInfo.injected > 0 && (
+            <p className="text-tiny text-default-600 mt-1.5">
+              {en
+                ? `Plus ${doneInfo.injected} section(s) kept as extra context for the prompt.`
+                : `另外有 ${doneInfo.injected} 段內容以「補充脈絡」的形式留下來，一樣會進 prompt。`}
+            </p>
+          )}
+          <div className="flex gap-2 mt-4 flex-wrap">
+            {onBackToOverview && (
+              <Button color="primary" size="sm" onPress={() => { setDoneInfo(null); onBackToOverview(); }}>
+                {en ? "Back to positioning overview" : "回到定位總覽"}
+              </Button>
+            )}
+            <Button size="sm" variant="flat" onPress={() => setDoneInfo(null)}>
+              {en ? "Stay here — upload another" : "留在這裡，再上傳一份"}
+            </Button>
+          </div>
         </div>
       </div>
     );
@@ -389,13 +453,21 @@ export default function PositioningDocPanel({
 
         {review.missing.length > 0 && (
           <div className="rounded-medium border border-warning-200 bg-warning-50/50 p-4">
+            {/* 2026-09-23（CJ「你列出了16格，但卻說只要補充四格，這樣數字對不上」）：
+                16 跟 4 其實是同一個 20 格的兩半（對到 4 + 沒對到 16），但畫面上
+                一個寫在黃框標題、一個寫在按鈕，中間沒有任何一句把關係講出來，
+                所以看起來像兩個互相矛盾的數字。這裡把算式直接寫出來。 */}
             <p className="text-small font-semibold text-warning-800">
-              {en ? `Your document doesn't cover these ${review.missing.length} fields` : `你的文件裡找不到這 ${review.missing.length} 格`}
+              {en
+                ? `The other ${review.missing.length} of ${review.total} aren't in this document`
+                : `${review.total} 格裡，另外這 ${review.missing.length} 格文件裡沒有寫到`}
             </p>
             <p className="text-tiny text-warning-700 mt-0.5 mb-2">
               {en
-                ? "Not an error — but these are read on every task run, so here's what stays missing."
-                : "不是錯誤 —— 但這幾格每次跑任務都會被讀，所以先講清楚缺了會少什麼。"}
+                ? `${review.proposals.length} found + ${review.missing.length} not found = ${review.total} fields the engine reads. `
+                  + "Not an error, and nothing to do right now — these stay exactly as they are. Two ways to fill them later: upload another document that covers them, or run the SoWork positioning method from the overview."
+                : `對到 ${review.proposals.length} 格 ＋ 沒對到 ${review.missing.length} 格 ＝ 這個${scopeLabel}的 ${review.total} 格。`
+                  + "不是錯誤，也不用現在處理——這幾格會維持原樣、不會被清掉。之後要補有兩條路：再上傳一份有寫到的文件，或回總覽用 SoWork 定位法自動產生。"}
             </p>
             <ul className="flex flex-col gap-1">
               {review.missing.map((f) => (
@@ -407,7 +479,9 @@ export default function PositioningDocPanel({
           </div>
         )}
 
-        <div className="flex gap-2">
+        {/* 2026-09-23：按鈕上的數字要跟上面的黃框對得起來，所以把「其餘幾格不動」
+            寫在同一行，而不是讓使用者自己去減。 */}
+        <div className="flex gap-2 items-center flex-wrap">
           <Button
             color="primary" size="sm"
             isLoading={busy === "apply"}
@@ -427,6 +501,11 @@ export default function PositioningDocPanel({
             {en ? `Write ${accepted.size} fields` : `寫入 ${accepted.size} 格`}
           </Button>
           <Button size="sm" variant="flat" onPress={() => setReview(null)}>{en ? "Cancel" : "取消"}</Button>
+          <span className="text-tiny text-default-500">
+            {en
+              ? `Writing ${accepted.size} of ${review.total}; the other ${review.total - accepted.size} stay as they are.`
+              : `${review.total} 格中寫入 ${accepted.size} 格，其餘 ${review.total - accepted.size} 格維持原樣。`}
+          </span>
         </div>
       </div>
     );
@@ -450,22 +529,39 @@ export default function PositioningDocPanel({
         </div>
       )}
 
-      {/* 落差表 —— 這是「不填完題目會不會影響結果」的誠實答案 */}
+      {/* 落差表 —— 這是「不填完題目會不會影響結果」的誠實答案。
+          2026-09-23（CJ「引擎真正讀得到的欄位的這部分，其實我看不懂這一頁要表達的，
+          跟我們的優勢有甚麼關係」）：原本的標題與說明是用實作語彙寫的（「引擎」
+          「品牌前綴」「path」），只有寫這段程式的人看得懂，而且完全沒講「所以呢」。
+          這一版改成從使用者的角度寫兩句話：這幾格是什麼（＝你的品牌大腦）、
+          填了跟沒填差在哪（每篇文章都自動帶 vs 比較通用），並把「不必每次重貼
+          一次背景」這個相對優勢講明白——那正是這個產品跟直接用 ChatGPT 的差別。 */}
       <div className="rounded-medium border border-divider bg-content1 p-4">
         <div className="flex items-center gap-2 flex-wrap">
-          <p className="text-small font-semibold">{en ? "What the engine actually reads" : "引擎真正讀得到的欄位"}</p>
+          <p className="text-small font-semibold">
+            {en ? "Your brand brain — what AI reads before it writes anything" : "你的品牌大腦——AI 動筆前會先讀的內容"}
+          </p>
           <Chip size="sm" color={missing.length === 0 ? "success" : filled.length ? "warning" : "default"} variant="flat">
-            {filled.length} / {total}
+            {en ? `${filled.length} of ${total} filled` : `${total} 格已填 ${filled.length} 格`}
           </Chip>
           {coverageQuery.isLoading && <Spinner size="sm" />}
         </div>
-        <p className="text-tiny text-default-500 mt-1">
+        <p className="text-tiny text-default-600 mt-1.5 leading-relaxed">
           {en
-            ? "Every task run builds a brand prefix from these paths only. A missing one never errors — the task still runs, the output just gets more generic."
-            : "每次跑任務組給 AI 的品牌前綴只會讀這幾格。缺格不會報錯、任務照跑 —— 只是那篇的內容會比較通用。"}
+            ? `These ${total} fields are the ${scopeLabel} context every task carries by itself — you fill them once here, and every post, script and email afterwards is written with them. That's the difference from pasting your background into ChatGPT again for every single piece.`
+            : `這 ${total} 格就是每一張任務卡都會自動帶著走的${scopeLabel}背景——在這裡填一次，之後每一篇貼文、每一支腳本、每一封信都是帶著它們寫出來的。這就是跟「每寫一篇就要再跟 ChatGPT 重貼一次品牌背景」的差別。`}
+        </p>
+        <p className="text-tiny text-default-500 mt-1.5">
+          {en
+            ? `Filled: written with your own words. Missing: never an error — the task still runs, that part just comes out generic.`
+            : `已填的那幾格：AI 會照你自己的說法寫。沒填的：不會報錯、任務照跑，只是那部分會寫得比較通用。`}
         </p>
         {missing.length > 0 && (
-          <ul className="flex flex-col gap-1 mt-3">
+          <>
+          <p className="text-tiny font-semibold text-default-700 mt-3">
+            {en ? `Still empty (${missing.length})` : `還沒填的 ${missing.length} 格`}
+          </p>
+          <ul className="flex flex-col gap-1 mt-1">
             {missing.map((f) => (
               <li key={f.path} className="text-tiny text-default-700 flex gap-2">
                 <span className="text-warning-600 shrink-0">●</span>
@@ -473,15 +569,21 @@ export default function PositioningDocPanel({
               </li>
             ))}
           </ul>
+          </>
         )}
         {filled.length > 0 && (
-          <div className="flex flex-wrap gap-1.5 mt-3">
+          <>
+          <p className="text-tiny font-semibold text-default-700 mt-3">
+            {en ? `Already filled (${filled.length})` : `已經填好的 ${filled.length} 格`}
+          </p>
+          <div className="flex flex-wrap gap-1.5 mt-1.5">
             {filled.map((f) => (
               <Chip key={f.path} size="sm" variant="flat" color="success" startContent={<Check size={11} />}>
                 {f.label}
               </Chip>
             ))}
           </div>
+          </>
         )}
         {applied?.injectedContext && (
           <p className="text-tiny text-default-500 mt-3">

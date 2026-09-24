@@ -1998,7 +1998,12 @@ export default function BrandsPage() {
                 }}>
                   ← {lang === "en" ? "Positioning overview" : "品牌定位總覽"}
                 </button>
-                {scopeMode !== "none" && pipelineSteps.length > 0 && (
+                {/* 2026-09-23（CJ「就不需要品牌分析的這一列功能了」——在上傳
+                    定位文件那一頁）：「我的定位文件」是「我已經有定位了，照
+                    我的來」的入口，頂上再擺一列「品牌定位分析／開始分析」等於
+                    在同一頁同時推兩條互斥的路，而且那條路在定位總覽已經有
+                    按鈕（重新套用 SoWork 定位法）。其他 section 維持原樣。 */}
+                {scopeMode !== "none" && pipelineSteps.length > 0 && section !== "doc" && (
                   <PipelineRunner
                     steps={pipelineSteps}
                     state={pipeline}
@@ -2054,6 +2059,7 @@ export default function BrandsPage() {
                   pipelineThinking={pipelineThinking && pipelineThinking.segmentTarget === section ? pipelineThinking : null}
                   onAutoFill={runSegmentAutoFill}
                   locked={!!tabLocks.positioning}
+                  onBackToOverview={() => setSection("pos:home")}
                 />
               </div>
               )}  {/* end section !== pos:home */}
@@ -3946,7 +3952,7 @@ interface PipelineThinking {
 function PositioningPanel({
   section, scopeMode, scopeName,
   scopeBrandId, scopeProductId, scopeEventId,
-  pipelineThinking, onAutoFill, locked,
+  pipelineThinking, onAutoFill, locked, onBackToOverview,
 }: {
   section: string;
   scopeMode: "brand" | "product" | "event" | "none";
@@ -3957,6 +3963,8 @@ function PositioningPanel({
   pipelineThinking?: PipelineThinking | null;
   onAutoFill?: (segmentId: string) => void;
   locked?: boolean;
+  /** 回定位總覽——「我的定位文件」寫入完成後的出口（CJ:「會迷路」）。 */
+  onBackToOverview?: () => void;
 }) {
   const { lang } = useLang();
   if (scopeMode === "none") {
@@ -3999,6 +4007,7 @@ function PositioningPanel({
           eventId={scopeEventId}
           pipelineThinking={pipelineThinking ?? null}
           onAutoFill={onAutoFill}
+          onBackToOverview={onBackToOverview}
         />
       </div>
     </div>
@@ -4006,7 +4015,7 @@ function PositioningPanel({
 }
 
 function PositioningEditor({
-  section, scopeMode, scopeName, brandId, productId, eventId, pipelineThinking, onAutoFill,
+  section, scopeMode, scopeName, brandId, productId, eventId, pipelineThinking, onAutoFill, onBackToOverview,
 }: {
   section: string;
   scopeMode: "brand" | "product" | "event";
@@ -4016,6 +4025,8 @@ function PositioningEditor({
   eventId: number | null;
   pipelineThinking: PipelineThinking | null;
   onAutoFill?: (segmentId: string) => void;
+  /** 回定位總覽——「我的定位文件」寫入完成後的出口（CJ:「會迷路」）。 */
+  onBackToOverview?: () => void;
 }) {
   const { lang } = useLang();
   const segments: SegmentSpec[] = SCOPE_SEGMENTS[scopeMode] ?? [];
@@ -4071,7 +4082,15 @@ function PositioningEditor({
 
   if (section === "doc") {
     return (
-      <PositioningDocPanel scopeMode={scopeMode} scopeId={targetId ?? null} scopeName={scopeName} />
+      <PositioningDocPanel
+        scopeMode={scopeMode}
+        scopeId={targetId ?? null}
+        scopeName={scopeName}
+        // 2026-09-23（CJ「我寫入四格後，也沒有儲存或回到品牌頁面的按鈕。
+        // 會迷路」）：寫入完成後要有一條明確的出口回總覽，不是靠使用者
+        // 自己找左上角那顆返回。
+        onBackToOverview={onBackToOverview}
+      />
     );
   }
   if (section === "card") {
