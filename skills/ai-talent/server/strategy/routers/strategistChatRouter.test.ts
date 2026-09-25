@@ -6,7 +6,43 @@
  * 名字」。
  */
 import { describe, expect, it } from "vitest";
-import { strategistChatRouter } from "./strategistChatRouter";
+import { strategistChatRouter, buildSystemPrompt } from "./strategistChatRouter";
+import type { StrategistDirector } from "../core/strategistDirectory";
+
+/** 最小可用的假總監——只有 roleId 會影響工具引導那一段。 */
+const director = (roleId: string, roleLabel: string): StrategistDirector => ({
+  agentId: 1, slug: "x", name: "測試", title: "測試", avatarUrl: "",
+  bio: null, experience: null, specialty: null, methodology: null,
+  industry: null, locale: "tw", alternatives: [],
+  roleId: roleId as any, roleLabel, roleLabelEn: roleLabel,
+  signatureQuestions: [], signatureQuestionsEn: [], isFallback: false,
+});
+
+// 2026-09-25（CJ「他應該要專注在產品相關策略和定位就好，就算是健檢，也是健檢
+// 產品策略」）：產品總監把人帶去品牌層的策略健檢＝答非所問，而且畫面上看不出
+// 是錯的——只有讀 prompt 才知道。所以這兩條要測。
+describe("工具引導依 scope 分開", () => {
+  it("品牌總監才拿得到策略監測／健檢的按鈕標記", () => {
+    const p = buildSystemPrompt(director("brand_positioning", "品牌定位"), "");
+    expect(p).toContain("<<action:open_healthcheck>>");
+    expect(p).toContain("<<action:open_monitor>>");
+  });
+
+  it("產品總監完全不給那兩顆按鈕，而且被明確擋住", () => {
+    for (const roleId of ["product_value_prop", "product_kano", "product_pricing"]) {
+      const p = buildSystemPrompt(director(roleId, "產品"), "");
+      expect(p).not.toContain("<<action:open_healthcheck>>");
+      expect(p).not.toContain("<<action:open_monitor>>");
+      expect(p).toContain("不要");      // 「不要把使用者帶去…」那段在
+      expect(p).toContain("品牌策略總監");  // 品牌層問題要轉介給誰
+    }
+  });
+
+  it("沒有指定人設（舊對話）維持品牌那套，不要突然什麼工具都沒有", () => {
+    const p = buildSystemPrompt(null, "");
+    expect(p).toContain("<<action:open_healthcheck>>");
+  });
+});
 
 describe("strategistChatRouter", () => {
   it("router 建得起來，而且沒有用到 tRPC 保留字", () => {

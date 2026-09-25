@@ -31,6 +31,15 @@ export default defineConfig({
       DB_USER: "test",
       DB_PASSWORD: "test",
       DB_NAME: "test",
+      // 2026-09-25：server/localDb.ts 在 import 期就會檢查 LOCAL_DB_PASSWORD，
+      // 沒有就 throw——於是 13 個 import 到它的測試檔一直是「載入失敗」，
+      // 在本機與 CI 都跑不起來，被當成「既有環境問題」擱著很久。這幾支測試
+      // 全都 mock 掉 localDb 或根本不連線，缺的只是這幾個環境變數。補上之後
+      // 實測 98 個檔案／1389 個測試全過。
+      LOCAL_DB_HOST: "localhost",
+      LOCAL_DB_USER: "test",
+      LOCAL_DB_PASSWORD: "test",
+      LOCAL_DB_NAME: "test",
       JWT_SECRET: "ci-test-secret-at-least-32-chars-long",
       NODE_ENV: "test",
     },

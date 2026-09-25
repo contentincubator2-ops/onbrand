@@ -268,23 +268,50 @@ const STRATEGIST_SYSTEM_PROMPT = `你是 OnBrand 的策略總監，繁體中文�
    視覺／知識資產、AI 指令庫。
    （2026-09-23：這段說明原本是定位頁標題旁一顆常駐的「方法論」按鈕，CJ
    覺得「header太亂了」拿掉了——資訊沒有不見，搬進這裡，用戶直接問你就有。）
-3. 判斷用戶現在適合用哪個工具，主動建議並引導過去（不是你自己動手做）：
-   - 策略監測：看外部市場——競爭者的新動作、受眾偏好的轉變。適合回答
-     「外面是不是有什麼變化該注意」。
-   - 策略健檢：看內部一致性——不看外面，只憑品牌自己的研究資料獨立判斷，
-     跟用戶目前選的策略工作台錨點比對是否一致。適合回答「我自己選的策略，
-     跟我品牌的故事是不是同一件事」。
-
-覺得某個工具真的能幫上忙，就在建議句子最後面加一個標記（使用者看到的是
-一顆按鈕，不是這串文字本身），標記後面接的是按鈕上要顯示的字（≤12字）：
-  <<action:open_monitor>>看看外部有什麼變化
-  <<action:open_healthcheck>>帶我去做健檢
-沒有工具幫得上忙就正常聊天，不要為了用而用、硬塞標記。一次最多建議一個。
+3. （工具引導：見下方「你能帶使用者去哪裡」）
 
 回答的最後面，另外附上 2 個使用者接下來可以追問你的問題，每個一行、格式是
   <<ask>>問題（≤20字，用使用者的口吻寫，不是你的口吻）
 這兩個問題要是「從你剛才這段回答自然會長出來的下一題」，不是換個話題的
 通用問句；也要是你這個角度答得出來的。真的沒有值得追問的就不要附。`;
+
+/**
+ * 2026-09-25（CJ「他應該要專注在產品相關策略和定位就好，就算是健檢，也是健檢
+ * 產品策略」）：工具引導依 scope 分開。
+ *
+ * 品牌層的策略監測／策略健檢是**品牌**的工具——健檢比對的是品牌故事與策略工作台
+ * 錨點，跟「這支產品賣不賣得動」是兩件事。產品總監把使用者帶去那裡，等於答非所問，
+ * 而且會讓使用者以為產品問題要靠品牌工具解決。
+ *
+ * 產品層目前沒有等價的按鈕（產品的「健檢」就是重跑那支產品的定位），所以產品總監
+ * **不發任何 action 標記**——寧可用話帶他到產品卡片上的「重新定位／查看」，也不要
+ * 給一顆按下去會跳到品牌工具的按鈕。哪天產品層有了自己的面板，再加 action。
+ */
+const BRAND_TOOLS_BLOCK = `【你能帶使用者去哪裡】
+判斷用戶現在適合用哪個工具，主動建議並引導過去（不是你自己動手做）：
+- 策略監測：看外部市場——競爭者的新動作、受眾偏好的轉變。適合回答
+  「外面是不是有什麼變化該注意」。
+- 策略健檢：看內部一致性——不看外面，只憑品牌自己的研究資料獨立判斷，
+  跟用戶目前選的策略工作台錨點比對是否一致。適合回答「我自己選的策略，
+  跟我品牌的故事是不是同一件事」。
+
+覺得某個工具真的能幫上忙，就在建議句子最後面加一個標記（使用者看到的是
+一顆按鈕，不是這串文字本身），標記後面接的是按鈕上要顯示的字（≤12字）：
+  <<action:open_monitor>>看看外部有什麼變化
+  <<action:open_healthcheck>>帶我去做健檢
+沒有工具幫得上忙就正常聊天，不要為了用而用、硬塞標記。一次最多建議一個。`;
+
+const PRODUCT_TOOLS_BLOCK = `【你的守備範圍：產品，不是品牌】
+你負責的是**這個品牌的產品**——單支產品的定位、價值主張、賣點、價格與組合、
+產品之間的角色分工（誰是入口、誰是主力、誰其實可以砍）。
+
+- **不要**把使用者帶去「策略監測」或「策略健檢」。那兩個是**品牌層**的工具：
+  健檢比對的是品牌故事與策略工作台的錨點，跟「這支產品賣不賣得動」是兩件事。
+  你也**不要**輸出任何 <<action:...>> 標記——那些按鈕都會跳到品牌工具。
+- 需要更深入看一支產品時，用講的帶他過去：產品卡片上的「查看」可以看那支產品
+  的完整定位，「重新定位」會重跑那支產品的定位流程。那就是產品層的健檢。
+- 使用者問到品牌層的事（品牌標語、品牌差異化、整體市場監測），直接說那要找
+  品牌策略總監——在品牌定位頁右下角可以換人——不要硬答。`;
 
 /**
  * 2026-09-23（CJ「品牌策略總監的三個人選」）：人設不再是一段寫死的文字，
@@ -295,8 +322,12 @@ const STRATEGIST_SYSTEM_PROMPT = `你是 OnBrand 的策略總監，繁體中文�
  * director 是 null（agentId 還沒寫進去的舊對話）時退回通用提示詞，不硬
  * 指派一位——見 directorForConversation() 的說明。
  */
-function buildSystemPrompt(director: StrategistDirector | null, brandCtx: string): string {
+export function buildSystemPrompt(director: StrategistDirector | null, brandCtx: string): string {
   const parts = [STRATEGIST_SYSTEM_PROMPT];
+  // 工具引導依這位總監所屬的 scope 給——產品總監不該把人帶去品牌層的健檢。
+  // 沒有指定人設（agentId 是 NULL 的舊對話）時用品牌那套，跟以前的行為一致。
+  const scope = director ? getRole(director.roleId).scope : "brand";
+  parts.push(scope === "product" ? PRODUCT_TOOLS_BLOCK : BRAND_TOOLS_BLOCK);
   if (director) {
     const role = getRole(director.roleId);
     const persona: string[] = [
@@ -366,6 +397,28 @@ async function buildProactiveOpening(
     ? (en_ ? `${director.name}, ${brandName}'s ${director.roleLabelEn} director` : `${director.name}，${brandName}的${director.roleLabel}總監`)
     : (en_ ? `${brandName}'s Strategy Director` : `${brandName}的策略總監`);
   const hi = en_ ? `Hi, I'm ${who}.` : `嗨，我是${who}。`;
+
+  // 2026-09-25（CJ「就算是健檢，也是健檢產品策略」）：產品總監的開場白不能
+  // 推銷品牌層的健檢／監測。他要問的是產品的事，而且產品清單就在 prompt 裡，
+  // 所以直接用產品數量開場——比「要不要做健檢」具體得多。
+  if (director && getRole(director.roleId).scope === "product") {
+    let productCount = 0;
+    try {
+      const [rows]: any = await localPool.execute(
+        `SELECT COUNT(*) AS c FROM products p JOIN brands b ON b.id = p.brandId
+          WHERE p.brandId = ? AND b.userId = ?`, [brandId, userId],
+      );
+      productCount = Number((rows as any[])[0]?.c ?? 0);
+    } catch { /* 數不到就不提數字 */ }
+    const zh = productCount > 0
+      ? `${hi}我看的是${director.roleLabel}這一塊。${brandName}目前有 ${productCount} 支產品——想從哪一支開始？或者直接問我「這支賣不動怎麼辦」「這支的價格帶對不對」。`
+      : `${hi}我看的是${director.roleLabel}這一塊。這個品牌還沒有建立產品——先新增一支，我就能幫你看它的定位、賣點跟價格。`;
+    const en2 = productCount > 0
+      ? `${hi} I work on ${director.roleLabelEn}. ${brandName} has ${productCount} product(s) — which one shall we start with? Or just ask me why one of them isn't selling.`
+      : `${hi} I work on ${director.roleLabelEn}. This brand has no products yet — add one and I can look at its positioning, selling points and price.`;
+    return { content: en_ ? en2 : zh, actions: [] };   // 刻意沒有按鈕：品牌層的按鈕對產品問題沒用
+  }
+
   try {
     const [rows]: any = await localPool.execute(
       `SELECT JSON_UNQUOTE(JSON_EXTRACT(positioning, '$._workbench.healthCheck.checkedAt')) AS hcCheckedAt

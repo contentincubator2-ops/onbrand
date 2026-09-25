@@ -217,10 +217,19 @@ export default function StrategyDirectorDrawer({ brandId }: { brandId: number | 
                 <img src={avatarSrcOf(current)} alt="" style={{ width: 36, height: 36, borderRadius: "50%", flexShrink: 0 }} />
                 <div style={{ minWidth: 0 }}>
                   <div style={{ fontSize: 13.5, fontWeight: 700, color: "#171717", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    {current?.name ?? (listQ?.isLoading ? (en ? "Loading…" : "載入中…") : (en ? "Strategy Director" : "策略總監"))}
+                    {current?.name
+                      ?? ((listQ?.isLoading || listQ?.isFetching)
+                            ? (en ? "Loading…" : "載入中…")
+                            : scope === "product"
+                              ? (en ? "Product Strategy" : "產品策略總監")
+                              : (en ? "Strategy Director" : "策略總監"))}
                   </div>
                   <div style={{ fontSize: 11, color: "#737373", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    {current ? `${roleLabelOf(current, en)}・${current.title}` : (en ? "Built for your brand" : "為你的品牌而設計")}
+                    {current
+                      ? `${roleLabelOf(current, en)}・${current.title}`
+                      : scope === "product"
+                        ? (en ? "Built for this product" : "為這支產品而設計")
+                        : (en ? "Built for your brand" : "為你的品牌而設計")}
                   </div>
                 </div>
               </div>
@@ -274,9 +283,45 @@ export default function StrategyDirectorDrawer({ brandId }: { brandId: number | 
               height={PANEL_HEIGHT}
             />
           )}
-          {view === "chat" && !current && !listQ?.isLoading && (
-            // mos_db 一位都查不到（資料被改動過）——說清楚是哪裡沒有東西，
-            // 不要留一個永遠打不出字的輸入框讓人以為是壞掉。
+          {view === "chat" && !current && (listQ?.isLoading || listQ?.isFetching) && (
+            <div style={{
+              height: PANEL_HEIGHT, border: "2px solid #111", borderRadius: 18, background: "#fff",
+              boxShadow: "4px 4px 0 rgba(17,17,17,0.15)", padding: 18,
+              display: "flex", alignItems: "center", justifyContent: "center",
+            }}>
+              <p style={{ fontSize: 12.5, color: "#a3a3a3", margin: 0 }}>{en ? "Loading…" : "載入中…"}</p>
+            </div>
+          )}
+          {/* 2026-09-25（CJ 回報「目前在 mos_db 找不到可用的策略總監人選」，但
+              server 端實測兩種 scope 都正常回三位）：原本的空狀態**在說謊**——
+              查詢失敗時也顯示同一句「mos_db 找不到人選」，於是真正的原因（權限、
+              網路、伺服器例外）被蓋掉，使用者跟我都只能猜。三種狀態現在分開講：
+              載入中／查詢失敗（顯示真正的錯誤訊息＋重試）／真的沒有人選。 */}
+          {view === "chat" && !current && !listQ?.isLoading && !listQ?.isFetching && listQ?.error && (
+            <div style={{
+              height: PANEL_HEIGHT, border: "2px solid #111", borderRadius: 18, background: "#fff",
+              boxShadow: "4px 4px 0 rgba(17,17,17,0.15)", padding: 18,
+              display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", textAlign: "center", gap: 10,
+            }}>
+              <p style={{ fontSize: 12.5, lineHeight: 1.7, color: "#B45309", margin: 0, maxWidth: 300 }}>
+                {en ? "Couldn't load your directors." : "讀取策略總監失敗。"}
+                <br />
+                <span style={{ color: "#737373", fontSize: 11.5 }}>
+                  {String((listQ.error as any)?.message ?? "").slice(0, 200)}
+                </span>
+              </p>
+              <button
+                onClick={() => listQ.refetch?.()}
+                style={{
+                  fontSize: 12, fontWeight: 700, border: "1.5px solid #171717", borderRadius: 999,
+                  padding: "4px 12px", background: "#fff", cursor: "pointer", color: "#171717",
+                }}
+              >
+                {en ? "Try again" : "重試"}
+              </button>
+            </div>
+          )}
+          {view === "chat" && !current && !listQ?.isLoading && !listQ?.isFetching && !listQ?.error && (
             <div style={{
               height: PANEL_HEIGHT, border: "2px solid #111", borderRadius: 18, background: "#fff",
               boxShadow: "4px 4px 0 rgba(17,17,17,0.15)", padding: 18,
