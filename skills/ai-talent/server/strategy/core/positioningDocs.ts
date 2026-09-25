@@ -182,6 +182,14 @@ export const BRAND_PROMPT_FIELDS: PromptField[] = [
 
 /** 產品：對應 PRODUCT_SEGMENTS 的 canonical 欄位。 */
 export const PRODUCT_PROMPT_FIELDS: PromptField[] = [
+  // 2026-09-25（CJ「將產品定位中，增加價格/規格／重量／份數 還有網址」）：事實欄位
+  // 沒有「自動填寫」按鈕（AI 不准憑空產生售價），但**使用者自己上傳的文件**裡本來
+  // 就常寫著這些數字——從他的文件抄過來是抄，不是編，所以這裡要收。
+  { path: "facts.price",    label: "售價",        shape: "text", cost: "談定價與 CP 值時只能反問使用者售價，他在畫面上已經填過" },
+  { path: "facts.spec",     label: "規格",        shape: "text", cost: "文案講不出包裝與份量，只能寫模糊的形容詞" },
+  { path: "facts.weight",   label: "重量／容量",  shape: "text", cost: "顧客判斷划不划算的第一個數字缺席，價格帶無從比較" },
+  { path: "facts.servings", label: "份數",        shape: "text", cost: "「幾人份」說不出來，情境文案寫不進餐桌場景" },
+  { path: "facts.url",      label: "商品網址",    shape: "text", cost: "導購文案沒有可直接放的連結" },
   { path: "core.coreStatement",     label: "核心定位",     shape: "text", cost: "產品任務只拿得到產品名稱，內容會圍著名字打轉" },
   { path: "core.zhTagline",         label: "產品標語",     shape: "text", cost: "每篇都要現編一句產品主張" },
   { path: "core.oneLineValueProp",  label: "一句話價值主張", shape: "text", cost: "速查卡與短文案沒有可直接引用的主張" },

@@ -134,8 +134,10 @@ describe("產品清單要帶得出使用者在卡片上看得到的東西", () =
     const out = await buildBrandCatalogBlock(1, 1);
     expect(out).toContain("USP：頂層的賣點");
     expect(out).toContain("主客群：頂層的客群");
-    // 有東西可講就不該再說「尚未填寫」
-    expect(out).not.toContain("尚未填寫");
+    // 有東西可講就不該再說「核心欄位尚未填寫」
+    // （2026-09-25：此處原本比對整串「尚未填寫」，商品事實那一句也會命中——
+    // 而那一句是對的：這支產品確實沒填售價／重量／份數。）
+    expect(out).not.toContain("核心欄位尚未填寫");
   });
 
   it("沒有售價就不要生一行空的「售價：」出來", async () => {

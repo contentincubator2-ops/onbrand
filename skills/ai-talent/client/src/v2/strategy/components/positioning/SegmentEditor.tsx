@@ -68,17 +68,26 @@ export default function SegmentEditor({
         </div>
         <div className="flex items-center gap-2">
           <SourceViewer research={research} segmentTitle={`${spec.num} ${spec.title}`} />
-          <Tooltip content={en ? `Fill with AI` : `由 AI 專家幫我填寫`} placement="top">
-            <Button
-              size="sm"
-              variant="bordered"
-              radius="full"
-              startContent={<FontAwesomeIcon icon={faRobot} className="text-tiny" />}
-              onPress={() => onRunAgent?.(spec.agent)}
-            >
-              自動填寫
-            </Button>
-          </Tooltip>
+          {/* 2026-09-25：事實欄位（售價／規格／重量／份數／網址）不給「自動填寫」。
+              給了就會有人按，AI 一定編得出一個很像真的數字，然後那個假數字會流進
+              文案與定價建議。沒有按鈕比按了會騙人好。 */}
+          {spec.userOnly ? (
+            <Chip size="sm" variant="flat" color="warning" className="shrink-0">
+              {en ? "You fill this in — AI won't" : "只由你填寫，AI 不代填"}
+            </Chip>
+          ) : (
+            <Tooltip content={en ? `Fill with AI` : `由 AI 專家幫我填寫`} placement="top">
+              <Button
+                size="sm"
+                variant="bordered"
+                radius="full"
+                startContent={<FontAwesomeIcon icon={faRobot} className="text-tiny" />}
+                onPress={() => onRunAgent?.(spec.agent)}
+              >
+                自動填寫
+              </Button>
+            </Tooltip>
+          )}
         </div>
       </CardHeader>
       <CardBody className="px-5 pb-5 pt-2 gap-4">

@@ -46,6 +46,25 @@ function pushFrom(
 }
 
 /**
+ * 同一個標籤、多個可能路徑，第一個有值的就用（不是每個都印一行）。
+ *
+ * 2026-09-25（CJ「將產品定位中，增加價格/規格／重量／份數 還有網址」）：事實欄位
+ * 的 canonical 位置是 `facts.*`，但舊資料在 positioning 頂層（`price` /
+ * `productUrl`，intake 與官網掃描寫的）。兩邊都要讀、但只能印一次——用 pushFrom
+ * 列兩條路徑的話，兩邊都有值的產品會出現兩行【產品售價】，模型看到兩個數字就得
+ * 自己猜哪個算數。
+ */
+function pushFirst(lines: string[], obj: any, label: string, paths: string[], max: number): void {
+  for (const path of paths) {
+    const v = path.split(".").reduce<any>((acc, k) => (acc == null ? acc : acc[k]), obj);
+    const text = typeof v === "string" ? v.trim() : "";
+    if (!text) continue;
+    lines.push(`【${label}】${text.slice(0, max)}`);
+    return;
+  }
+}
+
+/**
  * 用戶上傳的定位文件裡，對不到任何 canonical 欄位、但他選擇照樣餵進來的段落。
  *
  * 存在的理由是 CJ 的「按照用戶有的內容呈現，不一定要填完我們設定的題目」——
@@ -549,14 +568,23 @@ export async function buildBrandPrefix(
               //
               // 記憶裡記的是「三個 reader 要同步」；這是第四個，而且是唯一
               // 一個真的影響產出品質的。
+              // ── 事實欄位（售價／規格／重量／份數／網址）──────────────────
+              // 2026-09-25（CJ「明明我在此產品中，有寫價格，但是產品顧問，還是
+              // 重複問我價格」→「將產品定位中，增加價格/規格／重量／份數 還有
+              // 網址」）：2026-09-23 那次的判準寫「pricing/channel 這類純策略規劃
+              // 欄位不補」——事實欄位不在那個範圍：售價與克重是事實不是策略敘述，
+              // 而且這份 prefix 現在還餵給產品策略總監，他看不到就只能反問使用者。
+              //
+              // canonical 位置是 facts.*，舊資料在頂層（price / productUrl）。
+              // 路徑順序跟 client/src/v2/strategy/lib/productFacts.ts 同一份，
+              // 改那支要一起改這裡。用 pushFirst（第一個有值的就用），不是
+              // pushFrom——兩邊都有值時印兩行售價，模型得自己猜哪個算數。
+              pushFirst(lines, pp, "產品售價",   ["facts.price", "price", "core.price"], 60);
+              pushFirst(lines, pp, "產品規格",   ["facts.spec", "spec"], 80);
+              pushFirst(lines, pp, "重量／容量", ["facts.weight", "weight"], 40);
+              pushFirst(lines, pp, "份數",       ["facts.servings", "servings"], 40);
+              pushFirst(lines, pp, "商品網址",   ["facts.url", "productUrl", "url"], 150);
               pushFrom(lines, pp, [
-                // 2026-09-25（CJ「明明我在此產品中，有寫價格，但是產品顧問，還是
-                // 重複問我價格」）：售價在 positioning 頂層的 `price`（不在任何
-                // segment 裡），所以下面那串 canonical 路徑一個都撈不到它。
-                // 上面 2026-09-23 那次寫「pricing/channel 這類純策略規劃欄位不補」
-                // ——**售價不是策略規劃，是事實**，而且這份 prefix 現在還餵給產品
-                // 策略總監（strategistChatRouter），他看不到價格就只能反問。
-                ["price",                    "產品售價",     60],
                 ["core.coreStatement",       "產品核心定位", 400],
                 ["core.zhTagline",           "產品 Slogan",  100],
                 // 2026-09-23（缺口稽核 — 同一套手法再對一次產品定位）：

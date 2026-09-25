@@ -51,6 +51,16 @@ export interface SegmentSpec {
   rationale?: string;
   /** English rationale — displayed when UI language is "en". */
   rationaleEn?: string;
+  /**
+   * 這一段只由使用者填，AI 不代填。
+   *
+   * 2026-09-25（CJ「將產品定位中，增加價格/規格／重量／份數 還有網址」）：
+   * 這些是**事實**，不是判斷。讓 AI 去「產生」一個售價或克重，它一定編得出來，
+   * 而且編得很像真的——然後這個假數字會流進文案、流進定價建議、流進給策略總監
+   * 的脈絡。所以這一段刻意沒有「自動填寫」按鈕，產出定位的 pipeline 也不會碰它
+   * （positioningSteps.ts 的步驟是寫死的一段一步，不吃這個 segment）。
+   */
+  userOnly?: boolean;
 }
 
 // ── Brand (8 segments) ───────────────────────────────────────────────────
@@ -241,6 +251,30 @@ export const BRAND_SEGMENTS: SegmentSpec[] = [
 
 // ── Product (6 segments) ─────────────────────────────────────────────────
 export const PRODUCT_SEGMENTS: SegmentSpec[] = [
+  {
+    // 2026-09-25（CJ「將產品定位中，增加價格/規格／重量／份數 還有網址」）：
+    // 起因是產品策略總監在畫面寫著 NT$560 的情況下反問售價，追下去發現售價只存在
+    // positioning 的頂層（intake／掃描寫的），定位書裡根本沒有這一格；而「幾克、
+    // 幾份」這種顧客第一個會問的事，連存的地方都沒有。
+    //
+    // 編號用 1.0 而不是插進 1.1——既有六段的編號散落在文件、PDF 與使用者的記憶裡，
+    // 為了加一段把它們全部往後推一號不划算。
+    id: "facts",
+    num: "1.0",
+    title: "商品事實",
+    titleEn: "Product Facts",
+    agent: "product-strategist",
+    userOnly: true,
+    fields: [
+      { key: "price",    label: "售價",          type: "text", hint: "例：NT$560（含幣別，照你實際賣的寫）" },
+      { key: "spec",     label: "規格",          type: "text", hint: "例：2 片裝／厚度 1.5cm／真空包" },
+      { key: "weight",   label: "重量／容量",     type: "text", hint: "例：300g（顧客判斷划不划算的第一個數字）" },
+      { key: "servings", label: "份數",          type: "text", hint: "例：2–3 人份" },
+      { key: "url",      label: "商品網址",       type: "text", hint: "商品頁連結，寫文案要放連結時直接取用" },
+    ],
+    rationale: "售價、規格、重量、份數、連結是事實不是判斷——AI 不會也不該幫你編。填了它們，寫文案與談定價時才有共同的地面。",
+    rationaleEn: "Price, spec, weight, servings and the product URL are facts, not judgements — AI will not invent them for you. Filling them gives copy and pricing work a shared ground truth.",
+  },
   {
     id: "core",
     num: "1.1",

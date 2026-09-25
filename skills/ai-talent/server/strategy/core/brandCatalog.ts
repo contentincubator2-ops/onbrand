@@ -71,16 +71,30 @@ function productLine(idx: number, row: any): string {
   // 判準訂在這裡，之後加欄位照這條走：**使用者在產品卡片上看得到的，總監就要看得到**。
   // 卡片顯示的是 名稱／售價／標語／USP／受眾（BrandsPage getPreview），所以這行就這五樣。
   // 問一個畫面上已經寫著的數字，對使用者來說等於「你根本沒看我的資料」。
-  const price = pos ? pickAny(pos, ["price", "core.price"], 40) : null;
+  // 路徑順序跟 client/src/v2/strategy/lib/productFacts.ts 同一份（canonical
+  // facts.* 優先、舊位置其次）。那支改了，這裡要一起改。
+  const price = pos ? pickAny(pos, ["facts.price", "price", "core.price"], 40) : null;
+  const spec = pos ? pickAny(pos, ["facts.spec", "spec"], 60) : null;
+  const weight = pos ? pickAny(pos, ["facts.weight", "weight"], 40) : null;
+  const servings = pos ? pickAny(pos, ["facts.servings", "servings"], 40) : null;
+  const url = pos ? pickAny(pos, ["facts.url", "productUrl", "url"], 120) : null;
   const usp = pos ? pickAny(pos, ["usp", "competition.uniqueUsp", "core.oneLineValueProp"], 120) : null;
   const audience = pos ? pickAny(pos, ["audience.primary", "targetAudience"], 120) : null;
   const bits = [`${idx}. ${row.name ?? "(未命名)"}（產品 id ${row.id}）`];
   if (price) bits.push(`售價：${price}`);
+  // 2026-09-25（CJ「增加價格/規格／重量／份數 還有網址」）：顧客第一個問的是
+  // 「幾克、幾份」，定價與 CP 值的討論沒有這兩個數字就只能反問。
+  if (spec) bits.push(`規格：${spec}`);
+  if (weight) bits.push(`重量／容量：${weight}`);
+  if (servings) bits.push(`份數：${servings}`);
   if (slogan) bits.push(`Slogan：${slogan}`);
   if (core) bits.push(`核心定位：${core}`);
   if (usp) bits.push(`USP：${usp}`);
   if (audience) bits.push(`主客群：${audience}`);
+  if (url) bits.push(`商品網址：${url}`);
   if (!slogan && !core && !usp && !audience) bits.push(pos ? "定位資料：有，但核心欄位尚未填寫" : "定位資料：尚未建立");
+  // 事實欄位是空的就明講，總監才知道「要問」跟「已經有」的差別在哪。
+  if (!price && !weight && !servings) bits.push("商品事實（售價／重量／份數）：尚未填寫");
   return bits.join("｜");
 }
 

@@ -48,6 +48,7 @@ import ProductDetailModal from "../components/positioning/ProductDetailModal";
 import { Target as LucideTarget, Type as LucideType, Palette as LucidePalette, Lock as LucideLock, Play as LucidePlay, RotateCcw as LucideRotate, BookOpen as LucideBook, Sparkles, Bot as LucideRobotIcon, Quote as LucideQuote, Shield as LucideShield, Type as LucideTypeIcon, Pencil as LucidePencil, Award as LucideAward, Package as LucidePackage, Hash as LucideHash, MessageCircle as LucideMessage, FileText as LucideFileText, IdCard as LucideIdCard, Trash2 as LucideTrash } from "lucide-react";
 import { SCOPE_SEGMENTS, type SegmentSpec } from "../lib/positioningSchema";
 import { pickProductImageUrl } from "../lib/productImage";
+import { readProductFacts } from "../lib/productFacts";
 import { pipelineFor, type PipelineStepSpec } from "../lib/positioningPipeline";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faPlus, faPalette, faFont, faQuoteLeft, faBullseye, faUsers, faImage, faIcons, faChartPie, faImages, faPenNib, faShieldHalved, faFolderOpen, faLock, faLockOpen, faBookOpen, faTableList, faBox, faRocket, faBullhorn, faWandSparkles, faGear, faStickyNote, faTrash, faSatelliteDish, faStethoscope, faFileArrowUp } from "@fortawesome/free-solid-svg-icons";
@@ -4035,7 +4036,14 @@ function PositioningEditor({
       )}
       <SegmentEditor
         spec={activeSegment}
-        value={draft[activeSegment.id] ?? null}
+        // 2026-09-25：商品事實這一段開起來要先帶出舊位置的值（售價／商品網址本來
+        // 就存在 positioning 頂層），否則使用者會看到空表單，以為資料不見了，
+        // 然後重打一次。第一次編輯存檔後就落在 canonical 的 facts.*。
+        value={
+          activeSegment.id === "facts" && scopeMode === "product"
+            ? { ...readProductFacts(draft), ...(draft.facts ?? {}) }
+            : draft[activeSegment.id] ?? null
+        }
         onChange={(next) => onDraftChange({ ...draft, [activeSegment.id]: next })}
         onRunAgent={() => onAutoFill?.(activeSegment.id)}
         research={(draft._research as any)?.[activeSegment.id] ?? null}
@@ -5560,7 +5568,8 @@ function BrandEntityGrid({
                     || interim.usp || "",
         audience: extractField(p, "audience.primary", "targetAudience")
                     || interim.targetAudience || "",
-        price: extractField(p, "price"),
+        // 2026-09-25：售價的 canonical 位置改成 facts.price，舊資料仍在頂層。
+        price: extractField(p, "facts.price", "price"),
       };
     } else {
       return {
