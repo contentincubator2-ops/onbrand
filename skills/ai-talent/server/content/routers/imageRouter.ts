@@ -219,6 +219,36 @@ Rules:
       return parseBilingualBriefChoice(result.choices?.[0], input.caption);
     }),
 
+  /**
+   * refineScenePrompt — 把使用者隨手寫的場景敘述，潤成一段夠具體的場景描述。
+   *
+   * 2026-09-24（CJ「當我們要客戶用產品照片做場景圖的時候，會因為她的提示詞不夠
+   * 好，所以合成的圖片很糟糕，很AI。在描述場景時，請加入AI潤飾的按鈕」）。
+   *
+   * 實作在 content/core/scenePromptRefiner.ts——router 只做權限。抽出去的理由是
+   * probe 要能跑**同一段程式**驗證產出品質，不是複製一份 prompt 來測（兩份 prompt
+   * 遲早會漂移，而漂移的那天測出來的東西就不是線上跑的東西）。
+   */
+  refineScenePrompt: protectedProcedure
+    .input(z.object({
+      brandId: z.number().int().positive(),
+      scene: z.string().max(600).default(""),
+      productId: z.number().int().positive().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED" });
+      await assertBrandOwner(ctx.user.id, input.brandId);
+      const { refineScenePrompt } = await import("../core/scenePromptRefiner");
+      const refined = await refineScenePrompt({
+        brandId: input.brandId, userId: ctx.user.id,
+        productId: input.productId ?? null, scene: input.scene,
+      });
+      if (!refined) {
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "這次潤飾沒有結果，請再試一次，或直接用你原本寫的。" });
+      }
+      return { refined, original: input.scene };
+    }),
+
   listForDecision: protectedProcedure
     .input(z.object({ decisionId: z.number().int().positive() }))
     .query(async ({ input, ctx }) => {

@@ -1,0 +1,41 @@
+name: Ops (DEV) — probe the AI scene-prompt refiner
+
+# 2026-09-24（CJ「加入AI潤飾的按鈕…確認產出結果會好一些」）：「會好一些」不能
+# 靠宣稱。這支用真實品牌／產品資料，餵幾種使用者真的會打的爛提示詞，把潤出來的
+# 原文印出來對照。
+#
+# 會呼叫 LLM（4 次）。push 觸發只綁自己這個檔案，改別的檔案不會順手燒模型呼叫。
+on:
+  push:
+    paths:
+      - '.github/workflows/op-probe-scene-refine.yml'
+  workflow_dispatch:
+    inputs:
+      brandId:
+        description: '用哪個品牌（預設 2972）'
+        required: false
+        default: '2972'
+      productId:
+        description: '用哪支產品（留空＝自動挑最近更新的一支）'
+        required: false
+
+jobs:
+  probe:
+    runs-on: ubuntu-24.04
+    environment: dev
+    timeout-minutes: 10
+    steps:
+      - name: Refine a few real scene prompts on the DEV database
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 9m
+          script: |
+            set -e
+            cd /opt/onbrand/current/skills/ai-talent
+            set -a; source .env 2>/dev/null; set +a
+            echo "host=$(hostname)  app=$(readlink -f /opt/onbrand/current)"
+            echo "----------------------------------------------------------"
+            ./node_modules/.bin/tsx scripts/probe-scene-refine.ts "${{ github.event.inputs.brandId || '2972' }}" "${{ github.event.inputs.productId }}"

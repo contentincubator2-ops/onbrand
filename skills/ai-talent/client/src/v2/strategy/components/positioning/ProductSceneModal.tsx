@@ -55,6 +55,14 @@ export default function ProductSceneModal({
     if (!photoUrl && photos.length) setPhotoUrl((photos.find((p) => p.isPrimary) ?? photos[0]!).url);
   }, [photos, photoUrl]);
 
+  // 2026-09-24（CJ「因為她的提示詞不夠好，所以合成的圖片很糟糕，很AI…請加入AI
+  // 潤飾的按鈕」）：使用者通常只寫「餐桌」兩個字，模型缺的空間／光線／鏡頭／
+  // 氛圍就自己補，補出來就是那種一眼看穿的 AI 感。這顆按鈕把他寫的補成一段
+  // 具體場景——**是提案不是自動套用**：換上去之後可以一鍵復原回他原本寫的。
+  const [sceneBefore, setSceneBefore] = useState<string | null>(null);
+  const [refineError, setRefineError] = useState("");
+  const refineMut = (trpc as any).image?.refineScenePrompt?.useMutation?.();
+
   const generateMut = (trpc as any).image.generate.useMutation();
   const generic = label("暫時無法處理，請再試一次。", "Something went wrong. Please try again.");
 
@@ -129,12 +137,57 @@ export default function ProductSceneModal({
               </div>
             )}
             <div>
-              <label style={{ fontSize: 12, fontWeight: 600, color: MUTED }}>{label("場景（選填）", "Scene (optional)")}</label>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                <label style={{ fontSize: 12, fontWeight: 600, color: MUTED }}>{label("場景（選填）", "Scene (optional)")}</label>
+                <button
+                  onClick={() => {
+                    if (!refineMut || refineMut.isPending || step === "generating") return;
+                    setRefineError("");
+                    const before = scene;
+                    refineMut.mutate(
+                      { brandId, productId, scene: before.trim() },
+                      {
+                        onSuccess: (r: any) => {
+                          const refined = String(r?.refined ?? "").trim();
+                          if (!refined) { setRefineError(label("這次沒有潤出結果，直接用你原本寫的也可以。", "No refinement came back — your own text works too.")); return; }
+                          setSceneBefore(before);   // 留著原文，讓使用者可以反悔
+                          setScene(refined);
+                        },
+                        onError: (e: any) => setRefineError(e?.message || label("潤飾失敗，請再試一次。", "Couldn't refine — try again.")),
+                      },
+                    );
+                  }}
+                  disabled={!refineMut || refineMut.isPending || step === "generating"}
+                  title={label(
+                    "把你寫的場景補成具體的空間、光線、鏡頭與氛圍——不會動到產品本身的描述",
+                    "Expands your scene into concrete space, light, framing and mood — it never describes the product itself",
+                  )}
+                  style={{ ...btn(), padding: "3px 10px", fontSize: 12, opacity: (!refineMut || refineMut.isPending || step === "generating") ? 0.5 : 1 }}
+                >
+                  {refineMut?.isPending ? label("潤飾中…", "Refining…") : label("✨ AI 潤飾", "✨ Refine with AI")}
+                </button>
+              </div>
               <textarea
-                value={scene} onChange={(e) => setScene(e.target.value)} rows={2} maxLength={600} disabled={step === "generating"}
+                value={scene}
+                onChange={(e) => { setScene(e.target.value); if (sceneBefore !== null) setSceneBefore(null); }}
+                rows={sceneBefore !== null ? 4 : 2} maxLength={600} disabled={step === "generating"}
                 placeholder={label("例：淺色木紋桌面，早晨自然光", "e.g. light wood table, morning daylight")}
                 style={{ width: "100%", marginTop: 4, fontSize: 13, padding: "8px 10px", border: `1px solid ${LINE}`, borderRadius: 8, resize: "vertical" }}
               />
+              {sceneBefore !== null && (
+                <div style={{ marginTop: 4, fontSize: 11, color: MUTED, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                  <span>{label("已用 AI 潤飾。你可以直接改這段文字。", "Refined by AI — edit it freely.")}</span>
+                  <button
+                    onClick={() => { setScene(sceneBefore); setSceneBefore(null); }}
+                    style={{ ...btn(), padding: "2px 8px", fontSize: 11 }}
+                  >
+                    {label("復原成我寫的", "Undo")}
+                  </button>
+                </div>
+              )}
+              {refineError && (
+                <div style={{ marginTop: 4, fontSize: 11, color: WARN }}>{refineError.slice(0, 200)}</div>
+              )}
             </div>
             <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
               <span style={{ fontSize: 12, fontWeight: 600, color: MUTED }}>{label("版面", "Shape")}</span>
