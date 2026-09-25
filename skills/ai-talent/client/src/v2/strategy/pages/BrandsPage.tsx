@@ -5449,45 +5449,50 @@ function BrandPaletteHero({
  * Cards with no positioning show a placeholder state.
  * ─────────────────────────────────────────────────────────────────── */
 /**
- * 2026-09-25（CJ「產品列表的縮圖，我想要用跟任務卡一樣的樣式，現在的長寬似乎不同」）：
- * 任務卡（content/pages/PlatformTaskPage.tsx 的卡片）用的是**固定高 130** 的圖片區、
- * 底色 #F5F4F2、下緣一條 rgba(0,0,0,0.06)。這裡原本用 aspectRatio 4/3 + maxHeight 140，
- * 所以每張卡的圖片區高度會隨欄寬浮動，跟任務卡並排看就是兩套東西。改成同一組數值。
+ * ProductCardThumbnail — 產品列表的縮圖。
  *
- * 產品照片的長寬比什麼都有（直式包裝、橫式擺拍），所以圖片本身仍是 object-contain
- * 疊在自己的模糊底上——不裁切才看得到整支產品，這跟任務卡放頭像的做法目的一致：
- * 框一致、內容不變形。
+ * 2026-09-25（CJ「產品列表的縮圖，我想要用跟任務卡一樣的樣式」→ 看到結果後
+ * 「如果要好好展現產品圖的話，應該要用哪一張任務卡的格式？…要如何可以不要旁邊
+ * 都是馬賽克」）：
+ *
+ * 我們站上有兩種卡片格式，它們是為不同東西設計的：
+ *
+ *   (A) 任務卡（content/pages/PlatformTaskPage.tsx）：頂端是 130px 的中性色塊，
+ *       中間放一顆 80×80 的 agent 頭像。那塊底色不是「背景」，是構圖的一部分——
+ *       它**從來不是拿來放照片的**。把一張 4:3 的產品照塞進去，兩側必然留白。
+ *
+ *   (B) 作品卡（content/pages/ProjectsPage.tsx 的 MissionCard）：aspect-[4/3] 的
+ *       圖片區 + object-cover 滿版，沒有任何留白；沒有圖時退回有顏色的圖示磚。
+ *       這張卡的主角就是圖。
+ *
+ * 產品列表要「好好展現產品圖」，所以走 (B)。連帶解決馬賽克：先前為了不裁切用
+ * object-contain，兩側空白就用同一張圖模糊放大去填——那圈模糊就是畫面上看到的
+ * 「馬賽克」。滿版裁切之後不需要填補，模糊層整個拿掉。
+ *
+ * 取捨講明白：object-cover 會裁掉直式照片的上下。產品照多半是方形或橫式擺拍，
+ * 4:3 裁掉的很少；而且縮圖的工作是「認得出這是哪支產品」，完整照片在產品視窗
+ * 裡看得到。要改成不裁切就得回到留白，兩者只能選一個。
  */
-const TASK_CARD_SURFACE = "#F5F4F2";   // 與 PlatformTaskPage 的 CARD_SURFACE 同值
-const TASK_CARD_MEDIA_H = 130;
-
 function ProductCardThumbnail({ imageUrl, name, en }: { imageUrl?: string; name: string; en: boolean }) {
   const [failed, setFailed] = React.useState(false);
+  const showImage = !!imageUrl && !failed;
   return (
     <div
-      className="w-full flex items-center justify-center overflow-hidden relative"
-      style={{ height: TASK_CARD_MEDIA_H, background: TASK_CARD_SURFACE, borderBottom: "1px solid rgba(0,0,0,0.06)" }}
+      className="relative w-full aspect-[4/3] flex items-center justify-center overflow-hidden"
+      style={{ background: showImage ? "#F4F4F5" : "#FAFAF9" }}
     >
-      {imageUrl && !failed ? (
-        <>
-          <img
-            src={imageUrl}
-            aria-hidden
-            className="absolute inset-0 w-full h-full object-cover scale-110 opacity-50"
-            style={{ filter: "blur(16px)" }}
-            onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
-          />
-          <img
-            src={imageUrl}
-            alt={name}
-            loading="lazy"
-            className="relative w-full h-full object-contain transition-transform group-hover:scale-105"
-            onError={() => setFailed(true)}
-          />
-        </>
+      {showImage ? (
+        <img
+          src={imageUrl}
+          alt={name}
+          loading="lazy"
+          className="w-full h-full object-cover transition-transform group-hover:scale-105"
+          onError={() => setFailed(true)}
+        />
       ) : (
+        // 沒有圖也要顯示「某個東西」——整片空灰色的格子看起來像壞掉的。
         <div className={`flex flex-col items-center gap-1 px-3 text-center ${failed ? "text-amber-700" : "text-neutral-400"}`}>
-          <FontAwesomeIcon icon={faBox} className="text-2xl" />
+          <FontAwesomeIcon icon={faBox} className="text-3xl opacity-60" />
           <span className="text-[12px] font-semibold tracking-wide">
             {failed
               ? (en ? "Image link expired" : "圖片連結已失效")
@@ -5623,11 +5628,10 @@ function BrandEntityGrid({
                 style={{
                   animation: `fadeSlideIn 0.35s ease both`,
                   animationDelay: `${Math.min(idx * 60, 400)}ms`,
-                  // 邊框與任務卡同一個值（rgba(0,0,0,0.07)），不是 neutral-200
-                  border: "1px solid rgba(0,0,0,0.07)",
                 }}
                 onClick={() => onOpen(item.id)}
-                className="text-left rounded-2xl bg-white p-0 overflow-hidden transition group flex flex-col hover:shadow-lg"
+                // 2026-09-25：外框跟著圖片格式一起走 ProjectsPage 作品卡那一套。
+                className="text-left rounded-xl bg-white border border-default-100 p-0 overflow-hidden transition group flex flex-col hover:shadow-md hover:border-default-300"
               >
                 {/* 2026-06-21 (CJ「產品頁籤加縮圖」): thumbnail at top.
                     2026-06-30 (prod bug): products.imageUrl column doesn't
