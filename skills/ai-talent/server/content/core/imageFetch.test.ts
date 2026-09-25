@@ -2,7 +2,8 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { assertIsUsableImageContentType, fetchImageBuffer, isLocalUploadPath, probeImageUrl } from "./imageFetch";
+import { assertIsUsableImageContentType, fetchImageBuffer, isLocalUploadPath,
+  localCoverFile, probeImageUrl } from "./imageFetch";
 
 vi.mock("./urlGuard", () => ({ assertUrlSafe: vi.fn(async (url: string) => new URL(url)) }));
 
@@ -136,5 +137,46 @@ describe("uploaded product photos (relative /static/asset-photos paths)", () => 
   it("a missing or non-image upload is reported as an invalid photo, not a crash", async () => {
     await expect(fetchImageBuffer("/static/asset-photos/product/261/gone.png")).rejects.toThrow("產品圖片連結已失效");
     await expect(fetchImageBuffer("/static/asset-photos/product/261/notimage.png")).rejects.toThrow("產品圖片連結已失效");
+  });
+});
+
+// 2026-09-25（CJ「我想增加一個功能，可以儲存在現有產品下」）：存生成圖的 probe 實跑
+// 時撞到 —— 生成圖的網址是 /static/covers/<檔名>，既不是 http(s) 也不在上傳目錄裡，
+// 於是被 SSRF guard 擋成 "invalid URL"。伺服器要讀的是自己剛寫下的檔案。
+describe("generated images (relative /static/covers paths)", () => {
+  const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 0]);
+  let dir: string;
+
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), "covers-"));
+    writeFileSync(join(dir, "media-img-1.png"), PNG);
+    vi.stubEnv("COVERS_DIR", dir);
+    vi.stubEnv("COVERS_URL_PREFIX", "/static/covers");
+  });
+  afterEach(() => { vi.unstubAllEnvs(); rmSync(dir, { recursive: true, force: true }); });
+
+  it("只認固定前綴＋單段檔名，跳不出 covers 目錄", () => {
+    expect(localCoverFile("/static/covers/media-img-1.png")).toBe(join(dir, "media-img-1.png"));
+    for (const bad of [
+      "https://example.com/static/covers/media-img-1.png",
+      "/static/covers/../secret.png",
+      "/static/covers/sub/a.png",
+      "/static/covers/",
+      "/static/covers/.hidden",
+      "/etc/passwd", "", null, undefined,
+    ]) expect(localCoverFile(bad as any), String(bad)).toBeNull();
+  });
+
+  it("直接從硬碟讀，不打網路（這就是原本壞掉的那條路）", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    const r = await fetchImageBuffer("/static/covers/media-img-1.png");
+    expect(r.mime).toBe("image/png");
+    expect(r.buffer).toEqual(PNG);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("isLocalUploadPath 不因此放寬 —— 那是輸入驗證用的，生成圖不算使用者上傳的照片", () => {
+    expect(isLocalUploadPath("/static/covers/media-img-1.png")).toBe(false);
   });
 });

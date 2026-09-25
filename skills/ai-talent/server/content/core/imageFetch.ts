@@ -76,6 +76,35 @@ export function localUploadFile(url: unknown): string | null {
   return join(root, m[1]!, m[2]!, m[3]!);
 }
 
+/**
+ * 生成好的圖會被下載到 COVERS_DIR，對外是 `/static/covers/<檔名>`（單層、沒有子目錄，
+ * 見 mediaGen.ts）。
+ *
+ * 2026-09-25（CJ「我想增加一個功能，可以儲存在現有產品下」）：實跑 probe 才發現這條
+ * 路是斷的——`/static/covers/…` 既不是 http(s) 也不在上傳目錄底下，於是走進 SSRF guard
+ * 被判 "invalid URL"，畫面上只會看到「存不進去」。伺服器要讀的是**自己剛剛寫下的檔案**，
+ * 本來就不該繞公開網址回打自己。
+ *
+ * 一樣只認固定前綴＋單段檔名＋不含 `..`，碰不到 covers 目錄以外的東西。
+ */
+export function localCoverFile(url: unknown): string | null {
+  if (typeof url !== "string") return null;
+  const prefix = (process.env.COVERS_URL_PREFIX ?? "/static/covers").replace(/\/+$/, "");
+  if (!url.startsWith(prefix + "/")) return null;
+  const name = url.slice(prefix.length + 1);
+  if (!/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(name) || name.includes("..")) return null;
+  return join(process.env.COVERS_DIR ?? "/opt/onbrand/covers", name);
+}
+
+/**
+ * 我們自己硬碟上的檔案（使用者上傳的照片，或生成圖）。
+ * 只給「讀位元組」用；要判斷「這是不是使用者上傳的照片」請繼續用 isLocalUploadPath，
+ * 那是輸入驗證的語意，不能被這支放寬。
+ */
+export function localStaticFile(url: unknown): string | null {
+  return localUploadFile(url) ?? localCoverFile(url);
+}
+
 /** Is this a photo the user uploaded to us (readable from local disk)? */
 export function isLocalUploadPath(url: unknown): boolean {
   return localUploadFile(url) !== null;
@@ -181,7 +210,7 @@ export async function fetchImageBuffer(
 ): Promise<{ buffer: Buffer; mime: string }> {
   const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   const maxBytes = options.maxBytes ?? DEFAULT_MAX_BYTES;
-  const local = localUploadFile(url);
+  const local = localStaticFile(url);
   if (local) {
     let buffer: Buffer;
     try { buffer = await fs.readFile(local); }
@@ -205,7 +234,7 @@ export async function fetchImageBuffer(
 
 /** Validate status + final content type without downloading the whole body. */
 export async function probeImageUrl(url: string, timeoutMs = 5_000): Promise<boolean> {
-  const local = localUploadFile(url);
+  const local = localStaticFile(url);
   if (local) {
     try {
       const handle = await fs.open(local, "r");
