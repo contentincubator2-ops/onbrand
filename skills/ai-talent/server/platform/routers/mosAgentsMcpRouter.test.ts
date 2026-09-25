@@ -11,8 +11,22 @@ import { describe, it, expect, vi, beforeAll, afterAll } from "vitest";
 import express from "express";
 import type { Server } from "http";
 
+const productStrategyCard = {
+  version: "1.0.0",
+  domain: "product-strategy",
+  professionalSkill: { key: "product-strategy-agent-card-v1", runtimeSkillId: 2549 },
+};
 const agentsFixture = [
-  { id: 1, slug: "brand-strategist", name: "測試品牌策略顧問", title: "品牌策略總監" },
+  {
+    id: 1,
+    slug: "brand-strategist",
+    name: "測試品牌策略顧問",
+    title: "品牌策略總監",
+    primarySkill: "mbb-strategist",
+    primarySkillBundleKey: "product-strategy-agent-card-v1",
+    skillsProfileVersion: "agent-card-v1",
+    agentCard: productStrategyCard,
+  },
 ];
 const skillsFixture = [
   { id: 10, slug: "brand-positioning", name: "品牌定位", category: "strategy" },
@@ -93,10 +107,14 @@ describe("mosAgentsMcpRouter · JSON-RPC 協定", () => {
     expect(payload.data[0].slug).toBe("brand-strategist");
   });
 
-  it("tools/call get_agent 依數字 id 查", async () => {
+  it("tools/call get_agent 依數字 id 查，包含安全的 Agent Card 與 Skill 綁定", async () => {
     const { json } = await rpc({ jsonrpc: "2.0", id: 4, method: "tools/call", params: { name: "get_agent", arguments: { id: "1" } } });
     const payload = JSON.parse(json.result.content[0].text);
     expect(payload.data.slug).toBe("brand-strategist");
+    expect(payload.data.primarySkillBundleKey).toBe("product-strategy-agent-card-v1");
+    expect(payload.data.skillsProfileVersion).toBe("agent-card-v1");
+    expect(payload.data.agentCard).toEqual(productStrategyCard);
+    expect(payload.data).not.toHaveProperty("taskSystemPrompt");
   });
 
   it("tools/call get_agent 依 slug 查（非純數字）", async () => {
