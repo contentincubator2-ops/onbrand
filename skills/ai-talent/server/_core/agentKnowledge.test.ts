@@ -112,6 +112,23 @@ describe("renderAgentKnowledge", () => {
     expect(KNOWLEDGE_CAPS.taskSystemPrompt).toBeGreaterThanOrEqual(3376);
   });
 
+  // 正式站 Skill 2549：content 類欄位全空，內文在 manifest JSON（key 不固定）
+  it("reads the skill body out of manifest JSON whatever its keys are", () => {
+    const row = {
+      id: 2549, name_zh: "產品策略 Agent Card v1", description_zh: "短描述", version: "1",
+      manifest: JSON.stringify({
+        version: "1.1.0",
+        workflow: { steps: ["定義決策", "聚焦 ICP"] },
+        guardrails: ["不捏造市場數字"],
+        outputContract: "先給執行摘要",
+      }),
+    };
+    const out = renderAgentKnowledge({ id: 1 }, [row]);
+    for (const s of ["定義決策", "聚焦 ICP", "不捏造市場數字", "先給執行摘要"]) expect(out).toContain(s);
+    expect(out).not.toContain("短描述");
+    expect(out).not.toContain("1.1.0");
+  });
+
   it("prefers the skill body over its description", () => {
     const out = renderAgentKnowledge({ agentCard: card }, [skill]);
     expect(out).toContain("SKILL 內文");

@@ -115,6 +115,31 @@ const SKILL_BODY_COLUMNS = [
   "system_prompt", "systemPrompt", "markdown", "content_zh",
 ];
 
+/** manifest 攤成「標題 + 內容」文字：字串照放、字串陣列條列、物件往下一層。 */
+const MANIFEST_SKIP = new Set(["id", "slug", "version", "status", "createdAt", "updatedAt", "created_at", "updated_at", "schema", "$schema"]);
+
+export function flattenManifest(v: unknown, depth = 0): string {
+  if (v == null) return "";
+  if (typeof v === "string") return v.trim();
+  if (typeof v === "number" || typeof v === "boolean") return "";
+  if (Array.isArray(v)) {
+    return v.map((x) => {
+      const s = flattenManifest(x, depth + 1);
+      return s ? (s.includes("\n") ? s : `- ${s}`) : "";
+    }).filter(Boolean).join("\n");
+  }
+  if (typeof v === "object" && depth < 4) {
+    const out: string[] = [];
+    for (const [k, val] of Object.entries(v as Record<string, unknown>)) {
+      if (MANIFEST_SKIP.has(k)) continue;
+      const s = flattenManifest(val, depth + 1);
+      if (s) out.push(depth === 0 ? `【${k}】\n${s}` : `${k}：${s.includes("\n") ? `\n${s}` : s}`);
+    }
+    return out.join("\n");
+  }
+  return "";
+}
+
 export function renderSkill(row: any): string {
   if (!row) return "";
   let body = "";
@@ -123,9 +148,9 @@ export function renderSkill(row: any): string {
     if (typeof v === "string" && v.trim()) { body = v; break; }
   }
   if (!body) {
-    const manifest = parseJson<any>(row.manifest);
-    const fromManifest = manifest?.instructions ?? manifest?.content ?? manifest?.prompt;
-    if (typeof fromManifest === "string") body = fromManifest;
+    // 2026-09-25 正式站實測：Skill 2549 的內文（2,917 字）放在 manifest JSON，
+    // key 不固定，所以整份攤平，不猜 key 名。
+    body = flattenManifest(parseJson<any>(row.manifest));
   }
   if (!body) body = String(row.description_zh || row.description || "");
   if (!body.trim()) return "";
