@@ -27,7 +27,7 @@
  */
 import localPool from "../../localDb";
 import { randomUUID } from "crypto";
-import { join } from "path";
+import { join, resolve } from "path";
 import { promises as fs } from "fs";
 import { detectRasterImageMime } from "../../content/core/imageFetch";
 
@@ -115,6 +115,93 @@ async function mirrorPrimaryToProduct(userId: number, productId: number, url: st
       WHERE id = ? AND userId = ?`,
     [url, productId, userId],
   ).catch((e) => console.warn("[assetPhotos] mirror to product.imageUrl failed:", (e as Error).message));
+}
+
+/** 檔案要寫去哪、對外長什麼網址——兩個呼叫端（上傳 route、存生成圖）都認同一組值。 */
+export function photoStorageRoot(): string {
+  return process.env.ASSET_PHOTO_DIR ?? join(process.cwd(), "storage", "asset-photos");
+}
+export function photoUrlPrefix(): string {
+  return process.env.ASSET_PHOTO_URL_PREFIX ?? "/static/asset-photos";
+}
+
+/** 寫出去的路徑一定要留在 storage 根目錄底下，否則就是有人在玩檔名。 */
+export function assertInsideStorage(p: string, storageRoot: string): void {
+  const root = resolve(storageRoot);
+  if (!resolve(p).startsWith(root)) throw new Error("path escapes storage root");
+}
+
+export function safePhotoFilename(input: string): string {
+  const cleaned = String(input || "photo").replace(/[^\p{L}\p{N}._-]+/gu, "_").replace(/^\.+/, "");
+  return (cleaned || "photo").slice(0, 120);
+}
+
+/**
+ * 把一段位元組存成這個 scope 的一張照片（寫檔＋寫 DB）。
+ *
+ * 2026-09-25（CJ「剛剛用了新的AI修圖功能…可惜只能下載和修改提示詞，我想增加一個
+ * 功能，可以儲存在現有產品下，或是取代原圖」）：在這之前「照片怎麼落地」只寫在
+ * express 上傳路由裡，於是要多一個入口（存生成圖）就得複製一份寫檔邏輯。搬進 core，
+ * 讓上傳與存生成圖共用同一段——路徑規則只有一處。
+ */
+export async function storePhotoBytes(args: {
+  userId: number; brandId: number; scope: PhotoScope; scopeId: number;
+  bytes: Buffer; filename: string; storageRoot?: string;
+}): Promise<AssetPhoto | { error: string }> {
+  const check = validateUploadedImage(args.bytes);
+  if ("error" in check) return check;
+
+  const existing = await listPhotos(args.scope, args.scopeId);
+  if (existing.length >= MAX_PHOTOS_PER_SCOPE) {
+    return { error: `這個${args.scope === "brand" ? "品牌" : "產品"}已經有 ${MAX_PHOTOS_PER_SCOPE} 張照片，先刪掉幾張再存` };
+  }
+
+  const storageRoot = args.storageRoot ?? photoStorageRoot();
+  const fileId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}${extForMime(check.mime)}`;
+  const dir = join(storageRoot, args.scope, String(args.scopeId));
+  assertInsideStorage(dir, storageRoot);
+  await fs.mkdir(dir, { recursive: true });
+  const target = join(dir, fileId);
+  assertInsideStorage(target, storageRoot);
+  await fs.writeFile(target, args.bytes);
+
+  return insertPhoto({
+    userId: args.userId, brandId: args.brandId, scope: args.scope, scopeId: args.scopeId,
+    url: `${photoUrlPrefix()}/${args.scope}/${args.scopeId}/${fileId}`,
+    filename: safePhotoFilename(args.filename),
+    mimeType: check.mime, sizeBytes: args.bytes.length,
+  });
+}
+
+/**
+ * 把一張已經生成好的圖，抓回來存成這個 scope 的照片。
+ *
+ * 為什麼要「抓回來存」而不是把網址記起來就好：生成圖的網址是模型商給的暫時網址，
+ * 會過期。使用者說「存進我的產品」的意思是它以後還在，所以位元組要落到我們自己的
+ * 硬碟上。（這也是 asset_photos 一開始就是「使用者自己的照片」的原因。）
+ *
+ * makePrimary 是「取代原圖」的實作：把新的那張設成主圖，列表縮圖與所有讀
+ * positioning.imageUrl 的地方都會換成它——**原本上傳的照片不刪**，要刪由使用者
+ * 在照片區自己決定。生成圖不是像素級保真，把使用者的原始素材自動刪掉不可逆。
+ */
+export async function savePhotoFromUrl(args: {
+  userId: number; brandId: number; scope: PhotoScope; scopeId: number;
+  sourceUrl: string; filename: string; makePrimary?: boolean; storageRoot?: string;
+}): Promise<AssetPhoto | { error: string }> {
+  const { fetchImageBuffer } = await import("../../content/core/imageFetch");
+  let bytes: Buffer;
+  try {
+    ({ buffer: bytes } = await fetchImageBuffer(args.sourceUrl, { maxBytes: MAX_UPLOAD_BYTES }));
+  } catch (e: any) {
+    return { error: `抓不到這張圖：${String(e?.message ?? e).slice(0, 160)}` };
+  }
+  const stored = await storePhotoBytes({ ...args, bytes });
+  if ("error" in stored) return stored;
+  if (args.makePrimary) {
+    await setPrimaryPhoto({ userId: args.userId, scope: args.scope, scopeId: args.scopeId, photoId: stored.id });
+    return { ...stored, isPrimary: true };
+  }
+  return stored;
 }
 
 /** 新增一張照片；scope 內第一張自動當主圖。超過上限先擋在 route 層，這裡不重複檢查。 */

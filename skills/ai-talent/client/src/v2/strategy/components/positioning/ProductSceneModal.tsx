@@ -26,7 +26,7 @@ interface Photo { id: string; url: string; filename: string; isPrimary: boolean 
 // 讓用戶可以調整當前的提示詞?」）：每張圖都要記住**它自己**用的提示詞與版面，不能只留一份
 // 全域的 scene。使用者在「這次做過的圖」之間切來切去，按下「調整提示詞」時要拿到的是眼前
 // 這張圖的提示詞，不是最後一次輸入框裡的東西。
-interface Made { url: string; model: Model; scene: string; size: Size }
+interface Made { url: string; model: Model; scene: string; size: Size; imageId: number }
 interface Failure { message: string; canSwitchTo?: "nano-banana"; model: Model }
 
 const DEFAULT_SCENE = "A clean, natural setting with soft natural light and a realistic contact shadow";
@@ -85,6 +85,34 @@ export default function ProductSceneModal({
   const [tweakOf, setTweakOf] = useState<string | null>(null);
   const refineMut = (trpc as any).image?.refineScenePrompt?.useMutation?.();
 
+  // 2026-09-25（CJ「可惜的是，只能下載和修改提示詞，我想增加一個功能，可以儲存在
+  // 現有產品下，或是取代原圖」）：生成圖的網址是模型商給的暫時網址，會過期——所以
+  // 「存起來」是真的把位元組抓回我們自己的硬碟（server 端 savePhotoFromUrl）。
+  // 送的是 generated_images 的 id 不是網址，避免開一個「叫伺服器抓任意網址」的洞。
+  const utils = (trpc as any).useUtils();
+  const saveMut = (trpc as any).assetPhoto?.saveGeneratedImage?.useMutation?.();
+  const [savedUrls, setSavedUrls] = useState<Record<string, "photo" | "primary">>({});
+  const [saveError, setSaveError] = useState("");
+
+  function saveToProduct(makePrimary: boolean) {
+    if (!current || !saveMut || saveMut.isPending) return;
+    setSaveError("");
+    saveMut.mutate(
+      { brandId, scope: "product", scopeId: productId, imageId: current.imageId, makePrimary },
+      {
+        onSuccess: () => {
+          setSavedUrls((m) => ({ ...m, [current.url]: makePrimary ? "primary" : "photo" }));
+          // 上方的照片選擇器要立刻看得到新照片（存完就能拿它再生成下一張）。
+          utils?.assetPhoto?.list?.invalidate?.();
+          // 設為主圖會改到 products.positioning.imageUrl，產品列表的縮圖跟著換——
+          // 不炒新 product.list 的話，使用者關掉視窗會看到舊的那張，以為沒存到。
+          if (makePrimary) utils?.product?.list?.invalidate?.();
+        },
+        onError: (e: any) => setSaveError(e?.message || label("存不進去，請再試一次。", "Couldn't save — try again.")),
+      },
+    );
+  }
+
   const generateMut = (trpc as any).image.generate.useMutation();
   const generic = label("暫時無法處理，請再試一次。", "Something went wrong. Please try again.");
 
@@ -109,7 +137,7 @@ export default function ProductSceneModal({
           return;
         }
         const url = String(r.url);
-        setMade((list) => [{ url, model, scene: usedScene, size }, ...list.filter((m) => m.url !== url)]);
+        setMade((list) => [{ url, model, scene: usedScene, size, imageId: Number(r?.id ?? 0) }, ...list.filter((m) => m.url !== url)]);
         setCurrentUrl(url);
         setTweakOf(null);   // 這一輪改完了，橫幅要收掉
         setStep("done");
@@ -343,6 +371,49 @@ export default function ProductSceneModal({
                 </button>
               </div>
               <p style={{ margin: 0, fontSize: 12, color: INK, lineHeight: 1.7, whiteSpace: "pre-line" }}>{current.scene}</p>
+            </div>
+            {/* 存回產品。兩顆分開而不是一顆＋勾選框：「存起來」跟「換掉列表上看到的那張」
+                是兩個不同的決定，使用者按下去之前就該知道自己選的是哪一個。 */}
+            <div style={{ border: `1px solid ${LINE}`, borderRadius: 8, padding: "10px 12px", display: "grid", gap: 8 }}>
+              <div style={{ fontSize: 12, fontWeight: 600, color: MUTED }}>{label("存進這個產品", "Save to this product")}</div>
+              {savedUrls[current.url] ? (
+                <div style={{ fontSize: 12, color: "#15803D", lineHeight: 1.6 }}>
+                  {savedUrls[current.url] === "primary"
+                    ? label("✓ 已存進產品照片，並設為主圖 —— 產品列表的縮圖現在是這張。原本上傳的照片仍然保留。",
+                            "✓ Saved and set as the main photo — the product list thumbnail now shows it. Your original upload is kept.")
+                    : label("✓ 已存進產品照片。主圖沒有變動。", "✓ Saved to the product's photos. The main photo is unchanged.")}
+                </div>
+              ) : (
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  <button
+                    onClick={() => saveToProduct(false)}
+                    disabled={!saveMut || saveMut.isPending || !current.imageId}
+                    style={{ ...btn(), opacity: (!saveMut || saveMut.isPending || !current.imageId) ? 0.5 : 1 }}
+                  >
+                    {saveMut?.isPending ? label("儲存中…", "Saving…") : label("存進產品照片", "Save to product photos")}
+                  </button>
+                  <button
+                    onClick={() => saveToProduct(true)}
+                    disabled={!saveMut || saveMut.isPending || !current.imageId}
+                    style={{ ...btn(true), opacity: (!saveMut || saveMut.isPending || !current.imageId) ? 0.5 : 1 }}
+                  >
+                    {label("存起來並設為主圖", "Save and make it the main photo")}
+                  </button>
+                </div>
+              )}
+              <div style={{ fontSize: 11, color: MUTED, lineHeight: 1.6 }}>
+                {label(
+                  "設為主圖＝產品列表的縮圖、以及所有用到產品圖的地方都換成這張。原本上傳的照片不會被刪除，隨時可以在「產品照片」裡切回去。",
+                  "Making it the main photo swaps the list thumbnail and everywhere else the product image is used. Your original upload is not deleted — switch back any time under “Product photos”.",
+                )}
+              </div>
+              {!current.imageId && (
+                <div style={{ fontSize: 11, color: WARN }}>
+                  {label("這張圖沒有帶回生成記錄，存不進去 —— 重新生成一張就可以存。",
+                         "This image came back without a generation record, so it can't be saved — generate it again.")}
+                </div>
+              )}
+              {saveError && <div style={{ fontSize: 11, color: "#B91C1C" }}>{saveError.slice(0, 200)}</div>}
             </div>
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
               <a href={current.url} download style={{ ...btn(true), textDecoration: "none", display: "inline-block" }}>{label("下載", "Download")}</a>

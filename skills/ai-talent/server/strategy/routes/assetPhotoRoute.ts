@@ -21,14 +21,12 @@ import { getJwtSecret } from "../../platform/core/env";
 import localPool from "../../localDb";
 import {
   type PhotoScope, MAX_UPLOAD_BYTES, MAX_PHOTOS_PER_SCOPE,
-  validateUploadedImage, extForMime, insertPhoto, listPhotos,
+  listPhotos, photoStorageRoot, storePhotoBytes,
 } from "../core/assetPhotos";
 
 export const assetPhotoRouter = Router();
 
-export const STORAGE_ROOT =
-  process.env.ASSET_PHOTO_DIR ?? join(process.cwd(), "storage", "asset-photos");
-const URL_PREFIX = process.env.ASSET_PHOTO_URL_PREFIX ?? "/static/asset-photos";
+export const STORAGE_ROOT = photoStorageRoot();
 
 // ── auth（與 positioningDocRoute 同一套；express 路由不能丟 TRPCError）──
 async function userIdOf(req: Request): Promise<number | null> {
@@ -64,16 +62,6 @@ async function canAccessScope(userId: number, brandId: number, scope: PhotoScope
   return Array.isArray(rows) && rows.length > 0;
 }
 
-function assertInsideStorage(p: string): void {
-  const root = resolve(STORAGE_ROOT);
-  if (!resolve(p).startsWith(root)) throw new Error("path escapes storage root");
-}
-
-function safeFilename(input: string): string {
-  const cleaned = String(input || "photo").replace(/[^\p{L}\p{N}._-]+/gu, "_").replace(/^\.+/, "");
-  return (cleaned || "photo").slice(0, 120);
-}
-
 assetPhotoRouter.post(
   "/upload",
   express.raw({ type: () => true, limit: MAX_UPLOAD_BYTES + 1024 }),
@@ -95,24 +83,15 @@ assetPhotoRouter.post(
     }
 
     const body = req.body as Buffer;
-    const check = validateUploadedImage(Buffer.isBuffer(body) ? body : Buffer.alloc(0));
-    if ("error" in check) { res.status(400).json({ error: check.error }); return; }
-
-    const ext = extForMime(check.mime);
-    const fileId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}${ext}`;
-    const dir = join(STORAGE_ROOT, scope, String(scopeId));
-    assertInsideStorage(dir);
-    await fs.mkdir(dir, { recursive: true });
-    const target = join(dir, fileId);
-    assertInsideStorage(target);
-    await fs.writeFile(target, body);
-
-    const url = `${URL_PREFIX}/${scope}/${scopeId}/${fileId}`;
-    const filename = safeFilename(String(req.headers["x-filename"] ?? fileId));
-    const photo = await insertPhoto({
-      userId, brandId, scope, scopeId, url, filename,
-      mimeType: check.mime, sizeBytes: body.length,
+    // 2026-09-25：寫檔＋寫 DB 統一由 core 的 storePhotoBytes 做（跟「存生成圖」
+    // 同一段），這裡只負責 HTTP 的事：認身分、讀 header、回狀態碼。
+    const stored = await storePhotoBytes({
+      userId, brandId, scope, scopeId,
+      bytes: Buffer.isBuffer(body) ? body : Buffer.alloc(0),
+      filename: String(req.headers["x-filename"] ?? "photo"),
+      storageRoot: STORAGE_ROOT,
     });
-    res.json({ ok: true, photo });
+    if ("error" in stored) { res.status(400).json({ error: stored.error }); return; }
+    res.json({ ok: true, photo: stored });
   },
 );

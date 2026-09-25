@@ -1,0 +1,43 @@
+name: Ops (DEV) — probe saving a generated image into a product
+
+# 2026-09-25（CJ「我想增加一個功能，可以儲存在現有產品下，或是取代原圖」）：
+# 「抓回來 → 寫硬碟 → 寫 DB」三段任何一段壞掉，UI 上看起來都只是「轉一下然後
+# 沒事發生」。這支分段驗，並且驗完把自己建的那張照片刪掉（dev 維持原狀）。
+#
+# 預設打「開發測試用」品牌，不動客戶資料；不帶 makePrimary，不動任何主圖；
+# 不呼叫生圖模型（只拿已經生成好的圖）。
+on:
+  push:
+    paths:
+      - '.github/workflows/op-probe-save-generated-photo.yml'
+      - 'skills/ai-talent/scripts/probe-save-generated-photo.ts'
+  workflow_dispatch:
+    inputs:
+      brandId:
+        description: '用哪個品牌（預設 2958 開發測試用）'
+        required: false
+        default: '2958'
+      productId:
+        description: '用哪支產品（留空＝該品牌第一支）'
+        required: false
+
+jobs:
+  probe:
+    runs-on: ubuntu-24.04
+    environment: dev
+    timeout-minutes: 8
+    steps:
+      - name: Save a generated image into a product, verify, then clean up
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 7m
+          script: |
+            set -e
+            cd /opt/onbrand/current/skills/ai-talent
+            set -a; source .env 2>/dev/null; set +a
+            echo "host=$(hostname)  app=$(readlink -f /opt/onbrand/current)"
+            echo "----------------------------------------------------------"
+            ./node_modules/.bin/tsx scripts/probe-save-generated-photo.ts "${{ github.event.inputs.brandId || '2958' }}" "${{ github.event.inputs.productId }}"
