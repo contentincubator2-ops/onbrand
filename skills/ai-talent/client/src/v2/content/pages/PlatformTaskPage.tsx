@@ -18,6 +18,7 @@ import { trpc } from "../../../lib/trpc";
 import { useLang } from "../../../lib/i18n";
 import { showToastGlobal } from "../../../components/ui/Toast";
 import { TaskCardShell, TaskCardAvatar, CARD_SURFACE } from "../components/TaskCardShell";
+import { campaignPrefill } from "../lib/campaignIntakePrefill";
 import { toastWithUpgrade } from "../../platform/lib/upgradeToast";
 import { matchTaskWithSynonyms } from "../lib/taskSearchSynonyms";
 import { TIER_ORDER, tierAccent, tierLabel } from "../../platform/lib/tierVocabulary";
@@ -828,6 +829,14 @@ function PlatformTaskPageInner() {
   // 策略層那格的 ✓ 與 tray 的進度都靠它。用 ref 不用 state：參數會立刻從網址上
   // 清掉（跟 topic 一樣），但值要活到使用者真的按下產生為止。
   const campaignRef = React.useRef<{ eventId: number; itemId: string } | null>(null);
+  // 2026-09-25（CJ「他忘記帶入日期時間了，本來在活動企畫中，有該則貼文要發布的
+  // 時間」）：要預填「日期 / 時間」「為什麼參加 / 重點」就得真的去拿活動資料，
+  // 所以除了 ref 還要一份 state —— ref 不會觸發 query。
+  const [campaignScope, setCampaignScope] = React.useState<{ eventId: number; itemId: string } | null>(null);
+  const campaignQ = (trpc as any).campaign?.get?.useQuery?.(
+    { eventId: campaignScope?.eventId ?? 0 },
+    { enabled: !!campaignScope?.eventId, refetchOnWindowFocus: false, staleTime: 60_000 },
+  ) ?? { data: null };
   const markWrittenMut = (trpc as any).campaign?.markWritten?.useMutation?.();
   /** 寫完這一格 —— 失敗不擋使用者看產出（回貼失敗只是進度沒更新，不是內容沒寫成）。 */
   const finishCampaignItem = React.useCallback((outputId: number) => {
@@ -862,7 +871,7 @@ function PlatformTaskPageInner() {
     const t = allTasks.find((x: any) => x.id === taskId);
     const camp = Number(searchParams.get("camp") ?? 0);
     const item = searchParams.get("item");
-    if (camp && item) campaignRef.current = { eventId: camp, itemId: item };
+    if (camp && item) { campaignRef.current = { eventId: camp, itemId: item }; setCampaignScope({ eventId: camp, itemId: item }); }
     campOpenedRef.current = true;
     const next = new URLSearchParams(searchParams);
     next.delete("task"); next.delete("camp"); next.delete("item");
@@ -873,6 +882,36 @@ function PlatformTaskPageInner() {
       : "這個品牌目前沒有這張任務卡。");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams, allTasks]);
+
+  // 從活動企劃開卡時，把活動設定裡**已經有的**答案填進去。被系統問一個它自己
+  // 已經知道的問題（期間、優惠機制），比沒有預填更糟——那等於在說剛才填的沒人看。
+  // 規則與「只填空的、不知道的不要編」都在 lib/campaignIntakePrefill.ts，有測試。
+  useEffect(() => {
+    if (!activeTask || !campaignScope || !campaignQ.data) return;
+    const d: any = campaignQ.data;
+    const item = (d.plan?.items ?? []).find((i: any) => i.id === campaignScope.itemId) ?? null;
+    const st = d.settings ?? {};
+    const { primary, extras } = campaignPrefill({
+      primaryKey: (activeTask as any).primary_input?.key ?? null,
+      primaryLabel: (activeTask as any).primary_question ?? null,
+      fields: (activeTask as any).inputs ?? [],
+      existing: extraAnswers,
+      ctx: {
+        eventName: d.event?.name ?? "",
+        startAt: d.event?.startAt ?? null,
+        endAt: d.event?.endAt ?? null,
+        itemDate: item?.date ?? null,
+        mechanic: st.mechanic ?? null,
+        venue: st.venue ?? null,
+        sessions: st.sessions ?? null,
+        signupUrl: st.signupUrl ?? null,
+        angle: item?.angle ?? null,
+      },
+    });
+    if (Object.keys(extras).length) setExtraAnswers((prev) => ({ ...extras, ...prev }));
+    if (primary) setPrimaryAnswer((prev) => (prev.trim() ? prev : primary));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTask, campaignScope, campaignQ.data]);
 
   // ── Platform inference (matches QuickTask30sPage logic) ──────────────────
   const inferPlatform = (task: FBTaskCard): string =>
@@ -1191,6 +1230,7 @@ function PlatformTaskPageInner() {
   const runSeqRef = useRef(0);
 
   const closeTask = () => {
+    setCampaignScope(null);   // 不收的話，下一張卡會沿用上一格的活動預填
     runSeqRef.current++; // invalidate any in-flight run attempt
     setActiveTask(null);
     setRunning(false);
@@ -2460,6 +2500,30 @@ function PlatformTaskPageInner() {
               </ModalHeader>
 
               <ModalBody>
+                {/* 2026-09-25（CJ「本來在活動企畫中，有該則貼文要發布的時間」）：
+                    這一篇在企劃上排在哪一天，要看得見。卡片裡問的「日期 / 時間」
+                    是**活動**什麼時候發生（已自動帶入活動期間），跟這篇貼文的
+                    發布日是兩件事——不講清楚，使用者會以為系統把日期搞丟了。 */}
+                {(() => {
+                  if (!campaignScope || !campaignQ.data) return null;
+                  const d: any = campaignQ.data;
+                  const item = (d.plan?.items ?? []).find((i: any) => i.id === campaignScope.itemId);
+                  if (!item) return null;
+                  return (
+                    <div className="mb-3 rounded-lg border border-default-200 px-3 py-2">
+                      <p className="text-tiny text-default-600 m-0">
+                        {lang === "en"
+                          ? `From the campaign plan for “${d.event?.name ?? ""}” — this post is scheduled for ${item.date}.`
+                          : `來自「${d.event?.name ?? ""}」的宣傳企劃 —— 這篇排在 ${item.date} 發布。`}
+                      </p>
+                      <p className="text-tiny text-default-400 m-0 mt-0.5">
+                        {lang === "en"
+                          ? "Event dates and the offer are already filled in below."
+                          : "活動期間與優惠機制已自動帶入下方欄位。"}
+                      </p>
+                    </div>
+                  );
+                })()}
                 {/* 2026-06-16: per-task entity picker. Brand by default; the
                     user can switch to a specific product or event for THIS run.
                     Selecting one re-runs the context resolution so the chips
