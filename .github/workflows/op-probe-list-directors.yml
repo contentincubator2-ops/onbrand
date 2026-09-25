@@ -1,0 +1,32 @@
+name: Ops (DEV) — call listDirectors for real (read-only)
+
+# 2026-09-25：CJ 回報產品清單頁顯示「找不到可用的策略總監人選」。core 的挑人
+# 邏輯在 probe 裡是好的，所以要看的是 procedure 這一層實際回什麼／丟什麼。
+on:
+  push:
+    paths:
+      - '.github/workflows/op-probe-list-directors.yml'
+  workflow_dispatch:
+    inputs:
+      brandId:
+        required: false
+        default: '2972'
+
+jobs:
+  probe:
+    runs-on: ubuntu-24.04
+    environment: dev
+    timeout-minutes: 6
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 5m
+          script: |
+            set -e
+            cd /opt/onbrand/current/skills/ai-talent
+            set -a; source .env 2>/dev/null; set +a
+            echo "commit on box: $(readlink -f /opt/onbrand/current | sed 's#.*/##')"
+            ./node_modules/.bin/tsx scripts/probe-list-directors.ts "${{ github.event.inputs.brandId || '2972' }}"
