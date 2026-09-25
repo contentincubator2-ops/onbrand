@@ -976,6 +976,7 @@ import {
 import { isWuganVoiceTemplate, validateWuganVoice, repairWuganVoice } from "../_core/wuganVoiceContract";
 import { findFirstUrl, fetchUrlSummary, formatUrlSummaryForPrompt } from "../_core/urlContext";
 import localPool from "../localDb";
+import { loadAgentKnowledge, loadAgentKnowledgeMany, withAgentKnowledge } from "../_core/agentKnowledge";
 // 2026-05-18 (CJ「media to copy」): photo/video/doc media task catalog
 import { MEDIA_PHOTO_TASKS, MEDIA_VIDEO_TASKS, MEDIA_DOC_TASKS } from "../_core/quickTaskMedia";
 
@@ -2111,6 +2112,7 @@ ${polishTemplate.polishHint}`
           agentMap[a.id] = { name: a.name, title: a.title, specialty: a.specialty, methodology: a.methodology, avatarUrl: a.avatarUrl ?? null };
         }
       }
+      const agentKnowledge = await loadAgentKnowledgeMany(agentIds);
 
       const runPlanningStep = async (i: number) => {
         const step = stepsRaw[i];
@@ -2126,9 +2128,9 @@ ${polishTemplate.polishHint}`
         const agentName = a?.name ?? step.assignedAgentName ?? "Squad Agent";
         const agentTitle = a?.title ?? "";
 
-        const persona = a
+        const persona = withAgentKnowledge(a
           ? `你是 ${a.name}，${a.title}。${a.specialty ? `\n專長：${a.specialty}。` : ""}${a.methodology ? `\n方法論：${a.methodology}。` : ""}`
-          : `你是 ${agentName}。`;
+          : `你是 ${agentName}。`, agentKnowledge.get(aid) ?? "");
 
         // 2026-05-19 (CJ 驗收 IG7「+217% 無來源捏造」、IG2「弱引用無連結/日期」
         // 根因): 此處是所有 squad-pipeline 任務（IG/FB squad 等）共用的 step
@@ -3085,7 +3087,8 @@ ${polishTemplate.polishHint}`
               (a.bio ? `背景：${a.bio}\n` : "") +
               (a.specialty ? `專長：${a.specialty}\n` : "") +
               (a.methodology ? `方法論：${a.methodology}\n` : "") +
-              `用你的口氣寫，不要寫得像通用 AI。\n\n`;
+              withAgentKnowledge("", await loadAgentKnowledge(a.id)) +
+              `\n用你的口氣寫，不要寫得像通用 AI。\n\n`;
           }
         } catch { /* persona load failure is non-fatal */ }
       }

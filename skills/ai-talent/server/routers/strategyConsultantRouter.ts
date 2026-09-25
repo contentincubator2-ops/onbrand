@@ -21,6 +21,7 @@ import { buildBrandPrefix } from "../_core/brandContext";
 import { getDb } from "../db";
 import { sql } from "drizzle-orm";
 import { ENV } from "../_core/env";
+import { loadAgentKnowledge, withAgentKnowledge } from "../_core/agentKnowledge";
 
 // ─── Scenario → keyword mapping ────────────────────────────────────────────
 
@@ -299,10 +300,10 @@ export const strategyConsultantRouter = router({
       const tavilyContext = await fetchTavilyContext(tavilyQuery);
 
       // 4. Build system prompt
-      const systemPrompt = buildSystemPrompt(
+      const systemPrompt = withAgentKnowledge(buildSystemPrompt(
         agentName, agentTitle, agentBio, agentSpecialty, agentMethodology,
         input.scenario, input.methodology, brandContext, tavilyContext,
-      );
+      ), await loadAgentKnowledge(input.agentId));
 
       // 5. Call LLM
       const aiModel = agent?.aiModel ? String(agent.aiModel) : "gpt-4o";
@@ -375,10 +376,10 @@ export const strategyConsultantRouter = router({
         tavilyContext = await fetchTavilyContext(lastUserMsg.content);
       }
 
-      const systemPrompt = buildSystemPrompt(
+      const systemPrompt = withAgentKnowledge(buildSystemPrompt(
         agentName, agentTitle, agentBio, agentSpecialty, agentMethodology,
         input.scenario, input.methodology, brandContext, tavilyContext,
-      );
+      ), await loadAgentKnowledge(input.agentId));
 
       const aiModel = agent?.aiModel ? String(agent.aiModel) : "gpt-4o";
       const provider = (() => {

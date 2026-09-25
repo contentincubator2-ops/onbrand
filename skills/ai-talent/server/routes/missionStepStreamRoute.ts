@@ -20,6 +20,7 @@ import { Router, type Request, type Response } from "express";
 import { jwtVerify } from "jose";
 import { getJwtSecret } from "../_core/env.js";
 import localPool from "../localDb.js";
+import { loadAgentKnowledge } from "../_core/agentKnowledge.js";
 import { invokeLLMStream } from "../_core/llm.js";
 import { getDb } from "../db.js";
 import { sql } from "drizzle-orm";
@@ -119,6 +120,7 @@ missionStepStreamRouter.post("/step-stream", async (req: Request, res: Response)
     const agentName  = agentRow?.name ?? step.assignedAgentName ?? "AI 專員";
     const agentTitle = agentRow?.title ?? "";
     const agentSkill = agentRow?.primarySkill ?? step.requiredSkill ?? "";
+    const agentKnowledge = await loadAgentKnowledge(assignedId);
     const stepName   = step.name ?? step.title ?? `Step ${stepOrder}`;
     const stepDesc   = step.description ?? "";
     const outputType = step.outputType ?? step.output ?? "";
@@ -220,7 +222,7 @@ missionStepStreamRouter.post("/step-stream", async (req: Request, res: Response)
       : `直接寫出成品內容，不要寫「我會...」這種方法論說明。`;
 
     const systemPrompt = `你是 ${agentName}${agentTitle ? `（${agentTitle}）` : ""}，專長：${agentSkill}。
-你正在執行「${stepName}」步驟。
+${agentKnowledge ? `\n${agentKnowledge}\n` : ""}你正在執行「${stepName}」步驟。
 
 【最高優先規則】直接交付完成品本身。
 ${outputGuide}

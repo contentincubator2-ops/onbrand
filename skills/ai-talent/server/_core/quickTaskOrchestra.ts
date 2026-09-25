@@ -59,6 +59,7 @@ import { getCopywritingMasterPrompt, type MarketCode, type PlatformCode } from "
 import { getBrandMarket, DEFAULT_BRAND_MARKET, type BrandMarket } from "./brandMarket";
 import type { FBTaskTemplate, OrchestraConfig } from "./quickTaskFB";
 import localPool from "../localDb";
+import { loadAgentKnowledge } from "./agentKnowledge";
 
 // 2026-05-10 (CJ overnight finishing pass): 3 tasks still timeout with
 // 30s budget — fb-30-ad-primary, yt-30-end-cta, br-30-brand-voice (the
@@ -389,7 +390,7 @@ const FIELD_CAPS: Record<string, number> = {
   tool_instructions:800,
   bio_zh:           300,
   caseStudies:      800,   // applied to JSON-stringified body
-  taskSystemPrompt: 2000,  // canonical work manual when present
+  // taskSystemPrompt: see agentKnowledge.ts (own budget, not capped here)
 };
 
 /** Trim a single string field to its cap, with "…" suffix if cut. */
@@ -477,22 +478,14 @@ export async function loadAgent(id: number | null | undefined): Promise<{ meta: 
       usedChars += chunk.length;
     }
 
-    // taskSystemPrompt goes last, with a distinct heading. If we'd overflow,
-    // truncate but still always include it because it's the work-manual.
-    let tsp = trimField(a.taskSystemPrompt, FIELD_CAPS.taskSystemPrompt!);
-    if (tsp) {
-      const tspHeader = `\n# 工作守則（必讀，違反等於失敗）\n`;
-      const budgetLeft = PERSONA_TOTAL_CAP - usedChars - tspHeader.length;
-      if (budgetLeft < tsp.length && budgetLeft > 100) {
-        tsp = trimField(tsp, budgetLeft);
-      } else if (budgetLeft <= 100) {
-        tsp = ""; // no room
-      }
-    }
+    // 2026-09-25: 工作守則 / 專業執行卡 / 綁定 Skill 改由 agentKnowledge 統一
+    // 組裝，有自己的額度 —— 以前 taskSystemPrompt 跟身分欄位搶同一個
+    // 5000 字額度、排在最後，前面塞滿時整段被丟掉。
+    const knowledge = await loadAgentKnowledge(a.id);
 
     const persona =
       header + body +
-      (tsp ? `\n# 工作守則（必讀，違反等於失敗）\n${tsp}\n` : "") +
+      (knowledge ? `\n${knowledge}\n` : "") +
       `\n用你的口氣寫，不要寫得像通用 AI。\n\n`;
 
     return {

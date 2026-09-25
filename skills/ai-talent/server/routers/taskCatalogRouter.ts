@@ -24,6 +24,7 @@ import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure } from "../_core/trpc";
 import localPool from "../localDb";
+import { loadAgentKnowledge } from "../_core/agentKnowledge";
 import { callLLM } from "../_core/llmRouter";
 
 // ── helpers ──────────────────────────────────────────────────────────
@@ -352,6 +353,7 @@ export const taskCatalogRouter = router({
       const agentName  = task.agent_name  ?? task.name_zh ?? "行銷 Agent";
       const agentTitle = task.agent_title ?? "內容創作專家";
       const agentSkill = task.agent_skill ?? task.description ?? "社群內容創作";
+      const agentKnowledge = await loadAgentKnowledge(task.agent_id_resolved);
 
       // 2. Resolve scope context — same logic as stepExecute
       const contextParts: string[] = [];
@@ -409,7 +411,7 @@ export const taskCatalogRouter = router({
         : `直接交付完成品本身，不要寫「我會這樣做」的方法論說明。`;
 
       const systemPrompt = `你是 ${agentName}（${agentTitle}），專長：${agentSkill}。
-你正在執行「${task.name_zh}」這個 atomic 任務（單 agent 直接交付，不分多步驟）。
+${agentKnowledge ? `\n${agentKnowledge}\n` : ""}你正在執行「${task.name_zh}」這個 atomic 任務（單 agent 直接交付，不分多步驟）。
 
 任務描述：${task.description}
 
