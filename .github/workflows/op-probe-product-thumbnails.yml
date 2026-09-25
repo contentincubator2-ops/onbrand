@@ -1,0 +1,39 @@
+name: Ops (DEV) — probe product list thumbnails
+
+# 2026-09-25（CJ「我在產品的彈跳視窗中，有選擇一張主題，但沒有出現在產品列表的
+# 縮圖當中」）：縮圖沒出現有兩種斷點（寫入端沒同步／讀取端把相對路徑濾掉），
+# 光看程式碼分不出來。這支用 DEV 的真資料，把 asset_photos 的主圖、
+# products.positioning.imageUrl、以及前端同一支 picker 的判斷並排印出來。
+#
+# 唯讀、不呼叫任何模型。
+on:
+  push:
+    paths:
+      - '.github/workflows/op-probe-product-thumbnails.yml'
+      - 'skills/ai-talent/scripts/probe-product-thumbnails.ts'
+  workflow_dispatch:
+    inputs:
+      brandId:
+        description: '只看某個品牌（留空＝掃最近有上傳產品照的 5 個品牌）'
+        required: false
+
+jobs:
+  probe:
+    runs-on: ubuntu-24.04
+    environment: dev
+    timeout-minutes: 8
+    steps:
+      - name: Compare stored primary photo vs what the list picker resolves
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 7m
+          script: |
+            set -e
+            cd /opt/onbrand/current/skills/ai-talent
+            set -a; source .env 2>/dev/null; set +a
+            echo "host=$(hostname)  app=$(readlink -f /opt/onbrand/current)"
+            echo "----------------------------------------------------------"
+            ./node_modules/.bin/tsx scripts/probe-product-thumbnails.ts "${{ github.event.inputs.brandId }}"

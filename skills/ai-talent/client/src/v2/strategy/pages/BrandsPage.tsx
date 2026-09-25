@@ -47,6 +47,7 @@ import ProductDetailModal from "../components/positioning/ProductDetailModal";
 // Notion-style line icons
 import { Target as LucideTarget, Type as LucideType, Palette as LucidePalette, Lock as LucideLock, Play as LucidePlay, RotateCcw as LucideRotate, BookOpen as LucideBook, Sparkles, Bot as LucideRobotIcon, Quote as LucideQuote, Shield as LucideShield, Type as LucideTypeIcon, Pencil as LucidePencil, Award as LucideAward, Package as LucidePackage, Hash as LucideHash, MessageCircle as LucideMessage, FileText as LucideFileText, IdCard as LucideIdCard, Trash2 as LucideTrash } from "lucide-react";
 import { SCOPE_SEGMENTS, type SegmentSpec } from "../lib/positioningSchema";
+import { pickProductImageUrl } from "../lib/productImage";
 import { pipelineFor, type PipelineStepSpec } from "../lib/positioningPipeline";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faPlus, faPalette, faFont, faQuoteLeft, faBullseye, faUsers, faImage, faIcons, faChartPie, faImages, faPenNib, faShieldHalved, faFolderOpen, faLock, faLockOpen, faBookOpen, faTableList, faBox, faRocket, faBullhorn, faWandSparkles, faGear, faStickyNote, faTrash, faSatelliteDish, faStethoscope, faFileArrowUp } from "@fortawesome/free-solid-svg-icons";
@@ -5447,12 +5448,25 @@ function BrandPaletteHero({
  * Shows each entity's positioning preview (tagline / USP / audience).
  * Cards with no positioning show a placeholder state.
  * ─────────────────────────────────────────────────────────────────── */
+/**
+ * 2026-09-25（CJ「產品列表的縮圖，我想要用跟任務卡一樣的樣式，現在的長寬似乎不同」）：
+ * 任務卡（content/pages/PlatformTaskPage.tsx 的卡片）用的是**固定高 130** 的圖片區、
+ * 底色 #F5F4F2、下緣一條 rgba(0,0,0,0.06)。這裡原本用 aspectRatio 4/3 + maxHeight 140，
+ * 所以每張卡的圖片區高度會隨欄寬浮動，跟任務卡並排看就是兩套東西。改成同一組數值。
+ *
+ * 產品照片的長寬比什麼都有（直式包裝、橫式擺拍），所以圖片本身仍是 object-contain
+ * 疊在自己的模糊底上——不裁切才看得到整支產品，這跟任務卡放頭像的做法目的一致：
+ * 框一致、內容不變形。
+ */
+const TASK_CARD_SURFACE = "#F5F4F2";   // 與 PlatformTaskPage 的 CARD_SURFACE 同值
+const TASK_CARD_MEDIA_H = 130;
+
 function ProductCardThumbnail({ imageUrl, name, en }: { imageUrl?: string; name: string; en: boolean }) {
   const [failed, setFailed] = React.useState(false);
   return (
     <div
-      className="w-full bg-neutral-100 flex items-center justify-center overflow-hidden relative"
-      style={{ aspectRatio: "4 / 3", maxHeight: 140 }}
+      className="w-full flex items-center justify-center overflow-hidden relative"
+      style={{ height: TASK_CARD_MEDIA_H, background: TASK_CARD_SURFACE, borderBottom: "1px solid rgba(0,0,0,0.06)" }}
     >
       {imageUrl && !failed ? (
         <>
@@ -5609,25 +5623,21 @@ function BrandEntityGrid({
                 style={{
                   animation: `fadeSlideIn 0.35s ease both`,
                   animationDelay: `${Math.min(idx * 60, 400)}ms`,
+                  // 邊框與任務卡同一個值（rgba(0,0,0,0.07)），不是 neutral-200
+                  border: "1px solid rgba(0,0,0,0.07)",
                 }}
                 onClick={() => onOpen(item.id)}
-                className="text-left rounded-xl border border-neutral-200 bg-white p-0 overflow-hidden hover:border-neutral-400 hover:shadow-sm transition group flex flex-col"
+                className="text-left rounded-2xl bg-white p-0 overflow-hidden transition group flex flex-col hover:shadow-lg"
               >
                 {/* 2026-06-21 (CJ「產品頁籤加縮圖」): thumbnail at top.
                     2026-06-30 (prod bug): products.imageUrl column doesn't
                     exist — dig into positioning JSON for image locations. */}
                 {kind === "product" && (() => {
-                  const pos: any = item.positioning ?? {};
-                  const parsed = typeof pos === "string" ? (() => { try { return JSON.parse(pos); } catch { return {}; } })() : pos;
-                  const imgCandidates = [
-                    parsed?.imageUrl, parsed?.image,
-                    parsed?._interim?.imageUrl, parsed?._interim?.image,
-                    Array.isArray(parsed?.images) ? parsed.images[0] : null,
-                    Array.isArray(parsed?._interim?.images) ? parsed._interim.images[0] : null,
-                    Array.isArray(parsed?._assets?.photos) ? (typeof parsed._assets.photos[0] === "string" ? parsed._assets.photos[0] : parsed._assets.photos[0]?.url) : null,
-                    item.imageUrl,   // legacy top-level, if any writer sets it
-                  ];
-                  const imgUrl = imgCandidates.find((c: any) => typeof c === "string" && /^https?:\/\//.test(c)) as string | undefined;
+                  // 2026-09-25（CJ「有選擇一張主題，但沒有出現在產品列表的縮圖當中」）：
+                  // 挑圖規則搬到 lib/productImage.ts 並補上測試——原因是舊的篩選只收
+                  // http(s)，把使用者上傳主圖的根相對路徑（/static/asset-photos/…）
+                  // 濾掉了，所以「設為主圖」寫進 DB 卻顯示「尚無圖片」。
+                  const imgUrl = pickProductImageUrl(item.positioning, item.imageUrl);
                   return <ProductCardThumbnail key={imgUrl ?? "none"} imageUrl={imgUrl} name={item.name} en={en} />;
                 })()}
 
