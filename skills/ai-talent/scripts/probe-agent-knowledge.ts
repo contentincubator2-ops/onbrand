@@ -31,6 +31,7 @@ async function main() {
 
   let bad = 0;
   const lengths: number[] = [];
+  const skillLens: number[] = [];
   for (const a of rows as any[]) {
     const k = knowledge.get(Number(a.id)) ?? "";
     const tspLen = String(a.taskSystemPrompt ?? "").length;
@@ -43,6 +44,8 @@ async function main() {
     const ok = (!tspLen || has.tsp) && (!expectsCard || has.card) && (!a.primarySkillBundleKey || has.skill);
     if (!ok) bad++;
     lengths.push(k.length);
+    const si = k.indexOf("# 你綁定的專業 Skill");
+    if (si >= 0) skillLens.push(k.length - si);
     if (ids.length <= 20 || !ok) {
       console.log(
         `${ok ? "✓" : "✗"} ${a.id} ${a.name} | taskSystemPrompt ${tspLen} 字 → 工作守則 ${has.tsp ? "有" : "無"}`
@@ -84,6 +87,8 @@ async function main() {
   }
 
   lengths.sort((x, y) => x - y);
+  skillLens.sort((x, y) => x - y);
+  console.log(`Skill 注入字數：min ${skillLens[0] ?? 0} / max ${skillLens[skillLens.length - 1] ?? 0}（${skillLens.length} 位）`);
   console.log(`\n共 ${ids.length} 位，失敗 ${bad} 位；注入字數 min ${lengths[0] ?? 0} / max ${lengths[lengths.length - 1] ?? 0}`);
   await localPool.end();
   process.exit(bad ? 1 : 0);
