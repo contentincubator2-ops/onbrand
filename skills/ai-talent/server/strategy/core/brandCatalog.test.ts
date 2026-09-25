@@ -106,3 +106,42 @@ describe("buildBrandCatalogBlock", () => {
     expect(out).toContain("Slogan：直接是物件");
   });
 });
+
+// 2026-09-25（CJ「明明我在此產品中，有寫價格，但是產品顧問，還是重複問我價格」）：
+// 售價是 positioning 頂層的 `price`，不在任何 canonical segment 裡——清單原本只讀
+// core.*，所以定價策略師在畫面寫著 NT$560 的情況下還反問售價。
+describe("產品清單要帶得出使用者在卡片上看得到的東西", () => {
+  it("售價／USP／主客群都要進清單", async () => {
+    productRows = [{
+      id: 263, name: "美國橫膈牛排",
+      positioning: JSON.stringify({
+        price: "NT$560",
+        core: { zhTagline: "燒肉店的香，今晚在你家" },
+        competition: { uniqueUsp: "不修油、不預醃" },
+        audience: { primary: "25–45 歲的忙碌都市上班族" },
+      }),
+    }];
+    eventRows = [];
+    const out = await buildBrandCatalogBlock(1, 1);
+    expect(out).toContain("售價：NT$560");
+    expect(out).toContain("USP：不修油、不預醃");
+    expect(out).toContain("主客群：25–45 歲的忙碌都市上班族");
+  });
+
+  it("舊資料放在別的路徑也撈得到（usp 頂層、targetAudience 頂層）", async () => {
+    productRows = [{ id: 9, name: "舊資料產品", positioning: JSON.stringify({ usp: "頂層的賣點", targetAudience: "頂層的客群" }) }];
+    eventRows = [];
+    const out = await buildBrandCatalogBlock(1, 1);
+    expect(out).toContain("USP：頂層的賣點");
+    expect(out).toContain("主客群：頂層的客群");
+    // 有東西可講就不該再說「尚未填寫」
+    expect(out).not.toContain("尚未填寫");
+  });
+
+  it("沒有售價就不要生一行空的「售價：」出來", async () => {
+    productRows = [{ id: 10, name: "沒填價的產品", positioning: JSON.stringify({ core: { zhTagline: "標語" } }) }];
+    eventRows = [];
+    const out = await buildBrandCatalogBlock(1, 1);
+    expect(out).not.toContain("售價：");
+  });
+});

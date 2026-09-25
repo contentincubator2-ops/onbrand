@@ -175,7 +175,7 @@ async function insertMessage(args: {
  *   2. buildBrandCatalogBlock()——整份產品／活動清單（brandCatalog.ts）。
  *   3. 策略總監自己要用的兩個狀態：上次健檢時間、未讀監測提醒數。
  */
-async function gatherBrandContext(brandId: number, userId: number, productId?: number | null): Promise<string> {
+export async function gatherBrandContext(brandId: number, userId: number, productId?: number | null): Promise<string> {
   const ctx: string[] = [];
 
   // 1) canonical 品牌大腦。失敗不致命——後面兩段還是有價值。
@@ -256,6 +256,11 @@ const STRATEGIST_SYSTEM_PROMPT = `你是 OnBrand 的策略總監，繁體中文�
   產品名字。
 - 資料裡沒有的東西（例如某個產品的銷售數字）就說沒有這項資料，不要編——
   「沒有這項資料」跟「我沒有這個功能」也是兩句不同的話，講前者。
+- **不要問資料裡已經有的東西。** 下面的品牌資料與產品清單已經寫了的（售價、
+  客群、USP、標語、核心定位…），一律直接當事實使用，並在回答裡把你採用的數字
+  覆述一次（例如「你這支現在賣 NT$560」），讓使用者知道你確實看到了。要問，
+  只問資料裡**沒有**的（例如成本、毛利、實際銷量、庫存）。使用者在畫面上已經
+  填過的東西被反問一次，對他來說就是「你根本沒看我的資料」。
 
 你的職責有三件事：
 1. 回答用戶關於這個品牌策略的問題——定位、受眾、競爭、差異化、標語、語氣、

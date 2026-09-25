@@ -16,6 +16,9 @@
  * memory 裡 taskRegistry 那次一樣：同一件事有兩份各自維護的組裝邏輯，
  * 遲早會漂移成兩個答案。
  *
+ * 2026-09-25：清單每一行帶的欄位，判準是「使用者在產品卡片上看得到的，總監就要
+ * 看得到」——售價漏掉那次，定價策略師在畫面上寫著 NT$560 的情況下還反問售價。
+ *
  * 欄位路徑用 canonical dot-path（positioningSchema.ts 的 PRODUCT_SEGMENTS），
  * 跟 brandContext.ts 讀產品定位時同一組路徑——memory 記的「writer 與 reader
  * 必須同步」那條坑，這裡是第五個 reader，所以只讀最不可能改的兩個欄位
@@ -48,14 +51,36 @@ function pick(obj: any, path: string, max: number): string | null {
   return v.length > max ? `${v.slice(0, max)}…` : v;
 }
 
+/** 第一個取得到的路徑就用它——舊資料散在不同路徑，跟 BrandsPage 卡片的 extractField 同一招。 */
+function pickAny(pos: any, paths: string[], max: number): string | null {
+  for (const path of paths) {
+    const v = pick(pos, path, max);
+    if (v) return v;
+  }
+  return null;
+}
+
 function productLine(idx: number, row: any): string {
   const pos = parsePositioning(row.positioning);
   const slogan = pos ? pick(pos, "core.zhTagline", 60) : null;
   const core = pos ? pick(pos, "core.coreStatement", 160) : null;
+  // 2026-09-25（CJ「明明我在此產品中，有寫價格，但是產品顧問，還是重複問我價格，
+  // 這不應該發生」）：售價是 positioning 的頂層 `price`（intake／掃描寫進去的格式化
+  // 字串，例如「NT$560」），不在 PRODUCT_SEGMENTS 的任何一段裡，所以原本這行讀不到。
+  //
+  // 判準訂在這裡，之後加欄位照這條走：**使用者在產品卡片上看得到的，總監就要看得到**。
+  // 卡片顯示的是 名稱／售價／標語／USP／受眾（BrandsPage getPreview），所以這行就這五樣。
+  // 問一個畫面上已經寫著的數字，對使用者來說等於「你根本沒看我的資料」。
+  const price = pos ? pickAny(pos, ["price", "core.price"], 40) : null;
+  const usp = pos ? pickAny(pos, ["usp", "competition.uniqueUsp", "core.oneLineValueProp"], 120) : null;
+  const audience = pos ? pickAny(pos, ["audience.primary", "targetAudience"], 120) : null;
   const bits = [`${idx}. ${row.name ?? "(未命名)"}（產品 id ${row.id}）`];
+  if (price) bits.push(`售價：${price}`);
   if (slogan) bits.push(`Slogan：${slogan}`);
   if (core) bits.push(`核心定位：${core}`);
-  if (!slogan && !core) bits.push(pos ? "定位資料：有，但核心欄位尚未填寫" : "定位資料：尚未建立");
+  if (usp) bits.push(`USP：${usp}`);
+  if (audience) bits.push(`主客群：${audience}`);
+  if (!slogan && !core && !usp && !audience) bits.push(pos ? "定位資料：有，但核心欄位尚未填寫" : "定位資料：尚未建立");
   return bits.join("｜");
 }
 

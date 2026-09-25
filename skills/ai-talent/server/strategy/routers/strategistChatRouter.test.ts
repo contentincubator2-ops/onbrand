@@ -38,6 +38,16 @@ describe("工具引導依 scope 分開", () => {
     }
   });
 
+  // 2026-09-25（CJ「明明我在此產品中，有寫價格，但是產品顧問，還是重複問我價格，
+  // 這不應該發生」）：光把售價塞進脈絡不夠，模型照樣會禮貌性地再問一次。
+  it("prompt 明講不要問資料裡已經有的東西", () => {
+    for (const roleId of ["brand_positioning", "product_pricing"]) {
+      const p = buildSystemPrompt(director(roleId, "測試"), "");
+      expect(p).toContain("不要問資料裡已經有的東西");
+      expect(p).toContain("覆述");   // 要把採用的數字講回來，使用者才知道他讀到了
+    }
+  });
+
   it("沒有指定人設（舊對話）維持品牌那套，不要突然什麼工具都沒有", () => {
     const p = buildSystemPrompt(null, "");
     expect(p).toContain("<<action:open_healthcheck>>");

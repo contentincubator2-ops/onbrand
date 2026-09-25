@@ -1,0 +1,42 @@
+name: Ops (DEV) — probe whether the director can see the product price
+
+# 2026-09-25（CJ「明明我在此產品中，有寫價格，但是產品顧問，還是重複問我價格，
+# 這不應該發生」）：分兩層驗——脈絡裡有沒有那個數字（決定性），以及模型會不會
+# 還是照問（機率性，實跑一輪 LLM 把回答印出來）。
+#
+# 唯讀：不寫 DB、不留對話紀錄；只呼叫一次 LLM。
+on:
+  push:
+    paths:
+      - '.github/workflows/op-probe-director-knows-price.yml'
+      - 'skills/ai-talent/scripts/probe-director-knows-price.ts'
+  workflow_dispatch:
+    inputs:
+      brandId:
+        description: '用哪個品牌（預設 2972 懶得煮的Tom老闆）'
+        required: false
+        default: '2972'
+      productId:
+        description: '用哪支產品（留空＝自動挑有填售價的那支）'
+        required: false
+
+jobs:
+  probe:
+    runs-on: ubuntu-24.04
+    environment: dev
+    timeout-minutes: 10
+    steps:
+      - name: Build the real strategist context and ask a pricing question
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 9m
+          script: |
+            set -e
+            cd /opt/onbrand/current/skills/ai-talent
+            set -a; source .env 2>/dev/null; set +a
+            echo "host=$(hostname)  app=$(readlink -f /opt/onbrand/current)"
+            echo "----------------------------------------------------------"
+            ./node_modules/.bin/tsx scripts/probe-director-knows-price.ts "${{ github.event.inputs.brandId || '2972' }}" "${{ github.event.inputs.productId }}"

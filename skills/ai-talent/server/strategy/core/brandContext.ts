@@ -550,6 +550,13 @@ export async function buildBrandPrefix(
               // 記憶裡記的是「三個 reader 要同步」；這是第四個，而且是唯一
               // 一個真的影響產出品質的。
               pushFrom(lines, pp, [
+                // 2026-09-25（CJ「明明我在此產品中，有寫價格，但是產品顧問，還是
+                // 重複問我價格」）：售價在 positioning 頂層的 `price`（不在任何
+                // segment 裡），所以下面那串 canonical 路徑一個都撈不到它。
+                // 上面 2026-09-23 那次寫「pricing/channel 這類純策略規劃欄位不補」
+                // ——**售價不是策略規劃，是事實**，而且這份 prefix 現在還餵給產品
+                // 策略總監（strategistChatRouter），他看不到價格就只能反問。
+                ["price",                    "產品售價",     60],
                 ["core.coreStatement",       "產品核心定位", 400],
                 ["core.zhTagline",           "產品 Slogan",  100],
                 // 2026-09-23（缺口稽核 — 同一套手法再對一次產品定位）：
