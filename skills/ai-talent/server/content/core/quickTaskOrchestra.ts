@@ -31,6 +31,7 @@ import { angleVisualLens, angleWritingBlock, checkAngle, dedupeAngleLabels, pick
 import { findFirstUrl, fetchUrlSummary, formatUrlSummaryForPrompt, type UrlSummary } from "./urlContext";
 import { detectNonDeliverable } from "./captionSanity";
 import { isAdCopyTemplate, extractRequestedUrl, buildAdCopyRule, validateAdCopy, repairAdCopy } from "./adCopyContract";
+import { adSlotOf, buildAdSlotRule, validateAdSlot, repairAdSlot } from "./adSlotContract";
 import { isShotListTemplate, buildShotListRule, normalizeShotList, validateShotList, repairShotList } from "./shotListContract";
 // 2026-08-31 五感十築：正向直述句型合約（skill 01 Hard Rule 1）。
 import { isWuganVoiceTemplate, validateWuganVoice, repairWuganVoice, buildWuganVoiceReminder } from "./wuganVoiceContract";
@@ -737,6 +738,10 @@ async function callOneVariant(args: {
 }): Promise<{ label: string; caption: string; hashtags?: string[] }> {
   const { template, config, label, captionPersona, brandPrefix, urlContext, userMsg, inputKeys, agentAiModel, strategistAnchor, market, isZhTW } = args;
   const adCopy = isAdCopyTemplate(template);
+  // 2026-09-25（CJ「剛剛生出來的文案，顯示得很奇怪」）：單欄位廣告卡（標題／
+  // 說明／CTA）的字數在 systemPrompt 裡寫了，但沒有任何東西在驗證——adCopy 那套
+  // 只認 [headline]/[primary]/[CTA] 標記，這幾張沒有標記，整個掉在守備範圍外。
+  const adSlot = adSlotOf((template as any)?.id);
   const wuganVoice = isWuganVoiceTemplate(template);
   // 2026-08-23: 分格腳本卡的交付物不是貼文，需要自己的合約把社群骨架關掉。
   const shotList = isShotListTemplate(template);
@@ -1059,6 +1064,7 @@ async function callOneVariant(args: {
   // over the social scaffold's「不要排成結構化卡片」rule.
   const system = promptCore + deliverableOnlyRule
     + (adCopy ? buildAdCopyRule(requestedUrl) : "")
+    + (adSlot ? buildAdSlotRule(adSlot) : "")
     + (shotList ? buildShotListRule() : "");
 
   // Provider + model selection priority:
@@ -1211,6 +1217,21 @@ async function callOneVariant(args: {
               // (URL appended to [Primary]). Missing markers cannot be repaired.
               console.warn(`[callOneVariant] ad-copy contract still unmet for ${label} (${issue.reason}) — applying repair`);
               return { label, caption: repairAdCopy(caption, requestedUrl), hashtags: out.hashtags };
+            }
+          }
+          if (adSlot) {
+            const issue = validateAdSlot(caption, adSlot);
+            if (issue && attempt < 2) {
+              lastErr = new Error(`ad-slot contract miss for ${label} (${issue.reason}): ${issue.detail}`);
+              adCopyIssue = issue.detail;   // 重試提醒沿用同一個欄位，措辭由 issue.detail 帶
+              console.warn(`[callOneVariant] attempt ${attempt} ad-slot miss for ${label} (${issue.reason}): ${lastRaw.slice(0, 200)}`);
+              continue;
+            }
+            if (issue) {
+              // 最後一次：交出去的東西至少要放得進版面（按鈕只吃得下 12 字）。
+              // 修補只做切割與搬移，不重寫語意——被切下來的字搬去「適合：」那行。
+              console.warn(`[callOneVariant] ad-slot contract still unmet for ${label} (${issue.reason}) — applying repair`);
+              return { label, caption: repairAdSlot(caption, adSlot), hashtags: out.hashtags };
             }
           }
           if (wuganVoice) {
@@ -2052,6 +2073,9 @@ export async function runOrchestra(args: {
     // fetch it and never let it override the brand as「主題」. YouTube links
     // stay reference material and keep the existing fetch path.
     const adCopyTask = isAdCopyTemplate(args.template);
+    // 2026-09-25：禁用詞改寫同樣會打壞單欄位廣告卡的形狀（按鈕文字被改長）——
+    // 跟 adCopy / shotList 一樣，改寫後要再修補一次。
+    const adSlotTask = adSlotOf((args.template as any)?.id);
     const shotListTask = isShotListTemplate(args.template);
     const requestedUrl = adCopyTask ? extractRequestedUrl(args.inputs) : null;
     const ytUrlInput = inputValues.find((v) => !!extractYouTubeId(v));
@@ -2328,6 +2352,7 @@ export async function runOrchestra(args: {
             // 跑不到這一關，所以只有正式環境現形。
             v.caption = adCopyTask ? repairAdCopy(report.text, requestedUrl)
               : shotListTask ? repairShotList(report.text)
+              : adSlotTask ? repairAdSlot(report.text, adSlotTask)
               : report.text;
             if (adCopyTask) {
               const issue = validateAdCopy(v.caption, requestedUrl);
