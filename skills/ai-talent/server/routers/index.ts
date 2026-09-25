@@ -25,6 +25,7 @@ import { brandTaskCardRouter } from "../strategy/routers/brandTaskCardRouter";
 import { workbenchRouter } from "../strategy/routers/workbenchRouter";
 import { strategistChatRouter } from "../strategy/routers/strategistChatRouter";
 import { assetPhotoRouter } from "../strategy/routers/assetPhotoRouter";
+import { campaignRouter } from "../strategy/routers/campaignRouter";
 import { strategyMonitorRouter } from "../strategy/routers/strategyMonitorRouter";
 import { touchpointsRouter } from "../platform/routers/touchpointsRouter";
 import { competitorRouter } from "../strategy/routers/competitorRouter";
@@ -80,6 +81,9 @@ export const appRouter = router({
   entity:        entityRouter,
   product:       productRouter,
   event:         eventRouter,
+  // 2026-09-25（CJ 的活動企劃改版）：活動的「設定 + 宣傳企劃」。策略層的企劃頁
+  // 與內容層的活動 tray 讀的是同一筆資料，出入口只有這一支。
+  campaign:      campaignRouter,
   scope:         scopeRouter,
   pipeline:      pipelineRouter,
   postFormat:    postFormatRouter,
