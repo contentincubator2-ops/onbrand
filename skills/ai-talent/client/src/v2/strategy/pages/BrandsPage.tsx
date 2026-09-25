@@ -49,6 +49,7 @@ import { Target as LucideTarget, Type as LucideType, Palette as LucidePalette, L
 import { SCOPE_SEGMENTS, type SegmentSpec } from "../lib/positioningSchema";
 import { pickProductImageUrl } from "../lib/productImage";
 import { readProductFacts } from "../lib/productFacts";
+import CampaignWorkspace from "../components/positioning/CampaignWorkspace";
 import { pipelineFor, type PipelineStepSpec } from "../lib/positioningPipeline";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faPlus, faPalette, faFont, faQuoteLeft, faBullseye, faUsers, faImage, faIcons, faChartPie, faImages, faPenNib, faShieldHalved, faFolderOpen, faLock, faLockOpen, faBookOpen, faTableList, faBox, faRocket, faBullhorn, faWandSparkles, faGear, faStickyNote, faTrash, faSatelliteDish, faStethoscope, faFileArrowUp } from "@fortawesome/free-solid-svg-icons";
@@ -585,7 +586,7 @@ export default function BrandsPage() {
   // 2026-05-07 Path A simplification: 3 main tiles only (定位/文字/知識).
   // "visual" is kept in the type for legacy lock-state code paths, but
   // is no longer exposed as a tile — its contents live in Settings.
-  const category: "positioning" | "copy" | "visual" | "knowledge" | "info" | "publish" | "ai" | "settings" | "products" | "events" | "tools" | "persona" =
+  const category: "positioning" | "copy" | "visual" | "knowledge" | "info" | "publish" | "ai" | "settings" | "products" | "events" | "tools" | "persona" | "campaign" =
     urlCat === "copy" ? "copy"
     : urlCat === "knowledge" ? "knowledge"
     : urlCat === "visual" ? "visual"
@@ -597,6 +598,10 @@ export default function BrandsPage() {
     : urlCat === "events" ? "events"
     : urlCat === "tools" ? "tools"
     : urlCat === "persona" ? "persona"
+    // 2026-09-25（CJ「應該要在活動的 mission tray 當中，增加這個活動的任務卡」）：
+    // 活動的預設落點是宣傳企劃，不是 11 段的得獎 brief（那退成 cat=positioning
+    // 的「參獎／提案」進階模式）。
+    : urlCat === "campaign" ? "campaign"
     : "positioning";
   // 2026-07-28 (CJ「選活動定位卡片，跑回品牌定位頁面」): this built its
   // next params from the `searchParams` closure instead of the functional
@@ -2276,6 +2281,15 @@ export default function BrandsPage() {
             </>
           )}
 
+          {/* ── 宣傳企劃（活動限定）──
+              2026-09-25：策略層只排不寫。每一格的「去寫這篇」與底部的「開始撰寫」
+              都是通往內容層活動 tray 的門。 */}
+          {derivedCategory === "campaign" && scopeMode === "event" && scope?.eventId && (
+            <div style={{ padding: "24px" }}>
+              <CampaignWorkspace eventId={scope.eventId} brandId={scope?.brandId ?? brandId ?? null} />
+            </div>
+          )}
+
           {/* ── 設定（活動限定）── */}
           {derivedCategory === "settings" && scopeMode === "event" && scope?.eventId && (
             <div style={{ padding: "24px" }}>
@@ -2377,16 +2391,28 @@ export default function BrandsPage() {
                   // result always overwrites the first's — dropping `e`
                   // every time. Single combined call is the only fix that
                   // actually lands both changes atomically.
+                  // 2026-09-25（CJ「我填完活動定位後，他按下開始定位，居然跑到品牌
+                  // 的頁籤」）：活動的落點改成宣傳企劃。得獎 brief 仍在
+                  // cat=positioning，由企劃頁的「參獎／提案」進階入口進去。
                   setSearchParams((prev) => {
                     const sp = new URLSearchParams(prev);
                     sp.delete("p");
                     sp.set("e", String(id));
-                    sp.set("cat", "positioning");
+                    sp.set("cat", "campaign");
                     return sp;
                   }, { replace: true });
                 }}
                 onDelete={(id) => evRemoveMut?.mutate?.({ id })}
-                onPosition={(id) => kickReposition("event", id, brandEventsList?.find((p: any) => p.id === id)?.name)}
+                // 2026-09-25：活動的「開始」＝進宣傳企劃頁，不是跑得獎 brief。
+                onPosition={(id) => {
+                  setSearchParams((prev) => {
+                    const sp = new URLSearchParams(prev);
+                    sp.delete("p");
+                    sp.set("e", String(id));
+                    sp.set("cat", "campaign");
+                    return sp;
+                  }, { replace: true });
+                }}
                 runningIds={posRunning.event}
                 progressMap={posProgress}
               />
@@ -5704,17 +5730,22 @@ function BrandEntityGrid({
                     const prog = progressMap?.[`${kind}:${item.id}`];
                     return (
                       <button
-                        onClick={(e) => { e.stopPropagation(); if (!isRunning) onPosition(item.id); }}
-                        disabled={isRunning}
+                        onClick={(e) => { e.stopPropagation(); if (kind === "event" || !isRunning) onPosition(item.id); }}
+                        disabled={kind !== "event" && isRunning}
                         className={`text-[12px] font-medium px-2 py-1 rounded-md transition flex-1 min-w-0 text-center ${
                           isRunning
                             ? "bg-indigo-100 text-indigo-500 cursor-wait animate-pulse"
                             : "bg-indigo-50 text-indigo-700 hover:bg-indigo-100"
                         }`}
                       >
-                        {isRunning
-                          ? (en ? `Positioning… ${prog ?? ""}` : `定位中…${prog ? ` ${prog}` : ""}`)
-                          : positioned ? (en ? "Re-position" : "重新定位") : (en ? "▶ Run positioning" : "▶ 開始定位")}
+                        {/* 2026-09-25（CJ「按下開始定位，居然跑到品牌的頁籤」）：
+                            活動卡的主要動作是「宣傳企劃」——按下去進企劃頁，不是
+                            跑那份 11 段的得獎 brief。產品卡維持原本的定位流程。 */}
+                        {kind === "event"
+                          ? (en ? "▶ Promotion plan" : "▶ 宣傳企劃")
+                          : isRunning
+                            ? (en ? `Positioning… ${prog ?? ""}` : `定位中…${prog ? ` ${prog}` : ""}`)
+                            : positioned ? (en ? "Re-position" : "重新定位") : (en ? "▶ Run positioning" : "▶ 開始定位")}
                       </button>
                     );
                   })()}

@@ -228,6 +228,11 @@ function buildNavItems(lang: "zh-TW" | "en", userEmail?: string | null, currentP
       tooltip: en ? "Case library, filed by standard" : "依標準建檔的案例庫" },
     { to: "/tasks/calendar", label: en ? "Calendar" : "行事曆", icon: <FontAwesomeIcon icon={faCalendarDays} />, matchPrefix: "/tasks/calendar",
       tooltip: en ? "Plan the month's slots per content type" : "各類型當月篇數與切角規劃" },
+    // 2026-09-25（CJ「在內容層增加活動的 mission tray，當我新增活動企劃時，就會
+    // 出現該活動的任務卡」）：活動 tray。卡片完全由策略層的宣傳企劃長出來——
+    // 沒有企劃就沒有卡，這讓「先想清楚再寫」是結構上的前提，不是紀律。
+    { to: "/campaigns", label: en ? "Campaigns" : "活動", icon: <FontAwesomeIcon icon={faCalendarDays} />, matchPrefix: "/campaigns",
+      tooltip: en ? "Write out a campaign plan, post by post" : "照活動企劃一篇一篇寫" },
     // ── Workspace & tools ──────────────────────────────────────────────────
     { to: "/projects",  label: en ? "Projects" : "專案",     icon: <FontAwesomeIcon icon={faFolderOpen} /> },
     { to: "/calendar",  label: en ? "Calendar" : "日曆",     icon: <FontAwesomeIcon icon={faCalendarDays} />,

@@ -149,6 +149,11 @@ export interface CampaignPlanItem {
   /** 已經寫過的話，指回產出。 */
   outputId?: number | null;
   scheduledAt?: string | null;
+  /**
+   * 這一格的卡是模型選的，還是驗證失敗後系統補的（server 的 reconcileItems）。
+   * 畫面上要看得見：補上的那格值得使用者多看一眼，而不是假裝一切正常。
+   */
+  repaired?: boolean;
 }
 
 export interface CampaignPartnerBlock {

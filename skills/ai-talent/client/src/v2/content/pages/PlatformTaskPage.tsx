@@ -17,6 +17,7 @@ import { Navigate, useParams, useOutletContext, useNavigate, useSearchParams } f
 import { trpc } from "../../../lib/trpc";
 import { useLang } from "../../../lib/i18n";
 import { showToastGlobal } from "../../../components/ui/Toast";
+import { TaskCardShell, TaskCardAvatar, CARD_SURFACE } from "../components/TaskCardShell";
 import { toastWithUpgrade } from "../../platform/lib/upgradeToast";
 import { matchTaskWithSynonyms } from "../lib/taskSearchSynonyms";
 import { TIER_ORDER, tierAccent, tierLabel } from "../../platform/lib/tierVocabulary";
@@ -196,7 +197,7 @@ const PLATFORM_META: Record<string, PlatformMeta> = {
  *
  * 現在卡片頂端是單一的中性底色，資訊由頭像、標題與來源 pill 承擔。
  */
-const CARD_SURFACE = "#F5F4F2";
+// CARD_SURFACE 已搬進 TaskCardShell —— 任務卡的幾何只有一份。
 
 const dicebear = (seed: string) =>
   `https://api.dicebear.com/7.x/notionists/svg?seed=${encodeURIComponent(seed)}&backgroundColor=4267B2&backgroundType=solid`;
@@ -823,6 +824,19 @@ function PlatformTaskPageInner() {
   // but the value must survive until the user actually presses run, which can
   // be several interactions later. Only the reference is kept; the server
   // resolves the audience labels from the stored scenario.
+  // 2026-09-25（CJ 的活動企劃改版）：從活動 tray 過來的一格。寫完要回貼給企劃，
+  // 策略層那格的 ✓ 與 tray 的進度都靠它。用 ref 不用 state：參數會立刻從網址上
+  // 清掉（跟 topic 一樣），但值要活到使用者真的按下產生為止。
+  const campaignRef = React.useRef<{ eventId: number; itemId: string } | null>(null);
+  const markWrittenMut = (trpc as any).campaign?.markWritten?.useMutation?.();
+  /** 寫完這一格 —— 失敗不擋使用者看產出（回貼失敗只是進度沒更新，不是內容沒寫成）。 */
+  const finishCampaignItem = React.useCallback((outputId: number) => {
+    const c = campaignRef.current;
+    if (!c || !outputId || !markWrittenMut) return;
+    campaignRef.current = null;
+    try { markWrittenMut.mutate({ eventId: c.eventId, itemId: c.itemId, outputId }); } catch { /* 不致命 */ }
+  }, [markWrittenMut]);
+
   const spotRefRef = React.useRef<{ scenarioId: string; spotIndex: number } | null>(null);
   useEffect(() => {
     const sid = searchParams.get("sid");
@@ -837,6 +851,28 @@ function PlatformTaskPageInner() {
     next.delete("si");
     setSearchParams(next, { replace: true });
   }, [searchParams]);
+
+  // 2026-09-25：?task=<卡片id>&camp=<活動id>&item=<企劃格子id> —— 活動 tray 的
+  // 「去寫這篇」。交棒要一路到底：直接開那張卡，而不是把人丟在列表前面再找一次。
+  const campOpenedRef = React.useRef(false);
+  useEffect(() => {
+    const taskId = searchParams.get("task");
+    if (!taskId || campOpenedRef.current) return;
+    if (!allTasks.length) return;                     // 卡還沒載完，下一輪再試
+    const t = allTasks.find((x: any) => x.id === taskId);
+    const camp = Number(searchParams.get("camp") ?? 0);
+    const item = searchParams.get("item");
+    if (camp && item) campaignRef.current = { eventId: camp, itemId: item };
+    campOpenedRef.current = true;
+    const next = new URLSearchParams(searchParams);
+    next.delete("task"); next.delete("camp"); next.delete("item");
+    setSearchParams(next, { replace: true });
+    if (t) openTask(t as any);
+    else showToastGlobal(lang === "en"
+      ? "That task card isn't available for this brand."
+      : "這個品牌目前沒有這張任務卡。");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, allTasks]);
 
   // ── Platform inference (matches QuickTask30sPage logic) ──────────────────
   const inferPlatform = (task: FBTaskCard): string =>
@@ -1124,7 +1160,8 @@ function PlatformTaskPageInner() {
     // existing right-top product/event selection still carries through. Once
     // the right-top picker drops these options, this just defaults to brand.
     const gp = ctx?.scope?.productId ?? null;
-    const ge = ctx?.scope?.eventId ?? null;
+    // 從活動企劃過來時，活動就是這一篇的脈絡——優先於全域 scope。
+    const ge = campaignRef.current?.eventId ?? ctx?.scope?.eventId ?? null;
     setModalEntity(
       ge ? { kind: "event", id: ge } :
       gp ? { kind: "product", id: gp } :
@@ -1315,6 +1352,7 @@ function PlatformTaskPageInner() {
                 : "公開貼文未產生，目前只有內部草稿，可重新產生。");
             }
             closeTask();
+            finishCampaignItem(Number((r as any).outputId));
             navigate(`/run/${(r as any).outputId}`);
             return;
           }
@@ -1371,6 +1409,7 @@ function PlatformTaskPageInner() {
           }
           if (isStale()) { discardCancelledOutput(oid); return; }
           closeTask();
+          finishCampaignItem(Number(oid));
           navigate(`/run/${oid}`);
           return;
         }
@@ -2144,17 +2183,13 @@ function PlatformTaskPageInner() {
                 const accent = tierAccent(taskTier);
 
                 return (
-                  <button
+                  // 2026-09-25（CJ「任務卡的格式，我想要跟品牌的任務卡統一格式」）：
+                  // 外框與圖片區的幾何搬到 TaskCardShell，活動 tray 用的是同一個殼。
+                  // 共用元件而不是複製樣式 —— 複製的那份遲早會漂移。
+                  <TaskCardShell
                     key={task.id}
                     onClick={() => openTask(task)}
-                    className="flex flex-col rounded-2xl overflow-hidden text-left transition hover:scale-[1.02] hover:shadow-lg"
-                    style={{ border: "1px solid rgba(0,0,0,0.07)", background: "white" }}
-                  >
-                    {/* 卡片頂端：中性底 + 置中的 agent 頭像 */}
-                    <div
-                      className="flex items-center justify-center relative"
-                      style={{ height: 130, background: CARD_SURFACE, borderBottom: "1px solid rgba(0,0,0,0.06)" }}
-                    >
+                    media={<>
                       {/* 自己建的卡：標記 + 編輯入口。編輯放在卡片上而不是另開
                           管理頁 —— 使用者想改的時候，眼睛正看著這張卡。
                           用 span 而不是巢狀 button（button 不能包 button）。 */}
@@ -2180,13 +2215,7 @@ function PlatformTaskPageInner() {
                           {lang === "en" ? "My card" : "我的卡"}
                         </span>
                       )}
-                      <Avatar
-                        src={avatarSrc}
-                        size="lg"
-                        isBordered
-                        color="default"
-                        className="w-20 h-20 ring-2 ring-white/60"
-                      />
+                      <TaskCardAvatar src={avatarSrc} />
                       {/* Deliverable badge — top right (no duration labels) */}
                       <span
                         className="absolute top-2 right-2 text-tiny font-bold px-2 py-0.5 rounded-full text-white shadow-sm"
@@ -2214,10 +2243,8 @@ function PlatformTaskPageInner() {
                       >
                         <FontAwesomeIcon icon={meta.icon} className="text-white" style={{ fontSize: 12 }} />
                       </div>
-                    </div>
-
-                    {/* Card body */}
-                    <div className="p-3 flex flex-col gap-1 flex-1">
+                    </>}
+                  >
                       <p className="text-small font-semibold leading-tight line-clamp-2">
                         {lang === "en" ? (task.label_en ?? task.label) : task.label}
                       </p>
@@ -2316,8 +2343,7 @@ function PlatformTaskPageInner() {
                           </span>
                         </div>
                       )}
-                    </div>
-                  </button>
+                  </TaskCardShell>
                 );
               })}
 
