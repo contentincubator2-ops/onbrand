@@ -54,8 +54,17 @@ async function main() {
       // 2026-09-24 第一次實跑抓到的真 bug：使用者寫「一家人」，潤出來畫面裡
       // 一個人都沒有；使用者只寫「餐桌」，卻自己加了威士忌跟啤酒。潤飾是補，
       // 不是改——這兩條要一直守著。
+      // 2026-09-24 第二次實跑：這個檢查器自己誤報過一次——潤出來寫「一個穿著
+      // 居家T恤的男性」，而當時的正則只找「人／他／她」，於是報了「有人不見了」。
+      // 誤報比漏報更糟：人會學會忽略 ⚠。所以「畫面裡有人」用一組夠寬的詞判斷。
+      const PERSON_RE = /人|他|她|男性|女性|男子|女子|父母|孩子|小孩|家人|爸|媽|顧客|客人|手持|伸手|低頭/;
       const kept = ["一家人", "有人", "早晨", "夜晚", "戶外"].filter((w) => scene.includes(w));
-      const dropped = kept.filter((w) => !refined.includes(w) && !(w === "一家人" && /家人|孩子|爸爸|媽媽|小孩/.test(refined)) && !(w === "有人" && /人|他|她/.test(refined)));
+      const dropped = kept.filter((w) => {
+        if (refined.includes(w)) return false;
+        if (w === "一家人") return !/家人|一家|父母|孩子|小孩|全家/.test(refined);
+        if (w === "有人") return !PERSON_RE.test(refined);
+        return true;
+      });
       if (dropped.length) console.log(`   ⚠ 使用者寫的元素不見了：${dropped.join("、")}`);
       const added = ["威士忌", "啤酒", "紅酒", "香菸", "酒杯"].filter((w) => refined.includes(w) && !scene.includes(w));
       if (added.length) console.log(`   ⚠ 自己加了使用者沒提到的東西：${added.join("、")}`);
