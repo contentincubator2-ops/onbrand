@@ -40,7 +40,6 @@ import { sql } from "drizzle-orm";
 import { appRouter } from "./routers";
 import { resumeInterruptedPositioningJobs } from "./strategy/core/positioningJobRunner";
 import { runStartupCleanup } from "./platform/core/startupCleanup";
-import { recoverStuckDiscoveryJobs, processNextDiscoveryJob } from "./strategy/core/productDiscovery";
 import { computeMissionResources } from "./content/core/missionResourceComputer";
 import { getDisabledRuntimeFeatures, isRuntimeFeatureEnabled } from "./platform/core/runtimeSafety";
 
@@ -662,14 +661,9 @@ const server = app.listen(PORT, async () => {
     // so users see an error + retry button instead of a frozen spinner.
     runStartupCleanup();
 
-    // Product discovery worker — recover stuck jobs, then poll every 30s
-    await recoverStuckDiscoveryJobs();
-    setInterval(() => {
-      processNextDiscoveryJob().catch((e) => {
-        console.error("[productDiscovery] worker tick error:", e?.message ?? e);
-      });
-    }, 30_000);
-    console.log("[productDiscovery] Worker started (30s interval)");
+    // 2026-09-24（CJ「刪除AI掃描官網的功能」）：這裡原本每 30 秒輪詢一次
+    // product_discovery_jobs，把官網爬回來的產品寫進 products 表。整個功能
+    // 已移除，worker 一起拿掉——留著會是一個永遠撈不到工作的空轉迴圈。
 
     // 策略監測 worker：每 15 分鐘挑一份到期的監測清單掃一次（每份至少隔 7 天）。
     // 一拍只掃一份 —— scout 與 LLM 都要錢，寧可慢。

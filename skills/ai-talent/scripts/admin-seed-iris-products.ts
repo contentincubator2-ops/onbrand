@@ -67,7 +67,8 @@ const SEEDS: Array<{ brandName: string; line: string; products: SeedProduct[] }>
   },
 ];
 
-// Mirror productDiscovery.toSlug (post CJK fix) so future re-scans dedupe.
+// 2026-09-24：原本是為了跟掃描官網那條路的 toSlug 對齊（掃描功能已移除）；
+// 規則留著，資料庫裡的既有 slug 就是這樣產生的。
 function toSlug(name: string): string {
   return name
     .toLowerCase()

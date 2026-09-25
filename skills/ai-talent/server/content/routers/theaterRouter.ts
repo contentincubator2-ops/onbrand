@@ -503,40 +503,6 @@ export const theaterRouter = router({
     }),
 
   /**
-   * 2026-06-03 — Product discovery status for the Products tab progress banner.
-   */
-  getProductDiscoveryStatus: protectedProcedure
-    .input(z.object({ brandId: z.number().int().positive() }))
-    .query(async ({ input }) => {
-      const { getDiscoveryStatus } = await import("../../strategy/core/productDiscovery");
-      return getDiscoveryStatus(input.brandId);
-    }),
-
-  /**
-   * 2026-06-04 — Manually trigger product discovery for an existing brand.
-   * Used when the brand was created before auto-discovery was deployed,
-   * or when the user wants to re-scan after updating their website.
-   */
-  triggerProductDiscovery: protectedProcedure
-    .input(z.object({
-      brandId: z.number().int().positive(),
-      websiteUrl: z.string().url().max(500),
-    }))
-    .mutation(async ({ ctx, input }) => {
-      const { enqueueProductDiscovery } = await import("../../strategy/core/productDiscovery");
-      // Verify brand ownership
-      const [rows]: any = await localPool.execute(
-        `SELECT id FROM brands WHERE id = ? AND userId = ? LIMIT 1`,
-        [input.brandId, ctx.user.id],
-      );
-      if (!(rows as any[])[0]) {
-        throw new TRPCError({ code: "FORBIDDEN", message: "Brand not found or not yours" });
-      }
-      await enqueueProductDiscovery(input.brandId, ctx.user.id, input.websiteUrl);
-      return { ok: true };
-    }),
-
-  /**
    * 2026-06-03 — Fetch brand's existing products + events so Theater
    * modal can offer "從品牌選擇" without manual re-entry.
    *

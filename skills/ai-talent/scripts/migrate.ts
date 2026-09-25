@@ -2473,6 +2473,11 @@ async function main() {
     console.log("[migrate] market_profiles: OK");
 
     // ─── 2026-06-03: product_discovery_jobs ──────────────────────────
+    // 2026-09-24（CJ「刪除AI掃描官網的功能」）：這張表的功能已經整個移除
+    // （productDiscovery.ts / websiteImageScraper.ts 已刪、worker 已拿掉、
+    // tRPC 端點已拿掉）。**表本身刻意留著**：裡面有歷史工作紀錄，而且
+    // 「不砍表」是這個 repo 一貫的紀律——砍掉救不回來，留著只佔幾 KB。
+    // 新資料庫也照建，讓 schema 在各環境保持一致。
     // Auto-discovers products from brand website after brand creation.
     // Worker processes one job at a time, positions each product with
     // runInterim (fast) + start (full, background). Graceful: any failure

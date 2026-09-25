@@ -60,7 +60,7 @@ export interface AggregateOptions {
   targetSize?: number;
   /** k per single-image extraction. Default 5. */
   extractPerImageK?: number;
-  /** Hard cap on images (productDiscovery may return 50+). Default 30. */
+  /** Hard cap on images (callers may pass 50+). Default 30. */
   maxImages?: number;
   /** Parallel fetch chunk size. Default 4 — friendly to CDNs, fast enough. */
   parallelism?: number;

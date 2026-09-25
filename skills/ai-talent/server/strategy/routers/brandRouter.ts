@@ -360,12 +360,8 @@ export const brandRouter = router({
       // with cards showing nothing when clicked. Users start with a clean
       // workspace and create missions by actually running tasks.
 
-      // 2026-06-03: auto-enqueue product discovery if website URL provided
-      if (brandId && (input.website ?? "").trim()) {
-        import("../core/productDiscovery").then(({ enqueueProductDiscovery }) => {
-          enqueueProductDiscovery(brandId, ctx.user.id, input.website!).catch(() => {/* non-fatal */});
-        }).catch(() => {/* non-fatal */});
-      }
+      // 2026-09-24（CJ「刪除AI掃描官網的功能」）：建立品牌時原本會自動排入
+      // 「爬官網找產品」的工作，整個功能已移除。產品一律由使用者自己新增。
 
       return { id: brandId, name: input.name };
     }),

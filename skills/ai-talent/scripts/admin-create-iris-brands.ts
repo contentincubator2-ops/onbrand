@@ -7,8 +7,7 @@
  *
  * Side effects per brand (mirrors brandRouter.create + recalibrate):
  *   1. brands row (+ brand_members owner)
- *   2. enqueueProductDiscovery(website) — processed by the pm2 server worker
- *   3. startPositioningJob(...) — runs IN THIS PROCESS; we poll until done
+ *   2. startPositioningJob(...) — runs IN THIS PROCESS; we poll until done
  *      because exiting early would kill the detached pipeline.
  *
  * Idempotent: an existing brand with the same name under the owner is
@@ -21,7 +20,7 @@ dotenv.config();
 import localPool from "../server/localDb";
 import { startPositioningJob } from "../server/strategy/core/positioningJobRunner";
 import { buildBrandPositioningSteps } from "../server/strategy/core/positioningSteps";
-import { enqueueProductDiscovery, looksLikeNonProduct } from "../server/strategy/core/productDiscovery";
+import { looksLikeNonProduct } from "./lib/nonProductNames";
 
 const OWNER_EMAIL = "sowork@sowork.tw";
 const WEBSITE = "https://www.iris.com.tw/";
@@ -152,7 +151,9 @@ async function main() {
       console.log(`CLEANED: ${junkIds.length} non-product rows for "${spec.name}"`);
     }
 
-    await enqueueProductDiscovery(brandId, userId, PRODUCTS_URL);
+    // 2026-09-24（CJ「刪除AI掃描官網的功能」）：這裡原本會排一個「爬官網找
+    // 產品」的工作。功能已移除，產品改由使用者自己新增——這支腳本現在只負責
+    // 建立品牌、清掉舊掃描留下的垃圾列，以及跑品牌定位。
 
     if (!DISCOVERY_ONLY) {
       await localPool.execute(

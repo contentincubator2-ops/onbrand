@@ -310,11 +310,13 @@ export const productRouter = router({
    * 2026-09-10 (CJ「因為官網掃描的功能，持續不穩定，所以我還是偏好問產品
    * 數量，或是他可以貼上幾個優先設定的產品網址」)
    *
-   * ── 為什麼不用 productDiscovery ───────────────────────────────────
-   * productDiscovery 是**全站爬**（crawlWebsite → LLM 抽最多 50 個產品）。
+   * ── 為什麼不全站爬 ───────────────────────────────────────────────
+   * 當時的另一條路是「掃描官網」（crawlWebsite → LLM 抽最多 50 個產品）。
    * 同日實測 8 個商品頁：Shopify 站（gymshark）有完整 JSON-LD Product，
    * 而 Amazon 對 bot 回 404、自架 SPA 回 200 但只有 1KB 空殼。成敗由對方
    * 站台的技術棧決定，不是我們能修的 —— 所以不要在 onboarding 賭它。
+   * （2026-09-24：那條全站爬的路已依 CJ 指示整個移除，這支是現在唯一的
+   * 「從網址讀產品」入口。）
    *
    * 這支走 fetchProductMeta 的**單頁**路徑（JSON-LD → OG tag → title 三層
    * cascade），而且它會自報是哪一層抓到的（meta.source）。前端直接顯示那

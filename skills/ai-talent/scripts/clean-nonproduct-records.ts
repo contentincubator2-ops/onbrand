@@ -1,10 +1,11 @@
 /**
  * Scan (and optionally delete) product records whose names match the
- * non-product gate from productDiscovery — news / promo / notice junk that
- * pre-2026-07-19 discovery runs ingested as "products"
+ * non-product gate — news / promo / notice junk that the (now removed)
+ * website-scan feature ingested as "products"
  * (e.g. 夏日穿搭推薦 / 新品快訊 / 低價優惠專區 / 請慎防詐騙).
  *
- * SAME rule as live ingestion (looksLikeNonProduct) — single source of truth.
+ * 2026-09-24：掃描官網的功能已移除（CJ 指示），所以不會再產生新的垃圾列；
+ * 這支留著是為了清掉資料庫裡還在的舊資料。規則搬到 scripts/lib/nonProductNames.ts。
  *
  * Usage:
  *   npx tsx scripts/clean-nonproduct-records.ts            # scan only (default)
@@ -13,7 +14,7 @@
 import * as dotenv from "dotenv";
 dotenv.config();
 import { createPool } from "mysql2/promise";
-import { looksLikeNonProduct } from "../server/strategy/core/productDiscovery";
+import { looksLikeNonProduct } from "./lib/nonProductNames";
 
 async function main() {
   const doDelete = process.argv.includes("--delete");
