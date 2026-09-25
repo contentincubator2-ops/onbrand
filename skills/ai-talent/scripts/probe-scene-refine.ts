@@ -51,6 +51,14 @@ async function main() {
       const leaks = ["8K", "photorealistic", "超寫實", "editorial", "contact shadow", "浮水印", "logo"]
         .filter((w) => refined.toLowerCase().includes(w.toLowerCase()));
       if (leaks.length) console.log(`   ⚠ 出現不該有的技術詞：${leaks.join("、")}`);
+      // 2026-09-24 第一次實跑抓到的真 bug：使用者寫「一家人」，潤出來畫面裡
+      // 一個人都沒有；使用者只寫「餐桌」，卻自己加了威士忌跟啤酒。潤飾是補，
+      // 不是改——這兩條要一直守著。
+      const kept = ["一家人", "有人", "早晨", "夜晚", "戶外"].filter((w) => scene.includes(w));
+      const dropped = kept.filter((w) => !refined.includes(w) && !(w === "一家人" && /家人|孩子|爸爸|媽媽|小孩/.test(refined)) && !(w === "有人" && /人|他|她/.test(refined)));
+      if (dropped.length) console.log(`   ⚠ 使用者寫的元素不見了：${dropped.join("、")}`);
+      const added = ["威士忌", "啤酒", "紅酒", "香菸", "酒杯"].filter((w) => refined.includes(w) && !scene.includes(w));
+      if (added.length) console.log(`   ⚠ 自己加了使用者沒提到的東西：${added.join("、")}`);
     } catch (e: any) {
       console.log(`   ✗ 潤飾失敗：${String(e?.message ?? e).slice(0, 200)}`);
     }
