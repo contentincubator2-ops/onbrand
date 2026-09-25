@@ -65,6 +65,35 @@ describe("renderAgentCard", () => {
     }
   });
 
+  // v1.1（2026-09-25 18:31 起，例：180575）拿掉了 v1.0 的診斷/決策段落，
+  // 改放履歷方法論與 runtimeCapabilities。v1.0 解析器會把它渲染成空白。
+  it("renders v1.1 cards (profileMethodology + runtimeCapabilities)", () => {
+    const v11 = {
+      status: "active", version: "1.1.0", domain: "product-strategy",
+      identity: { name: "Joshua White" },
+      methodology: {
+        name: "產品策略七段式",
+        profileMethodology: "# Joshua White — AI 產品策略方法論",
+        agentSpecificMethod: "以已存履歷的職稱與專長為依據",
+        evidenceBoundary: "未經獨立驗證時不視為個人專屬方法論",
+      },
+      runtimeCapabilities: { category: "product-leadership", deliverableKeys: ["prd"], workflowKeys: ["discovery"], atomicSkillKeys: ["okr"] },
+      legacyProfileEvidence: { deliverableKeys: ["press-release"] },
+    };
+    const out = renderAgentCard(v11);
+    for (const s of ["AI 產品策略方法論", "以已存履歷", "未經獨立驗證", "product-leadership", "prd", "discovery", "okr"]) {
+      expect(out).toContain(s);
+    }
+    expect(out).not.toContain("press-release");
+    expect(out).not.toContain("Joshua White\n");
+  });
+
+  it("carries unknown future top-level fields instead of dropping them", () => {
+    const out = renderAgentCard({ status: "active", version: "2.0.0", guardrails: ["不得捏造數字"], tone: "直接" });
+    expect(out).toContain("不得捏造數字");
+    expect(out).toContain("直接");
+  });
+
   it("skips inactive cards", () => {
     expect(renderAgentCard({ ...card, status: "draft" })).toBe("");
   });

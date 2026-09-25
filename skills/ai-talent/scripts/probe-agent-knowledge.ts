@@ -53,6 +53,36 @@ async function main() {
   const missing = ids.filter((id) => !(rows as any[]).some((r) => Number(r.id) === id));
   if (missing.length) { console.log(`✗ 找不到 agent：${missing.join(", ")}`); bad += missing.length; }
 
+  // 卡片版本分布（看得出後台是否有新一批升版）
+  const versions: Record<string, number> = {};
+  for (const a of rows as any[]) {
+    let c: any = a.agentCard;
+    try { if (typeof c === "string") c = JSON.parse(c); } catch { c = null; }
+    const v = c ? `${c.version ?? "?"}/${c.status ?? "?"}` : "（無卡）";
+    versions[v] = (versions[v] ?? 0) + 1;
+  }
+  console.log(`\n卡片版本：${JSON.stringify(versions)}`);
+
+  // 綁定 Skill 的欄位清單：只印欄位名與字數，找出內文放在哪一欄
+  const skillIds = new Set<number>();
+  for (const a of rows as any[]) {
+    let s: any = a.attached_skill_ids;
+    try { if (typeof s === "string") s = JSON.parse(s); } catch { s = []; }
+    if (Array.isArray(s)) s.forEach((x: any) => skillIds.add(Number(x)));
+  }
+  if (skillIds.size) {
+    const [sRows]: any = await localPool.execute(
+      `SELECT * FROM skills WHERE id IN (${[...skillIds].map(() => "?").join(",")})`,
+      [...skillIds],
+    );
+    for (const s of sRows as any[]) {
+      const cols = Object.entries(s)
+        .map(([k, v]) => `${k}=${v == null ? "null" : typeof v === "object" ? `json${JSON.stringify(v).length}` : String(v).length}`)
+        .join(" ");
+      console.log(`Skill ${s.id} ${s.slug} active=${s.is_active} | ${cols}`);
+    }
+  }
+
   lengths.sort((x, y) => x - y);
   console.log(`\n共 ${ids.length} 位，失敗 ${bad} 位；注入字數 min ${lengths[0] ?? 0} / max ${lengths[lengths.length - 1] ?? 0}`);
   await localPool.end();

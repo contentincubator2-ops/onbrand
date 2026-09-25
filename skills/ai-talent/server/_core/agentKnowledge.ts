@@ -22,7 +22,7 @@
 /** 各段上限（字元）。taskSystemPrompt 目前最長 3,376 字，要能整段放進來。 */
 export const KNOWLEDGE_CAPS = {
   taskSystemPrompt: 3600,
-  agentCard: 2200,
+  agentCard: 3000,
   skillEach: 2800,
   skillsTotal: 4200,
   total: 9000,
@@ -66,8 +66,17 @@ export function renderAgentCard(raw: unknown): string {
     items.forEach((it, i) => lines.push(numbered ? `${i + 1}. ${it}` : `- ${it}`));
   };
 
+  const text = (title: string, v: unknown, cap = 1200) => {
+    if (typeof v === "string" && v.trim()) lines.push(`【${title}】\n${clip(v, cap)}`);
+  };
+
+  // v1.0 欄位
   const m = card.methodology ?? {};
   section(`方法論：${m.name ?? "工作流程"}`, strList(m.steps), true);
+  // v1.1 起：方法論改放履歷原文與這位 agent 的工作契約
+  text("這位 agent 的做法", m.agentSpecificMethod, 800);
+  text("既有方法論", m.profileMethodology, 1200);
+  text("證據邊界", m.evidenceBoundary, 300);
   section("診斷時先問", strList(card.diagnosticFlow?.questions));
   section("需要的輸入", strList(card.diagnosticFlow?.requiredInputs));
   section("決策規則", strList(card.decisionRules));
@@ -76,6 +85,26 @@ export function renderAgentCard(raw: unknown): string {
   section("7 天驗證實驗", strList(card.sevenDayExperiment));
   section("要做", strList(card.doDont?.do));
   section("不要做", strList(card.doDont?.dont));
+
+  // v1.1 起：以 runtimeCapabilities 為準（legacyProfileEvidence 只供追溯，不注入）
+  const rc = card.runtimeCapabilities ?? {};
+  if (rc.category) lines.push(`能力類別：${String(rc.category)}`);
+  section("可交付", strList(rc.deliverableKeys));
+  section("工作流程", strList(rc.workflowKeys));
+  section("原子技能", strList(rc.atomicSkillKeys));
+
+  // 往後新增、這裡還不認得的頂層欄位：字串或字串陣列照原樣帶進去，
+  // 免得卡片再升版時又變成空白。
+  const KNOWN = new Set([
+    "status", "version", "domain", "identity", "provenance", "professionalSkill", "expertise",
+    "methodology", "diagnosticFlow", "decisionRules", "responseContract", "sevenDayExperiment",
+    "doDont", "runtimeCapabilities", "legacyProfileEvidence",
+  ]);
+  for (const [k, v] of Object.entries(card)) {
+    if (KNOWN.has(k)) continue;
+    if (typeof v === "string") text(k, v, 600);
+    else section(k, strList(v));
+  }
 
   return lines.join("\n");
 }
