@@ -62,7 +62,8 @@ async function main() {
       if (primary && stored !== primary.url) marks.push(`✗ 寫入端沒同步：asset_photos 主圖=${primary.url}，positioning.imageUrl=${stored ?? "(空)"}`);
       // 症狀 (2)：DB 有值，但 picker 挑不出來 → 讀取端壞（就是這次修掉的那條）。
       if (stored && !picked) marks.push(`✗ 讀取端濾掉了：DB 有 ${stored}，picker 回 undefined`);
-      if (primary && picked === primary.url) marks.push("✓ 主圖 → 縮圖 一路通");
+      // 把實際存的網址形狀印出來（相對路徑／http）——這就是舊篩選 /^https?:\/\//會不會把它濾掉的關鍵。
+      if (primary && picked === primary.url) marks.push(`✓ 主圖 → 縮圖 一路通（${/^https?:\/\//.test(picked) ? "絕對網址" : "根相對路徑"}：${picked}）`);
       if (!primary && picked) marks.push(`· 沒有上傳照片，縮圖用其他來源：${picked}`);
       if (!primary && !picked) marks.push("· 沒照片也沒其他圖源（列表會顯示「尚無圖片」，正確）");
 
