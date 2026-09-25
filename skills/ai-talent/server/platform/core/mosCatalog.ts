@@ -23,6 +23,8 @@ export const MAX_LIMIT = 200;
 export const DATA_ANALYSIS_PATTERN =
   "data analyst|data scientist|data engineer|business intelligence|analytics|statistical|statistics|forecast|attribution|market research|social listening|consumer insight|data visualization|measurement|research|intelligence|insight|數據|資料分析|市場研究|輿情|洞察";
 
+// `agentCard` is curated, structured execution metadata. Raw system prompts,
+// credentials, and internal tool configuration remain excluded from this MCP surface.
 const AGENT_PUBLIC_FIELDS = [
   "id", "slug", "name", "englishName", "name_zh",
   "title", "englishTitle", "title_zh",
@@ -30,8 +32,9 @@ const AGENT_PUBLIC_FIELDS = [
   "avatarUrl", "coverUrl",
   "bio", "bio_en", "bio_zh", "experienceDetail",
   "specialty", "specialty_en", "specialtySummary",
-  "primarySkill", "methodology",
-  "atomicSkillKeys", "workflowKeys", "deliverableKeys",
+  "primarySkill", "primarySkillBundleKey", "methodology", "agentCard",
+  "atomicSkillKeys", "workflowKeys", "deliverableKeys", "attached_skill_ids",
+  "skillsProfileVersion", "skillsProfileSource", "skillsProfileConfidence", "skillsProfileUpdatedAt",
   "priceMonthly", "pricePerTask",
   "rating", "reviewCount", "taskCount",
   "isAvailable", "isFeatured", "hireCount", "taskEarnCount",
