@@ -24,6 +24,7 @@ import { notifyUser } from "./notificationService";
 import { searchBrandKnowledge } from "./rag";
 import { saveLearning, getRelevantLearnings, formatLearningsForPrompt } from "./learning";
 import { triggerWorkflowsForTask } from "./triggerWorkflows";
+import { loadAgentKnowledge } from "./_core/agentKnowledge";
 
 // ── Type declarations for cross-package imports ──────────────────────────────
 
@@ -337,6 +338,8 @@ interface TaskContext {
   marketIntelContext: string;
   learningContext: string;
   parentTaskContext: string;
+  /** taskSystemPrompt + agentCard + 綁定 Skill（agentKnowledge.ts） */
+  agentKnowledge: string;
 }
 
 async function buildTaskContext(
@@ -528,6 +531,7 @@ async function buildTaskContext(
     marketIntelContext,
     learningContext,
     parentTaskContext,
+    agentKnowledge: await loadAgentKnowledge(task.agentId),
   };
 }
 
@@ -619,7 +623,7 @@ interface PromptsResult {
 }
 
 function buildPrompts(ctx: TaskContext): PromptsResult {
-  const { task, brandContext, memoriesContext, ragContext, agentKbContext, marketIntelContext, learningContext, parentTaskContext } = ctx;
+  const { task, brandContext, memoriesContext, ragContext, agentKbContext, marketIntelContext, learningContext, parentTaskContext, agentKnowledge } = ctx;
 
   // Build agent persona
   let agentPersona = AGENT_SYSTEM_PROMPTS[task.agentSlug ?? ""] ?? "";
@@ -632,7 +636,7 @@ function buildPrompts(ctx: TaskContext): PromptsResult {
     ? `\n\n【你的個人方法論（必須在產出中明確體現）】\n你的核心專長是：${task.agentSpecialty}\n你的知識庫來源：${task.agentBio ?? ""}\n\n在本次任務的 publishable_content 中，你必須：\n- 使用你專業背景特有的分析框架和術語\n- 引用你知識庫中的具體方法論（不是泛用行銷框架）\n- 讓產出的結構和視角明顯反映你的專業背景\n- 例如：若你是 META 廣告策略 PM，競品分析必須包含各競品的廣告投放策略對比；若你是短影音策略 PM，活動企劃必須包含短影音傳播設計`
     : "";
 
-  const systemPrompt = `${agentPersona}${methodologyInstruction}
+  const systemPrompt = `${agentPersona}${agentKnowledge ? `\n\n${agentKnowledge}` : ""}${methodologyInstruction}
 
 【絕對禁止規則（違反將導致產出無效）】
 - 嚴格禁止：在 thinking 或 publishable_content 中以任何問候語開場（禁止「你好」「大家好」「我是」「很高興」「各位好」等）

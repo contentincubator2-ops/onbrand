@@ -1,0 +1,38 @@
+name: Admin — Probe agent knowledge (工作守則／執行卡／Skill 是否進 prompt)
+
+# 2026-09-25（CJ「確保 onbrand.sowork.ai 使用 ai agent 時會讀取到最新的描述和
+# skill」）：用正式機上部署中的 server/_core/agentKnowledge.ts 實際組一次，
+# 確認 taskSystemPrompt、agentCard、綁定 Skill 都有進 prompt。唯讀，只印字數。
+
+on:
+  workflow_dispatch:
+    inputs:
+      ids:
+        description: "agent id（空白分隔）；留空 = 全部產品策略 agent"
+        required: false
+        default: ""
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        env:
+          IDS: ${{ github.event.inputs.ids }}
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          envs: IDS
+          command_timeout: 120s
+          script: |
+            set -e
+            cd /opt/onbrand/app/skills/ai-talent
+            git -C /opt/onbrand/app log -1 --oneline || true
+            # localDb throws at import without env — load .env first.
+            set -a; source .env; set +a
+            if [ -n "$IDS" ]; then
+              npx tsx scripts/probe-agent-knowledge.ts $IDS
+            else
+              npx tsx scripts/probe-agent-knowledge.ts --product-strategy
+            fi
