@@ -25,7 +25,7 @@
 import React from "react";
 import { Button, Card, CardBody, Chip, Modal, ModalBody, ModalContent, ModalHeader } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faPlus, faCheck, faPenToSquare } from "@fortawesome/free-solid-svg-icons";
+import { faPlus, faCheck, faPenToSquare, faXmark } from "@fortawesome/free-solid-svg-icons";
 
 import { TaskCardShell } from "../../../content/components/TaskCardShell";
 import InlineAssetCard from "./InlineAssetCard";
@@ -44,7 +44,7 @@ export interface CustomCardRow {
 
 export default function CopyAssetBoard({
   brandId, drafts, added, onChange, onAddCard, readOnly, fillingKeys, lang,
-  customCards, onEditCustomCard,
+  customCards, onEditCustomCard, onDeleteCard, onDeleteCustomCard,
 }: {
   brandId: number | null;
   drafts: Record<string, any>;
@@ -63,6 +63,15 @@ export default function CopyAssetBoard({
    */
   customCards?: CustomCardRow[];
   onEditCustomCard?: (card: { id: string | null; title: string; fields: { label: string; value: string }[] } | null) => void;
+  /**
+   * 2026-09-26（CJ「任務卡上，要增加刪除的按鈕」）：
+   * · 預設卡片：刪＝清空內容並從清單移除。**內容一定要一起清掉**——顯示規則是
+   *   「有內容的一定看得見」，只移除不清空的話，那張卡下一秒又自己回來，看起來
+   *   像壞掉。所以刪除的確認訊息會講明這件事。
+   * · 自訂卡片：走品牌頁同一條刪除（positioning 的 customSegments）。
+   */
+  onDeleteCard?: (key: string) => void;
+  onDeleteCustomCard?: (id: string) => void;
 }) {
   const en = lang === "en";
   const L = (zh: string, e: string) => (en ? e : zh);
@@ -103,6 +112,25 @@ export default function CopyAssetBoard({
                     <Chip size="sm" variant="flat" color="default">{L("填寫中…", "Filling…")}</Chip>
                   </span>
                 )}
+                {/* 刪除：用 span 而不是巢狀 button（button 不能包 button）。
+                    hover 才顯示——每張卡都掛一顆常駐的 ✕ 會讓整片卡牆看起來像
+                    隨時要出事。 */}
+                {onDeleteCard && !readOnly && (
+                  <span
+                    role="button"
+                    tabIndex={0}
+                    aria-label={L("刪除這張卡", "Delete this card")}
+                    title={L("刪除這張卡", "Delete this card")}
+                    onClick={(e) => { e.stopPropagation(); onDeleteCard(key); }}
+                    onKeyDown={(e) => {
+                      if (e.key !== "Enter" && e.key !== " ") return;
+                      e.preventDefault(); e.stopPropagation(); onDeleteCard(key);
+                    }}
+                    className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 focus:opacity-100 transition rounded-full w-6 h-6 flex items-center justify-center bg-content1 border border-divider text-default-500 hover:text-danger hover:border-danger cursor-pointer"
+                  >
+                    <FontAwesomeIcon icon={faXmark} className="text-tiny" />
+                  </span>
+                )}
               </>}
             >
               <p className="text-small font-semibold leading-snug">{en ? spec.labelEn : spec.labelZh}</p>
@@ -139,6 +167,22 @@ export default function CopyAssetBoard({
                       startContent={<FontAwesomeIcon icon={faCheck} className="text-tiny ml-1" />}>
                       {n}
                     </Chip>
+                  </span>
+                )}
+                {onDeleteCustomCard && !readOnly && (
+                  <span
+                    role="button"
+                    tabIndex={0}
+                    aria-label={L("刪除這張卡", "Delete this card")}
+                    title={L("刪除這張卡", "Delete this card")}
+                    onClick={(e) => { e.stopPropagation(); onDeleteCustomCard(c.id); }}
+                    onKeyDown={(e) => {
+                      if (e.key !== "Enter" && e.key !== " ") return;
+                      e.preventDefault(); e.stopPropagation(); onDeleteCustomCard(c.id);
+                    }}
+                    className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 focus:opacity-100 transition rounded-full w-6 h-6 flex items-center justify-center bg-content1 border border-divider text-default-500 hover:text-danger hover:border-danger cursor-pointer"
+                  >
+                    <FontAwesomeIcon icon={faXmark} className="text-tiny" />
                   </span>
                 )}
               </>}

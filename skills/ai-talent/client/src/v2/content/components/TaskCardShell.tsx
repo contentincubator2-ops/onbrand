@@ -40,7 +40,8 @@ export function TaskCardShell({
       onClick={onClick}
       disabled={disabled}
       aria-label={ariaLabel}
-      className="flex flex-col rounded-2xl overflow-hidden text-left transition hover:scale-[1.02] hover:shadow-lg disabled:opacity-60 disabled:hover:scale-100 disabled:hover:shadow-none"
+      // `group` 讓卡片內的東西可以掛 group-hover（例如只在滑過時才出現的刪除鈕）
+      className="group flex flex-col rounded-2xl overflow-hidden text-left transition hover:scale-[1.02] hover:shadow-lg disabled:opacity-60 disabled:hover:scale-100 disabled:hover:shadow-none"
       style={{ border: CARD_BORDER, background: "white", ...style }}
     >
       <div

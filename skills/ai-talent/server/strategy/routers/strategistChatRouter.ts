@@ -670,6 +670,65 @@ export const strategistChatRouter = router({
   /** 取得（或建立）這個品牌 × 這位總監的開放對話串 + 歷史訊息，聊天面板開啟時呼叫一次。
    *  全新對話（還沒有任何訊息）會先幫使用者寫好一則開場白——見
    *  buildProactiveOpening()。 */
+  /**
+   * 開一串新的：把目前這串收成歷史（status='closed'），下一次 getConversation
+   * 就會建新的、並且重新產生開場白。
+   *
+   * 2026-09-26（CJ「增加一個按鈕，是開新對話，其他對話，就會留成歷史對話」）。
+   * **不刪任何東西**——舊的訊息原封不動留著，只是換一個狀態；history 讀得到。
+   */
+  startNew: protectedProcedure
+    .input(z.object({ brandId: z.number().int().positive(), agentId: z.number().int().positive() }))
+    .mutation(async ({ ctx, input }) => {
+      const userId = ctx.user!.id;
+      await assertBrandOwned(input.brandId, userId);
+      await localPool.execute(
+        `UPDATE strategist_conversations SET status = 'closed'
+          WHERE userId = ? AND brandId = ? AND agentId = ? AND status = 'open'`,
+        [userId, input.brandId, input.agentId],
+      );
+      return { ok: true };
+    }),
+
+  /**
+   * 這位總監跟這個品牌的歷史對話。
+   *
+   * 預覽用「使用者自己講的第一句」而不是開場白——每一串的開場白都長得差不多，
+   * 拿它當標題的話清單上全是同一行字，等於沒有清單。
+   */
+  history: protectedProcedure
+    .input(z.object({
+      brandId: z.number().int().positive(),
+      agentId: z.number().int().positive(),
+      limit: z.number().int().min(1).max(50).optional(),
+    }))
+    .query(async ({ ctx, input }) => {
+      const userId = ctx.user!.id;
+      await assertBrandOwned(input.brandId, userId);
+      const [rows]: any = await localPool.execute(
+        `SELECT c.id, c.status, c.createdAt, c.updatedAt,
+                (SELECT COUNT(*) FROM strategist_messages m WHERE m.conversationId = c.id) AS messageCount,
+                (SELECT m2.content FROM strategist_messages m2
+                  WHERE m2.conversationId = c.id AND m2.role = 'user'
+                  ORDER BY m2.id ASC LIMIT 1) AS firstUserMessage
+           FROM strategist_conversations c
+          WHERE c.userId = ? AND c.brandId = ? AND c.agentId = ?
+          ORDER BY c.updatedAt DESC
+          LIMIT ${Number(input.limit ?? 20)}`,
+        [userId, input.brandId, input.agentId],
+      );
+      return (rows as any[]).map((r) => ({
+        id: Number(r.id),
+        isOpen: String(r.status) === "open",
+        messageCount: Number(r.messageCount ?? 0),
+        // 只有開場白的那種（messageCount <= 1）在 UI 上會標成「還沒聊過」，
+        // 這裡照實回 null，不要編一個標題。
+        preview: typeof r.firstUserMessage === "string" ? r.firstUserMessage.slice(0, 60) : null,
+        startedAt: r.createdAt,
+        lastAt: r.updatedAt,
+      }));
+    }),
+
   getConversation: protectedProcedure
     .input(z.object({
       brandId: z.number().int().positive(),
@@ -678,6 +737,12 @@ export const strategistChatRouter = router({
       agentId: z.number().int().positive().optional(),
       /** 沒給 agentId 時，要從哪一組角色取第一位當預設。 */
       scope: z.enum(["brand", "product", "copy"]).optional(),
+      /**
+       * 2026-09-26（CJ「增加一個按鈕，是開新對話，其他對話，就會留成歷史對話」）：
+       * 指定要看哪一串。不給＝目前這串（status='open'）。看歷史時是唯讀的——
+       * 已經結束的對話可以讀，但不能在裡面繼續講（要繼續就開新的）。
+       */
+      conversationId: z.number().int().positive().optional(),
     }))
     .query(async ({ ctx, input }) => {
       const userId = ctx.user!.id;
@@ -688,9 +753,20 @@ export const strategistChatRouter = router({
         : (await listDirectorsForBrand(industry, input.scope ?? "brand"))[0] ?? null;
       if (!director) throw new TRPCError({ code: "NOT_FOUND", message: "strategy director not found" });
 
-      const conversationId = await ensureOpenConversation(userId, input.brandId, director.agentId, director.slug);
+      let readOnly = false;
+      let conversationId: number;
+      if (input.conversationId) {
+        const conv = await loadConversation(input.conversationId, userId);
+        if (!conv || Number(conv.brandId) !== input.brandId || Number(conv.agentId) !== director.agentId) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "找不到這串對話" });
+        }
+        conversationId = Number(conv.id);
+        readOnly = String(conv.status) !== "open";
+      } else {
+        conversationId = await ensureOpenConversation(userId, input.brandId, director.agentId, director.slug);
+      }
       let messages = await loadMessages(conversationId, 60);
-      if (messages.length === 0) {
+      if (!readOnly && messages.length === 0) {
         const [brandRows]: any = await localPool.execute(
           `SELECT name FROM brands WHERE id = ? AND userId = ? LIMIT 1`, [input.brandId, userId],
         );
@@ -701,7 +777,7 @@ export const strategistChatRouter = router({
           contextSnapshot: opening.actions.length > 0 ? { actions: opening.actions } : undefined,
         });
         messages = await loadMessages(conversationId, 60);
-      } else if (messages.length === 1 && isStaleOpening(messages[0], director)) {
+      } else if (!readOnly && messages.length === 1 && isStaleOpening(messages[0], director)) {
         // 2026-09-26（CJ 回報用詞總監第一句還在講策略健檢）：開場白是**對話建立
         // 當下寫進 DB 的**，所以改程式不會動到已經存在的那一句。使用者看到的
         // 還是舊的。
@@ -722,6 +798,7 @@ export const strategistChatRouter = router({
       return {
         conversationId,
         director,
+        readOnly,
         messages: messages.map((m) => {
           const snap = snapshotOf(m.contextSnapshot);
           return {
@@ -755,6 +832,12 @@ export const strategistChatRouter = router({
       if (!conv) throw new TRPCError({ code: "NOT_FOUND", message: "conversation not found" });
       if (Number(conv.brandId) !== input.brandId) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "conversation belongs to a different brand" });
+      }
+      // 2026-09-26（開新對話）：已經收成歷史的那幾串是唯讀的。前端在唯讀狀態
+      // 不會顯示輸入框，但這裡還是要擋——不然歷史對話會被人從別的路徑續寫，
+      // 「歷史」就不再是歷史了。
+      if (String(conv.status) !== "open") {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "這串對話已經結束，開一串新的再繼續" });
       }
 
       const userMsgId = await insertMessage({ conversationId: input.conversationId, role: "user", content: input.content });

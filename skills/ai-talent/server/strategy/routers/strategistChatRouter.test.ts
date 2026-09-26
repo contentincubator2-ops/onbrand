@@ -67,7 +67,7 @@ describe("strategistChatRouter", () => {
     const names = Object.keys((strategistChatRouter as any)._def.procedures);
     // 2026-09-23：加了 listDirectors / searchDirectors（三位真實 mos_db
     // 策略總監的人選清單與搜尋，見 strategistDirectory.ts）。
-    expect(names.sort()).toEqual(["getConversation", "listDirectors", "searchDirectors", "sendMessage"]);
+    expect(names.sort()).toEqual(["getConversation", "history", "listDirectors", "searchDirectors", "sendMessage", "startNew"]);
   });
 
   it("procedure 名稱不可以撞 Function.prototype 上的東西", () => {

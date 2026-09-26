@@ -2224,6 +2224,11 @@ export default function BrandsPage() {
               locked={!!tabLocks.copy}
               customCards={customPositioningSegments}
               onEditCustomCard={(card) => setEditingCard(card)}
+              onDeleteCustomCard={(segmentId) => {
+                const msg = lang === "en" ? "Delete this card?" : "確定要刪除這張卡片嗎？";
+                if (!confirm(msg)) return;
+                removeCustomSegmentMut?.mutate({ scope: "brand", scopeId: activeBrandIdForLocks, segmentId });
+              }}
             />
           )}
           {/* 2026-05-27 (CJ「為產品和活動設計文字標籤頁」):
@@ -4723,7 +4728,7 @@ function KickerRow({
    判斷得出要不要加那張卡。 */
 
 function CopyTabInline({
-  brandId, brandAssets, fullPositioning, locked, customCards, onEditCustomCard,
+  brandId, brandAssets, fullPositioning, locked, customCards, onEditCustomCard, onDeleteCustomCard,
 }: {
   brandId: number | null;
   brandAssets: Record<string, any>;
@@ -4736,6 +4741,7 @@ function CopyTabInline({
    *  跟品牌頁同一份自訂卡片（positioning 的 customSegments），不是另一套。 */
   customCards?: { id: string; title: string; fields: { key: string; label: string; value: string }[] }[];
   onEditCustomCard?: (card: EditableCard | null) => void;
+  onDeleteCustomCard?: (segmentId: string) => void;
 }) {
   const { lang } = useLang();
   const utils = (trpc as any).useUtils?.() ?? null;
@@ -4779,6 +4785,35 @@ function CopyTabInline({
     if (locked || !brandId || addedCopyCards.includes(key)) return;
     const merged = { ...fullPositioning, _assetCards: [...addedCopyCards, key] };
     saveMut?.mutate?.({ kind: "brand", id: brandId, positioning: merged });
+  };
+
+  /**
+   * 2026-09-26（CJ「任務卡上，要增加刪除的按鈕」）：刪掉一張預設卡。
+   *
+   * **內容一定要一起清掉**：顯示規則是「有內容的一定看得見」（CopyAssetBoard
+   * .visibleKeys），只把 key 從 _assetCards 拿掉的話，那張卡下一秒又自己回來，
+   * 看起來像刪除壞了。所以確認訊息要先講明這件事——有內容的卡片刪掉就是真的
+   * 刪掉那幾條。
+   */
+  const deleteCopyCard = (key: string) => {
+    if (locked || !brandId) return;
+    const hadContent = !isEmpty(key);
+    const msg = hadContent
+      ? (lang === "en"
+          ? "Delete this card? Everything written in it will be removed."
+          : "確定要刪除這張卡片嗎？裡面寫的內容會一起刪掉。")
+      : (lang === "en" ? "Remove this card?" : "確定要移除這張卡片嗎？");
+    if (!confirm(msg)) return;
+    dirtyRef.current.add(key);
+    setDrafts((d) => ({ ...d, [key]: null }));
+    const merged = {
+      ...fullPositioning,
+      _assets: { ...(fullPositioning._assets ?? {}), [key]: null },
+      _assetCards: addedCopyCards.filter((k) => k !== key),
+    };
+    saveMut?.mutate?.({ kind: "brand", id: brandId, positioning: merged }, {
+      onSuccess: () => dirtyRef.current.delete(key),
+    });
   };
 
   const updateAsset = (key: string, next: any) => {
@@ -4930,6 +4965,8 @@ function CopyTabInline({
         lang={lang}
         customCards={customCards ?? []}
         onEditCustomCard={onEditCustomCard}
+        onDeleteCard={deleteCopyCard}
+        onDeleteCustomCard={onDeleteCustomCard}
       />
     </div>
   );

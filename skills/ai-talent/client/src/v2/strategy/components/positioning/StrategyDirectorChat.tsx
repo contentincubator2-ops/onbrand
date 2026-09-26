@@ -51,6 +51,12 @@ export default function StrategyDirectorChat({
   const { lang } = useLang();
   const en = lang === "en";
   const [conversationId, setConversationId] = React.useState<number | null>(null);
+  // 2026-09-26（CJ「增加一個按鈕，是開新對話，其他對話，就會留成歷史對話」）：
+  // viewingId = 正在看哪一串歷史（null = 目前這串）。歷史是唯讀的：看得到，
+  // 但要繼續講就得開新的——否則「歷史」會被續寫，就不再是歷史了。
+  const [viewingId, setViewingId] = React.useState<number | null>(null);
+  const [historyOpen, setHistoryOpen] = React.useState(false);
+  const [readOnly, setReadOnly] = React.useState(false);
   const [messages, setMessages] = React.useState<ChatMessage[]>([]);
   const [input, setInput] = React.useState("");
   const [sending, setSending] = React.useState(false);
@@ -59,7 +65,7 @@ export default function StrategyDirectorChat({
 
   const convQ = (trpc as any).strategistChat?.getConversation?.useQuery
     ? (trpc as any).strategistChat.getConversation.useQuery(
-        { brandId, ...(agentId ? { agentId } : {}) },
+        { brandId, ...(agentId ? { agentId } : {}), ...(viewingId ? { conversationId: viewingId } : {}) },
         { enabled: !!brandId && !!agentId, refetchOnWindowFocus: false },
       )
     : { data: null, isLoading: false };
@@ -81,7 +87,34 @@ export default function StrategyDirectorChat({
     loadedForAgentRef.current = agentId;
     setConversationId(data.conversationId);
     setMessages(data.messages ?? []);
+    setReadOnly(!!data.readOnly);
   }, [convQ?.data, agentId, conversationId]);
+
+  // 換人時把歷史檢視收掉——不然會拿著上一位的某一串繼續看。
+  React.useEffect(() => { setViewingId(null); setHistoryOpen(false); }, [agentId]);
+
+  const historyQ = (trpc as any).strategistChat?.history?.useQuery
+    ? (trpc as any).strategistChat.history.useQuery(
+        { brandId, agentId: agentId ?? 0 },
+        { enabled: !!brandId && !!agentId && historyOpen, refetchOnWindowFocus: false },
+      )
+    : { data: [] };
+  const startNewMut = (trpc as any).strategistChat?.startNew?.useMutation?.();
+  const utils = (trpc as any).useUtils?.() ?? null;
+
+  const startNew = () => {
+    if (!agentId || startNewMut?.isPending) return;
+    startNewMut?.mutate?.({ brandId, agentId }, {
+      onSuccess: () => {
+        // 讓 getConversation 重跑：它會建新的一串並重新產生開場白。
+        setViewingId(null); setHistoryOpen(false); setReadOnly(false);
+        setMessages([]); setConversationId(null);
+        loadedForAgentRef.current = null;
+        utils?.strategistChat?.getConversation?.invalidate?.();
+        utils?.strategistChat?.history?.invalidate?.();
+      },
+    });
+  };
 
   const sendMut = (trpc as any).strategistChat?.sendMessage?.useMutation?.();
 
@@ -92,7 +125,7 @@ export default function StrategyDirectorChat({
   /** text 省略時送輸入框內容；膠囊是直接把問題送出去，不先填進輸入框。 */
   const send = (text?: string) => {
     const content = (text ?? input).trim();
-    if (!content || !conversationId || sending) return;
+    if (!content || !conversationId || sending || readOnly) return;
     setError(null);
     setSending(true);
     if (text === undefined) setInput("");
@@ -146,6 +179,70 @@ export default function StrategyDirectorChat({
       // 這個高度由 Drawer 統一傳，跟 roster/profile 兩個檢視共用同一個值。
       height,
     }}>
+      {/* 2026-09-26：對話的兩顆動作。放在最上面而不是輸入框旁邊——它們是
+          「這串對話」層級的事，跟「這一句要說什麼」不同層。 */}
+      <div style={{
+        display: "flex", alignItems: "center", gap: 6, padding: "8px 12px",
+        borderBottom: "1px solid #E5E5E5", flexWrap: "wrap",
+      }}>
+        <button
+          onClick={startNew}
+          disabled={!agentId || startNewMut?.isPending}
+          title={en ? "Start a new conversation — this one is kept in history" : "開一串新的對話，這一串會留成歷史"}
+          style={{ ...chipStyle, opacity: startNewMut?.isPending ? 0.5 : 1 }}
+        >
+          {startNewMut?.isPending ? (en ? "Starting…" : "開新中…") : (en ? "New chat" : "開新對話")}
+        </button>
+        <button
+          onClick={() => setHistoryOpen((v) => !v)}
+          style={{ ...chipStyle, background: historyOpen ? "#171717" : "#fff", color: historyOpen ? "#fff" : "#404040" }}
+        >
+          {en ? "History" : "歷史對話"}
+        </button>
+        {viewingId && (
+          <button onClick={() => { setViewingId(null); loadedForAgentRef.current = null; }} style={chipStyle}>
+            {en ? "Back to current" : "回到目前這串"}
+          </button>
+        )}
+        {readOnly && (
+          <span style={{ fontSize: 11, color: "#B45309" }}>
+            {en ? "Read-only — start a new chat to continue" : "唯讀 —— 要繼續講請開新對話"}
+          </span>
+        )}
+      </div>
+
+      {historyOpen && (
+        <div style={{ maxHeight: 160, overflowY: "auto", borderBottom: "1px solid #E5E5E5", padding: "6px 8px" }}>
+          {(historyQ?.data ?? []).length === 0 ? (
+            <p style={{ fontSize: 12, color: "#737373", margin: "6px 4px" }}>
+              {en ? "No past conversations yet." : "還沒有歷史對話。"}
+            </p>
+          ) : (
+            (historyQ.data as any[]).map((h) => (
+              <button
+                key={h.id}
+                onClick={() => { setViewingId(h.id); setHistoryOpen(false); loadedForAgentRef.current = null; }}
+                style={{
+                  display: "block", width: "100%", textAlign: "left", border: "none", background: "transparent",
+                  padding: "6px 6px", cursor: "pointer", borderRadius: 6,
+                }}
+              >
+                <span style={{ fontSize: 12.5, color: "#171717" }}>
+                  {/* 預覽用使用者自己講的第一句；只有開場白的那種照實說「還沒聊過」，
+                      不要編一個標題。 */}
+                  {h.preview ?? (en ? "(no messages yet)" : "（還沒聊過）")}
+                </span>
+                <span style={{ fontSize: 10.5, color: "#a3a3a3", marginLeft: 6 }}>
+                  {String(h.lastAt ?? "").slice(0, 10)}
+                  {h.isOpen ? (en ? " · current" : " · 目前這串") : ""}
+                  {` · ${h.messageCount}`}
+                </span>
+              </button>
+            ))
+          )}
+        </div>
+      )}
+
       <div ref={bodyRef} style={{ flex: 1, overflowY: "auto", padding: "14px 16px", display: "flex", flexDirection: "column", gap: 10 }}>
         {messages.length === 0 && !convQ?.isLoading && (
           <p style={{ fontSize: 13, color: "#737373", fontStyle: "italic", margin: 0 }}>
@@ -214,8 +311,8 @@ export default function StrategyDirectorChat({
           borderTop: "1px solid #F5F4F2",
         }}>
           {signature.map((q, i) => (
-            <button key={i} onClick={() => send(q)} disabled={sending || !conversationId}
-              title={q} style={{ ...chipStyle, opacity: (sending || !conversationId) ? 0.5 : 1, maxWidth: 210, overflow: "hidden", textOverflow: "ellipsis" }}>
+            <button key={i} onClick={() => send(q)} disabled={sending || !conversationId || readOnly}
+              title={q} style={{ ...chipStyle, opacity: (sending || !conversationId || readOnly) ? 0.5 : 1, maxWidth: 210, overflow: "hidden", textOverflow: "ellipsis" }}>
               {q}
             </button>
           ))}
@@ -227,17 +324,17 @@ export default function StrategyDirectorChat({
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }}
           placeholder={en ? "Ask the Strategy Director…" : "問策略總監…"}
-          disabled={sending || !conversationId}
+          disabled={sending || !conversationId || readOnly}
           style={{ flex: 1, fontSize: 13.5, padding: "8px 12px", borderRadius: 10, border: "1px solid #D4D4D4", outline: "none", minWidth: 0 }}
         />
         <button
           onClick={() => send()}
-          disabled={sending || !input.trim() || !conversationId}
+          disabled={sending || !input.trim() || !conversationId || readOnly}
           aria-label={en ? "Send" : "送出"}
           style={{
             width: 36, height: 36, borderRadius: 10, border: "none", flexShrink: 0,
             background: "#171717", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center",
-            cursor: "pointer", opacity: (sending || !input.trim() || !conversationId) ? 0.45 : 1,
+            cursor: "pointer", opacity: (sending || !input.trim() || !conversationId || readOnly) ? 0.45 : 1,
           }}
         >
           <Send size={15} />
