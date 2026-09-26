@@ -557,6 +557,12 @@ async function runStartupMigrations() {
     await db.execute(sql.raw(STRATEGY_ALERTS_DDL));
     console.log("[migrate] strategy_watch / strategy_alerts: OK");
 
+    // 2026-09-26（CJ「會議的主題、與會人員、多久開一次由用戶設定，定期留會議紀錄」）：策略會議。
+    const { STRATEGY_MEETINGS_DDL, STRATEGY_MEETING_RUNS_DDL } = await import("./strategy/core/strategyMeetings");
+    await db.execute(sql.raw(STRATEGY_MEETINGS_DDL));
+    await db.execute(sql.raw(STRATEGY_MEETING_RUNS_DDL));
+    console.log("[migrate] strategy_meetings / strategy_meeting_runs: OK");
+
     // 2026-09-14（CJ「選定一個競爭者，對比接觸點跟策略訴求差異」）：
     // 具名競爭者的逐接觸點比對快照（14 天內快取，不重跑研究）。
     const { COMPETITOR_SNAPSHOT_DDL } = await import("./strategy/core/competitorSnapshot");
@@ -674,6 +680,15 @@ const server = app.listen(PORT, async () => {
       });
     }, 15 * 60_000);
     console.log("[strategyMonitor] Worker started (15m interval)");
+
+    // 策略會議 worker：每 15 分鐘挑一場到期的會開（一拍一場，一場是 N+1 次 LLM）。
+    const { tickStrategyMeetings } = await import("./strategy/core/strategyMeetings");
+    setInterval(() => {
+      tickStrategyMeetings().catch((e) => {
+        console.error("[strategyMeetings] tick error:", e?.message ?? e);
+      });
+    }, 15 * 60_000);
+    console.log("[strategyMeetings] Worker started (15m interval)");
   }
 
   if (isRuntimeFeatureEnabled("LIVE_BILLING_ENABLED")) {

@@ -162,8 +162,11 @@ function buildNavItems(lang: "zh-TW" | "en", userEmail?: string | null, currentP
         tooltip: en ? "Voice, terms, CTA and hook libraries" : "語氣 / 用詞 / CTA / 鉤子庫" },
       { to: "/brands/edit?cat=visual", catKey: "visual", label: en ? "Visual" : "視覺", icon: <FontAwesomeIcon icon={faPaintBrush} />,
         tooltip: en ? "Logo / palette / fonts" : "Logo / 色票 / 字型" },
-      { to: "/brands/edit?cat=tools", catKey: "tools", label: en ? "Tools" : "工具", icon: <FontAwesomeIcon icon={faBookBookmark} />,
-        tooltip: en ? "Knowledge base / AI prompt library" : "知識庫 / AI 指令庫" },
+      // 2026-09-26（CJ「將工具拿掉、指令庫拿掉、隱藏知識庫；定期開會變成一個新的
+      // mission tray」）：「工具」（知識庫＋品牌 AI 指令）整個從 rail 拿掉。知識庫
+      // 只是藏起來——主產文引擎每次仍會讀 brand_knowledge_items，已上傳的資料照樣生效。
+      { to: "/brands/edit?cat=meetings", catKey: "meetings", label: en ? "Meetings" : "會議", icon: <FontAwesomeIcon icon={faUsers} />,
+        tooltip: en ? "Recurring strategy meetings — you set topic, attendees and cadence" : "定期策略會議 — 主題、與會總監、頻率你來定，會後留紀錄" },
       // 2026-08-21 (CJ「加一個人設的task tray...用戶可以自己新創agent，自己
       // 命名，並且決定這個Agent語調的應用範圍」): user-created persona
       // agents — trained from pasted text / article links / video links,

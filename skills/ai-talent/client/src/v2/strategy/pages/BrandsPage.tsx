@@ -33,7 +33,7 @@ import PositioningDocPanel from "../components/positioning/PositioningDocPanel";
 import CustomCardEditor, { type EditableCard } from "../components/positioning/CustomCardEditor";
 import AssetPhotoGallery from "../components/positioning/AssetPhotoGallery";
 import { InfoTab as BrandInfoTab, DangerTab as BrandDangerTab, PublishTab as BrandPublishTab } from "../components/positioning/BrandSettingsSheet";
-import AIPromptsEditor from "../components/positioning/AIPromptsEditor";
+import StrategyMeetingsPanel from "../components/meetings/StrategyMeetingsPanel";
 import BrandOnboardingWizard from "../components/onboarding/BrandOnboardingWizard";
 import StrategyWorkbench from "../components/positioning/StrategyWorkbench";
 import AIBriefPanel from "../components/positioning/AIBriefPanel";
@@ -44,7 +44,7 @@ import { BrandActionChipsRow, usePositioningStatus } from "../components/positio
 import AddEntityModal, { type AddEntityTab } from "../components/AddEntityModal";
 import ProductDetailModal from "../components/positioning/ProductDetailModal";
 // Notion-style line icons
-import { Target as LucideTarget, Type as LucideType, Palette as LucidePalette, Lock as LucideLock, Play as LucidePlay, RotateCcw as LucideRotate, BookOpen as LucideBook, Sparkles, Bot as LucideRobotIcon, Quote as LucideQuote, Shield as LucideShield, Type as LucideTypeIcon, Pencil as LucidePencil, Award as LucideAward, Package as LucidePackage, Hash as LucideHash, MessageCircle as LucideMessage, FileText as LucideFileText, IdCard as LucideIdCard, Trash2 as LucideTrash } from "lucide-react";
+import { Target as LucideTarget, Type as LucideType, Palette as LucidePalette, Lock as LucideLock, Play as LucidePlay, RotateCcw as LucideRotate, BookOpen as LucideBook, Users as LucideUsers, Sparkles, Bot as LucideRobotIcon, Quote as LucideQuote, Shield as LucideShield, Type as LucideTypeIcon, Pencil as LucidePencil, Award as LucideAward, Package as LucidePackage, Hash as LucideHash, MessageCircle as LucideMessage, FileText as LucideFileText, IdCard as LucideIdCard, Trash2 as LucideTrash } from "lucide-react";
 import { SCOPE_SEGMENTS, type SegmentSpec } from "../lib/positioningSchema";
 import { pickProductImageUrl } from "../lib/productImage";
 import { readProductFacts } from "../lib/productFacts";
@@ -639,7 +639,7 @@ export default function BrandsPage() {
   // 2026-05-07 Path A simplification: 3 main tiles only (定位/文字/知識).
   // "visual" is kept in the type for legacy lock-state code paths, but
   // is no longer exposed as a tile — its contents live in Settings.
-  const category: "positioning" | "copy" | "visual" | "knowledge" | "info" | "publish" | "ai" | "settings" | "products" | "events" | "tools" | "persona" | "campaign" =
+  const category: "positioning" | "copy" | "visual" | "knowledge" | "info" | "publish" | "ai" | "settings" | "products" | "events" | "meetings" | "persona" | "campaign" =
     urlCat === "copy" ? "copy"
     : urlCat === "knowledge" ? "knowledge"
     : urlCat === "visual" ? "visual"
@@ -649,7 +649,7 @@ export default function BrandsPage() {
     : urlCat === "settings" ? "settings"
     : urlCat === "products" ? "products"
     : urlCat === "events" ? "events"
-    : urlCat === "tools" ? "tools"
+    : urlCat === "meetings" ? "meetings"
     : urlCat === "persona" ? "persona"
     // 2026-09-25（CJ「應該要在活動的 mission tray 當中，增加這個活動的任務卡」）：
     // 活動的預設落點是宣傳企劃，不是 11 段的得獎 brief（那退成 cat=positioning
@@ -665,7 +665,7 @@ export default function BrandsPage() {
   // version clobbered it with a snapshot from BEFORE that write, dropping
   // `e` and silently falling back to brand-level positioning. Functional
   // form fixes it for every caller, not just this one site.
-  const setCategory = (next: "positioning" | "copy" | "knowledge" | "info" | "visual" | "publish" | "ai" | "products" | "events" | "tools" | "persona") => {
+  const setCategory = (next: "positioning" | "copy" | "knowledge" | "info" | "visual" | "publish" | "ai" | "products" | "events" | "meetings" | "persona") => {
     setSearchParams((prev) => {
       const nextParams = new URLSearchParams(prev);
       nextParams.set("cat", next);
@@ -1493,9 +1493,9 @@ export default function BrandsPage() {
                           : scopeMode === "product" ? (lang === "en" ? "Name / brand"        : "名稱 / 品牌")
                           : (lang === "en" ? "Name / industry" : "名稱 / 產業"),
                       Icon: LucideIdCard,    scopes: ["brand", "product", "event"] },
-                  { v: "tools"       as const, label: lang === "en" ? "Brand tools" : "品牌工具",
-                      desc: lang === "en" ? "Knowledge / AI prompts" : "知識庫 / AI 指令",
-                      Icon: LucideBook,      scopes: ["brand"] },
+                  { v: "meetings"    as const, label: lang === "en" ? "Meetings" : "會議",
+                      desc: lang === "en" ? "Recurring strategy meetings" : "定期策略會議",
+                      Icon: LucideUsers,     scopes: ["brand", "product"] },
                   { v: "products"    as const, label: lang === "en" ? "Products" : "產品",
                       desc: lang === "en" ? "Product cards & positioning" : "產品卡片與定位",
                       Icon: LucideRobotIcon, scopes: ["brand"] },
@@ -2321,28 +2321,17 @@ export default function BrandsPage() {
             </div>
           )}
 
-          {/* ── AI 指令 (ai) — per-platform prompt overrides (legacy route) ── */}
-          {derivedCategory === "ai" && scopeMode === "brand" && (
-            <div style={{ padding: "8px 0 32px" }}>
-              <AIPromptsEditor brandId={activeBrandIdForLocks} />
-            </div>
-          )}
+          {/* 2026-09-26（CJ「指令庫拿掉」）：品牌 AI 指令（positioning._aiPrompts）的
+              編輯器已移除——主產文引擎從來不讀那一格，只有 runTestBattery 讀
+              Facebook 那一格，用戶改了看不到任何效果。 */}
 
-          {/* ── 品牌工具 (tools) — 知識庫 + AI 指令 合一 ── */}
-          {derivedCategory === "tools" && scopeMode === "brand" && (
-            <div style={{ padding: "8px 0 32px" }} className="space-y-8">
-              <div>
-                <p className="text-[12px] font-semibold uppercase tracking-widest text-neutral-400 mb-4 px-1">
-                  {lang === "en" ? "Knowledge Base" : "知識庫"}
-                </p>
-                <KnowledgeEditor brandId={activeBrandIdForLocks} />
-              </div>
-              <div>
-                <p className="text-[12px] font-semibold uppercase tracking-widest text-neutral-400 mb-4 px-1">
-                  {lang === "en" ? "AI Prompt Library" : "AI 指令庫"}
-                </p>
-                <AIPromptsEditor brandId={activeBrandIdForLocks} />
-              </div>
+          {/* ── 會議 (meetings) — 定期策略會議 ──
+               2026-09-26（CJ「將定期開會變成一個新的 mission tray」）：取代原本的
+               「品牌工具」（知識庫＋AI 指令）。品牌與產品範圍都看得到——會議本身
+               可以選要討論品牌或某個產品。 */}
+          {derivedCategory === "meetings" && activeBrandIdForLocks && (
+            <div style={{ padding: "8px 0 32px" }}>
+              <StrategyMeetingsPanel brandId={activeBrandIdForLocks} />
             </div>
           )}
 

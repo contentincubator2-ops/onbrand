@@ -27,6 +27,7 @@ import { strategistChatRouter } from "../strategy/routers/strategistChatRouter";
 import { assetPhotoRouter } from "../strategy/routers/assetPhotoRouter";
 import { campaignRouter } from "../strategy/routers/campaignRouter";
 import { strategyMonitorRouter } from "../strategy/routers/strategyMonitorRouter";
+import { strategyMeetingRouter } from "../strategy/routers/strategyMeetingRouter";
 import { touchpointsRouter } from "../platform/routers/touchpointsRouter";
 import { competitorRouter } from "../strategy/routers/competitorRouter";
 import { brandKnowledgeRouter } from "../strategy/routers/brandKnowledgeRouter";
@@ -72,6 +73,7 @@ export const appRouter = router({
   brandBrain:    brandBrainRouter,
   assetPhoto:    assetPhotoRouter,
   strategyMonitor: strategyMonitorRouter,
+  strategyMeeting: strategyMeetingRouter,
   touchpoints:   touchpointsRouter,
   competitor:    competitorRouter,
   calendar:      calendarRouter,
