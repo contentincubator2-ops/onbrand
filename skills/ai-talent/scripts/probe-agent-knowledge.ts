@@ -86,6 +86,34 @@ async function main() {
     }
   }
 
+  // 正式流量的注入紀錄（agentKnowledge.recordInjection → error_log level=info）
+  try {
+    const [bySource]: any = await localPool.execute(
+      `SELECT route AS source, COUNT(*) AS n, COUNT(DISTINCT JSON_EXTRACT(meta, '$.agentId')) AS agents, MAX(createdAt) AS last
+         FROM error_log WHERE source = 'agent.knowledge' AND createdAt > NOW() - INTERVAL 7 DAY
+        GROUP BY route ORDER BY n DESC`,
+    );
+    console.log(`\n近 7 天實際注入（依呼叫來源）：`);
+    for (const r of bySource as any[]) console.log(`  ${r.source}: ${r.n} 次、${r.agents} 位 agent，最後 ${r.last}`);
+    if (!(bySource as any[]).length) console.log("  （還沒有紀錄）");
+
+    const [recent]: any = await localPool.execute(
+      `SELECT createdAt, route AS source, meta FROM error_log
+        WHERE source = 'agent.knowledge' AND JSON_EXTRACT(meta, '$.agentId') IN (${ids.slice(0, 50).map(() => "?").join(",")})
+        ORDER BY id DESC LIMIT 20`,
+      ids.slice(0, 50),
+    );
+    if ((recent as any[]).length) {
+      console.log(`\n這批 agent 最近被用到：`);
+      for (const r of recent as any[]) {
+        const m = typeof r.meta === "string" ? JSON.parse(r.meta) : r.meta;
+        console.log(`  ${r.createdAt} ${r.source} agent ${m.agentId} | 卡 v${m.cardVersion ?? "-"} | 守則 ${m.taskSystemPromptChars} 字 | Skill ${JSON.stringify(m.skillIds)} | 注入 ${m.chars} 字`);
+      }
+    }
+  } catch (e) {
+    console.log(`（讀注入紀錄失敗：${(e as Error).message}）`);
+  }
+
   lengths.sort((x, y) => x - y);
   skillLens.sort((x, y) => x - y);
   console.log(`Skill 注入字數：min ${skillLens[0] ?? 0} / max ${skillLens[skillLens.length - 1] ?? 0}（${skillLens.length} 位）`);

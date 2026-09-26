@@ -120,7 +120,7 @@ missionStepStreamRouter.post("/step-stream", async (req: Request, res: Response)
     const agentName  = agentRow?.name ?? step.assignedAgentName ?? "AI 專員";
     const agentTitle = agentRow?.title ?? "";
     const agentSkill = agentRow?.primarySkill ?? step.requiredSkill ?? "";
-    const agentKnowledge = await loadAgentKnowledge(assignedId);
+    const agentKnowledge = await loadAgentKnowledge(assignedId, { source: "missionStep.stream" });
     const stepName   = step.name ?? step.title ?? `Step ${stepOrder}`;
     const stepDesc   = step.description ?? "";
     const outputType = step.outputType ?? step.output ?? "";

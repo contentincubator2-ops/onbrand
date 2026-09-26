@@ -531,7 +531,7 @@ async function buildTaskContext(
     marketIntelContext,
     learningContext,
     parentTaskContext,
-    agentKnowledge: await loadAgentKnowledge(task.agentId),
+    agentKnowledge: await loadAgentKnowledge(task.agentId, { source: "a2a.executeTask" }),
   };
 }
 

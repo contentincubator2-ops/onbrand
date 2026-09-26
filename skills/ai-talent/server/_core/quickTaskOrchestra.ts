@@ -481,7 +481,7 @@ export async function loadAgent(id: number | null | undefined): Promise<{ meta: 
     // 2026-09-25: 工作守則 / 專業執行卡 / 綁定 Skill 改由 agentKnowledge 統一
     // 組裝，有自己的額度 —— 以前 taskSystemPrompt 跟身分欄位搶同一個
     // 5000 字額度、排在最後，前面塞滿時整段被丟掉。
-    const knowledge = await loadAgentKnowledge(a.id);
+    const knowledge = await loadAgentKnowledge(a.id, { source: "orchestra.loadAgent" });
 
     const persona =
       header + body +

@@ -170,3 +170,27 @@ describe("loadAgentKnowledgeMany", () => {
     await expect(loadAgentKnowledge(1, pool)).resolves.toBe("");
   });
 });
+
+describe("injection telemetry", () => {
+  it("records one info row per injected agent with source, card version and skills", async () => {
+    const agent = { id: 180837, taskSystemPrompt: "守則", agentCard: { status: "active", version: "1.1.0", guardrails: ["x"] }, attached_skill_ids: [2549], updatedAt: "2026-09-26" };
+    const pool = fakePool([agent, { id: 5, name: "no knowledge" }], [skill]);
+    const map = await loadAgentKnowledgeMany([180837, 5], { source: "strategist.chat", pool });
+    expect(map.has(5)).toBe(false);
+    await new Promise((r) => setTimeout(r, 0));
+    const inserts = pool.calls.filter((c) => c.includes("INSERT INTO error_log"));
+    expect(inserts).toHaveLength(1);
+    expect(inserts[0]).toContain("'agent.knowledge'");
+  });
+
+  it("a failing telemetry write never breaks the load", async () => {
+    const agent = { id: 1, taskSystemPrompt: "守則" };
+    const pool = {
+      execute: async (sql: string) => {
+        if (sql.includes("INSERT INTO error_log")) throw new Error("no table");
+        return sql.includes("FROM agents") ? [[agent]] : [[]];
+      },
+    };
+    await expect(loadAgentKnowledge(1, { source: "t", pool })).resolves.toContain("守則");
+  });
+});

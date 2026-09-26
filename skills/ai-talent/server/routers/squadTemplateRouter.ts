@@ -592,7 +592,7 @@ export const squadTemplateRouter = router({
       // which keys to fill — converges faster + more parseable than free-form.
       const schemaExample = JSON.stringify(mockConclusionForStep(step.outputKind, step.mockupVariant), null, 2);
 
-      const agentKnowledge = await loadAgentKnowledge(step.assignedAgentId ? Number(step.assignedAgentId) : null);
+      const agentKnowledge = await loadAgentKnowledge(step.assignedAgentId ? Number(step.assignedAgentId) : null, { source: "squad.runStepLive" });
       const systemPrompt = `你是 ${step.assignedAgentName ?? "Squad Agent"}（zh-TW）。Squad「${squad.name}」步驟「${step.name}」負責人。
 ${agentKnowledge ? `\n${agentKnowledge}\n` : ""}
 
@@ -1752,7 +1752,7 @@ ${schemaExample}
       const leadName  = sq.agent_name ?? sq.squad_lead ?? FALLBACK_SQUAD_LEAD.agentName;
       const leadTitle = sq.agent_title ?? FALLBACK_SQUAD_LEAD.agentTitle;
       // The card/skill contract is added only when this squad member has a canonical id.
-      const leadKnowledge = sourceAgentId ? await loadAgentKnowledge(sourceAgentId).catch(() => "") : "";
+      const leadKnowledge = sourceAgentId ? await loadAgentKnowledge(sourceAgentId, { source: "squad.leadOpen" }).catch(() => "") : "";
 
       const agentCtx = await loadAgentContext({
         missionId: input.missionId,
@@ -1984,7 +1984,7 @@ ${leadKnowledge}
       const agentName = agentRow?.name ?? step.assignedAgentName ?? "AI 專員";
       const agentTitle = agentRow?.title ?? "";
       const agentSkill = agentRow?.primarySkill ?? step.requiredSkill ?? "";
-      const agentKnowledge = await loadAgentKnowledge(assignedId);
+      const agentKnowledge = await loadAgentKnowledge(assignedId, { source: "squad.stepExecute" });
 
       // ── confirm: just flip status, no LLM ────────────────────────────────────
       if (input.mode === "confirm") {

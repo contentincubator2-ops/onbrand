@@ -1,19 +1,29 @@
 name: Admin — Probe agent knowledge (工作守則／執行卡／Skill 是否進 prompt)
 
 # 2026-09-25（CJ「確保 onbrand.sowork.ai 使用 ai agent 時會讀取到最新的描述和
-# skill」）：用正式機上部署中的 server/_core/agentKnowledge.ts 實際組一次，
-# 確認 taskSystemPrompt、agentCard、綁定 Skill 都有進 prompt。唯讀，只印字數。
+# skill」）：用 VM 上部署中的 agentKnowledge 載入器實際組一次，確認
+# taskSystemPrompt、agentCard、綁定 Skill 都有進 prompt；並列出近 7 天正式流量
+# 的注入紀錄（error_log source=agent.knowledge）。唯讀，只印字數。
+#
+# 2026-09-26：加 target=dev（dev VM 用 environment: dev 的 secrets，部署在
+# /opt/onbrand/current）。
 
 on:
   workflow_dispatch:
     inputs:
+      target:
+        description: "prod = onbrand.sowork.ai；dev = dev.onbrand.sowork.ai"
+        type: choice
+        options: [prod, dev]
+        default: prod
       ids:
         description: "agent id（空白分隔）；留空 = 全部產品策略 agent"
         required: false
         default: ""
 
 jobs:
-  probe:
+  probe-prod:
+    if: github.event.inputs.target != 'dev'
     runs-on: ubuntu-latest
     steps:
       - uses: appleboy/ssh-action@v1.0.3
@@ -28,7 +38,6 @@ jobs:
           script: |
             set -e
             cd /opt/onbrand/app/skills/ai-talent
-            git -C /opt/onbrand/app log -1 --oneline || true
             # localDb throws at import without env — load .env first.
             set -a; source .env; set +a
             if [ -n "$IDS" ]; then
@@ -36,3 +45,35 @@ jobs:
             else
               npx tsx scripts/probe-agent-knowledge.ts --product-strategy
             fi
+
+  probe-dev:
+    if: github.event.inputs.target == 'dev'
+    runs-on: ubuntu-24.04
+    environment: dev
+    steps:
+      - name: Configure dev SSH identity
+        env:
+          VM_SSH_PRIVATE_KEY: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          VM_SSH_HOST_KEY: ${{ secrets.VM_SSH_HOST_KEY }}
+        run: |
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$VM_SSH_PRIVATE_KEY" > ~/.ssh/onbrand-dev
+          chmod 600 ~/.ssh/onbrand-dev
+          printf '%s\n' "$VM_SSH_HOST_KEY" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+      - name: Probe
+        env:
+          VM_HOST: ${{ secrets.VM_HOST }}
+          VM_USER: ${{ secrets.VM_USER }}
+          IDS: ${{ github.event.inputs.ids }}
+        run: |
+          ssh -i ~/.ssh/onbrand-dev "$VM_USER@$VM_HOST" "IDS='${IDS//[^0-9 ]/}' bash -s" <<'REMOTE'
+          set -euo pipefail
+          cd /opt/onbrand/current/skills/ai-talent
+          set -a; source .env; set +a
+          if [ -n "$IDS" ]; then
+            ./node_modules/.bin/tsx scripts/probe-agent-knowledge.ts $IDS
+          else
+            ./node_modules/.bin/tsx scripts/probe-agent-knowledge.ts --product-strategy
+          fi
+          REMOTE

@@ -353,7 +353,7 @@ export const taskCatalogRouter = router({
       const agentName  = task.agent_name  ?? task.name_zh ?? "行銷 Agent";
       const agentTitle = task.agent_title ?? "內容創作專家";
       const agentSkill = task.agent_skill ?? task.description ?? "社群內容創作";
-      const agentKnowledge = await loadAgentKnowledge(task.agent_id_resolved);
+      const agentKnowledge = await loadAgentKnowledge(task.agent_id_resolved, { source: "taskCatalog.run" });
 
       // 2. Resolve scope context — same logic as stepExecute
       const contextParts: string[] = [];
