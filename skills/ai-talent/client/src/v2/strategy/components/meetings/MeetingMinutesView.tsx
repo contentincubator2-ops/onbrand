@@ -24,6 +24,20 @@ interface Props {
 
 const pill = "rounded-full border px-2.5 py-0.5 text-[11.5px] font-medium transition";
 
+/** 「目前」那格可能是整段語氣規範（含範例句、禁用詞），預設只露前 90 字。 */
+function Clamp({ text, en, max = 90 }: { text: string; en: boolean; max?: number }) {
+  const [open, setOpen] = useState(false);
+  if (text.length <= max) return <>{text}</>;
+  return (
+    <>
+      {open ? text : `${text.slice(0, max)}…`}
+      <button type="button" onClick={() => setOpen((v) => !v)} className="ml-1.5 text-[12px] text-neutral-400 underline hover:text-neutral-900">
+        {open ? (en ? "less" : "收起") : (en ? "more" : "展開")}
+      </button>
+    </>
+  );
+}
+
 export default function MeetingMinutesView({
   minutes, evidence, decisions, transcript, en, readOnly, busy, onDecide, onEditPositioning, onOpenTask,
 }: Props) {
@@ -66,7 +80,7 @@ export default function MeetingMinutesView({
                 </div>
                 <dl className="mt-2.5 grid grid-cols-[64px_1fr] gap-x-3 gap-y-1.5 text-[13px] leading-relaxed">
                   <dt className="text-neutral-400">{en ? "Now" : "目前"}</dt>
-                  <dd className="text-neutral-500 line-through decoration-neutral-300">{c.current || (en ? "(empty)" : "（未填）")}</dd>
+                  <dd className="text-neutral-500"><Clamp text={c.current || (en ? "(empty)" : "（未填）")} en={en} /></dd>
                   <dt className="text-neutral-400">{en ? "Proposed" : "建議"}</dt>
                   <dd className="font-medium text-neutral-900">{c.proposal}</dd>
                   <dt className="text-neutral-400">{en ? "Why" : "理由"}</dt>
@@ -186,10 +200,12 @@ export default function MeetingMinutesView({
               <div key={i} className="flex items-center gap-3 rounded-lg border border-neutral-200 bg-white px-3.5 py-2 text-[13px]">
                 <span className="flex-1 text-neutral-900">{a.title}</span>
                 {a.owner && <span className="text-[12px] text-neutral-400">{a.owner}</span>}
-                <button type="button" disabled={readOnly} onClick={() => onOpenTask?.(a.title)}
-                  className={`${pill} border-neutral-300 text-neutral-700 enabled:hover:border-neutral-900 disabled:opacity-50`}>
-                  {en ? "Open a task" : "開任務"}
-                </button>
+                {a.kind === "content" && (
+                  <button type="button" disabled={readOnly} onClick={() => onOpenTask?.(a.title)}
+                    className={`${pill} border-neutral-300 text-neutral-700 enabled:hover:border-neutral-900 disabled:opacity-50`}>
+                    {en ? "Open a task" : "開任務"}
+                  </button>
+                )}
               </div>
             ))}
           </div>

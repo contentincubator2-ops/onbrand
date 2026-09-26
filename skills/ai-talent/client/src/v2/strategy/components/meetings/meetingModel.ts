@@ -20,7 +20,8 @@ export interface MeetingMinutes {
   summary: string;
   remarks: Array<{ name: string; title: string; gist: string }>;
   checks: StrategyCheck[];
-  actions: Array<{ title: string; owner: string }>;
+  /** content = 可以直接寫成一篇內容；work = 研究／營運工作（沒有「開任務」）。舊紀錄沒有 kind，視為 work。 */
+  actions: Array<{ title: string; owner: string; kind?: "content" | "work" }>;
 }
 export interface Decision { status: DecisionStatus; note: string; at: string }
 export interface MeetingRun {
@@ -54,12 +55,16 @@ export function frequencyText(m: { frequency: MeetingFrequency; dayOfWeek: numbe
   }
 }
 
+/**
+ * 一律用台北時間顯示——會議排在台北早上 9 點，用瀏覽器時區顯示的話，人在美東會看到
+ * 「前一天晚上 8 點」（2026-09-26 在 dev 實測踩到）。
+ */
 export function fmtDate(iso: string | null | undefined, en: boolean, withTime = false): string {
   if (!iso) return "—";
   const d = new Date(iso);
   return d.toLocaleString(en ? "en-US" : "zh-TW", withTime
-    ? { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" }
-    : { year: "numeric", month: "numeric", day: "numeric" });
+    ? { timeZone: "Asia/Taipei", month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" }
+    : { timeZone: "Asia/Taipei", year: "numeric", month: "numeric", day: "numeric" });
 }
 
 /** 伺服器的 note 前綴轉成人話。 */
@@ -123,8 +128,8 @@ export const EXAMPLE_RUN: { date: string; minutes: MeetingMinutes; evidence: Mee
         proposal: "", reason: "本次會議未討論這一格", evidence: [], raisedBy: "" },
     ],
     actions: [
-      { title: "做一檔「開學季・筆記配色」主題內容", owner: "消費者行為顧問" },
-      { title: "下次會議追蹤競品 199 元組合的銷售反應", owner: "定價與價值顧問" },
+      { title: "開學季・筆記配色：大學生的第一本手帳怎麼挑", owner: "消費者行為顧問", kind: "content" },
+      { title: "下次會議追蹤競品 199 元組合的銷售反應", owner: "定價與價值顧問", kind: "work" },
     ],
   },
 };

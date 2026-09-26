@@ -78,14 +78,14 @@ describe("parseMinutesJson", () => {
         { anchorId: "audience", verdict: "adjust", proposal: "上班族＋大學生", reason: "開學季聲量", evidence: ["E1", "E9"], raisedBy: "林品妍" },
         { anchorId: "made_up", verdict: "adjust", proposal: "xxxx", reason: "" },
       ],
-      actions: [{ title: "做一檔開學季題材", owner: "林品妍" }],
+      actions: [{ title: "做一檔開學季題材", owner: "林品妍", kind: "content" }, { title: "排三場使用者訪談", owner: "林品妍" }],
     });
     const m = parseMinutesJson(raw, anchors, 2, people)!;
     expect(m.checks.map((c) => c.anchorId)).toEqual(anchors.map((a) => a.id));
     expect(m.checks[0]).toMatchObject({ verdict: "adjust", proposal: "上班族＋大學生", evidence: [0], current: "上班族" });
     expect(m.checks[1]).toMatchObject({ verdict: "keep", reason: "本次會議未討論這一格" });
     expect(m.remarks).toEqual([{ name: "林品妍", gist: "受眾該調整", title: "品牌定位總監" }]);
-    expect(m.actions).toHaveLength(1);
+    expect(m.actions.map((a) => a.kind)).toEqual(["content", "work"]);
   });
 
   it("adjust 沒有 proposal 就降成 keep；最多 MAX_ADJUSTMENTS 條", () => {

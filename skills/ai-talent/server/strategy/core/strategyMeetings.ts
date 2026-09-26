@@ -128,7 +128,8 @@ export interface MeetingMinutes {
   summary: string;
   remarks: Array<{ name: string; title: string; gist: string }>;
   checks: StrategyCheck[];
-  actions: Array<{ title: string; owner: string }>;
+  /** kind: content = 可以直接變成一篇內容（前台給「開任務」）；work = 研究／營運工作。 */
+  actions: Array<{ title: string; owner: string; kind: "content" | "work" }>;
 }
 export type DecisionStatus = "adopted" | "modified" | "rejected";
 export interface Decision { status: DecisionStatus; note: string; at: string }
@@ -282,7 +283,7 @@ export function parseMinutesJson(raw: string, anchors: Anchor[], evidenceCount: 
     .filter((r: any) => names.has(r.name) && r.gist)
     .map((r: any) => ({ ...r, title: attendees.find((x) => x.name === r.name)?.title ?? "" }));
   const actions = (Array.isArray(obj.actions) ? obj.actions : [])
-    .map((x: any) => ({ title: str(x?.title, 200), owner: str(x?.owner, 40) }))
+    .map((x: any) => ({ title: str(x?.title, 200), owner: str(x?.owner, 40), kind: x?.kind === "content" ? "content" as const : "work" as const }))
     .filter((x: any) => x.title.length >= 4)
     .slice(0, 5);
   const summary = str(obj.summary, 800);
@@ -510,9 +511,9 @@ export async function runMeeting(meeting: StrategyMeeting, userId: number, trigg
       `2. verdict 只能是 keep 或 adjust。只有與會者真的主張要改、而且講得出改成什麼，才標 adjust；最多 ${MAX_ADJUSTMENTS} 條。`,
       `3. adjust 的 proposal 寫具體的新內容（可以直接貼回定位的那段話），reason 寫為什麼。`,
       `4. evidence 只能填發言中真的引用到的情報編號（例如 ["E1"]）；沒有就填 []。不要自己補。`,
-      `5. raisedBy 填提出這個主張的與會者姓名。remarks 每位一句 gist（60 字內）。actions 是會後要做的事（最多 5 條）。`,
+      `5. raisedBy 填提出這個主張的與會者姓名。remarks 每位一句 gist（60 字內）。actions 是會後要做的事（最多 5 條）：能直接寫成一篇貼文／文章的標 kind:"content"，title 寫成內容題目；研究、訪談、分析、營運修正標 kind:"work"。`,
       `6. summary 用 2–3 句講這場會的結論。全部繁體中文（台灣用語）。`,
-      `格式：{"summary":"…","remarks":[{"name":"…","gist":"…"}],"checks":[{"anchorId":"audience","verdict":"keep","proposal":"","reason":"…","evidence":[],"raisedBy":"…"}],"actions":[{"title":"…","owner":"…"}]}`,
+      `格式：{"summary":"…","remarks":[{"name":"…","gist":"…"}],"checks":[{"anchorId":"audience","verdict":"keep","proposal":"","reason":"…","evidence":[],"raisedBy":"…"}],"actions":[{"title":"…","owner":"…","kind":"content"}]}`,
     ].join("\n\n");
     let minutes: MeetingMinutes | null = null;
     for (let attempt = 0; attempt < 2 && !minutes; attempt++) {
