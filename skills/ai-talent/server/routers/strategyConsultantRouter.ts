@@ -303,7 +303,7 @@ export const strategyConsultantRouter = router({
       const systemPrompt = withAgentKnowledge(buildSystemPrompt(
         agentName, agentTitle, agentBio, agentSpecialty, agentMethodology,
         input.scenario, input.methodology, brandContext, tavilyContext,
-      ), await loadAgentKnowledge(input.agentId));
+      ), await loadAgentKnowledge(input.agentId, { source: "strategyConsultant.analyze" }));
 
       // 5. Call LLM
       const aiModel = agent?.aiModel ? String(agent.aiModel) : "gpt-4o";
@@ -379,7 +379,7 @@ export const strategyConsultantRouter = router({
       const systemPrompt = withAgentKnowledge(buildSystemPrompt(
         agentName, agentTitle, agentBio, agentSpecialty, agentMethodology,
         input.scenario, input.methodology, brandContext, tavilyContext,
-      ), await loadAgentKnowledge(input.agentId));
+      ), await loadAgentKnowledge(input.agentId, { source: "strategyConsultant.chat" }));
 
       const aiModel = agent?.aiModel ? String(agent.aiModel) : "gpt-4o";
       const provider = (() => {

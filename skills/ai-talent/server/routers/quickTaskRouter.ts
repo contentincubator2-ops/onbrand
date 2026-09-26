@@ -1703,7 +1703,7 @@ export const quickTaskRouter = router({
         agentName = agent.name || agentName;
         agentTitle = agent.title || agentTitle;
         // Runtime-only injection: never return this private work contract to the client.
-        agentKnowledge = await loadAgentKnowledge(agent.id).catch(() => "");
+        agentKnowledge = await loadAgentKnowledge(agent.id, { source: "quickTask.refineCaption" }).catch(() => "");
       }
 
 
@@ -2135,7 +2135,7 @@ ${polishTemplate.polishHint}`
           agentMap[a.id] = { name: a.name, title: a.title, specialty: a.specialty, methodology: a.methodology, avatarUrl: a.avatarUrl ?? null };
         }
       }
-      const agentKnowledge = await loadAgentKnowledgeMany(agentIds);
+      const agentKnowledge = await loadAgentKnowledgeMany(agentIds, { source: "quickTask.runSquadAuto" });
 
       const runPlanningStep = async (i: number) => {
         const step = stepsRaw[i];
@@ -3110,7 +3110,7 @@ ${polishTemplate.polishHint}`
               (a.bio ? `背景：${a.bio}\n` : "") +
               (a.specialty ? `專長：${a.specialty}\n` : "") +
               (a.methodology ? `方法論：${a.methodology}\n` : "") +
-              withAgentKnowledge("", await loadAgentKnowledge(a.id)) +
+              withAgentKnowledge("", await loadAgentKnowledge(a.id, { source: "quickTask.runQuick" })) +
               `\n用你的口氣寫，不要寫得像通用 AI。\n\n`;
           }
         } catch { /* persona load failure is non-fatal */ }
