@@ -19,8 +19,18 @@ describe("scopeFromUrl", () => {
     expect(scopeFromUrl({ p: null, cat: "products" })).toBe("product");
   });
 
-  it("品牌定位、文字、視覺這些頁面維持品牌情境", () => {
-    for (const cat of ["positioning", "copy", "visual", "knowledge", "events", "tools", null]) {
+  // 2026-09-26（CJ「要從 mos_db 當中，選擇三個負責這一頁的 agent」）：文字頁
+  // 從此有自己的三位（語氣／用詞規範／產業用語），不再借用品牌那三位。
+  it("文字頁（cat=copy）是用詞情境", () => {
+    expect(scopeFromUrl({ p: null, cat: "copy" })).toBe("copy");
+  });
+
+  it("文字頁即使網址上還留著 ?p= 也還是用詞情境（使用者剛從產品頁切過來）", () => {
+    expect(scopeFromUrl({ p: "152", cat: "copy" })).toBe("copy");
+  });
+
+  it("品牌定位、視覺這些頁面維持品牌情境", () => {
+    for (const cat of ["positioning", "visual", "knowledge", "events", "tools", null]) {
       expect(scopeFromUrl({ p: null, cat })).toBe("brand");
     }
   });

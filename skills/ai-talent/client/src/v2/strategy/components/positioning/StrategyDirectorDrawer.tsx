@@ -168,9 +168,13 @@ export default function StrategyDirectorDrawer({ brandId }: { brandId: number | 
             {/* 2026-09-24：標籤也跟著 scope 換字。CJ 在產品清單頁看到的是
                 「策略總監」＋一位品牌策略師，兩個訊號都說「這不是產品專家」；
                 人換了、標籤沒換的話，收合狀態下還是看不出來切過。 */}
+            {/* 2026-09-26：文字頁也有自己的三位（語氣／用詞規範／產業用語），
+                標籤跟著換——標籤沒換的話，收合狀態下看不出人已經換過。 */}
             {scope === "product"
               ? (en ? "Product Strategy" : "產品策略總監")
-              : (en ? "Strategy Director" : "策略總監")}
+              : scope === "copy"
+                ? (en ? "Copy & Wording" : "用詞總監")
+                : (en ? "Strategy Director" : "策略總監")}
           </div>
         )}
         <button
@@ -179,7 +183,9 @@ export default function StrategyDirectorDrawer({ brandId }: { brandId: number | 
           title={
             scope === "product"
               ? (en ? "Your product strategy directors — value proposition, Kano, pricing" : "你的產品策略總監——價值主張、Kano、定價與組合")
-              : (en ? "Your Strategy Director — built for this brand" : "你的策略總監——為這個品牌而設計")
+              : scope === "copy"
+                ? (en ? "Your wording directors — tone of voice, word rules, industry language" : "你的用詞總監——品牌語氣、用詞規範、產業用語")
+                : (en ? "Your Strategy Director — built for this brand" : "你的策略總監——為這個品牌而設計")
           }
           style={{
             position: "relative", flexShrink: 0,
@@ -222,14 +228,18 @@ export default function StrategyDirectorDrawer({ brandId }: { brandId: number | 
                             ? (en ? "Loading…" : "載入中…")
                             : scope === "product"
                               ? (en ? "Product Strategy" : "產品策略總監")
-                              : (en ? "Strategy Director" : "策略總監"))}
+                              : scope === "copy"
+                                ? (en ? "Copy & Wording" : "用詞總監")
+                                : (en ? "Strategy Director" : "策略總監"))}
                   </div>
                   <div style={{ fontSize: 11, color: "#737373", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                     {current
                       ? `${roleLabelOf(current, en)}・${current.title}`
                       : scope === "product"
                         ? (en ? "Built for this product" : "為這支產品而設計")
-                        : (en ? "Built for your brand" : "為你的品牌而設計")}
+                        : scope === "copy"
+                          ? (en ? "Built for your wording rules" : "為你的用詞規範而設計")
+                          : (en ? "Built for your brand" : "為你的品牌而設計")}
                   </div>
                 </div>
               </div>

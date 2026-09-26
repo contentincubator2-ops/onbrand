@@ -41,7 +41,7 @@ export interface StrategistDirector {
  * 2026-09-24：品牌頁與產品頁是兩組不同的角色（產品頁＝價值主張／Kano／定價），
  * 共用一個 key 的話，在產品頁換人會把品牌頁的選擇也蓋掉。
  */
-export type StrategistScope = "brand" | "product";
+export type StrategistScope = "brand" | "product" | "copy";
 const directorStorageKey = (brandId: number, scope: StrategistScope) =>
   `sowork.strategyDirector.${scope}.${brandId}`;
 
@@ -86,6 +86,10 @@ export function localeLabelOf(locale: string | null | undefined, en: boolean): s
  * 還會長（產品變體、產品任務…），散著寫就會有兩套不同步的判斷。
  */
 export function scopeFromUrl(params: { p?: string | null; cat?: string | null }): StrategistScope {
+  // 2026-09-26（CJ「要從 mos_db 當中，選擇三個負責這一頁的 agent」）：文字頁
+  // （cat=copy）有自己的三位——語氣／用詞規範／產業用語。判斷要放在產品之前，
+  // 因為在文字頁時網址上可能還留著 ?p=（使用者剛從產品頁切過來）。
+  if ((params.cat ?? "") === "copy") return "copy";
   const pid = Number(params.p);
   if (Number.isFinite(pid) && pid > 0) return "product";   // 單一產品頁
   if ((params.cat ?? "") === "products") return "product"; // 產品清單頁
