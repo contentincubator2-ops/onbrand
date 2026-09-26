@@ -3,62 +3,37 @@
  *
  * 2026-09-25（CJ「在策略層，只做完活動的企劃和編輯，活動撰寫都還是在內容層」
  * ＋「每一格在策略層要也放一顆『去寫這篇』」）
- * 2026-09-26（CJ「我怎麼還是覺得，現在的顯示方式很複雜」）——這一版把畫面砍掉一半：
+ * 2026-09-26（CJ「顯示方式很複雜」→「請設計恰當，保持 notion style 一致性」）：
  *
- * 第一版在寫出第一個字之前，要面對約 70 個可點的元素：設定區 24 個控制項
- * （6 種類型 chips、10 個通路 chips、產品、目標、合作模組…），企劃區每一格
- * 4 個決定 ×8 格，再加上五個階段的區塊標題、合作段落、三顆底部按鈕。
+ * 第一版在寫出第一個字之前要面對約 70 個可點的元素。這一版收成兩件事：
+ *   · 設定＝**一段話**（這檔在賣什麼、優惠是什麼）。類型／通路／產品由 AI 推斷，
+ *     只呈現成一行 chip；要改才點右上角齒輪展開。
+ *   · 企劃＝**一條清單**，一行是「日期・階段・平台・要發什麼」＋一顆「寫」。
+ *     換卡、改日期、這篇不做收進行末的「⋯」。
  *
- * 現在：
- *   · 設定＝**一段話**（活動在賣什麼、優惠是什麼）。類型／通路／產品由 AI 從那段話
- *     推斷，只呈現成一行摘要；猜錯才點「調整」展開原本那些控制項。
- *   · 企劃＝**一條清單**，一行就是「日期・平台・要發什麼」，行末一顆「寫」。
- *     換卡、改日期、不做都收進「⋯」——排企劃的當下只需要決定一件事：這篇要不要。
- *   · 階段不再是區塊標題，只是那一行前面的兩個字。
+ * 設計系統（project_design_system）：顏色只有功能性意義——primary 只給「下一步
+ * 動作」，success 只給「已完成」，其餘一律 default。沒有 hex、沒有裝飾色、沒有
+ * shadow；階層靠字重與留白。平台不用品牌色區分，用 FA icon + default 文字。
  *
- * 分層沒有變：這一頁仍然沒有任何寫作介面，「寫」是通往內容層活動 tray 的門。
+ * 分層沒有變：這一頁沒有任何寫作介面，「寫」是通往內容層活動 tray 的門。
  */
 import React from "react";
 import { useNavigate } from "react-router-dom";
+import {
+  Button, Card, CardBody, Chip, Textarea, Input, Checkbox, Tooltip, Spinner, Divider,
+} from "@heroui/react";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import {
+  faGear, faEllipsis, faCheck, faPenNib, faArrowRight, faTriangleExclamation,
+} from "@fortawesome/free-solid-svg-icons";
 import { trpc } from "../../../../lib/trpc";
 import { useLang } from "../../../../lib/i18n";
+import { CHANNEL_META, channelLabel } from "../../../content/lib/channelMeta";
 import {
   CAMPAIGN_TYPES, campaignTypeOf, phaseOf,
   EMPTY_CAMPAIGN_SETTINGS,
   type CampaignSettings, type CampaignPlanItem,
 } from "../../lib/campaignSchema";
-
-const INK = "#171717";
-const MUTED = "#737373";
-const LINE = "#E5E5E5";
-const SURFACE = "#FAFAF9";
-
-const CHANNELS: Array<{ id: string; zh: string; en: string }> = [
-  { id: "facebook", zh: "Facebook", en: "Facebook" },
-  { id: "instagram", zh: "Instagram", en: "Instagram" },
-  { id: "email", zh: "電子報", en: "Email" },
-  { id: "pr", zh: "新聞稿", en: "PR" },
-  { id: "website", zh: "官網", en: "Website" },
-  { id: "linkedin", zh: "LinkedIn", en: "LinkedIn" },
-  { id: "threads", zh: "Threads", en: "Threads" },
-  { id: "x", zh: "X", en: "X" },
-  { id: "youtube", zh: "YouTube", en: "YouTube" },
-  { id: "tiktok", zh: "TikTok", en: "TikTok" },
-];
-const channelLabel = (id: string, en: boolean) => {
-  const c = CHANNELS.find((x) => x.id === id);
-  return c ? (en ? c.en : c.zh) : id;
-};
-
-const btn = (primary = false) => ({
-  fontSize: 13, fontWeight: 600, padding: "8px 14px", borderRadius: 8, cursor: "pointer",
-  border: primary ? "0" : `1px solid ${LINE}`, background: primary ? INK : "#fff", color: primary ? "#fff" : INK,
-}) as const;
-
-const chip = (on: boolean) => ({
-  fontSize: 12, fontWeight: 500, padding: "5px 11px", borderRadius: 999, cursor: "pointer",
-  border: `1px solid ${on ? INK : LINE}`, background: on ? INK : "#fff", color: on ? "#fff" : INK,
-}) as const;
 
 export default function CampaignWorkspace({ eventId, brandId }: { eventId: number; brandId: number | null }) {
   const { lang } = useLang();
@@ -76,8 +51,8 @@ export default function CampaignWorkspace({ eventId, brandId }: { eventId: numbe
   const [settings, setSettings] = React.useState<CampaignSettings>(EMPTY_CAMPAIGN_SETTINGS);
   const [productIds, setProductIds] = React.useState<number[]>([]);
   const [plan, setPlan] = React.useState<{ smp: string; items: CampaignPlanItem[]; kol?: any; cobrand?: any } | null>(null);
-  const [expanded, setExpanded] = React.useState(false);   // 設定的細項，預設收起來
-  const [openRow, setOpenRow] = React.useState<string | null>(null);   // 哪一行按了「⋯」
+  const [expanded, setExpanded] = React.useState(false);
+  const [openRow, setOpenRow] = React.useState<string | null>(null);
   const [dirty, setDirty] = React.useState(false);
   const [err, setErr] = React.useState("");
 
@@ -116,7 +91,9 @@ export default function CampaignWorkspace({ eventId, brandId }: { eventId: numbe
   const items = plan?.items ?? [];
   const live = items.filter((i) => i.enabled);
   const done = live.filter((i) => !!i.outputId).length;
-  const ready = !!settings.type && !!(settings.mechanic || brief).trim() && settings.channels.length > 0;
+  const configured = !!settings.type && settings.channels.length > 0;
+  const ready = configured && !!(settings.mechanic || brief).trim();
+  const busy = inferMut.isPending || saveSettingsMut.isPending || generateMut.isPending;
 
   const patch = (next: Partial<CampaignSettings>) => { setSettings((s) => ({ ...s, ...next })); setDirty(true); };
   const patchItem = (id: string, next: Partial<CampaignPlanItem>) =>
@@ -130,7 +107,7 @@ export default function CampaignWorkspace({ eventId, brandId }: { eventId: numbe
     navigate(`/campaigns?${sp.toString()}`);
   };
 
-  /** 一步到位：存設定 → 產生企劃。使用者要的是企劃，不是「儲存成功」。 */
+  /** 一步到位：存設定 → 排企劃。使用者要的是企劃，不是「儲存成功」。 */
   const saveAndGenerate = () => {
     setErr("");
     const next = { ...settings, mechanic: (settings.mechanic || brief).trim() };
@@ -139,245 +116,301 @@ export default function CampaignWorkspace({ eventId, brandId }: { eventId: numbe
     });
   };
 
-  if (q.isLoading) return <p style={{ fontSize: 13, color: MUTED }}>{L("載入中…", "Loading…")}</p>;
+  if (q.isLoading) {
+    return (
+      <div className="flex items-center gap-3 py-10">
+        <Spinner size="sm" />
+        <span className="text-small text-default-500">{L("載入中…", "Loading…")}</span>
+      </div>
+    );
+  }
   if (q.error) {
     return (
-      <div style={{ border: `1px solid ${LINE}`, borderRadius: 10, padding: 16 }}>
-        <p style={{ fontSize: 13, color: "#B91C1C", margin: 0 }}>{String(q.error?.message ?? "").slice(0, 200)}</p>
-        <button onClick={() => q.refetch?.()} style={{ ...btn(), marginTop: 10 }}>{L("重試", "Retry")}</button>
-      </div>
+      <Card shadow="none" radius="md" className="border border-divider">
+        <CardBody className="gap-3 p-5">
+          <p className="text-small text-danger">{String(q.error?.message ?? "").slice(0, 200)}</p>
+          <Button size="sm" variant="bordered" className="self-start" onPress={() => q.refetch?.()}>
+            {L("重試", "Retry")}
+          </Button>
+        </CardBody>
+      </Card>
     );
   }
 
   const ev = q.data?.event;
-  const busy = inferMut.isPending || saveSettingsMut.isPending || generateMut.isPending;
-  const summaryLine = [
-    campaignTypeOf(settings.type) ? (en ? campaignTypeOf(settings.type)!.en : campaignTypeOf(settings.type)!.zh) : null,
-    settings.channels.length ? settings.channels.map((c) => channelLabel(c, en)).join(" + ") : null,
-    productIds.length
-      ? productIds.map((id) => ((productsQ.data as any[]) ?? []).find((p: any) => p.id === id)?.name).filter(Boolean).join("、")
-      : null,
-  ].filter(Boolean).join("　·　");
+  const typeSpec = campaignTypeOf(settings.type);
+  const productNames = productIds
+    .map((id) => ((productsQ.data as any[]) ?? []).find((p: any) => p.id === id)?.name)
+    .filter(Boolean) as string[];
 
   return (
-    <div style={{ display: "grid", gap: 18, maxWidth: 820 }}>
-      <div>
-        <div style={{ fontSize: 20, fontWeight: 700, color: INK }}>{ev?.name}</div>
-        <div style={{ fontSize: 12, color: MUTED, marginTop: 4 }}>
+    <div className="max-w-[880px] flex flex-col gap-6">
+      {/* ── Page header（eyebrow + h1 + meta）───────────────────────── */}
+      <header>
+        <Chip size="sm" variant="flat" color="default" className="uppercase tracking-wider mb-2">
+          {L("宣傳企劃", "Campaign plan")}
+        </Chip>
+        <h1 className="text-3xl font-semibold tracking-tight">{ev?.name}</h1>
+        <p className="text-tiny text-default-500 mt-2">
           {ev?.startAt ? `${ev.startAt} → ${ev.endAt ?? "?"}` : L("尚未設定期間", "No dates set")}
-          {plan ? `　·　${L(`${live.length} 篇，已寫 ${done}`, `${live.length} posts, ${done} written`)}` : ""}
-        </div>
-      </div>
+          {plan ? `　·　${L(`${live.length} 篇 · 已寫 ${done}`, `${live.length} posts · ${done} written`)}` : ""}
+        </p>
+      </header>
 
       {/* ── 設定：一段話 ───────────────────────────────────────────── */}
-      <section style={{ border: `1px solid ${LINE}`, borderRadius: 10, padding: 16, display: "grid", gap: 10 }}>
-        <div style={{ fontSize: 13, fontWeight: 600, color: INK }}>
-          {L("這檔活動在賣什麼、優惠是什麼？", "What's on offer?")}
-        </div>
-        <textarea
-          value={brief}
-          onChange={(e) => { setBrief(e.target.value); setDirty(true); }}
-          rows={2} maxLength={800}
-          placeholder={L("例：中秋檔期，橫膈牛排＋厚切牛舌組合早鳥 8 折，9/20–9/28，數量有限",
-                         "e.g. Mid-Autumn bundle, 20% off early bird, 9/20–9/28, limited stock")}
-          style={{ width: "100%", fontSize: 14, padding: "10px 12px", border: `1px solid ${LINE}`, borderRadius: 8, resize: "vertical", lineHeight: 1.7 }}
-        />
-
-        {/* 推斷結果：一行摘要。猜錯才點開改。 */}
-        {summaryLine ? (
-          <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", background: SURFACE, borderRadius: 8, padding: "8px 10px" }}>
-            <span style={{ fontSize: 12, color: INK }}>{summaryLine}</span>
-            <button onClick={() => setExpanded((v) => !v)} style={{ ...btn(), padding: "2px 9px", fontSize: 11 }}>
-              {expanded ? L("收起", "Close") : L("調整", "Adjust")}
-            </button>
-          </div>
-        ) : (
-          <div style={{ fontSize: 11, color: MUTED }}>
-            {L("寫完按下面的按鈕，我會判斷活動類型、要發的通路與適用產品——猜錯可以改。",
-               "We'll work out the type, channels and products from this — you can correct it.")}
-          </div>
-        )}
-
-        {/* 細項：預設收起來。這些就是第一版一開場就全部攤開的 24 個控制項。 */}
-        {expanded && (
-          <div style={{ display: "grid", gap: 12, borderTop: `1px solid ${LINE}`, paddingTop: 12 }}>
-            <div>
-              <div style={{ fontSize: 12, fontWeight: 600, color: MUTED, marginBottom: 6 }}>{L("活動類型", "Type")}</div>
-              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                {CAMPAIGN_TYPES.map((t) => (
-                  <button key={t.id} onClick={() => patch({ type: t.id })} style={chip(settings.type === t.id)}>
-                    {en ? t.en : t.zh}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div>
-              <div style={{ fontSize: 12, fontWeight: 600, color: MUTED, marginBottom: 6 }}>{L("要發的通路", "Channels")}</div>
-              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                {CHANNELS.map((c) => (
-                  <button key={c.id} style={chip(settings.channels.includes(c.id))}
-                    onClick={() => patch({ channels: settings.channels.includes(c.id)
-                      ? settings.channels.filter((x) => x !== c.id) : [...settings.channels, c.id] })}>
-                    {en ? c.en : c.zh}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div>
-              <div style={{ fontSize: 12, fontWeight: 600, color: MUTED, marginBottom: 6 }}>{L("適用產品", "Products")}</div>
-              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                {((productsQ.data as any[]) ?? []).map((p: any) => {
-                  const on = productIds.includes(p.id);
-                  return (
-                    <button key={p.id} style={chip(on)}
-                      onClick={() => { setDirty(true); setProductIds((ids) => on ? ids.filter((x) => x !== p.id) : [...ids, p.id]); }}>
-                      {p.name}
-                    </button>
-                  );
-                })}
-                {!((productsQ.data as any[]) ?? []).length && (
-                  <span style={{ fontSize: 12, color: MUTED }}>{L("這個品牌還沒有產品", "No products yet")}</span>
-                )}
-              </div>
-            </div>
-            {settings.type === "offline" && (
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
-                {([["venue", "地點", "Venue"], ["sessions", "場次", "Sessions"], ["signupUrl", "報名連結", "Sign-up URL"]] as const).map(([k, zh, e2]) => (
-                  <div key={k}>
-                    <div style={{ fontSize: 12, fontWeight: 600, color: MUTED, marginBottom: 4 }}>{L(zh, e2)}</div>
-                    <input value={(settings as any)[k] ?? ""} onChange={(ev2) => patch({ [k]: ev2.target.value } as any)}
-                      style={{ width: "100%", fontSize: 13, padding: "7px 10px", border: `1px solid ${LINE}`, borderRadius: 8 }} />
-                  </div>
-                ))}
-              </div>
+      <Card shadow="none" radius="md" className="border border-divider">
+        <CardBody className="gap-3 p-5">
+          <div className="flex items-start justify-between gap-3">
+            <h2 className="text-medium font-semibold">
+              {L("這檔活動在賣什麼、優惠是什麼？", "What's on offer?")}
+            </h2>
+            {configured && (
+              <Tooltip content={L("調整活動類型 / 通路 / 產品", "Adjust type, channels, products")} placement="top">
+                <Button isIconOnly size="sm" variant="light" aria-label={L("設定", "Settings")}
+                  onPress={() => setExpanded((v) => !v)}>
+                  <FontAwesomeIcon icon={faGear} className="text-default-500" />
+                </Button>
+              </Tooltip>
             )}
-            <div style={{ display: "flex", gap: 14 }}>
-              {([["kol", "要找網紅合作", "Influencer collab"], ["cobrand", "要做異業合作", "Co-branding"]] as const).map(([k, zh, e2]) => (
-                <label key={k} style={{ fontSize: 13, color: INK, display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
-                  <input type="checkbox" checked={!!(settings.partners as any)?.[k]}
-                    onChange={(ev2) => patch({ partners: { ...(settings.partners ?? {}), [k]: ev2.target.checked } })} />
-                  {L(zh, e2)}
-                </label>
+          </div>
+
+          <Textarea
+            value={brief}
+            onValueChange={(v) => { setBrief(v); setDirty(true); }}
+            minRows={2} maxRows={6} maxLength={800} variant="bordered" radius="md"
+            placeholder={L("例：中秋檔期，橫膈牛排＋厚切牛舌組合早鳥 8 折，9/20–9/28，數量有限",
+                           "e.g. Mid-Autumn bundle, 20% off early bird, 9/20–9/28, limited stock")}
+          />
+
+          {configured ? (
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {typeSpec && (
+                <Chip size="sm" variant="flat" color="default">{en ? typeSpec.en : typeSpec.zh}</Chip>
+              )}
+              {settings.channels.map((c) => (
+                <Chip key={c} size="sm" variant="flat" color="default"
+                  startContent={<FontAwesomeIcon icon={CHANNEL_META[c]?.icon ?? faPenNib} className="text-tiny text-default-500 ml-1" />}>
+                  {channelLabel(c, en)}
+                </Chip>
+              ))}
+              {productNames.map((n) => (
+                <Chip key={n} size="sm" variant="flat" color="default">{n}</Chip>
               ))}
             </div>
-          </div>
-        )}
+          ) : (
+            <p className="text-tiny text-default-500 leading-relaxed">
+              {L("寫完按「下一步」，我會判斷活動類型、要發的通路與適用產品——猜錯可以改。",
+                 "We'll work out the type, channels and products from this — you can correct it.")}
+            </p>
+          )}
 
-        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-          {!summaryLine && (
-            <button onClick={() => { setErr(""); inferMut.mutate({ eventId, brief }); }}
-              disabled={!brief.trim() || busy}
-              style={{ ...btn(true), opacity: (!brief.trim() || busy) ? 0.5 : 1 }}>
-              {inferMut.isPending ? L("判斷中…", "Working…") : L("下一步", "Next")}
-            </button>
+          {/* 細項：預設收起來。第一版把這些一開場就全部攤開。 */}
+          {expanded && (
+            <>
+              <Divider className="my-1" />
+              <div className="flex flex-col gap-4">
+                <div>
+                  <p className="text-tiny text-default-500 mb-2">{L("活動類型", "Type")}</p>
+                  <div className="flex gap-1.5 flex-wrap">
+                    {CAMPAIGN_TYPES.map((t) => (
+                      <Chip key={t.id} size="sm" variant={settings.type === t.id ? "solid" : "flat"}
+                        color="default" className="cursor-pointer"
+                        onClick={() => patch({ type: t.id })}>
+                        {en ? t.en : t.zh}
+                      </Chip>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <p className="text-tiny text-default-500 mb-2">{L("要發的通路", "Channels")}</p>
+                  <div className="flex gap-1.5 flex-wrap">
+                    {Object.keys(CHANNEL_META).map((c) => {
+                      const on = settings.channels.includes(c);
+                      return (
+                        <Chip key={c} size="sm" variant={on ? "solid" : "flat"} color="default" className="cursor-pointer"
+                          startContent={<FontAwesomeIcon icon={CHANNEL_META[c]!.icon} className={`text-tiny ml-1 ${on ? "" : "text-default-500"}`} />}
+                          onClick={() => patch({ channels: on ? settings.channels.filter((x) => x !== c) : [...settings.channels, c] })}>
+                          {channelLabel(c, en)}
+                        </Chip>
+                      );
+                    })}
+                  </div>
+                </div>
+                <div>
+                  <p className="text-tiny text-default-500 mb-2">{L("適用產品", "Products")}</p>
+                  <div className="flex gap-1.5 flex-wrap">
+                    {((productsQ.data as any[]) ?? []).map((p: any) => {
+                      const on = productIds.includes(p.id);
+                      return (
+                        <Chip key={p.id} size="sm" variant={on ? "solid" : "flat"} color="default" className="cursor-pointer"
+                          onClick={() => { setDirty(true); setProductIds((ids) => on ? ids.filter((x) => x !== p.id) : [...ids, p.id]); }}>
+                          {p.name}
+                        </Chip>
+                      );
+                    })}
+                    {!((productsQ.data as any[]) ?? []).length && (
+                      <span className="text-tiny text-default-500">{L("這個品牌還沒有產品", "No products yet")}</span>
+                    )}
+                  </div>
+                </div>
+                {settings.type === "offline" && (
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    {([["venue", "地點", "Venue"], ["sessions", "場次", "Sessions"], ["signupUrl", "報名連結", "Sign-up URL"]] as const).map(([k, zh, e2]) => (
+                      <Input key={k} size="sm" variant="bordered" radius="md" label={L(zh, e2)} labelPlacement="outside"
+                        value={(settings as any)[k] ?? ""} onValueChange={(v) => patch({ [k]: v } as any)} />
+                    ))}
+                  </div>
+                )}
+                <div className="flex gap-5 flex-wrap">
+                  {([["kol", "要找網紅合作", "Influencer collab"], ["cobrand", "要做異業合作", "Co-branding"]] as const).map(([k, zh, e2]) => (
+                    <Checkbox key={k} size="sm" isSelected={!!(settings.partners as any)?.[k]}
+                      onValueChange={(v) => patch({ partners: { ...(settings.partners ?? {}), [k]: v } })}>
+                      <span className="text-small">{L(zh, e2)}</span>
+                    </Checkbox>
+                  ))}
+                </div>
+              </div>
+            </>
           )}
-          {summaryLine && (
-            <button onClick={saveAndGenerate} disabled={!ready || busy}
-              style={{ ...btn(true), opacity: (!ready || busy) ? 0.5 : 1 }}>
-              {generateMut.isPending ? L("排企劃中…約 20 秒", "Planning… ~20s")
-                : plan ? L("依現在的設定重排", "Re-plan") : L("排出宣傳企劃", "Build the plan")}
-            </button>
-          )}
-          {err && <span style={{ fontSize: 12, color: "#B91C1C" }}>{err.slice(0, 200)}</span>}
-        </div>
-      </section>
+
+          <div className="flex items-center gap-3 flex-wrap">
+            {!configured ? (
+              <Button color="primary" size="sm" radius="md"
+                isDisabled={!brief.trim() || busy} isLoading={inferMut.isPending}
+                endContent={!inferMut.isPending ? <FontAwesomeIcon icon={faArrowRight} /> : undefined}
+                onPress={() => { setErr(""); inferMut.mutate({ eventId, brief }); }}>
+                {L("下一步", "Next")}
+              </Button>
+            ) : (
+              <Button color="primary" size="sm" radius="md"
+                isDisabled={!ready || busy} isLoading={generateMut.isPending || saveSettingsMut.isPending}
+                onPress={saveAndGenerate}>
+                {generateMut.isPending ? L("排企劃中…約 20 秒", "Planning… ~20s")
+                  : plan ? L("依現在的設定重排", "Re-plan") : L("排出宣傳企劃", "Build the plan")}
+              </Button>
+            )}
+            {err && <span className="text-tiny text-danger">{err.slice(0, 200)}</span>}
+          </div>
+        </CardBody>
+      </Card>
 
       {/* ── 企劃：一條清單 ─────────────────────────────────────────── */}
       {plan && (
-        <section style={{ display: "grid", gap: 8 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
-            <div style={{ fontSize: 13, color: INK }}>{plan.smp}</div>
-            <div style={{ fontSize: 11, color: MUTED }}>
+        <section className="flex flex-col gap-3">
+          <div className="flex items-baseline justify-between gap-3 flex-wrap">
+            <h2 className="text-medium font-semibold">{plan.smp}</h2>
+            <p className="text-tiny text-default-500">
               {L("一行一篇。按「寫」會在內容層打開這一篇。", "One row per post. “Write” opens it in the content layer.")}
-            </div>
+            </p>
           </div>
 
-          <div style={{ border: `1px solid ${LINE}`, borderRadius: 10, overflow: "hidden" }}>
-            {items.map((i, idx) => {
-              const ph = phaseOf(i.phase);
-              const open = openRow === i.id;
-              return (
-                <div key={i.id} style={{
-                  borderTop: idx === 0 ? "none" : `1px solid ${LINE}`,
-                  background: i.enabled ? "#fff" : SURFACE, opacity: i.enabled ? 1 : 0.55,
-                }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 12px" }}>
-                    <span style={{ fontSize: 12, color: MUTED, width: 44, flexShrink: 0, fontVariantNumeric: "tabular-nums" }}>
-                      {i.date.slice(5).replace("-", "/")}
-                    </span>
-                    <span style={{ fontSize: 11, color: MUTED, width: 52, flexShrink: 0 }}>{ph ? (en ? ph.en : ph.zh) : ""}</span>
-                    <span style={{ fontSize: 11, color: MUTED, width: 64, flexShrink: 0 }}>{channelLabel(i.platform, en)}</span>
-                    <input
-                      value={i.angle}
-                      onChange={(e) => patchItem(i.id, { angle: e.target.value })}
-                      style={{ flex: 1, minWidth: 0, fontSize: 13, color: INK, border: "none", outline: "none", background: "transparent", padding: "2px 0" }}
-                    />
-                    {i.outputId ? (
-                      <button onClick={() => navigate(`/run/${i.outputId}`)} style={{ ...btn(), padding: "3px 10px", fontSize: 12, flexShrink: 0 }}>
-                        {L("✓ 看", "✓ View")}
-                      </button>
-                    ) : (
-                      <button onClick={() => goWrite(i.id)} disabled={!i.enabled}
-                        style={{ ...btn(true), padding: "3px 12px", fontSize: 12, flexShrink: 0, opacity: i.enabled ? 1 : 0.4 }}>
-                        {L("寫", "Write")}
-                      </button>
-                    )}
-                    <button onClick={() => setOpenRow(open ? null : i.id)} aria-label="more"
-                      style={{ ...btn(), padding: "3px 8px", fontSize: 12, flexShrink: 0 }}>⋯</button>
-                  </div>
-
-                  {/* 「⋯」展開才出現的三件事——排企劃的當下不該同時面對它們 */}
-                  {open && (
-                    <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", padding: "0 12px 10px 66px" }}>
-                      <label style={{ fontSize: 11, color: MUTED }}>{L("日期", "Date")}</label>
-                      <input type="date" value={i.date} onChange={(e) => patchItem(i.id, { date: e.target.value })}
-                        style={{ fontSize: 12, padding: "3px 6px", border: `1px solid ${LINE}`, borderRadius: 6 }} />
-                      <span style={{ fontSize: 11, color: MUTED }}>
-                        {L("用的卡：", "Card: ")}{i.taskLabel}
-                        {i.repaired ? L("（系統補選）", " (auto-picked)") : ""}
+          <Card shadow="none" radius="md" className="border border-divider">
+            <CardBody className="p-0">
+              {items.map((i, idx) => {
+                const ph = phaseOf(i.phase);
+                const open = openRow === i.id;
+                const ch = CHANNEL_META[i.platform];
+                return (
+                  <div key={i.id} className={idx === 0 ? "" : "border-t border-divider"}>
+                    <div className={`flex items-center gap-3 px-4 py-2.5 ${i.enabled ? "" : "opacity-50"}`}>
+                      <span className="text-tiny text-default-500 tabular-nums w-11 shrink-0">
+                        {i.date.slice(5).replace("-", "/")}
                       </span>
-                      <button onClick={() => patchItem(i.id, { enabled: !i.enabled })} style={{ ...btn(), padding: "3px 9px", fontSize: 11 }}>
-                        {i.enabled ? L("這篇不做", "Skip") : L("放回企劃", "Put back")}
-                      </button>
+                      <span className="text-tiny text-default-500 w-12 shrink-0">{ph ? (en ? ph.en : ph.zh) : ""}</span>
+                      <Tooltip content={channelLabel(i.platform, en)} placement="top">
+                        <span className="w-4 shrink-0 text-center">
+                          <FontAwesomeIcon icon={ch?.icon ?? faPenNib} className="text-tiny text-default-500" />
+                        </span>
+                      </Tooltip>
+                      <input
+                        value={i.angle}
+                        onChange={(e) => patchItem(i.id, { angle: e.target.value })}
+                        aria-label={L("這一篇要講什麼", "What this post says")}
+                        className="flex-1 min-w-0 text-small bg-transparent outline-none focus:underline underline-offset-4 decoration-default-300"
+                      />
+                      {i.outputId ? (
+                        <Button size="sm" variant="light" radius="md" className="shrink-0"
+                          startContent={<FontAwesomeIcon icon={faCheck} className="text-success" />}
+                          onPress={() => navigate(`/run/${i.outputId}`)}>
+                          {L("看", "View")}
+                        </Button>
+                      ) : (
+                        <Button size="sm" color="primary" radius="md" className="shrink-0"
+                          isDisabled={!i.enabled} onPress={() => goWrite(i.id)}>
+                          {L("寫", "Write")}
+                        </Button>
+                      )}
+                      <Button isIconOnly size="sm" variant="light" className="shrink-0"
+                        aria-label={L("更多", "More")} onPress={() => setOpenRow(open ? null : i.id)}>
+                        <FontAwesomeIcon icon={faEllipsis} className="text-default-500" />
+                      </Button>
                     </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
 
-          {/* 合作：勾了才有，收成兩行摘要，細節在 tray 裡跟著那幾張卡走 */}
+                    {/* 「⋯」展開才出現——排企劃的當下不該同時面對這三件事 */}
+                    {open && (
+                      <div className="flex items-center gap-3 flex-wrap px-4 pb-3 pl-[68px]">
+                        <Input type="date" size="sm" variant="bordered" radius="md" className="w-[160px]"
+                          aria-label={L("日期", "Date")} value={i.date}
+                          onValueChange={(v) => patchItem(i.id, { date: v })} />
+                        <span className="text-tiny text-default-500">
+                          {L("用的卡：", "Card: ")}{i.taskLabel}
+                        </span>
+                        {i.repaired && (
+                          <Chip size="sm" variant="flat" color="warning"
+                            startContent={<FontAwesomeIcon icon={faTriangleExclamation} className="text-tiny ml-1" />}>
+                            {L("系統補選", "auto-picked")}
+                          </Chip>
+                        )}
+                        <Button size="sm" variant="bordered" radius="md"
+                          onPress={() => patchItem(i.id, { enabled: !i.enabled })}>
+                          {i.enabled ? L("這篇不做", "Skip") : L("放回企劃", "Put back")}
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </CardBody>
+          </Card>
+
+          {/* 合作：勾了才有 */}
           {(plan.kol || plan.cobrand) && (
-            <div style={{ display: "grid", gap: 6 }}>
+            <div className="flex flex-col gap-2">
               {([["kol", "網紅合作", "Influencer collab"], ["cobrand", "異業合作", "Co-branding"]] as const).map(([k, zh, e2]) => {
                 const b = (plan as any)[k];
                 if (!b) return null;
                 return (
-                  <details key={k} style={{ border: `1px solid ${LINE}`, borderRadius: 8, padding: "8px 12px" }}>
-                    <summary style={{ fontSize: 12, fontWeight: 600, color: INK, cursor: "pointer" }}>
-                      {L(zh, e2)}　<span style={{ fontWeight: 400, color: MUTED }}>{b.summary}</span>
-                    </summary>
-                    <ul style={{ margin: "8px 0 0", paddingLeft: 18, display: "grid", gap: 4 }}>
-                      {(b.steps ?? []).map((st: any) => (
-                        <li key={st.id} style={{ fontSize: 12, color: INK, lineHeight: 1.6 }}>
-                          {st.text}{st.taskId && <span style={{ color: MUTED }}>（{st.taskLabel}）</span>}
-                        </li>
-                      ))}
-                    </ul>
-                  </details>
+                  <Card key={k} shadow="none" radius="md" className="border border-divider">
+                    <CardBody className="gap-2 p-4">
+                      <details>
+                        <summary className="text-small font-medium cursor-pointer">
+                          {L(zh, e2)}
+                          <span className="text-tiny text-default-500 font-normal">　{b.summary}</span>
+                        </summary>
+                        <ul className="mt-2 pl-5 list-disc flex flex-col gap-1">
+                          {(b.steps ?? []).map((st: any) => (
+                            <li key={st.id} className="text-small leading-relaxed">
+                              {st.text}
+                              {st.taskId && <span className="text-tiny text-default-500">（{st.taskLabel}）</span>}
+                            </li>
+                          ))}
+                        </ul>
+                      </details>
+                    </CardBody>
+                  </Card>
                 );
               })}
             </div>
           )}
 
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-            <button onClick={() => goWrite()} style={btn(true)}>
+          <div className="flex items-center gap-2 flex-wrap">
+            <Button color="primary" size="sm" radius="md" onPress={() => goWrite()}>
               {L(`開始撰寫（還有 ${live.length - done} 篇）`, `Start writing (${live.length - done} left)`)}
-            </button>
-            <button onClick={() => savePlanMut.mutate({ eventId, plan: { ...plan, items } })}
-              disabled={savePlanMut.isPending} style={btn()}>
-              {savePlanMut.isPending ? L("儲存中…", "Saving…") : L("儲存企劃", "Save plan")}
-            </button>
+            </Button>
+            <Button size="sm" variant="bordered" radius="md" isLoading={savePlanMut.isPending}
+              onPress={() => savePlanMut.mutate({ eventId, plan: { ...plan, items } })}>
+              {L("儲存企劃", "Save plan")}
+            </Button>
           </div>
         </section>
       )}
