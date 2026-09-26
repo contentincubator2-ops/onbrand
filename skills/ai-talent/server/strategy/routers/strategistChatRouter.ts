@@ -453,6 +453,17 @@ async function buildProactiveOpening(
     return { content: en_ ? en2 : zh, actions: [] };   // 刻意沒有按鈕：品牌層的按鈕對產品問題沒用
   }
 
+  // 2026-09-26（CJ「這一句應該要根據不同頁面調整，要根據文字的頁面需求，猜測
+  // 用戶可能需要的協助，設計開場白」）：用詞總監開口第一句還在推銷品牌層的
+  // 策略健檢——那是別頁的事，而且文字頁根本沒有那顆按鈕可以按。
+  //
+  // 這一頁的狀態只有三個數字（推薦用詞／禁用詞／縮寫對照各幾條），而這三個
+  // 數字就足以判斷使用者現在卡在哪：全空＝不知道從哪開始、只有禁用詞＝沒人
+  // 給他替代說法、都有了＝該檢查一致性。所以照數字講話，不要叫 LLM 猜。
+  if (director && getRole(director.roleId).scope === "copy") {
+    return { content: await buildCopyOpening(brandId, userId, brandName, en_, director, hi), actions: [] };
+  }
+
   try {
     const [rows]: any = await localPool.execute(
       `SELECT JSON_UNQUOTE(JSON_EXTRACT(positioning, '$._workbench.healthCheck.checkedAt')) AS hcCheckedAt
@@ -490,6 +501,121 @@ async function buildProactiveOpening(
       : `${hi}${director ? `我看的是${director.roleLabel}這一塊，` : ""}問我任何跟這個品牌策略有關的問題，或者我可以帶你去看看策略監測或做一次健檢。`,
     actions: [],
   };
+}
+
+/**
+ * 這一則開場白是不是「別的頁面的版本」。
+ *
+ * 判斷方式刻意保守：只認**明確屬於品牌層的推銷句**（策略健檢／策略監測），
+ * 而且只給非品牌 scope 的總監用。寬鬆一點就會把使用者自己的對話也改掉。
+ * 匯出給測試。
+ */
+export function isStaleOpening(
+  msg: { role: string; content: string } | undefined,
+  director: StrategistDirector | null,
+): boolean {
+  if (!msg || msg.role !== "strategist" || !director) return false;
+  const scope = getRole(director.roleId).scope;
+  if (scope === "brand") return false;            // 品牌頁本來就該講健檢
+  return /策略健檢|Strategy Health Check|策略監測|Strategy Monitoring/i.test(msg.content);
+}
+
+/** 文字頁三張預設卡各填了幾條。查不到就當 0——講「還沒開始」比講錯數字好。 */
+export async function copyAssetCounts(
+  brandId: number, userId: number,
+): Promise<{ preferred: number; banned: number; abbr: number; voice: boolean }> {
+  try {
+    const [rows]: any = await localPool.execute(
+      `SELECT positioning FROM brands WHERE id = ? AND userId = ? LIMIT 1`, [brandId, userId],
+    );
+    const raw = (rows as any[])[0]?.positioning;
+    const pos = typeof raw === "string" ? JSON.parse(raw) : (raw ?? {});
+    const a = pos?._assets ?? {};
+    const items = (v: any) => (Array.isArray(v?.items) ? v.items.filter((x: any) => typeof x === "string" && x.trim()).length : 0);
+    const pairs = (v: any) => (Array.isArray(v?.pairs) ? v.pairs.filter((x: any) => x?.from?.trim() && x?.to?.trim()).length : 0);
+    return {
+      preferred: items(a.preferred_terms),
+      banned: items(a.banned_words),
+      abbr: pairs(a.abbreviations),
+      voice: typeof a?.voice?.text === "string" && a.voice.text.trim().length > 0,
+    };
+  } catch {
+    return { preferred: 0, banned: 0, abbr: 0, voice: false };
+  }
+}
+
+/**
+ * 文字頁的開場白。三位總監的角度不同，開口第一句就該看得出差別：
+ *   · 品牌語氣：語氣還沒寫就先問「你的品牌講話像哪一種人」
+ *   · 用詞規範：照三張卡的條數講，缺什麼講什麼
+ *   · 產業用語：從這一行的紅線切入
+ *
+ * 共同點是**都不給按鈕**——文字頁沒有可以開的面板，給一顆會跳到品牌健檢的
+ * 按鈕就是答非所問（產品總監那次的同一個教訓）。
+ *
+ * 匯出給測試：開場白錯了不會壞畫面，只會讓使用者覺得這個角色沒在看他的資料。
+ */
+export function copyOpeningText(args: {
+  hi: string;
+  en: boolean;
+  roleId: string;
+  roleLabel: string;
+  roleLabelEn: string;
+  counts: { preferred: number; banned: number; abbr: number; voice: boolean };
+}): string {
+  const { hi, en, roleId, counts } = args;
+  const role = en ? args.roleLabelEn : args.roleLabel;
+  const total = counts.preferred + counts.banned + counts.abbr;
+
+  if (roleId === "copy_voice") {
+    if (!counts.voice) {
+      return en
+        ? `${hi} I work on ${role}. There's no brand voice written down yet — the fastest way in is one sentence: what kind of person does your brand sound like? Tell me that and I'll turn it into tone dimensions you can actually write against.`
+        : `${hi}我看的是${role}這一塊。這個品牌的口吻還沒寫下來——最快的起手式是一句話：你的品牌講話像哪一種人？講給我聽，我把它拆成寫得出來的語氣維度（正式↔親近、理性↔感性），而不是一串形容詞。`;
+    }
+    return en
+      ? `${hi} I work on ${role}. Your brand voice is written down — want me to pressure-test it? Give me a post you've published and I'll tell you where it drifts from the voice you defined.`
+      : `${hi}我看的是${role}這一塊。你的品牌口吻已經寫下來了——要不要壓力測試一下？貼一篇你實際發過的貼文給我，我指出哪幾句跟你定義的語氣對不上。`;
+  }
+
+  if (roleId === "copy_industry") {
+    return en
+      ? `${hi} I work on ${role}. Every category has words that get you in trouble and words everyone already overuses. Tell me what you sell and I'll give you both lists — what you can't claim, and what's too generic to bother saying.`
+      : `${hi}我看的是${role}這一塊。每一行都有兩種詞：說了會出事的（法規紅線），跟大家都在說、所以說了等於沒說的。告訴我你賣什麼，我把這兩份清單給你——哪些不能宣稱、哪些講了不如不講。`;
+  }
+
+  // copy_terms（預設）：照三張卡的條數講
+  if (total === 0) {
+    return en
+      ? `${hi} I work on ${role}. Your word rules are still empty. Start with banned words — they're hard-checked on every piece of copy, so one entry changes every future post. Give me three words that make you wince and I'll fill in the variants plus what to say instead.`
+      : `${hi}我看的是${role}這一塊。你的用詞規則目前是空的。建議從**禁用詞**開始——它會在每次產出時硬檢查，填一條就影響之後每一篇。先給我三個你看到會皺眉的詞，我幫你補上同義變形，還有「改說什麼」。`;
+  }
+  if (counts.banned > 0 && counts.preferred === 0) {
+    return en
+      ? `${hi} I work on ${role}. You have ${counts.banned} banned word(s) but no preferred terms yet — banning without a replacement means the same mistake comes back in different words. Want me to propose the "say this instead" side?`
+      : `${hi}我看的是${role}這一塊。你有 ${counts.banned} 個禁用詞，但推薦用詞還是空的——只禁不給替代，同一個錯只會換個說法再回來。要我幫你補「那該說什麼」那一半嗎？`;
+    }
+  if (counts.preferred > 0 && counts.banned === 0) {
+    return en
+      ? `${hi} I work on ${role}. You have ${counts.preferred} preferred term(s). The other half is what to avoid — banned words are hard-checked on every output, so they're the ones that actually bite. Shall we find yours?`
+      : `${hi}我看的是${role}這一塊。你已經有 ${counts.preferred} 個推薦用詞。另一半是「不要說什麼」——禁用詞會在產出時硬檢查，是真正咬得住的那一半。要不要一起把它補上？`;
+  }
+  return en
+    ? `${hi} I work on ${role}. You've got ${counts.preferred} preferred, ${counts.banned} banned and ${counts.abbr} abbreviation pair(s). Paste any copy you've published and I'll check it against all three — that's the fastest way to find the rules you're missing.`
+    : `${hi}我看的是${role}這一塊。你目前有 ${counts.preferred} 個推薦用詞、${counts.banned} 個禁用詞、${counts.abbr} 組縮寫對照。貼一段你實際發過的文案給我，我用這三份規則對一遍——漏掉的規則通常是這樣被找出來的，不是憑空想出來的。`;
+}
+
+async function buildCopyOpening(
+  brandId: number, userId: number, brandName: string, en: boolean,
+  director: StrategistDirector, hi: string,
+): Promise<string> {
+  void brandName;
+  const counts = await copyAssetCounts(brandId, userId);
+  return copyOpeningText({
+    hi, en, roleId: director.roleId,
+    roleLabel: director.roleLabel, roleLabelEn: director.roleLabelEn,
+    counts,
+  });
 }
 
 /** 訊息上的 contextSnapshot 是 JSON 欄位，驅動可能回字串也可能回物件。 */
@@ -574,6 +700,23 @@ export const strategistChatRouter = router({
           conversationId, role: "strategist", content: opening.content,
           contextSnapshot: opening.actions.length > 0 ? { actions: opening.actions } : undefined,
         });
+        messages = await loadMessages(conversationId, 60);
+      } else if (messages.length === 1 && isStaleOpening(messages[0], director)) {
+        // 2026-09-26（CJ 回報用詞總監第一句還在講策略健檢）：開場白是**對話建立
+        // 當下寫進 DB 的**，所以改程式不會動到已經存在的那一句。使用者看到的
+        // 還是舊的。
+        //
+        // 只在「這串還沒有人講過話（只有開場白那一則）」時重寫——有對話紀錄之後
+        // 改寫歷史是另一回事，那會讓人懷疑自己記錯了。
+        const [brandRows]: any = await localPool.execute(
+          `SELECT name FROM brands WHERE id = ? AND userId = ? LIMIT 1`, [input.brandId, userId],
+        );
+        const brandName = (brandRows as any[])[0]?.name ?? "";
+        const opening = await buildProactiveOpening(input.brandId, userId, brandName, false, director);
+        await localPool.execute(
+          `UPDATE strategist_messages SET content = ?, contextSnapshot = NULL WHERE id = ?`,
+          [opening.content, messages[0]!.id],
+        );
         messages = await loadMessages(conversationId, 60);
       }
       return {
