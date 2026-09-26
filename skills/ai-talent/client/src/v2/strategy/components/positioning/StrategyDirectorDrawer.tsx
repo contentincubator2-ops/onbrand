@@ -56,6 +56,7 @@ import {
 } from "../../lib/strategistDirectors";
 import StrategyDirectorChat from "./StrategyDirectorChat";
 import { DirectorRoster, DirectorProfile } from "./StrategyDirectorPicker";
+import StrategyHistoryModal from "./StrategyHistoryModal";
 
 /** 三個檢視共用的高度——切換檢視時面板不會變大變小。 */
 const PANEL_HEIGHT = 440;
@@ -110,6 +111,10 @@ export default function StrategyDirectorDrawer({ brandId }: { brandId: number | 
   // 這一輪剛從搜尋挑的人——後端要等下一次查詢才會帶他回來，中間這段時間得先
   // 靠這個 state 撐著，不然按下「找他聊」會瞬間變成「找不到策略總監」。
   const [pickedExtra, setPickedExtra] = React.useState<StrategistDirector | null>(null);
+  // 2026-09-26（CJ「按一個鈕，跳出一個視窗，決定要看跟哪個 AGENT 的對話紀錄」）：
+  // 歷史視窗掛在這一層，因為選了別位的紀錄要連人一起換——agentId 由這裡管。
+  const [historyOpen, setHistoryOpen] = React.useState(false);
+  const [viewingConversationId, setViewingConversationId] = React.useState<number | null>(null);
   const directors: StrategistDirector[] = React.useMemo(() => (
     pickedExtra && !fetched.some((d) => d.agentId === pickedExtra.agentId)
       ? [...fetched, pickedExtra]
@@ -130,7 +135,10 @@ export default function StrategyDirectorDrawer({ brandId }: { brandId: number | 
   }, [brandId, directors, scope]);
   // 換品牌、或在品牌頁/產品頁之間切換，都要重選一次預設人選——那是兩組
   // 不同的角色，沿用上一組的選擇會變成「產品頁掛著品牌定位總監」。
-  React.useEffect(() => { setAgentId(null); setPickedExtra(null); setView("chat"); }, [brandId, scope]);
+  React.useEffect(() => {
+    setAgentId(null); setPickedExtra(null); setView("chat");
+    setViewingConversationId(null); setHistoryOpen(false);
+  }, [brandId, scope]);
 
   const current = React.useMemo(
     () => directors.find((d) => d.agentId === agentId) ?? null,
@@ -141,6 +149,7 @@ export default function StrategyDirectorDrawer({ brandId }: { brandId: number | 
     setPickedExtra(d);          // 搜尋來的人先留在本地，下一次 listDirectors 會正式帶回來
     setAgentId(d.agentId);
     if (brandId) writeStoredDirector(brandId, d.agentId, scope);
+    setViewingConversationId(null);   // 換人＝回到那個人的目前這串，不要沿用上一位的歷史
     setView("chat");
   };
 
@@ -353,10 +362,32 @@ export default function StrategyDirectorDrawer({ brandId }: { brandId: number | 
               height={PANEL_HEIGHT}
               onOpenMonitor={() => { setOpen(false); navigate(`/brands/edit?b=${brandId}&cat=positioning&tool=monitor`); }}
               onOpenHealthCheck={() => { setOpen(false); navigate(`/brands/edit?b=${brandId}&cat=positioning&tool=healthcheck`); }}
+              onOpenHistory={() => setHistoryOpen(true)}
+              viewingConversationId={viewingConversationId}
+              onBackToCurrent={() => setViewingConversationId(null)}
             />
           )}
         </div>
       )}
+
+      {/* 對話紀錄：先選人、再選那串。選了別位就連人一起換——不然畫面上會
+          出現「A 的名字配 B 的對話」。 */}
+      <StrategyHistoryModal
+        open={historyOpen}
+        onClose={() => setHistoryOpen(false)}
+        brandId={brandId}
+        scope={scope}
+        currentAgentId={agentId}
+        onPickConversation={(nextAgentId, conversationId) => {
+          if (nextAgentId !== agentId) {
+            setAgentId(nextAgentId);
+            if (brandId) writeStoredDirector(brandId, nextAgentId, scope);
+          }
+          setViewingConversationId(conversationId);
+          setView("chat");
+          setOpen(true);
+        }}
+      />
     </>
   );
 }
