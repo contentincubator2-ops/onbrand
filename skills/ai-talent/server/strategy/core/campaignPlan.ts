@@ -140,11 +140,39 @@ export function planBeats(args: {
   });
 }
 
-/** 這個通路可以用的卡（30s／60s；99s 是整包企劃級，不排進日更節奏）。 */
+/**
+ * 零件卡：產出是「一篇貼文的一部分」，不是可以直接發出去的東西。
+ *
+ * 2026-09-26（CJ「剛剛生出來的文案，顯示得很奇怪」的根源，以及「現在的顯示方式
+ * 很複雜」的一部分）：企劃是一張**發布時間表**，每一行代表「這天要發這個」。
+ * 把「FB 廣告 CTA 5 種」「IG 主題標籤 30 個」這種素材零件排進去，使用者得自己
+ * 判斷哪幾行不是貼文——而且那幾行的產出放進貼文版型時一定長得很怪。
+ *
+ * 這些卡沒有消失，它們在任務庫裡照樣可以用；需要時也可以從企劃某一行的「⋯」
+ * 叫出來當那一篇的附屬素材。這裡只是不讓它們自己佔一行。
+ */
+const PART_CARD_PATTERNS: RegExp[] = [
+  /ad-(headline|primary|cta|description)$/,   // 廣告欄位：標題／主文／CTA／說明
+  /pure-text-hook|reel-hook/,                  // 開場鉤子（搭配你自己的原文用）
+  /hashtag-set/,                               // 標籤組
+  /comment-reply|comment-signal/,              // 留言回覆：反應型，不是排得出日期的
+  /bio-rewrite|profile-self-insert|highlight-suite/, // 個人檔案，不屬於檔期
+  /dm-script/,
+  /repost-strategy/,                           // 策略建議，不是一篇內容
+];
+
+export function isPartCard(taskId: string): boolean {
+  return PART_CARD_PATTERNS.some((re) => re.test(taskId));
+}
+
+/**
+ * 這個通路可以用的卡：30s／60s（99s 是整包企劃級，不排進日更節奏），
+ * 而且必須是「整篇可以發的」。
+ */
 export function candidateCards(channels: string[]): CatalogTask[] {
   const wanted = new Set(channels.map((c) => c.toLowerCase()));
   return buildTaskCatalogIndex().filter(
-    (t) => wanted.has(t.platform) && (t.tier === "30s" || t.tier === "60s"),
+    (t) => wanted.has(t.platform) && (t.tier === "30s" || t.tier === "60s") && !isPartCard(t.id),
   );
 }
 
@@ -302,6 +330,96 @@ async function eventFacts(eventId: number, userId: number): Promise<{
     startAt: row.startAt ? new Date(row.startAt) : null,
     endAt: row.endAt ? new Date(row.endAt) : null,
     settings, products,
+  };
+}
+
+/** 可以排進企劃的通路——推斷結果只能落在這裡面。 */
+export const PLANNABLE_CHANNELS = [
+  "facebook", "instagram", "email", "pr", "website", "linkedin", "threads", "x", "youtube", "tiktok",
+] as const;
+
+export interface InferredSettings {
+  type: CampaignTypeId;
+  mechanic: string;
+  goal: string;
+  channels: string[];
+  productIds: number[];
+  /** 講給使用者看的一行摘要（猜錯才需要點開改）。 */
+  summary: string;
+}
+
+const INFER_SYSTEM = `你在幫行銷人員把一段隨手寫的活動說明，整理成系統需要的設定。
+
+鐵則：
+- **只整理，不發明**。使用者沒寫的優惠內容、折數、期限，一個字都不要加。
+- mechanic 要盡量逐字保留使用者寫的機制（折數、門檻、期限、限量）；他沒寫就留空字串。
+- channels 只能從提供的清單裡挑，挑 2–3 個最合理的。
+- productIds 只能從提供的產品清單裡挑，挑使用者明確提到或明顯對應的；不確定就回空陣列。
+- 只輸出 JSON，不要任何說明文字。`;
+
+/**
+ * 從一段自由文字推斷活動設定。
+ *
+ * 2026-09-26（CJ「我怎麼還是覺得，現在的顯示方式很複雜」）：原本設定區要使用者
+ * 回答 24 個控制項（6 種類型 chips、10 個通路 chips、產品、目標、合作模組…），
+ * 而這些答案幾乎都寫在他腦子裡那一句「中秋檔期，橫膈牛排跟牛舌組合 85 折，
+ * 9/20 到 9/28」裡面。所以改成：他寫那一句，我們推斷，**結果用一行摘要呈現**，
+ * 猜錯才點開改。
+ *
+ * 「提案不自動套用」：這支只回建議值，要不要採用由前端讓使用者確認。
+ */
+export async function inferCampaignSettings(args: {
+  eventId: number;
+  userId: number;
+  brief: string;
+}): Promise<InferredSettings> {
+  const facts = await eventFacts(args.eventId, args.userId);
+  if (!facts) throw new Error("找不到這個活動");
+
+  const productList = facts.products.length
+    ? facts.products.map((p) => `- id ${p.id}｜${p.name}`).join("\n")
+    : "（這個品牌還沒有建立產品）";
+
+  const typeList = CAMPAIGN_TYPE_IDS.map((t) => `- ${t}`).join("\n");
+
+  const user = [
+    `【品牌】${facts.brandName}`,
+    `【活動名稱】${facts.name}`,
+    facts.startAt ? `【期間】${facts.startAt.toISOString().slice(0, 10)} ~ ${facts.endAt ? facts.endAt.toISOString().slice(0, 10) : "?"}` : "",
+    `【使用者寫的活動說明】\n${args.brief.trim() || "（沒有寫）"}`,
+    `【可選的活動類型】\n${typeList}`,
+    `【可選的通路】\n${PLANNABLE_CHANNELS.map((c) => `- ${c}`).join("\n")}`,
+    `【這個品牌的產品】\n${productList}`,
+    "",
+    "只輸出 JSON，鍵名固定如下：",
+    `{"type":"活動類型 id","mechanic":"優惠機制（逐字保留使用者寫的數字與期限）","goal":"想達成什麼（使用者沒寫就空字串）","channels":["通路id"],"productIds":[產品id],"summary":"一行摘要（20字內，例如「促銷折扣・FB+IG・橫膈牛排、牛舌」）"}`,
+  ].filter(Boolean).join("\n");
+
+  const { invokeLLM } = await import("../../platform/core/llm.js");
+  const r = await invokeLLM({
+    messages: [{ role: "system", content: INFER_SYSTEM }, { role: "user", content: user }],
+    maxTokens: 700,
+  });
+  const parsed = safeJSON<any>(String(r.choices?.[0]?.message?.content ?? ""), null);
+  if (!parsed) throw new Error("讀不懂這段活動說明，請再寫具體一點（賣什麼、優惠是什麼、到什麼時候）");
+
+  // 驗證與確定性修補：推斷出來的東西一律關在合法值域內，不然下游會拿到
+  // 不存在的通路／別人的產品 id。
+  const type = (CAMPAIGN_TYPE_IDS as readonly string[]).includes(parsed?.type) ? parsed.type : "promo_discount";
+  const channels = (Array.isArray(parsed?.channels) ? parsed.channels : [])
+    .map((c: any) => String(c).toLowerCase())
+    .filter((c: string) => (PLANNABLE_CHANNELS as readonly string[]).includes(c));
+  const validIds = new Set(facts.products.map((p) => p.id));
+  const productIds = (Array.isArray(parsed?.productIds) ? parsed.productIds : [])
+    .map((n: any) => Number(n)).filter((n: number) => validIds.has(n));
+
+  return {
+    type: type as CampaignTypeId,
+    mechanic: typeof parsed?.mechanic === "string" ? parsed.mechanic.trim().slice(0, 600) : "",
+    goal: typeof parsed?.goal === "string" ? parsed.goal.trim().slice(0, 300) : "",
+    channels: channels.length ? channels : ["facebook", "instagram"],
+    productIds,
+    summary: typeof parsed?.summary === "string" ? parsed.summary.trim().slice(0, 60) : "",
   };
 }
 

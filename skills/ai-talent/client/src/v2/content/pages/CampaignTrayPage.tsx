@@ -1,23 +1,21 @@
 /**
- * CampaignTrayPage — 內容層的「活動」tray：把策略層排好的企劃，一篇一篇寫出來。
+ * CampaignTrayPage — 內容層的「活動」：把策略層排好的企劃，一天一天寫出來。
  *
- * 2026-09-25（CJ「在內容層增加活動的 mission tray，當我新增活動企劃時，就會出現
- * 該活動的任務卡，並且可以一次撰寫完企劃時，想要寫的內容」）。
+ * 2026-09-25（CJ「在內容層增加活動的 mission tray」）
+ * 2026-09-26（CJ「點進去，會展開該活動的時間與發佈平台的圖，每天的內容點進去，
+ * 可以跳出視窗，看到預計要發布的內容」）——這一版把卡片牆換成**檔期日曆**。
  *
- * ── 這一頁的邊界 ─────────────────────────────────────────────────────
- * 策略層（活動企劃頁）決定「要做什麼」，這裡只負責「寫出來」。所以這一頁**沒有**
- * 任何「要不要做這篇」的決策——沒有增刪格子、沒有改日期。要改順序或切角，回企劃頁。
+ * 為什麼換：活動本來就是一張時間表。第一版把它畫成一格一格的卡片，時間維度整個
+ * 消失了——使用者得自己從八張卡的角標上把日期拼回來。日曆讓「哪幾天有東西要發、
+ * 分在哪些平台」變成一眼的事，而細節收在點擊之後。
  *
- * 讀的是同一筆資料（campaign.get → events.positioning.campaignPlan），不是複製
- * 一份再同步：策略層改了切角，這裡下一次進來就是新的。
+ * 三層資訊，一層只做一件事：
+ *   1. 沒帶活動 → 哪幾檔活動、進度多少
+ *   2. 帶了活動 → 日曆：每一天有什麼平台要發（有寫完的打勾）
+ *   3. 點某一天 → 視窗：那天要發的內容（用跟其他任務頁同一個卡殼），按下去開始寫
  *
- * ── 兩層結構 ─────────────────────────────────────────────────────────
- *   沒有 ?e=  → 列出這個品牌有企劃的活動（每檔一列：期間、進度）
- *   有 ?e=    → 這檔活動要寫的任務卡（用 TaskCardShell，跟平台任務卡同一個殼）
- *
- * ?start=1 會自動開第一張還沒寫的卡，?item=<id> 會直接開那一張——「開始撰寫」跟
- * 單格「去寫這篇」都從企劃頁帶著這兩個參數過來。交棒是明說的一個動作，不是丟一個
- * 列表讓使用者自己再找一次。
+ * 讀的是同一筆 campaignPlan（策略層改了切角，這裡下一次進來就是新的）；這一頁
+ * 沒有「要不要做這篇」的決策，那是策略層的事。
  */
 import React from "react";
 import { useNavigate, useSearchParams, useOutletContext } from "react-router-dom";
@@ -26,13 +24,17 @@ import { useLang } from "../../../lib/i18n";
 import type { ShellOutletCtx } from "../../app/shell/ShellLayout";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faFacebookF, faInstagram, faLinkedinIn, faYoutube, faTiktok, faXTwitter } from "@fortawesome/free-brands-svg-icons";
-import { faEnvelope, faBullhorn, faGlobe, faPenNib, faCheck } from "@fortawesome/free-solid-svg-icons";
+import { faEnvelope, faBullhorn, faGlobe, faPenNib, faCheck, faXmark } from "@fortawesome/free-solid-svg-icons";
 import { TaskCardShell, TaskCardAvatar } from "../components/TaskCardShell";
-import { CAMPAIGN_PHASES } from "../../strategy/lib/campaignSchema";
+import { phaseOf } from "../../strategy/lib/campaignSchema";
+import { weeksFor } from "../lib/campaignCalendar";
+
+const ymd = (d: Date) => d.toISOString().slice(0, 10);
 
 const INK = "#171717";
 const MUTED = "#737373";
 const LINE = "#E5E5E5";
+const SURFACE = "#FAFAF9";
 
 const PLATFORM_META: Record<string, { icon: any; bg: string; route: string; label: string }> = {
   facebook:  { icon: faFacebookF,  bg: "#1877F2", route: "fb",    label: "Facebook" },
@@ -68,6 +70,8 @@ export default function CampaignTrayPage() {
   const startFlag = searchParams.get("start") === "1";
   const wantItem = searchParams.get("item");
 
+  const [openDay, setOpenDay] = React.useState<string | null>(null);
+
   const listQ = (trpc as any).campaign.trayList.useQuery(
     { brandId: brandId ?? 0 }, { enabled: !!brandId && !eventId, refetchOnWindowFocus: false },
   );
@@ -75,7 +79,6 @@ export default function CampaignTrayPage() {
     { eventId: eventId ?? 0 }, { enabled: !!eventId, refetchOnWindowFocus: false },
   );
 
-  /** 開一張卡去寫：帶著活動、企劃格子與切角，使用者不必再選一次產品或重打折數。 */
   const openItem = React.useCallback((item: any) => {
     const m = metaOf(item.platform);
     const sp = new URLSearchParams();
@@ -86,7 +89,7 @@ export default function CampaignTrayPage() {
     navigate(`/tasks/${m.route}?${sp.toString()}`);
   }, [eventId, navigate]);
 
-  // ?start=1 / ?item= 的自動開卡。只跑一次——跑兩次會在使用者按上一頁時又把他彈走。
+  // ?start=1 / ?item= 的自動開卡：交棒要一路到底，不是把人丟在日曆前面再找一次。
   const firedRef = React.useRef(false);
   React.useEffect(() => {
     if (firedRef.current || !oneQ.data?.plan?.items?.length) return;
@@ -105,11 +108,11 @@ export default function CampaignTrayPage() {
     const live = rows.filter((r) => !r.ended);
     const ended = rows.filter((r) => r.ended);
     return (
-      <div style={{ padding: "28px 28px 40px", maxWidth: 900 }}>
+      <div style={{ padding: "28px 28px 40px", maxWidth: 860 }}>
         <h1 style={{ fontSize: 20, fontWeight: 700, color: INK, margin: 0 }}>{L("活動", "Campaigns")}</h1>
         <p style={{ fontSize: 13, color: MUTED, marginTop: 6, lineHeight: 1.7 }}>
-          {L("這裡是照企劃一篇一篇寫的地方。要改企劃內容（節奏、切角、用哪張卡），回策略層的活動頁。",
-             "Write the plan out, one post at a time. To change the plan itself, go back to the campaign page in Strategy.")}
+          {L("照企劃一天一天寫。要改企劃本身（節奏、切角、用哪張卡），回策略層的活動頁。",
+             "Write the plan out day by day. To change the plan itself, go back to the campaign page in Strategy.")}
         </p>
 
         {listQ.isLoading && <p style={{ fontSize: 13, color: MUTED }}>{L("載入中…", "Loading…")}</p>}
@@ -117,12 +120,10 @@ export default function CampaignTrayPage() {
 
         {!listQ.isLoading && !listQ.error && rows.length === 0 && (
           <div style={{ border: `1px solid ${LINE}`, borderRadius: 10, padding: 20, marginTop: 16 }}>
-            <p style={{ fontSize: 13, color: INK, margin: 0, fontWeight: 600 }}>
-              {L("還沒有任何活動企劃", "No campaign plans yet")}
-            </p>
+            <p style={{ fontSize: 13, color: INK, margin: 0, fontWeight: 600 }}>{L("還沒有任何活動企劃", "No campaign plans yet")}</p>
             <p style={{ fontSize: 12, color: MUTED, margin: "6px 0 12px", lineHeight: 1.7 }}>
-              {L("任務卡是從企劃長出來的：先到策略層建立活動、填好優惠機制，產生宣傳企劃之後，這裡就會出現要寫的卡。",
-                 "Cards here come from a plan: create the campaign in Strategy, fill in the offer, generate the plan — then the cards appear here.")}
+              {L("這裡的內容是從企劃長出來的：先到策略層建立活動、寫一句「賣什麼、優惠是什麼」，排出企劃之後這裡就會有東西。",
+                 "Everything here comes from a plan: create the campaign in Strategy, say what's on offer, build the plan — then it shows up here.")}
             </p>
             <button onClick={() => navigate(`/brands/edit?cat=events${brandId ? `&b=${brandId}` : ""}`)} style={btn(true)}>
               {L("去建立活動企劃", "Go set up a campaign")}
@@ -137,14 +138,11 @@ export default function CampaignTrayPage() {
               <div style={{ display: "grid", gap: 8 }}>
                 {(list as any[]).map((r) => (
                   <button key={r.id} onClick={() => navigate(`/campaigns?b=${brandId}&e=${r.id}`)}
-                    style={{
-                      textAlign: "left", border: `1px solid ${LINE}`, borderRadius: 10, padding: "12px 14px",
-                      background: "#fff", cursor: "pointer", display: "grid", gap: 4,
-                    }}>
+                    style={{ textAlign: "left", border: `1px solid ${LINE}`, borderRadius: 10, padding: "12px 14px", background: "#fff", cursor: "pointer", display: "grid", gap: 4 }}>
                     <div style={{ fontSize: 14, fontWeight: 600, color: INK }}>{r.name}</div>
                     <div style={{ fontSize: 12, color: MUTED }}>
                       {r.startAt ? `${r.startAt} → ${r.endAt ?? "?"}` : L("未設定期間", "No dates")}
-                      {`　｜　${r.done}/${r.total} ${L("已寫", "written")}`}
+                      {`　·　${r.done}/${r.total} ${L("已寫", "written")}`}
                     </div>
                     <div style={{ height: 4, borderRadius: 999, background: "#F5F4F2", overflow: "hidden" }}>
                       <div style={{ width: `${r.total ? (r.done / r.total) * 100 : 0}%`, height: "100%", background: INK }} />
@@ -159,14 +157,20 @@ export default function CampaignTrayPage() {
     );
   }
 
-  // ── 層二：這檔活動要寫的任務卡 ──
+  // ── 層二：檔期日曆 ──
   const plan = oneQ.data?.plan;
   const ev = oneQ.data?.event;
   const items: any[] = (plan?.items ?? []).filter((i: any) => i.enabled);
   const done = items.filter((i) => !!i.outputId).length;
+  const byDay = new Map<string, any[]>();
+  for (const i of items) byDay.set(i.date, [...(byDay.get(i.date) ?? []), i]);
+  const weeks = weeksFor(items.map((i) => i.date));
+  const today = ymd(new Date());
+  const dayItems = openDay ? (byDay.get(openDay) ?? []) : [];
+  const WEEKDAYS = en ? ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] : ["一", "二", "三", "四", "五", "六", "日"];
 
   return (
-    <div style={{ padding: "28px 28px 40px" }}>
+    <div style={{ padding: "28px 28px 40px", maxWidth: 980 }}>
       <button onClick={() => navigate(`/campaigns${brandId ? `?b=${brandId}` : ""}`)}
         style={{ ...btn(), padding: "4px 10px", fontSize: 12, marginBottom: 12 }}>
         {L("← 所有活動", "← All campaigns")}
@@ -176,14 +180,15 @@ export default function CampaignTrayPage() {
       {oneQ.error && <p style={{ fontSize: 13, color: "#B91C1C" }}>{String(oneQ.error?.message ?? "").slice(0, 200)}</p>}
 
       {ev && (
-        <>
-          <h1 style={{ fontSize: 20, fontWeight: 700, color: INK, margin: 0 }}>{ev.name}</h1>
-          <div style={{ fontSize: 12, color: MUTED, marginTop: 6 }}>
-            {plan?.smp ? `${plan.smp}　｜　` : ""}
-            {`${done}/${items.length} ${L("已寫", "written")}`}
-            {ev.startAt ? `　｜　${ev.startAt} → ${ev.endAt ?? "?"}` : ""}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", gap: 12, flexWrap: "wrap" }}>
+          <div>
+            <h1 style={{ fontSize: 20, fontWeight: 700, color: INK, margin: 0 }}>{ev.name}</h1>
+            <div style={{ fontSize: 12, color: MUTED, marginTop: 6 }}>
+              {plan?.smp ? `${plan.smp}　·　` : ""}{`${done}/${items.length} ${L("已寫", "written")}`}
+              {ev.startAt ? `　·　${ev.startAt} → ${ev.endAt ?? "?"}` : ""}
+            </div>
           </div>
-          <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap" }}>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             {items.some((i) => !i.outputId) && (
               <button onClick={() => { const n = items.find((i) => !i.outputId); if (n) openItem(n); }} style={btn(true)}>
                 {L("從下一篇開始寫", "Write the next one")}
@@ -193,7 +198,7 @@ export default function CampaignTrayPage() {
               {L("回企劃調整", "Edit the plan")}
             </button>
           </div>
-        </>
+        </div>
       )}
 
       {plan && items.length === 0 && (
@@ -203,36 +208,115 @@ export default function CampaignTrayPage() {
         </p>
       )}
 
-      {/* 依檔期節奏分段。卡片用的是跟平台任務卡同一個殼（TaskCardShell）。 */}
-      {CAMPAIGN_PHASES.map((ph) => {
-        const rows = items.filter((i) => i.phase === ph.id);
-        if (!rows.length) return null;
-        return (
-          <div key={ph.id} style={{ marginTop: 24 }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: INK, marginBottom: 2 }}>{en ? ph.en : ph.zh}</div>
-            <div style={{ fontSize: 12, color: MUTED, marginBottom: 10 }}>{ph.purposeZh}</div>
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-              {rows.map((i) => {
+      {/* 日曆：一眼看出哪幾天有東西、分在哪些平台 */}
+      {weeks.length > 0 && (
+        <div style={{ marginTop: 18, border: `1px solid ${LINE}`, borderRadius: 10, overflow: "hidden" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", background: SURFACE }}>
+            {WEEKDAYS.map((d) => (
+              <div key={d} style={{ fontSize: 11, color: MUTED, textAlign: "center", padding: "6px 0", fontWeight: 600 }}>{d}</div>
+            ))}
+          </div>
+          {weeks.map((week, wi) => (
+            <div key={wi} style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", borderTop: `1px solid ${LINE}` }}>
+              {week.map((day) => {
+                const list = byDay.get(day) ?? [];
+                const allDone = list.length > 0 && list.every((i) => !!i.outputId);
+                const isToday = day === today;
+                return (
+                  <button
+                    key={day}
+                    onClick={() => list.length && setOpenDay(day)}
+                    disabled={!list.length}
+                    style={{
+                      minHeight: 86, textAlign: "left", padding: "6px 8px", background: list.length ? "#fff" : SURFACE,
+                      border: "none", borderLeft: `1px solid ${LINE}`, cursor: list.length ? "pointer" : "default",
+                      display: "flex", flexDirection: "column", gap: 6,
+                    }}
+                  >
+                    <span style={{
+                      fontSize: 11, fontWeight: isToday ? 700 : 500,
+                      color: list.length ? INK : "#C4C4C4",
+                      fontVariantNumeric: "tabular-nums",
+                      ...(isToday ? { background: INK, color: "#fff", borderRadius: 999, padding: "1px 6px", alignSelf: "flex-start" } : {}),
+                    }}>
+                      {Number(day.slice(8))}
+                    </span>
+                    <div style={{ display: "flex", gap: 4, flexWrap: "wrap", alignItems: "center" }}>
+                      {list.map((i) => {
+                        const m = metaOf(i.platform);
+                        return (
+                          <span key={i.id} title={`${m.label}｜${i.angle}`}
+                            style={{
+                              width: 18, height: 18, borderRadius: 999, background: m.bg,
+                              display: "inline-flex", alignItems: "center", justifyContent: "center",
+                              opacity: i.outputId ? 0.45 : 1,
+                            }}>
+                            <FontAwesomeIcon icon={m.icon} className="text-white" style={{ fontSize: 9 }} />
+                          </span>
+                        );
+                      })}
+                      {allDone && <FontAwesomeIcon icon={faCheck} style={{ fontSize: 10, color: "#15803D" }} />}
+                    </div>
+                    {list.length > 0 && (
+                      <span style={{ fontSize: 10, color: MUTED, lineHeight: 1.4, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
+                        {list[0]!.angle}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* 某一天的內容：一天通常一到兩則，用跟其他任務頁同一個卡殼 */}
+      {openDay && (
+        <div
+          role="dialog" aria-modal="true"
+          onClick={(e) => { if (e.target === e.currentTarget) setOpenDay(null); }}
+          style={{ position: "fixed", inset: 0, zIndex: 1000, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}
+        >
+          <div style={{ background: "#fff", borderRadius: 14, width: "100%", maxWidth: 620, maxHeight: "88vh", overflowY: "auto", padding: 20 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, marginBottom: 14 }}>
+              <div>
+                <div style={{ fontSize: 16, fontWeight: 600, color: INK }}>
+                  {openDay.replace(/^\d{4}-/, "").replace("-", " / ")}
+                  <span style={{ fontSize: 12, fontWeight: 400, color: MUTED }}>
+                    {"　"}{L(`預計發布 ${dayItems.length} 則`, `${dayItems.length} scheduled`)}
+                  </span>
+                </div>
+                <div style={{ fontSize: 12, color: MUTED, marginTop: 2 }}>{ev?.name}</div>
+              </div>
+              <button onClick={() => setOpenDay(null)} aria-label="close" style={{ ...btn(), padding: "4px 10px" }}>
+                <FontAwesomeIcon icon={faXmark} />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {dayItems.map((i) => {
                 const m = metaOf(i.platform);
+                const ph = phaseOf(i.phase);
                 const written = !!i.outputId;
                 return (
                   <TaskCardShell
                     key={i.id}
-                    onClick={() => (written && i.outputId ? navigate(`/run/${i.outputId}`) : openItem(i))}
-                    ariaLabel={i.taskLabel}
+                    onClick={() => (written ? navigate(`/run/${i.outputId}`) : openItem(i))}
+                    ariaLabel={i.angle}
                     media={<>
                       <TaskCardAvatar src={dicebear(i.taskId)} />
                       <span className="absolute top-2 right-2 text-tiny font-bold px-2 py-0.5 rounded-full text-white shadow-sm"
                         style={{ background: written ? "#15803D" : INK, fontSize: 12, letterSpacing: "0.06em" }}>
-                        {written ? <><FontAwesomeIcon icon={faCheck} /> {L("已寫", "done")}</> : i.date.slice(5).replace("-", "/")}
+                        {written ? <><FontAwesomeIcon icon={faCheck} /> {L("已寫", "done")}</> : (ph ? (en ? ph.en : ph.zh) : "")}
                       </span>
                       <div className="absolute top-2 left-2 w-5 h-5 rounded-full flex items-center justify-center" style={{ background: m.bg }}>
                         <FontAwesomeIcon icon={m.icon} className="text-white" style={{ fontSize: 12 }} />
                       </div>
                     </>}
                   >
-                    <p className="text-small font-semibold leading-tight line-clamp-2">{i.taskLabel}</p>
-                    <p className="text-tiny text-default-500 line-clamp-3">{i.angle}</p>
+                    {/* 主角是「這則要發什麼」，用哪張卡是實作細節（降成小字） */}
+                    <p className="text-small font-semibold leading-snug line-clamp-3">{i.angle}</p>
+                    <p className="text-tiny text-default-400 line-clamp-1">{i.taskLabel}</p>
                     <div className="mt-auto pt-2 flex items-center gap-2 border-t border-default-100">
                       <span className="text-tiny font-medium text-default-700 truncate">
                         {written ? L("看產出 →", "View output →") : L("開始寫 →", "Write it →")}
@@ -243,8 +327,8 @@ export default function CampaignTrayPage() {
               })}
             </div>
           </div>
-        );
-      })}
+        </div>
+      )}
     </div>
   );
 }

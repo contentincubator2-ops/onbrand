@@ -23,7 +23,7 @@ import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure } from "../../platform/core/trpc";
 import localPool from "../../localDb";
-import { buildCampaignPlan, type CampaignPlan } from "../core/campaignPlan";
+import { buildCampaignPlan, inferCampaignSettings, type CampaignPlan } from "../core/campaignPlan";
 
 const settingsInput = z.object({
   type: z.string().max(40),
@@ -123,6 +123,24 @@ export const campaignRouter = router({
         /** 舊的 11 段得獎 brief 還在不在——進階模式的入口要不要亮由這個決定。 */
         hasLegacyBrief: ["brief", "smp", "creative", "awards"].some((k) => !!pos?.[k]),
       };
+    }),
+
+  /**
+   * 從一段自由文字推斷設定。**只回建議值，不寫入**——要不要採用由使用者確認。
+   *
+   * 2026-09-26（CJ「現在的顯示方式很複雜」）：設定區原本要回答 24 個控制項，
+   * 而答案幾乎都在使用者腦子裡那一句話裡。改成他寫一句，我們推斷，畫面只呈現
+   * 一行摘要。
+   */
+  infer: protectedProcedure
+    .input(z.object({ eventId: z.number().int().positive(), brief: z.string().max(2000) }))
+    .mutation(async ({ ctx, input }) => {
+      await loadEvent(input.eventId, ctx.user!.id);
+      try {
+        return await inferCampaignSettings({ eventId: input.eventId, userId: ctx.user!.id, brief: input.brief });
+      } catch (e: any) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: String(e?.message ?? e).slice(0, 300) });
+      }
     }),
 
   saveSettings: protectedProcedure

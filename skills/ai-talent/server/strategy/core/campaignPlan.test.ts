@@ -11,7 +11,7 @@
  */
 import { describe, it, expect } from "vitest";
 import {
-  planBeats, reconcileItems, candidateCards, kolBlock, cobrandBlock,
+  planBeats, reconcileItems, candidateCards, isPartCard, kolBlock, cobrandBlock,
   CAMPAIGN_PHASE_IDS,
 } from "./campaignPlan";
 import type { CatalogTask } from "../../content/core/taskCatalogIndex";
@@ -108,6 +108,31 @@ describe("candidateCards", () => {
     expect(cards.length).toBeGreaterThan(0);
     expect(cards.every((c) => c.platform === "facebook")).toBe(true);
     expect(cards.every((c) => c.tier === "30s" || c.tier === "60s")).toBe(true);
+  });
+
+  // 2026-09-26：企劃是一張發布時間表，每一行代表「這天要發這個」。素材零件
+  // （廣告 CTA、標籤組、開場鉤子）自己佔一行，使用者就得分辨哪幾行不是貼文，
+  // 而且那些產出放進貼文版型一定長得很怪——CJ 看到的「顯示很奇怪」就是這樣來的。
+  it("零件卡不進企劃：廣告欄位、標籤組、開場鉤子、留言回覆、個人檔案", () => {
+    const ids = candidateCards(["facebook", "instagram"]).map((c) => c.id);
+    for (const part of [
+      "fb-30-ad-cta", "fb-30-ad-headline", "fb-30-ad-primary", "fb-30-ad-description",
+      "fb-30-hashtag-set", "ig-30-hashtag-set", "fb-30-pure-text-hook", "ig-30-reel-hook",
+      "fb-30-comment-reply", "ig-30-comment-reply", "ig-30-bio-rewrite", "ig-30-dm-script",
+    ]) expect(ids, part).not.toContain(part);
+  });
+
+  it("整篇可以發的卡要留著（別誤殺）", () => {
+    const ids = candidateCards(["facebook", "instagram"]).map((c) => c.id);
+    for (const post of [
+      "fb-30-caption-short", "fb-60-single-full", "fb-30-story-text", "fb-60-launch-kit",
+      "ig-30-caption-short", "ig-60-feed-full", "ig-30-reel-script-full",
+    ]) expect(ids, post).toContain(post);
+  });
+
+  it("isPartCard 只看 id，不需要整個目錄", () => {
+    expect(isPartCard("fb-30-ad-cta")).toBe(true);
+    expect(isPartCard("fb-30-caption-short")).toBe(false);
   });
 
   it("通路名稱亂填不會炸，只是沒有卡", () => {
