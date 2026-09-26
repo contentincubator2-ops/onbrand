@@ -2211,20 +2211,20 @@ export default function BrandsPage() {
               Product: 行銷指引 (marketing segment) — tone/style/keywords
               Event:   創意與內容規範 (guidelines segment) — toneOfVoice/mustHave/forbidden
               2026-05-27 (CJ「為產品和活動設計與品牌相同的文字標籤頁」) */}
+          {/* 2026-09-26（CJ「目前文字總監的位置，請參考品牌頁面的做法，移除該
+              文件總監的位置」）：這一頁原本頂著一個大對話框（頭像＋「等你的定位
+              鎖定後…」）。品牌頁早就把總監收成右下角的常駐入口了，文字頁留著
+              那個框等於同一個角色在畫面上出現兩次，而且它佔掉整個第一屏。 */}
           {derivedCategory === "copy" && activeBrandIdForLocks && scopeMode === "brand" && (
-            <>
-              <div style={{ padding: "16px 28px 0" }}>
-                <AgentPersonaBar persona="copywriter" brandName={scopeName} mode="idle" />
-              </div>
-              <CopyTabInline
-                key={`copy-${activeBrandIdForLocks}`}
-                brandId={activeBrandIdForLocks}
-                brandAssets={brandAssets}
-                fullPositioning={fullPositioning}
-                locked={!!tabLocks.copy}
-                onLockToggle={() => handleLockToggle("copy")}
-              />
-            </>
+            <CopyTabInline
+              key={`copy-${activeBrandIdForLocks}`}
+              brandId={activeBrandIdForLocks}
+              brandAssets={brandAssets}
+              fullPositioning={fullPositioning}
+              locked={!!tabLocks.copy}
+              customCards={customPositioningSegments}
+              onEditCustomCard={(card) => setEditingCard(card)}
+            />
           )}
           {/* 2026-05-27 (CJ「為產品和活動設計文字標籤頁」):
               Product → 行銷指引 (marketing segment: tone/style/keywords)
@@ -4723,13 +4723,19 @@ function KickerRow({
    判斷得出要不要加那張卡。 */
 
 function CopyTabInline({
-  brandId, brandAssets, fullPositioning, locked, onLockToggle,
+  brandId, brandAssets, fullPositioning, locked, customCards, onEditCustomCard,
 }: {
   brandId: number | null;
   brandAssets: Record<string, any>;
   fullPositioning: Record<string, any>;
   locked: boolean;
-  onLockToggle: () => void;
+  // 2026-09-26：鎖定改由上方那條既有的鎖定列負責，所以這裡不再收 onLockToggle——
+  // 留著一個永遠不會被呼叫的 callback，只會讓下一個人以為這裡按了會鎖定
+  // （PositioningTopRow 2026-09-24 已經踩過同一個坑）。
+  /** 2026-09-26（CJ「新增的任務卡，也可以由用戶自行定義卡片名稱和內容」）：
+   *  跟品牌頁同一份自訂卡片（positioning 的 customSegments），不是另一套。 */
+  customCards?: { id: string; title: string; fields: { key: string; label: string; value: string }[] }[];
+  onEditCustomCard?: (card: EditableCard | null) => void;
 }) {
   const { lang } = useLang();
   const utils = (trpc as any).useUtils?.() ?? null;
@@ -4866,63 +4872,32 @@ function CopyTabInline({
 
   return (
     <div style={{ padding: "16px 28px 32px", display: "flex", flexDirection: "column", gap: 24 }}>
-      {/* Top action row: bulk auto-fill + save indicator + lock chip */}
-      <div className="flex items-center justify-between gap-3 flex-wrap">
-        <div className="flex items-center gap-3">
-          <button
-            onClick={handleBulkAutoFill}
-            disabled={!brandId || locked || bulkBusy || emptyKeys.length === 0}
-            className={`flex items-center gap-2 text-sm font-semibold px-4 py-2 rounded-full transition ${
-              bulkBusy ? "bg-neutral-100 text-neutral-700 cursor-wait border border-neutral-200"
-              : locked || emptyKeys.length === 0 ? "bg-default-100 text-default-600 cursor-not-allowed"
-              : "bg-neutral-900 text-white hover:bg-neutral-800 cursor-pointer"
-            }`}
-            title={
-              locked
-                ? (lang === "en" ? "Locked" : "已鎖定")
-                : emptyKeys.length === 0
-                  ? (lang === "en" ? "All fields filled" : "所有欄位都已填寫")
-                  : (lang === "en"
-                      ? `Auto-fill the remaining ${emptyKeys.length} fields from website / FB`
-                      : `根據官網 / FB 自動填寫剩下 ${emptyKeys.length} 個空欄`)
-            }
-          >
-            <Sparkles size={14} className={bulkBusy ? "animate-pulse" : ""} />
-            {bulkBusy
-              ? (lang === "en"
-                  ? `Auto-filling (${bulkFillingKeys.size} fields)…`
-                  : `自動填寫中 (${bulkFillingKeys.size} 個欄位)…`)
-              : emptyKeys.length === 0
-                ? (lang === "en" ? "All filled" : "全部已填寫")
-                : (lang === "en"
-                    ? `Auto-fill ${emptyKeys.length} fields`
-                    : `自動填寫 ${emptyKeys.length} 個空欄`)}
-          </button>
-          {savingKey ? (
-            <span className="flex items-center gap-1 text-xs text-default-700">
-              <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" /> {lang === "en" ? "Auto-saving…" : "自動儲存中…"}
-            </span>
-          ) : (
-            <span className="flex items-center gap-1 text-xs text-default-600">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" /> {lang === "en" ? "Auto-save on" : "自動儲存"}
-            </span>
-          )}
-        </div>
-        <button
-          onClick={onLockToggle}
-          className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full transition ${
-            locked ? "bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
-                   : "bg-default-100 text-default-600 hover:bg-default-200"
-          }`}
+      {/* 2026-09-26（CJ「自動填寫等功能，也變成 chips 就好」）：原本是一顆黑色
+          大按鈕＋另一顆鎖定按鈕分站兩端。改成跟品牌頁同一顆 StrategyToolIcon
+          的 pill —— 同一種動作在站上只有一種長相。 */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <StrategyToolIcon
+          active={bulkBusy}
+          onClick={() => { if (!bulkBusy && !locked && emptyKeys.length > 0) void handleBulkAutoFill(); }}
+          icon={faWandSparkles}
+          label={bulkBusy
+            ? (lang === "en" ? `Auto-filling (${bulkFillingKeys.size})…` : `自動填寫中（${bulkFillingKeys.size}）…`)
+            : emptyKeys.length === 0
+              ? (lang === "en" ? "All filled" : "全部已填寫")
+              : (lang === "en" ? `Auto-fill ${emptyKeys.length}` : `自動填寫 ${emptyKeys.length} 欄`)}
           title={locked
-            ? (lang === "en" ? "Click to unlock copy" : "點擊解鎖文字")
-            : (lang === "en" ? "Click to lock copy (becomes the single source of truth)" : "點擊鎖定文字（全平台用這份做為單一真相）")}
-        >
-          <FontAwesomeIcon icon={locked ? faLock : faLockOpen} className="text-[12px]" />
-          {locked
-            ? (lang === "en" ? "Locked · click to unlock" : "已鎖定 · 點此解鎖")
-            : (lang === "en" ? "Lock copy" : "鎖定文字")}
-        </button>
+            ? (lang === "en" ? "Locked — unlock to edit" : "已鎖定，解鎖才能編輯")
+            : emptyKeys.length === 0
+              ? (lang === "en" ? "Every card already has content" : "每張卡都有內容了")
+              : (lang === "en"
+                  ? `Fill the remaining ${emptyKeys.length} cards from website / FB`
+                  : `根據官網 / FB 自動填寫剩下的 ${emptyKeys.length} 張卡`)}
+        />
+        {/* 鎖定不放在這裡：上方那條「文字 尚未鎖定／鎖定文字」的列已經是
+            同一個動作。同一件事給兩顆按鈕，使用者會以為它們不一樣。 */}
+        <span className="text-tiny text-default-500">
+          {savingKey ? (lang === "en" ? "Saving…" : "儲存中…") : (lang === "en" ? "Auto-save on" : "自動儲存")}
+        </span>
       </div>
 
       {(bulkErr || bulkResult) && (
@@ -4953,6 +4928,8 @@ function CopyTabInline({
         readOnly={locked}
         fillingKeys={bulkFillingKeys}
         lang={lang}
+        customCards={customCards ?? []}
+        onEditCustomCard={onEditCustomCard}
       />
     </div>
   );

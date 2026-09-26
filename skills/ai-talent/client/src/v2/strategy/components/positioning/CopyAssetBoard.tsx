@@ -25,7 +25,7 @@
 import React from "react";
 import { Button, Card, CardBody, Chip, Modal, ModalBody, ModalContent, ModalHeader } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faPlus, faCheck } from "@fortawesome/free-solid-svg-icons";
+import { faPlus, faCheck, faPenToSquare } from "@fortawesome/free-solid-svg-icons";
 
 import { TaskCardShell } from "../../../content/components/TaskCardShell";
 import InlineAssetCard from "./InlineAssetCard";
@@ -36,8 +36,15 @@ import {
 export type { CopyAssetSpec, CopyShape };
 export { COPY_ASSETS, specOf, countOf, previewOf, visibleKeys };
 
+export interface CustomCardRow {
+  id: string;
+  title: string;
+  fields: { key: string; label: string; value: string }[];
+}
+
 export default function CopyAssetBoard({
   brandId, drafts, added, onChange, onAddCard, readOnly, fillingKeys, lang,
+  customCards, onEditCustomCard,
 }: {
   brandId: number | null;
   drafts: Record<string, any>;
@@ -48,6 +55,14 @@ export default function CopyAssetBoard({
   readOnly?: boolean;
   fillingKeys?: Set<string>;
   lang: "zh-TW" | "en";
+  /**
+   * 2026-09-26（CJ「新增的任務卡，也可以由用戶自行定義卡片名稱和內容」）：
+   * 自訂卡片用的是**品牌頁同一份** positioning customSegments，不是另開一套：
+   * 那條路的注入（brandContext.pushCustomSegments）已經在跑任務時生效，
+   * 另開一套等於使用者填了卻沒人讀。
+   */
+  customCards?: CustomCardRow[];
+  onEditCustomCard?: (card: { id: string | null; title: string; fields: { label: string; value: string }[] } | null) => void;
 }) {
   const en = lang === "en";
   const L = (zh: string, e: string) => (en ? e : zh);
@@ -56,6 +71,7 @@ export default function CopyAssetBoard({
 
   const keys = visibleKeys(added, drafts);
   const hidden = COPY_ASSETS.filter((a) => !keys.includes(a.key));
+  const customs = customCards ?? [];
   const openSpec = openKey ? specOf(openKey) : null;
 
   return (
@@ -102,8 +118,44 @@ export default function CopyAssetBoard({
           );
         })}
 
+        {/* 自訂卡片：使用者自己命名的那些。內容一樣會進 prompt（brandContext
+            的 pushCustomSegments），所以跟預設卡片並排，不另闢一區。 */}
+        {customs.map((c) => {
+          const preview = c.fields.map((f) => f.value).filter(Boolean).join(" · ");
+          const n = c.fields.filter((f) => (f.value ?? "").trim()).length;
+          return (
+            <TaskCardShell
+              key={c.id}
+              onClick={() => onEditCustomCard?.({ id: c.id, title: c.title, fields: c.fields.map((f) => ({ label: f.label, value: f.value })) })}
+              ariaLabel={c.title}
+              media={<>
+                <FontAwesomeIcon icon={faPenToSquare} className="text-4xl text-default-400" />
+                <span className="absolute top-2 left-2">
+                  <Chip size="sm" variant="flat" color="default">{L("自訂", "Custom")}</Chip>
+                </span>
+                {n > 0 && (
+                  <span className="absolute top-2 right-2">
+                    <Chip size="sm" variant="flat" color="success"
+                      startContent={<FontAwesomeIcon icon={faCheck} className="text-tiny ml-1" />}>
+                      {n}
+                    </Chip>
+                  </span>
+                )}
+              </>}
+            >
+              <p className="text-small font-semibold leading-snug">{c.title}</p>
+              <p className="text-tiny text-default-500 line-clamp-2">
+                {preview || L("還沒有內容", "No content yet")}
+              </p>
+              <div className="mt-auto pt-2 flex items-center gap-2 border-t border-divider">
+                <span className="text-tiny font-medium text-default-700 truncate">{L("編輯 →", "Edit →")}</span>
+              </div>
+            </TaskCardShell>
+          );
+        })}
+
         {/* 新增卡片：刻意長得像一張卡而不是一顆按鈕——它跟卡片並排，做的是同一件事的延伸 */}
-        {hidden.length > 0 && (
+        {(hidden.length > 0 || !!onEditCustomCard) && (
           <button
             type="button"
             onClick={() => setPickerOpen(true)}
@@ -111,7 +163,11 @@ export default function CopyAssetBoard({
           >
             <FontAwesomeIcon icon={faPlus} className="text-2xl" />
             <span className="text-small font-medium">{L("新增卡片", "Add a card")}</span>
-            <span className="text-tiny text-default-400">{L(`還有 ${hidden.length} 種`, `${hidden.length} more`)}</span>
+            <span className="text-tiny text-default-400">
+              {hidden.length > 0
+                ? L(`${hidden.length} 種現成的，或自己命名`, `${hidden.length} ready-made, or name your own`)
+                : L("自己命名一張", "Name your own")}
+            </span>
           </button>
         )}
       </div>
@@ -153,6 +209,23 @@ export default function CopyAssetBoard({
           </ModalHeader>
           <ModalBody className="pb-6">
             <div className="flex flex-col gap-2">
+              {/* 2026-09-26（CJ「也可以由用戶自行定義卡片名稱和內容」）：放最上面，
+                  因為「我要的那張不在清單裡」正是使用者打開這個選單的主要原因之一。 */}
+              {onEditCustomCard && (
+                <Card shadow="none" radius="md" isPressable
+                  className="border border-dashed border-default-300 hover:bg-default-50 transition"
+                  onPress={() => { setPickerOpen(false); onEditCustomCard(null); }}>
+                  <CardBody className="flex-row items-center gap-3 p-4">
+                    <FontAwesomeIcon icon={faPenToSquare} className="text-default-400" />
+                    <div className="min-w-0">
+                      <p className="text-small font-medium">{L("自訂卡片", "Custom card")}</p>
+                      <p className="text-tiny text-default-500">
+                        {L("自己命名標題與內容，打字或從檔案帶入", "Name it yourself — type or import from a file")}
+                      </p>
+                    </div>
+                  </CardBody>
+                </Card>
+              )}
               {hidden.map((a) => (
                 <Card key={a.key} shadow="none" radius="md" isPressable
                   className="border border-divider hover:bg-default-50 transition"
