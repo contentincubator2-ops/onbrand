@@ -80,37 +80,39 @@ type Mode = "edit" | "chat" | "image" | "video" | "agent" | "regen" | "rewrite" 
  * quickTask.refineCaption's existing agentName/agentTitle params (the
  * server builds the system prompt from them), so no new endpoint. */
 const REWRITE_AGENTS: Array<{
+  /** Canonical mos_db id. The server resolves all runtime persona data by this id. */
+  agentId: number;
   name: string;
   title: string; titleEn: string;          // card subtitle + agentTitle param
   style: string; styleEn: string;          // one-line pitch shown on the card
   instruction: string; instructionEn: string; // sent as userFeedback
 }> = [
   {
-    name: "林曉青", title: "感性故事文案", titleEn: "Story-driven Copywriter",
+    agentId: 180006, name: "Grace Wu", title: "感性故事文案", titleEn: "Story-driven Copywriter",
     style: "小故事帶入，品牌溫度", styleEn: "Warm, narrative-led",
     instruction: "請用你最擅長的感性說故事風格完整重寫這篇文案：以一個貼近受眾日常的小情境開場，把產品自然帶進故事，結尾收在情感共鳴加上輕聲的行動呼籲。保留原文的關鍵賣點與事實，不要新增原文沒有的功能或承諾。",
     instructionEn: "Rewrite fully in your signature story-driven style: open with a relatable everyday scene, weave the product in naturally, close with emotional resonance and a soft CTA. Keep every factual selling point; invent nothing.",
   },
   {
-    name: "張凱強", title: "直球促購文案", titleEn: "Direct-response Copywriter",
+    agentId: 180162, name: "Jason Peng", title: "直球促購文案", titleEn: "Direct-response Copywriter",
     style: "第一句就是賣點，轉單導向", styleEn: "Punchy, conversion-first",
     instruction: "請用直球促購風格完整重寫：第一句就丟最強賣點，全篇短句有力、節奏快，營造明確的行動急迫感，結尾一個不囉嗦的行動呼籲。保留原文的關鍵資訊與優惠條件，不得捏造價格、折扣或期限。",
     instructionEn: "Rewrite in direct-response style: strongest hook in the first line, short punchy sentences, clear urgency, one crisp CTA. Keep original facts and offer terms; never invent prices or deadlines.",
   },
   {
-    name: "Ray", title: "網感幽默文案", titleEn: "Meme-savvy Copywriter",
+    agentId: 180159, name: "Claire Hsu", title: "網感幽默文案", titleEn: "Meme-savvy Copywriter",
     style: "口語有梗，年輕化", styleEn: "Playful, youthful, witty",
     instruction: "請用年輕、有網感的幽默風格完整重寫：口語、有梗、帶一點自嘲或反差，讓人看完想 tag 朋友。梗要新不要老，幽默不能蓋過賣點，品牌的禁用語與事實照舊遵守。",
     instructionEn: "Rewrite with playful internet humor: conversational, witty, tag-a-friend energy. Keep the selling points visible under the humor and respect all brand rules.",
   },
   {
-    name: "沈以柔", title: "專業顧問文案", titleEn: "Expert-authority Copywriter",
+    agentId: 30002, name: "Sarah Liu", title: "專業顧問文案", titleEn: "Expert-authority Copywriter",
     style: "觀點與信任感，專業口吻", styleEn: "Credible, insight-led",
     instruction: "請用專業顧問的口吻完整重寫：以觀點或洞察切入，語氣可信、克制、不浮誇，讓讀者覺得是內行人給的建議。只使用原文已有的數據與事實，沒有數據就用定性描述，不得編造數字。",
     instructionEn: "Rewrite in a credible consultant voice: lead with an insight, restrained and trustworthy. Use only facts present in the original; never fabricate numbers.",
   },
   {
-    name: "阿捷", title: "極簡俐落文案", titleEn: "Minimalist Copywriter",
+    agentId: 222311, name: "Ming-Han Zhou", title: "極簡俐落文案", titleEn: "Minimalist Copywriter",
     style: "砍到最短，一眼看完", styleEn: "Cut to the bone",
     instruction: "請把這篇文案砍到最精簡：保留一個主賣點加一個行動呼籲，其餘全部拿掉，句子要短，總長度不超過原文的一半。刪減可以，但不能改變原意，也不能遺漏優惠的關鍵條件。",
     instructionEn: "Cut this caption to the bone: one key selling point plus one CTA, short lines, under half the original length. Trim aggressively but never change meaning or drop offer terms.",
@@ -3488,6 +3490,7 @@ export default function RunPage() {
                             const r = await refineMut.mutateAsync({
                               currentCaption: caption,
                               userFeedback: lang === "en" ? a.instructionEn : a.instruction,
+                              agentId: a.agentId,
                               agentName: a.name,
                               agentTitle: lang === "en" ? a.titleEn : a.title,
                               brandId: data.mission?.brandId ?? undefined,
