@@ -1670,6 +1670,9 @@ export const quickTaskRouter = router({
       // failed with a zod error on those tasks.
       currentCaption: z.string().min(1).max(20000),
       userFeedback: z.string().min(1).max(1000),
+      // When selected from the UI, the canonical mos_db id wins over label text.
+      // This prevents a display name from becoming an unverified persona.
+      agentId: z.number().int().positive().optional(),
       agentName: z.string().max(120).optional(),
       agentTitle: z.string().max(200).optional(),
       brandId: z.number().optional(),
@@ -1682,17 +1685,37 @@ export const quickTaskRouter = router({
     .mutation(async ({ input }) => {
       const { callModel } = await import("../_core/multiModelRouter");
       const { buildBrandPrefix } = await import("../_core/brandContext");
+      const { loadAgentKnowledge } = await import("../_core/agentKnowledge");
       const brandPrefix = await buildBrandPrefix(input.brandId, null, null, "core").catch(() => "");
+
+      let agentName = input.agentName ?? "資深文案";
+      let agentTitle = input.agentTitle ?? "Brand Copywriter";
+      let agentKnowledge = "";
+      if (input.agentId) {
+        const [rows]: any = await localPool.execute(
+          `SELECT id, name, title FROM agents WHERE id = ? AND isAvailable = 1 LIMIT 1`,
+          [input.agentId],
+        );
+        const agent = rows?.[0];
+        if (!agent) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Selected rewrite agent is unavailable." });
+        }
+        agentName = agent.name || agentName;
+        agentTitle = agent.title || agentTitle;
+        // Runtime-only injection: never return this private work contract to the client.
+        agentKnowledge = await loadAgentKnowledge(agent.id).catch(() => "");
+      }
 
 
 
       const system =
-        `你是 ${input.agentName ?? "資深文案"}（${input.agentTitle ?? "Brand Copywriter"}），正在跟用戶討論這篇文案的修改方向。\n` +
+        `你是 ${agentName}（${agentTitle}），正在跟用戶討論這篇文案的修改方向。\n` +
         `任務：根據用戶的修改意見，**重寫**整篇文案。輸出格式：\n` +
         `1. 第一段：1-2 句說明你怎麼理解用戶的意見、改了什麼\n` +
         `2. 接著 3 個 newline 分隔\n` +
         `3. 最後是完整的**修改後文案**（不要省略，不要寫 "如下"，直接給完整版）\n\n` +
         `重要：保留原本能用的部分，只動用戶提到的地方。語氣自然口語。\n` +
+        (agentKnowledge ? `\n【此 agent 的工作守則與專業能力】\n${agentKnowledge}\n` : "") +
         brandPrefix;
 
       const messages: Array<{ role: "system" | "user" | "assistant"; content: string }> = [
