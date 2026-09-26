@@ -387,6 +387,39 @@ export const brandRouter = router({
    * in. Every generated value is tagged `aiSuggested: true` so the UI can
    * flag it as a draft pending confirmation, not a finalized asset.
    */
+  /**
+   * 上傳幾張參考圖 → AI 歸納出風格描述與可用的 AI 提示詞。
+   *
+   * 2026-09-26（CJ「圖像風格、圖示風格…讓用戶自己上傳偏好的風格後，AI 自己
+   * 訓練出風格的描述，轉換成 AI 提示詞」）。
+   *
+   * 「提案不自動套用」：這支只回文字，要不要存進那張卡由前端讓使用者決定。
+   * 圖片是真的讀進模型（base64），不是拿檔名猜——猜出來的描述看起來一樣像真的，
+   * 但跟他上傳的圖無關。
+   */
+  describeVisualStyle: protectedProcedure
+    .input(z.object({
+      brandId: z.number().int().positive(),
+      kind: z.enum(["imagery", "icon"]),
+      imageUrls: z.array(z.string().min(1).max(500)).min(1).max(8),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const userId = ctx.user!.id;
+      const { default: localPool } = await import("../../localDb");
+      const [rows]: any = await localPool.execute(
+        `SELECT id FROM brands WHERE id = ? AND userId = ? LIMIT 1`, [input.brandId, userId],
+      );
+      if (!Array.isArray(rows) || rows.length === 0) {
+        throw new TRPCError({ code: "NOT_FOUND", message: `品牌 #${input.brandId} 不存在或不屬於這個帳號` });
+      }
+      const { describeVisualStyle } = await import("../core/visualStyleFromImages");
+      try {
+        return await describeVisualStyle({ kind: input.kind, imageUrls: input.imageUrls });
+      } catch (e: any) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: String(e?.message ?? e).slice(0, 300) });
+      }
+    }),
+
   autoFillVisualAssets: protectedProcedure
     .input(z.object({ brandId: z.number().int().positive() }))
     .mutation(async ({ ctx, input }) => {

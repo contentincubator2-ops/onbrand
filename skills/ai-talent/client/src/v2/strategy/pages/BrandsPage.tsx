@@ -50,6 +50,7 @@ import { pickProductImageUrl } from "../lib/productImage";
 import { readProductFacts } from "../lib/productFacts";
 import CampaignWorkspace from "../components/positioning/CampaignWorkspace";
 import CopyAssetBoard, { COPY_ASSETS } from "../components/positioning/CopyAssetBoard";
+import VisualAssetBoard from "../components/positioning/VisualAssetBoard";
 import { pipelineFor, type PipelineStepSpec } from "../lib/positioningPipeline";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faPlus, faPalette, faFont, faQuoteLeft, faBullseye, faUsers, faImage, faIcons, faChartPie, faImages, faPenNib, faShieldHalved, faFolderOpen, faLock, faLockOpen, faBookOpen, faTableList, faBox, faRocket, faBullhorn, faWandSparkles, faGear, faStickyNote, faTrash, faSatelliteDish, faStethoscope, faFileArrowUp } from "@fortawesome/free-solid-svg-icons";
@@ -422,6 +423,58 @@ export default function BrandsPage() {
     }
   })();
   const brandAssets: Record<string, any> = (fullPositioning?._assets ?? {}) as Record<string, any>;
+
+  // ── 視覺卡片板（2026-09-26 CJ「請幫我整理好整個架構」）─────────────────
+  // 使用者自己加的視覺卡存在 positioning._visualCards（跟文字頁的 _assetCards
+  // 同一個模式，不需要新欄位）。
+  const addedVisualCards: string[] = Array.isArray((fullPositioning as any)?._visualCards)
+    ? ((fullPositioning as any)._visualCards as any[]).filter((k) => typeof k === "string")
+    : [];
+  const visualSaveMut = (trpc as any).scope?.savePositioning?.useMutation?.();
+  const saveVisualPositioning = (next: Record<string, any>) => {
+    const id = (scope?.brandId ?? brandId) as number | null;
+    if (!id) return;
+    visualSaveMut?.mutate?.({ kind: "brand", id, positioning: next });
+  };
+  /** 一張卡的內容（_assets[key]）。風格卡存 {text, prompt}，文字卡存 {text}。 */
+  const saveBrandAsset = (key: string, value: any) => {
+    saveVisualPositioning({
+      ...fullPositioning,
+      _assets: { ...(fullPositioning._assets ?? {}), [key]: value },
+    });
+  };
+  const addVisualCard = (key: string) => {
+    if (addedVisualCards.includes(key)) return;
+    saveVisualPositioning({ ...fullPositioning, _visualCards: [...addedVisualCards, key] });
+  };
+  /**
+   * 刪一張視覺卡。內容一起清掉——顯示規則是「有內容的一定看得見」
+   * （visualAssets.visibleVisualKeys），只移除 key 的話那張卡會自己回來。
+   * 色彩 DNA 與品牌照片不走這裡刪（它們是獨立資料，刪卡不等於刪素材）。
+   */
+  const deleteVisualCard = (key: string) => {
+    const hadContent = !!brandAssets[key];
+    const msg = hadContent
+      ? (lang === "en" ? "Delete this card? Everything written in it will be removed."
+                       : "確定要刪除這張卡片嗎？裡面寫的內容會一起刪掉。")
+      : (lang === "en" ? "Remove this card?" : "確定要移除這張卡片嗎？");
+    if (!confirm(msg)) return;
+    saveVisualPositioning({
+      ...fullPositioning,
+      _assets: { ...(fullPositioning._assets ?? {}), [key]: null },
+      _visualCards: addedVisualCards.filter((k) => k !== key),
+    });
+  };
+  // 色票只是拿來判斷「這張卡有沒有內容」與縮圖，所以讀現成的那一份就好。
+  const dnaQ = (trpc as any).brandColors?.getCurrent?.useQuery?.(
+    { brandId: activeBrandIdForLocks ?? 0 },
+    { enabled: !!activeBrandIdForLocks, staleTime: 60_000 },
+  );
+  const dnaSwatches: string[] = Array.isArray(dnaQ?.data?.swatches)
+    ? (dnaQ.data.swatches as any[])
+        .map((sw) => (typeof sw?.hex === "string" ? sw.hex : ""))
+        .filter(Boolean)
+    : [];
 
   // Onboarding nudge: if this brand has no website / socialLinks yet,
   // auto-open Settings → 連結 once. localStorage tracks dismissal so
@@ -2080,9 +2133,10 @@ export default function BrandsPage() {
                   the visual tab, so the most distinctive thing OnBrand
                   knows about the brand is visible without a click. The
                   per-asset card grid below remains unchanged. */}
-              {section === "asset:all" && activeBrandIdForLocks && (
-                <BrandPaletteHero brandId={activeBrandIdForLocks} lang={lang} locked={!!tabLocks.visual} />
-              )}
+              {/* 2026-09-26（CJ「品牌視覺色彩(DNA)，也是單獨的任務卡」）：
+                  色票 hero 不再常駐在最上面——它現在是「品牌色彩 DNA」那張卡
+                  點開後的內容。常駐一條 hero＋底下又有一張「顏色」卡，正是
+                  CJ 說的「很亂、沒有統一性」的來源。 */}
 
               {/* ── 若選了具體資產類別，顯示其編輯器 ── */}
               {(() => {
@@ -2114,92 +2168,39 @@ export default function BrandsPage() {
                   );
                 }
 
-                /* ── 預設：所有資產卡片 grid ── */
-                const ASSET_GROUPS: Array<{
-                  label: string;
-                  items: Array<{ id: string; label: string; icon: any; bg: string; }>;
-                }> = [
-                  {
-                    label: lang === "en" ? "Essentials" : "基礎元素",
-                    items: [
-                      { id: "asset:logo",       label: lang === "en" ? "Logo"   : "標誌",   icon: faPenNib,    bg: "#FFF7ED" },
-                      { id: "asset:colors",     label: lang === "en" ? "Colors" : "顏色",   icon: faPalette,   bg: "#F5F3FF" },
-                      { id: "asset:fonts",      label: lang === "en" ? "Fonts"  : "字型",   icon: faFont,      bg: "#EFF6FF" },
-                    ],
-                  },
-                  {
-                    label: lang === "en" ? "Visual style" : "視覺風格",
-                    items: [
-                      { id: "asset:imagery_style", label: lang === "en" ? "Imagery style" : "圖像風格", icon: faImage,    bg: "#FFF7ED" },
-                      { id: "asset:icon_style",    label: lang === "en" ? "Icon style"    : "圖示風格", icon: faIcons,    bg: "#F5F3FF" },
-                      { id: "asset:chart_style",   label: lang === "en" ? "Chart style"   : "圖表風格", icon: faChartPie, bg: "#ECFDF5" },
-                    ],
-                  },
-                  {
-                    label: lang === "en" ? "Visual rules" : "視覺規範",
-                    items: [
-                      { id: "asset:guidelines",   label: lang === "en" ? "Visual guidelines" : "視覺準則", icon: faShieldHalved, bg: "#F0FDF4" },
-                      { id: "asset:layout_rules", label: lang === "en" ? "Layout rules"     : "排版規範", icon: faPenNib,       bg: "#FFFBEB" },
-                    ],
-                  },
-                  {
-                    label: lang === "en" ? "Library" : "素材庫",
-                    items: [
-                      { id: "asset:photos",     label: lang === "en" ? "Photos"    : "照片",     icon: faImages,    bg: "#F0F9FF" },
-                      { id: "asset:templates",  label: lang === "en" ? "Templates" : "品牌範本", icon: faFolderOpen, bg: "#FFFBEB" },
-                    ],
-                  },
-                ];
-
+                /* ── 預設：視覺資產卡片板 ──
+                   2026-09-26（CJ「請幫我整理好整個架構」＋「一開始也只要呈現出
+                   五個任務卡，其他的任務卡，請參考文字和產品的體驗設計」）：
+                   原本是 4 組 10 張帶粉彩底色的圖磚。現在預設五張（色彩 DNA／
+                   標誌／圖像風格／圖示風格／品牌照片），其餘自己加；卡片外框用
+                   跟任務卡同一個殼。顯示規則與「為什麼沒有字型卡」在
+                   lib/visualAssets.ts。 */
+                if (!activeBrandId) return null;
                 return (
-                  <>
-                    {ASSET_GROUPS.map((group, gi) => (
-                      <div key={gi}>
-                        {/* 分組標題 — 細線 + 灰色小標籤 */}
-                        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
-                          <span style={{
-                            fontSize: 12, fontWeight: 600, color: "#A8A29E",
-                            letterSpacing: "0.10em", textTransform: "uppercase",
-                            whiteSpace: "nowrap",
-                          }}>{group.label}</span>
-                          {/* 2026-07-21 (CJ「顯示更多按下去沒用」): the button had
-                              no onClick and every group's cards are already all
-                              rendered — nothing more to show. Removed. */}
-                          <div style={{ flex: 1, height: 1, background: "#F0EFED" }} />
-                        </div>
-
-                        {/* 4-col card grid */}
-                        <div style={{
-                          display: "grid",
-                          gridTemplateColumns: "repeat(4, 1fr)",
-                          gap: 14,
-                          marginBottom: 4,
-                        }}>
-                          {group.items.map(item => {
-                            const k = item.id.startsWith("asset:") ? item.id.slice("asset:".length) : item.id;
-                            const v = brandAssets[k];
-                            const preview = previewForAsset(k, v, lang);
-                            return (
-                              <AssetCard
-                                key={item.id}
-                                label={item.label}
-                                icon={item.icon}
-                                bg={item.bg}
-                                onClick={() => setSection(item.id)}
-                                preview={preview}
-                                hasContent={!!preview}
-                              />
-                            );
-                          })}
-                        </div>
-                      </div>
-                    ))}
-
-                    {/* 2026-05-13 (CJ「右下方的 icon 重疊了，只留客服 icon」):
-                        the floating + FAB was redundant with BrandHierarchyPill's
-                        「+ 新增品牌 / 產品 / 活動」menu top-left, and overlapped
-                        with the bottom-right Mia 客服 avatar. Removed. */}
-                  </>
+                  <VisualAssetBoard
+                    brandId={activeBrandId}
+                    assets={brandAssets}
+                    added={addedVisualCards}
+                    dnaSwatches={dnaSwatches}
+                    lang={lang}
+                    readOnly={!!tabLocks.visual}
+                    onChange={(key, next) => saveBrandAsset(key, next)}
+                    onAddCard={(key) => addVisualCard(key)}
+                    onDeleteCard={(key) => deleteVisualCard(key)}
+                    customCards={customPositioningSegments}
+                    onEditCustomCard={(card) => setEditingCard(card)}
+                    onDeleteCustomCard={(segmentId) => {
+                      const msg = lang === "en" ? "Delete this card?" : "確定要刪除這張卡片嗎？";
+                      if (!confirm(msg)) return;
+                      removeCustomSegmentMut?.mutate({ scope: "brand", scopeId: activeBrandId, segmentId });
+                    }}
+                    renderDna={() => (
+                      <BrandPaletteHero brandId={activeBrandId} lang={lang} locked={!!tabLocks.visual} />
+                    )}
+                    renderLogo={() => (
+                      <BrandAssetPanel assetKey={"logo" as AssetKey} brandId={activeBrandId} locked={!!tabLocks.visual} />
+                    )}
+                  />
                 );
               })()}
               </div>
@@ -3417,161 +3418,9 @@ const SOWORK_GROUP_INTRO: Record<string, { zh: string; en: string }> = {
   },
 };
 
-/* ─────────────────────────── AssetCard ───────────────────────────
-   2026-05-11 (CJ「最後品牌定位的呈現方式，也可以很 4A 廣告代理商」)
-   Editorial discipline that's still true:
-   - 14×14 thin icon top-left, no decorative pill background
-   - Eyebrow line "01.1 GOLDEN CIRCLE" in 9px uppercase tracking
-   - Title in 13.5px sans, preview in serif body
-   - Filled state: black 1px left edge bar — like a margin annotation
-   - Color stays functional only (monochrome ink/border states), never
-     decorative — same rule PlatformTaskPage.tsx enforces on its own cards.
+/* 2026-09-26：AssetCard（舊的視覺／文字圖磚）退場。視覺與文字兩頁現在都用
+   TaskCardShell —— 站上的任務卡只有一種長相。 */
 
-   2026-09-23 (CJ「重新根據 content 層的卡片呈現方式，優化品牌定位頁面的呈現
-   方式」): the physical shell now matches PlatformTaskPage.tsx's task-card
-   shell — rounded-2xl (was 8px), hover:scale+shadow (was "no scale/shadow
-   circus"; that 05-11 call is superseded by this direct instruction),
-   border→black hover kept via Tailwind instead of JS mouse handlers. The
-   typographic/monochrome discipline above is unaffected — content still
-   has no image/avatar and no per-card color coding.
-   ───────────────────────────────────────────────────────────────── */
-function AssetCard({ label, icon, bg, onClick, preview, hasContent, rationale, onDelete }: {
-  label: string; icon: any; bg: string; onClick: () => void;
-  preview?: React.ReactNode;
-  hasContent?: boolean;
-  /** Optional methodology rationale shown below the title — explains
-   *  WHY this step matters in the SoWork brand positioning method. */
-  rationale?: string;
-  /** 2026-09-23: only custom-segment cards pass this. Renders a small
-   *  trash affordance that appears on hover, top-right. */
-  onDelete?: () => void;
-}) {
-  const { lang } = useLang();
-  // Split "1.1 Golden Circle" → eyebrow "1.1" + title "Golden Circle".
-  // 2026-07-18 (CJ「CTA/HOOK 卡片標題被截斷」): only split when the first
-  // token is a NUMBERING token (digits/dots) — the old \S+ heuristic tore
-  // "CTA 庫" into eyebrow "CTA" + title "庫" and the card looked broken.
-  const m = label.match(/^([\d.]+)\s+(.+)$/);
-  const eyebrow = m ? m[1] : "";
-  const titleText = m ? m[2] : label;
-
-  return (
-    // A plain <button> can't validly contain the nested delete <button>
-    // below (interactive content inside interactive content) — div+role
-    // keeps the same click/keyboard behaviour for the existing call sites
-    // while making room for the delete affordance on custom-segment cards.
-    <div
-      role="button"
-      tabIndex={0}
-      onClick={onClick}
-      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onClick(); } }}
-      title={rationale}
-      className="group relative text-left cursor-pointer transition-all duration-150 rounded-2xl border border-neutral-300 hover:border-neutral-900 hover:shadow-lg hover:scale-[1.02]"
-      style={{
-        display: "flex", flexDirection: "column", gap: 10,
-        padding: "16px 16px 14px",
-        background: bg,
-        width: "100%",
-        minHeight: preview ? 140 : 124,
-        position: "relative",
-      }}
-    >
-      {onDelete && (
-        <button
-          type="button"
-          aria-label={lang === "en" ? "Delete card" : "刪除卡片"}
-          onClick={(e) => { e.stopPropagation(); onDelete(); }}
-          className="absolute top-2 right-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity rounded-full p-1.5 hover:bg-neutral-100"
-          style={{ color: "#737373" }}
-        >
-          <FontAwesomeIcon icon={faTrash} style={{ fontSize: 11 }} />
-        </button>
-      )}
-
-      {/* Filled accent — 1px black left edge bar */}
-      {hasContent && (
-        <span
-          aria-hidden
-          style={{
-            position: "absolute", left: 0, top: 12, bottom: 12, width: 2,
-            background: "#171717", borderRadius: 2,
-          }}
-        />
-      )}
-
-      {/* Top row: icon + eyebrow */}
-      <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
-        <FontAwesomeIcon
-          icon={icon}
-          style={{ fontSize: 12, color: hasContent ? "#171717" : "#525252", flexShrink: 0 }}
-        />
-        {eyebrow && (
-          <span style={{
-            fontSize: 12, fontWeight: 700, color: "#525252",
-            letterSpacing: "0.2em", textTransform: "uppercase",
-            fontVariantNumeric: "tabular-nums",
-          }}>
-            {eyebrow}
-          </span>
-        )}
-        <div style={{ flex: 1 }} />
-        {hasContent && (
-          <span style={{
-            fontSize: 12, fontWeight: 600, color: "#171717",
-            letterSpacing: "0.18em", textTransform: "uppercase",
-          }}>
-            {lang === "en" ? "Filled" : "已填寫"}
-          </span>
-        )}
-      </div>
-
-      {/* Title */}
-      <h3 style={{
-        fontSize: 14, fontWeight: 600, color: "#171717",
-        lineHeight: 1.35, margin: 0,
-      }}>
-        {titleText}
-      </h3>
-
-      {/* Rationale — methodology "why this step" line. Shown ONLY when
-          the segment has no content yet, so it teaches the user about the
-          method while the box is empty. Once filled, real content takes
-          over and the rationale is conserved for hover (title attr above). */}
-      {rationale && !hasContent && (
-        <p style={{
-          fontSize: 12.5, lineHeight: 1.55, color: "#404040",
-          fontFamily: '"Source Serif Pro", "Noto Serif TC", Georgia, serif',
-          fontStyle: "italic", margin: 0,
-        }}>
-          {rationale}
-        </p>
-      )}
-
-      {/* Body: serif preview when filled, hint otherwise. Use maxHeight
-          rather than -webkit-line-clamp so multi-block previews
-          (lists / tag rows) render fully without being clipped at line 4. */}
-      {preview ? (
-        <div style={{
-          flex: 1,
-          fontSize: 12, lineHeight: 1.55, color: "#525252",
-          fontFamily: '"Source Serif Pro", "Noto Serif TC", Georgia, serif',
-          overflow: "hidden",
-          maxHeight: 110,
-          textAlign: "left",
-        }}>
-          {preview}
-        </div>
-      ) : (
-        <span style={{
-          fontSize: 12, color: "#525252", marginTop: "auto",
-          letterSpacing: "0.05em",
-        }}>
-          {lang === "en" ? "Empty — tap to start" : "尚未填寫 — 點擊開始"}
-        </span>
-      )}
-    </div>
-  );
-}
 
 /* ─────────────────────────── PositioningCard ───────────────────────────
    2026-09-23 (CJ 看到自訂卡片後：「我們首先，先將品牌定位的卡片，改成跟
@@ -3722,100 +3571,9 @@ function PositioningCard({
   );
 }
 
-/** Derive a preview ReactNode from an asset value. Returns null if no
- *  meaningful content yet (caller falls back to compact card). */
-function previewForAsset(assetKey: string, value: any, lang: "zh-TW" | "en" = "zh-TW"): React.ReactNode | null {
-  if (!value || typeof value !== "object") return null;
-  const v = value;
-  // text-like: GenericTextarea uses { text } or { links }
-  const textBlob = (v.text ?? v.links ?? "").toString().trim();
+/* 2026-09-26：previewForAsset 隨舊視覺圖磚一起退場（卡片預覽改由
+   VisualAssetBoard 自己算，規則跟 visualHasContent 同一份）。 */
 
-  // ListEditor: { items: string[] }
-  if (Array.isArray(v.items) && v.items.length > 0) {
-    const cleaned = v.items.map((x: any) => String(x).trim()).filter(Boolean);
-    if (cleaned.length === 0) return null;
-    return (
-      <span>
-        {cleaned.slice(0, 4).map((x: string, i: number) => (
-          <span key={i} style={{
-            display: "inline-block", margin: "1px 3px 1px 0",
-            padding: "1px 6px", borderRadius: 999,
-            background: "rgba(255,255,255,0.7)", color: "#374151",
-            fontSize: 12, fontWeight: 500,
-          }}>{x.length > 14 ? x.slice(0, 14) + "…" : x}</span>
-        ))}
-        {cleaned.length > 4 && <span style={{ color: "#9CA3AF", fontSize: 12 }}>+{cleaned.length - 4}</span>}
-      </span>
-    );
-  }
-  // PairListEditor: { pairs: [{from, to}] }
-  if (Array.isArray(v.pairs) && v.pairs.length > 0) {
-    const ps = v.pairs.filter((p: any) => p?.from && p?.to);
-    if (ps.length === 0) return null;
-    return (
-      <span>
-        {ps.slice(0, 3).map((p: any, i: number) => (
-          <span key={i} style={{ display: "block", marginBottom: 2 }}>
-            <span style={{ color: "#9CA3AF" }}>{p.from}</span>
-            <span style={{ color: "#9CA3AF", margin: "0 4px" }}>→</span>
-            <span style={{ color: "#374151", fontWeight: 500 }}>{p.to}</span>
-          </span>
-        ))}
-        {ps.length > 3 && <span style={{ color: "#9CA3AF", fontSize: 12 }}>+{ps.length - 3}{lang === "en" ? "" : " 條"}</span>}
-      </span>
-    );
-  }
-  // ColorFields: { list: [{name, hex}] }
-  if (assetKey === "colors" && Array.isArray(v.list) && v.list.length > 0) {
-    const colors = v.list.filter((c: any) => c?.hex);
-    if (colors.length === 0) return null;
-    return (
-      <span style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-        {colors.slice(0, 6).map((c: any, i: number) => (
-          <span key={i} style={{
-            display: "inline-flex", alignItems: "center", gap: 4,
-            fontSize: 12, color: "#374151",
-          }}>
-            <span style={{
-              width: 14, height: 14, borderRadius: 4,
-              background: c.hex,
-              border: "1px solid rgba(0,0,0,0.08)",
-            }} />
-            {c.name ?? c.hex}
-          </span>
-        ))}
-      </span>
-    );
-  }
-  // LogoFields: { primaryUrl, ... }
-  if (assetKey === "logo" && (v.primaryUrl || v.iconUrl || v.darkUrl)) {
-    return (
-      <span style={{ fontSize: 12 }}>
-        {v.primaryUrl && <span style={{ display: "block", color: "#374151" }}>{lang === "en" ? "Primary logo: " : "主 logo: "}{String(v.primaryUrl).slice(0, 40)}…</span>}
-        {v.guidelines && <span style={{ display: "block", color: "#6B7280", marginTop: 2 }}>{String(v.guidelines).slice(0, 60)}</span>}
-      </span>
-    );
-  }
-  // FontFields: { primary, secondary, ... }
-  if (assetKey === "fonts") {
-    const lines: string[] = [];
-    if (v.primary) lines.push(lang === "en" ? `Primary: ${v.primary}` : `主：${v.primary}`);
-    if (v.secondary) lines.push(lang === "en" ? `Secondary: ${v.secondary}` : `副：${v.secondary}`);
-    if (lines.length === 0) return null;
-    return <span>{lines.join(" · ")}</span>;
-  }
-  // PhotoFields: { urls: [...] } or { list: [...] }
-  if (assetKey === "photos") {
-    const urls: string[] = Array.isArray(v.urls) ? v.urls : Array.isArray(v.list) ? v.list : [];
-    if (urls.length === 0) return null;
-    return <span>{lang === "en" ? `${urls.length} photos` : `${urls.length} 張照片`}</span>;
-  }
-  // Generic textarea
-  if (textBlob) {
-    return <span>{textBlob.length > 140 ? textBlob.slice(0, 140) + "…" : textBlob}</span>;
-  }
-  return null;
-}
 
 /* ─────────────────────────── VisualNavItem ─────────────────────────── */
 // Sidebar item for visual assets — shows hover-reveal + button, purple badge for 最新.

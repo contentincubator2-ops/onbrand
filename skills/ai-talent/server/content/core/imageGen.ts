@@ -123,6 +123,8 @@ export interface BrandVisualContext {
   archetype?: string;
   audience?: string;
   colourHints?: string[];
+  /** 視覺頁「圖像風格」那張卡的文字。2026-09-26 起真的會進 prompt。 */
+  imageryStyle?: string;
 }
 
 export interface ImageGenInput {
@@ -206,6 +208,7 @@ function buildPrompt(input: ImageGenInput): string {
   if (bc.voiceTone) lines.push(`Voice: ${bc.voiceTone}`);
   if (bc.audience) lines.push(`Audience: ${bc.audience}`);
   if (bc.colourHints?.length) lines.push(`Colour palette: ${bc.colourHints.join(", ")}`);
+  if (bc.imageryStyle) lines.push(`Imagery style: ${bc.imageryStyle}`);
   if (input.channel) lines.push(`Channel: ${input.channel.toUpperCase()}`);
   // Brand override: the scene may come from a commercial-photography
   // template that references another brand's product (e.g. Coca-Cola,
@@ -340,7 +343,60 @@ export async function resolveBrandVisualContext(
       }
     }
   }
-  return { brandName, positioning, archetype, voiceTone, audience };
+  // 2026-09-26（CJ「品牌色彩DNA就是一張任務卡…其他的標誌或顏色等，目前似乎都
+  // 很亂」）：查下去發現比「亂」更嚴重——**品牌色彩從來沒有進過生圖 prompt**。
+  // colourHints 這個欄位一直都在（buildPrompt 會印 `Colour palette: …`），但
+  // 唯一的填法是 imageRouter 的 overrideBrandContext，而全站沒有任何一個呼叫端
+  // 傳過它。所以使用者在視覺頁調的色票，對產出的圖一點影響都沒有。
+  //
+  // 這裡補上：色彩 DNA（brands.brand_colors，使用者上傳的圖抽出來、或他自己鎖
+  // 定的）直接變成 prompt 裡的色盤。抽不到就不加——寧可不給顏色，也不要編一組。
+  const colourHints = await loadBrandColourHints(brandId);
+  const imageryStyle = await loadImageryStyle(brandId);
+  return {
+    brandName, positioning, archetype, voiceTone, audience,
+    ...(colourHints.length ? { colourHints } : {}),
+    ...(imageryStyle ? { imageryStyle } : {}),
+  };
+}
+
+/**
+ * 品牌色彩 DNA → prompt 用的色票字串（最多 5 個，主色在前）。
+ * 讀的是 brands.brand_colors（brandColorsRouter 寫的那一份），查不到就回空陣列。
+ */
+async function loadBrandColourHints(brandId: number): Promise<string[]> {
+  try {
+    const { default: localPool } = await import("../../localDb");
+    const [rows]: any = await localPool.execute(
+      `SELECT brand_colors FROM brands WHERE id = ? LIMIT 1`, [brandId],
+    );
+    const raw = (rows as any[])[0]?.brand_colors;
+    if (!raw) return [];
+    const parsed = typeof raw === "string" ? safeParse(raw) : raw;
+    const swatches: any[] = Array.isArray(parsed?.swatches) ? parsed.swatches : [];
+    return swatches
+      .map((sw) => (typeof sw?.hex === "string" ? sw.hex.trim() : ""))
+      .filter((hex) => /^#?[0-9a-fA-F]{6}$/.test(hex))
+      .slice(0, 5);
+  } catch {
+    return [];
+  }
+}
+
+/** 圖像風格（視覺頁那張卡的文字）→ prompt。沒填就不加。 */
+async function loadImageryStyle(brandId: number): Promise<string | undefined> {
+  try {
+    const { default: localPool } = await import("../../localDb");
+    const [rows]: any = await localPool.execute(
+      `SELECT positioning FROM brands WHERE id = ? LIMIT 1`, [brandId],
+    );
+    const raw = (rows as any[])[0]?.positioning;
+    const pos = typeof raw === "string" ? safeParse(raw) : raw;
+    const text = pos?._assets?.imagery_style?.text;
+    return typeof text === "string" && text.trim() ? text.trim().slice(0, 300) : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 function safeParse(s: string): any {
