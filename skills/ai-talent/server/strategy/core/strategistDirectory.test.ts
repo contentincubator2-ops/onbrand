@@ -105,9 +105,9 @@ vi.mock("../../localDb.js", () => ({
       if (bySlug) return [AGENTS.filter((a) => a.slug === params[0])];
       // id 精準查
       if (/WHERE id = \?/.test(sql)) return [AGENTS.filter((a) => a.id === Number(params[0]))];
-      // 「換更多人選」：layer='strategy' 的關鍵字搜尋
+      // 「換更多人選」：layer='strategy'（或產品策略 bundle）的關鍵字搜尋
       if (/layer = 'strategy'/.test(sql)) {
-        const kw = String(params[0] ?? "").replace(/%/g, "");
+        const kw = String(params.find((p) => String(p).includes("%")) ?? "").replace(/%/g, "");
         return [AGENTS.filter((a) => `${a.name_zh}${a.title_zh}${a.specialty ?? ""}`.includes(kw))];
       }
       // 備用人選①：同產業、排除 tw（slug LIKE ? AND slug NOT LIKE ?）
@@ -347,9 +347,13 @@ describe("searchDirectors", () => {
     expect(calls).toHaveLength(0);
   });
 
-  it("關鍵字搜得到人，而且限制在 strategy 層", async () => {
+  // 2026-09-26：範圍＝strategy 層「或」綁了產品策略 Skill 的 agent
+  // （Sandra Roberts 180837 是 execution 層，舊條件會把她排除）。
+  it("關鍵字搜得到人，範圍是 strategy 層或產品策略 agent", async () => {
     const out = await searchDirectors("定價");
     expect(out.map((d) => d.agentId)).toContain(900003);
-    expect(calls.some((c) => /layer = 'strategy'/.test(c.sql))).toBe(true);
+    const search = calls.find((c) => /layer = 'strategy'/.test(c.sql));
+    expect(search?.sql).toMatch(/layer = 'strategy' OR primarySkillBundleKey = \?/);
+    expect(search?.params).toContain("product-strategy-agent-card-v1");
   });
 });

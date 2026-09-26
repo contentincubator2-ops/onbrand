@@ -36,6 +36,7 @@ import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure } from "../../platform/core/trpc";
 import localPool from "../../localDb";
 import { callModel } from "../../platform/core/multiModelRouter";
+import { loadAgentKnowledge } from "../../platform/core/agentKnowledge";
 import {
   listDirectorsForBrand, getDirectorByAgentId, searchDirectors as searchDirectoryAgents,
   getRole, type StrategistDirector, type StrategistScope,
@@ -327,7 +328,7 @@ const PRODUCT_TOOLS_BLOCK = `【你的守備範圍：產品，不是品牌】
  * director 是 null（agentId 還沒寫進去的舊對話）時退回通用提示詞，不硬
  * 指派一位——見 directorForConversation() 的說明。
  */
-export function buildSystemPrompt(director: StrategistDirector | null, brandCtx: string): string {
+export function buildSystemPrompt(director: StrategistDirector | null, brandCtx: string, knowledge = ""): string {
   const parts = [STRATEGIST_SYSTEM_PROMPT];
   // 工具引導依這位總監所屬的 scope 給——產品總監不該把人帶去品牌層的健檢。
   // 沒有指定人設（agentId 是 NULL 的舊對話）時用品牌那套，跟以前的行為一致。
@@ -348,6 +349,9 @@ export function buildSystemPrompt(director: StrategistDirector | null, brandCtx:
       + `就照上面這些講，講不出來的部分就說沒有這段資料。`,
     );
     parts.push(persona.join("\n"));
+    // 2026-09-26（CJ「mos_db 裡 agent 能力調整，onbrand 要跟著變強」）：
+    // 這位總監在 mos_db 的工作守則／執行卡／綁定 Skill（agentKnowledge 每次現讀）。
+    if (knowledge) parts.push(knowledge);
   }
   if (brandCtx) parts.push(`[品牌定位摘要]\n${brandCtx}\n[/品牌定位摘要]`);
   return parts.join("\n\n");
@@ -594,8 +598,9 @@ export const strategistChatRouter = router({
       // 總監答出來的東西真的不一樣（名字、經歷、看事情的角度都換了）。
       const director = await directorForConversation(conv, userId);
       const history = await loadMessages(input.conversationId);
+      const knowledge = director ? await loadAgentKnowledge(director.agentId, { source: "strategist.chat" }) : "";
       const llmMessages = [
-        { role: "system" as const, content: buildSystemPrompt(director, brandCtx) },
+        { role: "system" as const, content: buildSystemPrompt(director, brandCtx, knowledge) },
         ...history.slice(-10).map((m) => ({
           role: (m.role === "user" ? "user" : "assistant") as "user" | "assistant",
           content: m.content,

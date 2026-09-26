@@ -432,7 +432,7 @@ async function findBySlug(slug: string): Promise<any | null> {
 
 async function findAgentById(agentId: number): Promise<any | null> {
   const [rows]: any = await localPool.execute(
-    `SELECT ${DIRECTOR_FIELDS} FROM agents WHERE id = ? AND ${AVAILABLE} LIMIT 1`, [agentId],
+    `SELECT ${DIRECTOR_FIELDS}, primarySkillBundleKey FROM agents WHERE id = ? AND ${AVAILABLE} LIMIT 1`, [agentId],
   );
   return (rows as any[])[0] ?? null;
 }
@@ -553,6 +553,9 @@ export async function getDirectorByAgentId(
   const slug = String(row.slug ?? "");
   const role = STRATEGIST_ROLES.find((r) => r.fixedSlug === slug)
     ?? STRATEGIST_ROLES.find((r) => r.slugPrefix && slug.startsWith(r.slugPrefix))
+    ?? (row.primarySkillBundleKey === PRODUCT_STRATEGY_BUNDLE
+      ? STRATEGIST_ROLES.find((r) => r.id === "product_value_prop")
+      : undefined)
     ?? STRATEGIST_ROLES[0]!;
   // 從「換更多人選」搜來的人不屬於這三個角色的 cohort，roleId 會落在
   // 第一個角色上——這只影響 promptAngle 用哪一段，不影響顯示的真實資料。
@@ -567,27 +570,37 @@ export async function getDirectorByAgentId(
 }
 
 /**
- * 「換更多人選」：在 strategy 層的 agent 裡搜。刻意限制在 layer='strategy'
+ * 「換更多人選」：在 strategy 層的 agent、以及綁了產品策略 Skill 的 agent 裡搜
  * ——這個入口找的是策略總監，不是所有 16,000 位 agent。
  */
+/** 後台綁給產品策略 agent 的 Skill bundle（mos_db skills.slug）。 */
+export const PRODUCT_STRATEGY_BUNDLE = "product-strategy-agent-card-v1";
+
 export async function searchDirectors(search: string, limit = 12): Promise<StrategistDirector[]> {
   const q = search.trim();
   if (q.length < 1) return [];
   const safe = Math.max(1, Math.min(30, Math.floor(limit)));
   const like = `%${q}%`;
+  // 2026-09-26（CJ：產品策略 agent 要在產品頁總監實際被用到）：綁了產品策略
+  // Skill 的 agent 不論 layer 都搜得到——例如 Sandra Roberts(180837) 是
+  // execution 層，舊條件 layer='strategy' 會把她整批排除。
   const [rows]: any = await localPool.execute(
-    `SELECT ${DIRECTOR_FIELDS} FROM agents
+    `SELECT ${DIRECTOR_FIELDS}, primarySkillBundleKey FROM agents
       WHERE ${AVAILABLE}
-        AND layer = 'strategy'
+        AND (layer = 'strategy' OR primarySkillBundleKey = ?)
         AND (name_zh LIKE ? OR name LIKE ? OR title_zh LIKE ? OR title LIKE ? OR specialty LIKE ?)
       ORDER BY (slug LIKE '%-tw-%') DESC, CHAR_LENGTH(COALESCE(experienceDetail, '')) DESC, id ASC
       LIMIT ${safe}`,
-    [like, like, like, like, like],
+    [PRODUCT_STRATEGY_BUNDLE, like, like, like, like, like],
   );
   return (rows as any[]).map((row) => {
     const slug = String(row.slug ?? "");
     const role = STRATEGIST_ROLES.find((r) => r.fixedSlug === slug)
       ?? STRATEGIST_ROLES.find((r) => r.slugPrefix && slug.startsWith(r.slugPrefix))
+      // 產品策略 agent 用產品頁的角度與工具，不要套品牌定位那一套。
+      ?? (row.primarySkillBundleKey === PRODUCT_STRATEGY_BUNDLE
+        ? STRATEGIST_ROLES.find((r) => r.id === "product_value_prop")
+        : undefined)
       ?? STRATEGIST_ROLES[0]!;
     return toDirector(row, role, false);
   });

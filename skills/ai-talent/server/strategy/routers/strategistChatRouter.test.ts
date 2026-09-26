@@ -52,6 +52,14 @@ describe("工具引導依 scope 分開", () => {
     const p = buildSystemPrompt(null, "");
     expect(p).toContain("<<action:open_healthcheck>>");
   });
+
+  // 2026-09-26：總監在 mos_db 的工作守則／執行卡／Skill 要真的進 prompt，
+  // 後台把 agent 補強，產品頁總監才會跟著變強。
+  it("帶入這位總監在 mos_db 的工作守則與 Skill", () => {
+    const p = buildSystemPrompt(director("product_kano", "產品"), "", "# 工作守則（必讀）\nKANO-守則");
+    expect(p).toContain("KANO-守則");
+    expect(buildSystemPrompt(null, "", "不該出現")).not.toContain("不該出現");
+  });
 });
 
 describe("strategistChatRouter", () => {
