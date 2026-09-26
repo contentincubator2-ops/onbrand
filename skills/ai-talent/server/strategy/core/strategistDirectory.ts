@@ -85,10 +85,11 @@ export interface StrategistDirector {
 
 export type StrategistRoleId =
   | "brand_positioning" | "pricing_value" | "consumer_behavior"
-  | "product_value_prop" | "product_kano" | "product_pricing";
+  | "product_value_prop" | "product_kano" | "product_pricing"
+  | "copy_voice" | "copy_terms" | "copy_industry";
 
 /** 品牌頁與產品頁各有自己的三個角色（CJ 2026-09-24 定案，見 STRATEGIST_ROLES）。 */
-export type StrategistScope = "brand" | "product";
+export type StrategistScope = "brand" | "product" | "copy";
 
 interface StrategistRole {
   id: StrategistRoleId;
@@ -263,6 +264,91 @@ export const STRATEGIST_ROLES: StrategistRole[] = [
 ];
 
 /** 某個頁面（scope）用的角色。 */
+/**
+ * 文字頁（cat=copy）的三位。
+ *
+ * 2026-09-26（CJ「要從 mos_db 當中，選擇三個負責這一頁的 agent，作為右下角的
+ * 詢問人選」）：這一頁管的是**用詞**——推薦用詞、禁用詞、縮寫對照，以及後續自己
+ * 加的語氣、CTA、Hook 卡。所以三個角度要互補而不是三個文案師：
+ *
+ *   1. 語氣怎麼定（品牌語氣指南）
+ *   2. 詞怎麼挑、什麼不能說（Do/Don't 情境集、訊息一致性）
+ *   3. 這些詞在你的產業讀起來對不對、合不合規（產業內容策略師，有產業分身）
+ *
+ * 前兩位是固定人選：他們不是產業 cohort，沒有分身，所以不會出現「沒有你產業的
+ * 人選」那句話。第三位走既有的產業比對（content_strategy-<code>-tw-%）。
+ * 三個 slug 都在 mos_db 實際查過存在（exec-brand-k3 / exec-copywriter-senior /
+ * content_strategy-food-tw-3683）。
+ */
+const COPY_ROLES: StrategistRole[] = [
+  {
+    id: "copy_voice",
+    scope: "copy",
+    label: "品牌語氣",
+    labelEn: "Tone of Voice",
+    fixedSlug: "exec-brand-k3",
+    promptAngle:
+      "你看事情的角度是品牌語氣：品牌原型（Brand Archetypes）、語氣維度（正式↔親近、理性↔感性、克制↔張揚），"
+      + "以及台灣消費者對不同語氣的反應。被問到用詞的問題，你從「這個詞撐不撐得起你想要的語氣」切入；"
+      + "你不會給一長串形容詞，你會給可以照著寫的維度與例句。",
+    signatureQuestions: [
+      "我的品牌講話應該像哪一種人？",
+      "同一句話要怎麼寫才像我們、不像競品？",
+      "客服、貼文、廣告的語氣可以不一樣嗎？",
+    ],
+    signatureQuestionsEn: [
+      "What kind of person should my brand sound like?",
+      "How do I say this so it sounds like us, not our competitor?",
+      "Can support, social and ads use different tones?",
+    ],
+  },
+  {
+    id: "copy_terms",
+    scope: "copy",
+    label: "用詞規範",
+    labelEn: "Word Rules",
+    fixedSlug: "exec-copywriter-senior",
+    promptAngle:
+      "你看事情的角度是可以直接執行的用詞規則：推薦用詞、禁用詞、替換對照、縮寫怎麼統一。"
+      + "你做過品牌聲音規範（Do/Don't 情境集），所以你給的東西一定是「這樣寫 / 不要這樣寫」的成對範例，"
+      + "不是抽象原則。被問到語氣或策略的問題，你從「那要落成哪幾條寫得出來的規則」切入。",
+    signatureQuestions: [
+      "哪些詞我該固定用、哪些該禁掉？",
+      "同一個產品有好幾種叫法，要怎麼統一？",
+      "禁用詞除了法規，還有哪些是品牌自己該避開的？",
+    ],
+    signatureQuestionsEn: [
+      "Which words should we standardise on, and which should we ban?",
+      "We call the same product three different ways — how do we settle it?",
+      "Beyond legal, what words should our brand avoid?",
+    ],
+  },
+  {
+    id: "copy_industry",
+    scope: "copy",
+    label: "產業用語與合規",
+    labelEn: "Industry Wording",
+    slugPrefix: "content_strategy-",
+    fallbackSlug: "content_strategy-food-tw-3683",
+    promptAngle:
+      "你看事情的角度是這個產業實際的用語習慣與紅線：這一行的顧客怎麼講話、哪些宣稱會踩到法規"
+      + "（療效、誇大、功效保證那一類）、哪些詞在這個產業已經被用爛。"
+      + "被問到語氣的問題，你從「這個說法在你這一行會不會出事、會不會撞到所有人」切入。",
+    signatureQuestions: [
+      "我這一行有哪些詞是不能說的？",
+      "同業都在講的詞，我該跟還是該避開？",
+      "我的客人實際上都用什麼字在搜尋？",
+    ],
+    signatureQuestionsEn: [
+      "Which claims are off-limits in my industry?",
+      "Everyone in my category says this — should I follow or avoid it?",
+      "What words do my customers actually search with?",
+    ],
+  },
+];
+
+STRATEGIST_ROLES.push(...COPY_ROLES);
+
 export function rolesFor(scope: StrategistScope): StrategistRole[] {
   return STRATEGIST_ROLES.filter((r) => r.scope === scope);
 }

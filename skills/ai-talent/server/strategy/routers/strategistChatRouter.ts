@@ -328,12 +328,37 @@ const PRODUCT_TOOLS_BLOCK = `【你的守備範圍：產品，不是品牌】
  * director 是 null（agentId 還沒寫進去的舊對話）時退回通用提示詞，不硬
  * 指派一位——見 directorForConversation() 的說明。
  */
+/**
+ * 2026-09-26（CJ「要從 mos_db 當中，選擇三個負責這一頁的 agent」）：文字頁的三位。
+ *
+ * 這一頁的產出是**規則**（推薦用詞／禁用詞／縮寫對照），不是文案本身。所以這三位
+ * 的工作是把使用者說的話收斂成可以直接貼進卡片的條目——一條一個詞，不是一段說明。
+ * 他們也不發任何 action 標記：文字頁沒有可以按的面板，硬給一顆會跳到品牌健檢的
+ * 按鈕就是答非所問（產品總監那次的同一個教訓）。
+ */
+const COPY_TOOLS_BLOCK = `【你的守備範圍：用詞，不是文案】
+這一頁是品牌的**用詞規範**：推薦用詞、禁用詞、縮寫對照，以及使用者自己加的語氣、
+CTA、Hook 等卡片。你的產出要能直接變成卡片上的一條：
+
+- 建議用詞時，就給**詞或短句本身**，一行一個，不要寫成一段說明。
+- 建議禁用詞時，一併說「改說什麼」——只禁不給替代，使用者下次還是會寫錯。
+- 要改哪一張卡就明講卡名（例如「這幾個字建議放進禁用詞」），使用者才知道要動哪裡。
+- 使用者問的是整篇文案怎麼寫時，提醒他那是內容層任務卡的工作，你只負責把規則定下來——
+  但仍然給他一兩個示範句，讓他看得出規則落地長什麼樣。
+
+**不要**把使用者帶去品牌層的策略健檢或策略監測——那是品牌定位的工具，跟用詞規範是
+兩件事。品牌層的問題（我們是誰、定位對不對）請他去找品牌策略總監。`;
+
 export function buildSystemPrompt(director: StrategistDirector | null, brandCtx: string, knowledge = ""): string {
   const parts = [STRATEGIST_SYSTEM_PROMPT];
   // 工具引導依這位總監所屬的 scope 給——產品總監不該把人帶去品牌層的健檢。
   // 沒有指定人設（agentId 是 NULL 的舊對話）時用品牌那套，跟以前的行為一致。
   const scope = director ? getRole(director.roleId).scope : "brand";
-  parts.push(scope === "product" ? PRODUCT_TOOLS_BLOCK : BRAND_TOOLS_BLOCK);
+  parts.push(
+    scope === "product" ? PRODUCT_TOOLS_BLOCK
+    : scope === "copy" ? COPY_TOOLS_BLOCK
+    : BRAND_TOOLS_BLOCK,
+  );
   if (director) {
     const role = getRole(director.roleId);
     const persona: string[] = [
@@ -493,7 +518,7 @@ export const strategistChatRouter = router({
        * 2026-09-24（CJ「產品定位就用你推薦的那三位人選」）：品牌頁與產品頁
        * 各有自己的三個角色。前端在產品頁（URL 有 ?p=）會送 "product"。
        */
-      scope: z.enum(["brand", "product"]).optional(),
+      scope: z.enum(["brand", "product", "copy"]).optional(),
     }))
     .query(async ({ ctx, input }) => {
       const userId = ctx.user!.id;
@@ -526,7 +551,7 @@ export const strategistChatRouter = router({
       // （舊前端）退回這個品牌的第一位，不會炸。
       agentId: z.number().int().positive().optional(),
       /** 沒給 agentId 時，要從哪一組角色取第一位當預設。 */
-      scope: z.enum(["brand", "product"]).optional(),
+      scope: z.enum(["brand", "product", "copy"]).optional(),
     }))
     .query(async ({ ctx, input }) => {
       const userId = ctx.user!.id;

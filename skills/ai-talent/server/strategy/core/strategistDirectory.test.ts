@@ -357,3 +357,38 @@ describe("searchDirectors", () => {
     expect(search?.params).toContain("product-strategy-agent-card-v1");
   });
 });
+
+// 2026-09-26（CJ「要從 mos_db 當中，選擇三個負責這一頁的 agent，作為右下角的
+// 詢問人選」）：文字頁的三位。三個 slug 都在 mos_db 查過存在；這裡測的是「角色
+// 設定本身不要寫歪」——scope 分對、三個角度不重複、固定人選不要配 fallback
+// （配了的話畫面會說「沒有你產業的人選」，但那句話對固定人選不成立）。
+describe("文字頁（copy scope）的三位", () => {
+  const roles = rolesFor("copy");
+
+  it("剛好三位，而且不會混進品牌／產品的角色", () => {
+    expect(roles.map((r) => r.id)).toEqual(["copy_voice", "copy_terms", "copy_industry"]);
+    expect(rolesFor("brand").some((r) => r.scope !== "brand")).toBe(false);
+    expect(rolesFor("product").some((r) => r.scope !== "product")).toBe(false);
+  });
+
+  it("固定人選用實際存在的 slug，而且不配 fallback", () => {
+    const fixed = roles.filter((r) => r.fixedSlug);
+    expect(fixed.map((r) => r.fixedSlug)).toEqual(["exec-brand-k3", "exec-copywriter-senior"]);
+    for (const r of fixed) expect(r.fallbackSlug, r.id).toBeUndefined();
+  });
+
+  it("產業角色走既有的 <prefix><code>-tw- 比對，而且 fallback 真的長那樣", () => {
+    const ind = roles.find((r) => r.id === "copy_industry")!;
+    expect(ind.slugPrefix).toBe("content_strategy-");
+    expect(ind.fallbackSlug).toMatch(/^content_strategy-[a-z_]+-tw-\d+$/);
+  });
+
+  it("三個角度不重複，而且每位都有自己的引導問題", () => {
+    const angles = roles.map((r) => r.promptAngle);
+    expect(new Set(angles).size).toBe(3);
+    for (const r of roles) {
+      expect(r.signatureQuestions.length, r.id).toBeGreaterThanOrEqual(3);
+      expect(r.signatureQuestionsEn.length, r.id).toBe(r.signatureQuestions.length);
+    }
+  });
+});

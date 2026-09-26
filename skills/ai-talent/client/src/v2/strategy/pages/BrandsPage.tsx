@@ -32,7 +32,6 @@ import KnowledgeEditor from "../components/positioning/KnowledgeEditor";
 import PositioningDocPanel from "../components/positioning/PositioningDocPanel";
 import CustomCardEditor, { type EditableCard } from "../components/positioning/CustomCardEditor";
 import AssetPhotoGallery from "../components/positioning/AssetPhotoGallery";
-import InlineAssetCard from "../components/positioning/InlineAssetCard";
 import { InfoTab as BrandInfoTab, DangerTab as BrandDangerTab, PublishTab as BrandPublishTab } from "../components/positioning/BrandSettingsSheet";
 import AIPromptsEditor from "../components/positioning/AIPromptsEditor";
 import BrandOnboardingWizard from "../components/onboarding/BrandOnboardingWizard";
@@ -50,6 +49,7 @@ import { SCOPE_SEGMENTS, type SegmentSpec } from "../lib/positioningSchema";
 import { pickProductImageUrl } from "../lib/productImage";
 import { readProductFacts } from "../lib/productFacts";
 import CampaignWorkspace from "../components/positioning/CampaignWorkspace";
+import CopyAssetBoard, { COPY_ASSETS } from "../components/positioning/CopyAssetBoard";
 import { pipelineFor, type PipelineStepSpec } from "../lib/positioningPipeline";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faPlus, faPalette, faFont, faQuoteLeft, faBullseye, faUsers, faImage, faIcons, faChartPie, faImages, faPenNib, faShieldHalved, faFolderOpen, faLock, faLockOpen, faBookOpen, faTableList, faBox, faRocket, faBullhorn, faWandSparkles, faGear, faStickyNote, faTrash, faSatelliteDish, faStethoscope, faFileArrowUp } from "@fortawesome/free-solid-svg-icons";
@@ -4717,42 +4717,10 @@ function KickerRow({
    per-card lives inside InlineAssetCard and writes through onChange.
    Compact lock chip sits top-right (replaces the old wide TabActionBar).
    ───────────────────────────────────────────────────────────────────── */
-type CopyShape = "text" | "items" | "pairs";
-type CopyTileItem = { key: string; labelZh: string; labelEn: string; Icon: any; bg: string; shape: CopyShape };
-type CopyTileGroup = { labelZh: string; labelEn: string; items: CopyTileItem[] };
-const COPY_TILE_GROUPS: CopyTileGroup[] = [
-  {
-    labelZh: "口吻風格", labelEn: "Voice & style",
-    items: [
-      { key: "voice",            labelZh: "品牌口吻", labelEn: "Brand voice",       Icon: LucideQuote,       bg: "#FFF0F6", shape: "text" },
-      { key: "voice_principles", labelZh: "品牌準則", labelEn: "Voice principles",  Icon: LucideShield,      bg: "#F0FDF4", shape: "items" },
-    ],
-  },
-  {
-    labelZh: "用詞規範", labelEn: "Word rules",
-    items: [
-      { key: "preferred_terms",     labelZh: "推薦用詞", labelEn: "Preferred terms",   Icon: LucideTypeIcon, bg: "#ECFDF5", shape: "items" },
-      { key: "banned_words",        labelZh: "禁用詞",   labelEn: "Banned words",      Icon: LucideShield,   bg: "#FEE2E2", shape: "items" },
-      { key: "term_substitutions",  labelZh: "替換對照", labelEn: "Substitutions",     Icon: LucidePencil,   bg: "#FFFBEB", shape: "pairs" },
-    ],
-  },
-  {
-    labelZh: "專用詞彙", labelEn: "Brand vocabulary",
-    items: [
-      { key: "branded_terms",   labelZh: "品牌術語",     labelEn: "Brand terms",       Icon: LucideAward,    bg: "#F5F3FF", shape: "items" },
-      { key: "product_naming",  labelZh: "產品名稱規範", labelEn: "Product naming",    Icon: LucidePackage,  bg: "#EFF6FF", shape: "text" },
-      { key: "abbreviations",   labelZh: "縮寫對照",     labelEn: "Abbreviations",     Icon: LucideHash,     bg: "#FFF7ED", shape: "pairs" },
-    ],
-  },
-  {
-    labelZh: "常用文案", labelEn: "Copy library",
-    items: [
-      { key: "cta_library",     labelZh: "CTA 庫",     labelEn: "CTA library",        Icon: LucideMessage,    bg: "#F0F9FF", shape: "items" },
-      { key: "hook_library",    labelZh: "Hook 庫",    labelEn: "Hook library",       Icon: LucideQuote,      bg: "#FFF0F6", shape: "items" },
-      { key: "templates_copy",  labelZh: "文案範本",   labelEn: "Copy templates",     Icon: LucideFileText,   bg: "#FFFBEB", shape: "items" },
-    ],
-  },
-];
+/* 2026-09-26：COPY_TILE_GROUPS（4 組 11 張帶粉彩底色的圖磚）已退場。卡片定義
+   搬到 components/positioning/CopyAssetBoard.tsx 的 COPY_ASSETS——那裡沒有色票
+   （設計系統：顏色只有功能性意義），而且每張多了「填了會影響什麼」，使用者才
+   判斷得出要不要加那張卡。 */
 
 function CopyTabInline({
   brandId, brandAssets, fullPositioning, locked, onLockToggle,
@@ -4796,6 +4764,17 @@ function CopyTabInline({
   const timersRef = React.useRef<Record<string, any>>({});
   const [savingKey, setSavingKey] = useState<string | null>(null);
 
+  // 2026-09-26：使用者自己加的文字卡片。存在 positioning._assetCards（跟
+  // _assets 同一層），所以不需要新欄位也不必改 schema。
+  const addedCopyCards: string[] = Array.isArray((fullPositioning as any)?._assetCards)
+    ? ((fullPositioning as any)._assetCards as any[]).filter((k) => typeof k === "string")
+    : [];
+  const addCopyCard = (key: string) => {
+    if (locked || !brandId || addedCopyCards.includes(key)) return;
+    const merged = { ...fullPositioning, _assetCards: [...addedCopyCards, key] };
+    saveMut?.mutate?.({ kind: "brand", id: brandId, positioning: merged });
+  };
+
   const updateAsset = (key: string, next: any) => {
     if (locked || !brandId) return;
     dirtyRef.current.add(key);
@@ -4824,7 +4803,7 @@ function CopyTabInline({
     if (Array.isArray(v.pairs) && v.pairs.filter((p: any) => p?.from?.trim() && p?.to?.trim()).length > 0) return false;
     return true;
   };
-  const allCopyKeys = COPY_TILE_GROUPS.flatMap((g) => g.items.map((it) => it.key));
+  const allCopyKeys = COPY_ASSETS.map((a) => a.key);
   const emptyKeys = allCopyKeys.filter(isEmpty);
 
   const handleBulkAutoFill = async () => {
@@ -4959,38 +4938,22 @@ function CopyTabInline({
         </div>
       )}
 
-      {COPY_TILE_GROUPS.map((group, gi) => (
-        <div key={gi}>
-          {/* 2026-05-11 (CJ「文字和知識的設計風格，也改得跟定位一樣」):
-              editorial section divider, same syntax as PositioningGrid. */}
-          <SectionLabel
-            label={lang === "en" ? group.labelEn : group.labelZh}
-            counter={`${group.items.filter((it: any) => !isEmpty(it.key)).length} / ${group.items.length}`}
-          />
-
-          <div style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
-            gap: 14,
-          }}>
-            {group.items.map((item) => (
-              <InlineAssetCard
-                key={item.key}
-                assetKey={item.key}
-                label={lang === "en" ? item.labelEn : item.labelZh}
-                Icon={item.Icon}
-                bg={item.bg}
-                shape={item.shape}
-                value={drafts[item.key]}
-                onChange={(next) => updateAsset(item.key, next)}
-                brandId={brandId}
-                readOnly={locked}
-                filling={bulkFillingKeys.has(item.key)}
-              />
-            ))}
-          </div>
-        </div>
-      ))}
+      {/* 2026-09-26（CJ「改成跟品牌頁面相同格式的任務卡格式」＋「一開始，只要
+          出現推薦用詞、禁用詞與縮寫對照就好，其他的欄位，都提供新增的卡片的
+          選項」）：原本一次攤開 4 組 11 張圖磚。十一個空欄位擺在眼前，使用者
+          不知道從哪格開始，結果一格都不填。改成預設三張＋自己加。
+          顯示規則見 CopyAssetBoard.visibleKeys——已經有內容的卡片一定看得見，
+          不然既有品牌會以為資料不見了。 */}
+      <CopyAssetBoard
+        brandId={brandId}
+        drafts={drafts}
+        added={addedCopyCards}
+        onChange={updateAsset}
+        onAddCard={addCopyCard}
+        readOnly={locked}
+        fillingKeys={bulkFillingKeys}
+        lang={lang}
+      />
     </div>
   );
 }
