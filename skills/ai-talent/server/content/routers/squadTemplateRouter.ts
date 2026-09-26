@@ -606,7 +606,9 @@ export const squadTemplateRouter = router({
       // which keys to fill — converges faster + more parseable than free-form.
       const schemaExample = JSON.stringify(mockConclusionForStep(step.outputKind, step.mockupVariant), null, 2);
 
+      const agentKnowledge = await loadAgentKnowledge(step.assignedAgentId ? Number(step.assignedAgentId) : null, { source: "squad.runStepLive" });
       const systemPrompt = `你是 ${step.assignedAgentName ?? "Squad Agent"}（zh-TW）。Squad「${squad.name}」步驟「${step.name}」負責人。
+${agentKnowledge ? `\n${agentKnowledge}\n` : ""}
 
 【方法論】${squad.methodology ?? "N/A"}
 【步驟說明】${step.description ?? ""}
@@ -1763,7 +1765,7 @@ ${schemaExample}
       const sourceAgentId = Number(sq.source_agent_id) || undefined;
       const leadName  = sq.agent_name ?? sq.squad_lead ?? FALLBACK_SQUAD_LEAD.agentName;
       const leadTitle = sq.agent_title ?? FALLBACK_SQUAD_LEAD.agentTitle;
-      const leadKnowledge = sourceAgentId ? await loadAgentKnowledge(sourceAgentId).catch(() => "") : "";
+      const leadKnowledge = sourceAgentId ? await loadAgentKnowledge(sourceAgentId, { source: "squad.leadOpen" }).catch(() => "") : "";
 
       const agentCtx = await loadAgentContext({
         missionId: input.missionId,
@@ -1995,6 +1997,7 @@ ${leadKnowledge}
       const agentName = agentRow?.name ?? step.assignedAgentName ?? "AI 專員";
       const agentTitle = agentRow?.title ?? "";
       const agentSkill = agentRow?.primarySkill ?? step.requiredSkill ?? "";
+      const agentKnowledge = await loadAgentKnowledge(assignedId, { source: "squad.stepExecute" });
 
       // ── confirm: just flip status, no LLM ────────────────────────────────────
       if (input.mode === "confirm") {
@@ -2185,7 +2188,7 @@ ${leadKnowledge}
       // ── ask: agent asks 1–3 clarifying questions for this step ───────────────
       if (input.mode === "ask") {
         const systemPrompt = `你是 ${agentName}${agentTitle ? `（${agentTitle}）` : ""}，專長：${agentSkill}。
-你即將執行「${stepName}」這個步驟。先用使用者聽得懂的話，提出 1–3 個最關鍵的問題，幫你完成這一步。
+${agentKnowledge ? `\n${agentKnowledge}\n` : ""}你即將執行「${stepName}」這個步驟。先用使用者聽得懂的話，提出 1–3 個最關鍵的問題，幫你完成這一步。
 語氣專業但溫暖，像真正帶過品牌的行銷顧問。用繁體中文。控制在 200 字內。`;
         const userPrompt = `${missionContext}
 ${brandContext}
@@ -2328,7 +2331,7 @@ ${prevOutputs ? `\n前面步驟的成果：\n${prevOutputs}` : ""}
         : `直接寫出成品內容，不要寫「我會...」這種方法論說明。`;
 
       const systemPrompt = `你是 ${agentName}${agentTitle ? `（${agentTitle}）` : ""}，專長：${agentSkill}。
-你正在執行「${stepName}」步驟。
+${agentKnowledge ? `\n${agentKnowledge}\n` : ""}你正在執行「${stepName}」步驟。
 
 【最高優先規則】直接交付完成品本身。
 ✗ 錯誤輸出（寫方法論）：「先抓住眼球的 hook，再帶出產品價值，最後 CTA」

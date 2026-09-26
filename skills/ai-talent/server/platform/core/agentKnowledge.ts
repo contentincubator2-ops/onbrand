@@ -184,13 +184,58 @@ export function renderAgentKnowledge(agent: any, skillRows: any[] = []): string 
 
 type Pool = { execute: (sql: string, params?: any[]) => Promise<any> };
 
+export interface KnowledgeOpts {
+  /** 呼叫端代號（例：orchestra.loadAgent、strategist.chat），寫進注入紀錄。 */
+  source?: string;
+  pool?: Pool;
+}
+
+/** 舊呼叫方式 (ids, pool) 仍可用。 */
+function normalizeOpts(arg?: Pool | KnowledgeOpts): KnowledgeOpts {
+  if (!arg) return {};
+  return typeof (arg as Pool).execute === "function" ? { pool: arg as Pool } : (arg as KnowledgeOpts);
+}
+
+function cardVersion(raw: unknown): string | null {
+  const c = parseJson<any>(raw);
+  return c?.version ? String(c.version) : null;
+}
+
+/**
+ * 注入紀錄：每次真的把知識接進 prompt，就寫一筆 error_log level=info
+ * （source = agent.knowledge）。用途是拿正式流量證明「有用到 mos_db 的
+ * agent、而且是當下版本」——不印 console（agent 載入很頻繁）、不等寫入完成、
+ * 失敗就算了。讀 error_log 當錯誤看時記得過濾 level（見 error_log 雙用途）。
+ */
+function recordInjection(db: Pool, source: string, a: any, skillIds: number[], text: string): void {
+  const meta = {
+    agentId: Number(a.id),
+    source,
+    chars: text.length,
+    taskSystemPromptChars: String(a.taskSystemPrompt ?? "").length,
+    cardVersion: cardVersion(a.agentCard),
+    skillIds,
+    agentUpdatedAt: a.updatedAt ?? null,
+  };
+  void Promise.resolve()
+    .then(() => db.execute(
+      `INSERT INTO error_log (level, source, route, message, meta) VALUES ('info', 'agent.knowledge', ?, ?, ?)`,
+      [source.slice(0, 160), `${source}: agent ${a.id} ${text.length} chars`.slice(0, 500), JSON.stringify(meta)],
+    ))
+    .catch(() => { /* telemetry only */ });
+}
+
 async function getPool(): Promise<Pool> {
   const { default: localPool } = await import("../../localDb");
   return localPool as unknown as Pool;
 }
 
 /** 一次載入多位 agent 的知識區塊。拿不到的 id 不會出現在 Map 裡。 */
-export async function loadAgentKnowledgeMany(ids: Array<number | null | undefined>, pool?: Pool): Promise<Map<number, string>> {
+export async function loadAgentKnowledgeMany(
+  ids: Array<number | null | undefined>,
+  opts?: Pool | KnowledgeOpts,
+): Promise<Map<number, string>> {
+  const { pool, source = "unknown" } = normalizeOpts(opts);
   const out = new Map<number, string>();
   const uniq = Array.from(new Set(ids.map(Number).filter((n) => Number.isFinite(n) && n > 0)));
   if (!uniq.length) return out;
@@ -231,7 +276,10 @@ export async function loadAgentKnowledgeMany(ids: Array<number | null | undefine
       const slug = a.primarySkillBundleKey ? String(a.primarySkillBundleKey) : null;
       const mine = skillRows.filter((s) => ids.has(Number(s.id)) || (slug && s.slug === slug));
       const text = renderAgentKnowledge(a, mine);
-      if (text) out.set(Number(a.id), text);
+      if (text) {
+        out.set(Number(a.id), text);
+        recordInjection(db, source, a, mine.map((m) => Number(m.id)), text);
+      }
     }
   } catch (e) {
     console.warn("[agentKnowledge] load failed:", (e as Error)?.message);
@@ -239,9 +287,9 @@ export async function loadAgentKnowledgeMany(ids: Array<number | null | undefine
   return out;
 }
 
-export async function loadAgentKnowledge(id: number | null | undefined, pool?: Pool): Promise<string> {
+export async function loadAgentKnowledge(id: number | null | undefined, opts?: Pool | KnowledgeOpts): Promise<string> {
   if (!id) return "";
-  return (await loadAgentKnowledgeMany([id], pool)).get(Number(id)) ?? "";
+  return (await loadAgentKnowledgeMany([id], opts)).get(Number(id)) ?? "";
 }
 
 /** 接在既有 system prompt 後面；沒有知識就原封不動。 */
