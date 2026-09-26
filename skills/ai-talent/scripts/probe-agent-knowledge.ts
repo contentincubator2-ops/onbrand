@@ -27,7 +27,8 @@ async function main() {
     `SELECT * FROM agents WHERE id IN (${ids.map(() => "?").join(",")})`,
     ids,
   );
-  const knowledge = await loadAgentKnowledgeMany(ids);
+  // 標成 probe：探測自己觸發的注入不能算成「真實使用」。
+  const knowledge = await loadAgentKnowledgeMany(ids, { source: "probe" });
 
   let bad = 0;
   const lengths: number[] = [];
@@ -90,16 +91,16 @@ async function main() {
   try {
     const [bySource]: any = await localPool.execute(
       `SELECT route AS source, COUNT(*) AS n, COUNT(DISTINCT JSON_EXTRACT(meta, '$.agentId')) AS agents, MAX(createdAt) AS last
-         FROM error_log WHERE source = 'agent.knowledge' AND createdAt > NOW() - INTERVAL 7 DAY
+         FROM error_log WHERE source = 'agent.knowledge' AND route NOT IN ('probe', 'unknown') AND createdAt > NOW() - INTERVAL 7 DAY
         GROUP BY route ORDER BY n DESC`,
     );
-    console.log(`\n近 7 天實際注入（依呼叫來源）：`);
+    console.log(`\n近 7 天真實使用的注入（依呼叫來源，不含探測）：`);
     for (const r of bySource as any[]) console.log(`  ${r.source}: ${r.n} 次、${r.agents} 位 agent，最後 ${r.last}`);
     if (!(bySource as any[]).length) console.log("  （還沒有紀錄）");
 
     const [recent]: any = await localPool.execute(
       `SELECT createdAt, route AS source, meta FROM error_log
-        WHERE source = 'agent.knowledge' AND JSON_EXTRACT(meta, '$.agentId') IN (${ids.slice(0, 50).map(() => "?").join(",")})
+        WHERE source = 'agent.knowledge' AND route NOT IN ('probe', 'unknown') AND JSON_EXTRACT(meta, '$.agentId') IN (${ids.slice(0, 50).map(() => "?").join(",")})
         ORDER BY id DESC LIMIT 20`,
       ids.slice(0, 50),
     );
