@@ -27,6 +27,7 @@ import { normalizeTaskId, legacyTaskId } from "../../platform/core/tierCompat";
 import { TRPCError } from "@trpc/server";
 import { getDb } from "../../db";
 import localPool from "../../localDb";
+import { loadAgentKnowledge } from "../../platform/core/agentKnowledge";
 import { sql } from "drizzle-orm";
 import { callLLM } from "../../platform/core/llmRouter";
 import { randomBytes } from "crypto";
@@ -325,7 +326,9 @@ function normalizeWorkspace(ws: string): string {
 // ── Fallback squad lead definition ───────────────────────────────────────────
 
 const FALLBACK_SQUAD_LEAD = {
-  agentName: "Jordan Hayes",
+  // Canonical catalog record — never a display-only invented identity.
+  sourceAgentId: 30002,
+  agentName: "Sarah Liu",
   agentTitle: "AI 品牌故事 CMO",
   agentRole: "squad_lead",
   model: "claude-sonnet",
@@ -1554,7 +1557,7 @@ ${schemaExample}
 
       // ── Determine squad title + members ──────────────────────────────────────
       let squadTitle = `${brandName} 行銷小組`;
-      type AgentDef = { agentName: string; agentRole: string; agentTitle: string; model: string; skills: string[]; isLead?: boolean };
+      type AgentDef = { sourceAgentId?: number; agentName: string; agentRole: string; agentTitle: string; model: string; skills: string[]; isLead?: boolean };
       let agentDefs: AgentDef[] = [];
 
       if (input.squadId && input.squadId < 0) {
@@ -1571,6 +1574,7 @@ ${schemaExample}
             const synth = synthesizeAgentAsSquad(agent as AgentRow);
             squadTitle = `${brandName} × ${agent.name}`;
             agentDefs = [{
+              sourceAgentId: agent.id,
               agentName:  agent.name,
               agentRole:  agent.title ?? "specialist",
               agentTitle: agent.title ?? "Specialist",
@@ -1613,6 +1617,7 @@ ${schemaExample}
                   const a = agentMap[m.agent_id];
                   if (!a) return null;
                   return {
+                    sourceAgentId: a.id,
                     agentName:  a.name,
                     agentRole:  m.role ?? "specialist",
                     agentTitle: a.title,
@@ -1633,7 +1638,7 @@ ${schemaExample}
       if (!agentDefs.length) {
         squadTitle = `${brandName} 品牌定位小組`;
         agentDefs = [
-          { agentName: FALLBACK_SQUAD_LEAD.agentName, agentRole: "squad_lead", agentTitle: FALLBACK_SQUAD_LEAD.agentTitle, model: FALLBACK_SQUAD_LEAD.model, skills: FALLBACK_SQUAD_LEAD.skills, isLead: true },
+          { sourceAgentId: FALLBACK_SQUAD_LEAD.sourceAgentId, agentName: FALLBACK_SQUAD_LEAD.agentName, agentRole: "squad_lead", agentTitle: FALLBACK_SQUAD_LEAD.agentTitle, model: FALLBACK_SQUAD_LEAD.model, skills: FALLBACK_SQUAD_LEAD.skills, isLead: true },
           { agentName: "Ryan Torres",    agentRole: "市場研究員",   agentTitle: "市場研究師",   model: "claude-sonnet", skills: ["產業趨勢", "市場機會"] },
           { agentName: "Priya Nair",    agentRole: "消費者洞察師", agentTitle: "消費者研究師", model: "claude-sonnet", skills: ["消費者行為", "Persona 設計"] },
           { agentName: "Layla Brooks",  agentRole: "競品分析師",   agentTitle: "品牌策略師",   model: "claude-sonnet", skills: ["競品研究", "差異化定位"] },
@@ -1661,11 +1666,11 @@ ${schemaExample}
         const agentKey = genAgentKey(squadUid, agent.agentName);
         await db.execute(sql`
           INSERT INTO squad_agents
-            (squad_uid, brand_id, user_id, mission_id, agent_key, agent_name, agent_role, agent_title,
+            (squad_uid, brand_id, user_id, mission_id, source_agent_id, agent_key, agent_name, agent_role, agent_title,
              step_scope, brand_context, model, skills, status)
           VALUES (
             ${squadUid}, ${input.brandId}, ${userId}, ${input.missionId},
-            ${agentKey}, ${agent.agentName}, ${agent.agentRole}, ${agent.agentTitle},
+            ${agent.sourceAgentId ?? null}, ${agentKey}, ${agent.agentName}, ${agent.agentRole}, ${agent.agentTitle},
             ${JSON.stringify([])}, ${JSON.stringify({})},
             ${agent.model}, ${JSON.stringify(agent.skills)}, 'idle'
           )
@@ -1715,12 +1720,13 @@ ${schemaExample}
       const db = await getDb();
       if (!db) return [];
       const [rows] = await db.execute(
-        sql`SELECT agent_name, agent_role, agent_title, step_scope, skills, model, status
+        sql`SELECT source_agent_id, agent_name, agent_role, agent_title, step_scope, skills, model, status
             FROM squad_agents
             WHERE squad_uid = ${input.squadUid} AND user_id = ${ctx.user.id}
             ORDER BY id ASC`
       ) as any[];
       return (rows as any[]).map(r => ({
+        agentId:    r.source_agent_id ? Number(r.source_agent_id) : null,
         agentName:  r.agent_name,
         agentRole:  r.agent_role,
         agentTitle: r.agent_title,
@@ -1742,14 +1748,22 @@ ${schemaExample}
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
 
       const [sqRows] = await db.execute(
-        sql`SELECT brand_id, title, squad_lead FROM squad_sessions
-            WHERE squad_uid = ${input.squadUid} AND user_id = ${ctx.user.id} LIMIT 1`
+        sql`SELECT ss.brand_id, ss.title, ss.squad_lead,
+                   sa.source_agent_id, sa.agent_name, sa.agent_title
+            FROM squad_sessions ss
+            LEFT JOIN squad_agents sa
+              ON sa.squad_uid = ss.squad_uid AND sa.user_id = ss.user_id
+             AND (sa.agent_role = 'squad_lead' OR sa.agent_name = ss.squad_lead)
+            WHERE ss.squad_uid = ${input.squadUid} AND ss.user_id = ${ctx.user.id}
+            ORDER BY sa.source_agent_id IS NULL ASC, sa.id ASC LIMIT 1`
       ) as any[];
       const sq = (sqRows as any[])?.[0];
       if (!sq) throw new TRPCError({ code: "NOT_FOUND" });
 
-      const leadName  = sq.squad_lead ?? FALLBACK_SQUAD_LEAD.agentName;
-      const leadTitle = FALLBACK_SQUAD_LEAD.agentTitle;
+      const sourceAgentId = Number(sq.source_agent_id) || undefined;
+      const leadName  = sq.agent_name ?? sq.squad_lead ?? FALLBACK_SQUAD_LEAD.agentName;
+      const leadTitle = sq.agent_title ?? FALLBACK_SQUAD_LEAD.agentTitle;
+      const leadKnowledge = sourceAgentId ? await loadAgentKnowledge(sourceAgentId).catch(() => "") : "";
 
       const agentCtx = await loadAgentContext({
         missionId: input.missionId,
@@ -1762,7 +1776,9 @@ ${schemaExample}
 
       const systemPrompt = `你是 ${leadName}，${leadTitle}。
 你帶領了「${sq.title ?? "行銷小組"}」完成召集，即將展開工作。
-${agentCtx.systemPromptPrefix}`;
+${leadKnowledge ? `【此組長的工作守則與專業能力】
+${leadKnowledge}
+` : ""}${agentCtx.systemPromptPrefix}`;
 
       const userPrompt = `根據以上品牌資料和對話記錄，作為 Squad Lead，請：
 1. 用一句話確認你對這個品牌目前狀況的初步理解
@@ -1795,6 +1811,7 @@ ${agentCtx.systemPromptPrefix}`;
 
       return {
         message:    reply,
+        agentId:    sourceAgentId ?? null,
         agentName:  leadName,
         agentTitle: leadTitle,
         historyDepth: agentCtx.historyDepth,
