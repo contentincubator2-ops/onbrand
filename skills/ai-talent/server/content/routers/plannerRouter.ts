@@ -69,12 +69,12 @@ async function weekScheduled(userId: number, brandId: number, weekStart: string)
 // ─── 分歧方案卡 ───────────────────────────────────────────────────────
 
 interface ForkOption { advisor: AdvisorCard; stance: string; why: string; ops: any[]; preview: Array<{ date: string; platform: string; topic: string; format: string }> }
-interface StoredFork { axis: ForkAxis; question: string; options: ForkOption[]; chosen: number | null; overlap: number }
+interface StoredFork { axis: ForkAxis; weekStart: string; question: string; options: ForkOption[]; chosen: number | null; overlap: number }
 
 /** 給前端看的：不帶 ops（套用時伺服器自己從紀錄拿，前端不能改）。 */
 function publicFork(f: StoredFork) {
   return {
-    axis: f.axis, question: f.question, chosen: f.chosen ?? null,
+    axis: f.axis, weekStart: f.weekStart, question: f.question, chosen: f.chosen ?? null,
     options: (f.options ?? []).map((o) => ({ advisor: o.advisor, stance: o.stance, why: o.why, preview: o.preview })),
   };
 }
@@ -124,7 +124,7 @@ async function buildFork(ctxArgs: PlannerCtxArgs, axis: ForkAxis): Promise<Store
     }
   }
   return {
-    axis, question: ax.question, chosen: null, overlap: Math.round(overlap * 100) / 100,
+    axis, weekStart: ctxArgs.weekStart, question: ax.question, chosen: null, overlap: Math.round(overlap * 100) / 100,
     options: ([a, b] as const).map((r, i) => ({ advisor: advisors[i as 0 | 1], stance: ax.sides[i as 0 | 1].stance, why: r.why, ops: r.ops, preview: previewOf(r.ops) })),
   };
 }
@@ -224,8 +224,10 @@ export const plannerRouter = router({
 
       const platforms = await brandPlatforms(input.brandId);
       const cards: Card[] = cardsFor(platforms);
-      const slots: SlotRow[] = await loadWeekSlots(input.brandId, input.weekStart);
-      const ops = validateOps({ raw: opt.ops, weekStart: input.weekStart, platforms, cards, slots });
+      // 方案是替哪一週排的就套到哪一週——使用者可能已經翻到別週才按。
+      const weekStart = fork.weekStart || input.weekStart;
+      const slots: SlotRow[] = await loadWeekSlots(input.brandId, weekStart);
+      const ops = validateOps({ raw: opt.ops, weekStart, platforms, cards, slots });
       const touched = await applyOps({ userId, brandId: input.brandId, ops, cards });
 
       fork.chosen = input.index;
@@ -235,7 +237,7 @@ export const plannerRouter = router({
       await localPool.execute(`INSERT INTO planner_messages (userId, brandId, role, content) VALUES (?, ?, 'user', ?)`, [userId, input.brandId, said]);
       await localPool.execute(`INSERT INTO planner_messages (userId, brandId, role, content, meta) VALUES (?, ?, 'lead', ?, ?)`,
         [userId, input.brandId, reply, JSON.stringify({ choices: [], touched })]);
-      return { touched };
+      return { touched, weekStart };
     }),
 
   /** 排定這週：草稿 → 已排定。 */

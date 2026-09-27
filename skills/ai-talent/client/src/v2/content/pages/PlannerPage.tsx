@@ -47,7 +47,7 @@ function defaultWeek() {
 const md = (ymd: string) => { const [, m, d] = ymd.split("-"); return `${Number(m)}/${Number(d)}`; };
 
 type ForkView = {
-  axis: string; question: string; chosen: number | null;
+  axis: string; weekStart?: string; question: string; chosen: number | null;
   options: Array<{
     advisor: { slug: string; name: string; title: string; avatarUrl: string };
     stance: string; why: string; preview: Array<{ date: string; platform: string; topic: string; format: string }>;
@@ -96,7 +96,7 @@ export default function PlannerPage() {
   const removeSlot = T.planner?.removeSlot?.useMutation?.({ onSuccess: () => { setOpen(null); refresh(); } });
   // 分歧方案卡：選一版 → 伺服器套用那一版的格子。
   const pickFork = T.planner?.pickFork?.useMutation?.({
-    onSuccess: (r: any) => { setTouched(r?.touched ?? []); refresh(); },
+    onSuccess: (r: any) => { if (r?.weekStart) setWeekStart(r.weekStart); setTouched(r?.touched ?? []); refresh(); },
     onError: (e: any) => showToastGlobal(String(e?.message ?? "error"), "error"),
   });
   const cancelSched = T.calendar?.cancel?.useMutation?.({ onSuccess: () => { setOpen(null); refresh(); } });
