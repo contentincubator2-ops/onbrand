@@ -7,7 +7,7 @@
  */
 import { useState } from "react";
 import type { Decision, DecisionStatus, MeetingMinutes, MeetingRun } from "./meetingModel";
-import { decisionLabel } from "./meetingModel";
+import { decisionLabel, isWritableAnchor } from "./meetingModel";
 
 interface Props {
   minutes: MeetingMinutes;
@@ -17,7 +17,12 @@ interface Props {
   en: boolean;
   readOnly?: boolean;
   busy?: boolean;
-  onDecide?: (anchorId: string, status: DecisionStatus | null, note?: string) => void;
+  /** 範圍決定哪些格子「採用」會寫進品牌大腦。 */
+  scope?: "brand" | "product";
+  /** 不採用（rejected）或撤回（null；有寫入的話伺服器會一併復原）。 */
+  onDecide?: (anchorId: string, status: Extract<DecisionStatus, "rejected"> | null) => void;
+  /** 採用／修改後採用：打開確認視窗（預覽寫入內容與影響）。 */
+  onAdopt?: (anchorId: string, label: string, status: "adopted" | "modified", text: string) => void;
   onEditPositioning?: () => void;
   onOpenTask?: (title: string) => void;
 }
@@ -39,7 +44,7 @@ function Clamp({ text, en, max = 90 }: { text: string; en: boolean; max?: number
 }
 
 export default function MeetingMinutesView({
-  minutes, evidence, decisions, transcript, en, readOnly, busy, onDecide, onEditPositioning, onOpenTask,
+  minutes, evidence, decisions, transcript, en, readOnly, busy, scope = "brand", onDecide, onAdopt, onEditPositioning, onOpenTask,
 }: Props) {
   const [noteFor, setNoteFor] = useState<string | null>(null);
   const [noteDraft, setNoteDraft] = useState("");
@@ -103,16 +108,37 @@ export default function MeetingMinutesView({
                   </dd>
                 </dl>
 
+                {!d && (
+                  <p className="mt-2.5 text-[12px] text-neutral-500">
+                    {isWritableAnchor(scope, c.anchorId)
+                      ? (en ? "⚑ Adopting writes this into your Brand Brain — every task card after this will use it. You'll see exactly what changes before it's written."
+                            : "⚑ 採用會寫入品牌大腦，之後所有任務卡產文都會用新的內容。寫入前會先讓你看改動前後的對照。")
+                      : (en ? "This cell is research evidence — adopting only records your decision." : "這一格是研究證據，採用只會記錄決定，不會寫入品牌大腦。")}
+                  </p>
+                )}
                 <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-neutral-100 pt-3">
                   {d ? (
                     <>
                       <span className="text-[12.5px] font-medium text-neutral-900">✓ {decisionLabel(d.status, en)}</span>
-                      {d.note && <span className="text-[12.5px] text-neutral-500">「{d.note}」</span>}
+                      {d.versionId ? (
+                        <span className="rounded-full border border-neutral-900 px-2 py-0.5 text-[11.5px] text-neutral-900">
+                          {en ? `Written to Brand Brain: ${(d.written ?? []).join(", ")}` : `已寫入品牌大腦：${(d.written ?? []).join("、")}`}
+                        </span>
+                      ) : d.status !== "rejected" ? (
+                        <span className="text-[12px] text-neutral-500">{en ? "(decision only — Brand Brain unchanged)" : "（只記錄決定，品牌大腦沒有改）"}</span>
+                      ) : null}
+                      {d.note && d.status === "modified" && !d.versionId && <span className="text-[12.5px] text-neutral-500">「{d.note}」</span>}
                       {!readOnly && (
-                        <button type="button" disabled={busy} onClick={() => onDecide?.(c.anchorId, null)}
-                          className="text-[12px] text-neutral-400 underline hover:text-neutral-900">{en ? "Undo" : "撤回"}</button>
+                        <button type="button" disabled={busy}
+                          onClick={() => {
+                            if (d.versionId && !window.confirm(en ? "Undo this decision? Brand Brain will be restored to what it was before." : "撤回這個決定？品牌大腦會復原成寫入前的內容。")) return;
+                            onDecide?.(c.anchorId, null);
+                          }}
+                          className="text-[12px] text-neutral-400 underline hover:text-neutral-900">
+                          {d.versionId ? (en ? "Undo & restore" : "撤回並復原") : (en ? "Undo" : "撤回")}
+                        </button>
                       )}
-                      {!readOnly && d.status !== "rejected" && onEditPositioning && (
+                      {!readOnly && d.status !== "rejected" && !d.versionId && onEditPositioning && (
                         <button type="button" onClick={onEditPositioning}
                           className={`${pill} ml-auto border-neutral-900 text-neutral-900 hover:bg-neutral-900 hover:text-white`}>
                           {en ? "Edit positioning →" : "到定位頁修改 →"}
@@ -125,14 +151,14 @@ export default function MeetingMinutesView({
                         placeholder={en ? "What do you change?" : "你要改成什麼？"}
                         className="min-w-[200px] flex-1 rounded-lg border border-neutral-300 px-3 py-1.5 text-[13px] outline-none focus:border-neutral-900" />
                       <button type="button" disabled={busy || !noteDraft.trim()}
-                        onClick={() => { onDecide?.(c.anchorId, "modified", noteDraft.trim()); setNoteFor(null); setNoteDraft(""); }}
+                        onClick={() => { onAdopt?.(c.anchorId, c.label, "modified", noteDraft.trim()); setNoteFor(null); setNoteDraft(""); }}
                         className={`${pill} border-neutral-900 bg-neutral-900 text-white disabled:opacity-40`}>{en ? "Save" : "儲存"}</button>
                       <button type="button" onClick={() => setNoteFor(null)} className="text-[12px] text-neutral-500 underline">{en ? "Cancel" : "取消"}</button>
                     </div>
                   ) : (
                     <>
                       <span className="mr-1 text-[12px] text-neutral-500">{en ? "Your call:" : "你的決定："}</span>
-                      <button type="button" disabled={readOnly || busy} onClick={() => onDecide?.(c.anchorId, "adopted")}
+                      <button type="button" disabled={readOnly || busy} onClick={() => onAdopt?.(c.anchorId, c.label, "adopted", c.proposal)}
                         className={`${pill} border-neutral-900 text-neutral-900 enabled:hover:bg-neutral-900 enabled:hover:text-white disabled:opacity-50`}>{en ? "Adopt" : "採用"}</button>
                       <button type="button" disabled={readOnly || busy} onClick={() => { setNoteFor(c.anchorId); setNoteDraft(c.proposal); }}
                         className={`${pill} border-neutral-300 text-neutral-700 enabled:hover:border-neutral-900 disabled:opacity-50`}>{en ? "Adopt with changes" : "修改後採用"}</button>

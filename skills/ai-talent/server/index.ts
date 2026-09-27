@@ -561,6 +561,8 @@ async function runStartupMigrations() {
     const { STRATEGY_MEETINGS_DDL, STRATEGY_MEETING_RUNS_DDL } = await import("./strategy/core/strategyMeetings");
     await db.execute(sql.raw(STRATEGY_MEETINGS_DDL));
     await db.execute(sql.raw(STRATEGY_MEETING_RUNS_DDL));
+    const { POSITIONING_VERSIONS_DDL } = await import("./strategy/core/meetingWriteback");
+    await db.execute(sql.raw(POSITIONING_VERSIONS_DDL));
     console.log("[migrate] strategy_meetings / strategy_meeting_runs: OK");
 
     // 2026-09-14（CJ「選定一個競爭者，對比接觸點跟策略訴求差異」）：

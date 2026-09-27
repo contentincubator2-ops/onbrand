@@ -23,7 +23,31 @@ export interface MeetingMinutes {
   /** content = 可以直接寫成一篇內容；work = 研究／營運工作（沒有「開任務」）。舊紀錄沒有 kind，視為 work。 */
   actions: Array<{ title: string; owner: string; kind?: "content" | "work" }>;
 }
-export interface Decision { status: DecisionStatus; note: string; at: string }
+export interface Decision {
+  status: DecisionStatus; note: string; at: string;
+  /** 有寫進品牌大腦時的版本 id；撤回時伺服器會一併復原。 */
+  versionId?: number;
+  written?: string[];
+}
+
+/**
+ * 哪些格子「採用」後會寫進品牌大腦——跟 server/strategy/core/meetingWriteback.ts 的
+ * BRAND_WRITABLE／PRODUCT_WRITABLE 同一份名單（那邊才是真的閘門，這裡只決定提示怎麼寫）。
+ */
+const WRITABLE_IDS = { brand: ["audience", "differentiation", "tagline", "voice"], product: ["core", "audience", "value", "strategy"] } as const;
+export function isWritableAnchor(scope: "brand" | "product", anchorId: string): boolean {
+  return (WRITABLE_IDS[scope] as readonly string[]).includes(anchorId);
+}
+
+export interface AdoptPreview {
+  writable: boolean;
+  note?: string;
+  locked: boolean;
+  diffs: Array<{ key: string; label: string; before: string | string[]; after: string | string[] }>;
+  patch: Record<string, string | string[]>;
+  impact: string[];
+  notUpdated: string;
+}
 export interface MeetingRun {
   id: number; meetingId: number; status: "running" | "done" | "failed"; note: string; trigger: string;
   transcript: Array<{ name: string; title: string; content: string }>;

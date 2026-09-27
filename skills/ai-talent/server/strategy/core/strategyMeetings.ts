@@ -132,7 +132,13 @@ export interface MeetingMinutes {
   actions: Array<{ title: string; owner: string; kind: "content" | "work" }>;
 }
 export type DecisionStatus = "adopted" | "modified" | "rejected";
-export interface Decision { status: DecisionStatus; note: string; at: string }
+export interface Decision {
+  status: DecisionStatus; note: string; at: string;
+  /** 有寫進品牌大腦時的版本 id（strategy_positioning_versions）。 */
+  versionId?: number;
+  /** 寫入了哪些欄位（顯示「已寫入：差異化總結、唯一致勝理由」用）。 */
+  written?: string[];
+}
 
 // ─── 錨點：要檢查哪幾格定位 ────────────────────────────────────────────
 
@@ -171,10 +177,14 @@ export function flattenSegment(v: unknown, max = 400): string {
   return s.length > max ? `${s.slice(0, max)}…` : s;
 }
 
-export function anchorsFromPositioning(scope: MeetingScope, positioning: unknown): Anchor[] {
+/**
+ * overrides：品牌受眾的「目前」優先用 brands.targetAudience（受眾錨點，文案任務鎖定的
+ * 客群、會議採用後也寫這一欄）；沒有才退回受眾那一格的研究內容。
+ */
+export function anchorsFromPositioning(scope: MeetingScope, positioning: unknown, overrides: Record<string, string> = {}): Anchor[] {
   const pos = positioning && typeof positioning === "object" ? positioning as Record<string, unknown> : {};
   return (scope === "product" ? PRODUCT_ANCHORS : BRAND_ANCHORS).map((a) => ({
-    ...a, current: flattenSegment(pos[a.id]),
+    ...a, current: (overrides[a.id] ?? "").trim() ? flattenSegment(overrides[a.id]) : flattenSegment(pos[a.id]),
   }));
 }
 
@@ -353,9 +363,9 @@ export function pendingDecisionCount(run: MeetingRun): number {
 
 // ─── 開會 ─────────────────────────────────────────────────────────────
 
-async function loadScope(meeting: StrategyMeeting): Promise<{ brandName: string; industry: string | null; scopeName: string; positioning: unknown }> {
+async function loadScope(meeting: StrategyMeeting): Promise<{ brandName: string; industry: string | null; scopeName: string; positioning: unknown; overrides: Record<string, string> }> {
   const [bRows]: any = await localPool.execute(
-    `SELECT name, industry, positioning FROM brands WHERE id = ? LIMIT 1`, [meeting.brandId],
+    `SELECT name, industry, positioning, targetAudience FROM brands WHERE id = ? LIMIT 1`, [meeting.brandId],
   );
   const b = (bRows as any[])[0] ?? {};
   if (meeting.scope === "product") {
@@ -363,9 +373,12 @@ async function loadScope(meeting: StrategyMeeting): Promise<{ brandName: string;
       `SELECT name, positioning FROM products WHERE id = ? AND brandId = ? LIMIT 1`, [meeting.scopeId, meeting.brandId],
     );
     const p = (pRows as any[])[0] ?? {};
-    return { brandName: String(b.name ?? ""), industry: b.industry ?? null, scopeName: String(p.name ?? ""), positioning: parseJ(p.positioning, {}) };
+    return { brandName: String(b.name ?? ""), industry: b.industry ?? null, scopeName: String(p.name ?? ""), positioning: parseJ(p.positioning, {}), overrides: {} };
   }
-  return { brandName: String(b.name ?? ""), industry: b.industry ?? null, scopeName: String(b.name ?? ""), positioning: parseJ(b.positioning, {}) };
+  return {
+    brandName: String(b.name ?? ""), industry: b.industry ?? null, scopeName: String(b.name ?? ""), positioning: parseJ(b.positioning, {}),
+    overrides: b.targetAudience ? { audience: String(b.targetAudience) } : {},
+  };
 }
 
 async function loadEvidence(meeting: StrategyMeeting): Promise<{ lines: string; items: MeetingRun["evidence"] }> {
@@ -457,6 +470,8 @@ export async function runMeeting(meeting: StrategyMeeting, userId: number, trigg
     const attendees = meeting.attendees.slice(0, MAX_ATTENDEES);
     if (!attendees.length) return await fail("no_attendees：這場會沒有設定與會者");
     const scope = await loadScope(meeting);
+    // 「目前」讀的是產文實際用的那一格（buildBrandPrefix 讀 audience.primary），
+    // 不用 targetAudience 覆蓋——否則會議看到的跟品牌大腦實際在用的不一樣。
     const anchors = anchorsFromPositioning(meeting.scope, scope.positioning);
     const { gatherBrandContext } = await import("../routers/strategistChatRouter");
     const brandCtx = await gatherBrandContext(meeting.brandId, userId, meeting.scope === "product" ? meeting.scopeId : null).catch(() => "");

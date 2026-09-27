@@ -124,7 +124,7 @@ describe("rowToRun / pendingDecisionCount", () => {
 describe("strategyMeetingRouter", () => {
   it("建得起來，procedure 名字沒撞 tRPC 保留字", () => {
     const names = Object.keys((strategyMeetingRouter as any)._def.procedures).sort();
-    expect(names).toEqual(["create", "decide", "getRun", "list", "remove", "runNow", "runs", "update"]);
+    expect(names).toEqual(["adopt", "create", "decide", "getRun", "list", "previewAdopt", "remove", "runNow", "runs", "update"]);
     for (const n of names) expect(Object.getOwnPropertyNames(Function.prototype)).not.toContain(n);
   });
 });

@@ -19,6 +19,7 @@ import { useLang } from "../../../../lib/i18n";
 import { showToastGlobal } from "../../../../components/ui/Toast";
 import type { StrategistDirector } from "../../lib/strategistDirectors";
 import MeetingMinutesView from "./MeetingMinutesView";
+import AdoptConfirmDialog, { type AdoptRequest } from "./AdoptConfirmDialog";
 import {
   EXAMPLE_MEETING, EXAMPLE_RUN, TOPIC_TEMPLATES, fmtDate, frequencyText, pendingCount, runNoteText,
   type DecisionStatus, type MeetingAttendee, type MeetingFrequency, type MeetingRow, type MeetingRun,
@@ -497,14 +498,28 @@ function MinutesTimeline({ meeting, brandId, en, onBack, onOpenTask, onEditPosit
   }, [anyRunning]); // eslint-disable-line react-hooks/exhaustive-deps
   const current = runs.find((r) => r.id === selected) ?? runs[0] ?? null;
 
-  const decide = T.strategyMeeting?.decide?.useMutation?.({ onSuccess: () => runsQ.refetch?.(), onError: errToast });
-  const onDecide = (anchorId: string, status: DecisionStatus | null, note?: string) => {
+  const decide = T.strategyMeeting?.decide?.useMutation?.({
+    onSuccess: (_r: unknown, vars: any) => {
+      if (vars?.status === null && vars?.restoring) showToastGlobal(en ? "Undone — Brand Brain restored" : "已撤回，品牌大腦已復原", "success");
+      runsQ.refetch?.();
+    },
+    onError: errToast,
+  });
+  const onDecide = (anchorId: string, status: Extract<DecisionStatus, "rejected"> | null) => {
     if (!current) return;
-    decide?.mutate?.({ runId: current.id, anchorId, status, note });
+    const restoring = status === null && !!current.decisions[anchorId]?.versionId;
+    decide?.mutate?.({ runId: current.id, anchorId, status, restoring });
   };
+  const [adoptReq, setAdoptReq] = useState<AdoptRequest | null>(null);
 
   return (
     <div className="mx-auto max-w-[980px] px-2">
+      {adoptReq && (
+        <AdoptConfirmDialog
+          req={adoptReq} en={en} onClose={() => setAdoptReq(null)}
+          onDone={() => { setAdoptReq(null); runsQ.refetch?.(); }}
+        />
+      )}
       <button type="button" onClick={onBack} className="mb-3 text-[12.5px] text-neutral-500 underline hover:text-neutral-900">← {en ? "All meetings" : "所有會議"}</button>
       <h2 className="text-[20px] font-semibold text-neutral-900">{meeting.topic}</h2>
       <p className="mt-1 text-[12.5px] text-neutral-500">
@@ -569,8 +584,9 @@ function MinutesTimeline({ meeting, brandId, en, onBack, onOpenTask, onEditPosit
                 </p>
                 <MeetingMinutesView
                   minutes={current.minutes} evidence={current.evidence} decisions={current.decisions}
-                  transcript={current.transcript} en={en} busy={decide?.isPending}
+                  transcript={current.transcript} en={en} busy={decide?.isPending} scope={meeting.scope}
                   onDecide={onDecide} onEditPositioning={onEditPositioning} onOpenTask={onOpenTask}
+                  onAdopt={(anchorId, label, status, text) => setAdoptReq({ runId: current.id, anchorId, label, status, text })}
                 />
               </>
             ) : null}

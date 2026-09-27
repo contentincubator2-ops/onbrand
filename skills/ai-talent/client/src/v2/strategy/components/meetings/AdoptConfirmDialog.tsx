@@ -1,0 +1,144 @@
+/**
+ * AdoptConfirmDialog — 採用一項策略調整前的確認視窗。
+ *
+ * 2026-09-26（CJ「如果採用會影響到品牌大腦的時候，要出現一些提示，讓用戶知道」）：
+ * 寫入前一定先讓用戶看到三件事——
+ *   1. 這會寫進品牌大腦（最上面、最醒目）
+ *   2. 會影響哪裡、哪些東西不會自動跟著變
+ *   3. 哪幾個欄位、改動前後各是什麼
+ * 定案（鎖定）的品牌要多勾一次「我確認要修改已定案的定位」。
+ * 也可以選「只記錄決定、不寫入」——用戶可能想自己到定位頁改措辭。
+ */
+import { useEffect, useState } from "react";
+import { trpc } from "../../../../lib/trpc";
+import { showToastGlobal } from "../../../../components/ui/Toast";
+import type { AdoptPreview } from "./meetingModel";
+
+export interface AdoptRequest { runId: number; anchorId: string; label: string; status: "adopted" | "modified"; text: string }
+
+const btnPrimary = "rounded-full bg-neutral-900 px-4 py-1.5 text-[13px] font-medium text-white transition hover:bg-neutral-700 disabled:opacity-40";
+const btnQuiet = "rounded-full border border-neutral-300 px-3 py-1.5 text-[12.5px] font-medium text-neutral-700 transition hover:border-neutral-900 disabled:opacity-40";
+
+const show = (v: string | string[]) => (Array.isArray(v) ? v.join("、") : v);
+
+export default function AdoptConfirmDialog({ req, en, onClose, onDone }: {
+  req: AdoptRequest; en: boolean; onClose: () => void; onDone: () => void;
+}) {
+  const T = trpc as any;
+  const [preview, setPreview] = useState<AdoptPreview | null>(null);
+  const [lockedOk, setLockedOk] = useState(false);
+  const previewMut = T.strategyMeeting?.previewAdopt?.useMutation?.({
+    onSuccess: (r: AdoptPreview) => setPreview(r),
+    onError: (e: any) => { showToastGlobal(String(e?.message ?? "error"), "error"); onClose(); },
+  });
+  const adoptMut = T.strategyMeeting?.adopt?.useMutation?.({
+    onSuccess: (r: any) => {
+      showToastGlobal(r?.decision?.versionId
+        ? (en ? "Written to Brand Brain" : "已寫入品牌大腦，之後的產出會用新內容")
+        : (en ? "Decision recorded" : "已記錄決定"), "success");
+      onDone();
+    },
+    onError: (e: any) => showToastGlobal(String(e?.message ?? "error"), "error"),
+  });
+  useEffect(() => {
+    previewMut?.mutate?.({ runId: req.runId, anchorId: req.anchorId, text: req.text });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const submit = (write: boolean) => adoptMut?.mutate?.({
+    runId: req.runId, anchorId: req.anchorId, status: req.status,
+    note: req.status === "modified" ? req.text : undefined,
+    write, patch: write ? preview?.patch : undefined, confirmLocked: write && preview?.locked ? lockedOk : undefined,
+  });
+
+  const canWrite = !!preview?.writable && preview.diffs.length > 0 && (!preview.locked || lockedOk);
+  const busy = adoptMut?.isPending;
+
+  return (
+    <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/30 px-4" onClick={onClose}>
+      <div className="max-h-[88vh] w-full max-w-[640px] overflow-y-auto rounded-2xl bg-white px-6 py-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
+        <div className="mb-4 flex items-start justify-between gap-3">
+          <h3 className="text-[16px] font-semibold text-neutral-900">
+            {en ? `Adopt the change to “${req.label}”` : `採用「${req.label}」的調整`}
+          </h3>
+          <button type="button" onClick={onClose} className="text-[13px] text-neutral-400 hover:text-neutral-900">✕</button>
+        </div>
+
+        {!preview ? (
+          <p className="py-8 text-center text-[13px] text-neutral-500">
+            {en ? "Working out exactly what would change in your Brand Brain…" : "正在整理這項調整會改動品牌大腦的哪些內容…"}
+          </p>
+        ) : !preview.writable ? (
+          <>
+            <p className="rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-3 text-[13px] leading-relaxed text-neutral-700">{preview.note}</p>
+            <div className="mt-5 flex justify-end gap-2">
+              <button type="button" className={btnQuiet} onClick={onClose}>{en ? "Cancel" : "取消"}</button>
+              <button type="button" className={btnPrimary} disabled={busy} onClick={() => submit(false)}>{en ? "Record decision" : "記錄決定"}</button>
+            </div>
+          </>
+        ) : (
+          <>
+            {/* 1 醒目提示 */}
+            <div className="rounded-xl border-2 border-neutral-900 px-4 py-3">
+              <p className="text-[14px] font-semibold text-neutral-900">
+                {en ? "⚑ This will change your Brand Brain" : "⚑ 這項決定會改動品牌大腦"}
+              </p>
+              <p className="mt-1.5 text-[12.5px] font-medium text-neutral-700">{en ? "Once written, it affects:" : "寫入後會影響："}</p>
+              <ul className="mt-1 list-disc space-y-0.5 pl-5 text-[12.5px] leading-relaxed text-neutral-700">
+                {preview.impact.map((t, i) => <li key={i}>{t}</li>)}
+              </ul>
+              <p className="mt-2 text-[12px] leading-relaxed text-neutral-500">{preview.notUpdated}</p>
+            </div>
+
+            {/* 2 前後對照 */}
+            <p className="mb-2 mt-5 text-[12px] font-semibold uppercase tracking-widest text-neutral-400">{en ? "What changes" : "改動內容"}</p>
+            {preview.diffs.length === 0 ? (
+              <p className="rounded-xl border border-neutral-200 px-4 py-3 text-[13px] text-neutral-600">
+                {en ? "Nothing to write — the Brand Brain already says this." : "沒有需要寫入的變更——品牌大腦目前的內容已經是這樣。"}
+              </p>
+            ) : (
+              <div className="space-y-2.5">
+                {preview.diffs.map((d) => (
+                  <div key={d.key} className="rounded-xl border border-neutral-200 px-4 py-3">
+                    <p className="text-[12.5px] font-semibold text-neutral-900">{d.label}</p>
+                    <div className="mt-1.5 grid grid-cols-[44px_1fr] gap-x-3 gap-y-1 text-[13px] leading-relaxed">
+                      <span className="text-neutral-400">{en ? "Before" : "改前"}</span>
+                      <span className="text-neutral-500 line-through decoration-neutral-300">{show(d.before) || (en ? "(empty)" : "（空白）")}</span>
+                      <span className="text-neutral-400">{en ? "After" : "改後"}</span>
+                      <span className="font-medium text-neutral-900">{show(d.after)}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* 3 定案確認 */}
+            {preview.locked && preview.diffs.length > 0 && (
+              <label className="mt-4 flex cursor-pointer items-start gap-2 rounded-xl border border-neutral-300 bg-neutral-50 px-4 py-3 text-[13px] text-neutral-800">
+                <input type="checkbox" className="mt-0.5" checked={lockedOk} onChange={(e) => setLockedOk(e.target.checked)} />
+                <span>
+                  {en ? "This brand's positioning is finalized (locked). I confirm I want to change it."
+                      : "這個品牌的定位已經定案（鎖定）。我確認要修改已定案的定位。"}
+                </span>
+              </label>
+            )}
+
+            <p className="mt-4 text-[12px] text-neutral-500">
+              {en ? "You can undo this later from the minutes — the Brand Brain will be restored to what it is now."
+                  : "之後可以在會議紀錄按「撤回並復原」，品牌大腦會回到現在的內容。"}
+            </p>
+
+            <div className="mt-4 flex flex-wrap justify-end gap-2">
+              <button type="button" className={btnQuiet} onClick={onClose}>{en ? "Cancel" : "取消"}</button>
+              <button type="button" className={btnQuiet} disabled={busy} onClick={() => submit(false)}>
+                {en ? "Record decision only" : "只記錄決定、不寫入"}
+              </button>
+              <button type="button" className={btnPrimary} disabled={!canWrite || busy} onClick={() => submit(true)}>
+                {en ? "Write to Brand Brain" : "確認寫入品牌大腦"}
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}

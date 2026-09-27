@@ -9,11 +9,13 @@ import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure } from "../../platform/core/trpc";
 import { assertStrategyMonitoringAllowed, planQuotaFor } from "../../platform/core/planGate";
 import localPool from "../../localDb";
+import { isPositioningLocked } from "../core/positioningLock";
 import {
   MANUAL_RUN_COOLDOWN_HOURS, MAX_ATTENDEES, MEETING_FREQUENCIES,
   computeNextRunAt, pendingDecisionCount, rowToMeeting, rowToRun, startMeetingInBackground,
   type Decision, type MeetingFrequency,
 } from "../core/strategyMeetings";
+import { commitWriteback, previewWriteback, revertWriteback } from "../core/meetingWriteback";
 
 async function assertBrandOwner(userId: number, brandId: number): Promise<void> {
   const [rows]: any = await localPool.execute(
@@ -29,6 +31,18 @@ async function loadMeetingOwned(userId: number, id: number) {
   const r = (rows as any[])[0];
   if (!r) throw new TRPCError({ code: "NOT_FOUND", message: "找不到這場會議" });
   return rowToMeeting(r);
+}
+
+async function loadRunWithMeeting(userId: number, runId: number) {
+  const [rows]: any = await localPool.execute(
+    `SELECT * FROM strategy_meeting_runs WHERE id = ? AND userId = ? LIMIT 1`, [runId, userId],
+  );
+  const r = (rows as any[])[0];
+  if (!r) throw new TRPCError({ code: "NOT_FOUND", message: "找不到這份會議紀錄" });
+  const run = rowToRun(r);
+  // 會議設定被刪了也要能處理舊紀錄：範圍從設定讀，設定沒了就不能寫入。
+  const meeting = await loadMeetingOwned(userId, run.meetingId);
+  return { run, meeting };
 }
 
 async function assertScopeOwned(userId: number, brandId: number, scope: "brand" | "product", scopeId: number): Promise<void> {
@@ -195,12 +209,83 @@ export const strategyMeetingRouter = router({
       return rowToRun(r);
     }),
 
+  /**
+   * 採用前的預覽：這項調整寫進品牌大腦會改哪幾個欄位、前後各是什麼、會影響哪裡。
+   * 什麼都不寫。text＝建議原文，或用戶「修改後採用」改過的文字。
+   */
+  previewAdopt: protectedProcedure
+    .input(z.object({
+      runId: z.number().int().positive(),
+      anchorId: z.string().min(1).max(40),
+      text: z.string().trim().min(2).max(1200),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const userId = ctx.user!.id;
+      await assertStrategyMonitoringAllowed(userId);
+      const { run, meeting } = await loadRunWithMeeting(userId, input.runId);
+      const check = run.minutes?.checks.find((c) => c.anchorId === input.anchorId && c.verdict === "adjust");
+      if (!check) throw new TRPCError({ code: "BAD_REQUEST", message: "這一格沒有建議調整" });
+      return await previewWriteback({
+        userId, brandId: meeting.brandId, scope: meeting.scope, scopeId: meeting.scopeId,
+        anchorId: input.anchorId, anchorLabel: check.label, text: input.text,
+      });
+    }),
+
+  /**
+   * 採用。write=true 時把預覽過的 patch 寫進品牌大腦（伺服器再驗一次白名單）並存版本；
+   * 定案鎖定的品牌要 confirmLocked=true。write=false＝只記決定（研究證據類、或用戶選擇不寫入）。
+   */
+  adopt: protectedProcedure
+    .input(z.object({
+      runId: z.number().int().positive(),
+      anchorId: z.string().min(1).max(40),
+      status: z.enum(["adopted", "modified"]),
+      note: z.string().max(1200).optional(),
+      write: z.boolean(),
+      patch: z.record(z.union([z.string().max(1200), z.array(z.string().max(200)).max(12)])).optional(),
+      confirmLocked: z.boolean().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const userId = ctx.user!.id;
+      await assertStrategyMonitoringAllowed(userId);
+      const { run, meeting } = await loadRunWithMeeting(userId, input.runId);
+      if (!run.minutes?.checks.some((c) => c.anchorId === input.anchorId && c.verdict === "adjust")) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "這一格沒有建議調整" });
+      }
+      if (run.decisions[input.anchorId]) throw new TRPCError({ code: "BAD_REQUEST", message: "這一格已經決定過了，先撤回再重新決定" });
+      const decision: Decision = { status: input.status, note: input.note ?? "", at: new Date().toISOString() };
+      if (input.write) {
+        if (meeting.scope === "brand" && !input.confirmLocked && await isPositioningLocked("brand", meeting.brandId, userId)) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "品牌定位已定案（鎖定），請勾選「我確認要修改已定案的定位」再寫入" });
+        }
+        try {
+          const r = await commitWriteback({
+            userId, brandId: meeting.brandId, scope: meeting.scope, scopeId: meeting.scopeId,
+            anchorId: input.anchorId, runId: run.id, patch: input.patch ?? {},
+          });
+          decision.versionId = r.versionId;
+          decision.written = r.diffs.map((d) => d.label);
+        } catch (e) {
+          const m = String((e as Error)?.message ?? e);
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: m === "empty_patch" ? "沒有要寫入的變更（內容跟目前一樣）" : m === "not_writable" ? "這一格不能寫入品牌大腦" : `寫入失敗：${m.slice(0, 120)}`,
+          });
+        }
+      }
+      const decisions = { ...run.decisions, [input.anchorId]: decision };
+      await localPool.execute(`UPDATE strategy_meeting_runs SET decisions = ? WHERE id = ? AND userId = ?`,
+        [JSON.stringify(decisions), run.id, userId]);
+      return { ok: true, decision };
+    }),
+
   /** 對一條「建議調整」下決定。不改定位——實際修改在定位頁做。 */
   decide: protectedProcedure
     .input(z.object({
       runId: z.number().int().positive(),
       anchorId: z.string().min(1).max(40),
-      status: z.enum(["adopted", "modified", "rejected"]).nullable(),
+      /** rejected＝不採用；null＝撤回決定（若當初有寫入品牌大腦，會一併復原）。採用請走 adopt。 */
+      status: z.enum(["rejected"]).nullable(),
       note: z.string().max(600).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
@@ -216,6 +301,15 @@ export const strategyMeetingRouter = router({
         throw new TRPCError({ code: "BAD_REQUEST", message: "這一格沒有建議調整" });
       }
       const decisions: Record<string, Decision> = { ...run.decisions };
+      const prev = decisions[input.anchorId];
+      if (input.status === null && prev?.versionId) {
+        try { await revertWriteback({ userId, versionId: prev.versionId }); }
+        catch (e) {
+          if (String((e as Error)?.message) !== "already_reverted") {
+            throw new TRPCError({ code: "BAD_REQUEST", message: `復原失敗：${String((e as Error)?.message ?? e).slice(0, 120)}` });
+          }
+        }
+      }
       if (input.status === null) delete decisions[input.anchorId];
       else decisions[input.anchorId] = { status: input.status, note: input.note ?? "", at: new Date().toISOString() };
       await localPool.execute(
