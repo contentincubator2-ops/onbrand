@@ -84,3 +84,16 @@ describe("分歧方案卡", () => {
     expect(topicOverlap(a, ["顧客開箱：牛舌下鍋三分鐘", "Tom老闆的選肉標準"])).toBeLessThan(0.2);
   });
 });
+
+describe("一版的篇數上限", () => {
+  it("最多 7 篇、同日同通路一篇、remove 全留", async () => {
+    const { capAdds } = await import("./plannerAdvisors");
+    const days = ["2026-10-05", "2026-10-06", "2026-10-07", "2026-10-08", "2026-10-09", "2026-10-10", "2026-10-11"];
+    const ops: any[] = [{ op: "remove", id: 1 }];
+    for (const d of days) for (const p of ["facebook", "instagram"]) ops.push({ op: "add", date: d, platform: p });
+    ops.push({ op: "add", date: "2026-10-05", platform: "facebook" });
+    const out = capAdds(ops);
+    expect(out.filter((o) => o.op === "add")).toHaveLength(7);
+    expect(out.filter((o) => o.op === "remove")).toHaveLength(1);
+  });
+});

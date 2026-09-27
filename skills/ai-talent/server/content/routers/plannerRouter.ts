@@ -17,7 +17,7 @@ import {
   type Card, type PlannerCtxArgs, type SlotRow,
 } from "../core/weeklyPlanner";
 import {
-  PLANNER_AXES, advisorSystemPrompt, isForkAxis, loadAdvisor, parseAdvisorReply, topicOverlap,
+  PLANNER_AXES, advisorSystemPrompt, capAdds, isForkAxis, loadAdvisor, parseAdvisorReply, topicOverlap,
   type AdvisorCard, type ForkAxis,
 } from "../core/plannerAdvisors";
 
@@ -95,7 +95,7 @@ async function runAdvisor(args: {
       const r = await callModel([{ role: "system", content: system }, { role: "user", content: "請排你的版本。" }], "general");
       const parsed = parseAdvisorReply(String(r.content ?? ""));
       if (!parsed) continue;
-      const ops = validateOps({ raw: parsed.ops, weekStart: args.ctxArgs.weekStart, platforms: args.ctxArgs.platforms, cards: args.ctxArgs.cards, slots: args.ctxArgs.slots });
+      const ops = capAdds(validateOps({ raw: parsed.ops, weekStart: args.ctxArgs.weekStart, platforms: args.ctxArgs.platforms, cards: args.ctxArgs.cards, slots: args.ctxArgs.slots }));
       if (!ops.some((o) => o.op === "add")) continue;
       return { why: parsed.why, ops };
     } catch { /* retry */ }

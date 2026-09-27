@@ -107,6 +107,22 @@ export function topicOverlap(a: string[], b: string[]): number {
   return sum / a.length;
 }
 
+/**
+ * 一版最多 7 篇、同一天同一通路只留一篇（第一版實測兩位都排滿 14 篇——那不是方案，是清單）。
+ * remove 全部保留：不合立場的草稿要刪得掉。
+ */
+export function capAdds<T extends { op: string; date?: string; platform?: string }>(ops: T[], max = 7): T[] {
+  const seen = new Set<string>();
+  let adds = 0;
+  return ops.filter((o) => {
+    if (o.op !== "add") return true;
+    const key = `${o.date}|${o.platform}`;
+    if (seen.has(key) || adds >= max) return false;
+    seen.add(key); adds++;
+    return true;
+  });
+}
+
 /** 顧問回覆：{"why","ops"}。 */
 export function parseAdvisorReply(raw: string): { why: string; ops: unknown[] } | null {
   const cleaned = String(raw ?? "").replace(/^```(?:json)?\s*/i, "").replace(/\s*```\s*$/i, "").trim();
@@ -131,6 +147,7 @@ export function advisorSystemPrompt(args: {
     args.context,
     ``,
     `做法：把這週「草稿」格子全部重排成你的版本（不合你立場的草稿用 remove 刪掉，再 add 你的），已排定與已寫好的不要動。`,
+    `篇數：一週 3–6 篇（立場是「天天出現」的最多 7 篇、「少寫、寫到位」的 2–3 篇），每天每個通路最多一篇。`,
     `why 用一句話（30 字內）講你這樣排的理由，口語，不要重複立場名稱。`,
     `只輸出 JSON：{"why":"…","ops":[{"op":"add","date":"YYYY-MM-DD","platform":"facebook","taskId":"…","topic":"…","format":"…","reason":"…"},{"op":"remove","id":12}]}`,
   ].filter(Boolean).join("\n");
