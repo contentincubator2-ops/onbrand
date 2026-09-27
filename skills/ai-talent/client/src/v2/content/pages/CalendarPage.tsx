@@ -14,6 +14,7 @@
  */
 import React, { useMemo, useState, useRef, useEffect } from "react";
 import { useNavigate, useOutletContext } from "react-router-dom";
+import CalendarTabs from "../components/CalendarTabs";
 import { trpc } from "../../../lib/trpc";
 import type { ShellOutletCtx } from "../../app/shell/ShellLayout";
 import {
@@ -483,6 +484,8 @@ export default function CalendarPage() {
 
   return (
     <div style={{ minHeight: "100vh", background: "#FAFAFA" }}>
+      {/* 2026-09-27：行事曆合一——跟「當月規劃」共用同一組分頁。 */}
+      <CalendarTabs />
       {/* ── Hero header ──────────────────────────────────────────── */}
       <div className="pt-8 pb-4 px-6 text-center">
         <div className="flex flex-col items-center max-w-[1100px] mx-auto">

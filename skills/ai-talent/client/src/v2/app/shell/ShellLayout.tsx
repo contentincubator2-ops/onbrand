@@ -22,6 +22,7 @@ import SupportDrawer from "../../platform/components/SupportDrawer";
 // 2026-09-23（CJ「在每一頁派一個常駐的顧問…我喜歡在右上方的位置」）：
 // 跟 Mia（客服，右下角）刻意分開的第二個全域常駐入口。
 import StrategyDirectorDrawer from "../../strategy/components/positioning/StrategyDirectorDrawer";
+import NavItemPicker from "./NavItemPicker";
 // 2026-06-12 (CJ「Mia 細緻化 + 不要自動跳出」): unread-nudge state lives in
 // sessionStorage; this hook surfaces the count for the avatar badge and
 // the drain function for the drawer.
@@ -65,6 +66,14 @@ interface NavItem {
   label: string;
   icon: React.ReactNode;
   matchPrefix?: string;
+  /** 2026-09-27：內容層可自行加入的入口 id（跟 server navPrefsRouter.NAV_ITEM_IDS 同一份）。 */
+  id?: string;
+  /** 2026-09-27：內容層 rail 分兩段——user＝這個品牌自己加的、fixed＝專案／行事曆／活動。 */
+  group?: "user" | "fixed";
+  /** 2026-09-27：挑選清單分組：通路 or 工具。 */
+  kind?: "channel" | "tool";
+  /** 這些路徑也算這個入口（行事曆合一：/calendar 與 /tasks/calendar）。 */
+  alsoMatch?: string[];
   /** When set, renders as tier-style nav: bold tierBadge replacing icon
    *  + plain subtitle. CJ direction 2026-05-10「30s 取代現有 icon，快寫
    *  在第二列」 */
@@ -133,7 +142,7 @@ const CHANNEL_TO_TASK_ROUTE: Record<string, string> = {
  *   顯示全部（今天的行為）。非 null 時，不在名單裡的頻道整個不渲染 ——
  *   建設公司的側邊欄不該出現 TikTok。非 /tasks 的項目一律不受影響。
  */
-function buildNavItems(lang: "zh-TW" | "en", userEmail?: string | null, currentPath?: string, allowedTaskRoutes?: Set<string> | null): NavItem[] {
+function buildNavItems(lang: "zh-TW" | "en", userEmail?: string | null, currentPath?: string, allowedTaskRoutes?: Set<string> | null, userNavItems?: string[]): NavItem[] {
   const en = lang === "en";
   const isStrategyPreview = isStrategyPreviewEmail(userEmail);
   const isPersonaPreview = isPersonaPreviewEmail(userEmail);
@@ -198,76 +207,65 @@ function buildNavItems(lang: "zh-TW" | "en", userEmail?: string | null, currentP
     ];
   }
 
-  const items: NavItem[] = [
-    // 2026-09-27（CJ「內容層，刪除首頁頁籤」）：rail 不再列「首頁」。首頁本身
-    // （client/src/v2/platform/pages/HomePage.tsx）還在——登入後的落點、左上
-    // Logo、新手引導完成都還是導到 /home。
-    // ── Platform tier (primary content creation entry points) ──────────────
-    { to: "/tasks/fb",    label: "Facebook",  icon: <FontAwesomeIcon icon={faFacebookF} />,  matchPrefix: "/tasks/fb",
-      tooltip: en ? "Facebook posts, ads, stories, live copy" : "Facebook 貼文 / 廣告 / 限時 / 直播文案" },
-    { to: "/tasks/ig",    label: "Instagram", icon: <FontAwesomeIcon icon={faInstagram} />,  matchPrefix: "/tasks/ig",
-      tooltip: en ? "Instagram captions, Reels, carousel, Stories" : "IG 貼文 / Reels / 輪播 / 限時動態" },
-    { to: "/tasks/li",    label: "LinkedIn",  icon: <FontAwesomeIcon icon={faLinkedinIn} />, matchPrefix: "/tasks/li",
-      tooltip: en ? "LinkedIn posts, newsletters, thought leadership" : "LinkedIn 貼文 / 電子報 / 思想領袖文章" },
-    { to: "/tasks/yt",    label: "YouTube",   icon: <FontAwesomeIcon icon={faYoutube} />,    matchPrefix: "/tasks/yt",
-      tooltip: en ? "YouTube titles, descriptions, Shorts scripts" : "YouTube 標題 / SEO 說明 / Shorts 腳本" },
-    { to: "/tasks/tt",    label: "TikTok",    icon: <FontAwesomeIcon icon={faTiktok} />,     matchPrefix: "/tasks/tt",
-      tooltip: en ? "TikTok hooks, scripts, hashtags, bio" : "TikTok 開場鉤子 / 腳本 / 主題標籤" },
-    { to: "/tasks/email", label: en ? "Email" : "電子報", icon: <FontAwesomeIcon icon={faEnvelope} />, matchPrefix: "/tasks/email",
-      tooltip: en ? "Email newsletters, welcome series, promo emails" : "電子報 / 歡迎信 / 促銷郵件序列" },
-    { to: "/tasks/pr",    label: en ? "PR" : "新聞稿",   icon: <FontAwesomeIcon icon={faBullhorn} />, matchPrefix: "/tasks/pr",
-      tooltip: en ? "Press releases, media pitch, CEO quotes, fact sheets" : "新聞稿 / 媒體提案 / CEO 聲明 / 資料頁" },
-    // 2026-09-10 X 通路（原 Twitter）。路由 /tasks/x，平台代號 x。
-    { to: "/tasks/x",     label: "X",                    icon: <FontAwesomeIcon icon={faXTwitter} />, matchPrefix: "/tasks/x",
-      tooltip: en ? "Single posts and threads — 280 chars, hook in line one" : "單推與討論串 —— 280 字元，鉤子在第一行" },
-    // 2026-08-29 官網頻道：品牌自己的長文與產品頁，不是社群通路。
-    { to: "/tasks/web",   label: en ? "Website" : "官網",  icon: <FontAwesomeIcon icon={faGlobe} />,    matchPrefix: "/tasks/web",
-      tooltip: en ? "Long-form articles, brand columns, case studies, product page copy" : "官網長文 / 品牌專欄 / 案例深度 / 產品頁文案" },
-    // 2026-08-29 素材與規劃頻道。只有帶任務包的品牌會看到 —— 沒有包時
-    // allowedTaskRoutes 是 null，但全域目錄在這兩個頻道沒有卡，所以即使
-    // 顯示也是空的。放在這裡是為了讓有包的品牌拿得到入口。
-    { to: "/tasks/case",     label: en ? "Cases" : "案例",   icon: <FontAwesomeIcon icon={faBookBookmark} />, matchPrefix: "/tasks/case",
-      tooltip: en ? "Case library, filed by standard" : "依標準建檔的案例庫" },
-    { to: "/tasks/calendar", label: en ? "Calendar" : "行事曆", icon: <FontAwesomeIcon icon={faCalendarDays} />, matchPrefix: "/tasks/calendar",
-      tooltip: en ? "Plan the month's slots per content type" : "各類型當月篇數與切角規劃" },
-    // 2026-09-25（CJ「在內容層增加活動的 mission tray，當我新增活動企劃時，就會
-    // 出現該活動的任務卡」）：活動 tray。卡片完全由策略層的宣傳企劃長出來——
-    // 沒有企劃就沒有卡，這讓「先想清楚再寫」是結構上的前提，不是紀律。
-    { to: "/campaigns", label: en ? "Campaigns" : "活動", icon: <FontAwesomeIcon icon={faCalendarDays} />, matchPrefix: "/campaigns",
+  // 2026-09-27（CJ「左邊的 mission tray 要做大改變：除了專案、行事曆、活動以外，所有的
+  // mission tray 變成使用者自己可以加入，自己選要加 facebook、instagram 或其他通路……
+  // 功能都有了，但使用體驗還是很反直覺」）：原本 16 個入口一字排開。現在分兩段——
+  //   上段：這個品牌自己加的（navPrefs，預設 Facebook＋Instagram），可增刪排序
+  //   下段：固定的專案、行事曆（排程與發布＋當月規劃合一）、活動
+  // 首頁頁籤 9/27 已拿掉；品牌大腦在策略層（isStrategyPreview 現在恆為 true）。
+  const catalog = navCatalog(lang, allowedTaskRoutes);
+  const byId = new Map(catalog.map((c) => [c.id!, c]));
+  const userItems = (userNavItems ?? []).map((id) => byId.get(id)).filter(Boolean) as NavItem[];
+  const fixed: NavItem[] = [
+    { to: "/projects", label: en ? "Projects" : "專案", icon: <FontAwesomeIcon icon={faFolderOpen} />, group: "fixed",
+      tooltip: en ? "Everything you've produced, by project" : "你產出過的內容，依專案整理" },
+    { to: "/calendar", label: en ? "Calendar" : "行事曆", icon: <FontAwesomeIcon icon={faCalendarDays} />, group: "fixed",
+      matchPrefix: "/calendar", alsoMatch: ["/tasks/calendar"],
+      tooltip: en ? "Scheduled & published posts, and this month's plan" : "已排程／已發布的內容，以及當月規劃" },
+    // 2026-09-25（CJ「在內容層增加活動的 mission tray」）：卡片由策略層的宣傳企劃長出來。
+    { to: "/campaigns", label: en ? "Campaigns" : "活動", icon: <FontAwesomeIcon icon={faBullhorn} />, matchPrefix: "/campaigns", group: "fixed",
       tooltip: en ? "Write out a campaign plan, post by post" : "照活動企劃一篇一篇寫" },
-    // ── Workspace & tools ──────────────────────────────────────────────────
-    { to: "/projects",  label: en ? "Projects" : "專案",     icon: <FontAwesomeIcon icon={faFolderOpen} /> },
-    { to: "/calendar",  label: en ? "Calendar" : "日曆",     icon: <FontAwesomeIcon icon={faCalendarDays} />,
-      tooltip: en ? "Calendar view — all scheduled and published posts" : "月曆視圖 — 已排程 + 已發布內容" },
-    { to: "/theater",   label: en ? "7-Day Publisher" : "七日發布台",   icon: <FontAwesomeIcon icon={faBookBookmark} /> },
-    // 2026-09-23（CJ「AI指令庫，做成另一個mission tray」）：原本是品牌定位頁
-    // 「武器化工具」底下的一張卡片，升格成獨立頂層目的地。不加 /tasks/
-    // 前綴，所以不受 allowedTaskRoutes 任務包過濾——跟 /theater、/projects
-    // 一樣，每個品牌都看得到。
-    { to: "/ai-prompts", label: en ? "AI Prompts" : "AI 指令庫", icon: <FontAwesomeIcon icon={faRobot} />,
-      tooltip: en ? "Ready-to-copy prompts for ChatGPT / Claude / Gemini / Midjourney" : "現成的 ChatGPT / Claude / Gemini / Midjourney 指令範本" },
-    // 品牌大腦 — keep per CJ direction (no Brand Strategy / Research in nav).
-    // 2026-08-20: for the 策略 preview it moved OUT of this rail and became
-    // the 策略 workspace (its sections are now rail entries there), so
-    // keeping it here too would be a duplicate entry point. Everyone else
-    // has no mode switcher, so for them it must stay — removing it outright
-    // would strand 品牌大腦 with no way in.
-    ...(isStrategyPreview ? [] : [
-      { to: "/brands", label: en ? "Brand Brain" : "品牌大腦", icon: <FontAwesomeIcon icon={faBrain} /> },
-    ]),
-    // 2026-05-30 (CJ「移除連結頁」): "連結" sidebar item removed entirely.
-    // Social profile URLs now live in 基本資料 tab; OAuth connections in 平台授權 tab.
-    // Both reachable via Brand Brain → settings gear → respective tab.
   ];
+  return [...userItems.map((it) => ({ ...it, group: "user" as const })), ...fixed];
+}
 
-  // 2026-08-29 客製任務包：只留這個品牌實際在經營的頻道。
-  // allowedTaskRoutes 為 null（沒有包）時整段跳過，行為與改動前一致。
-  if (allowedTaskRoutes) {
-    return items.filter(
-      (it) => !it.to.startsWith("/tasks/") || allowedTaskRoutes.has(it.to),
-    );
-  }
-  return items;
+/**
+ * 內容層可以自行加入的入口（挑選清單的內容）。任務包限定頻道的品牌只列包裡有的；
+ * 案例只在包裡有 case 時列——全域目錄沒有案例卡，沒有包的品牌加了也是空頁。
+ */
+function navCatalog(lang: "zh-TW" | "en", allowedTaskRoutes?: Set<string> | null): NavItem[] {
+  const en = lang === "en";
+  const all: NavItem[] = [
+    { id: "fb", kind: "channel", to: "/tasks/fb", label: "Facebook", icon: <FontAwesomeIcon icon={faFacebookF} />, matchPrefix: "/tasks/fb",
+      tooltip: en ? "Facebook posts, ads, stories, live copy" : "Facebook 貼文 / 廣告 / 限時 / 直播文案" },
+    { id: "ig", kind: "channel", to: "/tasks/ig", label: "Instagram", icon: <FontAwesomeIcon icon={faInstagram} />, matchPrefix: "/tasks/ig",
+      tooltip: en ? "Instagram captions, Reels, carousel, Stories" : "IG 貼文 / Reels / 輪播 / 限時動態" },
+    { id: "li", kind: "channel", to: "/tasks/li", label: "LinkedIn", icon: <FontAwesomeIcon icon={faLinkedinIn} />, matchPrefix: "/tasks/li",
+      tooltip: en ? "LinkedIn posts, newsletters, thought leadership" : "LinkedIn 貼文 / 電子報 / 思想領袖文章" },
+    { id: "yt", kind: "channel", to: "/tasks/yt", label: "YouTube", icon: <FontAwesomeIcon icon={faYoutube} />, matchPrefix: "/tasks/yt",
+      tooltip: en ? "YouTube titles, descriptions, Shorts scripts" : "YouTube 標題 / SEO 說明 / Shorts 腳本" },
+    { id: "tt", kind: "channel", to: "/tasks/tt", label: "TikTok", icon: <FontAwesomeIcon icon={faTiktok} />, matchPrefix: "/tasks/tt",
+      tooltip: en ? "TikTok hooks, scripts, hashtags, bio" : "TikTok 開場鉤子 / 腳本 / 主題標籤" },
+    { id: "email", kind: "channel", to: "/tasks/email", label: en ? "Email" : "電子報", icon: <FontAwesomeIcon icon={faEnvelope} />, matchPrefix: "/tasks/email",
+      tooltip: en ? "Email newsletters, welcome series, promo emails" : "電子報 / 歡迎信 / 促銷郵件序列" },
+    { id: "pr", kind: "channel", to: "/tasks/pr", label: en ? "PR" : "新聞稿", icon: <FontAwesomeIcon icon={faBullhorn} />, matchPrefix: "/tasks/pr",
+      tooltip: en ? "Press releases, media pitch, CEO quotes, fact sheets" : "新聞稿 / 媒體提案 / CEO 聲明 / 資料頁" },
+    { id: "x", kind: "channel", to: "/tasks/x", label: "X", icon: <FontAwesomeIcon icon={faXTwitter} />, matchPrefix: "/tasks/x",
+      tooltip: en ? "Single posts and threads — 280 chars, hook in line one" : "單推與討論串 —— 280 字元，鉤子在第一行" },
+    { id: "web", kind: "channel", to: "/tasks/web", label: en ? "Website" : "官網", icon: <FontAwesomeIcon icon={faGlobe} />, matchPrefix: "/tasks/web",
+      tooltip: en ? "Long-form articles, brand columns, case studies, product page copy" : "官網長文 / 品牌專欄 / 案例深度 / 產品頁文案" },
+    { id: "case", kind: "tool", to: "/tasks/case", label: en ? "Cases" : "案例", icon: <FontAwesomeIcon icon={faBookBookmark} />, matchPrefix: "/tasks/case",
+      tooltip: en ? "Case library, filed by standard" : "依標準建檔的案例庫" },
+    { id: "theater", kind: "tool", to: "/theater", label: en ? "7-Day Publisher" : "七日發布台", icon: <FontAwesomeIcon icon={faLayerGroup} />, matchPrefix: "/theater",
+      tooltip: en ? "Plan and publish a week of posts" : "一次排好七天的發文" },
+    { id: "ai-prompts", kind: "tool", to: "/ai-prompts", label: en ? "AI Prompts" : "AI 指令庫", icon: <FontAwesomeIcon icon={faRobot} />, matchPrefix: "/ai-prompts",
+      tooltip: en ? "Ready-to-copy prompts for ChatGPT / Claude / Gemini / Midjourney" : "現成的 ChatGPT / Claude / Gemini / Midjourney 指令範本" },
+  ];
+  return all.filter((it) => {
+    if (!it.to.startsWith("/tasks/")) return true;
+    if (it.id === "case") return !!allowedTaskRoutes?.has(it.to);
+    return !allowedTaskRoutes || allowedTaskRoutes.has(it.to);
+  });
 }
 
 /* ─────────────────────────── Root layout ─────────────────────────── */
@@ -729,9 +727,30 @@ function IconBar({
       .filter(Boolean) as string[];
     return routes.length > 0 ? new Set(routes) : null;
   }, [packNavQuery.data]);
+  // 2026-09-27（CJ「除了專案、行事曆、活動，所有 mission tray 變成使用者自己加入」）：
+  // 這個品牌自己加的通路與工具。沒設定過＝預設 Facebook＋Instagram；任務包品牌若包裡
+  // 沒有 FB/IG，預設改成包裡的前兩個，不讓側欄上段一開始就是空的。
+  const navPrefsQ = (trpc as any).navPrefs?.get?.useQuery?.(
+    { brandId: scope.brandId ?? 0 },
+    { enabled: !!scope.brandId, refetchOnWindowFocus: false, staleTime: 300_000 },
+  ) ?? { data: null };
+  const utils = (trpc as any).useUtils?.();
+  const catalog = React.useMemo(() => navCatalog(lang, allowedTaskRoutes), [lang, allowedTaskRoutes]);
+  const userNavItems = React.useMemo<string[]>(() => {
+    const d = navPrefsQ.data as { items: string[]; isDefault: boolean } | null | undefined;
+    if (!d) return [];
+    const allowed = d.items.filter((id) => catalog.some((c) => c.id === id));
+    if (d.isDefault && allowed.length === 0) return catalog.filter((c) => c.kind === "channel").slice(0, 2).map((c) => c.id!);
+    return allowed;
+  }, [navPrefsQ.data, catalog]);
+  const [pickerOpen, setPickerOpen] = React.useState(false);
+  const saveNav = (trpc as any).navPrefs?.save?.useMutation?.({
+    onSuccess: () => { try { utils?.navPrefs?.get?.invalidate?.(); } catch { /* noop */ } setPickerOpen(false); },
+  });
+  const brandName = (brands ?? []).find((b: any) => b?.id === scope.brandId)?.name ?? null;
   const NAV_ITEMS = React.useMemo(
-    () => buildNavItems(lang, userEmail, currentPath, allowedTaskRoutes),
-    [lang, userEmail, currentPath, allowedTaskRoutes],
+    () => buildNavItems(lang, userEmail, currentPath, allowedTaskRoutes, userNavItems),
+    [lang, userEmail, currentPath, allowedTaskRoutes, userNavItems],
   );
   const isStrategyPreview = isStrategyPreviewEmail(userEmail);
   // 2026-08-20: 策略 added as a first-class workspace mode. 2026-09-08 市場
@@ -961,7 +980,8 @@ function IconBar({
           keeps every item reachable; scrollbarWidth:none hides the bar so
           the 70px rail stays visually clean. */}
       <nav style={{ flex: 1, overflowY: "auto", overflowX: "hidden", padding: "0 3px", scrollbarWidth: "none" }}>
-        {NAV_ITEMS.map((item) => {
+        {(() => {
+          const renderItem = (item: NavItem) => {
           // 2026-05-12 (CJ「按了連結還是顯示為品牌區」): pick the MOST SPECIFIC
           // matching item. If another nav item has a longer matching prefix,
           // this one yields. e.g. on /brands/settings, the 連結 item (prefix
@@ -974,7 +994,8 @@ function IconBar({
           const isCatItem = !!item.catKey;
           const myMatches = isCatItem
             ? currentPath.startsWith("/brands") && (activeCat ?? "positioning") === item.catKey
-            : item.to === "/" ? currentPath === "/" : currentPath.startsWith(myPrefix);
+            : item.to === "/" ? currentPath === "/"
+              : currentPath.startsWith(myPrefix) || (item.alsoMatch ?? []).some((p) => currentPath.startsWith(p));
           let beatenByMoreSpecific = false;
           if (myMatches && !isCatItem) {
             for (const other of NAV_ITEMS) {
@@ -989,7 +1010,35 @@ function IconBar({
           }
           const isActive = myMatches && !beatenByMoreSpecific;
           return <IconNavLink key={item.to} item={item} active={isActive} onClick={() => onNavigate(item.to)} />;
-        })}
+          };
+          // 2026-09-27：內容層 rail 分兩段——上段是這個品牌自己加的（＋ 在最後），下段固定三個。
+          // 策略層、成效層的 rail 沒有 group，照舊整排渲染。
+          const isContentRail = NAV_ITEMS.some((it) => it.group);
+          if (!isContentRail) return NAV_ITEMS.map(renderItem);
+          const userGroup = NAV_ITEMS.filter((it) => it.group === "user");
+          const fixedGroup = NAV_ITEMS.filter((it) => it.group === "fixed");
+          return (
+            <>
+              {userGroup.map(renderItem)}
+              <button
+                type="button"
+                onClick={() => setPickerOpen(true)}
+                aria-label={isEn ? "Add channels" : "加入通路"}
+                title={isEn ? "Add or remove channels and tools" : "加入或移除通路與工具"}
+                style={{
+                  width: 40, height: 32, margin: "6px auto 0", display: "flex", alignItems: "center", justifyContent: "center",
+                  border: "1.5px dashed #D4D4D4", borderRadius: 10, background: "none", color: "#9ca3af", cursor: "pointer",
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.borderColor = "#171717"; e.currentTarget.style.color = "#171717"; }}
+                onMouseLeave={(e) => { e.currentTarget.style.borderColor = "#D4D4D4"; e.currentTarget.style.color = "#9ca3af"; }}
+              >
+                <FontAwesomeIcon icon={faPlus} />
+              </button>
+              <div style={{ height: 1, background: "#EDEDED", margin: "10px 14px 6px" }} />
+              {fixedGroup.map(renderItem)}
+            </>
+          );
+        })()}
 
         {/* 2026-05-12 (CJ「顯示更多拿掉」): sidebar expand-toggle removed.
             The expanded panel content (plan card / invite users / brand
@@ -997,6 +1046,16 @@ function IconBar({
             can still reach those via: BrandSwitcherButton (top-left pill)
             → /brands list, S-menu → 帳號設定 / 方案 / Workspace, etc. */}
       </nav>
+      <NavItemPicker
+        open={pickerOpen}
+        en={isEn}
+        brandName={brandName}
+        catalog={catalog.map((c) => ({ id: c.id!, label: c.label, tooltip: c.tooltip, icon: c.icon, kind: c.kind }))}
+        selected={userNavItems}
+        saving={saveNav?.isPending}
+        onClose={() => setPickerOpen(false)}
+        onSave={(ids) => { if (scope.brandId) saveNav?.mutate?.({ brandId: scope.brandId, items: ids }); }}
+      />
 
       {/* Bottom: lang toggle + bell + avatar */}
       <div style={{ flexShrink: 0, paddingBottom: 12, display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>

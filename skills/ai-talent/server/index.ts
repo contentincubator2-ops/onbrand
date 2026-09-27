@@ -565,6 +565,11 @@ async function runStartupMigrations() {
     await db.execute(sql.raw(POSITIONING_VERSIONS_DDL));
     console.log("[migrate] strategy_meetings / strategy_meeting_runs: OK");
 
+    // 2026-09-27（CJ「除了專案、行事曆、活動，所有 mission tray 變成使用者自己加入」）
+    const { BRAND_NAV_PREFS_DDL } = await import("./platform/routers/navPrefsRouter");
+    await db.execute(sql.raw(BRAND_NAV_PREFS_DDL));
+    console.log("[migrate] brand_nav_prefs: OK");
+
     // 2026-09-14（CJ「選定一個競爭者，對比接觸點跟策略訴求差異」）：
     // 具名競爭者的逐接觸點比對快照（14 天內快取，不重跑研究）。
     const { COMPETITOR_SNAPSHOT_DDL } = await import("./strategy/core/competitorSnapshot");

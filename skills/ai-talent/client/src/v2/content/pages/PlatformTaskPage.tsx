@@ -14,6 +14,7 @@
  */
 import React, { useMemo, useState, useEffect, useRef } from "react";
 import { Navigate, useParams, useOutletContext, useNavigate, useSearchParams } from "react-router-dom";
+import CalendarTabs from "../components/CalendarTabs";
 import { trpc } from "../../../lib/trpc";
 import { useLang } from "../../../lib/i18n";
 import { showToastGlobal } from "../../../components/ui/Toast";
@@ -1519,6 +1520,8 @@ function PlatformTaskPageInner() {
   // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div>
+      {/* 2026-09-27：行事曆合一——當月規劃（/tasks/calendar）與排程與發布共用同一組分頁。 */}
+      {platform === "calendar" && <CalendarTabs />}
       {/* ─── HERO ──────────────────────────────────────────────────────── */}
       <div className="relative pt-8 pb-4 px-6 text-center">
 
