@@ -182,9 +182,10 @@ export const plannerRouter = router({
         await localPool.execute(`INSERT INTO planner_messages (userId, brandId, role, content) VALUES (?, ?, 'lead', ?)`, [userId, input.brandId, reply]);
         return { reply, choices: [] as string[], touched: [] as number[], repaired: 0, fork: null, messageId: 0 };
       }
-      // 分歧：總監不自己選，請兩位立場相反的顧問各排一版。還有一組沒選的方案卡時不再開新的。
-      const openFork = [...history].reverse().find((m) => m.role === "lead" && m.fork)?.fork;
-      if (isForkAxis(parsed.fork) && !(openFork && openFork.chosen == null)) {
+      // 分歧：總監不自己選，請兩位立場相反的顧問各排一版。
+      // 上一則總監訊息就是還沒選的方案卡時，不再開新的一組（使用者已經往下聊就可以）。
+      const lastLead = [...history].reverse().find((m) => m.role === "lead");
+      if (isForkAxis(parsed.fork) && !(lastLead?.fork && lastLead.fork.chosen == null)) {
         const fork = await buildFork(ctxArgs, parsed.fork);
         if (fork) {
           const [ins]: any = await localPool.execute(

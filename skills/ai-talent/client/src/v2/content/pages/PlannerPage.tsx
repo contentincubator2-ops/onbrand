@@ -250,7 +250,7 @@ export default function PlannerPage() {
               <button type="button" aria-label={en ? "Previous week" : "上一週"} onClick={() => { setWeekStart(addDays(weekStart, -7)); setTouched([]); setOpen(null); }}
                 className="flex h-8 w-8 items-center justify-center rounded-full border text-[12px] text-neutral-500 hover:text-neutral-900" style={{ borderColor: LINE }}><FontAwesomeIcon icon={faChevronLeft} /></button>
               <p className="m-0 text-[20px] font-bold" style={{ color: INK }}>
-                {weekName || (en ? "Week" : "週")} <span className="text-[15px] font-medium" style={{ color: META }}>{md(weekStart)} – {md(addDays(weekStart, 6))}</span>
+                {weekName ? `${weekName} ` : ""}<span className={weekName ? "text-[15px] font-medium" : ""} style={{ color: weekName ? META : INK }}>{md(weekStart)} – {md(addDays(weekStart, 6))}</span>
               </p>
               <button type="button" aria-label={en ? "Next week" : "下一週"} onClick={() => { setWeekStart(addDays(weekStart, 7)); setTouched([]); setOpen(null); }}
                 className="flex h-8 w-8 items-center justify-center rounded-full border text-[12px] text-neutral-500 hover:text-neutral-900" style={{ borderColor: LINE }}><FontAwesomeIcon icon={faChevronRight} /></button>
