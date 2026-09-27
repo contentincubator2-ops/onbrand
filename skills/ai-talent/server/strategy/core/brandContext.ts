@@ -347,11 +347,17 @@ export async function buildBrandPrefix(
   productId?: number | null,
   eventId?: number | null,
   mode: "core" | "full" = "full",
+  /**
+   * 2026-09-26（策略會議「採用前預覽」）：用一份還沒寫進資料庫的定位算簡報，
+   * 拿來比對「寫入後產文簡報會不會變」。有 override 時不讀也不寫快取。
+   */
+  opts?: { positioningOverride?: any; productPositioningOverride?: any },
 ): Promise<string> {
   if (!brandId) return "";
 
+  const hasOverride = opts?.positioningOverride !== undefined || opts?.productPositioningOverride !== undefined;
   const ck = `${cacheKey(brandId, productId, eventId)}:${mode}`;
-  const cached = CACHE.get(ck);
+  const cached = hasOverride ? undefined : CACHE.get(ck);
   if (cached && cached.expiresAt > Date.now()) return cached.prefix;
 
   try {
@@ -375,6 +381,7 @@ export async function buildBrandPrefix(
 
     // Parse the canonical positioning JSON.
     const positioning: any = (() => {
+      if (opts?.positioningOverride !== undefined) return opts.positioningOverride;
       if (!brandRow?.positioning) return null;
       if (typeof brandRow.positioning === "string") return safeParse(brandRow.positioning);
       return brandRow.positioning;
@@ -556,8 +563,9 @@ export async function buildBrandPrefix(
         const p = Array.isArray(prodRows) ? prodRows[0] : null;
         if (p) {
           const lines: string[] = [`【產品名稱】${p.name ?? "(未命名)"}`];
-          if (p.positioning) {
-            const pp = typeof p.positioning === "string" ? safeParse(p.positioning) : p.positioning;
+          const rawPp = opts?.productPositioningOverride !== undefined ? opts.productPositioningOverride : p.positioning;
+          if (rawPp) {
+            const pp = typeof rawPp === "string" ? safeParse(rawPp) : rawPp;
             if (pp && typeof pp === "object") {
               // 2026-09-01: 這裡本來讀 pp.usp / pp.target / pp.tagline /
               // pp.description / pp.keyMessages —— PRODUCT_SEGMENTS 裡一個都
@@ -698,7 +706,7 @@ export async function buildBrandPrefix(
       productSection ||
       eventSection;
     if (!hasAny) {
-      CACHE.set(ck, { prefix: "", expiresAt: Date.now() + TTL_MS });
+      if (!hasOverride) CACHE.set(ck, { prefix: "", expiresAt: Date.now() + TTL_MS });
       return "";
     }
 
@@ -740,7 +748,7 @@ export async function buildBrandPrefix(
       ? marketSection + coreDigest + productSection + eventSection
       : fullPrefix;
 
-    CACHE.set(ck, { prefix, expiresAt: Date.now() + TTL_MS });
+    if (!hasOverride) CACHE.set(ck, { prefix, expiresAt: Date.now() + TTL_MS });
     return prefix;
   } catch {
     return "";
@@ -781,4 +789,9 @@ export async function getBrandSummary(
 /** Test-only: clear the cache. */
 export function _clearBrandPrefixCache() {
   CACHE.clear();
+}
+
+/** 定位被寫入之後立刻讓下一次產文讀到新簡報（不等 1 分鐘快取過期）。 */
+export function invalidateBrandPrefix(brandId: number): void {
+  for (const k of [...CACHE.keys()]) if (k.startsWith(`${brandId}:`)) CACHE.delete(k);
 }

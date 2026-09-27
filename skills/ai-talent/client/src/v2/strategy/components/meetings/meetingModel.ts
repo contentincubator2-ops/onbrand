@@ -61,6 +61,8 @@ export interface AdoptPreview {
   patch: Record<string, string | string[]>;
   impact: string[];
   notUpdated: string;
+  /** 產文簡報的實際變化（伺服器用寫入後的定位真的算一次比對）；算不出來是 null。 */
+  brief: { changed: boolean; added: string[]; removed: string[] } | null;
 }
 export interface MeetingRun {
   id: number; meetingId: number; status: "running" | "done" | "failed"; note: string; trigger: string;

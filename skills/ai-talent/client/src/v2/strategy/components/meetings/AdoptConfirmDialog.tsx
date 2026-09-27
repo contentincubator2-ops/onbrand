@@ -80,7 +80,9 @@ export default function AdoptConfirmDialog({ req, en, onClose, onDone }: {
             {/* 1 醒目提示 */}
             <div className="rounded-xl border-2 border-neutral-900 px-4 py-3">
               <p className="text-[14px] font-semibold text-neutral-900">
-                {en ? "⚑ This will change your Brand Brain" : "⚑ 這項決定會改動品牌大腦"}
+                {preview.brief && !preview.brief.changed
+                  ? (en ? "⚑ This changes your positioning — but NOT what task cards write" : "⚑ 這項決定會改動定位，但不會改變任務卡產出的內容")
+                  : (en ? "⚑ This will change your Brand Brain" : "⚑ 這項決定會改動品牌大腦")}
               </p>
               <p className="mt-1.5 text-[12.5px] font-medium text-neutral-700">{en ? "Once written, it affects:" : "寫入後會影響："}</p>
               <ul className="mt-1 list-disc space-y-0.5 pl-5 text-[12.5px] leading-relaxed text-neutral-700">
@@ -109,6 +111,31 @@ export default function AdoptConfirmDialog({ req, en, onClose, onDone }: {
                   </div>
                 ))}
               </div>
+            )}
+
+            {/* 2b 產文簡報的實際變化——算出來的，不是猜的 */}
+            {preview.diffs.length > 0 && preview.brief && (
+              <>
+                <p className="mb-2 mt-5 text-[12px] font-semibold uppercase tracking-widest text-neutral-400">
+                  {en ? "What task cards will read" : "任務卡產文讀到的簡報"}
+                </p>
+                {preview.brief.changed ? (
+                  <div className="space-y-1 rounded-xl border border-neutral-200 px-4 py-3 text-[12.5px] leading-relaxed">
+                    {preview.brief.removed.map((l, i) => (
+                      <p key={`r${i}`} className="text-neutral-400 line-through decoration-neutral-300">− {l}</p>
+                    ))}
+                    {preview.brief.added.map((l, i) => (
+                      <p key={`a${i}`} className="font-medium text-neutral-900">＋ {l}</p>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="rounded-xl border border-neutral-900 bg-neutral-50 px-4 py-3 text-[13px] leading-relaxed text-neutral-800">
+                    {en
+                      ? "The fields changed here are not part of the brief task cards read. Writing is still possible (the positioning page and the next meeting will show it), but copy from task cards won't change. To make it take effect, adopt with changes and put the point into the summary or the one-line reason to win."
+                      : "這次改的欄位不在任務卡產文讀的簡報裡。仍然可以寫入（定位頁與下一場會議看得到），但任務卡產出的文案不會因此改變。要讓它生效，請用「修改後採用」，把重點寫進差異化總結或唯一致勝理由。"}
+                  </p>
+                )}
+              </>
             )}
 
             {/* 3 定案確認 */}

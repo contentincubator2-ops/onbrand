@@ -28,6 +28,7 @@
 import localPool from "../../localDb";
 import { callModel } from "../../platform/core/multiModelRouter";
 import { isPositioningLocked } from "./positioningLock";
+import { buildBrandPrefix, invalidateBrandPrefix } from "./brandContext";
 import type { MeetingScope } from "./strategyMeetings";
 
 export const POSITIONING_VERSIONS_DDL = `
@@ -50,7 +51,11 @@ export const POSITIONING_VERSIONS_DDL = `
 `;
 
 type FieldType = "text" | "list";
-interface FieldSpec { key: string; label: string; type: FieldType }
+/**
+ * inBrief：這個欄位會不會進到產文的品牌簡報（brandContext.buildBrandPrefix）。只是給模型的
+ * 提示——「把調整的重點寫進會被讀到的欄位」；真正的判斷是 preview 實際算一次簡報比對。
+ */
+interface FieldSpec { key: string; label: string; type: FieldType; inBrief?: boolean }
 interface WritableAnchor {
   /** 寫到哪裡：定位 JSON 的某一格。 */
   target: "segment";
@@ -68,7 +73,7 @@ const NOT_UPDATED = "已經產出的內容不會自動改寫；定位頁上其�
 const BRAND_WRITABLE: Record<string, WritableAnchor> = {
   audience: {
     target: "segment",
-    fields: [{ key: "primary", label: "主受眾", type: "text" }, { key: "secondary", label: "次受眾", type: "text" }],
+    fields: [{ key: "primary", label: "主受眾", type: "text", inBrief: true }, { key: "secondary", label: "次受眾", type: "text" }],
     impact: [
       "所有任務卡的目標客群——之後的產出會對新的受眾說話（也會同步成重跑定位時的受眾錨點）",
       ...COMMON_IMPACT,
@@ -78,8 +83,8 @@ const BRAND_WRITABLE: Record<string, WritableAnchor> = {
   differentiation: {
     target: "segment",
     fields: [
-      { key: "summary", label: "差異化總結", type: "text" },
-      { key: "discriminator", label: "唯一致勝理由", type: "text" },
+      { key: "summary", label: "差異化總結", type: "text", inBrief: true },
+      { key: "discriminator", label: "唯一致勝理由", type: "text", inBrief: true },
       { key: "emotional", label: "情感差異化", type: "text" },
       { key: "functional", label: "功能差異化", type: "text" },
     ],
@@ -87,15 +92,15 @@ const BRAND_WRITABLE: Record<string, WritableAnchor> = {
   },
   tagline: {
     target: "segment",
-    fields: [{ key: "zhTagline", label: "中文標語", type: "text" }, { key: "enTagline", label: "英文標語", type: "text" }],
+    fields: [{ key: "zhTagline", label: "中文標語", type: "text", inBrief: true }, { key: "enTagline", label: "英文標語", type: "text", inBrief: true }],
     impact: ["品牌標語（會同步到品牌基本資料的標語欄）", ...COMMON_IMPACT, "策略監測比對用的標語錨點"],
   },
   voice: {
     target: "segment",
     fields: [
-      { key: "tone", label: "核心語調關鍵詞", type: "list" },
-      { key: "forbidden", label: "溝通禁區", type: "list" },
-      { key: "archetypes", label: "人格原型", type: "list" },
+      { key: "tone", label: "核心語調關鍵詞", type: "list", inBrief: true },
+      { key: "forbidden", label: "溝通禁區", type: "list", inBrief: true },
+      { key: "archetypes", label: "人格原型", type: "list", inBrief: true },
     ],
     impact: ["所有文案的語氣規範——任務卡寫文案時遵守的語調與禁區", ...COMMON_IMPACT],
   },
@@ -211,6 +216,13 @@ async function loadCurrent(args: { userId: number; brandId: number; scope: Meeti
   };
 }
 
+/**
+ * 產文簡報的實際變化——用寫入後的定位真的算一次 buildBrandPrefix，跟現在的比對。
+ * 2026-09-26 dev 實測：寫入「功能差異化」成功，但產文簡報一個字都沒變（完整簡報只讀
+ * 總結與致勝理由）。提示不能靠手寫的欄位清單猜，要算出來。
+ */
+export interface BriefChange { changed: boolean; added: string[]; removed: string[] }
+
 export interface PreviewResult {
   writable: boolean;
   note?: string;
@@ -219,6 +231,39 @@ export interface PreviewResult {
   patch: Patch;
   impact: string[];
   notUpdated: string;
+  brief: BriefChange | null;
+}
+
+/** 兩份簡報的逐行差異（只看內容行，去掉空行與重複）。 */
+export function briefLineDiff(before: string, after: string): BriefChange {
+  const lines = (s: string) => new Set(s.split("\n").map((l) => l.trim()).filter((l) => l.length > 1));
+  const a = lines(before);
+  const b = lines(after);
+  const added = [...b].filter((l) => !a.has(l)).slice(0, 12).map((l) => l.slice(0, 300));
+  const removed = [...a].filter((l) => !b.has(l)).slice(0, 12).map((l) => l.slice(0, 300));
+  return { changed: added.length > 0 || removed.length > 0, added, removed };
+}
+
+async function computeBriefChange(args: {
+  brandId: number; scope: MeetingScope; scopeId: number; anchorId: string; positioning: any; patch: Patch;
+}): Promise<BriefChange | null> {
+  try {
+    const productId = args.scope === "product" ? args.scopeId : null;
+    const next = JSON.parse(JSON.stringify(args.positioning ?? {}));
+    next[args.anchorId] = { ...(next[args.anchorId] && typeof next[args.anchorId] === "object" ? next[args.anchorId] : {}), ...args.patch };
+    const override = args.scope === "product" ? { productPositioningOverride: next } : { positioningOverride: next };
+    const same = args.scope === "product" ? { productPositioningOverride: args.positioning } : { positioningOverride: args.positioning };
+    // 完整與精簡兩種簡報都算——短任務吃精簡版，長任務吃完整版。
+    const [bf, bc, af, ac] = await Promise.all([
+      buildBrandPrefix(args.brandId, productId, null, "full", same),
+      buildBrandPrefix(args.brandId, productId, null, "core", same),
+      buildBrandPrefix(args.brandId, productId, null, "full", override),
+      buildBrandPrefix(args.brandId, productId, null, "core", override),
+    ]);
+    return briefLineDiff(`${bf}\n${bc}`, `${af}\n${ac}`);
+  } catch {
+    return null;
+  }
 }
 
 /** 把一段建議拆進那一格的欄位。受眾錨點只有一個欄位，直接用原文，不叫模型。 */
@@ -227,14 +272,14 @@ export async function previewWriteback(args: {
 }): Promise<PreviewResult> {
   const spec = writableAnchor(args.scope, args.anchorId);
   const locked = args.scope === "brand" ? await isPositioningLocked("brand", args.brandId, args.userId) : false;
-  if (!spec) return { writable: false, note: NOT_WRITABLE_NOTE, locked, diffs: [], patch: {}, impact: [], notUpdated: "" };
-  const { current } = await loadCurrent({ ...args, spec });
+  if (!spec) return { writable: false, note: NOT_WRITABLE_NOTE, locked, diffs: [], patch: {}, impact: [], notUpdated: "", brief: null };
+  const { current, positioning } = await loadCurrent({ ...args, spec });
 
   let raw: unknown = null;
   if (spec.fields.length === 1 && spec.fields[0]!.type === "text") {
     raw = { [spec.fields[0]!.key]: args.text };
   } else {
-    const fieldList = spec.fields.map((f) => `- ${f.key}（${f.label}，${f.type === "list" ? "字串陣列，每項一個短詞或一句" : "一段文字"}）：${JSON.stringify(current[f.key] ?? (f.type === "list" ? [] : ""))}`).join("\n");
+    const fieldList = spec.fields.map((f) => `- ${f.key}（${f.label}，${f.type === "list" ? "字串陣列，每項一個短詞或一句" : "一段文字"}${f.inBrief ? "，★產文會讀這一欄" : ""}）：${JSON.stringify(current[f.key] ?? (f.type === "list" ? [] : ""))}`).join("\n");
     const prompt = [
       `你要把一項策略會議通過的調整，寫進品牌定位「${args.anchorLabel}」這一格的欄位。`,
       `【目前各欄位】\n${fieldList}`,
@@ -242,7 +287,8 @@ export async function previewWriteback(args: {
       `規則：`,
       `1. 只輸出需要改的欄位；沒被這項調整影響的欄位不要出現。`,
       `2. 寫成可以直接放進定位的內容（不是會議語氣、不要寫「建議」「應該」「待確認」）。保留原本仍然成立的部分，只改調整涉及的地方。`,
-      `3. 字串陣列欄位輸出完整的新陣列。繁體中文（台灣用語）。只輸出 JSON 物件，例如 {"summary":"…"}。`,
+      `3. 標★的欄位會進到每次產文的品牌簡報——調整的重點一定要落在★欄位，否則寫入後產出的文案不會改變。`,
+      `4. 字串陣列欄位輸出完整的新陣列。繁體中文（台灣用語）。只輸出 JSON 物件，例如 {"summary":"…"}。`,
     ].join("\n\n");
     for (let attempt = 0; attempt < 2 && !raw; attempt++) {
       try {
@@ -254,7 +300,17 @@ export async function previewWriteback(args: {
     }
   }
   const patch = sanitizePatch(raw, spec, current);
-  return { writable: true, locked, diffs: diffOf(patch, spec, current), patch, impact: spec.impact, notUpdated: NOT_UPDATED };
+  const brief = Object.keys(patch).length
+    ? await computeBriefChange({ brandId: args.brandId, scope: args.scope, scopeId: args.scopeId, anchorId: args.anchorId, positioning, patch })
+    : null;
+  // 影響清單照實算：簡報沒變，就不能說「產文會用新內容」。
+  const impact = brief && !brief.changed
+    ? [
+      "注意：這次改動的欄位不會進到任務卡產文的品牌簡報——寫入後，產出的文案不會因此改變",
+      "會影響：定位頁上這一格的內容，以及下一場會議的「目前策略」",
+    ]
+    : spec.impact;
+  return { writable: true, locked, diffs: diffOf(patch, spec, current), patch, impact, notUpdated: NOT_UPDATED, brief };
 }
 
 /** 寫入。回版本 id。呼叫端負責「用戶已確認」與鎖定確認。 */
@@ -273,6 +329,7 @@ export async function commitWriteback(args: {
   if (args.scope === "brand" && args.anchorId === "tagline" && "zhTagline" in patch) before.__tagline = columns?.tagline ?? null;
 
   await applyFields({ ...args, spec, positioning, values: patch });
+  invalidateBrandPrefix(args.brandId);
   const [ins]: any = await localPool.execute(
     `INSERT INTO strategy_positioning_versions (userId, brandId, scope, scopeId, anchorId, source, runId, beforeJson, afterJson)
      VALUES (?, ?, ?, ?, ?, 'meeting', ?, ?, ?)`,
@@ -329,6 +386,7 @@ export async function revertWriteback(args: { userId: number; versionId: number 
     userId: args.userId, brandId: Number(v.brandId), scope, scopeId: Number(v.scopeId), anchorId: String(v.anchorId),
     spec, positioning, values: parse(v.beforeJson),
   });
+  invalidateBrandPrefix(Number(v.brandId));
   await localPool.execute(`UPDATE strategy_positioning_versions SET revertedAt = NOW(3) WHERE id = ?`, [args.versionId]);
   return { runId: v.runId == null ? null : Number(v.runId), anchorId: String(v.anchorId) };
 }

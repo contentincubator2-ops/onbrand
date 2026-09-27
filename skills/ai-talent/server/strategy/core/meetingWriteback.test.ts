@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { diffOf, sanitizePatch, writableAnchor } from "./meetingWriteback";
+import { briefLineDiff, diffOf, sanitizePatch, writableAnchor } from "./meetingWriteback";
 
 describe("writableAnchor", () => {
   it("只有策略表達類可以寫；競爭格局（研究證據）不行", () => {
@@ -45,5 +45,14 @@ describe("diffOf", () => {
   it("列出前後值與欄位名稱", () => {
     const spec = writableAnchor("brand", "differentiation")!;
     expect(diffOf({ summary: "新" }, spec, { summary: "舊" })).toEqual([{ key: "summary", label: "差異化總結", before: "舊", after: "新" }]);
+  });
+});
+
+describe("briefLineDiff", () => {
+  it("找出新增與刪除的行；內容一樣就是沒變", () => {
+    const before = "[品牌]\n- 【差異化】舊的總結\n- 【唯一致勝理由】五分鐘\n";
+    const after = "[品牌]\n- 【差異化】新的總結\n- 【唯一致勝理由】五分鐘\n";
+    expect(briefLineDiff(before, after)).toEqual({ changed: true, added: ["- 【差異化】新的總結"], removed: ["- 【差異化】舊的總結"] });
+    expect(briefLineDiff(before, before).changed).toBe(false);
   });
 });
