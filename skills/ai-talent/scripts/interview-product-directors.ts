@@ -32,6 +32,26 @@ import { callModel } from "../server/platform/core/multiModelRouter.js";
  * 但幾乎都沒有【工作經歷】（只有 #238853 有）。兩族各面試一輪才比得出來。
  */
 const PANELS: Record<string, Array<{ id: number; why: string }>> = {
+  // 2026-09-27（CJ「要陸續更改各頁面右下方的顧問人選，從 fb 開始」→「先面試再選」）：
+  // Facebook 頁的候選人。四類各挑幾位，讓答案自己說明誰的角度不重疊：
+  // 內容策略／Meta 廣告／文案・社群經營・KOL／方法論族對照。繁中人選少，
+  // 所以 meta_ads_tw（cn／en 語系）與 SEA 的社群經營也放進來比。
+  facebook: [
+    { id: 60014, why: "社群行銷 × 餐飲食品（前麥當勞台灣社群）—— 產業最貼近" },
+    { id: 60008, why: "社群行銷策略 × 美妝 —— 同一族別產業，看角度會不會被產業綁住" },
+    { id: 222856, why: "社群行銷策略師（電商 / DTC）—— 純電商品牌的 FB 打法" },
+    { id: 222338, why: "社群行銷策略師 × 保健食品 —— 繁中社群族，比較答案厚度" },
+    { id: 223587, why: "內容行銷策略師 × 食品飲料 —— 文字頁的產業用語總監，看他在 FB 的表現" },
+    { id: 26, why: "META 廣告策略師 —— 知識庫是 FB 廣告課程＋Meta 官方課程" },
+    { id: 33, why: "META 廣告操手 —— 帳戶結構、受眾分層、出價（執行面）" },
+    { id: 222378, why: "Meta 廣告投手 × 食品飲料（cn 語系）—— 產業 cohort 的廣告人" },
+    { id: 223493, why: "Meta Ads 績效經理 × 食品飲料（en 語系）—— 同產業、別語系" },
+    { id: 223236, why: "Meta 廣告投手 × 電商 / DTC —— 電商導購廣告" },
+    { id: 60021, why: "Facebook/Instagram 社群文案 —— 開頭、CTA、語氣（服務過餐飲）" },
+    { id: 222841, why: "社群經理 × 電商（SEA）—— 留言、社團、回購互動" },
+    { id: 222836, why: "影響者行銷經理 × 電商（SEA）—— 找 KOL／團購主帶貨" },
+    { id: 239030, why: "Facebook 流量系統副總裁（Molly Pittman 方法論）—— 方法論族對照；資料有同 slug 兩個名字的問題" },
+  ],
   // 產品定位方法論族
   positioning: [
     { id: 238853, why: "產品價值主張副總裁 —— Osterwalder VPC（這族唯一有工作經歷的）" },
@@ -58,6 +78,16 @@ const PANELS: Record<string, Array<{ id: number; why: string }>> = {
   { id: 223909, why: "再行銷策略師 —— 既有客戶的第二次購買" },
   { id: 222875, why: "RevOps 收入營運 —— 客單價與毛利結構" },
   ],
+};
+
+const QUESTIONS: Record<string, string> = {
+  facebook: `中秋前兩週，我要在 Facebook 上推「中秋烤肉黃金組合（橫膈牛排＋厚切牛舌，早鳥 8 折）」。粉專平常按讚留言都不多。接下來兩週，FB 上我該怎麼做才賣得動？
+
+請照這個順序回答，每段都要具體：
+1. 你的判斷：這兩週最關鍵的一件事是什麼？（只講一件）
+2. 你會看哪三個數字來判斷有沒有做對？（講得出是 Meta 報表或粉專洞察的哪個欄位）
+3. 你會做的第一個動作——如果是貼文，直接寫出第一篇的開頭三行；如果是廣告或其他動作，寫出具體設定。
+限 350 字以內，不要開場白，不要客套。`,
 };
 
 const QUESTION = `我的商品裡只有「牛舌」賣得動，其他品項幾乎沒有人買。我該怎麼辦？
@@ -113,7 +143,8 @@ async function main() {
   try { brandBlock = (await buildBrandPrefix(brandId, null, null, "full")).trim(); } catch { /* 拿不到就空手面試 */ }
   try { brandBlock += `\n\n${await buildBrandCatalogBlock(brandId, Number(brand.userId))}`; } catch { /* 同上 */ }
   console.log(`品牌資料長度：${brandBlock.length} 字`);
-  console.log(`題目：\n${QUESTION}`);
+  const question = QUESTIONS[panelName] ?? QUESTION;
+  console.log(`題目：\n${question}`);
   console.log("=".repeat(78));
 
   for (const c of CANDIDATES) {
@@ -128,7 +159,7 @@ async function main() {
       const r = await callModel(
         [
           { role: "system" as const, content: personaPrompt(a, brandBlock) },
-          { role: "user" as const, content: QUESTION },
+          { role: "user" as const, content: question },
         ],
         "general",
       );
