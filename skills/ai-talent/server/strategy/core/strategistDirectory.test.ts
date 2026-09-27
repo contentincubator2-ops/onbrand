@@ -402,3 +402,28 @@ describe("Facebook 頁（facebook scope）的三位", () => {
     for (const r of roles) expect(r.signatureQuestions.length).toBe(3);
   });
 });
+
+describe("通路頁（IG 到官網）的三位", () => {
+  it("每個通路都有三個角色、都是固定人選、角色 id 不重複", () => {
+    const all = new Set<string>();
+    for (const sc of ["facebook", "instagram", "linkedin", "youtube", "tiktok", "email", "pr", "x", "website"] as const) {
+      const roles = rolesFor(sc);
+      expect(roles, sc).toHaveLength(3);
+      for (const r of roles) {
+        expect(r.fixedSlug, r.id).toBeTruthy();
+        expect(r.signatureQuestions).toHaveLength(3);
+        expect(r.signatureQuestionsEn).toHaveLength(3);
+        expect(all.has(r.id)).toBe(false);
+        all.add(r.id);
+      }
+    }
+  });
+});
+
+describe("固定人選不可以同時掛在兩個角色", () => {
+  it("fixedSlug 全站唯一——getDirectorByAgentId 用 slug 反查角色，重複的話另一頁的對話會拿到錯的角色與守則", async () => {
+    const { STRATEGIST_ROLES } = await import("./strategistDirectory");
+    const slugs = STRATEGIST_ROLES.map((r: any) => r.fixedSlug).filter(Boolean);
+    expect(new Set(slugs).size).toBe(slugs.length);
+  });
+});

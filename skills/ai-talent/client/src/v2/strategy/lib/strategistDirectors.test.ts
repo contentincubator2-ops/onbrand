@@ -8,7 +8,7 @@
  * 這個判斷錯了，畫面上不會有任何錯誤訊息（只是換了個人回答），所以要測。
  */
 import { describe, it, expect } from "vitest";
-import { scopeFromUrl } from "./strategistDirectors";
+import { channelAdvisorLabel, scopeFromUrl } from "./strategistDirectors";
 
 describe("scopeFromUrl", () => {
   it("單一產品頁（?p=）是產品情境", () => {
@@ -52,7 +52,26 @@ describe("scopeFromUrl — Facebook 任務頁", () => {
     expect(scopeFromUrl({ path: "/tasks/fb", p: "152", cat: "copy" })).toBe("facebook");
   });
   it("其他內容頁與品牌頁照舊", () => {
-    expect(scopeFromUrl({ path: "/tasks/ig", p: null, cat: null })).toBe("brand");
     expect(scopeFromUrl({ path: "/brands/edit", p: null, cat: "copy" })).toBe("copy");
+  });
+});
+
+describe("通路頁 scope 與標籤（2026-09-27：FB 到官網）", () => {
+  it("每個內容層通路路由都對到自己的 scope", () => {
+    const cases: Array<[string, string]> = [
+      ["/tasks/fb", "facebook"], ["/tasks/ig", "instagram"], ["/tasks/li", "linkedin"], ["/tasks/yt", "youtube"],
+      ["/tasks/tt", "tiktok"], ["/tasks/email", "email"], ["/tasks/pr", "pr"], ["/tasks/x", "x"], ["/tasks/web", "website"],
+    ];
+    for (const [path, scope] of cases) expect(scopeFromUrl({ path, p: null, cat: null })).toBe(scope);
+  });
+  it("案例、行事曆等不是通路的內容頁照舊", () => {
+    expect(scopeFromUrl({ path: "/tasks/case", p: null, cat: null })).toBe("brand");
+    expect(scopeFromUrl({ path: "/tasks/calendar", p: null, cat: null })).toBe("brand");
+  });
+  it("右下角標籤：英數通路名留空格，中文通路名不留", () => {
+    expect(channelAdvisorLabel("facebook", false)).toBe("FB 顧問");
+    expect(channelAdvisorLabel("email", false)).toBe("電子報顧問");
+    expect(channelAdvisorLabel("website", false)).toBe("官網顧問");
+    expect(channelAdvisorLabel("pr", true)).toBe("PR Advisors");
   });
 });

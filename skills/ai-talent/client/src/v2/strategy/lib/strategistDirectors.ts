@@ -41,7 +41,27 @@ export interface StrategistDirector {
  * 2026-09-24：品牌頁與產品頁是兩組不同的角色（產品頁＝價值主張／Kano／定價），
  * 共用一個 key 的話，在產品頁換人會把品牌頁的選擇也蓋掉。
  */
-export type StrategistScope = "brand" | "product" | "copy" | "facebook";
+/** 內容層通路頁：路由段 → scope（2026-09-27，跟 server CHANNEL_SCOPES 同一份）。 */
+export const CHANNEL_ROUTE_SCOPE = {
+  fb: "facebook", ig: "instagram", li: "linkedin", yt: "youtube", tt: "tiktok",
+  email: "email", pr: "pr", x: "x", web: "website",
+} as const;
+export type ChannelScope = (typeof CHANNEL_ROUTE_SCOPE)[keyof typeof CHANNEL_ROUTE_SCOPE];
+export type StrategistScope = "brand" | "product" | "copy" | ChannelScope;
+
+const CHANNEL_NAME: Record<ChannelScope, { zh: string; en: string }> = {
+  facebook: { zh: "FB", en: "Facebook" }, instagram: { zh: "IG", en: "Instagram" },
+  linkedin: { zh: "LinkedIn", en: "LinkedIn" }, youtube: { zh: "YouTube", en: "YouTube" },
+  tiktok: { zh: "TikTok", en: "TikTok" }, email: { zh: "電子報", en: "Email" },
+  pr: { zh: "新聞稿", en: "PR" }, x: { zh: "X", en: "X" }, website: { zh: "官網", en: "Website" },
+};
+export function isChannelScope(s: StrategistScope): s is ChannelScope {
+  return s in CHANNEL_NAME;
+}
+/** 右下角標籤：「FB 顧問」「電子報顧問」…。 */
+export function channelAdvisorLabel(s: ChannelScope, en: boolean): string {
+  return en ? `${CHANNEL_NAME[s].en} Advisors` : `${CHANNEL_NAME[s].zh} 顧問`.replace(/^(\p{Script=Han}+) 顧問$/u, "$1顧問");
+}
 const directorStorageKey = (brandId: number, scope: StrategistScope) =>
   `sowork.strategyDirector.${scope}.${brandId}`;
 
@@ -89,7 +109,8 @@ export function scopeFromUrl(params: { p?: string | null; cat?: string | null; p
   // 2026-09-27（CJ「要陸續更改各頁面右下方的顧問人選，從 fb 開始」）：內容層的
   // Facebook 任務頁有自己的三位（社群口碑／再行銷漏斗／廣告節奏）。看路徑，不看 cat——
   // 內容層的頁面沒有 cat 參數；而網址上可能還留著 ?p=（使用者選了產品在寫貼文）。
-  if ((params.path ?? "").startsWith("/tasks/fb")) return "facebook";
+  const m = /^\/tasks\/([a-z]+)/.exec(params.path ?? "");
+  if (m && m[1] && m[1] in CHANNEL_ROUTE_SCOPE) return CHANNEL_ROUTE_SCOPE[m[1] as keyof typeof CHANNEL_ROUTE_SCOPE];
   // 2026-09-26（CJ「要從 mos_db 當中，選擇三個負責這一頁的 agent」）：文字頁
   // （cat=copy）有自己的三位——語氣／用詞規範／產業用語。判斷要放在產品之前，
   // 因為在文字頁時網址上可能還留著 ?p=（使用者剛從產品頁切過來）。

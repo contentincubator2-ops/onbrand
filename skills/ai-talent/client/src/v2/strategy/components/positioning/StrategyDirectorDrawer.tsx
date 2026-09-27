@@ -53,6 +53,7 @@ import { trpc } from "../../../../lib/trpc";
 import { useLang } from "../../../../lib/i18n";
 import {
   type StrategistDirector, avatarSrcOf, roleLabelOf, readStoredDirector, writeStoredDirector, scopeFromUrl,
+  isChannelScope, channelAdvisorLabel,
 } from "../../lib/strategistDirectors";
 import StrategyDirectorChat from "./StrategyDirectorChat";
 import { DirectorRoster, DirectorProfile } from "./StrategyDirectorPicker";
@@ -184,8 +185,8 @@ export default function StrategyDirectorDrawer({ brandId }: { brandId: number | 
               ? (en ? "Product Strategy" : "產品策略總監")
               : scope === "copy"
                 ? (en ? "Copy & Wording" : "用詞總監")
-                : scope === "facebook"
-                  ? (en ? "Facebook Advisors" : "FB 顧問")
+                : isChannelScope(scope)
+                  ? channelAdvisorLabel(scope, en)
                   : (en ? "Strategy Director" : "策略總監")}
           </div>
         )}
@@ -197,8 +198,8 @@ export default function StrategyDirectorDrawer({ brandId }: { brandId: number | 
               ? (en ? "Your product strategy directors — value proposition, Kano, pricing" : "你的產品策略總監——價值主張、Kano、定價與組合")
               : scope === "copy"
                 ? (en ? "Your wording directors — tone of voice, word rules, industry language" : "你的用詞總監——品牌語氣、用詞規範、產業用語")
-                : scope === "facebook"
-                  ? (en ? "Your Facebook advisors — social proof, retargeting, ad cadence" : "你的 FB 顧問——社群口碑、再行銷漏斗、廣告節奏")
+                : isChannelScope(scope)
+                  ? `${en ? "Your " : "你的 "}${channelAdvisorLabel(scope, en)}${directors.length ? `${en ? " — " : "——"}${directors.map((d) => roleLabelOf(d, en)).join(en ? ", " : "、")}` : ""}`
                 : (en ? "Your Strategy Director — built for this brand" : "你的策略總監——為這個品牌而設計")
           }
           style={{
@@ -244,8 +245,8 @@ export default function StrategyDirectorDrawer({ brandId }: { brandId: number | 
                               ? (en ? "Product Strategy" : "產品策略總監")
                               : scope === "copy"
                                 ? (en ? "Copy & Wording" : "用詞總監")
-                                : scope === "facebook"
-                                  ? (en ? "Facebook Advisors" : "FB 顧問")
+                                : isChannelScope(scope)
+                                  ? channelAdvisorLabel(scope, en)
                                   : (en ? "Strategy Director" : "策略總監"))}
                   </div>
                   <div style={{ fontSize: 11, color: "#737373", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
@@ -255,8 +256,8 @@ export default function StrategyDirectorDrawer({ brandId }: { brandId: number | 
                         ? (en ? "Built for this product" : "為這支產品而設計")
                         : scope === "copy"
                           ? (en ? "Built for your wording rules" : "為你的用詞規範而設計")
-                          : scope === "facebook"
-                            ? (en ? "Built for your Facebook page" : "為你的 Facebook 而設計")
+                          : isChannelScope(scope)
+                            ? (en ? "Built for this channel" : "為這個通路而設計")
                           : (en ? "Built for your brand" : "為你的品牌而設計")}
                   </div>
                 </div>
