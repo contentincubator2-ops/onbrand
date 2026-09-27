@@ -349,6 +349,21 @@ CTA、Hook 等卡片。你的產出要能直接變成卡片上的一條：
 **不要**把使用者帶去品牌層的策略健檢或策略監測——那是品牌定位的工具，跟用詞規範是
 兩件事。品牌層的問題（我們是誰、定位對不對）請他去找品牌策略總監。`;
 
+/**
+ * 2026-09-27（CJ「從 fb 開始更改右下方的顧問人選」）：Facebook 頁的三位。他們的
+ * 產出是**這一頁上能做的事**——貼文、廣告、留言經營——不是品牌策略。
+ */
+const FACEBOOK_TOOLS_BLOCK = `【你的守備範圍：Facebook，不是品牌定位】
+使用者現在在 Facebook 任務頁：這裡的任務卡會產出 Facebook 貼文、廣告文案、限時動態、直播文案。
+
+- 你的建議要落在 Facebook 上做得到的事：哪一篇該發、開頭怎麼寫、要不要推廣、受眾怎麼設、看哪個報表欄位。
+- 要寫貼文或廣告文案時，直接寫出開頭幾行給他看；想完整產出，提醒他用這一頁的任務卡（任務卡會套品牌大腦）。
+- 講數字門檻時說清楚是「常見基準」還是品牌資料裡真的有的數字——品牌資料沒有的成效數字、預算、日期，不要編。
+- 產品名稱、產地、售價一律照品牌資料寫，不要自己改（例如資料寫「美國橫膈牛排」就不要寫成澳洲和牛）。
+
+**不要**把使用者帶去品牌層的策略健檢或策略監測，也不要輸出任何 <<action:...>> 標記。
+品牌層的問題（定位、標語、受眾要不要改）請他去找品牌策略總監。`;
+
 export function buildSystemPrompt(director: StrategistDirector | null, brandCtx: string, knowledge = ""): string {
   const parts = [STRATEGIST_SYSTEM_PROMPT];
   // 工具引導依這位總監所屬的 scope 給——產品總監不該把人帶去品牌層的健檢。
@@ -357,6 +372,7 @@ export function buildSystemPrompt(director: StrategistDirector | null, brandCtx:
   parts.push(
     scope === "product" ? PRODUCT_TOOLS_BLOCK
     : scope === "copy" ? COPY_TOOLS_BLOCK
+    : scope === "facebook" ? FACEBOOK_TOOLS_BLOCK
     : BRAND_TOOLS_BLOCK,
   );
   if (director) {
@@ -460,6 +476,16 @@ async function buildProactiveOpening(
   // 這一頁的狀態只有三個數字（推薦用詞／禁用詞／縮寫對照各幾條），而這三個
   // 數字就足以判斷使用者現在卡在哪：全空＝不知道從哪開始、只有禁用詞＝沒人
   // 給他替代說法、都有了＝該檢查一致性。所以照數字講話，不要叫 LLM 猜。
+  // 2026-09-27：Facebook 頁的三位開場只講自己在 FB 上能幫什麼——健檢／監測是品牌層的事。
+  if (director && getRole(director.roleId).scope === "facebook") {
+    return {
+      content: en_
+        ? `${hi} On Facebook I look at ${director.roleLabelEn}. Tell me what you're about to post or promote — or ask me one of the questions below.`
+        : `${hi}在 Facebook 這一頁，我看的是${director.roleLabel}。跟我說你接下來要發什麼、推什麼活動，或直接點下面的問題問我。`,
+      actions: [],
+    };
+  }
+
   if (director && getRole(director.roleId).scope === "copy") {
     return { content: await buildCopyOpening(brandId, userId, brandName, en_, director, hi), actions: [] };
   }
@@ -644,7 +670,7 @@ export const strategistChatRouter = router({
        * 2026-09-24（CJ「產品定位就用你推薦的那三位人選」）：品牌頁與產品頁
        * 各有自己的三個角色。前端在產品頁（URL 有 ?p=）會送 "product"。
        */
-      scope: z.enum(["brand", "product", "copy"]).optional(),
+      scope: z.enum(["brand", "product", "copy", "facebook"]).optional(),
     }))
     .query(async ({ ctx, input }) => {
       const userId = ctx.user!.id;
@@ -736,7 +762,7 @@ export const strategistChatRouter = router({
       // （舊前端）退回這個品牌的第一位，不會炸。
       agentId: z.number().int().positive().optional(),
       /** 沒給 agentId 時，要從哪一組角色取第一位當預設。 */
-      scope: z.enum(["brand", "product", "copy"]).optional(),
+      scope: z.enum(["brand", "product", "copy", "facebook"]).optional(),
       /**
        * 2026-09-26（CJ「增加一個按鈕，是開新對話，其他對話，就會留成歷史對話」）：
        * 指定要看哪一串。不給＝目前這串（status='open'）。看歷史時是唯讀的——

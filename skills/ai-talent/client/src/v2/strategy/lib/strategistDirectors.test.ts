@@ -45,3 +45,14 @@ describe("scopeFromUrl", () => {
     expect(scopeFromUrl({ p: "152", cat: "products" })).toBe("product");
   });
 });
+
+describe("scopeFromUrl — Facebook 任務頁", () => {
+  it("/tasks/fb 是 facebook，就算網址上留著 ?p= 或 cat", () => {
+    expect(scopeFromUrl({ path: "/tasks/fb", p: null, cat: null })).toBe("facebook");
+    expect(scopeFromUrl({ path: "/tasks/fb", p: "152", cat: "copy" })).toBe("facebook");
+  });
+  it("其他內容頁與品牌頁照舊", () => {
+    expect(scopeFromUrl({ path: "/tasks/ig", p: null, cat: null })).toBe("brand");
+    expect(scopeFromUrl({ path: "/brands/edit", p: null, cat: "copy" })).toBe("copy");
+  });
+});

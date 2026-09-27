@@ -86,10 +86,11 @@ export interface StrategistDirector {
 export type StrategistRoleId =
   | "brand_positioning" | "pricing_value" | "consumer_behavior"
   | "product_value_prop" | "product_kano" | "product_pricing"
-  | "copy_voice" | "copy_terms" | "copy_industry";
+  | "copy_voice" | "copy_terms" | "copy_industry"
+  | "fb_social_proof" | "fb_retargeting" | "fb_ads_cadence";
 
 /** 品牌頁與產品頁各有自己的三個角色（CJ 2026-09-24 定案，見 STRATEGIST_ROLES）。 */
-export type StrategistScope = "brand" | "product" | "copy";
+export type StrategistScope = "brand" | "product" | "copy" | "facebook";
 
 interface StrategistRole {
   id: StrategistRoleId;
@@ -348,6 +349,87 @@ const COPY_ROLES: StrategistRole[] = [
 ];
 
 STRATEGIST_ROLES.push(...COPY_ROLES);
+
+/**
+ * 2026-09-27（CJ「要陸續更改各頁面右下方的顧問人選，從 fb 開始」→「先面試再選」→
+ * 選了朱怡君＋謝曉雯＋侯沐阳）：Facebook 頁的三位。
+ *
+ * 面試（scripts/interview-product-directors.ts 的 facebook 組，14 位、懶得煮的Tom老闆
+ * 中秋烤肉組合題）：13 位的第一句都是「別靠自然觸及，直接下廣告」，連排進來做文案／
+ * 社群經營／KOL 的也答成廣告投手。真正不重疊的只有這三個角度：
+ *   - 朱怡君：唯一反對先砸廣告——「先讓真實買過的人留一句『我吃過』，再開廣告」
+ *   - 謝曉雯：先把看過商品頁的人建成名單，再用截止感追打（漏斗架構）
+ *   - 侯沐阳：前五天測素材、ROAS>2 才加預算、最後三天撈加購未結帳；文案最像品牌
+ * 三位都用 fixedSlug——選的是「這個人答出來的角度」，不是某個產業 cohort；換成同
+ * cohort 別產業的人，角度不保證一樣。
+ */
+const FACEBOOK_ROLES: StrategistRole[] = [
+  {
+    id: "fb_social_proof",
+    scope: "facebook",
+    label: "社群口碑",
+    labelEn: "Social Proof",
+    fixedSlug: "social_media-ecom-tw-1789",
+    promptAngle:
+      "你看 Facebook 的角度是「先有人幫你說話，再花錢推」：粉專互動冷的時候硬砸廣告，演算法跟受眾都不信任你。"
+      + "你會先找真實買過的人留下一句話、把留言和分享當成廣告的社會證明，再決定要不要推廣。"
+      + "被問到廣告的問題，你從「這篇貼文現在有沒有值得被放大的真實互動」切入。",
+    signatureQuestions: [
+      "粉專互動很冷，要先下廣告還是先暖場？",
+      "怎麼讓真的買過的人願意留言分享？",
+      "哪一篇貼文值得拿去推廣？",
+    ],
+    signatureQuestionsEn: [
+      "My page is quiet — ads first, or warm it up first?",
+      "How do I get real buyers to comment and share?",
+      "Which post is worth boosting?",
+    ],
+  },
+  {
+    id: "fb_retargeting",
+    scope: "facebook",
+    label: "再行銷漏斗",
+    labelEn: "Retargeting Funnel",
+    fixedSlug: "meta_ads_tw-ecom-cn-6845",
+    promptAngle:
+      "你看 Facebook 的角度是漏斗：冷流量不要一開始就叫人掏錢，先把看過商品頁、加過購物車的人建成自訂受眾，"
+      + "再用截止感、到貨時間這類訊息追打。你講得出每一層該看哪個事件（Landing Page View、Add to Cart、Initiate Checkout）"
+      + "以及名單要多大才開再行銷。被問到文案的問題，你從「這句話是給漏斗哪一層的人看的」切入。",
+    signatureQuestions: [
+      "看過商品頁卻沒買的人，要怎麼追回來？",
+      "我的像素和轉換事件設對了嗎？",
+      "活動快截止了，最後幾天該打誰？",
+    ],
+    signatureQuestionsEn: [
+      "How do I win back people who viewed but didn't buy?",
+      "Are my pixel and conversion events set up right?",
+      "The promo ends soon — who do I target in the last days?",
+    ],
+  },
+  {
+    id: "fb_ads_cadence",
+    scope: "facebook",
+    label: "廣告節奏",
+    labelEn: "Ad Cadence",
+    fixedSlug: "meta_ads_tw-food-cn-1427",
+    promptAngle:
+      "你看 Facebook 的角度是投放節奏與紀律：先測素材、再放量、最後撈回，每一步都有數字門檻（例如 ROAS 沒過 2 不加預算、"
+      + "連結點擊率低於 1.5% 就換素材）。你也在乎素材本身——廣告文案要像這個品牌會講的話，不是促銷公告。"
+      + "被問到內容的問題，你從「這支素材拿去跑，前五天要看到什麼數字才算過關」切入。",
+    signatureQuestions: [
+      "這檔活動的廣告預算該怎麼分配、什麼時候加碼？",
+      "我該同時測幾支素材？怎麼判斷哪支贏？",
+      "這篇文案拿去下廣告，開頭夠不夠抓人？",
+    ],
+    signatureQuestionsEn: [
+      "How should I split the ad budget, and when do I scale?",
+      "How many creatives should I test, and how do I pick the winner?",
+      "Is this caption's opening strong enough to run as an ad?",
+    ],
+  },
+];
+
+STRATEGIST_ROLES.push(...FACEBOOK_ROLES);
 
 export function rolesFor(scope: StrategistScope): StrategistRole[] {
   return STRATEGIST_ROLES.filter((r) => r.scope === scope);

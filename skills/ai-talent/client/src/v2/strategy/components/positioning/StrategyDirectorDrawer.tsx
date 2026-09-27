@@ -48,7 +48,7 @@
  * 帶著 ?tool= 參數——BrandsPage 讀到這個參數會自動展開對應的面板。
  */
 import React from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { trpc } from "../../../../lib/trpc";
 import { useLang } from "../../../../lib/i18n";
 import {
@@ -78,7 +78,8 @@ export default function StrategyDirectorDrawer({ brandId }: { brandId: number | 
   // 沒有更換成產品的專家」）：產品情境用另一組角色（產品價值主張／Kano／定價與
   // 組合）。判斷規則在 scopeFromUrl——**產品清單頁（cat=products）也算**，
   // 不是只有單一產品頁（?p=）。
-  const scope = scopeFromUrl({ p: searchParams.get("p"), cat: searchParams.get("cat") });
+  const { pathname } = useLocation();
+  const scope = scopeFromUrl({ p: searchParams.get("p"), cat: searchParams.get("cat"), path: pathname });
 
   const [open, setOpen] = React.useState(false);
   const [view, setView] = React.useState<View>("chat");
@@ -183,7 +184,9 @@ export default function StrategyDirectorDrawer({ brandId }: { brandId: number | 
               ? (en ? "Product Strategy" : "產品策略總監")
               : scope === "copy"
                 ? (en ? "Copy & Wording" : "用詞總監")
-                : (en ? "Strategy Director" : "策略總監")}
+                : scope === "facebook"
+                  ? (en ? "Facebook Advisors" : "FB 顧問")
+                  : (en ? "Strategy Director" : "策略總監")}
           </div>
         )}
         <button
@@ -194,6 +197,8 @@ export default function StrategyDirectorDrawer({ brandId }: { brandId: number | 
               ? (en ? "Your product strategy directors — value proposition, Kano, pricing" : "你的產品策略總監——價值主張、Kano、定價與組合")
               : scope === "copy"
                 ? (en ? "Your wording directors — tone of voice, word rules, industry language" : "你的用詞總監——品牌語氣、用詞規範、產業用語")
+                : scope === "facebook"
+                  ? (en ? "Your Facebook advisors — social proof, retargeting, ad cadence" : "你的 FB 顧問——社群口碑、再行銷漏斗、廣告節奏")
                 : (en ? "Your Strategy Director — built for this brand" : "你的策略總監——為這個品牌而設計")
           }
           style={{
@@ -239,7 +244,9 @@ export default function StrategyDirectorDrawer({ brandId }: { brandId: number | 
                               ? (en ? "Product Strategy" : "產品策略總監")
                               : scope === "copy"
                                 ? (en ? "Copy & Wording" : "用詞總監")
-                                : (en ? "Strategy Director" : "策略總監"))}
+                                : scope === "facebook"
+                                  ? (en ? "Facebook Advisors" : "FB 顧問")
+                                  : (en ? "Strategy Director" : "策略總監"))}
                   </div>
                   <div style={{ fontSize: 11, color: "#737373", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                     {current
@@ -248,6 +255,8 @@ export default function StrategyDirectorDrawer({ brandId }: { brandId: number | 
                         ? (en ? "Built for this product" : "為這支產品而設計")
                         : scope === "copy"
                           ? (en ? "Built for your wording rules" : "為你的用詞規範而設計")
+                          : scope === "facebook"
+                            ? (en ? "Built for your Facebook page" : "為你的 Facebook 而設計")
                           : (en ? "Built for your brand" : "為你的品牌而設計")}
                   </div>
                 </div>

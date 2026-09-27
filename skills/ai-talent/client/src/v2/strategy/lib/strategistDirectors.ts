@@ -41,7 +41,7 @@ export interface StrategistDirector {
  * 2026-09-24：品牌頁與產品頁是兩組不同的角色（產品頁＝價值主張／Kano／定價），
  * 共用一個 key 的話，在產品頁換人會把品牌頁的選擇也蓋掉。
  */
-export type StrategistScope = "brand" | "product" | "copy";
+export type StrategistScope = "brand" | "product" | "copy" | "facebook";
 const directorStorageKey = (brandId: number, scope: StrategistScope) =>
   `sowork.strategyDirector.${scope}.${brandId}`;
 
@@ -85,7 +85,11 @@ export function localeLabelOf(locale: string | null | undefined, en: boolean): s
  * 規則寫成函式而不是散在元件裡的條件式，是因為「哪些頁面算產品情境」之後一定
  * 還會長（產品變體、產品任務…），散著寫就會有兩套不同步的判斷。
  */
-export function scopeFromUrl(params: { p?: string | null; cat?: string | null }): StrategistScope {
+export function scopeFromUrl(params: { p?: string | null; cat?: string | null; path?: string | null }): StrategistScope {
+  // 2026-09-27（CJ「要陸續更改各頁面右下方的顧問人選，從 fb 開始」）：內容層的
+  // Facebook 任務頁有自己的三位（社群口碑／再行銷漏斗／廣告節奏）。看路徑，不看 cat——
+  // 內容層的頁面沒有 cat 參數；而網址上可能還留著 ?p=（使用者選了產品在寫貼文）。
+  if ((params.path ?? "").startsWith("/tasks/fb")) return "facebook";
   // 2026-09-26（CJ「要從 mos_db 當中，選擇三個負責這一頁的 agent」）：文字頁
   // （cat=copy）有自己的三位——語氣／用詞規範／產業用語。判斷要放在產品之前，
   // 因為在文字頁時網址上可能還留著 ?p=（使用者剛從產品頁切過來）。

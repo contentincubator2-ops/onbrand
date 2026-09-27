@@ -392,3 +392,13 @@ describe("文字頁（copy scope）的三位", () => {
     }
   });
 });
+
+describe("Facebook 頁（facebook scope）的三位", () => {
+  it("三個角色、三個面試選出來的固定人選，而且不混進別的 scope", () => {
+    const roles = rolesFor("facebook");
+    expect(roles.map((r) => r.id)).toEqual(["fb_social_proof", "fb_retargeting", "fb_ads_cadence"]);
+    expect(roles.map((r) => r.fixedSlug)).toEqual(["social_media-ecom-tw-1789", "meta_ads_tw-ecom-cn-6845", "meta_ads_tw-food-cn-1427"]);
+    expect(rolesFor("brand").some((r) => r.scope === "facebook")).toBe(false);
+    for (const r of roles) expect(r.signatureQuestions.length).toBe(3);
+  });
+});
