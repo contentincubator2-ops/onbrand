@@ -4,6 +4,7 @@ name: Ops (DEV) — interview the product-page director candidates
 # 問題，要怎麼解決，只有牛舌賣得動的問題，進行面試」）：拿真實品牌資料，讓
 # 10 位候選人各自回答同一題，答案原樣印出來給人評。
 #
+# 2026-09-27：加 IG／LinkedIn／YouTube／TikTok／電子報／新聞稿／X／官網 8 組（一次跑完，組內 4 位併發）。
 # 2026-09-27：加 facebook 組（14 位，FB 頁右下角顧問）；push 預設跑這一組。
 #
 # 會呼叫 LLM（每位一次）。push 觸發刻意只綁自己這個檔案：改別的檔案不會順手燒
@@ -22,13 +23,13 @@ on:
       panel:
         description: '面試哪一組名單：marketing（行銷職能族）／positioning（產品定位方法論族）／facebook（FB 頁顧問，2026-09-27）'
         required: false
-        default: 'facebook'
+        default: 'instagram,linkedin,youtube,tiktok,email,pr,x,website'
 
 jobs:
   interview:
     runs-on: ubuntu-24.04
     environment: dev
-    timeout-minutes: 20
+    timeout-minutes: 50
     steps:
       - name: Run the interview against the DEV database
         uses: appleboy/ssh-action@v1.0.3
@@ -36,11 +37,16 @@ jobs:
           host: ${{ secrets.VM_HOST }}
           username: ${{ secrets.VM_USER }}
           key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
-          command_timeout: 19m
+          command_timeout: 48m
           script: |
             set -e
-            cd /opt/onbrand/current/skills/ai-talent
+            # 推這個檔案會同時觸發 deploy-dev；等新版的腳本真的上線再跑（9/27 第一次就讀到舊版）。
+            for i in $(seq 1 60); do
+              if grep -q 'website: \[' /opt/onbrand/current/skills/ai-talent/scripts/interview-product-directors.ts 2>/dev/null; then break; fi
+              echo "waiting for the new release ($i)…"; sleep 15
+            done
+            cd -P /opt/onbrand/current/skills/ai-talent
             set -a; source .env 2>/dev/null; set +a
             echo "host=$(hostname)  app=$(readlink -f /opt/onbrand/current)"
             echo "----------------------------------------------------------"
-            ./node_modules/.bin/tsx scripts/interview-product-directors.ts "${{ github.event.inputs.brandId || '2972' }}" "${{ github.event.inputs.panel || 'facebook' }}"
+            ./node_modules/.bin/tsx scripts/interview-product-directors.ts "${{ github.event.inputs.brandId || '2972' }}" "${{ github.event.inputs.panel || 'instagram,linkedin,youtube,tiktok,email,pr,x,website' }}"

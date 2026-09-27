@@ -32,6 +32,99 @@ import { callModel } from "../server/platform/core/multiModelRouter.js";
  * 但幾乎都沒有【工作經歷】（只有 #238853 有）。兩族各面試一輪才比得出來。
  */
 const PANELS: Record<string, Array<{ id: number; why: string }>> = {
+  // 2026-09-27（CJ「請按照順序，執行到官網為止」）：IG → LinkedIn → YouTube → TikTok →
+  // 電子報 → 新聞稿 → X → 官網，每頁一組。候選人從 mos_db 依通路關鍵字撈、優先繁中＋
+  // 簡介夠長者；「董事會級交付物」套版族與簡介 <60 字的一律不收（X 例外，這一頁根本
+  // 沒有像樣的人選，只好放進來比）。
+  instagram: [
+    { id: 60014, why: "社群行銷 × 餐飲食品 —— 知識庫有餐飲品牌 IG 策略" },
+    { id: 60008, why: "社群行銷策略 × 美妝 —— IG 是美妝主戰場" },
+    { id: 60021, why: "FB/IG 社群文案 —— 開頭與輪播文字" },
+    { id: 27, why: "短影音策略師 —— Reels" },
+    { id: 180166, why: "Instagram 行銷專家 —— 簡介最長的 IG 專家" },
+    { id: 220584, why: "IG／Facebook 行銷專員 —— 真實課堂照換掉美圖、互動翻倍的經驗" },
+    { id: 227648, why: "KOL 策略總監（FMCG）—— IG 的 KOL 合作" },
+    { id: 227647, why: "成效分析師（IG KOL，FMCG）—— 看數字的人" },
+    { id: 210216, why: "資深短影音行銷專員 —— Reels 腳本" },
+  ],
+  linkedin: [
+    { id: 222943, why: "內容行銷策略師 × B2B SaaS" },
+    { id: 223049, why: "內容行銷策略師 × B2B 製造業" },
+    { id: 222342, why: "社群行銷策略師 × B2B SaaS" },
+    { id: 223656, why: "社群社區經理 × B2B SaaS" },
+    { id: 222940, why: "KOL 行銷專員 × B2B SaaS —— 用人帶企業採購" },
+    { id: 222499, why: "UGC 內容策略師 × B2B SaaS" },
+    { id: 223800, why: "廣告文案師 × B2B 製造業" },
+    { id: 222813, why: "成長駭客 × B2B SaaS" },
+    { id: 223183, why: "品牌策略師 × B2B SaaS" },
+    { id: 222308, why: "Email × CRM 策略師（保健食品 B2B）—— 企業名單經營" },
+  ],
+  youtube: [
+    { id: 224000, why: "YouTube 策略師 × 食品飲料 —— 產業最貼近" },
+    { id: 223995, why: "YouTube 策略師 × 電商 / DTC" },
+    { id: 223992, why: "YouTube 策略師 × 保健食品" },
+    { id: 224003, why: "YouTube 策略師 × 實體零售 O2O" },
+    { id: 224001, why: "YouTube 策略師 × 服飾時尚" },
+    { id: 222492, why: "YouTube 廣告投手 × 電商" },
+    { id: 210252, why: "資深 YouTube 內容創作者 —— 創作者視角" },
+    { id: 210175, why: "資深 YouTube 行銷講師" },
+    { id: 210216, why: "資深短影音行銷專員 —— Shorts" },
+  ],
+  tiktok: [
+    { id: 223195, why: "TikTok 廣告投手 × 食品飲料" },
+    { id: 223521, why: "TikTok 廣告投手 × 保健食品" },
+    { id: 223709, why: "TikTok 廣告投手 × 美妝保養" },
+    { id: 222720, why: "TikTok 廣告投手 × 電商 / DTC（cn 語系）" },
+    { id: 27, why: "短影音策略師 —— 內容面" },
+    { id: 220510, why: "短影音企劃製作人（服務業零售）—— 簡介最長" },
+    { id: 220508, why: "短影音企劃製作人（科技 3C）" },
+    { id: 220509, why: "短影音企劃製作人（傳產製造）" },
+    { id: 210216, why: "資深短影音行銷專員" },
+  ],
+  email: [
+    { id: 222332, why: "Email × CRM 策略師 × 綜合電商" },
+    { id: 222327, why: "Email × CRM 策略師 × 保健食品" },
+    { id: 222329, why: "Email × CRM 策略師 × 美妝電商" },
+    { id: 222308, why: "Email × CRM 策略師（保健食品 B2B）—— 簡介最長" },
+    { id: 223399, why: "CRM Lifecycle 行銷師 × 食品" },
+    { id: 223686, why: "CRM 行銷師 × 電商" },
+    { id: 222597, why: "CRM Lifecycle 行銷師 × 電商" },
+    { id: 223608, why: "CRM 系統設定專員 × 食品 —— 分眾與自動化設定" },
+    { id: 180230, why: "CRM 行銷專員（電商平台背景）" },
+  ],
+  pr: [
+    { id: 223755, why: "公關策略師 × 電商 / DTC" },
+    { id: 222665, why: "公關策略師 × 電商" },
+    { id: 223191, why: "公關策略師 × 保健食品" },
+    { id: 210260, why: "資深新聞稿撰寫師 —— 新聞稿本身" },
+    { id: 210254, why: "資深公關總監" },
+    { id: 210257, why: "資深媒體關係專員 —— 記者名單與發稿" },
+    { id: 210258, why: "資深危機公關顧問 —— 反面：什麼不該發" },
+    { id: 210267, why: "資深活動公關執行 —— 活動型新聞" },
+    { id: 210181, why: "資深公關行銷顧問" },
+  ],
+  x: [
+    { id: 60022, why: "LINE/Threads 社群文案 —— 台灣實際在用的短文平台" },
+    { id: 224293, why: "內容再製跨平台策略師 —— 把別頁內容改寫到 X" },
+    { id: 30001, why: "AI 成長駭客 CMO" },
+    { id: 230137, why: "內容企劃師｜Twitter/X × FMCG（簡介短，套版族）" },
+    { id: 229684, why: "策略 Twitter/X 內容師（簡介短，套版族）" },
+    { id: 225199, why: "X 廣告成效分析師（旅遊）" },
+    { id: 60021, why: "FB/IG 社群文案 —— 對照組" },
+    { id: 60014, why: "社群行銷 × 餐飲食品 —— 對照組" },
+  ],
+  website: [
+    { id: 222351, why: "轉換率優化專員 × 電商" },
+    { id: 222348, why: "轉換率優化專員 × 保健食品" },
+    { id: 223015, why: "AI SEO 策略師（GEO）× 電商" },
+    { id: 223882, why: "國際 SEO 策略師 × 食品飲料" },
+    { id: 222310, why: "SEO 技術專員 × 電商" },
+    { id: 222309, why: "前端工程師｜Landing Page × 電商官網" },
+    { id: 223955, why: "前端工程師｜Landing Page × 食品飲料" },
+    { id: 223899, why: "Google Ads 廣告投手 × 食品" },
+    { id: 222594, why: "UX 研究員 —— 商品頁與選購流程" },
+    { id: 222681, why: "轉換漏斗優化師" },
+  ],
   // 2026-09-27（CJ「要陸續更改各頁面右下方的顧問人選，從 fb 開始」→「先面試再選」）：
   // Facebook 頁的候選人。四類各挑幾位，讓答案自己說明誰的角度不重疊：
   // 內容策略／Meta 廣告／文案・社群經營・KOL／方法論族對照。繁中人選少，
@@ -81,6 +174,14 @@ const PANELS: Record<string, Array<{ id: number; why: string }>> = {
 };
 
 const QUESTIONS: Record<string, string> = {
+  instagram: `中秋烤肉黃金組合（橫膈牛排＋厚切牛舌，早鳥 8 折）要在 Instagram 上推。Reels、輪播、限時動態，各自該負責什麼？\n\n請照這個順序回答，每段都要具體：\n1. 你的判斷：這一檔在 IG 上最該做對的一件事是什麼？（只講一件）\n2. 你會看哪三個數字來判斷有沒有做對？（講得出是哪個後台或報表的哪個欄位）\n3. 你會做的第一個動作——寫出第一支 Reels 前 3 秒的畫面與字幕，或第一則輪播的第一張文字。\n限 350 字以內，不要開場白，不要客套。產品名稱、產地、價格、日期一律照品牌資料，資料沒有的不要編。`,
+  linkedin: `我們是賣冷凍即食料理的電商品牌。有人建議我用 LinkedIn 開發企業訂單（中秋禮盒、員工福利、尾牙團購）。\n\n請照這個順序回答，每段都要具體：\n1. 你的判斷：這值不值得做？（如果你認為不值得，直接說，並說為什麼）\n2. 你會看哪三個數字來判斷有沒有做對？（講得出是哪個後台或報表的哪個欄位）\n3. 你會做的第一個動作——如果做：寫出第一篇 LinkedIn 貼文的開頭三行，或第一個開發動作的具體做法。\n限 350 字以內，不要開場白，不要客套。產品名稱、產地、價格、日期一律照品牌資料，資料沒有的不要編。`,
+  youtube: `我們目前沒有經營 YouTube。這個品牌適不適合開始做？\n\n請照這個順序回答，每段都要具體：\n1. 你的判斷：適不適合、如果做第一年該做哪一種影片？（只選一種）\n2. 你會看哪三個數字來判斷有沒有做對？（講得出是哪個後台或報表的哪個欄位）\n3. 你會做的第一個動作——寫出第一支影片的標題、縮圖上的字、以及開頭 15 秒的腳本。\n限 350 字以內，不要開場白，不要客套。產品名稱、產地、價格、日期一律照品牌資料，資料沒有的不要編。`,
+  tiktok: `TikTok 在台灣的受眾跟我們（冷凍即食料理、宅配電商）對得上嗎？\n\n請照這個順序回答，每段都要具體：\n1. 你的判斷：要不要做？如果做，這個品牌在 TikTok 上應該是什麼樣子？\n2. 你會看哪三個數字來判斷有沒有做對？（講得出是哪個後台或報表的哪個欄位）\n3. 你會做的第一個動作——寫出第一支短影音前 3 秒的畫面與字幕，以及整支影片的結構（幾秒做什麼）。\n限 350 字以內，不要開場白，不要客套。產品名稱、產地、價格、日期一律照品牌資料，資料沒有的不要編。`,
+  email: `中秋烤肉組合開賣了。我手上有買過的舊客 Email 名單，中秋前想寄電子報。\n\n請照這個順序回答，每段都要具體：\n1. 你的判斷：這封該寄給誰、不該寄給誰？（講得出分眾條件）\n2. 你會看哪三個數字來判斷有沒有做對？（講得出是哪個後台或報表的哪個欄位）\n3. 你會做的第一個動作——寫出這封電子報的主旨、預覽文字、內文開頭三行。\n限 350 字以內，不要開場白，不要客套。產品名稱、產地、價格、日期一律照品牌資料，資料沒有的不要編。`,
+  pr: `中秋烤肉組合要不要發新聞稿？\n\n請照這個順序回答，每段都要具體：\n1. 你的判斷：值不值得發？如果發，媒體會買單的角度是什麼？（不是產品介紹）\n2. 你會看哪三個數字來判斷有沒有做對？（講得出是哪個後台或報表的哪個欄位）\n3. 你會做的第一個動作——寫出新聞稿標題、副標，以及第一段（導言）。\n限 350 字以內，不要開場白，不要客套。產品名稱、產地、價格、日期一律照品牌資料，資料沒有的不要編。`,
+  x: `有人建議品牌經營 X（Twitter）或 Threads。對一個台灣的冷凍即食料理品牌來說——\n\n請照這個順序回答，每段都要具體：\n1. 你的判斷：該不該做？該選 X 還是 Threads？在上面該扮演什麼角色？\n2. 你會看哪三個數字來判斷有沒有做對？（講得出是哪個後台或報表的哪個欄位）\n3. 你會做的第一個動作——寫出第一週的第一則貼文（完整一則）。\n限 350 字以內，不要開場白，不要客套。產品名稱、產地、價格、日期一律照品牌資料，資料沒有的不要編。`,
+  website: `官網上「中秋烤肉黃金組合」這一頁，流量有進來但下單的人很少。\n\n請照這個順序回答，每段都要具體：\n1. 你的判斷：你最先懷疑是哪一個環節出問題？（只講一個）\n2. 你會看哪三個數字來判斷有沒有做對？（講得出是哪個後台或報表的哪個欄位）\n3. 你會做的第一個動作——寫出這一頁第一屏要放的標題、副標與主按鈕文字，或你要改的第一件事的具體做法。\n限 350 字以內，不要開場白，不要客套。產品名稱、產地、價格、日期一律照品牌資料，資料沒有的不要編。`,
   facebook: `中秋前兩週，我要在 Facebook 上推「中秋烤肉黃金組合（橫膈牛排＋厚切牛舌，早鳥 8 折）」。粉專平常按讚留言都不多。接下來兩週，FB 上我該怎麼做才賣得動？
 
 請照這個順序回答，每段都要具體：
@@ -125,13 +226,15 @@ function personaPrompt(a: any, brandBlock: string): string {
 
 async function main() {
   const brandId = Number(process.argv[2] || 2972);   // 預設：懶得煮的Tom老闆
-  const panelName = String(process.argv[3] || "marketing");
-  const CANDIDATES = PANELS[panelName];
-  if (!CANDIDATES) {
-    console.error(`沒有這組名單：${panelName}（可用：${Object.keys(PANELS).join(" / ")}）`);
-    process.exit(1);
+  // 2026-09-27：可以一次面試多組（逗號分隔），每組內 4 位同時答——8 組 70 多位
+  // 一位一位跑要半小時以上，GitHub job 會逾時。
+  const panelNames = String(process.argv[3] || "marketing").split(",").map((x) => x.trim()).filter(Boolean);
+  for (const n of panelNames) {
+    if (!PANELS[n]) {
+      console.error(`沒有這組名單：${n}（可用：${Object.keys(PANELS).join(" / ")}）`);
+      process.exit(1);
+    }
   }
-  console.log(`面試名單：${panelName}（${CANDIDATES.length} 位）`);
   const [brandRows]: any = await localPool.execute(
     `SELECT id, name, userId, industry FROM brands WHERE id = ? LIMIT 1`, [brandId],
   );
@@ -141,38 +244,61 @@ async function main() {
   console.log(`面試題目所用品牌：#${brand.id} ${brand.name}（${brand.industry ?? "未填產業"}）`);
   let brandBlock = "";
   try { brandBlock = (await buildBrandPrefix(brandId, null, null, "full")).trim(); } catch { /* 拿不到就空手面試 */ }
-  try { brandBlock += `\n\n${await buildBrandCatalogBlock(brandId, Number(brand.userId))}`; } catch { /* 同上 */ }
-  console.log(`品牌資料長度：${brandBlock.length} 字`);
-  const question = QUESTIONS[panelName] ?? QUESTION;
-  console.log(`題目：\n${question}`);
-  console.log("=".repeat(78));
+  try { brandBlock += `
 
-  for (const c of CANDIDATES) {
-    const a = await loadAgent(c.id);
-    if (!a) { console.log(`\n#${c.id} —— 這個 agent 不在 mos_db 裡了，跳過`); continue; }
-    const name = a.name_zh || a.name;
-    const title = a.title_zh || a.title;
-    console.log(`\n── #${a.id} ${name}｜${title} ──`);
-    console.log(`   入選理由：${c.why}`);
-    const t0 = Date.now();
-    try {
-      const r = await callModel(
-        [
-          { role: "system" as const, content: personaPrompt(a, brandBlock) },
-          { role: "user" as const, content: question },
-        ],
-        "general",
-      );
-      const text = String(r?.content ?? "").trim();
-      console.log(`   （${((Date.now() - t0) / 1000).toFixed(1)}s，${text.length} 字）`);
-      console.log(text.split(String.fromCharCode(10)).map((l) => `   ${l}`).join(String.fromCharCode(10)));
-    } catch (e: any) {
-      console.log(`   ✗ 這位答不出來（LLM 呼叫失敗）：${String(e?.message ?? e).slice(0, 160)}`);
-    }
+${await buildBrandCatalogBlock(brandId, Number(brand.userId))}`; } catch { /* 同上 */ }
+  console.log(`品牌資料長度：${brandBlock.length} 字`);
+
+  for (const panelName of panelNames) {
+    const candidates = PANELS[panelName]!;
+    const question = QUESTIONS[panelName] ?? QUESTION;
+    console.log(`
+${"#".repeat(78)}
+面試名單：${panelName}（${candidates.length} 位）`);
+    console.log(`題目：
+${question}`);
+    console.log("=".repeat(78));
+    const answers = await mapLimit(candidates, 4, (c) => interviewOne(c, question, brandBlock));
+    for (const a of answers) console.log(a);
   }
 
   await localPool.end();
   process.exit(0);
+}
+
+async function mapLimit<T, R>(items: T[], limit: number, fn: (x: T) => Promise<R>): Promise<R[]> {
+  const out: R[] = new Array(items.length);
+  let next = 0;
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, async () => {
+    while (next < items.length) { const i = next++; out[i] = await fn(items[i]!); }
+  }));
+  return out;
+}
+
+/** 面試一位，回一整段要印的文字（併發時各自組好再依序印，才不會交錯）。 */
+async function interviewOne(c: { id: number; why: string }, question: string, brandBlock: string): Promise<string> {
+  const a = await loadAgent(c.id);
+  if (!a) return `
+#${c.id} —— 這個 agent 不在 mos_db 裡了，跳過`;
+  const name = a.name_zh || a.name;
+  const title = a.title_zh || a.title;
+  const head = [`
+── #${a.id} ${name}｜${title} ──`, `   入選理由：${c.why}`];
+  const t0 = Date.now();
+  try {
+    const r = await callModel(
+      [
+        { role: "system" as const, content: personaPrompt(a, brandBlock) },
+        { role: "user" as const, content: question },
+      ],
+      "general",
+    );
+    const text = String(r?.content ?? "").trim();
+    return [...head, `   （${((Date.now() - t0) / 1000).toFixed(1)}s，${text.length} 字）`,
+      text.split(String.fromCharCode(10)).map((l) => `   ${l}`).join(String.fromCharCode(10))].join(String.fromCharCode(10));
+  } catch (e: any) {
+    return [...head, `   ✗ 這位答不出來（LLM 呼叫失敗）：${String(e?.message ?? e).slice(0, 160)}`].join(String.fromCharCode(10));
+  }
 }
 
 main().catch((e) => { console.error("interview failed:", e); process.exit(1); });
