@@ -35,6 +35,7 @@ import { callModel } from "../../platform/core/multiModelRouter";
 import { loadAgentKnowledge } from "../../platform/core/agentKnowledge";
 import { planQuotaFor } from "../../platform/core/planGate";
 import { getDirectorByAgentId, getRole } from "./strategistDirectory";
+import { buildMeetingSources, sourcesBlock, verifyQuote, type MeetingSource } from "./meetingSources";
 
 export const STRATEGY_MEETINGS_DDL = `
   CREATE TABLE IF NOT EXISTS strategy_meetings (
@@ -120,16 +121,72 @@ export interface StrategyCheck {
   verdict: Verdict;
   proposal: string;
   reason: string;
-  /** 引用的監測證據編號（E1 → 0）。空陣列 = 依據是會中討論。 */
+  /** 引用的監測證據編號（E1 → 0）。 */
   evidence: number[];
+  /**
+   * 引用的品牌資料來源（S 編號，對到 minutes.sources）＋逐字原文（驗證過是來源的子字串，
+   * 否則 null）。evidence 與 cites 都空 = 依據只有會中討論。
+   */
+  cites: Cite[];
   raisedBy: string;
+}
+export interface Cite { code: string; quote: string | null }
+export interface MeetingAction {
+  title: string; owner: string; kind: "content" | "work"; cites: Cite[];
+  /**
+   * 內容類行動對應的任務卡（目錄裡真的存在的 id）。有值時前台「開任務」直接打開這張卡、
+   * 題目帶好（2026-09-26 CJ「按下開任務直接到 facebook 頁面就困惑了，開任務的時候
+   * 可以直接跳出對應的任務卡」）。挑不到就留空，前台誠實說「沒有對應的任務卡」。
+   */
+  taskId?: string; taskLabel?: string; platform?: string;
+}
+
+/** 可以給會議行動挑的通路：整篇可以發的內容通路。 */
+const CONTENT_CHANNELS = ["facebook", "instagram", "linkedin", "youtube", "tiktok", "x", "email", "pr", "website"];
+const PLATFORM_ZH: Record<string, string> = {
+  facebook: "Facebook", instagram: "Instagram", linkedin: "LinkedIn", youtube: "YouTube", tiktok: "TikTok",
+  x: "X", email: "電子報", pr: "新聞稿", website: "官網",
+};
+
+/** 模型挑的卡 → 只收目錄裡真的有的 id（跟 campaignPlan.reconcileItems 同一條紀律）。 */
+export function applyTaskPicks(actions: MeetingAction[], raw: unknown, cards: Array<{ id: string; platform: string; labelZh: string }>): MeetingAction[] {
+  const picks = Array.isArray((raw as any)?.picks) ? (raw as any).picks as any[] : [];
+  return actions.map((a, i) => {
+    if (a.kind !== "content") return a;
+    const pick = picks.find((p) => Number(p?.index) === i);
+    const card = pick ? cards.find((c) => c.id === String(pick.taskId ?? "")) : undefined;
+    if (!card) return a;
+    return { ...a, taskId: card.id, taskLabel: `${PLATFORM_ZH[card.platform] ?? card.platform}・${card.labelZh}`, platform: card.platform };
+  });
+}
+
+async function pickTaskCards(actions: MeetingAction[], brandName: string): Promise<MeetingAction[]> {
+  const content = actions.map((a, i) => ({ a, i })).filter((x) => x.a.kind === "content");
+  if (!content.length) return actions;
+  const { candidateCards } = await import("./campaignPlan");
+  const cards = candidateCards(CONTENT_CHANNELS).map((c) => ({ id: c.id, platform: c.platform, labelZh: c.labelZh }));
+  if (!cards.length) return actions;
+  const prompt = [
+    `品牌「${brandName}」的策略會議決定要做下面幾篇內容。幫每一篇挑一張最適合的任務卡（任務卡決定格式與平台）。`,
+    `【要做的內容】\n${content.map((x) => `${x.i}. ${x.a.title}`).join("\n")}`,
+    `【任務卡目錄（id｜平台｜名稱）】\n${cards.map((c) => `${c.id}｜${PLATFORM_ZH[c.platform] ?? c.platform}｜${c.labelZh}`).join("\n")}`,
+    `規則：taskId 只能從目錄挑、一字不差。內容沒指定平台時，挑最能表現這個題目的格式。只輸出 JSON：{"picks":[{"index":0,"taskId":"…"}]}`,
+  ].join("\n\n");
+  try {
+    const r = await callModel([{ role: "user", content: prompt }], "general");
+    return applyTaskPicks(actions, parseJsonLoose(String(r.content ?? "")), cards);
+  } catch {
+    return actions;
+  }
 }
 export interface MeetingMinutes {
   summary: string;
   remarks: Array<{ name: string; title: string; gist: string }>;
   checks: StrategyCheck[];
   /** kind: content = 可以直接變成一篇內容（前台給「開任務」）；work = 研究／營運工作。 */
-  actions: Array<{ title: string; owner: string; kind: "content" | "work" }>;
+  actions: MeetingAction[];
+  /** 這場會可引用的品牌資料來源（S 編號）——連結到 OnBrand 的哪一頁。 */
+  sources: MeetingSource[];
 }
 export type DecisionStatus = "adopted" | "modified" | "rejected";
 export interface Decision {
@@ -255,7 +312,22 @@ function parseJsonLoose(raw: string): any {
  * 「建議調整」沒有具體 proposal 就降成「維持」；最多 MAX_ADJUSTMENTS 條調整。
  * 清單上的每一格都一定會出現（模型漏掉的補成「維持／本次未討論」）。
  */
-export function parseMinutesJson(raw: string, anchors: Anchor[], evidenceCount: number, attendees: MeetingAttendee[]): MeetingMinutes | null {
+export function parseCites(raw: unknown, sources: MeetingSource[]): Cite[] {
+  const out: Cite[] = [];
+  const seen = new Set<string>();
+  for (const c of Array.isArray(raw) ? raw : []) {
+    const code = String((c && typeof c === "object" ? (c as any).code : c) ?? "").trim().toUpperCase().replace(/[\[\]]/g, "");
+    if (!/^S\d+$/.test(code) || seen.has(code)) continue;
+    const src = sources.find((x) => x.code === code);
+    if (!src) continue;
+    seen.add(code);
+    out.push({ code, quote: verifyQuote(c && typeof c === "object" ? (c as any).quote : null, src) });
+    if (out.length >= 4) break;
+  }
+  return out;
+}
+
+export function parseMinutesJson(raw: string, anchors: Anchor[], evidenceCount: number, attendees: MeetingAttendee[], sources: MeetingSource[] = []): MeetingMinutes | null {
   const obj = parseJsonLoose(raw);
   if (!obj || typeof obj !== "object") return null;
   const str = (v: unknown, n: number) => String(v ?? "").trim().slice(0, n);
@@ -273,8 +345,13 @@ export function parseMinutesJson(raw: string, anchors: Anchor[], evidenceCount: 
       if (adjustCount >= MAX_ADJUSTMENTS) verdict = "keep";
       else adjustCount++;
     }
-    const evidence = (Array.isArray(c?.evidence) ? c.evidence as unknown[] : [])
-      .map((x) => Number(String(x).replace(/^E/i, "")) - 1)
+    // E 編號可能放在 evidence，也可能混在 cites 裡——兩邊都收。
+    const eCodes = [
+      ...(Array.isArray(c?.evidence) ? c.evidence as unknown[] : []),
+      ...(Array.isArray(c?.cites) ? (c.cites as unknown[]).map((x: any) => (x && typeof x === "object" ? x.code : x)) : []),
+    ].map((x) => String(x ?? "").trim()).filter((x) => /^E?\d+$/i.test(x));
+    const evidence = eCodes
+      .map((x) => Number(x.replace(/^E/i, "")) - 1)
       .filter((n) => Number.isInteger(n) && n >= 0 && n < evidenceCount);
     return {
       anchorId: a.id,
@@ -284,6 +361,7 @@ export function parseMinutesJson(raw: string, anchors: Anchor[], evidenceCount: 
       proposal: verdict === "adjust" ? proposal : "",
       reason: str(c?.reason, 600) || (c ? "" : "本次會議未討論這一格"),
       evidence: [...new Set(evidence)].slice(0, 5),
+      cites: parseCites(c?.cites, sources),
       raisedBy: str(c?.raisedBy, 40),
     };
   });
@@ -293,12 +371,12 @@ export function parseMinutesJson(raw: string, anchors: Anchor[], evidenceCount: 
     .filter((r: any) => names.has(r.name) && r.gist)
     .map((r: any) => ({ ...r, title: attendees.find((x) => x.name === r.name)?.title ?? "" }));
   const actions = (Array.isArray(obj.actions) ? obj.actions : [])
-    .map((x: any) => ({ title: str(x?.title, 200), owner: str(x?.owner, 40), kind: x?.kind === "content" ? "content" as const : "work" as const }))
+    .map((x: any) => ({ title: str(x?.title, 200), owner: str(x?.owner, 40), kind: x?.kind === "content" ? "content" as const : "work" as const, cites: parseCites(x?.cites, sources) }))
     .filter((x: any) => x.title.length >= 4)
     .slice(0, 5);
   const summary = str(obj.summary, 800);
   if (!summary) return null;
-  return { summary, remarks, checks, actions };
+  return { summary, remarks, checks, actions, sources };
 }
 
 // ─── 資料存取 ─────────────────────────────────────────────────────────
@@ -476,6 +554,7 @@ export async function runMeeting(meeting: StrategyMeeting, userId: number, trigg
     const { gatherBrandContext } = await import("../routers/strategistChatRouter");
     const brandCtx = await gatherBrandContext(meeting.brandId, userId, meeting.scope === "product" ? meeting.scopeId : null).catch(() => "");
     const ev = await loadEvidence(meeting);
+    const sources = await buildMeetingSources({ userId, brandId: meeting.brandId, scope: meeting.scope, scopeId: meeting.scopeId }).catch(() => [] as MeetingSource[]);
     const prev = await lastConclusion(meeting.id);
 
     const anchorList = anchors.map((a) => `- [${a.id}] ${a.label}：${a.current || "（未填）"}`).join("\n");
@@ -484,7 +563,8 @@ export async function runMeeting(meeting: StrategyMeeting, userId: number, trigg
       meeting.agenda ? `【議程】${meeting.agenda}` : "",
       `【討論對象】${meeting.scope === "product" ? `產品「${scope.scopeName}」（品牌：${scope.brandName}）` : `品牌「${scope.brandName}」`}`,
       `【目前的策略】\n${anchorList}`,
-      ev.lines ? `【近 30 天策略監測情報（可引用編號）】\n${ev.lines}` : `【近 30 天策略監測情報】沒有。不要假裝有市場數據。`,
+      sources.length ? `【品牌資料來源（OnBrand 各頁的實際內容，引用時標 S 編號）】\n${sourcesBlock(sources)}` : "",
+      ev.lines ? `【近 30 天策略監測情報（引用時標 E 編號）】\n${ev.lines}` : `【近 30 天策略監測情報】沒有。不要假裝有市場數據。`,
       prev,
       brandCtx ? `【品牌資料】\n${brandCtx.slice(0, 6000)}` : "",
     ].filter(Boolean).join("\n\n");
@@ -498,7 +578,8 @@ export async function runMeeting(meeting: StrategyMeeting, userId: number, trigg
         knowledge,
         `你正在參加一場策略會議。用你的專業角度發言，200–350 字，繁體中文（台灣用語）。`,
         `要回應前面與會者的觀點（同意就補充，不同意就直說理由），不要重複別人講過的。`,
-        `必須明講：目前策略裡哪一格該維持、哪一格該調整、調成什麼。引用情報時寫出編號（例如 E2）；沒有情報就說是你的判斷。`,
+        `必須明講：目前策略裡哪一格該維持、哪一格該調整、調成什麼。`,
+        `每個主張都要標出處：品牌資料寫 [S編號] 並用「」逐字引用那一頁的原文（例如 [S12]「讓家人眼睛一亮」）；市場情報寫 [E編號]。資料裡沒有的就明說是你的判斷，不要編原文。`,
       ].filter(Boolean).join("\n\n");
       const prior = transcript.length
         ? `\n\n【前面的發言】\n${transcript.map((t) => `${t.name}（${t.title}）：${t.content}`).join("\n\n")}`
@@ -525,19 +606,20 @@ export async function runMeeting(meeting: StrategyMeeting, userId: number, trigg
       `1. checks 必須逐一涵蓋「目前的策略」清單的每個 id（${anchors.map((a) => a.id).join(", ")}），不能新增清單外的 id。`,
       `2. verdict 只能是 keep 或 adjust。只有與會者真的主張要改、而且講得出改成什麼，才標 adjust；最多 ${MAX_ADJUSTMENTS} 條。`,
       `3. adjust 的 proposal 寫具體的新內容（可以直接貼回定位的那段話），reason 寫為什麼。`,
-      `4. evidence 只能填發言中真的引用到的情報編號（例如 ["E1"]）；沒有就填 []。不要自己補。`,
-      `5. raisedBy 填提出這個主張的與會者姓名。remarks 每位一句 gist（60 字內）。actions 是會後要做的事（最多 5 條）：能直接寫成一篇貼文／文章的標 kind:"content"，title 寫成內容題目；研究、訪談、分析、營運修正標 kind:"work"。`,
+      `4. 出處：evidence 填引用到的市場情報編號（例如 ["E1"]）；cites 填引用到的品牌資料來源，格式 [{"code":"S12","quote":"逐字原文"}]——quote 必須是那個來源裡一字不差的片段（發言引用過的優先），找不到原文就只填 code、quote 留空。維持的格子也要標出支撐判斷的來源。沒有就填 []，不要自己補。`,
+      `5. raisedBy 填提出這個主張的與會者姓名。remarks 每位一句 gist（60 字內）。actions 也可以有 cites（同格式）。actions 是會後要做的事（最多 5 條）：能直接寫成一篇貼文／文章的標 kind:"content"，title 寫成內容題目；研究、訪談、分析、營運修正標 kind:"work"。`,
       `6. summary 用 2–3 句講這場會的結論。全部繁體中文（台灣用語）。`,
-      `格式：{"summary":"…","remarks":[{"name":"…","gist":"…"}],"checks":[{"anchorId":"audience","verdict":"keep","proposal":"","reason":"…","evidence":[],"raisedBy":"…"}],"actions":[{"title":"…","owner":"…","kind":"content"}]}`,
+      `格式：{"summary":"…","remarks":[{"name":"…","gist":"…"}],"checks":[{"anchorId":"audience","verdict":"keep","proposal":"","reason":"…","evidence":[],"cites":[{"code":"S3","quote":"…"}],"raisedBy":"…"}],"actions":[{"title":"…","owner":"…","kind":"content","cites":[]}]}`,
     ].join("\n\n");
     let minutes: MeetingMinutes | null = null;
     for (let attempt = 0; attempt < 2 && !minutes; attempt++) {
       try {
         const r = await callModel([{ role: "user", content: synthPrompt }], "general");
-        minutes = parseMinutesJson(String(r.content ?? ""), anchors, ev.items.length, transcript.map((t) => ({ agentId: 0, name: t.name, title: t.title })));
+        minutes = parseMinutesJson(String(r.content ?? ""), anchors, ev.items.length, transcript.map((t) => ({ agentId: 0, name: t.name, title: t.title })), sources);
       } catch { minutes = null; }
     }
     if (!minutes) return await fail("minutes_error：會議紀錄整理失敗（發言已保留）", transcript);
+    minutes.actions = await pickTaskCards(minutes.actions, scope.brandName);
 
     const adj = minutes.checks.filter((c) => c.verdict === "adjust").length;
     const note = adj ? `建議調整 ${adj} 項` : "策略維持，沒有需要調整的地方";

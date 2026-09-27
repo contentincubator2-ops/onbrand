@@ -6,7 +6,7 @@
  * 用戶打開紀錄最想知道的是要不要動策略，逐字發言放最後、預設收合。
  */
 import { useState } from "react";
-import type { Decision, DecisionStatus, MeetingMinutes, MeetingRun } from "./meetingModel";
+import type { Cite, Decision, DecisionStatus, MeetingAction, MeetingMinutes, MeetingRun, MeetingSource } from "./meetingModel";
 import { decisionLabel, isWritableAnchor } from "./meetingModel";
 
 interface Props {
@@ -24,7 +24,47 @@ interface Props {
   /** 採用／修改後採用：打開確認視窗（預覽寫入內容與影響）。 */
   onAdopt?: (anchorId: string, label: string, status: "adopted" | "modified", text: string) => void;
   onEditPositioning?: () => void;
-  onOpenTask?: (title: string) => void;
+  /** 開這個行動對應的任務卡（有 taskId 才會出現按鈕）。 */
+  onOpenTask?: (action: MeetingAction) => void;
+  /** 跳到出處那一頁。 */
+  onOpenSource?: (href: string) => void;
+}
+
+/**
+ * 出處清單：品牌資料（S，連到 OnBrand 那一頁、附逐字原文）＋市場情報（E）。
+ * 2026-09-26（CJ「指出的問題，我希望都可以引用到該頁面的證據」）。
+ */
+function Sources({ cites, evidenceIdx, sources, evidence, en, onOpenSource }: {
+  cites: Cite[]; evidenceIdx: number[]; sources: MeetingSource[]; evidence: MeetingRun["evidence"]; en: boolean;
+  onOpenSource?: (href: string) => void;
+}) {
+  const s = cites.map((c) => ({ c, src: sources.find((x) => x.code === c.code) })).filter((x) => x.src);
+  const e = evidenceIdx.map((i) => ({ i, ev: evidence[i] })).filter((x) => x.ev);
+  if (!s.length && !e.length) {
+    return <span className="text-neutral-500">{en ? "Discussion only — no page or market evidence cited" : "會中討論（沒有引用到頁面資料或市場情報）"}</span>;
+  }
+  return (
+    <div className="space-y-1">
+      {s.map(({ c, src }) => (
+        <div key={c.code} className="text-[12.5px] leading-relaxed">
+          <span className="font-mono text-neutral-400">{c.code}</span>{" "}
+          <span className="text-neutral-700">{src!.label}</span>
+          {c.quote && <span className="text-neutral-900">　「{c.quote}」</span>}
+          {src!.href && onOpenSource && (
+            <button type="button" onClick={() => onOpenSource(src!.href)}
+              className="ml-1.5 text-[12px] text-neutral-400 underline hover:text-neutral-900">{en ? "open page →" : "到這一頁 →"}</button>
+          )}
+        </div>
+      ))}
+      {e.map(({ i, ev }) => (
+        <div key={`E${i}`} className="text-[12.5px] leading-relaxed">
+          <span className="font-mono text-neutral-400">E{i + 1}</span>{" "}
+          {ev!.url ? <a href={ev!.url} target="_blank" rel="noreferrer" className="underline decoration-neutral-300 hover:decoration-neutral-900">{ev!.title}</a> : ev!.title}
+          {ev!.date && <span className="ml-1.5 font-mono text-neutral-400">{ev!.date}</span>}
+        </div>
+      ))}
+    </div>
+  );
 }
 
 const pill = "rounded-full border px-2.5 py-0.5 text-[11.5px] font-medium transition";
@@ -44,8 +84,9 @@ function Clamp({ text, en, max = 90 }: { text: string; en: boolean; max?: number
 }
 
 export default function MeetingMinutesView({
-  minutes, evidence, decisions, transcript, en, readOnly, busy, scope = "brand", onDecide, onAdopt, onEditPositioning, onOpenTask,
+  minutes, evidence, decisions, transcript, en, readOnly, busy, scope = "brand", onDecide, onAdopt, onEditPositioning, onOpenTask, onOpenSource,
 }: Props) {
+  const sources = minutes.sources ?? [];
   const [noteFor, setNoteFor] = useState<string | null>(null);
   const [noteDraft, setNoteDraft] = useState("");
   const [showTranscript, setShowTranscript] = useState(false);
@@ -92,19 +133,7 @@ export default function MeetingMinutesView({
                   <dd className="text-neutral-700">{c.reason}</dd>
                   <dt className="text-neutral-400">{en ? "Basis" : "依據"}</dt>
                   <dd className="text-neutral-700">
-                    {c.evidence.length === 0
-                      ? <span className="text-neutral-500">{en ? "Discussion only (no monitoring evidence)" : "會中討論（沒有監測情報佐證）"}</span>
-                      : c.evidence.map((i) => {
-                        const e = evidence[i];
-                        if (!e) return null;
-                        return (
-                          <div key={i} className="text-[12.5px]">
-                            <span className="font-mono text-neutral-400">E{i + 1}</span>{" "}
-                            {e.url ? <a href={e.url} target="_blank" rel="noreferrer" className="underline decoration-neutral-300 hover:decoration-neutral-900">{e.title}</a> : e.title}
-                            {e.date && <span className="ml-1.5 font-mono text-neutral-400">{e.date}</span>}
-                          </div>
-                        );
-                      })}
+                    <Sources cites={c.cites ?? []} evidenceIdx={c.evidence} sources={sources} evidence={evidence} en={en} onOpenSource={readOnly ? undefined : onOpenSource} />
                   </dd>
                 </dl>
 
@@ -173,10 +202,15 @@ export default function MeetingMinutesView({
           {keep.length > 0 && (
             <div className="rounded-xl border border-neutral-200 bg-white px-4 py-3">
               {keep.map((c) => (
-                <div key={c.anchorId} className="flex gap-3 border-b border-neutral-100 py-1.5 text-[13px] last:border-0">
+                <div key={c.anchorId} className="flex gap-3 border-b border-neutral-100 py-2 text-[13px] last:border-0">
                   <span className="w-[88px] shrink-0 font-medium text-neutral-900">{c.label}</span>
                   <span className="w-[40px] shrink-0 text-neutral-400">{en ? "Keep" : "維持"}</span>
-                  <span className="text-neutral-600">{c.reason}</span>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-neutral-600">{c.reason}</p>
+                    {((c.cites ?? []).length > 0 || c.evidence.length > 0) && (
+                      <div className="mt-1"><Sources cites={c.cites ?? []} evidenceIdx={c.evidence} sources={sources} evidence={evidence} en={en} onOpenSource={readOnly ? undefined : onOpenSource} /></div>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
@@ -223,14 +257,22 @@ export default function MeetingMinutesView({
           <h4 className="mb-2 text-[12px] font-semibold uppercase tracking-widest text-neutral-400">{en ? "Next steps" : "會後要做的事"}</h4>
           <div className="space-y-1.5">
             {minutes.actions.map((a, i) => (
-              <div key={i} className="flex items-center gap-3 rounded-lg border border-neutral-200 bg-white px-3.5 py-2 text-[13px]">
-                <span className="flex-1 text-neutral-900">{a.title}</span>
-                {a.owner && <span className="text-[12px] text-neutral-400">{a.owner}</span>}
-                {a.kind === "content" && (
-                  <button type="button" disabled={readOnly} onClick={() => onOpenTask?.(a.title)}
-                    className={`${pill} border-neutral-300 text-neutral-700 enabled:hover:border-neutral-900 disabled:opacity-50`}>
-                    {en ? "Open a task" : "開任務"}
-                  </button>
+              <div key={i} className="rounded-lg border border-neutral-200 bg-white px-3.5 py-2 text-[13px]">
+                <div className="flex flex-wrap items-center gap-3">
+                  <span className="min-w-0 flex-1 text-neutral-900">{a.title}</span>
+                  {a.owner && <span className="text-[12px] text-neutral-400">{a.owner}</span>}
+                  {a.kind === "content" && (a.taskLabel ? (
+                    <button type="button" disabled={readOnly || !a.taskId} onClick={() => onOpenTask?.(a)}
+                      title={en ? "Opens this task card with the topic filled in" : "直接打開這張任務卡，題目已帶好，可以改"}
+                      className={`${pill} border-neutral-900 text-neutral-900 enabled:hover:bg-neutral-900 enabled:hover:text-white disabled:opacity-60`}>
+                      {en ? `Open card: ${a.taskLabel}` : `開任務卡：${a.taskLabel}`}
+                    </button>
+                  ) : (
+                    <span className="text-[12px] text-neutral-400">{en ? "No matching task card" : "沒有對應的任務卡"}</span>
+                  ))}
+                </div>
+                {(a.cites ?? []).length > 0 && (
+                  <div className="mt-1"><Sources cites={a.cites ?? []} evidenceIdx={[]} sources={sources} evidence={evidence} en={en} onOpenSource={readOnly ? undefined : onOpenSource} /></div>
                 )}
               </div>
             ))}

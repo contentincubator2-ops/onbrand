@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   MAX_ADJUSTMENTS, anchorsFromPositioning, computeNextRunAt, flattenSegment, parseMinutesJson,
-  pendingDecisionCount, rowToRun,
+  pendingDecisionCount, rowToRun, applyTaskPicks,
 } from "./strategyMeetings";
 import { strategyMeetingRouter } from "../routers/strategyMeetingRouter";
 
@@ -126,5 +126,40 @@ describe("strategyMeetingRouter", () => {
     const names = Object.keys((strategyMeetingRouter as any)._def.procedures).sort();
     expect(names).toEqual(["adopt", "create", "decide", "getRun", "list", "previewAdopt", "remove", "runNow", "runs", "update"]);
     for (const n of names) expect(Object.getOwnPropertyNames(Function.prototype)).not.toContain(n);
+  });
+});
+
+describe("出處（S 編號）與任務卡", () => {
+  const sources = [
+    { code: "S1", label: "品牌定位・品牌語氣", href: "/brands/edit?cat=positioning&b=1", text: "輕鬆自嘲／直白有溫度／不過度推銷" },
+    { code: "S2", label: "產品「雪花牛排」", href: "/brands/edit?cat=positioning&b=1&p=9", text: "售價：NT$560｜Slogan：讓家人眼睛一亮的儀式感" },
+  ];
+  const anchors = anchorsFromPositioning("brand", {});
+  const people = [{ agentId: 1, name: "張雅琪", title: "品牌策略師" }];
+
+  it("S 引用：來源要存在；quote 必須是來源原文的子字串，不是就丟掉 quote", () => {
+    const raw = JSON.stringify({
+      summary: "s",
+      checks: [{ anchorId: "voice", verdict: "adjust", proposal: "產品頁語氣拉回自嘲", reason: "r",
+        cites: [{ code: "S2", quote: "讓家人眼睛一亮" }, { code: "S1", quote: "頂級尊榮" }, { code: "S9", quote: "x" }, { code: "E1" }] }],
+    });
+    const m = parseMinutesJson(raw, anchors, 1, people, sources)!;
+    const voice = m.checks.find((c) => c.anchorId === "voice")!;
+    expect(voice.cites).toEqual([{ code: "S2", quote: "讓家人眼睛一亮" }, { code: "S1", quote: null }]);
+    expect(voice.evidence).toEqual([0]);
+    expect(m.sources).toBe(sources);
+  });
+
+  it("任務卡：只收目錄裡有的 id，只給內容類行動", () => {
+    const cards = [{ id: "fb-story-post", platform: "facebook", labelZh: "品牌故事貼文" }];
+    const actions = [
+      { title: "開學季題材", owner: "a", kind: "content" as const, cites: [] },
+      { title: "排訪談", owner: "b", kind: "work" as const, cites: [] },
+      { title: "不存在的卡", owner: "c", kind: "content" as const, cites: [] },
+    ];
+    const out = applyTaskPicks(actions, { picks: [{ index: 0, taskId: "fb-story-post" }, { index: 1, taskId: "fb-story-post" }, { index: 2, taskId: "nope" }] }, cards);
+    expect(out[0]).toMatchObject({ taskId: "fb-story-post", taskLabel: "Facebook・品牌故事貼文", platform: "facebook" });
+    expect(out[1]!.taskId).toBeUndefined();
+    expect(out[2]!.taskId).toBeUndefined();
   });
 });

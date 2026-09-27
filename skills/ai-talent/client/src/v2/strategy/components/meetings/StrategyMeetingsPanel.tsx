@@ -19,10 +19,11 @@ import { useLang } from "../../../../lib/i18n";
 import { showToastGlobal } from "../../../../components/ui/Toast";
 import type { StrategistDirector } from "../../lib/strategistDirectors";
 import MeetingMinutesView from "./MeetingMinutesView";
+import { channelRoute } from "../../../content/lib/channelMeta";
 import AdoptConfirmDialog, { type AdoptRequest } from "./AdoptConfirmDialog";
 import {
   EXAMPLE_MEETING, EXAMPLE_RUN, TOPIC_TEMPLATES, fmtDate, frequencyText, pendingCount, runNoteText,
-  type DecisionStatus, type MeetingAttendee, type MeetingFrequency, type MeetingRow, type MeetingRun,
+  type DecisionStatus, type MeetingAction, type MeetingAttendee, type MeetingFrequency, type MeetingRow, type MeetingRun,
 } from "./meetingModel";
 
 interface ListData {
@@ -103,7 +104,15 @@ export default function StrategyMeetingsPanel({ brandId }: { brandId: number }) 
       <MinutesTimeline
         meeting={m} brandId={brandId} en={en}
         onBack={() => { refetchAll(); setView({ kind: "list" }); }}
-        onOpenTask={(title) => navigate(`/tasks/fb?topic=${encodeURIComponent(title)}&b=${brandId}`)}
+        // 2026-09-26（CJ「按下開任務直接到 facebook 頁面就困惑了」）：用 PlatformTaskPage
+        // 既有的 ?task= 直接打開對應那張卡、?topic= 把題目帶進去——落地就是卡片視窗，
+        // 不是一整頁要自己找卡。
+        onOpenTask={(a) => {
+          if (!a.taskId) return;
+          const sp = new URLSearchParams({ task: a.taskId, topic: a.title, b: String(brandId) });
+          navigate(`/tasks/${channelRoute(a.platform ?? "facebook")}?${sp.toString()}`);
+        }}
+        onOpenSource={(href) => navigate(href)}
         onEditPositioning={() => navigate(m.scope === "product"
           ? `/brands/edit?cat=positioning&b=${brandId}&p=${m.scopeId}`
           : `/brands/edit?cat=positioning&b=${brandId}`)}
@@ -482,9 +491,9 @@ function MeetingForm({ brandId, en, initial, products, maxAttendees, onCancel, o
 
 // ─── 會議紀錄時間軸 ─────────────────────────────────────────────────────
 
-function MinutesTimeline({ meeting, brandId, en, onBack, onOpenTask, onEditPositioning }: {
+function MinutesTimeline({ meeting, brandId, en, onBack, onOpenTask, onOpenSource, onEditPositioning }: {
   meeting: MeetingRow; brandId: number; en: boolean;
-  onBack: () => void; onOpenTask: (title: string) => void; onEditPositioning: () => void;
+  onBack: () => void; onOpenTask: (a: MeetingAction) => void; onOpenSource: (href: string) => void; onEditPositioning: () => void;
 }) {
   const T = trpc as any;
   const runsQ = T.strategyMeeting?.runs?.useQuery?.({ meetingId: meeting.id }, { staleTime: 5_000 }) ?? { data: null, isLoading: false };
@@ -585,7 +594,7 @@ function MinutesTimeline({ meeting, brandId, en, onBack, onOpenTask, onEditPosit
                 <MeetingMinutesView
                   minutes={current.minutes} evidence={current.evidence} decisions={current.decisions}
                   transcript={current.transcript} en={en} busy={decide?.isPending} scope={meeting.scope}
-                  onDecide={onDecide} onEditPositioning={onEditPositioning} onOpenTask={onOpenTask}
+                  onDecide={onDecide} onEditPositioning={onEditPositioning} onOpenTask={onOpenTask} onOpenSource={onOpenSource}
                   onAdopt={(anchorId, label, status, text) => setAdoptReq({ runId: current.id, anchorId, label, status, text })}
                 />
               </>

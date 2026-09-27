@@ -12,16 +12,30 @@ export type DecisionStatus = "adopted" | "modified" | "rejected";
 
 export interface MeetingAttendee { agentId: number; name: string; title: string }
 
+export interface Cite { code: string; quote: string | null }
+export interface MeetingSource { code: string; label: string; href: string; text: string }
 export interface StrategyCheck {
   anchorId: string; label: string; current: string; verdict: Verdict;
-  proposal: string; reason: string; evidence: number[]; raisedBy: string;
+  proposal: string; reason: string; evidence: number[];
+  /** 品牌資料出處（S 編號）；舊紀錄沒有這個欄位。 */
+  cites?: Cite[];
+  raisedBy: string;
+}
+export interface MeetingAction {
+  title: string; owner: string;
+  /** content = 可以直接寫成一篇內容；work = 研究／營運工作。舊紀錄沒有 kind，視為 work。 */
+  kind?: "content" | "work";
+  cites?: Cite[];
+  /** 對應的任務卡——「開任務」直接打開這張卡、題目帶好。 */
+  taskId?: string; taskLabel?: string; platform?: string;
 }
 export interface MeetingMinutes {
   summary: string;
   remarks: Array<{ name: string; title: string; gist: string }>;
   checks: StrategyCheck[];
-  /** content = 可以直接寫成一篇內容；work = 研究／營運工作（沒有「開任務」）。舊紀錄沒有 kind，視為 work。 */
-  actions: Array<{ title: string; owner: string; kind?: "content" | "work" }>;
+  actions: MeetingAction[];
+  /** 這場會可引用的品牌資料來源（S 編號）；舊紀錄沒有。 */
+  sources?: MeetingSource[];
 }
 export interface Decision {
   status: DecisionStatus; note: string; at: string;
@@ -134,6 +148,11 @@ export const EXAMPLE_RUN: { date: string; minutes: MeetingMinutes; evidence: Mee
     { title: "主要競品推出 199 元入門組合", source: "策略監測", date: "2026-08-22" },
   ],
   minutes: {
+    sources: [
+      { code: "S1", label: "品牌定位・目標受眾", href: "", text: "25–35 歲、喜歡手帳的上班族女性，重視日常小確幸" },
+      { code: "S2", label: "品牌定位・差異化", href: "", text: "顏色是心情的工具——每一支筆都有一個心情名字" },
+      { code: "S3", label: "產品「開學季筆記組」", href: "", text: "售價：NT$390｜Slogan：第一本手帳就上手｜主客群：尚未填寫" },
+    ],
     summary: "受眾建議往大學生延伸（開學季聲量是證據）；差異化與標語維持。競品的入門組合先觀察，不跟著降價。",
     remarks: [
       { name: "品牌定位總監", title: "負責受眾與差異化", gist: "受眾可以往大學生延伸，但差異化「顏色是心情的工具」不要動。" },
@@ -143,16 +162,16 @@ export const EXAMPLE_RUN: { date: string; minutes: MeetingMinutes; evidence: Mee
     checks: [
       { anchorId: "audience", label: "目標受眾", current: "25–35 歲、喜歡手帳的上班族女性", verdict: "adjust",
         proposal: "25–35 歲手帳上班族為主，延伸 18–22 歲重視筆記美感的大學生", reason: "開學季大學生聲量明顯上升，而且他們在意的正是我們的強項。",
-        evidence: [0], raisedBy: "品牌定位總監" },
+        evidence: [0], cites: [{ code: "S1", quote: "喜歡手帳的上班族女性" }, { code: "S3", quote: "主客群：尚未填寫" }], raisedBy: "品牌定位總監" },
       { anchorId: "competition", label: "競爭格局", current: "大型文具連鎖、日系進口品牌", verdict: "keep",
         proposal: "", reason: "競品降價是短期促銷，格局沒有改變。", evidence: [1], raisedBy: "定價與價值顧問" },
       { anchorId: "differentiation", label: "差異化", current: "顏色是心情的工具", verdict: "keep",
-        proposal: "", reason: "大學生的需求正好落在這個差異化上，不需要改。", evidence: [], raisedBy: "消費者行為顧問" },
+        proposal: "", reason: "大學生的需求正好落在這個差異化上，不需要改。", evidence: [], cites: [{ code: "S2", quote: "顏色是心情的工具" }], raisedBy: "消費者行為顧問" },
       { anchorId: "tagline", label: "品牌標語", current: "每天多一點顏色", verdict: "keep",
         proposal: "", reason: "本次會議未討論這一格", evidence: [], raisedBy: "" },
     ],
     actions: [
-      { title: "開學季・筆記配色：大學生的第一本手帳怎麼挑", owner: "消費者行為顧問", kind: "content" },
+      { title: "開學季・筆記配色：大學生的第一本手帳怎麼挑", owner: "消費者行為顧問", kind: "content", taskLabel: "Instagram・輪播貼文" },
       { title: "下次會議追蹤競品 199 元組合的銷售反應", owner: "定價與價值顧問", kind: "work" },
     ],
   },
