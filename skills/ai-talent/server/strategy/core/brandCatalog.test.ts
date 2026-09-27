@@ -50,7 +50,8 @@ describe("buildBrandCatalogBlock", () => {
     const out = await buildBrandCatalogBlock(1, 1);
     expect(out).toContain("【產品列表】共 1 個");
     expect(out).toContain("晨光筆記本");
-    expect(out).toContain("產品 id 11");
+    // 2026-09-27：內部編號不進 prompt（顧問會原樣講給用戶聽）。
+    expect(out).not.toMatch(/產品 id|id \d/);
     expect(out).toContain("Slogan：晨光筆記本的標語");
     expect(out).toContain("核心定位：晨光筆記本的核心定位敘述");
   });
@@ -94,8 +95,9 @@ describe("buildBrandCatalogBlock", () => {
       { id: 22, name: "沒排期活動", startAt: null, endAt: null, positioning: null },
     ];
     const out = await buildBrandCatalogBlock(1, 1);
-    expect(out).toContain("週年慶（活動 id 21，2026-10-01 ~ 2026-10-31）");
-    expect(out).toContain("沒排期活動（活動 id 22，未設定期間）");
+    expect(out).toContain("週年慶（2026-10-01 ~ 2026-10-31）");
+    expect(out).toContain("沒排期活動（未設定期間）");
+    expect(out).not.toContain("活動 id");
     expect(out).not.toContain("Invalid Date");
   });
 

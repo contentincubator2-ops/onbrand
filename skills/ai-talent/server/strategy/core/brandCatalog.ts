@@ -80,7 +80,9 @@ export function productLine(idx: number, row: any): string {
   const url = pos ? pickAny(pos, ["facts.url", "productUrl", "url"], 120) : null;
   const usp = pos ? pickAny(pos, ["usp", "competition.uniqueUsp", "core.oneLineValueProp"], 120) : null;
   const audience = pos ? pickAny(pos, ["audience.primary", "targetAudience"], 120) : null;
-  const bits = [`${idx}. ${row.name ?? "(未命名)"}（產品 id ${row.id}）`];
+  // 2026-09-27（通路顧問實測）：原本每行帶「（產品 id 263）」，電子報顧問就把「id 256、263」
+  // 原樣講給用戶聽。沒有任何功能會從回答裡解析這個編號，所以不再放進 prompt。
+  const bits = [`${idx}. ${row.name ?? "(未命名)"}`];
   if (price) bits.push(`售價：${price}`);
   // 2026-09-25（CJ「增加價格/規格／重量／份數 還有網址」）：顧客第一個問的是
   // 「幾克、幾份」，定價與 CP 值的討論沒有這兩個數字就只能反問。
@@ -110,7 +112,7 @@ function eventLine(idx: number, row: any): string {
   const from = fmtDate(row.startAt);
   const to = fmtDate(row.endAt);
   const period = from || to ? `${from ?? "?"} ~ ${to ?? "?"}` : "未設定期間";
-  const bits = [`${idx}. ${row.name ?? "(未命名)"}（活動 id ${row.id}，${period}）`];
+  const bits = [`${idx}. ${row.name ?? "(未命名)"}（${period}）`];
   if (core) bits.push(`核心：${core}`);
   return bits.join("｜");
 }
