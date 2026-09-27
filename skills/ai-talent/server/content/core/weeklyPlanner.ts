@@ -156,7 +156,7 @@ export function validateOps(args: {
 }
 
 /** 模型回覆：{"reply","choices","ops"}；解析失敗回 null。 */
-export function parsePlannerReply(raw: string): { reply: string; choices: string[]; ops: unknown[] } | null {
+export function parsePlannerReply(raw: string): { reply: string; choices: string[]; ops: unknown[]; fork: string | null } | null {
   const cleaned = String(raw ?? "").replace(/^```(?:json)?\s*/i, "").replace(/\s*```\s*$/i, "").trim();
   let obj: any = null;
   try { obj = JSON.parse(cleaned); } catch {
@@ -167,7 +167,8 @@ export function parsePlannerReply(raw: string): { reply: string; choices: string
   const reply = str(obj.reply, 300);
   if (!reply) return null;
   const choices = (Array.isArray(obj.choices) ? obj.choices : []).map((c: unknown) => str(c, 24)).filter((c: string) => c.length >= 2).slice(0, 3);
-  return { reply, choices, ops: Array.isArray(obj.ops) ? obj.ops : [] };
+  const fork = typeof obj.fork === "string" && obj.fork.trim() ? obj.fork.trim() : null;
+  return { reply, choices, ops: Array.isArray(obj.ops) ? obj.ops : [], fork };
 }
 
 // ─── 資料存取 ─────────────────────────────────────────────────────────
@@ -274,10 +275,13 @@ export async function applyOps(args: { userId: number; brandId: number; ops: Op[
 
 // ─── 提示詞 ───────────────────────────────────────────────────────────
 
-export function plannerSystemPrompt(args: {
+export interface PlannerCtxArgs {
   brandName: string; brandCtx: string; weekStart: string; platforms: string[]; cards: Card[];
   slots: SlotRow[]; campaign: CampaignSlot[]; scheduled: Array<{ date: string; platform: string; title: string }>;
-}): string {
+}
+
+/** 總監與分歧顧問共用：這一週的資料＋排法規則。 */
+export function plannerContext(args: PlannerCtxArgs): string {
   const days = weekDays(args.weekStart);
   const cardList = args.cards.map((c) => `${c.id}｜${PLATFORM_ZH[c.platform] ?? c.platform}｜${c.labelZh}`).join("\n");
   const slotList = args.slots.length
@@ -290,24 +294,36 @@ export function plannerSystemPrompt(args: {
     ? args.scheduled.map((s) => `${s.date}｜${PLATFORM_ZH[s.platform] ?? s.platform}｜${s.title}`).join("\n")
     : "（這週沒有）";
   return [
+    `【品牌】${args.brandName}`,
+    `【這一週】${days.map((d) => `${d.date}（${d.label}）`).join("、")}`,
+    `【品牌加入的通路】${args.platforms.map((p) => `${p}（${PLATFORM_ZH[p] ?? p}）`).join("、")}——只能排在這些通路。`,
+    `【這週已經有的內容，不要重複排】\n已排程／已發布：\n${schedList}\n活動企劃：\n${campList}`,
+    `【已排的格子（可以改的是草稿與已排定）】\n${slotList}`,
+    `【任務卡目錄（id｜通路｜名稱）——每一格要挑一張，id 一字不差】\n${cardList}`,
+    args.brandCtx ? `【品牌資料】\n${args.brandCtx.slice(0, 7000)}` : "",
+    ``,
+    `排法規則：`,
+    `- 產品名稱、產地、價格、活動起訖日照品牌資料寫，資料沒有的不要編；活動截止日寫確切日期，不要寫「節日前」。活動在這週之前就已經開始的，不要寫「開搶」「今天開始」這類開賣字眼。`,
+    `- topic 是一句能直接寫成貼文的題目（20 字內），format 是形式（貼文、輪播、Reels、限時動態…），reason 一句話說為什麼排這篇。`,
+  ].filter(Boolean).join("\n");
+}
+
+export function plannerSystemPrompt(args: PlannerCtxArgs): string {
+  return [
     `你是「${args.brandName}」的內容總監，負責跟使用者一起排這一週的內容。使用者是內容企劃或小公司老闆，沒時間讀長文。`,
     `說話規則：reply 最多兩句、口語、直接。改了什麼不用逐條描述（右邊的行事曆會亮起來）。`,
     `需要使用者做決定時，不要用長問句，把選項放進 choices（最多 3 個、每個 12 字內），例如「三篇風格一致」「風格差異大」。`,
     `你會從品牌一致性的角度帶使用者思考：題目、語氣要不要統一，活動與日常怎麼分配。但只在關鍵處提醒，不要每次都講。`,
     ``,
-    `【這一週】${days.map((d) => `${d.date}（${d.label}）`).join("、")}`,
-    `【品牌加入的通路】${args.platforms.map((p) => `${p}（${PLATFORM_ZH[p] ?? p}）`).join("、")}——只能排在這些通路。`,
-    `【這週已經有的內容，不要重複排】\n已排程／已發布：\n${schedList}\n活動企劃：\n${campList}`,
-    `【你排的格子（可以改的是草稿與已排定）】\n${slotList}`,
-    `【任務卡目錄（id｜通路｜名稱）——每一格要挑一張，id 一字不差】\n${cardList}`,
-    args.brandCtx ? `【品牌資料】\n${args.brandCtx.slice(0, 7000)}` : "",
+    plannerContext(args),
     ``,
-    `規則：`,
-    `1. 產品名稱、產地、價格、活動起訖日照品牌資料寫，資料沒有的不要編；活動截止日寫確切日期，不要寫「節日前」。活動在這週之前就已經開始的，不要寫「開搶」「今天開始」這類開賣字眼。`,
-    `2. 使用者只是打招呼或還沒說要推什麼，就先用 choices 問一個最關鍵的決定，不要自己亂排。`,
-    `3. 一週不要排超過使用者要的篇數；沒指定就 4–6 篇，留白比塞滿好。`,
-    `4. topic 是一句能直接寫成貼文的題目（20 字內），format 是形式（貼文、輪播、Reels、限時動態…），reason 一句話說為什麼排這篇。`,
-    `5. 只輸出 JSON，不要前言：`,
-    `{"reply":"…","choices":["…"],"ops":[{"op":"add","date":"YYYY-MM-DD","platform":"facebook","taskId":"…","topic":"…","format":"…","reason":"…"},{"op":"update","id":12,"topic":"…"},{"op":"remove","id":12}]}`,
-  ].filter(Boolean).join("\n");
+    `對話規則：`,
+    `1. 使用者只是打招呼或還沒說要推什麼，就先用 choices 問一個最關鍵的決定，不要自己亂排。`,
+    `2. 一週不要排超過使用者要的篇數；沒指定就 4–6 篇，留白比塞滿好。`,
+    `3. 分歧：這週有兩條都合理、但會讓一週長得很不一樣的路，而且使用者還沒表態時，不要自己選——填 fork，請兩位立場相反的顧問各排一版。`
+      + `fork 只能是 consistency（一致調性 vs 每篇換打法）、conversion（衝單 vs 養品牌）、volume（天天出現 vs 少而精）、voice（顧客說 vs 老闆說）其中一個。`
+      + `用 fork 時 ops 與 choices 留空，reply 一句話交代「這題有兩種走法，請兩位顧問各排一版」。使用者已經選了方向、只是要改一兩格、或要求你直接排，就不要用 fork。`,
+    `4. 只輸出 JSON，不要前言：`,
+    `{"reply":"…","choices":["…"],"fork":null,"ops":[{"op":"add","date":"YYYY-MM-DD","platform":"facebook","taskId":"…","topic":"…","format":"…","reason":"…"},{"op":"update","id":12,"topic":"…"},{"op":"remove","id":12}]}`,
+  ].join("\n");
 }

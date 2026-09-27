@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { addDays, mondayOf, parsePlannerReply, validateOps, weekDays, type SlotRow } from "./weeklyPlanner";
+import { FORK_AXES, PLANNER_AXES, isForkAxis, topicOverlap } from "./plannerAdvisors";
 import { plannerRouter } from "../routers/plannerRouter";
 
 describe("日期", () => {
@@ -60,7 +61,26 @@ describe("parsePlannerReply", () => {
 describe("plannerRouter", () => {
   it("procedure 名稱沒撞 tRPC 保留字", () => {
     const names = Object.keys((plannerRouter as any)._def.procedures).sort();
-    expect(names).toEqual(["commit", "markWritten", "removeSlot", "send", "week"]);
+    expect(names).toEqual(["commit", "markWritten", "pickFork", "removeSlot", "send", "week"]);
     for (const n of names) expect(Object.getOwnPropertyNames(Function.prototype)).not.toContain(n);
+  });
+});
+
+describe("分歧方案卡", () => {
+  it("八位顧問全部不同人，每一對立場不同", () => {
+    const slugs = FORK_AXES.flatMap((a) => PLANNER_AXES[a].sides.map((s) => s.slug));
+    expect(slugs).toHaveLength(8);
+    expect(new Set(slugs).size).toBe(8);
+    for (const a of FORK_AXES) expect(PLANNER_AXES[a].sides[0].stance).not.toBe(PLANNER_AXES[a].sides[1].stance);
+  });
+  it("總監回覆帶 fork；不認得的 fork 不算", () => {
+    expect(parsePlannerReply('{"reply":"這題有兩種走法","fork":"conversion","ops":[]}')?.fork).toBe("conversion");
+    expect(isForkAxis("conversion")).toBe(true);
+    expect(isForkAxis("whatever")).toBe(false);
+  });
+  it("題目重疊度：一樣的高、不同的低", () => {
+    const a = ["中秋烤肉就靠橫膈牛排撐場面", "8折早鳥10/16截止"];
+    expect(topicOverlap(a, a)).toBeGreaterThan(0.9);
+    expect(topicOverlap(a, ["顧客開箱：牛舌下鍋三分鐘", "Tom老闆的選肉標準"])).toBeLessThan(0.2);
   });
 });

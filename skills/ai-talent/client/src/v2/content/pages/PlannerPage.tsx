@@ -46,6 +46,16 @@ function defaultWeek() {
 }
 const md = (ymd: string) => { const [, m, d] = ymd.split("-"); return `${Number(m)}/${Number(d)}`; };
 
+type ForkView = {
+  axis: string; question: string; chosen: number | null;
+  options: Array<{
+    advisor: { slug: string; name: string; title: string; avatarUrl: string };
+    stance: string; why: string; preview: Array<{ date: string; platform: string; topic: string; format: string }>;
+  }>;
+};
+const avatarSrc = (a: { slug: string; avatarUrl: string }) =>
+  a.avatarUrl?.trim() || `https://api.dicebear.com/7.x/notionists/svg?seed=${encodeURIComponent(a.slug)}&backgroundColor=E5E5E5&backgroundType=solid`;
+
 type Item =
   | { kind: "slot"; key: string; date: string; platform: string; title: string; meta: string; slot: any }
   | { kind: "campaign"; key: string; date: string; platform: string; title: string; meta: string; camp: any }
@@ -84,6 +94,11 @@ export default function PlannerPage() {
     onError: (e: any) => showToastGlobal(String(e?.message ?? "error"), "error"),
   });
   const removeSlot = T.planner?.removeSlot?.useMutation?.({ onSuccess: () => { setOpen(null); refresh(); } });
+  // 分歧方案卡：選一版 → 伺服器套用那一版的格子。
+  const pickFork = T.planner?.pickFork?.useMutation?.({
+    onSuccess: (r: any) => { setTouched(r?.touched ?? []); refresh(); },
+    onError: (e: any) => showToastGlobal(String(e?.message ?? "error"), "error"),
+  });
   const cancelSched = T.calendar?.cancel?.useMutation?.({ onSuccess: () => { setOpen(null); refresh(); } });
   // 原本行事曆能做的三件事（取消／改時間／立即發布）都留在這裡，取代才不會少功能。
   const onErr = (e: any) => showToastGlobal(String(e?.message ?? "error"), "error");
@@ -93,7 +108,7 @@ export default function PlannerPage() {
   });
   const [moveAt, setMoveAt] = React.useState("");
 
-  const messages: Array<{ id: number; role: string; content: string; choices: string[] }> = data?.messages ?? [];
+  const messages: Array<{ id: number; role: string; content: string; choices: string[]; fork: ForkView | null }> = data?.messages ?? [];
   React.useEffect(() => { chatEnd.current?.scrollIntoView({ block: "end" }); }, [messages.length, pending]);
 
   const say = (text: string) => {
@@ -196,7 +211,11 @@ export default function PlannerPage() {
                 {messages.map((m) => m.role === "user" ? (
                   <div key={m.id} className="max-w-[280px] self-end rounded-2xl rounded-br px-3.5 py-2.5 text-[14px] leading-relaxed" style={{ background: SOFT }}>{m.content}</div>
                 ) : (
-                  <div key={m.id} className="flex items-start gap-2.5">{avatar}<p className="m-0 mt-1.5 max-w-[280px] whitespace-pre-wrap text-[14px] leading-relaxed" style={{ color: "#262626" }}>{m.content}</p></div>
+                  <React.Fragment key={m.id}>
+                    <div className="flex items-start gap-2.5">{avatar}<p className="m-0 mt-1.5 max-w-[280px] whitespace-pre-wrap text-[14px] leading-relaxed" style={{ color: "#262626" }}>{m.content}</p></div>
+                    {m.fork && <ForkCards messageId={m.id} fork={m.fork} en={en} busy={!!pickFork?.isPending}
+                      onPick={(i) => pickFork?.mutate?.({ brandId, weekStart, messageId: m.id, index: i })} />}
+                  </React.Fragment>
                 ))}
                 {pending && (
                   <>
@@ -333,6 +352,55 @@ export default function PlannerPage() {
           )}
         </section>
       </div>
+    </div>
+  );
+}
+
+/**
+ * 分歧時的兩張方案卡。每張只放：顧問（頭像、名字、職稱）、立場、一句理由、這版的題目清單、「用這版」。
+ * 選過之後：選中的那張留著、標「已採用」，另一張淡掉——對話紀錄要看得出當時怎麼選的。
+ */
+function ForkCards({ fork, en, busy, onPick }: {
+  messageId: number; fork: ForkView; en: boolean; busy: boolean; onPick: (i: 0 | 1) => void;
+}) {
+  const chosen = fork.chosen;
+  return (
+    <div className="flex flex-col gap-2.5 pl-[42px]">
+      {fork.options.map((o, i) => {
+        const isChosen = chosen === i;
+        const dim = chosen != null && !isChosen;
+        return (
+          <div key={o.advisor.slug} className="rounded-xl bg-white p-3.5 transition"
+            style={{ border: isChosen ? `1.5px solid ${INK}` : `1px solid ${LINE}`, opacity: dim ? 0.45 : 1 }}>
+            <div className="flex items-center gap-2.5">
+              <img src={avatarSrc(o.advisor)} alt="" className="h-8 w-8 shrink-0 rounded-full" style={{ background: SOFT }} />
+              <div className="min-w-0">
+                <p className="m-0 truncate text-[13px] font-semibold" style={{ color: INK }}>{o.advisor.name}</p>
+                <p className="m-0 truncate text-[11.5px]" style={{ color: META }}>{o.advisor.title}</p>
+              </div>
+            </div>
+            <p className="m-0 mt-3 text-[15px] font-bold" style={{ color: INK }}>{o.stance}</p>
+            {o.why && <p className="m-0 mt-1 text-[13px] leading-relaxed" style={{ color: "#404040" }}>{o.why}</p>}
+            <ul className="m-0 mt-2.5 flex list-none flex-col gap-1.5 p-0">
+              {o.preview.map((p, k) => (
+                <li key={k} className="flex items-baseline gap-2 text-[12.5px]">
+                  <span className="w-9 shrink-0 tabular-nums" style={{ color: META }}>{md(p.date)}</span>
+                  <FontAwesomeIcon icon={PLATFORM_ICON[p.platform] ?? faGlobe} className="shrink-0 text-[11px]" style={{ color: META }} />
+                  <span className="min-w-0 flex-1 truncate" style={{ color: "#262626" }}>{p.topic}</span>
+                </li>
+              ))}
+            </ul>
+            {chosen == null ? (
+              <button type="button" disabled={busy} onClick={() => onPick(i as 0 | 1)}
+                className="mt-3 w-full rounded-full py-2 text-[13px] font-semibold text-white disabled:opacity-40" style={{ background: INK }}>
+                {en ? "Use this plan" : "用這版"}
+              </button>
+            ) : isChosen ? (
+              <p className="m-0 mt-3 text-[12px] font-semibold" style={{ color: INK }}>{en ? "Adopted" : "已採用"}</p>
+            ) : null}
+          </div>
+        );
+      })}
     </div>
   );
 }
