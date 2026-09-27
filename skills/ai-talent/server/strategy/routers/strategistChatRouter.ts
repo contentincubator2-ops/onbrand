@@ -461,8 +461,12 @@ async function buildProactiveOpening(
   // 2026-09-23：開場白用這位總監自己的名字跟角度自我介紹——三位人選各自
   // 一串對話，開場就該看得出來現在是誰在講話（而不是三串都寫「策略總監」）。
   const en_ = en;
+  // 2026-09-27：通路頁的三位右下角標的是「顧問」，自我介紹也要一致，不是「總監」。
+  const isChannel = !!director && isChannelScope(getRole(director.roleId).scope);
   const who = director
-    ? (en_ ? `${director.name}, ${brandName}'s ${director.roleLabelEn} director` : `${director.name}，${brandName}的${director.roleLabel}總監`)
+    ? (en_
+      ? `${director.name}, ${brandName}'s ${director.roleLabelEn} ${isChannel ? "advisor" : "director"}`
+      : `${director.name}，${brandName}的${director.roleLabel}${isChannel ? "顧問" : "總監"}`)
     : (en_ ? `${brandName}'s Strategy Director` : `${brandName}的策略總監`);
   const hi = en_ ? `Hi, I'm ${who}.` : `嗨，我是${who}。`;
 
@@ -501,7 +505,7 @@ async function buildProactiveOpening(
     return {
       content: en_
         ? `${hi} On ${ch} I look at ${director.roleLabelEn}. Tell me what you're about to publish or promote — or ask me one of the questions below.`
-        : `${hi}在 ${ch} 這一頁，我看的是${director.roleLabel}。跟我說你接下來要發什麼、推什麼活動，或直接點下面的問題問我。`,
+        : `${hi}在${/^[A-Za-z]/.test(ch) ? ` ${ch} ` : ch}這一頁，我看的是${director.roleLabel}。跟我說你接下來要發什麼、推什麼活動，或直接點下面的問題問我。`,
       actions: [],
     };
   }
