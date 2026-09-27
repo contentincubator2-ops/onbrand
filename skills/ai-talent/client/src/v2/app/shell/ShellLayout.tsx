@@ -216,12 +216,14 @@ function buildNavItems(lang: "zh-TW" | "en", userEmail?: string | null, currentP
   const catalog = navCatalog(lang, allowedTaskRoutes);
   const byId = new Map(catalog.map((c) => [c.id!, c]));
   const userItems = (userNavItems ?? []).map((id) => byId.get(id)).filter(Boolean) as NavItem[];
+  // 2026-09-27（CJ「用本週企劃取代行事曆」「登入後直接落在本週企劃」）：本週企劃排第一，
+  // 已排程／已發布與活動企劃的格子都在它的週曆上；/calendar 轉到 /planner。
   const fixed: NavItem[] = [
+    { to: "/planner", label: en ? "This week" : "本週企劃", icon: <FontAwesomeIcon icon={faCalendarDays} />, group: "fixed",
+      matchPrefix: "/planner", alsoMatch: ["/calendar"],
+      tooltip: en ? "Plan the week with your content director" : "跟內容總監排這一週" },
     { to: "/projects", label: en ? "Projects" : "專案", icon: <FontAwesomeIcon icon={faFolderOpen} />, group: "fixed",
       tooltip: en ? "Everything you've produced, by project" : "你產出過的內容，依專案整理" },
-    { to: "/calendar", label: en ? "Calendar" : "行事曆", icon: <FontAwesomeIcon icon={faCalendarDays} />, group: "fixed",
-      matchPrefix: "/calendar", alsoMatch: ["/tasks/calendar"],
-      tooltip: en ? "Scheduled & published posts, and this month's plan" : "已排程／已發布的內容，以及當月規劃" },
     // 2026-09-25（CJ「在內容層增加活動的 mission tray」）：卡片由策略層的宣傳企劃長出來。
     { to: "/campaigns", label: en ? "Campaigns" : "活動", icon: <FontAwesomeIcon icon={faBullhorn} />, matchPrefix: "/campaigns", group: "fixed",
       tooltip: en ? "Write out a campaign plan, post by post" : "照活動企劃一篇一篇寫" },
@@ -834,7 +836,7 @@ function IconBar({
             <OnBrandLogo
               glyphOnly
               size={32}
-              onClick={() => onNavigate("/home")}
+              onClick={() => onNavigate("/planner")}
               style={{ padding: 4, borderRadius: 8 }}
             />
           </span>

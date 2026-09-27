@@ -72,7 +72,7 @@ const AiPromptLibraryPage = React.lazy(() => import("../strategy/pages/AiPromptL
 // 頂層目的地，不加 /tasks/ 前綴——它的卡片來自活動企劃，不受任務包過濾。
 const CampaignTrayPage = React.lazy(() => import("../content/pages/CampaignTrayPage"));
 const SquadLabPage = React.lazy(() => import("../platform/pages/admin/SquadLabPage"));
-const CalendarPage = React.lazy(() => import("../content/pages/CalendarPage"));
+const PlannerPage = React.lazy(() => import("../content/pages/PlannerPage"));
 const AccountPage = React.lazy(() => import("../platform/pages/AccountPage"));
 const WorkspaceSettingsPage = React.lazy(() => import("../platform/pages/WorkspaceSettingsPage"));
 const ReviewQueuePage = React.lazy(() => import("../platform/pages/ReviewQueuePage"));
@@ -291,7 +291,7 @@ export default function AppV2() {
           path="/onboarding"
           element={
             <RequireAuthV2>
-              <OnboardingWizard onComplete={() => (window.location.href = "/home")} />
+              <OnboardingWizard onComplete={() => (window.location.href = "/planner")} />
             </RequireAuthV2>
           }
         />
@@ -346,8 +346,9 @@ export default function AppV2() {
           {/* 2026-08-23 (CJ「安排定期任務掃描當地熱門的 facebook 貼文，補充為 task」)
               — 每月掃描產出的貼文形式候選佇列，核准後才照 SOP 開卡 */}
           <Route path="/admin/post-formats" element={<AdminPostFormatsPage />} />
-          {/* 2026-05-11 — content calendar (P0-1) */}
-          <Route path="/calendar" element={<CalendarPage />} />
+          {/* 2026-09-27（CJ「用本週企劃取代行事曆」）：行事曆併進本週企劃的週曆。 */}
+          <Route path="/planner" element={<PlannerPage />} />
+          <Route path="/calendar" element={<Navigate to="/planner" replace />} />
           {/* 2026-05-10 account settings */}
           <Route path="/settings/account" element={<AccountPage />} />
           <Route path="/settings/workspace" element={<WorkspaceSettingsPage />} />

@@ -839,13 +839,21 @@ function PlatformTaskPageInner() {
     { enabled: !!campaignScope?.eventId, refetchOnWindowFocus: false, staleTime: 60_000 },
   ) ?? { data: null };
   const markWrittenMut = (trpc as any).campaign?.markWritten?.useMutation?.();
+  // 2026-09-27（本週企劃）：?slot=<planned_slots.id> —— 從本週企劃「寫這篇」過來，寫完回填那一格。
+  const plannerSlotRef = React.useRef<number | null>(null);
+  const markSlotMut = (trpc as any).planner?.markWritten?.useMutation?.();
   /** 寫完這一格 —— 失敗不擋使用者看產出（回貼失敗只是進度沒更新，不是內容沒寫成）。 */
   const finishCampaignItem = React.useCallback((outputId: number) => {
+    const slotId = plannerSlotRef.current;
+    if (slotId && outputId && markSlotMut) {
+      plannerSlotRef.current = null;
+      try { markSlotMut.mutate({ slotId, outputId }); } catch { /* 不致命 */ }
+    }
     const c = campaignRef.current;
     if (!c || !outputId || !markWrittenMut) return;
     campaignRef.current = null;
     try { markWrittenMut.mutate({ eventId: c.eventId, itemId: c.itemId, outputId }); } catch { /* 不致命 */ }
-  }, [markWrittenMut]);
+  }, [markWrittenMut, markSlotMut]);
 
   const spotRefRef = React.useRef<{ scenarioId: string; spotIndex: number } | null>(null);
   useEffect(() => {
@@ -873,9 +881,11 @@ function PlatformTaskPageInner() {
     const camp = Number(searchParams.get("camp") ?? 0);
     const item = searchParams.get("item");
     if (camp && item) { campaignRef.current = { eventId: camp, itemId: item }; setCampaignScope({ eventId: camp, itemId: item }); }
+    const slot = Number(searchParams.get("slot") ?? 0);
+    if (slot > 0) plannerSlotRef.current = slot;
     campOpenedRef.current = true;
     const next = new URLSearchParams(searchParams);
-    next.delete("task"); next.delete("camp"); next.delete("item");
+    next.delete("task"); next.delete("camp"); next.delete("item"); next.delete("slot");
     setSearchParams(next, { replace: true });
     if (t) openTask(t as any);
     else showToastGlobal(lang === "en"

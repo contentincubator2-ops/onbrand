@@ -85,7 +85,7 @@ export default function LandingPage() {
         let brandCount = 1;
         try { brandCount = Number((await r.json())?.brandCount ?? 1); } catch {}
         if (dead) return;
-        navigate(brandCount > 0 ? "/home" : "/brands?all=1", { replace: true });
+        navigate(brandCount > 0 ? "/planner" : "/brands?all=1", { replace: true });
       })
       .catch(() => {});
     document.title = en

@@ -73,7 +73,7 @@ export const NUDGE_CATALOG = {
         "the whole week to the Calendar or publish straight to Facebook.",
     },
     actions: [
-      { kind: "navigate", url: "/calendar", label: "放進日曆 →" },
+      { kind: "navigate", url: "/planner", label: "放進日曆 →" },
     ],
     dedupePerSession: false, // re-fire every time user regenerates
   },
@@ -141,7 +141,7 @@ export const NUDGE_CATALOG = {
         "Want me to explain why this week's structure is sequenced this way?",
     },
     actions: [
-      { kind: "navigate", url: "/calendar", label: "送進日曆 →" },
+      { kind: "navigate", url: "/planner", label: "送進日曆 →" },
     ],
   },
 
@@ -314,7 +314,7 @@ export const NUDGE_CATALOG = {
         "History stays in the Calendar.",
     },
     actions: [
-      { kind: "navigate", url: "/calendar", label: "看行事曆 →" },
+      { kind: "navigate", url: "/planner", label: "看行事曆 →" },
     ],
   },
 
@@ -375,7 +375,7 @@ export const NUDGE_CATALOG = {
         "the bottom to schedule and start publishing.",
     },
     actions: [
-      { kind: "navigate", url: "/calendar", label: "進入執行模式 →" },
+      { kind: "navigate", url: "/planner", label: "進入執行模式 →" },
     ],
   },
 

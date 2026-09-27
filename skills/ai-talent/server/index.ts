@@ -570,6 +570,12 @@ async function runStartupMigrations() {
     await db.execute(sql.raw(BRAND_NAV_PREFS_DDL));
     console.log("[migrate] brand_nav_prefs: OK");
 
+    // 2026-09-27（CJ「本週企劃取代行事曆」）：規劃格子與總主管對話。
+    const { PLANNED_SLOTS_DDL, PLANNER_MESSAGES_DDL } = await import("./content/core/weeklyPlanner");
+    await db.execute(sql.raw(PLANNED_SLOTS_DDL));
+    await db.execute(sql.raw(PLANNER_MESSAGES_DDL));
+    console.log("[migrate] planned_slots / planner_messages: OK");
+
     // 2026-09-14（CJ「選定一個競爭者，對比接觸點跟策略訴求差異」）：
     // 具名競爭者的逐接觸點比對快照（14 天內快取，不重跑研究）。
     const { COMPETITOR_SNAPSHOT_DDL } = await import("./strategy/core/competitorSnapshot");

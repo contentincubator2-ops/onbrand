@@ -1221,7 +1221,7 @@ export default function RunPage() {
           });
         }
         setScheduleDialogOpen(false);
-        navigate("/calendar");
+        navigate("/planner");
       } catch {
         // error toast already shown by scheduleToCalMut.onError
       }
@@ -1254,7 +1254,7 @@ export default function RunPage() {
           platform: _platform, scheduledAt: _scheduledAt,
         });
         setScheduleDialogOpen(false);
-        navigate("/calendar");
+        navigate("/planner");
       } catch {
         // error toast already shown by scheduleToCalMut.onError
       }
