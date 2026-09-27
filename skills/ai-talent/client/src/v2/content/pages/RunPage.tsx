@@ -3328,7 +3328,7 @@ export default function RunPage() {
                   setScheduleDialogOpen(true);
                 }}
               >
-                {lang === "en" ? "Add to Calendar" : "送到行事曆"}
+                {lang === "en" ? "Schedule" : "排程發布"}
               </Button>
 
               {/* ── 3. 下載 .ics ──────────────────────────── */}

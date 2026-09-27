@@ -564,7 +564,7 @@ export default function EditCellModal({
                   : "bg-indigo-600 text-white hover:bg-indigo-700"
               }`}
             >
-              📅 {en ? "Send to Calendar" : "送到行事曆"}
+              📅 {en ? "Schedule" : "排程發布"}
             </button>
           </div>
         </div>

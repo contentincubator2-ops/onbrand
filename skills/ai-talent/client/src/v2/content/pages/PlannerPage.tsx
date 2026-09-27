@@ -32,7 +32,7 @@ const PLATFORM_ZH: Record<string, string> = {
   facebook: "Facebook", instagram: "Instagram", linkedin: "LinkedIn", youtube: "YouTube", tiktok: "TikTok",
   email: "電子報", pr: "新聞稿", x: "X", website: "官網",
 };
-const STARTERS = ["幫我排下週內容", "給我十個題目", "把進行中的活動拆成這週貼文", "我這週只有 3 小時"];
+const STARTERS = ["幫我排這週內容", "給我十個題目", "把進行中的活動拆成這週貼文", "我這週只有 3 小時"];
 
 // ── 日期（台北）──
 const ymdTpe = (d: Date) => d.toLocaleDateString("sv-SE", { timeZone: "Asia/Taipei" });
@@ -163,7 +163,7 @@ export default function PlannerPage() {
   );
 
   return (
-    <div className="flex h-screen flex-col bg-white">
+    <div className="flex flex-col bg-white" style={{ height: "calc(100vh - 64px)" }}>
       <header className="flex h-16 shrink-0 items-center px-7" style={{ borderBottom: `1px solid ${LINE}` }}>
         <h1 className="m-0 text-[17px] font-bold" style={{ color: INK }}>{en ? "Weekly plan" : "本週企劃"}</h1>
       </header>
@@ -266,7 +266,7 @@ export default function PlannerPage() {
                           </span>
                           {isTouched && <span className="flex items-center gap-1 text-[11px] font-semibold" style={{ color: "#C2410C" }}><span className="h-1.5 w-1.5 rounded-full" style={{ background: ORANGE }} />{en ? "Changed" : "剛改"}</span>}
                         </span>
-                        <span className="text-[14px] font-semibold leading-snug" style={{ color: INK }}>{it.title}</span>
+                        <span className="line-clamp-3 text-[14px] font-semibold leading-snug" style={{ color: INK }}>{it.title}</span>
                         <span className="text-[12px]" style={{ color: META }}>{it.meta}</span>
                       </button>
                     );
