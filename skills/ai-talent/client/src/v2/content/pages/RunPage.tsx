@@ -17,7 +17,7 @@
  *   ↻ 重跑  ✕ 關閉
  */
 import React, { useMemo, useState, useEffect, useRef } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import {
   Avatar, Button, Card, CardBody, Chip, Spinner, Textarea, Tooltip,
   Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Input,
@@ -386,6 +386,23 @@ function sanitizeProviderErrorForToast(input: unknown): string {
 export default function RunPage() {
   const { outputId } = useParams<{ outputId: string }>();
   const navigate = useNavigate();
+  // 2026-09-28（CJ「寫完要可以存回日曆，回到左談右曆的畫面」）：從本週企劃的任務視窗產生的，
+  // 網址帶 from=planner（＋w 週、slot 格子）。這種成品頁多一顆「存回本週企劃」。
+  const [runSearch] = useSearchParams();
+  const fromPlanner = runSearch.get("from") === "planner";
+  const plannerWeek = runSearch.get("w");
+  const plannerSlot = Number(runSearch.get("slot") ?? 0);
+  const plannerMarkMut = (trpc as any).planner?.markWritten?.useMutation?.();
+  const backToPlanner = async () => {
+    // 產生當下就已經回填過；這裡再補一次，保證格子一定連到這一篇（重跑、換版本後也一樣）。
+    if (plannerSlot > 0 && id) {
+      try { await plannerMarkMut?.mutateAsync?.({ slotId: plannerSlot, outputId: Number(id) }); } catch { /* 不擋回去 */ }
+    }
+    const sp = new URLSearchParams();
+    if (plannerWeek) sp.set("w", plannerWeek);
+    if (plannerSlot > 0) sp.set("hl", String(plannerSlot));
+    navigate(`/planner${sp.toString() ? `?${sp.toString()}` : ""}`);
+  };
   const { t, lang } = useLang();
   const id = Number(outputId);
 
@@ -1716,6 +1733,15 @@ export default function RunPage() {
             explicit path so the user knows where this output lives and
             has a 1-click way back to /projects without using the bare X.
             The save toast now mirrors this with an "Open Projects →" hint. */}
+      {fromPlanner && (
+        <div className="mb-3 flex items-center justify-between gap-3 rounded-xl border border-neutral-200 bg-white px-4 py-2.5">
+          <span className="text-[13px] text-neutral-600">{lang === "en" ? "From your weekly plan" : "這篇來自本週企劃"}</span>
+          <button type="button" onClick={backToPlanner} disabled={plannerMarkMut?.isPending}
+            className="rounded-full bg-neutral-900 px-4 py-2 text-[13px] font-semibold text-white transition hover:bg-neutral-700 disabled:opacity-50">
+            {lang === "en" ? "Save to weekly plan" : "存回本週企劃"}
+          </button>
+        </div>
+      )}
       <div className="flex items-center gap-1.5 text-tiny text-default-500 mb-2 px-1">
         <button
           onClick={() => navigate("/projects")}

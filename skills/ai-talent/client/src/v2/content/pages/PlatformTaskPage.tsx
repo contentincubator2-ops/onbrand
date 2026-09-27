@@ -398,9 +398,26 @@ class PlatformPageErrorBoundary extends React.Component<
   }
 }
 
+/**
+ * 2026-09-28（CJ「按下日曆上的某一篇要寫文章時，直接跳出按下任務卡以後的視窗開始撰寫，
+ * 寫完要可以存回日曆，回到左談右曆的畫面」）：本週企劃直接把這一頁的任務視窗疊在自己上面，
+ * 不換頁。embed 模式只渲染視窗（不畫頁面本體），產生完帶著 from=planner 去成品頁，
+ * 成品頁再用「存回本週企劃」回來。
+ */
+export interface TaskEmbed {
+  route: string;
+  taskId: string;
+  slotId?: number;
+  camp?: { eventId: number; itemId: string };
+  topic?: string;
+  weekStart?: string;
+  onClose: () => void;
+}
+
 // ── Main page ────────────────────────────────────────────────────────────────
-function PlatformTaskPageInner() {
-  const { platform: routeParam = "fb" } = useParams<{ platform: string }>();
+function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
+  const { platform: urlRoute = "fb" } = useParams<{ platform: string }>();
+  const routeParam = embed?.route ?? urlRoute;
   const platform = ROUTE_TO_PLATFORM[routeParam] ?? "facebook";
   const meta = PLATFORM_META[platform] ?? PLATFORM_META.facebook;
 
@@ -413,10 +430,11 @@ function PlatformTaskPageInner() {
   // dig chips deep-link here with ?topic=<角度>. Capture once, strip the
   // param, show a banner; the next task the user opens gets the topic
   // prefilled as its primary answer (strategy → copy in one line).
-  const [strategyTopic, setStrategyTopic] = useState<string | null>(null);
+  const [strategyTopic, setStrategyTopic] = useState<string | null>(embed?.topic?.trim() ? embed.topic.trim().slice(0, 200) : null);
   // 換頻道時把客製 pill 歸位 —— 「生活實踐」留在官網頁會濾成空白。
   useEffect(() => { setActivePackFormat("all"); }, [platform]);
   useEffect(() => {
+    if (embed) return;
     const t = searchParams.get("topic");
     if (t && t.trim()) {
       setStrategyTopic(t.trim().slice(0, 200));
@@ -874,23 +892,28 @@ function PlatformTaskPageInner() {
   // 「去寫這篇」。交棒要一路到底：直接開那張卡，而不是把人丟在列表前面再找一次。
   const campOpenedRef = React.useRef(false);
   useEffect(() => {
-    const taskId = searchParams.get("task");
+    const taskId = embed ? embed.taskId : searchParams.get("task");
     if (!taskId || campOpenedRef.current) return;
     if (!allTasks.length) return;                     // 卡還沒載完，下一輪再試
     const t = allTasks.find((x: any) => x.id === taskId);
-    const camp = Number(searchParams.get("camp") ?? 0);
-    const item = searchParams.get("item");
+    const camp = embed ? (embed.camp?.eventId ?? 0) : Number(searchParams.get("camp") ?? 0);
+    const item = embed ? (embed.camp?.itemId ?? null) : searchParams.get("item");
     if (camp && item) { campaignRef.current = { eventId: camp, itemId: item }; setCampaignScope({ eventId: camp, itemId: item }); }
-    const slot = Number(searchParams.get("slot") ?? 0);
+    const slot = embed ? (embed.slotId ?? 0) : Number(searchParams.get("slot") ?? 0);
     if (slot > 0) plannerSlotRef.current = slot;
     campOpenedRef.current = true;
-    const next = new URLSearchParams(searchParams);
-    next.delete("task"); next.delete("camp"); next.delete("item"); next.delete("slot");
-    setSearchParams(next, { replace: true });
+    if (!embed) {
+      const next = new URLSearchParams(searchParams);
+      next.delete("task"); next.delete("camp"); next.delete("item"); next.delete("slot");
+      setSearchParams(next, { replace: true });
+    }
     if (t) openTask(t as any);
-    else showToastGlobal(lang === "en"
-      ? "That task card isn't available for this brand."
-      : "這個品牌目前沒有這張任務卡。");
+    else {
+      showToastGlobal(lang === "en"
+        ? "That task card isn't available for this brand."
+        : "這個品牌目前沒有這張任務卡。");
+      embed?.onClose();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams, allTasks]);
 
@@ -1251,6 +1274,15 @@ function PlatformTaskPageInner() {
     setModalEntity({ kind: "brand", id: null });
     setEditingChip(null);
     setEditValue("");
+    embed?.onClose();
+  };
+  /** 成品頁網址：從本週企劃來的要帶回程資訊，成品頁才會出現「存回本週企劃」。 */
+  const runHref = (outputId: number | string) => {
+    if (!embed) return `/run/${outputId}`;
+    const sp = new URLSearchParams({ from: "planner" });
+    if (embed.weekStart) sp.set("w", embed.weekStart);
+    if (embed.slotId) sp.set("slot", String(embed.slotId));
+    return `/run/${outputId}?${sp.toString()}`;
   };
 
   // ── Inline context-field editing ────────────────────────────────────────
@@ -1404,7 +1436,7 @@ function PlatformTaskPageInner() {
             }
             closeTask();
             finishCampaignItem(Number((r as any).outputId));
-            navigate(`/run/${(r as any).outputId}`);
+            navigate(runHref((r as any).outputId));
             return;
           }
           const squadErrors = Array.isArray((r as any).errors) ? (r as any).errors : [];
@@ -1461,7 +1493,7 @@ function PlatformTaskPageInner() {
           if (isStale()) { discardCancelledOutput(oid); return; }
           closeTask();
           finishCampaignItem(Number(oid));
-          navigate(`/run/${oid}`);
+          navigate(runHref(oid));
           return;
         }
 
@@ -1522,7 +1554,7 @@ function PlatformTaskPageInner() {
   const progressPct = Math.min(100, (tickMs / (expectedSec * 1000)) * 100);
 
   // Render-time onboarding redirect (must be after all hooks)
-  if (needsOnboardingRedirect) return <Navigate to="/brands" replace />;
+  if (needsOnboardingRedirect && !embed) return <Navigate to="/brands" replace />;
 
   // Redirect unknown platform params
   if (!ROUTE_TO_PLATFORM[routeParam]) return <Navigate to="/tasks/fb" replace />;
@@ -1530,6 +1562,7 @@ function PlatformTaskPageInner() {
   // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div>
+      {!embed && (<>
       {/* 2026-09-27：行事曆合一——當月規劃（/tasks/calendar）與排程與發布共用同一組分頁。 */}
       {platform === "calendar" && <CalendarTabs />}
       {/* ─── HERO ──────────────────────────────────────────────────────── */}
@@ -2448,6 +2481,7 @@ function PlatformTaskPageInner() {
           </>
         )}
       </div>
+      </>)}
 
       <CardDetailDrawer
         taskId={detailTaskId}
@@ -2957,6 +2991,15 @@ function PlatformTaskPageInner() {
         brandId={brandId ?? null}
       />
     </div>
+  );
+}
+
+/** 本週企劃用：只有任務視窗，疊在呼叫它的頁面上。 */
+export function PlatformTaskModal(props: TaskEmbed) {
+  return (
+    <PlatformPageErrorBoundary platform={props.route}>
+      <PlatformTaskPageInner embed={props} />
+    </PlatformPageErrorBoundary>
   );
 }
 

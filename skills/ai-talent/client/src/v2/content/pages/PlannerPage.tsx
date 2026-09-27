@@ -12,14 +12,15 @@
  * 每張卡只放三樣：通路圖示、題目、一行小字。細節點開才看得到。
  */
 import React from "react";
-import { useNavigate, useOutletContext } from "react-router-dom";
+import { useNavigate, useOutletContext, useSearchParams } from "react-router-dom";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faEnvelope, faBullhorn, faGlobe, faArrowUp, faChevronLeft, faChevronRight } from "@fortawesome/free-solid-svg-icons";
+import { faEnvelope, faBullhorn, faGlobe, faArrowUp, faChevronLeft, faChevronRight, faEllipsis } from "@fortawesome/free-solid-svg-icons";
 import { faFacebookF, faInstagram, faLinkedinIn, faYoutube, faTiktok, faXTwitter } from "@fortawesome/free-brands-svg-icons";
 import { trpc } from "../../../lib/trpc";
 import { useLang } from "../../../lib/i18n";
 import { showToastGlobal } from "../../../components/ui/Toast";
 import { channelRoute } from "../lib/channelMeta";
+import { PlatformTaskModal, type TaskEmbed } from "./PlatformTaskPage";
 import { getCalendarPublishPayload } from "../lib/strategyContentEnvelope";
 
 const INK = "#171717", META = "#6B6B6B", LINE = "#EAEAEA", SOFT = "#F6F6F5", ORANGE = "#F97316";
@@ -70,9 +71,25 @@ export default function PlannerPage() {
   const ctx = useOutletContext<{ brandId: number | null; brands: any[] } | undefined>();
   const brandId = ctx?.brandId ?? null;
 
-  const [weekStart, setWeekStart] = React.useState(defaultWeek);
+  // 從成品頁「存回本週企劃」回來：?w=那一週、?hl=剛寫好的格子（亮橘框）。讀完就從網址拿掉。
+  const [params, setParams] = useSearchParams();
+  const [weekStart, setWeekStart] = React.useState(() => {
+    const w = params.get("w");
+    return w && /^\d{4}-\d{2}-\d{2}$/.test(w) ? mondayOf(w) : defaultWeek();
+  });
+  /** 正在寫的那一格：任務視窗直接疊在本週企劃上，不換頁。 */
+  const [writing, setWriting] = React.useState<Omit<TaskEmbed, "onClose"> | null>(null);
   const [draft, setDraft] = React.useState("");
-  const [touched, setTouched] = React.useState<number[]>([]);
+  const [touched, setTouched] = React.useState<number[]>(() => {
+    const hl = Number(params.get("hl") ?? 0);
+    return hl > 0 ? [hl] : [];
+  });
+  React.useEffect(() => {
+    if (!params.get("w") && !params.get("hl")) return;
+    const next = new URLSearchParams(params); next.delete("w"); next.delete("hl");
+    setParams(next, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [open, setOpen] = React.useState<Item | null>(null);
   const [pending, setPending] = React.useState<string | null>(null);
   const chatEnd = React.useRef<HTMLDivElement>(null);
@@ -149,16 +166,17 @@ export default function PlannerPage() {
   const hasDrafts = !!data?.hasDrafts;
   const lastLead = [...messages].reverse().find((m) => m.role === "lead");
 
-  const writeHref = (it: Item) => {
+  /** 還沒寫的格子：點下去直接開任務視窗。 */
+  const canWrite = (it: Item) =>
+    (it.kind === "slot" && (it.slot.status === "draft" || it.slot.status === "planned")) ||
+    (it.kind === "campaign" && !it.camp.outputId);
+  const startWriting = (it: Item) => {
+    setOpen(null);
     if (it.kind === "slot") {
-      const sp = new URLSearchParams({ task: it.slot.taskId, slot: String(it.slot.id), topic: it.slot.topic, b: String(brandId) });
-      return `/tasks/${channelRoute(it.platform)}?${sp.toString()}`;
+      setWriting({ route: channelRoute(it.platform), taskId: it.slot.taskId, slotId: it.slot.id, topic: it.slot.topic, weekStart });
+    } else if (it.kind === "campaign") {
+      setWriting({ route: channelRoute(it.platform), taskId: it.camp.taskId, camp: { eventId: it.camp.eventId, itemId: it.camp.itemId }, topic: it.camp.angle || undefined, weekStart });
     }
-    if (it.kind === "campaign") {
-      const sp = new URLSearchParams({ task: it.camp.taskId, camp: String(it.camp.eventId), item: it.camp.itemId, topic: it.camp.angle || "", b: String(brandId) });
-      return `/tasks/${channelRoute(it.platform)}?${sp.toString()}`;
-    }
-    return "";
   };
   const outputOf = (it: Item): number | null =>
     it.kind === "slot" ? it.slot.outputId : it.kind === "campaign" ? it.camp.outputId : it.cal?.outputId ?? null;
@@ -277,9 +295,10 @@ export default function PlannerPage() {
                     const isTouched = it.kind === "slot" && touched.includes(it.slot.id);
                     const border = isTouched ? `1.5px solid ${ORANGE}` : isDraft ? `1.5px dashed #D4D4D4` : `1px solid ${LINE}`;
                     return (
-                      <button key={it.key} type="button" onClick={() => setOpen(it)}
-                        className="flex flex-col gap-2.5 rounded-xl bg-white p-3.5 text-left transition hover:border-neutral-400" style={{ border }}>
-                        <span className="flex w-full items-center justify-between">
+                      <div key={it.key} className="relative">
+                      <button type="button" onClick={() => (canWrite(it) ? startWriting(it) : setOpen(it))}
+                        className="flex w-full flex-col gap-2.5 rounded-xl bg-white p-3.5 text-left transition hover:border-neutral-400" style={{ border }}>
+                        <span className={`flex w-full items-center justify-between ${canWrite(it) ? "pr-6" : ""}`}>
                           <span className="flex h-6 w-6 items-center justify-center rounded-[7px] text-[12px]" style={{ background: SOFT, color: "#404040" }}>
                             <FontAwesomeIcon icon={PLATFORM_ICON[it.platform] ?? faGlobe} />
                           </span>
@@ -288,6 +307,13 @@ export default function PlannerPage() {
                         <span className="line-clamp-3 text-[14px] font-semibold leading-snug" style={{ color: INK }}>{it.title}</span>
                         <span className="text-[12px]" style={{ color: META }}>{it.meta}</span>
                       </button>
+                      {canWrite(it) && (
+                        <button type="button" aria-label={en ? "More" : "更多"} onClick={() => setOpen(it)}
+                          className="absolute right-2 top-2.5 flex h-7 w-7 items-center justify-center rounded-full text-[13px] text-neutral-400 transition hover:bg-neutral-100 hover:text-neutral-900">
+                          <FontAwesomeIcon icon={faEllipsis} />
+                        </button>
+                      )}
+                      </div>
                     );
                   })}
                   <button type="button" aria-label={en ? "Add a post this day" : "這天加一篇"} onClick={() => setDraft(`${d.label || md(d.date)} 加一篇`)}
@@ -320,7 +346,7 @@ export default function PlannerPage() {
                   {outputOf(open) ? (
                     <button type="button" onClick={() => navigate(`/run/${outputOf(open)}`)} className="flex-1 rounded-full py-2.5 text-[13.5px] font-semibold text-white" style={{ background: INK }}>{en ? "Open" : "看成品"}</button>
                   ) : (open.kind === "slot" || open.kind === "campaign") ? (
-                    <button type="button" onClick={() => navigate(writeHref(open))} className="flex-1 rounded-full py-2.5 text-[13.5px] font-semibold text-white" style={{ background: INK }}>{en ? "Write it" : "寫這篇"}</button>
+                    <button type="button" onClick={() => startWriting(open)} className="flex-1 rounded-full py-2.5 text-[13.5px] font-semibold text-white" style={{ background: INK }}>{en ? "Write it" : "寫這篇"}</button>
                   ) : null}
                   {open.kind === "slot" && open.slot.status !== "written" && (
                     <button type="button" onClick={() => { setOpen(null); say(`${md(open.date)} 那篇「${open.title}」換一篇`); }}
@@ -352,6 +378,10 @@ export default function PlannerPage() {
           )}
         </section>
       </div>
+      {writing && brandId && (
+        <PlatformTaskModal key={`${writing.taskId}-${writing.slotId ?? writing.camp?.itemId ?? ""}`}
+          {...writing} onClose={() => { setWriting(null); refresh(); }} />
+      )}
     </div>
   );
 }
