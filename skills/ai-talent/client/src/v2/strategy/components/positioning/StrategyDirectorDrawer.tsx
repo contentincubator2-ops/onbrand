@@ -123,6 +123,18 @@ export default function StrategyDirectorDrawer({ brandId }: { brandId: number | 
       : fetched
   ), [fetched, pickedExtra]);
 
+  // 換品牌、或在品牌頁/產品頁之間切換，都要重選一次預設人選——那是兩組
+  // 不同的角色，沿用上一組的選擇會變成「產品頁掛著品牌定位總監」。
+  //
+  // 2026-09-27：這個 reset 必須寫在「選預設人選」那個 effect **前面**。React 依宣告
+  // 順序跑 effect：原本是先選人、再 reset 成 null；新頁的名單若已在快取裡，directors
+  // 不會再變，選人 effect 不會重跑，面板就卡在「找不到可用的策略總監」（在 FB→X 等
+  // 通路頁之間切換時重現）。
+  React.useEffect(() => {
+    setAgentId(null); setPickedExtra(null); setView("chat");
+    setViewingConversationId(null); setHistoryOpen(false);
+  }, [brandId, scope]);
+
   // 選過的人記在 localStorage（per brand）。三位人選回來之後才決定目前是誰：
   // 存過的那位還在名單裡就用他，否則用第一位。換品牌時 brandId 會變，這個
   // effect 會重跑，所以不會把 A 品牌選的人帶到 B 品牌。
@@ -135,12 +147,6 @@ export default function StrategyDirectorDrawer({ brandId }: { brandId: number | 
       return directors[0]!.agentId;
     });
   }, [brandId, directors, scope]);
-  // 換品牌、或在品牌頁/產品頁之間切換，都要重選一次預設人選——那是兩組
-  // 不同的角色，沿用上一組的選擇會變成「產品頁掛著品牌定位總監」。
-  React.useEffect(() => {
-    setAgentId(null); setPickedExtra(null); setView("chat");
-    setViewingConversationId(null); setHistoryOpen(false);
-  }, [brandId, scope]);
 
   const current = React.useMemo(
     () => directors.find((d) => d.agentId === agentId) ?? null,
@@ -199,7 +205,7 @@ export default function StrategyDirectorDrawer({ brandId }: { brandId: number | 
               : scope === "copy"
                 ? (en ? "Your wording directors — tone of voice, word rules, industry language" : "你的用詞總監——品牌語氣、用詞規範、產業用語")
                 : isChannelScope(scope)
-                  ? `${en ? "Your " : "你的 "}${channelAdvisorLabel(scope, en)}${directors.length ? `${en ? " — " : "——"}${directors.map((d) => roleLabelOf(d, en)).join(en ? ", " : "、")}` : ""}`
+                  ? `${en ? "Your " : /^[A-Za-z]/.test(channelAdvisorLabel(scope, en)) ? "你的 " : "你的"}${channelAdvisorLabel(scope, en)}${directors.length ? `${en ? " — " : "——"}${directors.map((d) => roleLabelOf(d, en)).join(en ? ", " : "、")}` : ""}`
                 : (en ? "Your Strategy Director — built for this brand" : "你的策略總監——為這個品牌而設計")
           }
           style={{
