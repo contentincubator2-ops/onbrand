@@ -411,6 +411,8 @@ export interface TaskEmbed {
   camp?: { eventId: number; itemId: string };
   topic?: string;
   weekStart?: string;
+  /** 這一格排在哪天——成品頁「排程到日曆」預填這天。 */
+  slotDate?: string;
   onClose: () => void;
 }
 
@@ -1282,6 +1284,8 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
     const sp = new URLSearchParams({ from: "planner" });
     if (embed.weekStart) sp.set("w", embed.weekStart);
     if (embed.slotId) sp.set("slot", String(embed.slotId));
+    if (embed.slotDate) sp.set("d", embed.slotDate);
+    if (embed.camp) { sp.set("camp", String(embed.camp.eventId)); sp.set("item", embed.camp.itemId); }
     return `/run/${outputId}?${sp.toString()}`;
   };
 

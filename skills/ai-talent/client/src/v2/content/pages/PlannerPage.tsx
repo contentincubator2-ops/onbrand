@@ -84,9 +84,11 @@ export default function PlannerPage() {
     const hl = Number(params.get("hl") ?? 0);
     return hl > 0 ? [hl] : [];
   });
+  // ?ho=剛排程／剛處理的那篇產出 → 那張卡亮起來（排程後格子會變成「已排程」那張）。
+  const [hlOutput] = React.useState<number>(() => Number(params.get("ho") ?? 0));
   React.useEffect(() => {
-    if (!params.get("w") && !params.get("hl")) return;
-    const next = new URLSearchParams(params); next.delete("w"); next.delete("hl");
+    if (!params.get("w") && !params.get("hl") && !params.get("ho")) return;
+    const next = new URLSearchParams(params); next.delete("w"); next.delete("hl"); next.delete("ho");
     setParams(next, { replace: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -157,7 +159,11 @@ export default function PlannerPage() {
         meta: it.kind === "published" ? (en ? "Published" : "已發布") : (en ? `Scheduled ${time}` : `已排程 ${time}`), cal: it,
       });
     }
-    return out;
+    // 同一篇產出已經排程／發布了，就只留排程那張（格子是它的前身）。
+    const onCalendar = new Set(out.filter((x) => x.kind === "scheduled" || x.kind === "published").map((x: any) => Number(x.cal?.outputId ?? 0)).filter(Boolean));
+    return out.filter((x) =>
+      !((x.kind === "slot" && x.slot.outputId && onCalendar.has(Number(x.slot.outputId))) ||
+        (x.kind === "campaign" && x.camp.outputId && onCalendar.has(Number(x.camp.outputId)))));
   }, [data, calQ.data, en]);
 
   const days: Array<{ date: string; label: string }> = data?.days ?? Array.from({ length: 7 }, (_, i) => ({ date: addDays(weekStart, i), label: "" }));
@@ -173,9 +179,9 @@ export default function PlannerPage() {
   const startWriting = (it: Item) => {
     setOpen(null);
     if (it.kind === "slot") {
-      setWriting({ route: channelRoute(it.platform), taskId: it.slot.taskId, slotId: it.slot.id, topic: it.slot.topic, weekStart });
+      setWriting({ route: channelRoute(it.platform), taskId: it.slot.taskId, slotId: it.slot.id, topic: it.slot.topic, weekStart, slotDate: it.date });
     } else if (it.kind === "campaign") {
-      setWriting({ route: channelRoute(it.platform), taskId: it.camp.taskId, camp: { eventId: it.camp.eventId, itemId: it.camp.itemId }, topic: it.camp.angle || undefined, weekStart });
+      setWriting({ route: channelRoute(it.platform), taskId: it.camp.taskId, camp: { eventId: it.camp.eventId, itemId: it.camp.itemId }, topic: it.camp.angle || undefined, weekStart, slotDate: it.date });
     }
   };
   const outputOf = (it: Item): number | null =>
@@ -292,7 +298,7 @@ export default function PlannerPage() {
                   </p>
                   {dayItems.map((it) => {
                     const isDraft = it.kind === "slot" && it.slot.status === "draft";
-                    const isTouched = it.kind === "slot" && touched.includes(it.slot.id);
+                    const isTouched = (it.kind === "slot" && touched.includes(it.slot.id)) || (hlOutput > 0 && outputOf(it) === hlOutput);
                     const border = isTouched ? `1.5px solid ${ORANGE}` : isDraft ? `1.5px dashed #D4D4D4` : `1px solid ${LINE}`;
                     return (
                       <div key={it.key} className="relative">

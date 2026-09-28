@@ -61,7 +61,7 @@ describe("parsePlannerReply", () => {
 describe("plannerRouter", () => {
   it("procedure 名稱沒撞 tRPC 保留字", () => {
     const names = Object.keys((plannerRouter as any)._def.procedures).sort();
-    expect(names).toEqual(["commit", "markWritten", "pickFork", "removeSlot", "send", "week"]);
+    expect(names).toEqual(["commit", "markWritten", "pickFork", "releaseSlot", "removeSlot", "send", "week"]);
     for (const n of names) expect(Object.getOwnPropertyNames(Function.prototype)).not.toContain(n);
   });
 });

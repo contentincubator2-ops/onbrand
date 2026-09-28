@@ -241,6 +241,24 @@ export const plannerRouter = router({
       return { touched, weekStart };
     }),
 
+  /**
+   * 成品頁按「放棄」：這一格退回「已排定、還沒寫」，跟那篇產出脫鉤。產出本身不刪（留在專案）。
+   * 只有格子目前連的就是這篇時才退，避免舊分頁把後來寫好的另一篇解掉。
+   */
+  releaseSlot: protectedProcedure
+    .input(z.object({ slotId: z.number().int().positive(), outputId: z.number().int().positive() }))
+    .mutation(async ({ ctx, input }) => {
+      const [rows]: any = await localPool.execute(`SELECT brandId FROM planned_slots WHERE id = ? LIMIT 1`, [input.slotId]);
+      const brandId = Number((rows as any[])[0]?.brandId ?? 0);
+      if (!brandId) throw new TRPCError({ code: "NOT_FOUND", message: "找不到這一格" });
+      await assertBrandAccess(ctx.user!.id, brandId);
+      await localPool.execute(
+        `UPDATE planned_slots SET status = 'planned', outputId = NULL WHERE id = ? AND status = 'written' AND outputId = ?`,
+        [input.slotId, input.outputId],
+      );
+      return { ok: true };
+    }),
+
   /** 排定這週：草稿 → 已排定。 */
   commit: protectedProcedure
     .input(weekInput)

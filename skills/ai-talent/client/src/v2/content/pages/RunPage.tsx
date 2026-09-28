@@ -386,22 +386,38 @@ function sanitizeProviderErrorForToast(input: unknown): string {
 export default function RunPage() {
   const { outputId } = useParams<{ outputId: string }>();
   const navigate = useNavigate();
-  // 2026-09-28（CJ「寫完要可以存回日曆，回到左談右曆的畫面」）：從本週企劃的任務視窗產生的，
-  // 網址帶 from=planner（＋w 週、slot 格子）。這種成品頁多一顆「存回本週企劃」。
+  // 2026-09-28（CJ「成品頁右下方只留兩顆：排程到日曆（排好跳回本週企劃）、放棄」）：
+  // 從本週企劃的任務視窗產生的，網址帶 from=planner（w 週、slot 格子、d 那天、camp/item 活動格子）。
   const [runSearch] = useSearchParams();
   const fromPlanner = runSearch.get("from") === "planner";
   const plannerWeek = runSearch.get("w");
   const plannerSlot = Number(runSearch.get("slot") ?? 0);
-  const plannerMarkMut = (trpc as any).planner?.markWritten?.useMutation?.();
-  const backToPlanner = async () => {
-    // 產生當下就已經回填過；這裡再補一次，保證格子一定連到這一篇（重跑、換版本後也一樣）。
-    if (plannerSlot > 0 && id) {
-      try { await plannerMarkMut?.mutateAsync?.({ slotId: plannerSlot, outputId: Number(id) }); } catch { /* 不擋回去 */ }
-    }
+  const plannerDate = runSearch.get("d");
+  const plannerCamp = Number(runSearch.get("camp") ?? 0);
+  const plannerItem = runSearch.get("item");
+  const plannerReleaseMut = (trpc as any).planner?.releaseSlot?.useMutation?.();
+  const campaignMarkMut = (trpc as any).campaign?.markWritten?.useMutation?.();
+  const [confirmDiscard, setConfirmDiscard] = useState(false);
+  /** 回本週企劃；ho＝剛處理的那篇（週曆上亮起來）。 */
+  const plannerHref = (highlight: boolean) => {
     const sp = new URLSearchParams();
     if (plannerWeek) sp.set("w", plannerWeek);
-    if (plannerSlot > 0) sp.set("hl", String(plannerSlot));
-    navigate(`/planner${sp.toString() ? `?${sp.toString()}` : ""}`);
+    if (highlight && outputId) sp.set("ho", String(outputId));
+    return `/planner${sp.toString() ? `?${sp.toString()}` : ""}`;
+  };
+  /** 放棄：那一格退回沒寫、跟這篇脫鉤；這篇本身留在專案，不刪。 */
+  const discardToPlanner = async () => {
+    const oid = Number(outputId);
+    try {
+      if (plannerSlot > 0 && oid) await plannerReleaseMut?.mutateAsync?.({ slotId: plannerSlot, outputId: oid });
+      if (plannerCamp > 0 && plannerItem) await campaignMarkMut?.mutateAsync?.({ eventId: plannerCamp, itemId: plannerItem, outputId: null });
+    } catch { /* 退不掉也照樣回去；格子最多是顯示「已寫好」 */ }
+    navigate(plannerHref(false));
+  };
+  const openPlannerSchedule = () => {
+    setSchedMode("calendar");
+    if (plannerDate && /^\d{4}-\d{2}-\d{2}$/.test(plannerDate)) setScheduleAt(`${plannerDate}T20:00`);
+    setScheduleDialogOpen(true);
   };
   const { t, lang } = useLang();
   const id = Number(outputId);
@@ -1238,7 +1254,7 @@ export default function RunPage() {
           });
         }
         setScheduleDialogOpen(false);
-        navigate("/planner");
+        navigate(fromPlanner ? plannerHref(true) : "/planner");
       } catch {
         // error toast already shown by scheduleToCalMut.onError
       }
@@ -1271,7 +1287,7 @@ export default function RunPage() {
           platform: _platform, scheduledAt: _scheduledAt,
         });
         setScheduleDialogOpen(false);
-        navigate("/planner");
+        navigate(fromPlanner ? plannerHref(true) : "/planner");
       } catch {
         // error toast already shown by scheduleToCalMut.onError
       }
@@ -1733,15 +1749,6 @@ export default function RunPage() {
             explicit path so the user knows where this output lives and
             has a 1-click way back to /projects without using the bare X.
             The save toast now mirrors this with an "Open Projects →" hint. */}
-      {fromPlanner && (
-        <div className="mb-3 flex items-center justify-between gap-3 rounded-xl border border-neutral-200 bg-white px-4 py-2.5">
-          <span className="text-[13px] text-neutral-600">{lang === "en" ? "From your weekly plan" : "這篇來自本週企劃"}</span>
-          <button type="button" onClick={backToPlanner} disabled={plannerMarkMut?.isPending}
-            className="rounded-full bg-neutral-900 px-4 py-2 text-[13px] font-semibold text-white transition hover:bg-neutral-700 disabled:opacity-50">
-            {lang === "en" ? "Save to weekly plan" : "存回本週企劃"}
-          </button>
-        </div>
-      )}
       <div className="flex items-center gap-1.5 text-tiny text-default-500 mb-2 px-1">
         <button
           onClick={() => navigate("/projects")}
@@ -3345,6 +3352,34 @@ export default function RunPage() {
           <Card>
             <CardBody className="space-y-2 p-3">
 
+              {fromPlanner ? (
+                <>
+                  <Button fullWidth className="bg-neutral-900 font-semibold text-white"
+                    startContent={<FontAwesomeIcon icon={faCalendarPlus} />} onPress={openPlannerSchedule}>
+                    {lang === "en" ? "Schedule to calendar" : "排程到日曆"}
+                  </Button>
+                  {confirmDiscard ? (
+                    <div className="rounded-lg border border-neutral-200 p-2.5">
+                      <p className="m-0 text-[12.5px] leading-relaxed text-neutral-600">
+                        {lang === "en" ? "Discard this draft? It stays in Projects." : "放棄這篇？週曆那一格會退回沒寫，內容仍留在專案。"}
+                      </p>
+                      <div className="mt-2 flex gap-2">
+                        <Button size="sm" variant="flat" className="flex-1" onPress={() => setConfirmDiscard(false)}>
+                          {lang === "en" ? "Keep" : "留著"}
+                        </Button>
+                        <Button size="sm" className="flex-1 bg-neutral-900 text-white"
+                          isLoading={plannerReleaseMut?.isPending || campaignMarkMut?.isPending} onPress={discardToPlanner}>
+                          {lang === "en" ? "Discard" : "放棄"}
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <Button fullWidth variant="light" className="text-neutral-600" onPress={() => setConfirmDiscard(true)}>
+                      {lang === "en" ? "Discard" : "放棄"}
+                    </Button>
+                  )}
+                </>
+              ) : (<>
               {/* ── 1. 送到行事曆 ─────────────────────────── */}
               <Button
                 variant="flat" fullWidth
@@ -3398,6 +3433,7 @@ export default function RunPage() {
                   ? "✓ Auto-saved to Projects — no action needed"
                   : "✓ 任務完成即自動記錄到專案，無需手動儲存"}
               </div>
+              </>)}
 
             </CardBody>
           </Card>
@@ -3527,8 +3563,8 @@ export default function RunPage() {
                     : "產生 .ics 檔 — 拖進 Google Calendar / Outlook / Apple Calendar 即可。")
                   : schedMode === "calendar"
                   ? (lang === "en"
-                    ? "Adds this post to Calendar. You can track it and publish from the Calendar page."
-                    : "將此貼文加入日曆。確認後自動跳轉日曆頁面，可在那裡追蹤並一鍵發布。")
+                    ? "Adds this post to your weekly plan. You can change the time or publish from there."
+                    : "排進本週企劃的週曆，確認後回到週曆；之後可以在那裡改時間或立即發布。")
                   : (lang === "en"
                     ? `Schedules this post to ${schedPlatform}. After confirming you'll be taken to the Calendar page to publish.`
                     : `排程此貼文到 ${schedPlatform}。確認後跳轉行事曆頁面，可在那裡一鍵發布。`)}
