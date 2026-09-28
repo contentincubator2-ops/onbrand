@@ -36,6 +36,11 @@ describe("bilingual visual brief parsing", () => {
     expect(result.prompt).toBe(`Photorealistic editorial scene representing: ${caption}`);
   });
 
+  it("前後多了一句話的完整 JSON 也要讀得到（回報產品照衝突時常見）", () => {
+    const wrapped = '這張照片是生肉，跟文案不合。\n{"prompt":"A kitchen counter at dusk.","promptZh":"黃昏的廚房檯面。","conflict":{"photoShows":"生肉","postNeeds":"熟食","suggestPhoto":"煎好的牛排"}}\n以上。';
+    expect(parseBilingualBrief(wrapped, caption)).toEqual({ prompt: "A kitchen counter at dusk.", promptZh: "黃昏的廚房檯面。" });
+  });
+
   it("preserves a provider's plain English prose response", () => {
     const prose = "A warm editorial photograph of friends sharing a meal.";
     expect(parseBilingualBrief(prose, caption)).toEqual({

@@ -36,6 +36,18 @@ export function parseBilingualBrief(raw: string, caption: string): BilingualVisu
     const promptZh = typeof parsed.promptZh === "string" ? parsed.promptZh.trim() : "";
     if (prompt && promptZh) return { prompt, promptZh };
   } catch {
+    // 2026-09-28：回報產品照衝突時，模型常在 JSON 前後多講一句話——整段不是 JSON，但中間那個
+    // 物件是完整的。只收「完整、欄位齊全」的物件；壞掉的 JSON 仍然不會被當成文字送去生圖。
+    const s = cleaned.indexOf("{");
+    const e = cleaned.lastIndexOf("}");
+    if (s >= 0 && e > s) {
+      try {
+        const parsed = JSON.parse(cleaned.slice(s, e + 1)) as Record<string, unknown>;
+        const prompt = typeof parsed.prompt === "string" ? parsed.prompt.trim() : "";
+        const promptZh = typeof parsed.promptZh === "string" ? parsed.promptZh.trim() : "";
+        if (prompt && promptZh) return { prompt, promptZh };
+      } catch { /* fall through */ }
+    }
     if (cleaned && !cleaned.startsWith("{")) {
       return { prompt: cleaned, promptZh: fallback.promptZh };
     }

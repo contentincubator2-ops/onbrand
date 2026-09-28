@@ -303,7 +303,8 @@ Rules:
         ],
         // 160 English words (~220 tokens) plus a natural Traditional Chinese
         // rendering (~200-350 tokens) and JSON escaping need ample headroom.
-        maxTokens: 1200,
+        // 看照片、回衝突時多一段輸出，再多給一些，免得被截斷退回預設句。
+        maxTokens: photoDataUrl ? 1800 : 1200,
       });
 
       const brief = parseBilingualBriefChoice(result.choices?.[0], input.caption);
