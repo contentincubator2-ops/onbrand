@@ -1262,7 +1262,11 @@ export default function RunPage() {
     }
 
     // ── Single-post path (original behaviour) ────────────────────────────
-    const _scheduledAt = new Date(scheduleAt).toISOString();
+    // 從本週企劃來的：時間照台北時間解讀——週曆是用台北時間畫的，瀏覽器在別的時區時
+    // （實測美國時區把 9/29 20:00 排成台北 9/30 09:00）格子會掉到隔天。
+    const _scheduledAt = fromPlanner && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(scheduleAt)
+      ? new Date(`${scheduleAt}:00+08:00`).toISOString()
+      : new Date(scheduleAt).toISOString();
     if (schedMode === "ics") {
       scheduleMut.mutate({
         id, ...getRunContentMutationLocator(selectedContentKind, activeIdx),
@@ -3497,7 +3501,7 @@ export default function RunPage() {
             {schedMode === "ics"
               ? (lang === "en" ? "Download .ics" : "下載 .ics")
               : schedMode === "calendar"
-              ? (lang === "en" ? "Add to Calendar" : "排程到行事曆")
+              ? (lang === "en" ? "Schedule to calendar" : "排程到日曆")
               : (lang === "en" ? `Publish — ${schedPlatform}` : `排程發布 — ${schedPlatform}`)}
           </ModalHeader>
           <ModalBody className="space-y-3">
