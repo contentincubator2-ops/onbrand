@@ -3024,7 +3024,8 @@ export default function RunPage() {
                           <p className="text-[12.5px] leading-relaxed text-warning-800">
                             {lang === "en"
                               ? `This photo shows “${photoConflict.photoShows}”, but this post needs “${photoConflict.postNeeds}”. Upload: ${photoConflict.suggestPhoto}`
-                              : `這張照片是「${photoConflict.photoShows}」，這篇要的是「${photoConflict.postNeeds}」。建議上傳：${photoConflict.suggestPhoto}`}
+                              : `這張照片是「${photoConflict.photoShows}」，這篇要的是「${photoConflict.postNeeds}」。建議用：${photoConflict.suggestPhoto}${
+                                  runProductImages.filter((x) => x.productId === validRunProduct.productId).length > 1 ? "（可以從上面換一張，或上傳新照片）" : ""}`}
                           </p>
                           <div className="mt-2 flex gap-2">
                             <Button size="sm" className="bg-neutral-900 text-white" isLoading={uploadingPhoto}
