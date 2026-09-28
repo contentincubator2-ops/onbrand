@@ -263,6 +263,28 @@ ${input.audienceContext ? `受眾：${input.audienceContext}` : ""}
           }
         } catch { /* skip malformed rows */ }
       }
+      // 2026-09-28（CJ「發現衝突的時候，應該提醒用戶上傳新的照片」）：一個產品可以有好幾張照片
+      // （生的、煎好擺盤的、包裝…），生圖時要能挑對的那張——主圖以外的上傳照片也列出來，主圖排第一。
+      try {
+        const ids = [...new Set((rows as any[]).map((r) => Number(r.id)))];
+        if (ids.length) {
+          const [ph]: any = await localPool.execute(
+            `SELECT scopeId, url FROM asset_photos WHERE brandId = ? AND scope = 'product'
+               AND scopeId IN (${ids.map(() => "?").join(",")}) ORDER BY isPrimary DESC, createdAt DESC`,
+            [input.brandId, ...ids],
+          );
+          const nameOf = new Map((rows as any[]).map((r) => [Number(r.id), String(r.name ?? "")]));
+          const seen = new Set(products.map((p) => p.imageUrl));
+          const perProduct = new Map<number, number>();
+          for (const r of ph as any[]) {
+            const pid = Number(r.scopeId);
+            const n = perProduct.get(pid) ?? products.filter((p) => p.productId === pid).length;
+            if (seen.has(r.url) || n >= 4) continue;
+            products.push({ productId: pid, name: nameOf.get(pid) ?? "", imageUrl: String(r.url) });
+            seen.add(r.url); perProduct.set(pid, n + 1);
+          }
+        }
+      } catch { /* asset_photos 讀不到就只給主圖 */ }
       return { products: await filterUsableProductImages(products) };
     }),
 });

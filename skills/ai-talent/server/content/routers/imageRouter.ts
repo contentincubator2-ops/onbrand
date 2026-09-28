@@ -14,7 +14,7 @@ import { router, protectedProcedure } from "../../platform/core/trpc";
 import { getDb } from "../../db";
 import { sql } from "drizzle-orm";
 import { generateImage, resolveBrandVisualContext } from "../core/imageGen";
-import { isLocalUploadPath } from "../core/imageFetch";
+import { fetchImageBuffer, isLocalUploadPath } from "../core/imageFetch";
 import { assertBrandOwner } from "../../platform/core/brandAuth";
 import { imageActionForRequest, reconcileImageCharge } from "../../platform/core/imageBilling";
 import {
@@ -60,11 +60,26 @@ function friendlyImageFailure(kind: string | undefined, rawError: string | undef
  *
  * 產品會以實照交給生圖模型，所以指令**只寫場景**，不描述產品本身——描述了，模型就會
  * 照文字重畫一個（2026-09-28 實例：照片是生的美國橫膈牛排，指令寫成「剛起鍋的厚切
- * 牛舌」，產出整盤烤好的另一種肉）。這個 LLM 看不到照片，所以也不能替產品決定狀態
- * （生／熟／包裝／擺盤），只能挑一個不管它長什麼樣都放得進去的場景。
+ * 牛舌」，產出整盤烤好的另一種肉）。
+ *
+ * canSeePhoto：照片有一起送給這個 LLM（視覺）時為 true——它就能挑一個配合照片狀態的
+ * 場景，並檢查「這篇要的畫面」跟「照片裡的產品狀態」有沒有衝突（例：文案講五分鐘上桌的
+ * 晚餐，照片卻是生肉），有就回 conflict，前端提醒使用者上傳合適的照片（CJ：「發現衝突的
+ * 時候，應該提醒用戶上傳新的照片」）。照片讀不到時退回 false：不替產品決定生熟、也不回衝突。
  */
-export function productScenePromptSystem(productName: string): string {
+export function productScenePromptSystem(productName: string, canSeePhoto = false): string {
   const name = productName.replace(/\s+/g, " ").trim().slice(0, 120);
+  const stateRule = canSeePhoto
+    ? `- The attached image is the product photo. Choose a setting that fits the product in the state it is photographed (raw, packaged, cooked, served, worn, boxed…) — never a setting that needs it in a different state.`
+    : `- You cannot see the photo, so do not decide whether the product is raw, cooked, packaged or served. Choose a setting where it looks natural as-is (e.g. a kitchen counter, a wooden table, a picnic setup).`;
+  const conflictRule = canSeePhoto
+    ? `
+Conflict check: does this post need the product shown in a clearly different state or use than the photo shows (e.g. the post is about a ready-to-eat dinner but the photo shows raw meat; the post shows the garment worn but the photo is a flat lay; the post is about the product in use but the photo is only the box)? Differences in angle, background, lighting or props are NOT conflicts.
+If there is a conflict, set "conflict" to {"photoShows":"…","postNeeds":"…","suggestPhoto":"…"} in Traditional Chinese, each 20 characters or fewer; suggestPhoto names the photo the user should upload (e.g. 「煎好擺盤的橫膈牛排」). Otherwise set "conflict" to null. Still write the scene prompt for the current photo either way.`
+    : "";
+  const shape = canSeePhoto
+    ? `{"prompt":"English prompt","promptZh":"繁體中文版","conflict":null}`
+    : `{"prompt":"English prompt","promptZh":"繁體中文版"}`;
   return `You are a senior commercial photography art director.
 A REAL product photo will be supplied to the image model separately and must appear exactly as photographed. The product is: ${name || "the brand's product"}.
 Given a social media caption and brand context, write one concise image-generation prompt (60–120 English words) that describes ONLY the scene the product is placed into, then a natural Traditional Chinese version for a Taiwan user. Both versions must describe exactly the same scene.
@@ -72,11 +87,43 @@ Given a social media caption and brand context, write one concise image-generati
 Rules:
 - Refer to the product only as "the product" / 「產品」. Never describe its appearance: no shape, colour, texture, cut, doneness, cooking state, portion, plating, packaging, label or size.
 - Never name or depict any other food or item that could be mistaken for the product or replace it (e.g. no other cuts of meat, no other dishes as the hero).
-- You cannot see the photo, so do not decide whether the product is raw, cooked, packaged or served. Choose a setting where it looks natural as-is (e.g. a kitchen counter, a wooden table, a picnic setup).
+${stateRule}
 - Describe only: the surface it rests on, a few supporting props that do not compete with it, environment, lighting, camera angle/framing, mood.
 - Reflect the caption's core message through the setting and mood — no text in frame.
-- Use the brand's visual identity (colours, archetype, tone). Do NOT mention competitor brand names.
-- Output JSON only in exactly this shape: {"prompt":"English prompt","promptZh":"繁體中文版"}`;
+- Use the brand's visual identity (colours, archetype, tone). Do NOT mention competitor brand names.${conflictRule}
+- Output JSON only in exactly this shape: ${shape}`;
+}
+
+export interface PhotoConflict { photoShows: string; postNeeds: string; suggestPhoto: string }
+
+/** 這張照片是不是這個品牌自己的產品照（上傳的，或產品資料裡的主圖）。 */
+async function brandOwnsProductPhoto(brandId: number, url: string): Promise<boolean> {
+  const { default: localPool } = await import("../../localDb");
+  try {
+    const [a]: any = await localPool.execute(
+      `SELECT 1 FROM asset_photos WHERE brandId = ? AND scope = 'product' AND url = ? LIMIT 1`, [brandId, url],
+    );
+    if ((a as any[]).length) return true;
+    const [b]: any = await localPool.execute(
+      `SELECT 1 FROM products WHERE brandId = ? AND JSON_UNQUOTE(JSON_EXTRACT(positioning, '$.imageUrl')) = ? LIMIT 1`, [brandId, url],
+    );
+    return (b as any[]).length > 0;
+  } catch { return false; }
+}
+
+/** 從回覆裡撈 conflict；格式不對、欄位空的一律當沒有衝突（寧可不提醒，也不要提醒錯）。 */
+export function parsePhotoConflict(raw: unknown): PhotoConflict | null {
+  const text = String(raw ?? "").replace(/^```(?:json)?\s*/i, "").replace(/\s*```\s*$/i, "").trim();
+  let obj: any = null;
+  try { obj = JSON.parse(text); } catch {
+    const s = text.indexOf("{"); const e = text.lastIndexOf("}");
+    if (s >= 0 && e > s) { try { obj = JSON.parse(text.slice(s, e + 1)); } catch { obj = null; } }
+  }
+  const c = obj?.conflict;
+  if (!c || typeof c !== "object") return null;
+  const clip = (v: unknown) => String(v ?? "").trim().slice(0, 40);
+  const out = { photoShows: clip(c.photoShows), postNeeds: clip(c.postNeeds), suggestPhoto: clip(c.suggestPhoto) };
+  return out.photoShows && out.postNeeds && out.suggestPhoto ? out : null;
 }
 
 export const imageRouter = router({
@@ -190,7 +237,8 @@ export const imageRouter = router({
       // 2026-09-28（CJ「產出的圖片跟真實產品圖片差很多」）：勾了「使用真實產品圖」時帶這個。
       // 沒帶的話，這支會自己想像主體（實例：產品照是生的美國橫膈牛排，指令卻寫
       // 「剛起鍋的厚切牛舌」），生圖模型就照文字重畫一個別的東西，產品保真指令壓不過它。
-      product: z.object({ name: z.string().max(200) }).optional(),
+      // imageUrl：那張產品照。有帶、而且確實是這個品牌的照片，就一起給 LLM 看（檢查衝突）。
+      product: z.object({ name: z.string().max(200), imageUrl: z.string().max(500).optional() }).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED" });
@@ -198,6 +246,15 @@ export const imageRouter = router({
 
       const resolved = await resolveBrandVisualContext(input.brandId);
       const { invokeLLM } = await import("../../platform/core/llm");
+
+      // 只讀「這個品牌自己的產品照」——不替任意網址代抓圖。讀不到就退回看不到照片的版本。
+      let photoDataUrl: string | null = null;
+      if (input.product?.imageUrl && await brandOwnsProductPhoto(input.brandId, input.product.imageUrl)) {
+        try {
+          const { buffer, mime } = await fetchImageBuffer(input.product.imageUrl, { maxBytes: 8 * 1024 * 1024 });
+          photoDataUrl = `data:${mime};base64,${buffer.toString("base64")}`;
+        } catch { photoDataUrl = null; }
+      }
 
       const brandBlock = [
         resolved.brandName   ? `Brand name: ${resolved.brandName}`     : "",
@@ -222,7 +279,7 @@ export const imageRouter = router({
         ? `\nVisual brief already drafted by art director:\n${input.imageStyle}`
         : "";
 
-      const systemPrompt = input.product ? productScenePromptSystem(input.product.name) : `You are a senior commercial photography art director.
+      const systemPrompt = input.product ? productScenePromptSystem(input.product.name, !!photoDataUrl) : `You are a senior commercial photography art director.
 Given a social media caption and brand context, write one concise, specific image-generation prompt (80–160 English words), then provide a natural Traditional Chinese version for a Taiwan user. Both versions must describe exactly the same scene.
 
 Rules:
@@ -237,14 +294,21 @@ Rules:
       const result = await invokeLLM({
         messages: [
           { role: "system", content: systemPrompt },
-          { role: "user",   content: userMsg },
+          {
+            role: "user",
+            content: photoDataUrl
+              ? ([{ type: "text", text: userMsg }, { type: "image_url", image_url: { url: photoDataUrl } }] as any)
+              : userMsg,
+          },
         ],
         // 160 English words (~220 tokens) plus a natural Traditional Chinese
         // rendering (~200-350 tokens) and JSON escaping need ample headroom.
         maxTokens: 1200,
       });
 
-      return parseBilingualBriefChoice(result.choices?.[0], input.caption);
+      const brief = parseBilingualBriefChoice(result.choices?.[0], input.caption);
+      const conflict = photoDataUrl ? parsePhotoConflict(result.choices?.[0]?.message?.content) : null;
+      return { ...brief, conflict };
     }),
 
   /**

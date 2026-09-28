@@ -7,7 +7,22 @@
  * 2026-09-24：imageRouter 原本沒有這支守門測試，這輪加 refineScenePrompt 時補上。
  */
 import { describe, expect, it } from "vitest";
-import { imageRouter, productScenePromptSystem } from "./imageRouter";
+import { imageRouter, parsePhotoConflict, productScenePromptSystem } from "./imageRouter";
+
+describe("產品照與這篇要的畫面衝突", () => {
+  it("看得到照片時要求回 conflict；看不到時不要求", () => {
+    expect(productScenePromptSystem("橫膈牛排", true)).toMatch(/"conflict"/);
+    expect(productScenePromptSystem("橫膈牛排", false)).not.toMatch(/Conflict check/);
+  });
+  it("解析衝突；缺欄位或 null 當沒有衝突", () => {
+    const raw = '{"prompt":"x","promptZh":"y","conflict":{"photoShows":"生的橫膈牛排","postNeeds":"五分鐘上桌的晚餐","suggestPhoto":"煎好擺盤的橫膈牛排"}}';
+    expect(parsePhotoConflict(raw)).toEqual({ photoShows: "生的橫膈牛排", postNeeds: "五分鐘上桌的晚餐", suggestPhoto: "煎好擺盤的橫膈牛排" });
+    expect(parsePhotoConflict('```json\n' + raw + '\n```')?.suggestPhoto).toBe("煎好擺盤的橫膈牛排");
+    expect(parsePhotoConflict('{"prompt":"x","conflict":null}')).toBeNull();
+    expect(parsePhotoConflict('{"conflict":{"photoShows":"生肉","postNeeds":""}}')).toBeNull();
+    expect(parsePhotoConflict("not json")).toBeNull();
+  });
+});
 
 describe("有真實產品照時的圖片指令", () => {
   it("帶產品名、只寫場景、不准描述或替換產品", () => {

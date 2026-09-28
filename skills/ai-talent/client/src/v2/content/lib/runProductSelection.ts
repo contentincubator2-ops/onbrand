@@ -14,7 +14,11 @@ export function findValidRunProductSelection(
   currentBrandProducts: RunProductImage[],
 ): RunProductImage | null {
   if (!pickedProduct) return null;
+  // 一個產品可以有好幾張照片：先找同一張；找不到（舊的選擇、清單更新）才退回同產品的第一張。
   return currentBrandProducts.find(
+    (product) => product.productId === pickedProduct.productId && product.imageUrl === pickedProduct.imageUrl
+      && product.imageUrl.trim().length > 0,
+  ) ?? currentBrandProducts.find(
     (product) => product.productId === pickedProduct.productId && product.imageUrl.trim().length > 0,
   ) ?? null;
 }

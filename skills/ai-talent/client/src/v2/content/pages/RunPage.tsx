@@ -949,25 +949,51 @@ export default function RunPage() {
 
   // 2026-09-28（CJ「產出的圖片跟真實產品圖片差很多」）：從文案產生的圖片指令，要知道有沒有
   // 真實產品照。沒帶的話它會自己想像主體（照片是生的橫膈牛排，指令寫「剛起鍋的厚切牛舌」），
-  // 模型就照文字畫另一個東西。「使用真實產品圖」的勾選在 Step 1 下面，使用者常常先產指令
-  // 再勾——所以記住目前這段指令是替哪個產品產的；勾選或換產品時，自動照新產品重產一次。
-  const productKeyNow = realProductMode ? `${validRunProduct!.productId}` : "";
-  const autoPromptRef = React.useRef<{ req: any; productKey: string; text: string } | null>(null);
-  const pendingAutoKeyRef = React.useRef<string>("");
+  // 模型就照文字畫另一個東西。產品照也一起給它看，它會回報「這篇要的畫面跟照片對不上」
+  // （CJ「發現衝突的時候，應該提醒用戶上傳新的照片」）。
+  // 「使用真實產品圖」的勾選在 Step 1 下面，使用者常常先有指令再勾——所以勾選／換照片時，
+  // 只要輸入框裡不是使用者自己打的字，就照這張照片自動重產一次。
+  const productKeyNow = realProductMode ? validRunProduct!.imageUrl : "";
+  const lastPromptReqRef = React.useRef<any>(null);
+  const userEditedPromptRef = React.useRef(false);
+  const [photoConflict, setPhotoConflict] = React.useState<{ photoShows: string; postNeeds: string; suggestPhoto: string; forUrl: string } | null>(null);
+  const pendingPhotoRef = React.useRef<string>("");
+  const captionPromptReq = () => {
+    const v = variants[activeIdx];
+    if (!v?.caption || !data?.brand?.id) return null;
+    return {
+      brandId: data.brand.id,
+      caption: v.caption,
+      channel: (
+        mockupVariant?.platform === "facebook"  ? "fb" :
+        mockupVariant?.platform === "instagram" ? "ig" :
+        mockupVariant?.platform === "linkedin"  ? "linkedin" :
+        mockupVariant?.platform === "youtube"   ? "youtube" :
+        mockupVariant?.platform === "tiktok"    ? "tiktok" :
+        undefined
+      ) as any,
+      imageStyle: v?.imageStyle ?? undefined,
+      size: getIgPublicVariantImageSize(selectedContentKind, v?.format),
+    };
+  };
   const requestPromptFromCaption = (req: any) => {
-    const withProduct = realProductMode ? { ...req, product: { name: String(validRunProduct!.name ?? "") } } : req;
-    pendingAutoKeyRef.current = productKeyNow;
-    autoPromptRef.current = { req, productKey: productKeyNow, text: "" };
+    if (!req) return;
+    lastPromptReqRef.current = req;
+    pendingPhotoRef.current = productKeyNow;
+    const withProduct = realProductMode
+      ? { ...req, product: { name: String(validRunProduct!.name ?? ""), imageUrl: validRunProduct!.imageUrl } }
+      : req;
     captionToPromptMut.mutate(withProduct);
   };
   // 2026-06-15: generate image prompt from the current variant's caption.
   const captionToPromptMut = (trpc as any).image?.promptFromCaption?.useMutation
     ? (trpc as any).image.promptFromCaption.useMutation({
         onSuccess: (r: any) => {
+          const c = r?.conflict;
+          setPhotoConflict(c && pendingPhotoRef.current ? { ...c, forUrl: pendingPhotoRef.current } : null);
           if (r?.promptZh || r?.prompt) {
-            const text = lang === "en" ? (r.prompt || r.promptZh) : (r.promptZh || r.prompt);
-            if (autoPromptRef.current) autoPromptRef.current = { ...autoPromptRef.current, productKey: pendingAutoKeyRef.current, text };
-            setImagePrompt(text);
+            userEditedPromptRef.current = false;
+            setImagePrompt(lang === "en" ? (r.prompt || r.promptZh) : (r.promptZh || r.prompt));
             showToastGlobal(lang === "en" ? "Image prompt generated from caption ✓" : "已從文案產生圖片指令 ✓");
           }
         },
@@ -976,17 +1002,45 @@ export default function RunPage() {
         ),
       })
     : { mutate: () => {}, isPending: false };
-  // 勾選／換了產品照，而輸入框裡還是自動產生、使用者沒改過的那段 → 照新產品重產。
-  // 使用者自己改過的指令不動（那是他的字）。
+  // 勾選／換了產品照：輸入框不是使用者自己打的字（自動產生的或系統預填的，兩種都會描述產品本身），
+  // 就照這張照片重產；使用者自己改過的不動（那是他的字）。
   React.useEffect(() => {
-    const a = autoPromptRef.current;
-    if (!a || !a.text || a.productKey === productKeyNow) return;
-    if (imagePrompt.trim() !== a.text.trim() || captionToPromptMut.isPending) return;
-    requestPromptFromCaption(a.req);
+    if (!productKeyNow || userEditedPromptRef.current || captionToPromptMut.isPending) return;
+    requestPromptFromCaption(lastPromptReqRef.current ?? captionPromptReq());
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [productKeyNow]);
-  // 換了一篇（變體或成品）就不再把舊的自動指令算成這篇的。
-  React.useEffect(() => { autoPromptRef.current = null; }, [id, activeIdx]);
+  // 換了一篇（變體或成品）：之前的指令與衝突提醒都不是這篇的。
+  React.useEffect(() => { lastPromptReqRef.current = null; userEditedPromptRef.current = false; setPhotoConflict(null); }, [id, activeIdx]);
+
+  // 衝突時直接在這裡上傳新照片：存進這個產品的照片庫（不改主圖），選起來，指令照新照片重產。
+  const conflictFileRef = React.useRef<HTMLInputElement>(null);
+  const [uploadingPhoto, setUploadingPhoto] = React.useState(false);
+  const uploadConflictPhoto = async (file: File | undefined) => {
+    if (!file || !validRunProduct || !data?.brand?.id) return;
+    setUploadingPhoto(true);
+    try {
+      const res = await fetch("/api/asset-photo/upload", {
+        method: "POST", credentials: "include",
+        headers: {
+          "content-type": file.type || "application/octet-stream",
+          "x-brand-id": String(data.brand.id), "x-scope": "product",
+          "x-scope-id": String(validRunProduct.productId), "x-filename": encodeURIComponent(file.name),
+        },
+        body: file,
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || !json?.photo?.url) throw new Error(json?.error ?? `HTTP ${res.status}`);
+      await runProductImagesQ?.refetch?.();
+      setPhotoConflict(null);
+      setPickedRunProduct({ productId: validRunProduct.productId, name: validRunProduct.name, imageUrl: String(json.photo.url) });
+      showToastGlobal(lang === "en" ? "Photo added to this product" : "已加進這個產品的照片", "success");
+    } catch (e: any) {
+      showToastGlobal(String(e?.message ?? e), "error");
+    } finally {
+      setUploadingPhoto(false);
+      if (conflictFileRef.current) conflictFileRef.current.value = "";
+    }
+  };
 
   const [emailDialogOpen, setEmailDialogOpen] = useState(false);
   const [emailRecipients, setEmailRecipients] = useState("");
@@ -2764,7 +2818,7 @@ export default function RunPage() {
                       ? "e.g. Sunlight on a warm wooden table, a steaming bowl of soup, soft-focus background with a homey feel"
                       : "例：陽光灑落在溫暖木桌上，一碗冒著煙的健力湯，柔焦背景帶有家庭溫度"}
                     value={imagePrompt}
-                    onChange={(e) => setImagePrompt(e.target.value)}
+                    onChange={(e) => { userEditedPromptRef.current = true; setImagePrompt(e.target.value); }}
                     minRows={3}
                     maxRows={6}
                     description={lang === "en"
@@ -2786,22 +2840,7 @@ export default function RunPage() {
                       color="secondary"
                       fullWidth
                       isLoading={captionToPromptMut.isPending}
-                      onPress={() => {
-                        requestPromptFromCaption({
-                          brandId: data.brand!.id,
-                          caption: variants[activeIdx].caption,
-                          channel: (
-                            mockupVariant?.platform === "facebook"  ? "fb" :
-                            mockupVariant?.platform === "instagram" ? "ig" :
-                            mockupVariant?.platform === "linkedin"  ? "linkedin" :
-                            mockupVariant?.platform === "youtube"   ? "youtube" :
-                            mockupVariant?.platform === "tiktok"    ? "tiktok" :
-                            undefined
-                          ) as any,
-                          imageStyle: variants[activeIdx]?.imageStyle ?? undefined,
-                          size: getIgPublicVariantImageSize(selectedContentKind, variants[activeIdx]?.format),
-                        });
-                      }}
+                      onPress={() => requestPromptFromCaption(captionPromptReq())}
                     >
                       {captionToPromptMut.isPending
                         ? (lang === "en" ? "Generating…" : "產生中…")
@@ -2963,13 +3002,13 @@ export default function RunPage() {
                       </label>
                       {useRealProduct && (
                         <div className="flex gap-2 mt-2 flex-wrap">
-                          {runProductImages.slice(0, 12).map((p) => (
+                          {runProductImages.slice(0, 16).map((p) => (
                             <button
-                              key={p.productId}
+                              key={p.imageUrl}
                               onClick={() => setPickedRunProduct(p)}
                               title={p.name}
                               className={`w-12 h-12 rounded-md overflow-hidden border-2 transition ${
-                                pickedRunProduct?.productId === p.productId ? "border-secondary" : "border-transparent hover:border-default-300"
+                                validRunProduct?.imageUrl === p.imageUrl ? "border-secondary" : "border-transparent hover:border-default-300"
                               }`}
                             >
                               <img src={p.imageUrl} alt={p.name} className="w-full h-full object-cover" />
@@ -2978,6 +3017,26 @@ export default function RunPage() {
                           {pickedRunProduct && (
                             <span className="text-[12px] text-default-600 self-center ml-1 truncate max-w-[160px]">{pickedRunProduct.name}</span>
                           )}
+                        </div>
+                      )}
+                      {useRealProduct && photoConflict && validRunProduct?.imageUrl === photoConflict.forUrl && (
+                        <div className="mt-2 rounded-lg border border-warning-300 bg-warning-50 px-3 py-2.5">
+                          <p className="text-[12.5px] leading-relaxed text-warning-800">
+                            {lang === "en"
+                              ? `This photo shows “${photoConflict.photoShows}”, but this post needs “${photoConflict.postNeeds}”. Upload: ${photoConflict.suggestPhoto}`
+                              : `這張照片是「${photoConflict.photoShows}」，這篇要的是「${photoConflict.postNeeds}」。建議上傳：${photoConflict.suggestPhoto}`}
+                          </p>
+                          <div className="mt-2 flex gap-2">
+                            <Button size="sm" className="bg-neutral-900 text-white" isLoading={uploadingPhoto}
+                              onPress={() => conflictFileRef.current?.click()}>
+                              {lang === "en" ? "Upload new photo" : "上傳新照片"}
+                            </Button>
+                            <Button size="sm" variant="light" onPress={() => setPhotoConflict(null)}>
+                              {lang === "en" ? "Use this one anyway" : "照舊用這張"}
+                            </Button>
+                          </div>
+                          <input ref={conflictFileRef} type="file" accept="image/*" className="hidden"
+                            onChange={(e) => uploadConflictPhoto(e.target.files?.[0])} />
                         </div>
                       )}
                     </div>
