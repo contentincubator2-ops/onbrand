@@ -55,6 +55,30 @@ function friendlyImageFailure(kind: string | undefined, rawError: string | undef
   return kind === "auth" || kind === "quota" ? headline : `${headline}\n\n[技術細節] ${raw.slice(0, 300)}`;
 }
 
+/**
+ * 勾了「使用真實產品圖」時，從文案產生圖片指令用的系統提示。
+ *
+ * 產品會以實照交給生圖模型，所以指令**只寫場景**，不描述產品本身——描述了，模型就會
+ * 照文字重畫一個（2026-09-28 實例：照片是生的美國橫膈牛排，指令寫成「剛起鍋的厚切
+ * 牛舌」，產出整盤烤好的另一種肉）。這個 LLM 看不到照片，所以也不能替產品決定狀態
+ * （生／熟／包裝／擺盤），只能挑一個不管它長什麼樣都放得進去的場景。
+ */
+export function productScenePromptSystem(productName: string): string {
+  const name = productName.replace(/\s+/g, " ").trim().slice(0, 120);
+  return `You are a senior commercial photography art director.
+A REAL product photo will be supplied to the image model separately and must appear exactly as photographed. The product is: ${name || "the brand's product"}.
+Given a social media caption and brand context, write one concise image-generation prompt (60–120 English words) that describes ONLY the scene the product is placed into, then a natural Traditional Chinese version for a Taiwan user. Both versions must describe exactly the same scene.
+
+Rules:
+- Refer to the product only as "the product" / 「產品」. Never describe its appearance: no shape, colour, texture, cut, doneness, cooking state, portion, plating, packaging, label or size.
+- Never name or depict any other food or item that could be mistaken for the product or replace it (e.g. no other cuts of meat, no other dishes as the hero).
+- You cannot see the photo, so do not decide whether the product is raw, cooked, packaged or served. Choose a setting where it looks natural as-is (e.g. a kitchen counter, a wooden table, a picnic setup).
+- Describe only: the surface it rests on, a few supporting props that do not compete with it, environment, lighting, camera angle/framing, mood.
+- Reflect the caption's core message through the setting and mood — no text in frame.
+- Use the brand's visual identity (colours, archetype, tone). Do NOT mention competitor brand names.
+- Output JSON only in exactly this shape: {"prompt":"English prompt","promptZh":"繁體中文版"}`;
+}
+
 export const imageRouter = router({
   generate: protectedProcedure
     .input(
@@ -163,6 +187,10 @@ export const imageRouter = router({
       // 3000 chars: plain-text Nano-Banana templates can reach ~2600 chars;
       // JSON-converted templates are ~200-530 chars after nanoBananaJsonToPrompt.
       imageStyle: z.string().max(3000).optional(),
+      // 2026-09-28（CJ「產出的圖片跟真實產品圖片差很多」）：勾了「使用真實產品圖」時帶這個。
+      // 沒帶的話，這支會自己想像主體（實例：產品照是生的美國橫膈牛排，指令卻寫
+      // 「剛起鍋的厚切牛舌」），生圖模型就照文字重畫一個別的東西，產品保真指令壓不過它。
+      product: z.object({ name: z.string().max(200) }).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED" });
@@ -194,7 +222,7 @@ export const imageRouter = router({
         ? `\nVisual brief already drafted by art director:\n${input.imageStyle}`
         : "";
 
-      const systemPrompt = `You are a senior commercial photography art director.
+      const systemPrompt = input.product ? productScenePromptSystem(input.product.name) : `You are a senior commercial photography art director.
 Given a social media caption and brand context, write one concise, specific image-generation prompt (80–160 English words), then provide a natural Traditional Chinese version for a Taiwan user. Both versions must describe exactly the same scene.
 
 Rules:

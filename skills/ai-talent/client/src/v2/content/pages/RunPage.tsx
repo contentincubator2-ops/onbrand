@@ -947,12 +947,27 @@ export default function RunPage() {
     });
   };
 
+  // 2026-09-28（CJ「產出的圖片跟真實產品圖片差很多」）：從文案產生的圖片指令，要知道有沒有
+  // 真實產品照。沒帶的話它會自己想像主體（照片是生的橫膈牛排，指令寫「剛起鍋的厚切牛舌」），
+  // 模型就照文字畫另一個東西。「使用真實產品圖」的勾選在 Step 1 下面，使用者常常先產指令
+  // 再勾——所以記住目前這段指令是替哪個產品產的；勾選或換產品時，自動照新產品重產一次。
+  const productKeyNow = realProductMode ? `${validRunProduct!.productId}` : "";
+  const autoPromptRef = React.useRef<{ req: any; productKey: string; text: string } | null>(null);
+  const pendingAutoKeyRef = React.useRef<string>("");
+  const requestPromptFromCaption = (req: any) => {
+    const withProduct = realProductMode ? { ...req, product: { name: String(validRunProduct!.name ?? "") } } : req;
+    pendingAutoKeyRef.current = productKeyNow;
+    autoPromptRef.current = { req, productKey: productKeyNow, text: "" };
+    captionToPromptMut.mutate(withProduct);
+  };
   // 2026-06-15: generate image prompt from the current variant's caption.
   const captionToPromptMut = (trpc as any).image?.promptFromCaption?.useMutation
     ? (trpc as any).image.promptFromCaption.useMutation({
         onSuccess: (r: any) => {
           if (r?.promptZh || r?.prompt) {
-            setImagePrompt(lang === "en" ? (r.prompt || r.promptZh) : (r.promptZh || r.prompt));
+            const text = lang === "en" ? (r.prompt || r.promptZh) : (r.promptZh || r.prompt);
+            if (autoPromptRef.current) autoPromptRef.current = { ...autoPromptRef.current, productKey: pendingAutoKeyRef.current, text };
+            setImagePrompt(text);
             showToastGlobal(lang === "en" ? "Image prompt generated from caption ✓" : "已從文案產生圖片指令 ✓");
           }
         },
@@ -961,6 +976,17 @@ export default function RunPage() {
         ),
       })
     : { mutate: () => {}, isPending: false };
+  // 勾選／換了產品照，而輸入框裡還是自動產生、使用者沒改過的那段 → 照新產品重產。
+  // 使用者自己改過的指令不動（那是他的字）。
+  React.useEffect(() => {
+    const a = autoPromptRef.current;
+    if (!a || !a.text || a.productKey === productKeyNow) return;
+    if (imagePrompt.trim() !== a.text.trim() || captionToPromptMut.isPending) return;
+    requestPromptFromCaption(a.req);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [productKeyNow]);
+  // 換了一篇（變體或成品）就不再把舊的自動指令算成這篇的。
+  React.useEffect(() => { autoPromptRef.current = null; }, [id, activeIdx]);
 
   const [emailDialogOpen, setEmailDialogOpen] = useState(false);
   const [emailRecipients, setEmailRecipients] = useState("");
@@ -2761,7 +2787,7 @@ export default function RunPage() {
                       fullWidth
                       isLoading={captionToPromptMut.isPending}
                       onPress={() => {
-                        captionToPromptMut.mutate({
+                        requestPromptFromCaption({
                           brandId: data.brand!.id,
                           caption: variants[activeIdx].caption,
                           channel: (
@@ -2876,7 +2902,7 @@ export default function RunPage() {
                                   const styleHint = adapted.length > 2800
                                     ? adapted.slice(0, 2797) + "…"
                                     : adapted;
-                                  captionToPromptMut.mutate({
+                                  requestPromptFromCaption({
                                     brandId,
                                     caption: activeCaption,
                                     channel: channelVal,
