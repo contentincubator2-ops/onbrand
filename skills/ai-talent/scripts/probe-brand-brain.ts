@@ -38,6 +38,8 @@ async function main() {
   used.sort((a, b) => a - b);
   console.log(`\n${ids.length} 個品牌；用量 min ${used[0] ?? 0} / 中位數 ${used[Math.floor(used.length / 2)] ?? 0} / max ${used[used.length - 1] ?? 0}`);
   await localPool.end();
+  // buildBrandBrain 也開了 drizzle 的連線池（getDb），不 exit 的話 process 不會結束。
+  process.exit(0);
 }
 
 main().catch((e) => { console.error(e); process.exit(1); });

@@ -49,7 +49,9 @@ export const BRAIN_CATEGORIES: Record<BrainCategoryKey, { zh: string; en: string
  * 大腦容量：一次產文最多帶進多少字的品牌記憶。超過時從優先度最低的類別
  * 開始割捨（見 PRIORITY），並在大腦畫面標成「超載」。
  */
-export const BRAIN_CAPACITY = 12_000;
+// 2026-09-29 用 dev 上定位資料最多的 15 個品牌校準：原本單格上限下用量 1,597～8,731 字
+// （中位數 2,802），單格放寬後最大的品牌約 11,000 字——容量留 16,000 當安全上限。
+export const BRAIN_CAPACITY = 16_000;
 
 /** 割捨順序：數字越大越先被擠掉。市場設定永遠保留。 */
 const PRIORITY: Record<BrainCategoryKey, number> = {
@@ -65,6 +67,8 @@ interface BrainEntry {
   label: string;
   line: string;
   storedChars: number;
+  /** 實際記住的內容字數（不含標籤）。 */
+  keptChars: number;
   trimmed: boolean;
   dropped: boolean;
 }
@@ -110,7 +114,7 @@ class BrainCollector {
     this.entries.push({
       section, category, label,
       line: render ? render(kept) : `【${label}】${kept}`,
-      storedChars: len(text), trimmed, dropped: false,
+      storedChars: len(text), keptChars: len(kept), trimmed, dropped: false,
     });
   }
 
@@ -197,7 +201,7 @@ function pushCustomSegments(c: BrainCollector, section: SectionKey, pos: any): v
  * 擠掉的那筆整行不進 prompt——截半句比整句不放更糟。
  */
 function applyCapacity(entries: BrainEntry[], fixedChars: number, capacity: number): void {
-  let used = fixedChars + entries.reduce((n, e) => n + len(e.line), 0);
+  let used = fixedChars + entries.reduce((n, e) => n + e.keptChars, 0);
   if (used <= capacity) return;
   const order = entries
     .map((e, i) => ({ e, i }))
@@ -206,7 +210,7 @@ function applyCapacity(entries: BrainEntry[], fixedChars: number, capacity: numb
     if (used <= capacity) break;
     if (e.category === "market") continue;
     e.dropped = true;
-    used -= len(e.line);
+    used -= e.keptChars;
   }
 }
 
@@ -464,9 +468,9 @@ export async function buildBrandBrain(
 
     const gc = positioning?.goldenCircle;
     if (gc && typeof gc === "object") {
-      if (gc.why) c.add("locked", "identity", "WHY (信念)", String(gc.why), 400);
-      if (gc.how) c.add("locked", "identity", "HOW (作法)", String(gc.how), 400);
-      if (gc.what) c.add("locked", "identity", "WHAT (產品/服務)", String(gc.what), 300);
+      if (gc.why) c.add("locked", "identity", "WHY (信念)", String(gc.why), 800);
+      if (gc.how) c.add("locked", "identity", "HOW (作法)", String(gc.how), 800);
+      if (gc.what) c.add("locked", "identity", "WHAT (產品/服務)", String(gc.what), 800);
     }
     if (brandRow?.positioningSummary) c.add("locked", "identity", "定位摘要 (legacy)", String(brandRow.positioningSummary), 1_200);
 
@@ -499,7 +503,7 @@ export async function buildBrandBrain(
     // 大腦畫面把它們標成「產出後檢查」。
     const assets = positioning?._assets;
     if (assets && typeof assets === "object") {
-      const grab = (key: string, label: string, max = 600, maxItems = 12) => {
+      const grab = (key: string, label: string, max = 1_500, maxItems = 20) => {
         const a = assets[key];
         if (!a) return;
         if (typeof a.text === "string" && a.text.trim()) {
@@ -507,14 +511,22 @@ export async function buildBrandBrain(
         } else if (Array.isArray(a.items) && a.items.length > 0) {
           const items = a.items.map((x: any) => String(x ?? "").trim()).filter(Boolean);
           if (items.length) c.add("assets", "rules", label, items.slice(0, maxItems).join(" · "), max);
-          if (items.length > maxItems) c.entries[c.entries.length - 1]!.trimmed = true;
+          if (items.length > maxItems) {
+            const e = c.entries[c.entries.length - 1]!;
+            e.trimmed = true;
+            e.storedChars = len(items.join(" · "));
+          }
         } else if (Array.isArray(a.pairs) && a.pairs.length > 0) {
           const ps = a.pairs.filter((p: any) => p?.from || p?.to).map((p: any) => `${p.from ?? "?"} → ${p.to ?? "?"}`);
           if (ps.length) c.add("assets", "rules", label, ps.slice(0, maxItems).join(" · "), max);
-          if (ps.length > maxItems) c.entries[c.entries.length - 1]!.trimmed = true;
+          if (ps.length > maxItems) {
+            const e = c.entries[c.entries.length - 1]!;
+            e.trimmed = true;
+            e.storedChars = len(ps.join(" · "));
+          }
         }
       };
-      grab("voice", "聲音指南", 600);
+      grab("voice", "聲音指南", 1_500);
       grab("voice_principles", "聲音原則");
       grab("preferred_terms", "偏好用詞");
       grab("branded_terms", "品牌術語");
@@ -522,7 +534,7 @@ export async function buildBrandBrain(
       grab("product_naming", "產品名稱規範");
       grab("cta_library", "CTA 範例");
       grab("hook_library", "開場 Hook 範例");
-      grab("templates_copy", "文案範本", 1_500, 8);
+      grab("templates_copy", "文案範本", 2_500, 10);
       grab("audience", "目標受眾");
 
       const strList = (x: any): string[] => Array.isArray(x?.items) ? x.items.map((s: any) => String(s ?? "").trim()).filter(Boolean) : [];
@@ -535,20 +547,20 @@ export async function buildBrandBrain(
     }
 
     // ── 補充脈絡：品牌故事 / 受眾 / 差異化 / 價值觀 / 競爭 ──
-    if (positioning?.origin?.story) c.add("context", "context", "品牌故事", String(positioning.origin.story), 400);
+    if (positioning?.origin?.story) c.add("context", "context", "品牌故事", String(positioning.origin.story), 1_500);
     if (positioning?.audience && typeof positioning.audience === "object") {
       const aud = positioning.audience;
-      if (aud.primary) c.add("context", "context", "主要受眾", String(aud.primary), 200);
+      if (aud.primary) c.add("context", "context", "主要受眾", String(aud.primary), 800);
       if (aud.painPoints && Array.isArray(aud.painPoints)) {
-        c.add("context", "context", "受眾痛點", aud.painPoints.slice(0, 5).join(" · "), 300);
+        c.add("context", "context", "受眾痛點", aud.painPoints.slice(0, 8).join(" · "), 600);
       }
     }
     if (positioning?.differentiation) {
       const d = positioning.differentiation;
-      if (typeof d === "string") c.add("context", "context", "差異化", d, 300);
-      else if (d.summary) c.add("context", "context", "差異化", String(d.summary), 300);
-      if (d && typeof d === "object" && d.discriminator) c.add("context", "context", "唯一致勝理由", String(d.discriminator), 100);
-      if (d && typeof d === "object" && d.reasonToBelieve) c.add("context", "context", "支撐證據", String(d.reasonToBelieve), 300);
+      if (typeof d === "string") c.add("context", "context", "差異化", d, 600);
+      else if (d.summary) c.add("context", "context", "差異化", String(d.summary), 600);
+      if (d && typeof d === "object" && d.discriminator) c.add("context", "context", "唯一致勝理由", String(d.discriminator), 300);
+      if (d && typeof d === "object" && d.reasonToBelieve) c.add("context", "context", "支撐證據", String(d.reasonToBelieve), 600);
     }
     if (positioning?.values?.items && Array.isArray(positioning.values.items)) {
       const vals = positioning.values.items
@@ -568,7 +580,7 @@ export async function buildBrandBrain(
     }
     if (positioning?.competition && typeof positioning.competition === "object") {
       const comp = positioning.competition;
-      if (comp.intensity) c.add("context", "context", "競爭強度", String(comp.intensity), 150);
+      if (comp.intensity) c.add("context", "context", "競爭強度", String(comp.intensity), 400);
       if (Array.isArray(comp.direct) && comp.direct.length) {
         const d2 = comp.direct
           .slice(0, 3)
@@ -579,9 +591,9 @@ export async function buildBrandBrain(
           })
           .filter(Boolean)
           .join("；");
-        if (d2) c.add("context", "context", "直接競品", d2, 400);
+        if (d2) c.add("context", "context", "直接競品", d2, 600);
       }
-      if (comp.map) c.add("context", "context", "競爭定位地圖", String(comp.map), 200);
+      if (comp.map) c.add("context", "context", "競爭定位地圖", String(comp.map), 600);
     }
     pushSourceDoc(c, "context", positioning, "品牌定位文件補充");
     pushCustomSegments(c, "context", positioning);
@@ -729,7 +741,7 @@ export async function buildBrandBrain(
         category: e.category,
         label: e.label,
         storedChars: e.storedChars,
-        keptChars: e.dropped ? 0 : len(e.line),
+        keptChars: e.dropped ? 0 : e.keptChars,
         status: e.dropped ? "overflow" : e.trimmed ? "trimmed" : "remembered",
         preview: e.line.replace(/^【[^】]*】/, "").slice(0, 80),
       })),
