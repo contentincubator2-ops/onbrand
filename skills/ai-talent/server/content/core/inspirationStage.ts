@@ -298,6 +298,34 @@ export function parseAngles(raw: string, args: { keys: ThinkerKey[]; platforms: 
 }
 
 /**
+ * 串流中的半截 JSON → 已經寫完整的那幾個切角物件（原文字串）。邊想邊顯示用：模型一寫完
+ * 一張卡的 `}` 就能先交出去，不必等整段 JSON 收尾。字串裡的括號與跳脫字元不算。
+ */
+export function completedAngleObjects(buf: string): string[] {
+  const start = buf.indexOf("[", Math.max(0, buf.indexOf('"angles"')));
+  if (start < 0) return [];
+  const out: string[] = [];
+  let depth = 0, inStr = false, esc = false, objStart = -1;
+  for (let i = start + 1; i < buf.length; i++) {
+    const ch = buf[i]!;
+    if (inStr) {
+      if (esc) esc = false;
+      else if (ch === "\\") esc = true;
+      else if (ch === '"') inStr = false;
+      continue;
+    }
+    if (ch === '"') { inStr = true; continue; }
+    if (ch === "{") { if (depth === 0) objStart = i; depth++; }
+    else if (ch === "}") {
+      depth--;
+      if (depth === 0 && objStart >= 0) { out.push(buf.slice(objStart, i + 1)); objStart = -1; }
+      if (depth < 0) break;
+    } else if (ch === "]" && depth === 0) break;
+  }
+  return out;
+}
+
+/**
  * 採用後寫進本週企劃格子的題目。任務卡會把它預填成主要輸入，所以要讓寫手一眼看懂
  * 切角與開場；planned_slots.topic 是 VARCHAR(200)。
  */

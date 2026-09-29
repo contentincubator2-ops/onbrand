@@ -11,7 +11,8 @@
 import React from "react";
 import { useNavigate, useOutletContext } from "react-router-dom";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faArrowsRotate, faChevronDown, faXmark, faPlus, faCheck, faEnvelope, faGlobe } from "@fortawesome/free-solid-svg-icons";
+import { faArrowsRotate, faChevronDown, faXmark, faPlus, faCheck, faEnvelope, faGlobe, faPlay, faWandMagicSparkles } from "@fortawesome/free-solid-svg-icons";
+import { Button } from "@heroui/react";
 import { faFacebookF, faInstagram, faThreads, faLine, faTiktok } from "@fortawesome/free-brands-svg-icons";
 import { trpc } from "../../../lib/trpc";
 import { useLang } from "../../../lib/i18n";
@@ -41,6 +42,9 @@ type ThinkerKey = string;
 interface ThinkerCard { key: ThinkerKey; agentId: number; name: string; title: string; avatarUrl: string; school: string; schoolEn: string; pitch: string; pitchEn: string }
 interface AngleView { id: string; thinker: ThinkerKey; answer?: string; title: string; hook: string; why: string; platform: string; format: string; adopted?: { date: string } }
 type Subject = { kind: "brand" | "product" | "event"; id: number | null };
+
+/** 同 server inspirationStage.DEFAULT_LINEUP——不同才顯示「恢復預設陣容」。 */
+const DEFAULT_LINEUP = ["story", "direct", "contrarian", "insight", "customer"];
 
 let seq = 0;
 const newId = () => `a${Date.now().toString(36)}${(seq++).toString(36)}`;
@@ -96,39 +100,74 @@ export default function InspirationPage() {
     if (rosterQ.data?.lineup) setLineup(rosterQ.data.lineup);
   }, [rosterQ.data]);
 
-  const ideate = T.inspiration?.ideate?.useMutation?.();
+  const utils = T.useUtils?.();
+  const ideateStart = T.inspiration?.ideateStart?.useMutation?.();
   const saveLineup = T.inspiration?.setLineup?.useMutation?.();
+  const resetLineup = T.inspiration?.resetLineup?.useMutation?.();
   const adopt = T.inspiration?.adopt?.useMutation?.();
 
   const subjectName = subject.kind === "product" ? products.find((p) => p.id === subject.id)?.name
     : subject.kind === "event" ? events.find((e) => e.id === subject.id)?.name : null;
+  const brandName: string | null = ctx?.brands?.find((b: any) => b.id === brandId)?.name ?? null;
 
+  /** 換品牌、離開頁面、開新一輪時遞增——舊的輪詢看到號碼變了就停。 */
+  const runSeq = React.useRef(0);
+  React.useEffect(() => () => { runSeq.current++; }, []);
+  React.useEffect(() => { runSeq.current++; setThinking([]); setReplacing(false); }, [brandId]);
+
+  /**
+   * 2026-09-30（CJ「邊想邊顯示」）：開始後伺服器立刻回 jobId，想好一張就能拿走一張；
+   * 這裡每秒問一次，把這一輪目前的卡片換進畫面（同一輪的卡用同一個前綴 id，重複換不會疊）。
+   */
   const run = async (opts: { keys: ThinkerKey[]; count: 1 | 3; mode: "replace" | "append"; avoid: string[] }) => {
-    if (!brandId || !ideate || !opts.keys.length) return;
+    if (!brandId || !ideateStart || !utils || !opts.keys.length) return;
+    const seq = ++runSeq.current;
+    const batch = newId();
+    const before = angles;
     setThinking(opts.keys);
     setReplacing(opts.mode === "replace");
+    const place = (list: any[]) => setAngles((cur) => {
+      const rest = cur.filter((a) => !a.id.startsWith(batch));
+      const fresh: AngleView[] = list.map((a, i) => ({ ...a, id: `${batch}-${i}` }));
+      if (opts.mode === "replace") return [...rest.filter((a) => a.adopted), ...fresh];
+      // 「請他再想」：新想的接在他原本那張後面，不要跑到最底下。
+      const lastIdx = rest.map((a) => a.thinker).lastIndexOf(opts.keys[0]!);
+      if (lastIdx < 0) return [...rest, ...fresh];
+      return [...rest.slice(0, lastIdx + 1), ...fresh, ...rest.slice(lastIdx + 1)];
+    });
     try {
-      const r = await ideate.mutateAsync({
+      const { jobId } = await ideateStart.mutateAsync({
         brandId, subject, occasion: occasion.trim() || undefined,
         thinkers: opts.keys, count: opts.count, avoid: opts.avoid.slice(0, 40),
       });
-      const fresh: AngleView[] = (r?.angles ?? []).map((a: any) => ({ ...a, id: newId() }));
-      setAngles((cur) => {
-        if (opts.mode === "replace") return [...cur.filter((a) => a.adopted), ...fresh];
-        // 「請他再想」：新想的接在他原本那張後面，不要跑到最底下。
-        const lastIdx = cur.map((a) => a.thinker).lastIndexOf(opts.keys[0]!);
-        if (lastIdx < 0) return [...cur, ...fresh];
-        return [...cur.slice(0, lastIdx + 1), ...fresh, ...cur.slice(lastIdx + 1)];
-      });
-      if (r?.failed?.length) {
-        const names = r.failed.map((k: string) => byKey(k)?.name ?? k).join("、");
+      let last: { angles: any[]; done: boolean; failed: string[]; lost: boolean } = { angles: [], done: false, failed: [], lost: false };
+      for (let i = 0; i < 180 && seq === runSeq.current; i++) {
+        await new Promise((r) => setTimeout(r, 1000));
+        if (seq !== runSeq.current) return;
+        last = await utils.inspiration.ideatePoll.fetch({ jobId }, { staleTime: 0 });
+        if (seq !== runSeq.current) return;
+        if (last.angles.length) {
+          setReplacing(false);
+          place(last.angles);
+          // 已經有卡的人就不再顯示「在想」；「請他再想」只有一位，想完三張前都算在想。
+          if (opts.count === 1) setThinking(opts.keys.filter((k) => !last.angles.some((a) => a.thinker === k)));
+        }
+        if (last.done) break;
+      }
+      if (!last.angles.length) {
+        setAngles(before);
+        showToastGlobal(last.lost
+          ? (en ? "The server restarted mid-way. Please try again." : "伺服器剛好重啟，這輪沒想完，再按一次。")
+          : (en ? "Nothing came back this time. Try again." : "這輪沒想出來，再試一次。"));
+      } else if (last.failed?.length) {
+        const names = last.failed.map((k: string) => byKey(k)?.name ?? k).join("、");
         showToastGlobal(en ? `${names} couldn't come up with anything this time.` : `${names} 這次沒想出來，可以再試一次。`);
       }
     } catch (e: any) {
+      if (seq === runSeq.current) setAngles(before);
       showToastGlobal(e?.message || (en ? "Something went wrong. Try again." : "剛剛沒想好，再試一次。"));
     } finally {
-      setThinking([]);
-      setReplacing(false);
+      if (seq === runSeq.current) { setThinking([]); setReplacing(false); }
     }
   };
 
@@ -185,16 +224,75 @@ export default function InspirationPage() {
     </button>
   );
 
-  return (
-    <div className="flex min-h-full flex-col bg-white">
-      <header className="flex h-16 shrink-0 items-center gap-3 px-7" style={{ borderBottom: `1px solid ${LINE}` }}>
-        <h1 className="m-0 text-[17px] font-bold" style={{ color: INK }}>{en ? "Idea stage" : "靈感舞台"}</h1>
-        <p className="m-0 text-[13px]" style={{ color: META }}>{en ? "One subject, several minds. Pick the angle you like." : "同一個主體，請幾位 agent 各想一個切角，挑一個開始。"}</p>
-      </header>
+  // 最上面那條狀態列：跟七日發布台的 brain bar 同一個位置，想的時候報進度。
+  const doneNames = lineup.filter((k) => !thinking.includes(k) && angles.some((a) => a.thinker === k)).map((k) => byKey(k)?.name ?? k);
+  const statusLine = busy
+    ? (en
+      ? `${thinking.map((k) => byKey(k)?.name ?? k).join(", ")} thinking…${doneNames.length && thinking.length < lineup.length ? ` · ${doneNames.join(", ")} done` : ""}`
+      : `${thinking.map((k) => byKey(k)?.name ?? k).join("、")} 正在想…${doneNames.length && thinking.length < lineup.length ? `　${doneNames.join("、")} 已想好` : ""}`)
+    : angles.length
+      ? (en ? `${angles.length} angles on the table — use one, or ask someone for more.` : `桌上有 ${angles.length} 個切角——挑一個採用，或請某位再多想幾個`)
+      : (en ? "Pick a subject, add this week's hook, press Start — each agent pitches one angle." : "選好主體和由頭，按「開始想」— 每位 agent 各想一個切角");
+  const canStart = !busy && lineup.length > 0 && !(subject.kind !== "brand" && !subject.id);
 
-      <div className="mx-auto flex w-full max-w-[1120px] flex-col gap-6 px-4 py-6 md:px-7">
+  return (
+    <div className="min-h-screen bg-neutral-50">
+      {/* 狀態列（sticky）——位置與樣式同七日發布台的 brain bar。 */}
+      <div className="sticky top-0 z-30 w-full border-b border-neutral-200 bg-white">
+        <div className="max-w-[1400px] mx-auto px-6 py-4 flex items-center gap-3" aria-live="polite">
+          <FontAwesomeIcon icon={faWandMagicSparkles} className="text-neutral-400" />
+          <p className="m-0 text-sm text-neutral-500">{statusLine}</p>
+        </div>
+      </div>
+
+      {/* 2026-09-30（CJ「排版要跟七日發布台一樣，標題位置不能跟其他頁不一致」）：
+          canonical header template — 眉標／標題／襯線副標／適合，同 /theater、/projects、/brands。 */}
+      <div className="max-w-[1400px] mx-auto px-6 pt-10 pb-4">
+        <div className="flex items-end justify-between flex-wrap gap-4 mb-4">
+          <div className="text-center mx-auto" style={{ flex: "1 1 auto" }}>
+            <h1
+              className="font-semibold tracking-tight leading-tight"
+              style={{
+                fontSize: "clamp(1.6rem, 3vw, 2.25rem)",
+                background: "#171717",
+                WebkitBackgroundClip: "text",
+                WebkitTextFillColor: "transparent",
+                backgroundClip: "text",
+              }}
+            >
+              {en ? "Idea Stage · Angles First" : "靈感舞台 · 先想角度"}
+            </h1>
+            <p
+              className="mt-3 mx-auto text-default-700"
+              style={{
+                fontFamily: '"Source Serif Pro", "Noto Serif TC", Georgia, serif',
+                fontStyle: "italic", fontSize: 14, lineHeight: 1.7, maxWidth: 640,
+              }}
+            >
+              {en
+                ? `Built on ${brandName ?? "your brand"}'s positioning. Several agents each pitch an angle — you pick one to write.`
+                : `以 ${brandName ?? "你的品牌"} 的定位為骨架，幾位 agent 各想一個切角，你挑一個開始寫`}
+            </p>
+            <p
+              className="mt-2 mx-auto text-default-700"
+              style={{ fontSize: 12, lineHeight: 1.55, maxWidth: 640, letterSpacing: "0.02em" }}
+            >
+              <span style={{ fontWeight: 600, color: "#171717", marginRight: 6 }}>{en ? "Best for" : "適合："}</span>
+              {en ? "Out of ideas this week · Before a launch · New ways to say the same product" : "這週沒靈感 · 新品上市前 · 同一個產品想換說法"}
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button color="primary" onPress={startRound} isDisabled={!canStart}
+              startContent={busy ? undefined : <FontAwesomeIcon icon={faPlay} />}>
+              {busy ? (en ? "Thinking…" : "正在想…") : angles.length ? (en ? "Start over" : "重新想") : (en ? "Start thinking" : "開始想")}
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      <div className="max-w-[1400px] mx-auto flex flex-col gap-6 px-6 pb-12">
         {/* ── 主體＋由頭 ── */}
-        <section aria-label={en ? "Subject" : "主體"} className="flex flex-col gap-3 rounded-2xl border p-5" style={{ borderColor: LINE }}>
+        <section aria-label={en ? "Subject" : "主體"} className="flex flex-col gap-3 rounded-2xl border bg-white p-5" style={{ borderColor: LINE }}>
           <p className="m-0 text-[13px] font-semibold" style={{ color: INK }}>{en ? "What are we talking about?" : "這次要講什麼？"}</p>
           <div className="flex flex-wrap items-center gap-2">
             {subjectBtn("brand", en ? "The brand" : "品牌本身")}
@@ -221,14 +319,21 @@ export default function InspirationPage() {
 
         {/* ── 陣容 ── */}
         <section aria-label={en ? "Who's thinking" : "誰來想"} className="flex flex-col gap-3">
-          <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <p className="m-0 text-[13px]" style={{ color: META }}>
               {en ? "Thinking for you — tap a face to swap" : "這幾位會幫你想，點頭像可以換人"}
             </p>
-            <button type="button" onClick={startRound} disabled={busy || !lineup.length || (subject.kind !== "brand" && !subject.id)}
-              className="rounded-full px-5 py-2.5 text-[13.5px] font-semibold text-white disabled:opacity-40" style={{ background: INK }}>
-              {busy ? (en ? "Thinking…" : "正在想…") : angles.length ? (en ? "Start over" : "重新想") : (en ? "Start thinking" : "開始想")}
-            </button>
+            {lineup.join() !== DEFAULT_LINEUP.join() && (
+              <button type="button" disabled={busy || !!resetLineup?.isPending}
+                onClick={async () => {
+                  if (!brandId || !resetLineup) return;
+                  const r = await resetLineup.mutateAsync({ brandId }).catch(() => null);
+                  if (r?.lineup) setLineup(r.lineup);
+                }}
+                className="text-[12.5px] underline underline-offset-2 disabled:opacity-40" style={{ color: META }}>
+                {en ? "Back to the default team" : "恢復預設陣容"}
+              </button>
+            )}
           </div>
           <div className="flex flex-wrap gap-2">
             {lineup.map((k) => {

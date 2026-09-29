@@ -3,10 +3,10 @@ import { describe, expect, it } from "vitest";
 // tRPC 在建構期就會拒絕保留字 procedure 名稱（apply/call/bind…），而 tsc 抓不到——
 // 所以每個 router 都要有一支真的 import 它的測試。
 describe("inspirationRouter", () => {
-  it("builds and exposes roster / setLineup / ideate / adopt", async () => {
+  it("builds and exposes roster / setLineup / ideateStart / ideatePoll / adopt", async () => {
     const { inspirationRouter } = await import("./inspirationRouter");
     const procs = Object.keys((inspirationRouter as any)._def.procedures);
-    expect(procs.sort()).toEqual(["adopt", "ideate", "roster", "setLineup"]);
+    expect(procs.sort()).toEqual(["adopt", "ideatePoll", "ideateStart", "resetLineup", "roster", "setLineup"]);
   }, 60_000);
 });
 
@@ -46,6 +46,26 @@ describe("inspirationStage", () => {
     const solo = parseAngles(JSON.stringify({ angles: [{ title: "單一細節", hook: "你注意過瓶蓋嗎？" }] }), { keys: ["detail"], platforms: ["facebook"], perThinker: 3 });
     expect(solo[0]?.thinker).toBe("detail");
     expect(parseAngles("not json", { keys: ["story"], platforms: ["facebook"], perThinker: 1 })).toEqual([]);
+  });
+
+  it("completedAngleObjects returns only cards whose closing brace has streamed in", async () => {
+    const { completedAngleObjects, parseAngles } = await import("../core/inspirationStage");
+    const full = JSON.stringify({ angles: [
+      { thinker: "story", title: "括號{不算}", hook: "他說：\"}\" 也不算", why: "" },
+      { thinker: "direct", title: "第二張", hook: "第二句", why: "" },
+    ] });
+    // 串流到第二張寫一半
+    const cut = full.indexOf('"第二句"');
+    expect(completedAngleObjects("")).toEqual([]);
+    expect(completedAngleObjects('{"angles":[{"thinker":"story","title":"寫一')).toEqual([]);
+    const partial = completedAngleObjects(full.slice(0, cut));
+    expect(partial).toHaveLength(1);
+    expect(JSON.parse(partial[0]!).title).toBe("括號{不算}");
+    expect(completedAngleObjects(full)).toHaveLength(2);
+    // 前言、```json 包裝都不影響
+    expect(completedAngleObjects("好的：\n```json\n" + full)).toHaveLength(2);
+    const parsed = parseAngles(`{"angles":[${partial.join(",")}]}`, { keys: ["story", "direct"], platforms: ["facebook"], perThinker: 1 });
+    expect(parsed.map((a) => a.thinker)).toEqual(["story"]);
   });
 
   it("unquote strips only a quote pair that wraps the whole hook", async () => {
