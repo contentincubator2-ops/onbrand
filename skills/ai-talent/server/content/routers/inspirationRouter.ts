@@ -23,7 +23,7 @@ import {
   type Angle, type ThinkerKey,
 } from "../core/inspirationStage";
 
-/** 想切角要的是判斷力，不是速度；用 general 預設的 haiku 實測切角偏泛。 */
+/** 想切角要的是判斷力，不是速度，固定用 Sonnet（Anthropic 的 provider 預設也是它；可用 env 覆寫）。 */
 const IDEATION_MODEL = process.env.INSPIRATION_MODEL || "claude-sonnet-4-6";
 
 const brandInput = z.object({ brandId: z.number().int().positive() });
