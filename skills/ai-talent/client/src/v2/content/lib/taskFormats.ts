@@ -323,6 +323,15 @@ export const IG_TASK_FORMAT_MAP: Record<string, IGActiveFormat> = {
 
   // ── 私訊 ──────────────────────────────────────────────────────────────
   "ig-30-dm-script":             "私訊",
+  // 2026-09-29 近 3 個月爆款結構卡
+  "ig-30-feed-account-takeover":   "貼文",
+  "ig-30-carousel-fake-callout":   "輪播",
+  "ig-30-reel-native-language-try": "Reels",
+  "ig-30-live-vote-bracket":       "直播",
+  "ig-30-profile-one-rule-debut":  "個人檔案",
+  "ig-30-comment-fill-blank":      "留言",
+  "ig-30-comment-ex-partner-jab":  "留言",
+  "ig-30-dm-sample-request":       "私訊",
 };
 
 // ── Format category config (LI) ─────────────────────────────────────────────

@@ -586,6 +586,327 @@ caption 結構：
     maxTokens: 660,
     outputDefaults: { platform: "instagram", post_type: "post" },
   },
+  // ── 爆款結構卡・近 3 個月案例（CJ 2026-09-29）────────────────────────
+  // IG 上的真實案例、2026-08～09 量測、數字要出現在 source.url 的參考文章裡。
+  // 前台只列近 3 個月的爆款卡，月份滑出去就自動下架，這批卡每月要換。
+  // 弱點（跨平台數字、品牌自報、年份推定）照實寫進 metric，讓用戶自己判斷。
+  {
+    id: "ig-30-feed-account-takeover",
+    tier: "30s",
+    postType: "feed",
+    label: { en: "Post: Cute Outsider Takes Over", zh: "IG 貼文：帳號被可愛的局外人接管" },
+    description: { en: "A playful 'takeover' photo with your brand hidden in the frame", zh: "假裝帳號被一個可愛的局外人接管，品牌元素藏在畫面裡" },
+    agent_id: 180166, // 沿用 IG feed 現役 agent
+    skill_slug: "instagram-copywriting",
+    source: {
+      type: "viral",
+      short: "新加坡 LTA「寶寶在公車上自拍」",
+      metric: "3 天逾 12,500 個讚（IG）",
+      asOf: "2026-08",
+      url: "https://www.asiaone.com/singapore/accidental-baby-selfie-trend-singapore",
+      takeaway:
+        "官方帳號假裝被一個反差極大的可愛局外人「接管」，畫面裡藏著自家場景（公車），語氣瞬間變軟，大家留言猜、留言玩。",
+    },
+    primary_question: "你們家最有代表性的場景或物件是什麼？誰來「接管」帳號最好笑？",
+    primary_input: { key: "topic", placeholder: "例：門市的收銀台 / 讓店貓接管帳號一天", type: "textarea" },
+    inputs: [
+      { key: "topic", label: "品牌場景 + 接管者（寶寶、寵物、吉祥物、實習生…）", type: "textarea", required: true },
+    ],
+    systemPrompt: `你要寫一則 IG 單圖貼文：品牌帳號「被一個可愛的局外人接管」了。
+
+先決定：
+- 接管者：跟品牌平常語氣反差越大越好（寶寶、店貓、吉祥物、最資淺的實習生）。
+- 畫面：接管者出現在品牌專屬的場景裡（門市、產線、制服色、招牌商品），一眼認得出是你們家。
+
+產出：
+1. 拍攝指示（一句話）：畫面要拍什麼、品牌元素放在哪裡。
+2. caption（30–120 字）：用接管者的口吻寫，隨性、錯字感、甚至只有 emoji 也可以，不能像官方。
+3. 置頂留言（40–80 字）：官方小編「發現帳號被接管」的反應，延續這個角色遊戲。
+
+硬規則：
+- 不要推銷、不要放價格或連結。
+- 不要用真實小孩的臉而沒有家長同意——預設用背影、手、或寵物／吉祥物。
+- hashtag 最多 2 個。`,
+    preferredModel: "qwen",
+    maxTokens: 500,
+    outputDefaults: { platform: "instagram", post_type: "feed" },
+  },
+  {
+    id: "ig-30-carousel-fake-callout",
+    tier: "30s",
+    postType: "carousel",
+    label: { en: "Carousel: Fake Call-Out, Real Pitch", zh: "IG 輪播：假公審，真賣點" },
+    description: { en: "Slide 1 stops the scroll with a mock call-out, last slide flips it", zh: "第一張假點名攔住滑動，中間把賣點寫成罪狀，最後一張反轉" },
+    agent_id: 224159, // 沿用 IG 輪播現役 agent
+    skill_slug: "carousel-copywriter",
+    source: {
+      type: "viral",
+      short: "Your Social Team 假公審輪播",
+      metric: "24 小時 5 萬次觀看（代理商自報；頁面未標年份，依貼文 ID 推定 2026-08）",
+      asOf: "2026-08",
+      url: "https://yoursocial.team/blog/trend-drops-august-week-two",
+      postUrl: "https://www.instagram.com/p/Db3Anfijuvo/",
+      takeaway:
+        "第一張用衝突型的假點名攔住滑動，中間把自家服務的好處寫成對方「偷走的東西」，最後一張揭曉是玩笑，賣點就這樣被看完了。",
+    },
+    primary_question: "你們最大的三個好處是什麼？要「點名」誰（虛構的對象）？",
+    primary_input: { key: "topic", placeholder: "例：點名「每天加班到 10 點的你」/ 好處：自動排程、報表一鍵、週末不用上線", type: "textarea" },
+    inputs: [
+      { key: "topic", label: "虛構的點名對象 + 三個好處", type: "textarea", required: true },
+    ],
+    systemPrompt: `你要寫一組 5 張的 IG 輪播：「假公審」。
+
+每張圖只放一句大字（15 字內）＋一行小字說明：
+1. 第 1 張：假的公開點名（「○○，我們要公開你了」），衝突感要夠，但對象必須是虛構或泛稱，不能點真人真品牌。
+2. 第 2–4 張：把品牌的三個好處寫成「他被我們偷走的東西」（例：「你的週末」「你的加班費藉口」），一張一個。
+3. 第 5 張：反轉揭曉是玩笑＋一個明確行動（收藏、分享給需要的人、或點連結）。
+
+另外寫 caption（80–180 字）：延續玩笑語氣，最後一句邀請大家 tag 一個「該被公審的人」。
+
+硬規則：
+- 不能點名真實的人、品牌、競爭對手。
+- 不要恐嚇或羞辱語氣；是玩笑，不是攻擊。`,
+    preferredModel: "qwen",
+    maxTokens: 700,
+    outputDefaults: { platform: "instagram", post_type: "carousel" },
+  },
+  {
+    id: "ig-30-reel-native-language-try",
+    tier: "30s",
+    postType: "reel",
+    label: { en: "Reel: Clumsy but Sincere in Their Language", zh: "IG Reels：用對方的母語笨拙地講一個好康" },
+    description: { en: "Admit you can't speak it, try anyway, deliver one concrete offer", zh: "先承認不會講，還是努力講完一個具體好康" },
+    agent_id: 60029, // 沿用 IG Reel 現役 agent
+    skill_slug: "short-video-scriptwriter",
+    source: {
+      type: "viral",
+      short: "紐約市長曼達尼中文宣傳 Reel",
+      metric: "IG 貼文逾 140 萬個讚、約 3 萬 7 千則留言",
+      asOf: "2026-08",
+      url: "https://www.worldjournal.com/wj/story/121390/9695681",
+      takeaway:
+        "開場直接承認「我不會講這個語言，但想試一下」，再用對方的母語講清楚一個具體好康；笨拙本身就是誠意，大家留言幫忙糾正、分享給同鄉。",
+    },
+    primary_question: "你想對哪一群說不同語言的人，講哪一個具體好康？",
+    primary_input: { key: "topic", placeholder: "例：對日本觀光客說：出示護照結帳 9 折，到 10/31", type: "textarea" },
+    inputs: [
+      { key: "topic", label: "對象的語言 + 具體好康（數字、期限）", type: "textarea", required: true },
+    ],
+    systemPrompt: `你要寫一支 30–45 秒的 IG Reels 腳本：品牌代表用「對方的母語」笨拙但真誠地講一個具體好康。
+
+結構：
+1. 開場 3 秒：用自己的語言說「我不會講○○話，但我想試試看」。
+2. 主體：換成對方的語言，只講一件事——好康是什麼、給誰、數字、到什麼時候。句子要短，允許有口音與停頓。
+3. 收尾：回到自己的語言，一句真心話＋一個明確動作（來店說一句暗號、點連結）。
+
+產出：
+- 分鏡：每個鏡頭寫「畫面／台詞（原文＋中文對照）／字幕」。
+- caption（50–120 字）：雙語，邀請母語者在留言區「糾正我的發音」。
+- 同一支腳本再給一個換成另一種語言的版本建議（一句話說可以換成哪一群人）。
+
+硬規則：
+- 外語台詞要正確、簡單，不能拿口音或文化開玩笑。
+- 好康一定要具體到數字與期限。`,
+    preferredModel: "qwen",
+    maxTokens: 800,
+    outputDefaults: { platform: "instagram", post_type: "reel" },
+  },
+  {
+    id: "ig-30-live-vote-bracket",
+    tier: "30s",
+    postType: "live",
+    label: { en: "Live: Viewer-Voted Knockout Bracket", zh: "IG 直播：觀眾投票淘汰賽" },
+    description: { en: "Turn your catalog into a bracket; the audience picks the winner", zh: "把商品目錄變成淘汰賽，觀眾留言決定誰晉級" },
+    agent_id: 60072, // 沿用 IG 直播現役 agent
+    skill_slug: "live-shopping-script",
+    source: {
+      type: "viral",
+      short: "SwissWatchExpo「The Grail Bracket」",
+      metric: "數百則留言，品牌史上互動最多的一場直播（品牌自報）",
+      asOf: "2026-08",
+      url: "https://www.swisswatchexpo.com/thewatchclub/the-grail-bracket/",
+      takeaway:
+        "16 件話題商品分組對戰、每回合開放留言投票、雙機位並排比細節，高單價商品也能靠「看比賽」累積信任，成交在直播後私訊完成。",
+    },
+    primary_question: "你有哪 8 或 16 件商品可以拿來對戰？觀眾會用什麼標準選？",
+    primary_input: { key: "topic", placeholder: "例：8 款招牌麵包 / 標準：你最想當早餐的", type: "textarea" },
+    inputs: [
+      { key: "topic", label: "參賽商品（8 或 16 件）+ 投票標準", type: "textarea", required: true },
+    ],
+    systemPrompt: `你要寫一場 IG 直播的「觀眾投票淘汰賽」企劃與主持腳本。
+
+產出：
+1. 賽程表：把商品兩兩分組（8 件＝3 輪、16 件＝4 輪），第一輪就放一組「冷門 vs 熱門」製造爆冷可能。
+2. 每一回合的主持稿（每回合 60–90 秒）：
+   - 兩件並排，各講一個具體細節（材質、做法、故事），不要講價格。
+   - 開放留言投票的口令（例：「留言 A 或 B」），並說明幾秒後結算。
+   - 結算後一句話評論結果。
+3. 決賽與收尾：公布冠軍、點出最大爆冷、告訴大家直播後怎麼私訊詢問或預約。
+4. 直播前一天的預告限動文案（40 字內）。
+
+硬規則：
+- 直播中不喊「快下單」；成交導到直播後私訊。
+- 每回合都要有明確的投票口令與結算時間。`,
+    preferredModel: "qwen",
+    maxTokens: 900,
+    outputDefaults: { platform: "instagram", post_type: "live" },
+  },
+  {
+    id: "ig-30-profile-one-rule-debut",
+    tier: "30s",
+    postType: "profile",
+    label: { en: "Profile: Debut With One Personality Rule", zh: "IG 個人檔案：開帳號先立一條個性規則" },
+    description: { en: "First post sets one rule; the story flips the same joke", zh: "首篇用一條個性規則定調，限動再延續同一個梗" },
+    agent_id: 180168, // 沿用 IG 個人檔案現役 agent
+    skill_slug: "link-in-bio",
+    source: {
+      type: "viral",
+      short: "珍妮佛勞倫斯開 IG 帳號",
+      metric: "不到 24 小時漲粉 300 萬（名人帳號）",
+      asOf: "2026-09",
+      url: "https://woman.tvbs.com.tw/fashion/52170",
+      takeaway:
+        "開帳號不放精修照，第一支影片就立一條很有個性的規則（誰酸我我就不玩了），限動再用同一個梗反轉，讓「開帳號」這件事本身變成話題。",
+    },
+    primary_question: "你們要開新帳號（或重新出發）嗎？品牌最有個性的一句話是什麼？",
+    primary_input: { key: "topic", placeholder: "例：甜點店開 IG / 個性：我們只做到賣完為止，不接預訂", type: "textarea" },
+    inputs: [
+      { key: "topic", label: "新帳號／重新出發 + 品牌最有個性的一句話", type: "textarea", required: true },
+    ],
+    systemPrompt: `你要幫品牌規劃一個 IG 新帳號（或重新出發）的「首發三件套」，核心是一條個性規則。
+
+產出：
+1. 個人檔案 bio（150 字元內）：第一行就是那條規則，第二行說明你是誰、在哪裡。
+2. 首篇 Reel 腳本（15–30 秒）：不精修、口語，一個人對鏡頭宣告這條規則，並說明為什麼。
+3. 首發限動 3 則：黑底白字或隨手拍，延續同一條規則的梗，最後一則反轉（自嘲或加碼）。
+4. 精選動態分類 3 個名稱（每個 4 字內），也用同一個語氣命名。
+
+硬規則：
+- 規則要真的是品牌會做到的事，不能只是口號。
+- 不要「歡迎追蹤」「敬請期待」這種開場。`,
+    preferredModel: "qwen",
+    maxTokens: 800,
+    outputDefaults: { platform: "instagram", post_type: "profile" },
+  },
+  {
+    id: "ig-30-comment-fill-blank",
+    tier: "30s",
+    postType: "comment",
+    label: { en: "Comments: Fill-in-the-Blank Entry", zh: "IG 留言：填空句型＋標記好友" },
+    description: { en: "A fixed sentence to complete, tag one friend, scarce prize", zh: "給一句填空、標記一位好友、名額稀少的獎品" },
+    agent_id: 180143, // Emily Wang — Community Manager
+    skill_slug: "community-manager",
+    source: {
+      type: "viral",
+      short: "臺北洲際酒店「The First 80」",
+      metric: "8 萬 2,956 則參與，約 1,037 人搶 1 個名額（FB／IG／Threads 合計）",
+      asOf: "2026-09",
+      url: "https://udn.com/news/amp/story/7270/9778590",
+      takeaway:
+        "用一句填空（「我愛上臺北，因為＿＿」）把留言門檻降到最低、再要求標記一位同行者，每一則留言都是一篇 UGC，也順便替活動擴散；名額只有 80 組，稀缺讓人搶著寫。",
+    },
+    primary_question: "你能送什麼稀少的獎品？想讓大家用哪一句話留言？",
+    primary_input: { key: "topic", placeholder: "例：新店試吃 30 名 / 句型：「我最想帶＿＿來吃，因為＿＿」", type: "textarea" },
+    inputs: [
+      { key: "topic", label: "獎品與名額 + 你想要的留言句型", type: "textarea", required: true },
+    ],
+    systemPrompt: `你要寫一則 IG 留言活動貼文，核心是「填空句型＋標記好友」。
+
+貼文（150–300 字）：
+1. 第一句：獎品是什麼、只有幾個名額（數字）。
+2. 參加方式（條列，最多 4 步）：追蹤帳號 → 在這篇留言，照句型填空 → 標記一位想一起來的人 →（需要的話）填報名表。
+3. 句型：給一句 10–20 字、有空格的句子，空格要讓人想講自己的故事，不是填產品名。
+4. 截止日與公布日（日期），以及怎麼公布。
+
+另外產出：
+- 3 則示範留言（不同人設的填法），讓大家知道可以寫得多有個性。
+- 公布名單那天的貼文開頭一句（預告下一波）。
+
+硬規則：
+- 不設購買門檻。
+- 評選標準要寫清楚（抽籤或看內容，二選一），避免事後爭議。`,
+    preferredModel: "qwen",
+    maxTokens: 700,
+    outputDefaults: { platform: "instagram", post_type: "comment" },
+  },
+  {
+    id: "ig-30-comment-ex-partner-jab",
+    tier: "30s",
+    postType: "comment",
+    label: { en: "Comments: A Friendly Jab Under a Hot Post", zh: "IG 留言：在熱門貼文底下留一句友善的刺" },
+    description: { en: "Borrow traffic from a big post with one short, friendly jab", zh: "在別人的高流量貼文底下，用既有關係留一句 20 字內的話" },
+    agent_id: 180143, // Emily Wang — Community Manager
+    skill_slug: "community-manager",
+    source: {
+      type: "viral",
+      short: "Samsung 在 Rosé IG 貼文下留言",
+      metric: "這則留言 21.2 萬人按讚、回覆超過 2,000 則",
+      asOf: "2026-09",
+      url: "https://www.mirrordaily.news/story/85288",
+      takeaway:
+        "當事人發了跟自家品類有關的大貼文，品牌用既有關係（前代言、前合作）的角度留一句友善但帶刺的話，不發聲明、不追加解釋，讓回覆串自己發酵。",
+    },
+    primary_question: "最近哪一則熱門貼文跟你們的品類有關？你們跟當事人有什麼既有關係？",
+    primary_input: { key: "topic", placeholder: "例：某部落客發文說在找好咖啡 / 我們曾經送過她豆子", type: "textarea" },
+    inputs: [
+      { key: "topic", label: "熱門貼文在講什麼 + 你們跟當事人的關係", type: "textarea", required: true },
+    ],
+    systemPrompt: `你要幫品牌在一則別人的熱門 IG 貼文底下，寫一句「友善但帶刺」的留言。
+
+先判斷（寫出來）：
+- 這則貼文為什麼跟品牌有關（品類、場景、當事人）。
+- 可以用的既有關係（曾合作、曾送禮、同一個城市…）；沒有關係就不要硬留，直接說「不建議留言」並說明原因。
+
+產出：
+1. 3 則留言候選（每則 20 字內）：語氣像朋友之間的吐槽，不能酸當事人、不能貶低對手。
+2. 風險檢查：每則一句話說明可能被誤解的地方。
+3. 被回覆之後的第二句（15 字內）：只接梗，不推銷、不放連結。
+
+硬規則：
+- 不在有爭議、悲傷或政治事件的貼文底下留言。
+- 不留連結、不提價格、不 tag 對手品牌。`,
+    preferredModel: "qwen",
+    maxTokens: 500,
+    outputDefaults: { platform: "instagram", post_type: "comment" },
+  },
+  {
+    id: "ig-30-dm-sample-request",
+    tier: "30s",
+    postType: "feed", // 還沒有 DM mockup —— 與 ig-30-dm-script 同樣退回 feed
+    label: { en: "DM: Message Us for a Free Sample", zh: "IG 私訊：私訊就送試用" },
+    description: { en: "DM is the only door to the sample — and to product feedback", zh: "私訊是拿試用品的唯一入口，順便收集產品回饋" },
+    agent_id: 180163, // Helen Sung — Social Media Community Builder
+    skill_slug: "customer-service-copy",
+    source: {
+      type: "viral",
+      short: "Plainspeak IG 私訊送試用包",
+      metric: "已寄出數千包試用包（報導未給精確數字）",
+      asOf: "2026-09",
+      url: "https://www.modernretail.co/marketing/brands-briefing-instagram-dms-are-proving-to-be-a-gold-mine-for-product-development/",
+      takeaway:
+        "把「私訊我們」設成拿免費試用的唯一入口，一次拿到潛在客戶名單與第一手問題；私訊裡最常被問的事，後來直接變成產品調整（例如開放單買）。",
+    },
+    primary_question: "你能送什麼試用品？最想從客人口中問到的一件事是什麼？",
+    primary_input: { key: "topic", placeholder: "例：單包掛耳咖啡 / 想知道大家都在什麼時間喝咖啡", type: "textarea" },
+    inputs: [
+      { key: "topic", label: "試用品 + 想問客人的一件事", type: "textarea", required: true },
+    ],
+    systemPrompt: `你要規劃一檔「IG 私訊就送試用」：公告貼文＋私訊回覆腳本。
+
+產出：
+1. 公告貼文（80–160 字）：第一句就說「私訊我們一個字就寄試用給你」，寫清楚送什麼、送到哪裡（地區）、到什麼時候或送完為止。
+2. 私訊自動回覆（第一則，60 字內）：謝謝＋請對方留下寄送資料的方式。
+3. 私訊第二則（40 字內）：只問一題使用情境問題（用戶指定的那件事），要好回答。
+4. 私訊整理表：把回覆分類的 3–5 個欄位（例：使用時間、最在意的點、想要的規格），方便之後轉成產品決策。
+5. 兩週後的回訪私訊（60 字內）：告訴提過需求的人「我們聽到了」，並說做了什麼調整或還在評估。
+
+硬規則：
+- 個資只收寄送需要的，不要多問。
+- 不要在第一則就推銷正貨。`,
+    preferredModel: "qwen",
+    maxTokens: 800,
+    outputDefaults: { platform: "instagram", post_type: "feed" },
+  },
 ];
 
 // ─── Plan B Orchestra config ────────────────────────────────────────────────
@@ -737,6 +1058,86 @@ export const IG_30S_ORCHESTRA: Record<string, OrchestraConfig> = {
     variantLabels: ["搬家版", "限定版", "先搶版"],
     captionMinChars: 120,
     captionMaxChars: 300,
+  },  // ── 爆款結構卡・近 3 個月案例（2026-09-29）
+  "ig-30-feed-account-takeover": {
+    variants: 3,
+    images: 3,
+    runImageGen: false,
+    imageDirectorId: NANCY_ID,
+    aspectRatio: "1:1",
+    variantLabels: ["寶寶接管", "寵物接管", "實習生接管"],
+    captionMinChars: 30,
+    captionMaxChars: 120,
+  },
+  "ig-30-carousel-fake-callout": {
+    variants: 3,
+    images: 3,
+    runImageGen: false,
+    imageDirectorId: NANCY_ID,
+    aspectRatio: "1:1",
+    variantLabels: ["點名你", "點名老闆", "點名週一"],
+    captionMinChars: 80,
+    captionMaxChars: 180,
+  },
+  "ig-30-reel-native-language-try": {
+    variants: 3,
+    images: 3,
+    runImageGen: false,
+    imageDirectorId: NANCY_ID,
+    aspectRatio: "9:16",
+    variantLabels: ["承認不會版", "努力講完版", "請你糾正版"],
+    captionMinChars: 50,
+    captionMaxChars: 120,
+  },
+  "ig-30-live-vote-bracket": {
+    variants: 3,
+    images: 3,
+    runImageGen: false,
+    imageDirectorId: NANCY_ID,
+    aspectRatio: "9:16",
+    variantLabels: ["8 強版", "16 強版", "爆冷版"],
+    captionMinChars: 40,
+    captionMaxChars: 200,
+  },
+  "ig-30-profile-one-rule-debut": {
+    variants: 3,
+    images: 3,
+    runImageGen: false,
+    imageDirectorId: NANCY_ID,
+    aspectRatio: "1:1",
+    variantLabels: ["規則版", "自嘲版", "加碼版"],
+    captionMinChars: 40,
+    captionMaxChars: 150,
+  },
+  "ig-30-comment-fill-blank": {
+    variants: 3,
+    images: 3,
+    runImageGen: false,
+    imageDirectorId: NANCY_ID,
+    aspectRatio: "1:1",
+    variantLabels: ["故事填空", "回憶填空", "願望填空"],
+    captionMinChars: 150,
+    captionMaxChars: 300,
+  },
+  "ig-30-comment-ex-partner-jab": {
+    variants: 3,
+    images: 3,
+    runImageGen: false,
+    imageDirectorId: NANCY_ID,
+    aspectRatio: "1:1",
+    variantLabels: ["前任角度", "老朋友角度", "同城角度"],
+    captionMinChars: 5,
+    captionMaxChars: 40,
+  },
+  "ig-30-dm-sample-request": {
+    variants: 3,
+    images: 3,
+    runImageGen: false,
+    imageDirectorId: NANCY_ID,
+    aspectRatio: "1:1",
+    variantLabels: ["一個字就寄", "限量版", "問一題版"],
+    captionMinChars: 80,
+    captionMaxChars: 160,
   },
 };
 
