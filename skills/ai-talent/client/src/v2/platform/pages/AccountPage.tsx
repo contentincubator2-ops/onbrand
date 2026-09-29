@@ -9,6 +9,7 @@ import { showToastGlobal } from "../../../components/ui/Toast";
 import { useLang } from "../../../lib/i18n";
 import { tierLabel } from "../lib/tierVocabulary";
 import { ChevronLeftIcon, DeleteIcon, DownloadIcon, WarningIcon } from "../components/icons";
+import { HelpTip } from "../components/HelpTip";
 
 export default function AccountPage() {
   const navigate = useNavigate();
@@ -419,12 +420,14 @@ export default function AccountPage() {
 
         {/* Data export */}
         <section className="bg-white border border-neutral-200 rounded-xl p-6 mb-6">
-          <h2 className="text-lg font-semibold text-neutral-900 mb-2">{t("account_export_data")}</h2>
-          <p className="text-sm text-neutral-500 mb-4">
-            {lang === "en"
-              ? "Download all your brands, tasks, and outputs as JSON. You own your data."
-              : "下載您所有的品牌、任務、產出內容（JSON 格式）— 個資法權利之一。"}
-          </p>
+          <h2 className="text-lg font-semibold text-neutral-900 mb-4 flex items-center gap-1.5">
+            {t("account_export_data")}
+            <HelpTip>
+              {lang === "en"
+                ? "All your brands, tasks, and outputs as JSON."
+                : "您所有的品牌、任務、產出內容（JSON 格式）。"}
+            </HelpTip>
+          </h2>
           <button
             onClick={() => exportMut?.mutate({})}
             disabled={!exportMut || exportMut.isPending}

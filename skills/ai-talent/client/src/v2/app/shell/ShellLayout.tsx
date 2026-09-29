@@ -7,6 +7,7 @@
  *
  * Content area paddingLeft = 70px always (collapsed) or 280px (expanded).
  */
+import { isChunkLoadError, autoReloadForStaleChunk, StaleChunkScreen } from "../staleChunk";
 import React from "react";
 import { createPortal } from "react-dom";
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
@@ -167,7 +168,7 @@ function buildNavItems(lang: "zh-TW" | "en", userEmail?: string | null, currentP
     // whichever scope is active.
     return [
       { to: "/brands/edit?cat=positioning", catKey: "positioning", label: en ? "Brand" : "品牌", icon: <FontAwesomeIcon icon={ICON.brand} />,
-        tooltip: en ? "Brand positioning — the locked constitution" : "品牌定位 — 鎖定的品牌憲法" },
+        tooltip: en ? "Brand positioning" : "品牌定位" },
       { to: "/brands/edit?cat=products", catKey: "products", label: en ? "Products" : "產品", icon: <FontAwesomeIcon icon={faBoxOpen} />,
         tooltip: en ? "Product cards & positioning" : "產品卡片與定位" },
       { to: "/brands/edit?cat=events", catKey: "events", label: en ? "Campaigns" : "活動", icon: <FontAwesomeIcon icon={ICON.campaign} />,
@@ -180,7 +181,7 @@ function buildNavItems(lang: "zh-TW" | "en", userEmail?: string | null, currentP
       // mission tray」）：「工具」（知識庫＋品牌 AI 指令）整個從 rail 拿掉。知識庫
       // 只是藏起來——主產文引擎每次仍會讀 brand_knowledge_items，已上傳的資料照樣生效。
       { to: "/brands/edit?cat=meetings", catKey: "meetings", label: en ? "Meetings" : "會議", icon: <FontAwesomeIcon icon={ICON.meeting} />,
-        tooltip: en ? "Recurring strategy meetings — you set topic, attendees and cadence" : "定期策略會議 — 主題、與會總監、頻率你來定，會後留紀錄" },
+        tooltip: en ? "Recurring strategy meetings" : "定期策略會議" },
       // 2026-08-21 (CJ「加一個人設的task tray...用戶可以自己新創agent，自己
       // 命名，並且決定這個Agent語調的應用範圍」): user-created persona
       // agents — trained from pasted text / article links / video links,
@@ -189,7 +190,7 @@ function buildNavItems(lang: "zh-TW" | "en", userEmail?: string | null, currentP
       // see isPersonaPreviewEmail's comment above.
       ...(isPersonaPreview ? [
         { to: "/brands/edit?cat=persona", catKey: "persona", label: en ? "Persona" : "人設", icon: <FontAwesomeIcon icon={faMicrophone} />,
-          tooltip: en ? "Custom persona agents — train, test-draft, and scope by platform" : "自訂人設 Agent — 訓練、試寫、指定套用平台" },
+          tooltip: en ? "Custom persona agents" : "自訂人設 Agent" },
       ] : []),
       { to: "/brands/edit?cat=info", catKey: "info", label: en ? "Info" : "基本資料", icon: <FontAwesomeIcon icon={faCircleInfo} />,
         tooltip: en ? "Name / industry / market" : "名稱 / 產業 / 市場" },
@@ -847,9 +848,7 @@ function IconBar({
             the logo. Tooltip explains we're actively iterating. Visible on
             every page in this layout, no per-page work needed. */}
         <Tooltip
-          content={isEn
-            ? "We're in beta — features are evolving fast. Feedback welcome via the chat bubble."
-            : "我們在 Beta 階段，每天都在優化功能。歡迎透過右下角客服回饋。"}
+          content={isEn ? "Beta" : "Beta 測試中"}
           placement="right"
         >
           <span style={{
@@ -1387,11 +1386,6 @@ function BrandHierarchyPill({
                 <FontAwesomeIcon icon={faPlus} />
                 {isEn ? "Add your first brand" : "新增你的第一個品牌"}
               </button>
-              <p style={{ fontSize: 12, color: "#9ca3af", padding: "8px 4px 0", lineHeight: 1.5 }}>
-                {isEn
-                  ? "Add a brand to unlock all AI marketing tools."
-                  : "新增品牌後，所有 AI 行銷工具將解鎖。"}
-              </p>
             </div>
           )}
 
@@ -1980,7 +1974,6 @@ function AccountPopup({ onLogout, onClose, onOpenSupport }: {
                   <p style={{ fontSize: 14, fontWeight: 600, color: "#111827" }}>
                     {Number(totalCredits).toLocaleString()} credits
                   </p>
-                  <p style={{ fontSize: 12, color: "#9ca3af" }}>{isEn ? "Tap to see plans" : "點此看方案"}</p>
                 </div>
                 <FontAwesomeIcon icon={faChevronRight} style={{ fontSize: 12, color: "#9ca3af" }} />
               </PopupRow>
@@ -2140,9 +2133,7 @@ function NotifPanel({ onClose }: { onClose: () => void }) {
         {!feedQ?.isLoading && items.length === 0 && (
           <div style={{ padding: "40px 16px", textAlign: "center", color: "#9ca3af", fontSize: 13, lineHeight: 1.6 }}>
             <div style={{ fontSize: 32, marginBottom: 8 }}><NotifyIcon size={28} /></div>
-            {isEn
-              ? "No notifications yet. Finish a task or apply brand positioning to get started."
-              : "目前還沒有通知。跑一個任務或套用品牌定位就會出現。"}
+            {isEn ? "No notifications yet" : "目前還沒有通知"}
           </div>
         )}
         {items.map((n) => {
@@ -2199,21 +2190,6 @@ function NotifPanel({ onClose }: { onClose: () => void }) {
 // stale index.html cached after a new deployment. The fix is a one-time hard
 // reload: the browser will fetch the new index.html and all chunk URLs will
 // resolve correctly. sessionStorage prevents infinite reload loops.
-function isChunkLoadError(err: Error): boolean {
-  const text = (err.message ?? "") + " " + (err.stack ?? "");
-  return /Failed to fetch dynamically imported module|ChunkLoadError|Loading chunk|Loading CSS chunk|error loading dynamically imported module/i.test(text);
-}
-function autoReloadOnce(): boolean {
-  try {
-    const last = Number(sessionStorage.getItem("_chunk_reload_at") ?? 0);
-    if (Date.now() - last > 15_000) {
-      sessionStorage.setItem("_chunk_reload_at", String(Date.now()));
-      window.location.reload();
-      return true;
-    }
-  } catch { /* sessionStorage blocked */ }
-  return false;
-}
 
 class RouteErrorBoundary extends React.Component<
   { children: React.ReactNode },
@@ -2223,7 +2199,7 @@ class RouteErrorBoundary extends React.Component<
   static getDerivedStateFromError(error: Error) { return { error, resetKey: 0 }; }
   componentDidCatch(error: Error, info: React.ErrorInfo) {
     // Stale-chunk auto-recovery: hard-reload once on deployment-induced 404.
-    if (isChunkLoadError(error) && autoReloadOnce()) return;
+    if (isChunkLoadError(error) && autoReloadForStaleChunk()) return;
     // eslint-disable-next-line no-console
     console.error("[RouteErrorBoundary] route render error:", error, info);
     try {
@@ -2251,6 +2227,9 @@ class RouteErrorBoundary extends React.Component<
     } catch {}
   }
   render() {
+    if (this.state.error && isChunkLoadError(this.state.error)) {
+      return <StaleChunkScreen />;
+    }
     if (this.state.error) {
       return (
         <div style={{ padding: "32px 24px", maxWidth: 720, margin: "0 auto" }}>

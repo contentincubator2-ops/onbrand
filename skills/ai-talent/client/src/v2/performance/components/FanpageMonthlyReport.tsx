@@ -183,8 +183,7 @@ export default function FanpageMonthlyReport() {
       {/* ── 上傳 ─────────────────────────────────────────────────────── */}
       <div style={card}>
         <div style={kicker}>STEP 1 · 上傳你現在在用的月報</div>
-        <h3 style={{ margin: "6px 0 4px", fontSize: 16, fontWeight: 850 }}>版型來自你自己的檔案</h3>
-        <p style={{ margin: "0 0 12px", fontSize: 13, color: "#6b7280" }}>
+        <p style={{ margin: "6px 0 12px", fontSize: 13, color: "#6b7280" }}>
           上傳同一份月報的<b>不同月份</b>（建議 4 份以上）。系統靠跨月比對判斷哪些位置每月會變 ——
           每月都一樣的是版型，會變的才是要自動填的欄位。只上傳一份無法比對。
         </p>
@@ -225,8 +224,7 @@ export default function FanpageMonthlyReport() {
 
       {!analysis && (
         <div style={{ ...card, color: "#6b7280", fontSize: 13 }}>
-          還沒有分析結果。上傳月報後按「開始分析」，系統會告訴你這份版型有多少欄位可以自動填、
-          哪些每月會變動、哪句洞察只有幾個字的空間。
+          還沒有分析結果。
         </div>
       )}
 

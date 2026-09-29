@@ -26,6 +26,7 @@ import {
   type DecisionStatus, type MeetingAction, type MeetingAttendee, type MeetingFrequency, type MeetingRow, type MeetingRun,
 } from "./meetingModel";
 import { CloseIcon } from "../../../platform/components/icons";
+import { HelpTip } from "../../../platform/components/HelpTip";
 
 interface ListData {
   locked: boolean;
@@ -130,12 +131,14 @@ export default function StrategyMeetingsPanel({ brandId }: { brandId: number }) 
     <div className="mx-auto max-w-[880px] space-y-6 px-2">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h2 className="text-[20px] font-semibold text-neutral-900">{en ? "Strategy meetings" : "策略會議"}</h2>
-          <p className="mt-1 max-w-[560px] text-[13px] leading-relaxed text-neutral-500">
-            {en
-              ? "Set a topic, pick the directors, choose how often. They meet in the background and leave minutes — the part that matters is whether your strategy should change."
-              : "你定主題、挑與會的策略總監、決定多久開一次。時間到了他們會在背景開會，留下一份會議紀錄——重點是策略要不要調整，最後由你決定。"}
-          </p>
+          <h2 className="text-[20px] font-semibold text-neutral-900 flex items-center gap-1.5">
+            {en ? "Strategy meetings" : "策略會議"}
+            <HelpTip>
+              {en
+                ? "Set a topic, pick the directors, choose how often. They meet in the background and leave minutes — whether your strategy should change is your call."
+                : "你定主題、挑與會的策略總監、決定多久開一次。時間到了他們會在背景開會，留下一份會議紀錄——策略要不要調整，最後由你決定。"}
+            </HelpTip>
+          </h2>
         </div>
         {!data.locked && (
           <button type="button" className={btnPrimary} onClick={() => setView({ kind: "form", form: newForm() })}>

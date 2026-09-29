@@ -69,8 +69,7 @@ export default function StrategyHistoryModal({
         <ModalHeader className="flex flex-col gap-1">
           <span className="text-medium font-semibold">{L("對話紀錄", "Conversation history")}</span>
           <span className="text-tiny text-default-500 font-normal">
-            {L("先選一位，再選要看哪一串。已經結束的對話是唯讀的。",
-               "Pick who you talked to, then which conversation. Past conversations are read-only.")}
+            {L("已經結束的對話是唯讀的。", "Past conversations are read-only.")}
           </span>
         </ModalHeader>
         <ModalBody className="pb-6">

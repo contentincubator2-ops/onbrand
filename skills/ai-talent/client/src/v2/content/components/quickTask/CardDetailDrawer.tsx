@@ -111,7 +111,7 @@ export default function CardDetailDrawer({ taskId, lang, onClose, onRun }: Props
         {/* ── header ─────────────────────────────────────────────── */}
         <div className="flex items-start gap-3 border-b border-neutral-200 px-5 py-4">
           <div className="min-w-0 flex-1">
-            <p className="text-[13px] text-neutral-500">{en ? "About this card" : "這張卡的出處與說明"}</p>
+            <p className="text-[13px] text-neutral-500">{en ? "About this card" : "出處與說明"}</p>
             <h2 className="mt-0.5 text-[17px] font-semibold leading-snug text-neutral-900">
               {d ? (en ? (d.labelEn || d.labelZh) : (d.labelZh || d.labelEn)) : (en ? "Loading…" : "讀取中…")}
             </h2>

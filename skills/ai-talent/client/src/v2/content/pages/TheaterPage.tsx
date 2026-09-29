@@ -1802,7 +1802,7 @@ export default function TheaterPage() {
           <div className="mt-4 p-4 rounded-xl border border-neutral-200 bg-white space-y-3">
             <div className="flex items-center justify-between">
               <p className="text-[12px] font-semibold uppercase tracking-wider text-neutral-500">
-                {lang === "en" ? "Weekly focus — select what to promote" : "本週焦點 — 選擇要推廣的產品 / 活動"}
+                {lang === "en" ? "Weekly focus" : "本週焦點"}
               </p>
               {(selectedProductIds.size > 0 || selectedEventIds.size > 0) && (
                 <button
@@ -1812,7 +1812,7 @@ export default function TheaterPage() {
                 >
                   {planScheduleMut?.isPending
                     ? (lang === "en" ? "Planning…" : "排程中…")
-                    : (lang === "en" ? "AI Schedule" : "AI 智能排程")}
+                    : (lang === "en" ? "AI Schedule" : "AI 排程")}
                 </button>
               )}
             </div>
@@ -2010,7 +2010,7 @@ export default function TheaterPage() {
                         <div className="flex justify-end mt-0.5 px-1">
                           {connectedPlatforms[p] ? (
                             <span className="text-[12px] px-1.5 py-0.5 rounded-full bg-success-50 border border-success-200 text-success-700 font-medium">
-                              <CheckIcon size={10} /> {lang === "en" ? "可排程發布" : "可排程發布"}
+                              <CheckIcon size={10} /> {lang === "en" ? "Ready" : "可發布"}
                             </span>
                           ) : (
                             <span className="text-[12px] px-1.5 py-0.5 rounded-full bg-warning-50 border border-warning-200 text-warning-700 font-medium">
@@ -2411,7 +2411,7 @@ export default function TheaterPage() {
                 <div>
                   <label className="text-[12px] font-semibold text-neutral-600 mb-1.5 flex items-center gap-1.5">
                     <EditIcon size={11} />
-                    {lang === "en" ? "Caption (edit before scheduling)" : "文案（排程前可修改）"}
+                    {lang === "en" ? "Caption" : "文案"}
                   </label>
                   <textarea
                     autoFocus

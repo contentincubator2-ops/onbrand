@@ -19,6 +19,7 @@ import { useLang } from "../../../../lib/i18n";
 import { showToastGlobal } from "../../../../components/ui/Toast";
 import { toastWithUpgrade } from "../../lib/upgradeToast";
 import { DoneIcon, SendBackIcon, SendIcon, WaitingIcon } from "../icons";
+import { HelpTip } from "../HelpTip";
 
 export default function ReviewBar({
   outputId, missionId,
@@ -129,11 +130,11 @@ export default function ReviewBar({
             </span>
           </>
         ) : (
-          <span className="text-[13px] text-default-500">
+          <HelpTip>
             {isEn
               ? "Content goes live only after someone other than the author approves it."
               : "產出要由作者以外的人放行才會上線。"}
-          </span>
+          </HelpTip>
         )}
         <button
           onClick={() => setOpen((v) => !v)}

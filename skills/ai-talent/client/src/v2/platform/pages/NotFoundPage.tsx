@@ -18,14 +18,9 @@ export default function NotFoundPage() {
         {/* Large 404 */}
         <div className="text-8xl font-bold text-default-100 select-none mb-2">404</div>
 
-        <h1 className="text-xl font-semibold text-default-900 mb-2">
+        <h1 className="text-xl font-semibold text-default-900 mb-8">
           {lang === "en" ? "Page not found" : "找不到這個頁面"}
         </h1>
-        <p className="text-sm text-default-500 mb-8 leading-relaxed">
-          {lang === "en"
-            ? "The link may be broken or the page may have been moved."
-            : "連結可能已失效，或頁面已移動到新的位置。"}
-        </p>
 
         {/* Recovery actions */}
         <div className="flex flex-col gap-3">

@@ -174,7 +174,7 @@ function ListField({ v, onChange }: { v: any; onChange: (next: any) => void }) {
           padding: "4px 0",
           fontFamily: '"Source Serif Pro", "Noto Serif TC", Georgia, serif',
         }}>
-          尚未填寫 — 按下方 + 自己輸入，或按上方「自動填寫」
+          尚未填寫
         </div>
       )}
       {items.map((it, i) => (
@@ -237,7 +237,7 @@ function PairListField({ v, onChange }: { v: any; onChange: (next: any) => void 
           padding: "4px 0",
           fontFamily: '"Source Serif Pro", "Noto Serif TC", Georgia, serif',
         }}>
-          尚未填寫 — 按下方 + 自己輸入，或按上方「自動填寫」
+          尚未填寫
         </div>
       )}
       {pairs.map((p, i) => (

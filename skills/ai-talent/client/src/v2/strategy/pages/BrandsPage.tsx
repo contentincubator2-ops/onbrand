@@ -53,6 +53,7 @@ import CopyAssetBoard, { COPY_ASSETS } from "../components/positioning/CopyAsset
 import VisualAssetBoard from "../components/positioning/VisualAssetBoard";
 import { pipelineFor, type PipelineStepSpec } from "../lib/positioningPipeline";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { HelpTip } from "../../platform/components/HelpTip";
 import {
   faPlus, faPalette, faFont, faQuoteLeft, faBullseye, faUsers, faImage, faIcons, faChartPie, faImages, faPenNib, faShieldHalved, faFolderOpen, faLock, faLockOpen, faBookOpen, faTableList, faBox, faRocket, faBullhorn, faWandMagicSparkles, faGear, faStickyNote, faTrashCan, faSatelliteDish, faStethoscope, faFileArrowUp,
 } from "@fortawesome/free-solid-svg-icons";
@@ -1376,17 +1377,9 @@ export default function BrandsPage() {
               decorative emblem. Editorial typography hierarchy. */}
           <div className="min-h-[60vh] flex items-center justify-center px-6">
             <div className="max-w-[440px] text-left">
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-neutral-600 mb-4">
-                BRAND · STEP 1
-              </p>
-              <h1 className="text-3xl font-bold text-neutral-900 mb-3 leading-tight">
+              <h1 className="text-3xl font-bold text-neutral-900 mb-6 leading-tight">
                 {lang === "en" ? "Set up your first brand" : "建立你的第一個品牌"}
               </h1>
-              <p className="text-sm text-neutral-600 mb-6 leading-relaxed">
-                {lang === "en"
-                  ? "Your brand is where everything in OnBrand starts. Once it's in, the AI reads your positioning, words, and visual style — every task pulls from this brain."
-                  : "品牌是 OnBrand 一切的起點。建立後，AI 會自動分析定位、用詞、視覺風格 — 接下來的所有任務都會吃這份品牌大腦。"}
-              </p>
               <button
                 onClick={() => setOnboardingOpen(true)}
                 className="inline-flex items-center gap-2 px-5 py-3 rounded-lg bg-neutral-900 text-white font-semibold text-sm hover:bg-neutral-800 transition"
@@ -3270,30 +3263,14 @@ function PositioningCompletionBridge({
       }}
     >
       <div style={{ flex: "1 1 320px", minWidth: 0 }}>
-        <p style={{
-          fontSize: 12, fontWeight: 600, color: "#404040",
-          letterSpacing: "0.25em", textTransform: "uppercase",
-          marginBottom: 6,
-        }}>
-          Positioning Locked · Ready for Production
-        </p>
         <h3 style={{
           fontSize: 18, fontWeight: 700, color: "#171717",
           letterSpacing: "-0.01em", marginBottom: 4,
         }}>
           {lang === "en"
-            ? `Your ${scopeLabel} is ready — the AI knows what every post should say`
-            : `你的${scopeLabel}已備好，AI 知道每篇文章該說什麼了`}
+            ? `Your ${scopeLabel} is ready`
+            : `你的${scopeLabel}已備好`}
         </h3>
-        <p style={{
-          fontSize: 13, lineHeight: 1.65, color: "#525252",
-          fontFamily: '"Source Serif Pro", "Noto Serif TC", Georgia, serif',
-          maxWidth: 620,
-        }}>
-          {lang === "en"
-            ? "This positioning becomes the backbone for every task and the 7-Day Publisher — every post is built from it, so the AI never sounds off-brand again."
-            : "這份定位現在會自動成為所有任務與七日發布台的內容骨架 — 每篇貼文都依此產出，再也不會「AI 寫出來不像你的品牌」。"}
-        </p>
       </div>
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
         {/* 2026-07-17 (CJ 去除時間分類 + zombie audit round 2): the /30s /60s
@@ -3342,13 +3319,14 @@ function BridgeBtn({ label, onClick, primary }: { label: string; onClick: () => 
 function SectionLabel({ label, counter, intro }: { label: string; counter?: string; intro?: string }) {
   return (
     <div style={{ marginBottom: 18 }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: intro ? 6 : 0 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
         <span style={{
           fontSize: 12, fontWeight: 600, color: "#525252",
           letterSpacing: "0.22em", textTransform: "uppercase",
         }}>
           {label}
         </span>
+        {intro && <HelpTip>{intro}</HelpTip>}
         <div style={{ flex: 1, height: 1, background: "#D4D4D4" }} />
         {counter && (
           // 2026-09-23：改成小圓角計數 chip（跟 content 層任務卡格頭的計數
@@ -3362,15 +3340,6 @@ function SectionLabel({ label, counter, intro }: { label: string; counter?: stri
           </span>
         )}
       </div>
-      {intro && (
-        <p style={{
-          fontSize: 12.5, lineHeight: 1.7, color: "#404040",
-          fontFamily: '"Source Serif Pro", "Noto Serif TC", Georgia, serif',
-          fontStyle: "italic", maxWidth: 700, margin: 0,
-        }}>
-          {intro}
-        </p>
-      )}
     </div>
   );
 }
@@ -3883,8 +3852,8 @@ function BrandAssetPanel({ assetKey, brandId, locked }: { assetKey: AssetKey; br
         <CardBody className="px-5 py-3 flex-row items-center justify-between flex-wrap">
           <p className="text-small text-default-700">
             {lang === "en"
-              ? "Fill this section in yourself — changes auto-save 800ms after you stop typing."
-              : "這個區塊由你手動填寫；改動會在 800ms 後自動儲存到 brand.positioning._assets"}
+              ? "Filled in manually · auto-saves"
+              : "手動填寫 · 自動儲存"}
           </p>
           <SaveIndicator state={saveState} hasTarget={true} />
         </CardBody>
@@ -4179,12 +4148,14 @@ function BrandLogoSettings({ brandId, brandName }: { brandId: number; brandName:
   return (
     <div className="max-w-[640px] mx-auto space-y-4">
       <div>
-        <h3 className="text-medium font-semibold">{lang === "en" ? "Brand logo / avatar" : "品牌 logo / 頭像"}</h3>
-        <p className="text-tiny text-default-700 mt-1">
-          {lang === "en"
-            ? `The "${brandName ?? "brand"}" avatar used in mockups. Auto-fetch from the FB page, or upload manually later.`
-            : `mockup 顯示用的「${brandName ?? "品牌"}」頭像。可以從 FB 粉專自動抓，或之後手動上傳。`}
-        </p>
+        <h3 className="text-medium font-semibold flex items-center gap-1.5">
+          {lang === "en" ? "Brand logo / avatar" : "品牌 logo / 頭像"}
+          <HelpTip>
+            {lang === "en"
+              ? `The "${brandName ?? "brand"}" avatar used in mockups. Auto-fetch from the FB page, or upload manually later.`
+              : `mockup 顯示用的「${brandName ?? "品牌"}」頭像。可以從 FB 粉專自動抓，或之後手動上傳。`}
+          </HelpTip>
+        </h3>
       </div>
 
       <div className="flex items-center gap-4 border border-default-200 rounded-medium p-4 bg-default-50">
@@ -4250,12 +4221,14 @@ function BrandLogoSettings({ brandId, brandName }: { brandId: number; brandName:
       </div>
 
       <div className="pt-2">
-        <h3 className="text-medium font-semibold">{lang === "en" ? "Brand photo library" : "品牌照片庫"}</h3>
-        <p className="text-tiny text-default-700 mt-1 mb-3">
-          {lang === "en"
-            ? "Real photos of the brand — materials, storefront, packaging — used as reference for on-brand image generation and color extraction. We no longer scrape these from your website."
-            : "品牌的真實照片——材質、門市、包裝——用來當 on-brand 生圖與取色的參考。我們不再從網站爬這些圖了。"}
-        </p>
+        <h3 className="text-medium font-semibold flex items-center gap-1.5 mb-3">
+          {lang === "en" ? "Brand photo library" : "品牌照片庫"}
+          <HelpTip>
+            {lang === "en"
+              ? "Real photos of the brand — materials, storefront, packaging — used as reference for on-brand image generation and color extraction. We no longer scrape these from your website."
+              : "品牌的真實照片——材質、門市、包裝——用來當 on-brand 生圖與取色的參考。我們不再從網站爬這些圖了。"}
+          </HelpTip>
+        </h3>
         <AssetPhotoGallery brandId={brandId} scope="brand" scopeId={brandId} scopeLabel={lang === "en" ? "this brand" : "這個品牌"} />
       </div>
     </div>
@@ -5148,8 +5121,8 @@ function BrandPaletteHero({
       {swatches.length === 0 && !isLoading && (
         <p style={{ fontSize: 13, color: "#737373", margin: 0, lineHeight: 1.6 }}>
           {en
-            ? "Run the extractor — Mia reads your product photos, runs K-means in LAB color space, and surfaces the 5–7 colors that actually define this brand. Future content generation will use these as canonical brand colors."
-            : "按「從產品圖萃取」— Mia 會讀你的產品照、在 LAB 色彩空間跑 K-means，挑出真正代表這個品牌的 5-7 個核心色。之後生成的所有內容都會用這份色票。"}
+            ? "Run the extractor to pull 5–7 core colors from your product photos. Generated content will use them."
+            : "按「從產品圖萃取」，從產品照挑出 5–7 個核心色；之後生成的內容都會用這份色票。"}
         </p>
       )}
 

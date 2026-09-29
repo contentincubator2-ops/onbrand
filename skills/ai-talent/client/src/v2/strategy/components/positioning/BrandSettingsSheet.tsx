@@ -25,6 +25,7 @@ import { trpc } from "../../../../lib/trpc";
 import { useLang } from "../../../../lib/i18n";
 import { useNavigate } from "react-router-dom";
 import { showToastGlobal } from "../../../../components/ui/Toast";
+import { HelpTip } from "../../../platform/components/HelpTip";
 
 // 2026-05-30 (CJ「modal 只留設定類 tab，內容類交給主頁面」):
 // 基本資料 和 視覺 都已在主工作區有完整 tab，不在 modal 重複。
@@ -450,12 +451,14 @@ export function VisualTab({ brandId }: { brandId: number | null }) {
 
   return (
     <div className="max-w-[820px] mx-auto p-8">
-      <h2 className="text-2xl font-semibold text-default-900 mb-2">{en ? "Visual identity" : "視覺識別"}</h2>
-      <p className="text-sm text-default-500 mb-6">
-        {en
-          ? "Logo · palette · font · guidelines — AI applies these when generating images so output stays on-brand"
-          : "Logo · 色票 · 字型 · 識別規範 — AI 生圖時會自動套用，確保不脫離品牌調性"}
-      </p>
+      <h2 className="text-2xl font-semibold text-default-900 mb-6 flex items-center gap-2">
+        {en ? "Visual identity" : "視覺識別"}
+        <HelpTip>
+          {en
+            ? "AI applies the logo, palette, font and guidelines when generating images."
+            : "AI 生圖時會自動套用 Logo、色票、字型與識別規範。"}
+        </HelpTip>
+      </h2>
 
       {/* Logo */}
       <section className="border border-default-200 rounded-xl p-5 bg-white mb-4">
@@ -1039,11 +1042,12 @@ export function PublishTab({ brandId }: { brandId: number | null }) {
                 <div className="rounded-xl border border-zinc-200 bg-zinc-50/60 px-3 py-3 space-y-2">
                   <p className="text-[12px] text-zinc-800 font-medium leading-relaxed">
                     <InboxIcon size={11} /> {en ? "Import voice from real posts" : "從真實貼文學習語氣"}
-                  </p>
-                  <p className="text-[12px] text-zinc-600 leading-relaxed">
-                    {en
-                      ? "Fetch your page's recent posts, analyze writing style, and store real examples in Brand DNA so AI generates content that sounds like you."
-                      : "抓取粉絲團最近 20-30 篇貼文，分析語氣特徵，存入品牌大腦作為真實範例。之後每次產文，AI 都會模仿你們真正的寫作風格。"}
+                    {" "}
+                    <HelpTip>
+                      {en
+                        ? "Fetches your page's recent 20–30 posts, analyzes the writing style, and stores real examples in Brand DNA for AI to imitate."
+                        : "抓取粉絲團最近 20-30 篇貼文，分析語氣特徵，存入品牌大腦作為真實範例，之後產文會模仿這個寫作風格。"}
+                    </HelpTip>
                   </p>
                   {importResult && (
                     <div className="text-[12px] text-zinc-700 bg-zinc-100 rounded-lg px-2 py-1.5 leading-relaxed">

@@ -93,8 +93,8 @@ export default function TaskPicker({
             </h2>
             <p className="mt-0.5 text-[13px] text-neutral-500">
               {isEn
-                ? `Pick the cards you use often. ${draft.length} / ${maxTray} selected.`
-                : `挑你常用的卡，平常就只擺這幾張。已選 ${draft.length} / ${maxTray}。`}
+                ? `${draft.length} / ${maxTray} selected`
+                : `已選 ${draft.length} / ${maxTray}`}
               {categoryLabel && (
                 <span className="ml-1.5 rounded-full border border-neutral-300 px-2 py-0.5 text-[12px] text-neutral-600">
                   {isEn ? `In: ${categoryLabel}` : `分類：${categoryLabel}`}

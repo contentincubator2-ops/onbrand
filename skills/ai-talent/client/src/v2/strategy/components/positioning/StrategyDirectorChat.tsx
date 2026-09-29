@@ -214,8 +214,8 @@ export default function StrategyDirectorChat({
         {messages.length === 0 && !convQ?.isLoading && (
           <p style={{ fontSize: 13, color: "#737373", fontStyle: "italic", margin: 0 }}>
             {en
-              ? `Ask ${director?.name ?? "the Strategy Director"} anything about this brand's strategy — or tap one of the questions below.`
-              : `問${director?.name ?? "策略總監"}任何跟這個品牌策略有關的問題——或者直接點下面的問題。`}
+              ? `Ask ${director?.name ?? "the Strategy Director"} anything about this brand's strategy.`
+              : `問${director?.name ?? "策略總監"}任何跟這個品牌策略有關的問題。`}
           </p>
         )}
         {messages.map((m, idx) => (

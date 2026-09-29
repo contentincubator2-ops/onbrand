@@ -25,6 +25,7 @@ import { AddIcon, CopyIcon, DeleteIcon, EditIcon, FolderIcon, InfoIcon, SearchIc
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faFacebook, faInstagram, faYoutube, faTiktok, faLinkedin, faThreads } from "@fortawesome/free-brands-svg-icons";
 import { faGlobe, faNewspaper, faEnvelope, faPenNib } from "@fortawesome/free-solid-svg-icons";
+import { HelpTip } from "../../platform/components/HelpTip";
 
 interface MissionRow {
   id: number;            // mission_outputs.id (output row) — NOT the mission PK
@@ -226,9 +227,6 @@ export default function ProjectsPage() {
       <div className="relative pt-10 pb-5 px-6 text-center">
         <div className="relative z-10 flex flex-col items-center max-w-[1100px] mx-auto">
           {/* 2026-05-11 (CJ): canonical header template — same as /30s / /60s / /99s. */}
-          <p className="text-[12px] font-semibold uppercase tracking-[0.25em] text-default-600 mb-3">
-            PROJECTS · OUTPUTS
-          </p>
           <h1
             className="font-semibold tracking-tight leading-none mb-3"
             style={{
@@ -239,30 +237,9 @@ export default function ProjectsPage() {
               backgroundClip: "text",
             }}
           >
-            {lang === "en" ? "Everything you've made — all in one place" : "你做過的每一篇都在這"}
+            {lang === "en" ? "Projects" : "專案"}
           </h1>
-          <p
-            className="mt-3 mx-auto text-default-700"
-            style={{
-              fontFamily: '"Source Serif Pro", "Noto Serif TC", Georgia, serif',
-              fontStyle: "italic", fontSize: 14, lineHeight: 1.7, maxWidth: 640,
-            }}
-          >
-            {lang === "en"
-              ? "Every piece of content you've generated, automatically archived here"
-              : "每次執行的產出，自動歸檔到這裡"}
-          </p>
-          <p
-            className="mt-2 mb-5 mx-auto text-default-700"
-            style={{ fontSize: 12, lineHeight: 1.55, maxWidth: 640, letterSpacing: "0.02em" }}
-          >
-            <span style={{ fontWeight: 600, color: "#171717", marginRight: 6 }}>
-              {lang === "en" ? "Good for:" : "適合："}
-            </span>
-            {lang === "en"
-              ? "Finding last week's work · Rerunning a task · Tidying drafts"
-              : "找上週做過的東西 · 重跑同任務 · 整理待發內容"}
-          </p>
+          <div className="mb-2" />
 
           {/* Single search bar */}
           <div className="w-full" style={{ maxWidth: 720 }}>
@@ -341,13 +318,13 @@ export default function ProjectsPage() {
               An explained empty state beats a missing control. */}
           <FacetRow
             label={lang === "en" ? "Audience" : "族群"}
-            hint={lang === "en" ? "from the strategy workbench" : "來自策略工作台的甜蜜點"}
+            hint={lang === "en"
+              ? "Audiences come from the strategy workbench: open a task from a sweet spot to tag its output."
+              : "族群來自策略工作台：從甜蜜點點「內容角度」開任務，產出就會記住寫給哪個族群"}
           >
             {audienceFacets.length === 0 ? (
               <span className="text-[12px] text-default-400">
-                {lang === "en"
-                  ? "No tagged runs yet — open a task from a sweet spot in the strategy workbench to tag it."
-                  : "尚無標記 — 從策略工作台的甜蜜點點「內容角度」開任務，產出就會記住寫給哪個族群"}
+                {lang === "en" ? "None yet" : "尚無標記"}
               </span>
             ) : (
               <>
@@ -370,12 +347,13 @@ export default function ProjectsPage() {
               </>
             )}
           </FacetRow>
-          <FacetRow label={lang === "en" ? "Product" : "產品"}>
+          <FacetRow
+            label={lang === "en" ? "Product" : "產品"}
+            hint={lang === "en" ? "Pick a product in the task modal and its output is filed here." : "在任務視窗選擇產品後，產出就會歸到該產品"}
+          >
             {productFacets.length === 0 ? (
               <span className="text-[12px] text-default-400">
-                {lang === "en"
-                  ? "No product-scoped runs yet — pick a product in the task modal."
-                  : "尚無產品範圍的產出 — 在任務視窗選擇產品後，產出就會歸到該產品"}
+                {lang === "en" ? "None yet" : "尚無產出"}
               </span>
             ) : (
               <>
@@ -690,9 +668,7 @@ function EmptyState({ search, onClear, onCreate, lang }: { search: string; onCle
           <p className="text-default-700 font-medium mb-1">
             {lang === "en" ? `No projects match "${search}"` : `找不到符合「${search}」的專案`}
           </p>
-          <p className="text-tiny text-default-500 mb-4">
-            {lang === "en" ? "Try different words, or clear the search" : "試試別的關鍵字，或清除搜尋條件"}
-          </p>
+          <div className="mb-4" />
           <button onClick={onClear} className="text-xs text-zinc-600 hover:underline">
             {lang === "en" ? "Clear search" : "清除搜尋"}
           </button>
@@ -704,9 +680,9 @@ function EmptyState({ search, onClear, onCreate, lang }: { search: string; onCle
           </p>
           <p className="text-tiny text-default-500 mb-4">
             {lang === "en" ? (
-              <>Run any platform task or the 7-Day Publisher and outputs land here.<br />Or start a new project:</>
+              <>Outputs from any task land here.</>
             ) : (
-              <>到各平台任務牆或七日發布台跑任務，產出會自動進來。<br />或直接建立新任務：</>
+              <>跑過的任務產出會自動進來。</>
             )}
           </p>
           <button
@@ -731,7 +707,7 @@ function FacetRow({ label, hint, children }: { label: string; hint?: string; chi
       <span className="text-[12px] font-semibold text-default-400 uppercase tracking-wider shrink-0">
         {label}
       </span>
-      {hint && <span className="text-[12px] text-default-300 shrink-0">{hint}</span>}
+      {hint && <HelpTip>{hint}</HelpTip>}
       {children}
     </div>
   );

@@ -302,9 +302,6 @@ export default function LoginPage() {
               {lang === "en" ? "繁體中文" : "English"}
             </button>
           </div>
-          <p className="text-sm leading-relaxed mb-1 font-bold" style={{ color: C.ink }}>
-            {lang === "en" ? "Always on-brand. Your AI marketing studio." : "永遠 on-brand · 你的 AI 行銷工作室"}
-          </p>
         </div>
 
         <div className="w-full max-w-md">
@@ -318,7 +315,7 @@ export default function LoginPage() {
               boxShadow: `0 6px 0 ${C.orangeDark}`,
             }}
           >
-            {lang === "en" ? "Start free — build your Brand Brain →" : "免費開始 · 建立你的第一個品牌大腦 →"}
+            {lang === "en" ? "Start free →" : "免費開始 →"}
           </Link>
           <p className="text-center text-[12px] mb-6" style={{ color: C.muted }}>
             {lang === "en" ? "No credit card. 14-step positioning takes ~10 minutes." : "免信用卡 · 14 步定位流程約 10 分鐘完成"}
@@ -349,10 +346,9 @@ export default function LoginPage() {
             }}
           >
             <div className="mb-6">
-              <h2 className="text-xl font-black mb-1" style={{ color: C.ink, letterSpacing: "-0.01em" }}>
+              <h2 className="text-xl font-black" style={{ color: C.ink, letterSpacing: "-0.01em" }}>
                 {t("auth_login_title")}
               </h2>
-              <p className="text-sm" style={{ color: C.muted }}>{t("auth_login_subtitle")}</p>
             </div>
 
             {/* Google Login Button */}

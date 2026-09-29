@@ -59,12 +59,9 @@ export default function VerifyEmailPage() {
         {status === "loading" && (
           <>
             <div className="w-16 h-16 border-4 border-zinc-200 border-t-indigo-500 rounded-full animate-spin mx-auto mb-6" />
-            <h1 className="text-2xl font-bold text-gray-900 mb-2">
+            <h1 className="text-2xl font-bold text-gray-900">
               {lang === "en" ? "Verifying…" : "驗證中…"}
             </h1>
-            <p className="text-gray-600">
-              {lang === "en" ? "Checking your email now" : "正在驗證您的電子郵件"}
-            </p>
           </>
         )}
 
@@ -78,7 +75,6 @@ export default function VerifyEmailPage() {
             <h1 className="text-2xl font-bold text-gray-900 mb-2">
               {lang === "en" ? "You're verified!" : "驗證成功！"}
             </h1>
-            <p className="text-gray-600 mb-6">{message}</p>
             <p className="text-sm text-gray-500">
               {lang === "en" ? "Taking you home…" : "正在前往首頁…"}
             </p>

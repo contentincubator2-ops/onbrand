@@ -247,9 +247,6 @@ export default function CopyAssetBoard({
         <ModalContent>
           <ModalHeader className="flex flex-col gap-1">
             <span className="text-medium font-semibold">{L("新增卡片", "Add a card")}</span>
-            <span className="text-tiny text-default-500 font-normal">
-              {L("這些都是選填的——需要的時候再加，填了才有用。", "All optional — add one when you actually need it.")}
-            </span>
           </ModalHeader>
           <ModalBody className="pb-6">
             <div className="flex flex-col gap-2">

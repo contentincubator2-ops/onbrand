@@ -19,6 +19,7 @@ import { trpc } from "../../../lib/trpc";
 import type { ShellOutletCtx } from "../../app/shell/ShellLayout";
 import { AddIcon, ChevronLeftIcon, ChevronRightIcon, CloseIcon, DeleteIcon, DoneIcon, ExternalIcon, GenerateIcon, GridIcon, InfoIcon, RegenerateIcon, TheaterIcon, WaitingIcon, WarningIcon, WorkingIcon, LinkIcon, PlannerIcon } from "../../platform/components/icons";
 import { useLang } from "../../../lib/i18n";
+import { HelpTip } from "../../platform/components/HelpTip";
 import { getFestivalHintEn } from "../lib/festivalI18n";
 import {
   getCalendarPublishPayload,
@@ -99,15 +100,6 @@ export default function CalendarPage() {
 
   // View mode: "week" (7-day) vs "month"
   const [view, setView] = useState<"week" | "month">("week");
-
-  // Dismissible onboarding strip
-  const [showHowTo, setShowHowTo] = useState(() => {
-    try { return !localStorage.getItem("cal_howto_dismissed"); } catch { return true; }
-  });
-  const dismissHowTo = () => {
-    setShowHowTo(false);
-    try { localStorage.setItem("cal_howto_dismissed", "1"); } catch {}
-  };
 
   // Week cursor: start of the displayed 7-day range (defaults to today)
   const todayRef = useRef(new Date());
@@ -484,9 +476,6 @@ export default function CalendarPage() {
       {/* ── Hero header ──────────────────────────────────────────── */}
       <div className="pt-8 pb-4 px-6 text-center">
         <div className="flex flex-col items-center max-w-[1100px] mx-auto">
-          <p className="text-[12px] font-semibold uppercase tracking-[0.25em] text-default-600 mb-2">
-            {lang === "en" ? "PUBLISHING · CONTENT CALENDAR" : "日曆 · 排程 & 發布管理"}
-          </p>
           <h1
             className="font-semibold tracking-tight leading-tight"
             style={{
@@ -498,82 +487,16 @@ export default function CalendarPage() {
             }}
           >
             {lang === "en" ? "Content Calendar" : "日曆"}
+            <span className="ml-2 align-middle" style={{ WebkitTextFillColor: "initial" }}>
+              <HelpTip>
+                {lang === "en"
+                  ? "Run a task → click \"Schedule\" on the result page → pick a date and time; the post shows up here."
+                  : "跑任務 → 在結果頁按「排程發布」→ 選日期時間，貼文就會出現在這裡。"}
+              </HelpTip>
+            </span>
           </h1>
-          <p className="mt-2 text-default-500" style={{ fontSize: 13 }}>
-            {lang === "en"
-              ? `${brandName} — schedule, track, and publish across platforms`
-              : `${brandName}｜排程、追蹤、跨平台發布，一個頁面全搞定`}
-          </p>
         </div>
       </div>
-
-      {/* ── How-to-publish strip ──────────────────────────────────── */}
-      {showHowTo && (
-        <div className="max-w-[1100px] mx-auto px-6 mb-5">
-          <div
-            className="rounded-xl px-5 py-4 relative"
-            style={{ background: "#F7F6F4", border: "1px solid #e4e4e7" }}
-          >
-            <button
-              onClick={dismissHowTo}
-              className="absolute top-3 right-3 w-6 h-6 rounded-full bg-white/60 flex items-center justify-center text-default-500 hover:bg-white"
-            >
-              <CloseIcon size={12} />
-            </button>
-            <div className="flex items-center gap-2 mb-3">
-              <InfoIcon size={14} className="text-emerald-700" />
-              <span className="text-[12px] font-semibold uppercase tracking-[0.2em] text-emerald-700">
-                {lang === "en" ? "HOW TO PUBLISH A POST" : "如何發布一篇貼文"}
-              </span>
-            </div>
-            <div className="grid grid-cols-3 gap-4">
-              {[
-                {
-                  step: "1",
-                  zh: "選平台，跑任務",
-                  en: "Pick a platform & run a task",
-                  desc_zh: "點下方「＋ 新增貼文」選平台，AI 幫你生成貼文草稿",
-                  desc_en: "Click「＋ New post」below, pick a platform, AI drafts your post",
-                  color: "#18181b",
-                },
-                {
-                  step: "2",
-                  zh: "在結果頁確認內容",
-                  en: "Review the result",
-                  desc_zh: "AI 生成完成後，結果頁可編輯文案、選擇圖片",
-                  desc_en: "After AI finishes, review and edit the caption on the output page",
-                  color: "#18181b",
-                },
-                {
-                  step: "3",
-                  zh: "按「排程」或「立即發布」",
-                  en: "Schedule or Publish now",
-                  desc_zh: "點結果頁上方的「排程發布」→ 選日期時間 → 貼文會出現在這裡",
-                  desc_en: "Click「Schedule」on the output page → pick date/time → appears here",
-                  color: "#18181b",
-                },
-              ].map((s) => (
-                <div key={s.step} className="flex items-start gap-3">
-                  <div
-                    className="w-6 h-6 rounded-full shrink-0 flex items-center justify-center text-[12px] font-bold text-white mt-0.5"
-                    style={{ background: s.color }}
-                  >
-                    {s.step}
-                  </div>
-                  <div>
-                    <p className="text-[12px] font-semibold text-default-900">
-                      {lang === "en" ? s.en : s.zh}
-                    </p>
-                    <p className="text-[12px] text-default-500 mt-0.5 leading-relaxed">
-                      {lang === "en" ? s.desc_en : s.desc_zh}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* ── Festival nudge ────────────────────────────────────────── */}
       <FestivalNudgeBanner brandId={brandId} navigate={navigate} lang={lang} />
@@ -861,11 +784,6 @@ export default function CalendarPage() {
               <div className="flex-1">
                 <p className="text-[13px] font-semibold text-default-700 mb-0.5">
                   {lang === "en" ? "No posts scheduled this month" : "本月尚無排程或發布記錄"}
-                </p>
-                <p className="text-[12px] text-default-400">
-                  {lang === "en"
-                    ? "Run a task → click \"Schedule\" on the result page → appears here."
-                    : "跑任務 → 在結果頁按「排程」→ 選日期 → 貼文自動出現在這裡。"}
                 </p>
               </div>
               <button
@@ -1310,9 +1228,6 @@ function PlatformPickerModal({
         {/* Header */}
         <div className="px-6 py-5 flex items-center justify-between" style={{ borderBottom: "1px solid #E5E5E5" }}>
           <div>
-            <p className="text-[12px] font-semibold uppercase tracking-[0.2em] text-default-500 mb-0.5">
-              {lang === "en" ? "NEW POST" : "新增貼文"}
-            </p>
             <h2 className="text-[15px] font-semibold text-default-900">
               {lang === "en" ? `Posting on ${displayDate}` : `${displayDate} 發布`}
             </h2>
@@ -1327,11 +1242,6 @@ function PlatformPickerModal({
 
         {/* Platform grid */}
         <div className="px-6 py-5">
-          <p className="text-[12px] text-default-500 mb-4">
-            {lang === "en"
-              ? "Choose a platform — AI will draft the post for you."
-              : "選擇平台，AI 會幫你生成貼文草稿，完成後回到這裡排程。"}
-          </p>
           <div className="grid grid-cols-4 gap-3">
             {PLATFORMS.map((p) => (
               <button
@@ -1361,14 +1271,6 @@ function PlatformPickerModal({
           </div>
         </div>
 
-        {/* Footer note */}
-        <div className="px-6 pb-5">
-          <p className="text-[12px] text-default-400 text-center">
-            {lang === "en"
-              ? "After AI generates the post, click \"Schedule\" on the result page to save it here."
-              : "AI 生成完成後，在結果頁按「排程發布」→ 選擇時間 → 貼文就會出現在這裡。"}
-          </p>
-        </div>
       </div>
     </div>
   );

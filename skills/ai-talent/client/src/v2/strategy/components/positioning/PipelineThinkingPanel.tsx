@@ -250,8 +250,7 @@ export default function PipelineThinkingPanel({
           >
             {phase === "loading" && !typed && (
               <div className="text-neutral-700 italic text-sm">
-                正在啟動 Anthropic 推理鏈，搭配 web search 與既有 context 推導本步驟。
-                通常 20–60 秒，請稍候 — 系統不是當機，是在認真思考。
+                推導本步驟中，通常 20–60 秒。
               </div>
             )}
             {/* 2026-05-11 (CJ「你好中文按了品牌定位後，一直停留在 0/14」):

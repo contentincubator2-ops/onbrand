@@ -19,6 +19,7 @@
 import React from "react";
 import { trpc } from "../../../lib/trpc";
 import { useLang } from "../../../lib/i18n";
+import { HelpTip } from "../../platform/components/HelpTip";
 import { CampaignIcon, DoneIcon, DotIcon, SetupBySoWorkIcon, ShopIcon, TextIcon } from "../../platform/components/icons";
 
 type Conn = {
@@ -49,8 +50,13 @@ export default function ConnectionsPanel({ brandId }: { brandId: number | null }
   return (
     <section className="mb-5 rounded-xl border border-neutral-200 bg-white p-4">
       <div className="flex flex-wrap items-baseline gap-2">
-        <h2 className="text-[15px] font-semibold text-neutral-900">
+        <h2 className="text-[15px] font-semibold text-neutral-900 flex items-center gap-1.5">
           {isEn ? "Data sources" : "資料來源"}
+          <HelpTip>
+            {isEn
+              ? "Each source below is reported from what is actually linked. Numbers on this page switch from sample to live per source as it connects."
+              : "下面每一項都是照實際串接狀態顯示。哪一項接上了，這頁對應的數字就從示意換成真的。"}
+          </HelpTip>
         </h2>
         <span className="text-[13px] text-neutral-500">
           {isEn ? `${connected} / 3 connected` : `已串接 ${connected} ／ 3`}
@@ -59,11 +65,6 @@ export default function ConnectionsPanel({ brandId }: { brandId: number | null }
           {isEn ? "Sample data until connected" : "串接前，本頁數字皆為示意資料"}
         </span>
       </div>
-      <p className="mt-1 text-[13px] text-neutral-500">
-        {isEn
-          ? "Each source below is reported from what is actually linked. Numbers on this page switch from sample to live per source as it connects."
-          : "下面每一項都是照實際串接狀態顯示。哪一項接上了，這頁對應的數字就從示意換成真的。"}
-      </p>
 
       <div className="mt-3 grid gap-3 md:grid-cols-3">
         {(conns.length ? conns : (["meta_page", "meta_ads", "commerce"] as Conn["id"][]).map((id) => ({

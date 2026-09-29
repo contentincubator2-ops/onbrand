@@ -10,6 +10,7 @@ import { trpc } from "../../../../lib/trpc";
 import { useLang } from "../../../../lib/i18n";
 import { Input, Textarea } from "@heroui/react";
 import { AddIcon, DeleteIcon, ExternalIcon, LibraryIcon } from "../../../platform/components/icons";
+import { HelpTip } from "../../../platform/components/HelpTip";
 
 interface Item {
   id: number;
@@ -81,6 +82,11 @@ export default function KnowledgeEditor({ brandId }: { brandId: number | null })
         }}>
           {en ? "BRAND KNOWLEDGE" : "品牌知識庫"}
         </span>
+        <HelpTip>
+          {en
+            ? "Past hits, reference articles, and competitor case studies — every task and the 7-Day Publisher pulls from this library first."
+            : "過去成功的貼文、外部參考文章、競品案例 — 所有任務與七日發布台會優先從這份知識庫取材。"}
+        </HelpTip>
         <div style={{ flex: 1, height: 1, background: "#D4D4D4" }} />
         <span style={{
           fontSize: 12, fontWeight: 500, color: "#525252",
@@ -104,16 +110,6 @@ export default function KnowledgeEditor({ brandId }: { brandId: number | null })
         </button>
       </div>
 
-      {/* Rationale line — why this exists */}
-      <p style={{
-        fontSize: 13, lineHeight: 1.7, color: "#525252",
-        fontFamily: '"Source Serif Pro", "Noto Serif TC", Georgia, serif',
-        fontStyle: "italic", maxWidth: 720, marginBottom: 18,
-      }}>
-        {en
-          ? "Upload your past hits, reference articles, and competitor case studies — every task and the 7-Day Publisher pulls from this library first. Closer to your real voice than letting AI start from scratch."
-          : "上傳你過去成功的貼文、外部參考文章、競品案例 — 所有任務與七日發布台會優先從這份知識庫取材，比起讓 AI 從零生成，輸出會更貼近你的真實調性。"}
-      </p>
 
       {/* Capacity meter */}
       <div style={{
@@ -217,17 +213,8 @@ export default function KnowledgeEditor({ brandId }: { brandId: number | null })
           border: "1px dashed #D4D4D4", borderRadius: 12,
         }}>
           <LibraryIcon size={36} strokeWidth={1.3} style={{ margin: "0 auto 12px", opacity: 0.5 }} />
-          <p style={{ fontSize: 13, color: "#525252", marginBottom: 6, fontWeight: 500 }}>
+          <p style={{ fontSize: 13, color: "#525252", fontWeight: 500 }}>
             {en ? "No knowledge entries yet" : "還沒有知識條目"}
-          </p>
-          <p style={{
-            fontSize: 12, color: "#525252",
-            fontFamily: '"Source Serif Pro", "Noto Serif TC", Georgia, serif',
-            fontStyle: "italic", maxWidth: 320, margin: "0 auto",
-          }}>
-            {en
-              ? "Start by uploading your best-performing post — the AI will fold its voice and structure into every future task."
-              : "從你最成功的一篇貼文開始上傳 — AI 會把它的語氣 / 結構納入後續任務的取材池。"}
           </p>
         </div>
       ) : (

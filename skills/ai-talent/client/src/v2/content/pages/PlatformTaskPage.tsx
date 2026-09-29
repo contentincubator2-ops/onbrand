@@ -1640,7 +1640,7 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                   startContent={<FontAwesomeIcon icon={faWandMagicSparkles} />}
                   onPress={() => setRewriteOpen(true)}
                 >
-                  {lang === "en" ? "Rewrite my text" : "貼上原文改寫"}
+                  {lang === "en" ? "Rewrite my text" : "改寫原文"}
                 </Button>
                 <Button
                   size="sm"
@@ -2210,9 +2210,7 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                   )}
                   {COMPOSER_CHANNELS.has(platform) && brandId ? (
                     <>
-                      <p className="text-tiny text-default-400 mb-3">
-                        {lang === "en" ? "You can still create your own." : "你可以自己建一張。"}
-                      </p>
+                      <div className="mb-3" />
                       <Button
                         size="sm"
                         color="primary"
@@ -2612,11 +2610,6 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                           ? `From the campaign plan for “${d.event?.name ?? ""}” — this post is scheduled for ${item.date}.`
                           : `來自「${d.event?.name ?? ""}」的宣傳企劃 —— 這篇排在 ${item.date} 發布。`}
                       </p>
-                      <p className="text-tiny text-default-400 m-0 mt-0.5">
-                        {lang === "en"
-                          ? "Event dates and the offer are already filled in below."
-                          : "活動期間與優惠機制已自動帶入下方欄位。"}
-                      </p>
                     </div>
                   );
                 })()}
@@ -2627,7 +2620,7 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                 {brandId && (modalProducts.length > 0 || modalEvents.length > 0) && (
                   <div className="mb-3">
                     <p className="text-tiny text-default-500 mb-1.5">
-                      {lang === "en" ? "Generate for" : "這次要為哪個對象產出"}
+                      {lang === "en" ? "Generate for" : "產出對象"}
                     </p>
                     <div className="flex flex-wrap gap-1.5">
                       <button
@@ -2776,10 +2769,11 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                       <p style={{ fontSize: 12, fontWeight: 700, color: "#525252", letterSpacing: "0.22em", textTransform: "uppercase", marginBottom: 6 }}>
                         {(() => {
                           const entityName = brandCtx?.brand?.name ?? brandName ?? (lang === "en" ? "your brand" : "你的品牌");
-                          return lang === "en"
-                            ? `Context · from ${entityName} · click a chip to edit`
-                            : `Context · 來自 ${entityName} · 點任一項可改寫`;
+                          return `Context · ${entityName}`;
                         })()}
+                        <span style={{ marginLeft: 4, letterSpacing: 0, textTransform: "none" }}>
+                          <HelpTip>{lang === "en" ? "Click a chip to edit it." : "點任一項可改寫"}</HelpTip>
+                        </span>
                       </p>
                       <div className="flex flex-wrap gap-1.5">
                         {chips.filter((c: any) => c.hasContent).map((c: any) => renderChip(c, false))}
@@ -2890,11 +2884,11 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                             ? (lang === "en" ? "Polishing…" : "潤稿中…")
                             : (lang === "en" ? "AI polish my brief" : "AI 潤稿")}
                         </Button>
-                        <span className="text-tiny text-default-400">
+                        <HelpTip>
                           {lang === "en"
                             ? "Tidies your input — facts kept, never invented."
                             : "幫你整理輸入（保留事實、不會捏造）"}
-                        </span>
+                        </HelpTip>
                       </div>
                     )}
                     {polishErr && <p className="text-tiny text-danger-500">{polishErr}</p>}

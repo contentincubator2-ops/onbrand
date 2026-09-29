@@ -216,10 +216,7 @@ export default function PlannerPage() {
         <section aria-label={en ? "Chat" : "對話"} className="flex w-[400px] shrink-0 flex-col p-6" style={{ borderRight: `1px solid ${LINE}` }}>
           <div className="flex items-center gap-2.5 pb-4" style={{ borderBottom: `1px solid ${LINE}` }}>
             {avatar}
-            <div>
-              <p className="m-0 text-[14px] font-semibold" style={{ color: INK }}>{en ? "Content director" : "內容總監"}</p>
-              <p className="m-0 mt-0.5 text-[12px]" style={{ color: META }}>{en ? "Plans with your brand brain" : "用你的品牌大腦排內容"}</p>
-            </div>
+            <p className="m-0 text-[14px] font-semibold" style={{ color: INK }}>{en ? "Content director" : "內容總監"}</p>
           </div>
 
           <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto py-5">

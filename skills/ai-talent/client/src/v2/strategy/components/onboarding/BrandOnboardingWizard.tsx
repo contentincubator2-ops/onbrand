@@ -29,6 +29,7 @@ import RunningAgentCarousel from "../../../content/components/quickTask/RunningA
 // COUNTRIES，舊資料的市場代號才不會變成空白。見 countries.ts marketOptions。
 import { marketOptions, getCountry } from "../../../../lib/countries";
 import { DoneIcon, WarningIcon, ErrorIcon } from "../../../platform/components/icons";
+import { HelpTip } from "../../../platform/components/HelpTip";
 
 const INDUSTRIES_ZH = [
   "AI / 科技軟體",
@@ -333,37 +334,13 @@ export default function BrandOnboardingWizard({ isOpen, onClose, onComplete }: P
                 tech specs). */}
             {step === 1 && (
               <div className="py-2">
-                <p style={{
-                  fontSize: 12, fontWeight: 600, color: "#404040",
-                  letterSpacing: "0.28em", textTransform: "uppercase",
-                  marginBottom: 12,
-                }}>
-                  Welcome · SoWork Brand Method
-                </p>
                 <h1 style={{
                   fontSize: 28, fontWeight: 700, color: "#171717",
                   lineHeight: 1.15, letterSpacing: "-0.015em",
-                  marginBottom: 14, maxWidth: 520,
+                  marginBottom: 26, maxWidth: 520,
                 }}>
-                  {lang === "en"
-                    ? "Lock in who you are first — then AI knows what every post should say"
-                    : "先鎖定你是誰，AI 才知道每篇文章要說什麼"}
+                  {lang === "en" ? "Lock in your positioning first" : "先鎖定品牌定位"}
                 </h1>
-                <p style={{
-                  fontSize: 14, lineHeight: 1.75, color: "#404040",
-                  fontFamily: '"Source Serif Pro", "Noto Serif TC", Georgia, serif',
-                  maxWidth: 580, marginBottom: 26,
-                }}>
-                  {lang === "en" ? (
-                    <>OnBrand isn't another "one-click AI generator" — we turned the
-                      <strong style={{ fontFamily: "system-ui", fontWeight: 600, color: "#171717" }}> SoWork Brand Positioning Method</strong>
-                      {" "}into an actionable 14-step flow. AI reads your WHY, TA, and differentiation before every post. Lock it once — every channel stays on tone.</>
-                  ) : (
-                    <>OnBrand 不是另一個「AI 一鍵生成」工具 — 我們把
-                      <strong style={{ fontFamily: "system-ui", fontWeight: 600, color: "#171717" }}> SoWork 品牌定位法</strong>
-                      做成可執行的 14 步流程，讓 AI 在每篇貼文之前，先讀懂你的 WHY、TA、差異化。鎖定一次，所有平台都跟著你的調性走。</>
-                  )}
-                </p>
 
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 14, marginBottom: 24 }}>
                   {(lang === "en" ? [
@@ -430,9 +407,7 @@ export default function BrandOnboardingWizard({ isOpen, onClose, onComplete }: P
                   <FontAwesomeIcon icon={faArrowRight} className="text-tiny" />
                 </button>
                 <p style={{ fontSize: 12, color: "#525252", marginTop: 10 }}>
-                  {lang === "en"
-                    ? "About 2 minutes · once finished, AI is ready to write for your brand"
-                    : "預計 2 分鐘 · 完成後 AI 已備好可以為你寫內容"}
+                  {lang === "en" ? "About 2 minutes" : "預計 2 分鐘"}
                 </p>
               </div>
             )}
@@ -448,10 +423,12 @@ export default function BrandOnboardingWizard({ isOpen, onClose, onComplete }: P
                     <FontAwesomeIcon icon={faTrademark} style={{ color: "white", fontSize: 16 }} />
                   </div>
                   <div>
-                    <h2 className="text-lg font-semibold">{lang === "en" ? "Add your first brand" : "建立第一個品牌"}</h2>
-                    <p className="text-xs text-default-500">{lang === "en"
-                      ? "Website + FB help a lot — AI reads real content to write more accurately about your brand"
-                      : "官網 + FB 連結很重要 — AI 會抓真實內容做 ground"}</p>
+                    <h2 className="text-lg font-semibold flex items-center gap-1.5">
+                      {lang === "en" ? "Add your first brand" : "建立第一個品牌"}
+                      <HelpTip>{lang === "en"
+                        ? "Website + FB help a lot — AI reads real content to write more accurately about your brand"
+                        : "官網 + FB 連結很重要 — AI 會抓真實內容當依據"}</HelpTip>
+                    </h2>
                   </div>
                 </div>
 
@@ -627,16 +604,14 @@ export default function BrandOnboardingWizard({ isOpen, onClose, onComplete }: P
                     {lang === "en"
                       ? "Reading your website + Facebook…"
                       : "正在讀你的官網 + Facebook…"}
+                    <span style={{ marginLeft: 6, verticalAlign: "middle" }}>
+                      <HelpTip>
+                        {lang === "en"
+                          ? "The full 14-step SoWork positioning keeps running in the background (~9 min); you'll be notified when it's ready."
+                          : "完整的 14 步 SoWork 定位會在背景繼續跑（約 9 分鐘），完成後會通知你。"}
+                      </HelpTip>
+                    </span>
                   </h2>
-                  <p style={{
-                    fontSize: 13.5, lineHeight: 1.75, color: "#525252",
-                    fontFamily: '"Source Serif Pro", "Noto Serif TC", Georgia, serif',
-                    maxWidth: 540,
-                  }}>
-                    {lang === "en"
-                      ? "Building a quick Brand Brain so you can generate your first week of content in ~3 minutes. The full 14-step SoWork positioning will keep running in the background — Mia will ping you when it's ready (~9 min)."
-                      : "正在建立品牌大腦初版，讓你 3 分鐘內就能看到第一週內容。完整的 14 步 SoWork 定位會在背景繼續跑（約 9 分鐘），完成後 Mia 會通知你。"}
-                  </p>
                 </div>
 
                 <RunningAgentCarousel
@@ -718,31 +693,21 @@ export default function BrandOnboardingWizard({ isOpen, onClose, onComplete }: P
             {/* STEP 4 — 完成 */}
             {step === 4 && (
               <div className="py-2">
-                <p style={{
-                  fontSize: 12, fontWeight: 600, color: "#404040",
-                  letterSpacing: "0.28em", textTransform: "uppercase",
-                  marginBottom: 12,
-                }}>
-                  Positioning Locked · Ready for Production
-                </p>
                 <h1 style={{
                   fontSize: 26, fontWeight: 700, color: "#171717",
                   lineHeight: 1.2, letterSpacing: "-0.015em",
                   marginBottom: 12, maxWidth: 540,
                 }}>
                   {lang === "en"
-                    ? "Your brand's locked in — AI knows what every post should say"
-                    : "你的品牌已備好，AI 知道每篇文章該說什麼了"}
+                    ? "Your brand is ready"
+                    : "你的品牌已備好"}
                 </h1>
                 <p style={{
                   fontSize: 13.5, lineHeight: 1.75, color: "#404040",
-                  fontFamily: '"Source Serif Pro", "Noto Serif TC", Georgia, serif',
                   maxWidth: 580, marginBottom: 24,
                 }}>
                   {jobData?.status === "done"
-                    ? (lang === "en"
-                      ? "All 10 sections are done — Golden Circle, target audience, differentiation, and Voice are written to your Brand DNA. From here on, every task and 7-Day Publisher post uses this as its backbone."
-                      : "10 個段落全部完成 — 黃金圈、目標受眾、差異化、Voice 已寫入品牌大腦。從現在起所有任務與七日發布台的每一篇內容都會以此為骨架產出。")
+                    ? null
                     : (lang === "en"
                       ? "Full positioning still running in the background (we'll ping you bottom-left). You can head to the workspace to watch the 10 steps live, or jump in with the interim positioning and write your first post."
                       : "完整定位仍在背景跑（左下會通知）— 你可以先到工作區看 10 步即時推理，或直接用臨時定位開始試寫第一篇。")}

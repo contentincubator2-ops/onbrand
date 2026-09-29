@@ -98,7 +98,7 @@ export default function HomePage() {
       </div>
 
       {/* ── 策略層 ─────────────────────────────────────────────────────── */}
-      <TrayHeader badge={en ? "Strategy" : "策略層"} color={LAYER_COLORS.strategy} caption={en ? "How complete is this brand's strategy" : "這個品牌的策略齊備度"} />
+      <TrayHeader badge={en ? "Strategy" : "策略層"} color={LAYER_COLORS.strategy} />
       <Tray>
         <TrayRow
           icon={positioningLocked ? faCircleCheck : faTriangleExclamation}
@@ -126,7 +126,7 @@ export default function HomePage() {
       <ArrowDown />
 
       {/* ── 內容層 ─────────────────────────────────────────────────────── */}
-      <TrayHeader badge={en ? "Content" : "內容層"} color={LAYER_COLORS.content} caption={en ? "Strategy landed as a workflow at each touchpoint" : "策略落地到每個接觸點的工作流"} />
+      <TrayHeader badge={en ? "Content" : "內容層"} color={LAYER_COLORS.content} />
       <Tray>
         {touchpoints.map((t: any) => (
           <TrayRow
@@ -144,7 +144,7 @@ export default function HomePage() {
       <ArrowDown />
 
       {/* ── 成效層 ─────────────────────────────────────────────────────── */}
-      <TrayHeader badge={en ? "Performance · early preview" : "成效層 · 早期預覽"} color={LAYER_COLORS.performance} caption={en ? "Which touchpoints you can already see performance for" : "哪些接觸點已經串接、看得到成效"} />
+      <TrayHeader badge={en ? "Performance · early preview" : "成效層 · 早期預覽"} color={LAYER_COLORS.performance} />
       <p style={{ fontSize: 12, color: "#9ca3af", margin: "0 0 8px" }}>
         {en ? `Simulated ROAS ${mockRoas.toFixed(2)}x — real connections get priority access on Professional.` : `模擬 ROAS ${mockRoas.toFixed(2)}x——真實串接：專業方案優先體驗。`}
       </p>
@@ -202,7 +202,7 @@ export default function HomePage() {
         </button>
         <button onClick={() => navigate("/tasks/fb")} style={{ fontSize: 12, padding: "6px 12px", border: "1px solid #e5e7eb", borderRadius: 8, background: "#fff", cursor: "pointer" }}>
           <FontAwesomeIcon icon={faLayerGroup} style={{ marginRight: 6, color: "#9ca3af" }} />
-          {en ? "Advanced: browse task cards" : "進階：自己挑任務卡"}
+          {en ? "Task cards" : "任務卡"}
         </button>
         <span onClick={() => navigate("/changelog")} style={{ fontSize: 11, color: "#9ca3af", marginLeft: "auto", cursor: "pointer" }}>
           {en ? "Changelog" : "更新日誌"}
@@ -212,11 +212,11 @@ export default function HomePage() {
   );
 }
 
-function TrayHeader({ badge, color, caption }: { badge: string; color: string; caption: string }) {
+function TrayHeader({ badge, color, caption }: { badge: string; color: string; caption?: string }) {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
       <span style={{ fontSize: 12, padding: "2px 8px", borderRadius: 6, background: `${color}1a`, color }}>{badge}</span>
-      <span style={{ fontSize: 12, color: "#6b7280" }}>{caption}</span>
+      {caption && <span style={{ fontSize: 12, color: "#6b7280" }}>{caption}</span>}
     </div>
   );
 }

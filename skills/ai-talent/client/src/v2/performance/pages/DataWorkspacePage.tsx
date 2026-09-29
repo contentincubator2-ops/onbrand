@@ -160,13 +160,7 @@ export default function DataWorkspacePage() {
   return (
     <div style={{ padding: "20px 24px 80px", maxWidth: 1320, margin: "0 auto" }}>
       <div style={{ marginBottom: 18 }}>
-        <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: "0.18em", textTransform: "uppercase", color: "#9ca3af" }}>
-          Performance Agents
-        </div>
-        <h1 style={{ margin: "4px 0 0", fontSize: 28, fontWeight: 850, color: INK }}>成效儀表板</h1>
-        <p style={{ margin: "6px 0 0", fontSize: 14, color: "#6b7280", maxWidth: 760 }}>
-          Meta、Google Ads、SHOPLINE、91APP、GA4 —— 廣告花費與電商訂單收在同一頁，並按內容鎖定的族群拆開看。
-        </p>
+        <h1 style={{ margin: 0, fontSize: 28, fontWeight: 850, color: INK }}>成效儀表板</h1>
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) 340px", gap: 16, alignItems: "start" }}>

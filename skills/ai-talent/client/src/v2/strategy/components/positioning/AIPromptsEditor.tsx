@@ -27,6 +27,7 @@ import {
   faUserTie, faEnvelope, faCheck,
 } from "@fortawesome/free-solid-svg-icons";
 import { GenerateIcon, LockIcon, UnlockIcon } from "../../../platform/components/icons";
+import { HelpTip } from "../../../platform/components/HelpTip";
 
 // 2026-09-29（CJ：內容通路只剩 FB／IG／TikTok／電子報／官網）：YouTube／LinkedIn／
 // Press 分頁拿掉；已存的 _aiPrompts 原樣保留（drafts 整包回存，不刪資料）。
@@ -126,12 +127,12 @@ export default function AIPromptsEditor({ brandId }: { brandId: number | null })
               <FontAwesomeIcon icon={faUserTie} style={{ color: "#fff", fontSize: 14 }} />
             </div>
             <h1 className="text-2xl font-semibold text-default-900">{en ? "AI prompt library" : "AI 指令庫"}</h1>
+            <HelpTip>
+              {en
+                ? "Brand-specific text and image instructions per platform. Every task and the 7-Day Publisher applies these automatically for that platform."
+                : "每個平台的品牌專屬文字指令 + 圖片指令。所有任務與七日發布台在該平台跑任務時會自動套用。"}
+            </HelpTip>
           </div>
-          <p className="text-sm text-default-500">
-            {en
-              ? "Set brand-specific text and image instructions for each platform. Every task and the 7-Day Publisher automatically applies these when generating content for that platform."
-              : "為每個社群平台設定品牌專屬的文字指令 + 圖片指令。所有任務與七日發布台在該平台跑任務時會自動套用。"}
-          </p>
         </div>
       </div>
 

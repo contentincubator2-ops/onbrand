@@ -224,11 +224,6 @@ export default function RegisterPage() {
             <h1 className="text-2xl font-black mb-2" style={{ color: C.ink, letterSpacing: "-0.01em" }}>
               {lang === "en" ? "You're in!" : "註冊成功！"}
             </h1>
-            <p className="mb-6" style={{ color: C.inkSoft }}>
-              {lang === "en"
-                ? "Your account is ready. Sign in to start creating content."
-                : "你的帳號已啟用，可以直接登入使用 OnBrand。"}
-            </p>
             <p className="text-sm mb-6" style={{ color: C.muted }}>
               {lang === "en" ? "Account" : "帳號"} <strong style={{ color: C.ink }}>{email}</strong>
             </p>
@@ -374,12 +369,6 @@ export default function RegisterPage() {
         <div className="w-full max-w-md">
           {/* Hero copy */}
           <div className="mb-5 text-center">
-            <div
-              className="inline-block text-[12px] font-bold tracking-[0.2em] uppercase px-3 py-1 rounded-md mb-3"
-              style={{ background: C.orangeChip, color: C.orangeDark }}
-            >
-              {lang === "en" ? "Start free" : "免費開始"}
-            </div>
             <h1 className="text-[28px] font-black mb-2" style={{ color: C.ink, letterSpacing: "-0.02em" }}>
               {lang === "en" ? "Build your Brand Brain." : "建立你的品牌大腦"}
             </h1>

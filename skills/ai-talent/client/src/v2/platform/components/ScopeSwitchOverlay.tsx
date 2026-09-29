@@ -113,15 +113,9 @@ export default function ScopeSwitchOverlay({ scopeKey, scopeName }: Props) {
       `}</style>
       <div className="bg-white rounded-2xl shadow-2xl px-7 py-6 max-w-lg mx-4">
         <div className="text-center">
-          <div className="text-tiny font-semibold uppercase tracking-widest text-zinc-500 mb-1">
-            BRAND WORKSPACE
-          </div>
-          <h2 className="text-lg font-semibold text-default-900 mb-1">
+          <h2 className="text-lg font-semibold text-default-900 mb-4">
             讀取 {scopeName ?? "品牌"} 定位書中…
           </h2>
-          <p className="text-tiny text-default-500 mb-4">
-            20 位 AI 專家正在載入定位 / 文字 / 視覺 / 知識
-          </p>
 
           {/* 20 agent avatars in a 10×2 grid */}
           <div className="grid grid-cols-10 gap-1.5 mb-3 mx-auto" style={{ maxWidth: 360 }}>

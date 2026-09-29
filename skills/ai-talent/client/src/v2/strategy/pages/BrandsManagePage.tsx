@@ -238,9 +238,6 @@ export default function BrandsManagePage() {
             the title column can stay centered without competing for space. */}
         <div className="relative pt-2 pb-8 mb-2">
           <div className="text-center max-w-[1100px] mx-auto">
-            <p className="text-[12px] font-semibold uppercase tracking-[0.25em] text-neutral-600 mb-3">
-              BRANDS · WORKSPACE
-            </p>
             <h1
               className="font-semibold tracking-tight leading-tight"
               style={{
@@ -253,32 +250,6 @@ export default function BrandsManagePage() {
             >
               {lang === "en" ? "All your brands" : "你的所有品牌"}
             </h1>
-            <p
-              className="mt-3 mx-auto text-default-700"
-              style={{
-                fontFamily: '"Source Serif Pro", "Noto Serif TC", Georgia, serif',
-                fontStyle: "italic", fontSize: 14, lineHeight: 1.7, maxWidth: 640,
-              }}
-            >
-              {brands.length === 0
-                ? (lang === "en"
-                    ? "Start your first brand with the SoWork positioning method"
-                    : "從第一個品牌開始套用 SoWork 品牌定位法")
-                : (lang === "en"
-                    ? `${brands.length} brands running the SoWork method · tap a card to edit`
-                    : `${brands.length} 個品牌跑著 SoWork 品牌定位法 · 點卡片進入編輯`)}
-            </p>
-            <p
-              className="mt-2 mx-auto text-default-700"
-              style={{ fontSize: 12, lineHeight: 1.55, maxWidth: 640, letterSpacing: "0.02em" }}
-            >
-              <span style={{ fontWeight: 600, color: "#171717", marginRight: 6 }}>
-                {lang === "en" ? "Good for:" : "適合："}
-              </span>
-              {lang === "en"
-                ? "Switching brands · Checking each brand's activity and output status"
-                : "切換品牌 · 看每個品牌的活動 / 產出狀態"}
-            </p>
           </div>
           <button
             onClick={() => setAddBrandOpen(true)}
@@ -327,9 +298,6 @@ export default function BrandsManagePage() {
         {brands.length === 0 ? (
           <div className="bg-white border border-dashed border-neutral-300 rounded-xl py-16 px-6 text-center">
             <div className="max-w-sm mx-auto">
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-neutral-400 mb-3">
-                STEP 1
-              </p>
               <h2 className="text-xl font-bold text-neutral-900 mb-2">
                 {lang === "en" ? "Set up your first brand" : "建立你的第一個品牌"}
               </h2>

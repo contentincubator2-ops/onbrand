@@ -22,6 +22,7 @@ import {
   faMicrophone, faPlus, faXmark, faTrashCan, faWandMagicSparkles, faEnvelope, faCopy, faCheck, faRotateRight,
 } from "@fortawesome/free-solid-svg-icons";
 import CloudFilePicker, { type CloudFileSource } from "./CloudFilePicker";
+import { HelpTip } from "../../../platform/components/HelpTip";
 
 // 2026-09-29（CJ：內容通路只剩 FB／IG／TikTok／電子報／官網）：應用範圍拿掉
 // YouTube／LinkedIn／Press；agent.scope 裡既有的舊值不刪，只是不顯示。
@@ -525,12 +526,12 @@ export default function PersonaAgentPanel({ brandId }: { brandId: number | null 
               <FontAwesomeIcon icon={faMicrophone} style={{ color: "#fff", fontSize: 14 }} />
             </div>
             <h1 className="text-2xl font-semibold text-default-900">{en ? "Persona agents" : "人設 Agent"}</h1>
-          </div>
-          <p className="text-sm text-default-500">
+            <HelpTip>
             {en
               ? "Train a custom agent from a specific person's real words — pasted text, article links, YouTube links, or a Google Drive/OneDrive video/audio file. Each agent can be scoped to specific platforms, used to draft in that voice, and keeps evolving as you add more material later."
               : "用某個真實的人的文字、文章連結、YouTube 連結，或 Google Drive／OneDrive 影音檔案，訓練出一個專屬 Agent。訓練完成後可指定應用範圍（平台）、用這個 Agent 的語氣試寫文案，之後也能持續加入更多素材讓它越來越像本人。"}
-          </p>
+            </HelpTip>
+          </div>
         </div>
         {!creating && (
           <button

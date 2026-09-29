@@ -29,8 +29,8 @@ export default function PlanExpiredPage() {
         </h1>
         <p className="text-sm text-default-500 mb-2 leading-relaxed">
           {lang === "en"
-            ? "Your 7-day free trial has expired. Upgrade to keep your brands, content history, and continue generating."
-            : "你的 7 天免費試用已到期。升級後可保留所有品牌定位、內容記錄，並繼續生成內容。"}
+            ? "Upgrade to keep your brands, content history, and continue generating."
+            : "升級後可保留所有品牌定位、內容記錄，並繼續生成內容。"}
         </p>
         <p className="text-xs text-default-400 mb-8">
           {lang === "en"
@@ -44,13 +44,13 @@ export default function PlanExpiredPage() {
             onClick={() => navigate("/pricing")}
             className="w-full py-3 rounded-full bg-zinc-600 text-white text-sm font-semibold hover:bg-zinc-700 transition"
           >
-            {lang === "en" ? "View plans & upgrade →" : "查看方案，立即升級 →"}
+            {lang === "en" ? "View plans →" : "查看方案 →"}
           </button>
           <a
             href="mailto:sowork@sowork.ai?subject=OnBrand 升級諮詢"
             className="block w-full py-2.5 rounded-full bg-default-100 text-default-700 text-sm hover:bg-default-200 transition"
           >
-            {lang === "en" ? "Talk to us first" : "先聯絡我們諮詢"}
+            {lang === "en" ? "Contact us" : "聯絡我們"}
           </a>
         </div>
 

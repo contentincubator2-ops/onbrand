@@ -23,6 +23,7 @@ import { trpc } from "../../../../lib/trpc";
 import { useLang } from "../../../../lib/i18n";
 import { Button, Chip, Textarea, Spinner } from "@heroui/react";
 import { CheckIcon, ChevronLeftIcon, DeleteIcon, GenerateIcon, PasteIcon, TextIcon, UploadIcon, WarningIcon } from "../../../platform/components/icons";
+import { HelpTip } from "../../../platform/components/HelpTip";
 
 type Scope = "brand" | "product" | "event";
 
@@ -513,11 +514,13 @@ export default function PositioningDocPanel({
   return (
     <div className="flex flex-col gap-4">
       <div>
-        <p className="text-medium font-semibold">{en ? "Your own positioning document" : `你自己的${scopeLabel}定位文件`}</p>
-        <p className="text-small text-default-700 mt-1">
-          {en
-            ? "Upload the positioning you already have, in whatever format you wrote it — or paste a whole ChatGPT / Claude / Gemini conversation where you already worked this out with AI. It's kept verbatim and shown by your own structure — you don't have to answer our questions."
-            : `上傳你已經在用的${scopeLabel}定位，格式照你自己的——或直接貼上你之前跟 ChatGPT / Claude / Gemini 討論過的整段對話。原文會逐字保留、按你自己的段落呈現 —— 不需要把我們設的題目填完。`}
+        <p className="text-medium font-semibold flex items-center gap-1.5">
+          {en ? "Your own positioning document" : `你自己的${scopeLabel}定位文件`}
+          <HelpTip>
+            {en
+              ? "Upload the positioning you already have, in any format — or paste a whole ChatGPT / Claude / Gemini conversation. It's kept verbatim and shown by your own structure."
+              : `上傳你已經在用的${scopeLabel}定位，格式照你自己的——或貼上跟 ChatGPT / Claude / Gemini 討論過的整段對話。原文會逐字保留、按你自己的段落呈現。`}
+          </HelpTip>
         </p>
       </div>
 

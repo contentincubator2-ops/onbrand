@@ -41,10 +41,7 @@ export default function RewriteDraftModal({
     <Modal isOpen={isOpen} onClose={() => { onClose(); reset(); }} size="2xl" scrollBehavior="inside">
       <ModalContent>
         <ModalHeader className="flex flex-col gap-1">
-          {en ? "Rewrite existing text" : "貼上原文，直接改寫"}
-          <p className="text-[12px] font-normal text-default-500">
-            {en ? "Paste something you've already written — get it rewritten in your brand's voice." : "貼上你已經寫好的一段文案，改寫成符合品牌調性的版本。"}
-          </p>
+          {en ? "Rewrite existing text" : "改寫原文"}
         </ModalHeader>
         <ModalBody className="pb-6">
           {!mut.data?.ok ? (

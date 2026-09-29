@@ -2457,7 +2457,7 @@ export default function RunPage() {
               <div className="rounded-xl border border-default-200 bg-white overflow-hidden shadow-sm">
                 <div className="px-4 py-3 border-b border-default-100 flex items-center justify-between">
                   <span className="text-small font-semibold text-default-700">
-                    {lang === "en" ? "12 Video Titles — click to generate script" : "12 支影片 title — 點選產出腳本"}
+                    {lang === "en" ? "12 Video Titles" : "12 支影片 title"}
                   </span>
                   <span className="text-tiny text-default-400">{rows.length} 支</span>
                 </div>
@@ -2501,11 +2501,6 @@ export default function RunPage() {
                 <ModalBody>
                   {!generatedScript && !scriptMut?.isPending && (
                     <div className="flex flex-col items-center gap-4 py-8 text-center">
-                      <p className="text-small text-default-600 max-w-sm">
-                        {lang === "en"
-                          ? "Generate a full shooting script. Includes an opening hook, 3–5 main points, and a closing call to action."
-                          : "為這支影片 title 產出完整拍攝腳本，包含開場鉤、主體論點（3–5個）、收尾行動呼籲。"}
-                      </p>
                       <Button
                         color="secondary"
                         onPress={() => {
@@ -2612,8 +2607,8 @@ export default function RunPage() {
               expands to show that tool. */}
           <div className="bg-white rounded-xl border border-default-200 shadow-sm">
             <div className="flex items-center gap-0.5 px-2 py-1.5 flex-wrap">
-              <ToolbarBtn icon={EditIcon}        label={lang === "en" ? "Edit text" : "直接編輯"}      active={mode==="edit"}  onClick={() => setMode("edit")} />
-              <ToolbarBtn icon={CommentIcon} label={lang === "en" ? "Chat with AI" : "跟 AI 專家對話"} active={mode==="chat"}  onClick={() => setMode("chat")} />
+              <ToolbarBtn icon={EditIcon}        label={lang === "en" ? "Edit text" : "編輯"}      active={mode==="edit"}  onClick={() => setMode("edit")} />
+              <ToolbarBtn icon={CommentIcon} label={lang === "en" ? "Chat with AI" : "對話修改"} active={mode==="chat"}  onClick={() => setMode("chat")} />
               {hasImageSlot && (
                 <ToolbarBtn icon={ImageIcon}   label={lang === "en" ? "Redo image" : "改圖"}          active={mode==="image"} onClick={() => setMode("image")} />
               )}
@@ -2682,11 +2677,6 @@ export default function RunPage() {
               {mode === "chat" && (
                 <>
                   <p className="text-tiny font-semibold">{lang === "en" ? "Tell the AI specialist what to change" : "跟 AI 專家改文案"}</p>
-                  <p className="text-[12px] text-default-500 leading-relaxed">
-                    {lang === "en"
-                      ? "Tell the agent how to adjust it — e.g. \"end with a limited-time offer\" or \"too wordy, cut the second paragraph\"."
-                      : "告訴 AI 專家你想怎麼調整：例如「結尾改成限時優惠」、「太囉嗦砍第二段」。"}
-                  </p>
                   {chatHistory.length > 0 && (
                     <div className="space-y-1.5 max-h-40 overflow-y-auto bg-default-50 rounded-lg p-2">
                       {chatHistory.slice(-4).map((m, i) => (
@@ -3127,8 +3117,9 @@ export default function RunPage() {
                   {/* 2026-09-21: every earlier image of this slot stays selectable — switching is free. */}
                   {(slide?.imageVersions?.length ?? 0) > 0 && (
                     <div className="space-y-1.5">
-                      <p className="text-[12px] font-semibold text-default-700">
-                        {lang === "en" ? "Earlier images — click to switch back (no regeneration)" : "之前的圖 — 點一下切回去（不用重新生成）"}
+                      <p className="text-[12px] font-semibold text-default-700 flex items-center gap-1">
+                        {lang === "en" ? "Earlier images" : "之前的圖"}
+                        <HelpTip>{lang === "en" ? "Click to switch back — no regeneration." : "點一下切回去，不用重新生成。"}</HelpTip>
                       </p>
                       <div className="flex gap-2 flex-wrap">
                         {slide?.imageUrl && slide?.imageStatus === "ready" && (
@@ -3305,11 +3296,13 @@ export default function RunPage() {
               })()}
               {mode === "regen" && !isStrategyEnvelope && (
                 <>
-                  <p className="text-tiny font-semibold">{lang === "en" ? "Rewrite this version" : "重生這段文案"}</p>
-                  <p className="text-[12px] text-default-500 leading-relaxed">
-                    {lang === "en"
-                      ? <>Have the same agent write this version again — &quot;{slide?.label ?? `Version ${activeIdx + 1}`}&quot;. The original is archived.</>
-                      : <>讓同一位 AI 專家重新寫一次當前版本「{slide?.label ?? `版本 ${activeIdx + 1}`}」。原版會歸檔到歷史。</>}
+                  <p className="text-tiny font-semibold flex items-center gap-1">
+                    {lang === "en" ? "Rewrite this version" : "重生這段文案"}
+                    <HelpTip>
+                      {lang === "en"
+                        ? <>The same agent rewrites &quot;{slide?.label ?? `Version ${activeIdx + 1}`}&quot;. The original is archived.</>
+                        : <>同一位 AI 專家重寫「{slide?.label ?? `版本 ${activeIdx + 1}`}」。原版會歸檔到歷史。</>}
+                    </HelpTip>
                   </p>
                   <Button
                     color="secondary"
@@ -3322,13 +3315,8 @@ export default function RunPage() {
                   >
                     {regenMut.isPending
                       ? (lang === "en" ? "Rewriting…" : "重生中…")
-                      : (lang === "en" ? "Rewrite this version" : "立即重生這個版本")}
+                      : (lang === "en" ? "Rewrite this version" : "重生這個版本")}
                   </Button>
-                  <p className="text-[12px] text-default-400">
-                    {lang === "en"
-                      ? <>Will ask {(typeof data.metadata?.captionAgent === "object" ? data.metadata.captionAgent?.name : data.metadata?.captionAgent) ?? "the copywriter"} to rewrite version {activeIdx + 1}.</>
-                      : <>將呼叫 {(typeof data.metadata?.captionAgent === "object" ? data.metadata.captionAgent?.name : data.metadata?.captionAgent) ?? "撰寫者"} 重新產出第 {activeIdx + 1} 個版本。</>}
-                  </p>
                   {Array.isArray(data.metadata?.archivedVariants) && data.metadata.archivedVariants.length > 0 && (
                     <p className="text-[12px] text-default-500">
                       <LibraryIcon size={11} /> {lang === "en"
@@ -3527,7 +3515,7 @@ export default function RunPage() {
                   startContent={<FontAwesomeIcon icon={faCalendarPlus} />}
                   onPress={handleBulkIcsExport}
                 >
-                  {lang === "en" ? "Export all to calendar (.ics)" : "批量下載到行事曆（全部 .ics）"}
+                  {lang === "en" ? "Export all (.ics)" : "全部下載 .ics"}
                 </Button>
               )}
 
@@ -3681,7 +3669,7 @@ export default function RunPage() {
                     : "排進本週企劃的週曆，確認後回到週曆；之後可以在那裡改時間或立即發布。")
                   : (lang === "en"
                     ? `Schedules this post to ${schedPlatform}. After confirming you'll be taken to the Calendar page to publish.`
-                    : `排程此貼文到 ${schedPlatform}。確認後跳轉行事曆頁面，可在那裡一鍵發布。`)}
+                    : `排程此貼文到 ${schedPlatform}。確認後跳轉行事曆頁面，可在那裡發布。`)}
               </p>
             ) : null}
           </ModalBody>

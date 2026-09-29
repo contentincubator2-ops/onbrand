@@ -18,6 +18,7 @@ import { trpc } from "../../../lib/trpc";
 import { useLang } from "../../../lib/i18n";
 import { showToastGlobal } from "../../../components/ui/Toast";
 import { ChevronLeftIcon, DoneIcon, InboxIcon, SendBackIcon, WaitingIcon, WarningIcon } from "../components/icons";
+import { HelpTip } from "../components/HelpTip";
 
 type Tab = "pending" | "mine";
 
@@ -96,14 +97,14 @@ export default function ReviewQueuePage() {
         {isEn ? "Back" : "返回"}
       </button>
 
-      <h1 className="text-2xl font-bold text-default-900">
+      <h1 className="text-2xl font-bold text-default-900 flex items-center gap-2">
         {isEn ? "Review queue" : "審核佇列"}
+        <HelpTip>
+          {isEn
+            ? "Content goes live only after someone other than the author approves it."
+            : "產出要由作者以外的人放行才會上線。"}
+        </HelpTip>
       </h1>
-      <p className="mt-1 text-[14px] text-default-500">
-        {isEn
-          ? "Content goes live only after someone other than the author approves it."
-          : "產出要由作者以外的人放行才會上線。"}
-      </p>
 
       <div className="mt-5 flex gap-1 border-b border-default-200">
         {(["pending", "mine"] as Tab[]).map((t) => (

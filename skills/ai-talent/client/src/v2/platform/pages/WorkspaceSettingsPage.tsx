@@ -72,10 +72,7 @@ export default function WorkspaceSettingsPage() {
           <ChevronLeftIcon size={16} /> {lang === "en" ? "Back" : "返回"}
         </button>
 
-        <h1 className="text-2xl font-bold text-neutral-900 mb-1">{lang === "en" ? "Workspace settings" : "工作空間設定"}</h1>
-        <p className="text-sm text-neutral-500 mb-6">{lang === "en"
-          ? "Manage team members, client access, and white-label"
-          : "管理團隊成員、客戶分權、白牌設定"}</p>
+        <h1 className="text-2xl font-bold text-neutral-900 mb-6">{lang === "en" ? "Workspace settings" : "工作空間設定"}</h1>
 
         <div className="grid grid-cols-1 md:grid-cols-[260px_1fr] gap-6">
           {/* Sidebar: workspace list */}

@@ -80,9 +80,6 @@ export default function ForgotPasswordPage() {
       <div className="hidden lg:flex flex-col justify-center px-16 w-1/2" style={{ background: "#171717" }}>
         <div className="text-white">
           <div className="text-4xl font-bold mb-3">{lang === "en" ? "OnBrand" : "OnBrand · 對版"}</div>
-          <div className="text-xl opacity-80">
-            {lang === "en" ? "Marketing on autopilot — always on-brand." : "永遠 on-brand 的行銷作戰指揮台"}
-          </div>
           <button
             onClick={() => setLang(lang === "en" ? "zh-TW" : "en")}
             className="mt-10 text-xs opacity-70 hover:opacity-100 underline transition"
@@ -95,8 +92,7 @@ export default function ForgotPasswordPage() {
       <div className="flex flex-col justify-center items-center w-full lg:w-1/2 px-8">
         <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-10 w-full max-w-md">
           <div className="mb-6">
-            <h1 className="text-2xl font-bold text-gray-900 mb-1">{t("auth_forgot_title")}</h1>
-            <p className="text-gray-400 text-sm">{t("auth_forgot_subtitle")}</p>
+            <h1 className="text-2xl font-bold text-gray-900">{t("auth_forgot_title")}</h1>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
