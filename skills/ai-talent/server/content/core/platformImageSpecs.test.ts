@@ -32,14 +32,15 @@ describe("platform image specs", () => {
     expect(ratioError(w / h, s.width / s.height)).toBeLessThanOrEqual(0.005);
   });
 
-  it("offers Nano Banana only for ratios it can produce natively", () => {
-    expect(nanoRatioFor(1080, 1350)).toBe("4:5");
-    expect(nanoRatioFor(1080, 1440)).toBe("3:4");
-    expect(nanoRatioFor(1080, 1920)).toBe("9:16");
+  it("offers Nano Banana only where its REAL output ratio matches", () => {
+    expect(nanoRatioFor(1080, 1080)).toBe("1:1");
     expect(nanoRatioFor(1040, 1560)).toBe("2:3");
-    expect(nanoRatioFor(1200, 630)).toBeNull();    // 1.91:1
-    expect(nanoRatioFor(2500, 1686)).toBeNull();   // LINE 圖文選單
-    expect(nanoRatioFor(1540, 1000)).toBeNull();   // LINE 多頁訊息
+    // 標籤有、但實際輸出比例差太多：9:16 回 768×1344、4:5 回 896×1152、3:4 回 864×1184。
+    expect(nanoRatioFor(1080, 1920)).toBeNull();
+    expect(nanoRatioFor(1080, 1350)).toBeNull();
+    expect(nanoRatioFor(1080, 1440)).toBeNull();
+    expect(nanoRatioFor(1200, 630)).toBeNull();
+    expect(nanoRatioFor(2500, 1686)).toBeNull();
   });
 
   it("canvas block states the exact size, the no-crop rule and the safe zone", () => {

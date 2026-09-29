@@ -13,7 +13,8 @@ describe("imageCardRouter", () => {
     const { publicSpec } = await import("./imageCardRouter");
     const { getImageSpec } = await import("../core/platformImageSpecs");
     expect(publicSpec(getImageSpec("web-img-og")!).nanoBanana).toBe(false);
-    expect(publicSpec(getImageSpec("ig-img-feed-45")!).nanoBanana).toBe(true);
+    expect(publicSpec(getImageSpec("ig-img-feed-45")!).nanoBanana).toBe(false);
+    expect(publicSpec(getImageSpec("line-img-richmsg")!).nanoBanana).toBe(true);
     expect(publicSpec(getImageSpec("ig-img-feed-45")!).ratio).toBe("4:5");
   }, 60_000);
 });

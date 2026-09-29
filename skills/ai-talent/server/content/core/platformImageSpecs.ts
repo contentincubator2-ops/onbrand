@@ -414,23 +414,43 @@ export function gptSizeFor(width: number, height: number): { w: number; h: numbe
   return { w: best.w, h: best.h };
 }
 
-/** Nano Banana 原生支援的比例（Gemini image generation 文件）。 */
+/** Nano Banana 可以指定的比例（Gemini image generation 文件）。 */
 export const NANO_BANANA_RATIOS = ["1:1", "2:3", "3:2", "3:4", "4:3", "4:5", "5:4", "9:16", "16:9", "21:9"] as const;
 export type NanoBananaRatio = (typeof NANO_BANANA_RATIOS)[number];
 
-/** 這個交付尺寸 Nano Banana 能不能原生產出——不能就回 null，卡片不給選 Nano Banana。 */
+/**
+ * 每個比例標籤 Nano Banana 實際回傳的像素（gemini-2.5-flash-image）。標籤只是「最接近的桶」：
+ * 2026-09-29 實測 "9:16" 回 768×1344（其實是 4:7，差 1.6%）。所以能不能給 Nano Banana，
+ * 看的是實際輸出比例，不是標籤。
+ */
+export const NANO_BANANA_OUTPUT: Record<NanoBananaRatio, [number, number]> = {
+  "1:1": [1024, 1024], "2:3": [832, 1248], "3:2": [1248, 832], "3:4": [864, 1184], "4:3": [1184, 864],
+  "4:5": [896, 1152], "5:4": [1152, 896], "9:16": [768, 1344], "16:9": [1344, 768], "21:9": [1536, 672],
+};
+
+/** 這個交付尺寸 Nano Banana 的實際輸出比例是否一致（≤1%）——不一致回 null，卡片不給選 Nano Banana。 */
 export function nanoRatioFor(width: number, height: number): NanoBananaRatio | null {
   const r = width / height;
   for (const label of NANO_BANANA_RATIOS) {
+    const [w, h] = NANO_BANANA_OUTPUT[label];
+    if (ratioError(w / h, r) <= RATIO_TOLERANCE) return label;
+  }
+  return null;
+}
+
+/** 顯示用的比例標籤。 */
+function niceRatio(width: number, height: number): string | null {
+  const r = width / height;
+  for (const label of NANO_BANANA_RATIOS) {
     const [a = 0, b = 1] = label.split(":").map(Number);
-    if (ratioError(a / b, r) <= RATIO_TOLERANCE) return label;
+    if (ratioError(a / b, r) <= 0.005) return label;
   }
   return null;
 }
 
 export function ratioLabel(width: number, height: number): string {
-  const nano = nanoRatioFor(width, height);
-  if (nano) return nano;
+  const nice = niceRatio(width, height);
+  if (nice) return nice;
   return `${(width / height).toFixed(2).replace(/\.?0+$/, "")}:1`;
 }
 
