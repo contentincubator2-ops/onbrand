@@ -66,6 +66,7 @@ import { tierLabel } from "../../platform/lib/tierVocabulary";
 import { useLang } from "../../../lib/i18n";
 import { fireNudge } from "../../platform/components/mia/miaNudges";
 import ReviewBar from "../../platform/components/review/ReviewBar";
+import PerfTagPicker from "../../performance/components/PerfTagPicker";
 
 type Mode = "edit" | "chat" | "image" | "agent" | "regen" | "rewrite" | "publish" | "source";
 
@@ -3489,6 +3490,8 @@ export default function RunPage() {
                   )}
                 </>
               ) : (<>
+              {/* 2026-09-29 成效標籤：這篇對哪個族群、講哪個 USP → 發布後成效自動落進成效層矩陣 */}
+              <PerfTagPicker outputId={id} platform={schedPlatform} />
               {/* ── 1. 送到行事曆 ─────────────────────────── */}
               <Button
                 variant="flat" fullWidth
