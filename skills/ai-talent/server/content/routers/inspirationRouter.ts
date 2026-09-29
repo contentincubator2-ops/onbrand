@@ -42,6 +42,17 @@ function checkRate(userId: number): void {
   rate.set(userId, hits);
 }
 
+/**
+ * 品牌加入的通路裡，有文字任務卡可以寫的那些。2026-09-29 dev 實測：Threads、LINE 在任務
+ * 目錄裡只有圖片規格卡、沒有文字卡，採用時「這個通路沒有可用的任務卡」——所以不給 agent
+ * 建議、也不給用戶選。那兩個通路補上文字卡後這裡自動放行。
+ */
+async function writablePlatforms(brandId: number): Promise<string[]> {
+  const all = await brandPlatforms(brandId);
+  const ok = all.filter((p) => cardsFor([p]).length > 0);
+  return ok.length ? ok : ["facebook"];
+}
+
 /** 主體的名稱；產品／活動必須屬於這個品牌。 */
 async function resolveSubject(brandId: number, subject: z.infer<typeof subjectZ>): Promise<{ brandName: string; subjectLine: string; productId: number | null; eventId: number | null }> {
   const [bRows]: any = await localPool.execute(`SELECT name FROM brands WHERE id = ? LIMIT 1`, [brandId]);
@@ -84,7 +95,7 @@ export const inspirationRouter = router({
     .query(async ({ ctx, input }) => {
       await assertBrandAccess(ctx.user!.id, input.brandId);
       const [thinkers, prefs, platforms] = await Promise.all([
-        loadThinkerCards(), loadPrefs(input.brandId), brandPlatforms(input.brandId),
+        loadThinkerCards(), loadPrefs(input.brandId), writablePlatforms(input.brandId),
       ]);
       return {
         thinkers, lineup: prefs.lineup,
@@ -122,7 +133,7 @@ export const inspirationRouter = router({
       const [subject, market, platforms, cards] = await Promise.all([
         resolveSubject(input.brandId, input.subject),
         getBrandMarket(input.brandId),
-        brandPlatforms(input.brandId),
+        writablePlatforms(input.brandId),
         loadThinkerCards(),
       ]);
       const brandCtx = await buildBrandPrefix(input.brandId, subject.productId, subject.eventId, "full").catch(() => "");
@@ -158,7 +169,7 @@ export const inspirationRouter = router({
     .mutation(async ({ ctx, input }) => {
       const userId = ctx.user!.id;
       await assertBrandAccess(userId, input.brandId);
-      const platforms = await brandPlatforms(input.brandId);
+      const platforms = await writablePlatforms(input.brandId);
       if (!platforms.includes(input.platform)) throw new TRPCError({ code: "BAD_REQUEST", message: "這個品牌沒有加入這個通路" });
       const card = pickCardForFormat(input.platform, input.format, cardsFor([input.platform]));
       if (!card) throw new TRPCError({ code: "BAD_REQUEST", message: "這個通路沒有可用的任務卡" });

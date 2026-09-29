@@ -376,7 +376,7 @@ function AngleCard({ a, t, en, busy, inLineup, platformLabel, onAdopt, onMore, o
         </span>
       </div>
       <h2 className="m-0 text-[16px] font-bold leading-snug" style={{ color: INK }}>{a.title}</h2>
-      <p className="m-0 rounded-xl px-3.5 py-2.5 text-[14px] leading-relaxed" style={{ background: SOFT, color: "#262626" }}>「{a.hook}」</p>
+      <p className="m-0 rounded-xl px-3.5 py-2.5 text-[14px] leading-relaxed" style={{ background: SOFT, color: "#262626" }}>{/^[「『“"]/.test(a.hook) ? a.hook : `「${a.hook}」`}</p>
       {a.why && <p className="m-0 text-[13px] leading-relaxed" style={{ color: META }}>{a.why}</p>}
       <div className="mt-auto flex flex-wrap items-center gap-2 pt-1">
         {a.adopted ? (

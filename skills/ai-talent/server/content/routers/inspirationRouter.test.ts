@@ -48,6 +48,13 @@ describe("inspirationStage", () => {
     expect(parseAngles("not json", { keys: ["story"], platforms: ["facebook"], perThinker: 1 })).toEqual([]);
   });
 
+  it("unquote strips only a quote pair that wraps the whole hook", async () => {
+    const { unquote } = await import("../core/inspirationStage");
+    expect(unquote("「啤酒已經開了。」")).toBe("啤酒已經開了。");
+    expect(unquote("「你去哪間打包的？」——「我自己煎的。」")).toBe("「你去哪間打包的？」——「我自己煎的。」");
+    expect(unquote("沒有引號")).toBe("沒有引號");
+  });
+
   it("slotTopic fits planned_slots.topic and pickCardForFormat prefers a matching card", async () => {
     const { slotTopic, pickCardForFormat } = await import("../core/inspirationStage");
     expect(slotTopic({ title: "t".repeat(40), hook: "h".repeat(300) }).length).toBeLessThanOrEqual(200);
