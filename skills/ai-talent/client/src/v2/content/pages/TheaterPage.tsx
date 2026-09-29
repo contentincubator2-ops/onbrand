@@ -1672,21 +1672,13 @@ export default function TheaterPage() {
                 {t("theater_hero_eyebrow")}
               </p>
             )}
-            <h1
-              className="font-semibold tracking-tight leading-tight"
-              style={{
-                fontSize: "clamp(1.6rem, 3vw, 2.25rem)",
-                background: "#171717",
-                WebkitBackgroundClip: "text",
-                WebkitTextFillColor: "transparent",
-                backgroundClip: "text",
-              }}
-            >
-              <span className="inline-flex items-center gap-2">
+            <div className="inline-flex items-center gap-2">
+              <h1
+                className="font-semibold tracking-tight leading-tight text-default-900"
+                style={{ fontSize: "clamp(1.6rem, 3vw, 2.25rem)" }}
+              >
                 {t("theater_title")}
-              </span>
-            </h1>
-            <div className="mt-1 inline-flex">
+              </h1>
               <HelpTip>
                 {t("theater_hero_subtitle", { brand: brandName ?? t("theater_brand_placeholder") })}
                 <span className="block mt-1 text-default-500">
