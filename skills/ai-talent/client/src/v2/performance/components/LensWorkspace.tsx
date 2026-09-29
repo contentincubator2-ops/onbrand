@@ -164,7 +164,7 @@ export default function LensWorkspace({ brandId, tray }: { brandId: number | nul
         <EntryButton icon={faFileArrowUp} label="我的報告" tip="照你原本的報告：上傳 pptx / xlsx / csv，AI 讀出你用的維度與指標" onClick={() => setModal("report")} />
         <EntryButton icon={faComments} label="貼對話" tip="貼 AI 對話串：把跟 ChatGPT / Claude 討論過的分析框架貼進來" onClick={() => setModal("chat")} />
         <div className="ml-auto flex flex-wrap items-center gap-2">
-          {showFbSync && data?.fbPage && (
+          {showFbSync && data?.fbPage && data?.fbSyncEnabled !== false && (
             <SmallAction icon={faArrowsRotate} label="同步粉專" busy={sync.isPending} onClick={() => sync.mutate({ brandId, days: 180 })} />
           )}
           {showImport && <SmallAction icon={faFileImport} label="匯入後台檔" onClick={() => setModal("import")} />}
@@ -302,18 +302,26 @@ function LensReport({ lens, dims, data, report, loading, onCell, onAutoTag, auto
         )}
       </div>
       <div className="overflow-x-auto">
-        <table className="w-full border-separate border-spacing-1 text-[13px]">
+        {/* 值的名稱常常是一整句（「5到10分鐘加熱即可上桌」）：欄寬至少 96px、表頭最多兩行，
+            完整名稱放 title，免得窄欄把字擠成直排。 */}
+        <table className="w-full border-separate border-spacing-1 text-[13px]" style={{ minWidth: 140 + cols.length * 100 }}>
           <thead>
             <tr>
-              <th />
-              {cols.map((c) => <th key={c.code} className="px-2 py-1 text-center font-normal text-neutral-500">{c.label}</th>)}
+              <th className="w-[140px]" />
+              {cols.map((c) => (
+                <th key={c.code} title={c.label} className="min-w-[96px] px-1.5 py-1 align-bottom font-normal text-neutral-500">
+                  <span className="line-clamp-2 break-words text-center leading-snug">{c.label}</span>
+                </th>
+              ))}
               {r.cols.length > 0 && <th className="px-2 py-1 text-center font-normal text-neutral-500">合計</th>}
             </tr>
           </thead>
           <tbody>
             {r.rows.map((row: DimValue) => (
               <tr key={row.code}>
-                <td className={`whitespace-nowrap pr-2 ${row.code === UNTAGGED ? "text-neutral-400" : "text-neutral-700"}`}>{row.label}</td>
+                <td title={row.label} className={`max-w-[160px] pr-2 leading-snug ${row.code === UNTAGGED ? "text-neutral-400" : "text-neutral-700"}`}>
+                  <span className="line-clamp-2">{row.label}</span>
+                </td>
                 {cols.map((col) => {
                   const c: Cell | undefined = r.cells[`${row.code}|${col.code}`];
                   const isBest = c && best != null && c.judge === best && c.count >= 2 && row.code !== UNTAGGED && col.code !== UNTAGGED;
