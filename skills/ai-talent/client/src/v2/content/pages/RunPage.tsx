@@ -2171,8 +2171,8 @@ export default function RunPage() {
                   <HelpTip>
                     {componentSlot
                       ? (lang === "en"
-                          ? "Component task: your deliverable is rendered in its real ad slot below (purple highlight). Dashed gray areas are NOT produced by this task. Switch the version pills above to compare angles."
-                          : "元件任務：交付物已放進下方版型的實際位置（紫色標記處）；灰色虛線區塊非本任務產出。切換上方版本標籤比較不同切角。")
+                          ? "Component task: your deliverable is rendered in its real ad slot below (outlined). Dashed gray areas are NOT produced by this task. Switch the version pills above to compare angles."
+                          : "元件任務：交付物已放進下方版型的實際位置（框線標記處）；灰色虛線區塊非本任務產出。切換上方版本標籤比較不同切角。")
                       : (lang === "en"
                           ? "Component task: each version is ONE short, copy-ready line (e.g. ad headline / description / button text) — not a full post. Switch the version pills above to compare angles; the post frame is just placement context."
                           : "元件任務：每個版本是「一條」可直接複製使用的短句（廣告標題／描述／按鈕文字等），本來就不是完整貼文。切換上方版本標籤比較不同切角；貼文外框只是示意擺放位置。")}

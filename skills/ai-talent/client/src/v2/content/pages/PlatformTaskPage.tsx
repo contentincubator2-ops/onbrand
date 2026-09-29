@@ -113,97 +113,45 @@ interface PlatformMeta {
   labelZh: string;
   icon: any;
   bg: string;
-  heroZh: string;
-  heroEn: string;
-  subZh: string;
-  subEn: string;
 }
 
 const PLATFORM_META: Record<string, PlatformMeta> = {
   facebook: {
     label: "Facebook", labelZh: "Facebook", icon: faFacebook, bg: "#18181b",
-    heroZh: "讓每篇 Facebook 貼文，都有爆款的骨架",
-    heroEn: "Every post has a proven structure — no more starting from scratch",
-    subZh: "Clio 獲獎敘事公式 × 品牌定位鎖定，自然引發互動",
-    subEn: "Narrative frameworks from award-winning campaigns, locked to your brand voice",
   },
   instagram: {
     label: "Instagram", labelZh: "Instagram", icon: faInstagram, bg: "#18181b",
-    heroZh: "文案 × 視覺指令同步產出，不再是漂亮圖片配隨便文字",
-    heroEn: "Caption and visual brief in one run — never pieced together separately",
-    subZh: "文案代理人 + 圖片指導代理人協作，輸出比競品深一層",
-    subEn: "Caption agent and image director agent work in sync, every time",
   },
   linkedin: {
     label: "LinkedIn", labelZh: "LinkedIn", icon: faLinkedin, bg: "#18181b",
-    heroZh: "不只是發文，是在 LinkedIn 建立你的專業話語權",
-    heroEn: "Thought leadership that earns real attention — not just vanity metrics",
-    subZh: "PR Strategist 代理人以記者邏輯構建你的觀點",
-    subEn: "PR Strategist agent thinks like a journalist, writes like an executive",
   },
   youtube: {
     label: "YouTube", labelZh: "YouTube", icon: faYoutube, bg: "#18181b",
-    heroZh: "標題、章節、縮圖文案、結尾鉤子 — YouTube 影片完整佈局",
-    heroEn: "Title, chapters, thumbnail brief, end hook — one run, done",
-    subZh: "Strategist 規劃敘事弧，再由文案代理人完成每一段腳本",
-    subEn: "Strategist maps the arc; writer handles every segment",
   },
   tiktok: {
     label: "TikTok", labelZh: "TikTok", icon: faTiktok, bg: "#18181b",
-    heroZh: "前 3 秒留人，後 60 秒轉化 — TikTok 腳本不靠靈感",
-    heroEn: "Grab them in 3 seconds, keep them for 60 — retention built in",
-    subZh: "TikTok 專屬代理人以角色弧度 × 未解懸念設計驅動完播率",
-    subEn: "TikTok agent that thinks in character arcs and unresolved tension",
   },
   email: {
     label: "Newsletter", labelZh: "電子報", icon: faEnvelope, bg: "#18181b",
-    heroZh: "每封電子報都是品牌聲音的延伸，不是隨機發文",
-    heroEn: "Every email sounds like you — consistent voice, every send",
-    subZh: "品牌定位鎖定主旨行、開場鉤子與 CTA，完整結構一次產出",
-    subEn: "Brand voice locks the subject line, opening hook, and CTA — zero drift",
   },
   pr: {
     label: "PR", labelZh: "新聞稿", icon: faBullhorn, bg: "#475569",
-    heroZh: "讓媒體真正想報導你 — 不是寫稿，是設計新聞角度",
-    heroEn: "Written to get picked up — not just to check a box",
-    subZh: "PR Strategist 代理人以記者視角找到新聞價值，再產出完整稿件",
-    subEn: "PR Strategist finds the news angle before writing a single word",
   },
   case: {
     label: "Case Library", labelZh: "案例", icon: faBookBookmark, bg: "#18181b",
-    heroZh: "案例不是寫稿當下才找，是平常就在累積",
-    heroEn: "A case library you build over time, not scramble for at deadline",
-    subZh: "依十項標準分別建檔，每次提報都對照既有紀錄去重",
-    subEn: "Filed by standard, deduplicated against everything already logged",
   },
   calendar: {
     label: "Content Calendar", labelZh: "行事曆", icon: faCalendarDays, bg: "#18181b",
-    heroZh: "先把整個月的篇數與切角排好，再逐篇寫",
-    heroEn: "Plan the month's slots and angles first, then write them one by one",
-    subZh: "每種內容類型一張卡，一次產出該類型當月所有篇數的摘要",
-    subEn: "One card per content type, producing every slot that type owns this month",
   },
   website: {
     label: "Website", labelZh: "官網", icon: faGlobe, bg: "#18181b",
-    heroZh: "官網長文不是部落格隨筆，是品牌把觀點說完整的地方",
-    heroEn: "Long-form that earns the reader's time — not filler blog posts",
-    subZh: "引言＋3 段的固定骨架，把案例與規格翻譯成讀者的生活感受",
-    subEn: "A fixed intro-plus-three structure that turns specs into felt experience",
   },
   // 2026-09-29 CJ：台灣市場加 Threads、LINE。目前沒有預設卡，用戶從自己的範例建卡。
   threads: {
     label: "Threads", labelZh: "Threads", icon: faThreads, bg: "#000000",
-    heroZh: "Threads 要像人在說話，不像品牌在發公告",
-    heroEn: "Threads should sound like a person talking, not a brand announcing",
-    subZh: "貼上你寫得最好的幾篇串文，建成自己的 Threads 任務卡",
-    subEn: "Paste your best threads and turn them into your own task card",
   },
   line: {
     label: "LINE", labelZh: "LINE", icon: faLine, bg: "#18181b",
-    heroZh: "LINE 群發是寫給已經加你好友的人——一則訊息、一個行動",
-    heroEn: "LINE broadcasts go to people who already follow you — one message, one action",
-    subZh: "貼上你效果最好的幾則群發訊息，建成自己的 LINE 任務卡",
-    subEn: "Paste your best-performing broadcasts and turn them into your own task card",
   },
 };
 
@@ -1662,7 +1610,7 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
 
         <div className="relative z-10 flex flex-col items-center text-center max-w-[1100px] mx-auto">
 
-          {/* Platform header：單色 logo＋平台名；賣點說明收進「?」（2026-09-29 介面去文字化） */}
+          {/* Platform header：單色 logo＋平台名（2026-09-29 介面去文字化：各通路標語已刪） */}
           <div className="flex items-center gap-2.5 mb-4">
             <div className="w-9 h-9 rounded-full flex items-center justify-center text-white shadow-sm bg-default-900">
               <FontAwesomeIcon icon={meta.icon} className="text-sm" />
@@ -1670,17 +1618,6 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
             <h1 className="font-bold tracking-tight leading-tight text-default-900" style={{ fontSize: "clamp(1.35rem, 2.4vw, 1.75rem)" }}>
               {lang === "en" ? meta.label : meta.labelZh}
             </h1>
-            <HelpTip>
-              <b className="block mb-1">{lang === "en" ? meta.heroEn : meta.heroZh}</b>
-              {lang === "en" ? meta.subEn : meta.subZh}
-              {brandId && (
-                <span className="block mt-1 text-default-500">
-                  {lang === "en"
-                    ? `Using ${brandName ?? "your brand"}'s positioning`
-                    : `以 ${brandName ?? "你的品牌"} 定位為骨架`}
-                </span>
-              )}
-            </HelpTip>
           </div>
 
           {/* Search */}

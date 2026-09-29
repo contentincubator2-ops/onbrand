@@ -115,11 +115,11 @@ export const NUDGE_CATALOG = {
     message: {
       "zh-TW":
         "👋 歡迎！你的品牌大腦初版好了，我幫你預設了 FB / IG 兩個平台 + 本週日期。" +
-        "按底下橘色「一鍵生成 7 天」就會出來 14 張卡（每天 × 2 平台）——大概 3 分鐘。" +
+        "按「生成 7 天內容」就會出來 14 張卡（每天 × 2 平台）——大概 3 分鐘。" +
         "完整 14 步品牌定位還在背景跑，完成後我會再叫你來看。",
       en:
         "👋 Welcome! Your Brand Brain (express version) is ready. I've pre-" +
-        "selected FB / IG + this week. Hit the orange 'Generate " +
+        "selected FB / IG + this week. Hit 'Generate " +
         "7 Days' button below — you'll see 14 cards (7 days × 2 channels) " +
         "in ~3 minutes. The full 14-step positioning is still running in " +
         "the background; I'll ping you when it's done.",

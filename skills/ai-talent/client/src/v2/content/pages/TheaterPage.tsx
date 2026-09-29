@@ -1631,18 +1631,11 @@ export default function TheaterPage() {
             <span className="flex-1">
               {lang === "en" ? (
                 <>
-                  <strong>Express Brain active.</strong> Full 14-step SoWork
-                  positioning still running in the background — Mia will ping
-                  you when it's done (~{Math.max(
-                    1,
-                    14 - (pipelineStatusQ.data.currentStep ?? 0),
-                  )} steps left).
+                  <strong>Express Brain</strong> · full positioning running — we'll notify you when it's done
                 </>
               ) : (
                 <>
-                  <strong>正在用品牌大腦初版生成內容。</strong>
-                  完整 14 步 SoWork 定位仍在背景跑——完成後 Mia 會通知你
-                  （剩 {Math.max(1, 14 - (pipelineStatusQ.data.currentStep ?? 0))} 步）。
+                  <strong>品牌大腦初版</strong> · 完整定位背景進行中，完成後會通知你
                 </>
               )}
             </span>
