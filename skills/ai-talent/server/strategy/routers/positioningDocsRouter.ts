@@ -356,7 +356,9 @@ ${targets}
         const s = doc.sections[i];
         if (!s) continue;
         const block = `【${s.heading || "補充"}】\n${s.body}`.trim();
-        if (injected.length + block.length + 2 > MAX_INJECTED_CHARS) break;
+        // 2026-09-29：原本是 break——某一段太長放不下時，它**和後面所有段落**都被丟掉，
+        // 而且沒有任何提示。改成只跳過放不下的那一段，後面較短的段落照樣放。
+        if (injected.length + block.length + 2 > MAX_INJECTED_CHARS) continue;
         injected += (injected ? "\n\n" : "") + block;
       }
 

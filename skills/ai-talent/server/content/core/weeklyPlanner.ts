@@ -305,7 +305,9 @@ export function plannerContext(args: PlannerCtxArgs): string {
     `【這週已經有的內容，不要重複排】\n已排程／已發布：\n${schedList}\n活動企劃：\n${campList}`,
     `【已排的格子（可以改的是草稿與已排定）】\n${slotList}`,
     `【任務卡目錄（id｜通路｜名稱）——每一格要挑一張，id 一字不差】\n${cardList}`,
-    args.brandCtx ? `【品牌資料】\n${args.brandCtx.slice(0, 7000)}` : "",
+    // 2026-09-29：原本整份品牌資料截前 7,000 字——產品／活動排在最後，最先被切掉。
+    // 品牌大腦本身已有容量上限（BRAIN_CAPACITY），這裡只防異常超長。
+    args.brandCtx ? `【品牌資料】\n${args.brandCtx.slice(0, 24000)}` : "",
     ``,
     `排法規則：`,
     `- 產品名稱、產地、價格、活動起訖日照品牌資料寫，資料沒有的不要編；活動截止日寫確切日期，不要寫「節日前」。活動在這週之前就已經開始的，不要寫「開搶」「今天開始」這類開賣字眼。`,

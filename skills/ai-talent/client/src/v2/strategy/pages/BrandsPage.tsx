@@ -34,6 +34,7 @@ import CustomCardEditor, { type EditableCard } from "../components/positioning/C
 import AssetPhotoGallery from "../components/positioning/AssetPhotoGallery";
 import { InfoTab as BrandInfoTab, DangerTab as BrandDangerTab, PublishTab as BrandPublishTab } from "../components/positioning/BrandSettingsSheet";
 import StrategyMeetingsPanel from "../components/meetings/StrategyMeetingsPanel";
+import BrainPanel from "../components/brain/BrainPanel";
 import BrandOnboardingWizard from "../components/onboarding/BrandOnboardingWizard";
 import StrategyWorkbench from "../components/positioning/StrategyWorkbench";
 import AIBriefPanel from "../components/positioning/AIBriefPanel";
@@ -639,7 +640,7 @@ export default function BrandsPage() {
   // 2026-05-07 Path A simplification: 3 main tiles only (定位/文字/知識).
   // "visual" is kept in the type for legacy lock-state code paths, but
   // is no longer exposed as a tile — its contents live in Settings.
-  const category: "positioning" | "copy" | "visual" | "knowledge" | "info" | "publish" | "ai" | "settings" | "products" | "events" | "meetings" | "persona" | "campaign" =
+  const category: "positioning" | "copy" | "visual" | "knowledge" | "info" | "publish" | "ai" | "settings" | "products" | "events" | "meetings" | "brain" | "persona" | "campaign" =
     urlCat === "copy" ? "copy"
     : urlCat === "knowledge" ? "knowledge"
     : urlCat === "visual" ? "visual"
@@ -650,6 +651,7 @@ export default function BrandsPage() {
     : urlCat === "products" ? "products"
     : urlCat === "events" ? "events"
     : urlCat === "meetings" ? "meetings"
+    : urlCat === "brain" ? "brain"
     : urlCat === "persona" ? "persona"
     // 2026-09-25（CJ「應該要在活動的 mission tray 當中，增加這個活動的任務卡」）：
     // 活動的預設落點是宣傳企劃，不是 11 段的得獎 brief（那退成 cat=positioning
@@ -665,7 +667,7 @@ export default function BrandsPage() {
   // version clobbered it with a snapshot from BEFORE that write, dropping
   // `e` and silently falling back to brand-level positioning. Functional
   // form fixes it for every caller, not just this one site.
-  const setCategory = (next: "positioning" | "copy" | "knowledge" | "info" | "visual" | "publish" | "ai" | "products" | "events" | "meetings" | "persona") => {
+  const setCategory = (next: "positioning" | "copy" | "knowledge" | "info" | "visual" | "publish" | "ai" | "products" | "events" | "meetings" | "brain" | "persona") => {
     setSearchParams((prev) => {
       const nextParams = new URLSearchParams(prev);
       nextParams.set("cat", next);
@@ -1496,6 +1498,9 @@ export default function BrandsPage() {
                   { v: "meetings"    as const, label: lang === "en" ? "Meetings" : "會議",
                       desc: lang === "en" ? "Recurring strategy meetings" : "定期策略會議",
                       Icon: LucideUsers,     scopes: ["brand", "product"] },
+                  { v: "brain"       as const, label: lang === "en" ? "Brain" : "大腦",
+                      desc: lang === "en" ? "What the AI remembers" : "AI 記住了什麼",
+                      Icon: LucideTarget,    scopes: ["brand", "product", "event"] },
                   { v: "products"    as const, label: lang === "en" ? "Products" : "產品",
                       desc: lang === "en" ? "Product cards & positioning" : "產品卡片與定位",
                       Icon: LucideRobotIcon, scopes: ["brand"] },
@@ -2332,6 +2337,20 @@ export default function BrandsPage() {
           {derivedCategory === "meetings" && activeBrandIdForLocks && (
             <div style={{ padding: "8px 0 32px" }}>
               <StrategyMeetingsPanel brandId={activeBrandIdForLocks} />
+            </div>
+          )}
+
+          {/* ── 大腦 (brain) — 檢查品牌大腦 ──
+               2026-09-29（CJ「在策略端增加一個 mission tray，是檢查大腦……像手機
+               記憶體的感覺」）：列出每篇產文實際讀到的品牌大腦、用了多少容量、
+               哪些只記住一部分、哪些超載。資料與產文 prompt 同源（buildBrandBrain）。 */}
+          {derivedCategory === "brain" && activeBrandIdForLocks && (
+            <div style={{ padding: "8px 0 32px" }}>
+              <BrainPanel
+                brandId={activeBrandIdForLocks}
+                initialProductId={scope?.productId ?? null}
+                initialEventId={scope?.eventId ?? null}
+              />
             </div>
           )}
 
