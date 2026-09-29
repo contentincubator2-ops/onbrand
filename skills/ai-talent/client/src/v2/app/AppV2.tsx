@@ -15,6 +15,7 @@
  *
  * Auth gate is unchanged — RequireAuth still wraps protected routes.
  */
+import { isChunkLoadError, autoReloadForStaleChunk, installStaleChunkRecovery, StaleChunkScreen } from "./staleChunk";
 import React from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import { LanguageProvider } from "../../lib/i18n";
@@ -130,21 +131,6 @@ function RouteFallback() {
 // Same stale-chunk helpers as ShellLayout — duplicated here so AppErrorBoundary
 // (the outermost boundary, outside the shell) also auto-recovers without
 // importing from ShellLayout and creating a circular dependency.
-function isChunkLoadError(err: Error): boolean {
-  const text = (err.message ?? "") + " " + (err.stack ?? "");
-  return /Failed to fetch dynamically imported module|ChunkLoadError|Loading chunk|Loading CSS chunk|error loading dynamically imported module/i.test(text);
-}
-function autoReloadOnce(): boolean {
-  try {
-    const last = Number(sessionStorage.getItem("_chunk_reload_at") ?? 0);
-    if (Date.now() - last > 15_000) {
-      sessionStorage.setItem("_chunk_reload_at", String(Date.now()));
-      window.location.reload();
-      return true;
-    }
-  } catch { /* sessionStorage blocked */ }
-  return false;
-}
 
 class AppErrorBoundary extends React.Component<
   { children: React.ReactNode },
@@ -154,7 +140,7 @@ class AppErrorBoundary extends React.Component<
   static getDerivedStateFromError(error: Error) { return { error }; }
   componentDidCatch(error: Error, info: React.ErrorInfo) {
     // Stale-chunk auto-recovery: hard-reload once on deployment-induced 404.
-    if (isChunkLoadError(error) && autoReloadOnce()) return;
+    if (isChunkLoadError(error) && autoReloadForStaleChunk()) return;
     // eslint-disable-next-line no-console
     console.error("[AppV2] render error:", error, info);
     // 2026-05-11 — auto-report to the Sentry-lite error_log table so the
@@ -195,6 +181,9 @@ class AppErrorBoundary extends React.Component<
     } catch { /* never throw from componentDidCatch */ }
   }
   render() {
+    if (this.state.error && isChunkLoadError(this.state.error)) {
+      return <StaleChunkScreen fullPage />;
+    }
     if (this.state.error) {
       return (
         <div style={{ minHeight: "100vh", padding: 32, fontFamily: "system-ui, sans-serif" }}>
@@ -255,6 +244,8 @@ class AppErrorBoundary extends React.Component<
     return this.props.children as any;
   }
 }
+
+installStaleChunkRecovery();
 
 export default function AppV2() {
   return (
