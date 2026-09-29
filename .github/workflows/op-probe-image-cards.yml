@@ -1,0 +1,61 @@
+name: "Ops — probe platform image cards (real generation, exact ratios)"
+
+# 2026-09-29（CJ「圖片獨立成任務卡；比例要在生成時鎖死，不能事後裁」）。
+# 在 GitHub runner 上用 dev 環境的金鑰，真的打 gpt-image-2／Nano Banana 生成幾張圖片卡，
+# 檢查交付尺寸完全等於規格、檔案在上限內。不碰任何 VM、不寫任何資料庫；結果圖拉回 artifact。
+#
+# 觸發：改這個檔案或 probe 腳本再 push（dev 或 hotfix/image-card*）。
+#   PROBE_CARDS 空白 = 腳本預設的 4 張；否則填 "cardId:model cardId:model ..."
+on:
+  push:
+    branches: [dev, "hotfix/image-card*"]
+    paths:
+      - ".github/workflows/op-probe-image-cards.yml"
+      - "skills/ai-talent/scripts/probe-image-cards.ts"
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-24.04
+    environment: dev
+    timeout-minutes: 25
+    env:
+      PROBE_CARDS: ""
+      OPENAI_API_KEY: ${{ secrets.OPEN_API_KEY }}
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      # 跟 CI 一樣的佔位值——env 驗證要求它們存在，探測本身不連資料庫。
+      DB_HOST: localhost
+      DB_USER: test
+      DB_PASSWORD: test
+      DB_NAME: test
+      LOCAL_DB_HOST: localhost
+      LOCAL_DB_PORT: "3306"
+      LOCAL_DB_USER: test
+      LOCAL_DB_PASSWORD: test
+      LOCAL_DB_NAME: test
+      JWT_SECRET: ci-test-secret-at-least-32-chars-long
+      NODE_ENV: test
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: skills/ai-talent/package-lock.json
+      - name: Install server dependencies
+        run: npm ci --legacy-peer-deps --prefix skills/ai-talent
+      - name: Generate
+        working-directory: skills/ai-talent
+        shell: bash
+        run: |
+          mkdir -p "$GITHUB_WORKSPACE/out"
+          echo "openai key present: $([ -n "$OPENAI_API_KEY" ] && echo yes || echo no)  gemini key present: $([ -n "$GEMINI_API_KEY" ] && echo yes || echo no)"
+          COVERS_DIR="$GITHUB_WORKSPACE/out" npx tsx scripts/probe-image-cards.ts $PROBE_CARDS 2>&1 | sed -E 's/sk-[A-Za-z0-9_*-]{6,}/[key]/g; s/AIza[0-9A-Za-z_-]{20,}/[key]/g'
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: image-cards-${{ github.run_id }}
+          path: out
+          retention-days: 3

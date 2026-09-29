@@ -180,19 +180,19 @@ export function FBFeed({ title, brandName, brandLogoUrl, variantLabel, liveCapti
                   </>
                 ) : liveImageStatus === "skipped" ? (
                   <>
-                    <p className="text-tiny font-semibold text-default-600 mb-1">{lang === "en" ? "This task doesn't include images" : "此任務不含主圖"}</p>
+                    <p className="text-tiny font-semibold text-default-600 mb-1">{lang === "en" ? "Want an image for this post?" : "要幫這篇做圖嗎？"}</p>
                     {liveImageStyle && <p className="text-tiny line-clamp-3 text-default-500">{liveImageStyle}</p>}
-                    <p className="text-[10px] text-default-400 mt-2">{lang === "en" ? "Tap to generate manually" : "點此手動生圖"}</p>
+                    <p className="text-[10px] text-default-400 mt-2">{lang === "en" ? "Tap to create one — this copy comes along" : "點此做圖，會自動帶入這篇文案"}</p>
                   </>
                 ) : liveImageStyle ? (
                   <>
                     <p className="text-tiny font-semibold text-default-600 mb-1">{lang === "en" ? "Visual direction" : "圖片風格方向"}</p>
                     <p className="text-tiny line-clamp-4 text-default-700 leading-relaxed">{liveImageStyle}</p>
-                    <p className="text-[10px] text-default-400 mt-2">{lang === "en" ? "Tap to generate via MediaGenFlow" : "點此用 MediaGenFlow 生圖"}</p>
+                    <p className="text-[10px] text-default-400 mt-2">{lang === "en" ? "Tap to create the image" : "點此做圖"}</p>
                   </>
                 ) : (
                   <p className="text-tiny line-clamp-3 text-default-500">
-                    {liveImageDesc ?? (lang === "en" ? "No image generated" : "尚未生成圖片 · 點此手動生圖")}
+                    {liveImageDesc ?? (lang === "en" ? "Want an image for this post? Tap to create one" : "要幫這篇做圖嗎？點此做圖")}
                   </p>
                 )}
               </div>

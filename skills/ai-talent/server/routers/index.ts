@@ -11,6 +11,7 @@ import { brandBrainRouter } from "../strategy/routers/brandBrainRouter";
 import { calendarRouter } from "../content/routers/calendarRouter";
 import { bundleConnectRouter } from "../platform/routers/bundleConnectRouter";
 import { imageRouter } from "../content/routers/imageRouter";
+import { imageCardRouter } from "../content/routers/imageCardRouter";
 import { quickTaskRouter } from "../content/routers/quickTaskRouter";
 import { entityRouter } from "../strategy/routers/entityRouter";
 import { productRouter, eventRouter, scopeRouter } from "../strategy/routers/scopeRouter";
@@ -83,6 +84,8 @@ export const appRouter = router({
   calendar:      calendarRouter,
   bundleConnect: bundleConnectRouter,
   image:         imageRouter,
+  // 2026-09-29 各通路「圖片」類別的圖片任務卡。
+  imageCard:     imageCardRouter,
   quickTask:     quickTaskRouter,
   entity:        entityRouter,
   product:       productRouter,

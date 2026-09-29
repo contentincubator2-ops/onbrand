@@ -97,7 +97,7 @@ ${stateRule}
 export interface PhotoConflict { photoShows: string; postNeeds: string; suggestPhoto: string }
 
 /** 這張照片是不是這個品牌自己的產品照（上傳的，或產品資料裡的主圖）。 */
-async function brandOwnsProductPhoto(brandId: number, url: string): Promise<boolean> {
+export async function brandOwnsProductPhoto(brandId: number, url: string): Promise<boolean> {
   const { default: localPool } = await import("../../localDb");
   try {
     const [a]: any = await localPool.execute(

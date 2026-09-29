@@ -34,6 +34,7 @@ import { Pencil, MessageCircle, Image as LucideImage, Wand2, Users as LucideUser
 import { trpc } from "../../../lib/trpc";
 import { showToastGlobal } from "../../../components/ui/Toast";
 import { PlatformMockup } from "../components/PlatformMockup";
+import ImageCardOffer, { IMAGE_CARD_OFFER_ID } from "../components/imageCard/ImageCardOffer";
 import type { MockupVariant } from "../lib/inferMockup";
 import { getStrategyPresentationMockup } from "../lib/strategyPresentation";
 import {
@@ -2192,9 +2193,23 @@ export default function RunPage() {
                 overlayTitle={mockupVariant?.platform === "youtube" ? overlayTitle : undefined}
                 onGenerateImage={isStrategyPlanning
                   ? undefined
-                  : () => { manualImageRef.current = true; setMode("image"); }}
+                  : () => {
+                      // 2026-09-29（CJ「要生圖嗎？要的話會打開生圖的任務卡」）：純文字任務點預覽圖區，
+                      // 帶到下方的圖片任務卡清單（選尺寸 → 開卡、帶入文案）；有該通路圖片卡才這樣走。
+                      const offer = slide.imageStatus === "skipped" && document.getElementById(IMAGE_CARD_OFFER_ID);
+                      if (offer) { offer.scrollIntoView({ behavior: "smooth", block: "center" }); return; }
+                      manualImageRef.current = true; setMode("image");
+                    }}
                 componentSlot={componentSlot}
               />
+              {!isStrategyPlanning && !isComponentTask && (
+                <ImageCardOffer
+                  platform={mockupVariant?.platform}
+                  copy={String(slide.caption ?? "")}
+                  runId={outputId}
+                  hasImage={!!slide.imageUrl}
+                />
+              )}
               {/* 2026-09-21 (CJ「不行的時候，再讓用戶選 NANO BANANA」): gpt-image-2 failed even after the
                   automatic same-model retry. Say so plainly and let the USER pick — nothing switches on
                   its own. Also covers a failed manual attempt (imageFailure). */}
