@@ -9,6 +9,7 @@ import { HeroUIProvider } from "@heroui/react";
 // — see git history if you need the old behavior.
 import AppV2 from "./v2/app/AppV2";
 import "./index.css";
+import { WarningIcon } from "./v2/platform/components/icons";
 
 // 2026-05-08 (P1-2): global mutation / query error toast.
 // Caught the silent-fail bug where many components used
@@ -154,7 +155,7 @@ class AppErrorBoundary extends React.Component<
           background: "#FFF1F0", border: "1px solid #FFA39E", borderRadius: 8,
         }}>
           <div style={{ fontSize: 18, fontWeight: 700, color: "#CF1322", marginBottom: 12 }}>
-            ⚠️ 應用程式載入失敗 (render error)
+            <WarningIcon size={18} /> 應用程式載入失敗 (render error)
           </div>
           <pre style={{ fontSize: 12, color: "#5c0011", whiteSpace: "pre-wrap", marginBottom: 16 }}>
             {this.state.error.message}

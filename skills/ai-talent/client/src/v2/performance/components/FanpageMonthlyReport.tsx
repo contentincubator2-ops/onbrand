@@ -14,6 +14,7 @@
  */
 import React from "react";
 import { useSearchParams } from "react-router-dom";
+import { WarningIcon } from "../../platform/components/icons";
 
 type SlotRef = { slide: number; x: number; y: number; w: number; h: number; shape: string };
 type Slot = {
@@ -204,7 +205,7 @@ export default function FanpageMonthlyReport() {
         </button>
 
         {busy && <div style={{ marginTop: 10, fontSize: 12, color: "#2563eb" }}>{busy}</div>}
-        {err && <div style={{ marginTop: 10, fontSize: 12, color: "#b91c1c" }}>⚠ {err}</div>}
+        {err && <div style={{ marginTop: 10, fontSize: 12, color: "#b91c1c" }}><WarningIcon size={12} /> {err}</div>}
 
         {decks.length > 0 && (
           <div style={{ marginTop: 14, display: "grid", gap: 6 }}>

@@ -23,10 +23,7 @@ import type { ShellOutletCtx } from "../../app/shell/ShellLayout";
 import { showToastGlobal } from "../../../components/ui/Toast";
 import { useLang } from "../../../lib/i18n";
 import AddEntityModal from "../components/AddEntityModal";
-import {
-  Plus, Trash2, ChevronRight, Calendar, Package, Layers,
-  FileText, ExternalLink, AlertTriangle,
-} from "lucide-react";
+import { AddIcon, BundleIcon, CampaignIcon, ChevronRightIcon, DeleteIcon, ExternalIcon, TaskCardsIcon, TextIcon, WarningIcon, HelpIcon } from "../../platform/components/icons";
 
 export default function BrandsManagePage() {
   const navigate = useNavigate();
@@ -171,7 +168,7 @@ export default function BrandsManagePage() {
     return (
       <div className="min-h-[60vh] flex items-center justify-center px-6">
         <div className="text-center max-w-md">
-          <p className="text-5xl mb-4">🤔</p>
+          <p className="text-5xl mb-4"><HelpIcon size={44} /></p>
           <h2 className="text-xl font-semibold text-neutral-900 mb-2">
             {lang === "en" ? "Brand not found" : "找不到這個品牌"}
           </h2>
@@ -287,7 +284,7 @@ export default function BrandsManagePage() {
             onClick={() => setAddBrandOpen(true)}
             className="absolute right-0 top-2 px-4 py-2.5 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-white text-sm font-semibold transition flex items-center gap-2"
           >
-            <Plus size={16} /> {t("create_brand")}
+            <AddIcon size={16} /> {t("create_brand")}
           </button>
         </div>
 
@@ -346,7 +343,7 @@ export default function BrandsManagePage() {
                 className="inline-flex items-center gap-2 px-5 py-3 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-white text-sm font-semibold transition"
               >
                 {lang === "en" ? "Get started" : "開始建立"}
-                <Plus size={14} />
+                <AddIcon size={14} />
               </button>
             </div>
           </div>
@@ -391,7 +388,7 @@ export default function BrandsManagePage() {
               onClick={(e) => e.stopPropagation()}
             >
               <div className="flex items-start gap-3 mb-4">
-                <AlertTriangle size={22} className="text-red-600 mt-0.5" />
+                <WarningIcon size={22} className="text-red-600 mt-0.5" />
                 <div>
                   <h3 className="text-base font-semibold text-neutral-900 mb-1">
                     {t("confirm_delete_brand", { name: pendingDelete.name })}
@@ -496,7 +493,7 @@ function BrandCard({
               onClick={(e) => e.stopPropagation()}
               className="text-[12px] text-neutral-500 hover:text-neutral-900 inline-flex items-center gap-0.5"
             >
-              {brand.website.replace(/^https?:\/\//, "")} <ExternalLink size={9} />
+              {brand.website.replace(/^https?:\/\//, "")} <ExternalIcon size={9} />
             </a>
           )}
         </div>
@@ -506,16 +503,16 @@ function BrandCard({
           className="opacity-0 group-hover:opacity-100 transition text-neutral-400 hover:text-red-600 p-1"
           title={lang === "en" ? "Delete brand" : "刪除品牌"}
         >
-          <Trash2 size={14} />
+          <DeleteIcon size={14} />
         </button>
       </div>
 
       {/* Stats grid */}
       <div className="grid grid-cols-4 gap-2 mb-4">
-        <Stat icon={Package}  label={lang === "en" ? "Products" : "產品"} n={brand.productCount} />
-        <Stat icon={Calendar} label={lang === "en" ? "Events" : "活動"} n={brand.eventCount} />
-        <Stat icon={Layers}   label={lang === "en" ? "Projects" : "任務"} n={brand.missionCount} />
-        <Stat icon={FileText} label={lang === "en" ? "Outputs" : "產出"} n={brand.outputCount} />
+        <Stat icon={BundleIcon}  label={lang === "en" ? "Products" : "產品"} n={brand.productCount} />
+        <Stat icon={CampaignIcon} label={lang === "en" ? "Events" : "活動"} n={brand.eventCount} />
+        <Stat icon={TaskCardsIcon}   label={lang === "en" ? "Projects" : "任務"} n={brand.missionCount} />
+        <Stat icon={TextIcon} label={lang === "en" ? "Outputs" : "產出"} n={brand.outputCount} />
       </div>
 
       {/* 2026-06-19 Phase 2: clickable product / event list → deep-links into
@@ -526,7 +523,7 @@ function BrandCard({
           {products.length > 0 && (
             <div>
               <p className="text-[12px] font-semibold uppercase tracking-wide text-neutral-400 mb-1 flex items-center gap-1">
-                <Package size={10} /> {lang === "en" ? "Products" : "產品"}
+                <BundleIcon size={10} /> {lang === "en" ? "Products" : "產品"}
               </p>
               <div className="flex flex-wrap gap-1.5">
                 {products.map((p) => (
@@ -545,7 +542,7 @@ function BrandCard({
           {events.length > 0 && (
             <div>
               <p className="text-[12px] font-semibold uppercase tracking-wide text-neutral-400 mb-1 flex items-center gap-1">
-                <Calendar size={10} /> {lang === "en" ? "Events" : "活動"}
+                <CampaignIcon size={10} /> {lang === "en" ? "Events" : "活動"}
               </p>
               <div className="flex flex-wrap gap-1.5">
                 {events.map((ev) => (
@@ -573,7 +570,7 @@ function BrandCard({
           onClick={onOpen}
           className="text-xs font-semibold text-neutral-900 hover:underline flex items-center gap-0.5"
         >
-          {lang === "en" ? "Open editor" : "進入編輯"} <ChevronRight size={12} />
+          {lang === "en" ? "Open editor" : "進入編輯"} <ChevronRightIcon size={12} />
         </button>
       </div>
     </div>

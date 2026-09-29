@@ -14,7 +14,7 @@ import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { trpc } from "../../../lib/trpc";
 import { useLang } from "../../../lib/i18n";
-import { X, Send, UserRound } from "lucide-react";
+import { CloseIcon, SendIcon, UserIcon, BugIcon } from "./icons";
 import type { ScopeState } from "../../app/shell/ScopeBar";
 
 interface Props {
@@ -323,7 +323,7 @@ export default function SupportDrawer({ open, onClose, scope, pendingNudges, onN
           onMouseEnter={(e) => (e.currentTarget.style.background = "#f3f4f6")}
           onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
         >
-          <X size={16} />
+          <CloseIcon size={16} />
         </button>
       </div>
 
@@ -492,7 +492,7 @@ export default function SupportDrawer({ open, onClose, scope, pendingNudges, onN
                   fontSize: 12, fontWeight: 600, cursor: "pointer",
                 }}
               >
-                <UserRound size={12} style={{ display: "inline", marginRight: 4, verticalAlign: -2 }} />
+                <UserIcon size={12} style={{ display: "inline", marginRight: 4, verticalAlign: -2 }} />
                 {isEn ? "Yes, open ticket" : "好，開單"}
               </button>
               <button
@@ -542,7 +542,7 @@ export default function SupportDrawer({ open, onClose, scope, pendingNudges, onN
                 }}
                 aria-label={isEn ? "Send" : "送出"}
               >
-                <Send size={14} />
+                <SendIcon size={14} />
               </button>
             </div>
             <div style={{ display: "flex", gap: 12, marginTop: 8 }}>
@@ -574,8 +574,8 @@ export default function SupportDrawer({ open, onClose, scope, pendingNudges, onN
                       setMessages((m) => [...m, {
                         id: Date.now(), role: "mia",
                         content: isEn
-                          ? `Bug #${r.bugId} reported. If it's a real bug we'll fix it and add bonus points — you'll be notified here. 🙏`
-                          : `已收到 Bug #${r.bugId}。如果確認是系統問題，我們會修復並加贈點數，修好會在這裡通知你 🙏`,
+                          ? `Bug #${r.bugId} reported. If it's a real bug we'll fix it and add bonus points — you'll be notified here.`
+                          : `已收到 Bug #${r.bugId}。如果確認是系統問題，我們會修復並加贈點數，修好會在這裡通知你`,
                         createdAt: new Date().toISOString(),
                       }]);
                     }
@@ -589,7 +589,7 @@ export default function SupportDrawer({ open, onClose, scope, pendingNudges, onN
                   padding: "2px 4px",
                 }}
               >
-                {isEn ? "🐛 Report a bug (earn points) →" : "🐛 回報 Bug（修好送點數）→"}
+                <BugIcon size={12} /> {isEn ? "Report a bug (earn points) →" : "回報 Bug（修好送點數）→"}
               </button>
             </div>
           </>

@@ -31,11 +31,14 @@ import type { QueuedNudge } from "../../platform/components/mia/miaNudges";
 import OnBrandLogo from "../../platform/components/OnBrandLogo";
 import { useLang } from "../../../lib/i18n";
 import { Avatar, Tooltip } from "@heroui/react";
-import { Brain as LucideBrain } from "lucide-react";
+import { StrategyIcon, LockIcon, CheckIcon, NotifyIcon } from "../../platform/components/icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faFolderOpen, faBrain, faWandMagicSparkles, faMicrophone, faBookBookmark, faBell, faPlus, faRightFromBracket, faLayerGroup, faGear, faXmark, faCheckDouble, faChevronRight, faCheck, faBoxOpen, faCalendarDays, faCircleInfo, faBriefcase, faShareNodes, faUsers, faLanguage, faPaintBrush, faFont, faMagnifyingGlass, faChevronDown, faEnvelope, faBullhorn, faGlobe, faChartLine, faDatabase, faFileLines } from "@fortawesome/free-solid-svg-icons";
+import { ICON } from "../../platform/components/icons";
 import {
-  faFacebookF, faInstagram, faTiktok, faThreads, faLine,
+  faFolderOpen, faBrain, faWandMagicSparkles, faMicrophone, faBookBookmark, faBell, faPlus, faRightFromBracket, faLayerGroup, faGear, faXmark, faCheckDouble, faChevronRight, faCheck, faBoxOpen, faCalendarDays, faCircleInfo, faBriefcase, faShareNodes, faUsers, faLanguage, faPaintBrush, faFont, faMagnifyingGlass, faChevronDown, faEnvelope, faBullhorn, faGlobe, faChartLine, faDatabase, faFileLines,
+} from "@fortawesome/free-solid-svg-icons";
+import {
+  faFacebook, faInstagram, faTiktok, faThreads, faLine,
 } from "@fortawesome/free-brands-svg-icons";
 
 const ICON_W  = 70;   // icon bar — never changes
@@ -163,11 +166,11 @@ function buildNavItems(lang: "zh-TW" | "en", userEmail?: string | null, currentP
     // am I positioning". Everything after is brand-level ASSET that supports
     // whichever scope is active.
     return [
-      { to: "/brands/edit?cat=positioning", catKey: "positioning", label: en ? "Brand" : "品牌", icon: <FontAwesomeIcon icon={faBrain} />,
+      { to: "/brands/edit?cat=positioning", catKey: "positioning", label: en ? "Brand" : "品牌", icon: <FontAwesomeIcon icon={ICON.brand} />,
         tooltip: en ? "Brand positioning — the locked constitution" : "品牌定位 — 鎖定的品牌憲法" },
       { to: "/brands/edit?cat=products", catKey: "products", label: en ? "Products" : "產品", icon: <FontAwesomeIcon icon={faBoxOpen} />,
         tooltip: en ? "Product cards & positioning" : "產品卡片與定位" },
-      { to: "/brands/edit?cat=events", catKey: "events", label: en ? "Campaigns" : "活動", icon: <FontAwesomeIcon icon={faCalendarDays} />,
+      { to: "/brands/edit?cat=events", catKey: "events", label: en ? "Campaigns" : "活動", icon: <FontAwesomeIcon icon={ICON.campaign} />,
         tooltip: en ? "Campaign cards & positioning" : "活動卡片與定位" },
       { to: "/brands/edit?cat=copy", catKey: "copy", label: en ? "Copy" : "文字", icon: <FontAwesomeIcon icon={faFont} />,
         tooltip: en ? "Voice, terms, CTA and hook libraries" : "語氣 / 用詞 / CTA / 鉤子庫" },
@@ -176,7 +179,7 @@ function buildNavItems(lang: "zh-TW" | "en", userEmail?: string | null, currentP
       // 2026-09-26（CJ「將工具拿掉、指令庫拿掉、隱藏知識庫；定期開會變成一個新的
       // mission tray」）：「工具」（知識庫＋品牌 AI 指令）整個從 rail 拿掉。知識庫
       // 只是藏起來——主產文引擎每次仍會讀 brand_knowledge_items，已上傳的資料照樣生效。
-      { to: "/brands/edit?cat=meetings", catKey: "meetings", label: en ? "Meetings" : "會議", icon: <FontAwesomeIcon icon={faUsers} />,
+      { to: "/brands/edit?cat=meetings", catKey: "meetings", label: en ? "Meetings" : "會議", icon: <FontAwesomeIcon icon={ICON.meeting} />,
         tooltip: en ? "Recurring strategy meetings — you set topic, attendees and cadence" : "定期策略會議 — 主題、與會總監、頻率你來定，會後留紀錄" },
       // 2026-08-21 (CJ「加一個人設的task tray...用戶可以自己新創agent，自己
       // 命名，並且決定這個Agent語調的應用範圍」): user-created persona
@@ -198,10 +201,10 @@ function buildNavItems(lang: "zh-TW" | "en", userEmail?: string | null, currentP
   if (currentPath?.startsWith("/performance")) {
     return [
       { to: "/performance/overview", label: en ? "Overview" : "總覽", icon: <FontAwesomeIcon icon={faChartLine} />, matchPrefix: "/performance/overview", tooltip: en ? "Cross-platform overview" : "跨平台總覽" },
-      { to: "/performance/meta", label: "Meta", icon: <FontAwesomeIcon icon={faFacebookF} />, matchPrefix: "/performance/meta", tooltip: "Meta Ads" },
-      { to: "/performance/google", label: "Google", icon: <FontAwesomeIcon icon={faMagnifyingGlass} />, matchPrefix: "/performance/google", tooltip: "Google Ads" },
-      { to: "/performance/shopline", label: "SHOPLINE", icon: <FontAwesomeIcon icon={faFolderOpen} />, matchPrefix: "/performance/shopline", tooltip: "SHOPLINE / Ecommerce" },
-      { to: "/performance/91app", label: "91APP", icon: <FontAwesomeIcon icon={faFolderOpen} />, matchPrefix: "/performance/91app", tooltip: "91APP / Ecommerce" },
+      { to: "/performance/meta", label: "Meta", icon: <FontAwesomeIcon icon={faFacebook} />, matchPrefix: "/performance/meta", tooltip: "Meta Ads" },
+      { to: "/performance/google", label: "Google", icon: <FontAwesomeIcon icon={ICON.google} />, matchPrefix: "/performance/google", tooltip: "Google Ads" },
+      { to: "/performance/shopline", label: "SHOPLINE", icon: <FontAwesomeIcon icon={ICON.store} />, matchPrefix: "/performance/shopline", tooltip: "SHOPLINE / Ecommerce" },
+      { to: "/performance/91app", label: "91APP", icon: <FontAwesomeIcon icon={ICON.store} />, matchPrefix: "/performance/91app", tooltip: "91APP / Ecommerce" },
       { to: "/performance/ga", label: "GA", icon: <FontAwesomeIcon icon={faChartLine} />, matchPrefix: "/performance/ga", tooltip: "GA / Website" },
       { to: "/performance/attribution", label: en ? "Attribution" : "歸因", icon: <FontAwesomeIcon icon={faDatabase} />, matchPrefix: "/performance/attribution", tooltip: en ? "Attribution" : "整合歸因" },
       // 2026-08-13 (CJ「新的任務 tray，稱為粉絲團月報，是 dev 底下大家都有的」)
@@ -243,7 +246,7 @@ function navCatalog(lang: "zh-TW" | "en", allowedTaskRoutes?: Set<string> | null
   // YouTube／新聞稿／X 拿掉（server planGate.HIDDEN_CONTENT_PLATFORMS 同一份決定）；
   // Threads、LINE 是為台灣市場加的；AI 指令庫從側欄移除。
   const all: NavItem[] = [
-    { id: "fb", kind: "channel", to: "/tasks/fb", label: "Facebook", icon: <FontAwesomeIcon icon={faFacebookF} />, matchPrefix: "/tasks/fb",
+    { id: "fb", kind: "channel", to: "/tasks/fb", label: "Facebook", icon: <FontAwesomeIcon icon={faFacebook} />, matchPrefix: "/tasks/fb",
       tooltip: en ? "Facebook posts, ads, stories, live copy" : "Facebook 貼文 / 廣告 / 限時 / 直播文案" },
     { id: "ig", kind: "channel", to: "/tasks/ig", label: "Instagram", icon: <FontAwesomeIcon icon={faInstagram} />, matchPrefix: "/tasks/ig",
       tooltip: en ? "Instagram captions, Reels, carousel, Stories" : "IG 貼文 / Reels / 輪播 / 限時動態" },
@@ -259,7 +262,7 @@ function navCatalog(lang: "zh-TW" | "en", allowedTaskRoutes?: Set<string> | null
       tooltip: en ? "Long-form articles, brand columns, case studies, product page copy" : "官網長文 / 品牌專欄 / 案例深度 / 產品頁文案" },
     { id: "case", kind: "tool", to: "/tasks/case", label: en ? "Cases" : "案例", icon: <FontAwesomeIcon icon={faBookBookmark} />, matchPrefix: "/tasks/case",
       tooltip: en ? "Case library, filed by standard" : "依標準建檔的案例庫" },
-    { id: "theater", kind: "tool", to: "/theater", label: en ? "7-Day Publisher" : "七日發布台", icon: <FontAwesomeIcon icon={faLayerGroup} />, matchPrefix: "/theater",
+    { id: "theater", kind: "tool", to: "/theater", label: en ? "7-Day Publisher" : "七日發布台", icon: <FontAwesomeIcon icon={ICON.theater} />, matchPrefix: "/theater",
       tooltip: en ? "Plan and publish a week of posts" : "一次排好七天的發文" },
   ];
   return all.filter((it) => {
@@ -770,7 +773,7 @@ function IconBar({
   //   策略 —— 照舊給 isStrategyPreview；內容一律有。
   const modeOptions = [
     ...(isStrategyPreview ? [{ id: "strategy" as const, label: isEn ? "Strategy" : "策略", icon: faBrain, to: "/brands", tip: isEn ? "Strategy — brand brain" : "策略 — 品牌大腦" }] : []),
-    { id: "content" as const, label: isEn ? "Content" : "內容", icon: faWandMagicSparkles, to: "/tasks/fb", tip: isEn ? "Content production" : "內容產出" },
+    { id: "content" as const, label: isEn ? "Content" : "內容", icon: ICON.content, to: "/tasks/fb", tip: isEn ? "Content production" : "內容產出" },
     { id: "performance" as const, label: isEn ? "Results" : "成效", icon: faChartLine, to: "/performance/overview", tip: isEn ? "Performance (sample data until connected)" : "成效數據（串接前為示意資料）" },
   ];
   // 成效對所有人開放之後，切換器至少有 2 項，一律顯示。
@@ -1585,7 +1588,7 @@ function BrainSummaryPanel({
     </div>
   );
 
-  const Row = ({ label, value, dim }: { label: string; value: string; dim?: boolean }) => (
+  const Row = ({ label, value, dim }: { label: string; value: React.ReactNode; dim?: boolean }) => (
     <div style={{
       display: "flex", justifyContent: "space-between", alignItems: "baseline",
       fontSize: 12, color: dim ? "#9ca3af" : "#374151", padding: "2px 0",
@@ -1602,7 +1605,7 @@ function BrainSummaryPanel({
         display: "flex", alignItems: "center", gap: 8,
         padding: "10px 10px 6px",
       }}>
-        <LucideBrain size={15} strokeWidth={1.5} color="#171717" />
+        <StrategyIcon size={15} strokeWidth={1.5} color="#171717" />
         <span style={{ fontSize: 13, fontWeight: 700, color: "#171717" }}>
           {isEn ? "Brand Brain" : "品牌大腦"} · {brandName}
         </span>
@@ -1614,7 +1617,7 @@ function BrainSummaryPanel({
           label={isEn ? "Positioning" : "品牌定位"}
           value={
             s?.positioning?.completedSections != null
-              ? `${s.positioning.completedSections}/${s.positioning.totalSections ?? 10} ${s.positioning.isLocked ? "🔒" : ""}`
+              ? <>{`${s.positioning.completedSections}/${s.positioning.totalSections ?? 10} `}{s.positioning.isLocked ? <LockIcon size={11} /> : null}</>
               : "—"
           }
         />
@@ -1634,7 +1637,7 @@ function BrainSummaryPanel({
         <Row label={isEn ? "Banned terms" : "禁用詞"} value={String(s?.preferences?.bannedCount ?? 0)} />
         <Row
           label={isEn ? "Visual identity" : "視覺識別"}
-          value={s?.visual?.hasLogo ? "✓" : "—"}
+          value={s?.visual?.hasLogo ? <CheckIcon size={11} /> : "—"}
           dim={!s?.visual?.hasLogo}
         />
         <Row
@@ -1894,7 +1897,7 @@ function AccountPopup({ onLogout, onClose, onOpenSupport }: {
     },
     {
       // 2026-09-07：審核佇列本來只能從某一則產出頁的送審列點進去，主管找不到。
-      icon: faFolderOpen, label: isEn ? "Review queue" : "審核佇列", arrow: true,
+      icon: ICON.review, label: isEn ? "Review queue" : "審核佇列", arrow: true,
       badge: pendingReviews > 0 ? String(pendingReviews) : null, danger: false,
       action: () => { navigate("/review"); onClose(); },
     },
@@ -2140,7 +2143,7 @@ function NotifPanel({ onClose }: { onClose: () => void }) {
         )}
         {!feedQ?.isLoading && items.length === 0 && (
           <div style={{ padding: "40px 16px", textAlign: "center", color: "#9ca3af", fontSize: 13, lineHeight: 1.6 }}>
-            <div style={{ fontSize: 32, marginBottom: 8 }}>🔔</div>
+            <div style={{ fontSize: 32, marginBottom: 8 }}><NotifyIcon size={28} /></div>
             {isEn
               ? "No notifications yet. Finish a task or apply brand positioning to get started."
               : "目前還沒有通知。跑一個任務或套用品牌定位就會出現。"}

@@ -30,7 +30,8 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 import {
 } from "@fortawesome/free-brands-svg-icons";
-import { Pencil, MessageCircle, Image as LucideImage, Wand2, Users as LucideUsers, Copy as LucideCopy, BookOpen } from "lucide-react";
+import { HelpTip } from "../../platform/components/HelpTip";
+import { CommentIcon, CopyIcon, EditIcon, ImageIcon, LibraryIcon, RegenerateIcon, RewriteAsIcon, PuzzleIcon, WaitingIcon, UserIcon, TextIcon, CheckIcon, BundleIcon, WarningIcon, DoneIcon, ErrorIcon, WorkingIcon, LinkIcon } from "../../platform/components/icons";
 import { trpc } from "../../../lib/trpc";
 import { showToastGlobal } from "../../../components/ui/Toast";
 import { PlatformMockup } from "../components/PlatformMockup";
@@ -698,7 +699,7 @@ export default function RunPage() {
     ? (trpc as any).quickTask.regenerateVariant.useMutation({
         onSuccess: () => {
           showToastGlobal(
-            lang === "en" ? "Version rewritten ✓" : "已重生此變體 ✓"
+            lang === "en" ? "Version rewritten" : "已重生此變體"
           );
           utils.output.getById.invalidate({ id });
           setOverrides({});
@@ -791,8 +792,8 @@ export default function RunPage() {
     onSuccess: (_r: any) => {
       showToastGlobal(
         lang === "en"
-          ? "Added to Calendar ✓ — go to Calendar page to publish"
-          : "已加入日曆 ✓ — 前往「日曆」頁面發布"
+          ? "Added to Calendar — go to Calendar page to publish"
+          : "已加入日曆 — 前往「日曆」頁面發布"
       );
     },
     onError: (e: any) => {
@@ -848,8 +849,8 @@ export default function RunPage() {
           const actualModel = String(r?.model ?? "").trim();
           showToastGlobal(
             lang === "en"
-              ? `Image ready ✓${actualModel ? ` — ${actualModel}` : ""} (the previous image is kept — switch back anytime)`
-              : `已產圖 ✓${actualModel ? ` — ${actualModel}` : ""}（前一張圖有保留，隨時可以切回去）`
+              ? `Image ready${actualModel ? ` — ${actualModel}` : ""} (the previous image is kept — switch back anytime)`
+              : `已產圖${actualModel ? ` — ${actualModel}` : ""}（前一張圖有保留，隨時可以切回去）`
           );
         },
         onError: (e: any) => {
@@ -866,7 +867,7 @@ export default function RunPage() {
     ? (trpc as any).output.selectVariantImageVersion.useMutation({
         onSuccess: () => {
           utils.output.getById.invalidate({ id });
-          showToastGlobal(lang === "en" ? "Switched back ✓ (no regeneration)" : "已切回這張圖 ✓（不用重新生成）");
+          showToastGlobal(lang === "en" ? "Switched back (no regeneration)" : "已切回這張圖（不用重新生成）");
         },
         onError: (e: any) => showToastGlobal(
           lang === "en" ? `Couldn't switch image: ${String(e?.message ?? e).slice(0, 120)}` : `切換圖片失敗：${String(e?.message ?? e).slice(0, 120)}`
@@ -995,7 +996,7 @@ export default function RunPage() {
           if (r?.promptZh || r?.prompt) {
             userEditedPromptRef.current = false;
             setImagePrompt(lang === "en" ? (r.prompt || r.promptZh) : (r.promptZh || r.prompt));
-            showToastGlobal(lang === "en" ? "Image prompt generated from caption ✓" : "已從文案產生圖片指令 ✓");
+            showToastGlobal(lang === "en" ? "Image prompt generated from caption" : "已從文案產生圖片指令");
           }
         },
         onError: (e: any) => showToastGlobal(
@@ -2119,7 +2120,7 @@ export default function RunPage() {
                     <div className="w-12 h-12 rounded-full bg-primary-50 text-primary-600 flex items-center justify-center text-xl">
                       {isGeneratingPublicPosts
                         ? <span className="inline-block w-6 h-6 border-[3px] border-primary-200 border-t-primary-600 rounded-full animate-spin" />
-                        : "↻"}
+                        : <RegenerateIcon size={18} />}
                     </div>
                     <p className="text-small font-semibold text-default-800">
                       {isGeneratingPublicPosts
@@ -2164,9 +2165,10 @@ export default function RunPage() {
               return effectiveVariant && slide ? (
               <>
               {isComponentTask && (
-                <div className="mx-4 mt-3 flex items-start gap-2 rounded-lg border border-primary-200 bg-primary-50 px-3 py-2">
-                  <span className="text-small leading-none pt-0.5">🧩</span>
-                  <p className="text-tiny text-primary-800 leading-relaxed">
+                <div className="mx-4 mt-3 flex items-center gap-1.5 text-tiny text-default-600">
+                  <PuzzleIcon size={13} />
+                  <span className="font-medium">{lang === "en" ? "Component task" : "元件任務"}</span>
+                  <HelpTip>
                     {componentSlot
                       ? (lang === "en"
                           ? "Component task: your deliverable is rendered in its real ad slot below (purple highlight). Dashed gray areas are NOT produced by this task. Switch the version pills above to compare angles."
@@ -2174,7 +2176,7 @@ export default function RunPage() {
                       : (lang === "en"
                           ? "Component task: each version is ONE short, copy-ready line (e.g. ad headline / description / button text) — not a full post. Switch the version pills above to compare angles; the post frame is just placement context."
                           : "元件任務：每個版本是「一條」可直接複製使用的短句（廣告標題／描述／按鈕文字等），本來就不是完整貼文。切換上方版本標籤比較不同切角；貼文外框只是示意擺放位置。")}
-                  </p>
+                  </HelpTip>
                 </div>
               )}
               <PlatformMockup
@@ -2256,7 +2258,7 @@ export default function RunPage() {
                 {slide.extras.postingTime && (
                   <div className="rounded-lg border border-divider bg-default-50 px-3 py-2">
                     <p className="text-tiny font-semibold text-default-700 mb-1">
-                      ⏰ {lang === "en" ? "Suggested posting time" : "建議發文時段"}
+                      <WaitingIcon size={11} /> {lang === "en" ? "Suggested posting time" : "建議發文時段"}
                     </p>
                     <p className="text-tiny text-default-600">{slide.extras.postingTime}</p>
                   </div>
@@ -2264,12 +2266,12 @@ export default function RunPage() {
                 {Array.isArray(slide.extras.replyTemplates) && slide.extras.replyTemplates.length > 0 && (
                   <div className="rounded-lg border border-divider bg-default-50 px-3 py-2">
                     <p className="text-tiny font-semibold text-default-700 mb-1.5">
-                      💬 {lang === "en" ? "Suggested reply templates" : "建議留言模板"}
+                      <CommentIcon size={11} /> {lang === "en" ? "Suggested reply templates" : "建議留言模板"}
                     </p>
                     <div className="space-y-1.5">
                       {slide.extras.replyTemplates.map((r: { userSays: string; yourReply: string }, i: number) => (
                         <div key={i} className="text-tiny">
-                          <p className="text-default-500">🗨️ {r.userSays}</p>
+                          <p className="text-default-500"><UserIcon size={10} /> {r.userSays}</p>
                           <p className="text-default-700 pl-4">↳ {r.yourReply}</p>
                         </div>
                       ))}
@@ -2279,7 +2281,7 @@ export default function RunPage() {
                 {slide.extras.followupPost && (
                   <div className="rounded-lg border border-divider bg-default-50 px-3 py-2">
                     <p className="text-tiny font-semibold text-default-700 mb-1">
-                      🔁 {lang === "en" ? "24h follow-up post" : "24 小時後續貼文"}
+                      <RegenerateIcon size={11} /> {lang === "en" ? "24h follow-up post" : "24 小時後續貼文"}
                     </p>
                     <p className="text-tiny text-default-600 whitespace-pre-line">{slide.extras.followupPost}</p>
                   </div>
@@ -2472,7 +2474,7 @@ export default function RunPage() {
                         }}
                         className="shrink-0 px-2.5 py-1 rounded-lg text-tiny font-semibold border border-secondary/40 text-secondary opacity-0 group-hover:opacity-100 transition hover:bg-secondary/5"
                       >
-                        {lang === "en" ? "📝 Script" : "📝 腳本"}
+                        <span className="inline-flex items-center gap-1"><TextIcon size={11} />{lang === "en" ? "Script" : "腳本"}</span>
                       </button>
                     </div>
                   ))}
@@ -2547,7 +2549,7 @@ export default function RunPage() {
                           } catch { showToastGlobal(lang === "en" ? "Copy failed" : "複製失敗"); }
                         }}
                       >
-                        {scriptCopied ? (lang === "en" ? "✓ Copied" : "✓ 已複製") : (lang === "en" ? "Copy script" : "複製腳本")}
+                        {scriptCopied ? <span className="inline-flex items-center gap-1"><CheckIcon size={11} />{lang === "en" ? "Copied" : "已複製"}</span> : (lang === "en" ? "Copy script" : "複製腳本")}
                       </Button>
                       <Button
                         variant="flat"
@@ -2610,10 +2612,10 @@ export default function RunPage() {
               expands to show that tool. */}
           <div className="bg-white rounded-xl border border-default-200 shadow-sm">
             <div className="flex items-center gap-0.5 px-2 py-1.5 flex-wrap">
-              <ToolbarBtn icon={Pencil}        label={lang === "en" ? "Edit text" : "直接編輯"}      active={mode==="edit"}  onClick={() => setMode("edit")} />
-              <ToolbarBtn icon={MessageCircle} label={lang === "en" ? "Chat with AI" : "跟 AI 專家對話"} active={mode==="chat"}  onClick={() => setMode("chat")} />
+              <ToolbarBtn icon={EditIcon}        label={lang === "en" ? "Edit text" : "直接編輯"}      active={mode==="edit"}  onClick={() => setMode("edit")} />
+              <ToolbarBtn icon={CommentIcon} label={lang === "en" ? "Chat with AI" : "跟 AI 專家對話"} active={mode==="chat"}  onClick={() => setMode("chat")} />
               {hasImageSlot && (
-                <ToolbarBtn icon={LucideImage}   label={lang === "en" ? "Redo image" : "改圖"}          active={mode==="image"} onClick={() => setMode("image")} />
+                <ToolbarBtn icon={ImageIcon}   label={lang === "en" ? "Redo image" : "改圖"}          active={mode==="image"} onClick={() => setMode("image")} />
               )}
               <Divider />
               {/* Agent avatars — click to see that agent's thinking */}
@@ -2645,13 +2647,13 @@ export default function RunPage() {
               </Tooltip>
               <Divider />
               {!isStrategyEnvelope && (
-                <ToolbarBtn icon={Wand2} label={lang === "en" ? "Rewrite this" : "重生這段"} active={mode==="regen"} onClick={() => setMode("regen")} />
+                <ToolbarBtn icon={RegenerateIcon} label={lang === "en" ? "Rewrite this" : "重生這段"} active={mode==="regen"} onClick={() => setMode("regen")} />
               )}
               {/* 2026-07-07 (CJ「參數儀表板客戶看不懂 → 換成選不同 agent 重寫」) */}
-              <ToolbarBtn icon={LucideUsers}   label={lang === "en" ? "Rewrite by agent" : "換人重寫"}   active={mode==="rewrite"}  onClick={() => setMode("rewrite")} />
-              <ToolbarBtn icon={BookOpen}      label={lang === "en" ? "Why it's written this way" : "為什麼這樣寫"} active={mode==="source"} onClick={() => setMode("source")} />
+              <ToolbarBtn icon={RewriteAsIcon}   label={lang === "en" ? "Rewrite by agent" : "換人重寫"}   active={mode==="rewrite"}  onClick={() => setMode("rewrite")} />
+              <ToolbarBtn icon={LibraryIcon}      label={lang === "en" ? "Why it's written this way" : "為什麼這樣寫"} active={mode==="source"} onClick={() => setMode("source")} />
               <Divider />
-              <ToolbarBtn icon={LucideCopy}    label={lang === "en" ? "Copy caption" : "複製文案"}       onClick={onCopy} highlight={copied} />
+              <ToolbarBtn icon={CopyIcon}    label={lang === "en" ? "Copy caption" : "複製文案"}       onClick={onCopy} highlight={copied} />
               {/* 2026-05-11 (CJ feedback「存 Mission 不要出現在工具列，只要在下方」):
                   publish card 已經有「存到 Mission」按鈕，工具列這個是重複，砍掉。 */}
               <Divider />
@@ -2763,9 +2765,9 @@ export default function RunPage() {
               )}
               {mode === "edit" && (
                 <>
-                  <p className="text-tiny font-semibold">{t("run_mode_edit")}</p>
-                  <p className="text-[12px] text-default-500">
-                    {lang === "en" ? "Edit here — the mockup updates live." : "在這裡改文字，左邊預覽即時更新。"}
+                  <p className="text-tiny font-semibold flex items-center gap-1">
+                    {t("run_mode_edit")}
+                    <HelpTip>{lang === "en" ? "Edit here — the mockup updates live." : "在這裡改文字，左邊預覽即時更新。"}</HelpTip>
                   </p>
                   <Textarea
                     value={editText ?? slide?.caption ?? ""}
@@ -2804,9 +2806,14 @@ export default function RunPage() {
                   {/* 2026-07-07 (CJ「產圖畫面有不是國字的國字」→ 圖改為無字背景，
                       標題文字改成用戶可編輯的疊層。只在 YT（縮圖有標題）顯示。 */}
                   {mockupVariant?.platform === "youtube" && (
-                    <div className="bg-warning-50 border border-warning-200 rounded-lg p-2.5 space-y-1.5">
-                      <label className="block text-tiny font-semibold text-warning-800">
+                    <div className="border border-default-200 rounded-lg p-2.5 space-y-1.5">
+                      <label className="flex items-center gap-1 text-tiny font-semibold text-default-800">
                         {lang === "en" ? "Thumbnail title (overlaid on the image)" : "縮圖標題文字（疊在圖片上）"}
+                        <HelpTip>
+                          {lang === "en"
+                            ? "AI can't render Chinese cleanly, so the image is generated text-free. Type your real title here — it overlays on the thumbnail and is included in the templated download."
+                            : "AI 無法正確畫中文，所以圖片刻意產成無字背景。真正的標題在這裡打 — 會疊在縮圖上，並包含在「帶版型下載」裡。"}
+                        </HelpTip>
                       </label>
                       <input
                         type="text"
@@ -2814,25 +2821,25 @@ export default function RunPage() {
                         onChange={(e) => setOverlayTitle(e.target.value.slice(0, 60))}
                         placeholder={lang === "en" ? "e.g. 3 signs your kid isn't just picky" : "例：孩子挑食的 3 個警訊"}
                         maxLength={60}
-                        className="w-full text-sm border border-warning-300 rounded-md px-2.5 py-1.5 bg-white focus:outline-none focus:border-warning-500"
+                        className="w-full text-sm border border-default-300 rounded-md px-2.5 py-1.5 bg-white focus:outline-none focus:border-default-500"
                       />
-                      <p className="text-[12px] text-warning-700 leading-relaxed">
-                        {lang === "en"
-                          ? "AI can't render Chinese cleanly, so the image is generated text-free. Type your real title here — it overlays on the thumbnail and is included in the templated download."
-                          : "AI 無法正確畫中文，所以圖片刻意產成無字背景。真正的標題在這裡打 — 會疊在縮圖上，並包含在「帶版型下載」裡。"}
-                      </p>
                     </div>
                   )}
                   {/* 2026-05-11 (CJ feedback「應該要先給用戶指令」):
                       明確分兩步 — Step 1 寫指令 → Step 2 產圖。
                       底下圖片變成「目前的圖」獨立區塊，不混在 prompt 裡 */}
-                  <div className="bg-secondary-50 border border-secondary-200 rounded-lg p-2 text-[12px] text-secondary-700">
-                    {lang === "en"
-                      ? "Step 1: Describe the image you want (or adjust the current prompt)"
-                      : "Step 1：先告訴我你想要什麼樣的圖（或調整現有 prompt）"}
-                  </div>
                   <Textarea
-                    label={lang === "en" ? "Your image instruction" : "你的圖片指令"}
+                    label={
+                      <span className="inline-flex items-center gap-1.5">
+                        <StepBadge n={1} />
+                        {lang === "en" ? "Your image instruction" : "你的圖片指令"}
+                        <HelpTip>
+                          {lang === "en"
+                            ? "Write naturally in Chinese or English. Chinese instructions are automatically translated to English before being sent to the image AI; brand colors / style / tone are also applied."
+                            : "請直接用中文描述；送給圖片 AI 前會自動翻成英文，並帶入品牌色彩 / 風格 / 調性。翻譯失敗時仍會用原指令繼續產圖。"}
+                        </HelpTip>
+                      </span>
+                    }
                     placeholder={lang === "en"
                       ? "e.g. Sunlight on a warm wooden table, a steaming bowl of soup, soft-focus background with a homey feel"
                       : "例：陽光灑落在溫暖木桌上，一碗冒著煙的健力湯，柔焦背景帶有家庭溫度"}
@@ -2840,9 +2847,6 @@ export default function RunPage() {
                     onChange={(e) => { userEditedPromptRef.current = true; setImagePrompt(e.target.value); }}
                     minRows={3}
                     maxRows={6}
-                    description={lang === "en"
-                      ? "Write naturally in Chinese or English. Chinese instructions are automatically translated to English before being sent to the image AI; brand colors / style / tone are also applied."
-                      : "請直接用中文描述；送給圖片 AI 前會自動翻成英文，並帶入品牌色彩 / 風格 / 調性。翻譯失敗時仍會用原指令繼續產圖。"}
                     autoFocus
                   />
                   {/* 2026-05-17 (CJ「右側欄不需要展示出圖片了」): the
@@ -2870,12 +2874,11 @@ export default function RunPage() {
                   {/* 2026-05-12 Phase 1 (CJ「prompt library 整合」):
                       Nano-Banana 175 商業攝影 prompt 範本。先選類別 → 列表
                       → 點 card 套用到 prompt textarea。 */}
-                  <div className="bg-secondary-50 border border-secondary-200 rounded-lg p-2 text-[12px] text-secondary-700 mt-2">
-                    {lang === "en"
-                      ? "Step 2 (optional): Start from a commercial-photography template"
-                      : "Step 2（選填）：用商業攝影範本當起點"}
-                  </div>
-                  <label className="block text-tiny text-default-600 -mb-1">{lang === "en" ? "Template category" : "範本類別"}</label>
+                  <label className="mt-2 flex items-center gap-1.5 text-tiny text-default-600 -mb-1">
+                    <StepBadge n={2} />
+                    {lang === "en" ? "Template category (optional)" : "範本類別（選填）"}
+                    <HelpTip>{lang === "en" ? "Start from a commercial-photography template" : "用商業攝影範本當起點"}</HelpTip>
+                  </label>
                   <select
                     value={templateCategory}
                     onChange={(e) => setTemplateCategory(e.target.value)}
@@ -3012,12 +3015,12 @@ export default function RunPage() {
                             }
                           }}
                         />
-                        <span className="text-tiny font-semibold">📦 {lang === "en" ? "Use real product photo" : "使用真實產品圖"}</span>
-                        <span className="text-[12px] text-default-500">
+                        <span className="text-tiny font-semibold inline-flex items-center gap-1"><BundleIcon size={11} /> {lang === "en" ? "Use real product photo" : "使用真實產品圖"}</span>
+                        <HelpTip>
                           {lang === "en"
                             ? "Uses your real product photo as the base (GPT Image 2 edits it; pick Nano Banana below if you prefer)"
                             : "以真實產品照為基準生圖 — 預設 GPT Image 2 依照片編輯；想換 Nano Banana 可在下方自行選擇"}
-                        </span>
+                        </HelpTip>
                       </label>
                       {useRealProduct && (
                         <div className="flex gap-2 mt-2 flex-wrap">
@@ -3061,12 +3064,11 @@ export default function RunPage() {
                       )}
                     </div>
                   )}
-                  <div className="bg-secondary-50 border border-secondary-200 rounded-lg p-2 text-[12px] text-secondary-700 mt-2">
-                    {lang === "en"
-                      ? "Step 3: Model — GPT Image 2 by default; try Nano Banana if it doesn't work out"
-                      : "Step 3：模型 — 預設 GPT Image 2；不行再換 Nano Banana"}
-                  </div>
-                  <label className="block text-tiny text-default-600 -mb-1">{lang === "en" ? "AI model" : "AI 模型"}</label>
+                  <label className="mt-2 flex items-center gap-1.5 text-tiny text-default-600 -mb-1">
+                    <StepBadge n={3} />
+                    {lang === "en" ? "AI model" : "AI 模型"}
+                    <HelpTip>{lang === "en" ? "GPT Image 2 by default; try Nano Banana if it doesn't work out" : "預設 GPT Image 2；不行再換 Nano Banana"}</HelpTip>
+                  </label>
                   <select
                     value={imageModel}
                     onChange={(e) => setImageModel(e.target.value)}
@@ -3084,10 +3086,13 @@ export default function RunPage() {
                       <span className="font-mono">{slide.imageModelId}</span>
                     </p>
                   )}
-                  <div className="bg-secondary-50 border border-secondary-200 rounded-lg p-2 text-[12px] text-secondary-700 mt-2">
-                    {lang === "en"
-                      ? "Step 4: Hit the button to make a new image (the current one is kept — switch back below)"
-                      : "Step 4：按下面按鈕，會用你的指令重新產圖（目前的圖會保留，可在下方切回去）"}
+                  <div className="mt-2 flex items-center gap-1.5 text-[12px] text-default-600">
+                    <StepBadge n={4} />
+                    <HelpTip>
+                      {lang === "en"
+                        ? "Hit the button to make a new image (the current one is kept — switch back below)"
+                        : "按下面按鈕，會用你的指令重新產圖（目前的圖會保留，可在下方切回去）"}
+                    </HelpTip>
                   </div>
                   <Button
                     color="secondary" fullWidth
@@ -3100,10 +3105,10 @@ export default function RunPage() {
                       : t("run_image_make")}
                   </Button>
                   {!data.brand?.id && (
-                    <p className="text-[12px] text-warning-700">⚠ {lang === "en" ? "This run has no brand — link a brand first" : "此 run 沒有 brand，請先綁品牌再產圖"}</p>
+                    <p className="text-[12px] text-warning-700"><WarningIcon size={11} /> {lang === "en" ? "This run has no brand — link a brand first" : "此 run 沒有 brand，請先綁品牌再產圖"}</p>
                   )}
                   {missingRealProductSelection && (
-                    <p className="text-[12px] text-warning-700">⚠ {lang === "en" ? "Choose a valid product photo from this brand" : "已勾選使用真實產品圖，請先從目前品牌選擇有效產品圖"}</p>
+                    <p className="text-[12px] text-warning-700"><WarningIcon size={11} /> {lang === "en" ? "Choose a valid product photo from this brand" : "已勾選使用真實產品圖，請先從目前品牌選擇有效產品圖"}</p>
                   )}
                   {imageFailure && !imageGenMut.isPending && (
                     <div className="rounded-lg border border-warning-300 bg-warning-50 px-3 py-2.5 space-y-2">
@@ -3199,9 +3204,9 @@ export default function RunPage() {
                               s.status === "failed" ? "text-danger" :
                               s.status === "running" ? "text-warning" : "text-default-400";
                             const dot =
-                              s.status === "done" ? "●" :
-                              s.status === "failed" ? "✕" :
-                              s.status === "running" ? "◌" : "○";
+                              s.status === "done" ? <DoneIcon size={11} /> :
+                              s.status === "failed" ? <ErrorIcon size={11} /> :
+                              s.status === "running" ? <WorkingIcon size={11} /> : <WaitingIcon size={11} />;
                             return (
                               <li key={i} className="flex items-start gap-2 text-[12px] leading-tight py-1 border-b border-default-100 last:border-0">
                                 <span className={`${statusColor} font-mono text-sm leading-none mt-0.5`}>{dot}</span>
@@ -3245,18 +3250,18 @@ export default function RunPage() {
                     </div>
                     {unavailableUrl ? (
                       <p className="text-[12px] text-warning-700" title={unavailableUrl}>
-                        ⚠️ {lang === "en"
+                        <WarningIcon size={11} /> {lang === "en"
                           ? "This link's content could not be fetched (platform restriction). Paste the video caption or describe the topic instead."
                           : "這個連結抓不到內容（平台限制），建議直接貼上影片文案或描述主題。"}
                       </p>
                     ) : fetchedUrl && (
                       <p className="text-[12px] text-default-500">
-                        🔗 {lang === "en" ? "Reference fetched: " : "抓取參考："}<a href={fetchedUrl} target="_blank" rel="noreferrer" className="underline truncate inline-block max-w-[260px] align-bottom">{fetchedUrl}</a>
+                        <LinkIcon size={11} /> {lang === "en" ? "Reference fetched: " : "抓取參考："}<a href={fetchedUrl} target="_blank" rel="noreferrer" className="underline truncate inline-block max-w-[260px] align-bottom">{fetchedUrl}</a>
                       </p>
                     )}
                     {Array.isArray(md.errors) && md.errors.length > 0 && (
                       <div className="bg-danger-50 border border-danger-200 rounded p-2 text-[12px] text-danger-700">
-                        ⚠ {md.errors.slice(0, 2).join(" · ")}
+                        <WarningIcon size={11} /> {md.errors.slice(0, 2).join(" · ")}
                       </div>
                     )}
                   </>
@@ -3326,7 +3331,7 @@ export default function RunPage() {
                   </p>
                   {Array.isArray(data.metadata?.archivedVariants) && data.metadata.archivedVariants.length > 0 && (
                     <p className="text-[12px] text-default-500">
-                      📚 {lang === "en"
+                      <LibraryIcon size={11} /> {lang === "en"
                         ? `Rewritten ${data.metadata.archivedVariants.length} time(s) — history kept`
                         : `已重生 ${data.metadata.archivedVariants.length} 次（歷史保留）`}
                     </p>
@@ -3335,11 +3340,13 @@ export default function RunPage() {
               )}
               {mode === "rewrite" && (
                 <>
-                  <p className="text-tiny font-semibold">{lang === "en" ? "Have another agent rewrite it" : "換一位 AI 專家重寫"}</p>
-                  <p className="text-[12px] text-default-500 leading-relaxed">
-                    {lang === "en"
-                      ? "Pick a specialist below — they rewrite this caption in their own style. Nothing changes until you accept the preview."
-                      : "挑一位不同風格的專家，用他的寫法重寫這篇文案。改完先給你預覽，按「採用」才會生效。"}
+                  <p className="text-tiny font-semibold flex items-center gap-1">
+                    {lang === "en" ? "Have another agent rewrite it" : "換一位 AI 專家重寫"}
+                    <HelpTip>
+                      {lang === "en"
+                        ? "Pick a specialist below — they rewrite this caption in their own style. Nothing changes until you accept the preview."
+                        : "挑一位不同風格的專家，用他的寫法重寫這篇文案。改完先給你預覽，按「採用」才會生效。"}
+                    </HelpTip>
                   </p>
                   <div className="space-y-1.5">
                     {REWRITE_AGENTS.map((a) => (
@@ -3538,9 +3545,7 @@ export default function RunPage() {
 
               {/* Auto-save note — always true, no action needed */}
               <div className="text-[12px] text-default-400 text-center px-1 leading-relaxed">
-                {lang === "en"
-                  ? "✓ Auto-saved to Projects — no action needed"
-                  : "✓ 任務完成即自動記錄到專案，無需手動儲存"}
+                <CheckIcon size={11} /> {lang === "en" ? "Auto-saved" : "已自動儲存"}
               </div>
               </>)}
 
@@ -3571,7 +3576,7 @@ export default function RunPage() {
               onChange={(e) => setEmailNote(e.target.value)}
               minRows={3}
             />
-            <p className="text-tiny text-default-500">{lang === "en" ? "We'll include the full caption and brand context." : "寄出時會附上完整文案 + 品牌資訊。"}</p>
+            <div><HelpTip>{lang === "en" ? "We'll include the full caption and brand context." : "寄出時會附上完整文案 + 品牌資訊。"}</HelpTip></div>
           </ModalBody>
           <ModalFooter>
             <Button variant="flat" onPress={() => setEmailDialogOpen(false)}>{t("cancel")}</Button>
@@ -3623,7 +3628,7 @@ export default function RunPage() {
                   value={seriesAnchorDate}
                   onChange={(e) => setSeriesAnchorDate(e.target.value)}
                 />
-                <p className="text-tiny text-default-500">
+                <div><HelpTip>
                   {isCountdownTask
                     ? (lang === "en"
                         ? "Posts are scheduled day-by-day counting down to the event date."
@@ -3631,7 +3636,7 @@ export default function RunPage() {
                     : (lang === "en"
                         ? "Posts are scheduled one per day starting from the first post date."
                         : "從第一篇日期開始，每天依序排一篇。")}
-                </p>
+                </HelpTip></div>
                 {/* Per-variant date preview */}
                 <div className="rounded-xl overflow-hidden" style={{ border: "1px solid #E5E5E5" }}>
                   {variants.map((v, i) => {
@@ -3727,5 +3732,14 @@ function ToolbarBtn({
         <Icon size={14} strokeWidth={1.75} />
       </button>
     </Tooltip>
+  );
+}
+
+/** 步驟編號：取代「Step 1：…」這類說明橫幅，只留一個數字圓點。 */
+function StepBadge({ n }: { n: number }) {
+  return (
+    <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-default-900 text-[10px] font-semibold text-white tabular-nums">
+      {n}
+    </span>
   );
 }

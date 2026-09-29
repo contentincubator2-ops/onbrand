@@ -8,7 +8,7 @@ import { trpc } from "../../../lib/trpc";
 import { showToastGlobal } from "../../../components/ui/Toast";
 import { useLang } from "../../../lib/i18n";
 import { tierLabel } from "../lib/tierVocabulary";
-import { ChevronLeft, Download, Trash2, AlertTriangle } from "lucide-react";
+import { ChevronLeftIcon, DeleteIcon, DownloadIcon, WarningIcon } from "../components/icons";
 
 export default function AccountPage() {
   const navigate = useNavigate();
@@ -125,7 +125,7 @@ export default function AccountPage() {
           onClick={() => navigate(-1)}
           className="text-sm text-neutral-500 hover:text-neutral-900 flex items-center gap-1 mb-6"
         >
-          <ChevronLeft size={16} /> {t("back")}
+          <ChevronLeftIcon size={16} /> {t("back")}
         </button>
 
         <h1 className="text-2xl font-bold text-neutral-900 mb-6">{t("account_title")}</h1>
@@ -220,7 +220,7 @@ export default function AccountPage() {
                           : "bg-white text-neutral-700 border-neutral-300 hover:border-neutral-500"
                       } disabled:opacity-50`}
                     >
-                      {c === "TW" ? "🇹🇼 TWD" : "🌐 USD"}
+                      {c === "TW" ? "TWD" : "USD"}
                     </button>
                   );
                 })}
@@ -430,7 +430,7 @@ export default function AccountPage() {
             disabled={!exportMut || exportMut.isPending}
             className="px-4 py-2 rounded-lg border border-neutral-300 hover:border-neutral-500 text-sm text-neutral-700 transition flex items-center gap-2"
           >
-            <Download size={14} />{" "}
+            <DownloadIcon size={14} />{" "}
             {exportMut?.isPending
               ? (lang === "en" ? "Preparing…" : "準備中…")
               : (lang === "en" ? "Download JSON" : "下載 JSON")}
@@ -454,7 +454,7 @@ export default function AccountPage() {
         {/* Danger zone — delete account */}
         <section className="bg-red-50 border border-red-200 rounded-xl p-6">
           <h2 className="text-lg font-semibold text-red-900 mb-2 flex items-center gap-2">
-            <AlertTriangle size={18} /> {t("account_danger_zone")}
+            <WarningIcon size={18} /> {t("account_danger_zone")}
           </h2>
           <p className="text-sm text-red-700 mb-4">
             {lang === "en"
@@ -466,7 +466,7 @@ export default function AccountPage() {
               onClick={() => setShowDeleteConfirm(true)}
               className="px-4 py-2 rounded-lg border border-red-300 hover:bg-red-100 text-sm text-red-700 transition flex items-center gap-2"
             >
-              <Trash2 size={14} /> {t("account_delete_account")}
+              <DeleteIcon size={14} /> {t("account_delete_account")}
             </button>
           ) : (
             <div className="space-y-3 max-w-md">

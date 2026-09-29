@@ -6,7 +6,9 @@
 import React from "react";
 import { Card, CardBody, Chip, Button, Tooltip, Tabs, Tab } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faCopy, faCheck, faRobot, faPalette } from "@fortawesome/free-solid-svg-icons";
+import {
+  faCopy, faCheck, faUserTie, faPalette,
+} from "@fortawesome/free-solid-svg-icons";
 import {
   SCOPE_PROMPTS, buildVariableMap, interpolatePrompt,
   type PromptTemplate, type LLM,
@@ -178,7 +180,7 @@ function PromptCard({ template, vars }: { template: PromptTemplate; vars: Record
 
         {unfilled.length > 0 && (
           <div className="flex items-center gap-2 flex-wrap">
-            <FontAwesomeIcon icon={faRobot} className="text-tiny text-default-400" />
+            <FontAwesomeIcon icon={faUserTie} className="text-tiny text-default-400" />
             <span className="text-tiny text-default-500">尚未填入：</span>
             {unfilled.map((v) => (
               <Chip key={v} size="sm" variant="flat" color="warning" className="h-4 text-tiny">

@@ -24,7 +24,7 @@
  * 不是 Mia 的漸層紫色調。
  */
 import React from "react";
-import { Send } from "lucide-react";
+import { SendIcon, WarningIcon } from "../../../platform/components/icons";
 import { trpc } from "../../../../lib/trpc";
 import { useLang } from "../../../../lib/i18n";
 import { type StrategistDirector, signatureQuestionsOf } from "../../lib/strategistDirectors";
@@ -268,7 +268,7 @@ export default function StrategyDirectorChat({
         )}
       </div>
       {error && (
-        <div style={{ padding: "0 16px 6px", fontSize: 12, color: "#B45309" }}>⚠ {error}</div>
+        <div style={{ padding: "0 16px 6px", fontSize: 12, color: "#B45309" }}><WarningIcon size={12} /> {error}</div>
       )}
       {signature.length > 0 && (
         // 常駐的招牌問題膠囊列（CJ:「輸入框上方常駐一排問題膠囊」）：橫向
@@ -304,7 +304,7 @@ export default function StrategyDirectorChat({
             cursor: "pointer", opacity: (sending || !input.trim() || !conversationId || readOnly) ? 0.45 : 1,
           }}
         >
-          <Send size={15} />
+          <SendIcon size={15} />
         </button>
       </div>
     </div>

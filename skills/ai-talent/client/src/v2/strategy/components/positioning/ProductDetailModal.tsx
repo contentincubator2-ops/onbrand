@@ -15,7 +15,7 @@
 import { useEffect, useState, useRef } from "react";
 import { trpc } from "../../../../lib/trpc";
 import { useLang } from "../../../../lib/i18n";
-import { X, Plus, Trash2, RefreshCw, Sparkles } from "lucide-react";
+import { AddIcon, CloseIcon, DeleteIcon, GenerateIcon, RegenerateIcon, CheckIcon } from "../../../platform/components/icons";
 import AssetPhotoGallery from "./AssetPhotoGallery";
 import ProductSceneModal from "./ProductSceneModal";
 
@@ -80,7 +80,7 @@ function ChipInput({
           >
             {c}
             <button onClick={() => remove(i)} className="opacity-60 hover:opacity-100">
-              <X size={10} />
+              <CloseIcon size={10} />
             </button>
           </span>
         ))}
@@ -100,7 +100,7 @@ function ChipInput({
           disabled={!input.trim()}
           className="text-xs font-medium px-3 py-1.5 rounded-lg bg-neutral-900 text-white hover:bg-neutral-700 disabled:opacity-40 transition"
         >
-          <Plus size={12} />
+          <AddIcon size={12} />
         </button>
       </div>
     </div>
@@ -140,7 +140,7 @@ function PeriodRow({
         className="text-xs px-2 py-1.5 border border-neutral-200 rounded-lg focus:outline-none focus:border-indigo-400"
       />
       <button onClick={onRemove} className="p-1.5 text-neutral-400 hover:text-red-500 transition">
-        <Trash2 size={13} />
+        <DeleteIcon size={13} />
       </button>
     </div>
   );
@@ -274,14 +274,14 @@ export default function ProductDetailModal({ productId, brandId, onClose, onRepo
               title={en ? "Re-run positioning" : "重新執行定位"}
               className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border border-indigo-200 text-indigo-600 hover:bg-indigo-50 transition"
             >
-              <RefreshCw size={12} />
+              <RegenerateIcon size={12} />
               {en ? "Re-position" : "重新定位"}
             </button>
             <button
               onClick={onClose}
               className="w-8 h-8 flex items-center justify-center rounded-full text-neutral-400 hover:bg-neutral-100 transition"
             >
-              <X size={16} />
+              <CloseIcon size={16} />
             </button>
           </div>
         </div>
@@ -293,7 +293,7 @@ export default function ProductDetailModal({ productId, brandId, onClose, onRepo
           {(tagline || audience || usp || price) && (
             <div className="bg-neutral-50 rounded-xl p-4 border border-indigo-100">
               <div className="flex items-center gap-1.5 mb-3">
-                <Sparkles size={13} className="text-indigo-500" />
+                <GenerateIcon size={13} className="text-indigo-500" />
                 <span className="text-[12px] font-bold uppercase tracking-widest text-indigo-600">
                   {en ? "AI Positioning Summary" : "AI 定位摘要"}
                 </span>
@@ -437,7 +437,7 @@ export default function ProductDetailModal({ productId, brandId, onClose, onRepo
                   }}
                   className="text-[12px] font-medium text-indigo-600 hover:text-indigo-800 flex items-center gap-1"
                 >
-                  <Plus size={11} /> {en ? "Add period" : "新增時間"}
+                  <AddIcon size={11} /> {en ? "Add period" : "新增時間"}
                 </button>
               </div>
               {periods.length === 0 ? (
@@ -492,7 +492,7 @@ export default function ProductDetailModal({ productId, brandId, onClose, onRepo
             {upsertMut?.isPending
               ? (en ? "Saving…" : "儲存中…")
               : saved
-                ? (en ? "Saved ✓" : "已儲存 ✓")
+                ? <span className="inline-flex items-center gap-1"><CheckIcon size={11} />{en ? "Saved" : "已儲存"}</span>
                 : (en ? "Save changes" : "儲存修改")}
           </button>
         </div>

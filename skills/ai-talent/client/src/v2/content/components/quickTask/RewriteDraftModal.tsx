@@ -15,7 +15,7 @@ import { useLang } from "../../../../lib/i18n";
 import {
   Button, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader, Textarea, Input,
 } from "@heroui/react";
-import { Wand2, ClipboardCopy, Check } from "lucide-react";
+import { CheckIcon, CopyIcon, GenerateIcon } from "../../../platform/components/icons";
 import { showToastGlobal } from "../../../../components/ui/Toast";
 
 export default function RewriteDraftModal({
@@ -88,7 +88,7 @@ export default function RewriteDraftModal({
               <Button variant="light" onPress={reset}>{en ? "Rewrite another" : "再改一篇"}</Button>
               <Button
                 color="primary"
-                startContent={copied ? <Check size={16} /> : <ClipboardCopy size={16} />}
+                startContent={copied ? <CheckIcon size={16} /> : <CopyIcon size={16} />}
                 onPress={() => {
                   navigator.clipboard?.writeText(mut.data!.rewritten).then(() => {
                     setCopied(true);
@@ -103,7 +103,7 @@ export default function RewriteDraftModal({
           ) : (
             <Button
               color="primary"
-              startContent={<Wand2 size={16} />}
+              startContent={<GenerateIcon size={16} />}
               isDisabled={material.trim().length < 20 || mut.isPending}
               isLoading={mut.isPending}
               onPress={() => mut.mutate({ material: material.trim(), audience: audience.trim() || undefined, brandId: brandId ?? undefined })}

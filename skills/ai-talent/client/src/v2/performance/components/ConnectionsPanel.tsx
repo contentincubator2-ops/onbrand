@@ -19,7 +19,7 @@
 import React from "react";
 import { trpc } from "../../../lib/trpc";
 import { useLang } from "../../../lib/i18n";
-import { CheckCircle2, Circle, Wrench, Megaphone, ShoppingBag, FileText } from "lucide-react";
+import { CampaignIcon, DoneIcon, DotIcon, SetupBySoWorkIcon, ShopIcon, TextIcon } from "../../platform/components/icons";
 
 type Conn = {
   id: "meta_page" | "meta_ads" | "commerce";
@@ -32,9 +32,9 @@ type Conn = {
 };
 
 const META: Record<Conn["id"], { zh: string; en: string; icon: React.ReactNode }> = {
-  meta_page: { zh: "粉專貼文（Facebook / Instagram）", en: "Page posts (Facebook / Instagram)", icon: <FileText size={16} /> },
-  meta_ads:  { zh: "廣告帳號（Meta Ads）",             en: "Ad account (Meta Ads)",             icon: <Megaphone size={16} /> },
-  commerce:  { zh: "電商後台（SHOPLINE / 91APP / Shopify）", en: "Commerce backend (SHOPLINE / 91APP / Shopify)", icon: <ShoppingBag size={16} /> },
+  meta_page: { zh: "粉專貼文（Facebook / Instagram）", en: "Page posts (Facebook / Instagram)", icon: <TextIcon size={16} /> },
+  meta_ads:  { zh: "廣告帳號（Meta Ads）",             en: "Ad account (Meta Ads)",             icon: <CampaignIcon size={16} /> },
+  commerce:  { zh: "電商後台（SHOPLINE / 91APP / Shopify）", en: "Commerce backend (SHOPLINE / 91APP / Shopify)", icon: <ShopIcon size={16} /> },
 };
 
 export default function ConnectionsPanel({ brandId }: { brandId: number | null }) {
@@ -78,14 +78,14 @@ export default function ConnectionsPanel({ brandId }: { brandId: number | null }
               </div>
               <div className="mt-2 flex items-center gap-1.5 text-[13px]">
                 {on
-                  ? <><CheckCircle2 size={14} className="text-neutral-900" /><span className="font-medium text-neutral-900">{isEn ? "Connected" : "已連結"}</span></>
-                  : <><Circle size={14} className="text-neutral-400" /><span className="text-neutral-500">{isEn ? "Not connected" : "尚未串接"}</span></>}
+                  ? <><DoneIcon size={14} className="text-neutral-900" /><span className="font-medium text-neutral-900">{isEn ? "Connected" : "已連結"}</span></>
+                  : <><DotIcon size={14} className="text-neutral-400" /><span className="text-neutral-500">{isEn ? "Not connected" : "尚未串接"}</span></>}
                 {c.label && <span className="ml-1 truncate text-neutral-500">· {c.label}</span>}
               </div>
               <p className="mt-2 text-[13px] leading-5 text-neutral-600">{isEn ? c.howEn : c.howZh}</p>
               {!on && !c.selfServe && (
                 <p className="mt-2 inline-flex items-center gap-1 text-[12px] text-neutral-500">
-                  <Wrench size={12} />
+                  <SetupBySoWorkIcon size={12} />
                   {isEn ? "Set up with SoWork during onboarding" : "導入時由 SoWork 設定"}
                 </p>
               )}

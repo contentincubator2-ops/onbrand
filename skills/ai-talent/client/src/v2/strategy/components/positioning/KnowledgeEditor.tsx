@@ -9,7 +9,7 @@ import { useState } from "react";
 import { trpc } from "../../../../lib/trpc";
 import { useLang } from "../../../../lib/i18n";
 import { Input, Textarea } from "@heroui/react";
-import { Plus, Trash2, BookOpen, ExternalLink } from "lucide-react";
+import { AddIcon, DeleteIcon, ExternalIcon, LibraryIcon } from "../../../platform/components/icons";
 
 interface Item {
   id: number;
@@ -100,7 +100,7 @@ export default function KnowledgeEditor({ brandId }: { brandId: number | null })
             display: "inline-flex", alignItems: "center", gap: 4,
           }}
         >
-          <Plus size={12} /> {en ? "Add entry" : "新增條目"}
+          <AddIcon size={12} /> {en ? "Add entry" : "新增條目"}
         </button>
       </div>
 
@@ -216,7 +216,7 @@ export default function KnowledgeEditor({ brandId }: { brandId: number | null })
           color: "#525252",
           border: "1px dashed #D4D4D4", borderRadius: 12,
         }}>
-          <BookOpen size={36} strokeWidth={1.3} style={{ margin: "0 auto 12px", opacity: 0.5 }} />
+          <LibraryIcon size={36} strokeWidth={1.3} style={{ margin: "0 auto 12px", opacity: 0.5 }} />
           <p style={{ fontSize: 13, color: "#525252", marginBottom: 6, fontWeight: 500 }}>
             {en ? "No knowledge entries yet" : "還沒有知識條目"}
           </p>
@@ -260,7 +260,7 @@ export default function KnowledgeEditor({ brandId }: { brandId: number | null })
                 )}
                 <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8, marginBottom: 6 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0, flex: 1 }}>
-                    <BookOpen size={12} strokeWidth={1.7} style={{ color: filled ? "#171717" : "#525252", flexShrink: 0 }} />
+                    <LibraryIcon size={12} strokeWidth={1.7} style={{ color: filled ? "#171717" : "#525252", flexShrink: 0 }} />
                     <h3 style={{
                       fontSize: 13.5, fontWeight: 600, color: "#171717",
                       lineHeight: 1.35, margin: 0,
@@ -279,7 +279,7 @@ export default function KnowledgeEditor({ brandId }: { brandId: number | null })
                     onMouseEnter={(e) => { e.currentTarget.style.color = "#B91C1C"; }}
                     onMouseLeave={(e) => { e.currentTarget.style.color = "#525252"; }}
                   >
-                    <Trash2 size={13} />
+                    <DeleteIcon size={13} />
                   </button>
                 </div>
                 {it.body && (
@@ -306,7 +306,7 @@ export default function KnowledgeEditor({ brandId }: { brandId: number | null })
                       href={it.sourceUrl} target="_blank" rel="noreferrer"
                       style={{ display: "flex", alignItems: "center", gap: 3, color: "#525252", textDecoration: "none" }}
                     >
-                      <ExternalLink size={10} /> {en ? "Source" : "來源"}
+                      <ExternalIcon size={10} /> {en ? "Source" : "來源"}
                     </a>
                   )}
                 </div>

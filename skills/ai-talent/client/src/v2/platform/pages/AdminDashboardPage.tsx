@@ -18,7 +18,7 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
 import { trpc } from "../../../lib/trpc";
-import { RefreshCw, TrendingUp, DollarSign, Activity, AlertTriangle, Bug, Download, Target, Users, Clock } from "lucide-react";
+import { ActivityIcon, BugIcon, DownloadIcon, MoneyIcon, PeopleIcon, PerformanceIcon, RegenerateIcon, TargetIcon, WaitingIcon, WarningIcon } from "../components/icons";
 
 const card: React.CSSProperties = {
   border: "1px solid #e5e7eb", borderRadius: 10, background: "#fff",
@@ -95,7 +95,7 @@ export default function AdminDashboardPage() {
   if (forbidden) {
     return (
       <div style={{ maxWidth: 520, margin: "80px auto", textAlign: "center", color: "#525252" }}>
-        <AlertTriangle size={28} style={{ color: "#b91c1c" }} />
+        <WarningIcon size={28} style={{ color: "#b91c1c" }} />
         <h1 style={{ fontSize: 18, fontWeight: 700, margin: "12px 0 6px", color: "#171717" }}>
           僅限管理員
         </h1>
@@ -117,7 +117,7 @@ export default function AdminDashboardPage() {
             border: "1px solid #e5e7eb", borderRadius: 8, padding: "6px 12px",
             background: "#fff", cursor: "pointer", color: "#525252",
           }}>
-            <Download size={13} /> 匯出 CSV
+            <DownloadIcon size={13} /> 匯出 CSV
           </button>
           <button
             onClick={() => { ovQ?.refetch?.(); ucQ?.refetch?.(); hQ?.refetch?.(); fbQ?.refetch?.(); fmQ?.refetch?.(); ruQ?.refetch?.(); afQ?.refetch?.(); crQ?.refetch?.(); ttfvQ?.refetch?.(); refetchBugs(); }}
@@ -127,14 +127,14 @@ export default function AdminDashboardPage() {
               background: "#fff", cursor: "pointer", color: "#525252",
             }}
           >
-            <RefreshCw size={13} /> 重新整理
+            <RegenerateIcon size={13} /> 重新整理
           </button>
         </div>
       </div>
       {loading && <p style={{ color: "#9ca3af", fontSize: 13, marginTop: 20 }}>載入中…</p>}
 
       {/* ── 1. 成長漏斗 ── */}
-      <div style={sectionTitle}><TrendingUp size={13} /> 成長漏斗</div>
+      <div style={sectionTitle}><PerformanceIcon size={13} /> 成長漏斗</div>
       <div style={grid()}>
         <Stat label="總用戶" value={ov?.users.total ?? "—"} sub={`${ov?.users.admin ?? 0} admin`} />
         <Stat label="已驗證 / 啟用" value={ov?.users.active ?? "—"}
@@ -157,7 +157,7 @@ export default function AdminDashboardPage() {
       </div>
 
       {/* ── 1.5 Activation Funnel — 投資人最在意的單一指標 ── */}
-      <div style={sectionTitle}><Target size={13} /> Activation Funnel（過去 30 天註冊用戶）</div>
+      <div style={sectionTitle}><TargetIcon size={13} /> Activation Funnel（過去 30 天註冊用戶）</div>
       <div style={card}>
         {afQ?.data?.stages ? (
           <>
@@ -206,7 +206,7 @@ export default function AdminDashboardPage() {
       </div>
 
       {/* ── 1.6 Time to First Value ── */}
-      <div style={sectionTitle}><Clock size={13} /> Time-to-First-Value（從註冊到第一次跑任務）</div>
+      <div style={sectionTitle}><WaitingIcon size={13} /> Time-to-First-Value（從註冊到第一次跑任務）</div>
       <div style={grid(180)}>
         <Stat
           label="中位數（P50）"
@@ -260,7 +260,7 @@ export default function AdminDashboardPage() {
       )}
 
       {/* ── 1.7 Cohort Retention ── */}
-      <div style={sectionTitle}><Users size={13} /> Cohort Retention（按註冊週分組）</div>
+      <div style={sectionTitle}><PeopleIcon size={13} /> Cohort Retention（按註冊週分組）</div>
       <div style={{ ...card, overflowX: "auto" }}>
         {crQ?.data?.grid?.length > 0 ? (
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12, fontVariantNumeric: "tabular-nums" }}>
@@ -303,7 +303,7 @@ export default function AdminDashboardPage() {
       </div>
 
       {/* ── 2. 用量與成本 ── */}
-      <div style={sectionTitle}><DollarSign size={13} /> 用量與成本（LLM）</div>
+      <div style={sectionTitle}><MoneyIcon size={13} /> 用量與成本（LLM）</div>
       <div style={grid()}>
         <Stat label="今日花費" value={`$${uc?.totals.usd24h ?? "—"}`}
           warn={(uc?.totals.usd24h ?? 0) > 20} />
@@ -350,7 +350,7 @@ export default function AdminDashboardPage() {
       </div>
 
       {/* ── 3. 健康與客服 ── */}
-      <div style={sectionTitle}><Activity size={13} /> 健康與客服</div>
+      <div style={sectionTitle}><ActivityIcon size={13} /> 健康與客服</div>
       <div style={grid()}>
         <Stat label="定位執行中" value={h?.positioning.running ?? "—"} />
         <Stat label="卡住 >10min" value={h?.positioning.stuck ?? "—"}
@@ -370,7 +370,7 @@ export default function AdminDashboardPage() {
 
       {/* ── 逐功能使用 + 完成率 ── */}
       <div style={sectionTitle}>
-        <TrendingUp size={13} /> 逐功能使用 + 完成率（近 {fbQ?.data?.days ?? 30} 天）
+        <PerformanceIcon size={13} /> 逐功能使用 + 完成率（近 {fbQ?.data?.days ?? 30} 天）
       </div>
       <div style={{ fontSize: 12, color: "#9ca3af", margin: "-4px 0 8px" }}>
         完成率 = 乾淨完成 ÷ 總次數。<b>高使用 + 低完成率</b> = 用戶想用但會卡住的功能，最該優先修。
@@ -413,7 +413,7 @@ export default function AdminDashboardPage() {
 
       {/* ── 摩擦地圖（哪個頁面錯誤最多） ── */}
       <div style={sectionTitle}>
-        <AlertTriangle size={13} /> 摩擦地圖 · 錯誤集中點（近 {fmQ?.data?.days ?? 7} 天）
+        <WarningIcon size={13} /> 摩擦地圖 · 錯誤集中點（近 {fmQ?.data?.days ?? 7} 天）
       </div>
       <div style={{ ...card, padding: 0, overflow: "hidden" }}>
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
@@ -445,7 +445,7 @@ export default function AdminDashboardPage() {
       </div>
 
       {/* ── Bug 回報佇列 ── */}
-      <div style={sectionTitle}><Bug size={13} /> Bug 回報佇列</div>
+      <div style={sectionTitle}><BugIcon size={13} /> BugIcon 回報佇列</div>
       <div style={{ ...card, padding: 0, overflow: "hidden" }}>
         {(bugsQ?.data ?? []).length === 0 && (
           <div style={{ padding: 16, fontSize: 12, color: "#9ca3af" }}>目前沒有 bug 回報</div>

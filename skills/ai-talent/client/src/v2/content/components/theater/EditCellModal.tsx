@@ -11,7 +11,10 @@
  */
 import { useState, useRef, useEffect } from "react";
 import { Spinner } from "@heroui/react";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import type { IconDefinition } from "@fortawesome/fontawesome-svg-core";
 import type { TheaterPlatform } from "../../../config/theaterCast";
+import { ICON, CheckIcon, CloseIcon, ImageIcon, PaletteIcon, ScheduleIcon } from "../../../platform/components/icons";
 
 // ── Platform display helpers ──────────────────────────────────────────────────
 const PLATFORM_LABEL: Record<TheaterPlatform, string> = {
@@ -23,13 +26,13 @@ const PLATFORM_LABEL: Record<TheaterPlatform, string> = {
   blog:      "Blog",
 };
 
-const PLATFORM_EMOJI: Record<TheaterPlatform, string> = {
-  facebook:  "📘",
-  instagram: "📸",
-  youtube:   "▶️",
-  threads:   "🧵",
-  line:      "💬",
-  blog:      "📝",
+const PLATFORM_ICON: Record<TheaterPlatform, IconDefinition> = {
+  facebook:  ICON.facebook,
+  instagram: ICON.instagram,
+  youtube:   ICON.youtube,
+  threads:   ICON.threads,
+  line:      ICON.line,
+  blog:      ICON.text,
 };
 
 // ── Props ─────────────────────────────────────────────────────────────────────
@@ -258,7 +261,7 @@ export default function EditCellModal({
       >
         {/* ── Header ────────────────────────────────────────────────── */}
         <div className="flex items-center gap-3 px-6 py-4 border-b border-neutral-100 shrink-0">
-          <span className="text-xl">{PLATFORM_EMOJI[platform]}</span>
+          <span className="text-xl"><FontAwesomeIcon icon={PLATFORM_ICON[platform]} /></span>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-semibold text-neutral-900">
               {PLATFORM_LABEL[platform]}
@@ -269,7 +272,7 @@ export default function EditCellModal({
           </div>
           {isAlreadyScheduled && (
             <span className="text-[12px] font-medium px-2 py-0.5 rounded-full bg-success-100 text-success-700">
-              {en ? "✓ Scheduled" : "✓ 已排程"}
+              <span className="inline-flex items-center gap-1"><CheckIcon size={10} />{en ? "Scheduled" : "已排程"}</span>
             </span>
           )}
           <button
@@ -277,7 +280,7 @@ export default function EditCellModal({
             className="w-7 h-7 flex items-center justify-center rounded-full text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 transition"
             aria-label="close"
           >
-            ✕
+            <CloseIcon size={14} />
           </button>
         </div>
 
@@ -324,7 +327,7 @@ export default function EditCellModal({
                 {hashtags.map((tag, i) => (
                   <span key={i} className="flex items-center gap-1 text-[12px] px-2 py-0.5 rounded-full bg-neutral-100 text-neutral-700">
                     {tag}
-                    <button onClick={() => removeHashtag(i)} className="text-neutral-400 hover:text-neutral-700 leading-none">✕</button>
+                    <button onClick={() => removeHashtag(i)} className="text-neutral-400 hover:text-neutral-700 leading-none"><CloseIcon size={10} /></button>
                   </span>
                 ))}
               </div>
@@ -376,7 +379,7 @@ export default function EditCellModal({
                       onChange={e => updateListItem("chapters", i, e.target.value)}
                       className="flex-1 text-[12px] px-2.5 py-1.5 border border-neutral-200 rounded-lg focus:outline-none focus:border-indigo-400 transition"
                     />
-                    <button onClick={() => removeListItem("chapters", i)} className="text-neutral-400 hover:text-danger-500 transition">✕</button>
+                    <button onClick={() => removeListItem("chapters", i)} className="text-neutral-400 hover:text-danger-500 transition"><CloseIcon size={12} /></button>
                   </div>
                 ))}
                 <button
@@ -411,7 +414,7 @@ export default function EditCellModal({
                         }}
                         className="flex-1 text-[12px] px-2.5 py-1.5 border border-neutral-200 rounded-lg focus:outline-none focus:border-indigo-400 transition resize-none"
                       />
-                      <button onClick={() => removeListItem("thread", i)} className="text-neutral-400 hover:text-danger-500 transition mt-2">✕</button>
+                      <button onClick={() => removeListItem("thread", i)} className="text-neutral-400 hover:text-danger-500 transition mt-2"><CloseIcon size={12} /></button>
                     </div>
                   );
                 })}
@@ -440,7 +443,7 @@ export default function EditCellModal({
                       onChange={e => updateListItem("h2", i, e.target.value)}
                       className="flex-1 text-[12px] px-2.5 py-1.5 border border-neutral-200 rounded-lg focus:outline-none focus:border-indigo-400 transition"
                     />
-                    <button onClick={() => removeListItem("h2", i)} className="text-neutral-400 hover:text-danger-500 transition">✕</button>
+                    <button onClick={() => removeListItem("h2", i)} className="text-neutral-400 hover:text-danger-500 transition"><CloseIcon size={12} /></button>
                   </div>
                 ))}
                 <button
@@ -467,7 +470,7 @@ export default function EditCellModal({
                 {imageUrl ? (
                   <img src={imageUrl} alt="" className="w-full h-full object-cover" />
                 ) : (
-                  <span className="text-3xl">🖼️</span>
+                  <span className="text-3xl"><ImageIcon size={28} /></span>
                 )}
               </div>
 
@@ -492,7 +495,7 @@ export default function EditCellModal({
                   disabled={imaging}
                   className="flex items-center gap-1.5 text-[12px] font-medium px-3 py-1.5 rounded-lg bg-amber-50 text-amber-700 hover:bg-amber-100 disabled:opacity-40 transition"
                 >
-                  {imaging ? <Spinner size="sm" color="current" /> : <span>🎨</span>}
+                  {imaging ? <Spinner size="sm" color="current" /> : <PaletteIcon size={12} />}
                   {en ? "Regenerate image" : "重新產圖"}
                 </button>
                 {imageError && <p className="text-[12px] text-danger-600">{imageError}</p>}
@@ -504,7 +507,7 @@ export default function EditCellModal({
           {showSchedule && (
             <section ref={scheduleRef} className="rounded-xl border border-indigo-200 bg-indigo-50/40 p-4 space-y-3">
               <p className="text-xs font-semibold uppercase tracking-wide text-indigo-700">
-                📅 {en ? "Schedule to Calendar" : "排程到行事曆"}
+                <span className="inline-flex items-center gap-1"><ScheduleIcon size={12} /> {en ? "Schedule to Calendar" : "排程到行事曆"}</span>
               </p>
               <div>
                 <label className="text-[12px] text-neutral-600 block mb-1">
@@ -564,7 +567,7 @@ export default function EditCellModal({
                   : "bg-indigo-600 text-white hover:bg-indigo-700"
               }`}
             >
-              📅 {en ? "Schedule" : "排程發布"}
+              <ScheduleIcon size={13} /> {en ? "Schedule" : "排程發布"}
             </button>
           </div>
         </div>

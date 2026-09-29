@@ -16,7 +16,7 @@
  * 邏輯來自 evergreenRationale，日期來自 git 歷史。這裡只負責排版，不另外編故事。
  */
 import { useEffect } from "react";
-import { X } from "lucide-react";
+import { CloseIcon } from "../../../platform/components/icons";
 import { trpc } from "../../../../lib/trpc";
 import { tierLabel } from "../../../platform/lib/tierVocabulary";
 import { resolveSource, sourceLabel, sourceWhy } from "../../lib/sourceVocabulary";
@@ -136,7 +136,7 @@ export default function CardDetailDrawer({ taskId, lang, onClose, onRun }: Props
             className="rounded-lg p-1.5 text-neutral-400 transition hover:bg-neutral-100 hover:text-neutral-600"
             aria-label={en ? "Close" : "關閉"}
           >
-            <X size={18} />
+            <CloseIcon size={18} />
           </button>
         </div>
 

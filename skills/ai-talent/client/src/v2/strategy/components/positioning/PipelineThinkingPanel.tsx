@@ -17,9 +17,7 @@
  */
 import React from "react";
 import { Avatar, Button, Progress } from "@heroui/react";
-import {
-  Play, Pause, SkipForward, Square, CircleDot, CheckCircle2,
-} from "lucide-react";
+import { CurrentIcon, DoneIcon, PauseIcon, PlayIcon, SkipIcon, StopIcon } from "../../../platform/components/icons";
 import type { PipelineStepSpec, PipelineStatus } from "../../lib/positioningPipeline";
 
 export interface PipelineThinkingPanelProps {
@@ -172,7 +170,7 @@ export default function PipelineThinkingPanel({
                 {status === "paused" && <span className="text-amber-700">Paused</span>}
                 {status === "done" && (
                   <span className="inline-flex items-center gap-1 text-emerald-700">
-                    <CheckCircle2 size={11} /> Done
+                    <DoneIcon size={11} /> Done
                   </span>
                 )}
               </div>
@@ -180,22 +178,22 @@ export default function PipelineThinkingPanel({
               <div className="flex items-center gap-1.5">
                 {status === "running" && (
                   <>
-                    <IconBtn label="暫停" onClick={onPause}><Pause size={13} /></IconBtn>
-                    <IconBtn label="跳過" onClick={onSkip}><SkipForward size={13} /></IconBtn>
-                    <IconBtn label="停止" onClick={onStop}><Square size={13} /></IconBtn>
+                    <IconBtn label="暫停" onClick={onPause}><PauseIcon size={13} /></IconBtn>
+                    <IconBtn label="跳過" onClick={onSkip}><SkipIcon size={13} /></IconBtn>
+                    <IconBtn label="停止" onClick={onStop}><StopIcon size={13} /></IconBtn>
                   </>
                 )}
                 {status === "paused" && (
                   <>
-                    <Button size="sm" className="bg-neutral-900 text-white font-semibold h-7" startContent={<Play size={12} fill="currentColor" />} onPress={onResume}>繼續</Button>
-                    <IconBtn label="停止" onClick={onStop}><Square size={13} /></IconBtn>
+                    <Button size="sm" className="bg-neutral-900 text-white font-semibold h-7" startContent={<PlayIcon size={12} fill="currentColor" />} onPress={onResume}>繼續</Button>
+                    <IconBtn label="停止" onClick={onStop}><StopIcon size={13} /></IconBtn>
                   </>
                 )}
                 {status === "done" && (
                   <Button size="sm" variant="light" className="h-7" onPress={onStop}>關閉</Button>
                 )}
                 {status === "idle" && (
-                  <Button size="sm" className="bg-neutral-900 text-white font-semibold h-7" startContent={<Play size={12} fill="currentColor" />} onPress={onStart}>開始分析</Button>
+                  <Button size="sm" className="bg-neutral-900 text-white font-semibold h-7" startContent={<PlayIcon size={12} fill="currentColor" />} onPress={onStart}>開始分析</Button>
                 )}
               </div>
             </div>
@@ -293,7 +291,7 @@ export default function PipelineThinkingPanel({
           <div className="mb-4">
             <p className="text-[12px] uppercase tracking-[0.2em] text-neutral-700 mb-1">Now</p>
             <div className="flex items-start gap-2">
-              <CircleDot size={13} className="text-neutral-900 mt-1 shrink-0" />
+              <CurrentIcon size={13} className="text-neutral-900 mt-1 shrink-0" />
               <div className="min-w-0">
                 <p className="text-sm font-semibold text-neutral-900 leading-snug">{stepTitle}</p>
                 {current?.segmentId && (

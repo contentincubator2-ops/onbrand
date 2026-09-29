@@ -21,7 +21,7 @@
  */
 import React from "react";
 import { Modal, ModalContent, ModalHeader, ModalBody, Spinner } from "@heroui/react";
-import { Check } from "lucide-react";
+import { CheckIcon } from "../../../platform/components/icons";
 import { trpc } from "../../../../lib/trpc";
 import { useLang } from "../../../../lib/i18n";
 import {
@@ -101,7 +101,7 @@ export default function StrategyHistoryModal({
                     <span className="min-w-0">
                       <span className="flex items-center gap-1.5">
                         <span className="text-small font-semibold truncate">{d.name}</span>
-                        {on && <Check size={13} />}
+                        {on && <CheckIcon size={13} />}
                       </span>
                       <span className="block text-tiny text-default-500 truncate">{roleLabelOf(d, en)}</span>
                       <span className="block text-tiny text-default-400 truncate">{d.title}</span>

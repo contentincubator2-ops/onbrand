@@ -19,7 +19,9 @@ import {
   Button, Card, CardBody, Chip, Modal, ModalBody, ModalContent, ModalHeader, Spinner, Textarea,
 } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faPlus, faCheck, faPenToSquare, faXmark, faWandSparkles } from "@fortawesome/free-solid-svg-icons";
+import {
+  faPlus, faCheck, faPenToSquare, faXmark, faWandMagicSparkles,
+} from "@fortawesome/free-solid-svg-icons";
 import { TaskCardShell } from "../../../content/components/TaskCardShell";
 import InlineAssetCard from "./InlineAssetCard";
 import AssetPhotoGallery from "./AssetPhotoGallery";
@@ -346,7 +348,7 @@ function StylePanel({
             size="sm" color="primary" radius="md"
             isDisabled={picked.length === 0 || describeMut?.isPending || readOnly}
             isLoading={describeMut?.isPending}
-            startContent={!describeMut?.isPending ? <FontAwesomeIcon icon={faWandSparkles} /> : undefined}
+            startContent={!describeMut?.isPending ? <FontAwesomeIcon icon={faWandMagicSparkles} /> : undefined}
             onPress={() => { setErr(""); describeMut?.mutate({ brandId, kind: spec.key === "icon_style" ? "icon" : "imagery", imageUrls: picked }); }}
           >
             {describeMut?.isPending ? L("讀圖中…", "Reading…") : L(`用這 ${picked.length} 張歸納風格`, `Derive style from ${picked.length}`)}

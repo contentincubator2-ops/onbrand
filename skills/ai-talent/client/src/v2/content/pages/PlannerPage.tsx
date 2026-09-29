@@ -14,8 +14,12 @@
 import React from "react";
 import { useNavigate, useOutletContext, useSearchParams } from "react-router-dom";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faEnvelope, faBullhorn, faGlobe, faArrowUp, faChevronLeft, faChevronRight, faEllipsis } from "@fortawesome/free-solid-svg-icons";
-import { faFacebookF, faInstagram, faLinkedinIn, faYoutube, faTiktok, faXTwitter, faThreads, faLine } from "@fortawesome/free-brands-svg-icons";
+import {
+  faEnvelope, faBullhorn, faGlobe, faArrowUp, faChevronLeft, faChevronRight, faEllipsis,
+} from "@fortawesome/free-solid-svg-icons";
+import {
+  faFacebook, faInstagram, faLinkedin, faYoutube, faTiktok, faXTwitter, faThreads, faLine,
+} from "@fortawesome/free-brands-svg-icons";
 import { trpc } from "../../../lib/trpc";
 import { useLang } from "../../../lib/i18n";
 import { showToastGlobal } from "../../../components/ui/Toast";
@@ -26,7 +30,7 @@ import { getCalendarPublishPayload } from "../lib/strategyContentEnvelope";
 const INK = "#171717", META = "#6B6B6B", LINE = "#EAEAEA", SOFT = "#F6F6F5", ORANGE = "#F97316";
 
 const PLATFORM_ICON: Record<string, any> = {
-  facebook: faFacebookF, instagram: faInstagram, linkedin: faLinkedinIn, youtube: faYoutube, tiktok: faTiktok,
+  facebook: faFacebook, instagram: faInstagram, linkedin: faLinkedin, youtube: faYoutube, tiktok: faTiktok,
   email: faEnvelope, pr: faBullhorn, x: faXTwitter, website: faGlobe, threads: faThreads, line: faLine,
 };
 const PLATFORM_ZH: Record<string, string> = {

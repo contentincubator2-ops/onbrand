@@ -2,6 +2,7 @@
  * Toast.tsx — lightweight toast notification system
  */
 import React, { createContext, useContext, useState, useCallback } from "react";
+import { DoneIcon, ErrorIcon, InfoIcon, WarningIcon } from "../../v2/platform/components/icons";
 
 type ToastType = "success" | "error" | "info" | "warning";
 
@@ -81,11 +82,11 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     return () => { _globalShowToast = () => {}; };
   }, [showToast]);
 
-  const COLORS: Record<ToastType, { bg: string; border: string; icon: string }> = {
-    success: { bg: "#F0FDF4", border: "#86EFAC", icon: "✓" },
-    error:   { bg: "#FFF1F0", border: "#FCA5A5", icon: "✕" },
-    info:    { bg: "#EFF6FF", border: "#93C5FD", icon: "ℹ" },
-    warning: { bg: "#FFFBEB", border: "#FCD34D", icon: "⚠" },
+  const COLORS: Record<ToastType, { bg: string; border: string; icon: React.ReactNode }> = {
+    success: { bg: "#F0FDF4", border: "#86EFAC", icon: <DoneIcon size={14} /> },
+    error:   { bg: "#FFF1F0", border: "#FCA5A5", icon: <ErrorIcon size={14} /> },
+    info:    { bg: "#EFF6FF", border: "#93C5FD", icon: <InfoIcon size={14} /> },
+    warning: { bg: "#FFFBEB", border: "#FCD34D", icon: <WarningIcon size={14} /> },
   };
 
   return (
@@ -110,7 +111,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
               fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
               maxWidth: toast.action ? 440 : 360,
             }}>
-              <span style={{ fontWeight: 700, fontSize: 14 }}>{c.icon}</span>
+              <span style={{ fontWeight: 700, fontSize: 14, display: "inline-flex" }}>{c.icon}</span>
               <span style={{ flex: 1, minWidth: 0 }}>{toast.message}</span>
               {toast.action && (
                 <button

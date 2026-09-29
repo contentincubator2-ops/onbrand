@@ -7,6 +7,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { trpc } from "../lib/trpc";
 import { useLang } from "../lib/i18n";
+import { DoneIcon } from "../v2/platform/components/icons";
 
 interface OnboardingProps {
   onComplete?: (brandId: number, brandName: string) => void;
@@ -143,7 +144,7 @@ export default function OnboardingWizard({ onComplete }: OnboardingProps) {
           textAlign: "center",
           boxShadow: "0 4px 24px rgba(0,0,0,0.06)",
         }}>
-          <div style={{ fontSize: 48, marginBottom: 16 }}>🎉</div>
+          <div style={{ fontSize: 48, marginBottom: 16 }}><DoneIcon size={44} /></div>
           <h2 style={{ fontSize: 22, fontWeight: 700, color: COLORS.text, margin: "0 0 12px" }}>
             {lang === "en" ? "Your brand is ready!" : "品牌已建立！"}
           </h2>

@@ -15,7 +15,7 @@
  *
  * Auto-shown when user has 0 brands (replaces the simple empty state).
  */
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { trpc } from "../../../../lib/trpc";
 import { useLang } from "../../../../lib/i18n";
@@ -28,6 +28,7 @@ import RunningAgentCarousel from "../../../content/components/quickTask/RunningA
 // 2026-09-10 (CJ 市場收斂): 選單只列 14 個焦點市場；getCountry 仍讀完整
 // COUNTRIES，舊資料的市場代號才不會變成空白。見 countries.ts marketOptions。
 import { marketOptions, getCountry } from "../../../../lib/countries";
+import { DoneIcon, WarningIcon, ErrorIcon } from "../../../platform/components/icons";
 
 const INDUSTRIES_ZH = [
   "AI / 科技軟體",
@@ -84,12 +85,12 @@ const PRODUCT_BANDS: Array<{ code: string; zh: string; en: string }> = [
  * 抓取結果的顯示層級。直接對映 fetchProductMeta 的 meta.source ——
  * 不做美化，抓不到就說抓不到，讓使用者知道要手填。
  */
-const SOURCE_BADGE: Record<string, { mark: string; zh: string; en: string; color: string }> = {
-  jsonld: { mark: "✓", zh: "已讀到商品資料",   en: "Product data read",  color: "#15803D" },
-  og:     { mark: "✓", zh: "已讀到頁面資料",   en: "Page data read",     color: "#15803D" },
-  title:  { mark: "△", zh: "只讀到標題",       en: "Title only",         color: "#B45309" },
-  none:   { mark: "✗", zh: "讀不到，請手動填", en: "Unreadable",         color: "#B91C1C" },
-  unsafe: { mark: "✗", zh: "網址無法存取",     en: "URL not reachable",  color: "#B91C1C" },
+const SOURCE_BADGE: Record<string, { mark: ReactNode; zh: string; en: string; color: string }> = {
+  jsonld: { mark: <DoneIcon size={12} />, zh: "已讀到商品資料",   en: "Product data read",  color: "#15803D" },
+  og:     { mark: <DoneIcon size={12} />, zh: "已讀到頁面資料",   en: "Page data read",     color: "#15803D" },
+  title:  { mark: <WarningIcon size={12} />, zh: "只讀到標題",       en: "Title only",         color: "#B45309" },
+  none:   { mark: <ErrorIcon size={12} />, zh: "讀不到，請手動填", en: "Unreadable",         color: "#B91C1C" },
+  unsafe: { mark: <ErrorIcon size={12} />, zh: "網址無法存取",     en: "URL not reachable",  color: "#B91C1C" },
 };
 
 interface ProductImportRow {
@@ -586,7 +587,7 @@ export default function BrandOnboardingWizard({ isOpen, onClose, onComplete }: P
                   />
                 </div>
 
-                {err && <div className="mt-3 text-sm text-danger">⚠ {err}</div>}
+                {err && <div className="mt-3 text-sm text-danger"><WarningIcon size={13} /> {err}</div>}
 
                 <div className="mt-5 flex items-center justify-between gap-2">
                   <Button variant="light" onPress={() => setStep(1)}>{lang === "en" ? "← Back" : "← 上一步"}</Button>

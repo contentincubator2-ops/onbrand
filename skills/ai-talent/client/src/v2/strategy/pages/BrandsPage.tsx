@@ -44,7 +44,7 @@ import { BrandActionChipsRow, usePositioningStatus } from "../components/positio
 import AddEntityModal, { type AddEntityTab } from "../components/AddEntityModal";
 import ProductDetailModal from "../components/positioning/ProductDetailModal";
 // Notion-style line icons
-import { Target as LucideTarget, Type as LucideType, Palette as LucidePalette, Lock as LucideLock, Play as LucidePlay, RotateCcw as LucideRotate, BookOpen as LucideBook, Users as LucideUsers, Sparkles, Bot as LucideRobotIcon, Quote as LucideQuote, Shield as LucideShield, Type as LucideTypeIcon, Pencil as LucidePencil, Award as LucideAward, Package as LucidePackage, Hash as LucideHash, MessageCircle as LucideMessage, FileText as LucideFileText, IdCard as LucideIdCard, Trash2 as LucideTrash } from "lucide-react";
+import { AgentIcon, AwardIcon, BundleIcon, CommentIcon, DeleteIcon, EditIcon, FontIcon, GenerateIcon, HashtagIcon, IdCardIcon, LibraryIcon, LockIcon, PaletteIcon, PeopleIcon, PlayIcon, QuoteIcon, RegenerateIcon, ShieldIcon, TargetIcon, TextIcon, DoneIcon, StopIcon, WarningIcon, CheckIcon, CloseIcon } from "../../platform/components/icons";
 import { SCOPE_SEGMENTS, type SegmentSpec } from "../lib/positioningSchema";
 import { pickProductImageUrl } from "../lib/productImage";
 import { readProductFacts } from "../lib/productFacts";
@@ -53,7 +53,9 @@ import CopyAssetBoard, { COPY_ASSETS } from "../components/positioning/CopyAsset
 import VisualAssetBoard from "../components/positioning/VisualAssetBoard";
 import { pipelineFor, type PipelineStepSpec } from "../lib/positioningPipeline";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faPlus, faPalette, faFont, faQuoteLeft, faBullseye, faUsers, faImage, faIcons, faChartPie, faImages, faPenNib, faShieldHalved, faFolderOpen, faLock, faLockOpen, faBookOpen, faTableList, faBox, faRocket, faBullhorn, faWandSparkles, faGear, faStickyNote, faTrash, faSatelliteDish, faStethoscope, faFileArrowUp } from "@fortawesome/free-solid-svg-icons";
+import {
+  faPlus, faPalette, faFont, faQuoteLeft, faBullseye, faUsers, faImage, faIcons, faChartPie, faImages, faPenNib, faShieldHalved, faFolderOpen, faLock, faLockOpen, faBookOpen, faTableList, faBox, faRocket, faBullhorn, faWandMagicSparkles, faGear, faStickyNote, faTrashCan, faSatelliteDish, faStethoscope, faFileArrowUp,
+} from "@fortawesome/free-solid-svg-icons";
 
 // Sub-nav id format:
 //   "asset:<key>"   — non-positioning brand assets (準則 / 標誌 / etc.)
@@ -551,7 +553,7 @@ export default function BrandsPage() {
       } else {
         const msg = lang === "en"
           ? `Lock "${tabName}"?\nAfter locking:\n· Editor goes read-only (unlock to change)\n· Every channel uses this as the single source of truth\n· All tasks and the 7-Day Publisher show the locked badge\nYou can unlock anytime.`
-          : `要鎖定「${tabName}」嗎？\n鎖定後：\n· 編輯欄會變成唯讀（解鎖才能改）\n· 全平台都會用這份為單一真相\n· 所有任務與七日發布台都會看到 ✅ 已鎖定的標示\n隨時可以解鎖。`;
+          : `要鎖定「${tabName}」嗎？\n鎖定後：\n· 編輯欄會變成唯讀（解鎖才能改）\n· 全平台都會用這份為單一真相\n· 所有任務與七日發布台都會看到已鎖定的標示\n隨時可以解鎖。`;
         if (!confirm(msg)) return;
         await lockTabMut?.mutateAsync({ brandId: activeBrandIdForLocks, tab });
       }
@@ -751,7 +753,7 @@ export default function BrandsPage() {
           listQ?.refetch?.();
           showToastGlobal(
             r.status === "done"
-              ? (lang === "en" ? "✓ Positioning complete" : "✓ 定位完成，卡片已更新")
+              ? (lang === "en" ? "Positioning complete" : "定位完成，卡片已更新")
               : (lang === "en" ? "Positioning failed — try again" : "定位失敗，請再試一次"),
             r.status === "done" ? "success" : undefined,
           );
@@ -1479,29 +1481,29 @@ export default function BrandsPage() {
                       desc: scopeMode === "event"   ? (lang === "en" ? "Campaign positioning" : "活動定位")
                           : scopeMode === "product" ? (lang === "en" ? "Product positioning"  : "產品定位")
                           : (lang === "en" ? "Brand core / Slogan" : "品牌核心 / Slogan"),
-                      Icon: LucideTarget,    scopes: ["brand", "product", "event"] as string[] },
+                      Icon: TargetIcon,    scopes: ["brand", "product", "event"] as string[] },
                   { v: "copy"        as const, label: lang === "en" ? "Copy"    : "文字",
                       desc: scopeMode === "product" ? (lang === "en" ? "Tone / style" : "語氣 / 風格")
                           : scopeMode === "event"   ? (lang === "en" ? "Voice / rules" : "語氣 / 規範")
                           : (lang === "en" ? "Words / banned / style" : "用詞 / 禁忌 / 風格"),
-                      Icon: LucideType,      scopes: ["brand", "product", "event"] as string[] },
+                      Icon: FontIcon,      scopes: ["brand", "product", "event"] as string[] },
                   { v: "visual"      as const, label: lang === "en" ? "Visual"  : "視覺",
                       desc: lang === "en" ? "Logo / palette / font" : "Logo / 色票 / 字型",
-                      Icon: LucidePalette,   scopes: ["brand"] },
+                      Icon: PaletteIcon,   scopes: ["brand"] },
                   { v: "info"        as const, label: lang === "en" ? "Info"    : "基本資料",
                       desc: scopeMode === "event"   ? (lang === "en" ? "Dates / products"    : "時間 / 產品")
                           : scopeMode === "product" ? (lang === "en" ? "Name / brand"        : "名稱 / 品牌")
                           : (lang === "en" ? "Name / industry" : "名稱 / 產業"),
-                      Icon: LucideIdCard,    scopes: ["brand", "product", "event"] },
+                      Icon: IdCardIcon,    scopes: ["brand", "product", "event"] },
                   { v: "meetings"    as const, label: lang === "en" ? "Meetings" : "會議",
                       desc: lang === "en" ? "Recurring strategy meetings" : "定期策略會議",
-                      Icon: LucideUsers,     scopes: ["brand", "product"] },
+                      Icon: PeopleIcon,     scopes: ["brand", "product"] },
                   { v: "products"    as const, label: lang === "en" ? "Products" : "產品",
                       desc: lang === "en" ? "Product cards & positioning" : "產品卡片與定位",
-                      Icon: LucideRobotIcon, scopes: ["brand"] },
+                      Icon: AgentIcon, scopes: ["brand"] },
                   { v: "events"      as const, label: lang === "en" ? "Events"   : "活動",
                       desc: lang === "en" ? "Campaign cards & positioning" : "活動卡片與定位",
-                      Icon: LucideTarget,    scopes: ["brand"] },
+                      Icon: TargetIcon,    scopes: ["brand"] },
                 ];
                 const visibleTiles = allTiles.filter((tile) =>
                   tile.scopes.includes(scopeMode === "none" ? "brand" : scopeMode),
@@ -1533,7 +1535,7 @@ export default function BrandsPage() {
                       <Icon size={16} strokeWidth={2} className={active ? "text-white" : "text-neutral-700"} />
                       <span className="text-sm font-semibold">{t.label}</span>
                       {locked && (
-                        <LucideLock
+                        <LockIcon
                           size={11} strokeWidth={2.5}
                           className={active ? "text-neutral-300 ml-auto" : "text-neutral-600 ml-auto"}
                         />
@@ -1603,9 +1605,9 @@ export default function BrandsPage() {
                   {isLocked ? (
                     <>
                       <p className="text-small font-semibold text-emerald-800 m-0">
-                        {lang === "en"
-                          ? `✅ ${tabLabel} locked — single source of truth across all channels`
-                          : `✅ ${tabLabel}已鎖定 — 全平台採用此版本為單一真相`}
+                        <DoneIcon size={13} /> {lang === "en"
+                          ? `${tabLabel} locked — single source of truth across all channels`
+                          : `${tabLabel}已鎖定 — 全平台採用此版本為單一真相`}
                       </p>
                       <p className="text-tiny text-emerald-600 m-0">
                         {lang === "en"
@@ -1787,7 +1789,7 @@ export default function BrandsPage() {
                 <div className="mt-8 max-w-[700px] mx-auto">
                   <div className="border border-rose-200 rounded-xl bg-rose-50/40 p-5">
                     <div className="flex items-center gap-2 mb-3">
-                      <LucideTrash size={14} className="text-rose-600" />
+                      <DeleteIcon size={14} className="text-rose-600" />
                       <h3 className="text-sm font-semibold text-rose-700">
                         {lang === "en" ? "Danger zone" : "危險區"}
                       </h3>
@@ -1948,7 +1950,7 @@ export default function BrandsPage() {
                       border: autoPosPhase === "full-done" ? "1px solid #BBF7D0" : "1px solid #E5E5E5",
                     }}>
                       {autoPosPhase === "full-done" ? (
-                        <span style={{ fontSize: 14 }}>✅</span>
+                        <span style={{ fontSize: 14, display: "inline-flex" }}><DoneIcon size={14} /></span>
                       ) : (
                         <>
                           <div style={{
@@ -2063,9 +2065,9 @@ export default function BrandsPage() {
                 {smpCheckpointActive && (
                   <div className="mt-2 rounded-md border border-primary-200 bg-primary-50 px-4 py-3">
                     <div className="flex items-start gap-3">
-                      <FontAwesomeIcon icon={faWandSparkles} className="text-primary mt-0.5" />
+                      <FontAwesomeIcon icon={faWandMagicSparkles} className="text-primary mt-0.5" />
                       <div className="flex-1 min-w-0">
-                        <p className="text-small font-semibold text-primary-800">{lang === "en" ? "🛑 SMP Checkpoint — confirm your single-minded proposition" : "🛑 SMP Checkpoint — 請確認單一核心命題"}</p>
+                        <p className="text-small font-semibold text-primary-800"><StopIcon size={12} /> {lang === "en" ? "SMP Checkpoint — confirm your single-minded proposition" : "SMP Checkpoint — 請確認單一核心命題"}</p>
                         <p className="text-tiny text-default-600 mt-1">{lang === "en" ? "SMP is the core creative principle for this campaign — the next 5 steps are built around it. Review it before moving on." : "SMP 是這次活動的最高創意準則，後面 5 個 step 都會圍繞它展開。先確認再繼續。"}</p>
                         {smpData?.singleMindedProposition && (
                           <div className="mt-2 p-2 rounded bg-white border border-divider">
@@ -2083,7 +2085,7 @@ export default function BrandsPage() {
                 )}
                 {failedStepIds.length > 0 && (
                   <div className="mt-2 rounded-md border border-warning-200 bg-warning-50 px-3 py-2 text-tiny text-warning-800">
-                    {lang === "en" ? "⚠ These steps came back empty — re-run them from each segment:" : "⚠ 以下步驟沒寫入內容，建議到對應頁籤重跑："}{" "}
+                    <WarningIcon size={11} /> {lang === "en" ? "These steps came back empty — re-run them from each segment:" : "以下步驟沒寫入內容，建議到對應頁籤重跑："}{" "}
                     {failedStepIds.map(id => { const s = pipelineSteps.find(x => x.id === id); return lang === "en" ? (s ? `Step ${id} · ${s.segmentId}` : `Step ${id}`) : (s ? `步驟 ${id} · ${s.segmentId}` : `步驟 ${id}`); }).join(lang === "en" ? ", " : "、")}
                     <button className="ml-2 underline" onClick={() => setFailedStepIds([])}>{t("close")}</button>
                   </div>
@@ -2544,7 +2546,7 @@ function TabActionBar({
             <Button
               size="sm"
               onPress={onResume}
-              startContent={<LucidePlay size={14} strokeWidth={2} />}
+              startContent={<PlayIcon size={14} strokeWidth={2} />}
               style={{ background: "#18181B", color: "white" }}
             >
               {lang === "en" ? "Continue" : "繼續"}
@@ -2558,9 +2560,9 @@ function TabActionBar({
               onPress={onAction}
               startContent={
                 busy ? undefined :
-                locked ? <LucideLock size={15} strokeWidth={2} /> :
-                hasContent ? <LucideRotate size={15} strokeWidth={2} /> :
-                <LucidePlay size={15} strokeWidth={2} />
+                locked ? <LockIcon size={15} strokeWidth={2} /> :
+                hasContent ? <RegenerateIcon size={15} strokeWidth={2} /> :
+                <PlayIcon size={15} strokeWidth={2} />
               }
               style={{
                 background: locked ? "#E4E4E7" : "#18181B",
@@ -2693,7 +2695,7 @@ function PositioningGrid({
     audience: faUsers, competition: faTableList,
     differentiation: faRocket, trends: faBullhorn, voice: faQuoteLeft,
     // product / event fallbacks
-    core: faBullseye, positioning: faBullseye, smp: faWandSparkles,
+    core: faBullseye, positioning: faBullseye, smp: faWandMagicSparkles,
   };
 
   // 2026-09-23（CJ「武器化工具裡面，我只需要留下AI指令庫，其他都不需要。
@@ -3489,7 +3491,7 @@ function PositioningCard({
             className="absolute top-1.5 right-1.5 z-10 opacity-0 group-hover:opacity-100 transition-opacity rounded-full p-1.5 bg-white/85 hover:bg-white"
             style={{ color: "#525252" }}
           >
-            <FontAwesomeIcon icon={faTrash} style={{ fontSize: 11 }} />
+            <FontAwesomeIcon icon={faTrashCan} style={{ fontSize: 11 }} />
           </button>
         )}
         {headline ? (
@@ -3665,7 +3667,7 @@ function PositioningPanel({
           fontSize: 12, color: "#92400E",
           display: "flex", alignItems: "center", gap: 8,
         }}>
-          <span>🔒</span>
+          <LockIcon size={13} />
           <span>{lang === "en" ? "Positioning is locked — this section is read-only. Go to Brand settings to unlock and edit." : "定位已鎖定 — 此 segment 為唯讀。回 /brands 解鎖才能編輯。"}</span>
         </div>
       )}
@@ -4227,7 +4229,7 @@ function BrandLogoSettings({ brandId, brandName }: { brandId: number; brandName:
               ? (lang === "en" ? "Re-fetch" : "重新抓取")
               : (lang === "en" ? "Fetch logo" : "抓取 logo")}
           </Button>
-          {okMsg && <span className="text-tiny text-success-600">✓ {okMsg}</span>}
+          {okMsg && <span className="text-tiny text-success-600 inline-flex items-center gap-1"><CheckIcon size={10} /> {okMsg}</span>}
           {err && <span className="text-tiny text-danger-600">{err}</span>}
         </div>
       </div>
@@ -4394,7 +4396,7 @@ function PositioningTopRow({
                     : `自動填寫所有定位欄位（共 ${totalSteps} 步，背景執行，最多重試 5 次）`)
           }
         >
-          <Sparkles size={12} className={isRunning ? "animate-pulse" : ""} />
+          <GenerateIcon size={12} className={isRunning ? "animate-pulse" : ""} />
           {buttonLabel}
         </button>
 
@@ -4419,11 +4421,11 @@ function PositioningTopRow({
           </div>
         )}
         {isFailed && jobData?.lastError && (
-          <span className="text-xs text-amber-700 max-w-md truncate" title={jobData.lastError}>⚠ {String(jobData.lastError).slice(0, 80)}</span>
+          <span className="text-xs text-amber-700 max-w-md truncate" title={jobData.lastError}><WarningIcon size={11} /> {String(jobData.lastError).slice(0, 80)}</span>
         )}
-        {isDone && <span className="text-xs text-emerald-700">{lang === "en" ? `✓ Done · ${total} sections` : `✓ 已完成 ${total} 個段落`}</span>}
+        {isDone && <span className="text-xs text-emerald-700 inline-flex items-center gap-1"><CheckIcon size={11} />{lang === "en" ? `Done · ${total} sections` : `已完成 ${total} 個段落`}</span>}
         {startError && (
-          <span className="text-xs text-danger truncate max-w-md" title={startError}>⚠ {startError}</span>
+          <span className="text-xs text-danger truncate max-w-md" title={startError}><WarningIcon size={11} /> {startError}</span>
         )}
       </div>
 
@@ -4629,8 +4631,8 @@ function CopyTabInline({
       const warnings: string[] = [];
       if (!r.hasRealContent) {
         warnings.push(lang === "en"
-          ? "⚠️ No website / FB found — results may be off. Add a website / social links in Settings, then retry."
-          : "⚠️ 找不到官網 / FB — 結果可能不準。請到「設定」補上 website / socialLinks 後重試。");
+          ? "No website / FB found — results may be off. Add a website / social links in Settings, then retry."
+          : "找不到官網 / FB — 結果可能不準。請到「設定」補上 website / socialLinks 後重試。");
       }
       if (errCount > 0) {
         const firstFew = Object.entries(r.errors ?? {}).slice(0, 3)
@@ -4661,7 +4663,7 @@ function CopyTabInline({
         <StrategyToolIcon
           active={bulkBusy}
           onClick={() => { if (!bulkBusy && !locked && emptyKeys.length > 0) void handleBulkAutoFill(); }}
-          icon={faWandSparkles}
+          icon={faWandMagicSparkles}
           label={bulkBusy
             ? (lang === "en" ? `Auto-filling (${bulkFillingKeys.size})…` : `自動填寫中（${bulkFillingKeys.size}）…`)
             : emptyKeys.length === 0
@@ -4688,9 +4690,9 @@ function CopyTabInline({
           bulkErr ? "bg-amber-50 text-amber-800" :
           "bg-emerald-50 text-emerald-800"
         }`}>
-          {bulkResult && <div>{lang === "en"
-            ? `✓ Filled ${bulkResult.filled} fields${bulkResult.sources.length > 0 ? ` (sources: ${bulkResult.sources.join(" + ")})` : ""}`
-            : `✓ 已填入 ${bulkResult.filled} 個欄位${bulkResult.sources.length > 0 ? `（來源：${bulkResult.sources.join(" + ")}）` : ""}`}</div>}
+          {bulkResult && <div><CheckIcon size={11} /> {lang === "en"
+            ? `Filled ${bulkResult.filled} fields${bulkResult.sources.length > 0 ? ` (sources: ${bulkResult.sources.join(" + ")})` : ""}`
+            : `已填入 ${bulkResult.filled} 個欄位${bulkResult.sources.length > 0 ? `（來源：${bulkResult.sources.join(" + ")}）` : ""}`}</div>}
           {bulkErr && <div>{bulkErr}</div>}
         </div>
       )}
@@ -4828,7 +4830,7 @@ function ProductInfoEditor({ productId, brandName, en }: { productId: number; br
           {en ? "Re-analyze (re-read product page)" : "重新分析（重讀產品頁）"}
         </Button>
         {savedAt && !upsertM?.isPending && (
-          <span className="text-tiny text-success-600">{en ? "Saved ✓" : "已儲存 ✓"}</span>
+          <span className="text-tiny text-success-600 inline-flex items-center gap-1"><CheckIcon size={10} />{en ? "Saved" : "已儲存"}</span>
         )}
         {recalDone && !startPositioningM?.isPending && (
           <span className="text-tiny text-secondary-600">
@@ -4889,7 +4891,7 @@ function BrandedVariantsModal({ title, loading, error, variants, cutoutAvailable
             }}
             aria-label={en ? "Close" : "關閉"}
           >
-            ✕
+            <CloseIcon size={14} />
           </button>
         </div>
 
@@ -4914,9 +4916,9 @@ function BrandedVariantsModal({ title, loading, error, variants, cutoutAvailable
             <>
               {cutoutAvailable === false && (
                 <p style={{ fontSize: 12, color: "#92400E", background: "#FEF3C7", padding: "8px 12px", borderRadius: 8, marginBottom: 14 }}>
-                  {en
-                    ? "⚠ REPLICATE_API_TOKEN not set — using the original product image as a tile (no transparent cutout). Set the env var for true riverflow-grade output."
-                    : "⚠ 還沒設 REPLICATE_API_TOKEN — 用原圖直接合成（沒去背）。設好環境變數後就會用透明去背達到 riverflow 效果。"}
+                  <WarningIcon size={12} /> {en
+                    ? "REPLICATE_API_TOKEN not set — using the original product image as a tile (no transparent cutout). Set the env var for true riverflow-grade output."
+                    : "還沒設 REPLICATE_API_TOKEN — 用原圖直接合成（沒去背）。設好環境變數後就會用透明去背達到 riverflow 效果。"}
                 </p>
               )}
               <div style={{
@@ -5544,7 +5546,7 @@ function BrandEntityGrid({
                     className="text-[12px] px-2 py-1 rounded-md text-neutral-400 hover:text-red-500 hover:bg-red-50 transition"
                     title={en ? "Delete" : "刪除"}
                   >
-                    ✕
+                    <CloseIcon size={12} />
                   </button>
                 </div>
                 </div>

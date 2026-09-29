@@ -5,6 +5,7 @@
 import { useEffect, useState } from "react";
 import { useSearchParams, Link } from "react-router-dom";
 import { useLang } from "../../lib/i18n";
+import { WarningIcon } from "../../v2/platform/components/icons";
 
 export default function ResetPasswordPage() {
   const { t, lang } = useLang();
@@ -176,7 +177,7 @@ export default function ResetPasswordPage() {
 
             {error && (
               <div className="flex items-center gap-2 text-red-600 text-sm bg-red-50 border border-red-100 rounded-lg px-3 py-2">
-                <span>⚠</span> {error}
+                <WarningIcon size={14} /> {error}
               </div>
             )}
 

@@ -15,6 +15,7 @@ import { CATALOG } from "../../v2/platform/lib/catalogFigures";
 import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useLang } from "../../lib/i18n";
+import { WarningIcon } from "../../v2/platform/components/icons";
 
 // ── SoWork.ai design tokens (single source of truth) ────────────────────
 const C = {
@@ -458,7 +459,7 @@ export default function LoginPage() {
                   style={{ background: "#FFF1ED", border: `1.5px solid ${C.orange}` }}
                 >
                   <div className="flex items-center gap-2" style={{ color: C.orangeDark }}>
-                    <span>⚠</span> {error}
+                    <WarningIcon size={14} /> {error}
                   </div>
                   {needsVerification && (
                     <div className="flex flex-col gap-1.5 pl-6">

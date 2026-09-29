@@ -24,7 +24,7 @@
  * 已經把「Details not available」這類匯入失敗的樣板字串濾成 null），不編一段補上。
  */
 import React from "react";
-import { Search, ArrowLeft, Check } from "lucide-react";
+import { BackIcon, CheckIcon, SearchIcon } from "../../../platform/components/icons";
 import { trpc } from "../../../../lib/trpc";
 import { useLang } from "../../../../lib/i18n";
 import { type StrategistDirector, avatarSrcOf, roleLabelOf, signatureQuestionsOf, localeLabelOf } from "../../lib/strategistDirectors";
@@ -64,7 +64,7 @@ export function DirectorRoster({
       <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", borderBottom: "1px solid #EFEDE8" }}>
         <button onClick={onBack} aria-label={en ? "Back to chat" : "回到對話"}
           style={{ border: "none", background: "transparent", cursor: "pointer", color: "#525252", display: "flex", padding: 2 }}>
-          <ArrowLeft size={16} />
+          <BackIcon size={16} />
         </button>
         <div style={{ fontSize: 13, fontWeight: 700, color: "#171717" }}>
           {en ? "Choose your Strategy Director" : "選一位策略總監"}
@@ -94,7 +94,7 @@ export function DirectorRoster({
                   }}>{roleLabelOf(d, en)}</span>
                   {isCurrent && (
                     <span style={{ fontSize: 10.5, fontWeight: 700, color: "#047857", display: "flex", alignItems: "center", gap: 2 }}>
-                      <Check size={11} />{en ? "current" : "目前"}
+                      <CheckIcon size={11} />{en ? "current" : "目前"}
                     </span>
                   )}
                 </div>
@@ -160,7 +160,7 @@ export function DirectorRoster({
       </div>
 
       <div style={{ borderTop: "1px solid #E5E5E5", padding: 10, display: "flex", gap: 8, alignItems: "center" }}>
-        <Search size={14} color="#a3a3a3" />
+        <SearchIcon size={14} color="#a3a3a3" />
         <input
           value={q}
           onChange={(e) => setQ(e.target.value)}
@@ -210,7 +210,7 @@ export function DirectorProfile({
       <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", borderBottom: "1px solid #EFEDE8" }}>
         <button onClick={onBack} aria-label={en ? "Back" : "返回"}
           style={{ border: "none", background: "transparent", cursor: "pointer", color: "#525252", display: "flex", padding: 2 }}>
-          <ArrowLeft size={16} />
+          <BackIcon size={16} />
         </button>
         <img src={avatarSrcOf(director)} alt="" style={{ width: 30, height: 30, borderRadius: "50%" }} />
         <div style={{ minWidth: 0 }}>

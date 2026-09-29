@@ -27,7 +27,7 @@
  */
 import React from "react";
 import { Button, Input, Textarea, Modal, ModalContent, ModalHeader, ModalBody, ModalFooter } from "@heroui/react";
-import { Upload, Plus, Trash2 } from "lucide-react";
+import { AddIcon, DeleteIcon, UploadIcon } from "../../../platform/components/icons";
 import { useLang } from "../../../../lib/i18n";
 import { trpc } from "../../../../lib/trpc";
 
@@ -168,7 +168,7 @@ export default function CustomCardEditor({
                   className="max-w-[200px]"
                 />
                 <Button
-                  size="sm" variant="flat" startContent={<Upload size={13} />}
+                  size="sm" variant="flat" startContent={<UploadIcon size={13} />}
                   isDisabled={busy || !scopeId}
                   onPress={() => { targetFieldRef.current = i; fileRef.current?.click(); }}
                 >
@@ -179,7 +179,7 @@ export default function CustomCardEditor({
                     size="sm" variant="light" isIconOnly
                     onPress={() => setFields((prev) => prev.filter((_, j) => j !== i))}
                   >
-                    <Trash2 size={14} className="text-danger-500" />
+                    <DeleteIcon size={14} className="text-danger-500" />
                   </Button>
                 )}
               </div>
@@ -198,7 +198,7 @@ export default function CustomCardEditor({
 
           {fields.length < MAX_FIELDS && (
             <Button
-              size="sm" variant="flat" startContent={<Plus size={13} />}
+              size="sm" variant="flat" startContent={<AddIcon size={13} />}
               onPress={() => setFields((prev) => [...prev, { label: "", value: "" }])}
             >
               {en ? "Add another field" : "再加一格"}

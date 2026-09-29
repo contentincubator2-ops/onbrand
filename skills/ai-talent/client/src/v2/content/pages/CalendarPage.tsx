@@ -17,12 +17,7 @@ import { useNavigate, useOutletContext } from "react-router-dom";
 import CalendarTabs from "../components/CalendarTabs";
 import { trpc } from "../../../lib/trpc";
 import type { ShellOutletCtx } from "../../app/shell/ShellLayout";
-import {
-  ChevronLeft, ChevronRight, X, Sparkles,
-  Plus, ExternalLink, Clock, CheckCircle2,
-  AlertCircle, LayoutGrid, CalendarDays, Info,
-  RefreshCw, Trash2, Loader2,
-} from "lucide-react";
+import { AddIcon, ChevronLeftIcon, ChevronRightIcon, CloseIcon, DeleteIcon, DoneIcon, ExternalIcon, GenerateIcon, GridIcon, InfoIcon, RegenerateIcon, TheaterIcon, WaitingIcon, WarningIcon, WorkingIcon, LinkIcon, PlannerIcon } from "../../platform/components/icons";
 import { useLang } from "../../../lib/i18n";
 import { getFestivalHintEn } from "../lib/festivalI18n";
 import {
@@ -523,10 +518,10 @@ export default function CalendarPage() {
               onClick={dismissHowTo}
               className="absolute top-3 right-3 w-6 h-6 rounded-full bg-white/60 flex items-center justify-center text-default-500 hover:bg-white"
             >
-              <X size={12} />
+              <CloseIcon size={12} />
             </button>
             <div className="flex items-center gap-2 mb-3">
-              <Info size={14} className="text-emerald-700" />
+              <InfoIcon size={14} className="text-emerald-700" />
               <span className="text-[12px] font-semibold uppercase tracking-[0.2em] text-emerald-700">
                 {lang === "en" ? "HOW TO PUBLISH A POST" : "如何發布一篇貼文"}
               </span>
@@ -591,8 +586,8 @@ export default function CalendarPage() {
           style={{ border: "1px solid #D4D4D4", background: "white" }}
         >
           {[
-            { key: "week", icon: <CalendarDays size={13} />, label: lang === "en" ? "7-day" : "七日" },
-            { key: "month", icon: <LayoutGrid size={13} />, label: lang === "en" ? "Month" : "月曆" },
+            { key: "week", icon: <TheaterIcon size={13} />, label: lang === "en" ? "7-day" : "七日" },
+            { key: "month", icon: <GridIcon size={13} />, label: lang === "en" ? "Month" : "月曆" },
           ].map((v) => (
             <button
               key={v.key}
@@ -616,7 +611,7 @@ export default function CalendarPage() {
                 onClick={() => setWeekStart((s) => addDays(s, -7))}
                 className="w-7 h-7 rounded border border-default-300 hover:border-default-900 flex items-center justify-center"
               >
-                <ChevronLeft size={13} />
+                <ChevronLeftIcon size={13} />
               </button>
               <span className="text-[13px] font-semibold text-default-900 min-w-[150px] text-center tabular-nums">
                 {weekLabel}
@@ -625,7 +620,7 @@ export default function CalendarPage() {
                 onClick={() => setWeekStart((s) => addDays(s, 7))}
                 className="w-7 h-7 rounded border border-default-300 hover:border-default-900 flex items-center justify-center"
               >
-                <ChevronRight size={13} />
+                <ChevronRightIcon size={13} />
               </button>
               <button
                 onClick={() => {
@@ -644,7 +639,7 @@ export default function CalendarPage() {
                 onClick={() => setMonthCursor(new Date(monthCursor.getFullYear(), monthCursor.getMonth() - 1, 1))}
                 className="w-7 h-7 rounded border border-default-300 hover:border-default-900 flex items-center justify-center"
               >
-                <ChevronLeft size={13} />
+                <ChevronLeftIcon size={13} />
               </button>
               <span className="text-[13px] font-semibold text-default-900 min-w-[110px] text-center">
                 {monthLabel}
@@ -653,7 +648,7 @@ export default function CalendarPage() {
                 onClick={() => setMonthCursor(new Date(monthCursor.getFullYear(), monthCursor.getMonth() + 1, 1))}
                 className="w-7 h-7 rounded border border-default-300 hover:border-default-900 flex items-center justify-center"
               >
-                <ChevronRight size={13} />
+                <ChevronRightIcon size={13} />
               </button>
               <button
                 onClick={() => setMonthCursor(new Date(today.getFullYear(), today.getMonth(), 1))}
@@ -668,15 +663,15 @@ export default function CalendarPage() {
         {/* Legend */}
         <div className="hidden md:flex items-center gap-3 text-[12px] text-default-600">
           <span className="flex items-center gap-1.5">
-            <Clock size={11} className="text-default-400" />
+            <WaitingIcon size={11} className="text-default-400" />
             {lang === "en" ? "Scheduled" : "待發布"}
           </span>
           <span className="flex items-center gap-1.5">
-            <CheckCircle2 size={11} className="text-emerald-600" />
+            <DoneIcon size={11} className="text-emerald-600" />
             {lang === "en" ? "Published" : "已發布"}
           </span>
           <span className="flex items-center gap-1.5">
-            <AlertCircle size={11} className="text-amber-500" />
+            <WarningIcon size={11} className="text-amber-500" />
             {lang === "en" ? "Failed" : "失敗"}
           </span>
         </div>
@@ -689,7 +684,7 @@ export default function CalendarPage() {
             className="flex items-center gap-3 px-4 py-3 rounded-lg"
             style={{ background: "#fef2f2", border: "1px solid #fecaca" }}
           >
-            <AlertCircle size={14} className="text-red-500 shrink-0" />
+            <WarningIcon size={14} className="text-red-500 shrink-0" />
             <p className="text-[12px] text-red-700 flex-1">
               {lang === "en"
                 ? "Failed to load calendar data."
@@ -699,7 +694,7 @@ export default function CalendarPage() {
               onClick={() => rangeQ?.refetch?.()}
               className="flex items-center gap-1 px-3 py-1 rounded text-[12px] font-medium text-red-700 hover:bg-red-100"
             >
-              <RefreshCw size={11} />
+              <RegenerateIcon size={11} />
               {lang === "en" ? "Retry" : "重試"}
             </button>
           </div>
@@ -834,7 +829,7 @@ export default function CalendarPage() {
                               (e.currentTarget as HTMLButtonElement).style.background = "transparent";
                             }}
                           >
-                            <Plus size={11} />
+                            <AddIcon size={11} />
                             {lang === "en" ? "New post" : "新增貼文"}
                           </button>
                         </div>
@@ -855,7 +850,7 @@ export default function CalendarPage() {
         <div className="max-w-[1100px] mx-auto px-6 pb-12">
           {isLoading && (
             <div className="flex justify-center py-16">
-              <Loader2 size={22} className="animate-spin text-default-400" />
+              <WorkingIcon size={22} className="animate-spin text-default-400" />
             </div>
           )}
           {!isLoading && items.length === 0 && (
@@ -961,7 +956,7 @@ export default function CalendarPage() {
                           onClick={() => setPickerDate(dc.date)}
                           className="mt-auto w-full py-0.5 rounded text-[12px] text-default-300 hover:text-violet-600 hover:bg-violet-50 flex items-center justify-center gap-0.5 transition-colors"
                         >
-                          <Plus size={9} />
+                          <AddIcon size={9} />
                         </button>
                       )}
                     </div>
@@ -1113,10 +1108,10 @@ function PostPill({
   const isPending = item.kind === "scheduled" && !isFailed;
 
   const StatusIcon = isPublished
-    ? CheckCircle2
+    ? DoneIcon
     : isFailed
-    ? AlertCircle
-    : Clock;
+    ? WarningIcon
+    : WaitingIcon;
   const statusColor = isPublished ? "#10b981" : isFailed ? "#f59e0b" : "#525252";
 
   const publishedTime = item.at
@@ -1172,7 +1167,7 @@ function PostPill({
             onClick={() => navigate(`/run/${item.outputId}`)}
             className="flex items-center gap-1 px-2 py-0.5 rounded text-[12px] font-medium bg-white border border-default-200 hover:border-default-500 text-default-700"
           >
-            <ExternalLink size={9} />
+            <ExternalIcon size={9} />
             {lang === "en" ? "View" : "查看"}
           </button>
           {isPending && (
@@ -1219,7 +1214,7 @@ function PostPill({
               {publishError && (
                 <div className="w-full mt-1 px-2 py-1.5 rounded-lg text-[12px] leading-relaxed space-y-1.5"
                   style={{ background: "#fff7ed", border: "1px solid #fed7aa", color: "#9a3412" }}>
-                  <p>⚠️ {publishError}</p>
+                  <p><WarningIcon size={12} /> {publishError}</p>
                   <div className="flex flex-wrap gap-1.5">
                     {/* FB connect button — shown when error mentions missing page connection */}
                     {(publishError.includes("粉專") || publishError.includes("Facebook") || publishError.includes("未連接")) &&
@@ -1235,7 +1230,7 @@ function PostPill({
                         className="px-2 py-1 rounded text-[12px] font-semibold text-white"
                         style={{ background: "#1877F2" }}
                       >
-                        🔗 {lang === "en" ? "Connect Facebook" : "連接 Facebook"}
+                        <LinkIcon size={11} /> {lang === "en" ? "Connect Facebook" : "連接 Facebook"}
                       </button>
                     )}
                     <button
@@ -1251,7 +1246,7 @@ function PostPill({
                 onClick={() => onReschedule(item.id, item.at)}
                 className="flex items-center gap-1 px-2 py-0.5 rounded text-[12px] font-medium bg-white border border-violet-200 hover:border-violet-500 text-violet-700"
               >
-                <RefreshCw size={9} />
+                <RegenerateIcon size={9} />
                 {lang === "en" ? "Reschedule" : "改時間"}
               </button>
               <button
@@ -1263,7 +1258,7 @@ function PostPill({
                 disabled={cancelling}
                 className="flex items-center gap-1 px-2 py-0.5 rounded text-[12px] font-medium bg-white border border-red-200 hover:border-red-400 text-red-600 disabled:opacity-50"
               >
-                <Trash2 size={9} />
+                <DeleteIcon size={9} />
                 {cancelling
                   ? (lang === "en" ? "…" : "…")
                   : (lang === "en" ? "Cancel" : "取消排程")}
@@ -1277,7 +1272,7 @@ function PostPill({
               rel="noopener noreferrer"
               className="flex items-center gap-1 px-2 py-0.5 rounded text-[12px] font-medium bg-emerald-50 border border-emerald-200 text-emerald-700 hover:border-emerald-500"
             >
-              <ExternalLink size={9} />
+              <ExternalIcon size={9} />
               {lang === "en" ? "Live link" : "查看原文"}
             </a>
           )}
@@ -1326,7 +1321,7 @@ function PlatformPickerModal({
             onClick={onClose}
             className="w-7 h-7 rounded-full flex items-center justify-center text-default-500 hover:bg-default-100"
           >
-            <X size={14} />
+            <CloseIcon size={14} />
           </button>
         </div>
 
@@ -1433,7 +1428,7 @@ function FestivalNudgeBanner({
         }}
       >
         <div className="flex items-center gap-2 mb-2">
-          <Sparkles size={13} className="text-default-700" strokeWidth={2} />
+          <GenerateIcon size={13} className="text-default-700" strokeWidth={2} />
           <span className="text-[12px] font-semibold uppercase tracking-[0.22em] text-default-600">
             {lang === "en" ? "UPCOMING · Holidays & festivals" : "UPCOMING · 接下來的節慶"}
           </span>
@@ -1448,7 +1443,7 @@ function FestivalNudgeBanner({
                 className="flex items-center gap-3 py-2 px-3 bg-white rounded-lg"
                 style={{ border: "1px solid #E5E5E5" }}
               >
-                <span style={{ fontSize: 20 }}>{f.emoji ?? "🎉"}</span>
+                <span style={{ fontSize: 20, display: "inline-flex" }}><PlannerIcon size={18} /></span>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-baseline gap-2 flex-wrap">
                     <span className="text-[13px] font-semibold text-default-900">
@@ -1498,7 +1493,7 @@ function FestivalNudgeBanner({
                   className="w-7 h-7 rounded-md flex items-center justify-center text-default-500 hover:bg-default-100"
                   title={lang === "en" ? "Don't remind me about this" : "這個節慶不要提醒"}
                 >
-                  <X size={13} />
+                  <CloseIcon size={13} />
                 </button>
               </div>
             );

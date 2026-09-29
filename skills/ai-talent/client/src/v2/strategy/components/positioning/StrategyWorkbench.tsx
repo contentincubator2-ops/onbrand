@@ -15,6 +15,7 @@ import React, { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { trpc } from "../../../../lib/trpc";
 import { showToastGlobal } from "../../../../components/ui/Toast";
+import { LockIcon, WarningIcon, CheckIcon } from "../../../platform/components/icons";
 
 /* 單色線條 icon（stroke currentColor） */
 const Ic = ({ d, vb = "0 0 24 24" }: { d: string; vb?: string }) => (
@@ -98,7 +99,7 @@ export default function StrategyWorkbench({
       utils?.scope?.active?.invalidate?.();
       showToastGlobal(
         row.status === "done"
-          ? (en ? "✓ Downstream regenerated — the page now follows the applied scenario" : "✓ 下游重生完成——差異化、黃金圈、語氣與 AI 指令庫已跟上套用的情境")
+          ? (en ? "Downstream regenerated — the page now follows the applied scenario" : "下游重生完成——差異化、黃金圈、語氣與 AI 指令庫已跟上套用的情境")
           : (en ? "Downstream regeneration failed — retry apply" : "下游重生失敗，請再套用一次"),
         row.status === "done" ? "success" : undefined,
       );
@@ -178,7 +179,7 @@ export default function StrategyWorkbench({
     researchMut?.mutate?.({ ...scopeArgs, kind, value: v.slice(0, 160) }, {
       onSuccess: (r: any) => {
         if (r?.ok) {
-          showToastGlobal(en ? "✓ Researched and added" : "✓ AI 已完成研究並加入選項（可點入查看）", "success");
+          showToastGlobal(en ? "Researched and added" : "AI 已完成研究並加入選項（可點入查看）", "success");
           setAdding(null); setAddText("");
           utils?.scope?.active?.invalidate?.();
         } else showToastGlobal(r?.error ?? (en ? "Research failed" : "研究失敗，請再試一次"));
@@ -303,7 +304,7 @@ export default function StrategyWorkbench({
       {
         onSuccess: (r: any) => {
           if (r?.ok) {
-            showToastGlobal(en ? "Derivation complete" : "✓ 推導完成，看板已更新", "success");
+            showToastGlobal(en ? "Derivation complete" : "推導完成，看板已更新", "success");
             setActiveName(r.scenario?.name ?? name);
             utils?.scope?.active?.invalidate?.();
           } else {
@@ -339,8 +340,8 @@ export default function StrategyWorkbench({
             const diverged = (r.findings ?? []).filter((f: any) => !f.agrees).length;
             showToastGlobal(
               diverged > 0
-                ? (en ? `Health check done — ${diverged} anchor(s) worth a second look` : `✓ 健檢完成——${diverged} 個錨點值得再看一眼`)
-                : (en ? "Health check done — everything matches" : "✓ 健檢完成——三個錨點都跟獨立判斷一致"),
+                ? (en ? `Health check done — ${diverged} anchor(s) worth a second look` : `健檢完成——${diverged} 個錨點值得再看一眼`)
+                : (en ? "Health check done — everything matches" : "健檢完成——三個錨點都跟獨立判斷一致"),
               "success",
             );
             utils?.scope?.active?.invalidate?.();
@@ -359,7 +360,7 @@ export default function StrategyWorkbench({
     researchMut?.mutate?.({ ...scopeArgs, kind: kindMap[anchor], value: value.slice(0, 160) }, {
       onSuccess: (r: any) => {
         if (r?.ok) {
-          showToastGlobal(en ? "✓ Added as a new option — pick it above if you agree" : "✓ 已加入選項——覺得有道理的話可以在上面勾選它", "success");
+          showToastGlobal(en ? "Added as a new option — pick it above if you agree" : "已加入選項——覺得有道理的話可以在上面勾選它", "success");
           dismissHealthCheckMut?.mutate?.({ ...scopeArgs, anchor });
           setOpenFinding(null);
           utils?.scope?.active?.invalidate?.();
@@ -412,7 +413,7 @@ export default function StrategyWorkbench({
           <span style={{ fontSize: 14, fontWeight: 800 }}><Ic d={IC.target} /> {en ? "Strategy Health Check" : "策略健檢"}</span>
           {locked ? (
             <span style={{ fontSize: 12, fontWeight: 800, letterSpacing: ".05em", border: "1px solid #2A2630", borderRadius: 5, padding: "1px 8px", color: "#2A2630", background: "#F0EEEA" }}>
-              🔒 {en ? "LOCKED · FINAL" : "已鎖定・定案"}
+              <LockIcon size={11} /> {en ? "LOCKED · FINAL" : "已鎖定・定案"}
             </span>
           ) : (
             <span style={{ fontSize: 12, fontWeight: 800, letterSpacing: ".1em", border: "1px solid #C9C4BC", borderRadius: 5, padding: "1px 6px", color: "#8A8494" }}>BETA</span>
@@ -426,7 +427,7 @@ export default function StrategyWorkbench({
               看不到健檢結果，除非剛好想到要點開。 */}
           {liveFindingsCount > 0 && (
             <span style={{ fontSize: 12, fontWeight: 800, border: "1.5px solid #E8542F", borderRadius: 999, padding: "2px 10px", color: "#E8542F", background: "#FDF1EC" }}>
-              ⚠ {en ? `${liveFindingsCount} anchor${liveFindingsCount > 1 ? "s" : ""} to review` : `${liveFindingsCount} 個錨點待複查`}
+              <WarningIcon size={11} /> {en ? `${liveFindingsCount} anchor${liveFindingsCount > 1 ? "s" : ""} to review` : `${liveFindingsCount} 個錨點待複查`}
             </span>
           )}
           {cascadeRow && (
@@ -489,7 +490,7 @@ export default function StrategyWorkbench({
               <div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}>
                 {audienceChips.map((c) => (
                   <span key={c.key} style={S.chip(selAudience === c.key)}>
-                    <span onClick={() => setSelAudience(c.key)}>{selAudience === c.key ? "✓ " : ""}{c.label}・{c.value.slice(0, 18)}…</span>
+                    <span onClick={() => setSelAudience(c.key)}>{selAudience === c.key ? <><CheckIcon size={10} />{" "}</> : null}{c.label}・{c.value.slice(0, 18)}…</span>
                     <span onClick={(e) => { e.stopPropagation(); setDrill({ kind: "audience", key: c.key }); }}
                           style={{ marginLeft: 6, fontSize: 12.5, opacity: .8, borderBottom: "1px dotted currentColor" }}>
                       {en ? "research ↗" : "查看研究 ↗"}
@@ -503,7 +504,7 @@ export default function StrategyWorkbench({
               <div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}>
                 {competitorChips.map((c) => (
                   <span key={c.key} style={S.chip(selComp.has(c.key))}>
-                    <span onClick={() => setSelComp(toggle(selComp, c.key))}>{selComp.has(c.key) ? "✓ " : ""}{c.label}</span>
+                    <span onClick={() => setSelComp(toggle(selComp, c.key))}>{selComp.has(c.key) ? <><CheckIcon size={10} />{" "}</> : null}{c.label}</span>
                     <span onClick={(e) => { e.stopPropagation(); setDrill({ kind: "competitor", key: c.key }); }}
                           style={{ marginLeft: 6, fontSize: 12.5, opacity: .8, borderBottom: "1px dotted currentColor" }}>↗</span>
                   </span>
@@ -515,7 +516,7 @@ export default function StrategyWorkbench({
               <div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}>
                 {advantageChips.map((c) => (
                   <span key={c.key} style={S.chip(selAdv.has(c.key))} onClick={() => setSelAdv(toggle(selAdv, c.key))}>
-                    {selAdv.has(c.key) ? "✓ " : ""}{c.label}・{c.value.slice(0, 16)}…
+                    {selAdv.has(c.key) ? <><CheckIcon size={10} />{" "}</> : null}{c.label}・{c.value.slice(0, 16)}…
                   </span>
                 ))}
                 <AddControl kind="advantage" placeholder={en ? "e.g. real dad's voice" : "例：真實爸爸親聲錄製"} />
@@ -542,7 +543,7 @@ export default function StrategyWorkbench({
                         fontSize: 12, fontWeight: 700, color: "#E8542F", cursor: "pointer",
                         border: "1.5px solid #E8542F", borderRadius: 999, padding: "2px 11px", background: "#FDF1EC",
                       }}>
-                      ⚠ {en ? "AI health check disagrees" : "AI 健檢跟這項不一致"} {openFinding === row.anchor ? "▾" : "▸"}
+                      <WarningIcon size={11} /> {en ? "AI health check disagrees" : "AI 健檢跟這項不一致"} {openFinding === row.anchor ? "▾" : "▸"}
                     </span>
                   )}
                 </div>
@@ -654,7 +655,7 @@ export default function StrategyWorkbench({
                             digMut?.mutate?.({ ...scopeArgs, scenarioId: active.id, spotIndex: i }, {
                               onSuccess: (r: any) => {
                                 setDigging(null);
-                                if (r?.ok) { showToastGlobal(en ? "Deep-dive ready" : "✓ 深挖完成", "success"); utils?.scope?.active?.invalidate?.(); }
+                                if (r?.ok) { showToastGlobal(en ? "Deep-dive ready" : "深挖完成", "success"); utils?.scope?.active?.invalidate?.(); }
                                 else showToastGlobal(r?.error ?? (en ? "Deep-dive failed" : "深挖失敗，請再試一次"));
                               },
                               onError: () => { setDigging(null); showToastGlobal(en ? "Deep-dive failed" : "深挖失敗，請再試一次"); },
@@ -679,7 +680,7 @@ export default function StrategyWorkbench({
                                   if (r?.ok) {
                                     showToastGlobal(en
                                       ? "Applied — downstream regenerating…"
-                                      : (isEvent ? "✓ 已套用——下游（訊息架構／創意概念）重生中…" : "✓ 已套用——下游（差異化／黃金圈／語氣／AI 指令庫）重生中…"), "success");
+                                      : (isEvent ? "已套用——下游（訊息架構／創意概念）重生中…" : "已套用——下游（差異化／黃金圈／語氣／AI 指令庫）重生中…"), "success");
                                     if (r.cascade) setCascading(true);
                                     utils?.scope?.active?.invalidate?.();
                                   }

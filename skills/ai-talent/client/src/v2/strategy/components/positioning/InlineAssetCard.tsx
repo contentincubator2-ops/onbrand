@@ -12,7 +12,7 @@
  * Per-card AI button removed (CJ 2026-05-07: 全局只要一個按鈕). Bulk
  * auto-fill is handled by parent CopyTabInline.
  */
-import { Plus, X, Sparkles } from "lucide-react";
+import { AddIcon, CloseIcon, GenerateIcon } from "../../../platform/components/icons";
 
 type Shape = "text" | "items" | "pairs";
 
@@ -102,7 +102,7 @@ export default function InlineAssetCard({
             fontSize: 12, fontWeight: 600, letterSpacing: "0.18em",
             textTransform: "uppercase", color: "#171717",
           }}>
-            <Sparkles size={10} className="animate-pulse" /> Writing
+            <GenerateIcon size={10} className="animate-pulse" /> Writing
           </span>
         ) : filled && (
           <span style={{
@@ -205,7 +205,7 @@ function ListField({ v, onChange }: { v: any; onChange: (next: any) => void }) {
             onMouseEnter={(e) => { e.currentTarget.style.color = "#B91C1C"; }}
             onMouseLeave={(e) => { e.currentTarget.style.color = "#525252"; }}
           >
-            <X size={12} />
+            <CloseIcon size={12} />
           </button>
         </div>
       ))}
@@ -220,7 +220,7 @@ function ListField({ v, onChange }: { v: any; onChange: (next: any) => void }) {
         onMouseEnter={(e) => { e.currentTarget.style.color = "#171717"; }}
         onMouseLeave={(e) => { e.currentTarget.style.color = "#525252"; }}
       >
-        <Plus size={11} /> 新增條目
+        <AddIcon size={11} /> 新增條目
       </button>
     </div>
   );
@@ -262,7 +262,7 @@ function PairListField({ v, onChange }: { v: any; onChange: (next: any) => void 
             onMouseEnter={(e) => { e.currentTarget.style.color = "#B91C1C"; }}
             onMouseLeave={(e) => { e.currentTarget.style.color = "#525252"; }}
           >
-            <X size={12} />
+            <CloseIcon size={12} />
           </button>
         </div>
       ))}
@@ -277,7 +277,7 @@ function PairListField({ v, onChange }: { v: any; onChange: (next: any) => void 
         onMouseEnter={(e) => { e.currentTarget.style.color = "#171717"; }}
         onMouseLeave={(e) => { e.currentTarget.style.color = "#525252"; }}
       >
-        <Plus size={11} /> 新增對照
+        <AddIcon size={11} /> 新增對照
       </button>
     </div>
   );

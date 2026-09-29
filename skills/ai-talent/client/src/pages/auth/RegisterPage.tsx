@@ -17,6 +17,7 @@ import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useLang } from "../../lib/i18n";
 import { logActivation } from "../../v2/platform/lib/activationTelemetry";
+import { WarningIcon } from "../../v2/platform/components/icons";
 
 // SoWork.ai design tokens
 const C = {
@@ -509,7 +510,7 @@ export default function RegisterPage() {
                   style={{ background: "#FFF1ED", border: `1.5px solid ${C.orange}` }}
                 >
                   <div className="flex items-center gap-2" style={{ color: C.orangeDark }}>
-                    <span>⚠</span> {error}
+                    <WarningIcon size={14} /> {error}
                   </div>
                   {(error.includes("已註冊") || error.includes("already") || error.includes("already registered")) && (
                     <div className="flex items-center gap-2 pt-0.5">

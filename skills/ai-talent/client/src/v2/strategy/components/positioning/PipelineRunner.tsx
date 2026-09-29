@@ -9,7 +9,9 @@
  */
 import { Card, CardBody, Button, Chip, Progress } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faPlay, faPause, faForward, faStop, faWandSparkles, faCheck } from "@fortawesome/free-solid-svg-icons";
+import {
+  faPlay, faPause, faForward, faStop, faWandMagicSparkles, faCheck,
+} from "@fortawesome/free-solid-svg-icons";
 import type { PipelineStepSpec, PipelineStatus } from "../../lib/positioningPipeline";
 
 export interface PipelineState {
@@ -53,7 +55,7 @@ export default function PipelineRunner({
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <div className="flex items-center gap-2">
             <span className="flex items-center justify-center w-7 h-7 rounded-full bg-default-100 border border-divider">
-              <FontAwesomeIcon icon={faWandSparkles} className="text-default-600 text-tiny" />
+              <FontAwesomeIcon icon={faWandMagicSparkles} className="text-default-600 text-tiny" />
             </span>
             <p className="text-small font-medium">{title}</p>
             {state.status === "paused" && (

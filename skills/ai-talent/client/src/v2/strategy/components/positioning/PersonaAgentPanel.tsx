@@ -15,10 +15,11 @@ import { trpc } from "../../../../lib/trpc";
 import { useLang } from "../../../../lib/i18n";
 import { showToastGlobal } from "../../../../components/ui/Toast";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faFacebook, faInstagram, faTiktok, faThreads } from "@fortawesome/free-brands-svg-icons";
 import {
-  faMicrophone, faPlus, faXmark, faTrash, faWandMagicSparkles,
-  faEnvelope, faCopy, faCheck, faRotateRight,
+  faFacebook, faInstagram, faTiktok, faThreads,
+} from "@fortawesome/free-brands-svg-icons";
+import {
+  faMicrophone, faPlus, faXmark, faTrashCan, faWandMagicSparkles, faEnvelope, faCopy, faCheck, faRotateRight,
 } from "@fortawesome/free-solid-svg-icons";
 import CloudFilePicker, { type CloudFileSource } from "./CloudFilePicker";
 
@@ -136,7 +137,7 @@ function NewAgentForm({ brandId, onDone }: { brandId: number; onDone: () => void
       {
         onSuccess: (r: any) => {
           if (r?.ok) {
-            showToastGlobal(en ? "✓ Training started" : "✓ 開始訓練", "success");
+            showToastGlobal(en ? "Training started" : "開始訓練", "success");
             utils.personaAgent?.list?.invalidate?.();
             onDone();
           } else showToastGlobal(r?.error ?? (en ? "Failed to start" : "建立失敗，請再試一次"));
@@ -260,7 +261,7 @@ function AddSourcesPanel({ brandId, agentId, onDone }: { brandId: number; agentI
       { brandId, id: agentId, sources: { texts: cleanTexts, articleUrls: cleanArticles, videoUrls: cleanVideos, cloudFiles } },
       {
         onSuccess: (r: any) => {
-          if (r?.ok) { showToastGlobal(en ? "✓ Retraining with new material" : "✓ 已加入，重新訓練中", "success"); utils.personaAgent?.list?.invalidate?.(); onDone(); }
+          if (r?.ok) { showToastGlobal(en ? "Retraining with new material" : "已加入，重新訓練中", "success"); utils.personaAgent?.list?.invalidate?.(); onDone(); }
           else showToastGlobal(r?.error ?? (en ? "Failed to add" : "加入失敗，請再試一次"));
         },
         onError: () => showToastGlobal(en ? "Failed to add" : "加入失敗，請再試一次"),
@@ -399,7 +400,7 @@ function AgentCard({ brandId, agent }: { brandId: number; agent: PersonaAgent })
             className="text-default-300 hover:text-danger-500 p-1.5"
             title={en ? "Delete" : "刪除"}
           >
-            <FontAwesomeIcon icon={faTrash} style={{ fontSize: 12 }} />
+            <FontAwesomeIcon icon={faTrashCan} style={{ fontSize: 12 }} />
           </button>
         </div>
       </div>

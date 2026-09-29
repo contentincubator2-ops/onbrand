@@ -25,6 +25,7 @@ import {
   EXAMPLE_MEETING, EXAMPLE_RUN, TOPIC_TEMPLATES, fmtDate, frequencyText, pendingCount, runNoteText,
   type DecisionStatus, type MeetingAction, type MeetingAttendee, type MeetingFrequency, type MeetingRow, type MeetingRun,
 } from "./meetingModel";
+import { CloseIcon } from "../../../platform/components/icons";
 
 interface ListData {
   locked: boolean;
@@ -438,7 +439,7 @@ function MeetingForm({ brandId, en, initial, products, maxAttendees, onCancel, o
           <div className="mt-2 flex flex-wrap gap-1.5">
             {f.attendees.filter((a) => !suggested.some((d) => d.agentId === a.agentId)).map((a) => (
               <button key={a.agentId} type="button" onClick={() => set("attendees", f.attendees.filter((x) => x.agentId !== a.agentId))}
-                className="rounded-full bg-neutral-900 px-3 py-1 text-[12px] text-white">{a.name} ✕</button>
+                className="rounded-full bg-neutral-900 px-3 py-1 text-[12px] text-white">{a.name} <CloseIcon size={10} /></button>
             ))}
           </div>
         )}

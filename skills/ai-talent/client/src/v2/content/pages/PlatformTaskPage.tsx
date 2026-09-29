@@ -53,13 +53,12 @@ import {
   ModalContent, ModalFooter, ModalHeader, Textarea,
 } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { HelpTip } from "../../platform/components/HelpTip";
 import {
-  faBolt, faPaperPlane, faXmark, faMagnifyingGlass,
-  faEnvelope, faBullhorn, faWandMagicSparkles, faTriangleExclamation, faGlobe,
-  faBookBookmark, faCalendarDays, faPlus, faPenToSquare,
+  faBolt, faPaperPlane, faXmark, faMagnifyingGlass, faEnvelope, faBullhorn, faWandMagicSparkles, faTriangleExclamation, faGlobe, faBookBookmark, faCalendarDays, faPlus, faPenToSquare,
 } from "@fortawesome/free-solid-svg-icons";
 import {
-  faFacebookF, faInstagram, faYoutube, faTiktok, faLinkedinIn, faThreads, faLine,
+  faFacebook, faInstagram, faYoutube, faTiktok, faLinkedin, faThreads, faLine,
 } from "@fortawesome/free-brands-svg-icons";
 import RunningAgentCarousel from "../components/quickTask/RunningAgentCarousel";
 import ImageCardTile, { type ImageCardInfo } from "../components/imageCard/ImageCardTile";
@@ -67,6 +66,7 @@ import { imageCardHref, imageChannelOf } from "../lib/imageCardHandoff";
 import CardDetailDrawer, { isRecentCard } from "../components/quickTask/CardDetailDrawer";
 import ChannelPicker from "../../platform/components/plan/ChannelPicker";
 import TaskPicker from "../../platform/components/plan/TaskPicker";
+import { LibraryIcon, AddIcon, EditIcon, TaskCardsIcon } from "../../platform/components/icons";
 
 // ── Recently used tasks helpers ─────────────────────────────────────────────
 const LAST_USED_KEY = "onbrand_last_used_tasks_v1";
@@ -121,7 +121,7 @@ interface PlatformMeta {
 
 const PLATFORM_META: Record<string, PlatformMeta> = {
   facebook: {
-    label: "Facebook", labelZh: "Facebook", icon: faFacebookF, bg: "#1877F2",
+    label: "Facebook", labelZh: "Facebook", icon: faFacebook, bg: "#1877F2",
     heroZh: "讓每篇 Facebook 貼文，都有爆款的骨架",
     heroEn: "Every post has a proven structure — no more starting from scratch",
     subZh: "Clio 獲獎敘事公式 × 品牌定位鎖定，自然引發互動",
@@ -135,7 +135,7 @@ const PLATFORM_META: Record<string, PlatformMeta> = {
     subEn: "Caption agent and image director agent work in sync, every time",
   },
   linkedin: {
-    label: "LinkedIn", labelZh: "LinkedIn", icon: faLinkedinIn, bg: "#0A66C2",
+    label: "LinkedIn", labelZh: "LinkedIn", icon: faLinkedin, bg: "#0A66C2",
     heroZh: "不只是發文，是在 LinkedIn 建立你的專業話語權",
     heroEn: "Thought leadership that earns real attention — not just vanity metrics",
     subZh: "PR Strategist 代理人以記者邏輯構建你的觀點",
@@ -251,7 +251,7 @@ function synthesizeStages(elapsedMs: number, tier: string, lang: string): any[] 
     status: t < start ? "pending" : t > end ? "done" : "running",
   });
   const stages: any[] = [];
-  if (isResearch) stages.push(mk("scout", L("🔬 Scout 爬取真實爆款數據", "🔬 Scout pulls real viral data"), 0, scoutEnd));
+  if (isResearch) stages.push(mk("scout", L("Scout 爬取真實爆款數據", "Scout pulls real viral data"), 0, scoutEnd));
   stages.push(mk("pre", L("URL / persona / brand load", "URL / persona / brand load"), scoutEnd, preEnd));
   if (isProd) stages.push(mk("strategist", L("Strategist 規劃敘事弧", "Strategist maps the narrative arc"), preEnd, stratEnd));
   stages.push(mk("caption", L("文案寫手 撰寫版本", "Caption writer drafts variants"), capStart, capEnd));
@@ -1662,45 +1662,26 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
 
         <div className="relative z-10 flex flex-col items-center text-center max-w-[1100px] mx-auto">
 
-          {/* Platform eyebrow */}
-          <div className="flex items-center gap-2 mb-4">
-            <div
-              className="w-9 h-9 rounded-full flex items-center justify-center text-white shadow-sm"
-              style={{ background: meta.bg }}
-            >
+          {/* Platform header：單色 logo＋平台名；賣點說明收進「?」（2026-09-29 介面去文字化） */}
+          <div className="flex items-center gap-2.5 mb-4">
+            <div className="w-9 h-9 rounded-full flex items-center justify-center text-white shadow-sm bg-default-900">
               <FontAwesomeIcon icon={meta.icon} className="text-sm" />
             </div>
-            <p className="text-[12px] font-semibold uppercase tracking-[0.22em] text-default-500">
+            <h1 className="font-bold tracking-tight leading-tight text-default-900" style={{ fontSize: "clamp(1.35rem, 2.4vw, 1.75rem)" }}>
               {lang === "en" ? meta.label : meta.labelZh}
-            </p>
+            </h1>
+            <HelpTip>
+              <b className="block mb-1">{lang === "en" ? meta.heroEn : meta.heroZh}</b>
+              {lang === "en" ? meta.subEn : meta.subZh}
+              {brandId && (
+                <span className="block mt-1 text-default-500">
+                  {lang === "en"
+                    ? `Using ${brandName ?? "your brand"}'s positioning`
+                    : `以 ${brandName ?? "你的品牌"} 定位為骨架`}
+                </span>
+              )}
+            </HelpTip>
           </div>
-
-          {/* Hero title — plain color (no gradient-text; gradient clip is unreliable cross-browser) */}
-          <h1
-            className="font-bold tracking-tight leading-tight mb-2"
-            style={{
-              fontSize: "clamp(1.45rem, 2.8vw, 2rem)",
-              color: "#0f0f0e",
-            }}
-          >
-            {lang === "en" ? meta.heroEn : meta.heroZh}
-          </h1>
-
-          {/* Platform sub-headline — differentiation copy */}
-          <p
-            className="mb-3 text-default-500"
-            style={{ fontSize: 14, lineHeight: 1.65, maxWidth: 580 }}
-          >
-            <span style={{ color: meta.bg, fontWeight: 600 }}>▸ </span>
-            {lang === "en" ? meta.subEn : meta.subZh}
-            {brandId && (
-              <span style={{ fontStyle: "italic", color: "#9ca3af" }}>
-                {lang === "en"
-                  ? ` · Using ${brandName ?? "your brand"}'s positioning`
-                  : ` · 以 ${brandName ?? "你的品牌"} 定位為骨架`}
-              </span>
-            )}
-          </p>
 
           {/* Search */}
           <div className="w-full mb-5" style={{ maxWidth: 740 }}>
@@ -2144,8 +2125,8 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
               <span>
                 <b>{lang === "en" ? "Strategy topic loaded: " : "策略題目已帶入："}</b>
                 「{strategyTopic}」
-                <span style={{ color: "#8A8494", marginLeft: 8, fontSize: 12 }}>
-                  {lang === "en" ? "Open any task — it autofills." : "點任一任務卡，題目會自動填入"}
+                <span style={{ marginLeft: 6 }}>
+                  <HelpTip>{lang === "en" ? "Open any task — it autofills." : "點任一任務卡，題目會自動填入"}</HelpTip>
                 </span>
               </span>
               <button onClick={() => setStrategyTopic(null)}
@@ -2298,12 +2279,10 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
 
             <div className="flex items-center justify-between mb-4">
               <div>
-                <h2 className="font-semibold text-lg tracking-tight">
+                <h2 className="font-semibold text-lg tracking-tight flex items-center gap-1">
                   {lang === "en" ? "Tasks" : "精選任務"}
+                  <HelpTip>{lang === "en" ? "Tap to make — answer one quick question first." : "按下即產出，先回答 1 個關鍵問題"}</HelpTip>
                 </h2>
-                <p className="text-tiny text-default-400 mt-0.5">
-                  {lang === "en" ? "Tap to make — answer one quick question first." : "按下即產出，先回答 1 個關鍵問題"}
-                </p>
               </div>
               <div className="flex items-center gap-2">
                 {/* 2026-09-08 亮出節奏：這個通路 30 天內上架了幾張。有新卡才顯示，
@@ -2481,7 +2460,7 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                         )}
                       </div>
                       {(task as any).methodology && (
-                        <span className="text-[12px] text-default-400 italic">📚 {(task as any).methodology}</span>
+                        <span className="text-[12px] text-default-400 italic inline-flex items-center gap-1"><LibraryIcon size={11} /> {(task as any).methodology}</span>
                       )}
                       <div className="mt-auto pt-2 flex items-center gap-2 border-t border-default-100">
                         <Avatar src={avatarSrc} size="sm" className="w-5 h-5" />
@@ -2513,16 +2492,11 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                   onClick={() => setPickerOpen(true)}
                   className="flex min-h-[180px] flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-neutral-300 bg-white text-neutral-500 transition hover:border-neutral-500 hover:text-neutral-800"
                 >
-                  <span className="flex h-8 w-8 items-center justify-center rounded-full border border-neutral-300 text-[18px] leading-none">
-                    +
+                  <span className="flex h-8 w-8 items-center justify-center rounded-full border border-neutral-300">
+                    <AddIcon size={14} />
                   </span>
                   <span className="text-[14px] font-medium">
                     {lang === "en" ? "Add task card" : "新增任務卡"}
-                  </span>
-                  <span className="px-4 text-center text-[13px] text-neutral-400">
-                    {activeCategoryLabel
-                      ? (lang === "en" ? `Within “${activeCategoryLabel}” only` : `只在「${activeCategoryLabel}」分類裡挑`)
-                      : (lang === "en" ? "Browse by source — viral, evergreen, award…" : "依來源挑選 — 爆款、長青、得獎案例…")}
                   </span>
                 </button>
               )}
@@ -2537,9 +2511,11 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                     ? (lang === "en"
                       ? `Showing all ${platformTasks.length} cards`
                       : `目前顯示全部 ${platformTasks.length} 張`)
-                    : (lang === "en"
-                      ? `Showing your ${trayIds.length} of ${platformTasks.length} cards`
-                      : `目前只擺你常用的 ${trayIds.length} 張，這個通路共 ${platformTasks.length} 張`)}
+                    : (
+                      <span className="inline-flex items-center gap-1.5 tabular-nums" title={lang === "en" ? "Your saved cards / all cards in this channel" : "常用 / 這個通路全部"}>
+                        <TaskCardsIcon size={12} /> {trayIds.length} / {platformTasks.length}
+                      </span>
+                    )}
                 </span>
                 <button
                   onClick={() => setShowAllTasks((v) => !v)}
@@ -2791,7 +2767,7 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                         style={base}
                         onClick={() => openChipEditor(c)}
                       >
-                        {c.label}{missing ? " ＋" : " ✎"}
+                        {c.label} {missing ? <AddIcon size={10} /> : <EditIcon size={10} />}
                       </button>
                     );
                   };

@@ -24,11 +24,10 @@ import React from "react";
 import { useNavigate } from "react-router-dom";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
-  faFacebookF, faInstagram, faTiktok,
+  faFacebook, faInstagram, faTiktok,
 } from "@fortawesome/free-brands-svg-icons";
 import {
-  faEnvelope, faGlobe, faComments, faBell, faFolderOpen, faLayerGroup,
-  faCheck, faWandMagicSparkles, faTriangleExclamation, faCircleCheck, faArrowDown,
+  faEnvelope, faGlobe, faComments, faBell, faFolderOpen, faLayerGroup, faCheck, faWandMagicSparkles, faTriangleExclamation, faCircleCheck, faArrowDown,
 } from "@fortawesome/free-solid-svg-icons";
 import { trpc } from "../../../lib/trpc";
 import { useLang } from "../../../lib/i18n";
@@ -37,7 +36,7 @@ import { aggregate, roas, setMockBrandSeed } from "../../performance/components/
 
 // 2026-09-29（CJ）：內容通路只剩 FB／IG／TikTok／電子報／官網，LinkedIn／YouTube／X／新聞稿拿掉。
 const TOUCHPOINT_ICON: Record<string, any> = {
-  facebook: faFacebookF, instagram: faInstagram, tiktok: faTiktok,
+  facebook: faFacebook, instagram: faInstagram, tiktok: faTiktok,
   email: faEnvelope, website: faGlobe, "brand-agent": faComments,
 };
 const TOUCHPOINT_ROUTE: Record<string, string> = {

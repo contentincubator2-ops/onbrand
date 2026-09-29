@@ -58,6 +58,7 @@ import {
 import StrategyDirectorChat from "./StrategyDirectorChat";
 import { DirectorRoster, DirectorProfile } from "./StrategyDirectorPicker";
 import StrategyHistoryModal from "./StrategyHistoryModal";
+import { CloseIcon } from "../../../platform/components/icons";
 
 /** 三個檢視共用的高度——切換檢視時面板不會變大變小。 */
 const PANEL_HEIGHT = 440;
@@ -293,7 +294,7 @@ export default function StrategyDirectorDrawer({ brandId }: { brandId: number | 
                   aria-label={en ? "Close" : "關閉"}
                   style={{ fontSize: 15, border: "none", background: "transparent", color: "#a3a3a3", cursor: "pointer", lineHeight: 1, padding: 2 }}
                 >
-                  ✕
+                  <CloseIcon size={14} />
                 </button>
               </div>
             </div>

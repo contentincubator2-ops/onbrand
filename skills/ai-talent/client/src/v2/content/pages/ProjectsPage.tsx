@@ -21,7 +21,7 @@ import { trpc } from "../../../lib/trpc";
 import { useLang } from "../../../lib/i18n";
 import type { ShellOutletCtx } from "../../app/shell/ShellLayout";
 import { Skeleton } from "@heroui/react";
-import { Search, Plus, Folder, Clock, Trash2, Copy, Info, Pencil } from "lucide-react";
+import { AddIcon, CopyIcon, DeleteIcon, EditIcon, FolderIcon, InfoIcon, SearchIcon, WaitingIcon } from "../../platform/components/icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faFacebook, faInstagram, faYoutube, faTiktok, faLinkedin, faThreads } from "@fortawesome/free-brands-svg-icons";
 import { faGlobe, faNewspaper, faEnvelope, faPenNib } from "@fortawesome/free-solid-svg-icons";
@@ -267,7 +267,7 @@ export default function ProjectsPage() {
           {/* Single search bar */}
           <div className="w-full" style={{ maxWidth: 720 }}>
             <div className="flex items-center gap-3 px-5 bg-white rounded-[20px] border border-default-100 shadow-md" style={{ height: 56 }}>
-              <Search size={18} className="text-default-400 shrink-0" />
+              <SearchIcon size={18} className="text-default-400 shrink-0" />
               <input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
@@ -403,7 +403,7 @@ export default function ProjectsPage() {
       <div className="max-w-[1100px] mx-auto px-6 pb-24">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
-            <Clock size={14} className="text-default-500" />
+            <WaitingIcon size={14} className="text-default-500" />
             <h2 className="text-sm font-semibold text-default-700">
               {activeBrandId === "all"
                 ? (lang === "en" ? "Recent" : "最近活動")
@@ -612,7 +612,7 @@ function ProjectCard({ mission, onClick, lang }: { mission: MissionRow; onClick:
               title={lang === "en" ? "Rename" : "重新命名"}
               aria-label={lang === "en" ? "Rename" : "重新命名"}
             >
-              <Pencil size={11} />
+              <EditIcon size={11} />
             </button>
           </div>
         )}
@@ -638,13 +638,13 @@ function ProjectCard({ mission, onClick, lang }: { mission: MissionRow; onClick:
             className="absolute top-9 right-2 z-50 bg-white rounded-lg border border-default-200 shadow-lg py-1 w-36"
           >
             <button onClick={(e) => { e.stopPropagation(); setMenuOpen(false); onClick(); }} className="w-full px-3 py-1.5 text-xs text-left hover:bg-default-50 flex items-center gap-2">
-              <Info size={11} /> {lang === "en" ? "View details" : "查看詳細"}
+              <InfoIcon size={11} /> {lang === "en" ? "View details" : "查看詳細"}
             </button>
             <button
               onClick={(e) => { e.stopPropagation(); setMenuOpen(false); startEditing(); }}
               className="w-full px-3 py-1.5 text-xs text-left hover:bg-default-50 flex items-center gap-2"
             >
-              <Pencil size={11} /> {lang === "en" ? "Rename" : "重新命名"}
+              <EditIcon size={11} /> {lang === "en" ? "Rename" : "重新命名"}
             </button>
             <button
               onClick={(e) => {
@@ -654,7 +654,7 @@ function ProjectCard({ mission, onClick, lang }: { mission: MissionRow; onClick:
               disabled={duplicateMut?.isPending}
               className="w-full px-3 py-1.5 text-xs text-left hover:bg-default-50 flex items-center gap-2 text-default-600 disabled:opacity-50"
             >
-              <Copy size={11} /> {lang === "en" ? "Duplicate" : "建立複本"}
+              <CopyIcon size={11} /> {lang === "en" ? "Duplicate" : "建立複本"}
             </button>
             <div className="border-t border-default-100 my-1" />
             <button
@@ -671,7 +671,7 @@ function ProjectCard({ mission, onClick, lang }: { mission: MissionRow; onClick:
               disabled={deleteMut?.isPending}
               className="w-full px-3 py-1.5 text-xs text-left hover:bg-danger-50 flex items-center gap-2 text-danger disabled:opacity-50"
             >
-              <Trash2 size={11} /> {lang === "en" ? "Move to trash" : "移到垃圾桶"}
+              <DeleteIcon size={11} /> {lang === "en" ? "Move to trash" : "移到垃圾桶"}
             </button>
           </div>
         </>
@@ -684,7 +684,7 @@ function ProjectCard({ mission, onClick, lang }: { mission: MissionRow; onClick:
 function EmptyState({ search, onClear, onCreate, lang }: { search: string; onClear: () => void; onCreate: () => void; lang: "zh-TW" | "en" }) {
   return (
     <div className="flex flex-col items-center justify-center py-20 text-center">
-      <Folder size={56} className="text-default-300 mb-4" strokeWidth={1.2} />
+      <FolderIcon size={56} className="text-default-300 mb-4" strokeWidth={1.2} />
       {search ? (
         <>
           <p className="text-default-700 font-medium mb-1">
@@ -714,7 +714,7 @@ function EmptyState({ search, onClear, onCreate, lang }: { search: string; onCle
             className="flex items-center gap-2 px-4 py-2 rounded-full text-white text-sm font-medium"
             style={{ background: "#171717" }}
           >
-            <Plus size={14} /> {lang === "en" ? "New project" : "新任務"}
+            <AddIcon size={14} /> {lang === "en" ? "New project" : "新任務"}
           </button>
         </>
       )}

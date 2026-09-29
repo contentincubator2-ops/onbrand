@@ -14,6 +14,7 @@ import { showToastGlobal } from "../../../../components/ui/Toast";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faGoogleDrive, faMicrosoft } from "@fortawesome/free-brands-svg-icons";
 import { faFolder, faFileVideo, faFileAudio, faChevronLeft, faPlus, faSpinner, faLink } from "@fortawesome/free-solid-svg-icons";
+import { CloseIcon } from "../../../platform/components/icons";
 
 type Provider = "google_drive" | "onedrive";
 export type CloudFileSource = { provider: Provider; fileId: string; name: string };
@@ -64,7 +65,7 @@ function ProviderPane({ brandId, provider, onAdd, added }: {
     try {
       const ok = await openConnectPopup(provider, brandId);
       if (ok) {
-        showToastGlobal(en ? `✓ ${PROVIDER_LABEL[provider]} connected` : `✓ 已連接 ${PROVIDER_LABEL[provider]}`, "success");
+        showToastGlobal(en ? `${PROVIDER_LABEL[provider]} connected` : `已連接 ${PROVIDER_LABEL[provider]}`, "success");
         utils.cloudDrive?.status?.invalidate?.();
       } else {
         showToastGlobal(en ? "Connection cancelled" : "已取消連接");
@@ -200,7 +201,7 @@ export default function CloudFilePicker({ brandId, sources, onAdd, onRemove }: {
             <div key={`${s.provider}:${s.fileId}`} className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-default-50 text-xs">
               <FontAwesomeIcon icon={PROVIDER_ICON[s.provider]} style={{ color: PROVIDER_TONE[s.provider], fontSize: 12 }} />
               <span className="flex-1 min-w-0 truncate text-default-700">{s.name}</span>
-              <button onClick={() => onRemove(`${s.provider}:${s.fileId}`)} className="text-default-300 hover:text-danger-500 text-[12px]">✕</button>
+              <button onClick={() => onRemove(`${s.provider}:${s.fileId}`)} className="text-default-300 hover:text-danger-500 text-[12px]"><CloseIcon size={11} /></button>
             </div>
           ))}
         </div>

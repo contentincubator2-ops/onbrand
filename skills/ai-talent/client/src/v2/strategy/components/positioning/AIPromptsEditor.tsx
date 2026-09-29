@@ -20,9 +20,13 @@ import { trpc } from "../../../../lib/trpc";
 import { useLang } from "../../../../lib/i18n";
 import { Card, CardBody, Textarea, Button } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faFacebook, faInstagram, faTiktok, faThreads } from "@fortawesome/free-brands-svg-icons";
-import { faRobot, faEnvelope, faCheck } from "@fortawesome/free-solid-svg-icons";
-import { Sparkles } from "lucide-react";
+import {
+  faFacebook, faInstagram, faTiktok, faThreads,
+} from "@fortawesome/free-brands-svg-icons";
+import {
+  faUserTie, faEnvelope, faCheck,
+} from "@fortawesome/free-solid-svg-icons";
+import { GenerateIcon, LockIcon, UnlockIcon } from "../../../platform/components/icons";
 
 // 2026-09-29（CJ：內容通路只剩 FB／IG／TikTok／電子報／官網）：YouTube／LinkedIn／
 // Press 分頁拿掉；已存的 _aiPrompts 原樣保留（drafts 整包回存，不刪資料）。
@@ -119,7 +123,7 @@ export default function AIPromptsEditor({ brandId }: { brandId: number | null })
         <div>
           <div className="flex items-center gap-2.5 mb-1.5">
             <div className="w-9 h-9 rounded-full flex items-center justify-center" style={{ background: "#7C3AED" }}>
-              <FontAwesomeIcon icon={faRobot} style={{ color: "#fff", fontSize: 14 }} />
+              <FontAwesomeIcon icon={faUserTie} style={{ color: "#fff", fontSize: 14 }} />
             </div>
             <h1 className="text-2xl font-semibold text-default-900">{en ? "AI prompt library" : "AI 指令庫"}</h1>
           </div>
@@ -141,7 +145,7 @@ export default function AIPromptsEditor({ brandId }: { brandId: number | null })
           className="w-full flex items-center justify-between px-4 py-3 text-left"
         >
           <div className="flex items-center gap-2">
-            <span className="text-base">{voiceLock ? "🔒" : "🔓"}</span>
+            <span className="text-base">{voiceLock ? <LockIcon size={14} /> : <UnlockIcon size={14} />}</span>
             <span className="text-sm font-semibold text-default-900">
               {en ? "Existing voice lock" : "既有語調鎖定"}
             </span>
@@ -216,7 +220,7 @@ export default function AIPromptsEditor({ brandId }: { brandId: number | null })
                 className="text-xs font-semibold px-4 py-1.5 rounded-full text-white transition"
                 style={{ background: extractVoiceLockMut?.isPending ? "#A78BFA" : "#7C3AED" }}
               >
-                {extractVoiceLockMut?.isPending ? (en ? "Analyzing…" : "分析中…") : (en ? "🔒 Analyze & lock" : "🔒 分析並鎖定")}
+                {extractVoiceLockMut?.isPending ? (en ? "Analyzing…" : "分析中…") : <><LockIcon size={11} /> {en ? "Analyze & lock" : "分析並鎖定"}</>}
               </button>
             </div>
           </div>
@@ -273,7 +277,7 @@ export default function AIPromptsEditor({ brandId }: { brandId: number | null })
               variant="flat"
               onPress={() => handleAIFor(active.id)}
               isLoading={filling === active.id}
-              startContent={filling !== active.id && <Sparkles size={12} />}
+              startContent={filling !== active.id && <GenerateIcon size={12} />}
             >
               {filling === active.id
                 ? (en ? "Generating…" : "產生中…")
