@@ -430,6 +430,8 @@ export interface TaskEmbed {
   weekStart?: string;
   /** 這一格排在哪天——成品頁「排程到日曆」預填這天。 */
   slotDate?: string;
+  /** 靈感舞台：主體是某個產品／活動時，任務視窗直接選好它，不必再選一次。 */
+  entity?: { kind: "product" | "event"; id: number };
   onClose: () => void;
 }
 
@@ -1286,6 +1288,7 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
     // 從活動企劃過來時，活動就是這一篇的脈絡——優先於全域 scope。
     const ge = campaignRef.current?.eventId ?? ctx?.scope?.eventId ?? null;
     setModalEntity(
+      embed?.entity ? { kind: embed.entity.kind, id: embed.entity.id } :
       ge ? { kind: "event", id: ge } :
       gp ? { kind: "product", id: gp } :
       { kind: "brand", id: null },

@@ -1,0 +1,467 @@
+/**
+ * InspirationPage — 「靈感舞台」：主體（品牌／產品／活動）固定，請幾位 agent 各用自己的思考方式
+ * 想切角。用戶挑一個採用 → 排進本週企劃 → 任務視窗直接疊上來寫全文、改稿、生圖。取代七日發布台的入口。
+ *
+ * 2026-09-29（CJ「七日發布台改成靈感舞台」「讓用戶選擇要哪些 agent 幫忙想」→ 定案：預設陣容＋事後調整）。
+ *   · 陣容不是必經步驟：預設五位直接按「開始想」；想控制的人點頭像換人。
+ *   · 選擇放在看完結果之後：每張切角卡有「請他再想 3 個」「換掉他」。
+ *   · 切角卡只放三樣：切角名稱、開場第一句、為什麼這樣切。採用了才寫全文，沒選的不花錢。
+ * 思考框架與偏好紀錄在 server/content/core/inspirationStage.ts。
+ */
+import React from "react";
+import { useNavigate, useOutletContext } from "react-router-dom";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faArrowsRotate, faChevronDown, faXmark, faPlus, faCheck, faEnvelope, faGlobe } from "@fortawesome/free-solid-svg-icons";
+import { faFacebookF, faInstagram, faThreads, faLine, faTiktok } from "@fortawesome/free-brands-svg-icons";
+import { trpc } from "../../../lib/trpc";
+import { useLang } from "../../../lib/i18n";
+import { showToastGlobal } from "../../../components/ui/Toast";
+import { channelRoute } from "../lib/channelMeta";
+import { PlatformTaskModal, type TaskEmbed } from "./PlatformTaskPage";
+
+const INK = "#171717", META = "#6B6B6B", LINE = "#EAEAEA", SOFT = "#F6F6F5";
+
+const PLATFORM_ICON: Record<string, any> = {
+  facebook: faFacebookF, instagram: faInstagram, threads: faThreads, line: faLine, tiktok: faTiktok,
+  email: faEnvelope, website: faGlobe,
+};
+
+// ── 日期（台北）──
+const ymdTpe = (d: Date) => d.toLocaleDateString("sv-SE", { timeZone: "Asia/Taipei" });
+function addDays(ymd: string, n: number) { const d = new Date(`${ymd}T00:00:00Z`); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); }
+function mondayOf(ymd: string) { const dow = new Date(`${ymd}T00:00:00Z`).getUTCDay(); return addDays(ymd, dow === 0 ? -6 : 1 - dow); }
+const WD = ["日", "一", "二", "三", "四", "五", "六"];
+const dayLabel = (ymd: string, en: boolean) => {
+  const d = new Date(`${ymd}T00:00:00Z`);
+  const [, m, dd] = ymd.split("-");
+  return en ? d.toLocaleDateString("en-US", { weekday: "short", month: "numeric", day: "numeric", timeZone: "UTC" }) : `週${WD[d.getUTCDay()]} ${Number(m)}/${Number(dd)}`;
+};
+
+type ThinkerKey = string;
+interface ThinkerCard { key: ThinkerKey; agentId: number; name: string; title: string; avatarUrl: string; school: string; schoolEn: string; pitch: string; pitchEn: string }
+interface AngleView { id: string; thinker: ThinkerKey; answer?: string; title: string; hook: string; why: string; platform: string; format: string; adopted?: { date: string } }
+type Subject = { kind: "brand" | "product" | "event"; id: number | null };
+
+let seq = 0;
+const newId = () => `a${Date.now().toString(36)}${(seq++).toString(36)}`;
+
+function Avatar({ t, size = 32 }: { t?: ThinkerCard; size?: number }) {
+  const [broken, setBroken] = React.useState(false);
+  if (t?.avatarUrl && !broken) {
+    return <img src={t.avatarUrl} alt="" onError={() => setBroken(true)} className="shrink-0 rounded-full object-cover"
+      style={{ width: size, height: size, border: `1px solid ${LINE}`, background: SOFT }} />;
+  }
+  return (
+    <span aria-hidden="true" className="flex shrink-0 items-center justify-center rounded-full font-bold"
+      style={{ width: size, height: size, fontSize: size * 0.4, background: SOFT, border: `1px solid ${LINE}`, color: "#525252" }}>
+      {(t?.name ?? "?").slice(0, 1)}
+    </span>
+  );
+}
+
+export default function InspirationPage() {
+  const { lang } = useLang();
+  const en = lang === "en";
+  const navigate = useNavigate();
+  const T = trpc as any;
+  const ctx = useOutletContext<{ brandId: number | null; brands: any[] } | undefined>();
+  const brandId = ctx?.brandId ?? null;
+
+  const rosterQ = T.inspiration?.roster?.useQuery?.({ brandId: brandId ?? 0 }, { enabled: !!brandId, refetchOnWindowFocus: false }) ?? { data: null };
+  const productsQ = T.product?.list?.useQuery?.({ brandId: brandId ?? undefined }, { enabled: !!brandId, refetchOnWindowFocus: false }) ?? { data: [] };
+  const eventsQ = T.event?.list?.useQuery?.({ brandId: brandId ?? undefined }, { enabled: !!brandId, refetchOnWindowFocus: false }) ?? { data: [] };
+  const thinkers: ThinkerCard[] = rosterQ.data?.thinkers ?? [];
+  const platforms: Array<{ id: string; label: string }> = rosterQ.data?.platforms ?? [];
+  const products: any[] = (productsQ.data as any[]) ?? [];
+  const events: any[] = (eventsQ.data as any[]) ?? [];
+  const byKey = (k: ThinkerKey) => thinkers.find((t) => t.key === k);
+
+  const [subject, setSubject] = React.useState<Subject>({ kind: "brand", id: null });
+  const [occasion, setOccasion] = React.useState("");
+  const [lineup, setLineup] = React.useState<ThinkerKey[]>([]);
+  const [angles, setAngles] = React.useState<AngleView[]>([]);
+  /** 正在想的 thinker（整輪時是整個陣容；「請他再想」時只有他）。 */
+  const [thinking, setThinking] = React.useState<ThinkerKey[]>([]);
+  /** 整輪重想時，舊的（沒採用的）切角先收起來，每位都顯示「在想」。 */
+  const [replacing, setReplacing] = React.useState(false);
+  const [swapFor, setSwapFor] = React.useState<ThinkerKey | "add" | null>(null);
+  const [adoptFor, setAdoptFor] = React.useState<AngleView | null>(null);
+  const [writing, setWriting] = React.useState<Omit<TaskEmbed, "onClose"> | null>(null);
+
+  // 換品牌：陣容回到那個品牌存的、結果清空。
+  React.useEffect(() => {
+    setAngles([]); setSubject({ kind: "brand", id: null }); setOccasion("");
+  }, [brandId]);
+  React.useEffect(() => {
+    if (rosterQ.data?.lineup) setLineup(rosterQ.data.lineup);
+  }, [rosterQ.data]);
+
+  const ideate = T.inspiration?.ideate?.useMutation?.();
+  const saveLineup = T.inspiration?.setLineup?.useMutation?.();
+  const adopt = T.inspiration?.adopt?.useMutation?.();
+
+  const subjectName = subject.kind === "product" ? products.find((p) => p.id === subject.id)?.name
+    : subject.kind === "event" ? events.find((e) => e.id === subject.id)?.name : null;
+
+  const run = async (opts: { keys: ThinkerKey[]; count: 1 | 3; mode: "replace" | "append"; avoid: string[] }) => {
+    if (!brandId || !ideate || !opts.keys.length) return;
+    setThinking(opts.keys);
+    setReplacing(opts.mode === "replace");
+    try {
+      const r = await ideate.mutateAsync({
+        brandId, subject, occasion: occasion.trim() || undefined,
+        thinkers: opts.keys, count: opts.count, avoid: opts.avoid.slice(0, 40),
+      });
+      const fresh: AngleView[] = (r?.angles ?? []).map((a: any) => ({ ...a, id: newId() }));
+      setAngles((cur) => {
+        if (opts.mode === "replace") return [...cur.filter((a) => a.adopted), ...fresh];
+        // 「請他再想」：新想的接在他原本那張後面，不要跑到最底下。
+        const lastIdx = cur.map((a) => a.thinker).lastIndexOf(opts.keys[0]!);
+        if (lastIdx < 0) return [...cur, ...fresh];
+        return [...cur.slice(0, lastIdx + 1), ...fresh, ...cur.slice(lastIdx + 1)];
+      });
+      if (r?.failed?.length) {
+        const names = r.failed.map((k: string) => byKey(k)?.name ?? k).join("、");
+        showToastGlobal(en ? `${names} couldn't come up with anything this time.` : `${names} 這次沒想出來，可以再試一次。`);
+      }
+    } catch (e: any) {
+      showToastGlobal(e?.message || (en ? "Something went wrong. Try again." : "剛剛沒想好，再試一次。"));
+    } finally {
+      setThinking([]);
+      setReplacing(false);
+    }
+  };
+
+  const startRound = () => run({ keys: lineup, count: 1, mode: "replace", avoid: [] });
+  const anotherRound = () => run({ keys: lineup, count: 1, mode: "replace", avoid: angles.map((a) => a.title) });
+  const moreFrom = (k: ThinkerKey) => run({ keys: [k], count: 3, mode: "append", avoid: angles.map((a) => a.title) });
+
+  const persistLineup = (next: ThinkerKey[], dropped?: ThinkerKey) => {
+    setLineup(next);
+    if (brandId) saveLineup?.mutate?.({ brandId, lineup: next, dropped });
+  };
+  const swap = (from: ThinkerKey | "add", to: ThinkerKey) => {
+    const next = from === "add" ? [...lineup, to] : lineup.map((k) => (k === from ? to : k));
+    persistLineup(next, from === "add" ? undefined : from);
+    setSwapFor(null);
+  };
+  const removeFromLineup = (k: ThinkerKey) => {
+    if (lineup.length <= 1) return;
+    persistLineup(lineup.filter((x) => x !== k), k);
+  };
+
+  const confirmAdopt = async (a: AngleView, date: string, platform: string) => {
+    if (!brandId || !adopt) return;
+    try {
+      const r = await adopt.mutateAsync({
+        brandId, thinker: a.thinker, title: a.title, hook: a.hook, why: a.why, answer: a.answer ?? "", platform, format: a.format, date,
+      });
+      setAngles((cur) => cur.map((x) => (x.id === a.id ? { ...x, platform, adopted: { date } } : x)));
+      setAdoptFor(null);
+      setWriting({
+        route: channelRoute(platform), taskId: r.taskId, slotId: r.slotId, topic: r.topic,
+        weekStart: mondayOf(date), slotDate: date,
+        entity: subject.kind !== "brand" && subject.id ? { kind: subject.kind, id: subject.id } : undefined,
+      });
+    } catch (e: any) {
+      showToastGlobal(e?.message || (en ? "Couldn't add it to this week's plan." : "沒放進本週企劃，再試一次。"));
+    }
+  };
+
+  if (!brandId) {
+    return <div className="p-10 text-[14px] text-neutral-500">{en ? "Pick a brand first." : "先選一個品牌。"}</div>;
+  }
+
+  const busy = thinking.length > 0;
+  const bench = thinkers.filter((t) => !lineup.includes(t.key));
+  const shown = replacing ? angles.filter((a) => a.adopted) : angles;
+
+  const subjectBtn = (kind: Subject["kind"], label: string) => (
+    <button type="button" onClick={() => setSubject({ kind, id: kind === "brand" ? null : (kind === "product" ? products[0]?.id : events[0]?.id) ?? null })}
+      disabled={kind === "product" ? !products.length : kind === "event" ? !events.length : false}
+      className="rounded-full border px-3.5 py-1.5 text-[13px] transition disabled:opacity-40"
+      style={subject.kind === kind ? { borderColor: INK, background: INK, color: "#FFFFFF" } : { borderColor: LINE, background: "#FFFFFF", color: "#404040" }}>
+      {label}
+    </button>
+  );
+
+  return (
+    <div className="flex min-h-full flex-col bg-white">
+      <header className="flex h-16 shrink-0 items-center gap-3 px-7" style={{ borderBottom: `1px solid ${LINE}` }}>
+        <h1 className="m-0 text-[17px] font-bold" style={{ color: INK }}>{en ? "Idea stage" : "靈感舞台"}</h1>
+        <p className="m-0 text-[13px]" style={{ color: META }}>{en ? "One subject, several minds. Pick the angle you like." : "同一個主體，請幾位 agent 各想一個切角，挑一個開始。"}</p>
+      </header>
+
+      <div className="mx-auto flex w-full max-w-[1120px] flex-col gap-6 px-4 py-6 md:px-7">
+        {/* ── 主體＋由頭 ── */}
+        <section aria-label={en ? "Subject" : "主體"} className="flex flex-col gap-3 rounded-2xl border p-5" style={{ borderColor: LINE }}>
+          <p className="m-0 text-[13px] font-semibold" style={{ color: INK }}>{en ? "What are we talking about?" : "這次要講什麼？"}</p>
+          <div className="flex flex-wrap items-center gap-2">
+            {subjectBtn("brand", en ? "The brand" : "品牌本身")}
+            {subjectBtn("product", en ? "A product" : "某個產品")}
+            {subjectBtn("event", en ? "A campaign" : "某個活動")}
+            {subject.kind !== "brand" && (
+              <label className="relative">
+                <span className="sr-only">{subject.kind === "product" ? (en ? "Product" : "產品") : (en ? "Campaign" : "活動")}</span>
+                <select value={subject.id ?? ""} onChange={(e) => setSubject({ kind: subject.kind, id: Number(e.target.value) || null })}
+                  className="appearance-none rounded-full border py-1.5 pl-3.5 pr-8 text-[13px] outline-none" style={{ borderColor: LINE, color: INK }}>
+                  {(subject.kind === "product" ? products : events).map((x: any) => <option key={x.id} value={x.id}>{x.name}</option>)}
+                </select>
+                <FontAwesomeIcon icon={faChevronDown} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[10px]" style={{ color: META }} />
+              </label>
+            )}
+          </div>
+          <label className="flex flex-col gap-1.5">
+            <span className="text-[12px]" style={{ color: META }}>{en ? "Anything happening this week? (optional)" : "這週有什麼由頭？（選填）"}</span>
+            <input value={occasion} onChange={(e) => setOccasion(e.target.value.slice(0, 120))}
+              placeholder={en ? "e.g. Mother's Day, new stock arrived, rainy week" : "例如：母親節、新品到貨、這週一直下雨"}
+              className="rounded-xl border px-3.5 py-2.5 text-[14px] outline-none focus:border-neutral-900" style={{ borderColor: LINE }} />
+          </label>
+        </section>
+
+        {/* ── 陣容 ── */}
+        <section aria-label={en ? "Who's thinking" : "誰來想"} className="flex flex-col gap-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="m-0 text-[13px]" style={{ color: META }}>
+              {en ? "Thinking for you — tap a face to swap" : "這幾位會幫你想，點頭像可以換人"}
+            </p>
+            <button type="button" onClick={startRound} disabled={busy || !lineup.length || (subject.kind !== "brand" && !subject.id)}
+              className="rounded-full px-5 py-2.5 text-[13.5px] font-semibold text-white disabled:opacity-40" style={{ background: INK }}>
+              {busy ? (en ? "Thinking…" : "正在想…") : angles.length ? (en ? "Start over" : "重新想") : (en ? "Start thinking" : "開始想")}
+            </button>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {lineup.map((k) => {
+              const t = byKey(k);
+              return (
+                <div key={k} className="relative">
+                  <button type="button" onClick={() => setSwapFor(swapFor === k ? null : k)} disabled={busy}
+                    className="flex items-center gap-2.5 rounded-full border py-1.5 pl-1.5 pr-3.5 text-left transition hover:border-neutral-900 disabled:opacity-60"
+                    style={{ borderColor: swapFor === k ? INK : LINE, background: "#FFFFFF" }}
+                    aria-expanded={swapFor === k} aria-label={en ? `Swap ${t?.name ?? k}` : `換掉 ${t?.name ?? k}`}>
+                    <Avatar t={t} size={30} />
+                    <span className="flex flex-col">
+                      <span className="text-[13px] font-semibold leading-tight" style={{ color: INK }}>{t?.name ?? k}</span>
+                      <span className="text-[11.5px] leading-tight" style={{ color: META }}>{en ? t?.schoolEn : t?.school}</span>
+                    </span>
+                  </button>
+                  {swapFor === k && (
+                    <SwapMenu en={en} bench={bench} onPick={(to) => swap(k, to)} onClose={() => setSwapFor(null)}
+                      onRemove={lineup.length > 1 ? () => { removeFromLineup(k); setSwapFor(null); } : undefined} />
+                  )}
+                </div>
+              );
+            })}
+            {lineup.length < 5 && bench.length > 0 && (
+              <div className="relative">
+                <button type="button" onClick={() => setSwapFor(swapFor === "add" ? null : "add")} disabled={busy}
+                  className="flex h-[44px] items-center gap-2 rounded-full border border-dashed px-4 text-[13px]" style={{ borderColor: LINE, color: META }}>
+                  <FontAwesomeIcon icon={faPlus} /> {en ? "Add" : "加人"}
+                </button>
+                {swapFor === "add" && <SwapMenu en={en} bench={bench} onPick={(to) => swap("add", to)} onClose={() => setSwapFor(null)} />}
+              </div>
+            )}
+          </div>
+        </section>
+
+        {/* ── 切角 ── */}
+        {(angles.length > 0 || busy) && (
+          <section aria-label={en ? "Angles" : "切角"} className="flex flex-col gap-4">
+            <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))" }}>
+              {shown.map((a) => (
+                <AngleCard key={a.id} a={a} t={byKey(a.thinker)} en={en} busy={busy}
+                  inLineup={lineup.includes(a.thinker)}
+                  platformLabel={platforms.find((p) => p.id === a.platform)?.label ?? a.platform}
+                  onAdopt={() => setAdoptFor(a)}
+                  onMore={() => moreFrom(a.thinker)}
+                  onSwap={() => { setSwapFor(a.thinker); window.scrollTo({ top: 0, behavior: "smooth" }); }}
+                  onOpenPlanner={() => navigate(`/planner?w=${mondayOf(a.adopted!.date)}`)} />
+              ))}
+              {thinking.map((k) => (
+                <div key={`p-${k}`} className="flex flex-col gap-3 rounded-2xl border p-5" style={{ borderColor: LINE, background: "#FCFCFB" }} aria-live="polite">
+                  <div className="flex items-center gap-2.5">
+                    <Avatar t={byKey(k)} />
+                    <span className="text-[13px]" style={{ color: META }}>{en ? `${byKey(k)?.name ?? k} is thinking…` : `${byKey(k)?.name ?? k} 在想…`}</span>
+                  </div>
+                  <div className="h-4 w-3/4 animate-pulse rounded" style={{ background: SOFT }} />
+                  <div className="h-3 w-full animate-pulse rounded" style={{ background: SOFT }} />
+                  <div className="h-3 w-5/6 animate-pulse rounded" style={{ background: SOFT }} />
+                </div>
+              ))}
+            </div>
+            {!busy && angles.some((a) => !a.adopted) && (
+              <div className="flex justify-center">
+                <button type="button" onClick={anotherRound}
+                  className="flex items-center gap-2 rounded-full border px-5 py-2.5 text-[13.5px] transition hover:border-neutral-900" style={{ borderColor: LINE, color: INK }}>
+                  <FontAwesomeIcon icon={faArrowsRotate} /> {en ? "None of these — another round" : "都不對，再想一輪"}
+                </button>
+              </div>
+            )}
+          </section>
+        )}
+
+        {angles.length === 0 && !busy && (
+          <p className="m-0 py-10 text-center text-[14px]" style={{ color: META }}>
+            {en
+              ? `Press "Start thinking" and each of them will pitch one angle on ${subjectName ?? "your brand"}.`
+              : `按「開始想」，每位會針對${subjectName ? `「${subjectName}」` : "品牌"}各提一個切角。`}
+          </p>
+        )}
+      </div>
+
+      {adoptFor && (
+        <AdoptDialog en={en} a={adoptFor} platforms={platforms} busy={!!adopt?.isPending}
+          onCancel={() => setAdoptFor(null)} onConfirm={(date, platform) => confirmAdopt(adoptFor, date, platform)} />
+      )}
+
+      {writing && (
+        <PlatformTaskModal key={`${writing.taskId}-${writing.slotId}`} {...writing}
+          onClose={() => {
+            setWriting(null);
+            showToastGlobal(en ? "It's in this week's plan." : "已放進本週企劃。");
+          }} />
+      )}
+    </div>
+  );
+}
+
+function SwapMenu({ en, bench, onPick, onClose, onRemove }: {
+  en: boolean; bench: ThinkerCard[]; onPick: (k: ThinkerKey) => void; onClose: () => void; onRemove?: () => void;
+}) {
+  const ref = React.useRef<HTMLDivElement>(null);
+  React.useEffect(() => {
+    const onDoc = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) onClose(); };
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    document.addEventListener("mousedown", onDoc); document.addEventListener("keydown", onKey);
+    return () => { document.removeEventListener("mousedown", onDoc); document.removeEventListener("keydown", onKey); };
+  }, [onClose]);
+  return (
+    <div ref={ref} role="menu" className="absolute left-0 top-[calc(100%+6px)] z-30 w-[300px] rounded-2xl border bg-white p-2 shadow-lg" style={{ borderColor: LINE }}>
+      <p className="m-0 px-2 pb-1.5 pt-1 text-[12px]" style={{ color: META }}>{en ? "Swap in" : "換成"}</p>
+      {bench.length === 0 && <p className="m-0 px-2 py-2 text-[13px]" style={{ color: META }}>{en ? "Everyone's already on the team." : "大家都已經在陣容裡了。"}</p>}
+      {bench.map((t) => (
+        <button key={t.key} type="button" role="menuitem" onClick={() => onPick(t.key)}
+          className="flex w-full items-start gap-2.5 rounded-xl px-2 py-2 text-left hover:bg-neutral-50">
+          <Avatar t={t} size={30} />
+          <span className="flex min-w-0 flex-col">
+            <span className="text-[13px] font-semibold" style={{ color: INK }}>{t.name}・{en ? t.schoolEn : t.school}</span>
+            <span className="text-[12px] leading-snug" style={{ color: META }}>{en ? t.pitchEn : t.pitch}</span>
+          </span>
+        </button>
+      ))}
+      {onRemove && (
+        <button type="button" role="menuitem" onClick={onRemove}
+          className="mt-1 w-full rounded-xl px-2 py-2 text-left text-[13px] hover:bg-neutral-50" style={{ color: META, borderTop: `1px solid ${LINE}` }}>
+          {en ? "Just remove from the team" : "只拿掉，不換人"}
+        </button>
+      )}
+    </div>
+  );
+}
+
+function AngleCard({ a, t, en, busy, inLineup, platformLabel, onAdopt, onMore, onSwap, onOpenPlanner }: {
+  a: AngleView; t?: ThinkerCard; en: boolean; busy: boolean; inLineup: boolean; platformLabel: string;
+  onAdopt: () => void; onMore: () => void; onSwap: () => void; onOpenPlanner: () => void;
+}) {
+  return (
+    <article className="flex flex-col gap-3 rounded-2xl border p-5" style={{ borderColor: a.adopted ? INK : LINE, background: "#FFFFFF" }}>
+      <div className="flex items-center gap-2.5">
+        <Avatar t={t} />
+        <div className="min-w-0">
+          <p className="m-0 truncate text-[13px] font-semibold" style={{ color: INK }}>{t?.name ?? a.thinker}</p>
+          <p className="m-0 truncate text-[12px]" style={{ color: META }}>{en ? t?.schoolEn : t?.school}</p>
+        </div>
+        <span className="ml-auto flex shrink-0 items-center gap-1.5 text-[12px]" style={{ color: META }}>
+          {PLATFORM_ICON[a.platform] && <FontAwesomeIcon icon={PLATFORM_ICON[a.platform]} />}{platformLabel}・{a.format}
+        </span>
+      </div>
+      <h2 className="m-0 text-[16px] font-bold leading-snug" style={{ color: INK }}>{a.title}</h2>
+      <p className="m-0 rounded-xl px-3.5 py-2.5 text-[14px] leading-relaxed" style={{ background: SOFT, color: "#262626" }}>「{a.hook}」</p>
+      {a.why && <p className="m-0 text-[13px] leading-relaxed" style={{ color: META }}>{a.why}</p>}
+      <div className="mt-auto flex flex-wrap items-center gap-2 pt-1">
+        {a.adopted ? (
+          <>
+            <span className="flex items-center gap-1.5 text-[13px] font-semibold" style={{ color: INK }}>
+              <FontAwesomeIcon icon={faCheck} /> {en ? `In the plan · ${dayLabel(a.adopted.date, en)}` : `已排進 ${dayLabel(a.adopted.date, en)}`}
+            </span>
+            <button type="button" onClick={onOpenPlanner} className="ml-auto text-[13px] underline underline-offset-2" style={{ color: META }}>
+              {en ? "Open weekly plan" : "看本週企劃"}
+            </button>
+          </>
+        ) : (
+          <>
+            <button type="button" onClick={onAdopt} disabled={busy}
+              className="rounded-full px-4 py-2 text-[13px] font-semibold text-white disabled:opacity-40" style={{ background: INK }}>
+              {en ? "Use this" : "採用"}
+            </button>
+            <button type="button" onClick={onMore} disabled={busy}
+              className="rounded-full border px-3.5 py-2 text-[13px] transition hover:border-neutral-900 disabled:opacity-40" style={{ borderColor: LINE, color: INK }}>
+              {en ? "3 more like this" : "請他再想 3 個"}
+            </button>
+            {inLineup && (
+              <button type="button" onClick={onSwap} disabled={busy} aria-label={en ? "Swap this thinker" : "換掉他"}
+                className="ml-auto flex items-center gap-1.5 rounded-full px-2.5 py-2 text-[12.5px] disabled:opacity-40" style={{ color: META }}>
+                <FontAwesomeIcon icon={faXmark} /> {en ? "Swap" : "換掉他"}
+              </button>
+            )}
+          </>
+        )}
+      </div>
+    </article>
+  );
+}
+
+function AdoptDialog({ en, a, platforms, busy, onCancel, onConfirm }: {
+  en: boolean; a: AngleView; platforms: Array<{ id: string; label: string }>; busy: boolean;
+  onCancel: () => void; onConfirm: (date: string, platform: string) => void;
+}) {
+  const today = ymdTpe(new Date());
+  const days = Array.from({ length: 14 }, (_, i) => addDays(today, i));
+  const [date, setDate] = React.useState(addDays(today, 1));
+  const [platform, setPlatform] = React.useState(platforms.some((p) => p.id === a.platform) ? a.platform : platforms[0]?.id ?? "facebook");
+  React.useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onCancel(); };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onCancel]);
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4" onMouseDown={(e) => { if (e.target === e.currentTarget) onCancel(); }}>
+      <div role="dialog" aria-modal="true" aria-labelledby="adopt-title" className="w-full max-w-[440px] rounded-2xl bg-white p-6 shadow-xl">
+        <h2 id="adopt-title" className="m-0 text-[16px] font-bold" style={{ color: INK }}>{en ? "Put it in the weekly plan" : "放進本週企劃"}</h2>
+        <p className="m-0 mt-1.5 text-[13.5px] leading-relaxed" style={{ color: META }}>{a.title}</p>
+
+        <p className="m-0 mt-5 text-[12px] font-semibold" style={{ color: INK }}>{en ? "Which day?" : "哪一天發？"}</p>
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          {days.map((d) => (
+            <button key={d} type="button" onClick={() => setDate(d)}
+              className="rounded-full border px-3 py-1.5 text-[12.5px]"
+              style={date === d ? { borderColor: INK, background: INK, color: "#FFFFFF" } : { borderColor: LINE, color: "#404040" }}>
+              {d === today ? (en ? "Today" : "今天") : dayLabel(d, en)}
+            </button>
+          ))}
+        </div>
+
+        <p className="m-0 mt-5 text-[12px] font-semibold" style={{ color: INK }}>{en ? "Where?" : "發在哪？"}</p>
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          {platforms.map((p) => (
+            <button key={p.id} type="button" onClick={() => setPlatform(p.id)}
+              className="flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[12.5px]"
+              style={platform === p.id ? { borderColor: INK, background: INK, color: "#FFFFFF" } : { borderColor: LINE, color: "#404040" }}>
+              {PLATFORM_ICON[p.id] && <FontAwesomeIcon icon={PLATFORM_ICON[p.id]} />}{p.label}
+            </button>
+          ))}
+        </div>
+
+        <div className="mt-6 flex gap-2">
+          <button type="button" onClick={onCancel} className="flex-1 rounded-full border py-2.5 text-[13.5px]" style={{ borderColor: LINE, color: INK }}>
+            {en ? "Cancel" : "取消"}
+          </button>
+          <button type="button" disabled={busy} onClick={() => onConfirm(date, platform)}
+            className="flex-1 rounded-full py-2.5 text-[13.5px] font-semibold text-white disabled:opacity-40" style={{ background: INK }}>
+            {busy ? (en ? "Adding…" : "排進去…") : (en ? "Add & write it" : "排進去並開始寫")}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}

@@ -259,8 +259,10 @@ function navCatalog(lang: "zh-TW" | "en", allowedTaskRoutes?: Set<string> | null
       tooltip: en ? "Long-form articles, brand columns, case studies, product page copy" : "官網長文 / 品牌專欄 / 案例深度 / 產品頁文案" },
     { id: "case", kind: "tool", to: "/tasks/case", label: en ? "Cases" : "案例", icon: <FontAwesomeIcon icon={faBookBookmark} />, matchPrefix: "/tasks/case",
       tooltip: en ? "Case library, filed by standard" : "依標準建檔的案例庫" },
-    { id: "theater", kind: "tool", to: "/theater", label: en ? "7-Day Publisher" : "七日發布台", icon: <FontAwesomeIcon icon={faLayerGroup} />, matchPrefix: "/theater",
-      tooltip: en ? "Plan and publish a week of posts" : "一次排好七天的發文" },
+    // 2026-09-29 CJ：七日發布台改成靈感舞台（id 沿用 theater，存過的側欄設定不用搬）。
+    // 舊的 /theater 頁面還在，只是側欄不再指過去。
+    { id: "theater", kind: "tool", to: "/inspiration", label: en ? "Idea stage" : "靈感舞台", icon: <FontAwesomeIcon icon={faLayerGroup} />, matchPrefix: "/inspiration",
+      tooltip: en ? "Several agents pitch angles on one subject; pick one to write" : "同一個主體，請幾位 agent 各想切角，挑一個開始寫" },
   ];
   return all.filter((it) => {
     if (!it.to.startsWith("/tasks/")) return true;
@@ -2274,7 +2276,7 @@ class RouteErrorBoundary extends React.Component<
               </button>
               <button
                 style={{ padding: "6px 12px", background: "white", border: "1px solid #cbd5e1", borderRadius: 6, cursor: "pointer", fontSize: 13 }}
-                onClick={() => window.location.assign("/theater")}
+                onClick={() => window.location.assign("/planner")}
               >
                 回到首頁
               </button>
