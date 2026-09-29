@@ -25,6 +25,7 @@
  */
 import localPool from "../../localDb.js";
 import { buildTaskCatalogIndex, type CatalogTask } from "../../content/core/taskCatalogIndex.js";
+import { isHiddenContentPlatform } from "../../platform/core/planGate.js";
 
 // ── 語彙（與 client/src/v2/strategy/lib/campaignSchema.ts 同一份）───────────
 // server 不能 import client 的檔案，所以這裡自己宣告一份，由
@@ -172,7 +173,7 @@ export function isPartCard(taskId: string): boolean {
 export function candidateCards(channels: string[]): CatalogTask[] {
   const wanted = new Set(channels.map((c) => c.toLowerCase()));
   return buildTaskCatalogIndex().filter(
-    (t) => wanted.has(t.platform) && (t.tier === "30s" || t.tier === "60s") && !isPartCard(t.id),
+    (t) => wanted.has(t.platform) && !isHiddenContentPlatform(t.platform) && (t.tier === "30s" || t.tier === "60s") && !isPartCard(t.id),
   );
 }
 
@@ -334,8 +335,9 @@ async function eventFacts(eventId: number, userId: number): Promise<{
 }
 
 /** 可以排進企劃的通路——推斷結果只能落在這裡面。 */
+// 2026-09-29 CJ：內容通路只留 FB／IG／TikTok／電子報／官網（planGate.HIDDEN_CONTENT_PLATFORMS）。
 export const PLANNABLE_CHANNELS = [
-  "facebook", "instagram", "email", "pr", "website", "linkedin", "threads", "x", "youtube", "tiktok",
+  "facebook", "instagram", "email", "website", "tiktok",
 ] as const;
 
 export interface InferredSettings {

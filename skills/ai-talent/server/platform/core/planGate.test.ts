@@ -41,10 +41,10 @@ describe("通路選擇", () => {
 
   it("存過就用存的", () => {
     const sel = resolveChannels(
-      { __channels: { platforms: ["tiktok", "youtube"], swappedAt: "2026-09-01T00:00:00Z" } },
+      { __channels: { platforms: ["tiktok", "email"], swappedAt: "2026-09-01T00:00:00Z" } },
       Q({ platforms: 2 }),
     );
-    expect(sel.platforms).toEqual(["tiktok", "youtube"]);
+    expect(sel.platforms).toEqual(["tiktok", "email"]);
     expect(sel.swappedAt).toBe("2026-09-01T00:00:00Z");
   });
 
@@ -56,8 +56,24 @@ describe("通路選擇", () => {
     expect(sel.platforms).toEqual(["a", "b"]);
   });
 
-  it("無限方案拿得到全部", () => {
-    expect(resolveChannels(null, Q({ platforms: -1 })).platforms.length).toBeGreaterThanOrEqual(11);
+  it("無限方案拿得到全部（下架的通路除外）", () => {
+    const all = resolveChannels(null, Q({ platforms: -1 })).platforms;
+    expect(all).toEqual(expect.arrayContaining(["facebook", "instagram", "tiktok", "email", "website"]));
+    for (const p of ["linkedin", "youtube", "x", "pr"]) expect(all).not.toContain(p);
+  });
+
+  it("存過已下架的通路，讀出來就被濾掉", () => {
+    const sel = resolveChannels(
+      { __channels: { platforms: ["youtube", "facebook", "linkedin"], swappedAt: null } },
+      Q({ platforms: 2 }),
+    );
+    expect(sel.platforms).toEqual(["facebook"]);
+  });
+
+  it("任務目錄不列下架通路的卡（不論方案）", () => {
+    const tasks = [{ platform: "facebook" }, { platform: "linkedin" }, { platform: "youtube" }, { platform: "x" }, { platform: "pr" }, { platform: "website" }];
+    const out = filterTasksByPlan(tasks, Q({ platforms: -1 }), { platforms: [], swappedAt: null });
+    expect(out.map((t) => t.platform)).toEqual(["facebook", "website"]);
   });
 });
 

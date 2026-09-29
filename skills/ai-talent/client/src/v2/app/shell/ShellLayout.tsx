@@ -35,7 +35,7 @@ import { Brain as LucideBrain } from "lucide-react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faFolderOpen, faBrain, faWandMagicSparkles, faMicrophone, faBookBookmark, faBell, faPlus, faRightFromBracket, faLayerGroup, faGear, faXmark, faCheckDouble, faChevronRight, faCheck, faBoxOpen, faCalendarDays, faCircleInfo, faBriefcase, faShareNodes, faUsers, faLanguage, faPaintBrush, faFont, faMagnifyingGlass, faChevronDown, faEnvelope, faBullhorn, faGlobe, faChartLine, faDatabase, faFileLines, faRobot } from "@fortawesome/free-solid-svg-icons";
 import {
-  faFacebookF, faInstagram, faYoutube, faTiktok, faLinkedinIn, faXTwitter,
+  faFacebookF, faInstagram, faTiktok,
 } from "@fortawesome/free-brands-svg-icons";
 
 const ICON_W  = 70;   // icon bar — never changes
@@ -237,23 +237,17 @@ function buildNavItems(lang: "zh-TW" | "en", userEmail?: string | null, currentP
  */
 function navCatalog(lang: "zh-TW" | "en", allowedTaskRoutes?: Set<string> | null): NavItem[] {
   const en = lang === "en";
+  // 2026-09-29 CJ：內容通路只留 FB／IG／TikTok／電子報／官網。LinkedIn／YouTube／
+  // 新聞稿／X 拿掉（server planGate.HIDDEN_CONTENT_PLATFORMS 同一份決定）。
   const all: NavItem[] = [
     { id: "fb", kind: "channel", to: "/tasks/fb", label: "Facebook", icon: <FontAwesomeIcon icon={faFacebookF} />, matchPrefix: "/tasks/fb",
       tooltip: en ? "Facebook posts, ads, stories, live copy" : "Facebook 貼文 / 廣告 / 限時 / 直播文案" },
     { id: "ig", kind: "channel", to: "/tasks/ig", label: "Instagram", icon: <FontAwesomeIcon icon={faInstagram} />, matchPrefix: "/tasks/ig",
       tooltip: en ? "Instagram captions, Reels, carousel, Stories" : "IG 貼文 / Reels / 輪播 / 限時動態" },
-    { id: "li", kind: "channel", to: "/tasks/li", label: "LinkedIn", icon: <FontAwesomeIcon icon={faLinkedinIn} />, matchPrefix: "/tasks/li",
-      tooltip: en ? "LinkedIn posts, newsletters, thought leadership" : "LinkedIn 貼文 / 電子報 / 思想領袖文章" },
-    { id: "yt", kind: "channel", to: "/tasks/yt", label: "YouTube", icon: <FontAwesomeIcon icon={faYoutube} />, matchPrefix: "/tasks/yt",
-      tooltip: en ? "YouTube titles, descriptions, Shorts scripts" : "YouTube 標題 / SEO 說明 / Shorts 腳本" },
     { id: "tt", kind: "channel", to: "/tasks/tt", label: "TikTok", icon: <FontAwesomeIcon icon={faTiktok} />, matchPrefix: "/tasks/tt",
       tooltip: en ? "TikTok hooks, scripts, hashtags, bio" : "TikTok 開場鉤子 / 腳本 / 主題標籤" },
     { id: "email", kind: "channel", to: "/tasks/email", label: en ? "Email" : "電子報", icon: <FontAwesomeIcon icon={faEnvelope} />, matchPrefix: "/tasks/email",
       tooltip: en ? "Email newsletters, welcome series, promo emails" : "電子報 / 歡迎信 / 促銷郵件序列" },
-    { id: "pr", kind: "channel", to: "/tasks/pr", label: en ? "PR" : "新聞稿", icon: <FontAwesomeIcon icon={faBullhorn} />, matchPrefix: "/tasks/pr",
-      tooltip: en ? "Press releases, media pitch, CEO quotes, fact sheets" : "新聞稿 / 媒體提案 / CEO 聲明 / 資料頁" },
-    { id: "x", kind: "channel", to: "/tasks/x", label: "X", icon: <FontAwesomeIcon icon={faXTwitter} />, matchPrefix: "/tasks/x",
-      tooltip: en ? "Single posts and threads — 280 chars, hook in line one" : "單推與討論串 —— 280 字元，鉤子在第一行" },
     { id: "web", kind: "channel", to: "/tasks/web", label: en ? "Website" : "官網", icon: <FontAwesomeIcon icon={faGlobe} />, matchPrefix: "/tasks/web",
       tooltip: en ? "Long-form articles, brand columns, case studies, product page copy" : "官網長文 / 品牌專欄 / 案例深度 / 產品頁文案" },
     { id: "case", kind: "tool", to: "/tasks/case", label: en ? "Cases" : "案例", icon: <FontAwesomeIcon icon={faBookBookmark} />, matchPrefix: "/tasks/case",

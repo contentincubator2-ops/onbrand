@@ -19,6 +19,17 @@
 import { TRPCError } from "@trpc/server";
 import { PLANS, type PlanCode, type PlanQuota } from "./plans";
 
+/**
+ * 2026-09-29 CJ「內容任務卡只要留下 Facebook、Instagram、TikTok、電子報、官網
+ * 這五個類別」。這四個通路的卡片與程式碼都還在，只是不再列出、不能再被選為
+ * 啟用通路——任務目錄、任務托盤、通路選擇、側欄都從這裡讀。要開回來就從這裡拿掉。
+ */
+export const HIDDEN_CONTENT_PLATFORMS: ReadonlySet<string> = new Set(["linkedin", "youtube", "x", "pr"]);
+
+export function isHiddenContentPlatform(platform: string | null | undefined): boolean {
+  return !!platform && HIDDEN_CONTENT_PLATFORMS.has(platform);
+}
+
 /** 沒選過通路時的預設。FB / IG 是產品主場，排前面。 */
 const DEFAULT_PLATFORM_ORDER = [
   "facebook", "instagram", "youtube", "tiktok", "linkedin",
@@ -74,16 +85,17 @@ export function resolveChannels(
     : null) as Partial<ChannelSelection> | null;
 
   const stored = Array.isArray(raw?.platforms)
-    ? raw!.platforms!.filter((p): p is string => typeof p === "string")
+    ? raw!.platforms!.filter((p): p is string => typeof p === "string" && !isHiddenContentPlatform(p))
     : null;
+  const defaults = DEFAULT_PLATFORM_ORDER.filter((p) => !isHiddenContentPlatform(p));
 
   if (isUnlimited(quota.platforms)) {
-    return { platforms: stored ?? [...DEFAULT_PLATFORM_ORDER], swappedAt: raw?.swappedAt ?? null };
+    return { platforms: stored ?? defaults, swappedAt: raw?.swappedAt ?? null };
   }
   const n = Math.max(0, quota.platforms);
   // 存過就用存的（多存的截掉——降級時額度會縮）
   if (stored) return { platforms: stored.slice(0, n), swappedAt: raw?.swappedAt ?? null };
-  return { platforms: DEFAULT_PLATFORM_ORDER.slice(0, n), swappedAt: null };
+  return { platforms: defaults.slice(0, n), swappedAt: null };
 }
 
 /** 還要幾天才能換通路。0 = 現在就可以換。 */
@@ -107,6 +119,7 @@ export function daysUntilSwap(
  *   ① 爆款結構卡 —— viralTaskCards=false 就整批拿掉。這是 2,250 → 9,000
  *      的主要升級鉤子，靠的正是 taskSource 那層分類。
  *   ② 通路 —— 只留已啟用的通路。
+ *   ⓪ 不論方案，HIDDEN_CONTENT_PLATFORMS 的卡一律不列。
  *
  * 刻意接受 `{ platform, source }` 這種最小形狀，讓 router 與測試都好餵。
  */
@@ -121,6 +134,7 @@ export function filterTasksByPlan<
     ? null
     : new Set(channels.platforms);
   return tasks.filter((t) => {
+    if (isHiddenContentPlatform(t.platform)) return false;
     if (quota.viralTaskCards === false && t.source?.type === "viral") return false;
     if (allowPlatform && t.platform && !allowPlatform.has(t.platform)) return false;
     return true;

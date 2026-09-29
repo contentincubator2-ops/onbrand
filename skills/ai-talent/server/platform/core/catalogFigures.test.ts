@@ -9,6 +9,7 @@ import { join, resolve } from "path";
 import { describe, expect, it } from "vitest";
 import { buildTaskCatalogIndex } from "../../content/core/taskCatalogIndex";
 import { CATALOG_FIGURES } from "./catalogFigures";
+import { isHiddenContentPlatform } from "./planGate";
 
 const ROOT = resolve(__dirname, "../../..");
 
@@ -21,7 +22,8 @@ function readClientFigures(): Record<string, number> {
 }
 
 describe("catalogFigures 對得上真實任務卡目錄", () => {
-  const all = buildTaskCatalogIndex();
+  // 對外宣稱的是用戶看得到的卡，下架通路的卡不算。
+  const all = buildTaskCatalogIndex().filter((t) => !isHiddenContentPlatform(t.platform));
   const count = (type: string) => all.filter((t) => t.source.type === type).length;
 
   it("總張數、基礎可用張數", () => {

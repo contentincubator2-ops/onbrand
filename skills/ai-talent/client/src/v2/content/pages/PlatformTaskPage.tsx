@@ -1,7 +1,7 @@
 /**
  * PlatformTaskPage — platform-first navigation (2026-05-26).
  *
- * Route: /tasks/:platform  (platform = fb | ig | li | yt | tt | email | pr)
+ * Route: /tasks/:platform  (platform = fb | ig | tt | email | web)
  *
  * Replaces the old 30s/60s/99s tier pages as the primary entry point.
  * Users pick the *platform* in the sidebar, then filter by complexity via
@@ -88,18 +88,14 @@ function getLastUsedDays(taskId: string): number | null {
 // ── Platform route mapping ───────────────────────────────────────────────────
 // URL param → internal platform filter key (matches task.platform from listFB)
 const ROUTE_TO_PLATFORM: Record<string, string> = {
+  // 2026-09-29 CJ：內容通路只留 FB／IG／TikTok／電子報／官網。li／yt／pr／x 從白名單
+  // 拿掉，舊書籤 /tasks/li 之類會被下面的 Navigate 導回 /tasks/fb。
   fb:    "facebook",
   ig:    "instagram",
-  li:    "linkedin",
-  yt:    "youtube",
   tt:    "tiktok",
   email: "email",
-  pr:    "pr",
   // 2026-08-29 官網頻道。路由是 /tasks/web，平台代號是 website。
   web:   "website",
-  // 2026-09-10 X 通路。路由與平台代號同名，所以這條看起來多餘 —— 但
-  // ROUTE_TO_PLATFORM 是白名單，缺這一行 /tasks/x 會解析不到平台。
-  x:     "x",
   // 素材與規劃頻道。目前只有品牌任務包會用到，全域目錄沒有卡 ——
   // 沒有包的品牌走到這兩個路由會看到空清單，側邊欄也不會有入口。
   case:     "case",
