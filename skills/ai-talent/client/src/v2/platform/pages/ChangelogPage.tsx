@@ -10,9 +10,9 @@ import { useEffect, useState } from "react";
 import { useLang } from "../../../lib/i18n";
 
 const TAG_STYLES: Record<string, { bg: string; fg: string; label: string; labelEn: string }> = {
-  NEW:     { bg: "rgba(124,58,237,0.10)", fg: "#5B21B6", label: "新功能", labelEn: "New"     },
-  FIX:     { bg: "rgba(239,68,68,0.10)",  fg: "#991B1B", label: "修復",   labelEn: "Fix"     },
-  IMPROVE: { bg: "rgba(59,130,246,0.10)", fg: "#1E3A8A", label: "改進",   labelEn: "Improve" },
+  NEW:     { bg: "rgba(24,24,27,0.06)", fg: "#27272a", label: "新功能", labelEn: "New"     },
+  FIX:     { bg: "rgba(24,24,27,0.06)",  fg: "#27272a", label: "修復",   labelEn: "Fix"     },
+  IMPROVE: { bg: "rgba(24,24,27,0.06)",  fg: "#27272a", label: "改進",   labelEn: "Improve" },
   BREAKING:{ bg: "rgba(245,158,11,0.10)", fg: "#92400E", label: "變更",   labelEn: "Change"  },
 };
 
@@ -66,28 +66,12 @@ export default function ChangelogPage() {
       <div style={{ maxWidth: 820, margin: "0 auto", padding: "60px 28px 80px" }}>
         {/* Hero */}
         <div style={{ textAlign: "center", marginBottom: 48 }}>
-          <p style={{
-            fontSize: 12, fontWeight: 700, color: "#6b7280",
-            letterSpacing: "0.25em", textTransform: "uppercase",
-            marginBottom: 12,
-          }}>
-            {isEn ? "Product Updates" : "產品更新日誌"}
-          </p>
           <h1 style={{
             fontSize: "clamp(1.75rem, 3vw, 2.5rem)", fontWeight: 700,
-            color: "#111827", lineHeight: 1.1, marginBottom: 14,
+            color: "#111827", lineHeight: 1.1,
           }}>
-            {isEn ? "Built with you, fixed for you" : "你回報的問題，我們真的會修"}
+            {isEn ? "Product Updates" : "產品更新日誌"}
           </h1>
-          <p style={{
-            fontSize: 14, color: "#525252", lineHeight: 1.7, fontStyle: "italic",
-            fontFamily: '"Source Serif Pro", "Noto Serif TC", Georgia, serif',
-            maxWidth: 580, margin: "0 auto",
-          }}>
-            {isEn
-              ? "Every fix below started as a user message to Mia. Transparency = trust."
-              : "下面每一條修復，最早都是一則用戶丟給 Mia 的訊息。透明度 = 信任。"}
-          </p>
         </div>
 
         {/* Loading / error */}
@@ -140,19 +124,6 @@ export default function ChangelogPage() {
           </section>
         ))}
 
-        {/* CTA */}
-        <div style={{ marginTop: 60, padding: 24, background: "white", border: "1px solid #e5e7eb", borderRadius: 12, textAlign: "center" }}>
-          <p style={{ fontSize: 14, color: "#1A1A18", lineHeight: 1.7, marginBottom: 12 }}>
-            {isEn
-              ? "Have a feature request or found a bug?"
-              : "想到的功能、卡住的地方？"}
-          </p>
-          <p style={{ fontSize: 12, color: "#6b7280" }}>
-            {isEn
-              ? "Click the Mia avatar bottom-right of any page to chat — every report is read."
-              : "點任何一頁右下角的 Mia 頭像聊 — 我們每則訊息都會看。"}
-          </p>
-        </div>
       </div>
     </div>
   );

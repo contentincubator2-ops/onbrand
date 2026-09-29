@@ -22,6 +22,7 @@ import { trpc } from "../../../lib/trpc";
 import { useLang } from "../../../lib/i18n";
 import type { ShellOutletCtx } from "../../app/shell/ShellLayout";
 import PromptLibrary from "../components/positioning/PromptLibrary";
+import { HelpTip } from "../../platform/components/HelpTip";
 
 export default function AiPromptLibraryPage() {
   const { lang } = useLang();
@@ -41,17 +42,14 @@ export default function AiPromptLibraryPage() {
   return (
     <div className="max-w-[1000px] mx-auto px-6 py-10">
       <div className="mb-6">
-        <p className="text-[12px] font-semibold uppercase tracking-[0.25em] text-neutral-500 mb-2">
-          {en ? "AI PROMPTS" : "AI 指令庫"}
-        </p>
-        <h1 className="text-[1.9rem] font-bold tracking-tight text-neutral-900">
+        <h1 className="text-[1.9rem] font-bold tracking-tight text-neutral-900 flex items-center gap-2">
           {en ? "AI Prompt Library" : "AI 指令庫"}
+          <HelpTip>
+            {en
+              ? "Prompts for ChatGPT / Claude / Gemini / Midjourney, auto-filled from this brand's positioning."
+              : "指令範本的變數已用這個品牌的定位自動代入，可複製給 ChatGPT / Claude / Gemini / Midjourney。"}
+          </HelpTip>
         </h1>
-        <p className="mt-2 text-[13.5px] text-neutral-500 max-w-[560px]">
-          {en
-            ? "Ready-to-copy prompts for ChatGPT / Claude / Gemini / Midjourney, auto-filled from this brand's positioning."
-            : "現成的指令範本，變數已經用這個品牌的定位自動代入——複製貼上就能丟給 ChatGPT / Claude / Gemini / Midjourney。"}
-        </p>
       </div>
 
       {!brandId ? (

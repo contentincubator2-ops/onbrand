@@ -8,6 +8,7 @@
  */
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { WaitingIcon } from "../platform/components/icons";
 
 const AUTH_CHECK_TIMEOUT_MS = 6000;
 
@@ -76,7 +77,7 @@ export default function RequireAuthV2({ children }: { children: React.ReactNode 
     return (
       <div className="min-h-screen bg-background flex items-center justify-center px-6">
         <div className="max-w-sm text-center">
-          <div className="text-2xl mb-3">⏱</div>
+          <div className="text-2xl mb-3"><WaitingIcon size={24} /></div>
           <h1 className="text-lg font-semibold mb-2">伺服器回應較慢</h1>
           <p className="text-sm text-default-500 mb-5">
             驗證身分超過 6 秒沒有回應。可能是網路慢或伺服器忙碌。
@@ -84,7 +85,7 @@ export default function RequireAuthV2({ children }: { children: React.ReactNode 
           <div className="flex flex-col gap-2">
             <button
               onClick={() => setAttempt((a) => a + 1)}
-              className="w-full px-4 py-2 rounded-full bg-violet-600 text-white text-sm font-semibold hover:bg-violet-700 transition"
+              className="w-full px-4 py-2 rounded-full bg-zinc-600 text-white text-sm font-semibold hover:bg-zinc-700 transition"
             >
               重新嘗試
             </button>

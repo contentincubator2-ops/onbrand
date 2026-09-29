@@ -20,18 +20,23 @@ import { trpc } from "../../../../lib/trpc";
 import { useLang } from "../../../../lib/i18n";
 import { Card, CardBody, Textarea, Button } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faFacebook, faInstagram, faTiktok, faThreads } from "@fortawesome/free-brands-svg-icons";
-import { faRobot, faEnvelope, faCheck } from "@fortawesome/free-solid-svg-icons";
-import { Sparkles } from "lucide-react";
+import {
+  faFacebook, faInstagram, faTiktok, faThreads,
+} from "@fortawesome/free-brands-svg-icons";
+import {
+  faUserTie, faEnvelope, faCheck,
+} from "@fortawesome/free-solid-svg-icons";
+import { GenerateIcon, LockIcon, UnlockIcon } from "../../../platform/components/icons";
+import { HelpTip } from "../../../platform/components/HelpTip";
 
 // 2026-09-29（CJ：內容通路只剩 FB／IG／TikTok／電子報／官網）：YouTube／LinkedIn／
 // Press 分頁拿掉；已存的 _aiPrompts 原樣保留（drafts 整包回存，不刪資料）。
 const PLATFORMS: Array<{ id: string; label: string; icon: any; tone: string }> = [
-  { id: "facebook",  label: "Facebook",  icon: faFacebook,  tone: "#1877F2" },
-  { id: "instagram", label: "Instagram", icon: faInstagram, tone: "#E1306C" },
+  { id: "facebook",  label: "Facebook",  icon: faFacebook,  tone: "#18181b" },
+  { id: "instagram", label: "Instagram", icon: faInstagram, tone: "#18181b" },
   { id: "threads",   label: "Threads",   icon: faThreads,   tone: "#000000" },
   { id: "tiktok",    label: "TikTok",    icon: faTiktok,    tone: "#000000" },
-  { id: "email",     label: "EDM",       icon: faEnvelope,  tone: "#0EA5E9" },
+  { id: "email",     label: "EDM",       icon: faEnvelope,  tone: "#18181b" },
 ];
 
 interface PromptValue { text?: string; image?: string }
@@ -118,16 +123,16 @@ export default function AIPromptsEditor({ brandId }: { brandId: number | null })
       <div className="flex items-start justify-between mb-5">
         <div>
           <div className="flex items-center gap-2.5 mb-1.5">
-            <div className="w-9 h-9 rounded-full flex items-center justify-center" style={{ background: "#7C3AED" }}>
-              <FontAwesomeIcon icon={faRobot} style={{ color: "#fff", fontSize: 14 }} />
+            <div className="w-9 h-9 rounded-full flex items-center justify-center" style={{ background: "#18181b" }}>
+              <FontAwesomeIcon icon={faUserTie} style={{ color: "#fff", fontSize: 14 }} />
             </div>
             <h1 className="text-2xl font-semibold text-default-900">{en ? "AI prompt library" : "AI 指令庫"}</h1>
+            <HelpTip>
+              {en
+                ? "Brand-specific text and image instructions per platform. Every task and the 7-Day Publisher applies these automatically for that platform."
+                : "每個平台的品牌專屬文字指令 + 圖片指令。所有任務與七日發布台在該平台跑任務時會自動套用。"}
+            </HelpTip>
           </div>
-          <p className="text-sm text-default-500">
-            {en
-              ? "Set brand-specific text and image instructions for each platform. Every task and the 7-Day Publisher automatically applies these when generating content for that platform."
-              : "為每個社群平台設定品牌專屬的文字指令 + 圖片指令。所有任務與七日發布台在該平台跑任務時會自動套用。"}
-          </p>
         </div>
       </div>
 
@@ -135,18 +140,18 @@ export default function AIPromptsEditor({ brandId }: { brandId: number | null })
           如何識別出它適合的語調，其實是用它原來溝通的語調」→「通用」):
           既有語調鎖定 — brand-wide, sits above the per-platform tabs since
           the locked rules apply to every platform's generation. */}
-      <div className="mb-6 rounded-2xl border" style={{ borderColor: voiceLock ? "#7C3AED" : "#E5E7EB", background: voiceLock ? "#FAF5FF" : "#FAFAF9" }}>
+      <div className="mb-6 rounded-2xl border" style={{ borderColor: voiceLock ? "#18181b" : "#E5E7EB", background: voiceLock ? "#FAFAFA" : "#FAFAF9" }}>
         <button
           onClick={() => setVoiceLockOpen((v) => !v)}
           className="w-full flex items-center justify-between px-4 py-3 text-left"
         >
           <div className="flex items-center gap-2">
-            <span className="text-base">{voiceLock ? "🔒" : "🔓"}</span>
+            <span className="text-base">{voiceLock ? <LockIcon size={14} /> : <UnlockIcon size={14} />}</span>
             <span className="text-sm font-semibold text-default-900">
               {en ? "Existing voice lock" : "既有語調鎖定"}
             </span>
             {voiceLock ? (
-              <span className="text-[12px] font-medium px-2 py-0.5 rounded-full" style={{ background: "#7C3AED", color: "#fff" }}>
+              <span className="text-[12px] font-medium px-2 py-0.5 rounded-full" style={{ background: "#18181b", color: "#fff" }}>
                 {en ? `${voiceLock.rules.length} rules locked` : `已鎖定 ${voiceLock.rules.length} 條規則`}
               </span>
             ) : (
@@ -165,12 +170,12 @@ export default function AIPromptsEditor({ brandId }: { brandId: number | null })
                 : "如果這個品牌已有活躍、有實際成效的既有陣地（真實互動，不是從零開始），貼上 2–10 篇真實貼文。AI 只萃取可驗證、可量化的規則（開頭稱呼、emoji 密度、標點慣例、固定格式）——絕不發明沒出現過的修辭——並永久鎖定。之後每一次 AI 產生這個品牌的指令都會強制帶上這些規則。"}
             </p>
             {voiceLock && (
-              <div className="mb-3 rounded-xl border border-violet-200 bg-white p-3">
+              <div className="mb-3 rounded-xl border border-zinc-200 bg-white p-3">
                 <p className="text-[12px] text-default-400 mb-1.5">{voiceLock.sourceSummary}</p>
                 <ul className="space-y-1">
                   {voiceLock.rules.map((r, i) => (
                     <li key={i} className="text-xs text-default-700 flex gap-1.5">
-                      <span className="text-violet-500 shrink-0">•</span>{r}
+                      <span className="text-zinc-500 shrink-0">•</span>{r}
                     </li>
                   ))}
                 </ul>
@@ -193,7 +198,7 @@ export default function AIPromptsEditor({ brandId }: { brandId: number | null })
                 ? "Paste 2-10 real posts, one per paragraph (blank line between each)…"
                 : "貼上 2–10 篇真實貼文原文，每篇一段（段落間空行分隔）…"}
               rows={6}
-              className="w-full text-xs border border-default-200 rounded-xl p-3 resize-y focus:outline-none focus:border-violet-400"
+              className="w-full text-xs border border-default-200 rounded-xl p-3 resize-y focus:outline-none focus:border-zinc-400"
             />
             <div className="flex items-center justify-between mt-2">
               <span className="text-[12px] text-default-400">
@@ -214,9 +219,9 @@ export default function AIPromptsEditor({ brandId }: { brandId: number | null })
                 }}
                 disabled={extractVoiceLockMut?.isPending}
                 className="text-xs font-semibold px-4 py-1.5 rounded-full text-white transition"
-                style={{ background: extractVoiceLockMut?.isPending ? "#A78BFA" : "#7C3AED" }}
+                style={{ background: extractVoiceLockMut?.isPending ? "#A1A1AA" : "#18181b" }}
               >
-                {extractVoiceLockMut?.isPending ? (en ? "Analyzing…" : "分析中…") : (en ? "🔒 Analyze & lock" : "🔒 分析並鎖定")}
+                {extractVoiceLockMut?.isPending ? (en ? "Analyzing…" : "分析中…") : <><LockIcon size={11} /> {en ? "Analyze & lock" : "分析並鎖定"}</>}
               </button>
             </div>
           </div>
@@ -273,7 +278,7 @@ export default function AIPromptsEditor({ brandId }: { brandId: number | null })
               variant="flat"
               onPress={() => handleAIFor(active.id)}
               isLoading={filling === active.id}
-              startContent={filling !== active.id && <Sparkles size={12} />}
+              startContent={filling !== active.id && <GenerateIcon size={12} />}
             >
               {filling === active.id
                 ? (en ? "Generating…" : "產生中…")
@@ -284,7 +289,7 @@ export default function AIPromptsEditor({ brandId }: { brandId: number | null })
           <div className="grid gap-4 lg:grid-cols-2">
             <div>
               <label className="text-xs font-semibold text-default-700 mb-1.5 block flex items-center gap-1.5">
-                <span className="px-1.5 py-0.5 rounded bg-sky-100 text-sky-700 text-[12px]">{en ? "Text prompt" : "文字指令"}</span>
+                <span className="px-1.5 py-0.5 rounded bg-zinc-100 text-zinc-700 text-[12px]">{en ? "Text prompt" : "文字指令"}</span>
                 {en ? "System prompt for copywriting" : "寫文案時的系統指令"}
               </label>
               <Textarea
@@ -301,7 +306,7 @@ export default function AIPromptsEditor({ brandId }: { brandId: number | null })
             </div>
             <div>
               <label className="text-xs font-semibold text-default-700 mb-1.5 block flex items-center gap-1.5">
-                <span className="px-1.5 py-0.5 rounded bg-orange-100 text-orange-700 text-[12px]">{en ? "Image prompt" : "圖片指令"}</span>
+                <span className="px-1.5 py-0.5 rounded bg-zinc-100 text-zinc-700 text-[12px]">{en ? "Image prompt" : "圖片指令"}</span>
                 {en ? "Image style brief" : "配圖風格指引"}
               </label>
               <Textarea

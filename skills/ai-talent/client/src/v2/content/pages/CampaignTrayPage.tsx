@@ -36,6 +36,7 @@ import { TaskCardShell, TaskCardAvatar } from "../components/TaskCardShell";
 import { phaseOf } from "../../strategy/lib/campaignSchema";
 import { weeksFor } from "../lib/campaignCalendar";
 import { CHANNEL_META, channelLabel, channelRoute } from "../lib/channelMeta";
+import { HelpTip } from "../../platform/components/HelpTip";
 
 const ymd = (d: Date) => d.toISOString().slice(0, 10);
 
@@ -94,14 +95,11 @@ export default function CampaignTrayPage() {
     return (
       <main className="px-8 py-10">
         <header className="mb-6">
-          <Chip size="sm" variant="flat" color="default" className="uppercase tracking-wider mb-2">
-            {L("內容", "Content")}
-          </Chip>
-          <h1 className="text-3xl font-semibold tracking-tight">{L("活動", "Campaigns")}</h1>
-          <p className="text-small text-default-500 max-w-[640px] leading-relaxed mt-2">
-            {L("照企劃一天一天寫。要改企劃本身（節奏、切角、用哪張卡），回策略層的活動頁。",
-               "Write the plan out day by day. To change the plan itself, go back to the campaign page in Strategy.")}
-          </p>
+          <h1 className="text-3xl font-semibold tracking-tight flex items-center gap-2">
+            {L("活動", "Campaigns")}
+            <HelpTip>{L("要改企劃本身（節奏、切角、用哪張卡），回策略層的活動頁。",
+               "To change the plan itself (cadence, angles, cards), go back to the campaign page in Strategy.")}</HelpTip>
+          </h1>
         </header>
 
         {listQ.isLoading && (
@@ -116,10 +114,6 @@ export default function CampaignTrayPage() {
             <CardBody className="py-16 items-center text-center gap-3">
               <FontAwesomeIcon icon={faCalendarDays} className="text-4xl text-default-300" />
               <p className="text-medium font-medium">{L("還沒有任何活動企劃", "No campaign plans yet")}</p>
-              <p className="text-small text-default-500 max-w-[420px] leading-relaxed">
-                {L("這裡的內容是從企劃長出來的：先到策略層建立活動、寫一句「賣什麼、優惠是什麼」，排出企劃之後這裡就會有東西。",
-                   "Everything here comes from a plan: create the campaign in Strategy, say what's on offer, build the plan — then it shows up here.")}
-              </p>
               <Button size="sm" variant="light" color="primary"
                 onPress={() => navigate(`/brands/edit?cat=events${brandId ? `&b=${brandId}` : ""}`)}>
                 {L("去建立活動企劃", "Go set up a campaign")}
@@ -187,9 +181,6 @@ export default function CampaignTrayPage() {
       {ev && (
         <header className="mb-6 flex items-end justify-between gap-4 flex-wrap">
           <div>
-            <Chip size="sm" variant="flat" color="default" className="uppercase tracking-wider mb-2">
-              {L("檔期行事曆", "Campaign calendar")}
-            </Chip>
             <h1 className="text-3xl font-semibold tracking-tight">{ev.name}</h1>
             <p className="text-tiny text-default-500 mt-2">
               {plan?.smp ? `${plan.smp}　·　` : ""}
@@ -200,7 +191,7 @@ export default function CampaignTrayPage() {
           <div className="flex items-center gap-2 flex-wrap">
             {next && (
               <Button size="sm" color="primary" radius="md" onPress={() => openItem(next)}>
-                {L("從下一篇開始寫", "Write the next one")}
+                {L("寫下一篇", "Write next")}
               </Button>
             )}
             <Button size="sm" variant="bordered" radius="md"

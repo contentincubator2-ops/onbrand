@@ -53,15 +53,15 @@ export const PLATFORM_META: Record<
   }
 > = {
   facebook:  {
-    label: "Facebook", short: "FB", accent: "#1877F2", iconKey: "facebook",
+    label: "Facebook", short: "FB", accent: "#18181b", iconKey: "facebook",
     mockup: { platform: "facebook", format: "feed", label: "Facebook 貼文" },
   },
   instagram: {
-    label: "Instagram", short: "IG", accent: "#E1306C", iconKey: "instagram",
+    label: "Instagram", short: "IG", accent: "#18181b", iconKey: "instagram",
     mockup: { platform: "instagram", format: "feed", label: "Instagram 貼文" },
   },
   youtube:   {
-    label: "YouTube", short: "YT", accent: "#FF0000", iconKey: "youtube",
+    label: "YouTube", short: "YT", accent: "#18181b", iconKey: "youtube",
     mockup: { platform: "youtube", format: "video-card", label: "YouTube 影片卡" },
   },
   threads:   {
@@ -69,11 +69,11 @@ export const PLATFORM_META: Record<
     mockup: { platform: "threads", format: "post", label: "Threads 貼文" },
   },
   line:      {
-    label: "LINE", short: "LINE", accent: "#06C755", iconKey: "line",
+    label: "LINE", short: "LINE", accent: "#18181b", iconKey: "line",
     mockup: { platform: "line", format: "broadcast", label: "LINE 廣播" },
   },
   blog:      {
-    label: "Blog 長文", short: "Blog", accent: "#F97316", iconKey: "blog",
+    label: "Blog 長文", short: "Blog", accent: "#18181b", iconKey: "blog",
     mockup: { platform: "web", format: "blog", label: "Web Blog" },
   },
 };

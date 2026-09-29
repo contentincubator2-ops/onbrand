@@ -13,6 +13,7 @@ import { useEffect, useRef, useState } from "react";
 import { trpc } from "../../../lib/trpc";
 import { Link } from "react-router-dom";
 import { useLang } from "../../../lib/i18n";
+import { DoneIcon, WarningIcon } from "./icons";
 
 interface Notif {
   id: number;
@@ -107,7 +108,7 @@ function NotifChip({ notif, onDismiss }: { notif: Notif; onDismiss: () => void }
         gap: 10,
       }}
     >
-      <span style={{ fontSize: 16 }}>{ok ? "✓" : "⚠"}</span>
+      <span style={{ fontSize: 16, display: "inline-flex" }}>{ok ? <DoneIcon size={16} /> : <WarningIcon size={16} />}</span>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ color: "#111", fontWeight: 600 }}>{kindLabel} #{notif.entityId} {statusLabel}</div>
         <Link to={linkTo} style={{ fontSize: 12, color: "#6b7280" }} onClick={onDismiss}>{lang === "en" ? "View" : "查看"}</Link>

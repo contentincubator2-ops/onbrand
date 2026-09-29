@@ -13,9 +13,11 @@
  */
 import type { IconDefinition } from "@fortawesome/fontawesome-svg-core";
 import {
-  faFacebookF, faInstagram, faLinkedinIn, faYoutube, faTiktok, faXTwitter, faThreads, faLine,
+  faFacebook, faInstagram, faLinkedin, faYoutube, faTiktok, faXTwitter, faThreads, faLine,
 } from "@fortawesome/free-brands-svg-icons";
-import { faEnvelope, faBullhorn, faGlobe } from "@fortawesome/free-solid-svg-icons";
+import {
+  faEnvelope, faBullhorn, faGlobe,
+} from "@fortawesome/free-solid-svg-icons";
 
 export interface ChannelMeta {
   icon: IconDefinition;
@@ -26,11 +28,11 @@ export interface ChannelMeta {
 }
 
 export const CHANNEL_META: Record<string, ChannelMeta> = {
-  facebook:  { icon: faFacebookF,  route: "fb",    zh: "Facebook",  en: "Facebook" },
+  facebook:  { icon: faFacebook,  route: "fb",    zh: "Facebook",  en: "Facebook" },
   instagram: { icon: faInstagram,  route: "ig",    zh: "Instagram", en: "Instagram" },
   threads:   { icon: faThreads,    route: "threads", zh: "Threads", en: "Threads" },
   line:      { icon: faLine,       route: "line",  zh: "LINE",      en: "LINE" },
-  linkedin:  { icon: faLinkedinIn, route: "li",    zh: "LinkedIn",  en: "LinkedIn" },
+  linkedin:  { icon: faLinkedin, route: "li",    zh: "LinkedIn",  en: "LinkedIn" },
   youtube:   { icon: faYoutube,    route: "yt",    zh: "YouTube",   en: "YouTube" },
   tiktok:    { icon: faTiktok,     route: "tt",    zh: "TikTok",    en: "TikTok" },
   x:         { icon: faXTwitter,   route: "x",     zh: "X",         en: "X" },

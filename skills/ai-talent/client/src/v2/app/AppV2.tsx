@@ -15,6 +15,7 @@
  *
  * Auth gate is unchanged — RequireAuth still wraps protected routes.
  */
+import { isChunkLoadError, autoReloadForStaleChunk, installStaleChunkRecovery, StaleChunkScreen } from "./staleChunk";
 import React from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import { LanguageProvider } from "../../lib/i18n";
@@ -104,7 +105,7 @@ function RouteFallback() {
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        background: "#F7F2EB",
+        background: "#FAFAFA",
       }}
       aria-label="Loading"
     >
@@ -113,8 +114,8 @@ function RouteFallback() {
           width: 32,
           height: 32,
           borderRadius: "50%",
-          border: "3px solid #EFE7D6",
-          borderTopColor: "#E85D2E",
+          border: "3px solid #E4E4E7",
+          borderTopColor: "#18181b",
           animation: "spin 0.8s linear infinite",
         }}
       />
@@ -131,21 +132,6 @@ function RouteFallback() {
 // Same stale-chunk helpers as ShellLayout — duplicated here so AppErrorBoundary
 // (the outermost boundary, outside the shell) also auto-recovers without
 // importing from ShellLayout and creating a circular dependency.
-function isChunkLoadError(err: Error): boolean {
-  const text = (err.message ?? "") + " " + (err.stack ?? "");
-  return /Failed to fetch dynamically imported module|ChunkLoadError|Loading chunk|Loading CSS chunk|error loading dynamically imported module/i.test(text);
-}
-function autoReloadOnce(): boolean {
-  try {
-    const last = Number(sessionStorage.getItem("_chunk_reload_at") ?? 0);
-    if (Date.now() - last > 15_000) {
-      sessionStorage.setItem("_chunk_reload_at", String(Date.now()));
-      window.location.reload();
-      return true;
-    }
-  } catch { /* sessionStorage blocked */ }
-  return false;
-}
 
 class AppErrorBoundary extends React.Component<
   { children: React.ReactNode },
@@ -155,7 +141,7 @@ class AppErrorBoundary extends React.Component<
   static getDerivedStateFromError(error: Error) { return { error }; }
   componentDidCatch(error: Error, info: React.ErrorInfo) {
     // Stale-chunk auto-recovery: hard-reload once on deployment-induced 404.
-    if (isChunkLoadError(error) && autoReloadOnce()) return;
+    if (isChunkLoadError(error) && autoReloadForStaleChunk()) return;
     // eslint-disable-next-line no-console
     console.error("[AppV2] render error:", error, info);
     // 2026-05-11 — auto-report to the Sentry-lite error_log table so the
@@ -196,6 +182,9 @@ class AppErrorBoundary extends React.Component<
     } catch { /* never throw from componentDidCatch */ }
   }
   render() {
+    if (this.state.error && isChunkLoadError(this.state.error)) {
+      return <StaleChunkScreen fullPage />;
+    }
     if (this.state.error) {
       return (
         <div style={{ minHeight: "100vh", padding: 32, fontFamily: "system-ui, sans-serif" }}>
@@ -212,7 +201,7 @@ class AppErrorBoundary extends React.Component<
             )}
             <div style={{ marginTop: 12, display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
               <button
-                style={{ padding: "6px 12px", background: "#3b82f6", color: "white", border: "none", borderRadius: 6, cursor: "pointer" }}
+                style={{ padding: "6px 12px", background: "#18181b", color: "white", border: "none", borderRadius: 6, cursor: "pointer" }}
                 onClick={() => { this.setState({ error: null }); }}
               >
                 重試渲染
@@ -244,7 +233,7 @@ class AppErrorBoundary extends React.Component<
                   shell/footer to reach customer service. */}
               <a
                 href={`mailto:sowork@sowork.ai?subject=${encodeURIComponent("OnBrand 應用程式錯誤")}&body=${encodeURIComponent("錯誤訊息：\n" + (this.state.error?.message ?? "") + "\n\n頁面：" + window.location.href)}`}
-                style={{ marginLeft: "auto", fontSize: 12, color: "#3b82f6", textDecoration: "underline" }}
+                style={{ marginLeft: "auto", fontSize: 12, color: "#3f3f46", textDecoration: "underline" }}
               >
                 聯絡客服 sowork@sowork.ai
               </a>
@@ -256,6 +245,8 @@ class AppErrorBoundary extends React.Component<
     return this.props.children as any;
   }
 }
+
+installStaleChunkRecovery();
 
 export default function AppV2() {
   return (

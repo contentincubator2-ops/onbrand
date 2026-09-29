@@ -26,19 +26,8 @@ import { useLang } from "../../../lib/i18n";
 import type { ShellOutletCtx } from "../../app/shell/ShellLayout";
 import { Avatar, Button, Spinner } from "@heroui/react";
 import { PlatformMockup } from "../components/PlatformMockup";
-import {
-  Sparkles,
-  Calendar as CalendarIcon,
-  Plus,
-  Play,
-  X,
-  Check,
-  RefreshCw,
-  Copy,
-  Pencil,
-  Clock,
-  CheckCircle2,
-} from "lucide-react";
+import { AddIcon, CheckIcon, ChevronRightIcon, CloseIcon, CopyIcon, DoneIcon, EditIcon, GenerateIcon, PlannerIcon, PlayIcon, RegenerateIcon, TaskCardsIcon, WaitingIcon, WarningIcon, UploadIcon } from "../../platform/components/icons";
+import { HelpTip } from "../../platform/components/HelpTip";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faFacebook,
@@ -375,13 +364,13 @@ function PlatformCell({
             onClick={() => onEdit()}
             className="flex items-center gap-1 text-[12px] font-semibold px-2.5 py-1 rounded-lg bg-white/95 backdrop-blur-sm border border-neutral-300 text-neutral-700 hover:bg-white hover:border-neutral-500 shadow-sm transition"
           >
-            <Pencil size={10} strokeWidth={2.5} />
+            <EditIcon size={10} strokeWidth={2.5} />
             {lang === "en" ? "Edit" : "編輯"}
           </button>
           {/* Scheduled indicator — compact badge next to edit button */}
           {state.scheduledPostId && (
             <span className="flex items-center gap-0.5 text-[12px] font-medium px-2 py-1 rounded-lg bg-emerald-500/90 text-white backdrop-blur-sm shadow-sm">
-              <CheckCircle2 size={10} strokeWidth={2.5} />
+              <DoneIcon size={10} strokeWidth={2.5} />
               {lang === "en" ? "Scheduled" : "已排程"}
             </span>
           )}
@@ -441,7 +430,7 @@ function PlatformCell({
           {isDone && state.imageError && !state.imageUrl && (
             <div className="absolute bottom-2 left-0 right-0 flex justify-center items-center gap-1.5 flex-wrap px-1">
               <span className="text-[12px] text-amber-600 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5">
-                ⚠️ {t("theater_image_failed")}
+                <WarningIcon size={11} /> {t("theater_image_failed")}
               </span>
               {onRetryImage && (
                 <>
@@ -502,7 +491,7 @@ function PlatformCell({
               className="p-1.5 rounded-md hover:bg-neutral-100 text-neutral-400 hover:text-neutral-700 transition"
               title={t("theater_copy_tip")}
             >
-              <Copy size={12} strokeWidth={2} />
+              <CopyIcon size={12} strokeWidth={2} />
             </button>
           )}
           {onRedo && (
@@ -511,7 +500,7 @@ function PlatformCell({
               className="p-1.5 rounded-md hover:bg-neutral-100 text-neutral-400 hover:text-neutral-700 transition"
               title={t("theater_btn_redo_tip")}
             >
-              <RefreshCw size={12} strokeWidth={2} />
+              <RegenerateIcon size={12} strokeWidth={2} />
             </button>
           )}
           {/* Scheduled time — tiny timestamp when scheduled */}
@@ -1600,10 +1589,14 @@ export default function TheaterPage() {
       ) : (
         <div className="sticky top-0 z-30 w-full border-b border-neutral-200 bg-white">
           <div className="max-w-[1400px] mx-auto px-6 py-4 flex items-center gap-3">
-            <Sparkles size={18} className="text-neutral-400" strokeWidth={1.5} />
-            <p className="text-sm text-neutral-500">
-              {t("theater_idle_brain")}
-            </p>
+            <div className="flex items-center gap-2 text-sm text-neutral-500" aria-label={t("theater_idle_brain")}>
+              <span className="inline-flex items-center gap-1"><TaskCardsIcon size={14} />{lang === "en" ? "Platforms" : "平台"}</span>
+              <ChevronRightIcon size={10} className="text-neutral-300" />
+              <span className="inline-flex items-center gap-1"><PlannerIcon size={14} />{lang === "en" ? "Key dates" : "重要日子"}</span>
+              <ChevronRightIcon size={10} className="text-neutral-300" />
+              <span className="inline-flex items-center gap-1"><GenerateIcon size={14} />{lang === "en" ? "Generate" : "生成"}</span>
+              <HelpTip>{t("theater_idle_brain")}</HelpTip>
+            </div>
           </div>
         </div>
       )}
@@ -1622,15 +1615,15 @@ export default function TheaterPage() {
           <div
             className="flex items-center gap-3 rounded-xl px-4 py-3 text-[13px]"
             style={{
-              background: "#FFF7ED",
-              border: "1px solid #FDBA74",
-              color: "#7C2D12",
+              background: "#FAFAFA",
+              border: "1px solid #D4D4D8",
+              color: "#27272a",
             }}
           >
             <span
               className="inline-block w-2.5 h-2.5 rounded-full flex-shrink-0"
               style={{
-                background: "#EA580C",
+                background: "#18181b",
                 animation: "miaUnreadRipple 1.6s ease-in-out infinite",
               }}
               aria-hidden
@@ -1638,18 +1631,11 @@ export default function TheaterPage() {
             <span className="flex-1">
               {lang === "en" ? (
                 <>
-                  <strong>Express Brain active.</strong> Full 14-step SoWork
-                  positioning still running in the background — Mia will ping
-                  you when it's done (~{Math.max(
-                    1,
-                    14 - (pipelineStatusQ.data.currentStep ?? 0),
-                  )} steps left).
+                  <strong>Express Brain</strong> · full positioning running — we'll notify you when it's done
                 </>
               ) : (
                 <>
-                  <strong>正在用品牌大腦初版生成內容。</strong>
-                  完整 14 步 SoWork 定位仍在背景跑——完成後 Mia 會通知你
-                  （剩 {Math.max(1, 14 - (pipelineStatusQ.data.currentStep ?? 0))} 步）。
+                  <strong>品牌大腦初版</strong> · 完整定位背景進行中，完成後會通知你
                 </>
               )}
             </span>
@@ -1679,34 +1665,20 @@ export default function TheaterPage() {
                 {t("theater_hero_eyebrow")}
               </p>
             )}
-            <h1
-              className="font-semibold tracking-tight leading-tight"
-              style={{
-                fontSize: "clamp(1.6rem, 3vw, 2.25rem)",
-                background: "#171717",
-                WebkitBackgroundClip: "text",
-                WebkitTextFillColor: "transparent",
-                backgroundClip: "text",
-              }}
-            >
-              {t("theater_hero_title")}
-            </h1>
-            <p
-              className="mt-3 mx-auto text-default-700"
-              style={{
-                fontFamily: '"Source Serif Pro", "Noto Serif TC", Georgia, serif',
-                fontStyle: "italic", fontSize: 14, lineHeight: 1.7, maxWidth: 640,
-              }}
-            >
-              {t("theater_hero_subtitle", { brand: brandName ?? t("theater_brand_placeholder") })}
-            </p>
-            <p
-              className="mt-2 mx-auto text-default-700"
-              style={{ fontSize: 12, lineHeight: 1.55, maxWidth: 640, letterSpacing: "0.02em" }}
-            >
-              <span style={{ fontWeight: 600, color: "#171717", marginRight: 6 }}>{t("theater_suitable_label")}</span>
-              {t("theater_suitable_value")}
-            </p>
+            <div className="inline-flex items-center gap-2">
+              <h1
+                className="font-semibold tracking-tight leading-tight text-default-900"
+                style={{ fontSize: "clamp(1.6rem, 3vw, 2.25rem)" }}
+              >
+                {t("theater_title")}
+              </h1>
+              <HelpTip>
+                {t("theater_hero_subtitle", { brand: brandName ?? t("theater_brand_placeholder") })}
+                <span className="block mt-1 text-default-500">
+                  {t("theater_suitable_label")}{t("theater_suitable_value")}
+                </span>
+              </HelpTip>
+            </div>
           </div>
           <div className="flex items-center gap-2">
             {!running && cells.size > 0 && (
@@ -1721,7 +1693,7 @@ export default function TheaterPage() {
                   const k = persistKey(brandId);
                   if (k) localStorage.removeItem(k);
                 }}
-                startContent={<RefreshCw size={13} strokeWidth={2} />}
+                startContent={<RegenerateIcon size={13} strokeWidth={2} />}
               >
                 {t("theater_btn_clear")}
               </Button>
@@ -1730,7 +1702,7 @@ export default function TheaterPage() {
               <Button
                 color="primary"
                 onPress={startRun}
-                startContent={<Play size={14} strokeWidth={2} />}
+                startContent={<PlayIcon size={14} strokeWidth={2} />}
                 isDisabled={!brandId}
               >
                 {cells.size > 0 ? t("theater_btn_restart") : t("theater_btn_start")}
@@ -1758,14 +1730,14 @@ export default function TheaterPage() {
                       )}
                     </div>
                     <div className="w-32 h-1 bg-default-200 rounded-full overflow-hidden mt-1">
-                      <div className="h-full bg-violet-500 transition-all" style={{ width: `${pct}%` }} />
+                      <div className="h-full bg-zinc-500 transition-all" style={{ width: `${pct}%` }} />
                     </div>
                   </div>
                   <Button
                     color="danger"
                     variant="flat"
                     onPress={() => { stopRef.current = true; stopRun(); }}
-                    startContent={<X size={14} strokeWidth={2} />}
+                    startContent={<CloseIcon size={14} strokeWidth={2} />}
                   >
                     {t("theater_btn_stop")}
                   </Button>
@@ -1812,7 +1784,7 @@ export default function TheaterPage() {
                     title={lang === "en" ? "Account not connected" : "帳號尚未連接"}
                   />
                 )}
-                {on && <Check size={12} strokeWidth={2.5} />}
+                {on && <CheckIcon size={12} strokeWidth={2.5} />}
               </button>
             );
           })}
@@ -1823,17 +1795,17 @@ export default function TheaterPage() {
           <div className="mt-4 p-4 rounded-xl border border-neutral-200 bg-white space-y-3">
             <div className="flex items-center justify-between">
               <p className="text-[12px] font-semibold uppercase tracking-wider text-neutral-500">
-                {lang === "en" ? "Weekly focus — select what to promote" : "本週焦點 — 選擇要推廣的產品 / 活動"}
+                {lang === "en" ? "Weekly focus" : "本週焦點"}
               </p>
               {(selectedProductIds.size > 0 || selectedEventIds.size > 0) && (
                 <button
                   onClick={handlePlanSchedule}
                   disabled={planScheduleMut?.isPending || running}
-                  className="text-[12px] font-semibold px-3 py-1.5 rounded-lg bg-violet-600 text-white hover:bg-violet-700 disabled:opacity-50 transition flex items-center gap-1.5"
+                  className="text-[12px] font-semibold px-3 py-1.5 rounded-lg bg-zinc-600 text-white hover:bg-zinc-700 disabled:opacity-50 transition flex items-center gap-1.5"
                 >
                   {planScheduleMut?.isPending
                     ? (lang === "en" ? "Planning…" : "排程中…")
-                    : (lang === "en" ? "AI Schedule" : "AI 智能排程")}
+                    : (lang === "en" ? "AI Schedule" : "AI 排程")}
                 </button>
               )}
             </div>
@@ -1858,7 +1830,7 @@ export default function TheaterPage() {
                           : "bg-white text-neutral-600 border-neutral-300 hover:border-emerald-400"
                       }`}
                     >
-                      {selected ? "✓ " : ""}{p.name}
+                      {selected ? <CheckIcon size={10} className="inline mr-1" /> : null}{p.name}
                     </button>
                   );
                 })}
@@ -1885,8 +1857,8 @@ export default function TheaterPage() {
                           : "bg-white text-neutral-600 border-neutral-300 hover:border-amber-400"
                       }`}
                     >
-                      <CalendarIcon size={10} className="inline mr-1" />
-                      {selected ? "✓ " : ""}{e.name}
+                      <PlannerIcon size={10} className="inline mr-1" />
+                      {selected ? <CheckIcon size={10} className="inline mr-1" /> : null}{e.name}
                       {e.startAt && <span className="ml-1 opacity-70 text-[12px]">{e.startAt.slice(5)}</span>}
                     </button>
                   );
@@ -1898,7 +1870,7 @@ export default function TheaterPage() {
             {scheduleVisible && aiSchedule && (
               <div className="mt-1 border-t border-neutral-100 pt-3 space-y-1.5">
                 <div className="flex items-center justify-between mb-2">
-                  <p className="text-[12px] font-semibold text-violet-700">
+                  <p className="text-[12px] font-semibold text-zinc-700">
                     {lang === "en" ? "AI suggested schedule" : "AI 排程建議"}
                   </p>
                   <button onClick={() => setScheduleVisible(false)} className="text-[12px] text-neutral-400 hover:text-neutral-700">
@@ -1908,7 +1880,7 @@ export default function TheaterPage() {
                 {days.map((d) => {
                   const entry = aiSchedule[d.date];
                   if (!entry) return null;
-                  const color = entry.type === "product" ? "#059669" : entry.type === "event" ? "#d97706" : "#6b7280";
+                  const color = entry.type === "product" ? "#3f3f46" : entry.type === "event" ? "#71717a" : "#6b7280";
                   return (
                     <div key={d.date} className="flex items-start gap-2 text-[12px]">
                       <span className="text-neutral-400 w-14 shrink-0 tabular-nums">{d.label}</span>
@@ -1926,13 +1898,13 @@ export default function TheaterPage() {
         <div className="flex items-center gap-2 flex-wrap mt-3">
           <button
             onClick={() => { setMaterialModalOpen(true); setMaterialTab("event"); }}
-            className="px-4 py-2 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 hover:text-indigo-900 border-2 border-indigo-200 hover:border-indigo-400 flex items-center gap-2 text-sm font-medium transition shadow-sm"
+            className="px-4 py-2 rounded-lg bg-zinc-50 hover:bg-zinc-100 text-zinc-700 hover:text-zinc-900 border-2 border-zinc-200 hover:border-zinc-400 flex items-center gap-2 text-sm font-medium transition shadow-sm"
             disabled={running}
           >
-            <Plus size={16} strokeWidth={2.5} />
+            <AddIcon size={16} strokeWidth={2.5} />
             <span>{t("theater_btn_add_materials")}</span>
             {totalMaterials > 0 && (
-              <span className="ml-1 text-[12px] px-1.5 py-0.5 rounded-full bg-indigo-500 text-white font-bold">
+              <span className="ml-1 text-[12px] px-1.5 py-0.5 rounded-full bg-zinc-500 text-white font-bold">
                 {totalMaterials}
               </span>
             )}
@@ -1941,11 +1913,11 @@ export default function TheaterPage() {
           {/* Inline summary chips */}
           {importantDates.map((d) => (
             <span key={d.id} className="px-2.5 py-1 text-xs rounded-lg bg-amber-50 text-amber-800 border border-amber-200 flex items-center gap-1.5">
-              <CalendarIcon size={11} strokeWidth={2} />
+              <PlannerIcon size={11} strokeWidth={2} />
               <span className="font-semibold">{d.date.slice(5)}</span>
               <span>{d.name}</span>
               <button onClick={() => setImportantDates((prev) => prev.filter((x) => x.id !== d.id))} className="text-amber-600 hover:text-amber-900">
-                <X size={11} />
+                <CloseIcon size={11} />
               </button>
             </span>
           ))}
@@ -1953,15 +1925,15 @@ export default function TheaterPage() {
             <span key={p.id} className="px-2.5 py-1 text-xs rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-200 flex items-center gap-1.5">
               <span className="font-semibold">{p.name}</span>
               <button onClick={() => setProducts((prev) => prev.filter((x) => x.id !== p.id))} className="text-emerald-600 hover:text-emerald-900">
-                <X size={11} />
+                <CloseIcon size={11} />
               </button>
             </span>
           ))}
           {photos.map((ph) => (
-            <span key={ph.id} className="px-2.5 py-1 text-xs rounded-lg bg-pink-50 text-pink-800 border border-pink-200 flex items-center gap-1.5">
+            <span key={ph.id} className="px-2.5 py-1 text-xs rounded-lg bg-zinc-50 text-zinc-800 border border-zinc-200 flex items-center gap-1.5">
               <span>{t(`theater_photo_tag_${ph.tag}` as any)}</span>
-              <button onClick={() => setPhotos((prev) => prev.filter((x) => x.id !== ph.id))} className="text-pink-600 hover:text-pink-900">
-                <X size={11} />
+              <button onClick={() => setPhotos((prev) => prev.filter((x) => x.id !== ph.id))} className="text-zinc-600 hover:text-zinc-900">
+                <CloseIcon size={11} />
               </button>
             </span>
           ))}
@@ -2031,11 +2003,11 @@ export default function TheaterPage() {
                         <div className="flex justify-end mt-0.5 px-1">
                           {connectedPlatforms[p] ? (
                             <span className="text-[12px] px-1.5 py-0.5 rounded-full bg-success-50 border border-success-200 text-success-700 font-medium">
-                              ✓ {lang === "en" ? "可排程發布" : "可排程發布"}
+                              <CheckIcon size={10} /> {lang === "en" ? "Ready" : "可發布"}
                             </span>
                           ) : (
                             <span className="text-[12px] px-1.5 py-0.5 rounded-full bg-warning-50 border border-warning-200 text-warning-700 font-medium">
-                              ⚠ {lang === "en" ? "Connect account first" : "需先連接帳號"}
+                              <WarningIcon size={10} /> {lang === "en" ? "Connect account first" : "需先連接帳號"}
                             </span>
                           )}
                         </div>
@@ -2060,7 +2032,7 @@ export default function TheaterPage() {
                 className="absolute top-3 right-3 text-neutral-400 hover:text-neutral-700 p-1 rounded-md hover:bg-neutral-100 transition"
                 title={t("theater_close_tip")}
               >
-                <X size={18} />
+                <CloseIcon size={18} />
               </button>
               <h3 className="text-base font-semibold text-neutral-900 mb-1">{t("theater_modal_materials_title")}</h3>
               <p className="text-xs text-neutral-500 mb-4">{t("theater_modal_materials_subtitle")}</p>
@@ -2077,7 +2049,7 @@ export default function TheaterPage() {
                     onClick={() => setMaterialTab(t.v)}
                     className={`px-4 py-2 text-sm font-medium border-b-2 transition ${
                       materialTab === t.v
-                        ? "border-indigo-500 text-indigo-700"
+                        ? "border-zinc-500 text-zinc-700"
                         : "border-transparent text-neutral-500 hover:text-neutral-800"
                     }`}
                   >
@@ -2095,7 +2067,7 @@ export default function TheaterPage() {
                       {lang === "en" ? "Select or create event" : "選擇活動或新增"}
                     </label>
                     <select
-                      className="w-full text-sm px-3 py-2 border border-neutral-300 rounded-lg bg-white focus:outline-none focus:border-indigo-500 cursor-pointer"
+                      className="w-full text-sm px-3 py-2 border border-neutral-300 rounded-lg bg-white focus:outline-none focus:border-zinc-500 cursor-pointer"
                       value=""
                       onChange={(e) => {
                         const val = e.target.value;
@@ -2127,7 +2099,7 @@ export default function TheaterPage() {
                             const added = importantDates.some((d) => d.entityId === ev.id);
                             return (
                               <option key={ev.id} value={String(ev.id)} disabled={added}>
-                                {ev.name}{ev.startAt ? ` (${ev.startAt})` : ""}{added ? (lang === "en" ? " ✓ added" : " ✓ 已加入") : ""}
+                                {ev.name}{ev.startAt ? ` (${ev.startAt})` : ""}{added ? (lang === "en" ? " added" : " 已加入") : ""}
                               </option>
                             );
                           })}
@@ -2142,11 +2114,11 @@ export default function TheaterPage() {
                   {/* Manual add form — shown when user picks "新增" OR has no brand events */}
                   <div className="flex items-center gap-2">
                     <input type="date" value={newDate} onChange={(e) => setNewDate(e.target.value)} className="text-sm px-2 py-1.5 border border-neutral-300 rounded" />
-                    <input type="text" placeholder={t("theater_event_placeholder")} value={newDateName} onChange={(e) => setNewDateName(e.target.value)} className="flex-1 text-sm px-2 py-1.5 border border-neutral-300 rounded focus:outline-none focus:border-indigo-500" />
+                    <input type="text" placeholder={t("theater_event_placeholder")} value={newDateName} onChange={(e) => setNewDateName(e.target.value)} className="flex-1 text-sm px-2 py-1.5 border border-neutral-300 rounded focus:outline-none focus:border-zinc-500" />
                     <button
                       onClick={() => { handleAddDate(); }}
                       disabled={!newDate || !newDateName}
-                      className="text-sm px-3 py-1.5 rounded-md bg-indigo-500 hover:bg-indigo-600 text-white font-medium disabled:opacity-40"
+                      className="text-sm px-3 py-1.5 rounded-md bg-zinc-500 hover:bg-zinc-600 text-white font-medium disabled:opacity-40"
                     >
                       {t("theater_btn_add_item")}
                     </button>
@@ -2162,13 +2134,13 @@ export default function TheaterPage() {
                         <div key={d.id} className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2.5 space-y-2">
                           <div className="flex items-center justify-between">
                             <span className="text-sm font-medium flex items-center gap-1.5">
-                              <CalendarIcon size={13} className="text-amber-600" />
+                              <PlannerIcon size={13} className="text-amber-600" />
                               <b>{d.date}</b>
                               {d.endDate && <span className="text-neutral-500 text-xs">→ {d.endDate}</span>}
                               <span className="ml-1">{d.name}</span>
                             </span>
                             <button onClick={() => setImportantDates((prev) => prev.filter((x) => x.id !== d.id))} className="text-amber-500 hover:text-amber-800">
-                              <X size={14} />
+                              <CloseIcon size={14} />
                             </button>
                           </div>
                           <div className="flex items-center gap-2 text-[12px] text-neutral-600">
@@ -2198,7 +2170,7 @@ export default function TheaterPage() {
                       {lang === "en" ? "Select or create product" : "選擇產品或新增"}
                     </label>
                     <select
-                      className="w-full text-sm px-3 py-2 border border-neutral-300 rounded-lg bg-white focus:outline-none focus:border-indigo-500 cursor-pointer"
+                      className="w-full text-sm px-3 py-2 border border-neutral-300 rounded-lg bg-white focus:outline-none focus:border-zinc-500 cursor-pointer"
                       value=""
                       onChange={(e) => {
                         const val = e.target.value;
@@ -2222,7 +2194,7 @@ export default function TheaterPage() {
                             const added = products.some((p) => p.entityId === bp.id);
                             return (
                               <option key={bp.id} value={String(bp.id)} disabled={added}>
-                                {bp.name}{bp.usp ? ` — ${bp.usp.slice(0, 30)}` : ""}{added ? (lang === "en" ? " ✓ added" : " ✓ 已加入") : ""}
+                                {bp.name}{bp.usp ? ` — ${bp.usp.slice(0, 30)}` : ""}{added ? (lang === "en" ? " added" : " 已加入") : ""}
                               </option>
                             );
                           })}
@@ -2236,8 +2208,8 @@ export default function TheaterPage() {
 
                   {/* Manual add form */}
                   <div className="space-y-2">
-                    <input type="text" placeholder={t("theater_product_name_ph")} value={newProductName} onChange={(e) => setNewProductName(e.target.value)} className="w-full text-sm px-2 py-1.5 border border-neutral-300 rounded focus:outline-none focus:border-indigo-500" />
-                    <input type="text" placeholder={t("theater_product_usp_ph")} value={newProductUsp} onChange={(e) => setNewProductUsp(e.target.value)} className="w-full text-sm px-2 py-1.5 border border-neutral-300 rounded focus:outline-none focus:border-indigo-500" />
+                    <input type="text" placeholder={t("theater_product_name_ph")} value={newProductName} onChange={(e) => setNewProductName(e.target.value)} className="w-full text-sm px-2 py-1.5 border border-neutral-300 rounded focus:outline-none focus:border-zinc-500" />
+                    <input type="text" placeholder={t("theater_product_usp_ph")} value={newProductUsp} onChange={(e) => setNewProductUsp(e.target.value)} className="w-full text-sm px-2 py-1.5 border border-neutral-300 rounded focus:outline-none focus:border-zinc-500" />
                     <div className="flex items-center gap-2">
                       <input type="date" value={newProductLaunch} onChange={(e) => setNewProductLaunch(e.target.value)} className="text-sm px-2 py-1.5 border border-neutral-300 rounded" />
                       <button
@@ -2253,7 +2225,7 @@ export default function TheaterPage() {
                           setNewProductName(""); setNewProductUsp(""); setNewProductLaunch("");
                         }}
                         disabled={!newProductName || !newProductUsp}
-                        className="ml-auto text-sm px-3 py-1.5 rounded-md bg-indigo-500 hover:bg-indigo-600 text-white font-medium disabled:opacity-40"
+                        className="ml-auto text-sm px-3 py-1.5 rounded-md bg-zinc-500 hover:bg-zinc-600 text-white font-medium disabled:opacity-40"
                       >
                         {t("theater_btn_add_item")}
                       </button>
@@ -2274,7 +2246,7 @@ export default function TheaterPage() {
                               {p.usp && <p className="text-[12px] text-neutral-500 truncate">{p.usp}</p>}
                             </div>
                             <button onClick={() => setProducts((prev) => prev.filter((x) => x.id !== p.id))} className="text-emerald-600 hover:text-emerald-900 mt-0.5 ml-2 shrink-0">
-                              <X size={14} />
+                              <CloseIcon size={14} />
                             </button>
                           </div>
                           <div className="grid grid-cols-2 gap-2">
@@ -2314,12 +2286,12 @@ export default function TheaterPage() {
                     <div className="grid grid-cols-3 gap-2 max-h-48 overflow-y-auto">
                       {photos.map((ph) => (
                         <div key={ph.id} className="relative group">
-                          <img src={ph.url} alt={ph.note ?? ph.tag} className="w-full aspect-square object-cover rounded-lg border border-pink-200" />
-                          <span className="absolute top-1 left-1 text-[12px] px-1.5 py-0.5 rounded-full bg-pink-500/90 text-white font-medium">
+                          <img src={ph.url} alt={ph.note ?? ph.tag} className="w-full aspect-square object-cover rounded-lg border border-zinc-200" />
+                          <span className="absolute top-1 left-1 text-[12px] px-1.5 py-0.5 rounded-full bg-zinc-500/90 text-white font-medium">
                             {t(`theater_photo_tag_${ph.tag}` as any)}
                           </span>
                           <button onClick={() => setPhotos((prev) => prev.filter((x) => x.id !== ph.id))} className="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/60 text-white flex items-center justify-center opacity-0 group-hover:opacity-100">
-                            <X size={11} />
+                            <CloseIcon size={11} />
                           </button>
                         </div>
                       ))}
@@ -2328,8 +2300,8 @@ export default function TheaterPage() {
                   <div className="space-y-2">
                     {/* File upload OR URL — two paths to add a photo */}
                     <div className="flex items-center gap-2">
-                      <label className="cursor-pointer flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg border-2 border-dashed border-indigo-300 text-indigo-600 hover:border-indigo-500 hover:bg-indigo-50 transition">
-                        📁 {lang === "en" ? "Upload from device" : "從電腦上傳"}
+                      <label className="cursor-pointer flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg border-2 border-dashed border-zinc-300 text-zinc-600 hover:border-zinc-500 hover:bg-zinc-50 transition">
+                        <UploadIcon size={13} /> {lang === "en" ? "Upload from device" : "從電腦上傳"}
                         <input
                           type="file"
                           accept="image/*"
@@ -2355,7 +2327,7 @@ export default function TheaterPage() {
                         />
                       </label>
                       <span className="text-neutral-400 text-xs">{lang === "en" ? "or" : "或"}</span>
-                      <input type="url" placeholder={t("theater_photo_url_ph")} value={newPhotoUrl} onChange={(e) => setNewPhotoUrl(e.target.value)} className="flex-1 text-sm px-2 py-1.5 border border-neutral-300 rounded focus:outline-none focus:border-indigo-500" />
+                      <input type="url" placeholder={t("theater_photo_url_ph")} value={newPhotoUrl} onChange={(e) => setNewPhotoUrl(e.target.value)} className="flex-1 text-sm px-2 py-1.5 border border-neutral-300 rounded focus:outline-none focus:border-zinc-500" />
                     </div>
                     <div className="flex items-center gap-2">
                       <select value={newPhotoTag} onChange={(e) => setNewPhotoTag(e.target.value as any)} className="text-sm px-2 py-1.5 border border-neutral-300 rounded">
@@ -2364,7 +2336,7 @@ export default function TheaterPage() {
                         <option value="person">{t("theater_photo_tag_person")}</option>
                         <option value="lifestyle">{t("theater_photo_tag_lifestyle")}</option>
                       </select>
-                      <input type="text" placeholder={t("theater_photo_note_ph")} value={newPhotoNote} onChange={(e) => setNewPhotoNote(e.target.value)} className="flex-1 text-sm px-2 py-1.5 border border-neutral-300 rounded focus:outline-none focus:border-indigo-500" />
+                      <input type="text" placeholder={t("theater_photo_note_ph")} value={newPhotoNote} onChange={(e) => setNewPhotoNote(e.target.value)} className="flex-1 text-sm px-2 py-1.5 border border-neutral-300 rounded focus:outline-none focus:border-zinc-500" />
                       <button
                         onClick={() => {
                           if (!newPhotoUrl) return;
@@ -2377,7 +2349,7 @@ export default function TheaterPage() {
                           setNewPhotoUrl(""); setNewPhotoNote("");
                         }}
                         disabled={!newPhotoUrl}
-                        className="text-sm px-3 py-1.5 rounded-md bg-indigo-500 hover:bg-indigo-600 text-white font-medium disabled:opacity-40"
+                        className="text-sm px-3 py-1.5 rounded-md bg-zinc-500 hover:bg-zinc-600 text-white font-medium disabled:opacity-40"
                       >
                         {t("theater_btn_add_item")}
                       </button>
@@ -2422,7 +2394,7 @@ export default function TheaterPage() {
                   onClick={closeScheduleModal}
                   className="w-7 h-7 rounded-full flex items-center justify-center text-neutral-400 hover:bg-neutral-100"
                 >
-                  <X size={14} />
+                  <CloseIcon size={14} />
                 </button>
               </div>
 
@@ -2431,8 +2403,8 @@ export default function TheaterPage() {
                 {/* Caption edit */}
                 <div>
                   <label className="text-[12px] font-semibold text-neutral-600 mb-1.5 flex items-center gap-1.5">
-                    <Pencil size={11} />
-                    {lang === "en" ? "Caption (edit before scheduling)" : "文案（排程前可修改）"}
+                    <EditIcon size={11} />
+                    {lang === "en" ? "Caption" : "文案"}
                   </label>
                   <textarea
                     autoFocus
@@ -2450,7 +2422,7 @@ export default function TheaterPage() {
                 {/* Date + time picker */}
                 <div>
                   <label className="text-[12px] font-semibold text-neutral-600 mb-1.5 flex items-center gap-1.5">
-                    <Clock size={11} />
+                    <WaitingIcon size={11} />
                     {lang === "en" ? "Publish date & time" : "發布日期與時間"}
                   </label>
                   <input
@@ -2477,7 +2449,7 @@ export default function TheaterPage() {
                   className="flex-1 py-2.5 rounded-xl text-[13px] font-semibold flex items-center justify-center gap-2 transition disabled:opacity-50"
                   style={{ background: "#171717", color: "white" }}
                 >
-                  <CalendarIcon size={13} />
+                  <PlannerIcon size={13} />
                   {scheduleCellMut?.isLoading
                     ? (lang === "en" ? "Scheduling…" : "排程中…")
                     : (lang === "en" ? "Confirm schedule" : "確認排程")}
@@ -2505,7 +2477,7 @@ export default function TheaterPage() {
                 value={ruleText}
                 onChange={(e) => setRuleText(e.target.value)}
                 placeholder={t("theater_rule_placeholder")}
-                className="w-full text-sm px-3 py-2 border border-neutral-300 rounded resize-none focus:outline-none focus:border-indigo-500"
+                className="w-full text-sm px-3 py-2 border border-neutral-300 rounded resize-none focus:outline-none focus:border-zinc-500"
                 style={{ minHeight: 80 }}
               />
               <p className="text-xs font-medium text-neutral-700 mt-4 mb-2">{t("theater_rule_scope_label")}</p>
@@ -2518,7 +2490,7 @@ export default function TheaterPage() {
                   <label
                     key={opt.v}
                     className={`block p-2.5 rounded-lg border cursor-pointer transition ${
-                      ruleScope === opt.v ? "border-indigo-500 bg-indigo-50" : "border-neutral-200 hover:bg-neutral-50"
+                      ruleScope === opt.v ? "border-zinc-500 bg-zinc-50" : "border-neutral-200 hover:bg-neutral-50"
                     }`}
                   >
                     <div className="flex items-start gap-2">
@@ -2546,7 +2518,7 @@ export default function TheaterPage() {
                 <button
                   onClick={submitRule}
                   disabled={!ruleText.trim()}
-                  className="text-sm px-4 py-1.5 rounded-md bg-indigo-500 hover:bg-indigo-600 text-white font-medium disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="text-sm px-4 py-1.5 rounded-md bg-zinc-500 hover:bg-zinc-600 text-white font-medium disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   {t("theater_btn_apply_redo")}
                 </button>

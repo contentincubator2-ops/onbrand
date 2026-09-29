@@ -16,9 +16,7 @@
  */
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { Modal, ModalContent, Button, Input, Textarea, Spinner } from "@heroui/react";
-import {
-  Bot, Trash2, X, Share2, CheckCircle2, ExternalLink,
-} from "lucide-react";
+import { AgentIcon, CloseIcon, DeleteIcon, DoneIcon, ExternalIcon, ShareIcon, InfoIcon, CheckIcon, WarningIcon, InboxIcon } from "../../../platform/components/icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faFacebook, faInstagram, faLinkedin, faYoutube, faLine, faThreads, faTiktok } from "@fortawesome/free-brands-svg-icons";
 import { faGlobe } from "@fortawesome/free-solid-svg-icons";
@@ -27,6 +25,7 @@ import { trpc } from "../../../../lib/trpc";
 import { useLang } from "../../../../lib/i18n";
 import { useNavigate } from "react-router-dom";
 import { showToastGlobal } from "../../../../components/ui/Toast";
+import { HelpTip } from "../../../platform/components/HelpTip";
 
 // 2026-05-30 (CJ「modal 只留設定類 tab，內容類交給主頁面」):
 // 基本資料 和 視覺 都已在主工作區有完整 tab，不在 modal 重複。
@@ -50,9 +49,9 @@ function getTabs(en: boolean): Array<{ id: SettingsTab; label: string; Icon: any
   // 視覺 → 主工作區「視覺」tab（完整版視覺資產庫）
   // Modal = 純設定（外部連接 + AI 客製化 + 危險操作）
   return [
-    { id: "publish", label: en ? "Platform auth" : "平台授權", Icon: Share2 },
-    { id: "ai",      label: en ? "AI prompts"    : "AI 指令",  Icon: Bot    },
-    { id: "danger",  label: en ? "Danger zone"   : "危險區",   Icon: Trash2 },
+    { id: "publish", label: en ? "Platform auth" : "平台授權", Icon: ShareIcon },
+    { id: "ai",      label: en ? "AI prompts"    : "AI 指令",  Icon: AgentIcon    },
+    { id: "danger",  label: en ? "Danger zone"   : "危險區",   Icon: DeleteIcon },
   ];
 }
 
@@ -104,7 +103,7 @@ export default function BrandSettingsSheet({ isOpen, onClose, brandId, brandName
               ))}
             </nav>
             <div className="px-2 py-3 border-t border-default-100">
-              <Button variant="light" size="sm" onPress={onClose} startContent={<X size={13} />} className="w-full justify-start">
+              <Button variant="light" size="sm" onPress={onClose} startContent={<CloseIcon size={13} />} className="w-full justify-start">
                 {en ? "Close" : "關閉"}
               </Button>
             </div>
@@ -114,7 +113,7 @@ export default function BrandSettingsSheet({ isOpen, onClose, brandId, brandName
           <div className="flex-1 min-w-0 overflow-y-auto">
             {onboardingHint && (
               <div className="bg-amber-50 border-b border-amber-200 px-6 py-3 text-sm text-amber-900 flex items-start gap-2">
-                <span className="text-base">👋</span>
+                <span className="text-base"><InfoIcon size={14} /></span>
                 <span className="leading-relaxed">{onboardingHint}</span>
               </div>
             )}
@@ -193,13 +192,13 @@ export function InfoTab({ brandId, brandName }: { brandId: number | null; brandN
  */
 function getSocialFields(en: boolean): Array<{ key: string; label: string; icon: any; tone: string; placeholder: string }> {
   return [
-    { key: "facebook",  label: en ? "Facebook Page" : "Facebook 粉專",  icon: faFacebook,  tone: "#1877F2", placeholder: "https://www.facebook.com/yourpage" },
-    { key: "instagram", label: "Instagram",    icon: faInstagram, tone: "#E1306C", placeholder: "https://www.instagram.com/yourhandle" },
-    { key: "youtube",   label: "YouTube",       icon: faYoutube,   tone: "#FF0000", placeholder: "https://www.youtube.com/@yourchannel" },
+    { key: "facebook",  label: en ? "Facebook Page" : "Facebook 粉專",  icon: faFacebook,  tone: "#18181b", placeholder: "https://www.facebook.com/yourpage" },
+    { key: "instagram", label: "Instagram",    icon: faInstagram, tone: "#18181b", placeholder: "https://www.instagram.com/yourhandle" },
+    { key: "youtube",   label: "YouTube",       icon: faYoutube,   tone: "#18181b", placeholder: "https://www.youtube.com/@yourchannel" },
     { key: "threads",   label: "Threads",       icon: faThreads,   tone: "#111111", placeholder: "https://www.threads.net/@yourhandle" },
     { key: "tiktok",    label: "TikTok",        icon: faTiktok,    tone: "#111111", placeholder: "https://www.tiktok.com/@yourhandle" },
-    { key: "linkedin",  label: "LinkedIn",      icon: faLinkedin,  tone: "#0A66C2", placeholder: "https://www.linkedin.com/company/yours" },
-    { key: "line",      label: en ? "LINE Official" : "LINE 官方帳號", icon: faLine, tone: "#06C755", placeholder: en ? "https://lin.ee/xxxxx or @yourLineId" : "https://lin.ee/xxxxx 或 @yourLineId" },
+    { key: "linkedin",  label: "LinkedIn",      icon: faLinkedin,  tone: "#18181b", placeholder: "https://www.linkedin.com/company/yours" },
+    { key: "line",      label: en ? "LINE Official" : "LINE 官方帳號", icon: faLine, tone: "#18181b", placeholder: en ? "https://lin.ee/xxxxx or @yourLineId" : "https://lin.ee/xxxxx 或 @yourLineId" },
   ];
 }
 
@@ -377,7 +376,7 @@ function BrandBasicEditor({ brandId, en }: { brandId: number | null; en: boolean
           {en ? "Re-analyze (re-read site)" : "重新分析（重讀官網/社群）"}
         </Button>
         {savedAt && !isSaving && (
-          <span className="text-tiny text-success-600">{en ? "Saved ✓" : "已儲存 ✓"}</span>
+          <span className="text-tiny text-success-600 inline-flex items-center gap-1"><CheckIcon size={10} />{en ? "Saved" : "已儲存"}</span>
         )}
         {recalDone && !recalM?.isPending && (
           <span className="text-tiny text-secondary-600">
@@ -452,12 +451,14 @@ export function VisualTab({ brandId }: { brandId: number | null }) {
 
   return (
     <div className="max-w-[820px] mx-auto p-8">
-      <h2 className="text-2xl font-semibold text-default-900 mb-2">{en ? "Visual identity" : "視覺識別"}</h2>
-      <p className="text-sm text-default-500 mb-6">
-        {en
-          ? "Logo · palette · font · guidelines — AI applies these when generating images so output stays on-brand"
-          : "Logo · 色票 · 字型 · 識別規範 — AI 生圖時會自動套用，確保不脫離品牌調性"}
-      </p>
+      <h2 className="text-2xl font-semibold text-default-900 mb-6 flex items-center gap-2">
+        {en ? "Visual identity" : "視覺識別"}
+        <HelpTip>
+          {en
+            ? "AI applies the logo, palette, font and guidelines when generating images."
+            : "AI 生圖時會自動套用 Logo、色票、字型與識別規範。"}
+        </HelpTip>
+      </h2>
 
       {/* Logo */}
       <section className="border border-default-200 rounded-xl p-5 bg-white mb-4">
@@ -721,10 +722,10 @@ export function PublishTab({ brandId }: { brandId: number | null }) {
   // ── Platform config ────────────────────────────────────────────────────
   type PlatformCfg = { key: string; label: string; color: string; icon: any; desc: string };
   const PLATFORMS: PlatformCfg[] = [
-    { key: "facebook",  label: "Facebook",  color: "#1877F2", icon: faFacebook,  desc: en ? "Publish to your Facebook Page"              : "發布到 Facebook 粉專"        },
-    { key: "instagram", label: "Instagram", color: "#E1306C", icon: faInstagram, desc: en ? "Publish to Instagram Business account"       : "發布到 Instagram 商業帳號"   },
-    { key: "linkedin",  label: "LinkedIn",  color: "#0A66C2", icon: faLinkedin,  desc: en ? "Publish to your LinkedIn profile or page"    : "發布到 LinkedIn 帳號或企業頁面" },
-    { key: "youtube",   label: "YouTube",   color: "#FF0000", icon: faYoutube,   desc: en ? "Upload videos to your YouTube channel"       : "上傳影片到 YouTube 頻道"     },
+    { key: "facebook",  label: "Facebook",  color: "#18181b", icon: faFacebook,  desc: en ? "Publish to your Facebook Page"              : "發布到 Facebook 粉專"        },
+    { key: "instagram", label: "Instagram", color: "#18181b", icon: faInstagram, desc: en ? "Publish to Instagram Business account"       : "發布到 Instagram 商業帳號"   },
+    { key: "linkedin",  label: "LinkedIn",  color: "#18181b", icon: faLinkedin,  desc: en ? "Publish to your LinkedIn profile or page"    : "發布到 LinkedIn 帳號或企業頁面" },
+    { key: "youtube",   label: "YouTube",   color: "#18181b", icon: faYoutube,   desc: en ? "Upload videos to your YouTube channel"       : "上傳影片到 YouTube 頻道"     },
   ];
 
   // ── After OAuth: poll until Pipedream registers the connection ───────────
@@ -959,7 +960,7 @@ export function PublishTab({ brandId }: { brandId: number | null }) {
                 {/* Connection status badge — always visible */}
                 {fullyConnected ? (
                   <span className="flex items-center gap-1 text-[12px] text-success-700 bg-success-100 border border-success-300 px-2 py-0.5 rounded-full flex-shrink-0 font-medium">
-                    <CheckCircle2 size={11} /> {en ? "Connected" : "已連接"}
+                    <DoneIcon size={11} /> {en ? "Connected" : "已連接"}
                   </span>
                 ) : isVerifying ? (
                   <span className="flex items-center gap-1 text-[12px] text-primary-600 bg-primary-50 border border-primary-200 px-2 py-0.5 rounded-full flex-shrink-0 font-medium animate-pulse">
@@ -996,7 +997,7 @@ export function PublishTab({ brandId }: { brandId: number | null }) {
                     {daysSince !== null && (
                       <div className={`mt-0.5 text-[12px] ${isStale ? "text-warning-600 font-medium" : "text-default-400"}`}>
                         {isStale
-                          ? (en ? `⚠ Connected ${daysSince}d ago — consider re-authorizing` : `⚠ 已連接 ${daysSince} 天，建議重新授權`)
+                          ? <><WarningIcon size={11} /> {en ? `Connected ${daysSince}d ago — consider re-authorizing` : `已連接 ${daysSince} 天，建議重新授權`}</>
                           : (en ? `Connected ${daysSince}d ago` : `已連接 ${daysSince} 天`)}
                       </div>
                     )}
@@ -1010,7 +1011,7 @@ export function PublishTab({ brandId }: { brandId: number | null }) {
                   size="sm"
                   color={fullyConnected ? "default" : "primary"}
                   variant={fullyConnected ? "bordered" : "solid"}
-                  startContent={(isPending || isVerifying) ? undefined : <ExternalLink size={12} />}
+                  startContent={(isPending || isVerifying) ? undefined : <ExternalIcon size={12} />}
                   isLoading={isPending || isVerifying}
                   isDisabled={isPending || isVerifying}
                   onPress={() => connectWithSDK(p)}
@@ -1038,18 +1039,19 @@ export function PublishTab({ brandId }: { brandId: number | null }) {
 
               {/* ── 匯入語氣範例 (Facebook only, fully connected) ── */}
               {p.key === "facebook" && fullyConnected && (
-                <div className="rounded-xl border border-violet-200 bg-violet-50/60 px-3 py-3 space-y-2">
-                  <p className="text-[12px] text-violet-800 font-medium leading-relaxed">
-                    📥 {en ? "Import voice from real posts" : "從真實貼文學習語氣"}
-                  </p>
-                  <p className="text-[12px] text-violet-600 leading-relaxed">
-                    {en
-                      ? "Fetch your page's recent posts, analyze writing style, and store real examples in Brand DNA so AI generates content that sounds like you."
-                      : "抓取粉絲團最近 20-30 篇貼文，分析語氣特徵，存入品牌大腦作為真實範例。之後每次產文，AI 都會模仿你們真正的寫作風格。"}
+                <div className="rounded-xl border border-zinc-200 bg-zinc-50/60 px-3 py-3 space-y-2">
+                  <p className="text-[12px] text-zinc-800 font-medium leading-relaxed">
+                    <InboxIcon size={11} /> {en ? "Import voice from real posts" : "從真實貼文學習語氣"}
+                    {" "}
+                    <HelpTip>
+                      {en
+                        ? "Fetches your page's recent 20–30 posts, analyzes the writing style, and stores real examples in Brand DNA for AI to imitate."
+                        : "抓取粉絲團最近 20-30 篇貼文，分析語氣特徵，存入品牌大腦作為真實範例，之後產文會模仿這個寫作風格。"}
+                    </HelpTip>
                   </p>
                   {importResult && (
-                    <div className="text-[12px] text-violet-700 bg-violet-100 rounded-lg px-2 py-1.5 leading-relaxed">
-                      ✓ {en
+                    <div className="text-[12px] text-zinc-700 bg-zinc-100 rounded-lg px-2 py-1.5 leading-relaxed">
+                      <CheckIcon size={11} /> {en
                         ? `Imported ${importResult.samplesImported} samples. Tone: "${importResult.toneSummary}"`
                         : `已匯入 ${importResult.samplesImported} 篇範例。語氣定位：「${importResult.toneSummary}」`}
                     </div>
@@ -1181,7 +1183,7 @@ export function DangerTab({ brandId, brandName, onClose }: { brandId: number | n
         </p>
         {confirmed && (
           <p className="text-sm font-semibold text-danger-700 mb-3">
-            {en ? "⚠ Are you sure? Click again to confirm deletion." : "⚠ 確定嗎？再按一次確認刪除。"}
+            <WarningIcon size={13} /> {en ? "Are you sure? Click again to confirm deletion." : "確定嗎？再按一次確認刪除。"}
           </p>
         )}
         <Button
