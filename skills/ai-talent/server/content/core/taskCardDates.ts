@@ -5,7 +5,7 @@
  * `npm run cards:dates` 重新產生並一起 commit；taskCardDates.test.ts 會確認
  * 目錄裡每一張卡都查得到日期。
  *
- * 產生時間：2026-09-29，491 個 id。
+ * 產生時間：2026-09-29，505 個 id。
  */
 export const TASK_CARD_DATES: Record<string, string> = {
   "apply": "2026-04-26",
@@ -71,8 +71,10 @@ export const TASK_CARD_DATES: Record<string, string> = {
   "em-30-preview-text": "2026-05-06",
   "em-30-promo": "2026-05-06",
   "em-30-re-engagement": "2026-05-06",
+  "em-30-subject-ai-variants": "2026-09-29",
   "em-30-subject-line": "2026-05-06",
   "em-30-transactional": "2026-05-06",
+  "em-30-trigger-plus-story": "2026-09-29",
   "em-30-welcome": "2026-05-06",
   "em-60-newsletter-full": "2026-05-06",
   "em-60-onboarding-3": "2026-05-06",
@@ -305,6 +307,10 @@ export const TASK_CARD_DATES: Record<string, string> = {
   "literal": "2026-04-26",
   "live-session": "2026-08-11",
   "live-teaser": "2026-08-11",
+  "ln-30-rich-menu-order-entry": "2026-09-29",
+  "ln-30-segmented-single-action": "2026-09-29",
+  "ln-30-survey-segment-menu": "2026-09-29",
+  "ln-30-triggered-moment-messages": "2026-09-29",
   "localize": "2026-04-26",
   "localizer": "2026-04-26",
   "media-doc-rewrite": "2026-05-18",
@@ -393,6 +399,13 @@ export const TASK_CARD_DATES: Record<string, string> = {
   "tag-rational": "2026-04-26",
   "tagline": "2026-04-26",
   "tagline-writer": "2026-04-26",
+  "th-30-post-reverse-seasonal": "2026-09-29",
+  "th-30-post-self-deprecating-ask": "2026-09-29",
+  "th-30-reply-celebrity-pile-on": "2026-09-29",
+  "th-30-reply-mock-statement": "2026-09-29",
+  "th-30-reply-one-word-magic": "2026-09-29",
+  "th-30-reply-personified-apology-deal": "2026-09-29",
+  "th-30-reply-verse": "2026-09-29",
   "translate-localize": "2026-04-26",
   "translator": "2026-04-26",
   "tt-100-30day-foryou": "2026-05-06",
@@ -442,6 +455,7 @@ export const TASK_CARD_DATES: Record<string, string> = {
   "web-30-longform-open-books": "2026-09-05",
   "web-30-product-desc": "2026-08-29",
   "web-30-product-faq": "2026-08-29",
+  "web-30-product-limited-pass": "2026-09-29",
   "web-30-product-page-plain-talk": "2026-09-05",
   "wg-fb-brand-view": "2026-08-29",
   "wg-fb-drive": "2026-08-29",
