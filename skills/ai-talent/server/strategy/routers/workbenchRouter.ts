@@ -466,7 +466,7 @@ scenes 3 個、contentAngles 4-6 個、risks 2-3 個。全部必須緊扣這個�
       // 上方的策略工作台而變動」): downstream CASCADE. The page's two natures:
       //   第一〜三幕（受眾/競品/趨勢/起源/價值觀）= research EVIDENCE — the
       //   workbench selects FROM them, never overwrites them.
-      //   第四〜五幕＋工具（差異化/黃金圈/語氣/標語評分/AI 指令庫）= strategy
+      //   第四〜五幕＋工具（差異化/黃金圈/語氣/標語評分）= strategy
       //   EXPRESSION — regenerated here so the whole page follows the applied
       //   scenario. 速查卡 is a derived view of tagline/goldenCircle/
       //   differentiation, so it updates for free.
@@ -545,41 +545,6 @@ scenes 3 個、contentAngles 4-6 個、risks 2-3 個。全部必須緊扣這個�
             return { taglineScore: t };
           },
         }] : []),
-        {
-          id: "aiPrompts", label: "AI 指令庫（5 平台人設重生）",
-          deps: ["differentiation", "goldenCircle", "voice"],
-          run: async (c) => {
-            const { generateAiPromptForPlatform } = await import("./brandKnowledgeRouter");
-            // 2026-09-29（CJ：內容通路只剩 FB／IG／TikTok／電子報／官網）：不再替
-            // youtube／linkedin／press 生成；既有值由下方 read-modify-write 原樣保留。
-            const platforms = ["facebook", "instagram", "threads", "tiktok", "email"] as const;
-            const generated: Record<string, { text: string; image: string }> = {};
-            for (const p of platforms) {
-              try {
-                const r = await generateAiPromptForPlatform(entityIdForSteps, userId, p);
-                if (r.ok) generated[p] = r.value;
-              } catch { /* per-platform best effort */ }
-            }
-            if (Object.keys(generated).length === 0) throw new Error("aiPrompts: all platforms failed");
-            // This writes via a raw UPDATE (not mergePositioning), so it
-            // needs its own lock check — a brand locked mid-cascade must
-            // not have this step land after the fact.
-            if (await isPositioningLocked("brand", entityIdForSteps, userId)) {
-              console.warn(`[workbenchRouter] skip aiPrompts write — brand ${entityIdForSteps} positioning is locked`);
-              return {};
-            }
-            // read-modify-write —mergePositioning 是整鍵覆蓋，_aiPrompts 需保留
-            // 未成功平台的既有值。
-            const cur = await loadBrandPositioning(entityIdForSteps, userId);
-            const merged = { ...(cur?.pos?._aiPrompts ?? {}), ...generated };
-            const nextPos = { ...(cur?.pos ?? {}), _aiPrompts: merged };
-            await localPool.execute(
-              `UPDATE brands SET positioning = ? WHERE id = ? AND userId = ?`,
-              [JSON.stringify(nextPos), entityIdForSteps, userId],
-            );
-            return {};
-          },
-        },
       ];
 
       startPositioningJob({

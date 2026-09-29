@@ -310,11 +310,11 @@ ${brandPrefix || ""}`;
     }))
     .mutation(async ({ ctx, input }) => {
       const userId = ctx.user!.id;
-      // CJ 2026-05-07: scan EVERYTHING under this brandId — positioning,
-      // 文字 assets, 視覺 assets, knowledge, interim, AI 指令 (FB only
-      // for this test). Plus real public content (官網/FB) when reachable.
+      // CJ 2026-05-07: scan everything under this brandId — positioning,
+      // 文字 assets, 視覺 assets, interim. Plus real public content (官網/FB)
+      // when reachable.
       const [fullCtx, real] = await Promise.all([
-        loadBrandFullContext(input.brandId, { platformFilter: "facebook" }).catch(() => ({ block: "", hasFullPositioning: false, hasInterim: false, hasTextAssets: false, hasVisualAssets: false, hasAIPrompts: {} as Record<string, boolean> })),
+        loadBrandFullContext(input.brandId).catch(() => ({ block: "", hasFullPositioning: false, hasInterim: false, hasTextAssets: false, hasVisualAssets: false })),
         getBrandRealContent(input.brandId).catch(() => ({ context: "", hasContent: false, sources: [] as string[] })),
       ]);
 
@@ -346,9 +346,8 @@ ${brandPrefix || ""}`;
 【產出原則】
 1. ${groundingHint}
 2. 必須遵守下方「文字資產」中的禁用詞 / 推薦用詞 / 替換對照（如有）。
-3. 必須採用下方「AI 指令庫 · facebook · 文字指令」中的口吻規則（如有）。
-4. 直接輸出純文字貼文（不要 markdown、不要前綴「貼文：」、不要解釋為什麼這樣寫）。
-5. 不要寫「祝大家 X 快樂」「親愛的客戶」這種僵化套話。
+3. 直接輸出純文字貼文（不要 markdown、不要前綴「貼文：」、不要解釋為什麼這樣寫）。
+4. 不要寫「祝大家 X 快樂」「親愛的客戶」這種僵化套話。
 ${fullCtx.block}${real.context}`;
 
       const results = await Promise.all(SCENARIOS.map(async (s) => {

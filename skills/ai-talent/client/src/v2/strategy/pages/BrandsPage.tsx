@@ -26,7 +26,6 @@ import PipelineRunner, { type PipelineState } from "../components/positioning/Pi
 import PipelineThinkingPanel from "../components/positioning/PipelineThinkingPanel";
 import AgentPersonaBar from "../components/positioning/AgentPersonaBar";
 import SpeedCard from "../components/positioning/SpeedCard";
-import PromptLibrary from "../components/positioning/PromptLibrary";
 import BrandAssetEditor, { type AssetKey } from "../components/positioning/BrandAssetEditor";
 import KnowledgeEditor from "../components/positioning/KnowledgeEditor";
 import PositioningDocPanel from "../components/positioning/PositioningDocPanel";
@@ -59,7 +58,7 @@ import { faPlus, faPalette, faFont, faQuoteLeft, faBullseye, faUsers, faImage, f
 // Sub-nav id format:
 //   "asset:<key>"   — non-positioning brand assets (準則 / 標誌 / etc.)
 //   "seg:<segment>" — one positioning segment (driven by positioningSchema)
-//   "card" / "prompts" / "all"
+//   "card" / "all"
 type SectionId = string;
 
 // Brand has positioning segments + visual/asset entries.
@@ -129,7 +128,7 @@ export default function BrandsPage() {
     try {
       const sp = new URLSearchParams(window.location.search);
       const t = sp.get("tab");
-      if (t === "publish" || t === "ai") {
+      if (t === "publish") {
         setCategory(t);
       } else if (t === "connector") {
         setCategory("publish"); // legacy alias
@@ -628,7 +627,7 @@ export default function BrandsPage() {
 
   // Build sub-nav from positioning schema + brand-only asset list.
   // Each segment becomes its own sub-nav entry (id = "seg:<segmentId>"),
-  // alongside 速查卡 / AI 指令庫 / brand assets (brand only).
+  // alongside 速查卡 / brand assets (brand only).
   const segments = scopeMode === "none" ? [] : SCOPE_SEGMENTS[scopeMode];
 
   // ── Navigation ────────────────────────────────────────────────────────────
@@ -640,13 +639,12 @@ export default function BrandsPage() {
   // 2026-05-07 Path A simplification: 3 main tiles only (定位/文字/知識).
   // "visual" is kept in the type for legacy lock-state code paths, but
   // is no longer exposed as a tile — its contents live in Settings.
-  const category: "positioning" | "copy" | "visual" | "knowledge" | "info" | "publish" | "ai" | "settings" | "products" | "events" | "meetings" | "brain" | "persona" | "campaign" =
+  const category: "positioning" | "copy" | "visual" | "knowledge" | "info" | "publish" | "settings" | "products" | "events" | "meetings" | "brain" | "persona" | "campaign" =
     urlCat === "copy" ? "copy"
     : urlCat === "knowledge" ? "knowledge"
     : urlCat === "visual" ? "visual"
     : urlCat === "info" ? "info"
     : urlCat === "publish" ? "publish"
-    : urlCat === "ai" ? "ai"
     : urlCat === "settings" ? "settings"
     : urlCat === "products" ? "products"
     : urlCat === "events" ? "events"
@@ -667,7 +665,7 @@ export default function BrandsPage() {
   // version clobbered it with a snapshot from BEFORE that write, dropping
   // `e` and silently falling back to brand-level positioning. Functional
   // form fixes it for every caller, not just this one site.
-  const setCategory = (next: "positioning" | "copy" | "knowledge" | "info" | "visual" | "publish" | "ai" | "products" | "events" | "meetings" | "brain" | "persona") => {
+  const setCategory = (next: "positioning" | "copy" | "knowledge" | "info" | "visual" | "publish" | "products" | "events" | "meetings" | "brain" | "persona") => {
     setSearchParams((prev) => {
       const nextParams = new URLSearchParams(prev);
       nextParams.set("cat", next);
@@ -786,7 +784,7 @@ export default function BrandsPage() {
       if (category === "visual" || category === "copy") setSection("asset:all");
       else if (category === "settings") setSection("settings");
       else if (category === "knowledge") setSection("settings");
-      else if (category === "publish" || category === "ai") setSection("pos:home");
+      else if (category === "publish") setSection("pos:home");
       else                              setSection("pos:home");
     }
   }, [category]);
@@ -1284,7 +1282,7 @@ export default function BrandsPage() {
     "voice", "voice_principles",
     "preferred_terms", "banned_words", "term_substitutions",
     "branded_terms", "product_naming", "abbreviations",
-    "cta_library", "hook_library", "ai_prompts", "templates_copy",
+    "cta_library", "hook_library", "templates_copy",
   ];
   const VISUAL_KEYS_FOR_COMPLETION: AssetKey[] = [
     "logo", "colors", "fonts", "photos", "guidelines", "templates",
@@ -1323,8 +1321,8 @@ export default function BrandsPage() {
   return (
     <main className="min-h-[calc(100vh-3.5rem)] flex flex-col">
       {/* 2026-05-30 (CJ「modal 移除，功能全進主工作區」):
-          BrandSettingsSheet modal removed. 平台授權 and AI 指令 are now
-          full tabs in the main workspace. 危險區 remains inside 基本資料. */}
+          BrandSettingsSheet modal removed. 平台授權 is now a full tab in
+          the main workspace. 危險區 remains inside 基本資料. */}
 
       {/* 2026-05-13 (CJ「建立好品牌後我點選左側品牌會是空白畫面」):
           when scope just changed to a brand that hasn't landed in
@@ -1417,7 +1415,7 @@ export default function BrandsPage() {
             ← {lang === "en" ? "All brands" : "所有品牌"}
           </a>
         </div>
-        {/* 2026-05-30: gear icon removed — 平台授權 / AI 指令 are now main workspace tabs */}
+        {/* 2026-05-30: gear icon removed — 平台授權 is now a main workspace tab */}
         {/* 2026-05-10 (CJ「4A 代理商專業感, B&W」): hero redesigned.
             Removed gradient emblem + gradient title. Editorial
             typography: tiny eyebrow, large bold title, subtle stats. */}
@@ -1474,7 +1472,6 @@ export default function BrandsPage() {
                 // CJ 2026-05-13「左上選活動時，這一頁就呈現該活動的定位等等資訊」.
                 // 2026-06-03 (CJ): Redesigned tab structure — 7 consistent tabs.
                 // 平台授權 removed (handled in Calendar connect flow).
-                // 知識 + AI指令 merged into 品牌工具.
                 // 產品 + 活動 added as independent tabs with card grids.
                 const allTiles = [
                   { v: "positioning" as const, label: lang === "en" ? "Positioning" : "定位",
@@ -1687,7 +1684,6 @@ export default function BrandsPage() {
             {category === "positioning" && [
               { id: "doc",     label: lang === "en" ? "My document" : "我的定位文件" },
               { id: "card",    label: lang === "en" ? "Cheat sheet" : "速查卡"    },
-              { id: "prompts", label: lang === "en" ? "AI prompts"  : "AI 指令庫" },
               ...segments.map(s => ({ id: `seg:${s.id}`, label: `${s.num} ${lang === "en" ? (s.titleEn ?? s.title) : s.title}` })),
             ].map(item => {
               const active = section === item.id;
@@ -2153,7 +2149,7 @@ export default function BrandsPage() {
                   "voice", "voice_principles",
                   "preferred_terms", "banned_words", "term_substitutions",
                   "branded_terms", "product_naming", "abbreviations",
-                  "cta_library", "hook_library", "ai_prompts", "templates_copy",
+                  "cta_library", "hook_library", "templates_copy",
                 ];
                 const assetKey = section.slice("asset:".length) as AssetKey;
                 const activeBrandId = scope?.brandId ?? brandId;
@@ -2326,13 +2322,9 @@ export default function BrandsPage() {
             </div>
           )}
 
-          {/* 2026-09-26（CJ「指令庫拿掉」）：品牌 AI 指令（positioning._aiPrompts）的
-              編輯器已移除——主產文引擎從來不讀那一格，只有 runTestBattery 讀
-              Facebook 那一格，用戶改了看不到任何效果。 */}
-
           {/* ── 會議 (meetings) — 定期策略會議 ──
                2026-09-26（CJ「將定期開會變成一個新的 mission tray」）：取代原本的
-               「品牌工具」（知識庫＋AI 指令）。品牌與產品範圍都看得到——會議本身
+               「品牌工具」。品牌與產品範圍都看得到——會議本身
                可以選要討論品牌或某個產品。 */}
           {derivedCategory === "meetings" && activeBrandIdForLocks && (
             <div style={{ padding: "8px 0 32px" }}>
@@ -2649,9 +2641,8 @@ function PositioningGrid({
   // 是自己的 grid 容器裡塞滿 3 張，行行都缺角。10 個 segment 重新分成 3 幕
   // 各 3 張——goldenCircle 從「策略結晶」搬到「自我探索」跟起源／價值觀放
   // 一起（WHY 信念本來就該扎根在起源與價值觀，敘事上比跟差異化放一起更
-  // 合理，不只是為了湊數）。taglineScore 不再是獨立卡片（同一天 CJ 決定
-  // 「武器化工具」整區只留 AI 指令庫、其他都不需要，taglineScore 的資料
-  // 還在，只是暫時沒有專屬卡片入口）。
+  // 合理，不只是為了湊數）。taglineScore 不再是獨立卡片（資料還在，只是
+  // 暫時沒有專屬卡片入口）。
   const BRAND_ACTS: Array<{ label: { zh: string; en: string }; q: { zh: string; en: string }; ids: string[] }> = [
     { label: { zh: "第一幕・市場與競爭研究", en: "Act 1 · Market & competitive research" },
       q: { zh: "她缺什麼？誰已經在滿足她、缺口在哪？—— 定位不是從「我是誰」開始，是先看懂她，再看懂戰場。", en: "What does she lack, and who's already trying to serve her? Positioning starts with her and the battlefield, not with us." },
@@ -2714,12 +2705,6 @@ function PositioningGrid({
     // product / event fallbacks
     core: faBullseye, positioning: faBullseye, smp: faWandSparkles,
   };
-
-  // 2026-09-23（CJ「武器化工具裡面，我只需要留下AI指令庫，其他都不需要。
-  // AI指令庫，做成另一個mission tray」）：這裡原本的「武器化工具」區塊
-  // （速查卡／標語評分／AI 指令庫三張卡）整個拿掉——速查卡跟標語評分不再
-  // 顯示成卡片，AI 指令庫升格成獨立頂層目的地（見 AiPromptLibraryPage.tsx
-  // + ShellLayout.tsx 左側 rail 的 /ai-prompts）。
 
   const segFilled = (sid: string) => {
     const v = segmentData?.[sid];
@@ -3252,10 +3237,9 @@ function renderSegmentPreview(segId: string, v: any, lang: "zh-TW" | "en" = "zh-
   return { node: null, hasContent: false };
 }
 
-// 2026-09-23：buildBrandCheatPreview / buildPromptsPreview 移除——兩者都只
-// 服務已經拿掉的「武器化工具」卡片預覽（速查卡／AI 指令庫），現在沒有任何
-// call site。SpeedCardView／PromptLibraryView 兩條 section 路由本身還在
-// （沒被要求整個拿掉這兩個功能，只是卡片入口先收起來），沒有牽動它們。
+// 2026-09-23：buildBrandCheatPreview 移除——它只服務已經拿掉的「武器化工具」
+// 卡片預覽（速查卡），現在沒有任何 call site。SpeedCardView 這條 section 路由
+// 本身還在，沒有牽動它。
 
 /* ────────────────── PositioningCompletionBridge ──────────────────
    Renders right after the 14-step pipeline finishes — closes the loop
@@ -3435,7 +3419,7 @@ const SOWORK_GROUP_INTRO: Record<string, { zh: string; en: string }> = {
    內容層一致的呈現方式」— 貼了 PlatformTaskPage.tsx 的任務卡截圖當參照)。
    AssetCard 只把外殼（圓角/hover）改了一輪，內部排版還是原本的純文字編輯
    卡；這支才是真的照 content 層任務卡的解剖結構重做，只用在 PositioningGrid
-   （固定 segment、自訂卡片、速查卡/AI 指令庫），品牌視覺資產格（logo/
+   （固定 segment、自訂卡片、速查卡），品牌視覺資產格（logo/
    調色盤）繼續用原本的 AssetCard，不在這次範圍內：
    - 上方灰底 header block（PlatformTaskPage 是置中大頭貼，這裡沒有「人」
      可以當頭貼，換成置中的圓形 icon徽章 —— 概念的頭貼）
@@ -3446,7 +3430,7 @@ const SOWORK_GROUP_INTRO: Record<string, { zh: string; en: string }> = {
      編輯鈕的位置
    - 內文下方一顆「出處」膠囊（對應 content 卡的來源標籤 + 「出處與說明」
      連結）：固定 segment 一律標「SoWork 品牌定位法」，自訂卡片標「來自你
-     的定位文件」，速查卡/AI 指令庫（純輸出物，沒有方法論出處）不顯示。
+     的定位文件」，速查卡（純輸出物，沒有方法論出處）不顯示。
    - 不做的：agent 頭像 + 具名掛名的頁尾列——定位卡沒有「誰寫的」這個概念，
      硬套會是編出來的資訊，寧可不做。
    ─────────────────────────────────────────────────────────────────────── */
@@ -3626,7 +3610,7 @@ function VisualNavItem({ label, badge, active, onClick }: {
 }
 
 /* ─────────────────────────── PositioningPanel ───────────────────────── */
-// Renders the 完整定位書 / 速查卡 / AI 指令庫 sub-views for the active scope.
+// Renders the 完整定位書 / 速查卡 sub-views for the active scope.
 // Reads positioning JSON from the appropriate router (brand / product / event)
 // and persists edits via mutation; segment list comes from positioningSchema.
 
@@ -3789,11 +3773,6 @@ function PositioningEditor({
       <SpeedCardView scopeMode={scopeMode} data={draft} scopeName={scopeName} />
     );
   }
-  if (section === "prompts") {
-    return (
-      <PromptLibraryView scopeMode={scopeMode} data={draft} scopeName={scopeName} />
-    );
-  }
 
   // section === "seg:xxx" — render ONE segment editor
   if (!activeSegment) {
@@ -3929,16 +3908,6 @@ function SaveIndicator({ state, hasTarget }: { state: "idle" | "saving" | "saved
 function SpeedCardView({ scopeMode, data, scopeName }: { scopeMode: string; data: any; scopeName: string }) {
   return (
     <SpeedCard
-      scopeMode={scopeMode as "brand" | "product" | "event"}
-      scopeName={scopeName}
-      data={data}
-    />
-  );
-}
-
-function PromptLibraryView({ scopeMode, data, scopeName }: { scopeMode: string; data: any; scopeName: string }) {
-  return (
-    <PromptLibrary
       scopeMode={scopeMode as "brand" | "product" | "event"}
       scopeName={scopeName}
       data={data}

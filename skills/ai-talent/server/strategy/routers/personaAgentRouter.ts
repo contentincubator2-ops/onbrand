@@ -14,15 +14,14 @@
  * audio file, run through real ASR (server/_core/transcription.ts) — into a
  * generated persona (who this voice is) + skill (concrete, checkable
  * writing rules), combined ≥2200 characters. Each agent is scoped to a
- * subset of the same 8 platforms brandKnowledgeRouter's AI 指令庫 already
- * uses, so "應用範圍" doesn't invent a second taxonomy. Sources aren't a
+ * subset of the content platforms ("應用範圍"). Sources aren't a
  * one-shot snapshot either — `addSources` lets an already-trained agent
  * keep absorbing more material and retrain from the merged set (same idea
  * as Delphi's "keeps evolving as you add content", CJ「Delphi.ai 請直接
  * 學習它的流程」).
  *
  * Persisted at brands.positioning._personaAgents[] — same per-brand JSON
- * pattern as _voiceLock / _aiPrompts / _workbench. Every write here is a
+ * pattern as _workbench. Every write here is a
  * fresh SELECT → modify → UPDATE (never a blind overwrite of a
  * client-cached `positioning` object) — training runs in the background
  * over tens of seconds, so a stale client write racing a server-side

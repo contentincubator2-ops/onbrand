@@ -175,8 +175,8 @@ export default function BrainPanel({ brandId, initialProductId, initialEventId }
 
       <p className="mt-6 text-[12px] leading-relaxed text-neutral-400">
         {en
-          ? "Every AI writer reads exactly this list before writing. Adopted strategy-meeting decisions are written into positioning and appear here; the knowledge base, AI prompt library and strategy workbench are not read."
-          : "每一位 AI 寫手動筆前，讀的就是這份清單。策略會議被採用的決定會寫進定位、出現在這裡；知識庫、AI 指令庫與策略工作台不會被讀取。"}
+          ? "Every AI writer reads exactly this list before writing. Adopted strategy-meeting decisions are written into positioning and appear here; the knowledge base and strategy workbench are not read."
+          : "每一位 AI 寫手動筆前，讀的就是這份清單。策略會議被採用的決定會寫進定位、出現在這裡；知識庫與策略工作台不會被讀取。"}
       </p>
     </div>
   );

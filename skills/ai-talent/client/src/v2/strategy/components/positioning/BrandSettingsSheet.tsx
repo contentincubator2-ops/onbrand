@@ -9,7 +9,6 @@
  *   - 基本資料 (name / industry / description)
  *   - 連結 (website + social URLs — uses existing ConnectorEditor)
  *   - 視覺 (logo upload + colors — placeholder, full editor later)
- *   - AI 指令庫 (per-platform overrides — uses existing AIPromptsEditor)
  *   - 危險區 (delete brand)
  *
  * Opens via the gear icon top-right of Brand workspace header.
@@ -17,12 +16,11 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { Modal, ModalContent, Button, Input, Textarea, Spinner } from "@heroui/react";
 import {
-  Bot, Trash2, X, Share2, CheckCircle2, ExternalLink,
+  Trash2, X, Share2, CheckCircle2, ExternalLink,
 } from "lucide-react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faFacebook, faInstagram, faLinkedin, faYoutube, faLine, faThreads, faTiktok } from "@fortawesome/free-brands-svg-icons";
 import { faGlobe } from "@fortawesome/free-solid-svg-icons";
-import AIPromptsEditor from "./AIPromptsEditor";
 import { trpc } from "../../../../lib/trpc";
 import { useLang } from "../../../../lib/i18n";
 import { useNavigate } from "react-router-dom";
@@ -30,8 +28,8 @@ import { showToastGlobal } from "../../../../components/ui/Toast";
 
 // 2026-05-30 (CJ「modal 只留設定類 tab，內容類交給主頁面」):
 // 基本資料 和 視覺 都已在主工作區有完整 tab，不在 modal 重複。
-// Modal = 設定齒輪 = 平台授權 / AI 指令 / 危險區 三項純設定。
-type SettingsTab = "publish" | "ai" | "danger";
+// Modal = 設定齒輪 = 平台授權 / 危險區 兩項純設定。
+type SettingsTab = "publish" | "danger";
 
 interface Props {
   isOpen: boolean;
@@ -48,10 +46,9 @@ function getTabs(en: boolean): Array<{ id: SettingsTab; label: string; Icon: any
   // 2026-05-30 (CJ「modal 只留設定類 tab」):
   // 基本資料 → 主工作區「基本資料」tab（InfoTab 已在 BrandsPage 直接嵌入）
   // 視覺 → 主工作區「視覺」tab（完整版視覺資產庫）
-  // Modal = 純設定（外部連接 + AI 客製化 + 危險操作）
+  // Modal = 純設定（外部連接 + 危險操作）
   return [
     { id: "publish", label: en ? "Platform auth" : "平台授權", Icon: Share2 },
-    { id: "ai",      label: en ? "AI prompts"    : "AI 指令",  Icon: Bot    },
     { id: "danger",  label: en ? "Danger zone"   : "危險區",   Icon: Trash2 },
   ];
 }
@@ -119,7 +116,6 @@ export default function BrandSettingsSheet({ isOpen, onClose, brandId, brandName
               </div>
             )}
             {activeTab === "publish" && <PublishTab brandId={brandId} />}
-            {activeTab === "ai" && <AIPromptsEditor brandId={brandId} />}
             {activeTab === "danger" && <DangerTab brandId={brandId} brandName={brandName} onClose={onClose} />}
           </div>
         </div>

@@ -4,14 +4,9 @@
  * exists with completed core positioning (built by a parallel track) — this
  * script fills the gaps CJ actually asked for:
  *   1. description + brand_colors — grounding text + official palette so
- *      every downstream generation (AI 指令庫、活動定位) reasons from real
+ *      every downstream generation (活動定位) reasons from real
  *      facts, not guesses.
- *   2. AI 指令庫 for facebook + instagram — text prompt encodes Pokémon GO's
- *      real public voice pattern; IMAGE prompt carries a HARD IP constraint
- *      (never render copyrighted Pokémon character art — abstract/
- *      environmental visuals + official screenshots only). This is the
- *      concrete answer to CJ's "嚴格視覺規範" concern.
- *   3. Six real, researched events spanning Aug–Sep 2026 (dates verified via
+ *   2. Six real, researched events spanning Aug–Sep 2026 (dates verified via
  *      web search — pokemongo.com/pokemongohub.net — NOT invented), each
  *      gets the full 11-segment event positioning pipeline, inheriting the
  *      brand's audience anchor automatically.
@@ -30,7 +25,6 @@ dotenv.config();
 import localPool from "../server/localDb";
 import { startPositioningJob } from "../server/strategy/core/positioningJobRunner";
 import { buildEventPositioningSteps } from "../server/strategy/core/positioningSteps";
-import { generateAiPromptForPlatform } from "../server/strategy/routers/brandKnowledgeRouter";
 
 const OWNER_EMAIL = "lucas.lai@sowork.tw";
 const BRAND_NAME = "Pokémon GO";
@@ -137,21 +131,7 @@ async function main() {
     console.log("SKIP: brand_colors already set");
   }
 
-  // 2. AI 指令庫 — facebook + instagram (CJ 明確點名的兩個平台)
-  for (const platform of ["facebook", "instagram"] as const) {
-    console.log(`Generating AI 指令庫 for ${platform}…`);
-    const r = await generateAiPromptForPlatform(brandId, userId, platform);
-    if (!r.ok) { console.warn(`  FAILED (${platform}): ${r.error}`); continue; }
-    const [posRows]: any = await localPool.execute(`SELECT positioning FROM brands WHERE id = ?`, [brandId]);
-    let pos: any = posRows[0]?.positioning;
-    if (typeof pos === "string") { try { pos = JSON.parse(pos); } catch { pos = {}; } }
-    pos = pos ?? {};
-    pos._aiPrompts = { ...(pos._aiPrompts ?? {}), [platform]: r.value };
-    await localPool.execute(`UPDATE brands SET positioning = ? WHERE id = ?`, [JSON.stringify(pos), brandId]);
-    console.log(`  OK (${platform}) — text ${r.value.text.length} chars, image ${r.value.image.length} chars`);
-  }
-
-  // 3. Events — create + kick positioning (parallel-safe: sequential create,
+  // 2. Events — create + kick positioning (parallel-safe: sequential create,
   // pipelines run detached).
   const eventIds: Array<{ id: number; name: string }> = [];
   for (const ev of EVENTS) {
@@ -214,11 +194,6 @@ async function main() {
   for (const r of fin as any[]) {
     console.log(`${r.name} (id ${r.id}, ${r.startAt}–${r.endAt}): segments=${r.segments}`);
   }
-  const [brandFin]: any = await localPool.execute(
-    `SELECT JSON_LENGTH(JSON_KEYS(JSON_EXTRACT(positioning,'$._aiPrompts'))) AS aiPromptPlatforms
-       FROM brands WHERE id = ?`, [brandId],
-  );
-  console.log(`Brand AI 指令庫 platforms set: ${(brandFin as any[])[0]?.aiPromptPlatforms ?? 0}`);
   process.exit(0);
 }
 
