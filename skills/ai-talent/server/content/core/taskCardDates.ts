@@ -5,7 +5,7 @@
  * `npm run cards:dates` 重新產生並一起 commit；taskCardDates.test.ts 會確認
  * 目錄裡每一張卡都查得到日期。
  *
- * 產生時間：2026-09-29，470 個 id。
+ * 產生時間：2026-09-29，478 個 id。
  */
 export const TASK_CARD_DATES: Record<string, string> = {
   "apply": "2026-04-26",
@@ -208,19 +208,27 @@ export const TASK_CARD_DATES: Record<string, string> = {
   "ig-100-youtility": "2026-05-06",
   "ig-30-bio-rewrite": "2026-05-05",
   "ig-30-caption-short": "2026-05-05",
+  "ig-30-carousel-fake-callout": "2026-09-29",
   "ig-30-carousel-proof-set": "2026-09-05",
   "ig-30-carousel-structure": "2026-05-05",
+  "ig-30-comment-ex-partner-jab": "2026-09-29",
+  "ig-30-comment-fill-blank": "2026-09-29",
   "ig-30-comment-reply": "2026-05-05",
+  "ig-30-dm-sample-request": "2026-09-29",
   "ig-30-dm-script": "2026-05-05",
+  "ig-30-feed-account-takeover": "2026-09-29",
   "ig-30-feed-single-object": "2026-09-05",
   "ig-30-hashtag-set": "2026-05-05",
   "ig-30-live-host-relay": "2026-09-05",
   "ig-30-live-opening": "2026-05-05",
+  "ig-30-live-vote-bracket": "2026-09-29",
   "ig-30-post-platform-firstday": "2026-09-05",
+  "ig-30-profile-one-rule-debut": "2026-09-29",
   "ig-30-profile-self-insert": "2026-09-05",
   "ig-30-pure-text-hook": "2026-05-05",
   "ig-30-reel-brand-event": "2026-09-05",
   "ig-30-reel-hook": "2026-05-05",
+  "ig-30-reel-native-language-try": "2026-09-29",
   "ig-30-reel-script-full": "2026-05-05",
   "ig-30-story-one-action": "2026-09-05",
   "ig-30-story-repost-strategy": "2026-05-05",
