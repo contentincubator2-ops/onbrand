@@ -369,18 +369,33 @@ export default function ImageCardPage() {
                 placeholder={lang === "en" ? "Paste the copy — we turn it into an image." : "貼上文案，我們幫你轉成圖片。"}
                 minRows={4} maxRows={10} value={copy} onValueChange={setCopy}
               />
+              {/* 2026-09-29（CJ「選擇產品圖，要用縮圖呈現」）：同一個產品常有好幾張照片（生的、擺盤、包裝），
+                  下拉選單只看得到重複的品名，分不出是哪一張——改成縮圖直接看照片挑。 */}
+              <div>
+                <p className="text-tiny text-default-500 mb-1.5">
+                  {lang === "en" ? "Product photo" : "產品照"}
+                  {product && <span className="ml-1.5 text-default-700">· {product.name}</span>}
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  <button type="button" onClick={() => setProduct(null)}
+                    className={`w-16 h-16 rounded-lg border-2 text-[11px] text-default-500 bg-default-50 flex items-center justify-center ${!product ? "border-default-900" : "border-default-200 hover:border-default-400"}`}>
+                    {lang === "en" ? "None" : "不使用"}
+                  </button>
+                  {products.map((p) => {
+                    const on = product?.imageUrl === p.imageUrl;
+                    return (
+                      <button key={p.imageUrl} type="button" title={p.name}
+                        onClick={() => setProduct({ name: p.name, imageUrl: p.imageUrl })}
+                        className={`relative w-16 h-16 rounded-lg overflow-hidden border-2 bg-white ${on ? "border-default-900" : "border-default-200 hover:border-default-400"}`}>
+                        <img src={p.imageUrl} alt={p.name} loading="lazy" className="w-full h-full object-cover" />
+                        {on && <span className="absolute top-0.5 right-0.5 w-4 h-4 rounded-full bg-default-900 text-white text-[10px] leading-4 text-center">✓</span>}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
               <div className="flex flex-wrap items-center gap-2 text-tiny">
-                <span className="text-default-500">{lang === "en" ? "Product photo" : "產品照"}</span>
-                <select className="border border-default-200 rounded-md px-2 py-1 bg-white"
-                  value={product?.imageUrl ?? ""}
-                  onChange={(e) => {
-                    const p = products.find((x) => x.imageUrl === e.target.value);
-                    setProduct(p ? { name: p.name, imageUrl: p.imageUrl } : null);
-                  }}>
-                  <option value="">{lang === "en" ? "None" : "不使用"}</option>
-                  {products.map((p) => <option key={p.imageUrl} value={p.imageUrl}>{p.name}</option>)}
-                </select>
-                <span className="text-default-500 ml-2">{lang === "en" ? "Model" : "模型"}</span>
+                <span className="text-default-500">{lang === "en" ? "Model" : "模型"}</span>
                 <select className="border border-default-200 rounded-md px-2 py-1 bg-white" value={model} onChange={(e) => setModel(e.target.value as Model)}>
                   <option value="gpt-image-2">GPT Image 2</option>
                   <option value="nano-banana" disabled={!card.nanoBanana}>
