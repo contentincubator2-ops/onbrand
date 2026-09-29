@@ -23,11 +23,17 @@ import { buildPipedreamAccountsUrl } from "../../platform/core/pipedreamConnect"
 import { getPipedreamAccounts, getPipedreamAppSlug, prioritizePipedreamAccounts } from "../../platform/core/pipedreamAccounts";
 import { findPipedreamFacebookPage, probePipedreamFacebookAccounts } from "../../platform/core/pipedreamFacebook";
 import { upsertFacts, type FactInput } from "./perfStore";
+import { isRuntimeFeatureEnabled } from "../../platform/core/runtimeSafety";
 
 const GRAPH = "https://graph.facebook.com/v25.0";
 
 export class FbSyncError extends Error {
-  constructor(public code: "not_connected" | "no_auth" | "no_page_access" | "graph_error", message: string) { super(message); }
+  constructor(public code: "not_connected" | "no_auth" | "no_page_access" | "graph_error" | "disabled", message: string) { super(message); }
+}
+
+/** 跟 publishRouter.socialProcedure 同一個開關：dev 關掉社群連接，這裡也不去打 Pipedream／Graph。 */
+export function fbSyncEnabled(): boolean {
+  return isRuntimeFeatureEnabled("SOCIAL_PUBLISH_ENABLED");
 }
 
 /** 標準指標 ← Graph insights 候選名稱（依偏好排序）。 */
@@ -149,6 +155,7 @@ async function fetchInsights(ids: string[], token: string, metrics: string[]): P
 export interface FbSyncResult { pageId: string; pageName: string | null; posts: number; metricsUsed: string[]; tagged: number }
 
 export async function syncFbPage(brandId: number, days = 120): Promise<FbSyncResult> {
+  if (!fbSyncEnabled()) throw new FbSyncError("disabled", "此環境已停用社群連接，粉專成效只在正式站同步。");
   const page = await resolvePage(brandId);
   if (!page) throw new FbSyncError("not_connected", "此品牌尚未連結 Facebook 粉專。");
   const token = await pageToken(brandId, page.pageId);
@@ -221,6 +228,7 @@ export async function syncFbPage(brandId: number, days = 120): Promise<FbSyncRes
  * —— 建過至少一個視角、而且有連粉專。沒在用的品牌不去打 Graph。
  */
 export async function tickFbPageSync(): Promise<void> {
+  if (!fbSyncEnabled()) return;
   const [rows]: any = await localPool.execute(
     `SELECT b.id AS brandId, MAX(f.updatedAt) AS lastSync
        FROM brands b
