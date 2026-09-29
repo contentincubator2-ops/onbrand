@@ -178,8 +178,8 @@ function buildNavItems(lang: "zh-TW" | "en", userEmail?: string | null, currentP
       { to: "/brands/edit?cat=visual", catKey: "visual", label: en ? "Visual" : "視覺", icon: <FontAwesomeIcon icon={faPaintBrush} />,
         tooltip: en ? "Logo / palette / fonts" : "Logo / 色票 / 字型" },
       // 2026-09-26（CJ「將工具拿掉、指令庫拿掉、隱藏知識庫；定期開會變成一個新的
-      // mission tray」）：「工具」（知識庫＋品牌 AI 指令）整個從 rail 拿掉。知識庫
-      // 只是藏起來——主產文引擎每次仍會讀 brand_knowledge_items，已上傳的資料照樣生效。
+      // mission tray」）：「工具」整個從 rail 拿掉。知識庫只是藏起來，資料保留；
+      // 2026-09-29 起沒有任何 AI 讀取它。
       { to: "/brands/edit?cat=meetings", catKey: "meetings", label: en ? "Meetings" : "會議", icon: <FontAwesomeIcon icon={ICON.meeting} />,
         tooltip: en ? "Recurring strategy meetings" : "定期策略會議" },
       // 2026-09-29（CJ「在策略端增加一個 mission tray，是檢查大腦」）：品牌大腦記住了
@@ -249,7 +249,7 @@ function navCatalog(lang: "zh-TW" | "en", allowedTaskRoutes?: Set<string> | null
   const en = lang === "en";
   // 2026-09-29 CJ：內容通路只留 FB／IG／Threads／LINE／TikTok／電子報／官網。LinkedIn／
   // YouTube／新聞稿／X 拿掉（server planGate.HIDDEN_CONTENT_PLATFORMS 同一份決定）；
-  // Threads、LINE 是為台灣市場加的；AI 指令庫從側欄移除。
+  // Threads、LINE 是為台灣市場加的。
   const all: NavItem[] = [
     { id: "fb", kind: "channel", to: "/tasks/fb", label: "Facebook", icon: <FontAwesomeIcon icon={faFacebook} />, matchPrefix: "/tasks/fb",
       tooltip: en ? "Facebook posts, ads, stories, live copy" : "Facebook 貼文 / 廣告 / 限時 / 直播文案" },

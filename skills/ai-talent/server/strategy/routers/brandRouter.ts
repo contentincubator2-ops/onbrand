@@ -611,7 +611,7 @@ export const brandRouter = router({
 
       // Positioning completion — count only real segment keys. 2026-05-17:
       // after the single-source refactor, positioning holds 10 segment
-      // keys + meta keys (_assets/_aiPrompts/_interim). Exclude any
+      // keys + meta keys (_assets/_interim …). Exclude any
       // "_"-prefixed meta key, and report against the real segment
       // total (10) so the panel shows N/10 not N/14.
       const BRAND_SEGMENT_TOTAL = 10;

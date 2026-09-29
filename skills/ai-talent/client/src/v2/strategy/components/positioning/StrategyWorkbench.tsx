@@ -81,7 +81,7 @@ export default function StrategyWorkbench({
   const [openFinding, setOpenFinding] = useState<null | "audience" | "competition" | "differentiation">(null);
   const [digging, setDigging] = useState<number | null>(null);
   // 2026-07-29 (CJ「品牌工具、黃金圈等應該跟著策略工作台變動」): apply now
-  // cascades — brand: 差異化/黃金圈/語氣/標語評分/AI 指令庫；event: 訊息架構/
+  // cascades — brand: 差異化/黃金圈/語氣/標語評分；event: 訊息架構/
   // 創意概念 — regenerate as a positioning job; poll it so the user sees
   // progress and the page below refreshes when the downstream is consistent
   // with the applied scenario.
@@ -99,7 +99,7 @@ export default function StrategyWorkbench({
       utils?.scope?.active?.invalidate?.();
       showToastGlobal(
         row.status === "done"
-          ? (en ? "Downstream regenerated — the page now follows the applied scenario" : "下游重生完成——差異化、黃金圈、語氣與 AI 指令庫已跟上套用的情境")
+          ? (en ? "Downstream regenerated — the page now follows the applied scenario" : "下游重生完成——差異化、黃金圈與語氣已跟上套用的情境")
           : (en ? "Downstream regeneration failed — retry apply" : "下游重生失敗，請再套用一次"),
         row.status === "done" ? "success" : undefined,
       );
@@ -673,14 +673,14 @@ export default function StrategyWorkbench({
                                     : `Apply this scenario?\n· audience anchor ← selected audience\n· main tagline ←「${tagZh}」\n· downstream regenerates (differentiation / golden circle / voice / tagline score / AI prompts ×8), ~1-2 min`)
                                 : (isEvent
                                     ? `套用此情境為正式定位？\n· 受眾錨點 ← 本情境所選受眾\n· SMP ←「${tagZh}」\n· 下游同步重生：訊息架構、創意概念，約 1-2 分鐘\n之後所有文案任務都以此為準。`
-                                    : `套用此情境為正式定位？\n· 受眾錨點 ← 本情境所選受眾\n· 主標語 ←「${tagZh}」\n· 下游同步重生：差異化、黃金圈、語氣、標語評分、AI 指令庫（5 平台人設），約 1-2 分鐘\n之後所有文案任務與定位重跑都以此為準。`);
+                                    : `套用此情境為正式定位？\n· 受眾錨點 ← 本情境所選受眾\n· 主標語 ←「${tagZh}」\n· 下游同步重生：差異化、黃金圈、語氣、標語評分，約 1-2 分鐘\n之後所有文案任務與定位重跑都以此為準。`);
                               if (!window.confirm(confirmMsg)) return;
                               applyMut?.mutate?.({ ...scopeArgs, scenarioId: active.id, taglineSpotIndex: i }, {
                                 onSuccess: (r: any) => {
                                   if (r?.ok) {
                                     showToastGlobal(en
                                       ? "Applied — downstream regenerating…"
-                                      : (isEvent ? "已套用——下游（訊息架構／創意概念）重生中…" : "已套用——下游（差異化／黃金圈／語氣／AI 指令庫）重生中…"), "success");
+                                      : (isEvent ? "已套用——下游（訊息架構／創意概念）重生中…" : "已套用——下游（差異化／黃金圈／語氣）重生中…"), "success");
                                     if (r.cascade) setCascading(true);
                                     utils?.scope?.active?.invalidate?.();
                                   }
