@@ -13,6 +13,20 @@ import { missions, missionTaskUnits } from "../../../drizzle/schema";
 import { eq, and, desc, or, isNull, sql } from "drizzle-orm";
 import { computeMissionResources } from "../core/missionResourceComputer";
 import { isMissingTableError } from "../../platform/core/mysqlErrors";
+import { isHiddenHistoryItem } from "../../platform/core/planGate";
+
+/** 產出的 task id：metadata.taskId 優先，舊資料退回 description 裡的 [task:<id>]。 */
+function historyTaskId(r: { taskId?: unknown; description?: unknown }): string | null {
+  if (typeof r.taskId === "string" && r.taskId && r.taskId !== "null") return r.taskId;
+  const m = typeof r.description === "string" ? /\[task:([^\]]+)\]/.exec(r.description) : null;
+  return m ? m[1]! : null;
+}
+
+/** 2026-09-29 CJ「前台隱藏，資料保留」：LinkedIn／YouTube／新聞稿／X 的舊產出不列。 */
+function isHiddenMissionRow(r: any): boolean {
+  return isHiddenHistoryItem({ platform: r.workspace, taskId: historyTaskId(r) })
+    || isHiddenHistoryItem({ platform: r.outputPlatform });
+}
 
 export const missionRouter = router({
   // List missions for a workspace
@@ -74,6 +88,7 @@ export const missionRouter = router({
                mo.version AS outputVersion,
                mo.platform AS outputPlatform,
                mo.outputType AS outputType,
+               NULLIF(JSON_UNQUOTE(JSON_EXTRACT(mo.metadata, '$.taskId')), 'null') AS taskId,
                -- 2026-08-11 (CJ「每一個任務，應該都可以出現縮圖才對」): MySQL's
                -- JSON_UNQUOTE(JSON_EXTRACT(x,'$.k')) returns the 4-char STRING
                -- 'null' when the stored value is JSON null — and that string is
@@ -114,11 +129,12 @@ export const missionRouter = router({
            AND (mo.id IS NOT NULL
                 OR NOT EXISTS (SELECT 1 FROM mission_outputs mo2 WHERE mo2.missionId = m.id))
          ORDER BY COALESCE(mo.createdAt, m.updatedAt) DESC, mo.id DESC
-         LIMIT 60
+         LIMIT 120
       `);
       // drizzle returns [rows, fields] for raw execute on mysql2
       const data = Array.isArray(rows) ? rows[0] : (rows as any).rows ?? rows;
-      const arr = Array.isArray(data) ? data : [];
+      // 多抓一些再濾掉下架通路，濾完仍維持最多 60 張。
+      const arr = (Array.isArray(data) ? data : []).filter((r: any) => !isHiddenMissionRow(r)).slice(0, 60);
       // Compute step count + resolve thumbnail priority, then drop raw JSON blobs
       return arr.map((r: any) => {
         let steps: any = r.squadSteps;
@@ -158,9 +174,10 @@ export const missionRouter = router({
     .query(async ({ ctx, input }) => {
       const db = await getDb();
       if (!db) return [];
-      return db.select().from(missions)
+      const rows = await db.select().from(missions)
         .where(and(eq(missions.userId, ctx.user.id), eq(missions.brandId, input.brandId)))
         .orderBy(missions.workspace, desc(missions.updatedAt));
+      return rows.filter((r: any) => !isHiddenMissionRow(r));
     }),
 
   // Get single mission with task units

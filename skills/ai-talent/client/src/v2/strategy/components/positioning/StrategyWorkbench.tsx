@@ -672,7 +672,7 @@ export default function StrategyWorkbench({
                                     : `Apply this scenario?\n· audience anchor ← selected audience\n· main tagline ←「${tagZh}」\n· downstream regenerates (differentiation / golden circle / voice / tagline score / AI prompts ×8), ~1-2 min`)
                                 : (isEvent
                                     ? `套用此情境為正式定位？\n· 受眾錨點 ← 本情境所選受眾\n· SMP ←「${tagZh}」\n· 下游同步重生：訊息架構、創意概念，約 1-2 分鐘\n之後所有文案任務都以此為準。`
-                                    : `套用此情境為正式定位？\n· 受眾錨點 ← 本情境所選受眾\n· 主標語 ←「${tagZh}」\n· 下游同步重生：差異化、黃金圈、語氣、標語評分、AI 指令庫（8 平台人設），約 1-2 分鐘\n之後所有文案任務與定位重跑都以此為準。`);
+                                    : `套用此情境為正式定位？\n· 受眾錨點 ← 本情境所選受眾\n· 主標語 ←「${tagZh}」\n· 下游同步重生：差異化、黃金圈、語氣、標語評分、AI 指令庫（5 平台人設），約 1-2 分鐘\n之後所有文案任務與定位重跑都以此為準。`);
                               if (!window.confirm(confirmMsg)) return;
                               applyMut?.mutate?.({ ...scopeArgs, scenarioId: active.id, taglineSpotIndex: i }, {
                                 onSuccess: (r: any) => {

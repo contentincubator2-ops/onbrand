@@ -68,6 +68,10 @@ function PlatformIcon({ platformKey, className }: { platformKey: string; classNa
 import {
   THEATER_CAST,
   PLATFORM_META,
+  VISIBLE_THEATER_PLATFORMS,
+  HIDDEN_THEATER_PLATFORMS,
+  DEFAULT_THEATER_PLATFORMS,
+  sanitizeTheaterPlatforms,
   getChief,
   getQA,
   getPlatformLead,
@@ -557,6 +561,8 @@ function loadPersisted(brandId: number | null): PersistedRun | null {
     const parsed = JSON.parse(raw);
     // sanity check shape
     if (!parsed.cells || !Array.isArray(parsed.cells)) return null;
+    // 2026-09-29（CJ）：YouTube 已下架，舊 run 存的 activePlatforms 讀進來就濾掉。
+    parsed.activePlatforms = sanitizeTheaterPlatforms(parsed.activePlatforms);
     return parsed as PersistedRun;
   } catch {
     return null;
@@ -628,9 +634,10 @@ export default function TheaterPage() {
   // Hydrate from localStorage on first mount (if there's a persisted run for this brand).
   const persisted = useMemo(() => loadPersisted(brandId), [brandId]);
 
-  // selected platforms (default: FB + IG + YT, or restored from persistence)
+  // selected platforms (default: FB + IG, or restored from persistence)
+  // 2026-09-29（CJ）：YouTube 拿掉，預設改 FB＋IG。
   const [activePlatforms, setActivePlatforms] = useState<TheaterPlatform[]>(
-    persisted?.activePlatforms ?? ["facebook", "instagram", "youtube"],
+    persisted?.activePlatforms ?? DEFAULT_THEATER_PLATFORMS,
   );
 
   // important dates user adds
@@ -847,7 +854,7 @@ export default function TheaterPage() {
     lastBrandIdRef.current = brandId;
     if (!brandId) {
       // Cleared to null — reset to defaults
-      setActivePlatforms(["facebook", "instagram", "youtube"]);
+      setActivePlatforms(DEFAULT_THEATER_PLATFORMS);
       setImportantDates([]);
       setProducts([]);
       setPhotos([]);
@@ -857,7 +864,7 @@ export default function TheaterPage() {
       return;
     }
     const p = loadPersisted(brandId);
-    setActivePlatforms(p?.activePlatforms ?? ["facebook", "instagram", "youtube"]);
+    setActivePlatforms(p?.activePlatforms ?? DEFAULT_THEATER_PLATFORMS);
     setImportantDates(p?.importantDates ?? []);
     setProducts(p?.products ?? []);
     setPhotos(p?.photos ?? []);
@@ -893,7 +900,7 @@ export default function TheaterPage() {
     const p = loadPersisted(brandId);
     setCells(new Map(p?.cells ?? []));
     setCellMeta(new Map(p?.cellMeta ?? []));
-    setActivePlatforms(p?.activePlatforms ?? ["facebook", "instagram", "youtube"]);
+    setActivePlatforms(p?.activePlatforms ?? DEFAULT_THEATER_PLATFORMS);
     setImportantDates(p?.importantDates ?? []);
     setProducts(p?.products ?? []);
     setPhotos(p?.photos ?? []);
@@ -1771,7 +1778,7 @@ export default function TheaterPage() {
         {/* Platform multi-select */}
         <div className="flex items-center gap-2 flex-wrap mb-4">
           <span className="text-xs text-neutral-500 mr-2">{t("theater_label_platforms")}</span>
-          {(Object.keys(PLATFORM_META) as TheaterPlatform[]).map((p) => {
+          {VISIBLE_THEATER_PLATFORMS.map((p) => {
             const meta = PLATFORM_META[p];
             const on = activePlatforms.includes(p);
             return (
@@ -2579,7 +2586,7 @@ export default function TheaterPage() {
         <div className="mt-12 pt-6 border-t border-neutral-200">
           <p className="text-xs text-neutral-500 mb-3">{t("theater_cast_footer")}</p>
           <div className="flex flex-wrap gap-2">
-            {THEATER_CAST.map((m) => (
+            {THEATER_CAST.filter((m) => !m.platform || !HIDDEN_THEATER_PLATFORMS.has(m.platform)).map((m) => (
               <div
                 key={m.id}
                 className="flex items-center gap-2 px-2.5 py-1.5 bg-white border border-neutral-200 rounded-lg"

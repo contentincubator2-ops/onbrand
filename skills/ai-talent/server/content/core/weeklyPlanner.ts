@@ -16,6 +16,7 @@
  */
 import localPool from "../../localDb";
 import { candidateCards } from "../../strategy/core/campaignPlan";
+import { isHiddenContentPlatform, isHiddenHistoryItem } from "../../platform/core/planGate";
 
 export const PLANNED_SLOTS_DDL = `
   CREATE TABLE IF NOT EXISTS planned_slots (
@@ -186,7 +187,9 @@ export async function brandPlatforms(brandId: number): Promise<string[]> {
     const r = (rows as any[])[0];
     if (r) { const p = parse(r.items); if (Array.isArray(p)) ids = p.map(String); }
   } catch { /* 表還沒建：用預設 */ }
-  const out = ids.map((id) => NAV_TO_PLATFORM[id]).filter(Boolean) as string[];
+  // 2026-09-29：存過 li/yt/pr/x 的舊品牌也不能再把下架通路帶進企劃。
+  const out = (ids.map((id) => NAV_TO_PLATFORM[id]).filter(Boolean) as string[])
+    .filter((p) => !isHiddenContentPlatform(p));
   return out.length ? out : ["facebook", "instagram"];
 }
 
@@ -210,7 +213,8 @@ export async function loadWeekSlots(brandId: number, weekStart: string): Promise
       ORDER BY slotDate ASC, id ASC`,
     [brandId, weekStart, addDays(weekStart, 7)],
   );
-  return (rows as any[]).map(rowToSlot);
+  // 2026-09-29 CJ「前台隱藏，資料保留」：下架通路的舊格子不列（資料不刪）。
+  return (rows as any[]).map(rowToSlot).filter((s) => !isHiddenHistoryItem(s));
 }
 
 export interface CampaignSlot {
@@ -228,6 +232,7 @@ export async function loadWeekCampaignItems(brandId: number, weekStart: string):
       if (it?.enabled === false) continue;
       const date = String(it?.date ?? "");
       if (!isYmd(date) || date < weekStart || date >= end) continue;
+      if (isHiddenHistoryItem({ platform: it?.platform, taskId: it?.taskId })) continue;
       out.push({
         eventId: Number(e.id), eventName: String(e.name ?? ""), itemId: String(it.id), date,
         platform: String(it.platform ?? ""), taskId: String(it.taskId ?? ""), taskLabel: String(it.taskLabel ?? ""),

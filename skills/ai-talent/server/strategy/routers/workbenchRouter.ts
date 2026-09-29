@@ -546,11 +546,13 @@ scenes 3 個、contentAngles 4-6 個、risks 2-3 個。全部必須緊扣這個�
           },
         }] : []),
         {
-          id: "aiPrompts", label: "AI 指令庫（8 平台人設重生）",
+          id: "aiPrompts", label: "AI 指令庫（5 平台人設重生）",
           deps: ["differentiation", "goldenCircle", "voice"],
           run: async (c) => {
             const { generateAiPromptForPlatform } = await import("./brandKnowledgeRouter");
-            const platforms = ["facebook", "instagram", "youtube", "threads", "tiktok", "linkedin", "email", "press"] as const;
+            // 2026-09-29（CJ：內容通路只剩 FB／IG／TikTok／電子報／官網）：不再替
+            // youtube／linkedin／press 生成；既有值由下方 read-modify-write 原樣保留。
+            const platforms = ["facebook", "instagram", "threads", "tiktok", "email"] as const;
             const generated: Record<string, { text: string; image: string }> = {};
             for (const p of platforms) {
               try {

@@ -102,6 +102,9 @@ export type StrategistRoleId =
  * 2026-09-27（CJ「請按照順序，執行到官網為止」）：內容層每個通路頁各有自己的三位。
  * 通路清單跟 client 的 channelMeta／ShellLayout 路由同一份順序。
  */
+// 2026-09-29（CJ：內容通路只剩 FB／IG／TikTok／電子報／官網）：前端已拿掉
+// li／yt／pr／x 的通路頁與路由對應；這裡刻意保留（角色資料、CHANNEL_INFO 與
+// chat router 的 z.enum 都靠它，舊對話紀錄也還查得到），只藏不刪。
 export const CHANNEL_SCOPES = ["facebook", "instagram", "linkedin", "youtube", "tiktok", "email", "pr", "x", "website"] as const;
 export type ChannelScope = (typeof CHANNEL_SCOPES)[number];
 export function isChannelScope(s: string): s is ChannelScope {

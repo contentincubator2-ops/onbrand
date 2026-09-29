@@ -15,22 +15,21 @@ import { trpc } from "../../../../lib/trpc";
 import { useLang } from "../../../../lib/i18n";
 import { showToastGlobal } from "../../../../components/ui/Toast";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faFacebook, faInstagram, faYoutube, faTiktok, faLinkedin, faThreads } from "@fortawesome/free-brands-svg-icons";
+import { faFacebook, faInstagram, faTiktok, faThreads } from "@fortawesome/free-brands-svg-icons";
 import {
   faMicrophone, faPlus, faXmark, faTrash, faWandMagicSparkles,
-  faEnvelope, faNewspaper, faCopy, faCheck, faRotateRight,
+  faEnvelope, faCopy, faCheck, faRotateRight,
 } from "@fortawesome/free-solid-svg-icons";
 import CloudFilePicker, { type CloudFileSource } from "./CloudFilePicker";
 
+// 2026-09-29（CJ：內容通路只剩 FB／IG／TikTok／電子報／官網）：應用範圍拿掉
+// YouTube／LinkedIn／Press；agent.scope 裡既有的舊值不刪，只是不顯示。
 const PLATFORMS: Array<{ id: string; label: string; icon: any; tone: string }> = [
   { id: "facebook",  label: "Facebook",  icon: faFacebook,  tone: "#1877F2" },
   { id: "instagram", label: "Instagram", icon: faInstagram, tone: "#E1306C" },
-  { id: "youtube",   label: "YouTube",   icon: faYoutube,   tone: "#FF0000" },
   { id: "threads",   label: "Threads",   icon: faThreads,   tone: "#000000" },
   { id: "tiktok",    label: "TikTok",    icon: faTiktok,    tone: "#000000" },
-  { id: "linkedin",  label: "LinkedIn",  icon: faLinkedin,  tone: "#0A66C2" },
   { id: "email",     label: "EDM",       icon: faEnvelope,  tone: "#0EA5E9" },
-  { id: "press",     label: "Press",     icon: faNewspaper, tone: "#64748B" },
 ];
 
 const STEP_LABELS_ZH = ["抓取素材", "生成人設", "生成 SKILL"];
@@ -321,7 +320,9 @@ function AgentCard({ brandId, agent }: { brandId: number; agent: PersonaAgent })
   const [expanded, setExpanded] = useState(false);
   const [addingSources, setAddingSources] = useState(false);
   const [scope, setScope] = useState<Set<string>>(new Set(agent.scope));
-  const [draftPlatform, setDraftPlatform] = useState<string>(agent.scope[0] ?? "facebook");
+  const [draftPlatform, setDraftPlatform] = useState<string>(
+    agent.scope.find((id) => PLATFORMS.some((p) => p.id === id)) ?? "facebook",
+  );
   const [draftTopic, setDraftTopic] = useState("");
   const [draftResult, setDraftResult] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);

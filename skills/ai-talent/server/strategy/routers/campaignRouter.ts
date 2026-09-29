@@ -24,6 +24,7 @@ import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure } from "../../platform/core/trpc";
 import localPool from "../../localDb";
 import { buildCampaignPlan, inferCampaignSettings, type CampaignPlan } from "../core/campaignPlan";
+import { isHiddenContentPlatform, isHiddenHistoryItem } from "../../platform/core/planGate";
 
 const settingsInput = z.object({
   type: z.string().max(40),
@@ -100,6 +101,21 @@ async function productIdsOf(eventId: number): Promise<number[]> {
   return (rows as any[]).map((r) => Number(r.productId));
 }
 
+/**
+ * 2026-09-29 CJ「前台隱藏，資料保留」：LinkedIn／YouTube／新聞稿／X 的企劃格與通路設定
+ * 不再回給前台。savePlan 是整份覆寫，所以存的時候要把藏起來的格子補回去，不然
+ * 使用者改一次企劃就把它們刪掉了。
+ */
+const isHiddenPlanItem = (i: any) => isHiddenHistoryItem({ platform: i?.platform, taskId: i?.taskId });
+function visiblePlan(plan: CampaignPlan | null): CampaignPlan | null {
+  if (!plan || !Array.isArray(plan.items)) return plan;
+  return { ...plan, items: plan.items.filter((i) => !isHiddenPlanItem(i)) };
+}
+function visibleSettings(settings: any): any {
+  if (!settings || !Array.isArray(settings.channels)) return settings ?? null;
+  return { ...settings, channels: settings.channels.filter((c: string) => !isHiddenContentPlatform(c)) };
+}
+
 export const campaignRouter = router({
   /** 設定 + 企劃 + 活動基本資料。策略層的企劃頁與內容層的 tray 都讀這支。 */
   get: protectedProcedure
@@ -117,8 +133,8 @@ export const campaignRouter = router({
           startAt: row.startAt ? new Date(row.startAt).toISOString().slice(0, 10) : null,
           endAt: row.endAt ? new Date(row.endAt).toISOString().slice(0, 10) : null,
         },
-        settings: pos.campaign ?? null,
-        plan: (pos.campaignPlan ?? null) as CampaignPlan | null,
+        settings: visibleSettings(pos.campaign),
+        plan: visiblePlan((pos.campaignPlan ?? null) as CampaignPlan | null),
         products: (prodRows as any[]).map((p) => ({ id: Number(p.id), name: String(p.name) })),
         /** 舊的 11 段得獎 brief 還在不在——進階模式的入口要不要亮由這個決定。 */
         hasLegacyBrief: ["brief", "smp", "creative", "awards"].some((k) => !!pos?.[k]),
@@ -184,7 +200,11 @@ export const campaignRouter = router({
   savePlan: protectedProcedure
     .input(z.object({ eventId: z.number().int().positive(), plan: planInput }))
     .mutation(async ({ ctx, input }) => {
-      await patchPositioning(input.eventId, ctx.user!.id, "campaignPlan", input.plan);
+      const row = await loadEvent(input.eventId, ctx.user!.id);
+      const stored = parsePositioning(row.positioning).campaignPlan as CampaignPlan | undefined;
+      const hidden = (stored?.items ?? []).filter(isHiddenPlanItem);
+      const incoming = (input.plan.items ?? []).filter((i: any) => !isHiddenPlanItem(i));
+      await patchPositioning(input.eventId, ctx.user!.id, "campaignPlan", { ...input.plan, items: [...incoming, ...hidden] });
       return { ok: true };
     }),
 
@@ -207,7 +227,7 @@ export const campaignRouter = router({
         const pos = parsePositioning(row.positioning);
         const plan = pos.campaignPlan as CampaignPlan | undefined;
         if (!plan?.items?.length) return [];
-        const items = plan.items.filter((i) => i.enabled);
+        const items = plan.items.filter((i) => i.enabled && !isHiddenPlanItem(i));
         const done = items.filter((i) => !!i.outputId).length;
         const endAt = row.endAt ? new Date(row.endAt).toISOString().slice(0, 10) : null;
         return [{

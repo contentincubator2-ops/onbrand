@@ -6,12 +6,6 @@
  * 並鎖住兩邊一致。文案裡不要再手寫這些數字，一律引用這裡。
  */
 export const CATALOG = {
-  total: 185,
-  basic: 154,
-  award: 75,
-  benchmark: 45,
-  viral: 31,
-  evergreen: 34,
-  sourced: 151,
-  channels: 8,
+  viral: 25,
+  channels: 5,
 } as const;

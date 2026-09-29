@@ -20,19 +20,18 @@ import { trpc } from "../../../../lib/trpc";
 import { useLang } from "../../../../lib/i18n";
 import { Card, CardBody, Textarea, Button } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faFacebook, faInstagram, faYoutube, faTiktok, faLinkedin, faThreads } from "@fortawesome/free-brands-svg-icons";
-import { faRobot, faEnvelope, faNewspaper, faCheck } from "@fortawesome/free-solid-svg-icons";
+import { faFacebook, faInstagram, faTiktok, faThreads } from "@fortawesome/free-brands-svg-icons";
+import { faRobot, faEnvelope, faCheck } from "@fortawesome/free-solid-svg-icons";
 import { Sparkles } from "lucide-react";
 
+// 2026-09-29（CJ：內容通路只剩 FB／IG／TikTok／電子報／官網）：YouTube／LinkedIn／
+// Press 分頁拿掉；已存的 _aiPrompts 原樣保留（drafts 整包回存，不刪資料）。
 const PLATFORMS: Array<{ id: string; label: string; icon: any; tone: string }> = [
   { id: "facebook",  label: "Facebook",  icon: faFacebook,  tone: "#1877F2" },
   { id: "instagram", label: "Instagram", icon: faInstagram, tone: "#E1306C" },
-  { id: "youtube",   label: "YouTube",   icon: faYoutube,   tone: "#FF0000" },
   { id: "threads",   label: "Threads",   icon: faThreads,   tone: "#000000" },
   { id: "tiktok",    label: "TikTok",    icon: faTiktok,    tone: "#000000" },
-  { id: "linkedin",  label: "LinkedIn",  icon: faLinkedin,  tone: "#0A66C2" },
   { id: "email",     label: "EDM",       icon: faEnvelope,  tone: "#0EA5E9" },
-  { id: "press",     label: "Press",     icon: faNewspaper, tone: "#64748B" },
 ];
 
 interface PromptValue { text?: string; image?: string }

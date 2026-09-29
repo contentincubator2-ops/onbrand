@@ -374,30 +374,7 @@ export const EVENT_PROMPTS: PromptTemplate[] = [
     variables: ["活動名稱", "推廣對象", "核心概念", "活動標語"],
     llms: ["chatgpt", "claude", "gemini"],
   },
-  {
-    id: "event-pr",
-    category: "SEO內容",
-    title: "新聞稿",
-    description: "活動發布新聞稿",
-    body: `為以下活動撰寫新聞稿：
-
-活動名稱：{活動名稱}
-推廣對象：{推廣對象}
-活動概念：{核心概念}
-標語：{活動標語}
-
-需包含：
-1. 標題（30 字）
-2. 導言
-3. 正文
-4. 引用語錄
-5. 活動詳情
-6. 媒體聯絡資訊
-
-繁體中文。`,
-    variables: ["活動名稱", "推廣對象", "核心概念", "活動標語"],
-    llms: ["chatgpt", "claude", "gemini"],
-  },
+  // 2026-09-29 CJ：新聞稿通路下架，「活動發布新聞稿」指令範本一併拿掉（id: event-pr）。
   {
     id: "event-edm",
     category: "電子郵件",

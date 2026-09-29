@@ -24,8 +24,9 @@ import { toastWithUpgrade } from "../../platform/lib/upgradeToast";
 import { matchTaskWithSynonyms } from "../lib/taskSearchSynonyms";
 import { TIER_ORDER, tierAccent, tierLabel } from "../../platform/lib/tierVocabulary";
 import {
-  SOURCE_ORDER, resolveSource, sourceAccent, sourceLabel, sourceWhy,
-  sourcePillText, sourceTooltip, type TaskSourceType,
+  resolveSource, sourceAccent, sourceWhy,
+  sourcePillText, sourceTooltip,
+  FRONT_CARD_KINDS, frontCardKind, frontCardKindLabel, isFrontVisibleCard, type FrontCardKind,
 } from "../lib/sourceVocabulary";
 import {
   FB_FORMAT_TABS as FORMAT_TABS,
@@ -538,7 +539,7 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
   // Tier tab state (used for non-FB/non-IG platforms)
   const [activeTier, setActiveTier] = useState<ActiveTier>("all");
   // 結構來源篩選。"all" = 不篩。與 tier 是兩條獨立的軸，可同時生效。
-  const [activeSource, setActiveSource] = useState<TaskSourceType | "all">("all");
+  const [activeSource, setActiveSource] = useState<FrontCardKind | "all">("all");
   // Format tab state (used for FB)
   const [activeFormat, setActiveFormat] = useState<ActiveFormat>("all");
   // Format tab state (used for IG)
@@ -770,6 +771,10 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
     .filter((c) => c.status !== "ready");
 
   const allTasks: FBTaskCard[] = (listQuery.data as FBTaskCard[]) ?? [];
+  // 2026-09-29 CJ：前台只列爆款結構＋品牌自建（sourceVocabulary.frontCardKind）。
+  // allTasks 保留完整清單給「用 id 找卡」的地方（?rerun=、?slot=、本週企劃回填）；
+  // 清單、張數、篩選、選卡器一律吃 shownTasks。
+  const shownTasks: FBTaskCard[] = useMemo(() => allTasks.filter(isFrontVisibleCard), [allTasks]);
   const catalogFailed = !!listQuery?.error && allTasks.length === 0;
 
   // Mutations
@@ -963,8 +968,8 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
   // ── Filtered task list ────────────────────────────────────────────────────
   /** 這個通路的全部可見卡（已過方案閘門）。托盤與選卡器都吃這一份。 */
   const platformTasks = useMemo(
-    () => allTasks.filter((task) => inferPlatform(task) === platform),
-    [allTasks, platform],
+    () => shownTasks.filter((task) => inferPlatform(task) === platform),
+    [shownTasks, platform],
   );
 
   // ── 2026-09-06 任務托盤 ─────────────────────────────────────────────
@@ -1056,12 +1061,13 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
       }
     } else {
       // Tier-based filter for other platforms
-      if (activeSource !== "all") {
-        list = list.filter((task) => resolveSource((task as any).source).type === activeSource);
-      }
       if (activeTier !== "all") {
         list = list.filter((task) => task.tier === activeTier);
       }
+    }
+    // 類型篩選（爆款結構／品牌自建）每個通路都套用。
+    if (activeSource !== "all") {
+      list = list.filter((task) => frontCardKind(task) === activeSource);
     }
     return list;
   }, [platformTasks, platform, activeTier, activeSource, activeFormat, activeIGFormat, activeLIFormat, activeYTFormat, activeTTFormat, activeEMFormat, activePRFormat, activeWEBFormat, activePackFormat, packChannel]);
@@ -1099,125 +1105,129 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
     // 是在找東西，不是在用日常的那幾張）。
     const filtering = searchQuery.trim().length > 0
       || activeSource !== "all" || activeTier !== "all" || onlyNew;
-    if (!showAllTasks && !filtering && trayIds.length) {
-      const inTray = new Set(trayIds);
+    // 2026-09-29：托盤（含系統預設）可能擺著前台已不列的類型——只算看得到的那幾張，
+    // 全都看不到就當沒設托盤，不要讓用戶停在「常用清單裡沒有這個分類的卡」。
+    const shownIds = new Set(shownTasks.map((t) => t.id));
+    const liveTray = trayIds.filter((id) => shownIds.has(id));
+    if (!showAllTasks && !filtering && liveTray.length) {
+      const inTray = new Set(liveTray);
       list = list.filter((task) => inTray.has(task.id));
     }
     return list;
-  }, [categoryTasks, activeSource, activeTier, searchQuery, showAllTasks, trayIds, onlyNew]);
+  }, [categoryTasks, shownTasks, activeSource, activeTier, searchQuery, showAllTasks, trayIds, onlyNew]);
 
   const totalForPlatform = useMemo(
-    () => allTasks.filter((task) => inferPlatform(task) === platform).length,
-    [allTasks, platform],
+    () => shownTasks.filter((task) => inferPlatform(task) === platform).length,
+    [shownTasks, platform],
   );
 
   // Count tasks per format category (FB)
   const formatCounts = useMemo<Record<string, number>>(() => {
     if (platform !== "facebook") return {};
-    const fbTasks = allTasks.filter((task) => inferPlatform(task) === platform);
+    const fbTasks = shownTasks.filter((task) => inferPlatform(task) === platform);
     const counts: Record<string, number> = { all: fbTasks.length };
     for (const task of fbTasks) {
       const fmt = TASK_FORMAT_MAP[task.id];
       if (fmt) counts[fmt] = (counts[fmt] ?? 0) + 1;
     }
     return counts;
-  }, [allTasks, platform]);
+  }, [shownTasks, platform]);
 
   // Count tasks per format category (IG)
   const igFormatCounts = useMemo<Record<string, number>>(() => {
     if (platform !== "instagram") return {};
-    const igTasks = allTasks.filter((task) => inferPlatform(task) === platform);
+    const igTasks = shownTasks.filter((task) => inferPlatform(task) === platform);
     const counts: Record<string, number> = { all: igTasks.length };
     for (const task of igTasks) {
       const fmt = IG_TASK_FORMAT_MAP[task.id];
       if (fmt) counts[fmt] = (counts[fmt] ?? 0) + 1;
     }
     return counts;
-  }, [allTasks, platform]);
+  }, [shownTasks, platform]);
 
   // Count tasks per format category (LI)
   const liFormatCounts = useMemo<Record<string, number>>(() => {
     if (platform !== "linkedin") return {};
-    const liTasks = allTasks.filter((task) => inferPlatform(task) === platform);
+    const liTasks = shownTasks.filter((task) => inferPlatform(task) === platform);
     const counts: Record<string, number> = { all: liTasks.length };
     for (const task of liTasks) {
       const fmt = LI_TASK_FORMAT_MAP[task.id];
       if (fmt) counts[fmt] = (counts[fmt] ?? 0) + 1;
     }
     return counts;
-  }, [allTasks, platform]);
+  }, [shownTasks, platform]);
 
   // Count tasks per format category (YT)
   const ytFormatCounts = useMemo<Record<string, number>>(() => {
     if (platform !== "youtube") return {};
-    const ytTasks = allTasks.filter((task) => inferPlatform(task) === platform);
+    const ytTasks = shownTasks.filter((task) => inferPlatform(task) === platform);
     const counts: Record<string, number> = { all: ytTasks.length };
     for (const task of ytTasks) {
       const fmt = YT_TASK_FORMAT_MAP[task.id];
       if (fmt) counts[fmt] = (counts[fmt] ?? 0) + 1;
     }
     return counts;
-  }, [allTasks, platform]);
+  }, [shownTasks, platform]);
 
   // Count tasks per format category (TikTok)
   const ttFormatCounts = useMemo<Record<string, number>>(() => {
     if (platform !== "tiktok") return {};
-    const ttTasks = allTasks.filter((task) => inferPlatform(task) === platform);
+    const ttTasks = shownTasks.filter((task) => inferPlatform(task) === platform);
     const counts: Record<string, number> = { all: ttTasks.length };
     for (const task of ttTasks) {
       const fmt = TT_TASK_FORMAT_MAP[task.id];
       if (fmt) counts[fmt] = (counts[fmt] ?? 0) + 1;
     }
     return counts;
-  }, [allTasks, platform]);
+  }, [shownTasks, platform]);
 
   // Count tasks per format category (Email)
   const emFormatCounts = useMemo<Record<string, number>>(() => {
     if (platform !== "email") return {};
-    const emTasks = allTasks.filter((task) => inferPlatform(task) === platform);
+    const emTasks = shownTasks.filter((task) => inferPlatform(task) === platform);
     const counts: Record<string, number> = { all: emTasks.length };
     for (const task of emTasks) {
       const fmt = EM_TASK_FORMAT_MAP[task.id];
       if (fmt) counts[fmt] = (counts[fmt] ?? 0) + 1;
     }
     return counts;
-  }, [allTasks, platform]);
+  }, [shownTasks, platform]);
 
   // Count tasks per format category (PR)
   const prFormatCounts = useMemo<Record<string, number>>(() => {
     if (platform !== "pr") return {};
-    const prTasks = allTasks.filter((task) => inferPlatform(task) === platform);
+    const prTasks = shownTasks.filter((task) => inferPlatform(task) === platform);
     const counts: Record<string, number> = { all: prTasks.length };
     for (const task of prTasks) {
       const fmt = PR_TASK_FORMAT_MAP[task.id];
       if (fmt) counts[fmt] = (counts[fmt] ?? 0) + 1;
     }
     return counts;
-  }, [allTasks, platform]);
+  }, [shownTasks, platform]);
 
   // Count tasks per format category (客製包)
   const packFormatCounts = useMemo<Record<string, number>>(() => {
     if (!packChannel) return {};
-    const scoped = allTasks.filter((task) => inferPlatform(task) === platform);
+    const scoped = shownTasks.filter((task) => inferPlatform(task) === platform);
     const counts: Record<string, number> = { all: scoped.length };
     for (const task of scoped) {
       const fmt = (task as any).packFormat;
       if (fmt) counts[fmt] = (counts[fmt] ?? 0) + 1;
     }
     return counts;
-  }, [allTasks, platform, packChannel]);
+  }, [shownTasks, platform, packChannel]);
 
   // Count tasks per format category (官網)
   const webFormatCounts = useMemo<Record<string, number>>(() => {
     if (platform !== "website") return {};
-    const webTasks = allTasks.filter((task) => inferPlatform(task) === platform);
+    const webTasks = shownTasks.filter((task) => inferPlatform(task) === platform);
     const counts: Record<string, number> = { all: webTasks.length };
     for (const task of webTasks) {
       const fmt = WEB_TASK_FORMAT_MAP[task.id];
       if (fmt) counts[fmt] = (counts[fmt] ?? 0) + 1;
     }
     return counts;
-  }, [allTasks, platform]);
+  }, [shownTasks, platform]);
 
   // ── Open / close task modal ───────────────────────────────────────────────
   const openTask = (task: FBTaskCard) => {
@@ -2029,24 +2039,25 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
           {/* 結構來源篩選 —— 只列出這個頻道實際存在的類型，避免一排點不動的空篩選。
               與上面的 tier 分頁是兩條獨立的軸：一條問「產出多大」，一條問「憑什麼這樣寫」。 */}
           {(() => {
-            const present = new Set<TaskSourceType>();
-            for (const t of allTasks) {
+            const present = new Set<FrontCardKind>();
+            for (const t of shownTasks) {
               if (platform && (t as any).platform && (t as any).platform !== platform) continue;
-              present.add(resolveSource((t as any).source).type);
+              const k = frontCardKind(t);
+              if (k) present.add(k);
             }
-            const types = SOURCE_ORDER.filter((t) => present.has(t));
-            if (types.length < 2) return null;   // 只有一種來源就不必給篩選
-            const tabs: Array<TaskSourceType | "all"> = ["all", ...types];
+            const types = FRONT_CARD_KINDS.filter((t) => present.has(t));
+            if (types.length < 2) return null;   // 只有一種類型就不必給篩選
+            const tabs: Array<FrontCardKind | "all"> = ["all", ...types];
             return (
               <div className="mt-3 flex items-center gap-1.5 flex-wrap justify-center">
                 {tabs.map((id) => {
                   const active = activeSource === id;
-                  const acc = id === "all" ? "#171717" : sourceAccent(id);
+                  const acc = id === "all" || id === "viral" ? "#171717" : "#404040";
                   return (
                     <button
                       key={id}
                       onClick={() => setActiveSource(id)}
-                      title={id === "all" ? undefined : sourceWhy(id, lang)}
+                      title={id === "all" ? undefined : id === "viral" ? sourceWhy("viral", lang) : (lang === "en" ? "Cards you built for this brand." : "你替這個品牌自己建的卡。")}
                       className="flex items-center gap-1.5 px-3 py-1 rounded-full text-tiny font-medium transition-all"
                       style={
                         active
@@ -2061,8 +2072,8 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                         />
                       )}
                       {id === "all"
-                        ? (lang === "en" ? "All sources" : "全部來源")
-                        : sourceLabel(id, lang, { long: true })}
+                        ? (lang === "en" ? "All" : "全部")
+                        : frontCardKindLabel(id, lang)}
                     </button>
                   );
                 })}
@@ -2124,7 +2135,7 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
 
       {/* ─── Task grid ─────────────────────────────────────────────────── */}
       <div className="max-w-[1200px] mx-auto px-6 pb-20 mt-2">
-        {totalForPlatform === 0 ? (
+        {totalForPlatform === 0 && allTasks.length === 0 ? (
           <Card>
             <CardBody className="text-center text-default-500 py-12">
               <FontAwesomeIcon icon={faBolt} className="text-3xl mb-2 text-default-300" />
@@ -2156,6 +2167,15 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                       ? `No preset cards in ${activeCategoryLabel ?? meta.label} yet`
                       : `「${activeCategoryLabel ?? meta.labelZh}」目前還沒有預設任務卡`}
                   </p>
+                  {/* 2026-09-29：前台只列爆款結構＋品牌自建，基礎方案看不到爆款卡——
+                      講清楚空的原因，不要讓用戶以為壞了。 */}
+                  {(trayData?.viralLocked ?? 0) > 0 && (
+                    <p className="text-tiny text-default-400 mb-1">
+                      {lang === "en"
+                        ? `${trayData!.viralLocked} viral-structure cards here are on the Pro plan.`
+                        : `這個通路有 ${trayData!.viralLocked} 張爆款結構卡，屬於專業方案。`}
+                    </p>
+                  )}
                   {COMPOSER_CHANNELS.has(platform) && brandId ? (
                     <>
                       <p className="text-tiny text-default-400 mb-3">
@@ -2342,6 +2362,8 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                       {(() => {
                         const src = resolveSource((task as any).source);
                         const acc = sourceAccent(src.type);
+                        // 自建卡沒有 source，resolveSource 會退回「長青公式」—— 印成品牌自建。
+                        const isOwn = frontCardKind(task) === "own";
                         // 2026-09-06：改為單色。原本是彩色圓點＋彩色文字＋淡色底，
                         // 249 張卡每張都有 —— 違反「不要彩色」的紀律。現在只用
                         // 墨色深淺與邊框，字級也從 10px 提到 12px。
@@ -2351,7 +2373,7 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                             tabIndex={0}
                             className="inline-flex items-center self-start rounded-full border px-2 py-0.5 max-w-full cursor-pointer hover:border-neutral-800"
                             style={{ borderColor: "#E5E5E5", background: "#FFFFFF" }}
-                            title={sourceTooltip(src, lang)}
+                            title={isOwn ? frontCardKindLabel("own", lang) : sourceTooltip(src, lang)}
                             // 2026-09-08 (CJ「在 dev 還看不到出處說明」)：出處 pill 本身就能點開詳情，
                             // 不必找下面那行小字。
                             onClick={(e) => { e.stopPropagation(); setDetailTaskId(task.id); }}
@@ -2364,7 +2386,7 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                               className="text-[12px] font-medium truncate"
                               style={{ color: acc }}
                             >
-                              {sourcePillText(src, lang)}
+                              {isOwn ? frontCardKindLabel("own", lang) : sourcePillText(src, lang)}
                             </span>
                           </span>
                         );
@@ -2498,7 +2520,7 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
         onClose={() => setPickerOpen(false)}
         tasks={categoryTasks as any[]}
         categoryLabel={activeCategoryLabel}
-        selected={trayIds}
+        selected={trayIds.filter((id) => shownTasks.some((t) => t.id === id))}
         maxTray={trayData?.maxTray ?? 12}
         viralLocked={trayData?.viralLocked ?? 0}
         saving={setTrayMut?.isPending}

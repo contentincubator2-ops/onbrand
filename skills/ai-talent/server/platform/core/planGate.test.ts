@@ -8,7 +8,7 @@
 import { describe, it, expect } from "vitest";
 import {
   isUnlimited, resolveChannels, daysUntilSwap, filterTasksByPlan, checkCap,
-  checkTaskAllowed, isViewerOnly,
+  checkTaskAllowed, isViewerOnly, isHiddenHistoryItem, isHiddenTaskId,
 } from "./planGate";
 import { PLANS } from "./plans";
 
@@ -249,3 +249,29 @@ describe("策略監測閘門", () => {
   });
 });
 
+
+describe("下架通路（2026-09-29）", () => {
+  it("歷史資料的各種寫法都認得：platform 別名與 task id 前綴", () => {
+    for (const platform of ["linkedin", "youtube", "x", "pr", "press", "li", "yt", "LinkedIn"]) {
+      expect(isHiddenHistoryItem({ platform })).toBe(true);
+    }
+    // X 的產出記成 generic，只能靠 task id
+    expect(isHiddenHistoryItem({ platform: "generic", taskId: "x-thread-hook" })).toBe(true);
+    expect(isHiddenTaskId("li-post")).toBe(true);
+    expect(isHiddenTaskId("pr-release")).toBe(true);
+  });
+
+  it("五個保留通路不誤殺", () => {
+    for (const platform of ["facebook", "instagram", "tiktok", "email", "website"]) {
+      expect(isHiddenHistoryItem({ platform })).toBe(false);
+    }
+    for (const taskId of ["fb-99-carousel-5", "ig-reel", "tt-hook", "em-welcome", "web-article", "live-x"]) {
+      expect(isHiddenTaskId(taskId)).toBe(false);
+    }
+  });
+
+  it("執行層：下架通路不論方案都不能跑", () => {
+    const v = checkTaskAllowed(Q({ platforms: -1, viralTaskCards: true }), null, { platform: "linkedin", sourceType: "award" });
+    expect(v.ok).toBe(false);
+  });
+});

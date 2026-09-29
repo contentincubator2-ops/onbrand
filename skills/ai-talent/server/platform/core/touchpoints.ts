@@ -13,6 +13,7 @@
  * （例如某些市場法規禁用特定平台）再把它接進 isApplicable()，不先編假規則。
  */
 import localPool from "../../localDb";
+import { isHiddenContentPlatform } from "./planGate";
 
 export type DeployMethod = "api-publish" | "manual-copy" | "embed-widget";
 export type DeployStatus = "connected" | "manual";
@@ -81,7 +82,9 @@ export interface BrandCoverage {
 
 export async function getTouchpointCoverage(brandId: number): Promise<BrandCoverage> {
   const brand = await loadBrandRow(brandId);
-  const touchpoints: TouchpointCoverage[] = TOUCHPOINTS.map((def) => ({
+  // 2026-09-29（CJ：內容通路只剩 FB／IG／TikTok／電子報／官網）：隱藏的通路
+  // 不進覆蓋率，totalCount 也一起降；TOUCHPOINTS 表本身保留不刪。
+  const touchpoints: TouchpointCoverage[] = TOUCHPOINTS.filter((def) => !isHiddenContentPlatform(def.id)).map((def) => ({
     ...def,
     deployStatus: deployStatusFor(def, brand),
     applicable: true,

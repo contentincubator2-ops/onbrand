@@ -59,10 +59,16 @@ describe("scopeFromUrl — Facebook 任務頁", () => {
 describe("通路頁 scope 與標籤（2026-09-27：FB 到官網）", () => {
   it("每個內容層通路路由都對到自己的 scope", () => {
     const cases: Array<[string, string]> = [
-      ["/tasks/fb", "facebook"], ["/tasks/ig", "instagram"], ["/tasks/li", "linkedin"], ["/tasks/yt", "youtube"],
-      ["/tasks/tt", "tiktok"], ["/tasks/email", "email"], ["/tasks/pr", "pr"], ["/tasks/x", "x"], ["/tasks/web", "website"],
+      ["/tasks/fb", "facebook"], ["/tasks/ig", "instagram"],
+      ["/tasks/tt", "tiktok"], ["/tasks/email", "email"], ["/tasks/web", "website"],
     ];
     for (const [path, scope] of cases) expect(scopeFromUrl({ path, p: null, cat: null })).toBe(scope);
+  });
+  // 2026-09-29（CJ）：內容通路只剩 FB／IG／TikTok／電子報／官網，其餘路由不再有通路顧問。
+  it("已下架的通路（LinkedIn／YouTube／新聞稿／X）不再對到通路 scope", () => {
+    for (const path of ["/tasks/li", "/tasks/yt", "/tasks/pr", "/tasks/x"]) {
+      expect(scopeFromUrl({ path, p: null, cat: null })).toBe("brand");
+    }
   });
   it("案例、行事曆等不是通路的內容頁照舊", () => {
     expect(scopeFromUrl({ path: "/tasks/case", p: null, cat: null })).toBe("brand");
@@ -72,6 +78,6 @@ describe("通路頁 scope 與標籤（2026-09-27：FB 到官網）", () => {
     expect(channelAdvisorLabel("facebook", false)).toBe("FB 顧問");
     expect(channelAdvisorLabel("email", false)).toBe("電子報顧問");
     expect(channelAdvisorLabel("website", false)).toBe("官網顧問");
-    expect(channelAdvisorLabel("pr", true)).toBe("PR Advisors");
+    expect(channelAdvisorLabel("tiktok", true)).toBe("TikTok Advisors");
   });
 });

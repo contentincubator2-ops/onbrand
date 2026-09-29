@@ -22,27 +22,16 @@ function readClientFigures(): Record<string, number> {
 }
 
 describe("catalogFigures 對得上真實任務卡目錄", () => {
-  // 對外宣稱的是用戶看得到的卡，下架通路的卡不算。
-  const all = buildTaskCatalogIndex().filter((t) => !isHiddenContentPlatform(t.platform));
-  const count = (type: string) => all.filter((t) => t.source.type === type).length;
+  // 2026-09-29：對外只宣稱前台看得到的——五個內容通路的爆款結構卡。
+  const FRONT_CHANNELS = new Set(["facebook", "instagram", "tiktok", "email", "website"]);
+  const all = buildTaskCatalogIndex().filter((t) => FRONT_CHANNELS.has(t.platform));
 
-  it("總張數、基礎可用張數", () => {
-    expect(all.length).toBe(CATALOG_FIGURES.total);
-    expect(all.length - count("viral")).toBe(CATALOG_FIGURES.basic);
+  it("爆款結構卡張數", () => {
+    expect(all.filter((t) => t.source.type === "viral").length).toBe(CATALOG_FIGURES.viral);
   });
 
-  it("各來源張數，以及「說得出出處」= 得獎＋標竿＋爆款", () => {
-    expect(count("award")).toBe(CATALOG_FIGURES.award);
-    expect(count("benchmark")).toBe(CATALOG_FIGURES.benchmark);
-    expect(count("viral")).toBe(CATALOG_FIGURES.viral);
-    expect(count("evergreen")).toBe(CATALOG_FIGURES.evergreen);
-    expect(CATALOG_FIGURES.award + CATALOG_FIGURES.benchmark + CATALOG_FIGURES.viral).toBe(CATALOG_FIGURES.sourced);
-    expect(CATALOG_FIGURES.sourced + CATALOG_FIGURES.evergreen).toBe(CATALOG_FIGURES.total);
-  });
-
-  it("全域目錄沒有其他來源類型混進來（客製包的 brand-method 不在裡面）", () => {
-    const known = new Set(["award", "benchmark", "viral", "evergreen"]);
-    expect(all.filter((t) => !known.has(t.source.type)).map((t) => t.id)).toEqual([]);
+  it("五個前台通路沒有一個是被下架的", () => {
+    for (const p of FRONT_CHANNELS) expect(isHiddenContentPlatform(p)).toBe(false);
   });
 
   it("通路數 = 通路選擇畫面（ChannelPicker）實際列出的通路", () => {

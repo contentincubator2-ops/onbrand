@@ -30,6 +30,25 @@ export function isHiddenContentPlatform(platform: string | null | undefined): bo
   return !!platform && HIDDEN_CONTENT_PLATFORMS.has(platform);
 }
 
+/**
+ * 歷史資料（產出、排程、企劃格、會議紀錄…）上的平台欄位寫法不一：missions.workspace
+ * 會是 press、路由片段會是 li／yt，X 卡則記成 generic（只能靠 task id 認）。
+ * CJ 2026-09-29「前台隱藏，資料保留」—— 讀歷史的地方一律過這支。
+ */
+const HIDDEN_PLATFORM_ALIASES: ReadonlySet<string> = new Set([
+  ...HIDDEN_CONTENT_PLATFORMS, "press", "li", "yt", "twitter",
+]);
+const HIDDEN_TASK_ID_PREFIXES = ["li-", "yt-", "pr-", "x-"];
+
+export function isHiddenTaskId(taskId: string | null | undefined): boolean {
+  return !!taskId && HIDDEN_TASK_ID_PREFIXES.some((p) => taskId.startsWith(p));
+}
+
+export function isHiddenHistoryItem(item: { platform?: string | null; taskId?: string | null }): boolean {
+  const p = typeof item.platform === "string" ? item.platform.toLowerCase() : "";
+  return (!!p && HIDDEN_PLATFORM_ALIASES.has(p)) || isHiddenTaskId(item.taskId);
+}
+
 /** 沒選過通路時的預設。FB / IG 是產品主場，排前面。 */
 const DEFAULT_PLATFORM_ORDER = [
   "facebook", "instagram", "youtube", "tiktok", "linkedin",
@@ -171,6 +190,10 @@ export function checkTaskAllowed(
   channels: ChannelSelection | null,
   info: TaskGateInfo,
 ): GateVerdict {
+  // 2026-09-29：下架通路不論方案都不能跑（舊書籤、舊產出的重跑都走到這裡）。
+  if (isHiddenContentPlatform(info.platform)) {
+    return { ok: false, reason: "channel", message: "這個通路的任務卡已下架。" };
+  }
   if (quota.viralTaskCards === false && info.sourceType === "viral") {
     return {
       ok: false, reason: "viral",
@@ -220,6 +243,10 @@ export async function assertTaskAllowed(args: {
   // 角色先於方案：viewer 不論方案都不能執行。五個執行入口都經過這裡，
   // 所以在這裡擋一次就全部擋到，不必再各接一次。
   await assertCanAct(args.userId);
+  // 2026-09-29：下架通路在無限方案也不放行——所以要擋在下面的「無限方案直接放行」之前。
+  if (isHiddenContentPlatform(args.info.platform)) {
+    throw new TRPCError({ code: "FORBIDDEN", message: "這個通路的任務卡已下架。" });
+  }
 
   let quota: PlanQuota;
   let positioning: unknown = null;

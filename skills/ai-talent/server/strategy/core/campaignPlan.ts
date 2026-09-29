@@ -448,7 +448,8 @@ export async function buildCampaignPlan(args: {
 }): Promise<CampaignPlan> {
   const facts = await eventFacts(args.eventId, args.userId);
   if (!facts) throw new Error("找不到這個活動");
-  const s = facts.settings;
+  // 2026-09-29：舊設定裡的下架通路（LinkedIn／YouTube／新聞稿／X）不排進新企劃。
+  const s = { ...facts.settings, channels: (facts.settings.channels ?? []).filter((c) => !isHiddenContentPlatform(c)) };
   if (!s.type || !s.mechanic?.trim() || !s.channels?.length) {
     throw new Error("活動設定還沒填完（需要活動類型、優惠機制、要發的通路）");
   }

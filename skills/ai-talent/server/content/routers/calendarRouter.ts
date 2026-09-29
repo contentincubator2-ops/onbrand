@@ -18,7 +18,7 @@ import {
   probePipedreamFacebookAccounts,
 } from "../../platform/core/pipedreamFacebook";
 import { router, protectedProcedure } from "../../platform/core/trpc";
-import { assertCanAct } from "../../platform/core/planGate";
+import { assertCanAct, isHiddenHistoryItem } from "../../platform/core/planGate";
 import { getDb } from "../../db";
 import { sql } from "drizzle-orm";
 import { assertBrandOwner } from "../../platform/core/brandAuth";
@@ -178,7 +178,8 @@ export const calendarRouter = router({
       const [published]: any = await localPool.execute(
         `SELECT o.id, o.content, o.publishedAt, o.status,
                 m.brandId, b.name AS brandName, m.title AS missionTitle,
-                m.workspace AS platform
+                m.workspace AS platform,
+                NULLIF(JSON_UNQUOTE(JSON_EXTRACT(o.metadata, '$.taskId')), 'null') AS taskId
          FROM mission_outputs o
          JOIN missions m ON m.id = o.missionId
          LEFT JOIN brands b ON b.id = m.brandId
@@ -191,8 +192,16 @@ export const calendarRouter = router({
         params2,
       );
 
+      // 2026-09-29 CJ「前台隱藏，資料保留」：下架通路（LinkedIn／YouTube／新聞稿／X）
+      // 的排程與已發布不上日曆。X 產出的 platform 是 generic，只能靠 task id 認。
+      const metaTaskId = (m: unknown): string | null => {
+        try { const j = typeof m === "string" ? JSON.parse(m) : m; return typeof (j as any)?.taskId === "string" ? (j as any).taskId : null; }
+        catch { return null; }
+      };
       const items = [
-        ...(scheduled as any[]).map((s) => {
+        ...(scheduled as any[])
+          .filter((s) => !isHiddenHistoryItem({ platform: s.platform, taskId: metaTaskId(s.outputMetadata) }))
+          .map((s) => {
           const selector = resolveStoredContentSelector({
             variantIndex: s.variantIndex,
             contentKind: s.contentKind,
@@ -216,7 +225,9 @@ export const calendarRouter = router({
             preview: extractCaption(s.outputContent, selector),
           };
         }),
-        ...(published as any[]).map((p) => ({
+        ...(published as any[])
+          .filter((p) => !isHiddenHistoryItem({ platform: p.platform, taskId: p.taskId }))
+          .map((p) => ({
           kind: "published" as const,
           id: p.id,
           outputId: p.id,
