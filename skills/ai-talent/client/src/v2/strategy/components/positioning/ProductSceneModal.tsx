@@ -11,6 +11,7 @@
 import { useEffect, useState } from "react";
 import { trpc } from "../../../../lib/trpc";
 import { useLang } from "../../../../lib/i18n";
+import { CloseIcon, GenerateIcon, CheckIcon } from "../../../platform/components/icons";
 
 const INK = "#171717";
 const MUTED = "#737373";
@@ -167,7 +168,7 @@ export default function ProductSceneModal({
               {label("用 GPT Image 2 以你的產品照片為基準生成。結果會跟原照片並排，方便你對照。", "GPT Image 2 builds the scene around your product photo. The result sits next to the original so you can compare.")}
             </div>
           </div>
-          <button onClick={onClose} aria-label="close" style={{ ...btn(), padding: "4px 10px" }}>✕</button>
+          <button onClick={onClose} aria-label="close" style={{ ...btn(), padding: "4px 10px" }}><CloseIcon size={12} /></button>
         </div>
 
         {step !== "done" && (
@@ -231,7 +232,7 @@ export default function ProductSceneModal({
                   )}
                   style={{ ...btn(), padding: "3px 10px", fontSize: 12, opacity: (!refineMut || refineMut.isPending || step === "generating") ? 0.5 : 1 }}
                 >
-                  {refineMut?.isPending ? label("潤飾中…", "Refining…") : label("✨ AI 潤飾", "✨ Refine with AI")}
+                  {refineMut?.isPending ? label("潤飾中…", "Refining…") : <><GenerateIcon size={11} /> {label("AI 潤飾", "Refine with AI")}</>}
                 </button>
               </div>
               <textarea
@@ -378,10 +379,10 @@ export default function ProductSceneModal({
               <div style={{ fontSize: 12, fontWeight: 600, color: MUTED }}>{label("存進這個產品", "Save to this product")}</div>
               {savedUrls[current.url] ? (
                 <div style={{ fontSize: 12, color: "#15803D", lineHeight: 1.6 }}>
-                  {savedUrls[current.url] === "primary"
-                    ? label("✓ 已存進產品照片，並設為主圖 —— 產品列表的縮圖現在是這張。原本上傳的照片仍然保留。",
-                            "✓ Saved and set as the main photo — the product list thumbnail now shows it. Your original upload is kept.")
-                    : label("✓ 已存進產品照片。主圖沒有變動。", "✓ Saved to the product's photos. The main photo is unchanged.")}
+                  <CheckIcon size={11} /> {savedUrls[current.url] === "primary"
+                    ? label("已存進產品照片，並設為主圖 —— 產品列表的縮圖現在是這張。原本上傳的照片仍然保留。",
+                            "Saved and set as the main photo — the product list thumbnail now shows it. Your original upload is kept.")
+                    : label("已存進產品照片。主圖沒有變動。", "Saved to the product's photos. The main photo is unchanged.")}
                 </div>
               ) : (
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>

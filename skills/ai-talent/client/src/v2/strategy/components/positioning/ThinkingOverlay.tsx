@@ -14,7 +14,9 @@
 import React from "react";
 import { Card, CardBody, Chip, Spinner } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faRobot, faPenNib } from "@fortawesome/free-solid-svg-icons";
+import {
+  faUserTie, faPenNib,
+} from "@fortawesome/free-solid-svg-icons";
 
 export type ThinkingPhase = "loading" | "typing" | "writing";
 
@@ -91,7 +93,7 @@ export default function ThinkingOverlay({
       <CardBody className="px-5 py-4 gap-3">
         <div className="flex items-center gap-2 flex-wrap">
           <span className="flex items-center justify-center w-7 h-7 rounded-full bg-content1 border border-divider">
-            <FontAwesomeIcon icon={faRobot} className="text-default-600 text-tiny" />
+            <FontAwesomeIcon icon={faUserTie} className="text-default-600 text-tiny" />
           </span>
           {cleanTitle && (
             <span className="text-small font-medium truncate">{cleanTitle}</span>

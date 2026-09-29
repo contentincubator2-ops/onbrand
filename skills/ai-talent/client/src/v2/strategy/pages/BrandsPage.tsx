@@ -44,7 +44,7 @@ import { BrandActionChipsRow, usePositioningStatus } from "../components/positio
 import AddEntityModal, { type AddEntityTab } from "../components/AddEntityModal";
 import ProductDetailModal from "../components/positioning/ProductDetailModal";
 // Notion-style line icons
-import { Target as LucideTarget, Type as LucideType, Palette as LucidePalette, Lock as LucideLock, Play as LucidePlay, RotateCcw as LucideRotate, BookOpen as LucideBook, Users as LucideUsers, Sparkles, Bot as LucideRobotIcon, Quote as LucideQuote, Shield as LucideShield, Type as LucideTypeIcon, Pencil as LucidePencil, Award as LucideAward, Package as LucidePackage, Hash as LucideHash, MessageCircle as LucideMessage, FileText as LucideFileText, IdCard as LucideIdCard, Trash2 as LucideTrash } from "lucide-react";
+import { AgentIcon, MemoryIcon, AwardIcon, BundleIcon, CommentIcon, DeleteIcon, EditIcon, FontIcon, GenerateIcon, HashtagIcon, IdCardIcon, LibraryIcon, LockIcon, PaletteIcon, PeopleIcon, PlayIcon, QuoteIcon, RegenerateIcon, ShieldIcon, TargetIcon, TextIcon, DoneIcon, StopIcon, WarningIcon, CheckIcon, CloseIcon } from "../../platform/components/icons";
 import { SCOPE_SEGMENTS, type SegmentSpec } from "../lib/positioningSchema";
 import { pickProductImageUrl } from "../lib/productImage";
 import { readProductFacts } from "../lib/productFacts";
@@ -53,7 +53,10 @@ import CopyAssetBoard, { COPY_ASSETS } from "../components/positioning/CopyAsset
 import VisualAssetBoard from "../components/positioning/VisualAssetBoard";
 import { pipelineFor, type PipelineStepSpec } from "../lib/positioningPipeline";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faPlus, faPalette, faFont, faQuoteLeft, faBullseye, faUsers, faImage, faIcons, faChartPie, faImages, faPenNib, faShieldHalved, faFolderOpen, faLock, faLockOpen, faBookOpen, faTableList, faBox, faRocket, faBullhorn, faWandSparkles, faGear, faStickyNote, faTrash, faSatelliteDish, faStethoscope, faFileArrowUp } from "@fortawesome/free-solid-svg-icons";
+import { HelpTip } from "../../platform/components/HelpTip";
+import {
+  faPlus, faPalette, faFont, faQuoteLeft, faBullseye, faUsers, faImage, faIcons, faChartPie, faImages, faPenNib, faShieldHalved, faFolderOpen, faLock, faLockOpen, faBookOpen, faTableList, faBox, faRocket, faBullhorn, faWandMagicSparkles, faGear, faStickyNote, faTrashCan, faSatelliteDish, faStethoscope, faFileArrowUp,
+} from "@fortawesome/free-solid-svg-icons";
 
 // Sub-nav id format:
 //   "asset:<key>"   — non-positioning brand assets (準則 / 標誌 / etc.)
@@ -551,7 +554,7 @@ export default function BrandsPage() {
       } else {
         const msg = lang === "en"
           ? `Lock "${tabName}"?\nAfter locking:\n· Editor goes read-only (unlock to change)\n· Every channel uses this as the single source of truth\n· All tasks and the 7-Day Publisher show the locked badge\nYou can unlock anytime.`
-          : `要鎖定「${tabName}」嗎？\n鎖定後：\n· 編輯欄會變成唯讀（解鎖才能改）\n· 全平台都會用這份為單一真相\n· 所有任務與七日發布台都會看到 ✅ 已鎖定的標示\n隨時可以解鎖。`;
+          : `要鎖定「${tabName}」嗎？\n鎖定後：\n· 編輯欄會變成唯讀（解鎖才能改）\n· 全平台都會用這份為單一真相\n· 所有任務與七日發布台都會看到已鎖定的標示\n隨時可以解鎖。`;
         if (!confirm(msg)) return;
         await lockTabMut?.mutateAsync({ brandId: activeBrandIdForLocks, tab });
       }
@@ -751,7 +754,7 @@ export default function BrandsPage() {
           listQ?.refetch?.();
           showToastGlobal(
             r.status === "done"
-              ? (lang === "en" ? "✓ Positioning complete" : "✓ 定位完成，卡片已更新")
+              ? (lang === "en" ? "Positioning complete" : "定位完成，卡片已更新")
               : (lang === "en" ? "Positioning failed — try again" : "定位失敗，請再試一次"),
             r.status === "done" ? "success" : undefined,
           );
@@ -1374,17 +1377,9 @@ export default function BrandsPage() {
               decorative emblem. Editorial typography hierarchy. */}
           <div className="min-h-[60vh] flex items-center justify-center px-6">
             <div className="max-w-[440px] text-left">
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-neutral-600 mb-4">
-                BRAND · STEP 1
-              </p>
-              <h1 className="text-3xl font-bold text-neutral-900 mb-3 leading-tight">
+              <h1 className="text-3xl font-bold text-neutral-900 mb-6 leading-tight">
                 {lang === "en" ? "Set up your first brand" : "建立你的第一個品牌"}
               </h1>
-              <p className="text-sm text-neutral-600 mb-6 leading-relaxed">
-                {lang === "en"
-                  ? "Your brand is where everything in OnBrand starts. Once it's in, the AI reads your positioning, words, and visual style — every task pulls from this brain."
-                  : "品牌是 OnBrand 一切的起點。建立後，AI 會自動分析定位、用詞、視覺風格 — 接下來的所有任務都會吃這份品牌大腦。"}
-              </p>
               <button
                 onClick={() => setOnboardingOpen(true)}
                 className="inline-flex items-center gap-2 px-5 py-3 rounded-lg bg-neutral-900 text-white font-semibold text-sm hover:bg-neutral-800 transition"
@@ -1478,32 +1473,32 @@ export default function BrandsPage() {
                       desc: scopeMode === "event"   ? (lang === "en" ? "Campaign positioning" : "活動定位")
                           : scopeMode === "product" ? (lang === "en" ? "Product positioning"  : "產品定位")
                           : (lang === "en" ? "Brand core / Slogan" : "品牌核心 / Slogan"),
-                      Icon: LucideTarget,    scopes: ["brand", "product", "event"] as string[] },
+                      Icon: TargetIcon,    scopes: ["brand", "product", "event"] as string[] },
                   { v: "copy"        as const, label: lang === "en" ? "Copy"    : "文字",
                       desc: scopeMode === "product" ? (lang === "en" ? "Tone / style" : "語氣 / 風格")
                           : scopeMode === "event"   ? (lang === "en" ? "Voice / rules" : "語氣 / 規範")
                           : (lang === "en" ? "Words / banned / style" : "用詞 / 禁忌 / 風格"),
-                      Icon: LucideType,      scopes: ["brand", "product", "event"] as string[] },
+                      Icon: FontIcon,      scopes: ["brand", "product", "event"] as string[] },
                   { v: "visual"      as const, label: lang === "en" ? "Visual"  : "視覺",
                       desc: lang === "en" ? "Logo / palette / font" : "Logo / 色票 / 字型",
-                      Icon: LucidePalette,   scopes: ["brand"] },
+                      Icon: PaletteIcon,   scopes: ["brand"] },
                   { v: "info"        as const, label: lang === "en" ? "Info"    : "基本資料",
                       desc: scopeMode === "event"   ? (lang === "en" ? "Dates / products"    : "時間 / 產品")
                           : scopeMode === "product" ? (lang === "en" ? "Name / brand"        : "名稱 / 品牌")
                           : (lang === "en" ? "Name / industry" : "名稱 / 產業"),
-                      Icon: LucideIdCard,    scopes: ["brand", "product", "event"] },
+                      Icon: IdCardIcon,    scopes: ["brand", "product", "event"] },
                   { v: "meetings"    as const, label: lang === "en" ? "Meetings" : "會議",
                       desc: lang === "en" ? "Recurring strategy meetings" : "定期策略會議",
-                      Icon: LucideUsers,     scopes: ["brand", "product"] },
+                      Icon: PeopleIcon,     scopes: ["brand", "product"] },
                   { v: "brain"       as const, label: lang === "en" ? "Brain" : "大腦",
                       desc: lang === "en" ? "What the AI remembers" : "AI 記住了什麼",
-                      Icon: LucideTarget,    scopes: ["brand", "product", "event"] },
+                      Icon: MemoryIcon,    scopes: ["brand", "product", "event"] },
                   { v: "products"    as const, label: lang === "en" ? "Products" : "產品",
                       desc: lang === "en" ? "Product cards & positioning" : "產品卡片與定位",
-                      Icon: LucideRobotIcon, scopes: ["brand"] },
+                      Icon: AgentIcon, scopes: ["brand"] },
                   { v: "events"      as const, label: lang === "en" ? "Events"   : "活動",
                       desc: lang === "en" ? "Campaign cards & positioning" : "活動卡片與定位",
-                      Icon: LucideTarget,    scopes: ["brand"] },
+                      Icon: TargetIcon,    scopes: ["brand"] },
                 ];
                 const visibleTiles = allTiles.filter((tile) =>
                   tile.scopes.includes(scopeMode === "none" ? "brand" : scopeMode),
@@ -1535,7 +1530,7 @@ export default function BrandsPage() {
                       <Icon size={16} strokeWidth={2} className={active ? "text-white" : "text-neutral-700"} />
                       <span className="text-sm font-semibold">{t.label}</span>
                       {locked && (
-                        <LucideLock
+                        <LockIcon
                           size={11} strokeWidth={2.5}
                           className={active ? "text-neutral-300 ml-auto" : "text-neutral-600 ml-auto"}
                         />
@@ -1605,9 +1600,9 @@ export default function BrandsPage() {
                   {isLocked ? (
                     <>
                       <p className="text-small font-semibold text-emerald-800 m-0">
-                        {lang === "en"
-                          ? `✅ ${tabLabel} locked — single source of truth across all channels`
-                          : `✅ ${tabLabel}已鎖定 — 全平台採用此版本為單一真相`}
+                        <DoneIcon size={13} /> {lang === "en"
+                          ? `${tabLabel} locked — single source of truth across all channels`
+                          : `${tabLabel}已鎖定 — 全平台採用此版本為單一真相`}
                       </p>
                       <p className="text-tiny text-emerald-600 m-0">
                         {lang === "en"
@@ -1691,15 +1686,15 @@ export default function BrandsPage() {
                 <button key={item.id} onClick={() => setSection(item.id)} style={{
                   width: "100%", display: "flex", alignItems: "center",
                   padding: "5px 10px", borderRadius: 8,
-                  background: active ? "rgba(163,112,252,0.15)" : "none",
+                  background: active ? "rgba(24,24,27,0.06)" : "none",
                   border: "none", cursor: "pointer",
                   fontSize: 12, fontWeight: active ? 600 : 400,
-                  color: active ? "rgb(74,46,126)" : "rgb(15,16,21)",
+                  color: active ? "rgb(24,24,27)" : "rgb(15,16,21)",
                   textAlign: "left", transition: "background 0.12s",
                   whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
                 }}
                   onMouseEnter={e => { if (!active) e.currentTarget.style.background = "#F5F4F2"; }}
-                  onMouseLeave={e => { e.currentTarget.style.background = active ? "rgba(163,112,252,0.15)" : "none"; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = active ? "rgba(24,24,27,0.06)" : "none"; }}
                 >
                   {item.label}
                 </button>
@@ -1736,16 +1731,16 @@ export default function BrandsPage() {
                 <button onClick={() => setSection("settings")} style={{
                   width: "100%", display: "flex", alignItems: "center", gap: 8,
                   padding: "5px 10px", borderRadius: 8,
-                  background: active ? "rgba(163,112,252,0.15)" : "none",
+                  background: active ? "rgba(24,24,27,0.06)" : "none",
                   border: "none", cursor: "pointer",
                   fontSize: 12, fontWeight: active ? 600 : 400,
-                  color: active ? "rgb(74,46,126)" : "rgb(15,16,21)",
+                  color: active ? "rgb(24,24,27)" : "rgb(15,16,21)",
                   textAlign: "left", transition: "background 0.12s",
                 }}
                   onMouseEnter={e => { if (!active) e.currentTarget.style.background = "#F5F4F2"; }}
-                  onMouseLeave={e => { e.currentTarget.style.background = active ? "rgba(163,112,252,0.15)" : "none"; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = active ? "rgba(24,24,27,0.06)" : "none"; }}
                 >
-                  <FontAwesomeIcon icon={faGear} style={{ fontSize: 12, color: active ? "rgb(74,46,126)" : "#A8A29E" }} />
+                  <FontAwesomeIcon icon={faGear} style={{ fontSize: 12, color: active ? "rgb(24,24,27)" : "#A8A29E" }} />
                   設定
                 </button>
               );
@@ -1788,7 +1783,7 @@ export default function BrandsPage() {
                 <div className="mt-8 max-w-[700px] mx-auto">
                   <div className="border border-rose-200 rounded-xl bg-rose-50/40 p-5">
                     <div className="flex items-center gap-2 mb-3">
-                      <LucideTrash size={14} className="text-rose-600" />
+                      <DeleteIcon size={14} className="text-rose-600" />
                       <h3 className="text-sm font-semibold text-rose-700">
                         {lang === "en" ? "Danger zone" : "危險區"}
                       </h3>
@@ -1949,7 +1944,7 @@ export default function BrandsPage() {
                       border: autoPosPhase === "full-done" ? "1px solid #BBF7D0" : "1px solid #E5E5E5",
                     }}>
                       {autoPosPhase === "full-done" ? (
-                        <span style={{ fontSize: 14 }}>✅</span>
+                        <span style={{ fontSize: 14, display: "inline-flex" }}><DoneIcon size={14} /></span>
                       ) : (
                         <>
                           <div style={{
@@ -2064,9 +2059,9 @@ export default function BrandsPage() {
                 {smpCheckpointActive && (
                   <div className="mt-2 rounded-md border border-primary-200 bg-primary-50 px-4 py-3">
                     <div className="flex items-start gap-3">
-                      <FontAwesomeIcon icon={faWandSparkles} className="text-primary mt-0.5" />
+                      <FontAwesomeIcon icon={faWandMagicSparkles} className="text-primary mt-0.5" />
                       <div className="flex-1 min-w-0">
-                        <p className="text-small font-semibold text-primary-800">{lang === "en" ? "🛑 SMP Checkpoint — confirm your single-minded proposition" : "🛑 SMP Checkpoint — 請確認單一核心命題"}</p>
+                        <p className="text-small font-semibold text-primary-800"><StopIcon size={12} /> {lang === "en" ? "SMP Checkpoint — confirm your single-minded proposition" : "SMP Checkpoint — 請確認單一核心命題"}</p>
                         <p className="text-tiny text-default-600 mt-1">{lang === "en" ? "SMP is the core creative principle for this campaign — the next 5 steps are built around it. Review it before moving on." : "SMP 是這次活動的最高創意準則，後面 5 個 step 都會圍繞它展開。先確認再繼續。"}</p>
                         {smpData?.singleMindedProposition && (
                           <div className="mt-2 p-2 rounded bg-white border border-divider">
@@ -2084,7 +2079,7 @@ export default function BrandsPage() {
                 )}
                 {failedStepIds.length > 0 && (
                   <div className="mt-2 rounded-md border border-warning-200 bg-warning-50 px-3 py-2 text-tiny text-warning-800">
-                    {lang === "en" ? "⚠ These steps came back empty — re-run them from each segment:" : "⚠ 以下步驟沒寫入內容，建議到對應頁籤重跑："}{" "}
+                    <WarningIcon size={11} /> {lang === "en" ? "These steps came back empty — re-run them from each segment:" : "以下步驟沒寫入內容，建議到對應頁籤重跑："}{" "}
                     {failedStepIds.map(id => { const s = pipelineSteps.find(x => x.id === id); return lang === "en" ? (s ? `Step ${id} · ${s.segmentId}` : `Step ${id}`) : (s ? `步驟 ${id} · ${s.segmentId}` : `步驟 ${id}`); }).join(lang === "en" ? ", " : "、")}
                     <button className="ml-2 underline" onClick={() => setFailedStepIds([])}>{t("close")}</button>
                   </div>
@@ -2555,7 +2550,7 @@ function TabActionBar({
             <Button
               size="sm"
               onPress={onResume}
-              startContent={<LucidePlay size={14} strokeWidth={2} />}
+              startContent={<PlayIcon size={14} strokeWidth={2} />}
               style={{ background: "#18181B", color: "white" }}
             >
               {lang === "en" ? "Continue" : "繼續"}
@@ -2569,9 +2564,9 @@ function TabActionBar({
               onPress={onAction}
               startContent={
                 busy ? undefined :
-                locked ? <LucideLock size={15} strokeWidth={2} /> :
-                hasContent ? <LucideRotate size={15} strokeWidth={2} /> :
-                <LucidePlay size={15} strokeWidth={2} />
+                locked ? <LockIcon size={15} strokeWidth={2} /> :
+                hasContent ? <RegenerateIcon size={15} strokeWidth={2} /> :
+                <PlayIcon size={15} strokeWidth={2} />
               }
               style={{
                 background: locked ? "#E4E4E7" : "#18181B",
@@ -2703,7 +2698,7 @@ function PositioningGrid({
     audience: faUsers, competition: faTableList,
     differentiation: faRocket, trends: faBullhorn, voice: faQuoteLeft,
     // product / event fallbacks
-    core: faBullseye, positioning: faBullseye, smp: faWandSparkles,
+    core: faBullseye, positioning: faBullseye, smp: faWandMagicSparkles,
   };
 
   const segFilled = (sid: string) => {
@@ -3271,30 +3266,14 @@ function PositioningCompletionBridge({
       }}
     >
       <div style={{ flex: "1 1 320px", minWidth: 0 }}>
-        <p style={{
-          fontSize: 12, fontWeight: 600, color: "#404040",
-          letterSpacing: "0.25em", textTransform: "uppercase",
-          marginBottom: 6,
-        }}>
-          Positioning Locked · Ready for Production
-        </p>
         <h3 style={{
           fontSize: 18, fontWeight: 700, color: "#171717",
           letterSpacing: "-0.01em", marginBottom: 4,
         }}>
           {lang === "en"
-            ? `Your ${scopeLabel} is ready — the AI knows what every post should say`
-            : `你的${scopeLabel}已備好，AI 知道每篇文章該說什麼了`}
+            ? `Your ${scopeLabel} is ready`
+            : `你的${scopeLabel}已備好`}
         </h3>
-        <p style={{
-          fontSize: 13, lineHeight: 1.65, color: "#525252",
-          fontFamily: '"Source Serif Pro", "Noto Serif TC", Georgia, serif',
-          maxWidth: 620,
-        }}>
-          {lang === "en"
-            ? "This positioning becomes the backbone for every task and the 7-Day Publisher — every post is built from it, so the AI never sounds off-brand again."
-            : "這份定位現在會自動成為所有任務與七日發布台的內容骨架 — 每篇貼文都依此產出，再也不會「AI 寫出來不像你的品牌」。"}
-        </p>
       </div>
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
         {/* 2026-07-17 (CJ 去除時間分類 + zombie audit round 2): the /30s /60s
@@ -3343,13 +3322,14 @@ function BridgeBtn({ label, onClick, primary }: { label: string; onClick: () => 
 function SectionLabel({ label, counter, intro }: { label: string; counter?: string; intro?: string }) {
   return (
     <div style={{ marginBottom: 18 }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: intro ? 6 : 0 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
         <span style={{
           fontSize: 12, fontWeight: 600, color: "#525252",
           letterSpacing: "0.22em", textTransform: "uppercase",
         }}>
           {label}
         </span>
+        {intro && <HelpTip>{intro}</HelpTip>}
         <div style={{ flex: 1, height: 1, background: "#D4D4D4" }} />
         {counter && (
           // 2026-09-23：改成小圓角計數 chip（跟 content 層任務卡格頭的計數
@@ -3363,15 +3343,6 @@ function SectionLabel({ label, counter, intro }: { label: string; counter?: stri
           </span>
         )}
       </div>
-      {intro && (
-        <p style={{
-          fontSize: 12.5, lineHeight: 1.7, color: "#404040",
-          fontFamily: '"Source Serif Pro", "Noto Serif TC", Georgia, serif',
-          fontStyle: "italic", maxWidth: 700, margin: 0,
-        }}>
-          {intro}
-        </p>
-      )}
     </div>
   );
 }
@@ -3492,7 +3463,7 @@ function PositioningCard({
             className="absolute top-1.5 right-1.5 z-10 opacity-0 group-hover:opacity-100 transition-opacity rounded-full p-1.5 bg-white/85 hover:bg-white"
             style={{ color: "#525252" }}
           >
-            <FontAwesomeIcon icon={faTrash} style={{ fontSize: 11 }} />
+            <FontAwesomeIcon icon={faTrashCan} style={{ fontSize: 11 }} />
           </button>
         )}
         {headline ? (
@@ -3581,10 +3552,10 @@ function VisualNavItem({ label, badge, active, onClick }: {
       style={{
         width: "100%", display: "flex", alignItems: "center",
         padding: "4px 12px", borderRadius: 8,
-        background: active ? "rgba(163,112,252,0.15)" : hovered ? "#F5F4F2" : "none",
+        background: active ? "rgba(24,24,27,0.06)" : hovered ? "#F5F4F2" : "none",
         border: "none", cursor: "pointer",
         fontSize: 12, fontWeight: active ? 600 : 400,
-        color: active ? "rgb(74,46,126)" : "rgb(15,16,21)",
+        color: active ? "rgb(24,24,27)" : "rgb(15,16,21)",
         textAlign: "left", transition: "background 0.12s",
         gap: 6,
       }}
@@ -3593,16 +3564,16 @@ function VisualNavItem({ label, badge, active, onClick }: {
       {badge && (
         <span style={{
           fontSize: 12, fontWeight: 700, padding: "1px 6px", borderRadius: 20,
-          background: "rgba(163,112,252,0.20)", color: "rgb(74,46,126)",
+          background: "rgba(24,24,27,0.08)", color: "rgb(24,24,27)",
           flexShrink: 0,
         }}>{badge}</span>
       )}
       {hovered && (
         <span style={{
           width: 18, height: 18, borderRadius: 4, flexShrink: 0,
-          background: "rgba(163,112,252,0.20)", display: "flex",
+          background: "rgba(24,24,27,0.08)", display: "flex",
           alignItems: "center", justifyContent: "center",
-          fontSize: 12, color: "rgb(74,46,126)", fontWeight: 700,
+          fontSize: 12, color: "rgb(24,24,27)", fontWeight: 700,
         }}>+</span>
       )}
     </button>
@@ -3668,7 +3639,7 @@ function PositioningPanel({
           fontSize: 12, color: "#92400E",
           display: "flex", alignItems: "center", gap: 8,
         }}>
-          <span>🔒</span>
+          <LockIcon size={13} />
           <span>{lang === "en" ? "Positioning is locked — this section is read-only. Go to Brand settings to unlock and edit." : "定位已鎖定 — 此 segment 為唯讀。回 /brands 解鎖才能編輯。"}</span>
         </div>
       )}
@@ -3879,8 +3850,8 @@ function BrandAssetPanel({ assetKey, brandId, locked }: { assetKey: AssetKey; br
         <CardBody className="px-5 py-3 flex-row items-center justify-between flex-wrap">
           <p className="text-small text-default-700">
             {lang === "en"
-              ? "Fill this section in yourself — changes auto-save 800ms after you stop typing."
-              : "這個區塊由你手動填寫；改動會在 800ms 後自動儲存到 brand.positioning._assets"}
+              ? "Filled in manually · auto-saves"
+              : "手動填寫 · 自動儲存"}
           </p>
           <SaveIndicator state={saveState} hasTarget={true} />
         </CardBody>
@@ -4165,12 +4136,14 @@ function BrandLogoSettings({ brandId, brandName }: { brandId: number; brandName:
   return (
     <div className="max-w-[640px] mx-auto space-y-4">
       <div>
-        <h3 className="text-medium font-semibold">{lang === "en" ? "Brand logo / avatar" : "品牌 logo / 頭像"}</h3>
-        <p className="text-tiny text-default-700 mt-1">
-          {lang === "en"
-            ? `The "${brandName ?? "brand"}" avatar used in mockups. Auto-fetch from the FB page, or upload manually later.`
-            : `mockup 顯示用的「${brandName ?? "品牌"}」頭像。可以從 FB 粉專自動抓，或之後手動上傳。`}
-        </p>
+        <h3 className="text-medium font-semibold flex items-center gap-1.5">
+          {lang === "en" ? "Brand logo / avatar" : "品牌 logo / 頭像"}
+          <HelpTip>
+            {lang === "en"
+              ? `The "${brandName ?? "brand"}" avatar used in mockups. Auto-fetch from the FB page, or upload manually later.`
+              : `mockup 顯示用的「${brandName ?? "品牌"}」頭像。可以從 FB 粉專自動抓，或之後手動上傳。`}
+          </HelpTip>
+        </h3>
       </div>
 
       <div className="flex items-center gap-4 border border-default-200 rounded-medium p-4 bg-default-50">
@@ -4215,7 +4188,7 @@ function BrandLogoSettings({ brandId, brandName }: { brandId: number; brandName:
               ? (lang === "en" ? "Re-fetch" : "重新抓取")
               : (lang === "en" ? "Fetch logo" : "抓取 logo")}
           </Button>
-          {okMsg && <span className="text-tiny text-success-600">✓ {okMsg}</span>}
+          {okMsg && <span className="text-tiny text-success-600 inline-flex items-center gap-1"><CheckIcon size={10} /> {okMsg}</span>}
           {err && <span className="text-tiny text-danger-600">{err}</span>}
         </div>
       </div>
@@ -4236,12 +4209,14 @@ function BrandLogoSettings({ brandId, brandName }: { brandId: number; brandName:
       </div>
 
       <div className="pt-2">
-        <h3 className="text-medium font-semibold">{lang === "en" ? "Brand photo library" : "品牌照片庫"}</h3>
-        <p className="text-tiny text-default-700 mt-1 mb-3">
-          {lang === "en"
-            ? "Real photos of the brand — materials, storefront, packaging — used as reference for on-brand image generation and color extraction. We no longer scrape these from your website."
-            : "品牌的真實照片——材質、門市、包裝——用來當 on-brand 生圖與取色的參考。我們不再從網站爬這些圖了。"}
-        </p>
+        <h3 className="text-medium font-semibold flex items-center gap-1.5 mb-3">
+          {lang === "en" ? "Brand photo library" : "品牌照片庫"}
+          <HelpTip>
+            {lang === "en"
+              ? "Real photos of the brand — materials, storefront, packaging — used as reference for on-brand image generation and color extraction. We no longer scrape these from your website."
+              : "品牌的真實照片——材質、門市、包裝——用來當 on-brand 生圖與取色的參考。我們不再從網站爬這些圖了。"}
+          </HelpTip>
+        </h3>
         <AssetPhotoGallery brandId={brandId} scope="brand" scopeId={brandId} scopeLabel={lang === "en" ? "this brand" : "這個品牌"} />
       </div>
     </div>
@@ -4382,7 +4357,7 @@ function PositioningTopRow({
                     : `自動填寫所有定位欄位（共 ${totalSteps} 步，背景執行，最多重試 5 次）`)
           }
         >
-          <Sparkles size={12} className={isRunning ? "animate-pulse" : ""} />
+          <GenerateIcon size={12} className={isRunning ? "animate-pulse" : ""} />
           {buttonLabel}
         </button>
 
@@ -4407,11 +4382,11 @@ function PositioningTopRow({
           </div>
         )}
         {isFailed && jobData?.lastError && (
-          <span className="text-xs text-amber-700 max-w-md truncate" title={jobData.lastError}>⚠ {String(jobData.lastError).slice(0, 80)}</span>
+          <span className="text-xs text-amber-700 max-w-md truncate" title={jobData.lastError}><WarningIcon size={11} /> {String(jobData.lastError).slice(0, 80)}</span>
         )}
-        {isDone && <span className="text-xs text-emerald-700">{lang === "en" ? `✓ Done · ${total} sections` : `✓ 已完成 ${total} 個段落`}</span>}
+        {isDone && <span className="text-xs text-emerald-700 inline-flex items-center gap-1"><CheckIcon size={11} />{lang === "en" ? `Done · ${total} sections` : `已完成 ${total} 個段落`}</span>}
         {startError && (
-          <span className="text-xs text-danger truncate max-w-md" title={startError}>⚠ {startError}</span>
+          <span className="text-xs text-danger truncate max-w-md" title={startError}><WarningIcon size={11} /> {startError}</span>
         )}
       </div>
 
@@ -4617,8 +4592,8 @@ function CopyTabInline({
       const warnings: string[] = [];
       if (!r.hasRealContent) {
         warnings.push(lang === "en"
-          ? "⚠️ No website / FB found — results may be off. Add a website / social links in Settings, then retry."
-          : "⚠️ 找不到官網 / FB — 結果可能不準。請到「設定」補上 website / socialLinks 後重試。");
+          ? "No website / FB found — results may be off. Add a website / social links in Settings, then retry."
+          : "找不到官網 / FB — 結果可能不準。請到「設定」補上 website / socialLinks 後重試。");
       }
       if (errCount > 0) {
         const firstFew = Object.entries(r.errors ?? {}).slice(0, 3)
@@ -4649,7 +4624,7 @@ function CopyTabInline({
         <StrategyToolIcon
           active={bulkBusy}
           onClick={() => { if (!bulkBusy && !locked && emptyKeys.length > 0) void handleBulkAutoFill(); }}
-          icon={faWandSparkles}
+          icon={faWandMagicSparkles}
           label={bulkBusy
             ? (lang === "en" ? `Auto-filling (${bulkFillingKeys.size})…` : `自動填寫中（${bulkFillingKeys.size}）…`)
             : emptyKeys.length === 0
@@ -4676,9 +4651,9 @@ function CopyTabInline({
           bulkErr ? "bg-amber-50 text-amber-800" :
           "bg-emerald-50 text-emerald-800"
         }`}>
-          {bulkResult && <div>{lang === "en"
-            ? `✓ Filled ${bulkResult.filled} fields${bulkResult.sources.length > 0 ? ` (sources: ${bulkResult.sources.join(" + ")})` : ""}`
-            : `✓ 已填入 ${bulkResult.filled} 個欄位${bulkResult.sources.length > 0 ? `（來源：${bulkResult.sources.join(" + ")}）` : ""}`}</div>}
+          {bulkResult && <div><CheckIcon size={11} /> {lang === "en"
+            ? `Filled ${bulkResult.filled} fields${bulkResult.sources.length > 0 ? ` (sources: ${bulkResult.sources.join(" + ")})` : ""}`
+            : `已填入 ${bulkResult.filled} 個欄位${bulkResult.sources.length > 0 ? `（來源：${bulkResult.sources.join(" + ")}）` : ""}`}</div>}
           {bulkErr && <div>{bulkErr}</div>}
         </div>
       )}
@@ -4816,7 +4791,7 @@ function ProductInfoEditor({ productId, brandName, en }: { productId: number; br
           {en ? "Re-analyze (re-read product page)" : "重新分析（重讀產品頁）"}
         </Button>
         {savedAt && !upsertM?.isPending && (
-          <span className="text-tiny text-success-600">{en ? "Saved ✓" : "已儲存 ✓"}</span>
+          <span className="text-tiny text-success-600 inline-flex items-center gap-1"><CheckIcon size={10} />{en ? "Saved" : "已儲存"}</span>
         )}
         {recalDone && !startPositioningM?.isPending && (
           <span className="text-tiny text-secondary-600">
@@ -4877,7 +4852,7 @@ function BrandedVariantsModal({ title, loading, error, variants, cutoutAvailable
             }}
             aria-label={en ? "Close" : "關閉"}
           >
-            ✕
+            <CloseIcon size={14} />
           </button>
         </div>
 
@@ -4889,7 +4864,7 @@ function BrandedVariantsModal({ title, loading, error, variants, cutoutAvailable
           )}
           {!error && loading && (
             <div style={{ textAlign: "center", padding: "40px 20px", color: "#78716C" }}>
-              <div style={{ display: "inline-block", width: 32, height: 32, borderRadius: "50%", border: "3px solid #E5E7EB", borderTopColor: "#E85D2E", animation: "spin 0.8s linear infinite", marginBottom: 16 }} />
+              <div style={{ display: "inline-block", width: 32, height: 32, borderRadius: "50%", border: "3px solid #E5E7EB", borderTopColor: "#18181B", animation: "spin 0.8s linear infinite", marginBottom: 16 }} />
               <p style={{ fontSize: 13, margin: 0 }}>
                 {en
                   ? "Compositing — running cutout + 4 layouts (~8 sec)…"
@@ -4902,9 +4877,9 @@ function BrandedVariantsModal({ title, loading, error, variants, cutoutAvailable
             <>
               {cutoutAvailable === false && (
                 <p style={{ fontSize: 12, color: "#92400E", background: "#FEF3C7", padding: "8px 12px", borderRadius: 8, marginBottom: 14 }}>
-                  {en
-                    ? "⚠ REPLICATE_API_TOKEN not set — using the original product image as a tile (no transparent cutout). Set the env var for true riverflow-grade output."
-                    : "⚠ 還沒設 REPLICATE_API_TOKEN — 用原圖直接合成（沒去背）。設好環境變數後就會用透明去背達到 riverflow 效果。"}
+                  <WarningIcon size={12} /> {en
+                    ? "REPLICATE_API_TOKEN not set — using the original product image as a tile (no transparent cutout). Set the env var for true riverflow-grade output."
+                    : "還沒設 REPLICATE_API_TOKEN — 用原圖直接合成（沒去背）。設好環境變數後就會用透明去背達到 riverflow 效果。"}
                 </p>
               )}
               <div style={{
@@ -4927,9 +4902,9 @@ function BrandedVariantsModal({ title, loading, error, variants, cutoutAvailable
                         href={v.pngDataUrl}
                         download={`${title}_${v.layout}.png`}
                         style={{
-                          fontSize: 12, fontWeight: 600, color: "#E85D2E",
+                          fontSize: 12, fontWeight: 600, color: "#18181B",
                           textDecoration: "none", padding: "4px 8px",
-                          border: "1px solid #E85D2E", borderRadius: 6,
+                          border: "1px solid #18181B", borderRadius: 6,
                         }}
                       >
                         {en ? "Download" : "下載"}
@@ -5091,8 +5066,8 @@ function BrandPaletteHero({
               style={{
                 fontSize: 12, fontWeight: 600, padding: "7px 14px",
                 borderRadius: 8, cursor: locked || genVisualMut?.isPending ? "not-allowed" : "pointer",
-                border: "1px solid #E85D2E",
-                background: "#E85D2E", color: "#FFFFFF",
+                border: "1px solid #18181B",
+                background: "#18181B", color: "#FFFFFF",
                 opacity: locked ? 0.5 : 1,
                 transition: "all 0.15s",
               }}
@@ -5134,8 +5109,8 @@ function BrandPaletteHero({
       {swatches.length === 0 && !isLoading && (
         <p style={{ fontSize: 13, color: "#737373", margin: 0, lineHeight: 1.6 }}>
           {en
-            ? "Run the extractor — Mia reads your product photos, runs K-means in LAB color space, and surfaces the 5–7 colors that actually define this brand. Future content generation will use these as canonical brand colors."
-            : "按「從產品圖萃取」— Mia 會讀你的產品照、在 LAB 色彩空間跑 K-means，挑出真正代表這個品牌的 5-7 個核心色。之後生成的所有內容都會用這份色票。"}
+            ? "Run the extractor to pull 5–7 core colors from your product photos. Generated content will use them."
+            : "按「從產品圖萃取」，從產品照挑出 5–7 個核心色；之後生成的內容都會用這份色票。"}
         </p>
       )}
 
@@ -5446,8 +5421,8 @@ function BrandEntityGrid({
                         disabled={kind !== "event" && isRunning}
                         className={`text-[12px] font-medium px-2 py-1 rounded-md transition flex-1 min-w-0 text-center ${
                           isRunning
-                            ? "bg-indigo-100 text-indigo-500 cursor-wait animate-pulse"
-                            : "bg-indigo-50 text-indigo-700 hover:bg-indigo-100"
+                            ? "bg-zinc-100 text-zinc-500 cursor-wait animate-pulse"
+                            : "bg-zinc-50 text-zinc-700 hover:bg-zinc-100"
                         }`}
                       >
                         {/* 2026-09-25（CJ「按下開始定位，居然跑到品牌的頁籤」）：
@@ -5506,7 +5481,7 @@ function BrandEntityGrid({
                           });
                         }
                       }}
-                      className="text-[12px] font-medium px-2 py-1 rounded-md bg-orange-50 text-orange-700 hover:bg-orange-100 transition"
+                      className="text-[12px] font-medium px-2 py-1 rounded-md bg-zinc-50 text-zinc-700 hover:bg-zinc-100 transition"
                       title={en ? "Generate 4 branded variants" : "用品牌色生成 4 種變體"}
                     >
                       {en ? "Variants" : "品牌變體"}
@@ -5532,7 +5507,7 @@ function BrandEntityGrid({
                     className="text-[12px] px-2 py-1 rounded-md text-neutral-400 hover:text-red-500 hover:bg-red-50 transition"
                     title={en ? "Delete" : "刪除"}
                   >
-                    ✕
+                    <CloseIcon size={12} />
                   </button>
                 </div>
                 </div>

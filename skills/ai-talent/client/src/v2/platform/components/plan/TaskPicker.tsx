@@ -16,7 +16,7 @@ import React, { useMemo, useState } from "react";
 import { useLang } from "../../../../lib/i18n";
 import { resolveSource, sourceWhy, sourcePillText,
   FRONT_CARD_KINDS, frontCardKind, frontCardKindLabel, type FrontCardKind } from "../../../content/lib/sourceVocabulary";
-import { Check, X, Lock, Search } from "lucide-react";
+import { CheckIcon, CloseIcon, LockIcon, SearchIcon } from "../icons";
 
 export interface PickerTask {
   id: string;
@@ -93,8 +93,8 @@ export default function TaskPicker({
             </h2>
             <p className="mt-0.5 text-[13px] text-neutral-500">
               {isEn
-                ? `Pick the cards you use often. ${draft.length} / ${maxTray} selected.`
-                : `挑你常用的卡，平常就只擺這幾張。已選 ${draft.length} / ${maxTray}。`}
+                ? `${draft.length} / ${maxTray} selected`
+                : `已選 ${draft.length} / ${maxTray}`}
               {categoryLabel && (
                 <span className="ml-1.5 rounded-full border border-neutral-300 px-2 py-0.5 text-[12px] text-neutral-600">
                   {isEn ? `In: ${categoryLabel}` : `分類：${categoryLabel}`}
@@ -103,13 +103,13 @@ export default function TaskPicker({
             </p>
           </div>
           <button onClick={onClose} className="rounded-lg p-1.5 text-neutral-400 hover:bg-neutral-100">
-            <X size={18} />
+            <CloseIcon size={18} />
           </button>
         </div>
 
         <div className="border-b border-neutral-200 px-5 py-2.5">
           <div className="flex items-center gap-2 rounded-lg border border-neutral-200 px-3 py-1.5">
-            <Search size={15} className="text-neutral-400" />
+            <SearchIcon size={15} className="text-neutral-400" />
             <input
               value={q}
               onChange={(e) => setQ(e.target.value)}
@@ -149,7 +149,7 @@ export default function TaskPicker({
                       <span className={`mt-0.5 flex h-4 w-4 flex-none items-center justify-center rounded border ${
                         on ? "border-neutral-900 bg-neutral-900 text-white" : "border-neutral-300"
                       }`}>
-                        {on && <Check size={11} strokeWidth={3} />}
+                        {on && <CheckIcon size={11} strokeWidth={3} />}
                       </span>
                       <span className="min-w-0">
                         <span className="block truncate text-[14px] font-medium text-neutral-900">
@@ -182,7 +182,7 @@ export default function TaskPicker({
 
           {viralLocked > 0 && (
             <div className="flex items-center gap-2 rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2.5">
-              <Lock size={15} className="text-neutral-400" />
+              <LockIcon size={15} className="text-neutral-400" />
               <span className="text-[13px] text-neutral-600">
                 {isEn
                   ? `${viralLocked} viral-structure cards on this channel are on the Professional plan.`

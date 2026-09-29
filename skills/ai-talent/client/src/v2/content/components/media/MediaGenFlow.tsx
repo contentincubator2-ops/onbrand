@@ -13,11 +13,14 @@ import React from "react";
 import { Card, CardBody, Chip, Button, Tooltip, Textarea, Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Spinner, Divider } from "@heroui/react";
 import { trpc } from "../../../../lib/trpc";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faPalette, faImage, faCheck, faCopy, faArrowRight, faPenNib, faRotate, faForward } from "@fortawesome/free-solid-svg-icons";
+import {
+  faPalette, faImage, faCheck, faCopy, faArrowRight, faPenNib, faRotateRight, faForward,
+} from "@fortawesome/free-solid-svg-icons";
 import {
   IMAGE_MODELS, NANO_BANANA_ID, GPT_IMAGE_2_ID, findModel, type MediaKind, type MediaModel,
 } from "../../lib/mediaModels";
 import { useLang } from "../../../../lib/i18n";
+import { BundleIcon } from "../../../platform/components/icons";
 
 interface MediaGenFlowProps {
   open: boolean;
@@ -253,7 +256,7 @@ export default function MediaGenFlow({
                 if (e.target.checked && !pickedProduct) setPickedProduct(productImages[0] ?? null);
               }}
             />
-            <span className="text-small font-medium">📦 {lang === "en" ? "Use real product photo" : "使用真實產品圖"}</span>
+            <span className="text-small font-medium inline-flex items-center gap-1"><BundleIcon size={13} /> {lang === "en" ? "Use real product photo" : "使用真實產品圖"}</span>
             <span className="text-tiny text-default-500">
               {lang === "en"
                 ? "Use the actual product photo as the base (GPT Image 2 edits it; Nano Banana if you pick it)"
@@ -420,7 +423,7 @@ function DirectionsPhase({
         <div className="flex items-center gap-1">
           <Tooltip content={lang === "en" ? "Refresh" : "重新提案"}>
             <Button isIconOnly size="sm" variant="light" onPress={onRefresh} isDisabled={busy} aria-label={lang === "en" ? "refresh" : "重新提案"}>
-              <FontAwesomeIcon icon={faRotate} className="text-tiny" />
+              <FontAwesomeIcon icon={faRotateRight} className="text-tiny" />
             </Button>
           </Tooltip>
           <Button size="sm" variant="light" startContent={<FontAwesomeIcon icon={faForward} />} onPress={onSkip}>

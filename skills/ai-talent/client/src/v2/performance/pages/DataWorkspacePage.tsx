@@ -15,9 +15,7 @@
 import React from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { trpc } from "../../../lib/trpc";
-import {
-  BarChart3, FileText, LineChart, Megaphone, MousePointerClick, Search, ShoppingBag, Target,
-} from "lucide-react";
+import { CampaignIcon, ChartIcon, ClickIcon, PerformanceIcon, SearchIcon, ShopIcon, TargetIcon, TextIcon } from "../../platform/components/icons";
 import PerformanceDashboard from "../components/PerformanceDashboard";
 import ConnectionsPanel from "../components/ConnectionsPanel";
 import { setMockBrandSeed } from "../components/perfMockData";
@@ -55,16 +53,16 @@ const AGENTS = {
 };
 
 const performanceSources: Source[] = [
-  { id: "overview", label: "整合總覽", short: "總覽", icon: <BarChart3 size={18} />, desc: "跨平台預算、成效、異常與老闆視角摘要" },
-  { id: "meta", label: "Meta", short: "Meta", icon: <Megaphone size={18} />, desc: "Facebook / Instagram 廣告活動、受眾與素材" },
-  { id: "google", label: "Google", short: "GAds", icon: <Search size={18} />, desc: "Search / Display / PMax / YouTube Ads" },
-  { id: "shopline", label: "SHOPLINE", short: "Shop", icon: <ShoppingBag size={18} />, desc: "商品銷售、轉換漏斗、客單價與回購" },
-  { id: "91app", label: "91APP", short: "91", icon: <ShoppingBag size={18} />, desc: "訂單、會員分層、回購與線上門市分流" },
-  { id: "ga", label: "GA / 官網", short: "GA", icon: <MousePointerClick size={18} />, desc: "流量來源、Landing page、路徑與轉換" },
-  { id: "attribution", label: "整合歸因", short: "歸因", icon: <Target size={18} />, desc: "跨平台比較、預算重分配與 Campaign ROI" },
+  { id: "overview", label: "整合總覽", short: "總覽", icon: <ChartIcon size={18} />, desc: "跨平台預算、成效、異常與老闆視角摘要" },
+  { id: "meta", label: "Meta", short: "Meta", icon: <CampaignIcon size={18} />, desc: "Facebook / Instagram 廣告活動、受眾與素材" },
+  { id: "google", label: "Google", short: "GAds", icon: <SearchIcon size={18} />, desc: "Search / Display / PMax / YouTube Ads" },
+  { id: "shopline", label: "SHOPLINE", short: "Shop", icon: <ShopIcon size={18} />, desc: "商品銷售、轉換漏斗、客單價與回購" },
+  { id: "91app", label: "91APP", short: "91", icon: <ShopIcon size={18} />, desc: "訂單、會員分層、回購與線上門市分流" },
+  { id: "ga", label: "GA / 官網", short: "GA", icon: <ClickIcon size={18} />, desc: "流量來源、Landing page、路徑與轉換" },
+  { id: "attribution", label: "整合歸因", short: "歸因", icon: <TargetIcon size={18} />, desc: "跨平台比較、預算重分配與 Campaign ROI" },
   // 2026-08-13 (CJ「將這份報告設定在成效報告當中，新的任務 tray，稱為粉絲團月報」):
   // 不刻儀表板 —— 使用者上傳自己在用的月報版型，系統跨月比對出可自動填的欄位。
-  { id: "fanpage_monthly", label: "粉絲團月報", short: "月報", icon: <FileText size={18} />, desc: "上傳你自己的月報版型，系統跨月比對後回填數據" },
+  { id: "fanpage_monthly", label: "粉絲團月報", short: "月報", icon: <TextIcon size={18} />, desc: "上傳你自己的月報版型，系統跨月比對後回填數據" },
 ];
 
 const performanceTasks: Record<string, TaskCard[]> = {
@@ -170,13 +168,7 @@ export default function DataWorkspacePage() {
   return (
     <div style={{ padding: "20px 24px 80px", maxWidth: 1320, margin: "0 auto" }}>
       <div style={{ marginBottom: 18 }}>
-        <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: "0.18em", textTransform: "uppercase", color: "#9ca3af" }}>
-          Performance Agents
-        </div>
-        <h1 style={{ margin: "4px 0 0", fontSize: 28, fontWeight: 850, color: INK }}>成效儀表板</h1>
-        <p style={{ margin: "6px 0 0", fontSize: 14, color: "#6b7280", maxWidth: 760 }}>
-          Meta、Google Ads、SHOPLINE、91APP、GA4 —— 廣告花費與電商訂單收在同一頁，並按內容鎖定的族群拆開看。
-        </p>
+        <h1 style={{ margin: 0, fontSize: 28, fontWeight: 850, color: INK }}>成效儀表板</h1>
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) 340px", gap: 16, alignItems: "start" }}>
@@ -220,7 +212,7 @@ export default function DataWorkspacePage() {
               >
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
                   <span style={{ fontSize: 12, fontWeight: 800, color: INK, background: "#f4f4f5", padding: "4px 8px", borderRadius: 999 }}>{active.short}</span>
-                  <LineChart size={16} color="#9ca3af" />
+                  <PerformanceIcon size={16} color="#9ca3af" />
                 </div>
                 <h3 style={{ margin: "14px 0 8px", fontSize: 17, lineHeight: 1.3, fontWeight: 850, color: INK }}>{task.title}</h3>
                 <p style={{ margin: 0, fontSize: 13, color: "#6b7280", lineHeight: 1.55 }}><b>Agent：</b><AgentLine agent={task.agent} /></p>

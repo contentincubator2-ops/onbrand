@@ -8,6 +8,7 @@
 import { useState } from "react";
 import type { Cite, Decision, DecisionStatus, MeetingAction, MeetingMinutes, MeetingRun, MeetingSource } from "./meetingModel";
 import { decisionLabel, isWritableAnchor } from "./meetingModel";
+import { FlagIcon, CheckIcon } from "../../../platform/components/icons";
 
 interface Props {
   minutes: MeetingMinutes;
@@ -140,15 +141,15 @@ export default function MeetingMinutesView({
                 {!d && (
                   <p className="mt-2.5 text-[12px] text-neutral-500">
                     {isWritableAnchor(scope, c.anchorId)
-                      ? (en ? "⚑ Adopting writes this into your Brand Brain — every task card after this will use it. You'll see exactly what changes before it's written."
-                            : "⚑ 採用會寫入品牌大腦，之後所有任務卡產文都會用新的內容。寫入前會先讓你看改動前後的對照。")
+                      ? <><FlagIcon size={11} /> {en ? "Adopting writes this into your Brand Brain — every task card after this will use it. You'll see exactly what changes before it's written."
+                            : "採用會寫入品牌大腦，之後所有任務卡產文都會用新的內容。寫入前會先讓你看改動前後的對照。"}</>
                       : (en ? "This cell is research evidence — adopting only records your decision." : "這一格是研究證據，採用只會記錄決定，不會寫入品牌大腦。")}
                   </p>
                 )}
                 <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-neutral-100 pt-3">
                   {d ? (
                     <>
-                      <span className="text-[12.5px] font-medium text-neutral-900">✓ {decisionLabel(d.status, en)}</span>
+                      <span className="text-[12.5px] font-medium text-neutral-900 inline-flex items-center gap-1"><CheckIcon size={11} /> {decisionLabel(d.status, en)}</span>
                       {d.versionId ? (
                         <span className="rounded-full border border-neutral-900 px-2 py-0.5 text-[11.5px] text-neutral-900">
                           {en ? `Written to Brand Brain: ${(d.written ?? []).join(", ")}` : `已寫入品牌大腦：${(d.written ?? []).join("、")}`}

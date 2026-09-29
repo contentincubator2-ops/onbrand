@@ -9,7 +9,9 @@ import {
   Button, Chip, Modal, ModalContent, ModalHeader, ModalBody, Card, CardBody,
 } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faBookOpen, faExternalLinkAlt, faFileLines } from "@fortawesome/free-solid-svg-icons";
+import {
+  faBookOpen, faArrowUpRightFromSquare, faFileLines,
+} from "@fortawesome/free-solid-svg-icons";
 
 interface Source {
   url: string;
@@ -99,7 +101,7 @@ export default function SourceViewer({ research, segmentTitle }: SourceViewerPro
                       href={s.url} target="_blank" rel="noopener noreferrer"
                       className="text-tiny text-primary truncate flex items-center gap-1 hover:underline"
                     >
-                      <FontAwesomeIcon icon={faExternalLinkAlt} className="text-tiny" />
+                      <FontAwesomeIcon icon={faArrowUpRightFromSquare} className="text-tiny" />
                       <span className="truncate">{s.url}</span>
                     </a>
                   )}

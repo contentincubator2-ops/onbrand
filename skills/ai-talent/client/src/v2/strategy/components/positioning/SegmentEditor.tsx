@@ -11,7 +11,9 @@
  */
 import { Card, CardBody, CardHeader, Button, Input, Textarea, Chip, Tooltip } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faRobot, faPlus, faXmark, faWandSparkles } from "@fortawesome/free-solid-svg-icons";
+import {
+  faUserTie, faPlus, faXmark, faWandMagicSparkles,
+} from "@fortawesome/free-solid-svg-icons";
 import type { SegmentSpec, FieldSpec } from "../../lib/positioningSchema";
 import SourceViewer from "./SourceViewer";
 import { useLang } from "../../../../lib/i18n";
@@ -58,7 +60,7 @@ export default function SegmentEditor({
                 size="sm"
                 variant="flat"
                 color="success"
-                startContent={<FontAwesomeIcon icon={faWandSparkles} className="text-tiny ml-1" />}
+                startContent={<FontAwesomeIcon icon={faWandMagicSparkles} className="text-tiny ml-1" />}
                 className="shrink-0"
               >
                 {en ? "Auto-filled by AI" : "AI 自動產出"}
@@ -81,7 +83,7 @@ export default function SegmentEditor({
                 size="sm"
                 variant="bordered"
                 radius="full"
-                startContent={<FontAwesomeIcon icon={faRobot} className="text-tiny" />}
+                startContent={<FontAwesomeIcon icon={faUserTie} className="text-tiny" />}
                 onPress={() => onRunAgent?.(spec.agent)}
               >
                 自動填寫

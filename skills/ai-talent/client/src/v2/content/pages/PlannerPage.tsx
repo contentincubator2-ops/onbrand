@@ -14,8 +14,12 @@
 import React from "react";
 import { useNavigate, useOutletContext, useSearchParams } from "react-router-dom";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faEnvelope, faBullhorn, faGlobe, faArrowUp, faChevronLeft, faChevronRight, faEllipsis } from "@fortawesome/free-solid-svg-icons";
-import { faFacebookF, faInstagram, faLinkedinIn, faYoutube, faTiktok, faXTwitter, faThreads, faLine } from "@fortawesome/free-brands-svg-icons";
+import {
+  faEnvelope, faBullhorn, faGlobe, faArrowUp, faChevronLeft, faChevronRight, faEllipsis,
+} from "@fortawesome/free-solid-svg-icons";
+import {
+  faFacebook, faInstagram, faLinkedin, faYoutube, faTiktok, faXTwitter, faThreads, faLine,
+} from "@fortawesome/free-brands-svg-icons";
 import { trpc } from "../../../lib/trpc";
 import { useLang } from "../../../lib/i18n";
 import { showToastGlobal } from "../../../components/ui/Toast";
@@ -23,10 +27,10 @@ import { channelRoute } from "../lib/channelMeta";
 import { PlatformTaskModal, type TaskEmbed } from "./PlatformTaskPage";
 import { getCalendarPublishPayload } from "../lib/strategyContentEnvelope";
 
-const INK = "#171717", META = "#6B6B6B", LINE = "#EAEAEA", SOFT = "#F6F6F5", ORANGE = "#F97316";
+const INK = "#171717", META = "#6B6B6B", LINE = "#EAEAEA", SOFT = "#F6F6F5", ORANGE = "#18181B";
 
 const PLATFORM_ICON: Record<string, any> = {
-  facebook: faFacebookF, instagram: faInstagram, linkedin: faLinkedinIn, youtube: faYoutube, tiktok: faTiktok,
+  facebook: faFacebook, instagram: faInstagram, linkedin: faLinkedin, youtube: faYoutube, tiktok: faTiktok,
   email: faEnvelope, pr: faBullhorn, x: faXTwitter, website: faGlobe, threads: faThreads, line: faLine,
 };
 const PLATFORM_ZH: Record<string, string> = {
@@ -212,10 +216,7 @@ export default function PlannerPage() {
         <section aria-label={en ? "Chat" : "對話"} className="flex w-[400px] shrink-0 flex-col p-6" style={{ borderRight: `1px solid ${LINE}` }}>
           <div className="flex items-center gap-2.5 pb-4" style={{ borderBottom: `1px solid ${LINE}` }}>
             {avatar}
-            <div>
-              <p className="m-0 text-[14px] font-semibold" style={{ color: INK }}>{en ? "Content director" : "內容總監"}</p>
-              <p className="m-0 mt-0.5 text-[12px]" style={{ color: META }}>{en ? "Plans with your brand brain" : "用你的品牌大腦排內容"}</p>
-            </div>
+            <p className="m-0 text-[14px] font-semibold" style={{ color: INK }}>{en ? "Content director" : "內容總監"}</p>
           </div>
 
           <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto py-5">
@@ -308,7 +309,7 @@ export default function PlannerPage() {
                           <span className="flex h-6 w-6 items-center justify-center rounded-[7px] text-[12px]" style={{ background: SOFT, color: "#404040" }}>
                             <FontAwesomeIcon icon={PLATFORM_ICON[it.platform] ?? faGlobe} />
                           </span>
-                          {isTouched && <span className="flex items-center gap-1 text-[11px] font-semibold" style={{ color: "#C2410C" }}><span className="h-1.5 w-1.5 rounded-full" style={{ background: ORANGE }} />{en ? "Changed" : "剛改"}</span>}
+                          {isTouched && <span className="flex items-center gap-1 text-[11px] font-semibold" style={{ color: "#3F3F46" }}><span className="h-1.5 w-1.5 rounded-full" style={{ background: ORANGE }} />{en ? "Changed" : "剛改"}</span>}
                         </span>
                         <span className="line-clamp-3 text-[14px] font-semibold leading-snug" style={{ color: INK }}>{it.title}</span>
                         <span className="text-[12px]" style={{ color: META }}>{it.meta}</span>

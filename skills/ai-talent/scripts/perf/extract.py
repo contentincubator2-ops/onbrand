@@ -129,6 +129,8 @@ def cmd_text(path):
 
 
 if __name__ == "__main__":
+    # Node 端用 UTF-8 解 stdout；Windows 或 locale 不是 UTF-8 的機器預設編碼會把中文弄壞
+    sys.stdout.reconfigure(encoding="utf-8")
     if len(sys.argv) != 3 or sys.argv[1] not in ("table", "text"):
         sys.stderr.write(__doc__)
         sys.exit(1)

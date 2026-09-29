@@ -154,10 +154,13 @@ export function reconcileDim(raw: any, existing: Dimension[], takenKeys: Set<str
   const label = str(raw?.label, 30);
   if (!label) return null;
   const rawKey = str(raw?.key, 40).toLowerCase();
-  const builtin = Object.entries(BUILTIN_DIMS).find(([k, v]) => k === rawKey || v.label === label);
+  const labels = listText(raw?.values);
+  // 內建維度（月份／來源／貼文形式）的值由數據本身決定。模型若自己列了值
+  // （例：「素材類型：開箱影片、教學短影音…」被套上 format），那是用戶自訂的維度，
+  // 不能被內建維度吃掉，否則那些值就不見了。
+  const builtin = labels.length ? null : Object.entries(BUILTIN_DIMS).find(([k, v]) => k === rawKey || v.label === label);
   if (builtin) return { key: builtin[0], label: builtin[1].label, values: [], isNew: false };
   const hit = existing.find((d) => d.key === rawKey || d.label === label);
-  const labels = listText(raw?.values);
   if (hit) {
     // 既有維度：沿用既有值（代碼不能變，不然舊標籤全失效），模型多列的值附加在後面。
     const values = [...hit.values];
@@ -167,7 +170,12 @@ export function reconcileDim(raw: any, existing: Dimension[], takenKeys: Set<str
     }
     return { key: hit.key, label: hit.label, values: values.slice(0, 40), isNew: false };
   }
-  const key = /^[a-z][a-z0-9_]{1,30}$/.test(rawKey) && !takenKeys.has(rawKey) ? rawKey : slugCode(label, takenKeys).replace(/-/g, "_");
+  let key = rawKey;
+  if (!/^[a-z][a-z0-9_]{1,30}$/.test(key) || takenKeys.has(key)) {
+    let i = 1;
+    while (takenKeys.has(`dim${i}`)) i++;
+    key = `dim${i}`;
+  }
   takenKeys.add(key);
   return { key, label, values: toValues(labels, 12), isNew: true };
 }

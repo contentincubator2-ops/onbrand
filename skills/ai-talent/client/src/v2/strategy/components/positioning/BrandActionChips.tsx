@@ -12,7 +12,7 @@
  */
 import { trpc } from "../../../../lib/trpc";
 import { useLang } from "../../../../lib/i18n";
-import { CheckCircle2 } from "lucide-react";
+import { DoneIcon } from "../../../platform/components/icons";
 
 interface Props {
   brandId: number | null;
@@ -55,7 +55,7 @@ export function BrandActionChipsRow({
           ? (lang === "en" ? "Finish full positioning before locking" : "等完整定位完成後才可定案")
           : (lang === "en" ? "Lock Positioning / Copy / Visual at once" : "一次鎖定 定位 / 文字 / 視覺")}
       >
-        <CheckCircle2 size={11} /> {lang === "en" ? "Lock in" : "定案"}
+        <DoneIcon size={11} /> {lang === "en" ? "Lock in" : "定案"}
       </button>
     </div>
   );

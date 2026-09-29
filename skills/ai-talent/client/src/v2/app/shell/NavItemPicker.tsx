@@ -9,6 +9,7 @@
  */
 import React from "react";
 import { createPortal } from "react-dom";
+import { CheckIcon, CloseIcon } from "../../platform/components/icons";
 
 export interface PickerItem {
   id: string;
@@ -59,7 +60,7 @@ export default function NavItemPicker({ open, en, brandName, catalog, selected, 
                   <span className="block text-[13.5px] font-semibold text-neutral-900">{c.label}</span>
                   {c.tooltip && <span className="mt-0.5 block text-[12px] leading-snug text-neutral-500">{c.tooltip}</span>}
                 </span>
-                <span className={`mt-1 flex h-4 w-4 shrink-0 items-center justify-center rounded border text-[11px] ${on ? "border-neutral-900 bg-neutral-900 text-white" : "border-neutral-300"}`}>{on ? "✓" : ""}</span>
+                <span className={`mt-1 flex h-4 w-4 shrink-0 items-center justify-center rounded border text-[11px] ${on ? "border-neutral-900 bg-neutral-900 text-white" : "border-neutral-300"}`}>{on ? <CheckIcon size={9} /> : null}</span>
               </button>
             );
           })}
@@ -80,7 +81,7 @@ export default function NavItemPicker({ open, en, brandName, catalog, selected, 
                 : `只放${brandName ? `「${brandName}」` : "這個品牌"}真的會用到的。專案、行事曆、活動一直都在，不用加。`}
             </p>
           </div>
-          <button type="button" onClick={onClose} className="text-[14px] text-neutral-400 hover:text-neutral-900">✕</button>
+          <button type="button" onClick={onClose} className="text-[14px] text-neutral-400 hover:text-neutral-900"><CloseIcon size={14} /></button>
         </div>
 
         {/* 側欄上的順序 */}
@@ -100,7 +101,7 @@ export default function NavItemPicker({ open, en, brandName, catalog, selected, 
                     <span className="flex-1 font-medium text-neutral-900">{c.label}</span>
                     <button type="button" disabled={i === 0} onClick={() => move(i, -1)} className="px-1 text-neutral-400 hover:text-neutral-900 disabled:opacity-30" aria-label={en ? "Move up" : "上移"}>↑</button>
                     <button type="button" disabled={i === draft.length - 1} onClick={() => move(i, 1)} className="px-1 text-neutral-400 hover:text-neutral-900 disabled:opacity-30" aria-label={en ? "Move down" : "下移"}>↓</button>
-                    <button type="button" onClick={() => toggle(id)} className="px-1 text-neutral-400 hover:text-neutral-900" aria-label={en ? "Remove" : "拿掉"}>✕</button>
+                    <button type="button" onClick={() => toggle(id)} className="px-1 text-neutral-400 hover:text-neutral-900" aria-label={en ? "Remove" : "拿掉"}><CloseIcon size={12} /></button>
                   </li>
                 );
               })}

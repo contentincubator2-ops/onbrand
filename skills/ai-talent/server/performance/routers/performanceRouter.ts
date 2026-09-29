@@ -37,7 +37,7 @@ import {
 import { pivot, resolveTag, judgeValue, BUILTIN_DIMS, METRIC_LABELS, JUDGE_LABELS, SOURCE_LABELS, UNTAGGED, type LensConfig } from "../core/perfPivot";
 import { deriveDimensions, proposeLens, autoTag } from "../core/perfAI";
 import { parseTable, guessSource, guessMapping, buildFacts, IMPORT_SOURCES, ROWCOUNT } from "../core/perfImport";
-import { syncFbPage, resolvePage, FbSyncError } from "../core/fbPageSync";
+import { syncFbPage, resolvePage, FbSyncError, fbSyncEnabled } from "../core/fbPageSync";
 import { utmContent } from "../core/perfUtm";
 
 const trayInput = z.enum(TRAYS as [string, ...string[]]);
@@ -174,6 +174,7 @@ export const performanceRouter = router({
           .map((t) => ({ key: t.key, name: t.name, nameEn: t.nameEn, config: t.config, recommended: t.trays.includes(input.tray) })),
         sources, traySources, trayFacts, rules, imports,
         fbPage: page,
+        fbSyncEnabled: fbSyncEnabled(),
         metricLabels: METRIC_LABELS, judgeLabels: JUDGE_LABELS, sourceLabels: SOURCE_LABELS,
       };
     }),

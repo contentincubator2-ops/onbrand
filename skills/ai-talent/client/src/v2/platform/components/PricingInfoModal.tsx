@@ -5,7 +5,7 @@
  */
 import { CATALOG } from "../lib/catalogFigures";
 import { Modal, ModalContent, ModalBody, Button } from "@heroui/react";
-import { Sparkles, Mail, ExternalLink } from "lucide-react";
+import { ExternalIcon, GenerateIcon, MailIcon, CheckIcon } from "./icons";
 import { Link } from "react-router-dom";
 import { trpc } from "../../../lib/trpc";
 import { useLang } from "../../../lib/i18n";
@@ -99,7 +99,7 @@ export default function PricingInfoModal({ isOpen, onClose }: Props) {
             style={{ background: "#171717" }}
           >
             <div className="flex items-center gap-2 mb-1">
-              <Sparkles size={16} />
+              <GenerateIcon size={16} />
               <span className="text-xs font-semibold uppercase tracking-widest opacity-90">
                 {lang === "en" ? "Plans & pricing" : "方案和定價"}
               </span>
@@ -148,7 +148,7 @@ export default function PricingInfoModal({ isOpen, onClose }: Props) {
                 <ul className="text-xs text-default-700 space-y-1.5 mb-4 flex-1">
                   {p.features.map((f, i) => (
                     <li key={i} className="flex items-start gap-1.5">
-                      <span className="mt-0.5 text-neutral-700">✓</span>
+                      <span className="mt-0.5 text-neutral-700"><CheckIcon size={11} /></span>
                       <span>{f}</span>
                     </li>
                   ))}
@@ -161,7 +161,7 @@ export default function PricingInfoModal({ isOpen, onClose }: Props) {
                     as={Link}
                     to="/pricing"
                     onPress={onClose}
-                    startContent={<ExternalLink size={12} />}
+                    startContent={<ExternalIcon size={12} />}
                     className="font-medium"
                   >
                     {p.cta}
@@ -193,7 +193,7 @@ export default function PricingInfoModal({ isOpen, onClose }: Props) {
                 variant="bordered"
                 as="a"
                 href="mailto:sowork@sowork.ai?subject=OnBrand 方案升級"
-                startContent={<Mail size={12} />}
+                startContent={<MailIcon size={12} />}
                 className="font-medium"
               >
                 {lang === "en" ? "Contact support" : "聯絡客服"}

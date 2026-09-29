@@ -27,6 +27,7 @@ import {
   DATE_RANGES, COMPARE_MODES, BREAKEVEN_ROAS, GROSS_MARGIN,
   type Filter, type Totals,
 } from "./perfMockData";
+import { WarningIcon } from "../../platform/components/icons";
 
 const C = {
   border: "#eceff3", sub: "#9ca3af", text: "#111827", mute: "#6b7280",
@@ -151,7 +152,7 @@ function FilterBar({ lens, setLens }: { lens: Lens; setLens: (l: Lens) => void }
       )}
       <div style={{ marginLeft: "auto", fontSize: 12, fontWeight: 800, color: C.bad,
                     background: C.badBg, border: "1px solid #FECACA", borderRadius: 6, padding: "5px 9px" }}>
-        ⚠ 模擬資料
+        <WarningIcon size={12} /> 模擬資料
       </div>
     </div>
   );

@@ -53,13 +53,12 @@ import {
   ModalContent, ModalFooter, ModalHeader, Textarea,
 } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { HelpTip } from "../../platform/components/HelpTip";
 import {
-  faBolt, faPaperPlane, faXmark, faMagnifyingGlass,
-  faEnvelope, faBullhorn, faWandMagicSparkles, faTriangleExclamation, faGlobe,
-  faBookBookmark, faCalendarDays, faPlus, faPenToSquare,
+  faBolt, faPaperPlane, faXmark, faMagnifyingGlass, faEnvelope, faBullhorn, faWandMagicSparkles, faTriangleExclamation, faGlobe, faBookBookmark, faCalendarDays, faPlus, faPenToSquare,
 } from "@fortawesome/free-solid-svg-icons";
 import {
-  faFacebookF, faInstagram, faYoutube, faTiktok, faLinkedinIn, faThreads, faLine,
+  faFacebook, faInstagram, faYoutube, faTiktok, faLinkedin, faThreads, faLine,
 } from "@fortawesome/free-brands-svg-icons";
 import RunningAgentCarousel from "../components/quickTask/RunningAgentCarousel";
 import ImageCardTile, { type ImageCardInfo } from "../components/imageCard/ImageCardTile";
@@ -67,6 +66,7 @@ import { imageCardHref, imageChannelOf } from "../lib/imageCardHandoff";
 import CardDetailDrawer, { isRecentCard } from "../components/quickTask/CardDetailDrawer";
 import ChannelPicker from "../../platform/components/plan/ChannelPicker";
 import TaskPicker from "../../platform/components/plan/TaskPicker";
+import { LibraryIcon, AddIcon, EditIcon, TaskCardsIcon } from "../../platform/components/icons";
 
 // ── Recently used tasks helpers ─────────────────────────────────────────────
 const LAST_USED_KEY = "onbrand_last_used_tasks_v1";
@@ -113,97 +113,45 @@ interface PlatformMeta {
   labelZh: string;
   icon: any;
   bg: string;
-  heroZh: string;
-  heroEn: string;
-  subZh: string;
-  subEn: string;
 }
 
 const PLATFORM_META: Record<string, PlatformMeta> = {
   facebook: {
-    label: "Facebook", labelZh: "Facebook", icon: faFacebookF, bg: "#1877F2",
-    heroZh: "讓每篇 Facebook 貼文，都有爆款的骨架",
-    heroEn: "Every post has a proven structure — no more starting from scratch",
-    subZh: "Clio 獲獎敘事公式 × 品牌定位鎖定，自然引發互動",
-    subEn: "Narrative frameworks from award-winning campaigns, locked to your brand voice",
+    label: "Facebook", labelZh: "Facebook", icon: faFacebook, bg: "#18181b",
   },
   instagram: {
-    label: "Instagram", labelZh: "Instagram", icon: faInstagram, bg: "#E4405F",
-    heroZh: "文案 × 視覺指令同步產出，不再是漂亮圖片配隨便文字",
-    heroEn: "Caption and visual brief in one run — never pieced together separately",
-    subZh: "文案代理人 + 圖片指導代理人協作，輸出比競品深一層",
-    subEn: "Caption agent and image director agent work in sync, every time",
+    label: "Instagram", labelZh: "Instagram", icon: faInstagram, bg: "#18181b",
   },
   linkedin: {
-    label: "LinkedIn", labelZh: "LinkedIn", icon: faLinkedinIn, bg: "#0A66C2",
-    heroZh: "不只是發文，是在 LinkedIn 建立你的專業話語權",
-    heroEn: "Thought leadership that earns real attention — not just vanity metrics",
-    subZh: "PR Strategist 代理人以記者邏輯構建你的觀點",
-    subEn: "PR Strategist agent thinks like a journalist, writes like an executive",
+    label: "LinkedIn", labelZh: "LinkedIn", icon: faLinkedin, bg: "#18181b",
   },
   youtube: {
-    label: "YouTube", labelZh: "YouTube", icon: faYoutube, bg: "#FF0000",
-    heroZh: "標題、章節、縮圖文案、結尾鉤子 — YouTube 影片完整佈局",
-    heroEn: "Title, chapters, thumbnail brief, end hook — one run, done",
-    subZh: "Strategist 規劃敘事弧，再由文案代理人完成每一段腳本",
-    subEn: "Strategist maps the arc; writer handles every segment",
+    label: "YouTube", labelZh: "YouTube", icon: faYoutube, bg: "#18181b",
   },
   tiktok: {
-    label: "TikTok", labelZh: "TikTok", icon: faTiktok, bg: "#EE1D52",
-    heroZh: "前 3 秒留人，後 60 秒轉化 — TikTok 腳本不靠靈感",
-    heroEn: "Grab them in 3 seconds, keep them for 60 — retention built in",
-    subZh: "TikTok 專屬代理人以角色弧度 × 未解懸念設計驅動完播率",
-    subEn: "TikTok agent that thinks in character arcs and unresolved tension",
+    label: "TikTok", labelZh: "TikTok", icon: faTiktok, bg: "#18181b",
   },
   email: {
-    label: "Newsletter", labelZh: "電子報", icon: faEnvelope, bg: "#7B5BC8",
-    heroZh: "每封電子報都是品牌聲音的延伸，不是隨機發文",
-    heroEn: "Every email sounds like you — consistent voice, every send",
-    subZh: "品牌定位鎖定主旨行、開場鉤子與 CTA，完整結構一次產出",
-    subEn: "Brand voice locks the subject line, opening hook, and CTA — zero drift",
+    label: "Newsletter", labelZh: "電子報", icon: faEnvelope, bg: "#18181b",
   },
   pr: {
     label: "PR", labelZh: "新聞稿", icon: faBullhorn, bg: "#475569",
-    heroZh: "讓媒體真正想報導你 — 不是寫稿，是設計新聞角度",
-    heroEn: "Written to get picked up — not just to check a box",
-    subZh: "PR Strategist 代理人以記者視角找到新聞價值，再產出完整稿件",
-    subEn: "PR Strategist finds the news angle before writing a single word",
   },
   case: {
-    label: "Case Library", labelZh: "案例", icon: faBookBookmark, bg: "#7C3AED",
-    heroZh: "案例不是寫稿當下才找，是平常就在累積",
-    heroEn: "A case library you build over time, not scramble for at deadline",
-    subZh: "依十項標準分別建檔，每次提報都對照既有紀錄去重",
-    subEn: "Filed by standard, deduplicated against everything already logged",
+    label: "Case Library", labelZh: "案例", icon: faBookBookmark, bg: "#18181b",
   },
   calendar: {
-    label: "Content Calendar", labelZh: "行事曆", icon: faCalendarDays, bg: "#B45309",
-    heroZh: "先把整個月的篇數與切角排好，再逐篇寫",
-    heroEn: "Plan the month's slots and angles first, then write them one by one",
-    subZh: "每種內容類型一張卡，一次產出該類型當月所有篇數的摘要",
-    subEn: "One card per content type, producing every slot that type owns this month",
+    label: "Content Calendar", labelZh: "行事曆", icon: faCalendarDays, bg: "#18181b",
   },
   website: {
-    label: "Website", labelZh: "官網", icon: faGlobe, bg: "#0F766E",
-    heroZh: "官網長文不是部落格隨筆，是品牌把觀點說完整的地方",
-    heroEn: "Long-form that earns the reader's time — not filler blog posts",
-    subZh: "引言＋3 段的固定骨架，把案例與規格翻譯成讀者的生活感受",
-    subEn: "A fixed intro-plus-three structure that turns specs into felt experience",
+    label: "Website", labelZh: "官網", icon: faGlobe, bg: "#18181b",
   },
   // 2026-09-29 CJ：台灣市場加 Threads、LINE。目前沒有預設卡，用戶從自己的範例建卡。
   threads: {
     label: "Threads", labelZh: "Threads", icon: faThreads, bg: "#000000",
-    heroZh: "Threads 要像人在說話，不像品牌在發公告",
-    heroEn: "Threads should sound like a person talking, not a brand announcing",
-    subZh: "貼上你寫得最好的幾篇串文，建成自己的 Threads 任務卡",
-    subEn: "Paste your best threads and turn them into your own task card",
   },
   line: {
-    label: "LINE", labelZh: "LINE", icon: faLine, bg: "#06C755",
-    heroZh: "LINE 群發是寫給已經加你好友的人——一則訊息、一個行動",
-    heroEn: "LINE broadcasts go to people who already follow you — one message, one action",
-    subZh: "貼上你效果最好的幾則群發訊息，建成自己的 LINE 任務卡",
-    subEn: "Paste your best-performing broadcasts and turn them into your own task card",
+    label: "LINE", labelZh: "LINE", icon: faLine, bg: "#18181b",
   },
 };
 
@@ -251,7 +199,7 @@ function synthesizeStages(elapsedMs: number, tier: string, lang: string): any[] 
     status: t < start ? "pending" : t > end ? "done" : "running",
   });
   const stages: any[] = [];
-  if (isResearch) stages.push(mk("scout", L("🔬 Scout 爬取真實爆款數據", "🔬 Scout pulls real viral data"), 0, scoutEnd));
+  if (isResearch) stages.push(mk("scout", L("Scout 爬取真實爆款數據", "Scout pulls real viral data"), 0, scoutEnd));
   stages.push(mk("pre", L("URL / persona / brand load", "URL / persona / brand load"), scoutEnd, preEnd));
   if (isProd) stages.push(mk("strategist", L("Strategist 規劃敘事弧", "Strategist maps the narrative arc"), preEnd, stratEnd));
   stages.push(mk("caption", L("文案寫手 撰寫版本", "Caption writer drafts variants"), capStart, capEnd));
@@ -402,7 +350,7 @@ class PlatformPageErrorBoundary extends React.Component<
             <h2 style={{ fontSize: 18, fontWeight: 600, marginTop: 4 }}>頁面載入失敗</h2>
             <p style={{ marginTop: 8 }}>{e.message}</p>
             <button
-              style={{ marginTop: 12, padding: "6px 12px", background: "#3b82f6", color: "white", border: "none", borderRadius: 6, cursor: "pointer" }}
+              style={{ marginTop: 12, padding: "6px 12px", background: "#18181b", color: "white", border: "none", borderRadius: 6, cursor: "pointer" }}
               onClick={() => this.setState({ error: null })}
             >
               重試渲染
@@ -1652,7 +1600,7 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                   startContent={<FontAwesomeIcon icon={faWandMagicSparkles} />}
                   onPress={() => setRewriteOpen(true)}
                 >
-                  {lang === "en" ? "Rewrite my text" : "貼上原文改寫"}
+                  {lang === "en" ? "Rewrite my text" : "改寫原文"}
                 </Button>
                 <Button
                   size="sm"
@@ -1674,45 +1622,15 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
 
         <div className="relative z-10 flex flex-col items-center text-center max-w-[1100px] mx-auto">
 
-          {/* Platform eyebrow */}
-          <div className="flex items-center gap-2 mb-4">
-            <div
-              className="w-9 h-9 rounded-full flex items-center justify-center text-white shadow-sm"
-              style={{ background: meta.bg }}
-            >
+          {/* Platform header：單色 logo＋平台名（2026-09-29 介面去文字化：各通路標語已刪） */}
+          <div className="flex items-center gap-2.5 mb-4">
+            <div className="w-9 h-9 rounded-full flex items-center justify-center text-white shadow-sm bg-default-900">
               <FontAwesomeIcon icon={meta.icon} className="text-sm" />
             </div>
-            <p className="text-[12px] font-semibold uppercase tracking-[0.22em] text-default-500">
+            <h1 className="font-bold tracking-tight leading-tight text-default-900" style={{ fontSize: "clamp(1.35rem, 2.4vw, 1.75rem)" }}>
               {lang === "en" ? meta.label : meta.labelZh}
-            </p>
+            </h1>
           </div>
-
-          {/* Hero title — plain color (no gradient-text; gradient clip is unreliable cross-browser) */}
-          <h1
-            className="font-bold tracking-tight leading-tight mb-2"
-            style={{
-              fontSize: "clamp(1.45rem, 2.8vw, 2rem)",
-              color: "#0f0f0e",
-            }}
-          >
-            {lang === "en" ? meta.heroEn : meta.heroZh}
-          </h1>
-
-          {/* Platform sub-headline — differentiation copy */}
-          <p
-            className="mb-3 text-default-500"
-            style={{ fontSize: 14, lineHeight: 1.65, maxWidth: 580 }}
-          >
-            <span style={{ color: meta.bg, fontWeight: 600 }}>▸ </span>
-            {lang === "en" ? meta.subEn : meta.subZh}
-            {brandId && (
-              <span style={{ fontStyle: "italic", color: "#9ca3af" }}>
-                {lang === "en"
-                  ? ` · Using ${brandName ?? "your brand"}'s positioning`
-                  : ` · 以 ${brandName ?? "你的品牌"} 定位為骨架`}
-              </span>
-            )}
-          </p>
 
           {/* Search */}
           <div className="w-full mb-5" style={{ maxWidth: 740 }}>
@@ -2156,8 +2074,8 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
               <span>
                 <b>{lang === "en" ? "Strategy topic loaded: " : "策略題目已帶入："}</b>
                 「{strategyTopic}」
-                <span style={{ color: "#8A8494", marginLeft: 8, fontSize: 12 }}>
-                  {lang === "en" ? "Open any task — it autofills." : "點任一任務卡，題目會自動填入"}
+                <span style={{ marginLeft: 6 }}>
+                  <HelpTip>{lang === "en" ? "Open any task — it autofills." : "點任一任務卡，題目會自動填入"}</HelpTip>
                 </span>
               </span>
               <button onClick={() => setStrategyTopic(null)}
@@ -2241,9 +2159,7 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                   )}
                   {COMPOSER_CHANNELS.has(platform) && brandId ? (
                     <>
-                      <p className="text-tiny text-default-400 mb-3">
-                        {lang === "en" ? "You can still create your own." : "你可以自己建一張。"}
-                      </p>
+                      <div className="mb-3" />
                       <Button
                         size="sm"
                         color="primary"
@@ -2310,12 +2226,10 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
 
             <div className="flex items-center justify-between mb-4">
               <div>
-                <h2 className="font-semibold text-lg tracking-tight">
+                <h2 className="font-semibold text-lg tracking-tight flex items-center gap-1">
                   {lang === "en" ? "Tasks" : "精選任務"}
+                  <HelpTip>{lang === "en" ? "Tap to make — answer one quick question first." : "按下即產出，先回答 1 個關鍵問題"}</HelpTip>
                 </h2>
-                <p className="text-tiny text-default-400 mt-0.5">
-                  {lang === "en" ? "Tap to make — answer one quick question first." : "按下即產出，先回答 1 個關鍵問題"}
-                </p>
               </div>
               <div className="flex items-center gap-2">
                 {/* 2026-09-08 亮出節奏：這個通路 30 天內上架了幾張。有新卡才顯示，
@@ -2516,7 +2430,7 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                         )}
                       </div>
                       {(task as any).methodology && (
-                        <span className="text-[12px] text-default-400 italic">📚 {(task as any).methodology}</span>
+                        <span className="text-[12px] text-default-400 italic inline-flex items-center gap-1"><LibraryIcon size={11} /> {(task as any).methodology}</span>
                       )}
                       <div className="mt-auto pt-2 flex items-center gap-2 border-t border-default-100">
                         <Avatar src={avatarSrc} size="sm" className="w-5 h-5" />
@@ -2548,16 +2462,11 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                   onClick={() => setPickerOpen(true)}
                   className="flex min-h-[180px] flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-neutral-300 bg-white text-neutral-500 transition hover:border-neutral-500 hover:text-neutral-800"
                 >
-                  <span className="flex h-8 w-8 items-center justify-center rounded-full border border-neutral-300 text-[18px] leading-none">
-                    +
+                  <span className="flex h-8 w-8 items-center justify-center rounded-full border border-neutral-300">
+                    <AddIcon size={14} />
                   </span>
                   <span className="text-[14px] font-medium">
                     {lang === "en" ? "Add task card" : "新增任務卡"}
-                  </span>
-                  <span className="px-4 text-center text-[13px] text-neutral-400">
-                    {activeCategoryLabel
-                      ? (lang === "en" ? `Within “${activeCategoryLabel}” only` : `只在「${activeCategoryLabel}」分類裡挑`)
-                      : (lang === "en" ? "Browse by source — viral, evergreen, award…" : "依來源挑選 — 爆款、長青、得獎案例…")}
                   </span>
                 </button>
               )}
@@ -2572,9 +2481,11 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                     ? (lang === "en"
                       ? `Showing all ${platformTasks.length} cards`
                       : `目前顯示全部 ${platformTasks.length} 張`)
-                    : (lang === "en"
-                      ? `Showing your ${trayIds.length} of ${platformTasks.length} cards`
-                      : `目前只擺你常用的 ${trayIds.length} 張，這個通路共 ${platformTasks.length} 張`)}
+                    : (
+                      <span className="inline-flex items-center gap-1.5 tabular-nums" title={lang === "en" ? "Your saved cards / all cards in this channel" : "常用 / 這個通路全部"}>
+                        <TaskCardsIcon size={12} /> {trayIds.length} / {platformTasks.length}
+                      </span>
+                    )}
                 </span>
                 <button
                   onClick={() => setShowAllTasks((v) => !v)}
@@ -2671,11 +2582,6 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                           ? `From the campaign plan for “${d.event?.name ?? ""}” — this post is scheduled for ${item.date}.`
                           : `來自「${d.event?.name ?? ""}」的宣傳企劃 —— 這篇排在 ${item.date} 發布。`}
                       </p>
-                      <p className="text-tiny text-default-400 m-0 mt-0.5">
-                        {lang === "en"
-                          ? "Event dates and the offer are already filled in below."
-                          : "活動期間與優惠機制已自動帶入下方欄位。"}
-                      </p>
                     </div>
                   );
                 })()}
@@ -2686,7 +2592,7 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                 {brandId && (modalProducts.length > 0 || modalEvents.length > 0) && (
                   <div className="mb-3">
                     <p className="text-tiny text-default-500 mb-1.5">
-                      {lang === "en" ? "Generate for" : "這次要為哪個對象產出"}
+                      {lang === "en" ? "Generate for" : "產出對象"}
                     </p>
                     <div className="flex flex-wrap gap-1.5">
                       <button
@@ -2826,7 +2732,7 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                         style={base}
                         onClick={() => openChipEditor(c)}
                       >
-                        {c.label}{missing ? " ＋" : " ✎"}
+                        {c.label} {missing ? <AddIcon size={10} /> : <EditIcon size={10} />}
                       </button>
                     );
                   };
@@ -2835,10 +2741,11 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                       <p style={{ fontSize: 12, fontWeight: 700, color: "#525252", letterSpacing: "0.22em", textTransform: "uppercase", marginBottom: 6 }}>
                         {(() => {
                           const entityName = brandCtx?.brand?.name ?? brandName ?? (lang === "en" ? "your brand" : "你的品牌");
-                          return lang === "en"
-                            ? `Context · from ${entityName} · click a chip to edit`
-                            : `Context · 來自 ${entityName} · 點任一項可改寫`;
+                          return `Context · ${entityName}`;
                         })()}
+                        <span style={{ marginLeft: 4, letterSpacing: 0, textTransform: "none" }}>
+                          <HelpTip>{lang === "en" ? "Click a chip to edit it." : "點任一項可改寫"}</HelpTip>
+                        </span>
                       </p>
                       <div className="flex flex-wrap gap-1.5">
                         {chips.filter((c: any) => c.hasContent).map((c: any) => renderChip(c, false))}
@@ -2949,11 +2856,11 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                             ? (lang === "en" ? "Polishing…" : "潤稿中…")
                             : (lang === "en" ? "AI polish my brief" : "AI 潤稿")}
                         </Button>
-                        <span className="text-tiny text-default-400">
+                        <HelpTip>
                           {lang === "en"
                             ? "Tidies your input — facts kept, never invented."
                             : "幫你整理輸入（保留事實、不會捏造）"}
-                        </span>
+                        </HelpTip>
                       </div>
                     )}
                     {polishErr && <p className="text-tiny text-danger-500">{polishErr}</p>}

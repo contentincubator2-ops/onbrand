@@ -5,6 +5,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useLang } from "../../lib/i18n";
+import { WarningIcon } from "../../v2/platform/components/icons";
 
 export default function ForgotPasswordPage() {
   const { t, lang, setLang } = useLang();
@@ -79,9 +80,6 @@ export default function ForgotPasswordPage() {
       <div className="hidden lg:flex flex-col justify-center px-16 w-1/2" style={{ background: "#171717" }}>
         <div className="text-white">
           <div className="text-4xl font-bold mb-3">{lang === "en" ? "OnBrand" : "OnBrand · 對版"}</div>
-          <div className="text-xl opacity-80">
-            {lang === "en" ? "Marketing on autopilot — always on-brand." : "永遠 on-brand 的行銷作戰指揮台"}
-          </div>
           <button
             onClick={() => setLang(lang === "en" ? "zh-TW" : "en")}
             className="mt-10 text-xs opacity-70 hover:opacity-100 underline transition"
@@ -94,8 +92,7 @@ export default function ForgotPasswordPage() {
       <div className="flex flex-col justify-center items-center w-full lg:w-1/2 px-8">
         <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-10 w-full max-w-md">
           <div className="mb-6">
-            <h1 className="text-2xl font-bold text-gray-900 mb-1">{t("auth_forgot_title")}</h1>
-            <p className="text-gray-400 text-sm">{t("auth_forgot_subtitle")}</p>
+            <h1 className="text-2xl font-bold text-gray-900">{t("auth_forgot_title")}</h1>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -106,7 +103,7 @@ export default function ForgotPasswordPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder={t("auth_email_placeholder")}
-                className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400 transition-colors"
+                className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-400 focus:border-zinc-400 transition-colors"
                 autoComplete="email"
                 required
               />
@@ -114,7 +111,7 @@ export default function ForgotPasswordPage() {
 
             {error && (
               <div className="flex items-center gap-2 text-red-600 text-sm bg-red-50 border border-red-100 rounded-lg px-3 py-2">
-                <span>⚠</span> {error}
+                <WarningIcon size={14} /> {error}
               </div>
             )}
 
@@ -123,9 +120,9 @@ export default function ForgotPasswordPage() {
               disabled={loading || !email}
               className="w-full rounded-lg py-2.5 text-sm font-semibold transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
               style={{
-                background: loading ? "#d1cbf8" : "#171717",
+                background: loading ? "#d4d4d8" : "#171717",
                 color: "white",
-                boxShadow: loading ? "none" : "0 4px 12px rgba(108,92,231,0.35)",
+                boxShadow: loading ? "none" : "0 4px 12px rgba(24,24,27,0.25)",
               }}
             >
               {loading ? t("auth_forgot_busy") : t("auth_forgot_btn")}
@@ -133,7 +130,7 @@ export default function ForgotPasswordPage() {
 
             <p className="text-center text-xs text-gray-400">
               {lang === "en" ? "Remembered it?" : "記得密碼了？"}
-              <Link to="/auth/login" className="text-indigo-500 hover:text-indigo-700 ml-1 underline">
+              <Link to="/auth/login" className="text-zinc-500 hover:text-zinc-700 ml-1 underline">
                 {t("auth_back_to_login")}
               </Link>
             </p>

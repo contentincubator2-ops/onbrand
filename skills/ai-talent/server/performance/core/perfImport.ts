@@ -58,6 +58,7 @@ export const HEADER_ALIASES: Record<string, string[]> = {
   entity: [
     "ad name", "廣告名稱", "ad set name", "廣告組合名稱", "campaign name", "行銷活動名稱", "campaign", "廣告活動",
     "session manual ad content", "工作階段手動廣告內容", "session campaign", "工作階段廣告活動", "utm content", "utm_content", "utm campaign",
+    "utm 內容", "utm內容", "utm 活動", "廣告內容", "來源活動",
     "landing page", "到達網頁", "product name", "商品名稱", "lineitem name",
   ],
   impressions: ["impressions", "曝光次數", "曝光", "impr."],

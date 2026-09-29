@@ -7,6 +7,7 @@
  *
  * Content area paddingLeft = 70px always (collapsed) or 280px (expanded).
  */
+import { isChunkLoadError, autoReloadForStaleChunk, StaleChunkScreen } from "../staleChunk";
 import React from "react";
 import { createPortal } from "react-dom";
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
@@ -31,11 +32,14 @@ import type { QueuedNudge } from "../../platform/components/mia/miaNudges";
 import OnBrandLogo from "../../platform/components/OnBrandLogo";
 import { useLang } from "../../../lib/i18n";
 import { Avatar, Tooltip } from "@heroui/react";
-import { Brain as LucideBrain } from "lucide-react";
+import { StrategyIcon, LockIcon, CheckIcon, NotifyIcon } from "../../platform/components/icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faFolderOpen, faBrain, faWandMagicSparkles, faMicrophone, faBookBookmark, faBell, faPlus, faRightFromBracket, faLayerGroup, faGear, faXmark, faCheckDouble, faChevronRight, faCheck, faBoxOpen, faCalendarDays, faCircleInfo, faBriefcase, faShareNodes, faUsers, faLanguage, faPaintBrush, faFont, faMagnifyingGlass, faChevronDown, faEnvelope, faBullhorn, faGlobe, faChartLine, faDatabase, faFileLines, faMemory } from "@fortawesome/free-solid-svg-icons";
+import { ICON } from "../../platform/components/icons";
 import {
-  faFacebookF, faInstagram, faTiktok, faThreads, faLine,
+  faFolderOpen, faBrain, faWandMagicSparkles, faMicrophone, faBookBookmark, faBell, faPlus, faRightFromBracket, faLayerGroup, faGear, faXmark, faCheckDouble, faChevronRight, faCheck, faBoxOpen, faCalendarDays, faCircleInfo, faBriefcase, faShareNodes, faUsers, faLanguage, faPaintBrush, faFont, faMagnifyingGlass, faChevronDown, faEnvelope, faBullhorn, faGlobe, faChartLine, faDatabase, faFileLines,
+} from "@fortawesome/free-solid-svg-icons";
+import {
+  faFacebook, faInstagram, faTiktok, faThreads, faLine,
 } from "@fortawesome/free-brands-svg-icons";
 
 const ICON_W  = 70;   // icon bar — never changes
@@ -163,11 +167,11 @@ function buildNavItems(lang: "zh-TW" | "en", userEmail?: string | null, currentP
     // am I positioning". Everything after is brand-level ASSET that supports
     // whichever scope is active.
     return [
-      { to: "/brands/edit?cat=positioning", catKey: "positioning", label: en ? "Brand" : "品牌", icon: <FontAwesomeIcon icon={faBrain} />,
-        tooltip: en ? "Brand positioning — the locked constitution" : "品牌定位 — 鎖定的品牌憲法" },
+      { to: "/brands/edit?cat=positioning", catKey: "positioning", label: en ? "Brand" : "品牌", icon: <FontAwesomeIcon icon={ICON.brand} />,
+        tooltip: en ? "Brand positioning" : "品牌定位" },
       { to: "/brands/edit?cat=products", catKey: "products", label: en ? "Products" : "產品", icon: <FontAwesomeIcon icon={faBoxOpen} />,
         tooltip: en ? "Product cards & positioning" : "產品卡片與定位" },
-      { to: "/brands/edit?cat=events", catKey: "events", label: en ? "Campaigns" : "活動", icon: <FontAwesomeIcon icon={faCalendarDays} />,
+      { to: "/brands/edit?cat=events", catKey: "events", label: en ? "Campaigns" : "活動", icon: <FontAwesomeIcon icon={ICON.campaign} />,
         tooltip: en ? "Campaign cards & positioning" : "活動卡片與定位" },
       { to: "/brands/edit?cat=copy", catKey: "copy", label: en ? "Copy" : "文字", icon: <FontAwesomeIcon icon={faFont} />,
         tooltip: en ? "Voice, terms, CTA and hook libraries" : "語氣 / 用詞 / CTA / 鉤子庫" },
@@ -176,12 +180,12 @@ function buildNavItems(lang: "zh-TW" | "en", userEmail?: string | null, currentP
       // 2026-09-26（CJ「將工具拿掉、指令庫拿掉、隱藏知識庫；定期開會變成一個新的
       // mission tray」）：「工具」整個從 rail 拿掉。知識庫只是藏起來，資料保留；
       // 2026-09-29 起沒有任何 AI 讀取它。
-      { to: "/brands/edit?cat=meetings", catKey: "meetings", label: en ? "Meetings" : "會議", icon: <FontAwesomeIcon icon={faUsers} />,
-        tooltip: en ? "Recurring strategy meetings — you set topic, attendees and cadence" : "定期策略會議 — 主題、與會總監、頻率你來定，會後留紀錄" },
+      { to: "/brands/edit?cat=meetings", catKey: "meetings", label: en ? "Meetings" : "會議", icon: <FontAwesomeIcon icon={ICON.meeting} />,
+        tooltip: en ? "Recurring strategy meetings" : "定期策略會議" },
       // 2026-09-29（CJ「在策略端增加一個 mission tray，是檢查大腦」）：品牌大腦記住了
       // 什麼、還能記多少——跟每篇產文讀的是同一份。
-      { to: "/brands/edit?cat=brain", catKey: "brain", label: en ? "Brain" : "大腦", icon: <FontAwesomeIcon icon={faMemory} />,
-        tooltip: en ? "Brand brain check — what the AI remembers and how much room is left" : "檢查大腦 — AI 記住了什麼、還能記多少、有沒有超載" },
+      { to: "/brands/edit?cat=brain", catKey: "brain", label: en ? "Brain" : "大腦", icon: <FontAwesomeIcon icon={ICON.brainCheck} />,
+        tooltip: en ? "What the AI remembers" : "AI 記住了什麼、還能記多少" },
       // 2026-08-21 (CJ「加一個人設的task tray...用戶可以自己新創agent，自己
       // 命名，並且決定這個Agent語調的應用範圍」): user-created persona
       // agents — trained from pasted text / article links / video links,
@@ -190,7 +194,7 @@ function buildNavItems(lang: "zh-TW" | "en", userEmail?: string | null, currentP
       // see isPersonaPreviewEmail's comment above.
       ...(isPersonaPreview ? [
         { to: "/brands/edit?cat=persona", catKey: "persona", label: en ? "Persona" : "人設", icon: <FontAwesomeIcon icon={faMicrophone} />,
-          tooltip: en ? "Custom persona agents — train, test-draft, and scope by platform" : "自訂人設 Agent — 訓練、試寫、指定套用平台" },
+          tooltip: en ? "Custom persona agents" : "自訂人設 Agent" },
       ] : []),
       { to: "/brands/edit?cat=info", catKey: "info", label: en ? "Info" : "基本資料", icon: <FontAwesomeIcon icon={faCircleInfo} />,
         tooltip: en ? "Name / industry / market" : "名稱 / 產業 / 市場" },
@@ -202,10 +206,10 @@ function buildNavItems(lang: "zh-TW" | "en", userEmail?: string | null, currentP
   if (currentPath?.startsWith("/performance")) {
     return [
       { to: "/performance/overview", label: en ? "Overview" : "總覽", icon: <FontAwesomeIcon icon={faChartLine} />, matchPrefix: "/performance/overview", tooltip: en ? "Cross-platform overview" : "跨平台總覽" },
-      { to: "/performance/meta", label: "Meta", icon: <FontAwesomeIcon icon={faFacebookF} />, matchPrefix: "/performance/meta", tooltip: "Meta Ads" },
-      { to: "/performance/google", label: "Google", icon: <FontAwesomeIcon icon={faMagnifyingGlass} />, matchPrefix: "/performance/google", tooltip: "Google Ads" },
-      { to: "/performance/shopline", label: "SHOPLINE", icon: <FontAwesomeIcon icon={faFolderOpen} />, matchPrefix: "/performance/shopline", tooltip: "SHOPLINE / Ecommerce" },
-      { to: "/performance/91app", label: "91APP", icon: <FontAwesomeIcon icon={faFolderOpen} />, matchPrefix: "/performance/91app", tooltip: "91APP / Ecommerce" },
+      { to: "/performance/meta", label: "Meta", icon: <FontAwesomeIcon icon={faFacebook} />, matchPrefix: "/performance/meta", tooltip: "Meta Ads" },
+      { to: "/performance/google", label: "Google", icon: <FontAwesomeIcon icon={ICON.google} />, matchPrefix: "/performance/google", tooltip: "Google Ads" },
+      { to: "/performance/shopline", label: "SHOPLINE", icon: <FontAwesomeIcon icon={ICON.store} />, matchPrefix: "/performance/shopline", tooltip: "SHOPLINE / Ecommerce" },
+      { to: "/performance/91app", label: "91APP", icon: <FontAwesomeIcon icon={ICON.store} />, matchPrefix: "/performance/91app", tooltip: "91APP / Ecommerce" },
       { to: "/performance/ga", label: "GA", icon: <FontAwesomeIcon icon={faChartLine} />, matchPrefix: "/performance/ga", tooltip: "GA / Website" },
       { to: "/performance/attribution", label: en ? "Attribution" : "歸因", icon: <FontAwesomeIcon icon={faDatabase} />, matchPrefix: "/performance/attribution", tooltip: en ? "Attribution" : "整合歸因" },
       // 2026-08-13 (CJ「新的任務 tray，稱為粉絲團月報，是 dev 底下大家都有的」)
@@ -247,7 +251,7 @@ function navCatalog(lang: "zh-TW" | "en", allowedTaskRoutes?: Set<string> | null
   // YouTube／新聞稿／X 拿掉（server planGate.HIDDEN_CONTENT_PLATFORMS 同一份決定）；
   // Threads、LINE 是為台灣市場加的。
   const all: NavItem[] = [
-    { id: "fb", kind: "channel", to: "/tasks/fb", label: "Facebook", icon: <FontAwesomeIcon icon={faFacebookF} />, matchPrefix: "/tasks/fb",
+    { id: "fb", kind: "channel", to: "/tasks/fb", label: "Facebook", icon: <FontAwesomeIcon icon={faFacebook} />, matchPrefix: "/tasks/fb",
       tooltip: en ? "Facebook posts, ads, stories, live copy" : "Facebook 貼文 / 廣告 / 限時 / 直播文案" },
     { id: "ig", kind: "channel", to: "/tasks/ig", label: "Instagram", icon: <FontAwesomeIcon icon={faInstagram} />, matchPrefix: "/tasks/ig",
       tooltip: en ? "Instagram captions, Reels, carousel, Stories" : "IG 貼文 / Reels / 輪播 / 限時動態" },
@@ -265,8 +269,8 @@ function navCatalog(lang: "zh-TW" | "en", allowedTaskRoutes?: Set<string> | null
       tooltip: en ? "Case library, filed by standard" : "依標準建檔的案例庫" },
     // 2026-09-29 CJ：七日發布台改成靈感舞台（id 沿用 theater，存過的側欄設定不用搬）。
     // 舊的 /theater 頁面還在，只是側欄不再指過去。
-    { id: "theater", kind: "tool", to: "/inspiration", label: en ? "Idea stage" : "靈感舞台", icon: <FontAwesomeIcon icon={faLayerGroup} />, matchPrefix: "/inspiration",
-      tooltip: en ? "Several agents pitch angles on one subject; pick one to write" : "同一個主體，請幾位 agent 各想切角，挑一個開始寫" },
+    { id: "theater", kind: "tool", to: "/inspiration", label: en ? "Idea stage" : "靈感舞台", icon: <FontAwesomeIcon icon={ICON.ideas} />, matchPrefix: "/inspiration",
+      tooltip: en ? "Agents pitch angles; pick one to write" : "幾位 agent 各想切角，挑一個開始寫" },
   ];
   return all.filter((it) => {
     if (!it.to.startsWith("/tasks/")) return true;
@@ -419,7 +423,7 @@ export default function ShellLayout() {
   const contentLeft = ICON_W;
 
   return (
-    <div className="min-h-screen" style={{ background: "rgb(252,251,254)" }}>
+    <div className="min-h-screen" style={{ background: "#fafafa" }}>
 
       {/* Layer 1: Icon bar — ALWAYS 70px, NEVER moves */}
       <IconBar
@@ -588,9 +592,9 @@ export default function ShellLayout() {
           position: "fixed", bottom: 20, right: 20, zIndex: 50,
           width: 56, height: 56, borderRadius: "50%",
           background: "white",
-          boxShadow: "0 8px 24px rgba(124,58,237,0.28), 0 2px 6px rgba(0,0,0,0.08)",
+          boxShadow: "0 8px 24px rgba(24,24,27,0.28), 0 2px 6px rgba(0,0,0,0.08)",
           display: "flex", alignItems: "center", justifyContent: "center",
-          border: "2px solid rgba(124,58,237,0.18)",
+          border: "2px solid rgba(24,24,27,0.18)",
           transition: "transform 0.18s, box-shadow 0.18s",
           // 2026-07-15 (CJ「通知數字有一半被遮住」): overflow:hidden clipped
           // the unread badge (positioned at top:-5/right:-5, outside the
@@ -602,11 +606,11 @@ export default function ShellLayout() {
         }}
         onMouseEnter={(e) => {
           e.currentTarget.style.transform = "scale(1.06)";
-          e.currentTarget.style.boxShadow = "0 12px 32px rgba(124,58,237,0.42), 0 4px 10px rgba(0,0,0,0.10)";
+          e.currentTarget.style.boxShadow = "0 12px 32px rgba(24,24,27,0.42), 0 4px 10px rgba(0,0,0,0.10)";
         }}
         onMouseLeave={(e) => {
           e.currentTarget.style.transform = "scale(1)";
-          e.currentTarget.style.boxShadow = "0 8px 24px rgba(124,58,237,0.28), 0 2px 6px rgba(0,0,0,0.08)";
+          e.currentTarget.style.boxShadow = "0 8px 24px rgba(24,24,27,0.28), 0 2px 6px rgba(0,0,0,0.08)";
         }}
       >
         <img
@@ -776,7 +780,7 @@ function IconBar({
   //   策略 —— 照舊給 isStrategyPreview；內容一律有。
   const modeOptions = [
     ...(isStrategyPreview ? [{ id: "strategy" as const, label: isEn ? "Strategy" : "策略", icon: faBrain, to: "/brands", tip: isEn ? "Strategy — brand brain" : "策略 — 品牌大腦" }] : []),
-    { id: "content" as const, label: isEn ? "Content" : "內容", icon: faWandMagicSparkles, to: "/tasks/fb", tip: isEn ? "Content production" : "內容產出" },
+    { id: "content" as const, label: isEn ? "Content" : "內容", icon: ICON.content, to: "/tasks/fb", tip: isEn ? "Content production" : "內容產出" },
     { id: "performance" as const, label: isEn ? "Results" : "成效", icon: faChartLine, to: "/performance/overview", tip: isEn ? "Performance (sample data until connected)" : "成效數據（串接前為示意資料）" },
   ];
   // 成效對所有人開放之後，切換器至少有 2 項，一律顯示。
@@ -850,16 +854,14 @@ function IconBar({
             the logo. Tooltip explains we're actively iterating. Visible on
             every page in this layout, no per-page work needed. */}
         <Tooltip
-          content={isEn
-            ? "We're in beta — features are evolving fast. Feedback welcome via the chat bubble."
-            : "我們在 Beta 階段，每天都在優化功能。歡迎透過右下角客服回饋。"}
+          content={isEn ? "Beta" : "Beta 測試中"}
           placement="right"
         >
           <span style={{
             position: "absolute",
             top: 4, right: 4,
             fontSize: 8, fontWeight: 800, letterSpacing: "0.08em",
-            color: "#fff", background: "#C2410C",
+            color: "#fff", background: "#18181b",
             padding: "1.5px 4px", borderRadius: 3,
             lineHeight: 1, cursor: "default",
             boxShadow: "0 1px 2px rgba(0,0,0,0.12)",
@@ -889,8 +891,8 @@ function IconBar({
               94%           { transform: translateY(0); }
             }
             @keyframes swRing {
-              0%, 82%, 100% { box-shadow: 0 0 0 0 rgba(249,115,22,0); }
-              88%           { box-shadow: 0 0 0 4px rgba(249,115,22,0.18); }
+              0%, 82%, 100% { box-shadow: 0 0 0 0 rgba(24,24,27,0); }
+              88%           { box-shadow: 0 0 0 4px rgba(24,24,27,0.18); }
             }
             .sw-trigger { animation: swRing 4s ease-in-out infinite; }
             .sw-chevron { animation: swNudge 4s ease-in-out infinite; }
@@ -912,7 +914,7 @@ function IconBar({
                   alignItems: "center", justifyContent: "center", gap: 1,
                   width: "100%", height: 50,
                   border: "none", borderRadius: 12,
-                  background: "#F97316", color: "#fff",
+                  background: "#18181b", color: "#fff",
                   cursor: "pointer", transition: "filter 0.15s ease",
                 }}
                 onMouseEnter={(e) => { e.currentTarget.style.filter = "brightness(1.07)"; }}
@@ -955,8 +957,8 @@ function IconBar({
                       display: "flex", alignItems: "center", gap: 10,
                       width: "100%", padding: "9px 10px",
                       border: "none", borderRadius: 8, textAlign: "left",
-                      background: active ? "#FFF7ED" : "transparent",
-                      color: active ? "#C2410C" : "#374151",
+                      background: active ? "#f4f4f5" : "transparent",
+                      color: active ? "#18181b" : "#374151",
                       cursor: "pointer", transition: "background 0.12s ease",
                     }}
                     onMouseEnter={(e) => { if (!active) e.currentTarget.style.background = "#f9fafb"; }}
@@ -1083,8 +1085,8 @@ function IconBar({
               position: "relative",
             }}
             onMouseEnter={e => {
-              e.currentTarget.style.borderColor = "#F97316";
-              e.currentTarget.style.background = "#fff7ed";
+              e.currentTarget.style.borderColor = "#18181b";
+              e.currentTarget.style.background = "#f4f4f5";
             }}
             onMouseLeave={e => {
               e.currentTarget.style.borderColor = "#e5e7eb";
@@ -1097,7 +1099,7 @@ function IconBar({
               left: isEn ? "auto" : 2,
               right: isEn ? 2 : "auto",
               top: 2, width: 20, height: 16, borderRadius: 8,
-              background: "#F97316",
+              background: "#18181b",
               transition: "left 0.18s, right 0.18s",
               zIndex: 0,
             }} />
@@ -1113,9 +1115,9 @@ function IconBar({
             aria-label={isEn ? "Notifications" : "通知"}
             style={{
               position: "relative", width: 36, height: 36, borderRadius: "50%", border: "none",
-              background: notifOpen ? "#fff7ed" : "none",
+              background: notifOpen ? "#f4f4f5" : "none",
               display: "flex", alignItems: "center", justifyContent: "center",
-              fontSize: 16, color: notifOpen ? "#F97316" : "#9ca3af", cursor: "pointer",
+              fontSize: 16, color: notifOpen ? "#18181b" : "#9ca3af", cursor: "pointer",
               transition: "background 0.1s, color 0.1s",
             }}
             onMouseEnter={e => {
@@ -1171,20 +1173,16 @@ function IconBar({
  *  signature color used as the pill background; first-letter stays white.
  *  Uses HSL with controlled lightness/saturation so colors stay readable. */
 function brandColor(name: string): { bg: string; bgGradient: string; light: string } {
-  if (!name) return { bg: "#7c3aed", bgGradient: "#171717", light: "rgba(124,58,237,0.10)" };
+  if (!name) return { bg: "#18181b", bgGradient: "#171717", light: "rgba(24,24,27,0.10)" };
   let hash = 0;
   for (let i = 0; i < name.length; i++) hash = (hash * 31 + name.charCodeAt(i)) & 0x7fffffff;
-  const hue = hash % 360;
-  // Slight per-name variance to avoid all brands being same saturation
-  const sat = 55 + ((hash >> 8) % 20); // 55-75%
-  const light = 42 + ((hash >> 16) % 8); // 42-50% — readable on white text
-  const bg = `hsl(${hue}, ${sat}%, ${light}%)`;
+  // 2026-09-29：全站去彩色 — 品牌識別色改為 hash 挑一階深灰（白字仍可讀）。
+  const ZINC_DARK = ["#18181b", "#27272a", "#3f3f46", "#52525b"];
+  const bg = ZINC_DARK[hash % ZINC_DARK.length]!;
   return {
     bg,
-    // 2026-09-06：攤平成單色。這個顏色是用品牌名 hash 出來的識別色，
-    // 功能性的（區分品牌）所以保留，但不需要做成漸層。
     bgGradient: bg,
-    light: `hsla(${hue}, ${sat}%, ${light}%, 0.10)`,
+    light: "rgba(24,24,27,0.06)",
   };
 }
 
@@ -1273,8 +1271,8 @@ function BrandHierarchyPill({
           borderRadius: 8,
           border: activeBrand
             ? (open ? "1px solid #d4d4d4" : "1px solid #e5e7eb")
-            : "1.5px dashed #F97316",
-          background: activeBrand ? "#fff" : (open ? "#fff7ed" : "#fff"),
+            : "1.5px dashed #18181b",
+          background: activeBrand ? "#fff" : (open ? "#f4f4f5" : "#fff"),
           display: "flex",
           alignItems: "center",
           gap: 8,
@@ -1282,14 +1280,14 @@ function BrandHierarchyPill({
           cursor: "pointer",
           boxShadow: activeBrand
             ? (open ? "0 4px 12px rgba(0,0,0,0.06)" : "0 1px 2px rgba(0,0,0,0.04)")
-            : "0 1px 4px rgba(249,115,22,0.12)",
+            : "0 1px 4px rgba(24,24,27,0.12)",
           transition: "border-color 0.12s, box-shadow 0.12s, background 0.12s",
         }}
         onMouseEnter={e => {
-          if (!activeBrand) e.currentTarget.style.background = "#fff7ed";
+          if (!activeBrand) e.currentTarget.style.background = "#f4f4f5";
         }}
         onMouseLeave={e => {
-          if (!activeBrand) e.currentTarget.style.background = open ? "#fff7ed" : "#fff";
+          if (!activeBrand) e.currentTarget.style.background = open ? "#f4f4f5" : "#fff";
         }}
       >
         {/* Icon: brand logo / initial / brain / + */}
@@ -1297,11 +1295,11 @@ function BrandHierarchyPill({
           width: 24, height: 24, borderRadius: 6, flexShrink: 0,
           background: activeBrand
             ? (activeBrand.logoUrl ? "#fafafa" : brandColor(activeBrand.name).bgGradient)
-            : "rgba(249,115,22,0.12)",
+            : "rgba(24,24,27,0.12)",
           border: activeBrand ? "none" : "none",
           display: "flex", alignItems: "center", justifyContent: "center",
           overflow: "hidden",
-          color: activeBrand ? "#fff" : "#F97316",
+          color: activeBrand ? "#fff" : "#18181b",
           fontSize: activeBrand ? 11 : 14,
           fontWeight: 700,
         }}>
@@ -1325,7 +1323,7 @@ function BrandHierarchyPill({
           )}
           <span style={{
             fontSize: 13,
-            color: activeBrand ? "#1f2937" : "#F97316",
+            color: activeBrand ? "#1f2937" : "#18181b",
             fontWeight: activeBrand ? 700 : 600,
             maxWidth: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
           }}>
@@ -1337,7 +1335,7 @@ function BrandHierarchyPill({
           icon={faChevronDown}
           style={{
             fontSize: 12,
-            color: activeBrand ? "#9ca3af" : "#F97316",
+            color: activeBrand ? "#9ca3af" : "#18181b",
             transition: "transform 0.15s",
             transform: open ? "rotate(180deg)" : "none",
           }}
@@ -1381,11 +1379,11 @@ function BrandHierarchyPill({
                 style={{
                   width: "100%", padding: "11px 14px",
                   borderRadius: 8,
-                  background: "#C2410C",
+                  background: "#18181b",
                   border: "none", cursor: "pointer", color: "#fff",
                   fontSize: 13, fontWeight: 700,
                   display: "flex", alignItems: "center", gap: 8,
-                  boxShadow: "0 2px 8px rgba(249,115,22,0.30)",
+                  boxShadow: "0 2px 8px rgba(24,24,27,0.30)",
                   transition: "opacity 0.15s",
                 }}
                 onMouseEnter={e => e.currentTarget.style.opacity = "0.88"}
@@ -1394,11 +1392,6 @@ function BrandHierarchyPill({
                 <FontAwesomeIcon icon={faPlus} />
                 {isEn ? "Add your first brand" : "新增你的第一個品牌"}
               </button>
-              <p style={{ fontSize: 12, color: "#9ca3af", padding: "8px 4px 0", lineHeight: 1.5 }}>
-                {isEn
-                  ? "Add a brand to unlock all AI marketing tools."
-                  : "新增品牌後，所有 AI 行銷工具將解鎖。"}
-              </p>
             </div>
           )}
 
@@ -1486,8 +1479,8 @@ function BrandHierarchyPill({
                 transition: "border-color 0.15s, background 0.15s",
               }}
               onMouseEnter={e => {
-                e.currentTarget.style.borderColor = "#7C3AED";
-                e.currentTarget.style.background = "rgba(124,58,237,0.04)";
+                e.currentTarget.style.borderColor = "#18181b";
+                e.currentTarget.style.background = "rgba(24,24,27,0.04)";
               }}
               onMouseLeave={e => {
                 e.currentTarget.style.borderColor = "#e5e7eb";
@@ -1496,20 +1489,20 @@ function BrandHierarchyPill({
             >
               <span style={{
                 width: 22, height: 22, borderRadius: 6, flexShrink: 0,
-                background: "rgba(124,58,237,0.10)", color: "#7C3AED",
+                background: "rgba(24,24,27,0.10)", color: "#18181b",
                 display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12,
               }}>
                 <FontAwesomeIcon icon={faPlus} />
               </span>
-              <span style={{ fontSize: 12.5, fontWeight: 600, color: "#7C3AED" }}>
+              <span style={{ fontSize: 12.5, fontWeight: 600, color: "#18181b" }}>
                 {isEn ? "New brand" : "新增品牌"}
               </span>
             </button>
           </div>
           {/* New product / event — smaller secondary row */}
           {([
-            { tab: "product" as const, label: isEn ? "New product" : "新增產品",  icon: faBoxOpen,       accent: "#059669" },
-            { tab: "event"   as const, label: isEn ? "New event" : "新增活動",    icon: faCalendarDays,  accent: "#F97316" },
+            { tab: "product" as const, label: isEn ? "New product" : "新增產品",  icon: faBoxOpen,       accent: "#18181b" },
+            { tab: "event"   as const, label: isEn ? "New event" : "新增活動",    icon: faCalendarDays,  accent: "#18181b" },
           ]).map((opt) => (
             <button
               key={opt.tab}
@@ -1591,7 +1584,7 @@ function BrainSummaryPanel({
     </div>
   );
 
-  const Row = ({ label, value, dim }: { label: string; value: string; dim?: boolean }) => (
+  const Row = ({ label, value, dim }: { label: string; value: React.ReactNode; dim?: boolean }) => (
     <div style={{
       display: "flex", justifyContent: "space-between", alignItems: "baseline",
       fontSize: 12, color: dim ? "#9ca3af" : "#374151", padding: "2px 0",
@@ -1608,7 +1601,7 @@ function BrainSummaryPanel({
         display: "flex", alignItems: "center", gap: 8,
         padding: "10px 10px 6px",
       }}>
-        <LucideBrain size={15} strokeWidth={1.5} color="#171717" />
+        <StrategyIcon size={15} strokeWidth={1.5} color="#171717" />
         <span style={{ fontSize: 13, fontWeight: 700, color: "#171717" }}>
           {isEn ? "Brand Brain" : "品牌大腦"} · {brandName}
         </span>
@@ -1620,7 +1613,7 @@ function BrainSummaryPanel({
           label={isEn ? "Positioning" : "品牌定位"}
           value={
             s?.positioning?.completedSections != null
-              ? `${s.positioning.completedSections}/${s.positioning.totalSections ?? 10} ${s.positioning.isLocked ? "🔒" : ""}`
+              ? <>{`${s.positioning.completedSections}/${s.positioning.totalSections ?? 10} `}{s.positioning.isLocked ? <LockIcon size={11} /> : null}</>
               : "—"
           }
         />
@@ -1640,7 +1633,7 @@ function BrainSummaryPanel({
         <Row label={isEn ? "Banned terms" : "禁用詞"} value={String(s?.preferences?.bannedCount ?? 0)} />
         <Row
           label={isEn ? "Visual identity" : "視覺識別"}
-          value={s?.visual?.hasLogo ? "✓" : "—"}
+          value={s?.visual?.hasLogo ? <CheckIcon size={11} /> : "—"}
           dim={!s?.visual?.hasLogo}
         />
         <Row
@@ -1704,7 +1697,7 @@ function IconNavLink({ item, active, onClick }: { item: NavItem; active: boolean
           width: 64, height: 44, margin: "1px auto 0",
           display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
           background: "none", border: "none", padding: 0, cursor: "pointer",
-          color: active ? "#F97316" : "#9ca3af",
+          color: active ? "#18181b" : "#9ca3af",
           transition: "color 0.1s",
           position: "relative",
         }}
@@ -1732,7 +1725,7 @@ function IconNavLink({ item, active, onClick }: { item: NavItem; active: boolean
         {/* Active/hover pill */}
         <span className="nav-pill" style={{
           position: "absolute", inset: "4px 6px", borderRadius: 10, pointerEvents: "none",
-          background: active ? "rgba(249,115,22,0.10)" : "transparent",
+          background: active ? "rgba(24,24,27,0.10)" : "transparent",
           transition: "background 0.1s",
         }} />
         {/* 2026-05-10: tier items render the seconds badge AS the icon.
@@ -1745,9 +1738,9 @@ function IconNavLink({ item, active, onClick }: { item: NavItem; active: boolean
             display: "flex", alignItems: "center", justifyContent: "center",
             fontSize: 12, fontWeight: 700, letterSpacing: "-0.02em",
             position: "relative",
-            color: active ? "white" : "#7C3AED",
-            background: active ? "rgb(249,115,22)" : "rgba(124,58,237,0.10)",
-            border: active ? "none" : "1px solid rgba(124,58,237,0.20)",
+            color: active ? "white" : "#18181b",
+            background: active ? "rgb(24,24,27)" : "rgba(24,24,27,0.10)",
+            border: active ? "none" : "1px solid rgba(24,24,27,0.20)",
             transition: "background 0.12s, color 0.12s",
           }}>
             {item.tierBadge}
@@ -1900,7 +1893,7 @@ function AccountPopup({ onLogout, onClose, onOpenSupport }: {
     },
     {
       // 2026-09-07：審核佇列本來只能從某一則產出頁的送審列點進去，主管找不到。
-      icon: faFolderOpen, label: isEn ? "Review queue" : "審核佇列", arrow: true,
+      icon: ICON.review, label: isEn ? "Review queue" : "審核佇列", arrow: true,
       badge: pendingReviews > 0 ? String(pendingReviews) : null, danger: false,
       action: () => { navigate("/review"); onClose(); },
     },
@@ -1987,7 +1980,6 @@ function AccountPopup({ onLogout, onClose, onOpenSupport }: {
                   <p style={{ fontSize: 14, fontWeight: 600, color: "#111827" }}>
                     {Number(totalCredits).toLocaleString()} credits
                   </p>
-                  <p style={{ fontSize: 12, color: "#9ca3af" }}>{isEn ? "Tap to see plans" : "點此看方案"}</p>
                 </div>
                 <FontAwesomeIcon icon={faChevronRight} style={{ fontSize: 12, color: "#9ca3af" }} />
               </PopupRow>
@@ -2007,8 +1999,8 @@ function AccountPopup({ onLogout, onClose, onOpenSupport }: {
                 {item.label}
                 {item.badge && (
                   <span style={{
-                    fontSize: 12, fontWeight: 600, color: "#7c3aed",
-                    background: "#ede9fe", borderRadius: 4, padding: "1px 5px",
+                    fontSize: 12, fontWeight: 600, color: "#18181b",
+                    background: "#f4f4f5", borderRadius: 4, padding: "1px 5px",
                   }}>{item.badge}</span>
                 )}
               </span>
@@ -2043,10 +2035,10 @@ function PopupRow({ children, onClick, active }: { children: React.ReactNode; on
     <button onClick={onClick} style={{
       width: "100%", display: "flex", alignItems: "center", gap: 12,
       padding: "8px 8px", borderRadius: 10, border: "none", textAlign: "left", cursor: "pointer",
-      background: active ? "#fff7ed" : "none", transition: "background 0.1s",
+      background: active ? "#f4f4f5" : "none", transition: "background 0.1s",
     }}
       onMouseEnter={e => { if (!active) e.currentTarget.style.background = "#f9fafb"; }}
-      onMouseLeave={e => { e.currentTarget.style.background = active ? "#fff7ed" : "none"; }}
+      onMouseLeave={e => { e.currentTarget.style.background = active ? "#f4f4f5" : "none"; }}
     >
       {children}
     </button>
@@ -2146,10 +2138,8 @@ function NotifPanel({ onClose }: { onClose: () => void }) {
         )}
         {!feedQ?.isLoading && items.length === 0 && (
           <div style={{ padding: "40px 16px", textAlign: "center", color: "#9ca3af", fontSize: 13, lineHeight: 1.6 }}>
-            <div style={{ fontSize: 32, marginBottom: 8 }}>🔔</div>
-            {isEn
-              ? "No notifications yet. Finish a task or apply brand positioning to get started."
-              : "目前還沒有通知。跑一個任務或套用品牌定位就會出現。"}
+            <div style={{ fontSize: 32, marginBottom: 8 }}><NotifyIcon size={28} /></div>
+            {isEn ? "No notifications yet" : "目前還沒有通知"}
           </div>
         )}
         {items.map((n) => {
@@ -2159,12 +2149,12 @@ function NotifPanel({ onClose }: { onClose: () => void }) {
               onClick={() => handleItemClick(n)}
               style={{
                 display: "flex", gap: 12, padding: "12px 16px",
-                background: isUnread ? "rgba(249,115,22,0.04)" : "transparent",
+                background: isUnread ? "rgba(24,24,27,0.04)" : "transparent",
                 borderBottom: "1px solid #f9fafb", cursor: "pointer", position: "relative",
                 transition: "background 0.1s",
               }}
-              onMouseEnter={e => (e.currentTarget.style.background = isUnread ? "rgba(249,115,22,0.08)" : "#f9fafb")}
-              onMouseLeave={e => (e.currentTarget.style.background = isUnread ? "rgba(249,115,22,0.04)" : "transparent")}
+              onMouseEnter={e => (e.currentTarget.style.background = isUnread ? "rgba(24,24,27,0.08)" : "#f9fafb")}
+              onMouseLeave={e => (e.currentTarget.style.background = isUnread ? "rgba(24,24,27,0.04)" : "transparent")}
             >
               <div style={{
                 width: 40, height: 40, borderRadius: "50%", flexShrink: 0, background: n.avatarColor,
@@ -2206,21 +2196,6 @@ function NotifPanel({ onClose }: { onClose: () => void }) {
 // stale index.html cached after a new deployment. The fix is a one-time hard
 // reload: the browser will fetch the new index.html and all chunk URLs will
 // resolve correctly. sessionStorage prevents infinite reload loops.
-function isChunkLoadError(err: Error): boolean {
-  const text = (err.message ?? "") + " " + (err.stack ?? "");
-  return /Failed to fetch dynamically imported module|ChunkLoadError|Loading chunk|Loading CSS chunk|error loading dynamically imported module/i.test(text);
-}
-function autoReloadOnce(): boolean {
-  try {
-    const last = Number(sessionStorage.getItem("_chunk_reload_at") ?? 0);
-    if (Date.now() - last > 15_000) {
-      sessionStorage.setItem("_chunk_reload_at", String(Date.now()));
-      window.location.reload();
-      return true;
-    }
-  } catch { /* sessionStorage blocked */ }
-  return false;
-}
 
 class RouteErrorBoundary extends React.Component<
   { children: React.ReactNode },
@@ -2230,7 +2205,7 @@ class RouteErrorBoundary extends React.Component<
   static getDerivedStateFromError(error: Error) { return { error, resetKey: 0 }; }
   componentDidCatch(error: Error, info: React.ErrorInfo) {
     // Stale-chunk auto-recovery: hard-reload once on deployment-induced 404.
-    if (isChunkLoadError(error) && autoReloadOnce()) return;
+    if (isChunkLoadError(error) && autoReloadForStaleChunk()) return;
     // eslint-disable-next-line no-console
     console.error("[RouteErrorBoundary] route render error:", error, info);
     try {
@@ -2258,6 +2233,9 @@ class RouteErrorBoundary extends React.Component<
     } catch {}
   }
   render() {
+    if (this.state.error && isChunkLoadError(this.state.error)) {
+      return <StaleChunkScreen />;
+    }
     if (this.state.error) {
       return (
         <div style={{ padding: "32px 24px", maxWidth: 720, margin: "0 auto" }}>
@@ -2273,7 +2251,7 @@ class RouteErrorBoundary extends React.Component<
             </p>
             <div style={{ marginTop: 14, display: "flex", gap: 8, flexWrap: "wrap" }}>
               <button
-                style={{ padding: "6px 12px", background: "#3b82f6", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontSize: 13 }}
+                style={{ padding: "6px 12px", background: "#18181b", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontSize: 13 }}
                 onClick={() => this.setState({ error: null, resetKey: this.state.resetKey + 1 })}
               >
                 重試
@@ -2286,7 +2264,7 @@ class RouteErrorBoundary extends React.Component<
               </button>
               <a
                 href={`mailto:sowork@sowork.ai?subject=${encodeURIComponent("OnBrand 頁面錯誤 " + window.location.pathname)}&body=${encodeURIComponent("錯誤訊息：\n" + (this.state.error?.message ?? "") + "\n\n頁面：" + window.location.href)}`}
-                style={{ fontSize: 12, color: "#3b82f6", textDecoration: "underline", marginLeft: "auto", alignSelf: "center" }}
+                style={{ fontSize: 12, color: "#3f3f46", textDecoration: "underline", marginLeft: "auto", alignSelf: "center" }}
               >
                 聯絡客服
               </a>

@@ -13,6 +13,7 @@ import { useEffect, useState } from "react";
 import { trpc } from "../../../../lib/trpc";
 import { showToastGlobal } from "../../../../components/ui/Toast";
 import type { AdoptPreview } from "./meetingModel";
+import { CloseIcon, FlagIcon } from "../../../platform/components/icons";
 
 export interface AdoptRequest { runId: number; anchorId: string; label: string; status: "adopted" | "modified"; text: string }
 
@@ -60,7 +61,7 @@ export default function AdoptConfirmDialog({ req, en, onClose, onDone }: {
           <h3 className="text-[16px] font-semibold text-neutral-900">
             {en ? `Adopt the change to “${req.label}”` : `採用「${req.label}」的調整`}
           </h3>
-          <button type="button" onClick={onClose} className="text-[13px] text-neutral-400 hover:text-neutral-900">✕</button>
+          <button type="button" onClick={onClose} className="text-[13px] text-neutral-400 hover:text-neutral-900"><CloseIcon size={13} /></button>
         </div>
 
         {!preview ? (
@@ -80,9 +81,9 @@ export default function AdoptConfirmDialog({ req, en, onClose, onDone }: {
             {/* 1 醒目提示 */}
             <div className="rounded-xl border-2 border-neutral-900 px-4 py-3">
               <p className="text-[14px] font-semibold text-neutral-900">
-                {preview.brief && !preview.brief.changed
-                  ? (en ? "⚑ This changes your positioning — but NOT what task cards write" : "⚑ 這項決定會改動定位，但不會改變任務卡產出的內容")
-                  : (en ? "⚑ This will change your Brand Brain" : "⚑ 這項決定會改動品牌大腦")}
+                <FlagIcon size={12} /> {preview.brief && !preview.brief.changed
+                  ? (en ? "This changes your positioning — but NOT what task cards write" : "這項決定會改動定位，但不會改變任務卡產出的內容")
+                  : (en ? "This will change your Brand Brain" : "這項決定會改動品牌大腦")}
               </p>
               <p className="mt-1.5 text-[12.5px] font-medium text-neutral-700">{en ? "Once written, it affects:" : "寫入後會影響："}</p>
               <ul className="mt-1 list-disc space-y-0.5 pl-5 text-[12.5px] leading-relaxed text-neutral-700">

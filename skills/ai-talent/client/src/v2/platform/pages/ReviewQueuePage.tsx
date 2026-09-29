@@ -17,7 +17,8 @@ import { useNavigate } from "react-router-dom";
 import { trpc } from "../../../lib/trpc";
 import { useLang } from "../../../lib/i18n";
 import { showToastGlobal } from "../../../components/ui/Toast";
-import { ChevronLeft, CheckCircle2, RotateCcw, Clock, AlertTriangle, Inbox } from "lucide-react";
+import { ChevronLeftIcon, DoneIcon, InboxIcon, SendBackIcon, WaitingIcon, WarningIcon } from "../components/icons";
+import { HelpTip } from "../components/HelpTip";
 
 type Tab = "pending" | "mine";
 
@@ -37,7 +38,7 @@ const STATUS_EN: Record<string, string> = {
 };
 const STATUS_TONE: Record<string, string> = {
   pending: "bg-amber-50 text-amber-700 border-amber-200",
-  in_review: "bg-blue-50 text-blue-700 border-blue-200",
+  in_review: "bg-zinc-50 text-zinc-700 border-zinc-200",
   approved: "bg-emerald-50 text-emerald-700 border-emerald-200",
   revision_requested: "bg-rose-50 text-rose-700 border-rose-200",
   expired: "bg-neutral-100 text-neutral-600 border-neutral-200",
@@ -92,18 +93,18 @@ export default function ReviewQueuePage() {
         onClick={() => navigate(-1)}
         className="mb-4 inline-flex items-center gap-1 text-[14px] text-default-500 hover:text-default-800"
       >
-        <ChevronLeft size={16} />
+        <ChevronLeftIcon size={16} />
         {isEn ? "Back" : "返回"}
       </button>
 
-      <h1 className="text-2xl font-bold text-default-900">
+      <h1 className="text-2xl font-bold text-default-900 flex items-center gap-2">
         {isEn ? "Review queue" : "審核佇列"}
+        <HelpTip>
+          {isEn
+            ? "Content goes live only after someone other than the author approves it."
+            : "產出要由作者以外的人放行才會上線。"}
+        </HelpTip>
       </h1>
-      <p className="mt-1 text-[14px] text-default-500">
-        {isEn
-          ? "Content goes live only after someone other than the author approves it."
-          : "產出要由作者以外的人放行才會上線。"}
-      </p>
 
       <div className="mt-5 flex gap-1 border-b border-default-200">
         {(["pending", "mine"] as Tab[]).map((t) => (
@@ -136,7 +137,7 @@ export default function ReviewQueuePage() {
 
       {!loading && rows.length === 0 && (
         <div className="flex flex-col items-center gap-2 py-16 text-default-400">
-          <Inbox size={28} />
+          <InboxIcon size={28} />
           <p className="text-[14px]">
             {tab === "pending"
               ? (isEn ? "Nothing waiting on you." : "目前沒有等你放行的東西。")
@@ -151,7 +152,7 @@ export default function ReviewQueuePage() {
             <div className="flex flex-wrap items-center gap-2">
               {r.isUrgent === 1 && (
                 <span className="inline-flex items-center gap-1 text-[13px] font-semibold text-rose-600">
-                  <AlertTriangle size={14} />
+                  <WarningIcon size={14} />
                   {isEn ? "Urgent" : "急件"}
                 </span>
               )}
@@ -160,7 +161,7 @@ export default function ReviewQueuePage() {
                 <span className="text-[13px] text-default-400">{r.platform}</span>
               )}
               <span className="ml-auto inline-flex items-center gap-1 text-[13px] text-default-400">
-                <Clock size={13} />
+                <WaitingIcon size={13} />
                 {new Date(r.createdAt).toLocaleDateString()}
               </span>
             </div>
@@ -189,14 +190,14 @@ export default function ReviewQueuePage() {
                   disabled={approveMut.isPending}
                   className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-[14px] font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
                 >
-                  <CheckCircle2 size={15} />
+                  <DoneIcon size={15} />
                   {isEn ? "Approve" : "放行"}
                 </button>
                 <button
                   onClick={() => { setRevising(revising === r.id ? null : r.id); setNote(""); }}
                   className="inline-flex items-center gap-1.5 rounded-lg border border-default-300 px-3 py-1.5 text-[14px] font-medium text-default-700 hover:bg-default-50"
                 >
-                  <RotateCcw size={15} />
+                  <SendBackIcon size={15} />
                   {isEn ? "Send back" : "退回修改"}
                 </button>
               </div>

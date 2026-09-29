@@ -25,10 +25,7 @@ import {
   Button, Chip, Input, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader,
   Progress, Textarea,
 } from "@heroui/react";
-import {
-  Plus, Trash2, Wand2, FlaskConical, Check, AlertTriangle, ChevronLeft,
-  MessagesSquare, ClipboardCopy, FileText,
-} from "lucide-react";
+import { AddIcon, CheckIcon, ChevronLeftIcon, CopyIcon, DeleteIcon, GenerateIcon, MeetingIcon, SampleIcon, TextIcon, WarningIcon } from "../../../platform/components/icons";
 
 /**
  * 給「想自己先整理」的使用者複製去別的 AI 用的提示詞。
@@ -236,7 +233,7 @@ export default function TaskCardComposer({
       <ModalContent>
         <ModalHeader className="flex flex-col gap-1">
           <div className="flex items-center gap-2">
-            <Wand2 size={16} className="text-primary-500" />
+            <GenerateIcon size={16} className="text-primary-500" />
             <span className="text-medium font-semibold">
               {en ? `New ${channelLabel} task card` : `新增${channelLabel}任務卡`}
             </span>
@@ -291,8 +288,8 @@ export default function TaskCardComposer({
                     產品在做的事，抽完還能攤開讓使用者確認。 */}
                 <div className="flex gap-1">
                   {([
-                    ["one-by-one", en ? "Paste one by one" : "一篇一篇貼", <FileText key="a" size={12} />],
-                    ["thread", en ? "Paste a whole AI chat" : "貼上整串 AI 對話", <MessagesSquare key="b" size={12} />],
+                    ["one-by-one", en ? "Paste one by one" : "一篇一篇貼", <TextIcon key="a" size={12} />],
+                    ["thread", en ? "Paste a whole AI chat" : "貼上整串 AI 對話", <MeetingIcon key="b" size={12} />],
                   ] as const).map(([mode, label, icon]) => (
                     <Chip
                       key={mode}
@@ -323,7 +320,7 @@ export default function TaskCardComposer({
                     />
                     <div className="flex items-center gap-2 flex-wrap">
                       <Button
-                        size="sm" color="primary" startContent={<Wand2 size={13} />}
+                        size="sm" color="primary" startContent={<GenerateIcon size={13} />}
                         isLoading={busy === "extract"}
                         isDisabled={threadText.trim().length < 80 || !brandId}
                         onPress={() => {
@@ -349,7 +346,7 @@ export default function TaskCardComposer({
                         </pre>
                         <Button
                           size="sm" variant="flat"
-                          startContent={copied ? <Check size={13} /> : <ClipboardCopy size={13} />}
+                          startContent={copied ? <CheckIcon size={13} /> : <CopyIcon size={13} />}
                           onPress={async () => {
                             try {
                               await navigator.clipboard.writeText(CLEANUP_PROMPT);
@@ -399,14 +396,14 @@ export default function TaskCardComposer({
                         size="sm" variant="light" isIconOnly className="mt-1"
                         onPress={() => setSamples((prev) => prev.filter((_, j) => j !== i))}
                       >
-                        <Trash2 size={14} className="text-danger-500" />
+                        <DeleteIcon size={14} className="text-danger-500" />
                       </Button>
                     )}
                   </div>
                 ))}
                 {sampleMode === "one-by-one" && (
                   <Button
-                    size="sm" variant="flat" startContent={<Plus size={14} />}
+                    size="sm" variant="flat" startContent={<AddIcon size={14} />}
                     isDisabled={samples.length >= 20}
                     onPress={() => setSamples((prev) => [...prev, ""])}
                   >
@@ -463,12 +460,12 @@ export default function TaskCardComposer({
                       size="sm" variant="light" isIconOnly
                       onPress={() => setAskFields((prev) => prev.filter((_, j) => j !== i))}
                     >
-                      <Trash2 size={14} className="text-danger-500" />
+                      <DeleteIcon size={14} className="text-danger-500" />
                     </Button>
                   </div>
                 ))}
                 <Button
-                  size="sm" variant="flat" startContent={<Plus size={14} />}
+                  size="sm" variant="flat" startContent={<AddIcon size={14} />}
                   isDisabled={askFields.length >= 8}
                   onPress={() => setAskFields((prev) => [...prev, { label: "", type: "text", required: false, placeholder: "" }])}
                 >
@@ -535,7 +532,7 @@ export default function TaskCardComposer({
               {card?.skill && (
                 <>
                   <div className="flex items-center gap-2 flex-wrap">
-                    <Chip size="sm" color="success" variant="flat" startContent={<Check size={12} />}>
+                    <Chip size="sm" color="success" variant="flat" startContent={<CheckIcon size={12} />}>
                       {en ? "SKILL ready" : "SKILL 已生成"}
                     </Chip>
                     <Chip size="sm" variant="flat">
@@ -563,7 +560,7 @@ export default function TaskCardComposer({
                     }}
                   />
                   <Button
-                    size="sm" variant="light" startContent={<Wand2 size={13} />}
+                    size="sm" variant="light" startContent={<GenerateIcon size={13} />}
                     isLoading={busy === "distil"}
                     onPress={() => { setBusy("distil"); setError(null); distilMut?.mutate({ brandId: brandId!, cardId: cardId! }); }}
                   >
@@ -608,7 +605,7 @@ export default function TaskCardComposer({
               ))}
 
               <Button
-                size="sm" color="secondary" startContent={<FlaskConical size={14} />}
+                size="sm" color="secondary" startContent={<SampleIcon size={14} />}
                 isLoading={busy === "dry"}
                 isDisabled={!(dryInputs.topic ?? "").trim()}
                 onPress={() => {
@@ -625,7 +622,7 @@ export default function TaskCardComposer({
                     <Chip
                       size="sm" variant="flat"
                       color={dryResult.inRange ? "success" : "warning"}
-                      startContent={dryResult.inRange ? <Check size={12} /> : <AlertTriangle size={12} />}
+                      startContent={dryResult.inRange ? <CheckIcon size={12} /> : <WarningIcon size={12} />}
                     >
                       {dryResult.chars} {en ? "chars" : "字"}
                     </Chip>
@@ -650,7 +647,7 @@ export default function TaskCardComposer({
         <ModalFooter className="gap-2">
           {step > 1 && (
             <Button
-              variant="light" size="sm" startContent={<ChevronLeft size={14} />}
+              variant="light" size="sm" startContent={<ChevronLeftIcon size={14} />}
               onPress={() => setStep((s) => (s === 3 ? 2 : 1) as 1 | 2 | 3)}
             >
               {en ? "Back" : "上一步"}

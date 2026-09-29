@@ -57,9 +57,9 @@ export interface TierVocabEntry {
 }
 
 export const TIER_VOCAB: Record<TierCode, TierVocabEntry> = {
-  "30s": { zh: "單篇", zhLong: "單篇內容", en: "Single", accent: "#00b4bc" },
-  "60s": { zh: "套組", zhLong: "內容套組", en: "Pack", accent: "#7c3aed" },
-  "99s": { zh: "企劃", zhLong: "完整企劃", en: "Campaign", accent: "#f59e0b" },
+  "30s": { zh: "單篇", zhLong: "單篇內容", en: "Single", accent: "#71717a" },
+  "60s": { zh: "套組", zhLong: "內容套組", en: "Pack", accent: "#3f3f46" },
+  "99s": { zh: "企劃", zhLong: "完整企劃", en: "Campaign", accent: "#18181b" },
 };
 
 /** 由輕到重 —— 分頁、清單一律依這個順序，不要各自手排。 */

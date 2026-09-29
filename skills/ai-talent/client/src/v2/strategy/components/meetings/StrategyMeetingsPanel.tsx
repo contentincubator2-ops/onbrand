@@ -25,6 +25,8 @@ import {
   EXAMPLE_MEETING, EXAMPLE_RUN, TOPIC_TEMPLATES, fmtDate, frequencyText, pendingCount, runNoteText,
   type DecisionStatus, type MeetingAction, type MeetingAttendee, type MeetingFrequency, type MeetingRow, type MeetingRun,
 } from "./meetingModel";
+import { CloseIcon } from "../../../platform/components/icons";
+import { HelpTip } from "../../../platform/components/HelpTip";
 
 interface ListData {
   locked: boolean;
@@ -129,12 +131,14 @@ export default function StrategyMeetingsPanel({ brandId }: { brandId: number }) 
     <div className="mx-auto max-w-[880px] space-y-6 px-2">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h2 className="text-[20px] font-semibold text-neutral-900">{en ? "Strategy meetings" : "策略會議"}</h2>
-          <p className="mt-1 max-w-[560px] text-[13px] leading-relaxed text-neutral-500">
-            {en
-              ? "Set a topic, pick the directors, choose how often. They meet in the background and leave minutes — the part that matters is whether your strategy should change."
-              : "你定主題、挑與會的策略總監、決定多久開一次。時間到了他們會在背景開會，留下一份會議紀錄——重點是策略要不要調整，最後由你決定。"}
-          </p>
+          <h2 className="text-[20px] font-semibold text-neutral-900 flex items-center gap-1.5">
+            {en ? "Strategy meetings" : "策略會議"}
+            <HelpTip>
+              {en
+                ? "Set a topic, pick the directors, choose how often. They meet in the background and leave minutes — whether your strategy should change is your call."
+                : "你定主題、挑與會的策略總監、決定多久開一次。時間到了他們會在背景開會，留下一份會議紀錄——策略要不要調整，最後由你決定。"}
+            </HelpTip>
+          </h2>
         </div>
         {!data.locked && (
           <button type="button" className={btnPrimary} onClick={() => setView({ kind: "form", form: newForm() })}>
@@ -438,7 +442,7 @@ function MeetingForm({ brandId, en, initial, products, maxAttendees, onCancel, o
           <div className="mt-2 flex flex-wrap gap-1.5">
             {f.attendees.filter((a) => !suggested.some((d) => d.agentId === a.agentId)).map((a) => (
               <button key={a.agentId} type="button" onClick={() => set("attendees", f.attendees.filter((x) => x.agentId !== a.agentId))}
-                className="rounded-full bg-neutral-900 px-3 py-1 text-[12px] text-white">{a.name} ✕</button>
+                className="rounded-full bg-neutral-900 px-3 py-1 text-[12px] text-white">{a.name} <CloseIcon size={10} /></button>
             ))}
           </div>
         )}
