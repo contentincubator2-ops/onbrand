@@ -34,6 +34,8 @@ import { slackOAuthRouter } from "./platform/routes/slackOAuthRoute";
 import { cloudOAuthRouter } from "./platform/routes/cloudOAuthRoute";
 import { manusRouter } from "./platform/routers/manusRouter";
 import { mosAgentsMcpRouter } from "./platform/routers/mosAgentsMcpRouter";
+import { wellKnownRouter, mcpOAuthRouter } from "./platform/mcp/oauthRoutes";
+import { onbrandMcpRouter } from "./platform/mcp/onbrandMcpRouter";
 import { publicAgentsRoute } from "./platform/routes/publicAgentsRoute";
 import { closeDb, pingDb, pingSoworkDb, getDb } from "./db";
 import { sql } from "drizzle-orm";
@@ -301,7 +303,8 @@ if (existsSync(publicDir)) {
       req.path.startsWith("/api") ||
       req.path.startsWith("/static/") ||
       req.path === "/health" ||
-      req.path === "/agents"
+      req.path === "/agents" ||
+      req.path.startsWith("/.well-known/")
     ) {
       return next();
     }
@@ -361,6 +364,11 @@ app.use("/api/manus", manusRouter);
 // 刻意不掛在 /api/manus 底下、不用 X-Manus-Key，路徑也沒有寫進任何公開
 // 文件／openapi.json。
 app.use("/api/mcp/mos-agents", mosAgentsMcpRouter);
+// 2026-09-28（CJ「onbrand 變成 claude 外掛服務」）：對外販售的 OnBrand 連接器（遠端 MCP＋OAuth）。
+// 見 platform/mcp/*.ts 檔頭。/.well-known 掛在根目錄（SPA fallback 已跳過）。
+app.use(wellKnownRouter);
+app.use("/api/mcp-oauth", mcpOAuthRouter);
+app.use("/api/mcp/onbrand", onbrandMcpRouter);
 
 // ─── Public agent showcase (no auth required by default) ─────────────────────
 app.use(publicAgentsRoute);
@@ -586,6 +594,14 @@ async function runStartupMigrations() {
     const { ADDON_REQUESTS_DDL } = await import("./platform/core/addonRequests");
     await db.execute(sql.raw(ADDON_REQUESTS_DDL));
     console.log("[migrate] addon_requests: OK");
+
+    // 2026-09-28（CJ「onbrand 變成 claude 外掛服務」）：OnBrand 連接器的 OAuth 與背景任務紀錄。
+    const { MCP_OAUTH_CLIENTS_DDL, MCP_OAUTH_CODES_DDL, MCP_OAUTH_TOKENS_DDL } = await import("./platform/mcp/oauthStore");
+    const { MCP_TASK_RUNS_DDL } = await import("./platform/mcp/onbrandTools");
+    for (const ddl of [MCP_OAUTH_CLIENTS_DDL, MCP_OAUTH_CODES_DDL, MCP_OAUTH_TOKENS_DDL, MCP_TASK_RUNS_DDL]) {
+      await db.execute(sql.raw(ddl));
+    }
+    console.log("[migrate] mcp_oauth_* / mcp_task_runs: OK");
   } catch (err) {
     console.error("[migrate] startup migration error:", err);
   }

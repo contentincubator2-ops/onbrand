@@ -1,0 +1,11 @@
+{
+  "name": "onbrand",
+  "owner": { "name": "SoWork", "email": "cjwang@sowork.tw" },
+  "plugins": [
+    {
+      "name": "onbrand-marketing-team",
+      "source": "./onbrand-marketing-team",
+      "description": "OnBrand AI 行銷團隊：品牌大腦、持續更新的任務卡、專屬寫手與設計。"
+    }
+  ]
+}
