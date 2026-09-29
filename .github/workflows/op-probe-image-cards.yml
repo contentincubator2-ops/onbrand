@@ -25,6 +25,18 @@ jobs:
       PROBE_CARDS: ""
       OPENAI_API_KEY: ${{ secrets.OPEN_API_KEY }}
       GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      # 跟 CI 一樣的佔位值——env 驗證要求它們存在，探測本身不連資料庫。
+      DB_HOST: localhost
+      DB_USER: test
+      DB_PASSWORD: test
+      DB_NAME: test
+      LOCAL_DB_HOST: localhost
+      LOCAL_DB_PORT: "3306"
+      LOCAL_DB_USER: test
+      LOCAL_DB_PASSWORD: test
+      LOCAL_DB_NAME: test
+      JWT_SECRET: ci-test-secret-at-least-32-chars-long
+      NODE_ENV: test
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
