@@ -356,6 +356,48 @@ A：直接回答，2–4 句。先給答案，再補理由。
     maxTokens: 2200,
     outputDefaults: { platform: "doc", post_type: "report" },
   },
+  // ── 爆款結構卡・近 3 個月案例（CJ 2026-09-29 核可）────────────────────
+  {
+    id: "web-30-product-limited-pass",
+    tier: "30s",
+    postType: "product-page",
+    label: { en: "Product Page: The Limited Pass", zh: "官網產品頁：限量通行證" },
+    description: { en: "Package 'unlimited for a year' as a numbered, members-first pass", zh: "把長期方案包成限量、會員優先的單頁通行證" },
+    agent_id: 238853, // 沿用同 postType 現役卡
+    skill_slug: "product-page",
+    source: {
+      type: "viral",
+      short: "UNO Pizzeria $99 Pizza Pass",
+      metric: "官網因搶購短暫當機並加開第二輪；約 65% 購買者為會員",
+      asOf: "2026-09",
+      caveat: "美國案例；沒有瀏覽量或營收數字；是促銷頁，不是內容頁",
+      url: "https://www.pmq.com/behind-the-pizza-pass-promo-that-crashed-this-pizzerias-website/",
+      takeaway:
+        "把「一段時間無限享用」包成限量、有期限的單頁通行證，先給會員優先購買權，把官網流量集中在同一個時間點爆發，售罄後再公布戰報、加開第二輪。",
+    },
+    primary_question: "你能做成「通行證」的方案是什麼？限量多少？會員有什麼優先？",
+    primary_input: { key: "topic", placeholder: "例：一年每月一杯手沖 / 限量 300 張 / 會員提早 24 小時開賣", type: "textarea" },
+    inputs: [
+      { key: "topic", label: "方案內容 + 限量數字 + 會員優先方式", type: "textarea", required: true },
+    ],
+    systemPrompt: `你要寫一頁官網「限量通行證」購買頁。
+
+頁面結構：
+1. 標題（20 字內）：通行證名稱＋一句「算下來每天不到多少錢」。
+2. 三個重點：你得到什麼、期間多久、限量幾張。
+3. 規則：怎麼使用、怎麼驗證、不能做什麼（例如不能轉讓）。
+4. 會員優先：什麼時間開放給誰、一般開賣什麼時候。
+5. FAQ 5 題：用顧客會問的原話。
+6. 售罄後的頁面文案（戰報＋是否加開、如何登記候補）。
+
+硬規則：
+- 價格、限量數字、期間只能用用戶給的，沒給就寫【待補】。
+- 限量要真實，不製造假稀缺。
+- 500–1000 字。`,
+    preferredModel: "qwen",
+    maxTokens: 2000,
+    outputDefaults: { platform: "doc", post_type: "report" },
+  },
 ];
 
 /**
@@ -399,6 +441,11 @@ export const WEBSITE_30S_ORCHESTRA: Record<string, OrchestraConfig> = {
   "web-30-product-page-plain-talk": {
     variants: 3, images: 0, runImageGen: false, imageDirectorId: null,
     aspectRatio: null, variantLabels: ["口語版", "比價版", "反話術版"],
+    captionMinChars: 500, captionMaxChars: 1000,
+  },
+  "web-30-product-limited-pass": {
+    variants: 3, images: 0, runImageGen: false, imageDirectorId: null,
+    aspectRatio: null, variantLabels: ["每日價版", "會員優先版", "售罄戰報版"],
     captionMinChars: 500, captionMaxChars: 1000,
   },
 };

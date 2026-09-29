@@ -1641,6 +1641,8 @@ export default function RunPage() {
       // 2026-09-10 X 通路。mockup 那側的 key 仍是 "twitter:"（XTweet /
       // XThread 早就註冊了），所以 x → twitter，不是 x → x。
       x: "twitter",
+      // 2026-09-29 Threads（th-）→ threads:post；LINE（ln-）→ line:broadcast／richmenu。
+      th: "threads", ln: "line",
     };
     const formatFromTaskId = (id: string): string => {
       // 2026-08-29 官網 (web-)：跟 pr- / em- 同樣的理由——先用前綴決斷，
@@ -1658,6 +1660,8 @@ export default function RunPage() {
       if (id.startsWith("x-")) {
         return id.includes("thread") ? "thread" : "tweet";
       }
+      if (id.startsWith("th-")) return "post";
+      if (id.startsWith("ln-")) return id.includes("rich-menu") ? "richmenu" : "broadcast";
       // 2026-05-16 (CJ「pr-30-lead-paragraph mockup 格式不對」):
       // press (pr-) + email (em-) each have ONE mockup family. Decide
       // by prefix FIRST — otherwise generic keyword scans below

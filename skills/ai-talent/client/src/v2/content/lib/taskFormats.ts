@@ -543,6 +543,8 @@ export const EM_FORMAT_TABS: { id: EMActiveFormat; label: string; labelEn: strin
 export const EM_TASK_FORMAT_MAP: Record<string, EMActiveFormat> = {
   // 爆款結構卡（2026-09-05）
   "em-30-annual-recap":                "Newsletter / 培育",
+  "em-30-subject-ai-variants":         "主旨 / 預覽",
+  "em-30-trigger-plus-story":          "Newsletter / 培育",
   // 主旨 / 預覽
   "em-30-subject-line":    "主旨 / 預覽",
   "em-30-preview-text":    "主旨 / 預覽",
@@ -618,6 +620,7 @@ export const WEB_TASK_FORMAT_MAP: Record<string, WEBActiveFormat> = {
   // 爆款結構卡（2026-09-05）
   "web-30-longform-open-books":        "長文",
   "web-30-product-page-plain-talk":    "產品描述",
+  "web-30-product-limited-pass":       "產品描述",
   // 長文
   "web-30-longform":     "長文",
   "web-30-column":       "長文",
