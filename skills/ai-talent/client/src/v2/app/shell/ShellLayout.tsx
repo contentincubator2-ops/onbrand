@@ -33,7 +33,7 @@ import { useLang } from "../../../lib/i18n";
 import { Avatar, Tooltip } from "@heroui/react";
 import { Brain as LucideBrain } from "lucide-react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faFolderOpen, faBrain, faWandMagicSparkles, faMicrophone, faBookBookmark, faBell, faPlus, faRightFromBracket, faLayerGroup, faGear, faXmark, faCheckDouble, faChevronRight, faCheck, faBoxOpen, faCalendarDays, faCircleInfo, faBriefcase, faShareNodes, faUsers, faLanguage, faPaintBrush, faFont, faMagnifyingGlass, faChevronDown, faEnvelope, faBullhorn, faGlobe, faChartLine, faDatabase, faFileLines } from "@fortawesome/free-solid-svg-icons";
+import { faFolderOpen, faBrain, faWandMagicSparkles, faMicrophone, faBookBookmark, faBell, faPlus, faRightFromBracket, faLayerGroup, faGear, faXmark, faCheckDouble, faChevronRight, faCheck, faBoxOpen, faCalendarDays, faCircleInfo, faBriefcase, faShareNodes, faUsers, faLanguage, faPaintBrush, faFont, faMagnifyingGlass, faChevronDown, faEnvelope, faBullhorn, faGlobe, faChartLine, faDatabase, faFileLines, faMemory } from "@fortawesome/free-solid-svg-icons";
 import {
   faFacebookF, faInstagram, faTiktok, faThreads, faLine,
 } from "@fortawesome/free-brands-svg-icons";
@@ -178,6 +178,10 @@ function buildNavItems(lang: "zh-TW" | "en", userEmail?: string | null, currentP
       // 只是藏起來——主產文引擎每次仍會讀 brand_knowledge_items，已上傳的資料照樣生效。
       { to: "/brands/edit?cat=meetings", catKey: "meetings", label: en ? "Meetings" : "會議", icon: <FontAwesomeIcon icon={faUsers} />,
         tooltip: en ? "Recurring strategy meetings — you set topic, attendees and cadence" : "定期策略會議 — 主題、與會總監、頻率你來定，會後留紀錄" },
+      // 2026-09-29（CJ「在策略端增加一個 mission tray，是檢查大腦」）：品牌大腦記住了
+      // 什麼、還能記多少——跟每篇產文讀的是同一份。
+      { to: "/brands/edit?cat=brain", catKey: "brain", label: en ? "Brain" : "大腦", icon: <FontAwesomeIcon icon={faMemory} />,
+        tooltip: en ? "Brand brain check — what the AI remembers and how much room is left" : "檢查大腦 — AI 記住了什麼、還能記多少、有沒有超載" },
       // 2026-08-21 (CJ「加一個人設的task tray...用戶可以自己新創agent，自己
       // 命名，並且決定這個Agent語調的應用範圍」): user-created persona
       // agents — trained from pasted text / article links / video links,

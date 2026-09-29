@@ -72,19 +72,13 @@ export async function loadAgentContext(input: AgentContextInput): Promise<AgentC
   const brand = (brandRows as any[])?.[0] ?? {};
   const brandName = brand.name ?? "未命名品牌";
 
-  // ── 2. 品牌大腦資料 ────────────────────────────────────────────────────────
-  const [brainRows] = await pool.execute(
-    `SELECT category, content FROM brand_brain
-     WHERE brandId = ? ORDER BY updatedAt DESC`,
-    [input.brandId]
-  ) as any[];
-
-  const brandBrain: Record<string, string[]> = {};
-  for (const row of (brainRows as any[])) {
-    const cat = row.category ?? "general";
-    if (!brandBrain[cat]) brandBrain[cat] = [];
-    brandBrain[cat].push(row.content);
-  }
+  // ── 2. 品牌大腦 ────────────────────────────────────────────────────────────
+  // 2026-09-29（CJ「生文前都要讀取策略層的內容」）：這裡原本自己查舊的
+  // brand_brain 表（欄位寫成 brandId/updatedAt，跟其他讀取端的 brand_id/updated_at
+  // 不一致）＋ brands 的舊欄位，讀不到定位 JSON、文字頁規則、自訂卡片。改讀同一份
+  // 品牌大腦（buildBrandPrefix，也就是「檢查大腦」畫面上那一份）。
+  const { buildBrandPrefix } = await import("../../strategy/core/brandContext");
+  const brandBrainPrefix = await buildBrandPrefix(input.brandId, null, null, "full").catch(() => "");
 
   // ── 3. 任務對話歷史 ────────────────────────────────────────────────────────
   // 2026-05-10: LIMIT ? as prepared param → MySQL 'Incorrect arguments'. Inline.
@@ -139,13 +133,8 @@ Tagline：${brand.tagline ?? "尚無"}
 功能差異化：${brand.functionalDiff ?? "未定義"}`);
 
   // 品牌大腦 section（有資料才顯示）
-  if (Object.keys(brandBrain).length > 0) {
-    const brainLines: string[] = ["【品牌大腦（累積知識）】"];
-    for (const [cat, items] of Object.entries(brandBrain)) {
-      brainLines.push(`${cat}：`);
-      items.slice(0, 3).forEach(item => brainLines.push(`  • ${item.slice(0, 120)}`));
-    }
-    sections.push(brainLines.join("\n"));
+  if (brandBrainPrefix.trim()) {
+    sections.push(`【品牌大腦】${brandBrainPrefix}`);
   }
 
   // 對話歷史 section
@@ -174,7 +163,7 @@ Tagline：${brand.tagline ?? "尚無"}
     historyDepth: recentMessages.length,
     brandName,
     recentMessages,
-    brandBrain,
+    brandBrain: {},  // 舊欄位；品牌大腦改走 systemPromptPrefix 裡的 buildBrandPrefix
     instanceContext,
     depthLabel,
   };

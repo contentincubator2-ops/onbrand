@@ -489,9 +489,17 @@ export async function buildCampaignPlan(args: {
     `items 必須剛好 ${beats.length} 筆，beat 從 0 到 ${beats.length - 1} 各一次。`,
   ].filter(Boolean).join("\n");
 
+  // 2026-09-29（CJ「生文前都要讀取策略層的內容」）：以前只給品牌名稱＋活動設定＋
+  // 5 項產品事實，每篇的「要講什麼」跟品牌定位、活動定位、文字規則都沒關係。
+  // 改帶同一份品牌大腦（含這檔活動的定位）。
+  const { buildBrandPrefix } = await import("./brandContext");
+  const brain = await buildBrandPrefix(facts.brandId, null, args.eventId, "full").catch(() => "");
   const { invokeLLM } = await import("../../platform/core/llm.js");
   const r = await invokeLLM({
-    messages: [{ role: "system", content: SYSTEM }, { role: "user", content: user }],
+    messages: [
+      { role: "system", content: brain ? `${SYSTEM}\n\n# 品牌大腦（每一篇的角度都要扣回這裡）${brain}` : SYSTEM },
+      { role: "user", content: user },
+    ],
     maxTokens: 2500,
   });
   const text = String(r.choices?.[0]?.message?.content ?? "");

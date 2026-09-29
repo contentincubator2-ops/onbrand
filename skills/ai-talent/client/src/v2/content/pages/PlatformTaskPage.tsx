@@ -756,6 +756,8 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
         taskLabel: typeof activeTask.label === "string" ? activeTask.label : undefined,
         primaryQuestion: activeTask.primary_question ?? undefined,
         brandId: brandId ?? undefined,
+        productId: taskProductId ?? undefined,
+        eventId: taskEventId ?? undefined,
       });
       if (r?.ok && r.polished) setPrimaryAnswer(r.polished);
       else setPolishErr(lang === "en" ? "Polish failed — try again." : "潤稿失敗，請再試一次");
@@ -1465,6 +1467,8 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
             squadSlug: (activeTask as any).squad_slug,
             topic: primaryAnswer || activeTask.label,
             brandId: brandId ?? undefined,
+            productId: taskProductId ?? undefined,
+            eventId: taskEventId ?? undefined,
           });
           if (isStale()) { if ((r as any).outputId) discardCancelledOutput((r as any).outputId); return; }
           if ((r as any).outputId) {

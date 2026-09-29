@@ -16,7 +16,7 @@ import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure } from "../../platform/core/trpc";
 import { assertCanAct } from "../../platform/core/planGate";
 import { getBrandPositioningById } from "../../strategy/core/positioningBridge";
-import { loadBrandKnowledgeForPrompt } from "../../strategy/routers/brandKnowledgeRouter";
+import { buildBrandPrefix } from "../../strategy/core/brandContext";
 import { getBrandRealContent } from "../../strategy/core/brandRealContent";
 import { getCopywritingMasterPrompt, type PlatformCode } from "../core/copywritingMaster";
 import { getBrandMarket, DEFAULT_BRAND_MARKET } from "../../strategy/core/brandMarket";
@@ -858,9 +858,14 @@ ${platformAsks}
       // didn't ship targetAudience, fall back to DB. Tagline/voice already
       // covered by client payload — only TA was missing.
       const needsTaLookup = !input.targetAudience;
-      const [brandRules, knowledgeBlock, realContent, taLookup, brandMarket] = await Promise.all([
+      // 2026-09-29（CJ「生文前都要讀取策略層」＋「知識庫是隱藏內容，不需要讀取」）：
+      // 劇場以前只拿 client 傳來的 tagline/voice/USP＋規則＋知識庫，讀不到定位 JSON、
+      // 自訂卡片、定位文件、CTA／Hook 庫。改讀同一份品牌大腦；知識庫不再注入。
+      const [brandRules, brainBlock, realContent, taLookup, brandMarket] = await Promise.all([
         loadBrandRules(input.brandId, ctx.user.id),
-        loadBrandKnowledgeForPrompt(input.brandId).catch(() => ""),
+        buildBrandPrefix(input.brandId, null, null, "full")
+          .then((p) => (p ? `\n\n【品牌大腦 — 所有貼文都要符合】${p}` : ""))
+          .catch(() => ""),
         // Real public content (website + social via Perplexity) — strongest
         // grounding signal; prevents AI from hallucinating industry from name.
         getBrandRealContent(input.brandId).then(r => r.context).catch(() => ""),
@@ -990,7 +995,7 @@ ${guide}
 
 【今日執行框架（強制）】
 • Hook 類型：${input.hook ? HOOK_PLAYBOOK[input.hook] : "依平台 best practice 自選"}
-• CTA 意圖：${input.cta ? CTA_PLAYBOOK[input.cta] : "依貼文目標自選"}${priorOpeningsInstruction}${scoutInstruction}${rulesInstruction}${materialsInstruction}${knowledgeBlock}${realContent}
+• CTA 意圖：${input.cta ? CTA_PLAYBOOK[input.cta] : "依貼文目標自選"}${priorOpeningsInstruction}${scoutInstruction}${rulesInstruction}${materialsInstruction}${brainBlock}${realContent}
 
 【鐵則（違反等於失敗）】
 1. **從 TA 視角寫，不是對 TA 喊話** —

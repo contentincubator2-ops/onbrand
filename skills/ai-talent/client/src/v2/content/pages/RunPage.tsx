@@ -2512,6 +2512,8 @@ export default function RunPage() {
                             videoTitle: scriptModalTitle,
                             titleContext: slide?.caption ?? undefined,
                             brandId: data?.brand?.id ?? undefined,
+                            productId: (data as any)?.metadata?.productId ?? undefined,
+                            eventId: (data as any)?.metadata?.eventId ?? undefined,
                           });
                         }}
                       >
@@ -2560,6 +2562,8 @@ export default function RunPage() {
                               videoTitle: scriptModalTitle!,
                               titleContext: slide?.caption ?? undefined,
                               brandId: data?.brand?.id ?? undefined,
+                              productId: (data as any)?.metadata?.productId ?? undefined,
+                              eventId: (data as any)?.metadata?.eventId ?? undefined,
                             });
                           }
                         }}
@@ -2731,6 +2735,9 @@ export default function RunPage() {
                           currentCaption: slide?.caption ?? "",
                           userFeedback: chatPrompt,
                           brandId: data.mission?.brandId ?? undefined,
+                          // 2026-09-29：改寫讀同一份品牌大腦，含原本那篇的產品／活動。
+                          productId: (data as any)?.metadata?.productId ?? undefined,
+                          eventId: (data as any)?.metadata?.eventId ?? undefined,
                           history: chatHistory,
                         });
                         if (r.ok) {
@@ -3360,6 +3367,9 @@ export default function RunPage() {
                               agentName: a.name,
                               agentTitle: lang === "en" ? a.titleEn : a.title,
                               brandId: data.mission?.brandId ?? undefined,
+                              // 2026-09-29：改寫讀同一份品牌大腦，含原本那篇的產品／活動。
+                              productId: (data as any)?.metadata?.productId ?? undefined,
+                              eventId: (data as any)?.metadata?.eventId ?? undefined,
                             });
                             if (r.ok) {
                               if (shouldApplyMutationPreview(activeSelectionKeyRef.current, locator)) {
