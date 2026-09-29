@@ -28,22 +28,131 @@ function safeParse(s: string): any {
  * 以前每一格各自 .slice()、超過就默默截掉，用戶不會知道。現在截掉的會標成
  * 「只記住一部分」，總量超過容量時被擠掉的會標成「超載」。
  */
-export type BrainCategoryKey =
+/** 內部分層：決定容量不夠時誰先被擠掉（見 PRIORITY）。不給使用者看。 */
+type BrainTier =
   | "market" | "identity" | "voice" | "rules" | "context" | "custom" | "doc"
   | "product" | "event" | "legacy";
 
+/**
+ * 大腦畫面的分類——跟策略層 rail 同一套名字（2026-09-29 CJ「用詞跟策略層沒對上，
+ * 例如品牌、產品、活動等等」）。每一筆底下再分到該頁的段落標題（group）與欄位名稱
+ * （label），名稱照 client/src/v2/strategy/lib/positioningSchema.ts 與 copyAssets.ts。
+ */
+export type BrainCategoryKey = "info" | "brand" | "copy" | "product" | "event" | "legacy";
+
 export const BRAIN_CATEGORIES: Record<BrainCategoryKey, { zh: string; en: string }> = {
-  market:   { zh: "市場與語言", en: "Market & language" },
-  identity: { zh: "品牌核心",   en: "Brand core" },
-  voice:    { zh: "品牌聲音",   en: "Brand voice" },
-  rules:    { zh: "文字規則",   en: "Copy rules" },
-  context:  { zh: "品牌脈絡",   en: "Brand context" },
-  custom:   { zh: "自訂卡片",   en: "Custom cards" },
-  doc:      { zh: "定位文件",   en: "Positioning docs" },
-  product:  { zh: "產品",       en: "Product" },
-  event:    { zh: "活動",       en: "Campaign" },
-  legacy:   { zh: "舊版補充",   en: "Legacy notes" },
+  info:    { zh: "基本資料", en: "Info" },
+  brand:   { zh: "品牌",     en: "Brand" },
+  copy:    { zh: "文字",     en: "Copy" },
+  product: { zh: "產品",     en: "Products" },
+  event:   { zh: "活動",     en: "Campaigns" },
+  legacy:  { zh: "舊資料",   en: "Legacy" },
 };
+
+interface Display { category: BrainCategoryKey; group: string; label: string }
+
+/**
+ * prompt 裡的標籤（給模型看、調過的措辭）→ 策略層頁面上的名稱（給使用者看）。
+ * key 是 `${tier}|${prompt 標籤}`。prompt 標籤刻意不改，只改畫面。
+ */
+const DISPLAY: Record<string, Display> = {
+  // 品牌定位頁
+  "identity|Tagline 中":         { category: "brand", group: "品牌核心標語", label: "中文標語" },
+  "identity|Tagline EN":         { category: "brand", group: "品牌核心標語", label: "英文標語" },
+  "identity|Tagline":            { category: "brand", group: "品牌核心標語", label: "中文標語" },
+  "identity|Archetype":          { category: "brand", group: "品牌個性與溝通風格", label: "人格原型" },
+  "identity|WHY (信念)":         { category: "brand", group: "品牌黃金圈", label: "WHY — 品牌願景" },
+  "identity|HOW (作法)":         { category: "brand", group: "品牌黃金圈", label: "HOW — 品牌使命" },
+  "identity|WHAT (產品/服務)":   { category: "brand", group: "品牌黃金圈", label: "WHAT — 品牌產品 / 服務" },
+  "identity|Tagline (legacy)":   { category: "legacy", group: "舊版欄位", label: "標語（舊版）" },
+  "identity|Archetype (legacy)": { category: "legacy", group: "舊版欄位", label: "人格原型（舊版）" },
+  "identity|定位摘要 (legacy)":  { category: "legacy", group: "舊版欄位", label: "定位摘要（舊版）" },
+  "voice|語氣關鍵詞":            { category: "brand", group: "品牌個性與溝通風格", label: "核心語調關鍵詞" },
+  "voice|禁用詞彙 / 句式":       { category: "brand", group: "品牌個性與溝通風格", label: "溝通禁區" },
+  "context|品牌故事":            { category: "brand", group: "品牌起源故事", label: "起源故事" },
+  "context|信念五層深挖":        { category: "brand", group: "品牌起源故事", label: "信念五層深挖" },
+  "context|核心價值觀":          { category: "brand", group: "品牌核心價值觀", label: "核心價值觀" },
+  "context|主要受眾":            { category: "brand", group: "目標受眾", label: "主受眾" },
+  "context|受眾痛點":            { category: "brand", group: "目標受眾", label: "受眾痛點" },
+  "context|競爭強度":            { category: "brand", group: "競爭格局分析", label: "競爭強度評估" },
+  "context|直接競品":            { category: "brand", group: "競爭格局分析", label: "直接競爭對手" },
+  "context|競爭定位地圖":        { category: "brand", group: "競爭格局分析", label: "競爭定位地圖" },
+  "context|差異化":              { category: "brand", group: "品牌差異化戰略", label: "差異化總結" },
+  "context|唯一致勝理由":        { category: "brand", group: "品牌差異化戰略", label: "唯一致勝理由" },
+  "context|支撐證據":            { category: "brand", group: "品牌差異化戰略", label: "支撐證據" },
+  // 文字頁（copyAssets.ts 的 labelZh）
+  "rules|聲音指南":              { category: "copy", group: "", label: "品牌口吻" },
+  "rules|聲音原則":              { category: "copy", group: "", label: "品牌準則" },
+  "rules|偏好用詞":              { category: "copy", group: "", label: "推薦用詞" },
+  "rules|品牌術語":              { category: "copy", group: "", label: "品牌術語" },
+  "rules|縮寫對照（同一個東西只有一種叫法）": { category: "copy", group: "", label: "縮寫對照" },
+  "rules|產品名稱規範":          { category: "copy", group: "", label: "產品名稱規範" },
+  "rules|CTA 範例":              { category: "copy", group: "", label: "CTA 庫" },
+  "rules|開場 Hook 範例":        { category: "copy", group: "", label: "Hook 庫" },
+  "rules|文案範本":              { category: "copy", group: "", label: "文案範本" },
+  "rules|目標受眾":              { category: "copy", group: "", label: "目標受眾（舊版文字欄位）" },
+  "rules|禁用詞（產出後自動檢查）":   { category: "copy", group: "", label: "禁用詞" },
+  "rules|替換對照（產出後自動套用）": { category: "copy", group: "", label: "替換對照" },
+  // 產品定位頁
+  "product|產品名稱":            { category: "product", group: "產品核心定位", label: "產品名稱" },
+  "product|產品售價":            { category: "product", group: "商品事實", label: "售價" },
+  "product|產品規格":            { category: "product", group: "商品事實", label: "規格" },
+  "product|重量／容量":          { category: "product", group: "商品事實", label: "重量／容量" },
+  "product|份數":                { category: "product", group: "商品事實", label: "份數" },
+  "product|商品網址":            { category: "product", group: "商品事實", label: "商品網址" },
+  "product|產品核心定位":        { category: "product", group: "產品核心定位", label: "核心定位" },
+  "product|產品 Slogan":         { category: "product", group: "產品核心定位", label: "中文標語" },
+  "product|產品英文標語":        { category: "product", group: "產品核心定位", label: "英文標語" },
+  "product|一句話價值主張":      { category: "product", group: "產品核心定位", label: "一句話價值主張" },
+  "product|產品目標客群":        { category: "product", group: "目標族群", label: "主目標族群" },
+  "product|客群痛點":            { category: "product", group: "目標族群", label: "族群痛點" },
+  "product|核心功能":            { category: "product", group: "產品價值主張", label: "核心功能" },
+  "product|主要情緒價值":        { category: "product", group: "產品價值主張", label: "主要情緒價值" },
+  "product|產品個性":            { category: "product", group: "產品價值主張", label: "品牌個性" },
+  "product|使用者感受":          { category: "product", group: "產品價值主張", label: "使用者感受" },
+  "product|獨家賣點":            { category: "product", group: "競爭定位", label: "獨家賣點" },
+  "product|次級賣點":            { category: "product", group: "競爭定位", label: "少數競品也說的賣點" },
+  "product|普遍賣點":            { category: "product", group: "競爭定位", label: "多數競爭者都說的賣點" },
+  "product|競品":                { category: "product", group: "競爭定位", label: "競品" },
+  "product|產品語氣":            { category: "product", group: "行銷文字指引", label: "品牌語氣" },
+  "product|溝通風格":            { category: "product", group: "行銷文字指引", label: "溝通風格" },
+  "product|關鍵詞彙":            { category: "product", group: "行銷文字指引", label: "關鍵詞彙" },
+  // 活動定位頁
+  "event|活動名稱":              { category: "event", group: "基本資料", label: "活動名稱" },
+  "event|活動開始":              { category: "event", group: "基本資料", label: "開始日期" },
+  "event|活動結束":              { category: "event", group: "基本資料", label: "結束日期" },
+  "event|倒數":                  { category: "event", group: "基本資料", label: "倒數" },
+  "event|活動":                  { category: "event", group: "基本資料", label: "進行天數" },
+  "event|活動定位摘要":          { category: "event", group: "戰略 Brief", label: "活動定位摘要" },
+  "event|活動類型":              { category: "event", group: "戰略 Brief", label: "活動類型" },
+  "event|核心問題":              { category: "event", group: "背景與問題", label: "核心問題" },
+  "event|活動核心受眾":          { category: "event", group: "目標受眾", label: "核心受眾" },
+  "event|關鍵洞察":              { category: "event", group: "目標受眾", label: "關鍵洞察" },
+  "event|行銷目標":              { category: "event", group: "活動目標", label: "行銷目標" },
+  "event|SMP 單一主張":          { category: "event", group: "單一核心命題（SMP）", label: "SMP" },
+  "event|核心訊息":              { category: "event", group: "訊息架構", label: "核心訊息" },
+  "event|支撐訊息":              { category: "event", group: "訊息架構", label: "支撐訊息" },
+  "event|創意主題":              { category: "event", group: "創意概念", label: "創意主題" },
+};
+
+/** 自訂卡片、定位文件、舊版 brand_brain 條目這些沒有固定標籤的，依所在的頁決定分類。 */
+const SECTION_CATEGORY: Record<SectionKey, BrainCategoryKey> = {
+  locked: "brand", voice: "brand", assets: "copy", context: "brand",
+  legacy: "legacy", product: "product", event: "event",
+};
+
+function displayOf(section: SectionKey, tier: BrainTier, promptLabel: string): Display {
+  const hit = DISPLAY[`${tier}|${promptLabel}`];
+  if (hit) return hit;
+  const category = SECTION_CATEGORY[section];
+  if (tier === "custom") return { category, group: "自訂卡片", label: promptLabel };
+  if (tier === "doc") return { category, group: "上傳的定位文件", label: "定位文件補充" };
+  if (tier === "legacy") return { category: "legacy", group: "舊版品牌大腦", label: promptLabel };
+  if (tier === "voice" && promptLabel.startsWith("語氣範例")) {
+    return { category: "brand", group: "品牌個性與溝通風格", label: promptLabel.replace("語氣範例", "溝通範例對比") };
+  }
+  return { category, group: "", label: promptLabel };
+}
 
 /**
  * 大腦容量：一次產文最多帶進多少字的品牌記憶。超過時從優先度最低的類別
@@ -54,7 +163,7 @@ export const BRAIN_CATEGORIES: Record<BrainCategoryKey, { zh: string; en: string
 export const BRAIN_CAPACITY = 16_000;
 
 /** 割捨順序：數字越大越先被擠掉。市場設定永遠保留。 */
-const PRIORITY: Record<BrainCategoryKey, number> = {
+const PRIORITY: Record<BrainTier, number> = {
   market: 0, identity: 1, voice: 2, rules: 3, product: 4, event: 5,
   context: 6, custom: 7, doc: 8, legacy: 9,
 };
@@ -63,8 +172,12 @@ type SectionKey = "locked" | "voice" | "assets" | "context" | "legacy" | "produc
 
 interface BrainEntry {
   section: SectionKey;
-  category: BrainCategoryKey;
+  /** 內部分層（容量割捨順序）。 */
+  category: BrainTier;
+  /** prompt 裡的標籤。 */
   label: string;
+  /** 畫面上的名稱。 */
+  display: Display;
   line: string;
   storedChars: number;
   /** 實際記住的內容字數（不含標籤）。 */
@@ -76,7 +189,11 @@ interface BrainEntry {
 export type BrainItemStatus = "remembered" | "trimmed" | "overflow" | "checkOnly";
 
 export interface BrainItem {
+  /** 策略層 rail 上的分類（基本資料／品牌／文字／產品／活動）。 */
   category: BrainCategoryKey;
+  /** 該頁的段落標題（例：品牌黃金圈、商品事實）；文字頁沒有段落，是空字串。 */
+  group: string;
+  /** 該頁上的欄位／卡片名稱。 */
   label: string;
   /** 用戶存了多少字。 */
   storedChars: number;
@@ -107,12 +224,13 @@ class BrainCollector {
   checkOnly: BrainItem[] = [];
 
   /** 一行 prompt＝一筆記憶。raw 是用戶存的原文，max 是這一格最多記住幾字。 */
-  add(section: SectionKey, category: BrainCategoryKey, label: string, raw: string, max: number, render?: (kept: string) => string): void {
+  add(section: SectionKey, category: BrainTier, label: string, raw: string, max: number, render?: (kept: string) => string): void {
     const text = raw.trim();
     if (!text) return;
     const { text: kept, trimmed } = clip(text, max);
     this.entries.push({
       section, category, label,
+      display: displayOf(section, category, label),
       line: render ? render(kept) : `【${label}】${kept}`,
       storedChars: len(text), keptChars: len(kept), trimmed, dropped: false,
     });
@@ -122,7 +240,8 @@ class BrainCollector {
   addCheckOnly(label: string, raw: string): void {
     const text = raw.trim();
     if (!text) return;
-    this.checkOnly.push({ category: "rules", label, storedChars: len(text), keptChars: 0, status: "checkOnly", preview: text.slice(0, 80) });
+    const d = displayOf("assets", "rules", label);
+    this.checkOnly.push({ category: d.category, group: d.group, label: d.label, storedChars: len(text), keptChars: 0, status: "checkOnly", preview: text.slice(0, 80) });
   }
 }
 
@@ -136,7 +255,7 @@ class BrainCollector {
  * 一律跳過（String() 出來就是 "[object Object]"）。
  */
 function pushFrom(
-  c: BrainCollector, section: SectionKey, category: BrainCategoryKey,
+  c: BrainCollector, section: SectionKey, category: BrainTier,
   obj: any, specs: [path: string, label: string, max: number][],
 ): void {
   for (const [path, label, max] of specs) {
@@ -155,7 +274,7 @@ function pushFrom(
  * 2026-09-25：事實欄位的 canonical 位置是 `facts.*`，舊資料在頂層（price /
  * productUrl）。兩邊都有值時只能印一次，否則模型看到兩個售價得自己猜。
  */
-function pushFirst(c: BrainCollector, section: SectionKey, category: BrainCategoryKey, obj: any, label: string, paths: string[], max: number): void {
+function pushFirst(c: BrainCollector, section: SectionKey, category: BrainTier, obj: any, label: string, paths: string[], max: number): void {
   for (const path of paths) {
     const v = path.split(".").reduce<any>((acc, k) => (acc == null ? acc : acc[k]), obj);
     const text = typeof v === "string" ? v.trim() : "";
@@ -734,12 +853,13 @@ export async function buildBrandBrain(
 
     const items: BrainItem[] = [
       ...(marketSection ? [{
-        category: "market" as const, label: "市場與語言設定", storedChars: len(marketSection.trim()),
+        category: "info" as const, group: "市場", label: "市場與語言設定", storedChars: len(marketSection.trim()),
         keptChars: len(marketSection.trim()), status: "remembered" as const, preview: marketSection.trim().slice(0, 80),
       }] : []),
       ...c.entries.map((e): BrainItem => ({
-        category: e.category,
-        label: e.label,
+        category: e.display.category,
+        group: e.display.group,
+        label: e.display.label,
         storedChars: e.storedChars,
         keptChars: e.dropped ? 0 : e.keptChars,
         status: e.dropped ? "overflow" : e.trimmed ? "trimmed" : "remembered",

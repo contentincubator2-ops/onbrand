@@ -46,9 +46,13 @@ describe("大腦清單 = prompt", () => {
     expect(brain.prefix).toContain("標語ZZ");
     expect(brain.prefix).toContain("故事ZZ");
     const labels = brain.items.map((i) => i.label);
-    expect(labels).toContain("Tagline 中");
-    expect(labels).toContain("品牌故事");
+    // 畫面用策略層頁面上的名稱，不是 prompt 裡的標籤。
+    expect(labels).toContain("中文標語");
+    expect(labels).toContain("起源故事");
     expect(labels).toContain("市場與語言設定");
+    const tag = brain.items.find((i) => i.label === "中文標語")!;
+    expect(tag.category).toBe("brand");
+    expect(tag.group).toBe("品牌核心標語");
     expect(brain.items.every((i) => i.status === "remembered")).toBe(true);
     expect(brain.capacity).toBe(BRAIN_CAPACITY);
     expect(brain.usedChars).toBeGreaterThan(0);
@@ -72,7 +76,7 @@ describe("以前默默截掉的地方，現在看得到", () => {
   it("太長的欄位標成「只記住一部分」，並記下存了多少字", async () => {
     const long = "字".repeat(2_000);
     const id = withPos({ origin: { story: long } });
-    const item = (await buildBrandBrain(id)).items.find((i) => i.label === "品牌故事")!;
+    const item = (await buildBrandBrain(id)).items.find((i) => i.label === "起源故事")!;
     expect(item.status).toBe("trimmed");
     expect(item.storedChars).toBe(2_000);
     expect(item.keptChars).toBeLessThan(2_000);
@@ -81,7 +85,7 @@ describe("以前默默截掉的地方，現在看得到", () => {
   it("清單超過上限條數也標成「只記住一部分」", async () => {
     const items = Array.from({ length: 30 }, (_, i) => `用詞${i}`);
     const id = withPos({ _assets: { preferred_terms: { items } } });
-    const item = (await buildBrandBrain(id)).items.find((i) => i.label === "偏好用詞")!;
+    const item = (await buildBrandBrain(id)).items.find((i) => i.label === "推薦用詞")!;
     expect(item.status).toBe("trimmed");
     // 「存了多少」算整份清單、「記住多少」只算內容——記住不可能比存的多。
     expect(item.storedChars).toBe(items.join(" · ").length);
@@ -96,7 +100,7 @@ describe("容量：超過就從優先度最低的開始擠掉，並標成超載"
     const brain = await buildBrandBrain(id);
     const overflow = brain.items.filter((i) => i.status === "overflow");
     expect(overflow.length).toBeGreaterThan(0);
-    expect(overflow.every((i) => i.category === "custom")).toBe(true);
+    expect(overflow.every((i) => i.category === "brand" && i.group === "自訂卡片")).toBe(true);
     expect(brain.prefix).toContain("核心標語ZZ");
     for (const o of overflow) {
       const n = o.label.replace("卡", "");
@@ -128,6 +132,8 @@ describe("文字頁規則", () => {
     expect(brain.prefix).not.toContain("BANNEDZZ");
     expect(brain.prefix).not.toContain("SUBFROMZZ");
     const checks = brain.items.filter((i) => i.status === "checkOnly");
+    expect(checks.map((c) => c.label).sort()).toEqual(["替換對照", "禁用詞"].sort());
+    expect(checks.every((c) => c.category === "copy")).toBe(true);
     expect(checks.map((c) => c.preview).join()).toContain("BANNEDZZ");
     expect(checks.every((c) => c.keptChars === 0)).toBe(true);
   });
@@ -139,6 +145,40 @@ describe("產品範圍", () => {
     rowsFor.product = [{ name: "產品A", positioning: { core: { coreStatement: "產品定位ZZ" } } }];
     const brain = await buildBrandBrain(id, 77);
     expect(brain.prefix).toContain("產品定位ZZ");
-    expect(brain.items.some((i) => i.category === "product" && i.label === "產品核心定位")).toBe(true);
+    expect(brain.items.some((i) => i.category === "product" && i.group === "產品核心定位" && i.label === "核心定位")).toBe(true);
+  });
+});
+
+describe("大腦畫面的名稱跟策略層一致", () => {
+  it("品牌定位與文字頁填滿時，每一筆都歸到策略層的分類與該頁段落，不會露出內部標籤", async () => {
+    const id = withPos({
+      tagline: { zhTagline: "a", enTagline: "b" },
+      goldenCircle: { why: "w", how: "h", what: "x" },
+      origin: { story: "s", belief5Layers: [{ body: "b1" }] },
+      values: { items: [{ label: "v" }] },
+      audience: { primary: "p", painPoints: ["pp"] },
+      differentiation: { summary: "d", discriminator: "dd", reasonToBelieve: "r" },
+      competition: { intensity: "i", direct: [{ name: "n", ourEdge: "e" }], map: "m" },
+      voice: { archetypes: ["a"], tone: ["t"], forbidden: ["f"], samples: [{ ours: "o", generic: "g" }] },
+      _customSegments: [{ title: "願景", fields: [{ label: "x", value: "y" }] }],
+      _sourceDoc: { injectedContext: "doc" },
+      _assets: {
+        voice: { text: "v" }, voice_principles: { items: ["p"] }, preferred_terms: { items: ["t"] },
+        branded_terms: { items: ["b"] }, abbreviations: { pairs: [{ from: "A", to: "B" }] },
+        product_naming: { text: "n" }, cta_library: { items: ["c"] }, hook_library: { items: ["h"] },
+        templates_copy: { items: ["tp"] }, banned_words: { items: ["x"] },
+        term_substitutions: { pairs: [{ from: "a", to: "b" }] },
+      },
+    });
+    const brain = await buildBrandBrain(id);
+    const strategyCats = ["info", "brand", "copy", "product", "event"];
+    for (const i of brain.items) {
+      expect(strategyCats, `${i.label} 歸到了 ${i.category}`).toContain(i.category);
+      if (i.category === "brand") expect(i.group, `${i.label} 沒有對到品牌頁的段落`).not.toBe("");
+    }
+    const copyLabels = brain.items.filter((i) => i.category === "copy").map((i) => i.label);
+    for (const l of ["品牌口吻", "品牌準則", "推薦用詞", "品牌術語", "縮寫對照", "產品名稱規範", "CTA 庫", "Hook 庫", "文案範本", "禁用詞", "替換對照"]) {
+      expect(copyLabels).toContain(l);
+    }
   });
 });

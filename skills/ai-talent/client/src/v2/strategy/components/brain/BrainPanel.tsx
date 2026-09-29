@@ -17,7 +17,7 @@ import { faBrain, faChevronDown, faChevronRight } from "@fortawesome/free-solid-
 import { trpc } from "../../../../lib/trpc";
 import { useLang } from "../../../../lib/i18n";
 import {
-  brainState, categorySummaries, fmtChars, STATUS_TEXT,
+  brainState, categorySummaries, fmtChars, groupsOf, STATUS_TEXT,
   type BrainData, type BrainItem,
 } from "./brainModel";
 
@@ -154,9 +154,19 @@ export default function BrainPanel({ brandId, initialProductId, initialEventId }
                 <FontAwesomeIcon icon={isOpen ? faChevronDown : faChevronRight} className="ml-auto text-[11px] text-neutral-400" />
               </button>
               {isOpen && (
-                <ul className="border-t border-neutral-100">
-                  {s.items.map((it, i) => <ItemRow key={i} item={it} en={en} />)}
-                </ul>
+                <div className="border-t border-neutral-100">
+                  {/* 依該頁的段落標題分組（品牌黃金圈、商品事實…），名稱跟策略層頁面一致。 */}
+                  {groupsOf(s.items).map((g) => (
+                    <div key={g.group || "_"}>
+                      {g.group && (
+                        <div className="bg-neutral-50 px-4 py-1.5 text-[11.5px] font-semibold text-neutral-500">{g.group}</div>
+                      )}
+                      <ul>
+                        {g.items.map((it, i) => <ItemRow key={i} item={it} en={en} />)}
+                      </ul>
+                    </div>
+                  ))}
+                </div>
               )}
             </div>
           );

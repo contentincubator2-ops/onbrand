@@ -8,7 +8,11 @@
 export type BrainItemStatus = "remembered" | "trimmed" | "overflow" | "checkOnly";
 
 export interface BrainItem {
+  /** 策略層 rail 上的分類：info／brand／copy／product／event（＋legacy）。 */
   category: string;
+  /** 該頁的段落標題（品牌黃金圈、商品事實…）；文字頁沒有段落，是空字串。 */
+  group: string;
+  /** 該頁上的欄位／卡片名稱。 */
   label: string;
   storedChars: number;
   keptChars: number;
@@ -72,6 +76,20 @@ export function categorySummaries(d: BrainData): CategorySummary[] {
       };
     })
     .filter((s) => s.count > 0);
+}
+
+/**
+ * 同一分類底下依頁面段落分組，保持 server 給的順序（也就是頁面上的順序）。
+ * 沒有段落的（文字頁）整組 group 是空字串，畫面上不印段落標題。
+ */
+export function groupsOf(items: BrainItem[]): Array<{ group: string; items: BrainItem[] }> {
+  const out: Array<{ group: string; items: BrainItem[] }> = [];
+  for (const it of items) {
+    const g = out.find((x) => x.group === (it.group ?? ""));
+    if (g) g.items.push(it);
+    else out.push({ group: it.group ?? "", items: [it] });
+  }
+  return out;
 }
 
 export function fmtChars(n: number): string {

@@ -104,9 +104,16 @@ export async function proposeImageDirections(args: {
   copy: string;
   brand: BrandVisualContext;
   productName?: string;
+  /**
+   * 2026-09-29（CJ「圖片卡要讀品牌大腦」）：圖上標題是會被看見的字，方向也要扣回
+   * 品牌——以前只有 BrandVisualContext 那幾行摘要。這裡帶同一份品牌大腦
+   * （buildBrandPrefix，也就是「大腦」tray 上列出的那一份）。
+   */
+  brainPrefix?: string;
 }): Promise<ProposeResult> {
   const { invokeLLM } = await import("../../platform/core/llm");
-  const user = `品牌資訊：\n${brandBlock(args.brand) || "（尚未設定）"}\n\n${args.productName ? `產品：${args.productName}\n\n` : ""}文案：\n${args.copy}`;
+  const brain = args.brainPrefix?.trim() ? `品牌大腦（標題的用詞、語氣與畫面方向都要符合）：${args.brainPrefix}\n\n` : "";
+  const user = `${brain}品牌資訊：\n${brandBlock(args.brand) || "（尚未設定）"}\n\n${args.productName ? `產品：${args.productName}\n\n` : ""}文案：\n${args.copy}`;
   const res = await invokeLLM({
     messages: [
       { role: "system", content: directionsSystemPrompt(args.spec, !!args.productName) },
