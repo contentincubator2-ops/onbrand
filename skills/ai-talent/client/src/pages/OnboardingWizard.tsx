@@ -49,7 +49,7 @@ const INDUSTRY_LABELS: Record<string, { en: string; zh: string }> = {
 
 const COLORS = {
   bg: "#F9F9F8",
-  accent: "#E8631A",
+  accent: "#18181B",
   border: "#E4E3E1",
   text: "#1A1A1A",
   muted: "#6B6B6B",

@@ -113,7 +113,7 @@ export default function ScopeSwitchOverlay({ scopeKey, scopeName }: Props) {
       `}</style>
       <div className="bg-white rounded-2xl shadow-2xl px-7 py-6 max-w-lg mx-4">
         <div className="text-center">
-          <div className="text-tiny font-semibold uppercase tracking-widest text-violet-500 mb-1">
+          <div className="text-tiny font-semibold uppercase tracking-widest text-zinc-500 mb-1">
             BRAND WORKSPACE
           </div>
           <h2 className="text-lg font-semibold text-default-900 mb-1">
@@ -147,7 +147,7 @@ export default function ScopeSwitchOverlay({ scopeKey, scopeName }: Props) {
                       className="absolute inset-0 rounded-full overflow-hidden"
                       style={{
                         animation: `avatarPop 0.35s cubic-bezier(0.34,1.56,0.64,1) forwards, avatarBreathe 1.6s ease-in-out infinite ${i * 50}ms`,
-                        boxShadow: "0 0 0 1.5px #fff, 0 1px 3px rgba(124,58,237,0.18)",
+                        boxShadow: "0 0 0 1.5px #fff, 0 1px 3px rgba(24,24,27,0.18)",
                       }}
                     >
                       <img

@@ -85,7 +85,7 @@ export default function RequireAuthV2({ children }: { children: React.ReactNode 
           <div className="flex flex-col gap-2">
             <button
               onClick={() => setAttempt((a) => a + 1)}
-              className="w-full px-4 py-2 rounded-full bg-violet-600 text-white text-sm font-semibold hover:bg-violet-700 transition"
+              className="w-full px-4 py-2 rounded-full bg-zinc-600 text-white text-sm font-semibold hover:bg-zinc-700 transition"
             >
               重新嘗試
             </button>

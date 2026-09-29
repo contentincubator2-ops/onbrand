@@ -26,11 +26,11 @@ import CloudFilePicker, { type CloudFileSource } from "./CloudFilePicker";
 // 2026-09-29（CJ：內容通路只剩 FB／IG／TikTok／電子報／官網）：應用範圍拿掉
 // YouTube／LinkedIn／Press；agent.scope 裡既有的舊值不刪，只是不顯示。
 const PLATFORMS: Array<{ id: string; label: string; icon: any; tone: string }> = [
-  { id: "facebook",  label: "Facebook",  icon: faFacebook,  tone: "#1877F2" },
-  { id: "instagram", label: "Instagram", icon: faInstagram, tone: "#E1306C" },
+  { id: "facebook",  label: "Facebook",  icon: faFacebook,  tone: "#18181b" },
+  { id: "instagram", label: "Instagram", icon: faInstagram, tone: "#18181b" },
   { id: "threads",   label: "Threads",   icon: faThreads,   tone: "#000000" },
   { id: "tiktok",    label: "TikTok",    icon: faTiktok,    tone: "#000000" },
-  { id: "email",     label: "EDM",       icon: faEnvelope,  tone: "#0EA5E9" },
+  { id: "email",     label: "EDM",       icon: faEnvelope,  tone: "#18181b" },
 ];
 
 const STEP_LABELS_ZH = ["抓取素材", "生成人設", "生成 SKILL"];
@@ -62,7 +62,7 @@ function ProgressBar({ current, total, en }: { current: number; total: number; e
         <span className="text-[12px] text-default-400">{current}/{total}</span>
       </div>
       <div className="h-1.5 w-full rounded-full bg-default-100 overflow-hidden">
-        <div className="h-full rounded-full transition-all duration-500" style={{ width: `${pct}%`, background: "#C2410C" }} />
+        <div className="h-full rounded-full transition-all duration-500" style={{ width: `${pct}%`, background: "#18181b" }} />
       </div>
     </div>
   );
@@ -87,14 +87,14 @@ function renderRowInput(
               onChange={(e) => setter((l) => setAt(l, i, e.target.value))}
               placeholder={placeholder}
               rows={3}
-              className="flex-1 text-xs border border-default-200 rounded-lg p-2.5 resize-y focus:outline-none focus:border-orange-400"
+              className="flex-1 text-xs border border-default-200 rounded-lg p-2.5 resize-y focus:outline-none focus:border-zinc-400"
             />
           ) : (
             <input
               value={v}
               onChange={(e) => setter((l) => setAt(l, i, e.target.value))}
               placeholder={placeholder}
-              className="flex-1 text-xs border border-default-200 rounded-lg px-3 py-2 focus:outline-none focus:border-orange-400"
+              className="flex-1 text-xs border border-default-200 rounded-lg px-3 py-2 focus:outline-none focus:border-zinc-400"
             />
           )}
           <button onClick={() => removeRow(i)} className="mt-1 text-default-300 hover:text-danger-500 shrink-0">
@@ -102,7 +102,7 @@ function renderRowInput(
           </button>
         </div>
       ))}
-      <button onClick={addRow} className="text-[12px] font-medium text-default-500 hover:text-orange-600 flex items-center gap-1">
+      <button onClick={addRow} className="text-[12px] font-medium text-default-500 hover:text-zinc-600 flex items-center gap-1">
         <FontAwesomeIcon icon={faPlus} style={{ fontSize: 12 }} /> {en ? "Add another" : "再加一個"}
       </button>
     </div>
@@ -151,14 +151,14 @@ function NewAgentForm({ brandId, onDone }: { brandId: number; onDone: () => void
     renderRowInput(list, setter, placeholder, en, multiline);
 
   return (
-    <div className="rounded-2xl border border-orange-200 bg-orange-50/40 p-5 mb-6">
+    <div className="rounded-2xl border border-zinc-200 bg-zinc-50/40 p-5 mb-6">
       <div className="mb-4">
         <label className="text-xs font-semibold text-default-700 mb-1.5 block">{en ? "Agent name" : "Agent 名稱"}</label>
         <input
           value={name}
           onChange={(e) => setName(e.target.value)}
           placeholder={en ? "e.g. Founder's voice" : "例：創辦人語氣"}
-          className="w-full text-sm border border-default-200 rounded-lg px-3 py-2 focus:outline-none focus:border-orange-400"
+          className="w-full text-sm border border-default-200 rounded-lg px-3 py-2 focus:outline-none focus:border-zinc-400"
         />
       </div>
 
@@ -223,7 +223,7 @@ function NewAgentForm({ brandId, onDone }: { brandId: number; onDone: () => void
           onClick={submit}
           disabled={createMut?.isPending}
           className="text-xs font-semibold px-4 py-2 rounded-full text-white transition flex items-center gap-1.5"
-          style={{ background: createMut?.isPending ? "#FDBA74" : "#F97316" }}
+          style={{ background: createMut?.isPending ? "#A1A1AA" : "#18181b" }}
         >
           <FontAwesomeIcon icon={faWandMagicSparkles} style={{ fontSize: 12 }} />
           {createMut?.isPending ? (en ? "Starting…" : "建立中…") : (en ? "Start training" : "開始訓練")}
@@ -270,7 +270,7 @@ function AddSourcesPanel({ brandId, agentId, onDone }: { brandId: number; agentI
   };
 
   return (
-    <div className="rounded-xl border border-orange-200 bg-orange-50/40 p-3.5 space-y-3">
+    <div className="rounded-xl border border-zinc-200 bg-zinc-50/40 p-3.5 space-y-3">
       <div className="grid gap-3 md:grid-cols-3">
         <div>
           <label className="text-[12px] font-semibold text-default-600 mb-1 block">{en ? "Text" : "文字"}</label>
@@ -300,7 +300,7 @@ function AddSourcesPanel({ brandId, agentId, onDone }: { brandId: number; agentI
           onClick={submit}
           disabled={addMut?.isPending}
           className="text-[12px] font-semibold px-3.5 py-1.5 rounded-full text-white transition"
-          style={{ background: addMut?.isPending ? "#FDBA74" : "#F97316" }}
+          style={{ background: addMut?.isPending ? "#A1A1AA" : "#18181b" }}
         >
           {addMut?.isPending ? (en ? "Adding…" : "加入中…") : (en ? "Add & retrain" : "加入並重新訓練")}
         </button>
@@ -364,7 +364,7 @@ function AgentCard({ brandId, agent }: { brandId: number; agent: PersonaAgent })
     <div className="rounded-2xl border border-default-200 bg-white overflow-hidden mb-4">
       <div className="px-5 py-4 flex items-start justify-between gap-3">
         <div className="flex items-center gap-3 min-w-0">
-          <div className="w-9 h-9 rounded-full flex items-center justify-center shrink-0" style={{ background: agent.status === "ready" ? "#F97316" : agent.status === "failed" ? "#DC2626" : "#A8A29E" }}>
+          <div className="w-9 h-9 rounded-full flex items-center justify-center shrink-0" style={{ background: agent.status === "ready" ? "#18181b" : agent.status === "failed" ? "#DC2626" : "#A8A29E" }}>
             <FontAwesomeIcon icon={faMicrophone} style={{ color: "#fff", fontSize: 13 }} />
           </div>
           <div className="min-w-0">
@@ -386,7 +386,7 @@ function AgentCard({ brandId, agent }: { brandId: number; agent: PersonaAgent })
             <button
               onClick={() => retrainMut?.mutate?.({ brandId, id: agent.id }, { onSuccess: () => utils.personaAgent?.list?.invalidate?.() })}
               disabled={retrainMut?.isPending}
-              className="text-default-400 hover:text-orange-600 p-1.5"
+              className="text-default-400 hover:text-zinc-600 p-1.5"
               title={en ? "Retry" : "重試"}
             >
               <FontAwesomeIcon icon={faRotateRight} style={{ fontSize: 13 }} />
@@ -447,7 +447,7 @@ function AgentCard({ brandId, agent }: { brandId: number; agent: PersonaAgent })
                 <p className="text-xs text-default-700 leading-relaxed whitespace-pre-wrap max-h-56 overflow-y-auto rounded-lg bg-default-50 p-3">{agent.skill}</p>
               </div>
 
-              <div className="rounded-xl border border-orange-200 bg-orange-50/40 p-3.5">
+              <div className="rounded-xl border border-zinc-200 bg-zinc-50/40 p-3.5">
                 <div className="text-[12px] font-semibold text-default-700 mb-2">{en ? "Test-draft with this agent" : "用這個 Agent 試寫"}</div>
                 <div className="flex items-center gap-2 mb-2 flex-wrap">
                   <select
@@ -467,7 +467,7 @@ function AgentCard({ brandId, agent }: { brandId: number; agent: PersonaAgent })
                     onClick={runDraft}
                     disabled={draftMut?.isPending}
                     className="text-xs font-semibold px-3.5 py-1.5 rounded-full text-white transition"
-                    style={{ background: draftMut?.isPending ? "#FDBA74" : "#F97316" }}
+                    style={{ background: draftMut?.isPending ? "#A1A1AA" : "#18181b" }}
                   >
                     {draftMut?.isPending ? (en ? "Writing…" : "試寫中…") : (en ? "Test draft" : "試寫")}
                   </button>
@@ -475,7 +475,7 @@ function AgentCard({ brandId, agent }: { brandId: number; agent: PersonaAgent })
                 {draftResult && (
                   <div className="rounded-lg bg-white border border-default-200 p-3 mt-2">
                     <p className="text-xs text-default-800 leading-relaxed whitespace-pre-wrap">{draftResult}</p>
-                    <button onClick={copyDraft} className="mt-2 text-[12px] font-medium text-default-500 hover:text-orange-600 flex items-center gap-1">
+                    <button onClick={copyDraft} className="mt-2 text-[12px] font-medium text-default-500 hover:text-zinc-600 flex items-center gap-1">
                       <FontAwesomeIcon icon={copied ? faCheck : faCopy} style={{ fontSize: 12 }} />
                       {copied ? (en ? "Copied" : "已複製") : (en ? "Copy" : "複製")}
                     </button>
@@ -488,7 +488,7 @@ function AgentCard({ brandId, agent }: { brandId: number; agent: PersonaAgent })
               ) : (
                 <button
                   onClick={() => setAddingSources(true)}
-                  className="text-[12px] font-medium text-default-500 hover:text-orange-600 flex items-center gap-1.5"
+                  className="text-[12px] font-medium text-default-500 hover:text-zinc-600 flex items-center gap-1.5"
                 >
                   <FontAwesomeIcon icon={faPlus} style={{ fontSize: 12 }} /> {en ? "Add more sources & retrain" : "加入更多素材並重新訓練"}
                 </button>
@@ -521,7 +521,7 @@ export default function PersonaAgentPanel({ brandId }: { brandId: number | null 
       <div className="flex items-start justify-between mb-5">
         <div>
           <div className="flex items-center gap-2.5 mb-1.5">
-            <div className="w-9 h-9 rounded-full flex items-center justify-center" style={{ background: "#F97316" }}>
+            <div className="w-9 h-9 rounded-full flex items-center justify-center" style={{ background: "#18181b" }}>
               <FontAwesomeIcon icon={faMicrophone} style={{ color: "#fff", fontSize: 14 }} />
             </div>
             <h1 className="text-2xl font-semibold text-default-900">{en ? "Persona agents" : "人設 Agent"}</h1>
@@ -536,7 +536,7 @@ export default function PersonaAgentPanel({ brandId }: { brandId: number | null 
           <button
             onClick={() => setCreating(true)}
             className="text-xs font-semibold px-4 py-2.5 rounded-full text-white transition flex items-center gap-1.5 shrink-0"
-            style={{ background: "#F97316" }}
+            style={{ background: "#18181b" }}
           >
             <FontAwesomeIcon icon={faPlus} style={{ fontSize: 12 }} />
             {en ? "New persona agent" : "新增人設 Agent"}

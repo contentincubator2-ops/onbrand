@@ -10,9 +10,9 @@ import { useEffect, useState } from "react";
 import { useLang } from "../../../lib/i18n";
 
 const TAG_STYLES: Record<string, { bg: string; fg: string; label: string; labelEn: string }> = {
-  NEW:     { bg: "rgba(124,58,237,0.10)", fg: "#5B21B6", label: "新功能", labelEn: "New"     },
-  FIX:     { bg: "rgba(239,68,68,0.10)",  fg: "#991B1B", label: "修復",   labelEn: "Fix"     },
-  IMPROVE: { bg: "rgba(59,130,246,0.10)", fg: "#1E3A8A", label: "改進",   labelEn: "Improve" },
+  NEW:     { bg: "rgba(24,24,27,0.06)", fg: "#27272a", label: "新功能", labelEn: "New"     },
+  FIX:     { bg: "rgba(24,24,27,0.06)",  fg: "#27272a", label: "修復",   labelEn: "Fix"     },
+  IMPROVE: { bg: "rgba(24,24,27,0.06)",  fg: "#27272a", label: "改進",   labelEn: "Improve" },
   BREAKING:{ bg: "rgba(245,158,11,0.10)", fg: "#92400E", label: "變更",   labelEn: "Change"  },
 };
 

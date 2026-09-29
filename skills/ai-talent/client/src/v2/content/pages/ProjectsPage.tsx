@@ -47,10 +47,10 @@ const WORKSPACE_ICONS: Record<string, any> = {
 };
 
 const WORKSPACE_TONE: Record<string, string> = {
-  facebook: "#1877F2", instagram: "#E1306C", youtube: "#FF0000",
-  tiktok: "#000000", linkedin: "#0A66C2", threads: "#000000",
-  email: "#0EA5E9", press: "#64748B", brand: "#7C3AED", audience: "#7C3AED",
-  website: "#10B981", theater: "#F97316",
+  facebook: "#18181b", instagram: "#18181b", youtube: "#18181b",
+  tiktok: "#000000", linkedin: "#18181b", threads: "#000000",
+  email: "#18181b", press: "#64748B", brand: "#18181b", audience: "#18181b",
+  website: "#18181b", theater: "#18181b",
 };
 
 function formatRelative(dateStr: string | undefined, lang: "zh-TW" | "en"): string {
@@ -69,7 +69,7 @@ function formatRelative(dateStr: string | undefined, lang: "zh-TW" | "en"): stri
 }
 
 function brandColor(seed: string): string {
-  const palette = ["#6366F1","#EC4899","#F97316","#10B981","#3B82F6","#8B5CF6","#EF4444","#14B8A6"];
+  const palette = ["#18181b","#27272a","#3f3f46","#52525b","#71717a","#27272a","#3f3f46","#52525b"];
   let h = 0;
   for (let i = 0; i < seed.length; i++) h = seed.charCodeAt(i) + ((h << 5) - h);
   return palette[Math.abs(h) % palette.length]!;
@@ -693,7 +693,7 @@ function EmptyState({ search, onClear, onCreate, lang }: { search: string; onCle
           <p className="text-tiny text-default-500 mb-4">
             {lang === "en" ? "Try different words, or clear the search" : "試試別的關鍵字，或清除搜尋條件"}
           </p>
-          <button onClick={onClear} className="text-xs text-violet-600 hover:underline">
+          <button onClick={onClear} className="text-xs text-zinc-600 hover:underline">
             {lang === "en" ? "Clear search" : "清除搜尋"}
           </button>
         </>

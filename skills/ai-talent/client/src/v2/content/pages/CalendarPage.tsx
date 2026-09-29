@@ -29,12 +29,12 @@ import {
 const PLATFORMS: Array<{
   key: string; label: string; color: string; route: string;
 }> = [
-  { key: "fb",       label: "Facebook",  color: "#1877F2", route: "/tasks/fb" },
-  { key: "ig",       label: "Instagram", color: "#E1306C", route: "/tasks/ig" },
+  { key: "fb",       label: "Facebook",  color: "#18181b", route: "/tasks/fb" },
+  { key: "ig",       label: "Instagram", color: "#18181b", route: "/tasks/ig" },
   { key: "threads",  label: "Threads",   color: "#000000", route: "/tasks/threads" },
-  { key: "line",     label: "LINE",      color: "#06C755", route: "/tasks/line" },
+  { key: "line",     label: "LINE",      color: "#18181b", route: "/tasks/line" },
   { key: "tt",       label: "TikTok",    color: "#000000", route: "/tasks/tt" },
-  { key: "email",    label: "Email",     color: "#0EA5E9", route: "/tasks/email" },
+  { key: "email",    label: "Email",     color: "#18181b", route: "/tasks/email" },
   { key: "web",      label: "官網",       color: "#525252", route: "/tasks/web" },
 ];
 
@@ -43,14 +43,14 @@ const PLATFORM_COLOR: Record<string, string> = Object.fromEntries(
 );
 // Also handle long keys returned from DB
 const PLATFORM_COLOR_FULL: Record<string, string> = {
-  facebook: "#1877F2", instagram: "#E1306C", youtube: "#FF0000",
-  tiktok: "#000000", linkedin: "#0A66C2", threads: "#000000",
-  email: "#0EA5E9", press: "#525252", brand: "#7C3AED",
+  facebook: "#18181b", instagram: "#18181b", youtube: "#18181b",
+  tiktok: "#000000", linkedin: "#18181b", threads: "#000000",
+  email: "#18181b", press: "#525252", brand: "#18181b",
   ...PLATFORM_COLOR,
 };
 
 function getPlatformColor(p: string): string {
-  return PLATFORM_COLOR_FULL[p?.toLowerCase()] ?? "#7C3AED";
+  return PLATFORM_COLOR_FULL[p?.toLowerCase()] ?? "#18181b";
 }
 
 function getPlatformLabel(p: string): string {
@@ -512,7 +512,7 @@ export default function CalendarPage() {
         <div className="max-w-[1100px] mx-auto px-6 mb-5">
           <div
             className="rounded-xl px-5 py-4 relative"
-            style={{ background: "#F7F6F4", border: "1px solid #a7f3d0" }}
+            style={{ background: "#F7F6F4", border: "1px solid #e4e4e7" }}
           >
             <button
               onClick={dismissHowTo}
@@ -534,7 +534,7 @@ export default function CalendarPage() {
                   en: "Pick a platform & run a task",
                   desc_zh: "點下方「＋ 新增貼文」選平台，AI 幫你生成貼文草稿",
                   desc_en: "Click「＋ New post」below, pick a platform, AI drafts your post",
-                  color: "#7c3aed",
+                  color: "#18181b",
                 },
                 {
                   step: "2",
@@ -542,7 +542,7 @@ export default function CalendarPage() {
                   en: "Review the result",
                   desc_zh: "AI 生成完成後，結果頁可編輯文案、選擇圖片",
                   desc_en: "After AI finishes, review and edit the caption on the output page",
-                  color: "#0ea5e9",
+                  color: "#18181b",
                 },
                 {
                   step: "3",
@@ -550,7 +550,7 @@ export default function CalendarPage() {
                   en: "Schedule or Publish now",
                   desc_zh: "點結果頁上方的「排程發布」→ 選日期時間 → 貼文會出現在這裡",
                   desc_en: "Click「Schedule」on the output page → pick date/time → appears here",
-                  color: "#10b981",
+                  color: "#18181b",
                 },
               ].map((s) => (
                 <div key={s.step} className="flex items-start gap-3">
@@ -752,7 +752,7 @@ export default function CalendarPage() {
                       {dayItems.length > 0 && (
                         <div
                           className="mt-1.5 mx-auto w-5 h-1 rounded-full"
-                          style={{ background: isT ? "rgba(255,255,255,0.4)" : "#7c3aed" }}
+                          style={{ background: isT ? "rgba(255,255,255,0.4)" : "#18181b" }}
                         />
                       )}
                     </div>
@@ -772,7 +772,7 @@ export default function CalendarPage() {
                       className="flex flex-col"
                       style={{
                         borderRight: i < 6 ? "1px solid #E5E5E5" : undefined,
-                        background: isT ? "rgba(124,58,237,0.02)" : isPast ? "#fafafa" : "white",
+                        background: isT ? "rgba(24,24,27,0.02)" : isPast ? "#fafafa" : "white",
                         minHeight: 420,
                       }}
                     >
@@ -819,9 +819,9 @@ export default function CalendarPage() {
                               background: "transparent",
                             }}
                             onMouseEnter={(e) => {
-                              (e.currentTarget as HTMLButtonElement).style.borderColor = "#7c3aed";
-                              (e.currentTarget as HTMLButtonElement).style.color = "#7c3aed";
-                              (e.currentTarget as HTMLButtonElement).style.background = "rgba(124,58,237,0.04)";
+                              (e.currentTarget as HTMLButtonElement).style.borderColor = "#18181b";
+                              (e.currentTarget as HTMLButtonElement).style.color = "#18181b";
+                              (e.currentTarget as HTMLButtonElement).style.background = "rgba(24,24,27,0.04)";
                             }}
                             onMouseLeave={(e) => {
                               (e.currentTarget as HTMLButtonElement).style.borderColor = "#D4D4D4";
@@ -908,7 +908,7 @@ export default function CalendarPage() {
                       className="border-r border-b border-default-100 last:border-r-0 p-1.5 relative flex flex-col"
                       style={{
                         minHeight: 88,
-                        background: dc.inMonth ? (isT ? "rgba(124,58,237,0.02)" : "white") : "#FAFAFA",
+                        background: dc.inMonth ? (isT ? "rgba(24,24,27,0.02)" : "white") : "#FAFAFA",
                         opacity: dc.inMonth ? 1 : 0.45,
                       }}
                     >
@@ -954,7 +954,7 @@ export default function CalendarPage() {
                       {dc.inMonth && !isPast && (
                         <button
                           onClick={() => setPickerDate(dc.date)}
-                          className="mt-auto w-full py-0.5 rounded text-[12px] text-default-300 hover:text-violet-600 hover:bg-violet-50 flex items-center justify-center gap-0.5 transition-colors"
+                          className="mt-auto w-full py-0.5 rounded text-[12px] text-default-300 hover:text-zinc-600 hover:bg-zinc-50 flex items-center justify-center gap-0.5 transition-colors"
                         >
                           <AddIcon size={9} />
                         </button>
@@ -1016,7 +1016,7 @@ export default function CalendarPage() {
                   setRescheduleId(null);
                 }}
                 disabled={rescheduleMut?.isLoading}
-                className="flex-1 py-2 rounded-lg bg-violet-600 text-white text-[13px] font-semibold disabled:opacity-60"
+                className="flex-1 py-2 rounded-lg bg-zinc-600 text-white text-[13px] font-semibold disabled:opacity-60"
               >
                 {rescheduleMut?.isLoading
                   ? (lang === "en" ? "Saving…" : "儲存中…")
@@ -1062,7 +1062,7 @@ export default function CalendarPage() {
                     setFbPages([]);
                     rangeQ?.refetch?.();
                   }}
-                  className="w-full text-left px-3 py-2 rounded-lg border border-default-200 hover:border-blue-400 hover:bg-blue-50 text-[13px]"
+                  className="w-full text-left px-3 py-2 rounded-lg border border-default-200 hover:border-zinc-400 hover:bg-zinc-50 text-[13px]"
                 >
                   <span className="font-medium">{p.name}</span>
                   {p.category && <span className="ml-2 text-[12px] text-default-400">{p.category}</span>}
@@ -1228,14 +1228,14 @@ function PostPill({
                           if (onPrefetchFacebook) void onPrefetchFacebook(item.brandId).catch(() => {});
                         }}
                         className="px-2 py-1 rounded text-[12px] font-semibold text-white"
-                        style={{ background: "#1877F2" }}
+                        style={{ background: "#18181b" }}
                       >
                         <LinkIcon size={11} /> {lang === "en" ? "Connect Facebook" : "連接 Facebook"}
                       </button>
                     )}
                     <button
                       onClick={() => navigate(`/run/${item.outputId}`)}
-                      className="px-2 py-1 rounded text-[12px] font-medium bg-white border border-orange-300 text-orange-800"
+                      className="px-2 py-1 rounded text-[12px] font-medium bg-white border border-zinc-300 text-zinc-800"
                     >
                       {lang === "en" ? "View post →" : "查看貼文 →"}
                     </button>
@@ -1244,7 +1244,7 @@ function PostPill({
               )}
               <button
                 onClick={() => onReschedule(item.id, item.at)}
-                className="flex items-center gap-1 px-2 py-0.5 rounded text-[12px] font-medium bg-white border border-violet-200 hover:border-violet-500 text-violet-700"
+                className="flex items-center gap-1 px-2 py-0.5 rounded text-[12px] font-medium bg-white border border-zinc-200 hover:border-zinc-500 text-zinc-700"
               >
                 <RegenerateIcon size={9} />
                 {lang === "en" ? "Reschedule" : "改時間"}

@@ -247,7 +247,7 @@ export default function AdminPostFormatsPage() {
                       </span>
                     )}
                     {row.shippedTaskId && (
-                      <span className="text-[12px] text-indigo-700">
+                      <span className="text-[12px] text-zinc-700">
                         已開：<code className="font-mono">{row.shippedTaskId}</code>
                       </span>
                     )}
@@ -319,7 +319,7 @@ export default function AdminPostFormatsPage() {
                           });
                         }
                       }}
-                      className="px-3 py-1.5 rounded-md text-xs font-medium border border-indigo-300 text-indigo-800 hover:bg-indigo-50 flex items-center gap-1.5"
+                      className="px-3 py-1.5 rounded-md text-xs font-medium border border-zinc-300 text-zinc-800 hover:bg-zinc-50 flex items-center gap-1.5"
                     >
                       <BundleIcon size={12} /> 已開卡…
                     </button>

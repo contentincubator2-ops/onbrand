@@ -58,7 +58,7 @@ export default function VerifyEmailPage() {
       <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-10 w-full max-w-md text-center">
         {status === "loading" && (
           <>
-            <div className="w-16 h-16 border-4 border-indigo-200 border-t-indigo-500 rounded-full animate-spin mx-auto mb-6" />
+            <div className="w-16 h-16 border-4 border-zinc-200 border-t-indigo-500 rounded-full animate-spin mx-auto mb-6" />
             <h1 className="text-2xl font-bold text-gray-900 mb-2">
               {lang === "en" ? "Verifying…" : "驗證中…"}
             </h1>

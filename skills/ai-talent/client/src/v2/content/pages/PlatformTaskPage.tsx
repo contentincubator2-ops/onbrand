@@ -121,42 +121,42 @@ interface PlatformMeta {
 
 const PLATFORM_META: Record<string, PlatformMeta> = {
   facebook: {
-    label: "Facebook", labelZh: "Facebook", icon: faFacebook, bg: "#1877F2",
+    label: "Facebook", labelZh: "Facebook", icon: faFacebook, bg: "#18181b",
     heroZh: "讓每篇 Facebook 貼文，都有爆款的骨架",
     heroEn: "Every post has a proven structure — no more starting from scratch",
     subZh: "Clio 獲獎敘事公式 × 品牌定位鎖定，自然引發互動",
     subEn: "Narrative frameworks from award-winning campaigns, locked to your brand voice",
   },
   instagram: {
-    label: "Instagram", labelZh: "Instagram", icon: faInstagram, bg: "#E4405F",
+    label: "Instagram", labelZh: "Instagram", icon: faInstagram, bg: "#18181b",
     heroZh: "文案 × 視覺指令同步產出，不再是漂亮圖片配隨便文字",
     heroEn: "Caption and visual brief in one run — never pieced together separately",
     subZh: "文案代理人 + 圖片指導代理人協作，輸出比競品深一層",
     subEn: "Caption agent and image director agent work in sync, every time",
   },
   linkedin: {
-    label: "LinkedIn", labelZh: "LinkedIn", icon: faLinkedin, bg: "#0A66C2",
+    label: "LinkedIn", labelZh: "LinkedIn", icon: faLinkedin, bg: "#18181b",
     heroZh: "不只是發文，是在 LinkedIn 建立你的專業話語權",
     heroEn: "Thought leadership that earns real attention — not just vanity metrics",
     subZh: "PR Strategist 代理人以記者邏輯構建你的觀點",
     subEn: "PR Strategist agent thinks like a journalist, writes like an executive",
   },
   youtube: {
-    label: "YouTube", labelZh: "YouTube", icon: faYoutube, bg: "#FF0000",
+    label: "YouTube", labelZh: "YouTube", icon: faYoutube, bg: "#18181b",
     heroZh: "標題、章節、縮圖文案、結尾鉤子 — YouTube 影片完整佈局",
     heroEn: "Title, chapters, thumbnail brief, end hook — one run, done",
     subZh: "Strategist 規劃敘事弧，再由文案代理人完成每一段腳本",
     subEn: "Strategist maps the arc; writer handles every segment",
   },
   tiktok: {
-    label: "TikTok", labelZh: "TikTok", icon: faTiktok, bg: "#EE1D52",
+    label: "TikTok", labelZh: "TikTok", icon: faTiktok, bg: "#18181b",
     heroZh: "前 3 秒留人，後 60 秒轉化 — TikTok 腳本不靠靈感",
     heroEn: "Grab them in 3 seconds, keep them for 60 — retention built in",
     subZh: "TikTok 專屬代理人以角色弧度 × 未解懸念設計驅動完播率",
     subEn: "TikTok agent that thinks in character arcs and unresolved tension",
   },
   email: {
-    label: "Newsletter", labelZh: "電子報", icon: faEnvelope, bg: "#7B5BC8",
+    label: "Newsletter", labelZh: "電子報", icon: faEnvelope, bg: "#18181b",
     heroZh: "每封電子報都是品牌聲音的延伸，不是隨機發文",
     heroEn: "Every email sounds like you — consistent voice, every send",
     subZh: "品牌定位鎖定主旨行、開場鉤子與 CTA，完整結構一次產出",
@@ -170,21 +170,21 @@ const PLATFORM_META: Record<string, PlatformMeta> = {
     subEn: "PR Strategist finds the news angle before writing a single word",
   },
   case: {
-    label: "Case Library", labelZh: "案例", icon: faBookBookmark, bg: "#7C3AED",
+    label: "Case Library", labelZh: "案例", icon: faBookBookmark, bg: "#18181b",
     heroZh: "案例不是寫稿當下才找，是平常就在累積",
     heroEn: "A case library you build over time, not scramble for at deadline",
     subZh: "依十項標準分別建檔，每次提報都對照既有紀錄去重",
     subEn: "Filed by standard, deduplicated against everything already logged",
   },
   calendar: {
-    label: "Content Calendar", labelZh: "行事曆", icon: faCalendarDays, bg: "#B45309",
+    label: "Content Calendar", labelZh: "行事曆", icon: faCalendarDays, bg: "#18181b",
     heroZh: "先把整個月的篇數與切角排好，再逐篇寫",
     heroEn: "Plan the month's slots and angles first, then write them one by one",
     subZh: "每種內容類型一張卡，一次產出該類型當月所有篇數的摘要",
     subEn: "One card per content type, producing every slot that type owns this month",
   },
   website: {
-    label: "Website", labelZh: "官網", icon: faGlobe, bg: "#0F766E",
+    label: "Website", labelZh: "官網", icon: faGlobe, bg: "#18181b",
     heroZh: "官網長文不是部落格隨筆，是品牌把觀點說完整的地方",
     heroEn: "Long-form that earns the reader's time — not filler blog posts",
     subZh: "引言＋3 段的固定骨架，把案例與規格翻譯成讀者的生活感受",
@@ -199,7 +199,7 @@ const PLATFORM_META: Record<string, PlatformMeta> = {
     subEn: "Paste your best threads and turn them into your own task card",
   },
   line: {
-    label: "LINE", labelZh: "LINE", icon: faLine, bg: "#06C755",
+    label: "LINE", labelZh: "LINE", icon: faLine, bg: "#18181b",
     heroZh: "LINE 群發是寫給已經加你好友的人——一則訊息、一個行動",
     heroEn: "LINE broadcasts go to people who already follow you — one message, one action",
     subZh: "貼上你效果最好的幾則群發訊息，建成自己的 LINE 任務卡",
@@ -402,7 +402,7 @@ class PlatformPageErrorBoundary extends React.Component<
             <h2 style={{ fontSize: 18, fontWeight: 600, marginTop: 4 }}>頁面載入失敗</h2>
             <p style={{ marginTop: 8 }}>{e.message}</p>
             <button
-              style={{ marginTop: 12, padding: "6px 12px", background: "#3b82f6", color: "white", border: "none", borderRadius: 6, cursor: "pointer" }}
+              style={{ marginTop: 12, padding: "6px 12px", background: "#18181b", color: "white", border: "none", borderRadius: 6, cursor: "pointer" }}
               onClick={() => this.setState({ error: null })}
             >
               重試渲染

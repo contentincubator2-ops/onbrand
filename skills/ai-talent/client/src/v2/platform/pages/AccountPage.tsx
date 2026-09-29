@@ -142,7 +142,7 @@ export default function AccountPage() {
               <div className="flex justify-between">
                 <span className="text-neutral-500">{lang === "en" ? "Status" : "狀態"}</span>
                 <span className="font-medium">
-                  {status.planStatus === "trial" && <span className="text-blue-600">{lang === "en" ? "Trial" : "試用中"}</span>}
+                  {status.planStatus === "trial" && <span className="text-zinc-600">{lang === "en" ? "Trial" : "試用中"}</span>}
                   {status.planStatus === "active" && <span className="text-emerald-600">{lang === "en" ? "Active" : "使用中"}</span>}
                   {status.planStatus === "canceled" && <span className="text-amber-600">{lang === "en" ? "Canceled (active until period end)" : "已取消（當期到期前可繼續使用）"}</span>}
                   {status.planStatus === "expired" && <span className="text-red-600">{lang === "en" ? "Expired" : "已到期"}</span>}
@@ -377,7 +377,7 @@ export default function AccountPage() {
                     </td>
                     <td className="py-2 text-right">
                       {inv.downloadUrl && (
-                        <a href={inv.downloadUrl} className="text-blue-600 hover:underline text-xs">{t("download")}</a>
+                        <a href={inv.downloadUrl} className="text-zinc-600 hover:underline text-xs">{t("download")}</a>
                       )}
                     </td>
                   </tr>

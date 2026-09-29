@@ -21,15 +21,15 @@ import { WarningIcon } from "../../v2/platform/components/icons";
 
 // SoWork.ai design tokens
 const C = {
-  cream: "#F7F2EB",
+  cream: "#FAFAFA",
   ink: "#0F0F0E",
   inkSoft: "#3A3633",
   muted: "#6B6660",
-  orange: "#E85D2E",
-  orangeDark: "#C84516",
-  orangeChip: "#FDE6D8",
-  border: "#E8DECC",
-  borderSoft: "#EFE7D6",
+  orange: "#18181B",
+  orangeDark: "#3F3F46",
+  orangeChip: "#F4F4F5",
+  border: "#D4D4D8",
+  borderSoft: "#E4E4E7",
   white: "#FFFFFF",
 };
 
@@ -507,7 +507,7 @@ export default function RegisterPage() {
               {error && (
                 <div
                   className="text-sm rounded-lg px-3 py-2.5 space-y-1.5"
-                  style={{ background: "#FFF1ED", border: `1.5px solid ${C.orange}` }}
+                  style={{ background: "#F4F4F5", border: `1.5px solid ${C.orange}` }}
                 >
                   <div className="flex items-center gap-2" style={{ color: C.orangeDark }}>
                     <WarningIcon size={14} /> {error}

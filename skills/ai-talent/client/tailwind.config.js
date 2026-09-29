@@ -1,6 +1,18 @@
 /** @type {import('tailwindcss').Config} */
 import { heroui } from "@heroui/react";
 
+// zinc 色階：primary／secondary 共用（見下方 heroui 設定）
+const ZINC = {
+  50: "#fafafa", 100: "#f4f4f5", 200: "#e4e4e7", 300: "#d4d4d8", 400: "#a1a1aa",
+  500: "#71717a", 600: "#52525b", 700: "#3f3f46", 800: "#27272a", 900: "#18181b",
+};
+const NEUTRAL_LIGHT = { ...ZINC, DEFAULT: "#18181b", foreground: "#ffffff" };
+const NEUTRAL_DARK = {
+  50: ZINC[900], 100: ZINC[800], 200: ZINC[700], 300: ZINC[600], 400: ZINC[500],
+  500: ZINC[400], 600: ZINC[300], 700: ZINC[200], 800: ZINC[100], 900: ZINC[50],
+  DEFAULT: "#fafafa", foreground: "#18181b",
+};
+
 export default {
   darkMode: "class",
   content: [
@@ -54,9 +66,15 @@ export default {
     },
   },
   plugins: [
-    // Pure HeroUI theme — no SoWork brand overrides. Stock primary (blue),
-    // success (green), danger (red), warning (yellow), secondary (purple).
-    heroui(),
+    // 2026-09-29 CJ「完全不要彩色風格」：primary／secondary 改成中性灰黑，
+    // 全站用到這兩個色的按鈕、標籤、提示框一次去色。success／warning／danger
+    // 是狀態色（功能性），保留。
+    heroui({
+      themes: {
+        light: { colors: { primary: NEUTRAL_LIGHT, secondary: NEUTRAL_LIGHT, focus: "#71717a" } },
+        dark: { colors: { primary: NEUTRAL_DARK, secondary: NEUTRAL_DARK, focus: "#a1a1aa" } },
+      },
+    }),
     function ({ addUtilities }) {
       // Geometric clip-paths matching the roll-up banner reference image.
       // Each variant gives a slightly different asymmetric cut so the teal/red/blue

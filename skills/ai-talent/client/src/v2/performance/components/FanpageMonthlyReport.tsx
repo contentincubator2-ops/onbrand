@@ -46,16 +46,16 @@ type Analysis = {
 type Deck = { name: string; bytes: number; uploadedAt: string };
 
 const TYPE_COLOR: Record<string, string> = {
-  scalar: "#2563eb", tableGroup: "#7c3aed", chart: "#0d9488",
-  image: "#d97706", marker: "#db2777", slideGroup: "#475569",
+  scalar: "#18181b", tableGroup: "#3f3f46", chart: "#52525b",
+  image: "#71717a", marker: "#a1a1aa", slideGroup: "#475569",
 };
 const TYPE_ZH: Record<string, string> = {
   scalar: "單值", tableGroup: "表格群組", chart: "圖表",
   image: "圖片", marker: "標記", slideGroup: "整頁重複",
 };
 const FIND_COLOR: Record<string, string> = {
-  stable: "#059669", variableCardinality: "#7c3aed", repeatingSlides: "#475569",
-  imageHeavy: "#d97706", tightBudget: "#b45309", shapeRenamed: "#db2777", manualOnly: "#6b7280",
+  stable: "#059669", variableCardinality: "#3f3f46", repeatingSlides: "#475569",
+  imageHeavy: "#d97706", tightBudget: "#b45309", shapeRenamed: "#52525b", manualOnly: "#6b7280",
 };
 
 const card: React.CSSProperties = {
@@ -204,7 +204,7 @@ export default function FanpageMonthlyReport() {
           開始分析（{decks.length} 份）
         </button>
 
-        {busy && <div style={{ marginTop: 10, fontSize: 12, color: "#2563eb" }}>{busy}</div>}
+        {busy && <div style={{ marginTop: 10, fontSize: 12, color: "#18181b" }}>{busy}</div>}
         {err && <div style={{ marginTop: 10, fontSize: 12, color: "#b91c1c" }}><WarningIcon size={12} /> {err}</div>}
 
         {decks.length > 0 && (
@@ -268,8 +268,8 @@ export default function FanpageMonthlyReport() {
                   return (
                     <div key={sl.index} onClick={() => { setPage(sl.index); setSel(null); }}
                          style={{ position: "relative", aspectRatio: "16/9", marginBottom: 6, cursor: "pointer",
-                                  border: `1px solid ${page === sl.index ? "#2563eb" : "#e5e7eb"}`,
-                                  outline: page === sl.index ? "1px solid #2563eb" : "none",
+                                  border: `1px solid ${page === sl.index ? "#18181b" : "#e5e7eb"}`,
+                                  outline: page === sl.index ? "1px solid #18181b" : "none",
                                   borderRadius: 5, background: "#fff", overflow: "hidden" }}>
                         {sl.shapes.slice(0, 22).map((sh, i) => (
                           <span key={i} style={{ position: "absolute", left: pct(sh.x, W), top: pct(sh.y, H),
@@ -331,7 +331,7 @@ export default function FanpageMonthlyReport() {
                 )}
                 {pageSlots.map(s => (
                   <div key={s.id} onClick={() => setSel(s.id)}
-                       style={{ border: `1px solid ${sel === s.id ? "#2563eb" : "#e5e7eb"}`, borderRadius: 8,
+                       style={{ border: `1px solid ${sel === s.id ? "#18181b" : "#e5e7eb"}`, borderRadius: 8,
                                 padding: "8px 10px", marginTop: 6, cursor: "pointer", background: "#fafafa" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 700 }}>
                       <span style={{ width: 8, height: 8, borderRadius: "50%", background: TYPE_COLOR[s.type] }} />
@@ -349,7 +349,7 @@ export default function FanpageMonthlyReport() {
                 ))}
 
                 {selected && (
-                  <div style={{ border: "1px solid #2563eb", borderRadius: 8, padding: "10px 11px", marginTop: 12, background: "#fff" }}>
+                  <div style={{ border: "1px solid #18181b", borderRadius: 8, padding: "10px 11px", marginTop: 12, background: "#fff" }}>
                     <div style={kicker}>欄位設定</div>
                     <table style={{ width: "100%", fontSize: 12, borderCollapse: "collapse", marginTop: 6 }}>
                       <tbody>

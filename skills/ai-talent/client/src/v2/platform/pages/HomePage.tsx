@@ -44,7 +44,7 @@ const TOUCHPOINT_ROUTE: Record<string, string> = {
   email: "/tasks/email", website: "/tasks/web",
 };
 
-const LAYER_COLORS = { strategy: "#2563eb", content: "#059669", performance: "#b45309" };
+const LAYER_COLORS = { strategy: "#18181b", content: "#18181b", performance: "#18181b" };
 
 export default function HomePage() {
   const navigate = useNavigate();
@@ -119,7 +119,7 @@ export default function HomePage() {
           />
         ))}
         {strategyAlerts.map((a) => (
-          <TrayRow key={a.id} icon={faBell} iconColor="#2563eb" label={a.title} status={en ? "New" : "新提醒"} statusColor="#2563eb" onClick={() => navigate("/brands")} />
+          <TrayRow key={a.id} icon={faBell} iconColor="#18181b" label={a.title} status={en ? "New" : "新提醒"} statusColor="#18181b" onClick={() => navigate("/brands")} />
         ))}
       </Tray>
 

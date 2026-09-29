@@ -309,7 +309,7 @@ export default function BrandOnboardingWizard({ isOpen, onClose, onComplete }: P
                     <div
                       className={`flex items-center justify-center w-6 h-6 rounded-full text-[12px] font-bold transition ${
                         isDone ? "bg-emerald-500 text-white"
-                          : isActive ? "bg-violet-600 text-white"
+                          : isActive ? "bg-zinc-600 text-white"
                           : "bg-default-100 text-default-400"
                       }`}
                     >
@@ -554,7 +554,7 @@ export default function BrandOnboardingWizard({ isOpen, onClose, onComplete }: P
                     placeholder="https://www.facebook.com/yourpage"
                     value={fbUrl}
                     onValueChange={setFbUrl}
-                    startContent={<FontAwesomeIcon icon={faFacebook} style={{ color: "#1877F2" }} className="text-tiny" />}
+                    startContent={<FontAwesomeIcon icon={faFacebook} style={{ color: "#18181b" }} className="text-tiny" />}
                   />
 
                   {/* 2026-09-10 產品 intake。兩格都可空白 —— 跳過的代價寫在
@@ -650,7 +650,7 @@ export default function BrandOnboardingWizard({ isOpen, onClose, onComplete }: P
                     { name: "Mandy Cheng", title: "策略師", role: "獨家賣點初稿" },
                   ]}
                   stages={null}
-                  accentColor="#E85D2E"
+                  accentColor="#18181b"
                   progressPct={50}
                   elapsedText={lang === "en" ? "Building express brain…" : "建立品牌大腦初版中…"}
                 />

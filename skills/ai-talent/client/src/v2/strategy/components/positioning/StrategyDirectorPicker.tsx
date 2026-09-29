@@ -93,7 +93,7 @@ export function DirectorRoster({
                     border: "1px solid #E5E5E5", borderRadius: 999, padding: "1px 7px",
                   }}>{roleLabelOf(d, en)}</span>
                   {isCurrent && (
-                    <span style={{ fontSize: 10.5, fontWeight: 700, color: "#047857", display: "flex", alignItems: "center", gap: 2 }}>
+                    <span style={{ fontSize: 10.5, fontWeight: 700, color: "#18181b", display: "flex", alignItems: "center", gap: 2 }}>
                       <CheckIcon size={11} />{en ? "current" : "目前"}
                     </span>
                   )}

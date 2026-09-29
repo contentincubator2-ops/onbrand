@@ -302,7 +302,7 @@ export default function BrandsManagePage() {
           >
             <span
               className="text-[12px] font-semibold uppercase tracking-[0.15em] px-2 py-1 rounded"
-              style={{ background: "rgba(124,58,237,0.12)", color: "#5B21B6" }}
+              style={{ background: "rgba(24,24,27,0.06)", color: "#27272a" }}
             >
               {scopeKind === "event"
                 ? (lang === "en" ? "Campaign" : "活動")

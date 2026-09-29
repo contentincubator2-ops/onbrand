@@ -416,7 +416,7 @@ export default function ShellLayout() {
   const contentLeft = ICON_W;
 
   return (
-    <div className="min-h-screen" style={{ background: "rgb(252,251,254)" }}>
+    <div className="min-h-screen" style={{ background: "#fafafa" }}>
 
       {/* Layer 1: Icon bar — ALWAYS 70px, NEVER moves */}
       <IconBar
@@ -585,9 +585,9 @@ export default function ShellLayout() {
           position: "fixed", bottom: 20, right: 20, zIndex: 50,
           width: 56, height: 56, borderRadius: "50%",
           background: "white",
-          boxShadow: "0 8px 24px rgba(124,58,237,0.28), 0 2px 6px rgba(0,0,0,0.08)",
+          boxShadow: "0 8px 24px rgba(24,24,27,0.28), 0 2px 6px rgba(0,0,0,0.08)",
           display: "flex", alignItems: "center", justifyContent: "center",
-          border: "2px solid rgba(124,58,237,0.18)",
+          border: "2px solid rgba(24,24,27,0.18)",
           transition: "transform 0.18s, box-shadow 0.18s",
           // 2026-07-15 (CJ「通知數字有一半被遮住」): overflow:hidden clipped
           // the unread badge (positioned at top:-5/right:-5, outside the
@@ -599,11 +599,11 @@ export default function ShellLayout() {
         }}
         onMouseEnter={(e) => {
           e.currentTarget.style.transform = "scale(1.06)";
-          e.currentTarget.style.boxShadow = "0 12px 32px rgba(124,58,237,0.42), 0 4px 10px rgba(0,0,0,0.10)";
+          e.currentTarget.style.boxShadow = "0 12px 32px rgba(24,24,27,0.42), 0 4px 10px rgba(0,0,0,0.10)";
         }}
         onMouseLeave={(e) => {
           e.currentTarget.style.transform = "scale(1)";
-          e.currentTarget.style.boxShadow = "0 8px 24px rgba(124,58,237,0.28), 0 2px 6px rgba(0,0,0,0.08)";
+          e.currentTarget.style.boxShadow = "0 8px 24px rgba(24,24,27,0.28), 0 2px 6px rgba(0,0,0,0.08)";
         }}
       >
         <img
@@ -856,7 +856,7 @@ function IconBar({
             position: "absolute",
             top: 4, right: 4,
             fontSize: 8, fontWeight: 800, letterSpacing: "0.08em",
-            color: "#fff", background: "#C2410C",
+            color: "#fff", background: "#18181b",
             padding: "1.5px 4px", borderRadius: 3,
             lineHeight: 1, cursor: "default",
             boxShadow: "0 1px 2px rgba(0,0,0,0.12)",
@@ -886,8 +886,8 @@ function IconBar({
               94%           { transform: translateY(0); }
             }
             @keyframes swRing {
-              0%, 82%, 100% { box-shadow: 0 0 0 0 rgba(249,115,22,0); }
-              88%           { box-shadow: 0 0 0 4px rgba(249,115,22,0.18); }
+              0%, 82%, 100% { box-shadow: 0 0 0 0 rgba(24,24,27,0); }
+              88%           { box-shadow: 0 0 0 4px rgba(24,24,27,0.18); }
             }
             .sw-trigger { animation: swRing 4s ease-in-out infinite; }
             .sw-chevron { animation: swNudge 4s ease-in-out infinite; }
@@ -909,7 +909,7 @@ function IconBar({
                   alignItems: "center", justifyContent: "center", gap: 1,
                   width: "100%", height: 50,
                   border: "none", borderRadius: 12,
-                  background: "#F97316", color: "#fff",
+                  background: "#18181b", color: "#fff",
                   cursor: "pointer", transition: "filter 0.15s ease",
                 }}
                 onMouseEnter={(e) => { e.currentTarget.style.filter = "brightness(1.07)"; }}
@@ -952,8 +952,8 @@ function IconBar({
                       display: "flex", alignItems: "center", gap: 10,
                       width: "100%", padding: "9px 10px",
                       border: "none", borderRadius: 8, textAlign: "left",
-                      background: active ? "#FFF7ED" : "transparent",
-                      color: active ? "#C2410C" : "#374151",
+                      background: active ? "#f4f4f5" : "transparent",
+                      color: active ? "#18181b" : "#374151",
                       cursor: "pointer", transition: "background 0.12s ease",
                     }}
                     onMouseEnter={(e) => { if (!active) e.currentTarget.style.background = "#f9fafb"; }}
@@ -1080,8 +1080,8 @@ function IconBar({
               position: "relative",
             }}
             onMouseEnter={e => {
-              e.currentTarget.style.borderColor = "#F97316";
-              e.currentTarget.style.background = "#fff7ed";
+              e.currentTarget.style.borderColor = "#18181b";
+              e.currentTarget.style.background = "#f4f4f5";
             }}
             onMouseLeave={e => {
               e.currentTarget.style.borderColor = "#e5e7eb";
@@ -1094,7 +1094,7 @@ function IconBar({
               left: isEn ? "auto" : 2,
               right: isEn ? 2 : "auto",
               top: 2, width: 20, height: 16, borderRadius: 8,
-              background: "#F97316",
+              background: "#18181b",
               transition: "left 0.18s, right 0.18s",
               zIndex: 0,
             }} />
@@ -1110,9 +1110,9 @@ function IconBar({
             aria-label={isEn ? "Notifications" : "通知"}
             style={{
               position: "relative", width: 36, height: 36, borderRadius: "50%", border: "none",
-              background: notifOpen ? "#fff7ed" : "none",
+              background: notifOpen ? "#f4f4f5" : "none",
               display: "flex", alignItems: "center", justifyContent: "center",
-              fontSize: 16, color: notifOpen ? "#F97316" : "#9ca3af", cursor: "pointer",
+              fontSize: 16, color: notifOpen ? "#18181b" : "#9ca3af", cursor: "pointer",
               transition: "background 0.1s, color 0.1s",
             }}
             onMouseEnter={e => {
@@ -1168,20 +1168,16 @@ function IconBar({
  *  signature color used as the pill background; first-letter stays white.
  *  Uses HSL with controlled lightness/saturation so colors stay readable. */
 function brandColor(name: string): { bg: string; bgGradient: string; light: string } {
-  if (!name) return { bg: "#7c3aed", bgGradient: "#171717", light: "rgba(124,58,237,0.10)" };
+  if (!name) return { bg: "#18181b", bgGradient: "#171717", light: "rgba(24,24,27,0.10)" };
   let hash = 0;
   for (let i = 0; i < name.length; i++) hash = (hash * 31 + name.charCodeAt(i)) & 0x7fffffff;
-  const hue = hash % 360;
-  // Slight per-name variance to avoid all brands being same saturation
-  const sat = 55 + ((hash >> 8) % 20); // 55-75%
-  const light = 42 + ((hash >> 16) % 8); // 42-50% — readable on white text
-  const bg = `hsl(${hue}, ${sat}%, ${light}%)`;
+  // 2026-09-29：全站去彩色 — 品牌識別色改為 hash 挑一階深灰（白字仍可讀）。
+  const ZINC_DARK = ["#18181b", "#27272a", "#3f3f46", "#52525b"];
+  const bg = ZINC_DARK[hash % ZINC_DARK.length]!;
   return {
     bg,
-    // 2026-09-06：攤平成單色。這個顏色是用品牌名 hash 出來的識別色，
-    // 功能性的（區分品牌）所以保留，但不需要做成漸層。
     bgGradient: bg,
-    light: `hsla(${hue}, ${sat}%, ${light}%, 0.10)`,
+    light: "rgba(24,24,27,0.06)",
   };
 }
 
@@ -1270,8 +1266,8 @@ function BrandHierarchyPill({
           borderRadius: 8,
           border: activeBrand
             ? (open ? "1px solid #d4d4d4" : "1px solid #e5e7eb")
-            : "1.5px dashed #F97316",
-          background: activeBrand ? "#fff" : (open ? "#fff7ed" : "#fff"),
+            : "1.5px dashed #18181b",
+          background: activeBrand ? "#fff" : (open ? "#f4f4f5" : "#fff"),
           display: "flex",
           alignItems: "center",
           gap: 8,
@@ -1279,14 +1275,14 @@ function BrandHierarchyPill({
           cursor: "pointer",
           boxShadow: activeBrand
             ? (open ? "0 4px 12px rgba(0,0,0,0.06)" : "0 1px 2px rgba(0,0,0,0.04)")
-            : "0 1px 4px rgba(249,115,22,0.12)",
+            : "0 1px 4px rgba(24,24,27,0.12)",
           transition: "border-color 0.12s, box-shadow 0.12s, background 0.12s",
         }}
         onMouseEnter={e => {
-          if (!activeBrand) e.currentTarget.style.background = "#fff7ed";
+          if (!activeBrand) e.currentTarget.style.background = "#f4f4f5";
         }}
         onMouseLeave={e => {
-          if (!activeBrand) e.currentTarget.style.background = open ? "#fff7ed" : "#fff";
+          if (!activeBrand) e.currentTarget.style.background = open ? "#f4f4f5" : "#fff";
         }}
       >
         {/* Icon: brand logo / initial / brain / + */}
@@ -1294,11 +1290,11 @@ function BrandHierarchyPill({
           width: 24, height: 24, borderRadius: 6, flexShrink: 0,
           background: activeBrand
             ? (activeBrand.logoUrl ? "#fafafa" : brandColor(activeBrand.name).bgGradient)
-            : "rgba(249,115,22,0.12)",
+            : "rgba(24,24,27,0.12)",
           border: activeBrand ? "none" : "none",
           display: "flex", alignItems: "center", justifyContent: "center",
           overflow: "hidden",
-          color: activeBrand ? "#fff" : "#F97316",
+          color: activeBrand ? "#fff" : "#18181b",
           fontSize: activeBrand ? 11 : 14,
           fontWeight: 700,
         }}>
@@ -1322,7 +1318,7 @@ function BrandHierarchyPill({
           )}
           <span style={{
             fontSize: 13,
-            color: activeBrand ? "#1f2937" : "#F97316",
+            color: activeBrand ? "#1f2937" : "#18181b",
             fontWeight: activeBrand ? 700 : 600,
             maxWidth: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
           }}>
@@ -1334,7 +1330,7 @@ function BrandHierarchyPill({
           icon={faChevronDown}
           style={{
             fontSize: 12,
-            color: activeBrand ? "#9ca3af" : "#F97316",
+            color: activeBrand ? "#9ca3af" : "#18181b",
             transition: "transform 0.15s",
             transform: open ? "rotate(180deg)" : "none",
           }}
@@ -1378,11 +1374,11 @@ function BrandHierarchyPill({
                 style={{
                   width: "100%", padding: "11px 14px",
                   borderRadius: 8,
-                  background: "#C2410C",
+                  background: "#18181b",
                   border: "none", cursor: "pointer", color: "#fff",
                   fontSize: 13, fontWeight: 700,
                   display: "flex", alignItems: "center", gap: 8,
-                  boxShadow: "0 2px 8px rgba(249,115,22,0.30)",
+                  boxShadow: "0 2px 8px rgba(24,24,27,0.30)",
                   transition: "opacity 0.15s",
                 }}
                 onMouseEnter={e => e.currentTarget.style.opacity = "0.88"}
@@ -1483,8 +1479,8 @@ function BrandHierarchyPill({
                 transition: "border-color 0.15s, background 0.15s",
               }}
               onMouseEnter={e => {
-                e.currentTarget.style.borderColor = "#7C3AED";
-                e.currentTarget.style.background = "rgba(124,58,237,0.04)";
+                e.currentTarget.style.borderColor = "#18181b";
+                e.currentTarget.style.background = "rgba(24,24,27,0.04)";
               }}
               onMouseLeave={e => {
                 e.currentTarget.style.borderColor = "#e5e7eb";
@@ -1493,20 +1489,20 @@ function BrandHierarchyPill({
             >
               <span style={{
                 width: 22, height: 22, borderRadius: 6, flexShrink: 0,
-                background: "rgba(124,58,237,0.10)", color: "#7C3AED",
+                background: "rgba(24,24,27,0.10)", color: "#18181b",
                 display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12,
               }}>
                 <FontAwesomeIcon icon={faPlus} />
               </span>
-              <span style={{ fontSize: 12.5, fontWeight: 600, color: "#7C3AED" }}>
+              <span style={{ fontSize: 12.5, fontWeight: 600, color: "#18181b" }}>
                 {isEn ? "New brand" : "新增品牌"}
               </span>
             </button>
           </div>
           {/* New product / event — smaller secondary row */}
           {([
-            { tab: "product" as const, label: isEn ? "New product" : "新增產品",  icon: faBoxOpen,       accent: "#059669" },
-            { tab: "event"   as const, label: isEn ? "New event" : "新增活動",    icon: faCalendarDays,  accent: "#F97316" },
+            { tab: "product" as const, label: isEn ? "New product" : "新增產品",  icon: faBoxOpen,       accent: "#18181b" },
+            { tab: "event"   as const, label: isEn ? "New event" : "新增活動",    icon: faCalendarDays,  accent: "#18181b" },
           ]).map((opt) => (
             <button
               key={opt.tab}
@@ -1701,7 +1697,7 @@ function IconNavLink({ item, active, onClick }: { item: NavItem; active: boolean
           width: 64, height: 44, margin: "1px auto 0",
           display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
           background: "none", border: "none", padding: 0, cursor: "pointer",
-          color: active ? "#F97316" : "#9ca3af",
+          color: active ? "#18181b" : "#9ca3af",
           transition: "color 0.1s",
           position: "relative",
         }}
@@ -1729,7 +1725,7 @@ function IconNavLink({ item, active, onClick }: { item: NavItem; active: boolean
         {/* Active/hover pill */}
         <span className="nav-pill" style={{
           position: "absolute", inset: "4px 6px", borderRadius: 10, pointerEvents: "none",
-          background: active ? "rgba(249,115,22,0.10)" : "transparent",
+          background: active ? "rgba(24,24,27,0.10)" : "transparent",
           transition: "background 0.1s",
         }} />
         {/* 2026-05-10: tier items render the seconds badge AS the icon.
@@ -1742,9 +1738,9 @@ function IconNavLink({ item, active, onClick }: { item: NavItem; active: boolean
             display: "flex", alignItems: "center", justifyContent: "center",
             fontSize: 12, fontWeight: 700, letterSpacing: "-0.02em",
             position: "relative",
-            color: active ? "white" : "#7C3AED",
-            background: active ? "rgb(249,115,22)" : "rgba(124,58,237,0.10)",
-            border: active ? "none" : "1px solid rgba(124,58,237,0.20)",
+            color: active ? "white" : "#18181b",
+            background: active ? "rgb(24,24,27)" : "rgba(24,24,27,0.10)",
+            border: active ? "none" : "1px solid rgba(24,24,27,0.20)",
             transition: "background 0.12s, color 0.12s",
           }}>
             {item.tierBadge}
@@ -2004,8 +2000,8 @@ function AccountPopup({ onLogout, onClose, onOpenSupport }: {
                 {item.label}
                 {item.badge && (
                   <span style={{
-                    fontSize: 12, fontWeight: 600, color: "#7c3aed",
-                    background: "#ede9fe", borderRadius: 4, padding: "1px 5px",
+                    fontSize: 12, fontWeight: 600, color: "#18181b",
+                    background: "#f4f4f5", borderRadius: 4, padding: "1px 5px",
                   }}>{item.badge}</span>
                 )}
               </span>
@@ -2040,10 +2036,10 @@ function PopupRow({ children, onClick, active }: { children: React.ReactNode; on
     <button onClick={onClick} style={{
       width: "100%", display: "flex", alignItems: "center", gap: 12,
       padding: "8px 8px", borderRadius: 10, border: "none", textAlign: "left", cursor: "pointer",
-      background: active ? "#fff7ed" : "none", transition: "background 0.1s",
+      background: active ? "#f4f4f5" : "none", transition: "background 0.1s",
     }}
       onMouseEnter={e => { if (!active) e.currentTarget.style.background = "#f9fafb"; }}
-      onMouseLeave={e => { e.currentTarget.style.background = active ? "#fff7ed" : "none"; }}
+      onMouseLeave={e => { e.currentTarget.style.background = active ? "#f4f4f5" : "none"; }}
     >
       {children}
     </button>
@@ -2156,12 +2152,12 @@ function NotifPanel({ onClose }: { onClose: () => void }) {
               onClick={() => handleItemClick(n)}
               style={{
                 display: "flex", gap: 12, padding: "12px 16px",
-                background: isUnread ? "rgba(249,115,22,0.04)" : "transparent",
+                background: isUnread ? "rgba(24,24,27,0.04)" : "transparent",
                 borderBottom: "1px solid #f9fafb", cursor: "pointer", position: "relative",
                 transition: "background 0.1s",
               }}
-              onMouseEnter={e => (e.currentTarget.style.background = isUnread ? "rgba(249,115,22,0.08)" : "#f9fafb")}
-              onMouseLeave={e => (e.currentTarget.style.background = isUnread ? "rgba(249,115,22,0.04)" : "transparent")}
+              onMouseEnter={e => (e.currentTarget.style.background = isUnread ? "rgba(24,24,27,0.08)" : "#f9fafb")}
+              onMouseLeave={e => (e.currentTarget.style.background = isUnread ? "rgba(24,24,27,0.04)" : "transparent")}
             >
               <div style={{
                 width: 40, height: 40, borderRadius: "50%", flexShrink: 0, background: n.avatarColor,
@@ -2270,7 +2266,7 @@ class RouteErrorBoundary extends React.Component<
             </p>
             <div style={{ marginTop: 14, display: "flex", gap: 8, flexWrap: "wrap" }}>
               <button
-                style={{ padding: "6px 12px", background: "#3b82f6", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontSize: 13 }}
+                style={{ padding: "6px 12px", background: "#18181b", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontSize: 13 }}
                 onClick={() => this.setState({ error: null, resetKey: this.state.resetKey + 1 })}
               >
                 重試
@@ -2283,7 +2279,7 @@ class RouteErrorBoundary extends React.Component<
               </button>
               <a
                 href={`mailto:sowork@sowork.ai?subject=${encodeURIComponent("OnBrand 頁面錯誤 " + window.location.pathname)}&body=${encodeURIComponent("錯誤訊息：\n" + (this.state.error?.message ?? "") + "\n\n頁面：" + window.location.href)}`}
-                style={{ fontSize: 12, color: "#3b82f6", textDecoration: "underline", marginLeft: "auto", alignSelf: "center" }}
+                style={{ fontSize: 12, color: "#3f3f46", textDecoration: "underline", marginLeft: "auto", alignSelf: "center" }}
               >
                 聯絡客服
               </a>

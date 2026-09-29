@@ -1692,15 +1692,15 @@ export default function BrandsPage() {
                 <button key={item.id} onClick={() => setSection(item.id)} style={{
                   width: "100%", display: "flex", alignItems: "center",
                   padding: "5px 10px", borderRadius: 8,
-                  background: active ? "rgba(163,112,252,0.15)" : "none",
+                  background: active ? "rgba(24,24,27,0.06)" : "none",
                   border: "none", cursor: "pointer",
                   fontSize: 12, fontWeight: active ? 600 : 400,
-                  color: active ? "rgb(74,46,126)" : "rgb(15,16,21)",
+                  color: active ? "rgb(24,24,27)" : "rgb(15,16,21)",
                   textAlign: "left", transition: "background 0.12s",
                   whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
                 }}
                   onMouseEnter={e => { if (!active) e.currentTarget.style.background = "#F5F4F2"; }}
-                  onMouseLeave={e => { e.currentTarget.style.background = active ? "rgba(163,112,252,0.15)" : "none"; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = active ? "rgba(24,24,27,0.06)" : "none"; }}
                 >
                   {item.label}
                 </button>
@@ -1737,16 +1737,16 @@ export default function BrandsPage() {
                 <button onClick={() => setSection("settings")} style={{
                   width: "100%", display: "flex", alignItems: "center", gap: 8,
                   padding: "5px 10px", borderRadius: 8,
-                  background: active ? "rgba(163,112,252,0.15)" : "none",
+                  background: active ? "rgba(24,24,27,0.06)" : "none",
                   border: "none", cursor: "pointer",
                   fontSize: 12, fontWeight: active ? 600 : 400,
-                  color: active ? "rgb(74,46,126)" : "rgb(15,16,21)",
+                  color: active ? "rgb(24,24,27)" : "rgb(15,16,21)",
                   textAlign: "left", transition: "background 0.12s",
                 }}
                   onMouseEnter={e => { if (!active) e.currentTarget.style.background = "#F5F4F2"; }}
-                  onMouseLeave={e => { e.currentTarget.style.background = active ? "rgba(163,112,252,0.15)" : "none"; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = active ? "rgba(24,24,27,0.06)" : "none"; }}
                 >
-                  <FontAwesomeIcon icon={faGear} style={{ fontSize: 12, color: active ? "rgb(74,46,126)" : "#A8A29E" }} />
+                  <FontAwesomeIcon icon={faGear} style={{ fontSize: 12, color: active ? "rgb(24,24,27)" : "#A8A29E" }} />
                   設定
                 </button>
               );
@@ -3580,10 +3580,10 @@ function VisualNavItem({ label, badge, active, onClick }: {
       style={{
         width: "100%", display: "flex", alignItems: "center",
         padding: "4px 12px", borderRadius: 8,
-        background: active ? "rgba(163,112,252,0.15)" : hovered ? "#F5F4F2" : "none",
+        background: active ? "rgba(24,24,27,0.06)" : hovered ? "#F5F4F2" : "none",
         border: "none", cursor: "pointer",
         fontSize: 12, fontWeight: active ? 600 : 400,
-        color: active ? "rgb(74,46,126)" : "rgb(15,16,21)",
+        color: active ? "rgb(24,24,27)" : "rgb(15,16,21)",
         textAlign: "left", transition: "background 0.12s",
         gap: 6,
       }}
@@ -3592,16 +3592,16 @@ function VisualNavItem({ label, badge, active, onClick }: {
       {badge && (
         <span style={{
           fontSize: 12, fontWeight: 700, padding: "1px 6px", borderRadius: 20,
-          background: "rgba(163,112,252,0.20)", color: "rgb(74,46,126)",
+          background: "rgba(24,24,27,0.08)", color: "rgb(24,24,27)",
           flexShrink: 0,
         }}>{badge}</span>
       )}
       {hovered && (
         <span style={{
           width: 18, height: 18, borderRadius: 4, flexShrink: 0,
-          background: "rgba(163,112,252,0.20)", display: "flex",
+          background: "rgba(24,24,27,0.08)", display: "flex",
           alignItems: "center", justifyContent: "center",
-          fontSize: 12, color: "rgb(74,46,126)", fontWeight: 700,
+          fontSize: 12, color: "rgb(24,24,27)", fontWeight: 700,
         }}>+</span>
       )}
     </button>
@@ -4903,7 +4903,7 @@ function BrandedVariantsModal({ title, loading, error, variants, cutoutAvailable
           )}
           {!error && loading && (
             <div style={{ textAlign: "center", padding: "40px 20px", color: "#78716C" }}>
-              <div style={{ display: "inline-block", width: 32, height: 32, borderRadius: "50%", border: "3px solid #E5E7EB", borderTopColor: "#E85D2E", animation: "spin 0.8s linear infinite", marginBottom: 16 }} />
+              <div style={{ display: "inline-block", width: 32, height: 32, borderRadius: "50%", border: "3px solid #E5E7EB", borderTopColor: "#18181B", animation: "spin 0.8s linear infinite", marginBottom: 16 }} />
               <p style={{ fontSize: 13, margin: 0 }}>
                 {en
                   ? "Compositing — running cutout + 4 layouts (~8 sec)…"
@@ -4941,9 +4941,9 @@ function BrandedVariantsModal({ title, loading, error, variants, cutoutAvailable
                         href={v.pngDataUrl}
                         download={`${title}_${v.layout}.png`}
                         style={{
-                          fontSize: 12, fontWeight: 600, color: "#E85D2E",
+                          fontSize: 12, fontWeight: 600, color: "#18181B",
                           textDecoration: "none", padding: "4px 8px",
-                          border: "1px solid #E85D2E", borderRadius: 6,
+                          border: "1px solid #18181B", borderRadius: 6,
                         }}
                       >
                         {en ? "Download" : "下載"}
@@ -5105,8 +5105,8 @@ function BrandPaletteHero({
               style={{
                 fontSize: 12, fontWeight: 600, padding: "7px 14px",
                 borderRadius: 8, cursor: locked || genVisualMut?.isPending ? "not-allowed" : "pointer",
-                border: "1px solid #E85D2E",
-                background: "#E85D2E", color: "#FFFFFF",
+                border: "1px solid #18181B",
+                background: "#18181B", color: "#FFFFFF",
                 opacity: locked ? 0.5 : 1,
                 transition: "all 0.15s",
               }}
@@ -5460,8 +5460,8 @@ function BrandEntityGrid({
                         disabled={kind !== "event" && isRunning}
                         className={`text-[12px] font-medium px-2 py-1 rounded-md transition flex-1 min-w-0 text-center ${
                           isRunning
-                            ? "bg-indigo-100 text-indigo-500 cursor-wait animate-pulse"
-                            : "bg-indigo-50 text-indigo-700 hover:bg-indigo-100"
+                            ? "bg-zinc-100 text-zinc-500 cursor-wait animate-pulse"
+                            : "bg-zinc-50 text-zinc-700 hover:bg-zinc-100"
                         }`}
                       >
                         {/* 2026-09-25（CJ「按下開始定位，居然跑到品牌的頁籤」）：
@@ -5520,7 +5520,7 @@ function BrandEntityGrid({
                           });
                         }
                       }}
-                      className="text-[12px] font-medium px-2 py-1 rounded-md bg-orange-50 text-orange-700 hover:bg-orange-100 transition"
+                      className="text-[12px] font-medium px-2 py-1 rounded-md bg-zinc-50 text-zinc-700 hover:bg-zinc-100 transition"
                       title={en ? "Generate 4 branded variants" : "用品牌色生成 4 種變體"}
                     >
                       {en ? "Variants" : "品牌變體"}

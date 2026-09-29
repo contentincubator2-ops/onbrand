@@ -42,7 +42,7 @@ export default function PlanExpiredPage() {
         <div className="flex flex-col gap-3">
           <button
             onClick={() => navigate("/pricing")}
-            className="w-full py-3 rounded-full bg-violet-600 text-white text-sm font-semibold hover:bg-violet-700 transition"
+            className="w-full py-3 rounded-full bg-zinc-600 text-white text-sm font-semibold hover:bg-zinc-700 transition"
           >
             {lang === "en" ? "View plans & upgrade →" : "查看方案，立即升級 →"}
           </button>

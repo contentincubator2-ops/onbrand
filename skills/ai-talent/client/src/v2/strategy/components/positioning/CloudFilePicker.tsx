@@ -21,7 +21,7 @@ export type CloudFileSource = { provider: Provider; fileId: string; name: string
 
 const PROVIDER_LABEL: Record<Provider, string> = { google_drive: "Google Drive", onedrive: "OneDrive" };
 const PROVIDER_ICON: Record<Provider, any> = { google_drive: faGoogleDrive, onedrive: faMicrosoft };
-const PROVIDER_TONE: Record<Provider, string> = { google_drive: "#0F9D58", onedrive: "#0078D4" };
+const PROVIDER_TONE: Record<Provider, string> = { google_drive: "#18181b", onedrive: "#18181b" };
 
 function openConnectPopup(provider: Provider, brandId: number): Promise<boolean> {
   return new Promise((resolve) => {
@@ -108,7 +108,7 @@ function ProviderPane({ brandId, provider, onAdd, added }: {
               {i > 0 && <span className="text-default-300">/</span>}
               <button
                 onClick={() => setPath(path.slice(0, i + 1))}
-                className={i === path.length - 1 ? "font-semibold text-default-700" : "hover:text-orange-600"}
+                className={i === path.length - 1 ? "font-semibold text-default-700" : "hover:text-zinc-600"}
               >
                 {p.name}
               </button>
@@ -139,7 +139,7 @@ function ProviderPane({ brandId, provider, onAdd, added }: {
             <div key={f.id} className="flex items-center gap-2 px-3 py-2 hover:bg-default-50">
               {f.isFolder ? (
                 <button onClick={() => setPath((p) => [...p, { id: f.id, name: f.name }])} className="flex items-center gap-2 flex-1 min-w-0 text-left">
-                  <FontAwesomeIcon icon={faFolder} style={{ color: "#F59E0B", fontSize: 13 }} />
+                  <FontAwesomeIcon icon={faFolder} style={{ color: "#71717a", fontSize: 13 }} />
                   <span className="text-xs text-default-700 truncate">{f.name}</span>
                 </button>
               ) : (
@@ -150,7 +150,7 @@ function ProviderPane({ brandId, provider, onAdd, added }: {
                     disabled={isAdded}
                     onClick={() => onAdd({ provider, fileId: f.id, name: f.name })}
                     className={`shrink-0 text-[12px] font-medium px-2 py-1 rounded-full flex items-center gap-1 ${
-                      isAdded ? "text-emerald-600 bg-emerald-50" : "text-orange-600 bg-orange-50 hover:bg-orange-100"
+                      isAdded ? "text-emerald-600 bg-emerald-50" : "text-zinc-600 bg-zinc-50 hover:bg-zinc-100"
                     }`}
                   >
                     <FontAwesomeIcon icon={faPlus} style={{ fontSize: 12 }} /> {isAdded ? (en ? "Added" : "已加入") : (en ? "Add" : "加入")}

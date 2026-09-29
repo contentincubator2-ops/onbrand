@@ -85,7 +85,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   const COLORS: Record<ToastType, { bg: string; border: string; icon: React.ReactNode }> = {
     success: { bg: "#F0FDF4", border: "#86EFAC", icon: <DoneIcon size={14} /> },
     error:   { bg: "#FFF1F0", border: "#FCA5A5", icon: <ErrorIcon size={14} /> },
-    info:    { bg: "#EFF6FF", border: "#93C5FD", icon: <InfoIcon size={14} /> },
+    info:    { bg: "#FAFAFA", border: "#D4D4D8", icon: <InfoIcon size={14} /> },
     warning: { bg: "#FFFBEB", border: "#FCD34D", icon: <WarningIcon size={14} /> },
   };
 

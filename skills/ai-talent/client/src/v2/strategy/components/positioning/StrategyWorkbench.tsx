@@ -426,7 +426,7 @@ export default function StrategyWorkbench({
           {/* 折疊時也要看得到「有東西值得注意」——不然收合等於使用者永遠
               看不到健檢結果，除非剛好想到要點開。 */}
           {liveFindingsCount > 0 && (
-            <span style={{ fontSize: 12, fontWeight: 800, border: "1.5px solid #E8542F", borderRadius: 999, padding: "2px 10px", color: "#E8542F", background: "#FDF1EC" }}>
+            <span style={{ fontSize: 12, fontWeight: 800, border: "1.5px solid #3F3F46", borderRadius: 999, padding: "2px 10px", color: "#3F3F46", background: "#F4F4F5" }}>
               <WarningIcon size={11} /> {en ? `${liveFindingsCount} anchor${liveFindingsCount > 1 ? "s" : ""} to review` : `${liveFindingsCount} 個錨點待複查`}
             </span>
           )}
@@ -540,8 +540,8 @@ export default function StrategyWorkbench({
                       onClick={() => setOpenFinding(openFinding === row.anchor ? null : row.anchor)}
                       style={{
                         display: "inline-flex", alignItems: "center", gap: 5, marginTop: 6,
-                        fontSize: 12, fontWeight: 700, color: "#E8542F", cursor: "pointer",
-                        border: "1.5px solid #E8542F", borderRadius: 999, padding: "2px 11px", background: "#FDF1EC",
+                        fontSize: 12, fontWeight: 700, color: "#3F3F46", cursor: "pointer",
+                        border: "1.5px solid #3F3F46", borderRadius: 999, padding: "2px 11px", background: "#F4F4F5",
                       }}>
                       <WarningIcon size={11} /> {en ? "AI health check disagrees" : "AI 健檢跟這項不一致"} {openFinding === row.anchor ? "▾" : "▸"}
                     </span>
@@ -549,7 +549,7 @@ export default function StrategyWorkbench({
                 </div>
               </div>
               {finding && openFinding === row.anchor && (
-                <div style={{ marginLeft: 130, marginTop: 6, background: "#FDF1EC", border: "1.5px solid #E8542F", borderRadius: 10, padding: "10px 13px", fontSize: 12.5 }}>
+                <div style={{ marginLeft: 130, marginTop: 6, background: "#F4F4F5", border: "1.5px solid #3F3F46", borderRadius: 10, padding: "10px 13px", fontSize: 12.5 }}>
                   {finding.rationale && (
                     <p style={{ margin: "0 0 6px", color: "#6E6878", lineHeight: 1.6 }}>{finding.rationale}</p>
                   )}
@@ -608,7 +608,7 @@ export default function StrategyWorkbench({
         ) : (
           <div style={{ display: "grid", gridTemplateColumns: "1.35fr 1fr", gap: 12 }}>
             {/* 甜蜜點（大區，含標語） */}
-            <div style={{ gridRow: "span 2", background: "#FDF1EC", border: "2px solid #E8542F", borderRadius: 13, padding: "13px 14px 8px" }}>
+            <div style={{ gridRow: "span 2", background: "#F4F4F5", border: "2px solid #3F3F46", borderRadius: 13, padding: "13px 14px 8px" }}>
               <div style={{ fontSize: 13.5, fontWeight: 800 }}>{en ? "Sweet spots" : "甜蜜點"}
                 <span style={{ fontSize: 12.5, fontWeight: 600, color: "#8A8494", marginLeft: 8 }}>
                   {en ? "she wants · rivals can't · we can" : "她要・所選對手沒有・我們有 → 差異化主軸"}
@@ -616,8 +616,8 @@ export default function StrategyWorkbench({
               </div>
               <div style={{ fontSize: 12.5, color: "#8A8494", marginBottom: 9 }}>{en ? "All copy firepower goes here" : "文案與活動的火力集中區"}</div>
               {derived.spots.map((s, i) => (
-                <div key={i} style={{ ...S.zoneCard, borderLeft: "4px solid #E8542F" }}>
-                  <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: ".1em", color: "#E8542F", display: "flex", alignItems: "center", gap: 8 }}>
+                <div key={i} style={{ ...S.zoneCard, borderLeft: "4px solid #3F3F46" }}>
+                  <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: ".1em", color: "#3F3F46", display: "flex", alignItems: "center", gap: 8 }}>
                     <span>SPOT {i + 1} · {s.lane === "function" ? (en ? "FUNCTION" : "功能") : (en ? "EMOTION" : "情感")}</span>
                     {(s as any).official && (
                       <span style={{ background: "#2A2630", color: "#fff", borderRadius: 5, padding: "1px 8px", letterSpacing: ".06em" }}>
@@ -629,12 +629,12 @@ export default function StrategyWorkbench({
                   <div style={{ fontSize: 12.5, color: "#6E6878", lineHeight: 1.65 }}>
                     {s.need}
                     <span style={{ color: "#C9C4BC", padding: "0 4px" }}>←</span>
-                    <b style={{ color: "#2A2630", borderBottom: "2px solid #D9A5A3", fontWeight: 700 }}>{s.gap}</b>
+                    <b style={{ color: "#2A2630", borderBottom: "2px solid #A1A1AA", fontWeight: 700 }}>{s.gap}</b>
                     <span style={{ color: "#C9C4BC", padding: "0 4px" }}>←</span>
                     <b style={{ color: "#2A2630", borderBottom: "2px solid #9CC3AB", fontWeight: 700 }}>{s.ours}</b>
                   </div>
                   {s.tagline?.zh && (
-                    <div style={{ marginTop: 7, paddingTop: 7, borderTop: "1px dashed #F0DFD6", display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
+                    <div style={{ marginTop: 7, paddingTop: 7, borderTop: "1px dashed #E4E4E7", display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
                       <span style={{ fontSize: 12, fontWeight: 800, color: "#8A8494" }}>{en ? (isEvent ? "SMP FROM THIS SPOT" : "TAGLINE FROM THIS SPOT") : (isEvent ? "此點長出的 SMP" : "此點長出的標語")}</span>
                       <span style={{ fontWeight: 800, fontSize: 14 }}>{s.tagline.zh}</span>
                       {s.tagline.en && <span style={{ fontSize: 12, color: "#8A8494", fontStyle: "italic" }}>{s.tagline.en}</span>}
@@ -696,7 +696,7 @@ export default function StrategyWorkbench({
                   )}
                   {/* P2 dig accordion */}
                   {s.dig && (
-                    <div style={{ marginTop: 8, background: "#FBF7F4", borderRadius: 9, padding: "9px 12px", fontSize: 12.5, color: "#4A4552" }}>
+                    <div style={{ marginTop: 8, background: "#FAFAFA", borderRadius: 9, padding: "9px 12px", fontSize: 12.5, color: "#4A4552" }}>
                       {Array.isArray(s.dig.scenes) && s.dig.scenes.length > 0 && (<>
                         <div style={{ fontSize: 12.5, fontWeight: 800, letterSpacing: ".12em", color: "#A8A29E" }}>{en ? "SCENES & MOT" : "場景與關鍵時刻"}</div>
                         <ul style={{ margin: "3px 0 7px", paddingLeft: 16 }}>
@@ -739,7 +739,7 @@ export default function StrategyWorkbench({
               ))}
             </div>
             {/* 基本籌碼 */}
-            <div style={{ background: "#EEF1F6", border: "1.5px solid #C6CEDD", borderRadius: 13, padding: "13px 14px 6px" }}>
+            <div style={{ background: "#F4F4F5", border: "1.5px solid #D4D4D8", borderRadius: 13, padding: "13px 14px 6px" }}>
               <div style={{ fontSize: 13, fontWeight: 800 }}>{en ? "Table stakes" : "基本籌碼"}
                 <span style={{ fontSize: 12.5, fontWeight: 600, color: "#8A8494", marginLeft: 8 }}>{en ? "must match, never lead" : "她要・對手也有 → 跟上，不當主軸"}</span>
               </div>
@@ -748,7 +748,7 @@ export default function StrategyWorkbench({
               </ul>
             </div>
             {/* 對手地盤 */}
-            <div style={{ background: "#FBF6F5", border: "1.5px solid #DFC0BE", borderRadius: 13, padding: "13px 14px 6px" }}>
+            <div style={{ background: "#FAFAFA", border: "1.5px solid #D4D4D8", borderRadius: 13, padding: "13px 14px 6px" }}>
               <div style={{ fontSize: 13, fontWeight: 800 }}>{en ? "Rival turf" : "對手地盤"}
                 <span style={{ fontSize: 12.5, fontWeight: 600, color: "#8A8494", marginLeft: 8 }}>{en ? "real demand we concede" : "她要・對手強 → 策略性不跟"}</span>
               </div>

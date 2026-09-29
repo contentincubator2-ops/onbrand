@@ -37,7 +37,7 @@ const STATUS_EN: Record<string, string> = {
 };
 const STATUS_TONE: Record<string, string> = {
   pending: "bg-amber-50 text-amber-700 border-amber-200",
-  in_review: "bg-blue-50 text-blue-700 border-blue-200",
+  in_review: "bg-zinc-50 text-zinc-700 border-zinc-200",
   approved: "bg-emerald-50 text-emerald-700 border-emerald-200",
   revision_requested: "bg-rose-50 text-rose-700 border-rose-200",
   expired: "bg-neutral-100 text-neutral-600 border-neutral-200",

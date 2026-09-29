@@ -1615,15 +1615,15 @@ export default function TheaterPage() {
           <div
             className="flex items-center gap-3 rounded-xl px-4 py-3 text-[13px]"
             style={{
-              background: "#FFF7ED",
-              border: "1px solid #FDBA74",
-              color: "#7C2D12",
+              background: "#FAFAFA",
+              border: "1px solid #D4D4D8",
+              color: "#27272a",
             }}
           >
             <span
               className="inline-block w-2.5 h-2.5 rounded-full flex-shrink-0"
               style={{
-                background: "#EA580C",
+                background: "#18181b",
                 animation: "miaUnreadRipple 1.6s ease-in-out infinite",
               }}
               aria-hidden
@@ -1737,7 +1737,7 @@ export default function TheaterPage() {
                       )}
                     </div>
                     <div className="w-32 h-1 bg-default-200 rounded-full overflow-hidden mt-1">
-                      <div className="h-full bg-violet-500 transition-all" style={{ width: `${pct}%` }} />
+                      <div className="h-full bg-zinc-500 transition-all" style={{ width: `${pct}%` }} />
                     </div>
                   </div>
                   <Button
@@ -1808,7 +1808,7 @@ export default function TheaterPage() {
                 <button
                   onClick={handlePlanSchedule}
                   disabled={planScheduleMut?.isPending || running}
-                  className="text-[12px] font-semibold px-3 py-1.5 rounded-lg bg-violet-600 text-white hover:bg-violet-700 disabled:opacity-50 transition flex items-center gap-1.5"
+                  className="text-[12px] font-semibold px-3 py-1.5 rounded-lg bg-zinc-600 text-white hover:bg-zinc-700 disabled:opacity-50 transition flex items-center gap-1.5"
                 >
                   {planScheduleMut?.isPending
                     ? (lang === "en" ? "Planning…" : "排程中…")
@@ -1877,7 +1877,7 @@ export default function TheaterPage() {
             {scheduleVisible && aiSchedule && (
               <div className="mt-1 border-t border-neutral-100 pt-3 space-y-1.5">
                 <div className="flex items-center justify-between mb-2">
-                  <p className="text-[12px] font-semibold text-violet-700">
+                  <p className="text-[12px] font-semibold text-zinc-700">
                     {lang === "en" ? "AI suggested schedule" : "AI 排程建議"}
                   </p>
                   <button onClick={() => setScheduleVisible(false)} className="text-[12px] text-neutral-400 hover:text-neutral-700">
@@ -1887,7 +1887,7 @@ export default function TheaterPage() {
                 {days.map((d) => {
                   const entry = aiSchedule[d.date];
                   if (!entry) return null;
-                  const color = entry.type === "product" ? "#059669" : entry.type === "event" ? "#d97706" : "#6b7280";
+                  const color = entry.type === "product" ? "#3f3f46" : entry.type === "event" ? "#71717a" : "#6b7280";
                   return (
                     <div key={d.date} className="flex items-start gap-2 text-[12px]">
                       <span className="text-neutral-400 w-14 shrink-0 tabular-nums">{d.label}</span>
@@ -1905,13 +1905,13 @@ export default function TheaterPage() {
         <div className="flex items-center gap-2 flex-wrap mt-3">
           <button
             onClick={() => { setMaterialModalOpen(true); setMaterialTab("event"); }}
-            className="px-4 py-2 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 hover:text-indigo-900 border-2 border-indigo-200 hover:border-indigo-400 flex items-center gap-2 text-sm font-medium transition shadow-sm"
+            className="px-4 py-2 rounded-lg bg-zinc-50 hover:bg-zinc-100 text-zinc-700 hover:text-zinc-900 border-2 border-zinc-200 hover:border-zinc-400 flex items-center gap-2 text-sm font-medium transition shadow-sm"
             disabled={running}
           >
             <AddIcon size={16} strokeWidth={2.5} />
             <span>{t("theater_btn_add_materials")}</span>
             {totalMaterials > 0 && (
-              <span className="ml-1 text-[12px] px-1.5 py-0.5 rounded-full bg-indigo-500 text-white font-bold">
+              <span className="ml-1 text-[12px] px-1.5 py-0.5 rounded-full bg-zinc-500 text-white font-bold">
                 {totalMaterials}
               </span>
             )}
@@ -1937,9 +1937,9 @@ export default function TheaterPage() {
             </span>
           ))}
           {photos.map((ph) => (
-            <span key={ph.id} className="px-2.5 py-1 text-xs rounded-lg bg-pink-50 text-pink-800 border border-pink-200 flex items-center gap-1.5">
+            <span key={ph.id} className="px-2.5 py-1 text-xs rounded-lg bg-zinc-50 text-zinc-800 border border-zinc-200 flex items-center gap-1.5">
               <span>{t(`theater_photo_tag_${ph.tag}` as any)}</span>
-              <button onClick={() => setPhotos((prev) => prev.filter((x) => x.id !== ph.id))} className="text-pink-600 hover:text-pink-900">
+              <button onClick={() => setPhotos((prev) => prev.filter((x) => x.id !== ph.id))} className="text-zinc-600 hover:text-zinc-900">
                 <CloseIcon size={11} />
               </button>
             </span>
@@ -2056,7 +2056,7 @@ export default function TheaterPage() {
                     onClick={() => setMaterialTab(t.v)}
                     className={`px-4 py-2 text-sm font-medium border-b-2 transition ${
                       materialTab === t.v
-                        ? "border-indigo-500 text-indigo-700"
+                        ? "border-zinc-500 text-zinc-700"
                         : "border-transparent text-neutral-500 hover:text-neutral-800"
                     }`}
                   >
@@ -2074,7 +2074,7 @@ export default function TheaterPage() {
                       {lang === "en" ? "Select or create event" : "選擇活動或新增"}
                     </label>
                     <select
-                      className="w-full text-sm px-3 py-2 border border-neutral-300 rounded-lg bg-white focus:outline-none focus:border-indigo-500 cursor-pointer"
+                      className="w-full text-sm px-3 py-2 border border-neutral-300 rounded-lg bg-white focus:outline-none focus:border-zinc-500 cursor-pointer"
                       value=""
                       onChange={(e) => {
                         const val = e.target.value;
@@ -2121,11 +2121,11 @@ export default function TheaterPage() {
                   {/* Manual add form — shown when user picks "新增" OR has no brand events */}
                   <div className="flex items-center gap-2">
                     <input type="date" value={newDate} onChange={(e) => setNewDate(e.target.value)} className="text-sm px-2 py-1.5 border border-neutral-300 rounded" />
-                    <input type="text" placeholder={t("theater_event_placeholder")} value={newDateName} onChange={(e) => setNewDateName(e.target.value)} className="flex-1 text-sm px-2 py-1.5 border border-neutral-300 rounded focus:outline-none focus:border-indigo-500" />
+                    <input type="text" placeholder={t("theater_event_placeholder")} value={newDateName} onChange={(e) => setNewDateName(e.target.value)} className="flex-1 text-sm px-2 py-1.5 border border-neutral-300 rounded focus:outline-none focus:border-zinc-500" />
                     <button
                       onClick={() => { handleAddDate(); }}
                       disabled={!newDate || !newDateName}
-                      className="text-sm px-3 py-1.5 rounded-md bg-indigo-500 hover:bg-indigo-600 text-white font-medium disabled:opacity-40"
+                      className="text-sm px-3 py-1.5 rounded-md bg-zinc-500 hover:bg-zinc-600 text-white font-medium disabled:opacity-40"
                     >
                       {t("theater_btn_add_item")}
                     </button>
@@ -2177,7 +2177,7 @@ export default function TheaterPage() {
                       {lang === "en" ? "Select or create product" : "選擇產品或新增"}
                     </label>
                     <select
-                      className="w-full text-sm px-3 py-2 border border-neutral-300 rounded-lg bg-white focus:outline-none focus:border-indigo-500 cursor-pointer"
+                      className="w-full text-sm px-3 py-2 border border-neutral-300 rounded-lg bg-white focus:outline-none focus:border-zinc-500 cursor-pointer"
                       value=""
                       onChange={(e) => {
                         const val = e.target.value;
@@ -2215,8 +2215,8 @@ export default function TheaterPage() {
 
                   {/* Manual add form */}
                   <div className="space-y-2">
-                    <input type="text" placeholder={t("theater_product_name_ph")} value={newProductName} onChange={(e) => setNewProductName(e.target.value)} className="w-full text-sm px-2 py-1.5 border border-neutral-300 rounded focus:outline-none focus:border-indigo-500" />
-                    <input type="text" placeholder={t("theater_product_usp_ph")} value={newProductUsp} onChange={(e) => setNewProductUsp(e.target.value)} className="w-full text-sm px-2 py-1.5 border border-neutral-300 rounded focus:outline-none focus:border-indigo-500" />
+                    <input type="text" placeholder={t("theater_product_name_ph")} value={newProductName} onChange={(e) => setNewProductName(e.target.value)} className="w-full text-sm px-2 py-1.5 border border-neutral-300 rounded focus:outline-none focus:border-zinc-500" />
+                    <input type="text" placeholder={t("theater_product_usp_ph")} value={newProductUsp} onChange={(e) => setNewProductUsp(e.target.value)} className="w-full text-sm px-2 py-1.5 border border-neutral-300 rounded focus:outline-none focus:border-zinc-500" />
                     <div className="flex items-center gap-2">
                       <input type="date" value={newProductLaunch} onChange={(e) => setNewProductLaunch(e.target.value)} className="text-sm px-2 py-1.5 border border-neutral-300 rounded" />
                       <button
@@ -2232,7 +2232,7 @@ export default function TheaterPage() {
                           setNewProductName(""); setNewProductUsp(""); setNewProductLaunch("");
                         }}
                         disabled={!newProductName || !newProductUsp}
-                        className="ml-auto text-sm px-3 py-1.5 rounded-md bg-indigo-500 hover:bg-indigo-600 text-white font-medium disabled:opacity-40"
+                        className="ml-auto text-sm px-3 py-1.5 rounded-md bg-zinc-500 hover:bg-zinc-600 text-white font-medium disabled:opacity-40"
                       >
                         {t("theater_btn_add_item")}
                       </button>
@@ -2293,8 +2293,8 @@ export default function TheaterPage() {
                     <div className="grid grid-cols-3 gap-2 max-h-48 overflow-y-auto">
                       {photos.map((ph) => (
                         <div key={ph.id} className="relative group">
-                          <img src={ph.url} alt={ph.note ?? ph.tag} className="w-full aspect-square object-cover rounded-lg border border-pink-200" />
-                          <span className="absolute top-1 left-1 text-[12px] px-1.5 py-0.5 rounded-full bg-pink-500/90 text-white font-medium">
+                          <img src={ph.url} alt={ph.note ?? ph.tag} className="w-full aspect-square object-cover rounded-lg border border-zinc-200" />
+                          <span className="absolute top-1 left-1 text-[12px] px-1.5 py-0.5 rounded-full bg-zinc-500/90 text-white font-medium">
                             {t(`theater_photo_tag_${ph.tag}` as any)}
                           </span>
                           <button onClick={() => setPhotos((prev) => prev.filter((x) => x.id !== ph.id))} className="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/60 text-white flex items-center justify-center opacity-0 group-hover:opacity-100">
@@ -2307,7 +2307,7 @@ export default function TheaterPage() {
                   <div className="space-y-2">
                     {/* File upload OR URL — two paths to add a photo */}
                     <div className="flex items-center gap-2">
-                      <label className="cursor-pointer flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg border-2 border-dashed border-indigo-300 text-indigo-600 hover:border-indigo-500 hover:bg-indigo-50 transition">
+                      <label className="cursor-pointer flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg border-2 border-dashed border-zinc-300 text-zinc-600 hover:border-zinc-500 hover:bg-zinc-50 transition">
                         <UploadIcon size={13} /> {lang === "en" ? "Upload from device" : "從電腦上傳"}
                         <input
                           type="file"
@@ -2334,7 +2334,7 @@ export default function TheaterPage() {
                         />
                       </label>
                       <span className="text-neutral-400 text-xs">{lang === "en" ? "or" : "或"}</span>
-                      <input type="url" placeholder={t("theater_photo_url_ph")} value={newPhotoUrl} onChange={(e) => setNewPhotoUrl(e.target.value)} className="flex-1 text-sm px-2 py-1.5 border border-neutral-300 rounded focus:outline-none focus:border-indigo-500" />
+                      <input type="url" placeholder={t("theater_photo_url_ph")} value={newPhotoUrl} onChange={(e) => setNewPhotoUrl(e.target.value)} className="flex-1 text-sm px-2 py-1.5 border border-neutral-300 rounded focus:outline-none focus:border-zinc-500" />
                     </div>
                     <div className="flex items-center gap-2">
                       <select value={newPhotoTag} onChange={(e) => setNewPhotoTag(e.target.value as any)} className="text-sm px-2 py-1.5 border border-neutral-300 rounded">
@@ -2343,7 +2343,7 @@ export default function TheaterPage() {
                         <option value="person">{t("theater_photo_tag_person")}</option>
                         <option value="lifestyle">{t("theater_photo_tag_lifestyle")}</option>
                       </select>
-                      <input type="text" placeholder={t("theater_photo_note_ph")} value={newPhotoNote} onChange={(e) => setNewPhotoNote(e.target.value)} className="flex-1 text-sm px-2 py-1.5 border border-neutral-300 rounded focus:outline-none focus:border-indigo-500" />
+                      <input type="text" placeholder={t("theater_photo_note_ph")} value={newPhotoNote} onChange={(e) => setNewPhotoNote(e.target.value)} className="flex-1 text-sm px-2 py-1.5 border border-neutral-300 rounded focus:outline-none focus:border-zinc-500" />
                       <button
                         onClick={() => {
                           if (!newPhotoUrl) return;
@@ -2356,7 +2356,7 @@ export default function TheaterPage() {
                           setNewPhotoUrl(""); setNewPhotoNote("");
                         }}
                         disabled={!newPhotoUrl}
-                        className="text-sm px-3 py-1.5 rounded-md bg-indigo-500 hover:bg-indigo-600 text-white font-medium disabled:opacity-40"
+                        className="text-sm px-3 py-1.5 rounded-md bg-zinc-500 hover:bg-zinc-600 text-white font-medium disabled:opacity-40"
                       >
                         {t("theater_btn_add_item")}
                       </button>
@@ -2484,7 +2484,7 @@ export default function TheaterPage() {
                 value={ruleText}
                 onChange={(e) => setRuleText(e.target.value)}
                 placeholder={t("theater_rule_placeholder")}
-                className="w-full text-sm px-3 py-2 border border-neutral-300 rounded resize-none focus:outline-none focus:border-indigo-500"
+                className="w-full text-sm px-3 py-2 border border-neutral-300 rounded resize-none focus:outline-none focus:border-zinc-500"
                 style={{ minHeight: 80 }}
               />
               <p className="text-xs font-medium text-neutral-700 mt-4 mb-2">{t("theater_rule_scope_label")}</p>
@@ -2497,7 +2497,7 @@ export default function TheaterPage() {
                   <label
                     key={opt.v}
                     className={`block p-2.5 rounded-lg border cursor-pointer transition ${
-                      ruleScope === opt.v ? "border-indigo-500 bg-indigo-50" : "border-neutral-200 hover:bg-neutral-50"
+                      ruleScope === opt.v ? "border-zinc-500 bg-zinc-50" : "border-neutral-200 hover:bg-neutral-50"
                     }`}
                   >
                     <div className="flex items-start gap-2">
@@ -2525,7 +2525,7 @@ export default function TheaterPage() {
                 <button
                   onClick={submitRule}
                   disabled={!ruleText.trim()}
-                  className="text-sm px-4 py-1.5 rounded-md bg-indigo-500 hover:bg-indigo-600 text-white font-medium disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="text-sm px-4 py-1.5 rounded-md bg-zinc-500 hover:bg-zinc-600 text-white font-medium disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   {t("theater_btn_apply_redo")}
                 </button>

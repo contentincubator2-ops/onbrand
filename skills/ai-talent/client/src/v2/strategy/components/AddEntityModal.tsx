@@ -265,9 +265,9 @@ export function AddEntityModal({ isOpen, onClose, initialTab = "brand", defaultB
           {/* Tab strip */}
           <div className="flex items-center gap-1 mb-5 border-b border-default-200">
             {([
-              { v: "brand"   as const, label: EntityLabel("brand"),   icon: faRocket,        accent: "#7C3AED" },
-              { v: "product" as const, label: EntityLabel("product"), icon: faCubes,         accent: "#059669" },
-              { v: "event"   as const, label: EntityLabel("event"),   icon: faCalendarDays,  accent: "#F97316" },
+              { v: "brand"   as const, label: EntityLabel("brand"),   icon: faRocket,        accent: "#18181b" },
+              { v: "product" as const, label: EntityLabel("product"), icon: faCubes,         accent: "#18181b" },
+              { v: "event"   as const, label: EntityLabel("event"),   icon: faCalendarDays,  accent: "#18181b" },
             ]).map((t) => (
               <button
                 key={t.v}

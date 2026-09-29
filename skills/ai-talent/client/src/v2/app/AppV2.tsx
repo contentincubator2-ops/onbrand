@@ -103,7 +103,7 @@ function RouteFallback() {
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        background: "#F7F2EB",
+        background: "#FAFAFA",
       }}
       aria-label="Loading"
     >
@@ -112,8 +112,8 @@ function RouteFallback() {
           width: 32,
           height: 32,
           borderRadius: "50%",
-          border: "3px solid #EFE7D6",
-          borderTopColor: "#E85D2E",
+          border: "3px solid #E4E4E7",
+          borderTopColor: "#18181b",
           animation: "spin 0.8s linear infinite",
         }}
       />
@@ -211,7 +211,7 @@ class AppErrorBoundary extends React.Component<
             )}
             <div style={{ marginTop: 12, display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
               <button
-                style={{ padding: "6px 12px", background: "#3b82f6", color: "white", border: "none", borderRadius: 6, cursor: "pointer" }}
+                style={{ padding: "6px 12px", background: "#18181b", color: "white", border: "none", borderRadius: 6, cursor: "pointer" }}
                 onClick={() => { this.setState({ error: null }); }}
               >
                 重試渲染
@@ -243,7 +243,7 @@ class AppErrorBoundary extends React.Component<
                   shell/footer to reach customer service. */}
               <a
                 href={`mailto:sowork@sowork.ai?subject=${encodeURIComponent("OnBrand 應用程式錯誤")}&body=${encodeURIComponent("錯誤訊息：\n" + (this.state.error?.message ?? "") + "\n\n頁面：" + window.location.href)}`}
-                style={{ marginLeft: "auto", fontSize: 12, color: "#3b82f6", textDecoration: "underline" }}
+                style={{ marginLeft: "auto", fontSize: 12, color: "#3f3f46", textDecoration: "underline" }}
               >
                 聯絡客服 sowork@sowork.ai
               </a>

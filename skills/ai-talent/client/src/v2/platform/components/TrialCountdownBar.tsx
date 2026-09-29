@@ -81,7 +81,7 @@ function TrialBarWithProgress({
   return (
     <div className={`px-4 py-2 text-xs flex items-center justify-center gap-4 border-b flex-wrap ${
       urgency === "high" ? "bg-amber-50 border-amber-200 text-amber-900" :
-      urgency === "medium" ? "bg-blue-50 border-blue-200 text-blue-900" :
+      urgency === "medium" ? "bg-zinc-50 border-zinc-200 text-zinc-900" :
       "bg-neutral-50 border-neutral-200 text-neutral-700"
     }`}>
       {/* Days remaining */}
@@ -97,7 +97,7 @@ function TrialBarWithProgress({
       <span className="flex items-center gap-1.5">
         <span className="w-16 h-1.5 bg-neutral-300/50 rounded-full overflow-hidden">
           <span
-            className={`block h-full rounded-full ${urgency === "high" ? "bg-amber-500" : urgency === "medium" ? "bg-blue-500" : "bg-neutral-500"}`}
+            className={`block h-full rounded-full ${urgency === "high" ? "bg-amber-500" : urgency === "medium" ? "bg-zinc-500" : "bg-neutral-500"}`}
             style={{ width: `${pointsPct}%` }}
           />
         </span>

@@ -107,7 +107,7 @@ export default function ForgotPasswordPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder={t("auth_email_placeholder")}
-                className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400 transition-colors"
+                className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-400 focus:border-zinc-400 transition-colors"
                 autoComplete="email"
                 required
               />
@@ -124,9 +124,9 @@ export default function ForgotPasswordPage() {
               disabled={loading || !email}
               className="w-full rounded-lg py-2.5 text-sm font-semibold transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
               style={{
-                background: loading ? "#d1cbf8" : "#171717",
+                background: loading ? "#d4d4d8" : "#171717",
                 color: "white",
-                boxShadow: loading ? "none" : "0 4px 12px rgba(108,92,231,0.35)",
+                boxShadow: loading ? "none" : "0 4px 12px rgba(24,24,27,0.25)",
               }}
             >
               {loading ? t("auth_forgot_busy") : t("auth_forgot_btn")}
@@ -134,7 +134,7 @@ export default function ForgotPasswordPage() {
 
             <p className="text-center text-xs text-gray-400">
               {lang === "en" ? "Remembered it?" : "記得密碼了？"}
-              <Link to="/auth/login" className="text-indigo-500 hover:text-indigo-700 ml-1 underline">
+              <Link to="/auth/login" className="text-zinc-500 hover:text-zinc-700 ml-1 underline">
                 {t("auth_back_to_login")}
               </Link>
             </p>

@@ -292,7 +292,7 @@ function CraftChip({ taskId, en }: { taskId?: string | null; en: boolean }) {
       <button
         onClick={() => setOpen((v) => !v)}
         className="flex items-center gap-1 text-[12px] px-2 py-1 rounded-full border transition"
-        style={{ borderColor: "#e5d9b6", background: "#fbf6e7", color: "#8a6d1d" }}
+        style={{ borderColor: "#e4e4e7", background: "#fafafa", color: "#52525b" }}
         title={en ? "Craft reference" : "工藝依據"}
       >
         {en ? "Craft reference" : "工藝依據"}：{caseLabel}
@@ -300,7 +300,7 @@ function CraftChip({ taskId, en }: { taskId?: string | null; en: boolean }) {
       {open && (
         <div
           className="absolute z-50 mt-1 left-0 rounded-lg border bg-white p-3 shadow-lg"
-          style={{ width: 300, borderColor: "#ece7d6" }}
+          style={{ width: 300, borderColor: "#e4e4e7" }}
         >
           <div className="text-[12px] font-bold text-neutral-900 mb-0.5">{caseLabel}</div>
           <div className="text-[12px] text-neutral-500 mb-2">{awardLabel}</div>
@@ -2317,7 +2317,7 @@ export default function RunPage() {
                   }
                 }}
                 className="absolute top-3 right-3 z-20 flex items-center justify-center w-9 h-9 rounded-full shadow-md transition hover:scale-105"
-                style={{ background: "rgba(31,42,77,0.88)", color: "#fff", backdropFilter: "blur(2px)" }}
+                style={{ background: "rgba(24,24,27,0.88)", color: "#fff", backdropFilter: "blur(2px)" }}
               >
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
@@ -2410,7 +2410,7 @@ export default function RunPage() {
                   }
                 }}
                 className="px-4 py-2 rounded-lg text-tiny font-semibold text-white"
-                style={{ background: "#1f2a4d" }}
+                style={{ background: "#18181b" }}
               >
                 {lang === "en" ? "Copy full text" : "複製全文"}
               </button>
@@ -2418,7 +2418,7 @@ export default function RunPage() {
                 onClick={exportSlidePng}
                 disabled={exporting}
                 className="px-4 py-2 rounded-lg text-tiny font-semibold border disabled:opacity-60"
-                style={{ borderColor: "#1f2a4d", color: "#1f2a4d" }}
+                style={{ borderColor: "#18181b", color: "#18181b" }}
               >
                 {exporting
                   ? (lang === "en" ? "Rendering…" : "產生圖片中…")
@@ -2436,7 +2436,7 @@ export default function RunPage() {
                   URL.revokeObjectURL(a.href);
                 }}
                 className="px-4 py-2 rounded-lg text-tiny font-semibold border"
-                style={{ borderColor: "#1f2a4d", color: "#1f2a4d" }}
+                style={{ borderColor: "#18181b", color: "#18181b" }}
               >
                 {lang === "en" ? "Full text (.md)" : "全文（.md）"}
               </button>

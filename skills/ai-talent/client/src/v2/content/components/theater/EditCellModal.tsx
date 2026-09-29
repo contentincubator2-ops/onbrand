@@ -300,14 +300,14 @@ export default function EditCellModal({
               value={caption}
               onChange={e => setCaption(e.target.value)}
               rows={10}
-              className="w-full text-[14px] leading-relaxed px-3 py-2.5 border border-neutral-200 rounded-xl resize-y focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 transition"
+              className="w-full text-[14px] leading-relaxed px-3 py-2.5 border border-neutral-200 rounded-xl resize-y focus:outline-none focus:border-zinc-400 focus:ring-2 focus:ring-zinc-100 transition"
               placeholder={en ? "Write your post here…" : "在這裡輸入貼文內容…"}
             />
             <div className="flex items-center gap-2 mt-2">
               <button
                 onClick={handlePolish}
                 disabled={polishing || !caption.trim()}
-                className="flex items-center gap-1.5 text-[12px] font-medium px-3 py-1.5 rounded-lg bg-indigo-50 text-indigo-700 hover:bg-indigo-100 disabled:opacity-40 transition"
+                className="flex items-center gap-1.5 text-[12px] font-medium px-3 py-1.5 rounded-lg bg-zinc-50 text-zinc-700 hover:bg-zinc-100 disabled:opacity-40 transition"
               >
                 {polishing ? <Spinner size="sm" color="current" /> : <span></span>}
                 {en ? "AI Polish" : "AI 潤稿"}
@@ -337,7 +337,7 @@ export default function EditCellModal({
                   onChange={e => setHashtagInput(e.target.value)}
                   onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); addHashtag(); } }}
                   placeholder={en ? "Add tag (Enter)" : "新增標籤（Enter）"}
-                  className="flex-1 text-[12px] px-2.5 py-1.5 border border-neutral-200 rounded-lg focus:outline-none focus:border-indigo-400 transition"
+                  className="flex-1 text-[12px] px-2.5 py-1.5 border border-neutral-200 rounded-lg focus:outline-none focus:border-zinc-400 transition"
                 />
                 <button
                   onClick={addHashtag}
@@ -358,7 +358,7 @@ export default function EditCellModal({
               <input
                 value={structured.subject ?? ""}
                 onChange={e => setStructured(s => ({ ...s, subject: e.target.value }))}
-                className="w-full text-[13px] px-3 py-2 border border-neutral-200 rounded-xl focus:outline-none focus:border-indigo-400 transition"
+                className="w-full text-[13px] px-3 py-2 border border-neutral-200 rounded-xl focus:outline-none focus:border-zinc-400 transition"
                 placeholder={en ? "Subject line…" : "輸入主旨…"}
               />
             </section>
@@ -377,14 +377,14 @@ export default function EditCellModal({
                     <input
                       value={ch}
                       onChange={e => updateListItem("chapters", i, e.target.value)}
-                      className="flex-1 text-[12px] px-2.5 py-1.5 border border-neutral-200 rounded-lg focus:outline-none focus:border-indigo-400 transition"
+                      className="flex-1 text-[12px] px-2.5 py-1.5 border border-neutral-200 rounded-lg focus:outline-none focus:border-zinc-400 transition"
                     />
                     <button onClick={() => removeListItem("chapters", i)} className="text-neutral-400 hover:text-danger-500 transition"><CloseIcon size={12} /></button>
                   </div>
                 ))}
                 <button
                   onClick={() => addListItem("chapters")}
-                  className="text-[12px] text-indigo-600 hover:text-indigo-800 mt-1"
+                  className="text-[12px] text-zinc-600 hover:text-zinc-800 mt-1"
                 >
                   + {en ? "Add chapter" : "新增章節"}
                 </button>
@@ -412,7 +412,7 @@ export default function EditCellModal({
                           arr[i] = typeof item === "string" ? e.target.value : { ...item, text: e.target.value };
                           setStructured(s => ({ ...s, thread: arr }));
                         }}
-                        className="flex-1 text-[12px] px-2.5 py-1.5 border border-neutral-200 rounded-lg focus:outline-none focus:border-indigo-400 transition resize-none"
+                        className="flex-1 text-[12px] px-2.5 py-1.5 border border-neutral-200 rounded-lg focus:outline-none focus:border-zinc-400 transition resize-none"
                       />
                       <button onClick={() => removeListItem("thread", i)} className="text-neutral-400 hover:text-danger-500 transition mt-2"><CloseIcon size={12} /></button>
                     </div>
@@ -420,7 +420,7 @@ export default function EditCellModal({
                 })}
                 <button
                   onClick={() => addListItem("thread")}
-                  className="text-[12px] text-indigo-600 hover:text-indigo-800 mt-1"
+                  className="text-[12px] text-zinc-600 hover:text-zinc-800 mt-1"
                 >
                   + {en ? "Add thread post" : "新增串文"}
                 </button>
@@ -441,14 +441,14 @@ export default function EditCellModal({
                     <input
                       value={h}
                       onChange={e => updateListItem("h2", i, e.target.value)}
-                      className="flex-1 text-[12px] px-2.5 py-1.5 border border-neutral-200 rounded-lg focus:outline-none focus:border-indigo-400 transition"
+                      className="flex-1 text-[12px] px-2.5 py-1.5 border border-neutral-200 rounded-lg focus:outline-none focus:border-zinc-400 transition"
                     />
                     <button onClick={() => removeListItem("h2", i)} className="text-neutral-400 hover:text-danger-500 transition"><CloseIcon size={12} /></button>
                   </div>
                 ))}
                 <button
                   onClick={() => addListItem("h2")}
-                  className="text-[12px] text-indigo-600 hover:text-indigo-800 mt-1"
+                  className="text-[12px] text-zinc-600 hover:text-zinc-800 mt-1"
                 >
                   + {en ? "Add H2" : "新增段落"}
                 </button>
@@ -488,7 +488,7 @@ export default function EditCellModal({
                   placeholder={en
                     ? "Describe the image you want (leave blank to auto-generate from caption)"
                     : "描述想要的圖片（留空則自動從貼文內容產生）"}
-                  className="w-full text-[12px] px-2.5 py-2 border border-neutral-200 rounded-xl resize-none focus:outline-none focus:border-indigo-400 transition"
+                  className="w-full text-[12px] px-2.5 py-2 border border-neutral-200 rounded-xl resize-none focus:outline-none focus:border-zinc-400 transition"
                 />
                 <button
                   onClick={handleRegenImage}
@@ -505,8 +505,8 @@ export default function EditCellModal({
 
           {/* Schedule section (expandable) */}
           {showSchedule && (
-            <section ref={scheduleRef} className="rounded-xl border border-indigo-200 bg-indigo-50/40 p-4 space-y-3">
-              <p className="text-xs font-semibold uppercase tracking-wide text-indigo-700">
+            <section ref={scheduleRef} className="rounded-xl border border-zinc-200 bg-zinc-50/40 p-4 space-y-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-zinc-700">
                 <span className="inline-flex items-center gap-1"><ScheduleIcon size={12} /> {en ? "Schedule to Calendar" : "排程到行事曆"}</span>
               </p>
               <div>
@@ -517,7 +517,7 @@ export default function EditCellModal({
                   type="datetime-local"
                   value={scheduleAt}
                   onChange={e => setScheduleAt(e.target.value)}
-                  className="text-[13px] px-3 py-2 border border-indigo-200 rounded-xl focus:outline-none focus:border-indigo-500 transition bg-white"
+                  className="text-[13px] px-3 py-2 border border-zinc-200 rounded-xl focus:outline-none focus:border-zinc-500 transition bg-white"
                 />
               </div>
               {scheduleError && <p className="text-[12px] text-danger-600">{scheduleError}</p>}
@@ -525,7 +525,7 @@ export default function EditCellModal({
                 <button
                   onClick={handleSchedule}
                   disabled={scheduling || !scheduleAt}
-                  className="flex items-center gap-1.5 text-[13px] font-semibold px-4 py-2 rounded-xl bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-40 transition"
+                  className="flex items-center gap-1.5 text-[13px] font-semibold px-4 py-2 rounded-xl bg-zinc-600 text-white hover:bg-zinc-700 disabled:opacity-40 transition"
                 >
                   {scheduling ? <Spinner size="sm" color="white" /> : null}
                   {isAlreadyScheduled
@@ -563,8 +563,8 @@ export default function EditCellModal({
               onClick={() => setShowSchedule(v => !v)}
               className={`flex items-center gap-1.5 text-[13px] font-semibold px-4 py-2 rounded-xl transition ${
                 showSchedule
-                  ? "bg-indigo-100 text-indigo-800 border border-indigo-300"
-                  : "bg-indigo-600 text-white hover:bg-indigo-700"
+                  ? "bg-zinc-100 text-zinc-800 border border-zinc-300"
+                  : "bg-zinc-600 text-white hover:bg-zinc-700"
               }`}
             >
               <ScheduleIcon size={13} /> {en ? "Schedule" : "排程發布"}

@@ -27,7 +27,7 @@ import { channelRoute } from "../lib/channelMeta";
 import { PlatformTaskModal, type TaskEmbed } from "./PlatformTaskPage";
 import { getCalendarPublishPayload } from "../lib/strategyContentEnvelope";
 
-const INK = "#171717", META = "#6B6B6B", LINE = "#EAEAEA", SOFT = "#F6F6F5", ORANGE = "#F97316";
+const INK = "#171717", META = "#6B6B6B", LINE = "#EAEAEA", SOFT = "#F6F6F5", ORANGE = "#18181B";
 
 const PLATFORM_ICON: Record<string, any> = {
   facebook: faFacebook, instagram: faInstagram, linkedin: faLinkedin, youtube: faYoutube, tiktok: faTiktok,
@@ -312,7 +312,7 @@ export default function PlannerPage() {
                           <span className="flex h-6 w-6 items-center justify-center rounded-[7px] text-[12px]" style={{ background: SOFT, color: "#404040" }}>
                             <FontAwesomeIcon icon={PLATFORM_ICON[it.platform] ?? faGlobe} />
                           </span>
-                          {isTouched && <span className="flex items-center gap-1 text-[11px] font-semibold" style={{ color: "#C2410C" }}><span className="h-1.5 w-1.5 rounded-full" style={{ background: ORANGE }} />{en ? "Changed" : "剛改"}</span>}
+                          {isTouched && <span className="flex items-center gap-1 text-[11px] font-semibold" style={{ color: "#3F3F46" }}><span className="h-1.5 w-1.5 rounded-full" style={{ background: ORANGE }} />{en ? "Changed" : "剛改"}</span>}
                         </span>
                         <span className="line-clamp-3 text-[14px] font-semibold leading-snug" style={{ color: INK }}>{it.title}</span>
                         <span className="text-[12px]" style={{ color: META }}>{it.meta}</span>

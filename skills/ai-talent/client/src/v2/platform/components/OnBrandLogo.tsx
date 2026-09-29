@@ -4,7 +4,7 @@
  * Concept: a concentric-circles glyph (大圈 + 小圈) representing the
  * "on-target" / "on-brand" idea — every piece of content lands inside
  * the inner ring (your brand). The inner dot uses SoWork.ai's signature
- * purple→teal gradient (#7C3AED → #00B4BC).
+ * zinc gradient (#18181B → #71717A).
  *
  * Wordmark: "OnBrand" in bold Inter + faint "AI" superscript +
  * "by SoWork" small caps subtitle. Editorial / Notion-style.
@@ -62,7 +62,7 @@ export default function OnBrandLogo({ glyphOnly = false, size = 28, onClick, cla
               fontWeight: 600,
               letterSpacing: "0.04em",
               color: "transparent",
-              background: "linear-gradient(135deg, #7C3AED 0%, #00B4BC 100%)",
+              background: "linear-gradient(135deg, #18181B 0%, #71717A 100%)",
               WebkitBackgroundClip: "text",
               backgroundClip: "text",
             }}>AI</span>
@@ -88,8 +88,8 @@ function Glyph({ size }: { size: number }) {
     <svg width={size} height={size} viewBox="0 0 32 32" fill="none" aria-hidden="true">
       <defs>
         <linearGradient id={GRADIENT_ID} x1="0" y1="0" x2="32" y2="32" gradientUnits="userSpaceOnUse">
-          <stop offset="0%" stopColor="#7C3AED" />
-          <stop offset="100%" stopColor="#00B4BC" />
+          <stop offset="0%" stopColor="#18181B" />
+          <stop offset="100%" stopColor="#71717A" />
         </linearGradient>
       </defs>
       {/* Outer ring — charcoal, semi-thick */}

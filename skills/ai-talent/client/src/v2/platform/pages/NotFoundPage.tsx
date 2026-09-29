@@ -37,7 +37,7 @@ export default function NotFoundPage() {
           </button>
           <button
             onClick={() => navigate("/theater", { replace: true })}
-            className="w-full py-2.5 rounded-full bg-violet-600 text-white text-sm font-semibold hover:bg-violet-700 transition"
+            className="w-full py-2.5 rounded-full bg-zinc-600 text-white text-sm font-semibold hover:bg-zinc-700 transition"
           >
             {lang === "en" ? "Go to home" : "前往主頁"}
           </button>
@@ -48,7 +48,7 @@ export default function NotFoundPage() {
           {lang === "en" ? "Need help? " : "需要協助？"}
           <a
             href="mailto:sowork@sowork.ai"
-            className="text-violet-500 hover:underline"
+            className="text-zinc-500 hover:underline"
           >
             sowork@sowork.ai
           </a>

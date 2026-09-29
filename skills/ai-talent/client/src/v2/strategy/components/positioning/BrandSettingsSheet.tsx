@@ -191,13 +191,13 @@ export function InfoTab({ brandId, brandName }: { brandId: number | null; brandN
  */
 function getSocialFields(en: boolean): Array<{ key: string; label: string; icon: any; tone: string; placeholder: string }> {
   return [
-    { key: "facebook",  label: en ? "Facebook Page" : "Facebook 粉專",  icon: faFacebook,  tone: "#1877F2", placeholder: "https://www.facebook.com/yourpage" },
-    { key: "instagram", label: "Instagram",    icon: faInstagram, tone: "#E1306C", placeholder: "https://www.instagram.com/yourhandle" },
-    { key: "youtube",   label: "YouTube",       icon: faYoutube,   tone: "#FF0000", placeholder: "https://www.youtube.com/@yourchannel" },
+    { key: "facebook",  label: en ? "Facebook Page" : "Facebook 粉專",  icon: faFacebook,  tone: "#18181b", placeholder: "https://www.facebook.com/yourpage" },
+    { key: "instagram", label: "Instagram",    icon: faInstagram, tone: "#18181b", placeholder: "https://www.instagram.com/yourhandle" },
+    { key: "youtube",   label: "YouTube",       icon: faYoutube,   tone: "#18181b", placeholder: "https://www.youtube.com/@yourchannel" },
     { key: "threads",   label: "Threads",       icon: faThreads,   tone: "#111111", placeholder: "https://www.threads.net/@yourhandle" },
     { key: "tiktok",    label: "TikTok",        icon: faTiktok,    tone: "#111111", placeholder: "https://www.tiktok.com/@yourhandle" },
-    { key: "linkedin",  label: "LinkedIn",      icon: faLinkedin,  tone: "#0A66C2", placeholder: "https://www.linkedin.com/company/yours" },
-    { key: "line",      label: en ? "LINE Official" : "LINE 官方帳號", icon: faLine, tone: "#06C755", placeholder: en ? "https://lin.ee/xxxxx or @yourLineId" : "https://lin.ee/xxxxx 或 @yourLineId" },
+    { key: "linkedin",  label: "LinkedIn",      icon: faLinkedin,  tone: "#18181b", placeholder: "https://www.linkedin.com/company/yours" },
+    { key: "line",      label: en ? "LINE Official" : "LINE 官方帳號", icon: faLine, tone: "#18181b", placeholder: en ? "https://lin.ee/xxxxx or @yourLineId" : "https://lin.ee/xxxxx 或 @yourLineId" },
   ];
 }
 
@@ -719,10 +719,10 @@ export function PublishTab({ brandId }: { brandId: number | null }) {
   // ── Platform config ────────────────────────────────────────────────────
   type PlatformCfg = { key: string; label: string; color: string; icon: any; desc: string };
   const PLATFORMS: PlatformCfg[] = [
-    { key: "facebook",  label: "Facebook",  color: "#1877F2", icon: faFacebook,  desc: en ? "Publish to your Facebook Page"              : "發布到 Facebook 粉專"        },
-    { key: "instagram", label: "Instagram", color: "#E1306C", icon: faInstagram, desc: en ? "Publish to Instagram Business account"       : "發布到 Instagram 商業帳號"   },
-    { key: "linkedin",  label: "LinkedIn",  color: "#0A66C2", icon: faLinkedin,  desc: en ? "Publish to your LinkedIn profile or page"    : "發布到 LinkedIn 帳號或企業頁面" },
-    { key: "youtube",   label: "YouTube",   color: "#FF0000", icon: faYoutube,   desc: en ? "Upload videos to your YouTube channel"       : "上傳影片到 YouTube 頻道"     },
+    { key: "facebook",  label: "Facebook",  color: "#18181b", icon: faFacebook,  desc: en ? "Publish to your Facebook Page"              : "發布到 Facebook 粉專"        },
+    { key: "instagram", label: "Instagram", color: "#18181b", icon: faInstagram, desc: en ? "Publish to Instagram Business account"       : "發布到 Instagram 商業帳號"   },
+    { key: "linkedin",  label: "LinkedIn",  color: "#18181b", icon: faLinkedin,  desc: en ? "Publish to your LinkedIn profile or page"    : "發布到 LinkedIn 帳號或企業頁面" },
+    { key: "youtube",   label: "YouTube",   color: "#18181b", icon: faYoutube,   desc: en ? "Upload videos to your YouTube channel"       : "上傳影片到 YouTube 頻道"     },
   ];
 
   // ── After OAuth: poll until Pipedream registers the connection ───────────
@@ -1036,17 +1036,17 @@ export function PublishTab({ brandId }: { brandId: number | null }) {
 
               {/* ── 匯入語氣範例 (Facebook only, fully connected) ── */}
               {p.key === "facebook" && fullyConnected && (
-                <div className="rounded-xl border border-violet-200 bg-violet-50/60 px-3 py-3 space-y-2">
-                  <p className="text-[12px] text-violet-800 font-medium leading-relaxed">
+                <div className="rounded-xl border border-zinc-200 bg-zinc-50/60 px-3 py-3 space-y-2">
+                  <p className="text-[12px] text-zinc-800 font-medium leading-relaxed">
                     <InboxIcon size={11} /> {en ? "Import voice from real posts" : "從真實貼文學習語氣"}
                   </p>
-                  <p className="text-[12px] text-violet-600 leading-relaxed">
+                  <p className="text-[12px] text-zinc-600 leading-relaxed">
                     {en
                       ? "Fetch your page's recent posts, analyze writing style, and store real examples in Brand DNA so AI generates content that sounds like you."
                       : "抓取粉絲團最近 20-30 篇貼文，分析語氣特徵，存入品牌大腦作為真實範例。之後每次產文，AI 都會模仿你們真正的寫作風格。"}
                   </p>
                   {importResult && (
-                    <div className="text-[12px] text-violet-700 bg-violet-100 rounded-lg px-2 py-1.5 leading-relaxed">
+                    <div className="text-[12px] text-zinc-700 bg-zinc-100 rounded-lg px-2 py-1.5 leading-relaxed">
                       <CheckIcon size={11} /> {en
                         ? `Imported ${importResult.samplesImported} samples. Tone: "${importResult.toneSummary}"`
                         : `已匯入 ${importResult.samplesImported} 篇範例。語氣定位：「${importResult.toneSummary}」`}
