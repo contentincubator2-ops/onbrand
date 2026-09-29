@@ -182,6 +182,10 @@ function buildNavItems(lang: "zh-TW" | "en", userEmail?: string | null, currentP
       // 只是藏起來——主產文引擎每次仍會讀 brand_knowledge_items，已上傳的資料照樣生效。
       { to: "/brands/edit?cat=meetings", catKey: "meetings", label: en ? "Meetings" : "會議", icon: <FontAwesomeIcon icon={ICON.meeting} />,
         tooltip: en ? "Recurring strategy meetings" : "定期策略會議" },
+      // 2026-09-29（CJ「在策略端增加一個 mission tray，是檢查大腦」）：品牌大腦記住了
+      // 什麼、還能記多少——跟每篇產文讀的是同一份。
+      { to: "/brands/edit?cat=brain", catKey: "brain", label: en ? "Brain" : "大腦", icon: <FontAwesomeIcon icon={ICON.brainCheck} />,
+        tooltip: en ? "What the AI remembers" : "AI 記住了什麼、還能記多少" },
       // 2026-08-21 (CJ「加一個人設的task tray...用戶可以自己新創agent，自己
       // 命名，並且決定這個Agent語調的應用範圍」): user-created persona
       // agents — trained from pasted text / article links / video links,
@@ -263,8 +267,10 @@ function navCatalog(lang: "zh-TW" | "en", allowedTaskRoutes?: Set<string> | null
       tooltip: en ? "Long-form articles, brand columns, case studies, product page copy" : "官網長文 / 品牌專欄 / 案例深度 / 產品頁文案" },
     { id: "case", kind: "tool", to: "/tasks/case", label: en ? "Cases" : "案例", icon: <FontAwesomeIcon icon={faBookBookmark} />, matchPrefix: "/tasks/case",
       tooltip: en ? "Case library, filed by standard" : "依標準建檔的案例庫" },
-    { id: "theater", kind: "tool", to: "/theater", label: en ? "7-Day Publisher" : "七日發布台", icon: <FontAwesomeIcon icon={ICON.theater} />, matchPrefix: "/theater",
-      tooltip: en ? "Plan and publish a week of posts" : "一次排好七天的發文" },
+    // 2026-09-29 CJ：七日發布台改成靈感舞台（id 沿用 theater，存過的側欄設定不用搬）。
+    // 舊的 /theater 頁面還在，只是側欄不再指過去。
+    { id: "theater", kind: "tool", to: "/inspiration", label: en ? "Idea stage" : "靈感舞台", icon: <FontAwesomeIcon icon={ICON.ideas} />, matchPrefix: "/inspiration",
+      tooltip: en ? "Agents pitch angles; pick one to write" : "幾位 agent 各想切角，挑一個開始寫" },
   ];
   return all.filter((it) => {
     if (!it.to.startsWith("/tasks/")) return true;
@@ -2252,7 +2258,7 @@ class RouteErrorBoundary extends React.Component<
               </button>
               <button
                 style={{ padding: "6px 12px", background: "white", border: "1px solid #cbd5e1", borderRadius: 6, cursor: "pointer", fontSize: 13 }}
-                onClick={() => window.location.assign("/theater")}
+                onClick={() => window.location.assign("/planner")}
               >
                 回到首頁
               </button>

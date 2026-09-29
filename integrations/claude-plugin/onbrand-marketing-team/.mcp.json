@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "onbrand": {
+      "type": "http",
+      "url": "https://onbrand.sowork.ai/api/mcp/onbrand"
+    }
+  }
+}

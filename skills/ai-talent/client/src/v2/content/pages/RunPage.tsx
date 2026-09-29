@@ -67,6 +67,7 @@ import { tierLabel } from "../../platform/lib/tierVocabulary";
 import { useLang } from "../../../lib/i18n";
 import { fireNudge } from "../../platform/components/mia/miaNudges";
 import ReviewBar from "../../platform/components/review/ReviewBar";
+import PerfTagPicker from "../../performance/components/PerfTagPicker";
 
 type Mode = "edit" | "chat" | "image" | "agent" | "regen" | "rewrite" | "publish" | "source";
 
@@ -1641,6 +1642,8 @@ export default function RunPage() {
       // 2026-09-10 X 通路。mockup 那側的 key 仍是 "twitter:"（XTweet /
       // XThread 早就註冊了），所以 x → twitter，不是 x → x。
       x: "twitter",
+      // 2026-09-29 Threads（th-）→ threads:post；LINE（ln-）→ line:broadcast／richmenu。
+      th: "threads", ln: "line",
     };
     const formatFromTaskId = (id: string): string => {
       // 2026-08-29 官網 (web-)：跟 pr- / em- 同樣的理由——先用前綴決斷，
@@ -1658,6 +1661,8 @@ export default function RunPage() {
       if (id.startsWith("x-")) {
         return id.includes("thread") ? "thread" : "tweet";
       }
+      if (id.startsWith("th-")) return "post";
+      if (id.startsWith("ln-")) return id.includes("rich-menu") ? "richmenu" : "broadcast";
       // 2026-05-16 (CJ「pr-30-lead-paragraph mockup 格式不對」):
       // press (pr-) + email (em-) each have ONE mockup family. Decide
       // by prefix FIRST — otherwise generic keyword scans below
@@ -2509,6 +2514,8 @@ export default function RunPage() {
                             videoTitle: scriptModalTitle,
                             titleContext: slide?.caption ?? undefined,
                             brandId: data?.brand?.id ?? undefined,
+                            productId: (data as any)?.metadata?.productId ?? undefined,
+                            eventId: (data as any)?.metadata?.eventId ?? undefined,
                           });
                         }}
                       >
@@ -2557,6 +2564,8 @@ export default function RunPage() {
                               videoTitle: scriptModalTitle!,
                               titleContext: slide?.caption ?? undefined,
                               brandId: data?.brand?.id ?? undefined,
+                              productId: (data as any)?.metadata?.productId ?? undefined,
+                              eventId: (data as any)?.metadata?.eventId ?? undefined,
                             });
                           }
                         }}
@@ -2723,6 +2732,9 @@ export default function RunPage() {
                           currentCaption: slide?.caption ?? "",
                           userFeedback: chatPrompt,
                           brandId: data.mission?.brandId ?? undefined,
+                          // 2026-09-29：改寫讀同一份品牌大腦，含原本那篇的產品／活動。
+                          productId: (data as any)?.metadata?.productId ?? undefined,
+                          eventId: (data as any)?.metadata?.eventId ?? undefined,
                           history: chatHistory,
                         });
                         if (r.ok) {
@@ -3355,6 +3367,9 @@ export default function RunPage() {
                               agentName: a.name,
                               agentTitle: lang === "en" ? a.titleEn : a.title,
                               brandId: data.mission?.brandId ?? undefined,
+                              // 2026-09-29：改寫讀同一份品牌大腦，含原本那篇的產品／活動。
+                              productId: (data as any)?.metadata?.productId ?? undefined,
+                              eventId: (data as any)?.metadata?.eventId ?? undefined,
                             });
                             if (r.ok) {
                               if (shouldApplyMutationPreview(activeSelectionKeyRef.current, locator)) {
@@ -3484,6 +3499,8 @@ export default function RunPage() {
                   )}
                 </>
               ) : (<>
+              {/* 2026-09-29 成效標籤：這篇對哪個族群、講哪個 USP → 發布後成效自動落進成效層矩陣 */}
+              <PerfTagPicker outputId={id} platform={schedPlatform} />
               {/* ── 1. 送到行事曆 ─────────────────────────── */}
               <Button
                 variant="flat" fullWidth

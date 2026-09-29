@@ -16,22 +16,247 @@ function safeParse(s: string): any {
   try { return JSON.parse(s); } catch { return null; }
 }
 
+
 /**
- * 2026-09-01 — 依 canonical dot-path 取值並排進 prompt 行。
+ * 2026-09-29（CJ「在策略端增加一個 mission tray，是檢查大腦……像手機記憶體的感覺，
+ * 透明化品牌大腦當中有記到的內容」）：大腦畫面與產文 prompt 必須是**同一份**。
  *
- * 產品與活動的區塊本來是手寫的 `if (pp.usp) …`，路徑全是 PRODUCT_SEGMENTS /
- * EVENT_SEGMENTS 裡不存在的舊 key，於是那兩層定位從來沒進過 prompt。改成
- * 走登錄表的原因是：路徑寫在一起就看得出對不對，而且能被 positioningDocs 的
- * PROMPT_FIELDS 拿去做落差報告 —— 「哪幾格會影響產出」不能有兩份各自維護的答案。
+ * 做法：組 prompt 的每一行都先登記成一筆 BrainEntry（屬於哪一類、用戶存了多少字、
+ * 實際記住多少字），prompt 由這份清單組出來，「檢查大腦」畫面也讀這份清單——
+ * 沒有第二套計算，所以畫面上寫「記住」的，就是 AI 真的讀得到的。
  *
- * 值可能是字串或字串陣列（canonical 的 array 欄位，例如 audience.pains）。
- * 物件與 tableRows 一律跳過：把它們 String() 出來就是 "[object Object]"，
- * 這正是活動受眾原本在做的事。
+ * 以前每一格各自 .slice()、超過就默默截掉，用戶不會知道。現在截掉的會標成
+ * 「只記住一部分」，總量超過容量時被擠掉的會標成「超載」。
+ */
+/** 內部分層：決定容量不夠時誰先被擠掉（見 PRIORITY）。不給使用者看。 */
+type BrainTier =
+  | "market" | "identity" | "voice" | "rules" | "context" | "custom" | "doc"
+  | "product" | "event" | "legacy";
+
+/**
+ * 大腦畫面的分類——跟策略層 rail 同一套名字（2026-09-29 CJ「用詞跟策略層沒對上，
+ * 例如品牌、產品、活動等等」）。每一筆底下再分到該頁的段落標題（group）與欄位名稱
+ * （label），名稱照 client/src/v2/strategy/lib/positioningSchema.ts 與 copyAssets.ts。
+ */
+export type BrainCategoryKey = "info" | "brand" | "copy" | "product" | "event" | "legacy";
+
+export const BRAIN_CATEGORIES: Record<BrainCategoryKey, { zh: string; en: string }> = {
+  info:    { zh: "基本資料", en: "Info" },
+  brand:   { zh: "品牌",     en: "Brand" },
+  copy:    { zh: "文字",     en: "Copy" },
+  product: { zh: "產品",     en: "Products" },
+  event:   { zh: "活動",     en: "Campaigns" },
+  legacy:  { zh: "舊資料",   en: "Legacy" },
+};
+
+interface Display { category: BrainCategoryKey; group: string; label: string }
+
+/**
+ * prompt 裡的標籤（給模型看、調過的措辭）→ 策略層頁面上的名稱（給使用者看）。
+ * key 是 `${tier}|${prompt 標籤}`。prompt 標籤刻意不改，只改畫面。
+ */
+const DISPLAY: Record<string, Display> = {
+  // 品牌定位頁
+  "identity|Tagline 中":         { category: "brand", group: "品牌核心標語", label: "中文標語" },
+  "identity|Tagline EN":         { category: "brand", group: "品牌核心標語", label: "英文標語" },
+  "identity|Tagline":            { category: "brand", group: "品牌核心標語", label: "中文標語" },
+  "identity|Archetype":          { category: "brand", group: "品牌個性與溝通風格", label: "人格原型" },
+  "identity|WHY (信念)":         { category: "brand", group: "品牌黃金圈", label: "WHY — 品牌願景" },
+  "identity|HOW (作法)":         { category: "brand", group: "品牌黃金圈", label: "HOW — 品牌使命" },
+  "identity|WHAT (產品/服務)":   { category: "brand", group: "品牌黃金圈", label: "WHAT — 品牌產品 / 服務" },
+  "identity|Tagline (legacy)":   { category: "legacy", group: "舊版欄位", label: "標語（舊版）" },
+  "identity|Archetype (legacy)": { category: "legacy", group: "舊版欄位", label: "人格原型（舊版）" },
+  "identity|定位摘要 (legacy)":  { category: "legacy", group: "舊版欄位", label: "定位摘要（舊版）" },
+  "voice|語氣關鍵詞":            { category: "brand", group: "品牌個性與溝通風格", label: "核心語調關鍵詞" },
+  "voice|禁用詞彙 / 句式":       { category: "brand", group: "品牌個性與溝通風格", label: "溝通禁區" },
+  "context|品牌故事":            { category: "brand", group: "品牌起源故事", label: "起源故事" },
+  "context|信念五層深挖":        { category: "brand", group: "品牌起源故事", label: "信念五層深挖" },
+  "context|核心價值觀":          { category: "brand", group: "品牌核心價值觀", label: "核心價值觀" },
+  "context|主要受眾":            { category: "brand", group: "目標受眾", label: "主受眾" },
+  "context|受眾痛點":            { category: "brand", group: "目標受眾", label: "受眾痛點" },
+  "context|競爭強度":            { category: "brand", group: "競爭格局分析", label: "競爭強度評估" },
+  "context|直接競品":            { category: "brand", group: "競爭格局分析", label: "直接競爭對手" },
+  "context|競爭定位地圖":        { category: "brand", group: "競爭格局分析", label: "競爭定位地圖" },
+  "context|差異化":              { category: "brand", group: "品牌差異化戰略", label: "差異化總結" },
+  "context|唯一致勝理由":        { category: "brand", group: "品牌差異化戰略", label: "唯一致勝理由" },
+  "context|支撐證據":            { category: "brand", group: "品牌差異化戰略", label: "支撐證據" },
+  // 文字頁（copyAssets.ts 的 labelZh）
+  "rules|聲音指南":              { category: "copy", group: "", label: "品牌口吻" },
+  "rules|聲音原則":              { category: "copy", group: "", label: "品牌準則" },
+  "rules|偏好用詞":              { category: "copy", group: "", label: "推薦用詞" },
+  "rules|品牌術語":              { category: "copy", group: "", label: "品牌術語" },
+  "rules|縮寫對照（同一個東西只有一種叫法）": { category: "copy", group: "", label: "縮寫對照" },
+  "rules|產品名稱規範":          { category: "copy", group: "", label: "產品名稱規範" },
+  "rules|CTA 範例":              { category: "copy", group: "", label: "CTA 庫" },
+  "rules|開場 Hook 範例":        { category: "copy", group: "", label: "Hook 庫" },
+  "rules|文案範本":              { category: "copy", group: "", label: "文案範本" },
+  "rules|目標受眾":              { category: "copy", group: "", label: "目標受眾（舊版文字欄位）" },
+  "rules|禁用詞（產出後自動檢查）":   { category: "copy", group: "", label: "禁用詞" },
+  "rules|替換對照（產出後自動套用）": { category: "copy", group: "", label: "替換對照" },
+  // 產品定位頁
+  "product|產品名稱":            { category: "product", group: "產品核心定位", label: "產品名稱" },
+  "product|產品售價":            { category: "product", group: "商品事實", label: "售價" },
+  "product|產品規格":            { category: "product", group: "商品事實", label: "規格" },
+  "product|重量／容量":          { category: "product", group: "商品事實", label: "重量／容量" },
+  "product|份數":                { category: "product", group: "商品事實", label: "份數" },
+  "product|商品網址":            { category: "product", group: "商品事實", label: "商品網址" },
+  "product|產品核心定位":        { category: "product", group: "產品核心定位", label: "核心定位" },
+  "product|產品 Slogan":         { category: "product", group: "產品核心定位", label: "中文標語" },
+  "product|產品英文標語":        { category: "product", group: "產品核心定位", label: "英文標語" },
+  "product|一句話價值主張":      { category: "product", group: "產品核心定位", label: "一句話價值主張" },
+  "product|產品目標客群":        { category: "product", group: "目標族群", label: "主目標族群" },
+  "product|客群痛點":            { category: "product", group: "目標族群", label: "族群痛點" },
+  "product|核心功能":            { category: "product", group: "產品價值主張", label: "核心功能" },
+  "product|主要情緒價值":        { category: "product", group: "產品價值主張", label: "主要情緒價值" },
+  "product|產品個性":            { category: "product", group: "產品價值主張", label: "品牌個性" },
+  "product|使用者感受":          { category: "product", group: "產品價值主張", label: "使用者感受" },
+  "product|獨家賣點":            { category: "product", group: "競爭定位", label: "獨家賣點" },
+  "product|次級賣點":            { category: "product", group: "競爭定位", label: "少數競品也說的賣點" },
+  "product|普遍賣點":            { category: "product", group: "競爭定位", label: "多數競爭者都說的賣點" },
+  "product|競品":                { category: "product", group: "競爭定位", label: "競品" },
+  "product|產品語氣":            { category: "product", group: "行銷文字指引", label: "品牌語氣" },
+  "product|溝通風格":            { category: "product", group: "行銷文字指引", label: "溝通風格" },
+  "product|關鍵詞彙":            { category: "product", group: "行銷文字指引", label: "關鍵詞彙" },
+  // 活動定位頁
+  "event|活動名稱":              { category: "event", group: "基本資料", label: "活動名稱" },
+  "event|活動開始":              { category: "event", group: "基本資料", label: "開始日期" },
+  "event|活動結束":              { category: "event", group: "基本資料", label: "結束日期" },
+  "event|倒數":                  { category: "event", group: "基本資料", label: "倒數" },
+  "event|活動":                  { category: "event", group: "基本資料", label: "進行天數" },
+  "event|活動定位摘要":          { category: "event", group: "戰略 Brief", label: "活動定位摘要" },
+  "event|活動類型":              { category: "event", group: "戰略 Brief", label: "活動類型" },
+  "event|核心問題":              { category: "event", group: "背景與問題", label: "核心問題" },
+  "event|活動核心受眾":          { category: "event", group: "目標受眾", label: "核心受眾" },
+  "event|關鍵洞察":              { category: "event", group: "目標受眾", label: "關鍵洞察" },
+  "event|行銷目標":              { category: "event", group: "活動目標", label: "行銷目標" },
+  "event|SMP 單一主張":          { category: "event", group: "單一核心命題（SMP）", label: "SMP" },
+  "event|核心訊息":              { category: "event", group: "訊息架構", label: "核心訊息" },
+  "event|支撐訊息":              { category: "event", group: "訊息架構", label: "支撐訊息" },
+  "event|創意主題":              { category: "event", group: "創意概念", label: "創意主題" },
+};
+
+/** 自訂卡片、定位文件、舊版 brand_brain 條目這些沒有固定標籤的，依所在的頁決定分類。 */
+const SECTION_CATEGORY: Record<SectionKey, BrainCategoryKey> = {
+  locked: "brand", voice: "brand", assets: "copy", context: "brand",
+  legacy: "legacy", product: "product", event: "event",
+};
+
+function displayOf(section: SectionKey, tier: BrainTier, promptLabel: string): Display {
+  const hit = DISPLAY[`${tier}|${promptLabel}`];
+  if (hit) return hit;
+  const category = SECTION_CATEGORY[section];
+  if (tier === "custom") return { category, group: "自訂卡片", label: promptLabel };
+  if (tier === "doc") return { category, group: "上傳的定位文件", label: "定位文件補充" };
+  if (tier === "legacy") return { category: "legacy", group: "舊版品牌大腦", label: promptLabel };
+  if (tier === "voice" && promptLabel.startsWith("語氣範例")) {
+    return { category: "brand", group: "品牌個性與溝通風格", label: promptLabel.replace("語氣範例", "溝通範例對比") };
+  }
+  return { category, group: "", label: promptLabel };
+}
+
+/**
+ * 大腦容量：一次產文最多帶進多少字的品牌記憶。超過時從優先度最低的類別
+ * 開始割捨（見 PRIORITY），並在大腦畫面標成「超載」。
+ */
+// 2026-09-29 用 dev 上定位資料最多的 15 個品牌校準：原本單格上限下用量 1,597～8,731 字
+// （中位數 2,802），單格放寬後最大的品牌約 11,000 字——容量留 16,000 當安全上限。
+export const BRAIN_CAPACITY = 16_000;
+
+/** 割捨順序：數字越大越先被擠掉。市場設定永遠保留。 */
+const PRIORITY: Record<BrainTier, number> = {
+  market: 0, identity: 1, voice: 2, rules: 3, product: 4, event: 5,
+  context: 6, custom: 7, doc: 8, legacy: 9,
+};
+
+type SectionKey = "locked" | "voice" | "assets" | "context" | "legacy" | "product" | "event";
+
+interface BrainEntry {
+  section: SectionKey;
+  /** 內部分層（容量割捨順序）。 */
+  category: BrainTier;
+  /** prompt 裡的標籤。 */
+  label: string;
+  /** 畫面上的名稱。 */
+  display: Display;
+  line: string;
+  storedChars: number;
+  /** 實際記住的內容字數（不含標籤）。 */
+  keptChars: number;
+  trimmed: boolean;
+  dropped: boolean;
+}
+
+export type BrainItemStatus = "remembered" | "trimmed" | "overflow" | "checkOnly";
+
+export interface BrainItem {
+  /** 策略層 rail 上的分類（基本資料／品牌／文字／產品／活動）。 */
+  category: BrainCategoryKey;
+  /** 該頁的段落標題（例：品牌黃金圈、商品事實）；文字頁沒有段落，是空字串。 */
+  group: string;
+  /** 該頁上的欄位／卡片名稱。 */
+  label: string;
+  /** 用戶存了多少字。 */
+  storedChars: number;
+  /** 實際進到 prompt 的字數（超載時是 0）。 */
+  keptChars: number;
+  status: BrainItemStatus;
+  /** 存的內容開頭，給畫面預覽。 */
+  preview: string;
+}
+
+export interface BrandBrain {
+  prefix: string;
+  items: BrainItem[];
+  capacity: number;
+  usedChars: number;
+}
+
+const len = (s: string) => [...s].length;
+
+/** 截到 max 字；回傳有沒有截。 */
+function clip(raw: string, max: number): { text: string; trimmed: boolean } {
+  const chars = [...raw];
+  return chars.length <= max ? { text: raw, trimmed: false } : { text: chars.slice(0, max).join(""), trimmed: true };
+}
+
+class BrainCollector {
+  entries: BrainEntry[] = [];
+  checkOnly: BrainItem[] = [];
+
+  /** 一行 prompt＝一筆記憶。raw 是用戶存的原文，max 是這一格最多記住幾字。 */
+  add(section: SectionKey, category: BrainTier, label: string, raw: string, max: number, render?: (kept: string) => string): void {
+    const text = raw.trim();
+    if (!text) return;
+    const { text: kept, trimmed } = clip(text, max);
+    this.entries.push({
+      section, category, label,
+      display: displayOf(section, category, label),
+      line: render ? render(kept) : `【${label}】${kept}`,
+      storedChars: len(text), keptChars: len(kept), trimmed, dropped: false,
+    });
+  }
+
+  /** 不進 prompt、但每篇產出後都會硬檢查的規則（禁用詞、替換對照）。 */
+  addCheckOnly(label: string, raw: string): void {
+    const text = raw.trim();
+    if (!text) return;
+    const d = displayOf("assets", "rules", label);
+    this.checkOnly.push({ category: d.category, group: d.group, label: d.label, storedChars: len(text), keptChars: 0, status: "checkOnly", preview: text.slice(0, 80) });
+  }
+}
+
+/**
+ * 依 canonical dot-path 取值並登記（產品／活動定位用）。
+ *
+ * 2026-09-01：產品與活動的區塊本來是手寫的 `if (pp.usp) …`，路徑全是
+ * PRODUCT_SEGMENTS / EVENT_SEGMENTS 裡不存在的舊 key，於是那兩層定位從來沒進過
+ * prompt。走登錄表的原因是：路徑寫在一起就看得出對不對，而且能被 positioningDocs
+ * 的 PROMPT_FIELDS 拿去做落差報告。值可能是字串或字串陣列；物件與 tableRows
+ * 一律跳過（String() 出來就是 "[object Object]"）。
  */
 function pushFrom(
-  lines: string[],
-  obj: any,
-  specs: [path: string, label: string, max: number][],
+  c: BrainCollector, section: SectionKey, category: BrainTier,
+  obj: any, specs: [path: string, label: string, max: number][],
 ): void {
   for (const [path, label, max] of specs) {
     const v = path.split(".").reduce<any>((acc, k) => (acc == null ? acc : acc[k]), obj);
@@ -39,68 +264,77 @@ function pushFrom(
     let text = "";
     if (typeof v === "string") text = v.trim();
     else if (Array.isArray(v)) text = v.filter((x) => typeof x === "string" && x.trim()).join(" · ");
-    else continue;                       // 物件 / tableRows：沒有安全的一行表示法
-    if (!text) continue;
-    lines.push(`【${label}】${text.slice(0, max)}`);
+    else continue;
+    c.add(section, category, label, text, max);
   }
 }
 
 /**
  * 同一個標籤、多個可能路徑，第一個有值的就用（不是每個都印一行）。
- *
- * 2026-09-25（CJ「將產品定位中，增加價格/規格／重量／份數 還有網址」）：事實欄位
- * 的 canonical 位置是 `facts.*`，但舊資料在 positioning 頂層（`price` /
- * `productUrl`，intake 與官網掃描寫的）。兩邊都要讀、但只能印一次——用 pushFrom
- * 列兩條路徑的話，兩邊都有值的產品會出現兩行【產品售價】，模型看到兩個數字就得
- * 自己猜哪個算數。
+ * 2026-09-25：事實欄位的 canonical 位置是 `facts.*`，舊資料在頂層（price /
+ * productUrl）。兩邊都有值時只能印一次，否則模型看到兩個售價得自己猜。
  */
-function pushFirst(lines: string[], obj: any, label: string, paths: string[], max: number): void {
+function pushFirst(c: BrainCollector, section: SectionKey, category: BrainTier, obj: any, label: string, paths: string[], max: number): void {
   for (const path of paths) {
     const v = path.split(".").reduce<any>((acc, k) => (acc == null ? acc : acc[k]), obj);
     const text = typeof v === "string" ? v.trim() : "";
     if (!text) continue;
-    lines.push(`【${label}】${text.slice(0, max)}`);
+    c.add(section, category, label, text, max);
     return;
   }
 }
 
 /**
- * 用戶上傳的定位文件裡，對不到任何 canonical 欄位、但他選擇照樣餵進來的段落。
- *
- * 存在的理由是 CJ 的「按照用戶有的內容呈現，不一定要填完我們設定的題目」——
- * 沒有這條，用戶文件裡我們沒問到的東西就等於白上傳。上限在寫入端就卡死
- * （positioningDocs.MAX_INJECTED_CHARS），這裡不再截，截兩次會把句子切一半。
+ * 用戶上傳的定位文件裡，對不到 canonical 欄位、但他選擇照樣餵進來的段落。
+ * 上限在寫入端（positioningDocs.MAX_INJECTED_CHARS）已卡住，這裡不再截。
  */
-function pushSourceDoc(lines: string[], pos: any, label: string): void {
+function pushSourceDoc(c: BrainCollector, section: SectionKey, pos: any, label: string): void {
   const text = String(pos?._sourceDoc?.injectedContext ?? "").trim();
-  if (text) lines.push(`【${label}】
-${text}`);
+  if (text) c.add(section, "doc", label, text, 100_000, (kept) => `【${label}】\n${kept}`);
 }
 
+/** 自訂卡片每張最多記住的字數（全部欄位合計）。 */
+const CUSTOM_CARD_MAX = 1_200;
+
 /**
- * 2026-09-23（CJ「品牌定位…也可以自訂新增欄位」）：使用者自己開的定位卡片
- * （positioning._customSegments[]，例如「品牌願景」）—— 跟固定欄位一樣要進
- * prompt，不然這張卡就只是畫面上的裝飾，違背了「定位是所有任務的上游」這件事。
- * 每張卡最多帶 3 格，總長度設上限（跟 pushSourceDoc 的補充段落同一個道理：
- * prompt 本來就吃不下太多字，塞多了只會稀釋品牌前綴）。
+ * 2026-09-23：使用者自己開的定位卡片（positioning._customSegments[]）。
+ * 2026-09-29：以前每張只帶前 3 格、500 字——畫面上填了 8 格，AI 只讀到 3 格，
+ * 用戶不會知道。改成全部欄位都讀，每張上限 CUSTOM_CARD_MAX，超過會在大腦畫面標出來。
  */
-function pushCustomSegments(lines: string[], pos: any): void {
+function pushCustomSegments(c: BrainCollector, section: SectionKey, pos: any): void {
   const segs = Array.isArray(pos?._customSegments) ? pos._customSegments : [];
   for (const s of segs) {
     const title = String(s?.title ?? "").trim();
     const fields = Array.isArray(s?.fields) ? s.fields : [];
     if (!title || fields.length === 0) continue;
     const body = fields
-      .slice(0, 3)
       .map((f: any) => `${String(f?.label ?? "").trim()}：${String(f?.value ?? "").trim()}`)
       .filter((l: string) => l !== "：")
       .join("；");
-    if (body) lines.push(`【${title}】${body.slice(0, 500)}`);
+    if (body) c.add(section, "custom", title, body, CUSTOM_CARD_MAX);
+  }
+}
+
+/**
+ * 總量超過容量時，從優先度最低（PRIORITY 數字大）、同類別裡排在後面的開始擠掉。
+ * 擠掉的那筆整行不進 prompt——截半句比整句不放更糟。
+ */
+function applyCapacity(entries: BrainEntry[], fixedChars: number, capacity: number): void {
+  let used = fixedChars + entries.reduce((n, e) => n + e.keptChars, 0);
+  if (used <= capacity) return;
+  const order = entries
+    .map((e, i) => ({ e, i }))
+    .sort((a, b) => (PRIORITY[b.e.category] - PRIORITY[a.e.category]) || (b.i - a.i));
+  for (const { e } of order) {
+    if (used <= capacity) break;
+    if (e.category === "market") continue;
+    e.dropped = true;
+    used -= e.keptChars;
   }
 }
 
 // Cache key includes optional product/event so different scopes don't collide.
-const CACHE = new Map<string, { prefix: string; expiresAt: number }>();
+const CACHE = new Map<string, { brain: BrandBrain; expiresAt: number }>();
 const TTL_MS = 60_000; // 1-minute cache — brand_brain edits become visible quickly
 const cacheKey = (brandId: number, productId?: number | null, eventId?: number | null) =>
   `${brandId}:${productId ?? 0}:${eventId ?? 0}`;
@@ -265,111 +499,39 @@ export async function enforceBrandRulesOnTextWithReport(
 }
 
 /**
- * 2026-05-17 (CJ「全部塞進每個任務怕拖慢/稀釋品質」→ 蒸餾+分層):
- * Distil the brand essence into a tight ~500-char digest. Short/atomic
- * tasks inject ONLY this (focused context → faster, cheaper, and
- * usually MORE on-brand — avoids "lost in the middle"). Hard rules
- * (banned/substitutions) are NOT here — the post-gen enforcement layer
- * guarantees them deterministically, so they don't need prompt tokens.
+ * 組出品牌大腦：prompt 前綴＋逐筆記憶清單（檢查大腦畫面用）。
+ *
+ * 2026-09-29（CJ「一律讀完整版」）：拿掉 2026-05-17 的 core／full 分層。短任務
+ * 以前只拿到精簡 digest，會漏掉自訂卡片、定位文件、禁用句式、CTA 庫——大腦畫面
+ * 要誠實，就只能有一份。buildBrandPrefix 的 mode 參數保留相容，但不再有作用。
+ *
+ * 順序：市場設定（最外層約束）→ 鎖定屬性 → 聲音指南 → 寫手指引 → 脈絡 →
+ * 舊版補充 → 產品 → 活動。LLM 對靠後的內容較易執行，所以 product/event 放最後。
  */
-function buildBrandCoreDigest(positioning: any): string {
-  if (!positioning || typeof positioning !== "object") return "";
-  const a = positioning._assets ?? {};
-  const firstSentence = (s: any, n: number) =>
-    String(s ?? "").split(/[。\n！？!?]/).map((x) => x.trim()).filter(Boolean)[0]?.slice(0, n) ?? "";
-  const lines: string[] = [];
-  const tagline = positioning.tagline?.zhTagline ?? positioning.tagline?.enTagline;
-  if (tagline) lines.push(`標語：${String(tagline).slice(0, 60)}`);
-  const posOneLiner = positioning.differentiation?.summary;
-  if (posOneLiner) lines.push(`定位：${String(posOneLiner).slice(0, 120)}`);
-  const tone = Array.isArray(positioning.voice?.tone) ? positioning.voice.tone.slice(0, 5).join("、") : "";
-  if (tone) lines.push(`語氣：${tone}`);
-  // 2026-09-23（缺口稽核 — CJ「品牌定位內容是否為 AI 能清楚解析的格式」）：
-  // 核心價值觀是「為什麼」層次的判斷準則，短任務也用得上，只放標籤（不放
-  // 說明），跟語氣關鍵詞同一個精簡等級——完整版（含說明）在 full mode 的
-  // contextBlock 裡。belief5Layers / competition 屬於策略深挖，留給 full
-  // mode，不進這份精簡 digest。
-  const values = Array.isArray(positioning.values?.items)
-    ? positioning.values.items.filter((v: any) => v?.label).slice(0, 5).map((v: any) => v.label).join("、")
-    : "";
-  if (values) lines.push(`核心價值觀：${values}`);
-  const aud = firstSentence(positioning.audience?.primary, 100);
-  if (aud) lines.push(`主受眾：${aud}`);
-  const diff = firstSentence(positioning.differentiation?.emotional, 110)
-    || firstSentence(positioning.differentiation?.functional, 110);
-  if (diff) lines.push(`核心差異：${diff}`);
-  // 2026-09-23：discriminator 是唯一一條、比 summary 更尖銳的致勝理由——
-  // 短任務尤其需要一句夠尖的 hook，值得跟標語同級放進精簡 digest。
-  const discriminator = positioning.differentiation?.discriminator;
-  if (discriminator) lines.push(`致勝理由：${String(discriminator).slice(0, 60)}`);
-  const story = firstSentence(positioning.origin?.story, 110);
-  if (story) lines.push(`品牌故事精華：${story}`);
-  const pref = Array.isArray(a.preferred_terms?.items)
-    ? a.preferred_terms.items.filter((s: any) => String(s ?? "").trim()).slice(0, 8).join("、") : "";
-  if (pref) lines.push(`偏好用詞：${pref}`);
-
-  // 2026-06-03 (CJ): 加回 voice sample 和聲音原則到短任務 digest。
-  // voice samples（真實貼文範例）是最高價值的語氣訊號，之前被切掉了。
-  // 只取第一個範例，控制 token 使用量。
-  const posVoice = positioning?.voice;
-  const voiceSamples: any[] = [
-    // positioning.voice.samples (top-level, manual + FB import)
-    ...(Array.isArray(posVoice?.samples) ? posVoice.samples : []),
-    // _assets.voice.items (FB import alternative path)
-    ...(Array.isArray(a.voice?.items) ? a.voice.items : []),
-  ];
-  const bestSample = voiceSamples.find((s: any) => s?.ours && String(s.ours).trim().length > 10);
-  if (bestSample?.ours) {
-    lines.push(`語氣示範 ✓「${String(bestSample.ours).slice(0, 100)}」`);
-  }
-
-  // 聲音原則（前 3 條）
-  const vp = Array.isArray(a.voice_principles?.items)
-    ? a.voice_principles.items.filter((s: any) => String(s ?? "").trim()).slice(0, 3).join(" · ")
-    : "";
-  if (vp) lines.push(`聲音原則：${vp}`);
-
-  if (!lines.length) return "";
-  return "\n\n[品牌核心 — 所有產出必須貼合此精神]\n" + lines.map((l) => `- ${l}`).join("\n") + "\n";
-}
-
-/**
- * mode:
- *   "core" — distilled digest only (default for short/atomic tasks:
- *            30s/60s caption, hooks, KOL DM, Theater cells, inline
- *            rewrite). Lean, focused, on-brand without bloat.
- *   "full" — full rich block (strategic/long-form: 100s, document
- *            tasks, manifesto/PR-full) that genuinely need golden
- *            circle / story / competition depth.
- */
-export async function buildBrandPrefix(
+export async function buildBrandBrain(
   brandId: number | undefined | null,
   productId?: number | null,
   eventId?: number | null,
-  mode: "core" | "full" = "full",
   /**
-   * 2026-09-26（策略會議「採用前預覽」）：用一份還沒寫進資料庫的定位算簡報，
-   * 拿來比對「寫入後產文簡報會不會變」。有 override 時不讀也不寫快取。
+   * 2026-09-26（策略會議「採用前預覽」）：用一份還沒寫進資料庫的定位算簡報。
+   * 有 override 時不讀也不寫快取。
    */
   opts?: { positioningOverride?: any; productPositioningOverride?: any },
-): Promise<string> {
-  if (!brandId) return "";
+): Promise<BrandBrain> {
+  const empty: BrandBrain = { prefix: "", items: [], capacity: BRAIN_CAPACITY, usedChars: 0 };
+  if (!brandId) return empty;
 
   const hasOverride = opts?.positioningOverride !== undefined || opts?.productPositioningOverride !== undefined;
-  const ck = `${cacheKey(brandId, productId, eventId)}:${mode}`;
+  const ck = cacheKey(brandId, productId, eventId);
   const cached = hasOverride ? undefined : CACHE.get(ck);
-  if (cached && cached.expiresAt > Date.now()) return cached.prefix;
+  if (cached && cached.expiresAt > Date.now()) return cached.brain;
 
   try {
     const db = await getDb();
-    if (!db) return "";
+    if (!db) return empty;
 
-    // 2026-05-11 (CJ direction「定義儲存/讀取規格」):
-    // brand.positioning JSON is the SINGLE SOURCE OF TRUTH. Wizard +
-    // positioningJobRunner both write to this column. Older
-    // tagline/positioningSummary/positioningReport top-level columns
-    // are LEGACY and usually NULL — still read for backward compat
-    // but should not be relied on.
+    // brand.positioning JSON 是單一真相；tagline/positioningSummary/positioningReport
+    // 頂層欄位是 LEGACY，多半是 NULL，仍讀以相容。
     const { default: localPool } = await import("../../localDb");
     const [brandRowsRaw]: any = await localPool.execute(
       `SELECT name, tagline, positioningSummary, positioningReport, positioningStatus, positioning,
@@ -379,7 +541,6 @@ export async function buildBrandPrefix(
     );
     const brandRow = Array.isArray(brandRowsRaw) ? brandRowsRaw[0] : null;
 
-    // Parse the canonical positioning JSON.
     const positioning: any = (() => {
       if (opts?.positioningOverride !== undefined) return opts.positioningOverride;
       if (!brandRow?.positioning) return null;
@@ -387,140 +548,146 @@ export async function buildBrandPrefix(
       return brandRow.positioning;
     })();
 
-    // Distilled core — short tasks get this (+ product/event narrowing)
-    // instead of the full heavy block. Chosen at final assembly.
-    const coreDigest = buildBrandCoreDigest(positioning);
+    // 舊版 brand_brain 表（已無寫入端）。獨立 try：這張表查失敗不能讓整份大腦變空。
+    let rows: any[] = [];
+    try {
+      const [r] = (await db.execute(
+        sql`SELECT category, title, content
+            FROM brand_brain
+            WHERE brand_id = ${brandId}
+            ORDER BY updated_at DESC
+            LIMIT 8`
+      )) as any;
+      rows = Array.isArray(r) ? r : [];
+    } catch { rows = []; }
 
-    const [rows] = (await db.execute(
-      sql`SELECT category, title, content
-          FROM brand_brain
-          WHERE brand_id = ${brandId}
-          ORDER BY updated_at DESC
-          LIMIT 8`
-    )) as any;
+    const c = new BrainCollector();
 
-    // ── BLOCK 1: 鎖定屬性（tagline / archetype / WHY / HOW from positioning JSON） ──
-    const brandLocked: string[] = [];
-
-    // tagline can be: legacy top-level string, OR positioning.tagline.{zhTagline,enTagline,story}
+    // ── 鎖定屬性（tagline / archetype / WHY / HOW） ──
     const tlObj = positioning?.tagline;
     if (tlObj && typeof tlObj === "object") {
-      if (tlObj.zhTagline) brandLocked.push(`【Tagline 中】${tlObj.zhTagline}`);
-      if (tlObj.enTagline) brandLocked.push(`【Tagline EN】${tlObj.enTagline}`);
+      if (tlObj.zhTagline) c.add("locked", "identity", "Tagline 中", String(tlObj.zhTagline), 300);
+      if (tlObj.enTagline) c.add("locked", "identity", "Tagline EN", String(tlObj.enTagline), 300);
     } else if (typeof tlObj === "string" && tlObj.trim()) {
-      brandLocked.push(`【Tagline】${tlObj}`);
+      c.add("locked", "identity", "Tagline", tlObj, 300);
     } else if (brandRow?.tagline) {
-      brandLocked.push(`【Tagline (legacy)】${brandRow.tagline}`);
+      c.add("locked", "identity", "Tagline (legacy)", String(brandRow.tagline), 300);
     }
 
-    // archetype: positioning.voice.archetypes (array) OR legacy positioningReport.archetype
     const archetypes = positioning?.voice?.archetypes;
     if (Array.isArray(archetypes) && archetypes.length > 0) {
-      brandLocked.push(`【Archetype】${archetypes.join(" / ")}`);
+      c.add("locked", "identity", "Archetype", archetypes.join(" / "), 200);
     } else if (brandRow?.positioningReport) {
       try {
         const rep = typeof brandRow.positioningReport === "string" ? JSON.parse(brandRow.positioningReport) : brandRow.positioningReport;
         const arch = rep?.archetype ?? rep?.brandArchetype ?? rep?.archetypePrimary;
-        if (arch) brandLocked.push(`【Archetype (legacy)】${typeof arch === "string" ? arch : JSON.stringify(arch).slice(0, 200)}`);
+        if (arch) c.add("locked", "identity", "Archetype (legacy)", typeof arch === "string" ? arch : JSON.stringify(arch), 200);
       } catch {}
     }
 
-    // golden circle: positioning.goldenCircle.{why,how,what}
     const gc = positioning?.goldenCircle;
     if (gc && typeof gc === "object") {
-      if (gc.why) brandLocked.push(`【WHY (信念)】${String(gc.why).slice(0, 400)}`);
-      if (gc.how) brandLocked.push(`【HOW (作法)】${String(gc.how).slice(0, 400)}`);
-      if (gc.what) brandLocked.push(`【WHAT (產品/服務)】${String(gc.what).slice(0, 300)}`);
+      if (gc.why) c.add("locked", "identity", "WHY (信念)", String(gc.why), 800);
+      if (gc.how) c.add("locked", "identity", "HOW (作法)", String(gc.how), 800);
+      if (gc.what) c.add("locked", "identity", "WHAT (產品/服務)", String(gc.what), 800);
     }
+    if (brandRow?.positioningSummary) c.add("locked", "identity", "定位摘要 (legacy)", String(brandRow.positioningSummary), 1_200);
 
-    // positioningSummary (legacy)
-    if (brandRow?.positioningSummary) brandLocked.push(`【定位摘要 (legacy)】${brandRow.positioningSummary}`);
-
-    // ── BLOCK 2: VOICE 完整指引 — 這是「中英夾雜變全中文」的關鍵修法 ──
-    // CJ direction「你好中文有跑了定位...每個 brand 都是相同處理方式」:
-    // positioning.voice 裡有 tone/samples/forbidden，必須完整餵給 LLM。
-    const voiceBlock: string[] = [];
+    // ── 聲音指南 —— positioning.voice 的 tone/forbidden/samples 完整餵給 LLM ──
     const voice = positioning?.voice;
     if (voice && typeof voice === "object") {
       if (Array.isArray(voice.tone) && voice.tone.length > 0) {
-        voiceBlock.push(`tone keywords: ${voice.tone.join(" / ")}`);
+        c.add("voice", "voice", "語氣關鍵詞", voice.tone.join(" / "), 300, (k) => `tone keywords: ${k}`);
       }
       if (Array.isArray(voice.forbidden) && voice.forbidden.length > 0) {
-        voiceBlock.push(`✗ 禁用詞彙 / 句式：\n  ${voice.forbidden.slice(0, 8).map((x: string) => `· ${x}`).join("\n  ")}`);
+        const items = voice.forbidden.map((x: any) => String(x ?? "").trim()).filter(Boolean);
+        c.add("voice", "voice", "禁用詞彙 / 句式", items.join("\n"), 1_000,
+          (k) => `✗ 禁用詞彙 / 句式：\n  ${k.split("\n").map((x) => `· ${x}`).join("\n  ")}`);
       }
-      // SAMPLES are the highest-value training signal (CJ's bilingual / 中英夾雜 use case)
       if (Array.isArray(voice.samples) && voice.samples.length > 0) {
-        const samp = voice.samples.slice(0, 4).map((s: any, i: number) => {
-          const ours = s.ours ?? s.good ?? s.brand;
-          const generic = s.generic ?? s.bad ?? s.wrong;
-          if (!ours) return null;
-          return `  範例 ${i + 1}：\n    ✓ 我們會寫：${ours}\n    ✗ 不要寫：${generic ?? "(略)"}`;
-        }).filter(Boolean).join("\n");
-        if (samp) voiceBlock.push(`【模仿這些範例的口吻】\n${samp}`);
+        voice.samples.slice(0, 6).forEach((s: any, i: number) => {
+          const ours = s?.ours ?? s?.good ?? s?.brand;
+          const generic = s?.generic ?? s?.bad ?? s?.wrong;
+          if (!ours) return;
+          c.add("voice", "voice", `語氣範例 ${i + 1}`, String(ours), 400,
+            (k) => `【模仿這個範例的口吻】\n    ✓ 我們會寫：${k}\n    ✗ 不要寫：${generic ?? "(略)"}`);
+        });
       }
     }
 
-    // ── BLOCK 3: _assets — wizard 寫出的具體寫手指引 ──
-    const assetsBlock: string[] = [];
+    // ── 寫手指引：文字頁（_assets）──
+    // 2026-09-29（CJ 同意「Hook 庫等丟給生文 prompt」）：Hook 庫、文案範本、產品
+    // 命名、縮寫、品牌術語以前只存著、主產文引擎不讀（縮寫與術語只有劇場讀）。
+    // 禁用詞與替換對照照舊不進 prompt——每篇產出後由 enforceBrandRulesOnText 硬檢查，
+    // 大腦畫面把它們標成「產出後檢查」。
     const assets = positioning?._assets;
     if (assets && typeof assets === "object") {
-      const grab = (key: string, label: string, max = 300) => {
+      const grab = (key: string, label: string, max = 1_500, maxItems = 20) => {
         const a = assets[key];
         if (!a) return;
         if (typeof a.text === "string" && a.text.trim()) {
-          assetsBlock.push(`【${label}】${a.text.trim().slice(0, max)}`);
+          c.add("assets", "rules", label, a.text, max);
         } else if (Array.isArray(a.items) && a.items.length > 0) {
-          assetsBlock.push(`【${label}】${a.items.slice(0, 8).join(" · ")}`);
+          const items = a.items.map((x: any) => String(x ?? "").trim()).filter(Boolean);
+          if (items.length) c.add("assets", "rules", label, items.slice(0, maxItems).join(" · "), max);
+          if (items.length > maxItems) {
+            const e = c.entries[c.entries.length - 1]!;
+            e.trimmed = true;
+            e.storedChars = len(items.join(" · "));
+          }
         } else if (Array.isArray(a.pairs) && a.pairs.length > 0) {
-          const ps = a.pairs.slice(0, 5).map((p: any) => `${p.from ?? "?"} → ${p.to ?? "?"}`).join(" · ");
-          assetsBlock.push(`【${label}】${ps}`);
+          const ps = a.pairs.filter((p: any) => p?.from || p?.to).map((p: any) => `${p.from ?? "?"} → ${p.to ?? "?"}`);
+          if (ps.length) c.add("assets", "rules", label, ps.slice(0, maxItems).join(" · "), max);
+          if (ps.length > maxItems) {
+            const e = c.entries[c.entries.length - 1]!;
+            e.trimmed = true;
+            e.storedChars = len(ps.join(" · "));
+          }
         }
       };
-      grab("voice", "聲音指南", 600);
+      grab("voice", "聲音指南", 1_500);
       grab("voice_principles", "聲音原則");
       grab("preferred_terms", "偏好用詞");
-      // 2026-05-17: banned_words / term_substitutions removed from the
-      // prompt — the post-gen enforcement layer guarantees them
-      // deterministically, so they no longer need prompt tokens.
+      grab("branded_terms", "品牌術語");
+      grab("abbreviations", "縮寫對照（同一個東西只有一種叫法）");
+      grab("product_naming", "產品名稱規範");
       grab("cta_library", "CTA 範例");
+      grab("hook_library", "開場 Hook 範例");
+      grab("templates_copy", "文案範本", 2_500, 10);
       grab("audience", "目標受眾");
+
+      const strList = (x: any): string[] => Array.isArray(x?.items) ? x.items.map((s: any) => String(s ?? "").trim()).filter(Boolean) : [];
+      const banned = strList(assets.banned_words);
+      if (banned.length) c.addCheckOnly("禁用詞（產出後自動檢查）", banned.join("、"));
+      const subs = Array.isArray(assets.term_substitutions?.pairs)
+        ? assets.term_substitutions.pairs.filter((p: any) => p?.from && p?.to).map((p: any) => `${p.from} → ${p.to}`)
+        : [];
+      if (subs.length) c.addCheckOnly("替換對照（產出後自動套用）", subs.join("、"));
     }
 
-    // ── BLOCK 4: origin 故事 + audience（次要 grounding） ──
-    const contextBlock: string[] = [];
-    if (positioning?.origin?.story) {
-      contextBlock.push(`【品牌故事】${String(positioning.origin.story).slice(0, 400)}`);
-    }
+    // ── 補充脈絡：品牌故事 / 受眾 / 差異化 / 價值觀 / 競爭 ──
+    if (positioning?.origin?.story) c.add("context", "context", "品牌故事", String(positioning.origin.story), 1_500);
     if (positioning?.audience && typeof positioning.audience === "object") {
       const aud = positioning.audience;
-      if (aud.primary) contextBlock.push(`【主要受眾】${String(aud.primary).slice(0, 200)}`);
+      if (aud.primary) c.add("context", "context", "主要受眾", String(aud.primary), 800);
       if (aud.painPoints && Array.isArray(aud.painPoints)) {
-        contextBlock.push(`【受眾痛點】${aud.painPoints.slice(0, 3).join(" · ")}`);
+        c.add("context", "context", "受眾痛點", aud.painPoints.slice(0, 8).join(" · "), 600);
       }
     }
     if (positioning?.differentiation) {
       const d = positioning.differentiation;
-      if (typeof d === "string") contextBlock.push(`【差異化】${d.slice(0, 300)}`);
-      else if (d.summary) contextBlock.push(`【差異化】${String(d.summary).slice(0, 300)}`);
-      // 2026-09-23：唯一致勝理由跟支撐證據分開列——長任務有空間讓 AI 真的
-      // 引用證據撐起主張，不是只複述一句總結。
-      if (d && typeof d === "object" && d.discriminator) contextBlock.push(`【唯一致勝理由】${String(d.discriminator).slice(0, 100)}`);
-      if (d && typeof d === "object" && d.reasonToBelieve) contextBlock.push(`【支撐證據】${String(d.reasonToBelieve).slice(0, 300)}`);
+      if (typeof d === "string") c.add("context", "context", "差異化", d, 600);
+      else if (d.summary) c.add("context", "context", "差異化", String(d.summary), 600);
+      if (d && typeof d === "object" && d.discriminator) c.add("context", "context", "唯一致勝理由", String(d.discriminator), 300);
+      if (d && typeof d === "object" && d.reasonToBelieve) c.add("context", "context", "支撐證據", String(d.reasonToBelieve), 600);
     }
-    // 2026-09-23（缺口稽核）：values / origin.belief5Layers / competition 三個
-    // segment 原本就在 schema 裡、writer 也會生成內容，但三個 reader 都沒讀過
-    // ——tableRows 型態被 pushFrom() 直接跳過，也沒有手動補寫。使用者填了這幾
-    // 格，AI 寫文案時完全看不到。這裡補上，跟 discriminator/reasonToBelieve
-    // 走同一條「發現落差 → brandContext + aiBrief + positioningDocs 三處同步」
-    // 的路。只挑對文案最有用的子欄位（競爭的 indirect / trends / matrix 這類
-    // 純策略規劃用的表格，仍刻意不塞進 prompt，避免稀釋品牌前綴）。
     if (positioning?.values?.items && Array.isArray(positioning.values.items)) {
       const vals = positioning.values.items
         .filter((v: any) => v?.label)
         .slice(0, 5)
         .map((v: any) => (v.body ? `${v.label}（${String(v.body).slice(0, 60)}）` : v.label))
         .join("、");
-      if (vals) contextBlock.push(`【核心價值觀】${vals}`);
+      if (vals) c.add("context", "context", "核心價值觀", vals, 500);
     }
     if (positioning?.origin?.belief5Layers && Array.isArray(positioning.origin.belief5Layers)) {
       const layers = positioning.origin.belief5Layers
@@ -528,11 +695,11 @@ export async function buildBrandPrefix(
         .slice(0, 5)
         .map((l: any) => String(l.body).slice(0, 90))
         .join(" → ");
-      if (layers) contextBlock.push(`【信念五層深挖】${layers}`);
+      if (layers) c.add("context", "context", "信念五層深挖", layers, 500);
     }
     if (positioning?.competition && typeof positioning.competition === "object") {
       const comp = positioning.competition;
-      if (comp.intensity) contextBlock.push(`【競爭強度】${String(comp.intensity).slice(0, 150)}`);
+      if (comp.intensity) c.add("context", "context", "競爭強度", String(comp.intensity), 400);
       if (Array.isArray(comp.direct) && comp.direct.length) {
         const d2 = comp.direct
           .slice(0, 3)
@@ -543,17 +710,23 @@ export async function buildBrandPrefix(
           })
           .filter(Boolean)
           .join("；");
-        if (d2) contextBlock.push(`【直接競品】${d2}`);
+        if (d2) c.add("context", "context", "直接競品", d2, 600);
       }
-      if (comp.map) contextBlock.push(`【競爭定位地圖】${String(comp.map).slice(0, 200)}`);
+      if (comp.map) c.add("context", "context", "競爭定位地圖", String(comp.map), 600);
     }
-    // 用戶自己上傳的品牌定位文件裡，我們沒有對應欄位可放、但他要求照樣帶進來
-    // 的段落。放在 contextBlock 最後 —— 它是補充，不該蓋過上面那些鎖定屬性。
-    pushSourceDoc(contextBlock, positioning, "品牌定位文件補充");
-    pushCustomSegments(contextBlock, positioning);
+    pushSourceDoc(c, "context", positioning, "品牌定位文件補充");
+    pushCustomSegments(c, "context", positioning);
 
-    // ── 2026-05-11 (CJ): product + event positioning overlays ──
-    let productSection = "";
+    // ── 舊版 brand_brain 表（已無寫入端，仍讀以相容）──
+    if (rows && rows.length > 0) {
+      for (const r of rows as any[]) {
+        c.add("legacy", "legacy", `${r.category}｜${r.title}`, String(r.content ?? ""), 400,
+          (k) => `【${r.category}】${r.title}：${k}`);
+      }
+    }
+
+    // ── 產品定位 ──
+    let productName: string | null = null;
     if (productId) {
       try {
         const [prodRows]: any = await localPool.execute(
@@ -562,80 +735,52 @@ export async function buildBrandPrefix(
         );
         const p = Array.isArray(prodRows) ? prodRows[0] : null;
         if (p) {
-          const lines: string[] = [`【產品名稱】${p.name ?? "(未命名)"}`];
+          productName = p.name ?? "(未命名)";
+          c.add("product", "product", "產品名稱", String(productName), 100);
           const rawPp = opts?.productPositioningOverride !== undefined ? opts.productPositioningOverride : p.positioning;
-          if (rawPp) {
-            const pp = typeof rawPp === "string" ? safeParse(rawPp) : rawPp;
-            if (pp && typeof pp === "object") {
-              // 2026-09-01: 這裡本來讀 pp.usp / pp.target / pp.tagline /
-              // pp.description / pp.keyMessages —— PRODUCT_SEGMENTS 裡一個都
-              // 沒有。產品定位的 writer 早就改成 canonical（core / audience /
-              // value / competition / strategy / marketing，commit 60c9323b），
-              // 但這個 reader 沒跟著改，所以**產品定位從來沒進過 prompt**，
-              // 只有產品名稱進去了。定位頁滿的、任務卻寫得像沒選產品。
-              //
-              // 記憶裡記的是「三個 reader 要同步」；這是第四個，而且是唯一
-              // 一個真的影響產出品質的。
-              // ── 事實欄位（售價／規格／重量／份數／網址）──────────────────
-              // 2026-09-25（CJ「明明我在此產品中，有寫價格，但是產品顧問，還是
-              // 重複問我價格」→「將產品定位中，增加價格/規格／重量／份數 還有
-              // 網址」）：2026-09-23 那次的判準寫「pricing/channel 這類純策略規劃
-              // 欄位不補」——事實欄位不在那個範圍：售價與克重是事實不是策略敘述，
-              // 而且這份 prefix 現在還餵給產品策略總監，他看不到就只能反問使用者。
-              //
-              // canonical 位置是 facts.*，舊資料在頂層（price / productUrl）。
-              // 路徑順序跟 client/src/v2/strategy/lib/productFacts.ts 同一份，
-              // 改那支要一起改這裡。用 pushFirst（第一個有值的就用），不是
-              // pushFrom——兩邊都有值時印兩行售價，模型得自己猜哪個算數。
-              pushFirst(lines, pp, "產品售價",   ["facts.price", "price", "core.price"], 60);
-              pushFirst(lines, pp, "產品規格",   ["facts.spec", "spec"], 80);
-              pushFirst(lines, pp, "重量／容量", ["facts.weight", "weight"], 40);
-              pushFirst(lines, pp, "份數",       ["facts.servings", "servings"], 40);
-              pushFirst(lines, pp, "商品網址",   ["facts.url", "productUrl", "url"], 150);
-              pushFrom(lines, pp, [
-                ["core.coreStatement",       "產品核心定位", 400],
-                ["core.zhTagline",           "產品 Slogan",  100],
-                // 2026-09-23（缺口稽核 — 同一套手法再對一次產品定位）：
-                // writer（positioningSteps.ts buildProductPositioningSteps）
-                // 一直都會產出以下欄位，但這個 reader 沒跟著讀，等於白寫。
-                // 只挑高價值的（跟品牌那次一樣的判準：直接影響文案語氣/賣點
-                // 論述的才補，pricing/channel 這類純策略規劃欄位不補）。
-                ["core.enTagline",           "產品英文標語", 100],
-                ["core.oneLineValueProp",    "一句話價值主張", 200],
-                ["audience.primary",         "產品目標客群", 250],
-                ["audience.pains",           "客群痛點",     250],
-                ["value.coreFunctions",      "核心功能",     250],
-                ["value.primaryEmotion",     "主要情緒價值", 150],
-                ["value.personality",        "產品個性",     150],
-                ["value.userFeeling",        "使用者感受",   200],
-                ["competition.uniqueUsp",    "獨家賣點",     300],
-                ["competition.rareUsp",      "次級賣點",     200],
-                ["competition.commonUsp",    "普遍賣點",     200],
-                ["marketing.tone",           "產品語氣",     200],
-                ["marketing.style",          "溝通風格",     200],
-                ["marketing.keywords",       "關鍵詞彙",     200],
-              ]);
-              // competitors 是 tableRows（[{name,position}]），pushFrom 對物件
-              // 陣列沒有安全的單行寫法，手動摘要——跟品牌 competition.direct
-              // 同一招。
-              if (pp?.competition?.competitors && Array.isArray(pp.competition.competitors)) {
-                const comps = pp.competition.competitors
-                  .filter((c: any) => c?.name)
-                  .slice(0, 3)
-                  .map((c: any) => (c.position ? `${c.name}（${String(c.position).slice(0, 40)}）` : c.name))
-                  .join("、");
-                if (comps) lines.push(`【競品】${comps.slice(0, 250)}`);
-              }
-              pushSourceDoc(lines, pp, "產品定位文件補充");
-              pushCustomSegments(lines, pp);
+          const pp = rawPp ? (typeof rawPp === "string" ? safeParse(rawPp) : rawPp) : null;
+          if (pp && typeof pp === "object") {
+            // 事實欄位（售價／規格／重量／份數／網址）：路徑順序跟
+            // client/src/v2/strategy/lib/productFacts.ts 同一份，改那支要一起改這裡。
+            pushFirst(c, "product", "product", pp, "產品售價",   ["facts.price", "price", "core.price"], 60);
+            pushFirst(c, "product", "product", pp, "產品規格",   ["facts.spec", "spec"], 80);
+            pushFirst(c, "product", "product", pp, "重量／容量", ["facts.weight", "weight"], 40);
+            pushFirst(c, "product", "product", pp, "份數",       ["facts.servings", "servings"], 40);
+            pushFirst(c, "product", "product", pp, "商品網址",   ["facts.url", "productUrl", "url"], 150);
+            pushFrom(c, "product", "product", pp, [
+              ["core.coreStatement",       "產品核心定位", 400],
+              ["core.zhTagline",           "產品 Slogan",  100],
+              ["core.enTagline",           "產品英文標語", 100],
+              ["core.oneLineValueProp",    "一句話價值主張", 200],
+              ["audience.primary",         "產品目標客群", 250],
+              ["audience.pains",           "客群痛點",     250],
+              ["value.coreFunctions",      "核心功能",     250],
+              ["value.primaryEmotion",     "主要情緒價值", 150],
+              ["value.personality",        "產品個性",     150],
+              ["value.userFeeling",        "使用者感受",   200],
+              ["competition.uniqueUsp",    "獨家賣點",     300],
+              ["competition.rareUsp",      "次級賣點",     200],
+              ["competition.commonUsp",    "普遍賣點",     200],
+              ["marketing.tone",           "產品語氣",     200],
+              ["marketing.style",          "溝通風格",     200],
+              ["marketing.keywords",       "關鍵詞彙",     200],
+            ]);
+            if (pp?.competition?.competitors && Array.isArray(pp.competition.competitors)) {
+              const comps = pp.competition.competitors
+                .filter((x: any) => x?.name)
+                .slice(0, 5)
+                .map((x: any) => (x.position ? `${x.name}（${String(x.position).slice(0, 40)}）` : x.name))
+                .join("、");
+              if (comps) c.add("product", "product", "競品", comps, 300);
             }
+            pushSourceDoc(c, "product", pp, "產品定位文件補充");
+            pushCustomSegments(c, "product", pp);
           }
-          productSection = "\n[本次產出聚焦的產品 — 必須圍繞此產品撰寫]\n" + lines.map(l => `- ${l}`).join("\n") + "\n";
         }
       } catch {/* non-fatal */}
     }
 
-    let eventSection = "";
+    // ── 活動定位 ──
     if (eventId) {
       try {
         const [evRows]: any = await localPool.execute(
@@ -644,48 +789,39 @@ export async function buildBrandPrefix(
         );
         const e = Array.isArray(evRows) ? evRows[0] : null;
         if (e) {
-          const lines: string[] = [`【活動名稱】${e.name ?? "(未命名活動)"}`];
+          c.add("event", "event", "活動名稱", String(e.name ?? "(未命名活動)"), 100);
           if (e.startAt) {
             const start = new Date(e.startAt);
-            lines.push(`【活動開始】${start.toLocaleDateString("zh-TW")}`);
-            const now = new Date();
-            const daysLeft = Math.ceil((start.getTime() - now.getTime()) / 86400_000);
-            if (daysLeft > 0) lines.push(`【倒數】還有 ${daysLeft} 天 — 可以做倒數 hook / 預熱`);
-            else if (daysLeft === 0) lines.push(`【倒數】今天就是活動日`);
-            else lines.push(`【活動】已開始 ${-daysLeft} 天`);
+            c.add("event", "event", "活動開始", start.toLocaleDateString("zh-TW"), 40);
+            const daysLeft = Math.ceil((start.getTime() - Date.now()) / 86400_000);
+            const cd = daysLeft > 0 ? `還有 ${daysLeft} 天 — 可以做倒數 hook / 預熱`
+              : daysLeft === 0 ? "今天就是活動日" : null;
+            if (cd) c.add("event", "event", "倒數", cd, 60);
+            else c.add("event", "event", "活動", `已開始 ${-daysLeft} 天`, 60);
           }
-          if (e.endAt) lines.push(`【活動結束】${new Date(e.endAt).toLocaleDateString("zh-TW")}`);
-          if (e.positioning) {
-            const ep = typeof e.positioning === "string" ? safeParse(e.positioning) : e.positioning;
-            if (ep && typeof ep === "object") {
-              // 2026-09-01: 同產品那段的 bug，但這裡還多壞一層 —— 舊碼讀
-              // ep.theme / ep.cta / ep.offer / ep.audience，EVENT_SEGMENTS 一個
-              // 都沒有，而 canonical 的 `audience` 是**物件**，所以
-              // `String(ep.audience)` 會把字串 "[object Object]" 直接餵給模型。
-              pushFrom(lines, ep, [
-                ["brief.briefSummary",             "活動定位摘要", 400],
-                ["brief.eventType",                "活動類型",     60],
-                ["context.coreProblem",            "核心問題",     250],
-                ["audience.primaryAudience",       "活動核心受眾", 300],
-                ["audience.keyInsight",            "關鍵洞察",     200],
-                ["objectives.marketingGoal",       "行銷目標",     200],
-                ["smp.singleMindedProposition",    "SMP 單一主張", 200],
-                ["messaging.coreMessage",          "核心訊息",     250],
-                ["messaging.supportingPoints",     "支撐訊息",     300],
-                ["creative.creativeTheme",         "創意主題",     200],
-              ]);
-              pushSourceDoc(lines, ep, "活動定位文件補充");
-              pushCustomSegments(lines, ep);
-            }
+          if (e.endAt) c.add("event", "event", "活動結束", new Date(e.endAt).toLocaleDateString("zh-TW"), 40);
+          const ep = e.positioning ? (typeof e.positioning === "string" ? safeParse(e.positioning) : e.positioning) : null;
+          if (ep && typeof ep === "object") {
+            pushFrom(c, "event", "event", ep, [
+              ["brief.briefSummary",             "活動定位摘要", 400],
+              ["brief.eventType",                "活動類型",     60],
+              ["context.coreProblem",            "核心問題",     250],
+              ["audience.primaryAudience",       "活動核心受眾", 300],
+              ["audience.keyInsight",            "關鍵洞察",     200],
+              ["objectives.marketingGoal",       "行銷目標",     200],
+              ["smp.singleMindedProposition",    "SMP 單一主張", 200],
+              ["messaging.coreMessage",          "核心訊息",     250],
+              ["messaging.supportingPoints",     "支撐訊息",     300],
+              ["creative.creativeTheme",         "創意主題",     200],
+            ]);
+            pushSourceDoc(c, "event", ep, "活動定位文件補充");
+            pushCustomSegments(c, "event", ep);
           }
-          eventSection = "\n[本次產出對應的活動 — 必須提及活動 / 時程 / 主軸]\n" + lines.map(l => `- ${l}`).join("\n") + "\n";
         }
       } catch {/* non-fatal */}
     }
 
-    // ── Market context (2026-05-21 global localisation) ──────────────────
-    // Injected FIRST so it's the outer constraint all other brand rules sit
-    // inside. Tier A = hand-crafted static. Tier B = LLM cached. Tier C = override.
+    // ── 市場設定（最外層約束，永遠保留）──
     let marketSection = "";
     try {
       marketSection = await buildMarketContext(
@@ -695,64 +831,69 @@ export async function buildBrandPrefix(
       );
     } catch { /* non-fatal: market context is best-effort */ }
 
-    const hasAny =
-      (rows && rows.length > 0) ||
-      brandLocked.length > 0 ||
-      voiceBlock.length > 0 ||
-      assetsBlock.length > 0 ||
-      contextBlock.length > 0 ||
-      coreDigest ||
-      marketSection ||
-      productSection ||
-      eventSection;
-    if (!hasAny) {
-      if (!hasOverride) CACHE.set(ck, { prefix: "", expiresAt: Date.now() + TTL_MS });
-      return "";
-    }
+    applyCapacity(c.entries, len(marketSection), BRAIN_CAPACITY);
 
-    const lockedSection = brandLocked.length > 0
-      ? "\n[品牌已鎖定屬性 — 最高優先級，所有產出都要符合]\n" + brandLocked.map(l => `- ${l}`).join("\n") + "\n"
-      : "";
+    const live = (s: SectionKey) => c.entries.filter((e) => e.section === s && !e.dropped);
+    const block = (s: SectionKey, header: string, bullet = true) => {
+      const es = live(s);
+      if (!es.length) return "";
+      return `\n${header}\n` + es.map((e) => (bullet ? `- ${e.line}` : e.line)).join("\n") + "\n";
+    };
 
-    const voiceSection = voiceBlock.length > 0
-      ? "\n[品牌聲音指南 — 嚴格遵守，這是品牌的「人聲」]\n" + voiceBlock.join("\n") + "\n"
-      : "";
+    const body =
+      block("locked",  "[品牌已鎖定屬性 — 最高優先級，所有產出都要符合]") +
+      block("voice",   "[品牌聲音指南 — 嚴格遵守，這是品牌的「人聲」]", false) +
+      block("assets",  "[寫手指引 — 用詞 / CTA / Hook / 範本 / 受眾規範]") +
+      block("context", "[補充脈絡 — 品牌故事 / 受眾 / 差異化]") +
+      block("legacy",  "[品牌大腦補充條目]") +
+      block("product", "[本次產出聚焦的產品 — 必須圍繞此產品撰寫]") +
+      block("event",   "[本次產出對應的活動 — 必須提及活動 / 時程 / 主軸]");
 
-    const assetsSection = assetsBlock.length > 0
-      ? "\n[寫手指引 — 用詞 / CTA / 受眾規範]\n" + assetsBlock.map(l => `- ${l}`).join("\n") + "\n"
-      : "";
+    const prefix = (marketSection || body) ? "\n\n" + marketSection + body : "";
 
-    const contextSection = contextBlock.length > 0
-      ? "\n[補充脈絡 — 品牌故事 / 受眾 / 差異化]\n" + contextBlock.map(l => `- ${l}`).join("\n") + "\n"
-      : "";
+    const items: BrainItem[] = [
+      ...(marketSection ? [{
+        category: "info" as const, group: "市場", label: "市場與語言設定", storedChars: len(marketSection.trim()),
+        keptChars: len(marketSection.trim()), status: "remembered" as const, preview: marketSection.trim().slice(0, 80),
+      }] : []),
+      ...c.entries.map((e): BrainItem => ({
+        category: e.display.category,
+        group: e.display.group,
+        label: e.display.label,
+        storedChars: e.storedChars,
+        keptChars: e.dropped ? 0 : e.keptChars,
+        status: e.dropped ? "overflow" : e.trimmed ? "trimmed" : "remembered",
+        preview: e.line.replace(/^【[^】]*】/, "").slice(0, 80),
+      })),
+      ...c.checkOnly,
+    ];
+    const brain: BrandBrain = {
+      prefix,
+      items,
+      capacity: BRAIN_CAPACITY,
+      usedChars: items.reduce((n, i) => n + i.keptChars, 0),
+    };
 
-    const brainSection = rows && rows.length > 0
-      ? "\n[品牌大腦補充條目]\n" +
-        rows.map((r: any) => `- 【${r.category}】${r.title}：${r.content}`).join("\n") + "\n"
-      : "";
-
-    // 順序：市場設定（最外層約束）→ 鎖定屬性 → 聲音指南 → 寫手指引 →
-    // 脈絡 → 補充 → product/event narrow。
-    // LLM 對「靠後出現」內容更易執行，product/event 放最後。
-    // marketSection 放最前：所有後續指令都要在此市場框架內執行。
-    const fullPrefix =
-      "\n\n" + marketSection + lockedSection + voiceSection + assetsSection + contextSection + brainSection + productSection + eventSection;
-    // mode="core" → market context + distilled digest + product/event narrowing
-    // (short tasks). SAFETY: if coreDigest is empty (brand not re-run after the
-    // single-source refactor → positioning has no segments yet), fall
-    // back to the full block so un-migrated brands don't silently lose
-    // ALL brand grounding on short tasks. mode="full" → rich block.
-    // Market context is ALWAYS prepended — even for core mode — because
-    // "write in Japanese for the JP market" must never be skipped.
-    const prefix = (mode === "core" && coreDigest)
-      ? marketSection + coreDigest + productSection + eventSection
-      : fullPrefix;
-
-    if (!hasOverride) CACHE.set(ck, { prefix, expiresAt: Date.now() + TTL_MS });
-    return prefix;
+    if (!hasOverride) CACHE.set(ck, { brain, expiresAt: Date.now() + TTL_MS });
+    return brain;
   } catch {
-    return "";
+    return empty;
   }
+}
+
+/**
+ * 回給 LLM 的品牌前綴。所有產文路徑都走這裡。
+ *
+ * mode 參數保留給既有呼叫端相容；2026-09-29 起 core 與 full 是同一份（見 buildBrandBrain）。
+ */
+export async function buildBrandPrefix(
+  brandId: number | undefined | null,
+  productId?: number | null,
+  eventId?: number | null,
+  _mode: "core" | "full" = "full",
+  opts?: { positioningOverride?: any; productPositioningOverride?: any },
+): Promise<string> {
+  return (await buildBrandBrain(brandId, productId, eventId, opts)).prefix;
 }
 
 /**

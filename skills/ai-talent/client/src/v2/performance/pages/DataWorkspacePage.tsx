@@ -20,6 +20,7 @@ import PerformanceDashboard from "../components/PerformanceDashboard";
 import ConnectionsPanel from "../components/ConnectionsPanel";
 import { setMockBrandSeed } from "../components/perfMockData";
 import FanpageMonthlyReport from "../components/FanpageMonthlyReport";
+import LensWorkspace from "../components/LensWorkspace";
 import AddonRequestModal from "../../platform/components/AddonRequestModal";
 
 type Source = {
@@ -157,6 +158,13 @@ export default function DataWorkspacePage() {
   // 比值（ROAS／CPA／客單價）不變。切換品牌時重播。
   setMockBrandSeed(brandId);
 
+  // 2026-09-29：這個 tray 有沒有真數據（perf_facts）。有 → 只看上面的視角報表；
+  // 沒有 → 下面才放示意儀表板，讓人知道接上之後長什麼樣子。
+  const wsQ = (trpc as any).performance?.workspace?.useQuery
+    ? (trpc as any).performance.workspace.useQuery({ brandId: brandId ?? 0, tray: active.id }, { enabled: !!brandId, refetchOnWindowFocus: false })
+    : { data: undefined };
+  const hasRealData = ((wsQ.data as any)?.trayFacts ?? 0) > 0;
+
   return (
     <div style={{ padding: "20px 24px 80px", maxWidth: 1320, margin: "0 auto" }}>
       <div style={{ marginBottom: 18 }}>
@@ -177,14 +185,22 @@ export default function DataWorkspacePage() {
             </div>
           </div>
 
-          <PlanNudge />
+          {/* 2026-09-29（CJ「所有成效層的 mission tray 都有最上面的三個選項」）：
+              範本／我的報告／貼對話＋真數據的視角報表，每個 tray 都一樣。 */}
+          <LensWorkspace brandId={brandId} tray={active.id} />
+          {!hasRealData && <PlanNudge />}
           {/* 粉絲團月報有自己的流程（上傳版型 → 跨月解析 → 體檢報告），不是
               PerformanceDashboard 那種模擬儀表板，所以整頁換掉而不是疊加。 */}
           {active.id === "fanpage_monthly" && <FanpageMonthlyReport />}
           {/* 2026-09-07 資料來源卡片：總覽最上方，先讓人看到「哪些接了、哪些沒接、
               沒接的要怎麼接」，再看下面標了「⚠ 模擬資料」的示意儀表板。 */}
           {active.id === "overview" && <ConnectionsPanel brandId={brandId} />}
-          {active.id !== "fanpage_monthly" && <PerformanceDashboard sourceId={active.id} />}
+          {active.id !== "fanpage_monthly" && !hasRealData && (
+            <>
+              <div style={{ margin: "4px 0 10px", fontSize: 13, color: "#6b7280" }}>以下為示意：接上資料後，這一頁的完整儀表板長這樣。</div>
+              <PerformanceDashboard sourceId={active.id} />
+            </>
+          )}
 
           {/* 這一層是「接下來可以跑什麼」：每張卡說明哪個 agent、用哪個 skill、
               吃哪些資料、產出什麼。資料串接後才會變成可執行。 */}
@@ -219,7 +235,7 @@ export default function DataWorkspacePage() {
           <div style={{ marginTop: 16, borderRadius: 16, background: "#f9fafb", padding: 14 }}>
             <div style={{ fontSize: 12, fontWeight: 800, color: INK, marginBottom: 6 }}>下一步</div>
             <p style={{ margin: 0, fontSize: 13, color: "#6b7280", lineHeight: 1.6 }}>
-              接上 Meta、Google、GA、Shopline connector 後，這裡會換成真實數據；串接屬於電商營運報告的建置範圍，由 SoWork 在導入時設定。
+              粉專貼文可以直接同步；廣告、GA4 與電商訂單先上傳匯出檔就能看漏斗。API 直連屬於電商營運報告的建置範圍，由 SoWork 在導入時設定。
             </p>
           </div>
         </aside>

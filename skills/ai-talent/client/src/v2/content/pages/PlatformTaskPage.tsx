@@ -378,6 +378,8 @@ export interface TaskEmbed {
   weekStart?: string;
   /** 這一格排在哪天——成品頁「排程到日曆」預填這天。 */
   slotDate?: string;
+  /** 靈感舞台：主體是某個產品／活動時，任務視窗直接選好它，不必再選一次。 */
+  entity?: { kind: "product" | "event"; id: number };
   onClose: () => void;
 }
 
@@ -704,6 +706,8 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
         taskLabel: typeof activeTask.label === "string" ? activeTask.label : undefined,
         primaryQuestion: activeTask.primary_question ?? undefined,
         brandId: brandId ?? undefined,
+        productId: taskProductId ?? undefined,
+        eventId: taskEventId ?? undefined,
       });
       if (r?.ok && r.polished) setPrimaryAnswer(r.polished);
       else setPolishErr(lang === "en" ? "Polish failed — try again." : "潤稿失敗，請再試一次");
@@ -937,6 +941,8 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
       : task.id?.startsWith("pr-") ? "pr"
       : task.id?.startsWith("web-") ? "website"
       : task.id?.startsWith("x-") ? "x"
+      : task.id?.startsWith("th-") ? "threads"
+      : task.id?.startsWith("ln-") ? "line"
       : task.id?.startsWith("br-") ? "brand"
       : task.id?.startsWith("rs-") ? "audience"
       : "facebook");
@@ -979,6 +985,9 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
     // 2026-09-29：server 的預設托盤是從「全部卡」裡每個形式挑一張，但前台只列
     // 爆款結構＋品牌自建——交集後常常只剩一兩張（FB 7 張爆款卡只擺出 2 張）。
     // 沒存過托盤時，改從「前台看得到的卡」裡每個形式挑一張，server 的挑法當次序參考。
+    // 看得到的卡本來就不超過托盤上限時全部擺出來——IG 兩張留言卡共用同一個形式，
+    // 私訊卡又是 feed 形式，每個形式挑一張會把 8 張砍成 6 張，藏掉唯一的私訊卡。
+    if (platformTasks.length <= (trayData.maxTray ?? 12)) return platformTasks.map((t: any) => t.id);
     const fallbackOrder = new Map((trayData.fallback ?? []).map((id, i) => [id, i] as const));
     const byType = new Map<string, any>();
     const ranked = [...platformTasks].sort((a: any, b: any) =>
@@ -1231,6 +1240,7 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
     // 從活動企劃過來時，活動就是這一篇的脈絡——優先於全域 scope。
     const ge = campaignRef.current?.eventId ?? ctx?.scope?.eventId ?? null;
     setModalEntity(
+      embed?.entity ? { kind: embed.entity.kind, id: embed.entity.id } :
       ge ? { kind: "event", id: ge } :
       gp ? { kind: "product", id: gp } :
       { kind: "brand", id: null },
@@ -1410,6 +1420,8 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
             squadSlug: (activeTask as any).squad_slug,
             topic: primaryAnswer || activeTask.label,
             brandId: brandId ?? undefined,
+            productId: taskProductId ?? undefined,
+            eventId: taskEventId ?? undefined,
           });
           if (isStale()) { if ((r as any).outputId) discardCancelledOutput((r as any).outputId); return; }
           if ((r as any).outputId) {
@@ -2351,9 +2363,32 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                               className="text-[12px] font-medium truncate"
                               style={{ color: acc }}
                             >
-                              {isOwn ? frontCardKindLabel("own", lang) : sourcePillText(src, lang)}
+                              {isOwn
+                                ? frontCardKindLabel("own", lang)
+                                : frontCardKind(task) === "viral"
+                                  ? `${lang === "en" ? "Reference: " : "參考貼文："}${sourcePillText(src, lang)}`
+                                  : sourcePillText(src, lang)}
                             </span>
                           </span>
+                        );
+                      })()}
+                      {/* 2026-09-29（CJ「爆款結構卡上都要有這些文字：參考貼文、副標題、數字是原貼文的」）：
+                          爆款卡直接印數字＋量測年月＋弱點，不用點進詳情才看得到。副標題就是 description。 */}
+                      {frontCardKind(task) === "viral" && (() => {
+                        const raw = (task as any).source ?? {};
+                        return (
+                          <div className="flex flex-col gap-0.5">
+                            {(raw.metric || raw.asOf) && (
+                              <p className="text-[12px] leading-snug text-default-600 line-clamp-2">
+                                {raw.metric}{raw.metric && raw.asOf ? " · " : ""}{raw.asOf}
+                              </p>
+                            )}
+                            {raw.caveat && (
+                              <p className="text-[12px] leading-snug text-default-400 line-clamp-2">
+                                {lang === "en" ? "Note: " : "註："}{raw.caveat}
+                              </p>
+                            )}
+                          </div>
                         );
                       })()}
                       {/* 2026-09-11 (CJ「還是沒有直接打開，就可以看到那些廣告形式的文字」)：

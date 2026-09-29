@@ -32,6 +32,7 @@ import { strategyMeetingRouter } from "../strategy/routers/strategyMeetingRouter
 import { touchpointsRouter } from "../platform/routers/touchpointsRouter";
 import { navPrefsRouter } from "../platform/routers/navPrefsRouter";
 import { plannerRouter } from "../content/routers/plannerRouter";
+import { inspirationRouter } from "../content/routers/inspirationRouter";
 import { competitorRouter } from "../strategy/routers/competitorRouter";
 import { brandKnowledgeRouter } from "../strategy/routers/brandKnowledgeRouter";
 import { personaAgentRouter } from "../strategy/routers/personaAgentRouter";
@@ -80,6 +81,7 @@ export const appRouter = router({
   touchpoints:   touchpointsRouter,
   navPrefs:      navPrefsRouter,
   planner:       plannerRouter,
+  inspiration:   inspirationRouter,
   competitor:    competitorRouter,
   calendar:      calendarRouter,
   bundleConnect: bundleConnectRouter,

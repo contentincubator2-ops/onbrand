@@ -702,6 +702,370 @@ ${TT_SUFFIX}`,
     maxTokens: 1210,
     outputDefaults: { platform: "tiktok", post_type: "storyboard" },
   },
+  // ── 爆款結構卡・近 3 個月案例（CJ 2026-09-29 核可）────────────────────
+  // TikTok、2026-08～09 量測、數字已對照參考文章；弱點寫在 caveat。
+  {
+    id: "tt-30-live-landmark-launch",
+    tier: "30s",
+    postType: "live",
+    label: { en: "Live: Landmark Launch Event", zh: "TikTok 直播：地標首賣事件" },
+    description: { en: "Tease, landmark set, story, countdown, results post", zh: "預告→地標場景→產品故事→倒數開賣→戰報" },
+    agent_id: 60073,
+    skill_slug: "live-script",
+    source: {
+      type: "viral",
+      short: "Sambal Nyet 新品 TikTok Shop 首賣直播",
+      metric: "1 分 51 秒賣出 RM200 萬；同時在線 38.8 萬人",
+      asOf: "2026-08",
+      caveat: "馬來西亞案例；品牌由創作者本人創辦，自帶粉絲",
+      url: "https://www.therakyatpost.com/news/malaysia/2026/08/10/khairul-aming-sets-five-new-tiktok-records-in-sambal-nyet-bilis-launch/",
+      takeaway:
+        "把新品上市做成一場有日期、有地標場景、有限量數字的直播事件，搶購本身變成內容，播完再發戰報收第二波聲量。",
+    },
+    primary_question: "要首賣的新品是什麼？有沒有一個有話題的地點？限量多少？",
+    primary_input: { key: "topic", placeholder: "例：新口味辣椒醬 / 在老店的屋頂直播 / 限量 3,000 罐", type: "textarea" },
+    inputs: [
+      { key: "topic", label: "新品 + 直播地點 + 限量數字", type: "textarea", required: true },
+    ],
+    systemPrompt: `你要規劃一場 TikTok Shop「新品首賣直播事件」，並寫出主持流程。
+
+產出：
+1. 預告（開播前 3 天、前 1 天、前 1 小時各一則短文案，40 字內）：日期、時間、限量數字。
+2. 直播流程（約 45 分鐘）：
+   - 開場 3 分鐘：介紹地點為什麼選這裡，和產品有什麼關係。
+   - 產品故事 10 分鐘：配方、做法、為什麼做這款。
+   - 倒數開賣：口令、限量數字，即時報庫存與秒數的講稿範例。
+   - 加碼：最早下單者的小獎（不要編造你沒有的大獎，寫「主持人現場公布」）。
+3. 戰報文案（播完 1 小時內）：賣出多少、幾分鐘、下一次什麼時候。
+
+硬規則：
+- 限量數字要真實，不能製造假稀缺。
+- 不承諾沒有的優惠。`,
+    preferredModel: "qwen",
+    maxTokens: 1100,
+    outputDefaults: { platform: "tiktok", post_type: "live" },
+  },
+  {
+    id: "tt-30-account-staff-trend-lines",
+    tier: "30s",
+    postType: "profile",
+    label: { en: "Account: Staff Cast + Branded Trends", zh: "TikTok 帳號：員工出演＋流行梗品牌版" },
+    description: { en: "Test with product videos, then run two fixed series", zh: "先測商品影片，再開兩條固定企劃線" },
+    agent_id: 220949,
+    skill_slug: "tiktok-strategist",
+    source: {
+      type: "viral",
+      short: "コメダ珈琲店 官方 TikTok",
+      metric: "追蹤突破 20 萬；總觀看 2.2 億，單支最高 430 萬",
+      asOf: "2026-09",
+      caveat: "日本案例；代營運商發布的新聞稿，觀看數是累計",
+      url: "https://prtimes.jp/main/html/rd/p/000000007.000108332.html",
+      takeaway:
+        "先用商品介紹影片測出受眾想看什麼，再固定兩條企劃線：員工出演、把流行格式改成品牌版；KPI 綁「讓年輕人變常客」而不是追蹤數。",
+    },
+    primary_question: "你們的經營目標是什麼？店裡有哪些員工願意上鏡？",
+    primary_input: { key: "topic", placeholder: "例：讓大學生變常客 / 有兩位店長和一位很會跳舞的工讀生", type: "textarea" },
+    inputs: [
+      { key: "topic", label: "經營目標 + 可以上鏡的員工", type: "textarea", required: true },
+    ],
+    systemPrompt: `你要幫品牌規劃 TikTok 官方帳號的前 8 週營運。
+
+產出：
+1. KPI：從用戶給的經營目標倒推 2 個可追蹤指標（不要只寫追蹤數、觀看數）。
+2. 第 1–2 週「測試期」：6 支商品介紹影片的主題，每支測一種角度（價格、做法、情境、員工推薦…），寫出要看哪個數字判斷勝出。
+3. 第 3–8 週「兩條固定企劃線」：
+   - 員工出演：3 個可以重複的單元名稱與一句話格式（例：「店長的一句話」）。
+   - 流行格式品牌版：說明怎麼挑流行格式、怎麼改成品牌場景，給 2 個示範。
+4. 每週覆盤表：固定看的 3 個數字與下一步怎麼調整。
+
+硬規則：
+- 員工出演要先取得同意，寫在規劃最上方。
+- 不追需要特定音樂授權的流行音樂，選格式不選歌。`,
+    preferredModel: "qwen",
+    maxTokens: 1100,
+    outputDefaults: { platform: "tiktok", post_type: "profile" },
+  },
+  {
+    id: "tt-30-comment-ugc-hack",
+    tier: "30s",
+    postType: "comment",
+    label: { en: "Comments: Show Up Under the Viral Hack", zh: "TikTok 留言：到顧客的爆紅吃法底下接梗" },
+    description: { en: "Don't film it — comment on the customer's viral video", zh: "品牌不自己拍，在別人的爆紅影片底下口語接梗" },
+    agent_id: 60055,
+    skill_slug: "tiktok-ads",
+    source: {
+      type: "viral",
+      short: "McDonald's 留言接「Cookie McDouble」吃法",
+      metric: "創作者影片 1,060 萬觀看、近 99 萬反應；官方帳號下場留言",
+      asOf: "2026-09",
+      caveat: "數字屬於創作者的影片，不是品牌的；美國案例",
+      url: "https://www.yahoo.com/lifestyle/articles/cookie-cheeseburger-mcdonalds-menu-hack-075922572.html",
+      takeaway:
+        "顧客自創的吃法爆紅時，品牌官方帳號在影片和後續二創底下用口語留一句不推銷的短評，用極低成本分到流量，之後再評估要不要做成限定品。",
+    },
+    primary_question: "最近有沒有顧客在 TikTok 上拍你們產品的「新吃法／新用法」？",
+    primary_input: { key: "topic", placeholder: "例：有人把我們的冰淇淋夾進鬆餅 / 把飲料加兩份珍珠", type: "textarea" },
+    inputs: [
+      { key: "topic", label: "顧客的新吃法或用法", type: "textarea", required: true },
+    ],
+    systemPrompt: `你要幫品牌規劃「到顧客爆紅影片底下留言」的回應。
+
+產出：
+1. 第一則留言（15 字內）×3 個版本：口語、像朋友，不推銷、不放連結、不說「歡迎來店」。
+2. 在二創（stitch／duet）影片底下的第二則留言 ×2 個版本。
+3. 官方跟進影片的點子（可選）：主管或員工「正式試吃／試用」這個吃法的 15 秒腳本。
+4. 後續判斷：這個吃法值不值得做成限定品，列 3 個判斷條件。
+
+硬規則：
+- 24 小時內留言，晚了就不要留。
+- 不在涉及安全疑慮（食安、過敏、危險用法）的影片底下附和；遇到這種情況改寫「安全提醒」版本。`,
+    preferredModel: "qwen",
+    maxTokens: 700,
+    outputDefaults: { platform: "tiktok", post_type: "comment" },
+  },
+  {
+    id: "tt-30-account-embrace-creator-meme",
+    tier: "30s",
+    postType: "profile",
+    label: { en: "Account: Adopt the Creator's Meme", zh: "TikTok 帳號：接住創作者給你的梗" },
+    description: { en: "Rename, crown the creator, invite remixes", zh: "創作者誤讀品牌時，改名、封頭銜、辦二創" },
+    agent_id: 220949,
+    skill_slug: "tiktok-strategist",
+    source: {
+      type: "viral",
+      short: "Vaseline 改名「Baseline」接梗",
+      metric: "創作者 TikTok 影片 460 萬觀看、62.55 萬讚",
+      asOf: "2026-08",
+      caveat: "數字屬於創作者的影片；品牌自己的回應影片只有「數百萬觀看」",
+      url: "https://www.fashiontimes.co.uk/vaseline-viral-baseline-marketing-1763315",
+      takeaway:
+        "創作者無意間把品牌名念錯而爆紅時，品牌立刻「承認並放大」：官方帳號改名、封創作者一個玩笑頭銜、邀粉絲用新名字二創，比自製廣告更快吃到聲量。",
+    },
+    primary_question: "有沒有創作者或顧客把你們的品牌名、產品念錯或用錯而變成梗？",
+    primary_input: { key: "topic", placeholder: "例：大家都把我們的「沐光」念成「木瓜」", type: "textarea" },
+    inputs: [
+      { key: "topic", label: "被誤讀的方式 + 是誰開始的", type: "textarea", required: true },
+    ],
+    systemPrompt: `你要規劃品牌在 48 小時內「接住」創作者給的梗。
+
+產出：
+1. 判斷：這個梗會不會傷害品牌（負面、低俗、涉及他人）？會的話直接寫「不建議接」與原因。
+2. 48 小時行動清單：
+   - 官方帳號暫時改名／換頭像的文字（改多久、怎麼改回來）。
+   - 給創作者的玩笑頭銜與公開致謝文案（40 字內）。
+   - 私訊創作者的合作邀請（60 字內，先徵求同意再公開標記）。
+3. 粉絲二創活動：一句話規則＋hashtag。
+4. 品牌自拍「致敬」影片的 20 秒腳本。
+
+硬規則：
+- 先取得創作者同意再標記或使用其影片。
+- 不嘲笑念錯的人；梗的主角是品牌自己。`,
+    preferredModel: "qwen",
+    maxTokens: 900,
+    outputDefaults: { platform: "tiktok", post_type: "profile" },
+  },
+  {
+    id: "tt-30-live-auction-trust",
+    tier: "30s",
+    postType: "live",
+    label: { en: "Live: Inspect Each Item, Then Auction", zh: "TikTok 直播：逐件驗貨＋競標" },
+    description: { en: "For high-ticket items, inspect on camera to earn trust", zh: "高單價、重真偽的品類，用鏡頭驗貨換信任" },
+    agent_id: 60073,
+    skill_slug: "live-script",
+    source: {
+      type: "viral",
+      short: "英國 TikTok Shop 直播競標（Lux Laces 等）",
+      metric: "Lux Laces 首場直播成交 £30,000；首月營收逾 £100,000",
+      asOf: "2026-08",
+      caveat: "英國案例；TikTok 官方新聞稿，首場直播日期未寫",
+      url: "https://newsroom.tiktok.com/tiktokshoplivefashionandcollectables?lang=en-GB",
+      takeaway:
+        "稀缺品或二手品在直播中逐件展示細節與瑕疵，再用限時競標製造搶購，信任感直接轉成成交；固定班表從每週 2–3 場推到每天。",
+    },
+    primary_question: "你們賣什麼高單價或重真偽的東西？這一場有幾件？",
+    primary_input: { key: "topic", placeholder: "例：二手名牌包 12 件 / 限量球鞋 8 雙", type: "textarea" },
+    inputs: [
+      { key: "topic", label: "品類 + 這一場的件數", type: "textarea", required: true },
+    ],
+    systemPrompt: `你要寫一場 TikTok 直播「逐件驗貨＋競標」的流程與主持稿。
+
+產出：
+1. 開場 2 分鐘：這一場有幾件、競標規則（起標價、每次加價、倒數秒數）、怎麼付款與出貨。
+2. 每一件的固定段落（約 3 分鐘）：
+   - 驗貨：正面、背面、細節、瑕疵，主持人主動講出瑕疵。
+   - 來源與狀況：一句話講清楚。
+   - 開標與倒數口令。
+3. 收尾：成交清單口播、下一場時間、導追蹤。
+4. 班表建議：從每週幾場開始、做到什麼數字再加場。
+
+硬規則：
+- 瑕疵一定要講，不能只拍好的一面。
+- 不提供你無法保證的真偽證明；寫「依店家鑑定流程」。`,
+    preferredModel: "qwen",
+    maxTokens: 1100,
+    outputDefaults: { platform: "tiktok", post_type: "live" },
+  },
+  {
+    id: "tt-30-live-daily-show",
+    tier: "30s",
+    postType: "live",
+    label: { en: "Live: A Named Daily Show", zh: "TikTok 直播：固定節目化的每日直播" },
+    description: { en: "Name it, fix the time slot, hosts call out flaws", zh: "取節目名、固定時段，主持人主動講瑕疵" },
+    agent_id: 60073,
+    skill_slug: "live-script",
+    source: {
+      type: "viral",
+      short: "Fashionphile 每日 TikTok 直播節目",
+      metric: "美國 TikTok Shop 二手精品營收 94% 來自直播；品類 GMV 年增 400%",
+      asOf: "2026-09",
+      caveat: "美國案例；數字是整個品類的，不是單一品牌的單場",
+      url: "https://www.modernretail.co/operations/nearly-all-luxury-resale-transactions-on-tiktok-shop-us-now-come-from-livestreams/",
+      takeaway:
+        "把直播做成有節目名、固定時段的「節目」，主持人主動講每件商品的狀況與瑕疵，點名熟客，留言區自然變成熟客社群。",
+    },
+    primary_question: "你們能每天固定哪個時段直播？主持人是誰？",
+    primary_input: { key: "topic", placeholder: "例：每天晚上 9 點 / 店長和一位資深店員輪流", type: "textarea" },
+    inputs: [
+      { key: "topic", label: "固定時段 + 主持人", type: "textarea", required: true },
+    ],
+    systemPrompt: `你要把品牌的 TikTok 直播規劃成一個「每日固定節目」。
+
+產出：
+1. 節目名稱 3 個候選（每個 8 字內）與一句節目口號。
+2. 固定時段與長度，以及每週的主題輪替（週一新品、週三瑕疵特價…）。
+3. 單集流程（60 分鐘）：開場固定台詞、每件商品的固定段落（來源、狀況、瑕疵、尺寸）、熟客點名時間、收尾預告。
+4. 熟客經營：怎麼記住常客、怎麼在直播中點名、怎麼在留言區讓熟客互相認識。
+
+硬規則：
+- 每件商品都要講狀況與瑕疵。
+- 固定時段一旦公布就不要隨意更動；要改先預告一週。`,
+    preferredModel: "qwen",
+    maxTokens: 1000,
+    outputDefaults: { platform: "tiktok", post_type: "live" },
+  },
+  {
+    id: "tt-30-script-character-scorecard",
+    tier: "30s",
+    postType: "foryou",
+    label: { en: "Script: Score a Famous Character", zh: "TikTok 腳本：用大家熟悉的角色打分數" },
+    description: { en: "Ten quick scores, a verdict, then swap the character", zh: "10 項能力逐一打分，最後下判決，換角色就能量產" },
+    agent_id: 180167,
+    skill_slug: "tiktok-content",
+    source: {
+      type: "viral",
+      short: "EMOLVA「用動漫角色評商業技能」系列",
+      metric: "單支突破 100 萬觀看",
+      asOf: "2026-08",
+      caveat: "日本案例；公司自己發的新聞稿，影片上架日未查到",
+      url: "https://prtimes.jp/main/html/rd/p/000000183.000021425.html",
+      takeaway:
+        "用大眾熟悉的角色當載體，套一個有評分、有判決的專業框架（錄不錄用），格式固定、換角色就能量產成系列。",
+    },
+    primary_question: "你們的專業可以拿來「評分」什麼？想用哪一類大家熟悉的角色？",
+    primary_input: { key: "topic", placeholder: "例：用營養師的角度評分卡通角色的早餐 / 用房仲角度評分動畫裡的房子", type: "textarea" },
+    inputs: [
+      { key: "topic", label: "你的專業評分框架 + 角色類型", type: "textarea", required: true },
+    ],
+    systemPrompt: `你要寫一支 45–60 秒的 TikTok「角色評分」腳本，並規劃成系列。
+
+腳本結構：
+1. 鉤子（3 秒）：「〇〇（角色）的＿＿能力幾分？」
+2. 評分：5–10 項能力，每項一句理由＋一個分數，節奏要快（每項 3–5 秒）。
+3. 公布總分。
+4. 下判決（錄用／不錄用、買／不買、住／不住…）＋一句專業洞察。
+5. 結尾預告下一個角色，邀請留言點名。
+
+產出：分鏡（畫面／台詞／字幕），另附 5 個下一集可以評的角色。
+
+硬規則：
+- 評分理由要來自真的專業知識，不要只是玩梗。
+- 使用角色時只做評論，不使用官方圖片素材；畫面用自己的手繪或文字卡。`,
+    preferredModel: "qwen",
+    maxTokens: 900,
+    outputDefaults: { platform: "tiktok", post_type: "foryou" },
+  },
+  {
+    id: "tt-30-topic-local-contest-kickoff",
+    tier: "30s",
+    postType: "foryou",
+    label: { en: "Ideation: Local Demo + Contest", zh: "TikTok 選題：在地示範＋比賽帶 UGC" },
+    description: { en: "Cold-start a new account with a local demo and a contest", zh: "新帳號冷啟動：先讓在地真人示範，再用比賽讓大家自己拍" },
+    agent_id: 210310,
+    skill_slug: "trend-researcher",
+    source: {
+      type: "viral",
+      short: "入間市「緑翠プロジェクト」",
+      metric: "開設 10 天總觀看突破 13 萬",
+      asOf: "2026-08",
+      caveat: "日本地方政府；數字量級小，是政府自己發的新聞稿",
+      url: "https://prtimes.jp/main/html/rd/p/000000234.000039058.html",
+      takeaway:
+        "新帳號先讓在地真人示範一首歌加一段舞（有排練花絮），再開一個有實質獎品的翻拍比賽，讓民眾自己拍，帳號冷啟動就有 UGC。",
+    },
+    primary_question: "你們要開新帳號或辦週年活動嗎？有沒有在地團體或員工可以示範？",
+    primary_input: { key: "topic", placeholder: "例：開店 10 週年 / 附近國中熱舞社願意一起拍", type: "textarea" },
+    inputs: [
+      { key: "topic", label: "場合 + 可以示範的在地團體或員工", type: "textarea", required: true },
+    ],
+    systemPrompt: `你要幫品牌規劃 TikTok 新帳號的冷啟動選題：「在地示範＋翻拍比賽」。
+
+產出：
+1. 主題：一段 15 秒、學得會的動作或一句口號（寫出動作分解或台詞）。
+2. 前 3 支示範影片的選題與一句話內容（排練花絮、正式示範、失敗 NG）。
+3. 比賽規則：參加方式、指定 hashtag、期間（日期）、評選方式、實質獎品（寫「由品牌提供」，不要編沒有的獎）。
+4. 收尾：決賽或頒獎怎麼做成最後一支影片。
+
+硬規則：
+- 有未成年人入鏡要取得監護人同意，寫在規劃最上方。
+- 動作不能有危險性。`,
+    preferredModel: "qwen",
+    maxTokens: 900,
+    outputDefaults: { platform: "tiktok", post_type: "foryou" },
+  },
+  {
+    id: "tt-30-copy-founder-number-story",
+    tier: "30s",
+    postType: "foryou",
+    label: { en: "Copy: The Founder Numbers Story", zh: "TikTok 文案：數字反差的創業故事系列" },
+    description: { en: "Open with a start-small, end-big number contrast", zh: "第一句丟出「小資本→大營收」的數字反差，每集接一段幕後" },
+    agent_id: 60055,
+    skill_slug: "tiktok-ads",
+    source: {
+      type: "viral",
+      short: "女子麥麵包 創業故事系列",
+      metric: "創業故事系列累積超過 100 萬次觀看",
+      asOf: "2026-09",
+      caveat: "台灣案例；100 萬是系列累計，未確認是近期爆紅；出自平台新聞稿",
+      url: "https://www.kocpc.com.tw/archives/669921",
+      takeaway:
+        "用「2,000 元起家到年營收 1,800 萬」這種數字反差當系列開場，每集接一段真實的卡關或產品開發幕後，最後導到節慶新品或課程。",
+    },
+    primary_question: "你們的起點和現在各是什麼數字？有哪一段卡關可以講？",
+    primary_input: { key: "topic", placeholder: "例：一台攤車起家、現在三家店 / 第一年差點收掉", type: "textarea" },
+    inputs: [
+      { key: "topic", label: "起點數字 + 現在數字 + 一段卡關", type: "textarea", required: true },
+    ],
+    systemPrompt: `你要寫一組 TikTok「數字反差創業故事」系列的文案（5 集）。
+
+每集產出：
+- 開場字幕（第一句，15 字內）：數字反差，例「從＿＿到＿＿」。
+- 口播稿（60–120 字）：這一集的一段故事。
+- 影片說明文（caption，50–100 字）＋3 個 hashtag。
+
+5 集的安排：
+1. 起點：當時有多少錢、為什麼開始。
+2. 卡關：最慘的一次，具體到哪一天、發生什麼。
+3. 轉折：做對了哪一件事。
+4. 產品幕後：一個產品怎麼做出來的。
+5. 現在：節慶新品或課程，自然導流。
+
+硬規則：
+- 數字必須真實，用戶沒給的數字不要編，寫「（請填入）」。
+- 不要雞湯口號。`,
+    preferredModel: "qwen",
+    maxTokens: 1100,
+    outputDefaults: { platform: "tiktok", post_type: "foryou" },
+  },
 ];
 
 const ANNA_ID      = 180165; // Anna Tseng (主場)
@@ -785,6 +1149,97 @@ export const TT_30S_ORCHESTRA: Record<string, OrchestraConfig> = {
     variants: 3, images: 3, runImageGen: false, imageDirectorId: ANNA_ID,
     aspectRatio: "9:16", variantLabels: ["續拍版", "致敬版", "回禮版"],
     captionMinChars: 250, captionMaxChars: 550,
+  },
+  // ── 爆款結構卡・近 3 個月案例（2026-09-29）
+  "tt-30-live-landmark-launch": {
+    variants: 3,
+    images: 3,
+    runImageGen: false,
+    imageDirectorId: ANNA_ID,
+    aspectRatio: "9:16",
+    variantLabels: ["地標版", "倒數版", "戰報版"],
+    captionMinChars: 300,
+    captionMaxChars: 700,
+  },
+  "tt-30-account-staff-trend-lines": {
+    variants: 3,
+    images: 3,
+    runImageGen: false,
+    imageDirectorId: ANNA_ID,
+    aspectRatio: "9:16",
+    variantLabels: ["員工線", "流行格式線", "覆盤版"],
+    captionMinChars: 300,
+    captionMaxChars: 700,
+  },
+  "tt-30-comment-ugc-hack": {
+    variants: 3,
+    images: 3,
+    runImageGen: false,
+    imageDirectorId: ANNA_ID,
+    aspectRatio: "9:16",
+    variantLabels: ["朋友口吻", "驚訝口吻", "試吃預告"],
+    captionMinChars: 5,
+    captionMaxChars: 60,
+  },
+  "tt-30-account-embrace-creator-meme": {
+    variants: 3,
+    images: 3,
+    runImageGen: false,
+    imageDirectorId: ANNA_ID,
+    aspectRatio: "9:16",
+    variantLabels: ["改名版", "封頭銜版", "二創版"],
+    captionMinChars: 200,
+    captionMaxChars: 500,
+  },
+  "tt-30-live-auction-trust": {
+    variants: 3,
+    images: 3,
+    runImageGen: false,
+    imageDirectorId: ANNA_ID,
+    aspectRatio: "9:16",
+    variantLabels: ["驗貨版", "競標版", "班表版"],
+    captionMinChars: 300,
+    captionMaxChars: 700,
+  },
+  "tt-30-live-daily-show": {
+    variants: 3,
+    images: 3,
+    runImageGen: false,
+    imageDirectorId: ANNA_ID,
+    aspectRatio: "9:16",
+    variantLabels: ["節目版", "熟客版", "主題輪替版"],
+    captionMinChars: 300,
+    captionMaxChars: 700,
+  },
+  "tt-30-script-character-scorecard": {
+    variants: 3,
+    images: 3,
+    runImageGen: false,
+    imageDirectorId: ANNA_ID,
+    aspectRatio: "9:16",
+    variantLabels: ["錄用判決", "買不買判決", "住不住判決"],
+    captionMinChars: 200,
+    captionMaxChars: 500,
+  },
+  "tt-30-topic-local-contest-kickoff": {
+    variants: 3,
+    images: 3,
+    runImageGen: false,
+    imageDirectorId: ANNA_ID,
+    aspectRatio: "9:16",
+    variantLabels: ["示範先行", "比賽先行", "NG 花絮先行"],
+    captionMinChars: 200,
+    captionMaxChars: 500,
+  },
+  "tt-30-copy-founder-number-story": {
+    variants: 3,
+    images: 3,
+    runImageGen: false,
+    imageDirectorId: ANNA_ID,
+    aspectRatio: "9:16",
+    variantLabels: ["起點集", "卡關集", "轉折集"],
+    captionMinChars: 200,
+    captionMaxChars: 600,
   },
 };
 

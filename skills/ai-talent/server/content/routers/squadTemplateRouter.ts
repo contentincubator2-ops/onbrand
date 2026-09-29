@@ -28,6 +28,7 @@ import { TRPCError } from "@trpc/server";
 import { getDb } from "../../db";
 import localPool from "../../localDb";
 import { loadAgentKnowledge } from "../../platform/core/agentKnowledge";
+import { buildBrandPrefix, enforceBrandRulesOnText } from "../../strategy/core/brandContext";
 import { sql } from "drizzle-orm";
 import { callLLM } from "../../platform/core/llmRouter";
 import { randomBytes } from "crypto";
@@ -552,8 +553,8 @@ export const squadTemplateRouter = router({
           const row = (r as any[])?.[0];
           if (row) {
             scopeLabel = `品牌：${row.name}${row.industry ? `（${row.industry}）` : ""}`;
-            const pos = parseJsonField(row.positioning);
-            scopeContext = formatPositioningContext(pos, row.description);
+            // 2026-09-29：讀同一份品牌大腦（以前是把定位 JSON 整包截 3000 字）。
+            scopeContext = await buildBrandPrefix(Number(row.id), null, null, "full").catch(() => "");
           }
         } else if (scopeKind === "product") {
           const [r] = await localPool.execute(
@@ -566,12 +567,7 @@ export const squadTemplateRouter = router({
           const row = (r as any[])?.[0];
           if (row) {
             scopeLabel = `產品：${row.name}（隸屬品牌「${row.brandName ?? "—"}」）`;
-            const productPos = parseJsonField(row.positioning);
-            const brandPos = parseJsonField(row.brandPositioning);
-            scopeContext = [
-              formatPositioningContext(brandPos, row.brandDescription, "父品牌定位"),
-              formatPositioningContext(productPos, null, "產品定位"),
-            ].filter(Boolean).join("\n\n");
+            scopeContext = row.brandId ? await buildBrandPrefix(Number(row.brandId), Number(row.id), null, "full").catch(() => "") : "";
           }
         } else if (scopeKind === "event") {
           const [r] = await localPool.execute(
@@ -586,12 +582,7 @@ export const squadTemplateRouter = router({
           if (row) {
             const period = row.startAt ? `${String(row.startAt).split("T")[0]} ~ ${String(row.endAt ?? "").split("T")[0]}` : "（無日期）";
             scopeLabel = `活動：${row.name}（隸屬品牌「${row.brandName ?? "—"}」，期間 ${period}）`;
-            const eventPos = parseJsonField(row.positioning);
-            const brandPos = parseJsonField(row.brandPositioning);
-            scopeContext = [
-              formatPositioningContext(brandPos, row.brandDescription, "父品牌定位"),
-              formatPositioningContext(eventPos, null, "活動定位（11-segment）"),
-            ].filter(Boolean).join("\n\n");
+            scopeContext = row.brandId ? await buildBrandPrefix(Number(row.brandId), null, Number(row.id), "full").catch(() => "") : "";
           }
         }
       }
@@ -2082,54 +2073,19 @@ ${leadKnowledge}
       const scopeProductId = input.scopeProductId ?? null;
       const scopeEventId   = input.scopeEventId   ?? null;
       const contextParts: string[] = [];
+      // 2026-09-29（CJ「onbrand 使用的 agent，生文前都要讀取策略層的內容」）：這裡
+      // 原本讀舊的 positioningSummary、沒有就讀 description、再沒有才把定位 JSON
+      // 整包截 800 字（產品 800、活動 1500）——99s squad 任務幾乎讀不到品牌大腦。
+      // 改讀同一份品牌大腦（跟「檢查大腦」畫面同一份），產品／活動範圍一起帶。
       if (scopeBrandId) {
-        const [bRows] = await db.execute(sql`
-          SELECT name, industry, description, positioningSummary, positioning
-            FROM brands WHERE id = ${scopeBrandId} LIMIT 1
-        `) as any[];
-        const brand = (bRows as any[])?.[0];
-        if (brand) {
-          const sub: string[] = [`【品牌】${brand.name}${brand.industry ? `（${brand.industry}）` : ""}`];
-          if (brand.positioningSummary) sub.push(`品牌定位：${String(brand.positioningSummary).slice(0, 600)}`);
-          else if (brand.description)   sub.push(`品牌描述：${String(brand.description).slice(0, 400)}`);
-          else if (brand.positioning) {
-            const pos = typeof brand.positioning === "string" ? brand.positioning : JSON.stringify(brand.positioning);
-            sub.push(`品牌定位（JSON）：${pos.slice(0, 800)}`);
-          }
-          contextParts.push(sub.join("\n"));
-        }
-      }
-      if (scopeProductId) {
-        const [pRows] = await localPool.execute(
-          `SELECT name, positioning FROM products WHERE id = ? LIMIT 1`,
-          [scopeProductId],
-        ) as any[];
-        const product = (pRows as any[])?.[0];
-        if (product) {
-          const pos = typeof product.positioning === "string" ? product.positioning : (product.positioning ? JSON.stringify(product.positioning) : "");
-          contextParts.push(`【產品】${product.name}${pos ? `\n產品定位：${pos.slice(0, 800)}` : ""}`);
-        }
+        const brandPrefix = await buildBrandPrefix(scopeBrandId, scopeProductId, scopeEventId, "full").catch(() => "");
+        if (brandPrefix) contextParts.push(`【品牌大腦】${brandPrefix}`);
       }
       if (scopeEventId) {
-        const [eRows] = await localPool.execute(
-          `SELECT name, startAt, endAt, positioning FROM events WHERE id = ? LIMIT 1`,
-          [scopeEventId],
-        ) as any[];
-        const ev = (eRows as any[])?.[0];
-        if (ev) {
-          const period = ev.startAt
-            ? `${String(ev.startAt).split("T")[0]} ~ ${String(ev.endAt ?? "").split("T")[0]}`
-            : "（無日期）";
-          const pos = typeof ev.positioning === "string" ? ev.positioning : (ev.positioning ? JSON.stringify(ev.positioning) : "");
-          contextParts.push(
-            `【活動】${ev.name}（期間 ${period}）\n` +
-            (pos ? `活動定位（11-segment）：${pos.slice(0, 1500)}` : "活動定位：（未填）"),
-          );
-          // Strong scope-anchor: tell the LLM the event is the FOCUS, brand is supporting.
-          contextParts.push(
-            `【重要】此 mission 的執行 scope 是上面這個「活動」。所有舉例、產品、受眾、主題、行動呼籲都必須緊扣這個活動本身（時間、主題、目標族群），禁止用品牌的通用範例（例如野生寶可夢一般介紹）取代活動的特定內容。如果你產出的內容換到品牌的其他活動也說得通，就是失敗。`,
-          );
-        }
+        // Strong scope-anchor: tell the LLM the event is the FOCUS, brand is supporting.
+        contextParts.push(
+          `【重要】此 mission 的執行 scope 是上面這個「活動」。所有舉例、產品、受眾、主題、行動呼籲都必須緊扣這個活動本身（時間、主題、目標族群），禁止用品牌的通用範例（例如野生寶可夢一般介紹）取代活動的特定內容。如果你產出的內容換到品牌的其他活動也說得通，就是失敗。`,
+        );
       }
       // 2026-09-07 執行層方案閘門。放在下面那個 try 之前 —— 那個 try 是 scout
       // 資料注入，錯誤會被吞掉，閘門丟出的 FORBIDDEN 若在裡面會被當成注入失敗。
@@ -2372,7 +2328,10 @@ ${quantityGuide}
         maxTokens: 3000,
         timeoutMs: 35_000,
       });
-      const rawOutput = llm.text;
+      // 2026-09-29：squad 步驟產出也過禁用詞／替換對照（以前只有 orchestra 有）。
+      const rawOutput = scopeBrandId
+        ? await enforceBrandRulesOnText(scopeBrandId, llm.text).catch(() => llm.text)
+        : llm.text;
 
       // Defensive cleanup for content-type outputs — strip markdown headers
       // and internal section labels even when the LLM ignores the prompt.
@@ -2626,7 +2585,10 @@ ${quantityGuide}
           SELECT name, industry, positioningSummary FROM brands WHERE id = ${mission.brandId} LIMIT 1
         `) as any[];
         const b = (bRows as any[])?.[0];
-        if (b) brandLine = `品牌：${b.name}${b.industry ? `（${b.industry}）` : ""}${b.positioningSummary ? ` · ${String(b.positioningSummary).slice(0, 300)}` : ""}`;
+        if (b) brandLine = `品牌：${b.name}${b.industry ? `（${b.industry}）` : ""}`;
+        // 2026-09-29：以前只給舊的 positioningSummary 300 字；改帶同一份品牌大腦。
+        const brain = await buildBrandPrefix(Number(mission.brandId), null, null, "full").catch(() => "");
+        if (brain) brandLine += `\n【品牌大腦】${brain}`;
       }
 
       // Step progress

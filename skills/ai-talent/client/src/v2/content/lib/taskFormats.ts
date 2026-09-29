@@ -146,6 +146,10 @@ export const FB_TASK_FORMAT_MAP: Record<string, FBActiveFormat> = {
   "fb-30-pinned-ritual-break":    "置頂貼文",
   "fb-30-comment-callback":       "留言",
   "fb-30-album-closeup-riff":     "相簿",
+  "fb-30-feed-curiosity-explainer": "貼文",
+  "fb-30-feed-rare-reunion":      "貼文",
+  "fb-30-album-evidence-chain":   "相簿",
+  "fb-30-pinned-correction":      "置頂貼文",
   "fb-60-launch-kit":             "活動",
 
   // ── 留言 ──────────────────────────────────────────────────────────────
@@ -323,6 +327,15 @@ export const IG_TASK_FORMAT_MAP: Record<string, IGActiveFormat> = {
 
   // ── 私訊 ──────────────────────────────────────────────────────────────
   "ig-30-dm-script":             "私訊",
+  // 2026-09-29 近 3 個月爆款結構卡
+  "ig-30-feed-account-takeover":   "貼文",
+  "ig-30-carousel-fake-callout":   "輪播",
+  "ig-30-reel-native-language-try": "Reels",
+  "ig-30-live-vote-bracket":       "直播",
+  "ig-30-profile-one-rule-debut":  "個人檔案",
+  "ig-30-comment-fill-blank":      "留言",
+  "ig-30-comment-ex-partner-jab":  "留言",
+  "ig-30-dm-sample-request":       "私訊",
 };
 
 // ── Format category config (LI) ─────────────────────────────────────────────
@@ -467,6 +480,16 @@ export const TT_TASK_FORMAT_MAP: Record<string, TTActiveFormat> = {
   "tt-30-live-relay-host":             "腳本",
   "tt-30-profile-self-aware":          "帳號營運",
   "tt-30-storyboard-catch-wave":       "分鏡表",
+  // 2026-09-29 近 3 個月爆款結構卡
+  "tt-30-live-landmark-launch":         "帳號營運",
+  "tt-30-account-staff-trend-lines":    "帳號營運",
+  "tt-30-comment-ugc-hack":             "帳號營運",
+  "tt-30-account-embrace-creator-meme": "帳號營運",
+  "tt-30-live-auction-trust":           "帳號營運",
+  "tt-30-live-daily-show":              "帳號營運",
+  "tt-30-script-character-scorecard":   "腳本",
+  "tt-30-topic-local-contest-kickoff":  "選題",
+  "tt-30-copy-founder-number-story":    "文案",
   // 選題 — 還沒有內容之前，決定「要做什麼」
   "tt-30-trend-remix":         "選題",
   "tt-30-duet-angle":          "選題",
@@ -520,6 +543,8 @@ export const EM_FORMAT_TABS: { id: EMActiveFormat; label: string; labelEn: strin
 export const EM_TASK_FORMAT_MAP: Record<string, EMActiveFormat> = {
   // 爆款結構卡（2026-09-05）
   "em-30-annual-recap":                "Newsletter / 培育",
+  "em-30-subject-ai-variants":         "主旨 / 預覽",
+  "em-30-trigger-plus-story":          "Newsletter / 培育",
   // 主旨 / 預覽
   "em-30-subject-line":    "主旨 / 預覽",
   "em-30-preview-text":    "主旨 / 預覽",
@@ -595,6 +620,7 @@ export const WEB_TASK_FORMAT_MAP: Record<string, WEBActiveFormat> = {
   // 爆款結構卡（2026-09-05）
   "web-30-longform-open-books":        "長文",
   "web-30-product-page-plain-talk":    "產品描述",
+  "web-30-product-limited-pass":       "產品描述",
   // 長文
   "web-30-longform":     "長文",
   "web-30-column":       "長文",

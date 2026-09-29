@@ -24,7 +24,7 @@ import {
   faArrowLeft, faFont, faBullseye, faShieldHalved, faPalette, faPlay, faQuoteLeft, faHashtag, faIdCard,
   faAward, faDollarSign, faBuilding, faBug, faInbox, faEnvelope, faFolder, faCircle, faBagShopping,
   faWaveSquare, faWrench, faGlobe, faChartColumn, faCircleDot, faPaste, faTableCellsLarge, faArrowPointer,
-  faPause, faForwardStep, faStop, faCircleXmark, faLink, faLockOpen, faFlag, faPuzzlePiece,
+  faPause, faForwardStep, faStop, faCircleXmark, faLink, faLockOpen, faFlag, faPuzzlePiece, faMemory, faLightbulb,
 } from "@fortawesome/free-solid-svg-icons";
 import {
   faFacebook, faInstagram, faThreads, faLine, faTiktok, faYoutube, faLinkedin, faGoogle,
@@ -71,6 +71,8 @@ export const ICON = {
   setupBySoWork: faWrench,
   // 主要導覽
   strategy: faBrain,
+  brainCheck: faMemory,
+  ideas: faLightbulb,
   brand: faTag,
   content: faPenNib,
   performance: faChartLine,
@@ -254,3 +256,5 @@ export const LinkIcon = make("link");
 export const PuzzleIcon = make("puzzle");
 export const ScheduleIcon = make("schedule");
 export const NotifyIcon = make("notify");
+export const MemoryIcon = make("brainCheck");
+export const IdeasIcon = make("ideas");
