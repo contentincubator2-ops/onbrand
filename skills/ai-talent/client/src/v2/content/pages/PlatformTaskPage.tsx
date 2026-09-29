@@ -1,7 +1,7 @@
 /**
  * PlatformTaskPage — platform-first navigation (2026-05-26).
  *
- * Route: /tasks/:platform  (platform = fb | ig | tt | email | web)
+ * Route: /tasks/:platform  (platform = fb | ig | threads | line | tt | email | web)
  *
  * Replaces the old 30s/60s/99s tier pages as the primary entry point.
  * Users pick the *platform* in the sidebar, then filter by complexity via
@@ -59,7 +59,7 @@ import {
   faBookBookmark, faCalendarDays, faPlus, faPenToSquare,
 } from "@fortawesome/free-solid-svg-icons";
 import {
-  faFacebookF, faInstagram, faYoutube, faTiktok, faLinkedinIn,
+  faFacebookF, faInstagram, faYoutube, faTiktok, faLinkedinIn, faThreads, faLine,
 } from "@fortawesome/free-brands-svg-icons";
 import RunningAgentCarousel from "../components/quickTask/RunningAgentCarousel";
 import CardDetailDrawer, { isRecentCard } from "../components/quickTask/CardDetailDrawer";
@@ -97,6 +97,9 @@ const ROUTE_TO_PLATFORM: Record<string, string> = {
   email: "email",
   // 2026-08-29 官網頻道。路由是 /tasks/web，平台代號是 website。
   web:   "website",
+  // 2026-09-29 CJ：台灣市場加 Threads、LINE（目前只有品牌自建卡）。
+  threads: "threads",
+  line:    "line",
   // 素材與規劃頻道。目前只有品牌任務包會用到，全域目錄沒有卡 ——
   // 沒有包的品牌走到這兩個路由會看到空清單，側邊欄也不會有入口。
   case:     "case",
@@ -184,6 +187,21 @@ const PLATFORM_META: Record<string, PlatformMeta> = {
     heroEn: "Long-form that earns the reader's time — not filler blog posts",
     subZh: "引言＋3 段的固定骨架，把案例與規格翻譯成讀者的生活感受",
     subEn: "A fixed intro-plus-three structure that turns specs into felt experience",
+  },
+  // 2026-09-29 CJ：台灣市場加 Threads、LINE。目前沒有預設卡，用戶從自己的範例建卡。
+  threads: {
+    label: "Threads", labelZh: "Threads", icon: faThreads, bg: "#000000",
+    heroZh: "Threads 要像人在說話，不像品牌在發公告",
+    heroEn: "Threads should sound like a person talking, not a brand announcing",
+    subZh: "貼上你寫得最好的幾篇串文，建成自己的 Threads 任務卡",
+    subEn: "Paste your best threads and turn them into your own task card",
+  },
+  line: {
+    label: "LINE", labelZh: "LINE", icon: faLine, bg: "#06C755",
+    heroZh: "LINE 群發是寫給已經加你好友的人——一則訊息、一個行動",
+    heroEn: "LINE broadcasts go to people who already follow you — one message, one action",
+    subZh: "貼上你效果最好的幾則群發訊息，建成自己的 LINE 任務卡",
+    subEn: "Paste your best-performing broadcasts and turn them into your own task card",
   },
 };
 
@@ -314,7 +332,7 @@ interface FBTaskCard {
  */
 const COMPOSER_CHANNELS = new Set<string>([
   "facebook", "instagram", "threads", "linkedin", "tiktok",
-  "youtube", "email", "pr", "website",
+  "youtube", "email", "pr", "website", "line",
 ]);
 
 function trimmedExtras(bag: Record<string, string>): Record<string, string> {

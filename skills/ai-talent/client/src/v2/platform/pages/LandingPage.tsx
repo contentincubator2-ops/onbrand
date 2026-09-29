@@ -270,8 +270,8 @@ export default function LandingPage() {
               style={{ color: C.muted }}
             >
               {en
-                ? "OnBrand isn't another one-click AI generator. SoWork's 14-step Brand Positioning Method writes your Why, TA, Differentiation and Voice into a Brand Brain. Set it once. Every channel — Facebook, Instagram, TikTok, Email, Website — stays on-brand automatically. We don't hand you content — we deploy your strategy to every touchpoint."
-                : "OnBrand 不是另一個「AI 一鍵生成」工具。SoWork 14 步品牌定位法把你的 WHY、TA、差異化、Voice 全部寫進品牌大腦。鎖定一次，所有平台（Facebook、Instagram、TikTok、電子報（EDM）、官網）都自動跟著你的調性走。我們給你的不是內容，是把你的品牌策略部署到每一個接觸點。"}
+                ? "OnBrand isn't another one-click AI generator. SoWork's 14-step Brand Positioning Method writes your Why, TA, Differentiation and Voice into a Brand Brain. Set it once. Every channel — Facebook, Instagram, Threads, LINE, TikTok, Email, Website — stays on-brand automatically. We don't hand you content — we deploy your strategy to every touchpoint."
+                : "OnBrand 不是另一個「AI 一鍵生成」工具。SoWork 14 步品牌定位法把你的 WHY、TA、差異化、Voice 全部寫進品牌大腦。鎖定一次，所有平台（Facebook、Instagram、Threads、LINE、TikTok、電子報（EDM）、官網）都自動跟著你的調性走。我們給你的不是內容，是把你的品牌策略部署到每一個接觸點。"}
             </p>
 
             {/* CTAs — primary orange + secondary ghost */}
@@ -542,7 +542,7 @@ function FAQSection({ en }: { en: boolean }) {
         // 2026-09-29（CJ）：內容通路只剩 FB／IG／TikTok／電子報／官網。
         {
           q: "Which channels does OnBrand support?",
-          a: `Facebook, Instagram, TikTok, Email (EDM), and your website — ${CATALOG.channels} channels total. Each has its own task library with documented award craft.`,
+          a: `Facebook, Instagram, Threads, LINE, TikTok, Email (EDM), and your website — ${CATALOG.channels} channels total. Each has its own task library with documented award craft.`,
         },
         {
           q: "Is there a free trial?",
@@ -572,7 +572,7 @@ function FAQSection({ en }: { en: boolean }) {
         },
         {
           q: "支援哪些社群與內容平台？",
-          a: `Facebook、Instagram、TikTok、電子報（EDM）、官網——共 ${CATALOG.channels} 個通路。任務卡分兩種：爆款結構卡（附傳播數字與量測年月）與品牌自建卡（從你的範例反推）。`,
+          a: `Facebook、Instagram、Threads、LINE、TikTok、電子報（EDM）、官網——共 ${CATALOG.channels} 個通路。任務卡分兩種：爆款結構卡（附傳播數字與量測年月）與品牌自建卡（從你的範例反推）。`,
         },
         {
           q: "有免費試用嗎？",

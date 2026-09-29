@@ -44,6 +44,8 @@ registerBrandTaskCardSource();
 const CHANNELS = [
   "facebook", "instagram", "threads", "linkedin", "tiktok",
   "youtube", "email", "pr", "website",
+  // 2026-09-29 CJ：台灣市場加 LINE（官方帳號群發訊息）。
+  "line",
 ] as const;
 
 const fieldInput = z.object({

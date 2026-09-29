@@ -26,9 +26,10 @@ export const BRAND_NAV_PREFS_DDL = `
 `;
 
 /** 可以加進側欄的入口（順序＝挑選清單上的順序）。跟 client 的 NAV_CATALOG 同一份 id。 */
-// 2026-09-29 CJ：內容通路只留 FB／IG／TikTok／電子報／官網（見 planGate.HIDDEN_CONTENT_PLATFORMS）。
-// 存過 li/yt/pr/x 的品牌，sanitizeNavItems 讀出來時就會濾掉。
-export const NAV_ITEM_IDS = ["fb", "ig", "tt", "email", "web", "case", "theater", "ai-prompts"] as const;
+// 2026-09-29 CJ：內容通路只留 FB／IG／Threads／LINE／TikTok／電子報／官網（見
+// planGate.HIDDEN_CONTENT_PLATFORMS）；AI 指令庫從側欄移除。存過 li/yt/pr/x 或
+// ai-prompts 的品牌，sanitizeNavItems 讀出來時就會濾掉。
+export const NAV_ITEM_IDS = ["fb", "ig", "threads", "line", "tt", "email", "web", "case", "theater"] as const;
 export type NavItemId = (typeof NAV_ITEM_IDS)[number];
 export const DEFAULT_NAV_ITEMS: NavItemId[] = ["fb", "ig"];
 

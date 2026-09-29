@@ -36,6 +36,8 @@ const PLATFORMS: Array<{
 }> = [
   { key: "fb",       label: "Facebook",  color: "#1877F2", route: "/tasks/fb" },
   { key: "ig",       label: "Instagram", color: "#E1306C", route: "/tasks/ig" },
+  { key: "threads",  label: "Threads",   color: "#000000", route: "/tasks/threads" },
+  { key: "line",     label: "LINE",      color: "#06C755", route: "/tasks/line" },
   { key: "tt",       label: "TikTok",    color: "#000000", route: "/tasks/tt" },
   { key: "email",    label: "Email",     color: "#0EA5E9", route: "/tasks/email" },
   { key: "web",      label: "官網",       color: "#525252", route: "/tasks/web" },

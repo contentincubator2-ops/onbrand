@@ -1,8 +1,8 @@
 # OnBrand AI
 
-> OnBrand 是 SoWork（摘星社群行銷顧問）推出的 AI 行銷工作室。它把 SoWork 14 步品牌定位法做成可執行的流程，鎖定品牌大腦後，五個通路（Facebook、Instagram、TikTok、電子報、官網）的內容都自動 on-brand。任務卡標示結構出處。
+> OnBrand 是 SoWork（摘星社群行銷顧問）推出的 AI 行銷工作室。它把 SoWork 14 步品牌定位法做成可執行的流程，鎖定品牌大腦後，七個通路（Facebook、Instagram、Threads、LINE、TikTok、電子報、官網）的內容都自動 on-brand。任務卡標示結構出處。
 
-OnBrand is the AI marketing studio by SoWork. It turns SoWork's 14-step Brand Positioning Method into an executable flow. Lock your brand brain once, and every caption across 5 channels — Facebook, Instagram, TikTok, Email and Website — stays on-brand automatically. Task cards state where their structure comes from.
+OnBrand is the AI marketing studio by SoWork. It turns SoWork's 14-step Brand Positioning Method into an executable flow. Lock your brand brain once, and every caption across 7 channels — Facebook, Instagram, Threads, LINE, TikTok, Email and Website — stays on-brand automatically. Task cards state where their structure comes from.
 
 ## Core Product
 

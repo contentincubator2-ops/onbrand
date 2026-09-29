@@ -271,7 +271,9 @@ export function redactFactLeaks(skill: string, leaks: string[]): string {
 const CHANNEL_OUTPUT: Record<string, { platform: FBTaskTemplate["outputDefaults"]["platform"]; post_type: string }> = {
   facebook:  { platform: "facebook",  post_type: "feed" },
   instagram: { platform: "instagram", post_type: "feed" },
-  threads:   { platform: "threads", post_type: "feed" },
+  threads:   { platform: "threads", post_type: "post" },   // mockup 是 threads:post，沒有 threads:feed
+  // 2026-09-29：LINE 官方帳號群發（mockup line:broadcast）。
+  line:      { platform: "line", post_type: "broadcast" },
   linkedin:  { platform: "linkedin",  post_type: "feed" },
   tiktok:    { platform: "tiktok", post_type: "foryou" },
   youtube:   { platform: "youtube", post_type: "video" },

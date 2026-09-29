@@ -60,7 +60,7 @@ function getPlans(lang: "zh-TW" | "en") {
       name: en ? "OnBrand Professional" : "OnBrand 專業",
       price: en ? "US$300 / mo" : "NT$9,000 / 月",
       badge: en ? "5 seats" : "5 席",
-      detail: en ? `1 brand · all ${CATALOG.channels} channels` : `1 個品牌 · ${CATALOG.channels} 個通路全開`,
+      detail: en ? `1 brand · pick 5 of ${CATALOG.channels} channels (swap monthly)` : `1 個品牌 · ${CATALOG.channels} 個通路選 5（每月可更換）`,
       features: en ? [
         "Brand + 10 product + monthly campaign positioning · 10 own task cards",
         `${CATALOG.viral} viral-structure cards (refreshed monthly) + your own cards`,

@@ -338,7 +338,7 @@ async function eventFacts(eventId: number, userId: number): Promise<{
 // 2026-09-29 CJ：拿掉 LinkedIn／YouTube／新聞稿／X（planGate.HIDDEN_CONTENT_PLATFORMS）；
 // Threads 與 LINE CJ 要留。
 export const PLANNABLE_CHANNELS = [
-  "facebook", "instagram", "email", "website", "tiktok", "threads",
+  "facebook", "instagram", "email", "website", "tiktok", "threads", "line",
 ] as const;
 
 export interface InferredSettings {

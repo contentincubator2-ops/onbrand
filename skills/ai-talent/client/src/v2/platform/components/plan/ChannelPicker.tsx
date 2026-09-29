@@ -18,9 +18,10 @@ import { showToastGlobal } from "../../../../components/ui/Toast";
 import { toastWithUpgrade } from "../../lib/upgradeToast";
 import { Check, Lock, RefreshCw } from "lucide-react";
 
-// 2026-09-29 CJ：內容通路只留 FB／IG／TikTok／電子報／官網（server 端 setChannels 也擋）。
+// 2026-09-29 CJ：內容通路只留 FB／IG／Threads／LINE／TikTok／電子報／官網（server 端 setChannels 也擋下架的）。
 const LABEL_ZH: Record<string, string> = {
   facebook: "Facebook", instagram: "Instagram",
+  threads: "Threads", line: "LINE",
   tiktok: "TikTok", email: "電子報",
   website: "官網",
 };

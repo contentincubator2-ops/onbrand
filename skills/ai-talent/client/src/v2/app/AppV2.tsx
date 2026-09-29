@@ -67,7 +67,6 @@ const BrandsManagePage = React.lazy(() => import("../strategy/pages/BrandsManage
 const BrandSettingsPage = React.lazy(() => import("../strategy/pages/BrandSettingsPage"));
 // 2026-09-23（CJ「AI指令庫，做成另一個mission tray」）：從品牌定位頁「武器化
 // 工具」的卡片升格成獨立頂層目的地，跟 /theater、/projects 同一個模子。
-const AiPromptLibraryPage = React.lazy(() => import("../strategy/pages/AiPromptLibraryPage"));
 // 2026-09-25（CJ「在內容層增加活動的 mission tray」）：活動 tray 是內容層的
 // 頂層目的地，不加 /tasks/ 前綴——它的卡片來自活動企劃，不受任務包過濾。
 const CampaignTrayPage = React.lazy(() => import("../content/pages/CampaignTrayPage"));
@@ -330,7 +329,8 @@ export default function AppV2() {
           <Route path="/home"      element={<HomePage />} />
           <Route path="/theater"   element={<TheaterPage />} />
           {/* 2026-09-23（CJ「AI指令庫，做成另一個mission tray」）*/}
-          <Route path="/ai-prompts" element={<AiPromptLibraryPage />} />
+          {/* 2026-09-29 CJ：AI 指令庫移除，舊網址導回任務頁。 */}
+          <Route path="/ai-prompts" element={<Navigate to="/tasks/fb" replace />} />
           <Route path="/campaigns" element={<CampaignTrayPage />} />
           <Route path="/m/:missionId" element={<MissionRedirect />} />
           <Route path="/b/:brandId/:workspace/m/:missionId" element={<MissionRedirect />} />

@@ -56,7 +56,10 @@ const DEFAULT_PLATFORM_ORDER = [
   // 「沒選過通路的品牌預設開哪幾個」，把 x 插到前面會讓既有品牌的預設值
   // 悄悄改變（基礎方案只取前 2 個）。
   "x",
-  "email", "website", "pr", "brand", "audience", "kol",
+  "email", "website", "pr",
+  // 2026-09-29 CJ：台灣市場加 Threads、LINE。接在內容通路最後，不動前面的順序。
+  "threads", "line",
+  "brand", "audience", "kol",
 ];
 
 export interface ChannelSelection {

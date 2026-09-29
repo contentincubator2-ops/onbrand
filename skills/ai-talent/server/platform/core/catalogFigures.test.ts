@@ -23,14 +23,14 @@ function readClientFigures(): Record<string, number> {
 
 describe("catalogFigures 對得上真實任務卡目錄", () => {
   // 2026-09-29：對外只宣稱前台看得到的——五個內容通路的爆款結構卡。
-  const FRONT_CHANNELS = new Set(["facebook", "instagram", "tiktok", "email", "website"]);
+  const FRONT_CHANNELS = new Set(["facebook", "instagram", "threads", "line", "tiktok", "email", "website"]);
   const all = buildTaskCatalogIndex().filter((t) => FRONT_CHANNELS.has(t.platform));
 
   it("爆款結構卡張數", () => {
     expect(all.filter((t) => t.source.type === "viral").length).toBe(CATALOG_FIGURES.viral);
   });
 
-  it("五個前台通路沒有一個是被下架的", () => {
+  it("前台通路沒有一個是被下架的", () => {
     for (const p of FRONT_CHANNELS) expect(isHiddenContentPlatform(p)).toBe(false);
   });
 

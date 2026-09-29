@@ -7,5 +7,5 @@
  */
 export const CATALOG = {
   viral: 25,
-  channels: 5,
+  channels: 7,
 } as const;

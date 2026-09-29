@@ -137,7 +137,7 @@ export interface FBTaskTemplate {
     // recordTaskRun 的 SAFE_PLATFORMS 會把未知值降級成 "other"（能寫入，但
     // 丟失語意）。"doc" 在 enum 值域內且語意正確，所以官網長文用它。
     // mockup 不靠這個欄位 —— RunPage Layer 1 由 taskId 前綴決定。
-    platform: "facebook" | "instagram" | "threads" | "linkedin" | "tiktok" | "youtube" | "email" | "press" | "doc" | "generic";
+    platform: "facebook" | "instagram" | "threads" | "linkedin" | "tiktok" | "youtube" | "email" | "press" | "doc" | "line" | "generic";
     post_type: string;
   };
   /**

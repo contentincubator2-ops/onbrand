@@ -55,6 +55,9 @@ export type CatalogPlatform =
   // 代號用 "x" 而不是 "twitter" —— 平台自己已經改名，而 mockup 那側的
   // "twitter:" 前綴屬於顯示層的既有 key，不動它（改名要付 migration 的錢）。
   | "x"
+  // 2026-09-29 (CJ「要為了台灣市場加入 LINE 和 Threads」)：目前只有品牌自建卡
+  // （brandTaskCards），全域目錄還沒有這兩個通路的卡。
+  | "threads" | "line"
   // 2026-08-29：素材與規劃型頻道，目前只由品牌任務包使用，全域目錄沒有卡。
   //   case     — 案例庫（查找 / 去重 / 提報），持續累積的素材
   //   calendar — 內容行事曆（產出當月各類型的篇數與摘要）

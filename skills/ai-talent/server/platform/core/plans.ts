@@ -323,7 +323,7 @@ export const PLANS: Record<PlanCode, Plan> = {
     },
     features: [
       "1 個品牌 · 5 席（含審核工作流）",
-      `${CATALOG_FIGURES.channels} 個通路全開`,
+      `${CATALOG_FIGURES.channels} 個通路選 5（每月可更換）`,
       "品牌定位 ＋ 產品定位 10 個 ＋ 活動定位每月 1 次 · 自建任務卡 10 張",
       `爆款結構卡 ${CATALOG_FIGURES.viral} 張（每月更新）＋ 品牌自建卡`,
       "執行次數不限 · 企劃任務開放",

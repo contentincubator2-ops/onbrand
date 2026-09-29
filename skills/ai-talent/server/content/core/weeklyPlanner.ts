@@ -56,11 +56,11 @@ export type SlotStatus = "draft" | "planned" | "written" | "dismissed";
 /** navPrefs 的 id → 任務目錄的通路名。 */
 export const NAV_TO_PLATFORM: Record<string, string> = {
   fb: "facebook", ig: "instagram", li: "linkedin", yt: "youtube", tt: "tiktok",
-  email: "email", pr: "pr", x: "x", web: "website",
+  email: "email", pr: "pr", x: "x", web: "website", threads: "threads", line: "line",
 };
 export const PLATFORM_ZH: Record<string, string> = {
   facebook: "Facebook", instagram: "Instagram", linkedin: "LinkedIn", youtube: "YouTube", tiktok: "TikTok",
-  email: "電子報", pr: "新聞稿", x: "X", website: "官網",
+  email: "電子報", pr: "新聞稿", x: "X", website: "官網", threads: "Threads", line: "LINE",
 };
 const WEEKDAY_ZH = ["日", "一", "二", "三", "四", "五", "六"];
 

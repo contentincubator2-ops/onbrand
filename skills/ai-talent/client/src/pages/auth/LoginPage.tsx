@@ -248,7 +248,7 @@ export default function LoginPage() {
             ))}
           </div>
 
-          {/* Channel strip — 2026-09-29（CJ）：內容通路只剩 FB／IG／TikTok／電子報／官網 */}
+          {/* Channel strip — 2026-09-29（CJ）：內容通路只剩 FB／IG／Threads／LINE／TikTok／電子報／官網 */}
           <div className="flex items-center gap-2 text-[10.5px] mb-6 flex-wrap" style={{ color: C.inkSoft }}>
             <span className="font-bold tracking-wider">
               {lang === "en" ? "ALL CHANNELS" : "全管道覆蓋"}
@@ -257,6 +257,10 @@ export default function LoginPage() {
             <span>Facebook</span>
             <span style={{ color: C.muted }}>·</span>
             <span>Instagram</span>
+            <span style={{ color: C.muted }}>·</span>
+            <span>Threads</span>
+            <span style={{ color: C.muted }}>·</span>
+            <span>LINE</span>
             <span style={{ color: C.muted }}>·</span>
             <span>TikTok</span>
             <span style={{ color: C.muted }}>·</span>

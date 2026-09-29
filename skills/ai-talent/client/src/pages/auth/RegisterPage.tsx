@@ -351,6 +351,8 @@ export default function RegisterPage() {
             </span>
             <span style={{ color: C.muted }}>·</span><span>Facebook</span>
             <span style={{ color: C.muted }}>·</span><span>Instagram</span>
+            <span style={{ color: C.muted }}>·</span><span>Threads</span>
+            <span style={{ color: C.muted }}>·</span><span>LINE</span>
             <span style={{ color: C.muted }}>·</span><span>TikTok</span>
             <span style={{ color: C.muted }}>·</span><span>Email</span>
             <span style={{ color: C.muted }}>·</span><span>{lang === "en" ? "Website" : "官網"}</span>

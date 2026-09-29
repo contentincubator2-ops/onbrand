@@ -143,7 +143,7 @@ export interface MeetingAction {
 
 /** 可以給會議行動挑的通路：整篇可以發的內容通路。 */
 // 2026-09-29 CJ：只留五個（planGate.HIDDEN_CONTENT_PLATFORMS）。
-const CONTENT_CHANNELS = ["facebook", "instagram", "tiktok", "email", "website"];
+const CONTENT_CHANNELS = ["facebook", "instagram", "threads", "line", "tiktok", "email", "website"];
 const PLATFORM_ZH: Record<string, string> = {
   facebook: "Facebook", instagram: "Instagram", linkedin: "LinkedIn", youtube: "YouTube", tiktok: "TikTok",
   x: "X", email: "電子報", pr: "新聞稿", website: "官網",
