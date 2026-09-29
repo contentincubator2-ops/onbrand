@@ -991,6 +991,8 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
       : task.id?.startsWith("pr-") ? "pr"
       : task.id?.startsWith("web-") ? "website"
       : task.id?.startsWith("x-") ? "x"
+      : task.id?.startsWith("th-") ? "threads"
+      : task.id?.startsWith("ln-") ? "line"
       : task.id?.startsWith("br-") ? "brand"
       : task.id?.startsWith("rs-") ? "audience"
       : "facebook");

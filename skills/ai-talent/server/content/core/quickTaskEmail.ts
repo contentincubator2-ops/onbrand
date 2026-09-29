@@ -211,6 +211,83 @@ ${EMAIL_TONE}`,
     maxTokens: 1320,
     outputDefaults: { platform: "email", post_type: "edm" },
   },
+  // ── 爆款結構卡・近 3 個月案例（CJ 2026-09-29 核可）────────────────────
+  {
+    id: "em-30-subject-ai-variants",
+    tier: "30s", postType: "edm",
+    label: { en: "Subject Lines: Five Drafts, Human Pick", zh: "電子報主旨：多版比稿＋人工定稿" },
+    description: { en: "Five subject-line types per send, pick two for A/B", zh: "每封先產 5 種主旨、挑 2 個 A/B，槓桿在主旨與小標" },
+    agent_id: 30017, skill_slug: "email-marketing",
+    source: {
+      type: "viral",
+      short: "サンコー 電子報 AI 件名比稿",
+      metric: "楽天市場電子報開信率約 20% → 45%；製作時間 3 小時 → 1 小時",
+      asOf: "2026-09",
+      caveat: "日本案例；沒寫比較期間，也沒附具體主旨範例",
+      url: "https://netshop.impress.co.jp/e/2026/09/09/16623",
+      takeaway:
+        "開信率的槓桿在「主旨＋小標」：每封一次產出多個版本再挑，比單稿精修有效；省下的時間拿去回看開信與點擊、更新主旨規則。",
+    },
+    primary_question: "這封電子報要講什麼？對象是誰？",
+    primary_input: { key: "topic", placeholder: "例：秋季新品到貨 / 對象：去年買過保暖商品的會員", type: "textarea" },
+    inputs: [
+      { key: "topic", label: "這封的內容 + 對象", type: "textarea", required: true },
+    ],
+    systemPrompt: `你要為一封電子報產出「多版主旨比稿」。
+
+產出：
+1. 5 個主旨，各用一種類型並標註：數字型、好處型、疑問型、限時型、商品名型（每個 25 字內）。
+2. 每個主旨配一行預覽文字（40 字內），跟主旨互補，不重複。
+3. 推薦 2 個做 A/B，說明各自想驗證什麼。
+4. 內文 3 個小標的兩種寫法（好處型／情境型）。
+5. 下次更新規則：看哪個數字判斷勝出、勝出的類型要怎麼記下來。
+
+硬規則：
+- 不用「限時」「最後機會」卻沒有真的期限。
+- 數字與優惠只能用用戶給的，沒給就寫【待補】。`,
+    preferredModel: "qwen",
+    maxTokens: 800,
+    outputDefaults: { platform: "email", post_type: "edm" },
+  },
+  {
+    id: "em-30-trigger-plus-story",
+    tier: "30s", postType: "edm",
+    label: { en: "Newsletter: Four Triggers + One Story a Month", zh: "電子報：四條自動信＋每月一封品牌讀物" },
+    description: { en: "Personal triggers hold the open rate; a monthly story builds loyalty", zh: "瀏覽、排行、推薦、點數四種個人化自動信撐開信率，每月一封讀物養忠誠" },
+    agent_id: 60060, skill_slug: "newsletter",
+    source: {
+      type: "viral",
+      short: "STAMPS（STAMP AND DIARY）電子報",
+      metric: "開信率平均 30% 以上、最高 40% 超；會員數成長 2 倍以上",
+      asOf: "2026-09",
+      caveat: "日本案例；會員倍增從 2024 春起算，開信率沒有前後對照；讀物型電子報是「預計強化」",
+      url: "https://netkeizai.com/articles/detail/19698",
+      takeaway:
+        "用瀏覽履歷、排行、推薦、點數明細四種跟個人有關的自動信撐起基本開信率，再用關於布料來源、工廠、理念的品牌讀物養忠誠。",
+    },
+    primary_question: "你們有哪些可以自動觸發的資料？這個月想寫哪個品牌故事？",
+    primary_input: { key: "topic", placeholder: "例：瀏覽紀錄、點數 / 故事：我們的布料來自哪個小鎮", type: "textarea" },
+    inputs: [
+      { key: "topic", label: "可用的觸發資料 + 這個月的品牌故事題目", type: "textarea", required: true },
+    ],
+    systemPrompt: `你要規劃品牌的「四條自動信＋每月一封品牌讀物」。
+
+產出：
+1. 四條自動信（每條：觸發條件、主旨 25 字內、內文 80–150 字、一個行動按鈕）：
+   - 瀏覽過但沒買的提醒
+   - 本週排行
+   - 依購買紀錄的推薦
+   - 點數／會員明細（快到期要提醒）
+2. 本月品牌讀物（400–700 字）：一個具體的人、地方或做法，結尾只放一個商品連結。
+3. 追蹤：要看的 2 個數字（開信、回購）。
+
+硬規則：
+- 自動信只能用用戶給的資料類型，沒有的就不要寫。
+- 讀物不能變成促銷信。`,
+    preferredModel: "qwen",
+    maxTokens: 1320,
+    outputDefaults: { platform: "email", post_type: "edm" },
+  },
 ];
 
 const NATHAN_ID    = 60062;  // Nathan Lu (主場 welcome email)
@@ -233,6 +310,17 @@ export const EMAIL_30S_ORCHESTRA: Record<string, OrchestraConfig> = {
     variants: 3, images: 0, runImageGen: false, imageDirectorId: null,
     aspectRatio: null, variantLabels: ["成就版", "懷舊版", "排名版"],
     captionMinChars: 250, captionMaxChars: 600,
+  },
+  // 2026-09-29 近 3 個月爆款結構卡
+  "em-30-subject-ai-variants": {
+    variants: 3, images: 0, runImageGen: false, imageDirectorId: null,
+    aspectRatio: null, variantLabels: ["數字型", "好處型", "疑問型"],
+    captionMinChars: 10, captionMaxChars: 400,
+  },
+  "em-30-trigger-plus-story": {
+    variants: 3, images: 0, runImageGen: false, imageDirectorId: null,
+    aspectRatio: null, variantLabels: ["布料故事", "工廠故事", "理念故事"],
+    captionMinChars: 300, captionMaxChars: 1200,
   },
 };
 

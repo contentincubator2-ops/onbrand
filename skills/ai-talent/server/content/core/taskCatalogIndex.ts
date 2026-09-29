@@ -39,6 +39,8 @@ import { ALL_99S_TASKS } from "./quickTask100";
 import { ALL_99S_SQUADS } from "./quickTask100Squads";
 import { WEBSITE_30S_TASKS } from "./quickTaskWebsite";
 import { X_30S_TASKS } from "./quickTaskX";
+import { TH_30S_TASKS } from "./quickTaskThreads";
+import { LN_30S_TASKS } from "./quickTaskLine";
 import { type TaskSource } from "./taskSource";
 import { sourceForTemplate } from "./craftSource";
 import { taskCardAddedAt } from "./taskCardDates";
@@ -125,6 +127,8 @@ export function platformOfTaskId(id: string): CatalogPlatform {
   if (id.startsWith("kl-")) return "kol";
   if (id.startsWith("web-")) return "website";
   if (id.startsWith("x-")) return "x";
+  if (id.startsWith("th-")) return "threads";
+  if (id.startsWith("ln-")) return "line";
   return "facebook";
 }
 
@@ -170,6 +174,8 @@ export function buildTaskCatalogIndex(): CatalogTask[] {
   for (const t of KOL_30S_TASKS) out.push(toTask(t, "kol", "30s"));
   for (const t of WEBSITE_30S_TASKS) out.push(toTask(t, "website", "30s"));
   for (const t of X_30S_TASKS) out.push(toTask(t, "x", "30s"));
+  for (const t of TH_30S_TASKS) out.push(toTask(t, "threads", "30s"));
+  for (const t of LN_30S_TASKS) out.push(toTask(t, "line", "30s"));
 
   // 60s
   for (const t of FB_60S_TASKS_V2) out.push(toTask(t, "facebook", "60s"));
