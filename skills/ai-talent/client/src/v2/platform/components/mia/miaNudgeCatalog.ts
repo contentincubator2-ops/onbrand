@@ -256,15 +256,15 @@ export const NUDGE_CATALOG = {
     id: "brand.positioning_complete",
     message: {
       "zh-TW":
-        "🔒 品牌大腦鎖定！現在最有效的下一步：到「七日發布台」一鍵生成一週內容——" +
+        "🔒 品牌大腦鎖定！現在最有效的下一步：到「靈感舞台」請幾位 agent 各想一個切角——" +
         "你會看到 AI 第一次真的「對得上你的品牌」。",
       en:
-        "🔒 Brand Brain locked. Best next step: head to 7-Day Publisher and " +
-        "generate a week of content — you'll see AI sound like your brand for " +
+        "🔒 Brand Brain locked. Best next step: open the Idea stage and let a few " +
+        "agents pitch angles — you'll see AI sound like your brand for " +
         "the first time.",
     },
     actions: [
-      { kind: "navigate", url: "/theater", label: "去七日發布台 →" },
+      { kind: "navigate", url: "/inspiration", label: "去靈感舞台 →" },
     ],
   },
 

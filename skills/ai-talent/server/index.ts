@@ -576,6 +576,11 @@ async function runStartupMigrations() {
     await db.execute(sql.raw(PLANNER_MESSAGES_DDL));
     console.log("[migrate] planned_slots / planner_messages: OK");
 
+    // 2026-09-29（CJ「七日發布台改成靈感舞台」）：每個品牌的 thinker 陣容與採用／換掉紀錄。
+    const { INSPIRATION_PREFS_DDL } = await import("./content/core/inspirationStage");
+    await db.execute(sql.raw(INSPIRATION_PREFS_DDL));
+    console.log("[migrate] inspiration_prefs: OK");
+
     // 2026-09-14（CJ「選定一個競爭者，對比接觸點跟策略訴求差異」）：
     // 具名競爭者的逐接觸點比對快照（14 天內快取，不重跑研究）。
     const { COMPETITOR_SNAPSHOT_DDL } = await import("./strategy/core/competitorSnapshot");
