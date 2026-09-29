@@ -70,19 +70,22 @@ describe("以前默默截掉的地方，現在看得到", () => {
   });
 
   it("太長的欄位標成「只記住一部分」，並記下存了多少字", async () => {
-    const long = "字".repeat(1_000);
+    const long = "字".repeat(2_000);
     const id = withPos({ origin: { story: long } });
     const item = (await buildBrandBrain(id)).items.find((i) => i.label === "品牌故事")!;
     expect(item.status).toBe("trimmed");
-    expect(item.storedChars).toBe(1_000);
-    expect(item.keptChars).toBeLessThan(1_000);
+    expect(item.storedChars).toBe(2_000);
+    expect(item.keptChars).toBeLessThan(2_000);
   });
 
   it("清單超過上限條數也標成「只記住一部分」", async () => {
-    const items = Array.from({ length: 20 }, (_, i) => `用詞${i}`);
+    const items = Array.from({ length: 30 }, (_, i) => `用詞${i}`);
     const id = withPos({ _assets: { preferred_terms: { items } } });
     const item = (await buildBrandBrain(id)).items.find((i) => i.label === "偏好用詞")!;
     expect(item.status).toBe("trimmed");
+    // 「存了多少」算整份清單、「記住多少」只算內容——記住不可能比存的多。
+    expect(item.storedChars).toBe(items.join(" · ").length);
+    expect(item.keptChars).toBeLessThan(item.storedChars);
   });
 });
 
