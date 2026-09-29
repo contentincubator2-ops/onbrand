@@ -2,10 +2,12 @@
  * inspirationRouter — 「靈感舞台」的 tRPC 介面。規則與思考框架在 core/inspirationStage.ts。
  *
  * roster：八位 thinker 的顯示資料＋這個品牌的預設陣容＋可以放的通路。
- * ideate：主體固定，請陣容裡每一位各想切角（可指定只請一位再想幾個、避開已有的切角）。
+ * ideateStart／ideatePoll：主體固定，請陣容裡每一位各想切角（可指定只請一位再想幾個、避開已有的切角）；
+ *   邊想邊顯示——開始後立刻回 jobId，想好一張就能被 poll 拿走一張。
  * setLineup：換人——存新陣容；被換掉的人記一次 dropped，之後不再排進預設。
  * adopt：採用一個切角 → 在本週企劃加一格（已排定），回傳任務卡讓前端接著寫全文。
  */
+import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure } from "../../platform/core/trpc";
@@ -16,7 +18,7 @@ import { buildBrandPrefix } from "../../strategy/core/brandContext";
 import localPool from "../../localDb";
 import { brandPlatforms, cardsFor, isYmd, PLATFORM_ZH } from "../core/weeklyPlanner";
 import {
-  THINKER_KEYS, LINEUP_SIZE, bump, ideationSystemPrompt, loadPrefs, loadThinkerCards, parseAngles,
+  THINKER_KEYS, LINEUP_SIZE, bump, completedAngleObjects, ideationSystemPrompt, loadPrefs, loadThinkerCards, parseAngles,
   pickCardForFormat, savePrefs, slotTopic, thinkerOf,
   type Angle, type ThinkerKey,
 } from "../core/inspirationStage";
@@ -40,6 +42,17 @@ function checkRate(userId: number): void {
   if (hits.length >= 30) throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: "這一小時想太多輪了，晚點再來。" });
   hits.push(now);
   rate.set(userId, hits);
+}
+
+/**
+ * 品牌加入的通路裡，有文字任務卡可以寫的那些。2026-09-29 dev 實測：Threads、LINE 在任務
+ * 目錄裡只有圖片規格卡、沒有文字卡，採用時「這個通路沒有可用的任務卡」——所以不給 agent
+ * 建議、也不給用戶選。那兩個通路補上文字卡後這裡自動放行。
+ */
+async function writablePlatforms(brandId: number): Promise<string[]> {
+  const all = await brandPlatforms(brandId);
+  const ok = all.filter((p) => cardsFor([p]).length > 0);
+  return ok.length ? ok : ["facebook"];
 }
 
 /** 主體的名稱；產品／活動必須屬於這個品牌。 */
@@ -78,13 +91,84 @@ async function runRound(args: Omit<Parameters<typeof ideationSystemPrompt>[0], "
   return [];
 }
 
+// ─── 邊想邊顯示 ────────────────────────────────────────────────────────
+//
+// 2026-09-30（CJ「邊想邊顯示」）：一輪 Sonnet 要 ~45 秒，整段回來才顯示太久。仍是一次呼叫
+// （多樣性靠同一份提示詞，見 ideationSystemPrompt），但改用 Anthropic 原生串流：每寫完一張卡
+// 的 `}` 就放進 job，前端每秒來拿一次。伺服器是單一 pm2 process（ecosystem*.cjs instances: 1），
+// job 放記憶體即可；重啟時進行中的 job 會消失，前端當成失敗讓用戶再按一次。
+
+interface IdeateJob {
+  userId: number;
+  keys: ThinkerKey[];
+  angles: Array<Angle & { thinker: ThinkerKey }>;
+  done: boolean;
+  failed: ThinkerKey[];
+  createdAt: number;
+}
+const jobs = new Map<string, IdeateJob>();
+const JOB_TTL_MS = 10 * 60_000;
+function sweepJobs(): void {
+  const now = Date.now();
+  for (const [id, j] of jobs) if (now - j.createdAt > JOB_TTL_MS) jobs.delete(id);
+}
+
+type RoundArgs = Parameters<typeof runRound>[0];
+
+/** 串流一輪：每多一張寫完的卡就呼叫 onAngles（整份目前的清單）。串流失敗回 null，由呼叫端退回非串流。 */
+async function streamRound(args: RoundArgs, onAngles: (a: Array<Angle & { thinker: ThinkerKey }>) => void): Promise<Array<Angle & { thinker: ThinkerKey }> | null> {
+  const system = ideationSystemPrompt({ ...args, thinkers: args.keys.map((k) => ({ thinker: thinkerOf(k), name: args.nameOf(k) })) });
+  try {
+    const { anthropicStream } = await import("../../platform/core/llm");
+    let buf = ""; let seen = 0;
+    let latest: Array<Angle & { thinker: ThinkerKey }> = [];
+    for await (const chunk of anthropicStream(
+      [{ role: "system", content: system }, { role: "user", content: "請開始想。" }] as any, 4000, IDEATION_MODEL,
+    )) {
+      buf += chunk;
+      const objs = completedAngleObjects(buf);
+      if (objs.length > seen) {
+        seen = objs.length;
+        latest = parseAngles(`{"angles":[${objs.join(",")}]}`, { keys: args.keys, platforms: args.platforms, perThinker: args.count });
+        onAngles(latest);
+      }
+    }
+    // 收尾：用整段再解析一次（容錯比逐張好，例如最後一張的 `}` 跟 `]` 黏在一起）。
+    const all = parseAngles(buf, { keys: args.keys, platforms: args.platforms, perThinker: args.count });
+    return all.length >= latest.length ? all : latest;
+  } catch (e) {
+    console.warn("[inspiration] stream failed, falling back:", (e as Error)?.message?.slice(0, 160));
+    return null;
+  }
+}
+
+async function runJob(job: IdeateJob, base: Omit<RoundArgs, "keys" | "avoid">, avoid: string[]): Promise<void> {
+  const byOrder = (xs: Array<Angle & { thinker: ThinkerKey }>) => xs.sort((x, y) => job.keys.indexOf(x.thinker) - job.keys.indexOf(y.thinker));
+  try {
+    let angles = await streamRound({ ...base, keys: job.keys, avoid }, (a) => { job.angles = a; });
+    if (!angles?.length) angles = await runRound({ ...base, keys: job.keys, avoid });
+    job.angles = byOrder([...angles]);
+    // 模型漏掉的人：只替他們再問一次（帶著已經有的切角，免得撞）。
+    const missing = job.keys.filter((k) => !job.angles.some((a) => a.thinker === k));
+    if (missing.length && job.angles.length) {
+      const more = await runRound({ ...base, keys: missing, avoid: [...avoid, ...job.angles.map((a) => a.title)] });
+      job.angles = byOrder([...job.angles, ...more]);
+    }
+  } catch (e) {
+    console.warn("[inspiration] job failed:", (e as Error)?.message?.slice(0, 160));
+  } finally {
+    job.failed = job.keys.filter((k) => !job.angles.some((a) => a.thinker === k));
+    job.done = true;
+  }
+}
+
 export const inspirationRouter = router({
   roster: protectedProcedure
     .input(brandInput)
     .query(async ({ ctx, input }) => {
       await assertBrandAccess(ctx.user!.id, input.brandId);
       const [thinkers, prefs, platforms] = await Promise.all([
-        loadThinkerCards(), loadPrefs(input.brandId), brandPlatforms(input.brandId),
+        loadThinkerCards(), loadPrefs(input.brandId), writablePlatforms(input.brandId),
       ]);
       return {
         thinkers, lineup: prefs.lineup,
@@ -103,7 +187,17 @@ export const inspirationRouter = router({
       return { lineup };
     }),
 
-  ideate: protectedProcedure
+  /** 恢復預設陣容：陣容與採用／換掉紀錄整筆清掉（換太多人、或測試後清理）。 */
+  resetLineup: protectedProcedure
+    .input(brandInput)
+    .mutation(async ({ ctx, input }) => {
+      await assertBrandAccess(ctx.user!.id, input.brandId);
+      await localPool.execute(`DELETE FROM inspiration_prefs WHERE brandId = ?`, [input.brandId]);
+      return { lineup: (await loadPrefs(input.brandId)).lineup };
+    }),
+
+  /** 開始一輪：準備好品牌資料就回 jobId，想的過程在背景跑；前端用 ideatePoll 拿進度。 */
+  ideateStart: protectedProcedure
     .input(brandInput.extend({
       subject: subjectZ,
       occasion: z.string().trim().max(120).optional(),
@@ -122,26 +216,32 @@ export const inspirationRouter = router({
       const [subject, market, platforms, cards] = await Promise.all([
         resolveSubject(input.brandId, input.subject),
         getBrandMarket(input.brandId),
-        brandPlatforms(input.brandId),
+        writablePlatforms(input.brandId),
         loadThinkerCards(),
       ]);
       const brandCtx = await buildBrandPrefix(input.brandId, subject.productId, subject.eventId, "full").catch(() => "");
       const nameOf = (k: ThinkerKey) => cards.find((c) => c.key === k)?.name ?? thinkerOf(k).fallbackName;
       const base = {
-        brandName: subject.brandName, subjectLine: subject.subjectLine, brandCtx,
+        brandName: subject.brandName, subjectLine: subject.subjectLine, brandCtx, nameOf,
         occasion: input.occasion || undefined, platforms, count: input.count,
         outputLanguage: market.outputLanguage, direction: input.direction || undefined,
       };
+      sweepJobs();
+      const jobId = randomUUID();
+      const job: IdeateJob = { userId, keys, angles: [], done: false, failed: [], createdAt: Date.now() };
+      jobs.set(jobId, job);
+      void runJob(job, base, input.avoid);
+      return { jobId };
+    }),
 
-      let angles = await runRound({ ...base, keys, nameOf, avoid: input.avoid });
-      // 模型漏掉的人：只替他們再問一次（帶著已經有的切角，免得撞）。
-      const missing = keys.filter((k) => !angles.some((a) => a.thinker === k));
-      if (missing.length && angles.length) {
-        const more = await runRound({ ...base, keys: missing, nameOf, avoid: [...input.avoid, ...angles.map((a) => a.title)] });
-        angles = [...angles, ...more].sort((x, y) => keys.indexOf(x.thinker) - keys.indexOf(y.thinker));
-      }
-      const failed = keys.filter((k) => !angles.some((a) => a.thinker === k));
-      return { angles, failed };
+  /** 這一輪目前想好的切角。done 之後 failed 才有意義。 */
+  ideatePoll: protectedProcedure
+    .input(z.object({ jobId: z.string().uuid() }))
+    .query(({ ctx, input }) => {
+      const job = jobs.get(input.jobId);
+      // 找不到＝伺服器重啟或過期；別人的 job 也當成找不到。
+      if (!job || job.userId !== ctx.user!.id) return { angles: [], done: true, failed: [] as ThinkerKey[], lost: true };
+      return { angles: job.angles, done: job.done, failed: job.failed, lost: false };
     }),
 
   adopt: protectedProcedure
@@ -158,7 +258,7 @@ export const inspirationRouter = router({
     .mutation(async ({ ctx, input }) => {
       const userId = ctx.user!.id;
       await assertBrandAccess(userId, input.brandId);
-      const platforms = await brandPlatforms(input.brandId);
+      const platforms = await writablePlatforms(input.brandId);
       if (!platforms.includes(input.platform)) throw new TRPCError({ code: "BAD_REQUEST", message: "這個品牌沒有加入這個通路" });
       const card = pickCardForFormat(input.platform, input.format, cardsFor([input.platform]));
       if (!card) throw new TRPCError({ code: "BAD_REQUEST", message: "這個通路沒有可用的任務卡" });

@@ -224,7 +224,10 @@ export function ideationSystemPrompt(args: {
   const hasTiming = args.thinkers.some((x) => x.thinker.key === "timing");
   return [
     `你要替「${args.brandName}」想社群貼文的切角——只想切角，不寫全文。`,
-    solo ? `這次只有一位在想，照他的思考方式想 ${args.count} 個不同的切角：` : `下面每一位用自己的思考方式各想 ${args.count} 個切角：`,
+    solo
+      ? `這次只有一位在想，照他的思考方式想 ${args.count} 個不同的切角。`
+        + `每個切角的 answer 都要是那個問題的另一個答案——同一個答案換句話說不算（2026-09-29 實測：「你醃掉的是最香的部分」被改寫成「你醃掉的是最貴的部分」又交回來）：`
+      : `下面每一位用自己的思考方式各想 ${args.count} 個切角：`,
     roster,
     ``,
     `【這次固定講的主體】${args.subjectLine}——每個切角都必須在講這個主體，不能換題目。`,
@@ -236,7 +239,7 @@ export function ideationSystemPrompt(args: {
       : "",
     `【可以放的通路】${args.platforms.join("、")}`,
     args.direction ? `【用戶希望往這個方向再想】${args.direction}` : "",
-    args.avoid?.length ? `【畫面上已經有的切角——不要重複，也不要換句話說】\n${args.avoid.map((a) => `- ${a}`).join("\n")}` : "",
+    args.avoid?.length ? `【畫面上已經有的切角——不要重複，也不要換句話說；新切角的 answer 必須跟這些切角背後的答案不同】\n${args.avoid.map((a) => `- ${a}`).join("\n")}` : "",
     args.brandCtx ? `【品牌資料】\n${args.brandCtx.slice(0, 6000)}` : "",
     ``,
     `做法：`,
@@ -251,6 +254,14 @@ export function ideationSystemPrompt(args: {
 }
 
 const clip = (v: unknown, n: number) => String(v ?? "").replace(/\s+/g, " ").trim().slice(0, n);
+/** 開場句卡片會自己加「」；模型常自己也包一層，變成「「…」」。只拿掉包住整句的那一對。 */
+export function unquote(s: string): string {
+  const pairs: Array<[string, string]> = [["「", "」"], ["『", "』"], ["“", "”"], ['"', '"']];
+  for (const [o, c] of pairs) {
+    if (s.startsWith(o) && s.endsWith(c) && s.length > 2 && !s.slice(1, -1).includes(o)) return s.slice(1, -1).trim();
+  }
+  return s;
+}
 
 /**
  * 模型回覆 → 每位的切角；只收要求的 thinker，每位最多 perThinker 個。通路不在清單就換成
@@ -271,7 +282,7 @@ export function parseAngles(raw: string, args: { keys: ThinkerKey[]; platforms: 
     const key = (args.keys as string[]).includes(raw) ? (raw as ThinkerKey) : args.keys.length === 1 ? args.keys[0]! : null;
     if (!key || (per.get(key) ?? 0) >= args.perThinker) continue;
     const title = clip(a?.title, 40);
-    const hook = clip(a?.hook, 80);
+    const hook = unquote(clip(a?.hook, 80));
     if (title.length < 2 || hook.length < 2) continue;
     const p = String(a?.platform ?? "").toLowerCase();
     const f = clip(a?.format, 12);
@@ -284,6 +295,34 @@ export function parseAngles(raw: string, args: { keys: ThinkerKey[]; platforms: 
   }
   // 依陣容順序排，同一位的放在一起。
   return out.sort((x, y) => args.keys.indexOf(x.thinker) - args.keys.indexOf(y.thinker));
+}
+
+/**
+ * 串流中的半截 JSON → 已經寫完整的那幾個切角物件（原文字串）。邊想邊顯示用：模型一寫完
+ * 一張卡的 `}` 就能先交出去，不必等整段 JSON 收尾。字串裡的括號與跳脫字元不算。
+ */
+export function completedAngleObjects(buf: string): string[] {
+  const start = buf.indexOf("[", Math.max(0, buf.indexOf('"angles"')));
+  if (start < 0) return [];
+  const out: string[] = [];
+  let depth = 0, inStr = false, esc = false, objStart = -1;
+  for (let i = start + 1; i < buf.length; i++) {
+    const ch = buf[i]!;
+    if (inStr) {
+      if (esc) esc = false;
+      else if (ch === "\\") esc = true;
+      else if (ch === '"') inStr = false;
+      continue;
+    }
+    if (ch === '"') { inStr = true; continue; }
+    if (ch === "{") { if (depth === 0) objStart = i; depth++; }
+    else if (ch === "}") {
+      depth--;
+      if (depth === 0 && objStart >= 0) { out.push(buf.slice(objStart, i + 1)); objStart = -1; }
+      if (depth < 0) break;
+    } else if (ch === "]" && depth === 0) break;
+  }
+  return out;
 }
 
 /**
