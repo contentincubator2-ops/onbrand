@@ -60,9 +60,16 @@ export interface GenResult {
 export interface GenOptions {
   prompt: string;
   /** Aspect ratio hint — provider-specific mapping. */
-  aspectRatio?: "1:1" | "4:3" | "3:4" | "16:9" | "9:16";
-  /** Image size when provider supports explicit pixels. */
-  size?: "1024x1024" | "1024x1536" | "1536x1024" | "1024x1792" | "1792x1024";
+  aspectRatio?: "1:1" | "4:3" | "3:4" | "16:9" | "9:16" | "2:3" | "3:2" | "4:5" | "5:4" | "21:9";
+  /** Image size when provider supports explicit pixels. gpt-image-2 accepts any
+   *  WxH (multiples of 16, ratio 1:3–3:1) — see platformImageSpecs.gptSizeFor. */
+  size?: "1024x1024" | "1024x1536" | "1536x1024" | "1024x1792" | "1792x1024" | `${number}x${number}`;
+  /**
+   * 2026-09-29 圖片任務卡：比例必須在生成當下鎖死（CJ「不能生成後再裁」）。
+   * true 時 Nano Banana 會把 aspectRatio 放進 generationConfig.imageConfig（原生比例），
+   * 而不只是 prompt 裡的一句提示。
+   */
+  strictAspect?: boolean;
   /** For i2v: source image URL. Also doubles as the MODEL/person photo for
    *  garment try-on (piapi/kling-try-on) — see garmentImageUrl below. */
   imageUrl?: string;
@@ -234,7 +241,10 @@ Output aspect ratio: ${opts.aspectRatio}.` : "";
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         contents: [{ role: "user", parts }],
-        generationConfig: { responseModalities: ["IMAGE"] },
+        generationConfig: {
+          responseModalities: ["IMAGE"],
+          ...(opts.strictAspect && opts.aspectRatio ? { imageConfig: { aspectRatio: opts.aspectRatio } } : {}),
+        },
       }),
       signal: AbortSignal.timeout(120_000),
     });

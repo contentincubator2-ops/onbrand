@@ -65,7 +65,7 @@ export function ImageGenSlot({
   const failed = status === "timeout" || status === "failed";
   const ctaText = failed
     ? (lang === "en" ? "Image failed · tap to retry" : "圖片生成失敗 · 點此重試")
-    : (lang === "en" ? "Tap to generate image" : "點此生成主圖");
+    : (lang === "en" ? "Want an image? Tap to create" : "要幫這篇做圖嗎？點此做圖");
   return (
     <div
       role={clickable ? "button" : undefined}
@@ -87,7 +87,7 @@ export function ImageGenSlot({
         </span>
       ) : (
         <span className={`text-tiny font-medium ${dark ? "text-white/70" : "text-default-500"}`}>
-          {lang === "en" ? "No image in this step" : "此步驟不含主圖"}
+          {lang === "en" ? "Text first — you can add an image when it's done" : "這一步先寫文字，完成後可以再做圖"}
         </span>
       )}
       {brief && (

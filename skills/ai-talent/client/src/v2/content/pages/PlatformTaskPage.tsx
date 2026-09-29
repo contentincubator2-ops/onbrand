@@ -62,6 +62,8 @@ import {
   faFacebookF, faInstagram, faYoutube, faTiktok, faLinkedinIn, faThreads, faLine,
 } from "@fortawesome/free-brands-svg-icons";
 import RunningAgentCarousel from "../components/quickTask/RunningAgentCarousel";
+import ImageCardTile, { type ImageCardInfo } from "../components/imageCard/ImageCardTile";
+import { imageCardHref, imageChannelOf } from "../lib/imageCardHandoff";
 import CardDetailDrawer, { isRecentCard } from "../components/quickTask/CardDetailDrawer";
 import ChannelPicker from "../../platform/components/plan/ChannelPicker";
 import TaskPicker from "../../platform/components/plan/TaskPicker";
@@ -463,6 +465,12 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
   }, []);
 
   const brandId = (ctx?.brandId as number | null) ?? null;
+  const imageChannel = imageChannelOf(platform);
+  const imageCardsQ = trpc.imageCard.list.useQuery(
+    { channel: (imageChannel ?? "facebook") as any },
+    { enabled: !!imageChannel, staleTime: 5 * 60_000 },
+  );
+  const imageCards = (imageChannel ? imageCardsQ.data?.cards ?? [] : []) as ImageCardInfo[];
   const brandName = useMemo(() => {
     const list = (ctx?.brands as any[]) ?? [];
     return list.find((b) => b?.id === brandId)?.name ?? null;
@@ -557,7 +565,9 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
   // Tier tab state (used for non-FB/non-IG platforms)
   const [activeTier, setActiveTier] = useState<ActiveTier>("all");
   // 結構來源篩選。"all" = 不篩。與 tier 是兩條獨立的軸，可同時生效。
-  const [activeSource, setActiveSource] = useState<FrontCardKind | "all">("all");
+  // 2026-09-29 CJ「每個平台要增加一個圖片的類別」："image" 不是任務卡來源，是另一個類別——
+  // 選它時下面改列這個通路的圖片任務卡（imageCard.list），不列文字任務。
+  const [activeSource, setActiveSource] = useState<FrontCardKind | "all" | "image">("all");
   // Format tab state (used for FB)
   const [activeFormat, setActiveFormat] = useState<ActiveFormat>("all");
   // Format tab state (used for IG)
@@ -2065,17 +2075,17 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
               const k = frontCardKind(t);
               if (k) counts[k] += 1;
             }
-            const tabs: Array<FrontCardKind | "all"> = ["all", ...FRONT_CARD_KINDS];
+            const tabs: Array<FrontCardKind | "all" | "image"> = ["all", ...FRONT_CARD_KINDS, ...(imageCards.length ? (["image"] as const) : [])];
             return (
               <div className="mt-3 flex items-center gap-1.5 flex-wrap justify-center">
                 {tabs.map((id) => {
                   const active = activeSource === id;
-                  const acc = id === "all" || id === "viral" ? "#171717" : "#404040";
+                  const acc = id === "all" || id === "viral" || id === "image" ? "#171717" : "#404040";
                   return (
                     <button
                       key={id}
                       onClick={() => setActiveSource(id)}
-                      title={id === "all" ? undefined : id === "viral" ? sourceWhy("viral", lang) : (lang === "en" ? "Cards you built for this brand." : "你替這個品牌自己建的卡。")}
+                      title={id === "all" ? undefined : id === "image" ? (lang === "en" ? "Image cards in this channel's sizes." : "這個平台各種尺寸的圖片任務卡。") : id === "viral" ? sourceWhy("viral", lang) : (lang === "en" ? "Cards you built for this brand." : "你替這個品牌自己建的卡。")}
                       className="flex items-center gap-1.5 px-3 py-1 rounded-full text-tiny font-medium transition-all"
                       style={
                         active
@@ -2091,7 +2101,9 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                       )}
                       {id === "all"
                         ? (lang === "en" ? "All" : "全部")
-                        : `${frontCardKindLabel(id, lang)} ${counts[id]}`}
+                        : id === "image"
+                          ? `${lang === "en" ? "Images" : "圖片"} ${imageCards.length}`
+                          : `${frontCardKindLabel(id, lang)} ${counts[id]}`}
                     </button>
                   );
                 })}
@@ -2153,7 +2165,13 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
 
       {/* ─── Task grid ─────────────────────────────────────────────────── */}
       <div className="max-w-[1200px] mx-auto px-6 pb-20 mt-2">
-        {totalForPlatform === 0 && allTasks.length === 0 ? (
+        {activeSource === "image" ? (
+          <div className="grid gap-4" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))" }}>
+            {imageCards.map((c) => (
+              <ImageCardTile key={c.id} card={c} onOpen={() => navigate(imageCardHref(c.id))} />
+            ))}
+          </div>
+        ) : totalForPlatform === 0 && allTasks.length === 0 ? (
           <Card>
             <CardBody className="text-center text-default-500 py-12">
               <FontAwesomeIcon icon={faBolt} className="text-3xl mb-2 text-default-300" />

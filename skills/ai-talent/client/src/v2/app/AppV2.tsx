@@ -61,6 +61,7 @@ const TheaterPage = React.lazy(() => import("../content/pages/TheaterPage"));
 const PlatformTaskPage = React.lazy(() => import("../content/pages/PlatformTaskPage"));
 const DataWorkspacePage = React.lazy(() => import("../performance/pages/DataWorkspacePage"));
 const RunPage = React.lazy(() => import("../content/pages/RunPage"));
+const ImageCardPage = React.lazy(() => import("../content/pages/ImageCardPage"));
 const ProjectsPage = React.lazy(() => import("../content/pages/ProjectsPage"));
 const BrandsPage = React.lazy(() => import("../strategy/pages/BrandsPage"));
 const BrandsManagePage = React.lazy(() => import("../strategy/pages/BrandsManagePage"));
@@ -315,6 +316,8 @@ export default function AppV2() {
               Replaces modal-based viewing for 60s/100s tasks. URL is
               shareable, browser back works, can multi-tab compare. */}
           <Route path="/run/:outputId" element={<RunPage />} />
+          {/* 2026-09-29 各通路「圖片」類別的圖片任務卡。 */}
+          <Route path="/image/:cardId" element={<ImageCardPage />} />
           <Route path="/projects" element={<ProjectsPage />} />
           {/* 2026-05-11 (CJ): /brands is now the manager dashboard.
               Old single-brand editor moved to /brands/edit?b=:id */}
