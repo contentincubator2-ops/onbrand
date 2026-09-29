@@ -92,8 +92,13 @@ export const imageCardRouter = router({
       await assertBrandOwner(ctx.user.id, input.brandId);
       const spec = specOr404(input.cardId);
       const brand = await resolveBrandVisualContext(input.brandId);
+      const { buildBrandPrefix, enforceBrandRulesOnText } = await import("../../strategy/core/brandContext");
+      const brainPrefix = await buildBrandPrefix(input.brandId, null, null, "full").catch(() => "");
       try {
-        return await proposeImageDirections({ spec, copy: input.copy, brand, productName: input.productName });
+        const out = await proposeImageDirections({ spec, copy: input.copy, brand, productName: input.productName, brainPrefix });
+        // 圖上標題是會被看見的字——跟文案一樣過禁用詞／替換對照。
+        out.headlineZh = await enforceBrandRulesOnText(input.brandId, out.headlineZh).catch(() => out.headlineZh);
+        return out;
       } catch (e) {
         throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: e instanceof Error ? e.message : String(e) });
       }

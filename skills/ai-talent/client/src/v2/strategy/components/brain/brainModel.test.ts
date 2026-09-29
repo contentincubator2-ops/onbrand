@@ -4,7 +4,7 @@
  * 優先於用量判斷。
  */
 import { describe, expect, it } from "vitest";
-import { brainState, categorySummaries, type BrainData, type BrainItem } from "./brainModel";
+import { brainState, categorySummaries, groupsOf, type BrainData, type BrainItem } from "./brainModel";
 
 const cats = [
   { key: "identity", zh: "品牌核心", en: "Brand core" },
@@ -12,7 +12,7 @@ const cats = [
   { key: "custom", zh: "自訂卡片", en: "Custom cards" },
 ];
 const item = (category: string, keptChars: number, status: BrainItem["status"] = "remembered"): BrainItem =>
-  ({ category, label: `${category}-${keptChars}`, storedChars: keptChars, keptChars, status, preview: "" });
+  ({ category, group: "", label: `${category}-${keptChars}`, storedChars: keptChars, keptChars, status, preview: "" });
 const data = (items: BrainItem[], capacity = 1000): BrainData =>
   ({ capacity, usedChars: items.reduce((n, i) => n + i.keptChars, 0), items, categories: cats });
 
@@ -46,5 +46,15 @@ describe("categorySummaries", () => {
     expect(custom.overflow).toBe(1);
     expect(custom.trimmed).toBe(1);
     expect(custom.keptChars).toBe(200);
+  });
+});
+
+describe("groupsOf", () => {
+  it("依頁面段落分組、保持原順序；沒有段落的歸在同一組", () => {
+    const it = (group: string, label: string): BrainItem => ({ category: "brand", group, label, storedChars: 1, keptChars: 1, status: "remembered", preview: "" });
+    const out = groupsOf([it("品牌黃金圈", "WHY"), it("品牌核心標語", "中文標語"), it("品牌黃金圈", "HOW")]);
+    expect(out.map((g) => g.group)).toEqual(["品牌黃金圈", "品牌核心標語"]);
+    expect(out[0]!.items.map((i) => i.label)).toEqual(["WHY", "HOW"]);
+    expect(groupsOf([it("", "推薦用詞"), it("", "禁用詞")])).toHaveLength(1);
   });
 });

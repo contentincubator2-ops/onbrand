@@ -101,7 +101,6 @@ async function suggestOne(args: {
   assetKey: CopyAssetKey;
   brandPrefix: string;
   realContent: string;
-  knowledgeBlock: string;
 }): Promise<{ ok: true; value: any; shape: string } | { ok: false; error: string }> {
   const spec = ASSET_SPEC[args.assetKey];
   const hasReal = (args.realContent ?? "").length > 0;
@@ -134,7 +133,7 @@ ${formatHintFor(spec.shape, spec.n)}
   : "下方資料有限，但仍要根據品牌名稱 + 描述 + 產業常識**精準推斷產業**。寧可少寫幾條真正貼合的，也不要塞通用詞充數。"
 }
 4. 如果真的判斷不出產業，回傳空陣列 / 空物件，**不要編造跟品牌無關的內容**。${localizeNote}
-${args.brandPrefix}${args.realContent}${args.knowledgeBlock}`;
+${args.brandPrefix}${args.realContent}`;
 
   try {
     const r = await Promise.race([
@@ -420,14 +419,13 @@ rules 3-8 條。`;
     }))
     .mutation(async ({ ctx, input }) => {
       const userId = ctx.user!.id;
-      const [brandPrefix, real, knowledgeBlock] = await Promise.all([
+      const [brandPrefix, real] = await Promise.all([
         buildBrandPrefix(input.brandId).catch(() => ""),
         getBrandRealContent(input.brandId).catch(() => ({ context: "", hasContent: false, sources: [] as string[] })),
-        loadBrandKnowledgeForPrompt(input.brandId).catch(() => ""),
       ]);
       const r = await suggestOne({
         brandId: input.brandId, userId, assetKey: input.assetKey,
-        brandPrefix, realContent: real.context, knowledgeBlock,
+        brandPrefix, realContent: real.context,
       });
       if (!r.ok) return { ok: false as const, error: r.error };
       return { ok: true as const, shape: r.shape, value: r.value, hasRealContent: real.hasContent };
@@ -469,10 +467,9 @@ rules 3-8 條。`;
     }))
     .mutation(async ({ ctx, input }) => {
       const userId = ctx.user!.id;
-      const [brandPrefix, real, knowledgeBlock] = await Promise.all([
+      const [brandPrefix, real] = await Promise.all([
         buildBrandPrefix(input.brandId).catch(() => ""),
         getBrandRealContent(input.brandId, { force: !!input.forceRefresh }).catch(() => ({ context: "", hasContent: false, sources: [] as string[] })),
-        loadBrandKnowledgeForPrompt(input.brandId).catch(() => ""),
       ]);
 
       const results: Record<string, { value: any; shape: string }> = {};
@@ -483,7 +480,7 @@ rules 3-8 條。`;
       for (let i = 0; i < input.emptyKeys.length; i += BATCH) {
         const batch = input.emptyKeys.slice(i, i + BATCH);
         const settled = await Promise.all(batch.map((k) =>
-          suggestOne({ brandId: input.brandId, userId, assetKey: k, brandPrefix, realContent: real.context, knowledgeBlock })
+          suggestOne({ brandId: input.brandId, userId, assetKey: k, brandPrefix, realContent: real.context })
             .then((r) => ({ key: k, r }))
         ));
         for (const { key, r } of settled) {
@@ -502,44 +499,9 @@ rules 3-8 條。`;
     }),
 });
 
-/**
- * Helper: pull all knowledge items for a brand and format for LLM injection.
- * Used by Theater / 30s / 60s / 100s prompt builders. Cuts at total char
- * budget (default 80K — leaves room for positioning + brand context).
- *
- * No userId filter: items were created with userId scoping at write time;
- * read-time injection trusts the brand context (orchestra is already
- * gated by brand ownership upstream).
- */
-export async function loadBrandKnowledgeForPrompt(
-  brandId: number,
-  budgetChars = 80_000,
-): Promise<string> {
-  try {
-    // 2026-05-10: LIMIT ? as prepared param triggers 'Incorrect arguments
-    // to mysqld_stmt_execute' on MySQL — inline the constant.
-    const safeLimit = Math.max(1, Math.min(1000, Number(MAX_ITEMS_PER_BRAND) || 100));
-    const [rows]: any = await localPool.execute(
-      `SELECT title, body, sourceUrl FROM brand_knowledge_items
-        WHERE brandId = ?
-        ORDER BY createdAt DESC LIMIT ${safeLimit}`,
-      [brandId],
-    );
-    const items = rows as any[];
-    if (!items.length) return "";
-    const blocks: string[] = [];
-    let used = 0;
-    for (const it of items) {
-      const block = `── ${it.title} ──\n${(it.body ?? "").slice(0, MAX_BODY_CHARS)}${it.sourceUrl ? `\n[來源] ${it.sourceUrl}` : ""}\n`;
-      if (used + block.length > budgetChars) break;
-      blocks.push(block);
-      used += block.length;
-    }
-    return `\n\n【品牌知識庫（user-uploaded reference）— 產出時請參考語氣 / 結構 / 案例】\n${blocks.join("\n")}`;
-  } catch {
-    return "";
-  }
-}
+// 2026-09-29（CJ「知識庫是隱藏內容，不需要讀取」「策略生成也拿掉知識庫」）：
+// loadBrandKnowledgeForPrompt 已移除——生文與策略生成都不再把 brand_knowledge_items
+// 塞進 prompt。資料照樣保留（list / 編輯仍在），只是不再被任何 AI 讀取。
 
 /**
  * AI 指令庫 per-platform generator — extracted from the suggestAIPrompts
@@ -580,10 +542,9 @@ export async function generateAiPromptForPlatform(
   | { ok: true; value: { text: string; image: string }; hasRealContent: boolean }
   | { ok: false; error: string }
 > {
-  const [brandPrefix, real, knowledgeBlock, voiceLock] = await Promise.all([
+  const [brandPrefix, real, voiceLock] = await Promise.all([
     buildBrandPrefix(brandId).catch(() => ""),
     getBrandRealContent(brandId).catch(() => ({ context: "", hasContent: false, sources: [] as string[] })),
-    loadBrandKnowledgeForPrompt(brandId).catch(() => ""),
     loadVoiceLock(brandId),
   ]);
   const labelMap: Record<string, string> = {
@@ -618,7 +579,7 @@ ${hasReal
   "image": "<完整可貼上的圖片指令；80-200 字；說明 ${label} 配圖風格：構圖、色調、字幅、品牌元素、可用 / 不可用素材類型>"
 }
 直接輸出 JSON，第一字元就是 {。
-${brandPrefix}${real.context}${knowledgeBlock}${voiceLockBlock(voiceLock)}`;
+${brandPrefix}${real.context}${voiceLockBlock(voiceLock)}`;
   try {
     const r = await Promise.race([
       invokeLLM({
