@@ -574,6 +574,11 @@ async function runStartupMigrations() {
     console.log("[migrate] strategy_meetings / strategy_meeting_runs: OK");
 
     // 2026-09-27（CJ「除了專案、行事曆、活動，所有 mission tray 變成使用者自己加入」）
+    // 2026-09-29（CJ「成效層要能在平台上落實……族群 × USP 只是一種選項」）：視角／維度／事實／規則／匯入。
+    const { PERF_DDLS } = await import("./performance/core/perfStore");
+    for (const ddl of PERF_DDLS) await db.execute(sql.raw(ddl));
+    console.log("[migrate] perf_dimensions / perf_lenses / perf_facts / perf_tag_rules / perf_imports: OK");
+
     const { BRAND_NAV_PREFS_DDL } = await import("./platform/routers/navPrefsRouter");
     await db.execute(sql.raw(BRAND_NAV_PREFS_DDL));
     console.log("[migrate] brand_nav_prefs: OK");
@@ -723,6 +728,15 @@ const server = app.listen(PORT, async () => {
       });
     }, 15 * 60_000);
     console.log("[strategyMeetings] Worker started (15m interval)");
+
+    // 成效層粉專回填：每 30 分鐘挑一個超過 20 小時沒同步的品牌（一拍一個，Graph 有頻率限制）。
+    const { tickFbPageSync } = await import("./performance/core/fbPageSync");
+    setInterval(() => {
+      tickFbPageSync().catch((e) => {
+        console.error("[fbPageSync] tick error:", e?.message ?? e);
+      });
+    }, 30 * 60_000);
+    console.log("[fbPageSync] Worker started (30m interval)");
   }
 
   if (isRuntimeFeatureEnabled("LIVE_BILLING_ENABLED")) {
