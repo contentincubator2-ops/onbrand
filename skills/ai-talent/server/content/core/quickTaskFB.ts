@@ -859,6 +859,306 @@ caption 直接列出這 10-15 個 hashtag 本身（每個 # 前綴 + 空格分�
     maxTokens: 700,
     outputDefaults: { platform: "facebook", post_type: "event" },
   },
+  // ── 爆款結構卡・2026-09 近 3 個月案例（CJ 2026-09-29）────────────────────
+  // 規則：FB 上的真實案例、近 3 個月量測、數字要出現在附上的參考文章裡（source.url）。
+  // 前台只列近 3 個月的爆款卡，月份滑出去就自動下架，所以這批卡每月要換。
+  {
+    id: "fb-30-reel-character-series",
+    tier: "30s",
+    postType: "reel",
+    label: { en: "Reel: Recurring Character Mini-Drama", zh: "FB Reels：固定角色短劇" },
+    description: { en: "A recurring character turns dry know-how into episodes", zh: "讓一個固定角色把枯燥的本業演成連續短劇" },
+    agent_id: 60033, // 沿用短影音腳本 agent
+    skill_slug: "short-video-script",
+    source: {
+      type: "viral",
+      short: "億家水電 AI 水電工「江澈」",
+      metric: "9/8 首支短劇破百萬觀看；單支近千萬瀏覽（FB＋IG 合計）",
+      asOf: "2026-09",
+      url: "https://www.mirrormedia.mg/story/20260922hea03",
+      takeaway:
+        "專業貼文只有兩位數瀏覽，交給一個有反差設定的固定角色演成短劇，粉絲追的是角色，本業變成劇情裡解決問題的那一刻。",
+    },
+    primary_question: "你的本業是什麼？客人最常遇到的一個麻煩是什麼？",
+    primary_input: { key: "topic", placeholder: "例：水電修繕／客人最怕半夜漏水找不到人", type: "textarea" },
+    inputs: [
+      { key: "topic", label: "本業 + 客人最常遇到的麻煩", type: "textarea", required: true },
+    ],
+    systemPrompt: `你要寫的是一集 FB Reels 短劇腳本（60–150 秒），主角是這個品牌的「固定角色」。
+
+先定角色（每集沿用，同一個人）：
+- 一個跟本業綁在一起的人物：職業就是品牌的本業。
+- 一個反差：外型、口音或個性，跟大家對這個行業的刻板印象不一樣。
+- 一句口頭禪，每集都會出現。
+
+這一集的結構（照順序）：
+1. 開場 3 秒：直接進衝突情境（誤會、搞錯、突發狀況），不要自我介紹。
+2. 中段：生活化的小故事，笑點來自角色的反差或直男／職場梗。
+3. 高潮：角色用本業的專業把問題解決——這是全片唯一出現「本業」的地方，要具體到一個真實做法。
+4. 收尾：一句口頭禪＋留一個下一集的鉤子（「下次遇到○○再找我」）。
+
+硬規則：
+- 不要推銷、不要報價、不要「歡迎來電」。品牌只在片尾字幕低調出現一次。
+- 用台灣口語，台詞短，一句不超過 15 字。
+- 輸出分鏡：每個鏡頭寫「畫面／台詞／字幕」。
+- caption 另寫 60–150 字，像角色本人在說話，最後一句邀請大家留言想看的下一集情境。`,
+    preferredModel: "qwen",
+    maxTokens: 900,
+    outputDefaults: { platform: "facebook", post_type: "reel" },
+  },
+  {
+    id: "fb-30-event-tiered-challenge",
+    tier: "30s",
+    postType: "event",
+    label: { en: "Event: Tiered Weekly Challenge", zh: "FB 活動：分級挑戰＋限量獎" },
+    description: { en: "Weekly tasks, tiered badges, a capped prize", zh: "每週小任務、分級證書、限量實體獎" },
+    agent_id: 30016, // 沿用 fb-60-launch-kit 的 agent
+    skill_slug: "fb-copywriting",
+    source: {
+      type: "viral",
+      short: "運動部「揮汗有禮」",
+      metric: "上線兩週突破 300 萬筆運動紀錄上限",
+      asOf: "2026-09",
+      url: "https://www.setn.com/news/1908542",
+      takeaway:
+        "把一次性的報名拆成每週可完成的小任務，依完成週數給銅／銀／金等級，最高級再加限量實體獎，名額滿了再宣布續辦，一檔活動就有兩波聲量。",
+    },
+    primary_question: "你想讓大家連續做什麼？能給什麼獎勵？",
+    primary_input: { key: "topic", placeholder: "例：連續 4 週每週帶自己的杯子來店 / 獎勵：金級送年度招待券 100 名", type: "textarea" },
+    inputs: [
+      { key: "topic", label: "要大家連續做的事 + 獎勵與名額", type: "textarea", required: true },
+    ],
+    systemPrompt: `你要寫一則發起「分級挑戰」的 FB 活動貼文。
+
+活動設計（貼文裡要講清楚）：
+1. 每週一個低門檻任務：一句話說完、當週做得到、不用花錢。
+2. 分級：完成 1 週／2–3 週／全部週數，分別拿到不同等級（例：銅／銀／金）。等級名稱要有面子。
+3. 最高等級加一個限量實體獎，寫出名額；超過名額就抽籤——寫清楚。
+4. 參加方式與截止日期明確到日期。
+
+貼文結構：
+- 第一句：這幾週要一起做什麼（動作，不是理念）。
+- 中段：怎麼參加、分級規則、限量獎與名額。
+- 結尾：一句話說為什麼值得一起做，具體，不要口號；邀請留言「+1 我要參加」。
+
+硬規則：
+- 不設購買門檻。
+- 名額、期限都要是數字。
+- 200–400 字。`,
+    preferredModel: "qwen",
+    maxTokens: 700,
+    outputDefaults: { platform: "facebook", post_type: "event" },
+  },
+  {
+    id: "fb-30-ad-audience-split-test",
+    tier: "30s",
+    postType: "ad",
+    label: { en: "Ad: One Message, Two Audiences", zh: "FB 廣告：一支素材兩組受眾對照" },
+    adFormats: ["image", "video"],
+    description: { en: "Same creative, manual vs Advantage+ audience, one metric", zh: "同一支素材跑人工受眾與自動受眾，用一個指標決勝" },
+    agent_id: 224114, // Ivy Kuo — FB Ad Copy
+    skill_slug: "fb-ad-copy",
+    source: {
+      type: "viral",
+      short: "NAR × Havas（2026 Meta 代理商獎）",
+      metric: "43.2 萬次著陸頁瀏覽；每次瀏覽成本 -29%、總花費 -25%",
+      asOf: "2026-09",
+      url: "https://www.nar.realtor/newsroom/nar-wins-metas-2026-agency-award-for-best-use-of-automation",
+      takeaway:
+        "同一支核心訊息素材，一組用人工受眾、一組交給 Advantage+ 自動受眾，只比一個指標（每次著陸頁瀏覽成本），跑完就把預算移到贏的那組。",
+    },
+    primary_question: "這支廣告要讓誰做什麼？你現在怎麼設定受眾？",
+    primary_input: { key: "topic", placeholder: "例：首購族來預約看屋 / 目前鎖定 25–40 歲、有興趣：房地產", type: "textarea" },
+    inputs: [
+      { key: "topic", label: "廣告目標 + 目前的受眾設定", type: "textarea", required: true },
+    ],
+    systemPrompt: `你要產出一組「一支素材、兩組受眾對照」的 FB 廣告。
+
+產出兩部分：
+
+A. 廣告文案（兩組共用同一支素材，文案一字不差）
+- 主要文字：第一句點出對象的處境（誰＋他現在的卡點），第二句給品牌能做的一件事，第三句一個明確動作。90–150 字。
+- 標題：12 字內，講結果不講品牌。
+- 說明：20 字內。
+- 行動呼籲按鈕：從 Meta 標準按鈕裡選一個最合適的（例如「瞭解詳情」「立即預約」）。
+
+B. 對照測試設定（給投手看，條列）
+- A 組：沿用用戶現在的人工受眾設定（照用戶輸入寫）。
+- B 組：Advantage+ 自動受眾，只給年齡下限與地區，其他交給系統。
+- 唯一比較指標：每次著陸頁瀏覽成本（不要同時比好幾個）。
+- 測試期與預算分配：兩組同預算、至少跑 7 天。
+- 勝出規則：一句話寫清楚怎麼判定、判定後預算怎麼移。
+
+硬規則：
+- 兩組素材與文案完全相同，差別只在受眾——否則對照沒有意義。
+- 禁止形容詞堆疊（頂級／極致／完美／領先）。`,
+    preferredModel: "qwen",
+    maxTokens: 800,
+    outputDefaults: { platform: "facebook", post_type: "ad" },
+  },
+  {
+    id: "fb-30-feed-big-move-local",
+    tier: "30s",
+    postType: "feed",
+    label: { en: "Post: One Big Move, Made Local", zh: "FB 貼文：一件大動作變成地方驕傲" },
+    description: { en: "A concrete milestone + public good + local ritual + what's next", zh: "具體里程碑＋公共利益＋在地儀式＋下一步預告" },
+    agent_id: 30020, // Iris Yi — Social Media Manager
+    skill_slug: "fb-copywriting",
+    source: {
+      type: "viral",
+      short: "啟德機械 104 米消防雲梯車抵台",
+      metric: "超過萬人點讚（FB 粉專，7/22 發文）",
+      asOf: "2026-07",
+      url: "https://news.ltn.com.tw/news/life/breakingnews/5515534",
+      takeaway:
+        "一家 B2B 公司把「買了一台設備」寫成：全台第二台、用在消防救災、先開去廟裡祈福、明年再買一台——數字、公益、在地儀式、預告四件事湊齊，就成了地方驕傲。",
+    },
+    primary_question: "你們最近做了哪一件「有數字的大動作」？它跟地方或大家有什麼關係？",
+    primary_input: { key: "topic", placeholder: "例：門市第 100 家開幕，開在老家的市場旁 / 新設備全台第一台，會用在…", type: "textarea" },
+    inputs: [
+      { key: "topic", label: "大動作（含數字）+ 跟地方／大家的關係", type: "textarea", required: true },
+    ],
+    systemPrompt: `你要寫一則 FB 粉專貼文，把品牌的一個「大動作」寫成讓在地人覺得驕傲、想按讚分享的消息。
+
+結構（照順序）：
+1. 第一句：具體的大動作＋一個數字（第幾台、第幾家、全台第幾、多少年）。不要先講理念。
+2. 這件事跟公共利益或地方的關係：它會幫到誰、用在哪裡。
+3. 一個在地的儀式感或畫面（去廟裡祈福、跟里長一起剪綵、老客人第一個來），寫成一個具體場景。
+4. 預告下一步（明年、下個月要再做什麼），讓人想追。
+5. 結尾附一個號召：徵才、邀請來看、或請大家幫忙分享給需要的人——只選一個。
+
+硬規則：
+- 第一人稱、像老闆或員工本人在說話，不是新聞稿。
+- 禁止形容詞堆疊（頂級／極致／完美／領先）。
+- 150–300 字。`,
+    preferredModel: "qwen",
+    maxTokens: 600,
+    outputDefaults: { platform: "facebook", post_type: "feed" },
+  },
+  {
+    id: "fb-30-pinned-ritual-break",
+    tier: "30s",
+    postType: "pinned",
+    label: { en: "Pinned: Fixed-Format Announcement", zh: "FB 置頂：固定格式的重要公告" },
+    description: { en: "Conclusion first, fixed signature, break it once on purpose", zh: "結論先講、固定招牌元素、偶爾刻意打破" },
+    agent_id: 60024, // 沿用 fb-30-pinned-short 的 agent
+    skill_slug: "fb-copywriting",
+    source: {
+      type: "viral",
+      short: "蔣萬安 颱風停班課公告",
+      metric: "一夜 5.5 萬讚、超過 4,600 則留言",
+      asOf: "2026-07",
+      url: "https://www.ettoday.net/news/20260710/3198472.htm",
+      takeaway:
+        "大家一定會等的實用公告，長期帶著一個固定招牌元素（每次都附帥照），粉絲自己把它玩成都市傳說；某一次刻意拿掉，公告本身就變成話題。",
+    },
+    primary_question: "你要公告什麼？你的公告平常有沒有一個固定的招牌元素？",
+    primary_input: { key: "topic", placeholder: "例：中秋連假營業時間異動 / 我們每次公告都會放店貓的照片", type: "textarea" },
+    inputs: [
+      { key: "topic", label: "要公告的事 + 平常固定的招牌元素（沒有就寫沒有）", type: "textarea", required: true },
+    ],
+    systemPrompt: `你要寫一則會被置頂的 FB 重要公告（營業異動、到貨、休假、規則變更這類大家一定要知道的事）。
+
+結構：
+1. 第一句就是結論：日期＋要做什麼／不做什麼。讀者只看這一句也不會搞錯。
+2. 接著 2–3 個具體資訊（時間、地點、例外狀況），條列。
+3. 為什麼這樣決定：一句話，具體，不要官腔。
+4. 讀者現在該做什麼（提早訂、改天來、私訊問）。
+5. 招牌元素：
+   - 用戶有固定招牌元素（店貓、固定開場白、老闆照…）→ 產出兩版：一版照常帶著，一版刻意拿掉並在最後補一句自嘲或預告（例：「店貓今天休假，明天補上」）。
+   - 沒有 → 幫他提一個之後每次公告都能沿用的招牌元素，並在這篇第一次用上。
+
+硬規則：
+- 結論永遠在第一句，招牌元素只是加分，不能蓋過資訊。
+- 不要用「親愛的顧客您好」開頭。
+- 120–280 字。`,
+    preferredModel: "qwen",
+    maxTokens: 650,
+    outputDefaults: { platform: "facebook", post_type: "pinned" },
+  },
+  {
+    id: "fb-30-comment-callback",
+    tier: "30s",
+    postType: "comment",
+    label: { en: "Comments: Answer the Top Ask Next Post", zh: "FB 留言：把留言區最多人要的放進下一篇" },
+    description: { en: "Spot the most-repeated comment, answer it visually next time", zh: "找出最多人講的那句留言，下一篇直接給" },
+    agent_id: 180162, // 沿用 fb-30-comment-reply 的 agent
+    skill_slug: "social-copy",
+    source: {
+      type: "viral",
+      short: "蔣萬安 回應留言「帥照呢」",
+      metric: "隔天貼文 15 分鐘近 3,600 讚、300 多則留言",
+      asOf: "2026-07",
+      url: "https://udn.com/news/story/124945/9620360",
+      takeaway:
+        "前一篇留言區一直有人問「帥照呢？」，下一篇就把照片放回來——不用解釋，粉絲自己看得懂這是在回應他們，互動馬上衝高。",
+    },
+    primary_question: "你上一篇貼文的留言區，最多人在講或在要的是什麼？（照貼幾則原句）",
+    primary_input: { key: "topic", placeholder: "例：「店貓呢？」「上次那款什麼時候補貨」「老闆怎麼沒出現」", type: "textarea" },
+    inputs: [
+      { key: "topic", label: "上一篇留言區最多人講的原句", type: "textarea", required: true },
+    ],
+    systemPrompt: `你要幫品牌把「上一篇留言區最多人要的東西」變成下一篇內容，外加留言區的回覆。
+
+先判斷：從用戶貼的留言原句裡，找出出現最多次、或最多人附和的那一個要求。只挑一個。
+
+產出三部分：
+1. 下一篇貼文（80–200 字）：
+   - 主要訊息照常講（這篇本來要講的事），不要整篇都在回應留言。
+   - 用「畫面或行動」回應那個要求，不用文字解釋（例：大家問店貓 → 這篇就放店貓，文字只輕輕帶一句）。
+   - 可以有一句點到為止的暗號，讓留言過的人看得懂是在回他們。
+2. 配圖指示：一句話說這張圖要拍什麼，才能讓人一眼看出「是在回應留言」。
+3. 置頂留言（40–80 字）：品牌自己在留言區第一則，用輕鬆口吻接住大家的梗，再邀請大家下次想看什麼。
+
+硬規則：
+- 不要寫「感謝大家的熱烈留言」這種客服腔。
+- 不要點名任何網友。
+- 台灣口語。`,
+    preferredModel: "qwen",
+    maxTokens: 650,
+    outputDefaults: { platform: "facebook", post_type: "comment" },
+  },
+  {
+    id: "fb-30-album-closeup-riff",
+    tier: "30s",
+    postType: "album",
+    label: { en: "Album: Our Own Close-Ups of a Trending Topic", zh: "FB 相簿：趁熱題推出自家近照組" },
+    description: { en: "When a topic is hot elsewhere, post your own version in close-ups", zh: "別人家的話題正熱時，拿出自己家的版本拍成近照組" },
+    agent_id: 60068, // 沿用 fb-60-album-4 的 agent
+    skill_slug: "social-copy",
+    source: {
+      type: "viral",
+      short: "故宮南院《龍藏經》近照組",
+      metric: "5 張近照破萬人按讚（FB／IG／Threads 同步發文，數字未分平台）",
+      asOf: "2026-07",
+      url: "https://www.ettoday.net/news/20260731/3210722.htm",
+      takeaway:
+        "別的地方的同類話題正熱時，拿出自家收藏的版本拍成 5 張近照，每張只給一個細節，配一句讓人想轉的梗（線上累積福報），不用追熱點本身也吃得到流量。",
+    },
+    primary_question: "最近哪個話題正熱？你們家有什麼跟它同類、但只有你們有的東西？",
+    primary_input: { key: "topic", placeholder: "例：大家在排隊買某款月餅 / 我們有一套用了 30 年的老模具", type: "textarea" },
+    inputs: [
+      { key: "topic", label: "正熱的話題 + 你們家同類的獨有東西", type: "textarea", required: true },
+    ],
+    systemPrompt: `你要寫一則 FB 相簿貼文（5 張近照），趁別處同類話題正熱，推出品牌自家的版本。
+
+相簿規劃（先寫）：
+- 5 張，每張只拍一個細節（近照、局部、材質、年份痕跡、手的動作），第 1 張是最有衝擊力的那一個細節。
+- 每張附一句圖說（15 字內），說這個細節是什麼、為什麼特別。
+
+貼文文字（120–250 字）：
+1. 第一句輕輕接上正熱的話題，但主角是自己家的東西——不要蹭別人的品牌名稱。
+2. 用 2–3 句講這東西的來歷（年份、誰做的、用了多久），要具體。
+3. 一句讓人想分享的梗或祝福（例：「看一張就累積一點福氣」），要跟這個東西有關，不能硬湊。
+4. 結尾邀請大家說出自己家有沒有類似的東西，或來現場看。
+
+硬規則：
+- 照片必須是真實拍攝，不要生成或 AI 修改；有後製就在文末註明。
+- 不要提及別的品牌或機構名稱。`,
+    preferredModel: "qwen",
+    maxTokens: 700,
+    outputDefaults: { platform: "facebook", post_type: "album" },
+  },
 ];
 
 // ─── Plan B Orchestra config (2026-05-05) ──────────────────────────────────
@@ -1293,6 +1593,77 @@ export const FB_30S_ORCHESTRA: Record<string, OrchestraConfig> = {
     variantLabels: ["指名接力版", "曬成果版", "限時共創版"],
     captionMinChars: 200,
     captionMaxChars: 400,
+  },
+  // ── 爆款結構卡・2026-09 近 3 個月案例 ────────────────────────────────
+  "fb-30-reel-character-series": {
+    variants: 3,
+    images: 3,
+    runImageGen: false,
+    imageDirectorId: MANDY_ID,
+    aspectRatio: "9:16",
+    variantLabels: ["誤會開場", "交換身分", "職場梗"],
+    captionMinChars: 60,
+    captionMaxChars: 150,
+  },
+  "fb-30-event-tiered-challenge": {
+    variants: 3,
+    images: 3,
+    runImageGen: false,
+    imageDirectorId: MANDY_ID,
+    aspectRatio: "1.91:1",
+    variantLabels: ["三級證書版", "限量獎版", "續辦加碼版"],
+    captionMinChars: 200,
+    captionMaxChars: 400,
+  },
+  "fb-30-ad-audience-split-test": {
+    variants: 3,
+    images: 3,
+    runImageGen: false,
+    imageDirectorId: MANDY_ID,
+    aspectRatio: "1.91:1",
+    variantLabels: ["處境開場", "結果開場", "問句開場"],
+    captionMinChars: 90,
+    captionMaxChars: 400,
+  },
+  "fb-30-feed-big-move-local": {
+    variants: 3,
+    images: 3,
+    runImageGen: false,
+    imageDirectorId: MANDY_ID,
+    aspectRatio: "1:1",
+    variantLabels: ["數字開場", "場景開場", "預告開場"],
+    captionMinChars: 150,
+    captionMaxChars: 300,
+  },
+  "fb-30-pinned-ritual-break": {
+    variants: 3,
+    images: 3,
+    runImageGen: false,
+    imageDirectorId: MANDY_ID,
+    aspectRatio: "1.91:1",
+    variantLabels: ["照常帶招牌", "刻意拿掉招牌", "新立招牌"],
+    captionMinChars: 120,
+    captionMaxChars: 280,
+  },
+  "fb-30-comment-callback": {
+    variants: 3,
+    images: 3,
+    runImageGen: false,
+    imageDirectorId: MANDY_ID,
+    aspectRatio: "1:1",
+    variantLabels: ["輕帶一句", "暗號版", "邀下一個梗"],
+    captionMinChars: 80,
+    captionMaxChars: 200,
+  },
+  "fb-30-album-closeup-riff": {
+    variants: 3,
+    images: 3,
+    runImageGen: false,
+    imageDirectorId: MANDY_ID,
+    aspectRatio: "1:1",
+    variantLabels: ["細節開場", "來歷開場", "祝福梗開場"],
+    captionMinChars: 120,
+    captionMaxChars: 250,
   },
 };
 

@@ -134,8 +134,8 @@ export default function PricingPage() {
           ? ["Brand positioning + 10 product positionings + 1 campaign positioning per month", "10 own task cards (saved to your Brand Task Library)", "Strategy workbench (three anchors → content angles)", "Strategy monitoring: alerts when your brand, products or competitors shift"]
           : ["品牌定位 ＋ 產品定位 10 個 ＋ 活動定位每月 1 次", "自建任務卡 10 張（存入品牌任務庫）", "策略工作台（三錨點推導內容角度）", "策略監測：品牌、產品與競爭者有變化時提醒調整"] },
         { label: isEn ? "Content" : "內容層", items: isEn
-          ? [`${CATALOG.viral} viral-structure cards + your own cards`, "Viral-structure cards refreshed monthly", "Scheduling, calendar and direct publishing to FB / IG"]
-          : [`爆款結構卡 ${CATALOG.viral} 張 ＋ 品牌自建卡`, "爆款結構卡每月更新", "排程、日曆與 FB／IG 直接發布"] },
+          ? ["Monthly viral-structure cards + your own cards", "Viral-structure cards refreshed monthly", "Scheduling, calendar and direct publishing to FB / IG"]
+          : [`每月更新的爆款結構卡 ＋ 品牌自建卡`, "爆款結構卡每月更新", "排程、日曆與 FB／IG 直接發布"] },
         { label: isEn ? "Performance" : "成效層", items: [isEn ? "Early preview + priority access to real connections (see below)" : "早期預覽 ＋ 優先加購真實串接（見下方加購）"] },
         { label: isEn ? "Also" : "其他", items: isEn
           ? ["Unlimited runs", "Campaign tasks included", "Review workflow"]
@@ -148,7 +148,7 @@ export default function PricingPage() {
   ];
 
   const faq: [string, string][] = isEn ? [
-    ["What is the difference between Basic and Professional?", `Capability, not volume. Both tiers have unlimited runs and campaign tasks. The difference is channels (2 vs 5), the ${CATALOG.viral} viral-structure cards (Professional only), product and campaign positioning, own task cards (3 vs 10) and seats (2 vs 5).`],
+    ["What is the difference between Basic and Professional?", `Capability, not volume. Both tiers have unlimited runs and campaign tasks. The difference is channels (2 vs 5), monthly viral-structure cards (Professional only), product and campaign positioning, own task cards (3 vs 10) and seats (2 vs 5).`],
     ["Why does Professional come with 5 seats?", "Because of the review workflow. The person producing and the person approving must be different people, otherwise review is a formality: marketer, ads specialist, performance analyst, mid-level manager (approves), owner (dashboard)."],
     ["Can I change my channels?", `Yes, once a month. You pick from ${CATALOG.channels} channels: Facebook, Instagram, Threads, LINE, TikTok, Email and Website (Basic 2, Professional 5).`],
     ["What is an own task card?", "Paste the output you actually want (say, 10 of your best promo posts); the AI reverse-engineers it into a SKILL, you approve a test write, and it goes into your Brand Task Library. Length, rhythm, opening and CTA placement are measured from your samples and later used as acceptance criteria."],
@@ -160,7 +160,7 @@ export default function PricingPage() {
     ["Can I get a company invoice?", "Yes. Add your tax ID and company name in Account settings → Invoice info; the next charge auto-issues a B2B e-invoice."],
     ["Single vs Pack vs Campaign tasks?", "Single = one fast output (1 variant). Pack = 5 caption variants + 5 images in parallel. Campaign = a research-first flow that produces a whole set of content."],
   ] : [
-    ["基礎和專業差在哪？", `差在能力，不在用量。執行次數兩級都不限、企劃任務兩級都開放；差別是通路數（2 vs 5）、爆款結構卡（${CATALOG.viral} 張，專業才有）、產品與活動定位、自建卡張數（3 vs 10）、席次（2 vs 5）。`],
+    ["基礎和專業差在哪？", `差在能力，不在用量。執行次數兩級都不限、企劃任務兩級都開放；差別是通路數（2 vs 5）、爆款結構卡（每月更新，專業才有）、產品與活動定位、自建卡張數（3 vs 10）、席次（2 vs 5）。`],
     ["為什麼專業方案是 5 席？", "因為有審核工作流。產出的人與放行的人必須分開，否則審核只是形式：行銷人員、廣告人員、成效人員、中階主管（審核放行）、負責人（看整體看板）。"],
     ["通路選了可以換嗎？", `可以，每月可更換一次，從 ${CATALOG.channels} 個通路（Facebook、Instagram、Threads、LINE、TikTok、電子報、官網）裡選：基礎 2 個、專業 5 個。`],
     ["自建任務卡是什麼？", "把你自己理想中的成品（例如 10 篇促購文）貼上來，AI 反推成 SKILL，試寫確認後上架，存入品牌任務庫。字數上下限、節奏、開場方式、CTA 位置全部從你貼的成品量出來，之後回頭當驗收標準。"],
@@ -211,7 +211,7 @@ export default function PricingPage() {
         {/* 封面四格 */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-px bg-neutral-200 border border-neutral-200 mb-12">
           {[
-            [isEn ? "Task cards" : "任務卡", isEn ? `${CATALOG.viral} viral-structure cards + your own` : `爆款結構卡 ${CATALOG.viral} 張 ＋ 品牌自建卡`],
+            [isEn ? "Task cards" : "任務卡", isEn ? "Monthly viral-structure cards + your own" : `每月更新的爆款結構卡 ＋ 品牌自建卡`],
             [isEn ? "Channels" : "支援通路", isEn ? `${CATALOG.channels}` : `${CATALOG.channels} 個`],
             [isEn ? "Self-serve plans" : "自助方案", `${sym}${price.starter.toLocaleString()} ／ ${sym}${price.pro.toLocaleString()} ${isEn ? "per month" : "每月"}`],
             [isEn ? "Consultant onboarding" : "顧問導入", isEn ? "from NT$80,000 (one-time)" : "NT$80,000 起（一次性）"],
@@ -427,10 +427,10 @@ export default function PricingPage() {
             hiCol={1}
             head={isEn ? ["Why this card is written this way", "Cards"] : ["這張卡憑什麼這樣寫", "張數"]}
             rows={isEn ? [
-              ["Viral structure — deconstructed from real viral content; each card carries the spread metric and the month measured", `${CATALOG.viral} (Professional)`],
+              ["Viral structure — deconstructed from real viral content; each card carries the spread metric and the month measured", "Refreshed monthly (Professional)"],
               ["Brand-built — reverse-engineered from the posts you paste; length, rhythm and CTA are measured from your samples", "3 / 10 (by plan)"],
             ] : [
-              ["爆款結構——拆自真實爆紅內容，每張附傳播數字與量測年月", `${CATALOG.viral}（專業方案）`],
+              ["爆款結構——拆自真實爆紅內容，每張附傳播數字與量測年月", "每月更新（專業方案）"],
               ["品牌自建——從你貼的成品反推，字數、節奏、CTA 位置都從範例量出來", "3／10（依方案）"],
             ]}
           />
@@ -452,14 +452,14 @@ export default function PricingPage() {
             head={isEn ? ["", "ChatGPT · Jasper", "Swipe files\nForeplay · Motion · Atria", "OnBrand"] : ["", "ChatGPT · Jasper", "素材庫\nForeplay · Motion · Atria", "OnBrand"]}
             rows={isEn ? [
               ["Writes it for you", "Yes", "No", "Yes"],
-              ["Can say where the structure comes from", "Gives you an answer\nbut changes it when asked twice", "Gives examples\nnot structures", `All ${CATALOG.viral} viral-structure cards`],
+              ["Can say where the structure comes from", "Gives you an answer\nbut changes it when asked twice", "Gives examples\nnot structures", "Every viral card links its reference article"],
               ["Writes the way your best posts are written", "Drifts", "No", "Brand-built cards, measured from your samples"],
               ["When the source was measured", "None", "None", "Every viral card carries the month"],
               ["Knows what your brand must not say", "No", "No", "Fact whitelist + banned words"],
               ["What you have after three years", "Nothing", "Nothing", "A Brand Task Library"],
             ] : [
               ["直接幫你寫出來", "可以", "不寫", "可以"],
-              ["說得出結構出自哪裡", "會給你一個答案\n但問第二次會改口", "給素材\n不給結構", `爆款結構卡 ${CATALOG.viral} 張全部說得出`],
+              ["說得出結構出自哪裡", "會給你一個答案\n但問第二次會改口", "給素材\n不給結構", "每張爆款結構卡都附參考文章"],
               ["照你最好的那幾篇的寫法寫", "會漂移", "不會", "品牌自建卡，從你的範例量出來"],
               ["出處什麼時候量的", "沒有", "沒有", "每張爆款卡印著年月"],
               ["知道你的品牌不能講什麼", "不知道", "不知道", "事實白名單＋禁用詞"],

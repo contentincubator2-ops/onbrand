@@ -3,7 +3,8 @@ import { cardPublishedItems } from "./notificationRouter";
 
 describe("notifications · card_published", () => {
   it("30 天內的上架日各合成一則，navUrl 指到 /tasks/<平台>?new=1，未看過就 unread", () => {
-    const now = new Date("2026-09-08T00:00:00Z");
+    // 2026-09-29：通知只算前台看得到的新卡（近 3 個月的爆款結構），所以日期要落在新卡上架之後。
+    const now = new Date("2026-09-30T00:00:00Z");
     const items = cardPublishedItems(now, new Date("2026-08-01T00:00:00Z"), false);
     expect(items.length).toBeGreaterThan(0);
     for (const it of items) {

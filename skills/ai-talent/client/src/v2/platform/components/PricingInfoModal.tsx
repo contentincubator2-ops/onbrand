@@ -63,13 +63,13 @@ function getPlans(lang: "zh-TW" | "en") {
       detail: en ? `1 brand · pick 5 of ${CATALOG.channels} channels (swap monthly)` : `1 個品牌 · ${CATALOG.channels} 個通路選 5（每月可更換）`,
       features: en ? [
         "Brand + 10 product + monthly campaign positioning · 10 own task cards",
-        `${CATALOG.viral} viral-structure cards (refreshed monthly) + your own cards`,
+        `Viral-structure cards (refreshed monthly) + your own cards`,
         "Unlimited runs · campaign tasks · review workflow",
         "Strategy monitoring: alerts when your brand, products or competitors shift",
         "Performance: early preview + priority access to real connections",
       ] : [
         "品牌 ＋ 產品 10 個 ＋ 活動每月 1 次定位 · 自建任務卡 10 張",
-        `爆款結構卡 ${CATALOG.viral} 張（每月更新）＋ 品牌自建卡`,
+        `每月更新的爆款結構卡 ＋ 品牌自建卡`,
         "執行次數不限 · 企劃任務開放 · 審核工作流",
         "策略監測：品牌、產品與競爭者有變化時提醒調整",
         "成效層：早期預覽 ＋ 優先加購真實串接",

@@ -5,7 +5,7 @@
  * `npm run cards:dates` 重新產生並一起 commit；taskCardDates.test.ts 會確認
  * 目錄裡每一張卡都查得到日期。
  *
- * 產生時間：2026-09-10，463 個 id。
+ * 產生時間：2026-09-29，470 個 id。
  */
 export const TASK_CARD_DATES: Record<string, string> = {
   "apply": "2026-04-26",
@@ -108,25 +108,32 @@ export const TASK_CARD_DATES: Record<string, string> = {
   "fb-100-offer-first": "2026-05-06",
   "fb-100-quarterly-strategy": "2026-05-06",
   "fb-100-reels-full": "2026-05-06",
+  "fb-30-ad-audience-split-test": "2026-09-29",
   "fb-30-ad-cta": "2026-05-06",
   "fb-30-ad-description": "2026-05-06",
   "fb-30-ad-headline": "2026-05-06",
   "fb-30-ad-primary": "2026-05-06",
   "fb-30-ad-viral-monologue": "2026-09-05",
+  "fb-30-album-closeup-riff": "2026-09-29",
   "fb-30-album-period-recap": "2026-09-05",
   "fb-30-caption-short": "2026-05-05",
   "fb-30-carousel-data-recap": "2026-09-05",
+  "fb-30-comment-callback": "2026-09-29",
   "fb-30-comment-reply": "2026-05-05",
   "fb-30-comment-signal-boost": "2026-09-05",
   "fb-30-countdown-1day": "2026-05-05",
   "fb-30-crisis-reply-short": "2026-05-05",
   "fb-30-event-challenge": "2026-09-05",
+  "fb-30-event-tiered-challenge": "2026-09-29",
+  "fb-30-feed-big-move-local": "2026-09-29",
   "fb-30-hashtag-set": "2026-05-05",
   "fb-30-link-caption": "2026-05-05",
   "fb-30-live-title": "2026-05-05",
+  "fb-30-pinned-ritual-break": "2026-09-29",
   "fb-30-pinned-short": "2026-05-05",
   "fb-30-pinned-stance": "2026-09-05",
   "fb-30-pure-text-hook": "2026-05-05",
+  "fb-30-reel-character-series": "2026-09-29",
   "fb-30-reel-self-roast": "2026-09-05",
   "fb-30-story-serial-event": "2026-09-05",
   "fb-30-story-text": "2026-05-05",

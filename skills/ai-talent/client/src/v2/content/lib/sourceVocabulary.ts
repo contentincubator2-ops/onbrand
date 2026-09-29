@@ -41,6 +41,10 @@ export interface TaskSource {
   metric?: string;
   /** 這個數字量測的年月 YYYY-MM，只有 viral 有（server 端強制必填）。 */
   asOf?: string;
+  /** 報導這個數字的參考文章（2025 年以後量測的爆款卡必填）。 */
+  url?: string;
+  /** 原始貼文連結（找得到才有）。 */
+  postUrl?: string;
 }
 
 export interface SourceVocabEntry {
@@ -183,15 +187,40 @@ export function sourcePillText(s: unknown, lang: string): string {
  *
  *   own   ＝ 品牌自建（用戶自己建的卡 ownCardId；品牌客製包 brand-method 也算，
  *           那是替這個品牌做的卡）
- *   viral ＝ 爆款結構
+ *   viral ＝ 爆款結構（只算近 3 個月量測的，見 isRecentViral）
  */
 export type FrontCardKind = "viral" | "own";
 export const FRONT_CARD_KINDS: readonly FrontCardKind[] = ["viral", "own"];
 
-export function frontCardKind(task: unknown): FrontCardKind | null {
+/**
+ * 2026-09-29 CJ「爆款結構，至少要是當月的，不能太久以前的」，後來因為當月 FB 案例太少改成
+ * 「視窗放寬到近 3 個月」：前台只列 source.asOf 落在「台北時間的本月＋前兩個月」的爆款卡，
+ * 月份一滑出去就自動下架。舊卡後端照留（本週企劃、策略會議仍會用），只是任務頁、
+ * 選卡器、張數都不算。server 端 taskSource.isRecentViral 是同一條規則。
+ */
+export const VIRAL_WINDOW_MONTHS = 3;
+export function currentYm(now: Date = new Date()): string {
+  // sv-SE 的日期格式是 YYYY-MM-DD；用台北時區，月底晚上不會提早換月。
+  return now.toLocaleDateString("sv-SE", { timeZone: "Asia/Taipei" }).slice(0, 7);
+}
+
+/** 視窗最早的年月（含）。例：2026-09 → 2026-07。 */
+export function viralWindowStart(now: Date = new Date()): string {
+  const [y, m] = currentYm(now).split("-").map(Number);
+  const idx = y! * 12 + (m! - 1) - (VIRAL_WINDOW_MONTHS - 1);
+  return `${Math.floor(idx / 12)}-${String((idx % 12) + 1).padStart(2, "0")}`;
+}
+
+export function isRecentViral(source: unknown, now: Date = new Date()): boolean {
+  const s = source as any;
+  if (s?.type !== "viral" || typeof s?.asOf !== "string") return false;
+  return s.asOf >= viralWindowStart(now) && s.asOf <= currentYm(now);
+}
+
+export function frontCardKind(task: unknown, now: Date = new Date()): FrontCardKind | null {
   const t = task as any;
   if (t?.ownCardId || t?.source?.type === "brand-method") return "own";
-  if (t?.source?.type === "viral") return "viral";
+  if (isRecentViral(t?.source, now)) return "viral";
   return null;
 }
 

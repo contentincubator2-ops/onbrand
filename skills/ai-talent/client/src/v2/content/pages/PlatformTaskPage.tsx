@@ -2057,15 +2057,15 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
           {/* 結構來源篩選 —— 只列出這個頻道實際存在的類型，避免一排點不動的空篩選。
               與上面的 tier 分頁是兩條獨立的軸：一條問「產出多大」，一條問「憑什麼這樣寫」。 */}
           {(() => {
-            const present = new Set<FrontCardKind>();
+            // 2026-09-29 CJ「已經沒有品牌自建和爆款結構兩個 chips」：兩類一律列出並附張數，
+            // 就算其中一類是 0 張——0 張的「品牌自建」正是要引導用戶去建卡的入口。
+            const counts: Record<FrontCardKind, number> = { viral: 0, own: 0 };
             for (const t of shownTasks) {
-              if (platform && (t as any).platform && (t as any).platform !== platform) continue;
+              if (inferPlatform(t) !== platform) continue;
               const k = frontCardKind(t);
-              if (k) present.add(k);
+              if (k) counts[k] += 1;
             }
-            const types = FRONT_CARD_KINDS.filter((t) => present.has(t));
-            if (types.length < 2) return null;   // 只有一種類型就不必給篩選
-            const tabs: Array<FrontCardKind | "all"> = ["all", ...types];
+            const tabs: Array<FrontCardKind | "all"> = ["all", ...FRONT_CARD_KINDS];
             return (
               <div className="mt-3 flex items-center gap-1.5 flex-wrap justify-center">
                 {tabs.map((id) => {
@@ -2091,7 +2091,7 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                       )}
                       {id === "all"
                         ? (lang === "en" ? "All" : "全部")
-                        : frontCardKindLabel(id, lang)}
+                        : `${frontCardKindLabel(id, lang)} ${counts[id]}`}
                     </button>
                   );
                 })}
@@ -2181,9 +2181,13 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                 <>
                   <FontAwesomeIcon icon={faPlus} className="text-2xl mb-2 text-default-300" />
                   <p className="font-semibold mb-1">
-                    {lang === "en"
-                      ? `No preset cards in ${activeCategoryLabel ?? meta.label} yet`
-                      : `「${activeCategoryLabel ?? meta.labelZh}」目前還沒有預設任務卡`}
+                    {activeSource === "own"
+                      ? (lang === "en" ? `No brand-built ${meta.label} cards yet` : `還沒有 ${meta.labelZh} 的品牌自建卡`)
+                      : activeSource === "viral"
+                        ? (lang === "en" ? `No viral-structure cards in ${activeCategoryLabel ?? meta.label} yet` : `「${activeCategoryLabel ?? meta.labelZh}」目前還沒有爆款結構卡`)
+                        : (lang === "en"
+                          ? `No preset cards in ${activeCategoryLabel ?? meta.label} yet`
+                          : `「${activeCategoryLabel ?? meta.labelZh}」目前還沒有預設任務卡`)}
                   </p>
                   {/* 2026-09-29：前台只列爆款結構＋品牌自建，基礎方案看不到爆款卡——
                       講清楚空的原因，不要讓用戶以為壞了。 */}

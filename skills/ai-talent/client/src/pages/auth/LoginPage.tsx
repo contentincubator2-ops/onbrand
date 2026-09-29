@@ -144,13 +144,13 @@ export default function LoginPage() {
         ["01", "Brand Brain", "Lock your positioning once. Every post stays on-brand."],
         ["02", "Content Tiers", "A single post · a content pack · a full campaign."],
         ["03", "7-Day Publisher", "Schedule a whole week across channels in one click."],
-        ["04", "Sourced", `${CATALOG.viral} viral-structure cards, each with its spread metric and the month measured.`],
+        ["04", "Sourced", `Viral-structure cards refreshed monthly, each with its spread metric, measurement month and reference article.`],
       ]
     : [
         ["01", "品牌大腦", "鎖定一次品牌定位 · 每篇貼文自動 on-brand"],
         ["02", "三種規格", "單篇內容 · 內容套組 · 完整企劃"],
         ["03", "七日發布台", "一次排好 7 天 × 全平台內容"],
-        ["04", "有出處", `爆款結構卡 ${CATALOG.viral} 張，每張附傳播數字與量測年月`],
+        ["04", "有出處", `每月更新的爆款結構卡，每張附傳播數字、量測年月與參考文章`],
       ];
 
   return (
