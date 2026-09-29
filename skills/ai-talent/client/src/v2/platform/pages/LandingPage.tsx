@@ -102,8 +102,8 @@ export default function LandingPage() {
     m.setAttribute(
       "content",
       en
-        ? `Lock your brand positioning once. Every caption stays on-brand. Brand Brain · Single/Pack/Campaign · 7-Day Publisher · ${CATALOG.viral} viral-structure cards + your own brand-built cards.`
-        : `鎖定一次品牌定位，每篇貼文自動 on-brand。品牌大腦 · 單篇/套組/企劃 · 七日發布台 · 爆款結構卡 ${CATALOG.viral} 張 ＋ 品牌自建卡。`,
+        ? `Lock your brand positioning once. Every caption stays on-brand. Brand Brain · Single/Pack/Campaign · 7-Day Publisher · monthly-refreshed viral-structure cards + your own brand-built cards.`
+        : `鎖定一次品牌定位，每篇貼文自動 on-brand。品牌大腦 · 單篇/套組/企劃 · 七日發布台 · 每月更新的爆款結構卡 ＋ 品牌自建卡。`,
     );
     return () => {
       dead = true;
@@ -115,7 +115,7 @@ export default function LandingPage() {
   const STATS = en
     ? [
         ["16,113", "AI Marketing Agents"],
-        [`${CATALOG.viral}`, "Viral-Structure Cards"],
+        ["Monthly", "Viral-Structure Refresh"],
         ["711", "Specialized Squads"],
         ["2,526", "Skill Modules"],
         ["60", "Award Cases"],
@@ -124,7 +124,7 @@ export default function LandingPage() {
       ]
     : [
         ["16,113", "個 AI 行銷專家"],
-        [`${CATALOG.viral}`, "張爆款結構卡"],
+        ["每月", "更新爆款結構卡"],
         ["711", "個專屬軍團"],
         ["2,526", "個技能模組"],
         ["60", "個得獎案例"],
@@ -138,13 +138,13 @@ export default function LandingPage() {
         ["01", "Brand Brain", "Lock your positioning once. Every post stays on-brand."],
         ["02", "Content Tiers", "A single post · a content pack · a full campaign."],
         ["03", "7-Day Publisher", "Schedule a whole week across channels in one click."],
-        ["04", "Sourced", `${CATALOG.viral} viral-structure cards, each with its spread metric and the month measured.`],
+        ["04", "Sourced", `Viral-structure cards refreshed monthly, each with its spread metric, measurement month and reference article.`],
       ]
     : [
         ["01", "品牌大腦", "鎖定一次品牌定位 · 每篇貼文自動 on-brand"],
         ["02", "三種規格", "單篇內容 · 內容套組 · 完整企劃"],
         ["03", "七日發布台", "一次排好 7 天 × 全平台內容"],
-        ["04", "有出處", `爆款結構卡 ${CATALOG.viral} 張，每張附傳播數字與量測年月`],
+        ["04", "有出處", `每月更新的爆款結構卡，每張附傳播數字、量測年月與參考文章`],
       ];
 
   return (
@@ -262,8 +262,8 @@ export default function LandingPage() {
               style={{ color: C.ink }}
             >
               {en
-                ? `Agent: 16,113 AI experts · Skill: ${CATALOG.viral} viral-structure cards + your brand-built cards · Data: your locked Brand Brain`
-                : `Agent：16,113 個 AI 專家 · Skill：爆款結構卡 ${CATALOG.viral} 張 ＋ 品牌自建卡 · Data：你鎖定的品牌大腦`}
+                ? `Agent: 16,113 AI experts · Skill: monthly viral-structure cards + your brand-built cards · Data: your locked Brand Brain`
+                : `Agent：16,113 個 AI 專家 · Skill：每月更新的爆款結構卡 ＋ 品牌自建卡 · Data：你鎖定的品牌大腦`}
             </p>
             <p
               className="text-[15px] leading-[1.75] mb-8 max-w-[540px]"
@@ -554,7 +554,7 @@ function FAQSection({ en }: { en: boolean }) {
         },
         {
           q: "What kinds of task cards are there?",
-          a: `Two. ${CATALOG.viral} viral-structure cards are deconstructed from real viral content, each with the spread metric and the month measured (Professional plan). Brand-built cards are reverse-engineered from the posts you paste — length, rhythm and CTA placement are measured from your samples. The publishing check is hard: a viral card that cannot produce its numbers fails the automated tests.`,
+          a: `Two. Viral-structure cards are deconstructed from this month's real viral content, each with the spread metric, measurement month and reference article, refreshed monthly (Professional plan). Brand-built cards are reverse-engineered from the posts you paste — length, rhythm and CTA placement are measured from your samples. The publishing check is hard: a viral card that cannot produce its numbers fails the automated tests.`,
         },
       ]
     : [
@@ -584,7 +584,7 @@ function FAQSection({ en }: { en: boolean }) {
         },
         {
           q: "任務卡有哪幾種？",
-          a: `兩種。爆款結構卡 ${CATALOG.viral} 張，拆自真實爆紅內容，每張附傳播數字與量測年月（專業方案）；品牌自建卡從你貼的成品反推，字數、節奏、CTA 位置都從範例量出來。上架檢核是硬性的：交不出數字的爆款卡，自動化測試直接擋掉。`,
+          a: `兩種。爆款結構卡拆自當月真實爆紅內容，每張附傳播數字、量測年月與參考文章，每月更新（專業方案）；品牌自建卡從你貼的成品反推，字數、節奏、CTA 位置都從範例量出來。上架檢核是硬性的：交不出數字的爆款卡，自動化測試直接擋掉。`,
         },
       ];
 

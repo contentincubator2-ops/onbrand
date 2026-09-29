@@ -684,10 +684,10 @@ export const NUDGE_CATALOG = {
     message: {
       "zh-TW":
         "你剛看的這個得獎案例——你知道它的工藝其實已經內建在哪個任務嗎？我可以告訴你。" +
-        `爆款結構卡 ${CATALOG.viral} 張每張都說得出結構出處，這是 OnBrand 跟其他 AI 工具最大的差別。`,
+        `每一張爆款結構卡都說得出結構出處，這是 OnBrand 跟其他 AI 工具最大的差別。`,
       en:
         "That award case you just viewed — did you know its craft is already " +
-        `encoded in one of our tasks? Ask me which one. All ${CATALOG.viral} of our viral-structure cards ` +
+        `encoded in one of our tasks? Ask me which one. Every one of our viral-structure cards ` +
         "state where their structure comes from — that's OnBrand's deepest difference.",
     },
   },

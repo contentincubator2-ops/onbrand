@@ -88,7 +88,7 @@ export default function CardDetailDrawer({ taskId, lang, onClose, onRun }: Props
     : { data: null, isLoading: false, error: null };
   const d = q.data as any;
   const src = resolveSource(d?.source);
-  const full = (d?.source ?? {}) as { short?: string; takeaway?: string; metric?: string; asOf?: string };
+  const full = (d?.source ?? {}) as { short?: string; takeaway?: string; metric?: string; asOf?: string; url?: string; postUrl?: string };
   const age = daysSince(d?.addedAt);
   const isNew = isRecentCard(d?.addedAt);
   const srcAgeMonths = full.asOf
@@ -192,6 +192,21 @@ export default function CardDetailDrawer({ taskId, lang, onClose, onRun }: Props
                             {en ? `measured ${full.asOf}` : `${full.asOf} 量測`}
                             {stale && (en ? " · worth re-checking" : " · 已一年以上，建議重看")}
                           </span>
+                        )}
+                      </p>
+                    )}
+                    {/* 2026-09-29（CJ「要有參考文章的連結」）：數字要能點過去自己核對。 */}
+                    {(full.url || full.postUrl) && (
+                      <p className="mt-2 flex flex-wrap gap-x-4 gap-y-1 border-t border-neutral-200 pt-2 text-[13px]">
+                        {full.url && (
+                          <a href={full.url} target="_blank" rel="noopener noreferrer" className="font-medium text-neutral-900 underline underline-offset-2 hover:text-neutral-600">
+                            {en ? "Reference article ↗" : "參考文章 ↗"}
+                          </a>
+                        )}
+                        {full.postUrl && (
+                          <a href={full.postUrl} target="_blank" rel="noopener noreferrer" className="font-medium text-neutral-900 underline underline-offset-2 hover:text-neutral-600">
+                            {en ? "Original post ↗" : "原始貼文 ↗"}
+                          </a>
                         )}
                       </p>
                     )}

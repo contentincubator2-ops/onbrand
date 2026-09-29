@@ -84,7 +84,37 @@ export interface TaskSource {
    * 這張卡如果離不開某個特定音樂或梗，它就不該是 viral。
    */
   asOf?: string;
+  /**
+   * 2026-09-29（CJ「要有更新時間，也要有參考文章的連結」）：報導這個數字的文章。
+   * 看卡的人要能自己點過去核對，數字才可信。2026-07 起量測的 viral 卡必填
+   * （validateTaskSource 擋）；更早的舊卡還沒補，逐步回填。
+   */
+  url?: string;
+  /** 原始貼文（找得到才填）。 */
+  postUrl?: string;
 }
+
+/**
+ * 2026-09-29 CJ「爆款結構至少要是當月的」→ 因當月 FB 案例太少改為「近 3 個月」，
+ * 滑出視窗自動下架：前台只列 asOf 落在台北時間本月＋前兩個月的爆款卡
+ * （client sourceVocabulary.isRecentViral 是同一條規則）。
+ */
+export const VIRAL_WINDOW_MONTHS = 3;
+export function currentYmTaipei(now: Date = new Date()): string {
+  return now.toLocaleDateString("sv-SE", { timeZone: "Asia/Taipei" }).slice(0, 7);
+}
+export function viralWindowStart(now: Date = new Date()): string {
+  const [y, m] = currentYmTaipei(now).split("-").map(Number);
+  const idx = y! * 12 + (m! - 1) - (VIRAL_WINDOW_MONTHS - 1);
+  return `${Math.floor(idx / 12)}-${String((idx % 12) + 1).padStart(2, "0")}`;
+}
+export function isRecentViral(s: TaskSource | null | undefined, now: Date = new Date()): boolean {
+  if (s?.type !== "viral" || !s.asOf) return false;
+  return s.asOf >= viralWindowStart(now) && s.asOf <= currentYmTaipei(now);
+}
+
+/** 從這個年月起量測的爆款卡，必須附參考文章連結。 */
+export const VIRAL_URL_REQUIRED_FROM = "2026-07";
 
 /** 未標記的卡一律視為長青公式。不猜、不編。 */
 export const DEFAULT_TASK_SOURCE: TaskSource = { type: "evergreen" };
@@ -111,6 +141,13 @@ export function validateTaskSource(s: TaskSource): string | null {
     if (!s.asOf || !/^\d{4}-(0[1-9]|1[0-2])$/.test(s.asOf)) {
       return `source.type="viral" 必須填 asOf（測量年月 YYYY-MM），現值：${s.asOf ?? "（空）"}`;
     }
+    if (s.asOf >= VIRAL_URL_REQUIRED_FROM && !s.url) {
+      return `source.type="viral" 且 asOf ≥ ${VIRAL_URL_REQUIRED_FROM} 必須填 url（參考文章連結）`;
+    }
+  }
+  for (const k of ["url", "postUrl"] as const) {
+    const v = s[k];
+    if (v !== undefined && !/^https:\/\/\S+$/.test(v)) return `source.${k} 必須是 https:// 開頭的完整網址，現值：${v}`;
   }
   return null;
 }

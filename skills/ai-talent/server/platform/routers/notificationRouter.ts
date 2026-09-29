@@ -18,6 +18,7 @@ import { router, protectedProcedure } from "../core/trpc";
 import localPool from "../../localDb";
 import { recentCatalogCards } from "../../content/core/taskCatalogIndex";
 import { isHiddenContentPlatform, isHiddenHistoryItem } from "../core/planGate";
+import { isRecentViral } from "../../content/core/taskSource";
 
 export interface NotificationItem {
   id: string;
@@ -63,7 +64,7 @@ export function cardPublishedItems(now: Date, lastSeen: Date, isEn: boolean): No
   // 2026-09-29 CJ：前台只列爆款結構＋品牌自建、只留五個通路——通知只算用戶
   // 在任務頁真的看得到的新卡，不然「上架 10 張」點進去一張都找不到。
   for (const c of recentCatalogCards(30, now)) {
-    if (isHiddenContentPlatform(c.platform) || c.source.type !== "viral") continue;
+    if (isHiddenContentPlatform(c.platform) || !isRecentViral(c.source, now)) continue;
     const day = c.addedAt!;
     const m = byDay.get(day) ?? new Map<string, number>();
     m.set(c.platform, (m.get(c.platform) ?? 0) + 1);

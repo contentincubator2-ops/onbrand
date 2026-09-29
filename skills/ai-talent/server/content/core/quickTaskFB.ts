@@ -859,6 +859,143 @@ caption 直接列出這 10-15 個 hashtag 本身（每個 # 前綴 + 空格分�
     maxTokens: 700,
     outputDefaults: { platform: "facebook", post_type: "event" },
   },
+  // ── 爆款結構卡・2026-09 近 3 個月案例（CJ 2026-09-29）────────────────────
+  // 規則：FB 上的真實案例、近 3 個月量測、數字要出現在附上的參考文章裡（source.url）。
+  // 前台只列近 3 個月的爆款卡，月份滑出去就自動下架，所以這批卡每月要換。
+  {
+    id: "fb-30-reel-character-series",
+    tier: "30s",
+    postType: "reel",
+    label: { en: "Reel: Recurring Character Mini-Drama", zh: "FB Reels：固定角色短劇" },
+    description: { en: "A recurring character turns dry know-how into episodes", zh: "讓一個固定角色把枯燥的本業演成連續短劇" },
+    agent_id: 60033, // 沿用短影音腳本 agent
+    skill_slug: "short-video-script",
+    source: {
+      type: "viral",
+      short: "億家水電 AI 水電工「江澈」",
+      metric: "9/8 首支短劇破百萬觀看；單支近千萬瀏覽（FB＋IG 合計）",
+      asOf: "2026-09",
+      url: "https://www.mirrormedia.mg/story/20260922hea03",
+      takeaway:
+        "專業貼文只有兩位數瀏覽，交給一個有反差設定的固定角色演成短劇，粉絲追的是角色，本業變成劇情裡解決問題的那一刻。",
+    },
+    primary_question: "你的本業是什麼？客人最常遇到的一個麻煩是什麼？",
+    primary_input: { key: "topic", placeholder: "例：水電修繕／客人最怕半夜漏水找不到人", type: "textarea" },
+    inputs: [
+      { key: "topic", label: "本業 + 客人最常遇到的麻煩", type: "textarea", required: true },
+    ],
+    systemPrompt: `你要寫的是一集 FB Reels 短劇腳本（60–150 秒），主角是這個品牌的「固定角色」。
+
+先定角色（每集沿用，同一個人）：
+- 一個跟本業綁在一起的人物：職業就是品牌的本業。
+- 一個反差：外型、口音或個性，跟大家對這個行業的刻板印象不一樣。
+- 一句口頭禪，每集都會出現。
+
+這一集的結構（照順序）：
+1. 開場 3 秒：直接進衝突情境（誤會、搞錯、突發狀況），不要自我介紹。
+2. 中段：生活化的小故事，笑點來自角色的反差或直男／職場梗。
+3. 高潮：角色用本業的專業把問題解決——這是全片唯一出現「本業」的地方，要具體到一個真實做法。
+4. 收尾：一句口頭禪＋留一個下一集的鉤子（「下次遇到○○再找我」）。
+
+硬規則：
+- 不要推銷、不要報價、不要「歡迎來電」。品牌只在片尾字幕低調出現一次。
+- 用台灣口語，台詞短，一句不超過 15 字。
+- 輸出分鏡：每個鏡頭寫「畫面／台詞／字幕」。
+- caption 另寫 60–150 字，像角色本人在說話，最後一句邀請大家留言想看的下一集情境。`,
+    preferredModel: "qwen",
+    maxTokens: 900,
+    outputDefaults: { platform: "facebook", post_type: "reel" },
+  },
+  {
+    id: "fb-30-event-tiered-challenge",
+    tier: "30s",
+    postType: "event",
+    label: { en: "Event: Tiered Weekly Challenge", zh: "FB 活動：分級挑戰＋限量獎" },
+    description: { en: "Weekly tasks, tiered badges, a capped prize", zh: "每週小任務、分級證書、限量實體獎" },
+    agent_id: 30016, // 沿用 fb-60-launch-kit 的 agent
+    skill_slug: "fb-copywriting",
+    source: {
+      type: "viral",
+      short: "運動部「揮汗有禮」",
+      metric: "上線兩週突破 300 萬筆運動紀錄上限",
+      asOf: "2026-09",
+      url: "https://www.setn.com/news/1908542",
+      takeaway:
+        "把一次性的報名拆成每週可完成的小任務，依完成週數給銅／銀／金等級，最高級再加限量實體獎，名額滿了再宣布續辦，一檔活動就有兩波聲量。",
+    },
+    primary_question: "你想讓大家連續做什麼？能給什麼獎勵？",
+    primary_input: { key: "topic", placeholder: "例：連續 4 週每週帶自己的杯子來店 / 獎勵：金級送年度招待券 100 名", type: "textarea" },
+    inputs: [
+      { key: "topic", label: "要大家連續做的事 + 獎勵與名額", type: "textarea", required: true },
+    ],
+    systemPrompt: `你要寫一則發起「分級挑戰」的 FB 活動貼文。
+
+活動設計（貼文裡要講清楚）：
+1. 每週一個低門檻任務：一句話說完、當週做得到、不用花錢。
+2. 分級：完成 1 週／2–3 週／全部週數，分別拿到不同等級（例：銅／銀／金）。等級名稱要有面子。
+3. 最高等級加一個限量實體獎，寫出名額；超過名額就抽籤——寫清楚。
+4. 參加方式與截止日期明確到日期。
+
+貼文結構：
+- 第一句：這幾週要一起做什麼（動作，不是理念）。
+- 中段：怎麼參加、分級規則、限量獎與名額。
+- 結尾：一句話說為什麼值得一起做，具體，不要口號；邀請留言「+1 我要參加」。
+
+硬規則：
+- 不設購買門檻。
+- 名額、期限都要是數字。
+- 200–400 字。`,
+    preferredModel: "qwen",
+    maxTokens: 700,
+    outputDefaults: { platform: "facebook", post_type: "event" },
+  },
+  {
+    id: "fb-30-ad-audience-split-test",
+    tier: "30s",
+    postType: "ad",
+    label: { en: "Ad: One Message, Two Audiences", zh: "FB 廣告：一支素材兩組受眾對照" },
+    adFormats: ["image", "video"],
+    description: { en: "Same creative, manual vs Advantage+ audience, one metric", zh: "同一支素材跑人工受眾與自動受眾，用一個指標決勝" },
+    agent_id: 224114, // Ivy Kuo — FB Ad Copy
+    skill_slug: "fb-ad-copy",
+    source: {
+      type: "viral",
+      short: "NAR × Havas（2026 Meta 代理商獎）",
+      metric: "43.2 萬次著陸頁瀏覽；每次瀏覽成本 -29%、總花費 -25%",
+      asOf: "2026-09",
+      url: "https://www.nar.realtor/newsroom/nar-wins-metas-2026-agency-award-for-best-use-of-automation",
+      takeaway:
+        "同一支核心訊息素材，一組用人工受眾、一組交給 Advantage+ 自動受眾，只比一個指標（每次著陸頁瀏覽成本），跑完就把預算移到贏的那組。",
+    },
+    primary_question: "這支廣告要讓誰做什麼？你現在怎麼設定受眾？",
+    primary_input: { key: "topic", placeholder: "例：首購族來預約看屋 / 目前鎖定 25–40 歲、有興趣：房地產", type: "textarea" },
+    inputs: [
+      { key: "topic", label: "廣告目標 + 目前的受眾設定", type: "textarea", required: true },
+    ],
+    systemPrompt: `你要產出一組「一支素材、兩組受眾對照」的 FB 廣告。
+
+產出兩部分：
+
+A. 廣告文案（兩組共用同一支素材，文案一字不差）
+- 主要文字：第一句點出對象的處境（誰＋他現在的卡點），第二句給品牌能做的一件事，第三句一個明確動作。90–150 字。
+- 標題：12 字內，講結果不講品牌。
+- 說明：20 字內。
+- 行動呼籲按鈕：從 Meta 標準按鈕裡選一個最合適的（例如「瞭解詳情」「立即預約」）。
+
+B. 對照測試設定（給投手看，條列）
+- A 組：沿用用戶現在的人工受眾設定（照用戶輸入寫）。
+- B 組：Advantage+ 自動受眾，只給年齡下限與地區，其他交給系統。
+- 唯一比較指標：每次著陸頁瀏覽成本（不要同時比好幾個）。
+- 測試期與預算分配：兩組同預算、至少跑 7 天。
+- 勝出規則：一句話寫清楚怎麼判定、判定後預算怎麼移。
+
+硬規則：
+- 兩組素材與文案完全相同，差別只在受眾——否則對照沒有意義。
+- 禁止形容詞堆疊（頂級／極致／完美／領先）。`,
+    preferredModel: "qwen",
+    maxTokens: 800,
+    outputDefaults: { platform: "facebook", post_type: "ad" },
+  },
 ];
 
 // ─── Plan B Orchestra config (2026-05-05) ──────────────────────────────────
@@ -1292,6 +1429,37 @@ export const FB_30S_ORCHESTRA: Record<string, OrchestraConfig> = {
     aspectRatio: "1.91:1",
     variantLabels: ["指名接力版", "曬成果版", "限時共創版"],
     captionMinChars: 200,
+    captionMaxChars: 400,
+  },
+  // ── 爆款結構卡・2026-09 近 3 個月案例 ────────────────────────────────
+  "fb-30-reel-character-series": {
+    variants: 3,
+    images: 3,
+    runImageGen: false,
+    imageDirectorId: MANDY_ID,
+    aspectRatio: "9:16",
+    variantLabels: ["誤會開場", "交換身分", "職場梗"],
+    captionMinChars: 60,
+    captionMaxChars: 150,
+  },
+  "fb-30-event-tiered-challenge": {
+    variants: 3,
+    images: 3,
+    runImageGen: false,
+    imageDirectorId: MANDY_ID,
+    aspectRatio: "1.91:1",
+    variantLabels: ["三級證書版", "限量獎版", "續辦加碼版"],
+    captionMinChars: 200,
+    captionMaxChars: 400,
+  },
+  "fb-30-ad-audience-split-test": {
+    variants: 3,
+    images: 3,
+    runImageGen: false,
+    imageDirectorId: MANDY_ID,
+    aspectRatio: "1.91:1",
+    variantLabels: ["處境開場", "結果開場", "問句開場"],
+    captionMinChars: 90,
     captionMaxChars: 400,
   },
 };

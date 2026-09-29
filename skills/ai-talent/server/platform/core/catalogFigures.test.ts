@@ -10,6 +10,7 @@ import { describe, expect, it } from "vitest";
 import { buildTaskCatalogIndex } from "../../content/core/taskCatalogIndex";
 import { CATALOG_FIGURES } from "./catalogFigures";
 import { isHiddenContentPlatform } from "./planGate";
+import { VIRAL_URL_REQUIRED_FROM } from "../../content/core/taskSource";
 
 const ROOT = resolve(__dirname, "../../..");
 
@@ -22,12 +23,13 @@ function readClientFigures(): Record<string, number> {
 }
 
 describe("catalogFigures 對得上真實任務卡目錄", () => {
-  // 2026-09-29：對外只宣稱前台看得到的——五個內容通路的爆款結構卡。
+  // 2026-09-29：爆款卡只列當月、每月換，張數不再寫進文案；這裡只鎖通路數。
   const FRONT_CHANNELS = new Set(["facebook", "instagram", "threads", "line", "tiktok", "email", "website"]);
   const all = buildTaskCatalogIndex().filter((t) => FRONT_CHANNELS.has(t.platform));
 
-  it("爆款結構卡張數", () => {
-    expect(all.filter((t) => t.source.type === "viral").length).toBe(CATALOG_FIGURES.viral);
+  it("2026-07 起量測的爆款卡都附參考文章", () => {
+    const missing = all.filter((t) => t.source.type === "viral" && (t.source.asOf ?? "") >= VIRAL_URL_REQUIRED_FROM && !t.source.url);
+    expect(missing.map((t) => t.id)).toEqual([]);
   });
 
   it("前台通路沒有一個是被下架的", () => {

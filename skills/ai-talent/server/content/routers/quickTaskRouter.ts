@@ -987,6 +987,7 @@ import localPool from "../../localDb";
 import { loadAgentKnowledge, loadAgentKnowledgeMany, withAgentKnowledge } from "../../platform/core/agentKnowledge";
 // 2026-05-18 (CJ「media to copy」): photo/video/doc media task catalog
 import { MEDIA_PHOTO_TASKS, MEDIA_VIDEO_TASKS, MEDIA_DOC_TASKS } from "../core/quickTaskMedia";
+import { isRecentViral } from "../core/taskSource";
 
 function tryParseJson(s: string): any | null {
   if (!s) return null;
@@ -1260,7 +1261,7 @@ export const quickTaskRouter = router({
       // 數字不能寫死在前端 —— 卡片會增加，寫死的數字第二天就是錯的。
       const viralLocked = quota.viralTaskCards === false
         ? (cat as any[]).filter((t) =>
-            t.platform === input.platform && t.source?.type === "viral").length
+            t.platform === input.platform && isRecentViral(t.source)).length
         : 0;
       return {
         stored: storedTray(positioning, input.platform),

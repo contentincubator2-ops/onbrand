@@ -138,6 +138,10 @@ export const FB_TASK_FORMAT_MAP: Record<string, FBActiveFormat> = {
   // ── 活動 ──────────────────────────────────────────────────────────────
   // 只留真的以「活動」為主體的兩張。倒數與發表會劇本交付的是貼文，見上。
   "fb-30-event-challenge":        "活動",
+  // 2026-09-29 近 3 個月爆款結構卡
+  "fb-30-reel-character-series":  "Reels",
+  "fb-30-event-tiered-challenge": "活動",
+  "fb-30-ad-audience-split-test": "廣告",
   "fb-60-launch-kit":             "活動",
 
   // ── 留言 ──────────────────────────────────────────────────────────────

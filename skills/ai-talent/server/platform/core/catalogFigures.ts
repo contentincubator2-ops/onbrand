@@ -13,12 +13,10 @@
  *   ① 內容通路只留 Facebook／Instagram／Threads／LINE／TikTok／電子報／官網（ChannelPicker 也只列這七個）；
  *   ② 前台任務卡只列兩類——爆款結構、品牌自建。得獎／標竿／平台通則的卡後端還在
  *      （本週企劃、策略會議會用），但用戶在任務頁看不到，報價頁就不能再拿它們算張數。
- * 所以這裡只剩兩個數：五個通路裡的爆款結構卡張數、通路數。品牌自建卡的張數是方案
+ * 爆款卡又只列當月、每月換（CJ 同日），張數每月不同，所以這裡只剩通路數。品牌自建卡的張數是方案
  * 額度（plans.ts ownTaskCards），不在這裡。
  */
 export const CATALOG_FIGURES = {
-  /** 內容通路裡的爆款結構卡（專業方案）。Threads／LINE 目前還沒有。 */
-  viral: 25,
   /** 可選通路數。 */
   channels: 7,
 } as const;
