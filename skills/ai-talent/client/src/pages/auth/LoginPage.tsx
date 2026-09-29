@@ -144,13 +144,13 @@ export default function LoginPage() {
         ["01", "Brand Brain", "Lock your positioning once. Every post stays on-brand."],
         ["02", "Content Tiers", "A single post · a content pack · a full campaign."],
         ["03", "7-Day Publisher", "Schedule a whole week across channels in one click."],
-        ["04", "Sourced", `${CATALOG.total} task cards — ${CATALOG.sourced} with a stated structural source.`],
+        ["04", "Sourced", `${CATALOG.viral} viral-structure cards, each with its spread metric and the month measured.`],
       ]
     : [
         ["01", "品牌大腦", "鎖定一次品牌定位 · 每篇貼文自動 on-brand"],
         ["02", "三種規格", "單篇內容 · 內容套組 · 完整企劃"],
         ["03", "七日發布台", "一次排好 7 天 × 全平台內容"],
-        ["04", "有出處", `${CATALOG.total} 張任務卡，${CATALOG.sourced} 張說得出結構出處`],
+        ["04", "有出處", `爆款結構卡 ${CATALOG.viral} 張，每張附傳播數字與量測年月`],
       ];
 
   return (
@@ -248,7 +248,7 @@ export default function LoginPage() {
             ))}
           </div>
 
-          {/* Channel strip */}
+          {/* Channel strip — 2026-09-29（CJ）：內容通路只剩 FB／IG／Threads／LINE／TikTok／電子報／官網 */}
           <div className="flex items-center gap-2 text-[10.5px] mb-6 flex-wrap" style={{ color: C.inkSoft }}>
             <span className="font-bold tracking-wider">
               {lang === "en" ? "ALL CHANNELS" : "全管道覆蓋"}
@@ -258,13 +258,15 @@ export default function LoginPage() {
             <span style={{ color: C.muted }}>·</span>
             <span>Instagram</span>
             <span style={{ color: C.muted }}>·</span>
-            <span>YouTube</span>
+            <span>Threads</span>
+            <span style={{ color: C.muted }}>·</span>
+            <span>LINE</span>
             <span style={{ color: C.muted }}>·</span>
             <span>TikTok</span>
             <span style={{ color: C.muted }}>·</span>
             <span>Email</span>
             <span style={{ color: C.muted }}>·</span>
-            <span>PR</span>
+            <span>{lang === "en" ? "Website" : "官網"}</span>
           </div>
 
           {/* Language toggle */}

@@ -25,6 +25,7 @@
  */
 import localPool from "../../localDb.js";
 import { buildTaskCatalogIndex, type CatalogTask } from "../../content/core/taskCatalogIndex.js";
+import { isHiddenContentPlatform } from "../../platform/core/planGate.js";
 
 // ── 語彙（與 client/src/v2/strategy/lib/campaignSchema.ts 同一份）───────────
 // server 不能 import client 的檔案，所以這裡自己宣告一份，由
@@ -172,7 +173,7 @@ export function isPartCard(taskId: string): boolean {
 export function candidateCards(channels: string[]): CatalogTask[] {
   const wanted = new Set(channels.map((c) => c.toLowerCase()));
   return buildTaskCatalogIndex().filter(
-    (t) => wanted.has(t.platform) && (t.tier === "30s" || t.tier === "60s") && !isPartCard(t.id),
+    (t) => wanted.has(t.platform) && !isHiddenContentPlatform(t.platform) && (t.tier === "30s" || t.tier === "60s") && !isPartCard(t.id),
   );
 }
 
@@ -334,8 +335,10 @@ async function eventFacts(eventId: number, userId: number): Promise<{
 }
 
 /** 可以排進企劃的通路——推斷結果只能落在這裡面。 */
+// 2026-09-29 CJ：拿掉 LinkedIn／YouTube／新聞稿／X（planGate.HIDDEN_CONTENT_PLATFORMS）；
+// Threads 與 LINE CJ 要留。
 export const PLANNABLE_CHANNELS = [
-  "facebook", "instagram", "email", "pr", "website", "linkedin", "threads", "x", "youtube", "tiktok",
+  "facebook", "instagram", "email", "website", "tiktok", "threads", "line",
 ] as const;
 
 export interface InferredSettings {
@@ -446,7 +449,8 @@ export async function buildCampaignPlan(args: {
 }): Promise<CampaignPlan> {
   const facts = await eventFacts(args.eventId, args.userId);
   if (!facts) throw new Error("找不到這個活動");
-  const s = facts.settings;
+  // 2026-09-29：舊設定裡的下架通路（LinkedIn／YouTube／新聞稿／X）不排進新企劃。
+  const s = { ...facts.settings, channels: (facts.settings.channels ?? []).filter((c) => !isHiddenContentPlatform(c)) };
   if (!s.type || !s.mechanic?.trim() || !s.channels?.length) {
     throw new Error("活動設定還沒填完（需要活動類型、優惠機制、要發的通路）");
   }

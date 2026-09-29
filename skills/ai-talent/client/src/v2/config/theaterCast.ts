@@ -116,6 +116,27 @@ export const THEATER_CAST: CastMember[] = [
   { id: 210207, name: "Chun-Hao Chen",   title: "Senior Social Media Editor",               role: "qa",     platform: null },
 ];
 
+/**
+ * 2026-09-29（CJ：內容通路只剩 FB／IG／TikTok／電子報／官網）：YouTube 從
+ * 七日發布台拿掉。型別、PLATFORM_META 與 cast 資料保留（舊的持久化 run 還
+ * 查得到），畫面上只列 VISIBLE_THEATER_PLATFORMS，讀進來的 activePlatforms
+ * 一律過 sanitizeTheaterPlatforms。
+ */
+export const HIDDEN_THEATER_PLATFORMS: ReadonlySet<TheaterPlatform> = new Set<TheaterPlatform>(["youtube"]);
+export const VISIBLE_THEATER_PLATFORMS: TheaterPlatform[] = (Object.keys(PLATFORM_META) as TheaterPlatform[])
+  .filter((p) => !HIDDEN_THEATER_PLATFORMS.has(p));
+export const DEFAULT_THEATER_PLATFORMS: TheaterPlatform[] = ["facebook", "instagram"];
+
+/** 過濾掉隱藏／未知平台；過濾完是空的就回預設（FB＋IG）。 */
+export function sanitizeTheaterPlatforms(list: unknown): TheaterPlatform[] {
+  if (!Array.isArray(list)) return [...DEFAULT_THEATER_PLATFORMS];
+  const out = list.filter(
+    (p): p is TheaterPlatform =>
+      typeof p === "string" && p in PLATFORM_META && !HIDDEN_THEATER_PLATFORMS.has(p as TheaterPlatform),
+  );
+  return out.length > 0 ? out : [...DEFAULT_THEATER_PLATFORMS];
+}
+
 /** Lookup helpers. */
 export function getChief(): CastMember {
   return THEATER_CAST.find((m) => m.role === "chief")!;

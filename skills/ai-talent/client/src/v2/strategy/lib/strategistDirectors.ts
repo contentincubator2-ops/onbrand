@@ -41,19 +41,22 @@ export interface StrategistDirector {
  * 2026-09-24：品牌頁與產品頁是兩組不同的角色（產品頁＝價值主張／Kano／定價），
  * 共用一個 key 的話，在產品頁換人會把品牌頁的選擇也蓋掉。
  */
-/** 內容層通路頁：路由段 → scope（2026-09-27，跟 server CHANNEL_SCOPES 同一份）。 */
+/**
+ * 內容層通路頁：路由段 → scope（2026-09-27，跟 server CHANNEL_SCOPES 同一份）。
+ * 2026-09-29（CJ：內容通路只剩 FB／IG／TikTok／電子報／官網）：前端拿掉
+ * li／yt／pr／x；server 端 CHANNEL_SCOPES 與角色資料保留（只藏不刪）。
+ */
 export const CHANNEL_ROUTE_SCOPE = {
-  fb: "facebook", ig: "instagram", li: "linkedin", yt: "youtube", tt: "tiktok",
-  email: "email", pr: "pr", x: "x", web: "website",
+  fb: "facebook", ig: "instagram", tt: "tiktok",
+  email: "email", web: "website",
 } as const;
 export type ChannelScope = (typeof CHANNEL_ROUTE_SCOPE)[keyof typeof CHANNEL_ROUTE_SCOPE];
 export type StrategistScope = "brand" | "product" | "copy" | ChannelScope;
 
 const CHANNEL_NAME: Record<ChannelScope, { zh: string; en: string }> = {
   facebook: { zh: "FB", en: "Facebook" }, instagram: { zh: "IG", en: "Instagram" },
-  linkedin: { zh: "LinkedIn", en: "LinkedIn" }, youtube: { zh: "YouTube", en: "YouTube" },
   tiktok: { zh: "TikTok", en: "TikTok" }, email: { zh: "電子報", en: "Email" },
-  pr: { zh: "新聞稿", en: "PR" }, x: { zh: "X", en: "X" }, website: { zh: "官網", en: "Website" },
+  website: { zh: "官網", en: "Website" },
 };
 export function isChannelScope(s: StrategistScope): s is ChannelScope {
   return s in CHANNEL_NAME;

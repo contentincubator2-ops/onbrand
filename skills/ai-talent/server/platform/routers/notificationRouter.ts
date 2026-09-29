@@ -17,6 +17,7 @@ import { z } from "zod";
 import { router, protectedProcedure } from "../core/trpc";
 import localPool from "../../localDb";
 import { recentCatalogCards } from "../../content/core/taskCatalogIndex";
+import { isHiddenContentPlatform, isHiddenHistoryItem } from "../core/planGate";
 
 export interface NotificationItem {
   id: string;
@@ -42,8 +43,8 @@ const AVATAR_PALETTE: Record<NotificationItem["kind"], { avatar: string; avatarC
 
 /** /tasks/:platform 的路由代號。與 PlatformTaskPage 的 ROUTE_TO_PLATFORM 反向。 */
 const PLATFORM_ROUTE: Record<string, string> = {
-  facebook: "fb", instagram: "ig", linkedin: "li", youtube: "yt", tiktok: "tt",
-  email: "email", pr: "pr", website: "web", case: "case", calendar: "calendar",
+  facebook: "fb", instagram: "ig", tiktok: "tt",
+  email: "email", website: "web", case: "case", calendar: "calendar",
 };
 const PLATFORM_ZH: Record<string, string> = {
   facebook: "FB", instagram: "IG", linkedin: "LinkedIn", youtube: "YouTube", tiktok: "TikTok",
@@ -59,7 +60,10 @@ const PLATFORM_ZH: Record<string, string> = {
  */
 export function cardPublishedItems(now: Date, lastSeen: Date, isEn: boolean): NotificationItem[] {
   const byDay = new Map<string, Map<string, number>>();
+  // 2026-09-29 CJ：前台只列爆款結構＋品牌自建、只留五個通路——通知只算用戶
+  // 在任務頁真的看得到的新卡，不然「上架 10 張」點進去一張都找不到。
   for (const c of recentCatalogCards(30, now)) {
+    if (isHiddenContentPlatform(c.platform) || c.source.type !== "viral") continue;
     const day = c.addedAt!;
     const m = byDay.get(day) ?? new Map<string, number>();
     m.set(c.platform, (m.get(c.platform) ?? 0) + 1);
@@ -164,6 +168,8 @@ export const notificationRouter = router({
         const [rows]: any = await localPool.execute(
           `SELECT o.id, o.title, o.platform, o.createdAt,
                   JSON_UNQUOTE(JSON_EXTRACT(o.metadata, '$.tier')) AS tier,
+                  NULLIF(JSON_UNQUOTE(JSON_EXTRACT(o.metadata, '$.taskId')), 'null') AS taskId,
+                  m.workspace AS workspace,
                   m.title AS missionTitle, m.brandId,
                   b.name AS brandName
              FROM mission_outputs o
@@ -176,6 +182,9 @@ export const notificationRouter = router({
           [userId],
         );
         for (const r of rows as any[]) {
+          // 2026-09-29「前台隱藏，資料保留」：下架通路的產出不發通知。
+          if (isHiddenHistoryItem({ platform: r.workspace, taskId: r.taskId })
+            || isHiddenHistoryItem({ platform: r.platform })) continue;
           const iso = new Date(r.createdAt).toISOString();
           const brand = r.brandName ? `${r.brandName} · ` : "";
           items.push({

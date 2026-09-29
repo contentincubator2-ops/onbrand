@@ -1,8 +1,8 @@
 /**
  * Pricing page — 照 2026-09-06 定案的《OnBrand 方案與報價》（Word）排版。
  *
- * 數字是合約，不是文案：任務卡 259 張＝得獎 99 ＋ 標竿 63 ＋ 爆款 46 ＋
- * 平台通則 51（其中 208 張說得出出處）、通路 12 個（一律引用 catalogFigures，
+ * 數字是合約，不是文案：2026-09-29 起前台只列爆款結構＋品牌自建兩類卡、七個通路，
+ * 對外只講爆款結構卡張數與通路數（一律引用 catalogFigures，
  * 由 server/platform/core/catalogFigures.test.ts 對真實目錄鎖住）、基礎 NT$2,250／專業
  * NT$9,000、策略顧問導入 NT$80,000、電商營運報告 NT$48,000 ＋ 25,000／月。
  * 2026-09-07 用 buildTaskCatalogIndex() 數過與 Word 一致；之後動目錄要
@@ -111,8 +111,8 @@ export default function PricingPage() {
           ? ["Brand positioning", "3 own task cards (saved to your Brand Task Library)"]
           : ["品牌定位", "自建任務卡 3 張（存入品牌任務庫）"] },
         { label: isEn ? "Content" : "內容層", items: isEn
-          ? [`${CATALOG.basic} task cards: ${CATALOG.award} award-winning + ${CATALOG.benchmark} benchmark + ${CATALOG.evergreen} platform conventions`, "Scheduling, calendar and direct publishing to FB / IG"]
-          : [`可用任務卡 ${CATALOG.basic} 張：得獎案例 ${CATALOG.award} ＋ 標竿品牌 ${CATALOG.benchmark} ＋ 平台通則 ${CATALOG.evergreen}`, "排程、日曆與 FB／IG 直接發布"] },
+          ? ["Task cards: the ones you build for your brand (viral-structure cards are Professional)", "Scheduling, calendar and direct publishing to FB / IG"]
+          : ["任務卡：你替品牌自建的卡（爆款結構卡屬於專業方案）", "排程、日曆與 FB／IG 直接發布"] },
         { label: isEn ? "Performance" : "成效層", items: isEn
           ? ["Early preview on simulated data — real connections are our top investment focus; Professional gets priority access"]
           : ["早期預覽：用模擬數據先看見成效層的樣子", "真實串接是我們目前最重點的投資方向，專業方案優先加購"], muted: true },
@@ -134,8 +134,8 @@ export default function PricingPage() {
           ? ["Brand positioning + 10 product positionings + 1 campaign positioning per month", "10 own task cards (saved to your Brand Task Library)", "Strategy workbench (three anchors → content angles)", "Strategy monitoring: alerts when your brand, products or competitors shift"]
           : ["品牌定位 ＋ 產品定位 10 個 ＋ 活動定位每月 1 次", "自建任務卡 10 張（存入品牌任務庫）", "策略工作台（三錨點推導內容角度）", "策略監測：品牌、產品與競爭者有變化時提醒調整"] },
         { label: isEn ? "Content" : "內容層", items: isEn
-          ? [`${CATALOG.total} task cards = the ${CATALOG.basic} above + ${CATALOG.viral} viral-structure cards`, "Viral-structure cards refreshed monthly", "Scheduling, calendar and direct publishing to FB / IG"]
-          : [`可用任務卡 ${CATALOG.total} 張＝上述 ${CATALOG.basic} 張 ＋ 爆款結構卡 ${CATALOG.viral} 張`, "爆款結構卡每月更新", "排程、日曆與 FB／IG 直接發布"] },
+          ? [`${CATALOG.viral} viral-structure cards + your own cards`, "Viral-structure cards refreshed monthly", "Scheduling, calendar and direct publishing to FB / IG"]
+          : [`爆款結構卡 ${CATALOG.viral} 張 ＋ 品牌自建卡`, "爆款結構卡每月更新", "排程、日曆與 FB／IG 直接發布"] },
         { label: isEn ? "Performance" : "成效層", items: [isEn ? "Early preview + priority access to real connections (see below)" : "早期預覽 ＋ 優先加購真實串接（見下方加購）"] },
         { label: isEn ? "Also" : "其他", items: isEn
           ? ["Unlimited runs", "Campaign tasks included", "Review workflow"]
@@ -150,7 +150,7 @@ export default function PricingPage() {
   const faq: [string, string][] = isEn ? [
     ["What is the difference between Basic and Professional?", `Capability, not volume. Both tiers have unlimited runs and campaign tasks. The difference is channels (2 vs 5), the ${CATALOG.viral} viral-structure cards (Professional only), product and campaign positioning, own task cards (3 vs 10) and seats (2 vs 5).`],
     ["Why does Professional come with 5 seats?", "Because of the review workflow. The person producing and the person approving must be different people, otherwise review is a formality: marketer, ads specialist, performance analyst, mid-level manager (approves), owner (dashboard)."],
-    ["Can I change my channels?", `Yes, once a month. You pick from ${CATALOG.channels} supported channels.`],
+    ["Can I change my channels?", `Yes, once a month. You pick from ${CATALOG.channels} channels: Facebook, Instagram, Threads, LINE, TikTok, Email and Website (Basic 2, Professional 5).`],
     ["What is an own task card?", "Paste the output you actually want (say, 10 of your best promo posts); the AI reverse-engineers it into a SKILL, you approve a test write, and it goes into your Brand Task Library. Length, rhythm, opening and CTA placement are measured from your samples and later used as acceptance criteria."],
     ["Do add-ons require the Professional plan?", "Yes. Both the strategy-consultant onboarding and the e-commerce operations report require an active OnBrand Professional (NT$9,000 / month) subscription."],
     ["Why are viral-structure cards refreshed monthly?", "Viral structures expire: only 27% of TikTok trends survive two weeks. Every viral card carries its spread metric and the month it was measured, and the set is refreshed monthly."],
@@ -162,7 +162,7 @@ export default function PricingPage() {
   ] : [
     ["基礎和專業差在哪？", `差在能力，不在用量。執行次數兩級都不限、企劃任務兩級都開放；差別是通路數（2 vs 5）、爆款結構卡（${CATALOG.viral} 張，專業才有）、產品與活動定位、自建卡張數（3 vs 10）、席次（2 vs 5）。`],
     ["為什麼專業方案是 5 席？", "因為有審核工作流。產出的人與放行的人必須分開，否則審核只是形式：行銷人員、廣告人員、成效人員、中階主管（審核放行）、負責人（看整體看板）。"],
-    ["通路選了可以換嗎？", `可以，每月可更換一次，從 ${CATALOG.channels} 個支援通路裡選。`],
+    ["通路選了可以換嗎？", `可以，每月可更換一次，從 ${CATALOG.channels} 個通路（Facebook、Instagram、Threads、LINE、TikTok、電子報、官網）裡選：基礎 2 個、專業 5 個。`],
     ["自建任務卡是什麼？", "把你自己理想中的成品（例如 10 篇促購文）貼上來，AI 反推成 SKILL，試寫確認後上架，存入品牌任務庫。字數上下限、節奏、開場方式、CTA 位置全部從你貼的成品量出來，之後回頭當驗收標準。"],
     ["加購一定要搭配專業方案嗎？", "是。策略顧問導入與電商營運報告都必須搭配 OnBrand 專業（NT$9,000／月）訂閱。"],
     ["爆款結構卡為什麼要每月更新？", "爆款結構會過期：TikTok 只有 27% 的趨勢活過兩週。所以每張爆款卡都印著傳播數字與量測年月，並每月更新。"],
@@ -211,7 +211,7 @@ export default function PricingPage() {
         {/* 封面四格 */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-px bg-neutral-200 border border-neutral-200 mb-12">
           {[
-            [isEn ? "Task cards" : "任務卡總數", isEn ? `${CATALOG.total} — ${CATALOG.sourced} with a stated structural source` : `${CATALOG.total} 張，其中 ${CATALOG.sourced} 張說得出結構出處`],
+            [isEn ? "Task cards" : "任務卡", isEn ? `${CATALOG.viral} viral-structure cards + your own` : `爆款結構卡 ${CATALOG.viral} 張 ＋ 品牌自建卡`],
             [isEn ? "Channels" : "支援通路", isEn ? `${CATALOG.channels}` : `${CATALOG.channels} 個`],
             [isEn ? "Self-serve plans" : "自助方案", `${sym}${price.starter.toLocaleString()} ／ ${sym}${price.pro.toLocaleString()} ${isEn ? "per month" : "每月"}`],
             [isEn ? "Consultant onboarding" : "顧問導入", isEn ? "from NT$80,000 (one-time)" : "NT$80,000 起（一次性）"],
@@ -422,28 +422,24 @@ export default function PricingPage() {
 
         {/* 二 · 內容層出處 */}
         <div className="max-w-3xl mx-auto">
-          <H2>{isEn ? `${CATALOG.total} task cards, ${CATALOG.sourced} with a stated source` : `${CATALOG.total} 張任務卡，${CATALOG.sourced} 張說得出出處`}</H2>
+          <H2>{isEn ? "Two kinds of task cards" : "兩種任務卡"}</H2>
           <Tbl
             hiCol={1}
             head={isEn ? ["Why this card is written this way", "Cards"] : ["這張卡憑什麼這樣寫", "張數"]}
             rows={isEn ? [
-              ["Deconstructed from named award-winning work (Cannes Lions / Effie / Clio / D&AD / Shorty)", `${CATALOG.award}`],
-              ["Deconstructed from named benchmark brands or named methodologies (Trout & Ries Positioning, Jay Baer Youtility)", `${CATALOG.benchmark}`],
-              ["Deconstructed from real viral content — each card carries the spread metric and the month measured", `${CATALOG.viral}`],
-              ["Platform conventions — we say plainly these have no source", `${CATALOG.evergreen}`],
+              ["Viral structure — deconstructed from real viral content; each card carries the spread metric and the month measured", `${CATALOG.viral} (Professional)`],
+              ["Brand-built — reverse-engineered from the posts you paste; length, rhythm and CTA are measured from your samples", "3 / 10 (by plan)"],
             ] : [
-              ["拆自具名得獎作品（坎城 Cannes Lions／Effie／Clio／D&AD／Shorty）", `${CATALOG.award}`],
-              ["拆自具名標竿品牌或具名方法論（Trout & Ries《定位》、Jay Baer《Youtility》）", `${CATALOG.benchmark}`],
-              ["拆自真實爆紅內容，每張附傳播數字與量測年月", `${CATALOG.viral}`],
-              ["平台通則——我們明講它沒有出處", `${CATALOG.evergreen}`],
+              ["爆款結構——拆自真實爆紅內容，每張附傳播數字與量測年月", `${CATALOG.viral}（專業方案）`],
+              ["品牌自建——從你貼的成品反推，字數、節奏、CTA 位置都從範例量出來", "3／10（依方案）"],
             ]}
           />
           <Note>{isEn ? "Viral-structure card example: Chipotle #GuacDance — 250k submissions and 430M views in 6 days (measured 2019-07)." : "爆款結構卡範例：Chipotle「#GuacDance」6 天 25 萬支投稿、4.3 億次播放（2019-07 量測）。"}</Note>
           <Note>{isEn ? "Viral structures expire: only 27% of TikTok trends survive two weeks, so every viral card carries its measurement month and the set is refreshed monthly." : "爆款結構會過期：TikTok 只有 27% 的趨勢活過兩週，所以每張爆款卡都印著量測年月，並每月更新。"}</Note>
           <p className="text-sm text-neutral-800 mt-4 leading-relaxed">
             {isEn
-              ? `Our publishing check is hard: a card labelled “from a viral post” that cannot produce a spread metric and a measurement month does not ship — the automated tests fail. A card labelled “award case” that cannot name the award is blocked the same way. That is why we can say it out loud: ${CATALOG.evergreen} of the ${CATALOG.total} have no source, and those ${CATALOG.evergreen} are labelled “platform conventions”. Admitting the ${CATALOG.evergreen} is what makes the ${CATALOG.sourced} credible.`
-              : `我們的上架檢核是硬性的：一張卡若標示「拆自爆款」，卻交不出傳播數字與量測年月，這張卡上不了架，自動化測試會直接失敗。標示「得獎案例」卻說不出是哪個獎，同樣擋掉。所以我們敢明講：${CATALOG.total} 張裡有 ${CATALOG.evergreen} 張沒有出處，那 ${CATALOG.evergreen} 張就標示為「平台通則」。會承認 ${CATALOG.evergreen} 張沒有出處，前面 ${CATALOG.sourced} 張才可信。`}
+              ? "Our publishing check is hard: a card labelled “from a viral post” that cannot produce a spread metric and a measurement month does not ship — the automated tests fail. Brand-built cards are held to the numbers measured from your own samples."
+              : "我們的上架檢核是硬性的：一張卡若標示「拆自爆款」，卻交不出傳播數字與量測年月，這張卡上不了架，自動化測試會直接失敗。品牌自建卡則用從你範例量出來的數字當驗收標準。"}
           </p>
         </div>
 
@@ -456,15 +452,15 @@ export default function PricingPage() {
             head={isEn ? ["", "ChatGPT · Jasper", "Swipe files\nForeplay · Motion · Atria", "OnBrand"] : ["", "ChatGPT · Jasper", "素材庫\nForeplay · Motion · Atria", "OnBrand"]}
             rows={isEn ? [
               ["Writes it for you", "Yes", "No", "Yes"],
-              ["Can say where the structure comes from", "Gives you an answer\nbut changes it when asked twice", "Gives examples\nnot structures", `${CATALOG.sourced} of ${CATALOG.total} cards`],
-              ["Admits which cards have no source", "No", "No", `${CATALOG.evergreen} cards, labelled`],
+              ["Can say where the structure comes from", "Gives you an answer\nbut changes it when asked twice", "Gives examples\nnot structures", `All ${CATALOG.viral} viral-structure cards`],
+              ["Writes the way your best posts are written", "Drifts", "No", "Brand-built cards, measured from your samples"],
               ["When the source was measured", "None", "None", "Every viral card carries the month"],
               ["Knows what your brand must not say", "No", "No", "Fact whitelist + banned words"],
               ["What you have after three years", "Nothing", "Nothing", "A Brand Task Library"],
             ] : [
               ["直接幫你寫出來", "可以", "不寫", "可以"],
-              ["說得出結構出自哪裡", "會給你一個答案\n但問第二次會改口", "給素材\n不給結構", `${CATALOG.total} 張裡 ${CATALOG.sourced} 張`],
-              ["敢說哪幾張沒有出處", "不會", "不會", `${CATALOG.evergreen} 張明確標示`],
+              ["說得出結構出自哪裡", "會給你一個答案\n但問第二次會改口", "給素材\n不給結構", `爆款結構卡 ${CATALOG.viral} 張全部說得出`],
+              ["照你最好的那幾篇的寫法寫", "會漂移", "不會", "品牌自建卡，從你的範例量出來"],
               ["出處什麼時候量的", "沒有", "沒有", "每張爆款卡印著年月"],
               ["知道你的品牌不能講什麼", "不知道", "不知道", "事實白名單＋禁用詞"],
               ["用三年之後累積了什麼", "零", "零", "一座品牌任務庫"],
@@ -472,7 +468,7 @@ export default function PricingPage() {
           />
           <H3>{isEn ? "Verify it yourself in 30 seconds" : "客戶自己 30 秒就能驗證"}</H3>
           <div className="border-l-4 border-neutral-900 pl-4 space-y-2 text-sm text-neutral-800 leading-relaxed">
-            <p>{isEn ? "Ask any AI: “Write me a Facebook post and tell me which award-winning case this structure comes from, and what that case's numbers were.”" : "問任何一個 AI：「幫我寫一則 FB 貼文，並告訴我這個結構出自哪個得獎案例、那個案例的數據是多少。」"}</p>
+            <p>{isEn ? "Ask any AI: “Write me a Facebook post and tell me which viral post this structure comes from, and what that post's numbers were.”" : "問任何一個 AI：「幫我寫一則 FB 貼文，並告訴我這個結構出自哪一則爆紅內容、那則內容的數據是多少。」"}</p>
             <p className="font-semibold">{isEn ? "It will give you a case name and a set of numbers. Ask “how do you know that number” — it changes its answer." : "它會給你案例名和一組數字。再問一次「你怎麼知道那個數字」——它會改口。"}</p>
             <p>{isEn ? "Ask OnBrand the same question and the answer is the same every time, because it is written on the card and a test forbids leaving it blank." : "同一題問 OnBrand，答案每次都一樣。因為那寫死在卡片上，而且有測試擋著不准留白。"}</p>
           </div>

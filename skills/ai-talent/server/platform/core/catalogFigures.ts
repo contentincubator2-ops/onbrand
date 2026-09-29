@@ -9,21 +9,16 @@
  * client 不 import server），catalogFigures.test.ts 拿真實目錄對過這些數字、並鎖住
  * 兩邊一致。之後加一張卡、加一個通路，這裡沒跟著改就會紅燈。
  *
- * 只有 total／basic／sourced／各來源數是「算得出來」的；channels 是產品定義
- * （ChannelPicker 可選的通路），測試對的是它的顯示表。
+ * 2026-09-29 CJ 兩個決定改了「對外宣稱」的定義：
+ *   ① 內容通路只留 Facebook／Instagram／Threads／LINE／TikTok／電子報／官網（ChannelPicker 也只列這七個）；
+ *   ② 前台任務卡只列兩類——爆款結構、品牌自建。得獎／標竿／平台通則的卡後端還在
+ *      （本週企劃、策略會議會用），但用戶在任務頁看不到，報價頁就不能再拿它們算張數。
+ * 所以這裡只剩兩個數：五個通路裡的爆款結構卡張數、通路數。品牌自建卡的張數是方案
+ * 額度（plans.ts ownTaskCards），不在這裡。
  */
 export const CATALOG_FIGURES = {
-  /** 專業方案可用：全部任務卡。 */
-  total: 259,
-  /** 基礎方案可用：扣掉爆款結構卡。 */
-  basic: 213,
-  award: 99,
-  benchmark: 63,
-  viral: 46,
-  /** 平台通則 —— 沒有出處。 */
-  evergreen: 51,
-  /** 說得出結構出處 = 得獎 ＋ 標竿 ＋ 爆款。 */
-  sourced: 208,
+  /** 內容通路裡的爆款結構卡（專業方案）。Threads／LINE 目前還沒有。 */
+  viral: 25,
   /** 可選通路數。 */
-  channels: 12,
+  channels: 7,
 } as const;

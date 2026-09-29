@@ -31,7 +31,8 @@ describe("touchpoints registry", () => {
 
     const coverage = await getTouchpointCoverage(42);
 
-    const manualIds = TOUCHPOINTS.filter((t) => t.deployMethod !== "api-publish").map((t) => t.id);
+    const manualIds = coverage.touchpoints.filter((t) => t.deployMethod !== "api-publish").map((t) => t.id);
+    expect(manualIds.length).toBeGreaterThan(0);
     for (const id of manualIds) {
       expect(coverage.touchpoints.find((t) => t.id === id)!.deployStatus).toBe("manual");
     }
@@ -51,8 +52,23 @@ describe("touchpoints registry", () => {
 
     const coverage = await getTouchpointCoverage(42);
 
-    expect(coverage.totalCount).toBe(TOUCHPOINTS.length);
+    expect(coverage.totalCount).toBe(coverage.touchpoints.length);
     expect(coverage.connectedCount).toBe(2);
+  });
+
+  // 2026-09-29（CJ）：內容通路只剩 FB／IG／TikTok／電子報／官網。
+  it("hides linkedin / youtube / x / pr from coverage (registry keeps them)", async () => {
+    executeMock.mockResolvedValue([[{ industry: null, targetCountry: null, bundleConnectedAt: null }]]);
+
+    const coverage = await getTouchpointCoverage(42);
+    const ids = coverage.touchpoints.map((t) => t.id);
+
+    for (const hidden of ["linkedin", "youtube", "x", "pr"]) {
+      expect(ids).not.toContain(hidden);
+      expect(TOUCHPOINTS.some((t) => t.id === hidden)).toBe(true);
+    }
+    expect(ids).toEqual(["facebook", "instagram", "tiktok", "email", "website", "brand-agent"]);
+    expect(coverage.totalCount).toBe(6);
   });
 
   it("falls back to defaults when the brand row is missing", async () => {

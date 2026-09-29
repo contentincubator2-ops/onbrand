@@ -36,11 +36,11 @@ const PLATFORMS: Array<{
 }> = [
   { key: "fb",       label: "Facebook",  color: "#1877F2", route: "/tasks/fb" },
   { key: "ig",       label: "Instagram", color: "#E1306C", route: "/tasks/ig" },
-  { key: "li",       label: "LinkedIn",  color: "#0A66C2", route: "/tasks/li" },
-  { key: "yt",       label: "YouTube",   color: "#FF0000", route: "/tasks/yt" },
+  { key: "threads",  label: "Threads",   color: "#000000", route: "/tasks/threads" },
+  { key: "line",     label: "LINE",      color: "#06C755", route: "/tasks/line" },
   { key: "tt",       label: "TikTok",    color: "#000000", route: "/tasks/tt" },
   { key: "email",    label: "Email",     color: "#0EA5E9", route: "/tasks/email" },
-  { key: "pr",       label: "PR",        color: "#525252", route: "/tasks/pr" },
+  { key: "web",      label: "官網",       color: "#525252", route: "/tasks/web" },
 ];
 
 const PLATFORM_COLOR: Record<string, string> = Object.fromEntries(

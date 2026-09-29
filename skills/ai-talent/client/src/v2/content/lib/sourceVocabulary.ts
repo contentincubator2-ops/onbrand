@@ -172,3 +172,34 @@ export function sourcePillText(s: unknown, lang: string): string {
   if (r.short && r.short.trim()) return r.short.trim();
   return sourceLabel(r.type, lang);
 }
+
+/**
+ * 2026-09-29 CJ「任務卡的類型，前台只要留下爆款結構和品牌自建這兩個類別就好。
+ * 後端都還是要留著」。
+ *
+ * 所以這裡只管「前台列不列」：得獎／標竿／長青／通路規格的卡後端照舊回傳，
+ * 本週企劃、策略會議、?rerun= 之類用 id 找卡的地方都還找得到；只有卡片清單、
+ * 篩選、張數、選卡器不列。
+ *
+ *   own   ＝ 品牌自建（用戶自己建的卡 ownCardId；品牌客製包 brand-method 也算，
+ *           那是替這個品牌做的卡）
+ *   viral ＝ 爆款結構
+ */
+export type FrontCardKind = "viral" | "own";
+export const FRONT_CARD_KINDS: readonly FrontCardKind[] = ["viral", "own"];
+
+export function frontCardKind(task: unknown): FrontCardKind | null {
+  const t = task as any;
+  if (t?.ownCardId || t?.source?.type === "brand-method") return "own";
+  if (t?.source?.type === "viral") return "viral";
+  return null;
+}
+
+export function isFrontVisibleCard(task: unknown): boolean {
+  return frontCardKind(task) !== null;
+}
+
+export function frontCardKindLabel(k: FrontCardKind, lang: string): string {
+  const en = lang === "en";
+  return k === "viral" ? (en ? "Viral structure" : "爆款結構") : (en ? "Brand-built" : "品牌自建");
+}

@@ -8,7 +8,7 @@
 import { describe, it, expect } from "vitest";
 import {
   isUnlimited, resolveChannels, daysUntilSwap, filterTasksByPlan, checkCap,
-  checkTaskAllowed, isViewerOnly,
+  checkTaskAllowed, isViewerOnly, isHiddenHistoryItem, isHiddenTaskId,
 } from "./planGate";
 import { PLANS } from "./plans";
 
@@ -41,10 +41,10 @@ describe("通路選擇", () => {
 
   it("存過就用存的", () => {
     const sel = resolveChannels(
-      { __channels: { platforms: ["tiktok", "youtube"], swappedAt: "2026-09-01T00:00:00Z" } },
+      { __channels: { platforms: ["tiktok", "email"], swappedAt: "2026-09-01T00:00:00Z" } },
       Q({ platforms: 2 }),
     );
-    expect(sel.platforms).toEqual(["tiktok", "youtube"]);
+    expect(sel.platforms).toEqual(["tiktok", "email"]);
     expect(sel.swappedAt).toBe("2026-09-01T00:00:00Z");
   });
 
@@ -56,8 +56,24 @@ describe("通路選擇", () => {
     expect(sel.platforms).toEqual(["a", "b"]);
   });
 
-  it("無限方案拿得到全部", () => {
-    expect(resolveChannels(null, Q({ platforms: -1 })).platforms.length).toBeGreaterThanOrEqual(11);
+  it("無限方案拿得到全部（下架的通路除外）", () => {
+    const all = resolveChannels(null, Q({ platforms: -1 })).platforms;
+    expect(all).toEqual(expect.arrayContaining(["facebook", "instagram", "tiktok", "email", "website"]));
+    for (const p of ["linkedin", "youtube", "x", "pr"]) expect(all).not.toContain(p);
+  });
+
+  it("存過已下架的通路，讀出來就被濾掉", () => {
+    const sel = resolveChannels(
+      { __channels: { platforms: ["youtube", "facebook", "linkedin"], swappedAt: null } },
+      Q({ platforms: 2 }),
+    );
+    expect(sel.platforms).toEqual(["facebook"]);
+  });
+
+  it("任務目錄不列下架通路的卡（不論方案）", () => {
+    const tasks = [{ platform: "facebook" }, { platform: "linkedin" }, { platform: "youtube" }, { platform: "x" }, { platform: "pr" }, { platform: "website" }];
+    const out = filterTasksByPlan(tasks, Q({ platforms: -1 }), { platforms: [], swappedAt: null });
+    expect(out.map((t) => t.platform)).toEqual(["facebook", "website"]);
   });
 });
 
@@ -233,3 +249,29 @@ describe("策略監測閘門", () => {
   });
 });
 
+
+describe("下架通路（2026-09-29）", () => {
+  it("歷史資料的各種寫法都認得：platform 別名與 task id 前綴", () => {
+    for (const platform of ["linkedin", "youtube", "x", "pr", "press", "li", "yt", "LinkedIn"]) {
+      expect(isHiddenHistoryItem({ platform })).toBe(true);
+    }
+    // X 的產出記成 generic，只能靠 task id
+    expect(isHiddenHistoryItem({ platform: "generic", taskId: "x-thread-hook" })).toBe(true);
+    expect(isHiddenTaskId("li-post")).toBe(true);
+    expect(isHiddenTaskId("pr-release")).toBe(true);
+  });
+
+  it("五個保留通路不誤殺", () => {
+    for (const platform of ["facebook", "instagram", "tiktok", "email", "website"]) {
+      expect(isHiddenHistoryItem({ platform })).toBe(false);
+    }
+    for (const taskId of ["fb-99-carousel-5", "ig-reel", "tt-hook", "em-welcome", "web-article", "live-x"]) {
+      expect(isHiddenTaskId(taskId)).toBe(false);
+    }
+  });
+
+  it("執行層：下架通路不論方案都不能跑", () => {
+    const v = checkTaskAllowed(Q({ platforms: -1, viralTaskCards: true }), null, { platform: "linkedin", sourceType: "award" });
+    expect(v.ok).toBe(false);
+  });
+});

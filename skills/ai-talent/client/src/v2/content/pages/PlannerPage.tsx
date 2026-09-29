@@ -15,7 +15,7 @@ import React from "react";
 import { useNavigate, useOutletContext, useSearchParams } from "react-router-dom";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faEnvelope, faBullhorn, faGlobe, faArrowUp, faChevronLeft, faChevronRight, faEllipsis } from "@fortawesome/free-solid-svg-icons";
-import { faFacebookF, faInstagram, faLinkedinIn, faYoutube, faTiktok, faXTwitter } from "@fortawesome/free-brands-svg-icons";
+import { faFacebookF, faInstagram, faLinkedinIn, faYoutube, faTiktok, faXTwitter, faThreads, faLine } from "@fortawesome/free-brands-svg-icons";
 import { trpc } from "../../../lib/trpc";
 import { useLang } from "../../../lib/i18n";
 import { showToastGlobal } from "../../../components/ui/Toast";
@@ -27,11 +27,11 @@ const INK = "#171717", META = "#6B6B6B", LINE = "#EAEAEA", SOFT = "#F6F6F5", ORA
 
 const PLATFORM_ICON: Record<string, any> = {
   facebook: faFacebookF, instagram: faInstagram, linkedin: faLinkedinIn, youtube: faYoutube, tiktok: faTiktok,
-  email: faEnvelope, pr: faBullhorn, x: faXTwitter, website: faGlobe,
+  email: faEnvelope, pr: faBullhorn, x: faXTwitter, website: faGlobe, threads: faThreads, line: faLine,
 };
 const PLATFORM_ZH: Record<string, string> = {
   facebook: "Facebook", instagram: "Instagram", linkedin: "LinkedIn", youtube: "YouTube", tiktok: "TikTok",
-  email: "電子報", pr: "新聞稿", x: "X", website: "官網",
+  email: "電子報", pr: "新聞稿", x: "X", website: "官網", threads: "Threads", line: "LINE",
 };
 const STARTERS = ["幫我排這週內容", "給我十個題目", "把進行中的活動拆成這週貼文", "我這週只有 3 小時"];
 

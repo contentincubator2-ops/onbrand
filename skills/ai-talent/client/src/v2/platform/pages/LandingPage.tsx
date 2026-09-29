@@ -102,8 +102,8 @@ export default function LandingPage() {
     m.setAttribute(
       "content",
       en
-        ? `Lock your brand positioning once. Every caption stays on-brand. Brand Brain · Single/Pack/Campaign · 7-Day Publisher · ${CATALOG.total} task cards, ${CATALOG.sourced} with a stated source.`
-        : `鎖定一次品牌定位，每篇貼文自動 on-brand。品牌大腦 · 單篇/套組/企劃 · 七日發布台 · ${CATALOG.total} 張任務卡，${CATALOG.sourced} 張有出處。`,
+        ? `Lock your brand positioning once. Every caption stays on-brand. Brand Brain · Single/Pack/Campaign · 7-Day Publisher · ${CATALOG.viral} viral-structure cards + your own brand-built cards.`
+        : `鎖定一次品牌定位，每篇貼文自動 on-brand。品牌大腦 · 單篇/套組/企劃 · 七日發布台 · 爆款結構卡 ${CATALOG.viral} 張 ＋ 品牌自建卡。`,
     );
     return () => {
       dead = true;
@@ -115,7 +115,7 @@ export default function LandingPage() {
   const STATS = en
     ? [
         ["16,113", "AI Marketing Agents"],
-        [`${CATALOG.total}`, `Task Cards · ${CATALOG.sourced} Sourced`],
+        [`${CATALOG.viral}`, "Viral-Structure Cards"],
         ["711", "Specialized Squads"],
         ["2,526", "Skill Modules"],
         ["60", "Award Cases"],
@@ -124,7 +124,7 @@ export default function LandingPage() {
       ]
     : [
         ["16,113", "個 AI 行銷專家"],
-        [`${CATALOG.total}`, `張任務卡 · ${CATALOG.sourced} 張有出處`],
+        [`${CATALOG.viral}`, "張爆款結構卡"],
         ["711", "個專屬軍團"],
         ["2,526", "個技能模組"],
         ["60", "個得獎案例"],
@@ -138,13 +138,13 @@ export default function LandingPage() {
         ["01", "Brand Brain", "Lock your positioning once. Every post stays on-brand."],
         ["02", "Content Tiers", "A single post · a content pack · a full campaign."],
         ["03", "7-Day Publisher", "Schedule a whole week across channels in one click."],
-        ["04", "Sourced", `${CATALOG.total} task cards — ${CATALOG.sourced} with a stated structural source.`],
+        ["04", "Sourced", `${CATALOG.viral} viral-structure cards, each with its spread metric and the month measured.`],
       ]
     : [
         ["01", "品牌大腦", "鎖定一次品牌定位 · 每篇貼文自動 on-brand"],
         ["02", "三種規格", "單篇內容 · 內容套組 · 完整企劃"],
         ["03", "七日發布台", "一次排好 7 天 × 全平台內容"],
-        ["04", "有出處", `${CATALOG.total} 張任務卡，${CATALOG.sourced} 張說得出結構出處`],
+        ["04", "有出處", `爆款結構卡 ${CATALOG.viral} 張，每張附傳播數字與量測年月`],
       ];
 
   return (
@@ -262,16 +262,16 @@ export default function LandingPage() {
               style={{ color: C.ink }}
             >
               {en
-                ? `Agent: 16,113 AI experts · Skill: ${CATALOG.total} task cards, ${CATALOG.sourced} with a stated source · Data: your locked Brand Brain`
-                : `Agent：16,113 個 AI 專家 · Skill：${CATALOG.total} 張任務卡，${CATALOG.sourced} 張有出處 · Data：你鎖定的品牌大腦`}
+                ? `Agent: 16,113 AI experts · Skill: ${CATALOG.viral} viral-structure cards + your brand-built cards · Data: your locked Brand Brain`
+                : `Agent：16,113 個 AI 專家 · Skill：爆款結構卡 ${CATALOG.viral} 張 ＋ 品牌自建卡 · Data：你鎖定的品牌大腦`}
             </p>
             <p
               className="text-[15px] leading-[1.75] mb-8 max-w-[540px]"
               style={{ color: C.muted }}
             >
               {en
-                ? "OnBrand isn't another one-click AI generator. SoWork's 14-step Brand Positioning Method writes your Why, TA, Differentiation and Voice into a Brand Brain. Set it once. Every channel — Facebook, Instagram, YouTube, TikTok, Email, PR — stays on-brand automatically. We don't hand you content — we deploy your strategy to every touchpoint."
-                : "OnBrand 不是另一個「AI 一鍵生成」工具。SoWork 14 步品牌定位法把你的 WHY、TA、差異化、Voice 全部寫進品牌大腦。鎖定一次，所有平台（FB、IG、YouTube、TikTok、EDM、PR）都自動跟著你的調性走。我們給你的不是內容，是把你的品牌策略部署到每一個接觸點。"}
+                ? "OnBrand isn't another one-click AI generator. SoWork's 14-step Brand Positioning Method writes your Why, TA, Differentiation and Voice into a Brand Brain. Set it once. Every channel — Facebook, Instagram, Threads, LINE, TikTok, Email, Website — stays on-brand automatically. We don't hand you content — we deploy your strategy to every touchpoint."
+                : "OnBrand 不是另一個「AI 一鍵生成」工具。SoWork 14 步品牌定位法把你的 WHY、TA、差異化、Voice 全部寫進品牌大腦。鎖定一次，所有平台（Facebook、Instagram、Threads、LINE、TikTok、電子報（EDM）、官網）都自動跟著你的調性走。我們給你的不是內容，是把你的品牌策略部署到每一個接觸點。"}
             </p>
 
             {/* CTAs — primary orange + secondary ghost */}
@@ -539,9 +539,10 @@ function FAQSection({ en }: { en: boolean }) {
           q: "What kind of brands is OnBrand for?",
           a: "F&B, fashion, beauty, wellness, tech, pet, real estate, education — any SMB brand, in-house marketing team, or agency-of-one that wants every caption to stay on-brand.",
         },
+        // 2026-09-29（CJ）：內容通路只剩 FB／IG／TikTok／電子報／官網。
         {
           q: "Which channels does OnBrand support?",
-          a: "Facebook, Instagram, YouTube, TikTok, Email (EDM), PR press releases, LinkedIn, and brand strategy — seven channels total. Each has its own task library with documented award craft.",
+          a: `Facebook, Instagram, Threads, LINE, TikTok, Email (EDM), and your website — ${CATALOG.channels} channels total. Each has its own task library with documented award craft.`,
         },
         {
           q: "Is there a free trial?",
@@ -552,8 +553,8 @@ function FAQSection({ en }: { en: boolean }) {
           a: "OnBrand is the AI product built by SoWork (摘星社群行銷顧問股份有限公司), a Taiwan-based brand marketing consultancy. OnBrand encodes SoWork's accumulated methodology into a self-serve tool.",
         },
         {
-          q: `What does 'sourced' mean for the ${CATALOG.total} task cards?`,
-          a: `${CATALOG.sourced} of the ${CATALOG.total} task cards state where their structure comes from: ${CATALOG.award} are deconstructed from named award-winning work (FB ad copy uses Aviation Gin's anti-consensus framing, Cannes Lions Silver; the IG Reels script uses Adobe's Unfinished-Film open invitation), ${CATALOG.benchmark} from named benchmark brands or methodologies, and ${CATALOG.viral} from real viral content with the spread metric and the month measured. The other ${CATALOG.evergreen} are platform conventions — we say plainly they have no source. The publishing check is hard: a card that cannot name its award or produce its numbers fails the automated tests.`,
+          q: "What kinds of task cards are there?",
+          a: `Two. ${CATALOG.viral} viral-structure cards are deconstructed from real viral content, each with the spread metric and the month measured (Professional plan). Brand-built cards are reverse-engineered from the posts you paste — length, rhythm and CTA placement are measured from your samples. The publishing check is hard: a viral card that cannot produce its numbers fails the automated tests.`,
         },
       ]
     : [
@@ -571,7 +572,7 @@ function FAQSection({ en }: { en: boolean }) {
         },
         {
           q: "支援哪些社群與內容平台？",
-          a: `Facebook、Instagram、YouTube、TikTok、LinkedIn、X、Email（EDM）、PR 新聞稿、官網、KOL、品牌策略、受眾——共 ${CATALOG.channels} 個通路。每張任務卡都標示出處類型：得獎案例、標竿品牌、爆款結構或平台通則。`,
+          a: `Facebook、Instagram、Threads、LINE、TikTok、電子報（EDM）、官網——共 ${CATALOG.channels} 個通路。任務卡分兩種：爆款結構卡（附傳播數字與量測年月）與品牌自建卡（從你的範例反推）。`,
         },
         {
           q: "有免費試用嗎？",
@@ -582,8 +583,8 @@ function FAQSection({ en }: { en: boolean }) {
           a: "OnBrand 是 SoWork（摘星社群行銷顧問股份有限公司）推出的 AI 產品。SoWork 是台灣資深品牌行銷顧問公司，把累積多年的方法論做成 AI 工具，就是 OnBrand。",
         },
         {
-          q: "任務卡的「出處」是什麼？",
-          a: `${CATALOG.total} 張任務卡裡有 ${CATALOG.sourced} 張說得出結構出處：${CATALOG.award} 張拆自具名得獎作品（例如 FB 廣告主文用 Aviation Gin（Cannes Lions Silver）的反共識前置、IG Reels 腳本用 Adobe《The Unfinished Film》的開放邀請）、${CATALOG.benchmark} 張拆自具名標竿品牌或方法論、${CATALOG.viral} 張拆自真實爆紅內容並附傳播數字與量測年月。另外 ${CATALOG.evergreen} 張是平台通則，我們明講它沒有出處。上架檢核是硬性的：說不出獎項、交不出數字的卡，自動化測試直接擋掉。`,
+          q: "任務卡有哪幾種？",
+          a: `兩種。爆款結構卡 ${CATALOG.viral} 張，拆自真實爆紅內容，每張附傳播數字與量測年月（專業方案）；品牌自建卡從你貼的成品反推，字數、節奏、CTA 位置都從範例量出來。上架檢核是硬性的：交不出數字的爆款卡，自動化測試直接擋掉。`,
         },
       ];
 

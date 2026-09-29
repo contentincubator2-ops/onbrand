@@ -18,10 +18,12 @@ import { showToastGlobal } from "../../../../components/ui/Toast";
 import { toastWithUpgrade } from "../../lib/upgradeToast";
 import { Check, Lock, RefreshCw } from "lucide-react";
 
+// 2026-09-29 CJ：內容通路只留 FB／IG／Threads／LINE／TikTok／電子報／官網（server 端 setChannels 也擋下架的）。
 const LABEL_ZH: Record<string, string> = {
-  facebook: "Facebook", instagram: "Instagram", youtube: "YouTube",
-  tiktok: "TikTok", linkedin: "LinkedIn", x: "X", email: "Email",
-  website: "官網", pr: "新聞稿", brand: "品牌", audience: "受眾研究", kol: "KOL",
+  facebook: "Facebook", instagram: "Instagram",
+  threads: "Threads", line: "LINE",
+  tiktok: "TikTok", email: "電子報",
+  website: "官網",
 };
 const ALL = Object.keys(LABEL_ZH);
 
@@ -52,17 +54,19 @@ export default function ChannelPicker({ brandId }: { brandId: number }) {
   // 無限方案沒有東西要選；資料還沒到也不要先閃一塊空的出來。
   if (!data || data.limit === -1) return null;
 
-  const current = draft ?? data.platforms;
+  // 存過的清單可能還有已不列出的通路（品牌／受眾／KOL、或下架的四個）——不算進已選。
+  const current = (draft ?? data.platforms).filter((p) => ALL.includes(p));
+  const saved = data.platforms.filter((p) => ALL.includes(p));
   const dirty = draft !== null
-    && (draft.length !== data.platforms.length
-      || draft.some((p) => !data.platforms.includes(p)));
+    && (draft.length !== saved.length
+      || draft.some((p) => !saved.includes(p)));
   const full = current.length >= data.limit;
   const locked = !data.canSwapNow;
 
   const toggle = (p: string) => {
     if (locked) return;
     setDraft((d) => {
-      const base = d ?? data.platforms;
+      const base = d ?? saved;
       if (base.includes(p)) return base.filter((x) => x !== p);
       if (base.length >= data.limit) return base;   // 選滿了就不再加
       return [...base, p];

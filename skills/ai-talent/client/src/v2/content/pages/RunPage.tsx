@@ -1174,13 +1174,17 @@ export default function RunPage() {
       return;
     }
     const ws = String(data?.mission?.workspace ?? "").toLowerCase();
+    // 2026-09-29 CJ：LinkedIn／YouTube／新聞稿／X 下架。舊產出還看得到，但不能再跑——
+    // 導去 /tasks/li 只會被踢回 FB、rerun 參數也丟了，不如直接說清楚。
+    if (/linkedin|youtube|press|^pr$|^x$|twitter/.test(ws) || /^(li|yt|pr|x)-/.test(String(taskId))) {
+      showToastGlobal(lang === "en" ? "This channel is no longer offered." : "這個通路的任務卡已下架，無法重跑。");
+      return;
+    }
     const slug =
       ws.includes("instagram") ? "ig" :
-      ws.includes("linkedin")  ? "li" :
-      ws.includes("youtube")   ? "yt" :
       ws.includes("tiktok")    ? "tt" :
       ws.includes("email")     ? "email" :
-      (ws.includes("press") || ws.includes("pr")) ? "pr" :
+      ws.includes("website")   ? "web" :
       "fb";
     navigate(`/tasks/${slug}?rerun=${id}`);
   }, [data?.mission?.taskId, data?.mission?.workspace, id, lang, navigate]);

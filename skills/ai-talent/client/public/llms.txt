@@ -1,8 +1,8 @@
 # OnBrand AI
 
-> OnBrand 是 SoWork（摘星社群行銷顧問）推出的 AI 行銷工作室。它把 SoWork 14 步品牌定位法做成可執行的流程，鎖定品牌大腦後，所有平台（FB、IG、YouTube、TikTok、EDM、PR）的內容都自動 on-brand。168 個任務內建得獎工藝案例。
+> OnBrand 是 SoWork（摘星社群行銷顧問）推出的 AI 行銷工作室。它把 SoWork 14 步品牌定位法做成可執行的流程，鎖定品牌大腦後，七個通路（Facebook、Instagram、Threads、LINE、TikTok、電子報、官網）的內容都自動 on-brand。任務卡標示結構出處。
 
-OnBrand is the AI marketing studio by SoWork. It turns SoWork's 14-step Brand Positioning Method into an executable flow. Lock your brand brain once, and every caption across Facebook, Instagram, YouTube, TikTok, Email and PR stays on-brand automatically. 168 tasks built in, each backed by a real award-winning case.
+OnBrand is the AI marketing studio by SoWork. It turns SoWork's 14-step Brand Positioning Method into an executable flow. Lock your brand brain once, and every caption across 7 channels — Facebook, Instagram, Threads, LINE, TikTok, Email and Website — stays on-brand automatically. Task cards state where their structure comes from.
 
 ## Core Product
 
@@ -12,12 +12,12 @@ OnBrand is the AI marketing studio by SoWork. It turns SoWork's 14-step Brand Po
   - 60s — a multi-platform content pack
   - 99s — a full campaign slate
 - **7-Day Publisher** (七日發布台): One click schedules a whole week of posts across all channels, with structural variety enforced.
-- **168 Award-Craft Tasks**: Each task is mapped to a documented award-winning campaign (Cannes Lions, Clio, Effie, Shorty Award, IAC, etc.) and encodes its transferable craft principle.
+- **Two kinds of task cards**: viral-structure cards (deconstructed from real viral content, each with its spread metric and the month measured) and brand-built cards (reverse-engineered from the brand's own best posts).
 - **16,113 AI Agents**: Specialized agents per content type — not a single generic model. Each agent has its own methodology, role, and output spec.
 
 ## Who It's For
 
-- Taiwan SMB brand owners running their own FB / IG / YouTube
+- Taiwan SMB brand owners running their own FB / IG / TikTok
 - In-house marketers / solo marketing managers
 - Marketing agencies serving multiple brand clients
 - Founders who want every caption to "sound like me, not ChatGPT"
@@ -72,7 +72,6 @@ Examples of how OnBrand tasks reference real campaigns:
 - **FB Ad Copy** ← Aviation Gin (Cannes Lions Silver 2021) — anti-consensus framing in first 3 words
 - **IG Reels Script** ← Adobe *The Unfinished Film* (IAC Best of Show) — open invitation as hook
 - **EDM Subject Line** ← Patagonia — commitment-cost subject structure
-- **PR News Hook** ← Liquid Death (Clio Grand Prix) — counter-intuitive claim that journalists write themselves
 - **TikTok Script** ← Duolingo (Shorty Award) — character arc with unresolved tension
 - **Welcome Email Sequence** ← Dropbox (IAC Award) — progress-milestone anchoring, not discount
 

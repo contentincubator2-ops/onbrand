@@ -14,8 +14,8 @@
  */
 import React, { useMemo, useState } from "react";
 import { useLang } from "../../../../lib/i18n";
-import { SOURCE_ORDER, resolveSource, sourceLabel, sourceWhy, sourcePillText,
-  type TaskSourceType } from "../../../content/lib/sourceVocabulary";
+import { resolveSource, sourceWhy, sourcePillText,
+  FRONT_CARD_KINDS, frontCardKind, frontCardKindLabel, type FrontCardKind } from "../../../content/lib/sourceVocabulary";
 import { Check, X, Lock, Search } from "lucide-react";
 
 export interface PickerTask {
@@ -24,6 +24,7 @@ export interface PickerTask {
   description?: string;
   source?: unknown;
   tier?: string;
+  ownCardId?: string | null;
 }
 
 export default function TaskPicker({
@@ -57,15 +58,17 @@ export default function TaskPicker({
 
   const groups = useMemo(() => {
     const kw = q.trim().toLowerCase();
-    const byType = new Map<TaskSourceType, PickerTask[]>();
+    // 2026-09-29：前台只分兩類——爆款結構、品牌自建；其他類型不列。
+    const byType = new Map<FrontCardKind, PickerTask[]>();
     for (const t of tasks) {
       if (kw && !`${t.label ?? ""} ${t.description ?? ""}`.toLowerCase().includes(kw)) continue;
-      const type = resolveSource(t.source).type;
+      const type = frontCardKind(t);
+      if (!type) continue;
       const arr = byType.get(type) ?? [];
       arr.push(t);
       byType.set(type, arr);
     }
-    return SOURCE_ORDER
+    return FRONT_CARD_KINDS
       .filter((s) => byType.has(s))
       .map((s) => ({ type: s, items: byType.get(s)! }));
   }, [tasks, q]);
@@ -121,10 +124,10 @@ export default function TaskPicker({
             <section key={type} className="mb-5">
               <div className="mb-2 flex items-baseline gap-2">
                 <h3 className="text-[14px] font-semibold text-neutral-900">
-                  {sourceLabel(type, lang)}
+                  {frontCardKindLabel(type, lang)}
                 </h3>
                 <span className="text-[13px] text-neutral-400">{items.length}</span>
-                <span className="truncate text-[13px] text-neutral-400">{sourceWhy(type, lang)}</span>
+                <span className="truncate text-[13px] text-neutral-400">{type === "viral" ? sourceWhy("viral", lang) : (lang === "en" ? "Cards you built for this brand." : "你替這個品牌自己建的卡。")}</span>
               </div>
               <div className="grid gap-2 sm:grid-cols-2">
                 {items.map((t) => {
@@ -153,7 +156,7 @@ export default function TaskPicker({
                           {t.label ?? t.id}
                         </span>
                         <span className="mt-0.5 block truncate text-[13px] text-neutral-500">
-                          {sourcePillText(src, lang)}
+                          {type === "own" ? frontCardKindLabel("own", lang) : sourcePillText(src, lang)}
                         </span>
                         {onDetail && (
                           <span

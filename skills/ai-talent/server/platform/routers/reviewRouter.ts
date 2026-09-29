@@ -20,7 +20,12 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure } from "../core/trpc";
-import { assertReviewAllowed } from "../core/planGate";
+import { assertReviewAllowed, isHiddenHistoryItem } from "../core/planGate";
+
+/** 2026-09-29 CJ「前台隱藏，資料保留」：下架通路（LinkedIn／YouTube／新聞稿／X）的稿不列、不算紅點。 */
+const hiddenReview = (r: any) =>
+  isHiddenHistoryItem({ platform: r.platform, taskId: r.taskId }) || isHiddenHistoryItem({ platform: r.workspace });
+const REVIEW_TASK_COLS = `NULLIF(JSON_UNQUOTE(JSON_EXTRACT(o.metadata, '$.taskId')), 'null') AS taskId, m.workspace AS workspace`;
 
 const REVIEW_TYPES = ["internal", "external", "legal", "client"] as const;
 
@@ -133,9 +138,10 @@ export const reviewRouter = router({
         `SELECT q.id, q.missionId, q.outputId, q.requestedBy, q.reviewType, q.status,
                 q.reviewerIds, q.isUrgent, q.revisionNote, q.createdAt,
                 o.title AS outputTitle, o.platform, o.outputType,
-                u.name AS requesterName, u.email AS requesterEmail
+                u.name AS requesterName, u.email AS requesterEmail, ${REVIEW_TASK_COLS}
            FROM mission_review_queue q
            LEFT JOIN mission_outputs o ON o.id = q.outputId
+           LEFT JOIN missions m ON m.id = q.missionId
            LEFT JOIN users u ON u.id = q.requestedBy
           WHERE q.status IN ('pending','in_review')
           ORDER BY q.isUrgent DESC, q.createdAt ASC
@@ -144,6 +150,7 @@ export const reviewRouter = router({
       );
       const out = [];
       for (const r of rows as any[]) {
+        if (hiddenReview(r)) continue;
         if (await canApprove(userId, Number(r.requestedBy), parseReviewers(r.reviewerIds))) {
           out.push({ ...r, reviewerIds: parseReviewers(r.reviewerIds) });
         }
@@ -158,15 +165,16 @@ export const reviewRouter = router({
       const { default: localPool } = await import("../../localDb");
       const [rows]: any = await localPool.execute(
         `SELECT q.id, q.missionId, q.outputId, q.status, q.reviewType, q.revisionNote,
-                q.approvedAt, q.createdAt, o.title AS outputTitle, o.platform
+                q.approvedAt, q.createdAt, o.title AS outputTitle, o.platform, ${REVIEW_TASK_COLS}
            FROM mission_review_queue q
            LEFT JOIN mission_outputs o ON o.id = q.outputId
+           LEFT JOIN missions m ON m.id = q.missionId
           WHERE q.requestedBy = ?
           ORDER BY q.createdAt DESC
           LIMIT ?`,
         [ctx.user!.id, input?.limit ?? 50],
       );
-      return rows as any[];
+      return (rows as any[]).filter((r) => !hiddenReview(r));
     }),
 
   /** 待審數量，給側邊欄的紅點用。 */
@@ -174,11 +182,15 @@ export const reviewRouter = router({
     const { default: localPool } = await import("../../localDb");
     try {
       const [rows]: any = await localPool.execute(
-        `SELECT q.requestedBy, q.reviewerIds FROM mission_review_queue q
+        `SELECT q.requestedBy, q.reviewerIds, o.platform, ${REVIEW_TASK_COLS}
+           FROM mission_review_queue q
+           LEFT JOIN mission_outputs o ON o.id = q.outputId
+           LEFT JOIN missions m ON m.id = q.missionId
           WHERE q.status IN ('pending','in_review') LIMIT 200`,
       );
       let n = 0;
       for (const r of rows as any[]) {
+        if (hiddenReview(r)) continue;
         if (await canApprove(ctx.user!.id, Number(r.requestedBy), parseReviewers(r.reviewerIds))) n++;
       }
       return n;

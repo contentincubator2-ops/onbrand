@@ -33,7 +33,7 @@
 import localPool from "../../localDb";
 import { callModel } from "../../platform/core/multiModelRouter";
 import { loadAgentKnowledge } from "../../platform/core/agentKnowledge";
-import { planQuotaFor } from "../../platform/core/planGate";
+import { isHiddenHistoryItem, planQuotaFor } from "../../platform/core/planGate";
 import { getDirectorByAgentId, getRole } from "./strategistDirectory";
 import { buildMeetingSources, sourcesBlock, verifyQuote, type MeetingSource } from "./meetingSources";
 
@@ -142,7 +142,8 @@ export interface MeetingAction {
 }
 
 /** 可以給會議行動挑的通路：整篇可以發的內容通路。 */
-const CONTENT_CHANNELS = ["facebook", "instagram", "linkedin", "youtube", "tiktok", "x", "email", "pr", "website"];
+// 2026-09-29 CJ：只留五個（planGate.HIDDEN_CONTENT_PLATFORMS）。
+const CONTENT_CHANNELS = ["facebook", "instagram", "threads", "line", "tiktok", "email", "website"];
 const PLATFORM_ZH: Record<string, string> = {
   facebook: "Facebook", instagram: "Instagram", linkedin: "LinkedIn", youtube: "YouTube", tiktok: "TikTok",
   x: "X", email: "電子報", pr: "新聞稿", website: "官網",
@@ -418,6 +419,21 @@ export interface MeetingRun {
 /** 一場會跑超過這個時間還是 running，就是伺服器中途重啟了——顯示成失敗，不要永遠轉圈。 */
 const STALE_RUNNING_MS = 30 * 60_000;
 
+/**
+ * 2026-09-29 CJ「前台隱藏，資料保留」：舊會議紀錄裡指到 LinkedIn／YouTube／新聞稿／X
+ * 任務卡的行動，拿掉卡片連結（行動本身留著）——點下去只會被導回 FB。
+ */
+function hideRetiredTaskLinks(m: MeetingMinutes | null): MeetingMinutes | null {
+  if (!m || !Array.isArray((m as any).actions)) return m;
+  return {
+    ...m,
+    actions: (m as any).actions.map((a: MeetingAction) =>
+      isHiddenHistoryItem({ platform: a.platform, taskId: a.taskId })
+        ? { ...a, taskId: undefined, taskLabel: undefined, platform: undefined }
+        : a),
+  } as MeetingMinutes;
+}
+
 export function rowToRun(r: any, now: Date = new Date()): MeetingRun {
   const stale = r.status === "running" && now.getTime() - new Date(r.createdAt).getTime() > STALE_RUNNING_MS;
   return {
@@ -426,7 +442,7 @@ export function rowToRun(r: any, now: Date = new Date()): MeetingRun {
     note: stale ? "interrupted：會議中途中斷（伺服器重啟），請再開一次" : String(r.note ?? ""),
     trigger: String(r.trigger_kind ?? "schedule"),
     transcript: parseJ(r.transcript, []),
-    minutes: parseJ<MeetingMinutes | null>(r.minutes, null),
+    minutes: hideRetiredTaskLinks(parseJ<MeetingMinutes | null>(r.minutes, null)),
     evidence: parseJ(r.evidence, []),
     decisions: parseJ<Record<string, Decision>>(r.decisions, {}),
     createdAt: new Date(r.createdAt).toISOString(),

@@ -933,7 +933,7 @@ import { ALL_99S_TASKS, get99Template } from "../core/quickTask100";
 import { ALL_99S_SQUADS } from "../core/quickTask100Squads";
 import { is99sOrchestraListed, platformOfTaskId } from "../core/taskCatalogIndex";
 import {
-  planQuotaFor, resolveChannels, filterTasksByPlan, daysUntilSwap, isUnlimited,
+  planQuotaFor, resolveChannels, filterTasksByPlan, daysUntilSwap, isUnlimited, isHiddenContentPlatform,
   loadBrandPositioning, assertTaskAllowed, type TaskGateInfo,
 } from "../../platform/core/planGate";
 import { defaultTray, storedTray, MAX_TRAY } from "../core/taskTray";
@@ -1334,6 +1334,11 @@ export const quickTaskRouter = router({
       const quota = await planQuotaFor(ctx.user!.id);
       const positioning = (await loadBrandPositioning(input.brandId)) ?? {};
       const sel = resolveChannels(positioning, quota);
+      // 2026-09-29 已下架的通路（planGate.HIDDEN_CONTENT_PLATFORMS）不能再被選。
+      const hidden = input.platforms.filter(isHiddenContentPlatform);
+      if (hidden.length) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: `這些通路已不提供：${hidden.join("、")}` });
+      }
 
       if (!isUnlimited(quota.platforms) && input.platforms.length > quota.platforms) {
         throw new TRPCError({
