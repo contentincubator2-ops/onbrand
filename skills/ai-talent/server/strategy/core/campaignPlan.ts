@@ -335,9 +335,10 @@ async function eventFacts(eventId: number, userId: number): Promise<{
 }
 
 /** 可以排進企劃的通路——推斷結果只能落在這裡面。 */
-// 2026-09-29 CJ：內容通路只留 FB／IG／TikTok／電子報／官網（planGate.HIDDEN_CONTENT_PLATFORMS）。
+// 2026-09-29 CJ：拿掉 LinkedIn／YouTube／新聞稿／X（planGate.HIDDEN_CONTENT_PLATFORMS）；
+// Threads 與 LINE CJ 要留。
 export const PLANNABLE_CHANNELS = [
-  "facebook", "instagram", "email", "website", "tiktok",
+  "facebook", "instagram", "email", "website", "tiktok", "threads",
 ] as const;
 
 export interface InferredSettings {
