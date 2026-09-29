@@ -7,6 +7,9 @@ name: Admin — Probe agent knowledge (工作守則／執行卡／Skill 是否�
 #
 # 2026-09-26：加 target=dev（dev VM 用 environment: dev 的 secrets，部署在
 # /opt/onbrand/current）。
+#
+# 2026-09-29：加 probe=brand-brain（CJ「檢查大腦」tray）——用 buildBrandBrain 量真實
+# 品牌的大腦用量、只記一部分／超載筆數，校準容量用。ids 這時是品牌 id。
 
 on:
   workflow_dispatch:
@@ -16,8 +19,13 @@ on:
         type: choice
         options: [prod, dev]
         default: prod
+      probe:
+        description: "agent-knowledge = agent 守則／卡／Skill；brand-brain = 品牌大腦用量（dev 限定）"
+        type: choice
+        options: [agent-knowledge, brand-brain]
+        default: agent-knowledge
       ids:
-        description: "agent id（空白分隔）；留空 = 全部產品策略 agent"
+        description: "agent id 或品牌 id（空白分隔）；留空 = 全部產品策略 agent／定位最多的 15 個品牌"
         required: false
         default: ""
 
@@ -29,18 +37,21 @@ jobs:
       - uses: appleboy/ssh-action@v1.0.3
         env:
           IDS: ${{ github.event.inputs.ids }}
+          PROBE: ${{ github.event.inputs.probe }}
         with:
           host: ${{ secrets.VM_HOST }}
           username: ${{ secrets.VM_USER }}
           key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
-          envs: IDS
+          envs: IDS,PROBE
           command_timeout: 120s
           script: |
             set -e
             cd /opt/onbrand/app/skills/ai-talent
             # localDb throws at import without env — load .env first.
             set -a; source .env; set +a
-            if [ -n "$IDS" ]; then
+            if [ "$PROBE" = "brand-brain" ]; then
+              npx tsx scripts/probe-brand-brain.ts $IDS
+            elif [ -n "$IDS" ]; then
               npx tsx scripts/probe-agent-knowledge.ts $IDS
             else
               npx tsx scripts/probe-agent-knowledge.ts --product-strategy
@@ -66,12 +77,15 @@ jobs:
           VM_HOST: ${{ secrets.VM_HOST }}
           VM_USER: ${{ secrets.VM_USER }}
           IDS: ${{ github.event.inputs.ids }}
+          PROBE: ${{ github.event.inputs.probe }}
         run: |
-          ssh -i ~/.ssh/onbrand-dev "$VM_USER@$VM_HOST" "IDS='${IDS//[^0-9 ]/}' bash -s" <<'REMOTE'
+          ssh -i ~/.ssh/onbrand-dev "$VM_USER@$VM_HOST" "IDS='${IDS//[^0-9 ]/}' PROBE='${PROBE//[^a-z-]/}' bash -s" <<'REMOTE'
           set -euo pipefail
           cd /opt/onbrand/current/skills/ai-talent
           set -a; source .env; set +a
-          if [ -n "$IDS" ]; then
+          if [ "$PROBE" = "brand-brain" ]; then
+            ./node_modules/.bin/tsx scripts/probe-brand-brain.ts $IDS
+          elif [ -n "$IDS" ]; then
             ./node_modules/.bin/tsx scripts/probe-agent-knowledge.ts $IDS
           else
             ./node_modules/.bin/tsx scripts/probe-agent-knowledge.ts --product-strategy
