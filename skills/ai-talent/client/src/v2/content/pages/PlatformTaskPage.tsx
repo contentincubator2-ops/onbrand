@@ -1031,6 +1031,9 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
     // 2026-09-29：server 的預設托盤是從「全部卡」裡每個形式挑一張，但前台只列
     // 爆款結構＋品牌自建——交集後常常只剩一兩張（FB 7 張爆款卡只擺出 2 張）。
     // 沒存過托盤時，改從「前台看得到的卡」裡每個形式挑一張，server 的挑法當次序參考。
+    // 看得到的卡本來就不超過托盤上限時全部擺出來——IG 兩張留言卡共用同一個形式，
+    // 私訊卡又是 feed 形式，每個形式挑一張會把 8 張砍成 6 張，藏掉唯一的私訊卡。
+    if (platformTasks.length <= (trayData.maxTray ?? 12)) return platformTasks.map((t: any) => t.id);
     const fallbackOrder = new Map((trayData.fallback ?? []).map((id, i) => [id, i] as const));
     const byType = new Map<string, any>();
     const ranked = [...platformTasks].sort((a: any, b: any) =>
