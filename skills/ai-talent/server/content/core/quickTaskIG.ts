@@ -601,8 +601,9 @@ caption 結構：
     source: {
       type: "viral",
       short: "新加坡 LTA「寶寶在公車上自拍」",
-      metric: "3 天逾 12,500 個讚（IG）",
+      metric: "3 天逾 12,500 個讚",
       asOf: "2026-08",
+      caveat: "政府帳號；跟風迷因，只取「帳號被接管」這個機制",
       url: "https://www.asiaone.com/singapore/accidental-baby-selfie-trend-singapore",
       takeaway:
         "官方帳號假裝被一個反差極大的可愛局外人「接管」，畫面裡藏著自家場景（公車），語氣瞬間變軟，大家留言猜、留言玩。",
@@ -642,8 +643,9 @@ caption 結構：
     source: {
       type: "viral",
       short: "Your Social Team 假公審輪播",
-      metric: "24 小時 5 萬次觀看（代理商自報；頁面未標年份，依貼文 ID 推定 2026-08）",
+      metric: "24 小時 5 萬次觀看",
       asOf: "2026-08",
+      caveat: "代理商自報；頁面未標年份，依貼文 ID 推定為 2026-08",
       url: "https://yoursocial.team/blog/trend-drops-august-week-two",
       postUrl: "https://www.instagram.com/p/Db3Anfijuvo/",
       takeaway:
@@ -683,6 +685,7 @@ caption 結構：
       short: "紐約市長曼達尼中文宣傳 Reel",
       metric: "IG 貼文逾 140 萬個讚、約 3 萬 7 千則留言",
       asOf: "2026-08",
+      caveat: "政治人物帳號",
       url: "https://www.worldjournal.com/wj/story/121390/9695681",
       takeaway:
         "開場直接承認「我不會講這個語言，但想試一下」，再用對方的母語講清楚一個具體好康；笨拙本身就是誠意，大家留言幫忙糾正、分享給同鄉。",
@@ -722,8 +725,9 @@ caption 結構：
     source: {
       type: "viral",
       short: "SwissWatchExpo「The Grail Bracket」",
-      metric: "數百則留言，品牌史上互動最多的一場直播（品牌自報）",
+      metric: "數百則留言，品牌史上互動最多的一場直播",
       asOf: "2026-08",
+      caveat: "品牌自報，數字不精確",
       url: "https://www.swisswatchexpo.com/thewatchclub/the-grail-bracket/",
       takeaway:
         "16 件話題商品分組對戰、每回合開放留言投票、雙機位並排比細節，高單價商品也能靠「看比賽」累積信任，成交在直播後私訊完成。",
@@ -762,8 +766,9 @@ caption 結構：
     source: {
       type: "viral",
       short: "珍妮佛勞倫斯開 IG 帳號",
-      metric: "不到 24 小時漲粉 300 萬（名人帳號）",
+      metric: "不到 24 小時漲粉 300 萬",
       asOf: "2026-09",
+      caveat: "名人帳號，靠既有知名度",
       url: "https://woman.tvbs.com.tw/fashion/52170",
       takeaway:
         "開帳號不放精修照，第一支影片就立一條很有個性的規則（誰酸我我就不玩了），限動再用同一個梗反轉，讓「開帳號」這件事本身變成話題。",
@@ -799,8 +804,9 @@ caption 結構：
     source: {
       type: "viral",
       short: "臺北洲際酒店「The First 80」",
-      metric: "8 萬 2,956 則參與，約 1,037 人搶 1 個名額（FB／IG／Threads 合計）",
+      metric: "8 萬 2,956 則參與，約 1,037 人搶 1 個名額",
       asOf: "2026-09",
+      caveat: "FB／IG／Threads 三平台合計",
       url: "https://udn.com/news/amp/story/7270/9778590",
       takeaway:
         "用一句填空（「我愛上臺北，因為＿＿」）把留言門檻降到最低、再要求標記一位同行者，每一則留言都是一篇 UGC，也順便替活動擴散；名額只有 80 組，稀缺讓人搶著寫。",
@@ -842,6 +848,7 @@ caption 結構：
       short: "Samsung 在 Rosé IG 貼文下留言",
       metric: "這則留言 21.2 萬人按讚、回覆超過 2,000 則",
       asOf: "2026-09",
+      caveat: "全球品牌；報導未寫出是哪個官方帳號留言",
       url: "https://www.mirrordaily.news/story/85288",
       takeaway:
         "當事人發了跟自家品類有關的大貼文，品牌用既有關係（前代言、前合作）的角度留一句友善但帶刺的話，不發聲明、不追加解釋，讓回覆串自己發酵。",
@@ -880,8 +887,9 @@ caption 結構：
     source: {
       type: "viral",
       short: "Plainspeak IG 私訊送試用包",
-      metric: "已寄出數千包試用包（報導未給精確數字）",
+      metric: "已寄出數千包試用包",
       asOf: "2026-09",
+      caveat: "報導只寫「數千包」，沒有精確數字",
       url: "https://www.modernretail.co/marketing/brands-briefing-instagram-dms-are-proving-to-be-a-gold-mine-for-product-development/",
       takeaway:
         "把「私訊我們」設成拿免費試用的唯一入口，一次拿到潛在客戶名單與第一手問題；私訊裡最常被問的事，後來直接變成產品調整（例如開放單買）。",

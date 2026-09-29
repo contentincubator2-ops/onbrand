@@ -146,6 +146,10 @@ export const FB_TASK_FORMAT_MAP: Record<string, FBActiveFormat> = {
   "fb-30-pinned-ritual-break":    "置頂貼文",
   "fb-30-comment-callback":       "留言",
   "fb-30-album-closeup-riff":     "相簿",
+  "fb-30-feed-curiosity-explainer": "貼文",
+  "fb-30-feed-rare-reunion":      "貼文",
+  "fb-30-album-evidence-chain":   "相簿",
+  "fb-30-pinned-correction":      "置頂貼文",
   "fb-60-launch-kit":             "活動",
 
   // ── 留言 ──────────────────────────────────────────────────────────────
@@ -476,6 +480,16 @@ export const TT_TASK_FORMAT_MAP: Record<string, TTActiveFormat> = {
   "tt-30-live-relay-host":             "腳本",
   "tt-30-profile-self-aware":          "帳號營運",
   "tt-30-storyboard-catch-wave":       "分鏡表",
+  // 2026-09-29 近 3 個月爆款結構卡
+  "tt-30-live-landmark-launch":         "帳號營運",
+  "tt-30-account-staff-trend-lines":    "帳號營運",
+  "tt-30-comment-ugc-hack":             "帳號營運",
+  "tt-30-account-embrace-creator-meme": "帳號營運",
+  "tt-30-live-auction-trust":           "帳號營運",
+  "tt-30-live-daily-show":              "帳號營運",
+  "tt-30-script-character-scorecard":   "腳本",
+  "tt-30-topic-local-contest-kickoff":  "選題",
+  "tt-30-copy-founder-number-story":    "文案",
   // 選題 — 還沒有內容之前，決定「要做什麼」
   "tt-30-trend-remix":         "選題",
   "tt-30-duet-angle":          "選題",
