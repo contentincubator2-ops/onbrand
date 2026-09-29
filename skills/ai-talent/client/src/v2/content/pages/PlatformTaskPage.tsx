@@ -1018,7 +1018,18 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
     const visible = new Set(platformTasks.map((t: any) => t.id));
     const stored = (trayData.stored ?? []).filter((id) => visible.has(id));
     if (stored.length) return stored;
-    return (trayData.fallback ?? []).filter((id) => visible.has(id));
+    // 2026-09-29：server 的預設托盤是從「全部卡」裡每個形式挑一張，但前台只列
+    // 爆款結構＋品牌自建——交集後常常只剩一兩張（FB 7 張爆款卡只擺出 2 張）。
+    // 沒存過托盤時，改從「前台看得到的卡」裡每個形式挑一張，server 的挑法當次序參考。
+    const fallbackOrder = new Map((trayData.fallback ?? []).map((id, i) => [id, i] as const));
+    const byType = new Map<string, any>();
+    const ranked = [...platformTasks].sort((a: any, b: any) =>
+      (fallbackOrder.get(a.id) ?? 1e9) - (fallbackOrder.get(b.id) ?? 1e9));
+    for (const t of ranked as any[]) {
+      const k = String(t.postType ?? "other");
+      if (!byType.has(k)) byType.set(k, t);
+    }
+    return [...byType.values()].map((t: any) => t.id);
   }, [trayData, platformTasks]);
 
   /**
