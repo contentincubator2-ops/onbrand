@@ -88,7 +88,7 @@ export default function CardDetailDrawer({ taskId, lang, onClose, onRun }: Props
     : { data: null, isLoading: false, error: null };
   const d = q.data as any;
   const src = resolveSource(d?.source);
-  const full = (d?.source ?? {}) as { short?: string; takeaway?: string; metric?: string; asOf?: string; url?: string; postUrl?: string; caveat?: string };
+  const full = (d?.source ?? {}) as { short?: string; takeaway?: string; metric?: string; asOf?: string; url?: string; postUrl?: string };
   const age = daysSince(d?.addedAt);
   const isNew = isRecentCard(d?.addedAt);
   const srcAgeMonths = full.asOf
@@ -194,9 +194,6 @@ export default function CardDetailDrawer({ taskId, lang, onClose, onRun }: Props
                           </span>
                         )}
                       </p>
-                    )}
-                    {full.caveat && (
-                      <p className="mt-1 text-[12px] text-neutral-500">{en ? "Note: " : "註："}{full.caveat}</p>
                     )}
                     {/* 2026-09-29（CJ「要有參考文章的連結」）：數字要能點過去自己核對。 */}
                     {(full.url || full.postUrl) && (
