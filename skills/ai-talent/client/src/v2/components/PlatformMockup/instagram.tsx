@@ -26,7 +26,7 @@ import {
 import {
   type MockupFields, MockupHeader, StoryRingAvatar, VerticalActionRail,
   dicebear, handleOf, SlotContent, MarkdownText, ImageGenSlot,
-  SHOW_IMAGE_STYLE_OVERLAY,
+  SHOW_IMAGE_STYLE_OVERLAY, CardTextOverlay,
 } from "./shared";
 import { useLang } from "../../../lib/i18n";
 import { getPostTitleFallback } from "../../lib/mockupTitle";
@@ -207,12 +207,32 @@ export function IGFeed({ title, brandName, brandLogoUrl, variantLabel, liveCapti
 
 /* ─────────────── IG Carousel ─────────────── */
 
-export function IGCarousel({ title, brandName, brandLogoUrl, variantLabel, liveCaption, liveHashtags, liveImageDesc, liveImageStyle, liveImageUrl, liveImageStatus, onGenerateImage }: MockupFields) {
+function narrowStatus(v: unknown): MockupFields["liveImageStatus"] {
+  return v === "ready" || v === "failed" || v === "skipped" || v === "timeout" ? v : undefined;
+}
+
+
+export function IGCarousel({ title, brandName, brandLogoUrl, variantLabel, liveCaption, liveHashtags, liveImageDesc, liveImageStyle, liveImageUrl, liveImageStatus, liveCards, onGenerateImage }: MockupFields) {
   const { lang } = useLang();
   const handle = handleOf(brandName);
   const avatarSrc = brandLogoUrl || dicebear(brandName ?? "brand");
   const postTitleFallback = getPostTitleFallback(title, liveCaption);
-  const carouselCount = 9;
+  // 2026-08-21 (CJ「說是七張卡片的輪播，但只有出現一張，右上方呈現 1/9」):
+  // carouselCount 本來寫死 9 —— 那個 9 純粹是裝飾，跟實際卡數無關，所以連
+  // 只有一張圖的輪播也標 1/9。改成讀 orchestra 真的產出的 cards。
+  // 沒有 cards 時（單圖任務共用這個 mockup）退回單張，計數就是 1/1。
+  const cards = Array.isArray(liveCards) && liveCards.length > 0
+    ? liveCards.map((c) => ({
+        headline: c.headline,
+        url: c.image?.url ?? null,
+        // liveCards 的 status 是寬鬆的 string（來自 orchestra JSON），
+        // ImageGenSlot 只吃那四個字面值 —— 收窄，不認得的一律當「還沒好」。
+        status: narrowStatus(c.image?.status),
+        style: c.image?.style ?? null,
+      }))
+    : [{ headline: "", url: liveImageUrl ?? null, status: liveImageStatus, style: liveImageStyle ?? null }];
+  const carouselCount = cards.length;
+  const anyImageReady = cards.some((c) => c.url && c.status === "ready");
   return (
     <div className="w-full max-w-[420px] mx-auto">
       <MockupHeader icon={faInstagram} label="Instagram" variantLabel={variantLabel} />
@@ -233,32 +253,42 @@ export function IGCarousel({ title, brandName, brandLogoUrl, variantLabel, liveC
         </div>
 
         {/* 2026-05-10 (CJ feedback「IG 主圖太高」): collapse to slim h-32 strip
-            when no image yet; use full aspect-square only when image ready. */}
+            when no image yet; use full aspect-square only when image ready.
+            2026-08-21: 多卡時改成可橫向滑動的整排卡片 —— 教學型輪播的重點就是
+            「七張合起來講完一個故事」，只顯示第一張等於看不到成品。每張卡的
+            headline 用 CardTextOverlay 壓在圖上（AI 生圖不烤中文字，見 shared）。 */}
         <div
-          className={`relative bg-default-100 overflow-hidden ${
-            liveImageUrl && liveImageStatus === "ready" ? "aspect-square" : "h-32"
-          }`}
+          className={`relative bg-default-100 overflow-hidden ${anyImageReady ? "aspect-square" : "h-32"}`}
         >
-          {liveImageUrl && liveImageStatus === "ready" ? (
-            <img src={liveImageUrl} alt="" className="absolute inset-0 w-full h-full object-cover" />
-          ) : (
-            // 2026-07-17 (CJ「盤查生圖佔位」): standardized ImageGenSlot
-            <div className="absolute inset-0">
-              <ImageGenSlot
-                brief={liveImageStyle || liveImageDesc}
-                status={liveImageStatus}
-                onGenerate={onGenerateImage}
-                aspectClass="w-full h-full"
-              />
-            </div>
-          )}
-          <div className="absolute top-2.5 right-2.5 bg-black/55 text-white text-tiny font-medium px-2 py-0.5 rounded-full backdrop-blur-sm">
+          <div className="absolute inset-0 flex overflow-x-auto snap-x snap-mandatory" style={{ scrollbarWidth: "none" }}>
+            {cards.map((c, i) => (
+              <div key={i} className="relative shrink-0 w-full h-full snap-start">
+                {c.url && c.status === "ready" ? (
+                  <>
+                    <img src={c.url} alt="" className="absolute inset-0 w-full h-full object-cover" />
+                    <CardTextOverlay text={c.headline} place="center" />
+                  </>
+                ) : (
+                  // 2026-07-17 (CJ「盤查生圖佔位」): standardized ImageGenSlot
+                  <div className="absolute inset-0">
+                    <ImageGenSlot
+                      brief={c.style || (i === 0 ? liveImageDesc : c.headline)}
+                      status={c.status}
+                      onGenerate={i === 0 ? onGenerateImage : undefined}
+                      aspectClass="w-full h-full"
+                    />
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+          <div className="absolute top-2.5 right-2.5 bg-black/55 text-white text-tiny font-medium px-2 py-0.5 rounded-full backdrop-blur-sm pointer-events-none">
             1/{carouselCount}
           </div>
         </div>
 
         <div className="flex items-center justify-center gap-1 py-1.5">
-          {[0, 1, 2, 3, 4].map((i) => (
+          {cards.map((_, i) => (
             <span key={i} className={`rounded-full ${i === 0 ? "bg-primary w-1.5 h-1.5" : "bg-default-300 w-1.5 h-1.5 opacity-70"}`} />
           ))}
         </div>

@@ -15,7 +15,7 @@ import {
   faVideo, faThumbsUp, faThumbsDown, faComment, faShareNodes,
   faMusic, faImages, faDownload, faBell, faScissors,
 } from "@fortawesome/free-solid-svg-icons";
-import { type MockupFields, MockupHeader, dicebear, MarkdownText, ImageGenSlot } from "./shared";
+import { type MockupFields, MockupHeader, dicebear, MarkdownText, ImageGenSlot, CardTextOverlay } from "./shared";
 import { useLang } from "../../../lib/i18n";
 
 /* ─────────────── Thumbnail title overlay ───────────────
@@ -23,29 +23,8 @@ import { useLang } from "../../../lib/i18n";
    Big, bold, high-contrast with a dark outline so it reads on any background —
    the classic YouTube-thumbnail look. Absolutely positioned; captured by the
    html2canvas "帶版型" download. */
-function ThumbnailTextOverlay({ text }: { text?: string }) {
-  const t = (text ?? "").trim();
-  if (!t) return null;
-  return (
-    <div
-      className="absolute inset-0 z-10 flex items-end p-[4%] pointer-events-none"
-      style={{ containerType: "inline-size" }}
-    >
-      <span
-        className="font-extrabold leading-tight line-clamp-3"
-        style={{
-          color: "#fff",
-          fontSize: "clamp(18px, 6cqw, 44px)",
-          letterSpacing: "-0.01em",
-          textShadow:
-            "-2px -2px 0 #000, 2px -2px 0 #000, -2px 2px 0 #000, 2px 2px 0 #000, 0 3px 8px rgba(0,0,0,0.55)",
-        }}
-      >
-        {t}
-      </span>
-    </div>
-  );
-}
+// 2026-08-21: ThumbnailTextOverlay moved to shared.tsx as CardTextOverlay —
+// IG carousel cards need the same overlay, and two copies drift apart.
 
 /* ─────────────── YT Video Card ─────────────── */
 
@@ -71,7 +50,7 @@ export function YTVideoCard({ title, brandName, brandLogoUrl, variantLabel, live
               />
             </div>
           )}
-          {liveImageUrl && liveImageStatus === "ready" && <ThumbnailTextOverlay text={overlayTitle} />}
+          {liveImageUrl && liveImageStatus === "ready" && <CardTextOverlay text={overlayTitle} />}
           <div className="absolute bottom-2 right-2 bg-black/80 text-white text-tiny px-1.5 py-0.5 rounded z-20 pointer-events-none">12:34</div>
         </div>
         <div className="p-4 space-y-2">
@@ -128,7 +107,7 @@ export function YTWatch({ title, brandName, brandLogoUrl, variantLabel, liveCapt
               />
             </div>
           )}
-          {liveImageUrl && liveImageStatus === "ready" && <ThumbnailTextOverlay text={overlayTitle} />}
+          {liveImageUrl && liveImageStatus === "ready" && <CardTextOverlay text={overlayTitle} />}
           {/* 2026-07-07 (CJ「用戶以為會生影片，其實不會」, round 2 「我現在
               看到的還是這樣」): the tooltip-only fix wasn't enough — a filled
               red circle still reads as YouTube's real play button. Remove
