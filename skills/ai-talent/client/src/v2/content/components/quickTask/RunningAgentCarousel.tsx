@@ -43,13 +43,15 @@ interface Props {
   lang?: string;
   /** 標記頭像為「換到成品頁時的起飛點」（v2/content/lib/agentHandoff.ts）。 */
   handoffAnchor?: boolean;
+  /** 目前在做的事：頭像左下角出現對應的小動畫（寫文案＝振筆疾書、圖片＝畫筆上色）。 */
+  activity?: "write" | "image" | null;
 }
 
 const dicebear = (seed: string) =>
   `https://api.dicebear.com/7.x/notionists/svg?seed=${encodeURIComponent(seed)}&backgroundColor=4267B2&backgroundType=solid`;
 
 export default function RunningAgentCarousel({
-  agents, stages, accentColor, progressPct, elapsedText, lang = "zh-TW", handoffAnchor,
+  agents, stages, accentColor, progressPct, elapsedText, lang = "zh-TW", handoffAnchor, activity,
 }: Props) {
   // Rotate through agents every 2.4s. If only 1 agent, stay on it.
   const [activeIdx, setActiveIdx] = useState(0);
@@ -156,6 +158,7 @@ export default function RunningAgentCarousel({
             classNames={{ base: "w-full h-full rounded-full" }}
           />
         </div>
+        {activity && <ActivityBadge kind={activity} accent={accentColor} />}
         {/* Percentage label — center bottom-overlay style. Only shows
             when progress > 0 to avoid empty 0% noise on first render. */}
         {safePct > 0 && (
@@ -252,6 +255,63 @@ export default function RunningAgentCarousel({
           50% { opacity: 0.35 }
         }
       `}</style>
+    </div>
+  );
+}
+
+/**
+ * 2026-09-30（CJ「Yawen 寫的時候，可以增加動畫嗎？振筆疾書的動畫」）：
+ * 頭像左下角一張小紙，筆在上面來回快寫、墨線一條條長出來；
+ * 圖片階段換成畫筆＋一塊塊上色。關掉動態效果時停在畫好的樣子。
+ */
+function ActivityBadge({ kind, accent }: { kind: "write" | "image"; accent: string }) {
+  const INK = "#1F2A44";
+  return (
+    <div
+      aria-hidden="true"
+      className="absolute rounded-full bg-white flex items-center justify-center"
+      style={{ left: -10, bottom: -6, width: 46, height: 46, boxShadow: "0 2px 8px rgba(0,0,0,0.12)", border: "2px solid white" }}
+    >
+      <svg viewBox="0 0 40 40" width={40} height={40} fill="none" stroke={INK} strokeLinecap="round" strokeLinejoin="round">
+        <style>{`
+          .ab-ink { stroke-dasharray: 16; stroke-dashoffset: 16; animation: ab-draw 1.8s ease-in-out infinite }
+          .ab-ink.l2 { animation-delay: .45s } .ab-ink.l3 { animation-delay: .9s }
+          @keyframes ab-draw { 0% { stroke-dashoffset: 16 } 35%, 80% { stroke-dashoffset: 0 } 100% { stroke-dashoffset: 16; opacity: 0 } }
+          .ab-pen { transform-box: fill-box; transform-origin: 0% 100%; animation: ab-scribble .45s ease-in-out infinite, ab-line 1.8s steps(1) infinite }
+          @keyframes ab-scribble { 0%,100% { rotate: -8deg } 50% { rotate: 10deg } }
+          @keyframes ab-line { 0% { translate: 0 0 } 25% { translate: 0 6px } 50% { translate: 0 12px } 75% { translate: 0 0 } }
+          .ab-dab { opacity: 0; animation: ab-pop 1.8s ease-out infinite }
+          .ab-dab.d2 { animation-delay: .5s } .ab-dab.d3 { animation-delay: 1s }
+          @keyframes ab-pop { 0% { opacity: 0; transform: scale(.3) } 30%, 80% { opacity: 1; transform: scale(1) } 100% { opacity: 0 } }
+          .ab-dab { transform-box: fill-box; transform-origin: 50% 50% }
+          @media (prefers-reduced-motion: reduce) {
+            .ab-ink, .ab-pen, .ab-dab { animation: none; stroke-dashoffset: 0; opacity: 1 }
+          }
+        `}</style>
+        <rect x="6" y="8" width="22" height="26" rx="3" fill="#fff" strokeWidth={1.8} />
+        {kind === "write" ? (
+          <>
+            <path className="ab-ink" d="M10 15 h14" strokeWidth={1.8} />
+            <path className="ab-ink l2" d="M10 21 h14" strokeWidth={1.8} />
+            <path className="ab-ink l3" d="M10 27 h9" strokeWidth={1.8} />
+            {/* 筆：以筆尖為支點快速擺動，每 0.45 秒換一行 */}
+            <g className="ab-pen">
+              <path d="M24 13 l8 -9 l3 3 l-9 8 z" fill={accent} strokeWidth={1.5} />
+              <path d="M24 13 l-1.5 3.5 l3.5 -1.5" fill="#fff" strokeWidth={1.5} />
+            </g>
+          </>
+        ) : (
+          <>
+            <circle className="ab-dab" cx="12" cy="16" r="3" fill={accent} stroke="none" />
+            <circle className="ab-dab d2" cx="20" cy="22" r="3.5" fill="#DCE6F4" stroke="none" />
+            <circle className="ab-dab d3" cx="13" cy="27" r="2.5" fill={INK} stroke="none" />
+            <g className="ab-pen">
+              <path d="M24 16 l9 -10 l2.5 2.5 l-10 9 z" fill={INK} strokeWidth={1.2} />
+              <path d="M24 16 c-2 1 -3 3 -2.5 4.5 c2 0 3.5 -1.5 4.5 -2.5 z" fill={accent} strokeWidth={1.2} />
+            </g>
+          </>
+        )}
+      </svg>
     </div>
   );
 }

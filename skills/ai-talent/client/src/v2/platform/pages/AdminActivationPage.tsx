@@ -18,7 +18,7 @@ const C = {
   ink: "#0F0F0E",
   inkSoft: "#3A3633",
   muted: "#6B6660",
-  orange: "#E85D2E",
+  orange: "#F37E4A",
   orangeDark: "#C84516",
   orangeChip: "#FDE6D8",
   border: "#E8DECC",

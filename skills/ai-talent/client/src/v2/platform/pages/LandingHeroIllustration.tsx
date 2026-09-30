@@ -12,7 +12,7 @@
 
 export default function LandingHeroIllustration({ en }: { en: boolean }) {
   const ink = "#0F0F0E";
-  const orange = "#E85D2E";
+  const orange = "#F37E4A";
   const orangeLight = "#F5B89A";
   const cream = "#FAEBD9";
   const white = "#FFFFFF";

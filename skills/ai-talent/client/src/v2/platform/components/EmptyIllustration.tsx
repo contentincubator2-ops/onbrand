@@ -12,7 +12,7 @@ import type { ComponentType, ReactNode } from "react";
 export const INK = "#1F2A44";
 export const PANEL = "#EDF2F9";
 export const FILL = "#DCE6F4";
-export const POP = "#E85D2E";
+export const POP = "#F37E4A";
 
 const MOTION = `
 @keyframes ei-rock { 0%,100% { transform: rotate(-5deg) } 50% { transform: rotate(6deg) } }
