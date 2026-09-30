@@ -11,7 +11,7 @@
  */
 import { describe, it, expect } from "vitest";
 import {
-  planBeats, reconcileItems, candidateCards, isPartCard, kolBlock, cobrandBlock,
+  planBeats, reconcileItems, reconcilePhaseMessages, candidateCards, isPartCard, kolBlock, cobrandBlock,
   CAMPAIGN_PHASE_IDS,
 } from "./campaignPlan";
 import type { CatalogTask } from "../../content/core/taskCatalogIndex";
@@ -168,5 +168,34 @@ describe("合作段落", () => {
     const b = cobrandBlock("買二送一", "懶得煮");
     expect(b.steps.length).toBeGreaterThanOrEqual(3);
     expect(b.steps.every((s) => !s.taskId)).toBe(true);
+  });
+});
+
+describe("reconcilePhaseMessages（每一段的訊息）", () => {
+  const beats = planBeats({ startAt: d("2026-11-01"), endAt: d("2026-11-03"), today: d("2026-10-31") });
+  // 開賣前一天才排：沒有預熱、檔期只有三天也沒有加溫
+
+  it("只收這份企劃真的有的階段；不認得的、沒有的段丟掉", () => {
+    const out = reconcilePhaseMessages({
+      phases: [
+        { phase: "launch", message: "免費試用，每週七篇" },
+        { phase: "teaser", message: "這段不存在" },
+        { phase: "hype", message: "不是階段" },
+        { phase: "lastcall", message: "  只到 11/03  " },
+      ],
+    }, beats);
+    expect(out).toEqual({ launch: "免費試用，每週七篇", lastcall: "只到 11/03" });
+  });
+
+  it("同一段寫兩次只留第一次；空字串不算", () => {
+    const out = reconcilePhaseMessages({
+      phases: [{ phase: "launch", message: "" }, { phase: "launch", message: "第一句" }, { phase: "launch", message: "第二句" }],
+    }, beats);
+    expect(out).toEqual({ launch: "第一句" });
+  });
+
+  it("模型沒給 phases：回空的，不拿階段目的冒充訊息", () => {
+    expect(reconcilePhaseMessages({}, beats)).toEqual({});
+    expect(reconcilePhaseMessages(null, beats)).toEqual({});
   });
 });

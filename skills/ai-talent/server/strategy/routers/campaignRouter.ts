@@ -16,6 +16,10 @@
  *   savePlan    — 使用者編輯後的企劃
  *   trayList    — 內容層 tray 的首頁：有企劃的活動 + 進度
  *   markWritten — 某一格寫完了，回貼產出（策略層的 ✓ 從這裡來）
+ *   setLock     — 定稿／解鎖（2026-09-30 CJ「定稿一次鎖整份」）
+ *
+ * 定稿之後 saveSettings／generate／savePlan 一律拒絕——鎖的是整份，不是只鎖
+ * 畫面。markWritten 不受影響：內容層本來就是在定稿之後寫。
  *
  * 權限一律以 events.userId 為準（跟 scopeRouter 的其他活動操作同一條線）。
  */
@@ -55,9 +59,12 @@ const planItemInput = z.object({
   repaired: z.boolean().optional(),
 });
 
+const PHASE_KEYS = ["teaser", "launch", "sustain", "lastcall", "encore"] as const;
+
 const planInput = z.object({
   smp: z.string().max(200),
   items: z.array(planItemInput).max(60),
+  phaseMessages: z.record(z.enum(PHASE_KEYS), z.string().max(60)).optional(),
   kol: z.any().nullable().optional(),
   cobrand: z.any().nullable().optional(),
   generatedAt: z.string().optional(),
@@ -98,6 +105,18 @@ async function patchPositioning(eventId: number, userId: number, key: string, va
   );
 }
 
+function lockedAtOf(pos: Record<string, any>): string | null {
+  const v = pos?.campaignPlan?.lockedAt;
+  return typeof v === "string" && v ? v : null;
+}
+
+/** 定稿後改不了——要改先解鎖。鎖的是整份，所以設定、重排、存檔都擋。 */
+function assertUnlocked(pos: Record<string, any>): void {
+  if (lockedAtOf(pos)) {
+    throw new TRPCError({ code: "BAD_REQUEST", message: "企劃已定稿，要修改請先按標題旁的鎖頭解鎖" });
+  }
+}
+
 async function productIdsOf(eventId: number): Promise<number[]> {
   const [rows]: any = await localPool.execute(
     `SELECT productId FROM event_products WHERE eventId = ? ORDER BY productId`, [eventId],
@@ -131,6 +150,7 @@ export const campaignRouter = router({
         `SELECT p.id, p.name FROM event_products ep JOIN products p ON p.id = ep.productId
           WHERE ep.eventId = ? ORDER BY p.id`, [input.eventId],
       );
+
       return {
         event: {
           id: Number(row.id), name: row.name, brandId: Number(row.brandId),
@@ -144,6 +164,8 @@ export const campaignRouter = router({
         productScope: resolveProductScope(pos.campaign?.productScope, (prodRows as any[]).length),
         /** 舊的 11 段得獎 brief 還在不在——進階模式的入口要不要亮由這個決定。 */
         hasLegacyBrief: ["brief", "smp", "creative", "awards"].some((k) => !!pos?.[k]),
+        /** 活動定位（舊的 11 段）裡寫的核心受眾——策略畫面的「對象」。 */
+        audience: typeof pos?.audience?.primaryAudience === "string" ? pos.audience.primaryAudience.slice(0, 120) : "",
       };
     }),
 
@@ -175,6 +197,7 @@ export const campaignRouter = router({
     .mutation(async ({ ctx, input }) => {
       const userId = ctx.user!.id;
       const row = await loadEvent(input.eventId, userId);
+      assertUnlocked(parsePositioning(row.positioning));
       // 純品牌活動不綁產品：畫面上選了「純品牌」就把綁定清掉，不留一份跟選擇矛盾的資料。
       const wantIds = input.settings.productScope === "brand" ? [] : input.productIds;
       let scope = input.settings.productScope;
@@ -207,7 +230,8 @@ export const campaignRouter = router({
   generate: protectedProcedure
     .input(z.object({ eventId: z.number().int().positive() }))
     .mutation(async ({ ctx, input }) => {
-      await loadEvent(input.eventId, ctx.user!.id);   // 權限
+      const row = await loadEvent(input.eventId, ctx.user!.id);   // 權限
+      assertUnlocked(parsePositioning(row.positioning));
       let plan: CampaignPlan;
       try {
         plan = await buildCampaignPlan({ eventId: input.eventId, userId: ctx.user!.id });
@@ -222,11 +246,32 @@ export const campaignRouter = router({
     .input(z.object({ eventId: z.number().int().positive(), plan: planInput }))
     .mutation(async ({ ctx, input }) => {
       const row = await loadEvent(input.eventId, ctx.user!.id);
-      const stored = parsePositioning(row.positioning).campaignPlan as CampaignPlan | undefined;
+      const pos = parsePositioning(row.positioning);
+      assertUnlocked(pos);
+      const stored = pos.campaignPlan as CampaignPlan | undefined;
       const hidden = (stored?.items ?? []).filter(isHiddenPlanItem);
       const incoming = (input.plan.items ?? []).filter((i: any) => !isHiddenPlanItem(i));
-      await patchPositioning(input.eventId, ctx.user!.id, "campaignPlan", { ...input.plan, items: [...incoming, ...hidden] });
+      await patchPositioning(input.eventId, ctx.user!.id, "campaignPlan", {
+        ...input.plan,
+        // 畫面沒有送回來就沿用存著的，不要因為舊畫面少送一個欄位就洗掉。
+        phaseMessages: input.plan.phaseMessages ?? stored?.phaseMessages,
+        items: [...incoming, ...hidden],
+        lockedAt: null,
+      });
       return { ok: true };
+    }),
+
+  /** 定稿／解鎖整份企劃。沒有企劃不能定稿——鎖一份空的沒有意義。 */
+  setLock: protectedProcedure
+    .input(z.object({ eventId: z.number().int().positive(), locked: z.boolean() }))
+    .mutation(async ({ ctx, input }) => {
+      const row = await loadEvent(input.eventId, ctx.user!.id);
+      const pos = parsePositioning(row.positioning);
+      const plan = pos.campaignPlan as CampaignPlan | undefined;
+      if (!plan?.items?.length) throw new TRPCError({ code: "BAD_REQUEST", message: "還沒有企劃，先排出企劃再定稿" });
+      const lockedAt = input.locked ? new Date().toISOString() : null;
+      await patchPositioning(input.eventId, ctx.user!.id, "campaignPlan", { ...plan, lockedAt });
+      return { lockedAt };
     }),
 
   /**
