@@ -3,14 +3,8 @@
  *
  * Route: /tasks/:platform  (platform = fb | ig | threads | line | tt | email | web)
  *
- * Replaces the old 30s/60s/99s tier pages as the primary entry point.
- * Users pick the *platform* in the sidebar, then filter by complexity via
- * tabs inside this page:
- *   全部  |  單篇內容  |  內容套組  |  完整企劃
- *   （分頁名一律取自 v2/lib/tierVocabulary.ts，不要在這裡另寫一套）
- *
- * Speed badges appear on every card so the timing expectation is clear
- * without requiring users to navigate tiers before seeing tasks.
+ * Users pick the *platform* in the sidebar, then filter by format / source
+ * inside this page. Tier is internal engine config and never shown.
  */
 import { IllustratedEmpty, EmptyIllustration } from "../../platform/components/EmptyIllustration";
 import React, { useMemo, useState, useEffect, useRef } from "react";
@@ -23,7 +17,7 @@ import { TaskCardShell, TaskCardAvatar, CARD_SURFACE } from "../components/TaskC
 import { campaignPrefill } from "../lib/campaignIntakePrefill";
 import { toastWithUpgrade } from "../../platform/lib/upgradeToast";
 import { matchTaskWithSynonyms } from "../lib/taskSearchSynonyms";
-import { TIER_ORDER, tierAccent, tierLabel } from "../../platform/lib/tierVocabulary";
+import { tierAccent } from "../../platform/lib/tierVocabulary";
 import {
   resolveSource, sourceAccent, sourceWhy,
   sourcePillText, sourceTooltip,
@@ -170,13 +164,9 @@ const PLATFORM_META: Record<string, PlatformMeta> = {
 const dicebear = (seed: string) =>
   `https://api.dicebear.com/7.x/notionists/svg?seed=${encodeURIComponent(seed)}&backgroundColor=4267B2&backgroundType=solid`;
 
-// tier 的顯示名與識別色都在 v2/lib/tierVocabulary.ts —— 這裡曾經有自己的
-// tierLabel() / tierAccent()，和 TIER_TABS、AccountPage、RunPage 各自硬寫的
-// 版本漂成四份。要改叫法就改那一個檔案。
-//
-// 2026-07-17 (CJ「去除 30s/60s/99s 分類標籤，不再使用時間長度分類」):
-// tier stays as INTERNAL engine config (routing / quota / timeouts), but the
-// user-facing classification is by deliverable, never by duration.
+// 2026-09-29（CJ「頁面上還有在讀秒…也不需要單篇 套組和企劃的備註了」）：
+// tier 只是內部引擎設定（路由／額度／timeout），畫面上不再出現——
+// 沒有讀秒、沒有 單篇／套組／企劃 標籤、也沒有依 tier 篩選的分頁。
 
 // Tasks that should hold the modal open until image is done
 const HOLD_FOR_IMAGES = new Set<string>(["fb-60-single-full", "fb-99-carousel-5"]);
@@ -212,26 +202,6 @@ function synthesizeStages(elapsedMs: number, tier: string, lang: string): any[] 
   }
   return stages;
 }
-
-// ── Tier tab config ──────────────────────────────────────────────────────────
-type ActiveTier = "all" | "30s" | "60s" | "99s";
-
-interface TierTab {
-  id: ActiveTier;
-  labelZh: string;
-  labelEn: string;
-  accent: string;
-}
-
-const TIER_TABS: TierTab[] = [
-  { id: "all", labelZh: "全部", labelEn: "All", accent: "#171717" },
-  ...TIER_ORDER.map((code): TierTab => ({
-    id: code,
-    labelZh: tierLabel(code, "zh", { long: true }),
-    labelEn: tierLabel(code, "en"),
-    accent: tierAccent(code),
-  })),
-];
 
 // ── Format category config (FB only) ────────────────────────────
 // 2026-08-23: 搬到 v2/lib/fbTaskFormats.ts —— 這份對照表爫過一次（90s 退役後
@@ -514,7 +484,6 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
   }, [brandAssetsForCheck, brandQuery?.data]);
 
   // Tier tab state (used for non-FB/non-IG platforms)
-  const [activeTier, setActiveTier] = useState<ActiveTier>("all");
   // 結構來源篩選。"all" = 不篩。與 tier 是兩條獨立的軸，可同時生效。
   // 2026-09-29 CJ「每個平台要增加一個圖片的類別」："image" 不是任務卡來源，是另一個類別——
   // 選它時下面改列這個通路的圖片任務卡（imageCard.list），不列文字任務。
@@ -1056,18 +1025,13 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
       if (activeWEBFormat !== "all") {
         list = list.filter((task) => WEB_TASK_FORMAT_MAP[task.id] === activeWEBFormat);
       }
-    } else {
-      // Tier-based filter for other platforms
-      if (activeTier !== "all") {
-        list = list.filter((task) => task.tier === activeTier);
-      }
     }
     // 類型篩選（爆款結構／品牌自建）每個通路都套用。
     if (activeSource !== "all") {
       list = list.filter((task) => frontCardKind(task) === activeSource);
     }
     return list;
-  }, [platformTasks, platform, activeTier, activeSource, activeFormat, activeIGFormat, activeLIFormat, activeYTFormat, activeTTFormat, activeEMFormat, activePRFormat, activeWEBFormat, activePackFormat, packChannel]);
+  }, [platformTasks, platform, activeSource, activeFormat, activeIGFormat, activeLIFormat, activeYTFormat, activeTTFormat, activeEMFormat, activePRFormat, activeWEBFormat, activePackFormat, packChannel]);
 
   /** 目前選的分類分頁顯示名；「全部」或沒有分頁分類的通路回 null。 */
   const activeCategoryLabel: string | null = packChannel
@@ -1101,7 +1065,7 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
     // 托盤模式：只擺挑過的那幾張。有搜尋或篩選時自動退出托盤（那時使用者
     // 是在找東西，不是在用日常的那幾張）。
     const filtering = searchQuery.trim().length > 0
-      || activeSource !== "all" || activeTier !== "all" || onlyNew;
+      || activeSource !== "all" || onlyNew;
     // 2026-09-29：托盤（含系統預設）可能擺著前台已不列的類型——只算看得到的那幾張，
     // 全都看不到就當沒設托盤，不要讓用戶停在「常用清單裡沒有這個分類的卡」。
     const shownIds = new Set(shownTasks.map((t) => t.id));
@@ -1111,7 +1075,7 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
       list = list.filter((task) => inTray.has(task.id));
     }
     return list;
-  }, [categoryTasks, shownTasks, activeSource, activeTier, searchQuery, showAllTasks, trayIds, onlyNew]);
+  }, [categoryTasks, shownTasks, activeSource, searchQuery, showAllTasks, trayIds, onlyNew]);
 
   const totalForPlatform = useMemo(
     () => shownTasks.filter((task) => inferPlatform(task) === platform).length,
@@ -1341,7 +1305,6 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
 
   // ── Determine effective tier for running (tab || task.tier) ──────────────
   const effectiveTier = (task: FBTaskCard): "30s" | "60s" | "99s" => {
-    if (activeTier !== "all") return activeTier;
     const t = task.tier as any;
     if (t === "60s" || t === "99s" || t === "30s") return t;
     return "30s";
@@ -1968,27 +1931,7 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                 })}
               </div>
             </div>
-          ) : (
-            <div className="flex items-center gap-2 flex-wrap justify-center">
-              {TIER_TABS.map((tab) => {
-                const active = activeTier === tab.id;
-                return (
-                  <button
-                    key={tab.id}
-                    onClick={() => setActiveTier(tab.id)}
-                    className="flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium transition-all"
-                    style={
-                      active
-                        ? { background: tab.accent, color: "white", boxShadow: `0 2px 12px ${tab.accent}55` }
-                        : { background: "white", color: "#525252", border: "1px solid #E5E5E5" }
-                    }
-                  >
-                    {tab.id !== "all" && (
-                      <span
-                        className="w-2 h-2 rounded-full"
-                        style={{ background: active ? "rgba(255,255,255,0.7)" : tab.accent }}
-                      />
-                    )}
+          ) : null}
                     {lang === "en" ? tab.labelEn : tab.labelZh}
                   </button>
                 );
@@ -2241,9 +2184,6 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
               {visibleTasks.map((task, idx) => {
                 const agentName = task.agent?.name ?? "AI Agent";
                 const avatarSrc = task.agent?.avatarUrl || dicebear(agentName);
-                const taskTier = task.tier as string;
-                const accent = tierAccent(taskTier);
-
                 return (
                   // 2026-09-25（CJ「任務卡的格式，我想要跟品牌的任務卡統一格式」）：
                   // 外框與圖片區的幾何搬到 TaskCardShell，活動 tray 用的是同一個殼。
@@ -2278,13 +2218,6 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                         </span>
                       )}
                       <TaskCardAvatar src={avatarSrc} />
-                      {/* Deliverable badge — top right (no duration labels) */}
-                      <span
-                        className="absolute top-2 right-2 text-tiny font-bold px-2 py-0.5 rounded-full text-white shadow-sm"
-                        style={{ background: accent, fontSize: 12, letterSpacing: "0.06em" }}
-                      >
-                        {tierLabel(taskTier, lang)}
-                      </span>
                       {/* Last-used badge — bottom right, only when used before */}
                       {(() => {
                         const days = getLastUsedDays(task.id);
@@ -2936,10 +2869,6 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                   const stagesNow = orchestraStages && orchestraStages.length > 0
                     ? orchestraStages
                     : synthesizeStages(tickMs, tier, lang);
-                  const elapsedText =
-                    (tier === "60s" || tier === "99s")
-                      ? `${(tickMs / 1000).toFixed(0)}s · ${lang === "en" ? "researching → writing → rendering" : "策略 → 文案 → 出圖中"}`
-                      : `${(tickMs / 1000).toFixed(1)}s / ${expectedSec}s`;
                   const accent = tierAccent(tier);
                   const agentRoster: Array<{ id?: number; name: string; title?: string; avatarUrl?: string | null; role?: string }> = [];
                   const cap = agentMeta ?? activeTask.agent;
@@ -2951,7 +2880,6 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                       stages={stagesNow}
                       accentColor={accent}
                       progressPct={progressPct}
-                      elapsedText={elapsedText}
                     />
                   );
                 })()}

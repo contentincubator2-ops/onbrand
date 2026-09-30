@@ -63,7 +63,6 @@ import { pickImagePromptSeed } from "../lib/imagePromptSeed";
 import { buildAllDayIcs, downloadIcs } from "../lib/ics";
 import { parseRunOfShow } from "../lib/runOfShow";
 import { sourceLabel, sourceWhy } from "../lib/sourceVocabulary";
-import { tierLabel } from "../../platform/lib/tierVocabulary";
 import { useLang } from "../../../lib/i18n";
 import { fireNudge } from "../../platform/components/mia/miaNudges";
 import ReviewBar from "../../platform/components/review/ReviewBar";
@@ -2171,12 +2170,6 @@ export default function RunPage() {
         <Chip size="sm" variant="flat" className="font-mono text-[12px]">
           {effectiveVariant ? `${effectiveVariant.platform}:${effectiveVariant.format}` : "?"} · {data.mission?.taskId ?? "no-task"}
         </Chip>
-        {/* 2026-07-17 (CJ): deliverable label, not duration — tier is internal config */}
-        {data.mission?.tier && (
-          <Chip size="sm" variant="flat" color="secondary">
-            {tierLabel(data.mission.tier, lang)}
-          </Chip>
-        )}
         <Chip size="sm" variant="flat" color={data.status === "published" ? "success" : data.status === "scheduled" ? "warning" : "default"}>
           {data.status}
         </Chip>
