@@ -1066,7 +1066,7 @@ function IconBar({
           const userGroup = NAV_ITEMS.filter((it) => it.group === "user");
           const fixedGroup = NAV_ITEMS.filter((it) => it.group === "fixed");
           // 2026-09-30（CJ 參考 Tesla）：三段各自一塊淺灰圓角底，取代分隔線。
-          const zone: React.CSSProperties = { background: "#F4F4F3", borderRadius: 14, padding: "4px 0", margin: "0 2px 8px" };
+          const zone: React.CSSProperties = { background: "#F4F4F3", borderRadius: 14, padding: "3px 0", margin: "0 2px 6px" };
           return (
             <>
               <div style={zone}>{topGroup.map(renderItem)}</div>
@@ -1753,8 +1753,8 @@ function IconNavLink({ item, active, onClick, meter, badge, en }: {
         onClick={onClick}
         aria-label={tip}
         style={{
-          width: "100%", padding: "5px 0", margin: 0,
-          display: "flex", flexDirection: "column", alignItems: "center", gap: 3,
+          width: "100%", padding: "3px 0", margin: 0,
+          display: "flex", flexDirection: "column", alignItems: "center", gap: 2,
           background: "none", border: "none", cursor: "pointer",
           color: active ? SOWORK_ORANGE_TEXT : "#6b7280",
         }}
@@ -1768,7 +1768,7 @@ function IconNavLink({ item, active, onClick, meter, badge, en }: {
         onMouseLeave={() => setHovered(false)}
       >
         <span style={{
-          width: 40, height: 36, borderRadius: 10, position: "relative",
+          width: 40, height: 32, borderRadius: 10, position: "relative",
           display: "flex", alignItems: "center", justifyContent: "center", fontSize: 17,
           background: active ? SOWORK_ORANGE : hovered ? "rgba(0,0,0,0.06)" : "transparent",
           color: active ? "#fff" : "#27272a",
