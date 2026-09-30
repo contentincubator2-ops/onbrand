@@ -157,10 +157,15 @@ export default function PlannerPage() {
       const raw = String(it.platform ?? "").toLowerCase();
       const date = ymdTpe(new Date(it.at));
       const time = new Date(it.at).toLocaleTimeString("zh-TW", { timeZone: "Asia/Taipei", hour: "2-digit", minute: "2-digit", hour12: false });
+      // 送審是排程的一個狀態：排好的格子直接標出審核進度。
+      const rs = it.kind === "scheduled" ? String(it.reviewStatus ?? "") : "";
+      const review = rs === "pending" || rs === "in_review" ? (en ? " · In review" : "・待審")
+        : rs === "revision_requested" ? (en ? " · Sent back" : "・退回修改")
+        : rs === "approved" ? (en ? " · Approved" : "・已放行") : "";
       out.push({
         kind: it.kind, key: `${it.kind}${it.id}`, date, platform: PLAT[raw] ?? raw,
         title: String(it.preview || it.missionTitle || "").slice(0, 40),
-        meta: it.kind === "published" ? (en ? "Published" : "已發布") : (en ? `Scheduled ${time}` : `已排程 ${time}`), cal: it,
+        meta: it.kind === "published" ? (en ? "Published" : "已發布") : (en ? `Scheduled ${time}${review}` : `已排程 ${time}${review}`), cal: it,
       });
     }
     // 同一篇產出已經排程／發布了，就只留排程那張（格子是它的前身）。

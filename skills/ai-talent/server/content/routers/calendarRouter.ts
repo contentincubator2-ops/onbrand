@@ -160,7 +160,10 @@ export const calendarRouter = router({
                 sp.scheduledAt, sp.status, sp.publishedAt, sp.externalUrl,
                 sp.brandId, b.name AS brandName,
                 o.content AS outputContent, o.metadata AS outputMetadata,
-                m.title AS missionTitle, m.squadSlug AS missionSquadSlug
+                m.title AS missionTitle, m.squadSlug AS missionSquadSlug,
+                -- 2026-09-29 送審是排程的一個狀態，不是另一條路：週曆格子要看得到「待審／退回／已放行」。
+                (SELECT q.status FROM mission_review_queue q WHERE q.outputId = sp.outputId
+                  ORDER BY q.id DESC LIMIT 1) AS reviewStatus
          FROM scheduled_posts sp
          LEFT JOIN brands b ON b.id = sp.brandId
          LEFT JOIN mission_outputs o ON o.id = sp.outputId
@@ -220,6 +223,7 @@ export const calendarRouter = router({
             brandName: s.brandName,
             missionTitle: s.missionTitle,
             externalUrl: s.externalUrl,
+            reviewStatus: s.reviewStatus ? String(s.reviewStatus) : null,
             contentKind: selector.contentKind ?? null,
             contentIndex: selector.contentIndex ?? null,
             preview: extractCaption(s.outputContent, selector),

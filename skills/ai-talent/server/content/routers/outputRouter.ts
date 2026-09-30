@@ -13,6 +13,7 @@ import {
   updateOutputContent,
 } from "../core/outputContentEnvelope";
 import { applyVariantImageUpdate, selectVariantImageVersion } from "../core/variantImageUpdate";
+import { switchWriter } from "../core/writerDrafts";
 
 /** Escape HTML special characters to prevent stored XSS in previewHtml */
 function escapeHtml(s: string): string {
@@ -196,6 +197,17 @@ export const outputRouter = router({
       id: z.number(),
       ...contentSelectorFields,
       caption: z.string().max(8000),
+      /**
+       * 2026-09-29（CJ「按下不同 agent，本文就改寫成不同風格」）：這次的文字是哪一位寫的。
+       * 帶了就是「換人寫」——換之前把目前的文字（含用戶手改）存回上一位的稿，
+       * 所以每一位寫過的版本都留著、點回去就是原樣，不必重寫。不帶＝一般存檔。
+       */
+      writer: z.object({
+        key: z.string().min(1).max(40),
+        name: z.string().max(80),
+        title: z.string().max(80).optional(),
+        agentId: z.number().int().positive().optional(),
+      }).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       // 2026-05-09 cleanup: localPool (drizzle.execute row shape was buggy).
@@ -209,7 +221,8 @@ export const outputRouter = router({
       );
       const row = Array.isArray(rowsRaw) ? rowsRaw[0] : null;
       if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "Output not found or not yours" });
-      const updated = updateOutputContent(row.content, input, (item) => ({ ...item, caption: input.caption }));
+      const updated = updateOutputContent(row.content, input, (item) =>
+        input.writer ? switchWriter(item, input.writer, input.caption) : { ...item, caption: input.caption });
       await localPool.execute(
         `UPDATE mission_outputs SET content = ?, updatedAt = NOW() WHERE id = ?`,
         [updated.content, input.id],

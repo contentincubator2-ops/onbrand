@@ -22,8 +22,13 @@ import { DoneIcon, SendBackIcon, SendIcon, WaitingIcon } from "../icons";
 import { HelpTip } from "../HelpTip";
 
 export default function ReviewBar({
-  outputId, missionId,
-}: { outputId: number; missionId: number | null | undefined }) {
+  outputId, missionId, statusOnly = false,
+}: {
+  outputId: number;
+  missionId: number | null | undefined;
+  /** 2026-09-29：送審入口移進排程視窗（「排好後送審」）。這條只在已送審後顯示狀態／退回理由。 */
+  statusOnly?: boolean;
+}) {
   const { lang } = useLang();
   const isEn = lang === "en";
   const navigate = useNavigate();
@@ -100,6 +105,7 @@ export default function ReviewBar({
   }
 
   const wasSentBack = st?.status === "revision_requested";
+  if (statusOnly && !wasSentBack) return null;
 
   if (reviewAllowed === false) {
     return (
