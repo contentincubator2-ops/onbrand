@@ -11,7 +11,7 @@ OnBrand is the AI marketing studio by SoWork. It turns SoWork's 14-step Brand Po
   - 30s — a single post
   - 60s — a multi-platform content pack
   - 99s — a full campaign slate
-- **7-Day Publisher** (七日發布台): One click schedules a whole week of posts across all channels, with structural variety enforced.
+- **Idea Stage** (靈感舞台): Pick a brand, product or campaign; several agents each pitch a different post angle using their own way of thinking. Adopt one and it goes into this week's plan to be written in full.
 - **Two kinds of task cards**: viral-structure cards (deconstructed from real viral content, each with its spread metric and the month measured) and brand-built cards (reverse-engineered from the brand's own best posts).
 - **16,113 AI Agents**: Specialized agents per content type — not a single generic model. Each agent has its own methodology, role, and output spec.
 

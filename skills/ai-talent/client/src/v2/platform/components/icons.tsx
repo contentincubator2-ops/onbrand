@@ -19,7 +19,7 @@ import {
   faArrowUpRightFromSquare, faShareNodes, faLock, faCircleCheck, faCheck, faTriangleExclamation,
   faCircleInfo, faCircleQuestion, faSpinner, faClock, faFlask, faUserTie, faFire, faImage, faImages,
   faVideo, faFileLines, faComment, faBoxOpen, faBookOpen, faBrain, faTag, faPenNib, faChartLine,
-  faCalendarDays, faBullhorn, faFolderOpen, faCalendarWeek, faLayerGroup, faComments, faClipboardCheck,
+  faCalendarDays, faBullhorn, faFolderOpen, faLayerGroup, faComments, faClipboardCheck,
   faBell, faLanguage, faGear, faStore, faUsers, faUser, faUserPlus, faChevronLeft, faChevronRight,
   faArrowLeft, faFont, faBullseye, faShieldHalved, faPalette, faPlay, faQuoteLeft, faHashtag, faIdCard,
   faAward, faDollarSign, faBuilding, faBug, faInbox, faEnvelope, faFolder, faCircle, faBagShopping,
@@ -79,7 +79,6 @@ export const ICON = {
   planner: faCalendarDays,
   campaign: faBullhorn,
   project: faFolderOpen,
-  theater: faCalendarWeek,
   taskCards: faLayerGroup,
   meeting: faComments,
   review: faClipboardCheck,
@@ -244,7 +243,6 @@ export const StopIcon = make("stop");
 export const WorkingIcon = make("working");
 export const SampleIcon = make("sample");
 export const PlannerIcon = make("planner");
-export const TheaterIcon = make("theater");
 export const TaskCardsIcon = make("taskCards");
 export const MeetingIcon = make("meeting");
 export const ShareIcon = make("share");

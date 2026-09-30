@@ -23,7 +23,7 @@ import { LanguageProvider } from "../../lib/i18n";
 // ─────────────────────────────────────────────────────────────────────────
 // 2026-06-12 (SEO audit perf fix): route-based code splitting.
 // Mobile PageSpeed was 55 because every anonymous visitor downloaded the
-// whole protected app (TheaterPage, all /admin/*, /tasks/*, /media/*).
+// whole protected app (all /admin/*, /tasks/*, /media/*).
 // Strategy:
 //   - EAGER: critical first-paint surfaces (LandingPage, LoginPage,
 //     RegisterPage), the auth shell (RequireAuthV2 / ShellLayout), and
@@ -58,7 +58,6 @@ const OnboardingWizard = React.lazy(() => import("../../pages/OnboardingWizard")
 
 // Protected app surface — never loaded by anonymous visitors
 const HomePage = React.lazy(() => import("../platform/pages/HomePage"));
-const TheaterPage = React.lazy(() => import("../content/pages/TheaterPage"));
 const PlatformTaskPage = React.lazy(() => import("../content/pages/PlatformTaskPage"));
 const DataWorkspacePage = React.lazy(() => import("../performance/pages/DataWorkspacePage"));
 const RunPage = React.lazy(() => import("../content/pages/RunPage"));
@@ -262,7 +261,7 @@ export default function AppV2() {
 
         {/* 2026-05-16 (CJ「主打品牌定位鎖定」): public marketing landing
             at /. Cold traffic used to hit /auth/login directly (funnel
-            leak). LandingPage self-redirects authed users to /theater. */}
+            leak). LandingPage self-redirects authed users to /planner. */}
         <Route path="/" element={<LandingPage />} />
 
         {/* 2026-05-10: Public legal + pricing pages (no auth required so
@@ -320,7 +319,8 @@ export default function AppV2() {
               brand settings (replaces the modal sheet for direct navigation). */}
           <Route path="/brands/settings" element={<BrandSettingsPage />} />
           <Route path="/home"      element={<HomePage />} />
-          <Route path="/theater"   element={<TheaterPage />} />
+          {/* 2026-09-30：七日發布台已移除，舊連結／書籤轉到取代它的靈感舞台。 */}
+          <Route path="/theater" element={<Navigate to="/inspiration" replace />} />
           <Route path="/campaigns" element={<CampaignTrayPage />} />
           <Route path="/m/:missionId" element={<MissionRedirect />} />
           <Route path="/b/:brandId/:workspace/m/:missionId" element={<MissionRedirect />} />

@@ -32,7 +32,7 @@ const C = {
 
 /**
  * 2026-09-28（OnBrand 連接器）：Claude 連接 OnBrand 時會先把人帶到 /api/mcp-oauth/authorize，
- * 沒登入就轉來這裡並帶 ?next=。登入後要回到那個授權頁，否則使用者會落在 /theater、連接流程斷掉。
+ * 沒登入就轉來這裡並帶 ?next=。登入後要回到那個授權頁，否則使用者會落在 /planner、連接流程斷掉。
  * 只放行授權頁這一條路徑 —— 通用的 next 等於開放轉址。伺服器端（Google 回呼）有同一條規則。
  */
 function oauthNextPath(): string | null {
@@ -70,7 +70,7 @@ export default function LoginPage() {
         if (r.ok) {
           const next = oauthNextPath();
           if (next) window.location.href = next;
-          else navigate("/theater", { replace: true });
+          else navigate("/planner", { replace: true });
         }
         else setAuthChecking(false);
       })
@@ -127,7 +127,7 @@ export default function LoginPage() {
 
       // Wait for cookie to be set
       await new Promise(resolve => setTimeout(resolve, 500));
-      window.location.href = oauthNextPath() ?? "/theater";
+      window.location.href = oauthNextPath() ?? "/planner";
     } catch (err) {
       setError(t("auth_err_network"));
     } finally {

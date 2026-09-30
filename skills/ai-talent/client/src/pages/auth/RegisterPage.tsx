@@ -57,7 +57,7 @@ export default function RegisterPage() {
       .then((r) => {
         if (cancelled) return;
         if (r.ok) {
-          navigate("/theater", { replace: true });
+          navigate("/planner", { replace: true });
         } else {
           setAuthChecking(false);
         }

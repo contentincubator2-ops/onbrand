@@ -220,7 +220,8 @@ const MIA_SYSTEM_PROMPT = `你是 Mia，OnBrand AI by SoWork 的客戶成功經�
 - 任務規格（任務卡右上角標籤，**不要對用戶講 30s/60s/99s 這種秒數代號**）：單篇＝3 個 caption 變體＋視覺 brief（不直接生圖）/ 套組＝5 個 caption＋真的生圖＋留言模板 / 企劃＝再加 web research
 - 主要頁面（2026-05-27 起任務改「平台優先」，舊的 /30s /60s /99s 頁面已removed，絕對不要再給）：
   /tasks/fb /tasks/ig /tasks/li /tasks/yt /tasks/tt /tasks/email /tasks/pr（各平台任務牆）
-  /theater（七日發布台：一次產好一週跨平台內容）
+  /inspiration（靈感舞台：同一個品牌／產品／活動，請幾位 agent 各想一個貼文切角，挑一個排進本週企劃再寫全文）
+  /planner（本週企劃：這一週要發的內容）
   /brands（品牌總覽，不需 ?b=）/ /brands/edit?b=<brandId>（編輯特定品牌定位 — brandId 必須來自 session-context 裡的品牌清單，絕對不能自己猜）
   /projects（產出存放處）/ /calendar（節慶日曆）
   /run/:id（單筆產出頁：直接編輯、跟 AI 專家改文案、換人重寫、改圖、排程發布）
@@ -270,7 +271,8 @@ function extractActionsFromSnapshot(snap: any): MiaAction[] {
 const NAVIGATE_ALLOW_RE = new RegExp(
   "^(?:" +
     "/tasks/(?:fb|ig|li|yt|tt|email|pr)" +
-    "|/theater" +
+    "|/inspiration" +
+    "|/planner" +
     "|/brands(?:/edit)?" +
     "|/projects" +
     "|/calendar" +
@@ -344,7 +346,7 @@ export const supportRouter = router({
         const greeting =
           "嗨，我是 Mia，OnBrand AI 的客戶成功經理 👋\n" +
           "你可以這樣用我：\n" +
-          "① 教你操作 — 例如問「七日發布台怎麼用？」「怎麼讓文案更像我的品牌？」\n" +
+          "① 教你操作 — 例如問「靈感舞台怎麼用？」「怎麼讓文案更像我的品牌？」\n" +
           "② 排除問題 — 例如「定位跑不完」「圖生不出來」，我會幫你診斷並給解法\n" +
           "③ 帶路 — 跟我說你想做什麼，我直接給你捷徑按鈕，一鍵到對的頁面\n" +
           "直接輸入你的問題就可以開始。";

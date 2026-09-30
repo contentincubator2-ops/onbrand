@@ -19,7 +19,7 @@ import { pipelineRouter } from "../strategy/routers/pipelineRouter";
 import { postFormatRouter } from "../content/routers/postFormatRouter";
 import { mediaRouter } from "../content/routers/mediaRouter";
 import { platformConnectRouter } from "../platform/routers/platformConnectRouter";
-import { theaterRouter } from "../content/routers/theaterRouter";
+import { tabLockRouter } from "../strategy/routers/tabLockRouter";
 import { positioningJobsRouter } from "../strategy/routers/positioningJobsRouter";
 import { positioningDocsRouter } from "../strategy/routers/positioningDocsRouter";
 import { brandTaskCardRouter } from "../strategy/routers/brandTaskCardRouter";
@@ -100,7 +100,7 @@ export const appRouter = router({
   postFormat:    postFormatRouter,
   media:         mediaRouter,
   platformConnect: platformConnectRouter,
-  theater:         theaterRouter,
+  tabLock:         tabLockRouter,
   positioningJobs: positioningJobsRouter,
   positioningDocs: positioningDocsRouter,
   brandTaskCard:   brandTaskCardRouter,

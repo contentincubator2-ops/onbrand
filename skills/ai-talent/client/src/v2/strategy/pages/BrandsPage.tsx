@@ -144,15 +144,15 @@ export default function BrandsPage() {
 
   // Tab locks (定位 / 文字 / 視覺) — fetched per-brand
   const activeBrandIdForLocks = scope?.brandId ?? brandId ?? null;
-  const tabLocksQuery = (trpc as any).theater?.getTabLocks?.useQuery
-    ? (trpc as any).theater.getTabLocks.useQuery(
+  const tabLocksQuery = (trpc as any).tabLock?.get?.useQuery
+    ? (trpc as any).tabLock.get.useQuery(
         { brandId: activeBrandIdForLocks ?? 0 },
         { enabled: !!activeBrandIdForLocks, refetchOnWindowFocus: false }
       )
     : { data: null, refetch: () => {} };
   const tabLocks = (tabLocksQuery.data as { positioning: any; copy: any; visual: any } | null) ?? { positioning: null, copy: null, visual: null };
-  const lockTabMut   = (trpc as any).theater?.lockTab?.useMutation();
-  const unlockTabMut = (trpc as any).theater?.unlockTab?.useMutation();
+  const lockTabMut   = (trpc as any).tabLock?.lock?.useMutation();
+  const unlockTabMut = (trpc as any).tabLock?.unlock?.useMutation();
   // Load brand's full positioning JSON so cards can show preview content
   // without re-fetching per-tile (single round trip via scope.active).
   // 2026-05-18 (CJ「選了 onbrand.ai 產品，品牌大腦還是顯示 sowork.ai」):
@@ -3232,7 +3232,7 @@ function PositioningCompletionBridge({
             /99s tier routes were removed 2026-05-27 — these three buttons all
             404'd. Tasks are platform-first now, one wall covers all sizes. */}
         <BridgeBtn label={lang === "en" ? "Run a task" : "去跑任務"} onClick={() => navigate(`/tasks/fb?b=${brandId}`)} primary />
-        <BridgeBtn label={lang === "en" ? "7-Day Publisher" : "七日發布台"} onClick={() => navigate(`/theater?b=${brandId}`)} />
+        <BridgeBtn label={lang === "en" ? "Idea stage" : "靈感舞台"} onClick={() => navigate(`/inspiration?b=${brandId}`)} />
       </div>
     </div>
   );
