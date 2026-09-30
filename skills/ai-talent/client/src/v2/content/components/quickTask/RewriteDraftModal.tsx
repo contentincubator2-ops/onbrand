@@ -16,6 +16,7 @@ import {
   Button, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader, Textarea, Input,
 } from "@heroui/react";
 import { CheckIcon, CopyIcon, GenerateIcon } from "../../../platform/components/icons";
+import RegulationComplianceNote from "../RegulationComplianceNote";
 import { showToastGlobal } from "../../../../components/ui/Toast";
 
 export default function RewriteDraftModal({
@@ -75,6 +76,10 @@ export default function RewriteDraftModal({
               )}
               {mut.data.whatChanged && (
                 <p className="text-[12px] text-default-500"><span className="font-semibold">{en ? "What changed: " : "改了什麼："}</span>{mut.data.whatChanged}</p>
+              )}
+              {/* 2026-09-30：品牌有法規時，改寫結果也過了合規檢查。 */}
+              {(mut.data as any).regulationCompliance && (
+                <RegulationComplianceNote rec={(mut.data as any).regulationCompliance} en={en} />
               )}
             </div>
           )}

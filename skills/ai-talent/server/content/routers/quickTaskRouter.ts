@@ -1987,11 +1987,15 @@ export const quickTaskRouter = router({
         }
         // Brand-rule hard enforcement: an inline rewrite must not
         // reintroduce banned words / skip substitutions.
+        // 2026-09-30（CJ「換人重寫、對話修改也要合規檢查」）：接著過法規合規檢查。
+        let regulationCompliance: import("../core/regulationCompliance").RegulationComplianceRecord | null = null;
         try {
-          const { enforceBrandRulesOnText } = await import("../../strategy/core/brandContext");
-          rewritten = await enforceBrandRulesOnText(input.brandId, rewritten);
+          const { enforceBrandAndRegulations } = await import("../core/regulationCompliance");
+          const checked = await enforceBrandAndRegulations(input.brandId, rewritten);
+          rewritten = checked.text;
+          regulationCompliance = checked.record;
         } catch { /* fail-safe */ }
-        return { explanation, rewritten, ok: true };
+        return { explanation, rewritten, ok: true, regulationCompliance };
       } catch (e: any) {
         return { explanation: "", rewritten: "", ok: false, error: e?.message ?? String(e) };
       }
@@ -2250,9 +2254,10 @@ ${polishTemplate.polishHint}`
         );
         const raw = (r.content ?? "").trim();
         if (!raw) return { script: "", ok: false, error: "empty response" };
-        const { enforceBrandRulesOnText } = await import("../../strategy/core/brandContext");
-        const script = await enforceBrandRulesOnText(input.brandId, raw).catch(() => raw);
-        return { script, ok: true };
+        // 2026-09-30：腳本也是會被發出去的字——禁用詞＋法規合規檢查。
+        const { enforceBrandAndRegulations } = await import("../core/regulationCompliance");
+        const checked = await enforceBrandAndRegulations(input.brandId, raw).catch(() => ({ text: raw, record: null }));
+        return { script: checked.text, ok: true, regulationCompliance: checked.record };
       } catch (e: any) {
         return { script: "", ok: false, error: e?.message ?? String(e) };
       }
@@ -3258,7 +3263,15 @@ ${polishTemplate.polishHint}`
           : {}),
       });
       const newContent = replaceRegeneratedContent(row.content, input, replacementVariant, target);
-      const newMetadata = JSON.stringify({ ...md, archivedVariants: archived, lastRegenAt: new Date().toISOString() });
+      // 2026-09-30：重生跑的是同一個 orchestra（含法規合規檢查），結果記到這個版本上。
+      const { mergeComplianceRecord } = await import("../core/regulationCompliance");
+      const regRec = (r as any).regulationCompliance?.[0] ?? null;
+      const newMetadata = JSON.stringify({
+        ...md, archivedVariants: archived, lastRegenAt: new Date().toISOString(),
+        ...(input.contentKind === undefined && (regRec || md.regulationCompliance)
+          ? { regulationCompliance: mergeComplianceRecord(md.regulationCompliance, input.variantIndex, regRec) }
+          : {}),
+      });
 
       await localPool.execute(
         `UPDATE mission_outputs SET content = ?, metadata = ?, version = version + 1, updatedAt = NOW() WHERE id = ?`,
@@ -3391,13 +3404,14 @@ ${polishTemplate.polishHint}`
       // 2026-09-29：禁用詞／替換對照硬檢查——以前只有 orchestra 與改寫路徑有做。
       // 只檢查會被發出去的文字欄位，不動 JSON 結構。
       if (parsedJson && typeof parsedJson === "object" && input.brandId) {
-        const { enforceBrandRulesOnText } = await import("../../strategy/core/brandContext");
-        for (const k of ["caption", "title", "description", "cta"] as const) {
+        // 2026-09-30：加上法規合規檢查（品牌沒有法規就只跑硬規則）。各欄位平行。
+        const { enforceBrandAndRegulations } = await import("../core/regulationCompliance");
+        await Promise.all((["caption", "title", "description", "cta"] as const).map(async (k) => {
           const v = (parsedJson as any)[k];
           if (typeof v === "string" && v.trim()) {
-            (parsedJson as any)[k] = await enforceBrandRulesOnText(input.brandId, v).catch(() => v);
+            (parsedJson as any)[k] = (await enforceBrandAndRegulations(input.brandId, v).catch(() => ({ text: v }))).text;
           }
-        }
+        }));
       }
       // 2026-05-05 fix: spread LLM output FIRST, then OVERRIDE the routing
       // fields with template defaults. Otherwise LLMs that emit Chinese

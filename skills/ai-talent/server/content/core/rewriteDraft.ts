@@ -13,7 +13,8 @@
  * 沒有呼叫）。
  */
 import { callModel } from "../../platform/core/multiModelRouter";
-import { buildBrandPrefix, enforceBrandRulesOnText } from "../../strategy/core/brandContext";
+import { buildBrandPrefix } from "../../strategy/core/brandContext";
+import type { RegulationComplianceRecord } from "./regulationCompliance";
 
 async function call(system: string, user: string): Promise<string> {
   try {
@@ -43,6 +44,8 @@ export interface RewriteDraftResult {
   rewritten: string;
   cta: string;
   whatChanged: string;
+  /** 2026-09-30：品牌有法規時的合規檢查結果。 */
+  regulationCompliance?: RegulationComplianceRecord;
 }
 
 /** 抽出「最終文案」／「CTA」／「改了什麼」三段——LLM 不一定乖乖照格式回，抓不到就整段當最終文案。 */
@@ -79,7 +82,11 @@ export async function rewriteDraft(input: RewriteDraftInput): Promise<RewriteDra
 
   const parsed = parseFinal(final);
   try {
-    parsed.rewritten = await enforceBrandRulesOnText(input.brandId ?? undefined, parsed.rewritten);
+    // 2026-09-30：禁用詞＋法規合規檢查（品牌沒有法規就只跑禁用詞）。
+    const { enforceBrandAndRegulations } = await import("./regulationCompliance");
+    const checked = await enforceBrandAndRegulations(input.brandId ?? undefined, parsed.rewritten);
+    parsed.rewritten = checked.text;
+    if (checked.record) parsed.regulationCompliance = checked.record;
   } catch { /* fail-safe：規則引擎壞掉不擋改寫結果 */ }
   return parsed;
 }

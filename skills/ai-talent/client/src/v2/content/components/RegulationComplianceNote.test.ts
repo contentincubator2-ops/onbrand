@@ -15,4 +15,9 @@ describe("complianceSummary", () => {
     expect(complianceSummary(rec("flagged", 2), false)).toMatchObject({ tone: "warn" });
     expect(complianceSummary(rec("skipped"), false).text).toContain("沒有完成");
   });
+  it("檢查後又手改過：照實說沒有重新檢查", () => {
+    const s = complianceSummary({ ...rec("compliant"), editedAfter: true }, false);
+    expect(s.tone).toBe("warn");
+    expect(s.text).toContain("之後修改過，這一版沒有重新檢查");
+  });
 });

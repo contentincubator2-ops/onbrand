@@ -89,3 +89,32 @@ describe("checkVariantsCompliance", () => {
     expect(got).toEqual([revised]);
   });
 });
+
+describe("後製路徑", () => {
+  it("enforceRegulationsOnText：品牌沒法規就原樣、不花呼叫", async () => {
+    const { enforceRegulationsOnText } = await import("./regulationCompliance");
+    expect(await enforceRegulationsOnText(1, CAP)).toEqual({ text: CAP, record: null });
+    expect(llm.calls).toBe(0);
+  });
+
+  it("enforceRegulationsOnText：有法規且違規 → 交修正稿與紀錄", async () => {
+    const { enforceRegulationsOnText } = await import("./regulationCompliance");
+    regs.rows = [{ ...REG[0], id: 1, brandId: 1, enabled: true, chars: 20 }];
+    const revised = "睡前點一支香氛，讓房間多一點安靜的氣味。今晚，把時間留給自己。#香氛 #放鬆";
+    llm.reply = JSON.stringify({ compliant: false, issues: [{ regulation: "化粧品廣告", quote: "幫助入眠、舒緩焦慮", detail: "醫療效能" }], revised });
+    const r = await enforceRegulationsOnText(1, CAP);
+    expect(r.text).toBe(revised);
+    expect(r.record).toMatchObject({ status: "fixed", regulationCount: 1 });
+  });
+
+  it("mergeComplianceRecord：同版本只留最新；沒帶紀錄＝之後修改過", async () => {
+    const { mergeComplianceRecord } = await import("./regulationCompliance");
+    const a = { variantIndex: 0, status: "compliant" as const, issues: [], regulationCount: 1 };
+    const b = { variantIndex: 1, status: "fixed" as const, issues: [], regulationCount: 1 };
+    const merged = mergeComplianceRecord([a, b], 1, { ...b, status: "compliant" });
+    expect(merged.filter((r) => r.variantIndex === 1)).toEqual([{ ...b, status: "compliant" }]);
+    expect(mergeComplianceRecord([a], 0, null)).toEqual([{ ...a, editedAfter: true }]);
+    expect(mergeComplianceRecord([a], 2, null)).toEqual([a]);
+    expect(mergeComplianceRecord(undefined, 0, null)).toEqual([]);
+  });
+});

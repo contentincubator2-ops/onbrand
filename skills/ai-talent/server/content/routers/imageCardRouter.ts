@@ -144,7 +144,11 @@ export const imageCardRouter = router({
       try {
         const out = await proposeImageDirections({ spec, copy: input.copy, brand, productName: input.productName, brainPrefix });
         // 圖上標題是會被看見的字——跟文案一樣過禁用詞／替換對照。
+        // 2026-09-30：再過法規合規檢查（圖上的字一樣會被看見）。
+        const { enforceRegulationsOnText } = await import("../core/regulationCompliance");
         out.headlineZh = await enforceBrandRulesOnText(input.brandId, out.headlineZh).catch(() => out.headlineZh);
+        const reg = await enforceRegulationsOnText(input.brandId, out.headlineZh);
+        if (reg.record?.status === "fixed") out.headlineZh = await enforceBrandRulesOnText(input.brandId, reg.text).catch(() => reg.text);
         return out;
       } catch (e) {
         throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: e instanceof Error ? e.message : String(e) });
