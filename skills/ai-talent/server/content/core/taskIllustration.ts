@@ -41,7 +41,7 @@ export function illustrationPrompt(concept: string): string {
 const CONCEPT_SYSTEM = `You design the small header illustration for marketing task cards in a Taiwanese content app.
 For each card, write ONE short English phrase (max 18 words) naming a single simple visual metaphor that captures what THIS card is specifically about — its twist, not just its channel.
 Rules:
-- Show objects, characters, gestures. Never rely on readable text, letters or numbers (the image will contain none).
+- Show objects, characters, gestures. Never mention text, letters, numbers, labels, or symbols like question/exclamation marks — the image will contain none.
 - Avoid generic channel icons alone (a phone, a play button). Make the scene specific to the card's idea.
 - Every card must look clearly different from the others and from the "already used" list.
 - It is shown as a small thumbnail (132px wide): ONE object, or ONE character with ONE prop. Never groups, scenes or settings.
