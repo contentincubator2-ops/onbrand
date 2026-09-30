@@ -116,6 +116,8 @@ export interface FBTaskTemplate {
   primary_question?: string;
   /** 任務 modal 插畫場景；沒有就由前端依標題自動挑（見 client taskScene.ts）。 */
   scene?: string;
+  /** 自建卡的 AI 插畫（內建卡的圖走前端 taskIllustrationIds.json，不經這裡）。 */
+  illustration_url?: string;
   primary_input?: { key: string; placeholder?: string; type: "text" | "textarea"; derive?: InputDerive };
   inputs: TaskInput[];
   /**

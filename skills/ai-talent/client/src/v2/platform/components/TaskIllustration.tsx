@@ -2,9 +2,10 @@
  * 任務 modal 開頭插畫：每張卡依題目畫不同場景（場景怎麼挑見 taskScene.ts）。
  * 畫風與 EmptyIllustration 同一套：INK 描邊、FILL 底塊、整張只有 POP 一個暖色重點。
  */
-import type { ComponentType } from "react";
+import { useEffect, useState, type ComponentType } from "react";
+import illustrationIds from "./taskIllustrationIds.json";
 import { EmptyIllustration, IllustrationFrame, Sparks, INK, FILL, POP, type EmptyKind } from "./EmptyIllustration";
-import { resolveTaskScene, type TaskScene } from "./taskScene";
+import { isTaskScene, resolveTaskScene, type TaskScene } from "./taskScene";
 
 /** 跟空白頁共用的幾張圖直接借過來，不重畫。 */
 const BORROWED: Partial<Record<TaskScene, EmptyKind>> = {
@@ -14,13 +15,43 @@ const BORROWED: Partial<Record<TaskScene, EmptyKind>> = {
   brief: "brief",
 };
 
+/**
+ * 優先序：用戶挑的現成場景 → 自建卡的 AI 圖 → 內建卡的 AI 圖（repo 裡的 webp）
+ * → 依題目自動挑的現成場景。圖載不到也退回現成場景，不留破圖。
+ */
 export function TaskIllustration({
   card, width = 132,
 }: {
-  card: Parameters<typeof resolveTaskScene>[0];
+  card: Parameters<typeof resolveTaskScene>[0] & { id?: string; illustration_url?: string | null };
   width?: number;
 }) {
+  const [broken, setBroken] = useState(false);
+  const picked = isTaskScene(card.scene) ? card.scene : null;
+  const src = picked ? null
+    : card.illustration_url
+      ? card.illustration_url
+      : card.id && HAS_IMAGE.has(card.id) ? `/task-illustrations/${card.id}.webp` : null;
+  useEffect(() => setBroken(false), [src]);
+  if (src && !broken) return <IllustrationImage src={src} width={width} onError={() => setBroken(true)} />;
   return <SceneArt scene={resolveTaskScene(card)} width={width} />;
+}
+
+const HAS_IMAGE = new Set<string>(illustrationIds as string[]);
+
+/** AI 插畫的外框跟 SVG 場景同尺寸同圓角，換來換去版面不跳。 */
+export function IllustrationImage({ src, width = 132, onError }: { src: string; width?: number; onError?: () => void }) {
+  return (
+    <img
+      src={src}
+      alt=""
+      aria-hidden="true"
+      width={width}
+      height={Math.round((width * 170) / 240)}
+      onError={onError}
+      loading="lazy"
+      style={{ width, height: Math.round((width * 170) / 240), objectFit: "cover", borderRadius: Math.round(width * 18 / 240), background: "#EDF2F9" }}
+    />
+  );
 }
 
 /** 直接畫某個場景（自建卡的場景選單用）。 */

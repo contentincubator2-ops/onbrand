@@ -89,6 +89,20 @@ export interface GenOptions {
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────
+/** covers URL → 磁碟路徑（只認自己產的 URL，其他回 null）。 */
+export function coverFilePath(url: string): string | null {
+  if (!url.startsWith(COVERS_URL_PREFIX + "/")) return null;
+  const name = url.slice(COVERS_URL_PREFIX.length + 1);
+  return /^[\w.-]+$/.test(name) ? join(COVERS_DIR, name) : null;
+}
+
+/** 把已處理好的位元組存進 covers，回傳公開 URL。 */
+export function saveCoverFile(buf: Buffer, name: string): string {
+  mkdirSync(COVERS_DIR, { recursive: true });
+  writeFileSync(join(COVERS_DIR, name), buf);
+  return `${COVERS_URL_PREFIX}/${name}`;
+}
+
 function saveB64(b64: string, kind: "img" | "vid"): string {
   const ext = kind === "img" ? "png" : "mp4";
   const id  = `${kind}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
