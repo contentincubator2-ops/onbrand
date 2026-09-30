@@ -1,0 +1,5 @@
+# 任務卡插畫產圖請求（見 .github/workflows/ops-gen-task-illustrations.yml）
+# 2026-09-30 第六輪：全量目檢後重畫——有問號（訪談大綱、FAQ）、假字（JTBD）、彩虹色（一稿四發）
+IDS=cw-60-crosspost-4platform,rs-60-interview-guide,rs-60-jtbd-suite,web-30-product-faq
+FORCE=1
+RECONCEPT=1

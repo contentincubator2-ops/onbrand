@@ -12,7 +12,7 @@ describe("brandTaskCardRouter", () => {
   it("建得起來，procedure 名單如預期", () => {
     const names = Object.keys((brandTaskCardRouter as any)._def.procedures).sort();
     expect(names).toEqual([
-      "create", "distil", "dryRun", "extractSamples", "get", "list",
+      "create", "distil", "dryRun", "extractSamples", "generateIllustration", "get", "list",
       "publish", "remove", "unpublish", "update",
     ]);
   });

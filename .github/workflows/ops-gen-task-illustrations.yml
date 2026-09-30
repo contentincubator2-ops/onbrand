@@ -1,0 +1,72 @@
+name: "Ops — 任務卡插畫批次產圖（gpt-image-2）"
+
+# 2026-09-30（CJ「每一個任務卡都要有自己符合情境的插畫，用 image 2 生」）。
+# 在 GitHub runner 上跑 scripts/gen-task-illustrations.ts，用 GitHub secret
+# OPEN_API_KEY（有額度的那把；dev VM .env 那把沒額度），產出的圖直接 commit
+# 回觸發的那條分支，再由人開 PR 進 dev——圖是 repo 的一部分，要看過才進站。
+#
+# 觸發：改 ops/task-illustrations/request 再 push 到 hotfix/task-illustrations*。
+# 那個檔用 KEY=VALUE 一行一個，會原樣變成環境變數（LIMIT / IDS / FORCE / RECONCEPT，
+# 意思見腳本開頭）。空檔＝把所有還沒有圖的卡畫完。
+on:
+  push:
+    branches: ["hotfix/task-illustrations*", "hotfix/task-card-ai-illustrations"]
+    paths:
+      - "ops/task-illustrations/**"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: gen-task-illustrations
+  cancel-in-progress: false
+
+jobs:
+  generate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install
+        run: npm install --prefix skills/ai-talent --legacy-peer-deps 2>&1 | tail -3
+      - name: Generate
+        working-directory: skills/ai-talent
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPEN_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          LLM_FALLBACK_CHAIN: anthropic,openai
+          COVERS_DIR: /tmp/covers
+          # env.ts 在 import 期驗證，這支腳本不連 DB、不發 JWT，給形狀對的假值即可。
+          JWT_SECRET: runner-only-placeholder-not-a-real-secret-000
+          DB_HOST: localhost
+          DB_USER: none
+          DB_PASSWORD: none
+          DB_NAME: none
+          LOCAL_DB_HOST: localhost
+          LOCAL_DB_USER: none
+          LOCAL_DB_PASSWORD: none
+          LOCAL_DB_NAME: none
+        run: |
+          set -a
+          if [ -f ../../ops/task-illustrations/request ]; then
+            grep -E '^(LIMIT|IDS|FORCE|RECONCEPT)=' ../../ops/task-illustrations/request > /tmp/req.env || true
+            cat /tmp/req.env
+            . /tmp/req.env
+          fi
+          set +a
+          npx tsx scripts/gen-task-illustrations.ts
+      - name: Commit results back to the branch
+        run: |
+          git config user.name "onbrand-illustrations-bot"
+          git config user.email "ops@contentincubator2.com"
+          git add skills/ai-talent/client/public/task-illustrations \
+                  skills/ai-talent/client/src/v2/platform/components/taskIllustrationIds.json \
+                  skills/ai-talent/scripts/data/task-illustration-concepts.json
+          if git diff --cached --quiet; then echo "nothing new"; exit 0; fi
+          git commit -m "ops(illustrations): gpt-image-2 產出任務卡插畫（run ${{ github.run_id }}）"
+          git push origin HEAD:${{ github.ref_name }}

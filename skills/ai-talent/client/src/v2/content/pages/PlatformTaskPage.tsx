@@ -233,6 +233,8 @@ interface FBTaskCard {
   primary_question?: string | null;
   /** 2026-09-30：自建卡用戶自選的插畫場景；null＝依題目自動挑。 */
   scene?: string | null;
+  /** 自建卡的 AI 插畫；內建卡的圖走 taskIllustrationIds.json。 */
+  illustration_url?: string | null;
   primary_input?: { key: string; placeholder?: string; type: "text" | "textarea"; derive?: any } | null;
   agent_id?: number | null;
   skill_slug?: string | null;
@@ -3015,10 +3017,15 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                   const PHASES: Array<{ key: string; stageKeys: string[]; icon: IconName; zh: string; en: string }> = [
                     { key: "plan",   stageKeys: ["scout", "pre", "strategist"], icon: "strategy", zh: "策略", en: "Plan" },
                     { key: "write",  stageKeys: ["caption"],                   icon: "content",  zh: "文案", en: "Copy" },
-                    { key: "image",  stageKeys: ["brief", "gen"],              icon: "image",    zh: "圖片", en: "Image" },
+                    { key: "image",  stageKeys: ["gen"],                       icon: "image",    zh: "圖片", en: "Image" },
                     { key: "review", stageKeys: ["extras", "qa"],              icon: "review",   zh: "審核", en: "Review" },
                   ];
-                  const phases = PHASES.map((p) => {
+                  // 2026-09-30（CJ「文案和圖片是分開處理的，不會同時寫文又產圖」）：
+                  // 單篇任務這次執行根本不呼叫生圖模型（runImageGen=false，圖到成品頁才由用戶
+                  // 自己生），所以不列「圖片」；只有這個視窗會等圖生完的任務才列，而且只對應
+                  // 真正的生圖（gen），不含跟文案同時寫的風格指示（brief）——文案寫完才會亮。
+                  const waitsForImages = tier === "60s" || HOLD_FOR_IMAGES.has(activeTask.id);
+                  const phases = PHASES.filter((p) => p.key !== "image" || waitsForImages).map((p) => {
                     const ss = (stagesNow as any[]).filter((s) => p.stageKeys.includes(s.key));
                     if (ss.length === 0) return null;
                     const status = ss.some((s) => s.status === "running") ? "running"
@@ -3040,7 +3047,6 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                         accentColor="#F37E4A"
                         progressPct={progressPct}
                         handoffAnchor
-                        activity={current?.key === "write" ? "write" : current?.key === "image" ? "image" : null}
                       />
                       <div className="flex items-center gap-1.5 -mt-1">
                         {phases.map((p, i) => (
