@@ -1377,6 +1377,76 @@ export default function BrandsPage() {
     if (tab === "visual")      { void runVisualAutoFill(); return; }
   };
 
+  // 2026-09-30（CJ「我按了上傳資料後，上方的 chips 不見了」）：工具列原本只畫在定位總覽
+  // （section === "pos:home"），點「上傳定位資料」切到 section="doc" 就整排消失。抽出來讓兩頁共用，
+  // 在上傳頁「上傳定位資料」是選中的那顆，點「定位資料／策略監測」會回到總覽。上傳頁不放
+  // 「重新套用定位法」——9/23 CJ 已說過那一頁不要同時推「照我的來」和「AI 幫你分析」兩條路。
+  const positioningToolbar = (
+    (pipeline.status === "idle" || pipeline.status === "done") && scopeMode !== "none" && (
+      <div className="flex items-center gap-2 mb-1 flex-wrap">
+        {/* 2026-09-30（CJ「在活動頁籤上，又找不到入口了」）：活動定位頁以前
+            沒有任何一條路通往這檔活動的宣傳企劃。 */}
+        {scopeMode === "event" && scope?.eventId && (
+          <StrategyToolIcon
+            active
+            onClick={() => setSearchParams((prev) => {
+              const sp = new URLSearchParams(prev);
+              sp.set("cat", "campaign");
+              return sp;
+            })}
+            icon={faBullhorn}
+            label={lang === "en" ? "Campaign plan →" : "宣傳企劃 →"}
+            title={lang === "en" ? "Open this campaign's promotion plan" : "打開這檔活動的宣傳企劃"}
+          />
+        )}
+        {scopeMode === "brand" && activeBrandIdForLocks && (
+          <>
+            <StrategyToolIcon
+              active={section === "pos:home" && activeStrategyTool === "positioning"}
+              onClick={() => { switchStrategyTool("positioning"); setSection("pos:home"); }}
+              icon={faTableList}
+              label={lang === "en" ? "Positioning" : "定位資料"}
+              title={lang === "en" ? "The positioning you've filled in so far" : "目前填寫好的定位資料"}
+            />
+            <StrategyToolIcon
+              active={section === "pos:home" && activeStrategyTool === "monitor"}
+              onClick={() => { switchStrategyTool("monitor"); setSection("pos:home"); }}
+              icon={faSatelliteDish}
+              label={lang === "en" ? "Strategy Monitoring" : "策略監測"}
+              count={monitorUnread}
+              title={monitorUnread > 0
+                ? (lang === "en" ? `${monitorUnread} new alert${monitorUnread === 1 ? "" : "s"}` : `${monitorUnread} 則新情報還沒看`)
+                : undefined}
+            />
+          </>
+        )}
+        <StrategyToolIcon
+          active={section === "doc"}
+          onClick={() => setSection("doc" as any)}
+          icon={faFileArrowUp}
+          label={lang === "en" ? "Upload your positioning doc" : "上傳定位資料"}
+          // 格式以 PositioningDocPanel 的 ACCEPT 為準（.docx/.pptx/
+          // .pdf/.md/.txt/.html）＋貼對話文字，不要在這裡承諾它吃不了的。
+          title={lang === "en"
+            ? "Upload your own positioning doc (Word / PPT / PDF / Markdown / txt / html) — or paste a ChatGPT conversation"
+            : "上傳你自己的定位文件（Word / PPT / PDF / Markdown / txt / html），或直接貼 ChatGPT 對話文字"}
+        />
+        {pipeline.status === "idle" && section !== "doc" && (
+          <PositioningTopRow
+            // 2026-05-13 (CJ「按了套用活動定位框架時，出現Event not found」):
+            // pass the scope-aware entity id, not the brand id.
+            // When scope is event/product, server looks up
+            // events.id = entityId — passing brandId here
+            // mismatched and returned "not found".
+            brandId={targetId as number | null}
+            scopeMode={scopeMode}
+            locked={!!tabLocks.positioning}
+          />
+        )}
+      </div>
+    )
+  );
+
   return (
     <main className="min-h-[calc(100vh-3.5rem)] flex flex-col">
       {/* 2026-05-30 (CJ「modal 移除，功能全進主工作區」):
@@ -1893,69 +1963,7 @@ export default function BrandsPage() {
                       使用者在這一頁看不到，以為沒有這個功能。這裡只是把它拉出來。
                       （跟定位卡片下方的「新增卡片」不同：那是新增單一欄位卡片，
                       不是上傳整份定位書——CJ 特別點出這兩件事不要混為一談。） */}
-                  {(pipeline.status === "idle" || pipeline.status === "done") && scopeMode !== "none" && (
-                    <div className="flex items-center gap-2 mb-1 flex-wrap">
-                      {/* 2026-09-30（CJ「在活動頁籤上，又找不到入口了」）：活動定位頁以前
-                          沒有任何一條路通往這檔活動的宣傳企劃。 */}
-                      {scopeMode === "event" && scope?.eventId && (
-                        <StrategyToolIcon
-                          active
-                          onClick={() => setSearchParams((prev) => {
-                            const sp = new URLSearchParams(prev);
-                            sp.set("cat", "campaign");
-                            return sp;
-                          })}
-                          icon={faBullhorn}
-                          label={lang === "en" ? "Campaign plan →" : "宣傳企劃 →"}
-                          title={lang === "en" ? "Open this campaign's promotion plan" : "打開這檔活動的宣傳企劃"}
-                        />
-                      )}
-                      {scopeMode === "brand" && activeBrandIdForLocks && (
-                        <>
-                          <StrategyToolIcon
-                            active={activeStrategyTool === "positioning"}
-                            onClick={() => switchStrategyTool("positioning")}
-                            icon={faTableList}
-                            label={lang === "en" ? "Positioning" : "定位資料"}
-                            title={lang === "en" ? "The positioning you've filled in so far" : "目前填寫好的定位資料"}
-                          />
-                          <StrategyToolIcon
-                            active={activeStrategyTool === "monitor"}
-                            onClick={() => switchStrategyTool("monitor")}
-                            icon={faSatelliteDish}
-                            label={lang === "en" ? "Strategy Monitoring" : "策略監測"}
-                            count={monitorUnread}
-                            title={monitorUnread > 0
-                              ? (lang === "en" ? `${monitorUnread} new alert${monitorUnread === 1 ? "" : "s"}` : `${monitorUnread} 則新情報還沒看`)
-                              : undefined}
-                          />
-                        </>
-                      )}
-                      <StrategyToolIcon
-                        active={false}
-                        onClick={() => setSection("doc" as any)}
-                        icon={faFileArrowUp}
-                        label={lang === "en" ? "Upload your positioning doc" : "上傳定位資料"}
-                        // 格式以 PositioningDocPanel 的 ACCEPT 為準（.docx/.pptx/
-                        // .pdf/.md/.txt/.html）＋貼對話文字，不要在這裡承諾它吃不了的。
-                        title={lang === "en"
-                          ? "Upload your own positioning doc (Word / PPT / PDF / Markdown / txt / html) — or paste a ChatGPT conversation"
-                          : "上傳你自己的定位文件（Word / PPT / PDF / Markdown / txt / html），或直接貼 ChatGPT 對話文字"}
-                      />
-                      {pipeline.status === "idle" && (
-                        <PositioningTopRow
-                          // 2026-05-13 (CJ「按了套用活動定位框架時，出現Event not found」):
-                          // pass the scope-aware entity id, not the brand id.
-                          // When scope is event/product, server looks up
-                          // events.id = entityId — passing brandId here
-                          // mismatched and returned "not found".
-                          brandId={targetId as number | null}
-                          scopeMode={scopeMode}
-                          locked={!!tabLocks.positioning}
-                        />
-                      )}
-                    </div>
-                  )}
+                  {positioningToolbar}
 
                   {scopeMode !== "none" && pipelineSteps.length > 0 && pipeline.status !== "idle" && (
                     <PipelineThinkingPanel
@@ -2076,6 +2084,7 @@ export default function BrandsPage() {
               ) : (
               /* ── 選了具體 section → 原本的內容 ── */
               <div style={{ padding: "24px", display: "flex", flexDirection: "column", gap: 16 }}>
+                {section === "doc" && positioningToolbar}
                 {/* 2026-09-23（CJ「就不需要品牌分析的這一列功能了」——在上傳
                     定位文件那一頁）：「我的定位文件」是「我已經有定位了，照
                     我的來」的入口，頂上再擺一列「品牌定位分析／開始分析」等於
