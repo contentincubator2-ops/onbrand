@@ -355,7 +355,7 @@ export default function CampaignStage({ eventId, brandId }: { eventId: number; b
 function RightBackdrop({ id }: { id: string }) {
   return (
     <img src={backdropUrl(id, "right")} alt="" aria-hidden draggable={false}
-      className="w-full h-full object-cover pointer-events-none select-none dark:opacity-30" />
+      className="w-full h-full object-cover pointer-events-none select-none opacity-60 dark:opacity-25" />
   );
 }
 
@@ -371,15 +371,15 @@ function BackdropPicker({ chosen, current, autoTheme, en, busy, onPick }: {
     ...availableBackdrops().map((t) => ({ key: t.id, id: t.id, title: en ? t.en : t.zh, story: en ? t.storyEn : t.storyZh, preview: t.id })),
   ];
   return (
-    <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))" }}>
+    <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))" }}>
       {cards.map((c) => {
         const on = c.id === null ? chosen === null : chosen === c.id;
         return (
           <button key={c.key} type="button" disabled={busy} onClick={() => onPick(c.id)} aria-pressed={on}
             className={`text-left rounded-2xl border p-2 flex flex-col gap-2 transition ${on ? "border-foreground ring-1 ring-foreground" : "border-divider hover:border-default-400"}`}>
-            <div className="grid grid-cols-[1fr_2fr] gap-1.5 h-[88px] rounded-xl overflow-hidden bg-default-100">
+            <div className="relative aspect-[3/1] rounded-xl overflow-hidden bg-default-100">
               {c.preview === DEFAULT_BACKDROP ? (
-                <div className="col-span-2 grid place-items-center text-default-400">
+                <div className="absolute inset-0 grid place-items-center text-default-400">
                   <svg viewBox="0 0 120 64" className="w-28" aria-hidden>
                     {[18, 30, 42, 54].map((r) => (
                       <path key={r} d={`M ${60 - r} 60 A ${r} ${r} 0 0 1 ${60 + r} 60`} fill="none" stroke="currentColor" strokeWidth={1.4} />
@@ -389,8 +389,10 @@ function BackdropPicker({ chosen, current, autoTheme, en, busy, onPick }: {
                 </div>
               ) : (
                 <>
-                  <img src={backdropUrl(c.preview, "left")} alt="" className="w-full h-full object-cover object-bottom" />
-                  <img src={backdropUrl(c.preview, "right")} alt="" className="w-full h-full object-cover" />
+                  {/* 右邊的故事圖在原圖的中間三分之一，裁成 3:1 剛好是那一條。 */}
+                  <img src={backdropUrl(c.preview, "right")} alt="" className="absolute inset-0 w-full h-full object-cover" />
+                  <img src={backdropUrl(c.preview, "left")} alt=""
+                    className="absolute left-1.5 bottom-1.5 w-9 h-12 object-cover object-bottom rounded-md border border-divider bg-content1" />
                 </>
               )}
             </div>

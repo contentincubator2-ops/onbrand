@@ -108,7 +108,7 @@ export default function CampaignMap({
         {W > 0 && lanes.map((c, j) => (
           <React.Fragment key={c}>
             <div className={`absolute rounded-full ${backdrop ? "bg-default-300/60" : "bg-default-200"}`} style={{ left: G, right: 16, top: HEAD + j * laneH + laneH / 2 - 6, height: 12 }} />
-            <div className="absolute flex items-center gap-2 text-tiny text-default-600" style={{ left: 12, top: HEAD + j * laneH + laneH / 2 - 13, width: G - 16 }}>
+            <div className={`absolute flex items-center gap-2 text-tiny text-default-600 ${backdrop ? "bg-content1/85 rounded-lg pr-2" : ""}`} style={{ left: 12, top: HEAD + j * laneH + laneH / 2 - 13, width: G - 16 }}>
               <span className="w-[26px] h-[26px] shrink-0 rounded-lg bg-content1 shadow-sm grid place-items-center">
                 <FontAwesomeIcon icon={CHANNEL_META[c]?.icon ?? faPenNib} className="text-tiny" />
               </span>
