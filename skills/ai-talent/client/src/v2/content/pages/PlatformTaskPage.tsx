@@ -56,7 +56,7 @@ import {
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { HelpTip } from "../../platform/components/HelpTip";
 import {
-  faBolt, faPaperPlane, faXmark, faMagnifyingGlass, faEnvelope, faBullhorn, faWandMagicSparkles, faTriangleExclamation, faGlobe, faBookBookmark, faCalendarDays, faPlus, faPenToSquare,
+  faBolt, faPaperPlane, faXmark, faMagnifyingGlass, faEnvelope, faBullhorn, faWandMagicSparkles, faTriangleExclamation, faGlobe, faBookBookmark, faCalendarDays, faPenToSquare,
 } from "@fortawesome/free-solid-svg-icons";
 import {
   faFacebook, faInstagram, faYoutube, faTiktok, faLinkedin, faThreads, faLine,
@@ -1603,15 +1603,9 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                 >
                   {lang === "en" ? "Rewrite my text" : "改寫原文"}
                 </Button>
-                <Button
-                  size="sm"
-                  color="primary"
-                  variant="shadow"
-                  startContent={<FontAwesomeIcon icon={faPlus} />}
-                  onPress={() => { setResumeCardId(null); setComposerOpen(true); }}
-                >
-                  {lang === "en" ? "New card" : "新增任務卡"}
-                </Button>
+                {/* 2026-09-29（CJ「新增任務卡有兩個地方，功能重複」）：右上角的
+                    「新增任務卡」拿掉，只留卡片旁邊那張虛線卡；品牌自建從那張卡
+                    打開的選卡器裡進。 */}
               </>
             ) : (
               <Chip size="sm" variant="flat" className="text-default-500">
@@ -2442,7 +2436,7 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
 
               {/* 2026-09-06 「新增任務卡」入口。刻意長得像一張任務卡而不是
                   一顆按鈕 —— 它跟卡片並排，做的是同一件事的延伸。 */}
-              {brandId && !showAllTasks && trayIds.length > 0 && (
+              {brandId && trayIds.length > 0 && (
                 <button
                   onClick={() => setPickerOpen(true)}
                   className="flex min-h-[180px] flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-neutral-300 bg-white text-neutral-500 transition hover:border-neutral-500 hover:text-neutral-800"
@@ -2508,6 +2502,9 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
         saving={setTrayMut?.isPending}
         onSave={(ids) => setTrayMut?.mutate?.({ brandId: brandId ?? 0, platform, taskIds: ids })}
         onDetail={(id) => setDetailTaskId(id)}
+        onCreateOwn={COMPOSER_CHANNELS.has(platform)
+          ? () => { setPickerOpen(false); setResumeCardId(null); setComposerOpen(true); }
+          : undefined}
       />
 
       {/* ─── Task modal (intake + running countdown) ───────────────────── */}
