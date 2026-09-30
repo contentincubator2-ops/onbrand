@@ -16,7 +16,7 @@ import React, { useMemo, useState } from "react";
 import { useLang } from "../../../../lib/i18n";
 import { resolveSource, sourceWhy, sourcePillText,
   FRONT_CARD_KINDS, frontCardKind, frontCardKindLabel, type FrontCardKind } from "../../../content/lib/sourceVocabulary";
-import { CheckIcon, CloseIcon, LockIcon, SearchIcon } from "../icons";
+import { CheckIcon, CloseIcon, LockIcon, AddIcon, SearchIcon } from "../icons";
 
 export interface PickerTask {
   id: string;
@@ -28,7 +28,7 @@ export interface PickerTask {
 }
 
 export default function TaskPicker({
-  open, onClose, tasks, selected, maxTray, viralLocked, onSave, saving, onDetail, categoryLabel,
+  open, onClose, tasks, selected, maxTray, viralLocked, onSave, saving, onDetail, categoryLabel, onCreateOwn,
 }: {
   open: boolean;
   onClose: () => void;
@@ -47,6 +47,12 @@ export default function TaskPicker({
    * 不是這個通路的全部。
    */
   categoryLabel?: string | null;
+  /**
+   * 2026-09-29（CJ「除了選我們本來有的任務卡，還要可以品牌自建」）：右上角的
+   * 「新增任務卡」拿掉後，品牌自建只剩這個入口——放在清單最上面，跟挑現成卡
+   * 是同一個決定的兩個答案。
+   */
+  onCreateOwn?: () => void;
 }) {
   const { lang } = useLang();
   const isEn = lang === "en";
@@ -120,6 +126,25 @@ export default function TaskPicker({
         </div>
 
         <div className="flex-1 overflow-y-auto px-5 py-4">
+          {onCreateOwn && (
+            <button
+              onClick={onCreateOwn}
+              className="mb-5 flex w-full items-center gap-3 rounded-lg border border-dashed border-neutral-300 px-3 py-3 text-left transition hover:border-neutral-500"
+            >
+              <span className="flex h-8 w-8 flex-none items-center justify-center rounded-full border border-neutral-300 text-neutral-600">
+                <AddIcon size={14} />
+              </span>
+              <span className="min-w-0">
+                <span className="block text-[14px] font-medium text-neutral-900">
+                  {isEn ? "Build your own card" : "品牌自建任務卡"}
+                </span>
+                <span className="mt-0.5 block text-[13px] text-neutral-500">
+                  {isEn ? "Paste examples you like — AI learns the format and saves it as a card for this brand." : "貼上你喜歡的範例，AI 學會寫法後存成這個品牌專屬的卡。"}
+                </span>
+              </span>
+            </button>
+          )}
+
           {groups.map(({ type, items }) => (
             <section key={type} className="mb-5">
               <div className="mb-2 flex items-baseline gap-2">
