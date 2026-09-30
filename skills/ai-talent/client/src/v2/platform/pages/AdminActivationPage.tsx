@@ -48,7 +48,7 @@ function formatDuration(ms: number): string {
 
 export default function AdminActivationPage() {
   const [days, setDays] = useState<number>(30);
-  const q = (trpc as any).ops?.activationFunnel?.useQuery?.({ days }, { refetchInterval: 60_000 });
+  const q = (trpc as any).ops?.activationFunnel?.useQuery({ days }, { refetchInterval: 60_000 });
   const d = q?.data;
 
   return (

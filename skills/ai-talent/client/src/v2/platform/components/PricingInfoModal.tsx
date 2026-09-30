@@ -83,7 +83,7 @@ function getPlans(lang: "zh-TW" | "en") {
 export default function PricingInfoModal({ isOpen, onClose }: Props) {
   const { lang } = useLang();
   const PLANS = getPlans(lang);
-  const balanceQuery = (trpc as any).credits?.getBalance?.useQuery?.(undefined, {
+  const balanceQuery = (trpc as any).credits?.getBalance?.useQuery(undefined, {
     enabled: isOpen,
     refetchOnWindowFocus: false,
   });

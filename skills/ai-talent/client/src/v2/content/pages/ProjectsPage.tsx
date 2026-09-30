@@ -90,7 +90,7 @@ export default function ProjectsPage() {
   // 2026-05-19 (CJ「任務完成沒有按儲存也要出現在專案」):
   // refetchOnWindowFocus: true → 從 /run 切回 /projects 立刻拿最新清單。
   // interval 縮到 8s (was 15s) 讓背景任務更快出現。
-  const allQuery = (trpc as any).mission?.listAllForUser?.useQuery?.(
+  const allQuery = (trpc as any).mission?.listAllForUser?.useQuery(
     undefined,
     { refetchOnWindowFocus: true, refetchInterval: 8_000 },
   );

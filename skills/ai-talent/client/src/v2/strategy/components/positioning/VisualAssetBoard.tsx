@@ -301,7 +301,7 @@ function StylePanel({
   const [err, setErr] = React.useState("");
   const [draft, setDraft] = React.useState<{ description: string; prompt: string } | null>(null);
 
-  const photosQ = (trpc as any).assetPhoto?.list?.useQuery?.(
+  const photosQ = (trpc as any).assetPhoto?.list?.useQuery(
     { brandId, scope: "brand", scopeId: brandId }, { staleTime: 30_000 },
   ) ?? { data: [] };
   const photos: any[] = (photosQ.data as any[]) ?? [];

@@ -14,14 +14,14 @@ import { RegenerateIcon } from "../../../platform/components/icons";
 interface Props { brandId: number | null }
 
 export default function BrandMessageBar({ brandId }: Props) {
-  const cur = (trpc as any).positioningJobs?.getCurrent?.useQuery?.(
+  const cur = (trpc as any).positioningJobs?.getCurrent?.useQuery(
     { entityKind: "brand", entityId: brandId ?? 0 },
     { enabled: !!brandId, refetchInterval: 6_000 },
   );
   const data = (cur?.data as any) ?? null;
   const status = (data?.source as "full" | "interim" | "empty" | undefined) ?? "empty";
 
-  const job = (trpc as any).positioningJobs?.getStatus?.useQuery?.(
+  const job = (trpc as any).positioningJobs?.getStatus?.useQuery(
     { entityKind: "brand", entityId: brandId ?? 0 },
     { enabled: !!brandId, refetchInterval: 4_000 },
   );

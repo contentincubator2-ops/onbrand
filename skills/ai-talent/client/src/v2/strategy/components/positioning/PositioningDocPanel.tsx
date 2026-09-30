@@ -95,7 +95,7 @@ export default function PositioningDocPanel({
   const [inject, setInject] = React.useState<Set<number>>(new Set());
   const fileRef = React.useRef<HTMLInputElement | null>(null);
 
-  const coverageQuery = (trpc as any).positioningDocs?.coverage?.useQuery?.(
+  const coverageQuery = (trpc as any).positioningDocs?.coverage?.useQuery(
     { scope: scopeMode, scopeId: scopeId ?? 0 },
     { enabled: !!scopeId, refetchOnWindowFocus: false },
   ) ?? { data: null, isLoading: false, refetch: () => {} };

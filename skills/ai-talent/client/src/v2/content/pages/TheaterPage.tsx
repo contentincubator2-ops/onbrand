@@ -601,7 +601,7 @@ export default function TheaterPage() {
   // Poll the background 14-step pipeline status. When it flips done → fire
   // the `brand.positioning_complete` Mia nudge so the user knows future
   // regenerations will be sharper. Only enabled when we have a brand.
-  const pipelineStatusQ = (trpc as any).positioningJobs?.getStatus?.useQuery?.(
+  const pipelineStatusQ = (trpc as any).positioningJobs?.getStatus?.useQuery(
     { entityKind: "brand", entityId: brandId ?? 0 },
     {
       enabled: !!brandId,
@@ -645,7 +645,7 @@ export default function TheaterPage() {
   const [materialTab, setMaterialTab] = useState<"event" | "product" | "photo">("event");
 
   // Brand entities — always loaded when brandId is known (needed for 本週焦點 chips)
-  const brandEntitiesQ = (trpc as any).theater?.getBrandEntities?.useQuery?.(
+  const brandEntitiesQ = (trpc as any).theater?.getBrandEntities?.useQuery(
     { brandId: brandId ?? 0 },
     { enabled: !!brandId, refetchOnWindowFocus: false, staleTime: 60_000 },
   );
@@ -755,7 +755,7 @@ export default function TheaterPage() {
   }, [lang]);
 
   // Platform connection status (for colored dots on platform selector)
-  const pdConnectQ = (trpc as any).publish?.getConnectedPlatforms?.useQuery?.(
+  const pdConnectQ = (trpc as any).publish?.getConnectedPlatforms?.useQuery(
     { brandId: brandId ?? 0 },
     { enabled: !!brandId, refetchOnWindowFocus: false, staleTime: 30_000 },
   );
