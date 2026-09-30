@@ -41,7 +41,7 @@ export default function PositioningNotificationCenter() {
   const seen = useRef<Set<number>>(loadSeen());
   const [active, setActive] = useState<Notif[]>([]);
 
-  const q = (trpc as any).positioningJobs?.getRecentDone?.useQuery?.(
+  const q = (trpc as any).positioningJobs?.getRecentDone?.useQuery(
     { sinceIso: since.current },
     { refetchInterval: 12_000, refetchOnWindowFocus: true },
   );

@@ -53,17 +53,17 @@ const grid = (min = 150): React.CSSProperties => ({
 export default function AdminDashboardPage() {
   const navigate = useNavigate();
   const opt = { refetchInterval: 30_000, refetchOnWindowFocus: false } as const;
-  const ovQ = (trpc as any).adminStats?.overview?.useQuery?.(undefined, opt);
-  const ucQ = (trpc as any).adminStats?.usageCost?.useQuery?.(undefined, opt);
-  const hQ  = (trpc as any).adminStats?.health?.useQuery?.(undefined, opt);
+  const ovQ = (trpc as any).adminStats?.overview?.useQuery(undefined, opt);
+  const ucQ = (trpc as any).adminStats?.usageCost?.useQuery(undefined, opt);
+  const hQ  = (trpc as any).adminStats?.health?.useQuery(undefined, opt);
   // 2026-06-07 (CJ「Part 1 投資人會看的指標」) — activation funnel + cohort retention + TTFV
-  const afQ = (trpc as any).adminStats?.activationFunnel?.useQuery?.({ days: 30 }, opt);
-  const crQ = (trpc as any).adminStats?.cohortRetention?.useQuery?.({ weeks: 8 }, opt);
-  const ttfvQ = (trpc as any).adminStats?.timeToFirstValue?.useQuery?.({ days: 30 }, opt);
-  const fbQ = (trpc as any).adminStats?.featureBreakdown?.useQuery?.({ days: 30, limit: 60 }, opt);
-  const fmQ = (trpc as any).adminStats?.frictionMap?.useQuery?.({ days: 7 }, opt);
-  const ruQ = (trpc as any).adminStats?.recentUsers?.useQuery?.({ limit: 50 }, opt);
-  const bugsQ = (trpc as any).adminStats?.listBugReports?.useQuery?.({ status: "all", limit: 60 }, opt);
+  const afQ = (trpc as any).adminStats?.activationFunnel?.useQuery({ days: 30 }, opt);
+  const crQ = (trpc as any).adminStats?.cohortRetention?.useQuery({ weeks: 8 }, opt);
+  const ttfvQ = (trpc as any).adminStats?.timeToFirstValue?.useQuery({ days: 30 }, opt);
+  const fbQ = (trpc as any).adminStats?.featureBreakdown?.useQuery({ days: 30, limit: 60 }, opt);
+  const fmQ = (trpc as any).adminStats?.frictionMap?.useQuery({ days: 7 }, opt);
+  const ruQ = (trpc as any).adminStats?.recentUsers?.useQuery({ limit: 50 }, opt);
+  const bugsQ = (trpc as any).adminStats?.listBugReports?.useQuery({ status: "all", limit: 60 }, opt);
   const utils = (trpc as any).useUtils?.() ?? null;
   const refetchBugs = () => { bugsQ?.refetch?.(); utils?.adminStats?.userDetail?.invalidate?.(); };
 

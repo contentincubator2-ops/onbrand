@@ -470,7 +470,7 @@ export default function BrandsPage() {
     });
   };
   // 色票只是拿來判斷「這張卡有沒有內容」與縮圖，所以讀現成的那一份就好。
-  const dnaQ = (trpc as any).brandColors?.getCurrent?.useQuery?.(
+  const dnaQ = (trpc as any).brandColors?.getCurrent?.useQuery(
     { brandId: activeBrandIdForLocks ?? 0 },
     { enabled: !!activeBrandIdForLocks, staleTime: 60_000 },
   );
@@ -483,7 +483,7 @@ export default function BrandsPage() {
   // Onboarding nudge: if this brand has no website / socialLinks yet,
   // auto-open Settings → 連結 once. localStorage tracks dismissal so
   // the prompt doesn't bug returning users.
-  const connQuery = (trpc as any).brand?.getConnections?.useQuery?.(
+  const connQuery = (trpc as any).brand?.getConnections?.useQuery(
     { brandId: activeBrandIdForLocks ?? 0 },
     { enabled: !!activeBrandIdForLocks, refetchOnWindowFocus: false, staleTime: 60_000 },
   );
@@ -678,11 +678,11 @@ export default function BrandsPage() {
   };
 
   // Products + events for brand tabs — must be after `category` is declared (TDZ guard)
-  const brandProductsQ = (trpc as any).product?.list?.useQuery?.(
+  const brandProductsQ = (trpc as any).product?.list?.useQuery(
     { brandId: activeBrandIdForLocks ?? 0 },
     { enabled: !!activeBrandIdForLocks && category === "products", refetchOnWindowFocus: false, staleTime: 30_000 },
   );
-  const brandEventsQ = (trpc as any).event?.list?.useQuery?.(
+  const brandEventsQ = (trpc as any).event?.list?.useQuery(
     { brandId: activeBrandIdForLocks ?? 0 },
     { enabled: !!activeBrandIdForLocks && category === "events", refetchOnWindowFocus: false, staleTime: 30_000 },
   );
@@ -738,11 +738,11 @@ export default function BrandsPage() {
     });
     interimMut?.mutate?.({ entityKind: kind, entityId: id });
   };
-  const prodPosStatusQ = (trpc as any).positioningJobs?.getStatusBatch?.useQuery?.(
+  const prodPosStatusQ = (trpc as any).positioningJobs?.getStatusBatch?.useQuery(
     { entityKind: "product", entityIds: posRunning.product },
     { enabled: posRunning.product.length > 0, refetchInterval: 4000 },
   );
-  const evPosStatusQ = (trpc as any).positioningJobs?.getStatusBatch?.useQuery?.(
+  const evPosStatusQ = (trpc as any).positioningJobs?.getStatusBatch?.useQuery(
     { entityKind: "event", entityIds: posRunning.event },
     { enabled: posRunning.event.length > 0, refetchInterval: 4000 },
   );
@@ -1142,7 +1142,7 @@ export default function BrandsPage() {
   const runInterimMut = (trpc as any).positioningJobs?.runInterim?.useMutation?.();
   const startJobMut   = (trpc as any).positioningJobs?.start?.useMutation?.();
   // Poll job status once interim is done (every 15s until full pipeline finishes)
-  const autoPosJobStatus = (trpc as any).positioningJobs?.getStatus?.useQuery?.(
+  const autoPosJobStatus = (trpc as any).positioningJobs?.getStatus?.useQuery(
     { entityKind: (scopeMode !== "none" ? scopeMode : "brand") as "brand"|"product"|"event", entityId: targetId ?? 0 },
     {
       enabled: autoPosPhase === "interim-done" && !!targetId && scopeMode !== "none",
@@ -4214,7 +4214,7 @@ function PositioningTopRow({
   // switches back. refetchIntervalInBackground keeps polling even when the
   // tab isn't focused; refetchOnWindowFocus/refetchOnMount force a fresh
   // read the moment the user does look back, instead of trusting stale cache.
-  const job = (trpc as any).positioningJobs?.getStatus?.useQuery?.(
+  const job = (trpc as any).positioningJobs?.getStatus?.useQuery(
     { entityKind: entityKind ?? "brand", entityId: brandId ?? 0 },
     {
       enabled: !!brandId && !!entityKind,
@@ -4622,7 +4622,7 @@ function FieldRow({ label, children }: { label: string; children: React.ReactNod
 }
 
 function ProductInfoEditor({ productId, brandName, en }: { productId: number; brandName: string | null; en: boolean }) {
-  const q = (trpc as any).product?.get?.useQuery?.(
+  const q = (trpc as any).product?.get?.useQuery(
     { id: productId },
     { enabled: !!productId, refetchOnWindowFocus: false },
   );
@@ -4858,7 +4858,7 @@ function BrandPaletteHero({
   brandId, lang, locked,
 }: { brandId: number; lang: "zh-TW" | "en"; locked: boolean }) {
   const en = lang === "en";
-  const paletteQ = (trpc as any).brandColors?.getCurrent?.useQuery?.(
+  const paletteQ = (trpc as any).brandColors?.getCurrent?.useQuery(
     { brandId },
     { enabled: !!brandId, staleTime: 30_000 },
   );

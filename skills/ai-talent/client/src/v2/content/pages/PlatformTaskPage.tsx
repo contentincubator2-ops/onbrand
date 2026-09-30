@@ -12,7 +12,7 @@
  * Speed badges appear on every card so the timing expectation is clear
  * without requiring users to navigate tiers before seeing tasks.
  */
-import { IllustratedEmpty } from "../../platform/components/EmptyIllustration";
+import { IllustratedEmpty, EmptyIllustration } from "../../platform/components/EmptyIllustration";
 import React, { useMemo, useState, useEffect, useRef } from "react";
 import { Navigate, useParams, useOutletContext, useNavigate, useSearchParams } from "react-router-dom";
 import CalendarTabs from "../components/CalendarTabs";
@@ -483,7 +483,7 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
   const [editValue, setEditValue] = useState("");
   const savePositioningMut = (trpc as any).scope?.savePositioning?.useMutation?.();
 
-  const scopeActiveQuery = (trpc as any).scope?.active?.useQuery?.(
+  const scopeActiveQuery = (trpc as any).scope?.active?.useQuery(
     {
       brandId:   brandId ?? 0,
       productId: taskProductId,
@@ -711,9 +711,9 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
         eventId: taskEventId ?? undefined,
       });
       if (r?.ok && r.polished) setPrimaryAnswer(r.polished);
-      else setPolishErr(lang === "en" ? "Polish failed — try again." : "潤稿失敗，請再試一次");
+      else setPolishErr(lang === "en" ? "Couldn't refine — try again." : "完善失敗，請再試一次");
     } catch {
-      setPolishErr(lang === "en" ? "Polish failed — try again." : "潤稿失敗，請再試一次");
+      setPolishErr(lang === "en" ? "Couldn't refine — try again." : "完善失敗，請再試一次");
     } finally {
       setPolishing(false);
     }
@@ -836,7 +836,7 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
   // 時間」）：要預填「日期 / 時間」「為什麼參加 / 重點」就得真的去拿活動資料，
   // 所以除了 ref 還要一份 state —— ref 不會觸發 query。
   const [campaignScope, setCampaignScope] = React.useState<{ eventId: number; itemId: string } | null>(null);
-  const campaignQ = (trpc as any).campaign?.get?.useQuery?.(
+  const campaignQ = (trpc as any).campaign?.get?.useQuery(
     { eventId: campaignScope?.eventId ?? 0 },
     { enabled: !!campaignScope?.eventId, refetchOnWindowFocus: false, staleTime: 60_000 },
   ) ?? { data: null };
@@ -2353,7 +2353,7 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                       })()}
                       {/* 2026-09-29（CJ「爆款結構卡上都要有這些文字：參考貼文、副標題、數字是原貼文的」）：
                           爆款卡直接印數字＋量測年月，不用點進詳情才看得到。副標題就是 description。
-                          （CJ 同日「備註的地方都拿掉」：卡面與「出處與說明」抽屜都不印 caveat，只留在資料層。） */}
+                          （2026-09-30 CJ「備註的地方都拿掉」：前台不印 caveat，只留在 server 資料層。） */}
                       {frontCardKind(task) === "viral" && (() => {
                         const raw = (task as any).source ?? {};
                         return (
@@ -2511,21 +2511,25 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
         size="2xl"
         scrollBehavior="inside"
         backdrop="blur"
+        // 2026-09-29（CJ 參考「Your inbox is clear」）：淡彩霧面底、大圓角白卡、
+        // 置中的一句大標＋手繪插畫。底色只在遮罩層，卡片本身維持白底黑字。
         classNames={{
-          base: "max-h-[90vh]",
-          body: "py-3 px-4",
-          footer: "border-t border-default-100 bg-white py-2 px-4",
-          header: "py-2 px-3 bg-white border-b border-default-100",
-          closeButton: "text-default-400 hover:bg-default-100",
+          backdrop: "bg-gradient-to-br from-rose-100/70 via-emerald-50/60 to-violet-200/60 backdrop-blur-md",
+          base: "max-h-[90vh] rounded-[28px] bg-white shadow-2xl ring-1 ring-black/5",
+          body: "pt-2 pb-4 px-6",
+          footer: "bg-white pt-2 pb-5 px-6",
+          header: "pt-4 pb-3 px-6 bg-white border-b border-default-100",
+          closeButton: "top-3.5 right-4 text-default-400 hover:bg-default-100",
         }}
       >
         <ModalContent>
           {activeTask && (
             <>
-              <ModalHeader className="flex flex-col items-stretch gap-0 py-2 px-3 border-b border-default-100">
-                <div className="flex items-center gap-2 min-w-0">
+              <ModalHeader className="flex flex-col items-stretch gap-0 pt-4 pb-3 pl-6 pr-14 border-b border-default-100">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <FontAwesomeIcon icon={meta.icon} className="text-neutral-900 shrink-0" style={{ fontSize: 18 }} />
                   <div className="min-w-0 flex-1">
-                    <p className="text-[12px] text-default-800 truncate font-medium">
+                    <p className="text-[15px] text-neutral-900 truncate font-semibold">
                       {lang === "en"
                         ? (activeTask.label_en ?? activeTask.label)
                         : (activeTask.label_zh ?? activeTask.label)}
@@ -2545,254 +2549,22 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
               </ModalHeader>
 
               <ModalBody>
-                {/* 2026-09-25（CJ「本來在活動企畫中，有該則貼文要發布的時間」）：
-                    這一篇在企劃上排在哪一天，要看得見。卡片裡問的「日期 / 時間」
-                    是**活動**什麼時候發生（已自動帶入活動期間），跟這篇貼文的
-                    發布日是兩件事——不講清楚，使用者會以為系統把日期搞丟了。 */}
-                {(() => {
-                  if (!campaignScope || !campaignQ.data) return null;
-                  const d: any = campaignQ.data;
-                  const item = (d.plan?.items ?? []).find((i: any) => i.id === campaignScope.itemId);
-                  if (!item) return null;
-                  return (
-                    <div className="mb-3 rounded-lg border border-default-200 px-3 py-2">
-                      <p className="text-tiny text-default-600 m-0">
-                        {lang === "en"
-                          ? `From the campaign plan for “${d.event?.name ?? ""}” — this post is scheduled for ${item.date}.`
-                          : `來自「${d.event?.name ?? ""}」的宣傳企劃 —— 這篇排在 ${item.date} 發布。`}
-                      </p>
-                    </div>
-                  );
-                })()}
-                {/* 2026-06-16: per-task entity picker. Brand by default; the
-                    user can switch to a specific product or event for THIS run.
-                    Selecting one re-runs the context resolution so the chips
-                    below + the generated content use that entity's positioning. */}
-                {brandId && (modalProducts.length > 0 || modalEvents.length > 0) && (
-                  <div className="mb-3">
-                    <p className="text-tiny text-default-500 mb-1.5">
-                      {lang === "en" ? "Generate for" : "產出對象"}
-                    </p>
-                    <div className="flex flex-wrap gap-1.5">
-                      <button
-                        onClick={() => setModalEntity({ kind: "brand", id: null })}
-                        className={`text-xs px-2.5 py-1 rounded-full border transition ${
-                          modalEntity.kind === "brand"
-                            ? "bg-neutral-900 text-white border-neutral-900"
-                            : "bg-white text-default-700 border-default-300 hover:border-default-500"
-                        }`}
-                      >
-                        {lang === "en" ? "Brand" : "品牌"}{brandName ? ` · ${brandName}` : ""}
-                      </button>
-                      {modalProducts.map((p: any) => (
-                        <button
-                          key={`p-${p.id}`}
-                          onClick={() => setModalEntity({ kind: "product", id: p.id })}
-                          className={`text-xs px-2.5 py-1 rounded-full border transition ${
-                            modalEntity.kind === "product" && modalEntity.id === p.id
-                              ? "bg-neutral-900 text-white border-neutral-900"
-                              : "bg-white text-default-700 border-default-300 hover:border-default-500"
-                          }`}
-                        >
-                          {lang === "en" ? "Product · " : "產品 · "}{p.name}
-                        </button>
-                      ))}
-                      {modalEvents.map((e: any) => (
-                        <button
-                          key={`e-${e.id}`}
-                          onClick={() => setModalEntity({ kind: "event", id: e.id })}
-                          className={`text-xs px-2.5 py-1 rounded-full border transition ${
-                            modalEntity.kind === "event" && modalEntity.id === e.id
-                              ? "bg-neutral-900 text-white border-neutral-900"
-                              : "bg-white text-default-700 border-default-300 hover:border-default-500"
-                          }`}
-                        >
-                          {lang === "en" ? "Event · " : "活動 · "}{e.name}
-                        </button>
-                      ))}
-                    </div>
+                {/* 2026-09-29（CJ 參考「Your inbox is clear」）：開頭是一張插畫＋
+                    一句置中大標（就是這張卡要問的那句話），輸入框緊接在下面；
+                    品牌脈絡退到後面當參考，不再是一打開最先看到的黑塊。 */}
+                {!running && (
+                  <div className="flex flex-col items-center text-center pt-3 pb-1">
+                    <EmptyIllustration kind="brief" width={132} />
+                    <h2 className="mt-4 text-[22px] leading-snug font-bold text-neutral-900 max-w-[30ch]">
+                      {activeTask.primary_question
+                        ?? (lang === "en" ? (activeTask.label_en ?? activeTask.label) : (activeTask.label_zh ?? activeTask.label))}
+                    </h2>
                   </div>
                 )}
-
-                {/* Brand assets empty hint */}
-                {textAssetsEmpty && brandId && (
-                  <div className="mb-3 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-900 flex items-start gap-2">
-                                        <div className="flex-1 leading-relaxed">
-                      {lang === "en" ? (
-                        <>
-                          <span className="font-medium">This brand's word assets are empty.</span>
-                          {" "}Pop into{" "}
-                          <a href={`/brands?b=${brandId}&cat=copy`} target="_blank" rel="noreferrer" className="underline font-medium hover:text-amber-700">
-                            Brand → Words
-                          </a>
-                          {" "}and click Auto-fill. Output will be far more on-brand.
-                        </>
-                      ) : (
-                        <>
-                          <span className="font-medium">這個品牌的「文字」資產還是空的。</span>
-                          {" "}先到{" "}
-                          <a href={`/brands?b=${brandId}&cat=copy`} target="_blank" rel="noreferrer" className="underline font-medium hover:text-amber-700">
-                            品牌 → 文字
-                          </a>
-                          {" "}按「自動填寫」，AI 產出會明顯貼合品牌語氣。
-                        </>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {/* Context chips */}
-                {(() => {
-                  // 2026-05-27 (CJ「modal chip 仍抓 SoWork」): scope-aware DEFAULT_SOURCES.
-                  // Product uses segment ids: core / audience / value / competition / strategy / marketing.
-                  // Brand uses: goldenCircle / audience / voice / differentiation / values / tagline.
-                  // When product/event scope is active, use the correct paths so chips read
-                  // from the product's own positioning segments, not the brand's.
-                  const isProductScope = !!(brandCtx?.product);
-                  const isEventScope   = !!(brandCtx?.event);
-                  const BRAND_SOURCES = [
-                    "brand.name",
-                    "brand.positioning.audience.primary",
-                    "brand.positioning.voice.archetypes",
-                    "brand.positioning.voice.tone",
-                    "brand.positioning.voice.forbidden",
-                    "brand.positioning.goldenCircle.why",
-                  ];
-                  const PRODUCT_SOURCES = [
-                    "brand.name",                                   // displayName = product name
-                    "brand.positioning.audience.primary",           // product.audience.primary
-                    "brand.positioning.core.coreStatement",         // product.core.coreStatement
-                    "brand.positioning.marketing.tone",             // product.marketing.tone
-                    "brand.positioning.competition.uniqueUsp",      // product.competition.uniqueUsp
-                    "brand.positioning.value.userFeeling",          // product.value.userFeeling
-                  ];
-                  const EVENT_SOURCES = [
-                    "brand.name",                                          // displayName = event name
-                    "brand.positioning.audience.primaryAudience",          // event.audience.primaryAudience
-                    "brand.positioning.smp.singleMindedProposition",       // event.smp.singleMindedProposition
-                    "brand.positioning.messaging.coreMessage",             // event.messaging.coreMessage
-                    "brand.positioning.creative.coreTranslation",          // event.creative.coreTranslation
-                  ];
-                  const DEFAULT_SOURCES =
-                    isProductScope ? PRODUCT_SOURCES :
-                    isEventScope   ? EVENT_SOURCES   :
-                    BRAND_SOURCES;
-                  const sources = (activeTask.contextSources && activeTask.contextSources.length > 0)
-                    ? activeTask.contextSources
-                    : DEFAULT_SOURCES;
-                  const chips = brandCtx ? buildContextChips(brandCtx, sources) : [];
-                  const anyContent = chips.some((c: any) => c.hasContent);
-                  // Is a chip inline-editable? Only string-typed (or empty)
-                  // segment fields; arrays/objects route to the full editor.
-                  const isEditable = (source: string): boolean => {
-                    if (!editSaveTarget) return false;
-                    const v = getNested(editSaveTarget.raw, chipFieldPath(source));
-                    return v == null || typeof v === "string";
-                  };
-                  // Render nothing only if there's truly nothing to show or edit.
-                  if (!anyContent && chips.every((c: any) => !isEditable(c.source))) return null;
-                  const shownMissing = chips.filter((c: any) => !c.hasContent && c.source !== "brand.name").slice(0, 4);
-                  const renderChip = (c: any, missing: boolean) => {
-                    const editable = isEditable(c.source) && c.source !== "brand.name";
-                    const base: React.CSSProperties = {
-                      fontSize: 12, padding: "3px 8px", borderRadius: 4, fontWeight: 500,
-                      ...(missing
-                        ? { background: "transparent", color: "#A3A3A3", border: "1px dashed #D4D4D4" }
-                        : { background: "#171717", color: "#FFFFFF" }),
-                      ...(editable ? { cursor: "pointer" } : {}),
-                    };
-                    if (!editable) {
-                      return <span key={c.source} title={c.source} style={base}>{c.label}</span>;
-                    }
-                    return (
-                      <button
-                        key={c.source}
-                        title={lang === "en" ? "Click to edit / rewrite" : "點擊編輯／改寫"}
-                        style={base}
-                        onClick={() => openChipEditor(c)}
-                      >
-                        {c.label} {missing ? <AddIcon size={10} /> : <EditIcon size={10} />}
-                      </button>
-                    );
-                  };
-                  return (
-                    <div className="mb-3 rounded-lg px-3 py-2.5" style={{ background: "#FAFAF9", border: "1px solid #171717" }}>
-                      <p style={{ fontSize: 12, fontWeight: 700, color: "#525252", letterSpacing: "0.22em", textTransform: "uppercase", marginBottom: 6 }}>
-                        {(() => {
-                          const entityName = brandCtx?.brand?.name ?? brandName ?? (lang === "en" ? "your brand" : "你的品牌");
-                          return `Context · ${entityName}`;
-                        })()}
-                        <span style={{ marginLeft: 4, letterSpacing: 0, textTransform: "none" }}>
-                          <HelpTip>{lang === "en" ? "Click a chip to edit it." : "點任一項可改寫"}</HelpTip>
-                        </span>
-                      </p>
-                      <div className="flex flex-wrap gap-1.5">
-                        {chips.filter((c: any) => c.hasContent).map((c: any) => renderChip(c, false))}
-                        {shownMissing.map((c: any) => renderChip(c, true))}
-                      </div>
-
-                      {/* Inline editor for the selected chip */}
-                      {editingChip && (() => {
-                        const fieldPath = chipFieldPath(editingChip.source);
-                        const siblings = (CHIP_SIBLING_CANDIDATES[fieldPath] ?? [])
-                          .map((sp) => ({ path: sp, val: getNested(editSaveTarget?.raw, sp) }))
-                          .filter((s) => typeof s.val === "string" && s.val.trim().length > 0);
-                        return (
-                          <div className="mt-2.5 pt-2.5" style={{ borderTop: "1px solid #E5E5E5" }}>
-                            <p className="text-tiny text-default-600 mb-1">
-                              {(lang === "en" ? "Editing: " : "編輯：") + editingChip.label.split(" · ")[0]}
-                            </p>
-                            {siblings.length > 0 && (
-                              <div className="flex flex-wrap gap-1 mb-1.5">
-                                <span className="text-[12px] text-default-400 self-center">
-                                  {lang === "en" ? "Pick:" : "可選用："}
-                                </span>
-                                {siblings.map((s) => (
-                                  <button
-                                    key={s.path}
-                                    onClick={() => setEditValue(s.val)}
-                                    className="text-[12px] px-2 py-0.5 rounded-full border border-default-300 bg-white text-default-600 hover:border-default-500"
-                                    title={s.val}
-                                  >
-                                    {s.val.length > 24 ? s.val.slice(0, 24) + "…" : s.val}
-                                  </button>
-                                ))}
-                              </div>
-                            )}
-                            <Textarea
-                              value={editValue}
-                              onChange={(e) => setEditValue(e.target.value)}
-                              minRows={2}
-                              autoFocus
-                              placeholder={lang === "en" ? "Type or rewrite…" : "輸入或改寫…"}
-                            />
-                            <p className="text-[12px] text-default-400 mt-1">
-                              {lang === "en"
-                                ? `Saves to this ${editSaveTarget?.kind ?? "brand"}'s positioning.`
-                                : `會更新此${editSaveTarget?.kind === "product" ? "產品" : editSaveTarget?.kind === "event" ? "活動" : "品牌"}的定位。`}
-                            </p>
-                            <div className="flex gap-2 mt-1.5">
-                              <Button size="sm" color="secondary"
-                                isLoading={savePositioningMut?.isPending}
-                                onPress={commitChipEdit}>
-                                {lang === "en" ? "Save" : "儲存"}
-                              </Button>
-                              <Button size="sm" variant="flat"
-                                onPress={() => { setEditingChip(null); setEditValue(""); }}>
-                                {lang === "en" ? "Cancel" : "取消"}
-                              </Button>
-                            </div>
-                          </div>
-                        );
-                      })()}
-                    </div>
-                  );
-                })()}
 
                 {/* Primary question input */}
                 {activeTask.primary_input && (
                   <div className="space-y-2" data-primary-question>
-                    <p className="text-small font-medium">{activeTask.primary_question}</p>
                     {activeTask.primary_input.type === "textarea" ? (
                       <Textarea
                         placeholder={activeTask.primary_input.placeholder ?? ""}
@@ -2801,6 +2573,7 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                         minRows={3}
                         autoFocus
                         isInvalid={!!inputError}
+                        classNames={{ inputWrapper: "rounded-2xl px-4 py-3", input: "text-[15px]" }}
                       />
                     ) : (
                       <Input
@@ -2809,6 +2582,7 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                         onChange={(e) => { setPrimaryAnswer(e.target.value); if (inputError) setInputError(null); }}
                         autoFocus
                         isInvalid={!!inputError}
+                        classNames={{ inputWrapper: "rounded-2xl px-4", input: "text-[15px]" }}
                       />
                     )}
                     {/* 2026-08-23: intake rejection prints here, next to the
@@ -2821,28 +2595,29 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                       </p>
                     )}
                     {polishInputMut && !running && (
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center justify-center gap-1.5">
                         <Button
                           size="sm"
-                          variant="flat"
-                          color="secondary"
+                          variant="light"
+                          radius="full"
+                          className="text-neutral-700"
                           isLoading={polishing}
                           isDisabled={polishing || !primaryAnswer.trim()}
                           onPress={handlePolish}
                           startContent={!polishing && <FontAwesomeIcon icon={faWandMagicSparkles} />}
                         >
                           {polishing
-                            ? (lang === "en" ? "Polishing…" : "潤稿中…")
-                            : (lang === "en" ? "AI polish my brief" : "AI 潤稿")}
+                            ? (lang === "en" ? "Refining…" : "完善中…")
+                            : (lang === "en" ? "AI refine prompt" : "AI 完善提示詞")}
                         </Button>
                         <HelpTip>
                           {lang === "en"
-                            ? "Tidies your input — facts kept, never invented."
-                            : "幫你整理輸入（保留事實、不會捏造）"}
+                            ? "Turns your note into a fuller prompt — facts kept, never invented."
+                            : "把你寫的補成更完整的提示詞（保留事實、不會捏造）"}
                         </HelpTip>
                       </div>
                     )}
-                    {polishErr && <p className="text-tiny text-danger-500">{polishErr}</p>}
+                    {polishErr && <p className="text-tiny text-danger-500 text-center">{polishErr}</p>}
                   </div>
                 )}
 
@@ -2915,6 +2690,253 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                   );
                 })()}
 
+                <div className="pt-2 space-y-3">
+                  {/* 2026-09-25（CJ「本來在活動企畫中，有該則貼文要發布的時間」）：
+                      這一篇在企劃上排在哪一天，要看得見。卡片裡問的「日期 / 時間」
+                      是**活動**什麼時候發生（已自動帶入活動期間），跟這篇貼文的
+                      發布日是兩件事——不講清楚，使用者會以為系統把日期搞丟了。 */}
+                  {(() => {
+                    if (!campaignScope || !campaignQ.data) return null;
+                    const d: any = campaignQ.data;
+                    const item = (d.plan?.items ?? []).find((i: any) => i.id === campaignScope.itemId);
+                    if (!item) return null;
+                    return (
+                      <div className="mb-3 rounded-lg border border-default-200 px-3 py-2">
+                        <p className="text-tiny text-default-600 m-0">
+                          {lang === "en"
+                            ? `From the campaign plan for “${d.event?.name ?? ""}” — this post is scheduled for ${item.date}.`
+                            : `來自「${d.event?.name ?? ""}」的宣傳企劃 —— 這篇排在 ${item.date} 發布。`}
+                        </p>
+                      </div>
+                    );
+                  })()}
+                  {/* 2026-06-16: per-task entity picker. Brand by default; the
+                      user can switch to a specific product or event for THIS run.
+                      Selecting one re-runs the context resolution so the chips
+                      below + the generated content use that entity's positioning. */}
+                  {brandId && (modalProducts.length > 0 || modalEvents.length > 0) && (
+                    <div className="mb-3">
+                      <p className="text-tiny text-default-500 mb-1.5">
+                        {lang === "en" ? "Generate for" : "產出對象"}
+                      </p>
+                      <div className="flex flex-wrap gap-1.5">
+                        <button
+                          onClick={() => setModalEntity({ kind: "brand", id: null })}
+                          className={`text-xs px-2.5 py-1 rounded-full border transition ${
+                            modalEntity.kind === "brand"
+                              ? "bg-neutral-900 text-white border-neutral-900"
+                              : "bg-white text-default-700 border-default-300 hover:border-default-500"
+                          }`}
+                        >
+                          {lang === "en" ? "Brand" : "品牌"}{brandName ? ` · ${brandName}` : ""}
+                        </button>
+                        {modalProducts.map((p: any) => (
+                          <button
+                            key={`p-${p.id}`}
+                            onClick={() => setModalEntity({ kind: "product", id: p.id })}
+                            className={`text-xs px-2.5 py-1 rounded-full border transition ${
+                              modalEntity.kind === "product" && modalEntity.id === p.id
+                                ? "bg-neutral-900 text-white border-neutral-900"
+                                : "bg-white text-default-700 border-default-300 hover:border-default-500"
+                            }`}
+                          >
+                            {lang === "en" ? "Product · " : "產品 · "}{p.name}
+                          </button>
+                        ))}
+                        {modalEvents.map((e: any) => (
+                          <button
+                            key={`e-${e.id}`}
+                            onClick={() => setModalEntity({ kind: "event", id: e.id })}
+                            className={`text-xs px-2.5 py-1 rounded-full border transition ${
+                              modalEntity.kind === "event" && modalEntity.id === e.id
+                                ? "bg-neutral-900 text-white border-neutral-900"
+                                : "bg-white text-default-700 border-default-300 hover:border-default-500"
+                            }`}
+                          >
+                            {lang === "en" ? "Event · " : "活動 · "}{e.name}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+  
+                  {/* Brand assets empty hint */}
+                  {textAssetsEmpty && brandId && (
+                    <div className="mb-3 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-900 flex items-start gap-2">
+                                          <div className="flex-1 leading-relaxed">
+                        {lang === "en" ? (
+                          <>
+                            <span className="font-medium">This brand's word assets are empty.</span>
+                            {" "}Pop into{" "}
+                            <a href={`/brands?b=${brandId}&cat=copy`} target="_blank" rel="noreferrer" className="underline font-medium hover:text-amber-700">
+                              Brand → Words
+                            </a>
+                            {" "}and click Auto-fill. Output will be far more on-brand.
+                          </>
+                        ) : (
+                          <>
+                            <span className="font-medium">這個品牌的「文字」資產還是空的。</span>
+                            {" "}先到{" "}
+                            <a href={`/brands?b=${brandId}&cat=copy`} target="_blank" rel="noreferrer" className="underline font-medium hover:text-amber-700">
+                              品牌 → 文字
+                            </a>
+                            {" "}按「自動填寫」，AI 產出會明顯貼合品牌語氣。
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  )}
+  
+                  {/* Context chips */}
+                  {(() => {
+                    // 2026-05-27 (CJ「modal chip 仍抓 SoWork」): scope-aware DEFAULT_SOURCES.
+                    // Product uses segment ids: core / audience / value / competition / strategy / marketing.
+                    // Brand uses: goldenCircle / audience / voice / differentiation / values / tagline.
+                    // When product/event scope is active, use the correct paths so chips read
+                    // from the product's own positioning segments, not the brand's.
+                    const isProductScope = !!(brandCtx?.product);
+                    const isEventScope   = !!(brandCtx?.event);
+                    const BRAND_SOURCES = [
+                      "brand.name",
+                      "brand.positioning.audience.primary",
+                      "brand.positioning.voice.archetypes",
+                      "brand.positioning.voice.tone",
+                      "brand.positioning.voice.forbidden",
+                      "brand.positioning.goldenCircle.why",
+                    ];
+                    const PRODUCT_SOURCES = [
+                      "brand.name",                                   // displayName = product name
+                      "brand.positioning.audience.primary",           // product.audience.primary
+                      "brand.positioning.core.coreStatement",         // product.core.coreStatement
+                      "brand.positioning.marketing.tone",             // product.marketing.tone
+                      "brand.positioning.competition.uniqueUsp",      // product.competition.uniqueUsp
+                      "brand.positioning.value.userFeeling",          // product.value.userFeeling
+                    ];
+                    const EVENT_SOURCES = [
+                      "brand.name",                                          // displayName = event name
+                      "brand.positioning.audience.primaryAudience",          // event.audience.primaryAudience
+                      "brand.positioning.smp.singleMindedProposition",       // event.smp.singleMindedProposition
+                      "brand.positioning.messaging.coreMessage",             // event.messaging.coreMessage
+                      "brand.positioning.creative.coreTranslation",          // event.creative.coreTranslation
+                    ];
+                    const DEFAULT_SOURCES =
+                      isProductScope ? PRODUCT_SOURCES :
+                      isEventScope   ? EVENT_SOURCES   :
+                      BRAND_SOURCES;
+                    const sources = (activeTask.contextSources && activeTask.contextSources.length > 0)
+                      ? activeTask.contextSources
+                      : DEFAULT_SOURCES;
+                    const chips = brandCtx ? buildContextChips(brandCtx, sources) : [];
+                    const anyContent = chips.some((c: any) => c.hasContent);
+                    // Is a chip inline-editable? Only string-typed (or empty)
+                    // segment fields; arrays/objects route to the full editor.
+                    const isEditable = (source: string): boolean => {
+                      if (!editSaveTarget) return false;
+                      const v = getNested(editSaveTarget.raw, chipFieldPath(source));
+                      return v == null || typeof v === "string";
+                    };
+                    // Render nothing only if there's truly nothing to show or edit.
+                    if (!anyContent && chips.every((c: any) => !isEditable(c.source))) return null;
+                    const shownMissing = chips.filter((c: any) => !c.hasContent && c.source !== "brand.name").slice(0, 4);
+                    const renderChip = (c: any, missing: boolean) => {
+                      const editable = isEditable(c.source) && c.source !== "brand.name";
+                      const base: React.CSSProperties = {
+                        fontSize: 12, padding: "3px 8px", borderRadius: 4, fontWeight: 500,
+                        ...(missing
+                          ? { background: "transparent", color: "#A3A3A3", border: "1px dashed #D4D4D4" }
+                          : { background: "#FFFFFF", color: "#262626", border: "1px solid #E5E5E5" }),
+                        ...(editable ? { cursor: "pointer" } : {}),
+                      };
+                      if (!editable) {
+                        return <span key={c.source} title={c.source} style={base}>{c.label}</span>;
+                      }
+                      return (
+                        <button
+                          key={c.source}
+                          title={lang === "en" ? "Click to edit / rewrite" : "點擊編輯／改寫"}
+                          style={base}
+                          onClick={() => openChipEditor(c)}
+                        >
+                          {c.label} {missing ? <AddIcon size={10} /> : <EditIcon size={10} />}
+                        </button>
+                      );
+                    };
+                    return (
+                      <div className="rounded-2xl px-4 py-3" style={{ background: "#FAFAF9", border: "1px solid #EDEDED" }}>
+                        <p style={{ fontSize: 11, fontWeight: 700, color: "#A3A3A3", letterSpacing: "0.18em", textTransform: "uppercase", marginBottom: 8 }}>
+                          {(() => {
+                            const entityName = brandCtx?.brand?.name ?? brandName ?? (lang === "en" ? "your brand" : "你的品牌");
+                            return `Context · ${entityName}`;
+                          })()}
+                          <span style={{ marginLeft: 4, letterSpacing: 0, textTransform: "none" }}>
+                            <HelpTip>{lang === "en" ? "Click a chip to edit it." : "點任一項可改寫"}</HelpTip>
+                          </span>
+                        </p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {chips.filter((c: any) => c.hasContent).map((c: any) => renderChip(c, false))}
+                          {shownMissing.map((c: any) => renderChip(c, true))}
+                        </div>
+  
+                        {/* Inline editor for the selected chip */}
+                        {editingChip && (() => {
+                          const fieldPath = chipFieldPath(editingChip.source);
+                          const siblings = (CHIP_SIBLING_CANDIDATES[fieldPath] ?? [])
+                            .map((sp) => ({ path: sp, val: getNested(editSaveTarget?.raw, sp) }))
+                            .filter((s) => typeof s.val === "string" && s.val.trim().length > 0);
+                          return (
+                            <div className="mt-2.5 pt-2.5" style={{ borderTop: "1px solid #E5E5E5" }}>
+                              <p className="text-tiny text-default-600 mb-1">
+                                {(lang === "en" ? "Editing: " : "編輯：") + editingChip.label.split(" · ")[0]}
+                              </p>
+                              {siblings.length > 0 && (
+                                <div className="flex flex-wrap gap-1 mb-1.5">
+                                  <span className="text-[12px] text-default-400 self-center">
+                                    {lang === "en" ? "Pick:" : "可選用："}
+                                  </span>
+                                  {siblings.map((s) => (
+                                    <button
+                                      key={s.path}
+                                      onClick={() => setEditValue(s.val)}
+                                      className="text-[12px] px-2 py-0.5 rounded-full border border-default-300 bg-white text-default-600 hover:border-default-500"
+                                      title={s.val}
+                                    >
+                                      {s.val.length > 24 ? s.val.slice(0, 24) + "…" : s.val}
+                                    </button>
+                                  ))}
+                                </div>
+                              )}
+                              <Textarea
+                                value={editValue}
+                                onChange={(e) => setEditValue(e.target.value)}
+                                minRows={2}
+                                autoFocus
+                                placeholder={lang === "en" ? "Type or rewrite…" : "輸入或改寫…"}
+                              />
+                              <p className="text-[12px] text-default-400 mt-1">
+                                {lang === "en"
+                                  ? `Saves to this ${editSaveTarget?.kind ?? "brand"}'s positioning.`
+                                  : `會更新此${editSaveTarget?.kind === "product" ? "產品" : editSaveTarget?.kind === "event" ? "活動" : "品牌"}的定位。`}
+                              </p>
+                              <div className="flex gap-2 mt-1.5">
+                                <Button size="sm" color="secondary"
+                                  isLoading={savePositioningMut?.isPending}
+                                  onPress={commitChipEdit}>
+                                  {lang === "en" ? "Save" : "儲存"}
+                                </Button>
+                                <Button size="sm" variant="flat"
+                                  onPress={() => { setEditingChip(null); setEditValue(""); }}>
+                                  {lang === "en" ? "Cancel" : "取消"}
+                                </Button>
+                              </div>
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    );
+                  })()}
+  
+                </div>
+
                 {/* Running carousel */}
                 {running && (() => {
                   const tier = effectiveTier(activeTask);
@@ -2950,11 +2972,13 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
               </ModalBody>
 
               <ModalFooter>
-                <Button variant="light" onPress={closeTask} startContent={<FontAwesomeIcon icon={faXmark} />}>
+                <Button variant="light" radius="full" onPress={closeTask} startContent={<FontAwesomeIcon icon={faXmark} />}>
                   {t("cancel")}
                 </Button>
                 <Button
                   color="primary"
+                  radius="full"
+                  className="px-6"
                   onPress={handleRun}
                   isLoading={running}
                   isDisabled={running}

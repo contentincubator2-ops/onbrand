@@ -42,11 +42,11 @@ export default function AdminErrorsPage() {
   const [window, setWindow] = useState<WindowOpt>("24h");
   const [openFingerprint, setOpenFingerprint] = useState<string | null>(null);
 
-  const statsQ = (trpc as any).ops?.errorStats?.useQuery?.(
+  const statsQ = (trpc as any).ops?.errorStats?.useQuery(
     { window },
     { refetchInterval: 30_000, refetchOnWindowFocus: false },
   );
-  const listQ = (trpc as any).ops?.listForAdmin?.useQuery?.(
+  const listQ = (trpc as any).ops?.listForAdmin?.useQuery(
     { limit: 200, resolved },
     { refetchInterval: 30_000, refetchOnWindowFocus: false },
   );

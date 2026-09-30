@@ -40,8 +40,8 @@ export default function BrainPanel({ brandId, initialProductId, initialEventId }
   const [eventId, setEventId] = useState<number | null>(initialEventId ?? null);
   const [open, setOpen] = useState<Record<string, boolean>>({});
 
-  const productsQ = (trpc as any).product?.list?.useQuery?.({ brandId }, { enabled: !!brandId, staleTime: 30_000 });
-  const eventsQ = (trpc as any).event?.list?.useQuery?.({ brandId }, { enabled: !!brandId, staleTime: 30_000 });
+  const productsQ = (trpc as any).product?.list?.useQuery({ brandId }, { enabled: !!brandId, staleTime: 30_000 });
+  const eventsQ = (trpc as any).event?.list?.useQuery({ brandId }, { enabled: !!brandId, staleTime: 30_000 });
   const brainQ = (trpc as any).brandKnowledge.brain.useQuery(
     { brandId, productId: productId ?? undefined, eventId: eventId ?? undefined },
     { enabled: !!brandId, refetchOnWindowFocus: true },

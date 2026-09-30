@@ -508,7 +508,7 @@ export default function PersonaAgentPanel({ brandId }: { brandId: number | null 
   const en = lang === "en";
   const [creating, setCreating] = useState(false);
 
-  const listQ = (trpc as any).personaAgent?.list?.useQuery?.(
+  const listQ = (trpc as any).personaAgent?.list?.useQuery(
     { brandId: brandId ?? 0 },
     { enabled: !!brandId, refetchInterval: (data: any) => (Array.isArray(data) && data.some((a: any) => a.status === "training") ? 3000 : false) },
   );

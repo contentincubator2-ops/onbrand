@@ -40,7 +40,7 @@ export default function BrandsManagePage() {
   // the brand card (deep-link into the editor with ?p= / ?e=) — the global
   // scope picker no longer carries product/event. scope.options returns all
   // products/events with their brandId so we can group them per card.
-  const scopeOptionsQuery = (trpc as any).scope?.options?.useQuery?.(
+  const scopeOptionsQuery = (trpc as any).scope?.options?.useQuery(
     undefined, { refetchOnWindowFocus: false },
   );
   const allProducts = ((scopeOptionsQuery?.data as any)?.products ?? []) as Array<any>;
@@ -75,11 +75,11 @@ export default function BrandsManagePage() {
     : "none";
   const activeBrand = scope.brandId ? brands.find((b) => b.id === scope.brandId) : null;
   // Pull event/product name when scope is set
-  const eventQ = (trpc as any).event?.get?.useQuery?.(
+  const eventQ = (trpc as any).event?.get?.useQuery(
     { id: scope.eventId ?? 0 },
     { enabled: !!scope.eventId, refetchOnWindowFocus: false },
   );
-  const productQ = (trpc as any).product?.get?.useQuery?.(
+  const productQ = (trpc as any).product?.get?.useQuery(
     { id: scope.productId ?? 0 },
     { enabled: !!scope.productId && !scope.eventId, refetchOnWindowFocus: false },
   );

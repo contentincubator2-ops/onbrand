@@ -51,11 +51,11 @@ function ProviderPane({ brandId, provider, onAdd, added }: {
   const [path, setPath] = useState<Array<{ id: string | null; name: string }>>([{ id: null, name: en ? "Root" : "根目錄" }]);
   const folderId = path[path.length - 1]?.id ?? null;
 
-  const statusQ = (trpc as any).cloudDrive?.status?.useQuery?.({ brandId }, { enabled: !!brandId });
+  const statusQ = (trpc as any).cloudDrive?.status?.useQuery({ brandId }, { enabled: !!brandId });
   const connected = !!statusQ?.data?.[provider]?.connected;
   const accountEmail = statusQ?.data?.[provider]?.accountEmail as string | null | undefined;
 
-  const listQ = (trpc as any).cloudDrive?.listFiles?.useQuery?.(
+  const listQ = (trpc as any).cloudDrive?.listFiles?.useQuery(
     { brandId, provider, folderId },
     { enabled: !!brandId && connected },
   );

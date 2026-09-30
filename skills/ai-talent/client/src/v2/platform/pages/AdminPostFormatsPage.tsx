@@ -61,7 +61,7 @@ export default function AdminPostFormatsPage() {
   const [status, setStatus] = useState<Status | "all">("pending");
   const [market, setMarket] = useState<string>("");
 
-  const listQ = (trpc as any).postFormat?.list?.useQuery?.(
+  const listQ = (trpc as any).postFormat?.list?.useQuery(
     {
       kind,
       status: status === "all" ? undefined : status,

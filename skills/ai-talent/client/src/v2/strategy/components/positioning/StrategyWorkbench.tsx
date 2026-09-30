@@ -86,7 +86,7 @@ export default function StrategyWorkbench({
   // progress and the page below refreshes when the downstream is consistent
   // with the applied scenario.
   const [cascading, setCascading] = useState(false);
-  const cascadeQ = (trpc as any).positioningJobs?.getStatusBatch?.useQuery?.(
+  const cascadeQ = (trpc as any).positioningJobs?.getStatusBatch?.useQuery(
     { entityKind: isEvent ? "event" : "brand", entityIds: [isEvent ? eventId! : brandId] },
     { enabled: cascading, refetchInterval: 4000 },
   );
@@ -118,7 +118,7 @@ export default function StrategyWorkbench({
   // shape → brands.targetAudience column (定位書欄位, brand.get already
   // derives it from segment/interim when the column is empty).
   const audSegmentEmpty = !aud.primary && !aud.secondary;
-  const brandQ = (trpc as any).brand?.get?.useQuery?.(
+  const brandQ = (trpc as any).brand?.get?.useQuery(
     { id: brandId },
     { enabled: !isEvent && !!brandId && audSegmentEmpty, refetchOnWindowFocus: false },
   );

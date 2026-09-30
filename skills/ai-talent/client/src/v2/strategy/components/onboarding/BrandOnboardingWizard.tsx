@@ -266,7 +266,7 @@ export default function BrandOnboardingWizard({ isOpen, onClose, onComplete }: P
   };
 
   // Poll job status while in step 3; auto-advance when done
-  const job = (trpc as any).positioningJobs?.getStatus?.useQuery?.(
+  const job = (trpc as any).positioningJobs?.getStatus?.useQuery(
     { entityKind: "brand", entityId: createdBrandId ?? 0 },
     { enabled: !!createdBrandId && step === 3, refetchInterval: 4_000 },
   );

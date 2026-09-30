@@ -71,9 +71,9 @@ export default function InspirationPage() {
   const ctx = useOutletContext<{ brandId: number | null; brands: any[] } | undefined>();
   const brandId = ctx?.brandId ?? null;
 
-  const rosterQ = T.inspiration?.roster?.useQuery?.({ brandId: brandId ?? 0 }, { enabled: !!brandId, refetchOnWindowFocus: false }) ?? { data: null };
-  const productsQ = T.product?.list?.useQuery?.({ brandId: brandId ?? undefined }, { enabled: !!brandId, refetchOnWindowFocus: false }) ?? { data: [] };
-  const eventsQ = T.event?.list?.useQuery?.({ brandId: brandId ?? undefined }, { enabled: !!brandId, refetchOnWindowFocus: false }) ?? { data: [] };
+  const rosterQ = T.inspiration?.roster?.useQuery({ brandId: brandId ?? 0 }, { enabled: !!brandId, refetchOnWindowFocus: false }) ?? { data: null };
+  const productsQ = T.product?.list?.useQuery({ brandId: brandId ?? undefined }, { enabled: !!brandId, refetchOnWindowFocus: false }) ?? { data: [] };
+  const eventsQ = T.event?.list?.useQuery({ brandId: brandId ?? undefined }, { enabled: !!brandId, refetchOnWindowFocus: false }) ?? { data: [] };
   const thinkers: ThinkerCard[] = rosterQ.data?.thinkers ?? [];
   const platforms: Array<{ id: string; label: string }> = rosterQ.data?.platforms ?? [];
   const products: any[] = (productsQ.data as any[]) ?? [];

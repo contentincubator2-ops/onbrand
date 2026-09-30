@@ -43,7 +43,7 @@ export default function CampaignWorkspace({ eventId, brandId }: { eventId: numbe
   const utils = (trpc as any).useUtils();
 
   const q = (trpc as any).campaign.get.useQuery({ eventId }, { refetchOnWindowFocus: false });
-  const productsQ = (trpc as any).product?.list?.useQuery?.(
+  const productsQ = (trpc as any).product?.list?.useQuery(
     { brandId: brandId ?? undefined }, { enabled: !!brandId, refetchOnWindowFocus: false },
   ) ?? { data: [] };
 

@@ -118,7 +118,7 @@ export default function TaskCardComposer({
   const utils = (trpc as any).useUtils?.() ?? null;
 
   // SKILL 在背景生成，所以要輪詢。跑完（或失敗）就停 —— 一直輪會白燒請求。
-  const cardQuery = (trpc as any).brandTaskCard?.get?.useQuery?.(
+  const cardQuery = (trpc as any).brandTaskCard?.get?.useQuery(
     { brandId: brandId ?? 0, cardId: cardId ?? "" },
     {
       enabled: !!brandId && !!cardId,

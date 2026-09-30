@@ -409,7 +409,7 @@ export default function ShellLayout() {
   // 2026-05-13: badge count comes from the same trpc query as the panel.
   // Polled every 60s + when the user opens/closes the panel.
   const notifLastSeen = readLastSeen();
-  const notifCountQ = (trpc as any).notifications?.list?.useQuery?.(
+  const notifCountQ = (trpc as any).notifications?.list?.useQuery(
     { limit: 20, lastSeenIso: notifLastSeen ?? undefined, lang },
     { refetchOnWindowFocus: false, refetchInterval: 60_000 },
   );
@@ -741,7 +741,7 @@ function IconBar({
   // 2026-09-27（CJ「除了專案、行事曆、活動，所有 mission tray 變成使用者自己加入」）：
   // 這個品牌自己加的通路與工具。沒設定過＝預設 Facebook＋Instagram；任務包品牌若包裡
   // 沒有 FB/IG，預設改成包裡的前兩個，不讓側欄上段一開始就是空的。
-  const navPrefsQ = (trpc as any).navPrefs?.get?.useQuery?.(
+  const navPrefsQ = (trpc as any).navPrefs?.get?.useQuery(
     { brandId: scope.brandId ?? 0 },
     { enabled: !!scope.brandId, refetchOnWindowFocus: false, staleTime: 300_000 },
   ) ?? { data: null };
@@ -1842,7 +1842,7 @@ function AccountPopup({ onLogout, onClose, onOpenSupport }: {
   const isEn = lang === "en";
 
   // Real wallet balance for the menu badge
-  const balanceQuery = (trpc as any).credits?.getBalance?.useQuery?.(undefined, {
+  const balanceQuery = (trpc as any).credits?.getBalance?.useQuery(undefined, {
     refetchOnWindowFocus: false,
   });
   const totalCredits = (balanceQuery?.data as any)?.totalAvailable ?? null;
@@ -2066,7 +2066,7 @@ function NotifPanel({ onClose }: { onClose: () => void }) {
   // sends current lastSeenAt so server can mark items above it as unread.
   const [lastSeen, setLastSeen] = React.useState<string | null>(() => readLastSeen());
   const utils = (trpc as any).useUtils?.() ?? null;
-  const feedQ = (trpc as any).notifications?.list?.useQuery?.(
+  const feedQ = (trpc as any).notifications?.list?.useQuery(
     { limit: 20, lastSeenIso: lastSeen ?? undefined, lang },
     { refetchOnWindowFocus: false, refetchInterval: 60_000 },
   );

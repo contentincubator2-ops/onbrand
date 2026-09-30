@@ -70,7 +70,7 @@ export default function StrategyMeetingsPanel({ brandId }: { brandId: number }) 
   const [view, setView] = useState<View>({ kind: "list" });
   const [showExample, setShowExample] = useState(false);
 
-  const listQ = T.strategyMeeting?.list?.useQuery?.({ brandId }, { staleTime: 10_000 }) ?? { data: null, isLoading: false };
+  const listQ = T.strategyMeeting?.list?.useQuery({ brandId }, { staleTime: 10_000 }) ?? { data: null, isLoading: false };
   const data = listQ.data as ListData | null | undefined;
   const anyRunning = !!data?.meetings.some((m) => m.latestRun?.status === "running");
   // 有會正在開的時候每 5 秒刷新一次，開完自動出現結果。
@@ -331,8 +331,8 @@ function MeetingForm({ brandId, en, initial, products, maxAttendees, onCancel, o
   const [searchTerm, setSearchTerm] = useState("");
   const set = <K extends keyof FormState>(k: K, v: FormState[K]) => setF((p) => ({ ...p, [k]: v }));
 
-  const dirQ = T.strategistChat?.listDirectors?.useQuery?.({ brandId, scope: f.scope }, { staleTime: 60_000 }) ?? { data: null };
-  const searchQ = T.strategistChat?.searchDirectors?.useQuery?.({ search: searchTerm, limit: 12 }, { enabled: searchTerm.length > 0, staleTime: 60_000 }) ?? { data: null };
+  const dirQ = T.strategistChat?.listDirectors?.useQuery({ brandId, scope: f.scope }, { staleTime: 60_000 }) ?? { data: null };
+  const searchQ = T.strategistChat?.searchDirectors?.useQuery({ search: searchTerm, limit: 12 }, { enabled: searchTerm.length > 0, staleTime: 60_000 }) ?? { data: null };
 
   const suggested = useMemo(() => {
     const out: StrategistDirector[] = [];
@@ -501,7 +501,7 @@ function MinutesTimeline({ meeting, brandId, en, onBack, onOpenTask, onOpenSourc
   onBack: () => void; onOpenTask: (a: MeetingAction) => void; onOpenSource: (href: string) => void; onEditPositioning: () => void;
 }) {
   const T = trpc as any;
-  const runsQ = T.strategyMeeting?.runs?.useQuery?.({ meetingId: meeting.id }, { staleTime: 5_000 }) ?? { data: null, isLoading: false };
+  const runsQ = T.strategyMeeting?.runs?.useQuery({ meetingId: meeting.id }, { staleTime: 5_000 }) ?? { data: null, isLoading: false };
   const runNow = T.strategyMeeting?.runNow?.useMutation?.({
     onSuccess: () => { showToastGlobal(en ? "Meeting started — about 1–2 minutes" : "會議開始了，大約 1–2 分鐘", "success"); runsQ.refetch?.(); },
     onError: errToast,
