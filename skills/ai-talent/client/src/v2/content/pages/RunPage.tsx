@@ -68,6 +68,7 @@ import { fireNudge } from "../../platform/components/mia/miaNudges";
 import ReviewBar from "../../platform/components/review/ReviewBar";
 import PerfTagPicker from "../../performance/components/PerfTagPicker";
 import WriterDesk, { type DeskWriter } from "../components/WriterDesk";
+import RegulationComplianceNote, { type ComplianceRecord } from "../components/RegulationComplianceNote";
 import { cancelAgentHandoff } from "../lib/agentHandoff";
 
 type Mode = "edit" | "chat" | "image" | "agent" | "regen" | "rewrite" | "publish" | "source";
@@ -2973,6 +2974,13 @@ export default function RunPage() {
           )}
           <Card>
             <CardBody className="space-y-3">
+              {/* 2026-09-30（CJ「表示有進行合規檢查」）：產出時的法規合規檢查結果（品牌沒有法規就沒有這筆）。 */}
+              {mode !== "image" && (() => {
+                const recs: ComplianceRecord[] = Array.isArray((data as any)?.metadata?.regulationCompliance)
+                  ? (data as any).metadata.regulationCompliance : [];
+                const rec = recs.find((r) => r.variantIndex === activeIdx);
+                return rec ? <RegulationComplianceNote rec={rec} en={lang === "en"} /> : null;
+              })()}
               {writerDesk && mode !== "image" && (
                 <WriterDesk
                   en={lang === "en"}

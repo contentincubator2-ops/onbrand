@@ -15,7 +15,7 @@ import localPool from "../../localDb";
 import { buildBrandBrain, invalidateBrandPrefix, BRAIN_CAPACITY, type BrainItem } from "../core/brandContext";
 import {
   REG_CARD_MAX, REG_MAX_CARDS, REG_SOURCE_MAX, REG_TITLE_MAX, REG_TOTAL_MAX,
-  charLen, checkRegulationFits, listRegulations, regulationBudget, rowToRegulation,
+  charLen, checkRegulationFits, listRegulations, loadActiveRegulations, regulationBudget, rowToRegulation,
 } from "../core/brandRegulations";
 
 /** 產品／活動太多時只算最近更新的這麼多個（跟 brandMemory 一樣）。 */
@@ -96,6 +96,17 @@ export const brandRegulationRouter = router({
           totalMax: REG_TOTAL_MAX, maxCards: REG_MAX_CARDS,
         },
       };
+    }),
+
+  /**
+   * 任務卡視窗用：這個品牌有幾條啟用中的法規（>0 時進度多一格「合規」）。
+   * 刻意不算大腦空間——list 要為每個產品／活動各跑一次大腦，開任務卡不該付這個成本。
+   */
+  activeCount: protectedProcedure
+    .input(z.object({ brandId: z.number().int().positive() }))
+    .query(async ({ ctx, input }) => {
+      await assertBrandAccess(ctx.user.id, input.brandId);
+      return { count: (await loadActiveRegulations(input.brandId)).length };
     }),
 
   create: protectedProcedure
