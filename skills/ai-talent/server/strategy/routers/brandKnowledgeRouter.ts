@@ -10,7 +10,7 @@ import { z } from "zod";
 import { router, protectedProcedure } from "../../platform/core/trpc";
 import { parseBrief, fieldsInBrief } from "../core/aiBrief";
 import { invokeLLM } from "../../platform/core/llm";
-import { buildBrandPrefix, buildBrandBrain, BRAIN_CAPACITY, BRAIN_CATEGORIES } from "../core/brandContext";
+import { buildBrandPrefix, buildBrandBrain, invalidateBrandPrefix, BRAIN_CAPACITY, BRAIN_CATEGORIES } from "../core/brandContext";
 import { getBrandRealContent } from "../core/brandRealContent";
 import localPool from "../../localDb";
 
@@ -217,6 +217,26 @@ export const brandKnowledgeRouter = router({
       }
       const brain = await buildBrandBrain(input.brandId, input.productId ?? null, input.eventId ?? null);
       return { capacity: brain.capacity, usedChars: brain.usedChars, items: brain.items, categories };
+    }),
+
+  /**
+   * 記憶空間的「忘掉」——只給舊版 brand_brain 表用（已無寫入端、也沒有編輯頁）。
+   * 2026-09-30（CJ「像操作手機的記憶一樣，按照引導去清理記憶」）。其他記憶一律
+   * 回到策略層原本的頁面精簡，不在這裡刪，免得同一份資料有兩個刪除入口。
+   */
+  forgetLegacy: protectedProcedure
+    .input(z.object({ brandId: z.number(), rowIds: z.array(z.number().int().positive()).min(1).max(50) }))
+    .mutation(async ({ ctx, input }) => {
+      const [own]: any = await localPool.execute(
+        `SELECT id FROM brands WHERE id = ? AND userId = ? LIMIT 1`, [input.brandId, ctx.user!.id],
+      );
+      if (!Array.isArray(own) || own.length === 0) return { forgotten: 0 };
+      const marks = input.rowIds.map(() => "?").join(",");
+      const [res]: any = await localPool.execute(
+        `DELETE FROM brand_brain WHERE brand_id = ? AND id IN (${marks})`, [input.brandId, ...input.rowIds],
+      );
+      invalidateBrandPrefix(input.brandId);
+      return { forgotten: Number(res?.affectedRows ?? 0) };
     }),
 
   list: protectedProcedure
