@@ -541,7 +541,10 @@ export default function ImageCardPage() {
 
           <p className="text-[11px] text-default-400">
             {lang === "en" ? "Spec source: " : "規格依據："}
-            <a className="underline" href={card.source} target="_blank" rel="noreferrer">{new URL(card.source).hostname}</a>
+            {/* source 可能是網址，也可能是內部文件名（漏項清單）——後者不能丟進 new URL，會整頁炸掉。 */}
+            {/^https?:\/\//.test(card.source)
+              ? <a className="underline" href={card.source} target="_blank" rel="noreferrer">{new URL(card.source).hostname}</a>
+              : <span>{card.source}</span>}
           </p>
         </div>
       </div>
