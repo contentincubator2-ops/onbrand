@@ -2139,7 +2139,7 @@ function NotifPanel({ onClose }: { onClose: () => void }) {
         {!feedQ?.isLoading && items.length === 0 && (
           <div style={{ padding: "40px 16px", textAlign: "center", color: "#9ca3af", fontSize: 13, lineHeight: 1.6 }}>
             <div style={{ fontSize: 32, marginBottom: 8 }}><NotifyIcon size={28} /></div>
-            {isEn ? "No notifications yet" : "目前還沒有通知"}
+            {isEn ? "All quiet — no new notifications" : "很安靜，沒有新通知"}
           </div>
         )}
         {items.map((n) => {

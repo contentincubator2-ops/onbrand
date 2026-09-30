@@ -18,6 +18,7 @@
  * 對映一律是「提案 → 用戶勾選 → 才寫入」。定位是所有任務的上游，靜靜寫錯一格
  * 會污染每一張卡。
  */
+import { IllustratedEmpty } from "../../../platform/components/EmptyIllustration";
 import React from "react";
 import { trpc } from "../../../../lib/trpc";
 import { useLang } from "../../../../lib/i18n";
@@ -669,12 +670,12 @@ export default function PositioningDocPanel({
 
       {/* 文件清單 */}
       {docs.length === 0 ? (
-        <div className="rounded-medium border border-dashed border-divider p-8 text-center">
-          <TextIcon size={22} className="mx-auto text-default-400" />
-          <p className="text-small text-default-600 mt-2">
-            {en ? `No document yet for ${scopeName}.` : `${scopeName} 還沒有上傳過定位文件。`}
-          </p>
-        </div>
+        <IllustratedEmpty
+          kind="folder"
+          size="sm"
+          title={en ? "No positioning documents yet" : "還沒收到任何定位文件"}
+          action={{ label: en ? "Upload a document" : "上傳文件", onPress: () => fileRef.current?.click() }}
+        />
       ) : (
         <div className="flex flex-col gap-2">
           {docs.map((d) => (

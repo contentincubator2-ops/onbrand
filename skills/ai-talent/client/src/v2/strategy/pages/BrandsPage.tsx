@@ -13,7 +13,7 @@
  *
  * No max-width container anywhere — extends to viewport edges.
  */
-import { EmptyIllustration } from "../../platform/components/EmptyIllustration";
+import { IllustratedEmpty } from "../../platform/components/EmptyIllustration";
 import React, { useMemo, useState, useRef } from "react";
 import { useNavigate, useOutletContext, useSearchParams } from "react-router-dom";
 import { trpc } from "../../../lib/trpc";
@@ -5321,20 +5321,16 @@ function BrandEntityGrid({
   return (
     <div className="px-2">
       {items.length === 0 && (
-        <div className="flex flex-col items-center text-center py-10">
-          <EmptyIllustration kind={kind === "product" ? "product" : "event"} />
-          <p className="mt-6 text-lg font-semibold text-neutral-800">
-            {kind === "product"
-              ? (en ? "This box is still empty" : "箱子還是空的")
-              : (en ? "The calendar is wide open" : "行事曆還一片空白")}
-          </p>
-          <button
-            onClick={onAdd}
-            className="mt-6 text-sm px-6 py-2.5 rounded-lg bg-neutral-900 text-white font-medium hover:bg-neutral-700 transition"
-          >
-            {kind === "product" ? (en ? "+ New product" : "+ 新增產品") : (en ? "+ New event" : "+ 新增活動")}
-          </button>
-        </div>
+        <IllustratedEmpty
+          kind={kind === "product" ? "product" : "event"}
+          title={kind === "product"
+            ? (en ? "This box is still empty" : "箱子還是空的")
+            : (en ? "Ready to kick off?" : "準備起跑了嗎？")}
+          action={{
+            label: kind === "product" ? (en ? "+ New product" : "+ 新增產品") : (en ? "+ New event" : "+ 新增活動"),
+            onPress: onAdd,
+          }}
+        />
       )}
       {items.length > 0 && (
         <div className="grid grid-cols-2 md:grid-cols-3 gap-4">

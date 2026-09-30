@@ -12,6 +12,7 @@
  * 字級從 13px 起跳。2026-09-06 已把介面地板抬到 12px，這頁是新的，
  * 不貼著地板寫。
  */
+import { IllustratedEmpty } from "../components/EmptyIllustration";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { trpc } from "../../../lib/trpc";
@@ -136,14 +137,12 @@ export default function ReviewQueuePage() {
       )}
 
       {!loading && rows.length === 0 && (
-        <div className="flex flex-col items-center gap-2 py-16 text-default-400">
-          <InboxIcon size={28} />
-          <p className="text-[14px]">
-            {tab === "pending"
-              ? (isEn ? "Nothing waiting on you." : "目前沒有等你放行的東西。")
-              : (isEn ? "You haven't sent anything for review." : "你還沒有送審過任何產出。")}
-          </p>
-        </div>
+        <IllustratedEmpty
+          kind="review"
+          title={tab === "pending"
+            ? (isEn ? "Nothing on your desk to approve" : "桌上沒有待放行的稿子")
+            : (isEn ? "You haven't sent anything for review." : "你還沒有送審過任何產出。")}
+        />
       )}
 
       <div className="mt-4 flex flex-col gap-3">
