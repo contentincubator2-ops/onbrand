@@ -44,7 +44,7 @@ export function departAgentHandoff(from: Element | null, src: string) {
     width: `${r.width}px`, height: `${r.height}px`,
     borderRadius: "9999px", overflow: "hidden", zIndex: "9999",
     pointerEvents: "none", background: "#fff",
-    boxShadow: "0 12px 32px rgba(0,0,0,0.18), 0 0 0 3px #E85D2E",
+    boxShadow: "0 12px 32px rgba(0,0,0,0.18), 0 0 0 3px #F37E4A",
   } as CSSStyleDeclaration);
   const img = document.createElement("img");
   img.src = src;
@@ -90,9 +90,9 @@ export function landAgentHandoff(target: Element | null): boolean {
   el.style.transformOrigin = "0 0";
   const fly = el.animate(
     [
-      { transform: "translate(0,0) scale(1)", boxShadow: "0 12px 32px rgba(0,0,0,0.18), 0 0 0 3px #E85D2E" },
+      { transform: "translate(0,0) scale(1)", boxShadow: "0 12px 32px rgba(0,0,0,0.18), 0 0 0 3px #F37E4A" },
       { transform: `translate(${dx * 0.55}px, ${dy * 0.55 - 40}px) scale(${1 + (s - 1) * 0.55})`, offset: 0.55 },
-      { transform: `translate(${dx}px, ${dy}px) scale(${s})`, boxShadow: "0 0 0 0 rgba(0,0,0,0), 0 0 0 0 #E85D2E" },
+      { transform: `translate(${dx}px, ${dy}px) scale(${s})`, boxShadow: "0 0 0 0 rgba(0,0,0,0), 0 0 0 0 #F37E4A" },
     ],
     { duration: 720, easing: "cubic-bezier(.2,.8,.2,1)", fill: "forwards" },
   );

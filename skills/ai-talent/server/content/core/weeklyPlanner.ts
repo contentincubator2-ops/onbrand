@@ -243,6 +243,27 @@ export async function loadWeekCampaignItems(brandId: number, weekStart: string):
   return out.sort((a, b) => a.date.localeCompare(b.date));
 }
 
+/**
+ * 側欄的「儀表」（2026-09-30 CJ 參考 Tesla：本週企劃像電量、平台圖示顯示待處理數）。
+ * 只算已排定的：草稿格子（總監提案、還沒按排定）不算；已寫＝slot written 或活動格子有 outputId。
+ * pendingByNav 用側欄的 nav id（fb/ig/…）當 key，前端直接對得上。
+ */
+export function railStatusOf(slots: SlotRow[], campaign: CampaignSlot[]): { total: number; written: number; pendingByNav: Record<string, number> } {
+  const platformToNav = new Map(Object.entries(NAV_TO_PLATFORM).map(([nav, p]) => [p, nav]));
+  const navOf = (platform: string) => platformToNav.get(platform) ?? (NAV_TO_PLATFORM[platform] ? platform : null);
+  const items = [
+    ...slots.filter((s) => s.status === "planned" || s.status === "written").map((s) => ({ platform: s.platform, done: s.status === "written" })),
+    ...campaign.map((c) => ({ platform: c.platform, done: c.outputId != null })),
+  ];
+  const pendingByNav: Record<string, number> = {};
+  for (const it of items) {
+    if (it.done) continue;
+    const nav = navOf(it.platform);
+    if (nav) pendingByNav[nav] = (pendingByNav[nav] ?? 0) + 1;
+  }
+  return { total: items.length, written: items.filter((i) => i.done).length, pendingByNav };
+}
+
 export async function applyOps(args: { userId: number; brandId: number; ops: Op[]; cards: Card[] }): Promise<number[]> {
   const label = (id: string) => args.cards.find((c) => c.id === id)?.labelZh ?? null;
   const touched: number[] = [];

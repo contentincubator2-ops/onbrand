@@ -36,6 +36,7 @@ import { Avatar, Tooltip } from "@heroui/react";
 import { StrategyIcon, LockIcon, CheckIcon, NotifyIcon } from "../../platform/components/icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { ICON } from "../../platform/components/icons";
+import { defaultWeek } from "../../content/lib/plannerWeek";
 import {
   faFolderOpen, faBrain, faWandMagicSparkles, faMicrophone, faBookBookmark, faBell, faPlus, faRightFromBracket, faLayerGroup, faGear, faXmark, faCheckDouble, faChevronRight, faCheck, faBoxOpen, faCalendarDays, faCircleInfo, faBriefcase, faShareNodes, faUsers, faLanguage, faPaintBrush, faFont, faMagnifyingGlass, faChevronDown, faEnvelope, faBullhorn, faGlobe, faChartLine, faDatabase, faFileLines,
 } from "@fortawesome/free-solid-svg-icons";
@@ -79,10 +80,8 @@ interface NavItem {
   kind?: "channel" | "tool";
   /** 這些路徑也算這個入口（行事曆合一：/calendar 與 /tasks/calendar）。 */
   alsoMatch?: string[];
-  /** When set, renders as tier-style nav: bold tierBadge replacing icon
-   *  + plain subtitle. CJ direction 2026-05-10「30s 取代現有 icon，快寫
-   *  在第二列」 */
-  tierBadge?: string;
+  /** 2026-09-30：圖示下方的短標籤（側欄 64px 放不下「Facebook」）。沒給就用 label。 */
+  short?: string;
   /** 2026-05-11 — hover tooltip explaining when this tier is for.
    *  Reviewer:「30s / 60s / 99s 的差異我看不清楚」. */
   tooltip?: string;
@@ -241,7 +240,7 @@ function buildNavItems(lang: "zh-TW" | "en", userEmail?: string | null, currentP
   ];
   const fixed: NavItem[] = [
     // 2026-09-29 CJ：七日發布台改成靈感舞台；舊的 /theater 轉址到 /inspiration。
-    { to: "/inspiration", label: en ? "Idea stage" : "靈感舞台", icon: <FontAwesomeIcon icon={ICON.ideas} />, matchPrefix: "/inspiration", group: "fixed",
+    { to: "/inspiration", label: en ? "Idea stage" : "靈感舞台", short: en ? "Ideas" : "靈感", icon: <FontAwesomeIcon icon={ICON.ideas} />, matchPrefix: "/inspiration", group: "fixed",
       tooltip: en ? "Agents pitch angles; pick one to write" : "幾位 agent 各想切角，挑一個開始寫" },
     { to: "/projects", label: en ? "Projects" : "專案", icon: <FontAwesomeIcon icon={faFolderOpen} />, group: "fixed",
       tooltip: en ? "Everything you've produced, by project" : "你產出過的內容，依專案整理" },
@@ -262,9 +261,9 @@ function navCatalog(lang: "zh-TW" | "en", allowedTaskRoutes?: Set<string> | null
   // YouTube／新聞稿／X 拿掉（server planGate.HIDDEN_CONTENT_PLATFORMS 同一份決定）；
   // Threads、LINE 是為台灣市場加的。
   const all: NavItem[] = [
-    { id: "fb", kind: "channel", to: "/tasks/fb", label: "Facebook", icon: <FontAwesomeIcon icon={faFacebook} />, matchPrefix: "/tasks/fb",
+    { id: "fb", kind: "channel", to: "/tasks/fb", label: "Facebook", short: "FB", icon: <FontAwesomeIcon icon={faFacebook} />, matchPrefix: "/tasks/fb",
       tooltip: en ? "Facebook posts, ads, stories, live copy" : "Facebook 貼文 / 廣告 / 限時 / 直播文案" },
-    { id: "ig", kind: "channel", to: "/tasks/ig", label: "Instagram", icon: <FontAwesomeIcon icon={faInstagram} />, matchPrefix: "/tasks/ig",
+    { id: "ig", kind: "channel", to: "/tasks/ig", label: "Instagram", short: "IG", icon: <FontAwesomeIcon icon={faInstagram} />, matchPrefix: "/tasks/ig",
       tooltip: en ? "Instagram captions, Reels, carousel, Stories" : "IG 貼文 / Reels / 輪播 / 限時動態" },
     { id: "threads", kind: "channel", to: "/tasks/threads", label: "Threads", icon: <FontAwesomeIcon icon={faThreads} />, matchPrefix: "/tasks/threads",
       tooltip: en ? "Threads posts and threads" : "Threads 串文 / 短貼文" },
@@ -786,6 +785,20 @@ function IconBar({
       .map((it) => (it.catKey === "brain" && memoryAlert ? { ...it, alert: memoryAlert } : it)),
     [lang, userEmail, currentPath, allowedTaskRoutes, userNavItems, memoryAlert],
   );
+  // 2026-09-30（CJ 參考 Tesla「電量」）：本週企劃的進度與各平台待寫篇數，真資料來自 planner.railStatus。
+  // 週次用跟 PlannerPage 同一個 defaultWeek()；換頁就重抓（寫完一篇回來數字要跟著變）。
+  const onContentRail = NAV_ITEMS.some((it) => it.group);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const railWeek = React.useMemo(() => defaultWeek(), [currentPath]);
+  const railStatusQ = trpc.planner.railStatus.useQuery(
+    { brandId: scope.brandId ?? 0, weekStart: railWeek },
+    { enabled: !!scope.brandId && onContentRail, refetchOnWindowFocus: true, refetchInterval: 60_000, staleTime: 15_000 },
+  );
+  React.useEffect(() => {
+    if (scope.brandId && onContentRail) railStatusQ.refetch();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentPath]);
+  const railStatus = onContentRail ? railStatusQ.data : undefined;
   const isStrategyPreview = isStrategyPreviewEmail(userEmail);
   // 2026-08-20: 策略 added as a first-class workspace mode. 2026-09-08 市場
   // removed with the market-data layer (not on the price list). Order follows
@@ -1014,6 +1027,8 @@ function IconBar({
       <nav style={{ flex: 1, overflowY: "auto", overflowX: "hidden", padding: "0 3px", scrollbarWidth: "none" }}>
         {(() => {
           const renderItem = (item: NavItem) => {
+          const meter = item.to === "/planner" && railStatus ? { done: railStatus.written, total: railStatus.total } : undefined;
+          const badge = item.id ? railStatus?.pendingByNav?.[item.id] : undefined;
           // 2026-05-12 (CJ「按了連結還是顯示為品牌區」): pick the MOST SPECIFIC
           // matching item. If another nav item has a longer matching prefix,
           // this one yields. e.g. on /brands/settings, the 連結 item (prefix
@@ -1041,7 +1056,7 @@ function IconBar({
             }
           }
           const isActive = myMatches && !beatenByMoreSpecific;
-          return <IconNavLink key={item.to} item={item} active={isActive} onClick={() => onNavigate(item.to)} />;
+          return <IconNavLink key={item.to} item={item} active={isActive} meter={meter} badge={badge} en={isEn} onClick={() => onNavigate(item.to)} />;
           };
           // 2026-09-30：內容層 rail 分三段——最上本週企劃；中段是這個品牌自己加的平台（＋ 在最後）；下段固定靈感、專案、活動。
           // 策略層、成效層的 rail 沒有 group，照舊整排渲染。
@@ -1050,10 +1065,12 @@ function IconBar({
           const topGroup = NAV_ITEMS.filter((it) => it.group === "top");
           const userGroup = NAV_ITEMS.filter((it) => it.group === "user");
           const fixedGroup = NAV_ITEMS.filter((it) => it.group === "fixed");
+          // 2026-09-30（CJ 參考 Tesla）：三段各自一塊淺灰圓角底，取代分隔線。
+          const zone: React.CSSProperties = { background: "#F4F4F3", borderRadius: 14, padding: "4px 0", margin: "0 2px 8px" };
           return (
             <>
-              {topGroup.map(renderItem)}
-              <div style={{ height: 1, background: "#EDEDED", margin: "6px 14px" }} />
+              <div style={zone}>{topGroup.map(renderItem)}</div>
+              <div style={zone}>
               {userGroup.map(renderItem)}
               <button
                 type="button"
@@ -1061,7 +1078,7 @@ function IconBar({
                 aria-label={isEn ? "Add channels" : "加入通路"}
                 title={isEn ? "Add or remove channels and tools" : "加入或移除通路與工具"}
                 style={{
-                  width: 40, height: 32, margin: "6px auto 0", display: "flex", alignItems: "center", justifyContent: "center",
+                  width: 40, height: 28, margin: "4px auto", display: "flex", alignItems: "center", justifyContent: "center",
                   border: "1.5px dashed #D4D4D4", borderRadius: 10, background: "none", color: "#9ca3af", cursor: "pointer",
                 }}
                 onMouseEnter={(e) => { e.currentTarget.style.borderColor = "#171717"; e.currentTarget.style.color = "#171717"; }}
@@ -1069,8 +1086,10 @@ function IconBar({
               >
                 <FontAwesomeIcon icon={faPlus} />
               </button>
-              <div style={{ height: 1, background: "#EDEDED", margin: "10px 14px 6px" }} />
+              </div>
+              <div style={zone}>
               {fixedGroup.map(renderItem)}
+              </div>
             </>
           );
         })()}
@@ -1708,81 +1727,83 @@ function BrainSummaryPanel({
   );
 }
 
-function IconNavLink({ item, active, onClick }: { item: NavItem; active: boolean; onClick: () => void }) {
+// 2026-09-30（CJ 參考 Tesla UI）：顏色只代表「你現在在哪」——選中＝SoWork 橘實心方塊＋白色圖示，
+// 其餘單色；圖示下方永遠有字；本週企劃帶進度條（像電量），平台圖示角落顯示這週還沒寫的篇數。
+const SOWORK_ORANGE = "#F37E4A";
+const SOWORK_ORANGE_TEXT = "#B4501F"; // 橘色文字要夠深才讀得清楚
+
+function IconNavLink({ item, active, onClick, meter, badge, en }: {
+  item: NavItem; active: boolean; onClick: () => void;
+  meter?: { done: number; total: number }; badge?: number; en?: boolean;
+}) {
   const [hovered, setHovered] = React.useState(false);
   const [tooltipTop, setTooltipTop] = React.useState(0);
   const buttonRef = React.useRef<HTMLButtonElement>(null);
+  const short = item.short ?? item.label;
+  const tip = meter
+    ? `${item.label}${en ? ` · ${meter.done} of ${meter.total} written` : `・已寫 ${meter.done}／排定 ${meter.total} 篇`}`
+    : badge
+      ? `${item.label}${en ? ` · ${badge} to write this week` : `・這週還有 ${badge} 篇沒寫`}`
+      : item.label;
 
   return (
     <>
       <button
         ref={buttonRef}
         onClick={onClick}
-        aria-label={item.label}
+        aria-label={tip}
         style={{
-          width: 64, height: 44, margin: "1px auto 0",
-          display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
-          background: "none", border: "none", padding: 0, cursor: "pointer",
-          color: active ? "#18181b" : "#9ca3af",
-          transition: "color 0.1s",
-          position: "relative",
+          width: "100%", padding: "5px 0", margin: 0,
+          display: "flex", flexDirection: "column", alignItems: "center", gap: 3,
+          background: "none", border: "none", cursor: "pointer",
+          color: active ? SOWORK_ORANGE_TEXT : "#6b7280",
         }}
-        onMouseEnter={e => {
+        onMouseEnter={() => {
           if (buttonRef.current) {
             const rect = buttonRef.current.getBoundingClientRect();
             setTooltipTop(rect.top + rect.height / 2);
           }
           setHovered(true);
-          if (!active) {
-            e.currentTarget.style.color = "#374151";
-            const pill = e.currentTarget.querySelector(".nav-pill") as HTMLElement | null;
-            if (pill) pill.style.background = "rgba(0,0,0,0.05)";
-          }
         }}
-        onMouseLeave={e => {
-          setHovered(false);
-          if (!active) {
-            e.currentTarget.style.color = "#9ca3af";
-            const pill = e.currentTarget.querySelector(".nav-pill") as HTMLElement | null;
-            if (pill) pill.style.background = "transparent";
-          }
-        }}
+        onMouseLeave={() => setHovered(false)}
       >
-        {/* Active/hover pill */}
-        <span className="nav-pill" style={{
-          position: "absolute", inset: "4px 6px", borderRadius: 10, pointerEvents: "none",
-          background: active ? "rgba(24,24,27,0.10)" : "transparent",
-          transition: "background 0.1s",
-        }} />
-        {/* 2026-05-10: tier items render the seconds badge AS the icon.
-            2026-05-14 (CJ「收合後 30s/60s/99s 識別度低」): rendered as a
-            coloured rounded chip (not bare text) so it reads as a button
-            and the tier number stands out. */}
-        {item.tierBadge ? (
-          <span style={{
-            width: 30, height: 22, borderRadius: 6,
-            display: "flex", alignItems: "center", justifyContent: "center",
-            fontSize: 12, fontWeight: 700, letterSpacing: "-0.02em",
-            position: "relative",
-            color: active ? "white" : "#18181b",
-            background: active ? "rgb(24,24,27)" : "rgba(24,24,27,0.10)",
-            border: active ? "none" : "1px solid rgba(24,24,27,0.20)",
-            transition: "background 0.12s, color 0.12s",
-          }}>
-            {item.tierBadge}
-          </span>
-        ) : (
-          <span style={{
-            width: 24, height: 24, display: "flex", alignItems: "center", justifyContent: "center",
-            fontSize: 18, position: "relative",
-          }}>
-            {item.icon}
-            {item.alert && (
-              <span aria-label={item.alert === "over" ? "full" : "almost full"} style={{
-                position: "absolute", top: -2, right: -4, width: 8, height: 8, borderRadius: 999,
-                background: item.alert === "over" ? "#dc2626" : "#d97706", boxShadow: "0 0 0 2px #fff",
+        <span style={{
+          width: 40, height: 36, borderRadius: 10, position: "relative",
+          display: "flex", alignItems: "center", justifyContent: "center", fontSize: 17,
+          background: active ? SOWORK_ORANGE : hovered ? "rgba(0,0,0,0.06)" : "transparent",
+          color: active ? "#fff" : "#27272a",
+          transition: "background 0.12s, color 0.12s",
+        }}>
+          {item.icon}
+          {item.alert && (
+            <span aria-label={item.alert === "over" ? "full" : "almost full"} style={{
+              position: "absolute", top: -2, right: -3, width: 8, height: 8, borderRadius: 999,
+              background: item.alert === "over" ? "#dc2626" : "#d97706", boxShadow: "0 0 0 2px #fff",
+            }} />
+          )}
+          {!!badge && badge > 0 && (
+            <span style={{
+              position: "absolute", top: -4, right: -5, minWidth: 16, height: 16, padding: "0 4px", borderRadius: 8,
+              background: "#fff", border: "1px solid #D4D4D4", color: "#18181b",
+              fontSize: 10, fontWeight: 600, lineHeight: "14px", textAlign: "center",
+            }}>{badge > 99 ? "99+" : badge}</span>
+          )}
+        </span>
+        <span style={{
+          fontSize: 11, lineHeight: "13px", fontWeight: active ? 600 : 500, maxWidth: 60,
+          overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+        }}>{short}</span>
+        {meter && (
+          <span style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
+            <span style={{ width: 36, height: 3, borderRadius: 2, background: "#E4E4E7", overflow: "hidden" }}>
+              <span style={{
+                display: "block", height: 3, borderRadius: 2, background: "#18181b",
+                width: meter.total > 0 ? `${Math.round((meter.done / meter.total) * 100)}%` : 0,
               }} />
-            )}
+            </span>
+            <span style={{ fontSize: 10, lineHeight: "12px", color: "#6b7280", fontVariantNumeric: "tabular-nums" }}>
+              {meter.total > 0 ? `${meter.done}/${meter.total}` : (en ? "Empty" : "未排")}
+            </span>
           </span>
         )}
       </button>
@@ -1805,7 +1826,7 @@ function IconNavLink({ item, active, onClick }: { item: NavItem; active: boolean
           boxShadow: "0 2px 8px rgba(0,0,0,0.18)",
           letterSpacing: "0.01em",
         }}>
-          {item.label}
+          {tip}
         </div>,
         document.body
       )}
