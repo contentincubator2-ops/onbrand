@@ -24,7 +24,7 @@ vi.mock("../../strategy/core/brandRegulations", async (orig) => ({
 
 import { checkRegulationCompliance, checkVariantsCompliance, cleanIssues } from "./regulationCompliance";
 
-const REG = [{ title: "化粧品廣告", source: "食藥署", body: "不得宣稱醫療效能，例如助眠、舒緩焦慮。" }];
+const REG = [{ title: "化粧品廣告", source: "食藥署", digest: "- 不得宣稱醫療效能，例如助眠、舒緩焦慮。" }];
 const CAP = "睡前點一支香氛，幫助入眠、舒緩焦慮。今晚，把時間留給自己。#香氛 #放鬆";
 const base = { regulations: REG, isZhTW: true, timeoutMs: 10_000 };
 

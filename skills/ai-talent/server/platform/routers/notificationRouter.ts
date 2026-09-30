@@ -22,7 +22,7 @@ import { isRecentViral } from "../../content/core/taskSource";
 
 export interface NotificationItem {
   id: string;
-  kind: "positioning_done" | "positioning_failed" | "task_complete" | "festival_upcoming" | "card_published" | "strategy_alert";
+  kind: "positioning_done" | "positioning_failed" | "task_complete" | "festival_upcoming" | "card_published" | "strategy_alert" | "regulation_review";
   title: string;
   excerpt: string;
   createdAtIso: string;
@@ -40,6 +40,7 @@ const AVATAR_PALETTE: Record<NotificationItem["kind"], { avatar: string; avatarC
   festival_upcoming:  { avatar: "🎉", avatarColor: "#f59e0b" }, // amber
   card_published:     { avatar: "＋", avatarColor: "#171717" }, // ink：新卡上架
   strategy_alert:     { avatar: "◆", avatarColor: "#171717" }, // ink：策略提醒
+  regulation_review:  { avatar: "§", avatarColor: "#171717" }, // ink：法規審查重點待確認
 };
 
 /** /tasks/:platform 的路由代號。與 PlatformTaskPage 的 ROUTE_TO_PLATFORM 反向。 */
@@ -267,6 +268,34 @@ export const notificationRouter = router({
         }
       } catch (e) {
         console.warn("[notifications] strategy_alerts query failed:", (e as Error).message);
+      }
+
+      // 6. 法規審查重點萃取好了、等用戶確認（2026-09-30 CJ「萃取好以後請用戶回來確認」）。
+      // 只列還沒確認的；確認或捨棄後 jobStatus 離開 review，這則就消失。
+      try {
+        const [rows]: any = await localPool.execute(
+          `SELECT r.id, r.brandId, r.title, r.updatedAt, b.name AS brandName
+             FROM brand_regulations r JOIN brands b ON b.id = r.brandId
+             LEFT JOIN brand_members bm ON bm.brandId = r.brandId AND bm.userId = ?
+            WHERE r.jobStatus = 'review' AND (b.userId = ? OR bm.userId IS NOT NULL)
+            ORDER BY r.updatedAt DESC LIMIT 10`,
+          [userId, userId],
+        );
+        for (const r of rows as any[]) {
+          const iso = new Date(r.updatedAt).toISOString();
+          items.push({
+            id: `reg-${r.id}-${iso}`,
+            kind: "regulation_review",
+            title: isEn ? `Regulation ready to confirm · ${r.brandName ?? ""}` : `法規審查重點待確認 · ${r.brandName ?? ""}`,
+            excerpt: isEn ? `“${r.title}” review points are ready — please check and confirm.` : `「${r.title}」的審查重點萃取好了，請回來確認。`,
+            createdAtIso: iso,
+            navUrl: `/brands/edit?b=${r.brandId}&cat=regulations&focus=reg:${r.id}`,
+            unread: new Date(iso) > lastSeen,
+            ...AVATAR_PALETTE.regulation_review,
+          });
+        }
+      } catch (e) {
+        console.warn("[notifications] brand_regulations query failed:", (e as Error).message);
       }
 
       // 4. 新任務卡上架（純計算，不打 DB）

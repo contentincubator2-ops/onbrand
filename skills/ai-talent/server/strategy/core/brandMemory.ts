@@ -110,6 +110,7 @@ export async function loadBrandMemory(brandId: number, userId: number): Promise<
       positioning: parse(e.positioning) ?? {}, brain: onlyCategory(eventBrains[i]!, "event"),
     })),
     visual: { swatchCount: swatches.length, swatches: swatches.slice(0, 8), brandPhotoCount },
-    regulations: regulations.map((r) => ({ id: r.id, title: r.title, body: r.body, enabled: r.enabled })),
+    // 記憶算的是進大腦的審查重點；還沒確認審查重點的卡當成未啟用。
+    regulations: regulations.map((r) => ({ id: r.id, title: r.title, body: r.digest, enabled: r.active })),
   };
 }

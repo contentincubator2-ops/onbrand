@@ -212,7 +212,7 @@ describe("每一行都有出處（「記憶」頁靠它把存著的欄位對到�
 
 describe("法規（寫之前先審查）", () => {
   const reg = (id: number, brandId: number, title: string, body: string, source = "") =>
-    ({ id, brandId, title, source, body, enabled: 1, createdAt: new Date(), updatedAt: new Date() });
+    ({ id, brandId, title, source, body: `（原文）${body}`, digest: body, enabled: 1, createdAt: new Date(), updatedAt: new Date() });
 
   it("啟用中的法規放在 prompt 最後一段，清單上歸在「法規」", async () => {
     const id = withPos({ origin: { story: "故事ZZ" } });
@@ -227,11 +227,20 @@ describe("法規（寫之前先審查）", () => {
 
   it("大腦超載時先擠掉別的內容，法規不割捨", async () => {
     const id = withPos({ origin: { story: "故".repeat(1_500) }, _customSegments: Array.from({ length: 20 }, (_, i) => ({ title: `卡${i}`, fields: [{ label: "x", value: "字".repeat(1_200) }] })) });
-    rowsFor.reg = [reg(8, id, "化粧品廣告", "法".repeat(3_000))];
+    rowsFor.reg = [reg(8, id, "化粧品廣告", "法".repeat(800))];
     const brain = await buildBrandBrain(id);
     expect(brain.items.some((i) => i.status === "overflow")).toBe(true);
     expect(brain.items.find((i) => i.source === "reg:8")!.status).toBe("remembered");
-    expect(brain.prefix).toContain("法".repeat(3_000));
+    expect(brain.prefix).toContain("法".repeat(800));
+    expect(brain.prefix).not.toContain("（原文）");
+  });
+
+  it("還沒確認審查重點的法規不進大腦（原文不進）", async () => {
+    const id = withPos({ origin: { story: "故事ZZ" } });
+    rowsFor.reg = [{ ...reg(9, id, "未萃取", "x"), digest: null }];
+    const brain = await buildBrandBrain(id);
+    expect(brain.prefix).not.toContain("[法規審查");
+    expect(brain.items.some((i) => i.category === "regulation")).toBe(false);
   });
 
   it("沒有法規就沒有法規段", async () => {

@@ -27,7 +27,7 @@ import {
   faFacebook, faInstagram, faTiktok,
 } from "@fortawesome/free-brands-svg-icons";
 import {
-  faEnvelope, faGlobe, faComments, faBell, faFolderOpen, faLayerGroup, faCheck, faWandMagicSparkles, faTriangleExclamation, faCircleCheck, faArrowDown,
+  faEnvelope, faGlobe, faComments, faBell, faFolderOpen, faLayerGroup, faCheck, faWandMagicSparkles, faTriangleExclamation, faScaleBalanced, faCircleCheck, faArrowDown,
 } from "@fortawesome/free-solid-svg-icons";
 import { trpc } from "../../../lib/trpc";
 import { useLang } from "../../../lib/i18n";
@@ -187,7 +187,7 @@ export default function HomePage() {
               <div style={{ padding: "8px 14px", fontSize: 13, color: "#9ca3af" }}>{en ? "Nothing yet" : "還沒有動態"}</div>
             ) : (notifQ.data?.items ?? notifQ.data ?? []).slice(0, 3).map((n: any) => (
               <div key={n.id} onClick={() => n.navUrl && navigate(n.navUrl)} style={{ display: "flex", gap: 8, padding: "8px 14px", fontSize: 13, color: "#6b7280", cursor: n.navUrl ? "pointer" : "default" }}>
-                <FontAwesomeIcon icon={n.kind === "task_complete" ? faCheck : n.kind === "card_published" ? faWandMagicSparkles : n.kind === "strategy_alert" ? faTriangleExclamation : faBell} style={{ fontSize: 13, marginTop: 2, color: "#9ca3af" }} />
+                <FontAwesomeIcon icon={n.kind === "task_complete" ? faCheck : n.kind === "card_published" ? faWandMagicSparkles : n.kind === "strategy_alert" ? faTriangleExclamation : n.kind === "regulation_review" ? faScaleBalanced : faBell} style={{ fontSize: 13, marginTop: 2, color: "#9ca3af" }} />
                 <span>{n.title}</span>
               </div>
             ))}
