@@ -26,12 +26,15 @@ import { planQuotaFor, isUnlimited, assertCanAct } from "../../platform/core/pla
 import { router, protectedProcedure } from "../../platform/core/trpc";
 import { assertBrandAccess } from "../../platform/core/brandAuth";
 import { invokeLLM } from "../../platform/core/llm";
+import { readFileSync } from "fs";
+import { coverFilePath, saveCoverFile } from "../../content/core/mediaGen";
+import { drawIllustration, shrinkToWebp, writeIllustrationConcepts } from "../../content/core/taskIllustration";
 import { buildBrandPrefix } from "../core/brandContext";
 import {
   type BrandTaskCard, type BrandTaskCardField,
   listBrandTaskCards, getBrandTaskCard, mutateBrandTaskCards,
   measureSamples, slugifyCardName, cardTemplate, cardConfig,
-  factLeaks, redactFactLeaks, verbatimSamples,
+  factLeaks, redactFactLeaks, verbatimSamples, illustrationInFlight,
   MAX_CARDS_PER_BRAND, MAX_SAMPLES, MAX_SAMPLE_CHARS,
   registerBrandTaskCardSource,
 } from "../core/brandTaskCards";
@@ -274,6 +277,35 @@ async function extractFromThread(text: string): Promise<{ samples: string[]; raw
   return { samples: verbatimSamples(candidates, text), raw: candidates.length };
 }
 
+/**
+ * 替自建卡畫插畫（背景跑，幾十秒）：Claude 寫畫面概念 → gpt-image-2 → 縮 webp。
+ * 狀態寫回卡片，前端輪詢 get 看 illustrationStatus。失敗不擋任何流程，卡片照樣
+ * 可以上架，modal 就退回現成的 SVG 場景。
+ */
+async function drawCardIllustration(brandId: number, userId: number, cardId: string): Promise<void> {
+  const set = (patch: Record<string, unknown>) =>
+    mutateBrandTaskCards(brandId, userId, (list) =>
+      list.map((c) => (c.id === cardId ? { ...c, ...patch } : c)));
+  try {
+    const card = await getBrandTaskCard(brandId, cardId);
+    if (!card) return;
+    const concepts = await writeIllustrationConcepts([{
+      id: card.id, label: card.name, question: card.primaryQuestion,
+      description: (card.samples[0] ?? "").slice(0, 200),
+    }]);
+    const concept = concepts[card.id];
+    if (!concept) throw new Error("沒拿到畫面概念");
+    const r = await drawIllustration(concept);
+    if ("error" in r) throw new Error(r.error);
+    const file = coverFilePath(r.url);
+    if (!file) throw new Error("圖檔位置不對");
+    const url = saveCoverFile(await shrinkToWebp(readFileSync(file)), `taskcard-${cardId}-${Date.now()}.webp`);
+    await set({ illustrationUrl: url, illustrationStatus: "ready", illustrationError: null });
+  } catch (e: any) {
+    await set({ illustrationStatus: "failed", illustrationError: String(e?.message ?? e).slice(0, 300) }).catch(() => {});
+  }
+}
+
 export const brandTaskCardRouter = router({
   /**
    * 貼上整串 AI 對話 → 挑出裡面的成品，變成一格一格的範例。
@@ -513,6 +545,27 @@ export const brandTaskCardRouter = router({
       };
     }),
 
+  /**
+   * 用 gpt-image-2 替這張卡畫一張（或重畫）。會把 scene 清成 null——按了「AI 畫」
+   * 就是要看 AI 的圖，不是剛剛挑的現成場景。立即回傳，圖在背景畫。
+   */
+  generateIllustration: protectedProcedure
+    .input(z.object({ brandId: z.number(), cardId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      await assertCanAct(ctx.user!.id);
+      const userId = ctx.user!.id;
+      await assertBrandAccess(userId, input.brandId);
+      const card = await getBrandTaskCard(input.brandId, input.cardId);
+      if (!card) throw new TRPCError({ code: "NOT_FOUND", message: "找不到這張卡" });
+      if (illustrationInFlight(card)) return { ok: true, alreadyRunning: true };
+      await mutateBrandTaskCards(input.brandId, userId, (list) =>
+        list.map((c) => (c.id === input.cardId
+          ? { ...c, scene: null, illustrationStatus: "generating", illustrationError: null, illustrationStartedAt: new Date().toISOString() }
+          : c)));
+      void drawCardIllustration(input.brandId, userId, input.cardId);
+      return { ok: true, alreadyRunning: false };
+    }),
+
   /** 確認沒問題 → 卡片上架，開始出現在該通道的任務頁。 */
   publish: protectedProcedure
     .input(z.object({ brandId: z.number(), cardId: z.string() }))
@@ -530,6 +583,14 @@ export const brandTaskCardRouter = router({
         list.map((c) => (c.id === input.cardId
           ? { ...c, status: "ready", lastError: null, updatedAt: new Date().toISOString() }
           : c)));
+      // 上架時還沒有插畫（例如沒經過試寫那步）就補畫一張；用戶自己挑了現成場景就不畫。
+      if (!card.scene && !card.illustrationUrl && !illustrationInFlight(card)) {
+        await mutateBrandTaskCards(input.brandId, userId, (list) =>
+          list.map((c) => (c.id === input.cardId
+            ? { ...c, illustrationStatus: "generating", illustrationError: null, illustrationStartedAt: new Date().toISOString() }
+            : c)));
+        void drawCardIllustration(input.brandId, userId, input.cardId);
+      }
       return { ok: true };
     }),
 

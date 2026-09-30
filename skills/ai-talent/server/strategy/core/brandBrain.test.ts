@@ -182,3 +182,29 @@ describe("大腦畫面的名稱跟策略層一致", () => {
     }
   });
 });
+
+describe("每一行都有出處（「記憶」頁靠它把存著的欄位對到讀了沒）", () => {
+  it("品牌、文字、產品、自訂卡片、市場的每一筆都帶 source", async () => {
+    const id = withPos({
+      tagline: { zhTagline: "標", enTagline: "T" }, goldenCircle: { why: "w", how: "h", what: "x" },
+      voice: { archetypes: ["智者"], tone: ["溫暖"], forbidden: ["不"], samples: [{ ours: "我們", generic: "一般" }] },
+      origin: { story: "s", belief5Layers: [{ body: "b" }] }, audience: { primary: "p" },
+      differentiation: { summary: "d", discriminator: "k", reasonToBelieve: "r" },
+      values: { items: [{ label: "誠" }] }, competition: { intensity: "i", direct: [{ name: "A" }], map: "m" },
+      _assets: { hook_library: { items: ["h1"] }, voice: { text: "v" }, banned_words: { items: ["壞"] } },
+      _customSegments: [{ title: "願景", fields: [{ label: "v", value: "卡" }] }],
+      _sourceDoc: { injectedContext: "文件" },
+    });
+    rowsFor.product = [{ name: "筆", positioning: { facts: { price: "100" }, core: { coreStatement: "c" }, strategy: { pricing: "p" } } }];
+    const brain = await buildBrandBrain(id, 77);
+    const missing = brain.items.filter((i) => !i.source).map((i) => `${i.category}/${i.label}`);
+    expect(missing).toEqual([]);
+    const src = (label: string) => brain.items.find((i) => i.label === label)?.source;
+    expect(src("WHY — 品牌願景")).toBe("pos:goldenCircle.why");
+    expect(src("Hook 庫")).toBe("asset:hook_library");
+    expect(src("禁用詞")).toBe("asset:banned_words");
+    expect(src("售價")).toBe("pos:facts.price");
+    expect(src("核心定位")).toBe("pos:core.coreStatement");
+    expect(src("願景")).toBe("custom:願景");
+  });
+});

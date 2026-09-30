@@ -15,12 +15,15 @@ import { assertBrandOwner } from "../../platform/core/brandAuth";
 import { imageActionForRequest, reconcileImageCharge } from "../../platform/core/imageBilling";
 import {
   IMAGE_CHANNELS,
+  MAX_IMAGE_TRAY,
   PLATFORM_IMAGE_SPECS,
   getImageSpec,
   nanoRatioFor,
   ratioLabel,
+  resolveImageTray,
   type PlatformImageSpec,
 } from "../core/platformImageSpecs";
+import { loadBrandPositioning } from "../../platform/core/planGate";
 import { proposeImageDirections, renderImageCard } from "../core/imageCards";
 import { resolveBrandVisualContext } from "../core/imageGen";
 import { localCoverFile } from "../core/imageFetch";
@@ -32,6 +35,9 @@ export function publicSpec(s: PlatformImageSpec) {
   return {
     id: s.id,
     channel: s.channel,
+    placement: s.placement ?? "organic",
+    /** 沒挑過的品牌預設擺出來的兩張。 */
+    pinned: !!s.pinned,
     labelZh: s.labelZh,
     labelEn: s.labelEn,
     descZh: s.descZh,
@@ -78,6 +84,41 @@ export const imageCardRouter = router({
         ? PLATFORM_IMAGE_SPECS.filter((s) => s.channel === input.channel)
         : PLATFORM_IMAGE_SPECS;
       return { cards: specs.map(publicSpec) };
+    }),
+
+  /** 這個品牌在這個通路擺哪幾張圖片卡（沒挑過＝每通路預設兩張）。 */
+  tray: protectedProcedure
+    .input(z.object({ brandId: z.number().int().positive(), channel }))
+    .query(async ({ ctx, input }) => {
+      if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED" });
+      await assertBrandOwner(ctx.user.id, input.brandId);
+      const positioning = await loadBrandPositioning(input.brandId);
+      return { ...resolveImageTray(positioning, input.channel), max: MAX_IMAGE_TRAY };
+    }),
+
+  /** 存這個通路要擺的圖片卡。空陣列＝回到預設兩張。 */
+  setTray: protectedProcedure
+    .input(z.object({
+      brandId: z.number().int().positive(),
+      channel,
+      cardIds: z.array(z.string().min(1).max(60)).max(MAX_IMAGE_TRAY),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED" });
+      await assertBrandOwner(ctx.user.id, input.brandId);
+      const bad = input.cardIds.find((id) => getImageSpec(id)?.channel !== input.channel);
+      if (bad) throw new TRPCError({ code: "BAD_REQUEST", message: `這個通路沒有這張圖片卡：${bad}` });
+      const positioning = await loadBrandPositioning(input.brandId);
+      const base = positioning && typeof positioning === "object" ? (positioning as Record<string, unknown>) : {};
+      const tray = { ...((base.__imageTray as Record<string, string[]> | undefined) ?? {}) };
+      if (input.cardIds.length) tray[input.channel] = [...new Set(input.cardIds)];
+      else delete tray[input.channel];
+      const { default: localPool } = await import("../../localDb");
+      await localPool.execute(
+        `UPDATE brands SET positioning = ? WHERE id = ?`,
+        [JSON.stringify({ ...base, __imageTray: tray }), input.brandId],
+      );
+      return resolveImageTray({ __imageTray: tray }, input.channel);
     }),
 
   propose: protectedProcedure

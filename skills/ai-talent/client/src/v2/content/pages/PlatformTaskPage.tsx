@@ -42,6 +42,7 @@ import { getStrategyPublicGenerationState } from "../lib/strategyContentEnvelope
 import { checkViralSource, platformLabelForTask, taskNeedsViralSource } from "../lib/viralSourceGuard";
 import { intakeExtraFields, missingRequiredInputs, type IntakeField } from "../lib/taskIntake";
 import TaskCardComposer, { type ComposerChannel } from "../../strategy/components/taskCard/TaskCardComposer";
+import { AddEntityModal } from "../../strategy/components/AddEntityModal";
 import RewriteDraftModal from "../components/quickTask/RewriteDraftModal";
 import {
   Avatar, Button, Card, CardBody, Chip, Input, Modal, ModalBody,
@@ -57,6 +58,7 @@ import {
 } from "@fortawesome/free-brands-svg-icons";
 import RunningAgentCarousel from "../components/quickTask/RunningAgentCarousel";
 import ImageCardTile, { type ImageCardInfo } from "../components/imageCard/ImageCardTile";
+import ImageSizePicker from "../components/imageCard/ImageSizePicker";
 import { imageCardHref, imageChannelOf } from "../lib/imageCardHandoff";
 import CardDetailDrawer, { isRecentCard } from "../components/quickTask/CardDetailDrawer";
 import ChannelPicker from "../../platform/components/plan/ChannelPicker";
@@ -182,9 +184,12 @@ function synthesizeStages(elapsedMs: number, tier: string, lang: string): any[] 
   const preEnd = scoutEnd + 3000;
   const stratEnd = preEnd + 9000;
   const capStart = preEnd;
-  const capEnd = capStart + 25000;
-  const genEnd = capEnd + 10000;
-  const extrasEnd = capEnd + 14000;
+  // 單篇實測約 8 秒寫完（2026-09-30 dev run 3784／3788）；套組以上維持 25 秒。
+  const capEnd = capStart + (isProd ? 25000 : 9000);
+  // 2026-09-30：文案寫完先過品牌一致性檢查（server brandConsistency.ts），圖與附加項都在它之後。
+  const checkEnd = capEnd + 8000;
+  const genEnd = checkEnd + 10000;
+  const extrasEnd = checkEnd + 14000;
   const qaEnd = extrasEnd + 8000;
   const mk = (key: string, label: string, start: number, end: number) => ({
     key, label, startedAt: start,
@@ -197,9 +202,10 @@ function synthesizeStages(elapsedMs: number, tier: string, lang: string): any[] 
   if (isProd) stages.push(mk("strategist", L("Strategist 規劃敘事弧", "Strategist maps the narrative arc"), preEnd, stratEnd));
   stages.push(mk("caption", L("文案寫手 撰寫版本", "Caption writer drafts variants"), capStart, capEnd));
   stages.push(mk("brief", L("視覺指導寫風格指示", "Image director writes the visual brief"), capStart, capEnd));
-  stages.push(mk("gen", L("AI 生圖", "AI paints the image"), capEnd, genEnd));
+  stages.push(mk("brandcheck", L("品牌一致性檢查", "Brand consistency check"), capEnd, checkEnd));
+  stages.push(mk("gen", L("AI 生圖", "AI paints the image"), checkEnd, genEnd));
   if (isProd) {
-    stages.push(mk("extras", L("留言模板 / 發文時段 / 跟進", "Reply templates · timing · follow-up"), capEnd, extrasEnd));
+    stages.push(mk("extras", L("留言模板 / 發文時段 / 跟進", "Reply templates · timing · follow-up"), checkEnd, extrasEnd));
     stages.push(mk("qa", L("Jordan Hayes 審核", "Jordan Hayes reviews"), extrasEnd, qaEnd));
   }
   return stages;
@@ -232,6 +238,8 @@ interface FBTaskCard {
   primary_question?: string | null;
   /** 2026-09-30：自建卡用戶自選的插畫場景；null＝依題目自動挑。 */
   scene?: string | null;
+  /** 自建卡的 AI 插畫；內建卡的圖走 taskIllustrationIds.json。 */
+  illustration_url?: string | null;
   primary_input?: { key: string; placeholder?: string; type: "text" | "textarea"; derive?: any } | null;
   agent_id?: number | null;
   skill_slug?: string | null;
@@ -396,6 +404,23 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
     { enabled: !!imageChannel, staleTime: 5 * 60_000 },
   );
   const imageCards = (imageChannel ? imageCardsQ.data?.cards ?? [] : []) as ImageCardInfo[];
+  // 2026-09-30 CJ：圖片卡不一次全列——每通路預設兩張，其餘用戶用「新增尺寸」自己加。
+  const imageTrayQ = trpc.imageCard.tray.useQuery(
+    { brandId: brandId ?? 0, channel: (imageChannel ?? "facebook") as any },
+    { enabled: !!imageChannel && !!brandId, refetchOnWindowFocus: false },
+  );
+  const [imagePickerOpen, setImagePickerOpen] = useState(false);
+  const setImageTrayMut = trpc.imageCard.setTray.useMutation({
+    onSuccess: () => { setImagePickerOpen(false); imageTrayQ.refetch(); },
+    onError: (e) => toastWithUpgrade(e?.message ?? "儲存失敗", lang === "en"),
+  });
+  /** 實際擺出來的圖片卡。還沒載入托盤（或沒有品牌）時先只擺預設的兩張，不閃出全部。 */
+  const shownImageCards = useMemo(() => {
+    const ids = imageTrayQ.data?.ids;
+    if (!ids) return imageCards.filter((c) => c.pinned);
+    const byId = new Map(imageCards.map((c) => [c.id, c] as const));
+    return ids.map((id) => byId.get(id)).filter((c): c is ImageCardInfo => !!c);
+  }, [imageCards, imageTrayQ.data]);
   const brandName = useMemo(() => {
     const list = (ctx?.brands as any[]) ?? [];
     return list.find((b) => b?.id === brandId)?.name ?? null;
@@ -458,6 +483,8 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
   // 2026-09-30 任務 modal 圖示化：目前點開的脈絡圖示（"__entity"＝產出對象），與選填欄位開關。
   const [ctxOpen, setCtxOpen] = useState<string | null>(null);
   const [showOptional, setShowOptional] = useState(false);
+  // 任務 modal 裡直接新增產品／活動（AddEntityModal 疊在上面）。
+  const [addEntityTab, setAddEntityTab] = useState<"product" | "event" | null>(null);
   const savePositioningMut = (trpc as any).scope?.savePositioning?.useMutation?.();
 
   const scopeActiveQuery = (trpc as any).scope?.active?.useQuery(
@@ -492,9 +519,17 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
 
   // Tier tab state (used for non-FB/non-IG platforms)
   // 結構來源篩選。"all" = 不篩。與 tier 是兩條獨立的軸，可同時生效。
-  // 2026-09-29 CJ「每個平台要增加一個圖片的類別」："image" 不是任務卡來源，是另一個類別——
-  // 選它時下面改列這個通路的圖片任務卡（imageCard.list），不列文字任務。
-  const [activeSource, setActiveSource] = useState<FrontCardKind | "all" | "image">("all");
+  const [activeSource, setActiveSource] = useState<FrontCardKind | "all">("all");
+  /** 2026-09-29 CJ「每個平台要增加一個圖片的類別」；9/30 移到分類列最後。選它時下面
+   *  改列這個通路的圖片任務卡（imageCard.list），不列文字任務。
+   *  放在網址（?view=images）：從圖片卡按上一頁回來時停在圖片，換通路時自然歸零。 */
+  const imageMode = searchParams.get("view") === "images";
+  const setImageMode = (on: boolean) => {
+    if (on === imageMode) return;
+    const next = new URLSearchParams(searchParams);
+    if (on) next.set("view", "images"); else next.delete("view");
+    setSearchParams(next, { replace: true });
+  };
   // Format tab state (used for FB)
   const [activeFormat, setActiveFormat] = useState<ActiveFormat>("all");
   // Format tab state (used for IG)
@@ -1629,326 +1664,85 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
             />
           </div>
 
-          {/* ── Format tiles (FB) / Format tiles (IG) / Tier tabs (other) ── */}
-          {/* 2026-08-29 客製包的 pill 優先於所有內建平台分類。分類值由該品牌的
+          {/* ── 分類列：貼文／連結貼文／廣告／Reels…＋圖片 ──
+              2026-08-29 客製包的 pill 優先於所有內建平台分類。分類值由該品牌的
               pack 定義（例如五感十築的 生活實踐／生態健築／永續生活／永續價值），
-              不是全域那七份手抄對照表 —— 有包的品牌完全繞開它們。 */}
-          {packChannel ? (
-            <div className="w-full" style={{ maxWidth: 860 }}>
-              <div className="flex items-center gap-2 flex-wrap justify-center">
-                {[{ id: "all", labelZh: "全部", labelEn: "All" }, ...packChannel.formats].map((tab: any) => {
-                  const active = activePackFormat === tab.id;
-                  const count = packFormatCounts[tab.id] ?? 0;
-                  if (tab.id !== "all" && count === 0) return null;
-                  return (
-                    <button
-                      key={tab.id}
-                      onClick={() => setActivePackFormat(tab.id)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all whitespace-nowrap"
-                      style={
-                        active
-                          ? { background: "#171717", color: "white", boxShadow: "0 2px 8px rgba(0,0,0,0.18)" }
-                          : { background: "white", color: "#525252", border: "1px solid #E5E5E5" }
-                      }
-                    >
-                      {lang === "en" ? tab.labelEn : tab.labelZh}
-                      {tab.id !== "all" && (
-                        <span
-                          className="text-[12px] px-1.5 py-0.5 rounded-full tabular-nums font-semibold"
-                          style={{
-                            background: active ? "rgba(255,255,255,0.18)" : "#F5F5F5",
-                            color: active ? "rgba(255,255,255,0.85)" : "#737373",
-                          }}
-                        >
-                          {count}
-                        </span>
-                      )}
-                    </button>
-                  );
-                })}
+              不是全域那七份手抄對照表 —— 有包的品牌完全繞開它們。
+              2026-09-30（CJ「圖片的 tile 應該要跟廣告貼文、Reels 在同一個地方，而不是跟
+              爆款結構在同一個地方」）：圖片是一種形式，放在這一列最後；原本八份一模一樣的
+              分類列收成一份。Threads／LINE 沒有文字分類，這列只有「全部｜圖片」。 */}
+          {(() => {
+            type Tab = { id: string; label: string; labelEn: string };
+            const row: { tabs: Tab[]; active: string; set: (id: string) => void; counts: Record<string, number> } | null =
+              packChannel
+                ? {
+                    tabs: [{ id: "all", label: "全部", labelEn: "All" }, ...packChannel.formats.map((f: any) => ({ id: f.id, label: f.labelZh, labelEn: f.labelEn }))],
+                    active: activePackFormat, set: setActivePackFormat, counts: packFormatCounts,
+                  }
+              : platform === "facebook" ? { tabs: FORMAT_TABS, active: activeFormat, set: (id) => setActiveFormat(id as ActiveFormat), counts: formatCounts }
+              : platform === "instagram" ? { tabs: IG_FORMAT_TABS, active: activeIGFormat, set: (id) => setActiveIGFormat(id as IGActiveFormat), counts: igFormatCounts }
+              : platform === "linkedin" ? { tabs: LI_FORMAT_TABS, active: activeLIFormat, set: (id) => setActiveLIFormat(id as LIActiveFormat), counts: liFormatCounts }
+              : platform === "youtube" ? { tabs: YT_FORMAT_TABS, active: activeYTFormat, set: (id) => setActiveYTFormat(id as YTActiveFormat), counts: ytFormatCounts }
+              : platform === "tiktok" ? { tabs: TT_FORMAT_TABS, active: activeTTFormat, set: (id) => setActiveTTFormat(id as TTActiveFormat), counts: ttFormatCounts }
+              : platform === "email" ? { tabs: EM_FORMAT_TABS, active: activeEMFormat, set: (id) => setActiveEMFormat(id as EMActiveFormat), counts: emFormatCounts }
+              : platform === "pr" ? { tabs: PR_FORMAT_TABS, active: activePRFormat, set: (id) => setActivePRFormat(id as PRActiveFormat), counts: prFormatCounts }
+              : platform === "website" ? { tabs: WEB_FORMAT_TABS, active: activeWEBFormat, set: (id) => setActiveWEBFormat(id as WEBActiveFormat), counts: webFormatCounts }
+              : null;
+            const hasImages = imageCards.length > 0;
+            if (!row && !hasImages) return null;
+            const tabs: Tab[] = row?.tabs ?? [{ id: "all", label: "全部", labelEn: "All" }];
+            const pill = (key: string, active: boolean, label: string, count: number | null, onClick: () => void, title?: string) => (
+              <button
+                key={key}
+                onClick={onClick}
+                title={title}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all whitespace-nowrap"
+                style={
+                  active
+                    ? { background: "#171717", color: "white", boxShadow: "0 2px 8px rgba(0,0,0,0.18)" }
+                    : { background: "white", color: "#525252", border: "1px solid #E5E5E5" }
+                }
+              >
+                {label}
+                {count !== null && (
+                  <span
+                    className="text-[12px] px-1.5 py-0.5 rounded-full tabular-nums font-semibold"
+                    style={{
+                      background: active ? "rgba(255,255,255,0.18)" : "#F5F5F5",
+                      color: active ? "rgba(255,255,255,0.85)" : "#737373",
+                    }}
+                  >
+                    {count}
+                  </span>
+                )}
+              </button>
+            );
+            return (
+              <div className="w-full" style={{ maxWidth: 860 }}>
+                <div className="flex items-center gap-2 flex-wrap justify-center">
+                  {tabs.map((tab) => {
+                    const count = row?.counts[tab.id] ?? 0;
+                    if (tab.id !== "all" && count === 0) return null;
+                    return pill(
+                      tab.id,
+                      !imageMode && (row?.active ?? "all") === tab.id,
+                      lang === "en" ? tab.labelEn : tab.label,
+                      tab.id === "all" ? null : count,
+                      () => { setImageMode(false); row?.set(tab.id); },
+                    );
+                  })}
+                  {hasImages && pill(
+                    "__image",
+                    imageMode,
+                    lang === "en" ? "Images" : "圖片",
+                    imageCards.length,
+                    () => setImageMode(true),
+                    lang === "en" ? "Image cards in this channel's sizes." : "這個平台各種尺寸的圖片任務卡。",
+                  )}
+                </div>
               </div>
-            </div>
-          ) : platform === "facebook" ? (
-            <div className="w-full" style={{ maxWidth: 860 }}>
-              <div className="flex items-center gap-2 flex-wrap justify-center">
-                {FORMAT_TABS.map((tab) => {
-                  const active = activeFormat === tab.id;
-                  const count = formatCounts[tab.id] ?? 0;
-                  if (tab.id !== "all" && count === 0) return null;
-                  return (
-                    <button
-                      key={tab.id}
-                      onClick={() => setActiveFormat(tab.id)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all whitespace-nowrap"
-                      style={
-                        active
-                          ? { background: "#171717", color: "white", boxShadow: "0 2px 8px rgba(0,0,0,0.18)" }
-                          : { background: "white", color: "#525252", border: "1px solid #E5E5E5" }
-                      }
-                    >
-                      {lang === "en" ? tab.labelEn : tab.label}
-                      {tab.id !== "all" && (
-                        <span
-                          className="text-[12px] px-1.5 py-0.5 rounded-full tabular-nums font-semibold"
-                          style={{
-                            background: active ? "rgba(255,255,255,0.18)" : "#F5F5F5",
-                            color: active ? "rgba(255,255,255,0.85)" : "#737373",
-                          }}
-                        >
-                          {count}
-                        </span>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          ) : platform === "instagram" ? (
-            <div className="w-full" style={{ maxWidth: 860 }}>
-              <div className="flex items-center gap-2 flex-wrap justify-center">
-                {IG_FORMAT_TABS.map((tab) => {
-                  const active = activeIGFormat === tab.id;
-                  const count = igFormatCounts[tab.id] ?? 0;
-                  if (tab.id !== "all" && count === 0) return null;
-                  return (
-                    <button
-                      key={tab.id}
-                      onClick={() => setActiveIGFormat(tab.id)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all whitespace-nowrap"
-                      style={
-                        active
-                          ? { background: "#171717", color: "white", boxShadow: "0 2px 8px rgba(0,0,0,0.18)" }
-                          : { background: "white", color: "#525252", border: "1px solid #E5E5E5" }
-                      }
-                    >
-                      {lang === "en" ? tab.labelEn : tab.label}
-                      {tab.id !== "all" && (
-                        <span
-                          className="text-[12px] px-1.5 py-0.5 rounded-full tabular-nums font-semibold"
-                          style={{
-                            background: active ? "rgba(255,255,255,0.18)" : "#F5F5F5",
-                            color: active ? "rgba(255,255,255,0.85)" : "#737373",
-                          }}
-                        >
-                          {count}
-                        </span>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          ) : platform === "linkedin" ? (
-            <div className="w-full" style={{ maxWidth: 860 }}>
-              <div className="flex items-center gap-2 flex-wrap justify-center">
-                {LI_FORMAT_TABS.map((tab) => {
-                  const active = activeLIFormat === tab.id;
-                  const count = liFormatCounts[tab.id] ?? 0;
-                  if (tab.id !== "all" && count === 0) return null;
-                  return (
-                    <button
-                      key={tab.id}
-                      onClick={() => setActiveLIFormat(tab.id)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all whitespace-nowrap"
-                      style={
-                        active
-                          ? { background: "#171717", color: "white", boxShadow: "0 2px 8px rgba(0,0,0,0.18)" }
-                          : { background: "white", color: "#525252", border: "1px solid #E5E5E5" }
-                      }
-                    >
-                      {lang === "en" ? tab.labelEn : tab.label}
-                      {tab.id !== "all" && (
-                        <span
-                          className="text-[12px] px-1.5 py-0.5 rounded-full tabular-nums font-semibold"
-                          style={{
-                            background: active ? "rgba(255,255,255,0.18)" : "#F5F5F5",
-                            color: active ? "rgba(255,255,255,0.85)" : "#737373",
-                          }}
-                        >
-                          {count}
-                        </span>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          ) : platform === "youtube" ? (
-            <div className="w-full" style={{ maxWidth: 860 }}>
-              <div className="flex items-center gap-2 flex-wrap justify-center">
-                {YT_FORMAT_TABS.map((tab) => {
-                  const active = activeYTFormat === tab.id;
-                  const count = ytFormatCounts[tab.id] ?? 0;
-                  if (tab.id !== "all" && count === 0) return null;
-                  return (
-                    <button
-                      key={tab.id}
-                      onClick={() => setActiveYTFormat(tab.id)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all whitespace-nowrap"
-                      style={
-                        active
-                          ? { background: "#171717", color: "white", boxShadow: "0 2px 8px rgba(0,0,0,0.18)" }
-                          : { background: "white", color: "#525252", border: "1px solid #E5E5E5" }
-                      }
-                    >
-                      {lang === "en" ? tab.labelEn : tab.label}
-                      {tab.id !== "all" && (
-                        <span
-                          className="text-[12px] px-1.5 py-0.5 rounded-full tabular-nums font-semibold"
-                          style={{
-                            background: active ? "rgba(255,255,255,0.18)" : "#F5F5F5",
-                            color: active ? "rgba(255,255,255,0.85)" : "#737373",
-                          }}
-                        >
-                          {count}
-                        </span>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          ) : platform === "tiktok" ? (
-            <div className="w-full" style={{ maxWidth: 860 }}>
-              <div className="flex items-center gap-2 flex-wrap justify-center">
-                {TT_FORMAT_TABS.map((tab) => {
-                  const active = activeTTFormat === tab.id;
-                  const count = ttFormatCounts[tab.id] ?? 0;
-                  if (tab.id !== "all" && count === 0) return null;
-                  return (
-                    <button
-                      key={tab.id}
-                      onClick={() => setActiveTTFormat(tab.id)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all whitespace-nowrap"
-                      style={
-                        active
-                          ? { background: "#171717", color: "white", boxShadow: "0 2px 8px rgba(0,0,0,0.18)" }
-                          : { background: "white", color: "#525252", border: "1px solid #E5E5E5" }
-                      }
-                    >
-                      {lang === "en" ? tab.labelEn : tab.label}
-                      {tab.id !== "all" && (
-                        <span
-                          className="text-[12px] px-1.5 py-0.5 rounded-full tabular-nums font-semibold"
-                          style={{
-                            background: active ? "rgba(255,255,255,0.18)" : "#F5F5F5",
-                            color: active ? "rgba(255,255,255,0.85)" : "#737373",
-                          }}
-                        >
-                          {count}
-                        </span>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          ) : platform === "email" ? (
-            <div className="w-full" style={{ maxWidth: 860 }}>
-              <div className="flex items-center gap-2 flex-wrap justify-center">
-                {EM_FORMAT_TABS.map((tab) => {
-                  const active = activeEMFormat === tab.id;
-                  const count = emFormatCounts[tab.id] ?? 0;
-                  if (tab.id !== "all" && count === 0) return null;
-                  return (
-                    <button
-                      key={tab.id}
-                      onClick={() => setActiveEMFormat(tab.id)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all whitespace-nowrap"
-                      style={
-                        active
-                          ? { background: "#171717", color: "white", boxShadow: "0 2px 8px rgba(0,0,0,0.18)" }
-                          : { background: "white", color: "#525252", border: "1px solid #E5E5E5" }
-                      }
-                    >
-                      {lang === "en" ? tab.labelEn : tab.label}
-                      {tab.id !== "all" && (
-                        <span
-                          className="text-[12px] px-1.5 py-0.5 rounded-full tabular-nums font-semibold"
-                          style={{
-                            background: active ? "rgba(255,255,255,0.18)" : "#F5F5F5",
-                            color: active ? "rgba(255,255,255,0.85)" : "#737373",
-                          }}
-                        >
-                          {count}
-                        </span>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          ) : platform === "pr" ? (
-            <div className="w-full" style={{ maxWidth: 860 }}>
-              <div className="flex items-center gap-2 flex-wrap justify-center">
-                {PR_FORMAT_TABS.map((tab) => {
-                  const active = activePRFormat === tab.id;
-                  const count = prFormatCounts[tab.id] ?? 0;
-                  if (tab.id !== "all" && count === 0) return null;
-                  return (
-                    <button
-                      key={tab.id}
-                      onClick={() => setActivePRFormat(tab.id)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all whitespace-nowrap"
-                      style={
-                        active
-                          ? { background: "#171717", color: "white", boxShadow: "0 2px 8px rgba(0,0,0,0.18)" }
-                          : { background: "white", color: "#525252", border: "1px solid #E5E5E5" }
-                      }
-                    >
-                      {lang === "en" ? tab.labelEn : tab.label}
-                      {tab.id !== "all" && (
-                        <span
-                          className="text-[12px] px-1.5 py-0.5 rounded-full tabular-nums font-semibold"
-                          style={{
-                            background: active ? "rgba(255,255,255,0.18)" : "#F5F5F5",
-                            color: active ? "rgba(255,255,255,0.85)" : "#737373",
-                          }}
-                        >
-                          {count}
-                        </span>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          ) : platform === "website" ? (
-            <div className="w-full" style={{ maxWidth: 860 }}>
-              <div className="flex items-center gap-2 flex-wrap justify-center">
-                {WEB_FORMAT_TABS.map((tab) => {
-                  const active = activeWEBFormat === tab.id;
-                  const count = webFormatCounts[tab.id] ?? 0;
-                  if (tab.id !== "all" && count === 0) return null;
-                  return (
-                    <button
-                      key={tab.id}
-                      onClick={() => setActiveWEBFormat(tab.id)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all whitespace-nowrap"
-                      style={
-                        active
-                          ? { background: "#171717", color: "white", boxShadow: "0 2px 8px rgba(0,0,0,0.18)" }
-                          : { background: "white", color: "#525252", border: "1px solid #E5E5E5" }
-                      }
-                    >
-                      {lang === "en" ? tab.labelEn : tab.label}
-                      {tab.id !== "all" && (
-                        <span
-                          className="text-[12px] px-1.5 py-0.5 rounded-full tabular-nums font-semibold"
-                          style={{
-                            background: active ? "rgba(255,255,255,0.18)" : "#F5F5F5",
-                            color: active ? "rgba(255,255,255,0.85)" : "#737373",
-                          }}
-                        >
-                          {count}
-                        </span>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          ) : null}
+            );
+          })()}
 
           {/* 2026-09-06 通路選擇。沒有這一區，用戶被鎖在方案預設值上，
               「11 個通路選 2 個、每月可更換一次」那句賣點就不存在。 */}
@@ -1965,17 +1759,19 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
               const k = frontCardKind(t);
               if (k) counts[k] += 1;
             }
-            const tabs: Array<FrontCardKind | "all" | "image"> = ["all", ...FRONT_CARD_KINDS, ...(imageCards.length ? (["image"] as const) : [])];
+            // 圖片卡沒有「爆款結構／品牌自建」之分——看圖片時這列收起來。
+            if (imageMode) return null;
+            const tabs: Array<FrontCardKind | "all"> = ["all", ...FRONT_CARD_KINDS];
             return (
               <div className="mt-3 flex items-center gap-1.5 flex-wrap justify-center">
                 {tabs.map((id) => {
                   const active = activeSource === id;
-                  const acc = id === "all" || id === "viral" || id === "image" ? "#171717" : "#404040";
+                  const acc = id === "all" || id === "viral" ? "#171717" : "#404040";
                   return (
                     <button
                       key={id}
                       onClick={() => setActiveSource(id)}
-                      title={id === "all" ? undefined : id === "image" ? (lang === "en" ? "Image cards in this channel's sizes." : "這個平台各種尺寸的圖片任務卡。") : id === "viral" ? sourceWhy("viral", lang) : (lang === "en" ? "Cards you built for this brand." : "你替這個品牌自己建的卡。")}
+                      title={id === "all" ? undefined : id === "viral" ? sourceWhy("viral", lang) : (lang === "en" ? "Cards you built for this brand." : "你替這個品牌自己建的卡。")}
                       className="flex items-center gap-1.5 px-3 py-1 rounded-full text-tiny font-medium transition-all"
                       style={
                         active
@@ -1991,9 +1787,7 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                       )}
                       {id === "all"
                         ? (lang === "en" ? "All" : "全部")
-                        : id === "image"
-                          ? `${lang === "en" ? "Images" : "圖片"} ${imageCards.length}`
-                          : `${frontCardKindLabel(id, lang)} ${counts[id]}`}
+                        : `${frontCardKindLabel(id, lang)} ${counts[id]}`}
                     </button>
                   );
                 })}
@@ -2002,7 +1796,7 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
           })()}
 
           {/* Task count micro-label */}
-          <div className="mt-3 text-tiny text-default-400">
+          {!imageMode && <div className="mt-3 text-tiny text-default-400">
             {lang === "en"
               ? `${visibleTasks.length} of ${totalForPlatform} tasks`
               : `${visibleTasks.length} / ${totalForPlatform} 個任務`}
@@ -2011,7 +1805,7 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                 · {lang === "en" ? "Brand:" : "品牌腦："}<span className="font-medium text-default-600">{brandName}</span>
               </span>
             )}
-          </div>
+          </div>}
           {/* 2026-07-20 (CJ): failed catalog fetch is now visible + retryable
               instead of a silent 0/0. */}
           {strategyTopic && (
@@ -2055,12 +1849,32 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
 
       {/* ─── Task grid ─────────────────────────────────────────────────── */}
       <div className="max-w-[1200px] mx-auto px-6 pb-20 mt-2">
-        {activeSource === "image" ? (
-          <div className="grid gap-4" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))" }}>
-            {imageCards.map((c) => (
-              <ImageCardTile key={c.id} card={c} onOpen={() => navigate(imageCardHref(c.id))} />
-            ))}
-          </div>
+        {imageMode ? (
+          <>
+            <div className="grid gap-4" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))" }}>
+              {shownImageCards.map((c) => (
+                <ImageCardTile key={c.id} card={c} onOpen={() => navigate(imageCardHref(c.id))} />
+              ))}
+              {/* 跟「新增任務卡」同一個長相：它跟卡片並排，做的是同一件事的延伸。 */}
+              {brandId && (
+                <button
+                  onClick={() => setImagePickerOpen(true)}
+                  className="flex min-h-[180px] flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-neutral-300 bg-white text-neutral-500 transition hover:border-neutral-500 hover:text-neutral-800"
+                >
+                  <span className="flex h-8 w-8 items-center justify-center rounded-full border border-neutral-300">
+                    <AddIcon size={14} />
+                  </span>
+                  <span className="text-[14px] font-medium">
+                    {lang === "en" ? "Add image size" : "新增圖片尺寸"}
+                  </span>
+                </button>
+              )}
+            </div>
+            <div className="mt-4 flex items-center justify-center gap-1.5 text-[13px] text-neutral-500 tabular-nums">
+              <TaskCardsIcon size={12} /> {shownImageCards.length} / {imageCards.length}
+              <span className="ml-1">{lang === "en" ? "sizes on this channel" : "這個平台的尺寸"}</span>
+            </div>
+          </>
         ) : totalForPlatform === 0 && allTasks.length === 0 ? (
           <Card>
             <CardBody className="text-center text-default-500 py-12">
@@ -2432,6 +2246,15 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
           if (t) openTask(t as any);
         }}
       />
+      <ImageSizePicker
+        open={imagePickerOpen}
+        onClose={() => setImagePickerOpen(false)}
+        cards={imageCards}
+        selected={shownImageCards.map((c) => c.id)}
+        max={imageTrayQ.data?.max ?? 12}
+        saving={setImageTrayMut.isPending}
+        onSave={(ids) => imageChannel && brandId && setImageTrayMut.mutate({ brandId, channel: imageChannel as any, cardIds: ids })}
+      />
       <TaskPicker
         open={pickerOpen}
         onClose={() => setPickerOpen(false)}
@@ -2477,9 +2300,6 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                       {lang === "en"
                         ? (activeTask.label_en ?? activeTask.label)
                         : (activeTask.label_zh ?? activeTask.label)}
-                      {activeTask.agent && (
-                        <span className="text-default-500 ml-2 font-normal">· {activeTask.agent.name}</span>
-                      )}
                     </p>
                   </div>
                 </div>
@@ -2517,7 +2337,7 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                         onClick={handlePolish}
                         disabled={polishing || !primaryAnswer.trim()}
                         aria-label={lang === "en" ? "AI refine prompt" : "AI 完善提示詞"}
-                        className="w-9 h-9 rounded-full bg-[#E85D2E] text-white flex items-center justify-center shadow-sm transition hover:bg-[#D04E22] disabled:opacity-40 disabled:cursor-not-allowed"
+                        className="w-9 h-9 rounded-full bg-[#F37E4A] text-white flex items-center justify-center shadow-sm transition hover:bg-[#D04E22] disabled:opacity-40 disabled:cursor-not-allowed"
                       >
                         {polishing
                           ? <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
@@ -2750,8 +2570,14 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                     ...chips.filter((c) => c.hasContent && c.source !== "brand.name"),
                     ...chips.filter((c) => !c.hasContent && c.source !== "brand.name").slice(0, 4),
                   ] : [];
-                  const hasEntityChoice = !!brandId && (modalProducts.length > 0 || modalEvents.length > 0);
+                  // 2026-09-30（CJ「缺乏選擇產品的地方」）：只要有品牌就能切換；還沒有產品／活動時
+                  // 第二層直接給「＋新增產品／＋新增活動」，建完自動選成這次的產出對象。
+                  const hasEntityChoice = !!brandId;
                   const showNameTile = hasEntityChoice || (showChips && !!nameChip);
+                  const entityName =
+                    modalEntity.kind === "product" ? (modalProducts.find((p: any) => p.id === modalEntity.id)?.name ?? "")
+                    : modalEntity.kind === "event" ? (modalEvents.find((e: any) => e.id === modalEntity.id)?.name ?? "")
+                    : (brandName ?? brandCtx?.brand?.name ?? "");
                   const entityIcon: IconName =
                     modalEntity.kind === "product" ? "shop" : modalEntity.kind === "event" ? "campaign" : "brand";
                   const entityShort =
@@ -2800,10 +2626,10 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                           {showNameTile && tile(
                             "__entity",
                             entityIcon,
-                            entityShort,
+                            `${entityShort} ▾`,
                             {
                               active: ctxOpen === "__entity",
-                              tip: (brandCtx?.brand?.name ?? brandName ?? "") + (hasEntityChoice ? (lang === "en" ? " — click to switch" : " —— 點一下切換產出對象") : ""),
+                              tip: `${entityShort} · ${entityName}` + (hasEntityChoice ? (lang === "en" ? " — switch to a product or event" : " —— 點一下改成產品或活動") : ""),
                               onPress: () => toggle("__entity"),
                             },
                           )}
@@ -2825,7 +2651,7 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                           aria-label={t("qt_run_btn")}
                           className="shrink-0 flex flex-col items-center gap-1 group"
                         >
-                          <span className="relative block rounded-full p-[3px] ring-[3px] ring-[#E85D2E] transition group-hover:scale-105 group-active:scale-95">
+                          <span className="relative block rounded-full p-[3px] ring-[3px] ring-[#F37E4A] transition group-hover:scale-105 group-active:scale-95">
                             {agentSrc ? (
                               <Avatar src={agentSrc} className="w-14 h-14" />
                             ) : (
@@ -2833,11 +2659,15 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                                 <Icon name="agent" size={22} />
                               </span>
                             )}
-                            <span className="absolute -right-1 -bottom-1 w-7 h-7 rounded-full bg-[#E85D2E] text-white flex items-center justify-center ring-2 ring-white">
+                            <span className="absolute -right-1 -bottom-1 w-7 h-7 rounded-full bg-[#F37E4A] text-white flex items-center justify-center ring-2 ring-white">
                               <Icon name="play" size={11} />
                             </span>
                           </span>
-                          <span className="text-[12px] font-semibold text-neutral-900">{t("qt_run_btn")}</span>
+                          {/* 2026-09-30（CJ「Yawen 的名字要跟人像對齊」）：名字從標題列搬到頭像正下方 */}
+                          <span className="flex flex-col items-center leading-tight">
+                            {agent && <span className="text-[12px] font-semibold text-neutral-900 max-w-[96px] truncate">{agent.name}</span>}
+                            <span className="text-[11px] font-semibold text-[#F37E4A]">{t("qt_run_btn")}</span>
+                          </span>
                         </button>
                       </div>
 
@@ -2883,6 +2713,18 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                                   }`}
                                 >
                                   {lang === "en" ? "Event · " : "活動 · "}{e.name}
+                                </button>
+                              ))}
+                              {(["product", "event"] as const).map((k) => (
+                                <button
+                                  key={`add-${k}`}
+                                  onClick={() => setAddEntityTab(k)}
+                                  className="text-xs px-2.5 py-1 rounded-full border border-dashed border-default-300 text-default-500 hover:border-default-500 hover:text-default-800 transition flex items-center gap-1"
+                                >
+                                  <AddIcon size={10} />
+                                  {k === "product"
+                                    ? (lang === "en" ? "New product" : "新增產品")
+                                    : (lang === "en" ? "New event" : "新增活動")}
                                 </button>
                               ))}
                             </div>
@@ -2993,10 +2835,16 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                   const PHASES: Array<{ key: string; stageKeys: string[]; icon: IconName; zh: string; en: string }> = [
                     { key: "plan",   stageKeys: ["scout", "pre", "strategist"], icon: "strategy", zh: "策略", en: "Plan" },
                     { key: "write",  stageKeys: ["caption"],                   icon: "content",  zh: "文案", en: "Copy" },
-                    { key: "image",  stageKeys: ["brief", "gen"],              icon: "image",    zh: "圖片", en: "Image" },
+                    { key: "check",  stageKeys: ["brandcheck"],                icon: "shield",   zh: "一致性", en: "On-brand" },
+                    { key: "image",  stageKeys: ["gen"],                       icon: "image",    zh: "圖片", en: "Image" },
                     { key: "review", stageKeys: ["extras", "qa"],              icon: "review",   zh: "審核", en: "Review" },
                   ];
-                  const phases = PHASES.map((p) => {
+                  // 2026-09-30（CJ「文案和圖片是分開處理的，不會同時寫文又產圖」）：
+                  // 單篇任務這次執行根本不呼叫生圖模型（runImageGen=false，圖到成品頁才由用戶
+                  // 自己生），所以不列「圖片」；只有這個視窗會等圖生完的任務才列，而且只對應
+                  // 真正的生圖（gen），不含跟文案同時寫的風格指示（brief）——文案寫完才會亮。
+                  const waitsForImages = tier === "60s" || HOLD_FOR_IMAGES.has(activeTask.id);
+                  const phases = PHASES.filter((p) => p.key !== "image" || waitsForImages).map((p) => {
                     const ss = (stagesNow as any[]).filter((s) => p.stageKeys.includes(s.key));
                     if (ss.length === 0) return null;
                     const status = ss.some((s) => s.status === "running") ? "running"
@@ -3015,7 +2863,7 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                       <RunningAgentCarousel
                         agents={agentRoster.length > 0 ? agentRoster : [{ name: "Agent", role: lang === "en" ? "Working" : "處理中" }]}
                         stages={null}
-                        accentColor="#E85D2E"
+                        accentColor="#F37E4A"
                         progressPct={progressPct}
                         handoffAnchor
                       />
@@ -3030,7 +2878,7 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                                 aria-label={lang === "en" ? p.en : p.zh}
                                 className={`relative w-10 h-10 rounded-xl flex items-center justify-center transition ${
                                   p.status === "done" ? "bg-neutral-900 text-white"
-                                  : p.status === "running" ? "bg-[#E85D2E]/10 text-[#E85D2E] ring-2 ring-[#E85D2E]/60 animate-pulse"
+                                  : p.status === "running" ? "bg-[#F37E4A]/10 text-[#F37E4A] ring-2 ring-[#F37E4A]/60 animate-pulse"
                                   : "bg-default-100 text-default-400"
                                 }`}
                               >
@@ -3060,6 +2908,18 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
           )}
         </ModalContent>
       </Modal>
+
+      <AddEntityModal
+        isOpen={!!addEntityTab}
+        initialTab={addEntityTab ?? "product"}
+        defaultBrandId={brandId ?? null}
+        onClose={() => setAddEntityTab(null)}
+        onCreated={(kind, id) => {
+          if (kind === "product" || kind === "event") setModalEntity({ kind, id });
+          void modalProductsQuery?.refetch?.();
+          void modalEventsQuery?.refetch?.();
+        }}
+      />
 
       {/* 自建任務卡的作者流程。上架成功後重抓 listFB，新卡立刻出現在這一頁。 */}
       <TaskCardComposer

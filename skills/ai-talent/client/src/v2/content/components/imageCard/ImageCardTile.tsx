@@ -8,6 +8,8 @@ import { useLang } from "../../../../lib/i18n";
 export interface ImageCardInfo {
   id: string;
   channel: string;
+  placement?: "organic" | "ad";
+  pinned?: boolean;
   labelZh: string;
   labelEn: string;
   descZh: string;

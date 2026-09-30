@@ -71,6 +71,15 @@ export interface BrandTaskCard {
    * 場景清單在前端 taskScene.ts；這裡只存字串，前端遇到不認得的就當沒選。
    */
   scene?: string | null;
+  /**
+   * gpt-image-2 替這張卡畫的插畫（480×320 webp，存 covers）。scene 有值時以
+   * 用戶選的現成場景為準；scene 是 null 且這張圖 ready 才顯示這張。
+   */
+  illustrationUrl?: string | null;
+  illustrationStatus?: "generating" | "ready" | "failed" | null;
+  illustrationError?: string | null;
+  /** 開始畫的時間。伺服器重啟會讓背景工作消失，超過 5 分鐘還在 generating 就當失敗。 */
+  illustrationStartedAt?: string | null;
 
   createdAt: string;
   updatedAt: string;
@@ -80,6 +89,14 @@ export interface BrandTaskCard {
 }
 
 export const MAX_CARDS_PER_BRAND = 40;
+
+const ILLUSTRATION_STALE_MS = 5 * 60_000;
+/** 真的還在畫（不是伺服器重啟後留下的殭屍狀態）。 */
+export function illustrationInFlight(card: Pick<BrandTaskCard, "illustrationStatus" | "illustrationStartedAt">, now = Date.now()): boolean {
+  if (card.illustrationStatus !== "generating") return false;
+  const t = Date.parse(card.illustrationStartedAt ?? "");
+  return Number.isFinite(t) && now - t < ILLUSTRATION_STALE_MS;
+}
 export const MAX_SAMPLES = 20;
 export const MAX_SAMPLE_CHARS = 8_000;
 export const CARD_ID_RE = /^u(\d+)-[a-z0-9][a-z0-9-]{0,48}$/;
@@ -315,6 +332,7 @@ export function cardTemplate(card: BrandTaskCard): FBTaskTemplate {
     skill_slug: card.id,
     primary_question: card.primaryQuestion,
     scene: card.scene ?? undefined,
+    illustration_url: card.illustrationStatus === "ready" && card.illustrationUrl ? card.illustrationUrl : undefined,
     primary_input: {
       key: "topic",
       placeholder: card.primaryPlaceholder,

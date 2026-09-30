@@ -26,6 +26,7 @@ import { showToastGlobal } from "../../../components/ui/Toast";
 import { channelRoute } from "../lib/channelMeta";
 import { PlatformTaskModal, type TaskEmbed } from "./PlatformTaskPage";
 import { getCalendarPublishPayload } from "../lib/strategyContentEnvelope";
+import { addDays, defaultWeek, mondayOf, ymdTpe } from "../lib/plannerWeek";
 
 const INK = "#171717", META = "#6B6B6B", LINE = "#EAEAEA", SOFT = "#F6F6F5", ORANGE = "#18181B";
 
@@ -39,16 +40,7 @@ const PLATFORM_ZH: Record<string, string> = {
 };
 const STARTERS = ["幫我排這週內容", "給我十個題目", "把進行中的活動拆成這週貼文", "我這週只有 3 小時"];
 
-// ── 日期（台北）──
-const ymdTpe = (d: Date) => d.toLocaleDateString("sv-SE", { timeZone: "Asia/Taipei" });
-function addDays(ymd: string, n: number) { const d = new Date(`${ymd}T00:00:00Z`); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); }
-function mondayOf(ymd: string) { const dow = new Date(`${ymd}T00:00:00Z`).getUTCDay(); return addDays(ymd, dow === 0 ? -6 : 1 - dow); }
-/** 預設週：今天所在週；週六、週日打開時直接看下週（要排的是下週）。 */
-function defaultWeek() {
-  const today = ymdTpe(new Date());
-  const dow = new Date(`${today}T00:00:00Z`).getUTCDay();
-  return dow === 0 || dow === 6 ? addDays(mondayOf(today), 7) : mondayOf(today);
-}
+// ── 日期（台北）：與側欄儀表共用 ──
 const md = (ymd: string) => { const [, m, d] = ymd.split("-"); return `${Number(m)}/${Number(d)}`; };
 
 type ForkView = {
@@ -106,7 +98,7 @@ export default function PlannerPage() {
     { enabled: !!brandId, refetchOnWindowFocus: false },
   ) ?? { data: null };
   const data = weekQ.data as any;
-  const refresh = () => { try { utils?.planner?.week?.invalidate?.(); utils?.calendar?.range?.invalidate?.(); } catch { /* noop */ } };
+  const refresh = () => { try { utils?.planner?.week?.invalidate?.(); utils?.planner?.railStatus?.invalidate?.(); utils?.calendar?.range?.invalidate?.(); } catch { /* noop */ } };
 
   const send = T.planner?.send?.useMutation?.({
     onSuccess: (r: any) => { setTouched(r?.touched ?? []); setPending(null); refresh(); },

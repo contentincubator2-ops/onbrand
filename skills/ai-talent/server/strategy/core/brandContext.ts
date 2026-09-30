@@ -141,6 +141,45 @@ const SECTION_CATEGORY: Record<SectionKey, BrainCategoryKey> = {
   legacy: "legacy", product: "product", event: "event",
 };
 
+/** 固定標籤的出處（見 BrainItem.source）。pushFrom 與動態標籤在呼叫端自己帶。 */
+const SOURCE_OF: Record<string, string> = {
+  "identity|Tagline 中": "pos:tagline.zhTagline",
+  "identity|Tagline EN": "pos:tagline.enTagline",
+  "identity|Tagline": "pos:tagline.zhTagline",
+  "identity|Tagline (legacy)": "col:tagline",
+  "identity|Archetype": "pos:voice.archetypes",
+  "identity|Archetype (legacy)": "col:positioningReport",
+  "identity|WHY (信念)": "pos:goldenCircle.why",
+  "identity|HOW (作法)": "pos:goldenCircle.how",
+  "identity|WHAT (產品/服務)": "pos:goldenCircle.what",
+  "identity|定位摘要 (legacy)": "col:positioningSummary",
+  "voice|語氣關鍵詞": "pos:voice.tone",
+  "voice|禁用詞彙 / 句式": "pos:voice.forbidden",
+  "context|品牌故事": "pos:origin.story",
+  "context|主要受眾": "pos:audience.primary",
+  "context|受眾痛點": "pos:audience.painPoints",
+  "context|差異化": "pos:differentiation.summary",
+  "context|唯一致勝理由": "pos:differentiation.discriminator",
+  "context|支撐證據": "pos:differentiation.reasonToBelieve",
+  "context|核心價值觀": "pos:values.items",
+  "context|信念五層深挖": "pos:origin.belief5Layers",
+  "context|競爭強度": "pos:competition.intensity",
+  "context|直接競品": "pos:competition.direct",
+  "context|競爭定位地圖": "pos:competition.map",
+  "product|產品名稱": "name",
+  "product|產品售價": "pos:facts.price",
+  "product|產品規格": "pos:facts.spec",
+  "product|重量／容量": "pos:facts.weight",
+  "product|份數": "pos:facts.servings",
+  "product|商品網址": "pos:facts.url",
+  "product|競品": "pos:competition.competitors",
+  "event|活動名稱": "name",
+  "event|活動開始": "startAt",
+  "event|倒數": "startAt",
+  "event|活動": "startAt",
+  "event|活動結束": "endAt",
+};
+
 function displayOf(section: SectionKey, tier: BrainTier, promptLabel: string): Display {
   const hit = DISPLAY[`${tier}|${promptLabel}`];
   if (hit) return hit;
@@ -184,6 +223,8 @@ interface BrainEntry {
   keptChars: number;
   trimmed: boolean;
   dropped: boolean;
+  /** 這一行是從哪裡讀來的（見 BrainItem.source）。 */
+  source?: string;
 }
 
 export type BrainItemStatus = "remembered" | "trimmed" | "overflow" | "checkOnly";
@@ -202,6 +243,16 @@ export interface BrainItem {
   status: BrainItemStatus;
   /** 存的內容開頭，給畫面預覽。 */
   preview: string;
+  /**
+   * 2026-09-30（CJ「策略層有品牌、產品、活動、文字、視覺，還有其他真實存入的資料，要整理得
+   * 精細」）：這一行記憶的出處，讓「記憶」頁把**所有存著的欄位**逐欄對到「AI 讀了沒」。
+   *   pos:<segment>.<field>  定位 JSON（品牌／產品／活動依 category 區分）
+   *   asset:<key>            文字頁 _assets
+   *   custom:<卡片標題>       自訂卡片     doc  上傳的定位文件
+   *   col:<欄位>              brands 表的舊欄位   legacy:<id>  舊版 brand_brain 列
+   *   name / startAt / endAt 產品或活動本身的欄位   market  市場設定
+   */
+  source?: string;
 }
 
 export interface BrandBrain {
@@ -224,7 +275,10 @@ class BrainCollector {
   checkOnly: BrainItem[] = [];
 
   /** 一行 prompt＝一筆記憶。raw 是用戶存的原文，max 是這一格最多記住幾字。 */
-  add(section: SectionKey, category: BrainTier, label: string, raw: string, max: number, render?: (kept: string) => string): void {
+  add(
+    section: SectionKey, category: BrainTier, label: string, raw: string, max: number,
+    render?: (kept: string) => string, extra?: { source?: string },
+  ): void {
     const text = raw.trim();
     if (!text) return;
     const { text: kept, trimmed } = clip(text, max);
@@ -233,15 +287,16 @@ class BrainCollector {
       display: displayOf(section, category, label),
       line: render ? render(kept) : `【${label}】${kept}`,
       storedChars: len(text), keptChars: len(kept), trimmed, dropped: false,
+      source: extra?.source ?? SOURCE_OF[`${category}|${label}`],
     });
   }
 
   /** 不進 prompt、但每篇產出後都會硬檢查的規則（禁用詞、替換對照）。 */
-  addCheckOnly(label: string, raw: string): void {
+  addCheckOnly(label: string, raw: string, source: string): void {
     const text = raw.trim();
     if (!text) return;
     const d = displayOf("assets", "rules", label);
-    this.checkOnly.push({ category: d.category, group: d.group, label: d.label, storedChars: len(text), keptChars: 0, status: "checkOnly", preview: text.slice(0, 80) });
+    this.checkOnly.push({ category: d.category, group: d.group, label: d.label, storedChars: len(text), keptChars: 0, status: "checkOnly", preview: text.slice(0, 80), source });
   }
 }
 
@@ -265,7 +320,7 @@ function pushFrom(
     if (typeof v === "string") text = v.trim();
     else if (Array.isArray(v)) text = v.filter((x) => typeof x === "string" && x.trim()).join(" · ");
     else continue;
-    c.add(section, category, label, text, max);
+    c.add(section, category, label, text, max, undefined, { source: `pos:${path}` });
   }
 }
 
@@ -290,7 +345,7 @@ function pushFirst(c: BrainCollector, section: SectionKey, category: BrainTier, 
  */
 function pushSourceDoc(c: BrainCollector, section: SectionKey, pos: any, label: string): void {
   const text = String(pos?._sourceDoc?.injectedContext ?? "").trim();
-  if (text) c.add(section, "doc", label, text, 100_000, (kept) => `【${label}】\n${kept}`);
+  if (text) c.add(section, "doc", label, text, 100_000, (kept) => `【${label}】\n${kept}`, { source: "doc" });
 }
 
 /** 自訂卡片每張最多記住的字數（全部欄位合計）。 */
@@ -311,7 +366,7 @@ function pushCustomSegments(c: BrainCollector, section: SectionKey, pos: any): v
       .map((f: any) => `${String(f?.label ?? "").trim()}：${String(f?.value ?? "").trim()}`)
       .filter((l: string) => l !== "：")
       .join("；");
-    if (body) c.add(section, "custom", title, body, CUSTOM_CARD_MAX);
+    if (body) c.add(section, "custom", title, body, CUSTOM_CARD_MAX, undefined, { source: `custom:${title}` });
   }
 }
 
@@ -552,7 +607,7 @@ export async function buildBrandBrain(
     let rows: any[] = [];
     try {
       const [r] = (await db.execute(
-        sql`SELECT category, title, content
+        sql`SELECT id, category, title, content
             FROM brand_brain
             WHERE brand_id = ${brandId}
             ORDER BY updated_at DESC
@@ -610,7 +665,7 @@ export async function buildBrandBrain(
           const generic = s?.generic ?? s?.bad ?? s?.wrong;
           if (!ours) return;
           c.add("voice", "voice", `語氣範例 ${i + 1}`, String(ours), 400,
-            (k) => `【模仿這個範例的口吻】\n    ✓ 我們會寫：${k}\n    ✗ 不要寫：${generic ?? "(略)"}`);
+            (k) => `【模仿這個範例的口吻】\n    ✓ 我們會寫：${k}\n    ✗ 不要寫：${generic ?? "(略)"}`, { source: "pos:voice.samples" });
         });
       }
     }
@@ -626,10 +681,10 @@ export async function buildBrandBrain(
         const a = assets[key];
         if (!a) return;
         if (typeof a.text === "string" && a.text.trim()) {
-          c.add("assets", "rules", label, a.text, max);
+          c.add("assets", "rules", label, a.text, max, undefined, { source: `asset:${key}` });
         } else if (Array.isArray(a.items) && a.items.length > 0) {
           const items = a.items.map((x: any) => String(x ?? "").trim()).filter(Boolean);
-          if (items.length) c.add("assets", "rules", label, items.slice(0, maxItems).join(" · "), max);
+          if (items.length) c.add("assets", "rules", label, items.slice(0, maxItems).join(" · "), max, undefined, { source: `asset:${key}` });
           if (items.length > maxItems) {
             const e = c.entries[c.entries.length - 1]!;
             e.trimmed = true;
@@ -637,7 +692,7 @@ export async function buildBrandBrain(
           }
         } else if (Array.isArray(a.pairs) && a.pairs.length > 0) {
           const ps = a.pairs.filter((p: any) => p?.from || p?.to).map((p: any) => `${p.from ?? "?"} → ${p.to ?? "?"}`);
-          if (ps.length) c.add("assets", "rules", label, ps.slice(0, maxItems).join(" · "), max);
+          if (ps.length) c.add("assets", "rules", label, ps.slice(0, maxItems).join(" · "), max, undefined, { source: `asset:${key}` });
           if (ps.length > maxItems) {
             const e = c.entries[c.entries.length - 1]!;
             e.trimmed = true;
@@ -658,11 +713,11 @@ export async function buildBrandBrain(
 
       const strList = (x: any): string[] => Array.isArray(x?.items) ? x.items.map((s: any) => String(s ?? "").trim()).filter(Boolean) : [];
       const banned = strList(assets.banned_words);
-      if (banned.length) c.addCheckOnly("禁用詞（產出後自動檢查）", banned.join("、"));
+      if (banned.length) c.addCheckOnly("禁用詞（產出後自動檢查）", banned.join("、"), "asset:banned_words");
       const subs = Array.isArray(assets.term_substitutions?.pairs)
         ? assets.term_substitutions.pairs.filter((p: any) => p?.from && p?.to).map((p: any) => `${p.from} → ${p.to}`)
         : [];
-      if (subs.length) c.addCheckOnly("替換對照（產出後自動套用）", subs.join("、"));
+      if (subs.length) c.addCheckOnly("替換對照（產出後自動套用）", subs.join("、"), "asset:term_substitutions");
     }
 
     // ── 補充脈絡：品牌故事 / 受眾 / 差異化 / 價值觀 / 競爭 ──
@@ -721,7 +776,7 @@ export async function buildBrandBrain(
     if (rows && rows.length > 0) {
       for (const r of rows as any[]) {
         c.add("legacy", "legacy", `${r.category}｜${r.title}`, String(r.content ?? ""), 400,
-          (k) => `【${r.category}】${r.title}：${k}`);
+          (k) => `【${r.category}】${r.title}：${k}`, { source: `legacy:${r.id}` });
       }
     }
 
@@ -855,6 +910,7 @@ export async function buildBrandBrain(
       ...(marketSection ? [{
         category: "info" as const, group: "市場", label: "市場與語言設定", storedChars: len(marketSection.trim()),
         keptChars: len(marketSection.trim()), status: "remembered" as const, preview: marketSection.trim().slice(0, 80),
+        source: "market",
       }] : []),
       ...c.entries.map((e): BrainItem => ({
         category: e.display.category,
@@ -864,6 +920,7 @@ export async function buildBrandBrain(
         keptChars: e.dropped ? 0 : e.keptChars,
         status: e.dropped ? "overflow" : e.trimmed ? "trimmed" : "remembered",
         preview: e.line.replace(/^【[^】]*】/, "").slice(0, 80),
+        ...(e.source ? { source: e.source } : {}),
       })),
       ...c.checkOnly,
     ];
