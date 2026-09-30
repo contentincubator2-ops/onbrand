@@ -12,7 +12,8 @@
  * Speed badges appear on every card so the timing expectation is clear
  * without requiring users to navigate tiers before seeing tasks.
  */
-import { IllustratedEmpty, EmptyIllustration } from "../../platform/components/EmptyIllustration";
+import { IllustratedEmpty } from "../../platform/components/EmptyIllustration";
+import { TaskIllustration } from "../../platform/components/TaskIllustration";
 import React, { useMemo, useState, useEffect, useRef } from "react";
 import { Navigate, useParams, useOutletContext, useNavigate, useSearchParams } from "react-router-dom";
 import CalendarTabs from "../components/CalendarTabs";
@@ -2554,7 +2555,7 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                     品牌脈絡退到後面當參考，不再是一打開最先看到的黑塊。 */}
                 {!running && (
                   <div className="flex flex-col items-center text-center pt-3 pb-1">
-                    <EmptyIllustration kind="brief" width={132} />
+                    <TaskIllustration card={activeTask} width={132} />
                     <h2 className="mt-4 text-[22px] leading-snug font-bold text-neutral-900 max-w-[30ch]">
                       {activeTask.primary_question
                         ?? (lang === "en" ? (activeTask.label_en ?? activeTask.label) : (activeTask.label_zh ?? activeTask.label))}
