@@ -35,6 +35,8 @@ export interface BrandMemoryData {
   products: Array<{ id: number; name: string; positioning: any; photoCount: number; brain: MemoryBrain }>;
   events: Array<{ id: number; name: string; startAt: string | null; endAt: string | null; positioning: any; brain: MemoryBrain }>;
   visual: { swatchCount: number; swatches: string[]; brandPhotoCount: number };
+  /** 策略層「法規」tray 的卡；舊 server 沒有這欄。 */
+  regulations?: Array<{ id: number; title: string; body: string; enabled: boolean }>;
 }
 
 export interface MemRow {
@@ -67,7 +69,7 @@ export interface MemEntity {
   fields: number;
 }
 
-export type SectionKey = "brand" | "product" | "event" | "copy" | "visual" | "info";
+export type SectionKey = "brand" | "product" | "event" | "copy" | "visual" | "regulation" | "info";
 
 export const SECTION_TEXT: Record<SectionKey, { zh: string; en: string }> = {
   brand: { zh: "品牌", en: "Brand" },
@@ -75,6 +77,7 @@ export const SECTION_TEXT: Record<SectionKey, { zh: string; en: string }> = {
   event: { zh: "活動", en: "Campaigns" },
   copy: { zh: "文字", en: "Copy" },
   visual: { zh: "視覺", en: "Visual" },
+  regulation: { zh: "法規", en: "Regulations" },
   info: { zh: "基本資料", en: "Info" },
 };
 
@@ -92,7 +95,7 @@ export interface MemoryView {
   capacity: number;
   usedChars: number;
   level: "ok" | "near" | "over";
-  /** 固定六區，順序跟策略層 rail 一樣；沒存東西的區也列（用量 0）。 */
+  /** 固定七區，順序跟策略層 rail 一樣；沒存東西的區也列（用量 0）。 */
   sections: MemSection[];
 }
 
@@ -211,6 +214,15 @@ export function buildMemoryView(d: BrandMemoryData, brandId: number, en: boolean
     ], new Set(), `${base}&cat=visual`),
   }]);
 
+  // 法規——啟用中的每一篇都會讀（見 brandContext 的法規段）；停用的列出但不算用量。
+  const regulation = entityOf("regulation", T("regulation"), [{
+    title: T("regulation"),
+    rows: makeRows((d.regulations ?? []).map((r) => ({
+      id: `reg-${r.id}`, label: r.enabled ? r.title : `${r.title}${en ? " (off)" : "（停用）"}`, text: r.body,
+      source: `reg:${r.id}`, focus: `reg:${r.id}`,
+    })), brandRead, `${base}&cat=regulations`),
+  }]);
+
   const b = d.brand;
   const socialCount = Object.values(b.socialLinks ?? {}).filter((v) => typeof v === "string" && v.trim()).length;
   const info = entityOf("info", T("info"), [{
@@ -258,6 +270,7 @@ export function buildMemoryView(d: BrandMemoryData, brandId: number, en: boolean
     sectionOf("event", events, true),
     sectionOf("copy", [copy], false),
     sectionOf("visual", [visual], false),
+    sectionOf("regulation", [regulation], false),
     sectionOf("info", [info], false),
   ];
   const usedChars = sections.reduce((n, s) => n + s.usedChars, 0);
@@ -272,7 +285,7 @@ export type MemScreen = { section: SectionKey; entity?: string } | null;
  * 2026-09-30（CJ「當他修改後，要怎麼導引回記憶這個頁面」）：從記憶點欄位去原頁修改時，網址帶
  * from=memory＋mem，原頁上的「回到記憶」按鈕照 mem 回到剛剛那一層，不用重新點進來。
  */
-const SECTION_KEYS: SectionKey[] = ["brand", "product", "event", "copy", "visual", "info"];
+const SECTION_KEYS: SectionKey[] = ["brand", "product", "event", "copy", "visual", "regulation", "info"];
 export function parseMem(raw: string | null): MemScreen {
   if (!raw) return null;
   const [section, entity] = raw.split(".");

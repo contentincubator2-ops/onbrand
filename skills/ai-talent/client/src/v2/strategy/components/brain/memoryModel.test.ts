@@ -45,8 +45,23 @@ describe("buildMemoryView", () => {
   const sec = (k: string) => v.sections.find((s) => s.key === k)!;
   const rows = (k: string) => sec(k).entities.flatMap((e) => e.groups.flatMap((g) => g.rows));
 
-  it("固定六區、跟策略層 rail 同順序", () => {
-    expect(v.sections.map((s) => s.key)).toEqual(["brand", "product", "event", "copy", "visual", "info"]);
+  it("固定七區、跟策略層 rail 同順序", () => {
+    expect(v.sections.map((s) => s.key)).toEqual(["brand", "product", "event", "copy", "visual", "regulation", "info"]);
+  });
+
+  it("法規：啟用且被讀到的算用量，停用的列出但不算", () => {
+    const d = data();
+    d.regulations = [
+      { id: 1, title: "食安法", body: "一二三四", enabled: true },
+      { id: 2, title: "舊規定", body: "五六", enabled: false },
+    ];
+    d.brandBrain.items.push(item("reg:1", "regulation"));
+    const view = buildMemoryView(d, 5, false);
+    const reg = view.sections.find((s) => s.key === "regulation")!;
+    const rs = reg.entities.flatMap((e) => e.groups.flatMap((g) => g.rows));
+    expect(rs.map((r) => r.label)).toEqual(["食安法", "舊規定（停用）"]);
+    expect(reg.usedChars).toBe(4);
+    expect(rs[0]!.href).toBe("/brands/edit?b=5&cat=regulations");
   });
 
   it("存著但 AI 不讀的欄位也列出來，但不算用量；段落用策略層標題", () => {

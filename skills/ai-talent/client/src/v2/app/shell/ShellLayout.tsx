@@ -186,6 +186,10 @@ function buildNavItems(lang: "zh-TW" | "en", userEmail?: string | null, currentP
       // 2026-09-29 起沒有任何 AI 讀取它。
       { to: "/brands/edit?cat=meetings", catKey: "meetings", label: en ? "Meetings" : "會議", icon: <FontAwesomeIcon icon={ICON.meeting} />,
         tooltip: en ? "Recurring strategy meetings" : "定期策略會議" },
+      // 2026-09-30（CJ「策略層加一個 mission tray，是法規……agent 寫文章前要審查」）：
+      // 用戶自己加的法規來源，每條一張卡；啟用中的每一篇產文動筆前都會讀、逐條審查。
+      { to: "/brands/edit?cat=regulations", catKey: "regulations", label: en ? "Regulations" : "法規", icon: <FontAwesomeIcon icon={ICON.regulation} />,
+        tooltip: en ? "Regulations every draft is checked against" : "寫文前要審查的法規" },
       // 2026-09-29（CJ「在策略端增加一個 mission tray，是檢查大腦」）：品牌大腦記住了
       // 什麼、還能記多少——跟每篇產文讀的是同一份。
       // 2026-09-30（CJ「重新想這個 mission tray 的名字，目的在管理記憶」→「名稱就叫做『記憶』」）：

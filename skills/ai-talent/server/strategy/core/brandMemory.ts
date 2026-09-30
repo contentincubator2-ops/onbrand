@@ -15,6 +15,7 @@
  */
 import localPool from "../../localDb";
 import { buildBrandBrain, BRAIN_CAPACITY, type BrainItem } from "./brandContext";
+import { listRegulations } from "./brandRegulations";
 
 /** 產品／活動太多時只算最近更新的這麼多個——每個都要跑一次大腦。 */
 const MAX_ENTITIES = 30;
@@ -33,6 +34,8 @@ export interface BrandMemory {
   products: Array<{ id: number; name: string; positioning: any; photoCount: number; brain: MemoryBrain }>;
   events: Array<{ id: number; name: string; startAt: string | null; endAt: string | null; positioning: any; brain: MemoryBrain }>;
   visual: { swatchCount: number; swatches: string[]; brandPhotoCount: number };
+  /** 2026-09-30 策略層「法規」tray 的卡（停用的也列，只是不算用量）。 */
+  regulations: Array<{ id: number; title: string; body: string; enabled: boolean }>;
 }
 
 const parse = (v: any): any => {
@@ -70,10 +73,11 @@ export async function loadBrandMemory(brandId: number, userId: number): Promise<
     ? colors.swatches.map((s: any) => str(s?.hex)).filter(Boolean)
     : [];
 
-  const [productRows, eventRows, photoRows] = await Promise.all([
+  const [productRows, eventRows, photoRows, regulations] = await Promise.all([
     rowsOf(`SELECT id, name, positioning FROM products WHERE brandId = ? ORDER BY updatedAt DESC LIMIT ${MAX_ENTITIES}`, [brandId]),
     rowsOf(`SELECT id, name, startAt, endAt, positioning FROM events WHERE brandId = ? ORDER BY updatedAt DESC LIMIT ${MAX_ENTITIES}`, [brandId]),
     rowsOf(`SELECT scope, scopeId, COUNT(*) AS c FROM asset_photos WHERE brandId = ? GROUP BY scope, scopeId`, [brandId]),
+    listRegulations(brandId).catch(() => []),
   ]);
 
   const photoCount = (scope: string, scopeId: number) =>
@@ -106,5 +110,6 @@ export async function loadBrandMemory(brandId: number, userId: number): Promise<
       positioning: parse(e.positioning) ?? {}, brain: onlyCategory(eventBrains[i]!, "event"),
     })),
     visual: { swatchCount: swatches.length, swatches: swatches.slice(0, 8), brandPhotoCount },
+    regulations: regulations.map((r) => ({ id: r.id, title: r.title, body: r.body, enabled: r.enabled })),
   };
 }

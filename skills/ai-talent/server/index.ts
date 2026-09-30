@@ -577,6 +577,11 @@ async function runStartupMigrations() {
     await db.execute(sql.raw(POSITIONING_VERSIONS_DDL));
     console.log("[migrate] strategy_meetings / strategy_meeting_runs: OK");
 
+    // 2026-09-30（CJ「策略層加一個 mission tray，是法規……agent 寫文章前要審查」）。
+    const { BRAND_REGULATIONS_DDL } = await import("./strategy/core/brandRegulations");
+    await db.execute(sql.raw(BRAND_REGULATIONS_DDL));
+    console.log("[migrate] brand_regulations: OK");
+
     // 2026-09-27（CJ「除了專案、行事曆、活動，所有 mission tray 變成使用者自己加入」）
     // 2026-09-29（CJ「成效層要能在平台上落實……族群 × USP 只是一種選項」）：視角／維度／事實／規則／匯入。
     const { PERF_DDLS } = await import("./performance/core/perfStore");

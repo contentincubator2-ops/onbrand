@@ -5,7 +5,7 @@
  * 2026-09-30 CJ 定調：
  *   · 名稱「記憶」、主視覺是大腦（自己畫的線條大腦，見 BrainGlyph——不能沿用別人的 logo）
  *   · 「用 tesla 圖示優先的設計方式」→ 各區是大圖示方塊，文字最少
- *   · 「只要看目前各個用量是多少，他再進去決定要不要修改」→ 首頁＝總用量＋六區方塊；
+ *   · 「只要看目前各個用量是多少，他再進去決定要不要修改」→ 首頁＝總用量＋七區方塊；
  *     點進去看「存了什麼」，點欄位回策略層原頁修改
  *   · 「不要呈現沒讀到、舊版留下的問題，屬於系統面的問題」→ 沒有狀態標記、沒有清理建議
  *
@@ -35,7 +35,7 @@ interface Props {
 const TONE = { ok: "#171717", near: "#b45309", over: "#b91c1c" } as const;
 
 const SECTION_ICON: Record<SectionKey, IconDefinition> = {
-  brand: ICON.brand, product: ICON.bundle, event: ICON.campaign, copy: ICON.font, visual: ICON.palette, info: ICON.info,
+  brand: ICON.brand, product: ICON.bundle, event: ICON.campaign, copy: ICON.font, visual: ICON.palette, regulation: ICON.regulation, info: ICON.info,
 };
 
 
@@ -102,7 +102,7 @@ export default function BrainPanel({ brandId, initialProductId, initialEventId }
   );
 }
 
-/* ── 首頁：總用量＋六區方塊 ─────────────────────────────────── */
+/* ── 首頁：總用量＋七區方塊 ─────────────────────────────────── */
 
 function Home({ view, en, T, onOpen }: { view: MemoryView; en: boolean; T: (k: SectionKey) => string; onOpen: (k: SectionKey) => void }) {
   const pct = Math.round((view.usedChars / view.capacity) * 100);
@@ -125,7 +125,7 @@ function Home({ view, en, T, onOpen }: { view: MemoryView; en: boolean; T: (k: S
         </div>
       </section>
 
-      <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3">
+      <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
         {view.sections.map((s) => (
           <Tile key={s.key} icon={SECTION_ICON[s.key]} title={T(s.key)} capacity={view.capacity} en={en}
             used={s.usedChars} sub={subOf(s, en)} onClick={() => onOpen(s.key)} />

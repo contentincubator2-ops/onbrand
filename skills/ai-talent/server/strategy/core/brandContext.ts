@@ -12,6 +12,7 @@ import { sql } from "drizzle-orm";
 import { getDb } from "../../db";
 import { buildMarketContext } from "./marketProfiles";
 import { loadEventProducts, productScopeBrief, resolveProductScope, type ScopedProduct } from "./eventProductScope";
+import { loadActiveRegulations, regulationLine, REG_CARD_MAX, REGULATION_BLOCK_HEADER } from "./brandRegulations";
 
 function safeParse(s: string): any {
   try { return JSON.parse(s); } catch { return null; }
@@ -32,14 +33,14 @@ function safeParse(s: string): any {
 /** 內部分層：決定容量不夠時誰先被擠掉（見 PRIORITY）。不給使用者看。 */
 type BrainTier =
   | "market" | "identity" | "voice" | "rules" | "context" | "custom" | "doc"
-  | "product" | "event" | "legacy";
+  | "product" | "event" | "legacy" | "regulation";
 
 /**
  * 大腦畫面的分類——跟策略層 rail 同一套名字（2026-09-29 CJ「用詞跟策略層沒對上，
  * 例如品牌、產品、活動等等」）。每一筆底下再分到該頁的段落標題（group）與欄位名稱
  * （label），名稱照 client/src/v2/strategy/lib/positioningSchema.ts 與 copyAssets.ts。
  */
-export type BrainCategoryKey = "info" | "brand" | "copy" | "product" | "event" | "legacy";
+export type BrainCategoryKey = "info" | "brand" | "copy" | "product" | "event" | "regulation" | "legacy";
 
 export const BRAIN_CATEGORIES: Record<BrainCategoryKey, { zh: string; en: string }> = {
   info:    { zh: "基本資料", en: "Info" },
@@ -47,6 +48,7 @@ export const BRAIN_CATEGORIES: Record<BrainCategoryKey, { zh: string; en: string
   copy:    { zh: "文字",     en: "Copy" },
   product: { zh: "產品",     en: "Products" },
   event:   { zh: "活動",     en: "Campaigns" },
+  regulation: { zh: "法規",  en: "Regulations" },
   legacy:  { zh: "舊資料",   en: "Legacy" },
 };
 
@@ -140,7 +142,7 @@ const DISPLAY: Record<string, Display> = {
 /** 自訂卡片、定位文件、舊版 brand_brain 條目這些沒有固定標籤的，依所在的頁決定分類。 */
 const SECTION_CATEGORY: Record<SectionKey, BrainCategoryKey> = {
   locked: "brand", voice: "brand", assets: "copy", context: "brand",
-  legacy: "legacy", product: "product", event: "event",
+  legacy: "legacy", product: "product", event: "event", regulation: "regulation",
 };
 
 /** 固定標籤的出處（見 BrainItem.source）。pushFrom 與動態標籤在呼叫端自己帶。 */
@@ -189,6 +191,7 @@ function displayOf(section: SectionKey, tier: BrainTier, promptLabel: string): D
   if (tier === "custom") return { category, group: "自訂卡片", label: promptLabel };
   if (tier === "doc") return { category, group: "上傳的定位文件", label: "定位文件補充" };
   if (tier === "legacy") return { category: "legacy", group: "舊版品牌大腦", label: promptLabel };
+  if (tier === "regulation") return { category: "regulation", group: "法規", label: promptLabel };
   if (tier === "voice" && promptLabel.startsWith("語氣範例")) {
     return { category: "brand", group: "品牌個性與溝通風格", label: promptLabel.replace("語氣範例", "溝通範例對比") };
   }
@@ -203,13 +206,19 @@ function displayOf(section: SectionKey, tier: BrainTier, promptLabel: string): D
 // （中位數 2,802），單格放寬後最大的品牌約 11,000 字——容量留 16,000 當安全上限。
 export const BRAIN_CAPACITY = 16_000;
 
-/** 割捨順序：數字越大越先被擠掉。市場設定永遠保留。 */
+/** 割捨順序：數字越大越先被擠掉。市場設定與法規永遠保留（見 NEVER_DROP）。 */
 const PRIORITY: Record<BrainTier, number> = {
-  market: 0, identity: 1, voice: 2, rules: 3, product: 4, event: 5,
+  regulation: -1, market: 0, identity: 1, voice: 2, rules: 3, product: 4, event: 5,
   context: 6, custom: 7, doc: 8, legacy: 9,
 };
 
-type SectionKey = "locked" | "voice" | "assets" | "context" | "legacy" | "product" | "event";
+type SectionKey = "locked" | "voice" | "assets" | "context" | "legacy" | "product" | "event" | "regulation";
+
+/**
+ * 容量不夠時也不割捨的類別。法規（2026-09-30）：寫文前的審查依據，被擠掉就等於沒審——
+ * 寧可擠掉品牌故事。可放多少由 brandRegulations 的上限與存檔時的空間檢查把關。
+ */
+const NEVER_DROP: ReadonlySet<BrainTier> = new Set<BrainTier>(["market", "regulation"]);
 
 interface BrainEntry {
   section: SectionKey;
@@ -384,7 +393,7 @@ function applyCapacity(entries: BrainEntry[], fixedChars: number, capacity: numb
     .sort((a, b) => (PRIORITY[b.e.category] - PRIORITY[a.e.category]) || (b.i - a.i));
   for (const { e } of order) {
     if (used <= capacity) break;
-    if (e.category === "market") continue;
+    if (NEVER_DROP.has(e.category)) continue;
     e.dropped = true;
     used -= e.keptChars;
   }
@@ -563,7 +572,8 @@ export async function enforceBrandRulesOnTextWithReport(
  * 要誠實，就只能有一份。buildBrandPrefix 的 mode 參數保留相容，但不再有作用。
  *
  * 順序：市場設定（最外層約束）→ 鎖定屬性 → 聲音指南 → 寫手指引 → 脈絡 →
- * 舊版補充 → 產品 → 活動。LLM 對靠後的內容較易執行，所以 product/event 放最後。
+ * 舊版補充 → 產品 → 活動 → 法規。LLM 對靠後的內容較易執行，所以 product/event 放後面，
+ * 法規（寫之前先審查）放最後。
  */
 export async function buildBrandBrain(
   brandId: number | undefined | null,
@@ -890,6 +900,14 @@ export async function buildBrandBrain(
       } catch {/* non-fatal */}
     }
 
+    // ── 法規（寫之前先審查）──
+    // 2026-09-30（CJ「agent 寫文章前要審查」）：用戶在策略層「法規」加的每一張卡。
+    // 放在 prompt 最後一段、容量不夠也不割捨（見 NEVER_DROP）。
+    for (const r of await loadActiveRegulations(brandId)) {
+      c.add("regulation", "regulation", r.title, r.body, REG_CARD_MAX,
+        (kept) => regulationLine(r, kept), { source: `reg:${r.id}` });
+    }
+
     // ── 市場設定（最外層約束，永遠保留）──
     let marketSection = "";
     try {
@@ -916,7 +934,8 @@ export async function buildBrandBrain(
       block("context", "[補充脈絡 — 品牌故事 / 受眾 / 差異化]") +
       block("legacy",  "[品牌大腦補充條目]") +
       block("product", "[本次產出聚焦的產品 — 必須圍繞此產品撰寫]") +
-      block("event",   "[本次產出對應的活動 — 必須提及活動 / 時程 / 主軸]");
+      block("event",   "[本次產出對應的活動 — 必須提及活動 / 時程 / 主軸]") +
+      block("regulation", REGULATION_BLOCK_HEADER, false);
 
     const prefix = (marketSection || body) ? "\n\n" + marketSection + body : "";
 

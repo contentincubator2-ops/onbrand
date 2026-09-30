@@ -19,7 +19,7 @@ describe("strategyRailTarget", () => {
   });
 
   it("人在產品裡按「視覺」「會議」「記憶」：都是品牌層，不帶產品 id", () => {
-    for (const cat of ["visual", "meetings", "brain", "products"]) {
+    for (const cat of ["visual", "meetings", "regulations", "brain", "products"]) {
       expect(strategyRailTarget(cat, "?b=5&p=9&cat=positioning", 5)).toBe(`/brands/edit?b=5&cat=${cat}`);
     }
   });
