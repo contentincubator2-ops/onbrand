@@ -105,6 +105,14 @@ describe("卡 → template", () => {
   });
 });
 
+describe("卡片插畫場景", () => {
+  it("用戶選過的場景跟著 template 送到前端；沒選就不帶（前端自動挑）", () => {
+    expect(cardTemplate(makeCard({ scene: "gift" })).scene).toBe("gift");
+    expect(cardTemplate(makeCard()).scene).toBeUndefined();
+    expect(cardTemplate(makeCard({ scene: null })).scene).toBeUndefined();
+  });
+});
+
 describe("卡 → config", () => {
   it("variants 收在 1–5，labels 數量對得上", () => {
     expect(cardConfig(makeCard({ variants: 3 })).variants).toBe(3);

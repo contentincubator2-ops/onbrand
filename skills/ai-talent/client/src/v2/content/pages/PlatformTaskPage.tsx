@@ -6,7 +6,8 @@
  * Users pick the *platform* in the sidebar, then filter by format / source
  * inside this page. Tier is internal engine config and never shown.
  */
-import { IllustratedEmpty, EmptyIllustration } from "../../platform/components/EmptyIllustration";
+import { IllustratedEmpty } from "../../platform/components/EmptyIllustration";
+import { TaskIllustration } from "../../platform/components/TaskIllustration";
 import React, { useMemo, useState, useEffect, useRef } from "react";
 import { Navigate, useParams, useOutletContext, useNavigate, useSearchParams } from "react-router-dom";
 import CalendarTabs from "../components/CalendarTabs";
@@ -228,6 +229,8 @@ interface FBTaskCard {
   kind: "fast" | "mid" | "squad";
   inputs?: any[];
   primary_question?: string | null;
+  /** 2026-09-30：自建卡用戶自選的插畫場景；null＝依題目自動挑。 */
+  scene?: string | null;
   primary_input?: { key: string; placeholder?: string; type: "text" | "textarea"; derive?: any } | null;
   agent_id?: number | null;
   skill_slug?: string | null;
@@ -2474,7 +2477,7 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                     品牌脈絡退到後面當參考，不再是一打開最先看到的黑塊。 */}
                 {!running && (
                   <div className="flex flex-col items-center text-center pt-3 pb-1">
-                    <EmptyIllustration kind="brief" width={132} />
+                    <TaskIllustration card={activeTask} width={132} />
                     <h2 className="mt-4 text-[22px] leading-snug font-bold text-neutral-900 max-w-[30ch]">
                       {activeTask.primary_question
                         ?? (lang === "en" ? (activeTask.label_en ?? activeTask.label) : (activeTask.label_zh ?? activeTask.label))}
