@@ -45,8 +45,6 @@ export interface TaskSource {
   url?: string;
   /** 原始貼文連結（找得到才有）。 */
   postUrl?: string;
-  /** 這個案例的弱點（跨平台合計、品牌自報…），卡片上照實印出。 */
-  caveat?: string;
 }
 
 export interface SourceVocabEntry {
