@@ -12,6 +12,7 @@
  *
  * 版面沿用 StrategyAlertsPanel 的單色 neutral 系統——顏色只拿來表達狀態。
  */
+import { IllustratedEmpty } from "../../../platform/components/EmptyIllustration";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { trpc } from "../../../../lib/trpc";
@@ -501,6 +502,10 @@ function MinutesTimeline({ meeting, brandId, en, onBack, onOpenTask, onOpenSourc
 }) {
   const T = trpc as any;
   const runsQ = T.strategyMeeting?.runs?.useQuery?.({ meetingId: meeting.id }, { staleTime: 5_000 }) ?? { data: null, isLoading: false };
+  const runNow = T.strategyMeeting?.runNow?.useMutation?.({
+    onSuccess: () => { showToastGlobal(en ? "Meeting started — about 1–2 minutes" : "會議開始了，大約 1–2 分鐘", "success"); runsQ.refetch?.(); },
+    onError: errToast,
+  });
   const runs: MeetingRun[] = runsQ.data?.runs ?? [];
   const [selected, setSelected] = useState<number | null>(null);
   const anyRunning = runs.some((r) => r.status === "running");
@@ -542,9 +547,11 @@ function MinutesTimeline({ meeting, brandId, en, onBack, onOpenTask, onOpenSourc
       {runsQ.isLoading ? (
         <p className="py-6 text-[13px] text-neutral-400">{en ? "Loading…" : "載入中…"}</p>
       ) : runs.length === 0 ? (
-        <p className="mt-6 rounded-xl border border-neutral-200 px-5 py-4 text-[13px] text-neutral-500">
-          {en ? "No minutes yet. The first meeting happens on schedule, or press “Meet now”." : "還沒有會議紀錄。時間到會自動開會，也可以按「現在開一次」。"}
-        </p>
+        <IllustratedEmpty
+          kind="meeting"
+          title={en ? "Nobody at the table yet" : "會議桌還沒人坐"}
+          action={{ label: en ? "Meet now" : "現在開一場", onPress: () => runNow?.mutate?.({ id: meeting.id }) }}
+        />
       ) : (
         <div className="mt-5 grid gap-5 md:grid-cols-[200px_1fr]">
           {/* 時間軸 */}

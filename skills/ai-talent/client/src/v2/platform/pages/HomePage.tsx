@@ -166,7 +166,7 @@ export default function HomePage() {
           <p style={{ fontSize: 13, fontWeight: 600, color: "#6b7280", margin: "0 0 8px" }}>{en ? "This week" : "本週建議"}</p>
           {(festivalQ.data ?? []).length === 0 ? (
             <div style={{ border: "1px solid #e5e7eb", borderRadius: 12, padding: "12px 14px", fontSize: 13, color: "#9ca3af" }}>
-              {en ? "No suggestions right now." : "目前沒有建議。"}
+              {en ? "No new suggestions" : "目前沒有新建議"}
             </div>
           ) : (festivalQ.data ?? []).map((f: any) => (
             <div key={f.slug} style={{ border: "1px solid #e5e7eb", borderRadius: 12, padding: "12px 14px", marginBottom: 8 }}>
@@ -184,7 +184,7 @@ export default function HomePage() {
           <p style={{ fontSize: 13, fontWeight: 600, color: "#6b7280", margin: "0 0 8px" }}>{en ? "Recent activity" : "最近動態"}</p>
           <div style={{ border: "1px solid #e5e7eb", borderRadius: 12, padding: "4px 0" }}>
             {(notifQ.data?.items ?? notifQ.data ?? []).length === 0 ? (
-              <div style={{ padding: "8px 14px", fontSize: 13, color: "#9ca3af" }}>{en ? "Nothing yet." : "還沒有動態。"}</div>
+              <div style={{ padding: "8px 14px", fontSize: 13, color: "#9ca3af" }}>{en ? "Nothing yet" : "還沒有動態"}</div>
             ) : (notifQ.data?.items ?? notifQ.data ?? []).slice(0, 3).map((n: any) => (
               <div key={n.id} onClick={() => n.navUrl && navigate(n.navUrl)} style={{ display: "flex", gap: 8, padding: "8px 14px", fontSize: 13, color: "#6b7280", cursor: n.navUrl ? "pointer" : "default" }}>
                 <FontAwesomeIcon icon={n.kind === "task_complete" ? faCheck : n.kind === "card_published" ? faWandMagicSparkles : n.kind === "strategy_alert" ? faTriangleExclamation : faBell} style={{ fontSize: 13, marginTop: 2, color: "#9ca3af" }} />

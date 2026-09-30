@@ -13,6 +13,7 @@
  * 沒資料時顯示空狀態，示意儀表板由 DataWorkspacePage 在下面另外處理。
  * 顏色只做功能：最好的格子綠、最差的紅，其餘中性。
  */
+import { IllustratedEmpty } from "../../platform/components/EmptyIllustration";
 import React from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
@@ -202,7 +203,8 @@ export default function LensWorkspace({ brandId, tray }: { brandId: number | nul
 
       {/* 3. 報表 */}
       {!lenses.length && !ws.isLoading && (
-        <p className="mt-4 text-[13px] text-neutral-500">還沒有視角。從上面三個入口挑一個開始。</p>
+        // 三個入口就在正上方，不另外放按鈕
+        <IllustratedEmpty kind="lens" title="還沒決定要從哪個角度看" />
       )}
       {active && (
         <LensReport

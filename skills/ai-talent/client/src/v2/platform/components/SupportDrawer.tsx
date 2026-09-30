@@ -350,7 +350,7 @@ export default function SupportDrawer({ open, onClose, scope, pendingNudges, onN
                 </p>
               ) : (listConvsQ?.data ?? []).length === 0 ? (
                 <p style={{ fontSize: 12, color: "#9ca3af", textAlign: "center", marginTop: 24 }}>
-                  {isEn ? "No past conversations" : "還沒有歷史對話"}
+                  {isEn ? "No chats yet" : "還沒聊過天"}
                 </p>
               ) : (
                 <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>

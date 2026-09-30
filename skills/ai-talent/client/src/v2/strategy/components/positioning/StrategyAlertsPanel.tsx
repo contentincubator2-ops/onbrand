@@ -204,7 +204,7 @@ export default function StrategyAlertsPanel({ brandId }: { brandId: number }) {
       <div className="mt-4">
         {alerts.length === 0 ? (
           <p className="text-[13px] leading-relaxed text-neutral-500">
-            {en ? "No alerts yet" : "目前沒有提醒"}
+            {en ? "All calm — nothing needs you" : "一切平靜，沒有要處理的事"}
           </p>
         ) : (
           <div className="flex flex-col gap-2.5">

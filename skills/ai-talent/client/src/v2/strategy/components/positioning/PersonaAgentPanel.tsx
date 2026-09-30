@@ -10,6 +10,7 @@
  *   - 訓練完成後可勾選「應用範圍」（套用的內容平台），並可用
  *     這個 Agent 的語氣試寫一篇貼文（試寫結果可直接複製使用）。
  */
+import { IllustratedEmpty } from "../../../platform/components/EmptyIllustration";
 import React, { useState } from "react";
 import { trpc } from "../../../../lib/trpc";
 import { useLang } from "../../../../lib/i18n";
@@ -548,9 +549,11 @@ export default function PersonaAgentPanel({ brandId }: { brandId: number | null 
       {creating && <NewAgentForm brandId={brandId} onDone={() => setCreating(false)} />}
 
       {agents.length === 0 && !creating ? (
-        <div className="text-center py-16 text-default-400 text-sm">
-          {en ? "No persona agents yet — create one above." : "還沒有任何人設 Agent，點右上角新增一個。"}
-        </div>
+        <IllustratedEmpty
+          kind="persona"
+          title={en ? "No one has checked in yet" : "團隊還沒人報到"}
+          action={{ label: en ? "+ New persona" : "＋ 新增人設", onPress: () => setCreating(true) }}
+        />
       ) : (
         agents.slice().reverse().map((a) => <AgentCard key={a.id} brandId={brandId} agent={a} />)
       )}

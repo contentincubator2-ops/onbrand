@@ -12,6 +12,7 @@
  * Speed badges appear on every card so the timing expectation is clear
  * without requiring users to navigate tiers before seeing tasks.
  */
+import { IllustratedEmpty } from "../../platform/components/EmptyIllustration";
 import React, { useMemo, useState, useEffect, useRef } from "react";
 import { Navigate, useParams, useOutletContext, useNavigate, useSearchParams } from "react-router-dom";
 import CalendarTabs from "../components/CalendarTabs";
@@ -2137,45 +2138,29 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                  * 卡被托盤／搜尋濾掉了，是 categoryTasks 本身是空的。「即將上線」
                  * 是死路；「新增任務卡」至少讓用戶當場自己建一張。
                  */
-                <>
-                  <FontAwesomeIcon icon={faPlus} className="text-2xl mb-2 text-default-300" />
-                  <p className="font-semibold mb-1">
-                    {activeSource === "own"
-                      ? (lang === "en" ? `No brand-built ${meta.label} cards yet` : `還沒有 ${meta.labelZh} 的品牌自建卡`)
-                      : activeSource === "viral"
-                        ? (lang === "en" ? `No viral-structure cards in ${activeCategoryLabel ?? meta.label} yet` : `「${activeCategoryLabel ?? meta.labelZh}」目前還沒有爆款結構卡`)
-                        : (lang === "en"
-                          ? `No preset cards in ${activeCategoryLabel ?? meta.label} yet`
-                          : `「${activeCategoryLabel ?? meta.labelZh}」目前還沒有預設任務卡`)}
-                  </p>
-                  {/* 2026-09-29：前台只列爆款結構＋品牌自建，基礎方案看不到爆款卡——
-                      講清楚空的原因，不要讓用戶以為壞了。 */}
-                  {(trayData?.viralLocked ?? 0) > 0 && (
-                    <p className="text-tiny text-default-400 mb-1">
-                      {lang === "en"
-                        ? `${trayData!.viralLocked} viral-structure cards here are on the Pro plan.`
-                        : `這個通路有 ${trayData!.viralLocked} 張爆款結構卡，屬於專業方案。`}
-                    </p>
-                  )}
-                  {COMPOSER_CHANNELS.has(platform) && brandId ? (
-                    <>
-                      <div className="mb-3" />
-                      <Button
-                        size="sm"
-                        color="primary"
-                        variant="shadow"
-                        startContent={<FontAwesomeIcon icon={faPlus} />}
-                        onPress={() => { setResumeCardId(null); setComposerOpen(true); }}
-                      >
-                        {lang === "en" ? "New card" : "新增任務卡"}
-                      </Button>
-                    </>
-                  ) : (
-                    <p className="text-tiny text-default-400">
-                      {lang === "en" ? "Coming soon." : "即將上線。"}
-                    </p>
-                  )}
-                </>
+                <IllustratedEmpty
+                  kind="cards"
+                  size="sm"
+                  title={activeSource === "own"
+                    ? (lang === "en" ? "No moves of your own yet" : "還沒有你們自己的招式")
+                    : activeSource === "viral"
+                      ? (lang === "en" ? `No viral-structure cards in ${activeCategoryLabel ?? meta.label} yet` : `「${activeCategoryLabel ?? meta.labelZh}」目前還沒有爆款結構卡`)
+                      : (lang === "en"
+                        ? `No preset cards in ${activeCategoryLabel ?? meta.label} yet`
+                        : `「${activeCategoryLabel ?? meta.labelZh}」目前還沒有預設任務卡`)}
+                  /* 2026-09-29：前台只列爆款結構＋品牌自建，基礎方案看不到爆款卡——
+                     講清楚空的原因，不要讓用戶以為壞了。 */
+                  note={(trayData?.viralLocked ?? 0) > 0
+                    ? (lang === "en"
+                      ? `${trayData!.viralLocked} viral-structure cards here are on the Pro plan.`
+                      : `這個通路有 ${trayData!.viralLocked} 張爆款結構卡，屬於專業方案。`)
+                    : !(COMPOSER_CHANNELS.has(platform) && brandId)
+                      ? (lang === "en" ? "Coming soon." : "即將上線。")
+                      : undefined}
+                  action={COMPOSER_CHANNELS.has(platform) && brandId
+                    ? { label: lang === "en" ? "+ New card" : "＋ 新增任務卡", onPress: () => { setResumeCardId(null); setComposerOpen(true); } }
+                    : undefined}
+                />
               ) : (
                 // 分類本身有卡，只是這裡只擺常用的那幾張、剛好都不在這個分類——
                 // 不是沒有卡，是托盤沒挑到，該做的是看全部，不是「即將上線」。

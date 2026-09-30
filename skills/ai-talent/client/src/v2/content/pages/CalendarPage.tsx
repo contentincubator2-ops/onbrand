@@ -12,6 +12,7 @@
  * - calendarRouter.range used with proper loading/error states (no silent fail)
  * - calendarRouter.schedule / reschedule / cancel mutations exposed
  */
+import { EmptyIllustration } from "../../platform/components/EmptyIllustration";
 import React, { useMemo, useState, useRef, useEffect } from "react";
 import { useNavigate, useOutletContext } from "react-router-dom";
 import CalendarTabs from "../components/CalendarTabs";
@@ -778,19 +779,21 @@ export default function CalendarPage() {
           )}
           {!isLoading && items.length === 0 && (
             <div
-              className="flex items-center gap-4 px-5 py-4 rounded-xl mb-4"
+              className="flex items-center gap-5 px-5 py-3 rounded-xl mb-4"
               style={{ border: "1px dashed #D4D4D4", background: "#fafafa" }}
             >
+              {/* 月曆格子就在下面，所以這裡只放一條橫幅＋小插畫，不佔整頁 */}
+              <EmptyIllustration kind="clock" width={96} />
               <div className="flex-1">
-                <p className="text-[13px] font-semibold text-default-700 mb-0.5">
-                  {lang === "en" ? "No posts scheduled this month" : "本月尚無排程或發布記錄"}
+                <p className="text-[15px] font-semibold text-neutral-800">
+                  {lang === "en" ? "A quiet month so far" : "這個月還很清閒"}
                 </p>
               </div>
               <button
                 className="shrink-0 px-4 py-2 rounded-lg text-[12px] font-semibold bg-default-900 text-white hover:bg-default-700"
                 onClick={() => navigate("/tasks/fb")}
               >
-                {lang === "en" ? "→ Start a task" : "→ 去跑任務"}
+                {lang === "en" ? "Schedule the first post" : "去排第一篇"}
               </button>
             </div>
           )}

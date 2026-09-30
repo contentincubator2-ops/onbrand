@@ -22,6 +22,7 @@
  * 讀的是同一筆 campaignPlan（策略層改了切角，這裡下一次進來就是新的）；這一頁
  * 沒有「要不要做這篇」的決策，那是策略層的事。
  */
+import { IllustratedEmpty } from "../../platform/components/EmptyIllustration";
 import React from "react";
 import { useNavigate, useSearchParams, useOutletContext } from "react-router-dom";
 import {
@@ -110,16 +111,14 @@ export default function CampaignTrayPage() {
         {listQ.error && <p className="text-small text-danger">{String(listQ.error?.message ?? "").slice(0, 200)}</p>}
 
         {!listQ.isLoading && !listQ.error && rows.length === 0 && (
-          <Card shadow="none" className="border-2 border-dashed border-divider">
-            <CardBody className="py-16 items-center text-center gap-3">
-              <FontAwesomeIcon icon={faCalendarDays} className="text-4xl text-default-300" />
-              <p className="text-medium font-medium">{L("還沒有任何活動企劃", "No campaign plans yet")}</p>
-              <Button size="sm" variant="light" color="primary"
-                onPress={() => navigate(`/brands/edit?cat=events${brandId ? `&b=${brandId}` : ""}`)}>
-                {L("去建立活動企劃", "Go set up a campaign")}
-              </Button>
-            </CardBody>
-          </Card>
+          <IllustratedEmpty
+            kind="event"
+            title={L("這季還沒排上任何檔期", "Nothing on this season's schedule yet")}
+            action={{
+              label: L("去建立活動企劃", "Go set up a campaign"),
+              onPress: () => navigate(`/brands/edit?cat=events${brandId ? `&b=${brandId}` : ""}`),
+            }}
+          />
         )}
 
         {[["進行中", "Active", live], ["已結束", "Ended", ended]].map(([zh, e2, list]: any) => (

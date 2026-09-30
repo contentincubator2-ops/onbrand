@@ -12,6 +12,7 @@
  * LibreOffice。要看真版面的話，之後接 Google Slides API 的 thumbnail 就能換掉，
  * 右邊面板不用重做。
  */
+import { IllustratedEmpty } from "../../platform/components/EmptyIllustration";
 import React from "react";
 import { useSearchParams } from "react-router-dom";
 import { WarningIcon } from "../../platform/components/icons";
@@ -223,8 +224,9 @@ export default function FanpageMonthlyReport() {
       </div>
 
       {!analysis && (
-        <div style={{ ...card, color: "#6b7280", fontSize: 13 }}>
-          還沒有分析結果。
+        // 「開始分析」按鈕就在上面的上傳區，這裡不重複放
+        <div style={card}>
+          <IllustratedEmpty kind="report" size="sm" title="這個月的報告還沒寫" />
         </div>
       )}
 

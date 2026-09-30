@@ -21,11 +21,12 @@ import { trpc } from "../../../lib/trpc";
 import { useLang } from "../../../lib/i18n";
 import type { ShellOutletCtx } from "../../app/shell/ShellLayout";
 import { Skeleton } from "@heroui/react";
-import { AddIcon, CopyIcon, DeleteIcon, EditIcon, FolderIcon, InfoIcon, SearchIcon, WaitingIcon } from "../../platform/components/icons";
+import { CopyIcon, DeleteIcon, EditIcon, FolderIcon, InfoIcon, SearchIcon, WaitingIcon } from "../../platform/components/icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faFacebook, faInstagram, faYoutube, faTiktok, faLinkedin, faThreads } from "@fortawesome/free-brands-svg-icons";
 import { faGlobe, faNewspaper, faEnvelope, faPenNib } from "@fortawesome/free-solid-svg-icons";
 import { HelpTip } from "../../platform/components/HelpTip";
+import { IllustratedEmpty } from "../../platform/components/EmptyIllustration";
 
 interface MissionRow {
   id: number;            // mission_outputs.id (output row) — NOT the mission PK
@@ -403,7 +404,7 @@ export default function ProjectsPage() {
           <EmptyState
             search={search}
             onClear={() => { setSearch(""); setActiveBrandId("all"); }}
-            onCreate={() => { /* New-task entry retired; users go to /30s etc. */ }}
+            onCreate={() => navigate("/tasks/fb")}
             lang={lang}
           />
         ) : (
@@ -660,40 +661,25 @@ function ProjectCard({ mission, onClick, lang }: { mission: MissionRow; onClick:
 
 /* ─────────────────────── EmptyState ─────────────────────── */
 function EmptyState({ search, onClear, onCreate, lang }: { search: string; onClear: () => void; onCreate: () => void; lang: "zh-TW" | "en" }) {
+  if (!search) {
+    return (
+      <IllustratedEmpty
+        kind="projects"
+        title={lang === "en" ? "Nothing on the wall yet" : "作品牆還沒掛上任何一張"}
+        action={{ label: lang === "en" ? "Open your first task card" : "去開第一張任務卡", onPress: onCreate }}
+      />
+    );
+  }
   return (
     <div className="flex flex-col items-center justify-center py-20 text-center">
       <FolderIcon size={56} className="text-default-300 mb-4" strokeWidth={1.2} />
-      {search ? (
-        <>
-          <p className="text-default-700 font-medium mb-1">
-            {lang === "en" ? `No projects match "${search}"` : `找不到符合「${search}」的專案`}
-          </p>
-          <div className="mb-4" />
-          <button onClick={onClear} className="text-xs text-zinc-600 hover:underline">
-            {lang === "en" ? "Clear search" : "清除搜尋"}
-          </button>
-        </>
-      ) : (
-        <>
-          <p className="text-default-700 font-medium mb-1">
-            {lang === "en" ? "No projects yet" : "還沒有任何專案"}
-          </p>
-          <p className="text-tiny text-default-500 mb-4">
-            {lang === "en" ? (
-              <>Outputs from any task land here.</>
-            ) : (
-              <>跑過的任務產出會自動進來。</>
-            )}
-          </p>
-          <button
-            onClick={onCreate}
-            className="flex items-center gap-2 px-4 py-2 rounded-full text-white text-sm font-medium"
-            style={{ background: "#171717" }}
-          >
-            <AddIcon size={14} /> {lang === "en" ? "New project" : "新任務"}
-          </button>
-        </>
-      )}
+      <p className="text-default-700 font-medium mb-1">
+        {lang === "en" ? `No projects match "${search}"` : `找不到符合「${search}」的專案`}
+      </p>
+      <div className="mb-4" />
+      <button onClick={onClear} className="text-xs text-zinc-600 hover:underline">
+        {lang === "en" ? "Clear search" : "清除搜尋"}
+      </button>
     </div>
   );
 }

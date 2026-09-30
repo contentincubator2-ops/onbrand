@@ -80,7 +80,7 @@ export default function WorkspaceSettingsPage() {
             {listQ?.isLoading ? (
               <p className="text-sm text-neutral-400">{lang === "en" ? "Loading…" : "載入中…"}</p>
             ) : workspaces.length === 0 ? (
-              <p className="text-sm text-neutral-400">{lang === "en" ? "No workspaces yet" : "尚無工作空間"}</p>
+              <p className="text-sm text-neutral-400">{lang === "en" ? "No workspaces yet" : "還沒有工作空間"}</p>
             ) : (
               workspaces.map((w) => (
                 <button

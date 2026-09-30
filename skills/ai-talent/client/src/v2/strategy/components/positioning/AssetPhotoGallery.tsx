@@ -12,6 +12,7 @@
  * 上傳位元組走 /api/asset-photo/upload（express.raw，不是 tRPC——tRPC 只吃
  * JSON），list／setPrimary／remove 走 tRPC。
  */
+import { IllustratedEmpty } from "../../../platform/components/EmptyIllustration";
 import { useRef, useState } from "react";
 import { trpc } from "../../../../lib/trpc";
 import { useLang } from "../../../../lib/i18n";
@@ -149,11 +150,14 @@ export default function AssetPhotoGallery({ brandId, scope, scopeId, scopeLabel,
       </div>
 
       {photos.length === 0 && !q.isLoading && (
-        <p style={{ fontSize: 12.5, color: MUTED, lineHeight: 1.6, margin: 0 }}>
-          {en
-            ? `No photos yet. Upload real photos of ${scopeLabel ?? "this"} — we no longer pull images from your website.`
-            : `目前還沒有照片。請上傳${scopeLabel ?? "這裡"}的真實照片 —— 我們不再從網站抓圖了。`}
-        </p>
+        <IllustratedEmpty
+          kind="photo"
+          size="sm"
+          title={en ? "The album is still empty" : "相簿還是空的"}
+          /* 2026-09：不再從官網抓圖——這句是用戶必須知道的規則，不是說明副標 */
+          note={en ? "Real photos only — we no longer pull images from your website." : "請上傳真實照片，我們不再從網站抓圖了。"}
+          action={{ label: en ? "Upload photos" : "上傳照片", onPress: () => fileRef.current?.click() }}
+        />
       )}
       <p style={{ fontSize: 11.5, color: MUTED, margin: 0 }}>
         {en ? "PNG / JPEG / WebP, up to 15MB each. First photo becomes the primary." : "PNG／JPEG／WebP，單張上限 15MB。第一張自動當主圖。"}
