@@ -12,6 +12,7 @@
  * Per-card AI button removed (CJ 2026-05-07: 全局只要一個按鈕). Bulk
  * auto-fill is handled by parent CopyTabInline.
  */
+import type { ComponentType } from "react";
 import { AddIcon, CloseIcon, GenerateIcon } from "../../../platform/components/icons";
 
 type Shape = "text" | "items" | "pairs";
@@ -19,7 +20,9 @@ type Shape = "text" | "items" | "pairs";
 interface Props {
   assetKey: string;
   label: string;
-  Icon: any;       // Lucide line-icon component (Notion-style)
+  /** 可省略：文字／視覺頁的 modal 標題已經有卡名，傳 null 表示不畫圖示。
+   *  2026-09-30：兩頁都傳 null，這裡卻無條件 <Icon/>，點任何一張卡整頁崩潰。 */
+  Icon?: ComponentType<any> | null;
   bg: string;      // legacy — ignored under the new 4A discipline
   shape: Shape;
   value: any;
@@ -85,7 +88,7 @@ export default function InlineAssetCard({
 
       {/* Header row */}
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-        <Icon size={12} strokeWidth={1.8} style={{ color: filled ? "#171717" : "#525252", flexShrink: 0 }} />
+        {Icon && <Icon size={12} strokeWidth={1.8} style={{ color: filled ? "#171717" : "#525252", flexShrink: 0 }} />}
         {eyebrow && (
           <span style={{
             fontSize: 12, fontWeight: 700, color: "#525252",
