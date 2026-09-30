@@ -231,6 +231,8 @@ interface FBTaskCard {
   primary_question?: string | null;
   /** 2026-09-30：自建卡用戶自選的插畫場景；null＝依題目自動挑。 */
   scene?: string | null;
+  /** 自建卡的 AI 插畫；內建卡的圖走 taskIllustrationIds.json。 */
+  illustration_url?: string | null;
   primary_input?: { key: string; placeholder?: string; type: "text" | "textarea"; derive?: any } | null;
   agent_id?: number | null;
   skill_slug?: string | null;

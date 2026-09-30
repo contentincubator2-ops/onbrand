@@ -8,7 +8,7 @@
 import { describe, expect, it } from "vitest";
 import {
   brandIdOfCardId, slugifyCardName, measureSamples,
-  cardTemplate, cardConfig, factLeaks, redactFactLeaks, verbatimSamples, type BrandTaskCard,
+  cardTemplate, cardConfig, illustrationInFlight, factLeaks, redactFactLeaks, verbatimSamples, type BrandTaskCard,
 } from "./brandTaskCards";
 
 function makeCard(over: Partial<BrandTaskCard> = {}): BrandTaskCard {
@@ -110,6 +110,21 @@ describe("卡片插畫場景", () => {
     expect(cardTemplate(makeCard({ scene: "gift" })).scene).toBe("gift");
     expect(cardTemplate(makeCard()).scene).toBeUndefined();
     expect(cardTemplate(makeCard({ scene: null })).scene).toBeUndefined();
+  });
+
+  it("AI 插畫畫好才送到前端，畫到一半或失敗都不送", () => {
+    const url = "/static/covers/taskcard-u1-x.webp";
+    expect(cardTemplate(makeCard({ illustrationUrl: url, illustrationStatus: "ready" })).illustration_url).toBe(url);
+    expect(cardTemplate(makeCard({ illustrationUrl: url, illustrationStatus: "generating" })).illustration_url).toBeUndefined();
+    expect(cardTemplate(makeCard({ illustrationUrl: url, illustrationStatus: "failed" })).illustration_url).toBeUndefined();
+  });
+
+  it("伺服器重啟留下的 generating 超過 5 分鐘就不算在畫", () => {
+    const now = Date.parse("2026-09-30T10:00:00Z");
+    expect(illustrationInFlight({ illustrationStatus: "generating", illustrationStartedAt: "2026-09-30T09:58:00Z" }, now)).toBe(true);
+    expect(illustrationInFlight({ illustrationStatus: "generating", illustrationStartedAt: "2026-09-30T09:50:00Z" }, now)).toBe(false);
+    expect(illustrationInFlight({ illustrationStatus: "generating", illustrationStartedAt: null }, now)).toBe(false);
+    expect(illustrationInFlight({ illustrationStatus: "ready", illustrationStartedAt: "2026-09-30T09:59:00Z" }, now)).toBe(false);
   });
 });
 

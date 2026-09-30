@@ -1,0 +1,3 @@
+# 任務卡插畫產圖請求（見 .github/workflows/ops-gen-task-illustrations.yml）
+# 試畫風：先挑 8 張不同題材的卡
+IDS=ig-30-reel-native-language-try,fb-30-reel-self-roast,fb-30-feed-curiosity-explainer,ig-30-carousel-fake-callout,fb-30-pinned-stance,th-30-reply-mock-statement,fb-30-feed-big-move-local,tt-30-live-auction-trust
