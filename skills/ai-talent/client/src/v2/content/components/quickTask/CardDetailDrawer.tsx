@@ -18,7 +18,6 @@
 import { useEffect } from "react";
 import { CloseIcon } from "../../../platform/components/icons";
 import { trpc } from "../../../../lib/trpc";
-import { tierLabel } from "../../../platform/lib/tierVocabulary";
 import { resolveSource, sourceLabel, sourceWhy } from "../../lib/sourceVocabulary";
 
 interface Props {
@@ -117,9 +116,6 @@ export default function CardDetailDrawer({ taskId, lang, onClose, onRun }: Props
             </h2>
             {d && (
               <div className="mt-2 flex flex-wrap gap-1.5">
-                <span className="rounded-full border border-neutral-200 px-2 py-0.5 text-[12px] text-neutral-600">
-                  {tierLabel(d.tier, lang)}
-                </span>
                 <span className="rounded-full border border-neutral-200 px-2 py-0.5 text-[12px] text-neutral-600">
                   {sourceLabel(src.type, lang)}
                 </span>
