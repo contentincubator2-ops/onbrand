@@ -1,7 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const invokeLLM = vi.fn();
-vi.mock("../../platform/core/llm", () => ({ invokeLLM: (...a: any[]) => invokeLLM(...a) }));
+const invokeLLMSingleProvider = vi.fn();
+vi.mock("../../platform/core/llm", () => ({
+  invokeLLM: (...a: any[]) => invokeLLM(...a),
+  invokeLLMSingleProvider: (...a: any[]) => invokeLLMSingleProvider(...a),
+}));
 
 import { acceptRevision, checkBrandConsistency } from "./brandConsistency";
 
@@ -16,7 +20,7 @@ const base = {
 };
 
 describe("checkBrandConsistency", () => {
-  beforeEach(() => invokeLLM.mockReset());
+  beforeEach(() => { invokeLLM.mockReset(); invokeLLMSingleProvider.mockReset(); });
 
   it("一致 → consistent，原稿不動", async () => {
     invokeLLM.mockResolvedValue(reply({ consistent: true, issues: [], revised: "" }));
@@ -31,6 +35,7 @@ describe("checkBrandConsistency", () => {
     const r = await checkBrandConsistency(base);
     expect(r.status).toBe("fixed");
     expect(r.caption).toBe(revised);
+    expect(r.before).toBe(base.caption);
     expect(r.issues[0]!.aspect).toBe("語氣");
   });
 
@@ -52,6 +57,14 @@ describe("checkBrandConsistency", () => {
     expect((await checkBrandConsistency({ ...base, brandPrefix: "" })).status).toBe("skipped");
     expect((await checkBrandConsistency({ ...base, timeoutMs: 1000 })).status).toBe("skipped");
     expect(invokeLLM).not.toHaveBeenCalled();
+  });
+
+  it("strictProvider＝只打那一家，不走串接（IG 策略卡的隱私約束）", async () => {
+    invokeLLMSingleProvider.mockResolvedValue(reply({ consistent: true, issues: [] }));
+    const r = await checkBrandConsistency({ ...base, strictProvider: "anthropic" });
+    expect(r.status).toBe("consistent");
+    expect(invokeLLM).not.toHaveBeenCalled();
+    expect(invokeLLMSingleProvider.mock.calls[0]![0].provider).toBe("anthropic");
   });
 
   it("回傳包在 ```json 裡也能解析", async () => {
