@@ -8,7 +8,8 @@ describe("performanceRouter", () => {
   it("建得起來，procedure 名單如預期", () => {
     const names = Object.keys((performanceRouter as any)._def.procedures).sort();
     expect(names).toEqual([
-      "acceptProposal", "addRule", "autoTag", "cellFacts", "connections", "importCommit", "importPreview",
+      "acceptProposal", "addRule", "autoTag", "campaignList", "campaignManual", "campaignMatch", "campaignReport",
+      "cellFacts", "connections", "importCommit", "importPreview",
       "outputTags", "proposeLens", "removeDimension", "removeImport", "removeLens", "removeRule", "report", "saveDimension",
       "saveLens", "setFactTag", "syncFacebook", "tagOutput", "useTemplate", "workspace",
     ]);

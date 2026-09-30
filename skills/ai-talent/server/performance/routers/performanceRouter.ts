@@ -39,6 +39,10 @@ import { deriveDimensions, proposeLens, autoTag } from "../core/perfAI";
 import { parseTable, guessSource, guessMapping, buildFacts, IMPORT_SOURCES, ROWCOUNT } from "../core/perfImport";
 import { syncFbPage, resolvePage, FbSyncError, fbSyncEnabled } from "../core/fbPageSync";
 import { utmContent } from "../core/perfUtm";
+import {
+  buildCampaignPerf, applyMatch, loadCampaignEvent, saveCampaignPerf, publishedPosts, listCampaigns,
+  type PerfFact, type CampaignPerfStore,
+} from "../core/campaignPerf";
 
 const trayInput = z.enum(TRAYS as [string, ...string[]]);
 const ymdInput = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
@@ -404,6 +408,98 @@ export const performanceRouter = router({
     }),
 
   /** 產出頁：這篇內容目前的成效標籤＋品牌可選的維度。 */
+  // ─── 2026-09-30 活動 tray：活動企劃的目標 vs 真的發出去的貼文（core/campaignPerf.ts） ───
+
+  /** 這個品牌有企劃的活動（定稿的排前面）。 */
+  campaignList: protectedProcedure
+    .input(z.object({ brandId: z.number().int().positive() }))
+    .query(async ({ ctx, input }) => {
+      await assertBrandAccess(ctx.user!.id, input.brandId);
+      return listCampaigns(input.brandId, ctx.user!.id);
+    }),
+
+  /** 一檔活動的成效：各段目標 vs 實際、每一篇對上沒、待確認的貼文。 */
+  campaignReport: protectedProcedure
+    .input(z.object({ brandId: z.number().int().positive(), eventId: z.number().int().positive() }))
+    .query(async ({ ctx, input }) => {
+      await assertBrandAccess(ctx.user!.id, input.brandId);
+      const ev = await loadCampaignEvent(input.eventId, ctx.user!.id);
+      if (!ev || ev.brandId !== input.brandId) throw new TRPCError({ code: "NOT_FOUND", message: "找不到這個活動" });
+      const plan = ev.pos?.campaignPlan;
+      if (!plan?.items?.length) throw new TRPCError({ code: "BAD_REQUEST", message: "這檔活動還沒有企劃" });
+      const items = (plan.items as any[]).map((i) => ({
+        id: String(i.id), phase: String(i.phase), date: String(i.date), platform: String(i.platform),
+        angle: String(i.angle ?? ""), paid: !!i.paid, outputId: i.outputId ? Number(i.outputId) : null, enabled: i.enabled !== false,
+      }));
+      const dates = items.filter((i) => i.enabled).map((i) => i.date).sort();
+      const addDays = (s: string, n: number) => new Date(new Date(`${s}T00:00:00Z`).getTime() + n * 86_400_000).toISOString().slice(0, 10);
+      const from = addDays(dates[0] ?? new Date().toISOString().slice(0, 10), -14);
+      const to = addDays(dates[dates.length - 1] ?? new Date().toISOString().slice(0, 10), 7);
+      const [rawFacts, published, page] = await Promise.all([
+        loadFacts(input.brandId, from, to, ["fb_page"]),
+        publishedPosts(input.brandId, items.map((i) => i.outputId ?? 0)),
+        resolvePage(input.brandId).catch(() => null),
+      ]);
+      const facts: PerfFact[] = rawFacts.map((f: any) => ({
+        key: `${f.source}:${f.entityId}`, source: f.source, entityId: String(f.entityId), date: f.date,
+        text: String(f.text ?? f.entityLabel ?? ""), permalink: f.permalink ?? null, metrics: f.metrics ?? {},
+      }));
+      const kpiPhases = plan.kpi?.phases ?? null;
+      const report = buildCampaignPerf({
+        items, kpiPhases, published, facts, store: (ev.pos?.campaignPerf ?? {}) as CampaignPerfStore,
+        today: new Date().toISOString().slice(0, 10),
+      });
+      return {
+        event: { id: ev.id, name: ev.name, startAt: ev.startAt, endAt: ev.endAt },
+        locked: !!plan.lockedAt,
+        kpi: plan.kpi ? { budget: plan.kpi.budget ?? null, goals: plan.kpi.goals ?? [] } : null,
+        fbPage: page,
+        fbSyncEnabled: fbSyncEnabled(),
+        ...report,
+      };
+    }),
+
+  /** 待確認的貼文：配對到某一格／企劃外／不是這檔／放回待確認。 */
+  campaignMatch: protectedProcedure
+    .input(z.object({
+      brandId: z.number().int().positive(), eventId: z.number().int().positive(),
+      key: z.string().min(3).max(240),
+      action: z.enum(["match", "extra", "dismiss", "clear"]),
+      itemId: z.string().max(80).nullable().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertBrandAccess(ctx.user!.id, input.brandId);
+      const ev = await loadCampaignEvent(input.eventId, ctx.user!.id);
+      if (!ev || ev.brandId !== input.brandId) throw new TRPCError({ code: "NOT_FOUND", message: "找不到這個活動" });
+      if (input.action === "match" && !(ev.pos?.campaignPlan?.items ?? []).some((i: any) => i?.id === input.itemId)) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "企劃上找不到這一篇" });
+      }
+      const next = applyMatch((ev.pos?.campaignPerf ?? {}) as CampaignPerfStore, input.key, input.action, input.itemId ?? null);
+      await saveCampaignPerf(input.eventId, ctx.user!.id, next);
+      return { ok: true };
+    }),
+
+  /** 粉專沒有的數字（名單、訂單、營收…）手動填；null＝清掉。 */
+  campaignManual: protectedProcedure
+    .input(z.object({
+      brandId: z.number().int().positive(), eventId: z.number().int().positive(),
+      phase: z.enum(["teaser", "launch", "sustain", "lastcall", "encore"]),
+      metric: z.string().regex(/^[a-z]{2,20}$/),
+      value: z.number().min(0).max(1_000_000_000).nullable(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertBrandAccess(ctx.user!.id, input.brandId);
+      const ev = await loadCampaignEvent(input.eventId, ctx.user!.id);
+      if (!ev || ev.brandId !== input.brandId) throw new TRPCError({ code: "NOT_FOUND", message: "找不到這個活動" });
+      const store = (ev.pos?.campaignPerf ?? {}) as CampaignPerfStore;
+      const manual = { ...(store.manual ?? {}) };
+      const row = { ...(manual[input.phase] ?? {}) };
+      if (input.value == null) delete row[input.metric]; else row[input.metric] = input.value;
+      manual[input.phase] = row;
+      await saveCampaignPerf(input.eventId, ctx.user!.id, { ...store, manual });
+      return { ok: true };
+    }),
+
   outputTags: protectedProcedure
     .input(z.object({ outputId: z.number().int().positive() }))
     .query(async ({ ctx, input }) => {
