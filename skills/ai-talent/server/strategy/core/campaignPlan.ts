@@ -88,9 +88,16 @@ export interface PartnerBlock { summary: string; steps: PartnerStep[] }
 export interface CampaignPlan {
   smp: string;
   items: PlanItem[];
+  /**
+   * 每一段要讓人記住的一句話（2026-09-30 CJ 的策略地圖：總覽時每段上方寫這一段
+   * 的訊息，放大到某一段時是那一段的主軸）。舊企劃沒有這個欄位，畫面就不顯示。
+   */
+  phaseMessages?: Partial<Record<CampaignPhaseId, string>>;
   kol?: PartnerBlock | null;
   cobrand?: PartnerBlock | null;
   generatedAt: string;
+  /** 定稿時間。定稿＝整份（設定＋企劃）鎖住，要改先解鎖；內容層只寫定稿過的東西。 */
+  lockedAt?: string | null;
 }
 
 const DAY = 86_400_000;
@@ -234,6 +241,24 @@ export function reconcileItems(args: {
     });
   });
 
+  return out;
+}
+
+/**
+ * 模型回來的「每一段的訊息」→ 只收這份企劃真的有的階段，其他丟掉。
+ * 沒寫的段就留空——不拿階段目的去冒充訊息，畫面上空著比講錯好。
+ */
+export function reconcilePhaseMessages(raw: any, beats: Beat[]): Partial<Record<CampaignPhaseId, string>> {
+  const present = new Set(beats.map((b) => b.phase));
+  const out: Partial<Record<CampaignPhaseId, string>> = {};
+  const list: any[] = Array.isArray(raw?.phases) ? raw.phases : [];
+  for (const p of list) {
+    const id = typeof p?.phase === "string" ? p.phase.trim() : "";
+    const msg = typeof p?.message === "string" ? p.message.trim().slice(0, 60) : "";
+    if (!msg || !(CAMPAIGN_PHASE_IDS as readonly string[]).includes(id)) continue;
+    if (!present.has(id as CampaignPhaseId) || out[id as CampaignPhaseId]) continue;
+    out[id as CampaignPhaseId] = msg;
+  }
   return out;
 }
 
@@ -481,9 +506,10 @@ export async function buildCampaignPlan(args: {
     `【要排的檔期格子】\n${beatList}`,
     `【候選任務卡（只能從這裡挑）】\n${cardMenu}`,
     "",
-    "請為每一格挑一張卡並寫出這一篇要講什麼。只輸出 JSON，鍵名固定如下：",
-    `{"smp":"這檔活動的一句話訴求（25字內）","items":[{"beat":0,"platform":"facebook","taskId":"逐字抄自候選清單","angle":"這一篇要講什麼（20-45字）"}]}`,
+    "請為每一格挑一張卡並寫出這一篇要講什麼，再為每一個階段寫一句這段要讓人記住的訊息。只輸出 JSON，鍵名固定如下：",
+    `{"smp":"這檔活動的一句話訴求（25字內）","phases":[{"phase":"階段 id","message":"這一段要讓人記住的一句話（20字內）"}],"items":[{"beat":0,"platform":"facebook","taskId":"逐字抄自候選清單","angle":"這一篇要講什麼（20-45字）"}]}`,
     `items 必須剛好 ${beats.length} 筆，beat 從 0 到 ${beats.length - 1} 各一次。`,
+    `phases 只寫這些階段，各一次：${[...new Set(beats.map((b) => b.phase))].join("、")}。每段的訊息要扣回一句話訴求，而且段與段之間要有推進（預熱不講優惠、開賣講清楚機制、倒數講期限）。`,
   ].filter(Boolean).join("\n");
 
   // 2026-09-29（CJ「生文前都要讀取策略層的內容」）：以前只給品牌名稱＋活動設定＋
@@ -497,7 +523,7 @@ export async function buildCampaignPlan(args: {
       { role: "system", content: brain ? `${SYSTEM}\n\n# 品牌大腦（每一篇的角度都要扣回這裡）${brain}` : SYSTEM },
       { role: "user", content: user },
     ],
-    maxTokens: 2500,
+    maxTokens: 3000,
   });
   const text = String(r.choices?.[0]?.message?.content ?? "");
   const parsed = safeJSON<any>(text, null);
@@ -511,6 +537,8 @@ export async function buildCampaignPlan(args: {
   return {
     smp: smp || facts.name,
     items,
+    phaseMessages: reconcilePhaseMessages(parsed, beats),
+    lockedAt: null,
     kol: s.partners?.kol ? kolBlock(s.mechanic, cards) : null,
     cobrand: s.partners?.cobrand ? cobrandBlock(s.mechanic, facts.brandName || "這個品牌") : null,
     generatedAt: new Date().toISOString(),

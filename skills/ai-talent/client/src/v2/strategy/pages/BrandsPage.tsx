@@ -53,7 +53,7 @@ import { visualSpecOf } from "../lib/visualAssets";
 import { strategyCrumbs, type CrumbTarget } from "../lib/strategyCrumbs";
 import { pickProductImageUrl } from "../lib/productImage";
 import { readProductFacts } from "../lib/productFacts";
-import CampaignWorkspace from "../components/positioning/CampaignWorkspace";
+import CampaignStage, { CampaignLockToggle } from "../components/positioning/CampaignStage";
 import CopyAssetBoard, { COPY_ASSETS } from "../components/positioning/CopyAssetBoard";
 import VisualAssetBoard from "../components/positioning/VisualAssetBoard";
 import { pipelineFor, type PipelineStepSpec } from "../lib/positioningPipeline";
@@ -1502,6 +1502,12 @@ export default function BrandsPage() {
             );
           })()}
 
+            {/* 活動的宣傳企劃：同一個位置、同一顆鎖頭，鎖的是整份企劃（定稿）。 */}
+            {category === "campaign" && scopeMode === "event" && scope?.eventId && (
+              <div className="mt-2 sm:mt-0 sm:absolute sm:top-1/2 sm:-translate-y-1/2 sm:left-[calc(100%+18px)]">
+                <CampaignLockToggle eventId={scope.eventId} en={lang === "en"} />
+              </div>
+            )}
             {(category === "positioning" || category === "copy" || category === "visual") && activeBrandIdForLocks && (() => {
               const tab = category as "positioning" | "copy" | "visual";
               const tabLabel = tab === "positioning"
@@ -2316,12 +2322,12 @@ export default function BrandsPage() {
             </>
           )}
 
-          {/* ── 宣傳企劃（活動限定）──
-              2026-09-25：策略層只排不寫。每一格的「去寫這篇」與底部的「開始撰寫」
-              都是通往內容層活動 tray 的門。 */}
+          {/* ── 活動（策略＋宣傳企劃，活動限定）──
+              2026-09-30（CJ 選 Tesla 分割畫面）：活動定位與宣傳企劃合成一個畫面，
+              策略層只排不寫；定稿後「到內容層寫」才出現。 */}
           {derivedCategory === "campaign" && scopeMode === "event" && scope?.eventId && (
-            <div style={{ padding: "24px" }}>
-              <CampaignWorkspace eventId={scope.eventId} brandId={scope?.brandId ?? brandId ?? null} />
+            <div style={{ padding: "16px 24px 32px" }}>
+              <CampaignStage eventId={scope.eventId} brandId={scope?.brandId ?? brandId ?? null} />
             </div>
           )}
 

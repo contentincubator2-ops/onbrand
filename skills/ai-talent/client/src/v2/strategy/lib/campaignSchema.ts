@@ -175,6 +175,10 @@ export interface CampaignPlan {
   /** 這檔活動的一句話訴求。 */
   smp: string;
   items: CampaignPlanItem[];
+  /** 每一段要讓人記住的一句話；舊企劃沒有。 */
+  phaseMessages?: Partial<Record<CampaignPhaseId, string>>;
+  /** 定稿時間；有值＝整份鎖住。 */
+  lockedAt?: string | null;
   kol?: CampaignPartnerBlock | null;
   cobrand?: CampaignPartnerBlock | null;
   generatedAt?: string;
