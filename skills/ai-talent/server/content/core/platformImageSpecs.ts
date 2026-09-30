@@ -9,7 +9,7 @@
  * 2026-09-30（CJ「按照這張表所列出的真實尺寸調整」，OnBrand_圖片尺寸漏項清單.xlsx）：
  * 補上表中 P1（一般類、尺寸明確）與 P2（廣告類、官方已確認）的尺寸；P3（官方資料
  * 未取得、依模板而定）不建卡。gpt-image-2 生不出超過 3:1 的比例，TikTok Ad Network
- * 的 640×200／640×100 Banner 因此不建卡（不能先生再裁）。每通路只預設擺兩張
+ * 的 640×200／640×100 Banner 改用「方形主體＋背景色補滿」合成（compose）。每通路只預設擺兩張
  * （pinned），其餘由用戶在「新增尺寸」自己加（brands.positioning.__imageTray）。
  *
  * 鐵律（CJ「不能是生成後依規格精準裁切，因為這通常會切不准，要嚴格限制在指令當中」）：
@@ -60,6 +60,12 @@ export interface PlatformImageSpec {
   format: "png" | "jpeg";
   /** 檔案上限（bytes），例如 LINE 圖文選單 1MB。 */
   maxBytes?: number;
+  /**
+   * 合成版型：比例超出模型能力（>3:1）的細長 Banner。模型只生成一塊方形主體圖
+   * （單色背景），伺服器把主體放在 side 那一端，其餘用主體圖的背景色補滿——
+   * 不裁切，也不拉伸。2026-09-30 CJ 同意 640×200／640×100 用這個方式。
+   */
+  compose?: { side: "left" | "right" };
   source: string;
 }
 
@@ -232,6 +238,15 @@ export const PLATFORM_IMAGE_SPECS: PlatformImageSpec[] = [
     compositionEn: "Square 1:1 image that must read at thumbnail size: one bold simple subject, high contrast against a plain background, no fine detail.",
     format: "jpeg", maxBytes: 30 * 1024 * 1024, source: "https://www.facebook.com/business/ads-guide/update/image",
   },
+  {
+    id: "fb-ad-catalog", channel: "facebook", placement: "ad",
+    labelZh: "商品目錄圖（動態商品廣告）", labelEn: "Catalog product image",
+    descZh: "Commerce Manager 商品目錄用的商品圖，動態商品廣告與商店都會用到。", descEn: "Catalog image for dynamic product ads and Shops.",
+    width: 1024, height: 1024, maxImages: 1, titleZone: "none",
+    noteZh: "1:1，官方建議 1024×1024（至少 500×500）；JPG/PNG、8MB 內。同一目錄的圖請統一比例。",
+    compositionEn: "Square 1:1 catalog product image, product as the clear hero, centred with even margins on a clean plain background.",
+    format: "jpeg", maxBytes: 8 * 1024 * 1024, source: "https://www.facebook.com/business/help/686259348512056",
+  },
 
   // ── Instagram ───────────────────────────────────────────────────────────
   {
@@ -389,6 +404,42 @@ export const PLATFORM_IMAGE_SPECS: PlatformImageSpec[] = [
     compositionEn: "Vertical 4:5 advertising image that stands out in a busy grid: one bold subject, simple background, headline space in the upper area.",
     format: "jpeg", maxBytes: 30 * 1024 * 1024, source: "https://www.facebook.com/business/ads-guide/update/image",
   },
+  {
+    id: "ig-ad-profile-feed", channel: "instagram", placement: "ad",
+    labelZh: "廣告：個人檔案動態", labelEn: "Ad · profile feed",
+    descZh: "出現在別人個人檔案貼文之間的廣告。", descEn: "Ad shown between posts on profiles.",
+    width: 1440, height: 1800, maxImages: 1, titleZone: "top",
+    noteZh: "官方沒有獨立規格：這個版位沿用動態消息的素材，所以用 4:5、1440×1800。",
+    compositionEn: "Vertical 4:5 advertising image, one clear focal subject in the middle, headline space in the upper area.",
+    format: "jpeg", maxBytes: 30 * 1024 * 1024, source: "https://www.facebook.com/business/help/2163679757136292",
+  },
+  {
+    id: "ig-ad-search", channel: "instagram", placement: "ad",
+    labelZh: "廣告：搜尋結果", labelEn: "Ad · search results",
+    descZh: "IG 搜尋結果頁裡的廣告。", descEn: "Ad inside Instagram search results.",
+    width: 1440, height: 1800, maxImages: 1, titleZone: "top",
+    noteZh: "官方支援 1.91:1、16:9、1:1、4:5（圖片建議 4:5），不支援 2:3；像素沿用動態消息 1440×1800。",
+    compositionEn: "Vertical 4:5 advertising image that stands out among search results: one bold subject, simple background, headline space in the upper area.",
+    format: "jpeg", maxBytes: 30 * 1024 * 1024, source: "https://www.facebook.com/business/help/682655495435254",
+  },
+  {
+    id: "ig-ad-catalog", channel: "instagram", placement: "ad",
+    labelZh: "商品目錄圖（方形）", labelEn: "Catalog image · square",
+    descZh: "購物廣告與 IG 商店用的商品圖（與 FB 共用同一份目錄）。", descEn: "Catalog image for shopping ads and IG Shops.",
+    width: 1024, height: 1024, maxImages: 1, titleZone: "none",
+    noteZh: "1:1，官方建議 1024×1024（至少 500×500）；JPG/PNG、8MB 內。",
+    compositionEn: "Square 1:1 catalog product image, product as the clear hero, centred with even margins on a clean plain background.",
+    format: "jpeg", maxBytes: 8 * 1024 * 1024, source: "https://www.facebook.com/business/help/686259348512056",
+  },
+  {
+    id: "ig-ad-catalog-45", channel: "instagram", placement: "ad",
+    labelZh: "商品目錄圖（直式 4:5）", labelEn: "Catalog image · 4:5",
+    descZh: "只用目錄圖的輪播購物廣告可用 4:5，版面更大。", descEn: "4:5 for catalog-only carousel ads.",
+    width: 1080, height: 1350, maxImages: 1, titleZone: "none",
+    noteZh: "4:5，至少 1080 寬；同一目錄請統一比例，否則輪播會自動調整。",
+    compositionEn: "Vertical 4:5 catalog product image, product as the clear hero, centred with even margins on a clean plain background.",
+    format: "jpeg", maxBytes: 8 * 1024 * 1024, source: "https://www.facebook.com/business/ads-guide/update/carousel/instagram-feed/outcome-sales",
+  },
 
   // ── Threads ─────────────────────────────────────────────────────────────
   {
@@ -481,9 +532,9 @@ export const PLATFORM_IMAGE_SPECS: PlatformImageSpec[] = [
     labelZh: "圖文訊息（長版）", labelEn: "Rich message · tall",
     descZh: "在聊天室佔更大版面，適合主打活動。", descEn: "Takes more chat space.",
     width: 1040, height: 1560, maxImages: 1, titleZone: "top",
-    noteZh: "1040×1560（2:3）。",
+    noteZh: "1040×1560（2:3），屬官方「自訂版型」1040×520–2080 範圍；自訂版型只能設一個點擊區。",
     compositionEn: "Vertical 2:3 promotional image; headline space at top, subject in the middle, calm bottom band for a call-to-action button.",
-    format: "jpeg", maxBytes: 10 * 1024 * 1024, source: "https://www.celiasu.com/2021/10/line-rich-message-canva-design.html",
+    format: "jpeg", maxBytes: 10 * 1024 * 1024, source: "https://www.lycbiz.com/jp/manual/OfficialAccountManager/rich-messages/",
   },
   {
     id: "line-img-richmenu-large", pinned: true, channel: "line",
@@ -515,11 +566,35 @@ export const PLATFORM_IMAGE_SPECS: PlatformImageSpec[] = [
   {
     id: "line-img-card-visual", channel: "line",
     labelZh: "多頁訊息（影像）", labelEn: "Card message · visual",
-    descZh: "近方形大圖卡，左上有標語、下方有按鈕。", descEn: "Near-square visual card.",
-    width: 1110, height: 1000, maxImages: 9, safeZone: { top: 0.15, bottom: 0.2, left: 0, right: 0 }, titleZone: "none",
-    noteZh: "1.11:1，最多 9 張；左上角與底部會被標語、按鈕蓋住。",
-    compositionEn: "Near-square 1.11:1 visual card; subject centred, top-left corner and bottom band kept plain.",
-    format: "jpeg", maxBytes: 10 * 1024 * 1024, source: "https://help2.line.me/official_account_tw/web/pc?lang=zh-Hant&contentId=200001327",
+    descZh: "大圖卡，左上有標語、下方有按鈕。", descEn: "Visual card with a label and button.",
+    width: 1540, height: 1000, maxImages: 9, safeZone: { top: 0.15, bottom: 0.2, left: 0, right: 0 }, titleZone: "none",
+    noteZh: "1.54:1（官方手冊；網路常見的 1.11:1 查無官方出處），最多 9 張；左上角與底部會被標語、按鈕蓋住。",
+    compositionEn: "Landscape 1.54:1 visual card; subject centred, top-left corner and bottom band kept plain.",
+    format: "jpeg", maxBytes: 10 * 1024 * 1024, source: "https://tw.linebiz.com/manual/line-official-account/20200515elearning05/",
+  },
+  ...([
+    [350, "短橫幅", "Short banner", "Wide banner strip; one subject, calm and simple."],
+    [585, "橫式", "Landscape", "Landscape image; subject centred, headline space on top."],
+    [700, "中型", "Medium", "Landscape image; subject centred, headline space on top."],
+    [1300, "直式", "Portrait", "Vertical image; headline space at top, subject in the middle, calm bottom band for a button."],
+    [1850, "長版", "Extra tall", "Very tall image; headline at top, subject in the middle, calm bottom band for a button."],
+  ] as const).map(([h, zh, en, comp]): PlatformImageSpec => ({
+    id: `line-img-richmsg-${h}`, channel: "line",
+    labelZh: `圖文訊息（${zh} 1040×${h}）`, labelEn: `Rich message · ${en}`,
+    descZh: "官方圖文訊息版型之一，可在後台切點擊區。", descEn: "An official rich-message template.",
+    width: 1040, height: h, maxImages: 1, titleZone: h <= 700 ? "left" : "top",
+    noteZh: `1040×${h}；10MB 內。點擊區在 LINE 後台切，重點不要壓在切線上。`,
+    compositionEn: comp,
+    format: "jpeg", maxBytes: 10 * 1024 * 1024, source: "https://www.lycbiz.com/jp/manual/OfficialAccountManager/rich-messages/",
+  })),
+  {
+    id: "line-img-card-person", channel: "line",
+    labelZh: "多頁訊息（人物）", labelEn: "Card message · person",
+    descZh: "介紹講師、店員、設計師的人物卡。", descEn: "Card introducing a person.",
+    width: 1080, height: 1080, maxImages: 9, titleZone: "none",
+    noteZh: "官方未限制比例，這裡做 1:1；JPG/PNG、10MB 內，最多 9 張。",
+    compositionEn: "Square 1:1 portrait-style image, one person or persona-representing subject centred, plain background, consistent across cards.",
+    format: "jpeg", maxBytes: 10 * 1024 * 1024, source: "https://tw.linebiz.com/manual/line-official-account/20200515elearning05/",
   },
   {
     id: "line-img-broadcast", channel: "line",
@@ -685,6 +760,87 @@ export const PLATFORM_IMAGE_SPECS: PlatformImageSpec[] = [
     compositionEn: "Wide 1.91:1 image; subject on the right half, calm left area for a headline.",
     format: "jpeg", maxBytes: 1000 * 1024, source: "LINE TODAY Scroller Media Guide（官方 PDF）",
   },
+  {
+    id: "line-ad-today-backdrop", channel: "line", placement: "ad",
+    labelZh: "TODAY：Backdrop", labelEn: "TODAY · Backdrop",
+    descZh: "文章頁背景滿版的直式圖片版位。", descEn: "Tall full-bleed backdrop behind articles.",
+    width: 1080, height: 1620, maxImages: 1, safeZone: { top: 0.1, bottom: 0.1, left: 0.08, right: 0.08 }, titleZone: "center",
+    noteZh: "1080×1620（2:3）；JPG/PNG、950KB 內、不可透明。官方上架表有標安全區，重點放中間。",
+    compositionEn: "Vertical 2:3 backdrop; subject and focal detail in the central area, edges atmospheric only.",
+    format: "jpeg", maxBytes: 950 * 1024, source: "LINE TODAY Ad Publication Form 2508（tw.linebiz.com/download/line-guaranteed-ads）",
+  },
+  {
+    id: "line-ad-today-masthead", channel: "line", placement: "ad",
+    labelZh: "TODAY：Masthead 橫幅", labelEn: "TODAY · Masthead banner",
+    descZh: "頁首的細長橫幅；右側主體、左側品牌色底可疊標題。", descEn: "Thin masthead banner.",
+    width: 1125, height: 294, maxImages: 1, titleZone: "left", compose: { side: "right" },
+    noteZh: "1125×294（3.83:1 超出 AI 原生比例：方形主體放右端＋同色背景補滿）；950KB 內。另需 144×144 圓形 logo 與 11 字內標題，請用品牌 logo 原檔。",
+    compositionEn: "One bold, simple subject that reads at a small size.",
+    format: "jpeg", maxBytes: 950 * 1024, source: "LINE TODAY Ad Publication Form 2508（tw.linebiz.com/download/line-guaranteed-ads）",
+  },
+  {
+    id: "line-ad-today-inread", channel: "line", placement: "ad",
+    labelZh: "TODAY：In-read 圖片", labelEn: "TODAY · In-read image",
+    descZh: "文章內文中間出現的圖片廣告。", descEn: "Image ad inside article text.",
+    width: 1200, height: 628, maxImages: 1, titleZone: "left",
+    noteZh: "1200×628；JPG/PNG、950KB 內。",
+    compositionEn: "Wide 1.91:1 image; subject on the right half, calm left area for a headline.",
+    format: "jpeg", maxBytes: 950 * 1024, source: "LINE TODAY Ad Publication Form 2508（tw.linebiz.com/download/line-guaranteed-ads）",
+  },
+  {
+    id: "line-ad-visionbox-banner", channel: "line", placement: "ad",
+    labelZh: "TODAY：Vision Box 底部橫幅", labelEn: "TODAY · Vision Box banner",
+    descZh: "Vision Box 收合時的底部細長橫幅。", descEn: "Collapsed bottom banner of Vision Box.",
+    width: 1125, height: 294, maxImages: 1, titleZone: "left", compose: { side: "right" },
+    noteZh: "1125×294（安全區 1000×236；左上 50%×35% 是 AD 標示）。3.83:1 超出 AI 原生比例：方形主體放右端＋同色背景補滿。",
+    compositionEn: "One bold, simple subject that reads at a small size.",
+    format: "jpeg", maxBytes: 950 * 1024, source: "LINE TODAY Vision Box 設計規範 260320（官方 PDF）",
+  },
+  {
+    id: "line-ad-visionbox-full", channel: "line", placement: "ad",
+    labelZh: "TODAY：Vision Box 全螢幕", labelEn: "TODAY · Vision Box full-screen",
+    descZh: "Vision Box 展開後的直式全螢幕圖。", descEn: "Expanded full-screen Vision Box image.",
+    width: 640, height: 1280, maxImages: 1, safeZone: { top: 0.07, bottom: 0.3, left: 0.055, right: 0.055 }, titleZone: "center",
+    noteZh: "640×1280（安全區 570×768）；小螢幕會切掉下方 640×384，左上 AD 標示、右上關閉鈕要避開；不建議透明 PNG。",
+    compositionEn: "Tall 1:2 full-screen image; subject and focal detail in the upper-middle area, the bottom third may be hidden on small phones, keep corners plain.",
+    format: "jpeg", maxBytes: 950 * 1024, source: "LINE TODAY Vision Box 設計規範 260320（官方 PDF）",
+  },
+  {
+    id: "line-ad-oap-cover", channel: "line", placement: "ad",
+    labelZh: "TODAY 官方帳號推播：封面", labelEn: "TODAY OAP · cover",
+    descZh: "LINE TODAY 官方帳號推播（主 OA）的封面圖。", descEn: "Cover image of a LINE TODAY OA push.",
+    width: 520, height: 336, maxImages: 1, titleZone: "none",
+    noteZh: "520×336、2MB 內（官方規範表 2023-04 版，送件前請再核對）。屬性 OA 封面要用官方 PSD 範本。",
+    compositionEn: "Small landscape cover, one clear subject, simple background, reads well as a thumbnail.",
+    format: "jpeg", maxBytes: 2 * 1024 * 1024, source: "OAP 情報快遞廣編文規範表 v230424（官方 xlsx）",
+  },
+  {
+    id: "line-ad-oap-article", channel: "line", placement: "ad",
+    labelZh: "TODAY 官方帳號推播：內文圖", labelEn: "TODAY OAP · article images",
+    descZh: "推播文章內的圖片，最多 5 張。", descEn: "Up to 5 images inside the OA push article.",
+    width: 1920, height: 1080, maxImages: 5, titleZone: "none",
+    noteZh: "1920×1080，最多 5 張、每張 2MB 內（官方規範表 2023-04 版）。",
+    compositionEn: "Wide 16:9 editorial image, one clear subject, consistent style across the set.",
+    format: "jpeg", maxBytes: 2 * 1024 * 1024, source: "OAP 情報快遞廣編文規範表 v230424（官方 xlsx）",
+  },
+  {
+    id: "line-ad-wallet-popup", channel: "line", placement: "ad",
+    labelZh: "錢包蓋板", labelEn: "Wallet popup",
+    descZh: "LINE 錢包分頁跳出的蓋板廣告圖。", descEn: "Popup ad on the LINE Wallet tab.",
+    width: 1125, height: 960, maxImages: 1, safeZone: { top: 0.08, bottom: 0.15, left: 0.07, right: 0.07 }, titleZone: "top",
+    noteZh: "1125×960 PNG、400–600KB；左上 AD 標示、分級標示與法定文字（≥21pt）會佔位；主標 10 字、按鈕 18 字內。",
+    compositionEn: "Near-square 1.17:1 popup visual; subject centred, corners and the bottom band kept plain for badges and a button.",
+    format: "png", maxBytes: 600 * 1024, source: "Wallet Tab Popup AD Guide v7（官方 PDF，2025-09）",
+  },
+  {
+    id: "line-ad-desktop-community", channel: "line", placement: "ad",
+    labelZh: "電腦版社群廣告", labelEn: "Desktop community ad",
+    descZh: "LINE 電腦版社群的圖片廣告。", descEn: "Image ad in LINE desktop communities.",
+    width: 1280, height: 720, maxImages: 1, titleZone: "left",
+    noteZh: "1280×720、PNG/JPG、10MB 內（官方上架表 2025-12）；製作規範未公開，重點放中間。",
+    compositionEn: "Wide 16:9 image; subject centre-right, calm left third for a headline.",
+    format: "jpeg", maxBytes: 10 * 1024 * 1024, source: "LINE Desktop Ad 廣告上架表－社群 2512（官方 xlsx）",
+  },
 
   // ── TikTok ──────────────────────────────────────────────────────────────
   {
@@ -784,8 +940,26 @@ export const PLATFORM_IMAGE_SPECS: PlatformImageSpec[] = [
     labelZh: "Ad Network：專用 Banner", labelEn: "Ad Network · banner",
     descZh: "Ad Network 專用 Banner 版位。", descEn: "Dedicated Ad Network banner.",
     width: 600, height: 500, maxImages: 1, titleZone: "none",
-    noteZh: "600×500；640×200、640×100 超過 3:1，AI 無法原生生成，不提供。",
+    noteZh: "600×500；JPG/PNG。",
     compositionEn: "Near-square 1.2:1 banner that reads at small size: one bold subject, plain background, no fine detail.",
+    format: "jpeg", source: "https://ads.tiktok.com/help/article/specifications-for-pangle-ad-assets",
+  },
+  {
+    id: "tt-an-banner-640x200", channel: "tiktok", placement: "ad",
+    labelZh: "Ad Network：Banner 640×200", labelEn: "Ad Network · banner 640×200",
+    descZh: "細長 Banner：右側放主體，左側是品牌色底，可疊標題。", descEn: "Thin banner: subject on the right, flat colour on the left.",
+    width: 640, height: 200, maxImages: 1, titleZone: "left", compose: { side: "right" },
+    noteZh: "3.2:1 超出 AI 原生比例：生成方形主體後，放在右端、其餘補上同色背景（不裁切）。",
+    compositionEn: "One bold, simple subject that reads at a tiny size.",
+    format: "jpeg", source: "https://ads.tiktok.com/help/article/specifications-for-pangle-ad-assets",
+  },
+  {
+    id: "tt-an-banner-640x100", channel: "tiktok", placement: "ad",
+    labelZh: "Ad Network：Banner 640×100", labelEn: "Ad Network · banner 640×100",
+    descZh: "最細的 Banner：右側小主體，左側是品牌色底，可疊短標題。", descEn: "Thinnest banner: small subject right, colour on the left.",
+    width: 640, height: 100, maxImages: 1, titleZone: "left", compose: { side: "right" },
+    noteZh: "6.4:1 超出 AI 原生比例：生成方形主體後，放在右端、其餘補上同色背景（不裁切）。",
+    compositionEn: "One bold, very simple subject that still reads at icon size.",
     format: "jpeg", source: "https://ads.tiktok.com/help/article/specifications-for-pangle-ad-assets",
   },
 
@@ -891,6 +1065,14 @@ const GPT_MIN_PIXELS = 655_360;
 /** 超過 2560×1440 屬實驗性，不用。 */
 const GPT_MAX_PIXELS = 2560 * 1440;
 const GPT_MAX_EDGE = 3840;
+
+/**
+ * 模型實際要生成的尺寸。一般卡＝交付尺寸；合成版型（compose）只生成方形主體，
+ * 邊長＝交付高度。
+ */
+export function generationSize(spec: Pick<PlatformImageSpec, "width" | "height" | "compose">): { width: number; height: number } {
+  return spec.compose ? { width: spec.height, height: spec.height } : { width: spec.width, height: spec.height };
+}
 
 /** 比例容差：生成比例與交付比例差多少以內算「同一個比例」。 */
 export const RATIO_TOLERANCE = 0.01;
@@ -998,6 +1180,16 @@ export function resolveImageTray(positioning: unknown, channel: string): { ids: 
  */
 export function canvasPromptBlock(spec: PlatformImageSpec): string {
   const lines: string[] = [];
+  if (spec.compose) {
+    lines.push(
+      `CANVAS (mandatory): square 1:1 subject tile. It will sit at the ${spec.compose.side} end of a very wide ${spec.width}x${spec.height} banner; ` +
+      `the rest of that banner is filled with this image's background colour. So: one subject, centred with comfortable margins, ` +
+      `on a single plain flat solid-colour background (use a brand colour if given) — no gradient, no vignette, no texture, ` +
+      `no shadow or object touching any edge. Nothing will be cropped.`,
+    );
+    lines.push(`FRAMING: ${spec.compositionEn}`);
+    return lines.join("\n");
+  }
   const orient = spec.width > spec.height ? "landscape" : spec.width < spec.height ? "portrait" : "square";
   lines.push(
     `CANVAS (mandatory): ${spec.width}x${spec.height} pixels, aspect ratio ${ratioLabel(spec.width, spec.height)}, ${orient}. ` +
