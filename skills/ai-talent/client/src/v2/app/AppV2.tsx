@@ -15,7 +15,7 @@
  *
  * Auth gate is unchanged — RequireAuth still wraps protected routes.
  */
-import { isChunkLoadError, autoReloadForStaleChunk, installStaleChunkRecovery, StaleChunkScreen } from "./staleChunk";
+import { isChunkLoadError, recoverFromStaleChunk, installStaleChunkRecovery, StaleChunkScreen } from "./staleChunk";
 import React from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import { LanguageProvider } from "../../lib/i18n";
@@ -138,7 +138,8 @@ class AppErrorBoundary extends React.Component<
   static getDerivedStateFromError(error: Error) { return { error }; }
   componentDidCatch(error: Error, info: React.ErrorInfo) {
     // Stale-chunk auto-recovery: hard-reload once on deployment-induced 404.
-    if (isChunkLoadError(error) && autoReloadForStaleChunk()) return;
+    // 重載已排定時也直接 return——那個錯誤只是重載前的殘影，不是 bug。
+    if (recoverFromStaleChunk(error)) return;
     // eslint-disable-next-line no-console
     console.error("[AppV2] render error:", error, info);
     // 2026-05-11 — auto-report to the Sentry-lite error_log table so the

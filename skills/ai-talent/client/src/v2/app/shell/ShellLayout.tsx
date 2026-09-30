@@ -8,7 +8,7 @@
  * Content area paddingLeft = 70px always (collapsed) or 280px (expanded).
  */
 import { buildMemoryView, type BrandMemoryData } from "../../strategy/components/brain/memoryModel";
-import { isChunkLoadError, autoReloadForStaleChunk, StaleChunkScreen } from "../staleChunk";
+import { isChunkLoadError, recoverFromStaleChunk, StaleChunkScreen } from "../staleChunk";
 import React from "react";
 import { createPortal } from "react-dom";
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
@@ -2259,7 +2259,8 @@ class RouteErrorBoundary extends React.Component<
   static getDerivedStateFromError(error: Error) { return { error, resetKey: 0 }; }
   componentDidCatch(error: Error, info: React.ErrorInfo) {
     // Stale-chunk auto-recovery: hard-reload once on deployment-induced 404.
-    if (isChunkLoadError(error) && autoReloadForStaleChunk()) return;
+    // 重載已排定時也直接 return——那個錯誤只是重載前的殘影，不是 bug。
+    if (recoverFromStaleChunk(error)) return;
     // eslint-disable-next-line no-console
     console.error("[RouteErrorBoundary] route render error:", error, info);
     try {

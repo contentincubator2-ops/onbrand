@@ -17,10 +17,32 @@ const KEY = "_chunk_reload_log";
 const WINDOW_MS = 60_000;
 const MAX_RELOADS = 2;
 
+/**
+ * 2026-09-30（CJ「短暫一秒內出現錯誤畫面，然後轉回正常」，不同用戶都遇到）：
+ * 已經叫了 window.location.reload() 但頁面還沒真的重載的那一小段時間。
+ * vite:preloadError 被 preventDefault 之後，Vite 會把失敗的 import 當成 undefined
+ * 交給 React.lazy，React 就丟 "Cannot use 'in' operator to search for 'default'
+ * in undefined"——這不是頁面的錯，只是重載前的殘影。旗標亮著時 error boundary
+ * 一律留白、不記錄，讓重載安靜落地。
+ */
+let reloadPending = false;
+export function isStaleReloadPending(): boolean { return reloadPending; }
+
 export function isChunkLoadError(err: unknown): boolean {
+  if (reloadPending) return true; // 重載已排定，之後任何 render 錯誤都是它的後果
   const e = err as { message?: string; stack?: string } | null;
   const text = (e?.message ?? String(err ?? "")) + " " + (e?.stack ?? "");
-  return /Failed to fetch dynamically imported module|ChunkLoadError|Loading chunk|Loading CSS chunk|error loading dynamically imported module|Importing a module script failed|Unable to preload CSS/i.test(text);
+  // 後兩條是 React.lazy 拿到 undefined module 的症狀（dev build 與 prod build 各一種）。
+  return /Failed to fetch dynamically imported module|ChunkLoadError|Loading chunk|Loading CSS chunk|error loading dynamically imported module|Importing a module script failed|Unable to preload CSS|Cannot use 'in' operator to search for 'default' in undefined|Cannot read propert(?:y|ies) of undefined \(reading 'default'\)/i.test(text);
+}
+
+/**
+ * Error boundary 的唯一入口：是 stale chunk 且已處理（重載排定中或剛排定）就回傳 true，
+ * boundary 直接 return，不印 console、不寫 error_log。
+ */
+export function recoverFromStaleChunk(err: unknown): boolean {
+  if (!isChunkLoadError(err)) return false;
+  return reloadPending || autoReloadForStaleChunk();
 }
 
 /** 視窗內還有額度就重新整理並回傳 true；額度用完回傳 false（交給畫面處理）。 */
@@ -34,6 +56,7 @@ export function autoReloadForStaleChunk(): boolean {
   } catch {
     return false; // sessionStorage 被擋就不自動重整，避免無法計數造成迴圈
   }
+  reloadPending = true;
   window.location.reload();
   return true;
 }
@@ -51,6 +74,8 @@ export function installStaleChunkRecovery() {
 /** 自動重整額度用完時的畫面：一個圖示、一個按鈕。 */
 export function StaleChunkScreen({ fullPage = false }: { fullPage?: boolean }) {
   const en = typeof navigator !== "undefined" && !/^zh/i.test(navigator.language);
+  // 重載已排定：留白就好，下一瞬間就是新頁面，不要閃任何字或圖示。
+  if (reloadPending) return <div style={{ minHeight: fullPage ? "100vh" : 320 }} />;
   return (
     <div
       style={{
