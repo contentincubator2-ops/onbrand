@@ -41,6 +41,7 @@ import { buildBrandPrefix as buildBrandContext, enforceBrandRulesOnText, enforce
 import { isEmailBodyTask, EDM_CRAFT_RUBRIC, edmPlaybookFor } from "./edmCraft";
 import { isInstagramTask, isInstagramBodyTask, IG_CRAFT_RUBRIC, igPlaybookFor } from "./igCraft";
 import { resolveTierVariantShape } from "./tierVariantShape";
+import { resolveSingleVersion } from "./singleVersion";
 import { isFacebookBodyTask, FB_CRAFT_RUBRIC, fbPlaybookFor } from "./fbCraft";
 import { isLinkedInBodyTask, LI_CRAFT_RUBRIC, liPlaybookFor } from "./liCraft";
 import { isTikTokBodyTask, TT_CRAFT_RUBRIC, ttPlaybookFor } from "./ttCraft";
@@ -2020,6 +2021,20 @@ export async function runOrchestra(args: {
         extras: { ...defaultExtras, ...(args.config.extras ?? {}) },
       },
     };
+  }
+  // 2026-09-29（CJ「任務產出直接就只有一個版本」）：單篇的替代版本收斂成一篇，
+  // 換風格改在產出頁換 agent 重寫。套組／多卡／候選池／多選即交付物的卡不動 —— 見 singleVersion.ts。
+  if (tier === "30s") {
+    const single = resolveSingleVersion({
+      taskId: args.template?.id,
+      variants: args.config.variants,
+      images: args.config.images,
+      variantLabels: args.config.variantLabels,
+      postLabels: args.config.postLabels,
+      postsCount: args.config.extras?.postsCount,
+      cardsPerVariant: args.config.cardsPerVariant,
+    });
+    if (single) args = { ...args, config: { ...args.config, ...single } };
   }
   const baseBudget = tier === "60s" ? HARD_BUDGET_60S : tier === "99s" ? HARD_BUDGET_99S : HARD_BUDGET_MS;
   // 長文件卡（案例提報 / 行事曆整月大綱）本質上不是 30s 的工作量，但仍走
