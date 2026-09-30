@@ -93,7 +93,7 @@ export function directionsSystemPrompt(spec: PlatformImageSpec, withProduct: boo
 - paletteZh：色調一句話（優先用品牌色）
 - whyZh：為什麼適合這篇文案 20–40 字
 - promptEn：給圖片模型的英文場景描述 60–120 字（主體、環境、光線、鏡頭、情緒），必須符合這張卡的構圖規則：${spec.compositionEn}
-${withProduct ? "- 使用者會附上真實產品照：promptEn 只描述產品以外的場景、光線、擺放位置，不要重新描述或改寫產品外觀。\n" : ""}
+${spec.compose ? "- 這是細長 Banner 的方形主體圖：promptEn 只描述單一主體，放在一整片純色背景上（不要場景、桌面、窗戶、地平線），四周留白。\n" : ""}${withProduct ? "- 使用者會附上真實產品照：promptEn 只描述產品以外的場景、光線、擺放位置，不要重新描述或改寫產品外觀。\n" : ""}
 另外給 headlineZh：從文案濃縮一句 6–14 字的圖上標題（會疊在圖上，不是畫進圖裡）。
 
 規則：畫面裡不能有任何文字、招牌字、logo 字樣；不要提到競品品牌。
@@ -150,6 +150,14 @@ export function buildImageCardPrompt(args: {
     );
   }
   lines.push("Scene:", args.scenePromptEn, "");
+  if (args.spec.compose) {
+    lines.push(
+      "OVERRIDE for this banner tile (takes priority over the scene above): show ONLY the main subject, isolated, " +
+      "on one flat solid-colour background that fills every edge of the frame — no room, window, table edge, horizon, " +
+      "gradient or texture reaching the borders. Keep the subject compact, centred, with at least 15% empty margin on every side.",
+      "",
+    );
+  }
   if (args.instruction) {
     lines.push(`CHANGE REQUEST from the user (apply this, keep everything else the same): ${args.instruction}`, "");
   }
@@ -177,26 +185,43 @@ const COVERS_DIR = process.env.COVERS_DIR ?? "/opt/onbrand/covers";
 const COVERS_URL_PREFIX = process.env.COVERS_URL_PREFIX ?? "/static/covers";
 
 /**
- * 合成版型：方形主體等比縮到交付高度，放在 side 那一端；其餘畫布用主體圖外框的
- * 顏色（取中位數，擋掉零星雜點）補滿。模型被要求用單色背景，所以接縫看不出來。
+ * 合成版型：方形主體等比縮到交付高度，放在 side 那一端；其餘畫布用主體「朝向空白那一側」
+ * 邊緣顏色的中位數補滿，並把那一側 35% 寬度羽化進底色——就算模型的背景不夠平，
+ * 也不會出現硬接縫。只做混色，不裁切、不拉伸。
  */
+export const COMPOSE_FEATHER = 0.35;
+
 async function composeBanner(
   buffer: Buffer,
   spec: PlatformImageSpec,
   gen: { width: number; height: number },
 ): Promise<Buffer> {
   const sharp = (await import("sharp")).default;
-  const tile = await sharp(buffer).resize(gen.width, gen.height, { fit: "fill" }).removeAlpha().raw().toBuffer();
-  const n = gen.width;
-  const border: number[][] = [[], [], []];
-  const push = (x: number, y: number) => { const i = (y * n + x) * 3; for (let c = 0; c < 3; c++) border[c]!.push(tile[i + c]!); };
-  for (let i = 0; i < n; i++) { push(i, 0); push(i, gen.height - 1); }
-  for (let j = 0; j < gen.height; j++) { push(0, j); push(n - 1, j); }
+  const W = gen.width, H = gen.height;
+  const tile = await sharp(buffer).resize(W, H, { fit: "fill" }).removeAlpha().raw().toBuffer();
+  const toRight = spec.compose!.side === "right";            // 主體在右 → 空白在左
+  const edgeX = toRight ? 0 : W - 1;
+  const cols: number[][] = [[], [], []];
+  for (let y = 0; y < H; y++) for (let dx = 0; dx < Math.max(2, Math.round(W * 0.03)); dx++) {
+    const x = toRight ? edgeX + dx : edgeX - dx;
+    const i = (y * W + x) * 3;
+    for (let c = 0; c < 3; c++) cols[c]!.push(tile[i + c]!);
+  }
   const median = (a: number[]) => a.sort((x, y) => x - y)[Math.floor(a.length / 2)]!;
-  const [r, g, b] = border.map(median) as [number, number, number];
-  const subject = await sharp(tile, { raw: { width: gen.width, height: gen.height, channels: 3 } }).png().toBuffer();
+  const [r, g, b] = cols.map(median) as [number, number, number];
+  // 主體加 alpha：朝空白那側從 0 漸變到 1（smoothstep），其餘不透明。
+  const rgba = Buffer.alloc(W * H * 4);
+  const band = W * COMPOSE_FEATHER;
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const d = toRight ? x : W - 1 - x;
+    const t = Math.min(1, d / band);
+    const a = t * t * (3 - 2 * t);
+    const si = (y * W + x) * 3, di = (y * W + x) * 4;
+    rgba[di] = tile[si]!; rgba[di + 1] = tile[si + 1]!; rgba[di + 2] = tile[si + 2]!; rgba[di + 3] = Math.round(a * 255);
+  }
+  const subject = await sharp(rgba, { raw: { width: W, height: H, channels: 4 } }).png().toBuffer();
   return sharp({ create: { width: spec.width, height: spec.height, channels: 3, background: { r, g, b } } })
-    .composite([{ input: subject, top: 0, left: spec.compose!.side === "right" ? spec.width - gen.width : 0 }])
+    .composite([{ input: subject, top: 0, left: toRight ? spec.width - W : 0 }])
     .png()
     .toBuffer();
 }
