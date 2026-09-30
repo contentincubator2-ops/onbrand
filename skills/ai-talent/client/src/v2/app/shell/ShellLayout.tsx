@@ -226,6 +226,8 @@ function buildNavItems(lang: "zh-TW" | "en", userEmail?: string | null, currentP
       { to: "/performance/attribution", label: en ? "Attribution" : "歸因", icon: <FontAwesomeIcon icon={faDatabase} />, matchPrefix: "/performance/attribution", tooltip: en ? "Attribution" : "整合歸因" },
       // 2026-08-13 (CJ「新的任務 tray，稱為粉絲團月報，是 dev 底下大家都有的」)
       { to: "/performance/fanpage_monthly", label: en ? "FB Monthly" : "粉絲團月報", icon: <FontAwesomeIcon icon={faFileLines} />, matchPrefix: "/performance/fanpage_monthly", tooltip: en ? "Fanpage monthly report" : "上傳自己的月報版型，找出可自動填的欄位" },
+      // 2026-09-30：活動企劃的目標 vs 真的發出去的貼文（成效層「活動」tray）。
+      { to: "/performance/campaign", label: en ? "Campaigns" : "活動", icon: <FontAwesomeIcon icon={ICON.campaign} />, matchPrefix: "/performance/campaign", tooltip: en ? "Campaign plan vs what was actually posted" : "活動企劃 vs 真的發出去的貼文" },
     ];
   }
 

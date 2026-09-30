@@ -21,6 +21,7 @@ import ConnectionsPanel from "../components/ConnectionsPanel";
 import { setMockBrandSeed } from "../components/perfMockData";
 import FanpageMonthlyReport from "../components/FanpageMonthlyReport";
 import LensWorkspace from "../components/LensWorkspace";
+import CampaignPerformance from "../components/CampaignPerformance";
 import AddonRequestModal from "../../platform/components/AddonRequestModal";
 
 type Source = {
@@ -63,6 +64,9 @@ const performanceSources: Source[] = [
   // 2026-08-13 (CJ「將這份報告設定在成效報告當中，新的任務 tray，稱為粉絲團月報」):
   // 不刻儀表板 —— 使用者上傳自己在用的月報版型，系統跨月比對出可自動填的欄位。
   { id: "fanpage_monthly", label: "粉絲團月報", short: "月報", icon: <TextIcon size={18} />, desc: "上傳你自己的月報版型，系統跨月比對後回填數據" },
+  // 2026-09-30（CJ「讓真實的成效，引導到成效層，建立一個活動 mission tray」）：活動企劃的
+  // 目標 vs 真的發出去的貼文。不是從這裡發的、或發文時間改了，都在這裡對照。
+  { id: "campaign", label: "活動", short: "活動", icon: <CampaignIcon size={18} />, desc: "活動企劃的每一段目標，對照真的發出去的貼文" },
 ];
 
 const performanceTasks: Record<string, TaskCard[]> = {
@@ -161,7 +165,7 @@ export default function DataWorkspacePage() {
   // 2026-09-29：這個 tray 有沒有真數據（perf_facts）。有 → 只看上面的視角報表；
   // 沒有 → 下面才放示意儀表板，讓人知道接上之後長什麼樣子。
   const wsQ = (trpc as any).performance?.workspace?.useQuery
-    ? (trpc as any).performance.workspace.useQuery({ brandId: brandId ?? 0, tray: active.id }, { enabled: !!brandId, refetchOnWindowFocus: false })
+    ? (trpc as any).performance.workspace.useQuery({ brandId: brandId ?? 0, tray: active.id }, { enabled: !!brandId && active.id !== "campaign", refetchOnWindowFocus: false })
     : { data: undefined };
   const hasRealData = ((wsQ.data as any)?.trayFacts ?? 0) > 0;
 
@@ -171,7 +175,8 @@ export default function DataWorkspacePage() {
         <h1 style={{ margin: 0, fontSize: 28, fontWeight: 850, color: INK }}>成效儀表板</h1>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) 340px", gap: 16, alignItems: "start" }}>
+      {/* 活動 tray 要整寬（各段卡片＋貼文對照表），不放右側的資料串接欄。 */}
+      <div style={{ display: "grid", gridTemplateColumns: active.id === "campaign" ? "minmax(0, 1fr)" : "minmax(0, 1fr) 340px", gap: 16, alignItems: "start" }}>
         <main style={{ minWidth: 0 }}>
           <div style={{ border: "1px solid #e5e7eb", borderRadius: 24, background: "#FFFFFF", padding: 22, marginBottom: 14 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
@@ -185,17 +190,19 @@ export default function DataWorkspacePage() {
             </div>
           </div>
 
+          {/* 活動 tray 有自己的畫面（企劃 vs 實際），不疊視角報表與示意儀表板。 */}
+          {active.id === "campaign" && <CampaignPerformance brandId={brandId} />}
           {/* 2026-09-29（CJ「所有成效層的 mission tray 都有最上面的三個選項」）：
               範本／我的報告／貼對話＋真數據的視角報表，每個 tray 都一樣。 */}
-          <LensWorkspace brandId={brandId} tray={active.id} />
-          {!hasRealData && <PlanNudge />}
+          {active.id !== "campaign" && <LensWorkspace brandId={brandId} tray={active.id} />}
+          {active.id !== "campaign" && !hasRealData && <PlanNudge />}
           {/* 粉絲團月報有自己的流程（上傳版型 → 跨月解析 → 體檢報告），不是
               PerformanceDashboard 那種模擬儀表板，所以整頁換掉而不是疊加。 */}
           {active.id === "fanpage_monthly" && <FanpageMonthlyReport />}
           {/* 2026-09-07 資料來源卡片：總覽最上方，先讓人看到「哪些接了、哪些沒接、
               沒接的要怎麼接」，再看下面標了「⚠ 模擬資料」的示意儀表板。 */}
           {active.id === "overview" && <ConnectionsPanel brandId={brandId} />}
-          {active.id !== "fanpage_monthly" && !hasRealData && (
+          {active.id !== "fanpage_monthly" && active.id !== "campaign" && !hasRealData && (
             <>
               <div style={{ margin: "4px 0 10px", fontSize: 13, color: "#6b7280" }}>以下為示意：接上資料後，這一頁的完整儀表板長這樣。</div>
               <PerformanceDashboard sourceId={active.id} />
@@ -224,7 +231,7 @@ export default function DataWorkspacePage() {
           </div>
         </main>
 
-        <aside style={{ border: "1px solid #e5e7eb", borderRadius: 24, background: "#fff", padding: 18, position: "sticky", top: 84, maxHeight: "calc(100vh - 100px)", overflowY: "auto" }}>
+        {active.id !== "campaign" && <aside style={{ border: "1px solid #e5e7eb", borderRadius: 24, background: "#fff", padding: 18, position: "sticky", top: 84, maxHeight: "calc(100vh - 100px)", overflowY: "auto" }}>
           <div style={{ fontSize: 12, fontWeight: 850, letterSpacing: "0.16em", textTransform: "uppercase", color: "#9ca3af" }}>Evidence Panel</div>
           <h3 style={{ margin: "8px 0 10px", fontSize: 18, fontWeight: 850, color: INK }}>資料串接狀態</h3>
           {["Meta Ads API / 報表匯入", "Google Ads / GA4", "Shopline Open API", "跨平台整合歸因表"].map((x) => (
@@ -238,7 +245,7 @@ export default function DataWorkspacePage() {
               粉專貼文可以直接同步；廣告、GA4 與電商訂單先上傳匯出檔就能看漏斗。API 直連屬於電商營運報告的建置範圍，由 SoWork 在導入時設定。
             </p>
           </div>
-        </aside>
+        </aside>}
       </div>
     </div>
   );
