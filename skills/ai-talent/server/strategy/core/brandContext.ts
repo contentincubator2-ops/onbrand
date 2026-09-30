@@ -223,8 +223,6 @@ interface BrainEntry {
   keptChars: number;
   trimmed: boolean;
   dropped: boolean;
-  /** 舊版 brand_brain 的列 id——只有這種記憶沒有編輯頁，「記憶」可以直接忘掉。 */
-  legacyRowId?: number;
   /** 這一行是從哪裡讀來的（見 BrainItem.source）。 */
   source?: string;
 }
@@ -245,12 +243,6 @@ export interface BrainItem {
   status: BrainItemStatus;
   /** 存的內容開頭，給畫面預覽。 */
   preview: string;
-  /**
-   * 2026-09-30（CJ「像操作手機的記憶一樣，按照引導去清理記憶」）：舊版 brand_brain
-   * 表的列 id。這張表已經沒有寫入端、也沒有編輯頁，所以清理只能在記憶空間直接忘掉
-   * （brandKnowledge.forgetLegacy）。其他記憶都回到原本的策略層頁面精簡。
-   */
-  legacyRowId?: number;
   /**
    * 2026-09-30（CJ「策略層有品牌、產品、活動、文字、視覺，還有其他真實存入的資料，要整理得
    * 精細」）：這一行記憶的出處，讓「記憶」頁把**所有存著的欄位**逐欄對到「AI 讀了沒」。
@@ -285,7 +277,7 @@ class BrainCollector {
   /** 一行 prompt＝一筆記憶。raw 是用戶存的原文，max 是這一格最多記住幾字。 */
   add(
     section: SectionKey, category: BrainTier, label: string, raw: string, max: number,
-    render?: (kept: string) => string, extra?: { legacyRowId?: number; source?: string },
+    render?: (kept: string) => string, extra?: { source?: string },
   ): void {
     const text = raw.trim();
     if (!text) return;
@@ -295,7 +287,6 @@ class BrainCollector {
       display: displayOf(section, category, label),
       line: render ? render(kept) : `【${label}】${kept}`,
       storedChars: len(text), keptChars: len(kept), trimmed, dropped: false,
-      ...(extra?.legacyRowId ? { legacyRowId: extra.legacyRowId } : {}),
       source: extra?.source ?? SOURCE_OF[`${category}|${label}`],
     });
   }
@@ -785,7 +776,7 @@ export async function buildBrandBrain(
     if (rows && rows.length > 0) {
       for (const r of rows as any[]) {
         c.add("legacy", "legacy", `${r.category}｜${r.title}`, String(r.content ?? ""), 400,
-          (k) => `【${r.category}】${r.title}：${k}`, { legacyRowId: Number(r.id) || undefined, source: `legacy:${r.id}` });
+          (k) => `【${r.category}】${r.title}：${k}`, { source: `legacy:${r.id}` });
       }
     }
 
@@ -929,7 +920,6 @@ export async function buildBrandBrain(
         keptChars: e.dropped ? 0 : e.keptChars,
         status: e.dropped ? "overflow" : e.trimmed ? "trimmed" : "remembered",
         preview: e.line.replace(/^【[^】]*】/, "").slice(0, 80),
-        ...(e.legacyRowId ? { legacyRowId: e.legacyRowId } : {}),
         ...(e.source ? { source: e.source } : {}),
       })),
       ...c.checkOnly,

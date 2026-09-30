@@ -17,8 +17,6 @@ export interface BrainItem {
   keptChars: number;
   status: BrainItemStatus;
   preview: string;
-  /** 舊版 brand_brain 列 id：沒有編輯頁，只能在「記憶」直接忘掉。 */
-  legacyRowId?: number;
   /** 出處（pos:… / asset:… / custom:… 等，見 server BrainItem.source）。 */
   source?: string;
 }

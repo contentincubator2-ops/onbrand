@@ -6,8 +6,7 @@
  * 存入的資料。你這樣整理，不是很精細」）：原本的大腦畫面只列 buildBrandBrain 讀進 prompt
  * 的那幾行——沒被讀的欄位（產品策略、活動旅程、視覺、知識庫……）完全看不到，用戶以為
  * 沒存。這裡一次回傳：
- *   · 原始資料（品牌定位 JSON、每個產品、每個活動、基本資料欄位、視覺、會議、知識庫、
- *     人設等），client 用策略層同一份 schema（positioningSchema / copyAssets /
+ *   · 原始資料（品牌定位 JSON、每個產品、每個活動、基本資料欄位、視覺），client 用策略層同一份 schema（positioningSchema / copyAssets /
  *     visualAssets）逐欄攤開——標題與欄位名跟策略層頁面一字不差；
  *   · 每一種寫作情境的大腦（只寫品牌／寫某個產品／寫某個活動），item 帶 source，
  *     client 用它把每一欄對到「讀了／只讀前段／沒讀到／只存著」。
@@ -34,8 +33,6 @@ export interface BrandMemory {
   products: Array<{ id: number; name: string; positioning: any; photoCount: number; brain: MemoryBrain }>;
   events: Array<{ id: number; name: string; startAt: string | null; endAt: string | null; positioning: any; brain: MemoryBrain }>;
   visual: { swatchCount: number; swatches: string[]; brandPhotoCount: number };
-  knowledge: Array<{ id: number; kind: string; title: string; chars: number }>;
-  meetings: Array<{ id: number; topic: string; scope: string; runs: number; adopted: number }>;
 }
 
 const parse = (v: any): any => {
@@ -73,14 +70,10 @@ export async function loadBrandMemory(brandId: number, userId: number): Promise<
     ? colors.swatches.map((s: any) => str(s?.hex)).filter(Boolean)
     : [];
 
-  const [productRows, eventRows, photoRows, knowledgeRows, meetingRows, runRows] = await Promise.all([
+  const [productRows, eventRows, photoRows] = await Promise.all([
     rowsOf(`SELECT id, name, positioning FROM products WHERE brandId = ? ORDER BY updatedAt DESC LIMIT ${MAX_ENTITIES}`, [brandId]),
     rowsOf(`SELECT id, name, startAt, endAt, positioning FROM events WHERE brandId = ? ORDER BY updatedAt DESC LIMIT ${MAX_ENTITIES}`, [brandId]),
     rowsOf(`SELECT scope, scopeId, COUNT(*) AS c FROM asset_photos WHERE brandId = ? GROUP BY scope, scopeId`, [brandId]),
-    rowsOf(`SELECT id, kind, title, CHAR_LENGTH(COALESCE(body, '')) AS chars FROM brand_knowledge_items
-             WHERE brandId = ? AND userId = ? ORDER BY updatedAt DESC`, [brandId, userId]),
-    rowsOf(`SELECT id, topic, scope FROM strategy_meetings WHERE brandId = ? AND userId = ? ORDER BY id`, [brandId, userId]),
-    rowsOf(`SELECT meetingId, decisions FROM strategy_meeting_runs WHERE brandId = ?`, [brandId]),
   ]);
 
   const photoCount = (scope: string, scopeId: number) =>
@@ -92,15 +85,6 @@ export async function loadBrandMemory(brandId: number, userId: number): Promise<
     Promise.all(productRows.map((p) => buildBrandBrain(brandId, Number(p.id), null))),
     Promise.all(eventRows.map((e) => buildBrandBrain(brandId, null, Number(e.id)))),
   ]);
-
-  const meetings = meetingRows.map((m) => {
-    const runs = runRows.filter((r) => Number(r.meetingId) === Number(m.id));
-    const adopted = runs.reduce((n, r) => {
-      const d = parse(r.decisions);
-      return n + (d && typeof d === "object" ? Object.values(d).filter((x: any) => x?.status === "adopted" || x?.status === "modified").length : 0);
-    }, 0);
-    return { id: Number(m.id), topic: str(m.topic), scope: str(m.scope), runs: runs.length, adopted };
-  });
 
   return {
     capacity: BRAIN_CAPACITY,
@@ -122,7 +106,5 @@ export async function loadBrandMemory(brandId: number, userId: number): Promise<
       positioning: parse(e.positioning) ?? {}, brain: onlyCategory(eventBrains[i]!, "event"),
     })),
     visual: { swatchCount: swatches.length, swatches: swatches.slice(0, 8), brandPhotoCount },
-    knowledge: knowledgeRows.map((k) => ({ id: Number(k.id), kind: str(k.kind), title: str(k.title), chars: Number(k.chars ?? 0) })),
-    meetings,
   };
 }
