@@ -1932,12 +1932,6 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
               </div>
             </div>
           ) : null}
-                    {lang === "en" ? tab.labelEn : tab.labelZh}
-                  </button>
-                );
-              })}
-            </div>
-          )}
 
           {/* 2026-09-06 通路選擇。沒有這一區，用戶被鎖在方案預設值上，
               「11 個通路選 2 個、每月可更換一次」那句賣點就不存在。 */}
