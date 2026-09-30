@@ -13,7 +13,7 @@
  * 顏色只表達狀態（快滿＝琥珀、滿了＝紅），其餘一律灰階。
  */
 import { useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import type { IconDefinition } from "@fortawesome/fontawesome-svg-core";
 import { ICON } from "../../../platform/components/icons";
@@ -21,8 +21,8 @@ import { trpc } from "../../../../lib/trpc";
 import { useLang } from "../../../../lib/i18n";
 import BrainGlyph from "./BrainGlyph";
 import {
-  buildMemoryView, fmtChars, SECTION_TEXT,
-  type BrandMemoryData, type MemEntity, type MemRow, type MemSection, type MemoryView, type SectionKey,
+  buildMemoryView, editHrefFromMemory, fmtChars, memKey, parseMem, SECTION_TEXT,
+  type BrandMemoryData, type MemScreen as Screen, type MemEntity, type MemRow, type MemSection, type MemoryView, type SectionKey,
 } from "./memoryModel";
 
 interface Props {
@@ -38,15 +38,22 @@ const SECTION_ICON: Record<SectionKey, IconDefinition> = {
   brand: ICON.brand, product: ICON.bundle, event: ICON.campaign, copy: ICON.font, visual: ICON.palette, info: ICON.info,
 };
 
-type Screen = { section: SectionKey; entity?: string } | null;
 
 export default function BrainPanel({ brandId, initialProductId, initialEventId }: Props) {
   const { lang } = useLang();
   const en = lang === "en";
   const navigate = useNavigate();
-  const [screen, setScreen] = useState<Screen>(() =>
-    initialProductId ? { section: "product", entity: `p${initialProductId}` }
+  const [searchParams, setSearchParams] = useSearchParams();
+  const screen: Screen = parseMem(searchParams.get("mem"))
+    ?? (initialProductId ? { section: "product", entity: `p${initialProductId}` }
       : initialEventId ? { section: "event", entity: `e${initialEventId}` } : null);
+  const setScreen = (s: Screen) => setSearchParams((prev) => {
+    const next = new URLSearchParams(prev);
+    const m = memKey(s);
+    if (m) next.set("mem", m); else next.delete("mem");
+    next.delete("p"); next.delete("e");
+    return next;
+  }, { replace: true });
 
   const memQ = (trpc as any).brandKnowledge.memory.useQuery({ brandId }, { enabled: !!brandId, refetchOnWindowFocus: true });
   const data: BrandMemoryData | null | undefined = memQ.data;
@@ -80,7 +87,7 @@ export default function BrainPanel({ brandId, initialProductId, initialEventId }
                   ))}
                 </div>
               )
-          ) : <Stored entity={cur.entities[0]!} en={en} onEdit={(h) => navigate(h)} />}
+          ) : <Stored entity={cur.entities[0]!} en={en} onEdit={(r) => navigate(editHrefFromMemory(r, screen))} />}
         </>
       )}
 
@@ -88,7 +95,7 @@ export default function BrainPanel({ brandId, initialProductId, initialEventId }
         <>
           <BackBar label={T(cur.key)} onBack={() => open({ section: cur.key })} />
           <Head icon={SECTION_ICON[cur.key]} title={entity.name} used={entity.usedChars} capacity={view.capacity} en={en} />
-          <Stored entity={entity} en={en} onEdit={(h) => navigate(h)} />
+          <Stored entity={entity} en={en} onEdit={(r) => navigate(editHrefFromMemory(r, screen))} />
         </>
       )}
     </div>
@@ -163,7 +170,7 @@ function Bar({ used, capacity, tone, className = "" }: { used: number; capacity:
 
 /* ── 存了什麼 ───────────────────────────────────────────────── */
 
-function Stored({ entity, en, onEdit }: { entity: MemEntity; en: boolean; onEdit: (href: string) => void }) {
+function Stored({ entity, en, onEdit }: { entity: MemEntity; en: boolean; onEdit: (row: MemRow) => void }) {
   if (!entity.groups.length) return <Empty en={en} />;
   return (
     <div className="space-y-5">
@@ -171,7 +178,7 @@ function Stored({ entity, en, onEdit }: { entity: MemEntity; en: boolean; onEdit
         <div key={g.title}>
           <div className="mb-2 px-1 text-[12px] font-semibold text-neutral-400">{g.title}</div>
           <ul className="overflow-hidden rounded-2xl bg-neutral-50">
-            {g.rows.map((r) => <FieldRow key={r.id} row={r} en={en} onClick={() => onEdit(r.href)} />)}
+            {g.rows.map((r) => <FieldRow key={r.id} row={r} en={en} onClick={() => onEdit(r)} />)}
           </ul>
         </div>
       ))}

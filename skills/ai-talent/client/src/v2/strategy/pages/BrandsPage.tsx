@@ -812,6 +812,27 @@ export default function BrandsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scopeMode]);
 
+  // 2026-09-30（CJ「修改後，要怎麼導引回記憶這個頁面」「加一個到記憶的按鈕」）：從「記憶」點欄位
+  // 過來時網址帶 focus（`seg:<id>` / `asset:<key>`），直接打開那一段。放在上面兩個重設 section
+  // 的 effect 之後，scope 載入完成觸發重設時也會再套回來。
+  const memoryFocus = searchParams.get("focus");
+  const fromMemory = searchParams.get("from") === "memory" && category !== "brain";
+  React.useEffect(() => {
+    if (!memoryFocus) return;
+    // 只在它所屬的頁套用：切到別的分頁時網址還留著 focus，不能在那裡打開錯的段落。
+    const fits = memoryFocus.startsWith("seg:") ? category === "positioning"
+      : memoryFocus.startsWith("asset:") ? category === "copy" || category === "visual" : false;
+    if (fits) setSection(memoryFocus);
+  }, [memoryFocus, category, scopeMode]);
+  const backToMemory = () => setSearchParams(() => {
+    const next = new URLSearchParams();
+    if (activeBrandIdForLocks) next.set("b", String(activeBrandIdForLocks));
+    next.set("cat", "brain");
+    const mem = searchParams.get("mem");
+    if (mem) next.set("mem", mem);
+    return next;
+  });
+
   // When scope switches to event/product, knowledge/visual tiles
   // aren't shown — force category back to positioning so the content
   // area doesn't render a hidden tab's contents. CJ 2026-05-13.
@@ -1703,6 +1724,16 @@ export default function BrandsPage() {
 
         {/* Right: scope-aware content pane — driven by `section` (sidebar handles all nav) */}
         <div className="flex-1 min-w-0 overflow-y-auto flex flex-col" style={{ minWidth: 0 }}>
+          {/* 從「記憶」點過來改內容：改完一鍵回到剛剛那一層（見 backToMemory）。 */}
+          {fromMemory && (
+            <div style={{ padding: "12px 28px 0" }}>
+              <button type="button" onClick={backToMemory}
+                className="inline-flex items-center gap-2 rounded-full border border-neutral-300 bg-white px-3.5 py-1.5 text-[13px] font-medium text-neutral-800 transition-colors hover:border-neutral-900">
+                <MemoryIcon size={13} />
+                {lang === "en" ? "Back to Memory" : "回到記憶"}
+              </button>
+            </div>
+          )}
           {/* ── 知識庫 ── */}
           {derivedCategory === "knowledge" && (
             <div style={{ padding: "16px 28px 0", display: "flex", flexDirection: "column", gap: 16 }}>

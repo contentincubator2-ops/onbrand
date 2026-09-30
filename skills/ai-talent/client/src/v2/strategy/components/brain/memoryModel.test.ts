@@ -6,7 +6,7 @@
  *   3. 固定六區、跟 rail 同順序；不產生任何系統面的狀態（沒讀到、舊版大腦、知識庫）。
  */
 import { describe, expect, it } from "vitest";
-import { buildMemoryView, textOf, type BrandMemoryData } from "./memoryModel";
+import { buildMemoryView, editHrefFromMemory, parseMem, textOf, type BrandMemoryData } from "./memoryModel";
 
 const item = (source: string, category: string, status: any = "remembered") =>
   ({ category, group: "", label: source, storedChars: 1, keptChars: 1, status, preview: "", source });
@@ -87,5 +87,34 @@ describe("textOf", () => {
   it("字串、清單、表格列、巢狀物件都攤成一段", () => {
     expect(textOf([{ name: "A", body: "B" }, "C"])).toBe("A · B · C");
     expect(textOf({ a: "", b: ["x"] })).toBe("x");
+  });
+});
+
+describe("從記憶去修改、再回到記憶", () => {
+  const v = buildMemoryView(data(), 5, false);
+  const rows = (k: string) => v.sections.find((s) => s.key === k)!.entities.flatMap((e) => e.groups.flatMap((g) => g.rows));
+
+  it("產品欄位：去該產品的定位頁、打開那一段，並帶著回程位置", () => {
+    const price = rows("product").find((r) => r.label === "售價")!;
+    const href = editHrefFromMemory(price, { section: "product", entity: "p11" });
+    const q = new URLSearchParams(href.split("?")[1]);
+    expect(q.get("cat")).toBe("positioning");
+    expect(q.get("p")).toBe("11");
+    expect(q.get("focus")).toBe("seg:facts");
+    expect(q.get("from")).toBe("memory");
+    expect(parseMem(q.get("mem"))).toEqual({ section: "product", entity: "p11" });
+  });
+
+  it("文字卡打開那張卡；沒有對應段落的欄位不帶 focus", () => {
+    const hook = rows("copy").find((r) => r.id === "copy-hook_library")!;
+    expect(new URLSearchParams(editHrefFromMemory(hook, { section: "copy" }).split("?")[1]).get("focus")).toBe("asset:hook_library");
+    const market = rows("info").find((r) => r.id === "info-market")!;
+    expect(new URLSearchParams(editHrefFromMemory(market, { section: "info" }).split("?")[1]).get("focus")).toBeNull();
+  });
+
+  it("網址上亂填的 mem 不會開出不存在的區", () => {
+    expect(parseMem("nope.p1")).toBeNull();
+    expect(parseMem(null)).toBeNull();
+    expect(parseMem("event")).toEqual({ section: "event" });
   });
 });

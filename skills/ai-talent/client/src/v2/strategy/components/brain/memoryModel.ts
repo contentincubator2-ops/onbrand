@@ -49,6 +49,11 @@ export interface MemRow {
   counted: boolean;
   /** 在策略層哪一頁改。 */
   href: string;
+  /**
+   * 到了那一頁直接打開哪一段（BrandsPage 的 section id：定位段落 `seg:<id>`、文字卡 `asset:<key>`）。
+   * 2026-09-30（CJ「修改後，要怎麼導引回記憶這個頁面」）：從記憶點過去要落在那一段，不是頁面最上面。
+   */
+  focus?: string;
 }
 
 export interface MemGroup { title: string; rows: MemRow[] }
@@ -105,7 +110,7 @@ export function textOf(v: any): string {
 
 const len = (s: string) => [...s].length;
 
-interface RowInput { id: string; label: string; text?: string; display?: string; source?: string }
+interface RowInput { id: string; label: string; text?: string; display?: string; source?: string; focus?: string }
 
 function makeRows(inputs: RowInput[], read: Set<string>, href: string): MemRow[] {
   return inputs
@@ -114,7 +119,7 @@ function makeRows(inputs: RowInput[], read: Set<string>, href: string): MemRow[]
       const text = r.text ?? "";
       return {
         id: r.id, label: r.label, chars: len(text), display: r.display, preview: text.slice(0, 90),
-        counted: !!r.source && read.has(r.source), href,
+        counted: !!r.source && read.has(r.source), href, ...(r.focus ? { focus: r.focus } : {}),
       };
     });
 }
@@ -130,6 +135,7 @@ function positioningGroups(pos: any, segments: SegmentSpec[], read: Set<string>,
     title: (en && seg.titleEn) || seg.title,
     rows: makeRows(seg.fields.map((f) => ({
       id: `${prefix}-${seg.id}.${f.key}`, label: f.label, text: textOf(p[seg.id]?.[f.key]), source: `pos:${seg.id}.${f.key}`,
+      focus: `seg:${seg.id}`,
     })), read, href),
   }));
   const cards = Array.isArray(p._customSegments) ? p._customSegments : [];
@@ -182,7 +188,7 @@ export function buildMemoryView(d: BrandMemoryData, brandId: number, en: boolean
       const text = spec.shape === "text" ? textOf(v?.text)
         : spec.shape === "items" ? textOf(v?.items)
         : (Array.isArray(v?.pairs) ? v.pairs.map((x: any) => `${x?.from ?? ""} → ${x?.to ?? ""}`).join(" · ") : "");
-      return { id: `copy-${spec.key}`, label: en ? spec.labelEn : spec.labelZh, text, source: `asset:${spec.key}` };
+      return { id: `copy-${spec.key}`, label: en ? spec.labelEn : spec.labelZh, text, source: `asset:${spec.key}`, focus: `asset:${spec.key}` };
     }), brandRead, `${base}&cat=copy`),
   }]);
 
@@ -257,6 +263,31 @@ export function buildMemoryView(d: BrandMemoryData, brandId: number, en: boolean
   const usedChars = sections.reduce((n, s) => n + s.usedChars, 0);
   const level = usedChars > d.capacity ? "over" : usedChars >= d.capacity * NEAR_FULL_RATIO ? "near" : "ok";
   return { capacity: d.capacity, usedChars, level, sections };
+}
+
+export type MemScreen = { section: SectionKey; entity?: string } | null;
+
+/**
+ * 點進去的位置寫在網址 ?mem=（`product` / `product.p11`）。
+ * 2026-09-30（CJ「當他修改後，要怎麼導引回記憶這個頁面」）：從記憶點欄位去原頁修改時，網址帶
+ * from=memory＋mem，原頁上的「回到記憶」按鈕照 mem 回到剛剛那一層，不用重新點進來。
+ */
+const SECTION_KEYS: SectionKey[] = ["brand", "product", "event", "copy", "visual", "info"];
+export function parseMem(raw: string | null): MemScreen {
+  if (!raw) return null;
+  const [section, entity] = raw.split(".");
+  if (!SECTION_KEYS.includes(section as SectionKey)) return null;
+  return entity ? { section: section as SectionKey, entity } : { section: section as SectionKey };
+}
+export const memKey = (s: MemScreen) => (s ? (s.entity ? `${s.section}.${s.entity}` : s.section) : "");
+
+/** 從記憶去原頁修改的網址：帶著回程（from/mem）與要打開的段落（focus）。 */
+export function editHrefFromMemory(row: MemRow, s: MemScreen): string {
+  const q = new URLSearchParams({ from: "memory" });
+  const m = memKey(s);
+  if (m) q.set("mem", m);
+  if (row.focus) q.set("focus", row.focus);
+  return `${row.href}&${q.toString()}`;
 }
 
 export function fmtChars(n: number): string {
