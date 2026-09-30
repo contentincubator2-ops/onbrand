@@ -42,6 +42,7 @@ import { getStrategyPublicGenerationState } from "../lib/strategyContentEnvelope
 import { checkViralSource, platformLabelForTask, taskNeedsViralSource } from "../lib/viralSourceGuard";
 import { intakeExtraFields, missingRequiredInputs, type IntakeField } from "../lib/taskIntake";
 import TaskCardComposer, { type ComposerChannel } from "../../strategy/components/taskCard/TaskCardComposer";
+import { AddEntityModal } from "../../strategy/components/AddEntityModal";
 import RewriteDraftModal from "../components/quickTask/RewriteDraftModal";
 import {
   Avatar, Button, Card, CardBody, Chip, Input, Modal, ModalBody,
@@ -458,6 +459,8 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
   // 2026-09-30 任務 modal 圖示化：目前點開的脈絡圖示（"__entity"＝產出對象），與選填欄位開關。
   const [ctxOpen, setCtxOpen] = useState<string | null>(null);
   const [showOptional, setShowOptional] = useState(false);
+  // 任務 modal 裡直接新增產品／活動（AddEntityModal 疊在上面）。
+  const [addEntityTab, setAddEntityTab] = useState<"product" | "event" | null>(null);
   const savePositioningMut = (trpc as any).scope?.savePositioning?.useMutation?.();
 
   const scopeActiveQuery = (trpc as any).scope?.active?.useQuery(
@@ -2477,9 +2480,6 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                       {lang === "en"
                         ? (activeTask.label_en ?? activeTask.label)
                         : (activeTask.label_zh ?? activeTask.label)}
-                      {activeTask.agent && (
-                        <span className="text-default-500 ml-2 font-normal">· {activeTask.agent.name}</span>
-                      )}
                     </p>
                   </div>
                 </div>
@@ -2750,8 +2750,14 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                     ...chips.filter((c) => c.hasContent && c.source !== "brand.name"),
                     ...chips.filter((c) => !c.hasContent && c.source !== "brand.name").slice(0, 4),
                   ] : [];
-                  const hasEntityChoice = !!brandId && (modalProducts.length > 0 || modalEvents.length > 0);
+                  // 2026-09-30（CJ「缺乏選擇產品的地方」）：只要有品牌就能切換；還沒有產品／活動時
+                  // 第二層直接給「＋新增產品／＋新增活動」，建完自動選成這次的產出對象。
+                  const hasEntityChoice = !!brandId;
                   const showNameTile = hasEntityChoice || (showChips && !!nameChip);
+                  const entityName =
+                    modalEntity.kind === "product" ? (modalProducts.find((p: any) => p.id === modalEntity.id)?.name ?? "")
+                    : modalEntity.kind === "event" ? (modalEvents.find((e: any) => e.id === modalEntity.id)?.name ?? "")
+                    : (brandName ?? brandCtx?.brand?.name ?? "");
                   const entityIcon: IconName =
                     modalEntity.kind === "product" ? "shop" : modalEntity.kind === "event" ? "campaign" : "brand";
                   const entityShort =
@@ -2800,10 +2806,10 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                           {showNameTile && tile(
                             "__entity",
                             entityIcon,
-                            entityShort,
+                            `${entityShort} ▾`,
                             {
                               active: ctxOpen === "__entity",
-                              tip: (brandCtx?.brand?.name ?? brandName ?? "") + (hasEntityChoice ? (lang === "en" ? " — click to switch" : " —— 點一下切換產出對象") : ""),
+                              tip: `${entityShort} · ${entityName}` + (hasEntityChoice ? (lang === "en" ? " — switch to a product or event" : " —— 點一下改成產品或活動") : ""),
                               onPress: () => toggle("__entity"),
                             },
                           )}
@@ -2837,7 +2843,11 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                               <Icon name="play" size={11} />
                             </span>
                           </span>
-                          <span className="text-[12px] font-semibold text-neutral-900">{t("qt_run_btn")}</span>
+                          {/* 2026-09-30（CJ「Yawen 的名字要跟人像對齊」）：名字從標題列搬到頭像正下方 */}
+                          <span className="flex flex-col items-center leading-tight">
+                            {agent && <span className="text-[12px] font-semibold text-neutral-900 max-w-[96px] truncate">{agent.name}</span>}
+                            <span className="text-[11px] font-semibold text-[#E85D2E]">{t("qt_run_btn")}</span>
+                          </span>
                         </button>
                       </div>
 
@@ -2883,6 +2893,18 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                                   }`}
                                 >
                                   {lang === "en" ? "Event · " : "活動 · "}{e.name}
+                                </button>
+                              ))}
+                              {(["product", "event"] as const).map((k) => (
+                                <button
+                                  key={`add-${k}`}
+                                  onClick={() => setAddEntityTab(k)}
+                                  className="text-xs px-2.5 py-1 rounded-full border border-dashed border-default-300 text-default-500 hover:border-default-500 hover:text-default-800 transition flex items-center gap-1"
+                                >
+                                  <AddIcon size={10} />
+                                  {k === "product"
+                                    ? (lang === "en" ? "New product" : "新增產品")
+                                    : (lang === "en" ? "New event" : "新增活動")}
                                 </button>
                               ))}
                             </div>
@@ -3018,6 +3040,7 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                         accentColor="#E85D2E"
                         progressPct={progressPct}
                         handoffAnchor
+                        activity={current?.key === "write" ? "write" : current?.key === "image" ? "image" : null}
                       />
                       <div className="flex items-center gap-1.5 -mt-1">
                         {phases.map((p, i) => (
@@ -3060,6 +3083,18 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
           )}
         </ModalContent>
       </Modal>
+
+      <AddEntityModal
+        isOpen={!!addEntityTab}
+        initialTab={addEntityTab ?? "product"}
+        defaultBrandId={brandId ?? null}
+        onClose={() => setAddEntityTab(null)}
+        onCreated={(kind, id) => {
+          if (kind === "product" || kind === "event") setModalEntity({ kind, id });
+          void modalProductsQuery?.refetch?.();
+          void modalEventsQuery?.refetch?.();
+        }}
+      />
 
       {/* 自建任務卡的作者流程。上架成功後重抓 listFB，新卡立刻出現在這一頁。 */}
       <TaskCardComposer
