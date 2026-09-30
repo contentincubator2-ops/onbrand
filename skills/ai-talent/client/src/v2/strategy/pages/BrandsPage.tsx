@@ -1886,6 +1886,21 @@ export default function BrandsPage() {
                       不是上傳整份定位書——CJ 特別點出這兩件事不要混為一談。） */}
                   {(pipeline.status === "idle" || pipeline.status === "done") && scopeMode !== "none" && (
                     <div className="flex items-center gap-2 mb-1 flex-wrap">
+                      {/* 2026-09-30（CJ「在活動頁籤上，又找不到入口了」）：活動定位頁以前
+                          沒有任何一條路通往這檔活動的宣傳企劃。 */}
+                      {scopeMode === "event" && scope?.eventId && (
+                        <StrategyToolIcon
+                          active
+                          onClick={() => setSearchParams((prev) => {
+                            const sp = new URLSearchParams(prev);
+                            sp.set("cat", "campaign");
+                            return sp;
+                          })}
+                          icon={faBullhorn}
+                          label={lang === "en" ? "Campaign plan →" : "宣傳企劃 →"}
+                          title={lang === "en" ? "Open this campaign's promotion plan" : "打開這檔活動的宣傳企劃"}
+                        />
+                      )}
                       {scopeMode === "brand" && activeBrandIdForLocks && (
                         <StrategyToolIcon
                           active={activeStrategyTool === "monitor"}
@@ -2469,10 +2484,20 @@ export default function BrandsPage() {
           // there's nothing there yet. Land back on the list instead (clear
           // any stale p/e so a leftover single-item view doesn't win) so the
           // user can see the new card and kick off positioning from there.
-          else if (kind === "product" || kind === "event") {
+          else if (kind === "event") {
+            // 2026-09-30（CJ「活動定位完成後，我有點迷路…又找不到入口了」）：建完活動
+            // 直接進這檔活動的宣傳企劃——那是下一步要做的事。以前落回活動列表，
+            // 要自己再找到卡片上的「宣傳企劃」按鈕才進得來。
+            const nextParams = new URLSearchParams(searchParams);
+            nextParams.set("cat", "campaign");
+            nextParams.delete("p");
+            nextParams.set("e", String(id));
+            setSearchParams(nextParams, { replace: true });
+          }
+          else if (kind === "product") {
             void id;
             const nextParams = new URLSearchParams(searchParams);
-            nextParams.set("cat", kind === "product" ? "products" : "events");
+            nextParams.set("cat", "products");
             nextParams.delete("p");
             nextParams.delete("e");
             setSearchParams(nextParams, { replace: true });

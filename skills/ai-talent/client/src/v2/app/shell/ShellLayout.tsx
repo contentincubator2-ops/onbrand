@@ -8,6 +8,7 @@
  * Content area paddingLeft = 70px always (collapsed) or 280px (expanded).
  */
 import { buildMemoryView, type BrandMemoryData } from "../../strategy/components/brain/memoryModel";
+import { strategyRailTarget, strategyRailActiveCat } from "./strategyRail";
 import { isChunkLoadError, recoverFromStaleChunk, StaleChunkScreen } from "../staleChunk";
 import React from "react";
 import { createPortal } from "react-dom";
@@ -439,7 +440,7 @@ export default function ShellLayout() {
         collapsed={collapsed}
         onToggle={toggleCollapsed}
         currentPath={loc.pathname}
-        activeCat={new URLSearchParams(loc.search).get("cat")}
+        activeCat={strategyRailActiveCat(loc.search)}
         onNavigate={(to) => {
           // 2026-08-20 策略 rail: entries carry only `?cat=`; the active
           // brand/product/event ids are injected here so the rail definition
@@ -452,20 +453,12 @@ export default function ShellLayout() {
           // search params instead). Using `scope` here silently dropped the
           // active product/event and bounced the editor back to brand-level
           // content on every strategy-rail click.
+          //
+          // 2026-09-30（CJ「我按了品牌以後，反而出現活動定位」）：p／e 不再一律帶著走，
+          // 規則在 strategyRail.ts（只有「文字」保留產品／活動）。
           if (to.startsWith("/brands/edit?cat=")) {
             const cat = to.split("cat=")[1]!;
-            const bid = scope.brandId ?? brands[0]?.id;
-            const currentParams = new URLSearchParams(loc.search);
-            const pid = currentParams.get("p");
-            const eid = currentParams.get("e");
-            const qs: string[] = [];
-            if (bid) {
-              qs.push(`b=${bid}`);
-              if (pid) qs.push(`p=${pid}`);
-              if (eid) qs.push(`e=${eid}`);
-            }
-            qs.push(`cat=${cat}`);
-            navigate(`/brands/edit?${qs.join("&")}`);
+            navigate(strategyRailTarget(cat, loc.search, scope.brandId ?? brands[0]?.id));
             return;
           }
           // 2026-05-16 (CJ「按下左側品牌功能時，總會先出現空白畫面」):
