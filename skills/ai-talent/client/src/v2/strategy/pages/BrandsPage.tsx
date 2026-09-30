@@ -1528,7 +1528,7 @@ export default function BrandsPage() {
                   { v: "meetings"    as const, label: lang === "en" ? "Meetings" : "會議",
                       desc: lang === "en" ? "Recurring strategy meetings" : "定期策略會議",
                       Icon: PeopleIcon,     scopes: ["brand", "product"] },
-                  { v: "brain"       as const, label: lang === "en" ? "Memory" : "記憶空間",
+                  { v: "brain"       as const, label: lang === "en" ? "Memory" : "記憶",
                       desc: lang === "en" ? "What the AI remembers" : "AI 記住了什麼、滿了怎麼清",
                       Icon: MemoryIcon,    scopes: ["brand", "product", "event"] },
                   { v: "products"    as const, label: lang === "en" ? "Products" : "產品",

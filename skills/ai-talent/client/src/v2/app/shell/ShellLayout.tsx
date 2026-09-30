@@ -7,7 +7,7 @@
  *
  * Content area paddingLeft = 70px always (collapsed) or 280px (expanded).
  */
-import { brainState, type BrainData } from "../../strategy/components/brain/brainModel";
+import { buildMemoryView, type BrandMemoryData } from "../../strategy/components/brain/memoryModel";
 import { isChunkLoadError, autoReloadForStaleChunk, StaleChunkScreen } from "../staleChunk";
 import React from "react";
 import { createPortal } from "react-dom";
@@ -187,9 +187,9 @@ function buildNavItems(lang: "zh-TW" | "en", userEmail?: string | null, currentP
         tooltip: en ? "Recurring strategy meetings" : "定期策略會議" },
       // 2026-09-29（CJ「在策略端增加一個 mission tray，是檢查大腦」）：品牌大腦記住了
       // 什麼、還能記多少——跟每篇產文讀的是同一份。
-      // 2026-09-30（CJ「重新想這個 mission tray 的名字，目的在管理記憶」）：改名「記憶空間」，
-      // 跟手機的「儲存空間」同一個心智模型；快滿／超載時圖示上亮狀態點（見 memoryAlert）。
-      { to: "/brands/edit?cat=brain", catKey: "brain", label: en ? "Memory" : "記憶空間", icon: <FontAwesomeIcon icon={ICON.brainCheck} />,
+      // 2026-09-30（CJ「重新想這個 mission tray 的名字，目的在管理記憶」→「名稱就叫做『記憶』」）：
+      // 跟手機管理儲存空間同一個心智模型；快滿／超載時圖示上亮狀態點（見 memoryAlert）。
+      { to: "/brands/edit?cat=brain", catKey: "brain", label: en ? "Memory" : "記憶", icon: <FontAwesomeIcon icon={ICON.brainCheck} />,
         tooltip: en ? "What the AI remembers — and cleanup when it's full" : "AI 記住了什麼、滿了怎麼清" },
       // 2026-08-21 (CJ「加一個人設的task tray...用戶可以自己新創agent，自己
       // 命名，並且決定這個Agent語調的應用範圍」): user-created persona
@@ -767,16 +767,17 @@ function IconBar({
   // 2026-09-30（CJ「超出記憶容量時，這邊會提醒用戶」）：在策略層任何一頁，記憶空間的
   // rail 圖示都會亮狀態點——用戶在別頁把內容填爆時，不用點進去就看得到。
   const onStrategyRail = currentPath?.startsWith("/brands") ?? false;
-  const memoryQ = (trpc as any).brandKnowledge?.brain?.useQuery(
+  // 算法跟「記憶」頁同一份（buildMemoryView）：任何一個產品／活動的寫作超載都算。
+  const memoryQ = (trpc as any).brandKnowledge?.memory?.useQuery(
     { brandId: scope.brandId ?? 0 },
     { enabled: !!scope.brandId && onStrategyRail, refetchOnWindowFocus: true, staleTime: 60_000 },
   ) ?? { data: null };
   const memoryAlert = React.useMemo<"near" | "over" | undefined>(() => {
-    const d = memoryQ.data as BrainData | null | undefined;
-    if (!d) return undefined;
-    const level = brainState(d).level;
+    const d = memoryQ.data as BrandMemoryData | null | undefined;
+    if (!d || !scope.brandId) return undefined;
+    const level = buildMemoryView(d, scope.brandId, false).level;
     return level === "ok" ? undefined : level;
-  }, [memoryQ.data]);
+  }, [memoryQ.data, scope.brandId]);
   const NAV_ITEMS = React.useMemo(
     () => buildNavItems(lang, userEmail, currentPath, allowedTaskRoutes, userNavItems)
       .map((it) => (it.catKey === "brain" && memoryAlert ? { ...it, alert: memoryAlert } : it)),

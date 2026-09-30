@@ -1,20 +1,20 @@
 /**
- * BrainPanel — 策略層「記憶空間」mission tray：品牌記憶用了多少、還能記多少、滿了怎麼清。
+ * BrainPanel — 策略層「記憶」mission tray。
  *
- * 2026-09-29（CJ「在策略端增加一個 mission tray，是檢查大腦……就像是手機記憶體
- * 的感覺，透明化品牌大腦當中有記到的內容，分為不同類別，視覺化給用戶看」）。
- * 2026-09-30（CJ「參考 tesla ui 的設計，比較簡化好看」「重新想這個 mission tray 的
- * 名字，目的在管理記憶；超出記憶容量時這邊會提醒用戶，用戶可以像在操作手機的記憶
- * 一樣，按照引導去清理記憶」）：改名「記憶空間」，版面改成儀表板——
- *   深色主控台：中央環形儀表（像車速錶）＋兩側已記住／還能記＋底下 P R N D 式的範圍切換
- *   清理建議：像手機「儲存空間」的建議清單，每條說清楚能騰出多少字、給一個動作
- *   分類方塊：像車機的功能方塊，點進去才看明細
+ * 2026-09-29 CJ：「檢查大腦……就像是手機記憶體的感覺，透明化品牌大腦當中有記到的內容」。
+ * 2026-09-30 CJ 三輪調整：
+ *   · 「名稱就叫做『記憶』，主視覺要用大腦」
+ *   · 「策略層有品牌、產品、活動、文字還有視覺，還有其他真實存入的資料……要精細」
+ *   · 「喜歡線條的 brain logo……線條簡單會比較像 tesla；請參考手機的介面設計，這是用戶
+ *      習慣管理記憶的方式，我們沿用他」
+ * 所以版面就是手機的「儲存空間」：
+ *   首頁   線條大腦（線畫到哪＝用到哪）＋用量條＋建議＋各區清單（右側圓環＝佔 AI 記憶多少）
+ *   區     產品／活動先列每一個（圓環＝寫它時整份記憶用了多少），其他區直接列段落
+ *   段落   策略層同名的段落卡片，逐欄標「寫文時讀／只讀前段／沒讀到／寫完後檢查／生圖時讀／只存著」
+ * 一層一層點進去，左上角「‹」回上一層——跟手機一樣。
  *
- * 資料來自 brandKnowledge.brain —— 跟每篇產文讀的 prompt 是同一份清單
- * （server/strategy/core/brandContext.ts buildBrandBrain），所以這裡寫「記住」的，
- * 就是 AI 真的讀得到的；寫「沒被讀到」的，就是 AI 讀不到的。
- *
- * 顏色只拿來表達狀態（快滿＝琥珀、超載＝紅），分類一律灰階。
+ * 資料：brandKnowledge.memory（server/strategy/core/brandMemory.ts），「讀了沒」跟每篇
+ * 產文讀的 prompt 是同一份（buildBrandBrain）。顏色只表達狀態（快滿＝琥珀、沒讀到＝紅）。
  */
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -23,349 +23,375 @@ import type { IconDefinition } from "@fortawesome/fontawesome-svg-core";
 import { ICON } from "../../../platform/components/icons";
 import { trpc } from "../../../../lib/trpc";
 import { useLang } from "../../../../lib/i18n";
+import BrainLine from "./BrainLine";
 import {
-  brainState, categorySummaries, cleanupTips, editHref, fmtChars, groupsOf, STATUS_TEXT,
-  type BrainData, type BrainItem, type CleanupKind,
-} from "./brainModel";
+  buildMemoryView, cleanupTips, fmtChars, SECTION_TEXT, TAG_TEXT,
+  type BrandMemoryData, type CleanupKind, type MemEntity, type MemRow, type MemSection, type ReadTag, type SectionKey,
+} from "./memoryModel";
 
 interface Props {
   brandId: number;
-  /** 進來時的範圍（網址上的 ?p= / ?e=）；面板裡可以再切。 */
+  /** 舊介面保留（網址上的 ?p= / ?e=）：有帶就直接打開那個產品／活動。 */
   initialProductId?: number | null;
   initialEventId?: number | null;
 }
 
-/** 狀態色：深色主控台上用亮一階的，淺色區塊用深一階的。 */
-const TONE = {
-  ok:   { dark: "#ffffff", light: "#171717" },
-  near: { dark: "#fbbf24", light: "#b45309" },
-  over: { dark: "#f87171", light: "#b91c1c" },
-} as const;
+const TONE = { ok: "#171717", near: "#b45309", over: "#b91c1c" } as const;
 
-const CAT_ICON: Record<string, IconDefinition> = {
-  info: ICON.info, brand: ICON.brand, copy: ICON.font, product: ICON.bundle, event: ICON.campaign, legacy: ICON.folder,
+const SECTION_ICON: Record<SectionKey, IconDefinition> = {
+  brand: ICON.brand, product: ICON.bundle, event: ICON.campaign, copy: ICON.font,
+  visual: ICON.palette, info: ICON.info, meetings: ICON.meeting, other: ICON.folder,
 };
 
-/** 環形儀表上各分類的灰階（深色底上的白色透明度）——只區分區塊，不帶語意。 */
-const RING_ALPHA = [1, 0.78, 0.6, 0.46, 0.34, 0.24];
+/** 容量條與清單圓點的灰階——只區分區塊，不帶語意。 */
+const SHADES: Record<SectionKey, string> = {
+  info: "#a3a3a3", brand: "#171717", copy: "#525252", product: "#737373", event: "#8a8a8a",
+  other: "#c4c4c4", visual: "#d4d4d4", meetings: "#d4d4d4",
+};
+
+type Screen = { section: SectionKey; entity?: string } | null;
 
 export default function BrainPanel({ brandId, initialProductId, initialEventId }: Props) {
   const { lang } = useLang();
   const en = lang === "en";
   const navigate = useNavigate();
-  const [productId, setProductId] = useState<number | null>(initialProductId ?? null);
-  const [eventId, setEventId] = useState<number | null>(initialEventId ?? null);
-  const [openCat, setOpenCat] = useState<string | null>(null);
+  const [screen, setScreen] = useState<Screen>(() =>
+    initialProductId ? { section: "product", entity: `p${initialProductId}` }
+      : initialEventId ? { section: "event", entity: `e${initialEventId}` } : null);
 
-  const productsQ = (trpc as any).product?.list?.useQuery({ brandId }, { enabled: !!brandId, staleTime: 30_000 });
-  const eventsQ = (trpc as any).event?.list?.useQuery({ brandId }, { enabled: !!brandId, staleTime: 30_000 });
-  const brainQ = (trpc as any).brandKnowledge.brain.useQuery(
-    { brandId, productId: productId ?? undefined, eventId: eventId ?? undefined },
-    { enabled: !!brandId, refetchOnWindowFocus: true },
-  );
+  const memQ = (trpc as any).brandKnowledge.memory.useQuery({ brandId }, { enabled: !!brandId, refetchOnWindowFocus: true });
   const utils = (trpc as any).useUtils?.();
   const forgetMut = (trpc as any).brandKnowledge.forgetLegacy.useMutation({
-    onSuccess: () => { try { utils?.brandKnowledge?.brain?.invalidate?.(); } catch { /* noop */ } },
+    onSuccess: () => { try { utils?.brandKnowledge?.memory?.invalidate?.(); } catch { /* noop */ } },
   });
-  const data: BrainData | undefined = brainQ.data;
+  const data: BrandMemoryData | null | undefined = memQ.data;
+  const view = useMemo(() => (data ? buildMemoryView(data, brandId, en) : null), [data, brandId, en]);
+  const tips = useMemo(() => (view ? cleanupTips(view) : []), [view]);
 
-  const summaries = useMemo(() => (data ? categorySummaries(data) : []), [data]);
-  const tips = useMemo(() => (data ? cleanupTips(data) : []), [data]);
-  const state = data ? brainState(data) : null;
+  if (memQ.isLoading) return <Center>{en ? "Reading brand memory…" : "正在讀取品牌記憶…"}</Center>;
+  if (!view) return <Center>{en ? "No memory for this brand yet." : "這個品牌還沒有記憶。"}</Center>;
 
-  if (brainQ.isLoading || !data || !state) {
-    return <div className="py-16 text-center text-[13px] text-neutral-400">{en ? "Reading brand memory…" : "正在讀取品牌記憶…"}</div>;
-  }
-
-  const pct = Math.min(100, Math.round((data.usedChars / data.capacity) * 100));
-  const tone = TONE[state.level];
-  const catLabel = (key: string) => {
-    const c = data.categories.find((x) => x.key === key);
-    return c ? (en ? c.en : c.zh) : key;
-  };
-  const scope = { brandId, productId, eventId };
-  const go = (item: BrainItem) => { const href = editHref(item, scope); if (href) navigate(href); };
-  const forget = (items: BrainItem[]) => {
-    const rowIds = items.map((i) => i.legacyRowId).filter((x): x is number => !!x);
+  const go = (href: string | null) => { if (href) navigate(href); };
+  const forget = (rows: MemRow[]) => {
+    const rowIds = rows.map((r) => r.legacyRowId).filter((x): x is number => !!x);
     if (rowIds.length) forgetMut.mutate({ brandId, rowIds });
   };
-  const headline = state.level === "over" ? (en ? "Memory full" : "記憶滿了")
-    : state.level === "near" ? (en ? "Almost full" : "快滿了")
-    : (en ? "Plenty of room" : "空間充足");
-  const products: any[] = productsQ?.data ?? [];
-  const events: any[] = eventsQ?.data ?? [];
-  const openSummary = summaries.find((s) => s.key === openCat) ?? null;
+  const open = (s: Screen) => { setScreen(s); try { window.scrollTo({ top: 0 }); } catch { /* noop */ } };
+  const sectionOf = (k: SectionKey) => view.sections.find((s) => s.key === k) ?? null;
+  const T = (k: SectionKey) => (en ? SECTION_TEXT[k].en : SECTION_TEXT[k].zh);
+
+  const cur = screen ? sectionOf(screen.section) : null;
+  const curEntity = cur && screen?.entity ? cur.entities.find((e) => e.id === screen.entity) ?? null : null;
 
   return (
-    <div className="mx-auto max-w-[920px]">
-      {/* ── 主控台 ───────────────────────────────────────────── */}
-      <section className="relative overflow-hidden rounded-[28px] px-5 pb-6 pt-5 text-white sm:px-8"
-        style={{ background: "radial-gradient(120% 90% at 50% 0%, #2a2a2a 0%, #161616 55%, #0e0e0e 100%)" }}>
-        <div className="flex items-center justify-between text-[12px] text-white/50">
-          <span className="font-medium tracking-wide">{en ? "BRAND MEMORY" : "品牌記憶空間"}</span>
-          <span className="inline-flex items-center gap-2">
-            <Battery pct={pct} color={tone.dark} />
-            <span className="tabular-nums text-white/80">{pct}%</span>
-          </span>
-        </div>
-
-        <div className="mt-2 grid grid-cols-2 items-center gap-y-2 sm:grid-cols-[1fr_auto_1fr]">
-          <Stat className="order-2 sm:order-1 sm:text-right" label={en ? "Remembered" : "已記住"} value={fmtChars(data.usedChars)} unit={en ? "chars" : "字"} />
-          <div className="order-1 col-span-2 flex justify-center sm:order-2 sm:col-span-1 sm:px-6">
-            <Gauge pct={pct} tone={tone.dark} headline={headline} en={en}
-              segments={summaries.filter((s) => s.keptChars > 0).map((s, i) => ({
-                key: s.key, frac: s.keptChars / data.capacity, alpha: RING_ALPHA[i % RING_ALPHA.length]!,
-              }))} />
-          </div>
-          <Stat className="order-3 text-right sm:text-left" label={en ? "Free" : "還能記"} value={fmtChars(state.free)} unit={en ? "chars" : "字"} />
-        </div>
-
-        {state.level !== "ok" && (
-          <div className="mt-3 flex justify-center">
-            <a href="#memory-cleanup" className="inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-[12.5px] font-medium no-underline"
-              style={{ background: `${tone.dark}1f`, color: tone.dark }}>
-              <FontAwesomeIcon icon={ICON.warning} />
-              {state.overflowCount > 0
-                ? (en ? `${state.overflowCount} memories aren't being read — clean up` : `${state.overflowCount} 筆記憶沒被讀到，去清理`)
-                : (en ? "Free up space before it fills" : "滿之前先清一清")}
-            </a>
-          </div>
-        )}
-
-        {/* 範圍切換——像排檔 P R N D：亮的是現在產文會讀到的範圍。 */}
-        <div className="mt-5 flex items-end justify-center gap-7 text-[15px]">
-          <Gear label={en ? "Brand" : "品牌"} active />
-          <GearSelect label={en ? "Product" : "產品"} value={productId} options={products} onChange={setProductId} none={en ? "None" : "不選"} />
-          <GearSelect label={en ? "Campaign" : "活動"} value={eventId} options={events} onChange={setEventId} none={en ? "None" : "不選"} />
-        </div>
-      </section>
-
-      {/* ── 清理建議 ─────────────────────────────────────────── */}
-      {tips.length > 0 && (
-        <section id="memory-cleanup" className="mt-8 scroll-mt-6">
-          <SectionTitle title={en ? "Cleanup suggestions" : "清理建議"}
-            hint={en ? "Follow these and the AI reads your whole brand again." : "照著清，AI 就能讀到完整的品牌。"} />
-          <div className="space-y-3">
-            {tips.map((t) => (
-              <TipCard key={t.kind} kind={t.kind} chars={t.chars} items={t.items} en={en} catLabel={catLabel}
-                onEdit={go} canEdit={(it) => !!editHref(it, scope)}
-                onForget={forget} forgetting={forgetMut.isPending} />
-            ))}
-          </div>
-        </section>
+    <div className="mx-auto max-w-[720px]">
+      {!cur && (
+        <Home view={view} tips={tips} en={en} T={T} onOpen={(k) => open({ section: k })}
+          onEdit={go} onForget={forget} forgetting={forgetMut.isPending} />
       )}
 
-      {/* ── 分類方塊 ─────────────────────────────────────────── */}
-      <section className="mt-8">
-        <SectionTitle title={en ? "What it remembers" : "記住了什麼"} />
-        {summaries.length === 0 ? (
-          <div className="rounded-2xl bg-neutral-100 px-6 py-10 text-center text-[13px] text-neutral-500">
-            {en ? "Nothing yet. Fill in positioning and copy rules — they'll show up here."
-              : "還沒有記憶。去填定位與文字規則，填了就會出現在這裡。"}
-          </div>
-        ) : (
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-            {summaries.map((s) => {
-              const active = openCat === s.key;
-              const alert = s.overflow > 0 ? TONE.over.light : s.trimmed > 0 ? TONE.near.light : null;
-              return (
-                <button key={s.key} type="button" onClick={() => setOpenCat(active ? null : s.key)}
-                  className={`relative flex flex-col items-start rounded-2xl px-4 py-4 text-left transition-colors ${active ? "bg-neutral-900 text-white" : "bg-neutral-100 text-neutral-900 hover:bg-neutral-200"}`}>
-                  {alert && <span className="absolute right-3.5 top-3.5 h-2 w-2 rounded-full" style={{ background: alert }} />}
-                  <FontAwesomeIcon icon={CAT_ICON[s.key] ?? ICON.folder} className={`text-[20px] ${active ? "text-white" : "text-neutral-700"}`} />
-                  <span className="mt-4 text-[14px] font-semibold">{catLabel(s.key)}</span>
-                  <span className={`mt-0.5 text-[12px] tabular-nums ${active ? "text-white/60" : "text-neutral-500"}`}>
-                    {en ? `${s.count} · ${fmtChars(s.keptChars)} chars` : `${s.count} 筆 · ${fmtChars(s.keptChars)} 字`}
-                  </span>
-                  <span className={`mt-3 block h-1 w-full overflow-hidden rounded-full ${active ? "bg-white/15" : "bg-neutral-200"}`}>
-                    <span className={`block h-full rounded-full ${active ? "bg-white" : "bg-neutral-800"}`}
-                      style={{ width: `${Math.max(2, Math.min(100, (s.keptChars / data.capacity) * 100))}%` }} />
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-        )}
+      {cur && !curEntity && (
+        <>
+          <BackBar label={en ? "Memory" : "記憶"} onBack={() => open(null)} />
+          <ScreenHead icon={SECTION_ICON[cur.key]} title={T(cur.key)}
+            sub={cur.multi
+              ? (en ? `${cur.entities.length} items · ${fmtChars(cur.storedChars)} chars stored` : `${cur.entities.length} 個 · 存了 ${fmtChars(cur.storedChars)} 字`)
+              : summaryLine(cur.entities[0]!, en)} />
+          {cur.multi ? (
+            <div className="space-y-3">
+              {cur.entities.map((e) => (
+                <EntityCard key={e.id} entity={e} capacity={view.capacity} en={en}
+                  onClick={() => open({ section: cur.key, entity: e.id })} />
+              ))}
+            </div>
+          ) : (
+            <Groups entity={cur.entities[0]!} en={en} onEdit={go} onForget={forget} forgetting={forgetMut.isPending} />
+          )}
+        </>
+      )}
 
-        {openSummary && (
-          <div className="mt-3 overflow-hidden rounded-2xl border border-neutral-200 bg-white">
-            {groupsOf(openSummary.items).map((g) => (
-              <div key={g.group || "_"}>
-                {g.group && <div className="bg-neutral-50 px-4 py-1.5 text-[11.5px] font-semibold text-neutral-500">{g.group}</div>}
-                <ul>
-                  {g.items.map((it, i) => (
-                    <ItemRow key={i} item={it} en={en}
-                      action={it.legacyRowId
-                        ? <ForgetButton en={en} busy={forgetMut.isPending} onConfirm={() => forget([it])} />
-                        : editHref(it, scope) ? <EditButton en={en} onClick={() => go(it)} /> : null} />
-                  ))}
-                </ul>
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
+      {cur && curEntity && (
+        <>
+          <BackBar label={T(cur.key)} onBack={() => open({ section: cur.key })} />
+          <ScreenHead icon={SECTION_ICON[cur.key]} title={curEntity.name} sub={summaryLine(curEntity, en)}
+            ring={curEntity.writeChars != null ? { value: curEntity.writeChars, capacity: view.capacity } : undefined} />
+          {curEntity.writeChars != null && (
+            <p className="-mt-2 mb-5 text-[12.5px] text-neutral-500">
+              {en
+                ? `Writing about this uses ${fmtChars(curEntity.writeChars)} of ${fmtChars(view.capacity)} characters (brand memory included).`
+                : `寫這個${cur.key === "product" ? "產品" : "活動"}的文時，整份記憶用了 ${fmtChars(curEntity.writeChars)}／${fmtChars(view.capacity)} 字（含品牌的部分）。`}
+            </p>
+          )}
+          <Groups entity={curEntity} en={en} onEdit={go} onForget={forget} forgetting={forgetMut.isPending} />
+        </>
+      )}
 
-      <p className="mt-6 text-[12px] leading-relaxed text-neutral-400">
+      <p className="mt-8 text-[12px] leading-relaxed text-neutral-400">
         {en
-          ? `Every AI writer reads exactly this memory before writing — up to ${fmtChars(data.capacity)} characters. Adopted strategy-meeting decisions are written into positioning and appear here; the knowledge base and strategy workbench are not read.`
-          : `每一位 AI 寫手動筆前，讀的就是這份記憶，最多 ${fmtChars(data.capacity)} 字。策略會議被採用的決定會寫進定位、出現在這裡；知識庫與策略工作台不會被讀取。`}
+          ? `Every AI writer reads this memory before writing — up to ${fmtChars(view.capacity)} characters per write. Items marked "Stored only" are kept but never read.`
+          : `每一位 AI 寫手動筆前都會讀這份記憶，一次最多 ${fmtChars(view.capacity)} 字。標「只存著」的內容有存下來，但 AI 不會讀。`}
       </p>
     </div>
   );
 }
 
-/* ── 主控台零件 ─────────────────────────────────────────────── */
+/* ── 首頁 ───────────────────────────────────────────────────── */
 
-/** 270° 環形儀表：各分類用量依序接成一圈，中央是用量百分比（像車速錶的大數字）。 */
-function Gauge({ pct, tone, headline, en, segments }: {
-  pct: number; tone: string; headline: string; en: boolean;
-  segments: Array<{ key: string; frac: number; alpha: number }>;
+function Home({ view, tips, en, T, onOpen, onEdit, onForget, forgetting }: {
+  view: NonNullable<ReturnType<typeof buildMemoryView>>; tips: ReturnType<typeof cleanupTips>; en: boolean;
+  T: (k: SectionKey) => string; onOpen: (k: SectionKey) => void;
+  onEdit: (href: string | null) => void; onForget: (rows: MemRow[]) => void; forgetting: boolean;
 }) {
-  const size = 236, stroke = 12, r = (size - stroke) / 2 - 4, c = 2 * Math.PI * r, arc = c * 0.75;
-  let offset = 0;
+  const pct = Math.min(100, Math.round((view.maxWrite.chars / view.capacity) * 100));
+  const tone = TONE[view.level];
+  const headline = view.level === "over" ? (en ? "Memory full" : "記憶滿了")
+    : view.level === "near" ? (en ? "Almost full" : "快滿了") : (en ? "Plenty of room" : "空間充足");
   return (
-    <div className="relative" style={{ width: size, height: size }} role="img" aria-label={`${pct}%`}>
-      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ transform: "rotate(135deg)" }}>
-        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth={stroke}
-          strokeDasharray={`${arc} ${c}`} strokeLinecap="round" />
-        {segments.map((s) => {
-          const len = Math.max(0, Math.min(1, s.frac) * arc - 2);
-          const el = (
-            <circle key={s.key} cx={size / 2} cy={size / 2} r={r} fill="none" strokeWidth={stroke}
-              stroke={tone === TONE.ok.dark ? `rgba(255,255,255,${s.alpha})` : tone} strokeOpacity={tone === TONE.ok.dark ? 1 : s.alpha}
-              strokeDasharray={`${len} ${c}`} strokeDashoffset={-offset} />
-          );
-          offset += Math.min(1, s.frac) * arc;
-          return el;
-        })}
-      </svg>
-      <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <div className="flex items-start font-semibold leading-none tabular-nums" style={{ letterSpacing: "-0.04em" }}>
-          <span className="text-[68px]">{pct}</span>
-          <span className="mt-2 text-[22px] text-white/60">%</span>
+    <>
+      <section className="rounded-3xl border border-neutral-200 bg-white px-6 pb-6 pt-8 text-center">
+        <div className="flex justify-center">
+          <BrainLine pct={pct} level={view.level} size={190} ariaLabel={`${pct}%`} />
         </div>
-        <div className="mt-1 text-[13px] text-white/50">{en ? "used" : "已使用"}</div>
-        <div className="mt-3 text-[14px] font-medium" style={{ color: tone }}>{headline}</div>
-      </div>
-    </div>
+        <div className="mt-3 flex items-baseline justify-center font-semibold tabular-nums text-neutral-900" style={{ letterSpacing: "-0.03em" }}>
+          <span className="text-[48px] leading-none">{pct}</span><span className="ml-0.5 text-[20px] text-neutral-400">%</span>
+        </div>
+        <div className="mt-1 text-[14px] font-semibold" style={{ color: tone }}>{headline}</div>
+        <div className="mt-1 text-[12.5px] text-neutral-500">
+          {view.maxWrite.name
+            ? (en ? `Fullest write: about “${view.maxWrite.name}”` : `最滿的一次寫作：寫「${view.maxWrite.name}」時`)
+            : (en ? "Per write, brand memory" : "每次寫作讀的品牌記憶")}
+          {" · "}
+          <span className="tabular-nums">{fmtChars(view.maxWrite.chars)}／{fmtChars(view.capacity)} {en ? "chars" : "字"}</span>
+        </div>
+
+        {/* 用量條——手機儲存空間那條彩色橫條，這裡用灰階分區。 */}
+        <div className="mt-6 flex h-2.5 w-full overflow-hidden rounded-full bg-neutral-100">
+          {view.composition.map((c) => (
+            <div key={c.key} style={{ width: `${(c.chars / view.capacity) * 100}%`, background: view.level === "ok" ? SHADES[c.key] : tone }} />
+          ))}
+        </div>
+        <div className="mt-2.5 flex flex-wrap justify-center gap-x-4 gap-y-1">
+          {view.composition.map((c) => (
+            <span key={c.key} className="inline-flex items-center gap-1.5 text-[11.5px] text-neutral-500">
+              <span className="inline-block h-2 w-2 rounded-full" style={{ background: SHADES[c.key] }} />
+              {T(c.key)} <span className="tabular-nums">{fmtChars(c.chars)}</span>
+            </span>
+          ))}
+        </div>
+      </section>
+
+      {tips.length > 0 && (
+        <section className="mt-6">
+          <Label>{en ? "Recommendations" : "建議"}</Label>
+          <div className="space-y-3">
+            {tips.map((t) => (
+              <TipCard key={t.kind} kind={t.kind} chars={t.chars} rows={t.rows} en={en}
+                onEdit={onEdit} onForget={onForget} forgetting={forgetting} />
+            ))}
+          </div>
+        </section>
+      )}
+
+      <section className="mt-6">
+        <Label>{en ? "What's stored" : "存了什麼"}</Label>
+        <div className="space-y-3">
+          {view.sections.map((s) => (
+            <SectionCard key={s.key} s={s} capacity={view.capacity} en={en} title={T(s.key)} onClick={() => onOpen(s.key)} />
+          ))}
+        </div>
+      </section>
+    </>
   );
 }
 
-function Stat({ label, value, unit, className = "" }: { label: string; value: string; unit: string; className?: string }) {
+/** 像手機課程列表那種卡片：左邊名稱與小字，右邊圓環。 */
+function SectionCard({ s, capacity, en, title, onClick }: { s: MemSection; capacity: number; en: boolean; title: string; onClick: () => void }) {
+  const alert = s.skipped > 0 ? TONE.over : s.partial > 0 ? TONE.near : null;
+  const notRead = s.readChars === 0;
+  const sub = s.multi
+    ? (en ? `${s.entities.length} items · ${fmtChars(s.storedChars)} chars stored` : `${s.entities.length} 個 · 存了 ${fmtChars(s.storedChars)} 字`)
+    : s.storedChars === 0 ? (en ? `${s.fields} items` : `${s.fields} 項`)
+    : (en ? `${s.fields} fields · ${fmtChars(s.storedChars)} chars stored` : `${s.fields} 項 · 存了 ${fmtChars(s.storedChars)} 字`);
   return (
-    <div className={className}>
-      <div className="text-[12px] text-white/45">{label}</div>
-      <div className="mt-0.5 text-[26px] font-semibold tabular-nums leading-tight sm:text-[30px]" style={{ letterSpacing: "-0.02em" }}>
-        {value}<span className="ml-1 text-[13px] font-normal text-white/50">{unit}</span>
-      </div>
-    </div>
-  );
-}
-
-/** 電池式的小容量條（主控台右上角）。 */
-function Battery({ pct, color }: { pct: number; color: string }) {
-  return (
-    <span className="inline-flex items-center">
-      <span className="relative inline-block h-[14px] w-[30px] rounded-[4px] border border-white/40 p-[2px]">
-        <span className="block h-full rounded-[2px]" style={{ width: `${Math.max(4, pct)}%`, background: color }} />
+    <button type="button" onClick={onClick}
+      className="flex w-full items-center gap-4 rounded-2xl border border-neutral-200 bg-white px-4 py-3.5 text-left shadow-[0_1px_2px_rgba(0,0,0,0.03)] transition-colors hover:border-neutral-400">
+      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-neutral-100 text-[16px] text-neutral-800">
+        <FontAwesomeIcon icon={SECTION_ICON[s.key]} />
       </span>
-      <span className="ml-[2px] inline-block h-[6px] w-[2px] rounded-r-sm bg-white/40" />
-    </span>
+      <span className="min-w-0 flex-1">
+        <span className="flex items-center gap-2 text-[15px] font-semibold text-neutral-900">
+          {title}
+          {alert && <span className="h-1.5 w-1.5 rounded-full" style={{ background: alert }} />}
+        </span>
+        <span className="mt-0.5 block text-[11px] font-medium uppercase tracking-wide text-neutral-400">{sub}</span>
+        {(s.skipped > 0 || s.partial > 0) && (
+          <span className="mt-1 block text-[12px]" style={{ color: alert ?? undefined }}>
+            {[s.skipped ? (en ? `${s.skipped} not read` : `${s.skipped} 項沒讀到`) : "", s.partial ? (en ? `${s.partial} partly read` : `${s.partial} 項只讀前段`) : ""].filter(Boolean).join(" · ")}
+          </span>
+        )}
+      </span>
+      {notRead
+        ? <span className="shrink-0 text-right text-[11.5px] leading-tight text-neutral-400">{s.key === "visual" ? (en ? "For images" : "生圖用") : (en ? "Not read" : "不佔記憶")}</span>
+        : <Ring value={s.readChars} capacity={capacity} tone={alert ?? TONE.ok} />}
+      <FontAwesomeIcon icon={ICON.chevronRight} className="shrink-0 text-[11px] text-neutral-300" />
+    </button>
   );
 }
 
-function Gear({ label, active }: { label: string; active?: boolean }) {
-  return <span className={active ? "text-[17px] font-semibold text-white" : "text-white/35"}>{label}</span>;
+function EntityCard({ entity, capacity, en, onClick }: { entity: MemEntity; capacity: number; en: boolean; onClick: () => void }) {
+  const rows = entity.groups.flatMap((g) => g.rows);
+  const skipped = rows.filter((r) => r.tag === "skipped").length;
+  const partial = rows.filter((r) => r.tag === "partial").length;
+  const alert = skipped ? TONE.over : partial ? TONE.near : null;
+  return (
+    <button type="button" onClick={onClick}
+      className="flex w-full items-center gap-4 rounded-2xl border border-neutral-200 bg-white px-4 py-3.5 text-left transition-colors hover:border-neutral-400">
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-[15px] font-semibold text-neutral-900">{entity.name}</span>
+        <span className="mt-0.5 block text-[11px] font-medium uppercase tracking-wide text-neutral-400">{summaryLine(entity, en)}</span>
+        {alert && (
+          <span className="mt-1 block text-[12px]" style={{ color: alert }}>
+            {skipped ? (en ? `${skipped} not read` : `${skipped} 項沒讀到`) : (en ? `${partial} partly read` : `${partial} 項只讀前段`)}
+          </span>
+        )}
+      </span>
+      <Ring value={entity.writeChars ?? 0} capacity={capacity} tone={alert ?? TONE.ok} />
+      <FontAwesomeIcon icon={ICON.chevronRight} className="shrink-0 text-[11px] text-neutral-300" />
+    </button>
+  );
 }
 
-/** 排檔式的範圍選擇：選了某個產品／活動就亮起來，底下小字是選中的名字。 */
-function GearSelect({ label, value, options, onChange, none }: {
-  label: string; value: number | null; options: any[]; none: string; onChange: (v: number | null) => void;
+/* ── 段落與欄位 ─────────────────────────────────────────────── */
+
+function Groups({ entity, en, onEdit, onForget, forgetting }: {
+  entity: MemEntity; en: boolean; onEdit: (href: string | null) => void; onForget: (rows: MemRow[]) => void; forgetting: boolean;
 }) {
-  const picked = options.find((o) => o.id === value);
+  if (!entity.groups.length) {
+    return <div className="rounded-2xl border border-dashed border-neutral-300 px-6 py-10 text-center text-[13px] text-neutral-500">{en ? "Nothing stored here yet." : "這裡還沒有存任何東西。"}</div>;
+  }
   return (
-    <label className="relative flex cursor-pointer flex-col items-center">
-      <span className={picked ? "text-[17px] font-semibold text-white" : "text-white/35 hover:text-white/70"}>
-        {label}<FontAwesomeIcon icon={ICON.chevronRight} className="ml-1 rotate-90 text-[9px] opacity-60" />
-      </span>
-      <span className="mt-0.5 max-w-[120px] truncate text-[11px] text-white/45">{picked ? picked.name : none}</span>
-      <select className="absolute inset-0 cursor-pointer opacity-0" value={value ?? ""} aria-label={label}
-        onChange={(e) => onChange(e.target.value ? Number(e.target.value) : null)}>
-        <option value="">{none}</option>
-        {options.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
-      </select>
-    </label>
+    <div className="space-y-5">
+      {entity.groups.map((g) => (
+        <div key={g.title}>
+          <Label>{g.title}</Label>
+          <ul className="overflow-hidden rounded-2xl border border-neutral-200 bg-white">
+            {g.rows.map((r) => (
+              <FieldRow key={r.id} row={r} en={en}
+                action={r.legacyRowId
+                  ? <ForgetButton en={en} busy={forgetting} onConfirm={() => onForget([r])} />
+                  : null}
+                onClick={r.href ? () => onEdit(r.href) : undefined} />
+            ))}
+          </ul>
+        </div>
+      ))}
+    </div>
   );
 }
 
-/* ── 清理建議 ───────────────────────────────────────────────── */
+const TAG_STYLE: Record<ReadTag, { color: string; bg: string }> = {
+  read:    { color: "#171717", bg: "#f5f5f5" },
+  partial: { color: TONE.near, bg: "#fef3c7" },
+  skipped: { color: TONE.over, bg: "#fee2e2" },
+  check:   { color: "#404040", bg: "#f5f5f5" },
+  image:   { color: "#404040", bg: "#f5f5f5" },
+  stored:  { color: "#a3a3a3", bg: "transparent" },
+};
+
+function FieldRow({ row, en, action, onClick, context }: {
+  row: MemRow; en: boolean; action?: React.ReactNode; onClick?: () => void; context?: boolean;
+}) {
+  const st = TAG_STYLE[row.tag];
+  const size = row.display ?? (row.tag === "partial"
+    ? (en ? `${fmtChars(row.keptChars)} of ${fmtChars(row.chars)}` : `讀 ${fmtChars(row.keptChars)}／存 ${fmtChars(row.chars)} 字`)
+    : `${fmtChars(row.chars)} ${en ? "chars" : "字"}`);
+  const body = (
+    <>
+      <span className="min-w-0 flex-1">
+        <span className="block text-[13.5px] font-medium text-neutral-900">
+          {context && <span className="mr-1.5 font-normal text-neutral-400">{row.context} ·</span>}
+          {row.label}
+        </span>
+        {row.preview && (
+          <span className={`mt-0.5 block truncate text-[12px] ${row.tag === "skipped" ? "text-neutral-400 line-through" : "text-neutral-500"}`}>{row.preview}</span>
+        )}
+      </span>
+      <span className="shrink-0 text-right">
+        <span className="inline-block rounded-full px-2 py-0.5 text-[11px] font-medium" style={{ color: st.color, background: st.bg, border: row.tag === "stored" ? "1px solid #e5e5e5" : "none" }}>
+          {en ? TAG_TEXT[row.tag].en : TAG_TEXT[row.tag].zh}
+        </span>
+        <span className="mt-0.5 block text-[11px] tabular-nums text-neutral-400">{size}</span>
+      </span>
+    </>
+  );
+  return (
+    <li className="border-b border-neutral-100 last:border-b-0">
+      <div className="flex items-center gap-3 px-4 py-3">
+        {onClick ? (
+          <button type="button" onClick={onClick} className="flex min-w-0 flex-1 items-center gap-3 text-left" title={en ? "Edit on its page" : "到原本的頁面修改"}>
+            {body}
+            <FontAwesomeIcon icon={ICON.chevronRight} className="shrink-0 text-[10px] text-neutral-300" />
+          </button>
+        ) : <div className="flex min-w-0 flex-1 items-center gap-3">{body}</div>}
+        {action}
+      </div>
+    </li>
+  );
+}
+
+/* ── 建議 ───────────────────────────────────────────────────── */
 
 const TIP_TEXT: Record<CleanupKind, { zh: (n: number, c: string) => [string, string]; en: (n: number, c: string) => [string, string] }> = {
-  overflow: {
-    zh: (n, c) => [`${n} 筆記憶沒被讀到`, `空間不夠，AI 寫文時整筆跳過了（共 ${c} 字）。精簡這幾筆，或精簡其他較長的記憶，就能讀回來。`],
-    en: (n, c) => [`${n} memories aren't being read`, `Out of space, so the AI skips them entirely (${c} chars). Shorten these or other long memories to bring them back.`],
+  skipped: {
+    zh: (n, c) => [`${n} 項記憶沒讀到`, `空間不夠，AI 寫文時整項跳過（共 ${c} 字）。精簡這幾項或其他較長的記憶，就能讀回來。`],
+    en: (n, c) => [`${n} memories aren't read`, `Out of space, so the AI skips them (${c} chars). Shorten these or other long memories to bring them back.`],
   },
   legacy: {
-    zh: (n, c) => [`舊版留下的記憶 ${n} 筆`, `改版前存的資料，現在沒有頁面能編輯，但 AI 仍然會讀。用不到就忘掉，可騰出 ${c} 字。`],
-    en: (n, c) => [`${n} memories from the old version`, `Saved before the redesign — no page edits them any more, but the AI still reads them. Forget them to free ${c} chars.`],
+    zh: (n, c) => [`舊版留下的記憶 ${n} 筆`, `改版前存的資料，沒有頁面能編輯，但 AI 仍然會讀。用不到就忘掉，可騰出 ${c} 字。`],
+    en: (n, c) => [`${n} memories from the old version`, `No page edits them any more, but the AI still reads them. Forget them to free ${c} chars.`],
   },
-  trimmed: {
-    zh: (n, c) => [`${n} 筆太長，只記住前段`, `超過單格上限的 ${c} 字 AI 讀不到。把重點寫在前面，或精簡到上限內。`],
-    en: (n, c) => [`${n} memories are too long`, `${c} chars past each slot's limit aren't read. Put the key points first, or trim to fit.`],
+  partial: {
+    zh: (n, c) => [`${n} 項太長，只讀前段`, `超過單格上限的 ${c} 字 AI 讀不到。把重點寫在前面，或精簡到上限內。`],
+    en: (n, c) => [`${n} memories are too long`, `${c} chars past each field's limit aren't read. Put key points first, or trim.`],
   },
   large: {
-    zh: (_n, c) => [`最佔空間的記憶`, `這幾筆加起來 ${c} 字，精簡它們最快騰出空間。`],
+    zh: (_n, c) => [`最佔空間的記憶`, `這幾項加起來 ${c} 字，精簡它們最快騰出空間。`],
     en: (_n, c) => [`Largest memories`, `Together ${c} chars — trimming these frees space fastest.`],
   },
 };
 
-function TipCard({ kind, chars, items, en, catLabel, onEdit, canEdit, onForget, forgetting }: {
-  kind: CleanupKind; chars: number; items: BrainItem[]; en: boolean; catLabel: (k: string) => string;
-  onEdit: (it: BrainItem) => void; canEdit: (it: BrainItem) => boolean;
-  onForget: (items: BrainItem[]) => void; forgetting: boolean;
+function TipCard({ kind, chars, rows, en, onEdit, onForget, forgetting }: {
+  kind: CleanupKind; chars: number; rows: MemRow[]; en: boolean;
+  onEdit: (href: string | null) => void; onForget: (rows: MemRow[]) => void; forgetting: boolean;
 }) {
-  const [open, setOpen] = useState(kind === "overflow");
-  const [title, desc] = (en ? TIP_TEXT[kind].en : TIP_TEXT[kind].zh)(items.length, fmtChars(chars));
-  const tone = kind === "overflow" ? TONE.over.light : kind === "trimmed" ? TONE.near.light : "#171717";
-  const icon = kind === "legacy" ? ICON.folder : kind === "large" ? ICON.chart : ICON.warning;
+  const [open, setOpen] = useState(kind === "skipped");
+  const [title, desc] = (en ? TIP_TEXT[kind].en : TIP_TEXT[kind].zh)(rows.length, fmtChars(chars));
+  const tone = kind === "skipped" ? TONE.over : kind === "partial" ? TONE.near : TONE.ok;
   return (
-    <div className="overflow-hidden rounded-2xl bg-neutral-100">
-      <div className="flex items-start gap-4 px-4 py-4 sm:px-5">
-        <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white" style={{ color: tone }}>
-          <FontAwesomeIcon icon={icon} />
+    <div className="overflow-hidden rounded-2xl border border-neutral-200 bg-white">
+      <div className="flex items-start gap-3.5 px-4 py-4">
+        <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-neutral-100" style={{ color: tone }}>
+          <FontAwesomeIcon icon={kind === "legacy" ? ICON.folder : kind === "large" ? ICON.chart : ICON.warning} />
         </span>
         <div className="min-w-0 flex-1">
           <div className="text-[14px] font-semibold text-neutral-900">{title}</div>
           <div className="mt-0.5 text-[12.5px] leading-relaxed text-neutral-500">{desc}</div>
-          <button type="button" onClick={() => setOpen(!open)} className="mt-2 text-[12.5px] font-medium text-neutral-900 underline-offset-2 hover:underline">
-            {open ? (en ? "Hide" : "收起") : (en ? `Review ${items.length}` : `查看 ${items.length} 筆`)}
+          <button type="button" onClick={() => setOpen(!open)} className="mt-1.5 text-[12.5px] font-medium text-neutral-900 hover:underline">
+            {open ? (en ? "Hide" : "收起") : (en ? `Review ${rows.length}` : `查看 ${rows.length} 項`)}
           </button>
         </div>
-        {kind === "legacy" && (
-          <ForgetButton en={en} busy={forgetting} all onConfirm={() => onForget(items)} />
-        )}
+        {kind === "legacy" && <ForgetButton en={en} busy={forgetting} all onConfirm={() => onForget(rows)} />}
       </div>
       {open && (
-        <ul className="border-t border-neutral-200 bg-white">
-          {items.map((it, i) => (
-            <ItemRow key={i} item={it} en={en} context={catLabel(it.category)}
-              action={it.legacyRowId
-                ? <ForgetButton en={en} busy={forgetting} onConfirm={() => onForget([it])} />
-                : canEdit(it) ? <EditButton en={en} onClick={() => onEdit(it)} /> : null} />
+        <ul className="border-t border-neutral-100">
+          {rows.map((r) => (
+            <FieldRow key={r.id} row={r} en={en} context
+              action={r.legacyRowId ? <ForgetButton en={en} busy={forgetting} onConfirm={() => onForget([r])} /> : null}
+              onClick={r.href ? () => onEdit(r.href) : undefined} />
           ))}
         </ul>
       )}
     </div>
-  );
-}
-
-function EditButton({ en, onClick }: { en: boolean; onClick: () => void }) {
-  return (
-    <button type="button" onClick={onClick}
-      className="shrink-0 rounded-full border border-neutral-300 px-3 py-1 text-[12px] font-medium text-neutral-800 hover:border-neutral-900">
-      {en ? "Trim" : "去精簡"}
-    </button>
   );
 }
 
@@ -382,44 +408,57 @@ function ForgetButton({ en, busy, all, onConfirm }: { en: boolean; busy: boolean
   );
 }
 
-/* ── 明細 ───────────────────────────────────────────────────── */
+/* ── 小零件 ─────────────────────────────────────────────────── */
 
-function SectionTitle({ title, hint }: { title: string; hint?: string }) {
+/** 手機課程卡右邊那種圓環：中間是百分比。 */
+function Ring({ value, capacity, tone, size = 46 }: { value: number; capacity: number; tone: string; size?: number }) {
+  const pct = Math.min(100, Math.round((value / capacity) * 100));
+  const r = (size - 6) / 2, c = 2 * Math.PI * r;
   return (
-    <div className="mb-3 flex items-baseline gap-3">
-      <h3 className="text-[16px] font-semibold text-neutral-900">{title}</h3>
-      {hint && <span className="text-[12.5px] text-neutral-400">{hint}</span>}
+    <span className="relative inline-flex shrink-0 items-center justify-center" style={{ width: size, height: size }} aria-label={`${pct}%`}>
+      <svg width={size} height={size} style={{ transform: "rotate(-90deg)" }}>
+        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="#ececec" strokeWidth={3.5} />
+        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={tone} strokeWidth={3.5} strokeLinecap="round"
+          strokeDasharray={`${(Math.max(pct, value > 0 ? 2 : 0) / 100) * c} ${c}`} />
+      </svg>
+      <span className="absolute text-[11px] font-semibold tabular-nums text-neutral-700">{pct}%</span>
+    </span>
+  );
+}
+
+function BackBar({ label, onBack }: { label: string; onBack: () => void }) {
+  return (
+    <button type="button" onClick={onBack} className="mb-3 inline-flex items-center gap-1.5 text-[14px] font-medium text-neutral-600 hover:text-neutral-900">
+      <FontAwesomeIcon icon={ICON.chevronLeft} className="text-[12px]" /> {label}
+    </button>
+  );
+}
+
+function ScreenHead({ icon, title, sub, ring }: { icon: IconDefinition; title: string; sub: string; ring?: { value: number; capacity: number } }) {
+  return (
+    <div className="mb-5 flex items-center gap-4">
+      <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-neutral-900 text-[18px] text-white">
+        <FontAwesomeIcon icon={icon} />
+      </span>
+      <div className="min-w-0 flex-1">
+        <h2 className="truncate text-[22px] font-semibold text-neutral-900">{title}</h2>
+        <div className="mt-0.5 text-[12.5px] text-neutral-500">{sub}</div>
+      </div>
+      {ring && <Ring value={ring.value} capacity={ring.capacity} tone={TONE.ok} size={56} />}
     </div>
   );
 }
 
-function ItemRow({ item, en, action, context }: { item: BrainItem; en: boolean; action?: React.ReactNode; context?: string }) {
-  const st = STATUS_TEXT[item.status];
-  const tone = item.status === "overflow" ? TONE.over.light : item.status === "trimmed" ? TONE.near.light : undefined;
-  return (
-    <li className="flex items-center gap-3 border-b border-neutral-100 px-4 py-3 last:border-b-0 sm:px-5">
-      <div className="min-w-0 flex-1">
-        <div className="text-[13px] font-medium text-neutral-800">
-          {context && <span className="mr-1.5 text-neutral-400">{context}{item.group ? ` · ${item.group}` : ""} ·</span>}
-          {item.label}
-        </div>
-        {item.preview && (
-          <div className={`mt-0.5 truncate text-[12px] ${item.status === "overflow" ? "text-neutral-400 line-through" : "text-neutral-500"}`}>
-            {item.preview}
-          </div>
-        )}
-      </div>
-      <div className="shrink-0 text-right">
-        <div className="text-[12px] font-medium" style={tone ? { color: tone } : { color: "#525252" }}>{en ? st.en : st.zh}</div>
-        <div className="text-[11px] tabular-nums text-neutral-400">
-          {item.status === "trimmed"
-            ? (en ? `${fmtChars(item.keptChars)} of ${fmtChars(item.storedChars)}` : `記住 ${fmtChars(item.keptChars)}／存 ${fmtChars(item.storedChars)} 字`)
-            : item.status === "overflow"
-              ? (en ? `${fmtChars(item.storedChars)} not read` : `${fmtChars(item.storedChars)} 字沒被讀到`)
-              : (en ? `${fmtChars(item.storedChars)} chars` : `${fmtChars(item.storedChars)} 字`)}
-        </div>
-      </div>
-      {action}
-    </li>
-  );
+function summaryLine(e: MemEntity, en: boolean): string {
+  return en
+    ? `${e.fields} fields · ${fmtChars(e.storedChars)} stored · ${fmtChars(e.readChars)} read`
+    : `${e.fields} 項 · 存 ${fmtChars(e.storedChars)} 字 · AI 讀 ${fmtChars(e.readChars)} 字`;
+}
+
+function Label({ children }: { children: React.ReactNode }) {
+  return <div className="mb-2 px-1 text-[12px] font-semibold uppercase tracking-wide text-neutral-400">{children}</div>;
+}
+
+function Center({ children }: { children: React.ReactNode }) {
+  return <div className="py-16 text-center text-[13px] text-neutral-400">{children}</div>;
 }

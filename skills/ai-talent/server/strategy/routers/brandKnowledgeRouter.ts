@@ -10,8 +10,9 @@ import { z } from "zod";
 import { router, protectedProcedure } from "../../platform/core/trpc";
 import { parseBrief, fieldsInBrief } from "../core/aiBrief";
 import { invokeLLM } from "../../platform/core/llm";
-import { buildBrandPrefix, buildBrandBrain, invalidateBrandPrefix, BRAIN_CAPACITY, BRAIN_CATEGORIES } from "../core/brandContext";
+import { buildBrandPrefix, invalidateBrandPrefix } from "../core/brandContext";
 import { getBrandRealContent } from "../core/brandRealContent";
+import { loadBrandMemory } from "../core/brandMemory";
 import localPool from "../../localDb";
 
 const ASSET_KEYS_COPY = [
@@ -199,28 +200,16 @@ export const brandKnowledgeRouter = router({
     }),
 
   /**
-   * 檢查大腦 —— 品牌大腦記住了什麼、用了多少容量、哪些只記住一部分、哪些超載。
-   *
-   * 2026-09-29（CJ「像手機記憶體的感覺，透明化品牌大腦當中有記到的內容，分為不同
-   * 類別，視覺化給用戶看」）。清單跟產文 prompt 由同一個 buildBrandBrain 產生，
-   * 所以畫面上寫「記住」的，就是每篇產文真的讀得到的。
+   * 「記憶」tray：品牌在策略層存了什麼（全部，不只 AI 讀的）＋每一種寫作情境讀到的大腦。
+   * 2026-09-30（CJ「策略層有品牌、產品、活動、文字、視覺，還有其他真實存入的資料……要精細」）。
+   * 不是自己的品牌回 null。見 server/strategy/core/brandMemory.ts。
    */
-  brain: protectedProcedure
-    .input(z.object({ brandId: z.number(), productId: z.number().optional(), eventId: z.number().optional() }))
-    .query(async ({ ctx, input }) => {
-      const [own]: any = await localPool.execute(
-        `SELECT id FROM brands WHERE id = ? AND userId = ? LIMIT 1`, [input.brandId, ctx.user!.id],
-      );
-      const categories = Object.entries(BRAIN_CATEGORIES).map(([key, v]) => ({ key, zh: v.zh, en: v.en }));
-      if (!Array.isArray(own) || own.length === 0) {
-        return { capacity: BRAIN_CAPACITY, usedChars: 0, items: [], categories };
-      }
-      const brain = await buildBrandBrain(input.brandId, input.productId ?? null, input.eventId ?? null);
-      return { capacity: brain.capacity, usedChars: brain.usedChars, items: brain.items, categories };
-    }),
+  memory: protectedProcedure
+    .input(z.object({ brandId: z.number() }))
+    .query(async ({ ctx, input }) => loadBrandMemory(input.brandId, ctx.user!.id)),
 
   /**
-   * 記憶空間的「忘掉」——只給舊版 brand_brain 表用（已無寫入端、也沒有編輯頁）。
+   * 記憶的「忘掉」——只給舊版 brand_brain 表用（已無寫入端、也沒有編輯頁）。
    * 2026-09-30（CJ「像操作手機的記憶一樣，按照引導去清理記憶」）。其他記憶一律
    * 回到策略層原本的頁面精簡，不在這裡刪，免得同一份資料有兩個刪除入口。
    */
