@@ -36,6 +36,8 @@ export interface ScoutContext {
   industryTags: string[];
   days: number;
   limit: number;
+  /** 2026-09-30 策略監測：只要新聞／文章（要有發布日），不要官網、工具頁、社群貼文。 */
+  newsOnly?: boolean;
   /** Lazy credential loader — returns decrypted creds or null. */
   loadCred: (tool: string) => Promise<Record<string, string> | null>;
 }

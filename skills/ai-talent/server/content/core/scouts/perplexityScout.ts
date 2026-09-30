@@ -36,7 +36,11 @@ function buildPrompts(ctx: ScoutContext) {
     "\"title\":string,\"content\":string (<=220 chars summary),\"source\":string (publisher/domain)," +
     "\"url\":string,\"publishedAt\":\"YYYY-MM-DD\" or ISO,\"relevanceScore\":0..1}]}. " +
     "Rules: no duplicate titles; each item must cite a real URL; content must reflect the article, not filler. " +
-    "Mix types — aim ~50% competitor_news, ~30% trending_topic, ~20% social_trend. Cap at " + limit + " items.";
+    (ctx.newsOnly
+      ? "ONLY news articles or blog/media articles that carry a visible publication date within the last " + days + " days — " +
+        "no product/official/landing pages, no tool directories, no social media posts. publishedAt is REQUIRED. "
+      : "Mix types — aim ~50% competitor_news, ~30% trending_topic, ~20% social_trend. ") +
+    "Cap at " + limit + " items.";
 
   const userMsg = [
     brandName ? `【Brand】${brandName}` : "",
@@ -147,6 +151,8 @@ async function fetchViaTavily(ctx: ScoutContext): Promise<IntelItem[]> {
       include_answer: true,
       max_results: Math.min(ctx.limit * 2, 20),
       days,
+      // topic:"news" 才會回 published_date，而且只搜新聞來源。
+      ...(ctx.newsOnly ? { topic: "news" } : {}),
     }),
   });
   if (!res.ok) throw new Error(`Tavily ${res.status}`);
@@ -226,7 +232,7 @@ export const perplexityScout: Scout = {
           `【品牌】${brandName ?? ""}`, `【產業】${industry ?? ""}`,
           competitors?.length ? `【競品】${competitors.join(", ")}` : "",
           keywords?.length ? `【關鍵字】${keywords.join(", ")}` : "",
-          `近 ${days} 天的最新新聞、趨勢、社群話題。產出 ${limit} 筆 JSON: {"items":[{"type":"competitor_news"|"trending_topic"|"social_trend","title":string,"content":string,"source":string,"url":string,"publishedAt":string,"relevanceScore":number}]}`,
+          `${ctx.newsOnly ? `只要近 ${days} 天內發布、頁面上有發布日期的新聞或媒體文章（不要官網、產品頁、工具目錄、社群貼文），publishedAt 必填。` : `近 ${days} 天的最新新聞、趨勢、社群話題。`}產出 ${limit} 筆 JSON: {"items":[{"type":"competitor_news"|"trending_topic"|"social_trend","title":string,"content":string,"source":string,"url":string,"publishedAt":string,"relevanceScore":number}]}`,
         ].filter(Boolean).join("\n");
 
         const raw = await invokeVertexGrounding({

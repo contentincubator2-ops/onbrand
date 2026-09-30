@@ -93,6 +93,25 @@ export const SCAN_INTERVAL_DAYS = 7;
 export const MANUAL_SCAN_COOLDOWN_HOURS = 24;
 /** 同一個 alertKey 在這個天數內不重複出現。 */
 export const DEDUPE_DAYS = 30;
+/**
+ * 2026-09-30（CJ「確定只有在 7 天內的新聞和內容」→「專心抓新聞，就很好了」）：
+ * 情報只收新聞／文章，而且原文發布日**確定**在掃描前 7 天內。讀不到日期的（官網頁、
+ * 要登入的社群貼文）與超過 7 天的舊文一律不採用。
+ */
+export const NEWS_WINDOW_DAYS = 7;
+export type EvidenceRole = "news";
+
+/** 單一來源是否採用（"news"）。null＝不採用。asOf＝掃描時間（補舊資料時用那則提醒的建立時間）。 */
+export function classifyEvidence(
+  e: { url?: string; publishedAt?: string | null }, asOf: Date = new Date(),
+): EvidenceRole | null {
+  const d = e.publishedAt && /^\d{4}-\d{2}-\d{2}$/.test(e.publishedAt) ? new Date(`${e.publishedAt}T00:00:00Z`) : null;
+  if (d) {
+    const ageDays = (asOf.getTime() - d.getTime()) / 86_400_000;
+    return ageDays <= NEWS_WINDOW_DAYS + 1 && ageDays >= -1 ? "news" : null;   // +1：時區與「當天」的寬容
+  }
+  return null;   // 讀不到發布日＝無法確定在 7 天內
+}
 
 export interface StrategyWatch {
   id: number;
@@ -120,7 +139,7 @@ export interface StrategyAlert {
   suggestion: string;
   /** publishedAt＝原文發布日 YYYY-MM-DD（從原文網頁讀，見 publishedDate.ts）；
    *  dateChecked＝已經去原文找過（找不到也記，避免每次開面板都重抓）。 */
-  evidence: Array<{ title: string; url?: string; source?: string; publishedAt?: string | null; dateChecked?: boolean }>;
+  evidence: Array<{ title: string; url?: string; source?: string; publishedAt?: string | null; dateChecked?: boolean; role?: EvidenceRole }>;
   status: AlertStatus;
   createdAt: string;
 }
@@ -259,23 +278,33 @@ function rowToAlert(r: any): StrategyAlert {
 }
 
 /**
- * 2026-09-30 之前存的情報沒有原文發布日（scout 沒給）。打開策略監測時在背景補：
- * 每則 evidence 只去原文找一次（dateChecked），找到／找不到都寫回 DB。
- * 不擋 overview——這次開面板看到「發布日不明」，下次開就有了。
+ * 舊情報（2026-09-30 之前存的）補兩件事：原文發布日、以及 7 天規則。打開策略監測時在背景跑：
+ *   - 每則 evidence 只去原文找一次日期（dateChecked）
+ *   - 用那則提醒的建立時間當基準，只留 7 天內的新聞，其他從 evidence 拿掉
+ *   - 一則 7 天內的 news 都沒有 → 這則提醒不符合規則，改成 dismissed（面板與未讀數都不再算它）
+ * 不擋 overview——這次開面板看到的是舊樣子，下次開就是新的。
  */
 const backfilling = new Set<number>();
 export function backfillEvidenceDates(alerts: StrategyAlert[]): void {
-  const todo = alerts.filter((a) => !backfilling.has(a.id) && a.evidence.some((e) => !e.dateChecked && !e.publishedAt));
+  const todo = alerts.filter((a) => !backfilling.has(a.id) && a.evidence.some((e) => !e.role));
   if (!todo.length) return;
   for (const a of todo) backfilling.add(a.id);
   void (async () => {
     for (const a of todo) {
       try {
-        const evidence = await Promise.all(a.evidence.map(async (e) =>
+        const asOf = new Date(a.createdAt);
+        const dated = await Promise.all(a.evidence.map(async (e) =>
           e.dateChecked || e.publishedAt ? e : { ...e, publishedAt: await fetchPublishedDate(e.url), dateChecked: true }));
-        await localPool.execute(`UPDATE strategy_alerts SET evidence = ? WHERE id = ?`, [JSON.stringify(evidence), a.id]);
+        const kept = dated
+          .map((e) => ({ ...e, role: e.role ?? classifyEvidence(e, asOf) }))
+          .filter((e): e is typeof e & { role: EvidenceRole } => !!e.role);
+        if (!kept.some((e) => e.role === "news")) {
+          await localPool.execute(`UPDATE strategy_alerts SET evidence = ?, status = 'dismissed' WHERE id = ?`, [JSON.stringify(dated), a.id]);
+        } else {
+          await localPool.execute(`UPDATE strategy_alerts SET evidence = ? WHERE id = ?`, [JSON.stringify(kept), a.id]);
+        }
       } catch (err) {
-        console.warn("[strategyMonitor] backfill dates failed", a.id, (err as Error).message);
+        console.warn("[strategyMonitor] backfill evidence failed", a.id, (err as Error).message);
       } finally {
         backfilling.delete(a.id);
       }
@@ -400,11 +429,11 @@ async function loadAnchors(watch: StrategyWatch): Promise<{ name: string; indust
 }
 
 function digestPrompt(a: Awaited<ReturnType<typeof loadAnchors>>, watch: StrategyWatch, items: IntelItem[]): string {
-  const list = items.map((it, i) =>
-    `[${i}] ${it.title}\n    來源：${it.source}${it.publishedAt ? `　日期：${it.publishedAt}` : ""}${it.url ? `　${it.url}` : ""}\n    ${String(it.content ?? "").slice(0, 400)}`,
-  ).join("\n");
+  const line = (it: IntelItem, i: number) =>
+    `[${i}] ${it.title}\n    來源：${it.source}${it.publishedAt ? `　發布日：${it.publishedAt}` : ""}${it.url ? `　${it.url}` : ""}\n    ${String(it.content ?? "").slice(0, 400)}`;
+  const news = items.map((it, i) => line(it, i)).join("\n");
   return [
-    `你是品牌的策略顧問。下面是品牌的三個錨點，以及近兩週掃到的市場情報。`,
+    `你是品牌的策略顧問。下面是品牌的三個錨點，以及近 ${NEWS_WINDOW_DAYS} 天確定發布的新聞。`,
     `你的工作：判斷有沒有「重要到該回頭調整品牌定位」的變化。沒有就回空陣列，這很常見，不要硬找。`,
     ``,
     `【品牌】${a.name}${a.industry ? `（${a.industry}）` : ""}${watch.scope === "product" ? `　【監測對象：產品】${a.scopeName}` : ""}`,
@@ -414,11 +443,11 @@ function digestPrompt(a: Awaited<ReturnType<typeof loadAnchors>>, watch: Strateg
     `【監測的競爭者】${watch.competitors.join("、") || "（無）"}`,
     `【監測關鍵字】${watch.keywords.join("、") || "（無）"}`,
     ``,
-    `【情報】`,
-    list,
+    `【新聞（原文發布日確定在近 ${NEWS_WINDOW_DAYS} 天內）】`,
+    news,
     ``,
     `規則：`,
-    `1. 每則提醒必須指回至少一則情報的編號（evidence），不能只憑推測。`,
+    `1. 每則提醒必須指回至少一則新聞的編號（evidence），不能只憑推測。`,
     `2. kind 只能是 competitor_move（競爭者動作）、audience_shift（受眾變化）、market_trend（市場趨勢）。`,
     `3. anchor 只能是 audience、competition、differentiation、tagline、none —— 指出該回頭看哪一張定位卡（受眾／競爭格局／差異化／標語）。`,
     `   （2026-09-30 策略工作台已刪除：suggestion 不要叫使用者「回工作台」，要說回哪一張定位卡、改什麼。）`,
@@ -462,14 +491,30 @@ export async function runStrategyScan(watch: StrategyWatch, opts?: { now?: Date 
     keywords: uniq([anchors.scopeName, ...watch.keywords]),
     competitors: watch.competitors,
     industryTags: anchors.industry ? [anchors.industry] : [],
-    days: 14,
-    limit: 8,
+    days: NEWS_WINDOW_DAYS,
+    limit: 12,   // 7 天規則會刷掉不少舊文，多要一些
+    newsOnly: true,
     loadCred: async () => null,
   };
   let items: IntelItem[] = [];
   try { items = await perplexityScout.fetch(ctx); }
   catch (e) { return finish({ ok: false, note: `scout_error：${String((e as Error)?.message ?? e).slice(0, 200)}`, items: 0, created: 0 }); }
-  if (!items.length) return finish({ ok: true, note: "no_items：這兩週沒掃到相關情報", items: 0, created: 0 });
+  if (!items.length) return finish({ ok: true, note: "no_items：這 7 天沒掃到相關情報", items: 0, created: 0 });
+
+  // 2026-09-30 7 天規則：先回原文讀發布日（只有 Tavily API 的日期可當備援，模型寫的不採用），
+  // 只留確定 7 天內的新聞。一則都沒有就不產生提醒。
+  const now = opts?.now ?? new Date();
+  const dated = await Promise.all(items.map(async (it) => {
+    const fromPage = await fetchPublishedDate(it.url);
+    const fromApi = it.scoutId === "tavily" ? normalizeDate(it.publishedAt) : null;
+    const publishedAt = fromPage ?? fromApi;
+    return { it: { ...it, publishedAt: publishedAt ?? undefined }, role: classifyEvidence({ url: it.url, publishedAt }, now) };
+  }));
+  const newsItems = dated.filter((d) => d.role === "news").map((d) => d.it);
+  if (!newsItems.length) {
+    return finish({ ok: true, note: `no_fresh：${items.length} 則情報都不是確定 7 天內發布的新聞`, items: items.length, created: 0 });
+  }
+  items = newsItems;
 
   let raw = "";
   try {
@@ -491,14 +536,11 @@ export async function runStrategyScan(watch: StrategyWatch, opts?: { now?: Date 
       [watch.scope, watch.scopeId, key, DEDUPE_DAYS],
     );
     if ((dup as any[]).length) continue;
-    // 2026-09-30：發布日回原文讀；只有 Tavily 搜尋 API 自己回的 published_date 可以當備援——
-    // Gemini／Vertex 那幾條是模型「寫」出來的日期，不採用。
-    const evidence = await Promise.all(a.evidence.map(async (i) => {
+    // 日期上面已經讀過了。
+    const evidence = a.evidence.map((i) => {
       const it = items[i]!;
-      const fromPage = await fetchPublishedDate(it.url);
-      const fromApi = it.scoutId === "tavily" ? normalizeDate(it.publishedAt) : null;
-      return { title: it.title, url: it.url, source: it.source, publishedAt: fromPage ?? fromApi, dateChecked: true };
-    }));
+      return { title: it.title, url: it.url, source: it.source, publishedAt: it.publishedAt ?? null, dateChecked: true, role: "news" as EvidenceRole };
+    });
     await localPool.execute(
       `INSERT INTO strategy_alerts (userId, brandId, scope, scopeId, kind, anchor, alertKey, title, summary, suggestion, evidence, status)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'new')`,
