@@ -18,6 +18,10 @@
  */
 import localPool from "../../localDb.js";
 import { eventFacts, safeJSON, CAMPAIGN_PHASE_IDS, type CampaignPlan, type CampaignPhaseId } from "./campaignPlan.js";
+import { pickKpiAgent, type TeamAgent } from "./campaignTeam.js";
+
+// 挑人（pickKpiAgent）在 campaignTeam.ts——活動頁上的三個人用同一套規則挑。
+export { pickKpiAgent };
 
 /** 指標語彙（前端 lib/campaignKpi.ts 同一份，campaignKpiVocab.test.ts 比對）。 */
 export const KPI_METRICS = ["reach", "impressions", "engagement", "clicks", "leads", "orders", "revenue", "visits", "followers"] as const;
@@ -40,7 +44,7 @@ export interface PhaseKpi {
   metrics: Array<{ metric: KpiMetric; target: number | null }>;
   note: string;
 }
-export interface KpiAgent { id: number; slug: string; name: string; title: string; avatarUrl: string }
+export type KpiAgent = TeamAgent;
 export interface CampaignKpi {
   budget: number | null;
   goals: KpiGoal[];
@@ -141,50 +145,6 @@ export function validateKpiPlan(args: {
   const assumptions = (Array.isArray(args.raw?.assumptions) ? args.raw.assumptions : [])
     .map((a: unknown) => humanize(str(a, 160)).slice(0, 140)).filter(Boolean).slice(0, 5);
   return { phases, paidIds, brief: humanize(str(args.raw?.brief, 500)).slice(0, 460), assumptions };
-}
-
-/** 品牌產業 → agents slug 裡的產業代號。 */
-const INDUSTRY_TOKENS: Array<[RegExp, string]> = [
-  [/餐|食|飲|咖啡|烘焙|甜點|牛排|肉|茶|酒|food|restaurant|cafe|coffee|bakery|beverage/i, "food"],
-  [/美妝|保養|香氛|香水|彩妝|美容|beauty|cosmetic|skincare|fragrance/i, "beauty"],
-  [/保健|醫|營養|健康|health|medical|nutrition|wellness/i, "health"],
-  [/教育|課程|學|edu|course/i, "edu"],
-  [/旅遊|旅行|飯店|travel|hotel/i, "travel"],
-  [/軟體|科技|SaaS|AI|app|平台|顧問|行銷|software|tech|platform|agency|consult/i, "saas"],
-  [/電商|網購|零售|服飾|文具|ecom|retail|fashion|stationery/i, "ecom"],
-];
-
-/**
- * 挑一位「會看數字」的專家：agents 裡 primarySkillBundleKey＝paid-media-operations 的人，
- * 產業對得上的優先、台灣市場優先、評分高的優先。slug 是「職能-產業-市場-編號」，市場看
- * 第三段（-tw-）；開頭的 meta_ads_tw 是職能名稱，不代表台灣市場（2026-09-30 在 dev
- * 選到 meta_ads_tw-ecom-sea-1754 就是這樣來的）。挑不到就用本週企劃已經在用的那位
- * （meta_ads_tw-ecom-cn-6845）。
- */
-export async function pickKpiAgent(industry: string | null | undefined): Promise<KpiAgent | null> {
-  const token = INDUSTRY_TOKENS.find(([re]) => re.test(String(industry ?? "")))?.[1] ?? "ecom";
-  const toAgent = (r: any): KpiAgent => ({
-    id: Number(r.id), slug: String(r.slug ?? ""),
-    name: String(r.name_zh || r.name || r.englishName || ""),
-    title: String(r.title_zh || r.title || ""), avatarUrl: String(r.avatarUrl ?? ""),
-  });
-  try {
-    const [rows]: any = await localPool.execute(
-      `SELECT id, slug, name, name_zh, englishName, title, title_zh, avatarUrl FROM agents
-        WHERE isAvailable = 1 AND primarySkillBundleKey = 'paid-media-operations'
-        ORDER BY (slug LIKE ?) DESC, (slug LIKE '%-tw-%') DESC, rating DESC, id ASC
-        LIMIT 1`,
-      [`%-${token}-%`],
-    );
-    if ((rows as any[])[0]) return toAgent((rows as any[])[0]);
-    const [fb]: any = await localPool.execute(
-      `SELECT id, slug, name, name_zh, englishName, title, title_zh, avatarUrl FROM agents WHERE slug = ? LIMIT 1`,
-      ["meta_ads_tw-ecom-cn-6845"],
-    );
-    return (fb as any[])[0] ? toAgent((fb as any[])[0]) : null;
-  } catch {
-    return null;
-  }
 }
 
 const PHASE_ZH: Record<string, string> = { teaser: "預熱", launch: "開賣", sustain: "加溫", lastcall: "倒數", encore: "返場" };

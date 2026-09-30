@@ -85,6 +85,21 @@ export default function StrategyDirectorDrawer({ brandId }: { brandId: number | 
 
   const [open, setOpen] = React.useState(false);
   const [view, setView] = React.useState<View>("chat");
+  // 2026-09-30（CJ「內容企劃…跟右下方的策略總監，是否會衝突」）：活動頁的內容企劃被問到
+  // 方向（訴求、主角、對誰說）時不自己改，丟 onbrand:ask-director 過來——這裡打開面板、
+  // 把問題填進輸入框。一件事只有一個人負責，兩個對話框才不會打架。
+  const [prefill, setPrefill] = React.useState<{ text: string; nonce: number } | null>(null);
+  React.useEffect(() => {
+    const onAsk = (e: Event) => {
+      const q = String((e as CustomEvent).detail?.question ?? "").trim();
+      if (!q) return;
+      setOpen(true);
+      setView("chat");
+      setPrefill({ text: q, nonce: Date.now() });
+    };
+    window.addEventListener("onbrand:ask-director", onAsk);
+    return () => window.removeEventListener("onbrand:ask-director", onAsk);
+  }, []);
   const [agentId, setAgentId] = React.useState<number | null>(null);
   /** 正在看誰的背景——可能不是目前聊天的那一位（在人選列表裡點「查看背景」）。 */
   const [profileOf, setProfileOf] = React.useState<StrategistDirector | null>(null);
@@ -381,6 +396,7 @@ export default function StrategyDirectorDrawer({ brandId }: { brandId: number | 
               onOpenHistory={() => setHistoryOpen(true)}
               viewingConversationId={viewingConversationId}
               onBackToCurrent={() => setViewingConversationId(null)}
+              prefill={prefill}
             />
           )}
         </div>

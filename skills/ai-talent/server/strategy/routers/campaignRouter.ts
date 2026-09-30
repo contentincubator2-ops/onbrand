@@ -19,6 +19,7 @@
  *   setLock     — 定稿／解鎖（2026-09-30 CJ「定稿一次鎖整份」）
  *   chat        — 跟內容企劃對話：回覆＋提案（不寫入；套用走 savePlan）
  *   kpiAgent    — 會協助拆 KPI 的投放專家是誰（打開 KPI 視窗時先讓用戶看到）
+ *   team        — 這檔活動的內容企劃與投放專家（真的 agent，見 core/campaignTeam.ts）
  *   planKpi     — 用戶填總預算／總目標 → 投放專家拆到每一段＋挑要下廣告的篇（提案，不寫入）
  *   setInPlanner— 內容層決定某一篇要不要排進本週企劃（定稿後也能改，它是排程不是企劃內容）
  *   setBackdrop — 策略畫面的底圖模板（用戶自己選；不受定稿影響，它不是企劃內容）
@@ -35,6 +36,7 @@ import localPool from "../../localDb";
 import { buildCampaignPlan, inferCampaignSettings, type CampaignPlan } from "../core/campaignPlan";
 import { runCampaignChat } from "../core/campaignChat";
 import { KPI_METRICS, pickKpiAgent, runKpiPlan } from "../core/campaignKpi";
+import { brandIndustry, pickPlannerAgent } from "../core/campaignTeam";
 import { isHiddenContentPlatform, isHiddenHistoryItem } from "../../platform/core/planGate";
 import { ownedProductIds, resolveProductScope } from "../core/eventProductScope";
 import { invalidateBrandPrefix } from "../core/brandContext";
@@ -302,6 +304,15 @@ export const campaignRouter = router({
       } catch (e: any) {
         throw new TRPCError({ code: "BAD_REQUEST", message: String(e?.message ?? e).slice(0, 300) });
       }
+    }),
+
+  team: protectedProcedure
+    .input(z.object({ eventId: z.number().int().positive() }))
+    .query(async ({ ctx, input }) => {
+      const row = await loadEvent(input.eventId, ctx.user!.id);
+      const industry = await brandIndustry(Number(row.brandId));
+      const [planner, kpi] = await Promise.all([pickPlannerAgent(industry), pickKpiAgent(industry)]);
+      return { planner, kpi };
     }),
 
   kpiAgent: protectedProcedure
