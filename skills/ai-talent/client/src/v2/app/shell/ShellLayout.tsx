@@ -32,6 +32,7 @@ import { useUnreadNudges, fireNudge } from "../../platform/components/mia/miaNud
 import type { QueuedNudge } from "../../platform/components/mia/miaNudges";
 import OnBrandLogo from "../../platform/components/OnBrandLogo";
 import { useLang } from "../../../lib/i18n";
+import { fetchAuthMe, clearAuthMeCache } from "../../../lib/authMe";
 import { Avatar, Tooltip } from "@heroui/react";
 import { StrategyIcon, LockIcon, CheckIcon, NotifyIcon } from "../../platform/components/icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
@@ -352,6 +353,7 @@ export default function ShellLayout() {
 
   const handleLogout = async () => {
     try { await fetch("/api/auth/logout", { method: "POST", credentials: "include" }); } catch {}
+    clearAuthMeCache();
     window.location.href = "/auth/login";
   };
 
@@ -362,8 +364,7 @@ export default function ShellLayout() {
     let cancelled = false;
     (async () => {
       try {
-        const r = await fetch("/api/auth/me", { method: "POST", credentials: "include" });
-        const d = r.ok ? await r.json() : null;
+        const { data: d } = await fetchAuthMe();
         if (!cancelled) setCurrentUserEmail(String(d?.user?.email ?? "").toLowerCase());
       } catch { if (!cancelled) setCurrentUserEmail(null); }
     })();
@@ -1883,9 +1884,8 @@ function AccountPopup({ onLogout, onClose, onOpenSupport }: {
     let cancelled = false;
     (async () => {
       try {
-        const r = await fetch("/api/auth/me", { method: "POST", credentials: "include" });
-        if (!r.ok || cancelled) return;
-        const d = await r.json();
+        const { data: d } = await fetchAuthMe();
+        if (!d || cancelled) return;
         if (!cancelled) setMe(d?.user ?? null);
       } catch {/* silent */}
     })();

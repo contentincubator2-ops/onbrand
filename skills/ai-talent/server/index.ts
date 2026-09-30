@@ -20,6 +20,7 @@ import express from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import { rateLimit } from "express-rate-limit";
+import { isExemptFromAuthLimiter } from "./platform/auth/authRateLimit";
 import helmet from "helmet";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 // existsSync already imported at top for env path resolution
@@ -342,6 +343,9 @@ const authLimiter = rateLimit({
   legacyHeaders:   false,
   validate:        false,
   message:         { error: "Too many auth attempts; please wait a minute" },
+  // Session reads (/me, /me/lang) and /logout fall through to generalLimiter —
+  // throttling /me made the client think the user was logged out.
+  skip:            (req) => isExemptFromAuthLimiter(req.path),
 });
 app.use("/api/auth", authLimiter);  // tighter — mounted FIRST so it wins
 app.use("/api", generalLimiter);
