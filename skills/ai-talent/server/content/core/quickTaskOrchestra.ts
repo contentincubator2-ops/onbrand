@@ -212,6 +212,14 @@ export interface OrchestraResult {
     subsApplied: Array<{ from: string; to: string }>;
     rewrittenByLLM: boolean;
   }>;
+  /** 2026-09-30: 品牌一致性檢查結果（brandConsistency.ts），每個變體一筆；
+   *  status = consistent / fixed / flagged / skipped。 */
+  brandConsistency?: Array<{
+    variantIndex: number;
+    status: string;
+    issues: Array<{ aspect: string; detail: string }>;
+    reason?: string;
+  }>;
   /** 2026-07-20 (CJ QA 斷字/漏字 forensics): raw writer captions for any
    *  variant the post-processing chain modified — persisted to metadata so
    *  the corrupting transform can be identified by diffing against content. */
@@ -2558,6 +2566,49 @@ export async function runOrchestra(args: {
     // transform chain 重跑一次（見 `const variants` 迴圈），在這裡修會被
     // 蓋掉。正確的位置是那條 chain 的最後一步。
 
+    // ── 品牌一致性檢查 (2026-09-30 CJ「我希望要做一致性檢查，多幾秒沒關係」) ──
+    // 禁用詞／替換對照只查用字；這一關對照品牌大腦全文查語氣、原型、受眾、禁用說法、
+    // 價值與編造事實，不一致就最小幅度修正（見 brandConsistency.ts）。放在 checkpoint
+    // 之前，用戶第一眼看到的就是檢查過的版本。行事曆合併／策略文件不查（不是貼文）。
+    // 上限 25 秒、且只用剩餘預算；失敗一律記 skipped，不假裝檢查過。
+    const brandConsistency: Array<{ variantIndex: number; status: string; issues: Array<{ aspect: string; detail: string }>; reason?: string }> = [];
+    const isStrategyDocTask = (args.template.id ?? "").includes("-99-") &&
+      /calendar|toolkit|playbook|策略|月曆|工具包/.test(args.template.id ?? "");
+    if (Array.isArray(captions) && captions.length && args.brandId && brandPrefix
+        && !args.config.calendarMerge && !isStrategyDocTask) {
+      const stCheck = stage("brandcheck", "品牌一致性檢查");
+      const remaining = tierBudget - (Date.now() - startedAt) - 15_000;
+      const timeoutMs = Math.min(25_000, remaining);
+      const { checkBrandConsistency } = await import("./brandConsistency");
+      const results = await Promise.all(captions.map(async (v, vi) => {
+        if (!v?.caption || v.caption.length > 6000) return null;
+        const res = await checkBrandConsistency({
+          caption: v.caption,
+          brandPrefix,
+          userMsg,
+          taskLabel: String((args.template as any).label ?? args.template.id),
+          isZhTW: brandMarket.isZhTW,
+          timeoutMs,
+        });
+        if (res.status === "fixed") {
+          // 修正稿一樣要過品牌硬規則與格式合約，跟禁用詞改寫後同一套修補。
+          let fixed = await enforceBrandRulesOnText(args.brandId, res.caption).catch(() => res.caption);
+          fixed = adCopyTask ? repairAdCopy(fixed, requestedUrl)
+            : shotListTask ? repairShotList(fixed)
+            : adSlotTask ? repairAdSlot(fixed, adSlotTask)
+            : fixed;
+          v.caption = fixed;
+        }
+        return { variantIndex: vi, status: res.status, issues: res.issues, ...(res.reason ? { reason: res.reason } : {}) };
+      }));
+      for (const r of results) if (r) brandConsistency.push(r);
+      const allSkipped = brandConsistency.length > 0 && brandConsistency.every((r) => r.status === "skipped");
+      stCheck.status = allSkipped ? "failed" : "done";
+      stCheck.completedAt = Date.now() - startedAt;
+      if (allSkipped) console.warn(`[orchestra] brandcheck skipped for ${args.template.id}: ${brandConsistency[0]?.reason ?? "unknown"}`);
+    }
+    (captions as any).__brandConsistency = brandConsistency;
+
     // ── Checkpoint (2026-05-14 「先回 caption + brief、image 跟 QA 變 async polling」) ─
     // Captions + briefs are ready. If the caller passed `onCheckpoint`,
     // (a) persist a PARTIAL mission_outputs row now with progress='caption_ready',
@@ -3057,6 +3108,7 @@ export async function runOrchestra(args: {
       // 2026-06-05 (CJ「不阻擋，事後解釋」): expose brand-rule fixes so
       // RunPage can trigger a friendly Mia nudge after generation.
       brandFixes: (captions as any).__brandFixes ?? [],
+      brandConsistency: (captions as any).__brandConsistency ?? [],
       // 2026-07-20 (CJ QA 斷字/漏字 forensics): raw pre-transform captions.
       rawCaptions,
       strategist: strategistMeta && strategistAnchor
@@ -3155,6 +3207,7 @@ export async function runOrchestra(args: {
           // enforceBrandRulesOnTextWithReport, so RunPage can trigger a
           // Mia nudge ("發現你寫了 X，已自動改成 Y，想調整定位嗎？").
           brandFixes: (result as any).brandFixes ?? [],
+          brandConsistency: (result as any).brandConsistency ?? [],
           // 2026-07-20 (CJ QA 斷字/漏字 forensics): raw writer captions for
           // any variant the transform chain modified — diff against content
           // to identify the corrupting layer.

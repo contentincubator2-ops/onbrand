@@ -183,9 +183,12 @@ function synthesizeStages(elapsedMs: number, tier: string, lang: string): any[] 
   const preEnd = scoutEnd + 3000;
   const stratEnd = preEnd + 9000;
   const capStart = preEnd;
-  const capEnd = capStart + 25000;
-  const genEnd = capEnd + 10000;
-  const extrasEnd = capEnd + 14000;
+  // 單篇實測約 8 秒寫完（2026-09-30 dev run 3784／3788）；套組以上維持 25 秒。
+  const capEnd = capStart + (isProd ? 25000 : 9000);
+  // 2026-09-30：文案寫完先過品牌一致性檢查（server brandConsistency.ts），圖與附加項都在它之後。
+  const checkEnd = capEnd + 8000;
+  const genEnd = checkEnd + 10000;
+  const extrasEnd = checkEnd + 14000;
   const qaEnd = extrasEnd + 8000;
   const mk = (key: string, label: string, start: number, end: number) => ({
     key, label, startedAt: start,
@@ -198,9 +201,10 @@ function synthesizeStages(elapsedMs: number, tier: string, lang: string): any[] 
   if (isProd) stages.push(mk("strategist", L("Strategist 規劃敘事弧", "Strategist maps the narrative arc"), preEnd, stratEnd));
   stages.push(mk("caption", L("文案寫手 撰寫版本", "Caption writer drafts variants"), capStart, capEnd));
   stages.push(mk("brief", L("視覺指導寫風格指示", "Image director writes the visual brief"), capStart, capEnd));
-  stages.push(mk("gen", L("AI 生圖", "AI paints the image"), capEnd, genEnd));
+  stages.push(mk("brandcheck", L("品牌一致性檢查", "Brand consistency check"), capEnd, checkEnd));
+  stages.push(mk("gen", L("AI 生圖", "AI paints the image"), checkEnd, genEnd));
   if (isProd) {
-    stages.push(mk("extras", L("留言模板 / 發文時段 / 跟進", "Reply templates · timing · follow-up"), capEnd, extrasEnd));
+    stages.push(mk("extras", L("留言模板 / 發文時段 / 跟進", "Reply templates · timing · follow-up"), checkEnd, extrasEnd));
     stages.push(mk("qa", L("Jordan Hayes 審核", "Jordan Hayes reviews"), extrasEnd, qaEnd));
   }
   return stages;
@@ -3015,6 +3019,7 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                   const PHASES: Array<{ key: string; stageKeys: string[]; icon: IconName; zh: string; en: string }> = [
                     { key: "plan",   stageKeys: ["scout", "pre", "strategist"], icon: "strategy", zh: "策略", en: "Plan" },
                     { key: "write",  stageKeys: ["caption"],                   icon: "content",  zh: "文案", en: "Copy" },
+                    { key: "check",  stageKeys: ["brandcheck"],                icon: "shield",   zh: "一致性", en: "On-brand" },
                     { key: "image",  stageKeys: ["gen"],                       icon: "image",    zh: "圖片", en: "Image" },
                     { key: "review", stageKeys: ["extras", "qa"],              icon: "review",   zh: "審核", en: "Review" },
                   ];
