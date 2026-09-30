@@ -89,8 +89,6 @@ export const ALERT_ANCHORS: readonly AlertAnchor[] = ["audience", "competition",
 
 /** 兩次自動掃描的最短間隔（天）。 */
 export const SCAN_INTERVAL_DAYS = 7;
-/** 手動掃描的冷卻（小時）。 */
-export const MANUAL_SCAN_COOLDOWN_HOURS = 24;
 /** 同一個 alertKey 在這個天數內不重複出現。 */
 export const DEDUPE_DAYS = 30;
 /**

@@ -18,6 +18,8 @@ import { useNavigate } from "react-router-dom";
 import { trpc } from "../../../../lib/trpc";
 import { useLang } from "../../../../lib/i18n";
 import { showToastGlobal } from "../../../../components/ui/Toast";
+import { Avatar } from "@heroui/react";
+import { Icon } from "../../../platform/components/icons";
 
 interface Watch {
   id: number; scope: "brand" | "product"; scopeId: number;
@@ -33,9 +35,9 @@ interface Alert {
   status: "new" | "seen" | "applied" | "dismissed"; createdAt: string;
 }
 interface Overview {
-  locked: boolean; brandName: string; scanIntervalDays: number; manualCooldownHours: number;
+  locked: boolean; brandName: string; scanIntervalDays: number;
   watches: Watch[]; alerts: Alert[]; productNames: Record<number, string>;
-  lastScanAt: string | null; canScanNow: boolean;
+  lastScanAt: string | null; scanning: boolean;
 }
 
 const KIND_ZH: Record<Alert["kind"], string> = { competitor_move: "競爭者動作", audience_shift: "受眾變化", market_trend: "市場趨勢" };
@@ -78,7 +80,6 @@ const splitList = (s: string): string[] => s.split(/[,，、\n]/).map((x) => x.t
 // 監測清單／立即掃描縮小一號——這張卡是輔助功能，不該跟下面的定位卡片
 // 搶視覺重量。
 const btnGhost = "rounded-full border border-neutral-900 px-2.5 py-0.5 text-[11px] font-medium text-neutral-900 transition hover:bg-neutral-900 hover:text-white";
-const btnGhostDisabled = "rounded-full border border-neutral-300 px-2.5 py-0.5 text-[11px] font-medium text-neutral-400";
 
 export default function StrategyAlertsPanel({ brandId }: { brandId: number }) {
   const { lang } = useLang();
@@ -87,7 +88,11 @@ export default function StrategyAlertsPanel({ brandId }: { brandId: number }) {
   const utils = (trpc as any).useUtils?.();
 
   const q = (trpc as any).strategyMonitor?.overview?.useQuery
-    ? (trpc as any).strategyMonitor.overview.useQuery({ brandId }, { staleTime: 30_000 })
+    ? (trpc as any).strategyMonitor.overview.useQuery({ brandId }, {
+        staleTime: 30_000,
+        // 掃描在伺服器跑（可能幾分鐘）；重新整理後仍在掃的話，每 10 秒看一次結果。
+        refetchInterval: (query: any) => (query?.state?.data?.scanning ? 10_000 : false),
+      })
     : { data: null, isLoading: false, refetch: () => {} };
   const data = q.data as Overview | null | undefined;
 
@@ -109,6 +114,16 @@ export default function StrategyAlertsPanel({ brandId }: { brandId: number }) {
     onError: (e: any) => showToastGlobal(String(e?.message ?? "error"), "error"),
   });
   const setStatus = (trpc as any).strategyMonitor?.setAlertStatus?.useMutation?.({ onSuccess: refetch });
+
+  // 2026-09-30（CJ「將按鈕改成一個我們其中一個策略總監 agent，就像任務卡一樣，該 icon 旁邊
+  // 有按鈕，可以開始。隨時都可以開始」）：掃描由品牌定位總監負責——監測看的是競爭者與定位
+  // 的變化，正是這個角色的守備範圍。人選跟右下角策略總監同一支 listDirectors（依品牌產業挑人）。
+  const directorsQ = (trpc as any).strategistChat.listDirectors.useQuery(
+    { brandId, scope: "brand" },
+    { staleTime: 5 * 60_000, refetchOnWindowFocus: false },
+  );
+  const directors: Array<{ roleId: string; name: string; avatarUrl?: string; roleLabel?: string }> = directorsQ.data?.directors ?? [];
+  const scanDirector = directors.find((d) => d.roleId === "brand_positioning") ?? directors[0] ?? null;
 
   // 監測清單的編輯草稿（逗號分隔字串）
   const [draft, setDraft] = useState<Record<string, { keywords: string; competitors: string; enabled: boolean }>>({});
@@ -159,26 +174,43 @@ export default function StrategyAlertsPanel({ brandId }: { brandId: number }) {
             <p className="mt-0.5 text-[12px] text-neutral-400">{noteText(data.watches[0].lastScanNote, en)}</p>
           )}
         </div>
-        <div className="flex flex-wrap items-center justify-end gap-2">
-          {/* 2026-09-30（CJ「立即掃描功能，無法按下」）：手動掃描 24 小時一次是成本線，但原因
-              只放在滑鼠移上去的 title，按鈕看起來像壞掉。直接寫出什麼時候可以再掃。 */}
-          {!data.canScanNow && data.lastScanAt && (
-            <span className="text-[11px] text-neutral-400">
-              {en ? "Next manual scan " : "下次可掃描 "}
-              {fmt(new Date(new Date(data.lastScanAt).getTime() + data.manualCooldownHours * 3_600_000).toISOString(), en)}
-            </span>
-          )}
-          <button onClick={() => setEditing((v) => !v)} className={btnGhost}>
+        <div className="flex items-start gap-3">
+          <button onClick={() => setEditing((v) => !v)} className={`${btnGhost} mt-1`}>
             {editing ? (en ? "Done" : "收起清單") : (en ? "Watch list" : "監測清單")}
           </button>
-          <button
-            disabled={!data.canScanNow || scanNow?.isPending}
-            onClick={() => scanNow?.mutate?.({ brandId })}
-            title={data.canScanNow ? "" : (en ? `Manual scan once every ${data.manualCooldownHours}h` : `手動掃描每 ${data.manualCooldownHours} 小時一次`)}
-            className={data.canScanNow ? btnGhost : btnGhostDisabled}
-          >
-            {scanNow?.isPending ? (en ? "Scanning…" : "掃描中…") : (en ? "Scan now" : "立即掃描")}
-          </button>
+          {/* 策略總監頭像＝開始鍵（樣式跟任務卡的 agent 頭像同一套：橘框＋▶，名字與動作在下方）。 */}
+          {(() => {
+            const busy = !!scanNow?.isPending || data.scanning;
+            return (
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => scanNow?.mutate?.({ brandId })}
+                aria-label={en ? "Start a scan" : "開始掃描"}
+                title={scanDirector ? `${scanDirector.name}${scanDirector.roleLabel ? ` · ${scanDirector.roleLabel}` : ""}` : undefined}
+                className="shrink-0 flex flex-col items-center gap-1 group disabled:cursor-wait"
+              >
+                <span className={`relative block rounded-full p-[3px] ring-[3px] ring-[#F37E4A] transition ${busy ? "animate-pulse" : "group-hover:scale-105 group-active:scale-95"}`}>
+                  {scanDirector?.avatarUrl ? (
+                    <Avatar src={scanDirector.avatarUrl} className="w-12 h-12" />
+                  ) : (
+                    <span className="w-12 h-12 rounded-full bg-neutral-100 flex items-center justify-center text-neutral-700">
+                      <Icon name="agent" size={20} />
+                    </span>
+                  )}
+                  <span className="absolute -right-1 -bottom-1 w-6 h-6 rounded-full bg-[#F37E4A] text-white flex items-center justify-center ring-2 ring-white">
+                    <Icon name="play" size={10} />
+                  </span>
+                </span>
+                <span className="flex flex-col items-center leading-tight">
+                  {scanDirector && <span className="text-[12px] font-semibold text-neutral-900 max-w-[96px] truncate">{scanDirector.name}</span>}
+                  <span className="text-[11px] font-semibold text-[#F37E4A]">
+                    {busy ? (en ? "Scanning…" : "掃描中…") : (en ? "Start scan" : "開始掃描")}
+                  </span>
+                </span>
+              </button>
+            );
+          })()}
         </div>
       </div>
 
