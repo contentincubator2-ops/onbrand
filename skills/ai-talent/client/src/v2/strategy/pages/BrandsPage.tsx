@@ -41,10 +41,10 @@ import AIBriefPanel from "../components/positioning/AIBriefPanel";
 import StrategyAlertsPanel from "../components/positioning/StrategyAlertsPanel";
 import PersonaAgentPanel from "../components/positioning/PersonaAgentPanel";
 import { showToastGlobal } from "../../../components/ui/Toast";
-import { BrandActionChipsRow, usePositioningStatus } from "../components/positioning/BrandActionChips";
 import AddEntityModal, { type AddEntityTab } from "../components/AddEntityModal";
 import ProductDetailModal from "../components/positioning/ProductDetailModal";
 // Notion-style line icons
+import { LockToggle } from "../components/positioning/LockToggle";
 import { AgentIcon, MemoryIcon, AwardIcon, BundleIcon, CommentIcon, DeleteIcon, EditIcon, FontIcon, GenerateIcon, HashtagIcon, IdCardIcon, LibraryIcon, LockIcon, PaletteIcon, PeopleIcon, PlayIcon, QuoteIcon, RegenerateIcon, ShieldIcon, TargetIcon, TextIcon, DoneIcon, StopIcon, WarningIcon, CheckIcon, CloseIcon } from "../../platform/components/icons";
 import { SCOPE_SEGMENTS, type SegmentSpec } from "../lib/positioningSchema";
 import { pickProductImageUrl } from "../lib/productImage";
@@ -56,7 +56,7 @@ import { pipelineFor, type PipelineStepSpec } from "../lib/positioningPipeline";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { HelpTip } from "../../platform/components/HelpTip";
 import {
-  faPlus, faPalette, faFont, faQuoteLeft, faBullseye, faUsers, faImage, faIcons, faChartPie, faImages, faPenNib, faShieldHalved, faFolderOpen, faLock, faLockOpen, faBookOpen, faTableList, faBox, faRocket, faBullhorn, faWandMagicSparkles, faGear, faStickyNote, faTrashCan, faSatelliteDish, faStethoscope, faFileArrowUp,
+  faPlus, faPalette, faFont, faQuoteLeft, faBullseye, faUsers, faImage, faIcons, faChartPie, faImages, faPenNib, faShieldHalved, faFolderOpen, faBookOpen, faTableList, faBox, faRocket, faBullhorn, faWandMagicSparkles, faGear, faStickyNote, faTrashCan, faSatelliteDish, faStethoscope, faFileArrowUp,
 } from "@fortawesome/free-solid-svg-icons";
 
 // Sub-nav id format:
@@ -1423,6 +1423,13 @@ export default function BrandsPage() {
               策略總監的系統提示詞了（見 strategistChatRouter.ts），使用者
               直接問策略總監就有，不用再靠這裡一顆 hover 才看得到的按鈕。
               現在只剩最單純的大標題。 */}
+          {/* 2026-09-29 (CJ「定案跟鎖定定位其實是相同功能，只留鎖定」→「在品牌名和標語的
+              右側」→「LOCK ONLY」)：原本標題下的「定案」chip 與內容上方整條「定位
+              尚未鎖定／鎖定定位」橫列是同一件事兩個入口，合併成標題區右側一顆手繪
+              鎖頭（LockToggle），鎖頭本身就是按鈕、下方小字表狀態。鎖的是目前頁籤
+              （定位／文字／視覺）。標題維持置中：鎖頭 absolute 掛在標題區右緣，
+              窄螢幕沒空間時改排到標語下方。 */}
+          <div className="relative inline-flex flex-col items-center">
           <h1
             className="font-bold tracking-tight leading-none text-neutral-900 mb-5"
             style={{ fontSize: "clamp(1.75rem, 3vw, 2.5rem)" }}
@@ -1445,6 +1452,36 @@ export default function BrandsPage() {
               </p>
             );
           })()}
+
+            {(category === "positioning" || category === "copy" || category === "visual") && activeBrandIdForLocks && (() => {
+              const tab = category as "positioning" | "copy" | "visual";
+              const tabLabel = tab === "positioning"
+                ? (lang === "en" ? "Positioning" : "定位")
+                : tab === "copy"
+                  ? (lang === "en" ? "Copy" : "文字")
+                  : (lang === "en" ? "Visual" : "視覺");
+              const lock = tabLocks[tab];
+              const isLocked = !!lock;
+              return (
+                <div className="mt-2 sm:mt-0 sm:absolute sm:top-1/2 sm:-translate-y-1/2 sm:left-[calc(100%+18px)]">
+                  <LockToggle
+                    locked={isLocked}
+                    busy={!!(lockTabMut?.isPending || unlockTabMut?.isPending)}
+                    onToggle={() => handleLockToggle(tab)}
+                    lockedLabel={lang === "en" ? "Locked" : "已鎖定"}
+                    unlockedLabel={lang === "en" ? "Unlocked" : "未鎖定"}
+                    title={isLocked
+                      ? (lang === "en"
+                          ? `${tabLabel} locked ${new Date(lock.at).toLocaleString("en-US", { dateStyle: "short", timeStyle: "short" })} · single source of truth · click to unlock`
+                          : `${tabLabel}鎖定於 ${new Date(lock.at).toLocaleString("zh-TW", { dateStyle: "short", timeStyle: "short" })} · 全平台採用此版本 · 點一下解鎖`)
+                      : (lang === "en"
+                          ? `Lock ${tabLabel} — editor goes read-only · every task uses this as the single source of truth`
+                          : `鎖定${tabLabel}：編輯欄變唯讀 · 所有任務用這份為單一真相`)}
+                  />
+                </div>
+              );
+            })()}
+          </div>
 
           {/* 2026-05-11 (CJ「搜尋 BAR 不需要了」): BrandMessageBar removed.
               Manifesto subtitle above already carries the value-prop;
@@ -1548,17 +1585,6 @@ export default function BrandsPage() {
           </div>
           )}
 
-          {/* 2026-09-23 (CJ「移除試寫功能」)：KickerRow 現在只剩定案按鈕
-              ——「BRAND WORKSPACE」跟品牌名稱都跟上面的大標題重複，一併拿掉。 */}
-          <KickerRow
-            brandId={activeBrandIdForLocks}
-            scopeMode={scopeMode}
-            scopeEntityId={
-              scopeMode === "product" ? (scope?.productId ?? null)
-              : scopeMode === "event"   ? (scope?.eventId   ?? null)
-              : null
-            }
-          />
         </div>
       </div>
       )}{/* end scopeBrands.length > 0 hero */}
@@ -1568,81 +1594,6 @@ export default function BrandsPage() {
           PipelineThinkingPanel. Removed — the in-page panel is now the
           single source of "AI thinking" UI. (Component retained below
           in case we want to revive it as a global indicator later.) */}
-
-      {/* Lock controls bar — sits above each tab's content. State-aware:
-          locked → green check banner with 解鎖 button
-          unlocked → soft hint with 🔒 鎖定 button to commit current state */}
-      {(category === "positioning" || category === "copy" || category === "visual") && activeBrandIdForLocks && (() => {
-        const tabLabel = category === "positioning"
-          ? (lang === "en" ? "Positioning" : "定位")
-          : category === "copy"
-            ? (lang === "en" ? "Copy" : "文字")
-            : (lang === "en" ? "Visual" : "視覺");
-        const lock = tabLocks[category];
-        const isLocked = !!lock;
-        return (
-          <div style={{
-            background: isLocked ? "#ECFDF5" : "#F9FAFB",
-            borderBottom: "1px solid #E5E7EB",
-            padding: "10px 28px",
-          }}>
-            <div className="max-w-[1400px] mx-auto flex items-center justify-between gap-3 flex-wrap">
-              <div className="flex items-center gap-3">
-                <div
-                  className="w-8 h-8 rounded-full flex items-center justify-center"
-                  style={{
-                    background: isLocked ? "#10B981" : "#E5E7EB",
-                    color: isLocked ? "white" : "#6B7280",
-                  }}
-                >
-                  <FontAwesomeIcon icon={isLocked ? faLock : faLockOpen} style={{ fontSize: 13 }} />
-                </div>
-                <div>
-                  {isLocked ? (
-                    <>
-                      <p className="text-small font-semibold text-emerald-800 m-0">
-                        <DoneIcon size={13} /> {lang === "en"
-                          ? `${tabLabel} locked — single source of truth across all channels`
-                          : `${tabLabel}已鎖定 — 全平台採用此版本為單一真相`}
-                      </p>
-                      <p className="text-tiny text-emerald-600 m-0">
-                        {lang === "en"
-                          ? `Locked at ${new Date(lock.at).toLocaleString("en-US", { dateStyle: "short", timeStyle: "short" })}`
-                          : `鎖定於 ${new Date(lock.at).toLocaleString("zh-TW", { dateStyle: "short", timeStyle: "short" })}`}
-                      </p>
-                    </>
-                  ) : (
-                    <>
-                      <p className="text-small font-semibold text-default-800 m-0">
-                        {lang === "en" ? `${tabLabel} — not locked yet` : `${tabLabel} 尚未鎖定`}
-                      </p>
-                      <p className="text-tiny text-default-700 m-0">
-                        {lang === "en"
-                          ? "Once locked: editor goes read-only · every task and the 7-Day Publisher uses this as the single source of truth"
-                          : "鎖定後：編輯欄變唯讀 · 所有任務與七日發布台用這份為單一真相"}
-                      </p>
-                    </>
-                  )}
-                </div>
-              </div>
-              <Button
-                size="sm"
-                color={isLocked ? "default" : "success"}
-                variant={isLocked ? "flat" : "solid"}
-                onPress={() => handleLockToggle(category as "positioning" | "copy" | "visual")}
-                isLoading={lockTabMut?.isPending || unlockTabMut?.isPending}
-              >
-                {/* CJ 2026-05-08: 只要出現一個 icon — kept the left circle
-                    icon at line ~875, removed the duplicate startContent
-                    icon from this button. */}
-                {isLocked
-                  ? (lang === "en" ? "Unlock" : "解鎖")
-                  : (lang === "en" ? `Lock ${tabLabel}` : `鎖定${tabLabel}`)}
-              </Button>
-            </div>
-          </div>
-        );
-      })()}
 
       {/* ─── Body: full-bleed (left rail removed 2026-05-07) ─────────────────── */}
       <div className="flex-1 flex">
@@ -4397,32 +4348,6 @@ function PositioningTopRow({
           2026-09-24：連帶把當時保留的 onLockToggle prop 也拿掉了——留著一個
           永遠不會被呼叫的 callback，只會讓下一個人以為這裡按了會鎖定。 */}
     </>
-  );
-}
-
-/* ─────────────────────────── KickerRow ───────────────────────────────
-   2026-09-23 (CJ「header太亂了…移除試寫功能」)：拿掉「BRAND WORKSPACE」
-   紫色 pill 跟重複的品牌/產品名稱（上面大標題已經有了）——現在只剩定案
-   按鈕，不再需要 testOpen/onToggleTest（試寫功能整個移除，見
-   BrandActionChips.tsx 的 BrandActionChipsRow）。
-   ───────────────────────────────────────────────────────────────────── */
-function KickerRow({
-  brandId, scopeMode, scopeEntityId,
-}: {
-  brandId: number | null;
-  /** BUG-3 fix: pass the current scope so status reflects the right entity. */
-  scopeMode: "brand" | "product" | "event" | "none";
-  scopeEntityId: number | null;
-}) {
-  // When scopeMode is "none" (no brand selected) fall back to brand kind so
-  // the hook stays valid; the enabled guard (entityId=null) will skip the query.
-  const resolvedKind = (scopeMode === "none" ? "brand" : scopeMode) as "brand" | "product" | "event";
-  const resolvedId   = scopeMode === "brand" ? brandId : scopeEntityId;
-  const { status } = usePositioningStatus(resolvedKind, resolvedId);
-  return (
-    <div className="mt-4 flex items-center gap-2 text-tiny text-default-600 flex-wrap justify-center">
-      <BrandActionChipsRow brandId={brandId} status={status} />
-    </div>
   );
 }
 
