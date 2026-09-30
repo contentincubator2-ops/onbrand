@@ -788,7 +788,7 @@ export default function RunPage() {
   const setBrandFbPageMut = (trpc as any).publish?.setBrandFacebookPage?.useMutation?.();
   // 2026-06-01 (CJ): Route all publishing through Calendar instead of direct Pipedream call.
   // scheduleToCalMut: schedules the output as a "pending" scheduled_post, then user
-  // goes to CalendarPage where they click "立即發布" to actually push via Pipedream.
+  // goes to 本週企劃 (/planner) where they click "立即發布" to actually push via Pipedream.
   const scheduleToCalMut = (trpc as any).calendar?.schedule?.useMutation?.({
     onSuccess: (_r: any) => {
       showToastGlobal(
