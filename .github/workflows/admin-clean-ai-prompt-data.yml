@@ -1,0 +1,108 @@
+name: Admin — Clean AI prompt library data (dev only)
+
+# 2026-09-30（CJ「要清理掉」）：AI 指令庫的程式碼已在 dev 完整移除（PR #228），
+# 這支把 dev 資料庫裡留下的資料也清掉：brands／products／events 的 positioning
+# JSON 裡的 _aiPrompts、_voiceLock、_assets.ai_prompts 三個鍵。
+#
+# - 只對 dev（environment: dev）。正式站的程式還在用這些資料，不能清。
+# - mode=dry-run（預設）只數有幾筆，不改任何東西。
+# - mode=apply 先把要刪的原值備份到 VM 的 /opt/onbrand/shared/backups/，再用
+#   JSON_REMOVE 移除；只動這三個鍵，positioning 其他內容不碰。
+# - 清完這支工作流程本身也要刪掉（CJ「不要殘存」）。
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "dry-run = 只數不改；apply = 備份後刪除"
+        type: choice
+        options: [dry-run, apply]
+        default: dry-run
+
+jobs:
+  clean-dev:
+    runs-on: ubuntu-24.04
+    environment: dev
+    steps:
+      - name: Configure dev SSH identity
+        env:
+          VM_SSH_PRIVATE_KEY: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          VM_SSH_HOST_KEY: ${{ secrets.VM_SSH_HOST_KEY }}
+        run: |
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$VM_SSH_PRIVATE_KEY" > ~/.ssh/onbrand-dev
+          chmod 600 ~/.ssh/onbrand-dev
+          printf '%s\n' "$VM_SSH_HOST_KEY" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+      - name: Clean
+        env:
+          VM_HOST: ${{ secrets.VM_HOST }}
+          VM_USER: ${{ secrets.VM_USER }}
+          MODE: ${{ github.event.inputs.mode }}
+        run: |
+          ssh -i ~/.ssh/onbrand-dev "$VM_USER@$VM_HOST" "MODE='${MODE//[^a-z-]/}' bash -s" <<'REMOTE'
+          set -euo pipefail
+          cd /opt/onbrand/current/skills/ai-talent
+          set -a; source .env; set +a
+          mkdir -p /opt/onbrand/shared/backups
+          export BACKUP="/opt/onbrand/shared/backups/ai-prompt-data-$(date -u +%Y%m%dT%H%M%SZ).json"
+          node <<'JS'
+          const mysql = require("./node_modules/mysql2/promise");
+          (async () => {
+            const db = await mysql.createConnection({
+              host: process.env.LOCAL_DB_HOST || "localhost",
+              port: Number(process.env.LOCAL_DB_PORT || 3306),
+              user: process.env.LOCAL_DB_USER || "mos_user",
+              password: process.env.LOCAL_DB_PASSWORD,
+              database: process.env.LOCAL_DB_NAME || "mos_db",
+            });
+            const apply = process.env.MODE === "apply";
+            const KEYS = ["$._aiPrompts", "$._voiceLock", "$._assets.ai_prompts"];
+            const backup = {};
+            let total = 0;
+            for (const table of ["brands", "products", "events"]) {
+              for (const key of KEYS) {
+                const [rows] = await db.query(
+                  `SELECT id, JSON_EXTRACT(positioning, ?) AS v FROM ${table}
+                    WHERE positioning IS NOT NULL AND JSON_VALID(positioning)
+                      AND JSON_CONTAINS_PATH(positioning, 'one', ?)`,
+                  [key, key],
+                );
+                console.log(`${table} ${key}: ${rows.length} 筆`);
+                total += rows.length;
+                if (rows.length) backup[`${table} ${key}`] = rows.map((r) => ({ id: r.id, value: r.v }));
+              }
+            }
+            console.log(`合計 ${total} 筆`);
+            if (!apply) { console.log("dry-run：沒有改任何東西"); await db.end(); return; }
+            if (!total) { console.log("沒有要清的資料"); await db.end(); return; }
+            require("fs").writeFileSync(process.env.BACKUP, JSON.stringify(backup));
+            console.log(`已備份到 ${process.env.BACKUP}`);
+            for (const table of ["brands", "products", "events"]) {
+              for (const key of KEYS) {
+                const [r] = await db.query(
+                  `UPDATE ${table} SET positioning = JSON_REMOVE(positioning, ?)
+                    WHERE positioning IS NOT NULL AND JSON_VALID(positioning)
+                      AND JSON_CONTAINS_PATH(positioning, 'one', ?)`,
+                  [key, key],
+                );
+                console.log(`已清除 ${table} ${key}: ${r.affectedRows} 筆`);
+              }
+            }
+            let left = 0;
+            for (const table of ["brands", "products", "events"]) {
+              const [[c]] = await db.query(
+                `SELECT COUNT(*) AS n FROM ${table}
+                  WHERE positioning IS NOT NULL AND JSON_VALID(positioning)
+                    AND (JSON_CONTAINS_PATH(positioning, 'one', '$._aiPrompts')
+                      OR JSON_CONTAINS_PATH(positioning, 'one', '$._voiceLock')
+                      OR JSON_CONTAINS_PATH(positioning, 'one', '$._assets.ai_prompts'))`,
+              );
+              left += Number(c.n);
+            }
+            console.log(`複查：剩下 ${left} 筆`);
+            await db.end();
+            if (left) process.exit(1);
+          })().catch((e) => { console.error(e); process.exit(1); });
+          JS
+          REMOTE
