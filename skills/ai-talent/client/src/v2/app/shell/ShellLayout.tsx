@@ -93,7 +93,8 @@ interface NavItem {
    *  the item is active iff the current `cat` equals this value. */
   catKey?: string;
   /** 2026-09-30：記憶空間快滿／超載時，圖示右上角亮狀態點。 */
-  alert?: "near" | "over";
+  /** near／over：記憶快滿／超載；review：有東西等用戶回來確認（法規審查重點萃取好了）。 */
+  alert?: "near" | "over" | "review";
 }
 
 // 2026-08-20: 策略 (Strategy) workspace — 品牌大腦's tile strip promoted to
@@ -779,10 +780,18 @@ function IconBar({
     const level = buildMemoryView(d, scope.brandId, false).level;
     return level === "ok" ? undefined : level;
   }, [memoryQ.data, scope.brandId]);
+  // 2026-09-30（CJ「萃取好以後請用戶回來確認（法規 mission tray 會跳出通知）」）：有法規的審查重點
+  // 萃取好、等確認時，「法規」圖示亮點。萃取在背景跑，所以每 20 秒問一次（只在策略層）。
+  const regReviewQ = (trpc as any).brandRegulation.reviewCount.useQuery(
+    { brandId: scope.brandId ?? 0 },
+    { enabled: !!scope.brandId && onStrategyRail, refetchInterval: 20_000, refetchOnWindowFocus: true },
+  );
+  const regulationAlert: "review" | undefined = (regReviewQ.data?.count ?? 0) > 0 ? "review" : undefined;
   const NAV_ITEMS = React.useMemo(
     () => buildNavItems(lang, userEmail, currentPath, allowedTaskRoutes, userNavItems)
-      .map((it) => (it.catKey === "brain" && memoryAlert ? { ...it, alert: memoryAlert } : it)),
-    [lang, userEmail, currentPath, allowedTaskRoutes, userNavItems, memoryAlert],
+      .map((it) => (it.catKey === "brain" && memoryAlert ? { ...it, alert: memoryAlert }
+        : it.catKey === "regulations" && regulationAlert ? { ...it, alert: regulationAlert } : it)),
+    [lang, userEmail, currentPath, allowedTaskRoutes, userNavItems, memoryAlert, regulationAlert],
   );
   // 2026-09-30（CJ 參考 Tesla「電量」）：本週企劃的進度與各平台待寫篇數，真資料來自 planner.railStatus。
   // 週次用跟 PlannerPage 同一個 defaultWeek()；換頁就重抓（寫完一篇回來數字要跟著變）。
@@ -1775,9 +1784,9 @@ function IconNavLink({ item, active, onClick, meter, badge, en }: {
         }}>
           {item.icon}
           {item.alert && (
-            <span aria-label={item.alert === "over" ? "full" : "almost full"} style={{
+            <span aria-label={item.alert === "over" ? "full" : item.alert === "review" ? "ready to confirm" : "almost full"} style={{
               position: "absolute", top: -2, right: -3, width: 8, height: 8, borderRadius: 999,
-              background: item.alert === "over" ? "#dc2626" : "#d97706", boxShadow: "0 0 0 2px #fff",
+              background: item.alert === "over" ? "#dc2626" : item.alert === "review" ? "#F37E4A" : "#d97706", boxShadow: "0 0 0 2px #fff",
             }} />
           )}
           {!!badge && badge > 0 && (

@@ -15,7 +15,7 @@
  */
 import { invokeLLM } from "../../platform/core/llm";
 import { acceptRevision } from "./brandConsistency";
-import { loadActiveRegulations, regulationLine, type BrandRegulation } from "../../strategy/core/brandRegulations";
+import { loadActiveRegulations, regulationLine, type ActiveRegulation } from "../../strategy/core/brandRegulations";
 
 export type RegulationComplianceStatus = "compliant" | "fixed" | "flagged" | "skipped";
 
@@ -96,13 +96,14 @@ export function cleanIssues(raw: any, original: string): RegulationIssue[] {
     .slice(0, 8);
 }
 
-export function regulationsBlock(regs: Pick<BrandRegulation, "title" | "source" | "body">[]): string {
-  return regs.map((r) => regulationLine(r, r.body.trim())).join("\n\n");
+/** 合規檢查對照的是用戶確認過的審查重點（不是動輒上萬字的原文）。 */
+export function regulationsBlock(regs: Pick<ActiveRegulation, "title" | "source" | "digest">[]): string {
+  return regs.map((r) => regulationLine(r, r.digest.trim())).join("\n\n");
 }
 
 export async function checkRegulationCompliance(args: {
   caption: string;
-  regulations: Pick<BrandRegulation, "title" | "source" | "body">[];
+  regulations: Pick<ActiveRegulation, "title" | "source" | "digest">[];
   isZhTW: boolean;
   timeoutMs: number;
 }): Promise<RegulationComplianceResult> {

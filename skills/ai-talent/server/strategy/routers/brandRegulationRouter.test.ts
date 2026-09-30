@@ -6,6 +6,6 @@ describe("brandRegulationRouter", () => {
   it("builds and exposes list / activeCount / create / update / setEnabled / remove", async () => {
     const { brandRegulationRouter } = await import("./brandRegulationRouter");
     const procs = Object.keys((brandRegulationRouter as any)._def.procedures);
-    expect(procs.sort()).toEqual(["activeCount", "create", "list", "remove", "setEnabled", "update"]);
+    expect(procs.sort()).toEqual(["activeCount", "adoptOriginal", "confirmDigest", "create", "discardDraft", "extract", "list", "remove", "reviewCount", "setEnabled", "update"]);
   }, 60_000);
 });

@@ -12,7 +12,7 @@ import { sql } from "drizzle-orm";
 import { getDb } from "../../db";
 import { buildMarketContext } from "./marketProfiles";
 import { loadEventProducts, productScopeBrief, resolveProductScope, type ScopedProduct } from "./eventProductScope";
-import { loadActiveRegulations, regulationLine, REG_CARD_MAX, REGULATION_BLOCK_HEADER } from "./brandRegulations";
+import { loadActiveRegulations, regulationLine, REG_DIGEST_MAX, REGULATION_BLOCK_HEADER } from "./brandRegulations";
 
 function safeParse(s: string): any {
   try { return JSON.parse(s); } catch { return null; }
@@ -915,9 +915,10 @@ export async function buildBrandBrain(
 
     // ── 法規（寫之前先審查）──
     // 2026-09-30（CJ「agent 寫文章前要審查」）：用戶在策略層「法規」加的每一張卡。
-    // 放在 prompt 最後一段、容量不夠也不割捨（見 NEVER_DROP）。
+    // 放在 prompt 最後一段、容量不夠也不割捨（見 NEVER_DROP）。讀的是用戶確認過的「審查重點」，
+    // 不是原文（原文可能上萬字，見 brandRegulations.ts）。
     for (const r of await loadActiveRegulations(brandId)) {
-      c.add("regulation", "regulation", r.title, r.body, REG_CARD_MAX,
+      c.add("regulation", "regulation", r.title, r.digest, REG_DIGEST_MAX,
         (kept) => regulationLine(r, kept), { source: `reg:${r.id}` });
     }
 
