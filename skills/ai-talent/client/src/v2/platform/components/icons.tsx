@@ -25,6 +25,7 @@ import {
   faAward, faDollarSign, faBuilding, faBug, faInbox, faEnvelope, faFolder, faCircle, faBagShopping,
   faWaveSquare, faWrench, faGlobe, faChartColumn, faCircleDot, faPaste, faTableCellsLarge, faArrowPointer,
   faPause, faForwardStep, faStop, faCircleXmark, faLink, faLockOpen, faFlag, faPuzzlePiece, faMemory, faLightbulb,
+  faCommentDots, faCompass, faMasksTheater, faBan, faGem, faStar, faChessKnight, faArrowTrendUp, faHeart, faMessage,
 } from "@fortawesome/free-solid-svg-icons";
 import {
   faFacebook, faInstagram, faThreads, faLine, faTiktok, faYoutube, faLinkedin, faGoogle,
@@ -121,6 +122,17 @@ export const ICON = {
   skip: faForwardStep,
   stop: faStop,
   puzzle: faPuzzlePiece,
+  // 品牌脈絡（任務 modal 的 context 圖示列；2026-09-30 CJ：語氣不用笑臉、WHY 不用燈泡）
+  tone: faCommentDots,       // 語氣＝說話的方式
+  why: faCompass,            // WHY＝品牌為什麼存在，是方向，不是點子
+  persona: faMasksTheater,   // 品牌原型（智者、照顧者…）
+  forbidden: faBan,
+  values: faGem,
+  standout: faStar,          // 差異化／獨家賣點
+  competitor: faChessKnight,
+  trend: faArrowTrendUp,
+  feeling: faHeart,          // 使用者感受／情緒價值
+  message: faMessage,        // 核心訊息
   // 通路與外部平台（單色 logo）
   facebook: faFacebook,
   instagram: faInstagram,

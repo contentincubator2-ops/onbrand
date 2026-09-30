@@ -41,13 +41,15 @@ interface Props {
   elapsedText?: string;
   /** Language: "en" or "zh-TW" (default zh-TW) */
   lang?: string;
+  /** 標記頭像為「換到成品頁時的起飛點」（v2/content/lib/agentHandoff.ts）。 */
+  handoffAnchor?: boolean;
 }
 
 const dicebear = (seed: string) =>
   `https://api.dicebear.com/7.x/notionists/svg?seed=${encodeURIComponent(seed)}&backgroundColor=4267B2&backgroundType=solid`;
 
 export default function RunningAgentCarousel({
-  agents, stages, accentColor, progressPct, elapsedText, lang = "zh-TW",
+  agents, stages, accentColor, progressPct, elapsedText, lang = "zh-TW", handoffAnchor,
 }: Props) {
   // Rotate through agents every 2.4s. If only 1 agent, stay on it.
   const [activeIdx, setActiveIdx] = useState(0);
@@ -140,6 +142,7 @@ export default function RunningAgentCarousel({
             with a small gap so the ring is clearly visible. */}
         <div
           key={activeAgent.id ?? activeAgent.name}
+          data-agent-handoff={handoffAnchor ? "" : undefined}
           className="absolute rounded-full overflow-hidden bg-white"
           style={{
             inset: STROKE + 4,
