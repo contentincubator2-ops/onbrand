@@ -29,7 +29,7 @@ interface Alert {
   kind: "competitor_move" | "audience_shift" | "market_trend";
   anchor: "audience" | "competition" | "differentiation" | "tagline" | "none";
   title: string; summary: string; suggestion: string;
-  evidence: Array<{ title: string; url?: string; source?: string; publishedAt?: string }>;
+  evidence: Array<{ title: string; url?: string; source?: string; publishedAt?: string | null }>;
   status: "new" | "seen" | "applied" | "dismissed"; createdAt: string;
 }
 interface Overview {
@@ -40,10 +40,21 @@ interface Overview {
 
 const KIND_ZH: Record<Alert["kind"], string> = { competitor_move: "競爭者動作", audience_shift: "受眾變化", market_trend: "市場趨勢" };
 const KIND_EN: Record<Alert["kind"], string> = { competitor_move: "Competitor move", audience_shift: "Audience shift", market_trend: "Market trend" };
-// 2026-09-30：策略工作台（健檢）刪除後，錨點改指向同名的定位卡——四個 anchor 剛好就是
-// BRAND_SEGMENTS 的 segment id，點了直接打開那張卡。
-const ANCHOR_ZH: Record<Alert["anchor"], string> = { audience: "目標受眾", competition: "競爭格局", differentiation: "差異化", tagline: "標語", none: "不用改定位，先知道就好" };
-const ANCHOR_EN: Record<Alert["anchor"], string> = { audience: "audience", competition: "competitive set", differentiation: "differentiation", tagline: "tagline", none: "no positioning change, just be aware" };
+/**
+ * 2026-09-30（CJ「不用寫著對應定位卡，然後，要寫掃描時間，但 AI Reporting 旁邊要寫的，
+ * 應該是原文發布時間」）：標題列的時間＝原文發布日（evidence 裡最新的一則），
+ * 掃描時間移到卡片底部。發布日由伺服器回原文網頁讀（publishedDate.ts），讀不到就寫不明。
+ */
+function pubDate(ymd: string, en: boolean): string {
+  const [y, m, d] = ymd.split("-").map(Number);
+  const sameYear = y === new Date().getFullYear();
+  if (en) return sameYear ? `${m}/${d}` : `${m}/${d}/${y}`;
+  return sameYear ? `${m}/${d}` : `${y}/${m}/${d}`;
+}
+function latestPublished(a: Alert): string | null {
+  const ds = a.evidence.map((e) => e.publishedAt).filter((x): x is string => typeof x === "string" && /^\d{4}-\d{2}-\d{2}$/.test(x));
+  return ds.length ? ds.sort().at(-1)! : null;
+}
 
 function fmt(iso: string | null, en: boolean): string {
   if (!iso) return en ? "never" : "還沒掃過";
@@ -67,11 +78,7 @@ const splitList = (s: string): string[] => s.split(/[,，、\n]/).map((x) => x.t
 const btnGhost = "rounded-full border border-neutral-900 px-2.5 py-0.5 text-[11px] font-medium text-neutral-900 transition hover:bg-neutral-900 hover:text-white";
 const btnGhostDisabled = "rounded-full border border-neutral-300 px-2.5 py-0.5 text-[11px] font-medium text-neutral-400";
 
-export default function StrategyAlertsPanel({ brandId, onOpenSegment }: {
-  brandId: number;
-  /** 打開某一張定位卡（segment id = alert.anchor）。沒給就只顯示文字。 */
-  onOpenSegment?: (segmentId: string) => void;
-}) {
+export default function StrategyAlertsPanel({ brandId }: { brandId: number }) {
   const { lang } = useLang();
   const en = lang === "en";
   const navigate = useNavigate();
@@ -223,7 +230,12 @@ export default function StrategyAlertsPanel({ brandId, onOpenSegment }: {
                 <div className="flex flex-wrap items-center gap-2 text-[12px] text-neutral-500">
                   <span className="rounded-full border border-neutral-200 px-2 py-0.5 text-neutral-700">{en ? KIND_EN[a.kind] : KIND_ZH[a.kind]}</span>
                   <span>{scopeName(a)}</span>
-                  <span className="font-mono tabular-nums">{fmt(a.createdAt, en)}</span>
+                  {(() => {
+                    const p = latestPublished(a);
+                    return p
+                      ? <span className="font-mono tabular-nums" title={en ? "Original publish date" : "原文發布日"}>{en ? `Published ${pubDate(p, en)}` : `原文 ${pubDate(p, en)}`}</span>
+                      : <span className="text-neutral-400">{en ? "Publish date unknown" : "原文發布日不明"}</span>;
+                  })()}
                   {a.status === "new" && <span className="font-medium text-neutral-900">{en ? "new" : "未讀"}</span>}
                 </div>
                 <p className="mt-1.5 text-[14px] font-semibold text-neutral-900">{a.title}</p>
@@ -239,21 +251,15 @@ export default function StrategyAlertsPanel({ brandId, onOpenSegment }: {
                       <li key={i}>
                         {e.url ? <a href={e.url} target="_blank" rel="noreferrer" className="text-neutral-700 underline underline-offset-2">{e.title}</a> : e.title}
                         {e.source ? ` · ${e.source}` : ""}
-                        {e.publishedAt && <span className="font-mono"> · {e.publishedAt}</span>}
+                        {e.publishedAt && <span className="font-mono"> · {pubDate(e.publishedAt, en)}</span>}
                       </li>
                     ))}
                   </ul>
                 )}
                 <div className="mt-2.5 flex flex-wrap items-center gap-3 border-t border-neutral-100 pt-2">
-                  {a.anchor !== "none" && onOpenSegment ? (
-                    <button type="button" onClick={() => onOpenSegment(a.anchor)} className="text-[12.5px] text-neutral-700 underline underline-offset-2 hover:text-neutral-900">
-                      {en ? `Open positioning card: ${ANCHOR_EN[a.anchor]} →` : `對應定位卡：${ANCHOR_ZH[a.anchor]} →`}
-                    </button>
-                  ) : (
-                    <span className="text-[12.5px] text-neutral-700">
-                      {a.anchor === "none" ? (en ? ANCHOR_EN.none : ANCHOR_ZH.none) : (en ? `Positioning card: ${ANCHOR_EN[a.anchor]}` : `對應定位卡：${ANCHOR_ZH[a.anchor]}`)}
-                    </span>
-                  )}
+                  <span className="font-mono tabular-nums text-[12px] text-neutral-400">
+                    {en ? `Scanned ${fmt(a.createdAt, en)}` : `掃描 ${fmt(a.createdAt, en)}`}
+                  </span>
                   <span className="flex-1" />
                   {a.status === "new" && (
                     <button onClick={() => setStatus?.mutate?.({ id: a.id, status: "seen" })} className="text-[12px] text-neutral-400 underline underline-offset-2 hover:text-neutral-700">
