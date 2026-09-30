@@ -1708,6 +1708,7 @@ export const quickTaskRouter = router({
         agent_id: t.agent_id ?? null,
         skill_slug: t.skill_slug ?? null,
         primary_question: t.primary_question ?? null,
+        scene: t.scene ?? null,
         primary_input: t.primary_input ?? null,
         // 2026-05-11 — surface bilingual label parts + context wiring so the
         // intake modal can render "EN · 中文" + the "我會用 X 來跑" strip.

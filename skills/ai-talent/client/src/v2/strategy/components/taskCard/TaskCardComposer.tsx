@@ -25,6 +25,8 @@ import {
   Button, Chip, Input, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader,
   Progress, Textarea,
 } from "@heroui/react";
+import { SceneArt } from "../../../platform/components/TaskIllustration";
+import { SCENE_OPTIONS, isTaskScene, pickTaskScene, type TaskScene } from "../../../platform/components/taskScene";
 import { AddIcon, CheckIcon, ChevronLeftIcon, CopyIcon, DeleteIcon, GenerateIcon, MeetingIcon, SampleIcon, TextIcon, WarningIcon } from "../../../platform/components/icons";
 
 /**
@@ -57,6 +59,7 @@ interface CardRecord {
   measured: { count: number; minChars: number; maxChars: number; medianChars: number };
   variants: number;
   lastDryRun: { at: string; caption: string } | null;
+  scene?: string | null;
 }
 
 /** 前端也量一次字數，讓使用者邊貼邊看到區間 —— 這份只是回饋，權威在 server。 */
@@ -105,6 +108,9 @@ export default function TaskCardComposer({
   const [dryResult, setDryResult] = React.useState<{ caption: string; chars: number; inRange: boolean; expected: { minChars: number; maxChars: number } } | null>(null);
   const [busy, setBusy] = React.useState<string | null>(null);
   const [error, setError] = React.useState<string | null>(null);
+  // 卡片插畫：null＝跟著卡名自動挑。選單預設收起，只秀目前那張。
+  const [sceneChoice, setSceneChoice] = React.useState<TaskScene | null>(null);
+  const [scenePickerOpen, setScenePickerOpen] = React.useState(false);
 
   // 每次開窗同步一次起始狀態。帶 initialCardId 就直接跳到步驟 2 —— 那張卡的
   // 範例早就貼過了，再走一次步驟 1 等於要求使用者重貼。
@@ -127,6 +133,10 @@ export default function TaskCardComposer({
     },
   ) ?? { data: null };
   const card: CardRecord | null = cardQuery.data ?? null;
+
+  React.useEffect(() => {
+    setSceneChoice(isTaskScene(card?.scene) ? card!.scene as TaskScene : null);
+  }, [card?.id, card?.scene]);
 
   // SKILL 一生出來就灌進可編輯的草稿框（只灌一次，別蓋掉使用者的編輯）。
   React.useEffect(() => {
@@ -180,6 +190,7 @@ export default function TaskCardComposer({
     setPrimaryPlaceholder(""); setAskFields([]); setVariants(1);
     setCardId(null); setSkillDraft(""); setDryInputs({}); setDryResult(null);
     setBusy(null); setError(null);
+    setSceneChoice(null); setScenePickerOpen(false);
   }
 
   const m = measure(samples);
@@ -579,6 +590,56 @@ export default function TaskCardComposer({
                   ? "Answer the card's own question, then test-write. Nothing is saved to your projects and no credits are used."
                   : "回答這張卡自己的問題，然後試寫。試寫不會存進專案、也不扣點數。"}
               </p>
+
+              {/* 2026-09-30（CJ「品牌自建的也要有場景圖，他也可以自己選」）：
+                  預設依卡名＋主問題自動挑，跟內建卡同一套規則；想換就展開選。 */}
+              {(() => {
+                const auto = pickTaskScene({ label: card.name, primary_question: card.primaryQuestion });
+                const current = sceneChoice ?? auto;
+                const choose = (s: TaskScene) => {
+                  const next = s === auto ? null : s;
+                  setSceneChoice(next);
+                  setScenePickerOpen(false);
+                  updateMut?.mutate({ brandId: brandId!, cardId: cardId!, scene: next });
+                };
+                return (
+                  <div className="rounded-medium border border-divider p-3 space-y-3">
+                    <div className="flex items-center gap-3">
+                      <SceneArt scene={current} width={96} />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-small font-medium">{en ? "Card illustration" : "卡片插畫"}</p>
+                        <p className="text-tiny text-default-500">
+                          {sceneChoice
+                            ? (en ? "You picked this one." : "你自己選的。")
+                            : (en ? "Picked from the card name. You can change it." : "依卡名自動挑的，可以換。")}
+                        </p>
+                      </div>
+                      <Button size="sm" variant="flat" onPress={() => setScenePickerOpen((o) => !o)}>
+                        {scenePickerOpen ? (en ? "Done" : "收起") : (en ? "Change" : "換一張")}
+                      </Button>
+                    </div>
+                    {scenePickerOpen && (
+                      <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
+                        {SCENE_OPTIONS.map((o) => (
+                          <button
+                            key={o.scene}
+                            type="button"
+                            onClick={() => choose(o.scene)}
+                            className={`flex flex-col items-center gap-1 rounded-lg p-1 transition ${
+                              o.scene === current ? "ring-2 ring-neutral-900" : "hover:bg-default-100"
+                            }`}
+                          >
+                            <SceneArt scene={o.scene} width={84} />
+                            <span className="text-[11px] text-default-600">
+                              {en ? o.en : o.zh}{o.scene === auto ? (en ? " · auto" : "・自動") : ""}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
 
               <div className="space-y-2">
                 <p className="text-small font-medium">{card.primaryQuestion}</p>

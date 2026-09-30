@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { pickTaskScene } from "./taskScene";
+import { pickTaskScene, resolveTaskScene, SCENE_OPTIONS } from "./taskScene";
 
 describe("pickTaskScene", () => {
   it("題材優先於形式：母語好康的 Reels 畫語言，不畫場記板", () => {
@@ -27,5 +27,17 @@ describe("pickTaskScene", () => {
   it("什麼都沒命中就用預設便條", () => {
     expect(pickTaskScene({ label_zh: "品牌命名候選 10 個" })).toBe("brief");
     expect(pickTaskScene({})).toBe("brief");
+  });
+
+  it("自建卡選過場景就用選的；不認得的值當沒選", () => {
+    expect(resolveTaskScene({ label_zh: "FB 5 卡輪播", scene: "trophy" })).toBe("trophy");
+    expect(resolveTaskScene({ label_zh: "FB 5 卡輪播", scene: null })).toBe("carousel");
+    expect(resolveTaskScene({ label_zh: "FB 5 卡輪播", scene: "nope" })).toBe("carousel");
+  });
+
+  it("選單涵蓋所有場景、沒有重複", () => {
+    const scenes = SCENE_OPTIONS.map((o) => o.scene);
+    expect(new Set(scenes).size).toBe(scenes.length);
+    expect(scenes.length).toBe(31);
   });
 });

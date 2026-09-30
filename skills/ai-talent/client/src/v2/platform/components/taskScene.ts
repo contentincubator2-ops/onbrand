@@ -53,6 +53,52 @@ const RULES: Array<[TaskScene, RegExp]> = [
   ["strategy", /策略|定位|企劃|劇本|工具包|strategy|playbook|position/],
 ];
 
+/** 自建卡讓用戶自己挑場景時的選單順序與名稱。 */
+export const SCENE_OPTIONS: Array<{ scene: TaskScene; zh: string; en: string }> = [
+  { scene: "brief", zh: "便條", en: "Note" },
+  { scene: "language", zh: "語言", en: "Language" },
+  { scene: "gift", zh: "好康", en: "Offer" },
+  { scene: "countdown", zh: "倒數", en: "Countdown" },
+  { scene: "announce", zh: "公告", en: "Announcement" },
+  { scene: "data", zh: "數據", en: "Data" },
+  { scene: "idea", zh: "冷知識", en: "Tip" },
+  { scene: "stance", zh: "立場", en: "Stance" },
+  { scene: "apology", zh: "道歉", en: "Apology" },
+  { scene: "mascot", zh: "角色", en: "Mascot" },
+  { scene: "poll", zh: "投票", en: "Poll" },
+  { scene: "trophy", zh: "挑戰", en: "Challenge" },
+  { scene: "local", zh: "在地", en: "Local" },
+  { scene: "research", zh: "研究", en: "Research" },
+  { scene: "audio", zh: "聲音", en: "Sound" },
+  { scene: "kol", zh: "KOL", en: "Creator" },
+  { scene: "voice", zh: "語氣", en: "Voice" },
+  { scene: "live", zh: "直播", en: "Live" },
+  { scene: "story", zh: "限時動態", en: "Stories" },
+  { scene: "video", zh: "短影音", en: "Video" },
+  { scene: "carousel", zh: "輪播", en: "Carousel" },
+  { scene: "chat", zh: "留言", en: "Comments" },
+  { scene: "mail", zh: "Email", en: "Email" },
+  { scene: "profile", zh: "個人檔案", en: "Profile" },
+  { scene: "menu", zh: "LINE 選單", en: "LINE menu" },
+  { scene: "calendar", zh: "月曆", en: "Calendar" },
+  { scene: "photo", zh: "照片", en: "Photo" },
+  { scene: "hashtag", zh: "標籤", en: "Hashtag" },
+  { scene: "web", zh: "官網", en: "Website" },
+  { scene: "rewrite", zh: "改寫", en: "Rewrite" },
+  { scene: "strategy", zh: "策略", en: "Strategy" },
+];
+
+const KNOWN = new Set<string>(SCENE_OPTIONS.map((o) => o.scene));
+
+export function isTaskScene(v: unknown): v is TaskScene {
+  return typeof v === "string" && KNOWN.has(v);
+}
+
+/** 卡片上有人選過場景（自建卡）就用那個；不認得或沒選就依題目自動挑。 */
+export function resolveTaskScene(card: Parameters<typeof pickTaskScene>[0] & { scene?: string | null }): TaskScene {
+  return isTaskScene(card.scene) ? card.scene : pickTaskScene(card);
+}
+
 export function pickTaskScene(card: {
   label?: string | null;
   label_zh?: string | null;

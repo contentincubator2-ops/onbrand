@@ -4,7 +4,7 @@
  */
 import type { ComponentType } from "react";
 import { EmptyIllustration, IllustrationFrame, Sparks, INK, FILL, POP, type EmptyKind } from "./EmptyIllustration";
-import { pickTaskScene, type TaskScene } from "./taskScene";
+import { resolveTaskScene, type TaskScene } from "./taskScene";
 
 /** 跟空白頁共用的幾張圖直接借過來，不重畫。 */
 const BORROWED: Partial<Record<TaskScene, EmptyKind>> = {
@@ -17,10 +17,14 @@ const BORROWED: Partial<Record<TaskScene, EmptyKind>> = {
 export function TaskIllustration({
   card, width = 132,
 }: {
-  card: Parameters<typeof pickTaskScene>[0];
+  card: Parameters<typeof resolveTaskScene>[0];
   width?: number;
 }) {
-  const scene = pickTaskScene(card);
+  return <SceneArt scene={resolveTaskScene(card)} width={width} />;
+}
+
+/** 直接畫某個場景（自建卡的場景選單用）。 */
+export function SceneArt({ scene, width = 132 }: { scene: TaskScene; width?: number }) {
   const Art = SCENES[scene];
   if (!Art) return <EmptyIllustration kind={BORROWED[scene] ?? "brief"} width={width} />;
   return (

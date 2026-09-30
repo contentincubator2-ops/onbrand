@@ -259,6 +259,8 @@ interface FBTaskCard {
   kind: "fast" | "mid" | "squad";
   inputs?: any[];
   primary_question?: string | null;
+  /** 2026-09-30：自建卡用戶自選的插畫場景；null＝依題目自動挑。 */
+  scene?: string | null;
   primary_input?: { key: string; placeholder?: string; type: "text" | "textarea"; derive?: any } | null;
   agent_id?: number | null;
   skill_slug?: string | null;
