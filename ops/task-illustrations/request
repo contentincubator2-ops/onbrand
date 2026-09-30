@@ -1,5 +1,5 @@
 # 任務卡插畫產圖請求（見 .github/workflows/ops-gen-task-illustrations.yml）
-# 2026-09-30 第五輪：冷知識（畫了問號）、立場宣言（刺青印章意思太繞）重畫
-IDS=fb-30-feed-curiosity-explainer,fb-30-pinned-stance
+# 2026-09-30 第六輪：全量目檢後重畫——有問號（訪談大綱、FAQ）、假字（JTBD）、彩虹色（一稿四發）
+IDS=cw-60-crosspost-4platform,rs-60-interview-guide,rs-60-jtbd-suite,web-30-product-faq
 FORCE=1
 RECONCEPT=1
