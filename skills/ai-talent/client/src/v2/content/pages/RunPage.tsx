@@ -1509,6 +1509,8 @@ export default function RunPage() {
     brandId: data?.mission?.brandId ?? undefined,
     productId: (data as any)?.metadata?.productId ?? undefined,
     eventId: (data as any)?.metadata?.eventId ?? undefined,
+    // 改寫要守這張卡的字數與形式（server rewriteContract.ts）。
+    taskId: String(data?.mission?.taskId ?? "") || undefined,
   };
   /** 打字：預覽即時更新，停手 1.2 秒後存檔（不跳 toast）。 */
   const onDeskType = (v: string) => {
@@ -3869,7 +3871,7 @@ export default function RunPage() {
             {schedMode === "ics"
               ? (lang === "en" ? "Download .ics" : "下載 .ics")
               : schedMode === "calendar"
-              ? (lang === "en" ? "Schedule to calendar" : "排程到日曆")
+              ? (lang === "en" ? "Add to calendar" : "排進行事曆")
               : (lang === "en" ? `Publish — ${schedPlatform}` : `排程發布 — ${schedPlatform}`)}
           </ModalHeader>
           <ModalBody className="space-y-3">

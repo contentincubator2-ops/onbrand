@@ -1884,6 +1884,8 @@ export const quickTaskRouter = router({
       // 2026-09-29：原本那篇是替哪個產品／活動寫的——改寫也要讀同一份範圍。
       productId: z.number().optional(),
       eventId: z.number().optional(),
+      // 2026-09-29：這篇是哪張卡 —— 帶了就套這張卡的字數與形式（rewriteContract.ts）。
+      taskId: z.string().max(80).optional(),
       // Conversation history (optional) — last 6 turns
       history: z.array(z.object({
         role: z.enum(["user", "assistant"]),
@@ -1911,6 +1913,22 @@ export const quickTaskRouter = router({
         agentKnowledge = await loadAgentKnowledge(agent.id, { source: "quickTask.refineCaption" }).catch(() => "");
       }
 
+      const contract = await import("../core/rewriteContract");
+      let spec: import("../core/rewriteContract").RewriteSpec = {};
+      if (input.taskId) {
+        const { resolveOrchestraConfig } = await import("../core/taskRegistry");
+        const [tpl, cfg]: any = await Promise.all([
+          resolveTaskTemplate(input.taskId).catch(() => null),
+          resolveOrchestraConfig(input.taskId).catch(() => null),
+        ]);
+        const label = tpl?.label;
+        spec = {
+          label: typeof label === "string" ? label : (label?.zh ?? label?.en ?? null),
+          minChars: cfg?.captionMinChars ?? null,
+          maxChars: cfg?.captionMaxChars ?? null,
+        };
+      }
+
 
 
       const system =
@@ -1921,7 +1939,9 @@ export const quickTaskRouter = router({
         `3. 最後是完整的**修改後文案**（不要省略，不要寫 "如下"，直接給完整版）\n\n` +
         `重要：保留原本能用的部分，只動用戶提到的地方。語氣自然口語。\n` +
         (agentKnowledge ? `\n【此 agent 的工作守則與專業能力】\n${agentKnowledge}\n` : "") +
-        brandPrefix;
+        brandPrefix +
+        // 合約接在最後：最後讀到的最有力，換人時個人風格不能蓋過這張卡的形式。
+        contract.rewriteContractBlock(spec);
 
       const messages: Array<{ role: "system" | "user" | "assistant"; content: string }> = [
         { role: "system", content: system },
@@ -1932,20 +1952,37 @@ export const quickTaskRouter = router({
       try {
         // 2026-05-17: was "qwen" (Chinese model, zh-TW policy violation)
         // → anthropic for Taiwan-correct output.
+        const parse = (raw: string) => {
+          const text = (raw ?? "").trim();
+          // Split on triple newline to separate explanation from rewritten caption
+          let parts = text.split(/\n\n\n+/);
+          // 2026-07-07 (verified live on /run/2887): models sometimes use a
+          // markdown horizontal rule as the separator instead of blank lines —
+          // the triple-newline split then fails and the explanation + '---'
+          // leak into the published caption. Fall back to splitting on the hr.
+          if (parts.length === 1) {
+            parts = text.split(/\n+[-—_*]{3,}\s*\n+/);
+          }
+          const explanation = parts.length > 1 ? (parts[0] ?? "").trim() : "";
+          let rewritten = parts.length > 1 ? parts.slice(1).join("\n\n").trim() : text;
+          rewritten = rewritten.replace(/^(?:[-—_*]{3,}\s*\n+)+/, "").replace(/\n+(?:[-—_*]{3,}\s*)+$/, "").trim();
+          return { explanation, rewritten: contract.stripMarkdown(rewritten) };
+        };
         const r = await callModel(messages, undefined, "anthropic");
-        const text = (r.content ?? "").trim();
-        // Split on triple newline to separate explanation from rewritten caption
-        let parts = text.split(/\n\n\n+/);
-        // 2026-07-07 (verified live on /run/2887): models sometimes use a
-        // markdown horizontal rule as the separator instead of blank lines —
-        // the triple-newline split then fails and the explanation + '---'
-        // leak into the published caption. Fall back to splitting on the hr.
-        if (parts.length === 1) {
-          parts = text.split(/\n+[-—_*]{3,}\s*\n+/);
+        let { explanation, rewritten } = parse(r.content ?? "");
+        // 驗證重試：超過這張卡的字數上限 25% → 帶著實際字數要求濃縮一次。還是太長就照給，不硬截斷。
+        if (contract.isOverLimit(rewritten, spec)) {
+          const r2 = await callModel([
+            ...messages,
+            { role: "assistant", content: r.content ?? "" },
+            { role: "user", content: contract.shortenRequest(rewritten, spec) },
+          ], undefined, "anthropic").catch(() => null);
+          const second = r2 ? parse(r2.content ?? "") : null;
+          if (second?.rewritten && contract.countChars(second.rewritten) < contract.countChars(rewritten)) {
+            rewritten = second.rewritten;
+            explanation = explanation || second.explanation;
+          }
         }
-        const explanation = parts.length > 1 ? (parts[0] ?? "").trim() : "";
-        let rewritten = parts.length > 1 ? parts.slice(1).join("\n\n").trim() : text;
-        rewritten = rewritten.replace(/^(?:[-—_*]{3,}\s*\n+)+/, "").replace(/\n+(?:[-—_*]{3,}\s*)+$/, "").trim();
         // Brand-rule hard enforcement: an inline rewrite must not
         // reintroduce banned words / skip substitutions.
         try {
