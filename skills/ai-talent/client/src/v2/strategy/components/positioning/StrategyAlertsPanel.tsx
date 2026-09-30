@@ -65,7 +65,9 @@ function fmt(iso: string | null, en: boolean): string {
 function noteText(note: string | null, en: boolean): string {
   if (!note) return "";
   if (note.startsWith("no_scout")) return en ? "Web research is not configured yet — ask SoWork to enable it." : "Web 市調尚未設定，請聯繫 SoWork 開通。";
-  if (note.startsWith("no_items")) return en ? "Nothing relevant found in the last two weeks." : "這兩週沒掃到相關情報。";
+  if (note.startsWith("no_items")) return en ? "Nothing relevant found in the last 7 days." : "這 7 天沒掃到相關情報。";
+  // 2026-09-30 只收確定 7 天內的新聞：有抓到東西，但都是舊文或讀不到日期。
+  if (note.startsWith("no_fresh")) return en ? "Found items, but none were news published in the last 7 days." : "有掃到資料，但沒有確定是近 7 天發布的新聞。";
   if (note.startsWith("ok")) return note.replace(/^ok：?/, "");
   if (note.startsWith("plan")) return en ? "Plan does not include monitoring." : "方案沒有策略監測。";
   return note;
@@ -157,7 +159,15 @@ export default function StrategyAlertsPanel({ brandId }: { brandId: number }) {
             <p className="mt-0.5 text-[12px] text-neutral-400">{noteText(data.watches[0].lastScanNote, en)}</p>
           )}
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          {/* 2026-09-30（CJ「立即掃描功能，無法按下」）：手動掃描 24 小時一次是成本線，但原因
+              只放在滑鼠移上去的 title，按鈕看起來像壞掉。直接寫出什麼時候可以再掃。 */}
+          {!data.canScanNow && data.lastScanAt && (
+            <span className="text-[11px] text-neutral-400">
+              {en ? "Next manual scan " : "下次可掃描 "}
+              {fmt(new Date(new Date(data.lastScanAt).getTime() + data.manualCooldownHours * 3_600_000).toISOString(), en)}
+            </span>
+          )}
           <button onClick={() => setEditing((v) => !v)} className={btnGhost}>
             {editing ? (en ? "Done" : "收起清單") : (en ? "Watch list" : "監測清單")}
           </button>
