@@ -74,3 +74,14 @@ describe("validateKpiPlan", () => {
     expect(o.phases.launch!.metrics.every((m) => m.target === null)).toBe(true);
   });
 });
+
+describe("給人看的文字", () => {
+  it("brief 與假設裡的企劃 id 換成「日期 通路」", () => {
+    const o = validateKpiPlan({
+      raw: { brief: "l1 是主力。", assumptions: ["t1 要確認版位", "l1、s1 分批投"], phases: {} },
+      plan, budget: null, goals: [],
+    });
+    expect(o.brief).toBe("11/01 Facebook 是主力。");
+    expect(o.assumptions).toEqual(["11/01 Instagram 要確認版位", "11/01 Facebook、11/01 Facebook 分批投"]);
+  });
+});

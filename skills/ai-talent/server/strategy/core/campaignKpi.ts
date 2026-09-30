@@ -132,9 +132,15 @@ export function validateKpiPlan(args: {
   const rawPaid: string[] = (Array.isArray(args.raw?.paid) ? args.raw.paid : []).map((x: unknown) => String(x));
   const paidIds = [...new Set(rawPaid)].filter((id) => eligible.has(id)).slice(0, 20);
 
+  // 給人看的文字裡不能出現企劃的內部 id（例：sustain-2026-11-03-4）——換成「11/03 Instagram」。
+  const CH: Record<string, string> = { facebook: "Facebook", instagram: "Instagram", threads: "Threads", line: "LINE", tiktok: "TikTok", email: "電子報", website: "官網" };
+  const labels = [...args.plan.items]
+    .sort((a, b) => b.id.length - a.id.length)
+    .map((i) => [i.id, `${i.date.slice(5).replace("-", "/")} ${CH[i.platform] ?? i.platform}`] as const);
+  const humanize = (s: string) => labels.reduce((acc, [id, label]) => acc.split(id).join(label), s);
   const assumptions = (Array.isArray(args.raw?.assumptions) ? args.raw.assumptions : [])
-    .map((a: unknown) => str(a, 120)).filter(Boolean).slice(0, 5);
-  return { phases, paidIds, brief: str(args.raw?.brief, 400), assumptions };
+    .map((a: unknown) => humanize(str(a, 160)).slice(0, 140)).filter(Boolean).slice(0, 5);
+  return { phases, paidIds, brief: humanize(str(args.raw?.brief, 500)).slice(0, 460), assumptions };
 }
 
 /** 品牌產業 → agents slug 裡的產業代號。 */
@@ -150,7 +156,9 @@ const INDUSTRY_TOKENS: Array<[RegExp, string]> = [
 
 /**
  * 挑一位「會看數字」的專家：agents 裡 primarySkillBundleKey＝paid-media-operations 的人，
- * 產業對得上的優先、台灣市場優先、評分高的優先。挑不到就用本週企劃已經在用的那位
+ * 產業對得上的優先、台灣市場優先、評分高的優先。slug 是「職能-產業-市場-編號」，市場看
+ * 第三段（-tw-）；開頭的 meta_ads_tw 是職能名稱，不代表台灣市場（2026-09-30 在 dev
+ * 選到 meta_ads_tw-ecom-sea-1754 就是這樣來的）。挑不到就用本週企劃已經在用的那位
  * （meta_ads_tw-ecom-cn-6845）。
  */
 export async function pickKpiAgent(industry: string | null | undefined): Promise<KpiAgent | null> {
@@ -164,7 +172,7 @@ export async function pickKpiAgent(industry: string | null | undefined): Promise
     const [rows]: any = await localPool.execute(
       `SELECT id, slug, name, name_zh, englishName, title, title_zh, avatarUrl FROM agents
         WHERE isAvailable = 1 AND primarySkillBundleKey = 'paid-media-operations'
-        ORDER BY (slug LIKE ?) DESC, (slug LIKE '%\\_tw-%') DESC, rating DESC, id ASC
+        ORDER BY (slug LIKE ?) DESC, (slug LIKE '%-tw-%') DESC, rating DESC, id ASC
         LIMIT 1`,
       [`%-${token}-%`],
     );
@@ -190,6 +198,7 @@ const SYSTEM = `你是這檔活動的投放與成效專家，替用戶把「總�
 - 挑要下廣告的貼文（paid）：只能從企劃裡、通路是 ${PAID_CHANNELS.join("／")} 的那幾篇挑，用 id。預算少就少挑，集中在最關鍵的幾篇。
 - 不准編業界平均、轉換率、CPM 等數字當事實。需要假設才能排的，寫進 assumptions，讓用戶自己確認。
 - brief 用繁體中文三到五句：你怎麼分配、為什麼、最需要用戶確認什麼。
+- brief 與 assumptions 裡不要寫企劃的 id；提到某一篇時用「日期＋通路」，例如「11/03 IG 那篇」。
 - 只輸出 JSON。`;
 
 /** 請投放專家拆 KPI 與預算 → 提案（還沒套用）。 */
