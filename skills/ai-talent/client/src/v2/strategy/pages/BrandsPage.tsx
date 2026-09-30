@@ -13,6 +13,7 @@
  *
  * No max-width container anywhere — extends to viewport edges.
  */
+import { EmptyIllustration } from "../../platform/components/EmptyIllustration";
 import React, { useMemo, useState, useRef } from "react";
 import { useNavigate, useOutletContext, useSearchParams } from "react-router-dom";
 import { trpc } from "../../../lib/trpc";
@@ -5320,20 +5321,16 @@ function BrandEntityGrid({
   return (
     <div className="px-2">
       {items.length === 0 && (
-        <div className="text-center py-12 text-neutral-400">
-          <p className="text-sm font-medium mb-1">
+        <div className="flex flex-col items-center text-center py-10">
+          <EmptyIllustration kind={kind === "product" ? "product" : "event"} />
+          <p className="mt-6 text-lg font-semibold text-neutral-800">
             {kind === "product"
-              ? (en ? "No products yet" : "還沒有產品")
-              : (en ? "No events yet" : "還沒有活動")}
-          </p>
-          <p className="text-xs mb-4">
-            {kind === "product"
-              ? (en ? "Add your first product to start positioning" : "新增第一個產品，開始建立定位")
-              : (en ? "Add a campaign or event" : "新增活動或行銷企劃")}
+              ? (en ? "This box is still empty" : "箱子還是空的")
+              : (en ? "The calendar is wide open" : "行事曆還一片空白")}
           </p>
           <button
             onClick={onAdd}
-            className="text-xs px-4 py-2 rounded-lg bg-neutral-900 text-white font-medium hover:bg-neutral-700 transition"
+            className="mt-6 text-sm px-6 py-2.5 rounded-lg bg-neutral-900 text-white font-medium hover:bg-neutral-700 transition"
           >
             {kind === "product" ? (en ? "+ New product" : "+ 新增產品") : (en ? "+ New event" : "+ 新增活動")}
           </button>
