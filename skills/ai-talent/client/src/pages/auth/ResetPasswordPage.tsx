@@ -129,7 +129,7 @@ export default function ResetPasswordPage() {
     <div className="min-h-screen flex">
       <div className="hidden lg:flex flex-col justify-center px-16 w-1/2" style={{ background: "#171717" }}>
         <div className="text-white">
-          <div className="text-4xl font-bold mb-3">{lang === "en" ? "OnBrand" : "OnBrand · 對版"}</div>
+          <div className="text-4xl font-bold mb-3">onBrand Studio</div>
         </div>
       </div>
 

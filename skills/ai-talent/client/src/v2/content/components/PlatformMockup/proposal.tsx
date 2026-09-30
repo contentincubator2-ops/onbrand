@@ -364,7 +364,7 @@ export function ProposalSpec({ title, brandName, variantLabel, liveCaption }: Mo
             borderBottom: "1px solid #E2E8F0",
           }}>
             <p style={{ fontSize: 10, color: "#94A3B8", textTransform: "uppercase", letterSpacing: "0.1em", fontWeight: 600, marginBottom: 5 }}>
-              OnBrand AI · Brand Spec
+              onBrand Studio · Brand Spec
             </p>
             <h1 style={{ fontSize: "1.05rem", fontWeight: 800, color: "#0F172A", lineHeight: 1.3 }}>
               {title || variantLabel || "Brand Specification"}
@@ -658,7 +658,7 @@ export function PersonaCard({ title, brandName, variantLabel, liveCaption }: Moc
         <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
           <div style={{ padding: "22px 32px 16px", borderBottom: "1px solid #E2E8F0" }}>
             <p style={{ fontSize: 10, color: "#94A3B8", textTransform: "uppercase", letterSpacing: "0.1em", fontWeight: 600, marginBottom: 5 }}>
-              OnBrand AI · User Persona
+              onBrand Studio · User Persona
             </p>
             <h1 style={{ fontSize: "1.05rem", fontWeight: 800, color: "#0F172A", lineHeight: 1.3 }}>
               {title || variantLabel || "用戶 Persona"}

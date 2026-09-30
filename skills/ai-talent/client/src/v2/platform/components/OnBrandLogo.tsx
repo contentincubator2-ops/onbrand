@@ -31,7 +31,7 @@ export default function OnBrandLogo({ glyphOnly = false, size = 28, onClick, cla
     <Element
       onClick={onClick}
       className={className}
-      aria-label="OnBrand AI by SoWork"
+      aria-label="onBrand Studio by SoWork"
       style={{
         display: "inline-flex",
         alignItems: "center",

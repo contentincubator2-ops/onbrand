@@ -89,8 +89,8 @@ export default function LandingPage() {
       })
       .catch(() => {});
     document.title = en
-      ? "OnBrand · Always on-brand. Your AI marketing studio."
-      : "OnBrand · 永遠 on-brand · 你的 AI 行銷工作室";
+      ? "onBrand Studio · Your AI brand marketing studio by SoWork"
+      : "onBrand Studio · SoWork 的 AI 品牌行銷工作室";
     const m =
       document.querySelector('meta[name="description"]') ??
       (() => {
@@ -102,8 +102,8 @@ export default function LandingPage() {
     m.setAttribute(
       "content",
       en
-        ? `Lock your brand positioning once. Every caption stays on-brand. Brand Brain · Single/Pack/Campaign · Idea Stage · monthly-refreshed viral-structure cards + your own brand-built cards.`
-        : `鎖定一次品牌定位，每篇貼文自動 on-brand。品牌大腦 · 單篇/套組/企劃 · 靈感舞台 · 每月更新的爆款結構卡 ＋ 品牌自建卡。`,
+        ? `onBrand Studio by SoWork — lock your brand positioning once and every caption across 7 channels follows your brand. Brand Brain · Single/Pack/Campaign · Idea Stage · monthly-refreshed viral-structure cards + your own brand-built cards.`
+        : `onBrand Studio 是 SoWork 的 AI 品牌行銷工作室：鎖定一次品牌定位，七個通路的每篇貼文都照你的品牌寫。品牌大腦 · 單篇/套組/企劃 · 靈感舞台 · 每月更新的爆款結構卡 ＋ 品牌自建卡。`,
     );
     return () => {
       dead = true;
@@ -243,15 +243,15 @@ export default function LandingPage() {
             >
               {en ? (
                 <>
-                  Always
+                  onBrand
                   <br />
-                  on-brand.
+                  Studio.
                 </>
               ) : (
                 <>
-                  永遠 on-brand
+                  onBrand Studio
                   <br />
-                  的 AI 行銷工作室
+                  品牌 AI 行銷工作室
                 </>
               )}
             </h1>

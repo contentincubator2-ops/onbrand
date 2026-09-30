@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  OnBrand AI · OG cover (1200×630)
+  onBrand Studio · OG cover (1200×630)
   Editorial-illustration style matching www.sowork.ai: thick black outlines,
   cream + orange + black palette. Drop into FB / LINE / LinkedIn / Twitter.
 
@@ -55,11 +55,11 @@
   <!-- Hero headline (two lines, very heavy) -->
   <text x="70" y="270" font-family="-apple-system, 'PingFang TC', 'Noto Sans CJK TC', sans-serif"
         font-size="72" font-weight="900" fill="#0F0F0E" letter-spacing="-2">
-    永遠 on-brand
+    onBrand Studio
   </text>
   <text x="70" y="346" font-family="-apple-system, 'PingFang TC', 'Noto Sans CJK TC', sans-serif"
         font-size="72" font-weight="900" fill="#0F0F0E" letter-spacing="-2" opacity="0.85">
-    的 AI 行銷工作室
+    品牌 AI 行銷工作室
   </text>
 
   <!-- Sub-pitch -->
@@ -74,13 +74,13 @@
     <g transform="translate(0, 0)">
       <rect x="0" y="0" width="240" height="48" rx="10" fill="#FFFFFF" stroke="#0F0F0E" stroke-width="2"/>
       <text x="14" y="20" font-size="10" font-weight="900" fill="#E85D2E" letter-spacing="2">01 / 品牌大腦</text>
-      <text x="14" y="37" font-size="14" font-weight="700" fill="#0F0F0E">鎖定一次 · 永遠 on-brand</text>
+      <text x="14" y="37" font-size="14" font-weight="700" fill="#0F0F0E">鎖定一次 · 每篇照品牌寫</text>
     </g>
     <!-- 02 Tiers -->
     <g transform="translate(250, 0)">
       <rect x="0" y="0" width="240" height="48" rx="10" fill="#FFFFFF" stroke="#0F0F0E" stroke-width="2"/>
       <text x="14" y="20" font-size="10" font-weight="900" fill="#E85D2E" letter-spacing="2">02 / 三種規格</text>
-      <text x="14" y="37" font-size="14" font-weight="700" fill="#0F0F0E">30s · 60s · 99s</text>
+      <text x="14" y="37" font-size="14" font-weight="700" fill="#0F0F0E">單篇 · 套組 · 企劃</text>
     </g>
   </g>
 

@@ -840,7 +840,7 @@ function IconBar({
           scope race conditions). /30s is the actual entry point users
           use 90% of the time, and it works without a redirect chain. */}
       <div style={{ height: 64, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", position: "relative" }}>
-        <Tooltip content={isEn ? "OnBrand AI · home" : "OnBrand AI · 回首頁"} placement="right">
+        <Tooltip content={isEn ? "onBrand Studio · home" : "onBrand Studio · 回首頁"} placement="right">
           <span>
             <OnBrandLogo
               glyphOnly

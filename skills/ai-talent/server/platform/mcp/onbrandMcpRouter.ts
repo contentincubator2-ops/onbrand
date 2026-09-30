@@ -17,7 +17,7 @@ import { publicBaseUrl, MCP_RESOURCE_PATH } from "./oauthRoutes";
 export const onbrandMcpRouter = Router();
 
 const SUPPORTED_VERSIONS = ["2025-11-25", "2025-06-18", "2025-03-26"];
-const SERVER_INFO = { name: "onbrand", title: "OnBrand AI", version: "1.0.0" };
+const SERVER_INFO = { name: "onbrand", title: "onBrand Studio", version: "1.0.0" };
 const INSTRUCTIONS =
   "OnBrand 是使用者的 AI 行銷團隊（品牌大腦＋持續更新的任務卡＋伺服器端的專屬寫手與設計）。" +
   "流程：list_brands → get_brand_context → list_tasks → describe_task（缺必填先問使用者）→ run_task → get_task_result。" +

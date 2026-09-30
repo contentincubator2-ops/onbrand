@@ -1,4 +1,4 @@
-# OnBrand AI robots.txt
+# onBrand Studio robots.txt
 # Last updated: 2026-06-12
 
 User-agent: *
