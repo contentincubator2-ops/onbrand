@@ -29,7 +29,7 @@ export const ILLUSTRATION_STYLE = [
   "Exactly ONE warm orange accent (#E85D2E) on the single most important element — nothing else orange.",
   "One clear focal subject, centered, sitting on a soft pale-blue oval ground shadow, generous empty space around it.",
   "Simple shapes, no gradients, no photorealism, no 3D, no drop shadows, no texture.",
-  "Absolutely no text, letters, words, numbers, logos, watermarks or UI labels anywhere in the image.",
+  "Absolutely no text, letters, words, numbers, question or exclamation marks, logos, watermarks or UI labels anywhere in the image.",
 ].join(" ");
 
 export function illustrationPrompt(concept: string): string {
@@ -42,7 +42,8 @@ Rules:
 - Show objects, characters, gestures. Never rely on readable text, letters or numbers (the image will contain none).
 - Avoid generic channel icons alone (a phone, a play button). Make the scene specific to the card's idea.
 - Every card must look clearly different from the others and from the "already used" list.
-- One focal subject; say which single element is the orange accent.
+- It is shown as a small thumbnail (132px wide): at most TWO characters, no crowds, no busy backgrounds; one focal subject.
+- Say which single element is the orange accent.
 Reply with JSON only: {"concepts": {"<card id>": "<sentence>", ...}}`;
 
 function cardLine(c: IllustrationCardInput): string {
