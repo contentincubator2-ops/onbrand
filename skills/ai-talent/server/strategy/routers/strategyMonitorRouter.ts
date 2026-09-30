@@ -12,7 +12,7 @@ import { router, protectedProcedure } from "../../platform/core/trpc";
 import { assertStrategyMonitoringAllowed, planQuotaFor } from "../../platform/core/planGate";
 import localPool from "../../localDb";
 import {
-  MANUAL_SCAN_COOLDOWN_HOURS, SCAN_INTERVAL_DAYS,
+  SCAN_INTERVAL_DAYS,
   backfillEvidenceDates, ensureWatches, listAlerts, runStrategyScan, setAlertStatus, unreadAlertSummary, updateWatch,
   type StrategyWatch,
 } from "../core/strategyMonitor";
@@ -32,6 +32,9 @@ function latestScan(watches: StrategyWatch[]): string | null {
   return best;
 }
 
+/** 正在手動掃描的品牌（單一 pm2 行程，記憶體即可）。 */
+const scanningBrands = new Set<number>();
+
 export const strategyMonitorRouter = router({
   /** 這個品牌的監測清單、提醒、上次掃描。基礎方案回 locked:true。 */
   overview: protectedProcedure
@@ -43,9 +46,9 @@ export const strategyMonitorRouter = router({
       try { locked = !(await planQuotaFor(userId)).strategyMonitoring; } catch { locked = false; }
       const base = {
         locked, brandName: brand.name,
-        scanIntervalDays: SCAN_INTERVAL_DAYS, manualCooldownHours: MANUAL_SCAN_COOLDOWN_HOURS,
+        scanIntervalDays: SCAN_INTERVAL_DAYS,
       };
-      if (locked) return { ...base, watches: [] as StrategyWatch[], alerts: [], productNames: {} as Record<number, string>, lastScanAt: null as string | null, canScanNow: false };
+      if (locked) return { ...base, watches: [] as StrategyWatch[], alerts: [], productNames: {} as Record<number, string>, lastScanAt: null as string | null, scanning: false };
 
       const watches = await ensureWatches({ userId, brandId: input.brandId });
       const alerts = await listAlerts(input.brandId);
@@ -56,8 +59,7 @@ export const strategyMonitorRouter = router({
       const productNames: Record<number, string> = {};
       for (const p of pRows as any[]) productNames[Number(p.id)] = String(p.name ?? "");
       const lastScanAt = latestScan(watches);
-      const canScanNow = !lastScanAt || (Date.now() - new Date(lastScanAt).getTime()) >= MANUAL_SCAN_COOLDOWN_HOURS * 3_600_000;
-      return { ...base, watches, alerts, productNames, lastScanAt, canScanNow };
+      return { ...base, watches, alerts, productNames, lastScanAt, scanning: scanningBrands.has(input.brandId) };
     }),
 
   /**
@@ -95,8 +97,9 @@ export const strategyMonitorRouter = router({
     }),
 
   /**
-   * 手動掃描：品牌先掃，再掃開著的產品，最多 4 份。24 小時一次 —— 掃描要花
-   * scout 與 LLM 的錢，冷卻是成本線。
+   * 手動掃描：品牌先掃，再掃開著的產品，最多 4 份。
+   * 2026-09-30（CJ「不要有限制…隨時都可以開始」）：拿掉 24 小時冷卻，改由策略總監頭像
+   * 隨時開始。只擋「同一個品牌正在掃」——連點兩下不該花兩次 scout／LLM 的錢。
    */
   scanNow: protectedProcedure
     .input(z.object({ brandId: z.number() }))
@@ -104,22 +107,25 @@ export const strategyMonitorRouter = router({
       const userId = ctx.user!.id;
       await assertBrandOwner(userId, input.brandId);
       await assertStrategyMonitoringAllowed(userId);
-      const watches = await ensureWatches({ userId, brandId: input.brandId });
-      const last = latestScan(watches);
-      if (last && Date.now() - new Date(last).getTime() < MANUAL_SCAN_COOLDOWN_HOURS * 3_600_000) {
-        const hrs = Math.ceil((MANUAL_SCAN_COOLDOWN_HOURS * 3_600_000 - (Date.now() - new Date(last).getTime())) / 3_600_000);
-        throw new TRPCError({ code: "BAD_REQUEST", message: `手動掃描每 ${MANUAL_SCAN_COOLDOWN_HOURS} 小時一次，還要等 ${hrs} 小時。自動掃描每 ${SCAN_INTERVAL_DAYS} 天會跑。` });
+      if (scanningBrands.has(input.brandId)) {
+        throw new TRPCError({ code: "CONFLICT", message: "這個品牌正在掃描中，完成後再開始下一次。" });
       }
-      const targets = watches
-        .filter((w) => w.enabled)
-        .sort((a, b) => (a.scope === "brand" ? -1 : 0) - (b.scope === "brand" ? -1 : 0))
-        .slice(0, 4);
-      const results = [];
-      for (const w of targets) {
-        const r = await runStrategyScan(w);
-        results.push({ scope: w.scope, scopeId: w.scopeId, ...r });
+      scanningBrands.add(input.brandId);
+      try {
+        const watches = await ensureWatches({ userId, brandId: input.brandId });
+        const targets = watches
+          .filter((w) => w.enabled)
+          .sort((a, b) => (a.scope === "brand" ? -1 : 0) - (b.scope === "brand" ? -1 : 0))
+          .slice(0, 4);
+        const results = [];
+        for (const w of targets) {
+          const r = await runStrategyScan(w);
+          results.push({ scope: w.scope, scopeId: w.scopeId, ...r });
+        }
+        return { results };
+      } finally {
+        scanningBrands.delete(input.brandId);
       }
-      return { results };
     }),
 
   setAlertStatus: protectedProcedure

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { alertKeyOf, deriveDefaultWatch, isDue, parseAlertsJson } from "./strategyMonitor";
+import { alertKeyOf, classifyEvidence, deriveDefaultWatch, isDue, parseAlertsJson } from "./strategyMonitor";
 
 describe("strategyMonitor · deriveDefaultWatch", () => {
   it("品牌：名稱＋產業當關鍵字，直接／間接競品當競爭者，去重且最多 10 個", () => {
@@ -76,5 +76,22 @@ describe("strategyMonitor · alertKeyOf / isDue", () => {
     expect(isDue("2026-08-31T00:00:00Z", now)).toBe(true);
     expect(isDue("2026-09-05T00:00:00Z", now)).toBe(false);
     expect(isDue("garbage", now)).toBe(true);
+  });
+});
+
+// 2026-09-30（CJ「確定只有在 7 天內的新聞」「專心抓新聞，就很好了」）
+describe("classifyEvidence — 只收確定 7 天內的新聞", () => {
+  const asOf = new Date("2026-09-30T12:00:00Z");
+  it("7 天內有發布日＝採用", () => {
+    expect(classifyEvidence({ url: "https://news.example.com/a", publishedAt: "2026-09-29" }, asOf)).toBe("news");
+    expect(classifyEvidence({ url: "https://news.example.com/a", publishedAt: "2026-09-23" }, asOf)).toBe("news");
+  });
+  it("超過 7 天的舊文不採用", () => {
+    expect(classifyEvidence({ url: "https://zapier.com/blog/x", publishedAt: "2023-03-17" }, asOf)).toBeNull();
+    expect(classifyEvidence({ url: "https://toolking.app/a", publishedAt: "2026-09-20" }, asOf)).toBeNull();
+  });
+  it("讀不到日期（官網頁、社群貼文）不採用", () => {
+    expect(classifyEvidence({ url: "https://thinklytics.com/services/x", publishedAt: null }, asOf)).toBeNull();
+    expect(classifyEvidence({ url: "https://www.threads.com/@a/post/1" }, asOf)).toBeNull();
   });
 });
