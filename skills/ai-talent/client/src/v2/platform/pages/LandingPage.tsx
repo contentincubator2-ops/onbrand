@@ -1,22 +1,29 @@
 /**
  * LandingPage — public marketing page at "/".
  *
- * 2026-06-12 (CJ direction「插畫風格參考 www.sowork.ai」):
- *   Redesigned with SoWork.ai's editorial-illustration visual language:
- *     - Warm cream background (#F7F2EB) instead of white
- *     - Orange (#E85D2E) primary accent instead of purple gradient
- *     - Heavy black headlines with stacked two-line composition
- *     - Pill chip above headline
- *     - Flat 2D illustration with thick black strokes on right side
- *     - Subtle dot-grid background texture
- *     - Black stats bar at bottom with tabular numerals
+ * 2026-09-30（CJ 產品頁改版，正名 onBrand Studio）：
+ *   定位＝「經過訓練與認證的 AI 行銷團隊」，優勢三支柱：
+ *     懂品牌大腦 ＋ 擁有任務庫 ＋ 整合公司的 AI 技能。
+ *   順序（CJ 確認）：
+ *     0 Hero：一句定位＋真實截圖（本週企劃），不要插畫
+ *     1 痛點對照：一般 AI 工具 vs onBrand Studio
+ *     2 三支柱，各配一張實際畫面
+ *     3 本月爆款卡牆：landing.showcase 即時拿，跟目錄一起每月換
+ *     4 七個通路＋規格圖卡
+ *     5 方案：基礎版當入口、企業客製版＝專屬行銷維運團隊（建置費＋月費）
+ *     6 FAQ（index.html 的 FAQPage JSON-LD 是鏡像，改這裡要一起改）
+ *   語氣：平視。痛點寫成行業現況，不寫成用戶的缺點（不要「請不起…」）。
  *
- * Auth-check: logged-in users redirect to /home.
+ *   截圖放在 /static/landing/，取自 dev 站 SoWork 品牌（brand 2977）的真實畫面。
+ *
+ * Auth-check: logged-in users redirect to /planner.
  */
-import { CATALOG } from "../lib/catalogFigures";
 import React from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useLang } from "../../../lib/i18n";
+import { trpc } from "../../../lib/trpc";
+import { CATALOG } from "../lib/catalogFigures";
+import { Icon, type IconName } from "../components/icons";
 
 // 2026-06-12 (SEO perf): hover-prefetch the auth chunks. By the time
 // a user clicks "Start free" or "Sign in", the chunk is already cached
@@ -30,28 +37,10 @@ const prefetchProps = (fn: () => void) => ({
   onTouchStart: fn,
 });
 
-// 2026-06-12 (SEO perf): HeroIllustration is desktop-only (hidden lg:flex
-// on its parent). Lazy-load it as a separate chunk so mobile visitors —
-// where it's invisible anyway — never pay the bytes.
-const LazyHeroIllustration = React.lazy(() => import("./LandingHeroIllustration"));
-
-// Tiny hook: returns true when viewport ≥ 1024px (Tailwind `lg` breakpoint).
-// SSR-safe (returns false until mounted). No useEffect cleanup leaks.
-function useIsDesktop() {
-  const [isDesktop, setIsDesktop] = React.useState(false);
-  React.useEffect(() => {
-    const mq = window.matchMedia("(min-width: 1024px)");
-    setIsDesktop(mq.matches);
-    const handler = (e: MediaQueryListEvent) => setIsDesktop(e.matches);
-    mq.addEventListener("change", handler);
-    return () => mq.removeEventListener("change", handler);
-  }, []);
-  return isDesktop;
-}
-
 // ── SoWork.ai design tokens ──────────────────────────────────────────────
 const C = {
   cream: "#F7F2EB",       // page background
+  creamDeep: "#FAF5EC",   // alternate section background
   ink: "#0F0F0E",          // headlines, primary text
   inkSoft: "#3A3633",      // body text
   muted: "#6B6660",        // tertiary text
@@ -63,11 +52,22 @@ const C = {
   white: "#FFFFFF",
 };
 
+/** 首頁上的七個通路。順序＝產品裡通路列的順序。 */
+const CHANNELS: { id: string; icon: IconName; zh: string; en: string }[] = [
+  { id: "facebook", icon: "facebook", zh: "Facebook", en: "Facebook" },
+  { id: "instagram", icon: "instagram", zh: "Instagram", en: "Instagram" },
+  { id: "threads", icon: "threads", zh: "Threads", en: "Threads" },
+  { id: "line", icon: "line", zh: "LINE", en: "LINE" },
+  { id: "tiktok", icon: "tiktok", zh: "TikTok", en: "TikTok" },
+  { id: "email", icon: "newsletter", zh: "電子報", en: "Email" },
+  { id: "website", icon: "website", zh: "官網", en: "Website" },
+];
+const channelOf = (id: string) => CHANNELS.find((c) => c.id === id);
+
 export default function LandingPage() {
   const { lang, setLang } = useLang();
   const en = lang === "en";
   const navigate = useNavigate();
-  const isDesktop = useIsDesktop();
 
   React.useEffect(() => {
     let dead = false;
@@ -89,8 +89,8 @@ export default function LandingPage() {
       })
       .catch(() => {});
     document.title = en
-      ? "onBrand Studio · Your AI brand marketing studio by SoWork"
-      : "onBrand Studio · SoWork 的 AI 品牌行銷工作室";
+      ? "onBrand Studio · A trained, certified AI marketing team"
+      : "onBrand Studio｜經過訓練與認證的 AI 行銷團隊";
     const m =
       document.querySelector('meta[name="description"]') ??
       (() => {
@@ -102,8 +102,8 @@ export default function LandingPage() {
     m.setAttribute(
       "content",
       en
-        ? `onBrand Studio by SoWork — lock your brand positioning once and every caption across 7 channels follows your brand. Brand Brain · Single/Pack/Campaign · Idea Stage · monthly-refreshed viral-structure cards + your own brand-built cards.`
-        : `onBrand Studio 是 SoWork 的 AI 品牌行銷工作室：鎖定一次品牌定位，七個通路的每篇貼文都照你的品牌寫。品牌大腦 · 單篇/套組/企劃 · 靈感舞台 · 每月更新的爆款結構卡 ＋ 品牌自建卡。`,
+        ? "onBrand Studio is a trained, certified AI marketing team: it knows your Brand Brain, carries a task library refreshed monthly, and can take on your company's own AI skills. Copy and images for 7 channels, done by one team. 7-day free trial, no card."
+        : "onBrand Studio 是經過訓練與認證的 AI 行銷團隊：懂你的品牌大腦、擁有每月更新的任務庫，還能整合貴公司自己的 AI 技能。FB、IG、Threads、LINE、TikTok、電子報、官網七個通路的文案與圖片，一支團隊完成。7 天免費試用，免綁卡。",
     );
     return () => {
       dead = true;
@@ -111,41 +111,8 @@ export default function LandingPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [en]);
 
-  // Bottom stats bar (mirrors sowork.ai's "44+ / 2,526 / 187..." strip)
-  const STATS = en
-    ? [
-        ["16,113", "AI Marketing Agents"],
-        ["Monthly", "Viral-Structure Refresh"],
-        ["711", "Specialized Squads"],
-        ["2,526", "Skill Modules"],
-        ["60", "Award Cases"],
-        ["14", "Steps to Brand Brain"],
-        [`${CATALOG.channels}`, "Channels"],
-      ]
-    : [
-        ["16,113", "個 AI 行銷專家"],
-        ["每月", "更新爆款結構卡"],
-        ["711", "個專屬軍團"],
-        ["2,526", "個技能模組"],
-        ["60", "個得獎案例"],
-        ["14", "步建品牌大腦"],
-        [`${CATALOG.channels}`, "個通路"],
-      ];
-
-  // 4 core USPs (single source of truth; mirrors Login/Register)
-  const FEATURES = en
-    ? [
-        ["01", "Brand Brain", "Lock your positioning once. Every post stays on-brand."],
-        ["02", "Content Tiers", "A single post · a content pack · a full campaign."],
-        ["03", "Idea Stage", "Several agents pitch different angles on one product — pick one and write it."],
-        ["04", "Sourced", `Viral-structure cards refreshed monthly, each with its spread metric, measurement month and reference article.`],
-      ]
-    : [
-        ["01", "品牌大腦", "鎖定一次品牌定位 · 每篇貼文自動 on-brand"],
-        ["02", "三種規格", "單篇內容 · 內容套組 · 完整企劃"],
-        ["03", "靈感舞台", "同一個產品，幾位 agent 各想一個切角，挑一個開始寫"],
-        ["04", "有出處", `每月更新的爆款結構卡，每張附傳播數字、量測年月與參考文章`],
-      ];
+  // 本月爆款卡牆與規格圖卡：跟任務目錄同一份資料，每月自動換。
+  const showcase = trpc.landing.showcase.useQuery(undefined, { staleTime: 60 * 60 * 1000, retry: 1 });
 
   return (
     <div className="min-h-screen flex flex-col" style={{ background: C.cream }}>
@@ -155,35 +122,21 @@ export default function LandingPage() {
         className="flex items-center justify-between px-6 lg:px-12 py-5"
         style={{ borderBottom: `1px solid ${C.borderSoft}` }}
       >
-        <div className="flex items-center gap-2">
-          {/* SoWork-style droplet logo */}
-          <svg width="24" height="28" viewBox="0 0 24 28" fill="none" aria-hidden>
-            <path
-              d="M12 2 C 16 8, 22 14, 22 19 A 10 10 0 0 1 2 19 C 2 14, 8 8, 12 2 Z"
-              fill={C.orange}
-              stroke={C.ink}
-              strokeWidth="2.2"
-              strokeLinejoin="round"
-            />
-          </svg>
-          <span className="text-[20px] font-extrabold" style={{ color: C.ink }}>
-            OnBrand<span style={{ color: C.orange }}>.ai</span>
-          </span>
-        </div>
+        <BrandMark size="lg" />
 
-        <nav className="hidden md:flex items-center gap-6 text-sm font-medium" style={{ color: C.inkSoft }}>
-          <a href="#features" className="hover:opacity-70 transition">
+        <nav className="flex items-center gap-4 md:gap-6 text-sm font-medium" style={{ color: C.inkSoft }}>
+          <a href="#pillars" className="hidden md:inline hover:opacity-70 transition">
             {en ? "Product" : "產品"}
           </a>
-          <a href="#how" className="hover:opacity-70 transition">
-            {en ? "How it works" : "運作方式"}
+          <a href="#viral" className="hidden md:inline hover:opacity-70 transition">
+            {en ? "This month" : "本月爆款"}
           </a>
-          <Link to="/pricing" className="hover:opacity-70 transition">
-            {en ? "Pricing" : "定價"}
-          </Link>
-          <Link to="/changelog" className="hover:opacity-70 transition">
-            {en ? "Updates" : "觀點"}
-          </Link>
+          <a href="#plans" className="hidden md:inline hover:opacity-70 transition">
+            {en ? "Plans" : "方案"}
+          </a>
+          <a href="#faq" className="hidden md:inline hover:opacity-70 transition">
+            FAQ
+          </a>
           <button
             onClick={() => setLang(en ? "zh-TW" : "en")}
             className="hover:opacity-70 transition"
@@ -204,182 +157,94 @@ export default function LandingPage() {
         </nav>
       </header>
 
-      {/* ── Main hero: split 55/45 ──────────────────────────────────── */}
-      <main className="flex-1 relative">
-        {/* Subtle dot-grid background */}
-        <div
-          className="absolute inset-0 pointer-events-none"
-          style={{
-            backgroundImage: `radial-gradient(circle, ${C.ink} 1px, transparent 1px)`,
-            backgroundSize: "28px 28px",
-            opacity: 0.045,
-          }}
-          aria-hidden
-        />
+      <main className="flex-1">
+        {/* ── 0 · Hero：一句定位＋真實截圖 ─────────────────────────── */}
+        <section className="relative">
+          {/* Subtle dot-grid background */}
+          <div
+            className="absolute inset-0 pointer-events-none"
+            style={{
+              backgroundImage: `radial-gradient(circle, ${C.ink} 1px, transparent 1px)`,
+              backgroundSize: "28px 28px",
+              opacity: 0.045,
+            }}
+            aria-hidden
+          />
+          <div className="relative max-w-[1200px] mx-auto px-6 lg:px-12 pt-12 lg:pt-16 pb-12 text-center">
+            <Chip>{en ? "Agency-grade strategy × real social data, every month" : "4A 品牌策略方法 × 每月真實社群數據"}</Chip>
 
-        <div className="relative flex flex-col lg:flex-row max-w-[1400px] mx-auto px-6 lg:px-12 py-12 lg:py-16 gap-10 lg:gap-8 items-center">
-
-          {/* ── Left: copy + CTAs (55%) ───────────────────────────── */}
-          <div className="w-full lg:w-[55%]">
-            {/* Pill chip */}
-            <div
-              className="inline-block text-[12px] font-bold px-3 py-1.5 rounded-md mb-6"
-              style={{
-                background: C.orangeChip,
-                color: C.orangeDark,
-              }}
-            >
-              {en ? "Marketing's Forward Deployed Engineer" : "行銷界的 Forward Deployed Engineer"}
-            </div>
-
-            {/* Hero headline — heavy, two-line stacked */}
             <h1
-              className="font-black tracking-tight leading-[1.05] mb-6"
+              className="font-black tracking-tight leading-[1.1] mt-6 mb-6"
               style={{
                 color: C.ink,
-                fontSize: "clamp(2.4rem, 5.4vw, 4.2rem)",
+                fontSize: "clamp(2.2rem, 5vw, 3.8rem)",
                 letterSpacing: "-0.02em",
               }}
             >
               {en ? (
-                <>
-                  onBrand
-                  <br />
-                  Studio.
-                </>
+                <>A trained, certified<br />AI marketing team</>
               ) : (
-                <>
-                  onBrand Studio
-                  <br />
-                  品牌 AI 行銷工作室
-                </>
+                <>經過訓練與認證的<br />AI 行銷團隊</>
               )}
             </h1>
 
-            {/* Sub-lead */}
-            <p
-              className="text-[17px] leading-[1.7] mb-3 max-w-[540px] font-medium"
-              style={{ color: C.ink }}
-            >
+            <p className="text-[17px] leading-[1.75] mx-auto mb-2 max-w-[680px] font-semibold" style={{ color: C.ink }}>
               {en
-                ? `Agent: 16,113 AI experts · Skill: monthly viral-structure cards + your brand-built cards · Data: your locked Brand Brain`
-                : `Agent：16,113 個 AI 專家 · Skill：每月更新的爆款結構卡 ＋ 品牌自建卡 · Data：你鎖定的品牌大腦`}
+                ? "AI writes fast but doesn't know your brand. People who know your brand never have enough time."
+                : "AI 寫得快，但不懂品牌；懂品牌的人，時間永遠不夠。"}
             </p>
-            <p
-              className="text-[15px] leading-[1.75] mb-8 max-w-[540px]"
-              style={{ color: C.muted }}
-            >
+            <p className="text-[15px] leading-[1.8] mx-auto mb-8 max-w-[680px]" style={{ color: C.inkSoft }}>
               {en
-                ? "OnBrand isn't another one-click AI generator. SoWork's 14-step Brand Positioning Method writes your Why, TA, Differentiation and Voice into a Brand Brain. Set it once. Every channel — Facebook, Instagram, Threads, LINE, TikTok, Email, Website — stays on-brand automatically. We don't hand you content — we deploy your strategy to every touchpoint."
-                : "OnBrand 不是另一個「AI 一鍵生成」工具。SoWork 14 步品牌定位法把你的 WHY、TA、差異化、Voice 全部寫進品牌大腦。鎖定一次，所有平台（Facebook、Instagram、Threads、LINE、TikTok、電子報（EDM）、官網）都自動跟著你的調性走。我們給你的不是內容，是把你的品牌策略部署到每一個接觸點。"}
+                ? "onBrand Studio's AI marketing team has read your Brand Brain, carries a task library refreshed every month, and can take on your company's own AI skills."
+                : "onBrand Studio 的 AI 行銷團隊讀過你的品牌大腦、帶著每月更新的任務庫，也能接上貴公司自己的 AI 技能。"}
             </p>
 
-            {/* CTAs — primary orange + secondary ghost */}
-            <div className="flex flex-wrap gap-3 mb-10">
-              <Link
-                to="/auth/register"
-                {...prefetchProps(prefetchRegister)}
-                className="inline-flex items-center gap-2 px-6 py-3.5 rounded-xl text-[15px] font-bold transition-transform hover:-translate-y-0.5"
-                style={{
-                  background: C.orange,
-                  color: C.white,
-                  boxShadow: `0 6px 0 ${C.orangeDark}`,
-                }}
-              >
-                {en ? "Start free trial" : "免費試用"}
-                <span aria-hidden>→</span>
-              </Link>
+            <div className="flex flex-wrap justify-center gap-3 mb-12">
+              <PrimaryCta en={en} />
               <Link
                 to="/auth/login"
                 {...prefetchProps(prefetchLogin)}
                 className="inline-flex items-center gap-2 px-6 py-3.5 rounded-xl text-[15px] font-bold transition hover:bg-white"
-                style={{
-                  background: "transparent",
-                  color: C.ink,
-                  border: `2px solid ${C.ink}`,
-                }}
+                style={{ background: "transparent", color: C.ink, border: `2px solid ${C.ink}` }}
               >
                 {en ? "Sign in" : "已有帳號 · 登入"}
                 <span aria-hidden>→</span>
               </Link>
             </div>
 
-            {/* 4 USP mini-cards */}
-            <div id="features" className="grid grid-cols-2 gap-3 max-w-[540px]">
-              {FEATURES.map(([n, title, desc]) => (
-                <div
-                  key={n}
-                  className="p-4 rounded-xl transition hover:-translate-y-0.5"
-                  style={{
-                    background: C.white,
-                    border: `1.5px solid ${C.ink}`,
-                  }}
-                >
-                  <div
-                    className="text-[12px] font-black tracking-[0.2em] mb-2"
-                    style={{ color: C.orange }}
-                  >
-                    {n}
-                  </div>
-                  <div
-                    className="text-[14px] font-bold mb-1 leading-snug"
-                    style={{ color: C.ink }}
-                  >
-                    {title}
-                  </div>
-                  <div
-                    className="text-[12px] leading-relaxed"
-                    style={{ color: C.muted }}
-                  >
-                    {desc}
-                  </div>
-                </div>
-              ))}
-            </div>
+            <Screenshot
+              src="/static/landing/planner.jpg"
+              width={1600}
+              height={900}
+              alt={en
+                ? "This week's plan: the content director and agents pitch angles, you adopt one, and the week's posts are scheduled across channels"
+                : "本週企劃：內容總監與團隊提案，你採用後，一週各通路的貼文就排好了"}
+              priority
+            />
+            <p className="text-[13px] mt-3" style={{ color: C.muted }}>
+              {en ? "This week's plan — the team pitches, you decide, the week is scheduled." : "本週企劃：團隊提案、你來決定，一週的貼文就排好了。"}
+            </p>
           </div>
+        </section>
 
-          {/* ── Right: editorial illustration (45%, desktop-only) ─── */}
-          <div className="w-full lg:w-[45%] flex justify-center lg:justify-end">
-            {isDesktop && (
-              <React.Suspense fallback={
-                <div
-                  className="rounded-3xl w-full max-w-[520px] aspect-[460/380]"
-                  style={{ background: "#FAEBD9", border: `2.5px dashed ${C.ink}40` }}
-                  aria-label={en ? "Loading illustration" : "插畫載入中"}
-                />
-              }>
-                <LazyHeroIllustration en={en} />
-              </React.Suspense>
-            )}
-          </div>
-        </div>
+        {/* ── 1 · 痛點對照 ─────────────────────────────────────────── */}
+        <PainSection en={en} />
+
+        {/* ── 2 · 三支柱 ───────────────────────────────────────────── */}
+        <PillarsSection en={en} />
+
+        {/* ── 3 · 本月爆款卡牆 ─────────────────────────────────────── */}
+        <ViralWall en={en} cards={showcase.data?.viralCards} loading={showcase.isLoading} failed={showcase.isError} />
+
+        {/* ── 4 · 七個通路＋規格圖卡 ───────────────────────────────── */}
+        <ChannelsSection en={en} specs={showcase.data?.imageSpecs} />
+
+        {/* ── 5 · 方案 ─────────────────────────────────────────────── */}
+        <PlansSection en={en} />
+
+        {/* ── 6 · FAQ (also mirrored in FAQPage JSON-LD in index.html) ─ */}
+        <FAQSection en={en} />
       </main>
-
-      {/* ── Bottom stats bar ───────────────────────────────────────── */}
-      <section
-        id="how"
-        className="overflow-x-auto"
-        style={{ background: C.ink, color: C.white }}
-      >
-        <div className="max-w-[1400px] mx-auto px-6 lg:px-12 py-6 flex items-center gap-8 lg:gap-12 min-w-max lg:min-w-0 lg:justify-between">
-          {STATS.map(([num, label]) => (
-            <div key={label} className="flex items-center gap-2 whitespace-nowrap">
-              <div
-                className="text-[26px] lg:text-[30px] font-black tabular-nums"
-                style={{ color: C.orange, letterSpacing: "-0.02em" }}
-              >
-                {num}
-              </div>
-              <div className="text-[12px] lg:text-[12px] opacity-70 leading-tight max-w-[80px]">
-                {label}
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* ── FAQ section (also mirrored in FAQPage JSON-LD in index.html) ─ */}
-      <FAQSection en={en} />
 
       {/* ── Footer ─────────────────────────────────────────────────── */}
       <footer
@@ -391,20 +256,8 @@ export default function LandingPage() {
         }}
       >
         <div className="max-w-[1400px] mx-auto px-6">
-          {/* Brand mark */}
-          <div className="flex items-center justify-center gap-2 mb-4">
-            <svg width="18" height="22" viewBox="0 0 24 28" fill="none" aria-hidden>
-              <path
-                d="M12 2 C 16 8, 22 14, 22 19 A 10 10 0 0 1 2 19 C 2 14, 8 8, 12 2 Z"
-                fill={C.orange}
-                stroke={C.ink}
-                strokeWidth="2.2"
-                strokeLinejoin="round"
-              />
-            </svg>
-            <span className="text-[15px] font-extrabold" style={{ color: C.ink }}>
-              OnBrand<span style={{ color: C.orange }}>.ai</span>
-            </span>
+          <div className="flex justify-center mb-4">
+            <BrandMark size="sm" />
           </div>
 
           {/* Social icons */}
@@ -468,19 +321,448 @@ export default function LandingPage() {
               <>
                 Operated by SoWork 摘星社群行銷顧問股份有限公司 · Service area: Taiwan
                 <br />
-                © {new Date().getFullYear()} SoWork · OnBrand. All rights reserved.
+                © {new Date().getFullYear()} SoWork · onBrand Studio. All rights reserved.
               </>
             ) : (
               <>
                 營運者：SoWork 摘星社群行銷顧問股份有限公司 · 服務地區：台灣
                 <br />
-                © {new Date().getFullYear()} SoWork · OnBrand. 版權所有。
+                © {new Date().getFullYear()} SoWork · onBrand Studio. 版權所有。
               </>
             )}
           </div>
         </div>
       </footer>
     </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Shared bits
+// ─────────────────────────────────────────────────────────────────────────
+
+function BrandMark({ size }: { size: "lg" | "sm" }) {
+  const lg = size === "lg";
+  return (
+    <div className="flex items-center gap-2">
+      {/* SoWork-style droplet logo */}
+      <svg width={lg ? 24 : 18} height={lg ? 28 : 22} viewBox="0 0 24 28" fill="none" aria-hidden>
+        <path
+          d="M12 2 C 16 8, 22 14, 22 19 A 10 10 0 0 1 2 19 C 2 14, 8 8, 12 2 Z"
+          fill={C.orange}
+          stroke={C.ink}
+          strokeWidth="2.2"
+          strokeLinejoin="round"
+        />
+      </svg>
+      <span className={lg ? "text-[20px] font-extrabold" : "text-[15px] font-extrabold"} style={{ color: C.ink }}>
+        onBrand <span style={{ color: C.orange }}>Studio</span>
+      </span>
+    </div>
+  );
+}
+
+function Chip({ children }: { children: React.ReactNode }) {
+  return (
+    <span
+      className="inline-block text-[12px] font-bold px-3 py-1.5 rounded-md"
+      style={{ background: C.orangeChip, color: C.orangeDark }}
+    >
+      {children}
+    </span>
+  );
+}
+
+function SectionHead({ chip, title, sub }: { chip: string; title: string; sub?: string }) {
+  return (
+    <div className="text-center mb-10">
+      <Chip>{chip}</Chip>
+      <h2
+        className="font-black tracking-tight mt-3 mb-3"
+        style={{ color: C.ink, fontSize: "clamp(1.7rem, 3.4vw, 2.5rem)", letterSpacing: "-0.02em" }}
+      >
+        {title}
+      </h2>
+      {sub && (
+        <p className="text-[15px] leading-[1.75] mx-auto max-w-[640px]" style={{ color: C.muted }}>
+          {sub}
+        </p>
+      )}
+    </div>
+  );
+}
+
+function PrimaryCta({ en }: { en: boolean }) {
+  return (
+    <Link
+      to="/auth/register"
+      {...prefetchProps(prefetchRegister)}
+      className="inline-flex items-center gap-2 px-6 py-3.5 rounded-xl text-[15px] font-bold transition-transform hover:-translate-y-0.5"
+      style={{ background: C.orange, color: C.white, boxShadow: `0 6px 0 ${C.orangeDark}` }}
+    >
+      {en ? "Start 7-day free trial" : "免費試用 7 天"}
+      <span aria-hidden>→</span>
+    </Link>
+  );
+}
+
+/** 真實產品截圖，套一個簡單的瀏覽器外框。 */
+function Screenshot({ src, alt, width, height, priority }: {
+  src: string; alt: string; width: number; height: number; priority?: boolean;
+}) {
+  return (
+    <div
+      className="rounded-2xl overflow-hidden mx-auto text-left"
+      style={{ background: C.white, border: `2px solid ${C.ink}`, boxShadow: `6px 6px 0 ${C.ink}` }}
+    >
+      <div className="flex items-center gap-1.5 px-3 py-2" style={{ borderBottom: `1.5px solid ${C.borderSoft}` }} aria-hidden>
+        <span className="w-2.5 h-2.5 rounded-full" style={{ background: C.border }} />
+        <span className="w-2.5 h-2.5 rounded-full" style={{ background: C.border }} />
+        <span className="w-2.5 h-2.5 rounded-full" style={{ background: C.border }} />
+      </div>
+      <img
+        src={src}
+        alt={alt}
+        width={width}
+        height={height}
+        loading={priority ? "eager" : "lazy"}
+        decoding="async"
+        className="block w-full h-auto"
+      />
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// 1 · 痛點對照
+// ─────────────────────────────────────────────────────────────────────────
+function PainSection({ en }: { en: boolean }) {
+  const ROWS: [string, string][] = en
+    ? [
+        ["Starts from a blank page every time — you re-explain your brand again and again.", "The team reads your Brand Brain first: positioning, voice and banned words are already known."],
+        ["Doesn't know what is actually working this month.", "Every month we break down posts that really spread, with the numbers and sources attached."],
+        ["After writing, you still schedule it and make the images yourself.", "The weekly plan lays out all seven channels; images are generated to each platform's specs."],
+      ]
+    : [
+        ["每次都從空白開始，品牌要重新交代一遍。", "團隊先讀過品牌大腦，定位、語氣、禁用詞都記得。"],
+        ["不知道這個月什麼寫法真的有效。", "每月拆解真實傳開的貼文，附數字與出處。"],
+        ["寫完還要自己排程、自己配圖。", "本週企劃一次排好七個通路，圖片照各平台規格生成。"],
+      ];
+  return (
+    <section className="py-16 lg:py-20" style={{ background: C.creamDeep, borderTop: `1px solid ${C.borderSoft}` }}>
+      <div className="max-w-[1000px] mx-auto px-6">
+        <SectionHead
+          chip={en ? "Why a team" : "為什麼是團隊"}
+          title={en ? "Writing isn't the slow part." : "寫一篇貼文，最花時間的不是寫。"}
+        />
+        <div className="rounded-2xl overflow-hidden" style={{ border: `2px solid ${C.ink}`, background: C.white }}>
+          <div className="grid grid-cols-2 text-[13px] font-black tracking-wide" style={{ borderBottom: `2px solid ${C.ink}` }}>
+            <div className="px-5 py-3" style={{ color: C.muted }}>{en ? "Generic AI tools" : "一般 AI 工具"}</div>
+            <div className="px-5 py-3" style={{ color: C.orangeDark, borderLeft: `2px solid ${C.ink}`, background: C.orangeChip }}>onBrand Studio</div>
+          </div>
+          {ROWS.map(([pain, fix], i) => (
+            <div
+              key={i}
+              className="grid grid-cols-2 text-[14px] leading-[1.7]"
+              style={{ borderTop: i === 0 ? "none" : `1px solid ${C.borderSoft}` }}
+            >
+              <div className="px-5 py-4" style={{ color: C.muted }}>{pain}</div>
+              <div className="px-5 py-4 font-semibold" style={{ color: C.ink, borderLeft: `2px solid ${C.ink}` }}>{fix}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// 2 · 三支柱
+// ─────────────────────────────────────────────────────────────────────────
+function PillarsSection({ en }: { en: boolean }) {
+  const PILLARS = [
+    {
+      n: "01",
+      title: en ? "Knows your Brand Brain" : "懂品牌大腦",
+      body: en
+        ? "SoWork's 14-step Brand Positioning Method builds your Brand Brain: audience, competitive landscape, origin story, voice. Once it's locked, every post the team writes starts from here."
+        : "用 SoWork 14 步品牌定位法建立品牌大腦：目標受眾、競爭格局、品牌故事、語氣。鎖定之後，團隊寫的每一篇都從這裡出發。",
+      img: { src: "/static/landing/brand-brain.jpg", w: 1600, h: 900 },
+      alt: en ? "Brand Brain board with audience, competition and brand story sections" : "品牌大腦看板：目標受眾、競爭格局、品牌故事等段落",
+    },
+    {
+      n: "02",
+      title: en ? "Owns a task library" : "擁有任務庫",
+      body: en
+        ? "Each task card is a proven way to write. Viral-structure cards come from posts that really spread in the last three months, each with its metric, the month it was measured and the reference article."
+        : "每張任務卡都是一種驗證過的寫法。爆款結構卡拆自近三個月真實傳開的貼文，每張附傳播數字、量測年月與參考文章。",
+      img: { src: "/static/landing/task-library.jpg", w: 1600, h: 900 },
+      alt: en ? "Facebook task library with viral-structure cards showing reference posts and metrics" : "Facebook 任務庫：爆款結構卡附參考貼文與傳播數字",
+    },
+    {
+      n: "03",
+      title: en ? "Takes on your company's AI skills" : "整合公司的 AI 技能",
+      body: en
+        ? "Already have a way of writing that works, or internal AI skills? Paste your best posts and the AI distils them into a reusable task card. On Enterprise, we bring your internal skills in as dedicated cards."
+        : "貴公司已經有好用的寫法或內部 AI 技能？貼上成品，AI 會反推成可重複使用的任務卡。企業客製版由我們把內部 SKILL 整批做成專屬任務卡。",
+      img: { src: "/static/landing/own-skill.jpg", w: 764, h: 720 },
+      alt: en ? "Create a task card: paste your ideal posts and let AI distil a SKILL" : "新增任務卡：貼上理想中的成品，讓 AI 總結成 SKILL",
+    },
+  ];
+  return (
+    <section id="pillars" className="py-16 lg:py-24" style={{ borderTop: `1px solid ${C.borderSoft}` }}>
+      <div className="max-w-[1200px] mx-auto px-6 lg:px-12">
+        <SectionHead
+          chip={en ? "What the team brings" : "團隊帶來什麼"}
+          title={en ? "Three things a good marketing team has." : "一支好的行銷團隊，該有的三件事。"}
+        />
+        <div className="space-y-16 lg:space-y-24">
+          {PILLARS.map((p, i) => (
+            <div
+              key={p.n}
+              className={`flex flex-col gap-8 lg:gap-12 items-center ${i % 2 === 1 ? "lg:flex-row-reverse" : "lg:flex-row"}`}
+            >
+              <div className="w-full lg:w-[38%]">
+                <div className="text-[13px] font-black tracking-[0.2em] mb-2" style={{ color: C.orange }}>{p.n}</div>
+                <h3 className="font-black mb-3" style={{ color: C.ink, fontSize: "clamp(1.5rem, 2.6vw, 2rem)" }}>{p.title}</h3>
+                <p className="text-[15px] leading-[1.85]" style={{ color: C.inkSoft }}>{p.body}</p>
+              </div>
+              <div className={`w-full ${p.img.w < 1000 ? "lg:w-[48%] max-w-[560px]" : "lg:w-[62%]"}`}>
+                <Screenshot src={p.img.src} width={p.img.w} height={p.img.h} alt={p.alt} />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// 3 · 本月爆款卡牆
+// ─────────────────────────────────────────────────────────────────────────
+type ViralCard = {
+  id: string; platform: string; labelZh: string; labelEn: string;
+  short: string; metric: string; asOf: string; caveat: string | null; url: string | null;
+};
+
+function ViralWall({ en, cards, loading, failed }: {
+  en: boolean; cards: ViralCard[] | undefined; loading: boolean; failed: boolean;
+}) {
+  // 拿不到資料就整段不出現——空的證據區比沒有更傷。
+  if (failed || (!loading && (!cards || cards.length === 0))) return null;
+  return (
+    <section id="viral" className="py-16 lg:py-24" style={{ background: C.creamDeep, borderTop: `1px solid ${C.borderSoft}` }}>
+      <div className="max-w-[1200px] mx-auto px-6 lg:px-12">
+        <SectionHead
+          chip={en ? "Refreshed monthly" : "每月更新"}
+          title={en ? "This month's viral-structure cards" : "本月爆款卡"}
+          sub={en
+            ? "Only cards from the last three months that can show their numbers. When a card ages out, it comes off the shelf."
+            : "只放近三個月、交得出數字的卡。過了三個月自動下架，這一區永遠是新的。"}
+        />
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {loading
+            ? [0, 1, 2, 3].map((i) => (
+                <div key={i} className="rounded-xl h-[220px] animate-pulse" style={{ background: C.white, border: `1.5px solid ${C.border}` }} />
+              ))
+            : cards!.map((c) => {
+                const ch = channelOf(c.platform);
+                return (
+                  <article
+                    key={c.id}
+                    className="rounded-xl p-5 flex flex-col"
+                    style={{ background: C.white, border: `1.5px solid ${C.ink}` }}
+                  >
+                    <div className="flex items-center gap-2 text-[12px] font-bold mb-3" style={{ color: C.muted }}>
+                      {ch && <Icon name={ch.icon} size={14} />}
+                      <span>{ch ? (en ? ch.en : ch.zh) : c.platform}</span>
+                      <span className="ml-auto tabular-nums">{c.asOf}</span>
+                    </div>
+                    <h3 className="text-[15px] font-bold leading-snug mb-3" style={{ color: C.ink }}>
+                      {en ? c.labelEn || c.labelZh : c.labelZh}
+                    </h3>
+                    <div className="text-[12px] mb-2" style={{ color: C.inkSoft }}>
+                      {en ? "Reference: " : "參考貼文："}{c.short}
+                    </div>
+                    <div className="text-[20px] font-black leading-snug mb-3" style={{ color: C.orangeDark }}>
+                      {c.metric}
+                    </div>
+                    {c.caveat && (
+                      <div className="text-[12px] leading-relaxed mb-3" style={{ color: C.muted }}>
+                        {en ? "Note: " : "註："}{c.caveat}
+                      </div>
+                    )}
+                    {c.url && (
+                      <a
+                        href={c.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="mt-auto inline-flex items-center gap-1.5 text-[12px] font-semibold underline hover:opacity-70"
+                        style={{ color: C.ink }}
+                      >
+                        {en ? "Read the source" : "看參考文章"} <Icon name="external" size={11} />
+                      </a>
+                    )}
+                  </article>
+                );
+              })}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// 4 · 七個通路＋規格圖卡
+// ─────────────────────────────────────────────────────────────────────────
+type ImageSpec = {
+  id: string; channel: string; labelZh: string; labelEn: string;
+  descZh: string; descEn: string; width: number; height: number;
+};
+
+function ChannelsSection({ en, specs }: { en: boolean; specs: ImageSpec[] | undefined }) {
+  const [active, setActive] = React.useState("facebook");
+  const list = (specs ?? []).filter((s) => s.channel === active);
+  const total = specs?.length ?? 0;
+  return (
+    <section id="channels" className="py-16 lg:py-24" style={{ borderTop: `1px solid ${C.borderSoft}` }}>
+      <div className="max-w-[1100px] mx-auto px-6 lg:px-12">
+        <SectionHead
+          chip={en ? `${CATALOG.channels} channels` : `${CATALOG.channels} 個通路`}
+          title={en ? "Copy and images, to each platform's spec." : "文案和圖片，照各平台的規格做。"}
+          sub={total > 0
+            ? (en
+                ? `${total} image spec cards. Aspect ratio is locked when the image is generated — never cropped afterwards.`
+                : `${total} 張規格圖卡。比例在生成當下就鎖定，不靠事後裁切。`)
+            : undefined}
+        />
+        <div className="flex flex-wrap justify-center gap-2 mb-8" role="tablist">
+          {CHANNELS.map((ch) => {
+            const on = ch.id === active;
+            return (
+              <button
+                key={ch.id}
+                role="tab"
+                aria-selected={on}
+                onClick={() => setActive(ch.id)}
+                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-full text-[14px] font-semibold transition"
+                style={{
+                  background: on ? C.ink : C.white,
+                  color: on ? C.white : C.ink,
+                  border: `1.5px solid ${C.ink}`,
+                }}
+              >
+                <Icon name={ch.icon} size={15} />
+                {en ? ch.en : ch.zh}
+              </button>
+            );
+          })}
+        </div>
+        {specs && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {list.map((s) => (
+              <div
+                key={s.id}
+                className="flex items-center gap-4 rounded-xl p-4"
+                style={{ background: C.white, border: `1.5px solid ${C.border}` }}
+              >
+                <div className="w-14 h-14 flex-shrink-0 flex items-center justify-center" aria-hidden>
+                  <div
+                    style={{
+                      aspectRatio: `${s.width} / ${s.height}`,
+                      width: s.width >= s.height ? "100%" : "auto",
+                      height: s.width >= s.height ? "auto" : "100%",
+                      background: C.orangeChip,
+                      border: `1.5px solid ${C.orangeDark}`,
+                      borderRadius: 4,
+                    }}
+                  />
+                </div>
+                <div className="min-w-0">
+                  <div className="text-[14px] font-bold" style={{ color: C.ink }}>{en ? s.labelEn : s.labelZh}</div>
+                  <div className="text-[12px] tabular-nums" style={{ color: C.muted }}>{s.width} × {s.height}</div>
+                  <div className="text-[12px] leading-snug mt-0.5" style={{ color: C.inkSoft }}>{en ? s.descEn : s.descZh}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// 5 · 方案：基礎版當入口，企業客製版＝專屬行銷維運團隊
+// 價格來源：PricingPage.tsx（台幣未稅）。改價要兩邊一起改。
+// ─────────────────────────────────────────────────────────────────────────
+function PlansSection({ en }: { en: boolean }) {
+  const basic = en
+    ? ["2 seats · 1 brand", `Pick 2 of ${CATALOG.channels} channels (swap monthly)`, "Brand positioning + 3 cards built from your own posts", "Scheduling and direct publishing to FB / IG"]
+    : ["2 席 · 1 個品牌", `${CATALOG.channels} 個通路選 2（每月可換）`, "品牌定位 ＋ 用你自己的貼文建 3 張任務卡", "排程與 FB／IG 直接發布"];
+  const enterprise = en
+    ? ["We inventory your internal AI writing skills and turn them into dedicated task cards", "Multiple brands and markets", "Strategy, content and performance layers, each maintained by our team", "Performance layer and e-commerce reporting"]
+    : ["盤點貴公司內部的 AI 寫作 SKILL，做成專屬任務卡", "多品牌、多市場", "策略、內容、成效三層，都有專人維運", "成效層與電商營運報告"];
+  return (
+    <section id="plans" className="py-16 lg:py-24" style={{ background: C.creamDeep, borderTop: `1px solid ${C.borderSoft}` }}>
+      <div className="max-w-[1000px] mx-auto px-6">
+        <SectionHead
+          chip={en ? "Plans" : "方案"}
+          title={en ? "Start with the basics, or bring in a dedicated team." : "從基礎版開始，或請一支專屬團隊。"}
+        />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+          <div className="rounded-2xl p-7 flex flex-col" style={{ background: C.white, border: `2px solid ${C.ink}` }}>
+            <div className="text-[13px] font-black tracking-wide mb-1" style={{ color: C.muted }}>{en ? "Basic" : "基礎版"}</div>
+            <div className="flex items-baseline gap-1 mb-1">
+              <span className="text-[34px] font-black tabular-nums" style={{ color: C.ink }}>NT$2,250</span>
+              <span className="text-[14px]" style={{ color: C.muted }}>{en ? "/ month, excl. tax" : "／月（未稅）"}</span>
+            </div>
+            <p className="text-[14px] mb-5" style={{ color: C.inkSoft }}>
+              {en ? "Your own AI marketing team, starting today." : "今天就有一支自己的 AI 行銷團隊。"}
+            </p>
+            <PlanList items={basic} />
+            <div className="mt-auto pt-6"><PrimaryCta en={en} /></div>
+          </div>
+
+          <div className="rounded-2xl p-7 flex flex-col" style={{ background: C.ink, color: C.white, border: `2px solid ${C.ink}` }}>
+            <div className="text-[13px] font-black tracking-wide mb-1" style={{ color: C.orange }}>{en ? "Enterprise" : "企業客製版"}</div>
+            <div className="text-[26px] font-black leading-tight mb-1">{en ? "A dedicated marketing ops team" : "專屬行銷維運團隊"}</div>
+            <p className="text-[14px] mb-5 opacity-80">
+              {en ? "Setup fee + monthly fee, quoted per company." : "建置費 ＋ 月費，依公司報價。"}
+            </p>
+            <PlanList items={enterprise} dark />
+            <div className="mt-auto pt-6">
+              <a
+                href="mailto:sowork@sowork.ai?subject=onBrand%20Studio%20%E4%BC%81%E6%A5%AD%E5%AE%A2%E8%A3%BD%E7%89%88"
+                className="inline-flex items-center gap-2 px-6 py-3.5 rounded-xl text-[15px] font-bold transition hover:opacity-90"
+                style={{ background: C.white, color: C.ink }}
+              >
+                {en ? "Talk to us" : "聯絡我們"} <span aria-hidden>→</span>
+              </a>
+            </div>
+          </div>
+        </div>
+        <p className="text-center text-[14px] mt-6" style={{ color: C.muted }}>
+          <Link to="/pricing" className="underline hover:opacity-70" style={{ color: C.ink }}>
+            {en ? "See all plans, including Professional →" : "看完整方案（含專業版）→"}
+          </Link>
+        </p>
+      </div>
+    </section>
+  );
+}
+
+function PlanList({ items, dark }: { items: string[]; dark?: boolean }) {
+  return (
+    <ul className="space-y-2.5">
+      {items.map((t) => (
+        <li key={t} className="flex gap-2.5 text-[14px] leading-snug">
+          <Icon name="check" size={13} style={{ color: C.orange, marginTop: 3, flexShrink: 0 }} />
+          <span style={{ color: dark ? C.white : C.inkSoft, opacity: dark ? 0.9 : 1 }}>{t}</span>
+        </li>
+      ))}
+    </ul>
   );
 }
 
@@ -521,70 +803,69 @@ function SocialIcon({
 }
 
 // ─────────────────────────────────────────────────────────────────────────
-// FAQSection — 7 FAQs that mirror the FAQPage JSON-LD in index.html.
+// FAQSection — mirrors the FAQPage JSON-LD in index.html.
 // Accordion pattern (click to expand). Cream bg, thick black borders.
 // ─────────────────────────────────────────────────────────────────────────
 function FAQSection({ en }: { en: boolean }) {
   const FAQS = en
     ? [
         {
-          q: "How is OnBrand different from ChatGPT for writing copy?",
-          a: "ChatGPT starts from a blank page every time, so the longer you use it the more off-brand it drifts. OnBrand runs SoWork's 14-step Brand Positioning Method first — your Why, your audience, your differentiation, your voice — and locks the result into a Brand Brain. Every caption afterwards is built on that single source of truth, so it sounds like you, on every platform.",
+          q: "How is onBrand Studio different from writing with ChatGPT?",
+          a: "ChatGPT starts from a blank page every time, so you keep re-explaining your brand and the copy drifts. onBrand Studio's team reads your Brand Brain first — built with SoWork's 14-step Brand Positioning Method — and writes with task cards that are proven ways to write, so every channel sounds like you.",
+        },
+        {
+          q: "Where do the viral-structure cards come from, and how often are they updated?",
+          a: "Every month we pick posts that really spread from public reporting in Taiwan and abroad, and break down the structure you can reuse. Each card carries its spread metric, the month it was measured and the reference article; a card that cannot show its numbers is not published. Only cards from the last three months are listed, and older ones come off automatically. (Professional plan)",
+        },
+        {
+          q: "Can the team use our company's own way of writing?",
+          a: "Yes. Paste your best posts and the AI distils them into a reusable task card — length, rhythm and CTA placement are measured from your samples. On Enterprise, we inventory your internal AI writing skills and turn them into dedicated cards.",
+        },
+        {
+          q: "Which channels are supported?",
+          a: `Facebook, Instagram, Threads, LINE, TikTok, Email and your website — ${CATALOG.channels} channels, with image spec cards for each platform.`,
         },
         {
           q: "How long does it take to get started?",
-          a: "The 14-step positioning flow takes about 10 minutes. After that, your first post is ready in 30 seconds, a multi-platform pack in 60, and a full campaign in 99.",
-        },
-        {
-          q: "What kind of brands is OnBrand for?",
-          a: "F&B, fashion, beauty, wellness, tech, pet, real estate, education — any SMB brand, in-house marketing team, or agency-of-one that wants every caption to stay on-brand.",
-        },
-        // 2026-09-29（CJ）：內容通路只剩 FB／IG／TikTok／電子報／官網。
-        {
-          q: "Which channels does OnBrand support?",
-          a: `Facebook, Instagram, Threads, LINE, TikTok, Email (EDM), and your website — ${CATALOG.channels} channels total. Each has its own task library with documented award craft.`,
+          a: "The 14-step positioning flow takes about 10 minutes. After that you can produce a single post, a content pack, or a full campaign plan.",
         },
         {
           q: "Is there a free trial?",
-          a: "Yes — a 7-day / 1,000-point dual-limit trial, no credit card required. Start by completing the 14-step Brand Positioning flow.",
+          a: "Yes — a 7-day / 1,000-point trial, no credit card required. Start by completing the 14-step Brand Positioning flow.",
         },
         {
-          q: "What's the relationship between OnBrand and SoWork?",
-          a: "OnBrand is the AI product built by SoWork (摘星社群行銷顧問股份有限公司), a Taiwan-based brand marketing consultancy. OnBrand encodes SoWork's accumulated methodology into a self-serve tool.",
-        },
-        {
-          q: "What kinds of task cards are there?",
-          a: `Two. Viral-structure cards are deconstructed from this month's real viral content, each with the spread metric, measurement month and reference article, refreshed monthly (Professional plan). Brand-built cards are reverse-engineered from the posts you paste — length, rhythm and CTA placement are measured from your samples. The publishing check is hard: a viral card that cannot produce its numbers fails the automated tests.`,
+          q: "What's the relationship between onBrand Studio and SoWork?",
+          a: "onBrand Studio is built by SoWork (摘星社群行銷顧問股份有限公司), a Taiwan-based brand marketing consultancy. It turns SoWork's methodology into an AI marketing team.",
         },
       ]
     : [
         {
-          q: "OnBrand 跟 ChatGPT 寫文案有什麼差別？",
-          a: "ChatGPT 每篇都從空白頁從零開始，所以越用越不像你的品牌。OnBrand 先用 SoWork 14 步品牌定位法把你的 WHY、TA、差異化、Voice 寫進品牌大腦，之後每篇文案都以這份大腦為骨架自動產出——所有平台都跟著你的調性走，不會「越寫越歪」。",
+          q: "onBrand Studio 跟 ChatGPT 寫文案有什麼差別？",
+          a: "ChatGPT 每次都從空白頁開始，品牌要一再重新交代，越寫越不像你。onBrand Studio 的團隊先讀過用 SoWork 14 步品牌定位法建立的品牌大腦，再用驗證過的任務卡來寫，所以每個通路都是你的口吻。",
+        },
+        {
+          q: "爆款結構卡從哪來、多久更新？",
+          a: "我們每個月從台灣與國際的公開報導中，挑出真的傳開的貼文，拆出可以套用的結構。每張卡附傳播數字、量測年月與參考文章，交不出數字的不上架。前台只列近三個月的卡，過期自動下架。（專業方案）",
+        },
+        {
+          q: "可以用我們公司自己的寫法嗎？",
+          a: "可以。貼上你們最好的成品，AI 會反推成可重複使用的任務卡，字數、節奏、CTA 位置都從範例量出來。企業客製版由我們盤點貴公司內部的 AI 寫作 SKILL，整批做成專屬任務卡。",
+        },
+        {
+          q: "支援哪些平台？",
+          a: `Facebook、Instagram、Threads、LINE、TikTok、電子報、官網，共 ${CATALOG.channels} 個通路，每個平台都有對應尺寸的規格圖卡。`,
         },
         {
           q: "我需要多久時間才能上手？",
           a: "14 步品牌定位流程約 10 分鐘完成。完成後即可產出單篇貼文、跨平台內容套組，或完整的活動企劃。",
         },
         {
-          q: "OnBrand 適合哪些行業？",
-          a: "餐飲、服飾、美妝、健康、科技、寵物、房產、教育——任何有自己品牌定位的台灣中小企業、行銷代理商、in-house 行銷專員都適用。",
-        },
-        {
-          q: "支援哪些社群與內容平台？",
-          a: `Facebook、Instagram、Threads、LINE、TikTok、電子報（EDM）、官網——共 ${CATALOG.channels} 個通路。任務卡分兩種：爆款結構卡（附傳播數字與量測年月）與品牌自建卡（從你的範例反推）。`,
-        },
-        {
           q: "有免費試用嗎？",
           a: "有，7 天 / 1,000 點雙限試用，免綁信用卡。完成註冊即可開始 14 步品牌定位流程。",
         },
         {
-          q: "OnBrand 和 SoWork 是什麼關係？",
-          a: "OnBrand 是 SoWork（摘星社群行銷顧問股份有限公司）推出的 AI 產品。SoWork 是台灣資深品牌行銷顧問公司，把累積多年的方法論做成 AI 工具，就是 OnBrand。",
-        },
-        {
-          q: "任務卡有哪幾種？",
-          a: `兩種。爆款結構卡拆自當月真實爆紅內容，每張附傳播數字、量測年月與參考文章，每月更新（專業方案）；品牌自建卡從你貼的成品反推，字數、節奏、CTA 位置都從範例量出來。上架檢核是硬性的：交不出數字的爆款卡，自動化測試直接擋掉。`,
+          q: "onBrand Studio 和 SoWork 是什麼關係？",
+          a: "onBrand Studio 是 SoWork（摘星社群行銷顧問股份有限公司）打造的 AI 行銷團隊。SoWork 是台灣的品牌行銷顧問公司，把多年的方法論訓練成這支團隊。",
         },
       ];
 
@@ -594,35 +875,16 @@ function FAQSection({ en }: { en: boolean }) {
     <section
       id="faq"
       className="py-16 lg:py-20 relative"
-      style={{ background: "#FAF5EC", borderTop: `1px solid #EFE7D6` }}
+      style={{ background: C.cream, borderTop: `1px solid ${C.borderSoft}` }}
     >
       <div className="max-w-3xl mx-auto px-6">
-        {/* Pill chip */}
-        <div className="text-center mb-3">
-          <span
-            className="inline-block text-[12px] font-bold px-3 py-1.5 rounded-md"
-            style={{ background: "#FDE6D8", color: "#C84516" }}
-          >
-            FAQ
-          </span>
-        </div>
-
-        {/* Section headline */}
-        <h2
-          className="text-center font-black tracking-tight mb-3"
-          style={{
-            color: "#0F0F0E",
-            fontSize: "clamp(1.8rem, 3.5vw, 2.6rem)",
-            letterSpacing: "-0.02em",
-          }}
-        >
-          {en ? "Common questions, straight answers." : "常被問的，直接回你。"}
-        </h2>
-        <p className="text-center text-[14px] mb-10" style={{ color: "#6B6660" }}>
-          {en
+        <SectionHead
+          chip="FAQ"
+          title={en ? "Common questions, straight answers." : "常被問的，直接回你。"}
+          sub={en
             ? "Still curious? Email sowork@sowork.ai — we reply within one business day."
             : "還沒回答到你的問題？寄信給 sowork@sowork.ai，一個工作天內回覆。"}
-        </p>
+        />
 
         {/* Accordion */}
         <div className="space-y-3">
@@ -633,9 +895,9 @@ function FAQSection({ en }: { en: boolean }) {
                 key={i}
                 className="rounded-xl overflow-hidden transition"
                 style={{
-                  background: "#FFFFFF",
-                  border: `1.5px solid #0F0F0E`,
-                  boxShadow: isOpen ? "4px 4px 0 #0F0F0E" : "none",
+                  background: C.white,
+                  border: `1.5px solid ${C.ink}`,
+                  boxShadow: isOpen ? `4px 4px 0 ${C.ink}` : "none",
                 }}
               >
                 <button
@@ -643,17 +905,14 @@ function FAQSection({ en }: { en: boolean }) {
                   className="w-full flex items-center justify-between gap-4 px-5 py-4 text-left transition hover:bg-[#FAF5EC]"
                   aria-expanded={isOpen}
                 >
-                  <span
-                    className="font-bold text-[15px] leading-snug"
-                    style={{ color: "#0F0F0E" }}
-                  >
+                  <span className="font-bold text-[15px] leading-snug" style={{ color: C.ink }}>
                     {faq.q}
                   </span>
                   <span
                     className="flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center font-black text-[14px] transition-transform"
                     style={{
-                      background: isOpen ? "#E85D2E" : "#FDE6D8",
-                      color: isOpen ? "#FFFFFF" : "#C84516",
+                      background: isOpen ? C.orange : C.orangeChip,
+                      color: isOpen ? C.white : C.orangeDark,
                       transform: isOpen ? "rotate(45deg)" : "rotate(0deg)",
                     }}
                   >
@@ -663,7 +922,7 @@ function FAQSection({ en }: { en: boolean }) {
                 {isOpen && (
                   <div
                     className="px-5 pb-5 text-[14px] leading-[1.8]"
-                    style={{ color: "#3A3633", borderTop: `1px solid #EFE7D6` }}
+                    style={{ color: C.inkSoft, borderTop: `1px solid ${C.borderSoft}` }}
                   >
                     <div className="pt-4">{faq.a}</div>
                   </div>
@@ -675,17 +934,7 @@ function FAQSection({ en }: { en: boolean }) {
 
         {/* Bottom CTA */}
         <div className="text-center mt-10">
-          <Link
-            to="/auth/register"
-            className="inline-flex items-center gap-2 px-6 py-3.5 rounded-xl text-[15px] font-bold transition-transform hover:-translate-y-0.5"
-            style={{
-              background: "#E85D2E",
-              color: "#FFFFFF",
-              boxShadow: "0 6px 0 #C84516",
-            }}
-          >
-            {en ? "Start free trial" : "免費試用"} <span aria-hidden>→</span>
-          </Link>
+          <PrimaryCta en={en} />
         </div>
       </div>
     </section>

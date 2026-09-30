@@ -54,6 +54,7 @@ import { festivalRouter } from "../content/routers/festivalRouter";
 import { promptTemplateRouter } from "../content/routers/promptTemplateRouter";
 // 2026-06-21 (CJ「按 riverflow 標準」brand DNA): auto-extracted brand color palette.
 import { brandColorsRouter } from "../strategy/routers/brandColorsRouter";
+import { landingRouter } from "../platform/routers/landingRouter";
 
 // 2026-05-14: removed 28 dead routers — none of them had any v2 callers
 // after the v1 frontend deletion. See git history (commit before this)
@@ -121,6 +122,8 @@ export const appRouter = router({
   festival:        festivalRouter,
   promptTemplate:      promptTemplateRouter,
   brandColors:         brandColorsRouter,
+  // 2026-09-30 首頁（未登入）的本月爆款卡牆與規格圖卡。
+  landing:             landingRouter,
 });
 
 export type AppRouter = typeof appRouter;
