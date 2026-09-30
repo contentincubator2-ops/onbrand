@@ -14,11 +14,12 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 vi.mock("./marketProfiles", () => ({ buildMarketContext: async () => "[市場] 台灣繁中\n" }));
 vi.mock("../../db", () => ({ getDb: async () => ({ execute: async () => [[]] }) }));
 
-const rowsFor = { brand: [] as any[], product: [] as any[] };
+const rowsFor = { brand: [] as any[], product: [] as any[], reg: [] as any[] };
 
 vi.mock("../../localDb", () => ({
   default: {
     execute: async (sqlText: string) => {
+      if (/FROM\s+brand_regulations/i.test(sqlText)) return [rowsFor.reg];
       if (/FROM\s+products/i.test(sqlText)) return [rowsFor.product];
       if (/FROM\s+brands/i.test(sqlText))   return [rowsFor.brand];
       return [[]];
@@ -31,7 +32,7 @@ import { buildBrandBrain, buildBrandPrefix, BRAIN_CAPACITY } from "./brandContex
 let nextId = 950_001;
 const freshId = () => nextId++;
 
-beforeEach(() => { rowsFor.brand = []; rowsFor.product = []; });
+beforeEach(() => { rowsFor.brand = []; rowsFor.product = []; rowsFor.reg = []; });
 
 const withPos = (positioning: any) => {
   const id = freshId();
@@ -206,5 +207,35 @@ describe("每一行都有出處（「記憶」頁靠它把存著的欄位對到�
     expect(src("售價")).toBe("pos:facts.price");
     expect(src("核心定位")).toBe("pos:core.coreStatement");
     expect(src("願景")).toBe("custom:願景");
+  });
+});
+
+describe("法規（寫之前先審查）", () => {
+  const reg = (id: number, brandId: number, title: string, body: string, source = "") =>
+    ({ id, brandId, title, source, body, enabled: 1, createdAt: new Date(), updatedAt: new Date() });
+
+  it("啟用中的法規放在 prompt 最後一段，清單上歸在「法規」", async () => {
+    const id = withPos({ origin: { story: "故事ZZ" } });
+    rowsFor.reg = [reg(7, id, "食安法第28條", "條文ZZ不得虛偽誇張", "衛福部")];
+    const brain = await buildBrandBrain(id);
+    const at = brain.prefix.indexOf("[法規審查");
+    expect(at).toBeGreaterThan(brain.prefix.indexOf("故事ZZ"));
+    expect(brain.prefix.slice(at)).toContain("【食安法第28條】（來源：衛福部）\n條文ZZ不得虛偽誇張");
+    const item = brain.items.find((i) => i.source === "reg:7")!;
+    expect(item).toMatchObject({ category: "regulation", group: "法規", label: "食安法第28條", status: "remembered" });
+  });
+
+  it("大腦超載時先擠掉別的內容，法規不割捨", async () => {
+    const id = withPos({ origin: { story: "故".repeat(1_500) }, _customSegments: Array.from({ length: 20 }, (_, i) => ({ title: `卡${i}`, fields: [{ label: "x", value: "字".repeat(1_200) }] })) });
+    rowsFor.reg = [reg(8, id, "化粧品廣告", "法".repeat(3_000))];
+    const brain = await buildBrandBrain(id);
+    expect(brain.items.some((i) => i.status === "overflow")).toBe(true);
+    expect(brain.items.find((i) => i.source === "reg:8")!.status).toBe("remembered");
+    expect(brain.prefix).toContain("法".repeat(3_000));
+  });
+
+  it("沒有法規就沒有法規段", async () => {
+    const id = withPos({ origin: { story: "故事ZZ" } });
+    expect((await buildBrandBrain(id)).prefix).not.toContain("[法規審查");
   });
 });

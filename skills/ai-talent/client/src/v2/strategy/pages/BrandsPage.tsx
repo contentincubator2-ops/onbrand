@@ -35,6 +35,7 @@ import AssetPhotoGallery from "../components/positioning/AssetPhotoGallery";
 import { InfoTab as BrandInfoTab, DangerTab as BrandDangerTab, PublishTab as BrandPublishTab } from "../components/positioning/BrandSettingsSheet";
 import StrategyMeetingsPanel from "../components/meetings/StrategyMeetingsPanel";
 import BrainPanel from "../components/brain/BrainPanel";
+import RegulationsPanel from "../components/regulations/RegulationsPanel";
 import BrandOnboardingWizard from "../components/onboarding/BrandOnboardingWizard";
 import StrategyWorkbench from "../components/positioning/StrategyWorkbench";
 import AIBriefPanel from "../components/positioning/AIBriefPanel";
@@ -45,7 +46,7 @@ import AddEntityModal, { type AddEntityTab } from "../components/AddEntityModal"
 import ProductDetailModal from "../components/positioning/ProductDetailModal";
 // Notion-style line icons
 import { LockToggle } from "../components/positioning/LockToggle";
-import { AgentIcon, MemoryIcon, AwardIcon, BundleIcon, CommentIcon, DeleteIcon, EditIcon, FontIcon, GenerateIcon, HashtagIcon, IdCardIcon, LibraryIcon, LockIcon, PaletteIcon, PeopleIcon, PlayIcon, QuoteIcon, RegenerateIcon, ShieldIcon, TargetIcon, TextIcon, DoneIcon, StopIcon, WarningIcon, CheckIcon, CloseIcon } from "../../platform/components/icons";
+import { AgentIcon, MemoryIcon, RegulationIcon, AwardIcon, BundleIcon, CommentIcon, DeleteIcon, EditIcon, FontIcon, GenerateIcon, HashtagIcon, IdCardIcon, LibraryIcon, LockIcon, PaletteIcon, PeopleIcon, PlayIcon, QuoteIcon, RegenerateIcon, ShieldIcon, TargetIcon, TextIcon, DoneIcon, StopIcon, WarningIcon, CheckIcon, CloseIcon } from "../../platform/components/icons";
 import { SCOPE_SEGMENTS, type SegmentSpec } from "../lib/positioningSchema";
 import { specOf as copySpecOf } from "../lib/copyAssets";
 import { visualSpecOf } from "../lib/visualAssets";
@@ -646,7 +647,7 @@ export default function BrandsPage() {
   // 2026-05-07 Path A simplification: 3 main tiles only (定位/文字/知識).
   // "visual" is kept in the type for legacy lock-state code paths, but
   // is no longer exposed as a tile — its contents live in Settings.
-  const category: "positioning" | "copy" | "visual" | "knowledge" | "info" | "publish" | "settings" | "products" | "events" | "meetings" | "brain" | "persona" | "campaign" =
+  const category: "positioning" | "copy" | "visual" | "knowledge" | "info" | "publish" | "settings" | "products" | "events" | "meetings" | "regulations" | "brain" | "persona" | "campaign" =
     urlCat === "copy" ? "copy"
     : urlCat === "knowledge" ? "knowledge"
     : urlCat === "visual" ? "visual"
@@ -656,6 +657,7 @@ export default function BrandsPage() {
     : urlCat === "products" ? "products"
     : urlCat === "events" ? "events"
     : urlCat === "meetings" ? "meetings"
+    : urlCat === "regulations" ? "regulations"
     : urlCat === "brain" ? "brain"
     : urlCat === "persona" ? "persona"
     // 2026-09-25（CJ「應該要在活動的 mission tray 當中，增加這個活動的任務卡」）：
@@ -672,7 +674,7 @@ export default function BrandsPage() {
   // version clobbered it with a snapshot from BEFORE that write, dropping
   // `e` and silently falling back to brand-level positioning. Functional
   // form fixes it for every caller, not just this one site.
-  const setCategory = (next: "positioning" | "copy" | "knowledge" | "info" | "visual" | "publish" | "products" | "events" | "meetings" | "brain" | "persona") => {
+  const setCategory = (next: "positioning" | "copy" | "knowledge" | "info" | "visual" | "publish" | "products" | "events" | "meetings" | "regulations" | "brain" | "persona") => {
     setSearchParams((prev) => {
       const nextParams = new URLSearchParams(prev);
       nextParams.set("cat", next);
@@ -1575,6 +1577,9 @@ export default function BrandsPage() {
                   { v: "meetings"    as const, label: lang === "en" ? "Meetings" : "會議",
                       desc: lang === "en" ? "Recurring strategy meetings" : "定期策略會議",
                       Icon: PeopleIcon,     scopes: ["brand", "product"] },
+                  { v: "regulations" as const, label: lang === "en" ? "Regulations" : "法規",
+                      desc: lang === "en" ? "Checked before every draft" : "寫文前先審查",
+                      Icon: RegulationIcon, scopes: ["brand"] },
                   { v: "brain"       as const, label: lang === "en" ? "Memory" : "記憶",
                       desc: lang === "en" ? "What the AI remembers" : "AI 記住了什麼、滿了怎麼清",
                       Icon: MemoryIcon,    scopes: ["brand", "product", "event"] },
@@ -2352,6 +2357,19 @@ export default function BrandsPage() {
           {derivedCategory === "meetings" && activeBrandIdForLocks && (
             <div style={{ padding: "8px 0 32px" }}>
               <StrategyMeetingsPanel brandId={activeBrandIdForLocks} />
+            </div>
+          )}
+
+          {/* ── 法規 (regulations) — 寫文前先審查 ──
+               2026-09-30（CJ「策略層加一個 mission tray，是法規，用戶自行增加整個法規來源（有字數
+               上限，確定品牌大腦吃得下），agent 寫文章前要審查，介面上要有免責。每一個法規就是一個
+               任務卡的形式」）。品牌層：一條法規對整個品牌的所有產文生效。 */}
+          {derivedCategory === "regulations" && activeBrandIdForLocks && (
+            <div style={{ padding: "8px 0 32px" }}>
+              <RegulationsPanel
+                brandId={activeBrandIdForLocks}
+                focusId={memoryFocus?.startsWith("reg:") ? Number(memoryFocus.slice(4)) || null : null}
+              />
             </div>
           )}
 
