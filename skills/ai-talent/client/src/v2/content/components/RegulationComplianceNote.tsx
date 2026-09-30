@@ -13,9 +13,33 @@ export interface ComplianceRecord {
   status: "compliant" | "fixed" | "flagged" | "skipped";
   issues: Array<{ regulation: string; quote: string; detail: string }>;
   regulationCount: number;
+  /** 檢查之後用戶又手改過（或切回舊稿）。 */
+  editedAfter?: boolean;
+}
+
+/** server 回的紀錄 → updateVariantCaption 收的欄位（只留 zod 認得的，issues 截長度）。 */
+export function toComplianceInput(r: any) {
+  return {
+    status: r.status,
+    issues: (Array.isArray(r.issues) ? r.issues : []).slice(0, 8).map((i: any) => ({
+      regulation: String(i?.regulation ?? "").slice(0, 80), quote: String(i?.quote ?? "").slice(0, 200), detail: String(i?.detail ?? "").slice(0, 160),
+    })),
+    regulationCount: Number(r.regulationCount ?? 0),
+  };
 }
 
 export function complianceSummary(rec: ComplianceRecord, en: boolean): { tone: "ok" | "warn"; text: string } {
+  const base = summaryOf(rec, en);
+  if (!rec.editedAfter) return base;
+  return {
+    tone: "warn",
+    text: en
+      ? `${base.text} This version was edited afterwards and hasn't been re-checked — please review before publishing.`
+      : `${base.text}之後修改過，這一版沒有重新檢查，發布前請自行確認。`,
+  };
+}
+
+function summaryOf(rec: ComplianceRecord, en: boolean): { tone: "ok" | "warn"; text: string } {
   const n = rec.regulationCount;
   const k = rec.issues.length;
   switch (rec.status) {

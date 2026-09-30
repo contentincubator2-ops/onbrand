@@ -2349,6 +2349,17 @@ ${quantityGuide}
           .trim();
       };
       let output = isContent ? stripContentArtifacts(rawOutput) : rawOutput;
+      // 2026-09-30（CJ「後製路徑也要合規檢查」）：會被發出去的貼文類步驟過法規合規檢查；
+      // 策略／brief 類步驟是內部文件，不檢查。品牌沒有法規就不跑。
+      let regulationCompliance: import("../core/regulationCompliance").RegulationComplianceRecord | null = null;
+      if (isContent && scopeBrandId && output.trim()) {
+        const { enforceRegulationsOnText } = await import("../core/regulationCompliance");
+        const reg = await enforceRegulationsOnText(scopeBrandId, output);
+        regulationCompliance = reg.record;
+        if (reg.record?.status === "fixed") {
+          output = await enforceBrandRulesOnText(scopeBrandId, reg.text).catch(() => reg.text);
+        }
+      }
 
       // ── Plan step: parse JSON output → write mission_step_overrides ──────────
       if (isPlanStep) {
@@ -2433,6 +2444,7 @@ ${quantityGuide}
         agentName, agentTitle, agentSkill,
         stepName, stepDesc, outputType,
         output,
+        regulationCompliance,
       };
     }),
 

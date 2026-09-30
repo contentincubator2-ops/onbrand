@@ -208,12 +208,21 @@ export const outputRouter = router({
         title: z.string().max(80).optional(),
         agentId: z.number().int().positive().optional(),
       }).optional(),
+      /**
+       * 2026-09-30：這段文字是 AI 改寫、而且剛過法規合規檢查（refineCaption 回的紀錄）。
+       * 帶了就記到這個版本；沒帶（用戶手改、切回舊稿）→ 既有紀錄標成「之後修改過」。
+       */
+      regulationCompliance: z.object({
+        status: z.enum(["compliant", "fixed", "flagged", "skipped"]),
+        issues: z.array(z.object({ regulation: z.string().max(80), quote: z.string().max(200), detail: z.string().max(160) })).max(8),
+        regulationCount: z.number().int().min(0).max(100),
+      }).nullable().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       // 2026-05-09 cleanup: localPool (drizzle.execute row shape was buggy).
       const { default: localPool } = await import("../../localDb");
       const [rowsRaw]: any = await localPool.execute(
-        `SELECT o.content FROM mission_outputs o
+        `SELECT o.content, o.metadata FROM mission_outputs o
          JOIN missions m ON m.id = o.missionId
          WHERE o.id = ? AND m.userId = ?
          LIMIT 1`,
@@ -223,10 +232,26 @@ export const outputRouter = router({
       if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "Output not found or not yours" });
       const updated = updateOutputContent(row.content, input, (item) =>
         input.writer ? switchWriter(item, input.writer, input.caption) : { ...item, caption: input.caption });
-      await localPool.execute(
-        `UPDATE mission_outputs SET content = ?, updatedAt = NOW() WHERE id = ?`,
-        [updated.content, input.id],
-      );
+      // 法規合規紀錄只記一般版本（舊的 variants 陣列）；策略包的 planning／public 內容不記。
+      const md = typeof row.metadata === "string"
+        ? (() => { try { return JSON.parse(row.metadata); } catch { return null; } })()
+        : row.metadata;
+      const touchesCompliance = input.contentKind === undefined && md && typeof md === "object"
+        && (input.regulationCompliance || Array.isArray(md.regulationCompliance));
+      if (touchesCompliance) {
+        const { mergeComplianceRecord } = await import("../core/regulationCompliance");
+        const rec = input.regulationCompliance ? { variantIndex: updated.resolved.index, ...input.regulationCompliance } : null;
+        md.regulationCompliance = mergeComplianceRecord(md.regulationCompliance, updated.resolved.index, rec);
+        await localPool.execute(
+          `UPDATE mission_outputs SET content = ?, metadata = ?, updatedAt = NOW() WHERE id = ?`,
+          [updated.content, JSON.stringify(md), input.id],
+        );
+      } else {
+        await localPool.execute(
+          `UPDATE mission_outputs SET content = ?, updatedAt = NOW() WHERE id = ?`,
+          [updated.content, input.id],
+        );
+      }
       return {
         ok: true,
         variantIndex: input.variantIndex,

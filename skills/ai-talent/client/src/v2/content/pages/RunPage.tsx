@@ -68,7 +68,7 @@ import { fireNudge } from "../../platform/components/mia/miaNudges";
 import ReviewBar from "../../platform/components/review/ReviewBar";
 import PerfTagPicker from "../../performance/components/PerfTagPicker";
 import WriterDesk, { type DeskWriter } from "../components/WriterDesk";
-import RegulationComplianceNote, { type ComplianceRecord } from "../components/RegulationComplianceNote";
+import RegulationComplianceNote, { toComplianceInput, type ComplianceRecord } from "../components/RegulationComplianceNote";
 import { cancelAgentHandoff } from "../lib/agentHandoff";
 
 type Mode = "edit" | "chat" | "image" | "agent" | "regen" | "rewrite" | "publish" | "source";
@@ -588,13 +588,14 @@ export default function RunPage() {
   const [overrides, setOverrides] = useState<Record<string, { caption: string }>>({});
   /** AI chat history per variant. */
   const [chatHistory, setChatHistory] = useState<Array<{ role: "user"|"assistant"; content: string }>>([]);
-  const [aiPreview, setAiPreview] = useState<{ text: string; locator: RunContentMutationLocator } | null>(null);
+  const [aiPreview, setAiPreview] = useState<{ text: string; locator: RunContentMutationLocator; compliance?: any } | null>(null);
   // 2026-07-07 (CJ): rewrite-agent picker — persona name in flight + preview
   const [rewriteBusy, setRewriteBusy] = useState<string | null>(null);
   const [rewritePreview, setRewritePreview] = useState<{
     agent: string;
     text: string;
     locator: RunContentMutationLocator;
+    compliance?: any;
   } | null>(null);
   /** P4: human-editable image instruction — prefers the Chinese counterpart
    *  and falls back through model prompt → art direction → local template. */
@@ -620,6 +621,7 @@ export default function RunPage() {
   /** 2026-05-19 (CJ「某個影片 title 產出腳本」): inline script generation modal. */
   const [scriptModalTitle, setScriptModalTitle] = useState<string | null>(null);
   const [generatedScript, setGeneratedScript] = useState<string | null>(null);
+  const [scriptCompliance, setScriptCompliance] = useState<ComplianceRecord | null>(null);
   const [scriptCopied, setScriptCopied] = useState(false);
 
   const utils = trpc.useUtils();
@@ -665,7 +667,7 @@ export default function RunPage() {
   const scriptMut = (trpc as any).quickTask?.generateVideoScript?.useMutation
     ? (trpc as any).quickTask.generateVideoScript.useMutation({
         onSuccess: (r: any) => {
-          if (r.ok) setGeneratedScript(r.script);
+          if (r.ok) { setGeneratedScript(r.script); setScriptCompliance(r.regulationCompliance ?? null); }
           else showToastGlobal(lang === "en" ? `Script failed: ${typeof r.error === "string" ? r.error : "unknown error"}` : `腳本生成失敗：${typeof r.error === "string" ? r.error : "未知錯誤"}`);
         },
         onError: (e: any) => showToastGlobal(lang === "en" ? `Script error: ${e.message}` : `腳本錯誤：${e.message}`),
@@ -1540,12 +1542,13 @@ export default function RunPage() {
     await saveCaptionQuietMut.mutateAsync({ id, ...getRunContentMutationLocator(selectedContentKind, activeIdx), caption: p.text });
   };
   /** 一段文字成為本文。帶 writer＝換人寫。 */
-  const commitDeskCaption = async (text: string, writer?: { key: string; name: string; title?: string; agentId?: number }) => {
+  const commitDeskCaption = async (text: string, writer?: { key: string; name: string; title?: string; agentId?: number }, compliance?: any) => {
     const locator = getRunContentMutationLocator(selectedContentKind, activeIdx);
     setOverrides((o) => ({ ...o, [getMutationLocatorSelectionKey(locator)]: { caption: text } }));
     const w = writer ? { key: writer.key, name: writer.name, title: writer.title, agentId: writer.agentId } : undefined;
-    await saveCaptionQuietMut.mutateAsync({ id, ...locator, caption: text, ...(w ? { writer: w } : {}) });
-    if (w) await utils.output.getById.invalidate({ id });
+    // 2026-09-30：AI 改寫回來的合規紀錄跟著存（見 RegulationComplianceNote）。
+    await saveCaptionQuietMut.mutateAsync({ id, ...locator, caption: text, ...(w ? { writer: w } : {}), ...(compliance ? { regulationCompliance: toComplianceInput(compliance) } : {}) });
+    if (w || compliance) await utils.output.getById.invalidate({ id });
   };
   const pickDeskWriter = async (key: string) => {
     if (!refineMut) { showToastGlobal(lang === "en" ? "AI rewrite is unavailable" : "AI 改寫服務暫不可用"); return; }
@@ -1578,7 +1581,7 @@ export default function RunPage() {
       }
       if (!shouldApplyMutationPreview(activeSelectionKeyRef.current, locator)) return;
       setDeskUndo(null); setChatHistory([]);
-      await commitDeskCaption(r.rewritten, w);
+      await commitDeskCaption(r.rewritten, w, r.regulationCompliance);
     } catch (e: any) {
       showToastGlobal(lang === "en" ? `Error: ${e?.message ?? String(e)}` : `錯誤：${e?.message ?? String(e)}`);
     } finally {
@@ -1612,7 +1615,7 @@ export default function RunPage() {
         { role: "assistant", content: r.explanation || (lang === "en" ? "Done — updated the draft." : "改好了，已更新本文。") },
       ]);
       setDeskUndo({ key: activeSelectionKey, caption: before });
-      await commitDeskCaption(r.rewritten);
+      await commitDeskCaption(r.rewritten, undefined, r.regulationCompliance);
       return true;
     } catch (e: any) {
       showToastGlobal(lang === "en" ? `Error: ${e?.message ?? String(e)}` : `錯誤：${e?.message ?? String(e)}`);
@@ -2740,7 +2743,7 @@ export default function RunPage() {
                       <button
                         onClick={() => {
                           setScriptModalTitle(row.title);
-                          setGeneratedScript(null);
+                          setGeneratedScript(null); setScriptCompliance(null);
                           setScriptCopied(false);
                         }}
                         className="shrink-0 px-2.5 py-1 rounded-lg text-tiny font-semibold border border-secondary/40 text-secondary opacity-0 group-hover:opacity-100 transition hover:bg-secondary/5"
@@ -2758,7 +2761,7 @@ export default function RunPage() {
           {scriptModalTitle !== null && (
             <Modal
               isOpen
-              onClose={() => { setScriptModalTitle(null); setGeneratedScript(null); }}
+              onClose={() => { setScriptModalTitle(null); setGeneratedScript(null); setScriptCompliance(null); }}
               size="3xl"
               scrollBehavior="inside"
             >
@@ -2797,6 +2800,9 @@ export default function RunPage() {
                       </span>
                     </div>
                   )}
+                  {generatedScript && scriptCompliance && (
+                    <RegulationComplianceNote rec={scriptCompliance} en={lang === "en"} />
+                  )}
                   {generatedScript && (
                     <div className="prose prose-sm max-w-none text-default-800 text-small leading-relaxed whitespace-pre-wrap font-[inherit]">
                       {generatedScript}
@@ -2823,7 +2829,7 @@ export default function RunPage() {
                         variant="flat"
                         size="sm"
                         onPress={() => {
-                          setGeneratedScript(null);
+                          setGeneratedScript(null); setScriptCompliance(null);
                           setScriptCopied(false);
                           if (scriptMut) {
                             scriptMut.mutate({
@@ -2843,7 +2849,7 @@ export default function RunPage() {
                   <Button
                     variant="light"
                     size="sm"
-                    onPress={() => { setScriptModalTitle(null); setGeneratedScript(null); }}
+                    onPress={() => { setScriptModalTitle(null); setGeneratedScript(null); setScriptCompliance(null); }}
                   >
                     {lang === "en" ? "Close" : "關閉"}
                   </Button>
@@ -3028,7 +3034,7 @@ export default function RunPage() {
                           onPress={() => {
                             const key = getMutationLocatorSelectionKey(aiPreview.locator);
                             setOverrides(o => ({ ...o, [key]: { caption: aiPreview.text } }));
-                            updateMut.mutate({ id, ...aiPreview.locator, caption: aiPreview.text });
+                            updateMut.mutate({ id, ...aiPreview.locator, caption: aiPreview.text, ...(aiPreview.compliance ? { regulationCompliance: toComplianceInput(aiPreview.compliance) } : {}) });
                             setAiPreview(null);
                           }}
                         >{lang === "en" ? "Use it" : "採用"}</Button>
@@ -3060,7 +3066,7 @@ export default function RunPage() {
                               { role: "user", content: chatPrompt },
                               { role: "assistant", content: r.explanation || (lang === "en" ? "(rewritten)" : "(已改寫)") },
                             ]);
-                            setAiPreview({ text: r.rewritten, locator });
+                            setAiPreview({ text: r.rewritten, locator, compliance: r.regulationCompliance });
                             setChatPrompt("");
                           }
                         } else {
@@ -3689,7 +3695,7 @@ export default function RunPage() {
                             });
                             if (r.ok) {
                               if (shouldApplyMutationPreview(activeSelectionKeyRef.current, locator)) {
-                                setRewritePreview({ agent: a.name, text: r.rewritten, locator });
+                                setRewritePreview({ agent: a.name, text: r.rewritten, locator, compliance: r.regulationCompliance });
                               }
                             } else {
                               showToastGlobal(
@@ -3737,7 +3743,7 @@ export default function RunPage() {
                           onPress={() => {
                             const key = getMutationLocatorSelectionKey(rewritePreview.locator);
                             setOverrides(o => ({ ...o, [key]: { caption: rewritePreview.text } }));
-                            updateMut.mutate({ id, ...rewritePreview.locator, caption: rewritePreview.text });
+                            updateMut.mutate({ id, ...rewritePreview.locator, caption: rewritePreview.text, ...(rewritePreview.compliance ? { regulationCompliance: toComplianceInput(rewritePreview.compliance) } : {}) });
                             setRewritePreview(null);
                           }}
                         >{lang === "en" ? "Use it" : "採用"}</Button>

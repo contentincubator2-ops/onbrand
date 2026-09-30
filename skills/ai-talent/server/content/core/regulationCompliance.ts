@@ -47,6 +47,8 @@ export interface RegulationComplianceRecord {
   regulationCount: number;
   reason?: string;
   before?: string;
+  /** 檢查之後用戶又手改過（或切回舊稿），這一版沒有重新檢查。 */
+  editedAfter?: boolean;
 }
 
 const SYSTEM = `你是廣告法規合規審查。你只判斷「這篇文案有沒有違反下面列出的法規」，不評文筆、不管品牌風格。
@@ -163,4 +165,75 @@ export async function checkVariantsCompliance(args: {
     };
   }));
   return out.filter((x): x is RegulationComplianceRecord => !!x);
+}
+
+/** 看文字本身像不像繁中（單篇路徑沒有 brandMarket 可讀時用）。 */
+const looksCJK = (s: string) => ((s.match(/[一-鿿]/g)?.length ?? 0) / Math.max(1, s.replace(/\s/g, "").length)) > 0.3;
+
+/**
+ * 寫完之後的後製路徑（換人重寫、對話修改、改寫原文、影片腳本、圖片卡標題、squad 步驟……）
+ * 共用的單篇合規檢查。2026-09-30（CJ「要補上」）。
+ *
+ * 品牌沒有法規 → record 為 null、文字原樣；有法規 → 跑 checkRegulationCompliance，
+ * fixed 時交修正稿（呼叫端自己再過品牌硬規則）。任何錯誤都不擋原本的產出。
+ */
+export async function enforceRegulationsOnText(
+  brandId: number | null | undefined,
+  text: string,
+  opts?: { isZhTW?: boolean; timeoutMs?: number },
+): Promise<{ text: string; record: RegulationComplianceRecord | null }> {
+  if (!brandId || !text?.trim() || text.length > 20_000) return { text, record: null };
+  try {
+    const regs = await loadActiveRegulations(brandId);
+    if (!regs.length) return { text, record: null };
+    const res = await checkRegulationCompliance({
+      caption: text, regulations: regs,
+      isZhTW: opts?.isZhTW ?? looksCJK(text),
+      timeoutMs: opts?.timeoutMs ?? 25_000,
+    });
+    return {
+      text: res.status === "fixed" ? res.caption : text,
+      record: {
+        variantIndex: 0, status: res.status, issues: res.issues, regulationCount: regs.length,
+        ...(res.reason ? { reason: res.reason } : {}), ...(res.before ? { before: res.before } : {}),
+      },
+    };
+  } catch {
+    return { text, record: null };
+  }
+}
+
+/**
+ * 把一筆合規紀錄寫進 metadata.regulationCompliance（同一個版本只留最新一筆）。
+ * record 為 null（這次沒檢查，例如用戶手改）時：那個版本已有的紀錄標成 editedAfter，
+ * 成品頁就會照實說「之後修改過，沒有重新檢查」。
+ */
+export function mergeComplianceRecord(
+  existing: unknown,
+  variantIndex: number,
+  record: RegulationComplianceRecord | null,
+): RegulationComplianceRecord[] {
+  const list: RegulationComplianceRecord[] = Array.isArray(existing) ? (existing as any[]).filter(Boolean) : [];
+  const others = list.filter((r) => r.variantIndex !== variantIndex);
+  const prev = list.find((r) => r.variantIndex === variantIndex);
+  if (record) return [...others, { ...record, variantIndex }];
+  if (prev) return [...others, { ...prev, editedAfter: true }];
+  return list;
+}
+
+/**
+ * 後製路徑一行搞定：品牌硬規則（禁用詞／替換）→ 法規合規檢查 → 修正稿再過一次硬規則。
+ * 取代這些路徑原本單獨呼叫的 enforceBrandRulesOnText。
+ */
+export async function enforceBrandAndRegulations(
+  brandId: number | null | undefined,
+  text: string,
+  opts?: { isZhTW?: boolean; timeoutMs?: number },
+): Promise<{ text: string; record: RegulationComplianceRecord | null }> {
+  const { enforceBrandRulesOnText } = await import("../../strategy/core/brandContext");
+  const ruled = brandId ? await enforceBrandRulesOnText(brandId, text).catch(() => text) : text;
+  const reg = await enforceRegulationsOnText(brandId, ruled, opts);
+  if (reg.record?.status !== "fixed") return { text: ruled, record: reg.record };
+  const again = await enforceBrandRulesOnText(brandId, reg.text).catch(() => reg.text);
+  return { text: again, record: reg.record };
 }
