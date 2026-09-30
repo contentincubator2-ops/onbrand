@@ -31,7 +31,7 @@ export default function NotFoundPage() {
             {lang === "en" ? "← Go back" : "← 返回上一頁"}
           </button>
           <button
-            onClick={() => navigate("/theater", { replace: true })}
+            onClick={() => navigate("/planner", { replace: true })}
             className="w-full py-2.5 rounded-full bg-zinc-600 text-white text-sm font-semibold hover:bg-zinc-700 transition"
           >
             {lang === "en" ? "Go to home" : "前往主頁"}

@@ -81,7 +81,7 @@ export default function LandingPage() {
         if (dead) return;
         if (!r.ok) return;
         // 2026-07-15 (activation Leak A): send brandless users (incl. OAuth
-        // first-login) into guided brand creation, not the empty /theater.
+        // first-login) into guided brand creation, not an empty planner.
         let brandCount = 1;
         try { brandCount = Number((await r.json())?.brandCount ?? 1); } catch {}
         if (dead) return;
@@ -102,8 +102,8 @@ export default function LandingPage() {
     m.setAttribute(
       "content",
       en
-        ? `Lock your brand positioning once. Every caption stays on-brand. Brand Brain · Single/Pack/Campaign · 7-Day Publisher · monthly-refreshed viral-structure cards + your own brand-built cards.`
-        : `鎖定一次品牌定位，每篇貼文自動 on-brand。品牌大腦 · 單篇/套組/企劃 · 七日發布台 · 每月更新的爆款結構卡 ＋ 品牌自建卡。`,
+        ? `Lock your brand positioning once. Every caption stays on-brand. Brand Brain · Single/Pack/Campaign · Idea Stage · monthly-refreshed viral-structure cards + your own brand-built cards.`
+        : `鎖定一次品牌定位，每篇貼文自動 on-brand。品牌大腦 · 單篇/套組/企劃 · 靈感舞台 · 每月更新的爆款結構卡 ＋ 品牌自建卡。`,
     );
     return () => {
       dead = true;
@@ -137,13 +137,13 @@ export default function LandingPage() {
     ? [
         ["01", "Brand Brain", "Lock your positioning once. Every post stays on-brand."],
         ["02", "Content Tiers", "A single post · a content pack · a full campaign."],
-        ["03", "7-Day Publisher", "Schedule a whole week across channels in one click."],
+        ["03", "Idea Stage", "Several agents pitch different angles on one product — pick one and write it."],
         ["04", "Sourced", `Viral-structure cards refreshed monthly, each with its spread metric, measurement month and reference article.`],
       ]
     : [
         ["01", "品牌大腦", "鎖定一次品牌定位 · 每篇貼文自動 on-brand"],
         ["02", "三種規格", "單篇內容 · 內容套組 · 完整企劃"],
-        ["03", "七日發布台", "一次排好 7 天 × 全平台內容"],
+        ["03", "靈感舞台", "同一個產品，幾位 agent 各想一個切角，挑一個開始寫"],
         ["04", "有出處", `每月更新的爆款結構卡，每張附傳播數字、量測年月與參考文章`],
       ];
 

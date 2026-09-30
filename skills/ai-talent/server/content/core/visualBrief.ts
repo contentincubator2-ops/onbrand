@@ -157,8 +157,3 @@ export async function captionToBilingualVisualBrief(args: VisualBriefArgs): Prom
     return fallbackBilingualVisualBrief(args.caption);
   }
 }
-
-/** Backward-compatible English-only API used by Theater and older callers. */
-export async function captionToVisualBrief(args: VisualBriefArgs): Promise<string> {
-  return (await captionToBilingualVisualBrief(args)).prompt;
-}

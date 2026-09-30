@@ -259,7 +259,7 @@ export default function BrandOnboardingWizard({ isOpen, onClose, onComplete }: P
       // Theater with the first-time flag so it knows to show the
       // oversized "Generate 7 days" CTA and progress banner.
       onComplete(newId);
-      navigate(`/theater?firstTime=1&b=${newId}`);
+      navigate(`/inspiration?b=${newId}`);
     } catch (e: any) {
       setErr(String(e?.message ?? e));
     }

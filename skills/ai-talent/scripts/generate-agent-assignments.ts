@@ -219,10 +219,6 @@ async function main() {
   addSlots(MULTI_60S_TASKS, MULTI_60S_ORCHESTRA);
   addSlots(ALL_99S_TASKS, ALL_99S_ORCHESTRA);
 
-  // Theater per-platform writers (6 platforms — FB / IG / YT / Threads / LINE / Blog)
-  for (const p of ["facebook","instagram","youtube","threads","line","blog"]) {
-    slots.push({ taskId: `theater-cell-${p}`, role: "lead", hint: `${p} caption writer per-cell`, platform: p });
-  }
   // Media generation directors (image + video)
   slots.push({ taskId: "media-image-gen", role: "imageDirector", hint: "image gen prompt engineer + art direction", platform: "generic" });
   slots.push({ taskId: "media-video-gen", role: "videoDirector", hint: "video gen prompt engineer + cinematic direction", platform: "generic" });

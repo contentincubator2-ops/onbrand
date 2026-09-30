@@ -59,93 +59,6 @@ export interface NudgeDefinition {
 
 export const NUDGE_CATALOG = {
 
-  // ─── Theater (七日發布台) ─────────────────────────────────────────────
-
-  "theater.generation_done": {
-    id: "theater.generation_done",
-    message: {
-      "zh-TW":
-        "✅ 7 天內容排好了！每一格右上角的 ✏️ 都還能改文字、換圖、調日期。" +
-        "全部滿意之後，可以一鍵送進「行事曆」或「FB 直接發布」。",
-      en:
-        "✅ Your 7 days of content are ready. Each card's ✏️ button lets you " +
-        "edit copy, swap images, or shift the date. When you're happy, send " +
-        "the whole week to the Calendar or publish straight to Facebook.",
-    },
-    actions: [
-      { kind: "navigate", url: "/planner", label: "排進本週 →" },
-    ],
-    dedupePerSession: false, // re-fire every time user regenerates
-  },
-
-  "theater.publish_complete": {
-    id: "theater.publish_complete",
-    message: {
-      "zh-TW":
-        "🎉 已成功發布！如果想再寫下個禮拜的內容，可以直接重新跑七日發布台——" +
-        "我會記得這次的主題方向，幫你延續敘事。",
-      en:
-        "🎉 Published! Want to plan next week? Run 7-Day Publisher again — " +
-        "I'll remember this week's narrative arc and continue it.",
-    },
-    actions: [
-      { kind: "navigate", url: "/theater", label: "排下週 →" },
-    ],
-  },
-
-  "theater.empty_state_idle": {
-    id: "theater.empty_state_idle",
-    message: {
-      "zh-TW":
-        "新來到七日發布台？三步驟：(1) 選平台 → (2) 標註本週的重要活動或檔期 → " +
-        "(3) 按「開始生成」。第一次跑大概 90 秒，之後可以全部一格一格手動微調。",
-      en:
-        "First time here? Three steps: (1) pick channels → (2) mark this " +
-        "week's key dates → (3) hit Generate. First run takes ~90 seconds, " +
-        "then every cell is editable.",
-    },
-  },
-
-  // 2026-06-21 (CJ「TTFV」): post-onboarding redirect to Theater.
-  // Fired when user lands at /theater?firstTime=1 — right after they've
-  // built their first brand and the express brain finished.
-  // 2026-09-29（CJ）：YouTube 下架，預設改 FB／IG 兩個平台（7 天 × 2 = 14 張）。
-  "theater.first_time_arrived": {
-    id: "theater.first_time_arrived",
-    message: {
-      "zh-TW":
-        "👋 歡迎！你的品牌大腦初版好了，我幫你預設了 FB / IG 兩個平台 + 本週日期。" +
-        "按「生成 7 天內容」就會出來 14 張卡（每天 × 2 平台）——大概 3 分鐘。" +
-        "完整 14 步品牌定位還在背景跑，完成後我會再叫你來看。",
-      en:
-        "👋 Welcome! Your Brand Brain (express version) is ready. I've pre-" +
-        "selected FB / IG + this week. Hit 'Generate " +
-        "7 Days' button below — you'll see 14 cards (7 days × 2 channels) " +
-        "in ~3 minutes. The full 14-step positioning is still running in " +
-        "the background; I'll ping you when it's done.",
-    },
-  },
-
-  // Fired right after the first 7-day generation completes — captures
-  // the "aha" moment and points the user to the most useful next move.
-  "theater.first_week_generated": {
-    id: "theater.first_week_generated",
-    message: {
-      "zh-TW":
-        "🎉 你的第一週 21 篇內容好了！每張卡都可以：(1) 右上 ✏️ 改文字 / 換圖，" +
-        "(2) 點「重生」用不同 hook 重寫，(3) 整週送進「日曆」自動排程發布。" +
-        "想看每天的結構為什麼這樣安排，我可以解釋。",
-      en:
-        "🎉 Your first 21 posts are ready! Each card lets you: (1) edit text / " +
-        "swap image via the ✏️ top-right, (2) hit 'Regenerate' for a different " +
-        "hook, (3) send the whole week to the Calendar for auto-publish. " +
-        "Want me to explain why this week's structure is sequenced this way?",
-    },
-    actions: [
-      { kind: "navigate", url: "/planner", label: "排進本週 →" },
-    ],
-  },
-
   // ─── Platform tasks (FB / IG / YT / TikTok / Email / PR) ─────────────
 
   "task.fb.first_run_done": {
@@ -715,32 +628,6 @@ export const NUDGE_CATALOG = {
   // to support.contextNudge.generate; backend renders the promptTemplate
   // with the brand brain + provided context and returns the personalised
   // message. Static fallback shown if LLM fails / unavailable.
-
-  "llm.theater.generation_done": {
-    id: "llm.theater.generation_done",
-    kind: "llm",
-    message: {
-      // Static fallback — used if backend LLM call fails
-      "zh-TW":
-        "7 天內容排好了。如果某幾天節奏不對，可以告訴我「週X感覺太用力 / 太冷淡」，我幫你重寫。",
-      en:
-        "Your 7-day plan is ready. If any day feels off pace, tell me " +
-        "'day X feels too pushy / too flat' and I'll rewrite.",
-    },
-    promptTemplate: {
-      "zh-TW":
-        "你是 Mia · OnBrand 客戶成功經理。用戶剛跑完七日發布台。" +
-        "根據以下品牌大腦 + 這次主題，生成 2-3 句**個人化的下一步建議**：" +
-        "提到用戶實際的 brandVoice / industry / 主題，不要說空話。最多 80 字。\n\n" +
-        "Brand：{brandName}\nVoice：{brandVoice}\n本週主題：{theme}\n",
-      en:
-        "You are Mia, OnBrand's customer success manager. The user just ran " +
-        "7-Day Publisher. Based on the brand brain + this week's theme below, " +
-        "generate 2-3 sentences of **personalized next-step guidance**. " +
-        "Reference their actual brandVoice / industry / theme. Max 80 words.\n\n" +
-        "Brand: {brandName}\nVoice: {brandVoice}\nTheme this week: {theme}\n",
-    },
-  },
 
 } as const satisfies Record<string, NudgeDefinition>;
 

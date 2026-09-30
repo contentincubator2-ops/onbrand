@@ -15,11 +15,11 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import type { IconDefinition } from "@fortawesome/fontawesome-svg-core";
 import {
   faWandMagicSparkles, faRotateRight, faRotateLeft, faUserPen, faPenToSquare, faTrashCan, faXmark,
-  faPlus, faMagnifyingGlass, faCopy, faDownload, faArrowUpFromBracket, faPaperPlane, faCalendarPlus,
+  faPlus, faMagnifyingGlass, faCopy, faDownload, faArrowUpFromBracket, faPaperPlane,
   faArrowUpRightFromSquare, faShareNodes, faLock, faCircleCheck, faCheck, faTriangleExclamation,
   faCircleInfo, faCircleQuestion, faSpinner, faClock, faFlask, faUserTie, faFire, faImage, faImages,
   faVideo, faFileLines, faComment, faBoxOpen, faBookOpen, faBrain, faTag, faPenNib, faChartLine,
-  faCalendarDays, faBullhorn, faFolderOpen, faCalendarWeek, faLayerGroup, faComments, faClipboardCheck,
+  faBullhorn, faFolderOpen, faLayerGroup, faComments, faClipboardCheck,
   faBell, faLanguage, faGear, faStore, faUsers, faUser, faUserPlus, faChevronLeft, faChevronRight,
   faArrowLeft, faFont, faBullseye, faShieldHalved, faPalette, faPlay, faQuoteLeft, faHashtag, faIdCard,
   faAward, faDollarSign, faBuilding, faBug, faInbox, faEnvelope, faFolder, faCircle, faBagShopping,
@@ -45,7 +45,6 @@ export const ICON = {
   download: faDownload,
   upload: faArrowUpFromBracket,
   send: faPaperPlane,
-  schedule: faCalendarPlus,
   external: faArrowUpRightFromSquare,
   share: faShareNodes,
   lock: faLock,
@@ -76,10 +75,8 @@ export const ICON = {
   brand: faTag,
   content: faPenNib,
   performance: faChartLine,
-  planner: faCalendarDays,
   campaign: faBullhorn,
   project: faFolderOpen,
-  theater: faCalendarWeek,
   taskCards: faLayerGroup,
   meeting: faComments,
   review: faClipboardCheck,
@@ -243,8 +240,6 @@ export const SkipIcon = make("skip");
 export const StopIcon = make("stop");
 export const WorkingIcon = make("working");
 export const SampleIcon = make("sample");
-export const PlannerIcon = make("planner");
-export const TheaterIcon = make("theater");
 export const TaskCardsIcon = make("taskCards");
 export const MeetingIcon = make("meeting");
 export const ShareIcon = make("share");
@@ -254,7 +249,6 @@ export const FlagIcon = make("flag");
 export const UnlockIcon = make("unlock");
 export const LinkIcon = make("link");
 export const PuzzleIcon = make("puzzle");
-export const ScheduleIcon = make("schedule");
 export const NotifyIcon = make("notify");
 export const MemoryIcon = make("brainCheck");
 export const IdeasIcon = make("ideas");

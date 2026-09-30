@@ -18,6 +18,7 @@ import { trpc } from "../../../lib/trpc";
 import { useLang } from "../../../lib/i18n";
 import { showToastGlobal } from "../../../components/ui/Toast";
 import { channelRoute } from "../lib/channelMeta";
+import { logActivation } from "../../platform/lib/activationTelemetry";
 import { PlatformTaskModal, type TaskEmbed } from "./PlatformTaskPage";
 
 const INK = "#171717", META = "#6B6B6B", LINE = "#EAEAEA", SOFT = "#F6F6F5";
@@ -97,6 +98,8 @@ export default function InspirationPage() {
   React.useEffect(() => {
     if (rosterQ.data?.lineup) setLineup(rosterQ.data.lineup);
   }, [rosterQ.data]);
+  // 活化漏斗第 4 步（後台只取每人第一次）。
+  React.useEffect(() => { if (brandId) logActivation("first_inspiration_arrived", { brandId }); }, [brandId]);
 
   const utils = T.useUtils?.();
   const ideateStart = T.inspiration?.ideateStart?.useMutation?.();
@@ -193,6 +196,8 @@ export default function InspirationPage() {
       const r = await adopt.mutateAsync({
         brandId, thinker: a.thinker, title: a.title, hook: a.hook, why: a.why, answer: a.answer ?? "", platform, format: a.format, date,
       });
+      // 活化漏斗終點＝TTFV：第一次拿到成果。
+      logActivation("first_angle_adopted", { brandId, thinker: a.thinker });
       setAngles((cur) => cur.map((x) => (x.id === a.id ? { ...x, platform, adopted: { date } } : x)));
       setAdoptFor(null);
       setWriting({
@@ -243,7 +248,7 @@ export default function InspirationPage() {
       </div>
 
       {/* 2026-09-30（CJ「排版要跟七日發布台一樣，標題位置不能跟其他頁不一致」）：
-          canonical header template — 眉標／標題／襯線副標／適合，同 /theater、/projects、/brands。 */}
+          canonical header template — 眉標／標題／襯線副標／適合，同 /projects、/brands。 */}
       <div className="max-w-[1400px] mx-auto px-6 pt-10 pb-4">
         <div className="flex items-end justify-between flex-wrap gap-4 mb-4">
           <div className="text-center mx-auto" style={{ flex: "1 1 auto" }}>

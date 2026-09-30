@@ -89,7 +89,7 @@ export default function HomePage() {
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "1.5rem" }}>
         <h1 style={{ fontSize: 20, fontWeight: 600, margin: 0 }}>{en ? "Deployment workflow" : "策略落地工作流"}</h1>
         <button
-          onClick={() => navigate("/theater")}
+          onClick={() => navigate("/planner")}
           style={{ fontSize: 13, padding: "6px 12px", border: "1px solid #e5e7eb", borderRadius: 8, background: "#fff", cursor: "pointer" }}
         >
           <FontAwesomeIcon icon={faBell} style={{ marginRight: 6, color: "#9ca3af" }} />
@@ -174,7 +174,7 @@ export default function HomePage() {
                 {en ? `${f.name_en ?? f.name_zh} in ${f.daysAway} day(s)` : `${f.name_zh}還有 ${f.daysAway} 天`}
                 {f.contentHint ? ` — ${f.contentHint}` : ""}
               </p>
-              <button onClick={() => navigate("/theater")} style={{ fontSize: 12, padding: "5px 10px", border: "1px solid #e5e7eb", borderRadius: 6, background: "#fff", cursor: "pointer" }}>
+              <button onClick={() => navigate("/inspiration")} style={{ fontSize: 12, padding: "5px 10px", border: "1px solid #e5e7eb", borderRadius: 6, background: "#fff", cursor: "pointer" }}>
                 {en ? "Act on it" : "採用建議"} ↗
               </button>
             </div>

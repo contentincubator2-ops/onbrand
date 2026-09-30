@@ -5,7 +5,7 @@
  *
  *   import { fireNudge } from "./miaNudges";
  *
- *   onGenerationDone(() => fireNudge("theater.generation_done"));
+ *   onGenerationDone(() => fireNudge("brand.positioning_complete"));
  *
  * State lives in sessionStorage so it survives client-side route changes
  * but resets on tab close / logout — we don't want nudges from yesterday
