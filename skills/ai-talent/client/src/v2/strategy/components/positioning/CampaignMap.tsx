@@ -8,10 +8,6 @@
  *   · 放大：地圖往那一段放大後淡出，疊上那一段的目的、訊息，以及每個通路排了哪幾篇。
  *     還沒定稿時，每一篇的「要講什麼」、日期、做不做都在這裡改。
  *
- * 底圖（backdrop）是獨立的一層：用戶選的模板的故事圖（汽車業是起點到終點的地圖、
- * 餐飲是從原料做成菜、文具是零件組成一支馬克筆，見 lib/campaignBackdrops.ts）。
- * 選「傳播圈」或圖還沒產出來時，是中性的底。
- *
  * 顏色照設計系統：只有中性色，success 只給「已寫」。
  */
 import React from "react";
@@ -43,7 +39,7 @@ function useSize(ref: React.RefObject<HTMLDivElement | null>): { w: number; h: n
 }
 
 export default function CampaignMap({
-  items, phases, lanes, phaseMessages, current, onPick, locked, en, onPatchItem, backdrop, fill, phaseKpi = {},
+  items, phases, lanes, phaseMessages, current, onPick, locked, en, onPatchItem, fill, phaseKpi = {},
 }: {
   items: CampaignPlanItem[];
   phases: StagePhase[];
@@ -54,7 +50,6 @@ export default function CampaignMap({
   locked: boolean;
   en: boolean;
   onPatchItem: (id: string, next: Partial<CampaignPlanItem>) => void;
-  backdrop?: React.ReactNode;
   /** 撐滿父層的高度（活動頁右欄）；通路之間的距離跟著拉開。 */
   fill?: boolean;
   /** 每一段的預算與 KPI（有設定才顯示）。 */
@@ -97,7 +92,6 @@ export default function CampaignMap({
 
   return (
     <div ref={boxRef} className={`relative w-full overflow-hidden bg-default-100 ${fill ? "h-full" : ""}`} style={fill ? { minHeight: H } : { height: H }}>
-      {backdrop && <div className="absolute inset-0 pointer-events-none">{backdrop}</div>}
 
       {/* ── 總覽地圖（放大時整層往那一段放大、淡出） ── */}
       <div
@@ -111,13 +105,13 @@ export default function CampaignMap({
         aria-hidden={ci >= 0}
       >
         {W > 0 && phases.map((p, i) => (
-          <div key={p.id} className={`absolute rounded-2xl ${backdrop ? (i % 2 ? "bg-content1/25" : "bg-content1/45") : (i % 2 ? "bg-default-200/50" : "bg-default-50/70")}`}
+          <div key={p.id} className={`absolute rounded-2xl ${i % 2 ? "bg-default-200/50" : "bg-default-50/70"}`}
             style={{ left: G + i * BW + 3, top: 8, width: BW - 6, height: HEAD + lanes.length * laneH }} />
         ))}
         {W > 0 && lanes.map((c, j) => (
           <React.Fragment key={c}>
-            <div className={`absolute rounded-full ${backdrop ? "bg-default-300/60" : "bg-default-200"}`} style={{ left: G, right: 16, top: HEAD + j * laneH + laneH / 2 - 6, height: 12 }} />
-            <div className={`absolute flex items-center gap-2 text-tiny text-default-600 ${backdrop ? "bg-content1/85 rounded-lg pr-2" : ""}`} style={{ left: 12, top: HEAD + j * laneH + laneH / 2 - 13, width: G - 16 }}>
+            <div className="absolute rounded-full bg-default-200" style={{ left: G, right: 16, top: HEAD + j * laneH + laneH / 2 - 6, height: 12 }} />
+            <div className="absolute flex items-center gap-2 text-tiny text-default-600" style={{ left: 12, top: HEAD + j * laneH + laneH / 2 - 13, width: G - 16 }}>
               <span className="w-[26px] h-[26px] shrink-0 rounded-lg bg-content1 shadow-sm grid place-items-center">
                 <FontAwesomeIcon icon={CHANNEL_META[c]?.icon ?? faPenNib} className="text-tiny" />
               </span>
