@@ -43,6 +43,7 @@ import { showToastGlobal } from "../../../components/ui/Toast";
 import AddEntityModal, { type AddEntityTab } from "../components/AddEntityModal";
 import ProductDetailModal from "../components/positioning/ProductDetailModal";
 // Notion-style line icons
+import { LockToggle } from "../components/positioning/LockToggle";
 import { AgentIcon, MemoryIcon, AwardIcon, BundleIcon, CommentIcon, DeleteIcon, EditIcon, FontIcon, GenerateIcon, HashtagIcon, IdCardIcon, LibraryIcon, LockIcon, PaletteIcon, PeopleIcon, PlayIcon, QuoteIcon, RegenerateIcon, ShieldIcon, TargetIcon, TextIcon, DoneIcon, StopIcon, WarningIcon, CheckIcon, CloseIcon } from "../../platform/components/icons";
 import { SCOPE_SEGMENTS, type SegmentSpec } from "../lib/positioningSchema";
 import { pickProductImageUrl } from "../lib/productImage";
@@ -54,7 +55,7 @@ import { pipelineFor, type PipelineStepSpec } from "../lib/positioningPipeline";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { HelpTip } from "../../platform/components/HelpTip";
 import {
-  faPlus, faPalette, faFont, faQuoteLeft, faBullseye, faUsers, faImage, faIcons, faChartPie, faImages, faPenNib, faShieldHalved, faFolderOpen, faLock, faLockOpen, faBookOpen, faTableList, faBox, faRocket, faBullhorn, faWandMagicSparkles, faGear, faStickyNote, faTrashCan, faSatelliteDish, faStethoscope, faFileArrowUp,
+  faPlus, faPalette, faFont, faQuoteLeft, faBullseye, faUsers, faImage, faIcons, faChartPie, faImages, faPenNib, faShieldHalved, faFolderOpen, faBookOpen, faTableList, faBox, faRocket, faBullhorn, faWandMagicSparkles, faGear, faStickyNote, faTrashCan, faSatelliteDish, faStethoscope, faFileArrowUp,
 } from "@fortawesome/free-solid-svg-icons";
 
 // Sub-nav id format:
@@ -1421,6 +1422,13 @@ export default function BrandsPage() {
               策略總監的系統提示詞了（見 strategistChatRouter.ts），使用者
               直接問策略總監就有，不用再靠這裡一顆 hover 才看得到的按鈕。
               現在只剩最單純的大標題。 */}
+          {/* 2026-09-29 (CJ「定案跟鎖定定位其實是相同功能，只留鎖定」→「在品牌名和標語的
+              右側」→「LOCK ONLY」)：原本標題下的「定案」chip 與內容上方整條「定位
+              尚未鎖定／鎖定定位」橫列是同一件事兩個入口，合併成標題區右側一顆手繪
+              鎖頭（LockToggle），鎖頭本身就是按鈕、下方小字表狀態。鎖的是目前頁籤
+              （定位／文字／視覺）。標題維持置中：鎖頭 absolute 掛在標題區右緣，
+              窄螢幕沒空間時改排到標語下方。 */}
+          <div className="relative inline-flex flex-col items-center">
           <h1
             className="font-bold tracking-tight leading-none text-neutral-900 mb-5"
             style={{ fontSize: "clamp(1.75rem, 3vw, 2.5rem)" }}
@@ -1443,6 +1451,36 @@ export default function BrandsPage() {
               </p>
             );
           })()}
+
+            {(category === "positioning" || category === "copy" || category === "visual") && activeBrandIdForLocks && (() => {
+              const tab = category as "positioning" | "copy" | "visual";
+              const tabLabel = tab === "positioning"
+                ? (lang === "en" ? "Positioning" : "定位")
+                : tab === "copy"
+                  ? (lang === "en" ? "Copy" : "文字")
+                  : (lang === "en" ? "Visual" : "視覺");
+              const lock = tabLocks[tab];
+              const isLocked = !!lock;
+              return (
+                <div className="mt-2 sm:mt-0 sm:absolute sm:top-1/2 sm:-translate-y-1/2 sm:left-[calc(100%+18px)]">
+                  <LockToggle
+                    locked={isLocked}
+                    busy={!!(lockTabMut?.isPending || unlockTabMut?.isPending)}
+                    onToggle={() => handleLockToggle(tab)}
+                    lockedLabel={lang === "en" ? "Locked" : "已鎖定"}
+                    unlockedLabel={lang === "en" ? "Unlocked" : "未鎖定"}
+                    title={isLocked
+                      ? (lang === "en"
+                          ? `${tabLabel} locked ${new Date(lock.at).toLocaleString("en-US", { dateStyle: "short", timeStyle: "short" })} · single source of truth · click to unlock`
+                          : `${tabLabel}鎖定於 ${new Date(lock.at).toLocaleString("zh-TW", { dateStyle: "short", timeStyle: "short" })} · 全平台採用此版本 · 點一下解鎖`)
+                      : (lang === "en"
+                          ? `Lock ${tabLabel} — editor goes read-only · every task uses this as the single source of truth`
+                          : `鎖定${tabLabel}：編輯欄變唯讀 · 所有任務用這份為單一真相`)}
+                  />
+                </div>
+              );
+            })()}
+          </div>
 
           {/* 2026-05-11 (CJ「搜尋 BAR 不需要了」): BrandMessageBar removed.
               Manifesto subtitle above already carries the value-prop;
@@ -1546,47 +1584,6 @@ export default function BrandsPage() {
           </div>
           )}
 
-          {/* 2026-09-29 (CJ「定案跟鎖定定位其實是相同功能，只留鎖定定位的按鈕，有鎖頭 icon」)：
-              原本標題下有「定案」chip（一次鎖三頁籤），內容上方又有一整條
-              「定位 尚未鎖定／鎖定定位」橫列——同一件事兩個入口。合併成這一顆
-              鎖頭 pill：狀態＋動作同一處，鎖的是目前頁籤（定位／文字／視覺）。 */}
-          {(category === "positioning" || category === "copy" || category === "visual") && activeBrandIdForLocks && (() => {
-            const tab = category as "positioning" | "copy" | "visual";
-            const tabLabel = tab === "positioning"
-              ? (lang === "en" ? "Positioning" : "定位")
-              : tab === "copy"
-                ? (lang === "en" ? "Copy" : "文字")
-                : (lang === "en" ? "Visual" : "視覺");
-            const lock = tabLocks[tab];
-            const isLocked = !!lock;
-            const busy = !!(lockTabMut?.isPending || unlockTabMut?.isPending);
-            const hint = isLocked
-              ? (lang === "en"
-                  ? `Locked ${new Date(lock.at).toLocaleString("en-US", { dateStyle: "short", timeStyle: "short" })} · single source of truth · click to unlock`
-                  : `鎖定於 ${new Date(lock.at).toLocaleString("zh-TW", { dateStyle: "short", timeStyle: "short" })} · 全平台採用此版本 · 點一下解鎖`)
-              : (lang === "en"
-                  ? "Once locked: editor goes read-only · every task uses this as the single source of truth"
-                  : "鎖定後：編輯欄變唯讀 · 所有任務用這份為單一真相");
-            return (
-              <div className="mt-4 flex justify-center">
-                <button
-                  type="button"
-                  onClick={() => handleLockToggle(tab)}
-                  disabled={busy}
-                  title={hint}
-                  className="flex items-center gap-1.5 text-[13px] font-semibold px-3.5 py-1.5 rounded-full transition disabled:opacity-60"
-                  style={isLocked
-                    ? { background: "#10B981", color: "white", border: "1px solid #10B981" }
-                    : { background: "white", color: "#374151", border: "1px solid #D1D5DB" }}
-                >
-                  <FontAwesomeIcon icon={isLocked ? faLock : faLockOpen} style={{ fontSize: 12 }} />
-                  {isLocked
-                    ? (lang === "en" ? `${tabLabel} locked` : `${tabLabel}已鎖定`)
-                    : (lang === "en" ? `Lock ${tabLabel}` : `鎖定${tabLabel}`)}
-                </button>
-              </div>
-            );
-          })()}
         </div>
       </div>
       )}{/* end scopeBrands.length > 0 hero */}
