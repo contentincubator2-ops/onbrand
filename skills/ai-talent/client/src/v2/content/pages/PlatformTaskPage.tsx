@@ -2382,34 +2382,35 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                           </p>
                         );
                       })()}
-                      {/* 2026-09-08 出處與說明：點開看這張卡憑什麼、什麼時候用、上架日。
-                          用 span 而不是巢狀 button（button 不能包 button）。 */}
-                      <div className="flex items-center gap-2 text-[12px]">
-                        <span
-                          role="button"
-                          tabIndex={0}
-                          className="font-medium text-neutral-800 underline underline-offset-2 hover:text-neutral-950"
-                          onClick={(e) => { e.stopPropagation(); setDetailTaskId(task.id); }}
-                          onKeyDown={(e) => {
-                            if (e.key !== "Enter" && e.key !== " ") return;
-                            e.preventDefault(); e.stopPropagation(); setDetailTaskId(task.id);
-                          }}
-                        >
-                          {lang === "en" ? "Source & notes" : "出處與說明"}
-                        </span>
-                        {isRecentCard((task as any).addedAt) && (
+                      {isRecentCard((task as any).addedAt) && (
+                        <div className="flex items-center gap-2 text-[12px]">
                           <span className="rounded-full border border-neutral-900 px-1.5 py-px text-[11px] text-neutral-900">
                             {lang === "en" ? "New" : "新上架"}
                             {(task as any).addedAt ? ` · ${String((task as any).addedAt).slice(5).replace("-", "/")}` : ""}
                           </span>
-                        )}
-                      </div>
+                        </div>
+                      )}
                       {(task as any).methodology && (
                         <span className="text-[12px] text-default-400 italic inline-flex items-center gap-1"><LibraryIcon size={11} /> {(task as any).methodology}</span>
                       )}
                       <div className="mt-auto pt-2 flex items-center gap-2 border-t border-default-100">
                         <Avatar src={avatarSrc} size="sm" className="w-5 h-5" />
                         <span className="text-tiny font-medium text-default-700 truncate">{agentName}</span>
+                        {/* 2026-09-08 出處詳情：點開看這張卡憑什麼、什麼時候用、上架日。
+                            2026-09-30（CJ「出處與說明改成出處，放右下角跟 agent 姓名對稱」）。
+                            用 span 而不是巢狀 button（button 不能包 button）。 */}
+                        <span
+                          role="button"
+                          tabIndex={0}
+                          className="ml-auto shrink-0 text-tiny font-medium text-neutral-800 underline underline-offset-2 hover:text-neutral-950"
+                          onClick={(e) => { e.stopPropagation(); setDetailTaskId(task.id); }}
+                          onKeyDown={(e) => {
+                            if (e.key !== "Enter" && e.key !== " ") return;
+                            e.preventDefault(); e.stopPropagation(); setDetailTaskId(task.id);
+                          }}
+                        >
+                          {lang === "en" ? "Source" : "出處"}
+                        </span>
                       </div>
                       {/* 60s team stack */}
                       {(task as any).team && (task as any).team.length > 1 && (
