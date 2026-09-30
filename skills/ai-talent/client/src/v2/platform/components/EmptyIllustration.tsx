@@ -30,7 +30,7 @@ const MOTION = `
 
 export type EmptyKind =
   | "product" | "event" | "projects" | "cards" | "clock" | "meeting"
-  | "persona" | "photo" | "folder" | "lens" | "report" | "review";
+  | "persona" | "photo" | "folder" | "lens" | "report" | "review" | "brief";
 
 const ART: Record<EmptyKind, ComponentType> = {
   product: EmptyBox,
@@ -45,6 +45,7 @@ const ART: Record<EmptyKind, ComponentType> = {
   lens: Telescope,
   report: EmptyReport,
   review: EmptyTray,
+  brief: BriefNote,
 };
 
 export function EmptyIllustration({ kind, width = 220 }: { kind: EmptyKind; width?: number }) {
@@ -315,6 +316,26 @@ function EmptyTray() {
         <path d="M112 48 l6 6 l11 -12" stroke="#fff" strokeWidth={3.5} />
       </g>
       <Sparks y={44} />
+    </g>
+  );
+}
+
+/** 任務 modal 開頭：一張等你寫的便條，筆浮在旁邊點——不是空白頁，是「開始吧」。 */
+function BriefNote() {
+  return (
+    <g>
+      <rect x="70" y="50" width="84" height="92" rx="8" fill={FILL} transform="rotate(-6 112 96)" />
+      <rect x="80" y="44" width="84" height="92" rx="8" fill="#fff" />
+      <path d="M94 66 h56 M94 80 h56 M94 94 h34" strokeWidth={2.5} />
+      <circle cx="102" cy="116" r="4" fill={POP} stroke="none" />
+      <path d="M112 116 h30" strokeWidth={2.5} />
+      <g className="ei-float">
+        <g transform="rotate(35 184 72)">
+          <rect x="178" y="30" width="13" height="54" rx="2" fill={POP} />
+          <path d="M178 84 l6.5 13 l6.5 -13 Z" fill="#fff" />
+        </g>
+      </g>
+      <Sparks l={46} r={206} y={40} />
     </g>
   );
 }
