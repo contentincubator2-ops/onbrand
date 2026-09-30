@@ -58,6 +58,7 @@ import {
 } from "@fortawesome/free-brands-svg-icons";
 import RunningAgentCarousel from "../components/quickTask/RunningAgentCarousel";
 import ImageCardTile, { type ImageCardInfo } from "../components/imageCard/ImageCardTile";
+import ImageSizePicker from "../components/imageCard/ImageSizePicker";
 import { imageCardHref, imageChannelOf } from "../lib/imageCardHandoff";
 import CardDetailDrawer, { isRecentCard } from "../components/quickTask/CardDetailDrawer";
 import ChannelPicker from "../../platform/components/plan/ChannelPicker";
@@ -399,6 +400,23 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
     { enabled: !!imageChannel, staleTime: 5 * 60_000 },
   );
   const imageCards = (imageChannel ? imageCardsQ.data?.cards ?? [] : []) as ImageCardInfo[];
+  // 2026-09-30 CJ：圖片卡不一次全列——每通路預設兩張，其餘用戶用「新增尺寸」自己加。
+  const imageTrayQ = trpc.imageCard.tray.useQuery(
+    { brandId: brandId ?? 0, channel: (imageChannel ?? "facebook") as any },
+    { enabled: !!imageChannel && !!brandId, refetchOnWindowFocus: false },
+  );
+  const [imagePickerOpen, setImagePickerOpen] = useState(false);
+  const setImageTrayMut = trpc.imageCard.setTray.useMutation({
+    onSuccess: () => { setImagePickerOpen(false); imageTrayQ.refetch(); },
+    onError: (e) => toastWithUpgrade(e?.message ?? "儲存失敗", lang === "en"),
+  });
+  /** 實際擺出來的圖片卡。還沒載入托盤（或沒有品牌）時先只擺預設的兩張，不閃出全部。 */
+  const shownImageCards = useMemo(() => {
+    const ids = imageTrayQ.data?.ids;
+    if (!ids) return imageCards.filter((c) => c.pinned);
+    const byId = new Map(imageCards.map((c) => [c.id, c] as const));
+    return ids.map((id) => byId.get(id)).filter((c): c is ImageCardInfo => !!c);
+  }, [imageCards, imageTrayQ.data]);
   const brandName = useMemo(() => {
     const list = (ctx?.brands as any[]) ?? [];
     return list.find((b) => b?.id === brandId)?.name ?? null;
@@ -497,9 +515,17 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
 
   // Tier tab state (used for non-FB/non-IG platforms)
   // 結構來源篩選。"all" = 不篩。與 tier 是兩條獨立的軸，可同時生效。
-  // 2026-09-29 CJ「每個平台要增加一個圖片的類別」："image" 不是任務卡來源，是另一個類別——
-  // 選它時下面改列這個通路的圖片任務卡（imageCard.list），不列文字任務。
-  const [activeSource, setActiveSource] = useState<FrontCardKind | "all" | "image">("all");
+  const [activeSource, setActiveSource] = useState<FrontCardKind | "all">("all");
+  /** 2026-09-29 CJ「每個平台要增加一個圖片的類別」；9/30 移到分類列最後。選它時下面
+   *  改列這個通路的圖片任務卡（imageCard.list），不列文字任務。
+   *  放在網址（?view=images）：從圖片卡按上一頁回來時停在圖片，換通路時自然歸零。 */
+  const imageMode = searchParams.get("view") === "images";
+  const setImageMode = (on: boolean) => {
+    if (on === imageMode) return;
+    const next = new URLSearchParams(searchParams);
+    if (on) next.set("view", "images"); else next.delete("view");
+    setSearchParams(next, { replace: true });
+  };
   // Format tab state (used for FB)
   const [activeFormat, setActiveFormat] = useState<ActiveFormat>("all");
   // Format tab state (used for IG)
@@ -1634,326 +1660,85 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
             />
           </div>
 
-          {/* ── Format tiles (FB) / Format tiles (IG) / Tier tabs (other) ── */}
-          {/* 2026-08-29 客製包的 pill 優先於所有內建平台分類。分類值由該品牌的
+          {/* ── 分類列：貼文／連結貼文／廣告／Reels…＋圖片 ──
+              2026-08-29 客製包的 pill 優先於所有內建平台分類。分類值由該品牌的
               pack 定義（例如五感十築的 生活實踐／生態健築／永續生活／永續價值），
-              不是全域那七份手抄對照表 —— 有包的品牌完全繞開它們。 */}
-          {packChannel ? (
-            <div className="w-full" style={{ maxWidth: 860 }}>
-              <div className="flex items-center gap-2 flex-wrap justify-center">
-                {[{ id: "all", labelZh: "全部", labelEn: "All" }, ...packChannel.formats].map((tab: any) => {
-                  const active = activePackFormat === tab.id;
-                  const count = packFormatCounts[tab.id] ?? 0;
-                  if (tab.id !== "all" && count === 0) return null;
-                  return (
-                    <button
-                      key={tab.id}
-                      onClick={() => setActivePackFormat(tab.id)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all whitespace-nowrap"
-                      style={
-                        active
-                          ? { background: "#171717", color: "white", boxShadow: "0 2px 8px rgba(0,0,0,0.18)" }
-                          : { background: "white", color: "#525252", border: "1px solid #E5E5E5" }
-                      }
-                    >
-                      {lang === "en" ? tab.labelEn : tab.labelZh}
-                      {tab.id !== "all" && (
-                        <span
-                          className="text-[12px] px-1.5 py-0.5 rounded-full tabular-nums font-semibold"
-                          style={{
-                            background: active ? "rgba(255,255,255,0.18)" : "#F5F5F5",
-                            color: active ? "rgba(255,255,255,0.85)" : "#737373",
-                          }}
-                        >
-                          {count}
-                        </span>
-                      )}
-                    </button>
-                  );
-                })}
+              不是全域那七份手抄對照表 —— 有包的品牌完全繞開它們。
+              2026-09-30（CJ「圖片的 tile 應該要跟廣告貼文、Reels 在同一個地方，而不是跟
+              爆款結構在同一個地方」）：圖片是一種形式，放在這一列最後；原本八份一模一樣的
+              分類列收成一份。Threads／LINE 沒有文字分類，這列只有「全部｜圖片」。 */}
+          {(() => {
+            type Tab = { id: string; label: string; labelEn: string };
+            const row: { tabs: Tab[]; active: string; set: (id: string) => void; counts: Record<string, number> } | null =
+              packChannel
+                ? {
+                    tabs: [{ id: "all", label: "全部", labelEn: "All" }, ...packChannel.formats.map((f: any) => ({ id: f.id, label: f.labelZh, labelEn: f.labelEn }))],
+                    active: activePackFormat, set: setActivePackFormat, counts: packFormatCounts,
+                  }
+              : platform === "facebook" ? { tabs: FORMAT_TABS, active: activeFormat, set: (id) => setActiveFormat(id as ActiveFormat), counts: formatCounts }
+              : platform === "instagram" ? { tabs: IG_FORMAT_TABS, active: activeIGFormat, set: (id) => setActiveIGFormat(id as IGActiveFormat), counts: igFormatCounts }
+              : platform === "linkedin" ? { tabs: LI_FORMAT_TABS, active: activeLIFormat, set: (id) => setActiveLIFormat(id as LIActiveFormat), counts: liFormatCounts }
+              : platform === "youtube" ? { tabs: YT_FORMAT_TABS, active: activeYTFormat, set: (id) => setActiveYTFormat(id as YTActiveFormat), counts: ytFormatCounts }
+              : platform === "tiktok" ? { tabs: TT_FORMAT_TABS, active: activeTTFormat, set: (id) => setActiveTTFormat(id as TTActiveFormat), counts: ttFormatCounts }
+              : platform === "email" ? { tabs: EM_FORMAT_TABS, active: activeEMFormat, set: (id) => setActiveEMFormat(id as EMActiveFormat), counts: emFormatCounts }
+              : platform === "pr" ? { tabs: PR_FORMAT_TABS, active: activePRFormat, set: (id) => setActivePRFormat(id as PRActiveFormat), counts: prFormatCounts }
+              : platform === "website" ? { tabs: WEB_FORMAT_TABS, active: activeWEBFormat, set: (id) => setActiveWEBFormat(id as WEBActiveFormat), counts: webFormatCounts }
+              : null;
+            const hasImages = imageCards.length > 0;
+            if (!row && !hasImages) return null;
+            const tabs: Tab[] = row?.tabs ?? [{ id: "all", label: "全部", labelEn: "All" }];
+            const pill = (key: string, active: boolean, label: string, count: number | null, onClick: () => void, title?: string) => (
+              <button
+                key={key}
+                onClick={onClick}
+                title={title}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all whitespace-nowrap"
+                style={
+                  active
+                    ? { background: "#171717", color: "white", boxShadow: "0 2px 8px rgba(0,0,0,0.18)" }
+                    : { background: "white", color: "#525252", border: "1px solid #E5E5E5" }
+                }
+              >
+                {label}
+                {count !== null && (
+                  <span
+                    className="text-[12px] px-1.5 py-0.5 rounded-full tabular-nums font-semibold"
+                    style={{
+                      background: active ? "rgba(255,255,255,0.18)" : "#F5F5F5",
+                      color: active ? "rgba(255,255,255,0.85)" : "#737373",
+                    }}
+                  >
+                    {count}
+                  </span>
+                )}
+              </button>
+            );
+            return (
+              <div className="w-full" style={{ maxWidth: 860 }}>
+                <div className="flex items-center gap-2 flex-wrap justify-center">
+                  {tabs.map((tab) => {
+                    const count = row?.counts[tab.id] ?? 0;
+                    if (tab.id !== "all" && count === 0) return null;
+                    return pill(
+                      tab.id,
+                      !imageMode && (row?.active ?? "all") === tab.id,
+                      lang === "en" ? tab.labelEn : tab.label,
+                      tab.id === "all" ? null : count,
+                      () => { setImageMode(false); row?.set(tab.id); },
+                    );
+                  })}
+                  {hasImages && pill(
+                    "__image",
+                    imageMode,
+                    lang === "en" ? "Images" : "圖片",
+                    imageCards.length,
+                    () => setImageMode(true),
+                    lang === "en" ? "Image cards in this channel's sizes." : "這個平台各種尺寸的圖片任務卡。",
+                  )}
+                </div>
               </div>
-            </div>
-          ) : platform === "facebook" ? (
-            <div className="w-full" style={{ maxWidth: 860 }}>
-              <div className="flex items-center gap-2 flex-wrap justify-center">
-                {FORMAT_TABS.map((tab) => {
-                  const active = activeFormat === tab.id;
-                  const count = formatCounts[tab.id] ?? 0;
-                  if (tab.id !== "all" && count === 0) return null;
-                  return (
-                    <button
-                      key={tab.id}
-                      onClick={() => setActiveFormat(tab.id)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all whitespace-nowrap"
-                      style={
-                        active
-                          ? { background: "#171717", color: "white", boxShadow: "0 2px 8px rgba(0,0,0,0.18)" }
-                          : { background: "white", color: "#525252", border: "1px solid #E5E5E5" }
-                      }
-                    >
-                      {lang === "en" ? tab.labelEn : tab.label}
-                      {tab.id !== "all" && (
-                        <span
-                          className="text-[12px] px-1.5 py-0.5 rounded-full tabular-nums font-semibold"
-                          style={{
-                            background: active ? "rgba(255,255,255,0.18)" : "#F5F5F5",
-                            color: active ? "rgba(255,255,255,0.85)" : "#737373",
-                          }}
-                        >
-                          {count}
-                        </span>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          ) : platform === "instagram" ? (
-            <div className="w-full" style={{ maxWidth: 860 }}>
-              <div className="flex items-center gap-2 flex-wrap justify-center">
-                {IG_FORMAT_TABS.map((tab) => {
-                  const active = activeIGFormat === tab.id;
-                  const count = igFormatCounts[tab.id] ?? 0;
-                  if (tab.id !== "all" && count === 0) return null;
-                  return (
-                    <button
-                      key={tab.id}
-                      onClick={() => setActiveIGFormat(tab.id)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all whitespace-nowrap"
-                      style={
-                        active
-                          ? { background: "#171717", color: "white", boxShadow: "0 2px 8px rgba(0,0,0,0.18)" }
-                          : { background: "white", color: "#525252", border: "1px solid #E5E5E5" }
-                      }
-                    >
-                      {lang === "en" ? tab.labelEn : tab.label}
-                      {tab.id !== "all" && (
-                        <span
-                          className="text-[12px] px-1.5 py-0.5 rounded-full tabular-nums font-semibold"
-                          style={{
-                            background: active ? "rgba(255,255,255,0.18)" : "#F5F5F5",
-                            color: active ? "rgba(255,255,255,0.85)" : "#737373",
-                          }}
-                        >
-                          {count}
-                        </span>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          ) : platform === "linkedin" ? (
-            <div className="w-full" style={{ maxWidth: 860 }}>
-              <div className="flex items-center gap-2 flex-wrap justify-center">
-                {LI_FORMAT_TABS.map((tab) => {
-                  const active = activeLIFormat === tab.id;
-                  const count = liFormatCounts[tab.id] ?? 0;
-                  if (tab.id !== "all" && count === 0) return null;
-                  return (
-                    <button
-                      key={tab.id}
-                      onClick={() => setActiveLIFormat(tab.id)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all whitespace-nowrap"
-                      style={
-                        active
-                          ? { background: "#171717", color: "white", boxShadow: "0 2px 8px rgba(0,0,0,0.18)" }
-                          : { background: "white", color: "#525252", border: "1px solid #E5E5E5" }
-                      }
-                    >
-                      {lang === "en" ? tab.labelEn : tab.label}
-                      {tab.id !== "all" && (
-                        <span
-                          className="text-[12px] px-1.5 py-0.5 rounded-full tabular-nums font-semibold"
-                          style={{
-                            background: active ? "rgba(255,255,255,0.18)" : "#F5F5F5",
-                            color: active ? "rgba(255,255,255,0.85)" : "#737373",
-                          }}
-                        >
-                          {count}
-                        </span>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          ) : platform === "youtube" ? (
-            <div className="w-full" style={{ maxWidth: 860 }}>
-              <div className="flex items-center gap-2 flex-wrap justify-center">
-                {YT_FORMAT_TABS.map((tab) => {
-                  const active = activeYTFormat === tab.id;
-                  const count = ytFormatCounts[tab.id] ?? 0;
-                  if (tab.id !== "all" && count === 0) return null;
-                  return (
-                    <button
-                      key={tab.id}
-                      onClick={() => setActiveYTFormat(tab.id)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all whitespace-nowrap"
-                      style={
-                        active
-                          ? { background: "#171717", color: "white", boxShadow: "0 2px 8px rgba(0,0,0,0.18)" }
-                          : { background: "white", color: "#525252", border: "1px solid #E5E5E5" }
-                      }
-                    >
-                      {lang === "en" ? tab.labelEn : tab.label}
-                      {tab.id !== "all" && (
-                        <span
-                          className="text-[12px] px-1.5 py-0.5 rounded-full tabular-nums font-semibold"
-                          style={{
-                            background: active ? "rgba(255,255,255,0.18)" : "#F5F5F5",
-                            color: active ? "rgba(255,255,255,0.85)" : "#737373",
-                          }}
-                        >
-                          {count}
-                        </span>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          ) : platform === "tiktok" ? (
-            <div className="w-full" style={{ maxWidth: 860 }}>
-              <div className="flex items-center gap-2 flex-wrap justify-center">
-                {TT_FORMAT_TABS.map((tab) => {
-                  const active = activeTTFormat === tab.id;
-                  const count = ttFormatCounts[tab.id] ?? 0;
-                  if (tab.id !== "all" && count === 0) return null;
-                  return (
-                    <button
-                      key={tab.id}
-                      onClick={() => setActiveTTFormat(tab.id)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all whitespace-nowrap"
-                      style={
-                        active
-                          ? { background: "#171717", color: "white", boxShadow: "0 2px 8px rgba(0,0,0,0.18)" }
-                          : { background: "white", color: "#525252", border: "1px solid #E5E5E5" }
-                      }
-                    >
-                      {lang === "en" ? tab.labelEn : tab.label}
-                      {tab.id !== "all" && (
-                        <span
-                          className="text-[12px] px-1.5 py-0.5 rounded-full tabular-nums font-semibold"
-                          style={{
-                            background: active ? "rgba(255,255,255,0.18)" : "#F5F5F5",
-                            color: active ? "rgba(255,255,255,0.85)" : "#737373",
-                          }}
-                        >
-                          {count}
-                        </span>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          ) : platform === "email" ? (
-            <div className="w-full" style={{ maxWidth: 860 }}>
-              <div className="flex items-center gap-2 flex-wrap justify-center">
-                {EM_FORMAT_TABS.map((tab) => {
-                  const active = activeEMFormat === tab.id;
-                  const count = emFormatCounts[tab.id] ?? 0;
-                  if (tab.id !== "all" && count === 0) return null;
-                  return (
-                    <button
-                      key={tab.id}
-                      onClick={() => setActiveEMFormat(tab.id)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all whitespace-nowrap"
-                      style={
-                        active
-                          ? { background: "#171717", color: "white", boxShadow: "0 2px 8px rgba(0,0,0,0.18)" }
-                          : { background: "white", color: "#525252", border: "1px solid #E5E5E5" }
-                      }
-                    >
-                      {lang === "en" ? tab.labelEn : tab.label}
-                      {tab.id !== "all" && (
-                        <span
-                          className="text-[12px] px-1.5 py-0.5 rounded-full tabular-nums font-semibold"
-                          style={{
-                            background: active ? "rgba(255,255,255,0.18)" : "#F5F5F5",
-                            color: active ? "rgba(255,255,255,0.85)" : "#737373",
-                          }}
-                        >
-                          {count}
-                        </span>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          ) : platform === "pr" ? (
-            <div className="w-full" style={{ maxWidth: 860 }}>
-              <div className="flex items-center gap-2 flex-wrap justify-center">
-                {PR_FORMAT_TABS.map((tab) => {
-                  const active = activePRFormat === tab.id;
-                  const count = prFormatCounts[tab.id] ?? 0;
-                  if (tab.id !== "all" && count === 0) return null;
-                  return (
-                    <button
-                      key={tab.id}
-                      onClick={() => setActivePRFormat(tab.id)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all whitespace-nowrap"
-                      style={
-                        active
-                          ? { background: "#171717", color: "white", boxShadow: "0 2px 8px rgba(0,0,0,0.18)" }
-                          : { background: "white", color: "#525252", border: "1px solid #E5E5E5" }
-                      }
-                    >
-                      {lang === "en" ? tab.labelEn : tab.label}
-                      {tab.id !== "all" && (
-                        <span
-                          className="text-[12px] px-1.5 py-0.5 rounded-full tabular-nums font-semibold"
-                          style={{
-                            background: active ? "rgba(255,255,255,0.18)" : "#F5F5F5",
-                            color: active ? "rgba(255,255,255,0.85)" : "#737373",
-                          }}
-                        >
-                          {count}
-                        </span>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          ) : platform === "website" ? (
-            <div className="w-full" style={{ maxWidth: 860 }}>
-              <div className="flex items-center gap-2 flex-wrap justify-center">
-                {WEB_FORMAT_TABS.map((tab) => {
-                  const active = activeWEBFormat === tab.id;
-                  const count = webFormatCounts[tab.id] ?? 0;
-                  if (tab.id !== "all" && count === 0) return null;
-                  return (
-                    <button
-                      key={tab.id}
-                      onClick={() => setActiveWEBFormat(tab.id)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all whitespace-nowrap"
-                      style={
-                        active
-                          ? { background: "#171717", color: "white", boxShadow: "0 2px 8px rgba(0,0,0,0.18)" }
-                          : { background: "white", color: "#525252", border: "1px solid #E5E5E5" }
-                      }
-                    >
-                      {lang === "en" ? tab.labelEn : tab.label}
-                      {tab.id !== "all" && (
-                        <span
-                          className="text-[12px] px-1.5 py-0.5 rounded-full tabular-nums font-semibold"
-                          style={{
-                            background: active ? "rgba(255,255,255,0.18)" : "#F5F5F5",
-                            color: active ? "rgba(255,255,255,0.85)" : "#737373",
-                          }}
-                        >
-                          {count}
-                        </span>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          ) : null}
+            );
+          })()}
 
           {/* 2026-09-06 通路選擇。沒有這一區，用戶被鎖在方案預設值上，
               「11 個通路選 2 個、每月可更換一次」那句賣點就不存在。 */}
@@ -1970,17 +1755,19 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
               const k = frontCardKind(t);
               if (k) counts[k] += 1;
             }
-            const tabs: Array<FrontCardKind | "all" | "image"> = ["all", ...FRONT_CARD_KINDS, ...(imageCards.length ? (["image"] as const) : [])];
+            // 圖片卡沒有「爆款結構／品牌自建」之分——看圖片時這列收起來。
+            if (imageMode) return null;
+            const tabs: Array<FrontCardKind | "all"> = ["all", ...FRONT_CARD_KINDS];
             return (
               <div className="mt-3 flex items-center gap-1.5 flex-wrap justify-center">
                 {tabs.map((id) => {
                   const active = activeSource === id;
-                  const acc = id === "all" || id === "viral" || id === "image" ? "#171717" : "#404040";
+                  const acc = id === "all" || id === "viral" ? "#171717" : "#404040";
                   return (
                     <button
                       key={id}
                       onClick={() => setActiveSource(id)}
-                      title={id === "all" ? undefined : id === "image" ? (lang === "en" ? "Image cards in this channel's sizes." : "這個平台各種尺寸的圖片任務卡。") : id === "viral" ? sourceWhy("viral", lang) : (lang === "en" ? "Cards you built for this brand." : "你替這個品牌自己建的卡。")}
+                      title={id === "all" ? undefined : id === "viral" ? sourceWhy("viral", lang) : (lang === "en" ? "Cards you built for this brand." : "你替這個品牌自己建的卡。")}
                       className="flex items-center gap-1.5 px-3 py-1 rounded-full text-tiny font-medium transition-all"
                       style={
                         active
@@ -1996,9 +1783,7 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                       )}
                       {id === "all"
                         ? (lang === "en" ? "All" : "全部")
-                        : id === "image"
-                          ? `${lang === "en" ? "Images" : "圖片"} ${imageCards.length}`
-                          : `${frontCardKindLabel(id, lang)} ${counts[id]}`}
+                        : `${frontCardKindLabel(id, lang)} ${counts[id]}`}
                     </button>
                   );
                 })}
@@ -2007,7 +1792,7 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
           })()}
 
           {/* Task count micro-label */}
-          <div className="mt-3 text-tiny text-default-400">
+          {!imageMode && <div className="mt-3 text-tiny text-default-400">
             {lang === "en"
               ? `${visibleTasks.length} of ${totalForPlatform} tasks`
               : `${visibleTasks.length} / ${totalForPlatform} 個任務`}
@@ -2016,7 +1801,7 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                 · {lang === "en" ? "Brand:" : "品牌腦："}<span className="font-medium text-default-600">{brandName}</span>
               </span>
             )}
-          </div>
+          </div>}
           {/* 2026-07-20 (CJ): failed catalog fetch is now visible + retryable
               instead of a silent 0/0. */}
           {strategyTopic && (
@@ -2060,12 +1845,32 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
 
       {/* ─── Task grid ─────────────────────────────────────────────────── */}
       <div className="max-w-[1200px] mx-auto px-6 pb-20 mt-2">
-        {activeSource === "image" ? (
-          <div className="grid gap-4" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))" }}>
-            {imageCards.map((c) => (
-              <ImageCardTile key={c.id} card={c} onOpen={() => navigate(imageCardHref(c.id))} />
-            ))}
-          </div>
+        {imageMode ? (
+          <>
+            <div className="grid gap-4" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))" }}>
+              {shownImageCards.map((c) => (
+                <ImageCardTile key={c.id} card={c} onOpen={() => navigate(imageCardHref(c.id))} />
+              ))}
+              {/* 跟「新增任務卡」同一個長相：它跟卡片並排，做的是同一件事的延伸。 */}
+              {brandId && (
+                <button
+                  onClick={() => setImagePickerOpen(true)}
+                  className="flex min-h-[180px] flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-neutral-300 bg-white text-neutral-500 transition hover:border-neutral-500 hover:text-neutral-800"
+                >
+                  <span className="flex h-8 w-8 items-center justify-center rounded-full border border-neutral-300">
+                    <AddIcon size={14} />
+                  </span>
+                  <span className="text-[14px] font-medium">
+                    {lang === "en" ? "Add image size" : "新增圖片尺寸"}
+                  </span>
+                </button>
+              )}
+            </div>
+            <div className="mt-4 flex items-center justify-center gap-1.5 text-[13px] text-neutral-500 tabular-nums">
+              <TaskCardsIcon size={12} /> {shownImageCards.length} / {imageCards.length}
+              <span className="ml-1">{lang === "en" ? "sizes on this channel" : "這個平台的尺寸"}</span>
+            </div>
+          </>
         ) : totalForPlatform === 0 && allTasks.length === 0 ? (
           <Card>
             <CardBody className="text-center text-default-500 py-12">
@@ -2436,6 +2241,15 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
           setDetailTaskId(null);
           if (t) openTask(t as any);
         }}
+      />
+      <ImageSizePicker
+        open={imagePickerOpen}
+        onClose={() => setImagePickerOpen(false)}
+        cards={imageCards}
+        selected={shownImageCards.map((c) => c.id)}
+        max={imageTrayQ.data?.max ?? 12}
+        saving={setImageTrayMut.isPending}
+        onSave={(ids) => imageChannel && brandId && setImageTrayMut.mutate({ brandId, channel: imageChannel as any, cardIds: ids })}
       />
       <TaskPicker
         open={pickerOpen}

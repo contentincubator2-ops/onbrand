@@ -3,10 +3,13 @@ import sharp from "sharp";
 import {
   IMAGE_CHANNELS,
   PLATFORM_IMAGE_SPECS,
+  MAX_IMAGE_TRAY,
   canvasPromptBlock,
+  defaultImageTray,
   gptSizeFor,
   nanoRatioFor,
   ratioError,
+  resolveImageTray,
 } from "./platformImageSpecs";
 import { buildImageCardPrompt, finalizeToSpec, normalizeDirections } from "./imageCards";
 
@@ -41,6 +44,45 @@ describe("platform image specs", () => {
     expect(nanoRatioFor(1080, 1440)).toBeNull();
     expect(nanoRatioFor(1200, 630)).toBeNull();
     expect(nanoRatioFor(2500, 1686)).toBeNull();
+  });
+
+  // 2026-09-30 CJ：每通路只預設擺兩張，其餘用戶自己加。
+  it.each(IMAGE_CHANNELS)("%s shows exactly two image cards by default", (ch) => {
+    const ids = defaultImageTray(ch);
+    expect(ids).toHaveLength(2);
+    for (const id of ids) expect(PLATFORM_IMAGE_SPECS.find((s) => s.id === id)?.channel).toBe(ch);
+  });
+
+  // 對照 OnBrand_圖片尺寸漏項清單.xlsx（2026-09-30）的 P1／P2 尺寸，每一個都要有卡。
+  it.each([
+    ["facebook", 1080, 1080], ["facebook", 1640, 856], ["facebook", 1200, 628], ["facebook", 1440, 1800], ["facebook", 1440, 2560],
+    ["instagram", 1080, 566], ["instagram", 1440, 1800], ["instagram", 1440, 2560], ["instagram", 1080, 1920],
+    ["line", 640, 640], ["line", 1080, 878], ["line", 1080, 1080], ["line", 1040, 1040], ["line", 2500, 1686], ["line", 2500, 843],
+    ["line", 1200, 628], ["line", 600, 400], ["line", 1280, 720], ["line", 640, 1284], ["line", 1200, 600], ["line", 1920, 1080],
+    ["line", 300, 600], ["line", 1125, 588],
+    ["threads", 1080, 1080], ["threads", 1200, 628], ["threads", 1200, 630], ["threads", 1440, 1800],
+    ["email", 1200, 480], ["email", 400, 400],
+    ["tiktok", 400, 400], ["tiktok", 1080, 1920], ["tiktok", 720, 1280], ["tiktok", 640, 640], ["tiktok", 1200, 628], ["tiktok", 600, 500],
+  ] as const)("%s has a %i×%i card", (ch, w, h) => {
+    expect(PLATFORM_IMAGE_SPECS.some((s) => s.channel === ch && s.width === w && s.height === h)).toBe(true);
+  });
+
+  it("ad cards are marked as ads", () => {
+    for (const s of PLATFORM_IMAGE_SPECS) {
+      if (/-ad-|^tt-an-/.test(s.id)) expect(s.placement, s.id).toBe("ad");
+      else expect(s.placement ?? "organic", s.id).toBe("organic");
+    }
+  });
+
+  it("resolves a brand's saved image tray and falls back to the two defaults", () => {
+    expect(resolveImageTray(null, "facebook")).toEqual({ ids: defaultImageTray("facebook"), isDefault: true });
+    const saved = { __imageTray: { facebook: ["fb-ad-story", "nope", "ig-img-story", "fb-ad-story", "fb-img-avatar"] } };
+    // 未知的、別通路的、重複的都濾掉。
+    expect(resolveImageTray(saved, "facebook")).toEqual({ ids: ["fb-ad-story", "fb-img-avatar"], isDefault: false });
+    // 存的全失效 → 回預設，不給空畫面。
+    expect(resolveImageTray({ __imageTray: { line: ["gone"] } }, "line").isDefault).toBe(true);
+    const many = { __imageTray: { facebook: PLATFORM_IMAGE_SPECS.filter((s) => s.channel === "facebook").map((s) => s.id) } };
+    expect(resolveImageTray(many, "facebook").ids.length).toBeLessThanOrEqual(MAX_IMAGE_TRAY);
   });
 
   it("canvas block states the exact size, the no-crop rule and the safe zone", () => {
