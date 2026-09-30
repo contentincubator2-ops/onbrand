@@ -8,7 +8,12 @@
  *   左：策略。階段列（總覽＋各段）、倒數、這檔／這一段要講什麼、傳播圈、
  *       跟內容企劃的對話卡（CampaignChatCard，第一則是企劃檢查）。
  *   右：策略地圖（CampaignMap）。總覽看整檔，點一段就放大到那一段。
- *   下：通路、設定、定稿後才出現的「到內容層寫」。
+ *   上：一條控制列——階段（總覽＋各段）、狀態、通路、底圖、設定、到內容層寫、全螢幕。
+ *
+ * 2026-09-30（CJ「左邊的對話在下方，而右方的企畫方向在右上方，會讓整個視線很不一致」
+ * →「將底下的企劃草稿的一系列 ICON 還有調整設定等，都移到右上方」＋「整個大畫布當中，
+ * 硬塞了一個小畫布…可以全螢幕嗎」）：控制列從底部搬到頂端、整個畫面撐滿可用高度
+ * （左右兩欄一樣高，地圖跟著長），並多一顆全螢幕。
  *
  * 分層沒有變：策略層只排不寫。定稿（標題旁的鎖頭，CampaignLockToggle）鎖整份——
  * 設定、重排、改每一篇都停住；內容層只寫定稿過的企劃。舊的 11 段活動定位留著當
@@ -24,7 +29,7 @@ import React from "react";
 import { useNavigate } from "react-router-dom";
 import { Button, Modal, ModalContent, ModalHeader, ModalBody, Spinner } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faMap, faPenNib, faSliders, faLockOpen, faLock, faArrowRight, faBookOpen, faImage, faCheck } from "@fortawesome/free-solid-svg-icons";
+import { faMap, faPenNib, faSliders, faLockOpen, faLock, faArrowRight, faBookOpen, faImage, faCheck, faExpand, faCompress, faBullseye } from "@fortawesome/free-solid-svg-icons";
 import { trpc } from "../../../../lib/trpc";
 import { useLang } from "../../../../lib/i18n";
 import { CHANNEL_META, channelLabel } from "../../../content/lib/channelMeta";
@@ -35,6 +40,8 @@ import CampaignMap from "./CampaignMap";
 import CampaignSetupForm from "./CampaignSetupForm";
 import CampaignChatCard from "./CampaignChatCard";
 import CampaignHandoff from "./CampaignHandoff";
+import CampaignKpiPanel from "./CampaignKpiPanel";
+import { money, metricLine } from "../../lib/campaignKpi";
 import {
   availableBackdrops, backdropForIndustry, backdropUrl, resolveBackdrop, BACKDROP_THEMES, DEFAULT_BACKDROP,
 } from "../../lib/campaignBackdrops";
@@ -58,6 +65,8 @@ export default function CampaignStage({ eventId, brandId }: { eventId: number; b
 
   const [plan, setPlan] = React.useState<CampaignPlan | null>(null);
   const [current, setCurrent] = React.useState<CampaignPhaseId | null>(null);
+  const [full, setFull] = React.useState(false);
+  const [kpiOpen, setKpiOpen] = React.useState(false);
   const [setupOpen, setSetupOpen] = React.useState(false);
   const [partner, setPartner] = React.useState<"kol" | "cobrand" | null>(null);
   const [pickerOpen, setPickerOpen] = React.useState(false);
@@ -97,6 +106,30 @@ export default function CampaignStage({ eventId, brandId }: { eventId: number; b
     }, 800);
   };
   React.useEffect(() => () => { if (timer.current) clearTimeout(timer.current); }, []);
+
+  const toggleFull = () => {
+    if (full) {
+      setFull(false);
+      if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {});
+    } else {
+      setFull(true);
+      document.documentElement.requestFullscreen?.().catch(() => {});
+    }
+  };
+  React.useEffect(() => {
+    if (!full) return;
+    const onChange = () => { if (!document.fullscreenElement) setFull(false); };
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape" && !document.fullscreenElement) setFull(false); };
+    document.addEventListener("fullscreenchange", onChange);
+    window.addEventListener("keydown", onKey);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("fullscreenchange", onChange);
+      window.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prev;
+    };
+  }, [full]);
 
   /** 對話提案按了「套用」：換掉企劃、馬上存（不等停手）。 */
   const applyPlan = (next: CampaignPlan) => {
@@ -170,11 +203,85 @@ export default function CampaignStage({ eventId, brandId }: { eventId: number; b
   };
 
   return (
-    <div className="max-w-[1240px] mx-auto w-full">
-      <div className="rounded-3xl border border-divider bg-content1 overflow-hidden shadow-small">
-        <div className="grid grid-cols-1 lg:grid-cols-[380px_minmax(0,1fr)]">
+    <div className={full ? "fixed inset-0 z-50 bg-background p-3 sm:p-4" : "w-full"}>
+      <div className={`rounded-3xl border border-divider bg-content1 overflow-hidden shadow-small flex flex-col ${full ? "h-full" : "lg:h-[calc(100vh-180px)] lg:min-h-[660px]"}`}>
+        {/* ── 上：控制列 ─────────────────────────────────────────── */}
+        <div className="border-b border-divider px-4 py-2.5 flex items-center gap-x-4 gap-y-2 flex-wrap shrink-0">
+          {full && <p className="text-medium font-bold mr-1 truncate max-w-[260px]" title={ev.name}>{ev.name}</p>}
+          <div className="flex items-center gap-1 flex-wrap" role="group" aria-label={L("階段", "Phases")}>
+            <button type="button" onClick={() => setCurrent(null)} aria-pressed={!cur}
+              className={`flex items-center gap-1.5 text-tiny font-semibold rounded-lg border px-2.5 py-1 mr-1 transition ${!cur ? "bg-foreground text-background border-foreground" : "border-default-300 text-default-600 hover:border-foreground"}`}>
+              <FontAwesomeIcon icon={faMap} />{L("總覽", "Overview")}
+            </button>
+            {phases.map((p) => {
+              const on = cur === p.id;
+              return (
+                <button key={p.id} type="button" onClick={() => setCurrent(p.id)} aria-pressed={on}
+                  className={`text-tiny font-semibold px-2 py-1 border-b-2 transition ${on ? "text-foreground border-foreground" : "text-default-400 border-transparent hover:text-default-700"}`}>
+                  {phaseShort(p.id, en)}
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="ml-auto flex items-center gap-2.5 flex-wrap justify-end">
+            {saveState === "saving" && <span className="text-tiny text-default-500">{L("儲存中…", "Saving…")}</span>}
+            {saveState === "saved" && <span className="text-tiny text-default-500">{L("已儲存", "Saved")}</span>}
+            {saveState === "error" && <span className="text-tiny text-danger max-w-[240px] truncate" title={saveErr}>{saveErr}</span>}
+            <span className={`flex items-center gap-1.5 text-tiny font-semibold ${locked ? "text-foreground" : "text-default-500"}`}
+              title={!locked && plan ? L("定稿後才能到內容層寫——按標題旁的鎖頭定稿", "Lock the plan (padlock by the title) to start writing") : undefined}>
+              <FontAwesomeIcon icon={locked ? faLock : faLockOpen} />
+              {locked
+                ? L(`已定稿 ${new Date(plan!.lockedAt!).toLocaleDateString("zh-TW")}`, `Locked ${new Date(plan!.lockedAt!).toLocaleDateString("en-US")}`)
+                : plan ? L("企劃草稿", "Draft") : L("尚未排企劃", "No plan yet")}
+            </span>
+            <span className="w-px h-5 bg-divider" />
+            <div className="flex gap-1.5" aria-label={L("通路", "Channels")}>
+              {DOCK_CHANNELS.map((c) => {
+                const on = (settings.channels ?? []).includes(c) || live.some((i) => i.platform === c);
+                return (
+                  <button key={c} type="button" disabled={locked || !plan}
+                    title={on ? channelLabel(c, en) : L(`加入 ${channelLabel(c, en)}：到設定裡勾選後重排，或直接跟內容企劃說`, `Add ${channelLabel(c, en)} in settings, or ask the planner`)}
+                    onClick={() => setSetupOpen(true)}
+                    className={`w-7 h-7 rounded-lg grid place-items-center text-tiny transition disabled:cursor-default ${on ? "bg-foreground text-background" : "bg-default-100 text-default-400 hover:text-default-700"}`}>
+                    <FontAwesomeIcon icon={CHANNEL_META[c]?.icon ?? faPenNib} />
+                  </button>
+                );
+              })}
+            </div>
+            <span className="w-px h-5 bg-divider" />
+            {plan?.kol && <Button size="sm" variant="light" radius="md" onPress={() => setPartner("kol")}>{L("網紅合作", "Influencers")}</Button>}
+            {plan?.cobrand && <Button size="sm" variant="light" radius="md" onPress={() => setPartner("cobrand")}>{L("異業合作", "Co-branding")}</Button>}
+            <Button size="sm" variant="light" radius="md" isIconOnly aria-label={L("底圖", "Backdrop")} title={L("底圖", "Backdrop")}
+              onPress={() => setPickerOpen(true)}>
+              <FontAwesomeIcon icon={faImage} />
+            </Button>
+            {plan && (
+              <Button size="sm" variant={plan.kpi ? "light" : "bordered"} radius="md" startContent={<FontAwesomeIcon icon={faBullseye} />}
+                onPress={() => setKpiOpen(true)}>{L("KPI 與預算", "KPIs & budget")}</Button>
+            )}
+            {plan && !locked && (
+              <Button size="sm" variant="bordered" radius="md" startContent={<FontAwesomeIcon icon={faSliders} />}
+                onPress={() => setSetupOpen(true)}>{L("調整設定", "Settings")}</Button>
+            )}
+            {locked && (
+              <Button size="sm" color="primary" radius="md" endContent={<FontAwesomeIcon icon={faArrowRight} />} onPress={goWrite}>
+                {L(`到內容層寫（還有 ${live.length - done} 篇）`, `Write in Content (${live.length - done} left)`)}
+              </Button>
+            )}
+            {/* 全螢幕時標題被蓋住，鎖頭跟著搬進來（同一顆，不是第二個入口）。 */}
+            {full && <div className="scale-75 -my-3"><CampaignLockToggle eventId={eventId} en={en} /></div>}
+            <Button size="sm" variant="light" radius="md" isIconOnly onPress={toggleFull}
+              aria-label={full ? L("離開全螢幕", "Exit full screen") : L("全螢幕", "Full screen")}
+              title={full ? L("離開全螢幕（Esc）", "Exit full screen (Esc)") : L("全螢幕", "Full screen")}>
+              <FontAwesomeIcon icon={full ? faCompress : faExpand} />
+            </Button>
+          </div>
+        </div>
+
+        <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-[380px_minmax(0,1fr)]">
           {/* ── 左：策略 ─────────────────────────────────────────── */}
-          <section className="relative bg-gradient-to-b from-default-50 to-default-100 min-w-0 lg:border-r border-b lg:border-b-0 border-divider overflow-hidden">
+          <section className="relative bg-gradient-to-b from-default-50 to-default-100 min-w-0 min-h-0 lg:border-r border-b lg:border-b-0 border-divider overflow-hidden">
             {pictured && (
               <>
                 <img src={backdropUrl(theme, "left")} alt="" aria-hidden draggable={false}
@@ -182,24 +289,8 @@ export default function CampaignStage({ eventId, brandId }: { eventId: number; b
                 <div className="absolute inset-x-0 top-0 h-3/5 bg-gradient-to-b from-default-50 via-default-50/85 to-transparent pointer-events-none" />
               </>
             )}
-            <div className="relative p-5 flex flex-col gap-4 h-full">
-            <div className="flex items-center gap-1 flex-wrap" role="group" aria-label={L("階段", "Phases")}>
-              <button type="button" onClick={() => setCurrent(null)} aria-pressed={!cur}
-                className={`flex items-center gap-1.5 text-tiny font-semibold rounded-lg border px-2.5 py-1 mr-1 transition ${!cur ? "bg-foreground text-background border-foreground" : "border-default-300 text-default-600 hover:border-foreground"}`}>
-                <FontAwesomeIcon icon={faMap} />{L("總覽", "Overview")}
-              </button>
-              {phases.map((p) => {
-                const on = cur === p.id;
-                return (
-                  <button key={p.id} type="button" onClick={() => setCurrent(p.id)} aria-pressed={on}
-                    className={`text-tiny font-semibold px-2 py-1 border-b-2 transition ${on ? "text-foreground border-foreground" : "text-default-400 border-transparent hover:text-default-700"}`}>
-                    {phaseShort(p.id, en)}
-                  </button>
-                );
-              })}
-            </div>
-
-            <div className="flex items-start justify-between gap-3">
+            <div className="relative p-5 flex flex-col gap-4 h-full overflow-y-auto">
+            <div className="flex items-start justify-between gap-3 shrink-0">
               <div>
                 <p className="text-6xl font-black leading-none tracking-tight tabular-nums">
                   {curPhase ? curPhase.count : cd.big}
@@ -217,7 +308,7 @@ export default function CampaignStage({ eventId, brandId }: { eventId: number; b
               </div>
             </div>
 
-            <div className="flex flex-col gap-1.5 min-h-[92px]">
+            <div className="flex flex-col gap-1.5 shrink-0">
               {curPhase ? (
                 <>
                   <p className="text-[11px] tracking-widest text-default-500">{L("這一段要做到", "THIS PHASE")}</p>
@@ -225,13 +316,28 @@ export default function CampaignStage({ eventId, brandId }: { eventId: number; b
                   {plan?.phaseMessages?.[curPhase.id] && (
                     <p className="text-small text-default-600">{L("訊息：", "Message: ")}{plan.phaseMessages[curPhase.id]}</p>
                   )}
+                  {plan?.kpi?.phases?.[curPhase.id] && (() => {
+                    const k = plan.kpi!.phases[curPhase.id]!;
+                    return (
+                      <p className="text-small text-default-600">
+                        {L("預算：", "Budget: ")}{money(k.budget, en)}（{k.share}%）
+                        {k.metrics.length ? `　KPI：${k.metrics.map((m) => metricLine(m, en)).join("、")}` : ""}
+                      </p>
+                    );
+                  })()}
                 </>
               ) : plan ? (
                 <>
                   <p className="text-[11px] tracking-widest text-default-500">{L("一句話訴求", "CORE MESSAGE")}</p>
                   <p className="text-xl font-bold leading-snug text-balance">{plan.smp}</p>
-                  {data.audience && <p className="text-small text-default-600">{L("對象：", "Audience: ")}{data.audience}</p>}
+                  {data.audience && <p className="text-small text-default-600 line-clamp-3" title={data.audience}>{L("對象：", "Audience: ")}{data.audience}</p>}
                   {settings.mechanic && <p className="text-small text-default-600">{L("機制：", "Offer: ")}{settings.mechanic}</p>}
+                  {plan.kpi && (plan.kpi.budget || plan.kpi.goals?.length) ? (
+                    <p className="text-small text-default-600">
+                      {plan.kpi.budget ? `${L("預算：", "Budget: ")}${money(plan.kpi.budget, en)}` : ""}
+                      {plan.kpi.goals?.length ? `${plan.kpi.budget ? "　" : ""}${L("目標：", "Goal: ")}${plan.kpi.goals.map((g) => metricLine(g, en)).join("、")}` : ""}
+                    </p>
+                  ) : null}
                 </>
               ) : (
                 <>
@@ -242,30 +348,31 @@ export default function CampaignStage({ eventId, brandId }: { eventId: number; b
             </div>
 
             {pictured
-              ? <div className="flex-1 min-h-[200px]" aria-hidden />
-              : <ReachFan phases={phases} lanes={lanes} items={items} current={cur} en={en} />}
+              ? <div className={`${plan ? "min-h-[120px]" : "flex-1 min-h-[200px]"} shrink-0`} aria-hidden />
+              : <div className="shrink-0"><ReachFan phases={phases} lanes={lanes} items={items} current={cur} en={en} /></div>}
 
             {plan && (
-              <CampaignChatCard eventId={eventId} plan={plan} phase={cur} notes={notes} locked={locked} en={en} onApply={applyPlan} />
+              <CampaignChatCard eventId={eventId} plan={plan} phase={cur} notes={notes} locked={locked} en={en} onApply={applyPlan} grow />
             )}
 
             <button type="button" onClick={goStrategyBasis}
-              className="self-start text-tiny text-default-500 hover:text-foreground flex items-center gap-1.5">
+              className="self-start shrink-0 text-tiny text-default-500 hover:text-foreground flex items-center gap-1.5">
               <FontAwesomeIcon icon={faBookOpen} />{L("策略依據：活動定位（11 段）", "Strategy basis: campaign positioning")}
             </button>
             </div>
           </section>
 
-          {/* ── 右：策略地圖 ─────────────────────────────────────── */}
-          <section className="min-w-0 relative bg-default-100">
+          {/* ── 右：策略地圖（撐滿這一欄的高度） ───────────────────── */}
+          <section className="min-w-0 min-h-0 relative bg-default-100 overflow-hidden">
             {plan ? (
               <CampaignMap
                 items={items} phases={phases} lanes={lanes} phaseMessages={plan.phaseMessages ?? {}}
                 current={cur} onPick={setCurrent} locked={locked} en={en} onPatchItem={patchItem}
-                backdrop={pictured ? <RightBackdrop id={theme} /> : undefined}
+                backdrop={pictured ? <RightBackdrop id={theme} /> : undefined} fill
+                phaseKpi={plan.kpi?.phases ?? {}}
               />
             ) : (
-              <div className="relative bg-default-100 p-4 sm:p-6 min-h-[420px]">
+              <div className="relative bg-default-100 p-4 sm:p-6 min-h-[420px] h-full overflow-y-auto">
                 {pictured && <div className="absolute inset-0 pointer-events-none"><RightBackdrop id={theme} /></div>}
                 <div className="relative bg-content1 rounded-2xl shadow-small p-5 max-w-[620px]">
                   <CampaignSetupForm eventId={eventId} data={data} brandProducts={brandProducts} hasPlan={false} en={en} />
@@ -274,53 +381,22 @@ export default function CampaignStage({ eventId, brandId }: { eventId: number; b
             )}
           </section>
         </div>
-
-        {/* ── 下：通路、設定、到內容層 ─────────────────────────────── */}
-        <div className="border-t border-divider px-4 py-3 flex items-center gap-3 flex-wrap">
-          <span className={`flex items-center gap-2 text-tiny font-semibold ${locked ? "text-foreground" : "text-default-500"}`}>
-            <FontAwesomeIcon icon={locked ? faLock : faLockOpen} />
-            {locked
-              ? L(`已定稿 ${new Date(plan!.lockedAt!).toLocaleDateString("zh-TW")}`, `Locked ${new Date(plan!.lockedAt!).toLocaleDateString("en-US")}`)
-              : plan ? L("企劃草稿", "Draft") : L("尚未排企劃", "No plan yet")}
-          </span>
-          <span className="w-px h-6 bg-divider hidden sm:block" />
-          <div className="flex gap-2" aria-label={L("通路", "Channels")}>
-            {DOCK_CHANNELS.map((c) => {
-              const on = (settings.channels ?? []).includes(c) || live.some((i) => i.platform === c);
-              return (
-                <button key={c} type="button" disabled={locked || !plan}
-                  title={on ? channelLabel(c, en) : L(`加入 ${channelLabel(c, en)}：到設定裡勾選後重排`, `Add ${channelLabel(c, en)} in settings, then re-plan`)}
-                  onClick={() => setSetupOpen(true)}
-                  className={`w-9 h-9 rounded-xl grid place-items-center text-small transition disabled:cursor-default ${on ? "bg-foreground text-background" : "bg-default-100 text-default-400 hover:text-default-700"}`}>
-                  <FontAwesomeIcon icon={CHANNEL_META[c]?.icon ?? faPenNib} />
-                </button>
-              );
-            })}
-          </div>
-          {plan?.kol && <Button size="sm" variant="light" radius="md" onPress={() => setPartner("kol")}>{L("網紅合作", "Influencers")}</Button>}
-          {plan?.cobrand && <Button size="sm" variant="light" radius="md" onPress={() => setPartner("cobrand")}>{L("異業合作", "Co-branding")}</Button>}
-          <Button size="sm" variant="light" radius="md" startContent={<FontAwesomeIcon icon={faImage} />} onPress={() => setPickerOpen(true)}>
-            {L("底圖", "Backdrop")}
-          </Button>
-
-          <div className="ml-auto flex items-center gap-3 flex-wrap">
-            {saveState === "saving" && <span className="text-tiny text-default-500">{L("儲存中…", "Saving…")}</span>}
-            {saveState === "saved" && <span className="text-tiny text-default-500">{L("已儲存", "Saved")}</span>}
-            {saveState === "error" && <span className="text-tiny text-danger">{saveErr.slice(0, 120)}</span>}
-            {plan && !locked && (
-              <Button size="sm" variant="bordered" radius="md" startContent={<FontAwesomeIcon icon={faSliders} />}
-                onPress={() => setSetupOpen(true)}>{L("調整設定", "Settings")}</Button>
-            )}
-            {locked ? (
-              <Button size="sm" color="primary" radius="md" endContent={<FontAwesomeIcon icon={faArrowRight} />} onPress={goWrite}>
-                {L(`到內容層寫（還有 ${live.length - done} 篇）`, `Write in Content (${live.length - done} left)`)}
-              </Button>
-            ) : plan ? (
-              <span className="text-tiny text-default-500">{L("定稿後才能到內容層寫——按標題旁的鎖頭定稿", "Lock the plan (padlock by the title) to start writing")}</span>
-            ) : null}
-          </div>
-        </div>
       </div>
+
+      <Modal isOpen={kpiOpen && !!plan} onClose={() => setKpiOpen(false)} size="3xl" scrollBehavior="inside">
+        <ModalContent>
+          <ModalHeader className="flex flex-col gap-1">
+            <span className="text-medium">{L("KPI 與預算", "KPIs & budget")}</span>
+            <span className="text-tiny font-normal text-default-500">{L("你填總數，專家拆到每一段、挑出要下廣告的貼文。各段加起來一定等於你填的總數。", "You set the totals; the specialist splits them across phases and picks posts to promote.")}</span>
+          </ModalHeader>
+          <ModalBody className="pb-6">
+            {plan && (
+              <CampaignKpiPanel eventId={eventId} plan={plan} locked={locked} en={en}
+                onApply={(next) => { applyPlan(next); setKpiOpen(false); }} />
+            )}
+          </ModalBody>
+        </ModalContent>
+      </Modal>
 
       <Modal isOpen={setupOpen} onClose={() => setSetupOpen(false)} size="2xl" scrollBehavior="inside">
         <ModalContent>
@@ -462,7 +538,7 @@ function ReachFan({ phases, lanes, items, current, en }: {
   const rings = phases.length ? phases.map((p) => p.id) : (["teaser", "launch", "sustain", "lastcall", "encore"] as CampaignPhaseId[]);
 
   return (
-    <div className="relative w-full max-w-[400px] mx-auto" style={{ aspectRatio: `${VW} / ${VH}` }} aria-hidden>
+    <div className="relative w-full max-w-[320px] mx-auto" style={{ aspectRatio: `${VW} / ${VH}` }} aria-hidden>
       <svg viewBox={`0 0 ${VW} ${VH}`} className="absolute inset-0 w-full h-full">
         {rings.map((id, i) => {
           const on = current === id;

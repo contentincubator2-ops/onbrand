@@ -22,27 +22,28 @@ import { faArrowLeft, faCheck, faEllipsis, faPenNib } from "@fortawesome/free-so
 import { CHANNEL_META, channelLabel } from "../../../content/lib/channelMeta";
 import { phaseOf, type CampaignPhaseId, type CampaignPlanItem } from "../../lib/campaignSchema";
 import { phaseShort, type StagePhase } from "../../lib/campaignStage";
+import { money, metricLine, PAID_CHANNELS, type PhaseKpi } from "../../lib/campaignKpi";
 
 const md = (s: string) => s.slice(5).replace("-", "/");
 const range = (p: StagePhase) => (p.from === p.to ? md(p.from) : `${md(p.from)} – ${md(p.to)}`);
 
-/** 量容器寬度——地圖的點與線要用同一套座標。 */
-function useWidth(ref: React.RefObject<HTMLDivElement | null>): number {
-  const [w, setW] = React.useState(0);
+/** 量容器大小——地圖的點與線要用同一套座標。 */
+function useSize(ref: React.RefObject<HTMLDivElement | null>): { w: number; h: number } {
+  const [s, setS] = React.useState({ w: 0, h: 0 });
   React.useLayoutEffect(() => {
     const el = ref.current;
     if (!el) return;
-    const update = () => setW(el.clientWidth);
+    const update = () => setS({ w: el.clientWidth, h: el.clientHeight });
     update();
     const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(update) : null;
     ro?.observe(el);
     return () => ro?.disconnect();
   }, [ref]);
-  return w;
+  return s;
 }
 
 export default function CampaignMap({
-  items, phases, lanes, phaseMessages, current, onPick, locked, en, onPatchItem, backdrop,
+  items, phases, lanes, phaseMessages, current, onPick, locked, en, onPatchItem, backdrop, fill, phaseKpi = {},
 }: {
   items: CampaignPlanItem[];
   phases: StagePhase[];
@@ -54,14 +55,22 @@ export default function CampaignMap({
   en: boolean;
   onPatchItem: (id: string, next: Partial<CampaignPlanItem>) => void;
   backdrop?: React.ReactNode;
+  /** 撐滿父層的高度（活動頁右欄）；通路之間的距離跟著拉開。 */
+  fill?: boolean;
+  /** 每一段的預算與 KPI（有設定才顯示）。 */
+  phaseKpi?: Partial<Record<CampaignPhaseId, PhaseKpi>>;
 }) {
   const L = (zh: string, e: string) => (en ? e : zh);
   const boxRef = React.useRef<HTMLDivElement>(null);
-  const W = useWidth(boxRef);
+  const { w: W, h: boxH } = useSize(boxRef);
 
   const G = W < 520 ? 44 : 112;                 // 左邊通路名稱那一欄
-  const HEAD = 112;                            // 每段上方的標題區
-  const laneH = lanes.length <= 3 ? 92 : lanes.length <= 5 ? 72 : 60;
+  const hasKpi = Object.keys(phaseKpi).length > 0;
+  const HEAD = hasKpi ? 150 : 112;             // 每段上方的標題區（有 KPI 時多兩行）
+  const baseLane = lanes.length <= 3 ? 92 : lanes.length <= 5 ? 72 : 60;
+  const laneH = fill && boxH > 0 && lanes.length
+    ? Math.max(baseLane, Math.min(150, (boxH - HEAD - 84) / lanes.length))
+    : baseLane;
   const H = Math.max(420, HEAD + lanes.length * laneH + 84);
   const n = Math.max(1, phases.length);
   const BW = W > 0 ? (W - G - 16) / n : 0;
@@ -87,7 +96,7 @@ export default function CampaignMap({
   const first = route[0]?.it.date;
 
   return (
-    <div ref={boxRef} className="relative w-full overflow-hidden bg-default-100" style={{ height: H }}>
+    <div ref={boxRef} className={`relative w-full overflow-hidden bg-default-100 ${fill ? "h-full" : ""}`} style={fill ? { minHeight: H } : { height: H }}>
       {backdrop && <div className="absolute inset-0 pointer-events-none">{backdrop}</div>}
 
       {/* ── 總覽地圖（放大時整層往那一段放大、淡出） ── */}
@@ -124,8 +133,8 @@ export default function CampaignMap({
         )}
         {W > 0 && pins.map(({ it, x, y }) => (
           <React.Fragment key={it.id}>
-            <span className={`absolute -translate-x-1/2 -translate-y-1/2 w-3.5 h-3.5 rounded-full border-[3px] ${it.outputId ? "bg-success border-success" : "bg-content1 border-foreground"}`}
-              style={{ left: x, top: y }} title={it.angle} />
+            <span className={`absolute -translate-x-1/2 -translate-y-1/2 w-3.5 h-3.5 border-[3px] ${it.paid ? "rounded-[3px]" : "rounded-full"} ${it.outputId ? "bg-success border-success" : it.paid ? "bg-foreground border-foreground" : "bg-content1 border-foreground"}`}
+              style={{ left: x, top: y }} title={it.paid ? `${L("廣告", "Ad")}｜${it.angle}` : it.angle} />
             <span className="absolute -translate-x-1/2 text-[10.5px] tabular-nums text-default-600 bg-content1/85 rounded px-1"
               style={{ left: x, top: y + 10 }}>{md(it.date)}</span>
           </React.Fragment>
@@ -139,7 +148,13 @@ export default function CampaignMap({
               <span className="text-small font-semibold">{phaseShort(p.id, en)}</span>
               <span className="text-[11px] text-default-500 tabular-nums">{range(p)}</span>
               {phaseMessages[p.id] && BW > 90 && (
-                <span className="text-[11.5px] leading-snug text-default-700 line-clamp-3">{phaseMessages[p.id]}</span>
+                <span className={`text-[11.5px] leading-snug text-default-700 ${hasKpi ? "line-clamp-2" : "line-clamp-3"}`}>{phaseMessages[p.id]}</span>
+              )}
+              {phaseKpi[p.id] && (
+                <span className="text-[11px] leading-snug text-default-600 tabular-nums">
+                  <b className="font-semibold text-foreground">{money(phaseKpi[p.id]!.budget, en)}</b>{phaseKpi[p.id]!.budget != null ? "・" : ""}{phaseKpi[p.id]!.share}%
+                  {phaseKpi[p.id]!.metrics[0] && BW > 90 && <span className="block truncate">{metricLine(phaseKpi[p.id]!.metrics[0]!, en)}</span>}
+                </span>
               )}
             </button>
           );
@@ -161,16 +176,18 @@ export default function CampaignMap({
           phase={phases[ci]!} message={phaseMessages[phases[ci]!.id] ?? ""}
           items={items.filter((i) => i.phase === phases[ci]!.id)} lanes={lanes}
           locked={locked} en={en} onBack={() => onPick(null)} onPatchItem={onPatchItem}
+          kpi={phaseKpi[phases[ci]!.id] ?? null}
         />
       )}
     </div>
   );
 }
 
-function PhaseDetail({ phase, message, items, lanes, locked, en, onBack, onPatchItem }: {
+function PhaseDetail({ phase, message, items, lanes, locked, en, onBack, onPatchItem, kpi }: {
   phase: StagePhase; message: string; items: CampaignPlanItem[]; lanes: string[];
   locked: boolean; en: boolean; onBack: () => void;
   onPatchItem: (id: string, next: Partial<CampaignPlanItem>) => void;
+  kpi: PhaseKpi | null;
 }) {
   const L = (zh: string, e: string) => (en ? e : zh);
   const navigate = useNavigate();
@@ -192,6 +209,13 @@ function PhaseDetail({ phase, message, items, lanes, locked, en, onBack, onPatch
         {message
           ? <p className="text-medium font-bold"><span className="text-tiny font-normal text-default-500 mr-2">{L("這一段的訊息", "Message")}</span>{message}</p>
           : <p className="text-tiny text-default-400">{L("這份企劃還沒有這一段的訊息，重排一次就會補上。", "No message for this phase yet — re-plan to add one.")}</p>}
+        {kpi && (
+          <div className="col-start-2 flex items-center gap-2 flex-wrap pt-1">
+            <Chip size="sm" variant="flat" className="tabular-nums">{L("預算 ", "Budget ")}{money(kpi.budget, en)}（{kpi.share}%）</Chip>
+            {kpi.metrics.map((m) => <Chip key={m.metric} size="sm" variant="bordered" className="tabular-nums">{metricLine(m, en)}</Chip>)}
+            {kpi.note && <span className="text-tiny text-default-500">{kpi.note}</span>}
+          </div>
+        )}
       </div>
       <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))" }}>
         {lanes.map((c) => {
@@ -214,6 +238,7 @@ function PhaseDetail({ phase, message, items, lanes, locked, en, onBack, onPatch
                   <div className="flex items-center gap-2 text-tiny">
                     <b className="tabular-nums">{md(i.date)}</b>
                     <Chip size="sm" variant="flat" className="h-5 text-[10.5px] max-w-[70%]" title={i.taskLabel}>{i.taskLabel}</Chip>
+                    {i.paid && <Chip size="sm" className="h-5 text-[10.5px] bg-foreground text-background">{L("廣告", "Ad")}</Chip>}
                     {i.outputId && <FontAwesomeIcon icon={faCheck} className="text-success" />}
                     {!locked && (
                       <button type="button" className="ml-auto text-default-400 hover:text-foreground px-1"
@@ -244,6 +269,11 @@ function PhaseDetail({ phase, message, items, lanes, locked, en, onBack, onPatch
                       <Button size="sm" variant="bordered" radius="md" onPress={() => onPatchItem(i.id, { enabled: !i.enabled })}>
                         {i.enabled ? L("這篇不做", "Skip") : L("放回企劃", "Put back")}
                       </Button>
+                      {PAID_CHANNELS.includes(i.platform) && (
+                        <Button size="sm" variant="bordered" radius="md" onPress={() => onPatchItem(i.id, { paid: !i.paid })}>
+                          {i.paid ? L("改為一般貼文", "Make organic") : L("這篇下廣告", "Promote as ad")}
+                        </Button>
+                      )}
                     </div>
                   )}
                 </div>

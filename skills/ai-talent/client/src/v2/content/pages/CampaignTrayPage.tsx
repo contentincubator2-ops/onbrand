@@ -329,7 +329,7 @@ export default function CampaignTrayPage() {
                   >
                     {/* 主角是「這則要發什麼」；用哪張卡是實作細節，降成 meta */}
                     <p className="text-small font-semibold leading-snug line-clamp-3">{i.angle}</p>
-                    <p className="text-tiny text-default-500 line-clamp-1">{i.taskLabel}</p>
+                    <p className="text-tiny text-default-500 line-clamp-1">{i.paid ? L("廣告・", "Ad · ") : ""}{i.taskLabel}</p>
                     <div className="mt-auto pt-2 flex items-center gap-2 border-t border-divider">
                       <span className="text-tiny font-medium text-default-700 truncate">
                         {written ? L("看產出 →", "View output →") : L("開始寫 →", "Write it →")}
