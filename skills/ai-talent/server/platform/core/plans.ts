@@ -171,14 +171,14 @@ export interface Plan {
 }
 
 export const PLANS: Record<PlanCode, Plan> = {
-  /** OnBrand 基礎 — NT$2,250／月，2 席。
+  /** onBrand Studio 基礎版 — NT$2,250／月，2 席。
    *  2026-09-06 Word 價目表：1 個品牌、12 通路選 2（每月可換）、自建卡 3 張、
    *  可用任務卡 213 張（得獎 99 ＋ 標竿 63 ＋ 平台通則 51；2026-09-21 對齊實際目錄）、成效層示意版；
    *  執行次數不限、企劃開放（兩級差在能力不在用量）。
    */
   drop_starter: {
     code: "drop_starter",
-    name: "OnBrand 基礎",
+    name: "onBrand Studio 基礎版",
     // 2026-07-15 (CJ「取消早鳥優惠，只呈現原價」): early-bird offer CLOSED for
     // new signups — standard price is the only public price. earlyBird* fields
     // are kept ONLY so existing users with the earlyBird DB flag keep their
@@ -273,7 +273,7 @@ export const PLANS: Record<PlanCode, Plan> = {
     ],
   },
 
-  /** OnBrand 專業 — NT$9,000／月，5 席。
+  /** onBrand Studio 專業版 — NT$9,000／月，5 席。
    *  2026-09-06 Word 價目表：1 個品牌、12 通路選 5（每月可換）、品牌＋產品 10 個
    *  ＋活動每月 1 次定位、自建卡 10 張、259 張任務卡（含爆款結構 46 張，每月更新）、
    *  審核工作流、成效層可加購。5 席是審核工作流的要求：產出者與放行者分開。
@@ -282,7 +282,7 @@ export const PLANS: Record<PlanCode, Plan> = {
    */
   drop_pro: {
     code: "drop_pro",
-    name: "OnBrand 專業",
+    name: "onBrand Studio 專業版",
     // 2026-07-15 (CJ): early-bird offer closed — see drop_starter note.
     priceTwdMonthly: 9000,                 // NT$9,000 standard monthly
     priceTwdAnnually: 90000,               // NT$90,000 standard annual (×10, 2 months free)
@@ -338,7 +338,7 @@ export const PLANS: Record<PlanCode, Plan> = {
   /** Enterprise — quote-based, contact sales. */
   enterprise: {
     code: "enterprise",
-    name: "企業版",
+    name: "企業客製版",
     priceTwdMonthly: -1,
     priceTwdAnnually: -1,
     trialDays: 0,

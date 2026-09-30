@@ -31,7 +31,7 @@ const C = {
 };
 
 /**
- * 2026-09-28（OnBrand 連接器）：Claude 連接 OnBrand 時會先把人帶到 /api/mcp-oauth/authorize，
+ * 2026-09-28（onBrand Studio 連接器）：Claude 連接 onBrand Studio 時會先把人帶到 /api/mcp-oauth/authorize，
  * 沒登入就轉來這裡並帶 ?next=。登入後要回到那個授權頁，否則使用者會落在 /planner、連接流程斷掉。
  * 只放行授權頁這一條路徑 —— 通用的 next 等於開放轉址。伺服器端（Google 回呼）有同一條規則。
  */
@@ -168,7 +168,7 @@ export default function LoginPage() {
                 <path d="M12 2 C 16 8, 22 14, 22 19 A 10 10 0 0 1 2 19 C 2 14, 8 8, 12 2 Z" fill={C.orange} stroke={C.ink} strokeWidth="2.2" strokeLinejoin="round" />
               </svg>
               <span className="text-[15px] font-extrabold" style={{ color: C.ink }}>
-                OnBrand<span style={{ color: C.orange }}>.ai</span>
+                onBrand <span style={{ color: C.orange }}>Studio</span>
               </span>
             </div>
             <button
@@ -379,8 +379,8 @@ export default function LoginPage() {
           {/* Trust footer */}
           <p className="text-center text-[12px] mt-6 leading-relaxed" style={{ color: C.muted }}>
             {lang === "en"
-              ? "By continuing you agree to our Terms & Privacy. SoWork × OnBrand"
-              : "繼續即代表同意《服務條款》與《隱私政策》。SoWork × OnBrand"}
+              ? "By continuing you agree to our Terms & Privacy. SoWork × onBrand Studio"
+              : "繼續即代表同意《服務條款》與《隱私政策》。SoWork × onBrand Studio"}
           </p>
         </div>
       </div>

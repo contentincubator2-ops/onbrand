@@ -379,8 +379,8 @@ export default function RegisterPage() {
 
           <p className="text-center text-[12px] mt-6 leading-relaxed" style={{ color: C.muted }}>
             {lang === "en"
-              ? "By signing up you agree to our Terms & Privacy. SoWork × OnBrand"
-              : "註冊即代表同意《服務條款》與《隱私政策》。SoWork × OnBrand"}
+              ? "By signing up you agree to our Terms & Privacy. SoWork × onBrand Studio"
+              : "註冊即代表同意《服務條款》與《隱私政策》。SoWork × onBrand Studio"}
           </p>
         </div>
       </div>

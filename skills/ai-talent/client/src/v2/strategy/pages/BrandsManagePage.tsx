@@ -303,8 +303,8 @@ export default function BrandsManagePage() {
               </h2>
               <p className="text-sm text-neutral-500 mb-6">
                 {lang === "en"
-                  ? "Your brand is where OnBrand starts. Once you set it up, AI learns your positioning, voice, and visual style — every task taps into that brand brain."
-                  : "品牌是 OnBrand 一切的起點。建立後 AI 自動分析定位、用詞、視覺風格，之後所有任務都會吃這份品牌大腦。"}
+                  ? "Your brand is where onBrand Studio starts. Once you set it up, AI learns your positioning, voice, and visual style — every task taps into that brand brain."
+                  : "品牌是 onBrand Studio 一切的起點。建立後 AI 自動分析定位、用詞、視覺風格，之後所有任務都會吃這份品牌大腦。"}
               </p>
               <button
                 onClick={() => setAddBrandOpen(true)}

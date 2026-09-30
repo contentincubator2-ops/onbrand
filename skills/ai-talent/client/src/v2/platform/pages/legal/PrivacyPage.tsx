@@ -1,5 +1,5 @@
 /**
- * 隱私政策 — OnBrand Privacy Policy (PDPA-compliant).
+ * 隱私政策 — onBrand Studio Privacy Policy (PDPA-compliant).
  * 2026-05-10. 由法律顧問 review 正式版替換 (TODO).
  */
 import { Link } from "react-router-dom";
@@ -65,8 +65,8 @@ export default function PrivacyPage() {
           <ul className="list-disc pl-6 space-y-1">
             <li>
               {isEn
-                ? "Deliver, maintain, and improve OnBrand."
-                : "提供、維護及改善 OnBrand 服務。"}
+                ? "Deliver, maintain, and improve onBrand Studio."
+                : "提供、維護及改善 onBrand Studio 服務。"}
             </li>
             <li>
               {isEn

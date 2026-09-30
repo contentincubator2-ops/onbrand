@@ -1,5 +1,5 @@
 /**
- * teamBoardApp — OnBrand 連接器的 MCP App（Claude 對話中嵌入的介面）。
+ * teamBoardApp — onBrand Studio 連接器的 MCP App（Claude 對話中嵌入的介面）。
  *
  * 2026-09-28（CJ「claude 哪個介面看起來比較像團隊在協作？customize、project 都不像」）：
  * Claude 原生介面永遠是「一個 Claude」，團隊感要由我們畫出來。這一頁是 team_board 與
@@ -17,7 +17,7 @@
 export const TEAM_BOARD_APP_HTML = `<!doctype html>
 <html lang="zh-Hant"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>OnBrand 團隊</title>
+<title>onBrand Studio 團隊</title>
 <style>
   :root{
     --bg:var(--color-background-primary,#ffffff);--bg2:var(--color-background-secondary,#f7f5f2);
@@ -71,7 +71,7 @@ export const TEAM_BOARD_APP_HTML = `<!doctype html>
   .row{display:flex;gap:8px;flex-wrap:wrap}
   @media (max-width:560px){.week{grid-template-columns:repeat(2,minmax(0,1fr))}}
 </style></head>
-<body><div class="wrap" id="root"><div class="empty">OnBrand 團隊連線中…</div></div>
+<body><div class="wrap" id="root"><div class="empty">onBrand Studio 團隊連線中…</div></div>
 <script>
 (function(){
   var root = document.getElementById("root");
@@ -160,7 +160,7 @@ export const TEAM_BOARD_APP_HTML = `<!doctype html>
     boardData = d;
     root.innerHTML =
       '<header><div><h1>' + esc(d.brand && d.brand.name) + ' 行銷團隊</h1><div class="sub">本週 ' + esc(d.weekStart) + ' 起</div></div><div class="sp"></div>' +
-      '<button data-open="' + esc(d.links && d.links.planner) + '">在 OnBrand 開啟本週企劃</button></header>' +
+      '<button data-open="' + esc(d.links && d.links.planner) + '">在 onBrand Studio 開啟本週企劃</button></header>' +
       '<h2>團隊成員</h2>' + team(d) +
       '<h2>本週企劃</h2>' + week(d) +
       '<h2>最近的工作</h2>' + workList(d);
@@ -193,7 +193,7 @@ export const TEAM_BOARD_APP_HTML = `<!doctype html>
       tabs +
       '<div class="post"><div class="ph">' + avatar({ name: brand.name, avatarUrl: brand.logoUrl }) + '<div><b>' + esc(brand.name) + '</b><span>預覽</span></div></div>' +
       '<div class="cap">' + esc(v.caption) + '</div>' + (tags ? '<div class="tags">' + esc(tags) + '</div>' : "") + img + '</div>' +
-      '<div class="row"><button class="primary" data-open="' + esc(d.link) + '">在 OnBrand 開啟、排程</button>' +
+      '<div class="row"><button class="primary" data-open="' + esc(d.link) + '">在 onBrand Studio 開啟、排程</button>' +
       '<button data-say="' + esc("我想調整「" + (d.taskLabel || "") + "」（成品 " + d.outputId + "，" + (v.label || "") + "）：") + '">請團隊修改</button></div>';
   }
 

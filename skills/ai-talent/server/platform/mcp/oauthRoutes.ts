@@ -1,5 +1,5 @@
 /**
- * oauthRoutes — OnBrand 連接器的 OAuth 2.1 端點（Claude 自訂連接器規格）。
+ * oauthRoutes — onBrand Studio 連接器的 OAuth 2.1 端點（Claude 自訂連接器規格）。
  *
  *   GET  /.well-known/oauth-protected-resource[/api/mcp/onbrand]  RFC 9728
  *   GET  /.well-known/oauth-authorization-server                  RFC 8414
@@ -48,7 +48,7 @@ export function protectedResourceMetadata(base: string) {
     authorization_servers: [base],
     bearer_methods_supported: ["header"],
     scopes_supported: ["onbrand"],
-    resource_name: "OnBrand AI",
+    resource_name: "onBrand Studio",
   };
 }
 
@@ -151,7 +151,7 @@ function page(res: Response, status: number, body: string, formActionOrigins: st
     `default-src 'none'; style-src 'unsafe-inline'; img-src 'self' data:; form-action 'self' ${formActionOrigins.join(" ")}; frame-ancestors 'none'; base-uri 'none'`,
   );
   res.status(status).type("html").send(`<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1"><title>OnBrand AI · 連接 Claude</title>
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>onBrand Studio · 連接 Claude</title>
 <style>
   :root{color-scheme:light dark;--bg:#faf8f5;--card:#fff;--ink:#1a1a1a;--mute:#6b6b6b;--line:#e7e2da;--accent:#e8590c}
   @media (prefers-color-scheme:dark){:root{--bg:#161514;--card:#1f1e1c;--ink:#f2f0ec;--mute:#a19d97;--line:#34312d}}
@@ -190,11 +190,11 @@ mcpOAuthRouter.get("/authorize", async (req: Request, res: Response) => {
     .map(([k, val]) => `<input type="hidden" name="${k}" value="${esc(val)}">`).join("");
 
   page(res, 200, `
-    <h1>${esc(clientLabel)} 想連接你的 OnBrand</h1>
-    <p>允許後，你在 Claude 裡就能直接調度 OnBrand 行銷團隊：</p>
+    <h1>${esc(clientLabel)} 想連接你的 onBrand Studio</h1>
+    <p>允許後，你在 Claude 裡就能直接調度 onBrand Studio 行銷團隊：</p>
     <ul>
       <li>讀取你的品牌大腦與品牌清單</li>
-      <li>用最新的任務卡產出貼文（會扣你 OnBrand 方案的點數）</li>
+      <li>用最新的任務卡產出貼文（會扣你 onBrand Studio 方案的點數）</li>
       <li>查看與排定本週企劃</li>
     </ul>
     <form method="post" action="/api/mcp-oauth/authorize">

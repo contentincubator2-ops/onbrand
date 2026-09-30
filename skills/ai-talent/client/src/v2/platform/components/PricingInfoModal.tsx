@@ -38,7 +38,7 @@ function getPlans(lang: "zh-TW" | "en") {
       highlight: false,
     },
     {
-      name: en ? "OnBrand Basic" : "OnBrand 基礎",
+      name: en ? "onBrand Studio Basic" : "onBrand Studio 基礎版",
       price: en ? "US$75 / mo" : "NT$2,250 / 月",
       badge: en ? "2 seats" : "2 席",
       detail: en ? `1 brand · pick 2 of ${CATALOG.channels} channels (swap monthly)` : `1 個品牌 · ${CATALOG.channels} 個通路選 2（每月可更換）`,
@@ -57,7 +57,7 @@ function getPlans(lang: "zh-TW" | "en") {
       highlight: false,
     },
     {
-      name: en ? "OnBrand Professional" : "OnBrand 專業",
+      name: en ? "onBrand Studio Professional" : "onBrand Studio 專業版",
       price: en ? "US$300 / mo" : "NT$9,000 / 月",
       badge: en ? "5 seats" : "5 席",
       detail: en ? `1 brand · pick 5 of ${CATALOG.channels} channels (swap monthly)` : `1 個品牌 · ${CATALOG.channels} 個通路選 5（每月可更換）`,
@@ -192,7 +192,7 @@ export default function PricingInfoModal({ isOpen, onClose }: Props) {
                 size="sm"
                 variant="bordered"
                 as="a"
-                href="mailto:sowork@sowork.ai?subject=OnBrand 方案升級"
+                href="mailto:sowork@sowork.ai?subject=onBrand Studio 方案升級"
                 startContent={<MailIcon size={12} />}
                 className="font-medium"
               >

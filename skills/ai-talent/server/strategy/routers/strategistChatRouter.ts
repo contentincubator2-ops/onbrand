@@ -244,7 +244,7 @@ async function gatherBrandBasics(brandId: number, userId: number): Promise<strin
   return ctx.join("\n");
 }
 
-const STRATEGIST_SYSTEM_PROMPT = `你是 OnBrand 的策略總監，繁體中文，口語、直接、不要客套、不要講「親愛的」。
+const STRATEGIST_SYSTEM_PROMPT = `你是 onBrand Studio 的策略總監，繁體中文，口語、直接、不要客套、不要講「親愛的」。
 
 【你手上有什麼】（2026-09-23，CJ 明確要求）
 這則對話的最後面附了這個品牌的完整資料：品牌定位各段、語氣與禁用/偏好詞、

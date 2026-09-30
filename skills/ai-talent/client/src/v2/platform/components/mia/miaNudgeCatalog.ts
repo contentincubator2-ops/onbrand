@@ -188,11 +188,11 @@ export const NUDGE_CATALOG = {
     message: {
       "zh-TW":
         "✅ 第一篇排定了。如果這個品牌還沒連 FB / IG，到「設定 → 帳號連結」" +
-        "可以串 OAuth，到時直接從 OnBrand 發布、不用再切回平台後台。",
+        "可以串 OAuth，到時直接從 onBrand Studio 發布、不用再切回平台後台。",
       en:
         "✅ Scheduled. If this brand hasn't connected FB / IG yet, head to " +
         "Settings → Connections to link OAuth — then you can publish directly " +
-        "from OnBrand without switching tabs.",
+        "from onBrand Studio without switching tabs.",
     },
     actions: [
       { kind: "navigate", url: "/connections", label: "連結平台 →" },
@@ -220,10 +220,10 @@ export const NUDGE_CATALOG = {
     id: "connections.fb_connected",
     message: {
       "zh-TW":
-        "🎉 FB 連好了。試試到任意一篇 FB 貼文點「直接發布」——OnBrand 會把文字" +
+        "🎉 FB 連好了。試試到任意一篇 FB 貼文點「直接發布」——onBrand Studio 會把文字" +
         "（含主題標籤、行動呼籲）一次推到粉專。發布紀錄保留在「行事曆」可以追蹤。",
       en:
-        "🎉 FB connected. Try any FB post → 'Publish directly' — OnBrand " +
+        "🎉 FB connected. Try any FB post → 'Publish directly' — onBrand Studio " +
         "pushes the copy (with hashtags + CTA) to your Page in one call. " +
         "History stays in the Calendar.",
     },
@@ -354,11 +354,11 @@ export const NUDGE_CATALOG = {
     message: {
       "zh-TW":
         "🎉 第一篇 FB 發布成功！48 小時後我會幫你拉觸及 / 互動數據——" +
-        "如果某些 hook 表現特別好，下次自動套用同個結構。不用記筆記，OnBrand 會學。",
+        "如果某些 hook 表現特別好，下次自動套用同個結構。不用記筆記，onBrand Studio 會學。",
       en:
         "🎉 First FB post published! In 48 hours I'll pull reach + engagement " +
         "data — if certain hooks perform notably better, I'll auto-apply the " +
-        "pattern next time. No need to take notes; OnBrand learns.",
+        "pattern next time. No need to take notes; onBrand Studio learns.",
     },
   },
 
@@ -597,11 +597,11 @@ export const NUDGE_CATALOG = {
     message: {
       "zh-TW":
         "你剛看的這個得獎案例——你知道它的工藝其實已經內建在哪個任務嗎？我可以告訴你。" +
-        `每一張爆款結構卡都說得出結構出處，這是 OnBrand 跟其他 AI 工具最大的差別。`,
+        `每一張爆款結構卡都說得出結構出處，這是 onBrand Studio 跟其他 AI 工具最大的差別。`,
       en:
         "That award case you just viewed — did you know its craft is already " +
         `encoded in one of our tasks? Ask me which one. Every one of our viral-structure cards ` +
-        "state where their structure comes from — that's OnBrand's deepest difference.",
+        "state where their structure comes from — that's onBrand Studio's deepest difference.",
     },
   },
 

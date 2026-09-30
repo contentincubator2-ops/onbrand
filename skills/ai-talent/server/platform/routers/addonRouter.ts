@@ -17,10 +17,10 @@ const SKUS = z.number().int().min(1).max(100000);
 async function assertCanRequest(userId: number): Promise<{ email: string | null }> {
   const plan = await loadUserPlan(userId);
   if (plan.planStatus === "expired" || plan.planStatus === "canceled") {
-    throw new TRPCError({ code: "FORBIDDEN", message: "方案已到期，請先續訂 OnBrand 專業。" });
+    throw new TRPCError({ code: "FORBIDDEN", message: "方案已到期，請先續訂 onBrand Studio 專業版。" });
   }
   if (!addonAvailableFor("ecom_reporting", plan.planCode)) {
-    throw new TRPCError({ code: "FORBIDDEN", message: "電商營運報告須搭配 OnBrand 專業（NT$9,000／月）訂閱。" });
+    throw new TRPCError({ code: "FORBIDDEN", message: "電商營運報告須搭配 onBrand Studio 專業版（NT$9,000／月）訂閱。" });
   }
   const [rows]: any = await localPool.execute(`SELECT email FROM users WHERE id = ? LIMIT 1`, [userId]);
   return { email: (rows as any[])[0]?.email ?? null };

@@ -176,7 +176,7 @@ async function gatherSessionContext(args: {
   return ctx.join("\n");
 }
 
-const MIA_SYSTEM_PROMPT = `你是 Mia，OnBrand AI by SoWork 的客戶成功經理。
+const MIA_SYSTEM_PROMPT = `你是 Mia，onBrand Studio by SoWork 的客戶成功經理。
 你說繁體中文，口語、不要客套、不要寫「親愛的」。
 你的工作是：
 1) 先給可執行的下一步（具體按鈕 / 頁面名稱）
@@ -215,7 +215,7 @@ const MIA_SYSTEM_PROMPT = `你是 Mia，OnBrand AI by SoWork 的客戶成功經�
 不要假裝你已經幫用戶觸發了任何後端動作（不要寫「已遠端觸發」「任務 ID #811」這種幻覺）。
 你只能：產生「行動按鈕」讓用戶自己點。
 
-關於 OnBrand AI（你必須知道的）：
+關於 onBrand Studio（你必須知道的）：
 - 核心：先用「SoWork 14 步品牌定位法」鎖定品牌定位，AI 寫文案才會像用戶的品牌
 - 任務規格（任務卡右上角標籤，**不要對用戶講 30s/60s/99s 這種秒數代號**）：單篇＝3 個 caption 變體＋視覺 brief（不直接生圖）/ 套組＝5 個 caption＋真的生圖＋留言模板 / 企劃＝再加 web research
 - 主要頁面（2026-05-27 起任務改「平台優先」，舊的 /30s /60s /99s 頁面已removed，絕對不要再給）：
@@ -344,7 +344,7 @@ export const supportRouter = router({
         // 讓別人知道怎麼運用它」): lead with who Mia is + what she can do,
         // with concrete example asks — not an interrogation.
         const greeting =
-          "嗨，我是 Mia，OnBrand AI 的客戶成功經理 👋\n" +
+          "嗨，我是 Mia，onBrand Studio 的客戶成功經理 👋\n" +
           "你可以這樣用我：\n" +
           "① 教你操作 — 例如問「靈感舞台怎麼用？」「怎麼讓文案更像我的品牌？」\n" +
           "② 排除問題 — 例如「定位跑不完」「圖生不出來」，我會幫你診斷並給解法\n" +
@@ -814,10 +814,10 @@ export const supportRouter = router({
       // We don't bail when no brand is found — the frontend already passes
       // {brandName} / {brandVoice} in the prompt for the common case.
       const systemPrompt = input.lang === "en"
-        ? "You are Mia, OnBrand's customer success manager. Respond in natural English. " +
+        ? "You are Mia, onBrand Studio's customer success manager. Respond in natural English. " +
           "No greetings or sign-offs — just the actionable next-step text. " +
           "Maximum 80 words. Never invent metrics or features."
-        : "你是 Mia，OnBrand 客戶成功經理。用自然口語繁體中文回應。" +
+        : "你是 Mia，onBrand Studio 客戶成功經理。用自然口語繁體中文回應。" +
           "不要打招呼或結尾——直接給可執行的下一步建議。" +
           "最多 80 字。不要編造數字或功能。";
 
@@ -870,7 +870,7 @@ export async function notifyAdminNewTicket(args: {
     const label = args.kind === "bug" ? "🐛 Bug 回報" : "🎧 客服升級";
     await sendEmail({
       to,
-      subject: `[OnBrand] ${label} #${args.refId}：${args.subject.slice(0, 80)}`,
+      subject: `[onBrand Studio] ${label} #${args.refId}：${args.subject.slice(0, 80)}`,
       html: `
         <div style="font-family:-apple-system,sans-serif;line-height:1.6;color:#333">
           <h2 style="margin:0 0 8px">${label} #${args.refId}</h2>

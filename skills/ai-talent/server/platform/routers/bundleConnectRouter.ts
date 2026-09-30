@@ -2,7 +2,7 @@
  * bundleConnectRouter — connect social accounts through bundle.social.
  *
  * bundle.social hosts the whole OAuth + channel-picking UI, so the browser only
- * needs a portal URL. Each OnBrand brand maps to one bundle.social team, stored
+ * needs a portal URL. Each onBrand Studio brand maps to one bundle.social team, stored
  * in brands.bundleTeamId. The Pipedream connect flow in publishRouter /
  * platformConnectRouter is left untouched — which path a platform uses is
  * decided by PUBLISH_PROVIDER_<PLATFORM>.
@@ -90,7 +90,7 @@ export const bundleConnectRouter = router({
       if (!brand) throw new TRPCError({ code: "NOT_FOUND", message: "品牌不存在" });
 
       // bundle.social caps team names at 80 chars.
-      const teamName = `OnBrand #${input.brandId} ${brand.name ?? ""}`.trim().slice(0, 80);
+      const teamName = `onBrand Studio #${input.brandId} ${brand.name ?? ""}`.trim().slice(0, 80);
 
       async function createAndStoreTeam(): Promise<string> {
         try {

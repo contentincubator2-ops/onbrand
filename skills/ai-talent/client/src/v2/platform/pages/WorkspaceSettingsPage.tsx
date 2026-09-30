@@ -33,8 +33,8 @@ const ROLE_LABEL_EN: Record<Role, string> = {
 const PLAN_LABEL: Record<string, string> = {
   trial:        "Trial",
   solo:         "Solo",
-  drop_starter: "OnBrand 基礎",
-  drop_pro:     "OnBrand 專業",
+  drop_starter: "onBrand Studio 基礎版",
+  drop_pro:     "onBrand Studio 專業版",
   enterprise:   "Enterprise",
 };
 
@@ -327,7 +327,7 @@ function WorkspaceDetail({ detail, onChanged }: { detail: any; onChanged: () => 
             )}
             <p className="mt-2 text-xs text-neutral-400">
               {lang === "en"
-                ? "They'll need an OnBrand account first. Basic: 2 seats; Professional: 5 seats."
+                ? "They'll need an onBrand Studio account first. Basic: 2 seats; Professional: 5 seats."
                 : "對方需先在 onbrand.sowork.ai 註冊。基礎方案 2 席，專業方案 5 席。"}
             </p>
           </div>
@@ -345,7 +345,7 @@ function WorkspaceDetail({ detail, onChanged }: { detail: any; onChanged: () => 
                 : "用你自己的公司名和 logo，給客戶看的工作報表會自動換成你的品牌。")
               : (lang === "en"
                 ? "Enterprise only — set up with SoWork during onboarding (your logo + name on client views)"
-                : "企業版功能 — 由 SoWork 導入時設定（用你的 logo + 公司名給客戶看）")}
+                : "企業客製版功能 — 由 SoWork 導入時設定（用你的 logo + 公司名給客戶看）")}
           </p>
           <div className="space-y-3 max-w-md">
             <div>

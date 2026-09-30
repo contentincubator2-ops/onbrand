@@ -108,7 +108,7 @@ export default function RequireAuthV2({ children }: { children: React.ReactNode 
             className="w-8 h-8 rounded-full border-2 border-default-200 border-t-violet-500 animate-spin"
           />
           <div className="text-small tracking-[0.2em] uppercase text-default-400">
-            OnBrand · 對版 · 載入中
+            onBrand Studio · 載入中
           </div>
         </div>
       </div>

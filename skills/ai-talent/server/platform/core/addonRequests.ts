@@ -111,7 +111,7 @@ export async function notifySalesNewAddonRequest(args: {
       : `建置 NT$${(r.quotedOneTimeTwd ?? 0).toLocaleString("en-US")} ＋ 月費 NT$${(r.quotedMonthlyTwd ?? 0).toLocaleString("en-US")}`;
     await sendEmail({
       to,
-      subject: `[OnBrand] 加購申請 #${r.id}：${label}（${r.skus} 品項）`,
+      subject: `[onBrand Studio] 加購申請 #${r.id}：${label}（${r.skus} 品項）`,
       html: `
         <div style="font-family:-apple-system,sans-serif;line-height:1.6;color:#333">
           <h2 style="margin:0 0 8px">加購申請 #${r.id}：${escapeHtml(label)}</h2>

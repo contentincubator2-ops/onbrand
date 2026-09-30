@@ -910,8 +910,8 @@ export function PublishTab({ brandId }: { brandId: number | null }) {
       <h2 className="text-2xl font-semibold text-default-900 mb-1">{en ? "Platform connections" : "平台連接"}</h2>
       <p className="text-sm text-default-500 mb-6">
         {en
-          ? "Connect your accounts once. OnBrand uses your authorization to publish content directly."
-          : "一次授權，之後 OnBrand 用你的授權直接發布內容。"}
+          ? "Connect your accounts once. onBrand Studio uses your authorization to publish content directly."
+          : "一次授權，之後 onBrand Studio 用你的授權直接發布內容。"}
       </p>
 
       {/* Platform card grid */}
@@ -1123,8 +1123,8 @@ export function PublishTab({ brandId }: { brandId: number | null }) {
 
       <p className="mt-5 text-xs text-default-400 leading-relaxed">
         {en
-          ? "OnBrand never stores your passwords. OAuth tokens are managed by Pipedream, isolated per brand. To fully revoke access, go to each platform's app settings and remove Pipedream."
-          : "OnBrand 不會儲存你的密碼。OAuth token 由 Pipedream 代管，每個品牌獨立。要徹底撤銷，請至各平台設定頁面移除 Pipedream 的存取權限。"}
+          ? "onBrand Studio never stores your passwords. OAuth tokens are managed by Pipedream, isolated per brand. To fully revoke access, go to each platform's app settings and remove Pipedream."
+          : "onBrand Studio 不會儲存你的密碼。OAuth token 由 Pipedream 代管，每個品牌獨立。要徹底撤銷，請至各平台設定頁面移除 Pipedream 的存取權限。"}
       </p>
     </div>
   );

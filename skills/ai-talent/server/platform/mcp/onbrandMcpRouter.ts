@@ -1,5 +1,5 @@
 /**
- * onbrandMcpRouter — 對外販售的 OnBrand 連接器（遠端 MCP，Streamable HTTP），掛在 /api/mcp/onbrand。
+ * onbrandMcpRouter — 對外販售的 onBrand Studio 連接器（遠端 MCP，Streamable HTTP），掛在 /api/mcp/onbrand。
  *
  * 2026-09-28（CJ「onbrand 變成 claude 外掛服務」）。跟 mosAgentsMcpRouter（內部用、免驗證的
  * 目錄查詢）是兩回事：這支必須帶 OAuth access token（oauthRoutes.ts 發的），每個工具都以
@@ -17,9 +17,9 @@ import { publicBaseUrl, MCP_RESOURCE_PATH } from "./oauthRoutes";
 export const onbrandMcpRouter = Router();
 
 const SUPPORTED_VERSIONS = ["2025-11-25", "2025-06-18", "2025-03-26"];
-const SERVER_INFO = { name: "onbrand", title: "OnBrand AI", version: "1.0.0" };
+const SERVER_INFO = { name: "onbrand", title: "onBrand Studio", version: "1.0.0" };
 const INSTRUCTIONS =
-  "OnBrand 是使用者的 AI 行銷團隊（品牌大腦＋持續更新的任務卡＋伺服器端的專屬寫手與設計）。" +
+  "onBrand Studio 是使用者的 AI 行銷團隊（品牌大腦＋持續更新的任務卡＋伺服器端的專屬寫手與設計）。" +
   "流程：list_brands → get_brand_context → list_tasks → describe_task（缺必填先問使用者）→ run_task → get_task_result。" +
   "使用者問團隊進度或要審稿時用 team_board。成品照原文交給使用者，不要自行改寫；品牌資訊以 get_brand_context 為準，不要自己假設。" +
   "跟使用者說話時，產出規模用「單篇／套組／企劃」，不要說 30s/60s/99s。";
@@ -47,7 +47,7 @@ function unauthorized(req: Request, res: Response, id: unknown) {
   const base = publicBaseUrl(req);
   res.status(401)
     .set("WWW-Authenticate", `Bearer resource_metadata="${base}/.well-known/oauth-protected-resource${MCP_RESOURCE_PATH}"`)
-    .json(rpcError(id ?? null, -32001, "需要登入 OnBrand（OAuth）"));
+    .json(rpcError(id ?? null, -32001, "需要登入 onBrand Studio（OAuth）"));
 }
 
 onbrandMcpRouter.post("/", async (req: Request, res: Response): Promise<void> => {
@@ -89,7 +89,7 @@ onbrandMcpRouter.post("/", async (req: Request, res: Response): Promise<void> =>
         return;
       case "resources/list":
         res.json(rpcResult(id, {
-          resources: [{ uri: UI_APP_URI, name: "onbrand_team_board", title: "OnBrand 團隊看板", mimeType: "text/html;profile=mcp-app" }],
+          resources: [{ uri: UI_APP_URI, name: "onbrand_team_board", title: "onBrand Studio 團隊看板", mimeType: "text/html;profile=mcp-app" }],
         }));
         return;
       case "resources/read": {
