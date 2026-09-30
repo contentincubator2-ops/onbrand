@@ -16,6 +16,10 @@
  * shadow；階層靠字重與留白。平台不用品牌色區分，用 FA icon + default 文字。
  *
  * 分層沒有變：這一頁沒有任何寫作介面，「寫」是通往內容層活動 tray 的門。
+ *
+ * 2026-09-30（CJ「要讓用戶可以選擇，該活動是搭配哪個產品 或是好幾個產品聯合或是
+ * 純品牌活動」）：搭配的產品從齒輪裡拿出來，跟那一段話放在一起（第一步就看得到）。
+ * 類型與通路仍然由 AI 推斷；「搭配什麼」使用者選了就以使用者為準，沒選才推斷。
  */
 import React from "react";
 import { useNavigate } from "react-router-dom";
@@ -34,6 +38,8 @@ import {
   EMPTY_CAMPAIGN_SETTINGS,
   type CampaignSettings, type CampaignPlanItem,
 } from "../../lib/campaignSchema";
+import { scopeValueFrom, UNDECIDED_SCOPE, type ProductScopeValue } from "../../lib/eventProductScope";
+import EventProductScopePicker from "./EventProductScopePicker";
 
 export default function CampaignWorkspace({ eventId, brandId }: { eventId: number; brandId: number | null }) {
   const { lang } = useLang();
@@ -49,7 +55,10 @@ export default function CampaignWorkspace({ eventId, brandId }: { eventId: numbe
 
   const [brief, setBrief] = React.useState("");
   const [settings, setSettings] = React.useState<CampaignSettings>(EMPTY_CAMPAIGN_SETTINGS);
-  const [productIds, setProductIds] = React.useState<number[]>([]);
+  const [scopeValue, setScopeValue] = React.useState<ProductScopeValue>(UNDECIDED_SCOPE);
+  // infer 的回呼要知道「使用者有沒有自己選過」——讀 ref，不讀 render 當下的閉包。
+  const scopeRef = React.useRef(scopeValue);
+  scopeRef.current = scopeValue;
   const [plan, setPlan] = React.useState<{ smp: string; items: CampaignPlanItem[]; kol?: any; cobrand?: any } | null>(null);
   const [expanded, setExpanded] = React.useState(false);
   const [openRow, setOpenRow] = React.useState<string | null>(null);
@@ -62,7 +71,7 @@ export default function CampaignWorkspace({ eventId, brandId }: { eventId: numbe
       const s = { ...EMPTY_CAMPAIGN_SETTINGS, ...(q.data.settings ?? {}) };
       setSettings(s);
       setBrief((prev) => prev || s.mechanic || "");
-      setProductIds((q.data.products ?? []).map((p: any) => p.id));
+      setScopeValue(scopeValueFrom(q.data.productScope, (q.data.products ?? []).map((p: any) => p.id)));
     }
     setPlan(q.data.plan ?? null);
   }, [q.data]);   // eslint-disable-line react-hooks/exhaustive-deps
@@ -70,7 +79,8 @@ export default function CampaignWorkspace({ eventId, brandId }: { eventId: numbe
   const inferMut = (trpc as any).campaign.infer.useMutation({
     onSuccess: (r: any) => {
       setSettings((s) => ({ ...s, type: r.type, mechanic: r.mechanic || brief, goal: r.goal ?? "", channels: r.channels }));
-      setProductIds(r.productIds ?? []);
+      // 使用者已經選了搭配什麼，就不讓推斷蓋掉；沒選才用推斷的結果。
+      if (scopeRef.current.scope === null) setScopeValue(scopeValueFrom(r.productScope, r.productIds ?? []));
       setDirty(true);
     },
     onError: (e: any) => setErr(e?.message ?? ""),
@@ -110,8 +120,12 @@ export default function CampaignWorkspace({ eventId, brandId }: { eventId: numbe
   /** 一步到位：存設定 → 排企劃。使用者要的是企劃，不是「儲存成功」。 */
   const saveAndGenerate = () => {
     setErr("");
-    const next = { ...settings, mechanic: (settings.mechanic || brief).trim() };
-    saveSettingsMut.mutate({ eventId, settings: next, productIds }, {
+    const { productScope: _stale, ...rest } = settings;
+    const next = {
+      ...rest, mechanic: (settings.mechanic || brief).trim(),
+      ...(scopeValue.scope ? { productScope: scopeValue.scope } : {}),
+    };
+    saveSettingsMut.mutate({ eventId, settings: next, productIds: scopeValue.productIds }, {
       onSuccess: () => generateMut.mutate({ eventId }),
     });
   };
@@ -139,9 +153,8 @@ export default function CampaignWorkspace({ eventId, brandId }: { eventId: numbe
 
   const ev = q.data?.event;
   const typeSpec = campaignTypeOf(settings.type);
-  const productNames = productIds
-    .map((id) => ((productsQ.data as any[]) ?? []).find((p: any) => p.id === id)?.name)
-    .filter(Boolean) as string[];
+  const brandProducts = (((productsQ.data as any[]) ?? []) as any[])
+    .map((p) => ({ id: Number(p.id), name: String(p.name) }));
 
   return (
     <div className="max-w-[880px] flex flex-col gap-6">
@@ -165,7 +178,7 @@ export default function CampaignWorkspace({ eventId, brandId }: { eventId: numbe
               {L("這檔活動在賣什麼、優惠是什麼？", "What's on offer?")}
             </h2>
             {configured && (
-              <Tooltip content={L("調整活動類型 / 通路 / 產品", "Adjust type, channels, products")} placement="top">
+              <Tooltip content={L("調整活動類型 / 通路", "Adjust type and channels")} placement="top">
                 <Button isIconOnly size="sm" variant="light" aria-label={L("設定", "Settings")}
                   onPress={() => setExpanded((v) => !v)}>
                   <FontAwesomeIcon icon={faGear} className="text-default-500" />
@@ -182,6 +195,11 @@ export default function CampaignWorkspace({ eventId, brandId }: { eventId: numbe
                            "e.g. Mid-Autumn bundle, 20% off early bird, 9/20–9/28, limited stock")}
           />
 
+          <EventProductScopePicker
+            products={brandProducts} value={scopeValue} en={en} isDisabled={busy}
+            onChange={(v) => { setScopeValue(v); setDirty(true); }}
+          />
+
           {configured ? (
             <div className="flex items-center gap-1.5 flex-wrap">
               {typeSpec && (
@@ -193,14 +211,11 @@ export default function CampaignWorkspace({ eventId, brandId }: { eventId: numbe
                   {channelLabel(c, en)}
                 </Chip>
               ))}
-              {productNames.map((n) => (
-                <Chip key={n} size="sm" variant="flat" color="default">{n}</Chip>
-              ))}
             </div>
           ) : (
             <p className="text-tiny text-default-500 leading-relaxed">
-              {L("寫完按「下一步」，我會判斷活動類型、要發的通路與適用產品——猜錯可以改。",
-                 "We'll work out the type, channels and products from this — you can correct it.")}
+              {L("寫完按「下一步」，我會判斷活動類型與要發的通路——猜錯可以改。",
+                 "We'll work out the type and channels from this — you can correct it.")}
             </p>
           )}
 
@@ -234,23 +249,6 @@ export default function CampaignWorkspace({ eventId, brandId }: { eventId: numbe
                         </Chip>
                       );
                     })}
-                  </div>
-                </div>
-                <div>
-                  <p className="text-tiny text-default-500 mb-2">{L("適用產品", "Products")}</p>
-                  <div className="flex gap-1.5 flex-wrap">
-                    {((productsQ.data as any[]) ?? []).map((p: any) => {
-                      const on = productIds.includes(p.id);
-                      return (
-                        <Chip key={p.id} size="sm" variant={on ? "solid" : "flat"} color="default" className="cursor-pointer"
-                          onClick={() => { setDirty(true); setProductIds((ids) => on ? ids.filter((x) => x !== p.id) : [...ids, p.id]); }}>
-                          {p.name}
-                        </Chip>
-                      );
-                    })}
-                    {!((productsQ.data as any[]) ?? []).length && (
-                      <span className="text-tiny text-default-500">{L("這個品牌還沒有產品", "No products yet")}</span>
-                    )}
                   </div>
                 </div>
                 {settings.type === "offline" && (

@@ -23,6 +23,8 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faRocket, faCubes, faCalendarDays } from "@fortawesome/free-solid-svg-icons";
 // 2026-09-10 (CJ 市場收斂): 見 BrandOnboardingWizard 的同一則說明。
 import { marketOptions, getCountry } from "../../../lib/countries";
+import EventProductScopePicker from "./positioning/EventProductScopePicker";
+import { UNDECIDED_SCOPE, type ProductScopeValue } from "../lib/eventProductScope";
 
 // 2026-07-18 (CJ 多市場): same list as BrandOnboardingWizard — common
 // languages first; the selected country's native language is auto-added.
@@ -135,6 +137,13 @@ export function AddEntityModal({ isOpen, onClose, initialTab = "brand", defaultB
   const [evStart, setEvStart] = useState("");
   const [evEnd, setEvEnd] = useState("");
   const [evNote, setEvNote] = useState("");
+  // 2026-09-30（CJ「新增活動的過程中，要讓用戶可以選擇…搭配哪個產品、好幾個產品聯合
+  // 或純品牌活動」）。沒選也能建立——宣傳企劃頁的第一步會再問一次同一題。
+  const [evScope, setEvScope] = useState<ProductScopeValue>(UNDECIDED_SCOPE);
+  const evBrandProducts: Array<{ id: number; name: string }> =
+    (((scopeOptions.data as any)?.products ?? []) as any[])
+      .filter((p) => Number(p.brandId) === Number(evBrandId))
+      .map((p) => ({ id: Number(p.id), name: String(p.name) }));
 
   // Reset on open
   useEffect(() => {
@@ -143,6 +152,7 @@ export function AddEntityModal({ isOpen, onClose, initialTab = "brand", defaultB
     setBrandCountry("TW"); setBrandLang("zh-TW");
     setProdBrandId(defaultBrandId ?? null); setProdName(""); setProdPositioning("");
     setEvBrandId(defaultBrandId ?? null); setEvName(""); setEvStart(""); setEvEnd(""); setEvNote("");
+    setEvScope(UNDECIDED_SCOPE);
   }, [isOpen, defaultBrandId]);
 
   const [busy, setBusy] = useState(false);
@@ -227,7 +237,15 @@ export function AddEntityModal({ isOpen, onClose, initialTab = "brand", defaultB
         name: evName.trim(),
         startAt: evStart || null,
         endAt: evEnd || null,
-        positioning: evNote.trim() ? { note: evNote.trim() } : undefined,
+        // 搭配的產品寫進 event_products；「純品牌」沒有產品可寫，所以記在
+        // positioning.campaign.productScope（語意見 server/strategy/core/eventProductScope.ts）。
+        ...(evScope.scope ? { productIds: evScope.productIds } : {}),
+        positioning: (evNote.trim() || evScope.scope)
+          ? {
+              ...(evNote.trim() ? { note: evNote.trim() } : {}),
+              ...(evScope.scope ? { campaign: { productScope: evScope.scope } } : {}),
+            }
+          : undefined,
       });
       const newId = Number(r?.id ?? 0);
       await refreshLists();
@@ -404,6 +422,7 @@ export function AddEntityModal({ isOpen, onClose, initialTab = "brand", defaultB
                   onSelectionChange={(keys) => {
                     const v = Array.from(keys as Set<string>)[0];
                     setEvBrandId(v ? Number(v) : null);
+                    setEvScope(UNDECIDED_SCOPE);   // 產品是跟著品牌的，換品牌就重選
                   }}
                   placeholder={lang === "en" ? "Pick a brand" : "請選擇品牌"}
                   isRequired
@@ -427,6 +446,12 @@ export function AddEntityModal({ isOpen, onClose, initialTab = "brand", defaultB
                   <Input type="date" value={evEnd} onValueChange={setEvEnd} />
                 </div>
               </div>
+              {evBrandId && (
+                <EventProductScopePicker
+                  products={evBrandProducts} value={evScope} onChange={setEvScope}
+                  en={lang === "en"} isDisabled={busy}
+                />
+              )}
               <div>
                 <label className="text-xs font-medium text-default-700 block mb-1">{lang === "en" ? "Theme / hooks (optional)" : "活動主題 / 重點（可選）"}</label>
                 <Textarea value={evNote} onValueChange={setEvNote} placeholder={lang === "en" ? "What's the angle, theme, or perks" : "活動的訴求 / 主題 / 配套"} minRows={2} />

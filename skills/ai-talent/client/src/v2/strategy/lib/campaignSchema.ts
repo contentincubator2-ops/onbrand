@@ -109,6 +109,13 @@ export function phaseOf(id: unknown): CampaignPhaseSpec | null {
   return CAMPAIGN_PHASES.find((p) => p.id === id) ?? null;
 }
 
+/**
+ * 這檔活動搭配什麼：products＝搭配產品（一個＝單一產品，多個＝聯合），brand＝純品牌活動。
+ * 沒有值＝還沒選。綁的產品本身存在 event_products，這裡只分辨「沒綁」是哪一種。
+ * 語意在 server/strategy/core/eventProductScope.ts。
+ */
+export type ProductScope = "brand" | "products";
+
 /** 使用者在「設定」填的東西。存在 events.positioning.campaign。 */
 export interface CampaignSettings {
   type: CampaignTypeId | "";
@@ -124,6 +131,7 @@ export interface CampaignSettings {
   signupUrl?: string;
   /** 合作模組：勾了企劃才會生出對應的段落。 */
   partners?: { kol?: boolean; cobrand?: boolean };
+  productScope?: ProductScope;
 }
 
 export const EMPTY_CAMPAIGN_SETTINGS: CampaignSettings = {
@@ -191,6 +199,7 @@ export function settingsFingerprint(s: CampaignSettings | null | undefined, prod
     venue: (s?.venue ?? "").trim(), sessions: (s?.sessions ?? "").trim(), signupUrl: (s?.signupUrl ?? "").trim(),
     partners: { kol: !!s?.partners?.kol, cobrand: !!s?.partners?.cobrand },
     products: [...productIds].sort((a, b) => a - b),
+    productScope: s?.productScope ?? "",
   };
   return JSON.stringify(norm);
 }

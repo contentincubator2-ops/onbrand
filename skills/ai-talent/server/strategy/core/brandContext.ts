@@ -11,6 +11,7 @@
 import { sql } from "drizzle-orm";
 import { getDb } from "../../db";
 import { buildMarketContext } from "./marketProfiles";
+import { loadEventProducts, productScopeBrief, resolveProductScope, type ScopedProduct } from "./eventProductScope";
 
 function safeParse(s: string): any {
   try { return JSON.parse(s); } catch { return null; }
@@ -123,6 +124,7 @@ const DISPLAY: Record<string, Display> = {
   "event|活動結束":              { category: "event", group: "基本資料", label: "結束日期" },
   "event|倒數":                  { category: "event", group: "基本資料", label: "倒數" },
   "event|活動":                  { category: "event", group: "基本資料", label: "進行天數" },
+  "event|活動搭配":              { category: "event", group: "基本資料", label: "搭配產品" },
   "event|活動定位摘要":          { category: "event", group: "戰略 Brief", label: "活動定位摘要" },
   "event|活動類型":              { category: "event", group: "戰略 Brief", label: "活動類型" },
   "event|核心問題":              { category: "event", group: "背景與問題", label: "核心問題" },
@@ -780,13 +782,23 @@ export async function buildBrandBrain(
       }
     }
 
+    // ── 活動搭配的產品（單一／聯合／純品牌，見 eventProductScope.ts）──
+    // 2026-09-30：以活動為範圍寫文案時，以前完全不知道這檔活動綁了哪些產品。
+    // 單一產品活動直接把那個產品當成本次聚焦的產品（完整產品定位），不用使用者
+    // 在任務視窗再選一次；聯合與純品牌則寫進活動區塊。
+    let eventProducts: ScopedProduct[] = [];
+    if (eventId) {
+      try { eventProducts = await loadEventProducts(eventId); } catch {/* non-fatal */}
+    }
+    const focusProductId = productId ?? (eventProducts.length === 1 ? eventProducts[0]!.id : null);
+
     // ── 產品定位 ──
     let productName: string | null = null;
-    if (productId) {
+    if (focusProductId) {
       try {
         const [prodRows]: any = await localPool.execute(
           `SELECT name, positioning FROM products WHERE id = ? LIMIT 1`,
-          [productId],
+          [focusProductId],
         );
         const p = Array.isArray(prodRows) ? prodRows[0] : null;
         if (p) {
@@ -856,6 +868,8 @@ export async function buildBrandBrain(
           }
           if (e.endAt) c.add("event", "event", "活動結束", new Date(e.endAt).toLocaleDateString("zh-TW"), 40);
           const ep = e.positioning ? (typeof e.positioning === "string" ? safeParse(e.positioning) : e.positioning) : null;
+          const productScope = resolveProductScope((ep as any)?.campaign?.productScope, eventProducts.length);
+          if (productScope) c.add("event", "event", "活動搭配", productScopeBrief(productScope, eventProducts), 900);
           if (ep && typeof ep === "object") {
             pushFrom(c, "event", "event", ep, [
               ["brief.briefSummary",             "活動定位摘要", 400],
