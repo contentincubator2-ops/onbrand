@@ -2738,6 +2738,31 @@ ${polishTemplate.polishHint}`
         if (allSkipped) console.warn(`[runSquadAuto] brandcheck skipped for ${input.squadSlug}: ${squadBrandConsistency[0]?.reason ?? "unknown"}`);
       }
 
+      // 4c. 法規合規檢查（2026-09-30 CJ「要多加一道寫完後的合規檢查」）——品牌有啟用中的
+      // 法規卡才跑；同樣只用剩下的時間，不夠就記 skipped。
+      let squadRegulationCompliance: any[] = [];
+      if (!strategyPublicPolicy && input.brandId && variants.some((v) => v.caption)) {
+        const { checkVariantsCompliance } = await import("../core/regulationCompliance");
+        const { enforceBrandRulesOnText } = await import("../../strategy/core/brandContext");
+        const regStartedAt = Date.now() - startedAt;
+        const remainingMs = 205_000 - (Date.now() - routeStartedAt) - 5_000;
+        const recs = await checkVariantsCompliance({
+          brandId: input.brandId,
+          captions: variants,
+          isZhTW: brandMarket.isZhTW,
+          timeoutMs: Math.min(25_000, remainingMs),
+          onFixed: async (vi, text) => {
+            variants[vi]!.caption = await enforceBrandRulesOnText(input.brandId, text).catch(() => text);
+          },
+        });
+        if (recs) {
+          squadRegulationCompliance = recs;
+          const allSkipped = recs.length > 0 && recs.every((r) => r.status === "skipped");
+          stages.push({ key: "regcheck", label: brandMarket.isZhTW ? "法規合規檢查" : "Regulation compliance check",
+            startedAt: regStartedAt, completedAt: Date.now() - startedAt, status: allSkipped ? "failed" : "done" });
+        }
+      }
+
       // 5. Build the background synthesis now, but do not start it until
       // the planning checkpoint has been committed and the HTTP response is
       // ready to return. Per user authorization, Anthropic receives only
@@ -2823,6 +2848,7 @@ ${polishTemplate.polishHint}`
                 variantCount: variants.length,
                 inputs: { topic: input.topic ?? "" },
                 brandConsistency: squadBrandConsistency,
+                regulationCompliance: squadRegulationCompliance,
               };
           const persisted = await recordTaskRun({
             userId,

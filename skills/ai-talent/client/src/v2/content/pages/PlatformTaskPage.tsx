@@ -175,7 +175,7 @@ const dicebear = (seed: string) =>
 // Tasks that should hold the modal open until image is done
 const HOLD_FOR_IMAGES = new Set<string>(["fb-60-single-full", "fb-99-carousel-5"]);
 
-function synthesizeStages(elapsedMs: number, tier: string, lang: string): any[] {
+function synthesizeStages(elapsedMs: number, tier: string, lang: string, hasRegulations = false): any[] {
   const L = (zh: string, en: string) => (lang === "en" ? en : zh);
   const t = elapsedMs;
   const isResearch = tier === "99s";
@@ -187,7 +187,9 @@ function synthesizeStages(elapsedMs: number, tier: string, lang: string): any[] 
   // 單篇實測約 8 秒寫完（2026-09-30 dev run 3784／3788）；套組以上維持 25 秒。
   const capEnd = capStart + (isProd ? 25000 : 9000);
   // 2026-09-30：文案寫完先過品牌一致性檢查（server brandConsistency.ts），圖與附加項都在它之後。
-  const checkEnd = capEnd + 8000;
+  const brandCheckEnd = capEnd + 8000;
+  // 2026-09-30：品牌有啟用中的法規卡時，一致性之後再過法規合規檢查（server regulationCompliance.ts）。
+  const checkEnd = hasRegulations ? brandCheckEnd + 8000 : brandCheckEnd;
   const genEnd = checkEnd + 10000;
   const extrasEnd = checkEnd + 14000;
   const qaEnd = extrasEnd + 8000;
@@ -202,7 +204,8 @@ function synthesizeStages(elapsedMs: number, tier: string, lang: string): any[] 
   if (isProd) stages.push(mk("strategist", L("Strategist 規劃敘事弧", "Strategist maps the narrative arc"), preEnd, stratEnd));
   stages.push(mk("caption", L("文案寫手 撰寫版本", "Caption writer drafts variants"), capStart, capEnd));
   stages.push(mk("brief", L("視覺指導寫風格指示", "Image director writes the visual brief"), capStart, capEnd));
-  stages.push(mk("brandcheck", L("品牌一致性檢查", "Brand consistency check"), capEnd, checkEnd));
+  stages.push(mk("brandcheck", L("品牌一致性檢查", "Brand consistency check"), capEnd, brandCheckEnd));
+  if (hasRegulations) stages.push(mk("regcheck", L("法規合規檢查", "Regulation compliance check"), brandCheckEnd, checkEnd));
   stages.push(mk("gen", L("AI 生圖", "AI paints the image"), checkEnd, genEnd));
   if (isProd) {
     stages.push(mk("extras", L("留言模板 / 發文時段 / 跟進", "Reply templates · timing · follow-up"), checkEnd, extrasEnd));
@@ -576,6 +579,11 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
   const [agentMeta, setAgentMeta] = useState<any | null>(null);
   const [imageAgentMeta, setImageAgentMeta] = useState<any | null>(null);
   const [orchestraStages, setOrchestraStages] = useState<any[] | null>(null);
+  // 2026-09-30：品牌有啟用中的法規卡 → 執行進度多一格「合規檢查」（跟 server 的 regcheck 對齊）。
+  const activeRegulationQ = (trpc as any).brandRegulation.activeCount.useQuery(
+    { brandId: brandId ?? 0 }, { enabled: !!brandId, staleTime: 60_000, refetchOnWindowFocus: false },
+  );
+  const activeRegulationCount: number = activeRegulationQ.data?.count ?? 0;
   const [latencyMs, setLatencyMs] = useState<number | null>(null);
 
   // Countdown
@@ -2827,7 +2835,7 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                   const tier = effectiveTier(activeTask);
                   const stagesNow = orchestraStages && orchestraStages.length > 0
                     ? orchestraStages
-                    : synthesizeStages(tickMs, tier, lang);
+                    : synthesizeStages(tickMs, tier, lang, activeRegulationCount > 0);
                   const agentRoster: Array<{ id?: number; name: string; title?: string; avatarUrl?: string | null; role?: string }> = [];
                   const cap = agentMeta ?? activeTask.agent;
                   if (cap) agentRoster.push({ id: cap.id, name: cap.name, title: cap.title, avatarUrl: cap.avatarUrl, role: lang === "en" ? "Writing caption" : "撰寫文案" });
@@ -2836,6 +2844,8 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                     { key: "plan",   stageKeys: ["scout", "pre", "strategist"], icon: "strategy", zh: "策略", en: "Plan" },
                     { key: "write",  stageKeys: ["caption"],                   icon: "content",  zh: "文案", en: "Copy" },
                     { key: "check",  stageKeys: ["brandcheck"],                icon: "shield",   zh: "一致性", en: "On-brand" },
+                    // 2026-09-30（CJ「寫在任務卡上的顯示進度，表示有進行合規檢查」）：品牌有啟用中的法規才出現。
+                    { key: "comply", stageKeys: ["regcheck"],                  icon: "regulation", zh: "合規檢查", en: "Compliance" },
                     { key: "image",  stageKeys: ["gen"],                       icon: "image",    zh: "圖片", en: "Image" },
                     { key: "review", stageKeys: ["extras", "qa"],              icon: "review",   zh: "審核", en: "Review" },
                   ];

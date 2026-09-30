@@ -222,6 +222,8 @@ export interface OrchestraResult {
     /** fixed 時的原稿 */
     before?: string;
   }>;
+  /** 2026-09-30: 法規合規檢查（regulationCompliance.ts），每個版本一筆；品牌沒有法規時是空陣列。 */
+  regulationCompliance?: import("./regulationCompliance").RegulationComplianceRecord[];
   /** 2026-07-20 (CJ QA 斷字/漏字 forensics): raw writer captions for any
    *  variant the post-processing chain modified — persisted to metadata so
    *  the corrupting transform can be identified by diffing against content. */
@@ -2611,6 +2613,41 @@ export async function runOrchestra(args: {
     }
     (captions as any).__brandConsistency = brandConsistency;
 
+    // ── 法規合規檢查（2026-09-30 CJ「要多加一道寫完後的合規檢查，也寫在任務卡上的顯示進度」）──
+    // 品牌在策略層「法規」有啟用中的卡才跑（沒有就不列這一關、不多花呼叫）。放在一致性檢查
+    // 之後、checkpoint 之前：用戶第一眼看到的就是審過的版本。跟一致性檢查同一套預算與修補。
+    const regulationCompliance: import("./regulationCompliance").RegulationComplianceRecord[] = [];
+    if (Array.isArray(captions) && captions.length && args.brandId
+        && !args.config.calendarMerge && !isStrategyDocTask) {
+      const { loadActiveRegulations } = await import("../../strategy/core/brandRegulations");
+      const hasRegs = (await loadActiveRegulations(args.brandId)).length > 0;
+      if (hasRegs) {
+        const stReg = stage("regcheck", "法規合規檢查");
+        const remaining = tierBudget - (Date.now() - startedAt) - 15_000;
+        const { checkVariantsCompliance } = await import("./regulationCompliance");
+        const recs = await checkVariantsCompliance({
+          brandId: args.brandId,
+          captions,
+          isZhTW: brandMarket.isZhTW,
+          timeoutMs: Math.min(25_000, remaining),
+          onFixed: async (vi, text) => {
+            let fixed = await enforceBrandRulesOnText(args.brandId, text).catch(() => text);
+            fixed = adCopyTask ? repairAdCopy(fixed, requestedUrl)
+              : shotListTask ? repairShotList(fixed)
+              : adSlotTask ? repairAdSlot(fixed, adSlotTask)
+              : fixed;
+            captions[vi]!.caption = fixed;
+          },
+        });
+        for (const r of recs ?? []) regulationCompliance.push(r);
+        const allSkipped = regulationCompliance.length > 0 && regulationCompliance.every((r) => r.status === "skipped");
+        stReg.status = allSkipped ? "failed" : "done";
+        stReg.completedAt = Date.now() - startedAt;
+        if (allSkipped) console.warn(`[orchestra] regcheck skipped for ${args.template.id}: ${regulationCompliance[0]?.reason ?? "unknown"}`);
+      }
+    }
+    (captions as any).__regulationCompliance = regulationCompliance;
+
     // ── Checkpoint (2026-05-14 「先回 caption + brief、image 跟 QA 變 async polling」) ─
     // Captions + briefs are ready. If the caller passed `onCheckpoint`,
     // (a) persist a PARTIAL mission_outputs row now with progress='caption_ready',
@@ -2710,6 +2747,7 @@ export async function runOrchestra(args: {
               audienceTag: args.audienceTag ?? null,
               productId: args.productId ?? null,
               eventId: args.eventId ?? null,
+              regulationCompliance: (captions as any).__regulationCompliance ?? [],
             },
             thumbnailUrl: null,
             progress: "caption_ready",
@@ -3111,6 +3149,7 @@ export async function runOrchestra(args: {
       // RunPage can trigger a friendly Mia nudge after generation.
       brandFixes: (captions as any).__brandFixes ?? [],
       brandConsistency: (captions as any).__brandConsistency ?? [],
+      regulationCompliance: (captions as any).__regulationCompliance ?? [],
       // 2026-07-20 (CJ QA 斷字/漏字 forensics): raw pre-transform captions.
       rawCaptions,
       strategist: strategistMeta && strategistAnchor
@@ -3210,6 +3249,8 @@ export async function runOrchestra(args: {
           // Mia nudge ("發現你寫了 X，已自動改成 Y，想調整定位嗎？").
           brandFixes: (result as any).brandFixes ?? [],
           brandConsistency: (result as any).brandConsistency ?? [],
+          // 2026-09-30：法規合規檢查（regulationCompliance.ts），成品頁顯示「已依 N 條法規檢查」。
+          regulationCompliance: (result as any).regulationCompliance ?? [],
           // 2026-07-20 (CJ QA 斷字/漏字 forensics): raw writer captions for
           // any variant the transform chain modified — diff against content
           // to identify the corrupting layer.
