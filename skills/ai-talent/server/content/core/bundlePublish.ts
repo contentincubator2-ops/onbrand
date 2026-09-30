@@ -58,7 +58,7 @@ function deriveTitle(caption: string): string {
     .split("\n")
     .map((line) => line.trim())
     .find((line) => line.length > 0);
-  return (firstLine ?? "OnBrand post").slice(0, TITLE_MAX_LENGTH);
+  return (firstLine ?? "onBrand Studio post").slice(0, TITLE_MAX_LENGTH);
 }
 
 export function buildBundlePostPayload(input: {

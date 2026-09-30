@@ -345,7 +345,7 @@ function WorkspaceDetail({ detail, onChanged }: { detail: any; onChanged: () => 
                 : "用你自己的公司名和 logo，給客戶看的工作報表會自動換成你的品牌。")
               : (lang === "en"
                 ? "Enterprise only — set up with SoWork during onboarding (your logo + name on client views)"
-                : "企業版功能 — 由 SoWork 導入時設定（用你的 logo + 公司名給客戶看）")}
+                : "企業客製版功能 — 由 SoWork 導入時設定（用你的 logo + 公司名給客戶看）")}
           </p>
           <div className="space-y-3 max-w-md">
             <div>

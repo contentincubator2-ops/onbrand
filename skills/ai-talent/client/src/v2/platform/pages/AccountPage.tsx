@@ -319,7 +319,7 @@ export default function AccountPage() {
                 )}
                 <p className="text-xs text-neutral-500 mb-4">
                   {unlimited
-                    ? (lang === "en" ? "Enterprise — no limit" : "企業版 · 無上限")
+                    ? (lang === "en" ? "Enterprise — no limit" : "企業客製版 · 無上限")
                     : pts.cycleDays === 7
                       ? (lang === "en" ? "Trial allocation · one-time grant" : "試用點數 · 一次性贈送")
                       : (lang === "en"

@@ -82,7 +82,7 @@ export function buildAllDayIcs(
   events: IcsAllDayEvent[],
   options: { prodId?: string; now?: Date } = {},
 ): string {
-  const prodId = options.prodId ?? "-//OnBrand//Content Calendar//ZH";
+  const prodId = options.prodId ?? "-//onBrand Studio//Content Calendar//ZH";
   const dtstamp = utcStamp(options.now ?? new Date());
 
   const lines: string[] = [

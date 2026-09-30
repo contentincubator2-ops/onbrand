@@ -56,7 +56,7 @@ export default function OnBrandLogo({ glyphOnly = false, size = 28, onClick, cla
             color: "#171717",
             display: "flex", alignItems: "baseline", gap: 2,
           }}>
-            OnBrand
+            onBrand
             <span style={{
               fontSize: Math.round(size * 0.34),
               fontWeight: 600,
@@ -65,7 +65,7 @@ export default function OnBrandLogo({ glyphOnly = false, size = 28, onClick, cla
               background: "linear-gradient(135deg, #18181B 0%, #71717A 100%)",
               WebkitBackgroundClip: "text",
               backgroundClip: "text",
-            }}>AI</span>
+            }}>Studio</span>
           </span>
           <span style={{
             fontSize: Math.round(size * 0.30),

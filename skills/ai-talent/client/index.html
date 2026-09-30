@@ -39,26 +39,20 @@
     <meta property="og:url" content="https://onbrand.sowork.ai/" />
     <meta property="og:locale" content="zh_TW" />
     <meta property="og:locale:alternate" content="en_US" />
-    <!-- 2026-06-12: og-onbrand-cover.png is the canonical asset (production CDN).
-         If/when missing, the .svg fallback below is a 1200×630 editorial-style
-         placeholder shipped in /public/static/covers/og-onbrand-cover.svg.
-         Most crawlers honour the first valid tag, so PNG stays primary. -->
-    <meta property="og:image" content="https://onbrand.sowork.ai/static/covers/og-onbrand-cover.png" />
+    <!-- 2026-09-30: onBrand Studio 分享封面。原始檔 og-src/og.html，node og-src/render.mjs 重產。
+         不放 /static/covers：那個路徑在 VM 上是用戶上傳圖的 symlink，部署時會被蓋掉。 -->
+    <meta property="og:image" content="https://onbrand.sowork.ai/static/og/onbrand-studio-og.png" />
     <meta property="og:image:type" content="image/png" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
     <meta property="og:image:alt" content="onBrand Studio｜經過訓練與認證的 AI 行銷團隊" />
-    <!-- SVG fallback (works on Facebook + most modern crawlers; Twitter/LinkedIn skip) -->
-    <meta property="og:image" content="https://onbrand.sowork.ai/static/covers/og-onbrand-cover.svg" />
-    <meta property="og:image:type" content="image/svg+xml" />
 
     <!-- Twitter / X -->
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:site" content="@SoWorkAI" />
     <meta name="twitter:title" content="onBrand Studio｜經過訓練與認證的 AI 行銷團隊" />
     <meta name="twitter:description" content="懂品牌大腦 ＋ 擁有任務庫 ＋ 整合公司的 AI 技能。一支訓練好的 AI 行銷團隊。" />
-    <!-- Twitter doesn't accept SVG; if PNG is missing the card falls back to text-only -->
-    <meta name="twitter:image" content="https://onbrand.sowork.ai/static/covers/og-onbrand-cover.png" />
+    <meta name="twitter:image" content="https://onbrand.sowork.ai/static/og/onbrand-studio-og.png" />
     <meta name="twitter:image:alt" content="onBrand Studio｜經過訓練與認證的 AI 行銷團隊" />
 
     <!-- ── JSON-LD: Organization (parent SoWork + this product) ─────────── -->
@@ -70,7 +64,7 @@
       "name": "onBrand Studio",
       "alternateName": ["onBrand", "OnBrand", "OnBrand AI"],
       "url": "https://onbrand.sowork.ai/",
-      "logo": "https://onbrand.sowork.ai/static/covers/og-onbrand-cover.png",
+      "logo": "https://onbrand.sowork.ai/static/og/onbrand-studio-og.png",
       "description": "onBrand Studio 是 SoWork 打造、經過訓練與認證的 AI 行銷團隊：懂品牌大腦（SoWork 14 步品牌定位法）、擁有每月更新的任務庫，還能整合公司自己的 AI 技能，負責 Facebook、Instagram、Threads、LINE、TikTok、電子報（EDM）、官網七個通路的內容。",
       "areaServed": {
         "@type": "Country",

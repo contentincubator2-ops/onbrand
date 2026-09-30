@@ -1907,7 +1907,7 @@ function AccountPopup({ onLogout, onClose, onOpenSupport }: {
         if (onOpenSupport) {
           onOpenSupport();
         } else {
-          window.location.href = "mailto:sowork@sowork.ai?subject=OnBrand%20%E5%B0%8D%E7%89%88%20%E6%94%AF%E6%8F%B4";
+          window.location.href = "mailto:sowork@sowork.ai?subject=onBrand%20Studio%20%E6%94%AF%E6%8F%B4";
         }
       },
     },
@@ -2263,7 +2263,7 @@ class RouteErrorBoundary extends React.Component<
                 回到首頁
               </button>
               <a
-                href={`mailto:sowork@sowork.ai?subject=${encodeURIComponent("OnBrand 頁面錯誤 " + window.location.pathname)}&body=${encodeURIComponent("錯誤訊息：\n" + (this.state.error?.message ?? "") + "\n\n頁面：" + window.location.href)}`}
+                href={`mailto:sowork@sowork.ai?subject=${encodeURIComponent("onBrand Studio 頁面錯誤 " + window.location.pathname)}&body=${encodeURIComponent("錯誤訊息：\n" + (this.state.error?.message ?? "") + "\n\n頁面：" + window.location.href)}`}
                 style={{ fontSize: 12, color: "#3f3f46", textDecoration: "underline", marginLeft: "auto", alignSelf: "center" }}
               >
                 聯絡客服

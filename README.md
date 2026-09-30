@@ -1,6 +1,6 @@
-# OnBrand AI
+# onBrand Studio
 
-> 永遠 on-brand 的 AI 行銷工作室：把 SoWork 的品牌定位方法寫進 Brand Brain，再由多模型 AI 與專業任務流程，產出、編排並發布一致的跨平台行銷內容。
+> 經過訓練與認證的 AI 行銷團隊：把 SoWork 的品牌定位方法寫進 Brand Brain，再由多模型 AI 與專業任務流程，產出、編排並發布一致的跨平台行銷內容。
 
 [單檔專案說明頁](docs/project-overview.html)（GitHub 會顯示原始檔；請下載或由靜態檔案伺服器開啟。）
 
@@ -8,7 +8,7 @@
 
 ## 這個專案在做什麼？
 
-OnBrand AI 是一套從「品牌策略」一路做到「內容執行與發布」的 AI 行銷平台。它不是只有一個聊天框，而是把品牌、產品、活動、受眾、語氣、證據來源與歷史產出組成可重用的 Brand Brain，再交給不同 AI Agent 協作完成任務。
+onBrand Studio（原名 OnBrand AI）是一套從「品牌策略」一路做到「內容執行與發布」的 AI 行銷平台。它不是只有一個聊天框，而是把品牌、產品、活動、受眾、語氣、證據來源與歷史產出組成可重用的 Brand Brain，再交給不同 AI Agent 協作完成任務。
 
 典型使用流程：
 
@@ -32,7 +32,7 @@ OnBrand AI 是一套從「品牌策略」一路做到「內容執行與發布」
 
 ```mermaid
 flowchart LR
-    U["使用者／瀏覽器"] --> FE["React 18 + Vite\nOnBrand Studio"]
+    U["使用者／瀏覽器"] --> FE["React 18 + Vite\nonBrand Studio"]
     FE -->|"tRPC / REST / SSE"| API["Express API"]
     API --> DOM["品牌、任務、專案、日曆、帳務 routers"]
     DOM --> ORCH["Agent orchestration\nA2A / Queue / QA"]
@@ -299,7 +299,7 @@ npx playwright test
 - client 的 GA4、Meta Pixel、Microsoft Clarity ID 仍是 placeholder；目前不可宣稱 analytics 已啟用。
 - 安全性事件、憑證輪替與弱點位置應只記錄於私人 security issue；公開文件僅保留一般性安全政策。
 - 根 README、根 scripts 與部分 `docs/` 曾長期落後；未來應以 active import、route、runtime guard 與測試為 source of truth。
-- `onbrand-onepager/` 仍是 Vite starter；`skills/mobile/` 是原型。兩者都不是目前 OnBrand Studio 的 production entry。
+- `onbrand-onepager/` 仍是 Vite starter；`skills/mobile/` 是原型。兩者都不是目前 onBrand Studio 的 production entry。
 
 ## 延伸文件
 
@@ -313,4 +313,4 @@ npx playwright test
 
 ---
 
-OnBrand AI 是產品名稱；SoWork 是營運與方法論來源。OpenClaw／Slack gateway 仍是可選整合，不再是整個 Web 產品的唯一入口。
+onBrand Studio 是產品名稱（2026-09-30 由 OnBrand AI 正名）；SoWork 是營運與方法論來源。OpenClaw／Slack gateway 仍是可選整合，不再是整個 Web 產品的唯一入口。

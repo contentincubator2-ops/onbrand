@@ -1,5 +1,5 @@
 /**
- * onbrandTools — OnBrand 連接器（/api/mcp/onbrand）對 Claude 開放的工具。
+ * onbrandTools — onBrand Studio 連接器（/api/mcp/onbrand）對 Claude 開放的工具。
  *
  * 2026-09-28（CJ「變成 claude 外掛服務」「用 SoWork 當範例做自主行銷團隊」）。
  *
@@ -123,7 +123,7 @@ function statusOf(progress: string | null | undefined): WorkStatus {
 const listBrands: ToolDef = {
   name: "list_brands",
   title: "列出品牌",
-  description: "列出使用者在 OnBrand 可以操作的品牌（自己的，以及被邀請加入的）。其他工具都要 brandId，第一步先呼叫這個。",
+  description: "列出使用者在 onBrand Studio 可以操作的品牌（自己的，以及被邀請加入的）。其他工具都要 brandId，第一步先呼叫這個。",
   inputSchema: { type: "object", properties: {}, additionalProperties: false },
   readOnly: true,
   run: async (_a, ctx) => {
@@ -137,7 +137,7 @@ const listBrands: ToolDef = {
     const brands = (rows as any[]).map((r) => ({ id: Number(r.id), name: r.name, industry: r.industry ?? null, website: r.website ?? null }));
     const lines = brands.map((b) => `- ${b.name}（brandId ${b.id}${b.industry ? `，${b.industry}` : ""}）`);
     return {
-      text: brands.length ? `共 ${brands.length} 個品牌：\n${lines.join("\n")}` : "這個帳號還沒有品牌。請先到 OnBrand 建立品牌並完成品牌定位。",
+      text: brands.length ? `共 ${brands.length} 個品牌：\n${lines.join("\n")}` : "這個帳號還沒有品牌。請先到 onBrand Studio 建立品牌並完成品牌定位。",
       structured: { brands },
     };
   },
@@ -180,7 +180,7 @@ const getBrandContext: ToolDef = {
       text: [
         `品牌：${r.name}${r.industry ? `（${r.industry}）` : ""}${r.website ? ` ${r.website}` : ""}`,
         r.positioningSummary ? `定位摘要：${r.positioningSummary}` : "定位摘要：尚未填寫",
-        filled ? `定位內容（JSON）：${body}` : "品牌定位尚未完成。請提醒使用者先到 OnBrand 完成品牌定位，產出才會 on-brand。",
+        filled ? `定位內容（JSON）：${body}` : "品牌定位尚未完成。請提醒使用者先到 onBrand Studio 完成品牌定位，產出才會 on-brand。",
       ].join("\n"),
       structured: { brandId, name: r.name, industry: r.industry ?? null, positioningSummary: r.positioningSummary ?? null, positioning },
     };
@@ -191,7 +191,7 @@ const listTasks: ToolDef = {
   name: "list_tasks",
   title: "列出任務卡",
   description:
-    "列出這個品牌目前可用的任務卡（OnBrand 會持續上新卡，每次都要重新查，不要沿用舊清單）。" +
+    "列出這個品牌目前可用的任務卡（onBrand Studio 會持續上新卡，每次都要重新查，不要沿用舊清單）。" +
     "單篇＝30s、套組＝60s、企劃＝99s（跟使用者說話時用「單篇／套組／企劃」，不要說 30s/60s/99s）。" +
     "選定後用 describe_task 看要填哪些欄位，再用 run_task 執行。",
   inputSchema: {
@@ -273,7 +273,7 @@ const runTask: ToolDef = {
   name: "run_task",
   title: "交辦任務",
   description:
-    "把一張任務卡交給 OnBrand 團隊執行（伺服器端的專屬寫手＋設計執行，會扣使用者 OnBrand 方案點數）。" +
+    "把一張任務卡交給 onBrand Studio 團隊執行（伺服器端的專屬寫手＋設計執行，會扣使用者 onBrand Studio 方案點數）。" +
     "立刻回傳 runId；大約 30–90 秒後用 get_task_result 查結果。不要重複送同一件事。",
   inputSchema: {
     type: "object",
@@ -366,12 +366,12 @@ const getTaskResult: ToolDef = {
   description:
     "查詢 run_task 的進度與成品（貼文文案、hashtag、配圖），並在對話中顯示貼文預覽。" +
     "status=running/writing 表示還在做，稍後再查；imaging 表示文案已好、配圖中。" +
-    "把成品交給使用者時照原文呈現，不要自行改寫——要修改請使用者在 OnBrand 用「換人重寫」，或再交辦一次。",
+    "把成品交給使用者時照原文呈現，不要自行改寫——要修改請使用者在 onBrand Studio 用「換人重寫」，或再交辦一次。",
   inputSchema: {
     type: "object",
     properties: {
       runId: { type: "integer", description: "run_task 回傳的 runId" },
-      outputId: { type: "integer", description: "或直接給 OnBrand 的成品 id" },
+      outputId: { type: "integer", description: "或直接給 onBrand Studio 的成品 id" },
     },
     additionalProperties: false,
   },
@@ -419,7 +419,7 @@ const getTaskResult: ToolDef = {
       `【${v.label || `版本 ${i + 1}`}】\n${v.caption}${v.hashtags.length ? `\n${v.hashtags.map((h) => (h.startsWith("#") ? h : `#${h}`)).join(" ")}` : ""}${v.imageUrl ? `\n配圖：${v.imageUrl}` : v.imageStatus && v.imageStatus !== "skipped" ? `\n配圖：${v.imageStatus}` : ""}`,
     ).join("\n\n");
     return {
-      text: `「${out.mission?.taskLabel ?? out.title}」${STATUS_ZH[status]}${agent ? `（${agent.name}${agent.title ? `・${agent.title}` : ""} 執筆）` : ""}。\n在 OnBrand 開啟：${link}\n\n${body}`,
+      text: `「${out.mission?.taskLabel ?? out.title}」${STATUS_ZH[status]}${agent ? `（${agent.name}${agent.title ? `・${agent.title}` : ""} 執筆）` : ""}。\n在 onBrand Studio 開啟：${link}\n\n${body}`,
       structured: {
         view: "post", status, outputId, runId: run ? Number(run.id) : null,
         taskLabel: out.mission?.taskLabel ?? out.title, platform,
@@ -434,7 +434,7 @@ const teamBoard: ToolDef = {
   name: "team_board",
   title: "團隊看板",
   description:
-    "在對話中顯示這個品牌的 OnBrand 行銷團隊看板：本週企劃、每位成員正在做的事、待審成品。" +
+    "在對話中顯示這個品牌的 onBrand Studio 行銷團隊看板：本週企劃、每位成員正在做的事、待審成品。" +
     "使用者問「團隊在忙什麼」「這週進度」「有什麼要我審」時呼叫。",
   inputSchema: {
     type: "object",
@@ -509,7 +509,7 @@ const addPlanSlots: ToolDef = {
   name: "add_plan_slots",
   title: "排進本週企劃",
   description:
-    "把內容排進 OnBrand 的本週企劃（planned_slots，使用者在 OnBrand 的「本週企劃」也看得到）。" +
+    "把內容排進 onBrand Studio 的本週企劃（planned_slots，使用者在 onBrand Studio 的「本週企劃」也看得到）。" +
     "每格＝一天×一個通路×一張任務卡×一個題目。日期必須在該週內、通路必須是品牌已加入的；不符的格子會被略過並回報。",
   inputSchema: {
     type: "object",

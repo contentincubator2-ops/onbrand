@@ -814,10 +814,10 @@ export const supportRouter = router({
       // We don't bail when no brand is found — the frontend already passes
       // {brandName} / {brandVoice} in the prompt for the common case.
       const systemPrompt = input.lang === "en"
-        ? "You are Mia, OnBrand's customer success manager. Respond in natural English. " +
+        ? "You are Mia, onBrand Studio's customer success manager. Respond in natural English. " +
           "No greetings or sign-offs — just the actionable next-step text. " +
           "Maximum 80 words. Never invent metrics or features."
-        : "你是 Mia，OnBrand 客戶成功經理。用自然口語繁體中文回應。" +
+        : "你是 Mia，onBrand Studio 客戶成功經理。用自然口語繁體中文回應。" +
           "不要打招呼或結尾——直接給可執行的下一步建議。" +
           "最多 80 字。不要編造數字或功能。";
 
@@ -870,7 +870,7 @@ export async function notifyAdminNewTicket(args: {
     const label = args.kind === "bug" ? "🐛 Bug 回報" : "🎧 客服升級";
     await sendEmail({
       to,
-      subject: `[OnBrand] ${label} #${args.refId}：${args.subject.slice(0, 80)}`,
+      subject: `[onBrand Studio] ${label} #${args.refId}：${args.subject.slice(0, 80)}`,
       html: `
         <div style="font-family:-apple-system,sans-serif;line-height:1.6;color:#333">
           <h2 style="margin:0 0 8px">${label} #${args.refId}</h2>

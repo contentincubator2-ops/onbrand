@@ -770,7 +770,7 @@ export const adminStatsRouter = router({
 
       const { invokeLLM } = await import("../core/llm");
       const prompt =
-        `你是 OnBrand 的 bug 分流員。判定使用者回報是「真的系統 bug」、` +
+        `你是 onBrand Studio 的 bug 分流員。判定使用者回報是「真的系統 bug」、` +
         `「使用者操作問題（不是 bug）」還是「需要人工再看」。\n\n` +
         `回報標題：${b.title}\n回報內容：${String(b.body).slice(0, 1500)}\n` +
         `頁面：${b.pageUrl ?? "(未提供)"}\n\n` +

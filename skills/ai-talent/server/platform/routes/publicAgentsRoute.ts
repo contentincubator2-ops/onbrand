@@ -163,7 +163,7 @@ publicAgentsRoute.get("/agents", async (_req, res) => {
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>OnBrand — AI Agent 團隊</title>
+<title>onBrand Studio — AI Agent 團隊</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
 <style>
@@ -232,7 +232,7 @@ publicAgentsRoute.get("/agents", async (_req, res) => {
 
 <div class="header">
   <div class="header-top">
-    <span class="logo">OnBrand</span>
+    <span class="logo">onBrand Studio</span>
     <span class="logo-sub">AI Agent 團隊</span>
   </div>
   <h1>認識你的<em>專屬 AI 行銷團隊</em></h1>
@@ -251,7 +251,7 @@ ${cards}
 </div>
 
 <div class="footer">
-  由 <a href="https://onbrand.sowork.ai">OnBrand · SoWork</a> 驅動 · JSON API: <code>/api/public/agents</code>
+  由 <a href="https://onbrand.sowork.ai">onBrand Studio · SoWork</a> 驅動 · JSON API: <code>/api/public/agents</code>
 </div>
 
 <script>

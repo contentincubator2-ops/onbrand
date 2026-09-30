@@ -1,5 +1,5 @@
 /**
- * 服務條款 — OnBrand Terms of Service.
+ * 服務條款 — onBrand Studio Terms of Service.
  * 2026-05-10. 由 SoWork 法律顧問 review 後正式版替換 (TODO).
  */
 import { Link } from "react-router-dom";
@@ -28,17 +28,17 @@ export default function TermsPage() {
           </h2>
           <p>
             {isEn
-              ? `This service ("OnBrand" or "the Service") is provided by SoWork 摘星社群行銷顧問股份有限公司 ("we", "us"). These terms are a binding agreement between you and us. By signing up for or using OnBrand, you agree to all of them.`
-              : "本服務（以下簡稱「OnBrand」或「本服務」）由 摘星社群行銷顧問股份有限公司（以下簡稱「我們」）提供。本條款是您與我們之間的正式協議。註冊或使用 OnBrand 即表示您同意本條款全部內容。"}
+              ? `This service ("onBrand Studio" or "the Service") is provided by SoWork 摘星社群行銷顧問股份有限公司 ("we", "us"). These terms are a binding agreement between you and us. By signing up for or using onBrand Studio, you agree to all of them.`
+              : "本服務（以下簡稱「onBrand Studio」或「本服務」）由 摘星社群行銷顧問股份有限公司（以下簡稱「我們」）提供。本條款是您與我們之間的正式協議。註冊或使用 onBrand Studio 即表示您同意本條款全部內容。"}
           </p>
 
           <h2 className="text-lg font-semibold">
-            {isEn ? "2. What OnBrand does" : "2. 服務內容"}
+            {isEn ? "2. What onBrand Studio does" : "2. 服務內容"}
           </h2>
           <p>
             {isEn
-              ? "OnBrand is an AI-powered marketing content and planning tool. Features include (but aren't limited to): copywriting, visual design suggestions, video generation, cross-channel publishing, brand asset management, and multi-day campaign scheduling."
-              : "OnBrand 是 AI 驅動的行銷內容生成與企劃工具。功能包含但不限於：文案產出、視覺設計建議、影片生成、跨平台發布、品牌資產管理、多日企劃排程等。"}
+              ? "onBrand Studio is an AI-powered marketing content and planning tool. Features include (but aren't limited to): copywriting, visual design suggestions, video generation, cross-channel publishing, brand asset management, and multi-day campaign scheduling."
+              : "onBrand Studio 是 AI 驅動的行銷內容生成與企劃工具。功能包含但不限於：文案產出、視覺設計建議、影片生成、跨平台發布、品牌資產管理、多日企劃排程等。"}
           </p>
 
           <h2 className="text-lg font-semibold">
@@ -56,8 +56,8 @@ export default function TermsPage() {
           <ul className="list-disc pl-6 space-y-1">
             <li>
               {isEn
-                ? "Free trial: new users get full access to OnBrand for 7 days. No credit card required."
-                : "免費試用：新用戶可免費使用 OnBrand 全部功能 7 天，免綁信用卡。"}
+                ? "Free trial: new users get full access to onBrand Studio for 7 days. No credit card required."
+                : "免費試用：新用戶可免費使用 onBrand Studio 全部功能 7 天，免綁信用卡。"}
             </li>
             <li>
               {isEn
@@ -99,8 +99,8 @@ export default function TermsPage() {
           <ul className="list-disc pl-6 space-y-1">
             <li>
               {isEn
-                ? "Use OnBrand to produce illegal, infringing, inflammatory, harassing, or otherwise harmful content."
-                : "用 OnBrand 產出違法、侵權、煽動、騷擾或其他違反公序良俗的內容。"}
+                ? "Use onBrand Studio to produce illegal, infringing, inflammatory, harassing, or otherwise harmful content."
+                : "用 onBrand Studio 產出違法、侵權、煽動、騷擾或其他違反公序良俗的內容。"}
             </li>
             <li>
               {isEn
@@ -124,8 +124,8 @@ export default function TermsPage() {
           </h2>
           <p>
             {isEn
-              ? "Anything you generate through OnBrand is yours. We don't claim rights to it. You do agree that we can collect anonymous usage data — with no way to identify you — to make the product better."
-              : "您透過 OnBrand 產出的所有內容，所有權歸您所有。我們不主張任何權利。您同意我們得在不識別您身分的前提下，蒐集匿名使用數據以改善服務品質。"}
+              ? "Anything you generate through onBrand Studio is yours. We don't claim rights to it. You do agree that we can collect anonymous usage data — with no way to identify you — to make the product better."
+              : "您透過 onBrand Studio 產出的所有內容，所有權歸您所有。我們不主張任何權利。您同意我們得在不識別您身分的前提下，蒐集匿名使用數據以改善服務品質。"}
           </p>
 
           <h2 className="text-lg font-semibold">
@@ -142,8 +142,8 @@ export default function TermsPage() {
           </h2>
           <p>
             {isEn
-              ? "OnBrand is an assistive creative tool. AI-generated content may be inaccurate, out of date, or inappropriate. Review it before you use it — we don't guarantee outcomes."
-              : "OnBrand 為輔助創作工具，AI 生成內容可能含有不準確、過時或不適當之資訊。您於使用前應自行檢視，我們對使用結果不負保證責任。"}
+              ? "onBrand Studio is an assistive creative tool. AI-generated content may be inaccurate, out of date, or inappropriate. Review it before you use it — we don't guarantee outcomes."
+              : "onBrand Studio 為輔助創作工具，AI 生成內容可能含有不準確、過時或不適當之資訊。您於使用前應自行檢視，我們對使用結果不負保證責任。"}
           </p>
 
           <h2 className="text-lg font-semibold">

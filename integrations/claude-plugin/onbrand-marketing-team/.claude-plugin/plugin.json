@@ -1,7 +1,7 @@
 {
   "name": "onbrand-marketing-team",
   "version": "0.1.0",
-  "description": "OnBrand AI 行銷團隊：品牌大腦、持續更新的任務卡、專屬寫手與設計，在 Claude 裡直接調度。",
+  "description": "onBrand Studio 行銷團隊：品牌大腦、持續更新的任務卡、專屬寫手與設計，在 Claude 裡直接調度。",
   "author": { "name": "SoWork", "email": "cjwang@sowork.tw", "url": "https://onbrand.sowork.ai" },
   "homepage": "https://onbrand.sowork.ai",
   "keywords": ["marketing", "social media", "brand", "content"]

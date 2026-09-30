@@ -131,7 +131,7 @@ export const tenantRouter = router({
       if (!invitee) {
         throw new TRPCError({
           code: "PRECONDITION_FAILED",
-          message: `${input.email} 還沒註冊 OnBrand。請他先到 onbrand.sowork.ai 註冊後再邀請。`,
+          message: `${input.email} 還沒註冊 onBrand Studio。請他先到 onbrand.sowork.ai 註冊後再邀請。`,
         });
       }
       await localPool.execute(
@@ -240,7 +240,7 @@ export const tenantRouter = router({
         if (plan !== "enterprise") {
           throw new TRPCError({
             code: "PRECONDITION_FAILED",
-            message: "White Label 屬於企業版，由 SoWork 導入時設定",
+            message: "White Label 屬於企業客製版，由 SoWork 導入時設定",
           });
         }
       }

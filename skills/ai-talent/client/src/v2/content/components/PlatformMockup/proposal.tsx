@@ -204,7 +204,7 @@ function ProposalSidebar({ brandName, variantLabel, docType = "Document", chipLa
         </div>
         <div>
           <p style={{ color: META_DIM, fontSize: 9, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 3, fontWeight: 600 }}>Powered by</p>
-          <p style={{ color: "rgba(248,250,252,0.72)", fontSize: 11 }}>SoWork OnBrand</p>
+          <p style={{ color: "rgba(248,250,252,0.72)", fontSize: 11 }}>SoWork onBrand Studio</p>
         </div>
       </div>
 
@@ -320,7 +320,7 @@ export function ProposalCover({ title, brandName, variantLabel, liveCaption }: M
               </div>
               <div>
                 <p style={{ fontSize: 11, fontWeight: 600, color: "#1E293B", lineHeight: 1.2 }}>{brandName ?? "Brand"}</p>
-                <p style={{ fontSize: 9, color: "#94A3B8", textTransform: "uppercase", letterSpacing: "0.08em" }}>SoWork · OnBrand</p>
+                <p style={{ fontSize: 9, color: "#94A3B8", textTransform: "uppercase", letterSpacing: "0.08em" }}>SoWork · onBrand Studio</p>
               </div>
             </div>
             <p style={{ fontSize: 10, color: "#94A3B8" }}>{today}</p>
@@ -390,7 +390,7 @@ export function ProposalSpec({ title, brandName, variantLabel, liveCaption }: Mo
             alignItems: "center",
             background: "#FAFAFA",
           }}>
-            <span style={{ fontSize: 10, color: "#94A3B8" }}>SoWork OnBrand · Brand Spec</span>
+            <span style={{ fontSize: 10, color: "#94A3B8" }}>SoWork onBrand Studio · Brand Spec</span>
             <span style={{ fontSize: 10, color: "#94A3B8" }}>1 / 1</span>
           </div>
         </div>
@@ -568,7 +568,7 @@ export function ResearchDoc({ title, brandName, variantLabel, liveCaption, liveT
         fontSize: 10, color: "#94A3B8",
         background: "#FAFAFA",
       }}>
-        <span>SoWork OnBrand · {chipLabel}</span>
+        <span>SoWork onBrand Studio · {chipLabel}</span>
         <span>Confidential · Internal Use Only</span>
       </div>
     </div>

@@ -186,7 +186,7 @@ export interface MeetingMinutes {
   checks: StrategyCheck[];
   /** kind: content = 可以直接變成一篇內容（前台給「開任務」）；work = 研究／營運工作。 */
   actions: MeetingAction[];
-  /** 這場會可引用的品牌資料來源（S 編號）——連結到 OnBrand 的哪一頁。 */
+  /** 這場會可引用的品牌資料來源（S 編號）——連結到 onBrand Studio 的哪一頁。 */
   sources: MeetingSource[];
 }
 export type DecisionStatus = "adopted" | "modified" | "rejected";
@@ -579,7 +579,7 @@ export async function runMeeting(meeting: StrategyMeeting, userId: number, trigg
       meeting.agenda ? `【議程】${meeting.agenda}` : "",
       `【討論對象】${meeting.scope === "product" ? `產品「${scope.scopeName}」（品牌：${scope.brandName}）` : `品牌「${scope.brandName}」`}`,
       `【目前的策略】\n${anchorList}`,
-      sources.length ? `【品牌資料來源（OnBrand 各頁的實際內容，引用時標 S 編號）】\n${sourcesBlock(sources)}` : "",
+      sources.length ? `【品牌資料來源（onBrand Studio 各頁的實際內容，引用時標 S 編號）】\n${sourcesBlock(sources)}` : "",
       ev.lines ? `【近 30 天策略監測情報（引用時標 E 編號）】\n${ev.lines}` : `【近 30 天策略監測情報】沒有。不要假裝有市場數據。`,
       prev,
       brandCtx ? `【品牌資料】\n${brandCtx.slice(0, 6000)}` : "",
