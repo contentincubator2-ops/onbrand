@@ -13,7 +13,8 @@
  *   · 確認：可以直接改審查重點，確認後才生效；原文改了，舊的審查重點照常用到新的確認為止。
  *   · 免責：頁首常駐一段；確認鍵上方再一句。
  */
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
+import { Popover, PopoverContent, PopoverTrigger } from "@heroui/react";
 import { useNavigate } from "react-router-dom";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { trpc } from "../../../../lib/trpc";
@@ -88,7 +89,7 @@ export default function RegulationsPanel({ brandId, focusId }: { brandId: number
 
   return (
     <div className="mx-auto max-w-[1040px] space-y-6 px-2">
-      <header className="flex flex-wrap items-end justify-between gap-3">
+      <header className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="flex items-center gap-1.5 text-[20px] font-semibold text-neutral-900">
           {en ? "Regulations" : "法規"}
           <HelpTip>
@@ -97,12 +98,13 @@ export default function RegulationsPanel({ brandId, focusId }: { brandId: number
               : "把行銷文案必須遵守的法規加進來，一條一張卡，整部法規貼進來也可以。AI 會從原文萃取跟行銷有關的審查重點，你確認後，每一篇產文寫之前、寫完後都會依它審查。"}
           </HelpTip>
         </h2>
-        {items.length > 0 && !full && (
-          <button type="button" className={btnPrimary} onClick={newCard}>{en ? "+ Add regulation" : "＋ 新增法規"}</button>
-        )}
+        {/* 2026-09-30（CJ「免責聲明或審查重點用量，仿 Tesla UI 或任務卡視窗的圖示，版面更小」）：
+            兩個圖示方塊，點開才看細節。新增法規只在卡片牆裡（右上角不放）。 */}
+        <div className="flex items-start gap-1">
+          <UsageTile en={en} used={usedTotal} budget={budget} onOpenMemory={() => navigate(`/brands/edit?b=${brandId}&cat=brain`)} />
+          <DisclaimerTile en={en} />
+        </div>
       </header>
-
-      <Disclaimer en={en} />
 
       {/* 萃取好、等確認：tray 頂端的通知 */}
       {reviewItems.length > 0 && (
@@ -118,8 +120,6 @@ export default function RegulationsPanel({ brandId, focusId }: { brandId: number
           </button>
         </div>
       )}
-
-      <Usage en={en} used={usedTotal} budget={budget} onOpenMemory={() => navigate(`/brands/edit?b=${brandId}&cat=brain`)} />
 
       {items.length === 0 ? (
         <div className="rounded-2xl border border-neutral-200">
@@ -189,42 +189,53 @@ function openScreenFor(r: Regulation): Screen {
   return { kind: "digest", id: r.id };
 }
 
-// ─── 免責 ────────────────────────────────────────────────────────────────
+// ─── 頁首的兩個圖示方塊（任務卡視窗同款：40px 圓角方塊＋一行小字，點開看細節） ───────
 
-function Disclaimer({ en }: { en: boolean }) {
+function InfoTile({ icon, label, tip, alert, children }: {
+  icon: ReactNode; label: string; tip: string; alert?: boolean; children: ReactNode;
+}) {
   return (
-    <div className="flex gap-3 rounded-xl border border-neutral-200 bg-neutral-50 px-5 py-4 text-[12.5px] leading-relaxed text-neutral-600">
-      <FontAwesomeIcon icon={ICON.info} className="mt-0.5 shrink-0 text-[13px] text-neutral-400" />
-      <p>
-        <span className="font-semibold text-neutral-800">{en ? "Disclaimer. " : "免責聲明："}</span>
-        {en
-          ? "Regulation text is provided by you; onBrand Studio does not verify that it is complete, accurate or current. The review points are extracted by AI and may miss rules — please check them before confirming. The AI checks each draft against them before and after writing, but cannot guarantee the output is compliant. The check is for reference only and is not legal advice — please confirm before publishing, or consult a qualified legal professional."
-          : "法規內容由你自行提供，onBrand Studio 不驗證其完整性、正確性或是否為最新版本。審查重點由 AI 從原文萃取，可能有遺漏，確認前請自行核對。AI 會在動筆前與寫完後依審查重點檢查，但無法保證產出完全合規；審查結果僅供參考，不構成法律意見。發布前請自行確認，或諮詢專業法律人士。"}
-      </p>
-    </div>
+    <Popover placement="bottom-end" showArrow triggerScaleOnOpen={false}>
+      <PopoverTrigger>
+        <button type="button" aria-label={tip} title={tip} className="group flex w-[60px] flex-col items-center gap-1">
+          <span className="relative flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl bg-neutral-100 text-neutral-800 transition group-hover:bg-neutral-200">
+            {icon}
+            {alert && <span className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-red-600" />}
+          </span>
+          <span className="w-full truncate text-center text-[11px] leading-tight text-neutral-600 tabular-nums">{label}</span>
+        </button>
+      </PopoverTrigger>
+      <PopoverContent>
+        <div className="max-w-[300px] px-1 py-1.5 text-[12.5px] leading-relaxed text-neutral-700">{children}</div>
+      </PopoverContent>
+    </Popover>
   );
 }
 
-// ─── 用量 ────────────────────────────────────────────────────────────────
-
-function Usage({ en, used, budget, onOpenMemory }: {
+/** Tesla 電量式：方塊從底部往上填，填多少＝審查重點用掉可用額度的多少。 */
+function UsageTile({ en, used, budget, onOpenMemory }: {
   en: boolean; used: number; budget: RegulationList["budget"]; onOpenMemory: () => void;
 }) {
   const allowed = budget.allowedTotal;
-  const w = allowed > 0 ? Math.min(100, (used / allowed) * 100) : used > 0 ? 100 : 0;
+  const ratio = allowed > 0 ? Math.min(1, used / allowed) : used > 0 ? 1 : 0;
   const noRoom = allowed === 0 && budget.limitedByBrain;
+  const pct = Math.round(ratio * 100);
   return (
-    <div className="rounded-xl border border-neutral-200 px-5 py-4">
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <span className="text-[13px] font-semibold text-neutral-900">{en ? "Review points in brand memory" : "審查重點用量"}</span>
-        <span className="text-[12.5px] tabular-nums text-neutral-600">
-          {fmt(used)} / {fmt(allowed)} {en ? "chars" : "字"}
-        </span>
-      </div>
-      <span className="mt-2 block h-1.5 overflow-hidden rounded-full bg-neutral-200">
-        <span className="block h-full rounded-full bg-neutral-900" style={{ width: `${w}%` }} />
+    <InfoTile
+      alert={noRoom}
+      label={noRoom ? (en ? "Full" : "已滿") : (en ? `Used ${pct}%` : `用量 ${pct}%`)}
+      tip={en ? "Review points in brand memory" : "審查重點用量"}
+      icon={<>
+        <span className="absolute inset-x-0 bottom-0 bg-neutral-900/15 transition-all duration-500" style={{ height: `${pct}%` }} />
+        <FontAwesomeIcon icon={ICON.regulation} className="relative text-[15px]" />
+      </>}
+    >
+      <p className="font-semibold text-neutral-900">{en ? "Review points in brand memory" : "審查重點用量"}</p>
+      <p className="mt-0.5 tabular-nums">{fmt(used)} / {fmt(allowed)} {en ? "chars" : "字"}</p>
+      <span className="mt-1.5 block h-1 overflow-hidden rounded-full bg-neutral-200">
+        <span className="block h-full rounded-full bg-neutral-900" style={{ width: `${pct}%` }} />
       </span>
-      <p className="mt-2 text-[12px] leading-relaxed text-neutral-500">
+      <p className="mt-2 text-[12px] text-neutral-500">
         {noRoom ? (
           <>
             {en ? "The brand memory is full, so there is no room for review points. " : "品牌大腦已經滿了，放不下審查重點。"}
@@ -232,11 +243,30 @@ function Usage({ en, used, budget, onOpenMemory }: {
               {en ? "Free up space in Memory" : "到「記憶」騰出空間"}
             </button>
           </>
-        ) : en
-          ? "Only the confirmed review points count here — the full text is stored separately and doesn't use brand memory. Active review points are never pushed out when memory gets full."
-          : "只有確認過的審查重點會放進品牌大腦、算在這裡；原文另外存著，不佔品牌大腦。啟用中的審查重點，大腦滿了也不會被擠掉。"}
+        ) : budget.limitedByBrain
+          ? (en ? `The limit is what the brand memory has left (${fmt(budget.nonRegulationChars)} of ${fmt(budget.capacity)} chars used by the rest of your strategy).`
+            : `上限是品牌大腦剩下的空間（其他策略內容已用 ${fmt(budget.nonRegulationChars)} / ${fmt(budget.capacity)} 字）。`)
+          : (en ? "Only confirmed review points count; the full text is stored separately. Active review points are never pushed out of memory."
+            : "只算確認過的審查重點；原文另外存著，不佔品牌大腦。啟用中的審查重點，大腦滿了也不會被擠掉。")}
       </p>
-    </div>
+    </InfoTile>
+  );
+}
+
+function DisclaimerTile({ en }: { en: boolean }) {
+  return (
+    <InfoTile
+      label={en ? "Disclaimer" : "免責聲明"}
+      tip={en ? "Disclaimer" : "免責聲明"}
+      icon={<FontAwesomeIcon icon={ICON.shield} className="text-[15px]" />}
+    >
+      <p className="font-semibold text-neutral-900">{en ? "Disclaimer" : "免責聲明"}</p>
+      <p className="mt-1">
+        {en
+          ? "Regulation text is provided by you; onBrand Studio does not verify that it is complete, accurate or current. The review points are extracted by AI and may miss rules — please check them before confirming. The AI checks each draft against them before and after writing, but cannot guarantee the output is compliant. The check is for reference only and is not legal advice — please confirm before publishing, or consult a qualified legal professional."
+          : "法規內容由你自行提供，onBrand Studio 不驗證其完整性、正確性或是否為最新版本。審查重點由 AI 從原文萃取，可能有遺漏，確認前請自行核對。AI 會在動筆前與寫完後依審查重點檢查，但無法保證產出完全合規；審查結果僅供參考，不構成法律意見。發布前請自行確認，或諮詢專業法律人士。"}
+      </p>
+    </InfoTile>
   );
 }
 
