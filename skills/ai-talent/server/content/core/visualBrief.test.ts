@@ -8,20 +8,20 @@ vi.mock("../../platform/core/llm", () => ({
   invokeLLM: invokeLLMMock,
 }));
 
-import { captionToBilingualVisualBrief, captionToVisualBrief } from "./visualBrief";
+import { captionToBilingualVisualBrief } from "./visualBrief";
 
 const response = {
   choices: [{ message: { content: "A safe generic product scene." } }],
 };
 
-describe("captionToVisualBrief brand identity", () => {
+describe("captionToBilingualVisualBrief brand identity", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     invokeLLMMock.mockResolvedValue(response);
   });
 
   it("includes brand name and industry in the user message", async () => {
-    await captionToVisualBrief({
+    await captionToBilingualVisualBrief({
       caption: "A runner laces up before sunrise.",
       platform: "instagram",
       brandIdentity: { name: "Adidas", industry: "Sportswear" },
@@ -32,7 +32,7 @@ describe("captionToVisualBrief brand identity", () => {
   });
 
   it("uses the explicit unknown marker when brand identity is unavailable", async () => {
-    await captionToVisualBrief({
+    await captionToBilingualVisualBrief({
       caption: "A runner laces up before sunrise.",
       platform: "instagram",
       brandIdentity: null,
@@ -43,7 +43,7 @@ describe("captionToVisualBrief brand identity", () => {
   });
 
   it("protects the attached product's own identifiers in subject mode", async () => {
-    await captionToVisualBrief({
+    await captionToBilingualVisualBrief({
       caption: "Place the photographed shoe in a running scene.",
       brandIdentity: { name: "小安素", industry: "營養補充" },
       subjectMode: true,
