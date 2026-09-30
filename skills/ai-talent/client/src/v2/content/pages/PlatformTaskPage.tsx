@@ -2538,13 +2538,6 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                       )}
                     </p>
                   </div>
-                  {/* Deliverable badge in modal header (no duration labels) */}
-                  <span
-                    className="text-[12px] font-bold px-2 py-0.5 rounded-full text-white shadow-sm shrink-0"
-                    style={{ background: tierAccent(effectiveTier(activeTask)) }}
-                  >
-                    {tierLabel(effectiveTier(activeTask), lang)}
-                  </span>
                 </div>
               </ModalHeader>
 
@@ -2598,9 +2591,9 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                       <div className="flex items-center justify-center gap-1.5">
                         <Button
                           size="sm"
-                          variant="light"
                           radius="full"
-                          className="text-neutral-700"
+                          // SoWork 橘（#E85D2E，與首頁 CTA 同色）：這是 modal 裡唯一要被看見的次要動作。
+                          className="bg-[#E85D2E] text-white font-medium px-4 hover:bg-[#D04E22] data-[disabled=true]:opacity-50"
                           isLoading={polishing}
                           isDisabled={polishing || !primaryAnswer.trim()}
                           onPress={handlePolish}
