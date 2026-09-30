@@ -13,7 +13,8 @@
  *
  * 純呈現元件：資料與 mutation 都在 RunPage。
  */
-import React, { useState } from "react";
+import React, { useLayoutEffect, useRef, useState } from "react";
+import { landAgentHandoff } from "../lib/agentHandoff";
 import { Avatar, Button, Spinner, Textarea } from "@heroui/react";
 
 export interface DeskWriter {
@@ -31,7 +32,7 @@ export function writerAvatar(w: Pick<DeskWriter, "name" | "avatarUrl">): string 
 
 export default function WriterDesk({
   en, lead, others, activeKey, draftKeys, busyKey, onPick,
-  leadReason, chatHistory, chatBusy, onSend, canUndo, onUndo,
+  leadReason, chatHistory, chatBusy, onSend, canUndo, onUndo, onHandoffLanded,
 }: {
   en: boolean;
   lead: DeskWriter;
@@ -47,18 +48,29 @@ export default function WriterDesk({
   onSend: (text: string) => Promise<boolean>;
   canUndo: boolean;
   onUndo: () => void;
+  /** 從任務 modal 飛過來的頭像降落在這裡之後呼叫（RunPage 用來播文案展開）。 */
+  onHandoffLanded?: () => void;
 }) {
   const [draft, setDraft] = useState("");
   const all = [lead, ...others];
   const active = all.find((w) => w.key === activeKey) ?? lead;
   const isLead = active.key === lead.key;
   const busy = !!busyKey || chatBusy;
+  const avatarRef = useRef<HTMLDivElement>(null);
+  // 只在第一次掛上時接：之後換人寫不會再觸發。layout effect＝在第一次畫面出來前就
+  // 把本文設成「待展開」，不會先閃一下完整本文再收起來。
+  useLayoutEffect(() => {
+    if (landAgentHandoff(avatarRef.current)) onHandoffLanded?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <div className="space-y-4">
       {/* ── 誰在寫 ── */}
       <div className="flex items-center gap-2.5">
-        <Avatar src={writerAvatar(active)} className="h-10 w-10 shrink-0" />
+        <div ref={avatarRef} className="h-10 w-10 shrink-0 rounded-full">
+          <Avatar src={writerAvatar(active)} className="h-10 w-10" />
+        </div>
         <div className="min-w-0 flex-1 leading-tight">
           <p className="text-[12px] text-default-500">{isLead ? (en ? "Lead writer" : "主筆") : (en ? "Rewritten by" : "改寫")}</p>
           <p className="truncate text-[15px] font-semibold text-default-900">

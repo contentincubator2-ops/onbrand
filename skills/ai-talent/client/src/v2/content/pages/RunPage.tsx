@@ -68,6 +68,7 @@ import { fireNudge } from "../../platform/components/mia/miaNudges";
 import ReviewBar from "../../platform/components/review/ReviewBar";
 import PerfTagPicker from "../../performance/components/PerfTagPicker";
 import WriterDesk, { type DeskWriter } from "../components/WriterDesk";
+import { cancelAgentHandoff } from "../lib/agentHandoff";
 
 type Mode = "edit" | "chat" | "image" | "agent" | "regen" | "rewrite" | "publish" | "source";
 
@@ -1486,6 +1487,12 @@ export default function RunPage() {
   const [deskChatBusy, setDeskChatBusy] = useState(false);
   const [deskUndo, setDeskUndo] = useState<{ key: string; caption: string } | null>(null);
   const [deskView, setDeskView] = useState<"text" | "preview">("text");
+  // 2026-09-30：從任務 modal 飛過來的主筆頭像降落後，本文像紙一樣從上往下展開。
+  const [handoffReveal, setHandoffReveal] = useState(false);
+  const hasData = !!data;
+  useEffect(() => {
+    if (hasData && !writerDesk) cancelAgentHandoff();
+  }, [hasData, writerDesk]);
   const deskPendingRef = useRef<{ timer: ReturnType<typeof setTimeout>; text: string } | null>(null);
   const saveCaptionQuietMut = trpc.output.updateVariantCaption.useMutation({
     onError: (e) => showToastGlobal(lang === "en" ? `Save failed: ${e.message}` : `儲存失敗：${e.message}`),
@@ -2303,6 +2310,16 @@ export default function RunPage() {
       {/* ─── 2-COL: mockup big (no toolbar) + right tool panel ──────── */}
       {/* 2026-05-10: mobile responsive — stack on small screens. md+ keeps 2-col. */}
       <div className="grid grid-cols-1 md:grid-cols-[1fr_360px] gap-4 items-start">
+        {handoffReveal && (
+          <style>{`
+            @keyframes ob-unfold-in {
+              from { clip-path: inset(0 0 100% 0 round 16px); transform: translateY(-6px); opacity: .4 }
+              to   { clip-path: inset(0 0 0 0 round 16px);   transform: none;              opacity: 1 }
+            }
+            .ob-unfold { animation: ob-unfold-in .8s cubic-bezier(.2,.8,.2,1) .5s both }
+            @media (prefers-reduced-motion: reduce) { .ob-unfold { animation: none } }
+          `}</style>
+        )}
         {/* CENTER: pure mockup, no toolbar above (CJ direction 2026-05-09) */}
         <section className="min-w-0 flex flex-col gap-3">
           {/* 2026-09-29 主筆桌：本文是主角，直接打字改（回到寫文案的習慣）；貼文長相切到「預覽」看。 */}
@@ -2321,7 +2338,7 @@ export default function RunPage() {
             </div>
           )}
           {writerDesk && deskView === "text" && (
-            <div className="rounded-2xl bg-white px-6 py-5 ring-1 ring-black/5 shadow-[0_4px_24px_rgba(0,0,0,0.05)]">
+            <div className={`rounded-2xl bg-white px-6 py-5 ring-1 ring-black/5 shadow-[0_4px_24px_rgba(0,0,0,0.05)] ${handoffReveal ? "ob-unfold" : ""}`}>
               <textarea
                 value={slide?.caption ?? ""}
                 onChange={(e) => onDeskType(e.target.value)}
@@ -2345,7 +2362,7 @@ export default function RunPage() {
               </div>
             </div>
           )}
-          <div ref={mockupRef} style={writerDesk && deskView === "text" ? { display: "none" } : undefined} className="relative bg-white rounded-2xl shadow-[0_4px_24px_rgba(0,0,0,0.05)] ring-1 ring-black/5 overflow-hidden">
+          <div ref={mockupRef} style={writerDesk && deskView === "text" ? { display: "none" } : undefined} className={`relative bg-white rounded-2xl shadow-[0_4px_24px_rgba(0,0,0,0.05)] ring-1 ring-black/5 overflow-hidden ${handoffReveal && deskView === "preview" ? "ob-unfold" : ""}`}>
             {(() => {
               const holdMockup =
                 (HOLD_FOR_IMAGES.has(data.mission?.taskId ?? "") ||
@@ -2971,6 +2988,7 @@ export default function RunPage() {
                   onSend={sendDeskChat}
                   canUndo={!!deskUndo && deskUndo.key === activeSelectionKey}
                   onUndo={undoDeskChat}
+                  onHandoffLanded={() => setHandoffReveal(true)}
                 />
               )}
               {!writerDesk && mode === "chat" && (

@@ -128,6 +128,10 @@ export interface ContextChip {
   label: string;       // e.g., "競品 · 屈臣氏 / 86 小舖 / Watsons"
   source: string;      // raw path
   hasContent: boolean; // false = label still shown but greyed
+  /** 欄位名（不含預覽），例如「主受眾」 */
+  name: string;
+  /** 完整內容（不截斷）；沒填是空字串。任務 modal 第二層顯示用。 */
+  text: string;
 }
 
 const PATH_LABELS: Record<string, string> = {
@@ -173,9 +177,9 @@ export function buildContextChips(ctx: any, sources: string[] | undefined): Cont
     const baseLabel = PATH_LABELS[path] ?? path.split(".").slice(-1)[0]!;
     if (shaped) {
       const preview = shaped.length > 38 ? shaped.slice(0, 38) + "…" : shaped;
-      chips.push({ label: `${baseLabel} · ${preview}`, source: path, hasContent: true });
+      chips.push({ label: `${baseLabel} · ${preview}`, source: path, hasContent: true, name: baseLabel, text: shaped });
     } else {
-      chips.push({ label: `${baseLabel} · 尚未填寫`, source: path, hasContent: false });
+      chips.push({ label: `${baseLabel} · 尚未填寫`, source: path, hasContent: false, name: baseLabel, text: "" });
     }
   }
   return chips;
