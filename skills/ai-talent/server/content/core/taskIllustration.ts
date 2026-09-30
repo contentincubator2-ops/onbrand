@@ -95,8 +95,60 @@ export async function drawIllustration(concept: string): Promise<{ url: string }
   return r.status === "ready" && r.url ? { url: r.url } : { error: r.errorMsg ?? "image failed" };
 }
 
-/** 原圖太大（~1.4MB PNG），卡片上只顯示 132px 寬：縮成 480×320 webp。 */
+/**
+ * 原圖太大（~1.4MB PNG），卡片上只顯示約 104px 寬：先裁到「畫面實際有東西的範圍」，
+ * 四周留一致的邊，再補成框的比例（240:170），輸出 480×340 webp。
+ * 不這樣做的話，模型留的大片空白會讓主體在小框裡只剩一小顆；直接等比放大裁切
+ * 又會切到高的主體（2026-09-30 在 dev 上對 301 張實測過）。
+ */
 export async function shrinkToWebp(png: Buffer): Promise<Buffer> {
+  return fitToFrame(png);
+}
+
+export const FRAME_W = 480;
+export const FRAME_H = 340;
+
+export async function fitToFrame(img: Buffer, margin = 0.1): Promise<Buffer> {
   const sharp = (await import("sharp")).default;
-  return sharp(png).resize(480, 320, { fit: "cover" }).webp({ quality: 82 }).toBuffer();
+  const base = sharp(img).removeAlpha();
+  const { data, info } = await base.clone().raw().toBuffer({ resolveWithObject: true });
+  const { width: w, height: h, channels: c } = info;
+  // 背景色取四個角的平均——模型給的淺藍不一定剛好是 #EDF2F9。
+  const at = (i: number): number => data[i] ?? 0;
+  const px = (x: number, y: number): [number, number, number] => {
+    const i = (y * w + x) * c; return [at(i), at(i + 1), at(i + 2)];
+  };
+  const corners = [px(2, 2), px(w - 3, 2), px(2, h - 3), px(w - 3, h - 3)];
+  const avg = (k: 0 | 1 | 2) => corners.reduce((a, p) => a + p[k], 0) / 4;
+  const bg: [number, number, number] = [avg(0), avg(1), avg(2)];
+  let x0 = w, y0 = h, x1 = -1, y1 = -1;
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const i = (y * w + x) * c;
+      const d = Math.abs(at(i) - bg[0]) + Math.abs(at(i + 1) - bg[1]) + Math.abs(at(i + 2) - bg[2]);
+      if (d > 24) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+    }
+  }
+  const bgHex = { r: Math.round(bg[0]), g: Math.round(bg[1]), b: Math.round(bg[2]) };
+  if (x1 < 0) return base.resize(FRAME_W, FRAME_H, { fit: "cover" }).webp({ quality: 82 }).toBuffer();
+
+  // 內容框＋邊，再擴成 240:170；擴出去超過原圖的部分用背景色補。
+  const cw = x1 - x0 + 1, ch = y1 - y0 + 1;
+  let bw = cw * (1 + 2 * margin), bh = ch * (1 + 2 * margin);
+  const ratio = FRAME_W / FRAME_H;
+  if (bw / bh < ratio) bw = bh * ratio; else bh = bw / ratio;
+  const cx = x0 + cw / 2, cy = y0 + ch / 2;
+  const left = Math.round(cx - bw / 2), top = Math.round(cy - bh / 2);
+  const W = Math.round(bw), H = Math.round(bh);
+  const pad = {
+    left: Math.max(0, -left), top: Math.max(0, -top),
+    right: Math.max(0, left + W - w), bottom: Math.max(0, top + H - h),
+  };
+  // sharp 在同一條 pipeline 裡會先 extract 再 extend，所以分兩趟。
+  const padded = await sharp(img).removeAlpha().extend({ ...pad, background: bgHex }).png().toBuffer();
+  return sharp(padded)
+    .extract({ left: left + pad.left, top: top + pad.top, width: W, height: H })
+    .resize(FRAME_W, FRAME_H)
+    .webp({ quality: 82 })
+    .toBuffer();
 }
