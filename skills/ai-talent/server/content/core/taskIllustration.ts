@@ -23,12 +23,14 @@ export interface IllustrationCardInput {
 }
 
 export const ILLUSTRATION_STYLE = [
-  "Flat vector spot illustration for a friendly marketing app, hand-drawn feel.",
+  "Minimal flat icon-style spot illustration, like an app empty-state graphic.",
+  "ONE simple subject only: a single object, or one simple character holding one prop. At most three elements in total.",
+  "Large simple geometric shapes, very few lines, no small details, no scenery, no background objects, no crowds, no furniture unless it is the subject.",
   "Thick rounded dark navy (#1F2A44) outlines of even weight.",
   "Fills only in white and pale blue (#DCE6F4); plain solid background in very light blue (#EDF2F9).",
-  "Exactly ONE warm orange accent (#E85D2E) on the single most important element — nothing else orange.",
-  "One clear focal subject, centered, sitting on a soft pale-blue oval ground shadow, generous empty space around it.",
-  "Simple shapes, no gradients, no photorealism, no 3D, no drop shadows, no texture.",
+  "Exactly ONE warm orange accent (#E85D2E) on the key element — nothing else orange.",
+  "Subject centered with lots of empty space around it, on a soft pale-blue oval ground shadow.",
+  "No gradients, no photorealism, no 3D, no drop shadows, no texture.",
   "Absolutely no text, letters, words, numbers, question or exclamation marks, logos, watermarks or UI labels anywhere in the image.",
 ].join(" ");
 
@@ -37,12 +39,12 @@ export function illustrationPrompt(concept: string): string {
 }
 
 const CONCEPT_SYSTEM = `You design the small header illustration for marketing task cards in a Taiwanese content app.
-For each card, write ONE English sentence (max 30 words) describing a concrete, charming scene that captures what THIS card is specifically about — its twist, not just its channel.
+For each card, write ONE short English phrase (max 18 words) naming a single simple visual metaphor that captures what THIS card is specifically about — its twist, not just its channel.
 Rules:
 - Show objects, characters, gestures. Never rely on readable text, letters or numbers (the image will contain none).
 - Avoid generic channel icons alone (a phone, a play button). Make the scene specific to the card's idea.
 - Every card must look clearly different from the others and from the "already used" list.
-- It is shown as a small thumbnail (132px wide): at most TWO characters, no crowds, no busy backgrounds; one focal subject.
+- It is shown as a small thumbnail (132px wide): ONE object, or ONE character with ONE prop. Never groups, scenes or settings.
 - Say which single element is the orange accent.
 Reply with JSON only: {"concepts": {"<card id>": "<sentence>", ...}}`;
 
