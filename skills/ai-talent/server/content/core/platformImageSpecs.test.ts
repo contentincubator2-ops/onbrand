@@ -6,6 +6,7 @@ import {
   MAX_IMAGE_TRAY,
   canvasPromptBlock,
   defaultImageTray,
+  generationSize,
   gptSizeFor,
   nanoRatioFor,
   ratioError,
@@ -24,7 +25,8 @@ describe("platform image specs", () => {
 
   // 比例在生成當下鎖死：每張卡都要有一個 gpt-image-2 合法、而且比例幾乎一樣的生成尺寸。
   it.each(PLATFORM_IMAGE_SPECS.map((s) => [s.id, s] as const))("%s has a native gpt-image-2 size", (_id, s) => {
-    const { w, h } = gptSizeFor(s.width, s.height);
+    const gen = generationSize(s);
+    const { w, h } = gptSizeFor(gen.width, gen.height);
     expect(w % 16).toBe(0);
     expect(h % 16).toBe(0);
     expect(Math.max(w, h)).toBeLessThanOrEqual(3840);
@@ -32,7 +34,7 @@ describe("platform image specs", () => {
     expect(w * h).toBeLessThanOrEqual(2560 * 1440);
     expect(w / h).toBeLessThanOrEqual(3);
     expect(w / h).toBeGreaterThanOrEqual(1 / 3);
-    expect(ratioError(w / h, s.width / s.height)).toBeLessThanOrEqual(0.005);
+    expect(ratioError(w / h, gen.width / gen.height)).toBeLessThanOrEqual(0.005);
   });
 
   it("offers Nano Banana only where its REAL output ratio matches", () => {
@@ -62,7 +64,7 @@ describe("platform image specs", () => {
     ["line", 300, 600], ["line", 1125, 588],
     ["threads", 1080, 1080], ["threads", 1200, 628], ["threads", 1200, 630], ["threads", 1440, 1800],
     ["email", 1200, 480], ["email", 400, 400],
-    ["tiktok", 400, 400], ["tiktok", 1080, 1920], ["tiktok", 720, 1280], ["tiktok", 640, 640], ["tiktok", 1200, 628], ["tiktok", 600, 500],
+    ["tiktok", 400, 400], ["tiktok", 1080, 1920], ["tiktok", 720, 1280], ["tiktok", 640, 640], ["tiktok", 1200, 628], ["tiktok", 600, 500], ["tiktok", 640, 200], ["tiktok", 640, 100],
   ] as const)("%s has a %i×%i card", (ch, w, h) => {
     expect(PLATFORM_IMAGE_SPECS.some((s) => s.channel === ch && s.width === w && s.height === h)).toBe(true);
   });
@@ -119,6 +121,26 @@ describe("finalizeToSpec", () => {
       const m = await sharp(r.buffer).metadata();
       expect([m.width, m.height]).toEqual([1080, 1350]);
     }
+  });
+
+  // 2026-09-30：>3:1 的 Banner 用合成——方形主體放右端，其餘補主體的背景色。
+  it("composes a thin banner from a square subject without cropping", async () => {
+    const banner = PLATFORM_IMAGE_SPECS.find((s) => s.id === "tt-an-banner-640x200")!;
+    // 1024 方形：藍底，中間一塊紅色主體。
+    const tile = await sharp({ create: { width: 1024, height: 1024, channels: 3, background: "#1e40af" } })
+      .composite([{ input: await sharp({ create: { width: 400, height: 400, channels: 3, background: "#dc2626" } }).png().toBuffer(), top: 312, left: 312 }])
+      .png().toBuffer();
+    const r = await finalizeToSpec(tile, banner);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    const { data, info } = await sharp(r.buffer).raw().toBuffer({ resolveWithObject: true });
+    expect([info.width, info.height]).toEqual([640, 200]);
+    const px = (x: number, y: number) => { const i = (y * info.width + x) * info.channels; return [data[i]!, data[i + 1]!, data[i + 2]!]; };
+    const near = (a: number[], b: number[]) => a.every((v, i) => Math.abs(v - b[i]!) < 24);
+    expect(near(px(20, 100), [0x1e, 0x40, 0xaf])).toBe(true);   // 左側補的是主體的背景色
+    expect(near(px(540, 100), [0xdc, 0x26, 0x26])).toBe(true);  // 主體在右端正中
+    // 方形以外的比例一樣擋下。
+    expect((await finalizeToSpec(await img(1024, 1536), banner)).ok).toBe(false);
   });
 
   it("refuses a wrong ratio instead of cropping it", async () => {

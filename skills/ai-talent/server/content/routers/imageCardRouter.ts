@@ -17,6 +17,7 @@ import {
   IMAGE_CHANNELS,
   MAX_IMAGE_TRAY,
   PLATFORM_IMAGE_SPECS,
+  generationSize,
   getImageSpec,
   nanoRatioFor,
   ratioLabel,
@@ -52,7 +53,9 @@ export function publicSpec(s: PlatformImageSpec) {
     format: s.format,
     maxBytes: s.maxBytes ?? null,
     /** Nano Banana 沒有這個原生比例時 false——前台不給選，不靠事後裁切湊。 */
-    nanoBanana: !!nanoRatioFor(s.width, s.height),
+    nanoBanana: !!nanoRatioFor(generationSize(s).width, generationSize(s).height),
+    /** 合成版型：AI 只生主體，其餘補背景色。 */
+    composed: !!s.compose,
     source: s.source,
   };
 }

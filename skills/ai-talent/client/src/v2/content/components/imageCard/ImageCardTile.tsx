@@ -24,6 +24,8 @@ export interface ImageCardInfo {
   format: "png" | "jpeg";
   maxBytes: number | null;
   nanoBanana: boolean;
+  /** 合成版型：AI 只生方形主體，其餘補背景色。 */
+  composed?: boolean;
   source: string;
 }
 

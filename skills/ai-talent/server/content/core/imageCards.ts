@@ -13,6 +13,7 @@ import { join } from "path";
 import {
   type PlatformImageSpec,
   canvasPromptBlock,
+  generationSize,
   gptSizeFor,
   nanoRatioFor,
   ratioError,
@@ -176,6 +177,31 @@ const COVERS_DIR = process.env.COVERS_DIR ?? "/opt/onbrand/covers";
 const COVERS_URL_PREFIX = process.env.COVERS_URL_PREFIX ?? "/static/covers";
 
 /**
+ * 合成版型：方形主體等比縮到交付高度，放在 side 那一端；其餘畫布用主體圖外框的
+ * 顏色（取中位數，擋掉零星雜點）補滿。模型被要求用單色背景，所以接縫看不出來。
+ */
+async function composeBanner(
+  buffer: Buffer,
+  spec: PlatformImageSpec,
+  gen: { width: number; height: number },
+): Promise<Buffer> {
+  const sharp = (await import("sharp")).default;
+  const tile = await sharp(buffer).resize(gen.width, gen.height, { fit: "fill" }).removeAlpha().raw().toBuffer();
+  const n = gen.width;
+  const border: number[][] = [[], [], []];
+  const push = (x: number, y: number) => { const i = (y * n + x) * 3; for (let c = 0; c < 3; c++) border[c]!.push(tile[i + c]!); };
+  for (let i = 0; i < n; i++) { push(i, 0); push(i, gen.height - 1); }
+  for (let j = 0; j < gen.height; j++) { push(0, j); push(n - 1, j); }
+  const median = (a: number[]) => a.sort((x, y) => x - y)[Math.floor(a.length / 2)]!;
+  const [r, g, b] = border.map(median) as [number, number, number];
+  const subject = await sharp(tile, { raw: { width: gen.width, height: gen.height, channels: 3 } }).png().toBuffer();
+  return sharp({ create: { width: spec.width, height: spec.height, channels: 3, background: { r, g, b } } })
+    .composite([{ input: subject, top: 0, left: spec.compose!.side === "right" ? spec.width - gen.width : 0 }])
+    .png()
+    .toBuffer();
+}
+
+/**
  * 生成後的唯一處理：確認比例與規格一致（≤1%），再「等比例」縮放到交付像素、
  * 依規格轉檔並壓到檔案上限內。比例不符直接判失敗——不裁切。
  */
@@ -185,10 +211,12 @@ export async function finalizeToSpec(buffer: Buffer, spec: PlatformImageSpec): P
   const sharp = (await import("sharp")).default;
   const meta = await sharp(buffer).metadata();
   if (!meta.width || !meta.height) return { ok: false, reason: "讀不到生成圖片的尺寸" };
-  const err = ratioError(meta.width / meta.height, spec.width / spec.height);
+  const gen = generationSize(spec);
+  const err = ratioError(meta.width / meta.height, gen.width / gen.height);
   if (err > RATIO_TOLERANCE) {
-    return { ok: false, reason: `模型回傳 ${meta.width}×${meta.height}，與 ${spec.width}×${spec.height} 的比例不符（差 ${(err * 100).toFixed(1)}%）。已擋下，不裁切。` };
+    return { ok: false, reason: `模型回傳 ${meta.width}×${meta.height}，與 ${gen.width}×${gen.height} 的比例不符（差 ${(err * 100).toFixed(1)}%）。已擋下，不裁切。` };
   }
+  if (spec.compose) buffer = await composeBanner(buffer, spec, gen);
   // 比例已一致（≤1%），fill 只是把最後幾個像素的差對齊，不會切掉畫面。
   const resized = sharp(buffer).resize(spec.width, spec.height, { fit: "fill" });
   if (spec.format === "png") {
@@ -223,14 +251,15 @@ export async function renderImageCard(args: {
   instruction?: string;
 }): Promise<RenderOutcome> {
   const modelId = resolveStillImageModel(args.modelChoice);
-  const nano = nanoRatioFor(args.spec.width, args.spec.height);
+  const gen = generationSize(args.spec);
+  const nano = nanoRatioFor(gen.width, gen.height);
   if (modelId === NANO_BANANA && !nano) {
     return {
       status: "failed", modelId, failureKind: "model_unsupported",
-      errorMsg: `Nano Banana 沒有 ${args.spec.width}×${args.spec.height} 這個比例，無法在生成時鎖定尺寸。這張卡請用 GPT Image 2。`,
+      errorMsg: `Nano Banana 沒有 ${gen.width}×${gen.height} 這個比例，無法在生成時鎖定尺寸。這張卡請用 GPT Image 2。`,
     };
   }
-  const { w, h } = gptSizeFor(args.spec.width, args.spec.height);
+  const { w, h } = gptSizeFor(gen.width, gen.height);
   // 參考圖只能帶一張：有上一版就用上一版（它已經含產品），否則用產品照。
   const imageUrl = args.referenceImageUrl ?? args.productImageUrl;
   const prompt = buildImageCardPrompt({

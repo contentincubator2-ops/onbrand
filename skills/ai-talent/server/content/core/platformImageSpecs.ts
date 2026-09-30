@@ -9,7 +9,7 @@
  * 2026-09-30（CJ「按照這張表所列出的真實尺寸調整」，OnBrand_圖片尺寸漏項清單.xlsx）：
  * 補上表中 P1（一般類、尺寸明確）與 P2（廣告類、官方已確認）的尺寸；P3（官方資料
  * 未取得、依模板而定）不建卡。gpt-image-2 生不出超過 3:1 的比例，TikTok Ad Network
- * 的 640×200／640×100 Banner 因此不建卡（不能先生再裁）。每通路只預設擺兩張
+ * 的 640×200／640×100 Banner 改用「方形主體＋背景色補滿」合成（compose）。每通路只預設擺兩張
  * （pinned），其餘由用戶在「新增尺寸」自己加（brands.positioning.__imageTray）。
  *
  * 鐵律（CJ「不能是生成後依規格精準裁切，因為這通常會切不准，要嚴格限制在指令當中」）：
@@ -60,6 +60,12 @@ export interface PlatformImageSpec {
   format: "png" | "jpeg";
   /** 檔案上限（bytes），例如 LINE 圖文選單 1MB。 */
   maxBytes?: number;
+  /**
+   * 合成版型：比例超出模型能力（>3:1）的細長 Banner。模型只生成一塊方形主體圖
+   * （單色背景），伺服器把主體放在 side 那一端，其餘用主體圖的背景色補滿——
+   * 不裁切，也不拉伸。2026-09-30 CJ 同意 640×200／640×100 用這個方式。
+   */
+  compose?: { side: "left" | "right" };
   source: string;
 }
 
@@ -784,8 +790,26 @@ export const PLATFORM_IMAGE_SPECS: PlatformImageSpec[] = [
     labelZh: "Ad Network：專用 Banner", labelEn: "Ad Network · banner",
     descZh: "Ad Network 專用 Banner 版位。", descEn: "Dedicated Ad Network banner.",
     width: 600, height: 500, maxImages: 1, titleZone: "none",
-    noteZh: "600×500；640×200、640×100 超過 3:1，AI 無法原生生成，不提供。",
+    noteZh: "600×500；JPG/PNG。",
     compositionEn: "Near-square 1.2:1 banner that reads at small size: one bold subject, plain background, no fine detail.",
+    format: "jpeg", source: "https://ads.tiktok.com/help/article/specifications-for-pangle-ad-assets",
+  },
+  {
+    id: "tt-an-banner-640x200", channel: "tiktok", placement: "ad",
+    labelZh: "Ad Network：Banner 640×200", labelEn: "Ad Network · banner 640×200",
+    descZh: "細長 Banner：右側放主體，左側是品牌色底，可疊標題。", descEn: "Thin banner: subject on the right, flat colour on the left.",
+    width: 640, height: 200, maxImages: 1, titleZone: "left", compose: { side: "right" },
+    noteZh: "3.2:1 超出 AI 原生比例：生成方形主體後，放在右端、其餘補上同色背景（不裁切）。",
+    compositionEn: "One bold, simple subject that reads at a tiny size.",
+    format: "jpeg", source: "https://ads.tiktok.com/help/article/specifications-for-pangle-ad-assets",
+  },
+  {
+    id: "tt-an-banner-640x100", channel: "tiktok", placement: "ad",
+    labelZh: "Ad Network：Banner 640×100", labelEn: "Ad Network · banner 640×100",
+    descZh: "最細的 Banner：右側小主體，左側是品牌色底，可疊短標題。", descEn: "Thinnest banner: small subject right, colour on the left.",
+    width: 640, height: 100, maxImages: 1, titleZone: "left", compose: { side: "right" },
+    noteZh: "6.4:1 超出 AI 原生比例：生成方形主體後，放在右端、其餘補上同色背景（不裁切）。",
+    compositionEn: "One bold, very simple subject that still reads at icon size.",
     format: "jpeg", source: "https://ads.tiktok.com/help/article/specifications-for-pangle-ad-assets",
   },
 
@@ -891,6 +915,14 @@ const GPT_MIN_PIXELS = 655_360;
 /** 超過 2560×1440 屬實驗性，不用。 */
 const GPT_MAX_PIXELS = 2560 * 1440;
 const GPT_MAX_EDGE = 3840;
+
+/**
+ * 模型實際要生成的尺寸。一般卡＝交付尺寸；合成版型（compose）只生成方形主體，
+ * 邊長＝交付高度。
+ */
+export function generationSize(spec: Pick<PlatformImageSpec, "width" | "height" | "compose">): { width: number; height: number } {
+  return spec.compose ? { width: spec.height, height: spec.height } : { width: spec.width, height: spec.height };
+}
 
 /** 比例容差：生成比例與交付比例差多少以內算「同一個比例」。 */
 export const RATIO_TOLERANCE = 0.01;
@@ -998,6 +1030,16 @@ export function resolveImageTray(positioning: unknown, channel: string): { ids: 
  */
 export function canvasPromptBlock(spec: PlatformImageSpec): string {
   const lines: string[] = [];
+  if (spec.compose) {
+    lines.push(
+      `CANVAS (mandatory): square 1:1 subject tile. It will sit at the ${spec.compose.side} end of a very wide ${spec.width}x${spec.height} banner; ` +
+      `the rest of that banner is filled with this image's background colour. So: one subject, centred with comfortable margins, ` +
+      `on a single plain flat solid-colour background (use a brand colour if given) — no gradient, no vignette, no texture, ` +
+      `no shadow or object touching any edge. Nothing will be cropped.`,
+    );
+    lines.push(`FRAMING: ${spec.compositionEn}`);
+    return lines.join("\n");
+  }
   const orient = spec.width > spec.height ? "landscape" : spec.width < spec.height ? "portrait" : "square";
   lines.push(
     `CANVAS (mandatory): ${spec.width}x${spec.height} pixels, aspect ratio ${ratioLabel(spec.width, spec.height)}, ${orient}. ` +
