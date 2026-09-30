@@ -352,7 +352,7 @@ function PhaseStepper({ phase }: { phase: Phase }) {
   const steps: Array<{ id: Phase; label: string }> = [
     { id: "input",      label: lang === "en" ? "Brief" : "視覺指引" },
     { id: "directions", label: lang === "en" ? "Direction" : "設計方向" },
-    { id: "prompt",     label: "AI Prompt" },
+    { id: "prompt",     label: lang === "en" ? "Scene description" : "畫面描述" },
     { id: "model",      label: lang === "en" ? "Pick model" : "選擇模型" },
   ];
   const idx = steps.findIndex((s) => s.id === phase);
@@ -480,7 +480,7 @@ function PromptPhase({
       )}
       <Textarea
         size="sm" radius="md" variant="bordered"
-        label={lang === "en" ? "AI Prompt (English)" : "AI 指令（英文）"} labelPlacement="outside"
+        label={lang === "en" ? "Scene description (English)" : "畫面描述（英文）"} labelPlacement="outside"
         placeholder="Auto-crafted from your direction — edit if needed."
         minRows={6}
         value={promptEn}

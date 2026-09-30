@@ -18,7 +18,7 @@
  *
  * Visual 3-step flow (project_media_gen_flow.md):
  *   1. 設計方向提案
- *   2. AI 指令生成
+ *   2. 畫面描述生成
  *   3. 模型選擇 + 執行
  */
 import React from "react";
@@ -60,7 +60,7 @@ const STEP_LABELS: Record<ImageGenPhase, { step: number; label: string; icon: st
   idle:       { step: 0, label: "等待 AI",      icon: "🎨" },
   designing:  { step: 1, label: "設計方向提案",     icon: "🤔" },
   direction:  { step: 1, label: "設計方向確認",     icon: "✅" },
-  prompting:  { step: 2, label: "AI 指令生成",  icon: "✍️" },
+  prompting:  { step: 2, label: "畫面描述生成",  icon: "✍️" },
   generating: { step: 3, label: "模型執行中",       icon: "🤖" },
   done:       { step: 3, label: "圖片完成",         icon: "✨" },
   error:      { step: 3, label: "生成失敗",         icon: "⚠️" },
@@ -72,7 +72,7 @@ const STEP_LABELS: Record<ImageGenPhase, { step: number; label: string; icon: st
 function StepStrip({ phase }: { phase: ImageGenPhase }) {
   const steps = [
     { n: 1, label: "設計方向" },
-    { n: 2, label: "AI Prompt" },
+    { n: 2, label: "畫面描述" },
     { n: 3, label: "模型執行" },
   ];
   const current = STEP_LABELS[phase].step;
@@ -131,11 +131,11 @@ function OverlayContent({ phase, designDirection, aiPrompt, modelName, errorMsg,
         </div>
       )}
 
-      {/* Step 2: AI Prompt */}
+      {/* Step 2: 畫面描述 */}
       {(phase === "prompting" || phase === "generating" || phase === "done") && (
         <div className="space-y-1 border-t border-white/10 pt-2">
           <p className="text-[10px] font-semibold text-white/60 uppercase tracking-wider">
-            {phase === "prompting" ? "✍️ AI 指令生成中…" : "✍️ AI 指令"}
+            {phase === "prompting" ? "✍️ 畫面描述生成中…" : "✍️ 畫面描述"}
           </p>
           {aiPrompt ? (
             <p className="text-[11px] text-white/80 leading-snug font-mono break-all">{aiPrompt}</p>
