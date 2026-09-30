@@ -22,7 +22,7 @@ jobs:
     environment: dev
     timeout-minutes: 25
     env:
-      PROBE_CARDS: "tt-an-banner-640x200:gpt-image-2 tt-an-banner-640x100:gpt-image-2"
+      PROBE_CARDS: "line-ad-wallet-popup:gpt-image-2 line-ad-today-masthead:gpt-image-2 line-ad-visionbox-full:gpt-image-2 line-img-richmsg-350:gpt-image-2 line-img-richmsg-1850:gpt-image-2"
       OPENAI_API_KEY: ${{ secrets.OPEN_API_KEY }}
       GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
       # 跟 CI 一樣的佔位值——env 驗證要求它們存在，探測本身不連資料庫。

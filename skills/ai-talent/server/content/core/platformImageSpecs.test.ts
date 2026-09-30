@@ -65,6 +65,11 @@ describe("platform image specs", () => {
     ["threads", 1080, 1080], ["threads", 1200, 628], ["threads", 1200, 630], ["threads", 1440, 1800],
     ["email", 1200, 480], ["email", 400, 400],
     ["tiktok", 400, 400], ["tiktok", 1080, 1920], ["tiktok", 720, 1280], ["tiktok", 640, 640], ["tiktok", 1200, 628], ["tiktok", 600, 500], ["tiktok", 640, 200], ["tiktok", 640, 100],
+    // 9/30 第二輪：Excel P3 經官方資料查證後補上的。
+    ["facebook", 1024, 1024], ["instagram", 1024, 1024], ["instagram", 1080, 1350],
+    ["line", 1040, 350], ["line", 1040, 585], ["line", 1040, 700], ["line", 1040, 1300], ["line", 1040, 1850],
+    ["line", 1540, 1000], ["line", 1080, 1620], ["line", 1125, 294], ["line", 640, 1280], ["line", 520, 336],
+    ["line", 1920, 1080], ["line", 1125, 960],
   ] as const)("%s has a %i×%i card", (ch, w, h) => {
     expect(PLATFORM_IMAGE_SPECS.some((s) => s.channel === ch && s.width === w && s.height === h)).toBe(true);
   });
@@ -142,6 +147,20 @@ describe("finalizeToSpec", () => {
     // 方形以外的比例一樣擋下。
     expect((await finalizeToSpec(await img(1024, 1536), banner)).ok).toBe(false);
   });
+
+  it("squeezes a photographic PNG under the LINE Wallet popup cap by palette quantisation", async () => {
+    const popup = PLATFORM_IMAGE_SPECS.find((s) => s.id === "line-ad-wallet-popup")!;
+    const { w, h } = gptSizeFor(popup.width, popup.height);
+    const noisy = await sharp(Buffer.from(Array.from({ length: w * h * 3 }, (_, i) => (i * 7 + Math.floor(Math.random() * 40)) % 256)), {
+      raw: { width: w, height: h, channels: 3 },
+    }).png().toBuffer();
+    const r = await finalizeToSpec(noisy, popup);
+    if (r.ok) {
+      expect(r.bytes).toBeLessThanOrEqual(600 * 1024);
+      const m = await sharp(r.buffer).metadata();
+      expect([m.format, m.width, m.height]).toEqual(["png", 1125, 960]);
+    } else expect(r.reason).toContain("上限");
+  }, 60_000);
 
   it("refuses a wrong ratio instead of cropping it", async () => {
     const r = await finalizeToSpec(await img(1024, 1024), spec);

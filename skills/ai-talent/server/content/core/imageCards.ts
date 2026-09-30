@@ -246,8 +246,14 @@ export async function finalizeToSpec(buffer: Buffer, spec: PlatformImageSpec): P
   const resized = sharp(buffer).resize(spec.width, spec.height, { fit: "fill" });
   if (spec.format === "png") {
     const out = await resized.png({ compressionLevel: 9 }).toBuffer();
-    if (spec.maxBytes && out.length > spec.maxBytes) return { ok: false, reason: "PNG 超過檔案上限" };
-    return { ok: true, buffer: out, bytes: out.length };
+    if (!spec.maxBytes || out.length <= spec.maxBytes) return { ok: true, buffer: out, bytes: out.length };
+    // 規格指定 PNG 又有上限（例如 LINE 錢包蓋板 600KB）：改用調色盤量化逐步壓，不改尺寸。
+    for (const colours of [256, 192, 128, 96, 64]) {
+      const q = await sharp(buffer).resize(spec.width, spec.height, { fit: "fill" })
+        .png({ palette: true, colours, quality: 90, effort: 10, compressionLevel: 9, dither: 1 }).toBuffer();
+      if (q.length <= spec.maxBytes) return { ok: true, buffer: q, bytes: q.length };
+    }
+    return { ok: false, reason: `PNG 量化到 64 色仍超過 ${Math.round(spec.maxBytes / 1024)}KB 上限` };
   }
   for (const q of [90, 82, 74, 66, 58, 50]) {
     const out = await sharp(buffer).resize(spec.width, spec.height, { fit: "fill" }).jpeg({ quality: q, mozjpeg: true }).toBuffer();
