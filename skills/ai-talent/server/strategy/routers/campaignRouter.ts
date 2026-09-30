@@ -17,6 +17,7 @@
  *   trayList    — 內容層 tray 的首頁：有企劃的活動 + 進度
  *   markWritten — 某一格寫完了，回貼產出（策略層的 ✓ 從這裡來）
  *   setLock     — 定稿／解鎖（2026-09-30 CJ「定稿一次鎖整份」）
+ *   setBackdrop — 策略畫面的底圖模板（用戶自己選；不受定稿影響，它不是企劃內容）
  *
  * 定稿之後 saveSettings／generate／savePlan 一律拒絕——鎖的是整份，不是只鎖
  * 畫面。markWritten 不受影響：內容層本來就是在定稿之後寫。
@@ -150,7 +151,9 @@ export const campaignRouter = router({
         `SELECT p.id, p.name FROM event_products ep JOIN products p ON p.id = ep.productId
           WHERE ep.eventId = ? ORDER BY p.id`, [input.eventId],
       );
-
+      const [brandRows]: any = await localPool.execute(
+        `SELECT industry FROM brands WHERE id = ? LIMIT 1`, [row.brandId],
+      );
       return {
         event: {
           id: Number(row.id), name: row.name, brandId: Number(row.brandId),
@@ -166,6 +169,9 @@ export const campaignRouter = router({
         hasLegacyBrief: ["brief", "smp", "creative", "awards"].some((k) => !!pos?.[k]),
         /** 活動定位（舊的 11 段）裡寫的核心受眾——策略畫面的「對象」。 */
         audience: typeof pos?.audience?.primaryAudience === "string" ? pos.audience.primaryAudience.slice(0, 120) : "",
+        /** 底圖模板：用戶選的（null＝依產業）＋品牌產業（前端用來挑預設）。 */
+        backdrop: typeof pos?.campaignBackdrop === "string" ? pos.campaignBackdrop : null,
+        industry: String((brandRows as any[])[0]?.industry ?? ""),
       };
     }),
 
@@ -258,6 +264,14 @@ export const campaignRouter = router({
         items: [...incoming, ...hidden],
         lockedAt: null,
       });
+      return { ok: true };
+    }),
+
+  /** 底圖模板。null＝回到依產業自動挑。模板清單在前端（campaignBackdrops.ts），這裡只擋明顯不對的值。 */
+  setBackdrop: protectedProcedure
+    .input(z.object({ eventId: z.number().int().positive(), backdrop: z.string().regex(/^[a-z][a-z0-9-]{1,30}$/).nullable() }))
+    .mutation(async ({ ctx, input }) => {
+      await patchPositioning(input.eventId, ctx.user!.id, "campaignBackdrop", input.backdrop);
       return { ok: true };
     }),
 

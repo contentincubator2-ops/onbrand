@@ -8,9 +8,9 @@
  *   · 放大：地圖往那一段放大後淡出，疊上那一段的目的、訊息，以及每個通路排了哪幾篇。
  *     還沒定稿時，每一篇的「要講什麼」、日期、做不做都在這裡改。
  *
- * 底圖（backdrop）是獨立的一層：CJ 要的是依產業換整張故事圖（汽車業是起點到終點的
- * 地圖、餐飲是從原料做成菜、文具是零件組成一支馬克筆）。那張圖還沒接上之前，這裡
- * 用中性的底。
+ * 底圖（backdrop）是獨立的一層：用戶選的模板的故事圖（汽車業是起點到終點的地圖、
+ * 餐飲是從原料做成菜、文具是零件組成一支馬克筆，見 lib/campaignBackdrops.ts）。
+ * 選「傳播圈」或圖還沒產出來時，是中性的底。
  *
  * 顏色照設計系統：只有中性色，success 只給「已寫」。
  */
@@ -102,13 +102,13 @@ export default function CampaignMap({
         aria-hidden={ci >= 0}
       >
         {W > 0 && phases.map((p, i) => (
-          <div key={p.id} className={`absolute rounded-2xl ${i % 2 ? "bg-default-200/50" : "bg-default-50/70"}`}
+          <div key={p.id} className={`absolute rounded-2xl ${backdrop ? (i % 2 ? "bg-content1/25" : "bg-content1/45") : (i % 2 ? "bg-default-200/50" : "bg-default-50/70")}`}
             style={{ left: G + i * BW + 3, top: 8, width: BW - 6, height: HEAD + lanes.length * laneH }} />
         ))}
         {W > 0 && lanes.map((c, j) => (
           <React.Fragment key={c}>
-            <div className="absolute rounded-full bg-default-200" style={{ left: G, right: 16, top: HEAD + j * laneH + laneH / 2 - 6, height: 12 }} />
-            <div className="absolute flex items-center gap-2 text-tiny text-default-600" style={{ left: 12, top: HEAD + j * laneH + laneH / 2 - 13, width: G - 16 }}>
+            <div className={`absolute rounded-full ${backdrop ? "bg-default-300/60" : "bg-default-200"}`} style={{ left: G, right: 16, top: HEAD + j * laneH + laneH / 2 - 6, height: 12 }} />
+            <div className={`absolute flex items-center gap-2 text-tiny text-default-600 ${backdrop ? "bg-content1/85 rounded-lg pr-2" : ""}`} style={{ left: 12, top: HEAD + j * laneH + laneH / 2 - 13, width: G - 16 }}>
               <span className="w-[26px] h-[26px] shrink-0 rounded-lg bg-content1 shadow-sm grid place-items-center">
                 <FontAwesomeIcon icon={CHANNEL_META[c]?.icon ?? faPenNib} className="text-tiny" />
               </span>
