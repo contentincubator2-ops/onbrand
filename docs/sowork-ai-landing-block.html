@@ -1,22 +1,20 @@
 <!--
-  OnBrand AI — landing block for embedding on www.sowork.ai
+  onBrand Studio — landing block for embedding on www.sowork.ai
   ────────────────────────────────────────────────────────────────────────
   Drop this whole block into a sowork.ai page (e.g. /products/onbrand or
   the homepage product carousel). Self-contained: inline styles + inline
-  SVG icons + inline JSON-LD Schema.
+  JSON-LD Schema. Images load from onbrand.sowork.ai.
 
-  2026-06-12 rewrite (CJ direction):
-    - Old "Drop · 秒稿" copy retired — wrong product name + wrong pricing.
-    - Now reflects actual OnBrand AI features: Brand Brain · 14-step
-      positioning · 30s/60s/99s tiers · 7-Day Publisher · 168 award-craft
-      tasks.
-    - Visual: SoWork.ai editorial style (cream + orange + black, heavy
-      headlines, thick-bordered cards).
-    - SEO: Product / SoftwareApplication JSON-LD inline · alt on every
-      image · semantic h1/h2/h3 hierarchy · canonical href tags.
-    - All CTAs link to https://onbrand.sowork.ai (the live product).
+  2026-09-30 rewrite（CJ 正名 onBrand Studio）：
+    - 與 onbrand.sowork.ai 首頁同一套說法：經過訓練與認證的 AI 行銷團隊，
+      三支柱＝懂品牌大腦＋擁有任務庫＋整合公司的 AI 技能。
+    - 拿掉舊的 30s/60s/99s 方案與價格、七日發布台、16,113／168／207 等數字。
+    - 方案：基礎版 NT$2,250／月（未稅）＋ 企業客製版（專屬行銷維運團隊）。
+    - 語氣平視：痛點寫成行業現況，不寫成讀者的缺點。
+    - 品牌橘 #F37E4A（2026-09-30 dev 側欄改版後的新值）。
+    - 截圖路徑 /static/landing/*.jpg 與 /static/og/ 需等 PR #258 上正式站後才有圖。
 
-  Last updated: 2026-06-12
+  Last updated: 2026-09-30
 -->
 
 <!-- ── JSON-LD Schema (inline for sowork.ai embed) ─────────────────── -->
@@ -24,29 +22,28 @@
 {
   "@context": "https://schema.org",
   "@type": "SoftwareApplication",
-  "name": "OnBrand AI",
-  "alternateName": ["OnBrand", "對版"],
+  "name": "onBrand Studio",
+  "alternateName": ["onBrand", "OnBrand", "OnBrand AI"],
   "applicationCategory": "BusinessApplication",
   "applicationSubCategory": "Marketing Automation",
   "operatingSystem": "Web",
   "url": "https://onbrand.sowork.ai/",
-  "description": "OnBrand 是 SoWork 推出的 AI 行銷工作室。先用 SoWork 14 步品牌定位法把你的 WHY、TA、差異化、Voice 寫進品牌大腦，鎖定一次，之後 FB、IG、YouTube、TikTok、EDM、PR 每篇文案都自動 on-brand。168 個任務內建得獎工藝案例。",
+  "description": "onBrand Studio 是 SoWork 打造、經過訓練與認證的 AI 行銷團隊：懂品牌大腦、擁有每月更新的任務庫，還能整合公司自己的 AI 技能。Facebook、Instagram、Threads、LINE、TikTok、電子報、官網七個通路的文案與圖片，一支團隊完成。",
   "inLanguage": ["zh-TW", "en"],
   "offers": {
     "@type": "AggregateOffer",
     "priceCurrency": "TWD",
-    "lowPrice": "750",
-    "highPrice": "3000",
-    "offerCount": "3",
+    "lowPrice": "2250",
+    "highPrice": "9000",
+    "offerCount": "2",
     "url": "https://onbrand.sowork.ai/pricing"
   },
   "featureList": [
-    "Brand Brain — lock positioning once, every post on-brand",
-    "14-step SoWork Brand Positioning Method",
-    "30s a post · 60s a pack · 99s a campaign",
-    "7-Day Publisher — schedule a week across channels",
-    "168 award-craft tasks (FB / IG / YT / TikTok / Email / PR / LinkedIn)",
-    "16,113 specialized AI agents"
+    "Knows your Brand Brain — SoWork 14-step Brand Positioning Method",
+    "Task library with viral-structure cards refreshed monthly",
+    "Integrates your company's own AI skills as brand-built task cards",
+    "Weekly plan across 7 channels (Facebook, Instagram, Threads, LINE, TikTok, Email, Website)",
+    "Enterprise: dedicated marketing ops team"
   ],
   "publisher": {
     "@type": "Organization",
@@ -61,178 +58,160 @@
   aria-labelledby="onbrand-hero-title"
   style="background:#F7F2EB; color:#0F0F0E; padding:80px 24px; font-family:-apple-system, 'PingFang TC', 'Noto Sans CJK TC', system-ui, sans-serif;"
 >
-  <!-- Subtle dot grid background overlay (inline SVG pattern) -->
   <div style="position:relative; max-width:1180px; margin:0 auto;">
 
-    <!-- ── Hero row: text left, illustration right ─────────────────── -->
+    <!-- ── Hero row: text left, cover right ────────────────────────── -->
     <div style="display:grid; grid-template-columns:1fr; gap:48px; align-items:center;" class="onbrand-hero-grid">
 
       <!-- Left: copy -->
-      <div>
-        <!-- Pill chip -->
+      <div style="min-width:0;">
         <span style="display:inline-block; font-size:13px; font-weight:700; padding:6px 12px; border-radius:6px; background:#FDE6D8; color:#C84516; margin-bottom:20px;">
-          AI 驅動的品牌大腦
+          4A 品牌策略方法 × 每月真實社群數據
         </span>
 
-        <!-- H1: two-line heavy headline -->
         <h1
           id="onbrand-hero-title"
-          style="font-size:clamp(2.4rem, 5vw, 3.8rem); font-weight:900; line-height:1.05; letter-spacing:-0.02em; margin:0 0 20px;"
+          style="font-size:clamp(2.2rem, 5vw, 3.6rem); font-weight:900; line-height:1.1; letter-spacing:-0.02em; margin:0 0 20px;"
         >
-          永遠 on-brand<br/>
-          <span style="opacity:0.85;">的 AI 行銷工作室</span>
+          經過訓練與認證的<br/>AI 行銷團隊
         </h1>
 
-        <!-- Sub-pitch -->
-        <p style="font-size:17px; line-height:1.7; color:#3A3633; margin:0 0 12px; max-width:560px; font-weight:500;">
-          16,113 個 AI 行銷專家 × 168 個得獎工藝任務 × 你鎖定的品牌大腦
+        <p style="font-size:17px; line-height:1.7; color:#0F0F0E; margin:0 0 10px; max-width:560px; font-weight:700;">
+          AI 寫得快，但不懂品牌；懂品牌的人，時間永遠不夠。
         </p>
-        <p style="font-size:15px; line-height:1.75; color:#6B6660; margin:0 0 32px; max-width:560px;">
-          OnBrand 不是另一個「AI 一鍵生成」工具。SoWork 14 步品牌定位法把你的 WHY、TA、差異化、Voice 寫進品牌大腦——鎖定一次，FB / IG / YouTube / TikTok / EDM / PR 每篇文案都自動 on-brand。
+        <p style="font-size:15px; line-height:1.8; color:#3A3633; margin:0 0 32px; max-width:560px;">
+          onBrand Studio 的 AI 行銷團隊讀過你的品牌大腦、帶著每月更新的任務庫，也能接上貴公司自己的 AI 技能。Facebook、Instagram、Threads、LINE、TikTok、電子報、官網，文案和圖片一起完成。
         </p>
 
-        <!-- CTAs -->
-        <div style="display:flex; flex-wrap:wrap; gap:12px; margin-bottom:40px;">
+        <div style="display:flex; flex-wrap:wrap; gap:12px;">
           <a
             href="https://onbrand.sowork.ai/auth/register"
-            style="display:inline-flex; align-items:center; gap:8px; padding:14px 26px; border-radius:12px; background:#E85D2E; color:#FFFFFF; font-size:15px; font-weight:700; text-decoration:none; box-shadow:0 6px 0 #C84516; transition:transform 0.15s;"
-            onmouseover="this.style.transform='translateY(-2px)'"
-            onmouseout="this.style.transform='translateY(0)'"
+            style="display:inline-flex; align-items:center; gap:8px; padding:14px 26px; border-radius:12px; background:#F37E4A; color:#FFFFFF; font-size:15px; font-weight:700; text-decoration:none; box-shadow:0 6px 0 #C84516;"
           >
-            免費試用 →
+            免費試用 7 天 →
           </a>
           <a
-            href="https://onbrand.sowork.ai/pricing"
+            href="https://onbrand.sowork.ai/"
             style="display:inline-flex; align-items:center; gap:8px; padding:14px 26px; border-radius:12px; background:transparent; color:#0F0F0E; border:2px solid #0F0F0E; font-size:15px; font-weight:700; text-decoration:none;"
           >
-            查看方案 →
+            了解 onBrand Studio →
           </a>
-        </div>
-
-        <!-- 4 USP cards (2×2 grid) -->
-        <div style="display:grid; grid-template-columns:repeat(2, 1fr); gap:12px; max-width:560px;">
-          <div style="padding:14px 16px; background:#FFFFFF; border:1.5px solid #0F0F0E; border-radius:12px;">
-            <div style="font-size:10px; font-weight:900; letter-spacing:0.2em; color:#E85D2E; margin-bottom:6px;">01 / 品牌大腦</div>
-            <div style="font-size:13.5px; font-weight:700; line-height:1.3; color:#0F0F0E; margin-bottom:3px;">鎖定一次品牌定位</div>
-            <div style="font-size:11.5px; color:#6B6660; line-height:1.5;">每篇貼文自動 on-brand</div>
-          </div>
-          <div style="padding:14px 16px; background:#FFFFFF; border:1.5px solid #0F0F0E; border-radius:12px;">
-            <div style="font-size:10px; font-weight:900; letter-spacing:0.2em; color:#E85D2E; margin-bottom:6px;">02 / 三種規格</div>
-            <div style="font-size:13.5px; font-weight:700; line-height:1.3; color:#0F0F0E; margin-bottom:3px;">30s · 60s · 99s</div>
-            <div style="font-size:11.5px; color:#6B6660; line-height:1.5;">一篇 / 套組 / 完整活動</div>
-          </div>
-          <div style="padding:14px 16px; background:#FFFFFF; border:1.5px solid #0F0F0E; border-radius:12px;">
-            <div style="font-size:10px; font-weight:900; letter-spacing:0.2em; color:#E85D2E; margin-bottom:6px;">03 / 七日發布台</div>
-            <div style="font-size:13.5px; font-weight:700; line-height:1.3; color:#0F0F0E; margin-bottom:3px;">一次排好 7 天</div>
-            <div style="font-size:11.5px; color:#6B6660; line-height:1.5;">全平台跨管道一鍵生成</div>
-          </div>
-          <div style="padding:14px 16px; background:#FFFFFF; border:1.5px solid #0F0F0E; border-radius:12px;">
-            <div style="font-size:10px; font-weight:900; letter-spacing:0.2em; color:#E85D2E; margin-bottom:6px;">04 / 得獎工藝</div>
-            <div style="font-size:13.5px; font-weight:700; line-height:1.3; color:#0F0F0E; margin-bottom:3px;">168 個任務</div>
-            <div style="font-size:11.5px; color:#6B6660; line-height:1.5;">每個內建得獎案例工藝</div>
-          </div>
         </div>
       </div>
 
-      <!-- Right: editorial illustration (inline SVG; 1200×630 cover trimmed) -->
-      <div style="display:flex; justify-content:center;">
+      <!-- Right: cover -->
+      <div style="display:flex; justify-content:center; min-width:0; padding-right:10px;">
         <img
-          src="https://onbrand.sowork.ai/static/covers/og-onbrand-cover.svg"
-          alt="OnBrand AI 品牌大腦視覺化插畫 — 米色背景 + 橘色得獎工藝任務卡片 + 黑色厚邊框編輯插畫風格"
-          width="540"
-          height="284"
+          src="https://onbrand.sowork.ai/static/og/onbrand-studio-og.png"
+          alt="onBrand Studio：經過訓練與認證的 AI 行銷團隊，懂品牌大腦、擁有任務庫、整合公司的 AI 技能"
+          width="1200"
+          height="630"
           loading="lazy"
-          style="width:100%; max-width:540px; height:auto; border-radius:18px; border:2.5px solid #0F0F0E; box-shadow:8px 8px 0 #0F0F0E; background:#FFFFFF;"
+          style="width:100%; max-width:560px; height:auto; border-radius:18px; border:2.5px solid #0F0F0E; box-shadow:8px 8px 0 #0F0F0E; background:#FFFFFF;"
         />
       </div>
     </div>
 
-    <!-- ── Pricing strip ─────────────────────────────────────────────── -->
-    <div style="margin-top:72px;">
-      <div style="text-align:center; margin-bottom:32px;">
-        <h2 style="font-size:clamp(1.8rem, 3.5vw, 2.6rem); font-weight:900; letter-spacing:-0.02em; margin:0 0 8px;">
-          三種顆粒度 · 一份品牌大腦
-        </h2>
-        <p style="font-size:15px; color:#6B6660; margin:0;">早鳥價 · 免信用卡 · 7 天 / 1,000 點雙限試用</p>
+    <!-- ── Pain vs team ─────────────────────────────────────────────── -->
+    <div style="margin-top:80px; max-width:980px; margin-left:auto; margin-right:auto;">
+      <h2 style="font-size:clamp(1.7rem, 3.4vw, 2.4rem); font-weight:900; letter-spacing:-0.02em; text-align:center; margin:0 0 32px;">
+        寫一篇貼文，最花時間的不是寫。
+      </h2>
+      <div style="border:2px solid #0F0F0E; border-radius:16px; overflow:hidden; background:#FFFFFF;">
+        <div style="display:grid; grid-template-columns:1fr 1fr; font-size:13px; font-weight:900; border-bottom:2px solid #0F0F0E;">
+          <div style="padding:12px 18px; color:#6B6660;">一般 AI 工具</div>
+          <div style="padding:12px 18px; color:#C84516; background:#FDE6D8; border-left:2px solid #0F0F0E;">onBrand Studio</div>
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; font-size:14px; line-height:1.7;">
+          <div style="padding:14px 18px; color:#6B6660;">每次都從空白開始，品牌要重新交代一遍。</div>
+          <div style="padding:14px 18px; font-weight:600; border-left:2px solid #0F0F0E;">團隊先讀過品牌大腦，定位、語氣、禁用詞都記得。</div>
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; font-size:14px; line-height:1.7; border-top:1px solid #EFE7D6;">
+          <div style="padding:14px 18px; color:#6B6660;">不知道這個月什麼寫法真的有效。</div>
+          <div style="padding:14px 18px; font-weight:600; border-left:2px solid #0F0F0E;">每月拆解真實傳開的貼文，附數字與出處。</div>
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; font-size:14px; line-height:1.7; border-top:1px solid #EFE7D6;">
+          <div style="padding:14px 18px; color:#6B6660;">寫完還要自己排程、自己配圖。</div>
+          <div style="padding:14px 18px; font-weight:600; border-left:2px solid #0F0F0E;">本週企劃一次排好七個通路，圖片照各平台規格生成。</div>
+        </div>
       </div>
+    </div>
 
-      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); gap:18px; max-width:980px; margin:0 auto;">
-        <!-- 30s -->
-        <article style="background:#FFFFFF; border:2px solid #0F0F0E; border-radius:18px; padding:28px; position:relative;">
-          <p style="font-size:11px; font-weight:900; letter-spacing:0.25em; color:#E85D2E; margin:0 0 10px;">30s · 一篇內容</p>
-          <div style="display:flex; align-items:baseline; gap:8px; margin-bottom:6px;">
-            <span style="font-size:42px; font-weight:900; letter-spacing:-1px;">NT$750</span>
-            <span style="font-size:14px; color:#6B6660;">/ 月</span>
+    <!-- ── Three pillars ────────────────────────────────────────────── -->
+    <div style="margin-top:80px; max-width:1080px; margin-left:auto; margin-right:auto;">
+      <h2 style="font-size:clamp(1.7rem, 3.4vw, 2.4rem); font-weight:900; letter-spacing:-0.02em; text-align:center; margin:0 0 36px;">
+        一支好的行銷團隊，該有的三件事。
+      </h2>
+      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:20px;">
+        <article style="background:#FFFFFF; border:1.5px solid #0F0F0E; border-radius:16px; overflow:hidden;">
+          <img src="https://onbrand.sowork.ai/static/landing/brand-brain.jpg" alt="品牌大腦看板：目標受眾、競爭格局、品牌故事等段落" width="1600" height="900" loading="lazy" style="display:block; width:100%; height:auto; border-bottom:1.5px solid #0F0F0E;" />
+          <div style="padding:22px;">
+            <div style="font-size:13px; font-weight:900; letter-spacing:0.2em; color:#F37E4A; margin-bottom:6px;">01</div>
+            <h3 style="font-size:19px; font-weight:900; margin:0 0 8px;">懂品牌大腦</h3>
+            <p style="font-size:14px; line-height:1.75; color:#3A3633; margin:0;">用 SoWork 14 步品牌定位法建立品牌大腦：目標受眾、競爭格局、品牌故事、語氣。鎖定之後，團隊寫的每一篇都從這裡出發。</p>
           </div>
-          <p style="font-size:12px; color:#6B6660; margin:0 0 22px;">早鳥價（原 NT$3,000）· 隨時取消</p>
-          <ul style="list-style:none; padding:0; margin:0 0 24px; font-size:13.5px; line-height:1.7; color:#3A3633;">
-            <li style="display:flex; gap:8px; margin-bottom:6px;"><span style="color:#E85D2E; font-weight:900;">✓</span> 14 步品牌大腦定位</li>
-            <li style="display:flex; gap:8px; margin-bottom:6px;"><span style="color:#E85D2E; font-weight:900;">✓</span> 168 個得獎工藝任務</li>
-            <li style="display:flex; gap:8px; margin-bottom:6px;"><span style="color:#E85D2E; font-weight:900;">✓</span> 單篇文案 30 秒產出</li>
-            <li style="display:flex; gap:8px;"><span style="color:#E85D2E; font-weight:900;">✓</span> 全管道支援</li>
-          </ul>
-          <a href="https://onbrand.sowork.ai/auth/register" style="display:block; text-align:center; padding:11px; border-radius:10px; background:#0F0F0E; color:#FFFFFF; font-size:14px; font-weight:700; text-decoration:none;">開始試用</a>
         </article>
-
-        <!-- 60s -->
-        <article style="background:#FFFFFF; border:2px solid #E85D2E; border-radius:18px; padding:28px; position:relative; box-shadow:6px 6px 0 #0F0F0E;">
-          <div style="position:absolute; top:-12px; left:24px; background:#E85D2E; color:#FFFFFF; font-size:10px; font-weight:900; letter-spacing:0.2em; padding:4px 10px; border-radius:4px;">最熱門</div>
-          <p style="font-size:11px; font-weight:900; letter-spacing:0.25em; color:#E85D2E; margin:0 0 10px;">60s · 內容套組</p>
-          <div style="display:flex; align-items:baseline; gap:8px; margin-bottom:6px;">
-            <span style="font-size:42px; font-weight:900; letter-spacing:-1px;">NT$1,500</span>
-            <span style="font-size:14px; color:#6B6660;">/ 月</span>
+        <article style="background:#FFFFFF; border:1.5px solid #0F0F0E; border-radius:16px; overflow:hidden;">
+          <img src="https://onbrand.sowork.ai/static/landing/task-library.jpg" alt="Facebook 任務庫：爆款結構卡附參考貼文與傳播數字" width="1600" height="900" loading="lazy" style="display:block; width:100%; height:auto; border-bottom:1.5px solid #0F0F0E;" />
+          <div style="padding:22px;">
+            <div style="font-size:13px; font-weight:900; letter-spacing:0.2em; color:#F37E4A; margin-bottom:6px;">02</div>
+            <h3 style="font-size:19px; font-weight:900; margin:0 0 8px;">擁有任務庫</h3>
+            <p style="font-size:14px; line-height:1.75; color:#3A3633; margin:0;">每張任務卡都是一種驗證過的寫法。爆款結構卡拆自近三個月真實傳開的貼文，每張附傳播數字、量測年月與參考文章。</p>
           </div>
-          <p style="font-size:12px; color:#6B6660; margin:0 0 22px;">早鳥價 · 含七日發布台</p>
-          <ul style="list-style:none; padding:0; margin:0 0 24px; font-size:13.5px; line-height:1.7; color:#3A3633;">
-            <li style="display:flex; gap:8px; margin-bottom:6px;"><span style="color:#E85D2E; font-weight:900;">✓</span> 30s 方案所有功能</li>
-            <li style="display:flex; gap:8px; margin-bottom:6px;"><span style="color:#E85D2E; font-weight:900;">✓</span> 跨平台內容套組 60 秒</li>
-            <li style="display:flex; gap:8px; margin-bottom:6px;"><span style="color:#E85D2E; font-weight:900;">✓</span> 七日發布台一次排 7 天</li>
-            <li style="display:flex; gap:8px;"><span style="color:#E85D2E; font-weight:900;">✓</span> FB 直接發布（OAuth）</li>
-          </ul>
-          <a href="https://onbrand.sowork.ai/auth/register" style="display:block; text-align:center; padding:11px; border-radius:10px; background:#E85D2E; color:#FFFFFF; font-size:14px; font-weight:700; text-decoration:none; box-shadow:0 4px 0 #C84516;">開始試用</a>
         </article>
-
-        <!-- 99s -->
-        <article style="background:#FFFFFF; border:2px solid #0F0F0E; border-radius:18px; padding:28px;">
-          <p style="font-size:11px; font-weight:900; letter-spacing:0.25em; color:#E85D2E; margin:0 0 10px;">99s · 完整活動</p>
-          <div style="display:flex; align-items:baseline; gap:8px; margin-bottom:6px;">
-            <span style="font-size:42px; font-weight:900; letter-spacing:-1px;">NT$3,000</span>
-            <span style="font-size:14px; color:#6B6660;">/ 月</span>
+        <article style="background:#FFFFFF; border:1.5px solid #0F0F0E; border-radius:16px; overflow:hidden;">
+          <img src="https://onbrand.sowork.ai/static/landing/own-skill.jpg" alt="新增任務卡：貼上理想中的成品，讓 AI 總結成 SKILL" width="764" height="720" loading="lazy" style="display:block; width:100%; height:auto; aspect-ratio:16/9; object-fit:cover; object-position:top; border-bottom:1.5px solid #0F0F0E;" />
+          <div style="padding:22px;">
+            <div style="font-size:13px; font-weight:900; letter-spacing:0.2em; color:#F37E4A; margin-bottom:6px;">03</div>
+            <h3 style="font-size:19px; font-weight:900; margin:0 0 8px;">整合公司的 AI 技能</h3>
+            <p style="font-size:14px; line-height:1.75; color:#3A3633; margin:0;">貴公司已經有好用的寫法或內部 AI 技能？貼上成品，AI 會反推成可重複使用的任務卡。企業客製版由我們把內部 SKILL 整批做成專屬任務卡。</p>
           </div>
-          <p style="font-size:12px; color:#6B6660; margin:0 0 22px;">完整活動企劃 99 秒</p>
-          <ul style="list-style:none; padding:0; margin:0 0 24px; font-size:13.5px; line-height:1.7; color:#3A3633;">
-            <li style="display:flex; gap:8px; margin-bottom:6px;"><span style="color:#E85D2E; font-weight:900;">✓</span> 60s 方案所有功能</li>
-            <li style="display:flex; gap:8px; margin-bottom:6px;"><span style="color:#E85D2E; font-weight:900;">✓</span> 完整活動企劃自動生成</li>
-            <li style="display:flex; gap:8px; margin-bottom:6px;"><span style="color:#E85D2E; font-weight:900;">✓</span> 多日跨平台主敘事弧</li>
-            <li style="display:flex; gap:8px;"><span style="color:#E85D2E; font-weight:900;">✓</span> 優先客服支援</li>
-          </ul>
-          <a href="https://onbrand.sowork.ai/auth/register" style="display:block; text-align:center; padding:11px; border-radius:10px; background:#0F0F0E; color:#FFFFFF; font-size:14px; font-weight:700; text-decoration:none;">開始試用</a>
         </article>
       </div>
     </div>
 
-    <!-- ── 3-step how it works ───────────────────────────────────────── -->
-    <div style="margin-top:80px; max-width:980px; margin-left:auto; margin-right:auto;">
-      <h2 style="font-size:clamp(1.8rem, 3.5vw, 2.6rem); font-weight:900; letter-spacing:-0.02em; text-align:center; margin:0 0 40px;">
-        三步驟 · 不到 12 分鐘
-      </h2>
-      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); gap:24px;">
-        <div style="background:#FFFFFF; border:1.5px solid #0F0F0E; border-radius:14px; padding:24px;">
-          <div style="font-size:36px; font-weight:900; color:#E85D2E; letter-spacing:-2px; margin-bottom:10px;">01</div>
-          <h3 style="font-size:17px; font-weight:800; margin:0 0 8px;">建立品牌</h3>
-          <p style="font-size:13.5px; line-height:1.65; color:#6B6660; margin:0;">填名稱、官網、FB——給 AI 抓真實內容的入口，2 分鐘完成。</p>
-        </div>
-        <div style="background:#FFFFFF; border:1.5px solid #0F0F0E; border-radius:14px; padding:24px;">
-          <div style="font-size:36px; font-weight:900; color:#E85D2E; letter-spacing:-2px; margin-bottom:10px;">02</div>
-          <h3 style="font-size:17px; font-weight:800; margin:0 0 8px;">跑 14 步品牌定位法</h3>
-          <p style="font-size:13.5px; line-height:1.65; color:#6B6660; margin:0;">黃金圈 → TA → 差異化 → Voice → 禁用詞——10 分鐘寫進品牌大腦，鎖定。</p>
-        </div>
-        <div style="background:#FFFFFF; border:1.5px solid #0F0F0E; border-radius:14px; padding:24px;">
-          <div style="font-size:36px; font-weight:900; color:#E85D2E; letter-spacing:-2px; margin-bottom:10px;">03</div>
-          <h3 style="font-size:17px; font-weight:800; margin:0 0 8px;">內容自動產出</h3>
-          <p style="font-size:13.5px; line-height:1.65; color:#6B6660; margin:0;">30s 一篇 / 60s 套組 / 99s 活動——全部對著你的品牌大腦產出，跨平台一致。</p>
-        </div>
+    <!-- ── Plans ─────────────────────────────────────────────────────── -->
+    <div style="margin-top:80px;">
+      <div style="text-align:center; margin-bottom:32px;">
+        <h2 style="font-size:clamp(1.7rem, 3.4vw, 2.4rem); font-weight:900; letter-spacing:-0.02em; margin:0 0 8px;">
+          從基礎版開始，或請一支專屬團隊。
+        </h2>
+        <p style="font-size:15px; color:#6B6660; margin:0;">7 天 / 1,000 點免費試用 · 免綁信用卡</p>
       </div>
+
+      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:18px; max-width:900px; margin:0 auto;">
+        <article style="background:#FFFFFF; border:2px solid #0F0F0E; border-radius:18px; padding:28px;">
+          <p style="font-size:13px; font-weight:900; color:#6B6660; margin:0 0 6px;">基礎版</p>
+          <div style="display:flex; align-items:baseline; gap:6px; margin-bottom:6px;">
+            <span style="font-size:38px; font-weight:900; letter-spacing:-1px;">NT$2,250</span>
+            <span style="font-size:14px; color:#6B6660;">／月（未稅）</span>
+          </div>
+          <p style="font-size:14px; color:#3A3633; margin:0 0 20px;">今天就有一支自己的 AI 行銷團隊。</p>
+          <ul style="list-style:none; padding:0; margin:0 0 24px; font-size:14px; line-height:1.7; color:#3A3633;">
+            <li style="display:flex; gap:8px; margin-bottom:6px;"><span style="color:#F37E4A; font-weight:900;">✓</span> 2 席 · 1 個品牌</li>
+            <li style="display:flex; gap:8px; margin-bottom:6px;"><span style="color:#F37E4A; font-weight:900;">✓</span> 7 個通路選 2（每月可換）</li>
+            <li style="display:flex; gap:8px; margin-bottom:6px;"><span style="color:#F37E4A; font-weight:900;">✓</span> 品牌定位 ＋ 用你自己的貼文建 3 張任務卡</li>
+            <li style="display:flex; gap:8px;"><span style="color:#F37E4A; font-weight:900;">✓</span> 排程與 FB／IG 直接發布</li>
+          </ul>
+          <a href="https://onbrand.sowork.ai/auth/register" style="display:block; text-align:center; padding:12px; border-radius:10px; background:#F37E4A; color:#FFFFFF; font-size:14px; font-weight:700; text-decoration:none; box-shadow:0 4px 0 #C84516;">免費試用 7 天</a>
+        </article>
+
+        <article style="background:#0F0F0E; color:#FFFFFF; border:2px solid #0F0F0E; border-radius:18px; padding:28px;">
+          <p style="font-size:13px; font-weight:900; color:#F37E4A; margin:0 0 6px;">企業客製版</p>
+          <div style="font-size:26px; font-weight:900; line-height:1.2; margin-bottom:6px;">專屬行銷維運團隊</div>
+          <p style="font-size:14px; opacity:0.8; margin:0 0 20px;">建置費 ＋ 月費，依公司報價。</p>
+          <ul style="list-style:none; padding:0; margin:0 0 24px; font-size:14px; line-height:1.7;">
+            <li style="display:flex; gap:8px; margin-bottom:6px;"><span style="color:#F37E4A; font-weight:900;">✓</span> 盤點貴公司內部的 AI 寫作 SKILL，做成專屬任務卡</li>
+            <li style="display:flex; gap:8px; margin-bottom:6px;"><span style="color:#F37E4A; font-weight:900;">✓</span> 多品牌、多市場</li>
+            <li style="display:flex; gap:8px; margin-bottom:6px;"><span style="color:#F37E4A; font-weight:900;">✓</span> 策略、內容、成效三層，都有專人維運</li>
+            <li style="display:flex; gap:8px;"><span style="color:#F37E4A; font-weight:900;">✓</span> 成效層與電商營運報告</li>
+          </ul>
+          <a href="mailto:sowork@sowork.ai?subject=onBrand%20Studio%20%E4%BC%81%E6%A5%AD%E5%AE%A2%E8%A3%BD%E7%89%88" style="display:block; text-align:center; padding:12px; border-radius:10px; background:#FFFFFF; color:#0F0F0E; font-size:14px; font-weight:700; text-decoration:none;">聯絡我們</a>
+        </article>
+      </div>
+      <p style="text-align:center; font-size:14px; margin:20px 0 0;">
+        <a href="https://onbrand.sowork.ai/pricing" style="color:#0F0F0E;">看完整方案（含專業版）→</a>
+      </p>
     </div>
 
     <!-- ── Trust + Final CTA ─────────────────────────────────────────── -->
@@ -242,9 +221,9 @@
 
       <a
         href="https://onbrand.sowork.ai/auth/register"
-        style="display:inline-flex; align-items:center; gap:8px; padding:16px 32px; border-radius:14px; background:#E85D2E; color:#FFFFFF; font-size:16px; font-weight:700; text-decoration:none; box-shadow:0 6px 0 #C84516;"
+        style="display:inline-flex; align-items:center; gap:8px; padding:16px 32px; border-radius:14px; background:#F37E4A; color:#FFFFFF; font-size:16px; font-weight:700; text-decoration:none; box-shadow:0 6px 0 #C84516;"
       >
-        免費試用 OnBrand AI →
+        免費試用 onBrand Studio →
       </a>
 
       <div style="margin-top:28px; font-size:12px; color:#6B6660;">
@@ -263,7 +242,7 @@
 <style>
   @media (min-width: 1024px) {
     .onbrand-hero-grid {
-      grid-template-columns: 55% 45% !important;
+      grid-template-columns: 52% 48% !important;
     }
   }
 </style>
