@@ -164,6 +164,8 @@ export interface CampaignPlanItem {
   repaired?: boolean;
   /** 內容層可以把某一篇拿出本週企劃（false）；沒有＝定稿後照日期進本週企劃。 */
   inPlanner?: boolean;
+  /** 這一篇要下廣告。 */
+  paid?: boolean;
 }
 
 export interface CampaignPartnerBlock {
@@ -181,6 +183,8 @@ export interface CampaignPlan {
   phaseMessages?: Partial<Record<CampaignPhaseId, string>>;
   /** 定稿時間；有值＝整份鎖住。 */
   lockedAt?: string | null;
+  /** KPI、預算與每一段的分配（見 lib/campaignKpi.ts）。 */
+  kpi?: import("./campaignKpi").CampaignKpi | null;
   kol?: CampaignPartnerBlock | null;
   cobrand?: CampaignPartnerBlock | null;
   generatedAt?: string;

@@ -29,7 +29,7 @@ import React from "react";
 import { useNavigate } from "react-router-dom";
 import { Button, Modal, ModalContent, ModalHeader, ModalBody, Spinner } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faMap, faPenNib, faSliders, faLockOpen, faLock, faArrowRight, faBookOpen, faImage, faCheck, faExpand, faCompress } from "@fortawesome/free-solid-svg-icons";
+import { faMap, faPenNib, faSliders, faLockOpen, faLock, faArrowRight, faBookOpen, faImage, faCheck, faExpand, faCompress, faBullseye } from "@fortawesome/free-solid-svg-icons";
 import { trpc } from "../../../../lib/trpc";
 import { useLang } from "../../../../lib/i18n";
 import { CHANNEL_META, channelLabel } from "../../../content/lib/channelMeta";
@@ -40,6 +40,8 @@ import CampaignMap from "./CampaignMap";
 import CampaignSetupForm from "./CampaignSetupForm";
 import CampaignChatCard from "./CampaignChatCard";
 import CampaignHandoff from "./CampaignHandoff";
+import CampaignKpiPanel from "./CampaignKpiPanel";
+import { money, metricLine } from "../../lib/campaignKpi";
 import {
   availableBackdrops, backdropForIndustry, backdropUrl, resolveBackdrop, BACKDROP_THEMES, DEFAULT_BACKDROP,
 } from "../../lib/campaignBackdrops";
@@ -64,6 +66,7 @@ export default function CampaignStage({ eventId, brandId }: { eventId: number; b
   const [plan, setPlan] = React.useState<CampaignPlan | null>(null);
   const [current, setCurrent] = React.useState<CampaignPhaseId | null>(null);
   const [full, setFull] = React.useState(false);
+  const [kpiOpen, setKpiOpen] = React.useState(false);
   const [setupOpen, setSetupOpen] = React.useState(false);
   const [partner, setPartner] = React.useState<"kol" | "cobrand" | null>(null);
   const [pickerOpen, setPickerOpen] = React.useState(false);
@@ -253,6 +256,10 @@ export default function CampaignStage({ eventId, brandId }: { eventId: number; b
               onPress={() => setPickerOpen(true)}>
               <FontAwesomeIcon icon={faImage} />
             </Button>
+            {plan && (
+              <Button size="sm" variant={plan.kpi ? "light" : "bordered"} radius="md" startContent={<FontAwesomeIcon icon={faBullseye} />}
+                onPress={() => setKpiOpen(true)}>{L("KPI 與預算", "KPIs & budget")}</Button>
+            )}
             {plan && !locked && (
               <Button size="sm" variant="bordered" radius="md" startContent={<FontAwesomeIcon icon={faSliders} />}
                 onPress={() => setSetupOpen(true)}>{L("調整設定", "Settings")}</Button>
@@ -309,6 +316,15 @@ export default function CampaignStage({ eventId, brandId }: { eventId: number; b
                   {plan?.phaseMessages?.[curPhase.id] && (
                     <p className="text-small text-default-600">{L("訊息：", "Message: ")}{plan.phaseMessages[curPhase.id]}</p>
                   )}
+                  {plan?.kpi?.phases?.[curPhase.id] && (() => {
+                    const k = plan.kpi!.phases[curPhase.id]!;
+                    return (
+                      <p className="text-small text-default-600">
+                        {L("預算：", "Budget: ")}{money(k.budget, en)}（{k.share}%）
+                        {k.metrics.length ? `　KPI：${k.metrics.map((m) => metricLine(m, en)).join("、")}` : ""}
+                      </p>
+                    );
+                  })()}
                 </>
               ) : plan ? (
                 <>
@@ -316,6 +332,12 @@ export default function CampaignStage({ eventId, brandId }: { eventId: number; b
                   <p className="text-xl font-bold leading-snug text-balance">{plan.smp}</p>
                   {data.audience && <p className="text-small text-default-600 line-clamp-3" title={data.audience}>{L("對象：", "Audience: ")}{data.audience}</p>}
                   {settings.mechanic && <p className="text-small text-default-600">{L("機制：", "Offer: ")}{settings.mechanic}</p>}
+                  {plan.kpi && (plan.kpi.budget || plan.kpi.goals?.length) ? (
+                    <p className="text-small text-default-600">
+                      {plan.kpi.budget ? `${L("預算：", "Budget: ")}${money(plan.kpi.budget, en)}` : ""}
+                      {plan.kpi.goals?.length ? `${plan.kpi.budget ? "　" : ""}${L("目標：", "Goal: ")}${plan.kpi.goals.map((g) => metricLine(g, en)).join("、")}` : ""}
+                    </p>
+                  ) : null}
                 </>
               ) : (
                 <>
@@ -347,6 +369,7 @@ export default function CampaignStage({ eventId, brandId }: { eventId: number; b
                 items={items} phases={phases} lanes={lanes} phaseMessages={plan.phaseMessages ?? {}}
                 current={cur} onPick={setCurrent} locked={locked} en={en} onPatchItem={patchItem}
                 backdrop={pictured ? <RightBackdrop id={theme} /> : undefined} fill
+                phaseKpi={plan.kpi?.phases ?? {}}
               />
             ) : (
               <div className="relative bg-default-100 p-4 sm:p-6 min-h-[420px] h-full overflow-y-auto">
@@ -359,6 +382,21 @@ export default function CampaignStage({ eventId, brandId }: { eventId: number; b
           </section>
         </div>
       </div>
+
+      <Modal isOpen={kpiOpen && !!plan} onClose={() => setKpiOpen(false)} size="3xl" scrollBehavior="inside">
+        <ModalContent>
+          <ModalHeader className="flex flex-col gap-1">
+            <span className="text-medium">{L("KPI 與預算", "KPIs & budget")}</span>
+            <span className="text-tiny font-normal text-default-500">{L("你填總數，專家拆到每一段、挑出要下廣告的貼文。各段加起來一定等於你填的總數。", "You set the totals; the specialist splits them across phases and picks posts to promote.")}</span>
+          </ModalHeader>
+          <ModalBody className="pb-6">
+            {plan && (
+              <CampaignKpiPanel eventId={eventId} plan={plan} locked={locked} en={en}
+                onApply={(next) => { applyPlan(next); setKpiOpen(false); }} />
+            )}
+          </ModalBody>
+        </ModalContent>
+      </Modal>
 
       <Modal isOpen={setupOpen} onClose={() => setSetupOpen(false)} size="2xl" scrollBehavior="inside">
         <ModalContent>

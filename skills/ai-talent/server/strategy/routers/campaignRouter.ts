@@ -18,6 +18,8 @@
  *   markWritten — 某一格寫完了，回貼產出（策略層的 ✓ 從這裡來）
  *   setLock     — 定稿／解鎖（2026-09-30 CJ「定稿一次鎖整份」）
  *   chat        — 跟內容企劃對話：回覆＋提案（不寫入；套用走 savePlan）
+ *   kpiAgent    — 會協助拆 KPI 的投放專家是誰（打開 KPI 視窗時先讓用戶看到）
+ *   planKpi     — 用戶填總預算／總目標 → 投放專家拆到每一段＋挑要下廣告的篇（提案，不寫入）
  *   setInPlanner— 內容層決定某一篇要不要排進本週企劃（定稿後也能改，它是排程不是企劃內容）
  *   setBackdrop — 策略畫面的底圖模板（用戶自己選；不受定稿影響，它不是企劃內容）
  *
@@ -32,6 +34,7 @@ import { router, protectedProcedure } from "../../platform/core/trpc";
 import localPool from "../../localDb";
 import { buildCampaignPlan, inferCampaignSettings, type CampaignPlan } from "../core/campaignPlan";
 import { runCampaignChat } from "../core/campaignChat";
+import { KPI_METRICS, pickKpiAgent, runKpiPlan } from "../core/campaignKpi";
 import { isHiddenContentPlatform, isHiddenHistoryItem } from "../../platform/core/planGate";
 import { ownedProductIds, resolveProductScope } from "../core/eventProductScope";
 import { invalidateBrandPrefix } from "../core/brandContext";
@@ -62,6 +65,7 @@ const planItemInput = z.object({
   scheduledAt: z.string().nullable().optional(),
   repaired: z.boolean().optional(),
   inPlanner: z.boolean().optional(),
+  paid: z.boolean().optional(),
 });
 
 const PHASE_KEYS = ["teaser", "launch", "sustain", "lastcall", "encore"] as const;
@@ -70,6 +74,7 @@ const planInput = z.object({
   smp: z.string().max(200),
   items: z.array(planItemInput).max(60),
   phaseMessages: z.record(z.enum(PHASE_KEYS), z.string().max(60)).optional(),
+  kpi: z.any().nullable().optional(),
   kol: z.any().nullable().optional(),
   cobrand: z.any().nullable().optional(),
   generatedAt: z.string().optional(),
@@ -265,6 +270,7 @@ export const campaignRouter = router({
         ...input.plan,
         // 畫面沒有送回來就沿用存著的，不要因為舊畫面少送一個欄位就洗掉。
         phaseMessages: input.plan.phaseMessages ?? stored?.phaseMessages,
+        kpi: input.plan.kpi !== undefined ? input.plan.kpi : stored?.kpi,
         items: [...incoming, ...hidden],
         lockedAt: null,
       });
@@ -292,6 +298,42 @@ export const campaignRouter = router({
         return await runCampaignChat({
           eventId: input.eventId, userId: ctx.user!.id, plan,
           message: input.message, phase: input.phase ?? null, history: input.history,
+        });
+      } catch (e: any) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: String(e?.message ?? e).slice(0, 300) });
+      }
+    }),
+
+  kpiAgent: protectedProcedure
+    .input(z.object({ eventId: z.number().int().positive() }))
+    .query(async ({ ctx, input }) => {
+      const row = await loadEvent(input.eventId, ctx.user!.id);
+      const [b]: any = await localPool.execute(`SELECT industry FROM brands WHERE id = ? LIMIT 1`, [row.brandId]);
+      return { agent: await pickKpiAgent((b as any[])[0]?.industry) };
+    }),
+
+  /**
+   * 用戶填總預算與總目標，投放專家拆到每一段、挑要下廣告的篇。只回提案，套用走 savePlan。
+   * 數字的規則見 core/campaignKpi.ts：絕對數字只來自用戶填的總數。
+   */
+  planKpi: protectedProcedure
+    .input(z.object({
+      eventId: z.number().int().positive(),
+      budget: z.number().int().min(0).max(1_000_000_000).nullable(),
+      goals: z.array(z.object({ metric: z.enum(KPI_METRICS), target: z.number().int().min(1).max(1_000_000_000) })).max(3),
+      notes: z.string().max(800).optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const row = await loadEvent(input.eventId, ctx.user!.id);
+      const pos = parsePositioning(row.positioning);
+      assertUnlocked(pos);
+      const plan = visiblePlan((pos.campaignPlan ?? null) as CampaignPlan | null);
+      if (!plan?.items?.length) throw new TRPCError({ code: "BAD_REQUEST", message: "還沒有企劃，先排出企劃再設定 KPI" });
+      try {
+        return await runKpiPlan({
+          eventId: input.eventId, userId: ctx.user!.id, plan,
+          budget: input.budget && input.budget > 0 ? input.budget : null,
+          goals: input.goals, notes: input.notes ?? "",
         });
       } catch (e: any) {
         throw new TRPCError({ code: "BAD_REQUEST", message: String(e?.message ?? e).slice(0, 300) });

@@ -82,6 +82,8 @@ export interface PlanItem extends Beat {
   repaired?: boolean;
   /** 內容層可以把某一篇拿出本週企劃（false）；沒有這個欄位＝定稿後照日期進本週企劃。 */
   inPlanner?: boolean;
+  /** 這一篇要下廣告（投放專家提議、用戶可改）；只有 PAID_CHANNELS 的通路能下。 */
+  paid?: boolean;
 }
 
 export interface PartnerStep { id: string; text: string; taskId?: string; taskLabel?: string; done?: boolean }
@@ -100,6 +102,8 @@ export interface CampaignPlan {
   generatedAt: string;
   /** 定稿時間。定稿＝整份（設定＋企劃）鎖住，要改先解鎖；內容層只寫定稿過的東西。 */
   lockedAt?: string | null;
+  /** KPI、預算與每一段的分配（見 campaignKpi.ts）。 */
+  kpi?: import("./campaignKpi").CampaignKpi | null;
 }
 
 const DAY = 86_400_000;
