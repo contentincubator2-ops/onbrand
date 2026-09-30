@@ -153,7 +153,7 @@ export default function ProductDetailModal({ productId, brandId, onClose, onRepo
   const [sceneOpen, setSceneOpen] = useState(false);
 
   // Fetch product
-  const productQ = (trpc as any).product?.get?.useQuery?.(
+  const productQ = (trpc as any).product?.get?.useQuery(
     { id: productId },
     { enabled: !!productId, refetchOnWindowFocus: false },
   );

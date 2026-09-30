@@ -217,12 +217,12 @@ function BrandBasicEditor({ brandId, en }: { brandId: number | null; en: boolean
   const SOCIAL_FIELDS = getSocialFields(en);
 
   // Brand data (industry / description / tagline / positioningSummary)
-  const q = (trpc as any).brand?.get?.useQuery?.(
+  const q = (trpc as any).brand?.get?.useQuery(
     { id: brandId ?? 0 },
     { enabled: !!brandId, refetchOnWindowFocus: false },
   );
   // Connections data (website + all social links)
-  const connQ = (trpc as any).brand?.getConnections?.useQuery?.(
+  const connQ = (trpc as any).brand?.getConnections?.useQuery(
     { brandId: brandId ?? 0 },
     { enabled: !!brandId, refetchOnWindowFocus: false },
   );
@@ -390,7 +390,7 @@ export function VisualTab({ brandId }: { brandId: number | null }) {
   // 2026-05-12 (CJ「視覺還在開發，請開發完成」): real implementation.
   // Logo URL + 3 brand colors + font hint + guidelines, all wired to
   // brand.updateVisual which also feeds image-gen as brandContext.
-  const visualQ = (trpc as any).brand?.getVisual?.useQuery?.(
+  const visualQ = (trpc as any).brand?.getVisual?.useQuery(
     { brandId: brandId ?? 0 },
     { enabled: !!brandId, refetchOnWindowFocus: false },
   );
@@ -588,11 +588,11 @@ export function PublishTab({ brandId }: { brandId: number | null }) {
   const en = lang === "en";
 
   // ── Queries ──────────────────────────────────────────────────────────
-  const fbStatusQ = (trpc as any).publish?.getBrandFacebookStatus?.useQuery?.(
+  const fbStatusQ = (trpc as any).publish?.getBrandFacebookStatus?.useQuery(
     { brandId: brandId ?? 0 },
     { enabled: !!brandId, refetchOnWindowFocus: false, staleTime: 15_000 },
   );
-  const platformsQ = (trpc as any).publish?.getConnectedPlatforms?.useQuery?.(
+  const platformsQ = (trpc as any).publish?.getConnectedPlatforms?.useQuery(
     { brandId: brandId ?? 0 },
     { enabled: !!brandId, refetchOnWindowFocus: false, staleTime: 20_000 },
   );
@@ -626,7 +626,7 @@ export function PublishTab({ brandId }: { brandId: number | null }) {
   // ── bundle.social connect path ─────────────────────────────────────────
   // Which platforms use bundle.social is decided server-side by
   // PUBLISH_PROVIDER_<PLATFORM>; this component just follows what it reports.
-  const bundleProvidersQ    = (trpc as any).bundleConnect?.getProviders?.useQuery?.();
+  const bundleProvidersQ    = (trpc as any).bundleConnect?.getProviders?.useQuery();
   const bundleConnectUrlMut = (trpc as any).bundleConnect?.getConnectUrl?.useMutation?.();
   const bundleStatusMut     = (trpc as any).bundleConnect?.getConnectionStatus?.useMutation?.();
   /** Portal links are single-use, so cache one per platform and refresh after use. */
@@ -1137,7 +1137,7 @@ export function DangerTab({ brandId, brandName, onClose }: { brandId: number | n
   const [confirmed, setConfirmed] = useState(false);
 
   // Fetch brand list so we can redirect to another brand after deletion
-  const brandsQ = (trpc as any).brand?.list?.useQuery?.(undefined, {
+  const brandsQ = (trpc as any).brand?.list?.useQuery(undefined, {
     refetchOnWindowFocus: false, staleTime: 30_000,
   });
   const allBrands: Array<{ id: number; name: string }> = brandsQ?.data ?? [];

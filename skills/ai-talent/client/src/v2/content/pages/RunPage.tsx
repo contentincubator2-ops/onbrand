@@ -888,7 +888,7 @@ export default function RunPage() {
   // must live HERE (MediaGenFlow got it first, but that flow isn't on this
   // click path). When on, image.generate routes to Nano Banana with the
   // real photo + fidelity guard (see project_product_faithful_imagegen).
-  const runProductImagesQ = (trpc as any).media?.listProductImages?.useQuery?.(
+  const runProductImagesQ = (trpc as any).media?.listProductImages?.useQuery(
     { brandId: data?.brand?.id ?? 0 },
     { enabled: !!data?.brand?.id, refetchOnWindowFocus: false, staleTime: 60_000 },
   ) ?? { data: null };

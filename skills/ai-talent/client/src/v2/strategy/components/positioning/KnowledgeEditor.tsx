@@ -31,7 +31,7 @@ export default function KnowledgeEditor({ brandId }: { brandId: number | null })
   }
 
   const utils = trpc.useUtils();
-  const list = (trpc as any).brandKnowledge?.list?.useQuery?.({ brandId }, { enabled: !!brandId });
+  const list = (trpc as any).brandKnowledge?.list?.useQuery({ brandId }, { enabled: !!brandId });
   const items: Item[] = (list?.data as Item[] | undefined) ?? [];
 
   const createMut = (trpc as any).brandKnowledge?.create?.useMutation?.({

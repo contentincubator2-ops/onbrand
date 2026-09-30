@@ -28,7 +28,7 @@ export default function AdminUserDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const uid = Number(id);
-  const q = (trpc as any).adminStats?.userDetail?.useQuery?.(
+  const q = (trpc as any).adminStats?.userDetail?.useQuery(
     { userId: uid }, { enabled: uid > 0, refetchOnWindowFocus: false });
 
   if (q?.error) {

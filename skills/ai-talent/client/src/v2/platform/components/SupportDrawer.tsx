@@ -68,7 +68,7 @@ export default function SupportDrawer({ open, onClose, scope, pendingNudges, onN
   const sendMut     = (trpc as any).support?.sendMessage?.useMutation?.();
   const escalateMut = (trpc as any).support?.escalateToHuman?.useMutation?.();
   const reportBugMut = (trpc as any).support?.reportBug?.useMutation?.();
-  const listConvsQ  = (trpc as any).support?.listConversations?.useQuery?.(
+  const listConvsQ  = (trpc as any).support?.listConversations?.useQuery(
     undefined,
     { enabled: showHistory, staleTime: 10_000 },
   );

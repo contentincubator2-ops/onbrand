@@ -100,8 +100,8 @@ export default function PlannerPage() {
   const [pending, setPending] = React.useState<string | null>(null);
   const chatEnd = React.useRef<HTMLDivElement>(null);
 
-  const weekQ = T.planner?.week?.useQuery?.({ brandId: brandId ?? 0, weekStart }, { enabled: !!brandId, refetchOnWindowFocus: false }) ?? { data: null };
-  const calQ = T.calendar?.range?.useQuery?.(
+  const weekQ = T.planner?.week?.useQuery({ brandId: brandId ?? 0, weekStart }, { enabled: !!brandId, refetchOnWindowFocus: false }) ?? { data: null };
+  const calQ = T.calendar?.range?.useQuery(
     { from: `${weekStart}T00:00:00+08:00`, to: `${addDays(weekStart, 7)}T00:00:00+08:00`, brandId: brandId ?? undefined },
     { enabled: !!brandId, refetchOnWindowFocus: false },
   ) ?? { data: null };

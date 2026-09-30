@@ -92,7 +92,7 @@ export default function MediaGenFlow({
   // real product photos (IRIS/Iris Girls seeded from 91APP) can use the ACTUAL
   // product instead of an AI-imagined one. When enabled the photo is sent with
   // the fidelity guard to whichever model is picked (GPT Image 2 by default).
-  const productImagesQ = (trpc as any).media?.listProductImages?.useQuery?.(
+  const productImagesQ = (trpc as any).media?.listProductImages?.useQuery(
     { brandId: brandId ?? 0 },
     { enabled: !!brandId && kind === "image", refetchOnWindowFocus: false, staleTime: 60_000 },
   ) ?? { data: null };

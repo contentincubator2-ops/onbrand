@@ -101,7 +101,7 @@ export default function ImageCardPage() {
   const cards = (listQ.data?.cards ?? []) as ImageCardInfo[];
   const card = cards.find((c) => c.id === cardId);
 
-  const productsQ = (trpc as any).media?.listProductImages?.useQuery?.(
+  const productsQ = (trpc as any).media?.listProductImages?.useQuery(
     { brandId: brandId ?? 0 }, { enabled: !!brandId, refetchOnWindowFocus: false, staleTime: 60_000 },
   ) ?? { data: null };
   const products: Array<{ productId: number; name: string; imageUrl: string }> = productsQ.data?.products ?? [];

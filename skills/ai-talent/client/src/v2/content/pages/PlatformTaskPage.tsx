@@ -483,7 +483,7 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
   const [editValue, setEditValue] = useState("");
   const savePositioningMut = (trpc as any).scope?.savePositioning?.useMutation?.();
 
-  const scopeActiveQuery = (trpc as any).scope?.active?.useQuery?.(
+  const scopeActiveQuery = (trpc as any).scope?.active?.useQuery(
     {
       brandId:   brandId ?? 0,
       productId: taskProductId,
@@ -836,7 +836,7 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
   // 時間」）：要預填「日期 / 時間」「為什麼參加 / 重點」就得真的去拿活動資料，
   // 所以除了 ref 還要一份 state —— ref 不會觸發 query。
   const [campaignScope, setCampaignScope] = React.useState<{ eventId: number; itemId: string } | null>(null);
-  const campaignQ = (trpc as any).campaign?.get?.useQuery?.(
+  const campaignQ = (trpc as any).campaign?.get?.useQuery(
     { eventId: campaignScope?.eventId ?? 0 },
     { enabled: !!campaignScope?.eventId, refetchOnWindowFocus: false, staleTime: 60_000 },
   ) ?? { data: null };
