@@ -184,6 +184,8 @@ interface BrainEntry {
   keptChars: number;
   trimmed: boolean;
   dropped: boolean;
+  /** 舊版 brand_brain 的列 id——只有這種記憶沒有編輯頁，「記憶空間」可以直接忘掉。 */
+  legacyRowId?: number;
 }
 
 export type BrainItemStatus = "remembered" | "trimmed" | "overflow" | "checkOnly";
@@ -202,6 +204,12 @@ export interface BrainItem {
   status: BrainItemStatus;
   /** 存的內容開頭，給畫面預覽。 */
   preview: string;
+  /**
+   * 2026-09-30（CJ「像操作手機的記憶一樣，按照引導去清理記憶」）：舊版 brand_brain
+   * 表的列 id。這張表已經沒有寫入端、也沒有編輯頁，所以清理只能在記憶空間直接忘掉
+   * （brandKnowledge.forgetLegacy）。其他記憶都回到原本的策略層頁面精簡。
+   */
+  legacyRowId?: number;
 }
 
 export interface BrandBrain {
@@ -224,7 +232,7 @@ class BrainCollector {
   checkOnly: BrainItem[] = [];
 
   /** 一行 prompt＝一筆記憶。raw 是用戶存的原文，max 是這一格最多記住幾字。 */
-  add(section: SectionKey, category: BrainTier, label: string, raw: string, max: number, render?: (kept: string) => string): void {
+  add(section: SectionKey, category: BrainTier, label: string, raw: string, max: number, render?: (kept: string) => string, legacyRowId?: number): void {
     const text = raw.trim();
     if (!text) return;
     const { text: kept, trimmed } = clip(text, max);
@@ -233,6 +241,7 @@ class BrainCollector {
       display: displayOf(section, category, label),
       line: render ? render(kept) : `【${label}】${kept}`,
       storedChars: len(text), keptChars: len(kept), trimmed, dropped: false,
+      ...(legacyRowId ? { legacyRowId } : {}),
     });
   }
 
@@ -552,7 +561,7 @@ export async function buildBrandBrain(
     let rows: any[] = [];
     try {
       const [r] = (await db.execute(
-        sql`SELECT category, title, content
+        sql`SELECT id, category, title, content
             FROM brand_brain
             WHERE brand_id = ${brandId}
             ORDER BY updated_at DESC
@@ -721,7 +730,7 @@ export async function buildBrandBrain(
     if (rows && rows.length > 0) {
       for (const r of rows as any[]) {
         c.add("legacy", "legacy", `${r.category}｜${r.title}`, String(r.content ?? ""), 400,
-          (k) => `【${r.category}】${r.title}：${k}`);
+          (k) => `【${r.category}】${r.title}：${k}`, Number(r.id) || undefined);
       }
     }
 
@@ -864,6 +873,7 @@ export async function buildBrandBrain(
         keptChars: e.dropped ? 0 : e.keptChars,
         status: e.dropped ? "overflow" : e.trimmed ? "trimmed" : "remembered",
         preview: e.line.replace(/^【[^】]*】/, "").slice(0, 80),
+        ...(e.legacyRowId ? { legacyRowId: e.legacyRowId } : {}),
       })),
       ...c.checkOnly,
     ];

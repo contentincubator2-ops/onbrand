@@ -7,6 +7,7 @@
  *
  * Content area paddingLeft = 70px always (collapsed) or 280px (expanded).
  */
+import { brainState, type BrainData } from "../../strategy/components/brain/brainModel";
 import { isChunkLoadError, autoReloadForStaleChunk, StaleChunkScreen } from "../staleChunk";
 import React from "react";
 import { createPortal } from "react-dom";
@@ -89,6 +90,8 @@ interface NavItem {
    *  pathname alone, so every one of them would light up at once. When set,
    *  the item is active iff the current `cat` equals this value. */
   catKey?: string;
+  /** 2026-09-30：記憶空間快滿／超載時，圖示右上角亮狀態點。 */
+  alert?: "near" | "over";
 }
 
 // 2026-08-20: 策略 (Strategy) workspace — 品牌大腦's tile strip promoted to
@@ -183,8 +186,10 @@ function buildNavItems(lang: "zh-TW" | "en", userEmail?: string | null, currentP
         tooltip: en ? "Recurring strategy meetings" : "定期策略會議" },
       // 2026-09-29（CJ「在策略端增加一個 mission tray，是檢查大腦」）：品牌大腦記住了
       // 什麼、還能記多少——跟每篇產文讀的是同一份。
-      { to: "/brands/edit?cat=brain", catKey: "brain", label: en ? "Brain" : "大腦", icon: <FontAwesomeIcon icon={ICON.brainCheck} />,
-        tooltip: en ? "What the AI remembers" : "AI 記住了什麼、還能記多少" },
+      // 2026-09-30（CJ「重新想這個 mission tray 的名字，目的在管理記憶」）：改名「記憶空間」，
+      // 跟手機的「儲存空間」同一個心智模型；快滿／超載時圖示上亮狀態點（見 memoryAlert）。
+      { to: "/brands/edit?cat=brain", catKey: "brain", label: en ? "Memory" : "記憶空間", icon: <FontAwesomeIcon icon={ICON.brainCheck} />,
+        tooltip: en ? "What the AI remembers — and cleanup when it's full" : "AI 記住了什麼、滿了怎麼清" },
       // 2026-08-21 (CJ「加一個人設的task tray...用戶可以自己新創agent，自己
       // 命名，並且決定這個Agent語調的應用範圍」): user-created persona
       // agents — trained from pasted text / article links / video links,
@@ -762,9 +767,23 @@ function IconBar({
     onSuccess: () => { try { utils?.navPrefs?.get?.invalidate?.(); } catch { /* noop */ } setPickerOpen(false); },
   });
   const brandName = (brands ?? []).find((b: any) => b?.id === scope.brandId)?.name ?? null;
+  // 2026-09-30（CJ「超出記憶容量時，這邊會提醒用戶」）：在策略層任何一頁，記憶空間的
+  // rail 圖示都會亮狀態點——用戶在別頁把內容填爆時，不用點進去就看得到。
+  const onStrategyRail = currentPath?.startsWith("/brands") ?? false;
+  const memoryQ = (trpc as any).brandKnowledge?.brain?.useQuery(
+    { brandId: scope.brandId ?? 0 },
+    { enabled: !!scope.brandId && onStrategyRail, refetchOnWindowFocus: true, staleTime: 60_000 },
+  ) ?? { data: null };
+  const memoryAlert = React.useMemo<"near" | "over" | undefined>(() => {
+    const d = memoryQ.data as BrainData | null | undefined;
+    if (!d) return undefined;
+    const level = brainState(d).level;
+    return level === "ok" ? undefined : level;
+  }, [memoryQ.data]);
   const NAV_ITEMS = React.useMemo(
-    () => buildNavItems(lang, userEmail, currentPath, allowedTaskRoutes, userNavItems),
-    [lang, userEmail, currentPath, allowedTaskRoutes, userNavItems],
+    () => buildNavItems(lang, userEmail, currentPath, allowedTaskRoutes, userNavItems)
+      .map((it) => (it.catKey === "brain" && memoryAlert ? { ...it, alert: memoryAlert } : it)),
+    [lang, userEmail, currentPath, allowedTaskRoutes, userNavItems, memoryAlert],
   );
   // 2026-09-30（CJ 參考 Tesla「電量」）：本週企劃的進度與各平台待寫篇數，真資料來自 planner.railStatus。
   // 週次用跟 PlannerPage 同一個 defaultWeek()；換頁就重抓（寫完一篇回來數字要跟著變）。
@@ -1756,6 +1775,12 @@ function IconNavLink({ item, active, onClick, meter, badge, en }: {
           transition: "background 0.12s, color 0.12s",
         }}>
           {item.icon}
+          {item.alert && (
+            <span aria-label={item.alert === "over" ? "full" : "almost full"} style={{
+              position: "absolute", top: -2, right: -3, width: 8, height: 8, borderRadius: 999,
+              background: item.alert === "over" ? "#dc2626" : "#d97706", boxShadow: "0 0 0 2px #fff",
+            }} />
+          )}
           {!!badge && badge > 0 && (
             <span style={{
               position: "absolute", top: -4, right: -5, minWidth: 16, height: 16, padding: "0 4px", borderRadius: 8,
