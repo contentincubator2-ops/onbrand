@@ -47,6 +47,9 @@ import ProductDetailModal from "../components/positioning/ProductDetailModal";
 import { LockToggle } from "../components/positioning/LockToggle";
 import { AgentIcon, MemoryIcon, AwardIcon, BundleIcon, CommentIcon, DeleteIcon, EditIcon, FontIcon, GenerateIcon, HashtagIcon, IdCardIcon, LibraryIcon, LockIcon, PaletteIcon, PeopleIcon, PlayIcon, QuoteIcon, RegenerateIcon, ShieldIcon, TargetIcon, TextIcon, DoneIcon, StopIcon, WarningIcon, CheckIcon, CloseIcon } from "../../platform/components/icons";
 import { SCOPE_SEGMENTS, type SegmentSpec } from "../lib/positioningSchema";
+import { specOf as copySpecOf } from "../lib/copyAssets";
+import { visualSpecOf } from "../lib/visualAssets";
+import { strategyCrumbs, type CrumbTarget } from "../lib/strategyCrumbs";
 import { pickProductImageUrl } from "../lib/productImage";
 import { readProductFacts } from "../lib/productFacts";
 import CampaignWorkspace from "../components/positioning/CampaignWorkspace";
@@ -812,6 +815,27 @@ export default function BrandsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scopeMode]);
 
+  // 2026-09-30（CJ「修改後，要怎麼導引回記憶這個頁面」「加一個到記憶的按鈕」）：從「記憶」點欄位
+  // 過來時網址帶 focus（`seg:<id>` / `asset:<key>`），直接打開那一段。放在上面兩個重設 section
+  // 的 effect 之後，scope 載入完成觸發重設時也會再套回來。
+  const memoryFocus = searchParams.get("focus");
+  const fromMemory = searchParams.get("from") === "memory" && category !== "brain";
+  React.useEffect(() => {
+    if (!memoryFocus) return;
+    // 只在它所屬的頁套用：切到別的分頁時網址還留著 focus，不能在那裡打開錯的段落。
+    const fits = memoryFocus.startsWith("seg:") ? category === "positioning"
+      : memoryFocus.startsWith("asset:") ? category === "copy" || category === "visual" : false;
+    if (fits) setSection(memoryFocus);
+  }, [memoryFocus, category, scopeMode]);
+  const backToMemory = () => setSearchParams(() => {
+    const next = new URLSearchParams();
+    if (activeBrandIdForLocks) next.set("b", String(activeBrandIdForLocks));
+    next.set("cat", "brain");
+    const mem = searchParams.get("mem");
+    if (mem) next.set("mem", mem);
+    return next;
+  });
+
   // When scope switches to event/product, knowledge/visual tiles
   // aren't shown — force category back to positioning so the content
   // area doesn't render a hidden tab's contents. CJ 2026-05-13.
@@ -835,6 +859,37 @@ export default function BrandsPage() {
     scopeMode === "product" ? ((productQuery.data as any)?.name ?? (lang === "en" ? "(Select a product above)" : "（請於右上選擇產品）"))
     : scopeMode === "event" ? ((eventQuery.data as any)?.name ?? (lang === "en" ? "(Select an event above)" : "（請於右上選擇活動）"))
     : (currentBrand?.name ?? (lang === "en" ? "(Select a brand above)" : "（請於右上選擇品牌）"));
+
+  // 路徑列（見 lib/strategyCrumbs.ts）：名稱都從這一頁已有的資料查，不另打 API。
+  const crumbs = useMemo(() => {
+    const en = lang === "en";
+    const segId = section.startsWith("seg:") ? section.slice(4) : null;
+    const seg = segId && scopeMode !== "none" ? SCOPE_SEGMENTS[scopeMode].find((x) => x.id === segId) : null;
+    const assetKey = section.startsWith("asset:") ? section.slice(6) : null;
+    const copySpec = assetKey ? copySpecOf(assetKey) : null;
+    const visSpec = assetKey ? visualSpecOf(assetKey) : null;
+    return strategyCrumbs({
+      en, brandName: currentBrand?.name ?? null, scopeMode,
+      entityName: scopeMode === "product" ? (productQuery.data as any)?.name ?? null
+        : scopeMode === "event" ? (eventQuery.data as any)?.name ?? null : null,
+      category, section,
+      segmentTitle: seg ? ((en && seg.titleEn) || seg.title) : null,
+      assetLabel: copySpec ? (en ? copySpec.labelEn : copySpec.labelZh)
+        : visSpec ? (en ? visSpec.labelEn : visSpec.labelZh) : assetKey,
+    });
+  }, [lang, currentBrand?.name, scopeMode, productQuery.data, eventQuery.data, category, section]);
+  const goCrumb = (t: CrumbTarget) => {
+    if ("href" in t) return;
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.set("cat", t.cat);
+      // focus 只在從記憶點過來的那一下有用；留著會讓切頁後又自動打開同一段。
+      next.delete("focus");
+      if (t.scope === "brand") { next.delete("p"); next.delete("e"); }
+      return next;
+    }, { replace: true });
+    if (t.section) setSection(t.section);
+  };
 
 
 
@@ -1402,15 +1457,7 @@ export default function BrandsPage() {
       {scopeBrands.length > 0 &&
        (!scope?.brandId || scopeBrands.some((b: any) => b.id === scope.brandId)) && (
       <div className="relative pt-6 pb-6 px-6 text-center">
-        {/* 2026-05-11 (CJ「品牌管理」): breadcrumb back to /brands manager */}
-        <div className="absolute top-5 left-5 z-10">
-          <a
-            href="/brands?all=1"
-            className="flex items-center gap-1 text-xs text-neutral-700 hover:text-neutral-900 transition"
-          >
-            ← {lang === "en" ? "All brands" : "所有品牌"}
-          </a>
-        </div>
+        {/* 2026-09-30：原本這裡的「← 所有品牌」併進內容區頂端的路徑列（見 strategyCrumbs）。 */}
         {/* 2026-05-30: gear icon removed — 平台授權 is now a main workspace tab */}
         {/* 2026-05-10 (CJ「4A 代理商專業感, B&W」): hero redesigned.
             Removed gradient emblem + gradient title. Editorial
@@ -1528,8 +1575,8 @@ export default function BrandsPage() {
                   { v: "meetings"    as const, label: lang === "en" ? "Meetings" : "會議",
                       desc: lang === "en" ? "Recurring strategy meetings" : "定期策略會議",
                       Icon: PeopleIcon,     scopes: ["brand", "product"] },
-                  { v: "brain"       as const, label: lang === "en" ? "Brain" : "大腦",
-                      desc: lang === "en" ? "What the AI remembers" : "AI 記住了什麼",
+                  { v: "brain"       as const, label: lang === "en" ? "Memory" : "記憶",
+                      desc: lang === "en" ? "What the AI remembers" : "AI 記住了什麼、滿了怎麼清",
                       Icon: MemoryIcon,    scopes: ["brand", "product", "event"] },
                   { v: "products"    as const, label: lang === "en" ? "Products" : "產品",
                       desc: lang === "en" ? "Product cards & positioning" : "產品卡片與定位",
@@ -1703,6 +1750,35 @@ export default function BrandsPage() {
 
         {/* Right: scope-aware content pane — driven by `section` (sidebar handles all nav) */}
         <div className="flex-1 min-w-0 overflow-y-auto flex flex-col" style={{ minWidth: 0 }}>
+          {/* 2026-09-30（CJ「所有品牌跟品牌定位總覽似乎很像……可以選擇上一頁到哪一個」）：
+              「← 所有品牌」「← 品牌定位總覽」「← 所有資產」收成這一條路徑列，每一段都能點；
+              從「記憶」點過來時，最右邊有「回到記憶」（見 backToMemory）。 */}
+          {currentBrand && (
+            <div className="flex flex-wrap items-center justify-between gap-3" style={{ padding: "12px 28px 0" }}>
+              <nav aria-label={lang === "en" ? "Breadcrumb" : "路徑"} className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1 text-[13px]">
+                {crumbs.map((c, i) => (
+                  <React.Fragment key={i}>
+                    {i > 0 && <span className="text-neutral-300">›</span>}
+                    {!c.target ? (
+                      <span className="font-semibold text-neutral-900" aria-current="page">{c.label}</span>
+                    ) : "href" in c.target ? (
+                      <a href={c.target.href} className="text-neutral-500 transition-colors hover:text-neutral-900">{c.label}</a>
+                    ) : (
+                      <button type="button" onClick={() => goCrumb(c.target as CrumbTarget)}
+                        className="text-neutral-500 transition-colors hover:text-neutral-900">{c.label}</button>
+                    )}
+                  </React.Fragment>
+                ))}
+              </nav>
+              {fromMemory && (
+                <button type="button" onClick={backToMemory}
+                  className="inline-flex shrink-0 items-center gap-2 rounded-full border border-neutral-300 bg-white px-3.5 py-1.5 text-[13px] font-medium text-neutral-800 transition-colors hover:border-neutral-900">
+                  <MemoryIcon size={13} />
+                  {lang === "en" ? "Back to Memory" : "回到記憶"}
+                </button>
+              )}
+            </div>
+          )}
           {/* ── 知識庫 ── */}
           {derivedCategory === "knowledge" && (
             <div style={{ padding: "16px 28px 0", display: "flex", flexDirection: "column", gap: 16 }}>
@@ -1978,13 +2054,6 @@ export default function BrandsPage() {
               ) : (
               /* ── 選了具體 section → 原本的內容 ── */
               <div style={{ padding: "24px", display: "flex", flexDirection: "column", gap: 16 }}>
-                <button onClick={() => setSection("pos:home")} style={{
-                  display: "flex", alignItems: "center", gap: 6,
-                  fontSize: 12, color: "#78716C", background: "none", border: "none",
-                  cursor: "pointer", padding: 0, marginBottom: 4,
-                }}>
-                  ← {lang === "en" ? "Positioning overview" : "品牌定位總覽"}
-                </button>
                 {/* 2026-09-23（CJ「就不需要品牌分析的這一列功能了」——在上傳
                     定位文件那一頁）：「我的定位文件」是「我已經有定位了，照
                     我的來」的入口，頂上再擺一列「品牌定位分析／開始分析」等於
@@ -2103,14 +2172,6 @@ export default function BrandsPage() {
                 if (VALID_ASSET_KEYS.includes(assetKey) && activeBrandId) {
                   return (
                     <div>
-                      {/* Back to grid */}
-                      <button onClick={() => setSection("asset:all")} style={{
-                        display: "flex", alignItems: "center", gap: 6,
-                        fontSize: 12, color: "#78716C", background: "none", border: "none",
-                        cursor: "pointer", marginBottom: 16, padding: 0,
-                      }}>
-                        ← {lang === "en" ? "All assets" : "所有資產"}
-                      </button>
                       <BrandAssetPanel assetKey={assetKey} brandId={activeBrandId} locked={!!tabLocks.visual} />
                     </div>
                   );

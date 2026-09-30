@@ -9,78 +9,77 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { WaitingIcon } from "../platform/components/icons";
+import { fetchAuthMe } from "../../lib/authMe";
 
 const AUTH_CHECK_TIMEOUT_MS = 6000;
+
+// 2026-09-29: only these mean "no valid session". A 429 (rate limit), 5xx or
+// network error used to redirect to /auth/login too, which looked like a
+// random logout after a few quick page switches. Those now show the retry
+// screen instead.
+const LOGGED_OUT_STATUSES = new Set([401, 403, 404]);
+
+type Failure = "timeout" | "error" | null;
 
 export default function RequireAuthV2({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate();
   const [checking, setChecking] = useState(true);
   const [ok, setOk] = useState(false);
-  const [timedOut, setTimedOut] = useState(false);
+  const [failure, setFailure] = useState<Failure>(null);
   const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
-    let cancelled = false;
+    let settled = false;
     setChecking(true);
-    setTimedOut(false);
+    setFailure(null);
 
-    const controller = new AbortController();
-    const timer = setTimeout(() => {
-      controller.abort();
-      if (!cancelled) {
-        setTimedOut(true);
-        setChecking(false);
-      }
-    }, AUTH_CHECK_TIMEOUT_MS);
+    // The /me request is shared with other callers (fetchAuthMe), so we don't
+    // abort it on timeout — we just stop waiting for it.
+    const settle = (fn: () => void) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      fn();
+      setChecking(false);
+    };
+    const timer = setTimeout(() => settle(() => setFailure("timeout")), AUTH_CHECK_TIMEOUT_MS);
 
-    (async () => {
-      try {
-        const r = await fetch("/api/auth/me", {
-          method: "POST",
-          credentials: "include",
-          signal: controller.signal,
-        });
-        if (cancelled) return;
-        clearTimeout(timer);
-        if (!r.ok) { setOk(false); setChecking(false); return; }
-        const d = await r.json();
-        if (d.user?.planStatus === "expired") {
+    fetchAuthMe().then(
+      ({ status, data }) => settle(() => {
+        if (LOGGED_OUT_STATUSES.has(status)) { setOk(false); return; }
+        if (status < 200 || status >= 300) { setFailure("error"); return; }
+        if (data?.user?.planStatus === "expired") {
           // 2026-05-29: auto-heal sets planStatus='expired' when trial ends.
           // Redirect to upgrade page instead of letting the user hit
           // confusing 403 errors on every tRPC call.
           navigate("/plan-expired", { replace: true });
-          setChecking(false);
           return;
         }
-        setOk(!!d.user);
-        setChecking(false);
-      } catch (err: any) {
-        if (cancelled) return;
-        clearTimeout(timer);
-        // Aborted by timeout → already handled above.
-        if (err?.name !== "AbortError") {
-          setOk(false);
-          setChecking(false);
-        }
-      }
-    })();
-    return () => { cancelled = true; clearTimeout(timer); controller.abort(); };
+        if (data?.user) setOk(true);
+        else setFailure("error");
+      }),
+      () => settle(() => setFailure("error")),
+    );
+    return () => { settled = true; clearTimeout(timer); };
   }, [attempt]);
 
   useEffect(() => {
-    // Only redirect when explicitly NOT ok (not on timeout — let the
-    // user retry first).
-    if (!checking && !ok && !timedOut) navigate("/auth/login", { replace: true });
-  }, [checking, ok, timedOut, navigate]);
+    // Only redirect when the server said the session is gone — on timeout or
+    // a transient error let the user retry first.
+    if (!checking && !ok && !failure) navigate("/auth/login", { replace: true });
+  }, [checking, ok, failure, navigate]);
 
-  if (timedOut) {
+  if (failure) {
+    const timedOut = failure === "timeout";
     return (
       <div className="min-h-screen bg-background flex items-center justify-center px-6">
         <div className="max-w-sm text-center">
           <div className="text-2xl mb-3"><WaitingIcon size={24} /></div>
-          <h1 className="text-lg font-semibold mb-2">伺服器回應較慢</h1>
+          <h1 className="text-lg font-semibold mb-2">{timedOut ? "伺服器回應較慢" : "暫時無法確認登入狀態"}</h1>
           <p className="text-sm text-default-500 mb-5">
-            驗證身分超過 6 秒沒有回應。可能是網路慢或伺服器忙碌。
+            {timedOut
+              ? "驗證身分超過 6 秒沒有回應。可能是網路慢或伺服器忙碌。"
+              : "伺服器忙碌或網路不穩，你仍在登入中。請稍候再試一次。"}
           </p>
           <div className="flex flex-col gap-2">
             <button

@@ -25,7 +25,7 @@ import {
   Button, Chip, Input, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader,
   Progress, Textarea,
 } from "@heroui/react";
-import { SceneArt } from "../../../platform/components/TaskIllustration";
+import { IllustrationImage, SceneArt } from "../../../platform/components/TaskIllustration";
 import { SCENE_OPTIONS, isTaskScene, pickTaskScene, type TaskScene } from "../../../platform/components/taskScene";
 import { AddIcon, CheckIcon, ChevronLeftIcon, CopyIcon, DeleteIcon, GenerateIcon, MeetingIcon, SampleIcon, TextIcon, WarningIcon } from "../../../platform/components/icons";
 
@@ -60,6 +60,9 @@ interface CardRecord {
   variants: number;
   lastDryRun: { at: string; caption: string } | null;
   scene?: string | null;
+  illustrationUrl?: string | null;
+  illustrationStatus?: "generating" | "ready" | "failed" | null;
+  illustrationError?: string | null;
 }
 
 /** 前端也量一次字數，讓使用者邊貼邊看到區間 —— 這份只是回饋，權威在 server。 */
@@ -128,8 +131,9 @@ export default function TaskCardComposer({
     { brandId: brandId ?? 0, cardId: cardId ?? "" },
     {
       enabled: !!brandId && !!cardId,
+      // 插畫也在背景畫，畫的期間繼續輪詢。
       refetchInterval: (data: any) =>
-        data && (data.skill || data.status === "failed") ? false : 2500,
+        data && (data.skill || data.status === "failed") && data.illustrationStatus !== "generating" ? false : 2500,
     },
   ) ?? { data: null };
   const card: CardRecord | null = cardQuery.data ?? null;
@@ -173,6 +177,24 @@ export default function TaskCardComposer({
     onSuccess: (r: any) => { setDryResult(r); setBusy(null); },
     onError: (e: any) => { setError(e?.message ?? "試寫失敗"); setBusy(null); },
   }) ?? null;
+  const illustrateMut = (trpc as any).brandTaskCard?.generateIllustration?.useMutation?.({
+    onSuccess: () => cardQuery.refetch?.(),
+    onError: (e: any) => setError(e?.message ?? "插畫生成失敗"),
+  }) ?? null;
+  const drawAI = () => {
+    if (!brandId || !cardId) return;
+    setSceneChoice(null); setScenePickerOpen(false);
+    illustrateMut?.mutate({ brandId, cardId });
+  };
+  // 進到試寫那步、這張卡還沒有圖也沒挑現成場景，就自動用 gpt-image-2 畫一張。
+  const autoDrawn = React.useRef<string | null>(null);
+  React.useEffect(() => {
+    if (step !== 3 || !card || !cardId || autoDrawn.current === cardId) return;
+    if (card.scene || card.illustrationUrl || card.illustrationStatus === "generating") return;
+    autoDrawn.current = cardId;
+    drawAI();
+  }, [step, card?.id, card?.illustrationUrl, card?.illustrationStatus, card?.scene]);
+
   const publishMut = (trpc as any).brandTaskCard?.publish?.useMutation?.({
     onSuccess: () => {
       setBusy(null);
@@ -591,32 +613,49 @@ export default function TaskCardComposer({
                   : "回答這張卡自己的問題，然後試寫。試寫不會存進專案、也不扣點數。"}
               </p>
 
-              {/* 2026-09-30（CJ「品牌自建的也要有場景圖，他也可以自己選」）：
-                  預設依卡名＋主問題自動挑，跟內建卡同一套規則；想換就展開選。 */}
+              {/* 2026-09-30（CJ「品牌自建的也要有自己創造的插畫，用 image 2 生；他也可以自己選」）：
+                  進這步就自動用 gpt-image-2 畫一張；可以重畫，也可以改挑現成場景。 */}
               {(() => {
                 const auto = pickTaskScene({ label: card.name, primary_question: card.primaryQuestion });
+                const drawing = card.illustrationStatus === "generating";
+                const aiReady = !sceneChoice && card.illustrationStatus === "ready" && !!card.illustrationUrl;
                 const current = sceneChoice ?? auto;
                 const choose = (s: TaskScene) => {
-                  const next = s === auto ? null : s;
-                  setSceneChoice(next);
+                  setSceneChoice(s);
                   setScenePickerOpen(false);
-                  updateMut?.mutate({ brandId: brandId!, cardId: cardId!, scene: next });
+                  updateMut?.mutate({ brandId: brandId!, cardId: cardId!, scene: s });
                 };
+                const note = drawing
+                  ? (en ? "AI is drawing this card's illustration (about 30 seconds)…" : "AI 正在替這張卡畫插畫（約 30 秒）…")
+                  : aiReady
+                    ? (en ? "Drawn by AI for this card." : "AI 替這張卡畫的。")
+                    : sceneChoice
+                      ? (en ? "You picked a ready-made one." : "你挑的現成插畫。")
+                      : card.illustrationStatus === "failed"
+                        ? (en ? "AI drawing failed — showing a ready-made one. Try again?" : "AI 沒畫成功，先用現成的，要再畫一次嗎？")
+                        : (en ? "Ready-made, picked from the card name." : "依卡名先挑的現成插畫。");
                 return (
                   <div className="rounded-medium border border-divider p-3 space-y-3">
                     <div className="flex items-center gap-3">
-                      <SceneArt scene={current} width={96} />
+                      <div className={drawing ? "animate-pulse" : ""}>
+                        {aiReady
+                          ? <IllustrationImage src={card.illustrationUrl!} width={96} />
+                          : <SceneArt scene={current} width={96} />}
+                      </div>
                       <div className="min-w-0 flex-1">
                         <p className="text-small font-medium">{en ? "Card illustration" : "卡片插畫"}</p>
-                        <p className="text-tiny text-default-500">
-                          {sceneChoice
-                            ? (en ? "You picked this one." : "你自己選的。")
-                            : (en ? "Picked from the card name. You can change it." : "依卡名自動挑的，可以換。")}
-                        </p>
+                        <p className="text-tiny text-default-500">{note}</p>
                       </div>
-                      <Button size="sm" variant="flat" onPress={() => setScenePickerOpen((o) => !o)}>
-                        {scenePickerOpen ? (en ? "Done" : "收起") : (en ? "Change" : "換一張")}
-                      </Button>
+                      <div className="flex flex-col gap-1.5 shrink-0">
+                        <Button size="sm" variant="flat" isLoading={drawing} onPress={drawAI}>
+                          {aiReady || card.illustrationStatus === "failed"
+                            ? (en ? "Redraw with AI" : "AI 重畫")
+                            : (en ? "Draw with AI" : "AI 畫一張")}
+                        </Button>
+                        <Button size="sm" variant="light" onPress={() => setScenePickerOpen((o) => !o)}>
+                          {scenePickerOpen ? (en ? "Done" : "收起") : (en ? "Pick ready-made" : "挑現成的")}
+                        </Button>
+                      </div>
                     </div>
                     {scenePickerOpen && (
                       <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
@@ -626,13 +665,11 @@ export default function TaskCardComposer({
                             type="button"
                             onClick={() => choose(o.scene)}
                             className={`flex flex-col items-center gap-1 rounded-lg p-1 transition ${
-                              o.scene === current ? "ring-2 ring-neutral-900" : "hover:bg-default-100"
+                              !aiReady && o.scene === current ? "ring-2 ring-neutral-900" : "hover:bg-default-100"
                             }`}
                           >
                             <SceneArt scene={o.scene} width={84} />
-                            <span className="text-[11px] text-default-600">
-                              {en ? o.en : o.zh}{o.scene === auto ? (en ? " · auto" : "・自動") : ""}
-                            </span>
+                            <span className="text-[11px] text-default-600">{en ? o.en : o.zh}</span>
                           </button>
                         ))}
                       </div>

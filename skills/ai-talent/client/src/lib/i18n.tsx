@@ -18,6 +18,7 @@
  */
 
 import React, { createContext, useContext, useState, useCallback, useEffect } from "react";
+import { fetchAuthMe } from "./authMe";
 import { zh } from "../locales/zh-TW";
 import { en } from "../locales/en";
 
@@ -99,13 +100,7 @@ function syncHtmlLangAttr(lang: Lang): void {
 /** Fetch preferredLang from the server (no-throw — returns null if unauthenticated) */
 async function fetchServerLang(): Promise<Lang | null> {
   try {
-    const res = await fetch("/api/auth/me", {
-      method: "POST",
-      credentials: "include",
-      headers: { "Content-Type": "application/json" },
-    });
-    if (!res.ok) return null;
-    const data = await res.json();
+    const { data } = await fetchAuthMe();
     const lang = data?.user?.preferredLang;
     if (lang === "zh-TW" || lang === "en") return lang;
     return null;

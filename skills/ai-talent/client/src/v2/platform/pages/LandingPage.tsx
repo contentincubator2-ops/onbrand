@@ -44,7 +44,7 @@ const C = {
   ink: "#0F0F0E",          // headlines, primary text
   inkSoft: "#3A3633",      // body text
   muted: "#6B6660",        // tertiary text
-  orange: "#E85D2E",       // primary CTA, accent
+  orange: "#F37E4A",       // primary CTA, accent
   orangeDark: "#C84516",   // hover
   orangeChip: "#FDE6D8",   // pill chip background
   border: "#E8DECC",       // warm border

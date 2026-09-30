@@ -77,6 +77,16 @@ export interface SynthesizeIgStrategyPublicSlotsArgs {
   squadName?: unknown;
   methodology?: unknown;
   agents: readonly StrategyAgentDescriptor[];
+  /** 品牌一致性檢查結果（每篇對外貼文一筆），給呼叫端寫進 metadata。 */
+  onBrandConsistency?: (results: IgStrategyBrandConsistencyEntry[]) => void;
+}
+
+export interface IgStrategyBrandConsistencyEntry {
+  variantId: string;
+  status: string;
+  issues: Array<{ aspect: string; detail: string }>;
+  reason?: string;
+  before?: string;
 }
 
 export function assertIgStrategyPublicCampaignSafe(args: {
@@ -264,6 +274,41 @@ export async function synthesizeIgStrategyPublicSlots(
   const publicResults = publicBatches.flat();
   if (publicResults.length === 0 && slotBatches.length > 0) {
     throw firstSynthesisError ?? new Error("public synthesis produced no variants");
+  }
+
+  // 2026-09-30（CJ「需要你處理活動」）：對外貼文也過品牌一致性檢查（brandConsistency.ts）。
+  // 這條路線依用戶授權只把去識別化內容送 Anthropic，所以：品牌脈絡用 safeBrandContext、
+  // 只用 Anthropic 不串接；修正稿只做確定性的替換對照（不走會串接其他模型的禁用詞改寫），
+  // 仍有禁用詞或洩漏內部名稱就不採用。背景執行，不佔 HTTP 時間，上限 25 秒。
+  if (safeBrandContext.trim()) {
+    const { checkBrandConsistency } = await import("./brandConsistency");
+    const isZhTW = /^zh-TW$/i.test(args.outputLanguage) || /繁體/.test(args.outputLanguage);
+    const entries = await Promise.all(publicResults.map(async (variant): Promise<IgStrategyBrandConsistencyEntry> => {
+      const res = await checkBrandConsistency({
+        caption: variant.caption,
+        brandPrefix: safeBrandContext,
+        userMsg: safeTopic,
+        taskLabel: variant.label,
+        isZhTW,
+        timeoutMs: 25_000,
+        strictProvider: "anthropic",
+      });
+      const entry: IgStrategyBrandConsistencyEntry = {
+        variantId: variant.id, status: res.status, issues: res.issues,
+        ...(res.reason ? { reason: res.reason } : {}),
+      };
+      if (res.status !== "fixed") return entry;
+      let fixed = res.caption;
+      for (const { from, to } of brandRules.subs) if (from) fixed = fixed.split(from).join(to);
+      const bannedLeft = brandRules.banned.filter((b) => b && fixed.includes(b));
+      const leaks = findIgStrategyInternalLeaks(fixed, privateTerms);
+      if (bannedLeft.length > 0 || leaks.length > 0) {
+        return { ...entry, status: "flagged", reason: bannedLeft.length ? "revision reintroduced banned words" : "revision leaked internal terms" };
+      }
+      variant.caption = fixed;
+      return { ...entry, before: res.before };
+    }));
+    args.onBrandConsistency?.(entries);
   }
   assertIgStrategyPublicCampaignSafe({
     idOrSlug: args.idOrSlug,

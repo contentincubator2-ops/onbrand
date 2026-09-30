@@ -18,7 +18,6 @@ import { TaskCardShell, TaskCardAvatar, CARD_SURFACE } from "../components/TaskC
 import { campaignPrefill } from "../lib/campaignIntakePrefill";
 import { toastWithUpgrade } from "../../platform/lib/upgradeToast";
 import { matchTaskWithSynonyms } from "../lib/taskSearchSynonyms";
-import { tierAccent } from "../../platform/lib/tierVocabulary";
 import {
   resolveSource, sourceAccent, sourceWhy,
   sourcePillText, sourceTooltip,
@@ -43,26 +42,30 @@ import { getStrategyPublicGenerationState } from "../lib/strategyContentEnvelope
 import { checkViralSource, platformLabelForTask, taskNeedsViralSource } from "../lib/viralSourceGuard";
 import { intakeExtraFields, missingRequiredInputs, type IntakeField } from "../lib/taskIntake";
 import TaskCardComposer, { type ComposerChannel } from "../../strategy/components/taskCard/TaskCardComposer";
+import { AddEntityModal } from "../../strategy/components/AddEntityModal";
 import RewriteDraftModal from "../components/quickTask/RewriteDraftModal";
 import {
   Avatar, Button, Card, CardBody, Chip, Input, Modal, ModalBody,
-  ModalContent, ModalFooter, ModalHeader, Textarea,
+  ModalContent, ModalHeader, Textarea, Tooltip,
 } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { HelpTip } from "../../platform/components/HelpTip";
 import {
-  faBolt, faPaperPlane, faXmark, faMagnifyingGlass, faEnvelope, faBullhorn, faWandMagicSparkles, faTriangleExclamation, faGlobe, faBookBookmark, faCalendarDays, faPenToSquare,
+  faBolt, faMagnifyingGlass, faEnvelope, faBullhorn, faWandMagicSparkles, faTriangleExclamation, faGlobe, faBookBookmark, faCalendarDays, faPenToSquare,
 } from "@fortawesome/free-solid-svg-icons";
 import {
   faFacebook, faInstagram, faYoutube, faTiktok, faLinkedin, faThreads, faLine,
 } from "@fortawesome/free-brands-svg-icons";
 import RunningAgentCarousel from "../components/quickTask/RunningAgentCarousel";
 import ImageCardTile, { type ImageCardInfo } from "../components/imageCard/ImageCardTile";
+import ImageSizePicker from "../components/imageCard/ImageSizePicker";
 import { imageCardHref, imageChannelOf } from "../lib/imageCardHandoff";
 import CardDetailDrawer, { isRecentCard } from "../components/quickTask/CardDetailDrawer";
 import ChannelPicker from "../../platform/components/plan/ChannelPicker";
 import TaskPicker from "../../platform/components/plan/TaskPicker";
-import { LibraryIcon, AddIcon, EditIcon, TaskCardsIcon } from "../../platform/components/icons";
+import { LibraryIcon, AddIcon, EditIcon, TaskCardsIcon, Icon, type IconName } from "../../platform/components/icons";
+import { contextChipIcon } from "../lib/contextChipIcons";
+import { departAgentHandoff } from "../lib/agentHandoff";
 
 // ── Recently used tasks helpers ─────────────────────────────────────────────
 const LAST_USED_KEY = "onbrand_last_used_tasks_v1";
@@ -181,9 +184,12 @@ function synthesizeStages(elapsedMs: number, tier: string, lang: string): any[] 
   const preEnd = scoutEnd + 3000;
   const stratEnd = preEnd + 9000;
   const capStart = preEnd;
-  const capEnd = capStart + 25000;
-  const genEnd = capEnd + 10000;
-  const extrasEnd = capEnd + 14000;
+  // 單篇實測約 8 秒寫完（2026-09-30 dev run 3784／3788）；套組以上維持 25 秒。
+  const capEnd = capStart + (isProd ? 25000 : 9000);
+  // 2026-09-30：文案寫完先過品牌一致性檢查（server brandConsistency.ts），圖與附加項都在它之後。
+  const checkEnd = capEnd + 8000;
+  const genEnd = checkEnd + 10000;
+  const extrasEnd = checkEnd + 14000;
   const qaEnd = extrasEnd + 8000;
   const mk = (key: string, label: string, start: number, end: number) => ({
     key, label, startedAt: start,
@@ -196,9 +202,10 @@ function synthesizeStages(elapsedMs: number, tier: string, lang: string): any[] 
   if (isProd) stages.push(mk("strategist", L("Strategist 規劃敘事弧", "Strategist maps the narrative arc"), preEnd, stratEnd));
   stages.push(mk("caption", L("文案寫手 撰寫版本", "Caption writer drafts variants"), capStart, capEnd));
   stages.push(mk("brief", L("視覺指導寫風格指示", "Image director writes the visual brief"), capStart, capEnd));
-  stages.push(mk("gen", L("AI 生圖", "AI paints the image"), capEnd, genEnd));
+  stages.push(mk("brandcheck", L("品牌一致性檢查", "Brand consistency check"), capEnd, checkEnd));
+  stages.push(mk("gen", L("AI 生圖", "AI paints the image"), checkEnd, genEnd));
   if (isProd) {
-    stages.push(mk("extras", L("留言模板 / 發文時段 / 跟進", "Reply templates · timing · follow-up"), capEnd, extrasEnd));
+    stages.push(mk("extras", L("留言模板 / 發文時段 / 跟進", "Reply templates · timing · follow-up"), checkEnd, extrasEnd));
     stages.push(mk("qa", L("Jordan Hayes 審核", "Jordan Hayes reviews"), extrasEnd, qaEnd));
   }
   return stages;
@@ -231,6 +238,8 @@ interface FBTaskCard {
   primary_question?: string | null;
   /** 2026-09-30：自建卡用戶自選的插畫場景；null＝依題目自動挑。 */
   scene?: string | null;
+  /** 自建卡的 AI 插畫；內建卡的圖走 taskIllustrationIds.json。 */
+  illustration_url?: string | null;
   primary_input?: { key: string; placeholder?: string; type: "text" | "textarea"; derive?: any } | null;
   agent_id?: number | null;
   skill_slug?: string | null;
@@ -395,6 +404,23 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
     { enabled: !!imageChannel, staleTime: 5 * 60_000 },
   );
   const imageCards = (imageChannel ? imageCardsQ.data?.cards ?? [] : []) as ImageCardInfo[];
+  // 2026-09-30 CJ：圖片卡不一次全列——每通路預設兩張，其餘用戶用「新增尺寸」自己加。
+  const imageTrayQ = trpc.imageCard.tray.useQuery(
+    { brandId: brandId ?? 0, channel: (imageChannel ?? "facebook") as any },
+    { enabled: !!imageChannel && !!brandId, refetchOnWindowFocus: false },
+  );
+  const [imagePickerOpen, setImagePickerOpen] = useState(false);
+  const setImageTrayMut = trpc.imageCard.setTray.useMutation({
+    onSuccess: () => { setImagePickerOpen(false); imageTrayQ.refetch(); },
+    onError: (e) => toastWithUpgrade(e?.message ?? "儲存失敗", lang === "en"),
+  });
+  /** 實際擺出來的圖片卡。還沒載入托盤（或沒有品牌）時先只擺預設的兩張，不閃出全部。 */
+  const shownImageCards = useMemo(() => {
+    const ids = imageTrayQ.data?.ids;
+    if (!ids) return imageCards.filter((c) => c.pinned);
+    const byId = new Map(imageCards.map((c) => [c.id, c] as const));
+    return ids.map((id) => byId.get(id)).filter((c): c is ImageCardInfo => !!c);
+  }, [imageCards, imageTrayQ.data]);
   const brandName = useMemo(() => {
     const list = (ctx?.brands as any[]) ?? [];
     return list.find((b) => b?.id === brandId)?.name ?? null;
@@ -454,6 +480,11 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
   // which would pollute a product with brand data).
   const [editingChip, setEditingChip] = useState<{ source: string; label: string } | null>(null);
   const [editValue, setEditValue] = useState("");
+  // 2026-09-30 任務 modal 圖示化：目前點開的脈絡圖示（"__entity"＝產出對象），與選填欄位開關。
+  const [ctxOpen, setCtxOpen] = useState<string | null>(null);
+  const [showOptional, setShowOptional] = useState(false);
+  // 任務 modal 裡直接新增產品／活動（AddEntityModal 疊在上面）。
+  const [addEntityTab, setAddEntityTab] = useState<"product" | "event" | null>(null);
   const savePositioningMut = (trpc as any).scope?.savePositioning?.useMutation?.();
 
   const scopeActiveQuery = (trpc as any).scope?.active?.useQuery(
@@ -488,9 +519,17 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
 
   // Tier tab state (used for non-FB/non-IG platforms)
   // 結構來源篩選。"all" = 不篩。與 tier 是兩條獨立的軸，可同時生效。
-  // 2026-09-29 CJ「每個平台要增加一個圖片的類別」："image" 不是任務卡來源，是另一個類別——
-  // 選它時下面改列這個通路的圖片任務卡（imageCard.list），不列文字任務。
-  const [activeSource, setActiveSource] = useState<FrontCardKind | "all" | "image">("all");
+  const [activeSource, setActiveSource] = useState<FrontCardKind | "all">("all");
+  /** 2026-09-29 CJ「每個平台要增加一個圖片的類別」；9/30 移到分類列最後。選它時下面
+   *  改列這個通路的圖片任務卡（imageCard.list），不列文字任務。
+   *  放在網址（?view=images）：從圖片卡按上一頁回來時停在圖片，換通路時自然歸零。 */
+  const imageMode = searchParams.get("view") === "images";
+  const setImageMode = (on: boolean) => {
+    if (on === imageMode) return;
+    const next = new URLSearchParams(searchParams);
+    if (on) next.set("view", "images"); else next.delete("view");
+    setSearchParams(next, { replace: true });
+  };
   // Format tab state (used for FB)
   const [activeFormat, setActiveFormat] = useState<ActiveFormat>("all");
   // Format tab state (used for IG)
@@ -1247,7 +1286,15 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
     setModalEntity({ kind: "brand", id: null });
     setEditingChip(null);
     setEditValue("");
+    setCtxOpen(null);
+    setShowOptional(false);
     embed?.onClose();
+  };
+  /** 成功要換到成品頁前呼叫：頭像分身從執行中的進度環起飛，降落在成品頁的主筆位置。 */
+  const departToRun = () => {
+    const cap = agentMeta ?? activeTask?.agent;
+    if (!cap?.name) return;
+    departAgentHandoff(document.querySelector("[data-agent-handoff]"), cap.avatarUrl || dicebear(cap.name));
   };
   /** 成品頁網址：從本週企劃來的要帶回程資訊，成品頁才會出現「存回本週企劃」。 */
   const runHref = (outputId: number | string) => {
@@ -1410,6 +1457,7 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                 ? "Public posts weren't generated. Only internal drafts are available right now; you can regenerate them."
                 : "公開貼文未產生，目前只有內部草稿，可重新產生。");
             }
+            departToRun();
             closeTask();
             finishCampaignItem(Number((r as any).outputId));
             navigate(runHref((r as any).outputId));
@@ -1467,6 +1515,7 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
             }
           }
           if (isStale()) { discardCancelledOutput(oid); return; }
+          departToRun();
           closeTask();
           finishCampaignItem(Number(oid));
           navigate(runHref(oid));
@@ -1615,326 +1664,85 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
             />
           </div>
 
-          {/* ── Format tiles (FB) / Format tiles (IG) / Tier tabs (other) ── */}
-          {/* 2026-08-29 客製包的 pill 優先於所有內建平台分類。分類值由該品牌的
+          {/* ── 分類列：貼文／連結貼文／廣告／Reels…＋圖片 ──
+              2026-08-29 客製包的 pill 優先於所有內建平台分類。分類值由該品牌的
               pack 定義（例如五感十築的 生活實踐／生態健築／永續生活／永續價值），
-              不是全域那七份手抄對照表 —— 有包的品牌完全繞開它們。 */}
-          {packChannel ? (
-            <div className="w-full" style={{ maxWidth: 860 }}>
-              <div className="flex items-center gap-2 flex-wrap justify-center">
-                {[{ id: "all", labelZh: "全部", labelEn: "All" }, ...packChannel.formats].map((tab: any) => {
-                  const active = activePackFormat === tab.id;
-                  const count = packFormatCounts[tab.id] ?? 0;
-                  if (tab.id !== "all" && count === 0) return null;
-                  return (
-                    <button
-                      key={tab.id}
-                      onClick={() => setActivePackFormat(tab.id)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all whitespace-nowrap"
-                      style={
-                        active
-                          ? { background: "#171717", color: "white", boxShadow: "0 2px 8px rgba(0,0,0,0.18)" }
-                          : { background: "white", color: "#525252", border: "1px solid #E5E5E5" }
-                      }
-                    >
-                      {lang === "en" ? tab.labelEn : tab.labelZh}
-                      {tab.id !== "all" && (
-                        <span
-                          className="text-[12px] px-1.5 py-0.5 rounded-full tabular-nums font-semibold"
-                          style={{
-                            background: active ? "rgba(255,255,255,0.18)" : "#F5F5F5",
-                            color: active ? "rgba(255,255,255,0.85)" : "#737373",
-                          }}
-                        >
-                          {count}
-                        </span>
-                      )}
-                    </button>
-                  );
-                })}
+              不是全域那七份手抄對照表 —— 有包的品牌完全繞開它們。
+              2026-09-30（CJ「圖片的 tile 應該要跟廣告貼文、Reels 在同一個地方，而不是跟
+              爆款結構在同一個地方」）：圖片是一種形式，放在這一列最後；原本八份一模一樣的
+              分類列收成一份。Threads／LINE 沒有文字分類，這列只有「全部｜圖片」。 */}
+          {(() => {
+            type Tab = { id: string; label: string; labelEn: string };
+            const row: { tabs: Tab[]; active: string; set: (id: string) => void; counts: Record<string, number> } | null =
+              packChannel
+                ? {
+                    tabs: [{ id: "all", label: "全部", labelEn: "All" }, ...packChannel.formats.map((f: any) => ({ id: f.id, label: f.labelZh, labelEn: f.labelEn }))],
+                    active: activePackFormat, set: setActivePackFormat, counts: packFormatCounts,
+                  }
+              : platform === "facebook" ? { tabs: FORMAT_TABS, active: activeFormat, set: (id) => setActiveFormat(id as ActiveFormat), counts: formatCounts }
+              : platform === "instagram" ? { tabs: IG_FORMAT_TABS, active: activeIGFormat, set: (id) => setActiveIGFormat(id as IGActiveFormat), counts: igFormatCounts }
+              : platform === "linkedin" ? { tabs: LI_FORMAT_TABS, active: activeLIFormat, set: (id) => setActiveLIFormat(id as LIActiveFormat), counts: liFormatCounts }
+              : platform === "youtube" ? { tabs: YT_FORMAT_TABS, active: activeYTFormat, set: (id) => setActiveYTFormat(id as YTActiveFormat), counts: ytFormatCounts }
+              : platform === "tiktok" ? { tabs: TT_FORMAT_TABS, active: activeTTFormat, set: (id) => setActiveTTFormat(id as TTActiveFormat), counts: ttFormatCounts }
+              : platform === "email" ? { tabs: EM_FORMAT_TABS, active: activeEMFormat, set: (id) => setActiveEMFormat(id as EMActiveFormat), counts: emFormatCounts }
+              : platform === "pr" ? { tabs: PR_FORMAT_TABS, active: activePRFormat, set: (id) => setActivePRFormat(id as PRActiveFormat), counts: prFormatCounts }
+              : platform === "website" ? { tabs: WEB_FORMAT_TABS, active: activeWEBFormat, set: (id) => setActiveWEBFormat(id as WEBActiveFormat), counts: webFormatCounts }
+              : null;
+            const hasImages = imageCards.length > 0;
+            if (!row && !hasImages) return null;
+            const tabs: Tab[] = row?.tabs ?? [{ id: "all", label: "全部", labelEn: "All" }];
+            const pill = (key: string, active: boolean, label: string, count: number | null, onClick: () => void, title?: string) => (
+              <button
+                key={key}
+                onClick={onClick}
+                title={title}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all whitespace-nowrap"
+                style={
+                  active
+                    ? { background: "#171717", color: "white", boxShadow: "0 2px 8px rgba(0,0,0,0.18)" }
+                    : { background: "white", color: "#525252", border: "1px solid #E5E5E5" }
+                }
+              >
+                {label}
+                {count !== null && (
+                  <span
+                    className="text-[12px] px-1.5 py-0.5 rounded-full tabular-nums font-semibold"
+                    style={{
+                      background: active ? "rgba(255,255,255,0.18)" : "#F5F5F5",
+                      color: active ? "rgba(255,255,255,0.85)" : "#737373",
+                    }}
+                  >
+                    {count}
+                  </span>
+                )}
+              </button>
+            );
+            return (
+              <div className="w-full" style={{ maxWidth: 860 }}>
+                <div className="flex items-center gap-2 flex-wrap justify-center">
+                  {tabs.map((tab) => {
+                    const count = row?.counts[tab.id] ?? 0;
+                    if (tab.id !== "all" && count === 0) return null;
+                    return pill(
+                      tab.id,
+                      !imageMode && (row?.active ?? "all") === tab.id,
+                      lang === "en" ? tab.labelEn : tab.label,
+                      tab.id === "all" ? null : count,
+                      () => { setImageMode(false); row?.set(tab.id); },
+                    );
+                  })}
+                  {hasImages && pill(
+                    "__image",
+                    imageMode,
+                    lang === "en" ? "Images" : "圖片",
+                    imageCards.length,
+                    () => setImageMode(true),
+                    lang === "en" ? "Image cards in this channel's sizes." : "這個平台各種尺寸的圖片任務卡。",
+                  )}
+                </div>
               </div>
-            </div>
-          ) : platform === "facebook" ? (
-            <div className="w-full" style={{ maxWidth: 860 }}>
-              <div className="flex items-center gap-2 flex-wrap justify-center">
-                {FORMAT_TABS.map((tab) => {
-                  const active = activeFormat === tab.id;
-                  const count = formatCounts[tab.id] ?? 0;
-                  if (tab.id !== "all" && count === 0) return null;
-                  return (
-                    <button
-                      key={tab.id}
-                      onClick={() => setActiveFormat(tab.id)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all whitespace-nowrap"
-                      style={
-                        active
-                          ? { background: "#171717", color: "white", boxShadow: "0 2px 8px rgba(0,0,0,0.18)" }
-                          : { background: "white", color: "#525252", border: "1px solid #E5E5E5" }
-                      }
-                    >
-                      {lang === "en" ? tab.labelEn : tab.label}
-                      {tab.id !== "all" && (
-                        <span
-                          className="text-[12px] px-1.5 py-0.5 rounded-full tabular-nums font-semibold"
-                          style={{
-                            background: active ? "rgba(255,255,255,0.18)" : "#F5F5F5",
-                            color: active ? "rgba(255,255,255,0.85)" : "#737373",
-                          }}
-                        >
-                          {count}
-                        </span>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          ) : platform === "instagram" ? (
-            <div className="w-full" style={{ maxWidth: 860 }}>
-              <div className="flex items-center gap-2 flex-wrap justify-center">
-                {IG_FORMAT_TABS.map((tab) => {
-                  const active = activeIGFormat === tab.id;
-                  const count = igFormatCounts[tab.id] ?? 0;
-                  if (tab.id !== "all" && count === 0) return null;
-                  return (
-                    <button
-                      key={tab.id}
-                      onClick={() => setActiveIGFormat(tab.id)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all whitespace-nowrap"
-                      style={
-                        active
-                          ? { background: "#171717", color: "white", boxShadow: "0 2px 8px rgba(0,0,0,0.18)" }
-                          : { background: "white", color: "#525252", border: "1px solid #E5E5E5" }
-                      }
-                    >
-                      {lang === "en" ? tab.labelEn : tab.label}
-                      {tab.id !== "all" && (
-                        <span
-                          className="text-[12px] px-1.5 py-0.5 rounded-full tabular-nums font-semibold"
-                          style={{
-                            background: active ? "rgba(255,255,255,0.18)" : "#F5F5F5",
-                            color: active ? "rgba(255,255,255,0.85)" : "#737373",
-                          }}
-                        >
-                          {count}
-                        </span>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          ) : platform === "linkedin" ? (
-            <div className="w-full" style={{ maxWidth: 860 }}>
-              <div className="flex items-center gap-2 flex-wrap justify-center">
-                {LI_FORMAT_TABS.map((tab) => {
-                  const active = activeLIFormat === tab.id;
-                  const count = liFormatCounts[tab.id] ?? 0;
-                  if (tab.id !== "all" && count === 0) return null;
-                  return (
-                    <button
-                      key={tab.id}
-                      onClick={() => setActiveLIFormat(tab.id)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all whitespace-nowrap"
-                      style={
-                        active
-                          ? { background: "#171717", color: "white", boxShadow: "0 2px 8px rgba(0,0,0,0.18)" }
-                          : { background: "white", color: "#525252", border: "1px solid #E5E5E5" }
-                      }
-                    >
-                      {lang === "en" ? tab.labelEn : tab.label}
-                      {tab.id !== "all" && (
-                        <span
-                          className="text-[12px] px-1.5 py-0.5 rounded-full tabular-nums font-semibold"
-                          style={{
-                            background: active ? "rgba(255,255,255,0.18)" : "#F5F5F5",
-                            color: active ? "rgba(255,255,255,0.85)" : "#737373",
-                          }}
-                        >
-                          {count}
-                        </span>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          ) : platform === "youtube" ? (
-            <div className="w-full" style={{ maxWidth: 860 }}>
-              <div className="flex items-center gap-2 flex-wrap justify-center">
-                {YT_FORMAT_TABS.map((tab) => {
-                  const active = activeYTFormat === tab.id;
-                  const count = ytFormatCounts[tab.id] ?? 0;
-                  if (tab.id !== "all" && count === 0) return null;
-                  return (
-                    <button
-                      key={tab.id}
-                      onClick={() => setActiveYTFormat(tab.id)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all whitespace-nowrap"
-                      style={
-                        active
-                          ? { background: "#171717", color: "white", boxShadow: "0 2px 8px rgba(0,0,0,0.18)" }
-                          : { background: "white", color: "#525252", border: "1px solid #E5E5E5" }
-                      }
-                    >
-                      {lang === "en" ? tab.labelEn : tab.label}
-                      {tab.id !== "all" && (
-                        <span
-                          className="text-[12px] px-1.5 py-0.5 rounded-full tabular-nums font-semibold"
-                          style={{
-                            background: active ? "rgba(255,255,255,0.18)" : "#F5F5F5",
-                            color: active ? "rgba(255,255,255,0.85)" : "#737373",
-                          }}
-                        >
-                          {count}
-                        </span>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          ) : platform === "tiktok" ? (
-            <div className="w-full" style={{ maxWidth: 860 }}>
-              <div className="flex items-center gap-2 flex-wrap justify-center">
-                {TT_FORMAT_TABS.map((tab) => {
-                  const active = activeTTFormat === tab.id;
-                  const count = ttFormatCounts[tab.id] ?? 0;
-                  if (tab.id !== "all" && count === 0) return null;
-                  return (
-                    <button
-                      key={tab.id}
-                      onClick={() => setActiveTTFormat(tab.id)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all whitespace-nowrap"
-                      style={
-                        active
-                          ? { background: "#171717", color: "white", boxShadow: "0 2px 8px rgba(0,0,0,0.18)" }
-                          : { background: "white", color: "#525252", border: "1px solid #E5E5E5" }
-                      }
-                    >
-                      {lang === "en" ? tab.labelEn : tab.label}
-                      {tab.id !== "all" && (
-                        <span
-                          className="text-[12px] px-1.5 py-0.5 rounded-full tabular-nums font-semibold"
-                          style={{
-                            background: active ? "rgba(255,255,255,0.18)" : "#F5F5F5",
-                            color: active ? "rgba(255,255,255,0.85)" : "#737373",
-                          }}
-                        >
-                          {count}
-                        </span>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          ) : platform === "email" ? (
-            <div className="w-full" style={{ maxWidth: 860 }}>
-              <div className="flex items-center gap-2 flex-wrap justify-center">
-                {EM_FORMAT_TABS.map((tab) => {
-                  const active = activeEMFormat === tab.id;
-                  const count = emFormatCounts[tab.id] ?? 0;
-                  if (tab.id !== "all" && count === 0) return null;
-                  return (
-                    <button
-                      key={tab.id}
-                      onClick={() => setActiveEMFormat(tab.id)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all whitespace-nowrap"
-                      style={
-                        active
-                          ? { background: "#171717", color: "white", boxShadow: "0 2px 8px rgba(0,0,0,0.18)" }
-                          : { background: "white", color: "#525252", border: "1px solid #E5E5E5" }
-                      }
-                    >
-                      {lang === "en" ? tab.labelEn : tab.label}
-                      {tab.id !== "all" && (
-                        <span
-                          className="text-[12px] px-1.5 py-0.5 rounded-full tabular-nums font-semibold"
-                          style={{
-                            background: active ? "rgba(255,255,255,0.18)" : "#F5F5F5",
-                            color: active ? "rgba(255,255,255,0.85)" : "#737373",
-                          }}
-                        >
-                          {count}
-                        </span>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          ) : platform === "pr" ? (
-            <div className="w-full" style={{ maxWidth: 860 }}>
-              <div className="flex items-center gap-2 flex-wrap justify-center">
-                {PR_FORMAT_TABS.map((tab) => {
-                  const active = activePRFormat === tab.id;
-                  const count = prFormatCounts[tab.id] ?? 0;
-                  if (tab.id !== "all" && count === 0) return null;
-                  return (
-                    <button
-                      key={tab.id}
-                      onClick={() => setActivePRFormat(tab.id)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all whitespace-nowrap"
-                      style={
-                        active
-                          ? { background: "#171717", color: "white", boxShadow: "0 2px 8px rgba(0,0,0,0.18)" }
-                          : { background: "white", color: "#525252", border: "1px solid #E5E5E5" }
-                      }
-                    >
-                      {lang === "en" ? tab.labelEn : tab.label}
-                      {tab.id !== "all" && (
-                        <span
-                          className="text-[12px] px-1.5 py-0.5 rounded-full tabular-nums font-semibold"
-                          style={{
-                            background: active ? "rgba(255,255,255,0.18)" : "#F5F5F5",
-                            color: active ? "rgba(255,255,255,0.85)" : "#737373",
-                          }}
-                        >
-                          {count}
-                        </span>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          ) : platform === "website" ? (
-            <div className="w-full" style={{ maxWidth: 860 }}>
-              <div className="flex items-center gap-2 flex-wrap justify-center">
-                {WEB_FORMAT_TABS.map((tab) => {
-                  const active = activeWEBFormat === tab.id;
-                  const count = webFormatCounts[tab.id] ?? 0;
-                  if (tab.id !== "all" && count === 0) return null;
-                  return (
-                    <button
-                      key={tab.id}
-                      onClick={() => setActiveWEBFormat(tab.id)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all whitespace-nowrap"
-                      style={
-                        active
-                          ? { background: "#171717", color: "white", boxShadow: "0 2px 8px rgba(0,0,0,0.18)" }
-                          : { background: "white", color: "#525252", border: "1px solid #E5E5E5" }
-                      }
-                    >
-                      {lang === "en" ? tab.labelEn : tab.label}
-                      {tab.id !== "all" && (
-                        <span
-                          className="text-[12px] px-1.5 py-0.5 rounded-full tabular-nums font-semibold"
-                          style={{
-                            background: active ? "rgba(255,255,255,0.18)" : "#F5F5F5",
-                            color: active ? "rgba(255,255,255,0.85)" : "#737373",
-                          }}
-                        >
-                          {count}
-                        </span>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          ) : null}
+            );
+          })()}
 
           {/* 2026-09-06 通路選擇。沒有這一區，用戶被鎖在方案預設值上，
               「11 個通路選 2 個、每月可更換一次」那句賣點就不存在。 */}
@@ -1951,17 +1759,19 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
               const k = frontCardKind(t);
               if (k) counts[k] += 1;
             }
-            const tabs: Array<FrontCardKind | "all" | "image"> = ["all", ...FRONT_CARD_KINDS, ...(imageCards.length ? (["image"] as const) : [])];
+            // 圖片卡沒有「爆款結構／品牌自建」之分——看圖片時這列收起來。
+            if (imageMode) return null;
+            const tabs: Array<FrontCardKind | "all"> = ["all", ...FRONT_CARD_KINDS];
             return (
               <div className="mt-3 flex items-center gap-1.5 flex-wrap justify-center">
                 {tabs.map((id) => {
                   const active = activeSource === id;
-                  const acc = id === "all" || id === "viral" || id === "image" ? "#171717" : "#404040";
+                  const acc = id === "all" || id === "viral" ? "#171717" : "#404040";
                   return (
                     <button
                       key={id}
                       onClick={() => setActiveSource(id)}
-                      title={id === "all" ? undefined : id === "image" ? (lang === "en" ? "Image cards in this channel's sizes." : "這個平台各種尺寸的圖片任務卡。") : id === "viral" ? sourceWhy("viral", lang) : (lang === "en" ? "Cards you built for this brand." : "你替這個品牌自己建的卡。")}
+                      title={id === "all" ? undefined : id === "viral" ? sourceWhy("viral", lang) : (lang === "en" ? "Cards you built for this brand." : "你替這個品牌自己建的卡。")}
                       className="flex items-center gap-1.5 px-3 py-1 rounded-full text-tiny font-medium transition-all"
                       style={
                         active
@@ -1977,9 +1787,7 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                       )}
                       {id === "all"
                         ? (lang === "en" ? "All" : "全部")
-                        : id === "image"
-                          ? `${lang === "en" ? "Images" : "圖片"} ${imageCards.length}`
-                          : `${frontCardKindLabel(id, lang)} ${counts[id]}`}
+                        : `${frontCardKindLabel(id, lang)} ${counts[id]}`}
                     </button>
                   );
                 })}
@@ -1988,7 +1796,7 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
           })()}
 
           {/* Task count micro-label */}
-          <div className="mt-3 text-tiny text-default-400">
+          {!imageMode && <div className="mt-3 text-tiny text-default-400">
             {lang === "en"
               ? `${visibleTasks.length} of ${totalForPlatform} tasks`
               : `${visibleTasks.length} / ${totalForPlatform} 個任務`}
@@ -1997,7 +1805,7 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                 · {lang === "en" ? "Brand:" : "品牌腦："}<span className="font-medium text-default-600">{brandName}</span>
               </span>
             )}
-          </div>
+          </div>}
           {/* 2026-07-20 (CJ): failed catalog fetch is now visible + retryable
               instead of a silent 0/0. */}
           {strategyTopic && (
@@ -2041,12 +1849,32 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
 
       {/* ─── Task grid ─────────────────────────────────────────────────── */}
       <div className="max-w-[1200px] mx-auto px-6 pb-20 mt-2">
-        {activeSource === "image" ? (
-          <div className="grid gap-4" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))" }}>
-            {imageCards.map((c) => (
-              <ImageCardTile key={c.id} card={c} onOpen={() => navigate(imageCardHref(c.id))} />
-            ))}
-          </div>
+        {imageMode ? (
+          <>
+            <div className="grid gap-4" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))" }}>
+              {shownImageCards.map((c) => (
+                <ImageCardTile key={c.id} card={c} onOpen={() => navigate(imageCardHref(c.id))} />
+              ))}
+              {/* 跟「新增任務卡」同一個長相：它跟卡片並排，做的是同一件事的延伸。 */}
+              {brandId && (
+                <button
+                  onClick={() => setImagePickerOpen(true)}
+                  className="flex min-h-[180px] flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-neutral-300 bg-white text-neutral-500 transition hover:border-neutral-500 hover:text-neutral-800"
+                >
+                  <span className="flex h-8 w-8 items-center justify-center rounded-full border border-neutral-300">
+                    <AddIcon size={14} />
+                  </span>
+                  <span className="text-[14px] font-medium">
+                    {lang === "en" ? "Add image size" : "新增圖片尺寸"}
+                  </span>
+                </button>
+              )}
+            </div>
+            <div className="mt-4 flex items-center justify-center gap-1.5 text-[13px] text-neutral-500 tabular-nums">
+              <TaskCardsIcon size={12} /> {shownImageCards.length} / {imageCards.length}
+              <span className="ml-1">{lang === "en" ? "sizes on this channel" : "這個平台的尺寸"}</span>
+            </div>
+          </>
         ) : totalForPlatform === 0 && allTasks.length === 0 ? (
           <Card>
             <CardBody className="text-center text-default-500 py-12">
@@ -2418,6 +2246,15 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
           if (t) openTask(t as any);
         }}
       />
+      <ImageSizePicker
+        open={imagePickerOpen}
+        onClose={() => setImagePickerOpen(false)}
+        cards={imageCards}
+        selected={shownImageCards.map((c) => c.id)}
+        max={imageTrayQ.data?.max ?? 12}
+        saving={setImageTrayMut.isPending}
+        onSave={(ids) => imageChannel && brandId && setImageTrayMut.mutate({ brandId, channel: imageChannel as any, cardIds: ids })}
+      />
       <TaskPicker
         open={pickerOpen}
         onClose={() => setPickerOpen(false)}
@@ -2463,22 +2300,24 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                       {lang === "en"
                         ? (activeTask.label_en ?? activeTask.label)
                         : (activeTask.label_zh ?? activeTask.label)}
-                      {activeTask.agent && (
-                        <span className="text-default-500 ml-2 font-normal">· {activeTask.agent.name}</span>
-                      )}
                     </p>
                   </div>
                 </div>
               </ModalHeader>
 
               <ModalBody>
-                {/* 2026-09-29（CJ 參考「Your inbox is clear」）：開頭是一張插畫＋
-                    一句置中大標（就是這張卡要問的那句話），輸入框緊接在下面；
-                    品牌脈絡退到後面當參考，不再是一打開最先看到的黑塊。 */}
+                {/* 2026-09-30（CJ「上面這幾列還可以優化…Tesla 的介面很少文字，圖示很明顯，
+                    複雜文字都在第二層」）：整個 modal 收成三塊——
+                      1. 插畫＋問題（同一列；CJ 喜歡插畫，保留）
+                      2. 輸入框，「AI 完善提示詞」是框內右下角的橘色 ✨
+                      3. 品牌脈絡圖示列（點開才看全文／改寫）＋ agent 頭像＝開始鍵
+                    執行中同一個 modal 原地變形：輸入收成一行引用，頭像到正中間變進度環。 */}
                 {!running && (
-                  <div className="flex flex-col items-center text-center pt-3 pb-1">
-                    <TaskIllustration card={activeTask} width={132} />
-                    <h2 className="mt-4 text-[22px] leading-snug font-bold text-neutral-900 max-w-[30ch]">
+                  <div className="flex items-center gap-4 pt-3 pb-1">
+                    <div className="shrink-0">
+                      <TaskIllustration card={activeTask} width={104} />
+                    </div>
+                    <h2 className="min-w-0 text-[20px] leading-snug font-bold text-neutral-900">
                       {activeTask.primary_question
                         ?? (lang === "en" ? (activeTask.label_en ?? activeTask.label) : (activeTask.label_zh ?? activeTask.label))}
                     </h2>
@@ -2486,63 +2325,83 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                 )}
 
                 {/* Primary question input */}
-                {activeTask.primary_input && (
-                  <div className="space-y-2" data-primary-question>
-                    {activeTask.primary_input.type === "textarea" ? (
-                      <Textarea
-                        placeholder={activeTask.primary_input.placeholder ?? ""}
-                        value={primaryAnswer}
-                        onChange={(e) => { setPrimaryAnswer(e.target.value); if (inputError) setInputError(null); }}
-                        minRows={3}
-                        autoFocus
-                        isInvalid={!!inputError}
-                        classNames={{ inputWrapper: "rounded-2xl px-4 py-3", input: "text-[15px]" }}
-                      />
-                    ) : (
-                      <Input
-                        placeholder={activeTask.primary_input.placeholder ?? ""}
-                        value={primaryAnswer}
-                        onChange={(e) => { setPrimaryAnswer(e.target.value); if (inputError) setInputError(null); }}
-                        autoFocus
-                        isInvalid={!!inputError}
-                        classNames={{ inputWrapper: "rounded-2xl px-4", input: "text-[15px]" }}
-                      />
-                    )}
-                    {/* 2026-08-23: intake rejection prints here, next to the
-                        field it is about — not only in the card at the very
-                        bottom of the modal body. */}
-                    {inputError && (
-                      <p className="text-tiny text-danger-500 flex items-start gap-1.5">
-                        <FontAwesomeIcon icon={faTriangleExclamation} className="mt-[2px]" />
-                        <span>{inputError}</span>
-                      </p>
-                    )}
-                    {polishInputMut && !running && (
-                      <div className="flex items-center justify-center gap-1.5">
-                        <Button
-                          size="sm"
-                          radius="full"
-                          // SoWork 橘（#E85D2E，與首頁 CTA 同色）：這是 modal 裡唯一要被看見的次要動作。
-                          className="bg-[#E85D2E] text-white font-medium px-4 hover:bg-[#D04E22] data-[disabled=true]:opacity-50"
-                          isLoading={polishing}
-                          isDisabled={polishing || !primaryAnswer.trim()}
-                          onPress={handlePolish}
-                          startContent={!polishing && <FontAwesomeIcon icon={faWandMagicSparkles} />}
-                        >
-                          {polishing
-                            ? (lang === "en" ? "Refining…" : "完善中…")
-                            : (lang === "en" ? "AI refine prompt" : "AI 完善提示詞")}
-                        </Button>
-                        <HelpTip>
-                          {lang === "en"
-                            ? "Turns your note into a fuller prompt — facts kept, never invented."
-                            : "把你寫的補成更完整的提示詞（保留事實、不會捏造）"}
-                        </HelpTip>
+                {activeTask.primary_input && !running && (() => {
+                  const extraFields = intakeExtraFields(activeTask as any);
+                  const optionalCount = extraFields.filter((f) => !f.required).length;
+                  const polishBtn = polishInputMut ? (
+                    <Tooltip content={polishing
+                      ? (lang === "en" ? "Refining…" : "完善中…")
+                      : (lang === "en" ? "AI refine prompt — facts kept, never invented" : "AI 完善提示詞（保留事實、不會捏造）")}>
+                      <button
+                        type="button"
+                        onClick={handlePolish}
+                        disabled={polishing || !primaryAnswer.trim()}
+                        aria-label={lang === "en" ? "AI refine prompt" : "AI 完善提示詞"}
+                        className="w-9 h-9 rounded-full bg-[#F37E4A] text-white flex items-center justify-center shadow-sm transition hover:bg-[#D04E22] disabled:opacity-40 disabled:cursor-not-allowed"
+                      >
+                        {polishing
+                          ? <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                          : <Icon name="generate" size={15} />}
+                      </button>
+                    </Tooltip>
+                  ) : null;
+                  const moreBtn = optionalCount > 0 ? (
+                    <Tooltip content={lang === "en" ? `Optional details (${optionalCount})` : `補充資訊（選填，${optionalCount} 項）`}>
+                      <button
+                        type="button"
+                        onClick={() => setShowOptional((v) => !v)}
+                        aria-label={lang === "en" ? "Optional details" : "補充資訊"}
+                        aria-pressed={showOptional}
+                        className={`relative w-9 h-9 rounded-full flex items-center justify-center transition ${showOptional ? "bg-neutral-900 text-white" : "bg-white text-neutral-700 ring-1 ring-default-200 hover:ring-default-400"}`}
+                      >
+                        <Icon name="add" size={14} />
+                        <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-neutral-900 text-white text-[10px] leading-4 text-center ring-2 ring-white">{optionalCount}</span>
+                      </button>
+                    </Tooltip>
+                  ) : null;
+                  return (
+                    <div className="space-y-2" data-primary-question>
+                      <div className="relative">
+                        {activeTask.primary_input.type === "textarea" ? (
+                          <Textarea
+                            placeholder={activeTask.primary_input.placeholder ?? ""}
+                            value={primaryAnswer}
+                            onChange={(e) => { setPrimaryAnswer(e.target.value); if (inputError) setInputError(null); }}
+                            minRows={3}
+                            autoFocus
+                            isInvalid={!!inputError}
+                            classNames={{ inputWrapper: "rounded-2xl px-4 pt-3 pb-12", input: "text-[15px]" }}
+                          />
+                        ) : (
+                          <Input
+                            placeholder={activeTask.primary_input.placeholder ?? ""}
+                            value={primaryAnswer}
+                            onChange={(e) => { setPrimaryAnswer(e.target.value); if (inputError) setInputError(null); }}
+                            autoFocus
+                            isInvalid={!!inputError}
+                            classNames={{ inputWrapper: "rounded-2xl pl-4 pr-24 h-12", input: "text-[15px]" }}
+                          />
+                        )}
+                        {(polishBtn || moreBtn) && (
+                          <div className={`absolute right-2 flex items-center gap-1.5 z-10 ${activeTask.primary_input.type === "textarea" ? "bottom-2" : "top-1.5"}`}>
+                            {moreBtn}
+                            {polishBtn}
+                          </div>
+                        )}
                       </div>
-                    )}
-                    {polishErr && <p className="text-tiny text-danger-500 text-center">{polishErr}</p>}
-                  </div>
-                )}
+                      {/* 2026-08-23: intake rejection prints here, next to the
+                          field it is about — not only in the card at the very
+                          bottom of the modal body. */}
+                      {inputError && (
+                        <p className="text-tiny text-danger-500 flex items-start gap-1.5">
+                          <FontAwesomeIcon icon={faTriangleExclamation} className="mt-[2px]" />
+                          <span>{inputError}</span>
+                        </p>
+                      )}
+                      {polishErr && <p className="text-tiny text-danger-500">{polishErr}</p>}
+                    </div>
+                  );
+                })()}
 
                 {/* 2026-09-02 — primary 以外的欄位。
                     在這之前 intake 只渲染 primary_input 一格，`template.inputs[]`
@@ -2550,13 +2409,15 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                     required 卻沒有任何 UI 可以填（fb-60-launch-kit 從來不問活動
                     什麼時候辦、為什麼辦，模型就自己編一個）。
 
-                    必填的展開、選填的收在摺疊區：主問題必須維持是這個 modal 的
-                    主角，多幾個框會讓「30 秒生一篇」的體感直接變成填表。 */}
+                    必填的永遠展開；選填的收在輸入框右下角的「＋」（2026-09-30 起，
+                    原本是一行「補充資訊（選填）」摺疊標題）。 */}
                 {!running && (() => {
                   const fields = intakeExtraFields(activeTask as any);
                   if (fields.length === 0) return null;
                   const required = fields.filter((f) => f.required);
                   const optional = fields.filter((f) => !f.required);
+                  // 沒有主問題的卡，「＋」按鈕不存在 —— 選填欄位直接展開。
+                  const optionalOpen = showOptional || !activeTask.primary_input;
                   const renderField = (f: IntakeField) => (
                     <div key={f.key} className="space-y-1">
                       <p className="text-tiny font-medium text-default-700">
@@ -2587,6 +2448,7 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                       )}
                     </div>
                   );
+                  if (required.length === 0 && !optionalOpen) return null;
                   return (
                     <div className="space-y-3" data-extra-inputs>
                       {required.length > 0 && (
@@ -2599,316 +2461,465 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                           {required.map(renderField)}
                         </div>
                       )}
-                      {optional.length > 0 && (
-                        <details className="group">
-                          <summary className="text-tiny text-default-500 cursor-pointer select-none hover:text-default-700">
-                            {lang === "en"
-                              ? `Optional details (${optional.length})`
-                              : `補充資訊（選填，${optional.length} 項）`}
-                          </summary>
-                          <div className="space-y-2 mt-2">{optional.map(renderField)}</div>
-                        </details>
+                      {optional.length > 0 && optionalOpen && (
+                        <div className="space-y-2">{optional.map(renderField)}</div>
                       )}
                     </div>
                   );
                 })()}
 
-                <div className="pt-2 space-y-3">
-                  {/* 2026-09-25（CJ「本來在活動企畫中，有該則貼文要發布的時間」）：
-                      這一篇在企劃上排在哪一天，要看得見。卡片裡問的「日期 / 時間」
-                      是**活動**什麼時候發生（已自動帶入活動期間），跟這篇貼文的
-                      發布日是兩件事——不講清楚，使用者會以為系統把日期搞丟了。 */}
-                  {(() => {
-                    if (!campaignScope || !campaignQ.data) return null;
-                    const d: any = campaignQ.data;
-                    const item = (d.plan?.items ?? []).find((i: any) => i.id === campaignScope.itemId);
-                    if (!item) return null;
-                    return (
-                      <div className="mb-3 rounded-lg border border-default-200 px-3 py-2">
-                        <p className="text-tiny text-default-600 m-0">
-                          {lang === "en"
-                            ? `From the campaign plan for “${d.event?.name ?? ""}” — this post is scheduled for ${item.date}.`
-                            : `來自「${d.event?.name ?? ""}」的宣傳企劃 —— 這篇排在 ${item.date} 發布。`}
-                        </p>
-                      </div>
-                    );
-                  })()}
-                  {/* 2026-06-16: per-task entity picker. Brand by default; the
-                      user can switch to a specific product or event for THIS run.
-                      Selecting one re-runs the context resolution so the chips
-                      below + the generated content use that entity's positioning. */}
-                  {brandId && (modalProducts.length > 0 || modalEvents.length > 0) && (
-                    <div className="mb-3">
-                      <p className="text-tiny text-default-500 mb-1.5">
-                        {lang === "en" ? "Generate for" : "產出對象"}
-                      </p>
-                      <div className="flex flex-wrap gap-1.5">
-                        <button
-                          onClick={() => setModalEntity({ kind: "brand", id: null })}
-                          className={`text-xs px-2.5 py-1 rounded-full border transition ${
-                            modalEntity.kind === "brand"
-                              ? "bg-neutral-900 text-white border-neutral-900"
-                              : "bg-white text-default-700 border-default-300 hover:border-default-500"
-                          }`}
-                        >
-                          {lang === "en" ? "Brand" : "品牌"}{brandName ? ` · ${brandName}` : ""}
-                        </button>
-                        {modalProducts.map((p: any) => (
-                          <button
-                            key={`p-${p.id}`}
-                            onClick={() => setModalEntity({ kind: "product", id: p.id })}
-                            className={`text-xs px-2.5 py-1 rounded-full border transition ${
-                              modalEntity.kind === "product" && modalEntity.id === p.id
-                                ? "bg-neutral-900 text-white border-neutral-900"
-                                : "bg-white text-default-700 border-default-300 hover:border-default-500"
-                            }`}
-                          >
-                            {lang === "en" ? "Product · " : "產品 · "}{p.name}
-                          </button>
-                        ))}
-                        {modalEvents.map((e: any) => (
-                          <button
-                            key={`e-${e.id}`}
-                            onClick={() => setModalEntity({ kind: "event", id: e.id })}
-                            className={`text-xs px-2.5 py-1 rounded-full border transition ${
-                              modalEntity.kind === "event" && modalEntity.id === e.id
-                                ? "bg-neutral-900 text-white border-neutral-900"
-                                : "bg-white text-default-700 border-default-300 hover:border-default-500"
-                            }`}
-                          >
-                            {lang === "en" ? "Event · " : "活動 · "}{e.name}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-  
-                  {/* Brand assets empty hint */}
-                  {textAssetsEmpty && brandId && (
-                    <div className="mb-3 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-900 flex items-start gap-2">
-                                          <div className="flex-1 leading-relaxed">
-                        {lang === "en" ? (
-                          <>
-                            <span className="font-medium">This brand's word assets are empty.</span>
-                            {" "}Pop into{" "}
-                            <a href={`/brands?b=${brandId}&cat=copy`} target="_blank" rel="noreferrer" className="underline font-medium hover:text-amber-700">
-                              Brand → Words
-                            </a>
-                            {" "}and click Auto-fill. Output will be far more on-brand.
-                          </>
-                        ) : (
-                          <>
-                            <span className="font-medium">這個品牌的「文字」資產還是空的。</span>
-                            {" "}先到{" "}
-                            <a href={`/brands?b=${brandId}&cat=copy`} target="_blank" rel="noreferrer" className="underline font-medium hover:text-amber-700">
-                              品牌 → 文字
-                            </a>
-                            {" "}按「自動填寫」，AI 產出會明顯貼合品牌語氣。
-                          </>
-                        )}
-                      </div>
-                    </div>
-                  )}
-  
-                  {/* Context chips */}
-                  {(() => {
-                    // 2026-05-27 (CJ「modal chip 仍抓 SoWork」): scope-aware DEFAULT_SOURCES.
-                    // Product uses segment ids: core / audience / value / competition / strategy / marketing.
-                    // Brand uses: goldenCircle / audience / voice / differentiation / values / tagline.
-                    // When product/event scope is active, use the correct paths so chips read
-                    // from the product's own positioning segments, not the brand's.
-                    const isProductScope = !!(brandCtx?.product);
-                    const isEventScope   = !!(brandCtx?.event);
-                    const BRAND_SOURCES = [
-                      "brand.name",
-                      "brand.positioning.audience.primary",
-                      "brand.positioning.voice.archetypes",
-                      "brand.positioning.voice.tone",
-                      "brand.positioning.voice.forbidden",
-                      "brand.positioning.goldenCircle.why",
-                    ];
-                    const PRODUCT_SOURCES = [
-                      "brand.name",                                   // displayName = product name
-                      "brand.positioning.audience.primary",           // product.audience.primary
-                      "brand.positioning.core.coreStatement",         // product.core.coreStatement
-                      "brand.positioning.marketing.tone",             // product.marketing.tone
-                      "brand.positioning.competition.uniqueUsp",      // product.competition.uniqueUsp
-                      "brand.positioning.value.userFeeling",          // product.value.userFeeling
-                    ];
-                    const EVENT_SOURCES = [
-                      "brand.name",                                          // displayName = event name
-                      "brand.positioning.audience.primaryAudience",          // event.audience.primaryAudience
-                      "brand.positioning.smp.singleMindedProposition",       // event.smp.singleMindedProposition
-                      "brand.positioning.messaging.coreMessage",             // event.messaging.coreMessage
-                      "brand.positioning.creative.coreTranslation",          // event.creative.coreTranslation
-                    ];
-                    const DEFAULT_SOURCES =
-                      isProductScope ? PRODUCT_SOURCES :
-                      isEventScope   ? EVENT_SOURCES   :
-                      BRAND_SOURCES;
-                    const sources = (activeTask.contextSources && activeTask.contextSources.length > 0)
-                      ? activeTask.contextSources
-                      : DEFAULT_SOURCES;
-                    const chips = brandCtx ? buildContextChips(brandCtx, sources) : [];
-                    const anyContent = chips.some((c: any) => c.hasContent);
-                    // Is a chip inline-editable? Only string-typed (or empty)
-                    // segment fields; arrays/objects route to the full editor.
-                    const isEditable = (source: string): boolean => {
-                      if (!editSaveTarget) return false;
-                      const v = getNested(editSaveTarget.raw, chipFieldPath(source));
-                      return v == null || typeof v === "string";
-                    };
-                    // Render nothing only if there's truly nothing to show or edit.
-                    if (!anyContent && chips.every((c: any) => !isEditable(c.source))) return null;
-                    const shownMissing = chips.filter((c: any) => !c.hasContent && c.source !== "brand.name").slice(0, 4);
-                    const renderChip = (c: any, missing: boolean) => {
-                      const editable = isEditable(c.source) && c.source !== "brand.name";
-                      const base: React.CSSProperties = {
-                        fontSize: 12, padding: "3px 8px", borderRadius: 4, fontWeight: 500,
-                        ...(missing
-                          ? { background: "transparent", color: "#A3A3A3", border: "1px dashed #D4D4D4" }
-                          : { background: "#FFFFFF", color: "#262626", border: "1px solid #E5E5E5" }),
-                        ...(editable ? { cursor: "pointer" } : {}),
-                      };
-                      if (!editable) {
-                        return <span key={c.source} title={c.source} style={base}>{c.label}</span>;
-                      }
-                      return (
-                        <button
-                          key={c.source}
-                          title={lang === "en" ? "Click to edit / rewrite" : "點擊編輯／改寫"}
-                          style={base}
-                          onClick={() => openChipEditor(c)}
-                        >
-                          {c.label} {missing ? <AddIcon size={10} /> : <EditIcon size={10} />}
-                        </button>
-                      );
-                    };
-                    return (
-                      <div className="rounded-2xl px-4 py-3" style={{ background: "#FAFAF9", border: "1px solid #EDEDED" }}>
-                        <p style={{ fontSize: 11, fontWeight: 700, color: "#A3A3A3", letterSpacing: "0.18em", textTransform: "uppercase", marginBottom: 8 }}>
-                          {(() => {
-                            const entityName = brandCtx?.brand?.name ?? brandName ?? (lang === "en" ? "your brand" : "你的品牌");
-                            return `Context · ${entityName}`;
-                          })()}
-                          <span style={{ marginLeft: 4, letterSpacing: 0, textTransform: "none" }}>
-                            <HelpTip>{lang === "en" ? "Click a chip to edit it." : "點任一項可改寫"}</HelpTip>
-                          </span>
-                        </p>
-                        <div className="flex flex-wrap gap-1.5">
-                          {chips.filter((c: any) => c.hasContent).map((c: any) => renderChip(c, false))}
-                          {shownMissing.map((c: any) => renderChip(c, true))}
-                        </div>
-  
-                        {/* Inline editor for the selected chip */}
-                        {editingChip && (() => {
-                          const fieldPath = chipFieldPath(editingChip.source);
-                          const siblings = (CHIP_SIBLING_CANDIDATES[fieldPath] ?? [])
-                            .map((sp) => ({ path: sp, val: getNested(editSaveTarget?.raw, sp) }))
-                            .filter((s) => typeof s.val === "string" && s.val.trim().length > 0);
-                          return (
-                            <div className="mt-2.5 pt-2.5" style={{ borderTop: "1px solid #E5E5E5" }}>
-                              <p className="text-tiny text-default-600 mb-1">
-                                {(lang === "en" ? "Editing: " : "編輯：") + editingChip.label.split(" · ")[0]}
-                              </p>
-                              {siblings.length > 0 && (
-                                <div className="flex flex-wrap gap-1 mb-1.5">
-                                  <span className="text-[12px] text-default-400 self-center">
-                                    {lang === "en" ? "Pick:" : "可選用："}
-                                  </span>
-                                  {siblings.map((s) => (
-                                    <button
-                                      key={s.path}
-                                      onClick={() => setEditValue(s.val)}
-                                      className="text-[12px] px-2 py-0.5 rounded-full border border-default-300 bg-white text-default-600 hover:border-default-500"
-                                      title={s.val}
-                                    >
-                                      {s.val.length > 24 ? s.val.slice(0, 24) + "…" : s.val}
-                                    </button>
-                                  ))}
-                                </div>
-                              )}
-                              <Textarea
-                                value={editValue}
-                                onChange={(e) => setEditValue(e.target.value)}
-                                minRows={2}
-                                autoFocus
-                                placeholder={lang === "en" ? "Type or rewrite…" : "輸入或改寫…"}
-                              />
-                              <p className="text-[12px] text-default-400 mt-1">
-                                {lang === "en"
-                                  ? `Saves to this ${editSaveTarget?.kind ?? "brand"}'s positioning.`
-                                  : `會更新此${editSaveTarget?.kind === "product" ? "產品" : editSaveTarget?.kind === "event" ? "活動" : "品牌"}的定位。`}
-                              </p>
-                              <div className="flex gap-2 mt-1.5">
-                                <Button size="sm" color="secondary"
-                                  isLoading={savePositioningMut?.isPending}
-                                  onPress={commitChipEdit}>
-                                  {lang === "en" ? "Save" : "儲存"}
-                                </Button>
-                                <Button size="sm" variant="flat"
-                                  onPress={() => { setEditingChip(null); setEditValue(""); }}>
-                                  {lang === "en" ? "Cancel" : "取消"}
-                                </Button>
-                              </div>
-                            </div>
-                          );
-                        })()}
-                      </div>
-                    );
-                  })()}
-  
-                </div>
+                {/* 2026-09-25（CJ「本來在活動企畫中，有該則貼文要發布的時間」）：
+                    這一篇在企劃上排在哪一天，要看得見。卡片裡問的「日期 / 時間」
+                    是**活動**什麼時候發生（已自動帶入活動期間），跟這篇貼文的
+                    發布日是兩件事——不講清楚，使用者會以為系統把日期搞丟了。 */}
+                {!running && (() => {
+                  if (!campaignScope || !campaignQ.data) return null;
+                  const d: any = campaignQ.data;
+                  const item = (d.plan?.items ?? []).find((i: any) => i.id === campaignScope.itemId);
+                  if (!item) return null;
+                  return (
+                    <p className="text-tiny text-default-600 m-0 flex items-center gap-1.5">
+                      <Icon name="campaign" size={12} />
+                      {lang === "en"
+                        ? `From the campaign plan for “${d.event?.name ?? ""}” — this post is scheduled for ${item.date}.`
+                        : `來自「${d.event?.name ?? ""}」的宣傳企劃 —— 這篇排在 ${item.date} 發布。`}
+                    </p>
+                  );
+                })()}
 
-                {/* Running carousel */}
+                {/* Brand assets empty hint */}
+                {!running && textAssetsEmpty && brandId && (
+                  <div className="bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 text-xs text-amber-900 leading-relaxed">
+                    {lang === "en" ? (
+                      <>
+                        <span className="font-medium">This brand's word assets are empty.</span>
+                        {" "}Pop into{" "}
+                        <a href={`/brands?b=${brandId}&cat=copy`} target="_blank" rel="noreferrer" className="underline font-medium hover:text-amber-700">
+                          Brand → Words
+                        </a>
+                        {" "}and click Auto-fill. Output will be far more on-brand.
+                      </>
+                    ) : (
+                      <>
+                        <span className="font-medium">這個品牌的「文字」資產還是空的。</span>
+                        {" "}先到{" "}
+                        <a href={`/brands?b=${brandId}&cat=copy`} target="_blank" rel="noreferrer" className="underline font-medium hover:text-amber-700">
+                          品牌 → 文字
+                        </a>
+                        {" "}按「自動填寫」，AI 產出會明顯貼合品牌語氣。
+                      </>
+                    )}
+                  </div>
+                )}
+
+                {/* ── 品牌脈絡圖示列＋開始鍵 ─────────────────────────────────────
+                    2026-09-30：原本的黑底長 chip 全部改成「圖示＋兩三個字」，
+                    完整內容與改寫收進點開後的第二層。涵蓋的東西跟原本一樣：
+                      - 產出對象（品牌／產品／活動）→ 第一顆「名稱」圖示，點開切換
+                      - 每條 contextSources（有內容的全部＋沒填的最多 4 條，虛線）
+                      - 字串欄位可直接改寫（含「可選用」的相鄰欄位），其餘只讀
+                    圖示對照：v2/content/lib/contextChipIcons.ts */}
+                {!running && (() => {
+                  // 2026-05-27 (CJ「modal chip 仍抓 SoWork」): scope-aware DEFAULT_SOURCES.
+                  // Product uses segment ids: core / audience / value / competition / strategy / marketing.
+                  // Brand uses: goldenCircle / audience / voice / differentiation / values / tagline.
+                  const isProductScope = !!(brandCtx?.product);
+                  const isEventScope   = !!(brandCtx?.event);
+                  const BRAND_SOURCES = [
+                    "brand.name",
+                    "brand.positioning.audience.primary",
+                    "brand.positioning.voice.archetypes",
+                    "brand.positioning.voice.tone",
+                    "brand.positioning.voice.forbidden",
+                    "brand.positioning.goldenCircle.why",
+                  ];
+                  const PRODUCT_SOURCES = [
+                    "brand.name",                                   // displayName = product name
+                    "brand.positioning.audience.primary",           // product.audience.primary
+                    "brand.positioning.core.coreStatement",         // product.core.coreStatement
+                    "brand.positioning.marketing.tone",             // product.marketing.tone
+                    "brand.positioning.competition.uniqueUsp",      // product.competition.uniqueUsp
+                    "brand.positioning.value.userFeeling",          // product.value.userFeeling
+                  ];
+                  const EVENT_SOURCES = [
+                    "brand.name",                                          // displayName = event name
+                    "brand.positioning.audience.primaryAudience",          // event.audience.primaryAudience
+                    "brand.positioning.smp.singleMindedProposition",       // event.smp.singleMindedProposition
+                    "brand.positioning.messaging.coreMessage",             // event.messaging.coreMessage
+                    "brand.positioning.creative.coreTranslation",          // event.creative.coreTranslation
+                  ];
+                  const DEFAULT_SOURCES =
+                    isProductScope ? PRODUCT_SOURCES :
+                    isEventScope   ? EVENT_SOURCES   :
+                    BRAND_SOURCES;
+                  const sources = (activeTask.contextSources && activeTask.contextSources.length > 0)
+                    ? activeTask.contextSources
+                    : DEFAULT_SOURCES;
+                  const chips = brandCtx ? buildContextChips(brandCtx, sources) : [];
+                  // Is a chip inline-editable? Only string-typed (or empty)
+                  // segment fields; arrays/objects route to the full editor.
+                  const isEditable = (source: string): boolean => {
+                    if (!editSaveTarget) return false;
+                    const v = getNested(editSaveTarget.raw, chipFieldPath(source));
+                    return v == null || typeof v === "string";
+                  };
+                  const anyContent = chips.some((c) => c.hasContent);
+                  const showChips = anyContent || chips.some((c) => isEditable(c.source));
+                  const nameChip = chips.find((c) => c.source === "brand.name");
+                  const tiles = showChips ? [
+                    ...chips.filter((c) => c.hasContent && c.source !== "brand.name"),
+                    ...chips.filter((c) => !c.hasContent && c.source !== "brand.name").slice(0, 4),
+                  ] : [];
+                  // 2026-09-30（CJ「缺乏選擇產品的地方」）：只要有品牌就能切換；還沒有產品／活動時
+                  // 第二層直接給「＋新增產品／＋新增活動」，建完自動選成這次的產出對象。
+                  const hasEntityChoice = !!brandId;
+                  const showNameTile = hasEntityChoice || (showChips && !!nameChip);
+                  const entityName =
+                    modalEntity.kind === "product" ? (modalProducts.find((p: any) => p.id === modalEntity.id)?.name ?? "")
+                    : modalEntity.kind === "event" ? (modalEvents.find((e: any) => e.id === modalEntity.id)?.name ?? "")
+                    : (brandName ?? brandCtx?.brand?.name ?? "");
+                  const entityIcon: IconName =
+                    modalEntity.kind === "product" ? "shop" : modalEntity.kind === "event" ? "campaign" : "brand";
+                  const entityShort =
+                    modalEntity.kind === "product" ? (lang === "en" ? "Product" : "產品")
+                    : modalEntity.kind === "event" ? (lang === "en" ? "Event" : "活動")
+                    : (lang === "en" ? "Brand" : "品牌");
+                  const openChip = ctxOpen && ctxOpen !== "__entity" ? chips.find((c) => c.source === ctxOpen) ?? null : null;
+
+                  const tile = (key: string, icon: IconName, short: string, opts: { missing?: boolean; active?: boolean; tip: string; onPress: () => void }) => (
+                    <Tooltip key={key} content={<span className="block max-w-[260px] text-[12px] leading-snug">{opts.tip}</span>} delay={250}>
+                      <button
+                        type="button"
+                        onClick={opts.onPress}
+                        aria-label={short}
+                        aria-expanded={!!opts.active}
+                        className="flex flex-col items-center gap-1 w-[52px] group"
+                      >
+                        <span className={`relative w-10 h-10 rounded-xl flex items-center justify-center transition ${
+                          opts.active
+                            ? "bg-neutral-900 text-white"
+                            : opts.missing
+                            ? "border border-dashed border-default-300 text-default-400 group-hover:border-default-500"
+                            : "bg-default-100 text-neutral-800 group-hover:bg-default-200"
+                        }`}>
+                          <Icon name={icon} size={16} />
+                          {!opts.missing && !opts.active && (
+                            <span className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                          )}
+                        </span>
+                        <span className={`w-full truncate text-center text-[11px] leading-tight ${opts.missing ? "text-default-400" : "text-default-600"}`}>{short}</span>
+                      </button>
+                    </Tooltip>
+                  );
+                  const toggle = (key: string) => {
+                    setEditingChip(null);
+                    setEditValue("");
+                    setCtxOpen((cur) => (cur === key ? null : key));
+                  };
+                  const agent = activeTask.agent;
+                  const agentSrc = agent ? (agent.avatarUrl || dicebear(agent.name)) : null;
+
+                  return (
+                    <div className="pt-1">
+                      <div className="flex items-end gap-3">
+                        <div className="flex-1 min-w-0 flex flex-wrap gap-x-0.5 gap-y-2">
+                          {showNameTile && tile(
+                            "__entity",
+                            entityIcon,
+                            `${entityShort} ▾`,
+                            {
+                              active: ctxOpen === "__entity",
+                              tip: `${entityShort} · ${entityName}` + (hasEntityChoice ? (lang === "en" ? " — switch to a product or event" : " —— 點一下改成產品或活動") : ""),
+                              onPress: () => toggle("__entity"),
+                            },
+                          )}
+                          {tiles.map((c) => {
+                            const ic = contextChipIcon(c.source, c.name);
+                            return tile(c.source, ic.icon, lang === "en" ? ic.shortEn : ic.short, {
+                              missing: !c.hasContent,
+                              active: ctxOpen === c.source,
+                              tip: c.hasContent ? `${c.name} · ${c.text.length > 80 ? c.text.slice(0, 80) + "…" : c.text}` : `${c.name} · ${lang === "en" ? "not filled yet" : "尚未填寫"}`,
+                              onPress: () => toggle(c.source),
+                            });
+                          })}
+                        </div>
+
+                        {/* agent 頭像＝開始鍵（2026-09-30 CJ「agent 本身就是啟動的按鈕」） */}
+                        <button
+                          type="button"
+                          onClick={handleRun}
+                          aria-label={t("qt_run_btn")}
+                          className="shrink-0 flex flex-col items-center gap-1 group"
+                        >
+                          <span className="relative block rounded-full p-[3px] ring-[3px] ring-[#F37E4A] transition group-hover:scale-105 group-active:scale-95">
+                            {agentSrc ? (
+                              <Avatar src={agentSrc} className="w-14 h-14" />
+                            ) : (
+                              <span className="w-14 h-14 rounded-full bg-default-100 flex items-center justify-center text-neutral-700">
+                                <Icon name="agent" size={22} />
+                              </span>
+                            )}
+                            <span className="absolute -right-1 -bottom-1 w-7 h-7 rounded-full bg-[#F37E4A] text-white flex items-center justify-center ring-2 ring-white">
+                              <Icon name="play" size={11} />
+                            </span>
+                          </span>
+                          {/* 2026-09-30（CJ「Yawen 的名字要跟人像對齊」）：名字從標題列搬到頭像正下方 */}
+                          <span className="flex flex-col items-center leading-tight">
+                            {agent && <span className="text-[12px] font-semibold text-neutral-900 max-w-[96px] truncate">{agent.name}</span>}
+                            <span className="text-[11px] font-semibold text-[#F37E4A]">{t("qt_run_btn")}</span>
+                          </span>
+                        </button>
+                      </div>
+
+                      {/* 第二層：產出對象切換 */}
+                      {ctxOpen === "__entity" && (
+                        <div className="mt-3 rounded-2xl bg-default-50 px-3 py-2.5">
+                          <p className="text-tiny text-default-500 mb-1.5">
+                            {lang === "en" ? "Generate for" : "產出對象"}
+                          </p>
+                          {hasEntityChoice ? (
+                            <div className="flex flex-wrap gap-1.5">
+                              <button
+                                onClick={() => setModalEntity({ kind: "brand", id: null })}
+                                className={`text-xs px-2.5 py-1 rounded-full border transition ${
+                                  modalEntity.kind === "brand"
+                                    ? "bg-neutral-900 text-white border-neutral-900"
+                                    : "bg-white text-default-700 border-default-300 hover:border-default-500"
+                                }`}
+                              >
+                                {lang === "en" ? "Brand" : "品牌"}{brandName ? ` · ${brandName}` : ""}
+                              </button>
+                              {modalProducts.map((p: any) => (
+                                <button
+                                  key={`p-${p.id}`}
+                                  onClick={() => setModalEntity({ kind: "product", id: p.id })}
+                                  className={`text-xs px-2.5 py-1 rounded-full border transition ${
+                                    modalEntity.kind === "product" && modalEntity.id === p.id
+                                      ? "bg-neutral-900 text-white border-neutral-900"
+                                      : "bg-white text-default-700 border-default-300 hover:border-default-500"
+                                  }`}
+                                >
+                                  {lang === "en" ? "Product · " : "產品 · "}{p.name}
+                                </button>
+                              ))}
+                              {modalEvents.map((e: any) => (
+                                <button
+                                  key={`e-${e.id}`}
+                                  onClick={() => setModalEntity({ kind: "event", id: e.id })}
+                                  className={`text-xs px-2.5 py-1 rounded-full border transition ${
+                                    modalEntity.kind === "event" && modalEntity.id === e.id
+                                      ? "bg-neutral-900 text-white border-neutral-900"
+                                      : "bg-white text-default-700 border-default-300 hover:border-default-500"
+                                  }`}
+                                >
+                                  {lang === "en" ? "Event · " : "活動 · "}{e.name}
+                                </button>
+                              ))}
+                              {(["product", "event"] as const).map((k) => (
+                                <button
+                                  key={`add-${k}`}
+                                  onClick={() => setAddEntityTab(k)}
+                                  className="text-xs px-2.5 py-1 rounded-full border border-dashed border-default-300 text-default-500 hover:border-default-500 hover:text-default-800 transition flex items-center gap-1"
+                                >
+                                  <AddIcon size={10} />
+                                  {k === "product"
+                                    ? (lang === "en" ? "New product" : "新增產品")
+                                    : (lang === "en" ? "New event" : "新增活動")}
+                                </button>
+                              ))}
+                            </div>
+                          ) : (
+                            <p className="text-small text-default-800 m-0">{nameChip?.text || brandName}</p>
+                          )}
+                        </div>
+                      )}
+
+                      {/* 第二層：單一脈絡的全文＋改寫 */}
+                      {openChip && (() => {
+                        const editable = isEditable(openChip.source);
+                        const editing = editingChip?.source === openChip.source;
+                        const fieldPath = chipFieldPath(openChip.source);
+                        const siblings = (CHIP_SIBLING_CANDIDATES[fieldPath] ?? [])
+                          .map((sp) => ({ path: sp, val: getNested(editSaveTarget?.raw, sp) }))
+                          .filter((s) => typeof s.val === "string" && s.val.trim().length > 0);
+                        return (
+                          <div className="mt-3 rounded-2xl bg-default-50 px-3.5 py-3">
+                            <div className="flex items-center gap-2 mb-1.5">
+                              <Icon name={contextChipIcon(openChip.source, openChip.name).icon} size={13} className="text-default-500" />
+                              <p className="text-tiny font-semibold text-default-700 flex-1 m-0">{openChip.name}</p>
+                              {editable && !editing && (
+                                <button
+                                  type="button"
+                                  onClick={() => openChipEditor(openChip)}
+                                  className="text-tiny text-default-600 hover:text-default-900 flex items-center gap-1"
+                                >
+                                  {openChip.hasContent ? <EditIcon size={11} /> : <AddIcon size={11} />}
+                                  {openChip.hasContent ? (lang === "en" ? "Rewrite" : "改寫") : (lang === "en" ? "Fill in" : "填寫")}
+                                </button>
+                              )}
+                            </div>
+                            {!editing && (
+                              <p className="text-small text-default-800 whitespace-pre-wrap leading-relaxed m-0">
+                                {openChip.hasContent ? openChip.text : (
+                                  <span className="text-default-400">{lang === "en" ? "Not filled yet." : "尚未填寫。"}</span>
+                                )}
+                              </p>
+                            )}
+                            {!editable && (
+                              <p className="text-[12px] text-default-400 mt-1.5 m-0">
+                                {lang === "en" ? "Edit this one in the full positioning editor." : "這一項請到定位頁完整編輯。"}
+                              </p>
+                            )}
+                            {editing && (
+                              <>
+                                {siblings.length > 0 && (
+                                  <div className="flex flex-wrap gap-1 mb-1.5">
+                                    <span className="text-[12px] text-default-400 self-center">
+                                      {lang === "en" ? "Pick:" : "可選用："}
+                                    </span>
+                                    {siblings.map((s) => (
+                                      <button
+                                        key={s.path}
+                                        onClick={() => setEditValue(s.val)}
+                                        className="text-[12px] px-2 py-0.5 rounded-full border border-default-300 bg-white text-default-600 hover:border-default-500"
+                                        title={s.val}
+                                      >
+                                        {s.val.length > 24 ? s.val.slice(0, 24) + "…" : s.val}
+                                      </button>
+                                    ))}
+                                  </div>
+                                )}
+                                <Textarea
+                                  value={editValue}
+                                  onChange={(e) => setEditValue(e.target.value)}
+                                  minRows={2}
+                                  autoFocus
+                                  placeholder={lang === "en" ? "Type or rewrite…" : "輸入或改寫…"}
+                                />
+                                <p className="text-[12px] text-default-400 mt-1">
+                                  {lang === "en"
+                                    ? `Saves to this ${editSaveTarget?.kind ?? "brand"}'s positioning.`
+                                    : `會更新此${editSaveTarget?.kind === "product" ? "產品" : editSaveTarget?.kind === "event" ? "活動" : "品牌"}的定位。`}
+                                </p>
+                                <div className="flex gap-2 mt-1.5">
+                                  <Button size="sm" color="secondary"
+                                    isLoading={savePositioningMut?.isPending}
+                                    onPress={commitChipEdit}>
+                                    {lang === "en" ? "Save" : "儲存"}
+                                  </Button>
+                                  <Button size="sm" variant="flat"
+                                    onPress={() => { setEditingChip(null); setEditValue(""); }}>
+                                    {lang === "en" ? "Cancel" : "取消"}
+                                  </Button>
+                                </div>
+                              </>
+                            )}
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  );
+                })()}
+
+                {/* 執行中：同一個 modal 原地變形 —— 輸入收成一行引用，頭像到正中間，
+                    進度環＝開始鍵那圈橘色；階段改成一排圖示（策略→文案→圖片→審核）。 */}
                 {running && (() => {
                   const tier = effectiveTier(activeTask);
                   const stagesNow = orchestraStages && orchestraStages.length > 0
                     ? orchestraStages
                     : synthesizeStages(tickMs, tier, lang);
-                  const accent = tierAccent(tier);
                   const agentRoster: Array<{ id?: number; name: string; title?: string; avatarUrl?: string | null; role?: string }> = [];
                   const cap = agentMeta ?? activeTask.agent;
                   if (cap) agentRoster.push({ id: cap.id, name: cap.name, title: cap.title, avatarUrl: cap.avatarUrl, role: lang === "en" ? "Writing caption" : "撰寫文案" });
                   if (imageAgentMeta) agentRoster.push({ id: imageAgentMeta.id, name: imageAgentMeta.name, title: imageAgentMeta.title, avatarUrl: imageAgentMeta.avatarUrl, role: lang === "en" ? "Visual direction" : "視覺方向" });
+                  const PHASES: Array<{ key: string; stageKeys: string[]; icon: IconName; zh: string; en: string }> = [
+                    { key: "plan",   stageKeys: ["scout", "pre", "strategist"], icon: "strategy", zh: "策略", en: "Plan" },
+                    { key: "write",  stageKeys: ["caption"],                   icon: "content",  zh: "文案", en: "Copy" },
+                    { key: "check",  stageKeys: ["brandcheck"],                icon: "shield",   zh: "一致性", en: "On-brand" },
+                    { key: "image",  stageKeys: ["gen"],                       icon: "image",    zh: "圖片", en: "Image" },
+                    { key: "review", stageKeys: ["extras", "qa"],              icon: "review",   zh: "審核", en: "Review" },
+                  ];
+                  // 2026-09-30（CJ「文案和圖片是分開處理的，不會同時寫文又產圖」）：
+                  // 單篇任務這次執行根本不呼叫生圖模型（runImageGen=false，圖到成品頁才由用戶
+                  // 自己生），所以不列「圖片」；只有這個視窗會等圖生完的任務才列，而且只對應
+                  // 真正的生圖（gen），不含跟文案同時寫的風格指示（brief）——文案寫完才會亮。
+                  const waitsForImages = tier === "60s" || HOLD_FOR_IMAGES.has(activeTask.id);
+                  const phases = PHASES.filter((p) => p.key !== "image" || waitsForImages).map((p) => {
+                    const ss = (stagesNow as any[]).filter((s) => p.stageKeys.includes(s.key));
+                    if (ss.length === 0) return null;
+                    const status = ss.some((s) => s.status === "running") ? "running"
+                      : ss.every((s) => s.status === "done") ? "done" : "pending";
+                    return { ...p, status };
+                  }).filter(Boolean) as Array<(typeof PHASES)[number] & { status: string }>;
+                  const current = phases.find((p) => p.status === "running");
                   return (
-                    <RunningAgentCarousel
-                      agents={agentRoster.length > 0 ? agentRoster : [{ name: "Agent", role: lang === "en" ? "Working" : "處理中" }]}
-                      stages={stagesNow}
-                      accentColor={accent}
-                      progressPct={progressPct}
-                    />
+                    <div className="flex flex-col items-center">
+                      {primaryAnswer.trim() && (
+                        <p className="self-stretch mt-2 mb-0 rounded-xl bg-default-100 px-3 py-2 text-tiny text-default-600 truncate">
+                          <Icon name="quote" size={10} className="mr-1.5 text-default-400" />
+                          {primaryAnswer.trim()}
+                        </p>
+                      )}
+                      <RunningAgentCarousel
+                        agents={agentRoster.length > 0 ? agentRoster : [{ name: "Agent", role: lang === "en" ? "Working" : "處理中" }]}
+                        stages={null}
+                        accentColor="#F37E4A"
+                        progressPct={progressPct}
+                        handoffAnchor
+                      />
+                      <div className="flex items-center gap-1.5 -mt-1">
+                        {phases.map((p, i) => (
+                          <React.Fragment key={p.key}>
+                            {i > 0 && (
+                              <span className={`w-5 h-0.5 rounded-full ${phases[i - 1].status === "done" ? "bg-neutral-900" : "bg-default-200"}`} />
+                            )}
+                            <Tooltip content={lang === "en" ? p.en : p.zh}>
+                              <span
+                                aria-label={lang === "en" ? p.en : p.zh}
+                                className={`relative w-10 h-10 rounded-xl flex items-center justify-center transition ${
+                                  p.status === "done" ? "bg-neutral-900 text-white"
+                                  : p.status === "running" ? "bg-[#F37E4A]/10 text-[#F37E4A] ring-2 ring-[#F37E4A]/60 animate-pulse"
+                                  : "bg-default-100 text-default-400"
+                                }`}
+                              >
+                                <Icon name={p.status === "done" ? "check" : p.icon} size={15} />
+                              </span>
+                            </Tooltip>
+                          </React.Fragment>
+                        ))}
+                      </div>
+                      <p className="text-[12px] text-default-500 mt-2 mb-1">
+                        {current
+                          ? (lang === "en" ? current.en : current.zh)
+                          : (lang === "en" ? "Wrapping up" : "收尾中")}
+                      </p>
+                    </div>
                   );
                 })()}
 
                 {/* Error message */}
                 {errorMsg && (
-                  <Card className="bg-warning-50 border border-warning-200 mt-4">
+                  <Card className="bg-warning-50 border border-warning-200 mt-2">
                     <CardBody className="text-warning-800 text-small">{errorMsg}</CardBody>
                   </Card>
                 )}
               </ModalBody>
-
-              <ModalFooter>
-                <Button variant="light" radius="full" onPress={closeTask} startContent={<FontAwesomeIcon icon={faXmark} />}>
-                  {t("cancel")}
-                </Button>
-                <Button
-                  color="primary"
-                  radius="full"
-                  className="px-6"
-                  onPress={handleRun}
-                  isLoading={running}
-                  isDisabled={running}
-                  startContent={!running && <FontAwesomeIcon icon={faPaperPlane} />}
-                >
-                  {running ? t("qt_run_busy") : t("qt_run_btn")}
-                </Button>
-              </ModalFooter>
             </>
           )}
         </ModalContent>
       </Modal>
+
+      <AddEntityModal
+        isOpen={!!addEntityTab}
+        initialTab={addEntityTab ?? "product"}
+        defaultBrandId={brandId ?? null}
+        onClose={() => setAddEntityTab(null)}
+        onCreated={(kind, id) => {
+          if (kind === "product" || kind === "event") setModalEntity({ kind, id });
+          void modalProductsQuery?.refetch?.();
+          void modalEventsQuery?.refetch?.();
+        }}
+      />
 
       {/* 自建任務卡的作者流程。上架成功後重抓 listFB，新卡立刻出現在這一頁。 */}
       <TaskCardComposer

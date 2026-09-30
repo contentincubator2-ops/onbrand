@@ -1709,6 +1709,7 @@ export const quickTaskRouter = router({
         skill_slug: t.skill_slug ?? null,
         primary_question: t.primary_question ?? null,
         scene: t.scene ?? null,
+        illustration_url: t.illustration_url ?? null,
         primary_input: t.primary_input ?? null,
         // 2026-05-11 — surface bilingual label parts + context wiring so the
         // intake modal can render "EN · 中文" + the "我會用 X 來跑" strip.
@@ -2703,10 +2704,45 @@ ${polishTemplate.polishHint}`
         errors.sort((a, b) => stepIndexOf(a) - stepIndexOf(b));
       }
 
+      // 4b. 品牌一致性檢查（2026-09-30 CJ「需要你處理活動」）——非 IG 策略卡的 squad，
+      // 每一步的產出就是交付內容，全部平行過 brandConsistency.ts。這條路線逼近 205 秒
+      // 路由上限（220s socket − 15s 收尾），所以只用剩下的時間（再留 5 秒），最多 25 秒；
+      // 不夠 3 秒就整批記 skipped，絕不為了檢查讓任務逾時。
+      const squadBrandConsistency: any[] = [];
+      if (!strategyPublicPolicy && input.brandId && brandPrefix && variants.some((v) => v.caption)) {
+        const { checkBrandConsistency } = await import("../core/brandConsistency");
+        const remainingMs = 205_000 - (Date.now() - routeStartedAt) - 5_000;
+        const timeoutMs = Math.min(25_000, remainingMs);
+        const checkStartedAt = Date.now() - startedAt;
+        const { enforceBrandRulesOnText } = await import("../../strategy/core/brandContext");
+        const results = await Promise.all(variants.map(async (v, vi) => {
+          if (!v?.caption || v.caption.length > 6000) return null;
+          const res = await checkBrandConsistency({
+            caption: v.caption,
+            brandPrefix,
+            userMsg: input.topic || "(無)",
+            taskLabel: `${squad.name ?? input.squadSlug} · ${v.label}`,
+            isZhTW: brandMarket.isZhTW,
+            timeoutMs,
+          });
+          if (res.status === "fixed") {
+            v.caption = await enforceBrandRulesOnText(input.brandId, res.caption).catch(() => res.caption);
+          }
+          return { variantIndex: vi, status: res.status, issues: res.issues,
+            ...(res.reason ? { reason: res.reason } : {}), ...(res.before ? { before: res.before } : {}) };
+        }));
+        for (const r of results) if (r) squadBrandConsistency.push(r);
+        const allSkipped = squadBrandConsistency.length > 0 && squadBrandConsistency.every((r) => r.status === "skipped");
+        stages.push({ key: "brandcheck", label: brandMarket.isZhTW ? "品牌一致性檢查" : "Brand consistency check",
+          startedAt: checkStartedAt, completedAt: Date.now() - startedAt, status: allSkipped ? "failed" : "done" });
+        if (allSkipped) console.warn(`[runSquadAuto] brandcheck skipped for ${input.squadSlug}: ${squadBrandConsistency[0]?.reason ?? "unknown"}`);
+      }
+
       // 5. Build the background synthesis now, but do not start it until
       // the planning checkpoint has been committed and the HTTP response is
       // ready to return. Per user authorization, Anthropic receives only
       // de-identified planning conclusions, brand context and task input.
+      let strategyBrandConsistency: any[] = [];
       const synthesizeStrategyPublicVariants = strategyPublicPolicy ? async () => {
           const slots = buildIgStrategyPublicSlots(sqSlugNew, input.topic, brandMarket.outputLanguage);
           if (!slots?.length) throw new Error("no public deliverable slots configured");
@@ -2724,6 +2760,7 @@ ${polishTemplate.polishHint}`
               ? squad.methodology
               : squad.methodology?.author,
             agents: Object.values(agentMap),
+            onBrandConsistency: (r) => { strategyBrandConsistency = r; },
           });
       } : null;
       const strategyPublicSlotCount = strategyPublicPolicy
@@ -2785,6 +2822,7 @@ ${polishTemplate.polishHint}`
                 squadSlug: input.squadSlug,
                 variantCount: variants.length,
                 inputs: { topic: input.topic ?? "" },
+                brandConsistency: squadBrandConsistency,
               };
           const persisted = await recordTaskRun({
             userId,
@@ -2833,6 +2871,7 @@ ${polishTemplate.polishHint}`
                     latencyMs: Date.now() - startedAt,
                     publicVariantCount: publicResults.length,
                     publicFormats: [...new Set(publicResults.map((variant) => variant.format))],
+                    brandConsistency: strategyBrandConsistency,
                   };
                   const finalised = await finaliseTaskRun({
                     outputId: checkpointOutputId,

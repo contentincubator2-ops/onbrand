@@ -13,7 +13,7 @@ import { callModel } from "../../platform/core/multiModelRouter";
 import localPool from "../../localDb";
 import {
   addDays, applyOps, brandPlatforms, cardsFor, isYmd, loadWeekCampaignItems, loadWeekSlots,
-  parsePlannerReply, plannerContext, plannerSystemPrompt, validateOps, weekDays,
+  parsePlannerReply, plannerContext, plannerSystemPrompt, railStatusOf, validateOps, weekDays,
   type Card, type PlannerCtxArgs, type SlotRow,
 } from "../core/weeklyPlanner";
 import {
@@ -144,6 +144,17 @@ export const plannerRouter = router({
       return { days: weekDays(input.weekStart), slots, campaign, messages, platforms, hasDrafts: slots.some((s) => s.status === "draft") };
     }),
 
+  /** 側欄儀表：這週排了幾篇、寫好幾篇、各平台還有幾篇沒寫。 */
+  railStatus: protectedProcedure
+    .input(weekInput)
+    .query(async ({ ctx, input }) => {
+      await assertBrandAccess(ctx.user!.id, input.brandId);
+      const [slots, campaign] = await Promise.all([
+        loadWeekSlots(input.brandId, input.weekStart),
+        loadWeekCampaignItems(input.brandId, input.weekStart).catch(() => []),
+      ]);
+      return railStatusOf(slots, campaign);
+    }),
   send: protectedProcedure
     .input(weekInput.extend({ content: z.string().trim().min(1).max(1000) }))
     .mutation(async ({ ctx, input }) => {
