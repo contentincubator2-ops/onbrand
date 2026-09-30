@@ -5,7 +5,7 @@
  * 通路真的有的、寫好的不能動。這支是「對話會不會把企劃改壞」的唯一守門員。
  */
 import { describe, it, expect } from "vitest";
-import { validateCampaignOps } from "./campaignChat";
+import { validateCampaignOps, parseChatReply } from "./campaignChat";
 import type { CampaignPlan } from "./campaignPlan";
 import type { CatalogTask } from "../../content/core/taskCatalogIndex";
 
@@ -85,5 +85,25 @@ describe("訊息", () => {
   });
   it("只是問問題：沒有操作也沒有訊息", () => {
     expect(run({ reply: "好問題", ops: [] })).toEqual({ ops: [] });
+  });
+});
+
+describe("parseChatReply（回覆被截斷也救得回來）", () => {
+  it("完整的 JSON：照常解析，帶 askDirector", () => {
+    const r = parseChatReply('{"reply":"好","ops":[{"op":"remove","id":"a"}],"askDirector":"訴求要不要改？"}');
+    expect(r).toEqual({ reply: "好", ops: [{ op: "remove", id: "a" }], phaseMessages: undefined, askDirector: "訴求要不要改？", truncated: false });
+  });
+
+  it("被截斷：救回完整的那幾條，最後半條丟掉", () => {
+    const cut = '{"reply":"每一段都改了，重點放在「一人行銷」的處境","ops":[{"op":"update","id":"a","angle":"講真實的{週一}"},{"op":"update","id":"b","angle":"第二條"},{"op":"update","id":"c","ang';
+    const r = parseChatReply(cut)!;
+    expect(r.truncated).toBe(true);
+    expect(r.reply).toBe("每一段都改了，重點放在「一人行銷」的處境");
+    expect(r.ops).toEqual([{ op: "update", id: "a", angle: "講真實的{週一}" }, { op: "update", id: "b", angle: "第二條" }]);
+  });
+
+  it("沒有 JSON：整段當一般回答；什麼都沒有：null", () => {
+    expect(parseChatReply("這週先別加篇數比較好。")).toEqual({ reply: "這週先別加篇數比較好。", ops: [], truncated: false });
+    expect(parseChatReply("   ")).toBeNull();
   });
 });

@@ -34,7 +34,7 @@ type ChatMessage = { id: number; role: string; content: string; actions?: Strate
 
 export default function StrategyDirectorChat({
   brandId, agentId, productId, director, height, onOpenMonitor,
-  onOpenHistory, viewingConversationId, onBackToCurrent,
+  onOpenHistory, viewingConversationId, onBackToCurrent, prefill,
 }: {
   brandId: number;
   /** 哪一位總監——每位一串獨立對話，所以這個值變了就要整串重載。 */
@@ -56,6 +56,11 @@ export default function StrategyDirectorChat({
   viewingConversationId?: number | null;
   /** 使用者按「回到目前這串」。 */
   onBackToCurrent?: () => void;
+  /**
+   * 2026-09-30：別處轉過來的問題（例如活動頁的內容企劃被問到方向）。填進輸入框、
+   * 不自動送——使用者看一眼再送。nonce 變了才填，同一個問題不會一直覆蓋使用者打的字。
+   */
+  prefill?: { text: string; nonce: number } | null;
 }) {
   const { lang } = useLang();
   const en = lang === "en";
@@ -68,6 +73,9 @@ export default function StrategyDirectorChat({
   const [messages, setMessages] = React.useState<ChatMessage[]>([]);
   const [input, setInput] = React.useState("");
   const [sending, setSending] = React.useState(false);
+  React.useEffect(() => {
+    if (prefill?.text) setInput(prefill.text);
+  }, [prefill?.nonce]);   // eslint-disable-line react-hooks/exhaustive-deps
   const [error, setError] = React.useState<string | null>(null);
   const bodyRef = React.useRef<HTMLDivElement | null>(null);
 

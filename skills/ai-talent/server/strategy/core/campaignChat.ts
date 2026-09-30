@@ -16,6 +16,7 @@
  */
 import { candidateCards, eventFacts, safeJSON, PLANNABLE_CHANNELS, CAMPAIGN_PHASE_IDS, type CampaignPlan, type CampaignPhaseId, type PlanItem } from "./campaignPlan.js";
 import type { CatalogTask } from "../../content/core/taskCatalogIndex.js";
+import { pickPlannerAgent, brandIndustry, type TeamAgent } from "./campaignTeam.js";
 
 export type CampaignOp =
   | { op: "add"; item: PlanItem }
@@ -121,6 +122,56 @@ export function validateCampaignOps(args: {
 const DAY = 86_400_000;
 const ymd = (d: Date) => d.toISOString().slice(0, 10);
 
+/**
+ * 模型的回覆 → { reply, ops, phaseMessages, askDirector }。純函式。
+ *
+ * 2026-09-30（CJ「我請內容企劃調整方向，結果她回復：內容企劃的回覆讀不懂」）：
+ * 「每一段都改」這種要求會一次回十幾條操作，回覆超過長度上限被截斷，JSON 不完整就
+ * 整份丟掉。現在先照常解析；解析不了就把**完整的那幾條操作**救回來（truncated=true，
+ * 畫面會說「只來得及提出前幾條」）；連 JSON 都沒有，就把文字當成一般回答。
+ */
+export function parseChatReply(text: string): { reply: string; ops: any[]; phaseMessages?: any; askDirector?: string; truncated: boolean } | null {
+  const raw = String(text ?? "");
+  const whole = safeJSON<any>(raw, null);
+  if (whole && typeof whole === "object") {
+    return {
+      reply: String(whole.reply ?? ""), ops: Array.isArray(whole.ops) ? whole.ops : [],
+      phaseMessages: whole.phaseMessages, askDirector: typeof whole.askDirector === "string" ? whole.askDirector : undefined,
+      truncated: false,
+    };
+  }
+  const start = raw.indexOf("{");
+  if (start < 0) return raw.trim() ? { reply: raw.trim().slice(0, 400), ops: [], truncated: false } : null;
+  const replyM = raw.match(/"reply"\s*:\s*"((?:[^"\\]|\\.)*)"/);
+  let reply = "";
+  if (replyM) { try { reply = JSON.parse(`"${replyM[1]}"`); } catch { reply = replyM[1]!; } }
+  const ops: any[] = [];
+  const opsAt = raw.search(/"ops"\s*:\s*\[/);
+  if (opsAt >= 0) {
+    let i = raw.indexOf("[", opsAt) + 1;
+    while (i < raw.length) {
+      const open = raw.indexOf("{", i);
+      if (open < 0) break;
+      // 找到這個物件的結尾（略過字串裡的括號）
+      let depth = 0, inStr = false, esc = false, end = -1;
+      for (let k = open; k < raw.length; k++) {
+        const ch = raw[k]!;
+        if (inStr) { if (esc) esc = false; else if (ch === "\\") esc = true; else if (ch === '"') inStr = false; continue; }
+        if (ch === '"') inStr = true;
+        else if (ch === "{") depth++;
+        else if (ch === "}") { depth--; if (depth === 0) { end = k; break; } }
+      }
+      if (end < 0) break;                         // 被截斷的最後一條：丟掉
+      try { ops.push(JSON.parse(raw.slice(open, end + 1))); } catch { /* 壞的那條跳過 */ }
+      i = end + 1;
+      const next = raw.slice(i).match(/^\s*([,\]])/);
+      if (!next || next[1] === "]") break;
+    }
+  }
+  if (!reply && !ops.length) return null;
+  return { reply, ops, truncated: true };
+}
+
 const SYSTEM = `你是這檔活動的內容企劃。策略（一句話訴求、主角、每一段的訊息）是策略總監跟使用者談定的，寫在下面；你負責把它排成可以執行的貼文——哪一天、哪個通路、用哪張任務卡、這一篇講什麼。
 
 鐵則：
@@ -130,7 +181,9 @@ const SYSTEM = `你是這檔活動的內容企劃。策略（一句話訴求、�
 - 標了（已寫）的那幾篇不能改、不能刪。
 - 不准編使用者沒給的數字、成效、顧客見證、名額限制或網址。
 - 使用者只是在問問題、還沒要你改，ops 就回空陣列，用 reply 回答。
-- 要改一句話訴求或某一段的訊息，才填 smp／phaseMessages；沒要改就不要填。
+- 你可以改某一段的訊息（phaseMessages），那是執行層的說法；沒要改就不要填。
+- 一句話訴求、主角、目標客群、定位這類「方向」的問題不是你改的——那是策略總監的工作。使用者問到這些時，ops 回空陣列，reply 簡短說明，並在 askDirector 寫一句要請策略總監回答的問題。
+- ops 最多 12 條，每條 angle 20–45 字；使用者要改很多篇時，先改最重要的 12 篇，reply 說明其餘下一輪再改。
 - reply 用繁體中文一到三句：你打算改什麼、為什麼。不要列清單，清單畫面會自己列。
 - 只輸出 JSON，不要任何說明文字。`;
 
@@ -144,9 +197,10 @@ export async function runCampaignChat(args: {
   message: string;
   phase?: CampaignPhaseId | null;
   history?: Array<{ role: "user" | "assistant"; content: string }>;
-}): Promise<{ reply: string; proposal: CampaignProposal }> {
+}): Promise<{ reply: string; proposal: CampaignProposal; askDirector: string | null; truncated: boolean; agent: TeamAgent | null }> {
   const facts = await eventFacts(args.eventId, args.userId);
   if (!facts) throw new Error("找不到這個活動");
+  const agent = await pickPlannerAgent(await brandIndustry(facts.brandId));
   const today = new Date(ymd(new Date()));
   const start = facts.startAt ? new Date(ymd(facts.startAt)) : today;
   const end = facts.endAt ? new Date(ymd(facts.endAt)) : new Date(start.getTime() + 30 * DAY);
@@ -181,23 +235,32 @@ export async function runCampaignChat(args: {
     `【使用者現在說】${args.message.trim()}`,
     "",
     "只輸出 JSON，鍵名固定如下：",
-    `{"reply":"一到三句","ops":[{"op":"add","phase":"sustain","date":"YYYY-MM-DD","platform":"instagram","taskId":"逐字抄自候選清單","angle":"這一篇要講什麼（20-45字）"},{"op":"update","id":"企劃裡的 id","angle":"…","date":"…","enabled":true},{"op":"remove","id":"企劃裡的 id"}],"phaseMessages":{"sustain":"只有要改才填"},"smp":"只有要改才填"}`,
+    `{"reply":"一到三句","ops":[{"op":"add","phase":"sustain","date":"YYYY-MM-DD","platform":"instagram","taskId":"逐字抄自候選清單","angle":"這一篇要講什麼（20-45字）"},{"op":"update","id":"企劃裡的 id","angle":"…","date":"…","enabled":true},{"op":"remove","id":"企劃裡的 id"}],"phaseMessages":{"sustain":"只有要改才填"},"askDirector":"只有方向的問題才填"}`,
   ].filter(Boolean).join("\n");
 
+  let system = SYSTEM;
+  if (agent) {
+    const { loadAgentKnowledge, withAgentKnowledge } = await import("../../platform/core/agentKnowledge.js");
+    const knowledge = await loadAgentKnowledge(agent.id, { source: "campaign.chat" }).catch(() => "");
+    system = withAgentKnowledge(`你是${agent.name}（${agent.title}），負責這檔活動的內容企劃。\n\n${SYSTEM}`, knowledge);
+  }
   const { buildBrandPrefix } = await import("./brandContext.js");
   const brain = await buildBrandPrefix(facts.brandId, null, args.eventId, "full").catch(() => "");
   const { invokeLLM } = await import("../../platform/core/llm.js");
   const r = await invokeLLM({
     messages: [
-      { role: "system", content: brain ? `${SYSTEM}\n\n# 品牌大腦${brain}` : SYSTEM },
+      { role: "system", content: brain ? `${system}\n\n# 品牌大腦${brain}` : system },
       { role: "user", content: user },
     ],
-    maxTokens: 1800,
+    maxTokens: 4000,
   });
   const text = String(r.choices?.[0]?.message?.content ?? "");
-  const parsed = safeJSON<any>(text, null);
-  if (!parsed) throw new Error("內容企劃的回覆讀不懂，請換個說法再試一次");
-  const proposal = validateCampaignOps({ raw: parsed, plan: args.plan, cards, window });
-  const reply = str(parsed?.reply, 400) || (proposal.ops.length ? "我照你說的改了，看一下下面的提案。" : "了解。");
-  return { reply, proposal };
+  const parsed = parseChatReply(text);
+  if (!parsed) throw new Error("這次沒有收到回覆，請再說一次");
+  // 一句話訴求是策略總監的事：就算模型提了也不收。
+  const proposal = validateCampaignOps({ raw: { ops: parsed.ops, phaseMessages: parsed.phaseMessages }, plan: args.plan, cards, window });
+  const askDirector = str(parsed.askDirector, 200) || null;
+  const reply = str(parsed.reply, 400)
+    || (proposal.ops.length ? "我照你說的改了，看一下下面的提案。" : askDirector ? "這是方向的問題，我請策略總監來回答。" : "了解。");
+  return { reply, proposal, askDirector, truncated: parsed.truncated && proposal.ops.length > 0, agent };
 }
