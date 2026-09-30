@@ -2943,10 +2943,6 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                   const stagesNow = orchestraStages && orchestraStages.length > 0
                     ? orchestraStages
                     : synthesizeStages(tickMs, tier, lang);
-                  const elapsedText =
-                    (tier === "60s" || tier === "99s")
-                      ? `${(tickMs / 1000).toFixed(0)}s · ${lang === "en" ? "researching → writing → rendering" : "策略 → 文案 → 出圖中"}`
-                      : `${(tickMs / 1000).toFixed(1)}s / ${expectedSec}s`;
                   const accent = tierAccent(tier);
                   const agentRoster: Array<{ id?: number; name: string; title?: string; avatarUrl?: string | null; role?: string }> = [];
                   const cap = agentMeta ?? activeTask.agent;
@@ -2958,7 +2954,6 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                       stages={stagesNow}
                       accentColor={accent}
                       progressPct={progressPct}
-                      elapsedText={elapsedText}
                     />
                   );
                 })()}
