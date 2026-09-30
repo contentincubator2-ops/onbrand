@@ -20,16 +20,16 @@
  * 「策略依據」，不再是另一條要走的路。
  *
  * 設計系統：只有中性色；success 只給「已寫」。
+
  *
- * 底圖（2026-09-30 CJ「左邊和右邊的底圖，我們有固定模板，但用戶也可以自己選擇」）：
- * 模板在 lib/campaignBackdrops.ts。有圖的模板，左邊是主視覺、右邊是地圖底下的故事圖；
- * 「傳播圈」沒有圖，左邊畫企劃本身（ReachFan）。
+ * 2026-09-30（CJ「現在選擇底圖的視覺很差，直接移除整個選擇底圖和客製化底圖的功能」）：
+ * 底圖模板整組拿掉，左邊固定是傳播圈（畫的是企劃本身），右邊是中性的地圖底。
  */
 import React from "react";
 import { useNavigate } from "react-router-dom";
 import { Button, Modal, ModalContent, ModalHeader, ModalBody, Spinner } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faMap, faPenNib, faSliders, faLockOpen, faLock, faArrowRight, faBookOpen, faImage, faCheck, faExpand, faCompress, faBullseye } from "@fortawesome/free-solid-svg-icons";
+import { faMap, faPenNib, faSliders, faLockOpen, faLock, faArrowRight, faBookOpen, faExpand, faCompress, faBullseye } from "@fortawesome/free-solid-svg-icons";
 import { trpc } from "../../../../lib/trpc";
 import { useLang } from "../../../../lib/i18n";
 import { CHANNEL_META, channelLabel } from "../../../content/lib/channelMeta";
@@ -42,9 +42,6 @@ import CampaignChatCard from "./CampaignChatCard";
 import CampaignHandoff from "./CampaignHandoff";
 import CampaignKpiPanel from "./CampaignKpiPanel";
 import { money, metricLine } from "../../lib/campaignKpi";
-import {
-  availableBackdrops, backdropForIndustry, backdropUrl, resolveBackdrop, BACKDROP_THEMES, DEFAULT_BACKDROP,
-} from "../../lib/campaignBackdrops";
 
 const ymd = (d: Date) => d.toISOString().slice(0, 10);
 const md = (s: string) => s.slice(5).replace("-", "/");
@@ -67,9 +64,10 @@ export default function CampaignStage({ eventId, brandId }: { eventId: number; b
   const [current, setCurrent] = React.useState<CampaignPhaseId | null>(null);
   const [full, setFull] = React.useState(false);
   const [kpiOpen, setKpiOpen] = React.useState(false);
+  /** 對話卡展開＝佔滿左欄（CJ 2026-09-30）；左欄其他東西先收起來。 */
+  const [chatExpanded, setChatExpanded] = React.useState(false);
   const [setupOpen, setSetupOpen] = React.useState(false);
   const [partner, setPartner] = React.useState<"kol" | "cobrand" | null>(null);
-  const [pickerOpen, setPickerOpen] = React.useState(false);
   const [saveState, setSaveState] = React.useState<"idle" | "saving" | "saved" | "error">("idle");
   const [saveErr, setSaveErr] = React.useState("");
   const dirtyRef = React.useRef(false);
@@ -82,9 +80,6 @@ export default function CampaignStage({ eventId, brandId }: { eventId: number; b
     setPlan(q.data.plan ?? null);
   }, [q.data]);
 
-  const backdropMut = (trpc as any).campaign.setBackdrop.useMutation({
-    onSuccess: () => utils?.campaign?.get?.invalidate?.({ eventId }),
-  });
   const savePlanMut = (trpc as any).campaign.savePlan.useMutation({
     onSuccess: () => { dirtyRef.current = false; setSaveState("saved"); utils?.campaign?.get?.invalidate?.({ eventId }); },
     onError: (e: any) => { setSaveState("error"); setSaveErr(e?.message ?? ""); },
@@ -183,9 +178,6 @@ export default function CampaignStage({ eventId, brandId }: { eventId: number; b
   const cd = countdown(ev.startAt ?? null, ev.endAt ?? null, ymd(new Date()));
   const notes = plan ? stageNotes(items, settings.channels ?? [], cur) : [];
   const brandProducts = (((productsQ.data as any[]) ?? []) as any[]).map((p) => ({ id: Number(p.id), name: String(p.name) }));
-  const theme = resolveBackdrop(data.backdrop, data.industry);
-  const pictured = theme !== DEFAULT_BACKDROP;
-  const autoTheme = backdropForIndustry(data.industry);
   const lead = data.productScope === "brand" ? L("純品牌活動", "Brand campaign")
     : (data.products ?? []).map((p: any) => p.name).join("、") || L("還沒指定", "Not set");
 
@@ -252,10 +244,6 @@ export default function CampaignStage({ eventId, brandId }: { eventId: number; b
             <span className="w-px h-5 bg-divider" />
             {plan?.kol && <Button size="sm" variant="light" radius="md" onPress={() => setPartner("kol")}>{L("網紅合作", "Influencers")}</Button>}
             {plan?.cobrand && <Button size="sm" variant="light" radius="md" onPress={() => setPartner("cobrand")}>{L("異業合作", "Co-branding")}</Button>}
-            <Button size="sm" variant="light" radius="md" isIconOnly aria-label={L("底圖", "Backdrop")} title={L("底圖", "Backdrop")}
-              onPress={() => setPickerOpen(true)}>
-              <FontAwesomeIcon icon={faImage} />
-            </Button>
             {plan && (
               <Button size="sm" variant={plan.kpi ? "light" : "bordered"} radius="md" startContent={<FontAwesomeIcon icon={faBullseye} />}
                 onPress={() => setKpiOpen(true)}>{L("KPI 與預算", "KPIs & budget")}</Button>
@@ -282,14 +270,8 @@ export default function CampaignStage({ eventId, brandId }: { eventId: number; b
         <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-[380px_minmax(0,1fr)]">
           {/* ── 左：策略 ─────────────────────────────────────────── */}
           <section className="relative bg-gradient-to-b from-default-50 to-default-100 min-w-0 min-h-0 lg:border-r border-b lg:border-b-0 border-divider overflow-hidden">
-            {pictured && (
-              <>
-                <img src={backdropUrl(theme, "left")} alt="" aria-hidden draggable={false}
-                  className="absolute inset-0 w-full h-full object-cover object-bottom pointer-events-none select-none dark:opacity-30" />
-                <div className="absolute inset-x-0 top-0 h-3/5 bg-gradient-to-b from-default-50 via-default-50/85 to-transparent pointer-events-none" />
-              </>
-            )}
             <div className="relative p-5 flex flex-col gap-4 h-full overflow-y-auto">
+            {!(chatExpanded && plan) && (<>
             <div className="flex items-start justify-between gap-3 shrink-0">
               <div>
                 <p className="text-6xl font-black leading-none tracking-tight tabular-nums">
@@ -347,18 +329,20 @@ export default function CampaignStage({ eventId, brandId }: { eventId: number; b
               )}
             </div>
 
-            {pictured
-              ? <div className={`${plan ? "min-h-[120px]" : "flex-1 min-h-[200px]"} shrink-0`} aria-hidden />
-              : <div className="shrink-0"><ReachFan phases={phases} lanes={lanes} items={items} current={cur} en={en} /></div>}
+            <div className="shrink-0"><ReachFan phases={phases} lanes={lanes} items={items} current={cur} en={en} /></div>
+            </>)}
 
             {plan && (
-              <CampaignChatCard eventId={eventId} plan={plan} phase={cur} notes={notes} locked={locked} en={en} onApply={applyPlan} grow />
+              <CampaignChatCard eventId={eventId} plan={plan} phase={cur} notes={notes} locked={locked} en={en} onApply={applyPlan} grow
+                expanded={chatExpanded} onToggleExpand={() => setChatExpanded((v) => !v)} />
             )}
 
-            <button type="button" onClick={goStrategyBasis}
-              className="self-start shrink-0 text-tiny text-default-500 hover:text-foreground flex items-center gap-1.5">
-              <FontAwesomeIcon icon={faBookOpen} />{L("策略依據：活動定位（11 段）", "Strategy basis: campaign positioning")}
-            </button>
+            {!(chatExpanded && plan) && (
+              <button type="button" onClick={goStrategyBasis}
+                className="self-start shrink-0 text-tiny text-default-500 hover:text-foreground flex items-center gap-1.5">
+                <FontAwesomeIcon icon={faBookOpen} />{L("策略依據：活動定位（11 段）", "Strategy basis: campaign positioning")}
+              </button>
+            )}
             </div>
           </section>
 
@@ -368,12 +352,11 @@ export default function CampaignStage({ eventId, brandId }: { eventId: number; b
               <CampaignMap
                 items={items} phases={phases} lanes={lanes} phaseMessages={plan.phaseMessages ?? {}}
                 current={cur} onPick={setCurrent} locked={locked} en={en} onPatchItem={patchItem}
-                backdrop={pictured ? <RightBackdrop id={theme} /> : undefined} fill
+                fill
                 phaseKpi={plan.kpi?.phases ?? {}}
               />
             ) : (
               <div className="relative bg-default-100 p-4 sm:p-6 min-h-[420px] h-full overflow-y-auto">
-                {pictured && <div className="absolute inset-0 pointer-events-none"><RightBackdrop id={theme} /></div>}
                 <div className="relative bg-content1 rounded-2xl shadow-small p-5 max-w-[620px]">
                   <CampaignSetupForm eventId={eventId} data={data} brandProducts={brandProducts} hasPlan={false} en={en} />
                 </div>
@@ -416,25 +399,6 @@ export default function CampaignStage({ eventId, brandId }: { eventId: number; b
         />
       )}
 
-      <Modal isOpen={pickerOpen} onClose={() => setPickerOpen(false)} size="3xl" scrollBehavior="inside">
-        <ModalContent>
-          <ModalHeader className="flex flex-col gap-1">
-            <span className="text-medium">{L("選擇底圖", "Choose a backdrop")}</span>
-            <span className="text-tiny font-normal text-default-500">{L("左邊是主視覺，右邊是策略地圖底下的故事。只換畫面，不影響企劃。", "Left is the hero picture, right sits under the strategy map. Visual only — the plan doesn't change.")}</span>
-          </ModalHeader>
-          <ModalBody className="pb-6">
-            <BackdropPicker
-              chosen={data.backdrop ?? null} current={theme} autoTheme={autoTheme} en={en}
-              busy={backdropMut.isPending}
-              onPick={(id) => backdropMut.mutate({ eventId, backdrop: id }, { onSuccess: () => setPickerOpen(false) })}
-            />
-            {availableBackdrops().length === 1 && (
-              <p className="text-tiny text-default-500">{L("其他模板的圖還在準備中。", "More templates are on the way.")}</p>
-            )}
-          </ModalBody>
-        </ModalContent>
-      </Modal>
-
       <Modal isOpen={!!partner} onClose={() => setPartner(null)} size="lg" scrollBehavior="inside">
         <ModalContent>
           <ModalHeader className="text-medium">{partner === "kol" ? L("網紅合作", "Influencer collab") : L("異業合作", "Co-branding")}</ModalHeader>
@@ -454,64 +418,6 @@ export default function CampaignStage({ eventId, brandId }: { eventId: number; b
           </ModalBody>
         </ModalContent>
       </Modal>
-    </div>
-  );
-}
-
-function RightBackdrop({ id }: { id: string }) {
-  return (
-    <img src={backdropUrl(id, "right")} alt="" aria-hidden draggable={false}
-      className="w-full h-full object-cover pointer-events-none select-none opacity-60 dark:opacity-25" />
-  );
-}
-
-/** 底圖模板清單：第一格是「依產業自動」，其餘每一格是一組左右兩張。 */
-function BackdropPicker({ chosen, current, autoTheme, en, busy, onPick }: {
-  chosen: string | null; current: string; autoTheme: string; en: boolean; busy: boolean;
-  onPick: (id: string | null) => void;
-}) {
-  const L = (zh: string, e: string) => (en ? e : zh);
-  const nameOf = (id: string) => { const t = BACKDROP_THEMES.find((x) => x.id === id); return t ? (en ? t.en : t.zh) : id; };
-  const cards: Array<{ key: string; id: string | null; title: string; story: string; preview: string }> = [
-    { key: "auto", id: null, title: L("依產業自動", "Match my industry"), story: L(`目前會用「${nameOf(autoTheme)}」`, `Currently: ${nameOf(autoTheme)}`), preview: autoTheme },
-    ...availableBackdrops().map((t) => ({ key: t.id, id: t.id, title: en ? t.en : t.zh, story: en ? t.storyEn : t.storyZh, preview: t.id })),
-  ];
-  return (
-    <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))" }}>
-      {cards.map((c) => {
-        const on = c.id === null ? chosen === null : chosen === c.id;
-        return (
-          <button key={c.key} type="button" disabled={busy} onClick={() => onPick(c.id)} aria-pressed={on}
-            className={`text-left rounded-2xl border p-2 flex flex-col gap-2 transition ${on ? "border-foreground ring-1 ring-foreground" : "border-divider hover:border-default-400"}`}>
-            <div className="relative aspect-[3/1] rounded-xl overflow-hidden bg-default-100">
-              {c.preview === DEFAULT_BACKDROP ? (
-                <div className="absolute inset-0 grid place-items-center text-default-400">
-                  <svg viewBox="0 0 120 64" className="w-28" aria-hidden>
-                    {[18, 30, 42, 54].map((r) => (
-                      <path key={r} d={`M ${60 - r} 60 A ${r} ${r} 0 0 1 ${60 + r} 60`} fill="none" stroke="currentColor" strokeWidth={1.4} />
-                    ))}
-                    <circle cx={60} cy={60} r={4} fill="currentColor" />
-                  </svg>
-                </div>
-              ) : (
-                <>
-                  {/* 右邊的故事圖在原圖的中間三分之一，裁成 3:1 剛好是那一條。 */}
-                  <img src={backdropUrl(c.preview, "right")} alt="" className="absolute inset-0 w-full h-full object-cover" />
-                  <img src={backdropUrl(c.preview, "left")} alt=""
-                    className="absolute left-1.5 bottom-1.5 w-9 h-12 object-cover object-bottom rounded-md border border-divider bg-content1" />
-                </>
-              )}
-            </div>
-            <div className="px-1 pb-1">
-              <p className="text-small font-semibold flex items-center gap-1.5">
-                {c.title}{on && <FontAwesomeIcon icon={faCheck} className="text-tiny" />}
-                {c.id !== null && current === c.id && !on && <span className="text-[11px] font-normal text-default-500">{L("（目前）", "(current)")}</span>}
-              </p>
-              <p className="text-tiny text-default-500 leading-snug">{c.story}</p>
-            </div>
-          </button>
-        );
-      })}
     </div>
   );
 }
