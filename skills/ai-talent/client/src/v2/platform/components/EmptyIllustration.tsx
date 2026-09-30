@@ -9,10 +9,10 @@
  */
 import type { ComponentType, ReactNode } from "react";
 
-const INK = "#1F2A44";
-const PANEL = "#EDF2F9";
-const FILL = "#DCE6F4";
-const POP = "#E85D2E";
+export const INK = "#1F2A44";
+export const PANEL = "#EDF2F9";
+export const FILL = "#DCE6F4";
+export const POP = "#E85D2E";
 
 const MOTION = `
 @keyframes ei-rock { 0%,100% { transform: rotate(-5deg) } 50% { transform: rotate(6deg) } }
@@ -51,6 +51,15 @@ const ART: Record<EmptyKind, ComponentType> = {
 export function EmptyIllustration({ kind, width = 220 }: { kind: EmptyKind; width?: number }) {
   const Art = ART[kind];
   return (
+    <IllustrationFrame width={width}>
+      <Art />
+    </IllustrationFrame>
+  );
+}
+
+/** 共用畫框：淺藍圓角底＋地面陰影＋動畫樣式。任務卡插畫（TaskIllustration）也用這個。 */
+export function IllustrationFrame({ width, children }: { width: number; children: ReactNode }) {
+  return (
     <svg
       viewBox="0 0 240 170"
       width={width}
@@ -66,7 +75,7 @@ export function EmptyIllustration({ kind, width = 220 }: { kind: EmptyKind; widt
       <style>{MOTION}</style>
       <rect x="0" y="0" width="240" height="170" rx="18" fill={PANEL} stroke="none" />
       <ellipse cx="120" cy="146" rx="62" ry="7" fill={FILL} stroke="none" />
-      <Art />
+      {children}
     </svg>
   );
 }
@@ -100,7 +109,7 @@ export function IllustratedEmpty({
   );
 }
 
-const Sparks = ({ l = 40, r = 200, y = 40 }: { l?: number; r?: number; y?: number }) => (
+export const Sparks = ({ l = 40, r = 200, y = 40 }: { l?: number; r?: number; y?: number }) => (
   <path className="ei-blink" strokeWidth={2.5}
     d={`M${l} ${y} l6 4 M${l - 6} ${y + 12} h7 M${r} ${y - 2} l-6 5 M${r + 6} ${y + 10} h-7`} />
 );

@@ -3,8 +3,8 @@
  * （positioning._aiPrompts、語調鎖定 _voiceLock、各平台指令產生器）與內容層的
  * AI 指令庫範本頁都已刪除。這支測試守著不讓它們悄悄長回來。
  *
- * 生圖流程裡的「AI 指令生成／AI 指令（英文）」是送給圖片模型的畫面描述，
- * 不是指令庫，不在此列。
+ * 生圖流程第二步送給圖片模型的內容，2026-09-30 起在畫面上叫「畫面描述」
+ * （原本叫「AI 指令」，會跟指令庫混淆）。
  */
 import { describe, expect, it } from "vitest";
 import fs from "node:fs";

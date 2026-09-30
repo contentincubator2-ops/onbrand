@@ -425,6 +425,8 @@ export const brandTaskCardRouter = router({
       samples: z.array(z.string().min(20).max(MAX_SAMPLE_CHARS)).min(1).max(MAX_SAMPLES).optional(),
       variants: z.number().int().min(1).max(5).optional(),
       agentId: z.number().nullable().optional(),
+      // null＝回到自動挑。只驗形狀，場景清單在前端。
+      scene: z.string().regex(/^[a-z]{2,16}$/).nullable().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const userId = ctx.user!.id;
@@ -444,6 +446,7 @@ export const brandTaskCardRouter = router({
             measured: input.samples ? measureSamples(samples) : c.measured,
             variants: input.variants ?? c.variants,
             agentId: input.agentId !== undefined ? input.agentId : c.agentId,
+            scene: input.scene !== undefined ? input.scene : (c.scene ?? null),
             updatedAt: new Date().toISOString(),
           };
         }));

@@ -114,6 +114,8 @@ export interface FBTaskTemplate {
    */
   adFormats?: AdFormat[];
   primary_question?: string;
+  /** 任務 modal 插畫場景；沒有就由前端依標題自動挑（見 client taskScene.ts）。 */
+  scene?: string;
   primary_input?: { key: string; placeholder?: string; type: "text" | "textarea"; derive?: InputDerive };
   inputs: TaskInput[];
   /**

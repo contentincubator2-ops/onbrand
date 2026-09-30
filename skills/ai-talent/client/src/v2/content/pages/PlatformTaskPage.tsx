@@ -6,7 +6,8 @@
  * Users pick the *platform* in the sidebar, then filter by format / source
  * inside this page. Tier is internal engine config and never shown.
  */
-import { IllustratedEmpty, EmptyIllustration } from "../../platform/components/EmptyIllustration";
+import { IllustratedEmpty } from "../../platform/components/EmptyIllustration";
+import { TaskIllustration } from "../../platform/components/TaskIllustration";
 import React, { useMemo, useState, useEffect, useRef } from "react";
 import { Navigate, useParams, useOutletContext, useNavigate, useSearchParams } from "react-router-dom";
 import CalendarTabs from "../components/CalendarTabs";
@@ -229,6 +230,8 @@ interface FBTaskCard {
   kind: "fast" | "mid" | "squad";
   inputs?: any[];
   primary_question?: string | null;
+  /** 2026-09-30：自建卡用戶自選的插畫場景；null＝依題目自動挑。 */
+  scene?: string | null;
   primary_input?: { key: string; placeholder?: string; type: "text" | "textarea"; derive?: any } | null;
   agent_id?: number | null;
   skill_slug?: string | null;
@@ -2492,7 +2495,7 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                 {!running && (
                   <div className="flex items-center gap-4 pt-3 pb-1">
                     <div className="shrink-0">
-                      <EmptyIllustration kind="brief" width={104} />
+                      <TaskIllustration card={activeTask} width={104} />
                     </div>
                     <h2 className="min-w-0 text-[20px] leading-snug font-bold text-neutral-900">
                       {activeTask.primary_question
