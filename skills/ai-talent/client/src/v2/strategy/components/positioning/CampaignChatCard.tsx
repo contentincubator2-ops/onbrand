@@ -22,7 +22,7 @@ import { applyProposal, describeProposal, isEmptyProposal, type CampaignProposal
 
 interface Msg { role: "user" | "assistant"; content: string; proposal?: CampaignProposal; state?: "open" | "applied" | "dismissed" }
 
-export default function CampaignChatCard({ eventId, plan, phase, notes, locked, en, onApply }: {
+export default function CampaignChatCard({ eventId, plan, phase, notes, locked, en, onApply, grow }: {
   eventId: number;
   plan: CampaignPlan;
   phase: CampaignPhaseId | null;
@@ -31,6 +31,8 @@ export default function CampaignChatCard({ eventId, plan, phase, notes, locked, 
   en: boolean;
   /** 套用提案：父層換掉企劃並立刻存。 */
   onApply: (next: CampaignPlan) => void;
+  /** 撐滿父層剩下的高度（活動頁左欄）；對話區跟著長，而不是固定一小格。 */
+  grow?: boolean;
 }) {
   const L = (zh: string, e: string) => (en ? e : zh);
   const [msgs, setMsgs] = React.useState<Msg[]>([]);
@@ -73,7 +75,7 @@ export default function CampaignChatCard({ eventId, plan, phase, notes, locked, 
        L("倒數那週多排兩篇", "Two more posts in the last-call week")];
 
   return (
-    <div className="rounded-2xl bg-foreground text-background px-4 py-3 flex flex-col gap-2.5">
+    <div className={`rounded-2xl bg-foreground text-background px-4 py-3 flex flex-col gap-2.5 ${grow ? "flex-1 min-h-[300px]" : ""}`}>
       <div className="flex items-center gap-2.5">
         <span className="w-7 h-7 rounded-full bg-background text-foreground grid place-items-center text-tiny font-bold shrink-0">
           {L("內", "C")}
@@ -86,7 +88,7 @@ export default function CampaignChatCard({ eventId, plan, phase, notes, locked, 
         </div>
       </div>
 
-      <div ref={boxRef} className="flex flex-col gap-2 max-h-[280px] overflow-y-auto pr-1 -mr-1">
+      <div ref={boxRef} className={`flex flex-col gap-2 overflow-y-auto pr-1 -mr-1 ${grow ? "flex-1 min-h-[120px]" : "max-h-[280px]"}`}>
         {notes.map((n, k) => <p key={`n${k}`} className="text-small leading-relaxed">{en ? n.en : n.zh}</p>)}
         {msgs.map((m, k) => (
           <div key={k} className={m.role === "user" ? "self-end max-w-[88%]" : "flex flex-col gap-2"}>

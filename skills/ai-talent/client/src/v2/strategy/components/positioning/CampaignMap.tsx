@@ -26,23 +26,23 @@ import { phaseShort, type StagePhase } from "../../lib/campaignStage";
 const md = (s: string) => s.slice(5).replace("-", "/");
 const range = (p: StagePhase) => (p.from === p.to ? md(p.from) : `${md(p.from)} – ${md(p.to)}`);
 
-/** 量容器寬度——地圖的點與線要用同一套座標。 */
-function useWidth(ref: React.RefObject<HTMLDivElement | null>): number {
-  const [w, setW] = React.useState(0);
+/** 量容器大小——地圖的點與線要用同一套座標。 */
+function useSize(ref: React.RefObject<HTMLDivElement | null>): { w: number; h: number } {
+  const [s, setS] = React.useState({ w: 0, h: 0 });
   React.useLayoutEffect(() => {
     const el = ref.current;
     if (!el) return;
-    const update = () => setW(el.clientWidth);
+    const update = () => setS({ w: el.clientWidth, h: el.clientHeight });
     update();
     const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(update) : null;
     ro?.observe(el);
     return () => ro?.disconnect();
   }, [ref]);
-  return w;
+  return s;
 }
 
 export default function CampaignMap({
-  items, phases, lanes, phaseMessages, current, onPick, locked, en, onPatchItem, backdrop,
+  items, phases, lanes, phaseMessages, current, onPick, locked, en, onPatchItem, backdrop, fill,
 }: {
   items: CampaignPlanItem[];
   phases: StagePhase[];
@@ -54,14 +54,19 @@ export default function CampaignMap({
   en: boolean;
   onPatchItem: (id: string, next: Partial<CampaignPlanItem>) => void;
   backdrop?: React.ReactNode;
+  /** 撐滿父層的高度（活動頁右欄）；通路之間的距離跟著拉開。 */
+  fill?: boolean;
 }) {
   const L = (zh: string, e: string) => (en ? e : zh);
   const boxRef = React.useRef<HTMLDivElement>(null);
-  const W = useWidth(boxRef);
+  const { w: W, h: boxH } = useSize(boxRef);
 
   const G = W < 520 ? 44 : 112;                 // 左邊通路名稱那一欄
   const HEAD = 112;                            // 每段上方的標題區
-  const laneH = lanes.length <= 3 ? 92 : lanes.length <= 5 ? 72 : 60;
+  const baseLane = lanes.length <= 3 ? 92 : lanes.length <= 5 ? 72 : 60;
+  const laneH = fill && boxH > 0 && lanes.length
+    ? Math.max(baseLane, Math.min(150, (boxH - HEAD - 84) / lanes.length))
+    : baseLane;
   const H = Math.max(420, HEAD + lanes.length * laneH + 84);
   const n = Math.max(1, phases.length);
   const BW = W > 0 ? (W - G - 16) / n : 0;
@@ -87,7 +92,7 @@ export default function CampaignMap({
   const first = route[0]?.it.date;
 
   return (
-    <div ref={boxRef} className="relative w-full overflow-hidden bg-default-100" style={{ height: H }}>
+    <div ref={boxRef} className={`relative w-full overflow-hidden bg-default-100 ${fill ? "h-full" : ""}`} style={fill ? { minHeight: H } : { height: H }}>
       {backdrop && <div className="absolute inset-0 pointer-events-none">{backdrop}</div>}
 
       {/* ── 總覽地圖（放大時整層往那一段放大、淡出） ── */}
