@@ -24,12 +24,11 @@
  * 少量更新的結構性資料本質不同，硬塞進 positioning 等於每則訊息都要
  * 讀寫整個品牌定位 JSON。
  *
- * 只有兩種 action（比 Mia 少，也刻意少）：
+ * 只有一種 action：
  *   open_monitor     → 前端打開「策略監測」面板（不直接觸發掃描）
- *   open_healthcheck → 前端打開「策略健檢」面板（不直接觸發健檢——
- *                       健檢需要的錨點選擇只存在 StrategyWorkbench 自己
- *                       的 React state，總監這裡拿不到，硬塞會是編的）
  * 「引導進行」= 帶使用者到那個面板，不是總監自己動手。
+ * （2026-09-30 CJ「我要刪除策略健檢的功能」：open_healthcheck 拿掉。DB 裡
+ *  舊對話存的 open_healthcheck 按鈕在 getConversation 讀出來時濾掉。）
  */
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
@@ -175,7 +174,7 @@ async function insertMessage(args: {
  *      現在正在看某個產品時把 productId 一起傳進去，那個產品的完整定位也會
  *      進來。
  *   2. buildBrandCatalogBlock()——整份產品／活動清單（brandCatalog.ts）。
- *   3. 策略總監自己要用的兩個狀態：上次健檢時間、未讀監測提醒數。
+ *   3. 策略總監自己要用的狀態：未讀監測提醒數。
  */
 export async function gatherBrandContext(brandId: number, userId: number, productId?: number | null): Promise<string> {
   const ctx: string[] = [];
@@ -193,7 +192,7 @@ export async function gatherBrandContext(brandId: number, userId: number, produc
     if (catalog) ctx.push(catalog);
   } catch { /* non-fatal */ }
 
-  // 3) 策略總監專屬狀態（健檢／監測）——這兩件事是他的職責，要知道現況才
+  // 3) 策略總監專屬狀態（監測）——這是他的職責，要知道現況才
   //    建議得準。
   try {
     const [alertRows]: any = await localPool.execute(
@@ -213,7 +212,7 @@ export async function gatherBrandContext(brandId: number, userId: number, produc
   return ctx.join("\n\n");
 }
 
-/** 品牌最關鍵的幾個定位欄位 + 健檢狀態。buildBrandPrefix 整段失敗時，這段
+/** 品牌最關鍵的幾個定位欄位。buildBrandPrefix 整段失敗時，這段
  *  仍然讓總監答得出最基本的問題（標語、受眾、差異化）。 */
 async function gatherBrandBasics(brandId: number, userId: number): Promise<string> {
   const ctx: string[] = [];
@@ -224,8 +223,7 @@ async function gatherBrandBasics(brandId: number, userId: number): Promise<strin
               JSON_UNQUOTE(JSON_EXTRACT(positioning, '$.goldenCircle.why'))           AS gcWhy,
               JSON_UNQUOTE(JSON_EXTRACT(positioning, '$.audience.primary'))           AS audience,
               JSON_UNQUOTE(JSON_EXTRACT(positioning, '$.differentiation.summary'))    AS diffSummary,
-              JSON_UNQUOTE(JSON_EXTRACT(positioning, '$.differentiation.discriminator')) AS discriminator,
-              JSON_UNQUOTE(JSON_EXTRACT(positioning, '$._workbench.healthCheck.checkedAt')) AS hcCheckedAt
+              JSON_UNQUOTE(JSON_EXTRACT(positioning, '$.differentiation.discriminator')) AS discriminator
          FROM brands WHERE id = ? AND userId = ? LIMIT 1`,
       [brandId, userId],
     );
@@ -237,9 +235,6 @@ async function gatherBrandBasics(brandId: number, userId: number): Promise<strin
     if (b.audience && b.audience !== "null") ctx.push(`主受眾：${String(b.audience).slice(0, 200)}`);
     const diff = b.discriminator && b.discriminator !== "null" ? b.discriminator : b.diffSummary;
     if (diff && diff !== "null") ctx.push(`差異化：${String(diff).slice(0, 200)}`);
-    ctx.push(b.hcCheckedAt && b.hcCheckedAt !== "null"
-      ? `上次策略健檢時間：${b.hcCheckedAt}（可以主動問要不要再檢查一次）`
-      : `這個品牌還沒做過策略健檢`);
   } catch { /* non-fatal */ }
   return ctx.join("\n");
 }
@@ -248,7 +243,7 @@ const STRATEGIST_SYSTEM_PROMPT = `你是 onBrand Studio 的策略總監，繁體
 
 【你手上有什麼】（2026-09-23，CJ 明確要求）
 這則對話的最後面附了這個品牌的完整資料：品牌定位各段、語氣與禁用/偏好詞、
-市場脈絡、**整份產品列表**、**整份活動列表**、策略監測未讀數、上次健檢時間。
+市場脈絡、**整份產品列表**、**整份活動列表**、策略監測未讀數。
 所以：
 - **絕對不要說「我沒有讀取你產品列表的功能」「我看不到你的產品」這類話**。
   你看得到，就在下面。使用者問「我有哪些產品」就直接照清單回答。
@@ -298,22 +293,20 @@ const BRAND_TOOLS_BLOCK = `【你能帶使用者去哪裡】
 判斷用戶現在適合用哪個工具，主動建議並引導過去（不是你自己動手做）：
 - 策略監測：看外部市場——競爭者的新動作、受眾偏好的轉變。適合回答
   「外面是不是有什麼變化該注意」。
-- 策略健檢：看內部一致性——不看外面，只憑品牌自己的研究資料獨立判斷，
-  跟用戶目前選的策略工作台錨點比對是否一致。適合回答「我自己選的策略，
-  跟我品牌的故事是不是同一件事」。
+（系統已經沒有「策略健檢」這個功能，不要提，也不要說要帶使用者去做健檢。
+使用者問自己的策略前後是否一致，直接根據下面的品牌資料回答。）
 
 覺得某個工具真的能幫上忙，就在建議句子最後面加一個標記（使用者看到的是
 一顆按鈕，不是這串文字本身），標記後面接的是按鈕上要顯示的字（≤12字）：
   <<action:open_monitor>>看看外部有什麼變化
-  <<action:open_healthcheck>>帶我去做健檢
-沒有工具幫得上忙就正常聊天，不要為了用而用、硬塞標記。一次最多建議一個。`;
+沒有工具幫得上忙就正常聊天，不要為了用而用、硬塞標記。`;
 
 const PRODUCT_TOOLS_BLOCK = `【你的守備範圍：產品，不是品牌】
 你負責的是**這個品牌的產品**——單支產品的定位、價值主張、賣點、價格與組合、
 產品之間的角色分工（誰是入口、誰是主力、誰其實可以砍）。
 
-- **不要**把使用者帶去「策略監測」或「策略健檢」。那兩個是**品牌層**的工具：
-  健檢比對的是品牌故事與策略工作台的錨點，跟「這支產品賣不賣得動」是兩件事。
+- **不要**把使用者帶去「策略監測」。那是**品牌層**的工具：它看的是品牌的
+  競爭者與市場，跟「這支產品賣不賣得動」是兩件事。
   你也**不要**輸出任何 <<action:...>> 標記——那些按鈕都會跳到品牌工具。
 - 需要更深入看一支產品時，用講的帶他過去：產品卡片上的「查看」可以看那支產品
   的完整定位，「重新定位」會重跑那支產品的定位流程。那就是產品層的健檢。
@@ -347,7 +340,7 @@ CTA、Hook 等卡片。你的產出要能直接變成卡片上的一條：
 - 使用者問的是整篇文案怎麼寫時，提醒他那是內容層任務卡的工作，你只負責把規則定下來——
   但仍然給他一兩個示範句，讓他看得出規則落地長什麼樣。
 
-**不要**把使用者帶去品牌層的策略健檢或策略監測——那是品牌定位的工具，跟用詞規範是
+**不要**把使用者帶去品牌層的策略監測——那是品牌定位的工具，跟用詞規範是
 兩件事。品牌層的問題（我們是誰、定位對不對）請他去找品牌策略總監。`;
 
 /**
@@ -381,7 +374,7 @@ export function channelToolsBlock(scope: ChannelScope): string {
 - 不要說出系統內部的編號（產品 id、活動 id 等），用名稱稱呼。
 - 你判斷這個通路根本不適合這個品牌時，直接說，並說為什麼——不要為了有話講而硬給做法。
 
-**不要**把使用者帶去品牌層的策略健檢或策略監測，也不要輸出任何 <<action:...>> 標記。
+**不要**把使用者帶去品牌層的策略監測，也不要輸出任何 <<action:...>> 標記。
 品牌層的問題（定位、標語、受眾要不要改）請他去找品牌策略總監。`;
 }
 
@@ -422,9 +415,7 @@ export function buildSystemPrompt(director: StrategistDirector | null, brandCtx:
 const ACTION_RE = /<<action:([a-z_0-9]+)>>\s*([^\n<]*)/gi;
 /** 2026-09-23（CJ「對話中持續出現的追問建議」）：回答末尾附的下一題。 */
 const ASK_RE = /<<ask>>\s*([^\n<]*)/gi;
-export type StrategistAction =
-  | { kind: "open_monitor"; label: string }
-  | { kind: "open_healthcheck"; label: string };
+export type StrategistAction = { kind: "open_monitor"; label: string };
 
 function parseActions(raw: string): { clean: string; actions: StrategistAction[]; followUps: string[] } {
   if (!raw) return { clean: "", actions: [], followUps: [] };
@@ -434,7 +425,6 @@ function parseActions(raw: string): { clean: string; actions: StrategistAction[]
     const trimmedLabel = (label ?? "").trim().slice(0, 24) || _full;
     const lower = kind.toLowerCase();
     if (lower === "open_monitor") actions.push({ kind: "open_monitor", label: trimmedLabel });
-    else if (lower === "open_healthcheck") actions.push({ kind: "open_healthcheck", label: trimmedLabel });
     return "";
   });
   clean = clean.replace(ASK_RE, (_full, q: string) => {
@@ -453,9 +443,9 @@ function parseActions(raw: string): { clean: string; actions: StrategistAction[]
 /**
  * 2026-09-23（CJ「策略總監也可以...主動發問」）：新對話第一次開啟時，與其
  * 讓使用者面對一個空面板，不如讓總監先開口——用「品牌現在缺什麼」決定
- * 開場白，不叫 LLM（省一次呼叫，也不會因為 LLM 亂猜而失真）：沒做過健檢
- * 就建議健檢，有未讀的策略監測提醒就提一下，兩者都沒有就給一句帶品牌
- * 名字的一般問候。只在對話「第一次建立、還沒有任何訊息」時算一次，之後
+ * 開場白，不叫 LLM（省一次呼叫，也不會因為 LLM 亂猜而失真）：有未讀的
+ * 策略監測提醒就提一下，沒有就給一句帶品牌名字的一般問候（2026-09-30
+ * 策略健檢刪除，「沒做過健檢就建議健檢」那一支跟著拿掉）。只在對話「第一次建立、還沒有任何訊息」時算一次，之後
  * 不會每次開面板都重講一次開場白。
  */
 async function buildProactiveOpening(
@@ -518,20 +508,6 @@ async function buildProactiveOpening(
   }
 
   try {
-    const [rows]: any = await localPool.execute(
-      `SELECT JSON_UNQUOTE(JSON_EXTRACT(positioning, '$._workbench.healthCheck.checkedAt')) AS hcCheckedAt
-         FROM brands WHERE id = ? AND userId = ? LIMIT 1`,
-      [brandId, userId],
-    );
-    const hcDone = !!(rows as any[])[0]?.hcCheckedAt && (rows as any[])[0].hcCheckedAt !== "null";
-    if (!hcDone) {
-      return {
-        content: en
-          ? `${hi} You haven't run a Strategy Health Check yet — want me to take you there? I'll independently read your brand's own research and see if it agrees with what you picked in the workbench.`
-          : `${hi}你還沒做過策略健檢——要我帶你去看看嗎？我會獨立看一次品牌自己的研究資料，看跟你在工作台選的是不是一致。`,
-        actions: [{ kind: "open_healthcheck", label: en ? "Take me there" : "帶我去看看" }],
-      };
-    }
     // brandId（不是 scope/scopeId）——這樣品牌底下的產品層提醒也算得到，
     // 跟 idx_strategy_alerts_brand 這個既有索引對得上。
     const [alertRows]: any = await localPool.execute(
@@ -550,8 +526,8 @@ async function buildProactiveOpening(
   } catch { /* non-fatal — fall through to generic greeting */ }
   return {
     content: en
-      ? `${hi} Ask me anything about this brand's strategy from my angle — or I can point you to Strategy Monitoring or a Health Check.`
-      : `${hi}${director ? `我看的是${director.roleLabel}這一塊，` : ""}問我任何跟這個品牌策略有關的問題，或者我可以帶你去看看策略監測或做一次健檢。`,
+      ? `${hi} Ask me anything about this brand's strategy from my angle — or I can point you to Strategy Monitoring.`
+      : `${hi}${director ? `我看的是${director.roleLabel}這一塊，` : ""}問我任何跟這個品牌策略有關的問題，或者我可以帶你去看看策略監測。`,
     actions: [],
   };
 }
@@ -561,6 +537,8 @@ async function buildProactiveOpening(
  *
  * 判斷方式刻意保守：只認**明確屬於品牌層的推銷句**（策略健檢／策略監測），
  * 而且只給非品牌 scope 的總監用。寬鬆一點就會把使用者自己的對話也改掉。
+ * 2026-09-30：策略健檢整個刪除之後，品牌總監的舊開場白（「你還沒做過策略健檢
+ * ——要我帶你去看看嗎？」）也過期了，所以品牌 scope 只認「健檢」那一句。
  * 匯出給測試。
  */
 export function isStaleOpening(
@@ -569,7 +547,7 @@ export function isStaleOpening(
 ): boolean {
   if (!msg || msg.role !== "strategist" || !director) return false;
   const scope = getRole(director.roleId).scope;
-  if (scope === "brand") return false;            // 品牌頁本來就該講健檢
+  if (scope === "brand") return /策略健檢|Strategy Health Check/i.test(msg.content);
   return /策略健檢|Strategy Health Check|策略監測|Strategy Monitoring/i.test(msg.content);
 }
 
@@ -856,7 +834,8 @@ export const strategistChatRouter = router({
           const snap = snapshotOf(m.contextSnapshot);
           return {
             id: m.id, role: m.role, content: m.content,
-            actions: snap.actions ?? [],
+            // 舊對話存的 open_healthcheck（功能已刪）不再給按鈕。
+            actions: (snap.actions ?? []).filter((a: any) => a?.kind === "open_monitor"),
             followUps: snap.followUps ?? [],
             createdAt: m.createdAt,
           };

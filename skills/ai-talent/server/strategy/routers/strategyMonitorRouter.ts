@@ -13,7 +13,7 @@ import { assertStrategyMonitoringAllowed, planQuotaFor } from "../../platform/co
 import localPool from "../../localDb";
 import {
   MANUAL_SCAN_COOLDOWN_HOURS, SCAN_INTERVAL_DAYS,
-  ensureWatches, listAlerts, runStrategyScan, setAlertStatus, updateWatch,
+  ensureWatches, listAlerts, runStrategyScan, setAlertStatus, unreadAlertSummary, updateWatch,
   type StrategyWatch,
 } from "../core/strategyMonitor";
 
@@ -57,6 +57,21 @@ export const strategyMonitorRouter = router({
       const lastScanAt = latestScan(watches);
       const canScanNow = !lastScanAt || (Date.now() - new Date(lastScanAt).getTime()) >= MANUAL_SCAN_COOLDOWN_HOURS * 3_600_000;
       return { ...base, watches, alerts, productNames, lastScanAt, canScanNow };
+    }),
+
+  /**
+   * 未讀情報數＋最新一則——側欄「品牌」圖示的數字與左下角通知用（2026-09-30）。
+   * 基礎方案（locked）一律回 0：看不到內容的人不該被通知叫過去。
+   */
+  unreadSummary: protectedProcedure
+    .input(z.object({ brandId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      const userId = ctx.user!.id;
+      await assertBrandOwner(userId, input.brandId);
+      let locked = false;
+      try { locked = !(await planQuotaFor(userId)).strategyMonitoring; } catch { locked = false; }
+      if (locked) return { count: 0, latestId: null as number | null, latestTitle: null as string | null };
+      return unreadAlertSummary(input.brandId);
     }),
 
   /** 改一份監測清單（品牌或某個產品）。 */

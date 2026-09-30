@@ -1,6 +1,6 @@
 /**
  * StrategyAlertsPanel — 策略監測：監測清單（品牌＋每個產品的關鍵字與競爭者）、
- * 掃描出來的策略提醒、以及「回工作台看哪個錨點」。
+ * 掃描出來的策略提醒、以及「回頭看哪一張定位卡」。
  *
  * 2026-09-08 (CJ「有一群人，策略層上，如果發現用戶有變化的時候，或是競爭者有變化
  * 的時候，會亮出情報，提醒用戶要調整策略。為他的品牌和產品，都設定好監測的機制」；
@@ -40,8 +40,10 @@ interface Overview {
 
 const KIND_ZH: Record<Alert["kind"], string> = { competitor_move: "競爭者動作", audience_shift: "受眾變化", market_trend: "市場趨勢" };
 const KIND_EN: Record<Alert["kind"], string> = { competitor_move: "Competitor move", audience_shift: "Audience shift", market_trend: "Market trend" };
-const ANCHOR_ZH: Record<Alert["anchor"], string> = { audience: "受眾錨點", competition: "競爭格局", differentiation: "差異化", tagline: "標語", none: "（不動錨點，先知道就好）" };
-const ANCHOR_EN: Record<Alert["anchor"], string> = { audience: "audience anchor", competition: "competitive set", differentiation: "differentiation", tagline: "tagline", none: "(no anchor change, just be aware)" };
+// 2026-09-30：策略工作台（健檢）刪除後，錨點改指向同名的定位卡——四個 anchor 剛好就是
+// BRAND_SEGMENTS 的 segment id，點了直接打開那張卡。
+const ANCHOR_ZH: Record<Alert["anchor"], string> = { audience: "目標受眾", competition: "競爭格局", differentiation: "差異化", tagline: "標語", none: "不用改定位，先知道就好" };
+const ANCHOR_EN: Record<Alert["anchor"], string> = { audience: "audience", competition: "competitive set", differentiation: "differentiation", tagline: "tagline", none: "no positioning change, just be aware" };
 
 function fmt(iso: string | null, en: boolean): string {
   if (!iso) return en ? "never" : "還沒掃過";
@@ -65,7 +67,11 @@ const splitList = (s: string): string[] => s.split(/[,，、\n]/).map((x) => x.t
 const btnGhost = "rounded-full border border-neutral-900 px-2.5 py-0.5 text-[11px] font-medium text-neutral-900 transition hover:bg-neutral-900 hover:text-white";
 const btnGhostDisabled = "rounded-full border border-neutral-300 px-2.5 py-0.5 text-[11px] font-medium text-neutral-400";
 
-export default function StrategyAlertsPanel({ brandId }: { brandId: number }) {
+export default function StrategyAlertsPanel({ brandId, onOpenSegment }: {
+  brandId: number;
+  /** 打開某一張定位卡（segment id = alert.anchor）。沒給就只顯示文字。 */
+  onOpenSegment?: (segmentId: string) => void;
+}) {
   const { lang } = useLang();
   const en = lang === "en";
   const navigate = useNavigate();
@@ -76,7 +82,11 @@ export default function StrategyAlertsPanel({ brandId }: { brandId: number }) {
     : { data: null, isLoading: false, refetch: () => {} };
   const data = q.data as Overview | null | undefined;
 
-  const refetch = () => { try { utils?.strategyMonitor?.overview?.invalidate?.(); } catch { /* noop */ } q.refetch?.(); };
+  // unreadSummary 是側欄「品牌」圖示的數字與左下角通知的來源——標已讀／掃描後一起刷新，數字才會跟著變。
+  const refetch = () => {
+    try { utils?.strategyMonitor?.overview?.invalidate?.(); utils?.strategyMonitor?.unreadSummary?.invalidate?.(); } catch { /* noop */ }
+    q.refetch?.();
+  };
   const setWatch = (trpc as any).strategyMonitor?.setWatch?.useMutation?.({
     onSuccess: () => { showToastGlobal(en ? "Watch list saved" : "監測清單已儲存", "success"); refetch(); },
     onError: (e: any) => showToastGlobal(String(e?.message ?? "error"), "error"),
@@ -235,9 +245,15 @@ export default function StrategyAlertsPanel({ brandId }: { brandId: number }) {
                   </ul>
                 )}
                 <div className="mt-2.5 flex flex-wrap items-center gap-3 border-t border-neutral-100 pt-2">
-                  <span className="text-[12.5px] text-neutral-700">
-                    {en ? `Revisit in the workbench: ${ANCHOR_EN[a.anchor]}` : `回工作台看：${ANCHOR_ZH[a.anchor]}`}
-                  </span>
+                  {a.anchor !== "none" && onOpenSegment ? (
+                    <button type="button" onClick={() => onOpenSegment(a.anchor)} className="text-[12.5px] text-neutral-700 underline underline-offset-2 hover:text-neutral-900">
+                      {en ? `Open positioning card: ${ANCHOR_EN[a.anchor]} →` : `對應定位卡：${ANCHOR_ZH[a.anchor]} →`}
+                    </button>
+                  ) : (
+                    <span className="text-[12.5px] text-neutral-700">
+                      {a.anchor === "none" ? (en ? ANCHOR_EN.none : ANCHOR_ZH.none) : (en ? `Positioning card: ${ANCHOR_EN[a.anchor]}` : `對應定位卡：${ANCHOR_ZH[a.anchor]}`)}
+                    </span>
+                  )}
                   <span className="flex-1" />
                   {a.status === "new" && (
                     <button onClick={() => setStatus?.mutate?.({ id: a.id, status: "seen" })} className="text-[12px] text-neutral-400 underline underline-offset-2 hover:text-neutral-700">

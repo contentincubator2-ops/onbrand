@@ -37,7 +37,6 @@ import StrategyMeetingsPanel from "../components/meetings/StrategyMeetingsPanel"
 import BrainPanel from "../components/brain/BrainPanel";
 import RegulationsPanel from "../components/regulations/RegulationsPanel";
 import BrandOnboardingWizard from "../components/onboarding/BrandOnboardingWizard";
-import StrategyWorkbench from "../components/positioning/StrategyWorkbench";
 import AIBriefPanel from "../components/positioning/AIBriefPanel";
 import StrategyAlertsPanel from "../components/positioning/StrategyAlertsPanel";
 import PersonaAgentPanel from "../components/positioning/PersonaAgentPanel";
@@ -60,7 +59,7 @@ import { pipelineFor, type PipelineStepSpec } from "../lib/positioningPipeline";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { HelpTip } from "../../platform/components/HelpTip";
 import {
-  faPlus, faPalette, faFont, faQuoteLeft, faBullseye, faUsers, faImage, faIcons, faChartPie, faImages, faPenNib, faShieldHalved, faFolderOpen, faBookOpen, faTableList, faBox, faRocket, faBullhorn, faWandMagicSparkles, faGear, faStickyNote, faTrashCan, faSatelliteDish, faStethoscope, faFileArrowUp,
+  faPlus, faPalette, faFont, faQuoteLeft, faBullseye, faUsers, faImage, faIcons, faChartPie, faImages, faPenNib, faShieldHalved, faFolderOpen, faBookOpen, faTableList, faBox, faRocket, faBullhorn, faWandMagicSparkles, faGear, faStickyNote, faTrashCan, faSatelliteDish, faFileArrowUp,
 } from "@fortawesome/free-solid-svg-icons";
 
 // Sub-nav id format:
@@ -126,10 +125,27 @@ export default function BrandsPage() {
   // 右上角常駐入口，見 StrategyDirectorDrawer.tsx，這裡不再重複。）
   // 也讀 ?tool= —— 全域總監的「引導進行」按鈕會帶著這個參數導過來，讓
   // 這一頁自動展開對應面板，不用使用者自己再點一次 icon。
-  const [activeStrategyTool, setActiveStrategyTool] = useState<null | "monitor" | "healthcheck">(() => {
-    const t = searchParams.get("tool");
-    return t === "monitor" || t === "healthcheck" ? t : null;
-  });
+  //
+  // 2026-09-30（CJ「我要刪除策略健檢的功能，要有一個 chip 是『定位資料』，按下去
+  // 可看到目前填寫好的定位資料」）：健檢刪除；「定位資料」與「策略監測」變成
+  // 二選一的兩個視圖——定位資料＝下面那組定位卡片（預設），策略監測＝只看情報。
+  // 以前監測是疊在卡片上方，要一路往下捲才回得到定位。舊連結 ?tool=healthcheck
+  // 落在預設的定位資料。
+  const toolFromUrl = searchParams.get("tool");
+  const [activeStrategyTool, setActiveStrategyTool] = useState<"positioning" | "monitor">(
+    () => (toolFromUrl === "monitor" ? "monitor" : "positioning"),
+  );
+  // 已經在這一頁時，左下角通知或策略總監帶 ?tool=monitor 導過來，也要切過去。
+  React.useEffect(() => {
+    if (toolFromUrl === "monitor") setActiveStrategyTool("monitor");
+  }, [toolFromUrl]);
+  // 使用者自己切 chip 時把 ?tool= 拿掉——不然網址還停在 monitor，下一次通知帶同一個網址過來會沒反應。
+  const switchStrategyTool = (t: "positioning" | "monitor") => {
+    setActiveStrategyTool(t);
+    if (searchParams.get("tool")) {
+      setSearchParams((prev) => { const sp = new URLSearchParams(prev); sp.delete("tool"); return sp; }, { replace: true });
+    }
+  };
   // 2026-05-30 (CJ「modal 移除」): ?tab= deep-links now navigate to the
   // corresponding main-workspace category instead of opening a modal.
   React.useEffect(() => {
@@ -148,6 +164,12 @@ export default function BrandsPage() {
 
   // Tab locks (定位 / 文字 / 視覺) — fetched per-brand
   const activeBrandIdForLocks = scope?.brandId ?? brandId ?? null;
+  // 2026-09-30：策略監測 chip 上的未讀數。跟側欄「品牌」圖示、左下角通知同一支查詢（react-query 共用快取）。
+  const monitorUnreadQ = (trpc as any).strategyMonitor.unreadSummary.useQuery(
+    { brandId: activeBrandIdForLocks ?? 0 },
+    { enabled: !!activeBrandIdForLocks, staleTime: 30_000 },
+  );
+  const monitorUnread = Number(monitorUnreadQ.data?.count ?? 0);
   const tabLocksQuery = (trpc as any).tabLock?.get?.useQuery
     ? (trpc as any).tabLock.get.useQuery(
         { brandId: activeBrandIdForLocks ?? 0 },
@@ -576,30 +598,6 @@ export default function BrandsPage() {
     : scope?.brandId ? "brand"
     : (brandId ? "brand" : "none"); // legacy fallback
 
-  // 2026-07-29 (「穩定了」— generalize Strategy Workbench to events): the
-  // workbench's chip-derivation logic expects brand-shaped keys (audience.
-  // primary/secondary, competition.direct, differentiation). Events store
-  // audience under primaryAudience/secondaryAudience and have no competition/
-  // differentiation segments of their own — so when scope is on an event we
-  // build a translated + merged view for the workbench only: event's own
-  // audience (remapped) + the PARENT BRAND's competition/differentiation
-  // borrowed read-only for grounding. positioningSegmentData itself (used by
-  // PositioningGrid / AssetCard) stays untouched — this merge is workbench-only.
-  const workbenchPositioning: Record<string, any> = React.useMemo(() => {
-    if (scopeMode !== "event") return positioningSegmentData;
-    const evAud = positioningSegmentData?.audience ?? {};
-    const brandPos = (_sa?.brand?.positioning ?? {}) as Record<string, any>;
-    return {
-      ...positioningSegmentData,
-      audience: {
-        primary: [evAud.primaryAudience, evAud.keyInsight].filter(Boolean).join("\n"),
-        secondary: evAud.secondaryAudience ?? "",
-      },
-      competition: brandPos.competition ?? {},
-      differentiation: brandPos.differentiation ?? {},
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scopeMode, positioningSegmentData, _sa?.brand?.positioning]);
 
   // Pull product/event details when those scopes are active
   const productQuery = (trpc as any).product?.get?.useQuery
@@ -1913,20 +1911,25 @@ export default function BrandsPage() {
                         />
                       )}
                       {scopeMode === "brand" && activeBrandIdForLocks && (
-                        <StrategyToolIcon
-                          active={activeStrategyTool === "monitor"}
-                          onClick={() => setActiveStrategyTool(activeStrategyTool === "monitor" ? null : "monitor")}
-                          icon={faSatelliteDish}
-                          label={lang === "en" ? "Strategy Monitoring" : "策略監測"}
-                        />
-                      )}
-                      {(scopeMode === "brand" || scopeMode === "event") && activeBrandIdForLocks && (
-                        <StrategyToolIcon
-                          active={activeStrategyTool === "healthcheck"}
-                          onClick={() => setActiveStrategyTool(activeStrategyTool === "healthcheck" ? null : "healthcheck")}
-                          icon={faStethoscope}
-                          label={lang === "en" ? "Strategy Health Check" : "策略健檢"}
-                        />
+                        <>
+                          <StrategyToolIcon
+                            active={activeStrategyTool === "positioning"}
+                            onClick={() => switchStrategyTool("positioning")}
+                            icon={faTableList}
+                            label={lang === "en" ? "Positioning" : "定位資料"}
+                            title={lang === "en" ? "The positioning you've filled in so far" : "目前填寫好的定位資料"}
+                          />
+                          <StrategyToolIcon
+                            active={activeStrategyTool === "monitor"}
+                            onClick={() => switchStrategyTool("monitor")}
+                            icon={faSatelliteDish}
+                            label={lang === "en" ? "Strategy Monitoring" : "策略監測"}
+                            count={monitorUnread}
+                            title={monitorUnread > 0
+                              ? (lang === "en" ? `${monitorUnread} new alert${monitorUnread === 1 ? "" : "s"}` : `${monitorUnread} 則新情報還沒看`)
+                              : undefined}
+                          />
+                        </>
                       )}
                       <StrategyToolIcon
                         active={false}
@@ -2034,20 +2037,12 @@ export default function BrandsPage() {
                           2026-09-23：不再一律展開——只有上面的 icon row 被點開
                           （activeStrategyTool）才掛載，見同一天的 CJ 指示。 */}
                       {activeStrategyTool === "monitor" && scopeMode === "brand" && activeBrandIdForLocks ? (
-                        <StrategyAlertsPanel brandId={activeBrandIdForLocks} />
-                      ) : null}
-                      {activeStrategyTool === "healthcheck" && (scopeMode === "brand" || scopeMode === "event") && activeBrandIdForLocks ? (
-                        <StrategyWorkbench
+                        <StrategyAlertsPanel
                           brandId={activeBrandIdForLocks}
-                          eventId={scopeMode === "event" ? (scope?.eventId ?? null) : null}
-                          positioning={workbenchPositioning}
-                          lang={lang}
-                          // 2026-08-21 (CJ「鎖定後，策略工作檯就會只留下最後
-                          // 定案的，變成下方的文字就好」): only brand scope
-                          // has a 定位 lock — events aren't lockable.
-                          locked={scopeMode === "brand" ? !!tabLocks.positioning : false}
+                          onOpenSegment={(segId) => { switchStrategyTool("positioning"); setSection(`seg:${segId}`); }}
                         />
                       ) : null}
+                      {!(activeStrategyTool === "monitor" && scopeMode === "brand" && activeBrandIdForLocks) && (
                       <PositioningGrid
                         scopeMode={scopeMode}
                         segments={segments}
@@ -2074,6 +2069,7 @@ export default function BrandsPage() {
                           );
                         }}
                       />
+                      )}
                     </>
                   )}
                 </div>
@@ -2925,15 +2921,17 @@ const isFilledArr = (a: any) => Array.isArray(a) && a.some((x: any) =>
  * ICON。問用戶是否需要策略監測或健檢，若需要，才會啟動」）：策略總監／
  * 策略監測／策略健檢三個區塊的統一收合入口——單色線條圖示 + 文字標籤的
  * 小圓角按鈕，點下去才等於「使用者說需要」，對應區塊才真的掛載（不是
- * 只是 CSS 收合，未點開時 StrategyAlertsPanel/StrategyWorkbench 的查詢
+ * 只是 CSS 收合，未點開時 StrategyAlertsPanel 的查詢
  * 都不會發出）。active 狀態純用墨色深淺分，不上色——跟這個頁面其餘卡片
  * 同一套紀律。
  */
 function StrategyToolIcon({
-  active, onClick, icon, label, title,
+  active, onClick, icon, label, title, count,
 }: { active: boolean; onClick: () => void; icon: any; label: string;
      /** 需要比標籤講更多時（例如「上傳定位資料」要說明吃哪些格式）。預設用 label。 */
-     title?: string }) {
+     title?: string;
+     /** 2026-09-30：策略監測的未讀情報數。0／沒給就不顯示。 */
+     count?: number }) {
   return (
     <button
       type="button"
@@ -2949,6 +2947,11 @@ function StrategyToolIcon({
     >
       <FontAwesomeIcon icon={icon} style={{ fontSize: 12 }} />
       {label}
+      {!!count && count > 0 && (
+        <span className={`min-w-[18px] rounded-full px-1.5 text-[11px] leading-[18px] text-center tabular-nums ${
+          active ? "bg-white text-neutral-900" : "bg-neutral-900 text-white"
+        }`}>{count > 99 ? "99+" : count}</span>
+      )}
     </button>
   );
 }
@@ -4379,13 +4382,20 @@ function PositioningTopRow({
     : entityKind === "product"
       ? (lang === "en" ? "the product positioning framework (6 steps)" : "產品定位框架（6 步）")
       : (lang === "en" ? "the campaign positioning framework (11 steps)" : "活動定位框架（11 步）");
+  const shortMethodLabel = entityKind === "brand"
+    ? (lang === "en" ? "the SoWork method" : " SoWork 定位法")
+    : entityKind === "product"
+      ? (lang === "en" ? "the product framework" : "產品定位框架")
+      : (lang === "en" ? "the campaign framework" : "活動定位框架");
   const buttonLabel =
     optimisticStarting && !jobData?.status
       ? (lang === "en" ? "Starting…" : "啟動中…")
       : isRunning
         ? (lang === "en" ? `Analyzing ${cur}/${total || totalSteps}` : `分析中 ${cur}/${total || totalSteps}`)
       : isDone
-        ? (lang === "en" ? `Re-apply ${methodLabel}` : `重新套用${methodLabel}`)
+        // 2026-09-30（CJ「重新套用SoWork品牌定位法的功能，看起來可以縮小一點」）：
+        // 已經跑完的版本字拿短——步數留在滑過的說明裡。
+        ? (lang === "en" ? `Re-apply ${shortMethodLabel}` : `重新套用${shortMethodLabel}`)
       : isFailed
         ? (lang === "en" ? `Retry — ${methodLabel}` : `重試 — ${methodLabel}`)
         : (lang === "en" ? `Apply ${methodLabel}` : `套用${methodLabel}`);
@@ -4400,11 +4410,14 @@ function PositioningTopRow({
           border / px-3 py-1.5 / text-[12.5px]）——那邊是 12.5px + icon 12，這裡照抄，
           兩邊要一起改才不會又各長各的。
           外層的 mb-3 也拿掉：現在它被包在工具列那一排裡面，間距由那一排統一給。 */}
-      <div className="flex items-center gap-2 flex-wrap">
+      {/* 2026-09-30（CJ「重新套用…可以縮小一點」）：跑完之後它是少用的次要動作——
+          改成不帶框的小字、靠右，不再跟「定位資料／策略監測」同一個量級。
+          還沒跑過（第一次套用）時維持 pill，那時它就是這一頁最該按的東西。 */}
+      <div className={`flex items-center gap-2 flex-wrap ${isDone ? "ml-auto" : ""}`}>
         <button
           onClick={handleAuto}
           disabled={!brandId || !entityKind || locked || isRunning || startMut?.isPending}
-          className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-[12.5px] font-medium transition-colors ${
+          className={isDone && !locked ? "inline-flex items-center gap-1.5 px-1 py-1 text-[12px] text-neutral-500 hover:text-neutral-900 transition-colors cursor-pointer" : `inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-[12.5px] font-medium transition-colors ${
             isRunning ? "bg-neutral-100 border-neutral-200 text-neutral-700 cursor-wait"
             : locked ? "bg-neutral-100 border-neutral-200 text-neutral-400 cursor-not-allowed"
             : "bg-white border-neutral-300 text-neutral-600 hover:border-neutral-900 hover:text-neutral-900 cursor-pointer"
@@ -4446,7 +4459,8 @@ function PositioningTopRow({
         {isFailed && jobData?.lastError && (
           <span className="text-xs text-amber-700 max-w-md truncate" title={jobData.lastError}><WarningIcon size={11} /> {String(jobData.lastError).slice(0, 80)}</span>
         )}
-        {isDone && <span className="text-xs text-emerald-700 inline-flex items-center gap-1"><CheckIcon size={11} />{lang === "en" ? `Done · ${total} sections` : `已完成 ${total} 個段落`}</span>}
+        {/* 2026-09-30（CJ「已完成10個段落這段字，不知道要做甚麼」）：那是上次跑完的狀態，
+            不是能做的事——卡片本身就看得出填了沒，拿掉。 */}
         {startError && (
           <span className="text-xs text-danger truncate max-w-md" title={startError}><WarningIcon size={11} /> {startError}</span>
         )}

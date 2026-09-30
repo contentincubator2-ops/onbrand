@@ -378,7 +378,6 @@ export default function StrategyDirectorDrawer({ brandId }: { brandId: number | 
               director={current}
               height={PANEL_HEIGHT}
               onOpenMonitor={() => { setOpen(false); navigate(`/brands/edit?b=${brandId}&cat=positioning&tool=monitor`); }}
-              onOpenHealthCheck={() => { setOpen(false); navigate(`/brands/edit?b=${brandId}&cat=positioning&tool=healthcheck`); }}
               onOpenHistory={() => setHistoryOpen(true)}
               viewingConversationId={viewingConversationId}
               onBackToCurrent={() => setViewingConversationId(null)}
