@@ -18,6 +18,7 @@ import { trpc } from "../../../lib/trpc";
 import { useLang } from "../../../lib/i18n";
 import { showToastGlobal } from "../../../components/ui/Toast";
 import { channelRoute } from "../lib/channelMeta";
+import { logActivation } from "../../platform/lib/activationTelemetry";
 import { PlatformTaskModal, type TaskEmbed } from "./PlatformTaskPage";
 
 const INK = "#171717", META = "#6B6B6B", LINE = "#EAEAEA", SOFT = "#F6F6F5";
@@ -97,6 +98,8 @@ export default function InspirationPage() {
   React.useEffect(() => {
     if (rosterQ.data?.lineup) setLineup(rosterQ.data.lineup);
   }, [rosterQ.data]);
+  // 活化漏斗第 4 步（後台只取每人第一次）。
+  React.useEffect(() => { if (brandId) logActivation("first_inspiration_arrived", { brandId }); }, [brandId]);
 
   const utils = T.useUtils?.();
   const ideateStart = T.inspiration?.ideateStart?.useMutation?.();
@@ -193,6 +196,8 @@ export default function InspirationPage() {
       const r = await adopt.mutateAsync({
         brandId, thinker: a.thinker, title: a.title, hook: a.hook, why: a.why, answer: a.answer ?? "", platform, format: a.format, date,
       });
+      // 活化漏斗終點＝TTFV：第一次拿到成果。
+      logActivation("first_angle_adopted", { brandId, thinker: a.thinker });
       setAngles((cur) => cur.map((x) => (x.id === a.id ? { ...x, platform, adopted: { date } } : x)));
       setAdoptFor(null);
       setWriting({

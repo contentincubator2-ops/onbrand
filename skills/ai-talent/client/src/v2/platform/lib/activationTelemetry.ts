@@ -10,18 +10,20 @@
  *   1. register_completed       — first successful registration (RegisterPage)
  *   2. first_brand_created      — Wizard creates the first brand
  *   3. express_brain_ready      — runInterim completed (~30s after #2)
- *   4. first_theater_arrived    — first time hitting /theater?firstTime=1
- *   5. first_week_generated     — first 7-day batch of cards completed
+ *   4. first_inspiration_arrived — first time opening 靈感舞台 (/inspiration)
+ *   5. first_angle_adopted       — first angle adopted into 本週企劃
  *
  * TTFV = time between #1 and #5 for the same userId.
+ * 2026-09-30：七日發布台移除，#4／#5 從 first_theater_arrived／first_week_generated
+ * 換成現在這兩個；後台把舊事件當別名一起算（server/platform/core/activationFunnel.ts）。
  */
 
 export type ActivationStage =
   | "register_completed"
   | "first_brand_created"
   | "express_brain_ready"
-  | "first_theater_arrived"
-  | "first_week_generated";
+  | "first_inspiration_arrived"
+  | "first_angle_adopted";
 
 /**
  * Fire an activation milestone. Per-user dedupe happens server-side via
