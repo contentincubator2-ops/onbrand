@@ -2045,10 +2045,7 @@ export default function BrandsPage() {
                           2026-09-23：不再一律展開——只有上面的 icon row 被點開
                           （activeStrategyTool）才掛載，見同一天的 CJ 指示。 */}
                       {activeStrategyTool === "monitor" && scopeMode === "brand" && activeBrandIdForLocks ? (
-                        <StrategyAlertsPanel
-                          brandId={activeBrandIdForLocks}
-                          onOpenSegment={(segId) => { switchStrategyTool("positioning"); setSection(`seg:${segId}`); }}
-                        />
+                        <StrategyAlertsPanel brandId={activeBrandIdForLocks} />
                       ) : null}
                       {!(activeStrategyTool === "monitor" && scopeMode === "brand" && activeBrandIdForLocks) && (
                       <PositioningGrid

@@ -33,6 +33,7 @@ import localPool from "../../localDb";
 import { invokeLLM } from "../../platform/core/llm";
 import { planQuotaFor } from "../../platform/core/planGate";
 import { perplexityScout } from "../../content/core/scouts/perplexityScout";
+import { fetchPublishedDate, normalizeDate } from "./publishedDate";
 import type { IntelItem, ScoutContext } from "../../content/core/scouts/types";
 
 export const STRATEGY_WATCH_DDL = `
@@ -117,7 +118,9 @@ export interface StrategyAlert {
   title: string;
   summary: string;
   suggestion: string;
-  evidence: Array<{ title: string; url?: string; source?: string; publishedAt?: string }>;
+  /** publishedAt＝原文發布日 YYYY-MM-DD（從原文網頁讀，見 publishedDate.ts）；
+   *  dateChecked＝已經去原文找過（找不到也記，避免每次開面板都重抓）。 */
+  evidence: Array<{ title: string; url?: string; source?: string; publishedAt?: string | null; dateChecked?: boolean }>;
   status: AlertStatus;
   createdAt: string;
 }
@@ -253,6 +256,31 @@ function rowToAlert(r: any): StrategyAlert {
     evidence, status: r.status ?? "new",
     createdAt: new Date(r.createdAt).toISOString(),
   };
+}
+
+/**
+ * 2026-09-30 之前存的情報沒有原文發布日（scout 沒給）。打開策略監測時在背景補：
+ * 每則 evidence 只去原文找一次（dateChecked），找到／找不到都寫回 DB。
+ * 不擋 overview——這次開面板看到「發布日不明」，下次開就有了。
+ */
+const backfilling = new Set<number>();
+export function backfillEvidenceDates(alerts: StrategyAlert[]): void {
+  const todo = alerts.filter((a) => !backfilling.has(a.id) && a.evidence.some((e) => !e.dateChecked && !e.publishedAt));
+  if (!todo.length) return;
+  for (const a of todo) backfilling.add(a.id);
+  void (async () => {
+    for (const a of todo) {
+      try {
+        const evidence = await Promise.all(a.evidence.map(async (e) =>
+          e.dateChecked || e.publishedAt ? e : { ...e, publishedAt: await fetchPublishedDate(e.url), dateChecked: true }));
+        await localPool.execute(`UPDATE strategy_alerts SET evidence = ? WHERE id = ?`, [JSON.stringify(evidence), a.id]);
+      } catch (err) {
+        console.warn("[strategyMonitor] backfill dates failed", a.id, (err as Error).message);
+      } finally {
+        backfilling.delete(a.id);
+      }
+    }
+  })();
 }
 
 export async function listWatches(brandId: number): Promise<StrategyWatch[]> {
@@ -463,10 +491,14 @@ export async function runStrategyScan(watch: StrategyWatch, opts?: { now?: Date 
       [watch.scope, watch.scopeId, key, DEDUPE_DAYS],
     );
     if ((dup as any[]).length) continue;
-    const evidence = a.evidence.map((i) => {
+    // 2026-09-30：發布日回原文讀；只有 Tavily 搜尋 API 自己回的 published_date 可以當備援——
+    // Gemini／Vertex 那幾條是模型「寫」出來的日期，不採用。
+    const evidence = await Promise.all(a.evidence.map(async (i) => {
       const it = items[i]!;
-      return { title: it.title, url: it.url, source: it.source, publishedAt: it.publishedAt };
-    });
+      const fromPage = await fetchPublishedDate(it.url);
+      const fromApi = it.scoutId === "tavily" ? normalizeDate(it.publishedAt) : null;
+      return { title: it.title, url: it.url, source: it.source, publishedAt: fromPage ?? fromApi, dateChecked: true };
+    }));
     await localPool.execute(
       `INSERT INTO strategy_alerts (userId, brandId, scope, scopeId, kind, anchor, alertKey, title, summary, suggestion, evidence, status)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'new')`,

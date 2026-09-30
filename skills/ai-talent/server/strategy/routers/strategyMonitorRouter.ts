@@ -13,7 +13,7 @@ import { assertStrategyMonitoringAllowed, planQuotaFor } from "../../platform/co
 import localPool from "../../localDb";
 import {
   MANUAL_SCAN_COOLDOWN_HOURS, SCAN_INTERVAL_DAYS,
-  ensureWatches, listAlerts, runStrategyScan, setAlertStatus, unreadAlertSummary, updateWatch,
+  backfillEvidenceDates, ensureWatches, listAlerts, runStrategyScan, setAlertStatus, unreadAlertSummary, updateWatch,
   type StrategyWatch,
 } from "../core/strategyMonitor";
 
@@ -49,6 +49,7 @@ export const strategyMonitorRouter = router({
 
       const watches = await ensureWatches({ userId, brandId: input.brandId });
       const alerts = await listAlerts(input.brandId);
+      backfillEvidenceDates(alerts);   // 舊情報在背景補原文發布日（2026-09-30）
       const [pRows]: any = await localPool.execute(
         `SELECT id, name FROM products WHERE brandId = ? AND userId = ? LIMIT 50`, [input.brandId, userId],
       );
