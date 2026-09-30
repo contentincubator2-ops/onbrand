@@ -25,6 +25,8 @@ import { router, protectedProcedure } from "../../platform/core/trpc";
 import localPool from "../../localDb";
 import { buildCampaignPlan, inferCampaignSettings, type CampaignPlan } from "../core/campaignPlan";
 import { isHiddenContentPlatform, isHiddenHistoryItem } from "../../platform/core/planGate";
+import { ownedProductIds, resolveProductScope } from "../core/eventProductScope";
+import { invalidateBrandPrefix } from "../core/brandContext";
 
 const settingsInput = z.object({
   type: z.string().max(40),
@@ -35,6 +37,8 @@ const settingsInput = z.object({
   sessions: z.string().max(300).optional(),
   signupUrl: z.string().max(500).optional(),
   partners: z.object({ kol: z.boolean().optional(), cobrand: z.boolean().optional() }).optional(),
+  /** 搭配產品／純品牌。沒傳＝還沒選（見 core/eventProductScope.ts）。 */
+  productScope: z.enum(["brand", "products"]).optional(),
 });
 
 const planItemInput = z.object({
@@ -136,6 +140,8 @@ export const campaignRouter = router({
         settings: visibleSettings(pos.campaign),
         plan: visiblePlan((pos.campaignPlan ?? null) as CampaignPlan | null),
         products: (prodRows as any[]).map((p) => ({ id: Number(p.id), name: String(p.name) })),
+        /** "products"｜"brand"｜null（還沒選）。event_products 有資料時一律是 products。 */
+        productScope: resolveProductScope(pos.campaign?.productScope, (prodRows as any[]).length),
         /** 舊的 11 段得獎 brief 還在不在——進階模式的入口要不要亮由這個決定。 */
         hasLegacyBrief: ["brief", "smp", "creative", "awards"].some((k) => !!pos?.[k]),
       };
@@ -167,15 +173,30 @@ export const campaignRouter = router({
       productIds: z.array(z.number().int().positive()).max(50).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
-      await patchPositioning(input.eventId, ctx.user!.id, "campaign", input.settings);
-      if (input.productIds !== undefined) {
+      const userId = ctx.user!.id;
+      const row = await loadEvent(input.eventId, userId);
+      // 純品牌活動不綁產品：畫面上選了「純品牌」就把綁定清掉，不留一份跟選擇矛盾的資料。
+      const wantIds = input.settings.productScope === "brand" ? [] : input.productIds;
+      let scope = input.settings.productScope;
+      if (wantIds !== undefined) {
+        const ids = await ownedProductIds(wantIds, userId, Number(row.brandId) || null);
         await localPool.execute(`DELETE FROM event_products WHERE eventId = ?`, [input.eventId]);
-        for (const pid of input.productIds) {
+        for (const pid of ids) {
           await localPool.execute(
             `INSERT IGNORE INTO event_products (eventId, productId) VALUES (?, ?)`, [input.eventId, pid],
           );
         }
+        // events.productId 是舊的「主要產品」欄位，活動列表與定位流程在 event_products
+        // 是空的時候會退回去讀它——不同步的話，改成純品牌之後舊產品還會冒出來。
+        await localPool.execute(
+          `UPDATE events SET productId = ? WHERE id = ? AND userId = ?`, [ids[0] ?? null, input.eventId, userId],
+        );
+        if (ids.length > 0) scope = "products";
+        else if (scope === "products") scope = undefined;   // 說要搭產品卻一個都沒選＝還沒選
+        if (row.brandId) invalidateBrandPrefix(Number(row.brandId));
       }
+      const { productScope: _drop, ...rest } = input.settings;
+      await patchPositioning(input.eventId, userId, "campaign", scope ? { ...rest, productScope: scope } : rest);
       return { ok: true };
     }),
 

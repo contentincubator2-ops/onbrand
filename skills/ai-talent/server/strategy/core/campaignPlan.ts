@@ -26,6 +26,10 @@
 import localPool from "../../localDb.js";
 import { buildTaskCatalogIndex, type CatalogTask } from "../../content/core/taskCatalogIndex.js";
 import { isHiddenContentPlatform } from "../../platform/core/planGate.js";
+import {
+  loadEventProducts, productScopeBrief, resolveProductScope,
+  type ProductScope, type ScopedProduct,
+} from "./eventProductScope.js";
 
 // ── 語彙（與 client/src/v2/strategy/lib/campaignSchema.ts 同一份）───────────
 // server 不能 import client 的檔案，所以這裡自己宣告一份，由
@@ -55,6 +59,8 @@ export interface CampaignSettings {
   sessions?: string;
   signupUrl?: string;
   partners?: { kol?: boolean; cobrand?: boolean };
+  /** 搭配產品／純品牌。沒有這個 key＝還沒選（見 eventProductScope.ts）。 */
+  productScope?: ProductScope;
 }
 
 export interface Beat {
@@ -283,7 +289,7 @@ function safeJSON<T>(text: string, fallback: T): T {
 /** 活動 + 它綁的產品，組成產生企劃需要的事實。 */
 async function eventFacts(eventId: number, userId: number): Promise<{
   name: string; brandId: number; brandName: string; startAt: Date | null; endAt: Date | null;
-  settings: CampaignSettings; products: Array<{ id: number; name: string; facts: string }>;
+  settings: CampaignSettings; products: ScopedProduct[];
 } | null> {
   const [rows]: any = await localPool.execute(
     `SELECT e.id, e.name, e.brandId, e.startAt, e.endAt, e.positioning, b.name AS brandName
@@ -298,33 +304,7 @@ async function eventFacts(eventId: number, userId: number): Promise<{
     : (row.positioning ?? {});
   const settings: CampaignSettings = { type: "", mechanic: "", channels: [], ...(pos?.campaign ?? {}) };
 
-  const [prodRows]: any = await localPool.execute(
-    `SELECT p.id, p.name, p.positioning
-       FROM event_products ep JOIN products p ON p.id = ep.productId
-      WHERE ep.eventId = ? LIMIT 20`,
-    [eventId],
-  );
-  const products = (prodRows as any[]).map((p) => {
-    const pp = typeof p.positioning === "string"
-      ? (() => { try { return JSON.parse(p.positioning); } catch { return {}; } })()
-      : (p.positioning ?? {});
-    const first = (paths: string[]): string => {
-      for (const path of paths) {
-        const v = path.split(".").reduce<any>((acc, k) => (acc == null ? acc : acc[k]), pp);
-        if (typeof v === "string" && v.trim()) return v.trim();
-      }
-      return "";
-    };
-    // 路徑順序跟 client/.../lib/productFacts.ts 同一份
-    const facts = [
-      first(["facts.price", "price", "core.price"]) && `售價 ${first(["facts.price", "price", "core.price"])}`,
-      first(["facts.weight", "weight"]) && `重量 ${first(["facts.weight", "weight"])}`,
-      first(["facts.servings", "servings"]) && `${first(["facts.servings", "servings"])}`,
-      first(["core.zhTagline"]) && `標語「${first(["core.zhTagline"])}」`,
-      first(["competition.uniqueUsp"]) && `賣點：${first(["competition.uniqueUsp"]).slice(0, 80)}`,
-    ].filter(Boolean).join("｜");
-    return { id: Number(p.id), name: String(p.name), facts };
-  });
+  const products = await loadEventProducts(eventId);
 
   return {
     name: String(row.name), brandId: Number(row.brandId), brandName: String(row.brandName ?? ""),
@@ -347,6 +327,8 @@ export interface InferredSettings {
   goal: string;
   channels: string[];
   productIds: number[];
+  /** 推斷出來的搭配範圍：挑得到產品＝products，挑不到＝brand。使用者已經選了就不會用到。 */
+  productScope: ProductScope;
   /** 講給使用者看的一行摘要（猜錯才需要點開改）。 */
   summary: string;
 }
@@ -358,6 +340,7 @@ const INFER_SYSTEM = `你在幫行銷人員把一段隨手寫的活動說明，�
 - mechanic 要盡量逐字保留使用者寫的機制（折數、門檻、期限、限量）；他沒寫就留空字串。
 - channels 只能從提供的清單裡挑，挑 2–3 個最合理的。
 - productIds 只能從提供的產品清單裡挑，挑使用者明確提到或明顯對應的；不確定就回空陣列。
+  活動講的是整個品牌、或沒有指向任何一個產品時，也回空陣列（代表純品牌活動）。
 - 只輸出 JSON，不要任何說明文字。`;
 
 /**
@@ -379,8 +362,15 @@ export async function inferCampaignSettings(args: {
   const facts = await eventFacts(args.eventId, args.userId);
   if (!facts) throw new Error("找不到這個活動");
 
-  const productList = facts.products.length
-    ? facts.products.map((p) => `- id ${p.id}｜${p.name}`).join("\n")
+  // 2026-09-30：候選是**這個品牌的所有產品**。以前拿的是 event_products（這檔活動
+  // 已經綁的），新活動一個都還沒綁，模型永遠看到「還沒有建立產品」，推不出任何產品。
+  const [brandProdRows]: any = await localPool.execute(
+    `SELECT id, name FROM products WHERE userId = ? AND brandId = ? ORDER BY id LIMIT 60`,
+    [args.userId, facts.brandId],
+  );
+  const brandProducts = ((brandProdRows as any[]) ?? []).map((p) => ({ id: Number(p.id), name: String(p.name) }));
+  const productList = brandProducts.length
+    ? brandProducts.map((p) => `- id ${p.id}｜${p.name}`).join("\n")
     : "（這個品牌還沒有建立產品）";
 
   const typeList = CAMPAIGN_TYPE_IDS.map((t) => `- ${t}`).join("\n");
@@ -412,7 +402,7 @@ export async function inferCampaignSettings(args: {
   const channels = (Array.isArray(parsed?.channels) ? parsed.channels : [])
     .map((c: any) => String(c).toLowerCase())
     .filter((c: string) => (PLANNABLE_CHANNELS as readonly string[]).includes(c));
-  const validIds = new Set(facts.products.map((p) => p.id));
+  const validIds = new Set(brandProducts.map((p) => p.id));
   const productIds = (Array.isArray(parsed?.productIds) ? parsed.productIds : [])
     .map((n: any) => Number(n)).filter((n: number) => validIds.has(n));
 
@@ -422,6 +412,7 @@ export async function inferCampaignSettings(args: {
     goal: typeof parsed?.goal === "string" ? parsed.goal.trim().slice(0, 300) : "",
     channels: channels.length ? channels : ["facebook", "instagram"],
     productIds,
+    productScope: productIds.length ? "products" : "brand",
     summary: typeof parsed?.summary === "string" ? parsed.summary.trim().slice(0, 60) : "",
   };
 }
@@ -433,6 +424,8 @@ const SYSTEM = `你是負責「檔期宣傳」的資深行銷企劃。使用者�
 - 每一格的「要講什麼」是一句話的內容方向（20–45 字），要具體到寫的人不必再想——
   講這一篇的切角與要強調的事實，不是「宣傳活動」這種空話。
 - 優惠機制、售價、期限、份量這些數字，只能用使用者提供的，不准自己編。
+- 【活動搭配】寫的是這檔活動的主角：單一產品就每篇圍繞它；多產品聯合要讓每個產品都
+  輪到、並交代為什麼放在一起；純品牌活動就不要自己挑產品當主打。
 - 同一個切角不要重複用；預熱階段不要把折數講完（那是開賣那一格的工作）。
 - 只輸出 JSON，不要任何說明文字。`;
 
@@ -467,9 +460,9 @@ export async function buildCampaignPlan(args: {
     .map((b, i) => `${i}. ${b.date}｜${b.phase}（${PHASE_PURPOSE[b.phase]}）`)
     .join("\n");
 
-  const productBlock = facts.products.length
-    ? facts.products.map((p) => `- ${p.name}${p.facts ? `：${p.facts}` : ""}`).join("\n")
-    : "（這檔活動沒有綁定特定產品）";
+  // 單一產品／多產品聯合／純品牌——三種的企劃長得不一樣（見 eventProductScope.ts）。
+  const scope = resolveProductScope(s.productScope, facts.products.length);
+  const productBlock = productScopeBrief(scope, facts.products);
 
   const user = [
     `【品牌】${facts.brandName}`,
@@ -480,7 +473,7 @@ export async function buildCampaignPlan(args: {
     s.venue ? `【地點】${s.venue}` : "",
     s.sessions ? `【場次】${s.sessions}` : "",
     s.signupUrl ? `【報名連結】${s.signupUrl}` : "",
-    `【適用產品】\n${productBlock}`,
+    `【活動搭配】\n${productBlock}`,
     `【要排的檔期格子】\n${beatList}`,
     `【候選任務卡（只能從這裡挑）】\n${cardMenu}`,
     "",
