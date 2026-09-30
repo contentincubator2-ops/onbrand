@@ -73,7 +73,7 @@ interface NavItem {
   /** 2026-09-27：內容層可自行加入的入口 id（跟 server navPrefsRouter.NAV_ITEM_IDS 同一份）。 */
   id?: string;
   /** 2026-09-27：內容層 rail 分兩段——user＝這個品牌自己加的、fixed＝專案／行事曆／活動。 */
-  group?: "user" | "fixed";
+  group?: "top" | "user" | "fixed";
   /** 2026-09-27：挑選清單分組：通路 or 工具。 */
   kind?: "channel" | "tool";
   /** 這些路徑也算這個入口（行事曆合一：/calendar 與 /tasks/calendar）。 */
@@ -228,17 +228,23 @@ function buildNavItems(lang: "zh-TW" | "en", userEmail?: string | null, currentP
   const userItems = (userNavItems ?? []).map((id) => byId.get(id)).filter(Boolean) as NavItem[];
   // 2026-09-27（CJ「用本週企劃取代行事曆」「登入後直接落在本週企劃」）：本週企劃排第一，
   // 已排程／已發布與活動企劃的格子都在它的週曆上；/calendar 轉到 /planner。
-  const fixed: NavItem[] = [
-    { to: "/planner", label: en ? "This week" : "本週企劃", icon: <FontAwesomeIcon icon={faCalendarDays} />, group: "fixed",
+  // 2026-09-30 CJ：順序改成 本週企劃（最上）→ 各平台 → ＋ → 靈感、專案、活動。
+  const top: NavItem[] = [
+    { to: "/planner", label: en ? "This week" : "本週企劃", icon: <FontAwesomeIcon icon={faCalendarDays} />, group: "top",
       matchPrefix: "/planner", alsoMatch: ["/calendar"],
       tooltip: en ? "Plan the week with your content director" : "跟內容總監排這一週" },
+  ];
+  const fixed: NavItem[] = [
+    // 2026-09-29 CJ：七日發布台改成靈感舞台；舊的 /theater 轉址到 /inspiration。
+    { to: "/inspiration", label: en ? "Idea stage" : "靈感舞台", icon: <FontAwesomeIcon icon={ICON.ideas} />, matchPrefix: "/inspiration", group: "fixed",
+      tooltip: en ? "Agents pitch angles; pick one to write" : "幾位 agent 各想切角，挑一個開始寫" },
     { to: "/projects", label: en ? "Projects" : "專案", icon: <FontAwesomeIcon icon={faFolderOpen} />, group: "fixed",
       tooltip: en ? "Everything you've produced, by project" : "你產出過的內容，依專案整理" },
     // 2026-09-25（CJ「在內容層增加活動的 mission tray」）：卡片由策略層的宣傳企劃長出來。
     { to: "/campaigns", label: en ? "Campaigns" : "活動", icon: <FontAwesomeIcon icon={faBullhorn} />, matchPrefix: "/campaigns", group: "fixed",
       tooltip: en ? "Write out a campaign plan, post by post" : "照活動企劃一篇一篇寫" },
   ];
-  return [...userItems.map((it) => ({ ...it, group: "user" as const })), ...fixed];
+  return [...top, ...userItems.map((it) => ({ ...it, group: "user" as const })), ...fixed];
 }
 
 /**
@@ -267,10 +273,8 @@ function navCatalog(lang: "zh-TW" | "en", allowedTaskRoutes?: Set<string> | null
       tooltip: en ? "Long-form articles, brand columns, case studies, product page copy" : "官網長文 / 品牌專欄 / 案例深度 / 產品頁文案" },
     { id: "case", kind: "tool", to: "/tasks/case", label: en ? "Cases" : "案例", icon: <FontAwesomeIcon icon={faBookBookmark} />, matchPrefix: "/tasks/case",
       tooltip: en ? "Case library, filed by standard" : "依標準建檔的案例庫" },
-    // 2026-09-29 CJ：七日發布台改成靈感舞台（id 沿用 theater，存過的側欄設定不用搬）。
-    // 舊的 /theater 頁面還在，只是側欄不再指過去。
-    { id: "theater", kind: "tool", to: "/inspiration", label: en ? "Idea stage" : "靈感舞台", icon: <FontAwesomeIcon icon={ICON.ideas} />, matchPrefix: "/inspiration",
-      tooltip: en ? "Agents pitch angles; pick one to write" : "幾位 agent 各想切角，挑一個開始寫" },
+    // 2026-09-30 CJ：靈感舞台改成固定入口（＋ 下方），不再是可自選項目；
+    // 存過 "theater" 的品牌設定在 userNavItems 會被濾掉，不用搬資料。
   ];
   return all.filter((it) => {
     if (!it.to.startsWith("/tasks/")) return true;
@@ -1020,14 +1024,17 @@ function IconBar({
           const isActive = myMatches && !beatenByMoreSpecific;
           return <IconNavLink key={item.to} item={item} active={isActive} onClick={() => onNavigate(item.to)} />;
           };
-          // 2026-09-27：內容層 rail 分兩段——上段是這個品牌自己加的（＋ 在最後），下段固定三個。
+          // 2026-09-30：內容層 rail 分三段——最上本週企劃；中段是這個品牌自己加的平台（＋ 在最後）；下段固定靈感、專案、活動。
           // 策略層、成效層的 rail 沒有 group，照舊整排渲染。
           const isContentRail = NAV_ITEMS.some((it) => it.group);
           if (!isContentRail) return NAV_ITEMS.map(renderItem);
+          const topGroup = NAV_ITEMS.filter((it) => it.group === "top");
           const userGroup = NAV_ITEMS.filter((it) => it.group === "user");
           const fixedGroup = NAV_ITEMS.filter((it) => it.group === "fixed");
           return (
             <>
+              {topGroup.map(renderItem)}
+              <div style={{ height: 1, background: "#EDEDED", margin: "6px 14px" }} />
               {userGroup.map(renderItem)}
               <button
                 type="button"
