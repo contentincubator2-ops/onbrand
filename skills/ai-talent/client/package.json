@@ -22,7 +22,6 @@
     "@trpc/server": "^11.0.0",
     "framer-motion": "^12.43.0",
     "html2canvas": "^1.4.1",
-    "lucide-react": "^1.14.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-markdown": "^9.1.0",
