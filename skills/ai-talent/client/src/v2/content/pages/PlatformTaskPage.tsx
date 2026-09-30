@@ -2359,7 +2359,7 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                       })()}
                       {/* 2026-09-29（CJ「爆款結構卡上都要有這些文字：參考貼文、副標題、數字是原貼文的」）：
                           爆款卡直接印數字＋量測年月，不用點進詳情才看得到。副標題就是 description。
-                          （CJ 同日「備註的地方都拿掉」：卡面不印 caveat，只留在「出處與說明」詳情。） */}
+                          （CJ 同日「備註的地方都拿掉」：卡面與「出處與說明」抽屜都不印 caveat，只留在資料層。） */}
                       {frontCardKind(task) === "viral" && (() => {
                         const raw = (task as any).source ?? {};
                         return (
