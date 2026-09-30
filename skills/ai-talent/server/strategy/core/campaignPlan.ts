@@ -296,7 +296,7 @@ export function cobrandBlock(mechanic: string, brandName: string): PartnerBlock 
   };
 }
 
-function safeJSON<T>(text: string, fallback: T): T {
+export function safeJSON<T>(text: string, fallback: T): T {
   const tryParse = (s: string): T | undefined => { try { return JSON.parse(s); } catch { return undefined; } };
   const m = text.match(/```(?:json)?\s*([\s\S]*?)```/);
   const raw = (m ? m[1]! : text).trim();
@@ -312,7 +312,7 @@ function safeJSON<T>(text: string, fallback: T): T {
 }
 
 /** 活動 + 它綁的產品，組成產生企劃需要的事實。 */
-async function eventFacts(eventId: number, userId: number): Promise<{
+export async function eventFacts(eventId: number, userId: number): Promise<{
   name: string; brandId: number; brandName: string; startAt: Date | null; endAt: Date | null;
   settings: CampaignSettings; products: ScopedProduct[];
 } | null> {

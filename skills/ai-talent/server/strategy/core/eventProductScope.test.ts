@@ -127,3 +127,15 @@ describe("寫文案時讀得到活動搭配（品牌大腦的活動區塊）", (
     expect(prefix).not.toContain("活動搭配");
   });
 });
+
+describe("寫文案時讀得到宣傳企劃的交接內容", () => {
+  it("一句話訴求與每一段的訊息都進活動區塊，照檔期順序", async () => {
+    const brandId = freshBrand();
+    db.event = [{ name: "上市活動", startAt: null, endAt: null, positioning: {
+      campaignPlan: { smp: "你的品牌故事，從今天開始被看見", phaseMessages: { lastcall: "只到 12/25", teaser: "品牌越發越模糊" }, items: [] },
+    } }];
+    const prefix = await buildBrandPrefix(brandId, null, 505);
+    expect(prefix).toContain("【活動訴求】你的品牌故事，從今天開始被看見");
+    expect(prefix).toContain("【各段訊息】預熱：品牌越發越模糊；倒數：只到 12/25");
+  });
+});

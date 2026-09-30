@@ -17,6 +17,7 @@
  *   trayList    — 內容層 tray 的首頁：有企劃的活動 + 進度
  *   markWritten — 某一格寫完了，回貼產出（策略層的 ✓ 從這裡來）
  *   setLock     — 定稿／解鎖（2026-09-30 CJ「定稿一次鎖整份」）
+ *   chat        — 跟內容企劃對話：回覆＋提案（不寫入；套用走 savePlan）
  *   setBackdrop — 策略畫面的底圖模板（用戶自己選；不受定稿影響，它不是企劃內容）
  *
  * 定稿之後 saveSettings／generate／savePlan 一律拒絕——鎖的是整份，不是只鎖
@@ -29,6 +30,7 @@ import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure } from "../../platform/core/trpc";
 import localPool from "../../localDb";
 import { buildCampaignPlan, inferCampaignSettings, type CampaignPlan } from "../core/campaignPlan";
+import { runCampaignChat } from "../core/campaignChat";
 import { isHiddenContentPlatform, isHiddenHistoryItem } from "../../platform/core/planGate";
 import { ownedProductIds, resolveProductScope } from "../core/eventProductScope";
 import { invalidateBrandPrefix } from "../core/brandContext";
@@ -265,6 +267,33 @@ export const campaignRouter = router({
         lockedAt: null,
       });
       return { ok: true };
+    }),
+
+  /**
+   * 跟內容企劃說一句話。只回提案、不寫入——套用由畫面送 savePlan（見 core/campaignChat.ts）。
+   * 定稿後不能再改企劃，所以對話也跟著擋，免得提了一份套用不了的提案。
+   */
+  chat: protectedProcedure
+    .input(z.object({
+      eventId: z.number().int().positive(),
+      message: z.string().min(1).max(800),
+      phase: z.enum(PHASE_KEYS).nullable().optional(),
+      history: z.array(z.object({ role: z.enum(["user", "assistant"]), content: z.string().max(1200) })).max(12).optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const row = await loadEvent(input.eventId, ctx.user!.id);
+      const pos = parsePositioning(row.positioning);
+      assertUnlocked(pos);
+      const plan = visiblePlan((pos.campaignPlan ?? null) as CampaignPlan | null);
+      if (!plan?.items?.length) throw new TRPCError({ code: "BAD_REQUEST", message: "還沒有企劃，先排出企劃再來討論" });
+      try {
+        return await runCampaignChat({
+          eventId: input.eventId, userId: ctx.user!.id, plan,
+          message: input.message, phase: input.phase ?? null, history: input.history,
+        });
+      } catch (e: any) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: String(e?.message ?? e).slice(0, 300) });
+      }
     }),
 
   /** 底圖模板。null＝回到依產業自動挑。模板清單在前端（campaignBackdrops.ts），這裡只擋明顯不對的值。 */
