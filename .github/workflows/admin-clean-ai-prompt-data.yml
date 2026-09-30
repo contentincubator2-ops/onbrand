@@ -6,7 +6,7 @@ name: Admin — Clean AI prompt library data (dev only)
 #
 # - 只對 dev（environment: dev）。正式站的程式還在用這些資料，不能清。
 # - mode=dry-run（預設）只數有幾筆，不改任何東西。
-# - mode=apply 先把要刪的原值備份到 VM 的 /opt/onbrand/shared/backups/，再用
+# - mode=apply 先把要刪的原值備份到 VM 登入帳號的 ~/backups/，再用
 #   JSON_REMOVE 移除；只動這三個鍵，positioning 其他內容不碰。
 # - 清完這支工作流程本身也要刪掉（CJ「不要殘存」）。
 
@@ -44,8 +44,9 @@ jobs:
           set -euo pipefail
           cd /opt/onbrand/current/skills/ai-talent
           set -a; source .env; set +a
-          mkdir -p /opt/onbrand/shared/backups
-          export BACKUP="/opt/onbrand/shared/backups/ai-prompt-data-$(date -u +%Y%m%dT%H%M%SZ).json"
+          # 備份放登入帳號的家目錄：/opt/onbrand/shared/backups 這個帳號寫不進去（9/30 第一次 apply 撞到 EACCES，當時什麼都沒刪）。
+          mkdir -p "$HOME/backups"
+          export BACKUP="$HOME/backups/ai-prompt-data-$(date -u +%Y%m%dT%H%M%SZ).json"
           node <<'JS'
           const mysql = require("./node_modules/mysql2/promise");
           (async () => {
