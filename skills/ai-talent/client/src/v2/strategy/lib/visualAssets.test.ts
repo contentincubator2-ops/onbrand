@@ -7,14 +7,20 @@
  */
 import { describe, expect, it } from "vitest";
 import {
-  VISUAL_ASSETS, DEFAULT_VISUAL_KEYS, visualSpecOf, visualHasContent, visibleVisualKeys,
+  VISUAL_ASSETS, DEFAULT_VISUAL_KEYS, PINNED_VISUAL_KEYS, visualSpecOf, visualHasContent, visibleVisualKeys,
 } from "./visualAssets";
 
 describe("預設五張", () => {
   it("就是 CJ 指定的那五張，而且順序固定", () => {
     expect(visibleVisualKeys([], {}, 0)).toEqual([
-      "colors_dna", "logo", "imagery_style", "icon_style", "photos",
+      "colors_dna", "logo", "imagery_style", "icon_style", "library",
     ]);
+  });
+
+  it("素材庫是常駐卡：一定在預設裡、而且取代了只看得到品牌照的「品牌照片」卡", () => {
+    for (const k of PINNED_VISUAL_KEYS) expect(DEFAULT_VISUAL_KEYS as readonly string[]).toContain(k);
+    expect(PINNED_VISUAL_KEYS).toContain("library");
+    expect(VISUAL_ASSETS.some((a) => a.key === "photos")).toBe(false);
   });
 
   it("每一張都真的在清單裡", () => {
@@ -69,6 +75,11 @@ describe("visualHasContent 依卡片型態判斷", () => {
   it("風格卡：描述或提示詞任一有值就算", () => {
     expect(visualHasContent("imagery_style", { text: "" , prompt: "" })).toBe(false);
     expect(visualHasContent("imagery_style", { prompt: "soft window light" })).toBe(true);
+  });
+
+  it("素材庫看的是張數（內容在 asset_photos，不在 _assets）", () => {
+    expect(visualHasContent("library", null)).toBe(false);
+    expect(visualHasContent("library", { count: 3 })).toBe(true);
   });
 
   it("不認得的 key 一律回 false，不要猜", () => {

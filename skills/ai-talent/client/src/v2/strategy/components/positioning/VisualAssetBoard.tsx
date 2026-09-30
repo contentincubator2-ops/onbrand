@@ -7,8 +7,9 @@
  * 卡片外框用 TaskCardShell（跟任務卡／文字頁同一個殼）。每一張點下去開的視窗
  * 依卡片型態不同，但只有四種：
  *   dna     色票：上傳的圖抽出來、或自己鎖定
- *   upload  標誌檔
- *   gallery 圖片庫（品牌照片／範本）
+ *   upload  標誌檔（可直接上傳，見 BrandAssetEditor LogoFields）
+ *   gallery 圖片庫（品牌範本）
+ *   library 素材庫：全站上傳過的圖（常駐、不能刪，見 BrandLibrary）
  *   style   上傳參考圖 → AI 歸納風格描述 + AI 提示詞
  *   text    純文字規範（沿用 InlineAssetCard，不重寫編輯器）
  *
@@ -25,9 +26,10 @@ import {
 import { TaskCardShell } from "../../../content/components/TaskCardShell";
 import InlineAssetCard from "./InlineAssetCard";
 import AssetPhotoGallery from "./AssetPhotoGallery";
+import BrandLibrary, { useBrandLibrary } from "./BrandLibrary";
 import { trpc } from "../../../../lib/trpc";
 import {
-  VISUAL_ASSETS, visualSpecOf, visualHasContent, visibleVisualKeys, type VisualAssetSpec,
+  VISUAL_ASSETS, PINNED_VISUAL_KEYS, visualSpecOf, visualHasContent, visibleVisualKeys, type VisualAssetSpec,
 } from "../../lib/visualAssets";
 
 export interface VisualCustomCard {
@@ -37,7 +39,7 @@ export interface VisualCustomCard {
 }
 
 export default function VisualAssetBoard({
-  brandId, assets, added, dnaSwatches, lang, readOnly,
+  brandId, assets: assetsIn, added, dnaSwatches, lang, readOnly,
   onChange, onAddCard, onDeleteCard,
   customCards, onEditCustomCard, onDeleteCustomCard,
   renderDna, renderLogo,
@@ -64,6 +66,18 @@ export default function VisualAssetBoard({
   const [openKey, setOpenKey] = React.useState<string | null>(null);
   const [pickerOpen, setPickerOpen] = React.useState(false);
 
+  // 素材庫與標誌的內容不全在 _assets 裡：素材庫在 asset_photos，標誌可能只存在
+  // brands.logoUrl（FB 抓的、基本資料頁上傳的）。合進 assets 再判斷「已填」與縮圖。
+  const { items: libraryItems } = useBrandLibrary(brandId);
+  const brandQ = (trpc as any).brand.get.useQuery({ id: brandId }, { enabled: brandId > 0, refetchOnWindowFocus: false });
+  const brandLogo: string | null = (brandQ.data as any)?.logoUrl ?? null;
+  const logoUrl: string | null = assetsIn?.logo?.primaryUrl || assetsIn?.logo?.url || brandLogo;
+  const assets: Record<string, any> = {
+    ...assetsIn,
+    library: { count: libraryItems.length },
+    ...(logoUrl ? { logo: { ...(assetsIn?.logo ?? {}), primaryUrl: logoUrl } } : {}),
+  };
+
   const keys = visibleVisualKeys(added, assets, dnaSwatches.length);
   const hidden = VISUAL_ASSETS.filter((a) => !keys.includes(a.key));
   const customs = customCards ?? [];
@@ -79,6 +93,7 @@ export default function VisualAssetBoard({
     if (spec.kind === "style") return String(v?.text ?? v?.prompt ?? "").trim();
     if (spec.kind === "upload") return v?.primaryUrl || v?.url ? L("已上傳", "Uploaded") : "";
     if (spec.kind === "gallery") return "";
+    if (spec.kind === "library") return libraryItems.length ? L(`${libraryItems.length} 張圖`, `${libraryItems.length} images`) : "";
     return String(v?.text ?? "").trim();
   };
 
@@ -119,10 +134,18 @@ export default function VisualAssetBoard({
                       <span key={i} className="flex-1" style={{ background: hex }} />
                     ))}
                   </span>
+                ) : spec.kind === "upload" && logoUrl ? (
+                  <img src={logoUrl} alt="" className="max-h-[70%] max-w-[70%] object-contain" />
+                ) : spec.kind === "library" && libraryItems.length > 0 ? (
+                  <span className="grid grid-cols-3 w-full h-full gap-px">
+                    {libraryItems.slice(0, 6).map((it) => (
+                      <img key={it.key} src={it.url} alt="" loading="lazy" className="w-full h-full object-cover" />
+                    ))}
+                  </span>
                 ) : (
                   <FontAwesomeIcon icon={spec.icon} className="text-4xl text-default-400" />
                 )}
-                {filled && spec.kind !== "dna" && (
+                {filled && spec.kind !== "dna" && spec.kind !== "library" && (
                   <span className="absolute top-2 right-2">
                     <Chip size="sm" variant="flat" color="success"
                       startContent={<FontAwesomeIcon icon={faCheck} className="text-tiny ml-1" />}>
@@ -130,7 +153,7 @@ export default function VisualAssetBoard({
                     </Chip>
                   </span>
                 )}
-                {!readOnly && deleteBtn(() => onDeleteCard(key))}
+                {!readOnly && !PINNED_VISUAL_KEYS.includes(key) && deleteBtn(() => onDeleteCard(key))}
               </>}
             >
               <p className="text-small font-semibold leading-snug">{en ? spec.labelEn : spec.labelZh}</p>
@@ -139,7 +162,9 @@ export default function VisualAssetBoard({
               </p>
               <div className="mt-auto pt-2 flex items-center gap-2 border-t border-divider">
                 <span className="text-tiny font-medium text-default-700 truncate">
-                  {filled ? L("編輯 →", "Edit →") : L("開始設定 →", "Set it up →")}
+                  {spec.kind === "library"
+                    ? (filled ? L("挑圖、上傳 →", "Browse & upload →") : L("上傳第一張 →", "Upload your first →"))
+                    : filled ? L("編輯 →", "Edit →") : L("開始設定 →", "Set it up →")}
                 </span>
               </div>
             </TaskCardShell>
@@ -188,7 +213,7 @@ export default function VisualAssetBoard({
       </div>
 
       {/* ── 開卡：依型態決定視窗內容 ── */}
-      <Modal isOpen={!!openKey} onClose={() => setOpenKey(null)} size="2xl" scrollBehavior="inside">
+      <Modal isOpen={!!openKey} onClose={() => setOpenKey(null)} size={openSpec?.kind === "library" ? "4xl" : "2xl"} scrollBehavior="inside">
         <ModalContent>
           <ModalHeader className="flex flex-col gap-1">
             <span className="text-medium font-semibold">{openSpec ? (en ? openSpec.labelEn : openSpec.labelZh) : ""}</span>
@@ -204,6 +229,9 @@ export default function VisualAssetBoard({
                 scopeId={brandId}
                 scopeLabel={en ? "brand" : "品牌"}
               />
+            )}
+            {openSpec?.kind === "library" && (
+              <BrandLibrary brandId={brandId} lang={lang} readOnly={readOnly} />
             )}
             {openSpec?.kind === "style" && (
               <StylePanel
@@ -283,7 +311,7 @@ export default function VisualAssetBoard({
  * 風格卡的視窗：上傳幾張參考圖 → AI 歸納 → 兩段文字（人看的描述、模型吃的提示詞）。
  *
  * 「提案不自動套用」：AI 回來的東西先顯示，按了「採用」才寫進卡片；兩段都可以手改。
- * 參考圖走既有的品牌照片庫（asset_photos，scope=brand），不另開一套上傳。
+ * 參考圖走素材庫（asset_photos，全站上傳的圖），不另開一套上傳。
  */
 function StylePanel({
   brandId, spec, value, lang, readOnly, onChange,
@@ -301,10 +329,8 @@ function StylePanel({
   const [err, setErr] = React.useState("");
   const [draft, setDraft] = React.useState<{ description: string; prompt: string } | null>(null);
 
-  const photosQ = (trpc as any).assetPhoto?.list?.useQuery(
-    { brandId, scope: "brand", scopeId: brandId }, { staleTime: 30_000 },
-  ) ?? { data: [] };
-  const photos: any[] = (photosQ.data as any[]) ?? [];
+  // 參考圖從素材庫挑（2026-09-30 起不限品牌照——產品照、存下來的 AI 圖也能拿來歸納風格）。
+  const photos = useBrandLibrary(brandId).items.filter((p) => p.source !== "logo");
 
   const describeMut = (trpc as any).brand?.describeVisualStyle?.useMutation?.({
     onSuccess: (r: any) => setDraft({ description: r.description ?? "", prompt: r.prompt ?? "" }),
@@ -319,12 +345,12 @@ function StylePanel({
       <div>
         <p className="text-small font-medium mb-1">{L("挑幾張你喜歡的參考圖", "Pick a few references you like")}</p>
         <p className="text-tiny text-default-500 mb-2">
-          {L("從品牌照片庫挑（最多 5 張）。AI 只歸納風格——光線、色調、構圖、質感，不會把照片裡的人或產品寫進去。",
-             "From your brand photo library (max 5). AI describes style only — light, tone, framing, texture — never the subjects in them.")}
+          {L("從素材庫挑（最多 5 張）。AI 只歸納風格——光線、色調、構圖、質感，不會把照片裡的人或產品寫進去。",
+             "From your asset library (max 5). AI describes style only — light, tone, framing, texture — never the subjects in them.")}
         </p>
         {photos.length === 0 ? (
           <p className="text-tiny text-warning">
-            {L("照片庫還是空的——先到「品牌照片」那張卡上傳幾張。", "Your photo library is empty — upload a few under “Brand photos” first.")}
+            {L("素材庫還是空的——先到「素材庫」那張卡上傳幾張。", "Your asset library is empty — upload a few under “Asset library” first.")}
           </p>
         ) : (
           <div className="flex gap-2 flex-wrap">
@@ -332,7 +358,7 @@ function StylePanel({
               const on = picked.includes(p.url);
               return (
                 <button
-                  key={p.id}
+                  key={p.key}
                   type="button"
                   onClick={() => setPicked((cur) => on ? cur.filter((u) => u !== p.url) : cur.length >= 5 ? cur : [...cur, p.url])}
                   className={`rounded-lg overflow-hidden border-2 transition ${on ? "border-foreground" : "border-divider"}`}

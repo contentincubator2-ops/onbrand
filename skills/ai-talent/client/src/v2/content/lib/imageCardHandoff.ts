@@ -43,3 +43,31 @@ export function readImageCardHandoff(): ImageCardHandoff | null {
 export function imageCardHref(cardId: string): string {
   return `/image/${encodeURIComponent(cardId)}`;
 }
+
+/**
+ * 素材庫 → 圖片任務卡：使用者在素材庫挑了一張「用這張作圖」（2026-09-30 CJ「可以自己
+ * 選取，當成作圖使用」）。跟文案交接分開存——兩者可以同時存在（先從文字任務帶文案過來，
+ * 再從素材庫挑照片），也各自只用一次。
+ */
+const SUBJECT_KEY = "onbrand.imageCard.subjectPhoto";
+
+export interface ImageSubjectHandoff {
+  url: string;
+  /** 挑選器上顯示的名字（產品名／「素材庫」）。 */
+  label: string;
+}
+
+export function saveImageSubjectHandoff(h: ImageSubjectHandoff): void {
+  try { sessionStorage.setItem(SUBJECT_KEY, JSON.stringify(h)); } catch { /* 無痕或被擋：略過 */ }
+}
+
+/** 讀一次就清掉——重新整理或下一次開卡不該又被預選。 */
+export function takeImageSubjectHandoff(): ImageSubjectHandoff | null {
+  try {
+    const raw = sessionStorage.getItem(SUBJECT_KEY);
+    if (!raw) return null;
+    sessionStorage.removeItem(SUBJECT_KEY);
+    const v = JSON.parse(raw);
+    return typeof v?.url === "string" ? { url: v.url, label: String(v.label ?? "") } : null;
+  } catch { return null; }
+}

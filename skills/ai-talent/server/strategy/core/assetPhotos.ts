@@ -66,6 +66,16 @@ export const ASSET_PHOTO_DDL = `
 export const MAX_UPLOAD_BYTES = 15 * 1024 * 1024;
 /** 一個 scope（一個品牌，或一個產品）最多留幾張——防止無限堆積硬碟。 */
 export const MAX_PHOTOS_PER_SCOPE = 24;
+/**
+ * 品牌 scope 的上限另計。2026-09-30（CJ「增加一個常駐的任務卡…可以儲存各種他上傳的照片」）：
+ * 品牌 scope 從「幾張品牌照」變成素材庫的收件匣（標誌、情境照、存下來的 AI 圖都進這裡），
+ * 24 張一下就滿；產品仍是 24（一個產品不需要更多）。
+ */
+export const MAX_BRAND_LIBRARY_PHOTOS = 200;
+
+export function maxPhotosFor(scope: PhotoScope): number {
+  return scope === "brand" ? MAX_BRAND_LIBRARY_PHOTOS : MAX_PHOTOS_PER_SCOPE;
+}
 
 const MIME_EXT: Record<string, string> = {
   "image/png": ".png", "image/jpeg": ".jpg", "image/webp": ".webp",
@@ -152,8 +162,9 @@ export async function storePhotoBytes(args: {
   if ("error" in check) return check;
 
   const existing = await listPhotos(args.scope, args.scopeId);
-  if (existing.length >= MAX_PHOTOS_PER_SCOPE) {
-    return { error: `這個${args.scope === "brand" ? "品牌" : "產品"}已經有 ${MAX_PHOTOS_PER_SCOPE} 張照片，先刪掉幾張再存` };
+  const cap = maxPhotosFor(args.scope);
+  if (existing.length >= cap) {
+    return { error: `這個${args.scope === "brand" ? "品牌" : "產品"}已經有 ${cap} 張照片，先刪掉幾張再存` };
   }
 
   const storageRoot = args.storageRoot ?? photoStorageRoot();
@@ -257,4 +268,125 @@ export async function removePhoto(args: { userId: number; scope: PhotoScope; sco
     if (next) await setPrimaryPhoto({ userId: args.userId, scope: args.scope, scopeId: args.scopeId, photoId: next.id });
     else await mirrorPrimaryToProduct(args.userId, args.scopeId, null);
   }
+}
+
+/**
+ * 素材庫：這個品牌「在網站任何地方上傳過的圖」一次列出來。
+ *
+ * 2026-09-30（CJ「也要包括客戶在網站任何地方上傳的視覺，都要集結起來處理」）。
+ * 全站的圖片上傳入口（視覺頁標誌、素材庫、品牌照片、產品照片庫、任務頁的換照片、
+ * 存下來的 AI 修圖）最後都寫進 asset_photos——所以彙整不必另開一張表，只要**不分
+ * scope** 用 brandId 撈，再補兩種不在這張表裡、但也是使用者給的圖：
+ *   · brands.logoUrl（FB 粉專抓回來的頭像落在 covers，不在 asset_photos）
+ *   · 產品資料裡的主圖（早期貼網址填的，positioning.imageUrl）
+ * 這兩種唯讀（source 標成 logo／product、photoId 為 null），刪除要回到原本的地方。
+ */
+export type LibrarySource = "brand" | "product" | "logo";
+
+export interface LibraryItem {
+  key: string;
+  /** asset_photos.id；不是這張表來的（舊 logo、產品資料裡的網址）為 null，不能在素材庫刪。 */
+  photoId: string | null;
+  url: string;
+  filename: string;
+  source: LibrarySource;
+  /** 產品名稱，或「品牌」／「標誌」。 */
+  sourceLabel: string;
+  scope: PhotoScope;
+  scopeId: number;
+  isLogo: boolean;
+  createdAt: string | null;
+}
+
+export async function listBrandLibrary(brandId: number): Promise<LibraryItem[]> {
+  const [rows]: any = await localPool.execute(
+    `SELECT ap.*, p.name AS productName
+       FROM asset_photos ap
+       LEFT JOIN products p ON ap.scope = 'product' AND p.id = ap.scopeId
+      WHERE ap.brandId = ?
+      ORDER BY ap.createdAt DESC
+      LIMIT 500`,
+    [brandId],
+  );
+  const [bRows]: any = await localPool.execute(
+    `SELECT logoUrl, positioning FROM brands WHERE id = ? LIMIT 1`, [brandId],
+  );
+  const brand = (bRows as any[])[0] ?? {};
+  let pos: any = brand.positioning;
+  if (typeof pos === "string") { try { pos = JSON.parse(pos); } catch { pos = {}; } }
+  const logoAsset = pos?._assets?.logo ?? {};
+  const logoUrls = new Set<string>(
+    [brand.logoUrl, logoAsset.primaryUrl, logoAsset.darkUrl, logoAsset.iconUrl]
+      .filter((u): u is string => typeof u === "string" && u.trim().length > 0),
+  );
+
+  const items: LibraryItem[] = [];
+  const seen = new Set<string>();
+  for (const r of rows as any[]) {
+    const url = String(r.url);
+    if (seen.has(url)) continue;
+    seen.add(url);
+    const isLogo = logoUrls.has(url);
+    const source: LibrarySource = r.scope === "product" ? "product" : isLogo ? "logo" : "brand";
+    items.push({
+      key: String(r.id), photoId: String(r.id), url,
+      filename: String(r.filename ?? ""),
+      source,
+      sourceLabel: r.scope === "product" ? String(r.productName ?? "產品") : isLogo ? "標誌" : "品牌",
+      scope: r.scope === "product" ? "product" : "brand",
+      scopeId: Number(r.scopeId),
+      isLogo,
+      createdAt: r.createdAt ? new Date(r.createdAt).toISOString() : null,
+    });
+  }
+
+  // 標誌：沒走 asset_photos 的（FB 頭像、早期貼的網址）也要看得到。
+  for (const url of logoUrls) {
+    if (seen.has(url) || !isUsableImageRef(url)) continue;
+    seen.add(url);
+    items.unshift({
+      key: `logo:${url}`, photoId: null, url, filename: "logo", source: "logo", sourceLabel: "標誌",
+      scope: "brand", scopeId: brandId, isLogo: true, createdAt: null,
+    });
+  }
+
+  // 產品資料裡的主圖（早期貼網址）。上傳過的照片已在上面，這裡只補沒上傳過的。
+  try {
+    const [pRows]: any = await localPool.execute(
+      `SELECT id, name, JSON_UNQUOTE(JSON_EXTRACT(positioning, '$.imageUrl')) AS imageUrl
+         FROM products WHERE brandId = ? LIMIT 200`,
+      [brandId],
+    );
+    for (const p of pRows as any[]) {
+      const url = typeof p.imageUrl === "string" ? p.imageUrl : "";
+      if (!url || url === "null" || seen.has(url) || !isUsableImageRef(url)) continue;
+      seen.add(url);
+      items.push({
+        key: `product:${p.id}`, photoId: null, url, filename: String(p.name ?? ""),
+        source: "product", sourceLabel: String(p.name ?? "產品"),
+        scope: "product", scopeId: Number(p.id), isLogo: false, createdAt: null,
+      });
+    }
+  } catch { /* products 讀不到就只列上傳的 */ }
+
+  return items;
+}
+
+/** 素材庫只收看得到的圖：本站上傳／產出的相對路徑，或 http(s)。 */
+function isUsableImageRef(url: string): boolean {
+  return /^https?:\/\//.test(url) || url.startsWith("/static/");
+}
+
+/** 這個網址是不是這個品牌素材庫裡的圖（任何 scope 的上傳，或它的標誌）。生圖前的歸屬檢查用。 */
+export async function brandOwnsLibraryPhoto(brandId: number, url: string): Promise<boolean> {
+  try {
+    const [a]: any = await localPool.execute(
+      `SELECT 1 FROM asset_photos WHERE brandId = ? AND url = ? LIMIT 1`, [brandId, url],
+    );
+    if ((a as any[]).length) return true;
+    const [b]: any = await localPool.execute(
+      `SELECT 1 FROM brands WHERE id = ? AND logoUrl = ? LIMIT 1`, [brandId, url],
+    );
+    return (b as any[]).length > 0;
+  } catch { return false; }
 }

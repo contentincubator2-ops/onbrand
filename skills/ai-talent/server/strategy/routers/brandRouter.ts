@@ -1010,8 +1010,30 @@ export const brandRouter = router({
       if (!input.logoUrl.startsWith("/static/asset-photos/")) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "logoUrl 必須是剛上傳的照片網址" });
       }
+      // 2026-09-30：素材庫可以「設為標誌」任何一張——所以要確認這張真的是這個品牌的上傳，
+      // 不能拿別的品牌的照片網址來當自己的標誌。
+      {
+        const { brandOwnsLibraryPhoto } = await import("../core/assetPhotos");
+        if (!(await brandOwnsLibraryPhoto(input.brandId, input.logoUrl))) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "這張圖不在這個品牌的素材庫裡" });
+        }
+      }
       await db.update(brands).set({ logoUrl: input.logoUrl })
         .where(and(eq(brands.id, input.brandId), eq(brands.userId, ctx.user.id)));
+      // 2026-09-30：標誌有兩格——brands.logoUrl（mockup、品牌頭像讀）與視覺頁標誌卡的
+      // positioning._assets.logo.primaryUrl。在這裡一起寫，任何入口換標誌兩邊都跟著換。
+      {
+        const { default: localPool } = await import("../../localDb");
+        await localPool.execute(
+          `UPDATE brands SET positioning = JSON_SET(
+              COALESCE(positioning, JSON_OBJECT()),
+              '$._assets', COALESCE(JSON_EXTRACT(positioning, '$._assets'), JSON_OBJECT()),
+              '$._assets.logo', COALESCE(JSON_EXTRACT(positioning, '$._assets.logo'), JSON_OBJECT()),
+              '$._assets.logo.primaryUrl', ?)
+            WHERE id = ?`,
+          [input.logoUrl, input.brandId],
+        ).catch((e) => console.warn("[brand.setLogo] sync _assets.logo failed:", (e as Error).message));
+      }
       return { ok: true, logoUrl: input.logoUrl };
     }),
 

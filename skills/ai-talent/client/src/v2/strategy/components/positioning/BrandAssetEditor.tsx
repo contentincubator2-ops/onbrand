@@ -5,7 +5,10 @@
  * via the same scope.savePositioning mutation. Per CJ direction these
  * are user-supplied (no LLM auto-fill); 圖像/圖示/圖表 are dropped.
  */
+import { useRef, useState } from "react";
 import { useLang } from "../../../../lib/i18n";
+import { trpc } from "../../../../lib/trpc";
+import { uploadBrandPhoto, IMAGE_ACCEPT } from "../../lib/uploadBrandPhoto";
 import {
   Card, CardBody, CardHeader, Chip, Input, Textarea, Button, Tooltip,
 } from "@heroui/react";
@@ -31,12 +34,14 @@ interface AssetEditorProps {
   /** When true, all fields render read-only and a lock banner appears.
    *  Driven by the parent tab's lock state from /brands page. */
   readOnly?: boolean;
+  /** 有給才出現「上傳」按鈕（標誌）；上傳進這個品牌的素材庫。 */
+  brandId?: number;
 }
 
 function getMeta(en: boolean): Record<AssetKey, { icon: any; title: string; sub: string }> {
   return {
     // 視覺
-    logo:           { icon: faPenNib,  title: en ? "Logo"             : "標誌",       sub: en ? "Logo URL or usage guidelines"           : "上傳 logo URL 或描述使用規範" },
+    logo:           { icon: faPenNib,  title: en ? "Logo"             : "標誌",       sub: en ? "Upload your logo files and usage rules" : "上傳標誌檔，並寫下使用規範" },
     colors:         { icon: faPalette, title: en ? "Colors"           : "顏色",       sub: en ? "Primary, secondary, complementary"      : "品牌主色、輔助色、互補色" },
     fonts:          { icon: faFont,    title: en ? "Fonts"            : "字型",       sub: en ? "Primary CN/EN, serif / sans, display"   : "中英文主字型、襯線 / 無襯線、特殊字" },
     photos:         { icon: faImages,  title: en ? "Photos"           : "照片",       sub: en ? "Team, product, space photos (URL list)" : "團隊照、產品照、空間照（URL 列表）" },
@@ -61,7 +66,7 @@ function getMeta(en: boolean): Record<AssetKey, { icon: any; title: string; sub:
   };
 }
 
-export default function BrandAssetEditor({ assetKey, value, onChange, readOnly = false }: AssetEditorProps) {
+export default function BrandAssetEditor({ assetKey, value, onChange, readOnly = false, brandId }: AssetEditorProps) {
   const { lang } = useLang();
   const en = lang === "en";
   const meta = getMeta(en)[assetKey];
@@ -104,7 +109,7 @@ export default function BrandAssetEditor({ assetKey, value, onChange, readOnly =
         className="px-5 pb-5 pt-2 gap-4"
         style={readOnly ? { opacity: 0.65, pointerEvents: "none", userSelect: "text" } : undefined}
       >
-        {assetKey === "logo"     && <LogoFields     v={v} onChange={safeOnChange} en={en} />}
+        {assetKey === "logo"     && <LogoFields     v={v} onChange={safeOnChange} en={en} brandId={brandId} />}
         {assetKey === "colors"   && <ColorFields    v={v} onChange={safeOnChange} en={en} />}
         {assetKey === "fonts"    && <FontFields     v={v} onChange={safeOnChange} en={en} />}
         {assetKey === "photos"   && <PhotoFields    v={v} onChange={safeOnChange} en={en} />}
@@ -132,27 +137,119 @@ export default function BrandAssetEditor({ assetKey, value, onChange, readOnly =
   );
 }
 
-function LogoFields({ v, onChange, en }: { v: any; onChange: (next: any) => void; en: boolean }) {
+/**
+ * 標誌：三個檔位（主標誌／深色背景版／小圖示）各自可以直接上傳，也保留貼網址。
+ *
+ * 2026-09-30（CJ「策略層當中的視覺，標誌應該要讓用戶可以直接上傳 LOGO」）：原本這裡
+ * 只有三格網址輸入框，上傳入口藏在「基本資料」頁。上傳的檔案進品牌素材庫
+ * （asset_photos），主標誌另外同步到 brands.logoUrl——mockup、側欄品牌頭像讀的是
+ * 那一格，不同步的話使用者在這裡換了標誌、貼文預覽還是舊的。
+ */
+const LOGO_SLOTS: Array<{ key: "primaryUrl" | "darkUrl" | "iconUrl"; zh: string; en: string; hintZh: string; hintEn: string; dark?: boolean }> = [
+  { key: "primaryUrl", zh: "主標誌", en: "Primary logo", hintZh: "貼文預覽、品牌頭像用這一張", hintEn: "Used in post previews and as the brand avatar" },
+  { key: "darkUrl", zh: "深色背景版", en: "On dark backgrounds", hintZh: "放在深色底上的反白版本", hintEn: "Light version for dark backgrounds", dark: true },
+  { key: "iconUrl", zh: "小圖示", en: "Icon / favicon", hintZh: "方形、小尺寸也認得出來", hintEn: "Square, legible at small sizes" },
+];
+
+function LogoFields({ v, onChange, en, brandId }: { v: any; onChange: (next: any) => void; en: boolean; brandId?: number }) {
+  const utils = (trpc as any).useUtils?.();
+  const setLogoMut = (trpc as any).brand?.setLogo?.useMutation?.();
+  const brandQ = (trpc as any).brand.get.useQuery(
+    { id: brandId ?? 0 }, { enabled: !!brandId, refetchOnWindowFocus: false },
+  ) ?? { data: null };
+  // 標誌欄是空的、但品牌已經有頭像（FB 粉專抓的、或在基本資料頁上傳的）→ 先顯示那一張，
+  // 免得使用者以為沒有標誌又重傳一次。
+  const brandLogo: string | null = (brandQ.data as any)?.logoUrl ?? null;
+  const [busy, setBusy] = useState<string | null>(null);
+  const [err, setErr] = useState("");
+  const [showUrl, setShowUrl] = useState(false);
+  const fileRefs = useRef<Record<string, HTMLInputElement | null>>({});
+
+  const upload = async (slot: (typeof LOGO_SLOTS)[number], file: File | undefined) => {
+    if (!file || !brandId) return;
+    setBusy(slot.key); setErr("");
+    try {
+      const photo = await uploadBrandPhoto(brandId, file);
+      onChange({ ...v, [slot.key]: photo.url });
+      if (slot.key === "primaryUrl") {
+        await setLogoMut?.mutateAsync?.({ brandId, logoUrl: photo.url });
+        utils?.brand?.get?.invalidate?.();
+      }
+      utils?.assetPhoto?.library?.invalidate?.();
+      utils?.assetPhoto?.list?.invalidate?.();
+    } catch (e: any) {
+      setErr(String(e?.message ?? e));
+    } finally {
+      setBusy(null);
+      const el = fileRefs.current[slot.key];
+      if (el) el.value = "";
+    }
+  };
+
   return (
     <>
-      <Input size="sm" radius="md" variant="bordered" labelPlacement="outside"
-        label={en ? "Primary logo URL (PNG / SVG)" : "主 logo URL（PNG / SVG）"}
-        placeholder="https://example.com/logo.svg"
-        value={v.primaryUrl ?? ""}
-        onValueChange={(s) => onChange({ ...v, primaryUrl: s })}
-      />
-      <Input size="sm" radius="md" variant="bordered" labelPlacement="outside"
-        label={en ? "Dark-background logo URL (light version)" : "深色背景 logo URL（白底版本）"}
-        placeholder="https://example.com/logo-dark.svg"
-        value={v.darkUrl ?? ""}
-        onValueChange={(s) => onChange({ ...v, darkUrl: s })}
-      />
-      <Input size="sm" radius="md" variant="bordered" labelPlacement="outside"
-        label="Icon / Favicon URL"
-        placeholder="https://example.com/icon.png"
-        value={v.iconUrl ?? ""}
-        onValueChange={(s) => onChange({ ...v, iconUrl: s })}
-      />
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        {LOGO_SLOTS.map((slot) => {
+          const own: string = v?.[slot.key] ?? "";
+          const shown = own || (slot.key === "primaryUrl" ? brandLogo ?? "" : "");
+          return (
+            <div key={slot.key} className="flex flex-col gap-2 rounded-medium border border-divider p-3">
+              <p className="text-small font-medium">{en ? slot.en : slot.zh}</p>
+              <div
+                className={`h-24 rounded-md flex items-center justify-center overflow-hidden border border-divider ${slot.dark ? "bg-default-900" : "bg-default-50"}`}
+              >
+                {shown
+                  ? <img src={shown} alt={en ? slot.en : slot.zh} className="max-h-full max-w-full object-contain p-2" />
+                  : <FontAwesomeIcon icon={faPenNib} className={`text-2xl ${slot.dark ? "text-default-500" : "text-default-300"}`} />}
+              </div>
+              <p className="text-tiny text-default-500 leading-snug">
+                {!own && shown
+                  ? (en ? "From your brand settings" : "沿用品牌基本資料裡的頭像")
+                  : (en ? slot.hintEn : slot.hintZh)}
+              </p>
+              {brandId && (
+                <>
+                  <Button size="sm" variant="flat" radius="md"
+                    isLoading={busy === slot.key} isDisabled={!!busy && busy !== slot.key}
+                    onPress={() => fileRefs.current[slot.key]?.click()}>
+                    {own ? (en ? "Replace" : "換一張") : (en ? "Upload" : "上傳")}
+                  </Button>
+                  <input
+                    ref={(el) => { fileRefs.current[slot.key] = el; }}
+                    type="file" hidden accept={IMAGE_ACCEPT}
+                    onChange={(e) => void upload(slot, e.target.files?.[0])}
+                  />
+                </>
+              )}
+            </div>
+          );
+        })}
+      </div>
+      {err && <p className="text-tiny text-danger">{err.slice(0, 200)}</p>}
+      <p className="text-tiny text-default-500">
+        {en
+          ? "PNG / JPEG / WebP up to 15MB. Uploaded logos are also kept in your asset library."
+          : "PNG／JPEG／WebP，上限 15MB。上傳的標誌也會收進素材庫。"}
+      </p>
+
+      {(showUrl || !brandId) ? (
+        <div className="flex flex-col gap-3">
+          {LOGO_SLOTS.map((slot) => (
+            <Input key={slot.key} size="sm" radius="md" variant="bordered" labelPlacement="outside"
+              label={en ? `${slot.en} URL` : `${slot.zh}網址`}
+              placeholder="https://example.com/logo.svg"
+              value={v?.[slot.key] ?? ""}
+              onValueChange={(s) => onChange({ ...v, [slot.key]: s })}
+            />
+          ))}
+        </div>
+      ) : (
+        <button type="button" className="self-start text-tiny text-default-500 underline underline-offset-2 hover:text-default-700"
+          onClick={() => setShowUrl(true)}>
+          {en ? "Paste URLs instead" : "改用網址填入"}
+        </button>
+      )}
+
       <Textarea size="sm" radius="md" variant="bordered" labelPlacement="outside"
         label={en ? "Usage guidelines" : "使用規範"} minRows={2}
         placeholder={en ? "e.g. min 24px / clear space / no distortion" : "例：最小尺寸 24px / 留白邊距 / 禁止變形"}
