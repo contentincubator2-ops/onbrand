@@ -755,10 +755,10 @@ export const PLATFORM_IMAGE_SPECS: PlatformImageSpec[] = [
     id: "line-ad-today-scroller", channel: "line", placement: "ad",
     labelZh: "TODAY：Scroller", labelEn: "TODAY · Scroller",
     descZh: "文章捲動時出現的橫式素材。", descEn: "Landscape creative revealed while scrolling.",
-    width: 1125, height: 588, maxImages: 1, titleZone: "left",
-    noteZh: "1125×588；1,000KB 內。",
+    width: 1200, height: 628, maxImages: 1, titleZone: "left",
+    noteZh: "1200×628；JPG/PNG、950KB 內（依 2025-08 上架表；舊版素材指南寫 1125×588）。",
     compositionEn: "Wide 1.91:1 image; subject on the right half, calm left area for a headline.",
-    format: "jpeg", maxBytes: 1000 * 1024, source: "LINE TODAY Scroller Media Guide（官方 PDF）",
+    format: "jpeg", maxBytes: 950 * 1024, source: "LINE TODAY Ad Publication Form 2508（tw.linebiz.com/download/line-guaranteed-ads）",
   },
   {
     id: "line-ad-today-backdrop", channel: "line", placement: "ad",
