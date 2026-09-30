@@ -57,7 +57,7 @@ describe("platform image specs", () => {
 
   // 對照 OnBrand_圖片尺寸漏項清單.xlsx（2026-09-30）的 P1／P2 尺寸，每一個都要有卡。
   it.each([
-    ["facebook", 1080, 1080], ["facebook", 1640, 856], ["facebook", 1200, 628], ["facebook", 1440, 1800], ["facebook", 1440, 2560],
+    ["facebook", 1080, 1080], ["facebook", 851, 315], ["facebook", 1640, 856], ["facebook", 1200, 628], ["facebook", 1440, 1800], ["facebook", 1440, 2560],
     ["instagram", 1080, 566], ["instagram", 1440, 1800], ["instagram", 1440, 2560], ["instagram", 1080, 1920],
     ["line", 640, 640], ["line", 1080, 878], ["line", 1080, 1080], ["line", 1040, 1040], ["line", 2500, 1686], ["line", 2500, 843],
     ["line", 1200, 628], ["line", 600, 400], ["line", 1280, 720], ["line", 640, 1284], ["line", 1200, 600], ["line", 1920, 1080],
