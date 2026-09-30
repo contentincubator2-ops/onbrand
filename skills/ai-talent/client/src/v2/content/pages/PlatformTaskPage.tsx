@@ -2517,7 +2517,7 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                         onClick={handlePolish}
                         disabled={polishing || !primaryAnswer.trim()}
                         aria-label={lang === "en" ? "AI refine prompt" : "AI 完善提示詞"}
-                        className="w-9 h-9 rounded-full bg-[#E85D2E] text-white flex items-center justify-center shadow-sm transition hover:bg-[#D04E22] disabled:opacity-40 disabled:cursor-not-allowed"
+                        className="w-9 h-9 rounded-full bg-[#F37E4A] text-white flex items-center justify-center shadow-sm transition hover:bg-[#D04E22] disabled:opacity-40 disabled:cursor-not-allowed"
                       >
                         {polishing
                           ? <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
@@ -2831,7 +2831,7 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                           aria-label={t("qt_run_btn")}
                           className="shrink-0 flex flex-col items-center gap-1 group"
                         >
-                          <span className="relative block rounded-full p-[3px] ring-[3px] ring-[#E85D2E] transition group-hover:scale-105 group-active:scale-95">
+                          <span className="relative block rounded-full p-[3px] ring-[3px] ring-[#F37E4A] transition group-hover:scale-105 group-active:scale-95">
                             {agentSrc ? (
                               <Avatar src={agentSrc} className="w-14 h-14" />
                             ) : (
@@ -2839,14 +2839,14 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                                 <Icon name="agent" size={22} />
                               </span>
                             )}
-                            <span className="absolute -right-1 -bottom-1 w-7 h-7 rounded-full bg-[#E85D2E] text-white flex items-center justify-center ring-2 ring-white">
+                            <span className="absolute -right-1 -bottom-1 w-7 h-7 rounded-full bg-[#F37E4A] text-white flex items-center justify-center ring-2 ring-white">
                               <Icon name="play" size={11} />
                             </span>
                           </span>
                           {/* 2026-09-30（CJ「Yawen 的名字要跟人像對齊」）：名字從標題列搬到頭像正下方 */}
                           <span className="flex flex-col items-center leading-tight">
                             {agent && <span className="text-[12px] font-semibold text-neutral-900 max-w-[96px] truncate">{agent.name}</span>}
-                            <span className="text-[11px] font-semibold text-[#E85D2E]">{t("qt_run_btn")}</span>
+                            <span className="text-[11px] font-semibold text-[#F37E4A]">{t("qt_run_btn")}</span>
                           </span>
                         </button>
                       </div>
@@ -3037,7 +3037,7 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                       <RunningAgentCarousel
                         agents={agentRoster.length > 0 ? agentRoster : [{ name: "Agent", role: lang === "en" ? "Working" : "處理中" }]}
                         stages={null}
-                        accentColor="#E85D2E"
+                        accentColor="#F37E4A"
                         progressPct={progressPct}
                         handoffAnchor
                         activity={current?.key === "write" ? "write" : current?.key === "image" ? "image" : null}
@@ -3053,7 +3053,7 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                                 aria-label={lang === "en" ? p.en : p.zh}
                                 className={`relative w-10 h-10 rounded-xl flex items-center justify-center transition ${
                                   p.status === "done" ? "bg-neutral-900 text-white"
-                                  : p.status === "running" ? "bg-[#E85D2E]/10 text-[#E85D2E] ring-2 ring-[#E85D2E]/60 animate-pulse"
+                                  : p.status === "running" ? "bg-[#F37E4A]/10 text-[#F37E4A] ring-2 ring-[#F37E4A]/60 animate-pulse"
                                   : "bg-default-100 text-default-400"
                                 }`}
                               >

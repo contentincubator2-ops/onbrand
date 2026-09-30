@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { addDays, mondayOf, parsePlannerReply, validateOps, weekDays, type SlotRow } from "./weeklyPlanner";
+import { addDays, mondayOf, parsePlannerReply, railStatusOf, validateOps, weekDays, type SlotRow } from "./weeklyPlanner";
 import { FORK_AXES, PLANNER_AXES, isForkAxis, topicOverlap } from "./plannerAdvisors";
 import { plannerRouter } from "../routers/plannerRouter";
 
@@ -61,7 +61,7 @@ describe("parsePlannerReply", () => {
 describe("plannerRouter", () => {
   it("procedure 名稱沒撞 tRPC 保留字", () => {
     const names = Object.keys((plannerRouter as any)._def.procedures).sort();
-    expect(names).toEqual(["commit", "markWritten", "pickFork", "releaseSlot", "removeSlot", "send", "week"]);
+    expect(names).toEqual(["commit", "markWritten", "pickFork", "railStatus", "releaseSlot", "removeSlot", "send", "week"]);
     for (const n of names) expect(Object.getOwnPropertyNames(Function.prototype)).not.toContain(n);
   });
 });
@@ -95,5 +95,21 @@ describe("一版的篇數上限", () => {
     const out = capAdds(ops);
     expect(out.filter((o) => o.op === "add")).toHaveLength(7);
     expect(out.filter((o) => o.op === "remove")).toHaveLength(1);
+  });
+});
+
+describe("railStatusOf（側欄儀表）", () => {
+  const slot = (id: number, platform: string, status: SlotRow["status"]): SlotRow =>
+    ({ id, slotDate: "2026-09-29", platform, taskId: "x", taskLabel: null, topic: "t", format: null, reason: null, status, outputId: status === "written" ? 1 : null });
+  it("草稿不算；已寫算進 written；待寫依側欄 nav id 分平台", () => {
+    const r = railStatusOf(
+      [slot(1, "facebook", "planned"), slot(2, "facebook", "planned"), slot(3, "instagram", "written"), slot(4, "threads", "draft")],
+      [{ eventId: 1, eventName: "e", itemId: "a", date: "2026-09-30", platform: "website", taskId: "x", taskLabel: "", angle: "", outputId: null },
+       { eventId: 1, eventName: "e", itemId: "b", date: "2026-09-30", platform: "instagram", taskId: "x", taskLabel: "", angle: "", outputId: 5 }],
+    );
+    expect(r).toEqual({ total: 5, written: 2, pendingByNav: { fb: 2, web: 1 } });
+  });
+  it("空的一週", () => {
+    expect(railStatusOf([], [])).toEqual({ total: 0, written: 0, pendingByNav: {} });
   });
 });

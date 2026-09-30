@@ -4,7 +4,7 @@
  * 2026-06-12 (CJ direction「插畫風格參考 www.sowork.ai」):
  *   Redesigned with SoWork.ai's editorial-illustration visual language:
  *     - Warm cream background (#F7F2EB) instead of white
- *     - Orange (#E85D2E) primary accent instead of purple gradient
+ *     - Orange (#F37E4A) primary accent instead of purple gradient
  *     - Heavy black headlines with stacked two-line composition
  *     - Pill chip above headline
  *     - Flat 2D illustration with thick black strokes on right side
@@ -55,7 +55,7 @@ const C = {
   ink: "#0F0F0E",          // headlines, primary text
   inkSoft: "#3A3633",      // body text
   muted: "#6B6660",        // tertiary text
-  orange: "#E85D2E",       // primary CTA, accent
+  orange: "#F37E4A",       // primary CTA, accent
   orangeDark: "#C84516",   // hover
   orangeChip: "#FDE6D8",   // pill chip background
   border: "#E8DECC",       // warm border
@@ -652,7 +652,7 @@ function FAQSection({ en }: { en: boolean }) {
                   <span
                     className="flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center font-black text-[14px] transition-transform"
                     style={{
-                      background: isOpen ? "#E85D2E" : "#FDE6D8",
+                      background: isOpen ? "#F37E4A" : "#FDE6D8",
                       color: isOpen ? "#FFFFFF" : "#C84516",
                       transform: isOpen ? "rotate(45deg)" : "rotate(0deg)",
                     }}
@@ -679,7 +679,7 @@ function FAQSection({ en }: { en: boolean }) {
             to="/auth/register"
             className="inline-flex items-center gap-2 px-6 py-3.5 rounded-xl text-[15px] font-bold transition-transform hover:-translate-y-0.5"
             style={{
-              background: "#E85D2E",
+              background: "#F37E4A",
               color: "#FFFFFF",
               boxShadow: "0 6px 0 #C84516",
             }}
