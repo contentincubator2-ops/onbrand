@@ -162,6 +162,8 @@ export interface CampaignPlanItem {
    * 畫面上要看得見：補上的那格值得使用者多看一眼，而不是假裝一切正常。
    */
   repaired?: boolean;
+  /** 內容層可以把某一篇拿出本週企劃（false）；沒有＝定稿後照日期進本週企劃。 */
+  inPlanner?: boolean;
 }
 
 export interface CampaignPartnerBlock {

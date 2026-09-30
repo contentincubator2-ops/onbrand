@@ -80,6 +80,8 @@ export interface PlanItem extends Beat {
   scheduledAt?: string | null;
   /** 這一格的卡是模型選的，還是驗證失敗後我們補上的——使用者有權知道。 */
   repaired?: boolean;
+  /** 內容層可以把某一篇拿出本週企劃（false）；沒有這個欄位＝定稿後照日期進本週企劃。 */
+  inPlanner?: boolean;
 }
 
 export interface PartnerStep { id: string; text: string; taskId?: string; taskLabel?: string; done?: boolean }
@@ -296,7 +298,7 @@ export function cobrandBlock(mechanic: string, brandName: string): PartnerBlock 
   };
 }
 
-function safeJSON<T>(text: string, fallback: T): T {
+export function safeJSON<T>(text: string, fallback: T): T {
   const tryParse = (s: string): T | undefined => { try { return JSON.parse(s); } catch { return undefined; } };
   const m = text.match(/```(?:json)?\s*([\s\S]*?)```/);
   const raw = (m ? m[1]! : text).trim();
@@ -312,7 +314,7 @@ function safeJSON<T>(text: string, fallback: T): T {
 }
 
 /** 活動 + 它綁的產品，組成產生企劃需要的事實。 */
-async function eventFacts(eventId: number, userId: number): Promise<{
+export async function eventFacts(eventId: number, userId: number): Promise<{
   name: string; brandId: number; brandName: string; startAt: Date | null; endAt: Date | null;
   settings: CampaignSettings; products: ScopedProduct[];
 } | null> {

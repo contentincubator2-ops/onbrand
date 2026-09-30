@@ -127,6 +127,8 @@ const DISPLAY: Record<string, Display> = {
   "event|倒數":                  { category: "event", group: "基本資料", label: "倒數" },
   "event|活動":                  { category: "event", group: "基本資料", label: "進行天數" },
   "event|活動搭配":              { category: "event", group: "基本資料", label: "搭配產品" },
+  "event|活動訴求":              { category: "event", group: "宣傳企劃", label: "一句話訴求" },
+  "event|各段訊息":              { category: "event", group: "宣傳企劃", label: "每一段的訊息" },
   "event|活動定位摘要":          { category: "event", group: "戰略 Brief", label: "活動定位摘要" },
   "event|活動類型":              { category: "event", group: "戰略 Brief", label: "活動類型" },
   "event|核心問題":              { category: "event", group: "背景與問題", label: "核心問題" },
@@ -880,6 +882,17 @@ export async function buildBrandBrain(
           const ep = e.positioning ? (typeof e.positioning === "string" ? safeParse(e.positioning) : e.positioning) : null;
           const productScope = resolveProductScope((ep as any)?.campaign?.productScope, eventProducts.length);
           if (productScope) c.add("event", "event", "活動搭配", productScopeBrief(productScope, eventProducts), 900);
+          // 2026-09-30（活動頁定稿交接）：策略層排好的一句話訴求與每一段的訊息，內容層寫每一篇
+          // 時都要讀得到——不然交接單只存在畫面上，寫的人（模型）根本沒看過。
+          const cp = (ep as any)?.campaignPlan;
+          if (typeof cp?.smp === "string" && cp.smp.trim()) c.add("event", "event", "活動訴求", cp.smp, 120);
+          if (cp?.phaseMessages && typeof cp.phaseMessages === "object") {
+            const PHASE_ZH: Array<[string, string]> = [["teaser", "預熱"], ["launch", "開賣"], ["sustain", "加溫"], ["lastcall", "倒數"], ["encore", "返場"]];
+            const lines = PHASE_ZH
+              .filter(([id]) => typeof cp.phaseMessages[id] === "string" && cp.phaseMessages[id].trim())
+              .map(([id, zh]) => `${zh}：${cp.phaseMessages[id].trim()}`);
+            if (lines.length) c.add("event", "event", "各段訊息", lines.join("；"), 500);
+          }
           if (ep && typeof ep === "object") {
             pushFrom(c, "event", "event", ep, [
               ["brief.briefSummary",             "活動定位摘要", 400],

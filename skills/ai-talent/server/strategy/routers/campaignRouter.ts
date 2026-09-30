@@ -17,6 +17,8 @@
  *   trayList    — 內容層 tray 的首頁：有企劃的活動 + 進度
  *   markWritten — 某一格寫完了，回貼產出（策略層的 ✓ 從這裡來）
  *   setLock     — 定稿／解鎖（2026-09-30 CJ「定稿一次鎖整份」）
+ *   chat        — 跟內容企劃對話：回覆＋提案（不寫入；套用走 savePlan）
+ *   setInPlanner— 內容層決定某一篇要不要排進本週企劃（定稿後也能改，它是排程不是企劃內容）
  *   setBackdrop — 策略畫面的底圖模板（用戶自己選；不受定稿影響，它不是企劃內容）
  *
  * 定稿之後 saveSettings／generate／savePlan 一律拒絕——鎖的是整份，不是只鎖
@@ -29,6 +31,7 @@ import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure } from "../../platform/core/trpc";
 import localPool from "../../localDb";
 import { buildCampaignPlan, inferCampaignSettings, type CampaignPlan } from "../core/campaignPlan";
+import { runCampaignChat } from "../core/campaignChat";
 import { isHiddenContentPlatform, isHiddenHistoryItem } from "../../platform/core/planGate";
 import { ownedProductIds, resolveProductScope } from "../core/eventProductScope";
 import { invalidateBrandPrefix } from "../core/brandContext";
@@ -58,6 +61,7 @@ const planItemInput = z.object({
   outputId: z.number().nullable().optional(),
   scheduledAt: z.string().nullable().optional(),
   repaired: z.boolean().optional(),
+  inPlanner: z.boolean().optional(),
 });
 
 const PHASE_KEYS = ["teaser", "launch", "sustain", "lastcall", "encore"] as const;
@@ -267,6 +271,47 @@ export const campaignRouter = router({
       return { ok: true };
     }),
 
+  /**
+   * 跟內容企劃說一句話。只回提案、不寫入——套用由畫面送 savePlan（見 core/campaignChat.ts）。
+   * 定稿後不能再改企劃，所以對話也跟著擋，免得提了一份套用不了的提案。
+   */
+  chat: protectedProcedure
+    .input(z.object({
+      eventId: z.number().int().positive(),
+      message: z.string().min(1).max(800),
+      phase: z.enum(PHASE_KEYS).nullable().optional(),
+      history: z.array(z.object({ role: z.enum(["user", "assistant"]), content: z.string().max(1200) })).max(12).optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const row = await loadEvent(input.eventId, ctx.user!.id);
+      const pos = parsePositioning(row.positioning);
+      assertUnlocked(pos);
+      const plan = visiblePlan((pos.campaignPlan ?? null) as CampaignPlan | null);
+      if (!plan?.items?.length) throw new TRPCError({ code: "BAD_REQUEST", message: "還沒有企劃，先排出企劃再來討論" });
+      try {
+        return await runCampaignChat({
+          eventId: input.eventId, userId: ctx.user!.id, plan,
+          message: input.message, phase: input.phase ?? null, history: input.history,
+        });
+      } catch (e: any) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: String(e?.message ?? e).slice(0, 300) });
+      }
+    }),
+
+  /** 某一篇要不要排進本週企劃。只改這一個欄位，定稿後也可以（見檔頭）。 */
+  setInPlanner: protectedProcedure
+    .input(z.object({ eventId: z.number().int().positive(), itemId: z.string().max(80), inPlanner: z.boolean() }))
+    .mutation(async ({ ctx, input }) => {
+      const row = await loadEvent(input.eventId, ctx.user!.id);
+      const pos = parsePositioning(row.positioning);
+      const plan = pos.campaignPlan as CampaignPlan | undefined;
+      const item = plan?.items?.find((i) => i.id === input.itemId);
+      if (!plan || !item) throw new TRPCError({ code: "NOT_FOUND", message: "企劃上找不到這一篇" });
+      item.inPlanner = input.inPlanner;
+      await patchPositioning(input.eventId, ctx.user!.id, "campaignPlan", plan);
+      return { ok: true };
+    }),
+
   /** 底圖模板。null＝回到依產業自動挑。模板清單在前端（campaignBackdrops.ts），這裡只擋明顯不對的值。 */
   setBackdrop: protectedProcedure
     .input(z.object({ eventId: z.number().int().positive(), backdrop: z.string().regex(/^[a-z][a-z0-9-]{1,30}$/).nullable() }))
@@ -297,6 +342,7 @@ export const campaignRouter = router({
   trayList: protectedProcedure
     .input(z.object({ brandId: z.number().int().positive() }))
     .query(async ({ ctx, input }) => {
+      // 2026-09-30：只列定稿的企劃（策略層只排不寫，定稿後才到內容層寫）。
       const [rows]: any = await localPool.execute(
         `SELECT id, name, startAt, endAt, positioning FROM events
           WHERE brandId = ? AND userId = ? ORDER BY COALESCE(startAt, createdAt) DESC LIMIT 50`,
@@ -306,7 +352,7 @@ export const campaignRouter = router({
       return (rows as any[]).flatMap((row) => {
         const pos = parsePositioning(row.positioning);
         const plan = pos.campaignPlan as CampaignPlan | undefined;
-        if (!plan?.items?.length) return [];
+        if (!plan?.items?.length || !plan.lockedAt) return [];
         const items = plan.items.filter((i) => i.enabled && !isHiddenPlanItem(i));
         const done = items.filter((i) => !!i.outputId).length;
         const endAt = row.endAt ? new Date(row.endAt).toISOString().slice(0, 10) : null;

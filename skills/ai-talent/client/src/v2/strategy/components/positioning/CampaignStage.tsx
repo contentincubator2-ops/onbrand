@@ -5,7 +5,8 @@
  * 畫面 →「左邊的準備等階段，要增加一個總覽…看加溫期的時候，右邊才會 ZOOM IN」→
  * 「定稿一次鎖整份」）。取代舊的 CampaignWorkspace（一段話＋一條清單）。
  *
- *   左：策略。階段列（總覽＋各段）、倒數、這檔／這一段要講什麼、傳播圈、企劃檢查。
+ *   左：策略。階段列（總覽＋各段）、倒數、這檔／這一段要講什麼、傳播圈、
+ *       跟內容企劃的對話卡（CampaignChatCard，第一則是企劃檢查）。
  *   右：策略地圖（CampaignMap）。總覽看整檔，點一段就放大到那一段。
  *   下：通路、設定、定稿後才出現的「到內容層寫」。
  *
@@ -32,6 +33,8 @@ import { stagePhases, stageLanes, countdown, stageNotes, phaseShort, type StageP
 import { LockToggle } from "./LockToggle";
 import CampaignMap from "./CampaignMap";
 import CampaignSetupForm from "./CampaignSetupForm";
+import CampaignChatCard from "./CampaignChatCard";
+import CampaignHandoff from "./CampaignHandoff";
 import {
   availableBackdrops, backdropForIndustry, backdropUrl, resolveBackdrop, BACKDROP_THEMES, DEFAULT_BACKDROP,
 } from "../../lib/campaignBackdrops";
@@ -94,6 +97,28 @@ export default function CampaignStage({ eventId, brandId }: { eventId: number; b
     }, 800);
   };
   React.useEffect(() => () => { if (timer.current) clearTimeout(timer.current); }, []);
+
+  /** 對話提案按了「套用」：換掉企劃、馬上存（不等停手）。 */
+  const applyPlan = (next: CampaignPlan) => {
+    if (timer.current) clearTimeout(timer.current);
+    planRef.current = next;
+    setPlan(next);
+    dirtyRef.current = true;
+    setSaveState("saving");
+    const { lockedAt: _l, ...body } = next as any;
+    savePlanMut.mutate({ eventId, plan: body });
+  };
+
+  // 定稿那一刻（鎖頭在標題旁，由 CampaignLockToggle 按）跳出交接單。第一次載入就已經
+  // 定稿的不跳——那不是「剛交接」。
+  const [handoffOpen, setHandoffOpen] = React.useState(false);
+  const prevLock = React.useRef<string | null | undefined>(undefined);
+  React.useEffect(() => {
+    if (!plan) return;
+    const now = plan.lockedAt ?? null;
+    if (prevLock.current === null && now) setHandoffOpen(true);
+    prevLock.current = now;
+  }, [plan?.lockedAt, plan]);
 
   if (q.isLoading) {
     return (
@@ -220,11 +245,8 @@ export default function CampaignStage({ eventId, brandId }: { eventId: number; b
               ? <div className="flex-1 min-h-[200px]" aria-hidden />
               : <ReachFan phases={phases} lanes={lanes} items={items} current={cur} en={en} />}
 
-            {notes.length > 0 && (
-              <div className="rounded-2xl bg-foreground text-background px-4 py-3 flex flex-col gap-1.5">
-                <p className="text-tiny font-semibold opacity-70">{L("企劃檢查", "Plan check")}{cur ? L(`　·　${phaseShort(cur, false)}期`, ` · ${phaseShort(cur, true)}`) : ""}</p>
-                {notes.map((n, k) => <p key={k} className="text-small leading-relaxed">{en ? n.en : n.zh}</p>)}
-              </div>
+            {plan && (
+              <CampaignChatCard eventId={eventId} plan={plan} phase={cur} notes={notes} locked={locked} en={en} onApply={applyPlan} />
             )}
 
             <button type="button" onClick={goStrategyBasis}
@@ -309,6 +331,14 @@ export default function CampaignStage({ eventId, brandId }: { eventId: number; b
           </ModalBody>
         </ModalContent>
       </Modal>
+
+      {plan && (
+        <CampaignHandoff
+          open={handoffOpen} onClose={() => setHandoffOpen(false)} onWrite={() => { setHandoffOpen(false); goWrite(); }}
+          plan={plan} lead={lead} mechanic={settings.mechanic ?? ""}
+          range={ev.startAt ? `${ev.startAt} → ${ev.endAt ?? "?"}` : L("未設定", "Not set")} en={en}
+        />
+      )}
 
       <Modal isOpen={pickerOpen} onClose={() => setPickerOpen(false)} size="3xl" scrollBehavior="inside">
         <ModalContent>
