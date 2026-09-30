@@ -1962,6 +1962,12 @@ export async function runOrchestra(args: {
     spotIndex?: number | null;
   } | null;
   /**
+   * 2026-09-30（CJ「廣告文案要標註」）：從活動企劃寫某一篇時，那一篇在企劃裡的位置與
+   * 要不要下廣告。由 caller 讀好（strategy/core/campaignItemBrief.ts），這裡接在品牌大腦
+   * 後面，並寫進產出的 metadata（產出頁、本週企劃靠它標「廣告文案」）。
+   */
+  campaignItem?: import("../../strategy/core/campaignItemBrief").CampaignItemInfo | null;
+  /**
    * 2026-05-14 (CJ「先回 caption + brief、image 跟 QA 變 async polling」):
    * Optional checkpoint — fires AFTER captions + briefs are assembled but
    * BEFORE image gen / extras / QA. Caller can persist this partial result,
@@ -2151,7 +2157,10 @@ export async function runOrchestra(args: {
         args.brandId
           ? getBrandRealContent(args.brandId).then(r => r.context).catch(() => "")
           : Promise.resolve(""),
-      ]).then(([prefix, real]) => prefix + (real || "")),
+        args.campaignItem
+          ? import("../../strategy/core/campaignItemBrief").then((m) => m.campaignItemBriefText(args.campaignItem!))
+          : Promise.resolve(""),
+      ]).then(([prefix, real, item]) => prefix + (real || "") + (item || "")),
       // Scout stage — only fires for 100s tier. scoutKind drives WHAT we fetch:
       // viral (default) / festivals (calendar tasks) / trending (時事改寫) / news.
       // 2026-05-18 (CJ 驗收: em-99 序列只產 5 封 + 502): scout fires for
@@ -2747,6 +2756,9 @@ export async function runOrchestra(args: {
               audienceTag: args.audienceTag ?? null,
               productId: args.productId ?? null,
               eventId: args.eventId ?? null,
+              campaignItem: args.campaignItem
+                ? { eventId: args.campaignItem.eventId, itemId: args.campaignItem.itemId, paid: args.campaignItem.paid }
+                : null,
               regulationCompliance: (captions as any).__regulationCompliance ?? [],
             },
             thumbnailUrl: null,
@@ -3244,6 +3256,10 @@ export async function runOrchestra(args: {
           // missions by product/event and /run page can re-apply scope.
           productId: args.productId ?? null,
           eventId: args.eventId ?? null,
+          // 2026-09-30：活動企劃的那一篇（產出頁、本週企劃靠 paid 標「廣告文案」）。
+          campaignItem: args.campaignItem
+            ? { eventId: args.campaignItem.eventId, itemId: args.campaignItem.itemId, paid: args.campaignItem.paid }
+            : null,
           // 2026-06-05 (CJ「不阻擋，事後解釋」): brand-rule fixes from
           // enforceBrandRulesOnTextWithReport, so RunPage can trigger a
           // Mia nudge ("發現你寫了 X，已自動改成 Y，想調整定位嗎？").

@@ -141,7 +141,7 @@ export default function PlannerPage() {
       out.push({ kind: "slot", key: `s${s.id}`, date: s.slotDate, platform: s.platform, title: s.topic, meta, slot: s });
     }
     for (const c of data?.campaign ?? []) {
-      out.push({ kind: "campaign", key: `c${c.eventId}-${c.itemId}`, date: c.date, platform: c.platform, title: c.angle || c.taskLabel, meta: c.outputId ? (en ? "Campaign · written" : "活動・已寫好") : (en ? `Campaign · ${c.eventName}` : `活動・${c.eventName}`), camp: c });
+      out.push({ kind: "campaign", key: `c${c.eventId}-${c.itemId}`, date: c.date, platform: c.platform, title: c.angle || c.taskLabel, meta: `${c.paid ? (en ? "Ad · " : "廣告・") : ""}${c.outputId ? (en ? "Campaign · written" : "活動・已寫好") : (en ? `Campaign · ${c.eventName}` : `活動・${c.eventName}`)}`, camp: c });
     }
     const PLAT: Record<string, string> = { fb: "facebook", ig: "instagram", li: "linkedin", yt: "youtube", tt: "tiktok" };
     for (const it of (calQ.data as any[]) ?? []) {
