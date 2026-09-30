@@ -219,6 +219,8 @@ export interface OrchestraResult {
     status: string;
     issues: Array<{ aspect: string; detail: string }>;
     reason?: string;
+    /** fixed 時的原稿 */
+    before?: string;
   }>;
   /** 2026-07-20 (CJ QA 斷字/漏字 forensics): raw writer captions for any
    *  variant the post-processing chain modified — persisted to metadata so
@@ -2571,7 +2573,7 @@ export async function runOrchestra(args: {
     // 價值與編造事實，不一致就最小幅度修正（見 brandConsistency.ts）。放在 checkpoint
     // 之前，用戶第一眼看到的就是檢查過的版本。行事曆合併／策略文件不查（不是貼文）。
     // 上限 25 秒、且只用剩餘預算；失敗一律記 skipped，不假裝檢查過。
-    const brandConsistency: Array<{ variantIndex: number; status: string; issues: Array<{ aspect: string; detail: string }>; reason?: string }> = [];
+    const brandConsistency: Array<{ variantIndex: number; status: string; issues: Array<{ aspect: string; detail: string }>; reason?: string; before?: string }> = [];
     const isStrategyDocTask = (args.template.id ?? "").includes("-99-") &&
       /calendar|toolkit|playbook|策略|月曆|工具包/.test(args.template.id ?? "");
     if (Array.isArray(captions) && captions.length && args.brandId && brandPrefix
@@ -2599,7 +2601,7 @@ export async function runOrchestra(args: {
             : fixed;
           v.caption = fixed;
         }
-        return { variantIndex: vi, status: res.status, issues: res.issues, ...(res.reason ? { reason: res.reason } : {}) };
+        return { variantIndex: vi, status: res.status, issues: res.issues, ...(res.reason ? { reason: res.reason } : {}), ...(res.before ? { before: res.before } : {}) };
       }));
       for (const r of results) if (r) brandConsistency.push(r);
       const allSkipped = brandConsistency.length > 0 && brandConsistency.every((r) => r.status === "skipped");

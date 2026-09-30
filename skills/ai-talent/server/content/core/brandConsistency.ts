@@ -11,7 +11,7 @@
  * 跟 squadLeadQA 的差別：那個只拿得到品牌名／產業／描述，也會在失敗時回假的
  * 「通過 80 分」。這裡失敗一律回 skipped，不假裝檢查過。
  */
-import { invokeLLM } from "../../platform/core/llm";
+import { invokeLLM, invokeLLMSingleProvider } from "../../platform/core/llm";
 
 export type BrandConsistencyStatus = "consistent" | "fixed" | "flagged" | "skipped";
 
@@ -27,6 +27,8 @@ export interface BrandConsistencyResult {
   caption: string;
   /** skipped／flagged 的原因（給 metadata 與除錯用，不給用戶看） */
   reason?: string;
+  /** fixed 時的原稿，存進 metadata 才看得出改了什麼 */
+  before?: string;
 }
 
 const SYSTEM = `你是品牌一致性審核。你只判斷「這篇文案符不符合這個品牌」，不評文筆好壞。
@@ -91,6 +93,8 @@ export async function checkBrandConsistency(args: {
   taskLabel: string;
   isZhTW: boolean;
   timeoutMs: number;
+  /** 指定後只用這一家、不做 provider 串接（IG 策略卡：依用戶授權只送去識別化內容給 Anthropic）。 */
+  strictProvider?: "anthropic";
 }): Promise<BrandConsistencyResult> {
   const original = args.caption;
   const skip = (reason: string): BrandConsistencyResult => ({ status: "skipped", issues: [], caption: original, reason });
@@ -101,7 +105,10 @@ export async function checkBrandConsistency(args: {
   const ac = new AbortController();
   const timer = setTimeout(() => ac.abort(), args.timeoutMs);
   try {
-    const r = await invokeLLM({
+    const call = args.strictProvider
+      ? (p: Parameters<typeof invokeLLM>[0]) => invokeLLMSingleProvider({ ...p, provider: args.strictProvider })
+      : invokeLLM;
+    const r = await call({
       signal: ac.signal,
       maxTokens: Math.min(4000, Math.ceil(original.length * 2) + 600),
       messages: [
@@ -129,7 +136,7 @@ export async function checkBrandConsistency(args: {
     const revised = typeof parsed?.revised === "string" ? parsed.revised : "";
     const rejected = acceptRevision(original, revised, { isZhTW: args.isZhTW });
     if (rejected) return { status: "flagged", issues, caption: original, reason: `revision rejected: ${rejected}` };
-    return { status: "fixed", issues, caption: revised.trim() };
+    return { status: "fixed", issues, caption: revised.trim(), before: original };
   } catch (e: any) {
     return skip(ac.signal.aborted ? `timeout ${args.timeoutMs}ms` : `llm error: ${String(e?.message ?? e).slice(0, 160)}`);
   } finally {
