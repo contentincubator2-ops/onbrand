@@ -220,6 +220,8 @@ export async function loadWeekSlots(brandId: number, weekStart: string): Promise
 export interface CampaignSlot {
   eventId: number; eventName: string; itemId: string; date: string; platform: string;
   taskId: string; taskLabel: string; angle: string; outputId: number | null;
+  /** 這一篇要下廣告（本週企劃標「廣告」）。 */
+  paid?: boolean;
 }
 /**
  * 一份活動企劃裡、落在這一週的格子。純函式。
@@ -244,6 +246,7 @@ export function campaignItemsInWeek(
       eventId: event.id, eventName: event.name, itemId: String(it.id), date,
       platform: String(it.platform ?? ""), taskId: String(it.taskId ?? ""), taskLabel: String(it.taskLabel ?? ""),
       angle: String(it.angle ?? ""), outputId: it.outputId ? Number(it.outputId) : null,
+      ...(it.paid ? { paid: true } : {}),
     });
   }
   return out;

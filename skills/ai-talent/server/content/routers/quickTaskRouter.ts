@@ -17,6 +17,7 @@
  * Provider 容錯：preferred 失敗 → forge fallback（同 v2）
  */
 import { z } from "zod";
+import { loadCampaignItem } from "../../strategy/core/campaignItemBrief";
 import { randomUUID } from "node:crypto";
 import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure, singleFlightPerUser } from "../../platform/core/trpc";
@@ -1085,6 +1086,12 @@ function gateInfoFor(taskId: string): TaskGateInfo {
   return gateInfoCache.get(taskId) ?? { platform: null, sourceType: null };
 }
 
+/** 從活動企劃寫某一篇：哪一檔活動、企劃上的哪一格。 */
+const CAMPAIGN_ITEM_INPUT = z.object({
+  eventId: z.number().int().positive(),
+  itemId: z.string().min(1).max(80),
+}).optional().nullable();
+
 export const quickTaskRouter = router({
   /**
    * 一張卡的「憑什麼」：用途、出處、模型實際被餵的參考、長青的背後邏輯、
@@ -1749,6 +1756,8 @@ export const quickTaskRouter = router({
         scenarioId: z.string().min(1).max(40),
         spotIndex: z.number().int().min(0).max(7),
       }).optional().nullable(),
+      // 2026-09-30：從活動企劃寫某一篇（見 strategy/core/campaignItemBrief.ts）。
+      campaignItem: CAMPAIGN_ITEM_INPUT,
       asyncMode: z.boolean().default(true),
     }))
     .mutation(async ({ ctx, input }) => {
@@ -1820,7 +1829,8 @@ export const quickTaskRouter = router({
       }
 
       const baseArgs = { template, config, inputs: input.inputs, brandId: input.brandId, ...scope, userId, tier: "60s" as const,
-        audienceTag: await resolveAudienceTag(userId, input.brandId, input.spotRef) };
+        audienceTag: await resolveAudienceTag(userId, input.brandId, input.spotRef),
+        campaignItem: input.campaignItem ? await loadCampaignItem(input.campaignItem, userId) : null };
 
       if (!input.asyncMode) {
         return runOrchestra(baseArgs);
@@ -2987,6 +2997,8 @@ ${polishTemplate.polishHint}`
         scenarioId: z.string().min(1).max(40),
         spotIndex: z.number().int().min(0).max(7),
       }).optional().nullable(),
+      // 2026-09-30：從活動企劃寫某一篇（見 strategy/core/campaignItemBrief.ts）。
+      campaignItem: CAMPAIGN_ITEM_INPUT,
       asyncMode: z.boolean().default(true),
     }))
     .mutation(async ({ ctx, input }) => {
@@ -3035,7 +3047,8 @@ ${polishTemplate.polishHint}`
       const { runOrchestra } = await import("../core/quickTaskOrchestra");
 
       const baseArgs = { template, config, inputs: input.inputs, brandId: input.brandId, ...scope, userId, tier: "99s" as const,
-        audienceTag: await resolveAudienceTag(userId, input.brandId, input.spotRef) };
+        audienceTag: await resolveAudienceTag(userId, input.brandId, input.spotRef),
+        campaignItem: input.campaignItem ? await loadCampaignItem(input.campaignItem, userId) : null };
 
       if (!input.asyncMode) {
         // Legacy sync path — fully await, return final result.
@@ -3115,6 +3128,8 @@ ${polishTemplate.polishHint}`
           scenarioId: z.string().min(1).max(40),
           spotIndex: z.number().int().min(0).max(7),
         }).optional().nullable(),
+        // 2026-09-30：從活動企劃寫某一篇（見 strategy/core/campaignItemBrief.ts）。
+        campaignItem: CAMPAIGN_ITEM_INPUT,
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -3161,6 +3176,7 @@ ${polishTemplate.polishHint}`
         eventId: input.eventId ?? null,
         userId,
         audienceTag: await resolveAudienceTag(userId, input.brandId, input.spotRef),
+        campaignItem: input.campaignItem ? await loadCampaignItem(input.campaignItem, userId) : null,
       };
 
       return runOrchestra(orchestraArgs);

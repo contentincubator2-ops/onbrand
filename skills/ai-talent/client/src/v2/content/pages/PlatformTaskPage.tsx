@@ -1505,6 +1505,8 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
           // Null when the task wasn't opened from a workbench sweet spot —
           // the run just goes untagged, it never blocks.
           spotRef: spotRefRef.current,
+          // 2026-09-30：從活動企劃開的卡，告訴寫手是哪一篇（要不要下廣告）。
+          campaignItem: campaignScope ?? null,
         });
         if (isStale()) { if ((r as any).outputId) discardCancelledOutput((r as any).outputId); return; }
 
@@ -2486,11 +2488,17 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                   const item = (d.plan?.items ?? []).find((i: any) => i.id === campaignScope.itemId);
                   if (!item) return null;
                   return (
-                    <p className="text-tiny text-default-600 m-0 flex items-center gap-1.5">
+                    <p className="text-tiny text-default-600 m-0 flex items-center gap-1.5 flex-wrap">
                       <Icon name="campaign" size={12} />
                       {lang === "en"
                         ? `From the campaign plan for “${d.event?.name ?? ""}” — this post is scheduled for ${item.date}.`
                         : `來自「${d.event?.name ?? ""}」的宣傳企劃 —— 這篇排在 ${item.date} 發布。`}
+                      {/* 2026-09-30（CJ「廣告文案要標註」）：寫之前就講清楚這篇是廣告。 */}
+                      {item.paid && (
+                        <span className="inline-flex items-center rounded-full bg-foreground text-background px-2 py-0.5 text-[11px] font-semibold">
+                          {lang === "en" ? "Ad copy — will be promoted" : "廣告文案・這篇會下廣告"}
+                        </span>
+                      )}
                     </p>
                   );
                 })()}

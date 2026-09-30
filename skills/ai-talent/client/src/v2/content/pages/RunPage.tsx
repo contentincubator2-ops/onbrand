@@ -2183,6 +2183,10 @@ export default function RunPage() {
         <Chip size="sm" variant="flat" className="font-mono text-[12px]">
           {effectiveVariant ? `${effectiveVariant.platform}:${effectiveVariant.format}` : "?"} · {data.mission?.taskId ?? "no-task"}
         </Chip>
+        {/* 2026-09-30（CJ「廣告文案要標註」）：活動企劃上標了廣告的那一篇，寫出來就是廣告文案。 */}
+        {(data as any)?.metadata?.campaignItem?.paid && (
+          <Chip size="sm" className="bg-foreground text-background font-semibold">{lang === "en" ? "Ad copy" : "廣告文案"}</Chip>
+        )}
         <Chip size="sm" variant="flat" color={data.status === "published" ? "success" : data.status === "scheduled" ? "warning" : "default"}>
           {data.status}
         </Chip>
