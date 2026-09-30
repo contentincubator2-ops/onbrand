@@ -2843,7 +2843,7 @@ export default function RunPage() {
         {/* RIGHT: toolbar (top) + mode panel + publish actions
             CJ direction 2026-05-09: 'toolbar 一道右方對話窗上面，當用戶選擇
             不同按鍵，在顯示出該功能' — toolbar is the tab bar for the panel */}
-        <aside className="space-y-3 sticky top-2 self-start">
+        <aside className="space-y-3 sticky top-2 self-start md:max-h-[calc(100vh-1rem)] md:overflow-y-auto">
           {isEmptyPublicSelection ? (
             <Card>
               <CardBody className="space-y-3 p-4">
