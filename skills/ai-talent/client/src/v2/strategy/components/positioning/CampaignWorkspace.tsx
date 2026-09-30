@@ -160,9 +160,23 @@ export default function CampaignWorkspace({ eventId, brandId }: { eventId: numbe
     <div className="max-w-[880px] flex flex-col gap-6">
       {/* ── Page header（eyebrow + h1 + meta）───────────────────────── */}
       <header>
-        <Chip size="sm" variant="flat" color="default" className="uppercase tracking-wider mb-2">
-          {L("宣傳企劃", "Campaign plan")}
-        </Chip>
+        <div className="flex items-center justify-between gap-3 mb-2">
+          <Chip size="sm" variant="flat" color="default" className="uppercase tracking-wider">
+            {L("宣傳企劃", "Campaign plan")}
+          </Chip>
+          {/* 2026-09-30（CJ「活動定位有兩條路」）：企劃是照活動定位排的，但以前這一頁
+              沒有路回去看那份定位。 */}
+          <Button size="sm" variant="light" radius="md" className="text-default-500"
+            onPress={() => {
+              const sp = new URLSearchParams();
+              if (brandId) sp.set("b", String(brandId));
+              sp.set("e", String(eventId));
+              sp.set("cat", "positioning");
+              navigate(`/brands/edit?${sp.toString()}`);
+            }}>
+            {L("看活動定位", "View positioning")}
+          </Button>
+        </div>
         <h1 className="text-3xl font-semibold tracking-tight">{ev?.name}</h1>
         <p className="text-tiny text-default-500 mt-2">
           {ev?.startAt ? `${ev.startAt} → ${ev.endAt ?? "?"}` : L("尚未設定期間", "No dates set")}
