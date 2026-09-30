@@ -22,10 +22,17 @@ const director = (roleId: string, roleLabel: string): StrategistDirector => ({
 // 產品策略」）：產品總監把人帶去品牌層的策略健檢＝答非所問，而且畫面上看不出
 // 是錯的——只有讀 prompt 才知道。所以這兩條要測。
 describe("工具引導依 scope 分開", () => {
-  it("品牌總監才拿得到策略監測／健檢的按鈕標記", () => {
+  it("品牌總監才拿得到策略監測的按鈕標記", () => {
     const p = buildSystemPrompt(director("brand_positioning", "品牌定位"), "");
-    expect(p).toContain("<<action:open_healthcheck>>");
     expect(p).toContain("<<action:open_monitor>>");
+  });
+
+  // 2026-09-30（CJ「我要刪除策略健檢的功能」）：功能刪了，總監就不能再推銷它。
+  it("任何總監都不再給策略健檢的按鈕", () => {
+    for (const roleId of ["brand_positioning", "product_kano", "copy_terms"]) {
+      expect(buildSystemPrompt(director(roleId, "測試"), "")).not.toContain("open_healthcheck");
+    }
+    expect(buildSystemPrompt(null, "")).not.toContain("open_healthcheck");
   });
 
   it("產品總監完全不給那兩顆按鈕，而且被明確擋住", () => {
@@ -50,7 +57,7 @@ describe("工具引導依 scope 分開", () => {
 
   it("沒有指定人設（舊對話）維持品牌那套，不要突然什麼工具都沒有", () => {
     const p = buildSystemPrompt(null, "");
-    expect(p).toContain("<<action:open_healthcheck>>");
+    expect(p).toContain("<<action:open_monitor>>");
   });
 
   // 2026-09-26：總監在 mos_db 的工作守則／執行卡／Skill 要真的進 prompt，
@@ -147,8 +154,10 @@ describe("舊開場白的重寫判斷", () => {
     expect(isStaleOpening(msg("有 2 則策略監測提醒還沒看——要看一下嗎？"), copyDir)).toBe(true);
   });
 
-  it("品牌總監講健檢是對的，不要動它", () => {
-    expect(isStaleOpening(msg("你還沒做過策略健檢——要我帶你去看看嗎？"), brandDir)).toBe(false);
+  // 2026-09-30：策略健檢刪除後，品牌總監的健檢開場白也過期了；監測那句仍然有效。
+  it("品牌總監講健檢＝舊版要重寫，講監測不要動", () => {
+    expect(isStaleOpening(msg("你還沒做過策略健檢——要我帶你去看看嗎？"), brandDir)).toBe(true);
+    expect(isStaleOpening(msg("有 2 則策略監測提醒還沒看——要看一下嗎？"), brandDir)).toBe(false);
   });
 
   it("新版的用詞開場白不會被誤判", () => {

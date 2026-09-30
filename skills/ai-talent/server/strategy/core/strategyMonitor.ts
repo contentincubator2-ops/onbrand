@@ -1,6 +1,6 @@
 /**
  * strategyMonitor — 策略監測：為品牌與產品設監測清單，受眾或競爭者有變化時
- * 亮出情報，提醒回策略工作台調整哪個錨點。
+ * 亮出情報，提醒回頭看哪一張定位卡（2026-09-30 前是「回策略工作台調整錨點」，工作台已刪）。
  *
  * 2026-09-08 (CJ「有一群人，策略層上，如果發現用戶有變化的時候，或是競爭者有
  * 變化的時候，會亮出情報，提醒用戶要調整策略。為他的品牌和產品，都設定好監測
@@ -321,6 +321,25 @@ export async function listAlerts(brandId: number, days = 60): Promise<StrategyAl
   return (rows as any[]).map(rowToAlert);
 }
 
+/**
+ * 2026-09-30（CJ「策略監測有新的資料的時候，可以跳出通知，也會在品牌 mission tray
+ * 跳出通知」）：全站每一頁都會輪詢這支，所以只回數字與最新一則的標題，不回整份清單。
+ * 「新」＝status 'new'（面板上的「未讀」），時間窗跟 listAlerts 一樣，兩邊的數字才對得上。
+ */
+export async function unreadAlertSummary(brandId: number, days = 60): Promise<{
+  count: number; latestId: number | null; latestTitle: string | null;
+}> {
+  const where = `WHERE brandId = ? AND status = 'new' AND createdAt > NOW() - INTERVAL ? DAY`;
+  const [cRows]: any = await localPool.execute(`SELECT COUNT(*) AS c FROM strategy_alerts ${where}`, [brandId, days]);
+  const count = Number((cRows as any[])[0]?.c ?? 0);
+  if (count === 0) return { count: 0, latestId: null, latestTitle: null };
+  const [rows]: any = await localPool.execute(
+    `SELECT id, title FROM strategy_alerts ${where} ORDER BY id DESC LIMIT 1`, [brandId, days],
+  );
+  const r = (rows as any[])[0];
+  return { count, latestId: r ? Number(r.id) : null, latestTitle: r ? (String(r.title ?? "") || null) : null };
+}
+
 export async function setAlertStatus(args: { userId: number; id: number; status: AlertStatus }): Promise<void> {
   await localPool.execute(
     `UPDATE strategy_alerts SET status = ? WHERE id = ? AND userId = ?`,
@@ -358,7 +377,7 @@ function digestPrompt(a: Awaited<ReturnType<typeof loadAnchors>>, watch: Strateg
   ).join("\n");
   return [
     `你是品牌的策略顧問。下面是品牌的三個錨點，以及近兩週掃到的市場情報。`,
-    `你的工作：判斷有沒有「重要到該回策略工作台調整錨點」的變化。沒有就回空陣列，這很常見，不要硬找。`,
+    `你的工作：判斷有沒有「重要到該回頭調整品牌定位」的變化。沒有就回空陣列，這很常見，不要硬找。`,
     ``,
     `【品牌】${a.name}${a.industry ? `（${a.industry}）` : ""}${watch.scope === "product" ? `　【監測對象：產品】${a.scopeName}` : ""}`,
     `【受眾錨點】${a.audience || "（未填）"}`,
@@ -373,7 +392,8 @@ function digestPrompt(a: Awaited<ReturnType<typeof loadAnchors>>, watch: Strateg
     `規則：`,
     `1. 每則提醒必須指回至少一則情報的編號（evidence），不能只憑推測。`,
     `2. kind 只能是 competitor_move（競爭者動作）、audience_shift（受眾變化）、market_trend（市場趨勢）。`,
-    `3. anchor 只能是 audience、competition、differentiation、tagline、none —— 指出該回工作台看哪一格。`,
+    `3. anchor 只能是 audience、competition、differentiation、tagline、none —— 指出該回頭看哪一張定位卡（受眾／競爭格局／差異化／標語）。`,
+    `   （2026-09-30 策略工作台已刪除：suggestion 不要叫使用者「回工作台」，要說回哪一張定位卡、改什麼。）`,
     `4. 最多 3 則，只留真的重要的。summary 講「發生了什麼、為什麼跟這個品牌有關」，suggestion 是一句具體建議。`,
     `5. 全部繁體中文（台灣用語）。只輸出 JSON，不要前言。`,
     ``,

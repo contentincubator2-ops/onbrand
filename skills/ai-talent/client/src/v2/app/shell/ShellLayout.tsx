@@ -25,6 +25,7 @@ import SupportDrawer from "../../platform/components/SupportDrawer";
 // 2026-09-23（CJ「在每一頁派一個常駐的顧問…我喜歡在右上方的位置」）：
 // 跟 Mia（客服，右下角）刻意分開的第二個全域常駐入口。
 import StrategyDirectorDrawer from "../../strategy/components/positioning/StrategyDirectorDrawer";
+import StrategyMonitorNotice from "../../strategy/components/positioning/StrategyMonitorNotice";
 import NavItemPicker from "./NavItemPicker";
 // 2026-06-12 (CJ「Mia 細緻化 + 不要自動跳出」): unread-nudge state lives in
 // sessionStorage; this hook surfaces the count for the avatar badge and
@@ -683,6 +684,8 @@ export default function ShellLayout() {
         onNudgesConsumed={() => setDrainedNudges([])}
       />
       <StrategyDirectorDrawer brandId={brandId} />
+      {/* 2026-09-30（CJ「策略監測有新的資料的時候，可以跳出通知」）：全站每一頁都看得到。 */}
+      <StrategyMonitorNotice brandId={scope.brandId ?? null} />
 
       {/* Bottom-left toast feed for background positioning pipeline completions */}
       <PositioningNotificationCenter />
@@ -798,6 +801,13 @@ function IconBar({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentPath]);
   const railStatus = onContentRail ? railStatusQ.data : undefined;
+  // 2026-09-30（CJ「策略監測有新的資料的時候…也會在品牌 mission tray 跳出通知」）：
+  // 策略層 rail 的「品牌」圖示角落顯示未讀情報數。跟左下角通知、定位頁 chip 同一支查詢。
+  const monitorUnreadQ = (trpc as any).strategyMonitor.unreadSummary.useQuery(
+    { brandId: scope.brandId ?? 0 },
+    { enabled: !!scope.brandId && onStrategyRail, refetchOnWindowFocus: true, refetchInterval: 5 * 60_000, staleTime: 30_000 },
+  );
+  const monitorUnread = onStrategyRail ? Number(monitorUnreadQ.data?.count ?? 0) : 0;
   const isStrategyPreview = isStrategyPreviewEmail(userEmail);
   // 2026-08-20: 策略 added as a first-class workspace mode. 2026-09-08 市場
   // removed with the market-data layer (not on the price list). Order follows
@@ -1027,7 +1037,9 @@ function IconBar({
         {(() => {
           const renderItem = (item: NavItem) => {
           const meter = item.to === "/planner" && railStatus ? { done: railStatus.written, total: railStatus.total } : undefined;
-          const badge = item.id ? railStatus?.pendingByNav?.[item.id] : undefined;
+          const isBrandItem = item.catKey === "positioning" && monitorUnread > 0;
+          const badge = isBrandItem ? monitorUnread : item.id ? railStatus?.pendingByNav?.[item.id] : undefined;
+          const badgeTip = isBrandItem ? (isEn ? `${monitorUnread} new strategy alert${monitorUnread === 1 ? "" : "s"}` : `策略監測有 ${monitorUnread} 則新情報`) : undefined;
           // 2026-05-12 (CJ「按了連結還是顯示為品牌區」): pick the MOST SPECIFIC
           // matching item. If another nav item has a longer matching prefix,
           // this one yields. e.g. on /brands/settings, the 連結 item (prefix
@@ -1055,7 +1067,7 @@ function IconBar({
             }
           }
           const isActive = myMatches && !beatenByMoreSpecific;
-          return <IconNavLink key={item.to} item={item} active={isActive} meter={meter} badge={badge} en={isEn} onClick={() => onNavigate(item.to)} />;
+          return <IconNavLink key={item.to} item={item} active={isActive} meter={meter} badge={badge} badgeTip={badgeTip} en={isEn} onClick={() => onNavigate(item.to)} />;
           };
           // 2026-09-30：內容層 rail 分三段——最上本週企劃；中段是這個品牌自己加的平台（＋ 在最後）；下段固定靈感、專案、活動。
           // 策略層、成效層的 rail 沒有 group，照舊整排渲染。
@@ -1731,9 +1743,11 @@ function BrainSummaryPanel({
 const SOWORK_ORANGE = "#F37E4A";
 const SOWORK_ORANGE_TEXT = "#B4501F"; // 橘色文字要夠深才讀得清楚
 
-function IconNavLink({ item, active, onClick, meter, badge, en }: {
+function IconNavLink({ item, active, onClick, meter, badge, badgeTip, en }: {
   item: NavItem; active: boolean; onClick: () => void;
   meter?: { done: number; total: number }; badge?: number; en?: boolean;
+  /** 數字的意思不是「這週待寫篇數」時（例如品牌圖示上的未讀情報數），用這句當說明。 */
+  badgeTip?: string;
 }) {
   const [hovered, setHovered] = React.useState(false);
   const [tooltipTop, setTooltipTop] = React.useState(0);
@@ -1742,7 +1756,7 @@ function IconNavLink({ item, active, onClick, meter, badge, en }: {
   const tip = meter
     ? `${item.label}${en ? ` · ${meter.done} of ${meter.total} written` : `・已寫 ${meter.done}／排定 ${meter.total} 篇`}`
     : badge
-      ? `${item.label}${en ? ` · ${badge} to write this week` : `・這週還有 ${badge} 篇沒寫`}`
+      ? badgeTip ? `${item.label}・${badgeTip}` : `${item.label}${en ? ` · ${badge} to write this week` : `・這週還有 ${badge} 篇沒寫`}`
       : item.label;
 
   return (

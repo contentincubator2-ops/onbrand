@@ -29,11 +29,11 @@ import { trpc } from "../../../../lib/trpc";
 import { useLang } from "../../../../lib/i18n";
 import { type StrategistDirector, signatureQuestionsOf } from "../../lib/strategistDirectors";
 
-type StrategistAction = { kind: "open_monitor" | "open_healthcheck"; label: string };
+type StrategistAction = { kind: "open_monitor"; label: string };
 type ChatMessage = { id: number; role: string; content: string; actions?: StrategistAction[]; followUps?: string[] };
 
 export default function StrategyDirectorChat({
-  brandId, agentId, productId, director, height, onOpenMonitor, onOpenHealthCheck,
+  brandId, agentId, productId, director, height, onOpenMonitor,
   onOpenHistory, viewingConversationId, onBackToCurrent,
 }: {
   brandId: number;
@@ -46,8 +46,6 @@ export default function StrategyDirectorChat({
   height: number;
   /** 使用者點了「看看外部有什麼變化」建議按鈕——打開策略監測面板。 */
   onOpenMonitor: () => void;
-  /** 使用者點了「帶我去做健檢」建議按鈕——打開策略健檢面板。 */
-  onOpenHealthCheck: () => void;
   /**
    * 2026-09-26（CJ「按一個鈕，跳出一個視窗，決定要看跟哪個 AGENT 的對話紀錄」）：
    * 開歷史視窗。放在 Drawer 而不是這裡，因為選了別位的紀錄要連人一起換——
@@ -153,7 +151,6 @@ export default function StrategyDirectorChat({
 
   const runAction = (a: StrategistAction) => {
     if (a.kind === "open_monitor") onOpenMonitor();
-    else if (a.kind === "open_healthcheck") onOpenHealthCheck();
   };
 
   // 追問建議只掛在「最後一則」總監訊息上——舊訊息底下留著一排過期的追問，
