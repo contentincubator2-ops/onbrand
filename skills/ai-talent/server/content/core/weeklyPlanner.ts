@@ -221,24 +221,40 @@ export interface CampaignSlot {
   eventId: number; eventName: string; itemId: string; date: string; platform: string;
   taskId: string; taskLabel: string; angle: string; outputId: number | null;
 }
+/**
+ * 一份活動企劃裡、落在這一週的格子。純函式。
+ *
+ * 2026-09-30（CJ「策略層只排不寫…定稿以後，再到內容層寫內容…決定哪些行動方案，例如
+ * 某一天的貼文，要排程到本周企畫的行事曆上」）：
+ *   · 只收定稿（lockedAt）的企劃——草稿還在改，排進行事曆等於叫人寫一篇可能會被換掉的。
+ *   · 內容層在活動日曆上按了「不排進本週企劃」（inPlanner === false）的那篇不收。
+ */
+export function campaignItemsInWeek(
+  event: { id: number; name: string }, plan: any, weekStart: string,
+): CampaignSlot[] {
+  if (!plan?.lockedAt) return [];
+  const end = addDays(weekStart, 7);
+  const out: CampaignSlot[] = [];
+  for (const it of Array.isArray(plan?.items) ? plan.items : []) {
+    if (it?.enabled === false || it?.inPlanner === false) continue;
+    const date = String(it?.date ?? "");
+    if (!isYmd(date) || date < weekStart || date >= end) continue;
+    if (isHiddenHistoryItem({ platform: it?.platform, taskId: it?.taskId })) continue;
+    out.push({
+      eventId: event.id, eventName: event.name, itemId: String(it.id), date,
+      platform: String(it.platform ?? ""), taskId: String(it.taskId ?? ""), taskLabel: String(it.taskLabel ?? ""),
+      angle: String(it.angle ?? ""), outputId: it.outputId ? Number(it.outputId) : null,
+    });
+  }
+  return out;
+}
+
 /** 這一週裡，品牌各活動企劃排到的格子（活動企劃存在 events.positioning.campaignPlan）。 */
 export async function loadWeekCampaignItems(brandId: number, weekStart: string): Promise<CampaignSlot[]> {
-  const end = addDays(weekStart, 7);
   const [rows]: any = await localPool.execute(`SELECT id, name, positioning FROM events WHERE brandId = ?`, [brandId]);
   const out: CampaignSlot[] = [];
   for (const e of rows as any[]) {
-    const plan = parse(e.positioning)?.campaignPlan;
-    for (const it of Array.isArray(plan?.items) ? plan.items : []) {
-      if (it?.enabled === false) continue;
-      const date = String(it?.date ?? "");
-      if (!isYmd(date) || date < weekStart || date >= end) continue;
-      if (isHiddenHistoryItem({ platform: it?.platform, taskId: it?.taskId })) continue;
-      out.push({
-        eventId: Number(e.id), eventName: String(e.name ?? ""), itemId: String(it.id), date,
-        platform: String(it.platform ?? ""), taskId: String(it.taskId ?? ""), taskLabel: String(it.taskLabel ?? ""),
-        angle: String(it.angle ?? ""), outputId: it.outputId ? Number(it.outputId) : null,
-      });
-    }
+    out.push(...campaignItemsInWeek({ id: Number(e.id), name: String(e.name ?? "") }, parse(e.positioning)?.campaignPlan, weekStart));
   }
   return out.sort((a, b) => a.date.localeCompare(b.date));
 }

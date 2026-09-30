@@ -80,6 +80,8 @@ export interface PlanItem extends Beat {
   scheduledAt?: string | null;
   /** 這一格的卡是模型選的，還是驗證失敗後我們補上的——使用者有權知道。 */
   repaired?: boolean;
+  /** 內容層可以把某一篇拿出本週企劃（false）；沒有這個欄位＝定稿後照日期進本週企劃。 */
+  inPlanner?: boolean;
 }
 
 export interface PartnerStep { id: string; text: string; taskId?: string; taskLabel?: string; done?: boolean }

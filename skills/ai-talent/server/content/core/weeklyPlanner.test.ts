@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { addDays, mondayOf, parsePlannerReply, railStatusOf, validateOps, weekDays, type SlotRow } from "./weeklyPlanner";
+import { addDays, campaignItemsInWeek, mondayOf, parsePlannerReply, railStatusOf, validateOps, weekDays, type SlotRow } from "./weeklyPlanner";
 import { FORK_AXES, PLANNER_AXES, isForkAxis, topicOverlap } from "./plannerAdvisors";
 import { plannerRouter } from "../routers/plannerRouter";
 
@@ -111,5 +111,27 @@ describe("railStatusOf（側欄儀表）", () => {
   });
   it("空的一週", () => {
     expect(railStatusOf([], [])).toEqual({ total: 0, written: 0, pendingByNav: {} });
+  });
+});
+
+describe("campaignItemsInWeek（活動企劃進本週企劃）", () => {
+  const ev = { id: 31, name: "上市活動" };
+  const item = (id: string, date: string, extra: any = {}) => ({ id, date, platform: "facebook", taskId: "fb-post", taskLabel: "FB 貼文", angle: id, enabled: true, ...extra });
+  const items = [
+    item("in", "2026-11-02"),
+    item("next-week", "2026-11-09"),
+    item("skipped", "2026-11-03", { enabled: false }),
+    item("opted-out", "2026-11-04", { inPlanner: false }),
+    item("written", "2026-11-05", { outputId: 7 }),
+  ];
+
+  it("草稿（還沒定稿）的企劃一篇都不進", () => {
+    expect(campaignItemsInWeek(ev, { items }, "2026-11-02")).toEqual([]);
+  });
+
+  it("定稿後：只收這一週、要做、而且沒被拿掉的", () => {
+    const out = campaignItemsInWeek(ev, { items, lockedAt: "2026-10-01T00:00:00Z" }, "2026-11-02");
+    expect(out.map((c) => c.itemId)).toEqual(["in", "written"]);
+    expect(out[1]).toMatchObject({ eventId: 31, eventName: "上市活動", outputId: 7 });
   });
 });

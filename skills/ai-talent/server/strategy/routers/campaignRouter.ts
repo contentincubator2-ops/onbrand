@@ -18,6 +18,7 @@
  *   markWritten — 某一格寫完了，回貼產出（策略層的 ✓ 從這裡來）
  *   setLock     — 定稿／解鎖（2026-09-30 CJ「定稿一次鎖整份」）
  *   chat        — 跟內容企劃對話：回覆＋提案（不寫入；套用走 savePlan）
+ *   setInPlanner— 內容層決定某一篇要不要排進本週企劃（定稿後也能改，它是排程不是企劃內容）
  *   setBackdrop — 策略畫面的底圖模板（用戶自己選；不受定稿影響，它不是企劃內容）
  *
  * 定稿之後 saveSettings／generate／savePlan 一律拒絕——鎖的是整份，不是只鎖
@@ -60,6 +61,7 @@ const planItemInput = z.object({
   outputId: z.number().nullable().optional(),
   scheduledAt: z.string().nullable().optional(),
   repaired: z.boolean().optional(),
+  inPlanner: z.boolean().optional(),
 });
 
 const PHASE_KEYS = ["teaser", "launch", "sustain", "lastcall", "encore"] as const;
@@ -296,6 +298,20 @@ export const campaignRouter = router({
       }
     }),
 
+  /** 某一篇要不要排進本週企劃。只改這一個欄位，定稿後也可以（見檔頭）。 */
+  setInPlanner: protectedProcedure
+    .input(z.object({ eventId: z.number().int().positive(), itemId: z.string().max(80), inPlanner: z.boolean() }))
+    .mutation(async ({ ctx, input }) => {
+      const row = await loadEvent(input.eventId, ctx.user!.id);
+      const pos = parsePositioning(row.positioning);
+      const plan = pos.campaignPlan as CampaignPlan | undefined;
+      const item = plan?.items?.find((i) => i.id === input.itemId);
+      if (!plan || !item) throw new TRPCError({ code: "NOT_FOUND", message: "企劃上找不到這一篇" });
+      item.inPlanner = input.inPlanner;
+      await patchPositioning(input.eventId, ctx.user!.id, "campaignPlan", plan);
+      return { ok: true };
+    }),
+
   /** 底圖模板。null＝回到依產業自動挑。模板清單在前端（campaignBackdrops.ts），這裡只擋明顯不對的值。 */
   setBackdrop: protectedProcedure
     .input(z.object({ eventId: z.number().int().positive(), backdrop: z.string().regex(/^[a-z][a-z0-9-]{1,30}$/).nullable() }))
@@ -326,6 +342,7 @@ export const campaignRouter = router({
   trayList: protectedProcedure
     .input(z.object({ brandId: z.number().int().positive() }))
     .query(async ({ ctx, input }) => {
+      // 2026-09-30：只列定稿的企劃（策略層只排不寫，定稿後才到內容層寫）。
       const [rows]: any = await localPool.execute(
         `SELECT id, name, startAt, endAt, positioning FROM events
           WHERE brandId = ? AND userId = ? ORDER BY COALESCE(startAt, createdAt) DESC LIMIT 50`,
@@ -335,7 +352,7 @@ export const campaignRouter = router({
       return (rows as any[]).flatMap((row) => {
         const pos = parsePositioning(row.positioning);
         const plan = pos.campaignPlan as CampaignPlan | undefined;
-        if (!plan?.items?.length) return [];
+        if (!plan?.items?.length || !plan.lockedAt) return [];
         const items = plan.items.filter((i) => i.enabled && !isHiddenPlanItem(i));
         const done = items.filter((i) => !!i.outputId).length;
         const endAt = row.endAt ? new Date(row.endAt).toISOString().slice(0, 10) : null;

@@ -21,12 +21,18 @@
  *
  * 讀的是同一筆 campaignPlan（策略層改了切角，這裡下一次進來就是新的）；這一頁
  * 沒有「要不要做這篇」的決策，那是策略層的事。
+ *
+ * 2026-09-30（CJ「都定稿以後，再到內容層寫內容…決定哪些行動方案，例如某一天的貼文，
+ * 要排程到本周企畫的行事曆上」）：
+ *   · 只有定稿的企劃會出現在這裡（trayList 已經擋）；直接開一份還沒定稿的，請他回策略層。
+ *   · 點某一天打開的視窗裡，每一篇下面有「排進本週企劃」——預設是排進去的，關掉那篇
+ *     就不會出現在本週企劃（campaign.setInPlanner）。
  */
 import { IllustratedEmpty } from "../../platform/components/EmptyIllustration";
 import React from "react";
 import { useNavigate, useSearchParams, useOutletContext } from "react-router-dom";
 import {
-  Button, Card, CardBody, Chip, Modal, ModalContent, ModalHeader, ModalBody, Progress, Spinner, Tooltip,
+  Button, Card, CardBody, Chip, Modal, ModalContent, ModalHeader, ModalBody, Progress, Spinner, Switch, Tooltip,
 } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faCheck, faPenNib, faCalendarDays, faChevronLeft } from "@fortawesome/free-solid-svg-icons";
@@ -65,6 +71,13 @@ export default function CampaignTrayPage() {
   const oneQ = (trpc as any).campaign.get.useQuery(
     { eventId: eventId ?? 0 }, { enabled: !!eventId, refetchOnWindowFocus: false },
   );
+  const utils = (trpc as any).useUtils();
+  const inPlannerMut = (trpc as any).campaign.setInPlanner.useMutation({
+    onSuccess: () => {
+      utils?.campaign?.get?.invalidate?.({ eventId: eventId ?? 0 });
+      utils?.planner?.invalidate?.();
+    },
+  });
 
   const openItem = React.useCallback((item: any) => {
     const sp = new URLSearchParams();
@@ -78,7 +91,7 @@ export default function CampaignTrayPage() {
   // ?start=1 / ?item= 的自動開卡：交棒要一路到底，不是把人丟在日曆前面再找一次。
   const firedRef = React.useRef(false);
   React.useEffect(() => {
-    if (firedRef.current || !oneQ.data?.plan?.items?.length) return;
+    if (firedRef.current || !oneQ.data?.plan?.items?.length || !oneQ.data.plan.lockedAt) return;
     const items = oneQ.data.plan.items.filter((i: any) => i.enabled);
     const target = wantItem
       ? items.find((i: any) => i.id === wantItem)
@@ -188,7 +201,7 @@ export default function CampaignTrayPage() {
             </p>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
-            {next && (
+            {next && plan?.lockedAt && (
               <Button size="sm" color="primary" radius="md" onPress={() => openItem(next)}>
                 {L("寫下一篇", "Write next")}
               </Button>
@@ -201,7 +214,21 @@ export default function CampaignTrayPage() {
         </header>
       )}
 
-      {plan && items.length === 0 && (
+      {plan && !plan.lockedAt && (
+        <Card shadow="none" className="border-2 border-dashed border-divider">
+          <CardBody className="py-14 items-center text-center gap-3">
+            <FontAwesomeIcon icon={faCalendarDays} className="text-4xl text-default-300" />
+            <p className="text-medium font-medium">{L("這份企劃還沒定稿", "This plan isn't locked yet")}</p>
+            <p className="text-small text-default-500">{L("策略層定稿之後，才會在這裡一篇一篇寫。", "Lock it in Strategy first, then write it here.")}</p>
+            <Button size="sm" color="primary" radius="md"
+              onPress={() => navigate(`/brands/edit?cat=campaign&e=${eventId}${brandId ? `&b=${brandId}` : ""}`)}>
+              {L("回策略層定稿", "Go lock the plan")}
+            </Button>
+          </CardBody>
+        </Card>
+      )}
+
+      {plan?.lockedAt && items.length === 0 && (
         <Card shadow="none" className="border-2 border-dashed border-divider">
           <CardBody className="py-16 items-center text-center gap-3">
             <FontAwesomeIcon icon={faCalendarDays} className="text-4xl text-default-300" />
@@ -211,7 +238,7 @@ export default function CampaignTrayPage() {
         </Card>
       )}
 
-      {weeks.length > 0 && (
+      {plan?.lockedAt && weeks.length > 0 && (
         <Card shadow="none" radius="md" className="border border-divider overflow-hidden">
           <div className="grid grid-cols-7 bg-default-50">
             {WEEKDAYS.map((d) => (
@@ -281,8 +308,8 @@ export default function CampaignTrayPage() {
                 const ph = phaseOf(i.phase);
                 const written = !!i.outputId;
                 return (
+                  <div key={i.id} className="flex flex-col gap-2">
                   <TaskCardShell
-                    key={i.id}
                     onClick={() => (written ? navigate(`/run/${i.outputId}`) : openItem(i))}
                     ariaLabel={i.angle}
                     media={<>
@@ -309,6 +336,11 @@ export default function CampaignTrayPage() {
                       </span>
                     </div>
                   </TaskCardShell>
+                  <Switch size="sm" isSelected={i.inPlanner !== false} isDisabled={inPlannerMut.isPending}
+                    onValueChange={(v) => inPlannerMut.mutate({ eventId, itemId: i.id, inPlanner: v })}>
+                    <span className="text-tiny text-default-600">{L("排進本週企劃", "Add to this week's plan")}</span>
+                  </Switch>
+                  </div>
                 );
               })}
             </div>
