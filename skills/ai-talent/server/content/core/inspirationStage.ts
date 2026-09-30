@@ -108,7 +108,7 @@ export const THINKER_KEYS = THINKERS.map((t) => t.key);
 export const DEFAULT_LINEUP: ThinkerKey[] = ["story", "direct", "contrarian", "insight", "customer"];
 export const LINEUP_SIZE = 5;
 
-export function isThinkerKey(s: unknown): s is ThinkerKey {
+function isThinkerKey(s: unknown): s is ThinkerKey {
   return typeof s === "string" && (THINKER_KEYS as string[]).includes(s);
 }
 export function thinkerOf(key: ThinkerKey): Thinker {
@@ -203,7 +203,7 @@ export interface Angle {
   format: string;
 }
 
-export const FORMATS_ZH = ["貼文", "輪播", "Reels", "限時動態"];
+const FORMATS_ZH = ["貼文", "輪播", "Reels", "限時動態"];
 
 /**
  * 一輪只打一次模型：陣容裡每一位的思考框架都放進同一份提示詞，讓模型看得到別人想了什麼。

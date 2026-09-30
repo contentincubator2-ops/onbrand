@@ -39,7 +39,7 @@ const dayLabel = (ymd: string, en: boolean) => {
 };
 
 type ThinkerKey = string;
-interface ThinkerCard { key: ThinkerKey; agentId: number; name: string; title: string; avatarUrl: string; school: string; schoolEn: string; pitch: string; pitchEn: string }
+interface ThinkerCard { key: ThinkerKey; name: string; avatarUrl: string; school: string; schoolEn: string; pitch: string; pitchEn: string }
 interface AngleView { id: string; thinker: ThinkerKey; answer?: string; title: string; hook: string; why: string; platform: string; format: string; adopted?: { date: string } }
 type Subject = { kind: "brand" | "product" | "event"; id: number | null };
 
@@ -86,8 +86,6 @@ export default function InspirationPage() {
   const [angles, setAngles] = React.useState<AngleView[]>([]);
   /** 正在想的 thinker（整輪時是整個陣容；「請他再想」時只有他）。 */
   const [thinking, setThinking] = React.useState<ThinkerKey[]>([]);
-  /** 整輪重想時，舊的（沒採用的）切角先收起來，每位都顯示「在想」。 */
-  const [replacing, setReplacing] = React.useState(false);
   const [swapFor, setSwapFor] = React.useState<ThinkerKey | "add" | null>(null);
   const [adoptFor, setAdoptFor] = React.useState<AngleView | null>(null);
   const [writing, setWriting] = React.useState<Omit<TaskEmbed, "onClose"> | null>(null);
@@ -113,7 +111,7 @@ export default function InspirationPage() {
   /** 換品牌、離開頁面、開新一輪時遞增——舊的輪詢看到號碼變了就停。 */
   const runSeq = React.useRef(0);
   React.useEffect(() => () => { runSeq.current++; }, []);
-  React.useEffect(() => { runSeq.current++; setThinking([]); setReplacing(false); }, [brandId]);
+  React.useEffect(() => { runSeq.current++; setThinking([]); }, [brandId]);
 
   /**
    * 2026-09-30（CJ「邊想邊顯示」）：開始後伺服器立刻回 jobId，想好一張就能拿走一張；
@@ -125,7 +123,8 @@ export default function InspirationPage() {
     const batch = newId();
     const before = angles;
     setThinking(opts.keys);
-    setReplacing(opts.mode === "replace");
+    // 整輪重想：沒採用的舊卡先收起來（失敗時用 before 還原）。
+    if (opts.mode === "replace") setAngles((cur) => cur.filter((a) => a.adopted));
     const place = (list: any[]) => setAngles((cur) => {
       const rest = cur.filter((a) => !a.id.startsWith(batch));
       const fresh: AngleView[] = list.map((a, i) => ({ ...a, id: `${batch}-${i}` }));
@@ -147,7 +146,6 @@ export default function InspirationPage() {
         last = await utils.inspiration.ideatePoll.fetch({ jobId }, { staleTime: 0 });
         if (seq !== runSeq.current) return;
         if (last.angles.length) {
-          setReplacing(false);
           place(last.angles);
           // 已經有卡的人就不再顯示「在想」；「請他再想」只有一位，想完三張前都算在想。
           if (opts.count === 1) setThinking(opts.keys.filter((k) => !last.angles.some((a) => a.thinker === k)));
@@ -167,7 +165,7 @@ export default function InspirationPage() {
       if (seq === runSeq.current) setAngles(before);
       showToastGlobal(e?.message || (en ? "Something went wrong. Try again." : "剛剛沒想好，再試一次。"));
     } finally {
-      if (seq === runSeq.current) { setThinking([]); setReplacing(false); }
+      if (seq === runSeq.current) setThinking([]);
     }
   };
 
@@ -213,7 +211,6 @@ export default function InspirationPage() {
 
   const busy = thinking.length > 0;
   const bench = thinkers.filter((t) => !lineup.includes(t.key));
-  const shown = replacing ? angles.filter((a) => a.adopted) : angles;
 
   const subjectBtn = (kind: Subject["kind"], label: string) => (
     <button type="button" onClick={() => setSubject({ kind, id: kind === "brand" ? null : (kind === "product" ? products[0]?.id : events[0]?.id) ?? null })}
@@ -373,7 +370,7 @@ export default function InspirationPage() {
         {(angles.length > 0 || busy) && (
           <section aria-label={en ? "Angles" : "切角"} className="flex flex-col gap-4">
             <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))" }}>
-              {shown.map((a) => (
+              {angles.map((a) => (
                 <AngleCard key={a.id} a={a} t={byKey(a.thinker)} en={en} busy={busy}
                   inLineup={lineup.includes(a.thinker)}
                   platformLabel={platforms.find((p) => p.id === a.platform)?.label ?? a.platform}
