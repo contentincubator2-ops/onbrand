@@ -243,7 +243,7 @@ export default function InspirationPage() {
       </div>
 
       {/* 2026-09-30（CJ「排版要跟七日發布台一樣，標題位置不能跟其他頁不一致」）：
-          canonical header template — 眉標／標題／襯線副標／適合，同 /theater、/projects、/brands。 */}
+          canonical header template — 眉標／標題／襯線副標／適合，同 /projects、/brands。 */}
       <div className="max-w-[1400px] mx-auto px-6 pt-10 pb-4">
         <div className="flex items-end justify-between flex-wrap gap-4 mb-4">
           <div className="text-center mx-auto" style={{ flex: "1 1 auto" }}>
