@@ -68,8 +68,8 @@ export default function AddonRequestModal({ isOpen, onClose }: { isOpen: boolean
           ) : !statusQ.data?.eligible ? (
             <p className="text-[13px] text-default-700">
               {en
-                ? "This add-on requires an active OnBrand Professional (NT$9,000 / month) subscription."
-                : "這個加購須搭配 OnBrand 專業（NT$9,000／月）訂閱。"}
+                ? "This add-on requires an active onBrand Studio Professional (NT$9,000 / month) subscription."
+                : "這個加購須搭配 onBrand Studio 專業版（NT$9,000／月）訂閱。"}
             </p>
           ) : submitted ? (
             <div className="space-y-2 text-[13px]">

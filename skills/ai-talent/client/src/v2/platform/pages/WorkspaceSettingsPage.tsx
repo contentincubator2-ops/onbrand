@@ -33,8 +33,8 @@ const ROLE_LABEL_EN: Record<Role, string> = {
 const PLAN_LABEL: Record<string, string> = {
   trial:        "Trial",
   solo:         "Solo",
-  drop_starter: "OnBrand 基礎",
-  drop_pro:     "OnBrand 專業",
+  drop_starter: "onBrand Studio 基礎版",
+  drop_pro:     "onBrand Studio 專業版",
   enterprise:   "Enterprise",
 };
 
@@ -327,7 +327,7 @@ function WorkspaceDetail({ detail, onChanged }: { detail: any; onChanged: () => 
             )}
             <p className="mt-2 text-xs text-neutral-400">
               {lang === "en"
-                ? "They'll need an OnBrand account first. Basic: 2 seats; Professional: 5 seats."
+                ? "They'll need an onBrand Studio account first. Basic: 2 seats; Professional: 5 seats."
                 : "對方需先在 onbrand.sowork.ai 註冊。基礎方案 2 席，專業方案 5 席。"}
             </p>
           </div>

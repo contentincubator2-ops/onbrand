@@ -1,5 +1,5 @@
 /**
- * Pricing page — 照 2026-09-06 定案的《OnBrand 方案與報價》（Word）排版。
+ * Pricing page — 照 2026-09-06 定案的《onBrand Studio 方案與報價》（Word）排版。
  *
  * 數字是合約，不是文案：2026-09-29 起前台只列爆款結構＋品牌自建兩類卡、七個通路，
  * 對外只講爆款結構卡張數與通路數（一律引用 catalogFigures，
@@ -102,7 +102,7 @@ export default function PricingPage() {
   }[] = [
     {
       code: "drop_starter",
-      name: isEn ? "OnBrand Basic" : "OnBrand 基礎",
+      name: isEn ? "onBrand Studio Basic" : "onBrand Studio 基礎版",
       seats: isEn ? "2 seats" : "2 席",
       sub: isEn ? `1 brand · pick 2 of ${CATALOG.channels} channels (swap monthly)` : `1 個品牌 · ${CATALOG.channels} 個通路選 2（每月可更換）`,
       monthly: price.starter,
@@ -125,7 +125,7 @@ export default function PricingPage() {
     },
     {
       code: "drop_pro",
-      name: isEn ? "OnBrand Professional" : "OnBrand 專業",
+      name: isEn ? "onBrand Studio Professional" : "onBrand Studio 專業版",
       seats: isEn ? "5 seats" : "5 席",
       sub: isEn ? `1 brand · pick 5 of ${CATALOG.channels} channels (swap monthly)` : `1 個品牌 · ${CATALOG.channels} 個通路選 5（每月可更換）`,
       monthly: price.pro,
@@ -152,7 +152,7 @@ export default function PricingPage() {
     ["Why does Professional come with 5 seats?", "Because of the review workflow. The person producing and the person approving must be different people, otherwise review is a formality: marketer, ads specialist, performance analyst, mid-level manager (approves), owner (dashboard)."],
     ["Can I change my channels?", `Yes, once a month. You pick from ${CATALOG.channels} channels: Facebook, Instagram, Threads, LINE, TikTok, Email and Website (Basic 2, Professional 5).`],
     ["What is an own task card?", "Paste the output you actually want (say, 10 of your best promo posts); the AI reverse-engineers it into a SKILL, you approve a test write, and it goes into your Brand Task Library. Length, rhythm, opening and CTA placement are measured from your samples and later used as acceptance criteria."],
-    ["Do add-ons require the Professional plan?", "Yes. Both the strategy-consultant onboarding and the e-commerce operations report require an active OnBrand Professional (NT$9,000 / month) subscription."],
+    ["Do add-ons require the Professional plan?", "Yes. Both the strategy-consultant onboarding and the e-commerce operations report require an active onBrand Studio Professional (NT$9,000 / month) subscription."],
     ["Why are viral-structure cards refreshed monthly?", "Viral structures expire: only 27% of TikTok trends survive two weeks. Every viral card carries its spread metric and the month it was measured, and the set is refreshed monthly."],
     ["What happens when my trial ends?", "Trial stops when EITHER the 7 days OR your 1,000 trial points run out — whichever comes first. You keep read access to your history but cannot generate new content."],
     ["Can I cancel anytime?", "Yes. Cancel in Account settings whenever you want. You keep access until the current period ends, then no more charges."],
@@ -164,7 +164,7 @@ export default function PricingPage() {
     ["為什麼專業方案是 5 席？", "因為有審核工作流。產出的人與放行的人必須分開，否則審核只是形式：行銷人員、廣告人員、成效人員、中階主管（審核放行）、負責人（看整體看板）。"],
     ["通路選了可以換嗎？", `可以，每月可更換一次，從 ${CATALOG.channels} 個通路（Facebook、Instagram、Threads、LINE、TikTok、電子報、官網）裡選：基礎 2 個、專業 5 個。`],
     ["自建任務卡是什麼？", "把你自己理想中的成品（例如 10 篇促購文）貼上來，AI 反推成 SKILL，試寫確認後上架，存入品牌任務庫。字數上下限、節奏、開場方式、CTA 位置全部從你貼的成品量出來，之後回頭當驗收標準。"],
-    ["加購一定要搭配專業方案嗎？", "是。策略顧問導入與電商營運報告都必須搭配 OnBrand 專業（NT$9,000／月）訂閱。"],
+    ["加購一定要搭配專業方案嗎？", "是。策略顧問導入與電商營運報告都必須搭配 onBrand Studio 專業版（NT$9,000／月）訂閱。"],
     ["爆款結構卡為什麼要每月更新？", "爆款結構會過期：TikTok 只有 27% 的趨勢活過兩週。所以每張爆款卡都印著傳播數字與量測年月，並每月更新。"],
     ["試用期過了會怎樣？", "試用在「7 天到期」或「1,000 試用點數用完」時停止，先到先停。到期後仍可查看歷史紀錄，但不能再產出。"],
     ["可以中途取消嗎？", "可以，隨時於「帳號設定」取消。當期到期前仍能正常使用，到期後不再扣款。"],
@@ -178,7 +178,7 @@ export default function PricingPage() {
     // logged-in user to register during the first-response window.
     if (!status && !statusLoading) { navigate("/auth/register"); return; }
     if (!status) return;
-    if (!checkoutMut) { window.location.href = "mailto:sowork@sowork.ai?subject=OnBrand Upgrade"; return; }
+    if (!checkoutMut) { window.location.href = "mailto:sowork@sowork.ai?subject=onBrand Studio Upgrade"; return; }
     const wsId = (status as any)?.workspaceId ?? (status as any)?.defaultWorkspaceId;
     if (!wsId) {
       showToastGlobal(isEn ? "Couldn't find your workspace — please reload and try again." : "找不到 workspace，請重新整理頁面再試一次。");
@@ -203,8 +203,8 @@ export default function PricingPage() {
             style={{ fontFamily: '"Source Serif Pro", "Noto Serif TC", Georgia, serif', fontStyle: "italic", fontSize: 15, lineHeight: 1.7, maxWidth: 640 }}
           >
             {isEn
-              ? "ChatGPT can name a source — but it makes it up. OnBrand cannot: the code blocks it."
-              : "ChatGPT 說得出出處，但它是編的。OnBrand 編不出來——程式擋著。"}
+              ? "ChatGPT can name a source — but it makes it up. onBrand Studio cannot: the code blocks it."
+              : "ChatGPT 說得出出處，但它是編的。onBrand Studio 編不出來——程式擋著。"}
           </p>
         </div>
 
@@ -329,8 +329,8 @@ export default function PricingPage() {
           <H2>{isEn ? "Add-ons" : "加購"}</H2>
           <p className="text-sm font-semibold text-neutral-900 mb-6">
             {isEn
-              ? "Both add-ons require an active OnBrand Professional (NT$9,000 / month) subscription."
-              : "以下兩項都必須搭配 OnBrand 專業（NT$9,000／月）訂閱。"}
+              ? "Both add-ons require an active onBrand Studio Professional (NT$9,000 / month) subscription."
+              : "以下兩項都必須搭配 onBrand Studio 專業版（NT$9,000／月）訂閱。"}
           </p>
 
           <div className="border border-neutral-200 rounded-xl p-6 mb-5">
@@ -449,7 +449,7 @@ export default function PricingPage() {
           <Tbl
             labelCol
             hiCol={3}
-            head={isEn ? ["", "ChatGPT · Jasper", "Swipe files\nForeplay · Motion · Atria", "OnBrand"] : ["", "ChatGPT · Jasper", "素材庫\nForeplay · Motion · Atria", "OnBrand"]}
+            head={isEn ? ["", "ChatGPT · Jasper", "Swipe files\nForeplay · Motion · Atria", "onBrand Studio"] : ["", "ChatGPT · Jasper", "素材庫\nForeplay · Motion · Atria", "onBrand Studio"]}
             rows={isEn ? [
               ["Writes it for you", "Yes", "No", "Yes"],
               ["Can say where the structure comes from", "Gives you an answer\nbut changes it when asked twice", "Gives examples\nnot structures", "Every viral card links its reference article"],
@@ -470,7 +470,7 @@ export default function PricingPage() {
           <div className="border-l-4 border-neutral-900 pl-4 space-y-2 text-sm text-neutral-800 leading-relaxed">
             <p>{isEn ? "Ask any AI: “Write me a Facebook post and tell me which viral post this structure comes from, and what that post's numbers were.”" : "問任何一個 AI：「幫我寫一則 FB 貼文，並告訴我這個結構出自哪一則爆紅內容、那則內容的數據是多少。」"}</p>
             <p className="font-semibold">{isEn ? "It will give you a case name and a set of numbers. Ask “how do you know that number” — it changes its answer." : "它會給你案例名和一組數字。再問一次「你怎麼知道那個數字」——它會改口。"}</p>
-            <p>{isEn ? "Ask OnBrand the same question and the answer is the same every time, because it is written on the card and a test forbids leaving it blank." : "同一題問 OnBrand，答案每次都一樣。因為那寫死在卡片上，而且有測試擋著不准留白。"}</p>
+            <p>{isEn ? "Ask onBrand Studio the same question and the answer is the same every time, because it is written on the card and a test forbids leaving it blank." : "同一題問 onBrand Studio，答案每次都一樣。因為那寫死在卡片上，而且有測試擋著不准留白。"}</p>
           </div>
         </div>
 
