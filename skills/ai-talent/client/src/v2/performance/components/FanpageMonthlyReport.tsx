@@ -12,8 +12,10 @@
  * LibreOffice。要看真版面的話，之後接 Google Slides API 的 thumbnail 就能換掉，
  * 右邊面板不用重做。
  */
+import { IllustratedEmpty } from "../../platform/components/EmptyIllustration";
 import React from "react";
 import { useSearchParams } from "react-router-dom";
+import { WarningIcon } from "../../platform/components/icons";
 
 type SlotRef = { slide: number; x: number; y: number; w: number; h: number; shape: string };
 type Slot = {
@@ -45,16 +47,16 @@ type Analysis = {
 type Deck = { name: string; bytes: number; uploadedAt: string };
 
 const TYPE_COLOR: Record<string, string> = {
-  scalar: "#2563eb", tableGroup: "#7c3aed", chart: "#0d9488",
-  image: "#d97706", marker: "#db2777", slideGroup: "#475569",
+  scalar: "#18181b", tableGroup: "#3f3f46", chart: "#52525b",
+  image: "#71717a", marker: "#a1a1aa", slideGroup: "#475569",
 };
 const TYPE_ZH: Record<string, string> = {
   scalar: "單值", tableGroup: "表格群組", chart: "圖表",
   image: "圖片", marker: "標記", slideGroup: "整頁重複",
 };
 const FIND_COLOR: Record<string, string> = {
-  stable: "#059669", variableCardinality: "#7c3aed", repeatingSlides: "#475569",
-  imageHeavy: "#d97706", tightBudget: "#b45309", shapeRenamed: "#db2777", manualOnly: "#6b7280",
+  stable: "#059669", variableCardinality: "#3f3f46", repeatingSlides: "#475569",
+  imageHeavy: "#d97706", tightBudget: "#b45309", shapeRenamed: "#52525b", manualOnly: "#6b7280",
 };
 
 const card: React.CSSProperties = {
@@ -182,8 +184,7 @@ export default function FanpageMonthlyReport() {
       {/* ── 上傳 ─────────────────────────────────────────────────────── */}
       <div style={card}>
         <div style={kicker}>STEP 1 · 上傳你現在在用的月報</div>
-        <h3 style={{ margin: "6px 0 4px", fontSize: 16, fontWeight: 850 }}>版型來自你自己的檔案</h3>
-        <p style={{ margin: "0 0 12px", fontSize: 13, color: "#6b7280" }}>
+        <p style={{ margin: "6px 0 12px", fontSize: 13, color: "#6b7280" }}>
           上傳同一份月報的<b>不同月份</b>（建議 4 份以上）。系統靠跨月比對判斷哪些位置每月會變 ——
           每月都一樣的是版型，會變的才是要自動填的欄位。只上傳一份無法比對。
         </p>
@@ -203,8 +204,8 @@ export default function FanpageMonthlyReport() {
           開始分析（{decks.length} 份）
         </button>
 
-        {busy && <div style={{ marginTop: 10, fontSize: 12, color: "#2563eb" }}>{busy}</div>}
-        {err && <div style={{ marginTop: 10, fontSize: 12, color: "#b91c1c" }}>⚠ {err}</div>}
+        {busy && <div style={{ marginTop: 10, fontSize: 12, color: "#18181b" }}>{busy}</div>}
+        {err && <div style={{ marginTop: 10, fontSize: 12, color: "#b91c1c" }}><WarningIcon size={12} /> {err}</div>}
 
         {decks.length > 0 && (
           <div style={{ marginTop: 14, display: "grid", gap: 6 }}>
@@ -223,9 +224,9 @@ export default function FanpageMonthlyReport() {
       </div>
 
       {!analysis && (
-        <div style={{ ...card, color: "#6b7280", fontSize: 13 }}>
-          還沒有分析結果。上傳月報後按「開始分析」，系統會告訴你這份版型有多少欄位可以自動填、
-          哪些每月會變動、哪句洞察只有幾個字的空間。
+        // 「開始分析」按鈕就在上面的上傳區，這裡不重複放
+        <div style={card}>
+          <IllustratedEmpty kind="report" size="sm" title="這個月的報告還沒寫" />
         </div>
       )}
 
@@ -267,8 +268,8 @@ export default function FanpageMonthlyReport() {
                   return (
                     <div key={sl.index} onClick={() => { setPage(sl.index); setSel(null); }}
                          style={{ position: "relative", aspectRatio: "16/9", marginBottom: 6, cursor: "pointer",
-                                  border: `1px solid ${page === sl.index ? "#2563eb" : "#e5e7eb"}`,
-                                  outline: page === sl.index ? "1px solid #2563eb" : "none",
+                                  border: `1px solid ${page === sl.index ? "#18181b" : "#e5e7eb"}`,
+                                  outline: page === sl.index ? "1px solid #18181b" : "none",
                                   borderRadius: 5, background: "#fff", overflow: "hidden" }}>
                         {sl.shapes.slice(0, 22).map((sh, i) => (
                           <span key={i} style={{ position: "absolute", left: pct(sh.x, W), top: pct(sh.y, H),
@@ -330,7 +331,7 @@ export default function FanpageMonthlyReport() {
                 )}
                 {pageSlots.map(s => (
                   <div key={s.id} onClick={() => setSel(s.id)}
-                       style={{ border: `1px solid ${sel === s.id ? "#2563eb" : "#e5e7eb"}`, borderRadius: 8,
+                       style={{ border: `1px solid ${sel === s.id ? "#18181b" : "#e5e7eb"}`, borderRadius: 8,
                                 padding: "8px 10px", marginTop: 6, cursor: "pointer", background: "#fafafa" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 700 }}>
                       <span style={{ width: 8, height: 8, borderRadius: "50%", background: TYPE_COLOR[s.type] }} />
@@ -348,7 +349,7 @@ export default function FanpageMonthlyReport() {
                 ))}
 
                 {selected && (
-                  <div style={{ border: "1px solid #2563eb", borderRadius: 8, padding: "10px 11px", marginTop: 12, background: "#fff" }}>
+                  <div style={{ border: "1px solid #18181b", borderRadius: 8, padding: "10px 11px", marginTop: 12, background: "#fff" }}>
                     <div style={kicker}>欄位設定</div>
                     <table style={{ width: "100%", fontSize: 12, borderCollapse: "collapse", marginTop: 6 }}>
                       <tbody>

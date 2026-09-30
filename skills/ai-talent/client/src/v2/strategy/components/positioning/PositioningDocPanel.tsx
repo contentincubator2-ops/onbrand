@@ -18,13 +18,13 @@
  * 對映一律是「提案 → 用戶勾選 → 才寫入」。定位是所有任務的上游，靜靜寫錯一格
  * 會污染每一張卡。
  */
+import { IllustratedEmpty } from "../../../platform/components/EmptyIllustration";
 import React from "react";
 import { trpc } from "../../../../lib/trpc";
 import { useLang } from "../../../../lib/i18n";
 import { Button, Chip, Textarea, Spinner } from "@heroui/react";
-import {
-  Upload, FileText, Trash2, Wand2, ClipboardPaste, AlertTriangle, Check, ChevronLeft,
-} from "lucide-react";
+import { CheckIcon, ChevronLeftIcon, DeleteIcon, GenerateIcon, PasteIcon, TextIcon, UploadIcon, WarningIcon } from "../../../platform/components/icons";
+import { HelpTip } from "../../../platform/components/HelpTip";
 
 type Scope = "brand" | "product" | "event";
 
@@ -95,7 +95,7 @@ export default function PositioningDocPanel({
   const [inject, setInject] = React.useState<Set<number>>(new Set());
   const fileRef = React.useRef<HTMLInputElement | null>(null);
 
-  const coverageQuery = (trpc as any).positioningDocs?.coverage?.useQuery?.(
+  const coverageQuery = (trpc as any).positioningDocs?.coverage?.useQuery(
     { scope: scopeMode, scopeId: scopeId ?? 0 },
     { enabled: !!scopeId, refetchOnWindowFocus: false },
   ) ?? { data: null, isLoading: false, refetch: () => {} };
@@ -222,7 +222,7 @@ export default function PositioningDocPanel({
     return (
       <div className="flex flex-col gap-4">
         <div className="flex items-center gap-2">
-          <Button size="sm" variant="light" startContent={<ChevronLeft size={14} />} onPress={() => setReading(null)}>
+          <Button size="sm" variant="light" startContent={<ChevronLeftIcon size={14} />} onPress={() => setReading(null)}>
             {en ? "Back" : "返回"}
           </Button>
           <p className="text-small font-semibold">{reading.name}</p>
@@ -260,7 +260,7 @@ export default function PositioningDocPanel({
       <div className="flex flex-col gap-4">
         <div className="rounded-medium border border-success-200 bg-success-50/60 p-5">
           <div className="flex items-center gap-2">
-            <Check size={16} className="text-success-700" />
+            <CheckIcon size={16} className="text-success-700" />
             <p className="text-medium font-semibold text-success-800">
               {doneInfo.written > 0
                 ? (en ? `Saved — ${doneInfo.written} fields written` : `已寫入並存檔：${doneInfo.written} 格`)
@@ -306,7 +306,7 @@ export default function PositioningDocPanel({
     return (
       <div className="flex flex-col gap-4">
         <div className="flex items-center gap-2 flex-wrap">
-          <Button size="sm" variant="light" startContent={<ChevronLeft size={14} />} onPress={() => setReview(null)}>
+          <Button size="sm" variant="light" startContent={<ChevronLeftIcon size={14} />} onPress={() => setReview(null)}>
             {en ? "Cancel" : "取消"}
           </Button>
           <p className="text-small font-semibold">{review.docName}</p>
@@ -314,7 +314,7 @@ export default function PositioningDocPanel({
             {en ? `${review.proposals.length} of ${review.total} fields found` : `${review.total} 格裡對到 ${review.proposals.length} 格`}
           </Chip>
           {overwriteCount > 0 && (
-            <Chip size="sm" color="warning" variant="flat" startContent={<AlertTriangle size={12} />}>
+            <Chip size="sm" color="warning" variant="flat" startContent={<WarningIcon size={12} />}>
               {en ? `${overwriteCount} will overwrite existing values` : `${overwriteCount} 格會覆蓋現有內容`}
             </Chip>
           )}
@@ -350,7 +350,7 @@ export default function PositioningDocPanel({
                     <span className="text-tiny text-default-400">{p.path}</span>
                     {p.fromHeading && <Chip size="sm" variant="flat">{en ? "from" : "來自"}「{p.fromHeading}」</Chip>}
                     {p.overwrites != null && (
-                      <Chip size="sm" color="warning" variant="flat" startContent={<AlertTriangle size={11} />}>
+                      <Chip size="sm" color="warning" variant="flat" startContent={<WarningIcon size={11} />}>
                         {en ? "overwrites" : "會覆蓋現有內容"}
                       </Chip>
                     )}
@@ -417,7 +417,7 @@ export default function PositioningDocPanel({
                       <span className="text-small font-semibold">{s.title}</span>
                       {s.fromHeading && <Chip size="sm" variant="flat">{en ? "from" : "來自"}「{s.fromHeading}」</Chip>}
                       {done && (
-                        <Chip size="sm" color="success" variant="flat" startContent={<Check size={11} />}>
+                        <Chip size="sm" color="success" variant="flat" startContent={<CheckIcon size={11} />}>
                           {en ? "created" : "已建立"}
                         </Chip>
                       )}
@@ -515,11 +515,13 @@ export default function PositioningDocPanel({
   return (
     <div className="flex flex-col gap-4">
       <div>
-        <p className="text-medium font-semibold">{en ? "Your own positioning document" : `你自己的${scopeLabel}定位文件`}</p>
-        <p className="text-small text-default-700 mt-1">
-          {en
-            ? "Upload the positioning you already have, in whatever format you wrote it — or paste a whole ChatGPT / Claude / Gemini conversation where you already worked this out with AI. It's kept verbatim and shown by your own structure — you don't have to answer our questions."
-            : `上傳你已經在用的${scopeLabel}定位，格式照你自己的——或直接貼上你之前跟 ChatGPT / Claude / Gemini 討論過的整段對話。原文會逐字保留、按你自己的段落呈現 —— 不需要把我們設的題目填完。`}
+        <p className="text-medium font-semibold flex items-center gap-1.5">
+          {en ? "Your own positioning document" : `你自己的${scopeLabel}定位文件`}
+          <HelpTip>
+            {en
+              ? "Upload the positioning you already have, in any format — or paste a whole ChatGPT / Claude / Gemini conversation. It's kept verbatim and shown by your own structure."
+              : `上傳你已經在用的${scopeLabel}定位，格式照你自己的——或貼上跟 ChatGPT / Claude / Gemini 討論過的整段對話。原文會逐字保留、按你自己的段落呈現。`}
+          </HelpTip>
         </p>
       </div>
 
@@ -578,7 +580,7 @@ export default function PositioningDocPanel({
           </p>
           <div className="flex flex-wrap gap-1.5 mt-1.5">
             {filled.map((f) => (
-              <Chip key={f.path} size="sm" variant="flat" color="success" startContent={<Check size={11} />}>
+              <Chip key={f.path} size="sm" variant="flat" color="success" startContent={<CheckIcon size={11} />}>
                 {f.label}
               </Chip>
             ))}
@@ -621,7 +623,7 @@ export default function PositioningDocPanel({
                   isLoading={busy === `rmseg:${s.id}`}
                   onPress={() => { setBusy(`rmseg:${s.id}`); setError(null); removeSegmentMut?.mutate({ scope: scopeMode, scopeId, segmentId: s.id }); }}
                 >
-                  <Trash2 size={14} className="text-danger-500" />
+                  <DeleteIcon size={14} className="text-danger-500" />
                 </Button>
               </div>
             ))}
@@ -636,12 +638,12 @@ export default function PositioningDocPanel({
           onChange={(e) => { const f = e.target.files?.[0]; if (f) void onFile(f); }}
         />
         <Button
-          size="sm" color="primary" startContent={<Upload size={14} />}
+          size="sm" color="primary" startContent={<UploadIcon size={14} />}
           isLoading={busy === "upload"} onPress={() => fileRef.current?.click()}
         >
           {en ? "Upload a document" : "上傳文件"}
         </Button>
-        <Button size="sm" variant="flat" startContent={<ClipboardPaste size={14} />} onPress={() => setPasteOpen((v) => !v)}>
+        <Button size="sm" variant="flat" startContent={<PasteIcon size={14} />} onPress={() => setPasteOpen((v) => !v)}>
           {en ? "Paste text" : "直接貼上"}
         </Button>
         <span className="text-tiny text-default-400">.docx / .pptx / .pdf / .md / .txt / .html</span>
@@ -668,24 +670,24 @@ export default function PositioningDocPanel({
 
       {/* 文件清單 */}
       {docs.length === 0 ? (
-        <div className="rounded-medium border border-dashed border-divider p-8 text-center">
-          <FileText size={22} className="mx-auto text-default-400" />
-          <p className="text-small text-default-600 mt-2">
-            {en ? `No document yet for ${scopeName}.` : `${scopeName} 還沒有上傳過定位文件。`}
-          </p>
-        </div>
+        <IllustratedEmpty
+          kind="folder"
+          size="sm"
+          title={en ? "No positioning documents yet" : "還沒收到任何定位文件"}
+          action={{ label: en ? "Upload a document" : "上傳文件", onPress: () => fileRef.current?.click() }}
+        />
       ) : (
         <div className="flex flex-col gap-2">
           {docs.map((d) => (
             <div key={d.id} className="rounded-medium border border-divider bg-content1 p-3 flex gap-3 items-start">
-              <FileText size={16} className="mt-0.5 text-default-500 shrink-0" />
+              <TextIcon size={16} className="mt-0.5 text-default-500 shrink-0" />
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-small font-semibold truncate">{d.name}</span>
                   <Chip size="sm" variant="flat">{d.kind}</Chip>
                   <span className="text-tiny text-default-400">{d.chars} 字 · {d.outline.length} 節</span>
                   {d.appliedAt && (
-                    <Chip size="sm" color="success" variant="flat" startContent={<Check size={11} />}>
+                    <Chip size="sm" color="success" variant="flat" startContent={<CheckIcon size={11} />}>
                       {en ? "applied" : "已套用"}
                     </Chip>
                   )}
@@ -699,14 +701,14 @@ export default function PositioningDocPanel({
                   {en ? "Read" : "看內容"}
                 </Button>
                 <Button
-                  size="sm" variant="flat" color="primary" startContent={<Wand2 size={13} />}
+                  size="sm" variant="flat" color="primary" startContent={<GenerateIcon size={13} />}
                   isLoading={busy === `map:${d.id}`}
                   onPress={() => { setBusy(`map:${d.id}`); setError(null); proposeMut?.mutate({ scope: scopeMode, scopeId, docId: d.id }); }}
                 >
                   {en ? "Map fields" : "對映欄位"}
                 </Button>
                 <Button size="sm" variant="light" isIconOnly isLoading={busy === `del:${d.id}`} onPress={() => void onDelete(d)}>
-                  <Trash2 size={14} className="text-danger-500" />
+                  <DeleteIcon size={14} className="text-danger-500" />
                 </Button>
               </div>
             </div>

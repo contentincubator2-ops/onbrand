@@ -114,6 +114,8 @@ export interface FBTaskTemplate {
    */
   adFormats?: AdFormat[];
   primary_question?: string;
+  /** 任務 modal 插畫場景；沒有就由前端依標題自動挑（見 client taskScene.ts）。 */
+  scene?: string;
   primary_input?: { key: string; placeholder?: string; type: "text" | "textarea"; derive?: InputDerive };
   inputs: TaskInput[];
   /**
@@ -873,8 +875,9 @@ caption 直接列出這 10-15 個 hashtag 本身（每個 # 前綴 + 空格分�
     source: {
       type: "viral",
       short: "億家水電 AI 水電工「江澈」",
-      metric: "9/8 首支短劇破百萬觀看；單支近千萬瀏覽（FB＋IG 合計）",
+      metric: "9/8 首支短劇破百萬觀看；單支近千萬瀏覽",
       asOf: "2026-09",
+      caveat: "FB＋IG 合計，未拆平台；千萬瀏覽那支的發布日不明",
       url: "https://www.mirrormedia.mg/story/20260922hea03",
       takeaway:
         "專業貼文只有兩位數瀏覽，交給一個有反差設定的固定角色演成短劇，粉絲追的是角色，本業變成劇情裡解決問題的那一刻。",
@@ -919,6 +922,7 @@ caption 直接列出這 10-15 個 hashtag 本身（每個 # 前綴 + 空格分�
       short: "運動部「揮汗有禮」",
       metric: "上線兩週突破 300 萬筆運動紀錄上限",
       asOf: "2026-09",
+      caveat: "政府機關；活動在運動部自己的系統進行，FB 只用來宣布",
       url: "https://www.setn.com/news/1908542",
       takeaway:
         "把一次性的報名拆成每週可完成的小任務，依完成週數給銅／銀／金等級，最高級再加限量實體獎，名額滿了再宣布續辦，一檔活動就有兩波聲量。",
@@ -963,6 +967,7 @@ caption 直接列出這 10-15 個 hashtag 本身（每個 # 前綴 + 空格分�
       short: "NAR × Havas（2026 Meta 代理商獎）",
       metric: "43.2 萬次著陸頁瀏覽；每次瀏覽成本 -29%、總花費 -25%",
       asOf: "2026-09",
+      caveat: "美國案例；數字是 Meta 整體，重點在投放設定而非寫法",
       url: "https://www.nar.realtor/newsroom/nar-wins-metas-2026-agency-award-for-best-use-of-automation",
       takeaway:
         "同一支核心訊息素材，一組用人工受眾、一組交給 Advantage+ 自動受眾，只比一個指標（每次著陸頁瀏覽成本），跑完就把預算移到贏的那組。",
@@ -1007,8 +1012,9 @@ B. 對照測試設定（給投手看，條列）
     source: {
       type: "viral",
       short: "啟德機械 104 米消防雲梯車抵台",
-      metric: "超過萬人點讚（FB 粉專，7/22 發文）",
+      metric: "超過萬人點讚",
       asOf: "2026-07",
+      caveat: "B2B 公司粉專、老闆個人色彩強；數字為約數",
       url: "https://news.ltn.com.tw/news/life/breakingnews/5515534",
       takeaway:
         "一家 B2B 公司把「買了一台設備」寫成：全台第二台、用在消防救災、先開去廟裡祈福、明年再買一台——數字、公益、在地儀式、預告四件事湊齊，就成了地方驕傲。",
@@ -1048,6 +1054,7 @@ B. 對照測試設定（給投手看，條列）
       short: "蔣萬安 颱風停班課公告",
       metric: "一夜 5.5 萬讚、超過 4,600 則留言",
       asOf: "2026-07",
+      caveat: "政治人物粉專，颱風假新聞本身也帶流量",
       url: "https://www.ettoday.net/news/20260710/3198472.htm",
       takeaway:
         "大家一定會等的實用公告，長期帶著一個固定招牌元素（每次都附帥照），粉絲自己把它玩成都市傳說；某一次刻意拿掉，公告本身就變成話題。",
@@ -1089,6 +1096,7 @@ B. 對照測試設定（給投手看，條列）
       short: "蔣萬安 回應留言「帥照呢」",
       metric: "隔天貼文 15 分鐘近 3,600 讚、300 多則留言",
       asOf: "2026-07",
+      caveat: "政治人物粉專；「回應留言」是媒體的解讀",
       url: "https://udn.com/news/story/124945/9620360",
       takeaway:
         "前一篇留言區一直有人問「帥照呢？」，下一篇就把照片放回來——不用解釋，粉絲自己看得懂這是在回應他們，互動馬上衝高。",
@@ -1129,8 +1137,9 @@ B. 對照測試設定（給投手看，條列）
     source: {
       type: "viral",
       short: "故宮南院《龍藏經》近照組",
-      metric: "5 張近照破萬人按讚（FB／IG／Threads 同步發文，數字未分平台）",
+      metric: "5 張近照破萬人按讚",
       asOf: "2026-07",
+      caveat: "FB／IG／Threads 同步發文，數字未分平台",
       url: "https://www.ettoday.net/news/20260731/3210722.htm",
       takeaway:
         "別的地方的同類話題正熱時，拿出自家收藏的版本拍成 5 張近照，每張只給一個細節，配一句讓人想轉的梗（線上累積福報），不用追熱點本身也吃得到流量。",
@@ -1158,6 +1167,168 @@ B. 對照測試設定（給投手看，條列）
     preferredModel: "qwen",
     maxTokens: 700,
     outputDefaults: { platform: "facebook", post_type: "album" },
+  },
+  // ── 爆款結構卡・2026-10 補卡（8～9 月案例，CJ 2026-09-29 核可）──────────
+  {
+    id: "fb-30-feed-curiosity-explainer",
+    tier: "30s",
+    postType: "feed",
+    label: { en: "Post: 'Ever Noticed…?' Explainer", zh: "FB 貼文：「你有沒有發現…」冷知識" },
+    description: { en: "An everyday observation, then two expert reasons", zh: "日常觀察開場＋2 個原因的專業解答" },
+    agent_id: 30020,
+    skill_slug: "fb-copywriting",
+    source: {
+      type: "viral",
+      short: "李政穎醫師「手術服為何是綠色」",
+      metric: "上萬網友按讚",
+      asOf: "2026-09",
+      caveat: "醫師個人專業粉專，不是品牌；數字為約數",
+      url: "https://tw.news.yahoo.com/%E6%89%8B%E8%A1%93%E6%9C%8D%E7%82%BA%E4%BD%95%E6%98%AF%E7%B6%A0%E8%89%B2-%E9%86%AB%E6%8F%AD2%E5%8E%9F%E5%9B%A0%E5%BE%88%E5%AF%A6%E9%9A%9B-%E4%B8%8A%E8%90%AC%E4%BA%BA%E6%8C%89%E8%AE%9A-103906865.html",
+      takeaway:
+        "用「大家有沒有發現…」的日常觀察開場，再給編號的 2 個專業原因，讀者有「困擾很久終於懂了」的感覺，就會收藏、按讚、轉給朋友。",
+    },
+    primary_question: "你們這一行有什麼「大家天天看到、卻不知道為什麼」的事？",
+    primary_input: { key: "topic", placeholder: "例：為什麼麵包店的麵包都放在木架上 / 為什麼冷氣要先開送風", type: "textarea" },
+    inputs: [
+      { key: "topic", label: "大家常見但不知道原因的一件事", type: "textarea", required: true },
+    ],
+    systemPrompt: `你要寫一則 FB 冷知識貼文，讓讀者有「困擾很久終於懂了」的感覺。
+
+結構（照順序）：
+1. 第一句：「你有沒有發現＿＿都是＿＿？」——用讀者每天會看到的具體畫面。
+2. 第二句：一句話拋出反直覺的答案（不是「為了好看」，是真正的原因）。
+3. 編號寫 2–3 個原因，每個原因一段 1–2 句，要具體、可驗證，用專業的人才知道的細節。
+4. 收尾：再給一個延伸冷知識，或問讀者「你還想知道哪一個？」引導留言。
+
+硬規則：
+- 原因必須是真的；不確定的寫「一說是」或不要寫。
+- 不要推銷產品，品牌只以「我們每天在做這件事的人」的身分出現。
+- 150–300 字。`,
+    preferredModel: "qwen",
+    maxTokens: 600,
+    outputDefaults: { platform: "facebook", post_type: "feed" },
+  },
+  {
+    id: "fb-30-feed-rare-reunion",
+    tier: "30s",
+    postType: "feed",
+    label: { en: "Post: Rare Reunion, Recounted", zh: "FB 貼文：稀有同框＋換個角度算" },
+    description: { en: "One rare group photo and a question that recounts the numbers", zh: "一張稀有同框照＋一句換角度算數字的反問" },
+    agent_id: 30020,
+    skill_slug: "fb-copywriting",
+    source: {
+      type: "viral",
+      short: "黃舒駿 五位歌手同框合照",
+      metric: "萬人按讚",
+      asOf: "2026-09",
+      caveat: "個人帳號；數字為約數",
+      url: "https://today.line.me/tw/v3/article/YapqyvN",
+      takeaway:
+        "一張「平常不可能同框」的照片，配一句把數字換個角度算的反問（不是加起來幾歲，是加起來出道幾年），懷舊的人會自己在留言區補回憶。",
+    },
+    primary_question: "你們有什麼「很難得湊在一起」的人或東西？",
+    primary_input: { key: "topic", placeholder: "例：開店 30 年的三位老師傅同一天值班 / 四代包裝排在一起", type: "textarea" },
+    inputs: [
+      { key: "topic", label: "難得同框的人或物 + 可以換角度算的數字", type: "textarea", required: true },
+    ],
+    systemPrompt: `你要寫一則 FB 單圖貼文：一張「稀有同框」的照片＋一句換個角度算的反問。
+
+產出：
+1. 拍攝指示（一句話）：誰或什麼要同框、怎麼排，讓人一眼看出很難得。
+2. caption（30–100 字）：
+   - 第一句是反問，把數字換個角度算（例：不是「加起來幾歲」，而是「加起來做了幾年／賣出幾個／走過幾公里」）。
+   - 第二句最多交代一下場合，不要長。
+   - 不要結論、不要推銷，把空間留給留言區。
+3. 置頂留言（30–60 字）：品牌自己補一個小回憶或冷知識，邀請大家說出自己的記憶。
+
+硬規則：
+- 數字要真實，可以算得出來。
+- 照片裡的人要取得同意。`,
+    preferredModel: "qwen",
+    maxTokens: 450,
+    outputDefaults: { platform: "facebook", post_type: "feed" },
+  },
+  {
+    id: "fb-30-album-evidence-chain",
+    tier: "30s",
+    postType: "album",
+    label: { en: "Album: Good News as an Evidence Chain", zh: "FB 相簿：證據鏈式好消息" },
+    description: { en: "Trace → subject → number → what's next", zh: "痕跡→主角→數字→後續，講一個睽違多年的好消息" },
+    agent_id: 60068,
+    skill_slug: "social-copy",
+    source: {
+      type: "viral",
+      short: "登嘉樓漁業局 革龜睽違 9 年回歸",
+      metric: "超過 1 萬人按讚、2,700 多次分享",
+      asOf: "2026-09",
+      caveat: "馬來西亞政府機關粉專",
+      url: "https://tw.news.yahoo.com/%E5%85%A8%E7%90%83%E6%9C%80%E5%A4%A7%E6%B5%B7%E9%BE%9C-%E6%B6%88%E5%A4%B19%E5%B9%B4%E5%9B%9E%E4%BE%86%E4%BA%86-%E6%B2%99%E7%81%98%E7%95%99%E4%B8%8B2-1%E5%85%AC%E5%B0%BA%E5%B7%A8%E7%97%95-%E9%A9%9A%E8%A6%8B44%E9%A1%86%E8%9B%8B-103300303.html",
+      takeaway:
+        "照片照「證據鏈」排：先放痕跡製造懸念、再揭曉主角和數字、最後交代後續安置與時間表；「睽違 9 年」的稀缺讓分享數特別高。",
+    },
+    primary_question: "你們有什麼「睽違很久終於回來」的好消息？",
+    primary_input: { key: "topic", placeholder: "例：停產 5 年的口味復刻了 / 老店招牌修好重新點亮", type: "textarea" },
+    inputs: [
+      { key: "topic", label: "睽違多久 + 回來的是什麼 + 後續安排", type: "textarea", required: true },
+    ],
+    systemPrompt: `你要寫一則 FB 相簿貼文（4–5 張），用「證據鏈」的順序講一個睽違多年的好消息。
+
+相簿順序（每張附 15 字內圖說）：
+1. 第 1 張：懸念證據——只拍痕跡或局部，看不出是什麼。
+2. 第 2–3 張：揭曉主角，並放一個具體數字（幾顆、幾年、第幾次）。
+3. 最後一張：後續行動與時間表（接下來會怎麼做、什麼時候再更新）。
+
+貼文文字（120–250 字）：
+- 第一句點出「睽違 N 年」。
+- 中段照相簿順序講一次，數字要具體。
+- 結尾說什麼時候會再更新，邀請大家追蹤或分享給會開心的人。
+
+硬規則：
+- 照片必須真實拍攝，不用 AI 生成或修改。
+- 不誇大，數字都要可查證。`,
+    preferredModel: "qwen",
+    maxTokens: 700,
+    outputDefaults: { platform: "facebook", post_type: "album" },
+  },
+  {
+    id: "fb-30-pinned-correction",
+    tier: "30s",
+    postType: "pinned",
+    label: { en: "Pinned: The Correction Post", zh: "FB 置頂：翻車時的更正公告" },
+    description: { en: "Five steps for a correction post when something goes wrong", zh: "翻車時的更正公告五步驟" },
+    agent_id: 60024,
+    skill_slug: "fb-copywriting",
+    source: {
+      type: "viral",
+      short: "奧萬大情報站 AI 照更正道歉",
+      metric: "原貼文 1.9 萬人按讚",
+      asOf: "2026-08",
+      caveat: "數字是原貼文的，不是更正文的",
+      url: "https://www.setn.com/news/1897531",
+      takeaway:
+        "爆紅貼文翻車時，用「坦承＋還原事實＋保留原文示警＋補真實素材＋提出制度承諾」寫更正文，把信任危機變成一次透明度展示。",
+    },
+    primary_question: "發生了什麼需要更正的事？哪部分是真的、哪部分出錯？",
+    primary_input: { key: "topic", placeholder: "例：宣傳照被發現修圖過度 / 活動日期公告寫錯", type: "textarea" },
+    inputs: [
+      { key: "topic", label: "出錯的事 + 真的部分 + 錯的部分", type: "textarea", required: true },
+    ],
+    systemPrompt: `你要寫一則 FB 更正公告（會被置頂），用五個步驟把翻車變成信任。
+
+五步驟（照順序，缺一不可）：
+1. 開頭直接認錯：一句「真的很抱歉」，不要先解釋。
+2. 還原事實：哪部分是真的、哪部分不是、錯在哪個環節（誰、什麼時候、怎麼發生）。
+3. 原文處理：說明原貼文不刪除、已加註更正，以及保留的理由（讓大家看得到經過）。
+4. 補上真實素材：附上正確的照片／資訊，並說明出處。
+5. 往後的規則：一條具體可檢查的承諾（例：AI 圖一律標示、公告經兩人確認）。
+
+硬規則：
+- 不推卸給「小編」「廠商」；用品牌的口吻負責。
+- 不要「造成不便敬請見諒」這類官腔。
+- 150–300 字。`,
+    preferredModel: "qwen",
+    maxTokens: 650,
+    outputDefaults: { platform: "facebook", post_type: "pinned" },
   },
 ];
 
@@ -1664,6 +1835,47 @@ export const FB_30S_ORCHESTRA: Record<string, OrchestraConfig> = {
     variantLabels: ["細節開場", "來歷開場", "祝福梗開場"],
     captionMinChars: 120,
     captionMaxChars: 250,
+  },
+  // ── 爆款結構卡・2026-10 補卡（8～9 月案例）
+  "fb-30-feed-curiosity-explainer": {
+    variants: 3,
+    images: 3,
+    runImageGen: false,
+    imageDirectorId: MANDY_ID,
+    aspectRatio: "1:1",
+    variantLabels: ["兩個原因版", "三個原因版", "延伸冷知識版"],
+    captionMinChars: 150,
+    captionMaxChars: 300,
+  },
+  "fb-30-feed-rare-reunion": {
+    variants: 3,
+    images: 3,
+    runImageGen: false,
+    imageDirectorId: MANDY_ID,
+    aspectRatio: "1:1",
+    variantLabels: ["年資算法", "次數算法", "距離算法"],
+    captionMinChars: 30,
+    captionMaxChars: 100,
+  },
+  "fb-30-album-evidence-chain": {
+    variants: 3,
+    images: 3,
+    runImageGen: false,
+    imageDirectorId: MANDY_ID,
+    aspectRatio: "1:1",
+    variantLabels: ["懸念開場", "數字開場", "睽違開場"],
+    captionMinChars: 120,
+    captionMaxChars: 250,
+  },
+  "fb-30-pinned-correction": {
+    variants: 3,
+    images: 3,
+    runImageGen: false,
+    imageDirectorId: MANDY_ID,
+    aspectRatio: "1.91:1",
+    variantLabels: ["直接認錯版", "還原經過版", "制度承諾版"],
+    captionMinChars: 150,
+    captionMaxChars: 300,
   },
 };
 

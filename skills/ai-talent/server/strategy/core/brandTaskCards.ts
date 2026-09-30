@@ -66,6 +66,11 @@ export interface BrandTaskCard {
   variants: number;
   /** 綁哪個 agent 的人設（可空）。 */
   agentId: number | null;
+  /**
+   * 任務 modal 開頭插畫的場景（2026-09-30）。null／沒有＝依卡名與主問題自動挑。
+   * 場景清單在前端 taskScene.ts；這裡只存字串，前端遇到不認得的就當沒選。
+   */
+  scene?: string | null;
 
   createdAt: string;
   updatedAt: string;
@@ -309,6 +314,7 @@ export function cardTemplate(card: BrandTaskCard): FBTaskTemplate {
     agent_id: card.agentId ?? undefined,
     skill_slug: card.id,
     primary_question: card.primaryQuestion,
+    scene: card.scene ?? undefined,
     primary_input: {
       key: "topic",
       placeholder: card.primaryPlaceholder,

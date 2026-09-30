@@ -14,7 +14,7 @@ import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { trpc } from "../../../lib/trpc";
 import { useLang } from "../../../lib/i18n";
-import { X, Send, UserRound } from "lucide-react";
+import { CloseIcon, SendIcon, UserIcon, BugIcon } from "./icons";
 import type { ScopeState } from "../../app/shell/ScopeBar";
 
 interface Props {
@@ -68,7 +68,7 @@ export default function SupportDrawer({ open, onClose, scope, pendingNudges, onN
   const sendMut     = (trpc as any).support?.sendMessage?.useMutation?.();
   const escalateMut = (trpc as any).support?.escalateToHuman?.useMutation?.();
   const reportBugMut = (trpc as any).support?.reportBug?.useMutation?.();
-  const listConvsQ  = (trpc as any).support?.listConversations?.useQuery?.(
+  const listConvsQ  = (trpc as any).support?.listConversations?.useQuery(
     undefined,
     { enabled: showHistory, staleTime: 10_000 },
   );
@@ -275,7 +275,7 @@ export default function SupportDrawer({ open, onClose, scope, pendingNudges, onN
       background: "white",
       borderRadius: 16,
       border: "1px solid #e5e7eb",
-      boxShadow: "0 20px 50px rgba(0,0,0,0.18), 0 4px 12px rgba(124,58,237,0.18)",
+      boxShadow: "0 20px 50px rgba(0,0,0,0.18), 0 4px 12px rgba(24,24,27,0.18)",
       display: "flex", flexDirection: "column",
       animation: "miaPopIn 0.22s cubic-bezier(0.34,1.56,0.64,1)",
       transformOrigin: "bottom right",
@@ -310,7 +310,7 @@ export default function SupportDrawer({ open, onClose, scope, pendingNudges, onN
             border: "1px solid #e5e7eb", background: "white", color: "#6b7280",
             cursor: "pointer", whiteSpace: "nowrap",
           }}
-          onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.borderColor = "#7c3aed"; (e.currentTarget as HTMLButtonElement).style.color = "#7c3aed"; }}
+          onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.borderColor = "#18181b"; (e.currentTarget as HTMLButtonElement).style.color = "#18181b"; }}
           onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.borderColor = "#e5e7eb"; (e.currentTarget as HTMLButtonElement).style.color = "#6b7280"; }}
         >
           {isEn ? "History" : "歷史"}
@@ -323,7 +323,7 @@ export default function SupportDrawer({ open, onClose, scope, pendingNudges, onN
           onMouseEnter={(e) => (e.currentTarget.style.background = "#f3f4f6")}
           onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
         >
-          <X size={16} />
+          <CloseIcon size={16} />
         </button>
       </div>
 
@@ -350,7 +350,7 @@ export default function SupportDrawer({ open, onClose, scope, pendingNudges, onN
                 </p>
               ) : (listConvsQ?.data ?? []).length === 0 ? (
                 <p style={{ fontSize: 12, color: "#9ca3af", textAlign: "center", marginTop: 24 }}>
-                  {isEn ? "No past conversations" : "還沒有歷史對話"}
+                  {isEn ? "No chats yet" : "還沒聊過天"}
                 </p>
               ) : (
                 <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
@@ -363,7 +363,7 @@ export default function SupportDrawer({ open, onClose, scope, pendingNudges, onN
                         border: "1px solid #e5e7eb", background: "white", cursor: "pointer",
                         display: "flex", flexDirection: "column", gap: 2,
                       }}
-                      onMouseEnter={(e) => (e.currentTarget.style.borderColor = "#7c3aed")}
+                      onMouseEnter={(e) => (e.currentTarget.style.borderColor = "#18181b")}
                       onMouseLeave={(e) => (e.currentTarget.style.borderColor = "#e5e7eb")}
                     >
                       <span style={{ fontSize: 12, color: "#374151", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
@@ -390,7 +390,7 @@ export default function SupportDrawer({ open, onClose, scope, pendingNudges, onN
                     <div key={m.id} style={{
                       alignSelf: m.role === "user" ? "flex-end" : "flex-start",
                       maxWidth: "85%",
-                      background: m.role === "user" ? "#7c3aed" : "#f3f4f6",
+                      background: m.role === "user" ? "#18181b" : "#f3f4f6",
                       color: m.role === "user" ? "white" : "#111827",
                       padding: "8px 12px", borderRadius: 10,
                       fontSize: 12, lineHeight: 1.5,
@@ -492,7 +492,7 @@ export default function SupportDrawer({ open, onClose, scope, pendingNudges, onN
                   fontSize: 12, fontWeight: 600, cursor: "pointer",
                 }}
               >
-                <UserRound size={12} style={{ display: "inline", marginRight: 4, verticalAlign: -2 }} />
+                <UserIcon size={12} style={{ display: "inline", marginRight: 4, verticalAlign: -2 }} />
                 {isEn ? "Yes, open ticket" : "好，開單"}
               </button>
               <button
@@ -542,7 +542,7 @@ export default function SupportDrawer({ open, onClose, scope, pendingNudges, onN
                 }}
                 aria-label={isEn ? "Send" : "送出"}
               >
-                <Send size={14} />
+                <SendIcon size={14} />
               </button>
             </div>
             <div style={{ display: "flex", gap: 12, marginTop: 8 }}>
@@ -574,8 +574,8 @@ export default function SupportDrawer({ open, onClose, scope, pendingNudges, onN
                       setMessages((m) => [...m, {
                         id: Date.now(), role: "mia",
                         content: isEn
-                          ? `Bug #${r.bugId} reported. If it's a real bug we'll fix it and add bonus points — you'll be notified here. 🙏`
-                          : `已收到 Bug #${r.bugId}。如果確認是系統問題，我們會修復並加贈點數，修好會在這裡通知你 🙏`,
+                          ? `Bug #${r.bugId} reported. If it's a real bug we'll fix it and add bonus points — you'll be notified here.`
+                          : `已收到 Bug #${r.bugId}。如果確認是系統問題，我們會修復並加贈點數，修好會在這裡通知你`,
                         createdAt: new Date().toISOString(),
                       }]);
                     }
@@ -584,12 +584,12 @@ export default function SupportDrawer({ open, onClose, scope, pendingNudges, onN
                   }
                 }}
                 style={{
-                  fontSize: 12, color: "#7c3aed", fontWeight: 600,
+                  fontSize: 12, color: "#18181b", fontWeight: 600,
                   background: "transparent", border: "none", cursor: "pointer",
                   padding: "2px 4px",
                 }}
               >
-                {isEn ? "🐛 Report a bug (earn points) →" : "🐛 回報 Bug（修好送點數）→"}
+                <BugIcon size={12} /> {isEn ? "Report a bug (earn points) →" : "回報 Bug（修好送點數）→"}
               </button>
             </div>
           </>
@@ -635,16 +635,16 @@ function MessageBubble({ message, onAction }: { message: Message; onAction: (a: 
           ? "16px 16px 4px 16px"
           : "16px 16px 16px 4px",
         background: isUser ? "#171717"
-                  : isAdmin ? "#FEF2F2"
+                  : isAdmin ? "#F4F4F5"
                   : "white",
         color: isUser ? "white" : "#1A1A18",
-        border: isUser ? "none" : isAdmin ? "1px solid #FCA5A5" : "1px solid #e5e7eb",
+        border: isUser ? "none" : isAdmin ? "1px solid #D4D4D8" : "1px solid #e5e7eb",
         fontSize: 13, lineHeight: 1.5,
         whiteSpace: "pre-wrap",
         wordBreak: "break-word",
       }}>
         {isAdmin && (
-          <div style={{ fontSize: 12, fontWeight: 700, color: "#B91C1C", marginBottom: 3, letterSpacing: 0.5 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: "#3f3f46", marginBottom: 3, letterSpacing: 0.5 }}>
             SOWORK 團隊
           </div>
         )}
@@ -656,21 +656,21 @@ function MessageBubble({ message, onAction }: { message: Message; onAction: (a: 
                 textAlign: "left",
                 padding: "6px 10px",
                 borderRadius: 8,
-                border: "1px solid rgba(124,58,237,0.25)",
-                background: "rgba(124,58,237,0.06)",
-                color: "#5B21B6",
+                border: "1px solid rgba(24,24,27,0.25)",
+                background: "rgba(24,24,27,0.06)",
+                color: "#27272a",
                 fontSize: 12,
                 fontWeight: 600,
                 cursor: "pointer",
                 display: "flex", alignItems: "center", gap: 6,
               }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.background = "rgba(124,58,237,0.12)";
-                  e.currentTarget.style.borderColor = "rgba(124,58,237,0.45)";
+                  e.currentTarget.style.background = "rgba(24,24,27,0.12)";
+                  e.currentTarget.style.borderColor = "rgba(24,24,27,0.45)";
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.background = "rgba(124,58,237,0.06)";
-                  e.currentTarget.style.borderColor = "rgba(124,58,237,0.25)";
+                  e.currentTarget.style.background = "rgba(24,24,27,0.06)";
+                  e.currentTarget.style.borderColor = "rgba(24,24,27,0.25)";
                 }}
               >
                 <span style={{ fontSize: 13 }}>→</span>

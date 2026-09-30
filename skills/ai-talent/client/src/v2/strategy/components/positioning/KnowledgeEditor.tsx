@@ -9,7 +9,8 @@ import { useState } from "react";
 import { trpc } from "../../../../lib/trpc";
 import { useLang } from "../../../../lib/i18n";
 import { Input, Textarea } from "@heroui/react";
-import { Plus, Trash2, BookOpen, ExternalLink } from "lucide-react";
+import { AddIcon, DeleteIcon, ExternalIcon, LibraryIcon } from "../../../platform/components/icons";
+import { HelpTip } from "../../../platform/components/HelpTip";
 
 interface Item {
   id: number;
@@ -30,7 +31,7 @@ export default function KnowledgeEditor({ brandId }: { brandId: number | null })
   }
 
   const utils = trpc.useUtils();
-  const list = (trpc as any).brandKnowledge?.list?.useQuery?.({ brandId }, { enabled: !!brandId });
+  const list = (trpc as any).brandKnowledge?.list?.useQuery({ brandId }, { enabled: !!brandId });
   const items: Item[] = (list?.data as Item[] | undefined) ?? [];
 
   const createMut = (trpc as any).brandKnowledge?.create?.useMutation?.({
@@ -81,6 +82,11 @@ export default function KnowledgeEditor({ brandId }: { brandId: number | null })
         }}>
           {en ? "BRAND KNOWLEDGE" : "品牌知識庫"}
         </span>
+        <HelpTip>
+          {en
+            ? "Past hits, reference articles, and competitor case studies — every task and the 7-Day Publisher pulls from this library first."
+            : "過去成功的貼文、外部參考文章、競品案例 — 所有任務與七日發布台會優先從這份知識庫取材。"}
+        </HelpTip>
         <div style={{ flex: 1, height: 1, background: "#D4D4D4" }} />
         <span style={{
           fontSize: 12, fontWeight: 500, color: "#525252",
@@ -100,20 +106,10 @@ export default function KnowledgeEditor({ brandId }: { brandId: number | null })
             display: "inline-flex", alignItems: "center", gap: 4,
           }}
         >
-          <Plus size={12} /> {en ? "Add entry" : "新增條目"}
+          <AddIcon size={12} /> {en ? "Add entry" : "新增條目"}
         </button>
       </div>
 
-      {/* Rationale line — why this exists */}
-      <p style={{
-        fontSize: 13, lineHeight: 1.7, color: "#525252",
-        fontFamily: '"Source Serif Pro", "Noto Serif TC", Georgia, serif',
-        fontStyle: "italic", maxWidth: 720, marginBottom: 18,
-      }}>
-        {en
-          ? "Upload your past hits, reference articles, and competitor case studies — every task and the 7-Day Publisher pulls from this library first. Closer to your real voice than letting AI start from scratch."
-          : "上傳你過去成功的貼文、外部參考文章、競品案例 — 所有任務與七日發布台會優先從這份知識庫取材，比起讓 AI 從零生成，輸出會更貼近你的真實調性。"}
-      </p>
 
       {/* Capacity meter */}
       <div style={{
@@ -216,18 +212,9 @@ export default function KnowledgeEditor({ brandId }: { brandId: number | null })
           color: "#525252",
           border: "1px dashed #D4D4D4", borderRadius: 12,
         }}>
-          <BookOpen size={36} strokeWidth={1.3} style={{ margin: "0 auto 12px", opacity: 0.5 }} />
-          <p style={{ fontSize: 13, color: "#525252", marginBottom: 6, fontWeight: 500 }}>
+          <LibraryIcon size={36} strokeWidth={1.3} style={{ margin: "0 auto 12px", opacity: 0.5 }} />
+          <p style={{ fontSize: 13, color: "#525252", fontWeight: 500 }}>
             {en ? "No knowledge entries yet" : "還沒有知識條目"}
-          </p>
-          <p style={{
-            fontSize: 12, color: "#525252",
-            fontFamily: '"Source Serif Pro", "Noto Serif TC", Georgia, serif',
-            fontStyle: "italic", maxWidth: 320, margin: "0 auto",
-          }}>
-            {en
-              ? "Start by uploading your best-performing post — the AI will fold its voice and structure into every future task."
-              : "從你最成功的一篇貼文開始上傳 — AI 會把它的語氣 / 結構納入後續任務的取材池。"}
           </p>
         </div>
       ) : (
@@ -260,7 +247,7 @@ export default function KnowledgeEditor({ brandId }: { brandId: number | null })
                 )}
                 <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8, marginBottom: 6 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0, flex: 1 }}>
-                    <BookOpen size={12} strokeWidth={1.7} style={{ color: filled ? "#171717" : "#525252", flexShrink: 0 }} />
+                    <LibraryIcon size={12} strokeWidth={1.7} style={{ color: filled ? "#171717" : "#525252", flexShrink: 0 }} />
                     <h3 style={{
                       fontSize: 13.5, fontWeight: 600, color: "#171717",
                       lineHeight: 1.35, margin: 0,
@@ -279,7 +266,7 @@ export default function KnowledgeEditor({ brandId }: { brandId: number | null })
                     onMouseEnter={(e) => { e.currentTarget.style.color = "#B91C1C"; }}
                     onMouseLeave={(e) => { e.currentTarget.style.color = "#525252"; }}
                   >
-                    <Trash2 size={13} />
+                    <DeleteIcon size={13} />
                   </button>
                 </div>
                 {it.body && (
@@ -306,7 +293,7 @@ export default function KnowledgeEditor({ brandId }: { brandId: number | null })
                       href={it.sourceUrl} target="_blank" rel="noreferrer"
                       style={{ display: "flex", alignItems: "center", gap: 3, color: "#525252", textDecoration: "none" }}
                     >
-                      <ExternalLink size={10} /> {en ? "Source" : "來源"}
+                      <ExternalIcon size={10} /> {en ? "Source" : "來源"}
                     </a>
                   )}
                 </div>

@@ -18,14 +18,9 @@ export default function NotFoundPage() {
         {/* Large 404 */}
         <div className="text-8xl font-bold text-default-100 select-none mb-2">404</div>
 
-        <h1 className="text-xl font-semibold text-default-900 mb-2">
+        <h1 className="text-xl font-semibold text-default-900 mb-8">
           {lang === "en" ? "Page not found" : "找不到這個頁面"}
         </h1>
-        <p className="text-sm text-default-500 mb-8 leading-relaxed">
-          {lang === "en"
-            ? "The link may be broken or the page may have been moved."
-            : "連結可能已失效，或頁面已移動到新的位置。"}
-        </p>
 
         {/* Recovery actions */}
         <div className="flex flex-col gap-3">
@@ -36,8 +31,8 @@ export default function NotFoundPage() {
             {lang === "en" ? "← Go back" : "← 返回上一頁"}
           </button>
           <button
-            onClick={() => navigate("/theater", { replace: true })}
-            className="w-full py-2.5 rounded-full bg-violet-600 text-white text-sm font-semibold hover:bg-violet-700 transition"
+            onClick={() => navigate("/planner", { replace: true })}
+            className="w-full py-2.5 rounded-full bg-zinc-600 text-white text-sm font-semibold hover:bg-zinc-700 transition"
           >
             {lang === "en" ? "Go to home" : "前往主頁"}
           </button>
@@ -48,7 +43,7 @@ export default function NotFoundPage() {
           {lang === "en" ? "Need help? " : "需要協助？"}
           <a
             href="mailto:sowork@sowork.ai"
-            className="text-violet-500 hover:underline"
+            className="text-zinc-500 hover:underline"
           >
             sowork@sowork.ai
           </a>

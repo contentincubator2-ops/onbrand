@@ -3,15 +3,11 @@
  *
  * Route: /tasks/:platform  (platform = fb | ig | threads | line | tt | email | web)
  *
- * Replaces the old 30s/60s/99s tier pages as the primary entry point.
- * Users pick the *platform* in the sidebar, then filter by complexity via
- * tabs inside this page:
- *   全部  |  單篇內容  |  內容套組  |  完整企劃
- *   （分頁名一律取自 v2/lib/tierVocabulary.ts，不要在這裡另寫一套）
- *
- * Speed badges appear on every card so the timing expectation is clear
- * without requiring users to navigate tiers before seeing tasks.
+ * Users pick the *platform* in the sidebar, then filter by format / source
+ * inside this page. Tier is internal engine config and never shown.
  */
+import { IllustratedEmpty } from "../../platform/components/EmptyIllustration";
+import { TaskIllustration } from "../../platform/components/TaskIllustration";
 import React, { useMemo, useState, useEffect, useRef } from "react";
 import { Navigate, useParams, useOutletContext, useNavigate, useSearchParams } from "react-router-dom";
 import CalendarTabs from "../components/CalendarTabs";
@@ -22,7 +18,6 @@ import { TaskCardShell, TaskCardAvatar, CARD_SURFACE } from "../components/TaskC
 import { campaignPrefill } from "../lib/campaignIntakePrefill";
 import { toastWithUpgrade } from "../../platform/lib/upgradeToast";
 import { matchTaskWithSynonyms } from "../lib/taskSearchSynonyms";
-import { TIER_ORDER, tierAccent, tierLabel } from "../../platform/lib/tierVocabulary";
 import {
   resolveSource, sourceAccent, sourceWhy,
   sourcePillText, sourceTooltip,
@@ -50,16 +45,15 @@ import TaskCardComposer, { type ComposerChannel } from "../../strategy/component
 import RewriteDraftModal from "../components/quickTask/RewriteDraftModal";
 import {
   Avatar, Button, Card, CardBody, Chip, Input, Modal, ModalBody,
-  ModalContent, ModalFooter, ModalHeader, Textarea,
+  ModalContent, ModalHeader, Textarea, Tooltip,
 } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { HelpTip } from "../../platform/components/HelpTip";
 import {
-  faBolt, faPaperPlane, faXmark, faMagnifyingGlass,
-  faEnvelope, faBullhorn, faWandMagicSparkles, faTriangleExclamation, faGlobe,
-  faBookBookmark, faCalendarDays, faPlus, faPenToSquare,
+  faBolt, faMagnifyingGlass, faEnvelope, faBullhorn, faWandMagicSparkles, faTriangleExclamation, faGlobe, faBookBookmark, faCalendarDays, faPenToSquare,
 } from "@fortawesome/free-solid-svg-icons";
 import {
-  faFacebookF, faInstagram, faYoutube, faTiktok, faLinkedinIn, faThreads, faLine,
+  faFacebook, faInstagram, faYoutube, faTiktok, faLinkedin, faThreads, faLine,
 } from "@fortawesome/free-brands-svg-icons";
 import RunningAgentCarousel from "../components/quickTask/RunningAgentCarousel";
 import ImageCardTile, { type ImageCardInfo } from "../components/imageCard/ImageCardTile";
@@ -67,6 +61,9 @@ import { imageCardHref, imageChannelOf } from "../lib/imageCardHandoff";
 import CardDetailDrawer, { isRecentCard } from "../components/quickTask/CardDetailDrawer";
 import ChannelPicker from "../../platform/components/plan/ChannelPicker";
 import TaskPicker from "../../platform/components/plan/TaskPicker";
+import { LibraryIcon, AddIcon, EditIcon, TaskCardsIcon, Icon, type IconName } from "../../platform/components/icons";
+import { contextChipIcon } from "../lib/contextChipIcons";
+import { departAgentHandoff } from "../lib/agentHandoff";
 
 // ── Recently used tasks helpers ─────────────────────────────────────────────
 const LAST_USED_KEY = "onbrand_last_used_tasks_v1";
@@ -113,97 +110,45 @@ interface PlatformMeta {
   labelZh: string;
   icon: any;
   bg: string;
-  heroZh: string;
-  heroEn: string;
-  subZh: string;
-  subEn: string;
 }
 
 const PLATFORM_META: Record<string, PlatformMeta> = {
   facebook: {
-    label: "Facebook", labelZh: "Facebook", icon: faFacebookF, bg: "#1877F2",
-    heroZh: "讓每篇 Facebook 貼文，都有爆款的骨架",
-    heroEn: "Every post has a proven structure — no more starting from scratch",
-    subZh: "Clio 獲獎敘事公式 × 品牌定位鎖定，自然引發互動",
-    subEn: "Narrative frameworks from award-winning campaigns, locked to your brand voice",
+    label: "Facebook", labelZh: "Facebook", icon: faFacebook, bg: "#18181b",
   },
   instagram: {
-    label: "Instagram", labelZh: "Instagram", icon: faInstagram, bg: "#E4405F",
-    heroZh: "文案 × 視覺指令同步產出，不再是漂亮圖片配隨便文字",
-    heroEn: "Caption and visual brief in one run — never pieced together separately",
-    subZh: "文案代理人 + 圖片指導代理人協作，輸出比競品深一層",
-    subEn: "Caption agent and image director agent work in sync, every time",
+    label: "Instagram", labelZh: "Instagram", icon: faInstagram, bg: "#18181b",
   },
   linkedin: {
-    label: "LinkedIn", labelZh: "LinkedIn", icon: faLinkedinIn, bg: "#0A66C2",
-    heroZh: "不只是發文，是在 LinkedIn 建立你的專業話語權",
-    heroEn: "Thought leadership that earns real attention — not just vanity metrics",
-    subZh: "PR Strategist 代理人以記者邏輯構建你的觀點",
-    subEn: "PR Strategist agent thinks like a journalist, writes like an executive",
+    label: "LinkedIn", labelZh: "LinkedIn", icon: faLinkedin, bg: "#18181b",
   },
   youtube: {
-    label: "YouTube", labelZh: "YouTube", icon: faYoutube, bg: "#FF0000",
-    heroZh: "標題、章節、縮圖文案、結尾鉤子 — YouTube 影片完整佈局",
-    heroEn: "Title, chapters, thumbnail brief, end hook — one run, done",
-    subZh: "Strategist 規劃敘事弧，再由文案代理人完成每一段腳本",
-    subEn: "Strategist maps the arc; writer handles every segment",
+    label: "YouTube", labelZh: "YouTube", icon: faYoutube, bg: "#18181b",
   },
   tiktok: {
-    label: "TikTok", labelZh: "TikTok", icon: faTiktok, bg: "#EE1D52",
-    heroZh: "前 3 秒留人，後 60 秒轉化 — TikTok 腳本不靠靈感",
-    heroEn: "Grab them in 3 seconds, keep them for 60 — retention built in",
-    subZh: "TikTok 專屬代理人以角色弧度 × 未解懸念設計驅動完播率",
-    subEn: "TikTok agent that thinks in character arcs and unresolved tension",
+    label: "TikTok", labelZh: "TikTok", icon: faTiktok, bg: "#18181b",
   },
   email: {
-    label: "Newsletter", labelZh: "電子報", icon: faEnvelope, bg: "#7B5BC8",
-    heroZh: "每封電子報都是品牌聲音的延伸，不是隨機發文",
-    heroEn: "Every email sounds like you — consistent voice, every send",
-    subZh: "品牌定位鎖定主旨行、開場鉤子與 CTA，完整結構一次產出",
-    subEn: "Brand voice locks the subject line, opening hook, and CTA — zero drift",
+    label: "Newsletter", labelZh: "電子報", icon: faEnvelope, bg: "#18181b",
   },
   pr: {
     label: "PR", labelZh: "新聞稿", icon: faBullhorn, bg: "#475569",
-    heroZh: "讓媒體真正想報導你 — 不是寫稿，是設計新聞角度",
-    heroEn: "Written to get picked up — not just to check a box",
-    subZh: "PR Strategist 代理人以記者視角找到新聞價值，再產出完整稿件",
-    subEn: "PR Strategist finds the news angle before writing a single word",
   },
   case: {
-    label: "Case Library", labelZh: "案例", icon: faBookBookmark, bg: "#7C3AED",
-    heroZh: "案例不是寫稿當下才找，是平常就在累積",
-    heroEn: "A case library you build over time, not scramble for at deadline",
-    subZh: "依十項標準分別建檔，每次提報都對照既有紀錄去重",
-    subEn: "Filed by standard, deduplicated against everything already logged",
+    label: "Case Library", labelZh: "案例", icon: faBookBookmark, bg: "#18181b",
   },
   calendar: {
-    label: "Content Calendar", labelZh: "行事曆", icon: faCalendarDays, bg: "#B45309",
-    heroZh: "先把整個月的篇數與切角排好，再逐篇寫",
-    heroEn: "Plan the month's slots and angles first, then write them one by one",
-    subZh: "每種內容類型一張卡，一次產出該類型當月所有篇數的摘要",
-    subEn: "One card per content type, producing every slot that type owns this month",
+    label: "Content Calendar", labelZh: "行事曆", icon: faCalendarDays, bg: "#18181b",
   },
   website: {
-    label: "Website", labelZh: "官網", icon: faGlobe, bg: "#0F766E",
-    heroZh: "官網長文不是部落格隨筆，是品牌把觀點說完整的地方",
-    heroEn: "Long-form that earns the reader's time — not filler blog posts",
-    subZh: "引言＋3 段的固定骨架，把案例與規格翻譯成讀者的生活感受",
-    subEn: "A fixed intro-plus-three structure that turns specs into felt experience",
+    label: "Website", labelZh: "官網", icon: faGlobe, bg: "#18181b",
   },
   // 2026-09-29 CJ：台灣市場加 Threads、LINE。目前沒有預設卡，用戶從自己的範例建卡。
   threads: {
     label: "Threads", labelZh: "Threads", icon: faThreads, bg: "#000000",
-    heroZh: "Threads 要像人在說話，不像品牌在發公告",
-    heroEn: "Threads should sound like a person talking, not a brand announcing",
-    subZh: "貼上你寫得最好的幾篇串文，建成自己的 Threads 任務卡",
-    subEn: "Paste your best threads and turn them into your own task card",
   },
   line: {
-    label: "LINE", labelZh: "LINE", icon: faLine, bg: "#06C755",
-    heroZh: "LINE 群發是寫給已經加你好友的人——一則訊息、一個行動",
-    heroEn: "LINE broadcasts go to people who already follow you — one message, one action",
-    subZh: "貼上你效果最好的幾則群發訊息，建成自己的 LINE 任務卡",
-    subEn: "Paste your best-performing broadcasts and turn them into your own task card",
+    label: "LINE", labelZh: "LINE", icon: faLine, bg: "#18181b",
   },
 };
 
@@ -221,13 +166,9 @@ const PLATFORM_META: Record<string, PlatformMeta> = {
 const dicebear = (seed: string) =>
   `https://api.dicebear.com/7.x/notionists/svg?seed=${encodeURIComponent(seed)}&backgroundColor=4267B2&backgroundType=solid`;
 
-// tier 的顯示名與識別色都在 v2/lib/tierVocabulary.ts —— 這裡曾經有自己的
-// tierLabel() / tierAccent()，和 TIER_TABS、AccountPage、RunPage 各自硬寫的
-// 版本漂成四份。要改叫法就改那一個檔案。
-//
-// 2026-07-17 (CJ「去除 30s/60s/99s 分類標籤，不再使用時間長度分類」):
-// tier stays as INTERNAL engine config (routing / quota / timeouts), but the
-// user-facing classification is by deliverable, never by duration.
+// 2026-09-29（CJ「頁面上還有在讀秒…也不需要單篇 套組和企劃的備註了」）：
+// tier 只是內部引擎設定（路由／額度／timeout），畫面上不再出現——
+// 沒有讀秒、沒有 單篇／套組／企劃 標籤、也沒有依 tier 篩選的分頁。
 
 // Tasks that should hold the modal open until image is done
 const HOLD_FOR_IMAGES = new Set<string>(["fb-60-single-full", "fb-99-carousel-5"]);
@@ -251,7 +192,7 @@ function synthesizeStages(elapsedMs: number, tier: string, lang: string): any[] 
     status: t < start ? "pending" : t > end ? "done" : "running",
   });
   const stages: any[] = [];
-  if (isResearch) stages.push(mk("scout", L("🔬 Scout 爬取真實爆款數據", "🔬 Scout pulls real viral data"), 0, scoutEnd));
+  if (isResearch) stages.push(mk("scout", L("Scout 爬取真實爆款數據", "Scout pulls real viral data"), 0, scoutEnd));
   stages.push(mk("pre", L("URL / persona / brand load", "URL / persona / brand load"), scoutEnd, preEnd));
   if (isProd) stages.push(mk("strategist", L("Strategist 規劃敘事弧", "Strategist maps the narrative arc"), preEnd, stratEnd));
   stages.push(mk("caption", L("文案寫手 撰寫版本", "Caption writer drafts variants"), capStart, capEnd));
@@ -263,26 +204,6 @@ function synthesizeStages(elapsedMs: number, tier: string, lang: string): any[] 
   }
   return stages;
 }
-
-// ── Tier tab config ──────────────────────────────────────────────────────────
-type ActiveTier = "all" | "30s" | "60s" | "99s";
-
-interface TierTab {
-  id: ActiveTier;
-  labelZh: string;
-  labelEn: string;
-  accent: string;
-}
-
-const TIER_TABS: TierTab[] = [
-  { id: "all", labelZh: "全部", labelEn: "All", accent: "#171717" },
-  ...TIER_ORDER.map((code): TierTab => ({
-    id: code,
-    labelZh: tierLabel(code, "zh", { long: true }),
-    labelEn: tierLabel(code, "en"),
-    accent: tierAccent(code),
-  })),
-];
 
 // ── Format category config (FB only) ────────────────────────────
 // 2026-08-23: 搬到 v2/lib/fbTaskFormats.ts —— 這份對照表爫過一次（90s 退役後
@@ -309,6 +230,8 @@ interface FBTaskCard {
   kind: "fast" | "mid" | "squad";
   inputs?: any[];
   primary_question?: string | null;
+  /** 2026-09-30：自建卡用戶自選的插畫場景；null＝依題目自動挑。 */
+  scene?: string | null;
   primary_input?: { key: string; placeholder?: string; type: "text" | "textarea"; derive?: any } | null;
   agent_id?: number | null;
   skill_slug?: string | null;
@@ -402,7 +325,7 @@ class PlatformPageErrorBoundary extends React.Component<
             <h2 style={{ fontSize: 18, fontWeight: 600, marginTop: 4 }}>頁面載入失敗</h2>
             <p style={{ marginTop: 8 }}>{e.message}</p>
             <button
-              style={{ marginTop: 12, padding: "6px 12px", background: "#3b82f6", color: "white", border: "none", borderRadius: 6, cursor: "pointer" }}
+              style={{ marginTop: 12, padding: "6px 12px", background: "#18181b", color: "white", border: "none", borderRadius: 6, cursor: "pointer" }}
               onClick={() => this.setState({ error: null })}
             >
               重試渲染
@@ -430,6 +353,8 @@ export interface TaskEmbed {
   weekStart?: string;
   /** 這一格排在哪天——成品頁「排程到日曆」預填這天。 */
   slotDate?: string;
+  /** 靈感舞台：主體是某個產品／活動時，任務視窗直接選好它，不必再選一次。 */
+  entity?: { kind: "product" | "event"; id: number };
   onClose: () => void;
 }
 
@@ -530,9 +455,12 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
   // which would pollute a product with brand data).
   const [editingChip, setEditingChip] = useState<{ source: string; label: string } | null>(null);
   const [editValue, setEditValue] = useState("");
+  // 2026-09-30 任務 modal 圖示化：目前點開的脈絡圖示（"__entity"＝產出對象），與選填欄位開關。
+  const [ctxOpen, setCtxOpen] = useState<string | null>(null);
+  const [showOptional, setShowOptional] = useState(false);
   const savePositioningMut = (trpc as any).scope?.savePositioning?.useMutation?.();
 
-  const scopeActiveQuery = (trpc as any).scope?.active?.useQuery?.(
+  const scopeActiveQuery = (trpc as any).scope?.active?.useQuery(
     {
       brandId:   brandId ?? 0,
       productId: taskProductId,
@@ -563,7 +491,6 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
   }, [brandAssetsForCheck, brandQuery?.data]);
 
   // Tier tab state (used for non-FB/non-IG platforms)
-  const [activeTier, setActiveTier] = useState<ActiveTier>("all");
   // 結構來源篩選。"all" = 不篩。與 tier 是兩條獨立的軸，可同時生效。
   // 2026-09-29 CJ「每個平台要增加一個圖片的類別」："image" 不是任務卡來源，是另一個類別——
   // 選它時下面改列這個通路的圖片任務卡（imageCard.list），不列文字任務。
@@ -756,11 +683,13 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
         taskLabel: typeof activeTask.label === "string" ? activeTask.label : undefined,
         primaryQuestion: activeTask.primary_question ?? undefined,
         brandId: brandId ?? undefined,
+        productId: taskProductId ?? undefined,
+        eventId: taskEventId ?? undefined,
       });
       if (r?.ok && r.polished) setPrimaryAnswer(r.polished);
-      else setPolishErr(lang === "en" ? "Polish failed — try again." : "潤稿失敗，請再試一次");
+      else setPolishErr(lang === "en" ? "Couldn't refine — try again." : "完善失敗，請再試一次");
     } catch {
-      setPolishErr(lang === "en" ? "Polish failed — try again." : "潤稿失敗，請再試一次");
+      setPolishErr(lang === "en" ? "Couldn't refine — try again." : "完善失敗，請再試一次");
     } finally {
       setPolishing(false);
     }
@@ -883,7 +812,7 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
   // 時間」）：要預填「日期 / 時間」「為什麼參加 / 重點」就得真的去拿活動資料，
   // 所以除了 ref 還要一份 state —— ref 不會觸發 query。
   const [campaignScope, setCampaignScope] = React.useState<{ eventId: number; itemId: string } | null>(null);
-  const campaignQ = (trpc as any).campaign?.get?.useQuery?.(
+  const campaignQ = (trpc as any).campaign?.get?.useQuery(
     { eventId: campaignScope?.eventId ?? 0 },
     { enabled: !!campaignScope?.eventId, refetchOnWindowFocus: false, staleTime: 60_000 },
   ) ?? { data: null };
@@ -989,6 +918,8 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
       : task.id?.startsWith("pr-") ? "pr"
       : task.id?.startsWith("web-") ? "website"
       : task.id?.startsWith("x-") ? "x"
+      : task.id?.startsWith("th-") ? "threads"
+      : task.id?.startsWith("ln-") ? "line"
       : task.id?.startsWith("br-") ? "brand"
       : task.id?.startsWith("rs-") ? "audience"
       : "facebook");
@@ -1031,6 +962,9 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
     // 2026-09-29：server 的預設托盤是從「全部卡」裡每個形式挑一張，但前台只列
     // 爆款結構＋品牌自建——交集後常常只剩一兩張（FB 7 張爆款卡只擺出 2 張）。
     // 沒存過托盤時，改從「前台看得到的卡」裡每個形式挑一張，server 的挑法當次序參考。
+    // 看得到的卡本來就不超過托盤上限時全部擺出來——IG 兩張留言卡共用同一個形式，
+    // 私訊卡又是 feed 形式，每個形式挑一張會把 8 張砍成 6 張，藏掉唯一的私訊卡。
+    if (platformTasks.length <= (trayData.maxTray ?? 12)) return platformTasks.map((t: any) => t.id);
     const fallbackOrder = new Map((trayData.fallback ?? []).map((id, i) => [id, i] as const));
     const byType = new Map<string, any>();
     const ranked = [...platformTasks].sort((a: any, b: any) =>
@@ -1098,18 +1032,13 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
       if (activeWEBFormat !== "all") {
         list = list.filter((task) => WEB_TASK_FORMAT_MAP[task.id] === activeWEBFormat);
       }
-    } else {
-      // Tier-based filter for other platforms
-      if (activeTier !== "all") {
-        list = list.filter((task) => task.tier === activeTier);
-      }
     }
     // 類型篩選（爆款結構／品牌自建）每個通路都套用。
     if (activeSource !== "all") {
       list = list.filter((task) => frontCardKind(task) === activeSource);
     }
     return list;
-  }, [platformTasks, platform, activeTier, activeSource, activeFormat, activeIGFormat, activeLIFormat, activeYTFormat, activeTTFormat, activeEMFormat, activePRFormat, activeWEBFormat, activePackFormat, packChannel]);
+  }, [platformTasks, platform, activeSource, activeFormat, activeIGFormat, activeLIFormat, activeYTFormat, activeTTFormat, activeEMFormat, activePRFormat, activeWEBFormat, activePackFormat, packChannel]);
 
   /** 目前選的分類分頁顯示名；「全部」或沒有分頁分類的通路回 null。 */
   const activeCategoryLabel: string | null = packChannel
@@ -1143,7 +1072,7 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
     // 托盤模式：只擺挑過的那幾張。有搜尋或篩選時自動退出托盤（那時使用者
     // 是在找東西，不是在用日常的那幾張）。
     const filtering = searchQuery.trim().length > 0
-      || activeSource !== "all" || activeTier !== "all" || onlyNew;
+      || activeSource !== "all" || onlyNew;
     // 2026-09-29：托盤（含系統預設）可能擺著前台已不列的類型——只算看得到的那幾張，
     // 全都看不到就當沒設托盤，不要讓用戶停在「常用清單裡沒有這個分類的卡」。
     const shownIds = new Set(shownTasks.map((t) => t.id));
@@ -1153,7 +1082,7 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
       list = list.filter((task) => inTray.has(task.id));
     }
     return list;
-  }, [categoryTasks, shownTasks, activeSource, activeTier, searchQuery, showAllTasks, trayIds, onlyNew]);
+  }, [categoryTasks, shownTasks, activeSource, searchQuery, showAllTasks, trayIds, onlyNew]);
 
   const totalForPlatform = useMemo(
     () => shownTasks.filter((task) => inferPlatform(task) === platform).length,
@@ -1283,6 +1212,7 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
     // 從活動企劃過來時，活動就是這一篇的脈絡——優先於全域 scope。
     const ge = campaignRef.current?.eventId ?? ctx?.scope?.eventId ?? null;
     setModalEntity(
+      embed?.entity ? { kind: embed.entity.kind, id: embed.entity.id } :
       ge ? { kind: "event", id: ge } :
       gp ? { kind: "product", id: gp } :
       { kind: "brand", id: null },
@@ -1321,7 +1251,15 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
     setModalEntity({ kind: "brand", id: null });
     setEditingChip(null);
     setEditValue("");
+    setCtxOpen(null);
+    setShowOptional(false);
     embed?.onClose();
+  };
+  /** 成功要換到成品頁前呼叫：頭像分身從執行中的進度環起飛，降落在成品頁的主筆位置。 */
+  const departToRun = () => {
+    const cap = agentMeta ?? activeTask?.agent;
+    if (!cap?.name) return;
+    departAgentHandoff(document.querySelector("[data-agent-handoff]"), cap.avatarUrl || dicebear(cap.name));
   };
   /** 成品頁網址：從本週企劃來的要帶回程資訊，成品頁才會出現「存回本週企劃」。 */
   const runHref = (outputId: number | string) => {
@@ -1382,7 +1320,6 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
 
   // ── Determine effective tier for running (tab || task.tier) ──────────────
   const effectiveTier = (task: FBTaskCard): "30s" | "60s" | "99s" => {
-    if (activeTier !== "all") return activeTier;
     const t = task.tier as any;
     if (t === "60s" || t === "99s" || t === "30s") return t;
     return "30s";
@@ -1462,6 +1399,8 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
             squadSlug: (activeTask as any).squad_slug,
             topic: primaryAnswer || activeTask.label,
             brandId: brandId ?? undefined,
+            productId: taskProductId ?? undefined,
+            eventId: taskEventId ?? undefined,
           });
           if (isStale()) { if ((r as any).outputId) discardCancelledOutput((r as any).outputId); return; }
           if ((r as any).outputId) {
@@ -1483,6 +1422,7 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                 ? "Public posts weren't generated. Only internal drafts are available right now; you can regenerate them."
                 : "公開貼文未產生，目前只有內部草稿，可重新產生。");
             }
+            departToRun();
             closeTask();
             finishCampaignItem(Number((r as any).outputId));
             navigate(runHref((r as any).outputId));
@@ -1540,6 +1480,7 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
             }
           }
           if (isStale()) { discardCancelledOutput(oid); return; }
+          departToRun();
           closeTask();
           finishCampaignItem(Number(oid));
           navigate(runHref(oid));
@@ -1640,17 +1581,11 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                   startContent={<FontAwesomeIcon icon={faWandMagicSparkles} />}
                   onPress={() => setRewriteOpen(true)}
                 >
-                  {lang === "en" ? "Rewrite my text" : "貼上原文改寫"}
+                  {lang === "en" ? "Rewrite my text" : "改寫原文"}
                 </Button>
-                <Button
-                  size="sm"
-                  color="primary"
-                  variant="shadow"
-                  startContent={<FontAwesomeIcon icon={faPlus} />}
-                  onPress={() => { setResumeCardId(null); setComposerOpen(true); }}
-                >
-                  {lang === "en" ? "New card" : "新增任務卡"}
-                </Button>
+                {/* 2026-09-29（CJ「新增任務卡有兩個地方，功能重複」）：右上角的
+                    「新增任務卡」拿掉，只留卡片旁邊那張虛線卡；品牌自建從那張卡
+                    打開的選卡器裡進。 */}
               </>
             ) : (
               <Chip size="sm" variant="flat" className="text-default-500">
@@ -1662,45 +1597,15 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
 
         <div className="relative z-10 flex flex-col items-center text-center max-w-[1100px] mx-auto">
 
-          {/* Platform eyebrow */}
-          <div className="flex items-center gap-2 mb-4">
-            <div
-              className="w-9 h-9 rounded-full flex items-center justify-center text-white shadow-sm"
-              style={{ background: meta.bg }}
-            >
+          {/* Platform header：單色 logo＋平台名（2026-09-29 介面去文字化：各通路標語已刪） */}
+          <div className="flex items-center gap-2.5 mb-4">
+            <div className="w-9 h-9 rounded-full flex items-center justify-center text-white shadow-sm bg-default-900">
               <FontAwesomeIcon icon={meta.icon} className="text-sm" />
             </div>
-            <p className="text-[12px] font-semibold uppercase tracking-[0.22em] text-default-500">
+            <h1 className="font-bold tracking-tight leading-tight text-default-900" style={{ fontSize: "clamp(1.35rem, 2.4vw, 1.75rem)" }}>
               {lang === "en" ? meta.label : meta.labelZh}
-            </p>
+            </h1>
           </div>
-
-          {/* Hero title — plain color (no gradient-text; gradient clip is unreliable cross-browser) */}
-          <h1
-            className="font-bold tracking-tight leading-tight mb-2"
-            style={{
-              fontSize: "clamp(1.45rem, 2.8vw, 2rem)",
-              color: "#0f0f0e",
-            }}
-          >
-            {lang === "en" ? meta.heroEn : meta.heroZh}
-          </h1>
-
-          {/* Platform sub-headline — differentiation copy */}
-          <p
-            className="mb-3 text-default-500"
-            style={{ fontSize: 14, lineHeight: 1.65, maxWidth: 580 }}
-          >
-            <span style={{ color: meta.bg, fontWeight: 600 }}>▸ </span>
-            {lang === "en" ? meta.subEn : meta.subZh}
-            {brandId && (
-              <span style={{ fontStyle: "italic", color: "#9ca3af" }}>
-                {lang === "en"
-                  ? ` · Using ${brandName ?? "your brand"}'s positioning`
-                  : ` · 以 ${brandName ?? "你的品牌"} 定位為骨架`}
-              </span>
-            )}
-          </p>
 
           {/* Search */}
           <div className="w-full mb-5" style={{ maxWidth: 740 }}>
@@ -2043,33 +1948,7 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                 })}
               </div>
             </div>
-          ) : (
-            <div className="flex items-center gap-2 flex-wrap justify-center">
-              {TIER_TABS.map((tab) => {
-                const active = activeTier === tab.id;
-                return (
-                  <button
-                    key={tab.id}
-                    onClick={() => setActiveTier(tab.id)}
-                    className="flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium transition-all"
-                    style={
-                      active
-                        ? { background: tab.accent, color: "white", boxShadow: `0 2px 12px ${tab.accent}55` }
-                        : { background: "white", color: "#525252", border: "1px solid #E5E5E5" }
-                    }
-                  >
-                    {tab.id !== "all" && (
-                      <span
-                        className="w-2 h-2 rounded-full"
-                        style={{ background: active ? "rgba(255,255,255,0.7)" : tab.accent }}
-                      />
-                    )}
-                    {lang === "en" ? tab.labelEn : tab.labelZh}
-                  </button>
-                );
-              })}
-            </div>
-          )}
+          ) : null}
 
           {/* 2026-09-06 通路選擇。沒有這一區，用戶被鎖在方案預設值上，
               「11 個通路選 2 個、每月可更換一次」那句賣點就不存在。 */}
@@ -2144,8 +2023,8 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
               <span>
                 <b>{lang === "en" ? "Strategy topic loaded: " : "策略題目已帶入："}</b>
                 「{strategyTopic}」
-                <span style={{ color: "#8A8494", marginLeft: 8, fontSize: 12 }}>
-                  {lang === "en" ? "Open any task — it autofills." : "點任一任務卡，題目會自動填入"}
+                <span style={{ marginLeft: 6 }}>
+                  <HelpTip>{lang === "en" ? "Open any task — it autofills." : "點任一任務卡，題目會自動填入"}</HelpTip>
                 </span>
               </span>
               <button onClick={() => setStrategyTopic(null)}
@@ -2207,47 +2086,29 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                  * 卡被托盤／搜尋濾掉了，是 categoryTasks 本身是空的。「即將上線」
                  * 是死路；「新增任務卡」至少讓用戶當場自己建一張。
                  */
-                <>
-                  <FontAwesomeIcon icon={faPlus} className="text-2xl mb-2 text-default-300" />
-                  <p className="font-semibold mb-1">
-                    {activeSource === "own"
-                      ? (lang === "en" ? `No brand-built ${meta.label} cards yet` : `還沒有 ${meta.labelZh} 的品牌自建卡`)
-                      : activeSource === "viral"
-                        ? (lang === "en" ? `No viral-structure cards in ${activeCategoryLabel ?? meta.label} yet` : `「${activeCategoryLabel ?? meta.labelZh}」目前還沒有爆款結構卡`)
-                        : (lang === "en"
-                          ? `No preset cards in ${activeCategoryLabel ?? meta.label} yet`
-                          : `「${activeCategoryLabel ?? meta.labelZh}」目前還沒有預設任務卡`)}
-                  </p>
-                  {/* 2026-09-29：前台只列爆款結構＋品牌自建，基礎方案看不到爆款卡——
-                      講清楚空的原因，不要讓用戶以為壞了。 */}
-                  {(trayData?.viralLocked ?? 0) > 0 && (
-                    <p className="text-tiny text-default-400 mb-1">
-                      {lang === "en"
-                        ? `${trayData!.viralLocked} viral-structure cards here are on the Pro plan.`
-                        : `這個通路有 ${trayData!.viralLocked} 張爆款結構卡，屬於專業方案。`}
-                    </p>
-                  )}
-                  {COMPOSER_CHANNELS.has(platform) && brandId ? (
-                    <>
-                      <p className="text-tiny text-default-400 mb-3">
-                        {lang === "en" ? "You can still create your own." : "你可以自己建一張。"}
-                      </p>
-                      <Button
-                        size="sm"
-                        color="primary"
-                        variant="shadow"
-                        startContent={<FontAwesomeIcon icon={faPlus} />}
-                        onPress={() => { setResumeCardId(null); setComposerOpen(true); }}
-                      >
-                        {lang === "en" ? "New card" : "新增任務卡"}
-                      </Button>
-                    </>
-                  ) : (
-                    <p className="text-tiny text-default-400">
-                      {lang === "en" ? "Coming soon." : "即將上線。"}
-                    </p>
-                  )}
-                </>
+                <IllustratedEmpty
+                  kind="cards"
+                  size="sm"
+                  title={activeSource === "own"
+                    ? (lang === "en" ? "No moves of your own yet" : "還沒有你們自己的招式")
+                    : activeSource === "viral"
+                      ? (lang === "en" ? `No viral-structure cards in ${activeCategoryLabel ?? meta.label} yet` : `「${activeCategoryLabel ?? meta.labelZh}」目前還沒有爆款結構卡`)
+                      : (lang === "en"
+                        ? `No preset cards in ${activeCategoryLabel ?? meta.label} yet`
+                        : `「${activeCategoryLabel ?? meta.labelZh}」目前還沒有預設任務卡`)}
+                  /* 2026-09-29：前台只列爆款結構＋品牌自建，基礎方案看不到爆款卡——
+                     講清楚空的原因，不要讓用戶以為壞了。 */
+                  note={(trayData?.viralLocked ?? 0) > 0
+                    ? (lang === "en"
+                      ? `${trayData!.viralLocked} viral-structure cards here are on the Pro plan.`
+                      : `這個通路有 ${trayData!.viralLocked} 張爆款結構卡，屬於專業方案。`)
+                    : !(COMPOSER_CHANNELS.has(platform) && brandId)
+                      ? (lang === "en" ? "Coming soon." : "即將上線。")
+                      : undefined}
+                  action={COMPOSER_CHANNELS.has(platform) && brandId
+                    ? { label: lang === "en" ? "+ New card" : "＋ 新增任務卡", onPress: () => { setResumeCardId(null); setComposerOpen(true); } }
+                    : undefined}
+                />
               ) : (
                 // 分類本身有卡，只是這裡只擺常用的那幾張、剛好都不在這個分類——
                 // 不是沒有卡，是托盤沒挑到，該做的是看全部，不是「即將上線」。
@@ -2298,12 +2159,10 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
 
             <div className="flex items-center justify-between mb-4">
               <div>
-                <h2 className="font-semibold text-lg tracking-tight">
+                <h2 className="font-semibold text-lg tracking-tight flex items-center gap-1">
                   {lang === "en" ? "Tasks" : "精選任務"}
+                  <HelpTip>{lang === "en" ? "Tap to make — answer one quick question first." : "按下即產出，先回答 1 個關鍵問題"}</HelpTip>
                 </h2>
-                <p className="text-tiny text-default-400 mt-0.5">
-                  {lang === "en" ? "Tap to make — answer one quick question first." : "按下即產出，先回答 1 個關鍵問題"}
-                </p>
               </div>
               <div className="flex items-center gap-2">
                 {/* 2026-09-08 亮出節奏：這個通路 30 天內上架了幾張。有新卡才顯示，
@@ -2336,9 +2195,6 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
               {visibleTasks.map((task, idx) => {
                 const agentName = task.agent?.name ?? "AI Agent";
                 const avatarSrc = task.agent?.avatarUrl || dicebear(agentName);
-                const taskTier = task.tier as string;
-                const accent = tierAccent(taskTier);
-
                 return (
                   // 2026-09-25（CJ「任務卡的格式，我想要跟品牌的任務卡統一格式」）：
                   // 外框與圖片區的幾何搬到 TaskCardShell，活動 tray 用的是同一個殼。
@@ -2373,13 +2229,6 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                         </span>
                       )}
                       <TaskCardAvatar src={avatarSrc} />
-                      {/* Deliverable badge — top right (no duration labels) */}
-                      <span
-                        className="absolute top-2 right-2 text-tiny font-bold px-2 py-0.5 rounded-full text-white shadow-sm"
-                        style={{ background: accent, fontSize: 12, letterSpacing: "0.06em" }}
-                      >
-                        {tierLabel(taskTier, lang)}
-                      </span>
                       {/* Last-used badge — bottom right, only when used before */}
                       {(() => {
                         const days = getLastUsedDays(task.id);
@@ -2437,9 +2286,28 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                               className="text-[12px] font-medium truncate"
                               style={{ color: acc }}
                             >
-                              {isOwn ? frontCardKindLabel("own", lang) : sourcePillText(src, lang)}
+                              {isOwn
+                                ? frontCardKindLabel("own", lang)
+                                : frontCardKind(task) === "viral"
+                                  ? `${lang === "en" ? "Reference: " : "參考貼文："}${sourcePillText(src, lang)}`
+                                  : sourcePillText(src, lang)}
                             </span>
                           </span>
+                        );
+                      })()}
+                      {/* 2026-09-29（CJ「爆款結構卡上都要有這些文字：參考貼文、副標題、數字是原貼文的」）：
+                          爆款卡直接印數字＋量測年月，不用點進詳情才看得到。副標題就是 description。
+                          （2026-09-30 CJ「備註的地方都拿掉」：前台不印 caveat，只留在 server 資料層。） */}
+                      {frontCardKind(task) === "viral" && (() => {
+                        const raw = (task as any).source ?? {};
+                        return (
+                          <div className="flex flex-col gap-0.5">
+                            {(raw.metric || raw.asOf) && (
+                              <p className="text-[12px] leading-snug text-default-600 line-clamp-2">
+                                {raw.metric}{raw.metric && raw.asOf ? " · " : ""}{raw.asOf}
+                              </p>
+                            )}
+                          </div>
                         );
                       })()}
                       {/* 2026-09-11 (CJ「還是沒有直接打開，就可以看到那些廣告形式的文字」)：
@@ -2458,34 +2326,35 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                           </p>
                         );
                       })()}
-                      {/* 2026-09-08 出處與說明：點開看這張卡憑什麼、什麼時候用、上架日。
-                          用 span 而不是巢狀 button（button 不能包 button）。 */}
-                      <div className="flex items-center gap-2 text-[12px]">
+                      {isRecentCard((task as any).addedAt) && (
+                        <div className="flex items-center gap-2 text-[12px]">
+                          <span className="rounded-full border border-neutral-900 px-1.5 py-px text-[11px] text-neutral-900">
+                            {lang === "en" ? "New" : "新上架"}
+                            {(task as any).addedAt ? ` · ${String((task as any).addedAt).slice(5).replace("-", "/")}` : ""}
+                          </span>
+                        </div>
+                      )}
+                      {(task as any).methodology && (
+                        <span className="text-[12px] text-default-400 italic inline-flex items-center gap-1"><LibraryIcon size={11} /> {(task as any).methodology}</span>
+                      )}
+                      <div className="mt-auto pt-2 flex items-center gap-2 border-t border-default-100">
+                        <Avatar src={avatarSrc} size="sm" className="w-5 h-5" />
+                        <span className="text-tiny font-medium text-default-700 truncate">{agentName}</span>
+                        {/* 2026-09-08 出處詳情：點開看這張卡憑什麼、什麼時候用、上架日。
+                            2026-09-30（CJ「出處與說明改成出處，放右下角跟 agent 姓名對稱」）。
+                            用 span 而不是巢狀 button（button 不能包 button）。 */}
                         <span
                           role="button"
                           tabIndex={0}
-                          className="font-medium text-neutral-800 underline underline-offset-2 hover:text-neutral-950"
+                          className="ml-auto shrink-0 text-tiny font-medium text-neutral-800 underline underline-offset-2 hover:text-neutral-950"
                           onClick={(e) => { e.stopPropagation(); setDetailTaskId(task.id); }}
                           onKeyDown={(e) => {
                             if (e.key !== "Enter" && e.key !== " ") return;
                             e.preventDefault(); e.stopPropagation(); setDetailTaskId(task.id);
                           }}
                         >
-                          {lang === "en" ? "Source & notes" : "出處與說明"}
+                          {lang === "en" ? "Source" : "出處"}
                         </span>
-                        {isRecentCard((task as any).addedAt) && (
-                          <span className="rounded-full border border-neutral-900 px-1.5 py-px text-[11px] text-neutral-900">
-                            {lang === "en" ? "New" : "新上架"}
-                            {(task as any).addedAt ? ` · ${String((task as any).addedAt).slice(5).replace("-", "/")}` : ""}
-                          </span>
-                        )}
-                      </div>
-                      {(task as any).methodology && (
-                        <span className="text-[12px] text-default-400 italic">📚 {(task as any).methodology}</span>
-                      )}
-                      <div className="mt-auto pt-2 flex items-center gap-2 border-t border-default-100">
-                        <Avatar src={avatarSrc} size="sm" className="w-5 h-5" />
-                        <span className="text-tiny font-medium text-default-700 truncate">{agentName}</span>
                       </div>
                       {/* 60s team stack */}
                       {(task as any).team && (task as any).team.length > 1 && (
@@ -2508,21 +2377,16 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
 
               {/* 2026-09-06 「新增任務卡」入口。刻意長得像一張任務卡而不是
                   一顆按鈕 —— 它跟卡片並排，做的是同一件事的延伸。 */}
-              {brandId && !showAllTasks && trayIds.length > 0 && (
+              {brandId && trayIds.length > 0 && (
                 <button
                   onClick={() => setPickerOpen(true)}
                   className="flex min-h-[180px] flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-neutral-300 bg-white text-neutral-500 transition hover:border-neutral-500 hover:text-neutral-800"
                 >
-                  <span className="flex h-8 w-8 items-center justify-center rounded-full border border-neutral-300 text-[18px] leading-none">
-                    +
+                  <span className="flex h-8 w-8 items-center justify-center rounded-full border border-neutral-300">
+                    <AddIcon size={14} />
                   </span>
                   <span className="text-[14px] font-medium">
                     {lang === "en" ? "Add task card" : "新增任務卡"}
-                  </span>
-                  <span className="px-4 text-center text-[13px] text-neutral-400">
-                    {activeCategoryLabel
-                      ? (lang === "en" ? `Within “${activeCategoryLabel}” only` : `只在「${activeCategoryLabel}」分類裡挑`)
-                      : (lang === "en" ? "Browse by source — viral, evergreen, award…" : "依來源挑選 — 爆款、長青、得獎案例…")}
                   </span>
                 </button>
               )}
@@ -2537,9 +2401,11 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                     ? (lang === "en"
                       ? `Showing all ${platformTasks.length} cards`
                       : `目前顯示全部 ${platformTasks.length} 張`)
-                    : (lang === "en"
-                      ? `Showing your ${trayIds.length} of ${platformTasks.length} cards`
-                      : `目前只擺你常用的 ${trayIds.length} 張，這個通路共 ${platformTasks.length} 張`)}
+                    : (
+                      <span className="inline-flex items-center gap-1.5 tabular-nums" title={lang === "en" ? "Your saved cards / all cards in this channel" : "常用 / 這個通路全部"}>
+                        <TaskCardsIcon size={12} /> {trayIds.length} / {platformTasks.length}
+                      </span>
+                    )}
                 </span>
                 <button
                   onClick={() => setShowAllTasks((v) => !v)}
@@ -2577,6 +2443,9 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
         saving={setTrayMut?.isPending}
         onSave={(ids) => setTrayMut?.mutate?.({ brandId: brandId ?? 0, platform, taskIds: ids })}
         onDetail={(id) => setDetailTaskId(id)}
+        onCreateOwn={COMPOSER_CHANNELS.has(platform)
+          ? () => { setPickerOpen(false); setResumeCardId(null); setComposerOpen(true); }
+          : undefined}
       />
 
       {/* ─── Task modal (intake + running countdown) ───────────────────── */}
@@ -2586,21 +2455,25 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
         size="2xl"
         scrollBehavior="inside"
         backdrop="blur"
+        // 2026-09-29（CJ 參考「Your inbox is clear」）：淡彩霧面底、大圓角白卡、
+        // 置中的一句大標＋手繪插畫。底色只在遮罩層，卡片本身維持白底黑字。
         classNames={{
-          base: "max-h-[90vh]",
-          body: "py-3 px-4",
-          footer: "border-t border-default-100 bg-white py-2 px-4",
-          header: "py-2 px-3 bg-white border-b border-default-100",
-          closeButton: "text-default-400 hover:bg-default-100",
+          backdrop: "bg-gradient-to-br from-rose-100/70 via-emerald-50/60 to-violet-200/60 backdrop-blur-md",
+          base: "max-h-[90vh] rounded-[28px] bg-white shadow-2xl ring-1 ring-black/5",
+          body: "pt-2 pb-4 px-6",
+          footer: "bg-white pt-2 pb-5 px-6",
+          header: "pt-4 pb-3 px-6 bg-white border-b border-default-100",
+          closeButton: "top-3.5 right-4 text-default-400 hover:bg-default-100",
         }}
       >
         <ModalContent>
           {activeTask && (
             <>
-              <ModalHeader className="flex flex-col items-stretch gap-0 py-2 px-3 border-b border-default-100">
-                <div className="flex items-center gap-2 min-w-0">
+              <ModalHeader className="flex flex-col items-stretch gap-0 pt-4 pb-3 pl-6 pr-14 border-b border-default-100">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <FontAwesomeIcon icon={meta.icon} className="text-neutral-900 shrink-0" style={{ fontSize: 18 }} />
                   <div className="min-w-0 flex-1">
-                    <p className="text-[12px] text-default-800 truncate font-medium">
+                    <p className="text-[15px] text-neutral-900 truncate font-semibold">
                       {lang === "en"
                         ? (activeTask.label_en ?? activeTask.label)
                         : (activeTask.label_zh ?? activeTask.label)}
@@ -2609,125 +2482,227 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                       )}
                     </p>
                   </div>
-                  {/* Deliverable badge in modal header (no duration labels) */}
-                  <span
-                    className="text-[12px] font-bold px-2 py-0.5 rounded-full text-white shadow-sm shrink-0"
-                    style={{ background: tierAccent(effectiveTier(activeTask)) }}
-                  >
-                    {tierLabel(effectiveTier(activeTask), lang)}
-                  </span>
                 </div>
               </ModalHeader>
 
               <ModalBody>
+                {/* 2026-09-30（CJ「上面這幾列還可以優化…Tesla 的介面很少文字，圖示很明顯，
+                    複雜文字都在第二層」）：整個 modal 收成三塊——
+                      1. 插畫＋問題（同一列；CJ 喜歡插畫，保留）
+                      2. 輸入框，「AI 完善提示詞」是框內右下角的橘色 ✨
+                      3. 品牌脈絡圖示列（點開才看全文／改寫）＋ agent 頭像＝開始鍵
+                    執行中同一個 modal 原地變形：輸入收成一行引用，頭像到正中間變進度環。 */}
+                {!running && (
+                  <div className="flex items-center gap-4 pt-3 pb-1">
+                    <div className="shrink-0">
+                      <TaskIllustration card={activeTask} width={104} />
+                    </div>
+                    <h2 className="min-w-0 text-[20px] leading-snug font-bold text-neutral-900">
+                      {activeTask.primary_question
+                        ?? (lang === "en" ? (activeTask.label_en ?? activeTask.label) : (activeTask.label_zh ?? activeTask.label))}
+                    </h2>
+                  </div>
+                )}
+
+                {/* Primary question input */}
+                {activeTask.primary_input && !running && (() => {
+                  const extraFields = intakeExtraFields(activeTask as any);
+                  const optionalCount = extraFields.filter((f) => !f.required).length;
+                  const polishBtn = polishInputMut ? (
+                    <Tooltip content={polishing
+                      ? (lang === "en" ? "Refining…" : "完善中…")
+                      : (lang === "en" ? "AI refine prompt — facts kept, never invented" : "AI 完善提示詞（保留事實、不會捏造）")}>
+                      <button
+                        type="button"
+                        onClick={handlePolish}
+                        disabled={polishing || !primaryAnswer.trim()}
+                        aria-label={lang === "en" ? "AI refine prompt" : "AI 完善提示詞"}
+                        className="w-9 h-9 rounded-full bg-[#E85D2E] text-white flex items-center justify-center shadow-sm transition hover:bg-[#D04E22] disabled:opacity-40 disabled:cursor-not-allowed"
+                      >
+                        {polishing
+                          ? <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                          : <Icon name="generate" size={15} />}
+                      </button>
+                    </Tooltip>
+                  ) : null;
+                  const moreBtn = optionalCount > 0 ? (
+                    <Tooltip content={lang === "en" ? `Optional details (${optionalCount})` : `補充資訊（選填，${optionalCount} 項）`}>
+                      <button
+                        type="button"
+                        onClick={() => setShowOptional((v) => !v)}
+                        aria-label={lang === "en" ? "Optional details" : "補充資訊"}
+                        aria-pressed={showOptional}
+                        className={`relative w-9 h-9 rounded-full flex items-center justify-center transition ${showOptional ? "bg-neutral-900 text-white" : "bg-white text-neutral-700 ring-1 ring-default-200 hover:ring-default-400"}`}
+                      >
+                        <Icon name="add" size={14} />
+                        <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-neutral-900 text-white text-[10px] leading-4 text-center ring-2 ring-white">{optionalCount}</span>
+                      </button>
+                    </Tooltip>
+                  ) : null;
+                  return (
+                    <div className="space-y-2" data-primary-question>
+                      <div className="relative">
+                        {activeTask.primary_input.type === "textarea" ? (
+                          <Textarea
+                            placeholder={activeTask.primary_input.placeholder ?? ""}
+                            value={primaryAnswer}
+                            onChange={(e) => { setPrimaryAnswer(e.target.value); if (inputError) setInputError(null); }}
+                            minRows={3}
+                            autoFocus
+                            isInvalid={!!inputError}
+                            classNames={{ inputWrapper: "rounded-2xl px-4 pt-3 pb-12", input: "text-[15px]" }}
+                          />
+                        ) : (
+                          <Input
+                            placeholder={activeTask.primary_input.placeholder ?? ""}
+                            value={primaryAnswer}
+                            onChange={(e) => { setPrimaryAnswer(e.target.value); if (inputError) setInputError(null); }}
+                            autoFocus
+                            isInvalid={!!inputError}
+                            classNames={{ inputWrapper: "rounded-2xl pl-4 pr-24 h-12", input: "text-[15px]" }}
+                          />
+                        )}
+                        {(polishBtn || moreBtn) && (
+                          <div className={`absolute right-2 flex items-center gap-1.5 z-10 ${activeTask.primary_input.type === "textarea" ? "bottom-2" : "top-1.5"}`}>
+                            {moreBtn}
+                            {polishBtn}
+                          </div>
+                        )}
+                      </div>
+                      {/* 2026-08-23: intake rejection prints here, next to the
+                          field it is about — not only in the card at the very
+                          bottom of the modal body. */}
+                      {inputError && (
+                        <p className="text-tiny text-danger-500 flex items-start gap-1.5">
+                          <FontAwesomeIcon icon={faTriangleExclamation} className="mt-[2px]" />
+                          <span>{inputError}</span>
+                        </p>
+                      )}
+                      {polishErr && <p className="text-tiny text-danger-500">{polishErr}</p>}
+                    </div>
+                  );
+                })()}
+
+                {/* 2026-09-02 — primary 以外的欄位。
+                    在這之前 intake 只渲染 primary_input 一格，`template.inputs[]`
+                    其餘欄位是死的：225 張卡有 24 張宣告了額外欄位，其中 7 張標成
+                    required 卻沒有任何 UI 可以填（fb-60-launch-kit 從來不問活動
+                    什麼時候辦、為什麼辦，模型就自己編一個）。
+
+                    必填的永遠展開；選填的收在輸入框右下角的「＋」（2026-09-30 起，
+                    原本是一行「補充資訊（選填）」摺疊標題）。 */}
+                {!running && (() => {
+                  const fields = intakeExtraFields(activeTask as any);
+                  if (fields.length === 0) return null;
+                  const required = fields.filter((f) => f.required);
+                  const optional = fields.filter((f) => !f.required);
+                  // 沒有主問題的卡，「＋」按鈕不存在 —— 選填欄位直接展開。
+                  const optionalOpen = showOptional || !activeTask.primary_input;
+                  const renderField = (f: IntakeField) => (
+                    <div key={f.key} className="space-y-1">
+                      <p className="text-tiny font-medium text-default-700">
+                        {f.label}
+                        {f.required && <span className="text-danger-500 ml-1">*</span>}
+                      </p>
+                      {f.type === "textarea" ? (
+                        <Textarea
+                          size="sm"
+                          minRows={2}
+                          placeholder={f.placeholder}
+                          value={extraAnswers[f.key] ?? ""}
+                          onChange={(e) => {
+                            setExtraAnswers((prev) => ({ ...prev, [f.key]: e.target.value }));
+                            if (inputError) setInputError(null);
+                          }}
+                        />
+                      ) : (
+                        <Input
+                          size="sm"
+                          placeholder={f.placeholder}
+                          value={extraAnswers[f.key] ?? ""}
+                          onChange={(e) => {
+                            setExtraAnswers((prev) => ({ ...prev, [f.key]: e.target.value }));
+                            if (inputError) setInputError(null);
+                          }}
+                        />
+                      )}
+                    </div>
+                  );
+                  if (required.length === 0 && !optionalOpen) return null;
+                  return (
+                    <div className="space-y-3" data-extra-inputs>
+                      {required.length > 0 && (
+                        <div className="space-y-2">
+                          <p className="text-tiny text-default-500">
+                            {lang === "en"
+                              ? "This task needs a couple more things — without them the model makes them up."
+                              : "這張卡還需要這幾項 —— 沒給的話模型會自己編。"}
+                          </p>
+                          {required.map(renderField)}
+                        </div>
+                      )}
+                      {optional.length > 0 && optionalOpen && (
+                        <div className="space-y-2">{optional.map(renderField)}</div>
+                      )}
+                    </div>
+                  );
+                })()}
+
                 {/* 2026-09-25（CJ「本來在活動企畫中，有該則貼文要發布的時間」）：
                     這一篇在企劃上排在哪一天，要看得見。卡片裡問的「日期 / 時間」
                     是**活動**什麼時候發生（已自動帶入活動期間），跟這篇貼文的
                     發布日是兩件事——不講清楚，使用者會以為系統把日期搞丟了。 */}
-                {(() => {
+                {!running && (() => {
                   if (!campaignScope || !campaignQ.data) return null;
                   const d: any = campaignQ.data;
                   const item = (d.plan?.items ?? []).find((i: any) => i.id === campaignScope.itemId);
                   if (!item) return null;
                   return (
-                    <div className="mb-3 rounded-lg border border-default-200 px-3 py-2">
-                      <p className="text-tiny text-default-600 m-0">
-                        {lang === "en"
-                          ? `From the campaign plan for “${d.event?.name ?? ""}” — this post is scheduled for ${item.date}.`
-                          : `來自「${d.event?.name ?? ""}」的宣傳企劃 —— 這篇排在 ${item.date} 發布。`}
-                      </p>
-                      <p className="text-tiny text-default-400 m-0 mt-0.5">
-                        {lang === "en"
-                          ? "Event dates and the offer are already filled in below."
-                          : "活動期間與優惠機制已自動帶入下方欄位。"}
-                      </p>
-                    </div>
+                    <p className="text-tiny text-default-600 m-0 flex items-center gap-1.5">
+                      <Icon name="campaign" size={12} />
+                      {lang === "en"
+                        ? `From the campaign plan for “${d.event?.name ?? ""}” — this post is scheduled for ${item.date}.`
+                        : `來自「${d.event?.name ?? ""}」的宣傳企劃 —— 這篇排在 ${item.date} 發布。`}
+                    </p>
                   );
                 })()}
-                {/* 2026-06-16: per-task entity picker. Brand by default; the
-                    user can switch to a specific product or event for THIS run.
-                    Selecting one re-runs the context resolution so the chips
-                    below + the generated content use that entity's positioning. */}
-                {brandId && (modalProducts.length > 0 || modalEvents.length > 0) && (
-                  <div className="mb-3">
-                    <p className="text-tiny text-default-500 mb-1.5">
-                      {lang === "en" ? "Generate for" : "這次要為哪個對象產出"}
-                    </p>
-                    <div className="flex flex-wrap gap-1.5">
-                      <button
-                        onClick={() => setModalEntity({ kind: "brand", id: null })}
-                        className={`text-xs px-2.5 py-1 rounded-full border transition ${
-                          modalEntity.kind === "brand"
-                            ? "bg-neutral-900 text-white border-neutral-900"
-                            : "bg-white text-default-700 border-default-300 hover:border-default-500"
-                        }`}
-                      >
-                        {lang === "en" ? "Brand" : "品牌"}{brandName ? ` · ${brandName}` : ""}
-                      </button>
-                      {modalProducts.map((p: any) => (
-                        <button
-                          key={`p-${p.id}`}
-                          onClick={() => setModalEntity({ kind: "product", id: p.id })}
-                          className={`text-xs px-2.5 py-1 rounded-full border transition ${
-                            modalEntity.kind === "product" && modalEntity.id === p.id
-                              ? "bg-neutral-900 text-white border-neutral-900"
-                              : "bg-white text-default-700 border-default-300 hover:border-default-500"
-                          }`}
-                        >
-                          {lang === "en" ? "Product · " : "產品 · "}{p.name}
-                        </button>
-                      ))}
-                      {modalEvents.map((e: any) => (
-                        <button
-                          key={`e-${e.id}`}
-                          onClick={() => setModalEntity({ kind: "event", id: e.id })}
-                          className={`text-xs px-2.5 py-1 rounded-full border transition ${
-                            modalEntity.kind === "event" && modalEntity.id === e.id
-                              ? "bg-neutral-900 text-white border-neutral-900"
-                              : "bg-white text-default-700 border-default-300 hover:border-default-500"
-                          }`}
-                        >
-                          {lang === "en" ? "Event · " : "活動 · "}{e.name}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
 
                 {/* Brand assets empty hint */}
-                {textAssetsEmpty && brandId && (
-                  <div className="mb-3 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-900 flex items-start gap-2">
-                                        <div className="flex-1 leading-relaxed">
-                      {lang === "en" ? (
-                        <>
-                          <span className="font-medium">This brand's word assets are empty.</span>
-                          {" "}Pop into{" "}
-                          <a href={`/brands?b=${brandId}&cat=copy`} target="_blank" rel="noreferrer" className="underline font-medium hover:text-amber-700">
-                            Brand → Words
-                          </a>
-                          {" "}and click Auto-fill. Output will be far more on-brand.
-                        </>
-                      ) : (
-                        <>
-                          <span className="font-medium">這個品牌的「文字」資產還是空的。</span>
-                          {" "}先到{" "}
-                          <a href={`/brands?b=${brandId}&cat=copy`} target="_blank" rel="noreferrer" className="underline font-medium hover:text-amber-700">
-                            品牌 → 文字
-                          </a>
-                          {" "}按「自動填寫」，AI 產出會明顯貼合品牌語氣。
-                        </>
-                      )}
-                    </div>
+                {!running && textAssetsEmpty && brandId && (
+                  <div className="bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 text-xs text-amber-900 leading-relaxed">
+                    {lang === "en" ? (
+                      <>
+                        <span className="font-medium">This brand's word assets are empty.</span>
+                        {" "}Pop into{" "}
+                        <a href={`/brands?b=${brandId}&cat=copy`} target="_blank" rel="noreferrer" className="underline font-medium hover:text-amber-700">
+                          Brand → Words
+                        </a>
+                        {" "}and click Auto-fill. Output will be far more on-brand.
+                      </>
+                    ) : (
+                      <>
+                        <span className="font-medium">這個品牌的「文字」資產還是空的。</span>
+                        {" "}先到{" "}
+                        <a href={`/brands?b=${brandId}&cat=copy`} target="_blank" rel="noreferrer" className="underline font-medium hover:text-amber-700">
+                          品牌 → 文字
+                        </a>
+                        {" "}按「自動填寫」，AI 產出會明顯貼合品牌語氣。
+                      </>
+                    )}
                   </div>
                 )}
 
-                {/* Context chips */}
-                {(() => {
+                {/* ── 品牌脈絡圖示列＋開始鍵 ─────────────────────────────────────
+                    2026-09-30：原本的黑底長 chip 全部改成「圖示＋兩三個字」，
+                    完整內容與改寫收進點開後的第二層。涵蓋的東西跟原本一樣：
+                      - 產出對象（品牌／產品／活動）→ 第一顆「名稱」圖示，點開切換
+                      - 每條 contextSources（有內容的全部＋沒填的最多 4 條，虛線）
+                      - 字串欄位可直接改寫（含「可選用」的相鄰欄位），其餘只讀
+                    圖示對照：v2/content/lib/contextChipIcons.ts */}
+                {!running && (() => {
                   // 2026-05-27 (CJ「modal chip 仍抓 SoWork」): scope-aware DEFAULT_SOURCES.
                   // Product uses segment ids: core / audience / value / competition / strategy / marketing.
                   // Brand uses: goldenCircle / audience / voice / differentiation / values / tagline.
-                  // When product/event scope is active, use the correct paths so chips read
-                  // from the product's own positioning segments, not the brand's.
                   const isProductScope = !!(brandCtx?.product);
                   const isEventScope   = !!(brandCtx?.event);
                   const BRAND_SOURCES = [
@@ -2761,7 +2736,6 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                     ? activeTask.contextSources
                     : DEFAULT_SOURCES;
                   const chips = brandCtx ? buildContextChips(brandCtx, sources) : [];
-                  const anyContent = chips.some((c: any) => c.hasContent);
                   // Is a chip inline-editable? Only string-typed (or empty)
                   // segment fields; arrays/objects route to the full editor.
                   const isEditable = (source: string): boolean => {
@@ -2769,98 +2743,235 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                     const v = getNested(editSaveTarget.raw, chipFieldPath(source));
                     return v == null || typeof v === "string";
                   };
-                  // Render nothing only if there's truly nothing to show or edit.
-                  if (!anyContent && chips.every((c: any) => !isEditable(c.source))) return null;
-                  const shownMissing = chips.filter((c: any) => !c.hasContent && c.source !== "brand.name").slice(0, 4);
-                  const renderChip = (c: any, missing: boolean) => {
-                    const editable = isEditable(c.source) && c.source !== "brand.name";
-                    const base: React.CSSProperties = {
-                      fontSize: 12, padding: "3px 8px", borderRadius: 4, fontWeight: 500,
-                      ...(missing
-                        ? { background: "transparent", color: "#A3A3A3", border: "1px dashed #D4D4D4" }
-                        : { background: "#171717", color: "#FFFFFF" }),
-                      ...(editable ? { cursor: "pointer" } : {}),
-                    };
-                    if (!editable) {
-                      return <span key={c.source} title={c.source} style={base}>{c.label}</span>;
-                    }
-                    return (
+                  const anyContent = chips.some((c) => c.hasContent);
+                  const showChips = anyContent || chips.some((c) => isEditable(c.source));
+                  const nameChip = chips.find((c) => c.source === "brand.name");
+                  const tiles = showChips ? [
+                    ...chips.filter((c) => c.hasContent && c.source !== "brand.name"),
+                    ...chips.filter((c) => !c.hasContent && c.source !== "brand.name").slice(0, 4),
+                  ] : [];
+                  const hasEntityChoice = !!brandId && (modalProducts.length > 0 || modalEvents.length > 0);
+                  const showNameTile = hasEntityChoice || (showChips && !!nameChip);
+                  const entityIcon: IconName =
+                    modalEntity.kind === "product" ? "shop" : modalEntity.kind === "event" ? "campaign" : "brand";
+                  const entityShort =
+                    modalEntity.kind === "product" ? (lang === "en" ? "Product" : "產品")
+                    : modalEntity.kind === "event" ? (lang === "en" ? "Event" : "活動")
+                    : (lang === "en" ? "Brand" : "品牌");
+                  const openChip = ctxOpen && ctxOpen !== "__entity" ? chips.find((c) => c.source === ctxOpen) ?? null : null;
+
+                  const tile = (key: string, icon: IconName, short: string, opts: { missing?: boolean; active?: boolean; tip: string; onPress: () => void }) => (
+                    <Tooltip key={key} content={<span className="block max-w-[260px] text-[12px] leading-snug">{opts.tip}</span>} delay={250}>
                       <button
-                        key={c.source}
-                        title={lang === "en" ? "Click to edit / rewrite" : "點擊編輯／改寫"}
-                        style={base}
-                        onClick={() => openChipEditor(c)}
+                        type="button"
+                        onClick={opts.onPress}
+                        aria-label={short}
+                        aria-expanded={!!opts.active}
+                        className="flex flex-col items-center gap-1 w-[52px] group"
                       >
-                        {c.label}{missing ? " ＋" : " ✎"}
+                        <span className={`relative w-10 h-10 rounded-xl flex items-center justify-center transition ${
+                          opts.active
+                            ? "bg-neutral-900 text-white"
+                            : opts.missing
+                            ? "border border-dashed border-default-300 text-default-400 group-hover:border-default-500"
+                            : "bg-default-100 text-neutral-800 group-hover:bg-default-200"
+                        }`}>
+                          <Icon name={icon} size={16} />
+                          {!opts.missing && !opts.active && (
+                            <span className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                          )}
+                        </span>
+                        <span className={`w-full truncate text-center text-[11px] leading-tight ${opts.missing ? "text-default-400" : "text-default-600"}`}>{short}</span>
                       </button>
-                    );
+                    </Tooltip>
+                  );
+                  const toggle = (key: string) => {
+                    setEditingChip(null);
+                    setEditValue("");
+                    setCtxOpen((cur) => (cur === key ? null : key));
                   };
+                  const agent = activeTask.agent;
+                  const agentSrc = agent ? (agent.avatarUrl || dicebear(agent.name)) : null;
+
                   return (
-                    <div className="mb-3 rounded-lg px-3 py-2.5" style={{ background: "#FAFAF9", border: "1px solid #171717" }}>
-                      <p style={{ fontSize: 12, fontWeight: 700, color: "#525252", letterSpacing: "0.22em", textTransform: "uppercase", marginBottom: 6 }}>
-                        {(() => {
-                          const entityName = brandCtx?.brand?.name ?? brandName ?? (lang === "en" ? "your brand" : "你的品牌");
-                          return lang === "en"
-                            ? `Context · from ${entityName} · click a chip to edit`
-                            : `Context · 來自 ${entityName} · 點任一項可改寫`;
-                        })()}
-                      </p>
-                      <div className="flex flex-wrap gap-1.5">
-                        {chips.filter((c: any) => c.hasContent).map((c: any) => renderChip(c, false))}
-                        {shownMissing.map((c: any) => renderChip(c, true))}
+                    <div className="pt-1">
+                      <div className="flex items-end gap-3">
+                        <div className="flex-1 min-w-0 flex flex-wrap gap-x-0.5 gap-y-2">
+                          {showNameTile && tile(
+                            "__entity",
+                            entityIcon,
+                            entityShort,
+                            {
+                              active: ctxOpen === "__entity",
+                              tip: (brandCtx?.brand?.name ?? brandName ?? "") + (hasEntityChoice ? (lang === "en" ? " — click to switch" : " —— 點一下切換產出對象") : ""),
+                              onPress: () => toggle("__entity"),
+                            },
+                          )}
+                          {tiles.map((c) => {
+                            const ic = contextChipIcon(c.source, c.name);
+                            return tile(c.source, ic.icon, lang === "en" ? ic.shortEn : ic.short, {
+                              missing: !c.hasContent,
+                              active: ctxOpen === c.source,
+                              tip: c.hasContent ? `${c.name} · ${c.text.length > 80 ? c.text.slice(0, 80) + "…" : c.text}` : `${c.name} · ${lang === "en" ? "not filled yet" : "尚未填寫"}`,
+                              onPress: () => toggle(c.source),
+                            });
+                          })}
+                        </div>
+
+                        {/* agent 頭像＝開始鍵（2026-09-30 CJ「agent 本身就是啟動的按鈕」） */}
+                        <button
+                          type="button"
+                          onClick={handleRun}
+                          aria-label={t("qt_run_btn")}
+                          className="shrink-0 flex flex-col items-center gap-1 group"
+                        >
+                          <span className="relative block rounded-full p-[3px] ring-[3px] ring-[#E85D2E] transition group-hover:scale-105 group-active:scale-95">
+                            {agentSrc ? (
+                              <Avatar src={agentSrc} className="w-14 h-14" />
+                            ) : (
+                              <span className="w-14 h-14 rounded-full bg-default-100 flex items-center justify-center text-neutral-700">
+                                <Icon name="agent" size={22} />
+                              </span>
+                            )}
+                            <span className="absolute -right-1 -bottom-1 w-7 h-7 rounded-full bg-[#E85D2E] text-white flex items-center justify-center ring-2 ring-white">
+                              <Icon name="play" size={11} />
+                            </span>
+                          </span>
+                          <span className="text-[12px] font-semibold text-neutral-900">{t("qt_run_btn")}</span>
+                        </button>
                       </div>
 
-                      {/* Inline editor for the selected chip */}
-                      {editingChip && (() => {
-                        const fieldPath = chipFieldPath(editingChip.source);
+                      {/* 第二層：產出對象切換 */}
+                      {ctxOpen === "__entity" && (
+                        <div className="mt-3 rounded-2xl bg-default-50 px-3 py-2.5">
+                          <p className="text-tiny text-default-500 mb-1.5">
+                            {lang === "en" ? "Generate for" : "產出對象"}
+                          </p>
+                          {hasEntityChoice ? (
+                            <div className="flex flex-wrap gap-1.5">
+                              <button
+                                onClick={() => setModalEntity({ kind: "brand", id: null })}
+                                className={`text-xs px-2.5 py-1 rounded-full border transition ${
+                                  modalEntity.kind === "brand"
+                                    ? "bg-neutral-900 text-white border-neutral-900"
+                                    : "bg-white text-default-700 border-default-300 hover:border-default-500"
+                                }`}
+                              >
+                                {lang === "en" ? "Brand" : "品牌"}{brandName ? ` · ${brandName}` : ""}
+                              </button>
+                              {modalProducts.map((p: any) => (
+                                <button
+                                  key={`p-${p.id}`}
+                                  onClick={() => setModalEntity({ kind: "product", id: p.id })}
+                                  className={`text-xs px-2.5 py-1 rounded-full border transition ${
+                                    modalEntity.kind === "product" && modalEntity.id === p.id
+                                      ? "bg-neutral-900 text-white border-neutral-900"
+                                      : "bg-white text-default-700 border-default-300 hover:border-default-500"
+                                  }`}
+                                >
+                                  {lang === "en" ? "Product · " : "產品 · "}{p.name}
+                                </button>
+                              ))}
+                              {modalEvents.map((e: any) => (
+                                <button
+                                  key={`e-${e.id}`}
+                                  onClick={() => setModalEntity({ kind: "event", id: e.id })}
+                                  className={`text-xs px-2.5 py-1 rounded-full border transition ${
+                                    modalEntity.kind === "event" && modalEntity.id === e.id
+                                      ? "bg-neutral-900 text-white border-neutral-900"
+                                      : "bg-white text-default-700 border-default-300 hover:border-default-500"
+                                  }`}
+                                >
+                                  {lang === "en" ? "Event · " : "活動 · "}{e.name}
+                                </button>
+                              ))}
+                            </div>
+                          ) : (
+                            <p className="text-small text-default-800 m-0">{nameChip?.text || brandName}</p>
+                          )}
+                        </div>
+                      )}
+
+                      {/* 第二層：單一脈絡的全文＋改寫 */}
+                      {openChip && (() => {
+                        const editable = isEditable(openChip.source);
+                        const editing = editingChip?.source === openChip.source;
+                        const fieldPath = chipFieldPath(openChip.source);
                         const siblings = (CHIP_SIBLING_CANDIDATES[fieldPath] ?? [])
                           .map((sp) => ({ path: sp, val: getNested(editSaveTarget?.raw, sp) }))
                           .filter((s) => typeof s.val === "string" && s.val.trim().length > 0);
                         return (
-                          <div className="mt-2.5 pt-2.5" style={{ borderTop: "1px solid #E5E5E5" }}>
-                            <p className="text-tiny text-default-600 mb-1">
-                              {(lang === "en" ? "Editing: " : "編輯：") + editingChip.label.split(" · ")[0]}
-                            </p>
-                            {siblings.length > 0 && (
-                              <div className="flex flex-wrap gap-1 mb-1.5">
-                                <span className="text-[12px] text-default-400 self-center">
-                                  {lang === "en" ? "Pick:" : "可選用："}
-                                </span>
-                                {siblings.map((s) => (
-                                  <button
-                                    key={s.path}
-                                    onClick={() => setEditValue(s.val)}
-                                    className="text-[12px] px-2 py-0.5 rounded-full border border-default-300 bg-white text-default-600 hover:border-default-500"
-                                    title={s.val}
-                                  >
-                                    {s.val.length > 24 ? s.val.slice(0, 24) + "…" : s.val}
-                                  </button>
-                                ))}
-                              </div>
-                            )}
-                            <Textarea
-                              value={editValue}
-                              onChange={(e) => setEditValue(e.target.value)}
-                              minRows={2}
-                              autoFocus
-                              placeholder={lang === "en" ? "Type or rewrite…" : "輸入或改寫…"}
-                            />
-                            <p className="text-[12px] text-default-400 mt-1">
-                              {lang === "en"
-                                ? `Saves to this ${editSaveTarget?.kind ?? "brand"}'s positioning.`
-                                : `會更新此${editSaveTarget?.kind === "product" ? "產品" : editSaveTarget?.kind === "event" ? "活動" : "品牌"}的定位。`}
-                            </p>
-                            <div className="flex gap-2 mt-1.5">
-                              <Button size="sm" color="secondary"
-                                isLoading={savePositioningMut?.isPending}
-                                onPress={commitChipEdit}>
-                                {lang === "en" ? "Save" : "儲存"}
-                              </Button>
-                              <Button size="sm" variant="flat"
-                                onPress={() => { setEditingChip(null); setEditValue(""); }}>
-                                {lang === "en" ? "Cancel" : "取消"}
-                              </Button>
+                          <div className="mt-3 rounded-2xl bg-default-50 px-3.5 py-3">
+                            <div className="flex items-center gap-2 mb-1.5">
+                              <Icon name={contextChipIcon(openChip.source, openChip.name).icon} size={13} className="text-default-500" />
+                              <p className="text-tiny font-semibold text-default-700 flex-1 m-0">{openChip.name}</p>
+                              {editable && !editing && (
+                                <button
+                                  type="button"
+                                  onClick={() => openChipEditor(openChip)}
+                                  className="text-tiny text-default-600 hover:text-default-900 flex items-center gap-1"
+                                >
+                                  {openChip.hasContent ? <EditIcon size={11} /> : <AddIcon size={11} />}
+                                  {openChip.hasContent ? (lang === "en" ? "Rewrite" : "改寫") : (lang === "en" ? "Fill in" : "填寫")}
+                                </button>
+                              )}
                             </div>
+                            {!editing && (
+                              <p className="text-small text-default-800 whitespace-pre-wrap leading-relaxed m-0">
+                                {openChip.hasContent ? openChip.text : (
+                                  <span className="text-default-400">{lang === "en" ? "Not filled yet." : "尚未填寫。"}</span>
+                                )}
+                              </p>
+                            )}
+                            {!editable && (
+                              <p className="text-[12px] text-default-400 mt-1.5 m-0">
+                                {lang === "en" ? "Edit this one in the full positioning editor." : "這一項請到定位頁完整編輯。"}
+                              </p>
+                            )}
+                            {editing && (
+                              <>
+                                {siblings.length > 0 && (
+                                  <div className="flex flex-wrap gap-1 mb-1.5">
+                                    <span className="text-[12px] text-default-400 self-center">
+                                      {lang === "en" ? "Pick:" : "可選用："}
+                                    </span>
+                                    {siblings.map((s) => (
+                                      <button
+                                        key={s.path}
+                                        onClick={() => setEditValue(s.val)}
+                                        className="text-[12px] px-2 py-0.5 rounded-full border border-default-300 bg-white text-default-600 hover:border-default-500"
+                                        title={s.val}
+                                      >
+                                        {s.val.length > 24 ? s.val.slice(0, 24) + "…" : s.val}
+                                      </button>
+                                    ))}
+                                  </div>
+                                )}
+                                <Textarea
+                                  value={editValue}
+                                  onChange={(e) => setEditValue(e.target.value)}
+                                  minRows={2}
+                                  autoFocus
+                                  placeholder={lang === "en" ? "Type or rewrite…" : "輸入或改寫…"}
+                                />
+                                <p className="text-[12px] text-default-400 mt-1">
+                                  {lang === "en"
+                                    ? `Saves to this ${editSaveTarget?.kind ?? "brand"}'s positioning.`
+                                    : `會更新此${editSaveTarget?.kind === "product" ? "產品" : editSaveTarget?.kind === "event" ? "活動" : "品牌"}的定位。`}
+                                </p>
+                                <div className="flex gap-2 mt-1.5">
+                                  <Button size="sm" color="secondary"
+                                    isLoading={savePositioningMut?.isPending}
+                                    onPress={commitChipEdit}>
+                                    {lang === "en" ? "Save" : "儲存"}
+                                  </Button>
+                                  <Button size="sm" variant="flat"
+                                    onPress={() => { setEditingChip(null); setEditValue(""); }}>
+                                    {lang === "en" ? "Cancel" : "取消"}
+                                  </Button>
+                                </div>
+                              </>
+                            )}
                           </div>
                         );
                       })()}
@@ -2868,180 +2979,83 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                   );
                 })()}
 
-                {/* Primary question input */}
-                {activeTask.primary_input && (
-                  <div className="space-y-2" data-primary-question>
-                    <p className="text-small font-medium">{activeTask.primary_question}</p>
-                    {activeTask.primary_input.type === "textarea" ? (
-                      <Textarea
-                        placeholder={activeTask.primary_input.placeholder ?? ""}
-                        value={primaryAnswer}
-                        onChange={(e) => { setPrimaryAnswer(e.target.value); if (inputError) setInputError(null); }}
-                        minRows={3}
-                        autoFocus
-                        isInvalid={!!inputError}
-                      />
-                    ) : (
-                      <Input
-                        placeholder={activeTask.primary_input.placeholder ?? ""}
-                        value={primaryAnswer}
-                        onChange={(e) => { setPrimaryAnswer(e.target.value); if (inputError) setInputError(null); }}
-                        autoFocus
-                        isInvalid={!!inputError}
-                      />
-                    )}
-                    {/* 2026-08-23: intake rejection prints here, next to the
-                        field it is about — not only in the card at the very
-                        bottom of the modal body. */}
-                    {inputError && (
-                      <p className="text-tiny text-danger-500 flex items-start gap-1.5">
-                        <FontAwesomeIcon icon={faTriangleExclamation} className="mt-[2px]" />
-                        <span>{inputError}</span>
-                      </p>
-                    )}
-                    {polishInputMut && !running && (
-                      <div className="flex items-center gap-2">
-                        <Button
-                          size="sm"
-                          variant="flat"
-                          color="secondary"
-                          isLoading={polishing}
-                          isDisabled={polishing || !primaryAnswer.trim()}
-                          onPress={handlePolish}
-                          startContent={!polishing && <FontAwesomeIcon icon={faWandMagicSparkles} />}
-                        >
-                          {polishing
-                            ? (lang === "en" ? "Polishing…" : "潤稿中…")
-                            : (lang === "en" ? "AI polish my brief" : "AI 潤稿")}
-                        </Button>
-                        <span className="text-tiny text-default-400">
-                          {lang === "en"
-                            ? "Tidies your input — facts kept, never invented."
-                            : "幫你整理輸入（保留事實、不會捏造）"}
-                        </span>
-                      </div>
-                    )}
-                    {polishErr && <p className="text-tiny text-danger-500">{polishErr}</p>}
-                  </div>
-                )}
-
-                {/* 2026-09-02 — primary 以外的欄位。
-                    在這之前 intake 只渲染 primary_input 一格，`template.inputs[]`
-                    其餘欄位是死的：225 張卡有 24 張宣告了額外欄位，其中 7 張標成
-                    required 卻沒有任何 UI 可以填（fb-60-launch-kit 從來不問活動
-                    什麼時候辦、為什麼辦，模型就自己編一個）。
-
-                    必填的展開、選填的收在摺疊區：主問題必須維持是這個 modal 的
-                    主角，多幾個框會讓「30 秒生一篇」的體感直接變成填表。 */}
-                {!running && (() => {
-                  const fields = intakeExtraFields(activeTask as any);
-                  if (fields.length === 0) return null;
-                  const required = fields.filter((f) => f.required);
-                  const optional = fields.filter((f) => !f.required);
-                  const renderField = (f: IntakeField) => (
-                    <div key={f.key} className="space-y-1">
-                      <p className="text-tiny font-medium text-default-700">
-                        {f.label}
-                        {f.required && <span className="text-danger-500 ml-1">*</span>}
-                      </p>
-                      {f.type === "textarea" ? (
-                        <Textarea
-                          size="sm"
-                          minRows={2}
-                          placeholder={f.placeholder}
-                          value={extraAnswers[f.key] ?? ""}
-                          onChange={(e) => {
-                            setExtraAnswers((prev) => ({ ...prev, [f.key]: e.target.value }));
-                            if (inputError) setInputError(null);
-                          }}
-                        />
-                      ) : (
-                        <Input
-                          size="sm"
-                          placeholder={f.placeholder}
-                          value={extraAnswers[f.key] ?? ""}
-                          onChange={(e) => {
-                            setExtraAnswers((prev) => ({ ...prev, [f.key]: e.target.value }));
-                            if (inputError) setInputError(null);
-                          }}
-                        />
-                      )}
-                    </div>
-                  );
-                  return (
-                    <div className="space-y-3" data-extra-inputs>
-                      {required.length > 0 && (
-                        <div className="space-y-2">
-                          <p className="text-tiny text-default-500">
-                            {lang === "en"
-                              ? "This task needs a couple more things — without them the model makes them up."
-                              : "這張卡還需要這幾項 —— 沒給的話模型會自己編。"}
-                          </p>
-                          {required.map(renderField)}
-                        </div>
-                      )}
-                      {optional.length > 0 && (
-                        <details className="group">
-                          <summary className="text-tiny text-default-500 cursor-pointer select-none hover:text-default-700">
-                            {lang === "en"
-                              ? `Optional details (${optional.length})`
-                              : `補充資訊（選填，${optional.length} 項）`}
-                          </summary>
-                          <div className="space-y-2 mt-2">{optional.map(renderField)}</div>
-                        </details>
-                      )}
-                    </div>
-                  );
-                })()}
-
-                {/* Running carousel */}
+                {/* 執行中：同一個 modal 原地變形 —— 輸入收成一行引用，頭像到正中間，
+                    進度環＝開始鍵那圈橘色；階段改成一排圖示（策略→文案→圖片→審核）。 */}
                 {running && (() => {
                   const tier = effectiveTier(activeTask);
                   const stagesNow = orchestraStages && orchestraStages.length > 0
                     ? orchestraStages
                     : synthesizeStages(tickMs, tier, lang);
-                  const elapsedText =
-                    (tier === "60s" || tier === "99s")
-                      ? `${(tickMs / 1000).toFixed(0)}s · ${lang === "en" ? "researching → writing → rendering" : "策略 → 文案 → 出圖中"}`
-                      : `${(tickMs / 1000).toFixed(1)}s / ${expectedSec}s`;
-                  const accent = tierAccent(tier);
                   const agentRoster: Array<{ id?: number; name: string; title?: string; avatarUrl?: string | null; role?: string }> = [];
                   const cap = agentMeta ?? activeTask.agent;
                   if (cap) agentRoster.push({ id: cap.id, name: cap.name, title: cap.title, avatarUrl: cap.avatarUrl, role: lang === "en" ? "Writing caption" : "撰寫文案" });
                   if (imageAgentMeta) agentRoster.push({ id: imageAgentMeta.id, name: imageAgentMeta.name, title: imageAgentMeta.title, avatarUrl: imageAgentMeta.avatarUrl, role: lang === "en" ? "Visual direction" : "視覺方向" });
+                  const PHASES: Array<{ key: string; stageKeys: string[]; icon: IconName; zh: string; en: string }> = [
+                    { key: "plan",   stageKeys: ["scout", "pre", "strategist"], icon: "strategy", zh: "策略", en: "Plan" },
+                    { key: "write",  stageKeys: ["caption"],                   icon: "content",  zh: "文案", en: "Copy" },
+                    { key: "image",  stageKeys: ["brief", "gen"],              icon: "image",    zh: "圖片", en: "Image" },
+                    { key: "review", stageKeys: ["extras", "qa"],              icon: "review",   zh: "審核", en: "Review" },
+                  ];
+                  const phases = PHASES.map((p) => {
+                    const ss = (stagesNow as any[]).filter((s) => p.stageKeys.includes(s.key));
+                    if (ss.length === 0) return null;
+                    const status = ss.some((s) => s.status === "running") ? "running"
+                      : ss.every((s) => s.status === "done") ? "done" : "pending";
+                    return { ...p, status };
+                  }).filter(Boolean) as Array<(typeof PHASES)[number] & { status: string }>;
+                  const current = phases.find((p) => p.status === "running");
                   return (
-                    <RunningAgentCarousel
-                      agents={agentRoster.length > 0 ? agentRoster : [{ name: "Agent", role: lang === "en" ? "Working" : "處理中" }]}
-                      stages={stagesNow}
-                      accentColor={accent}
-                      progressPct={progressPct}
-                      elapsedText={elapsedText}
-                    />
+                    <div className="flex flex-col items-center">
+                      {primaryAnswer.trim() && (
+                        <p className="self-stretch mt-2 mb-0 rounded-xl bg-default-100 px-3 py-2 text-tiny text-default-600 truncate">
+                          <Icon name="quote" size={10} className="mr-1.5 text-default-400" />
+                          {primaryAnswer.trim()}
+                        </p>
+                      )}
+                      <RunningAgentCarousel
+                        agents={agentRoster.length > 0 ? agentRoster : [{ name: "Agent", role: lang === "en" ? "Working" : "處理中" }]}
+                        stages={null}
+                        accentColor="#E85D2E"
+                        progressPct={progressPct}
+                        handoffAnchor
+                      />
+                      <div className="flex items-center gap-1.5 -mt-1">
+                        {phases.map((p, i) => (
+                          <React.Fragment key={p.key}>
+                            {i > 0 && (
+                              <span className={`w-5 h-0.5 rounded-full ${phases[i - 1].status === "done" ? "bg-neutral-900" : "bg-default-200"}`} />
+                            )}
+                            <Tooltip content={lang === "en" ? p.en : p.zh}>
+                              <span
+                                aria-label={lang === "en" ? p.en : p.zh}
+                                className={`relative w-10 h-10 rounded-xl flex items-center justify-center transition ${
+                                  p.status === "done" ? "bg-neutral-900 text-white"
+                                  : p.status === "running" ? "bg-[#E85D2E]/10 text-[#E85D2E] ring-2 ring-[#E85D2E]/60 animate-pulse"
+                                  : "bg-default-100 text-default-400"
+                                }`}
+                              >
+                                <Icon name={p.status === "done" ? "check" : p.icon} size={15} />
+                              </span>
+                            </Tooltip>
+                          </React.Fragment>
+                        ))}
+                      </div>
+                      <p className="text-[12px] text-default-500 mt-2 mb-1">
+                        {current
+                          ? (lang === "en" ? current.en : current.zh)
+                          : (lang === "en" ? "Wrapping up" : "收尾中")}
+                      </p>
+                    </div>
                   );
                 })()}
 
                 {/* Error message */}
                 {errorMsg && (
-                  <Card className="bg-warning-50 border border-warning-200 mt-4">
+                  <Card className="bg-warning-50 border border-warning-200 mt-2">
                     <CardBody className="text-warning-800 text-small">{errorMsg}</CardBody>
                   </Card>
                 )}
               </ModalBody>
-
-              <ModalFooter>
-                <Button variant="light" onPress={closeTask} startContent={<FontAwesomeIcon icon={faXmark} />}>
-                  {t("cancel")}
-                </Button>
-                <Button
-                  color="primary"
-                  onPress={handleRun}
-                  isLoading={running}
-                  isDisabled={running}
-                  startContent={!running && <FontAwesomeIcon icon={faPaperPlane} />}
-                >
-                  {running ? t("qt_run_busy") : t("qt_run_btn")}
-                </Button>
-              </ModalFooter>
             </>
           )}
         </ModalContent>

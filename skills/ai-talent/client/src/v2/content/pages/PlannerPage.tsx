@@ -14,8 +14,12 @@
 import React from "react";
 import { useNavigate, useOutletContext, useSearchParams } from "react-router-dom";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faEnvelope, faBullhorn, faGlobe, faArrowUp, faChevronLeft, faChevronRight, faEllipsis } from "@fortawesome/free-solid-svg-icons";
-import { faFacebookF, faInstagram, faLinkedinIn, faYoutube, faTiktok, faXTwitter, faThreads, faLine } from "@fortawesome/free-brands-svg-icons";
+import {
+  faEnvelope, faBullhorn, faGlobe, faArrowUp, faChevronLeft, faChevronRight, faEllipsis,
+} from "@fortawesome/free-solid-svg-icons";
+import {
+  faFacebook, faInstagram, faLinkedin, faYoutube, faTiktok, faXTwitter, faThreads, faLine,
+} from "@fortawesome/free-brands-svg-icons";
 import { trpc } from "../../../lib/trpc";
 import { useLang } from "../../../lib/i18n";
 import { showToastGlobal } from "../../../components/ui/Toast";
@@ -23,10 +27,10 @@ import { channelRoute } from "../lib/channelMeta";
 import { PlatformTaskModal, type TaskEmbed } from "./PlatformTaskPage";
 import { getCalendarPublishPayload } from "../lib/strategyContentEnvelope";
 
-const INK = "#171717", META = "#6B6B6B", LINE = "#EAEAEA", SOFT = "#F6F6F5", ORANGE = "#F97316";
+const INK = "#171717", META = "#6B6B6B", LINE = "#EAEAEA", SOFT = "#F6F6F5", ORANGE = "#18181B";
 
 const PLATFORM_ICON: Record<string, any> = {
-  facebook: faFacebookF, instagram: faInstagram, linkedin: faLinkedinIn, youtube: faYoutube, tiktok: faTiktok,
+  facebook: faFacebook, instagram: faInstagram, linkedin: faLinkedin, youtube: faYoutube, tiktok: faTiktok,
   email: faEnvelope, pr: faBullhorn, x: faXTwitter, website: faGlobe, threads: faThreads, line: faLine,
 };
 const PLATFORM_ZH: Record<string, string> = {
@@ -96,8 +100,8 @@ export default function PlannerPage() {
   const [pending, setPending] = React.useState<string | null>(null);
   const chatEnd = React.useRef<HTMLDivElement>(null);
 
-  const weekQ = T.planner?.week?.useQuery?.({ brandId: brandId ?? 0, weekStart }, { enabled: !!brandId, refetchOnWindowFocus: false }) ?? { data: null };
-  const calQ = T.calendar?.range?.useQuery?.(
+  const weekQ = T.planner?.week?.useQuery({ brandId: brandId ?? 0, weekStart }, { enabled: !!brandId, refetchOnWindowFocus: false }) ?? { data: null };
+  const calQ = T.calendar?.range?.useQuery(
     { from: `${weekStart}T00:00:00+08:00`, to: `${addDays(weekStart, 7)}T00:00:00+08:00`, brandId: brandId ?? undefined },
     { enabled: !!brandId, refetchOnWindowFocus: false },
   ) ?? { data: null };
@@ -153,10 +157,15 @@ export default function PlannerPage() {
       const raw = String(it.platform ?? "").toLowerCase();
       const date = ymdTpe(new Date(it.at));
       const time = new Date(it.at).toLocaleTimeString("zh-TW", { timeZone: "Asia/Taipei", hour: "2-digit", minute: "2-digit", hour12: false });
+      // 送審是排程的一個狀態：排好的格子直接標出審核進度。
+      const rs = it.kind === "scheduled" ? String(it.reviewStatus ?? "") : "";
+      const review = rs === "pending" || rs === "in_review" ? (en ? " · In review" : "・待審")
+        : rs === "revision_requested" ? (en ? " · Sent back" : "・退回修改")
+        : rs === "approved" ? (en ? " · Approved" : "・已放行") : "";
       out.push({
         kind: it.kind, key: `${it.kind}${it.id}`, date, platform: PLAT[raw] ?? raw,
         title: String(it.preview || it.missionTitle || "").slice(0, 40),
-        meta: it.kind === "published" ? (en ? "Published" : "已發布") : (en ? `Scheduled ${time}` : `已排程 ${time}`), cal: it,
+        meta: it.kind === "published" ? (en ? "Published" : "已發布") : (en ? `Scheduled ${time}${review}` : `已排程 ${time}${review}`), cal: it,
       });
     }
     // 同一篇產出已經排程／發布了，就只留排程那張（格子是它的前身）。
@@ -212,10 +221,7 @@ export default function PlannerPage() {
         <section aria-label={en ? "Chat" : "對話"} className="flex w-[400px] shrink-0 flex-col p-6" style={{ borderRight: `1px solid ${LINE}` }}>
           <div className="flex items-center gap-2.5 pb-4" style={{ borderBottom: `1px solid ${LINE}` }}>
             {avatar}
-            <div>
-              <p className="m-0 text-[14px] font-semibold" style={{ color: INK }}>{en ? "Content director" : "內容總監"}</p>
-              <p className="m-0 mt-0.5 text-[12px]" style={{ color: META }}>{en ? "Plans with your brand brain" : "用你的品牌大腦排內容"}</p>
-            </div>
+            <p className="m-0 text-[14px] font-semibold" style={{ color: INK }}>{en ? "Content director" : "內容總監"}</p>
           </div>
 
           <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto py-5">
@@ -308,7 +314,7 @@ export default function PlannerPage() {
                           <span className="flex h-6 w-6 items-center justify-center rounded-[7px] text-[12px]" style={{ background: SOFT, color: "#404040" }}>
                             <FontAwesomeIcon icon={PLATFORM_ICON[it.platform] ?? faGlobe} />
                           </span>
-                          {isTouched && <span className="flex items-center gap-1 text-[11px] font-semibold" style={{ color: "#C2410C" }}><span className="h-1.5 w-1.5 rounded-full" style={{ background: ORANGE }} />{en ? "Changed" : "剛改"}</span>}
+                          {isTouched && <span className="flex items-center gap-1 text-[11px] font-semibold" style={{ color: "#3F3F46" }}><span className="h-1.5 w-1.5 rounded-full" style={{ background: ORANGE }} />{en ? "Changed" : "剛改"}</span>}
                         </span>
                         <span className="line-clamp-3 text-[14px] font-semibold leading-snug" style={{ color: INK }}>{it.title}</span>
                         <span className="text-[12px]" style={{ color: META }}>{it.meta}</span>

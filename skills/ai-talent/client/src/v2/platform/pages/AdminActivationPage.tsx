@@ -48,7 +48,7 @@ function formatDuration(ms: number): string {
 
 export default function AdminActivationPage() {
   const [days, setDays] = useState<number>(30);
-  const q = (trpc as any).ops?.activationFunnel?.useQuery?.({ days }, { refetchInterval: 60_000 });
+  const q = (trpc as any).ops?.activationFunnel?.useQuery({ days }, { refetchInterval: 60_000 });
   const d = q?.data;
 
   return (
@@ -68,11 +68,12 @@ export default function AdminActivationPage() {
             fontSize: 32, fontWeight: 900, letterSpacing: "-0.02em",
             margin: 0, lineHeight: 1.15,
           }}>
-            註冊 → 第一週 21 篇生成 漏斗
+            註冊 → 靈感舞台第一次採用切角 漏斗
           </h1>
           <p style={{ fontSize: 14, color: C.muted, marginTop: 8, marginBottom: 0 }}>
             事件來源：error_log（level="info" + source LIKE 'activation.%'）。
             每個 (userId, stage) 取 MIN(createdAt)。
+            2026-09-30 前的用戶以「七日發布台產完一週」計為同一終點。
           </p>
         </div>
 

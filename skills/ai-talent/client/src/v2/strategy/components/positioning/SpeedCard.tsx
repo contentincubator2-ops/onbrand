@@ -13,6 +13,7 @@ import React from "react";
 import { useLang } from "../../../../lib/i18n";
 import { Card, CardBody, Chip, Divider } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { HelpTip } from "../../../platform/components/HelpTip";
 import { faQuoteLeft, faShieldHalved, faUsers, faTrademark, faBox, faCalendarDay, faBullseye, faChartLine, faRocket, faMessage } from "@fortawesome/free-solid-svg-icons";
 
 interface SpeedCardProps {
@@ -393,8 +394,8 @@ function SubHeader({ icon, title, sub }: { icon: any; title: string; sub?: strin
       <p className="text-medium font-semibold flex items-center gap-2">
         <FontAwesomeIcon icon={icon} className="text-default-500" />
         {title}
+        {sub && <HelpTip>{sub}</HelpTip>}
       </p>
-      {sub && <p className="text-tiny text-default-500 mt-0.5">{sub}</p>}
     </div>
   );
 }

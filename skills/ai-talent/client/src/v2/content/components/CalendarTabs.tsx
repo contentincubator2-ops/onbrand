@@ -18,7 +18,7 @@ export default function CalendarTabs() {
   const { pathname, search } = useLocation();
   const ctx = useOutletContext<{ brandId: number | null } | undefined>();
   const brandId = ctx?.brandId ?? null;
-  const navQ = (trpc as any).quickTask?.brandNav?.useQuery?.(
+  const navQ = (trpc as any).quickTask?.brandNav?.useQuery(
     { brandId: brandId ?? undefined },
     { enabled: !!brandId, refetchOnWindowFocus: false, staleTime: 300_000 },
   ) ?? { data: null };

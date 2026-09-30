@@ -11,7 +11,6 @@
  *   3. _assets — 文字 tab content (voice / principles / banned / preferred /
  *      CTA / hook libraries, etc.)
  *   4. Visual assets (logo / colors / fonts) summary
- *   5. _aiPrompts — per-platform text + image prompt overrides
  *
  * Does NOT include real public content (官網 / FB) or knowledge base —
  * those are fetched separately and concatenated by the caller.
@@ -24,7 +23,6 @@ export interface FullBrandContext {
   hasInterim: boolean;
   hasTextAssets: boolean;
   hasVisualAssets: boolean;
-  hasAIPrompts: Record<string, boolean>; // per-platform
 }
 
 const EMPTY: FullBrandContext = {
@@ -33,7 +31,6 @@ const EMPTY: FullBrandContext = {
   hasInterim: false,
   hasTextAssets: false,
   hasVisualAssets: false,
-  hasAIPrompts: {},
 };
 
 function fmtItems(label: string, items: any): string | null {
@@ -64,7 +61,6 @@ export type EntityKind = "brand" | "product" | "event";
 export async function loadFullContext(
   entityKind: EntityKind,
   entityId: number,
-  opts: { platformFilter?: string } = {},
 ): Promise<FullBrandContext> {
   if (!entityId) return EMPTY;
   const table = entityKind === "brand" ? "brands" : entityKind === "product" ? "products" : "events";
@@ -213,34 +209,12 @@ export async function loadFullContext(
       lines.push(...visualLines);
     }
 
-    // ── 6. AI 指令 (per-platform) ────────────────────────────────────
-    const aiPrompts: Record<string, any> = pos._aiPrompts ?? {};
-    const hasAIPrompts: Record<string, boolean> = {};
-    const aiLines: string[] = [];
-    const platformsToInclude = opts.platformFilter
-      ? [opts.platformFilter]
-      : Object.keys(aiPrompts);
-    for (const p of platformsToInclude) {
-      const ap = aiPrompts[p];
-      if (!ap) { hasAIPrompts[p] = false; continue; }
-      const t = (ap.text ?? "").trim();
-      const i = (ap.image ?? "").trim();
-      hasAIPrompts[p] = !!(t || i);
-      if (t) aiLines.push(`【${p} · 文字指令】${t}`);
-      if (i) aiLines.push(`【${p} · 圖片指令】${i}`);
-    }
-    if (aiLines.length > 0) {
-      lines.push("\n【AI 指令庫（platform-specific overrides）】");
-      lines.push(...aiLines);
-    }
-
     return {
       block: `\n\n${lines.join("\n")}`,
       hasFullPositioning,
       hasInterim,
       hasTextAssets,
       hasVisualAssets,
-      hasAIPrompts,
     };
   } catch {
     return EMPTY;
@@ -248,7 +222,4 @@ export async function loadFullContext(
 }
 
 /** Backwards-compat alias for callers that still pass brandId only. */
-export const loadBrandFullContext = (
-  brandId: number,
-  opts: { platformFilter?: string } = {},
-) => loadFullContext("brand", brandId, opts);
+export const loadBrandFullContext = (brandId: number) => loadFullContext("brand", brandId);

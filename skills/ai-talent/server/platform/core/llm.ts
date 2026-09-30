@@ -1041,14 +1041,16 @@ export function looksLikeChainOfThought(text: string): boolean {
  * Stream tokens from Anthropic's native API (different SSE format to OpenAI).
  * Used as fallback when the primary provider fails with a deployment error.
  */
-async function* anthropicStream(
+export async function* anthropicStream(
   messages: Message[],
   maxTokens: number,
+  /** 2026-09-30：靈感舞台要邊想邊顯示，直接用這條原生 API 串流並指定模型。 */
+  modelOverride?: string,
 ): AsyncGenerator<string> {
   const key = (ENV as any).ANTHROPIC_API_KEY ?? "";
   if (!key) throw new Error("Anthropic not configured");
   // Primary model: claude-sonnet-4-6. Override via ANTHROPIC_MODEL env.
-  const model = (ENV as any).ANTHROPIC_MODEL ?? "claude-sonnet-4-6";
+  const model = modelOverride ?? (ENV as any).ANTHROPIC_MODEL ?? "claude-sonnet-4-6";
 
   // Split system message from conversation
   const systemMsgs = messages.filter((m) => m.role === "system");

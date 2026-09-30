@@ -10,7 +10,7 @@
 import React from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { trpc } from "../../../lib/trpc";
-import { ArrowLeft, AlertTriangle } from "lucide-react";
+import { BackIcon, WarningIcon } from "../components/icons";
 
 const card: React.CSSProperties = {
   border: "1px solid #e5e7eb", borderRadius: 10, background: "#fff",
@@ -28,14 +28,14 @@ export default function AdminUserDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const uid = Number(id);
-  const q = (trpc as any).adminStats?.userDetail?.useQuery?.(
+  const q = (trpc as any).adminStats?.userDetail?.useQuery(
     { userId: uid }, { enabled: uid > 0, refetchOnWindowFocus: false });
 
   if (q?.error) {
     const forbidden = q.error?.data?.code === "FORBIDDEN" || q.error?.message?.includes("Admin only");
     return (
       <div style={{ maxWidth: 520, margin: "80px auto", textAlign: "center", color: "#525252" }}>
-        <AlertTriangle size={26} style={{ color: "#b91c1c" }} />
+        <WarningIcon size={26} style={{ color: "#b91c1c" }} />
         <p style={{ marginTop: 10, fontSize: 14 }}>
           {forbidden ? "僅限管理員（@sowork.tw / @sowork.ai）" : "找不到此用戶"}
         </p>
@@ -51,7 +51,7 @@ export default function AdminUserDetailPage() {
         display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "#525252",
         border: "1px solid #e5e7eb", borderRadius: 8, padding: "6px 12px",
         background: "#fff", cursor: "pointer", marginBottom: 16,
-      }}><ArrowLeft size={13} /> 回監控後台</button>
+      }}><BackIcon size={13} /> 回監控後台</button>
 
       {!d && <p style={{ color: "#9ca3af", fontSize: 13 }}>載入中…</p>}
       {d && (

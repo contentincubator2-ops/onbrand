@@ -1270,7 +1270,7 @@ async function main() {
     // for why this is a dedicated table pair instead of a positioning._xxx
     // JSON field: conversations are unbounded/append-only over the brand's
     // whole lifetime, unlike the small bounded structures — _workbench,
-    // _aiPrompts, _customSegments — that live inside positioning JSON).
+    // _customSegments — that live inside positioning JSON).
     // No tickets/escalation table — that's Mia's job, not the strategist's.
     await conn.execute(`
       CREATE TABLE IF NOT EXISTS strategist_conversations (

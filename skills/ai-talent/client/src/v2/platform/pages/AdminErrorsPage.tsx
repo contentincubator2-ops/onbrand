@@ -17,7 +17,7 @@
  */
 import { useMemo, useState } from "react";
 import { trpc } from "../../../lib/trpc";
-import { AlertTriangle, CheckCircle2, ChevronRight, RefreshCw } from "lucide-react";
+import { ChevronRightIcon, DoneIcon, RegenerateIcon, WarningIcon } from "../components/icons";
 
 type ResolvedFilter = "unresolved" | "resolved" | "all";
 type WindowOpt = "24h" | "7d";
@@ -42,11 +42,11 @@ export default function AdminErrorsPage() {
   const [window, setWindow] = useState<WindowOpt>("24h");
   const [openFingerprint, setOpenFingerprint] = useState<string | null>(null);
 
-  const statsQ = (trpc as any).ops?.errorStats?.useQuery?.(
+  const statsQ = (trpc as any).ops?.errorStats?.useQuery(
     { window },
     { refetchInterval: 30_000, refetchOnWindowFocus: false },
   );
-  const listQ = (trpc as any).ops?.listForAdmin?.useQuery?.(
+  const listQ = (trpc as any).ops?.listForAdmin?.useQuery(
     { limit: 200, resolved },
     { refetchInterval: 30_000, refetchOnWindowFocus: false },
   );
@@ -80,7 +80,7 @@ export default function AdminErrorsPage() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-neutral-50 p-6">
         <div className="text-center max-w-md">
-          <AlertTriangle size={32} className="mx-auto mb-3 text-neutral-500" />
+          <WarningIcon size={32} className="mx-auto mb-3 text-neutral-500" />
           <p className="text-base font-semibold text-neutral-900 mb-1">需要管理員權限</p>
           <p className="text-sm text-neutral-600">
             錯誤追蹤面板僅限管理員。請聯絡 SoWork 把你帳號的 role 設為 admin。
@@ -128,7 +128,7 @@ export default function AdminErrorsPage() {
               onClick={() => { statsQ?.refetch?.(); listQ?.refetch?.(); }}
               className="px-3 py-1.5 rounded-md border border-neutral-300 hover:border-neutral-900 text-xs text-neutral-700 flex items-center gap-1.5"
             >
-              <RefreshCw size={12} /> 重新整理
+              <RegenerateIcon size={12} /> 重新整理
             </button>
           </div>
         </div>
@@ -155,7 +155,7 @@ export default function AdminErrorsPage() {
           <div className="text-center py-16 text-neutral-600">載入中…</div>
         ) : grouped.length === 0 ? (
           <div className="bg-white border border-dashed border-neutral-300 rounded-xl py-16 text-center">
-            <CheckCircle2 size={32} className="mx-auto mb-3 text-emerald-600" />
+            <DoneIcon size={32} className="mx-auto mb-3 text-emerald-600" />
             <p className="text-base font-medium text-neutral-900 mb-1">乾淨 — 沒有未處理錯誤</p>
             <p className="text-sm text-neutral-600">最後 {window} 內沒有需要看的案例</p>
           </div>
@@ -211,7 +211,7 @@ export default function AdminErrorsPage() {
                         標記全部已處理
                       </button>
                     )}
-                    <ChevronRight
+                    <ChevronRightIcon
                       size={16}
                       className="text-neutral-600 transition-transform"
                       style={{ transform: isOpen ? "rotate(90deg)" : "none" }}

@@ -15,6 +15,7 @@
  *
  * Auth gate is unchanged — RequireAuth still wraps protected routes.
  */
+import { isChunkLoadError, autoReloadForStaleChunk, installStaleChunkRecovery, StaleChunkScreen } from "./staleChunk";
 import React from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import { LanguageProvider } from "../../lib/i18n";
@@ -22,7 +23,7 @@ import { LanguageProvider } from "../../lib/i18n";
 // ─────────────────────────────────────────────────────────────────────────
 // 2026-06-12 (SEO audit perf fix): route-based code splitting.
 // Mobile PageSpeed was 55 because every anonymous visitor downloaded the
-// whole protected app (TheaterPage, all /admin/*, /tasks/*, /media/*).
+// whole protected app (all /admin/*, /tasks/*, /media/*).
 // Strategy:
 //   - EAGER: critical first-paint surfaces (LandingPage, LoginPage,
 //     RegisterPage), the auth shell (RequireAuthV2 / ShellLayout), and
@@ -57,7 +58,6 @@ const OnboardingWizard = React.lazy(() => import("../../pages/OnboardingWizard")
 
 // Protected app surface — never loaded by anonymous visitors
 const HomePage = React.lazy(() => import("../platform/pages/HomePage"));
-const TheaterPage = React.lazy(() => import("../content/pages/TheaterPage"));
 const PlatformTaskPage = React.lazy(() => import("../content/pages/PlatformTaskPage"));
 const DataWorkspacePage = React.lazy(() => import("../performance/pages/DataWorkspacePage"));
 const RunPage = React.lazy(() => import("../content/pages/RunPage"));
@@ -66,13 +66,12 @@ const ProjectsPage = React.lazy(() => import("../content/pages/ProjectsPage"));
 const BrandsPage = React.lazy(() => import("../strategy/pages/BrandsPage"));
 const BrandsManagePage = React.lazy(() => import("../strategy/pages/BrandsManagePage"));
 const BrandSettingsPage = React.lazy(() => import("../strategy/pages/BrandSettingsPage"));
-// 2026-09-23（CJ「AI指令庫，做成另一個mission tray」）：從品牌定位頁「武器化
-// 工具」的卡片升格成獨立頂層目的地，跟 /theater、/projects 同一個模子。
 // 2026-09-25（CJ「在內容層增加活動的 mission tray」）：活動 tray 是內容層的
 // 頂層目的地，不加 /tasks/ 前綴——它的卡片來自活動企劃，不受任務包過濾。
 const CampaignTrayPage = React.lazy(() => import("../content/pages/CampaignTrayPage"));
 const SquadLabPage = React.lazy(() => import("../platform/pages/admin/SquadLabPage"));
 const PlannerPage = React.lazy(() => import("../content/pages/PlannerPage"));
+const InspirationPage = React.lazy(() => import("../content/pages/InspirationPage"));
 const AccountPage = React.lazy(() => import("../platform/pages/AccountPage"));
 const WorkspaceSettingsPage = React.lazy(() => import("../platform/pages/WorkspaceSettingsPage"));
 const ReviewQueuePage = React.lazy(() => import("../platform/pages/ReviewQueuePage"));
@@ -103,7 +102,7 @@ function RouteFallback() {
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        background: "#F7F2EB",
+        background: "#FAFAFA",
       }}
       aria-label="Loading"
     >
@@ -112,8 +111,8 @@ function RouteFallback() {
           width: 32,
           height: 32,
           borderRadius: "50%",
-          border: "3px solid #EFE7D6",
-          borderTopColor: "#E85D2E",
+          border: "3px solid #E4E4E7",
+          borderTopColor: "#18181b",
           animation: "spin 0.8s linear infinite",
         }}
       />
@@ -130,21 +129,6 @@ function RouteFallback() {
 // Same stale-chunk helpers as ShellLayout — duplicated here so AppErrorBoundary
 // (the outermost boundary, outside the shell) also auto-recovers without
 // importing from ShellLayout and creating a circular dependency.
-function isChunkLoadError(err: Error): boolean {
-  const text = (err.message ?? "") + " " + (err.stack ?? "");
-  return /Failed to fetch dynamically imported module|ChunkLoadError|Loading chunk|Loading CSS chunk|error loading dynamically imported module/i.test(text);
-}
-function autoReloadOnce(): boolean {
-  try {
-    const last = Number(sessionStorage.getItem("_chunk_reload_at") ?? 0);
-    if (Date.now() - last > 15_000) {
-      sessionStorage.setItem("_chunk_reload_at", String(Date.now()));
-      window.location.reload();
-      return true;
-    }
-  } catch { /* sessionStorage blocked */ }
-  return false;
-}
 
 class AppErrorBoundary extends React.Component<
   { children: React.ReactNode },
@@ -154,7 +138,7 @@ class AppErrorBoundary extends React.Component<
   static getDerivedStateFromError(error: Error) { return { error }; }
   componentDidCatch(error: Error, info: React.ErrorInfo) {
     // Stale-chunk auto-recovery: hard-reload once on deployment-induced 404.
-    if (isChunkLoadError(error) && autoReloadOnce()) return;
+    if (isChunkLoadError(error) && autoReloadForStaleChunk()) return;
     // eslint-disable-next-line no-console
     console.error("[AppV2] render error:", error, info);
     // 2026-05-11 — auto-report to the Sentry-lite error_log table so the
@@ -195,6 +179,9 @@ class AppErrorBoundary extends React.Component<
     } catch { /* never throw from componentDidCatch */ }
   }
   render() {
+    if (this.state.error && isChunkLoadError(this.state.error)) {
+      return <StaleChunkScreen fullPage />;
+    }
     if (this.state.error) {
       return (
         <div style={{ minHeight: "100vh", padding: 32, fontFamily: "system-ui, sans-serif" }}>
@@ -211,7 +198,7 @@ class AppErrorBoundary extends React.Component<
             )}
             <div style={{ marginTop: 12, display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
               <button
-                style={{ padding: "6px 12px", background: "#3b82f6", color: "white", border: "none", borderRadius: 6, cursor: "pointer" }}
+                style={{ padding: "6px 12px", background: "#18181b", color: "white", border: "none", borderRadius: 6, cursor: "pointer" }}
                 onClick={() => { this.setState({ error: null }); }}
               >
                 重試渲染
@@ -243,7 +230,7 @@ class AppErrorBoundary extends React.Component<
                   shell/footer to reach customer service. */}
               <a
                 href={`mailto:sowork@sowork.ai?subject=${encodeURIComponent("OnBrand 應用程式錯誤")}&body=${encodeURIComponent("錯誤訊息：\n" + (this.state.error?.message ?? "") + "\n\n頁面：" + window.location.href)}`}
-                style={{ marginLeft: "auto", fontSize: 12, color: "#3b82f6", textDecoration: "underline" }}
+                style={{ marginLeft: "auto", fontSize: 12, color: "#3f3f46", textDecoration: "underline" }}
               >
                 聯絡客服 sowork@sowork.ai
               </a>
@@ -255,6 +242,8 @@ class AppErrorBoundary extends React.Component<
     return this.props.children as any;
   }
 }
+
+installStaleChunkRecovery();
 
 export default function AppV2() {
   return (
@@ -272,7 +261,7 @@ export default function AppV2() {
 
         {/* 2026-05-16 (CJ「主打品牌定位鎖定」): public marketing landing
             at /. Cold traffic used to hit /auth/login directly (funnel
-            leak). LandingPage self-redirects authed users to /theater. */}
+            leak). LandingPage self-redirects authed users to /planner. */}
         <Route path="/" element={<LandingPage />} />
 
         {/* 2026-05-10: Public legal + pricing pages (no auth required so
@@ -330,10 +319,8 @@ export default function AppV2() {
               brand settings (replaces the modal sheet for direct navigation). */}
           <Route path="/brands/settings" element={<BrandSettingsPage />} />
           <Route path="/home"      element={<HomePage />} />
-          <Route path="/theater"   element={<TheaterPage />} />
-          {/* 2026-09-23（CJ「AI指令庫，做成另一個mission tray」）*/}
-          {/* 2026-09-29 CJ：AI 指令庫移除，舊網址導回任務頁。 */}
-          <Route path="/ai-prompts" element={<Navigate to="/tasks/fb" replace />} />
+          {/* 2026-09-30：七日發布台已移除，舊連結／書籤轉到取代它的靈感舞台。 */}
+          <Route path="/theater" element={<Navigate to="/inspiration" replace />} />
           <Route path="/campaigns" element={<CampaignTrayPage />} />
           <Route path="/m/:missionId" element={<MissionRedirect />} />
           <Route path="/b/:brandId/:workspace/m/:missionId" element={<MissionRedirect />} />
@@ -351,6 +338,7 @@ export default function AppV2() {
           <Route path="/admin/post-formats" element={<AdminPostFormatsPage />} />
           {/* 2026-09-27（CJ「用本週企劃取代行事曆」）：行事曆併進本週企劃的週曆。 */}
           <Route path="/planner" element={<PlannerPage />} />
+          <Route path="/inspiration" element={<InspirationPage />} />
           <Route path="/calendar" element={<Navigate to="/planner" replace />} />
           {/* 2026-05-10 account settings */}
           <Route path="/settings/account" element={<AccountPage />} />

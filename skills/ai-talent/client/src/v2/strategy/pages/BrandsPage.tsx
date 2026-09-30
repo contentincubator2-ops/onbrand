@@ -13,6 +13,7 @@
  *
  * No max-width container anywhere — extends to viewport edges.
  */
+import { IllustratedEmpty } from "../../platform/components/EmptyIllustration";
 import React, { useMemo, useState, useRef } from "react";
 import { useNavigate, useOutletContext, useSearchParams } from "react-router-dom";
 import { trpc } from "../../../lib/trpc";
@@ -26,7 +27,6 @@ import PipelineRunner, { type PipelineState } from "../components/positioning/Pi
 import PipelineThinkingPanel from "../components/positioning/PipelineThinkingPanel";
 import AgentPersonaBar from "../components/positioning/AgentPersonaBar";
 import SpeedCard from "../components/positioning/SpeedCard";
-import PromptLibrary from "../components/positioning/PromptLibrary";
 import BrandAssetEditor, { type AssetKey } from "../components/positioning/BrandAssetEditor";
 import KnowledgeEditor from "../components/positioning/KnowledgeEditor";
 import PositioningDocPanel from "../components/positioning/PositioningDocPanel";
@@ -34,17 +34,18 @@ import CustomCardEditor, { type EditableCard } from "../components/positioning/C
 import AssetPhotoGallery from "../components/positioning/AssetPhotoGallery";
 import { InfoTab as BrandInfoTab, DangerTab as BrandDangerTab, PublishTab as BrandPublishTab } from "../components/positioning/BrandSettingsSheet";
 import StrategyMeetingsPanel from "../components/meetings/StrategyMeetingsPanel";
+import BrainPanel from "../components/brain/BrainPanel";
 import BrandOnboardingWizard from "../components/onboarding/BrandOnboardingWizard";
 import StrategyWorkbench from "../components/positioning/StrategyWorkbench";
 import AIBriefPanel from "../components/positioning/AIBriefPanel";
 import StrategyAlertsPanel from "../components/positioning/StrategyAlertsPanel";
 import PersonaAgentPanel from "../components/positioning/PersonaAgentPanel";
 import { showToastGlobal } from "../../../components/ui/Toast";
-import { BrandActionChipsRow, usePositioningStatus } from "../components/positioning/BrandActionChips";
 import AddEntityModal, { type AddEntityTab } from "../components/AddEntityModal";
 import ProductDetailModal from "../components/positioning/ProductDetailModal";
 // Notion-style line icons
-import { Target as LucideTarget, Type as LucideType, Palette as LucidePalette, Lock as LucideLock, Play as LucidePlay, RotateCcw as LucideRotate, BookOpen as LucideBook, Users as LucideUsers, Sparkles, Bot as LucideRobotIcon, Quote as LucideQuote, Shield as LucideShield, Type as LucideTypeIcon, Pencil as LucidePencil, Award as LucideAward, Package as LucidePackage, Hash as LucideHash, MessageCircle as LucideMessage, FileText as LucideFileText, IdCard as LucideIdCard, Trash2 as LucideTrash } from "lucide-react";
+import { LockToggle } from "../components/positioning/LockToggle";
+import { AgentIcon, MemoryIcon, AwardIcon, BundleIcon, CommentIcon, DeleteIcon, EditIcon, FontIcon, GenerateIcon, HashtagIcon, IdCardIcon, LibraryIcon, LockIcon, PaletteIcon, PeopleIcon, PlayIcon, QuoteIcon, RegenerateIcon, ShieldIcon, TargetIcon, TextIcon, DoneIcon, StopIcon, WarningIcon, CheckIcon, CloseIcon } from "../../platform/components/icons";
 import { SCOPE_SEGMENTS, type SegmentSpec } from "../lib/positioningSchema";
 import { pickProductImageUrl } from "../lib/productImage";
 import { readProductFacts } from "../lib/productFacts";
@@ -53,12 +54,15 @@ import CopyAssetBoard, { COPY_ASSETS } from "../components/positioning/CopyAsset
 import VisualAssetBoard from "../components/positioning/VisualAssetBoard";
 import { pipelineFor, type PipelineStepSpec } from "../lib/positioningPipeline";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faPlus, faPalette, faFont, faQuoteLeft, faBullseye, faUsers, faImage, faIcons, faChartPie, faImages, faPenNib, faShieldHalved, faFolderOpen, faLock, faLockOpen, faBookOpen, faTableList, faBox, faRocket, faBullhorn, faWandSparkles, faGear, faStickyNote, faTrash, faSatelliteDish, faStethoscope, faFileArrowUp } from "@fortawesome/free-solid-svg-icons";
+import { HelpTip } from "../../platform/components/HelpTip";
+import {
+  faPlus, faPalette, faFont, faQuoteLeft, faBullseye, faUsers, faImage, faIcons, faChartPie, faImages, faPenNib, faShieldHalved, faFolderOpen, faBookOpen, faTableList, faBox, faRocket, faBullhorn, faWandMagicSparkles, faGear, faStickyNote, faTrashCan, faSatelliteDish, faStethoscope, faFileArrowUp,
+} from "@fortawesome/free-solid-svg-icons";
 
 // Sub-nav id format:
 //   "asset:<key>"   — non-positioning brand assets (準則 / 標誌 / etc.)
 //   "seg:<segment>" — one positioning segment (driven by positioningSchema)
-//   "card" / "prompts" / "all"
+//   "card" / "all"
 type SectionId = string;
 
 // Brand has positioning segments + visual/asset entries.
@@ -128,7 +132,7 @@ export default function BrandsPage() {
     try {
       const sp = new URLSearchParams(window.location.search);
       const t = sp.get("tab");
-      if (t === "publish" || t === "ai") {
+      if (t === "publish") {
         setCategory(t);
       } else if (t === "connector") {
         setCategory("publish"); // legacy alias
@@ -140,15 +144,15 @@ export default function BrandsPage() {
 
   // Tab locks (定位 / 文字 / 視覺) — fetched per-brand
   const activeBrandIdForLocks = scope?.brandId ?? brandId ?? null;
-  const tabLocksQuery = (trpc as any).theater?.getTabLocks?.useQuery
-    ? (trpc as any).theater.getTabLocks.useQuery(
+  const tabLocksQuery = (trpc as any).tabLock?.get?.useQuery
+    ? (trpc as any).tabLock.get.useQuery(
         { brandId: activeBrandIdForLocks ?? 0 },
         { enabled: !!activeBrandIdForLocks, refetchOnWindowFocus: false }
       )
     : { data: null, refetch: () => {} };
   const tabLocks = (tabLocksQuery.data as { positioning: any; copy: any; visual: any } | null) ?? { positioning: null, copy: null, visual: null };
-  const lockTabMut   = (trpc as any).theater?.lockTab?.useMutation();
-  const unlockTabMut = (trpc as any).theater?.unlockTab?.useMutation();
+  const lockTabMut   = (trpc as any).tabLock?.lock?.useMutation();
+  const unlockTabMut = (trpc as any).tabLock?.unlock?.useMutation();
   // Load brand's full positioning JSON so cards can show preview content
   // without re-fetching per-tile (single round trip via scope.active).
   // 2026-05-18 (CJ「選了 onbrand.ai 產品，品牌大腦還是顯示 sowork.ai」):
@@ -466,7 +470,7 @@ export default function BrandsPage() {
     });
   };
   // 色票只是拿來判斷「這張卡有沒有內容」與縮圖，所以讀現成的那一份就好。
-  const dnaQ = (trpc as any).brandColors?.getCurrent?.useQuery?.(
+  const dnaQ = (trpc as any).brandColors?.getCurrent?.useQuery(
     { brandId: activeBrandIdForLocks ?? 0 },
     { enabled: !!activeBrandIdForLocks, staleTime: 60_000 },
   );
@@ -479,7 +483,7 @@ export default function BrandsPage() {
   // Onboarding nudge: if this brand has no website / socialLinks yet,
   // auto-open Settings → 連結 once. localStorage tracks dismissal so
   // the prompt doesn't bug returning users.
-  const connQuery = (trpc as any).brand?.getConnections?.useQuery?.(
+  const connQuery = (trpc as any).brand?.getConnections?.useQuery(
     { brandId: activeBrandIdForLocks ?? 0 },
     { enabled: !!activeBrandIdForLocks, refetchOnWindowFocus: false, staleTime: 60_000 },
   );
@@ -551,7 +555,7 @@ export default function BrandsPage() {
       } else {
         const msg = lang === "en"
           ? `Lock "${tabName}"?\nAfter locking:\n· Editor goes read-only (unlock to change)\n· Every channel uses this as the single source of truth\n· All tasks and the 7-Day Publisher show the locked badge\nYou can unlock anytime.`
-          : `要鎖定「${tabName}」嗎？\n鎖定後：\n· 編輯欄會變成唯讀（解鎖才能改）\n· 全平台都會用這份為單一真相\n· 所有任務與七日發布台都會看到 ✅ 已鎖定的標示\n隨時可以解鎖。`;
+          : `要鎖定「${tabName}」嗎？\n鎖定後：\n· 編輯欄會變成唯讀（解鎖才能改）\n· 全平台都會用這份為單一真相\n· 所有任務與七日發布台都會看到已鎖定的標示\n隨時可以解鎖。`;
         if (!confirm(msg)) return;
         await lockTabMut?.mutateAsync({ brandId: activeBrandIdForLocks, tab });
       }
@@ -627,7 +631,7 @@ export default function BrandsPage() {
 
   // Build sub-nav from positioning schema + brand-only asset list.
   // Each segment becomes its own sub-nav entry (id = "seg:<segmentId>"),
-  // alongside 速查卡 / AI 指令庫 / brand assets (brand only).
+  // alongside 速查卡 / brand assets (brand only).
   const segments = scopeMode === "none" ? [] : SCOPE_SEGMENTS[scopeMode];
 
   // ── Navigation ────────────────────────────────────────────────────────────
@@ -639,17 +643,17 @@ export default function BrandsPage() {
   // 2026-05-07 Path A simplification: 3 main tiles only (定位/文字/知識).
   // "visual" is kept in the type for legacy lock-state code paths, but
   // is no longer exposed as a tile — its contents live in Settings.
-  const category: "positioning" | "copy" | "visual" | "knowledge" | "info" | "publish" | "ai" | "settings" | "products" | "events" | "meetings" | "persona" | "campaign" =
+  const category: "positioning" | "copy" | "visual" | "knowledge" | "info" | "publish" | "settings" | "products" | "events" | "meetings" | "brain" | "persona" | "campaign" =
     urlCat === "copy" ? "copy"
     : urlCat === "knowledge" ? "knowledge"
     : urlCat === "visual" ? "visual"
     : urlCat === "info" ? "info"
     : urlCat === "publish" ? "publish"
-    : urlCat === "ai" ? "ai"
     : urlCat === "settings" ? "settings"
     : urlCat === "products" ? "products"
     : urlCat === "events" ? "events"
     : urlCat === "meetings" ? "meetings"
+    : urlCat === "brain" ? "brain"
     : urlCat === "persona" ? "persona"
     // 2026-09-25（CJ「應該要在活動的 mission tray 當中，增加這個活動的任務卡」）：
     // 活動的預設落點是宣傳企劃，不是 11 段的得獎 brief（那退成 cat=positioning
@@ -665,7 +669,7 @@ export default function BrandsPage() {
   // version clobbered it with a snapshot from BEFORE that write, dropping
   // `e` and silently falling back to brand-level positioning. Functional
   // form fixes it for every caller, not just this one site.
-  const setCategory = (next: "positioning" | "copy" | "knowledge" | "info" | "visual" | "publish" | "ai" | "products" | "events" | "meetings" | "persona") => {
+  const setCategory = (next: "positioning" | "copy" | "knowledge" | "info" | "visual" | "publish" | "products" | "events" | "meetings" | "brain" | "persona") => {
     setSearchParams((prev) => {
       const nextParams = new URLSearchParams(prev);
       nextParams.set("cat", next);
@@ -674,11 +678,11 @@ export default function BrandsPage() {
   };
 
   // Products + events for brand tabs — must be after `category` is declared (TDZ guard)
-  const brandProductsQ = (trpc as any).product?.list?.useQuery?.(
+  const brandProductsQ = (trpc as any).product?.list?.useQuery(
     { brandId: activeBrandIdForLocks ?? 0 },
     { enabled: !!activeBrandIdForLocks && category === "products", refetchOnWindowFocus: false, staleTime: 30_000 },
   );
-  const brandEventsQ = (trpc as any).event?.list?.useQuery?.(
+  const brandEventsQ = (trpc as any).event?.list?.useQuery(
     { brandId: activeBrandIdForLocks ?? 0 },
     { enabled: !!activeBrandIdForLocks && category === "events", refetchOnWindowFocus: false, staleTime: 30_000 },
   );
@@ -734,11 +738,11 @@ export default function BrandsPage() {
     });
     interimMut?.mutate?.({ entityKind: kind, entityId: id });
   };
-  const prodPosStatusQ = (trpc as any).positioningJobs?.getStatusBatch?.useQuery?.(
+  const prodPosStatusQ = (trpc as any).positioningJobs?.getStatusBatch?.useQuery(
     { entityKind: "product", entityIds: posRunning.product },
     { enabled: posRunning.product.length > 0, refetchInterval: 4000 },
   );
-  const evPosStatusQ = (trpc as any).positioningJobs?.getStatusBatch?.useQuery?.(
+  const evPosStatusQ = (trpc as any).positioningJobs?.getStatusBatch?.useQuery(
     { entityKind: "event", entityIds: posRunning.event },
     { enabled: posRunning.event.length > 0, refetchInterval: 4000 },
   );
@@ -751,7 +755,7 @@ export default function BrandsPage() {
           listQ?.refetch?.();
           showToastGlobal(
             r.status === "done"
-              ? (lang === "en" ? "✓ Positioning complete" : "✓ 定位完成，卡片已更新")
+              ? (lang === "en" ? "Positioning complete" : "定位完成，卡片已更新")
               : (lang === "en" ? "Positioning failed — try again" : "定位失敗，請再試一次"),
             r.status === "done" ? "success" : undefined,
           );
@@ -784,7 +788,7 @@ export default function BrandsPage() {
       if (category === "visual" || category === "copy") setSection("asset:all");
       else if (category === "settings") setSection("settings");
       else if (category === "knowledge") setSection("settings");
-      else if (category === "publish" || category === "ai") setSection("pos:home");
+      else if (category === "publish") setSection("pos:home");
       else                              setSection("pos:home");
     }
   }, [category]);
@@ -1138,7 +1142,7 @@ export default function BrandsPage() {
   const runInterimMut = (trpc as any).positioningJobs?.runInterim?.useMutation?.();
   const startJobMut   = (trpc as any).positioningJobs?.start?.useMutation?.();
   // Poll job status once interim is done (every 15s until full pipeline finishes)
-  const autoPosJobStatus = (trpc as any).positioningJobs?.getStatus?.useQuery?.(
+  const autoPosJobStatus = (trpc as any).positioningJobs?.getStatus?.useQuery(
     { entityKind: (scopeMode !== "none" ? scopeMode : "brand") as "brand"|"product"|"event", entityId: targetId ?? 0 },
     {
       enabled: autoPosPhase === "interim-done" && !!targetId && scopeMode !== "none",
@@ -1282,7 +1286,7 @@ export default function BrandsPage() {
     "voice", "voice_principles",
     "preferred_terms", "banned_words", "term_substitutions",
     "branded_terms", "product_naming", "abbreviations",
-    "cta_library", "hook_library", "ai_prompts", "templates_copy",
+    "cta_library", "hook_library", "templates_copy",
   ];
   const VISUAL_KEYS_FOR_COMPLETION: AssetKey[] = [
     "logo", "colors", "fonts", "photos", "guidelines", "templates",
@@ -1321,8 +1325,8 @@ export default function BrandsPage() {
   return (
     <main className="min-h-[calc(100vh-3.5rem)] flex flex-col">
       {/* 2026-05-30 (CJ「modal 移除，功能全進主工作區」):
-          BrandSettingsSheet modal removed. 平台授權 and AI 指令 are now
-          full tabs in the main workspace. 危險區 remains inside 基本資料. */}
+          BrandSettingsSheet modal removed. 平台授權 is now a full tab in
+          the main workspace. 危險區 remains inside 基本資料. */}
 
       {/* 2026-05-13 (CJ「建立好品牌後我點選左側品牌會是空白畫面」):
           when scope just changed to a brand that hasn't landed in
@@ -1374,17 +1378,9 @@ export default function BrandsPage() {
               decorative emblem. Editorial typography hierarchy. */}
           <div className="min-h-[60vh] flex items-center justify-center px-6">
             <div className="max-w-[440px] text-left">
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-neutral-600 mb-4">
-                BRAND · STEP 1
-              </p>
-              <h1 className="text-3xl font-bold text-neutral-900 mb-3 leading-tight">
+              <h1 className="text-3xl font-bold text-neutral-900 mb-6 leading-tight">
                 {lang === "en" ? "Set up your first brand" : "建立你的第一個品牌"}
               </h1>
-              <p className="text-sm text-neutral-600 mb-6 leading-relaxed">
-                {lang === "en"
-                  ? "Your brand is where everything in OnBrand starts. Once it's in, the AI reads your positioning, words, and visual style — every task pulls from this brain."
-                  : "品牌是 OnBrand 一切的起點。建立後，AI 會自動分析定位、用詞、視覺風格 — 接下來的所有任務都會吃這份品牌大腦。"}
-              </p>
               <button
                 onClick={() => setOnboardingOpen(true)}
                 className="inline-flex items-center gap-2 px-5 py-3 rounded-lg bg-neutral-900 text-white font-semibold text-sm hover:bg-neutral-800 transition"
@@ -1415,7 +1411,7 @@ export default function BrandsPage() {
             ← {lang === "en" ? "All brands" : "所有品牌"}
           </a>
         </div>
-        {/* 2026-05-30: gear icon removed — 平台授權 / AI 指令 are now main workspace tabs */}
+        {/* 2026-05-30: gear icon removed — 平台授權 is now a main workspace tab */}
         {/* 2026-05-10 (CJ「4A 代理商專業感, B&W」): hero redesigned.
             Removed gradient emblem + gradient title. Editorial
             typography: tiny eyebrow, large bold title, subtle stats. */}
@@ -1427,6 +1423,13 @@ export default function BrandsPage() {
               策略總監的系統提示詞了（見 strategistChatRouter.ts），使用者
               直接問策略總監就有，不用再靠這裡一顆 hover 才看得到的按鈕。
               現在只剩最單純的大標題。 */}
+          {/* 2026-09-29 (CJ「定案跟鎖定定位其實是相同功能，只留鎖定」→「在品牌名和標語的
+              右側」→「LOCK ONLY」)：原本標題下的「定案」chip 與內容上方整條「定位
+              尚未鎖定／鎖定定位」橫列是同一件事兩個入口，合併成標題區右側一顆手繪
+              鎖頭（LockToggle），鎖頭本身就是按鈕、下方小字表狀態。鎖的是目前頁籤
+              （定位／文字／視覺）。標題維持置中：鎖頭 absolute 掛在標題區右緣，
+              窄螢幕沒空間時改排到標語下方。 */}
+          <div className="relative inline-flex flex-col items-center">
           <h1
             className="font-bold tracking-tight leading-none text-neutral-900 mb-5"
             style={{ fontSize: "clamp(1.75rem, 3vw, 2.5rem)" }}
@@ -1450,6 +1453,36 @@ export default function BrandsPage() {
             );
           })()}
 
+            {(category === "positioning" || category === "copy" || category === "visual") && activeBrandIdForLocks && (() => {
+              const tab = category as "positioning" | "copy" | "visual";
+              const tabLabel = tab === "positioning"
+                ? (lang === "en" ? "Positioning" : "定位")
+                : tab === "copy"
+                  ? (lang === "en" ? "Copy" : "文字")
+                  : (lang === "en" ? "Visual" : "視覺");
+              const lock = tabLocks[tab];
+              const isLocked = !!lock;
+              return (
+                <div className="mt-2 sm:mt-0 sm:absolute sm:top-1/2 sm:-translate-y-1/2 sm:left-[calc(100%+18px)]">
+                  <LockToggle
+                    locked={isLocked}
+                    busy={!!(lockTabMut?.isPending || unlockTabMut?.isPending)}
+                    onToggle={() => handleLockToggle(tab)}
+                    lockedLabel={lang === "en" ? "Locked" : "已鎖定"}
+                    unlockedLabel={lang === "en" ? "Unlocked" : "未鎖定"}
+                    title={isLocked
+                      ? (lang === "en"
+                          ? `${tabLabel} locked ${new Date(lock.at).toLocaleString("en-US", { dateStyle: "short", timeStyle: "short" })} · single source of truth · click to unlock`
+                          : `${tabLabel}鎖定於 ${new Date(lock.at).toLocaleString("zh-TW", { dateStyle: "short", timeStyle: "short" })} · 全平台採用此版本 · 點一下解鎖`)
+                      : (lang === "en"
+                          ? `Lock ${tabLabel} — editor goes read-only · every task uses this as the single source of truth`
+                          : `鎖定${tabLabel}：編輯欄變唯讀 · 所有任務用這份為單一真相`)}
+                  />
+                </div>
+              );
+            })()}
+          </div>
+
           {/* 2026-05-11 (CJ「搜尋 BAR 不需要了」): BrandMessageBar removed.
               Manifesto subtitle above already carries the value-prop;
               tagline preview lived in the bar redundantly. Kept the import
@@ -1472,36 +1505,38 @@ export default function BrandsPage() {
                 // CJ 2026-05-13「左上選活動時，這一頁就呈現該活動的定位等等資訊」.
                 // 2026-06-03 (CJ): Redesigned tab structure — 7 consistent tabs.
                 // 平台授權 removed (handled in Calendar connect flow).
-                // 知識 + AI指令 merged into 品牌工具.
                 // 產品 + 活動 added as independent tabs with card grids.
                 const allTiles = [
                   { v: "positioning" as const, label: lang === "en" ? "Positioning" : "定位",
                       desc: scopeMode === "event"   ? (lang === "en" ? "Campaign positioning" : "活動定位")
                           : scopeMode === "product" ? (lang === "en" ? "Product positioning"  : "產品定位")
                           : (lang === "en" ? "Brand core / Slogan" : "品牌核心 / Slogan"),
-                      Icon: LucideTarget,    scopes: ["brand", "product", "event"] as string[] },
+                      Icon: TargetIcon,    scopes: ["brand", "product", "event"] as string[] },
                   { v: "copy"        as const, label: lang === "en" ? "Copy"    : "文字",
                       desc: scopeMode === "product" ? (lang === "en" ? "Tone / style" : "語氣 / 風格")
                           : scopeMode === "event"   ? (lang === "en" ? "Voice / rules" : "語氣 / 規範")
                           : (lang === "en" ? "Words / banned / style" : "用詞 / 禁忌 / 風格"),
-                      Icon: LucideType,      scopes: ["brand", "product", "event"] as string[] },
+                      Icon: FontIcon,      scopes: ["brand", "product", "event"] as string[] },
                   { v: "visual"      as const, label: lang === "en" ? "Visual"  : "視覺",
                       desc: lang === "en" ? "Logo / palette / font" : "Logo / 色票 / 字型",
-                      Icon: LucidePalette,   scopes: ["brand"] },
+                      Icon: PaletteIcon,   scopes: ["brand"] },
                   { v: "info"        as const, label: lang === "en" ? "Info"    : "基本資料",
                       desc: scopeMode === "event"   ? (lang === "en" ? "Dates / products"    : "時間 / 產品")
                           : scopeMode === "product" ? (lang === "en" ? "Name / brand"        : "名稱 / 品牌")
                           : (lang === "en" ? "Name / industry" : "名稱 / 產業"),
-                      Icon: LucideIdCard,    scopes: ["brand", "product", "event"] },
+                      Icon: IdCardIcon,    scopes: ["brand", "product", "event"] },
                   { v: "meetings"    as const, label: lang === "en" ? "Meetings" : "會議",
                       desc: lang === "en" ? "Recurring strategy meetings" : "定期策略會議",
-                      Icon: LucideUsers,     scopes: ["brand", "product"] },
+                      Icon: PeopleIcon,     scopes: ["brand", "product"] },
+                  { v: "brain"       as const, label: lang === "en" ? "Brain" : "大腦",
+                      desc: lang === "en" ? "What the AI remembers" : "AI 記住了什麼",
+                      Icon: MemoryIcon,    scopes: ["brand", "product", "event"] },
                   { v: "products"    as const, label: lang === "en" ? "Products" : "產品",
                       desc: lang === "en" ? "Product cards & positioning" : "產品卡片與定位",
-                      Icon: LucideRobotIcon, scopes: ["brand"] },
+                      Icon: AgentIcon, scopes: ["brand"] },
                   { v: "events"      as const, label: lang === "en" ? "Events"   : "活動",
                       desc: lang === "en" ? "Campaign cards & positioning" : "活動卡片與定位",
-                      Icon: LucideTarget,    scopes: ["brand"] },
+                      Icon: TargetIcon,    scopes: ["brand"] },
                 ];
                 const visibleTiles = allTiles.filter((tile) =>
                   tile.scopes.includes(scopeMode === "none" ? "brand" : scopeMode),
@@ -1533,7 +1568,7 @@ export default function BrandsPage() {
                       <Icon size={16} strokeWidth={2} className={active ? "text-white" : "text-neutral-700"} />
                       <span className="text-sm font-semibold">{t.label}</span>
                       {locked && (
-                        <LucideLock
+                        <LockIcon
                           size={11} strokeWidth={2.5}
                           className={active ? "text-neutral-300 ml-auto" : "text-neutral-600 ml-auto"}
                         />
@@ -1550,17 +1585,6 @@ export default function BrandsPage() {
           </div>
           )}
 
-          {/* 2026-09-23 (CJ「移除試寫功能」)：KickerRow 現在只剩定案按鈕
-              ——「BRAND WORKSPACE」跟品牌名稱都跟上面的大標題重複，一併拿掉。 */}
-          <KickerRow
-            brandId={activeBrandIdForLocks}
-            scopeMode={scopeMode}
-            scopeEntityId={
-              scopeMode === "product" ? (scope?.productId ?? null)
-              : scopeMode === "event"   ? (scope?.eventId   ?? null)
-              : null
-            }
-          />
         </div>
       </div>
       )}{/* end scopeBrands.length > 0 hero */}
@@ -1570,81 +1594,6 @@ export default function BrandsPage() {
           PipelineThinkingPanel. Removed — the in-page panel is now the
           single source of "AI thinking" UI. (Component retained below
           in case we want to revive it as a global indicator later.) */}
-
-      {/* Lock controls bar — sits above each tab's content. State-aware:
-          locked → green check banner with 解鎖 button
-          unlocked → soft hint with 🔒 鎖定 button to commit current state */}
-      {(category === "positioning" || category === "copy" || category === "visual") && activeBrandIdForLocks && (() => {
-        const tabLabel = category === "positioning"
-          ? (lang === "en" ? "Positioning" : "定位")
-          : category === "copy"
-            ? (lang === "en" ? "Copy" : "文字")
-            : (lang === "en" ? "Visual" : "視覺");
-        const lock = tabLocks[category];
-        const isLocked = !!lock;
-        return (
-          <div style={{
-            background: isLocked ? "#ECFDF5" : "#F9FAFB",
-            borderBottom: "1px solid #E5E7EB",
-            padding: "10px 28px",
-          }}>
-            <div className="max-w-[1400px] mx-auto flex items-center justify-between gap-3 flex-wrap">
-              <div className="flex items-center gap-3">
-                <div
-                  className="w-8 h-8 rounded-full flex items-center justify-center"
-                  style={{
-                    background: isLocked ? "#10B981" : "#E5E7EB",
-                    color: isLocked ? "white" : "#6B7280",
-                  }}
-                >
-                  <FontAwesomeIcon icon={isLocked ? faLock : faLockOpen} style={{ fontSize: 13 }} />
-                </div>
-                <div>
-                  {isLocked ? (
-                    <>
-                      <p className="text-small font-semibold text-emerald-800 m-0">
-                        {lang === "en"
-                          ? `✅ ${tabLabel} locked — single source of truth across all channels`
-                          : `✅ ${tabLabel}已鎖定 — 全平台採用此版本為單一真相`}
-                      </p>
-                      <p className="text-tiny text-emerald-600 m-0">
-                        {lang === "en"
-                          ? `Locked at ${new Date(lock.at).toLocaleString("en-US", { dateStyle: "short", timeStyle: "short" })}`
-                          : `鎖定於 ${new Date(lock.at).toLocaleString("zh-TW", { dateStyle: "short", timeStyle: "short" })}`}
-                      </p>
-                    </>
-                  ) : (
-                    <>
-                      <p className="text-small font-semibold text-default-800 m-0">
-                        {lang === "en" ? `${tabLabel} — not locked yet` : `${tabLabel} 尚未鎖定`}
-                      </p>
-                      <p className="text-tiny text-default-700 m-0">
-                        {lang === "en"
-                          ? "Once locked: editor goes read-only · every task and the 7-Day Publisher uses this as the single source of truth"
-                          : "鎖定後：編輯欄變唯讀 · 所有任務與七日發布台用這份為單一真相"}
-                      </p>
-                    </>
-                  )}
-                </div>
-              </div>
-              <Button
-                size="sm"
-                color={isLocked ? "default" : "success"}
-                variant={isLocked ? "flat" : "solid"}
-                onPress={() => handleLockToggle(category as "positioning" | "copy" | "visual")}
-                isLoading={lockTabMut?.isPending || unlockTabMut?.isPending}
-              >
-                {/* CJ 2026-05-08: 只要出現一個 icon — kept the left circle
-                    icon at line ~875, removed the duplicate startContent
-                    icon from this button. */}
-                {isLocked
-                  ? (lang === "en" ? "Unlock" : "解鎖")
-                  : (lang === "en" ? `Lock ${tabLabel}` : `鎖定${tabLabel}`)}
-              </Button>
-            </div>
-          </div>
-        );
-      })()}
 
       {/* ─── Body: full-bleed (left rail removed 2026-05-07) ─────────────────── */}
       <div className="flex-1 flex">
@@ -1682,7 +1631,6 @@ export default function BrandsPage() {
             {category === "positioning" && [
               { id: "doc",     label: lang === "en" ? "My document" : "我的定位文件" },
               { id: "card",    label: lang === "en" ? "Cheat sheet" : "速查卡"    },
-              { id: "prompts", label: lang === "en" ? "AI prompts"  : "AI 指令庫" },
               ...segments.map(s => ({ id: `seg:${s.id}`, label: `${s.num} ${lang === "en" ? (s.titleEn ?? s.title) : s.title}` })),
             ].map(item => {
               const active = section === item.id;
@@ -1690,15 +1638,15 @@ export default function BrandsPage() {
                 <button key={item.id} onClick={() => setSection(item.id)} style={{
                   width: "100%", display: "flex", alignItems: "center",
                   padding: "5px 10px", borderRadius: 8,
-                  background: active ? "rgba(163,112,252,0.15)" : "none",
+                  background: active ? "rgba(24,24,27,0.06)" : "none",
                   border: "none", cursor: "pointer",
                   fontSize: 12, fontWeight: active ? 600 : 400,
-                  color: active ? "rgb(74,46,126)" : "rgb(15,16,21)",
+                  color: active ? "rgb(24,24,27)" : "rgb(15,16,21)",
                   textAlign: "left", transition: "background 0.12s",
                   whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
                 }}
                   onMouseEnter={e => { if (!active) e.currentTarget.style.background = "#F5F4F2"; }}
-                  onMouseLeave={e => { e.currentTarget.style.background = active ? "rgba(163,112,252,0.15)" : "none"; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = active ? "rgba(24,24,27,0.06)" : "none"; }}
                 >
                   {item.label}
                 </button>
@@ -1735,16 +1683,16 @@ export default function BrandsPage() {
                 <button onClick={() => setSection("settings")} style={{
                   width: "100%", display: "flex", alignItems: "center", gap: 8,
                   padding: "5px 10px", borderRadius: 8,
-                  background: active ? "rgba(163,112,252,0.15)" : "none",
+                  background: active ? "rgba(24,24,27,0.06)" : "none",
                   border: "none", cursor: "pointer",
                   fontSize: 12, fontWeight: active ? 600 : 400,
-                  color: active ? "rgb(74,46,126)" : "rgb(15,16,21)",
+                  color: active ? "rgb(24,24,27)" : "rgb(15,16,21)",
                   textAlign: "left", transition: "background 0.12s",
                 }}
                   onMouseEnter={e => { if (!active) e.currentTarget.style.background = "#F5F4F2"; }}
-                  onMouseLeave={e => { e.currentTarget.style.background = active ? "rgba(163,112,252,0.15)" : "none"; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = active ? "rgba(24,24,27,0.06)" : "none"; }}
                 >
-                  <FontAwesomeIcon icon={faGear} style={{ fontSize: 12, color: active ? "rgb(74,46,126)" : "#A8A29E" }} />
+                  <FontAwesomeIcon icon={faGear} style={{ fontSize: 12, color: active ? "rgb(24,24,27)" : "#A8A29E" }} />
                   設定
                 </button>
               );
@@ -1787,7 +1735,7 @@ export default function BrandsPage() {
                 <div className="mt-8 max-w-[700px] mx-auto">
                   <div className="border border-rose-200 rounded-xl bg-rose-50/40 p-5">
                     <div className="flex items-center gap-2 mb-3">
-                      <LucideTrash size={14} className="text-rose-600" />
+                      <DeleteIcon size={14} className="text-rose-600" />
                       <h3 className="text-sm font-semibold text-rose-700">
                         {lang === "en" ? "Danger zone" : "危險區"}
                       </h3>
@@ -1948,7 +1896,7 @@ export default function BrandsPage() {
                       border: autoPosPhase === "full-done" ? "1px solid #BBF7D0" : "1px solid #E5E5E5",
                     }}>
                       {autoPosPhase === "full-done" ? (
-                        <span style={{ fontSize: 14 }}>✅</span>
+                        <span style={{ fontSize: 14, display: "inline-flex" }}><DoneIcon size={14} /></span>
                       ) : (
                         <>
                           <div style={{
@@ -2063,9 +2011,9 @@ export default function BrandsPage() {
                 {smpCheckpointActive && (
                   <div className="mt-2 rounded-md border border-primary-200 bg-primary-50 px-4 py-3">
                     <div className="flex items-start gap-3">
-                      <FontAwesomeIcon icon={faWandSparkles} className="text-primary mt-0.5" />
+                      <FontAwesomeIcon icon={faWandMagicSparkles} className="text-primary mt-0.5" />
                       <div className="flex-1 min-w-0">
-                        <p className="text-small font-semibold text-primary-800">{lang === "en" ? "🛑 SMP Checkpoint — confirm your single-minded proposition" : "🛑 SMP Checkpoint — 請確認單一核心命題"}</p>
+                        <p className="text-small font-semibold text-primary-800"><StopIcon size={12} /> {lang === "en" ? "SMP Checkpoint — confirm your single-minded proposition" : "SMP Checkpoint — 請確認單一核心命題"}</p>
                         <p className="text-tiny text-default-600 mt-1">{lang === "en" ? "SMP is the core creative principle for this campaign — the next 5 steps are built around it. Review it before moving on." : "SMP 是這次活動的最高創意準則，後面 5 個 step 都會圍繞它展開。先確認再繼續。"}</p>
                         {smpData?.singleMindedProposition && (
                           <div className="mt-2 p-2 rounded bg-white border border-divider">
@@ -2083,7 +2031,7 @@ export default function BrandsPage() {
                 )}
                 {failedStepIds.length > 0 && (
                   <div className="mt-2 rounded-md border border-warning-200 bg-warning-50 px-3 py-2 text-tiny text-warning-800">
-                    {lang === "en" ? "⚠ These steps came back empty — re-run them from each segment:" : "⚠ 以下步驟沒寫入內容，建議到對應頁籤重跑："}{" "}
+                    <WarningIcon size={11} /> {lang === "en" ? "These steps came back empty — re-run them from each segment:" : "以下步驟沒寫入內容，建議到對應頁籤重跑："}{" "}
                     {failedStepIds.map(id => { const s = pipelineSteps.find(x => x.id === id); return lang === "en" ? (s ? `Step ${id} · ${s.segmentId}` : `Step ${id}`) : (s ? `步驟 ${id} · ${s.segmentId}` : `步驟 ${id}`); }).join(lang === "en" ? ", " : "、")}
                     <button className="ml-2 underline" onClick={() => setFailedStepIds([])}>{t("close")}</button>
                   </div>
@@ -2148,7 +2096,7 @@ export default function BrandsPage() {
                   "voice", "voice_principles",
                   "preferred_terms", "banned_words", "term_substitutions",
                   "branded_terms", "product_naming", "abbreviations",
-                  "cta_library", "hook_library", "ai_prompts", "templates_copy",
+                  "cta_library", "hook_library", "templates_copy",
                 ];
                 const assetKey = section.slice("asset:".length) as AssetKey;
                 const activeBrandId = scope?.brandId ?? brandId;
@@ -2321,17 +2269,27 @@ export default function BrandsPage() {
             </div>
           )}
 
-          {/* 2026-09-26（CJ「指令庫拿掉」）：品牌 AI 指令（positioning._aiPrompts）的
-              編輯器已移除——主產文引擎從來不讀那一格，只有 runTestBattery 讀
-              Facebook 那一格，用戶改了看不到任何效果。 */}
-
           {/* ── 會議 (meetings) — 定期策略會議 ──
                2026-09-26（CJ「將定期開會變成一個新的 mission tray」）：取代原本的
-               「品牌工具」（知識庫＋AI 指令）。品牌與產品範圍都看得到——會議本身
+               「品牌工具」。品牌與產品範圍都看得到——會議本身
                可以選要討論品牌或某個產品。 */}
           {derivedCategory === "meetings" && activeBrandIdForLocks && (
             <div style={{ padding: "8px 0 32px" }}>
               <StrategyMeetingsPanel brandId={activeBrandIdForLocks} />
+            </div>
+          )}
+
+          {/* ── 大腦 (brain) — 檢查品牌大腦 ──
+               2026-09-29（CJ「在策略端增加一個 mission tray，是檢查大腦……像手機
+               記憶體的感覺」）：列出每篇產文實際讀到的品牌大腦、用了多少容量、
+               哪些只記住一部分、哪些超載。資料與產文 prompt 同源（buildBrandBrain）。 */}
+          {derivedCategory === "brain" && activeBrandIdForLocks && (
+            <div style={{ padding: "8px 0 32px" }}>
+              <BrainPanel
+                brandId={activeBrandIdForLocks}
+                initialProductId={scope?.productId ?? null}
+                initialEventId={scope?.eventId ?? null}
+              />
             </div>
           )}
 
@@ -2544,7 +2502,7 @@ function TabActionBar({
             <Button
               size="sm"
               onPress={onResume}
-              startContent={<LucidePlay size={14} strokeWidth={2} />}
+              startContent={<PlayIcon size={14} strokeWidth={2} />}
               style={{ background: "#18181B", color: "white" }}
             >
               {lang === "en" ? "Continue" : "繼續"}
@@ -2558,9 +2516,9 @@ function TabActionBar({
               onPress={onAction}
               startContent={
                 busy ? undefined :
-                locked ? <LucideLock size={15} strokeWidth={2} /> :
-                hasContent ? <LucideRotate size={15} strokeWidth={2} /> :
-                <LucidePlay size={15} strokeWidth={2} />
+                locked ? <LockIcon size={15} strokeWidth={2} /> :
+                hasContent ? <RegenerateIcon size={15} strokeWidth={2} /> :
+                <PlayIcon size={15} strokeWidth={2} />
               }
               style={{
                 background: locked ? "#E4E4E7" : "#18181B",
@@ -2630,9 +2588,8 @@ function PositioningGrid({
   // 是自己的 grid 容器裡塞滿 3 張，行行都缺角。10 個 segment 重新分成 3 幕
   // 各 3 張——goldenCircle 從「策略結晶」搬到「自我探索」跟起源／價值觀放
   // 一起（WHY 信念本來就該扎根在起源與價值觀，敘事上比跟差異化放一起更
-  // 合理，不只是為了湊數）。taglineScore 不再是獨立卡片（同一天 CJ 決定
-  // 「武器化工具」整區只留 AI 指令庫、其他都不需要，taglineScore 的資料
-  // 還在，只是暫時沒有專屬卡片入口）。
+  // 合理，不只是為了湊數）。taglineScore 不再是獨立卡片（資料還在，只是
+  // 暫時沒有專屬卡片入口）。
   const BRAND_ACTS: Array<{ label: { zh: string; en: string }; q: { zh: string; en: string }; ids: string[] }> = [
     { label: { zh: "第一幕・市場與競爭研究", en: "Act 1 · Market & competitive research" },
       q: { zh: "她缺什麼？誰已經在滿足她、缺口在哪？—— 定位不是從「我是誰」開始，是先看懂她，再看懂戰場。", en: "What does she lack, and who's already trying to serve her? Positioning starts with her and the battlefield, not with us." },
@@ -2693,14 +2650,8 @@ function PositioningGrid({
     audience: faUsers, competition: faTableList,
     differentiation: faRocket, trends: faBullhorn, voice: faQuoteLeft,
     // product / event fallbacks
-    core: faBullseye, positioning: faBullseye, smp: faWandSparkles,
+    core: faBullseye, positioning: faBullseye, smp: faWandMagicSparkles,
   };
-
-  // 2026-09-23（CJ「武器化工具裡面，我只需要留下AI指令庫，其他都不需要。
-  // AI指令庫，做成另一個mission tray」）：這裡原本的「武器化工具」區塊
-  // （速查卡／標語評分／AI 指令庫三張卡）整個拿掉——速查卡跟標語評分不再
-  // 顯示成卡片，AI 指令庫升格成獨立頂層目的地（見 AiPromptLibraryPage.tsx
-  // + ShellLayout.tsx 左側 rail 的 /ai-prompts）。
 
   const segFilled = (sid: string) => {
     const v = segmentData?.[sid];
@@ -3233,10 +3184,9 @@ function renderSegmentPreview(segId: string, v: any, lang: "zh-TW" | "en" = "zh-
   return { node: null, hasContent: false };
 }
 
-// 2026-09-23：buildBrandCheatPreview / buildPromptsPreview 移除——兩者都只
-// 服務已經拿掉的「武器化工具」卡片預覽（速查卡／AI 指令庫），現在沒有任何
-// call site。SpeedCardView／PromptLibraryView 兩條 section 路由本身還在
-// （沒被要求整個拿掉這兩個功能，只是卡片入口先收起來），沒有牽動它們。
+// 2026-09-23：buildBrandCheatPreview 移除——它只服務已經拿掉的「武器化工具」
+// 卡片預覽（速查卡），現在沒有任何 call site。SpeedCardView 這條 section 路由
+// 本身還在，沒有牽動它。
 
 /* ────────────────── PositioningCompletionBridge ──────────────────
    Renders right after the 14-step pipeline finishes — closes the loop
@@ -3268,37 +3218,21 @@ function PositioningCompletionBridge({
       }}
     >
       <div style={{ flex: "1 1 320px", minWidth: 0 }}>
-        <p style={{
-          fontSize: 12, fontWeight: 600, color: "#404040",
-          letterSpacing: "0.25em", textTransform: "uppercase",
-          marginBottom: 6,
-        }}>
-          Positioning Locked · Ready for Production
-        </p>
         <h3 style={{
           fontSize: 18, fontWeight: 700, color: "#171717",
           letterSpacing: "-0.01em", marginBottom: 4,
         }}>
           {lang === "en"
-            ? `Your ${scopeLabel} is ready — the AI knows what every post should say`
-            : `你的${scopeLabel}已備好，AI 知道每篇文章該說什麼了`}
+            ? `Your ${scopeLabel} is ready`
+            : `你的${scopeLabel}已備好`}
         </h3>
-        <p style={{
-          fontSize: 13, lineHeight: 1.65, color: "#525252",
-          fontFamily: '"Source Serif Pro", "Noto Serif TC", Georgia, serif',
-          maxWidth: 620,
-        }}>
-          {lang === "en"
-            ? "This positioning becomes the backbone for every task and the 7-Day Publisher — every post is built from it, so the AI never sounds off-brand again."
-            : "這份定位現在會自動成為所有任務與七日發布台的內容骨架 — 每篇貼文都依此產出，再也不會「AI 寫出來不像你的品牌」。"}
-        </p>
       </div>
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
         {/* 2026-07-17 (CJ 去除時間分類 + zombie audit round 2): the /30s /60s
             /99s tier routes were removed 2026-05-27 — these three buttons all
             404'd. Tasks are platform-first now, one wall covers all sizes. */}
         <BridgeBtn label={lang === "en" ? "Run a task" : "去跑任務"} onClick={() => navigate(`/tasks/fb?b=${brandId}`)} primary />
-        <BridgeBtn label={lang === "en" ? "7-Day Publisher" : "七日發布台"} onClick={() => navigate(`/theater?b=${brandId}`)} />
+        <BridgeBtn label={lang === "en" ? "Idea stage" : "靈感舞台"} onClick={() => navigate(`/inspiration?b=${brandId}`)} />
       </div>
     </div>
   );
@@ -3340,13 +3274,14 @@ function BridgeBtn({ label, onClick, primary }: { label: string; onClick: () => 
 function SectionLabel({ label, counter, intro }: { label: string; counter?: string; intro?: string }) {
   return (
     <div style={{ marginBottom: 18 }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: intro ? 6 : 0 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
         <span style={{
           fontSize: 12, fontWeight: 600, color: "#525252",
           letterSpacing: "0.22em", textTransform: "uppercase",
         }}>
           {label}
         </span>
+        {intro && <HelpTip>{intro}</HelpTip>}
         <div style={{ flex: 1, height: 1, background: "#D4D4D4" }} />
         {counter && (
           // 2026-09-23：改成小圓角計數 chip（跟 content 層任務卡格頭的計數
@@ -3360,15 +3295,6 @@ function SectionLabel({ label, counter, intro }: { label: string; counter?: stri
           </span>
         )}
       </div>
-      {intro && (
-        <p style={{
-          fontSize: 12.5, lineHeight: 1.7, color: "#404040",
-          fontFamily: '"Source Serif Pro", "Noto Serif TC", Georgia, serif',
-          fontStyle: "italic", maxWidth: 700, margin: 0,
-        }}>
-          {intro}
-        </p>
-      )}
     </div>
   );
 }
@@ -3416,7 +3342,7 @@ const SOWORK_GROUP_INTRO: Record<string, { zh: string; en: string }> = {
    內容層一致的呈現方式」— 貼了 PlatformTaskPage.tsx 的任務卡截圖當參照)。
    AssetCard 只把外殼（圓角/hover）改了一輪，內部排版還是原本的純文字編輯
    卡；這支才是真的照 content 層任務卡的解剖結構重做，只用在 PositioningGrid
-   （固定 segment、自訂卡片、速查卡/AI 指令庫），品牌視覺資產格（logo/
+   （固定 segment、自訂卡片、速查卡），品牌視覺資產格（logo/
    調色盤）繼續用原本的 AssetCard，不在這次範圍內：
    - 上方灰底 header block（PlatformTaskPage 是置中大頭貼，這裡沒有「人」
      可以當頭貼，換成置中的圓形 icon徽章 —— 概念的頭貼）
@@ -3427,7 +3353,7 @@ const SOWORK_GROUP_INTRO: Record<string, { zh: string; en: string }> = {
      編輯鈕的位置
    - 內文下方一顆「出處」膠囊（對應 content 卡的來源標籤 + 「出處與說明」
      連結）：固定 segment 一律標「SoWork 品牌定位法」，自訂卡片標「來自你
-     的定位文件」，速查卡/AI 指令庫（純輸出物，沒有方法論出處）不顯示。
+     的定位文件」，速查卡（純輸出物，沒有方法論出處）不顯示。
    - 不做的：agent 頭像 + 具名掛名的頁尾列——定位卡沒有「誰寫的」這個概念，
      硬套會是編出來的資訊，寧可不做。
    ─────────────────────────────────────────────────────────────────────── */
@@ -3489,7 +3415,7 @@ function PositioningCard({
             className="absolute top-1.5 right-1.5 z-10 opacity-0 group-hover:opacity-100 transition-opacity rounded-full p-1.5 bg-white/85 hover:bg-white"
             style={{ color: "#525252" }}
           >
-            <FontAwesomeIcon icon={faTrash} style={{ fontSize: 11 }} />
+            <FontAwesomeIcon icon={faTrashCan} style={{ fontSize: 11 }} />
           </button>
         )}
         {headline ? (
@@ -3578,10 +3504,10 @@ function VisualNavItem({ label, badge, active, onClick }: {
       style={{
         width: "100%", display: "flex", alignItems: "center",
         padding: "4px 12px", borderRadius: 8,
-        background: active ? "rgba(163,112,252,0.15)" : hovered ? "#F5F4F2" : "none",
+        background: active ? "rgba(24,24,27,0.06)" : hovered ? "#F5F4F2" : "none",
         border: "none", cursor: "pointer",
         fontSize: 12, fontWeight: active ? 600 : 400,
-        color: active ? "rgb(74,46,126)" : "rgb(15,16,21)",
+        color: active ? "rgb(24,24,27)" : "rgb(15,16,21)",
         textAlign: "left", transition: "background 0.12s",
         gap: 6,
       }}
@@ -3590,16 +3516,16 @@ function VisualNavItem({ label, badge, active, onClick }: {
       {badge && (
         <span style={{
           fontSize: 12, fontWeight: 700, padding: "1px 6px", borderRadius: 20,
-          background: "rgba(163,112,252,0.20)", color: "rgb(74,46,126)",
+          background: "rgba(24,24,27,0.08)", color: "rgb(24,24,27)",
           flexShrink: 0,
         }}>{badge}</span>
       )}
       {hovered && (
         <span style={{
           width: 18, height: 18, borderRadius: 4, flexShrink: 0,
-          background: "rgba(163,112,252,0.20)", display: "flex",
+          background: "rgba(24,24,27,0.08)", display: "flex",
           alignItems: "center", justifyContent: "center",
-          fontSize: 12, color: "rgb(74,46,126)", fontWeight: 700,
+          fontSize: 12, color: "rgb(24,24,27)", fontWeight: 700,
         }}>+</span>
       )}
     </button>
@@ -3607,7 +3533,7 @@ function VisualNavItem({ label, badge, active, onClick }: {
 }
 
 /* ─────────────────────────── PositioningPanel ───────────────────────── */
-// Renders the 完整定位書 / 速查卡 / AI 指令庫 sub-views for the active scope.
+// Renders the 完整定位書 / 速查卡 sub-views for the active scope.
 // Reads positioning JSON from the appropriate router (brand / product / event)
 // and persists edits via mutation; segment list comes from positioningSchema.
 
@@ -3665,7 +3591,7 @@ function PositioningPanel({
           fontSize: 12, color: "#92400E",
           display: "flex", alignItems: "center", gap: 8,
         }}>
-          <span>🔒</span>
+          <LockIcon size={13} />
           <span>{lang === "en" ? "Positioning is locked — this section is read-only. Go to Brand settings to unlock and edit." : "定位已鎖定 — 此 segment 為唯讀。回 /brands 解鎖才能編輯。"}</span>
         </div>
       )}
@@ -3768,11 +3694,6 @@ function PositioningEditor({
   if (section === "card") {
     return (
       <SpeedCardView scopeMode={scopeMode} data={draft} scopeName={scopeName} />
-    );
-  }
-  if (section === "prompts") {
-    return (
-      <PromptLibraryView scopeMode={scopeMode} data={draft} scopeName={scopeName} />
     );
   }
 
@@ -3881,8 +3802,8 @@ function BrandAssetPanel({ assetKey, brandId, locked }: { assetKey: AssetKey; br
         <CardBody className="px-5 py-3 flex-row items-center justify-between flex-wrap">
           <p className="text-small text-default-700">
             {lang === "en"
-              ? "Fill this section in yourself — changes auto-save 800ms after you stop typing."
-              : "這個區塊由你手動填寫；改動會在 800ms 後自動儲存到 brand.positioning._assets"}
+              ? "Filled in manually · auto-saves"
+              : "手動填寫 · 自動儲存"}
           </p>
           <SaveIndicator state={saveState} hasTarget={true} />
         </CardBody>
@@ -3910,16 +3831,6 @@ function SaveIndicator({ state, hasTarget }: { state: "idle" | "saving" | "saved
 function SpeedCardView({ scopeMode, data, scopeName }: { scopeMode: string; data: any; scopeName: string }) {
   return (
     <SpeedCard
-      scopeMode={scopeMode as "brand" | "product" | "event"}
-      scopeName={scopeName}
-      data={data}
-    />
-  );
-}
-
-function PromptLibraryView({ scopeMode, data, scopeName }: { scopeMode: string; data: any; scopeName: string }) {
-  return (
-    <PromptLibrary
       scopeMode={scopeMode as "brand" | "product" | "event"}
       scopeName={scopeName}
       data={data}
@@ -4177,12 +4088,14 @@ function BrandLogoSettings({ brandId, brandName }: { brandId: number; brandName:
   return (
     <div className="max-w-[640px] mx-auto space-y-4">
       <div>
-        <h3 className="text-medium font-semibold">{lang === "en" ? "Brand logo / avatar" : "品牌 logo / 頭像"}</h3>
-        <p className="text-tiny text-default-700 mt-1">
-          {lang === "en"
-            ? `The "${brandName ?? "brand"}" avatar used in mockups. Auto-fetch from the FB page, or upload manually later.`
-            : `mockup 顯示用的「${brandName ?? "品牌"}」頭像。可以從 FB 粉專自動抓，或之後手動上傳。`}
-        </p>
+        <h3 className="text-medium font-semibold flex items-center gap-1.5">
+          {lang === "en" ? "Brand logo / avatar" : "品牌 logo / 頭像"}
+          <HelpTip>
+            {lang === "en"
+              ? `The "${brandName ?? "brand"}" avatar used in mockups. Auto-fetch from the FB page, or upload manually later.`
+              : `mockup 顯示用的「${brandName ?? "品牌"}」頭像。可以從 FB 粉專自動抓，或之後手動上傳。`}
+          </HelpTip>
+        </h3>
       </div>
 
       <div className="flex items-center gap-4 border border-default-200 rounded-medium p-4 bg-default-50">
@@ -4227,7 +4140,7 @@ function BrandLogoSettings({ brandId, brandName }: { brandId: number; brandName:
               ? (lang === "en" ? "Re-fetch" : "重新抓取")
               : (lang === "en" ? "Fetch logo" : "抓取 logo")}
           </Button>
-          {okMsg && <span className="text-tiny text-success-600">✓ {okMsg}</span>}
+          {okMsg && <span className="text-tiny text-success-600 inline-flex items-center gap-1"><CheckIcon size={10} /> {okMsg}</span>}
           {err && <span className="text-tiny text-danger-600">{err}</span>}
         </div>
       </div>
@@ -4248,12 +4161,14 @@ function BrandLogoSettings({ brandId, brandName }: { brandId: number; brandName:
       </div>
 
       <div className="pt-2">
-        <h3 className="text-medium font-semibold">{lang === "en" ? "Brand photo library" : "品牌照片庫"}</h3>
-        <p className="text-tiny text-default-700 mt-1 mb-3">
-          {lang === "en"
-            ? "Real photos of the brand — materials, storefront, packaging — used as reference for on-brand image generation and color extraction. We no longer scrape these from your website."
-            : "品牌的真實照片——材質、門市、包裝——用來當 on-brand 生圖與取色的參考。我們不再從網站爬這些圖了。"}
-        </p>
+        <h3 className="text-medium font-semibold flex items-center gap-1.5 mb-3">
+          {lang === "en" ? "Brand photo library" : "品牌照片庫"}
+          <HelpTip>
+            {lang === "en"
+              ? "Real photos of the brand — materials, storefront, packaging — used as reference for on-brand image generation and color extraction. We no longer scrape these from your website."
+              : "品牌的真實照片——材質、門市、包裝——用來當 on-brand 生圖與取色的參考。我們不再從網站爬這些圖了。"}
+          </HelpTip>
+        </h3>
         <AssetPhotoGallery brandId={brandId} scope="brand" scopeId={brandId} scopeLabel={lang === "en" ? "this brand" : "這個品牌"} />
       </div>
     </div>
@@ -4299,7 +4214,7 @@ function PositioningTopRow({
   // switches back. refetchIntervalInBackground keeps polling even when the
   // tab isn't focused; refetchOnWindowFocus/refetchOnMount force a fresh
   // read the moment the user does look back, instead of trusting stale cache.
-  const job = (trpc as any).positioningJobs?.getStatus?.useQuery?.(
+  const job = (trpc as any).positioningJobs?.getStatus?.useQuery(
     { entityKind: entityKind ?? "brand", entityId: brandId ?? 0 },
     {
       enabled: !!brandId && !!entityKind,
@@ -4394,7 +4309,7 @@ function PositioningTopRow({
                     : `自動填寫所有定位欄位（共 ${totalSteps} 步，背景執行，最多重試 5 次）`)
           }
         >
-          <Sparkles size={12} className={isRunning ? "animate-pulse" : ""} />
+          <GenerateIcon size={12} className={isRunning ? "animate-pulse" : ""} />
           {buttonLabel}
         </button>
 
@@ -4419,11 +4334,11 @@ function PositioningTopRow({
           </div>
         )}
         {isFailed && jobData?.lastError && (
-          <span className="text-xs text-amber-700 max-w-md truncate" title={jobData.lastError}>⚠ {String(jobData.lastError).slice(0, 80)}</span>
+          <span className="text-xs text-amber-700 max-w-md truncate" title={jobData.lastError}><WarningIcon size={11} /> {String(jobData.lastError).slice(0, 80)}</span>
         )}
-        {isDone && <span className="text-xs text-emerald-700">{lang === "en" ? `✓ Done · ${total} sections` : `✓ 已完成 ${total} 個段落`}</span>}
+        {isDone && <span className="text-xs text-emerald-700 inline-flex items-center gap-1"><CheckIcon size={11} />{lang === "en" ? `Done · ${total} sections` : `已完成 ${total} 個段落`}</span>}
         {startError && (
-          <span className="text-xs text-danger truncate max-w-md" title={startError}>⚠ {startError}</span>
+          <span className="text-xs text-danger truncate max-w-md" title={startError}><WarningIcon size={11} /> {startError}</span>
         )}
       </div>
 
@@ -4433,32 +4348,6 @@ function PositioningTopRow({
           2026-09-24：連帶把當時保留的 onLockToggle prop 也拿掉了——留著一個
           永遠不會被呼叫的 callback，只會讓下一個人以為這裡按了會鎖定。 */}
     </>
-  );
-}
-
-/* ─────────────────────────── KickerRow ───────────────────────────────
-   2026-09-23 (CJ「header太亂了…移除試寫功能」)：拿掉「BRAND WORKSPACE」
-   紫色 pill 跟重複的品牌/產品名稱（上面大標題已經有了）——現在只剩定案
-   按鈕，不再需要 testOpen/onToggleTest（試寫功能整個移除，見
-   BrandActionChips.tsx 的 BrandActionChipsRow）。
-   ───────────────────────────────────────────────────────────────────── */
-function KickerRow({
-  brandId, scopeMode, scopeEntityId,
-}: {
-  brandId: number | null;
-  /** BUG-3 fix: pass the current scope so status reflects the right entity. */
-  scopeMode: "brand" | "product" | "event" | "none";
-  scopeEntityId: number | null;
-}) {
-  // When scopeMode is "none" (no brand selected) fall back to brand kind so
-  // the hook stays valid; the enabled guard (entityId=null) will skip the query.
-  const resolvedKind = (scopeMode === "none" ? "brand" : scopeMode) as "brand" | "product" | "event";
-  const resolvedId   = scopeMode === "brand" ? brandId : scopeEntityId;
-  const { status } = usePositioningStatus(resolvedKind, resolvedId);
-  return (
-    <div className="mt-4 flex items-center gap-2 text-tiny text-default-600 flex-wrap justify-center">
-      <BrandActionChipsRow brandId={brandId} status={status} />
-    </div>
   );
 }
 
@@ -4629,8 +4518,8 @@ function CopyTabInline({
       const warnings: string[] = [];
       if (!r.hasRealContent) {
         warnings.push(lang === "en"
-          ? "⚠️ No website / FB found — results may be off. Add a website / social links in Settings, then retry."
-          : "⚠️ 找不到官網 / FB — 結果可能不準。請到「設定」補上 website / socialLinks 後重試。");
+          ? "No website / FB found — results may be off. Add a website / social links in Settings, then retry."
+          : "找不到官網 / FB — 結果可能不準。請到「設定」補上 website / socialLinks 後重試。");
       }
       if (errCount > 0) {
         const firstFew = Object.entries(r.errors ?? {}).slice(0, 3)
@@ -4661,7 +4550,7 @@ function CopyTabInline({
         <StrategyToolIcon
           active={bulkBusy}
           onClick={() => { if (!bulkBusy && !locked && emptyKeys.length > 0) void handleBulkAutoFill(); }}
-          icon={faWandSparkles}
+          icon={faWandMagicSparkles}
           label={bulkBusy
             ? (lang === "en" ? `Auto-filling (${bulkFillingKeys.size})…` : `自動填寫中（${bulkFillingKeys.size}）…`)
             : emptyKeys.length === 0
@@ -4688,9 +4577,9 @@ function CopyTabInline({
           bulkErr ? "bg-amber-50 text-amber-800" :
           "bg-emerald-50 text-emerald-800"
         }`}>
-          {bulkResult && <div>{lang === "en"
-            ? `✓ Filled ${bulkResult.filled} fields${bulkResult.sources.length > 0 ? ` (sources: ${bulkResult.sources.join(" + ")})` : ""}`
-            : `✓ 已填入 ${bulkResult.filled} 個欄位${bulkResult.sources.length > 0 ? `（來源：${bulkResult.sources.join(" + ")}）` : ""}`}</div>}
+          {bulkResult && <div><CheckIcon size={11} /> {lang === "en"
+            ? `Filled ${bulkResult.filled} fields${bulkResult.sources.length > 0 ? ` (sources: ${bulkResult.sources.join(" + ")})` : ""}`
+            : `已填入 ${bulkResult.filled} 個欄位${bulkResult.sources.length > 0 ? `（來源：${bulkResult.sources.join(" + ")}）` : ""}`}</div>}
           {bulkErr && <div>{bulkErr}</div>}
         </div>
       )}
@@ -4733,7 +4622,7 @@ function FieldRow({ label, children }: { label: string; children: React.ReactNod
 }
 
 function ProductInfoEditor({ productId, brandName, en }: { productId: number; brandName: string | null; en: boolean }) {
-  const q = (trpc as any).product?.get?.useQuery?.(
+  const q = (trpc as any).product?.get?.useQuery(
     { id: productId },
     { enabled: !!productId, refetchOnWindowFocus: false },
   );
@@ -4828,7 +4717,7 @@ function ProductInfoEditor({ productId, brandName, en }: { productId: number; br
           {en ? "Re-analyze (re-read product page)" : "重新分析（重讀產品頁）"}
         </Button>
         {savedAt && !upsertM?.isPending && (
-          <span className="text-tiny text-success-600">{en ? "Saved ✓" : "已儲存 ✓"}</span>
+          <span className="text-tiny text-success-600 inline-flex items-center gap-1"><CheckIcon size={10} />{en ? "Saved" : "已儲存"}</span>
         )}
         {recalDone && !startPositioningM?.isPending && (
           <span className="text-tiny text-secondary-600">
@@ -4889,7 +4778,7 @@ function BrandedVariantsModal({ title, loading, error, variants, cutoutAvailable
             }}
             aria-label={en ? "Close" : "關閉"}
           >
-            ✕
+            <CloseIcon size={14} />
           </button>
         </div>
 
@@ -4901,7 +4790,7 @@ function BrandedVariantsModal({ title, loading, error, variants, cutoutAvailable
           )}
           {!error && loading && (
             <div style={{ textAlign: "center", padding: "40px 20px", color: "#78716C" }}>
-              <div style={{ display: "inline-block", width: 32, height: 32, borderRadius: "50%", border: "3px solid #E5E7EB", borderTopColor: "#E85D2E", animation: "spin 0.8s linear infinite", marginBottom: 16 }} />
+              <div style={{ display: "inline-block", width: 32, height: 32, borderRadius: "50%", border: "3px solid #E5E7EB", borderTopColor: "#18181B", animation: "spin 0.8s linear infinite", marginBottom: 16 }} />
               <p style={{ fontSize: 13, margin: 0 }}>
                 {en
                   ? "Compositing — running cutout + 4 layouts (~8 sec)…"
@@ -4914,9 +4803,9 @@ function BrandedVariantsModal({ title, loading, error, variants, cutoutAvailable
             <>
               {cutoutAvailable === false && (
                 <p style={{ fontSize: 12, color: "#92400E", background: "#FEF3C7", padding: "8px 12px", borderRadius: 8, marginBottom: 14 }}>
-                  {en
-                    ? "⚠ REPLICATE_API_TOKEN not set — using the original product image as a tile (no transparent cutout). Set the env var for true riverflow-grade output."
-                    : "⚠ 還沒設 REPLICATE_API_TOKEN — 用原圖直接合成（沒去背）。設好環境變數後就會用透明去背達到 riverflow 效果。"}
+                  <WarningIcon size={12} /> {en
+                    ? "REPLICATE_API_TOKEN not set — using the original product image as a tile (no transparent cutout). Set the env var for true riverflow-grade output."
+                    : "還沒設 REPLICATE_API_TOKEN — 用原圖直接合成（沒去背）。設好環境變數後就會用透明去背達到 riverflow 效果。"}
                 </p>
               )}
               <div style={{
@@ -4939,9 +4828,9 @@ function BrandedVariantsModal({ title, loading, error, variants, cutoutAvailable
                         href={v.pngDataUrl}
                         download={`${title}_${v.layout}.png`}
                         style={{
-                          fontSize: 12, fontWeight: 600, color: "#E85D2E",
+                          fontSize: 12, fontWeight: 600, color: "#18181B",
                           textDecoration: "none", padding: "4px 8px",
-                          border: "1px solid #E85D2E", borderRadius: 6,
+                          border: "1px solid #18181B", borderRadius: 6,
                         }}
                       >
                         {en ? "Download" : "下載"}
@@ -4969,7 +4858,7 @@ function BrandPaletteHero({
   brandId, lang, locked,
 }: { brandId: number; lang: "zh-TW" | "en"; locked: boolean }) {
   const en = lang === "en";
-  const paletteQ = (trpc as any).brandColors?.getCurrent?.useQuery?.(
+  const paletteQ = (trpc as any).brandColors?.getCurrent?.useQuery(
     { brandId },
     { enabled: !!brandId, staleTime: 30_000 },
   );
@@ -5103,8 +4992,8 @@ function BrandPaletteHero({
               style={{
                 fontSize: 12, fontWeight: 600, padding: "7px 14px",
                 borderRadius: 8, cursor: locked || genVisualMut?.isPending ? "not-allowed" : "pointer",
-                border: "1px solid #E85D2E",
-                background: "#E85D2E", color: "#FFFFFF",
+                border: "1px solid #18181B",
+                background: "#18181B", color: "#FFFFFF",
                 opacity: locked ? 0.5 : 1,
                 transition: "all 0.15s",
               }}
@@ -5146,8 +5035,8 @@ function BrandPaletteHero({
       {swatches.length === 0 && !isLoading && (
         <p style={{ fontSize: 13, color: "#737373", margin: 0, lineHeight: 1.6 }}>
           {en
-            ? "Run the extractor — Mia reads your product photos, runs K-means in LAB color space, and surfaces the 5–7 colors that actually define this brand. Future content generation will use these as canonical brand colors."
-            : "按「從產品圖萃取」— Mia 會讀你的產品照、在 LAB 色彩空間跑 K-means，挑出真正代表這個品牌的 5-7 個核心色。之後生成的所有內容都會用這份色票。"}
+            ? "Run the extractor to pull 5–7 core colors from your product photos. Generated content will use them."
+            : "按「從產品圖萃取」，從產品照挑出 5–7 個核心色；之後生成的內容都會用這份色票。"}
         </p>
       )}
 
@@ -5357,24 +5246,16 @@ function BrandEntityGrid({
   return (
     <div className="px-2">
       {items.length === 0 && (
-        <div className="text-center py-12 text-neutral-400">
-          <p className="text-sm font-medium mb-1">
-            {kind === "product"
-              ? (en ? "No products yet" : "還沒有產品")
-              : (en ? "No events yet" : "還沒有活動")}
-          </p>
-          <p className="text-xs mb-4">
-            {kind === "product"
-              ? (en ? "Add your first product to start positioning" : "新增第一個產品，開始建立定位")
-              : (en ? "Add a campaign or event" : "新增活動或行銷企劃")}
-          </p>
-          <button
-            onClick={onAdd}
-            className="text-xs px-4 py-2 rounded-lg bg-neutral-900 text-white font-medium hover:bg-neutral-700 transition"
-          >
-            {kind === "product" ? (en ? "+ New product" : "+ 新增產品") : (en ? "+ New event" : "+ 新增活動")}
-          </button>
-        </div>
+        <IllustratedEmpty
+          kind={kind === "product" ? "product" : "event"}
+          title={kind === "product"
+            ? (en ? "This box is still empty" : "箱子還是空的")
+            : (en ? "Ready to kick off?" : "準備起跑了嗎？")}
+          action={{
+            label: kind === "product" ? (en ? "+ New product" : "+ 新增產品") : (en ? "+ New event" : "+ 新增活動"),
+            onPress: onAdd,
+          }}
+        />
       )}
       {items.length > 0 && (
         <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
@@ -5458,8 +5339,8 @@ function BrandEntityGrid({
                         disabled={kind !== "event" && isRunning}
                         className={`text-[12px] font-medium px-2 py-1 rounded-md transition flex-1 min-w-0 text-center ${
                           isRunning
-                            ? "bg-indigo-100 text-indigo-500 cursor-wait animate-pulse"
-                            : "bg-indigo-50 text-indigo-700 hover:bg-indigo-100"
+                            ? "bg-zinc-100 text-zinc-500 cursor-wait animate-pulse"
+                            : "bg-zinc-50 text-zinc-700 hover:bg-zinc-100"
                         }`}
                       >
                         {/* 2026-09-25（CJ「按下開始定位，居然跑到品牌的頁籤」）：
@@ -5518,7 +5399,7 @@ function BrandEntityGrid({
                           });
                         }
                       }}
-                      className="text-[12px] font-medium px-2 py-1 rounded-md bg-orange-50 text-orange-700 hover:bg-orange-100 transition"
+                      className="text-[12px] font-medium px-2 py-1 rounded-md bg-zinc-50 text-zinc-700 hover:bg-zinc-100 transition"
                       title={en ? "Generate 4 branded variants" : "用品牌色生成 4 種變體"}
                     >
                       {en ? "Variants" : "品牌變體"}
@@ -5544,7 +5425,7 @@ function BrandEntityGrid({
                     className="text-[12px] px-2 py-1 rounded-md text-neutral-400 hover:text-red-500 hover:bg-red-50 transition"
                     title={en ? "Delete" : "刪除"}
                   >
-                    ✕
+                    <CloseIcon size={12} />
                   </button>
                 </div>
                 </div>

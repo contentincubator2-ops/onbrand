@@ -35,6 +35,8 @@ import { slackOAuthRouter } from "./platform/routes/slackOAuthRoute";
 import { cloudOAuthRouter } from "./platform/routes/cloudOAuthRoute";
 import { manusRouter } from "./platform/routers/manusRouter";
 import { mosAgentsMcpRouter } from "./platform/routers/mosAgentsMcpRouter";
+import { wellKnownRouter, mcpOAuthRouter } from "./platform/mcp/oauthRoutes";
+import { onbrandMcpRouter } from "./platform/mcp/onbrandMcpRouter";
 import { publicAgentsRoute } from "./platform/routes/publicAgentsRoute";
 import { closeDb, pingDb, pingSoworkDb, getDb } from "./db";
 import { sql } from "drizzle-orm";
@@ -302,7 +304,8 @@ if (existsSync(publicDir)) {
       req.path.startsWith("/api") ||
       req.path.startsWith("/static/") ||
       req.path === "/health" ||
-      req.path === "/agents"
+      req.path === "/agents" ||
+      req.path.startsWith("/.well-known/")
     ) {
       return next();
     }
@@ -365,6 +368,11 @@ app.use("/api/manus", manusRouter);
 // 刻意不掛在 /api/manus 底下、不用 X-Manus-Key，路徑也沒有寫進任何公開
 // 文件／openapi.json。
 app.use("/api/mcp/mos-agents", mosAgentsMcpRouter);
+// 2026-09-28（CJ「onbrand 變成 claude 外掛服務」）：對外販售的 OnBrand 連接器（遠端 MCP＋OAuth）。
+// 見 platform/mcp/*.ts 檔頭。/.well-known 掛在根目錄（SPA fallback 已跳過）。
+app.use(wellKnownRouter);
+app.use("/api/mcp-oauth", mcpOAuthRouter);
+app.use("/api/mcp/onbrand", onbrandMcpRouter);
 
 // ─── Public agent showcase (no auth required by default) ─────────────────────
 app.use(publicAgentsRoute);
@@ -570,6 +578,11 @@ async function runStartupMigrations() {
     console.log("[migrate] strategy_meetings / strategy_meeting_runs: OK");
 
     // 2026-09-27（CJ「除了專案、行事曆、活動，所有 mission tray 變成使用者自己加入」）
+    // 2026-09-29（CJ「成效層要能在平台上落實……族群 × USP 只是一種選項」）：視角／維度／事實／規則／匯入。
+    const { PERF_DDLS } = await import("./performance/core/perfStore");
+    for (const ddl of PERF_DDLS) await db.execute(sql.raw(ddl));
+    console.log("[migrate] perf_dimensions / perf_lenses / perf_facts / perf_tag_rules / perf_imports: OK");
+
     const { BRAND_NAV_PREFS_DDL } = await import("./platform/routers/navPrefsRouter");
     await db.execute(sql.raw(BRAND_NAV_PREFS_DDL));
     console.log("[migrate] brand_nav_prefs: OK");
@@ -579,6 +592,11 @@ async function runStartupMigrations() {
     await db.execute(sql.raw(PLANNED_SLOTS_DDL));
     await db.execute(sql.raw(PLANNER_MESSAGES_DDL));
     console.log("[migrate] planned_slots / planner_messages: OK");
+
+    // 2026-09-29（CJ「七日發布台改成靈感舞台」）：每個品牌的 thinker 陣容與採用／換掉紀錄。
+    const { INSPIRATION_PREFS_DDL } = await import("./content/core/inspirationStage");
+    await db.execute(sql.raw(INSPIRATION_PREFS_DDL));
+    console.log("[migrate] inspiration_prefs: OK");
 
     // 2026-09-14（CJ「選定一個競爭者，對比接觸點跟策略訴求差異」）：
     // 具名競爭者的逐接觸點比對快照（14 天內快取，不重跑研究）。
@@ -590,6 +608,14 @@ async function runStartupMigrations() {
     const { ADDON_REQUESTS_DDL } = await import("./platform/core/addonRequests");
     await db.execute(sql.raw(ADDON_REQUESTS_DDL));
     console.log("[migrate] addon_requests: OK");
+
+    // 2026-09-28（CJ「onbrand 變成 claude 外掛服務」）：OnBrand 連接器的 OAuth 與背景任務紀錄。
+    const { MCP_OAUTH_CLIENTS_DDL, MCP_OAUTH_CODES_DDL, MCP_OAUTH_TOKENS_DDL } = await import("./platform/mcp/oauthStore");
+    const { MCP_TASK_RUNS_DDL } = await import("./platform/mcp/onbrandTools");
+    for (const ddl of [MCP_OAUTH_CLIENTS_DDL, MCP_OAUTH_CODES_DDL, MCP_OAUTH_TOKENS_DDL, MCP_TASK_RUNS_DDL]) {
+      await db.execute(sql.raw(ddl));
+    }
+    console.log("[migrate] mcp_oauth_* / mcp_task_runs: OK");
   } catch (err) {
     console.error("[migrate] startup migration error:", err);
   }
@@ -706,6 +732,15 @@ const server = app.listen(PORT, async () => {
       });
     }, 15 * 60_000);
     console.log("[strategyMeetings] Worker started (15m interval)");
+
+    // 成效層粉專回填：每 30 分鐘挑一個超過 20 小時沒同步的品牌（一拍一個，Graph 有頻率限制）。
+    const { tickFbPageSync } = await import("./performance/core/fbPageSync");
+    setInterval(() => {
+      tickFbPageSync().catch((e) => {
+        console.error("[fbPageSync] tick error:", e?.message ?? e);
+      });
+    }, 30 * 60_000);
+    console.log("[fbPageSync] Worker started (30m interval)");
   }
 
   if (isRuntimeFeatureEnabled("LIVE_BILLING_ENABLED")) {

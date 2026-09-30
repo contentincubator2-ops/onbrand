@@ -21,10 +21,12 @@ import { trpc } from "../../../lib/trpc";
 import { useLang } from "../../../lib/i18n";
 import type { ShellOutletCtx } from "../../app/shell/ShellLayout";
 import { Skeleton } from "@heroui/react";
-import { Search, Plus, Folder, Clock, Trash2, Copy, Info, Pencil } from "lucide-react";
+import { CopyIcon, DeleteIcon, EditIcon, FolderIcon, InfoIcon, SearchIcon, WaitingIcon } from "../../platform/components/icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faFacebook, faInstagram, faYoutube, faTiktok, faLinkedin, faThreads } from "@fortawesome/free-brands-svg-icons";
 import { faGlobe, faNewspaper, faEnvelope, faPenNib } from "@fortawesome/free-solid-svg-icons";
+import { HelpTip } from "../../platform/components/HelpTip";
+import { IllustratedEmpty } from "../../platform/components/EmptyIllustration";
 
 interface MissionRow {
   id: number;            // mission_outputs.id (output row) — NOT the mission PK
@@ -47,10 +49,10 @@ const WORKSPACE_ICONS: Record<string, any> = {
 };
 
 const WORKSPACE_TONE: Record<string, string> = {
-  facebook: "#1877F2", instagram: "#E1306C", youtube: "#FF0000",
-  tiktok: "#000000", linkedin: "#0A66C2", threads: "#000000",
-  email: "#0EA5E9", press: "#64748B", brand: "#7C3AED", audience: "#7C3AED",
-  website: "#10B981", theater: "#F97316",
+  facebook: "#18181b", instagram: "#18181b", youtube: "#18181b",
+  tiktok: "#000000", linkedin: "#18181b", threads: "#000000",
+  email: "#18181b", press: "#64748B", brand: "#18181b", audience: "#18181b",
+  website: "#18181b", theater: "#18181b",
 };
 
 function formatRelative(dateStr: string | undefined, lang: "zh-TW" | "en"): string {
@@ -69,7 +71,7 @@ function formatRelative(dateStr: string | undefined, lang: "zh-TW" | "en"): stri
 }
 
 function brandColor(seed: string): string {
-  const palette = ["#6366F1","#EC4899","#F97316","#10B981","#3B82F6","#8B5CF6","#EF4444","#14B8A6"];
+  const palette = ["#18181b","#27272a","#3f3f46","#52525b","#71717a","#27272a","#3f3f46","#52525b"];
   let h = 0;
   for (let i = 0; i < seed.length; i++) h = seed.charCodeAt(i) + ((h << 5) - h);
   return palette[Math.abs(h) % palette.length]!;
@@ -88,7 +90,7 @@ export default function ProjectsPage() {
   // 2026-05-19 (CJ「任務完成沒有按儲存也要出現在專案」):
   // refetchOnWindowFocus: true → 從 /run 切回 /projects 立刻拿最新清單。
   // interval 縮到 8s (was 15s) 讓背景任務更快出現。
-  const allQuery = (trpc as any).mission?.listAllForUser?.useQuery?.(
+  const allQuery = (trpc as any).mission?.listAllForUser?.useQuery(
     undefined,
     { refetchOnWindowFocus: true, refetchInterval: 8_000 },
   );
@@ -226,9 +228,6 @@ export default function ProjectsPage() {
       <div className="relative pt-10 pb-5 px-6 text-center">
         <div className="relative z-10 flex flex-col items-center max-w-[1100px] mx-auto">
           {/* 2026-05-11 (CJ): canonical header template — same as /30s / /60s / /99s. */}
-          <p className="text-[12px] font-semibold uppercase tracking-[0.25em] text-default-600 mb-3">
-            PROJECTS · OUTPUTS
-          </p>
           <h1
             className="font-semibold tracking-tight leading-none mb-3"
             style={{
@@ -239,35 +238,14 @@ export default function ProjectsPage() {
               backgroundClip: "text",
             }}
           >
-            {lang === "en" ? "Everything you've made — all in one place" : "你做過的每一篇都在這"}
+            {lang === "en" ? "Projects" : "專案"}
           </h1>
-          <p
-            className="mt-3 mx-auto text-default-700"
-            style={{
-              fontFamily: '"Source Serif Pro", "Noto Serif TC", Georgia, serif',
-              fontStyle: "italic", fontSize: 14, lineHeight: 1.7, maxWidth: 640,
-            }}
-          >
-            {lang === "en"
-              ? "Every piece of content you've generated, automatically archived here"
-              : "每次執行的產出，自動歸檔到這裡"}
-          </p>
-          <p
-            className="mt-2 mb-5 mx-auto text-default-700"
-            style={{ fontSize: 12, lineHeight: 1.55, maxWidth: 640, letterSpacing: "0.02em" }}
-          >
-            <span style={{ fontWeight: 600, color: "#171717", marginRight: 6 }}>
-              {lang === "en" ? "Good for:" : "適合："}
-            </span>
-            {lang === "en"
-              ? "Finding last week's work · Rerunning a task · Tidying drafts"
-              : "找上週做過的東西 · 重跑同任務 · 整理待發內容"}
-          </p>
+          <div className="mb-2" />
 
           {/* Single search bar */}
           <div className="w-full" style={{ maxWidth: 720 }}>
             <div className="flex items-center gap-3 px-5 bg-white rounded-[20px] border border-default-100 shadow-md" style={{ height: 56 }}>
-              <Search size={18} className="text-default-400 shrink-0" />
+              <SearchIcon size={18} className="text-default-400 shrink-0" />
               <input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
@@ -341,13 +319,13 @@ export default function ProjectsPage() {
               An explained empty state beats a missing control. */}
           <FacetRow
             label={lang === "en" ? "Audience" : "族群"}
-            hint={lang === "en" ? "from the strategy workbench" : "來自策略工作台的甜蜜點"}
+            hint={lang === "en"
+              ? "Audiences come from the strategy workbench: open a task from a sweet spot to tag its output."
+              : "族群來自策略工作台：從甜蜜點點「內容角度」開任務，產出就會記住寫給哪個族群"}
           >
             {audienceFacets.length === 0 ? (
               <span className="text-[12px] text-default-400">
-                {lang === "en"
-                  ? "No tagged runs yet — open a task from a sweet spot in the strategy workbench to tag it."
-                  : "尚無標記 — 從策略工作台的甜蜜點點「內容角度」開任務，產出就會記住寫給哪個族群"}
+                {lang === "en" ? "None yet" : "尚無標記"}
               </span>
             ) : (
               <>
@@ -370,12 +348,13 @@ export default function ProjectsPage() {
               </>
             )}
           </FacetRow>
-          <FacetRow label={lang === "en" ? "Product" : "產品"}>
+          <FacetRow
+            label={lang === "en" ? "Product" : "產品"}
+            hint={lang === "en" ? "Pick a product in the task modal and its output is filed here." : "在任務視窗選擇產品後，產出就會歸到該產品"}
+          >
             {productFacets.length === 0 ? (
               <span className="text-[12px] text-default-400">
-                {lang === "en"
-                  ? "No product-scoped runs yet — pick a product in the task modal."
-                  : "尚無產品範圍的產出 — 在任務視窗選擇產品後，產出就會歸到該產品"}
+                {lang === "en" ? "None yet" : "尚無產出"}
               </span>
             ) : (
               <>
@@ -403,7 +382,7 @@ export default function ProjectsPage() {
       <div className="max-w-[1100px] mx-auto px-6 pb-24">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
-            <Clock size={14} className="text-default-500" />
+            <WaitingIcon size={14} className="text-default-500" />
             <h2 className="text-sm font-semibold text-default-700">
               {activeBrandId === "all"
                 ? (lang === "en" ? "Recent" : "最近活動")
@@ -425,7 +404,7 @@ export default function ProjectsPage() {
           <EmptyState
             search={search}
             onClear={() => { setSearch(""); setActiveBrandId("all"); }}
-            onCreate={() => { /* New-task entry retired; users go to /30s etc. */ }}
+            onCreate={() => navigate("/tasks/fb")}
             lang={lang}
           />
         ) : (
@@ -612,7 +591,7 @@ function ProjectCard({ mission, onClick, lang }: { mission: MissionRow; onClick:
               title={lang === "en" ? "Rename" : "重新命名"}
               aria-label={lang === "en" ? "Rename" : "重新命名"}
             >
-              <Pencil size={11} />
+              <EditIcon size={11} />
             </button>
           </div>
         )}
@@ -638,13 +617,13 @@ function ProjectCard({ mission, onClick, lang }: { mission: MissionRow; onClick:
             className="absolute top-9 right-2 z-50 bg-white rounded-lg border border-default-200 shadow-lg py-1 w-36"
           >
             <button onClick={(e) => { e.stopPropagation(); setMenuOpen(false); onClick(); }} className="w-full px-3 py-1.5 text-xs text-left hover:bg-default-50 flex items-center gap-2">
-              <Info size={11} /> {lang === "en" ? "View details" : "查看詳細"}
+              <InfoIcon size={11} /> {lang === "en" ? "View details" : "查看詳細"}
             </button>
             <button
               onClick={(e) => { e.stopPropagation(); setMenuOpen(false); startEditing(); }}
               className="w-full px-3 py-1.5 text-xs text-left hover:bg-default-50 flex items-center gap-2"
             >
-              <Pencil size={11} /> {lang === "en" ? "Rename" : "重新命名"}
+              <EditIcon size={11} /> {lang === "en" ? "Rename" : "重新命名"}
             </button>
             <button
               onClick={(e) => {
@@ -654,7 +633,7 @@ function ProjectCard({ mission, onClick, lang }: { mission: MissionRow; onClick:
               disabled={duplicateMut?.isPending}
               className="w-full px-3 py-1.5 text-xs text-left hover:bg-default-50 flex items-center gap-2 text-default-600 disabled:opacity-50"
             >
-              <Copy size={11} /> {lang === "en" ? "Duplicate" : "建立複本"}
+              <CopyIcon size={11} /> {lang === "en" ? "Duplicate" : "建立複本"}
             </button>
             <div className="border-t border-default-100 my-1" />
             <button
@@ -671,7 +650,7 @@ function ProjectCard({ mission, onClick, lang }: { mission: MissionRow; onClick:
               disabled={deleteMut?.isPending}
               className="w-full px-3 py-1.5 text-xs text-left hover:bg-danger-50 flex items-center gap-2 text-danger disabled:opacity-50"
             >
-              <Trash2 size={11} /> {lang === "en" ? "Move to trash" : "移到垃圾桶"}
+              <DeleteIcon size={11} /> {lang === "en" ? "Move to trash" : "移到垃圾桶"}
             </button>
           </div>
         </>
@@ -682,42 +661,25 @@ function ProjectCard({ mission, onClick, lang }: { mission: MissionRow; onClick:
 
 /* ─────────────────────── EmptyState ─────────────────────── */
 function EmptyState({ search, onClear, onCreate, lang }: { search: string; onClear: () => void; onCreate: () => void; lang: "zh-TW" | "en" }) {
+  if (!search) {
+    return (
+      <IllustratedEmpty
+        kind="projects"
+        title={lang === "en" ? "Nothing on the wall yet" : "作品牆還沒掛上任何一張"}
+        action={{ label: lang === "en" ? "Open your first task card" : "去開第一張任務卡", onPress: onCreate }}
+      />
+    );
+  }
   return (
     <div className="flex flex-col items-center justify-center py-20 text-center">
-      <Folder size={56} className="text-default-300 mb-4" strokeWidth={1.2} />
-      {search ? (
-        <>
-          <p className="text-default-700 font-medium mb-1">
-            {lang === "en" ? `No projects match "${search}"` : `找不到符合「${search}」的專案`}
-          </p>
-          <p className="text-tiny text-default-500 mb-4">
-            {lang === "en" ? "Try different words, or clear the search" : "試試別的關鍵字，或清除搜尋條件"}
-          </p>
-          <button onClick={onClear} className="text-xs text-violet-600 hover:underline">
-            {lang === "en" ? "Clear search" : "清除搜尋"}
-          </button>
-        </>
-      ) : (
-        <>
-          <p className="text-default-700 font-medium mb-1">
-            {lang === "en" ? "No projects yet" : "還沒有任何專案"}
-          </p>
-          <p className="text-tiny text-default-500 mb-4">
-            {lang === "en" ? (
-              <>Run any platform task or the 7-Day Publisher and outputs land here.<br />Or start a new project:</>
-            ) : (
-              <>到各平台任務牆或七日發布台跑任務，產出會自動進來。<br />或直接建立新任務：</>
-            )}
-          </p>
-          <button
-            onClick={onCreate}
-            className="flex items-center gap-2 px-4 py-2 rounded-full text-white text-sm font-medium"
-            style={{ background: "#171717" }}
-          >
-            <Plus size={14} /> {lang === "en" ? "New project" : "新任務"}
-          </button>
-        </>
-      )}
+      <FolderIcon size={56} className="text-default-300 mb-4" strokeWidth={1.2} />
+      <p className="text-default-700 font-medium mb-1">
+        {lang === "en" ? `No projects match "${search}"` : `找不到符合「${search}」的專案`}
+      </p>
+      <div className="mb-4" />
+      <button onClick={onClear} className="text-xs text-zinc-600 hover:underline">
+        {lang === "en" ? "Clear search" : "清除搜尋"}
+      </button>
     </div>
   );
 }
@@ -731,7 +693,7 @@ function FacetRow({ label, hint, children }: { label: string; hint?: string; chi
       <span className="text-[12px] font-semibold text-default-400 uppercase tracking-wider shrink-0">
         {label}
       </span>
-      {hint && <span className="text-[12px] text-default-300 shrink-0">{hint}</span>}
+      {hint && <HelpTip>{hint}</HelpTip>}
       {children}
     </div>
   );

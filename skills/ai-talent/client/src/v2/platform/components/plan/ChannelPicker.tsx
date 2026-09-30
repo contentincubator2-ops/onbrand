@@ -16,7 +16,7 @@ import { trpc } from "../../../../lib/trpc";
 import { useLang } from "../../../../lib/i18n";
 import { showToastGlobal } from "../../../../components/ui/Toast";
 import { toastWithUpgrade } from "../../lib/upgradeToast";
-import { Check, Lock, RefreshCw } from "lucide-react";
+import { CheckIcon, LockIcon, RegenerateIcon } from "../icons";
 
 // 2026-09-29 CJ：內容通路只留 FB／IG／Threads／LINE／TikTok／電子報／官網（server 端 setChannels 也擋下架的）。
 const LABEL_ZH: Record<string, string> = {
@@ -84,7 +84,7 @@ export default function ChannelPicker({ brandId }: { brandId: number }) {
         </span>
         {locked && (
           <span className="inline-flex items-center gap-1 text-[13px] text-default-500">
-            <Lock size={13} />
+            <LockIcon size={13} />
             {isEn
               ? `Can change again in ${data.daysUntilSwap} days`
               : `還要 ${data.daysUntilSwap} 天才能再更換`}
@@ -96,7 +96,7 @@ export default function ChannelPicker({ brandId }: { brandId: number }) {
             disabled={mut?.isPending || current.length === 0}
             className="ml-auto inline-flex items-center gap-1.5 rounded-lg bg-default-900 px-3 py-1.5 text-[14px] font-medium text-white disabled:opacity-40"
           >
-            <RefreshCw size={14} />
+            <RegenerateIcon size={14} />
             {isEn ? "Save channels" : "儲存變更"}
           </button>
         )}
@@ -124,7 +124,7 @@ export default function ChannelPicker({ brandId }: { brandId: number }) {
                     : "border-default-300 bg-white text-default-700 hover:border-default-500"
               }`}
             >
-              {on && <Check size={13} />}
+              {on && <CheckIcon size={13} />}
               {LABEL_ZH[p] ?? p}
             </button>
           );

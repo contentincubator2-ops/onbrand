@@ -7,8 +7,7 @@
  */
 import type { IconDefinition } from "@fortawesome/fontawesome-svg-core";
 import {
-  faQuoteLeft, faShieldHalved, faFont, faPencil, faAward,
-  faBoxOpen, faHashtag, faCommentDots, faFileLines,
+  faQuoteLeft, faShieldHalved, faFont, faPenToSquare, faAward, faBoxOpen, faHashtag, faCommentDots, faFileLines,
 } from "@fortawesome/free-solid-svg-icons";
 
 export type CopyShape = "text" | "items" | "pairs";
@@ -34,7 +33,7 @@ export const COPY_ASSETS: CopyAssetSpec[] = [
     whyZh: "產出時硬檢查，出現就自動改掉", whyEn: "Hard-checked on every output and rewritten" },
   { key: "abbreviations", labelZh: "縮寫對照", labelEn: "Abbreviations", shape: "pairs", icon: faHashtag,
     whyZh: "同一個東西只有一種叫法", whyEn: "One name per thing" },
-  { key: "term_substitutions", labelZh: "替換對照", labelEn: "Substitutions", shape: "pairs", icon: faPencil,
+  { key: "term_substitutions", labelZh: "替換對照", labelEn: "Substitutions", shape: "pairs", icon: faPenToSquare,
     whyZh: "寫到 A 自動換成 B", whyEn: "Swap A for B automatically" },
   { key: "voice", labelZh: "品牌口吻", labelEn: "Brand voice", shape: "text", icon: faQuoteLeft,
     whyZh: "文案的語氣基調", whyEn: "The tone every post is written in" },

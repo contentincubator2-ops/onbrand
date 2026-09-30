@@ -13,7 +13,7 @@ import { useNavigate } from "react-router-dom";
 import { trpc } from "../../../lib/trpc";
 import { useLang } from "../../../lib/i18n";
 import { showToastGlobal } from "../../../components/ui/Toast";
-import { ChevronLeft, UserPlus, Trash2, Shield, Building2 } from "lucide-react";
+import { BuildingIcon, ChevronLeftIcon, DeleteIcon, ShieldIcon, UserAddIcon } from "../components/icons";
 
 type Role = "owner" | "admin" | "editor" | "viewer";
 
@@ -69,13 +69,10 @@ export default function WorkspaceSettingsPage() {
           onClick={() => navigate(-1)}
           className="text-sm text-neutral-500 hover:text-neutral-900 flex items-center gap-1 mb-6"
         >
-          <ChevronLeft size={16} /> {lang === "en" ? "Back" : "返回"}
+          <ChevronLeftIcon size={16} /> {lang === "en" ? "Back" : "返回"}
         </button>
 
-        <h1 className="text-2xl font-bold text-neutral-900 mb-1">{lang === "en" ? "Workspace settings" : "工作空間設定"}</h1>
-        <p className="text-sm text-neutral-500 mb-6">{lang === "en"
-          ? "Manage team members, client access, and white-label"
-          : "管理團隊成員、客戶分權、白牌設定"}</p>
+        <h1 className="text-2xl font-bold text-neutral-900 mb-6">{lang === "en" ? "Workspace settings" : "工作空間設定"}</h1>
 
         <div className="grid grid-cols-1 md:grid-cols-[260px_1fr] gap-6">
           {/* Sidebar: workspace list */}
@@ -83,7 +80,7 @@ export default function WorkspaceSettingsPage() {
             {listQ?.isLoading ? (
               <p className="text-sm text-neutral-400">{lang === "en" ? "Loading…" : "載入中…"}</p>
             ) : workspaces.length === 0 ? (
-              <p className="text-sm text-neutral-400">{lang === "en" ? "No workspaces yet" : "尚無工作空間"}</p>
+              <p className="text-sm text-neutral-400">{lang === "en" ? "No workspaces yet" : "還沒有工作空間"}</p>
             ) : (
               workspaces.map((w) => (
                 <button
@@ -96,7 +93,7 @@ export default function WorkspaceSettingsPage() {
                   }`}
                 >
                   <div className="font-medium flex items-center gap-1.5">
-                    <Building2 size={14} /> {w.name}
+                    <BuildingIcon size={14} /> {w.name}
                   </div>
                   <div className={`text-xs mt-0.5 ${selectedId === w.id ? "text-neutral-300" : "text-neutral-400"}`}>
                     {PLAN_LABEL[w.planCode] ?? w.planCode} · {lang === "en"
@@ -161,7 +158,7 @@ function WorkspaceDetail({ detail, onChanged }: { detail: any; onChanged: () => 
     onError: (e: any) => showToastGlobal(e?.message ?? (lang === "en" ? "Couldn't remove" : "移除失敗")),
   });
   const updateMut = (trpc as any).tenant?.update?.useMutation?.({
-    onSuccess: () => { showToastGlobal(lang === "en" ? "Saved ✓" : "已儲存", "success"); onChanged(); },
+    onSuccess: () => { showToastGlobal(lang === "en" ? "Saved" : "已儲存", "success"); onChanged(); },
     onError: (e: any) => showToastGlobal(e?.message ?? (lang === "en" ? "Update failed" : "更新失敗")),
   });
 
@@ -194,7 +191,7 @@ function WorkspaceDetail({ detail, onChanged }: { detail: any; onChanged: () => 
       {/* Members */}
       <section className="bg-white border border-neutral-200 rounded-xl p-6">
         <h3 className="text-base font-semibold text-neutral-900 mb-4 flex items-center gap-2">
-          <Shield size={16} /> {lang === "en" ? `Members (${members.length}${seatLabel})` : `成員（${members.length}${seatLabel}）`}
+          <ShieldIcon size={16} /> {lang === "en" ? `Members (${members.length}${seatLabel})` : `成員（${members.length}${seatLabel}）`}
         </h3>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -241,7 +238,7 @@ function WorkspaceDetail({ detail, onChanged }: { detail: any; onChanged: () => 
                         }}
                         className="text-xs text-red-600 hover:text-red-800 transition"
                       >
-                        <Trash2 size={14} />
+                        <DeleteIcon size={14} />
                       </button>
                     )}
                   </td>
@@ -255,7 +252,7 @@ function WorkspaceDetail({ detail, onChanged }: { detail: any; onChanged: () => 
         {canManage && (
           <div className="mt-6 pt-6 border-t border-neutral-100">
             <h4 className="text-sm font-medium text-neutral-900 mb-3 flex items-center gap-1.5">
-              <UserPlus size={14} /> {lang === "en" ? "Invite a member" : "邀請新成員"}
+              <UserAddIcon size={14} /> {lang === "en" ? "Invite a member" : "邀請新成員"}
             </h4>
             <div className="flex flex-wrap gap-2 items-start">
               <input

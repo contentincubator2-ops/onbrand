@@ -25,10 +25,9 @@ import {
   Button, Chip, Input, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader,
   Progress, Textarea,
 } from "@heroui/react";
-import {
-  Plus, Trash2, Wand2, FlaskConical, Check, AlertTriangle, ChevronLeft,
-  MessagesSquare, ClipboardCopy, FileText,
-} from "lucide-react";
+import { SceneArt } from "../../../platform/components/TaskIllustration";
+import { SCENE_OPTIONS, isTaskScene, pickTaskScene, type TaskScene } from "../../../platform/components/taskScene";
+import { AddIcon, CheckIcon, ChevronLeftIcon, CopyIcon, DeleteIcon, GenerateIcon, MeetingIcon, SampleIcon, TextIcon, WarningIcon } from "../../../platform/components/icons";
 
 /**
  * 給「想自己先整理」的使用者複製去別的 AI 用的提示詞。
@@ -60,6 +59,7 @@ interface CardRecord {
   measured: { count: number; minChars: number; maxChars: number; medianChars: number };
   variants: number;
   lastDryRun: { at: string; caption: string } | null;
+  scene?: string | null;
 }
 
 /** 前端也量一次字數，讓使用者邊貼邊看到區間 —— 這份只是回饋，權威在 server。 */
@@ -108,6 +108,9 @@ export default function TaskCardComposer({
   const [dryResult, setDryResult] = React.useState<{ caption: string; chars: number; inRange: boolean; expected: { minChars: number; maxChars: number } } | null>(null);
   const [busy, setBusy] = React.useState<string | null>(null);
   const [error, setError] = React.useState<string | null>(null);
+  // 卡片插畫：null＝跟著卡名自動挑。選單預設收起，只秀目前那張。
+  const [sceneChoice, setSceneChoice] = React.useState<TaskScene | null>(null);
+  const [scenePickerOpen, setScenePickerOpen] = React.useState(false);
 
   // 每次開窗同步一次起始狀態。帶 initialCardId 就直接跳到步驟 2 —— 那張卡的
   // 範例早就貼過了，再走一次步驟 1 等於要求使用者重貼。
@@ -121,7 +124,7 @@ export default function TaskCardComposer({
   const utils = (trpc as any).useUtils?.() ?? null;
 
   // SKILL 在背景生成，所以要輪詢。跑完（或失敗）就停 —— 一直輪會白燒請求。
-  const cardQuery = (trpc as any).brandTaskCard?.get?.useQuery?.(
+  const cardQuery = (trpc as any).brandTaskCard?.get?.useQuery(
     { brandId: brandId ?? 0, cardId: cardId ?? "" },
     {
       enabled: !!brandId && !!cardId,
@@ -130,6 +133,10 @@ export default function TaskCardComposer({
     },
   ) ?? { data: null };
   const card: CardRecord | null = cardQuery.data ?? null;
+
+  React.useEffect(() => {
+    setSceneChoice(isTaskScene(card?.scene) ? card!.scene as TaskScene : null);
+  }, [card?.id, card?.scene]);
 
   // SKILL 一生出來就灌進可編輯的草稿框（只灌一次，別蓋掉使用者的編輯）。
   React.useEffect(() => {
@@ -183,6 +190,7 @@ export default function TaskCardComposer({
     setPrimaryPlaceholder(""); setAskFields([]); setVariants(1);
     setCardId(null); setSkillDraft(""); setDryInputs({}); setDryResult(null);
     setBusy(null); setError(null);
+    setSceneChoice(null); setScenePickerOpen(false);
   }
 
   const m = measure(samples);
@@ -236,7 +244,7 @@ export default function TaskCardComposer({
       <ModalContent>
         <ModalHeader className="flex flex-col gap-1">
           <div className="flex items-center gap-2">
-            <Wand2 size={16} className="text-primary-500" />
+            <GenerateIcon size={16} className="text-primary-500" />
             <span className="text-medium font-semibold">
               {en ? `New ${channelLabel} task card` : `新增${channelLabel}任務卡`}
             </span>
@@ -291,8 +299,8 @@ export default function TaskCardComposer({
                     產品在做的事，抽完還能攤開讓使用者確認。 */}
                 <div className="flex gap-1">
                   {([
-                    ["one-by-one", en ? "Paste one by one" : "一篇一篇貼", <FileText key="a" size={12} />],
-                    ["thread", en ? "Paste a whole AI chat" : "貼上整串 AI 對話", <MessagesSquare key="b" size={12} />],
+                    ["one-by-one", en ? "Paste one by one" : "一篇一篇貼", <TextIcon key="a" size={12} />],
+                    ["thread", en ? "Paste a whole AI chat" : "貼上整串 AI 對話", <MeetingIcon key="b" size={12} />],
                   ] as const).map(([mode, label, icon]) => (
                     <Chip
                       key={mode}
@@ -323,7 +331,7 @@ export default function TaskCardComposer({
                     />
                     <div className="flex items-center gap-2 flex-wrap">
                       <Button
-                        size="sm" color="primary" startContent={<Wand2 size={13} />}
+                        size="sm" color="primary" startContent={<GenerateIcon size={13} />}
                         isLoading={busy === "extract"}
                         isDisabled={threadText.trim().length < 80 || !brandId}
                         onPress={() => {
@@ -349,7 +357,7 @@ export default function TaskCardComposer({
                         </pre>
                         <Button
                           size="sm" variant="flat"
-                          startContent={copied ? <Check size={13} /> : <ClipboardCopy size={13} />}
+                          startContent={copied ? <CheckIcon size={13} /> : <CopyIcon size={13} />}
                           onPress={async () => {
                             try {
                               await navigator.clipboard.writeText(CLEANUP_PROMPT);
@@ -399,14 +407,14 @@ export default function TaskCardComposer({
                         size="sm" variant="light" isIconOnly className="mt-1"
                         onPress={() => setSamples((prev) => prev.filter((_, j) => j !== i))}
                       >
-                        <Trash2 size={14} className="text-danger-500" />
+                        <DeleteIcon size={14} className="text-danger-500" />
                       </Button>
                     )}
                   </div>
                 ))}
                 {sampleMode === "one-by-one" && (
                   <Button
-                    size="sm" variant="flat" startContent={<Plus size={14} />}
+                    size="sm" variant="flat" startContent={<AddIcon size={14} />}
                     isDisabled={samples.length >= 20}
                     onPress={() => setSamples((prev) => [...prev, ""])}
                   >
@@ -463,12 +471,12 @@ export default function TaskCardComposer({
                       size="sm" variant="light" isIconOnly
                       onPress={() => setAskFields((prev) => prev.filter((_, j) => j !== i))}
                     >
-                      <Trash2 size={14} className="text-danger-500" />
+                      <DeleteIcon size={14} className="text-danger-500" />
                     </Button>
                   </div>
                 ))}
                 <Button
-                  size="sm" variant="flat" startContent={<Plus size={14} />}
+                  size="sm" variant="flat" startContent={<AddIcon size={14} />}
                   isDisabled={askFields.length >= 8}
                   onPress={() => setAskFields((prev) => [...prev, { label: "", type: "text", required: false, placeholder: "" }])}
                 >
@@ -535,7 +543,7 @@ export default function TaskCardComposer({
               {card?.skill && (
                 <>
                   <div className="flex items-center gap-2 flex-wrap">
-                    <Chip size="sm" color="success" variant="flat" startContent={<Check size={12} />}>
+                    <Chip size="sm" color="success" variant="flat" startContent={<CheckIcon size={12} />}>
                       {en ? "SKILL ready" : "SKILL 已生成"}
                     </Chip>
                     <Chip size="sm" variant="flat">
@@ -563,7 +571,7 @@ export default function TaskCardComposer({
                     }}
                   />
                   <Button
-                    size="sm" variant="light" startContent={<Wand2 size={13} />}
+                    size="sm" variant="light" startContent={<GenerateIcon size={13} />}
                     isLoading={busy === "distil"}
                     onPress={() => { setBusy("distil"); setError(null); distilMut?.mutate({ brandId: brandId!, cardId: cardId! }); }}
                   >
@@ -582,6 +590,56 @@ export default function TaskCardComposer({
                   ? "Answer the card's own question, then test-write. Nothing is saved to your projects and no credits are used."
                   : "回答這張卡自己的問題，然後試寫。試寫不會存進專案、也不扣點數。"}
               </p>
+
+              {/* 2026-09-30（CJ「品牌自建的也要有場景圖，他也可以自己選」）：
+                  預設依卡名＋主問題自動挑，跟內建卡同一套規則；想換就展開選。 */}
+              {(() => {
+                const auto = pickTaskScene({ label: card.name, primary_question: card.primaryQuestion });
+                const current = sceneChoice ?? auto;
+                const choose = (s: TaskScene) => {
+                  const next = s === auto ? null : s;
+                  setSceneChoice(next);
+                  setScenePickerOpen(false);
+                  updateMut?.mutate({ brandId: brandId!, cardId: cardId!, scene: next });
+                };
+                return (
+                  <div className="rounded-medium border border-divider p-3 space-y-3">
+                    <div className="flex items-center gap-3">
+                      <SceneArt scene={current} width={96} />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-small font-medium">{en ? "Card illustration" : "卡片插畫"}</p>
+                        <p className="text-tiny text-default-500">
+                          {sceneChoice
+                            ? (en ? "You picked this one." : "你自己選的。")
+                            : (en ? "Picked from the card name. You can change it." : "依卡名自動挑的，可以換。")}
+                        </p>
+                      </div>
+                      <Button size="sm" variant="flat" onPress={() => setScenePickerOpen((o) => !o)}>
+                        {scenePickerOpen ? (en ? "Done" : "收起") : (en ? "Change" : "換一張")}
+                      </Button>
+                    </div>
+                    {scenePickerOpen && (
+                      <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
+                        {SCENE_OPTIONS.map((o) => (
+                          <button
+                            key={o.scene}
+                            type="button"
+                            onClick={() => choose(o.scene)}
+                            className={`flex flex-col items-center gap-1 rounded-lg p-1 transition ${
+                              o.scene === current ? "ring-2 ring-neutral-900" : "hover:bg-default-100"
+                            }`}
+                          >
+                            <SceneArt scene={o.scene} width={84} />
+                            <span className="text-[11px] text-default-600">
+                              {en ? o.en : o.zh}{o.scene === auto ? (en ? " · auto" : "・自動") : ""}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
 
               <div className="space-y-2">
                 <p className="text-small font-medium">{card.primaryQuestion}</p>
@@ -608,7 +666,7 @@ export default function TaskCardComposer({
               ))}
 
               <Button
-                size="sm" color="secondary" startContent={<FlaskConical size={14} />}
+                size="sm" color="secondary" startContent={<SampleIcon size={14} />}
                 isLoading={busy === "dry"}
                 isDisabled={!(dryInputs.topic ?? "").trim()}
                 onPress={() => {
@@ -625,7 +683,7 @@ export default function TaskCardComposer({
                     <Chip
                       size="sm" variant="flat"
                       color={dryResult.inRange ? "success" : "warning"}
-                      startContent={dryResult.inRange ? <Check size={12} /> : <AlertTriangle size={12} />}
+                      startContent={dryResult.inRange ? <CheckIcon size={12} /> : <WarningIcon size={12} />}
                     >
                       {dryResult.chars} {en ? "chars" : "字"}
                     </Chip>
@@ -650,7 +708,7 @@ export default function TaskCardComposer({
         <ModalFooter className="gap-2">
           {step > 1 && (
             <Button
-              variant="light" size="sm" startContent={<ChevronLeft size={14} />}
+              variant="light" size="sm" startContent={<ChevronLeftIcon size={14} />}
               onPress={() => setStep((s) => (s === 3 ? 2 : 1) as 1 | 2 | 3)}
             >
               {en ? "Back" : "上一步"}

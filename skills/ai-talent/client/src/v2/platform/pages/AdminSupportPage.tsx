@@ -44,7 +44,7 @@ export default function AdminSupportPage() {
   const [statusFilter, setStatusFilter] = useState<"all" | "open" | "in_progress" | "resolved">("open");
   const [selectedId, setSelectedId] = useState<number | null>(null);
 
-  const listQ = (trpc as any).support?.adminListTickets?.useQuery?.(
+  const listQ = (trpc as any).support?.adminListTickets?.useQuery(
     { status: statusFilter },
     { refetchInterval: 15_000 },
   );
@@ -191,7 +191,7 @@ export default function AdminSupportPage() {
 function TicketDetail({ ticketId, onUpdated }: { ticketId: number; onUpdated: () => void }) {
   const { lang } = useLang();
   const isEn = lang === "en";
-  const ticketQ = (trpc as any).support?.adminGetTicket?.useQuery?.(
+  const ticketQ = (trpc as any).support?.adminGetTicket?.useQuery(
     { ticketId },
     { refetchInterval: 15_000 },
   );

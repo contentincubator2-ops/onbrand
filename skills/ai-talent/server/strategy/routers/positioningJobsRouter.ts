@@ -27,7 +27,6 @@ import { loadBrandFullContext } from "../core/brandFullContext";
 import { invokeLLM } from "../../platform/core/llm";
 import { buildBrandPrefix } from "../core/brandContext";
 import { getBrandRealContent } from "../core/brandRealContent";
-import { loadBrandKnowledgeForPrompt } from "./brandKnowledgeRouter";
 import localPool from "../../localDb";
 
 const entityKindSchema = z.enum(["brand", "product", "event"]);
@@ -261,14 +260,12 @@ export const positioningJobsRouter = router({
     }))
     .mutation(async ({ ctx, input }) => {
       const userId = ctx.user!.id;
-      const [brandPrefix, knowledgeBlock] = await Promise.all([
-        buildBrandPrefix(input.brandId).catch(() => ""),
-        loadBrandKnowledgeForPrompt(input.brandId).catch(() => ""),
-      ]);
+      // 2026-09-29：知識庫不再注入（CJ「策略生成也拿掉知識庫」）。
+      const brandPrefix = await buildBrandPrefix(input.brandId).catch(() => "");
       const sys = `你是台灣本地市場的社群文案，繁體中文。
 為以下品牌寫一則 ${input.platform.toUpperCase()} 貼文（120-180 字），口語自然、不要套話、不要寫「祝大家...」。
 直接輸出貼文純文字，不要前綴、不要 markdown。
-${brandPrefix || ""}${knowledgeBlock || ""}`;
+${brandPrefix || ""}`;
       const userPrompt = `主題：${input.topic}`;
       try {
         const r = await invokeLLM({
@@ -290,7 +287,6 @@ ${brandPrefix || ""}${knowledgeBlock || ""}`;
         return {
           ok: true as const,
           caption: text,
-          hasKnowledge: knowledgeBlock.length > 0,
           hasPositioning: brandPrefix.length > 0,
         };
       } catch (e: any) {
@@ -314,13 +310,12 @@ ${brandPrefix || ""}${knowledgeBlock || ""}`;
     }))
     .mutation(async ({ ctx, input }) => {
       const userId = ctx.user!.id;
-      // CJ 2026-05-07: scan EVERYTHING under this brandId — positioning,
-      // 文字 assets, 視覺 assets, knowledge, interim, AI 指令 (FB only
-      // for this test). Plus real public content (官網/FB) when reachable.
-      const [fullCtx, real, knowledgeBlock] = await Promise.all([
-        loadBrandFullContext(input.brandId, { platformFilter: "facebook" }).catch(() => ({ block: "", hasFullPositioning: false, hasInterim: false, hasTextAssets: false, hasVisualAssets: false, hasAIPrompts: {} as Record<string, boolean> })),
+      // CJ 2026-05-07: scan everything under this brandId — positioning,
+      // 文字 assets, 視覺 assets, interim. Plus real public content (官網/FB)
+      // when reachable.
+      const [fullCtx, real] = await Promise.all([
+        loadBrandFullContext(input.brandId).catch(() => ({ block: "", hasFullPositioning: false, hasInterim: false, hasTextAssets: false, hasVisualAssets: false })),
         getBrandRealContent(input.brandId).catch(() => ({ context: "", hasContent: false, sources: [] as string[] })),
-        loadBrandKnowledgeForPrompt(input.brandId).catch(() => ""),
       ]);
 
       // CJ 2026-05-07: simplified to 3 FB scenarios — covers most of the
@@ -351,10 +346,9 @@ ${brandPrefix || ""}${knowledgeBlock || ""}`;
 【產出原則】
 1. ${groundingHint}
 2. 必須遵守下方「文字資產」中的禁用詞 / 推薦用詞 / 替換對照（如有）。
-3. 必須採用下方「AI 指令庫 · facebook · 文字指令」中的口吻規則（如有）。
-4. 直接輸出純文字貼文（不要 markdown、不要前綴「貼文：」、不要解釋為什麼這樣寫）。
-5. 不要寫「祝大家 X 快樂」「親愛的客戶」這種僵化套話。
-${fullCtx.block}${real.context}${knowledgeBlock}`;
+3. 直接輸出純文字貼文（不要 markdown、不要前綴「貼文：」、不要解釋為什麼這樣寫）。
+4. 不要寫「祝大家 X 快樂」「親愛的客戶」這種僵化套話。
+${fullCtx.block}${real.context}`;
 
       const results = await Promise.all(SCENARIOS.map(async (s) => {
         try {

@@ -915,6 +915,11 @@ authRouter.get("/google/callback", async (req: Request, res: Response) => {
     const sessionToken = await createSessionToken(user.userId, user.openId);
     res.cookie(SESSION_COOKIE_NAME, sessionToken, SESSION_COOKIE_OPTIONS);
 
+    // 2026-09-28（OnBrand 連接器）：從 Claude 連接流程來的，登入後回到授權頁（見 LoginPage oauthNextPath）。
+    const next = String((req as any).cookies?.ob_oauth_next ?? ""); // cookie-parser 已經解碼過
+    if (next) res.clearCookie("ob_oauth_next", { path: "/" });
+    if (/^\/api\/mcp-oauth\/authorize(\?|$)/.test(next)) { res.redirect(next); return; }
+
     // Redirect to frontend
     res.redirect("/");
   } catch (err) {

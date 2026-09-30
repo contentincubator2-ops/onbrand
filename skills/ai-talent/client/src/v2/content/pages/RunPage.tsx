@@ -30,7 +30,8 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 import {
 } from "@fortawesome/free-brands-svg-icons";
-import { Pencil, MessageCircle, Image as LucideImage, Wand2, Users as LucideUsers, Copy as LucideCopy, BookOpen } from "lucide-react";
+import { HelpTip } from "../../platform/components/HelpTip";
+import { CommentIcon, CopyIcon, EditIcon, ImageIcon, LibraryIcon, RegenerateIcon, RewriteAsIcon, PuzzleIcon, WaitingIcon, UserIcon, TextIcon, CheckIcon, BundleIcon, WarningIcon, DoneIcon, ErrorIcon, WorkingIcon, LinkIcon } from "../../platform/components/icons";
 import { trpc } from "../../../lib/trpc";
 import { showToastGlobal } from "../../../components/ui/Toast";
 import { PlatformMockup } from "../components/PlatformMockup";
@@ -62,10 +63,12 @@ import { pickImagePromptSeed } from "../lib/imagePromptSeed";
 import { buildAllDayIcs, downloadIcs } from "../lib/ics";
 import { parseRunOfShow } from "../lib/runOfShow";
 import { sourceLabel, sourceWhy } from "../lib/sourceVocabulary";
-import { tierLabel } from "../../platform/lib/tierVocabulary";
 import { useLang } from "../../../lib/i18n";
 import { fireNudge } from "../../platform/components/mia/miaNudges";
 import ReviewBar from "../../platform/components/review/ReviewBar";
+import PerfTagPicker from "../../performance/components/PerfTagPicker";
+import WriterDesk, { type DeskWriter } from "../components/WriterDesk";
+import { cancelAgentHandoff } from "../lib/agentHandoff";
 
 type Mode = "edit" | "chat" | "image" | "agent" | "regen" | "rewrite" | "publish" | "source";
 
@@ -147,6 +150,9 @@ interface VariantData {
   imageStatus?: string;
   qa?: any;
   extras?: any;
+  /** 2026-09-29 換人寫：每位寫過的稿（server writerDrafts.ts）與目前是誰的稿。 */
+  writerDrafts?: Record<string, { name: string; title?: string; agentId?: number; caption: string }>;
+  activeWriter?: string;
   // 2026-05-18 (CJ): carousel / album — N cards, each its own image
   cards?: Array<{
     headline: string;
@@ -197,6 +203,8 @@ function normalizeVariantData(v: any): VariantData {
     qa: v?.qa,
     extras: v?.extras,
     cards: Array.isArray(v?.cards) ? v.cards : undefined,
+    writerDrafts: v?.writerDrafts && typeof v.writerDrafts === "object" ? v.writerDrafts : undefined,
+    activeWriter: typeof v?.activeWriter === "string" ? v.activeWriter : undefined,
   };
 }
 
@@ -291,7 +299,7 @@ function CraftChip({ taskId, en }: { taskId?: string | null; en: boolean }) {
       <button
         onClick={() => setOpen((v) => !v)}
         className="flex items-center gap-1 text-[12px] px-2 py-1 rounded-full border transition"
-        style={{ borderColor: "#e5d9b6", background: "#fbf6e7", color: "#8a6d1d" }}
+        style={{ borderColor: "#e4e4e7", background: "#fafafa", color: "#52525b" }}
         title={en ? "Craft reference" : "工藝依據"}
       >
         {en ? "Craft reference" : "工藝依據"}：{caseLabel}
@@ -299,7 +307,7 @@ function CraftChip({ taskId, en }: { taskId?: string | null; en: boolean }) {
       {open && (
         <div
           className="absolute z-50 mt-1 left-0 rounded-lg border bg-white p-3 shadow-lg"
-          style={{ width: 300, borderColor: "#ece7d6" }}
+          style={{ width: 300, borderColor: "#e4e4e7" }}
         >
           <div className="text-[12px] font-bold text-neutral-900 mb-0.5">{caseLabel}</div>
           <div className="text-[12px] text-neutral-500 mb-2">{awardLabel}</div>
@@ -698,7 +706,7 @@ export default function RunPage() {
     ? (trpc as any).quickTask.regenerateVariant.useMutation({
         onSuccess: () => {
           showToastGlobal(
-            lang === "en" ? "Version rewritten ✓" : "已重生此變體 ✓"
+            lang === "en" ? "Version rewritten" : "已重生此變體"
           );
           utils.output.getById.invalidate({ id });
           setOverrides({});
@@ -771,7 +779,8 @@ export default function RunPage() {
   const fbStatusQuery = (trpc as any).publish?.getBrandFacebookStatus?.useQuery
     ? (trpc as any).publish.getBrandFacebookStatus.useQuery(
         { brandId: fbBrandId },
-        { enabled: fbBrandId > 0, refetchOnWindowFocus: false, staleTime: 15_000 },
+        // 社群開關關閉的環境（dev）這支會回錯；它只決定 FB 按鈕長相，不該跳紅色「載入失敗」。
+        { enabled: fbBrandId > 0, refetchOnWindowFocus: false, staleTime: 15_000, retry: false, onError: () => {} },
       )
     : { data: null };
 
@@ -786,13 +795,13 @@ export default function RunPage() {
   const setBrandFbPageMut = (trpc as any).publish?.setBrandFacebookPage?.useMutation?.();
   // 2026-06-01 (CJ): Route all publishing through Calendar instead of direct Pipedream call.
   // scheduleToCalMut: schedules the output as a "pending" scheduled_post, then user
-  // goes to CalendarPage where they click "立即發布" to actually push via Pipedream.
+  // goes to 本週企劃 (/planner) where they click "立即發布" to actually push via Pipedream.
   const scheduleToCalMut = (trpc as any).calendar?.schedule?.useMutation?.({
     onSuccess: (_r: any) => {
       showToastGlobal(
         lang === "en"
-          ? "Added to Calendar ✓ — go to Calendar page to publish"
-          : "已加入日曆 ✓ — 前往「日曆」頁面發布"
+          ? "Added to Calendar — go to Calendar page to publish"
+          : "已加入日曆 — 前往「日曆」頁面發布"
       );
     },
     onError: (e: any) => {
@@ -848,8 +857,8 @@ export default function RunPage() {
           const actualModel = String(r?.model ?? "").trim();
           showToastGlobal(
             lang === "en"
-              ? `Image ready ✓${actualModel ? ` — ${actualModel}` : ""} (the previous image is kept — switch back anytime)`
-              : `已產圖 ✓${actualModel ? ` — ${actualModel}` : ""}（前一張圖有保留，隨時可以切回去）`
+              ? `Image ready${actualModel ? ` — ${actualModel}` : ""} (the previous image is kept — switch back anytime)`
+              : `已產圖${actualModel ? ` — ${actualModel}` : ""}（前一張圖有保留，隨時可以切回去）`
           );
         },
         onError: (e: any) => {
@@ -866,7 +875,7 @@ export default function RunPage() {
     ? (trpc as any).output.selectVariantImageVersion.useMutation({
         onSuccess: () => {
           utils.output.getById.invalidate({ id });
-          showToastGlobal(lang === "en" ? "Switched back ✓ (no regeneration)" : "已切回這張圖 ✓（不用重新生成）");
+          showToastGlobal(lang === "en" ? "Switched back (no regeneration)" : "已切回這張圖（不用重新生成）");
         },
         onError: (e: any) => showToastGlobal(
           lang === "en" ? `Couldn't switch image: ${String(e?.message ?? e).slice(0, 120)}` : `切換圖片失敗：${String(e?.message ?? e).slice(0, 120)}`
@@ -879,7 +888,7 @@ export default function RunPage() {
   // must live HERE (MediaGenFlow got it first, but that flow isn't on this
   // click path). When on, image.generate routes to Nano Banana with the
   // real photo + fidelity guard (see project_product_faithful_imagegen).
-  const runProductImagesQ = (trpc as any).media?.listProductImages?.useQuery?.(
+  const runProductImagesQ = (trpc as any).media?.listProductImages?.useQuery(
     { brandId: data?.brand?.id ?? 0 },
     { enabled: !!data?.brand?.id, refetchOnWindowFocus: false, staleTime: 60_000 },
   ) ?? { data: null };
@@ -995,7 +1004,7 @@ export default function RunPage() {
           if (r?.promptZh || r?.prompt) {
             userEditedPromptRef.current = false;
             setImagePrompt(lang === "en" ? (r.prompt || r.promptZh) : (r.promptZh || r.prompt));
-            showToastGlobal(lang === "en" ? "Image prompt generated from caption ✓" : "已從文案產生圖片指令 ✓");
+            showToastGlobal(lang === "en" ? "Image prompt generated from caption" : "已從文案產生圖片指令");
           }
         },
         onError: (e: any) => showToastGlobal(
@@ -1052,6 +1061,30 @@ export default function RunPage() {
   //   "calendar" → write to scheduled_posts + navigate /calendar
   //   "publish"  → platform-specific write to scheduled_posts + navigate /calendar
   const [schedMode, setSchedMode] = useState<"ics" | "calendar" | "publish">("ics");
+  // 2026-09-29 送審是排程的一個狀態：排程視窗裡勾「排好後送審」。專業方案才有審核工作流；
+  // 已經在審／已放行的不再顯示。
+  const [reviewOnSchedule, setReviewOnSchedule] = useState(true);
+  const reviewBillingQ = (trpc as any).billing?.getStatus?.useQuery
+    ? (trpc as any).billing.getStatus.useQuery(undefined, { staleTime: 60_000, refetchOnWindowFocus: false })
+    : { data: null };
+  const reviewStatusQ = (trpc as any).review?.statusFor?.useQuery
+    ? (trpc as any).review.statusFor.useQuery({ outputId: id }, { enabled: Number.isFinite(id) && id > 0 })
+    : { data: null, refetch: () => {} };
+  const reviewSubmitMut = (trpc as any).review?.submit?.useMutation?.();
+  const reviewState = String((reviewStatusQ.data as any)?.status ?? "");
+  const reviewCanSubmit = (reviewBillingQ.data as any)?.quota?.reviewWorkflow === true
+    && !!(data as any)?.mission?.id
+    && !["pending", "in_review", "approved"].includes(reviewState);
+  const submitReviewIfAsked = async () => {
+    if (!reviewCanSubmit || !reviewOnSchedule || !reviewSubmitMut) return;
+    try {
+      await reviewSubmitMut.mutateAsync({ missionId: (data as any).mission.id, outputId: id });
+      showToastGlobal(lang === "en" ? "Scheduled and sent for review" : "已排程並送審", "success");
+      reviewStatusQ.refetch?.();
+    } catch (e: any) {
+      showToastGlobal(lang === "en" ? `Scheduled, but review failed: ${e?.message ?? e}` : `已排程，但送審失敗：${e?.message ?? e}`);
+    }
+  };
   const [schedPlatform, setSchedPlatform] = useState("facebook");
   const [scheduleAt, setScheduleAt] = useState(() => {
     const d = new Date();
@@ -1339,6 +1372,7 @@ export default function RunPage() {
           });
         }
         setScheduleDialogOpen(false);
+        await submitReviewIfAsked();
         navigate(fromPlanner ? plannerHref(true) : "/planner");
       } catch {
         // error toast already shown by scheduleToCalMut.onError
@@ -1376,13 +1410,14 @@ export default function RunPage() {
           platform: _platform, scheduledAt: _scheduledAt,
         });
         setScheduleDialogOpen(false);
+        await submitReviewIfAsked();
         navigate(fromPlanner ? plannerHref(true) : "/planner");
       } catch {
         // error toast already shown by scheduleToCalMut.onError
       }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [schedMode, schedPlatform, scheduleAt, seriesAnchorDate, id, activeIdx, selectedContentKind, data, variants, postDates, isMultiDayTask, scheduleMut, scheduleToCalMut, navigate, lang]);
+  }, [schedMode, schedPlatform, scheduleAt, seriesAnchorDate, id, activeIdx, selectedContentKind, data, variants, postDates, isMultiDayTask, scheduleMut, scheduleToCalMut, navigate, lang, reviewCanSubmit, reviewOnSchedule]);
 
   // ── Bulk .ics export (calendar-type tasks only) ──────────────────────────
   const handleBulkIcsExport = React.useCallback(() => {
@@ -1420,6 +1455,177 @@ export default function RunPage() {
     const ov = overrides[getRunContentSelectionKey(selectedContentKind, safeIdx)];
     return ov ? { ...base, caption: ov.caption } : base;
   }, [variants, activeIdx, overrides, selectedContentKind]);
+
+  // ── 2026-09-29 主筆桌（CJ「只有一個版本；右邊是主筆＋這樣寫的原因＋換人寫；要改就跟那位對話」）──
+  // 左邊本文可以直接打字（自動存），右邊換人寫／請主筆改，改完直接進本文。
+  // 每位寫過的稿由伺服器留在 item.writerDrafts（server/content/core/writerDrafts.ts）。
+  const writerDesk = !isStrategyEnvelope && !isEmptyPublicSelection;
+  const deskLeadAgentId: number | undefined = (() => {
+    const ca: any = (data as any)?.metadata?.captionAgent;
+    const n = Number(typeof ca === "object" ? ca?.id : NaN);
+    return Number.isFinite(n) && n > 0 ? n : undefined;
+  })();
+  const deskLead: DeskWriter = useMemo(() => {
+    const ca: any = (data as any)?.metadata?.captionAgent;
+    const name = (typeof ca === "object" ? ca?.name : ca) || (lang === "en" ? "Lead writer" : "主筆");
+    return {
+      key: "lead", name: String(name),
+      title: String((typeof ca === "object" ? ca?.title : "") ?? ""),
+      avatarUrl: typeof ca === "object" ? ca?.avatarUrl ?? null : null,
+    };
+  }, [data, lang]);
+  const deskOthers: DeskWriter[] = useMemo(() => REWRITE_AGENTS
+    .filter((a) => a.agentId !== deskLeadAgentId)
+    .map((a) => ({
+      key: String(a.agentId), name: a.name,
+      title: lang === "en" ? a.titleEn : a.title,
+      pitch: lang === "en" ? a.styleEn : a.style,
+    })), [lang, deskLeadAgentId]);
+  const deskActiveKey = slide?.activeWriter ?? "lead";
+  const deskDrafts = slide?.writerDrafts ?? {};
+  const [deskBusyKey, setDeskBusyKey] = useState<string | null>(null);
+  const [deskChatBusy, setDeskChatBusy] = useState(false);
+  const [deskUndo, setDeskUndo] = useState<{ key: string; caption: string } | null>(null);
+  const [deskView, setDeskView] = useState<"text" | "preview">("text");
+  // 2026-09-30：從任務 modal 飛過來的主筆頭像降落後，本文像紙一樣從上往下展開。
+  const [handoffReveal, setHandoffReveal] = useState(false);
+  const hasData = !!data;
+  useEffect(() => {
+    if (hasData && !writerDesk) cancelAgentHandoff();
+  }, [hasData, writerDesk]);
+  const deskPendingRef = useRef<{ timer: ReturnType<typeof setTimeout>; text: string } | null>(null);
+  const saveCaptionQuietMut = trpc.output.updateVariantCaption.useMutation({
+    onError: (e) => showToastGlobal(lang === "en" ? `Save failed: ${e.message}` : `儲存失敗：${e.message}`),
+  });
+  useEffect(() => {
+    setDeskUndo(null);
+    setChatHistory([]);
+    setDeskView("text");
+  }, [id, activeSelectionKey]);
+
+  const deskWriterRef = (key: string): { key: string; name: string; title?: string; agentId?: number; instruction?: string } => {
+    if (key === "lead") return { key, name: deskLead.name, title: deskLead.title || undefined, agentId: deskLeadAgentId };
+    const a = REWRITE_AGENTS.find((x) => String(x.agentId) === key);
+    if (!a) return { key, name: key };
+    return {
+      key, name: a.name, title: lang === "en" ? a.titleEn : a.title, agentId: a.agentId,
+      instruction: lang === "en" ? a.instructionEn : a.instruction,
+    };
+  };
+  const deskScope = {
+    brandId: data?.mission?.brandId ?? undefined,
+    productId: (data as any)?.metadata?.productId ?? undefined,
+    eventId: (data as any)?.metadata?.eventId ?? undefined,
+    // 改寫要守這張卡的字數與形式（server rewriteContract.ts）。
+    taskId: String(data?.mission?.taskId ?? "") || undefined,
+  };
+  /** 打字：預覽即時更新，停手 1.2 秒後存檔（不跳 toast）。 */
+  const onDeskType = (v: string) => {
+    setOverrides((o) => ({ ...o, [activeSelectionKey]: { caption: v } }));
+    if (deskPendingRef.current) clearTimeout(deskPendingRef.current.timer);
+    const locator = getRunContentMutationLocator(selectedContentKind, activeIdx);
+    const timer = setTimeout(() => {
+      deskPendingRef.current = null;
+      saveCaptionQuietMut.mutate({ id, ...locator, caption: v });
+    }, 1200);
+    deskPendingRef.current = { timer, text: v };
+  };
+  /** 換人／請他改之前，先把還沒存的手改存掉 —— 伺服器要拿它當上一位的稿。 */
+  const flushDeskTyping = async () => {
+    const p = deskPendingRef.current;
+    if (!p) return;
+    clearTimeout(p.timer);
+    deskPendingRef.current = null;
+    await saveCaptionQuietMut.mutateAsync({ id, ...getRunContentMutationLocator(selectedContentKind, activeIdx), caption: p.text });
+  };
+  /** 一段文字成為本文。帶 writer＝換人寫。 */
+  const commitDeskCaption = async (text: string, writer?: { key: string; name: string; title?: string; agentId?: number }) => {
+    const locator = getRunContentMutationLocator(selectedContentKind, activeIdx);
+    setOverrides((o) => ({ ...o, [getMutationLocatorSelectionKey(locator)]: { caption: text } }));
+    const w = writer ? { key: writer.key, name: writer.name, title: writer.title, agentId: writer.agentId } : undefined;
+    await saveCaptionQuietMut.mutateAsync({ id, ...locator, caption: text, ...(w ? { writer: w } : {}) });
+    if (w) await utils.output.getById.invalidate({ id });
+  };
+  const pickDeskWriter = async (key: string) => {
+    if (!refineMut) { showToastGlobal(lang === "en" ? "AI rewrite is unavailable" : "AI 改寫服務暫不可用"); return; }
+    const w = deskWriterRef(key);
+    const locator = getRunContentMutationLocator(selectedContentKind, activeIdx);
+    setDeskBusyKey(key);
+    try {
+      await flushDeskTyping();
+      const cached = deskDrafts[key]?.caption;
+      if (typeof cached === "string" && cached.trim()) {
+        // 寫過的：原樣切回，不重寫。
+        setDeskUndo(null); setChatHistory([]);
+        await commitDeskCaption(cached, w);
+        return;
+      }
+      // 沒寫過的：以主筆的稿（含用戶手改）為底，用這位的寫法重寫。
+      const base = deskActiveKey === "lead" ? (slide?.caption ?? "") : (deskDrafts.lead?.caption ?? slide?.caption ?? "");
+      if (!base.trim()) { showToastGlobal(lang === "en" ? "Nothing to rewrite yet" : "還沒有文案可以改寫"); return; }
+      const r = await refineMut.mutateAsync({
+        currentCaption: base,
+        userFeedback: w.instruction ?? (lang === "en" ? "Rewrite this in your own style." : "請用你的寫法重寫這篇。"),
+        agentId: w.agentId, agentName: w.name, agentTitle: w.title,
+        ...deskScope,
+      });
+      if (!r.ok) {
+        showToastGlobal(lang === "en"
+          ? `Rewrite failed: ${typeof r.error === "string" ? r.error : "unknown error"}`
+          : `改寫失敗：${typeof r.error === "string" ? r.error : "未知錯誤"}`);
+        return;
+      }
+      if (!shouldApplyMutationPreview(activeSelectionKeyRef.current, locator)) return;
+      setDeskUndo(null); setChatHistory([]);
+      await commitDeskCaption(r.rewritten, w);
+    } catch (e: any) {
+      showToastGlobal(lang === "en" ? `Error: ${e?.message ?? String(e)}` : `錯誤：${e?.message ?? String(e)}`);
+    } finally {
+      setDeskBusyKey(null);
+    }
+  };
+  /** 跟目前那位說哪裡要改：改完直接進本文，可復原一步。回傳是否成功（成功才清輸入框）。 */
+  const sendDeskChat = async (text: string): Promise<boolean> => {
+    if (!refineMut) { showToastGlobal(lang === "en" ? "AI rewrite is unavailable" : "AI 改寫服務暫不可用"); return false; }
+    const w = deskWriterRef(deskActiveKey);
+    const locator = getRunContentMutationLocator(selectedContentKind, activeIdx);
+    setDeskChatBusy(true);
+    try {
+      await flushDeskTyping();
+      const before = slide?.caption ?? "";
+      const r = await refineMut.mutateAsync({
+        currentCaption: before, userFeedback: text,
+        agentId: w.agentId, agentName: w.name, agentTitle: w.title,
+        ...deskScope,
+        history: chatHistory.slice(-12),
+      });
+      if (!r.ok) {
+        showToastGlobal(lang === "en"
+          ? `AI rewrite failed: ${typeof r.error === "string" ? r.error : "unknown error"}`
+          : `AI 改寫失敗：${typeof r.error === "string" ? r.error : "未知錯誤"}`);
+        return false;
+      }
+      if (!shouldApplyMutationPreview(activeSelectionKeyRef.current, locator)) return false;
+      setChatHistory((h) => [...h,
+        { role: "user", content: text },
+        { role: "assistant", content: r.explanation || (lang === "en" ? "Done — updated the draft." : "改好了，已更新本文。") },
+      ]);
+      setDeskUndo({ key: activeSelectionKey, caption: before });
+      await commitDeskCaption(r.rewritten);
+      return true;
+    } catch (e: any) {
+      showToastGlobal(lang === "en" ? `Error: ${e?.message ?? String(e)}` : `錯誤：${e?.message ?? String(e)}`);
+      return false;
+    } finally {
+      setDeskChatBusy(false);
+    }
+  };
+  const undoDeskChat = async () => {
+    if (!deskUndo || deskUndo.key !== activeSelectionKey) return;
+    const prev = deskUndo.caption;
+    setDeskUndo(null);
+    await commitDeskCaption(prev);
+  };
 
   /* 2026-08-20 (CJ「IG 留言回覆（一般）… 為什麼沒有產出內容」): reply-type
    * tasks answer something the user pasted in (用戶留言 / 評價 / 提問). The
@@ -1640,6 +1846,8 @@ export default function RunPage() {
       // 2026-09-10 X 通路。mockup 那側的 key 仍是 "twitter:"（XTweet /
       // XThread 早就註冊了），所以 x → twitter，不是 x → x。
       x: "twitter",
+      // 2026-09-29 Threads（th-）→ threads:post；LINE（ln-）→ line:broadcast／richmenu。
+      th: "threads", ln: "line",
     };
     const formatFromTaskId = (id: string): string => {
       // 2026-08-29 官網 (web-)：跟 pr- / em- 同樣的理由——先用前綴決斷，
@@ -1657,6 +1865,8 @@ export default function RunPage() {
       if (id.startsWith("x-")) {
         return id.includes("thread") ? "thread" : "tweet";
       }
+      if (id.startsWith("th-")) return "post";
+      if (id.startsWith("ln-")) return id.includes("rich-menu") ? "richmenu" : "broadcast";
       // 2026-05-16 (CJ「pr-30-lead-paragraph mockup 格式不對」):
       // press (pr-) + email (em-) each have ONE mockup family. Decide
       // by prefix FIRST — otherwise generic keyword scans below
@@ -1819,6 +2029,23 @@ export default function RunPage() {
   // No more red error blocking. mockupVariant always resolves to a usable
   // template via 3-layer fallback (taskId → output.platform → generic).
 
+  const renderWhyWritten = (): React.ReactNode => {
+    const detail: any = cardDetailQ.data;
+    if (cardDetailQ.isLoading) return <p className="text-[12.5px] text-default-500">{lang === "en" ? "Loading…" : "載入中…"}</p>;
+    if (!detail) return <p className="text-[12.5px] text-default-500">{lang === "en" ? "No registered source for this card." : "這張卡沒有登記出處。"}</p>;
+    const src = detail.source ?? { type: "evergreen" };
+    return (
+      <div className="space-y-1.5 rounded-lg bg-default-50 p-2.5 text-[12.5px] leading-relaxed text-default-800">
+        <p className="font-medium">{sourceLabel(src.type, lang, { long: true })}</p>
+        {src.short && <p><span className="text-default-500">{lang === "en" ? "Source: " : "出處："}</span>{src.short}</p>}
+        {src.metric && <p><span className="text-default-500">{lang === "en" ? "Evidence: " : "傳播證據："}</span>{src.metric}{src.asOf ? (lang === "en" ? ` (measured ${src.asOf})` : `（${src.asOf} 量測）`) : ""}</p>}
+        {src.takeaway && <p><span className="text-default-500">{lang === "en" ? "Why it works: " : "為什麼有效："}</span>{src.takeaway}</p>}
+        {detail.rationale && <p className="whitespace-pre-wrap">{detail.rationale}</p>}
+        {!src.short && !src.takeaway && !detail.rationale && <p className="text-default-500">{sourceWhy(src.type, lang)}</p>}
+      </div>
+    );
+  };
+
   const onCopy = async () => {
     try {
       await navigator.clipboard.writeText(slide?.caption ?? "");
@@ -1878,7 +2105,7 @@ export default function RunPage() {
 
       {/* 2026-09-06 送審／審核狀態。沒有這條，/review 佇列永遠是空的 ——
           後端能收、佇列頁有，但沒有入口把稿子送進去。 */}
-      <ReviewBar outputId={id} missionId={(data as any)?.mission?.id ?? null} />
+      <ReviewBar outputId={id} missionId={(data as any)?.mission?.id ?? null} statusOnly={writerDesk} />
 
       {/* 2026-05-14 (async polling): progress banner — only shown when the
           orchestra wrote captions early and is still working on images/QA */}
@@ -1952,12 +2179,6 @@ export default function RunPage() {
         <Chip size="sm" variant="flat" className="font-mono text-[12px]">
           {effectiveVariant ? `${effectiveVariant.platform}:${effectiveVariant.format}` : "?"} · {data.mission?.taskId ?? "no-task"}
         </Chip>
-        {/* 2026-07-17 (CJ): deliverable label, not duration — tier is internal config */}
-        {data.mission?.tier && (
-          <Chip size="sm" variant="flat" color="secondary">
-            {tierLabel(data.mission.tier, lang)}
-          </Chip>
-        )}
         <Chip size="sm" variant="flat" color={data.status === "published" ? "success" : data.status === "scheduled" ? "warning" : "default"}>
           {data.status}
         </Chip>
@@ -2089,9 +2310,59 @@ export default function RunPage() {
       {/* ─── 2-COL: mockup big (no toolbar) + right tool panel ──────── */}
       {/* 2026-05-10: mobile responsive — stack on small screens. md+ keeps 2-col. */}
       <div className="grid grid-cols-1 md:grid-cols-[1fr_360px] gap-4 items-start">
+        {handoffReveal && (
+          <style>{`
+            @keyframes ob-unfold-in {
+              from { clip-path: inset(0 0 100% 0 round 16px); transform: translateY(-6px); opacity: .4 }
+              to   { clip-path: inset(0 0 0 0 round 16px);   transform: none;              opacity: 1 }
+            }
+            .ob-unfold { animation: ob-unfold-in .8s cubic-bezier(.2,.8,.2,1) .5s both }
+            @media (prefers-reduced-motion: reduce) { .ob-unfold { animation: none } }
+          `}</style>
+        )}
         {/* CENTER: pure mockup, no toolbar above (CJ direction 2026-05-09) */}
         <section className="min-w-0 flex flex-col gap-3">
-          <div ref={mockupRef} className="relative bg-white rounded-2xl shadow-[0_4px_24px_rgba(0,0,0,0.05)] ring-1 ring-black/5 overflow-hidden">
+          {/* 2026-09-29 主筆桌：本文是主角，直接打字改（回到寫文案的習慣）；貼文長相切到「預覽」看。 */}
+          {writerDesk && (
+            <div className="flex items-center gap-1 self-start rounded-lg bg-default-100 p-0.5">
+              {(["text", "preview"] as const).map((v) => (
+                <button
+                  key={v}
+                  type="button"
+                  onClick={() => setDeskView(v)}
+                  className={`rounded-md px-3 py-1 text-[13px] transition ${deskView === v ? "bg-white font-medium text-default-900 shadow-sm" : "text-default-500 hover:text-default-800"}`}
+                >
+                  {v === "text" ? (lang === "en" ? "Draft" : "本文") : (lang === "en" ? "Post preview" : "貼文預覽")}
+                </button>
+              ))}
+            </div>
+          )}
+          {writerDesk && deskView === "text" && (
+            <div className={`rounded-2xl bg-white px-6 py-5 ring-1 ring-black/5 shadow-[0_4px_24px_rgba(0,0,0,0.05)] ${handoffReveal ? "ob-unfold" : ""}`}>
+              <textarea
+                value={slide?.caption ?? ""}
+                onChange={(e) => onDeskType(e.target.value)}
+                disabled={!!deskBusyKey || deskChatBusy}
+                rows={Math.max(12, (slide?.caption ?? "").split("\n").length + 3)}
+                placeholder={lang === "en" ? "Write here…" : "在這裡寫…"}
+                className="w-full resize-none border-0 bg-transparent text-[16px] leading-[1.9] text-default-900 outline-none placeholder:text-default-300 disabled:opacity-50"
+              />
+              {(slide?.hashtags?.length ?? 0) > 0 && (
+                <p className="mt-2 text-[14px] text-default-500">{(slide?.hashtags ?? []).map((h) => (h.startsWith("#") ? h : `#${h}`)).join(" ")}</p>
+              )}
+              <div className="mt-3 flex items-center justify-between border-t border-default-100 pt-2 text-[12px] text-default-400">
+                <span>{lang === "en" ? `${(slide?.caption ?? "").length} characters` : `${(slide?.caption ?? "").length} 字`}</span>
+                <span>
+                  {deskBusyKey || deskChatBusy
+                    ? (lang === "en" ? "Rewriting…" : "改寫中…")
+                    : saveCaptionQuietMut.isPending
+                    ? (lang === "en" ? "Saving…" : "儲存中…")
+                    : (lang === "en" ? "Auto-saved" : "已自動儲存")}
+                </span>
+              </div>
+            </div>
+          )}
+          <div ref={mockupRef} style={writerDesk && deskView === "text" ? { display: "none" } : undefined} className={`relative bg-white rounded-2xl shadow-[0_4px_24px_rgba(0,0,0,0.05)] ring-1 ring-black/5 overflow-hidden ${handoffReveal && deskView === "preview" ? "ob-unfold" : ""}`}>
             {(() => {
               const holdMockup =
                 (HOLD_FOR_IMAGES.has(data.mission?.taskId ?? "") ||
@@ -2119,7 +2390,7 @@ export default function RunPage() {
                     <div className="w-12 h-12 rounded-full bg-primary-50 text-primary-600 flex items-center justify-center text-xl">
                       {isGeneratingPublicPosts
                         ? <span className="inline-block w-6 h-6 border-[3px] border-primary-200 border-t-primary-600 rounded-full animate-spin" />
-                        : "↻"}
+                        : <RegenerateIcon size={18} />}
                     </div>
                     <p className="text-small font-semibold text-default-800">
                       {isGeneratingPublicPosts
@@ -2164,17 +2435,18 @@ export default function RunPage() {
               return effectiveVariant && slide ? (
               <>
               {isComponentTask && (
-                <div className="mx-4 mt-3 flex items-start gap-2 rounded-lg border border-primary-200 bg-primary-50 px-3 py-2">
-                  <span className="text-small leading-none pt-0.5">🧩</span>
-                  <p className="text-tiny text-primary-800 leading-relaxed">
+                <div className="mx-4 mt-3 flex items-center gap-1.5 text-tiny text-default-600">
+                  <PuzzleIcon size={13} />
+                  <span className="font-medium">{lang === "en" ? "Component task" : "元件任務"}</span>
+                  <HelpTip>
                     {componentSlot
                       ? (lang === "en"
-                          ? "Component task: your deliverable is rendered in its real ad slot below (purple highlight). Dashed gray areas are NOT produced by this task. Switch the version pills above to compare angles."
-                          : "元件任務：交付物已放進下方版型的實際位置（紫色標記處）；灰色虛線區塊非本任務產出。切換上方版本標籤比較不同切角。")
+                          ? "Component task: your deliverable is rendered in its real ad slot below (outlined). Dashed gray areas are NOT produced by this task. Switch the version pills above to compare angles."
+                          : "元件任務：交付物已放進下方版型的實際位置（框線標記處）；灰色虛線區塊非本任務產出。切換上方版本標籤比較不同切角。")
                       : (lang === "en"
                           ? "Component task: each version is ONE short, copy-ready line (e.g. ad headline / description / button text) — not a full post. Switch the version pills above to compare angles; the post frame is just placement context."
                           : "元件任務：每個版本是「一條」可直接複製使用的短句（廣告標題／描述／按鈕文字等），本來就不是完整貼文。切換上方版本標籤比較不同切角；貼文外框只是示意擺放位置。")}
-                  </p>
+                  </HelpTip>
                 </div>
               )}
               <PlatformMockup
@@ -2256,7 +2528,7 @@ export default function RunPage() {
                 {slide.extras.postingTime && (
                   <div className="rounded-lg border border-divider bg-default-50 px-3 py-2">
                     <p className="text-tiny font-semibold text-default-700 mb-1">
-                      ⏰ {lang === "en" ? "Suggested posting time" : "建議發文時段"}
+                      <WaitingIcon size={11} /> {lang === "en" ? "Suggested posting time" : "建議發文時段"}
                     </p>
                     <p className="text-tiny text-default-600">{slide.extras.postingTime}</p>
                   </div>
@@ -2264,12 +2536,12 @@ export default function RunPage() {
                 {Array.isArray(slide.extras.replyTemplates) && slide.extras.replyTemplates.length > 0 && (
                   <div className="rounded-lg border border-divider bg-default-50 px-3 py-2">
                     <p className="text-tiny font-semibold text-default-700 mb-1.5">
-                      💬 {lang === "en" ? "Suggested reply templates" : "建議留言模板"}
+                      <CommentIcon size={11} /> {lang === "en" ? "Suggested reply templates" : "建議留言模板"}
                     </p>
                     <div className="space-y-1.5">
                       {slide.extras.replyTemplates.map((r: { userSays: string; yourReply: string }, i: number) => (
                         <div key={i} className="text-tiny">
-                          <p className="text-default-500">🗨️ {r.userSays}</p>
+                          <p className="text-default-500"><UserIcon size={10} /> {r.userSays}</p>
                           <p className="text-default-700 pl-4">↳ {r.yourReply}</p>
                         </div>
                       ))}
@@ -2279,7 +2551,7 @@ export default function RunPage() {
                 {slide.extras.followupPost && (
                   <div className="rounded-lg border border-divider bg-default-50 px-3 py-2">
                     <p className="text-tiny font-semibold text-default-700 mb-1">
-                      🔁 {lang === "en" ? "24h follow-up post" : "24 小時後續貼文"}
+                      <RegenerateIcon size={11} /> {lang === "en" ? "24h follow-up post" : "24 小時後續貼文"}
                     </p>
                     <p className="text-tiny text-default-600 whitespace-pre-line">{slide.extras.followupPost}</p>
                   </div>
@@ -2315,7 +2587,7 @@ export default function RunPage() {
                   }
                 }}
                 className="absolute top-3 right-3 z-20 flex items-center justify-center w-9 h-9 rounded-full shadow-md transition hover:scale-105"
-                style={{ background: "rgba(31,42,77,0.88)", color: "#fff", backdropFilter: "blur(2px)" }}
+                style={{ background: "rgba(24,24,27,0.88)", color: "#fff", backdropFilter: "blur(2px)" }}
               >
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
@@ -2408,7 +2680,7 @@ export default function RunPage() {
                   }
                 }}
                 className="px-4 py-2 rounded-lg text-tiny font-semibold text-white"
-                style={{ background: "#1f2a4d" }}
+                style={{ background: "#18181b" }}
               >
                 {lang === "en" ? "Copy full text" : "複製全文"}
               </button>
@@ -2416,7 +2688,7 @@ export default function RunPage() {
                 onClick={exportSlidePng}
                 disabled={exporting}
                 className="px-4 py-2 rounded-lg text-tiny font-semibold border disabled:opacity-60"
-                style={{ borderColor: "#1f2a4d", color: "#1f2a4d" }}
+                style={{ borderColor: "#18181b", color: "#18181b" }}
               >
                 {exporting
                   ? (lang === "en" ? "Rendering…" : "產生圖片中…")
@@ -2434,7 +2706,7 @@ export default function RunPage() {
                   URL.revokeObjectURL(a.href);
                 }}
                 className="px-4 py-2 rounded-lg text-tiny font-semibold border"
-                style={{ borderColor: "#1f2a4d", color: "#1f2a4d" }}
+                style={{ borderColor: "#18181b", color: "#18181b" }}
               >
                 {lang === "en" ? "Full text (.md)" : "全文（.md）"}
               </button>
@@ -2455,7 +2727,7 @@ export default function RunPage() {
               <div className="rounded-xl border border-default-200 bg-white overflow-hidden shadow-sm">
                 <div className="px-4 py-3 border-b border-default-100 flex items-center justify-between">
                   <span className="text-small font-semibold text-default-700">
-                    {lang === "en" ? "12 Video Titles — click to generate script" : "12 支影片 title — 點選產出腳本"}
+                    {lang === "en" ? "12 Video Titles" : "12 支影片 title"}
                   </span>
                   <span className="text-tiny text-default-400">{rows.length} 支</span>
                 </div>
@@ -2472,7 +2744,7 @@ export default function RunPage() {
                         }}
                         className="shrink-0 px-2.5 py-1 rounded-lg text-tiny font-semibold border border-secondary/40 text-secondary opacity-0 group-hover:opacity-100 transition hover:bg-secondary/5"
                       >
-                        {lang === "en" ? "📝 Script" : "📝 腳本"}
+                        <span className="inline-flex items-center gap-1"><TextIcon size={11} />{lang === "en" ? "Script" : "腳本"}</span>
                       </button>
                     </div>
                   ))}
@@ -2499,11 +2771,6 @@ export default function RunPage() {
                 <ModalBody>
                   {!generatedScript && !scriptMut?.isPending && (
                     <div className="flex flex-col items-center gap-4 py-8 text-center">
-                      <p className="text-small text-default-600 max-w-sm">
-                        {lang === "en"
-                          ? "Generate a full shooting script. Includes an opening hook, 3–5 main points, and a closing call to action."
-                          : "為這支影片 title 產出完整拍攝腳本，包含開場鉤、主體論點（3–5個）、收尾行動呼籲。"}
-                      </p>
                       <Button
                         color="secondary"
                         onPress={() => {
@@ -2512,6 +2779,8 @@ export default function RunPage() {
                             videoTitle: scriptModalTitle,
                             titleContext: slide?.caption ?? undefined,
                             brandId: data?.brand?.id ?? undefined,
+                            productId: (data as any)?.metadata?.productId ?? undefined,
+                            eventId: (data as any)?.metadata?.eventId ?? undefined,
                           });
                         }}
                       >
@@ -2547,7 +2816,7 @@ export default function RunPage() {
                           } catch { showToastGlobal(lang === "en" ? "Copy failed" : "複製失敗"); }
                         }}
                       >
-                        {scriptCopied ? (lang === "en" ? "✓ Copied" : "✓ 已複製") : (lang === "en" ? "Copy script" : "複製腳本")}
+                        {scriptCopied ? <span className="inline-flex items-center gap-1"><CheckIcon size={11} />{lang === "en" ? "Copied" : "已複製"}</span> : (lang === "en" ? "Copy script" : "複製腳本")}
                       </Button>
                       <Button
                         variant="flat"
@@ -2560,6 +2829,8 @@ export default function RunPage() {
                               videoTitle: scriptModalTitle!,
                               titleContext: slide?.caption ?? undefined,
                               brandId: data?.brand?.id ?? undefined,
+                              productId: (data as any)?.metadata?.productId ?? undefined,
+                              eventId: (data as any)?.metadata?.eventId ?? undefined,
                             });
                           }
                         }}
@@ -2584,7 +2855,7 @@ export default function RunPage() {
         {/* RIGHT: toolbar (top) + mode panel + publish actions
             CJ direction 2026-05-09: 'toolbar 一道右方對話窗上面，當用戶選擇
             不同按鍵，在顯示出該功能' — toolbar is the tab bar for the panel */}
-        <aside className="space-y-3 sticky top-2 self-start">
+        <aside className="space-y-3 sticky top-2 self-start md:max-h-[calc(100vh-1rem)] md:overflow-y-auto">
           {isEmptyPublicSelection ? (
             <Card>
               <CardBody className="space-y-3 p-4">
@@ -2608,12 +2879,36 @@ export default function RunPage() {
           <>
           {/* Toolbar — clicking a button switches mode + the panel below
               expands to show that tool. */}
+          {writerDesk ? (
+            <div className="bg-white rounded-xl border border-default-200 shadow-sm">
+              <div className="flex items-center gap-0.5 px-2 py-1.5">
+                {hasImageSlot && (
+                  <ToolbarBtn icon={ImageIcon} label={lang === "en" ? "Redo image" : "改圖"} active={mode === "image"}
+                    onClick={() => { if (mode === "image") setMode("chat"); else { setMode("image"); setDeskView("preview"); } }} />
+                )}
+                <ToolbarBtn icon={CopyIcon} label={lang === "en" ? "Copy caption" : "複製文案"} onClick={onCopy} highlight={copied} />
+                <div className="flex-1" />
+                <Tooltip content={lang === "en" ? "Re-run task" : "重跑同任務"} placement="bottom">
+                  <button onClick={rerunOriginalTask} aria-label={lang === "en" ? "Re-run" : "重跑"}
+                    className="w-7 h-7 rounded-md flex items-center justify-center text-default-500 hover:bg-default-100 hover:text-default-800 transition">
+                    <FontAwesomeIcon icon={faRotateRight} className="text-tiny" />
+                  </button>
+                </Tooltip>
+                <Tooltip content={lang === "en" ? "Close → Projects" : "關閉 → 專案"} placement="bottom">
+                  <button onClick={() => navigate("/projects")} aria-label={lang === "en" ? "Close to Projects" : "關閉到專案"}
+                    className="w-7 h-7 rounded-md flex items-center justify-center text-default-500 hover:bg-default-100 hover:text-default-800 transition">
+                    <FontAwesomeIcon icon={faXmark} className="text-tiny" />
+                  </button>
+                </Tooltip>
+              </div>
+            </div>
+          ) : (
           <div className="bg-white rounded-xl border border-default-200 shadow-sm">
             <div className="flex items-center gap-0.5 px-2 py-1.5 flex-wrap">
-              <ToolbarBtn icon={Pencil}        label={lang === "en" ? "Edit text" : "直接編輯"}      active={mode==="edit"}  onClick={() => setMode("edit")} />
-              <ToolbarBtn icon={MessageCircle} label={lang === "en" ? "Chat with AI" : "跟 AI 專家對話"} active={mode==="chat"}  onClick={() => setMode("chat")} />
+              <ToolbarBtn icon={EditIcon}        label={lang === "en" ? "Edit text" : "編輯"}      active={mode==="edit"}  onClick={() => setMode("edit")} />
+              <ToolbarBtn icon={CommentIcon} label={lang === "en" ? "Chat with AI" : "對話修改"} active={mode==="chat"}  onClick={() => setMode("chat")} />
               {hasImageSlot && (
-                <ToolbarBtn icon={LucideImage}   label={lang === "en" ? "Redo image" : "改圖"}          active={mode==="image"} onClick={() => setMode("image")} />
+                <ToolbarBtn icon={ImageIcon}   label={lang === "en" ? "Redo image" : "改圖"}          active={mode==="image"} onClick={() => setMode("image")} />
               )}
               <Divider />
               {/* Agent avatars — click to see that agent's thinking */}
@@ -2645,13 +2940,13 @@ export default function RunPage() {
               </Tooltip>
               <Divider />
               {!isStrategyEnvelope && (
-                <ToolbarBtn icon={Wand2} label={lang === "en" ? "Rewrite this" : "重生這段"} active={mode==="regen"} onClick={() => setMode("regen")} />
+                <ToolbarBtn icon={RegenerateIcon} label={lang === "en" ? "Rewrite this" : "重生這段"} active={mode==="regen"} onClick={() => setMode("regen")} />
               )}
               {/* 2026-07-07 (CJ「參數儀表板客戶看不懂 → 換成選不同 agent 重寫」) */}
-              <ToolbarBtn icon={LucideUsers}   label={lang === "en" ? "Rewrite by agent" : "換人重寫"}   active={mode==="rewrite"}  onClick={() => setMode("rewrite")} />
-              <ToolbarBtn icon={BookOpen}      label={lang === "en" ? "Why it's written this way" : "為什麼這樣寫"} active={mode==="source"} onClick={() => setMode("source")} />
+              <ToolbarBtn icon={RewriteAsIcon}   label={lang === "en" ? "Rewrite by agent" : "換人重寫"}   active={mode==="rewrite"}  onClick={() => setMode("rewrite")} />
+              <ToolbarBtn icon={LibraryIcon}      label={lang === "en" ? "Why it's written this way" : "為什麼這樣寫"} active={mode==="source"} onClick={() => setMode("source")} />
               <Divider />
-              <ToolbarBtn icon={LucideCopy}    label={lang === "en" ? "Copy caption" : "複製文案"}       onClick={onCopy} highlight={copied} />
+              <ToolbarBtn icon={CopyIcon}    label={lang === "en" ? "Copy caption" : "複製文案"}       onClick={onCopy} highlight={copied} />
               {/* 2026-05-11 (CJ feedback「存 Mission 不要出現在工具列，只要在下方」):
                   publish card 已經有「存到 Mission」按鈕，工具列這個是重複，砍掉。 */}
               <Divider />
@@ -2675,16 +2970,30 @@ export default function RunPage() {
               </Tooltip>
             </div>
           </div>
+          )}
           <Card>
             <CardBody className="space-y-3">
-              {mode === "chat" && (
+              {writerDesk && mode !== "image" && (
+                <WriterDesk
+                  en={lang === "en"}
+                  lead={deskLead}
+                  others={deskOthers}
+                  activeKey={deskActiveKey}
+                  draftKeys={Object.keys(deskDrafts)}
+                  busyKey={deskBusyKey}
+                  onPick={pickDeskWriter}
+                  leadReason={renderWhyWritten()}
+                  chatHistory={chatHistory}
+                  chatBusy={deskChatBusy}
+                  onSend={sendDeskChat}
+                  canUndo={!!deskUndo && deskUndo.key === activeSelectionKey}
+                  onUndo={undoDeskChat}
+                  onHandoffLanded={() => setHandoffReveal(true)}
+                />
+              )}
+              {!writerDesk && mode === "chat" && (
                 <>
                   <p className="text-tiny font-semibold">{lang === "en" ? "Tell the AI specialist what to change" : "跟 AI 專家改文案"}</p>
-                  <p className="text-[12px] text-default-500 leading-relaxed">
-                    {lang === "en"
-                      ? "Tell the agent how to adjust it — e.g. \"end with a limited-time offer\" or \"too wordy, cut the second paragraph\"."
-                      : "告訴 AI 專家你想怎麼調整：例如「結尾改成限時優惠」、「太囉嗦砍第二段」。"}
-                  </p>
                   {chatHistory.length > 0 && (
                     <div className="space-y-1.5 max-h-40 overflow-y-auto bg-default-50 rounded-lg p-2">
                       {chatHistory.slice(-4).map((m, i) => (
@@ -2731,6 +3040,9 @@ export default function RunPage() {
                           currentCaption: slide?.caption ?? "",
                           userFeedback: chatPrompt,
                           brandId: data.mission?.brandId ?? undefined,
+                          // 2026-09-29：改寫讀同一份品牌大腦，含原本那篇的產品／活動。
+                          productId: (data as any)?.metadata?.productId ?? undefined,
+                          eventId: (data as any)?.metadata?.eventId ?? undefined,
                           history: chatHistory,
                         });
                         if (r.ok) {
@@ -2761,11 +3073,11 @@ export default function RunPage() {
                   </Button>
                 </>
               )}
-              {mode === "edit" && (
+              {!writerDesk && mode === "edit" && (
                 <>
-                  <p className="text-tiny font-semibold">{t("run_mode_edit")}</p>
-                  <p className="text-[12px] text-default-500">
-                    {lang === "en" ? "Edit here — the mockup updates live." : "在這裡改文字，左邊預覽即時更新。"}
+                  <p className="text-tiny font-semibold flex items-center gap-1">
+                    {t("run_mode_edit")}
+                    <HelpTip>{lang === "en" ? "Edit here — the mockup updates live." : "在這裡改文字，左邊預覽即時更新。"}</HelpTip>
                   </p>
                   <Textarea
                     value={editText ?? slide?.caption ?? ""}
@@ -2804,9 +3116,14 @@ export default function RunPage() {
                   {/* 2026-07-07 (CJ「產圖畫面有不是國字的國字」→ 圖改為無字背景，
                       標題文字改成用戶可編輯的疊層。只在 YT（縮圖有標題）顯示。 */}
                   {mockupVariant?.platform === "youtube" && (
-                    <div className="bg-warning-50 border border-warning-200 rounded-lg p-2.5 space-y-1.5">
-                      <label className="block text-tiny font-semibold text-warning-800">
+                    <div className="border border-default-200 rounded-lg p-2.5 space-y-1.5">
+                      <label className="flex items-center gap-1 text-tiny font-semibold text-default-800">
                         {lang === "en" ? "Thumbnail title (overlaid on the image)" : "縮圖標題文字（疊在圖片上）"}
+                        <HelpTip>
+                          {lang === "en"
+                            ? "AI can't render Chinese cleanly, so the image is generated text-free. Type your real title here — it overlays on the thumbnail and is included in the templated download."
+                            : "AI 無法正確畫中文，所以圖片刻意產成無字背景。真正的標題在這裡打 — 會疊在縮圖上，並包含在「帶版型下載」裡。"}
+                        </HelpTip>
                       </label>
                       <input
                         type="text"
@@ -2814,25 +3131,25 @@ export default function RunPage() {
                         onChange={(e) => setOverlayTitle(e.target.value.slice(0, 60))}
                         placeholder={lang === "en" ? "e.g. 3 signs your kid isn't just picky" : "例：孩子挑食的 3 個警訊"}
                         maxLength={60}
-                        className="w-full text-sm border border-warning-300 rounded-md px-2.5 py-1.5 bg-white focus:outline-none focus:border-warning-500"
+                        className="w-full text-sm border border-default-300 rounded-md px-2.5 py-1.5 bg-white focus:outline-none focus:border-default-500"
                       />
-                      <p className="text-[12px] text-warning-700 leading-relaxed">
-                        {lang === "en"
-                          ? "AI can't render Chinese cleanly, so the image is generated text-free. Type your real title here — it overlays on the thumbnail and is included in the templated download."
-                          : "AI 無法正確畫中文，所以圖片刻意產成無字背景。真正的標題在這裡打 — 會疊在縮圖上，並包含在「帶版型下載」裡。"}
-                      </p>
                     </div>
                   )}
                   {/* 2026-05-11 (CJ feedback「應該要先給用戶指令」):
                       明確分兩步 — Step 1 寫指令 → Step 2 產圖。
                       底下圖片變成「目前的圖」獨立區塊，不混在 prompt 裡 */}
-                  <div className="bg-secondary-50 border border-secondary-200 rounded-lg p-2 text-[12px] text-secondary-700">
-                    {lang === "en"
-                      ? "Step 1: Describe the image you want (or adjust the current prompt)"
-                      : "Step 1：先告訴我你想要什麼樣的圖（或調整現有 prompt）"}
-                  </div>
                   <Textarea
-                    label={lang === "en" ? "Your image instruction" : "你的圖片指令"}
+                    label={
+                      <span className="inline-flex items-center gap-1.5">
+                        <StepBadge n={1} />
+                        {lang === "en" ? "Your image instruction" : "你的圖片指令"}
+                        <HelpTip>
+                          {lang === "en"
+                            ? "Write naturally in Chinese or English. Chinese instructions are automatically translated to English before being sent to the image AI; brand colors / style / tone are also applied."
+                            : "請直接用中文描述；送給圖片 AI 前會自動翻成英文，並帶入品牌色彩 / 風格 / 調性。翻譯失敗時仍會用原指令繼續產圖。"}
+                        </HelpTip>
+                      </span>
+                    }
                     placeholder={lang === "en"
                       ? "e.g. Sunlight on a warm wooden table, a steaming bowl of soup, soft-focus background with a homey feel"
                       : "例：陽光灑落在溫暖木桌上，一碗冒著煙的健力湯，柔焦背景帶有家庭溫度"}
@@ -2840,9 +3157,6 @@ export default function RunPage() {
                     onChange={(e) => { userEditedPromptRef.current = true; setImagePrompt(e.target.value); }}
                     minRows={3}
                     maxRows={6}
-                    description={lang === "en"
-                      ? "Write naturally in Chinese or English. Chinese instructions are automatically translated to English before being sent to the image AI; brand colors / style / tone are also applied."
-                      : "請直接用中文描述；送給圖片 AI 前會自動翻成英文，並帶入品牌色彩 / 風格 / 調性。翻譯失敗時仍會用原指令繼續產圖。"}
                     autoFocus
                   />
                   {/* 2026-05-17 (CJ「右側欄不需要展示出圖片了」): the
@@ -2870,12 +3184,11 @@ export default function RunPage() {
                   {/* 2026-05-12 Phase 1 (CJ「prompt library 整合」):
                       Nano-Banana 175 商業攝影 prompt 範本。先選類別 → 列表
                       → 點 card 套用到 prompt textarea。 */}
-                  <div className="bg-secondary-50 border border-secondary-200 rounded-lg p-2 text-[12px] text-secondary-700 mt-2">
-                    {lang === "en"
-                      ? "Step 2 (optional): Start from a commercial-photography template"
-                      : "Step 2（選填）：用商業攝影範本當起點"}
-                  </div>
-                  <label className="block text-tiny text-default-600 -mb-1">{lang === "en" ? "Template category" : "範本類別"}</label>
+                  <label className="mt-2 flex items-center gap-1.5 text-tiny text-default-600 -mb-1">
+                    <StepBadge n={2} />
+                    {lang === "en" ? "Template category (optional)" : "範本類別（選填）"}
+                    <HelpTip>{lang === "en" ? "Start from a commercial-photography template" : "用商業攝影範本當起點"}</HelpTip>
+                  </label>
                   <select
                     value={templateCategory}
                     onChange={(e) => setTemplateCategory(e.target.value)}
@@ -3012,12 +3325,12 @@ export default function RunPage() {
                             }
                           }}
                         />
-                        <span className="text-tiny font-semibold">📦 {lang === "en" ? "Use real product photo" : "使用真實產品圖"}</span>
-                        <span className="text-[12px] text-default-500">
+                        <span className="text-tiny font-semibold inline-flex items-center gap-1"><BundleIcon size={11} /> {lang === "en" ? "Use real product photo" : "使用真實產品圖"}</span>
+                        <HelpTip>
                           {lang === "en"
                             ? "Uses your real product photo as the base (GPT Image 2 edits it; pick Nano Banana below if you prefer)"
                             : "以真實產品照為基準生圖 — 預設 GPT Image 2 依照片編輯；想換 Nano Banana 可在下方自行選擇"}
-                        </span>
+                        </HelpTip>
                       </label>
                       {useRealProduct && (
                         <div className="flex gap-2 mt-2 flex-wrap">
@@ -3061,12 +3374,11 @@ export default function RunPage() {
                       )}
                     </div>
                   )}
-                  <div className="bg-secondary-50 border border-secondary-200 rounded-lg p-2 text-[12px] text-secondary-700 mt-2">
-                    {lang === "en"
-                      ? "Step 3: Model — GPT Image 2 by default; try Nano Banana if it doesn't work out"
-                      : "Step 3：模型 — 預設 GPT Image 2；不行再換 Nano Banana"}
-                  </div>
-                  <label className="block text-tiny text-default-600 -mb-1">{lang === "en" ? "AI model" : "AI 模型"}</label>
+                  <label className="mt-2 flex items-center gap-1.5 text-tiny text-default-600 -mb-1">
+                    <StepBadge n={3} />
+                    {lang === "en" ? "AI model" : "AI 模型"}
+                    <HelpTip>{lang === "en" ? "GPT Image 2 by default; try Nano Banana if it doesn't work out" : "預設 GPT Image 2；不行再換 Nano Banana"}</HelpTip>
+                  </label>
                   <select
                     value={imageModel}
                     onChange={(e) => setImageModel(e.target.value)}
@@ -3084,10 +3396,13 @@ export default function RunPage() {
                       <span className="font-mono">{slide.imageModelId}</span>
                     </p>
                   )}
-                  <div className="bg-secondary-50 border border-secondary-200 rounded-lg p-2 text-[12px] text-secondary-700 mt-2">
-                    {lang === "en"
-                      ? "Step 4: Hit the button to make a new image (the current one is kept — switch back below)"
-                      : "Step 4：按下面按鈕，會用你的指令重新產圖（目前的圖會保留，可在下方切回去）"}
+                  <div className="mt-2 flex items-center gap-1.5 text-[12px] text-default-600">
+                    <StepBadge n={4} />
+                    <HelpTip>
+                      {lang === "en"
+                        ? "Hit the button to make a new image (the current one is kept — switch back below)"
+                        : "按下面按鈕，會用你的指令重新產圖（目前的圖會保留，可在下方切回去）"}
+                    </HelpTip>
                   </div>
                   <Button
                     color="secondary" fullWidth
@@ -3100,10 +3415,10 @@ export default function RunPage() {
                       : t("run_image_make")}
                   </Button>
                   {!data.brand?.id && (
-                    <p className="text-[12px] text-warning-700">⚠ {lang === "en" ? "This run has no brand — link a brand first" : "此 run 沒有 brand，請先綁品牌再產圖"}</p>
+                    <p className="text-[12px] text-warning-700"><WarningIcon size={11} /> {lang === "en" ? "This run has no brand — link a brand first" : "此 run 沒有 brand，請先綁品牌再產圖"}</p>
                   )}
                   {missingRealProductSelection && (
-                    <p className="text-[12px] text-warning-700">⚠ {lang === "en" ? "Choose a valid product photo from this brand" : "已勾選使用真實產品圖，請先從目前品牌選擇有效產品圖"}</p>
+                    <p className="text-[12px] text-warning-700"><WarningIcon size={11} /> {lang === "en" ? "Choose a valid product photo from this brand" : "已勾選使用真實產品圖，請先從目前品牌選擇有效產品圖"}</p>
                   )}
                   {imageFailure && !imageGenMut.isPending && (
                     <div className="rounded-lg border border-warning-300 bg-warning-50 px-3 py-2.5 space-y-2">
@@ -3122,8 +3437,9 @@ export default function RunPage() {
                   {/* 2026-09-21: every earlier image of this slot stays selectable — switching is free. */}
                   {(slide?.imageVersions?.length ?? 0) > 0 && (
                     <div className="space-y-1.5">
-                      <p className="text-[12px] font-semibold text-default-700">
-                        {lang === "en" ? "Earlier images — click to switch back (no regeneration)" : "之前的圖 — 點一下切回去（不用重新生成）"}
+                      <p className="text-[12px] font-semibold text-default-700 flex items-center gap-1">
+                        {lang === "en" ? "Earlier images" : "之前的圖"}
+                        <HelpTip>{lang === "en" ? "Click to switch back — no regeneration." : "點一下切回去，不用重新生成。"}</HelpTip>
                       </p>
                       <div className="flex gap-2 flex-wrap">
                         {slide?.imageUrl && slide?.imageStatus === "ready" && (
@@ -3154,7 +3470,7 @@ export default function RunPage() {
                   )}
                 </>
               )}
-              {mode === "agent" && (() => {
+              {!writerDesk && mode === "agent" && (() => {
                 // 2026-05-09 (P2): real agent timeline from persisted metadata.
                 // captionAgent/imageAgent are now full {id,name,title,avatarUrl}
                 // (was string). Stages = orchestra timeline. Backward compat for
@@ -3199,9 +3515,9 @@ export default function RunPage() {
                               s.status === "failed" ? "text-danger" :
                               s.status === "running" ? "text-warning" : "text-default-400";
                             const dot =
-                              s.status === "done" ? "●" :
-                              s.status === "failed" ? "✕" :
-                              s.status === "running" ? "◌" : "○";
+                              s.status === "done" ? <DoneIcon size={11} /> :
+                              s.status === "failed" ? <ErrorIcon size={11} /> :
+                              s.status === "running" ? <WorkingIcon size={11} /> : <WaitingIcon size={11} />;
                             return (
                               <li key={i} className="flex items-start gap-2 text-[12px] leading-tight py-1 border-b border-default-100 last:border-0">
                                 <span className={`${statusColor} font-mono text-sm leading-none mt-0.5`}>{dot}</span>
@@ -3245,24 +3561,24 @@ export default function RunPage() {
                     </div>
                     {unavailableUrl ? (
                       <p className="text-[12px] text-warning-700" title={unavailableUrl}>
-                        ⚠️ {lang === "en"
+                        <WarningIcon size={11} /> {lang === "en"
                           ? "This link's content could not be fetched (platform restriction). Paste the video caption or describe the topic instead."
                           : "這個連結抓不到內容（平台限制），建議直接貼上影片文案或描述主題。"}
                       </p>
                     ) : fetchedUrl && (
                       <p className="text-[12px] text-default-500">
-                        🔗 {lang === "en" ? "Reference fetched: " : "抓取參考："}<a href={fetchedUrl} target="_blank" rel="noreferrer" className="underline truncate inline-block max-w-[260px] align-bottom">{fetchedUrl}</a>
+                        <LinkIcon size={11} /> {lang === "en" ? "Reference fetched: " : "抓取參考："}<a href={fetchedUrl} target="_blank" rel="noreferrer" className="underline truncate inline-block max-w-[260px] align-bottom">{fetchedUrl}</a>
                       </p>
                     )}
                     {Array.isArray(md.errors) && md.errors.length > 0 && (
                       <div className="bg-danger-50 border border-danger-200 rounded p-2 text-[12px] text-danger-700">
-                        ⚠ {md.errors.slice(0, 2).join(" · ")}
+                        <WarningIcon size={11} /> {md.errors.slice(0, 2).join(" · ")}
                       </div>
                     )}
                   </>
                 );
               })()}
-              {mode === "source" && (() => {
+              {!writerDesk && mode === "source" && (() => {
                 const detail: any = cardDetailQ.data;
                 if (cardDetailQ.isLoading) {
                   return <p className="text-[12px] text-default-500">{lang === "en" ? "Loading…" : "載入中…"}</p>;
@@ -3298,13 +3614,15 @@ export default function RunPage() {
                   </>
                 );
               })()}
-              {mode === "regen" && !isStrategyEnvelope && (
+              {!writerDesk && mode === "regen" && !isStrategyEnvelope && (
                 <>
-                  <p className="text-tiny font-semibold">{lang === "en" ? "Rewrite this version" : "重生這段文案"}</p>
-                  <p className="text-[12px] text-default-500 leading-relaxed">
-                    {lang === "en"
-                      ? <>Have the same agent write this version again — &quot;{slide?.label ?? `Version ${activeIdx + 1}`}&quot;. The original is archived.</>
-                      : <>讓同一位 AI 專家重新寫一次當前版本「{slide?.label ?? `版本 ${activeIdx + 1}`}」。原版會歸檔到歷史。</>}
+                  <p className="text-tiny font-semibold flex items-center gap-1">
+                    {lang === "en" ? "Rewrite this version" : "重生這段文案"}
+                    <HelpTip>
+                      {lang === "en"
+                        ? <>The same agent rewrites &quot;{slide?.label ?? `Version ${activeIdx + 1}`}&quot;. The original is archived.</>
+                        : <>同一位 AI 專家重寫「{slide?.label ?? `版本 ${activeIdx + 1}`}」。原版會歸檔到歷史。</>}
+                    </HelpTip>
                   </p>
                   <Button
                     color="secondary"
@@ -3317,29 +3635,26 @@ export default function RunPage() {
                   >
                     {regenMut.isPending
                       ? (lang === "en" ? "Rewriting…" : "重生中…")
-                      : (lang === "en" ? "Rewrite this version" : "立即重生這個版本")}
+                      : (lang === "en" ? "Rewrite this version" : "重生這個版本")}
                   </Button>
-                  <p className="text-[12px] text-default-400">
-                    {lang === "en"
-                      ? <>Will ask {(typeof data.metadata?.captionAgent === "object" ? data.metadata.captionAgent?.name : data.metadata?.captionAgent) ?? "the copywriter"} to rewrite version {activeIdx + 1}.</>
-                      : <>將呼叫 {(typeof data.metadata?.captionAgent === "object" ? data.metadata.captionAgent?.name : data.metadata?.captionAgent) ?? "撰寫者"} 重新產出第 {activeIdx + 1} 個版本。</>}
-                  </p>
                   {Array.isArray(data.metadata?.archivedVariants) && data.metadata.archivedVariants.length > 0 && (
                     <p className="text-[12px] text-default-500">
-                      📚 {lang === "en"
+                      <LibraryIcon size={11} /> {lang === "en"
                         ? `Rewritten ${data.metadata.archivedVariants.length} time(s) — history kept`
                         : `已重生 ${data.metadata.archivedVariants.length} 次（歷史保留）`}
                     </p>
                   )}
                 </>
               )}
-              {mode === "rewrite" && (
+              {!writerDesk && mode === "rewrite" && (
                 <>
-                  <p className="text-tiny font-semibold">{lang === "en" ? "Have another agent rewrite it" : "換一位 AI 專家重寫"}</p>
-                  <p className="text-[12px] text-default-500 leading-relaxed">
-                    {lang === "en"
-                      ? "Pick a specialist below — they rewrite this caption in their own style. Nothing changes until you accept the preview."
-                      : "挑一位不同風格的專家，用他的寫法重寫這篇文案。改完先給你預覽，按「採用」才會生效。"}
+                  <p className="text-tiny font-semibold flex items-center gap-1">
+                    {lang === "en" ? "Have another agent rewrite it" : "換一位 AI 專家重寫"}
+                    <HelpTip>
+                      {lang === "en"
+                        ? "Pick a specialist below — they rewrite this caption in their own style. Nothing changes until you accept the preview."
+                        : "挑一位不同風格的專家，用他的寫法重寫這篇文案。改完先給你預覽，按「採用」才會生效。"}
+                    </HelpTip>
                   </p>
                   <div className="space-y-1.5">
                     {REWRITE_AGENTS.map((a) => (
@@ -3360,6 +3675,9 @@ export default function RunPage() {
                               agentName: a.name,
                               agentTitle: lang === "en" ? a.titleEn : a.title,
                               brandId: data.mission?.brandId ?? undefined,
+                              // 2026-09-29：改寫讀同一份品牌大腦，含原本那篇的產品／活動。
+                              productId: (data as any)?.metadata?.productId ?? undefined,
+                              eventId: (data as any)?.metadata?.eventId ?? undefined,
                             });
                             if (r.ok) {
                               if (shouldApplyMutationPreview(activeSelectionKeyRef.current, locator)) {
@@ -3465,7 +3783,7 @@ export default function RunPage() {
                 <>
                   <Button fullWidth className="bg-neutral-900 font-semibold text-white"
                     startContent={<FontAwesomeIcon icon={faCalendarPlus} />} onPress={openPlannerSchedule}>
-                    {lang === "en" ? "Schedule to calendar" : "排程到日曆"}
+                    {lang === "en" ? "Add to calendar" : "排進行事曆"}
                   </Button>
                   {confirmDiscard ? (
                     <div className="rounded-lg border border-neutral-200 p-2.5">
@@ -3489,58 +3807,23 @@ export default function RunPage() {
                   )}
                 </>
               ) : (<>
-              {/* ── 1. 送到行事曆 ─────────────────────────── */}
+              {/* 2026-09-29（CJ「不需要下載 ics、也不需要分享連結，只有排程或送審」）：
+                  送審不再是另一條路 —— 排程視窗裡勾「排好後送審」，週曆格子會標待審。
+                  成效標籤移進排程視窗。 */}
               <Button
-                variant="flat" fullWidth
+                fullWidth className="bg-neutral-900 font-semibold text-white"
                 startContent={<FontAwesomeIcon icon={faCalendarPlus} />}
                 onPress={() => {
                   setSchedMode("calendar");
                   setScheduleDialogOpen(true);
                 }}
               >
-                {lang === "en" ? "Schedule" : "排程發布"}
-              </Button>
-
-              {/* ── 3. 下載 .ics ──────────────────────────── */}
-              <Button
-                variant="flat" fullWidth
-                startContent={<FontAwesomeIcon icon={faDownload} />}
-                onPress={() => {
-                  setSchedMode("ics");
-                  setScheduleDialogOpen(true);
-                }}
-              >
-                {lang === "en" ? "Download .ics" : "下載 .ics"}
-              </Button>
-
-              {/* Bulk export — calendar-type tasks only */}
-              {(data?.mission?.taskId ?? "").includes("calendar") && variants.length > 1 && (
-                <Button
-                  variant="flat" fullWidth size="sm" color="secondary"
-                  startContent={<FontAwesomeIcon icon={faCalendarPlus} />}
-                  onPress={handleBulkIcsExport}
-                >
-                  {lang === "en" ? "Export all to calendar (.ics)" : "批量下載到行事曆（全部 .ics）"}
-                </Button>
-              )}
-
-              {/* ── 4. 分享連結 ───────────────────────────── */}
-              <Button
-                variant="light" fullWidth size="sm"
-                startContent={<FontAwesomeIcon icon={faShare} />}
-                onPress={() => {
-                  navigator.clipboard.writeText(window.location.href);
-                  showToastGlobal(t("toast_link_copied"));
-                }}
-              >
-                {lang === "en" ? "Share link" : "分享連結"}
+                {lang === "en" ? "Add to calendar" : "排進行事曆"}
               </Button>
 
               {/* Auto-save note — always true, no action needed */}
               <div className="text-[12px] text-default-400 text-center px-1 leading-relaxed">
-                {lang === "en"
-                  ? "✓ Auto-saved to Projects — no action needed"
-                  : "✓ 任務完成即自動記錄到專案，無需手動儲存"}
+                <CheckIcon size={11} /> {lang === "en" ? "Auto-saved" : "已自動儲存"}
               </div>
               </>)}
 
@@ -3571,7 +3854,7 @@ export default function RunPage() {
               onChange={(e) => setEmailNote(e.target.value)}
               minRows={3}
             />
-            <p className="text-tiny text-default-500">{lang === "en" ? "We'll include the full caption and brand context." : "寄出時會附上完整文案 + 品牌資訊。"}</p>
+            <div><HelpTip>{lang === "en" ? "We'll include the full caption and brand context." : "寄出時會附上完整文案 + 品牌資訊。"}</HelpTip></div>
           </ModalBody>
           <ModalFooter>
             <Button variant="flat" onPress={() => setEmailDialogOpen(false)}>{t("cancel")}</Button>
@@ -3606,7 +3889,7 @@ export default function RunPage() {
             {schedMode === "ics"
               ? (lang === "en" ? "Download .ics" : "下載 .ics")
               : schedMode === "calendar"
-              ? (lang === "en" ? "Schedule to calendar" : "排程到日曆")
+              ? (lang === "en" ? "Add to calendar" : "排進行事曆")
               : (lang === "en" ? `Publish — ${schedPlatform}` : `排程發布 — ${schedPlatform}`)}
           </ModalHeader>
           <ModalBody className="space-y-3">
@@ -3623,7 +3906,7 @@ export default function RunPage() {
                   value={seriesAnchorDate}
                   onChange={(e) => setSeriesAnchorDate(e.target.value)}
                 />
-                <p className="text-tiny text-default-500">
+                <div><HelpTip>
                   {isCountdownTask
                     ? (lang === "en"
                         ? "Posts are scheduled day-by-day counting down to the event date."
@@ -3631,7 +3914,7 @@ export default function RunPage() {
                     : (lang === "en"
                         ? "Posts are scheduled one per day starting from the first post date."
                         : "從第一篇日期開始，每天依序排一篇。")}
-                </p>
+                </HelpTip></div>
                 {/* Per-variant date preview */}
                 <div className="rounded-xl overflow-hidden" style={{ border: "1px solid #E5E5E5" }}>
                   {variants.map((v, i) => {
@@ -3664,6 +3947,25 @@ export default function RunPage() {
                 onChange={(e) => setScheduleAt(e.target.value)}
               />
             )}
+            {schedMode === "calendar" && (
+              <>
+                {/* 2026-09-29 成效標籤從右欄移進來：排程時順手標，發布後成效落進成效層矩陣 */}
+                <PerfTagPicker outputId={id} platform={schedPlatform} />
+                {reviewCanSubmit && (
+                  <label className="flex cursor-pointer items-start gap-2 rounded-lg border border-default-200 px-3 py-2">
+                    <input type="checkbox" className="mt-1" checked={reviewOnSchedule} onChange={(e) => setReviewOnSchedule(e.target.checked)} />
+                    <span className="text-[13px] leading-relaxed text-default-700">
+                      {lang === "en" ? "Send for review after scheduling" : "排好後送審"}
+                      <span className="block text-[12px] text-default-500">
+                        {lang === "en"
+                          ? "The calendar cell shows “In review” until someone else approves it."
+                          : "週曆格子會標「待審」，要由作者以外的人放行。"}
+                      </span>
+                    </span>
+                  </label>
+                )}
+              </>
+            )}
             {!isMultiDayTask || schedMode === "publish" ? (
               <p className="text-tiny text-default-500">
                 {schedMode === "ics"
@@ -3676,7 +3978,7 @@ export default function RunPage() {
                     : "排進本週企劃的週曆，確認後回到週曆；之後可以在那裡改時間或立即發布。")
                   : (lang === "en"
                     ? `Schedules this post to ${schedPlatform}. After confirming you'll be taken to the Calendar page to publish.`
-                    : `排程此貼文到 ${schedPlatform}。確認後跳轉行事曆頁面，可在那裡一鍵發布。`)}
+                    : `排程此貼文到 ${schedPlatform}。確認後跳轉行事曆頁面，可在那裡發布。`)}
               </p>
             ) : null}
           </ModalBody>
@@ -3727,5 +4029,14 @@ function ToolbarBtn({
         <Icon size={14} strokeWidth={1.75} />
       </button>
     </Tooltip>
+  );
+}
+
+/** 步驟編號：取代「Step 1：…」這類說明橫幅，只留一個數字圓點。 */
+function StepBadge({ n }: { n: number }) {
+  return (
+    <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-default-900 text-[10px] font-semibold text-white tabular-nums">
+      {n}
+    </span>
   );
 }

@@ -17,7 +17,7 @@
  */
 import { useState } from "react";
 import { trpc } from "../../../lib/trpc";
-import { AlertTriangle, ExternalLink, RefreshCw, Check, X, Package } from "lucide-react";
+import { BundleIcon, CheckIcon, CloseIcon, ExternalIcon, RegenerateIcon, WarningIcon } from "../components/icons";
 
 type Kind = "format" | "topic";
 type Status = "pending" | "approved" | "rejected" | "shipped";
@@ -61,7 +61,7 @@ export default function AdminPostFormatsPage() {
   const [status, setStatus] = useState<Status | "all">("pending");
   const [market, setMarket] = useState<string>("");
 
-  const listQ = (trpc as any).postFormat?.list?.useQuery?.(
+  const listQ = (trpc as any).postFormat?.list?.useQuery(
     {
       kind,
       status: status === "all" ? undefined : status,
@@ -89,7 +89,7 @@ export default function AdminPostFormatsPage() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-neutral-50 p-6">
         <div className="text-center max-w-md">
-          <AlertTriangle size={32} className="mx-auto mb-3 text-neutral-500" />
+          <WarningIcon size={32} className="mx-auto mb-3 text-neutral-500" />
           <p className="text-base font-semibold text-neutral-900 mb-1">需要管理員權限</p>
           <p className="text-sm text-neutral-600">
             貼文形式佇列僅限管理員。請聯絡 SoWork 把你帳號的 role 設為 admin。
@@ -156,7 +156,7 @@ export default function AdminPostFormatsPage() {
             onClick={() => listQ?.refetch?.()}
             className="px-3 py-2 rounded-lg border border-neutral-300 hover:border-neutral-900 text-xs text-neutral-700 flex items-center gap-1.5"
           >
-            <RefreshCw size={12} /> 重新整理
+            <RegenerateIcon size={12} /> 重新整理
           </button>
         </div>
 
@@ -206,7 +206,7 @@ export default function AdminPostFormatsPage() {
 
         {!isLoading && items.length === 0 && (
           <div className="bg-white border border-neutral-200 rounded-xl p-10 text-center">
-            <Package size={28} className="mx-auto mb-3 text-neutral-400" />
+            <BundleIcon size={28} className="mx-auto mb-3 text-neutral-400" />
             <p className="text-sm font-medium text-neutral-900 mb-1">這個分頁沒有候選</p>
             <p className="text-sm text-neutral-600 max-w-md mx-auto leading-relaxed">
               {kind === "format"
@@ -247,7 +247,7 @@ export default function AdminPostFormatsPage() {
                       </span>
                     )}
                     {row.shippedTaskId && (
-                      <span className="text-[12px] text-indigo-700">
+                      <span className="text-[12px] text-zinc-700">
                         已開：<code className="font-mono">{row.shippedTaskId}</code>
                       </span>
                     )}
@@ -282,7 +282,7 @@ export default function AdminPostFormatsPage() {
                           rel="noopener noreferrer"
                           className="text-xs text-neutral-600 hover:text-neutral-900 flex items-center gap-1.5 min-w-0"
                         >
-                          <ExternalLink size={11} className="shrink-0" />
+                          <ExternalIcon size={11} className="shrink-0" />
                           <span className="truncate">{e.title}</span>
                           {e.observedAt && (
                             <span className="text-neutral-400 shrink-0">{e.observedAt}</span>
@@ -306,7 +306,7 @@ export default function AdminPostFormatsPage() {
                       onClick={() => setStatusM?.mutate?.({ id: row.id, status: "approved" })}
                       className="px-3 py-1.5 rounded-md text-xs font-medium border border-emerald-300 text-emerald-800 hover:bg-emerald-50 flex items-center gap-1.5"
                     >
-                      <Check size={12} /> 值得開卡
+                      <CheckIcon size={12} /> 值得開卡
                     </button>
                   )}
                   {row.status === "approved" && (
@@ -319,9 +319,9 @@ export default function AdminPostFormatsPage() {
                           });
                         }
                       }}
-                      className="px-3 py-1.5 rounded-md text-xs font-medium border border-indigo-300 text-indigo-800 hover:bg-indigo-50 flex items-center gap-1.5"
+                      className="px-3 py-1.5 rounded-md text-xs font-medium border border-zinc-300 text-zinc-800 hover:bg-zinc-50 flex items-center gap-1.5"
                     >
-                      <Package size={12} /> 已開卡…
+                      <BundleIcon size={12} /> 已開卡…
                     </button>
                   )}
                   {row.status !== "rejected" && (
@@ -332,7 +332,7 @@ export default function AdminPostFormatsPage() {
                       }}
                       className="px-3 py-1.5 rounded-md text-xs font-medium border border-neutral-300 text-neutral-700 hover:bg-neutral-50 flex items-center gap-1.5"
                     >
-                      <X size={12} /> 不開
+                      <CloseIcon size={12} /> 不開
                     </button>
                   )}
                 </div>

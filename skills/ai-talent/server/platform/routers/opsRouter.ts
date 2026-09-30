@@ -16,6 +16,7 @@
  */
 import { z } from "zod";
 import { router, protectedProcedure, publicProcedure, adminProcedure } from "../core/trpc";
+import { END_STAGE, START_STAGE, summarizeFunnel } from "../core/activationFunnel";
 
 // 2026-07-05 (security scan): logError is a publicProcedure (unauthenticated),
 // so it's a DB-write flood vector. Coarse global fixed-window cap: beyond
@@ -217,13 +218,13 @@ export const opsRouter = router({
 
   /**
    * 2026-06-21 (CJ「TTFV dashboard」): activation funnel from register to
-   * first-week-generated. Reads activation.* events out of error_log
+   * first value（2026-09-30 起＝靈感舞台第一次採用切角，見 core/activationFunnel.ts）. Reads activation.* events out of error_log
    * (where level="info"), groups by user, takes MIN(createdAt) per
    * (userId, stage) as the user's first occurrence of that stage.
    *
    * Returns:
    *   - funnel: count of users reaching each stage + % conversion
-   *   - ttfvMs: p50 / p90 / avg ms from register to first_week_generated
+   *   - ttfvMs: p50 / p90 / avg ms from register to the funnel's last stage
    *   - recent: latest N completed activations (for an "activity feed" panel)
    *   - daily: per-day register + completed counts for the last `days` days
    */
@@ -255,90 +256,31 @@ export const opsRouter = router({
         byUser.get(uid)![r.source as string] = new Date(r.firstSeen);
       }
 
-      const STAGES: Array<{ id: string; label: string }> = [
-        { id: "activation.register_completed",    label: "Registered" },
-        { id: "activation.first_brand_created",   label: "Brand created" },
-        { id: "activation.express_brain_ready",   label: "Express brain ready" },
-        { id: "activation.first_theater_arrived", label: "Arrived at Theater" },
-        { id: "activation.first_week_generated",  label: "First 7-day generated" },
-      ];
-
-      const funnel = STAGES.map((s) => ({ ...s, users: 0, pctOfRegistered: 0, pctFromPrev: 0 }));
-      const ttfvs: number[] = []; // ms
-
-      for (const [, stages] of byUser) {
-        STAGES.forEach((s, i) => {
-          if (stages[s.id]) funnel[i]!.users++;
-        });
-        const start = stages["activation.register_completed"];
-        const end = stages["activation.first_week_generated"];
-        if (start && end && end.getTime() > start.getTime()) {
-          ttfvs.push(end.getTime() - start.getTime());
-        }
-      }
-
-      // Conversion %
-      const registered = funnel[0]!.users || 1;
-      funnel.forEach((s, i) => {
-        s.pctOfRegistered = Math.round((s.users / registered) * 1000) / 10;
-        const prev = i > 0 ? funnel[i - 1]!.users : s.users;
-        s.pctFromPrev = prev > 0 ? Math.round((s.users / prev) * 1000) / 10 : 0;
-      });
-
-      // TTFV stats
-      ttfvs.sort((a, b) => a - b);
-      const pick = (q: number) =>
-        ttfvs.length ? ttfvs[Math.min(ttfvs.length - 1, Math.floor(ttfvs.length * q))] : 0;
-      const ttfvMs = {
-        count: ttfvs.length,
-        p50: pick(0.5),
-        p90: pick(0.9),
-        avg: ttfvs.length
-          ? Math.round(ttfvs.reduce((a, b) => a + b, 0) / ttfvs.length)
-          : 0,
-      };
-
-      // Recent completed activations (for the live feed panel)
-      const recent: Array<{
-        userId: number;
-        registeredAt: string;
-        completedAt: string;
-        ttfvMs: number;
-      }> = [];
-      for (const [uid, stages] of byUser) {
-        const r = stages["activation.register_completed"];
-        const c = stages["activation.first_week_generated"];
-        if (r && c) {
-          recent.push({
-            userId: uid,
-            registeredAt: r.toISOString(),
-            completedAt: c.toISOString(),
-            ttfvMs: c.getTime() - r.getTime(),
-          });
-        }
-      }
-      recent.sort((a, b) => b.completedAt.localeCompare(a.completedAt));
+      // 步驟定義、舊事件別名、TTFV 計算在 core/activationFunnel.ts（有測試）。
+      const { funnel, ttfvMs, recent } = summarizeFunnel(byUser);
 
       // Daily aggregation
+      // 每天：註冊人數、達成 TTFV 終點的人數（終點的各個別名算同一件事，同一人只算一次）。
+      const endSources = END_STAGE.sources;
       const [dailyRows]: any = await localPool.execute(
         `SELECT DATE(createdAt) AS day,
-                source,
+                CASE WHEN source = ? THEN 'registered' ELSE 'completed' END AS kind,
                 COUNT(DISTINCT userId) AS users
          FROM error_log
-         WHERE source IN ('activation.register_completed', 'activation.first_week_generated')
+         WHERE source IN (?, ${endSources.map(() => "?").join(", ")})
            AND createdAt > NOW() - INTERVAL ? DAY
            AND userId IS NOT NULL
-         GROUP BY DATE(createdAt), source
+         GROUP BY DATE(createdAt), kind
          ORDER BY day DESC`,
-        [input.days],
+        [START_STAGE.id, START_STAGE.id, ...endSources, input.days],
       );
       const dayMap = new Map<string, { registered: number; completed: number }>();
       for (const r of (dailyRows as any[])) {
         const day = r.day instanceof Date ? r.day.toISOString().slice(0, 10) : String(r.day);
         if (!dayMap.has(day)) dayMap.set(day, { registered: 0, completed: 0 });
         const slot = dayMap.get(day)!;
-        if (r.source === "activation.register_completed") slot.registered = Number(r.users);
-        if (r.source === "activation.first_week_generated") slot.completed = Number(r.users);
+        if (r.kind === "registered") slot.registered = Number(r.users);
+        else slot.completed = Number(r.users);
       }
       const daily = Array.from(dayMap.entries())
         .map(([day, v]) => ({ day, ...v }))

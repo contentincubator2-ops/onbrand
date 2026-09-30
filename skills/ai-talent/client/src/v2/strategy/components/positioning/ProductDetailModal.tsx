@@ -15,7 +15,7 @@
 import { useEffect, useState, useRef } from "react";
 import { trpc } from "../../../../lib/trpc";
 import { useLang } from "../../../../lib/i18n";
-import { X, Plus, Trash2, RefreshCw, Sparkles } from "lucide-react";
+import { AddIcon, CloseIcon, DeleteIcon, GenerateIcon, RegenerateIcon, CheckIcon } from "../../../platform/components/icons";
 import AssetPhotoGallery from "./AssetPhotoGallery";
 import ProductSceneModal from "./ProductSceneModal";
 
@@ -67,7 +67,7 @@ function ChipInput({
 
   const chipBg = color === "red"
     ? "bg-red-50 border-red-200 text-red-700"
-    : "bg-indigo-50 border-indigo-200 text-indigo-700";
+    : "bg-zinc-50 border-zinc-200 text-zinc-700";
 
   return (
     <div>
@@ -80,7 +80,7 @@ function ChipInput({
           >
             {c}
             <button onClick={() => remove(i)} className="opacity-60 hover:opacity-100">
-              <X size={10} />
+              <CloseIcon size={10} />
             </button>
           </span>
         ))}
@@ -93,14 +93,14 @@ function ChipInput({
             if (e.key === "Enter" || e.key === ",") { e.preventDefault(); add(); }
           }}
           placeholder={placeholder ?? "輸入後按 Enter 新增"}
-          className="flex-1 text-sm px-3 py-1.5 border border-neutral-200 rounded-lg focus:outline-none focus:border-indigo-400"
+          className="flex-1 text-sm px-3 py-1.5 border border-neutral-200 rounded-lg focus:outline-none focus:border-zinc-400"
         />
         <button
           onClick={add}
           disabled={!input.trim()}
           className="text-xs font-medium px-3 py-1.5 rounded-lg bg-neutral-900 text-white hover:bg-neutral-700 disabled:opacity-40 transition"
         >
-          <Plus size={12} />
+          <AddIcon size={12} />
         </button>
       </div>
     </div>
@@ -125,22 +125,22 @@ function PeriodRow({
         value={period.label}
         onChange={(e) => onChange({ ...period, label: e.target.value })}
         placeholder={lang === "en" ? "Label (e.g. Mother's Day)" : "名稱（如：母親節）"}
-        className="text-sm px-2.5 py-1.5 border border-neutral-200 rounded-lg focus:outline-none focus:border-indigo-400"
+        className="text-sm px-2.5 py-1.5 border border-neutral-200 rounded-lg focus:outline-none focus:border-zinc-400"
       />
       <input
         type="date"
         value={period.startDate}
         onChange={(e) => onChange({ ...period, startDate: e.target.value })}
-        className="text-xs px-2 py-1.5 border border-neutral-200 rounded-lg focus:outline-none focus:border-indigo-400"
+        className="text-xs px-2 py-1.5 border border-neutral-200 rounded-lg focus:outline-none focus:border-zinc-400"
       />
       <input
         type="date"
         value={period.endDate}
         onChange={(e) => onChange({ ...period, endDate: e.target.value })}
-        className="text-xs px-2 py-1.5 border border-neutral-200 rounded-lg focus:outline-none focus:border-indigo-400"
+        className="text-xs px-2 py-1.5 border border-neutral-200 rounded-lg focus:outline-none focus:border-zinc-400"
       />
       <button onClick={onRemove} className="p-1.5 text-neutral-400 hover:text-red-500 transition">
-        <Trash2 size={13} />
+        <DeleteIcon size={13} />
       </button>
     </div>
   );
@@ -153,7 +153,7 @@ export default function ProductDetailModal({ productId, brandId, onClose, onRepo
   const [sceneOpen, setSceneOpen] = useState(false);
 
   // Fetch product
-  const productQ = (trpc as any).product?.get?.useQuery?.(
+  const productQ = (trpc as any).product?.get?.useQuery(
     { id: productId },
     { enabled: !!productId, refetchOnWindowFocus: false },
   );
@@ -272,16 +272,16 @@ export default function ProductDetailModal({ productId, brandId, onClose, onRepo
             <button
               onClick={() => onReposition(productId)}
               title={en ? "Re-run positioning" : "重新執行定位"}
-              className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border border-indigo-200 text-indigo-600 hover:bg-indigo-50 transition"
+              className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border border-zinc-200 text-zinc-600 hover:bg-zinc-50 transition"
             >
-              <RefreshCw size={12} />
+              <RegenerateIcon size={12} />
               {en ? "Re-position" : "重新定位"}
             </button>
             <button
               onClick={onClose}
               className="w-8 h-8 flex items-center justify-center rounded-full text-neutral-400 hover:bg-neutral-100 transition"
             >
-              <X size={16} />
+              <CloseIcon size={16} />
             </button>
           </div>
         </div>
@@ -291,10 +291,10 @@ export default function ProductDetailModal({ productId, brandId, onClose, onRepo
 
           {/* AI Positioning Summary */}
           {(tagline || audience || usp || price) && (
-            <div className="bg-neutral-50 rounded-xl p-4 border border-indigo-100">
+            <div className="bg-neutral-50 rounded-xl p-4 border border-zinc-100">
               <div className="flex items-center gap-1.5 mb-3">
-                <Sparkles size={13} className="text-indigo-500" />
-                <span className="text-[12px] font-bold uppercase tracking-widest text-indigo-600">
+                <GenerateIcon size={13} className="text-zinc-500" />
+                <span className="text-[12px] font-bold uppercase tracking-widest text-zinc-600">
                   {en ? "AI Positioning Summary" : "AI 定位摘要"}
                 </span>
               </div>
@@ -304,7 +304,7 @@ export default function ProductDetailModal({ productId, brandId, onClose, onRepo
                 )}
                 {tagline && (
                   <div>
-                    <span className="text-[12px] font-semibold uppercase text-indigo-400 tracking-wider">
+                    <span className="text-[12px] font-semibold uppercase text-zinc-400 tracking-wider">
                       {en ? "Tagline" : "標語"}
                     </span>
                     <p className="text-sm font-semibold text-neutral-900 mt-0.5">{tagline}</p>
@@ -312,13 +312,13 @@ export default function ProductDetailModal({ productId, brandId, onClose, onRepo
                 )}
                 {usp && (
                   <div>
-                    <span className="text-[12px] font-semibold uppercase text-indigo-400 tracking-wider">USP</span>
+                    <span className="text-[12px] font-semibold uppercase text-zinc-400 tracking-wider">USP</span>
                     <p className="text-sm text-neutral-700 mt-0.5">{usp}</p>
                   </div>
                 )}
                 {audience && (
                   <div>
-                    <span className="text-[12px] font-semibold uppercase text-indigo-400 tracking-wider">
+                    <span className="text-[12px] font-semibold uppercase text-zinc-400 tracking-wider">
                       {en ? "Audience" : "目標受眾"}
                     </span>
                     <p className="text-sm text-neutral-600 mt-0.5">{audience}</p>
@@ -374,7 +374,7 @@ export default function ProductDetailModal({ productId, brandId, onClose, onRepo
                 value={tagline}
                 onChange={(e) => { setTagline(e.target.value); mark(); }}
                 placeholder={en ? "e.g. Fresh from the farm, direct to your table" : "例：直送農場新鮮，品牌最短距離"}
-                className="w-full text-sm px-3 py-2 border border-neutral-200 rounded-lg focus:outline-none focus:border-indigo-400"
+                className="w-full text-sm px-3 py-2 border border-neutral-200 rounded-lg focus:outline-none focus:border-zinc-400"
               />
             </div>
 
@@ -388,7 +388,7 @@ export default function ProductDetailModal({ productId, brandId, onClose, onRepo
                 onChange={(e) => { setAudience(e.target.value); mark(); }}
                 placeholder={en ? "Who is this product for?" : "這個產品是給誰的？描述主要受眾的特徵、需求和痛點"}
                 rows={3}
-                className="w-full text-sm px-3 py-2 border border-neutral-200 rounded-lg resize-none focus:outline-none focus:border-indigo-400"
+                className="w-full text-sm px-3 py-2 border border-neutral-200 rounded-lg resize-none focus:outline-none focus:border-zinc-400"
               />
             </div>
 
@@ -402,7 +402,7 @@ export default function ProductDetailModal({ productId, brandId, onClose, onRepo
                 onChange={(e) => { setUsp(e.target.value); mark(); }}
                 placeholder={en ? "What makes this product uniquely valuable?" : "這個產品跟競品最大的差異是什麼？為什麼值得選擇？"}
                 rows={3}
-                className="w-full text-sm px-3 py-2 border border-neutral-200 rounded-lg resize-none focus:outline-none focus:border-indigo-400"
+                className="w-full text-sm px-3 py-2 border border-neutral-200 rounded-lg resize-none focus:outline-none focus:border-zinc-400"
               />
             </div>
 
@@ -435,9 +435,9 @@ export default function ProductDetailModal({ productId, brandId, onClose, onRepo
                     setPeriods([...periods, { label: "", startDate: "", endDate: "" }]);
                     mark();
                   }}
-                  className="text-[12px] font-medium text-indigo-600 hover:text-indigo-800 flex items-center gap-1"
+                  className="text-[12px] font-medium text-zinc-600 hover:text-zinc-800 flex items-center gap-1"
                 >
-                  <Plus size={11} /> {en ? "Add period" : "新增時間"}
+                  <AddIcon size={11} /> {en ? "Add period" : "新增時間"}
                 </button>
               </div>
               {periods.length === 0 ? (
@@ -492,7 +492,7 @@ export default function ProductDetailModal({ productId, brandId, onClose, onRepo
             {upsertMut?.isPending
               ? (en ? "Saving…" : "儲存中…")
               : saved
-                ? (en ? "Saved ✓" : "已儲存 ✓")
+                ? <span className="inline-flex items-center gap-1"><CheckIcon size={11} />{en ? "Saved" : "已儲存"}</span>
                 : (en ? "Save changes" : "儲存修改")}
           </button>
         </div>

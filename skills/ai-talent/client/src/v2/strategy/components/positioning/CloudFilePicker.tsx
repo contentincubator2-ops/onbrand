@@ -14,13 +14,14 @@ import { showToastGlobal } from "../../../../components/ui/Toast";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faGoogleDrive, faMicrosoft } from "@fortawesome/free-brands-svg-icons";
 import { faFolder, faFileVideo, faFileAudio, faChevronLeft, faPlus, faSpinner, faLink } from "@fortawesome/free-solid-svg-icons";
+import { CloseIcon } from "../../../platform/components/icons";
 
 type Provider = "google_drive" | "onedrive";
 export type CloudFileSource = { provider: Provider; fileId: string; name: string };
 
 const PROVIDER_LABEL: Record<Provider, string> = { google_drive: "Google Drive", onedrive: "OneDrive" };
 const PROVIDER_ICON: Record<Provider, any> = { google_drive: faGoogleDrive, onedrive: faMicrosoft };
-const PROVIDER_TONE: Record<Provider, string> = { google_drive: "#0F9D58", onedrive: "#0078D4" };
+const PROVIDER_TONE: Record<Provider, string> = { google_drive: "#18181b", onedrive: "#18181b" };
 
 function openConnectPopup(provider: Provider, brandId: number): Promise<boolean> {
   return new Promise((resolve) => {
@@ -50,11 +51,11 @@ function ProviderPane({ brandId, provider, onAdd, added }: {
   const [path, setPath] = useState<Array<{ id: string | null; name: string }>>([{ id: null, name: en ? "Root" : "根目錄" }]);
   const folderId = path[path.length - 1]?.id ?? null;
 
-  const statusQ = (trpc as any).cloudDrive?.status?.useQuery?.({ brandId }, { enabled: !!brandId });
+  const statusQ = (trpc as any).cloudDrive?.status?.useQuery({ brandId }, { enabled: !!brandId });
   const connected = !!statusQ?.data?.[provider]?.connected;
   const accountEmail = statusQ?.data?.[provider]?.accountEmail as string | null | undefined;
 
-  const listQ = (trpc as any).cloudDrive?.listFiles?.useQuery?.(
+  const listQ = (trpc as any).cloudDrive?.listFiles?.useQuery(
     { brandId, provider, folderId },
     { enabled: !!brandId && connected },
   );
@@ -64,7 +65,7 @@ function ProviderPane({ brandId, provider, onAdd, added }: {
     try {
       const ok = await openConnectPopup(provider, brandId);
       if (ok) {
-        showToastGlobal(en ? `✓ ${PROVIDER_LABEL[provider]} connected` : `✓ 已連接 ${PROVIDER_LABEL[provider]}`, "success");
+        showToastGlobal(en ? `${PROVIDER_LABEL[provider]} connected` : `已連接 ${PROVIDER_LABEL[provider]}`, "success");
         utils.cloudDrive?.status?.invalidate?.();
       } else {
         showToastGlobal(en ? "Connection cancelled" : "已取消連接");
@@ -107,7 +108,7 @@ function ProviderPane({ brandId, provider, onAdd, added }: {
               {i > 0 && <span className="text-default-300">/</span>}
               <button
                 onClick={() => setPath(path.slice(0, i + 1))}
-                className={i === path.length - 1 ? "font-semibold text-default-700" : "hover:text-orange-600"}
+                className={i === path.length - 1 ? "font-semibold text-default-700" : "hover:text-zinc-600"}
               >
                 {p.name}
               </button>
@@ -138,7 +139,7 @@ function ProviderPane({ brandId, provider, onAdd, added }: {
             <div key={f.id} className="flex items-center gap-2 px-3 py-2 hover:bg-default-50">
               {f.isFolder ? (
                 <button onClick={() => setPath((p) => [...p, { id: f.id, name: f.name }])} className="flex items-center gap-2 flex-1 min-w-0 text-left">
-                  <FontAwesomeIcon icon={faFolder} style={{ color: "#F59E0B", fontSize: 13 }} />
+                  <FontAwesomeIcon icon={faFolder} style={{ color: "#71717a", fontSize: 13 }} />
                   <span className="text-xs text-default-700 truncate">{f.name}</span>
                 </button>
               ) : (
@@ -149,7 +150,7 @@ function ProviderPane({ brandId, provider, onAdd, added }: {
                     disabled={isAdded}
                     onClick={() => onAdd({ provider, fileId: f.id, name: f.name })}
                     className={`shrink-0 text-[12px] font-medium px-2 py-1 rounded-full flex items-center gap-1 ${
-                      isAdded ? "text-emerald-600 bg-emerald-50" : "text-orange-600 bg-orange-50 hover:bg-orange-100"
+                      isAdded ? "text-emerald-600 bg-emerald-50" : "text-zinc-600 bg-zinc-50 hover:bg-zinc-100"
                     }`}
                   >
                     <FontAwesomeIcon icon={faPlus} style={{ fontSize: 12 }} /> {isAdded ? (en ? "Added" : "已加入") : (en ? "Add" : "加入")}
@@ -200,7 +201,7 @@ export default function CloudFilePicker({ brandId, sources, onAdd, onRemove }: {
             <div key={`${s.provider}:${s.fileId}`} className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-default-50 text-xs">
               <FontAwesomeIcon icon={PROVIDER_ICON[s.provider]} style={{ color: PROVIDER_TONE[s.provider], fontSize: 12 }} />
               <span className="flex-1 min-w-0 truncate text-default-700">{s.name}</span>
-              <button onClick={() => onRemove(`${s.provider}:${s.fileId}`)} className="text-default-300 hover:text-danger-500 text-[12px]">✕</button>
+              <button onClick={() => onRemove(`${s.provider}:${s.fileId}`)} className="text-default-300 hover:text-danger-500 text-[12px]"><CloseIcon size={11} /></button>
             </div>
           ))}
         </div>

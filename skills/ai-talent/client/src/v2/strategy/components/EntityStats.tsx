@@ -12,7 +12,9 @@ import { trpc } from "../../../lib/trpc";
 import { useLang } from "../../../lib/i18n";
 import { Card, CardBody, Chip, Skeleton, Table, TableBody, TableCell, TableColumn, TableHeader, TableRow } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faUsers, faCubes, faRobot } from "@fortawesome/free-solid-svg-icons";
+import {
+  faUsers, faCubes, faUserTie,
+} from "@fortawesome/free-solid-svg-icons";
 
 interface Props {
   variant?: "inline" | "row" | "table";
@@ -53,7 +55,7 @@ export function EntityStats({ variant = "inline", className }: Props) {
       <div className={`grid grid-cols-3 gap-3 ${className ?? ""}`}>
         <StatCell icon={faUsers} label="方法論小組" main={data.squad.curated} sub={`精選 / 全部 ${data.squad.total}`} />
         <StatCell icon={faCubes}  label="技能"        main={data.skill.total} sub={originBreakdown(data.skill.byOrigin)} />
-        <StatCell icon={faRobot}  label={en ? "Agents" : "AI 專家"}      main={data.agent.available} sub={`可用 / 全部 ${data.agent.total}`} />
+        <StatCell icon={faUserTie}  label={en ? "Agents" : "AI 專家"}      main={data.agent.available} sub={`可用 / 全部 ${data.agent.total}`} />
       </div>
     );
   }

@@ -18,11 +18,17 @@ import { trpc } from "../../../../lib/trpc";
 import { useLang } from "../../../../lib/i18n";
 import { showToastGlobal } from "../../../../components/ui/Toast";
 import { toastWithUpgrade } from "../../lib/upgradeToast";
-import { CheckCircle2, Clock, RotateCcw, Send } from "lucide-react";
+import { DoneIcon, SendBackIcon, SendIcon, WaitingIcon } from "../icons";
+import { HelpTip } from "../HelpTip";
 
 export default function ReviewBar({
-  outputId, missionId,
-}: { outputId: number; missionId: number | null | undefined }) {
+  outputId, missionId, statusOnly = false,
+}: {
+  outputId: number;
+  missionId: number | null | undefined;
+  /** 2026-09-29：送審入口移進排程視窗（「排好後送審」）。這條只在已送審後顯示狀態／退回理由。 */
+  statusOnly?: boolean;
+}) {
   const { lang } = useLang();
   const isEn = lang === "en";
   const navigate = useNavigate();
@@ -67,7 +73,7 @@ export default function ReviewBar({
   if (st?.status === "approved") {
     return (
       <Wrap>
-        <CheckCircle2 size={15} className="text-emerald-600" />
+        <DoneIcon size={15} className="text-emerald-600" />
         <span className="text-[14px] font-medium text-emerald-700">
           {isEn ? "Approved" : "已放行"}
         </span>
@@ -81,7 +87,7 @@ export default function ReviewBar({
   if (st?.status === "pending" || st?.status === "in_review") {
     return (
       <Wrap>
-        <Clock size={15} className="text-amber-600" />
+        <WaitingIcon size={15} className="text-amber-600" />
         <span className="text-[14px] font-medium text-amber-700">
           {isEn ? "In review" : "審核中"}
         </span>
@@ -99,6 +105,7 @@ export default function ReviewBar({
   }
 
   const wasSentBack = st?.status === "revision_requested";
+  if (statusOnly && !wasSentBack) return null;
 
   if (reviewAllowed === false) {
     return (
@@ -123,23 +130,23 @@ export default function ReviewBar({
       <div className="flex flex-wrap items-center gap-2">
         {wasSentBack ? (
           <>
-            <RotateCcw size={15} className="text-rose-600" />
+            <SendBackIcon size={15} className="text-rose-600" />
             <span className="text-[14px] font-medium text-rose-700">
               {isEn ? "Sent back for revision" : "已退回修改"}
             </span>
           </>
         ) : (
-          <span className="text-[13px] text-default-500">
+          <HelpTip>
             {isEn
               ? "Content goes live only after someone other than the author approves it."
               : "產出要由作者以外的人放行才會上線。"}
-          </span>
+          </HelpTip>
         )}
         <button
           onClick={() => setOpen((v) => !v)}
           className="ml-auto inline-flex items-center gap-1.5 rounded-lg bg-default-900 px-3 py-1.5 text-[14px] font-medium text-white hover:bg-default-800"
         >
-          <Send size={14} />
+          <SendIcon size={14} />
           {wasSentBack
             ? (isEn ? "Resubmit" : "改好了，再送一次")
             : (isEn ? "Send for review" : "送審")}

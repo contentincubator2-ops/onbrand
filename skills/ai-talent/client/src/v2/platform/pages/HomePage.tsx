@@ -24,11 +24,10 @@ import React from "react";
 import { useNavigate } from "react-router-dom";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
-  faFacebookF, faInstagram, faTiktok,
+  faFacebook, faInstagram, faTiktok,
 } from "@fortawesome/free-brands-svg-icons";
 import {
-  faEnvelope, faGlobe, faComments, faBell, faFolderOpen, faLayerGroup,
-  faCheck, faWandMagicSparkles, faTriangleExclamation, faCircleCheck, faArrowDown,
+  faEnvelope, faGlobe, faComments, faBell, faFolderOpen, faLayerGroup, faCheck, faWandMagicSparkles, faTriangleExclamation, faCircleCheck, faArrowDown,
 } from "@fortawesome/free-solid-svg-icons";
 import { trpc } from "../../../lib/trpc";
 import { useLang } from "../../../lib/i18n";
@@ -37,7 +36,7 @@ import { aggregate, roas, setMockBrandSeed } from "../../performance/components/
 
 // 2026-09-29（CJ）：內容通路只剩 FB／IG／TikTok／電子報／官網，LinkedIn／YouTube／X／新聞稿拿掉。
 const TOUCHPOINT_ICON: Record<string, any> = {
-  facebook: faFacebookF, instagram: faInstagram, tiktok: faTiktok,
+  facebook: faFacebook, instagram: faInstagram, tiktok: faTiktok,
   email: faEnvelope, website: faGlobe, "brand-agent": faComments,
 };
 const TOUCHPOINT_ROUTE: Record<string, string> = {
@@ -45,7 +44,7 @@ const TOUCHPOINT_ROUTE: Record<string, string> = {
   email: "/tasks/email", website: "/tasks/web",
 };
 
-const LAYER_COLORS = { strategy: "#2563eb", content: "#059669", performance: "#b45309" };
+const LAYER_COLORS = { strategy: "#18181b", content: "#18181b", performance: "#18181b" };
 
 export default function HomePage() {
   const navigate = useNavigate();
@@ -90,7 +89,7 @@ export default function HomePage() {
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "1.5rem" }}>
         <h1 style={{ fontSize: 20, fontWeight: 600, margin: 0 }}>{en ? "Deployment workflow" : "策略落地工作流"}</h1>
         <button
-          onClick={() => navigate("/theater")}
+          onClick={() => navigate("/planner")}
           style={{ fontSize: 13, padding: "6px 12px", border: "1px solid #e5e7eb", borderRadius: 8, background: "#fff", cursor: "pointer" }}
         >
           <FontAwesomeIcon icon={faBell} style={{ marginRight: 6, color: "#9ca3af" }} />
@@ -99,7 +98,7 @@ export default function HomePage() {
       </div>
 
       {/* ── 策略層 ─────────────────────────────────────────────────────── */}
-      <TrayHeader badge={en ? "Strategy" : "策略層"} color={LAYER_COLORS.strategy} caption={en ? "How complete is this brand's strategy" : "這個品牌的策略齊備度"} />
+      <TrayHeader badge={en ? "Strategy" : "策略層"} color={LAYER_COLORS.strategy} />
       <Tray>
         <TrayRow
           icon={positioningLocked ? faCircleCheck : faTriangleExclamation}
@@ -120,14 +119,14 @@ export default function HomePage() {
           />
         ))}
         {strategyAlerts.map((a) => (
-          <TrayRow key={a.id} icon={faBell} iconColor="#2563eb" label={a.title} status={en ? "New" : "新提醒"} statusColor="#2563eb" onClick={() => navigate("/brands")} />
+          <TrayRow key={a.id} icon={faBell} iconColor="#18181b" label={a.title} status={en ? "New" : "新提醒"} statusColor="#18181b" onClick={() => navigate("/brands")} />
         ))}
       </Tray>
 
       <ArrowDown />
 
       {/* ── 內容層 ─────────────────────────────────────────────────────── */}
-      <TrayHeader badge={en ? "Content" : "內容層"} color={LAYER_COLORS.content} caption={en ? "Strategy landed as a workflow at each touchpoint" : "策略落地到每個接觸點的工作流"} />
+      <TrayHeader badge={en ? "Content" : "內容層"} color={LAYER_COLORS.content} />
       <Tray>
         {touchpoints.map((t: any) => (
           <TrayRow
@@ -145,7 +144,7 @@ export default function HomePage() {
       <ArrowDown />
 
       {/* ── 成效層 ─────────────────────────────────────────────────────── */}
-      <TrayHeader badge={en ? "Performance · early preview" : "成效層 · 早期預覽"} color={LAYER_COLORS.performance} caption={en ? "Which touchpoints you can already see performance for" : "哪些接觸點已經串接、看得到成效"} />
+      <TrayHeader badge={en ? "Performance · early preview" : "成效層 · 早期預覽"} color={LAYER_COLORS.performance} />
       <p style={{ fontSize: 12, color: "#9ca3af", margin: "0 0 8px" }}>
         {en ? `Simulated ROAS ${mockRoas.toFixed(2)}x — real connections get priority access on Professional.` : `模擬 ROAS ${mockRoas.toFixed(2)}x——真實串接：專業方案優先體驗。`}
       </p>
@@ -167,7 +166,7 @@ export default function HomePage() {
           <p style={{ fontSize: 13, fontWeight: 600, color: "#6b7280", margin: "0 0 8px" }}>{en ? "This week" : "本週建議"}</p>
           {(festivalQ.data ?? []).length === 0 ? (
             <div style={{ border: "1px solid #e5e7eb", borderRadius: 12, padding: "12px 14px", fontSize: 13, color: "#9ca3af" }}>
-              {en ? "No suggestions right now." : "目前沒有建議。"}
+              {en ? "No new suggestions" : "目前沒有新建議"}
             </div>
           ) : (festivalQ.data ?? []).map((f: any) => (
             <div key={f.slug} style={{ border: "1px solid #e5e7eb", borderRadius: 12, padding: "12px 14px", marginBottom: 8 }}>
@@ -175,7 +174,7 @@ export default function HomePage() {
                 {en ? `${f.name_en ?? f.name_zh} in ${f.daysAway} day(s)` : `${f.name_zh}還有 ${f.daysAway} 天`}
                 {f.contentHint ? ` — ${f.contentHint}` : ""}
               </p>
-              <button onClick={() => navigate("/theater")} style={{ fontSize: 12, padding: "5px 10px", border: "1px solid #e5e7eb", borderRadius: 6, background: "#fff", cursor: "pointer" }}>
+              <button onClick={() => navigate("/inspiration")} style={{ fontSize: 12, padding: "5px 10px", border: "1px solid #e5e7eb", borderRadius: 6, background: "#fff", cursor: "pointer" }}>
                 {en ? "Act on it" : "採用建議"} ↗
               </button>
             </div>
@@ -185,7 +184,7 @@ export default function HomePage() {
           <p style={{ fontSize: 13, fontWeight: 600, color: "#6b7280", margin: "0 0 8px" }}>{en ? "Recent activity" : "最近動態"}</p>
           <div style={{ border: "1px solid #e5e7eb", borderRadius: 12, padding: "4px 0" }}>
             {(notifQ.data?.items ?? notifQ.data ?? []).length === 0 ? (
-              <div style={{ padding: "8px 14px", fontSize: 13, color: "#9ca3af" }}>{en ? "Nothing yet." : "還沒有動態。"}</div>
+              <div style={{ padding: "8px 14px", fontSize: 13, color: "#9ca3af" }}>{en ? "Nothing yet" : "還沒有動態"}</div>
             ) : (notifQ.data?.items ?? notifQ.data ?? []).slice(0, 3).map((n: any) => (
               <div key={n.id} onClick={() => n.navUrl && navigate(n.navUrl)} style={{ display: "flex", gap: 8, padding: "8px 14px", fontSize: 13, color: "#6b7280", cursor: n.navUrl ? "pointer" : "default" }}>
                 <FontAwesomeIcon icon={n.kind === "task_complete" ? faCheck : n.kind === "card_published" ? faWandMagicSparkles : n.kind === "strategy_alert" ? faTriangleExclamation : faBell} style={{ fontSize: 13, marginTop: 2, color: "#9ca3af" }} />
@@ -203,7 +202,7 @@ export default function HomePage() {
         </button>
         <button onClick={() => navigate("/tasks/fb")} style={{ fontSize: 12, padding: "6px 12px", border: "1px solid #e5e7eb", borderRadius: 8, background: "#fff", cursor: "pointer" }}>
           <FontAwesomeIcon icon={faLayerGroup} style={{ marginRight: 6, color: "#9ca3af" }} />
-          {en ? "Advanced: browse task cards" : "進階：自己挑任務卡"}
+          {en ? "Task cards" : "任務卡"}
         </button>
         <span onClick={() => navigate("/changelog")} style={{ fontSize: 11, color: "#9ca3af", marginLeft: "auto", cursor: "pointer" }}>
           {en ? "Changelog" : "更新日誌"}
@@ -213,11 +212,11 @@ export default function HomePage() {
   );
 }
 
-function TrayHeader({ badge, color, caption }: { badge: string; color: string; caption: string }) {
+function TrayHeader({ badge, color, caption }: { badge: string; color: string; caption?: string }) {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
       <span style={{ fontSize: 12, padding: "2px 8px", borderRadius: 6, background: `${color}1a`, color }}>{badge}</span>
-      <span style={{ fontSize: 12, color: "#6b7280" }}>{caption}</span>
+      {caption && <span style={{ fontSize: 12, color: "#6b7280" }}>{caption}</span>}
     </div>
   );
 }

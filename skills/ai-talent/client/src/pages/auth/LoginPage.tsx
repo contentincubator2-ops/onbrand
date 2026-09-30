@@ -11,24 +11,34 @@
  * Google-OAuth users who navigate here directly are sent straight to the app.
  */
 
-import { CATALOG } from "../../v2/platform/lib/catalogFigures";
 import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useLang } from "../../lib/i18n";
+import { WarningIcon } from "../../v2/platform/components/icons";
 
 // ── SoWork.ai design tokens (single source of truth) ────────────────────
 const C = {
-  cream: "#F7F2EB",
+  cream: "#FAFAFA",
   ink: "#0F0F0E",
   inkSoft: "#3A3633",
   muted: "#6B6660",
-  orange: "#E85D2E",
-  orangeDark: "#C84516",
-  orangeChip: "#FDE6D8",
-  border: "#E8DECC",
-  borderSoft: "#EFE7D6",
+  orange: "#18181B",
+  orangeDark: "#3F3F46",
+  orangeChip: "#F4F4F5",
+  border: "#D4D4D8",
+  borderSoft: "#E4E4E7",
   white: "#FFFFFF",
 };
+
+/**
+ * 2026-09-28（OnBrand 連接器）：Claude 連接 OnBrand 時會先把人帶到 /api/mcp-oauth/authorize，
+ * 沒登入就轉來這裡並帶 ?next=。登入後要回到那個授權頁，否則使用者會落在 /planner、連接流程斷掉。
+ * 只放行授權頁這一條路徑 —— 通用的 next 等於開放轉址。伺服器端（Google 回呼）有同一條規則。
+ */
+function oauthNextPath(): string | null {
+  const next = new URLSearchParams(window.location.search).get("next") ?? "";
+  return /^\/api\/mcp-oauth\/authorize(\?|$)/.test(next) ? next : null;
+}
 
 export default function LoginPage() {
   const { t, lang, setLang } = useLang();
@@ -57,7 +67,11 @@ export default function LoginPage() {
     })
       .then((r) => {
         if (cancelled) return;
-        if (r.ok) navigate("/theater", { replace: true });
+        if (r.ok) {
+          const next = oauthNextPath();
+          if (next) window.location.href = next;
+          else navigate("/planner", { replace: true });
+        }
         else setAuthChecking(false);
       })
       .catch(() => { if (!cancelled) setAuthChecking(false); });
@@ -113,7 +127,7 @@ export default function LoginPage() {
 
       // Wait for cookie to be set
       await new Promise(resolve => setTimeout(resolve, 500));
-      window.location.href = "/theater";
+      window.location.href = oauthNextPath() ?? "/planner";
     } catch (err) {
       setError(t("auth_err_network"));
     } finally {
@@ -123,6 +137,9 @@ export default function LoginPage() {
 
   const handleGoogleLogin = () => {
     setGoogleLoading(true);
+    // Google 登入會離開本站再回到 /api/auth/google/callback，next 只能靠短效 cookie 帶過去。
+    const next = oauthNextPath();
+    if (next) document.cookie = `ob_oauth_next=${encodeURIComponent(next)}; path=/; max-age=600; samesite=lax`;
     window.location.href = "/api/auth/google";
   };
 
@@ -139,149 +156,10 @@ export default function LoginPage() {
     );
   }
 
-  const FEATURES = lang === "en"
-    ? [
-        ["01", "Brand Brain", "Lock your positioning once. Every post stays on-brand."],
-        ["02", "Content Tiers", "A single post · a content pack · a full campaign."],
-        ["03", "7-Day Publisher", "Schedule a whole week across channels in one click."],
-        ["04", "Sourced", `Viral-structure cards refreshed monthly, each with its spread metric, measurement month and reference article.`],
-      ]
-    : [
-        ["01", "品牌大腦", "鎖定一次品牌定位 · 每篇貼文自動 on-brand"],
-        ["02", "三種規格", "單篇內容 · 內容套組 · 完整企劃"],
-        ["03", "七日發布台", "一次排好 7 天 × 全平台內容"],
-        ["04", "有出處", `每月更新的爆款結構卡，每張附傳播數字、量測年月與參考文章`],
-      ];
-
   return (
     <div className="min-h-screen flex" style={{ background: C.cream }}>
-      {/* ── Left: marketing panel (55%) ──────────────────────────── */}
-      <div
-        className="hidden lg:flex flex-col justify-center px-14 py-12 w-[55%] relative overflow-y-auto"
-        style={{ background: C.cream, borderRight: `1px solid ${C.borderSoft}` }}
-      >
-        {/* Dot grid background */}
-        <div
-          className="absolute inset-0 pointer-events-none"
-          style={{
-            backgroundImage: `radial-gradient(circle, ${C.ink} 1px, transparent 1px)`,
-            backgroundSize: "28px 28px",
-            opacity: 0.045,
-          }}
-          aria-hidden
-        />
-
-        <div className="max-w-xl relative z-10">
-          {/* Brand mark with droplet */}
-          <div className="flex items-center gap-2 mb-8">
-            <svg width="22" height="26" viewBox="0 0 24 28" fill="none" aria-hidden>
-              <path
-                d="M12 2 C 16 8, 22 14, 22 19 A 10 10 0 0 1 2 19 C 2 14, 8 8, 12 2 Z"
-                fill={C.orange}
-                stroke={C.ink}
-                strokeWidth="2.2"
-                strokeLinejoin="round"
-              />
-            </svg>
-            <span className="text-[18px] font-extrabold" style={{ color: C.ink }}>
-              OnBrand<span style={{ color: C.orange }}>.ai</span>
-            </span>
-          </div>
-
-          {/* Pill chip */}
-          <div
-            className="inline-block text-[12px] font-bold px-3 py-1.5 rounded-md mb-5"
-            style={{ background: C.orangeChip, color: C.orangeDark }}
-          >
-            {lang === "en" ? "AI-Powered Brand Brain" : "AI 驅動的品牌大腦"}
-          </div>
-
-          {/* Hero headline */}
-          <h1
-            className="font-black tracking-tight leading-[1.05] mb-5"
-            style={{
-              color: C.ink,
-              fontSize: "clamp(2rem, 4vw, 3.2rem)",
-              letterSpacing: "-0.02em",
-            }}
-          >
-            {lang === "en" ? (
-              <>
-                Always
-                <br />
-                on-brand.
-              </>
-            ) : (
-              <>
-                永遠 on-brand
-                <br />
-                的 AI 行銷工作室
-              </>
-            )}
-          </h1>
-
-          {/* Sub-pitch */}
-          <p className="text-[14.5px] leading-[1.75] mb-8 max-w-[500px]" style={{ color: C.muted }}>
-            {lang === "en"
-              ? "OnBrand isn't another one-click AI generator. SoWork's 14-step Brand Positioning Method writes your Why, TA, Differentiation and Voice into a Brand Brain. Set it once. Every channel follows."
-              : "OnBrand 不是「AI 一鍵生成」工具——把 SoWork 14 步品牌定位法做成可執行流程，AI 在每篇貼文之前先讀懂你的 WHY、TA、差異化。鎖定一次，所有平台都跟著你的調性走。"}
-          </p>
-
-          {/* 4 USP mini-cards */}
-          <div className="grid grid-cols-2 gap-3 mb-8 max-w-[500px]">
-            {FEATURES.map(([n, title, desc]) => (
-              <div
-                key={n}
-                className="p-4 rounded-xl transition hover:-translate-y-0.5"
-                style={{ background: C.white, border: `1.5px solid ${C.ink}` }}
-              >
-                <div className="text-[12px] font-black tracking-[0.2em] mb-2" style={{ color: C.orange }}>
-                  {n}
-                </div>
-                <div className="text-[13.5px] font-bold mb-1 leading-snug" style={{ color: C.ink }}>
-                  {title}
-                </div>
-                <div className="text-[11.5px] leading-relaxed" style={{ color: C.muted }}>
-                  {desc}
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* Channel strip — 2026-09-29（CJ）：內容通路只剩 FB／IG／Threads／LINE／TikTok／電子報／官網 */}
-          <div className="flex items-center gap-2 text-[10.5px] mb-6 flex-wrap" style={{ color: C.inkSoft }}>
-            <span className="font-bold tracking-wider">
-              {lang === "en" ? "ALL CHANNELS" : "全管道覆蓋"}
-            </span>
-            <span style={{ color: C.muted }}>·</span>
-            <span>Facebook</span>
-            <span style={{ color: C.muted }}>·</span>
-            <span>Instagram</span>
-            <span style={{ color: C.muted }}>·</span>
-            <span>Threads</span>
-            <span style={{ color: C.muted }}>·</span>
-            <span>LINE</span>
-            <span style={{ color: C.muted }}>·</span>
-            <span>TikTok</span>
-            <span style={{ color: C.muted }}>·</span>
-            <span>Email</span>
-            <span style={{ color: C.muted }}>·</span>
-            <span>{lang === "en" ? "Website" : "官網"}</span>
-          </div>
-
-          {/* Language toggle */}
-          <button
-            onClick={() => setLang(lang === "en" ? "zh-TW" : "en")}
-            className="text-xs underline transition hover:opacity-70"
-            style={{ color: C.muted }}
-          >
-            {lang === "en" ? "切換為繁體中文" : "Switch to English"}
-          </button>
-        </div>
-      </div>
-
       {/* ── Right: login panel (45%) ─────────────────────────────── */}
-      <div className="flex flex-col justify-center items-center w-full lg:w-[45%] px-8 py-10" style={{ background: C.cream }}>
+      <div className="flex flex-col justify-center items-center w-full px-8 py-10" style={{ background: C.cream }}>
         {/* Mobile-only brand strip */}
         <div className="lg:hidden w-full max-w-md mb-6 pt-4">
           <div className="flex items-center justify-between mb-2">
@@ -301,9 +179,6 @@ export default function LoginPage() {
               {lang === "en" ? "繁體中文" : "English"}
             </button>
           </div>
-          <p className="text-sm leading-relaxed mb-1 font-bold" style={{ color: C.ink }}>
-            {lang === "en" ? "Always on-brand. Your AI marketing studio." : "永遠 on-brand · 你的 AI 行銷工作室"}
-          </p>
         </div>
 
         <div className="w-full max-w-md">
@@ -317,7 +192,7 @@ export default function LoginPage() {
               boxShadow: `0 6px 0 ${C.orangeDark}`,
             }}
           >
-            {lang === "en" ? "Start free — build your Brand Brain →" : "免費開始 · 建立你的第一個品牌大腦 →"}
+            {lang === "en" ? "Start free →" : "免費開始 →"}
           </Link>
           <p className="text-center text-[12px] mb-6" style={{ color: C.muted }}>
             {lang === "en" ? "No credit card. 14-step positioning takes ~10 minutes." : "免信用卡 · 14 步定位流程約 10 分鐘完成"}
@@ -348,10 +223,9 @@ export default function LoginPage() {
             }}
           >
             <div className="mb-6">
-              <h2 className="text-xl font-black mb-1" style={{ color: C.ink, letterSpacing: "-0.01em" }}>
+              <h2 className="text-xl font-black" style={{ color: C.ink, letterSpacing: "-0.01em" }}>
                 {t("auth_login_title")}
               </h2>
-              <p className="text-sm" style={{ color: C.muted }}>{t("auth_login_subtitle")}</p>
             </div>
 
             {/* Google Login Button */}
@@ -455,10 +329,10 @@ export default function LoginPage() {
               {error && (
                 <div
                   className="flex flex-col gap-2 text-sm rounded-lg px-3 py-2"
-                  style={{ background: "#FFF1ED", border: `1.5px solid ${C.orange}` }}
+                  style={{ background: "#F4F4F5", border: `1.5px solid ${C.orange}` }}
                 >
                   <div className="flex items-center gap-2" style={{ color: C.orangeDark }}>
-                    <span>⚠</span> {error}
+                    <WarningIcon size={14} /> {error}
                   </div>
                   {needsVerification && (
                     <div className="flex flex-col gap-1.5 pl-6">

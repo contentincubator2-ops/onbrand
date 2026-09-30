@@ -166,7 +166,7 @@ async function recordUsageRow(args: {
  *  so a plain spread-merge into `positioning` is correct.
  *
  *  Spread-merge preserves wizard-written sibling keys: _assets,
- *  _aiPrompts, _interim, and any manually-edited segments not in this run. */
+ *  _interim, and any manually-edited segments not in this run. */
 async function mergePositioning(kind: EntityKind, id: number, userId: number, patch: Record<string, any>): Promise<void> {
   // Defense-in-depth: even if a pipeline was already mid-flight when the
   // user locked 定位, don't let a step that finishes afterwards overwrite
@@ -188,7 +188,7 @@ async function mergePositioning(kind: EntityKind, id: number, userId: number, pa
   let cur: any = row.payload;
   if (typeof cur === "string") { try { cur = JSON.parse(cur); } catch { cur = {}; } }
   cur = cur ?? {};
-  // Top-level spread: { ...prior segments + _assets/_aiPrompts/_interim, ...new segments }
+  // Top-level spread: { ...prior segments + _assets/_interim, ...new segments }
   const next = { ...cur, ...patch };
   await localPool.execute(
     `UPDATE \`${table}\` SET \`${col}\` = ? WHERE id = ? AND userId = ?`,

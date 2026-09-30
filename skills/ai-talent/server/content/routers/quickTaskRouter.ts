@@ -973,6 +973,8 @@ import { KOL_30S_TASKS } from "../core/quickTaskKOL";
 // 2026-08-29 官網頻道 (web-)：品牌自己的部落格長文 / 品牌專欄 / 案例 / 產品頁。
 import { WEBSITE_30S_TASKS } from "../core/quickTaskWebsite";
 import { X_30S_TASKS } from "../core/quickTaskX";
+import { TH_30S_TASKS } from "../core/quickTaskThreads";
+import { LN_30S_TASKS } from "../core/quickTaskLine";
 // 2026-08-29 per-brand 任務包。有 pack 的品牌，頻道與卡片完全由 pack 決定。
 import { resolveBrandPack, expandPackCards, packNavForBrand } from "../../strategy/core/brandPacks";
 // 2026-09-02: task id → template + config 的唯一解析點。這條鏈本來在這個檔案
@@ -1442,6 +1444,9 @@ export const quickTaskRouter = router({
       kind: "fast" as const,
       platform: "x",
     }));
+    // 2026-09-29 Threads／LINE 通路的全域卡。
+    const thTasks = TH_30S_TASKS.map((t) => ({ ...t, kind: "fast" as const, platform: "threads" }));
+    const lnTasks = LN_30S_TASKS.map((t) => ({ ...t, kind: "fast" as const, platform: "line" }));
     const kolTasks = KOL_30S_TASKS.map((t) => ({
       ...t,
       kind: "fast" as const,
@@ -1542,7 +1547,7 @@ export const quickTaskRouter = router({
       ...fbTasks, ...fb60Tasks, ...ig60Tasks, ...yt60Tasks, ...multi60Tasks,
       ...tasks100,
       ...igTasks, ...ytTasks, ...ttTasks, ...liTasks, ...emTasks, ...prTasks, ...brTasks, ...rsTasks, ...kolTasks,
-      ...webTasks, ...xTasks,
+      ...webTasks, ...xTasks, ...thTasks, ...lnTasks,
       ...mediaTasks,
     ];
 
@@ -1703,6 +1708,7 @@ export const quickTaskRouter = router({
         agent_id: t.agent_id ?? null,
         skill_slug: t.skill_slug ?? null,
         primary_question: t.primary_question ?? null,
+        scene: t.scene ?? null,
         primary_input: t.primary_input ?? null,
         // 2026-05-11 — surface bilingual label parts + context wiring so the
         // intake modal can render "EN · 中文" + the "我會用 X 來跑" strip.
@@ -1876,6 +1882,11 @@ export const quickTaskRouter = router({
       agentName: z.string().max(120).optional(),
       agentTitle: z.string().max(200).optional(),
       brandId: z.number().optional(),
+      // 2026-09-29：原本那篇是替哪個產品／活動寫的——改寫也要讀同一份範圍。
+      productId: z.number().optional(),
+      eventId: z.number().optional(),
+      // 2026-09-29：這篇是哪張卡 —— 帶了就套這張卡的字數與形式（rewriteContract.ts）。
+      taskId: z.string().max(80).optional(),
       // Conversation history (optional) — last 6 turns
       history: z.array(z.object({
         role: z.enum(["user", "assistant"]),
@@ -1886,7 +1897,7 @@ export const quickTaskRouter = router({
       const { callModel } = await import("../../platform/core/multiModelRouter");
       const { buildBrandPrefix } = await import("../../strategy/core/brandContext");
       const { loadAgentKnowledge } = await import("../../platform/core/agentKnowledge");
-      const brandPrefix = await buildBrandPrefix(input.brandId, null, null, "core").catch(() => "");
+      const brandPrefix = await buildBrandPrefix(input.brandId, input.productId ?? null, input.eventId ?? null, "full").catch(() => "");
 
       let agentName = input.agentName ?? "資深文案";
       let agentTitle = input.agentTitle ?? "Brand Copywriter";
@@ -1903,6 +1914,22 @@ export const quickTaskRouter = router({
         agentKnowledge = await loadAgentKnowledge(agent.id, { source: "quickTask.refineCaption" }).catch(() => "");
       }
 
+      const contract = await import("../core/rewriteContract");
+      let spec: import("../core/rewriteContract").RewriteSpec = {};
+      if (input.taskId) {
+        const { resolveOrchestraConfig } = await import("../core/taskRegistry");
+        const [tpl, cfg]: any = await Promise.all([
+          resolveTaskTemplate(input.taskId).catch(() => null),
+          resolveOrchestraConfig(input.taskId).catch(() => null),
+        ]);
+        const label = tpl?.label;
+        spec = {
+          label: typeof label === "string" ? label : (label?.zh ?? label?.en ?? null),
+          minChars: cfg?.captionMinChars ?? null,
+          maxChars: cfg?.captionMaxChars ?? null,
+        };
+      }
+
 
 
       const system =
@@ -1913,7 +1940,9 @@ export const quickTaskRouter = router({
         `3. 最後是完整的**修改後文案**（不要省略，不要寫 "如下"，直接給完整版）\n\n` +
         `重要：保留原本能用的部分，只動用戶提到的地方。語氣自然口語。\n` +
         (agentKnowledge ? `\n【此 agent 的工作守則與專業能力】\n${agentKnowledge}\n` : "") +
-        brandPrefix;
+        brandPrefix +
+        // 合約接在最後：最後讀到的最有力，換人時個人風格不能蓋過這張卡的形式。
+        contract.rewriteContractBlock(spec);
 
       const messages: Array<{ role: "system" | "user" | "assistant"; content: string }> = [
         { role: "system", content: system },
@@ -1924,20 +1953,37 @@ export const quickTaskRouter = router({
       try {
         // 2026-05-17: was "qwen" (Chinese model, zh-TW policy violation)
         // → anthropic for Taiwan-correct output.
+        const parse = (raw: string) => {
+          const text = (raw ?? "").trim();
+          // Split on triple newline to separate explanation from rewritten caption
+          let parts = text.split(/\n\n\n+/);
+          // 2026-07-07 (verified live on /run/2887): models sometimes use a
+          // markdown horizontal rule as the separator instead of blank lines —
+          // the triple-newline split then fails and the explanation + '---'
+          // leak into the published caption. Fall back to splitting on the hr.
+          if (parts.length === 1) {
+            parts = text.split(/\n+[-—_*]{3,}\s*\n+/);
+          }
+          const explanation = parts.length > 1 ? (parts[0] ?? "").trim() : "";
+          let rewritten = parts.length > 1 ? parts.slice(1).join("\n\n").trim() : text;
+          rewritten = rewritten.replace(/^(?:[-—_*]{3,}\s*\n+)+/, "").replace(/\n+(?:[-—_*]{3,}\s*)+$/, "").trim();
+          return { explanation, rewritten: contract.stripMarkdown(rewritten) };
+        };
         const r = await callModel(messages, undefined, "anthropic");
-        const text = (r.content ?? "").trim();
-        // Split on triple newline to separate explanation from rewritten caption
-        let parts = text.split(/\n\n\n+/);
-        // 2026-07-07 (verified live on /run/2887): models sometimes use a
-        // markdown horizontal rule as the separator instead of blank lines —
-        // the triple-newline split then fails and the explanation + '---'
-        // leak into the published caption. Fall back to splitting on the hr.
-        if (parts.length === 1) {
-          parts = text.split(/\n+[-—_*]{3,}\s*\n+/);
+        let { explanation, rewritten } = parse(r.content ?? "");
+        // 驗證重試：超過這張卡的字數上限 25% → 帶著實際字數要求濃縮一次。還是太長就照給，不硬截斷。
+        if (contract.isOverLimit(rewritten, spec)) {
+          const r2 = await callModel([
+            ...messages,
+            { role: "assistant", content: r.content ?? "" },
+            { role: "user", content: contract.shortenRequest(rewritten, spec) },
+          ], undefined, "anthropic").catch(() => null);
+          const second = r2 ? parse(r2.content ?? "") : null;
+          if (second?.rewritten && contract.countChars(second.rewritten) < contract.countChars(rewritten)) {
+            rewritten = second.rewritten;
+            explanation = explanation || second.explanation;
+          }
         }
-        const explanation = parts.length > 1 ? (parts[0] ?? "").trim() : "";
-        let rewritten = parts.length > 1 ? parts.slice(1).join("\n\n").trim() : text;
-        rewritten = rewritten.replace(/^(?:[-—_*]{3,}\s*\n+)+/, "").replace(/\n+(?:[-—_*]{3,}\s*)+$/, "").trim();
         // Brand-rule hard enforcement: an inline rewrite must not
         // reintroduce banned words / skip substitutions.
         try {
@@ -1962,6 +2008,8 @@ export const quickTaskRouter = router({
       taskLabel: z.string().max(200).optional(),
       primaryQuestion: z.string().max(400).optional(),
       brandId: z.number().optional(),
+      productId: z.number().optional(),
+      eventId: z.number().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const userId = ctx.user!.id;
@@ -1974,7 +2022,8 @@ export const quickTaskRouter = router({
 
       const { callModel } = await import("../../platform/core/multiModelRouter");
       const { buildBrandPrefix } = await import("../../strategy/core/brandContext");
-      const brandPrefix = await buildBrandPrefix(input.brandId, null, null, "core").catch(() => "");
+      // 2026-09-29：完整品牌大腦＋這張任務選的產品／活動（以前只給精簡 digest、不帶產品）。
+      const brandPrefix = await buildBrandPrefix(input.brandId, input.productId ?? null, input.eventId ?? null, "full").catch(() => "");
 
       // 2026-09-01 (CJ「AI 潤稿當中的十築，根本不是官網定義的十築」):
       // brandPrefix 是通用的品牌 digest，沒有任何任務專屬知識，所以模型會
@@ -2138,6 +2187,8 @@ ${polishTemplate.polishHint}`
       /** Full text of the "12 影片 title" tab — provides channel context. */
       titleContext: z.string().max(4000).optional(),
       brandId: z.number().optional(),
+      productId: z.number().optional(),
+      eventId: z.number().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const userId = ctx.user!.id;
@@ -2153,7 +2204,11 @@ ${polishTemplate.polishHint}`
         ? `\n\n【頻道本季其他影片方向（供參考，勿直接複製）】\n${input.titleContext}`
         : "";
 
-      const system = `你是資深 YouTube 內容策略師兼腳本撰稿人。
+      // 2026-09-29（CJ「生文前都要讀取策略層的內容」）：這裡一直收 brandId 卻沒用，
+      // 腳本完全不認得品牌。現在讀同一份品牌大腦，語言與市場也照大腦的設定。
+      const brandPrefix = await buildBrandContext(input.brandId, input.productId ?? null, input.eventId ?? null).catch(() => "");
+
+      const system = `${brandPrefix ? `# 品牌大腦（腳本的觀點、用詞、語氣都要符合）${brandPrefix}\n\n` : ""}你是資深 YouTube 內容策略師兼腳本撰稿人。
 請為以下影片標題撰寫一份完整的拍攝腳本。
 
 【腳本格式】
@@ -2176,7 +2231,7 @@ ${polishTemplate.polishHint}`
 [有記憶點的結尾觀點 + 自然的訂閱/留言 CTA，不要爆料腔「快來訂閱」]
 
 【品牌聲音規則】
-- 台灣繁體中文，口語自然但具專業感
+- 語言與市場照品牌大腦的市場設定（沒有設定時用台灣繁體中文），口語自然但具專業感
 - 驚嘆號→句號；無 emoji；無主題標籤
 - 所有數字必須有來源邏輯（不捏造統計數字）
 - 總字數：800–1400 字`;
@@ -2192,8 +2247,10 @@ ${polishTemplate.polishHint}`
           undefined,
           "anthropic",
         );
-        const script = (r.content ?? "").trim();
-        if (!script) return { script: "", ok: false, error: "empty response" };
+        const raw = (r.content ?? "").trim();
+        if (!raw) return { script: "", ok: false, error: "empty response" };
+        const { enforceBrandRulesOnText } = await import("../../strategy/core/brandContext");
+        const script = await enforceBrandRulesOnText(input.brandId, raw).catch(() => raw);
         return { script, ok: true };
       } catch (e: any) {
         return { script: "", ok: false, error: e?.message ?? String(e) };
@@ -2214,6 +2271,9 @@ ${polishTemplate.polishHint}`
       squadSlug: z.string().min(1).max(80),
       topic:     z.string().max(2000).default(""),
       brandId:   z.number().optional(),
+      // 2026-09-29：任務 modal 選的產品／活動，品牌大腦要一起帶。
+      productId: z.number().optional(),
+      eventId:   z.number().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const userId = ctx.user!.id;
@@ -2247,7 +2307,7 @@ ${polishTemplate.polishHint}`
       // squad work → full brand depth (golden circle / story /
       // competition), NOT the lean core digest.
       const { buildBrandPrefix } = await import("../../strategy/core/brandContext");
-      const brandPrefix = await buildBrandPrefix(input.brandId, null, null, "full").catch(() => "");
+      const brandPrefix = await buildBrandPrefix(input.brandId, input.productId ?? null, input.eventId ?? null, "full").catch(() => "");
       // 2026-07-17 多市場: brand's outputLanguage drives step language +
       // whether the zh-TW deterministic sanitizer may run on step output.
       const { getBrandMarket, DEFAULT_BRAND_MARKET } = await import("../../strategy/core/brandMarket");
@@ -2510,6 +2570,11 @@ ${polishTemplate.polishHint}`
               if (latinPunctLang(brandMarket.outputLanguage)) text = normalizeLatinPunct(text);
             }
           } catch { /* fail-safe: keep raw text */ }
+          // 2026-09-29：squad 每一步的產出也過禁用詞／替換對照（以前只有 orchestra 有）。
+          if (text && input.brandId) {
+            const { enforceBrandRulesOnText } = await import("../../strategy/core/brandContext");
+            text = await enforceBrandRulesOnText(input.brandId, text).catch(() => text);
+          }
           if (strategyPublicPolicy) {
             const privateTerms = [
               { value: squad.name, replacement: { zh: "策略團隊", en: "strategy team" } },
@@ -3106,6 +3171,8 @@ ${polishTemplate.polishHint}`
       const { runOrchestra } = await import("../core/quickTaskOrchestra");
       const r = await runOrchestra({
         template, config: singleConfig, inputs, brandId: row.mission_brand_id ?? undefined, userId, tier: taskTier,
+        // 2026-09-29：重生時沿用原本那篇的產品／活動範圍（metadata 有存），不然重生的版本讀不到產品定位。
+        productId: md.productId ?? undefined, eventId: md.eventId ?? undefined,
       });
       const newVariant = r.variants?.[0];
       if (!newVariant?.caption) throw new Error("重生失敗，agent 沒回傳內容");
@@ -3256,6 +3323,17 @@ ${polishTemplate.polishHint}`
 
       // Parse + soft-validate output
       const parsedJson = tryParseJson(result.content);
+      // 2026-09-29：禁用詞／替換對照硬檢查——以前只有 orchestra 與改寫路徑有做。
+      // 只檢查會被發出去的文字欄位，不動 JSON 結構。
+      if (parsedJson && typeof parsedJson === "object" && input.brandId) {
+        const { enforceBrandRulesOnText } = await import("../../strategy/core/brandContext");
+        for (const k of ["caption", "title", "description", "cta"] as const) {
+          const v = (parsedJson as any)[k];
+          if (typeof v === "string" && v.trim()) {
+            (parsedJson as any)[k] = await enforceBrandRulesOnText(input.brandId, v).catch(() => v);
+          }
+        }
+      }
       // 2026-05-05 fix: spread LLM output FIRST, then OVERRIDE the routing
       // fields with template defaults. Otherwise LLMs that emit Chinese
       // post_type (e.g. "图文貼文") break the mockup variant routing because

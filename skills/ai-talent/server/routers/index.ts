@@ -19,7 +19,7 @@ import { pipelineRouter } from "../strategy/routers/pipelineRouter";
 import { postFormatRouter } from "../content/routers/postFormatRouter";
 import { mediaRouter } from "../content/routers/mediaRouter";
 import { platformConnectRouter } from "../platform/routers/platformConnectRouter";
-import { theaterRouter } from "../content/routers/theaterRouter";
+import { tabLockRouter } from "../strategy/routers/tabLockRouter";
 import { positioningJobsRouter } from "../strategy/routers/positioningJobsRouter";
 import { positioningDocsRouter } from "../strategy/routers/positioningDocsRouter";
 import { brandTaskCardRouter } from "../strategy/routers/brandTaskCardRouter";
@@ -32,6 +32,7 @@ import { strategyMeetingRouter } from "../strategy/routers/strategyMeetingRouter
 import { touchpointsRouter } from "../platform/routers/touchpointsRouter";
 import { navPrefsRouter } from "../platform/routers/navPrefsRouter";
 import { plannerRouter } from "../content/routers/plannerRouter";
+import { inspirationRouter } from "../content/routers/inspirationRouter";
 import { competitorRouter } from "../strategy/routers/competitorRouter";
 import { brandKnowledgeRouter } from "../strategy/routers/brandKnowledgeRouter";
 import { personaAgentRouter } from "../strategy/routers/personaAgentRouter";
@@ -80,6 +81,7 @@ export const appRouter = router({
   touchpoints:   touchpointsRouter,
   navPrefs:      navPrefsRouter,
   planner:       plannerRouter,
+  inspiration:   inspirationRouter,
   competitor:    competitorRouter,
   calendar:      calendarRouter,
   bundleConnect: bundleConnectRouter,
@@ -98,7 +100,7 @@ export const appRouter = router({
   postFormat:    postFormatRouter,
   media:         mediaRouter,
   platformConnect: platformConnectRouter,
-  theater:         theaterRouter,
+  tabLock:         tabLockRouter,
   positioningJobs: positioningJobsRouter,
   positioningDocs: positioningDocsRouter,
   brandTaskCard:   brandTaskCardRouter,

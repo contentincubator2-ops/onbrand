@@ -15,6 +15,7 @@ import {
   CAMPAIGN_PHASE_IDS,
 } from "./campaignPlan";
 import type { CatalogTask } from "../../content/core/taskCatalogIndex";
+import { resolveTask } from "../../content/core/taskRegistry";
 
 const d = (s: string) => new Date(`${s}T00:00:00.000Z`);
 const card = (id: string, platform: string, tier = "30s"): CatalogTask => ({
@@ -137,6 +138,22 @@ describe("candidateCards", () => {
 
   it("通路名稱亂填不會炸，只是沒有卡", () => {
     expect(candidateCards(["不存在的通路"])).toHaveLength(0);
+  });
+
+  // 2026-09-29：Threads／LINE 原本只有圖片規格卡（不在目錄裡），本週企劃排不進、
+  // 靈感舞台採用會丟「這個通路沒有可用的任務卡」。#224 補了 th-／ln- 文字卡；
+  // 這條鎖住「兩個通路至少有一張可排的文字卡」，而且每張都解得到 template＋config
+  // （不然排得進去、按下去照樣壞）。
+  it.each(["threads", "line"])("%s 有可排進企劃的文字卡，而且都解得到", async (platform) => {
+    const cards = candidateCards([platform]);
+    expect(cards.length).toBeGreaterThan(0);
+    for (const c of cards) {
+      expect(c.platform).toBe(platform);
+      expect(c.addedAt).toBeTruthy();
+      const r = await resolveTask(c.id);
+      expect(r?.template, c.id).toBeTruthy();
+      expect(r?.config, c.id).toBeTruthy();
+    }
   });
 });
 

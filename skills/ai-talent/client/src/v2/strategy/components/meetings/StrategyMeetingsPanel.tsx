@@ -12,6 +12,7 @@
  *
  * 版面沿用 StrategyAlertsPanel 的單色 neutral 系統——顏色只拿來表達狀態。
  */
+import { IllustratedEmpty } from "../../../platform/components/EmptyIllustration";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { trpc } from "../../../../lib/trpc";
@@ -25,6 +26,8 @@ import {
   EXAMPLE_MEETING, EXAMPLE_RUN, TOPIC_TEMPLATES, fmtDate, frequencyText, pendingCount, runNoteText,
   type DecisionStatus, type MeetingAction, type MeetingAttendee, type MeetingFrequency, type MeetingRow, type MeetingRun,
 } from "./meetingModel";
+import { CloseIcon } from "../../../platform/components/icons";
+import { HelpTip } from "../../../platform/components/HelpTip";
 
 interface ListData {
   locked: boolean;
@@ -67,7 +70,7 @@ export default function StrategyMeetingsPanel({ brandId }: { brandId: number }) 
   const [view, setView] = useState<View>({ kind: "list" });
   const [showExample, setShowExample] = useState(false);
 
-  const listQ = T.strategyMeeting?.list?.useQuery?.({ brandId }, { staleTime: 10_000 }) ?? { data: null, isLoading: false };
+  const listQ = T.strategyMeeting?.list?.useQuery({ brandId }, { staleTime: 10_000 }) ?? { data: null, isLoading: false };
   const data = listQ.data as ListData | null | undefined;
   const anyRunning = !!data?.meetings.some((m) => m.latestRun?.status === "running");
   // 有會正在開的時候每 5 秒刷新一次，開完自動出現結果。
@@ -129,12 +132,14 @@ export default function StrategyMeetingsPanel({ brandId }: { brandId: number }) 
     <div className="mx-auto max-w-[880px] space-y-6 px-2">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h2 className="text-[20px] font-semibold text-neutral-900">{en ? "Strategy meetings" : "策略會議"}</h2>
-          <p className="mt-1 max-w-[560px] text-[13px] leading-relaxed text-neutral-500">
-            {en
-              ? "Set a topic, pick the directors, choose how often. They meet in the background and leave minutes — the part that matters is whether your strategy should change."
-              : "你定主題、挑與會的策略總監、決定多久開一次。時間到了他們會在背景開會，留下一份會議紀錄——重點是策略要不要調整，最後由你決定。"}
-          </p>
+          <h2 className="text-[20px] font-semibold text-neutral-900 flex items-center gap-1.5">
+            {en ? "Strategy meetings" : "策略會議"}
+            <HelpTip>
+              {en
+                ? "Set a topic, pick the directors, choose how often. They meet in the background and leave minutes — whether your strategy should change is your call."
+                : "你定主題、挑與會的策略總監、決定多久開一次。時間到了他們會在背景開會，留下一份會議紀錄——策略要不要調整，最後由你決定。"}
+            </HelpTip>
+          </h2>
         </div>
         {!data.locked && (
           <button type="button" className={btnPrimary} onClick={() => setView({ kind: "form", form: newForm() })}>
@@ -326,8 +331,8 @@ function MeetingForm({ brandId, en, initial, products, maxAttendees, onCancel, o
   const [searchTerm, setSearchTerm] = useState("");
   const set = <K extends keyof FormState>(k: K, v: FormState[K]) => setF((p) => ({ ...p, [k]: v }));
 
-  const dirQ = T.strategistChat?.listDirectors?.useQuery?.({ brandId, scope: f.scope }, { staleTime: 60_000 }) ?? { data: null };
-  const searchQ = T.strategistChat?.searchDirectors?.useQuery?.({ search: searchTerm, limit: 12 }, { enabled: searchTerm.length > 0, staleTime: 60_000 }) ?? { data: null };
+  const dirQ = T.strategistChat?.listDirectors?.useQuery({ brandId, scope: f.scope }, { staleTime: 60_000 }) ?? { data: null };
+  const searchQ = T.strategistChat?.searchDirectors?.useQuery({ search: searchTerm, limit: 12 }, { enabled: searchTerm.length > 0, staleTime: 60_000 }) ?? { data: null };
 
   const suggested = useMemo(() => {
     const out: StrategistDirector[] = [];
@@ -438,7 +443,7 @@ function MeetingForm({ brandId, en, initial, products, maxAttendees, onCancel, o
           <div className="mt-2 flex flex-wrap gap-1.5">
             {f.attendees.filter((a) => !suggested.some((d) => d.agentId === a.agentId)).map((a) => (
               <button key={a.agentId} type="button" onClick={() => set("attendees", f.attendees.filter((x) => x.agentId !== a.agentId))}
-                className="rounded-full bg-neutral-900 px-3 py-1 text-[12px] text-white">{a.name} ✕</button>
+                className="rounded-full bg-neutral-900 px-3 py-1 text-[12px] text-white">{a.name} <CloseIcon size={10} /></button>
             ))}
           </div>
         )}
@@ -496,7 +501,11 @@ function MinutesTimeline({ meeting, brandId, en, onBack, onOpenTask, onOpenSourc
   onBack: () => void; onOpenTask: (a: MeetingAction) => void; onOpenSource: (href: string) => void; onEditPositioning: () => void;
 }) {
   const T = trpc as any;
-  const runsQ = T.strategyMeeting?.runs?.useQuery?.({ meetingId: meeting.id }, { staleTime: 5_000 }) ?? { data: null, isLoading: false };
+  const runsQ = T.strategyMeeting?.runs?.useQuery({ meetingId: meeting.id }, { staleTime: 5_000 }) ?? { data: null, isLoading: false };
+  const runNow = T.strategyMeeting?.runNow?.useMutation?.({
+    onSuccess: () => { showToastGlobal(en ? "Meeting started — about 1–2 minutes" : "會議開始了，大約 1–2 分鐘", "success"); runsQ.refetch?.(); },
+    onError: errToast,
+  });
   const runs: MeetingRun[] = runsQ.data?.runs ?? [];
   const [selected, setSelected] = useState<number | null>(null);
   const anyRunning = runs.some((r) => r.status === "running");
@@ -538,9 +547,11 @@ function MinutesTimeline({ meeting, brandId, en, onBack, onOpenTask, onOpenSourc
       {runsQ.isLoading ? (
         <p className="py-6 text-[13px] text-neutral-400">{en ? "Loading…" : "載入中…"}</p>
       ) : runs.length === 0 ? (
-        <p className="mt-6 rounded-xl border border-neutral-200 px-5 py-4 text-[13px] text-neutral-500">
-          {en ? "No minutes yet. The first meeting happens on schedule, or press “Meet now”." : "還沒有會議紀錄。時間到會自動開會，也可以按「現在開一次」。"}
-        </p>
+        <IllustratedEmpty
+          kind="meeting"
+          title={en ? "Nobody at the table yet" : "會議桌還沒人坐"}
+          action={{ label: en ? "Meet now" : "現在開一場", onPress: () => runNow?.mutate?.({ id: meeting.id }) }}
+        />
       ) : (
         <div className="mt-5 grid gap-5 md:grid-cols-[200px_1fr]">
           {/* 時間軸 */}

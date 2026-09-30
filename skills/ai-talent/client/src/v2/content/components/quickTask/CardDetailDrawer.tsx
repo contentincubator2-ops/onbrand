@@ -16,9 +16,8 @@
  * 邏輯來自 evergreenRationale，日期來自 git 歷史。這裡只負責排版，不另外編故事。
  */
 import { useEffect } from "react";
-import { X } from "lucide-react";
+import { CloseIcon } from "../../../platform/components/icons";
 import { trpc } from "../../../../lib/trpc";
-import { tierLabel } from "../../../platform/lib/tierVocabulary";
 import { resolveSource, sourceLabel, sourceWhy } from "../../lib/sourceVocabulary";
 
 interface Props {
@@ -111,15 +110,12 @@ export default function CardDetailDrawer({ taskId, lang, onClose, onRun }: Props
         {/* ── header ─────────────────────────────────────────────── */}
         <div className="flex items-start gap-3 border-b border-neutral-200 px-5 py-4">
           <div className="min-w-0 flex-1">
-            <p className="text-[13px] text-neutral-500">{en ? "About this card" : "這張卡的出處與說明"}</p>
+            <p className="text-[13px] text-neutral-500">{en ? "About this card" : "出處與說明"}</p>
             <h2 className="mt-0.5 text-[17px] font-semibold leading-snug text-neutral-900">
               {d ? (en ? (d.labelEn || d.labelZh) : (d.labelZh || d.labelEn)) : (en ? "Loading…" : "讀取中…")}
             </h2>
             {d && (
               <div className="mt-2 flex flex-wrap gap-1.5">
-                <span className="rounded-full border border-neutral-200 px-2 py-0.5 text-[12px] text-neutral-600">
-                  {tierLabel(d.tier, lang)}
-                </span>
                 <span className="rounded-full border border-neutral-200 px-2 py-0.5 text-[12px] text-neutral-600">
                   {sourceLabel(src.type, lang)}
                 </span>
@@ -136,7 +132,7 @@ export default function CardDetailDrawer({ taskId, lang, onClose, onRun }: Props
             className="rounded-lg p-1.5 text-neutral-400 transition hover:bg-neutral-100 hover:text-neutral-600"
             aria-label={en ? "Close" : "關閉"}
           >
-            <X size={18} />
+            <CloseIcon size={18} />
           </button>
         </div>
 

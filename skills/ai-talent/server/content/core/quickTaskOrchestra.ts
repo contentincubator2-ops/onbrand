@@ -41,6 +41,7 @@ import { buildBrandPrefix as buildBrandContext, enforceBrandRulesOnText, enforce
 import { isEmailBodyTask, EDM_CRAFT_RUBRIC, edmPlaybookFor } from "./edmCraft";
 import { isInstagramTask, isInstagramBodyTask, IG_CRAFT_RUBRIC, igPlaybookFor } from "./igCraft";
 import { resolveTierVariantShape } from "./tierVariantShape";
+import { resolveSingleVersion } from "./singleVersion";
 import { isFacebookBodyTask, FB_CRAFT_RUBRIC, fbPlaybookFor } from "./fbCraft";
 import { isLinkedInBodyTask, LI_CRAFT_RUBRIC, liPlaybookFor } from "./liCraft";
 import { isTikTokBodyTask, TT_CRAFT_RUBRIC, ttPlaybookFor } from "./ttCraft";
@@ -50,7 +51,6 @@ import { isBrandStrategyBodyTask, BR_CRAFT_RUBRIC, brPlaybookFor } from "./brCra
 import { isKOLBodyTask, KL_CRAFT_RUBRIC, klPlaybookFor } from "./klCraft";
 import { isResearchBodyTask, RS_CRAFT_RUBRIC, rsPlaybookFor } from "./rsCraft";
 import { isCrossplatformBodyTask, CW_CRAFT_RUBRIC, cwPlaybookFor } from "./cwCraft";
-import { loadBrandKnowledgeForPrompt } from "../../strategy/routers/brandKnowledgeRouter";
 import { getBrandRealContent } from "../../strategy/core/brandRealContent";
 import { resolveAgentId } from "./agentAssignments";
 import { getCopywritingMasterPrompt, type MarketCode, type PlatformCode } from "./copywritingMaster";
@@ -2022,6 +2022,20 @@ export async function runOrchestra(args: {
       },
     };
   }
+  // 2026-09-29（CJ「任務產出直接就只有一個版本」）：單篇的替代版本收斂成一篇，
+  // 換風格改在產出頁換 agent 重寫。套組／多卡／候選池／多選即交付物的卡不動 —— 見 singleVersion.ts。
+  if (tier === "30s") {
+    const single = resolveSingleVersion({
+      taskId: args.template?.id,
+      variants: args.config.variants,
+      images: args.config.images,
+      variantLabels: args.config.variantLabels,
+      postLabels: args.config.postLabels,
+      postsCount: args.config.extras?.postsCount,
+      cardsPerVariant: args.config.cardsPerVariant,
+    });
+    if (single) args = { ...args, config: { ...args.config, ...single } };
+  }
   const baseBudget = tier === "60s" ? HARD_BUDGET_60S : tier === "99s" ? HARD_BUDGET_99S : HARD_BUDGET_MS;
   // 長文件卡（案例提報 / 行事曆整月大綱）本質上不是 30s 的工作量，但仍走
   // 30s 引擎。給它們自己的總預算，否則 caption 還沒生完 job 就被判超時。
@@ -2112,24 +2126,20 @@ export async function runOrchestra(args: {
         if (ytUrlInput || !detectedUrl) return null; // skip — YT path handles it
         try { return await fetchUrlSummary(detectedUrl); } catch { return null; }
       })(),
-      // Brand context + knowledge base + REAL public content merged.
+      // Brand brain + REAL public content merged.
       // brandRealContent (website + social via Perplexity) is the strongest
       // grounding signal — without it AI hallucinates industry from brand
       // name (e.g. 桂冠營養研究室 → 美妝). 2026-05-08 (CJ direction).
+      //
+      // 2026-09-29（CJ「一律讀完整版」＋「知識庫是隱藏內容，不需要讀取」）：
+      // 拿掉 2026-05-17 的 core／full 分層——每個 tier 都讀同一份品牌大腦，
+      // 也就是「檢查大腦」畫面上列出來的那一份。知識庫不再注入。
       Promise.all([
-        // 2026-05-17 蒸餾+分層: short/atomic tasks (30s/60s) get the
-        // distilled brand core (focused → faster, cheaper, more
-        // on-brand); only strategic/long-form (100s or document) get
-        // the full heavy block that needs golden-circle/story depth.
-        buildBrandContext(
-          args.brandId, args.productId, args.eventId,
-          (tier === "99s" || args.template.outputMode === "document") ? "full" : "core",
-        ).catch(() => ""),
-        args.brandId ? loadBrandKnowledgeForPrompt(args.brandId).catch(() => "") : Promise.resolve(""),
+        buildBrandContext(args.brandId, args.productId, args.eventId, "full").catch(() => ""),
         args.brandId
           ? getBrandRealContent(args.brandId).then(r => r.context).catch(() => "")
           : Promise.resolve(""),
-      ]).then(([prefix, knowledge, real]) => prefix + (knowledge || "") + (real || "")),
+      ]).then(([prefix, real]) => prefix + (real || "")),
       // Scout stage — only fires for 100s tier. scoutKind drives WHAT we fetch:
       // viral (default) / festivals (calendar tasks) / trending (時事改寫) / news.
       // 2026-05-18 (CJ 驗收: em-99 序列只產 5 封 + 502): scout fires for
@@ -2938,25 +2948,32 @@ export async function runOrchestra(args: {
             const trendSrc = (args.inputs["trend_topic"] ?? "").toString();
             const testSrc = (args.inputs["testimonial_source"] ?? "").toString();
             const consent = (args.inputs["consent_status"] ?? "").toString();
+            // 2026-09-29（CJ「onbrand 使用的 agent，生文前都要讀取策略層的內容」）：
+            // 這幾個附加產出以前只拿到人設＋貼文，完全沒有品牌大腦——回覆範本和
+            // 追蹤貼文是會直接發出去的字，不能不認得品牌。
+            const withBrain = (p: string) => (brandPrefix ? `${p}\n# 品牌大腦（所有建議與文字都要符合）\n${brandPrefix}\n` : p);
             const subResults = await Promise.all([
               extrasCfg.replyTemplates && extrasCfg.replyTemplates > 0
-                ? callReplyTemplates({ caption: v.caption, channel, n: extrasCfg.replyTemplates, persona: replyPersona })
+                ? callReplyTemplates({ caption: v.caption, channel, n: extrasCfg.replyTemplates, persona: withBrain(replyPersona) })
                 : Promise.resolve([] as Array<{ userSays: string; yourReply: string }>),
-              extrasCfg.postingTime ? callPostingTime({ caption: v.caption, channel, persona: timingPersona }) : Promise.resolve(""),
-              extrasCfg.followupPost ? callFollowupPost({ caption: v.caption, channel, persona: followupPersona }) : Promise.resolve(""),
+              extrasCfg.postingTime ? callPostingTime({ caption: v.caption, channel, persona: withBrain(timingPersona) }) : Promise.resolve(""),
+              extrasCfg.followupPost ? callFollowupPost({ caption: v.caption, channel, persona: withBrain(followupPersona) }) : Promise.resolve(""),
               extrasCfg.compareTable && useSpecialty
-                ? callCompareTable({ caption: v.caption, viralSource: viralSrc, persona: specialtyPersona })
+                ? callCompareTable({ caption: v.caption, viralSource: viralSrc, persona: withBrain(specialtyPersona) })
                 : Promise.resolve(""),
               extrasCfg.timingAdvisor && useSpecialty
-                ? callTimingAdvisor({ caption: v.caption, trendTopic: trendSrc, persona: specialtyPersona })
+                ? callTimingAdvisor({ caption: v.caption, trendTopic: trendSrc, persona: withBrain(specialtyPersona) })
                 : Promise.resolve(""),
               extrasCfg.legalAssistant && useSpecialty
-                ? callLegalAssistant({ caption: v.caption, testimonialSource: testSrc, consentStatus: consent, persona: specialtyPersona })
+                ? callLegalAssistant({ caption: v.caption, testimonialSource: testSrc, consentStatus: consent, persona: withBrain(specialtyPersona) })
                 : Promise.resolve(""),
             ]);
-            const replies = subResults[0];
+            // 會直接發出去的字，一樣過禁用詞／替換對照。
+            const replies = await Promise.all(subResults[0].map(async (r) => ({
+              ...r, yourReply: await enforceBrandRulesOnText(args.brandId, r.yourReply).catch(() => r.yourReply),
+            })));
             const postingTime = subResults[1];
-            const followupPost = subResults[2];
+            const followupPost = subResults[2] ? await enforceBrandRulesOnText(args.brandId, subResults[2]).catch(() => subResults[2]) : "";
             const compareTable = subResults[3];
             const timingAdvice = subResults[4];
             const legalCheck = subResults[5];

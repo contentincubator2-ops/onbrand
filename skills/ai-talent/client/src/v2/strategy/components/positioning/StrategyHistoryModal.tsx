@@ -21,7 +21,7 @@
  */
 import React from "react";
 import { Modal, ModalContent, ModalHeader, ModalBody, Spinner } from "@heroui/react";
-import { Check } from "lucide-react";
+import { CheckIcon } from "../../../platform/components/icons";
 import { trpc } from "../../../../lib/trpc";
 import { useLang } from "../../../../lib/i18n";
 import {
@@ -69,8 +69,7 @@ export default function StrategyHistoryModal({
         <ModalHeader className="flex flex-col gap-1">
           <span className="text-medium font-semibold">{L("對話紀錄", "Conversation history")}</span>
           <span className="text-tiny text-default-500 font-normal">
-            {L("先選一位，再選要看哪一串。已經結束的對話是唯讀的。",
-               "Pick who you talked to, then which conversation. Past conversations are read-only.")}
+            {L("已經結束的對話是唯讀的。", "Past conversations are read-only.")}
           </span>
         </ModalHeader>
         <ModalBody className="pb-6">
@@ -101,7 +100,7 @@ export default function StrategyHistoryModal({
                     <span className="min-w-0">
                       <span className="flex items-center gap-1.5">
                         <span className="text-small font-semibold truncate">{d.name}</span>
-                        {on && <Check size={13} />}
+                        {on && <CheckIcon size={13} />}
                       </span>
                       <span className="block text-tiny text-default-500 truncate">{roleLabelOf(d, en)}</span>
                       <span className="block text-tiny text-default-400 truncate">{d.title}</span>

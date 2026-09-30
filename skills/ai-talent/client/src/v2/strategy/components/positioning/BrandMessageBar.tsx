@@ -9,19 +9,19 @@
  * the bar stays clean and matches /30s search-bar visuals.
  */
 import { trpc } from "../../../../lib/trpc";
-import { RefreshCw } from "lucide-react";
+import { RegenerateIcon } from "../../../platform/components/icons";
 
 interface Props { brandId: number | null }
 
 export default function BrandMessageBar({ brandId }: Props) {
-  const cur = (trpc as any).positioningJobs?.getCurrent?.useQuery?.(
+  const cur = (trpc as any).positioningJobs?.getCurrent?.useQuery(
     { entityKind: "brand", entityId: brandId ?? 0 },
     { enabled: !!brandId, refetchInterval: 6_000 },
   );
   const data = (cur?.data as any) ?? null;
   const status = (data?.source as "full" | "interim" | "empty" | undefined) ?? "empty";
 
-  const job = (trpc as any).positioningJobs?.getStatus?.useQuery?.(
+  const job = (trpc as any).positioningJobs?.getStatus?.useQuery(
     { entityKind: "brand", entityId: brandId ?? 0 },
     { enabled: !!brandId, refetchInterval: 4_000 },
   );
@@ -37,7 +37,7 @@ export default function BrandMessageBar({ brandId }: Props) {
   const message = data?.usp || data?.positioning || data?.tagline || "";
   const placeholder = "等待品牌定位產生中…";
 
-  const pillColor = status === "full" ? { bg: "#D1FAE5", fg: "#047857", label: "完整定位 ✓" }
+  const pillColor = status === "full" ? { bg: "#D1FAE5", fg: "#047857", label: "完整定位" }
                   : status === "interim" ? { bg: "#FEF3C7", fg: "#92400E", label: isRunning ? "暫時定位（全本進行中）" : "暫時定位" }
                   : { bg: "#F3F4F6", fg: "#6B7280", label: "等待產生" };
 
@@ -68,7 +68,7 @@ export default function BrandMessageBar({ brandId }: Props) {
           title="重新產生暫時定位"
           disabled={!brandId}
         >
-          <RefreshCw size={14} className={interimMut?.isPending ? "animate-spin" : ""} />
+          <RegenerateIcon size={14} className={interimMut?.isPending ? "animate-spin" : ""} />
         </button>
       </div>
     </div>
