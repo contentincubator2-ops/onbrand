@@ -67,6 +67,8 @@ export default function CampaignStage({ eventId, brandId }: { eventId: number; b
   const [current, setCurrent] = React.useState<CampaignPhaseId | null>(null);
   const [full, setFull] = React.useState(false);
   const [kpiOpen, setKpiOpen] = React.useState(false);
+  /** 對話卡展開＝佔滿左欄（CJ 2026-09-30）；左欄其他東西先收起來。 */
+  const [chatExpanded, setChatExpanded] = React.useState(false);
   const [setupOpen, setSetupOpen] = React.useState(false);
   const [partner, setPartner] = React.useState<"kol" | "cobrand" | null>(null);
   const [pickerOpen, setPickerOpen] = React.useState(false);
@@ -290,6 +292,7 @@ export default function CampaignStage({ eventId, brandId }: { eventId: number; b
               </>
             )}
             <div className="relative p-5 flex flex-col gap-4 h-full overflow-y-auto">
+            {!(chatExpanded && plan) && (<>
             <div className="flex items-start justify-between gap-3 shrink-0">
               <div>
                 <p className="text-6xl font-black leading-none tracking-tight tabular-nums">
@@ -350,15 +353,19 @@ export default function CampaignStage({ eventId, brandId }: { eventId: number; b
             {pictured
               ? <div className={`${plan ? "min-h-[120px]" : "flex-1 min-h-[200px]"} shrink-0`} aria-hidden />
               : <div className="shrink-0"><ReachFan phases={phases} lanes={lanes} items={items} current={cur} en={en} /></div>}
+            </>)}
 
             {plan && (
-              <CampaignChatCard eventId={eventId} plan={plan} phase={cur} notes={notes} locked={locked} en={en} onApply={applyPlan} grow />
+              <CampaignChatCard eventId={eventId} plan={plan} phase={cur} notes={notes} locked={locked} en={en} onApply={applyPlan} grow
+                expanded={chatExpanded} onToggleExpand={() => setChatExpanded((v) => !v)} />
             )}
 
-            <button type="button" onClick={goStrategyBasis}
-              className="self-start shrink-0 text-tiny text-default-500 hover:text-foreground flex items-center gap-1.5">
-              <FontAwesomeIcon icon={faBookOpen} />{L("策略依據：活動定位（11 段）", "Strategy basis: campaign positioning")}
-            </button>
+            {!(chatExpanded && plan) && (
+              <button type="button" onClick={goStrategyBasis}
+                className="self-start shrink-0 text-tiny text-default-500 hover:text-foreground flex items-center gap-1.5">
+                <FontAwesomeIcon icon={faBookOpen} />{L("策略依據：活動定位（11 段）", "Strategy basis: campaign positioning")}
+              </button>
+            )}
             </div>
           </section>
 

@@ -22,7 +22,7 @@
 import React from "react";
 import { Avatar } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faArrowUp, faCheck, faArrowRight } from "@fortawesome/free-solid-svg-icons";
+import { faArrowUp, faCheck, faArrowRight, faUpRightAndDownLeftFromCenter, faDownLeftAndUpRightToCenter } from "@fortawesome/free-solid-svg-icons";
 import { trpc } from "../../../../lib/trpc";
 import type { CampaignPhaseId, CampaignPlan } from "../../lib/campaignSchema";
 import type { StageNote } from "../../lib/campaignStage";
@@ -38,7 +38,7 @@ interface Msg {
   truncated?: boolean;
 }
 
-export default function CampaignChatCard({ eventId, plan, phase, notes, locked, en, onApply, grow }: {
+export default function CampaignChatCard({ eventId, plan, phase, notes, locked, en, onApply, grow, expanded, onToggleExpand }: {
   eventId: number;
   plan: CampaignPlan;
   phase: CampaignPhaseId | null;
@@ -49,6 +49,12 @@ export default function CampaignChatCard({ eventId, plan, phase, notes, locked, 
   onApply: (next: CampaignPlan) => void;
   /** 撐滿父層剩下的高度（活動頁左欄）；對話區跟著長，而不是固定一小格。 */
   grow?: boolean;
+  /**
+   * 2026-09-30（CJ「這個對話窗，我想讓用戶也可以有選項，可以展開，展開後，就是將左側欄的
+   * 版面佈滿的高度即可」）：展開＝佔滿左欄（左欄其他東西先收起來），再按一次收回。
+   */
+  expanded?: boolean;
+  onToggleExpand?: () => void;
 }) {
   const L = (zh: string, e: string) => (en ? e : zh);
   const [msgs, setMsgs] = React.useState<Msg[]>([]);
@@ -108,6 +114,14 @@ export default function CampaignChatCard({ eventId, plan, phase, notes, locked, 
             {phase ? L(`正在看：${phaseShort(phase, false)}期`, `Looking at: ${phaseShort(phase, true)}`) : L("正在看：整檔總覽", "Looking at: overview")}
           </p>
         </div>
+        {onToggleExpand && (
+          <button type="button" onClick={onToggleExpand}
+            aria-label={expanded ? L("收回對話", "Collapse chat") : L("展開對話", "Expand chat")}
+            title={expanded ? L("收回", "Collapse") : L("展開到整欄", "Expand to full column")}
+            className="ml-auto w-7 h-7 shrink-0 rounded-lg grid place-items-center opacity-70 hover:opacity-100 hover:bg-background/15 transition">
+            <FontAwesomeIcon icon={expanded ? faDownLeftAndUpRightToCenter : faUpRightAndDownLeftFromCenter} className="text-tiny" />
+          </button>
+        )}
       </div>
 
       <div ref={boxRef} className={`flex flex-col gap-2 overflow-y-auto pr-1 -mr-1 ${grow ? "flex-1 min-h-[120px]" : "max-h-[280px]"}`}>
