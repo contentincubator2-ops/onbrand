@@ -10,7 +10,7 @@ import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure } from "../../platform/core/trpc";
 import localPool from "../../localDb";
-import { listPhotos, setPrimaryPhoto, removePhoto, savePhotoFromUrl, type PhotoScope } from "../core/assetPhotos";
+import { listPhotos, listBrandLibrary, setPrimaryPhoto, removePhoto, savePhotoFromUrl, type PhotoScope } from "../core/assetPhotos";
 import { STORAGE_ROOT } from "../routes/assetPhotoRoute";
 
 const scopeInput = z.object({
@@ -47,6 +47,17 @@ export const assetPhotoRouter = router({
     .query(async ({ ctx, input }) => {
       await assertScopeOwner(ctx.user!.id, input.brandId, input.scope, input.scopeId);
       return listPhotos(input.scope, input.scopeId);
+    }),
+
+  /**
+   * 素材庫：這個品牌在網站任何地方上傳過的圖，不分品牌／產品一次列出來
+   * （2026-09-30 CJ「客戶在網站任何地方上傳的視覺，都要集結起來處理」）。
+   */
+  library: protectedProcedure
+    .input(z.object({ brandId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      await assertScopeOwner(ctx.user!.id, input.brandId, "brand", input.brandId);
+      return listBrandLibrary(input.brandId);
     }),
 
   setPrimary: protectedProcedure

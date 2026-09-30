@@ -3869,7 +3869,7 @@ function BrandAssetPanel({ assetKey, brandId, locked }: { assetKey: AssetKey; br
           <SaveIndicator state={saveState} hasTarget={true} />
         </CardBody>
       </Card>
-      <BrandAssetEditor assetKey={assetKey} value={draft} onChange={onChange} readOnly={!!locked} />
+      <BrandAssetEditor assetKey={assetKey} value={draft} onChange={onChange} readOnly={!!locked} brandId={brandId} />
     </div>
   );
 }

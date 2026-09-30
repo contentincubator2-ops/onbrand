@@ -20,6 +20,7 @@
  *   3. 圖像風格 —— 上傳參考圖，AI 歸納風格描述＋AI 提示詞
  *   4. 圖示風格 —— 同上
  *   5. 品牌照片 —— 色彩 DNA 與產品情境圖都吃這一份，所以必須看得見
+ *      → 2026-09-30 升級成「素材庫」（見下方 PINNED_VISUAL_KEYS）
  *
  * ── 為什麼沒有字型 ───────────────────────────────────────────────────
  * CJ：「字型可以讓用戶自行上傳(但若是AI無法控制後續產出，我寧願沒有這各功能)」。
@@ -41,7 +42,8 @@ import {
 export type VisualCardKind =
   | "dna"       // 色票：上傳圖 → AI 解析，或自己鎖定
   | "upload"    // 檔案上傳（標誌）
-  | "gallery"   // 圖片庫（品牌照片）
+  | "gallery"   // 圖片庫（品牌範本）
+  | "library"   // 素材庫：全站上傳過的圖，集中挑選、拿去作圖
   | "style"     // 上傳參考圖 → AI 歸納風格描述 + AI 提示詞
   | "text";     // 純文字規範
 
@@ -56,7 +58,15 @@ export interface VisualAssetSpec {
   whyEn: string;
 }
 
-export const DEFAULT_VISUAL_KEYS = ["colors_dna", "logo", "imagery_style", "icon_style", "photos"] as const;
+export const DEFAULT_VISUAL_KEYS = ["colors_dna", "logo", "imagery_style", "icon_style", "library"] as const;
+
+/**
+ * 常駐卡：不能刪。2026-09-30（CJ「增加一個常駐的任務卡，是點進去，可以儲存各種他上傳的
+ * 照片，他可以自己選取，當成在這邊作圖使用的。也要包括客戶在網站任何地方上傳的視覺」）。
+ * 素材庫取代原本的「品牌照片」卡——那張只看得到品牌 scope 的照片，產品照、標誌都不在裡面；
+ * 素材庫把全站上傳的圖集中在一起，是作圖時挑主體照片的來源，所以不給刪。
+ */
+export const PINNED_VISUAL_KEYS: readonly string[] = ["library"];
 
 export const VISUAL_ASSETS: VisualAssetSpec[] = [
   {
@@ -78,8 +88,9 @@ export const VISUAL_ASSETS: VisualAssetSpec[] = [
     whyEn: "Upload icons you like — AI turns them into repeatable rules",
   },
   {
-    key: "photos", labelZh: "品牌照片", labelEn: "Brand photos", kind: "gallery", icon: faImages,
-    whyZh: "色彩 DNA 與情境圖都從這裡取材", whyEn: "Colour DNA and scene images draw from here",
+    key: "library", labelZh: "素材庫", labelEn: "Asset library", kind: "library", icon: faImages,
+    whyZh: "你在網站各處上傳的圖都收在這裡，挑一張就能拿去作圖",
+    whyEn: "Every image you've uploaded, in one place — pick one to make an image with",
   },
   // ── 以下預設不出現，使用者自己加 ──
   {
@@ -117,6 +128,8 @@ export function visualHasContent(key: string, value: any, dnaCount = 0): boolean
   if (spec.kind === "dna") return dnaCount > 0;
   if (spec.kind === "upload") return !!(value?.primaryUrl || value?.url);
   if (spec.kind === "gallery") return Array.isArray(value?.items) ? value.items.length > 0 : !!value?.count;
+  // 素材庫的內容在 asset_photos，不在 _assets——由呼叫端把張數放進 value.count。
+  if (spec.kind === "library") return !!value?.count;
   if (spec.kind === "style") return !!(value?.text?.trim() || value?.prompt?.trim());
   return typeof value?.text === "string" && value.text.trim().length > 0;
 }

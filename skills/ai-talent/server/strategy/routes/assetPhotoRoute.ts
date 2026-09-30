@@ -20,7 +20,7 @@ import { promises as fs } from "fs";
 import { getJwtSecret } from "../../platform/core/env";
 import localPool from "../../localDb";
 import {
-  type PhotoScope, MAX_UPLOAD_BYTES, MAX_PHOTOS_PER_SCOPE,
+  type PhotoScope, MAX_UPLOAD_BYTES, maxPhotosFor,
   listPhotos, photoStorageRoot, storePhotoBytes,
 } from "../core/assetPhotos";
 
@@ -77,8 +77,9 @@ assetPhotoRouter.post(
     if (!(await canAccessScope(userId, brandId, scope, scopeId))) { res.status(404).json({ error: "Not found" }); return; }
 
     const existing = await listPhotos(scope, scopeId);
-    if (existing.length >= MAX_PHOTOS_PER_SCOPE) {
-      res.status(400).json({ error: `這個${scope === "brand" ? "品牌" : "產品"}已經有 ${MAX_PHOTOS_PER_SCOPE} 張照片，先刪掉幾張再上傳` });
+    const cap = maxPhotosFor(scope);
+    if (existing.length >= cap) {
+      res.status(400).json({ error: `這個${scope === "brand" ? "品牌" : "產品"}已經有 ${cap} 張照片，先刪掉幾張再上傳` });
       return;
     }
 

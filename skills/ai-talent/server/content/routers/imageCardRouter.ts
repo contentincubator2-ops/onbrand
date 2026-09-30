@@ -28,6 +28,7 @@ import { proposeImageDirections, renderImageCard } from "../core/imageCards";
 import { resolveBrandVisualContext } from "../core/imageGen";
 import { localCoverFile } from "../core/imageFetch";
 import { brandOwnsProductPhoto } from "./imageRouter";
+import { brandOwnsLibraryPhoto } from "../../strategy/core/assetPhotos";
 
 const channel = z.enum(IMAGE_CHANNELS as [string, ...string[]]);
 
@@ -65,6 +66,8 @@ function specOr404(id: string): PlatformImageSpec {
 
 async function productPhotoAllowed(brandId: number, url: string): Promise<boolean> {
   if (await brandOwnsProductPhoto(brandId, url)) return true;
+  // 2026-09-30：素材庫的任何一張（品牌照、標誌、存下來的 AI 圖）也能當主體照片作圖。
+  if (await brandOwnsLibraryPhoto(brandId, url)) return true;
   // 產品主圖也可能存在 positioning 的其他欄位（listProductImages 的候選）。
   try {
     const { default: localPool } = await import("../../localDb");

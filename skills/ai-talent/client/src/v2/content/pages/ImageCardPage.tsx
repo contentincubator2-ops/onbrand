@@ -11,13 +11,14 @@
  */
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate, useOutletContext, useParams } from "react-router-dom";
-import { Button, Spinner, Textarea, Input } from "@heroui/react";
+import { Button, Spinner, Textarea, Input, Modal, ModalBody, ModalContent, ModalHeader } from "@heroui/react";
 import { trpc } from "../../../lib/trpc";
 import { useLang } from "../../../lib/i18n";
 import { showToastGlobal } from "../../../components/ui/Toast";
 import type { ShellOutletCtx } from "../../app/shell/ShellLayout";
 import type { ImageCardInfo } from "../components/imageCard/ImageCardTile";
-import { readImageCardHandoff } from "../lib/imageCardHandoff";
+import { readImageCardHandoff, takeImageSubjectHandoff } from "../lib/imageCardHandoff";
+import BrandLibrary from "../../strategy/components/positioning/BrandLibrary";
 
 type Model = "gpt-image-2" | "nano-banana";
 
@@ -115,6 +116,18 @@ export default function ImageCardPage() {
 
   const [model, setModel] = useState<Model>("gpt-image-2");
   const [product, setProduct] = useState<{ name: string; imageUrl: string } | null>(null);
+  // 2026-09-30（CJ「素材庫…可以自己選取，當成作圖使用」）：從素材庫「用這張作圖」過來的，
+  // 或在這裡按「從素材庫挑」的——不一定是某個產品的照片，所以另外記著，縮圖列才畫得出來。
+  const [libraryOpen, setLibraryOpen] = useState(false);
+  const [libraryPick, setLibraryPick] = useState<{ name: string; imageUrl: string } | null>(null);
+  useEffect(() => {
+    const h = takeImageSubjectHandoff();
+    if (h?.url) {
+      const picked = { name: h.label, imageUrl: h.url };
+      setLibraryPick(picked);
+      setProduct(picked);
+    }
+  }, []);
   const [directions, setDirections] = useState<Direction[]>([]);
   const [picked, setPicked] = useState<string | null>(null);
   const [customScene, setCustomScene] = useState("");
@@ -160,7 +173,7 @@ export default function ImageCardPage() {
     if (!brandId) { showToastGlobal(lang === "en" ? "Pick a brand first." : "請先選擇品牌。"); return; }
     if (copy.trim().length < 2) { showToastGlobal(lang === "en" ? "Paste the copy first." : "先貼上文案。"); return; }
     try {
-      const r = await proposeMut.mutateAsync({ brandId, cardId: card!.id, copy: copy.trim(), productName: product?.name });
+      const r = await proposeMut.mutateAsync({ brandId, cardId: card!.id, copy: copy.trim(), productName: products.some((p) => p.imageUrl === product?.imageUrl) ? product?.name : undefined });
       setDirections(r.directions as Direction[]);
       setPicked((r.directions[0] as Direction | undefined)?.id ?? null);
       if (!headline) setHeadline(r.headlineZh);
@@ -373,7 +386,7 @@ export default function ImageCardPage() {
                   下拉選單只看得到重複的品名，分不出是哪一張——改成縮圖直接看照片挑。 */}
               <div>
                 <p className="text-tiny text-default-500 mb-1.5">
-                  {lang === "en" ? "Product photo" : "產品照"}
+                  {lang === "en" ? "Product / subject photo" : "產品照／主體照片"}
                   {product && <span className="ml-1.5 text-default-700">· {product.name}</span>}
                 </p>
                 <div className="flex flex-wrap gap-2">
@@ -381,6 +394,14 @@ export default function ImageCardPage() {
                     className={`w-16 h-16 rounded-lg border-2 text-[11px] text-default-500 bg-default-50 flex items-center justify-center ${!product ? "border-default-900" : "border-default-200 hover:border-default-400"}`}>
                     {lang === "en" ? "None" : "不使用"}
                   </button>
+                  {libraryPick && !products.some((p) => p.imageUrl === libraryPick.imageUrl) && (
+                    <button type="button" title={libraryPick.name}
+                      onClick={() => setProduct(libraryPick)}
+                      className={`relative w-16 h-16 rounded-lg overflow-hidden border-2 bg-white ${product?.imageUrl === libraryPick.imageUrl ? "border-default-900" : "border-default-200 hover:border-default-400"}`}>
+                      <img src={libraryPick.imageUrl} alt={libraryPick.name} className="w-full h-full object-cover" />
+                      {product?.imageUrl === libraryPick.imageUrl && <span className="absolute top-0.5 right-0.5 w-4 h-4 rounded-full bg-default-900 text-white text-[10px] leading-4 text-center">✓</span>}
+                    </button>
+                  )}
                   {products.map((p) => {
                     const on = product?.imageUrl === p.imageUrl;
                     return (
@@ -392,6 +413,26 @@ export default function ImageCardPage() {
                       </button>
                     );
                   })}
+                  {brandId && (
+                    <button type="button" onClick={() => setLibraryOpen(true)}
+                      className="w-16 h-16 rounded-lg border-2 border-dashed border-default-300 text-[11px] leading-tight text-default-500 bg-white hover:border-default-500 hover:text-default-700 flex items-center justify-center text-center px-1">
+                      {lang === "en" ? "From library" : "從素材庫挑"}
+                    </button>
+                  )}
+                  {brandId && (
+                    <Modal isOpen={libraryOpen} onClose={() => setLibraryOpen(false)} size="4xl" scrollBehavior="inside">
+                      <ModalContent>
+                        <ModalHeader>{lang === "en" ? "Pick from your asset library" : "從素材庫挑一張"}</ModalHeader>
+                        <ModalBody className="pb-6">
+                          <BrandLibrary brandId={brandId} lang={lang === "en" ? "en" : "zh-TW"} mode="pick"
+                            onPick={(it) => {
+                              const picked = { name: it.source === "product" ? it.sourceLabel : (lang === "en" ? "Library" : "素材庫"), imageUrl: it.url };
+                              setLibraryPick(picked); setProduct(picked); setLibraryOpen(false);
+                            }} />
+                        </ModalBody>
+                      </ModalContent>
+                    </Modal>
+                  )}
                 </div>
               </div>
               <div className="flex flex-wrap items-center gap-2 text-tiny">
