@@ -33,7 +33,7 @@ import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure } from "../../platform/core/trpc";
 import localPool from "../../localDb";
 import { buildCampaignPlan, inferCampaignSettings, type CampaignPlan } from "../core/campaignPlan";
-import { runCampaignChat } from "../core/campaignChat";
+import { runCampaignChat, pickCampaignDirector } from "../core/campaignChat";
 import { KPI_METRICS, pickKpiAgent, runKpiPlan } from "../core/campaignKpi";
 import { brandIndustry, pickPlannerAgent } from "../core/campaignTeam";
 import { isHiddenContentPlatform, isHiddenHistoryItem } from "../../platform/core/planGate";
@@ -281,7 +281,14 @@ export const campaignRouter = router({
       eventId: z.number().int().positive(),
       message: z.string().min(1).max(800),
       phase: z.enum(PHASE_KEYS).nullable().optional(),
-      history: z.array(z.object({ role: z.enum(["user", "assistant"]), content: z.string().max(1200) })).max(12).optional(),
+      history: z.array(z.object({
+        role: z.enum(["user", "assistant"]), content: z.string().max(1200),
+        speaker: z.enum(["planner", "director"]).optional(), name: z.string().max(40).optional(),
+      })).max(16).optional(),
+      /** 2026-09-30：左邊同一張卡兩個人——內容企劃（預設）或策略總監。 */
+      speaker: z.enum(["planner", "director"]).optional(),
+      directorAgentId: z.number().int().positive().nullable().optional(),
+      handoff: z.boolean().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const row = await loadEvent(input.eventId, ctx.user!.id);
@@ -293,6 +300,7 @@ export const campaignRouter = router({
         return await runCampaignChat({
           eventId: input.eventId, userId: ctx.user!.id, plan,
           message: input.message, phase: input.phase ?? null, history: input.history,
+          speaker: input.speaker ?? "planner", directorAgentId: input.directorAgentId ?? null, handoff: !!input.handoff,
         });
       } catch (e: any) {
         throw new TRPCError({ code: "BAD_REQUEST", message: String(e?.message ?? e).slice(0, 300) });
@@ -300,12 +308,15 @@ export const campaignRouter = router({
     }),
 
   team: protectedProcedure
-    .input(z.object({ eventId: z.number().int().positive() }))
+    .input(z.object({ eventId: z.number().int().positive(), directorAgentId: z.number().int().positive().nullable().optional() }))
     .query(async ({ ctx, input }) => {
       const row = await loadEvent(input.eventId, ctx.user!.id);
       const industry = await brandIndustry(Number(row.brandId));
-      const [planner, kpi] = await Promise.all([pickPlannerAgent(industry), pickKpiAgent(industry)]);
-      return { planner, kpi };
+      const [planner, kpi, director] = await Promise.all([
+        pickPlannerAgent(industry), pickKpiAgent(industry),
+        pickCampaignDirector(Number(row.brandId), input.directorAgentId ?? null).catch(() => null),
+      ]);
+      return { planner, kpi, director };
     }),
 
   kpiAgent: protectedProcedure

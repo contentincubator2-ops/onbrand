@@ -1,51 +1,76 @@
 /**
- * CampaignChatCard — 活動頁左下角的對話卡：跟內容企劃談這份企劃。
+ * CampaignChatCard — 活動頁左邊的對話卡：跟內容企劃、策略總監談這份企劃。
  *
  * 2026-09-30（CJ「用對話的方式，看是否要增加其他管道宣傳，或是依照該策略，用對話的方式，
  * 將執行計畫完成」＋畫面稿 A 的 AI 對話卡）。
  *
  *   · 第一則永遠是「企劃檢查」（空窗、沒排到的通路）——這些不用問模型就知道。
- *   · 說一句話 → 內容企劃回一兩句＋一份提案（加哪幾篇、改哪幾篇）；按「套用」才寫進
- *     企劃，按「不要」就什麼都沒變。提案的檢查在 server/strategy/core/campaignChat.ts。
  *   · 放大到某一段時，對話預設在談那一段。
  *   · 定稿後不能再改企劃，輸入框收起來。
- *   · 策略（訴求、主角）要大改，找右下角的策略總監；這張卡管的是「怎麼排」。
- *
- * 2026-09-30（CJ「內容企劃應該是一個人，要匹配 AI agent」＋「跟右下方的策略總監，是否會
- * 衝突」）：
- *   · 卡上是一個真的人（agents 裡的社群／內容策略師，依品牌產業挑，見
- *     server/strategy/core/campaignTeam.ts），帶著他自己的知識回答。
- *   · 分工：策略總監管方向、內容企劃管怎麼排。問到方向時她不自己改，給一顆
- *     「請策略總監回答」，按了就打開右下角的總監、問題已經填好。
  *   · 回覆太長被截斷時，救回完整的那幾條，告訴使用者說「繼續」改剩下的。
+ *
+ * 2026-09-30（CJ「內容企劃應該是一個人，要匹配 AI agent」）：卡上是真的人（agents 裡的
+ * 社群／內容策略師，見 server/strategy/core/campaignTeam.ts），帶著他自己的知識回答。
+ *
+ * 2026-09-30（CJ「在這個介面上，我偏好是都在左邊完成回答，雖然要換人，但也在同一個地方
+ * 換人，並且要掌握之前討論的脈絡。最大的驚喜，就是我跟 agent 講完後，圖上的訴求或是
+ * 行事曆就會修改」）：
+ *   · 同一張卡、同一串對話、兩個人：內容企劃管怎麼排，策略總監（右下角選過的那位）管
+ *     方向。標題的「換人」切換；內容企劃遇到方向問題直接把話轉給總監，總監接著回答，
+ *     不用跳到右下角。活動頁的右下角總監收起來（directorDock）。
+ *   · 兩個人都讀同一串（標了誰說的）；這串記在這台瀏覽器，重新整理還在。
+ *   · 改法一回來就寫進企劃——圖上的訴求、各段訊息、行事曆馬上變；留一顆「復原」
+ *     （只有最新那一次可以復原，免得蓋掉之後的修改）。
  */
 import React from "react";
 import { Avatar } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faArrowUp, faCheck, faArrowRight, faUpRightAndDownLeftFromCenter, faDownLeftAndUpRightToCenter } from "@fortawesome/free-solid-svg-icons";
+import { faArrowUp, faCheck, faRotateLeft, faUpRightAndDownLeftFromCenter, faDownLeftAndUpRightToCenter, faRightLeft } from "@fortawesome/free-solid-svg-icons";
 import { trpc } from "../../../../lib/trpc";
 import type { CampaignPhaseId, CampaignPlan } from "../../lib/campaignSchema";
 import type { StageNote } from "../../lib/campaignStage";
 import { phaseShort } from "../../lib/campaignStage";
 import { applyProposal, describeProposal, isEmptyProposal, type CampaignProposal } from "../../lib/campaignChat";
+import { readStoredDirector } from "../../lib/strategistDirectors";
+
+type Speaker = "planner" | "director";
+interface Agent { id: number; name: string; title: string; avatarUrl: string }
 
 interface Msg {
-  role: "user" | "assistant"; content: string;
-  proposal?: CampaignProposal; state?: "open" | "applied" | "dismissed";
-  /** 方向的問題：轉給策略總監。 */
-  askDirector?: string | null;
-  /** 回覆被截斷，只救回前幾條。 */
+  role: "user" | "assistant" | "handoff";
+  content: string;
+  speaker?: Speaker;
+  name?: string;
+  /** 這則帶來的修改（已經寫進企劃）。 */
+  proposal?: CampaignProposal;
+  /** 修改前的企劃，復原用；只存在這次開著的頁面裡。 */
+  before?: CampaignPlan;
+  undone?: boolean;
   truncated?: boolean;
 }
 
-export default function CampaignChatCard({ eventId, plan, phase, notes, locked, en, onApply, grow, expanded, onToggleExpand }: {
+const KEY = (eventId: number) => `onbrand.campaignChat.${eventId}`;
+function loadMsgs(eventId: number): Msg[] {
+  try {
+    const raw = JSON.parse(localStorage.getItem(KEY(eventId)) ?? "[]");
+    return Array.isArray(raw) ? raw.slice(-40) : [];
+  } catch { return []; }
+}
+function saveMsgs(eventId: number, msgs: Msg[]) {
+  try {
+    localStorage.setItem(KEY(eventId), JSON.stringify(msgs.slice(-40).map(({ before: _b, ...m }) => m)));
+  } catch { /* 私密模式：重新整理之後對話就沒了，不影響企劃 */ }
+}
+
+export default function CampaignChatCard({ eventId, brandId, plan, phase, notes, locked, en, onApply, grow, expanded, onToggleExpand }: {
   eventId: number;
+  brandId: number | null;
   plan: CampaignPlan;
   phase: CampaignPhaseId | null;
   notes: StageNote[];
   locked: boolean;
   en: boolean;
-  /** 套用提案：父層換掉企劃並立刻存。 */
+  /** 寫進企劃：父層換掉企劃並立刻存。 */
   onApply: (next: CampaignPlan) => void;
   /** 撐滿父層剩下的高度（活動頁左欄）；對話區跟著長，而不是固定一小格。 */
   grow?: boolean;
@@ -57,112 +82,195 @@ export default function CampaignChatCard({ eventId, plan, phase, notes, locked, 
   onToggleExpand?: () => void;
 }) {
   const L = (zh: string, e: string) => (en ? e : zh);
-  const [msgs, setMsgs] = React.useState<Msg[]>([]);
+  const [msgs, setMsgs] = React.useState<Msg[]>(() => loadMsgs(eventId));
+  const [speaker, setSpeaker] = React.useState<Speaker>(() => {
+    const last = [...loadMsgs(eventId)].reverse().find((m) => m.role === "assistant");
+    return last?.speaker === "director" ? "director" : "planner";
+  });
   const [text, setText] = React.useState("");
   const [err, setErr] = React.useState("");
+  const [busy, setBusy] = React.useState<Speaker | null>(null);
   const boxRef = React.useRef<HTMLDivElement>(null);
-  const chatMut = (trpc as any).campaign.chat.useMutation();
-  const teamQ = (trpc as any).campaign.team.useQuery({ eventId }, { refetchOnWindowFocus: false, staleTime: 10 * 60_000 });
-  const agent = teamQ.data?.planner ?? null;
+  const planRef = React.useRef(plan);
+  planRef.current = plan;
+  const msgsRef = React.useRef(msgs);
+  msgsRef.current = msgs;
 
+  const chatMut = (trpc as any).campaign.chat.useMutation();
+  const directorAgentId = React.useMemo(() => (brandId ? readStoredDirector(brandId, "brand") : null), [brandId]);
+  const teamQ = (trpc as any).campaign.team.useQuery(
+    { eventId, directorAgentId },
+    { refetchOnWindowFocus: false, staleTime: 10 * 60_000 },
+  );
+  const agents: Record<Speaker, Agent | null> = { planner: teamQ.data?.planner ?? null, director: teamQ.data?.director ?? null };
+  const roleName = (s: Speaker) => (s === "director" ? L("策略總監", "Strategy director") : L("內容企劃", "Content planner"));
+  const cur = agents[speaker];
+  const other: Speaker = speaker === "planner" ? "director" : "planner";
+
+  React.useEffect(() => { saveMsgs(eventId, msgs); }, [eventId, msgs]);
   React.useEffect(() => {
     boxRef.current?.scrollTo({ top: boxRef.current.scrollHeight, behavior: "smooth" });
-  }, [msgs.length, chatMut.isPending]);
+  }, [msgs.length, busy]);
 
-  const send = (message: string) => {
-    const m = message.trim();
-    if (!m || chatMut.isPending) return;
+  const history = (list: Msg[]) => list
+    .filter((x) => x.content && x.role !== "handoff")
+    .slice(-14)
+    .map((x) => ({ role: x.role as "user" | "assistant", content: x.content.slice(0, 1200), ...(x.speaker ? { speaker: x.speaker } : {}), ...(x.name ? { name: x.name.slice(0, 40) } : {}) }));
+
+  /** 問某一位。handoff＝內容企劃轉過去的，不是使用者親口說的。 */
+  const ask = (who: Speaker, message: string, opts: { handoff?: boolean; prior: Msg[] }) => {
     setErr("");
-    const history = msgs.filter((x) => x.content).map((x) => ({ role: x.role, content: x.content.slice(0, 1200) }));
-    setMsgs((prev) => [...prev, { role: "user", content: m }]);
-    setText("");
-    chatMut.mutate({ eventId, message: m, phase, history }, {
-      onSuccess: (r: any) => setMsgs((prev) => [...prev, {
-        role: "assistant", content: String(r?.reply ?? ""),
-        ...(isEmptyProposal(r?.proposal) ? {} : { proposal: r.proposal, state: "open" as const }),
-        askDirector: r?.askDirector ?? null,
-        truncated: !!r?.truncated,
-      }]),
-      onError: (e: any) => setErr(String(e?.message ?? "").slice(0, 160)),
+    setBusy(who);
+    chatMut.mutate({ eventId, message, phase, history: history(opts.prior), speaker: who, directorAgentId, handoff: !!opts.handoff }, {
+      onSuccess: (r: any) => {
+        setBusy(null);
+        const name = r?.agent?.name ?? agents[who]?.name ?? "";
+        const proposal: CampaignProposal | undefined = isEmptyProposal(r?.proposal) ? undefined : r.proposal;
+        let before: CampaignPlan | undefined;
+        if (proposal && !locked) {
+          before = planRef.current;
+          onApply(applyProposal(planRef.current, proposal));
+        }
+        const reply: Msg = {
+          role: "assistant", content: String(r?.reply ?? ""), speaker: who, name,
+          ...(proposal ? { proposal, before } : {}), truncated: !!r?.truncated,
+        };
+        const next = [...msgsRef.current, reply];
+        // 內容企劃說這是方向的問題 → 同一張卡裡交給總監，總監接著回答。
+        if (who === "planner" && r?.askDirector) {
+          const dName = agents.director?.name ?? "";
+          next.push({ role: "handoff", content: dName ? L(`${name || "內容企劃"}請 ${dName} 接手`, `${name || "Planner"} hands over to ${dName}`) : L("交給策略總監", "Handing over to the director") });
+          setMsgs(next);
+          setSpeaker("director");
+          ask("director", String(r.askDirector), { handoff: true, prior: next });
+          return;
+        }
+        setMsgs(next);
+      },
+      onError: (e: any) => { setBusy(null); setErr(String(e?.message ?? "").slice(0, 160)); },
     });
   };
 
-  const settle = (idx: number, state: "applied" | "dismissed") => {
-    const m = msgs[idx];
-    if (!m?.proposal) return;
-    if (state === "applied") onApply(applyProposal(plan, m.proposal));
-    setMsgs((prev) => prev.map((x, k) => (k === idx ? { ...x, state } : x)));
+  const send = (message: string) => {
+    const m = message.trim();
+    if (!m || busy) return;
+    const next = [...msgs, { role: "user" as const, content: m }];
+    setMsgs(next);
+    setText("");
+    ask(speaker, m, { prior: msgs });
   };
 
-  const suggestions = phase
-    ? [L(`${phaseShort(phase, false)}期再多排一篇 IG`, `One more Instagram post in ${phaseShort(phase, true)}`),
-       L("這一段的內容太像了，換個角度", "These posts are too similar — vary the angles")]
-    : [L("官網也要發，開賣日加一篇公告頁", "Add a launch announcement on the website"),
-       L("倒數那週多排兩篇", "Two more posts in the last-call week")];
+  // 只有最新那一次修改可以復原；之後又改過，復原會把後面的也蓋掉。
+  const lastChangeIdx = (() => { for (let i = msgs.length - 1; i >= 0; i--) if (msgs[i]!.proposal && !msgs[i]!.undone) return i; return -1; })();
+  const undo = (idx: number) => {
+    const m = msgs[idx];
+    if (!m?.before || locked) return;
+    onApply(m.before);
+    setMsgs((prev) => prev.map((x, k) => (k === idx ? { ...x, undone: true, before: undefined } : x)));
+  };
+
+  const switchTo = (s: Speaker) => {
+    if (s === speaker || busy) return;
+    setSpeaker(s);
+    const a = agents[s];
+    setMsgs((prev) => [...prev, { role: "handoff", content: a ? L(`換 ${a.name}（${roleName(s)}）`, `Now talking to ${a.name} (${roleName(s)})`) : L(`換${roleName(s)}`, `Now: ${roleName(s)}`) }]);
+  };
+
+  const clear = () => {
+    if (busy) return;
+    setMsgs([]);
+  };
+
+  const suggestions = speaker === "director"
+    ? [L("這檔的一句話訴求再收斂一點", "Tighten the core message"),
+       L("每一段的訊息有沒有接得起來？", "Do the phase messages flow?")]
+    : phase
+      ? [L(`${phaseShort(phase, false)}期再多排一篇 IG`, `One more Instagram post in ${phaseShort(phase, true)}`),
+         L("這一段的內容太像了，換個角度", "These posts are too similar — vary the angles")]
+      : [L("官網也要發，開賣日加一篇公告頁", "Add a launch announcement on the website"),
+         L("倒數那週多排兩篇", "Two more posts in the last-call week")];
+
+  const face = (a: Agent | null, s: Speaker, size = "w-7 h-7") => (a?.avatarUrl
+    ? <Avatar src={a.avatarUrl} name={a.name} size="sm" className={`${size} shrink-0 ring-2 ring-background/60`} />
+    : <span className={`${size} rounded-full bg-background text-foreground grid place-items-center text-tiny font-bold shrink-0`}>{s === "director" ? L("總", "D") : L("內", "C")}</span>);
 
   return (
     <div className={`rounded-2xl bg-foreground text-background px-4 py-3 flex flex-col gap-2.5 ${grow ? "flex-1 min-h-[300px]" : ""}`}>
       <div className="flex items-center gap-2.5">
-        {agent?.avatarUrl
-          ? <Avatar src={agent.avatarUrl} name={agent.name} size="sm" className="w-7 h-7 shrink-0 ring-2 ring-background/60" />
-          : <span className="w-7 h-7 rounded-full bg-background text-foreground grid place-items-center text-tiny font-bold shrink-0">{L("內", "C")}</span>}
+        {face(cur, speaker)}
         <div className="min-w-0">
-          <p className="text-small font-semibold leading-tight truncate" title={agent ? `${agent.name}｜${agent.title}` : undefined}>
-            {agent ? `${agent.name}　${L("內容企劃", "Content planner")}` : L("內容企劃", "Content planner")}
+          <p className="text-small font-semibold leading-tight truncate" title={cur ? `${cur.name}｜${cur.title}` : undefined}>
+            {cur ? `${cur.name}　${roleName(speaker)}` : roleName(speaker)}
           </p>
           <p className="text-[11px] opacity-60 leading-tight">
             {phase ? L(`正在看：${phaseShort(phase, false)}期`, `Looking at: ${phaseShort(phase, true)}`) : L("正在看：整檔總覽", "Looking at: overview")}
           </p>
         </div>
-        {onToggleExpand && (
-          <button type="button" onClick={onToggleExpand}
-            aria-label={expanded ? L("收回對話", "Collapse chat") : L("展開對話", "Expand chat")}
-            title={expanded ? L("收回", "Collapse") : L("展開到整欄", "Expand to full column")}
-            className="ml-auto w-7 h-7 shrink-0 rounded-lg grid place-items-center opacity-70 hover:opacity-100 hover:bg-background/15 transition">
-            <FontAwesomeIcon icon={expanded ? faDownLeftAndUpRightToCenter : faUpRightAndDownLeftFromCenter} className="text-tiny" />
-          </button>
-        )}
+        <div className="ml-auto flex items-center gap-1 shrink-0">
+          {!locked && (
+            <button type="button" onClick={() => switchTo(other)} disabled={!!busy}
+              title={agents[other] ? L(`換 ${agents[other]!.name}（${roleName(other)}）`, `Switch to ${agents[other]!.name}`) : L(`換${roleName(other)}`, `Switch to ${roleName(other)}`)}
+              className="h-7 rounded-lg px-2 flex items-center gap-1.5 text-[11.5px] opacity-80 hover:opacity-100 hover:bg-background/15 transition disabled:opacity-40">
+              <FontAwesomeIcon icon={faRightLeft} className="text-[10px]" />
+              {face(agents[other], other, "w-5 h-5")}
+              <span>{L("換人", "Switch")}</span>
+            </button>
+          )}
+          {onToggleExpand && (
+            <button type="button" onClick={onToggleExpand}
+              aria-label={expanded ? L("收回對話", "Collapse chat") : L("展開對話", "Expand chat")}
+              title={expanded ? L("收回", "Collapse") : L("展開到整欄", "Expand to full column")}
+              className="w-7 h-7 rounded-lg grid place-items-center opacity-70 hover:opacity-100 hover:bg-background/15 transition">
+              <FontAwesomeIcon icon={expanded ? faDownLeftAndUpRightToCenter : faUpRightAndDownLeftFromCenter} className="text-tiny" />
+            </button>
+          )}
+        </div>
       </div>
 
       <div ref={boxRef} className={`flex flex-col gap-2 overflow-y-auto pr-1 -mr-1 ${grow ? "flex-1 min-h-[120px]" : "max-h-[280px]"}`}>
         {notes.map((n, k) => <p key={`n${k}`} className="text-small leading-relaxed">{en ? n.en : n.zh}</p>)}
-        {msgs.map((m, k) => (
-          <div key={k} className={m.role === "user" ? "self-end max-w-[88%]" : "flex flex-col gap-2"}>
-            {m.content && (
-              <p className={`text-small leading-relaxed ${m.role === "user" ? "bg-background/15 rounded-xl px-3 py-1.5" : ""}`}>{m.content}</p>
-            )}
-            {m.askDirector && (
-              <button type="button"
-                onClick={() => window.dispatchEvent(new CustomEvent("onbrand:ask-director", { detail: { question: m.askDirector } }))}
-                className="self-start text-tiny font-semibold bg-background text-foreground rounded-lg px-3 py-1 flex items-center gap-1.5">
-                {L("請策略總監回答", "Ask the strategy director")}<FontAwesomeIcon icon={faArrowRight} />
-              </button>
-            )}
-            {m.proposal && (
-              <div className={`rounded-xl border px-3 py-2 flex flex-col gap-1.5 ${m.state === "open" ? "border-background/40" : "border-background/15 opacity-60"}`}>
-                <p className="text-[11px] opacity-70">{L("提案（還沒寫進企劃）", "Proposal (not applied yet)")}</p>
-                {m.truncated && (
-                  <p className="text-[11px] opacity-70">{L("改的篇數太多，先提出前幾條；套用後說「繼續」改剩下的。", "Too many changes at once — here are the first few. Say “continue” for the rest.")}</p>
-                )}
-                {describeProposal(plan, m.proposal, en).map((line, j) => (
-                  <p key={j} className="text-tiny leading-snug">{line}</p>
-                ))}
-                {m.state === "open" ? (
-                  <div className="flex items-center gap-3 pt-0.5">
-                    <button type="button" onClick={() => settle(k, "applied")}
-                      className="bg-background text-foreground rounded-lg px-3 py-0.5 text-tiny font-bold">{L("套用", "Apply")}</button>
-                    <button type="button" onClick={() => settle(k, "dismissed")} className="text-tiny opacity-70 hover:opacity-100">{L("不要", "Discard")}</button>
-                  </div>
-                ) : (
-                  <p className="text-tiny opacity-70 flex items-center gap-1.5">
-                    {m.state === "applied" ? <><FontAwesomeIcon icon={faCheck} />{L("已套用", "Applied")}</> : L("沒有套用", "Discarded")}
+        {msgs.length > 0 && !busy && (
+          <button type="button" onClick={clear} className="self-center text-[11px] opacity-50 hover:opacity-90">{L("清掉這串對話", "Clear conversation")}</button>
+        )}
+        {msgs.map((m, k) => {
+          if (m.role === "handoff") {
+            return <p key={k} className="self-center text-[11px] opacity-60 flex items-center gap-1.5"><FontAwesomeIcon icon={faRightLeft} />{m.content}</p>;
+          }
+          return (
+            <div key={k} className={m.role === "user" ? "self-end max-w-[88%]" : "flex flex-col gap-2"}>
+              {m.role === "assistant" && m.name && (
+                <p className="text-[11px] opacity-60 -mb-1">{m.name}・{roleName(m.speaker === "director" ? "director" : "planner")}</p>
+              )}
+              {m.content && (
+                <p className={`text-small leading-relaxed whitespace-pre-line ${m.role === "user" ? "bg-background/15 rounded-xl px-3 py-1.5" : ""}`}>{m.content}</p>
+              )}
+              {m.proposal && (
+                <div className={`rounded-xl border px-3 py-2 flex flex-col gap-1.5 ${m.undone ? "border-background/15 opacity-60" : "border-background/40"}`}>
+                  <p className="text-[11px] opacity-70 flex items-center gap-1.5">
+                    {m.undone ? L("已復原", "Undone") : <><FontAwesomeIcon icon={faCheck} />{L("已改進企劃", "Applied to the plan")}</>}
                   </p>
-                )}
-              </div>
-            )}
-          </div>
-        ))}
-        {chatMut.isPending && <p className="text-small opacity-60">{agent ? L(`${agent.name}想一下…`, `${agent.name} is thinking…`) : L("內容企劃想一下…", "Thinking…")}</p>}
+                  {m.truncated && (
+                    <p className="text-[11px] opacity-70">{L("改的篇數太多，先改了前幾條；說「繼續」改剩下的。", "Too many changes at once — did the first few. Say “continue” for the rest.")}</p>
+                  )}
+                  {describeProposal(m.before ?? plan, m.proposal, en).map((line, j) => (
+                    <p key={j} className="text-tiny leading-snug">{line}</p>
+                  ))}
+                  {k === lastChangeIdx && m.before && !locked && (
+                    <button type="button" onClick={() => undo(k)}
+                      className="self-start text-tiny opacity-70 hover:opacity-100 flex items-center gap-1.5 pt-0.5">
+                      <FontAwesomeIcon icon={faRotateLeft} />{L("復原", "Undo")}
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })}
+        {busy && (
+          <p className="text-small opacity-60">
+            {agents[busy] ? L(`${agents[busy]!.name}想一下…`, `${agents[busy]!.name} is thinking…`) : L(`${roleName(busy)}想一下…`, "Thinking…")}
+          </p>
+        )}
         {err && <p className="text-tiny text-danger-300">{err}</p>}
       </div>
 
@@ -183,12 +291,14 @@ export default function CampaignChatCard({ eventId, plan, phase, notes, locked, 
               value={text} rows={1} maxLength={800}
               onChange={(e) => setText(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); send(text); } }}
-              placeholder={L("跟內容企劃說：例如「Threads 每週一篇」", "Tell the planner, e.g. “one Threads post a week”")}
-              aria-label={L("跟內容企劃說", "Message the planner")}
+              placeholder={speaker === "director"
+                ? L("跟策略總監說：例如「訴求不要有免費兩個字」", "Tell the director, e.g. “drop the word free”")
+                : L("跟內容企劃說：例如「Threads 每週一篇」", "Tell the planner, e.g. “one Threads post a week”")}
+              aria-label={L(`跟${roleName(speaker)}說`, `Message the ${roleName(speaker)}`)}
               style={{ fieldSizing: "content" } as React.CSSProperties}
               className="flex-1 min-w-0 resize-none bg-background/10 rounded-xl px-3 py-2 text-small placeholder:text-background/45 outline-none focus:bg-background/15 max-h-28"
             />
-            <button type="submit" disabled={!text.trim() || chatMut.isPending} aria-label={L("送出", "Send")}
+            <button type="submit" disabled={!text.trim() || !!busy} aria-label={L("送出", "Send")}
               className="w-8 h-8 rounded-full bg-background text-foreground grid place-items-center disabled:opacity-40 shrink-0">
               <FontAwesomeIcon icon={faArrowUp} className="text-tiny" />
             </button>
