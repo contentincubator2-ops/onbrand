@@ -2429,7 +2429,6 @@ export default function BrandsPage() {
             <div style={{ padding: "8px 0 32px" }}>
 
               <BrandEntityGrid
-                kind="product"
                 items={brandProductsList}
                 isLoading={brandProductsQ?.isLoading ?? false}
                 lang={lang}
@@ -5336,11 +5335,14 @@ function ProductCardThumbnail({ imageUrl, name, en }: { imageUrl?: string; name:
   );
 }
 
+/**
+ * 產品列表的卡片格。2026-10-02：活動改用 components/events/EventCardGrid（照 BrandCard 版型），
+ * 這裡原本 product／event 兩用的分支拿掉，只剩產品。
+ */
 function BrandEntityGrid({
-  kind, items, isLoading, lang, onAdd, onOpen, onDelete, onPosition,
+  items, isLoading, lang, onAdd, onOpen, onDelete, onPosition,
   runningIds, progressMap,
 }: {
-  kind: "product" | "event";
   items: any[];
   isLoading: boolean;
   lang: "zh-TW" | "en";
@@ -5350,7 +5352,7 @@ function BrandEntityGrid({
   onPosition: (id: number) => void;
   /** 2026-07-24: entity ids with a positioning pipeline in flight. */
   runningIds?: number[];
-  /** id-keyed (`kind:id`) progress labels, e.g. "3/6". */
+  /** id-keyed (`product:id`) progress labels, e.g. "3/6". */
   progressMap?: Record<string, string>;
 }) {
   const en = lang === "en";
@@ -5381,34 +5383,23 @@ function BrandEntityGrid({
   const getPreview = (item: any) => {
     const p = item.positioning ?? {};
     const interim = p._interim ?? {};   // interim positioning from auto-discovery
-    if (kind === "product") {
-      return {
-        tagline:  extractField(p, "tagline", "tagline.zhTagline", "core.zhTagline", "core.oneLineValueProp", "differentiation.summary")
-                    || interim.tagline || "",
-        usp:      extractField(p, "usp", "competition.uniqueUsp", "core.oneLineValueProp", "differentiation.functional", "differentiation.summary")
-                    || interim.usp || "",
-        audience: extractField(p, "audience.primary", "targetAudience")
-                    || interim.targetAudience || "",
-        // 2026-09-25：售價的 canonical 位置改成 facts.price，舊資料仍在頂層。
-        price: extractField(p, "facts.price", "price"),
-      };
-    } else {
-      return {
-        tagline: extractField(p, "theme", "tagline", "tagline.zhTagline"),
-        usp:     extractField(p, "cta", "offer", "usp"),
-        audience: item.startAt
-          ? `${new Date(item.startAt).toLocaleDateString(en ? "en-US" : "zh-TW", { month: "short", day: "numeric" })}${item.endAt ? ` → ${new Date(item.endAt).toLocaleDateString(en ? "en-US" : "zh-TW", { month: "short", day: "numeric" })}` : ""}`
-          : "",
-        price: "",
-      };
-    }
+    return {
+      tagline:  extractField(p, "tagline", "tagline.zhTagline", "core.zhTagline", "core.oneLineValueProp", "differentiation.summary")
+                  || interim.tagline || "",
+      usp:      extractField(p, "usp", "competition.uniqueUsp", "core.oneLineValueProp", "differentiation.functional", "differentiation.summary")
+                  || interim.usp || "",
+      audience: extractField(p, "audience.primary", "targetAudience")
+                  || interim.targetAudience || "",
+      // 2026-09-25：售價的 canonical 位置改成 facts.price，舊資料仍在頂層。
+      price: extractField(p, "facts.price", "price"),
+    };
   };
 
   const hasPositioning = (item: any): boolean => {
     const p = item.positioning ?? {};
     const interim = p._interim ?? {};
     return !!(
-      p.tagline || p.usp || p.theme || p.differentiation?.summary ||
+      p.tagline || p.usp || p.differentiation?.summary ||
       p.core?.zhTagline || p.core?.oneLineValueProp || p.competition?.uniqueUsp ||
       p.audience?.primary || p.targetAudience ||
       interim.tagline || interim.usp || interim.targetAudience
@@ -5429,14 +5420,9 @@ function BrandEntityGrid({
     <div className="px-2">
       {items.length === 0 && (
         <IllustratedEmpty
-          kind={kind === "product" ? "product" : "event"}
-          title={kind === "product"
-            ? (en ? "This box is still empty" : "箱子還是空的")
-            : (en ? "Ready to kick off?" : "準備起跑了嗎？")}
-          action={{
-            label: kind === "product" ? (en ? "+ New product" : "+ 新增產品") : (en ? "+ New event" : "+ 新增活動"),
-            onPress: onAdd,
-          }}
+          kind="product"
+          title={en ? "This box is still empty" : "箱子還是空的"}
+          action={{ label: en ? "+ New product" : "+ 新增產品", onPress: onAdd }}
         />
       )}
       {items.length > 0 && (
@@ -5458,7 +5444,7 @@ function BrandEntityGrid({
                 {/* 2026-06-21 (CJ「產品頁籤加縮圖」): thumbnail at top.
                     2026-06-30 (prod bug): products.imageUrl column doesn't
                     exist — dig into positioning JSON for image locations. */}
-                {kind === "product" && (() => {
+                {(() => {
                   // 2026-09-25（CJ「有選擇一張主題，但沒有出現在產品列表的縮圖當中」）：
                   // 挑圖規則搬到 lib/productImage.ts 並補上測試——原因是舊的篩選只收
                   // http(s)，把使用者上傳主圖的根相對路徑（/static/asset-photos/…）
@@ -5467,10 +5453,10 @@ function BrandEntityGrid({
                   return <ProductCardThumbnail key={imgUrl ?? "none"} imageUrl={imgUrl} name={item.name} en={en} />;
                 })()}
 
-                <div className={kind === "product" ? "p-3" : "p-4"}>
+                <div className="p-3">
                 {/* Name */}
                 <p className="text-sm font-semibold text-neutral-900 mb-2 truncate">{item.name}</p>
-                {kind === "product" && preview.price && (
+                {preview.price && (
                   <p className="text-[12px] font-medium text-neutral-500 -mt-1 mb-2">{preview.price}</p>
                 )}
 
@@ -5479,7 +5465,7 @@ function BrandEntityGrid({
                     {preview.tagline && (
                       <div>
                         <span className="text-[12px] font-semibold uppercase tracking-widest text-neutral-400">
-                          {kind === "product" ? (en ? "Tagline" : "標語") : (en ? "Theme" : "主軸")}
+                          {en ? "Tagline" : "標語"}
                         </span>
                         <p className="text-[12px] text-neutral-700 leading-tight line-clamp-2 mt-0.5">{preview.tagline}</p>
                       </div>
@@ -5487,7 +5473,7 @@ function BrandEntityGrid({
                     {preview.usp && (
                       <div>
                         <span className="text-[12px] font-semibold uppercase tracking-widest text-neutral-400">
-                          {kind === "product" ? "USP" : (en ? "CTA / Offer" : "CTA / 優惠")}
+                          USP
                         </span>
                         <p className="text-[12px] text-neutral-600 line-clamp-1 mt-0.5">{preview.usp}</p>
                       </div>
@@ -5495,7 +5481,7 @@ function BrandEntityGrid({
                     {preview.audience && (
                       <div>
                         <span className="text-[12px] font-semibold uppercase tracking-widest text-neutral-400">
-                          {kind === "product" ? (en ? "Audience" : "受眾") : (en ? "Period" : "時間")}
+                          {en ? "Audience" : "受眾"}
                         </span>
                         <p className="text-[12px] text-neutral-500 line-clamp-1 mt-0.5">{preview.audience}</p>
                       </div>
@@ -5514,25 +5500,20 @@ function BrandEntityGrid({
                   {/* Run positioning — running state shows live step progress */}
                   {(() => {
                     const isRunning = runningIds?.includes(item.id) ?? false;
-                    const prog = progressMap?.[`${kind}:${item.id}`];
+                    const prog = progressMap?.[`product:${item.id}`];
                     return (
                       <button
-                        onClick={(e) => { e.stopPropagation(); if (kind === "event" || !isRunning) onPosition(item.id); }}
-                        disabled={kind !== "event" && isRunning}
+                        onClick={(e) => { e.stopPropagation(); if (!isRunning) onPosition(item.id); }}
+                        disabled={isRunning}
                         className={`text-[12px] font-medium px-2 py-1 rounded-md transition flex-1 min-w-0 text-center ${
                           isRunning
                             ? "bg-zinc-100 text-zinc-500 cursor-wait animate-pulse"
                             : "bg-zinc-50 text-zinc-700 hover:bg-zinc-100"
                         }`}
                       >
-                        {/* 2026-09-25（CJ「按下開始定位，居然跑到品牌的頁籤」）：
-                            活動卡的主要動作是「宣傳企劃」——按下去進企劃頁，不是
-                            跑那份 11 段的得獎 brief。產品卡維持原本的定位流程。 */}
-                        {kind === "event"
-                          ? (en ? "▶ Promotion plan" : "▶ 宣傳企劃")
-                          : isRunning
-                            ? (en ? `Positioning… ${prog ?? ""}` : `定位中…${prog ? ` ${prog}` : ""}`)
-                            : positioned ? (en ? "Re-position" : "重新定位") : (en ? "▶ Run positioning" : "▶ 開始定位")}
+                        {isRunning
+                          ? (en ? `Positioning… ${prog ?? ""}` : `定位中…${prog ? ` ${prog}` : ""}`)
+                          : positioned ? (en ? "Re-position" : "重新定位") : (en ? "▶ Run positioning" : "▶ 開始定位")}
                       </button>
                     );
                   })()}
@@ -5540,8 +5521,7 @@ function BrandEntityGrid({
                       2026-06-30: dropped item.imageUrl gate — column doesn't
                       exist. Backend returns `product_has_no_image` if positioning
                       JSON has no image, and the modal shows that message. */}
-                  {kind === "product" && (
-                    <button
+                  <button
                       onClick={async (e) => {
                         e.stopPropagation();
                         setVariantState({
@@ -5586,7 +5566,6 @@ function BrandEntityGrid({
                     >
                       {en ? "Variants" : "品牌變體"}
                     </button>
-                  )}
                   {/* Open */}
                   <button
                     onClick={(e) => { e.stopPropagation(); onOpen(item.id); }}
@@ -5622,7 +5601,7 @@ function BrandEntityGrid({
           >
             <span className="text-2xl text-neutral-300">+</span>
             <span className="text-xs text-neutral-400 font-medium">
-              {kind === "product" ? (en ? "New product" : "新增產品") : (en ? "New event" : "新增活動")}
+              {en ? "New product" : "新增產品"}
             </span>
           </button>
         </div>
