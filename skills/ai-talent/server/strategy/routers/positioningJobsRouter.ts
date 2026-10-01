@@ -91,6 +91,8 @@ export const positioningJobsRouter = router({
       // Zod errors during initial mount before enabled guard kicked in.
       entityId: z.number().int().min(0),
       lang: z.enum(["zh-TW", "en"]).default("zh-TW"),
+      /** 2026-09-30：按下哪一位策略總監的頭像——他的人設會影響每一步產出。 */
+      directorAgentId: z.number().int().positive().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       if (input.entityId === 0) return { ok: false as const, error: "no entity selected" };
@@ -118,6 +120,7 @@ export const positioningJobsRouter = router({
         description: ent.description,
         website: ent.website,
         steps,
+        directorAgentId: input.directorAgentId,
       });
       return { ok: true as const, totalSteps: steps.length };
     }),

@@ -123,7 +123,8 @@ async function callJSON(
 ): Promise<any> {
   const r = await invokeLLM({
     messages: [
-      { role: "system", content: system },
+      // 2026-09-30：執行這份定位的策略總監人設接在 system 後面（見 positioningDirector.ts）。
+      { role: "system", content: ctx.directorPersona ? `${system}\n\n${ctx.directorPersona}` : system },
       { role: "user", content: user },
     ],
     maxTokens,

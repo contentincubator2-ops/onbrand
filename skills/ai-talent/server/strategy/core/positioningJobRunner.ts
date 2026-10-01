@@ -83,6 +83,9 @@ export interface StepContext {
    *  exact segment (persona, pains, needs, MOT), never replace it with an
    *  invented one. Loaded from the parent brand row for product/event too. */
   officialAudience?: string;
+  /** 2026-09-30（CJ「總監的人設應該會影響產出」）：執行這份定位的策略總監人設＋工作守則，
+   *  callJSON 接在每一步的 system prompt 後面（positioningDirector.ts）。沒有＝通用 prompt。 */
+  directorPersona?: string;
   // outputs from already-completed steps in this run, keyed by step id
   prevOutputs: Record<string, any>;
   /** Helper to record cost — runner calls this after each LLM call. */
@@ -213,6 +216,8 @@ export function startPositioningJob(args: {
   description?: string;
   website?: string;
   steps: PositioningStep[];
+  /** 執行這份定位的策略總監（mos_db agents.id）。 */
+  directorAgentId?: number;
 }): void {
   const k = jobKey(args.entityKind, args.entityId);
   if (activeJobs.has(k)) {
@@ -328,8 +333,20 @@ export async function resumeInterruptedPositioningJobs(): Promise<void> {
         kind === "product" ? buildProductPositioningSteps(stepOpts) :
                              buildEventPositioningSteps(stepOpts);
 
+      // 2026-09-30：續跑時沿用同一位策略總監（開始時記在 positioning._director）。
+      let directorAgentId: number | undefined;
+      try {
+        const table = kind === "brand" ? "brands" : kind === "product" ? "products" : "events";
+        const [pr]: any = await localPool.execute(`SELECT positioning FROM \`${table}\` WHERE id = ? LIMIT 1`, [entityId]);
+        const raw = (pr as any[])[0]?.positioning;
+        const pos = typeof raw === "string" ? JSON.parse(raw) : raw;
+        const id = Number(pos?._director?.agentId);
+        if (Number.isFinite(id) && id > 0) directorAgentId = id;
+      } catch { /* 沒有就用通用 prompt */ }
+
       console.log(`[positioningJobRunner] startup: re-queuing ${kind}:${entityId} "${name}"`);
       startPositioningJob({
+        directorAgentId,
         userId,
         entityKind: kind,
         entityId,
@@ -445,9 +462,31 @@ async function runPipelineDetached(args: {
   description?: string;
   website?: string;
   steps: PositioningStep[];
+  directorAgentId?: number;
 }): Promise<void> {
   const jobId = await upsertJob(args.userId, args.entityKind, args.entityId, args.steps.length);
   await setJobStatus(jobId, "running");
+
+  // 2026-09-30：策略總監人設。載一次、每一步共用；也把是誰寫的記在 positioning._director
+  // （頁面可以標示，pm2 重啟續跑時也從這裡讀回同一位）。查不到這位 agent 就照通用 prompt 跑。
+  let directorPersona: string | undefined;
+  if (args.directorAgentId) {
+    try {
+      const { loadDirectorPersona } = await import("./positioningDirector");
+      const d = await loadDirectorPersona(args.directorAgentId, args.industry ?? null);
+      if (d) {
+        directorPersona = d.block;
+        await mergePositioning(args.entityKind, args.entityId, args.userId, {
+          _director: { agentId: d.agentId, name: d.name, title: d.title, at: new Date().toISOString() },
+        });
+        console.log(`[positioningJobRunner] ${args.entityKind}:${args.entityId} director ${d.agentId} ${d.name} (${d.block.length} chars)`);
+      } else {
+        console.warn(`[positioningJobRunner] director agent ${args.directorAgentId} not found — generic prompt`);
+      }
+    } catch (e: any) {
+      console.warn(`[positioningJobRunner] director persona load failed (non-fatal):`, e?.message ?? e);
+    }
+  }
 
   // Fetch real website/social content BEFORE wave execution so every step
   // can ground its output in actual brand content (not hallucinated from name).
@@ -562,6 +601,7 @@ async function runPipelineDetached(args: {
             marketContext,
             outputLanguage,
             officialAudience,
+            directorPersona,
             prevOutputs: outputs,
             recordUsage,
           };
