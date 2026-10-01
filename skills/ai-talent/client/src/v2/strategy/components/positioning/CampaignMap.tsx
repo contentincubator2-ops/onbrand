@@ -9,6 +9,10 @@
  *     還沒定稿時，每一篇的「要講什麼」、日期、做不做都在這裡改。
  *
  * 顏色照設計系統：只有中性色，success 只給「已寫」。
+ *
+ * 2026-10-02（CJ「右邊的任務點點，滑過去的時候只是一段文字，可以改成縮圖嗎」）：
+ * 滑過（或鍵盤移到）一個點就浮出那一篇的縮圖卡——寫好的用成品的圖與開頭幾句，
+ * 還沒寫的用那張任務卡的插畫＋要講什麼。點一下放大到那一段。
  */
 import React from "react";
 import { useNavigate } from "react-router-dom";
@@ -19,6 +23,10 @@ import { CHANNEL_META, channelLabel } from "../../../content/lib/channelMeta";
 import { phaseOf, type CampaignPhaseId, type CampaignPlanItem } from "../../lib/campaignSchema";
 import { phaseShort, type StagePhase } from "../../lib/campaignStage";
 import { money, metricLine, PAID_CHANNELS, type PhaseKpi } from "../../lib/campaignKpi";
+import { TaskIllustration } from "../../../platform/components/TaskIllustration";
+
+/** 寫好的那一篇的縮圖（campaign.itemThumbs）。 */
+export interface ItemThumb { image: string | null; title: string; excerpt: string }
 
 const md = (s: string) => s.slice(5).replace("-", "/");
 const range = (p: StagePhase) => (p.from === p.to ? md(p.from) : `${md(p.from)} – ${md(p.to)}`);
@@ -39,7 +47,7 @@ function useSize(ref: React.RefObject<HTMLDivElement | null>): { w: number; h: n
 }
 
 export default function CampaignMap({
-  items, phases, lanes, phaseMessages, current, onPick, locked, en, onPatchItem, fill, phaseKpi = {},
+  items, phases, lanes, phaseMessages, current, onPick, locked, en, onPatchItem, fill, phaseKpi = {}, thumbs = {},
 }: {
   items: CampaignPlanItem[];
   phases: StagePhase[];
@@ -54,9 +62,12 @@ export default function CampaignMap({
   fill?: boolean;
   /** 每一段的預算與 KPI（有設定才顯示）。 */
   phaseKpi?: Partial<Record<CampaignPhaseId, PhaseKpi>>;
+  /** 寫好的那幾篇的圖與開頭（itemId → 縮圖）。 */
+  thumbs?: Record<string, ItemThumb>;
 }) {
   const L = (zh: string, e: string) => (en ? e : zh);
   const boxRef = React.useRef<HTMLDivElement>(null);
+  const [hover, setHover] = React.useState<string | null>(null);
   const { w: W, h: boxH } = useSize(boxRef);
 
   const G = W < 520 ? 44 : 112;                 // 左邊通路名稱那一欄
@@ -127,8 +138,16 @@ export default function CampaignMap({
         )}
         {W > 0 && pins.map(({ it, x, y }) => (
           <React.Fragment key={it.id}>
-            <span className={`absolute -translate-x-1/2 -translate-y-1/2 w-3.5 h-3.5 border-[3px] ${it.paid ? "rounded-[3px]" : "rounded-full"} ${it.outputId ? "bg-success border-success" : it.paid ? "bg-foreground border-foreground" : "bg-content1 border-foreground"}`}
-              style={{ left: x, top: y }} title={it.paid ? `${L("廣告", "Ad")}｜${it.angle}` : it.angle} />
+            {/* 點本身小，感應區放大到 28px，滑鼠不用瞄準。 */}
+            <button type="button"
+              className="absolute -translate-x-1/2 -translate-y-1/2 w-7 h-7 grid place-items-center rounded-full focus-visible:outline focus-visible:outline-2 focus-visible:outline-foreground z-[1]"
+              style={{ left: x, top: y }}
+              aria-label={`${md(it.date)} ${channelLabel(it.platform, en)}${it.paid ? `・${L("廣告", "Ad")}` : ""}：${it.angle}`}
+              onMouseEnter={() => setHover(it.id)} onMouseLeave={() => setHover((h) => (h === it.id ? null : h))}
+              onFocus={() => setHover(it.id)} onBlur={() => setHover((h) => (h === it.id ? null : h))}
+              onClick={() => { setHover(null); onPick(it.phase); }}>
+              <span className={`block w-3.5 h-3.5 border-[3px] transition-transform ${hover === it.id ? "scale-150" : ""} ${it.paid ? "rounded-[3px]" : "rounded-full"} ${it.outputId ? "bg-success border-success" : it.paid ? "bg-foreground border-foreground" : "bg-content1 border-foreground"}`} />
+            </button>
             <span className="absolute -translate-x-1/2 text-[10.5px] tabular-nums text-default-600 bg-content1/85 rounded px-1"
               style={{ left: x, top: y + 10 }}>{md(it.date)}</span>
           </React.Fragment>
@@ -164,6 +183,22 @@ export default function CampaignMap({
         </div>
       </div>
 
+      {/* ── 滑過一個點：那一篇的縮圖 ── */}
+      {ci < 0 && hover && (() => {
+        const pin = pins.find((p) => p.it.id === hover);
+        if (!pin) return null;
+        const CW = 240;
+        const boxHeight = Math.max(H, boxH);
+        const left = Math.max(8, Math.min(W - CW - 8, pin.x - CW / 2));
+        const below = pin.y + 20 + 270 < boxHeight;
+        return (
+          <PinThumb
+            item={pin.it} thumb={thumbs[pin.it.id] ?? null} en={en}
+            style={below ? { left, top: pin.y + 18 } : { left, bottom: boxHeight - pin.y + 18 }}
+          />
+        );
+      })()}
+
       {/* ── 放大：這一段的通路、訊息與內容安排 ── */}
       {ci >= 0 && (
         <PhaseDetail
@@ -173,6 +208,42 @@ export default function CampaignMap({
           kpi={phaseKpi[phases[ci]!.id] ?? null}
         />
       )}
+    </div>
+  );
+}
+
+/** 地圖上一個點的縮圖卡：像一則縮小的貼文——上面是圖，下面是這一篇要講什麼。 */
+function PinThumb({ item, thumb, en, style }: { item: CampaignPlanItem; thumb: ItemThumb | null; en: boolean; style: React.CSSProperties }) {
+  const L = (zh: string, e: string) => (en ? e : zh);
+  const [broken, setBroken] = React.useState(false);
+  const img = thumb?.image && !broken ? thumb.image : null;
+  return (
+    <div role="tooltip" style={style}
+      className="absolute z-20 w-[240px] bg-content1 rounded-2xl shadow-large overflow-hidden pointer-events-none animate-[pinIn_.16s_ease-out] motion-reduce:animate-none">
+      <style>{"@keyframes pinIn{from{opacity:0;transform:translateY(4px) scale(.98)}to{opacity:1;transform:none}}"}</style>
+      <div className="relative h-[136px] bg-default-100 grid place-items-center overflow-hidden">
+        {img
+          ? <img src={img} alt="" className="w-full h-full object-cover" onError={() => setBroken(true)} />
+          : <TaskIllustration card={{ id: item.taskId, label: item.taskLabel }} width={176} />}
+        <span className="absolute left-2 top-2 flex items-center gap-1.5 rounded-full bg-content1/90 px-2 py-0.5 text-[11px] font-medium shadow-small">
+          <FontAwesomeIcon icon={CHANNEL_META[item.platform]?.icon ?? faPenNib} className="text-[10px]" />
+          {channelLabel(item.platform, en)}
+        </span>
+        <span className="absolute right-2 top-2 flex gap-1">
+          {item.paid && <span className="rounded-full bg-foreground text-background px-2 py-0.5 text-[10.5px]">{L("廣告", "Ad")}</span>}
+          {item.outputId
+            ? <span className="rounded-full bg-success text-success-foreground px-2 py-0.5 text-[10.5px] flex items-center gap-1"><FontAwesomeIcon icon={faCheck} className="text-[9px]" />{L("已寫", "Written")}</span>
+            : <span className="rounded-full bg-content1/90 px-2 py-0.5 text-[10.5px] text-default-600">{L("還沒寫", "Not written")}</span>}
+        </span>
+      </div>
+      <div className="px-3 py-2.5 flex flex-col gap-1">
+        <p className="text-[11px] text-default-500 tabular-nums truncate">{md(item.date)}・{phaseShort(item.phase, en)}・{item.taskLabel}</p>
+        <p className="text-small font-semibold leading-snug line-clamp-3">{item.angle}</p>
+        {thumb?.excerpt
+          ? <p className="text-tiny text-default-500 leading-snug line-clamp-2">{thumb.excerpt}</p>
+          : item.outputId ? null : <p className="text-[11px] text-default-400">{L("點一下看這一段的安排", "Click to open this phase")}</p>}
+        {item.partner && <p className="text-[11px] text-default-500 truncate">{L("給：", "For: ")}{item.partner}</p>}
+      </div>
     </div>
   );
 }

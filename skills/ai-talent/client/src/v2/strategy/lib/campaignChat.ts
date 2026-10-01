@@ -81,8 +81,33 @@ export function describeProposal(plan: CampaignPlan, p: CampaignProposal, en: bo
       if (o.patch.enabled === false) bits.push(L("這篇不做", "skip"));
       if (o.patch.enabled === true) bits.push(L("放回企劃", "put back"));
       if (o.patch.angle) bits.push(L(`內容改成「${o.patch.angle}」`, `now: “${o.patch.angle}”`));
+      if (o.patch.paid === true) bits.push(L("改成廣告", "promote as ad"));
+      if (o.patch.paid === false) bits.push(L("改回一般貼文", "back to organic"));
       if (bits.length) lines.push(`${L("✎", "✎")} ${md(i.date)} ${channelLabel(i.platform, en)}：${bits.join(L("，", ", "))}`);
     }
   }
   return lines;
+}
+
+/**
+ * 「@朱怡君 倒數多兩篇」「@投放 哪幾篇下廣告」→ 名冊上的那一位＋去掉 @ 的訊息。
+ * 認人：名字（全名或開頭）→ 角色（「投放專家」或前兩字「投放」、英文、角色 id）。找不到就照原樣。純函式。
+ */
+export function routeMention(text: string, roster: Array<{ role: string; name: string; roleZh: string; roleEn: string }>): { to: string | null; message: string } {
+  const m = text.match(/^\s*[@＠]\s*(\S+)\s*([\s\S]*)$/);
+  if (!m) return { to: null, message: text };
+  const word = m[1]!;
+  const key = word.toLowerCase();
+  // 每個人可以被叫的說法，長的先比（「投放專家」先於「投放」）。
+  const calls = roster.flatMap((r) => [r.name, r.roleZh, r.roleZh.slice(0, 2), r.roleEn, r.role]
+    .filter((c) => c && c.length >= 2)
+    .map((c) => ({ r, c: c.toLowerCase() })))
+    .sort((x, y) => y.c.length - x.c.length);
+  const glued = calls.find(({ c }) => key.startsWith(c));
+  const prefix = glued ? null : calls.find(({ c }) => key.length >= 1 && c.startsWith(key));
+  const hit = glued ?? prefix;
+  if (!hit) return { to: null, message: text };
+  // 名字後面直接接字（「@朱怡君倒數多兩篇」）：切掉叫人的那段，留後半句。
+  const tail = glued ? word.slice(hit.c.length) : "";
+  return { to: hit.r.role, message: [tail, m[2]!.trim()].filter(Boolean).join(" ").trim() };
 }
