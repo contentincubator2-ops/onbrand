@@ -348,9 +348,52 @@ export async function eventFacts(eventId: number, userId: number): Promise<{
 /** 可以排進企劃的通路——推斷結果只能落在這裡面。 */
 // 2026-09-29 CJ：拿掉 LinkedIn／YouTube／新聞稿／X（planGate.HIDDEN_CONTENT_PLATFORMS）；
 // Threads 與 LINE CJ 要留。
+// 2026-10-01 CJ「網紅合作跟 instagram 相同功能，也是可以新增的管道，目前按進去，只有說明，
+// 這樣不夠，他要被納入行銷計畫」：加 kol。kol 這條線排的是「要做的事」（邀約、brief、
+// 追蹤、素材包、接住自然提及），日期跟著開賣日往回推，見 kolItems。
 export const PLANNABLE_CHANNELS = [
-  "facebook", "instagram", "email", "website", "tiktok", "threads", "line",
+  "facebook", "instagram", "email", "website", "tiktok", "threads", "line", "kol",
 ] as const;
+
+export const KOL_CHANNEL = "kol";
+
+/**
+ * 網紅這條線：五件事，日期以開賣日為準（邀約 −21 天、brief −14、追蹤 −7、開賣當天給素材包、
+ * 開賣後 5 天接住自然提及的粉絲與創作者）。過去的日期往後挪到今天起，最晚不超過活動結束後
+ * 7 天。對應的任務卡不存在就跳過那一件（不放按不下去的格子）。純函式，有測試。
+ */
+export function kolItems(args: {
+  launch: string; end: string; today: string; mechanic: string; cards: CatalogTask[];
+}): PlanItem[] {
+  const addDays = (s: string, n: number) => ymd(new Date(new Date(`${s}T00:00:00Z`).getTime() + n * DAY));
+  const latest = addDays(args.end, 7);
+  const hook = args.mechanic.trim().slice(0, 30);
+  const plan: Array<{ off: number; taskId: string; angle: string }> = [
+    { off: -21, taskId: "kl-30-invite-opener", angle: hook ? `邀約開場：用「${hook}」當合作理由，第一句就讓對方想回` : "邀約開場：第一句就讓對方想回" },
+    { off: -14, taskId: "kl-30-influencer-brief", angle: "給合作網紅的 brief：這檔要說什麼、不能說什麼、什麼時候交稿" },
+    { off: -7, taskId: "kl-30-followup", angle: "回覆與追蹤：報價、檔期、交稿前的確認" },
+    { off: 0, taskId: "kl-30-fan-template-kit", angle: "開賣當天給網紅與粉絲的素材包：照著就能發" },
+    { off: 5, taskId: "kl-30-catch-organic-fan", angle: "接住自然提到你的粉絲與創作者，邀他們一起加入這波" },
+  ];
+  const out: PlanItem[] = [];
+  let prev = "";
+  plan.forEach((p, n) => {
+    const card = args.cards.find((c) => c.id === p.taskId);
+    if (!card) return;
+    let date = addDays(args.launch, p.off);
+    if (date < args.today) date = args.today;
+    if (date <= prev) date = addDays(prev, 1);       // 往後挪的時候不要疊在同一天
+    if (date > latest) return;
+    prev = date;
+    const phase: CampaignPhaseId = date < args.launch ? "teaser" : date === args.launch ? "launch" : "sustain";
+    out.push({
+      id: `${phase}-${date}-kol${n}`, phase, date, platform: KOL_CHANNEL,
+      taskId: card.id, taskLabel: card.labelZh || card.labelEn || card.id, angle: p.angle,
+      enabled: true, outputId: null, scheduledAt: null,
+    });
+  });
+  return out;
+}
 
 export interface InferredSettings {
   type: CampaignTypeId;
@@ -412,7 +455,7 @@ export async function inferCampaignSettings(args: {
     facts.startAt ? `【期間】${facts.startAt.toISOString().slice(0, 10)} ~ ${facts.endAt ? facts.endAt.toISOString().slice(0, 10) : "?"}` : "",
     `【使用者寫的活動說明】\n${args.brief.trim() || "（沒有寫）"}`,
     `【可選的活動類型】\n${typeList}`,
-    `【可選的通路】\n${PLANNABLE_CHANNELS.map((c) => `- ${c}`).join("\n")}`,
+    `【可選的通路】\n${PLANNABLE_CHANNELS.map((c) => `- ${c}${c === KOL_CHANNEL ? "（網紅合作：使用者提到網紅、KOL、創作者、團購主合作才選）" : ""}`).join("\n")}`,
     `【這個品牌的產品】\n${productList}`,
     "",
     "只輸出 JSON，鍵名固定如下：",
@@ -479,13 +522,23 @@ export async function buildCampaignPlan(args: {
   if (!facts) throw new Error("找不到這個活動");
   // 2026-09-29：舊設定裡的下架通路（LinkedIn／YouTube／新聞稿／X）不排進新企劃。
   const s = { ...facts.settings, channels: (facts.settings.channels ?? []).filter((c) => !isHiddenContentPlatform(c)) };
+  // 舊設定的「要找網紅合作」勾選＝網紅通路。
+  if (s.partners?.kol && !s.channels.includes(KOL_CHANNEL)) s.channels = [...s.channels, KOL_CHANNEL];
   if (!s.type || !s.mechanic?.trim() || !s.channels?.length) {
     throw new Error("活動設定還沒填完（需要活動類型、優惠機制、要發的通路）");
   }
 
   const beats = planBeats({ startAt: facts.startAt, endAt: facts.endAt, today: args.today });
-  const cards = candidateCards(s.channels);
-  if (cards.length === 0) throw new Error("你選的通路目前沒有可用的任務卡，換一個通路再試");
+  // 網紅那條線是固定的幾件事（kolItems），不佔模型的檔期格子；模型只排貼文通路。
+  const wantKol = s.channels.includes(KOL_CHANNEL);
+  const postChannels = s.channels.filter((c) => c !== KOL_CHANNEL);
+  const kolCards = wantKol ? candidateCards([KOL_CHANNEL]) : [];
+  const cards = candidateCards(postChannels);
+  if (cards.length === 0 && kolCards.length === 0) throw new Error("你選的通路目前沒有可用的任務卡，換一個通路再試");
+  const today = ymd(args.today ?? new Date());
+  const launchDate = beats.find((b) => b.phase === "launch")?.date ?? (facts.startAt ? ymd(facts.startAt) : today);
+  const endDate = facts.endAt ? ymd(facts.endAt) : launchDate;
+  const kol = wantKol ? kolItems({ launch: launchDate, end: endDate, today, mechanic: s.mechanic, cards: kolCards }) : [];
 
   const cardMenu = cards
     .map((c) => `- ${c.id}｜${c.platform}｜${c.labelZh || c.labelEn}`)
@@ -524,18 +577,23 @@ export async function buildCampaignPlan(args: {
   const { buildBrandPrefix } = await import("./brandContext");
   const brain = await buildBrandPrefix(facts.brandId, null, args.eventId, "full").catch(() => "");
   const { invokeLLM } = await import("../../platform/core/llm.js");
-  const r = await invokeLLM({
-    messages: [
-      { role: "system", content: brain ? `${SYSTEM}\n\n# 品牌大腦（每一篇的角度都要扣回這裡）${brain}` : SYSTEM },
-      { role: "user", content: user },
-    ],
-    maxTokens: 3000,
-  });
-  const text = String(r.choices?.[0]?.message?.content ?? "");
-  const parsed = safeJSON<any>(text, null);
-  if (!parsed) throw new Error(`企劃產生失敗：模型的輸出讀不成 JSON（${text.slice(0, 160)}）`);
+  // 只選了網紅：不必問模型排貼文，訴求用活動名稱，使用者之後可以跟總監改。
+  let parsed: any = {};
+  if (cards.length) {
+    const r = await invokeLLM({
+      messages: [
+        { role: "system", content: brain ? `${SYSTEM}\n\n# 品牌大腦（每一篇的角度都要扣回這裡）${brain}` : SYSTEM },
+        { role: "user", content: user },
+      ],
+      maxTokens: 3000,
+    });
+    const text = String(r.choices?.[0]?.message?.content ?? "");
+    parsed = safeJSON<any>(text, null);
+    if (!parsed) throw new Error(`企劃產生失敗：模型的輸出讀不成 JSON（${text.slice(0, 160)}）`);
+  }
 
-  const items = reconcileItems({ beats, raw: parsed, cards, channels: s.channels });
+  const items = [...(cards.length ? reconcileItems({ beats, raw: parsed, cards, channels: postChannels }) : []), ...kol]
+    .sort((a, b) => a.date.localeCompare(b.date));
   if (items.length === 0) throw new Error("企劃產生失敗：一格都排不出來");
 
   const smp = typeof parsed?.smp === "string" ? parsed.smp.trim().slice(0, 60) : "";
@@ -545,7 +603,8 @@ export async function buildCampaignPlan(args: {
     items,
     phaseMessages: reconcilePhaseMessages(parsed, beats),
     lockedAt: null,
-    kol: s.partners?.kol ? kolBlock(s.mechanic, cards) : null,
+    // 網紅不再是一段說明，而是企劃裡的一條線（kolItems）。
+    kol: null,
     cobrand: s.partners?.cobrand ? cobrandBlock(s.mechanic, facts.brandName || "這個品牌") : null,
     generatedAt: new Date().toISOString(),
   };
