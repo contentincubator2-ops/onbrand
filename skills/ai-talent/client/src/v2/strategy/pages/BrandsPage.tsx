@@ -2429,7 +2429,6 @@ export default function BrandsPage() {
             <div style={{ padding: "8px 0 32px" }}>
 
               <BrandEntityGrid
-                kind="product"
                 items={brandProductsList}
                 isLoading={brandProductsQ?.isLoading ?? false}
                 lang={lang}
@@ -5049,7 +5048,8 @@ function BrandPaletteHero({
   });
   // 2026-07-19 (CJ「品牌視覺頁通常只有色號跑得出來」): brand-level visual
   // generator — most brands have no product with an image, so the only
-  // variants entry (per-product ✨ button) never appeared. This button runs
+  // variants entry (per-product ✨ button) never appeared. 2026-10-02（CJ「移除產品
+  // 卡片上的品牌變體功能」）：產品卡那個入口已拿掉，品牌變體只剩這裡。 This button runs
   // generateBrandedVariants({brandId}); the server falls back to website
   // images (the same source the palette extraction already used).
   const genVisualMut = (trpc as any).brandColors?.generateBrandedVariants?.useMutation?.();
@@ -5336,11 +5336,14 @@ function ProductCardThumbnail({ imageUrl, name, en }: { imageUrl?: string; name:
   );
 }
 
+/**
+ * 產品列表的卡片格。2026-10-02：活動改用 components/events/EventCardGrid（照 BrandCard 版型），
+ * 這裡原本 product／event 兩用的分支拿掉，只剩產品。
+ */
 function BrandEntityGrid({
-  kind, items, isLoading, lang, onAdd, onOpen, onDelete, onPosition,
+  items, isLoading, lang, onAdd, onOpen, onDelete, onPosition,
   runningIds, progressMap,
 }: {
-  kind: "product" | "event";
   items: any[];
   isLoading: boolean;
   lang: "zh-TW" | "en";
@@ -5350,22 +5353,11 @@ function BrandEntityGrid({
   onPosition: (id: number) => void;
   /** 2026-07-24: entity ids with a positioning pipeline in flight. */
   runningIds?: number[];
-  /** id-keyed (`kind:id`) progress labels, e.g. "3/6". */
+  /** id-keyed (`product:id`) progress labels, e.g. "3/6". */
   progressMap?: Record<string, string>;
 }) {
   const en = lang === "en";
 
-  // 2026-06-21 (CJ「按 riverflow 標準」brand DNA): branded variant generator
-  // state. When user clicks "品牌變體" on a card, we mutate, store results
-  // in this state, and render a modal showing 4 variants.
-  const [variantState, setVariantState] = React.useState<{
-    productId: number;
-    productName: string;
-    variants: Array<{ layout: string; pngDataUrl: string }> | null;
-    error: string | null;
-    cutoutAvailable?: boolean;
-  } | null>(null);
-  const genVariantsMut = (trpc as any).brandColors?.generateBrandedVariants?.useMutation?.();
 
   const extractField = (positioning: any, ...keys: string[]): string => {
     if (!positioning) return "";
@@ -5381,34 +5373,23 @@ function BrandEntityGrid({
   const getPreview = (item: any) => {
     const p = item.positioning ?? {};
     const interim = p._interim ?? {};   // interim positioning from auto-discovery
-    if (kind === "product") {
-      return {
-        tagline:  extractField(p, "tagline", "tagline.zhTagline", "core.zhTagline", "core.oneLineValueProp", "differentiation.summary")
-                    || interim.tagline || "",
-        usp:      extractField(p, "usp", "competition.uniqueUsp", "core.oneLineValueProp", "differentiation.functional", "differentiation.summary")
-                    || interim.usp || "",
-        audience: extractField(p, "audience.primary", "targetAudience")
-                    || interim.targetAudience || "",
-        // 2026-09-25：售價的 canonical 位置改成 facts.price，舊資料仍在頂層。
-        price: extractField(p, "facts.price", "price"),
-      };
-    } else {
-      return {
-        tagline: extractField(p, "theme", "tagline", "tagline.zhTagline"),
-        usp:     extractField(p, "cta", "offer", "usp"),
-        audience: item.startAt
-          ? `${new Date(item.startAt).toLocaleDateString(en ? "en-US" : "zh-TW", { month: "short", day: "numeric" })}${item.endAt ? ` → ${new Date(item.endAt).toLocaleDateString(en ? "en-US" : "zh-TW", { month: "short", day: "numeric" })}` : ""}`
-          : "",
-        price: "",
-      };
-    }
+    return {
+      tagline:  extractField(p, "tagline", "tagline.zhTagline", "core.zhTagline", "core.oneLineValueProp", "differentiation.summary")
+                  || interim.tagline || "",
+      usp:      extractField(p, "usp", "competition.uniqueUsp", "core.oneLineValueProp", "differentiation.functional", "differentiation.summary")
+                  || interim.usp || "",
+      audience: extractField(p, "audience.primary", "targetAudience")
+                  || interim.targetAudience || "",
+      // 2026-09-25：售價的 canonical 位置改成 facts.price，舊資料仍在頂層。
+      price: extractField(p, "facts.price", "price"),
+    };
   };
 
   const hasPositioning = (item: any): boolean => {
     const p = item.positioning ?? {};
     const interim = p._interim ?? {};
     return !!(
-      p.tagline || p.usp || p.theme || p.differentiation?.summary ||
+      p.tagline || p.usp || p.differentiation?.summary ||
       p.core?.zhTagline || p.core?.oneLineValueProp || p.competition?.uniqueUsp ||
       p.audience?.primary || p.targetAudience ||
       interim.tagline || interim.usp || interim.targetAudience
@@ -5429,14 +5410,9 @@ function BrandEntityGrid({
     <div className="px-2">
       {items.length === 0 && (
         <IllustratedEmpty
-          kind={kind === "product" ? "product" : "event"}
-          title={kind === "product"
-            ? (en ? "This box is still empty" : "箱子還是空的")
-            : (en ? "Ready to kick off?" : "準備起跑了嗎？")}
-          action={{
-            label: kind === "product" ? (en ? "+ New product" : "+ 新增產品") : (en ? "+ New event" : "+ 新增活動"),
-            onPress: onAdd,
-          }}
+          kind="product"
+          title={en ? "This box is still empty" : "箱子還是空的"}
+          action={{ label: en ? "+ New product" : "+ 新增產品", onPress: onAdd }}
         />
       )}
       {items.length > 0 && (
@@ -5458,7 +5434,7 @@ function BrandEntityGrid({
                 {/* 2026-06-21 (CJ「產品頁籤加縮圖」): thumbnail at top.
                     2026-06-30 (prod bug): products.imageUrl column doesn't
                     exist — dig into positioning JSON for image locations. */}
-                {kind === "product" && (() => {
+                {(() => {
                   // 2026-09-25（CJ「有選擇一張主題，但沒有出現在產品列表的縮圖當中」）：
                   // 挑圖規則搬到 lib/productImage.ts 並補上測試——原因是舊的篩選只收
                   // http(s)，把使用者上傳主圖的根相對路徑（/static/asset-photos/…）
@@ -5467,10 +5443,10 @@ function BrandEntityGrid({
                   return <ProductCardThumbnail key={imgUrl ?? "none"} imageUrl={imgUrl} name={item.name} en={en} />;
                 })()}
 
-                <div className={kind === "product" ? "p-3" : "p-4"}>
+                <div className="p-3">
                 {/* Name */}
                 <p className="text-sm font-semibold text-neutral-900 mb-2 truncate">{item.name}</p>
-                {kind === "product" && preview.price && (
+                {preview.price && (
                   <p className="text-[12px] font-medium text-neutral-500 -mt-1 mb-2">{preview.price}</p>
                 )}
 
@@ -5479,7 +5455,7 @@ function BrandEntityGrid({
                     {preview.tagline && (
                       <div>
                         <span className="text-[12px] font-semibold uppercase tracking-widest text-neutral-400">
-                          {kind === "product" ? (en ? "Tagline" : "標語") : (en ? "Theme" : "主軸")}
+                          {en ? "Tagline" : "標語"}
                         </span>
                         <p className="text-[12px] text-neutral-700 leading-tight line-clamp-2 mt-0.5">{preview.tagline}</p>
                       </div>
@@ -5487,7 +5463,7 @@ function BrandEntityGrid({
                     {preview.usp && (
                       <div>
                         <span className="text-[12px] font-semibold uppercase tracking-widest text-neutral-400">
-                          {kind === "product" ? "USP" : (en ? "CTA / Offer" : "CTA / 優惠")}
+                          USP
                         </span>
                         <p className="text-[12px] text-neutral-600 line-clamp-1 mt-0.5">{preview.usp}</p>
                       </div>
@@ -5495,7 +5471,7 @@ function BrandEntityGrid({
                     {preview.audience && (
                       <div>
                         <span className="text-[12px] font-semibold uppercase tracking-widest text-neutral-400">
-                          {kind === "product" ? (en ? "Audience" : "受眾") : (en ? "Period" : "時間")}
+                          {en ? "Audience" : "受眾"}
                         </span>
                         <p className="text-[12px] text-neutral-500 line-clamp-1 mt-0.5">{preview.audience}</p>
                       </div>
@@ -5514,79 +5490,23 @@ function BrandEntityGrid({
                   {/* Run positioning — running state shows live step progress */}
                   {(() => {
                     const isRunning = runningIds?.includes(item.id) ?? false;
-                    const prog = progressMap?.[`${kind}:${item.id}`];
+                    const prog = progressMap?.[`product:${item.id}`];
                     return (
                       <button
-                        onClick={(e) => { e.stopPropagation(); if (kind === "event" || !isRunning) onPosition(item.id); }}
-                        disabled={kind !== "event" && isRunning}
+                        onClick={(e) => { e.stopPropagation(); if (!isRunning) onPosition(item.id); }}
+                        disabled={isRunning}
                         className={`text-[12px] font-medium px-2 py-1 rounded-md transition flex-1 min-w-0 text-center ${
                           isRunning
                             ? "bg-zinc-100 text-zinc-500 cursor-wait animate-pulse"
                             : "bg-zinc-50 text-zinc-700 hover:bg-zinc-100"
                         }`}
                       >
-                        {/* 2026-09-25（CJ「按下開始定位，居然跑到品牌的頁籤」）：
-                            活動卡的主要動作是「宣傳企劃」——按下去進企劃頁，不是
-                            跑那份 11 段的得獎 brief。產品卡維持原本的定位流程。 */}
-                        {kind === "event"
-                          ? (en ? "▶ Promotion plan" : "▶ 宣傳企劃")
-                          : isRunning
-                            ? (en ? `Positioning… ${prog ?? ""}` : `定位中…${prog ? ` ${prog}` : ""}`)
-                            : positioned ? (en ? "Re-position" : "重新定位") : (en ? "▶ Run positioning" : "▶ 開始定位")}
+                        {isRunning
+                          ? (en ? `Positioning… ${prog ?? ""}` : `定位中…${prog ? ` ${prog}` : ""}`)
+                          : positioned ? (en ? "Re-position" : "重新定位") : (en ? "▶ Run positioning" : "▶ 開始定位")}
                       </button>
                     );
                   })()}
-                  {/* 2026-06-21 (CJ「按 riverflow 標準」): branded variant generator.
-                      2026-06-30: dropped item.imageUrl gate — column doesn't
-                      exist. Backend returns `product_has_no_image` if positioning
-                      JSON has no image, and the modal shows that message. */}
-                  {kind === "product" && (
-                    <button
-                      onClick={async (e) => {
-                        e.stopPropagation();
-                        setVariantState({
-                          productId: item.id,
-                          productName: item.name,
-                          variants: null,
-                          error: null,
-                        });
-                        try {
-                          const r = await genVariantsMut?.mutateAsync?.({ productId: item.id });
-                          if (r?.ok) {
-                            setVariantState({
-                              productId: item.id,
-                              productName: item.name,
-                              variants: r.variants,
-                              error: null,
-                              cutoutAvailable: r.cutoutAvailable,
-                            });
-                          } else {
-                            const reason = (r as any)?.reason ?? "unknown";
-                            const msg = reason === "no_palette_yet"
-                              ? (en
-                                  ? "Brand palette not extracted yet. Open the Visual tab and click Extract from products first."
-                                  : "品牌色彩還沒萃取。請先到「視覺」tab 按「從產品圖萃取」。")
-                              : reason === "product_has_no_image" || reason === "no_subject_image"
-                                ? (en
-                                    ? "No usable photo found — this product has no photo, and neither does the brand's photo library. Upload one first."
-                                    : "找不到可用照片 — 這個產品沒有照片，品牌照片庫也沒有。請先上傳一張。")
-                                : reason;
-                            setVariantState({ productId: item.id, productName: item.name, variants: null, error: msg });
-                          }
-                        } catch (err: any) {
-                          setVariantState({
-                            productId: item.id, productName: item.name,
-                            variants: null,
-                            error: String(err?.message ?? err).slice(0, 200),
-                          });
-                        }
-                      }}
-                      className="text-[12px] font-medium px-2 py-1 rounded-md bg-zinc-50 text-zinc-700 hover:bg-zinc-100 transition"
-                      title={en ? "Generate 4 branded variants" : "用品牌色生成 4 種變體"}
-                    >
-                      {en ? "Variants" : "品牌變體"}
-                    </button>
-                  )}
                   {/* Open */}
                   <button
                     onClick={(e) => { e.stopPropagation(); onOpen(item.id); }}
@@ -5622,26 +5542,12 @@ function BrandEntityGrid({
           >
             <span className="text-2xl text-neutral-300">+</span>
             <span className="text-xs text-neutral-400 font-medium">
-              {kind === "product" ? (en ? "New product" : "新增產品") : (en ? "New event" : "新增活動")}
+              {en ? "New product" : "新增產品"}
             </span>
           </button>
         </div>
       )}
 
-      {/* 2026-06-21 (CJ「按 riverflow 標準」) → 2026-07-19: markup extracted
-          to the shared BrandedVariantsModal (also used by the palette hero's
-          brand-level 生成品牌視覺 button). */}
-      {variantState && (
-        <BrandedVariantsModal
-          title={variantState.productName}
-          loading={!variantState.error && !variantState.variants}
-          error={variantState.error}
-          variants={variantState.variants}
-          cutoutAvailable={variantState.cutoutAvailable}
-          onClose={() => setVariantState(null)}
-          en={en}
-        />
-      )}
     </div>
   );
 }
