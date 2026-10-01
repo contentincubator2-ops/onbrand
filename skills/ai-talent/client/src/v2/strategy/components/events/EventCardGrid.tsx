@@ -48,6 +48,14 @@ export default function EventCardGrid({ events, isLoading, lang, today, onAdd, o
       {sorted.map((ev) => (
         <EventCard key={ev.id} ev={ev} en={en} today={today} onOpen={() => onOpen(ev.id)} onDelete={() => onDelete(ev.id)} />
       ))}
+      {/* 新增卡：已有活動時唯一的直接新增入口（不經時間軸節點）。#315 拆卡時漏掉，補回。 */}
+      <button
+        onClick={onAdd}
+        className="rounded-xl border-2 border-dashed border-neutral-200 bg-neutral-50/50 p-5 flex flex-col items-center justify-center gap-2 hover:border-neutral-400 hover:bg-neutral-50 transition min-h-[180px]"
+      >
+        <span className="text-2xl text-neutral-300">+</span>
+        <span className="text-xs text-neutral-400 font-medium">{en ? "New event" : "新增活動"}</span>
+      </button>
     </div>
   );
 }
