@@ -20,7 +20,7 @@ import { CAMPAIGN_TYPES, EMPTY_CAMPAIGN_SETTINGS, type CampaignSettings } from "
 import { scopeValueFrom, UNDECIDED_SCOPE, type ProductScopeValue } from "../../lib/eventProductScope";
 import EventProductScopePicker from "./EventProductScopePicker";
 
-export default function CampaignSetupForm({ eventId, data, brandProducts, hasPlan, en, onPlanned }: {
+export default function CampaignSetupForm({ eventId, data, brandProducts, hasPlan, en, onPlanned, onOpenKolBrief }: {
   eventId: number;
   /** campaign.get 的結果 */
   data: any;
@@ -28,6 +28,8 @@ export default function CampaignSetupForm({ eventId, data, brandProducts, hasPla
   hasPlan: boolean;
   en: boolean;
   onPlanned?: () => void;
+  /** 選了網紅時，打開「網紅任務說明單」（2026-10-01）。 */
+  onOpenKolBrief?: () => void;
 }) {
   const L = (zh: string, e: string) => (en ? e : zh);
   const utils = (trpc as any).useUtils();
@@ -130,6 +132,12 @@ export default function CampaignSetupForm({ eventId, data, brandProducts, hasPla
                 );
               })}
             </div>
+            {settings.channels.includes("kol") && onOpenKolBrief && (
+              <button type="button" onClick={onOpenKolBrief}
+                className="mt-2 text-tiny text-default-600 hover:text-foreground underline underline-offset-2">
+                {L("填網紅任務說明單（名單或類型、預算、時程…）", "Fill in the influencer brief (who, budget, timeline…)")}
+              </button>
+            )}
           </div>
           {settings.type === "offline" && (
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">

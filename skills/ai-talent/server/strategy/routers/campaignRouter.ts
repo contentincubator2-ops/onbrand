@@ -35,6 +35,8 @@ import localPool from "../../localDb";
 import { buildCampaignPlan, inferCampaignSettings, type CampaignPlan } from "../core/campaignPlan";
 import { runCampaignChat, pickCampaignDirector } from "../core/campaignChat";
 import { validateBasis, applyBasis, basisSnapshot } from "../core/campaignBasis";
+import { cleanKolBrief } from "../core/campaignKolBrief";
+import { laneItems, candidateCards, planBeats, KOL_CHANNEL } from "../core/campaignPlan";
 import { KPI_METRICS, pickKpiAgent, runKpiPlan } from "../core/campaignKpi";
 import { brandIndustry, pickPlannerAgent } from "../core/campaignTeam";
 import { isHiddenContentPlatform, isHiddenHistoryItem } from "../../platform/core/planGate";
@@ -68,6 +70,7 @@ const planItemInput = z.object({
   repaired: z.boolean().optional(),
   inPlanner: z.boolean().optional(),
   paid: z.boolean().optional(),
+  partner: z.string().max(80).optional(),
 });
 
 const PHASE_KEYS = ["teaser", "launch", "sustain", "lastcall", "encore"] as const;
@@ -183,6 +186,8 @@ export const campaignRouter = router({
           raw: Object.fromEntries(["brief", "context", "audience", "objectives", "awards", "smp", "messaging", "creative", "guidelines", "channels", "journey"].map((k) => [k, pos?.[k] ?? null])),
           editable: basisSnapshot(pos),
         },
+        /** 網紅任務說明單（core/campaignKolBrief.ts）。 */
+        kolBrief: cleanKolBrief(pos.kolBrief),
         /** 活動定位（舊的 11 段）裡寫的核心受眾——策略畫面的「對象」。 */
         audience: typeof pos?.audience?.primaryAudience === "string" ? pos.audience.primaryAudience.slice(0, 120) : "",
       };
@@ -338,6 +343,53 @@ export const campaignRouter = router({
         [JSON.stringify(applyBasis(pos, patch)), input.eventId, ctx.user!.id],
       );
       return { ok: true, changed: Object.keys(patch).length };
+    }),
+
+  /**
+   * 存網紅任務說明單。企劃已經排了網紅那條線、又還沒定稿的話，順便照新名單重排網紅那幾件
+   * （已經寫好的不動），回傳新的企劃讓畫面直接換上。
+   */
+  saveKolBrief: protectedProcedure
+    .input(z.object({
+      eventId: z.number().int().positive(),
+      brief: z.object({
+        influencers: z.array(z.object({
+          name: z.string().max(200).optional(), type: z.string().max(200).optional(),
+          tier: z.string().max(10).optional(), platform: z.string().max(100).optional(), angle: z.string().max(400).optional(),
+        })).max(12).optional(),
+      }).catchall(z.string().max(2000)),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const userId = ctx.user!.id;
+      const row = await loadEvent(input.eventId, userId);
+      const pos = parsePositioning(row.positioning);
+      assertUnlocked(pos);
+      const brief = cleanKolBrief(input.brief);
+      pos.kolBrief = brief;
+      const plan = pos.campaignPlan as CampaignPlan | null | undefined;
+      let replanned = false;
+      if (plan?.items?.some((i) => i.platform === KOL_CHANNEL)) {
+        const ymdOf = (d: any) => (d ? new Date(d).toISOString().slice(0, 10) : null);
+        const today = new Date().toISOString().slice(0, 10);
+        const start = ymdOf(row.startAt);
+        const end = ymdOf(row.endAt);
+        const beats = planBeats({ startAt: row.startAt ? new Date(row.startAt) : null, endAt: row.endAt ? new Date(row.endAt) : null });
+        const launch = beats.find((b) => b.phase === "launch")?.date ?? start ?? today;
+        const written = plan.items.filter((i) => i.platform === KOL_CHANNEL && i.outputId);
+        const fresh = laneItems(KOL_CHANNEL, {
+          launch, end: end ?? launch, today, mechanic: String(pos.campaign?.mechanic ?? ""),
+          cards: candidateCards([KOL_CHANNEL]), influencers: brief.influencers,
+        }).filter((n) => !written.some((w) => w.taskId === n.taskId && (w.partner ?? "") === (n.partner ?? "")));
+        plan.items = [...plan.items.filter((i) => i.platform !== KOL_CHANNEL || i.outputId), ...fresh]
+          .sort((a, b) => a.date.localeCompare(b.date));
+        pos.campaignPlan = plan;
+        replanned = true;
+      }
+      await localPool.execute(
+        `UPDATE events SET positioning = ? WHERE id = ? AND userId = ?`,
+        [JSON.stringify(pos), input.eventId, userId],
+      );
+      return { ok: true, brief, replanned, plan: replanned ? visiblePlan(plan as CampaignPlan) : null };
     }),
 
   team: protectedProcedure
