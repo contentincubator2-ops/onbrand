@@ -4,7 +4,10 @@
  * 2026-09-30（CJ「按下總覽後，右邊會按照階段時間，所使用的管道，列出總覽，當你要看
  * 加溫期的時候，右邊才會 ZOOM IN 到加溫期的傳播管道和訊息和內容安排」）。
  *
- *   · 總覽：橫的是階段、直的是通路，點是一篇，線是發文順序；每段上方是那一段的訊息。
+ *   · 總覽：橫的是階段、直的是通路，點是一篇；每段上方是那一段的訊息。
+ *     2026-10-01（CJ 問「點點之間很多線連在一起，代表什麼」→ 同意拿掉）：原本有一條把每一篇
+ *     依日期串起來的「發文順序」線，通路一多就變成上下亂跳、看不出意思。改成：點在階段裡照日期
+ *     排（不是平均分散），加一條「今天」直線；過去的點淡掉，下方摘要顯示「下一篇」。
  *   · 放大：地圖往那一段放大後淡出，疊上那一段的目的、訊息，以及每個通路排了哪幾篇。
  *     還沒定稿時，每一篇的「要講什麼」、日期、做不做都在這裡改。
  *
@@ -21,6 +24,9 @@ import { phaseShort, type StagePhase } from "../../lib/campaignStage";
 import { money, metricLine, PAID_CHANNELS, type PhaseKpi } from "../../lib/campaignKpi";
 
 const md = (s: string) => s.slice(5).replace("-", "/");
+const DAY = 86_400_000;
+const dayNo = (s: string) => Math.round(new Date(`${s}T00:00:00Z`).getTime() / DAY);
+const todayYmd = () => new Date().toISOString().slice(0, 10);
 const range = (p: StagePhase) => (p.from === p.to ? md(p.from) : `${md(p.from)} – ${md(p.to)}`);
 
 /** 量容器大小——地圖的點與線要用同一套座標。 */
@@ -71,24 +77,51 @@ export default function CampaignMap({
   const BW = W > 0 ? (W - G - 16) / n : 0;
 
   const live = items.filter((i) => i.enabled);
+  // 某一天在地圖上的 x：落在哪一段，就照那一段的起訖日期按比例放（兩邊留一點邊）。
+  const pad = Math.min(18, BW * 0.12);
+  const xOfDate = (pi: number, date: string): number => {
+    const p = phases[pi]!;
+    const span = Math.max(1, dayNo(p.to) - dayNo(p.from));
+    const t = Math.min(1, Math.max(0, (dayNo(date) - dayNo(p.from)) / span));
+    return G + pi * BW + pad + (BW - 2 * pad) * (phases[pi]!.from === phases[pi]!.to ? 0.5 : t);
+  };
+  const placed = new Map<string, number>();
   const pins = live.map((it) => {
     const pi = phases.findIndex((p) => p.id === it.phase);
     const li = lanes.indexOf(it.platform);
-    const cell = live.filter((x) => x.phase === it.phase && x.platform === it.platform);
-    const k = cell.findIndex((x) => x.id === it.id);
-    return {
-      it,
-      x: G + pi * BW + (BW * (k + 1)) / (cell.length + 1),
-      y: HEAD + li * laneH + laneH / 2,
-      ok: pi >= 0 && li >= 0,
-    };
-  }).filter((p) => p.ok);
-  const route = [...pins].sort((a, b) => (a.it.date < b.it.date ? -1 : a.it.date > b.it.date ? 1 : a.x - b.x));
+    if (pi < 0 || li < 0) return null;
+    // 同一條通路同一天有好幾篇：往右錯開一點，不疊在一起。
+    const key = `${li}|${it.date}`;
+    const k = placed.get(key) ?? 0;
+    placed.set(key, k + 1);
+    return { it, x: xOfDate(pi, it.date) + k * 12, y: HEAD + li * laneH + laneH / 2 };
+  }).filter((p): p is { it: CampaignPlanItem; x: number; y: number } => !!p);
+  // 日期標籤：同一條通路上離前一個標籤太近就不重複寫（滑過點看得到日期）。
+  const showDate = new Set<string>();
+  for (const li of lanes.map((_, j) => j)) {
+    let lastX = -Infinity;
+    for (const p of pins.filter((q) => q.y === HEAD + li * laneH + laneH / 2).sort((a, b) => a.x - b.x)) {
+      if (p.x - lastX >= 34) { showDate.add(p.it.id); lastX = p.x; }
+    }
+  }
+
+  // 「今天」：落在某一段裡就照日期放；落在兩段之間就放在交界；整檔前後不畫，改在摘要說。
+  const today = todayYmd();
+  let todayX: number | null = null;
+  if (phases.length && today >= phases[0]!.from && today <= phases[phases.length - 1]!.to) {
+    const pi = phases.findIndex((p) => today >= p.from && today <= p.to);
+    if (pi >= 0) todayX = xOfDate(pi, today);
+    else {
+      const next = phases.findIndex((p) => p.from > today);
+      todayX = G + Math.max(0, next) * BW;
+    }
+  }
+  const upcoming = [...live].filter((i) => i.date >= today).sort((a, b) => a.date.localeCompare(b.date))[0] ?? null;
+  const daysToFirst = phases.length && today < phases[0]!.from ? dayNo(phases[0]!.from) - dayNo(today) : null;
 
   const ci = current ? phases.findIndex((p) => p.id === current) : -1;
   const cx = ci >= 0 ? G + (ci + 0.5) * BW : W / 2;
   const cy = HEAD + (lanes.length * laneH) / 2;
-  const first = route[0]?.it.date;
 
   return (
     <div ref={boxRef} className={`relative w-full overflow-hidden bg-default-100 ${fill ? "h-full" : ""}`} style={fill ? { minHeight: H } : { height: H }}>
@@ -119,20 +152,27 @@ export default function CampaignMap({
             </div>
           </React.Fragment>
         ))}
-        {W > 0 && route.length > 1 && (
-          <svg className="absolute inset-0 text-foreground" width={W} height={H} aria-hidden>
-            <polyline points={route.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ")}
-              fill="none" stroke="currentColor" strokeWidth={4} strokeLinejoin="round" strokeLinecap="round" opacity={0.85} />
-          </svg>
+        {W > 0 && todayX != null && (
+          <>
+            <div className="absolute w-0.5 bg-foreground/70 rounded-full" style={{ left: todayX - 1, top: HEAD - 6, height: lanes.length * laneH + 12 }} aria-hidden />
+            <span className="absolute -translate-x-1/2 text-[10.5px] font-semibold bg-foreground text-background rounded px-1.5 py-0.5"
+              style={{ left: todayX, top: HEAD + lanes.length * laneH + 8 }}>{L("今天", "Today")} {md(today)}</span>
+          </>
         )}
-        {W > 0 && pins.map(({ it, x, y }) => (
-          <React.Fragment key={it.id}>
-            <span className={`absolute -translate-x-1/2 -translate-y-1/2 w-3.5 h-3.5 border-[3px] ${it.paid ? "rounded-[3px]" : "rounded-full"} ${it.outputId ? "bg-success border-success" : it.paid ? "bg-foreground border-foreground" : "bg-content1 border-foreground"}`}
-              style={{ left: x, top: y }} title={it.paid ? `${L("廣告", "Ad")}｜${it.angle}` : it.angle} />
-            <span className="absolute -translate-x-1/2 text-[10.5px] tabular-nums text-default-600 bg-content1/85 rounded px-1"
-              style={{ left: x, top: y + 10 }}>{md(it.date)}</span>
-          </React.Fragment>
-        ))}
+        {W > 0 && pins.map(({ it, x, y }) => {
+          const past = it.date < today && !it.outputId;
+          const tip = `${md(it.date)}｜${it.paid ? `${L("廣告", "Ad")}｜` : ""}${it.angle}`;
+          return (
+            <React.Fragment key={it.id}>
+              <span className={`absolute -translate-x-1/2 -translate-y-1/2 w-3.5 h-3.5 border-[3px] ${it.paid ? "rounded-[3px]" : "rounded-full"} ${it.outputId ? "bg-success border-success" : it.paid ? "bg-foreground border-foreground" : "bg-content1 border-foreground"} ${past ? "opacity-35" : ""}`}
+                style={{ left: x, top: y }} title={tip} />
+              {showDate.has(it.id) && (
+                <span className={`absolute -translate-x-1/2 text-[10.5px] tabular-nums text-default-600 bg-content1/85 rounded px-1 ${past ? "opacity-50" : ""}`}
+                  style={{ left: x, top: y + 10 }}>{md(it.date)}</span>
+              )}
+            </React.Fragment>
+          );
+        })}
         {W > 0 && phases.map((p, i) => {
           return (
             <button key={p.id} type="button" onClick={() => onPick(p.id)}
@@ -157,7 +197,11 @@ export default function CampaignMap({
           {[
             [String(live.length), L("篇", "posts")],
             [String(new Set(live.map((i) => i.platform)).size), L("個通路", "channels")],
-            [first ? md(first) : "—", L("第一篇", "first post")],
+            daysToFirst != null
+              ? [String(daysToFirst), L("天後第一篇", "days to first post")]
+              : upcoming
+                ? [md(upcoming.date), L(`下一篇・${channelLabel(upcoming.platform, false)}`, `next · ${channelLabel(upcoming.platform, true)}`)]
+                : ["—", L("都過了", "all done")],
           ].map(([v, k]) => (
             <div key={k}><b className="block text-medium font-black leading-tight tabular-nums">{v}</b><span className="text-[11px] text-default-500">{k}</span></div>
           ))}
