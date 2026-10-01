@@ -87,3 +87,16 @@ export async function brandIndustry(brandId: number): Promise<string> {
     return "";
   }
 }
+
+/** 指名找人（固定人選）：slug 或 id。找不到回 null。 */
+export async function agentByRef(ref: { slug?: string; id?: number }): Promise<TeamAgent | null> {
+  try {
+    const [rows]: any = await localPool.execute(
+      `SELECT id, slug, name, name_zh, englishName, title, title_zh, avatarUrl FROM agents WHERE ${ref.slug ? "slug = ?" : "id = ?"} LIMIT 1`,
+      [ref.slug ?? ref.id ?? 0],
+    );
+    return (rows as any[])[0] ? toAgent((rows as any[])[0]) : null;
+  } catch {
+    return null;
+  }
+}
