@@ -14,6 +14,7 @@ import { eq, and, desc, or, isNull, sql } from "drizzle-orm";
 import { computeMissionResources } from "../core/missionResourceComputer";
 import { isMissingTableError } from "../../platform/core/mysqlErrors";
 import { isHiddenHistoryItem } from "../../platform/core/planGate";
+import { applyProjectFilters, PROJECT_STAGES, taskIdOf, type ProjectIndexRow } from "../core/projectFilters";
 
 /** 產出的 task id：metadata.taskId 優先，舊資料退回 description 裡的 [task:<id>]。 */
 function historyTaskId(r: { taskId?: unknown; description?: unknown }): string | null {
@@ -43,129 +44,93 @@ export const missionRouter = router({
       return db.select().from(missions).where(and(...conditions)).orderBy(desc(missions.updatedAt));
     }),
 
-  // List ALL missions for the current user across every brand. Powers the
-  // new MissionsHome (任務牆) — Sprint 1 D1. Returns mission rows joined
-  // with brand name + squad slug so the rack-card can render without an
-  // extra round-trip per card.
-  listAllForUser: protectedProcedure
-    .query(async ({ ctx }) => {
+  /**
+   * /projects 專案頁。2026-10-02 取代 listAllForUser（最多 60 筆、頁面只畫 18 張、
+   * 沒有平台／進度／任務卡篩選）。撈該用戶（＋品牌）全部輕量索引列，篩選、分面、
+   * 分頁交給 projectFilters。一次執行一張卡；已移到垃圾桶（archived）的不列。
+   */
+  listProjects: protectedProcedure
+    .input(z.object({
+      brandId: z.number().int().positive().nullish(),
+      platform: z.string().max(24).nullish(),
+      stage: z.enum(PROJECT_STAGES).nullish(),
+      taskId: z.string().max(100).nullish(),
+      productId: z.number().int().positive().nullish(),
+      period: z.enum(["7d", "30d", "older"]).nullish(),
+      q: z.string().max(100).nullish(),
+      sort: z.enum(["new", "old"]).default("new"),
+      cursor: z.number().int().min(0).nullish(), // = offset；useInfiniteQuery 規定叫 cursor
+      limit: z.number().int().min(1).max(60).default(24),
+    }))
+    .query(async ({ ctx, input }) => {
       const db = await getDb();
-      if (!db) return [];
-      // 2026-05-14 (CJ「有些任務存到專案的時候，會無法顯示」):
-      //   Was INNER JOIN missions ON mo — meaning if mission_outputs INSERT
-      //   silently failed in recordTaskRun (e.g. emoji into utf8 column,
-      //   content > MEDIUMTEXT, enum mismatch), the mission row existed
-      //   but had no outputs → INNER JOIN dropped it → card vanished
-      //   entirely from /projects.
-      //
-      //   Changed to: select FROM missions m LEFT JOIN mission_outputs mo
-      //   on the *latest* output (or NULL if none). Orphan missions now
-      //   appear as cards with no version/platform/thumb — at least the
-      //   user sees the task exists, can click into the detail page, and
-      //   we can investigate. Latest-only sub-select keeps the
-      //   "one card per run" semantic for missions that DO have outputs.
-      //
-      // Earlier (2026-05-14) note: rack now shows one row per run, not
-      // per mission. We preserve that by joining each mission to its
-      // latest output via a correlated sub-select; multiple runs still
-      // show as multiple cards via the original FROM mo path. To keep
-      // the simpler "card per latest output OR per orphan mission":
-      // 2026-05-14 (CJ「專案名稱可以編輯，按 enter 會恢復原狀」):
-      // output.updateTitle writes to mission_outputs.title; the card on
-      // /projects shows `title`. Previously we returned `m.title` here, so
-      // a rename did save but the next refetch overwrote the UI with the
-      // (untouched) mission title. COALESCE picks the per-output title if
-      // the user has renamed this card, else falls back to mission title.
+      const empty = { total: 0, nextCursor: null as number | null, items: [], facets: { platform: [], stage: [], task: [], product: [], period: [] } };
+      if (!db) return empty;
+      // JSON_UNQUOTE(JSON_EXTRACT(...)) 遇到 JSON null 會回字串 'null'（JS 裡是 truthy），
+      // 一律 NULLIF 掉——2026-08-11 縮圖 <img src="null"> 的教訓。
       const rows = await db.execute(sql`
         SELECT mo.id AS id,
                m.id  AS missionId,
                COALESCE(NULLIF(mo.title, ''), m.title) AS title,
-               m.description, m.workspace, m.methodology,
-               m.squadSlug AS squadSlug, m.brandId AS brandId,
-               m.status,
-               COALESCE(mo.createdAt, m.updatedAt) AS updatedAt,
-               mo.title AS outputTitle,
-               mo.version AS outputVersion,
-               mo.platform AS outputPlatform,
-               mo.outputType AS outputType,
-               NULLIF(JSON_UNQUOTE(JSON_EXTRACT(mo.metadata, '$.taskId')), 'null') AS taskId,
-               -- 2026-08-11 (CJ「每一個任務，應該都可以出現縮圖才對」): MySQL's
-               -- JSON_UNQUOTE(JSON_EXTRACT(x,'$.k')) returns the 4-char STRING
-               -- 'null' when the stored value is JSON null — and that string is
-               -- truthy in JS. The client then rendered <img src="null">, which
-               -- 404s and left a blank grey card. NULLIF turns it back into a
-               -- real SQL NULL so the coloured placeholder shows instead.
-               NULLIF(JSON_UNQUOTE(JSON_EXTRACT(mo.metadata, '$.thumbnailUrl')), 'null') AS outputThumbUrl,
-               m.output_image_url AS outputImageUrl,
-               m.cover_image_url  AS coverImageUrl,
+               m.title AS taskLabel,
+               m.description, m.workspace, m.brandId AS brandId,
                b.name AS brandName,
-               s.name AS squadName,
-               s.strategy_layer AS squadLayer,
-               s.steps AS squadSteps,
-               s.hero_image_url AS squadHeroImageUrl,
-               s.mockup_images  AS squadMockupImages,
-               CAST(JSON_UNQUOTE(JSON_EXTRACT(mo.metadata, '$.productId')) AS UNSIGNED) AS scopeProductId,
-               CAST(JSON_UNQUOTE(JSON_EXTRACT(mo.metadata, '$.eventId'))   AS UNSIGNED) AS scopeEventId,
-               -- 2026-08-11: audience attribution written at run time (see
-               -- quickTaskRouter.resolveAudienceTag). NULL for anything not
-               -- started from a strategy-workbench sweet spot, which is most
-               -- historical work — the /projects filter must tolerate that.
-               -- Same 'null'-string trap: untagged runs store audienceTag as
-               -- JSON null, which would otherwise surface as a facet chip
-               -- literally labelled "null".
-               NULLIF(JSON_UNQUOTE(JSON_EXTRACT(mo.metadata, '$.audienceTag.audience')),  'null') AS audienceLabel,
-               NULLIF(JSON_UNQUOTE(JSON_EXTRACT(mo.metadata, '$.audienceTag.spotTitle')), 'null') AS sweetSpotTitle,
-               p.name AS scopeProductName
-          FROM missions m
-          LEFT JOIN mission_outputs mo ON mo.missionId = m.id
+               mo.createdAt AS createdAt,
+               mo.platform AS outputPlatform,
+               mo.progress AS progress,
+               mo.status AS status,
+               NULLIF(JSON_UNQUOTE(JSON_EXTRACT(mo.metadata, '$.taskId')), 'null') AS metaTaskId,
+               CAST(NULLIF(JSON_UNQUOTE(JSON_EXTRACT(mo.metadata, '$.productId')), 'null') AS UNSIGNED) AS productId,
+               p.name AS productName,
+               COALESCE(
+                 NULLIF(JSON_UNQUOTE(JSON_EXTRACT(mo.metadata, '$.thumbnailUrl')), 'null'),
+                 m.output_image_url, m.cover_image_url, s.hero_image_url
+               ) AS thumbnailUrl,
+               EXISTS(SELECT 1 FROM scheduled_posts sp
+                       WHERE sp.outputId = mo.id
+                         AND (sp.status = 'published' OR sp.publishedAt IS NOT NULL)) AS spPublished,
+               EXISTS(SELECT 1 FROM scheduled_posts sp
+                       WHERE sp.outputId = mo.id AND sp.status = 'pending') AS spPending,
+               EXISTS(SELECT 1 FROM planned_slots ps
+                       WHERE ps.outputId = mo.id AND ps.status <> 'dismissed') AS inPlanner
+          FROM mission_outputs mo
+          JOIN missions m ON m.id = mo.missionId
           LEFT JOIN brands b ON b.id = m.brandId
           LEFT JOIN products p
-                 ON p.id = CAST(JSON_UNQUOTE(JSON_EXTRACT(mo.metadata, '$.productId')) AS UNSIGNED)
+                 ON p.id = CAST(NULLIF(JSON_UNQUOTE(JSON_EXTRACT(mo.metadata, '$.productId')), 'null') AS UNSIGNED)
           LEFT JOIN squads s ON s.slug COLLATE utf8mb4_unicode_ci
                               = m.squadSlug COLLATE utf8mb4_unicode_ci
          WHERE m.userId = ${ctx.user.id}
-           -- Show every output as its own card, OR show the mission
-           -- once if it has zero outputs (orphan recovery path).
-           AND (mo.id IS NOT NULL
-                OR NOT EXISTS (SELECT 1 FROM mission_outputs mo2 WHERE mo2.missionId = m.id))
-         ORDER BY COALESCE(mo.createdAt, m.updatedAt) DESC, mo.id DESC
-         LIMIT 120
+           AND (mo.status IS NULL OR mo.status <> 'archived')
+           ${input.brandId ? sql`AND m.brandId = ${input.brandId}` : sql``}
       `);
-      // drizzle returns [rows, fields] for raw execute on mysql2
       const data = Array.isArray(rows) ? rows[0] : (rows as any).rows ?? rows;
-      // 多抓一些再濾掉下架通路，濾完仍維持最多 60 張。
-      const arr = (Array.isArray(data) ? data : []).filter((r: any) => !isHiddenMissionRow(r)).slice(0, 60);
-      // Compute step count + resolve thumbnail priority, then drop raw JSON blobs
-      return arr.map((r: any) => {
-        let steps: any = r.squadSteps;
-        if (typeof steps === "string") {
-          try { steps = JSON.parse(steps); } catch { steps = null; }
-        }
-        const stepCount = Array.isArray(steps) ? steps.length : null;
-
-        // Parse squad mockup_images JSON array (may be null if column not yet populated)
-        let squadMockupImages: string[] = [];
-        if (r.squadMockupImages) {
-          try { squadMockupImages = JSON.parse(r.squadMockupImages); } catch { /* ignore */ }
-        }
-
-        // Resolved thumbnail priority (now output-aware):
-        //   1. mission_output.metadata.thumbnailUrl — THIS specific run's thumb
-        //   2. missions.output_image_url            — latest output (legacy)
-        //   3. missions.cover_image_url             — user-set cover
-        //   4. squads.hero_image_url                — squad mockup (fallback)
-        // squadMockupImages[] is passed separately for hover slideshow
-        const thumbnailUrl: string | null =
-          r.outputThumbUrl ?? r.outputImageUrl ?? r.coverImageUrl ?? r.squadHeroImageUrl ?? null;
-
-        const { squadSteps, squadMockupImages: _raw, ...rest } = r;
-        return {
-          ...rest,
-          squadStepCount: stepCount,
-          squadMockupImages,
-          thumbnailUrl,
-        };
-      });
+      const index: ProjectIndexRow[] = (Array.isArray(data) ? data : [])
+        .map((r: any) => ({ ...r, taskId: taskIdOf(r.metaTaskId, r.description) }))
+        .filter((r: any) => !isHiddenMissionRow(r))
+        .map((r: any) => ({
+          id: Number(r.id),
+          missionId: Number(r.missionId),
+          title: r.title ?? null,
+          workspace: r.workspace ?? null,
+          brandId: r.brandId == null ? null : Number(r.brandId),
+          brandName: r.brandName ?? null,
+          createdAt: r.createdAt,
+          taskId: r.taskId,
+          taskLabel: r.taskLabel ?? null,
+          productId: r.productId ? Number(r.productId) : null,
+          productName: r.productName ?? null,
+          progress: r.progress ?? null,
+          status: r.status ?? null,
+          spPublished: Number(r.spPublished) || 0,
+          spPending: Number(r.spPending) || 0,
+          inPlanner: Number(r.inPlanner) || 0,
+          thumbnailUrl: r.thumbnailUrl ?? null,
+        }));
+      const offset = input.cursor ?? 0;
+      const res = applyProjectFilters(index, { ...input, offset });
+      const next = offset + res.items.length;
+      return { ...res, nextCursor: next < res.total ? next : null };
     }),
 
   // List all missions for a brand across all workspaces
