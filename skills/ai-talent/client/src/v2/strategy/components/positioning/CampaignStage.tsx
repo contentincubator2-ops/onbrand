@@ -39,6 +39,8 @@ import { LockToggle } from "./LockToggle";
 import CampaignMap from "./CampaignMap";
 import CampaignSetupForm from "./CampaignSetupForm";
 import CampaignChatCard from "./CampaignChatCard";
+import CampaignBasisPanel from "./CampaignBasisPanel";
+import type { BasisPatch, BasisValue } from "../../lib/campaignBasis";
 import { dockDirector } from "../../lib/directorDock";
 import CampaignHandoff from "./CampaignHandoff";
 import CampaignKpiPanel from "./CampaignKpiPanel";
@@ -65,6 +67,14 @@ export default function CampaignStage({ eventId, brandId }: { eventId: number; b
   const [current, setCurrent] = React.useState<CampaignPhaseId | null>(null);
   const [full, setFull] = React.useState(false);
   const [kpiOpen, setKpiOpen] = React.useState(false);
+  /**
+   * 右邊看什麼：企劃地圖或策略依據（2026-09-30 CJ「策略依據…可以替代右邊的行事曆，讓用戶
+   * 還是可以透過跟總監的互動，進行修改和討論…位置移到最上方的企劃草稿」）。
+   */
+  const [view, setView] = React.useState<"map" | "basis">("map");
+  /** 策略依據目前的值（存檔前先改畫面）與剛被總監改過的格子。 */
+  const [basisLocal, setBasisLocal] = React.useState<Record<string, BasisValue | null>>({});
+  const [basisRecent, setBasisRecent] = React.useState<Set<string>>(new Set());
   /** 對話卡展開＝佔滿左欄（CJ 2026-09-30）；左欄其他東西先收起來。 */
   const [chatExpanded, setChatExpanded] = React.useState(false);
   const [setupOpen, setSetupOpen] = React.useState(false);
@@ -80,6 +90,29 @@ export default function CampaignStage({ eventId, brandId }: { eventId: number; b
     if (!q.data || dirtyRef.current) return;
     setPlan(q.data.plan ?? null);
   }, [q.data]);
+  React.useEffect(() => {
+    if (q.data?.basis?.editable) setBasisLocal(q.data.basis.editable);
+  }, [q.data?.basis?.editable]);
+
+  const saveBasisMut = (trpc as any).campaign.saveBasis.useMutation({
+    onSuccess: () => { setSaveState("saved"); utils?.campaign?.get?.invalidate?.({ eventId }); },
+    onError: (e: any) => { setSaveState("error"); setSaveErr(e?.message ?? ""); utils?.campaign?.get?.invalidate?.({ eventId }); },
+  });
+  /** 改策略依據：畫面先變、馬上存。fromChat＝總監改的——右邊切過去、標出剛改的格子。 */
+  const applyBasis = (patch: BasisPatch, fromChat = false) => {
+    setBasisLocal((prev) => ({ ...prev, ...patch }));
+    setSaveState("saving");
+    saveBasisMut.mutate({ eventId, patch });
+    if (fromChat) {
+      setView("basis");
+      setBasisRecent(new Set(Object.keys(patch)));
+    }
+  };
+  React.useEffect(() => {
+    if (!basisRecent.size) return;
+    const t = setTimeout(() => setBasisRecent(new Set()), 6000);
+    return () => clearTimeout(t);
+  }, [basisRecent]);
 
   const savePlanMut = (trpc as any).campaign.savePlan.useMutation({
     onSuccess: () => { dirtyRef.current = false; setSaveState("saved"); utils?.campaign?.get?.invalidate?.({ eventId }); },
@@ -206,14 +239,14 @@ export default function CampaignStage({ eventId, brandId }: { eventId: number; b
         <div className="border-b border-divider px-4 py-2.5 flex items-center gap-x-4 gap-y-2 flex-wrap shrink-0">
           {full && <p className="text-medium font-bold mr-1 truncate max-w-[260px]" title={ev.name}>{ev.name}</p>}
           <div className="flex items-center gap-1 flex-wrap" role="group" aria-label={L("階段", "Phases")}>
-            <button type="button" onClick={() => setCurrent(null)} aria-pressed={!cur}
-              className={`flex items-center gap-1.5 text-tiny font-semibold rounded-lg border px-2.5 py-1 mr-1 transition ${!cur ? "bg-foreground text-background border-foreground" : "border-default-300 text-default-600 hover:border-foreground"}`}>
+            <button type="button" onClick={() => { setCurrent(null); setView("map"); }} aria-pressed={!cur && view === "map"}
+              className={`flex items-center gap-1.5 text-tiny font-semibold rounded-lg border px-2.5 py-1 mr-1 transition ${!cur && view === "map" ? "bg-foreground text-background border-foreground" : "border-default-300 text-default-600 hover:border-foreground"}`}>
               <FontAwesomeIcon icon={faMap} />{L("總覽", "Overview")}
             </button>
             {phases.map((p) => {
-              const on = cur === p.id;
+              const on = cur === p.id && view === "map";
               return (
-                <button key={p.id} type="button" onClick={() => setCurrent(p.id)} aria-pressed={on}
+                <button key={p.id} type="button" onClick={() => { setCurrent(p.id); setView("map"); }} aria-pressed={on}
                   className={`text-tiny font-semibold px-2 py-1 border-b-2 transition ${on ? "text-foreground border-foreground" : "text-default-400 border-transparent hover:text-default-700"}`}>
                   {phaseShort(p.id, en)}
                 </button>
@@ -232,6 +265,13 @@ export default function CampaignStage({ eventId, brandId }: { eventId: number; b
                 ? L(`已定稿 ${new Date(plan!.lockedAt!).toLocaleDateString("zh-TW")}`, `Locked ${new Date(plan!.lockedAt!).toLocaleDateString("en-US")}`)
                 : plan ? L("企劃草稿", "Draft") : L("尚未排企劃", "No plan yet")}
             </span>
+            {plan && (
+              <button type="button" onClick={() => setView((v) => (v === "basis" ? "map" : "basis"))} aria-pressed={view === "basis"}
+                title={L("右邊換成策略依據（活動定位 11 段），左邊照常跟總監談", "Show the strategy basis on the right")}
+                className={`flex items-center gap-1.5 text-tiny font-semibold rounded-lg border px-2 py-0.5 transition ${view === "basis" ? "bg-foreground text-background border-foreground" : "border-default-300 text-default-600 hover:border-foreground"}`}>
+                <FontAwesomeIcon icon={faBookOpen} className="text-[10px]" />{L("策略依據", "Basis")}
+              </button>
+            )}
             <span className="w-px h-5 bg-divider" />
             <div className="flex gap-1.5" aria-label={L("通路", "Channels")}>
               {DOCK_CHANNELS.map((c) => {
@@ -339,21 +379,19 @@ export default function CampaignStage({ eventId, brandId }: { eventId: number; b
 
             {plan && (
               <CampaignChatCard eventId={eventId} brandId={brandId} plan={plan} phase={cur} notes={notes} locked={locked} en={en} onApply={applyPlan} grow
+                basis={basisLocal} onApplyBasis={(p) => applyBasis(p, true)} view={view}
                 expanded={chatExpanded} onToggleExpand={() => setChatExpanded((v) => !v)} />
             )}
 
-            {!(chatExpanded && plan) && (
-              <button type="button" onClick={goStrategyBasis}
-                className="self-start shrink-0 text-tiny text-default-500 hover:text-foreground flex items-center gap-1.5">
-                <FontAwesomeIcon icon={faBookOpen} />{L("策略依據：活動定位（11 段）", "Strategy basis: campaign positioning")}
-              </button>
-            )}
             </div>
           </section>
 
           {/* ── 右：策略地圖（撐滿這一欄的高度） ───────────────────── */}
           <section className="min-w-0 min-h-0 relative bg-default-100 overflow-hidden">
-            {plan ? (
+            {plan && view === "basis" ? (
+              <CampaignBasisPanel raw={data.basis?.raw ?? {}} editable={basisLocal} recent={basisRecent} locked={locked} en={en}
+                onSave={(p) => applyBasis(p)} onOpenFull={goStrategyBasis} />
+            ) : plan ? (
               <CampaignMap
                 items={items} phases={phases} lanes={lanes} phaseMessages={plan.phaseMessages ?? {}}
                 current={cur} onPick={setCurrent} locked={locked} en={en} onPatchItem={patchItem}

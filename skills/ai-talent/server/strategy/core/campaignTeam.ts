@@ -38,15 +38,24 @@ const toAgent = (r: any): TeamAgent => ({
   title: String(r.title_zh || r.title || ""), avatarUrl: String(r.avatarUrl ?? ""),
 });
 
-/** 在一個 cohort 裡挑一位（WHERE 片段由呼叫端給，只能是常數字串）。 */
-async function pickFromCohort(cohortWhere: string, industry: string | null | undefined, fallbackSlug: string): Promise<TeamAgent | null> {
+/**
+ * 在一個 cohort 裡挑一位（WHERE 片段由呼叫端給，只能是常數字串）。
+ *
+ * 2026-10-01（dev 實測：SoWork 的產業改成「行銷顧問」→ saas，內容企劃 cohort 裡沒有 saas 的人，
+ * 原本的排序就掉到評分最高的「金融科技」內容策略師——剛好也叫潘建宇，跟策略總監同名，
+ * 一張對話卡出現兩個潘建宇）：
+ *   · 只在**產業對得上**的人裡挑；對不上就用固定的預設人選，不再隨便換成別的產業。
+ *   · avoidName：同一張卡上已經有的人（策略總監）的名字，不挑同名的。
+ */
+async function pickFromCohort(cohortWhere: string, industry: string | null | undefined, fallbackSlug: string, avoidName?: string | null): Promise<TeamAgent | null> {
   try {
     const [rows]: any = await localPool.execute(
       `SELECT id, slug, name, name_zh, englishName, title, title_zh, avatarUrl FROM agents
-        WHERE isAvailable = 1 AND (${cohortWhere})
-        ORDER BY (slug LIKE ?) DESC, (slug LIKE '%-tw-%') DESC, (experienceDetail IS NOT NULL) DESC, rating DESC, id ASC
+        WHERE isAvailable = 1 AND (${cohortWhere}) AND slug LIKE ?
+          AND COALESCE(NULLIF(name_zh, ''), name, '') <> ?
+        ORDER BY (slug LIKE '%-tw-%') DESC, (experienceDetail IS NOT NULL) DESC, rating DESC, id ASC
         LIMIT 1`,
-      [`%-${industryToken(industry)}-%`],
+      [`%-${industryToken(industry)}-%`, String(avoidName ?? "")],
     );
     if ((rows as any[])[0]) return toAgent((rows as any[])[0]);
     const [fb]: any = await localPool.execute(
@@ -60,8 +69,8 @@ async function pickFromCohort(cohortWhere: string, industry: string | null | und
 }
 
 /** 內容企劃：社群／內容策略的人（會排內容日曆、懂各平台差異）。 */
-export function pickPlannerAgent(industry: string | null | undefined): Promise<TeamAgent | null> {
-  return pickFromCohort("slug LIKE 'social_media-%' OR slug LIKE 'content_strategy-%'", industry, "social_media-ecom-tw-1789");
+export function pickPlannerAgent(industry: string | null | undefined, avoidName?: string | null): Promise<TeamAgent | null> {
+  return pickFromCohort("slug LIKE 'social_media-%' OR slug LIKE 'content_strategy-%'", industry, "social_media-ecom-tw-1789", avoidName);
 }
 
 /** 投放專家：paid-media 的人（會拆預算、定 KPI、挑哪幾篇下廣告）。 */

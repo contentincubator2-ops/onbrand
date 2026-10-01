@@ -32,6 +32,7 @@ import type { StageNote } from "../../lib/campaignStage";
 import { phaseShort } from "../../lib/campaignStage";
 import { applyProposal, describeProposal, isEmptyProposal, type CampaignProposal } from "../../lib/campaignChat";
 import { readStoredDirector } from "../../lib/strategistDirectors";
+import type { BasisPatch, BasisValue } from "../../lib/campaignBasis";
 
 type Speaker = "planner" | "director";
 interface Agent { id: number; name: string; title: string; avatarUrl: string }
@@ -45,6 +46,8 @@ interface Msg {
   proposal?: CampaignProposal;
   /** 修改前的企劃，復原用；只存在這次開著的頁面裡。 */
   before?: CampaignPlan;
+  /** 修改前的策略依據（只有被改的那幾格），復原用。 */
+  beforeBasis?: BasisPatch;
   undone?: boolean;
   truncated?: boolean;
 }
@@ -58,11 +61,11 @@ function loadMsgs(eventId: number): Msg[] {
 }
 function saveMsgs(eventId: number, msgs: Msg[]) {
   try {
-    localStorage.setItem(KEY(eventId), JSON.stringify(msgs.slice(-40).map(({ before: _b, ...m }) => m)));
+    localStorage.setItem(KEY(eventId), JSON.stringify(msgs.slice(-40).map(({ before: _b, beforeBasis: _bb, ...m }) => m)));
   } catch { /* 私密模式：重新整理之後對話就沒了，不影響企劃 */ }
 }
 
-export default function CampaignChatCard({ eventId, brandId, plan, phase, notes, locked, en, onApply, grow, expanded, onToggleExpand }: {
+export default function CampaignChatCard({ eventId, brandId, plan, phase, notes, locked, en, onApply, basis, onApplyBasis, view, grow, expanded, onToggleExpand }: {
   eventId: number;
   brandId: number | null;
   plan: CampaignPlan;
@@ -72,6 +75,12 @@ export default function CampaignChatCard({ eventId, brandId, plan, phase, notes,
   en: boolean;
   /** 寫進企劃：父層換掉企劃並立刻存。 */
   onApply: (next: CampaignPlan) => void;
+  /** 策略依據目前的值（能改的格子）。 */
+  basis?: Record<string, BasisValue | null>;
+  /** 寫進策略依據：父層存、右邊切到策略依據並標出剛改的格子。 */
+  onApplyBasis?: (patch: BasisPatch) => void;
+  /** 右邊正在看的：企劃地圖或策略依據（總監據此判斷「這裡」指哪裡）。 */
+  view?: "map" | "basis";
   /** 撐滿父層剩下的高度（活動頁左欄）；對話區跟著長，而不是固定一小格。 */
   grow?: boolean;
   /**
@@ -93,6 +102,8 @@ export default function CampaignChatCard({ eventId, brandId, plan, phase, notes,
   const boxRef = React.useRef<HTMLDivElement>(null);
   const planRef = React.useRef(plan);
   planRef.current = plan;
+  const basisRef = React.useRef(basis);
+  basisRef.current = basis;
   const msgsRef = React.useRef(msgs);
   msgsRef.current = msgs;
 
@@ -121,19 +132,26 @@ export default function CampaignChatCard({ eventId, brandId, plan, phase, notes,
   const ask = (who: Speaker, message: string, opts: { handoff?: boolean; prior: Msg[] }) => {
     setErr("");
     setBusy(who);
-    chatMut.mutate({ eventId, message, phase, history: history(opts.prior), speaker: who, directorAgentId, handoff: !!opts.handoff }, {
+    chatMut.mutate({ eventId, message, phase, history: history(opts.prior), speaker: who, directorAgentId, handoff: !!opts.handoff, view: view ?? "map" }, {
       onSuccess: (r: any) => {
         setBusy(null);
         const name = r?.agent?.name ?? agents[who]?.name ?? "";
         const proposal: CampaignProposal | undefined = isEmptyProposal(r?.proposal) ? undefined : r.proposal;
         let before: CampaignPlan | undefined;
+        let beforeBasis: BasisPatch | undefined;
         if (proposal && !locked) {
-          before = planRef.current;
-          onApply(applyProposal(planRef.current, proposal));
+          if (proposal.ops.length || proposal.smp || Object.keys(proposal.phaseMessages ?? {}).length) {
+            before = planRef.current;
+            onApply(applyProposal(planRef.current, proposal));
+          }
+          if (proposal.basis && Object.keys(proposal.basis).length && onApplyBasis) {
+            beforeBasis = Object.fromEntries(Object.keys(proposal.basis).map((p) => [p, basisRef.current?.[p] ?? null]));
+            onApplyBasis(proposal.basis);
+          }
         }
         const reply: Msg = {
           role: "assistant", content: String(r?.reply ?? ""), speaker: who, name,
-          ...(proposal ? { proposal, before } : {}), truncated: !!r?.truncated,
+          ...(proposal ? { proposal, before, beforeBasis } : {}), truncated: !!r?.truncated,
         };
         const next = [...msgsRef.current, reply];
         // 內容企劃說這是方向的問題 → 同一張卡裡交給總監，總監接著回答。
@@ -164,9 +182,10 @@ export default function CampaignChatCard({ eventId, brandId, plan, phase, notes,
   const lastChangeIdx = (() => { for (let i = msgs.length - 1; i >= 0; i--) if (msgs[i]!.proposal && !msgs[i]!.undone) return i; return -1; })();
   const undo = (idx: number) => {
     const m = msgs[idx];
-    if (!m?.before || locked) return;
-    onApply(m.before);
-    setMsgs((prev) => prev.map((x, k) => (k === idx ? { ...x, undone: true, before: undefined } : x)));
+    if (!m || (!m.before && !m.beforeBasis) || locked) return;
+    if (m.before) onApply(m.before);
+    if (m.beforeBasis) onApplyBasis?.(m.beforeBasis);
+    setMsgs((prev) => prev.map((x, k) => (k === idx ? { ...x, undone: true, before: undefined, beforeBasis: undefined } : x)));
   };
 
   const switchTo = (s: Speaker) => {
@@ -182,8 +201,11 @@ export default function CampaignChatCard({ eventId, brandId, plan, phase, notes,
   };
 
   const suggestions = speaker === "director"
-    ? [L("這檔的一句話訴求再收斂一點", "Tighten the core message"),
-       L("每一段的訊息有沒有接得起來？", "Do the phase messages flow?")]
+    ? view === "basis"
+      ? [L("關鍵洞察寫得更具體一點", "Make the key insight sharper"),
+         L("禁用元素加上「免費」", "Add “free” to the don'ts")]
+      : [L("這檔的一句話訴求再收斂一點", "Tighten the core message"),
+         L("每一段的訊息有沒有接得起來？", "Do the phase messages flow?")]
     : phase
       ? [L(`${phaseShort(phase, false)}期再多排一篇 IG`, `One more Instagram post in ${phaseShort(phase, true)}`),
          L("這一段的內容太像了，換個角度", "These posts are too similar — vary the angles")]
@@ -203,7 +225,8 @@ export default function CampaignChatCard({ eventId, brandId, plan, phase, notes,
             {cur ? `${cur.name}　${roleName(speaker)}` : roleName(speaker)}
           </p>
           <p className="text-[11px] opacity-60 leading-tight">
-            {phase ? L(`正在看：${phaseShort(phase, false)}期`, `Looking at: ${phaseShort(phase, true)}`) : L("正在看：整檔總覽", "Looking at: overview")}
+            {view === "basis" ? L("正在看：策略依據", "Looking at: strategy basis")
+              : phase ? L(`正在看：${phaseShort(phase, false)}期`, `Looking at: ${phaseShort(phase, true)}`) : L("正在看：整檔總覽", "Looking at: overview")}
           </p>
         </div>
         <div className="ml-auto flex items-center gap-1 shrink-0">
@@ -255,7 +278,7 @@ export default function CampaignChatCard({ eventId, brandId, plan, phase, notes,
                   {describeProposal(m.before ?? plan, m.proposal, en).map((line, j) => (
                     <p key={j} className="text-tiny leading-snug">{line}</p>
                   ))}
-                  {k === lastChangeIdx && m.before && !locked && (
+                  {k === lastChangeIdx && (m.before || m.beforeBasis) && !locked && (
                     <button type="button" onClick={() => undo(k)}
                       className="self-start text-tiny opacity-70 hover:opacity-100 flex items-center gap-1.5 pt-0.5">
                       <FontAwesomeIcon icon={faRotateLeft} />{L("復原", "Undo")}

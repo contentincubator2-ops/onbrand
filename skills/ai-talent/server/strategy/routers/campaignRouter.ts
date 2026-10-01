@@ -34,6 +34,7 @@ import { router, protectedProcedure } from "../../platform/core/trpc";
 import localPool from "../../localDb";
 import { buildCampaignPlan, inferCampaignSettings, type CampaignPlan } from "../core/campaignPlan";
 import { runCampaignChat, pickCampaignDirector } from "../core/campaignChat";
+import { validateBasis, applyBasis, basisSnapshot } from "../core/campaignBasis";
 import { KPI_METRICS, pickKpiAgent, runKpiPlan } from "../core/campaignKpi";
 import { brandIndustry, pickPlannerAgent } from "../core/campaignTeam";
 import { isHiddenContentPlatform, isHiddenHistoryItem } from "../../platform/core/planGate";
@@ -174,6 +175,14 @@ export const campaignRouter = router({
         productScope: resolveProductScope(pos.campaign?.productScope, (prodRows as any[]).length),
         /** 舊的 11 段得獎 brief 還在不在——進階模式的入口要不要亮由這個決定。 */
         hasLegacyBrief: ["brief", "smp", "creative", "awards"].some((k) => !!pos?.[k]),
+        /**
+         * 策略依據（舊的 11 段活動定位）：右邊切到「策略依據」時顯示。raw＝11 段原樣（表格也在），
+         * editable＝總監／使用者能改的欄位目前的值（campaignBasis.BASIS_FIELDS）。
+         */
+        basis: {
+          raw: Object.fromEntries(["brief", "context", "audience", "objectives", "awards", "smp", "messaging", "creative", "guidelines", "channels", "journey"].map((k) => [k, pos?.[k] ?? null])),
+          editable: basisSnapshot(pos),
+        },
         /** 活動定位（舊的 11 段）裡寫的核心受眾——策略畫面的「對象」。 */
         audience: typeof pos?.audience?.primaryAudience === "string" ? pos.audience.primaryAudience.slice(0, 120) : "",
       };
@@ -289,6 +298,7 @@ export const campaignRouter = router({
       speaker: z.enum(["planner", "director"]).optional(),
       directorAgentId: z.number().int().positive().nullable().optional(),
       handoff: z.boolean().optional(),
+      view: z.enum(["map", "basis"]).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const row = await loadEvent(input.eventId, ctx.user!.id);
@@ -301,10 +311,33 @@ export const campaignRouter = router({
           eventId: input.eventId, userId: ctx.user!.id, plan,
           message: input.message, phase: input.phase ?? null, history: input.history,
           speaker: input.speaker ?? "planner", directorAgentId: input.directorAgentId ?? null, handoff: !!input.handoff,
+          positioning: pos, view: input.view ?? "map",
         });
       } catch (e: any) {
         throw new TRPCError({ code: "BAD_REQUEST", message: String(e?.message ?? e).slice(0, 300) });
       }
+    }),
+
+  /**
+   * 改策略依據（11 段活動定位裡的文字／清單欄位）。對話裡總監的改法、右邊直接編輯、
+   * 復原，都走這一支。只改送來的格子，其他段原封不動；定稿後擋。
+   */
+  saveBasis: protectedProcedure
+    .input(z.object({
+      eventId: z.number().int().positive(),
+      patch: z.record(z.union([z.string().max(2000), z.array(z.string().max(400)).max(12), z.null()])),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const row = await loadEvent(input.eventId, ctx.user!.id);
+      const pos = parsePositioning(row.positioning);
+      assertUnlocked(pos);
+      const patch = validateBasis(input.patch, pos, { allowClear: true });
+      if (!Object.keys(patch).length) return { ok: true, changed: 0 };
+      await localPool.execute(
+        `UPDATE events SET positioning = ? WHERE id = ? AND userId = ?`,
+        [JSON.stringify(applyBasis(pos, patch)), input.eventId, ctx.user!.id],
+      );
+      return { ok: true, changed: Object.keys(patch).length };
     }),
 
   team: protectedProcedure
@@ -312,10 +345,8 @@ export const campaignRouter = router({
     .query(async ({ ctx, input }) => {
       const row = await loadEvent(input.eventId, ctx.user!.id);
       const industry = await brandIndustry(Number(row.brandId));
-      const [planner, kpi, director] = await Promise.all([
-        pickPlannerAgent(industry), pickKpiAgent(industry),
-        pickCampaignDirector(Number(row.brandId), input.directorAgentId ?? null).catch(() => null),
-      ]);
+      const director = await pickCampaignDirector(Number(row.brandId), input.directorAgentId ?? null).catch(() => null);
+      const [planner, kpi] = await Promise.all([pickPlannerAgent(industry, director?.name ?? null), pickKpiAgent(industry)]);
       return { planner, kpi, director };
     }),
 

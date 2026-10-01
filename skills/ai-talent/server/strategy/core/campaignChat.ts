@@ -20,6 +20,7 @@ import type { CatalogTask } from "../../content/core/taskCatalogIndex.js";
 import { pickPlannerAgent, brandIndustry, type TeamAgent } from "./campaignTeam.js";
 import { getDirectorByAgentId, listDirectorsForBrand } from "./strategistDirectory.js";
 import localPool from "../../localDb.js";
+import { validateBasis, basisLines, type BasisPatch } from "./campaignBasis.js";
 
 /**
  * 2026-09-30（CJ「在這個介面上，我偏好是都在左邊完成回答，雖然要換人，但也在同一個地方
@@ -69,6 +70,8 @@ export interface CampaignProposal {
   ops: CampaignOp[];
   phaseMessages?: Partial<Record<CampaignPhaseId, string>>;
   smp?: string;
+  /** 策略依據（11 段活動定位）的改法：路徑（段.欄位）→ 新值。只有策略總監會給。 */
+  basis?: BasisPatch;
 }
 
 const YMD = /^\d{4}-\d{2}-\d{2}$/;
@@ -172,7 +175,7 @@ const ymd = (d: Date) => d.toISOString().slice(0, 10);
  * 整份丟掉。現在先照常解析；解析不了就把**完整的那幾條操作**救回來（truncated=true，
  * 畫面會說「只來得及提出前幾條」）；連 JSON 都沒有，就把文字當成一般回答。
  */
-export function parseChatReply(text: string): { reply: string; ops: any[]; phaseMessages?: any; smp?: string; askDirector?: string; truncated: boolean } | null {
+export function parseChatReply(text: string): { reply: string; ops: any[]; phaseMessages?: any; smp?: string; basis?: any; askDirector?: string; truncated: boolean } | null {
   const raw = String(text ?? "");
   const whole = safeJSON<any>(raw, null);
   if (whole && typeof whole === "object") {
@@ -180,6 +183,7 @@ export function parseChatReply(text: string): { reply: string; ops: any[]; phase
       reply: String(whole.reply ?? ""), ops: Array.isArray(whole.ops) ? whole.ops : [],
       phaseMessages: whole.phaseMessages, askDirector: typeof whole.askDirector === "string" ? whole.askDirector : undefined,
       smp: typeof whole.smp === "string" ? whole.smp : undefined,
+      ...(whole.basis && typeof whole.basis === "object" ? { basis: whole.basis } : {}),
       truncated: false,
     };
   }
@@ -241,6 +245,8 @@ const DIRECTOR_SYSTEM = `你是這檔活動的策略總監，跟內容企劃在�
 - 真的缺一個只有使用者知道的事實才能決定時（例如這次是要註冊還是預約），先用最合理的假設改好，reply 最後問那一個問題。不要只丟選項給使用者挑。
 - 不准編使用者沒給的數字、成效、顧客見證、名額限制或網址。
 - 加篇、刪篇、換通路、換日期是內容企劃的事；除非使用者明講，否則不要動。
+- 策略依據（活動定位 11 段：受眾、洞察、目標、SMP、訊息架構、創意、語氣與禁用元素…）也歸你管。使用者在看策略依據、或要改的是這些時，用 basis 改，鍵是【策略依據】列出的路徑（例如 audience.keyInsight），清單型的欄位給字串陣列。只改要改的格子。
+- 一句話訴求（smp）跟策略依據的 SMP 是同一件事的兩個說法：改了其中一個，另一個對不上就一起改。
 - reply 用繁體中文兩到四句，口語、不要條列、不要 markdown 粗體：你決定了什麼、為什麼。改了什麼畫面會自己列。
 - 只輸出 JSON，不要任何說明文字。`;
 
@@ -260,13 +266,19 @@ export async function runCampaignChat(args: {
   directorAgentId?: number | null;
   /** 這句是內容企劃轉給總監的，不是使用者親口說的。 */
   handoff?: boolean;
+  /** 活動的 positioning（策略依據從這裡讀）。 */
+  positioning?: Record<string, any> | null;
+  /** 使用者右邊正在看的：企劃地圖或策略依據。 */
+  view?: "map" | "basis";
 }): Promise<{ reply: string; proposal: CampaignProposal; askDirector: string | null; truncated: boolean; agent: TeamAgent | null; speaker: CampaignSpeaker }> {
   const facts = await eventFacts(args.eventId, args.userId);
   if (!facts) throw new Error("找不到這個活動");
   const speaker: CampaignSpeaker = args.speaker === "director" ? "director" : "planner";
+  // 內容企劃跟卡片上顯示的同一位（campaign.team 也是這樣挑：避開總監的名字）。
+  const director = await pickCampaignDirector(facts.brandId, args.directorAgentId);
   const agent = speaker === "director"
-    ? await pickCampaignDirector(facts.brandId, args.directorAgentId)
-    : await pickPlannerAgent(await brandIndustry(facts.brandId));
+    ? director
+    : await pickPlannerAgent(await brandIndustry(facts.brandId), director?.name ?? null);
   const today = new Date(ymd(new Date()));
   const start = facts.startAt ? new Date(ymd(facts.startAt)) : today;
   const end = facts.endAt ? new Date(ymd(facts.endAt)) : new Date(start.getTime() + 30 * DAY);
@@ -302,16 +314,19 @@ export async function runCampaignChat(args: {
     pmLines ? `【每一段的訊息】\n${pmLines}` : "",
     `【允許的日期範圍】${window.from} ~ ${window.to}`,
     `【可以用的通路】${PLANNABLE_CHANNELS.join("、")}`,
-    args.phase ? `【使用者正在看】${PHASE_ZH[args.phase]}期（${args.phase}）——沒特別說的話，指的是這一段` : "",
+    args.view === "basis"
+      ? "【使用者正在看】右邊的策略依據（活動定位 11 段）——沒特別說的話，指的是策略依據"
+      : args.phase ? `【使用者正在看】${PHASE_ZH[args.phase]}期（${args.phase}）——沒特別說的話，指的是這一段` : "",
     `【目前的企劃（id｜階段｜日期｜通路｜任務卡｜要講什麼）】\n${planLines}`,
     `【候選任務卡（只能從這裡挑）】\n${menu}`,
+    speaker === "director" ? `【策略依據（路徑｜欄位｜目前寫的）】\n${basisLines(args.positioning ?? {})}` : "",
     thread ? `【你之前在右下角跟使用者談過（最近幾則）】\n${thread}` : "",
     history ? `【這個對話前面說過的】\n${history}` : "",
     args.handoff ? `【內容企劃轉給你的問題】${args.message.trim()}` : `【使用者現在說】${args.message.trim()}`,
     "",
     "只輸出 JSON，鍵名固定如下：",
     speaker === "director"
-      ? `{"reply":"兩到四句","smp":"新的一句話訴求（要改才填）","phaseMessages":{"launch":"只有要改的段才填"},"ops":[{"op":"update","id":"企劃裡的 id","angle":"改寫後要講什麼（20-45字）"}]}`
+      ? `{"reply":"兩到四句","smp":"新的一句話訴求（要改才填）","phaseMessages":{"launch":"只有要改的段才填"},"ops":[{"op":"update","id":"企劃裡的 id","angle":"改寫後要講什麼（20-45字）"}],"basis":{"audience.keyInsight":"只有要改的格子才填","guidelines.forbiddenElements":["清單型給陣列"]}}`
       : `{"reply":"一到三句","ops":[{"op":"add","phase":"sustain","date":"YYYY-MM-DD","platform":"instagram","taskId":"逐字抄自候選清單","angle":"這一篇要講什麼（20-45字）"},{"op":"update","id":"企劃裡的 id","angle":"…","date":"…","enabled":true},{"op":"remove","id":"企劃裡的 id"}],"phaseMessages":{"sustain":"只有要改才填"},"askDirector":"只有方向的問題才填"}`,
   ].filter(Boolean).join("\n");
 
@@ -341,8 +356,13 @@ export async function runCampaignChat(args: {
     raw: { ops: parsed.ops, phaseMessages: parsed.phaseMessages, ...(speaker === "director" ? { smp: parsed.smp } : {}) },
     plan: args.plan, cards, window,
   });
+  // 策略依據只有總監能改。
+  if (speaker === "director" && parsed.basis) {
+    const b = validateBasis(parsed.basis, args.positioning ?? {});
+    if (Object.keys(b).length) proposal.basis = b;
+  }
   const askDirector = speaker === "planner" ? str(parsed.askDirector, 200) || null : null;
   const reply = str(parsed.reply, 500)
-    || (proposal.ops.length || proposal.smp || proposal.phaseMessages ? "我照你說的改好了。" : askDirector ? "這是方向的問題，我請策略總監來回答。" : "了解。");
+    || (proposal.ops.length || proposal.smp || proposal.phaseMessages || proposal.basis ? "我照你說的改好了。" : askDirector ? "這是方向的問題，我請策略總監來回答。" : "了解。");
   return { reply, proposal, askDirector, truncated: parsed.truncated && proposal.ops.length > 0, agent, speaker };
 }
