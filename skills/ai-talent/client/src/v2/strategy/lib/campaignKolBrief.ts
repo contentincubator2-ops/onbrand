@@ -11,7 +11,7 @@ export interface KolBrief {
   objective?: string; kpi?: string; audience?: string;
   keyMessage?: string; mustSay?: string; mustNotSay?: string;
   deliverables?: string; timeline?: string; samples?: string;
-  budget?: string; usageRights?: string; exclusivity?: string; review?: string; reporting?: string;
+  usageRights?: string; exclusivity?: string; review?: string; reporting?: string;
 }
 
 export type KolTextKey = Exclude<keyof KolBrief, "influencers">;
@@ -54,9 +54,9 @@ export const KOL_BRIEF_GROUPS: Array<{
     ],
   },
   {
-    zh: "預算與條款", en: "Budget & terms",
+    // 2026-10-01 CJ：拿掉預算（價格由使用者跟經紀公司直接談，不放任何估算）。
+    zh: "合作條款", en: "Terms",
     fields: [
-      { key: "budget", zh: "預算", en: "Budget", ph: "例：總預算 30 萬（未稅）；單價範圍 1–8 萬；可接受產品互惠" },
       { key: "usageRights", zh: "二次授權", en: "Usage rights", ph: "例：內容可轉發到品牌官方帳號、可拿去投廣告 3 個月" },
       { key: "exclusivity", zh: "競品排他", en: "Exclusivity", ph: "例：上線前後 30 天不接同類型 AI 行銷工具" },
       { key: "review", zh: "審稿流程", en: "Review", ph: "例：上線前 3 天交稿，品牌修改 2 次" },

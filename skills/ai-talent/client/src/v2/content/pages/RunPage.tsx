@@ -31,7 +31,8 @@ import {
 import {
 } from "@fortawesome/free-brands-svg-icons";
 import { HelpTip } from "../../platform/components/HelpTip";
-import { CommentIcon, CopyIcon, EditIcon, ImageIcon, LibraryIcon, RegenerateIcon, RewriteAsIcon, PuzzleIcon, WaitingIcon, UserIcon, TextIcon, CheckIcon, BundleIcon, WarningIcon, DoneIcon, ErrorIcon, WorkingIcon, LinkIcon } from "../../platform/components/icons";
+import { CommentIcon, CopyIcon, EditIcon, ImageIcon, LibraryIcon, RegenerateIcon, RewriteAsIcon, PuzzleIcon, WaitingIcon, UserIcon, TextIcon, CheckIcon, BundleIcon, WarningIcon, DoneIcon, ErrorIcon, WorkingIcon, LinkIcon, PartnerIcon } from "../../platform/components/icons";
+import VendorFinder, { vendorKindOf } from "../components/VendorFinder";
 import { trpc } from "../../../lib/trpc";
 import { showToastGlobal } from "../../../components/ui/Toast";
 import { PlatformMockup } from "../components/PlatformMockup";
@@ -71,7 +72,7 @@ import WriterDesk, { type DeskWriter } from "../components/WriterDesk";
 import RegulationComplianceNote, { toComplianceInput, type ComplianceRecord } from "../components/RegulationComplianceNote";
 import { cancelAgentHandoff } from "../lib/agentHandoff";
 
-type Mode = "edit" | "chat" | "image" | "agent" | "regen" | "rewrite" | "publish" | "source";
+type Mode = "edit" | "chat" | "image" | "agent" | "regen" | "rewrite" | "publish" | "source" | "vendors";
 
 /* 2026-07-07 (CJ「參數儀表板 technical data 客戶看不懂，乾脆換成可以選擇
  * 不同 agent 幫他重寫」): the settings/telemetry panel is gone from the
@@ -2956,6 +2957,10 @@ export default function RunPage() {
               {/* 2026-07-07 (CJ「參數儀表板客戶看不懂 → 換成選不同 agent 重寫」) */}
               <ToolbarBtn icon={RewriteAsIcon}   label={lang === "en" ? "Rewrite by agent" : "換人重寫"}   active={mode==="rewrite"}  onClick={() => setMode("rewrite")} />
               <ToolbarBtn icon={LibraryIcon}      label={lang === "en" ? "Why it's written this way" : "為什麼這樣寫"} active={mode==="source"} onClick={() => setMode("source")} />
+              {/* 2026-10-01（CJ「用 AI 幫忙查出可以合作的廠商，可以自己接洽聯繫」）：網紅、異業合作、廣告的產出才有。 */}
+              {vendorKindOf(data.mission?.taskId, !!(data as any)?.metadata?.campaignItem?.paid) && (
+                <ToolbarBtn icon={PartnerIcon} label={lang === "en" ? "Find partners" : "找合作對象"} active={mode==="vendors"} onClick={() => setMode("vendors")} />
+              )}
               <Divider />
               <ToolbarBtn icon={CopyIcon}    label={lang === "en" ? "Copy caption" : "複製文案"}       onClick={onCopy} highlight={copied} />
               {/* 2026-05-11 (CJ feedback「存 Mission 不要出現在工具列，只要在下方」):
@@ -3596,6 +3601,10 @@ export default function RunPage() {
                   </>
                 );
               })()}
+              {!writerDesk && mode === "vendors" && (
+                <VendorFinder outputId={id} taskId={data.mission?.taskId} caption={slide?.caption ?? ""}
+                  title={data.title ?? data.mission?.taskLabel ?? ""} en={lang === "en"} />
+              )}
               {!writerDesk && mode === "source" && (() => {
                 const detail: any = cardDetailQ.data;
                 if (cardDetailQ.isLoading) {

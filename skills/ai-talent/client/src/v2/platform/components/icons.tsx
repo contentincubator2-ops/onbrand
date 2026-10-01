@@ -26,7 +26,7 @@ import {
   faWaveSquare, faWrench, faGlobe, faChartColumn, faCircleDot, faPaste, faTableCellsLarge, faArrowPointer,
   faPause, faForwardStep, faStop, faCircleXmark, faLink, faLockOpen, faFlag, faPuzzlePiece, faMemory, faLightbulb,
   faCommentDots, faCompass, faMasksTheater, faBan, faGem, faStar, faChessKnight, faArrowTrendUp, faHeart, faMessage,
-  faScaleBalanced,
+  faScaleBalanced, faHandshake,
 } from "@fortawesome/free-solid-svg-icons";
 import {
   faFacebook, faInstagram, faThreads, faLine, faTiktok, faYoutube, faLinkedin, faGoogle,
@@ -78,6 +78,7 @@ export const ICON = {
   content: faPenNib,
   performance: faChartLine,
   campaign: faBullhorn,
+  partner: faHandshake,
   project: faFolderOpen,
   taskCards: faLayerGroup,
   meeting: faComments,
@@ -263,6 +264,7 @@ export const ErrorIcon = make("error");
 export const FlagIcon = make("flag");
 export const UnlockIcon = make("unlock");
 export const LinkIcon = make("link");
+export const PartnerIcon = make("partner");
 export const PuzzleIcon = make("puzzle");
 export const NotifyIcon = make("notify");
 export const MemoryIcon = make("brainCheck");

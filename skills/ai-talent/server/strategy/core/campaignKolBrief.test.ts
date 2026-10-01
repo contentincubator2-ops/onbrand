@@ -9,7 +9,7 @@ import { campaignItemBriefText } from "./campaignItemBrief";
 describe("cleanKolBrief", () => {
   it("空欄位不留、層級只收認得的、沒有名字也沒有類型的那一列丟掉、最多 8 位", () => {
     const b = cleanKolBrief({
-      objective: "  導購  ", kpi: "", budget: "總預算 30 萬，可產品互惠", hacker: "x",
+      objective: "  導購  ", kpi: "", budget: "總預算 30 萬，可產品互惠", hacker: "x",   // budget 已不收
       influencers: [
         { name: "林小美", type: "美妝", tier: "mid", platform: "IG", angle: "上班族底妝" },
         { type: "親子", tier: "bogus" },
@@ -20,6 +20,7 @@ describe("cleanKolBrief", () => {
     expect(b.objective).toBe("導購");
     expect(b).not.toHaveProperty("kpi");
     expect(b).not.toHaveProperty("hacker");
+    expect(b).not.toHaveProperty("budget");
     expect(b.influencers![0]).toEqual({ name: "林小美", type: "美妝", tier: "mid", platform: "IG", angle: "上班族底妝" });
     expect(b.influencers![1]).toEqual({ type: "親子" });
     expect(b.influencers).toHaveLength(8);
@@ -67,9 +68,9 @@ describe("寫手拿到的說明", () => {
   it("網紅那一件：寫明給誰＋整張說明單", () => {
     const t = campaignItemBriefText({
       eventId: 1, itemId: "a", paid: false, phase: "teaser", date: "2026-10-11", angle: "邀約", phaseMessage: "",
-      partner: "林小美（美妝）", kolBrief: "[網紅任務說明單]\n- 預算：30 萬",
+      partner: "林小美（美妝）", kolBrief: "[網紅任務說明單]\n- 審稿流程：改 2 次",
     });
     expect(t).toContain("這一件是給：林小美（美妝）");
-    expect(t).toContain("- 預算：30 萬");
+    expect(t).toContain("- 審稿流程：改 2 次");
   });
 });

@@ -24,9 +24,9 @@ describe("strategyRailTarget", () => {
     }
   });
 
-  it("「文字」保留產品／活動——那是它們的行銷指引唯一的入口", () => {
-    expect(strategyRailTarget("copy", "?b=5&e=31&cat=campaign", 5)).toBe("/brands/edit?b=5&e=31&cat=copy");
-    expect(strategyRailTarget("copy", "?b=5&p=9", 5)).toBe("/brands/edit?b=5&p=9&cat=copy");
+  it("人在活動／產品裡按「文字」：看的是品牌的文字，不帶活動／產品 id（10/2 CJ）", () => {
+    expect(strategyRailTarget("copy", "?b=5&e=31&cat=campaign", 5)).toBe("/brands/edit?b=5&cat=copy");
+    expect(strategyRailTarget("copy", "?b=5&p=9", 5)).toBe("/brands/edit?b=5&cat=copy");
   });
 
   it("沒有品牌時只帶 cat", () => {
