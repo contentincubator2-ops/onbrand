@@ -1431,7 +1431,9 @@ export default function BrandsPage() {
             ? "Upload your own positioning doc (Word / PPT / PDF / Markdown / txt / html) — or paste a ChatGPT conversation"
             : "上傳你自己的定位文件（Word / PPT / PDF / Markdown / txt / html），或直接貼 ChatGPT 對話文字"}
         />
-        {pipeline.status === "idle" && section !== "doc" && (
+        {/* 2026-09-30（CJ「策略監測這一頁的右上方，不需要出現重新套用 SoWork 定位法」）：
+            只在「定位資料」視圖出現——它重跑的是定位卡片，跟監測情報無關。 */}
+        {pipeline.status === "idle" && section !== "doc" && !(scopeMode === "brand" && activeStrategyTool === "monitor") && (
           <PositioningTopRow
             // 2026-05-13 (CJ「按了套用活動定位框架時，出現Event not found」):
             // pass the scope-aware entity id, not the brand id.
