@@ -38,7 +38,7 @@ export function campaignItemBriefText(info: CampaignItemInfo): string {
     info.partner ? `- 這一件是給：${info.partner}。內容要為他量身寫（他的領域、平台、受眾），不要寫成通用版。` : "",
   ].filter(Boolean);
   // 網紅任務說明單：使用者填給經紀公司的需求。寫邀約、brief、追蹤時都要照這裡，不要另外編條件。
-  if (info.kolBrief) lines.push(`- 以下是這檔的網紅任務說明單，裡面有的條件（預算、時程、必提禁提、授權）照寫，沒有的標 [待補]，不要自己編：\n${info.kolBrief}`);
+  if (info.kolBrief) lines.push(`- 以下是這檔的網紅任務說明單，裡面有的條件（時程、必提禁提、授權）照寫，沒有的標 [待補]，不要自己編；不要寫任何報價、預算或價格數字（由使用者跟對方直接談）：\n${info.kolBrief}`);
   return `\n\n[本篇在活動企劃中的位置]\n${lines.join("\n")}\n`;
 }
 
