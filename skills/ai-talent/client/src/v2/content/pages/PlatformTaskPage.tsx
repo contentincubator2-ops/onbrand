@@ -52,7 +52,7 @@ import {
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { HelpTip } from "../../platform/components/HelpTip";
 import {
-  faBolt, faMagnifyingGlass, faEnvelope, faBullhorn, faWandMagicSparkles, faTriangleExclamation, faGlobe, faUserGroup, faBookBookmark, faCalendarDays, faPenToSquare,
+  faBolt, faMagnifyingGlass, faEnvelope, faBullhorn, faWandMagicSparkles, faTriangleExclamation, faGlobe, faUserGroup, faHandshake, faBookBookmark, faCalendarDays, faPenToSquare,
 } from "@fortawesome/free-solid-svg-icons";
 import {
   faFacebook, faInstagram, faYoutube, faTiktok, faLinkedin, faThreads, faLine,
@@ -104,6 +104,7 @@ const ROUTE_TO_PLATFORM: Record<string, string> = {
   line:    "line",
   // 2026-10-01：活動企劃的網紅那條線（kl- 卡）從這裡開卡。
   kol:     "kol",
+  cobrand: "cobrand",
   // 素材與規劃頻道。目前只有品牌任務包會用到，全域目錄沒有卡 ——
   // 沒有包的品牌走到這兩個路由會看到空清單，側邊欄也不會有入口。
   case:     "case",
@@ -150,6 +151,9 @@ const PLATFORM_META: Record<string, PlatformMeta> = {
   },
   kol: {
     label: "Influencers", labelZh: "網紅", icon: faUserGroup, bg: "#18181b",
+  },
+  cobrand: {
+    label: "Co-branding", labelZh: "異業合作", icon: faHandshake, bg: "#18181b",
   },
   // 2026-09-29 CJ：台灣市場加 Threads、LINE。目前沒有預設卡，用戶從自己的範例建卡。
   threads: {

@@ -427,8 +427,8 @@ export const performanceRouter = router({
       if (!ev || ev.brandId !== input.brandId) throw new TRPCError({ code: "NOT_FOUND", message: "找不到這個活動" });
       const plan = ev.pos?.campaignPlan;
       if (!plan?.items?.length) throw new TRPCError({ code: "BAD_REQUEST", message: "這檔活動還沒有企劃" });
-      // 網紅那條線（kol）是要做的事，不是品牌粉專上的貼文，不進貼文對照。
-      const items = (plan.items as any[]).filter((i) => i?.platform !== "kol").map((i) => ({
+      // 合作類的線（網紅 kol、異業合作 cobrand）是要做的事，不是品牌粉專上的貼文，不進貼文對照。
+      const items = (plan.items as any[]).filter((i) => i?.platform !== "kol" && i?.platform !== "cobrand").map((i) => ({
         id: String(i.id), phase: String(i.phase), date: String(i.date), platform: String(i.platform),
         angle: String(i.angle ?? ""), paid: !!i.paid, outputId: i.outputId ? Number(i.outputId) : null, enabled: i.enabled !== false,
       }));

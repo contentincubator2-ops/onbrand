@@ -49,7 +49,8 @@ import { money, metricLine } from "../../lib/campaignKpi";
 const ymd = (d: Date) => d.toISOString().slice(0, 10);
 const md = (s: string) => s.slice(5).replace("-", "/");
 /** 前台的七個通路（planGate 隱藏的不列）。 */
-const DOCK_CHANNELS = ["facebook", "instagram", "threads", "line", "tiktok", "email", "website", "kol"];
+// 2026-10-01：網紅、異業合作跟其他通路一樣在這裡（企劃裡各一條線），不再是只有說明的按鈕。
+const DOCK_CHANNELS = ["facebook", "instagram", "threads", "line", "tiktok", "email", "website", "kol", "cobrand"];
 
 export default function CampaignStage({ eventId, brandId }: { eventId: number; brandId: number | null }) {
   const { lang } = useLang();
@@ -78,7 +79,6 @@ export default function CampaignStage({ eventId, brandId }: { eventId: number; b
   /** 對話卡展開＝佔滿左欄（CJ 2026-09-30）；左欄其他東西先收起來。 */
   const [chatExpanded, setChatExpanded] = React.useState(false);
   const [setupOpen, setSetupOpen] = React.useState(false);
-  const [partner, setPartner] = React.useState<"kol" | "cobrand" | null>(null);
   const [saveState, setSaveState] = React.useState<"idle" | "saving" | "saved" | "error">("idle");
   const [saveErr, setSaveErr] = React.useState("");
   const dirtyRef = React.useRef(false);
@@ -276,7 +276,8 @@ export default function CampaignStage({ eventId, brandId }: { eventId: number; b
             <div className="flex gap-1.5" aria-label={L("通路", "Channels")}>
               {DOCK_CHANNELS.map((c) => {
                 const on = (settings.channels ?? []).includes(c) || live.some((i) => i.platform === c)
-                  || (c === "kol" && !!settings.partners?.kol);   // 舊設定的「要找網紅合作」
+                  || (c === "kol" && !!settings.partners?.kol)          // 舊設定的「要找網紅合作」
+                  || (c === "cobrand" && !!settings.partners?.cobrand); // 舊設定的「要做異業合作」
                 return (
                   <button key={c} type="button" disabled={locked || !plan}
                     title={on ? channelLabel(c, en) : L(`加入 ${channelLabel(c, en)}：到設定裡勾選後重排，或直接跟內容企劃說`, `Add ${channelLabel(c, en)} in settings, or ask the planner`)}
@@ -288,7 +289,6 @@ export default function CampaignStage({ eventId, brandId }: { eventId: number; b
               })}
             </div>
             <span className="w-px h-5 bg-divider" />
-            {plan?.cobrand && <Button size="sm" variant="light" radius="md" onPress={() => setPartner("cobrand")}>{L("異業合作", "Co-branding")}</Button>}
             {plan && (
               <Button size="sm" variant={plan.kpi ? "light" : "bordered"} radius="md" startContent={<FontAwesomeIcon icon={faBullseye} />}
                 onPress={() => setKpiOpen(true)}>{L("KPI 與預算", "KPIs & budget")}</Button>
@@ -442,25 +442,6 @@ export default function CampaignStage({ eventId, brandId }: { eventId: number; b
         />
       )}
 
-      <Modal isOpen={!!partner} onClose={() => setPartner(null)} size="lg" scrollBehavior="inside">
-        <ModalContent>
-          <ModalHeader className="text-medium">{partner === "kol" ? L("網紅合作", "Influencer collab") : L("異業合作", "Co-branding")}</ModalHeader>
-          <ModalBody className="pb-6 gap-3">
-            {partner && (plan as any)?.[partner] && (
-              <>
-                <p className="text-small text-default-600">{(plan as any)[partner].summary}</p>
-                <ul className="pl-5 list-disc flex flex-col gap-1.5">
-                  {((plan as any)[partner].steps ?? []).map((st: any) => (
-                    <li key={st.id} className="text-small leading-relaxed">
-                      {st.text}{st.taskLabel && <span className="text-tiny text-default-500">（{st.taskLabel}）</span>}
-                    </li>
-                  ))}
-                </ul>
-              </>
-            )}
-          </ModalBody>
-        </ModalContent>
-      </Modal>
     </div>
   );
 }

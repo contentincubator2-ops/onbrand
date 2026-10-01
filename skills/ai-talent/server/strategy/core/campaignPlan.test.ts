@@ -231,3 +231,38 @@ describe("kolItems：網紅那條線", () => {
     expect(r).toHaveLength(4);
   });
 });
+
+// ─── 2026-10-01 異業合作一條線＋每個通路至少一篇 ─────────────────────────
+import { laneItems, ensureChannelCoverage } from "./campaignPlan";
+describe("laneItems('cobrand')：異業合作那條線", () => {
+  const cards = candidateCards(["cobrand"]);
+  it("五張卡都在目錄裡，日期以開賣日往回推", () => {
+    expect(PLANNABLE_CHANNELS).toContain("cobrand");
+    const r = laneItems("cobrand", { launch: "2026-11-01", end: "2026-12-25", today: "2026-10-01", mechanic: "免費試用", cards });
+    expect(r.map((i) => [i.date, i.phase, i.taskId])).toEqual([
+      ["2026-10-04", "teaser", "cb-30-partner-shortlist"],
+      ["2026-10-11", "teaser", "cb-30-pitch-letter"],
+      ["2026-10-18", "teaser", "cb-30-followup"],
+      ["2026-10-22", "teaser", "cb-30-deal-terms"],
+      ["2026-11-01", "launch", "cb-30-joint-post"],
+    ]);
+    expect(r.every((i) => i.platform === "cobrand")).toBe(true);
+    expect(r[1]!.angle).toContain("免費試用");
+  });
+});
+
+describe("ensureChannelCoverage：選了的通路每個至少一篇", () => {
+  const cards = candidateCards(["facebook", "website", "threads", "line"]);
+  const fb = { id: "launch-2026-11-01-0", phase: "launch", date: "2026-11-01", platform: "facebook", taskId: "fb-30-caption-short", taskLabel: "", angle: "a", enabled: true, outputId: null, scheduledAt: null } as any;
+  it("0 篇的通路在開賣日補一篇預設卡，講開賣段的訊息；有的不動；合作類的線不補", () => {
+    const r = ensureChannelCoverage({ items: [fb], channels: ["facebook", "website", "threads", "line", "kol"], cards, launch: "2026-11-01", launchMessage: "現在申請" });
+    expect(r[0]).toBe(fb);
+    expect(r.slice(1).map((i) => [i.platform, i.date, i.phase, i.angle])).toEqual([
+      ["website", "2026-11-01", "launch", "現在申請"],
+      ["threads", "2026-11-01", "launch", "現在申請"],
+      ["line", "2026-11-01", "launch", "現在申請"],
+    ]);
+    expect(r.slice(1).every((i) => cards.some((c) => c.id === i.taskId && c.platform === i.platform))).toBe(true);
+    expect(new Set(r.map((i) => i.id)).size).toBe(r.length);
+  });
+});
