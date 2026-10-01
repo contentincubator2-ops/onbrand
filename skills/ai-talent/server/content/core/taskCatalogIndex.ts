@@ -34,6 +34,7 @@ import { PR_30S_TASKS } from "./quickTaskPR";
 import { BRAND_30S_TASKS } from "./quickTaskBrand";
 import { RESEARCH_30S_TASKS } from "./quickTaskResearch";
 import { KOL_30S_TASKS } from "./quickTaskKOL";
+import { COBRAND_30S_TASKS } from "./quickTaskCobrand";
 import { MULTI_60S_TASKS } from "./quickTaskMulti60";
 import { ALL_99S_TASKS } from "./quickTask100";
 import { ALL_99S_SQUADS } from "./quickTask100Squads";
@@ -48,7 +49,7 @@ import { taskCardAddedAt } from "./taskCardDates";
 /** 前端 channel 列使用的平台代號。 */
 export type CatalogPlatform =
   | "facebook" | "instagram" | "youtube" | "tiktok" | "linkedin"
-  | "email" | "pr" | "brand" | "audience" | "kol"
+  | "email" | "pr" | "brand" | "audience" | "kol" | "cobrand"
   // 2026-08-29：品牌自己的官網（部落格長文 / 品牌專欄 / 案例 / 產品頁）。
   // 在這之前官網內容只能硬塞進 pr- 或 br-，然後拿到新聞稿版型。
   | "website"
@@ -125,6 +126,7 @@ export function platformOfTaskId(id: string): CatalogPlatform {
   if (id.startsWith("br-")) return "brand";
   if (id.startsWith("rs-")) return "audience";
   if (id.startsWith("kl-")) return "kol";
+  if (id.startsWith("cb-")) return "cobrand";
   if (id.startsWith("web-")) return "website";
   if (id.startsWith("x-")) return "x";
   if (id.startsWith("th-")) return "threads";
@@ -172,6 +174,7 @@ export function buildTaskCatalogIndex(): CatalogTask[] {
   for (const t of BRAND_30S_TASKS) out.push(toTask(t, "brand", "30s"));
   for (const t of RESEARCH_30S_TASKS) out.push(toTask(t, "audience", "30s"));
   for (const t of KOL_30S_TASKS) out.push(toTask(t, "kol", "30s"));
+  for (const t of COBRAND_30S_TASKS) out.push(toTask(t, "cobrand", "30s"));
   for (const t of WEBSITE_30S_TASKS) out.push(toTask(t, "website", "30s"));
   for (const t of X_30S_TASKS) out.push(toTask(t, "x", "30s"));
   for (const t of TH_30S_TASKS) out.push(toTask(t, "threads", "30s"));

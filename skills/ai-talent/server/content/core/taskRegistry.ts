@@ -39,6 +39,7 @@ import { PR_30S_TASKS, getPROrchestraConfig } from "./quickTaskPR";
 import { BRAND_30S_TASKS, getBrandOrchestraConfig } from "./quickTaskBrand";
 import { RESEARCH_30S_TASKS, getResearchOrchestraConfig } from "./quickTaskResearch";
 import { KOL_30S_TASKS, KOL_30S_ORCHESTRA } from "./quickTaskKOL";
+import { COBRAND_30S_TASKS, COBRAND_30S_ORCHESTRA } from "./quickTaskCobrand";
 import { WEBSITE_30S_TASKS, getWebsiteOrchestraConfig } from "./quickTaskWebsite";
 import { X_30S_TASKS, getXOrchestraConfig } from "./quickTaskX";
 // 2026-09-29 Threads（th-）與 LINE（ln-）通路的第一批全域卡。
@@ -82,6 +83,8 @@ const THIRTY_S_CATALOGS: FBTaskTemplate[][] = [
   FB_30S_TASKS, IG_30S_TASKS, YT_30S_TASKS, TT_30S_TASKS, LI_30S_TASKS,
   EMAIL_30S_TASKS, PR_30S_TASKS, BRAND_30S_TASKS, RESEARCH_30S_TASKS,
   KOL_30S_TASKS, WEBSITE_30S_TASKS,
+  // 2026-10-01 異業合作（cb-）：活動企劃的「異業合作」那條線。
+  COBRAND_30S_TASKS,
   // 2026-09-10 X 通路。漏加這一行的後果是 x- 卡查不到 template，
   // 六個呼叫點同時壞 —— 這正是把查表鏈收斂成一支的理由。
   X_30S_TASKS,
@@ -109,6 +112,7 @@ function get30sConfig(taskId: string): OrchestraConfig | null {
     // 2026-09-02: regenerateVariant 抄這條鏈時漏了 KOL，KOL 任務按「換人重寫」
     // 就丟 no orchestra config。收斂成一支之後這種漏抄不可能再發生。
     ?? (KOL_30S_ORCHESTRA[taskId] ?? null)
+    ?? (COBRAND_30S_ORCHESTRA[taskId] ?? null)
     ?? getWebsiteOrchestraConfig(taskId)
     ?? getXOrchestraConfig(taskId)
     ?? getThreadsOrchestraConfig(taskId)

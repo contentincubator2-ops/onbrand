@@ -971,6 +971,7 @@ import { BRAND_30S_TASKS } from "../core/quickTaskBrand";
 import { RESEARCH_30S_TASKS } from "../core/quickTaskResearch";
 // 2026-05-12 (CJ「KOL 提供說法不提供名單」)
 import { KOL_30S_TASKS } from "../core/quickTaskKOL";
+import { COBRAND_30S_TASKS } from "../core/quickTaskCobrand";
 // 2026-08-29 官網頻道 (web-)：品牌自己的部落格長文 / 品牌專欄 / 案例 / 產品頁。
 import { WEBSITE_30S_TASKS } from "../core/quickTaskWebsite";
 import { X_30S_TASKS } from "../core/quickTaskX";
@@ -1459,6 +1460,8 @@ export const quickTaskRouter = router({
       kind: "fast" as const,
       platform: "kol",
     }));
+    // 2026-10-01 異業合作（活動企劃的一條線）。
+    const cobrandTasks = COBRAND_30S_TASKS.map((t) => ({ ...t, kind: "fast" as const, platform: "cobrand" }));
     // 60s production-package tasks (2026-05-06) — multi-agent collab
     const fb60Tasks = FB_60S_TASKS_V2.map((t) => ({ ...t, kind: "fast" as const, platform: "facebook" }));
     const ig60Tasks = IG_60S_TASKS.map((t) => ({ ...t, kind: "fast" as const, platform: "instagram" }));
@@ -1553,7 +1556,7 @@ export const quickTaskRouter = router({
     const globalTasks: any[] = [
       ...fbTasks, ...fb60Tasks, ...ig60Tasks, ...yt60Tasks, ...multi60Tasks,
       ...tasks100,
-      ...igTasks, ...ytTasks, ...ttTasks, ...liTasks, ...emTasks, ...prTasks, ...brTasks, ...rsTasks, ...kolTasks,
+      ...igTasks, ...ytTasks, ...ttTasks, ...liTasks, ...emTasks, ...prTasks, ...brTasks, ...rsTasks, ...kolTasks, ...cobrandTasks,
       ...webTasks, ...xTasks, ...thTasks, ...lnTasks,
       ...mediaTasks,
     ];
