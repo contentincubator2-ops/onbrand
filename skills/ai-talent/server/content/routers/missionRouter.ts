@@ -14,7 +14,7 @@ import { eq, and, desc, or, isNull, sql } from "drizzle-orm";
 import { computeMissionResources } from "../core/missionResourceComputer";
 import { isMissingTableError } from "../../platform/core/mysqlErrors";
 import { isHiddenHistoryItem } from "../../platform/core/planGate";
-import { applyProjectFilters, PROJECT_STAGES, taskIdOf, type ProjectIndexRow } from "../core/projectFilters";
+import { applyProjectFilters, PROJECT_STAGES, taskIdOf, THEATER_TASK_ID, THEATER_TASK_LABEL, type ProjectIndexRow } from "../core/projectFilters";
 
 /** 產出的 task id：metadata.taskId 優先，舊資料退回 description 裡的 [task:<id>]。 */
 function historyTaskId(r: { taskId?: unknown; description?: unknown }): string | null {
@@ -117,7 +117,7 @@ export const missionRouter = router({
           brandName: r.brandName ?? null,
           createdAt: r.createdAt,
           taskId: r.taskId,
-          taskLabel: r.taskLabel ?? null,
+          taskLabel: r.taskId === THEATER_TASK_ID ? THEATER_TASK_LABEL : r.taskLabel ?? null,
           productId: r.productId ? Number(r.productId) : null,
           productName: r.productName ?? null,
           progress: r.progress ?? null,
