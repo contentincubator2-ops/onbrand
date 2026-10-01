@@ -21,6 +21,10 @@
  *   · 兩個人都讀同一串（標了誰說的）；這串記在這台瀏覽器，重新整理還在。
  *   · 改法一回來就寫進企劃——圖上的訴求、各段訊息、行事曆馬上變；留一顆「復原」
  *     （只有最新那一次可以復原，免得蓋掉之後的修改）。
+ *
+ * 2026-10-02（CJ「無法讓策略總監再交回去給內容企劃」「提到的人跟可以換的人名字不一樣」）：
+ *   · 交棒雙向：伺服器回 handoff {to, question}，誰都能交給另一位；一串最多轉兩手。
+ *   · 名字一律用現在的名冊（campaign.team）顯示——舊訊息存的名字可能是換人之前的。
  */
 import React from "react";
 import { Avatar } from "@heroui/react";
@@ -128,11 +132,12 @@ export default function CampaignChatCard({ eventId, brandId, plan, phase, notes,
     .slice(-14)
     .map((x) => ({ role: x.role as "user" | "assistant", content: x.content.slice(0, 1200), ...(x.speaker ? { speaker: x.speaker } : {}), ...(x.name ? { name: x.name.slice(0, 40) } : {}) }));
 
-  /** 問某一位。handoff＝內容企劃轉過去的，不是使用者親口說的。 */
-  const ask = (who: Speaker, message: string, opts: { handoff?: boolean; prior: Msg[] }) => {
+  /** 問某一位。handoff＝另一位轉過來的，不是使用者親口說的；hops＝這一串轉了幾手。 */
+  const ask = (who: Speaker, message: string, opts: { handoff?: boolean; hops?: number; prior: Msg[] }) => {
     setErr("");
     setBusy(who);
-    chatMut.mutate({ eventId, message, phase, history: history(opts.prior), speaker: who, directorAgentId, handoff: !!opts.handoff, view: view ?? "map" }, {
+    const hops = opts.hops ?? 0;
+    chatMut.mutate({ eventId, message, phase, history: history(opts.prior), speaker: who, directorAgentId, handoff: !!opts.handoff, hops, view: view ?? "map" }, {
       onSuccess: (r: any) => {
         setBusy(null);
         const name = r?.agent?.name ?? agents[who]?.name ?? "";
@@ -154,13 +159,17 @@ export default function CampaignChatCard({ eventId, brandId, plan, phase, notes,
           ...(proposal ? { proposal, before, beforeBasis } : {}), truncated: !!r?.truncated,
         };
         const next = [...msgsRef.current, reply];
-        // 內容企劃說這是方向的問題 → 同一張卡裡交給總監，總監接著回答。
-        if (who === "planner" && r?.askDirector) {
-          const dName = agents.director?.name ?? "";
-          next.push({ role: "handoff", content: dName ? L(`${name || "內容企劃"}請 ${dName} 接手`, `${name || "Planner"} hands over to ${dName}`) : L("交給策略總監", "Handing over to the director") });
+        // 交棒（雙向）：內容企劃遇到方向 → 總監；總監遇到加篇／刪篇／挪日期 → 內容企劃。
+        // 同一張卡裡接著回答，之後使用者的話也由接手的那位回答。
+        const to: Speaker | null = r?.handoff?.to === "director" || r?.handoff?.to === "planner" ? r.handoff.to : null;
+        const question = String(r?.handoff?.question ?? "");
+        if (to && to !== who && question && hops < 2) {
+          const toName = agents[to]?.name ?? "";
+          const fromName = name || roleName(who);
+          next.push({ role: "handoff", content: toName ? L(`${fromName}請 ${toName}（${roleName(to)}）接手`, `${fromName} hands over to ${toName}`) : L(`交給${roleName(to)}`, `Handing over to the ${roleName(to)}`) });
           setMsgs(next);
-          setSpeaker("director");
-          ask("director", String(r.askDirector), { handoff: true, prior: next });
+          setSpeaker(to);
+          ask(to, question, { handoff: true, hops: hops + 1, prior: next });
           return;
         }
         setMsgs(next);
@@ -261,8 +270,8 @@ export default function CampaignChatCard({ eventId, brandId, plan, phase, notes,
           }
           return (
             <div key={k} className={m.role === "user" ? "self-end max-w-[88%]" : "flex flex-col gap-2"}>
-              {m.role === "assistant" && m.name && (
-                <p className="text-[11px] opacity-60 -mb-1">{m.name}・{roleName(m.speaker === "director" ? "director" : "planner")}</p>
+              {m.role === "assistant" && (agents[m.speaker === "director" ? "director" : "planner"]?.name || m.name) && (
+                <p className="text-[11px] opacity-60 -mb-1">{agents[m.speaker === "director" ? "director" : "planner"]?.name || m.name}・{roleName(m.speaker === "director" ? "director" : "planner")}</p>
               )}
               {m.content && (
                 <p className={`text-small leading-relaxed whitespace-pre-line ${m.role === "user" ? "bg-background/15 rounded-xl px-3 py-1.5" : ""}`}>{m.content}</p>
