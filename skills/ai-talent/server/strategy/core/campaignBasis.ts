@@ -61,6 +61,22 @@ function clean(kind: "text" | "list", v: unknown): BasisValue | null {
   return items.length ? items : null;
 }
 
+/**
+ * 清單型欄位：模型回的是整份新清單，常會順手把原本的某一項縮短（2026-10-01 dev 實測：
+ * 加「免費」進禁用元素時，把「無障礙違規設計：…（WCAG AA 以下）或字體過小…」縮成前半句）。
+ * 新清單裡的某一項如果只是原本某一項的開頭，換回原本那一項的全文。純函式。
+ */
+export function keepOriginalItems(next: string[], prev: BasisValue | null): string[] {
+  const old = Array.isArray(prev) ? prev.map(String) : [];
+  const core = (s: string) => s.trim().replace(/[。．.，,、；;：:\s]+$/u, "");
+  return next.map((item) => {
+    const c = core(item);
+    if (c.length < 4) return item;
+    const full = old.find((o) => o.length > item.length && core(o).startsWith(c));
+    return full ?? item;
+  });
+}
+
 /** 讀出某個路徑目前的值。 */
 export function basisValue(pos: Record<string, any>, path: string): BasisValue | null {
   const [seg, key] = path.split(".");
@@ -72,14 +88,15 @@ export function basisValue(pos: Record<string, any>, path: string): BasisValue |
 const same = (a: BasisValue | null, b: BasisValue | null) => JSON.stringify(a) === JSON.stringify(b);
 
 /** 模型或畫面送來的改法 → 只留允許的路徑、整理過、跟現在不一樣的。純函式。 */
-export function validateBasis(raw: unknown, pos: Record<string, any>, opts: { allowClear?: boolean } = {}): BasisPatch {
+export function validateBasis(raw: unknown, pos: Record<string, any>, opts: { allowClear?: boolean; preserveItems?: boolean } = {}): BasisPatch {
   const out: BasisPatch = {};
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return out;
   for (const [path, v] of Object.entries(raw as Record<string, unknown>)) {
     const spec = BASIS_FIELDS[path];
     if (!spec) continue;
-    const c = clean(spec.kind, v);
+    let c = clean(spec.kind, v);
     if (c == null && !opts.allowClear) continue;
+    if (opts.preserveItems && Array.isArray(c)) c = keepOriginalItems(c, basisValue(pos, path));
     if (same(c, basisValue(pos, path))) continue;
     out[path] = c;
     if (Object.keys(out).length >= 10) break;

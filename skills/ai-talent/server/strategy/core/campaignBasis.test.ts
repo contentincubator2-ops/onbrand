@@ -51,3 +51,17 @@ describe("給總監看的與給畫面的", () => {
     expect(Object.keys(basisSnapshot(pos))).toEqual(Object.keys(BASIS_FIELDS));
   });
 });
+
+import { keepOriginalItems } from "./campaignBasis";
+describe("keepOriginalItems（模型順手縮短原本的項目）", () => {
+  it("新清單某一項只是原本某一項的開頭 → 換回全文；新加的照收", () => {
+    const prev = ["誇大", "無障礙違規設計：文字與背景對比度不足（WCAG AA 以下）或字體過小"];
+    expect(keepOriginalItems(["誇大", "無障礙違規設計：文字與背景對比", "免費"], prev))
+      .toEqual(["誇大", "無障礙違規設計：文字與背景對比度不足（WCAG AA 以下）或字體過小", "免費"]);
+  });
+  it("validateBasis 走模型路徑時會套用", () => {
+    const p = validateBasis({ "guidelines.forbiddenElements": ["誇大無法實證", "免費"] },
+      { guidelines: { forbiddenElements: ["誇大無法實證的功效宣稱"] } }, { preserveItems: true });
+    expect(p).toEqual({ "guidelines.forbiddenElements": ["誇大無法實證的功效宣稱", "免費"] });
+  });
+});
