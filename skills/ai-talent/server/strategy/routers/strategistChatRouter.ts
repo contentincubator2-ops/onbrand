@@ -39,7 +39,8 @@ import { loadAgentKnowledge } from "../../platform/core/agentKnowledge";
 import {
   listDirectorsForBrand, getDirectorByAgentId, searchDirectors as searchDirectoryAgents,
   getRole, type StrategistDirector, type StrategistScope,
-  CHANNEL_SCOPES, isChannelScope, type ChannelScope,
+  isChannelScope, type ChannelScope,
+  ALL_STRATEGIST_SCOPES, isPageScope, type PageScope, type DirectorRoleHint,
 } from "../core/strategistDirectory";
 import { buildBrandPrefix } from "../core/brandContext";
 import { buildBrandCatalogBlock } from "../core/brandCatalog";
@@ -118,10 +119,12 @@ async function brandIndustry(brandId: number, userId: number): Promise<string | 
  * 那一列被移除了）就回 null，呼叫端退回「沒有指定人設」的通用提示詞——
  * 不是隨便指派一位頂替，那會讓使用者看到的名字跟實際回答的人設對不上。
  */
-async function directorForConversation(conv: any, userId: number): Promise<StrategistDirector | null> {
+async function directorForConversation(
+  conv: any, userId: number, hint: DirectorRoleHint = {},
+): Promise<StrategistDirector | null> {
   const agentId = Number(conv?.agentId ?? 0);
   if (!agentId) return null;
-  return await getDirectorByAgentId(agentId, await brandIndustry(Number(conv.brandId), userId));
+  return await getDirectorByAgentId(agentId, await brandIndustry(Number(conv.brandId), userId), hint);
 }
 
 async function loadMessages(conversationId: number, limit = 100) {
@@ -358,7 +361,69 @@ const CHANNEL_INFO: Record<ChannelScope, { name: string; outputs: string }> = {
   pr: { name: "新聞稿", outputs: "新聞稿標題、導言、內文與媒體角度" },
   x: { name: "X", outputs: "X／Threads 短貼文與串文" },
   website: { name: "官網", outputs: "官網與商品頁文案、第一屏、按鈕與 SEO" },
+  threads: { name: "Threads", outputs: "Threads 串文、短貼文與留言回覆" },
+  line: { name: "LINE", outputs: "LINE 官方帳號推播、圖文訊息與分眾訊息" },
 };
+
+/**
+ * 2026-10-01（CJ「每個頁面右下方的 ai agent，都要符合該頁面的需求」）：不是發文通路的
+ * 頁面顧問。守則跟通路頁同一套精神（建議落在這一頁做得到的事、不編數字），只差在
+ * 「這一頁是做什麼的」與各頁自己的紅線。
+ */
+const PAGE_INFO: Record<PageScope, { name: string; does: string; rules: string[] }> = {
+  events: {
+    name: "活動",
+    does: "規劃一檔活動的定位、企劃、檔期與各通路分工",
+    rules: [
+      "活動的起訖日、截止日、優惠內容一律照品牌資料裡的活動資料寫確切日期與條件；資料沒有就問，不要自己設。",
+    ],
+  },
+  visual: {
+    name: "視覺",
+    does: "管理品牌的視覺規範與素材（品牌色、字體、Logo、產品照與素材庫）",
+    rules: [
+      "AI 生圖不烤字：圖上要有文字時，建議用平台的標題疊層，不要叫模型把字畫進圖裡。",
+      "產品外觀要用真實產品照；不要建議用生成圖代替產品本身。",
+    ],
+  },
+  regulations: {
+    name: "法規",
+    does: "整理這個品牌要遵守的廣告與產業法規，生文時會拿來檢查",
+    rules: [
+      "你不是律師，不提供法律意見。判斷有風險時說清楚風險在哪、為什麼，個案請他找法務或主管機關確認。",
+      "引用法規時講法規名稱與重點；記不清條號就不要編條號。",
+    ],
+  },
+  performance: {
+    name: "成效",
+    does: "看廣告、網站、電商與粉絲團的成效數據，並對照活動企劃",
+    rules: [
+      "只根據品牌資料或使用者貼給你的數字下結論；資料沒有的數字（ROAS、轉換率、預算）不要編，說需要接哪個資料才看得到。",
+      "分清楚「常見基準」與「這個品牌自己的數字」。",
+    ],
+  },
+  content: {
+    name: "內容企劃",
+    does: "排這週要發的內容、找靈感、管理專案與審核產出",
+    rules: [
+      "要產出完整貼文時，提醒他開對應通路的任務卡（任務卡會套品牌大腦）；你這裡給方向、題目與開頭幾行。",
+    ],
+  },
+};
+
+export function pageToolsBlock(scope: PageScope): string {
+  const p = PAGE_INFO[scope];
+  return `【你的守備範圍：${p.name}頁，不是品牌定位】
+使用者現在在「${p.name}」頁：這一頁用來${p.does}。
+
+- 你的建議要落在這一頁上做得到的事：該做什麼、先做哪一步、看哪個欄位或數字。
+${p.rules.map((r) => `- ${r}`).join("\n")}
+- 產品名稱、產地、售價一律照品牌資料寫，不要自己改。
+- 不要說出系統內部的編號（產品 id、活動 id 等），用名稱稱呼。
+
+**不要**把使用者帶去品牌層的策略監測，也不要輸出任何 <<action:...>> 標記。
+品牌層的問題（定位、標語、受眾要不要改）請他去找品牌策略總監。`;
+}
 
 export function channelToolsBlock(scope: ChannelScope): string {
   const c = CHANNEL_INFO[scope];
@@ -387,6 +452,7 @@ export function buildSystemPrompt(director: StrategistDirector | null, brandCtx:
     scope === "product" ? PRODUCT_TOOLS_BLOCK
     : scope === "copy" ? COPY_TOOLS_BLOCK
     : isChannelScope(scope) ? channelToolsBlock(scope)
+    : isPageScope(scope) ? pageToolsBlock(scope)
     : BRAND_TOOLS_BLOCK,
   );
   if (director) {
@@ -455,7 +521,8 @@ async function buildProactiveOpening(
   // 一串對話，開場就該看得出來現在是誰在講話（而不是三串都寫「策略總監」）。
   const en_ = en;
   // 2026-09-27：通路頁的三位右下角標的是「顧問」，自我介紹也要一致，不是「總監」。
-  const isChannel = !!director && isChannelScope(getRole(director.roleId).scope);
+  // 2026-10-01：頁面顧問（活動／視覺／法規／成效／內容企劃）也是「顧問」。
+  const isChannel = !!director && (isChannelScope(getRole(director.roleId).scope) || isPageScope(getRole(director.roleId).scope));
   const who = director
     ? (en_
       ? `${director.name}, ${brandName}'s ${director.roleLabelEn} ${isChannel ? "advisor" : "director"}`
@@ -499,6 +566,16 @@ async function buildProactiveOpening(
       content: en_
         ? `${hi} On ${ch} I look at ${director.roleLabelEn}. Tell me what you're about to publish or promote — or ask me one of the questions below.`
         : `${hi}在${/^[A-Za-z]/.test(ch) ? ` ${ch} ` : ch}這一頁，我看的是${director.roleLabel}。跟我說你接下來要發什麼、推什麼活動，或直接點下面的問題問我。`,
+      actions: [],
+    };
+  }
+
+  if (director && dScope && isPageScope(dScope)) {
+    const page = PAGE_INFO[dScope].name;
+    return {
+      content: en_
+        ? `${hi} On this page I look at ${director.roleLabelEn}. Tell me what you're working on here — or ask me one of the questions below.`
+        : `${hi}在「${page}」這一頁，我看的是${director.roleLabel}。跟我說你現在在處理什麼，或直接點下面的問題問我。`,
       actions: [],
     };
   }
@@ -675,7 +752,7 @@ export const strategistChatRouter = router({
        * 2026-09-24（CJ「產品定位就用你推薦的那三位人選」）：品牌頁與產品頁
        * 各有自己的三個角色。前端在產品頁（URL 有 ?p=）會送 "product"。
        */
-      scope: z.enum(["brand", "product", "copy", ...CHANNEL_SCOPES]).optional(),
+      scope: z.enum(ALL_STRATEGIST_SCOPES).optional(),
     }))
     .query(async ({ ctx, input }) => {
       const userId = ctx.user!.id;
@@ -684,7 +761,8 @@ export const strategistChatRouter = router({
       const scope: StrategistScope = input.scope ?? "brand";
       const directors = await listDirectorsForBrand(industry, scope);
       if (input.includeAgentId && !directors.some((d) => d.agentId === input.includeAgentId)) {
-        const extra = await getDirectorByAgentId(input.includeAgentId, industry);
+        // 2026-10-01：從搜尋挑的人掛在「這一頁」的角色上，不是全表第一個（品牌定位）。
+        const extra = await getDirectorByAgentId(input.includeAgentId, industry, { scope });
         // 查不到就當作沒選過（mos_db 那一列可能被移除了），不要塞一個空殼進去。
         if (extra) directors.push(extra);
       }
@@ -767,20 +845,22 @@ export const strategistChatRouter = router({
       // （舊前端）退回這個品牌的第一位，不會炸。
       agentId: z.number().int().positive().optional(),
       /** 沒給 agentId 時，要從哪一組角色取第一位當預設。 */
-      scope: z.enum(["brand", "product", "copy", ...CHANNEL_SCOPES]).optional(),
+      scope: z.enum(ALL_STRATEGIST_SCOPES).optional(),
       /**
        * 2026-09-26（CJ「增加一個按鈕，是開新對話，其他對話，就會留成歷史對話」）：
        * 指定要看哪一串。不給＝目前這串（status='open'）。看歷史時是唯讀的——
        * 已經結束的對話可以讀，但不能在裡面繼續講（要繼續就開新的）。
        */
       conversationId: z.number().int().positive().optional(),
+      /** 2026-10-01：前端拿到的那位總監的角色——同一個人可能是兩頁的人選，見 resolveRoleForSlug。 */
+      roleId: z.string().max(40).optional(),
     }))
     .query(async ({ ctx, input }) => {
       const userId = ctx.user!.id;
       await assertBrandOwned(input.brandId, userId);
       const industry = await brandIndustry(input.brandId, userId);
       const director = input.agentId
-        ? await getDirectorByAgentId(input.agentId, industry)
+        ? await getDirectorByAgentId(input.agentId, industry, { roleId: input.roleId, scope: input.scope })
         : (await listDirectorsForBrand(industry, input.scope ?? "brand"))[0] ?? null;
       if (!director) throw new TRPCError({ code: "NOT_FOUND", message: "strategy director not found" });
 
@@ -850,6 +930,9 @@ export const strategistChatRouter = router({
       content: z.string().min(1).max(2000),
       /** 使用者目前在看的產品（URL 的 ?p=）——有的話那個產品的完整定位會進 prompt。 */
       productId: z.number().int().positive().optional(),
+      /** 2026-10-01：哪一頁、哪個角色——跟 getConversation 同一組 hint。 */
+      roleId: z.string().max(40).optional(),
+      scope: z.enum(ALL_STRATEGIST_SCOPES).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const userId = ctx.user!.id;
@@ -879,7 +962,7 @@ export const strategistChatRouter = router({
       const brandCtx = await gatherBrandContext(input.brandId, userId, input.productId ?? null);
       // 2026-09-23：人設來自這串對話記住的那一位 mos_db agent——所以三位
       // 總監答出來的東西真的不一樣（名字、經歷、看事情的角度都換了）。
-      const director = await directorForConversation(conv, userId);
+      const director = await directorForConversation(conv, userId, { roleId: input.roleId, scope: input.scope });
       const history = await loadMessages(input.conversationId);
       const knowledge = director ? await loadAgentKnowledge(director.agentId, { source: "strategist.chat" }) : "";
       const llmMessages = [

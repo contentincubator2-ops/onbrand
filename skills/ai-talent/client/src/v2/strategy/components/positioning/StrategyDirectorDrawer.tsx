@@ -53,7 +53,7 @@ import { trpc } from "../../../../lib/trpc";
 import { useLang } from "../../../../lib/i18n";
 import {
   type StrategistDirector, avatarSrcOf, roleLabelOf, readStoredDirector, writeStoredDirector, scopeFromUrl,
-  isChannelScope, channelAdvisorLabel,
+  isChannelScope, isPageScope, advisorLabelOf, advisorSubtitleOf, isAdvisorHiddenPath,
 } from "../../lib/strategistDirectors";
 import StrategyDirectorChat from "./StrategyDirectorChat";
 import { DirectorRoster, DirectorProfile } from "./StrategyDirectorPicker";
@@ -81,7 +81,9 @@ export default function StrategyDirectorDrawer({ brandId }: { brandId: number | 
   // 組合）。判斷規則在 scopeFromUrl——**產品清單頁（cat=products）也算**，
   // 不是只有單一產品頁（?p=）。
   const { pathname } = useLocation();
-  const scope = scopeFromUrl({ p: searchParams.get("p"), cat: searchParams.get("cat"), path: pathname });
+  const scope = scopeFromUrl({ p: searchParams.get("p"), cat: searchParams.get("cat"), e: searchParams.get("e"), path: pathname });
+  // 2026-10-01：設定／後台這類頁面不掛顧問（見 isAdvisorHiddenPath）。hooks 照跑，只在 render 前 return。
+  const hiddenHere = isAdvisorHiddenPath(pathname);
 
   const [open, setOpen] = React.useState(false);
   const [view, setView] = React.useState<View>("chat");
@@ -177,7 +179,7 @@ export default function StrategyDirectorDrawer({ brandId }: { brandId: number | 
     setView("chat");
   };
 
-  if (!brandId) return null;
+  if (!brandId || hiddenHere) return null;
 
   const headerBtn = (active: boolean): React.CSSProperties => ({
     fontSize: 11.5, fontWeight: 600, border: "1px solid #D4D4D4", borderRadius: 999, padding: "3px 10px",
@@ -203,13 +205,7 @@ export default function StrategyDirectorDrawer({ brandId }: { brandId: number | 
                 人換了、標籤沒換的話，收合狀態下還是看不出來切過。 */}
             {/* 2026-09-26：文字頁也有自己的三位（語氣／用詞規範／產業用語），
                 標籤跟著換——標籤沒換的話，收合狀態下看不出人已經換過。 */}
-            {scope === "product"
-              ? (en ? "Product Strategy" : "產品策略總監")
-              : scope === "copy"
-                ? (en ? "Copy & Wording" : "用詞總監")
-                : isChannelScope(scope)
-                  ? channelAdvisorLabel(scope, en)
-                  : (en ? "Strategy Director" : "策略總監")}
+            {advisorLabelOf(scope, en)}
           </div>
         )}
         <button
@@ -220,8 +216,8 @@ export default function StrategyDirectorDrawer({ brandId }: { brandId: number | 
               ? (en ? "Your product strategy directors — value proposition, Kano, pricing" : "你的產品策略總監——價值主張、Kano、定價與組合")
               : scope === "copy"
                 ? (en ? "Your wording directors — tone of voice, word rules, industry language" : "你的用詞總監——品牌語氣、用詞規範、產業用語")
-                : isChannelScope(scope)
-                  ? `${en ? "Your " : /^[A-Za-z]/.test(channelAdvisorLabel(scope, en)) ? "你的 " : "你的"}${channelAdvisorLabel(scope, en)}${directors.length ? `${en ? " — " : "——"}${directors.map((d) => roleLabelOf(d, en)).join(en ? ", " : "、")}` : ""}`
+                : (isChannelScope(scope) || isPageScope(scope))
+                  ? `${en ? "Your " : /^[A-Za-z]/.test(advisorLabelOf(scope, en)) ? "你的 " : "你的"}${advisorLabelOf(scope, en)}${directors.length ? `${en ? " — " : "——"}${directors.map((d) => roleLabelOf(d, en)).join(en ? ", " : "、")}` : ""}`
                 : (en ? "Your Strategy Director — built for this brand" : "你的策略總監——為這個品牌而設計")
           }
           style={{
@@ -263,24 +259,12 @@ export default function StrategyDirectorDrawer({ brandId }: { brandId: number | 
                     {current?.name
                       ?? ((listQ?.isLoading || listQ?.isFetching)
                             ? (en ? "Loading…" : "載入中…")
-                            : scope === "product"
-                              ? (en ? "Product Strategy" : "產品策略總監")
-                              : scope === "copy"
-                                ? (en ? "Copy & Wording" : "用詞總監")
-                                : isChannelScope(scope)
-                                  ? channelAdvisorLabel(scope, en)
-                                  : (en ? "Strategy Director" : "策略總監"))}
+                            : advisorLabelOf(scope, en))}
                   </div>
                   <div style={{ fontSize: 11, color: "#737373", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                     {current
                       ? `${roleLabelOf(current, en)}・${current.title}`
-                      : scope === "product"
-                        ? (en ? "Built for this product" : "為這支產品而設計")
-                        : scope === "copy"
-                          ? (en ? "Built for your wording rules" : "為你的用詞規範而設計")
-                          : isChannelScope(scope)
-                            ? (en ? "Built for this channel" : "為這個通路而設計")
-                          : (en ? "Built for your brand" : "為你的品牌而設計")}
+                      : advisorSubtitleOf(scope, en)}
                   </div>
                 </div>
               </div>
@@ -391,6 +375,7 @@ export default function StrategyDirectorDrawer({ brandId }: { brandId: number | 
               agentId={agentId}
               productId={productId}
               director={current}
+              scope={scope}
               height={PANEL_HEIGHT}
               onOpenMonitor={() => { setOpen(false); navigate(`/brands/edit?b=${brandId}&cat=positioning&tool=monitor`); }}
               onOpenHistory={() => setHistoryOpen(true)}

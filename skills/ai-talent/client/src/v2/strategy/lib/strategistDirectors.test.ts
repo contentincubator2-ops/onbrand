@@ -8,7 +8,7 @@
  * 這個判斷錯了，畫面上不會有任何錯誤訊息（只是換了個人回答），所以要測。
  */
 import { describe, it, expect } from "vitest";
-import { channelAdvisorLabel, scopeFromUrl } from "./strategistDirectors";
+import { advisorLabelOf, channelAdvisorLabel, isAdvisorHiddenPath, scopeFromUrl } from "./strategistDirectors";
 
 describe("scopeFromUrl", () => {
   it("單一產品頁（?p=）是產品情境", () => {
@@ -29,8 +29,9 @@ describe("scopeFromUrl", () => {
     expect(scopeFromUrl({ p: "152", cat: "copy" })).toBe("copy");
   });
 
-  it("品牌定位、視覺這些頁面維持品牌情境", () => {
-    for (const cat of ["positioning", "visual", "knowledge", "events", "tools", null]) {
+  // 2026-10-01：視覺、活動改成自己的顧問（見檔尾「逐頁對照」）；其餘品牌層頁面維持品牌情境。
+  it("品牌定位這類頁面維持品牌情境", () => {
+    for (const cat of ["positioning", "knowledge", "tools", null]) {
       expect(scopeFromUrl({ p: null, cat })).toBe("brand");
     }
   });
@@ -70,14 +71,68 @@ describe("通路頁 scope 與標籤（2026-09-27：FB 到官網）", () => {
       expect(scopeFromUrl({ path, p: null, cat: null })).toBe("brand");
     }
   });
-  it("案例、行事曆等不是通路的內容頁照舊", () => {
-    expect(scopeFromUrl({ path: "/tasks/case", p: null, cat: null })).toBe("brand");
-    expect(scopeFromUrl({ path: "/tasks/calendar", p: null, cat: null })).toBe("brand");
+  // 2026-10-01：案例／行事曆原本落回品牌策略總監，改成內容企劃顧問。
+  it("案例、行事曆等不是通路的內容頁走內容企劃顧問", () => {
+    expect(scopeFromUrl({ path: "/tasks/case", p: null, cat: null })).toBe("content");
+    expect(scopeFromUrl({ path: "/tasks/calendar", p: null, cat: null })).toBe("content");
   });
   it("右下角標籤：英數通路名留空格，中文通路名不留", () => {
     expect(channelAdvisorLabel("facebook", false)).toBe("FB 顧問");
     expect(channelAdvisorLabel("email", false)).toBe("電子報顧問");
     expect(channelAdvisorLabel("website", false)).toBe("官網顧問");
     expect(channelAdvisorLabel("tiktok", true)).toBe("TikTok Advisors");
+  });
+});
+
+/**
+ * 2026-10-01（CJ「檢查每個頁面右下方的 ai agent，都符合該頁面的需求」）：逐頁比對表。
+ * 每一列是一個真實路由；改路由或加頁面時這張表會擋住「默默落回品牌策略總監」。
+ */
+describe("逐頁對照：每頁右下角是哪一組顧問", () => {
+  const rows: Array<[string, { path: string; cat?: string; p?: string; e?: string }, string]> = [
+    ["品牌定位", { path: "/brands/edit", cat: "positioning" }, "brand"],
+    ["基本資料", { path: "/brands/edit", cat: "info" }, "brand"],
+    ["記憶", { path: "/brands/edit", cat: "brain" }, "brand"],
+    ["會議", { path: "/brands/edit", cat: "meetings" }, "brand"],
+    ["產品清單", { path: "/brands/edit", cat: "products" }, "product"],
+    ["單一產品", { path: "/brands/edit", p: "152" }, "product"],
+    ["文字", { path: "/brands/edit", cat: "copy" }, "copy"],
+    ["人設", { path: "/brands/edit", cat: "persona" }, "copy"],
+    ["視覺", { path: "/brands/edit", cat: "visual" }, "visual"],
+    ["法規", { path: "/brands/edit", cat: "regulations" }, "regulations"],
+    ["活動清單", { path: "/brands/edit", cat: "events" }, "events"],
+    ["單一活動（綁了產品）", { path: "/brands/edit", e: "41", p: "152" }, "events"],
+    ["Threads", { path: "/tasks/threads" }, "threads"],
+    ["LINE", { path: "/tasks/line" }, "line"],
+    ["本週企劃", { path: "/planner" }, "content"],
+    ["靈感舞台", { path: "/inspiration" }, "content"],
+    ["專案", { path: "/projects" }, "content"],
+    ["產出頁", { path: "/run/123" }, "content"],
+    ["圖片卡", { path: "/image/ig-1x1" }, "content"],
+    ["審核", { path: "/review" }, "content"],
+    ["內容層活動", { path: "/campaigns" }, "events"],
+    ["成效總覽", { path: "/performance/overview" }, "performance"],
+    ["成效歸因", { path: "/performance/attribution" }, "performance"],
+    ["成效活動", { path: "/performance/campaign" }, "performance"],
+  ];
+  for (const [name, q, want] of rows) {
+    it(`${name} → ${want}`, () => {
+      expect(scopeFromUrl({ path: q.path, cat: q.cat ?? null, p: q.p ?? null, e: q.e ?? null })).toBe(want);
+    });
+  }
+  it("設定／後台／更新紀錄／品牌連線設定不掛顧問；一般頁面照掛", () => {
+    for (const p of ["/settings/account", "/settings/workspace", "/admin/errors", "/admin/user/3", "/changelog", "/brands/settings"]) {
+      expect(isAdvisorHiddenPath(p), p).toBe(true);
+    }
+    for (const p of ["/brands/edit", "/brands", "/tasks/fb", "/performance/overview", "/planner", "/home"]) {
+      expect(isAdvisorHiddenPath(p), p).toBe(false);
+    }
+  });
+  it("標籤跟著頁面換字", () => {
+    expect(advisorLabelOf("threads", false)).toBe("Threads 顧問");
+    expect(advisorLabelOf("line", false)).toBe("LINE 顧問");
+    expect(advisorLabelOf("performance", false)).toBe("成效顧問");
+    expect(advisorLabelOf("regulations", true)).toBe("Compliance Advisors");
+    expect(advisorLabelOf("brand", false)).toBe("策略總監");
   });
 });

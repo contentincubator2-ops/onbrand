@@ -27,16 +27,21 @@ import React from "react";
 import { SendIcon, WarningIcon } from "../../../platform/components/icons";
 import { trpc } from "../../../../lib/trpc";
 import { useLang } from "../../../../lib/i18n";
-import { type StrategistDirector, signatureQuestionsOf } from "../../lib/strategistDirectors";
+import { type StrategistDirector, type StrategistScope, signatureQuestionsOf } from "../../lib/strategistDirectors";
 
 type StrategistAction = { kind: "open_monitor"; label: string };
 type ChatMessage = { id: number; role: string; content: string; actions?: StrategistAction[]; followUps?: string[] };
 
 export default function StrategyDirectorChat({
   brandId, agentId, productId, director, height, onOpenMonitor,
-  onOpenHistory, viewingConversationId, onBackToCurrent, prefill,
+  onOpenHistory, viewingConversationId, onBackToCurrent, prefill, scope,
 }: {
   brandId: number;
+  /**
+   * 2026-10-01：這是哪一頁的顧問。同一位 agent 可能同時是兩頁的人選（cohort 跨頁共用），
+   * 後端靠 scope＋director.roleId 決定用哪一頁的守則，不然會套到別頁的角色。
+   */
+  scope?: StrategistScope;
   /** 哪一位總監——每位一串獨立對話，所以這個值變了就要整串重載。 */
   agentId: number | null;
   /** 使用者現在正在看的產品（URL 的 ?p=）；後端會把那個產品的完整定位加進 prompt。 */
@@ -81,7 +86,10 @@ export default function StrategyDirectorChat({
 
   const convQ = (trpc as any).strategistChat?.getConversation?.useQuery
     ? (trpc as any).strategistChat.getConversation.useQuery(
-        { brandId, ...(agentId ? { agentId } : {}), ...(viewingId ? { conversationId: viewingId } : {}) },
+        {
+          brandId, ...(agentId ? { agentId } : {}), ...(viewingId ? { conversationId: viewingId } : {}),
+          ...(scope ? { scope } : {}), ...(director?.roleId ? { roleId: director.roleId } : {}),
+        },
         { enabled: !!brandId && !!agentId, refetchOnWindowFocus: false },
       )
     : { data: null, isLoading: false };
@@ -138,7 +146,10 @@ export default function StrategyDirectorChat({
     setSending(true);
     if (text === undefined) setInput("");
     setMessages((prev) => [...prev, { id: Date.now(), role: "user", content }]);
-    sendMut?.mutate?.({ conversationId, brandId, content, ...(productId ? { productId } : {}) }, {
+    sendMut?.mutate?.({
+      conversationId, brandId, content, ...(productId ? { productId } : {}),
+      ...(scope ? { scope } : {}), ...(director?.roleId ? { roleId: director.roleId } : {}),
+    }, {
       onSuccess: (r: any) => {
         setSending(false);
         if (r?.strategistMessage) {

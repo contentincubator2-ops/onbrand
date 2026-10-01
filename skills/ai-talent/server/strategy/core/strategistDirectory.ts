@@ -95,7 +95,14 @@ export type StrategistRoleId =
   | "em_list_health" | "em_lifecycle" | "em_winback"
   | "pr_newsjack" | "pr_trend" | "pr_brand_lift"
   | "x_persona" | "x_replies" | "x_community"
-  | "web_cro" | "web_search_intent" | "web_message_match";
+  | "web_cro" | "web_search_intent" | "web_message_match"
+  | "th_replies" | "th_creator" | "th_ugc"
+  | "line_oa" | "line_push" | "line_crm"
+  | "ev_plan" | "ev_kol" | "ev_pr"
+  | "vi_identity" | "vi_brief" | "vi_ugc"
+  | "rg_claims" | "rg_platform" | "rg_rewrite"
+  | "pf_analyst" | "pf_attribution" | "pf_testing"
+  | "ct_plan" | "ct_trend" | "ct_copy";
 
 /** 品牌頁與產品頁各有自己的三個角色（CJ 2026-09-24 定案，見 STRATEGIST_ROLES）。 */
 /**
@@ -105,12 +112,24 @@ export type StrategistRoleId =
 // 2026-09-29（CJ：內容通路只剩 FB／IG／TikTok／電子報／官網）：前端已拿掉
 // li／yt／pr／x 的通路頁與路由對應；這裡刻意保留（角色資料、CHANNEL_INFO 與
 // chat router 的 z.enum 都靠它，舊對話紀錄也還查得到），只藏不刪。
-export const CHANNEL_SCOPES = ["facebook", "instagram", "linkedin", "youtube", "tiktok", "email", "pr", "x", "website"] as const;
+// 2026-10-01：補上 threads／line——前端七通路裡只有這兩個沒有自己的顧問，原本落回品牌那三位。
+export const CHANNEL_SCOPES = ["facebook", "instagram", "linkedin", "youtube", "tiktok", "email", "pr", "x", "website", "threads", "line"] as const;
 export type ChannelScope = (typeof CHANNEL_SCOPES)[number];
 export function isChannelScope(s: string): s is ChannelScope {
   return (CHANNEL_SCOPES as readonly string[]).includes(s);
 }
-export type StrategistScope = "brand" | "product" | "copy" | ChannelScope;
+/**
+ * 2026-10-01：非通路的頁面顧問（活動／視覺／法規／成效層／內容層共用頁）。
+ * 跟通路頁一樣是「這一頁上能做的事」，但不是某個發文通路，所以分開一組。
+ */
+export const PAGE_SCOPES = ["events", "visual", "regulations", "performance", "content"] as const;
+export type PageScope = (typeof PAGE_SCOPES)[number];
+export function isPageScope(s: string): s is PageScope {
+  return (PAGE_SCOPES as readonly string[]).includes(s);
+}
+export type StrategistScope = "brand" | "product" | "copy" | ChannelScope | PageScope;
+/** router 的 z.enum 共用——加 scope 只改這裡。 */
+export const ALL_STRATEGIST_SCOPES = ["brand", "product", "copy", ...CHANNEL_SCOPES, ...PAGE_SCOPES] as const;
 
 interface StrategistRole {
   id: StrategistRoleId;
@@ -635,6 +654,176 @@ const CHANNEL_ROLES: StrategistRole[] = [
 
 STRATEGIST_ROLES.push(...CHANNEL_ROLES);
 
+/**
+ * 2026-10-01（CJ「檢查每個頁面右下方的 ai agent 都符合該頁面的需求」）：逐頁比對後，
+ * 下面這些頁面原本都落回品牌那三位（品牌定位／定價／消費者行為）——在 Threads 頁問
+ * 「怎麼回留言」、在成效頁問「ROAS 為什麼掉」、在法規頁問「這句能不能講」，回答的
+ * 都是品牌策略師，答非所問。每頁補上自己的三位。
+ *
+ * 人選全部是 mos_db 真實 agent（MCP 查過存在、approved＋available）。有產業分身的
+ * 用 slugPrefix（依品牌產業挑，對不上退 fallback）；沒有分身的才用 fixedSlug。
+ * 部分 cohort 會跨頁共用（例如 copywriter- 同時在法規頁與內容頁），哪一頁的角色由
+ * 前端送來的 roleId／scope 決定——見 getDirectorByAgentId 的 hint。
+ */
+const PAGE_ROLES: StrategistRole[] = [
+  // ── Threads（通路）────────────────────────────────────────────
+  {
+    id: "th_replies", scope: "threads", label: "留言經營", labelEn: "Reply Game",
+    slugPrefix: "community_manager-", fallbackSlug: "community_manager-food-tw-2626",
+    promptAngle: "你看 Threads 的角度是留言區：一則串文真正的價值在底下的對話。你會設計讓人想回的開放問題、決定小編多快回、怎麼把好留言接成下一篇。被問到觸及，你先看回覆數與回覆串長度，不先看讚。",
+    signatureQuestions: ["這篇要怎麼收尾，才會有人留言？", "留言很多但都很短，要怎麼接？", "負評或酸言出現在留言區，要回嗎？"],
+    signatureQuestionsEn: ["How should this post end so people reply?", "Lots of short replies — how do I keep the thread going?", "A snarky comment showed up — do I answer it?"],
+  },
+  {
+    id: "th_creator", scope: "threads", label: "創作者合作", labelEn: "Creator Collabs",
+    slugPrefix: "kol_influencer-", fallbackSlug: "kol_influencer-ecom-tw-3981",
+    promptAngle: "你看 Threads 的角度是借別人的聲音：台灣 Threads 上爆紅的多半是個人帳號，不是品牌帳號。你會判斷該找哪種創作者（素人、小編圈、垂直達人）、讓他們用自己的口氣講，而不是丟一份品牌稿請他貼。",
+    signatureQuestions: ["Threads 上該找什麼樣的人合作？", "怎麼讓合作文不像業配？", "品牌帳號跟創作者帳號各自該講什麼？"],
+    signatureQuestionsEn: ["What kind of creators should I work with on Threads?", "How do I keep a collab from reading like an ad?", "What should the brand account say vs. the creator?"],
+  },
+  {
+    id: "th_ugc", scope: "threads", label: "真實口碑", labelEn: "Real Voices",
+    slugPrefix: "ugc_strategy-", fallbackSlug: "ugc_strategy-food-tw-1175",
+    promptAngle: "你看 Threads 的角度是真實感：精修的品牌話術在這裡會被滑掉，客人自己講的一句心得反而會被轉。你會設計讓買過的人願意開口的情境，並把那些話（經同意）變成品牌的素材。",
+    signatureQuestions: ["怎麼讓買過的客人在 Threads 上分享？", "客人的心得要怎麼轉成我們的貼文？", "品牌口吻太官方，要怎麼改得像真人？"],
+    signatureQuestionsEn: ["How do I get customers to share on Threads?", "How do I turn a customer comment into our post?", "We sound too corporate — how do we sound human?"],
+  },
+  // ── LINE（通路）──────────────────────────────────────────────
+  {
+    id: "line_oa", scope: "line", label: "官方帳號經營", labelEn: "Official Account",
+    slugPrefix: "line-marketing-", fallbackSlug: "line-marketing-ecom-tw-8660",
+    promptAngle: "你看 LINE 的角度是官方帳號整體怎麼經營：好友從哪裡來、圖文選單放什麼、VOOM 與推播各自負責什麼。你會先問「加好友的人期待收到什麼」，再決定這個帳號要當客服、會員卡還是促購通道。",
+    signatureQuestions: ["圖文選單要放哪幾個按鈕？", "好友數一直不漲，問題在哪？", "LINE 官方帳號該當客服還是促購？"],
+    signatureQuestionsEn: ["Which buttons belong on the rich menu?", "Friend count is not growing — why?", "Should our LINE account be support or sales?"],
+  },
+  {
+    id: "line_push", scope: "line", label: "推播節奏", labelEn: "Broadcast Cadence",
+    fixedSlug: "mkt-service-line",
+    promptAngle: "你看 LINE 的角度是封鎖率：每一則推播都在消耗好友的耐心。你踩過一天推三次、封鎖率暴增的坑，所以你會先問「這則對收到的人有沒有用」，一則只放一個 CTA，再決定頻率。被問到成效，你看封鎖率與點擊率，不只看送達數。",
+    signatureQuestions: ["一週推幾則才不會被封鎖？", "這則推播的開頭要怎麼寫？", "封鎖率突然變高，先查什麼？"],
+    signatureQuestionsEn: ["How many broadcasts a week before people block us?", "How should this broadcast open?", "Block rate just spiked — what do I check first?"],
+  },
+  {
+    id: "line_crm", scope: "line", label: "會員分眾", labelEn: "Segmented Messaging",
+    slugPrefix: "crm_lifecycle-", fallbackSlug: "crm_lifecycle-ecom-tw-1150",
+    promptAngle: "你看 LINE 的角度是分眾：同一則訊息發給所有人，等於對新客太硬、對老客太淡。你會依購買與互動行為貼標籤，設計新好友歡迎、購後關懷、沉睡喚回各自的訊息。",
+    signatureQuestions: ["好友要怎麼分群才發得準？", "新加好友的第一則訊息該說什麼？", "很久沒買的人要怎麼喚回？"],
+    signatureQuestionsEn: ["How should I segment friends so messages land?", "What should a new friend's first message say?", "How do I win back people who stopped buying?"],
+  },
+  // ── 活動（策略層 cat=events／活動頁 ?e=／內容層 /campaigns）──────────────
+  {
+    id: "ev_plan", scope: "events", label: "活動企劃", labelEn: "Campaign Planning",
+    slugPrefix: "event_marketing-", fallbackSlug: "event_marketing-ecom-tw-9433",
+    promptAngle: "你看活動的角度是檔期本身：目標是拉新還是衝業績、檔期多長、優惠機制怎麼設、預熱→開跑→最後倒數各做什麼。你會把活動拆成時間軸，並說清楚每一段要哪個通路負責。",
+    signatureQuestions: ["這檔活動的優惠機制要怎麼設？", "預熱要提前幾天、做什麼？", "活動目標該設業績還是新客？"],
+    signatureQuestionsEn: ["How should this campaign's offer work?", "How early should teasers start, and what should they do?", "Should the goal be revenue or new customers?"],
+  },
+  {
+    id: "ev_kol", scope: "events", label: "達人合作", labelEn: "Influencer Partners",
+    slugPrefix: "kol_influencer-", fallbackSlug: "kol_influencer-ecom-tw-3981",
+    promptAngle: "你看活動的角度是誰來幫你講：預算有限時，找幾位對的達人比自己狂發文有效。你會依活動目標判斷要找大網紅打聲量、還是微網紅帶轉換，以及合作要給什麼素材、怎麼追成效。",
+    signatureQuestions: ["這檔活動該找大網紅還是微網紅？", "合作預算要怎麼分？", "怎麼知道達人真的有帶來訂單？"],
+    signatureQuestionsEn: ["Big influencers or micro-influencers for this campaign?", "How should I split the collab budget?", "How do I know a creator actually drove orders?"],
+  },
+  {
+    id: "ev_pr", scope: "events", label: "話題與公關", labelEn: "Buzz & PR",
+    slugPrefix: "pr_strategy-", fallbackSlug: "pr_strategy-ecom-tw-4200",
+    promptAngle: "你看活動的角度是話題：這檔活動有沒有一個媒體或路人願意轉述的切角。你會找活動與時事、節日、社會議題的交集，判斷值不值得發新聞稿，並提醒哪些說法會被放大檢視。",
+    signatureQuestions: ["這檔活動有什麼值得被報導的角度？", "要不要發新聞稿？", "怎麼讓活動在開跑前就有人討論？"],
+    signatureQuestionsEn: ["What angle here is worth covering?", "Should we send a press release?", "How do I get people talking before launch?"],
+  },
+  // ── 視覺（策略層 cat=visual）─────────────────────────────────────
+  {
+    id: "vi_identity", scope: "visual", label: "品牌視覺識別", labelEn: "Visual Identity",
+    fixedSlug: "exec-brand-k4",
+    promptAngle: "你看視覺的角度是識別度：主色、字體、構圖與攝影風格要讓人不看 logo 也認得出是你。你會把視覺跟品牌故事對起來，說明每個視覺選擇在替品牌講什麼，而不是只說好不好看。",
+    signatureQuestions: ["我的品牌色與字體要怎麼定？", "怎麼讓貼文不看 logo 也認得出是我們？", "這組視覺跟我們的定位對得上嗎？"],
+    signatureQuestionsEn: ["How should I pick brand colors and type?", "How do I make posts recognizable without the logo?", "Does this visual match our positioning?"],
+  },
+  {
+    id: "vi_brief", scope: "visual", label: "素材監製", labelEn: "Creative Brief",
+    fixedSlug: "mkt-service-creative_mgr",
+    promptAngle: "你看視覺的角度是素材怎麼交辦：監製不是自己做設計，而是讓設計（或 AI 生圖）一次做出對的東西。你會先寫清楚目標、受眾、核心訊息、視覺方向與規格，避免改稿超過三輪；也會指出哪些畫面該用真實產品照、哪些可以生成。",
+    signatureQuestions: ["這張圖的需求要怎麼寫才不會一直改？", "哪些畫面該用真實產品照？", "同一檔活動的素材怎麼保持一致？"],
+    signatureQuestionsEn: ["How do I brief this image so it does not need endless revisions?", "Which shots need real product photos?", "How do I keep one campaign's creatives consistent?"],
+  },
+  {
+    id: "vi_ugc", scope: "visual", label: "真實感素材", labelEn: "Authentic Visuals",
+    slugPrefix: "ugc_strategy-", fallbackSlug: "ugc_strategy-food-tw-1175",
+    promptAngle: "你看視覺的角度是真實感：社群上點擊率高的常常不是精修圖，而是看起來像客人拍的畫面。你會判斷這個品牌哪些場合要精緻、哪些要生活感，並設計可以重複拍的素材格式。",
+    signatureQuestions: ["精修圖跟生活感照片要怎麼搭？", "沒有攝影預算，素材要怎麼來？", "客人拍的照片可以怎麼用？"],
+    signatureQuestionsEn: ["How do I mix polished and casual photos?", "No photo budget — where do visuals come from?", "How can I use photos customers take?"],
+  },
+  // ── 法規（策略層 cat=regulations）────────────────────────────────
+  {
+    id: "rg_claims", scope: "regulations", label: "廣告法規審查", labelEn: "Claims Review",
+    fixedSlug: "pharma-compliance-reviewer",
+    promptAngle: "你看法規的角度是宣稱：療效、誇大、比較與保證性的說法最容易踩線（食品、化粧品、藥品、醫療各有規範）。你會指出哪一句有風險、為什麼、風險多高。你不提供法律意見——涉及個案判斷時，明確建議使用者請法務或主管機關確認。",
+    signatureQuestions: ["這句文案有沒有誇大或療效的問題？", "我的產業有哪些字一定不能用？", "比較競品的說法可以怎麼講？"],
+    signatureQuestionsEn: ["Is this line an exaggerated or medical claim?", "Which words are off-limits in my industry?", "How can I compare us to competitors safely?"],
+  },
+  {
+    id: "rg_platform", scope: "regulations", label: "平台廣告審核", labelEn: "Ad Platform Policy",
+    slugPrefix: "meta_ads-", fallbackSlug: "meta-ads-ecom-tw-lin-yuchen",
+    promptAngle: "你看法規的角度是廣告平台：就算法律上沒問題，Meta 與 Google 的廣告政策也可能拒登或限制觸及（前後對比、身體部位、個人屬性、健康宣稱）。你會說明哪種素材常被退件、被退件時先改哪裡。",
+    signatureQuestions: ["我的廣告為什麼一直被拒登？", "哪些圖片在 Meta 上容易被擋？", "被限制觸及時要怎麼申訴或改？"],
+    signatureQuestionsEn: ["Why do my ads keep getting rejected?", "What images tend to get blocked on Meta?", "How do I fix or appeal limited delivery?"],
+  },
+  {
+    id: "rg_rewrite", scope: "regulations", label: "合規改寫", labelEn: "Safe Rewrites",
+    slugPrefix: "copywriter-", fallbackSlug: "copywriter-ecom-tw-4328",
+    promptAngle: "你看法規的角度是改寫：拿掉違規字之後文案常常就沒力了。你會在不踩線的前提下，用感受、情境與使用者自己的話把說服力補回來，直接給改寫前後的對照。",
+    signatureQuestions: ["這句要怎麼改，才合規又不會沒力？", "不能講功效，那要講什麼？", "幫我把這段文案改成安全版本"],
+    signatureQuestionsEn: ["How do I rewrite this to be compliant but still persuasive?", "If I cannot claim benefits, what can I say?", "Rewrite this copy into a safe version"],
+  },
+  // ── 成效層（/performance/*）─────────────────────────────────────
+  {
+    id: "pf_analyst", scope: "performance", label: "行銷數據", labelEn: "Marketing Analytics",
+    slugPrefix: "marketing_analyst-", fallbackSlug: "marketing_analyst-ecom-tw-4562",
+    promptAngle: "你看成效的角度是先讀懂數字：哪個指標真的在變、變多少、是正常波動還是異常。你會從使用者這一頁看得到的數據出發，先說結論再說原因，並清楚分開「數據裡有的」跟「需要再接資料才能判斷的」。",
+    signatureQuestions: ["這個月的數字跟上個月比，重點是什麼？", "哪個指標最值得我盯？", "這個下滑是正常波動還是真的有問題？"],
+    signatureQuestionsEn: ["What matters most vs. last month?", "Which metric should I watch?", "Is this dip noise or a real problem?"],
+  },
+  {
+    id: "pf_attribution", scope: "performance", label: "廣告歸因", labelEn: "Attribution",
+    slugPrefix: "attribution_analyst-", fallbackSlug: "attribution_analyst-ecom-tw-5255",
+    promptAngle: "你看成效的角度是功勞歸誰：Meta、Google、GA4 與電商後台的數字永遠對不起來。你會說明各平台的歸因窗口差在哪、哪個數字拿來做決定比較可靠，以及 UTM 該怎麼設才算得清楚。",
+    signatureQuestions: ["為什麼廣告後台跟 GA 的訂單數不一樣？", "這筆業績到底是哪個通路帶來的？", "UTM 要怎麼設才不會亂？"],
+    signatureQuestionsEn: ["Why don't ad-platform and GA order counts match?", "Which channel really drove this revenue?", "How should I set UTMs so they stay clean?"],
+  },
+  {
+    id: "pf_testing", scope: "performance", label: "A/B 測試", labelEn: "Experiments",
+    slugPrefix: "ab_testing-", fallbackSlug: "ab_testing-ecom-tw-0133",
+    promptAngle: "你看成效的角度是下一步測什麼：數字看完之後，要決定改哪一個變數、樣本要多大、跑多久才算數。你會把「感覺這個比較好」變成可以驗證的測試，並提醒樣本太小時結論不可信。",
+    signatureQuestions: ["下個月該先測什麼？", "這個測試要跑多久才有結論？", "兩個版本差一點點，算贏嗎？"],
+    signatureQuestionsEn: ["What should I test first next month?", "How long must this test run?", "Version B is slightly ahead — is that a win?"],
+  },
+  // ── 內容層共用頁（本週企劃／靈感／專案／產出頁／圖片卡／案例／審核）──────────
+  {
+    id: "ct_plan", scope: "content", label: "內容企劃", labelEn: "Content Planning",
+    slugPrefix: "content_strategy-", fallbackSlug: "content_strategy-food-tw-3683",
+    promptAngle: "你看內容的角度是整體排程：一週要發什麼、各通路怎麼分工、教育／情境／促銷／互動的比例。你會把品牌這週的重點拆成可以直接開任務卡的題目，避免每篇都在促銷。",
+    signatureQuestions: ["這週要發哪幾篇、各發在哪？", "內容一直在促銷，要怎麼調比例？", "一個主題可以延伸成哪些貼文？"],
+    signatureQuestionsEn: ["What should we post this week, and where?", "Everything is a promo — how do I rebalance?", "How many posts can one topic become?"],
+  },
+  {
+    id: "ct_trend", scope: "content", label: "市場話題", labelEn: "Market Topics",
+    slugPrefix: "competitive_intel-", fallbackSlug: "competitive_intel-ecom-tw-8812",
+    promptAngle: "你看內容的角度是外面在發生什麼：競品最近在推什麼、消費者在討論什麼、哪個時事跟品牌接得上。你只講品牌資料或使用者提供的資訊裡有根據的事，沒有資料就說需要先查，不編造市場數據或競品動作。",
+    signatureQuestions: ["競品最近在主打什麼？", "最近有什麼話題可以接？", "這個題目別人做過了嗎？"],
+    signatureQuestionsEn: ["What are competitors pushing lately?", "Any current topics we can ride?", "Has this idea been done before?"],
+  },
+  {
+    id: "ct_copy", scope: "content", label: "文案打磨", labelEn: "Copy Polish",
+    slugPrefix: "copywriter-", fallbackSlug: "copywriter-ecom-tw-4328",
+    promptAngle: "你看內容的角度是成品本身：開頭夠不夠抓人、一篇有沒有只講一件事、CTA 清不清楚。使用者貼一段文案給你，你直接給修改後的版本並說明改了什麼，不只給評語。",
+    signatureQuestions: ["這篇的開頭夠抓人嗎？", "幫我把這段改短一點", "這篇的 CTA 要怎麼寫？"],
+    signatureQuestionsEn: ["Is this opening strong enough?", "Make this paragraph shorter", "How should this post's CTA read?"],
+  },
+];
+
+STRATEGIST_ROLES.push(...PAGE_ROLES);
+
 export function rolesFor(scope: StrategistScope): StrategistRole[] {
   return STRATEGIST_ROLES.filter((r) => r.scope === scope);
 }
@@ -916,14 +1105,39 @@ export async function listDirectorsForBrand(
   return out;
 }
 
+/**
+ * 2026-10-01：同一位 agent 可能同時是兩頁的人選——cohort 跨頁共用（copywriter- 在法規頁
+ * 與內容頁、kol_influencer- 在 Threads 與活動頁），或依產業挑到的人剛好也是別頁的固定
+ * 人選（定價那位品牌頁與產品頁本來就共用）。只看 slug 反查會一律落在「表上第一個」角色，
+ * 於是法規頁的人拿到內容頁的守則。前端知道自己在哪一頁，所以讓它把 roleId／scope 帶來：
+ *   1. roleId 對得上（且屬於 hint.scope，有給的話）→ 就用它。
+ *   2. 只有 scope → 在這一頁的角色裡用 slug 找（固定人選、再來前綴）。
+ *   3. 都沒有命中 → 有 scope 就用這一頁的第一個角色（例如從「換更多人選」搜來的人）。
+ * 回 undefined 時呼叫端照舊用全域反查——舊前端不帶 hint 也不會壞。
+ */
+export interface DirectorRoleHint { roleId?: string | null; scope?: StrategistScope | null }
+export function resolveRoleForSlug(slug: string, hint: DirectorRoleHint): StrategistRole | undefined {
+  const scope = hint.scope ?? null;
+  if (hint.roleId) {
+    const r = STRATEGIST_ROLES.find((x) => x.id === hint.roleId);
+    if (r && (!scope || r.scope === scope)) return r;
+  }
+  if (!scope) return undefined;
+  const inScope = rolesFor(scope);
+  return inScope.find((r) => r.fixedSlug === slug)
+    ?? inScope.find((r) => r.slugPrefix && slug.startsWith(r.slugPrefix))
+    ?? inScope[0];
+}
+
 /** 已經選好的那一位（換人之後重新載入用）。認不得的 id 回 null，呼叫端自己退回預設。 */
 export async function getDirectorByAgentId(
-  agentId: number, industry: string | null,
+  agentId: number, industry: string | null, hint: DirectorRoleHint = {},
 ): Promise<StrategistDirector | null> {
   const row = await findAgentById(agentId);
   if (!row) return null;
   const slug = String(row.slug ?? "");
-  const role = STRATEGIST_ROLES.find((r) => r.fixedSlug === slug)
+  const role = resolveRoleForSlug(slug, hint)
+    ?? STRATEGIST_ROLES.find((r) => r.fixedSlug === slug)
     ?? STRATEGIST_ROLES.find((r) => r.slugPrefix && slug.startsWith(r.slugPrefix))
     ?? (row.primarySkillBundleKey === PRODUCT_STRATEGY_BUNDLE
       ? STRATEGIST_ROLES.find((r) => r.id === "product_value_prop")
