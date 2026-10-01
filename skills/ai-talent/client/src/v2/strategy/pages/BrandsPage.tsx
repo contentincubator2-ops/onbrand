@@ -5048,7 +5048,8 @@ function BrandPaletteHero({
   });
   // 2026-07-19 (CJ「品牌視覺頁通常只有色號跑得出來」): brand-level visual
   // generator — most brands have no product with an image, so the only
-  // variants entry (per-product ✨ button) never appeared. This button runs
+  // variants entry (per-product ✨ button) never appeared. 2026-10-02（CJ「移除產品
+  // 卡片上的品牌變體功能」）：產品卡那個入口已拿掉，品牌變體只剩這裡。 This button runs
   // generateBrandedVariants({brandId}); the server falls back to website
   // images (the same source the palette extraction already used).
   const genVisualMut = (trpc as any).brandColors?.generateBrandedVariants?.useMutation?.();
@@ -5357,17 +5358,6 @@ function BrandEntityGrid({
 }) {
   const en = lang === "en";
 
-  // 2026-06-21 (CJ「按 riverflow 標準」brand DNA): branded variant generator
-  // state. When user clicks "品牌變體" on a card, we mutate, store results
-  // in this state, and render a modal showing 4 variants.
-  const [variantState, setVariantState] = React.useState<{
-    productId: number;
-    productName: string;
-    variants: Array<{ layout: string; pngDataUrl: string }> | null;
-    error: string | null;
-    cutoutAvailable?: boolean;
-  } | null>(null);
-  const genVariantsMut = (trpc as any).brandColors?.generateBrandedVariants?.useMutation?.();
 
   const extractField = (positioning: any, ...keys: string[]): string => {
     if (!positioning) return "";
@@ -5517,55 +5507,6 @@ function BrandEntityGrid({
                       </button>
                     );
                   })()}
-                  {/* 2026-06-21 (CJ「按 riverflow 標準」): branded variant generator.
-                      2026-06-30: dropped item.imageUrl gate — column doesn't
-                      exist. Backend returns `product_has_no_image` if positioning
-                      JSON has no image, and the modal shows that message. */}
-                  <button
-                      onClick={async (e) => {
-                        e.stopPropagation();
-                        setVariantState({
-                          productId: item.id,
-                          productName: item.name,
-                          variants: null,
-                          error: null,
-                        });
-                        try {
-                          const r = await genVariantsMut?.mutateAsync?.({ productId: item.id });
-                          if (r?.ok) {
-                            setVariantState({
-                              productId: item.id,
-                              productName: item.name,
-                              variants: r.variants,
-                              error: null,
-                              cutoutAvailable: r.cutoutAvailable,
-                            });
-                          } else {
-                            const reason = (r as any)?.reason ?? "unknown";
-                            const msg = reason === "no_palette_yet"
-                              ? (en
-                                  ? "Brand palette not extracted yet. Open the Visual tab and click Extract from products first."
-                                  : "品牌色彩還沒萃取。請先到「視覺」tab 按「從產品圖萃取」。")
-                              : reason === "product_has_no_image" || reason === "no_subject_image"
-                                ? (en
-                                    ? "No usable photo found — this product has no photo, and neither does the brand's photo library. Upload one first."
-                                    : "找不到可用照片 — 這個產品沒有照片，品牌照片庫也沒有。請先上傳一張。")
-                                : reason;
-                            setVariantState({ productId: item.id, productName: item.name, variants: null, error: msg });
-                          }
-                        } catch (err: any) {
-                          setVariantState({
-                            productId: item.id, productName: item.name,
-                            variants: null,
-                            error: String(err?.message ?? err).slice(0, 200),
-                          });
-                        }
-                      }}
-                      className="text-[12px] font-medium px-2 py-1 rounded-md bg-zinc-50 text-zinc-700 hover:bg-zinc-100 transition"
-                      title={en ? "Generate 4 branded variants" : "用品牌色生成 4 種變體"}
-                    >
-                      {en ? "Variants" : "品牌變體"}
-                    </button>
                   {/* Open */}
                   <button
                     onClick={(e) => { e.stopPropagation(); onOpen(item.id); }}
@@ -5607,20 +5548,6 @@ function BrandEntityGrid({
         </div>
       )}
 
-      {/* 2026-06-21 (CJ「按 riverflow 標準」) → 2026-07-19: markup extracted
-          to the shared BrandedVariantsModal (also used by the palette hero's
-          brand-level 生成品牌視覺 button). */}
-      {variantState && (
-        <BrandedVariantsModal
-          title={variantState.productName}
-          loading={!variantState.error && !variantState.variants}
-          error={variantState.error}
-          variants={variantState.variants}
-          cutoutAvailable={variantState.cutoutAvailable}
-          onClose={() => setVariantState(null)}
-          en={en}
-        />
-      )}
     </div>
   );
 }
