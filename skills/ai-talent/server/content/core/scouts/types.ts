@@ -38,6 +38,8 @@ export interface ScoutContext {
   limit: number;
   /** 2026-09-30 策略監測：只要新聞／文章（要有發布日），不要官網、工具頁、社群貼文。 */
   newsOnly?: boolean;
+  /** 2026-09-30（CJ「看在台灣或美國，搜尋不同語言的」）：新聞要搜哪個市場、哪個語言。 */
+  newsMarket?: { country: string; language: string; label: string; searchHint: string };
   /** Lazy credential loader — returns decrypted creds or null. */
   loadCred: (tool: string) => Promise<Record<string, string> | null>;
 }

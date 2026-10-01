@@ -745,7 +745,9 @@ const INDUSTRY_KEYWORDS: Array<[string, string[]]> = [
   ["education",  ["教育", "補習", "課程", "學習", "培訓", "edtech", "education"]],
   ["fintech",    ["金融科技", "金融", "保險", "支付", "銀行", "證券", "fintech"]],
   ["travel",     ["旅遊", "觀光", "飯店", "旅宿", "民宿", "旅行", "travel", "hotel", "hospitality"]],
-  ["martech",    ["martech", "行銷科技", "廣告科技", "adtech"]],
+  // 2026-10-01（CJ「SoWork 產業寫成行銷顧問」）：行銷顧問／代理商這類服務業本身沒有 cohort，
+  // 最接近的是 MarTech（品牌策略師｜MarTech 有 -tw- 人選）。
+  ["martech",    ["martech", "行銷科技", "廣告科技", "adtech", "行銷顧問", "行銷公司", "行銷代理", "廣告代理", "廣告公司", "數位行銷", "marketing agency", "marketing consult"]],
   ["hr_tech",     ["人資", "招募", "人力資源", "hr tech", "hrtech"]],
 ];
 

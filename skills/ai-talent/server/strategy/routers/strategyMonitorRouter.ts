@@ -13,7 +13,7 @@ import { assertStrategyMonitoringAllowed, planQuotaFor } from "../../platform/co
 import localPool from "../../localDb";
 import {
   SCAN_INTERVAL_DAYS,
-  backfillEvidenceDates, ensureWatches, listAlerts, runStrategyScan, setAlertStatus, unreadAlertSummary, updateWatch,
+  backfillEvidenceDates, ensureWatches, listAlerts, newsMarketOf, runStrategyScan, setAlertStatus, unreadAlertSummary, updateWatch,
   type StrategyWatch,
 } from "../core/strategyMonitor";
 
@@ -44,8 +44,14 @@ export const strategyMonitorRouter = router({
       const brand = await assertBrandOwner(userId, input.brandId);
       let locked = false;
       try { locked = !(await planQuotaFor(userId)).strategyMonitoring; } catch { locked = false; }
+      let newsMarket = newsMarketOf(null, null).display;
+      try {
+        const [mr]: any = await localPool.execute(`SELECT targetCountry, outputLanguage FROM brands WHERE id = ? LIMIT 1`, [input.brandId]);
+        const m = (mr as any[])[0];
+        newsMarket = newsMarketOf(m?.targetCountry, m?.outputLanguage).display;
+      } catch { /* 預設台灣 */ }
       const base = {
-        locked, brandName: brand.name,
+        locked, brandName: brand.name, newsMarket,
         scanIntervalDays: SCAN_INTERVAL_DAYS,
       };
       if (locked) return { ...base, watches: [] as StrategyWatch[], alerts: [], productNames: {} as Record<number, string>, lastScanAt: null as string | null, scanning: false };

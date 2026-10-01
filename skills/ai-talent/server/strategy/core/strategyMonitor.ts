@@ -97,6 +97,41 @@ export const DEDUPE_DAYS = 30;
  * 要登入的社群貼文）與超過 7 天的舊文一律不採用。
  */
 export const NEWS_WINDOW_DAYS = 7;
+
+/**
+ * 2026-09-30（CJ「策略監測只要搜尋新聞就可以，看在台灣或美國，搜尋不同語言的」）：
+ * 依品牌的目標市場（brands.targetCountry / outputLanguage）決定搜哪個語言的新聞。
+ * 沒設定＝台灣（產品預設市場）。
+ */
+export interface NewsMarket { country: string; language: string; label: string; searchHint: string; display: string }
+export function newsMarketOf(targetCountry?: string | null, outputLanguage?: string | null): NewsMarket {
+  const c = String(targetCountry ?? "").trim().toUpperCase();
+  const l = String(outputLanguage ?? "").trim().toLowerCase();
+  if (c === "US" || c === "GB" || c === "AU" || c === "CA" || (!c && l.startsWith("en"))) {
+    const label = c === "GB" ? "UK" : c === "AU" ? "Australia" : c === "CA" ? "Canada" : "United States";
+    return { country: c || "US", language: "English", label, searchHint: "", display: `${c === "GB" ? "英國" : c === "AU" ? "澳洲" : c === "CA" ? "加拿大" : "美國"}・英文新聞` };
+  }
+  if (c === "JP" || l.startsWith("ja")) return { country: "JP", language: "Japanese", label: "Japan", searchHint: "日本", display: "日本・日文新聞" };
+  if (c === "KR" || l.startsWith("ko")) return { country: "KR", language: "Korean", label: "South Korea", searchHint: "한국", display: "韓國・韓文新聞" };
+  if (c === "CN" || l === "zh-cn" || l === "zh-hans") return { country: "CN", language: "Simplified Chinese", label: "中國", searchHint: "中国", display: "中國・簡體中文新聞" };
+  if (c === "HK") return { country: "HK", language: "Traditional Chinese", label: "香港", searchHint: "香港", display: "香港・繁體中文新聞" };
+  return { country: "TW", language: "Traditional Chinese", label: "台灣", searchHint: "台灣", display: "台灣・繁體中文新聞" };
+}
+
+/** 新聞的標題＋摘要是不是這個市場的語言（搜尋結果常混進其他語言的報導）。 */
+export function matchesNewsLanguage(text: string, m: Pick<NewsMarket, "language">): boolean {
+  const t = String(text ?? "");
+  const han = (t.match(/[\u4e00-\u9fff]/g) ?? []).length;
+  const kana = (t.match(/[\u3040-\u30ff]/g) ?? []).length;
+  const hangul = (t.match(/[\uac00-\ud7af]/g) ?? []).length;
+  const latin = (t.match(/[A-Za-z]/g) ?? []).length;
+  switch (m.language) {
+    case "English": return latin >= 20 && han + kana + hangul < 3;
+    case "Japanese": return kana >= 3;
+    case "Korean": return hangul >= 5;
+    default: return han >= 8 && kana < 3;   // 中文（繁／簡）
+  }
+}
 export type EvidenceRole = "news";
 
 /** 單一來源是否採用（"news"）。null＝不採用。asOf＝掃描時間（補舊資料時用那則提醒的建立時間）。 */
@@ -404,9 +439,9 @@ export async function setAlertStatus(args: { userId: number; id: number; status:
 
 // ─── 掃描 ─────────────────────────────────────────────────────────────────
 
-async function loadAnchors(watch: StrategyWatch): Promise<{ name: string; industry: string; audience: string; differentiation: string; tagline: string; scopeName: string }> {
+async function loadAnchors(watch: StrategyWatch): Promise<{ name: string; industry: string; audience: string; differentiation: string; tagline: string; scopeName: string; newsMarket: NewsMarket }> {
   const [bRows]: any = await localPool.execute(
-    `SELECT name, industry, positioning FROM brands WHERE id = ? LIMIT 1`, [watch.brandId],
+    `SELECT name, industry, positioning, targetCountry, outputLanguage FROM brands WHERE id = ? LIMIT 1`, [watch.brandId],
   );
   const b = (bRows as any[])[0] ?? {};
   const pos = typeof b.positioning === "string" ? (() => { try { return JSON.parse(b.positioning); } catch { return {}; } })() : (b.positioning ?? {});
@@ -423,6 +458,7 @@ async function loadAnchors(watch: StrategyWatch): Promise<{ name: string; indust
     differentiation: s(typeof pos?.differentiation === "string" ? pos.differentiation : pos?.differentiation?.summary, 300),
     tagline: s(pos?.tagline?.zhTagline ?? pos?.tagline, 80),
     scopeName,
+    newsMarket: newsMarketOf(b.targetCountry, b.outputLanguage),
   };
 }
 
@@ -492,6 +528,7 @@ export async function runStrategyScan(watch: StrategyWatch, opts?: { now?: Date 
     days: NEWS_WINDOW_DAYS,
     limit: 12,   // 7 天規則會刷掉不少舊文，多要一些
     newsOnly: true,
+    newsMarket: anchors.newsMarket,
     loadCred: async () => null,
   };
   let items: IntelItem[] = [];
@@ -506,11 +543,14 @@ export async function runStrategyScan(watch: StrategyWatch, opts?: { now?: Date 
     const fromPage = await fetchPublishedDate(it.url);
     const fromApi = it.scoutId === "tavily" ? normalizeDate(it.publishedAt) : null;
     const publishedAt = fromPage ?? fromApi;
-    return { it: { ...it, publishedAt: publishedAt ?? undefined }, role: classifyEvidence({ url: it.url, publishedAt }, now) };
+    const role = classifyEvidence({ url: it.url, publishedAt }, now);
+    // 語言不符市場（台灣品牌撈到英文報導、美國品牌撈到中文報導）也不採用。
+    const langOk = matchesNewsLanguage(`${it.title} ${it.content ?? ""}`, anchors.newsMarket);
+    return { it: { ...it, publishedAt: publishedAt ?? undefined }, role: langOk ? role : null };
   }));
   const newsItems = dated.filter((d) => d.role === "news").map((d) => d.it);
   if (!newsItems.length) {
-    return finish({ ok: true, note: `no_fresh：${items.length} 則情報都不是確定 7 天內發布的新聞`, items: items.length, created: 0 });
+    return finish({ ok: true, note: `no_fresh：${items.length} 則情報都不是確定 7 天內發布的${anchors.newsMarket.display}`, items: items.length, created: 0 });
   }
   items = newsItems;
 

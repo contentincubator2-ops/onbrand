@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { alertKeyOf, classifyEvidence, deriveDefaultWatch, isDue, parseAlertsJson } from "./strategyMonitor";
+import { alertKeyOf, classifyEvidence, deriveDefaultWatch, isDue, matchesNewsLanguage, newsMarketOf, parseAlertsJson } from "./strategyMonitor";
 
 describe("strategyMonitor · deriveDefaultWatch", () => {
   it("品牌：名稱＋產業當關鍵字，直接／間接競品當競爭者，去重且最多 10 個", () => {
@@ -93,5 +93,25 @@ describe("classifyEvidence — 只收確定 7 天內的新聞", () => {
   it("讀不到日期（官網頁、社群貼文）不採用", () => {
     expect(classifyEvidence({ url: "https://thinklytics.com/services/x", publishedAt: null }, asOf)).toBeNull();
     expect(classifyEvidence({ url: "https://www.threads.com/@a/post/1" }, asOf)).toBeNull();
+  });
+});
+
+// 2026-09-30（CJ「看在台灣或美國，搜尋不同語言的」）
+describe("newsMarketOf／matchesNewsLanguage — 依市場搜不同語言的新聞", () => {
+  it("台灣（含未設定）＝繁中；美國＝英文", () => {
+    expect(newsMarketOf("TW", "zh-TW")).toMatchObject({ language: "Traditional Chinese", searchHint: "台灣" });
+    expect(newsMarketOf(null, null).country).toBe("TW");
+    expect(newsMarketOf("US", "en-US")).toMatchObject({ language: "English", searchHint: "" });
+    expect(newsMarketOf("US", null).display).toBe("美國・英文新聞");
+  });
+  it("語言不符的報導擋掉", () => {
+    const tw = newsMarketOf("TW", "zh-TW");
+    const us = newsMarketOf("US", "en");
+    const zh = "HubSpot 推出 Breeze AI 套件，台灣中小企業行銷團隊開始評估導入成本與效益";
+    const en = "HubSpot launches Breeze AI suite as marketers weigh the cost of adopting new tools";
+    expect(matchesNewsLanguage(zh, tw)).toBe(true);
+    expect(matchesNewsLanguage(en, tw)).toBe(false);
+    expect(matchesNewsLanguage(en, us)).toBe(true);
+    expect(matchesNewsLanguage(zh, us)).toBe(false);
   });
 });

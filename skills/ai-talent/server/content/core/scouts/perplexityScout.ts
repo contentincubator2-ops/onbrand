@@ -38,7 +38,8 @@ function buildPrompts(ctx: ScoutContext) {
     "Rules: no duplicate titles; each item must cite a real URL; content must reflect the article, not filler. " +
     (ctx.newsOnly
       ? "ONLY news articles or blog/media articles that carry a visible publication date within the last " + days + " days — " +
-        "no product/official/landing pages, no tool directories, no social media posts. publishedAt is REQUIRED. "
+        "no product/official/landing pages, no tool directories, no social media posts. publishedAt is REQUIRED. " +
+        (ctx.newsMarket ? "Only articles written in " + ctx.newsMarket.language + " from " + ctx.newsMarket.label + " media. " : "")
       : "Mix types — aim ~50% competitor_news, ~30% trending_topic, ~20% social_trend. ") +
     "Cap at " + limit + " items.";
 
@@ -138,8 +139,10 @@ async function fetchViaTavily(ctx: ScoutContext): Promise<IntelItem[]> {
   if (!tavilyKey) throw new Error("no tavily key");
 
   const { brandName, industry, keywords, competitors, days } = ctx;
+  // 2026-09-30：策略監測依品牌市場搜不同語言的新聞——查詢字串的語言決定 Tavily 回哪種語言的報導，
+  // 所以台灣品牌加上中文的市場提示（「台灣」），英文市場不加。
   const q = [brandName, industry, ...(keywords ?? []), ...(competitors ?? [])]
-    .filter(Boolean).slice(0, 6).join(" ");
+    .filter(Boolean).slice(0, 6).concat(ctx.newsMarket?.searchHint ? [ctx.newsMarket.searchHint] : []).join(" ");
 
   const res = await fetch("https://api.tavily.com/search", {
     method: "POST",
@@ -232,7 +235,7 @@ export const perplexityScout: Scout = {
           `【品牌】${brandName ?? ""}`, `【產業】${industry ?? ""}`,
           competitors?.length ? `【競品】${competitors.join(", ")}` : "",
           keywords?.length ? `【關鍵字】${keywords.join(", ")}` : "",
-          `${ctx.newsOnly ? `只要近 ${days} 天內發布、頁面上有發布日期的新聞或媒體文章（不要官網、產品頁、工具目錄、社群貼文），publishedAt 必填。` : `近 ${days} 天的最新新聞、趨勢、社群話題。`}產出 ${limit} 筆 JSON: {"items":[{"type":"competitor_news"|"trending_topic"|"social_trend","title":string,"content":string,"source":string,"url":string,"publishedAt":string,"relevanceScore":number}]}`,
+          `${ctx.newsOnly ? `只要近 ${days} 天內發布、頁面上有發布日期的新聞或媒體文章（不要官網、產品頁、工具目錄、社群貼文）${ctx.newsMarket ? `，而且必須是${ctx.newsMarket.label}媒體以 ${ctx.newsMarket.language} 撰寫的報導` : ""}，publishedAt 必填。` : `近 ${days} 天的最新新聞、趨勢、社群話題。`}產出 ${limit} 筆 JSON: {"items":[{"type":"competitor_news"|"trending_topic"|"social_trend","title":string,"content":string,"source":string,"url":string,"publishedAt":string,"relevanceScore":number}]}`,
         ].filter(Boolean).join("\n");
 
         const raw = await invokeVertexGrounding({

@@ -175,6 +175,8 @@ describe("industryCodeOf", () => {
   it("真實品牌填的產業字串要對到 cohort 的產業代碼", () => {
     expect(industryCodeOf("冷凍即食料理 / 生鮮宅配電商")).toBe("food");
     expect(industryCodeOf("美妝保養")).toBe("beauty");
+    // 2026-10-01：SoWork 填「行銷顧問」，對到 MarTech（品牌策略師｜MarTech 有 -tw- 人選）。
+    expect(industryCodeOf("行銷顧問")).toBe("martech");
     expect(industryCodeOf("色彩文具")).toBeNull();
     expect(industryCodeOf("建設開發 / 不動產（住宅建案品牌）")).toBeNull();
   });
