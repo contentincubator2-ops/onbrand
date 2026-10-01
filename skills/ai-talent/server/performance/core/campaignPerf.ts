@@ -10,7 +10,15 @@
  *   2. 待確認：活動期間（第一篇前 14 天到最後一篇後 7 天）內、還沒對上的粉專貼文，列出來
  *      並猜最像哪一格（內文跟切角的字重疊＋日期接近）；用戶一鍵配對、標成企劃外、或不是
  *      這檔。確認過的存在 events.positioning.campaignPerf。
- *   3. 粉專沒有的數字（名單、訂單、營收…）先手動填；廣告與 GA4／電商匯入是第 2 步。
+ *   3. 粉專沒有的數字（名單、訂單、營收…）：匯入後台檔自動歸檔，沒有檔就手動填。
+ *
+ * ── 第 2 步：廣告／GA4／電商匯入怎麼知道是這檔活動 ───────────────────
+ *   · UTM：企劃每一篇的連結帶 utm_campaign=ob-ev<id>、utm_content=cp.ev<id>~it.…~ph.…
+ *     （perfUtm.campaignLink）。匯出檔的名稱欄或標籤欄帶著它 → 自動歸這檔；有 ph 就歸那一段。
+ *   · 名稱對應：Meta 廣告匯出檔通常沒有網址參數，只有「行銷活動名稱」。用戶把名稱加進
+ *     這檔的對應（aliases），名稱含那幾個字的列就算這檔。
+ *   · 都沒有的列列在「還沒歸檔」，一鍵把名稱加進對應。別檔活動代碼的列不列。
+ *   · 手動填的數字蓋過匯入的（用戶最後說了算）。
  *
  * ── 呈現 ────────────────────────────────────────────────────────────
  *   · 依「實際發文日」把貼文歸到各段（段的時間窗＝企劃各段的起點接到下一段起點前一天）。
@@ -19,6 +27,7 @@
  * 計算全是純函式（buildCampaignPerf），DB 進出在最下面。
  */
 import localPool from "../../localDb";
+import { campaignCode } from "./perfUtm";
 
 export type ItemStatus = "matched" | "moved" | "missing" | "upcoming";
 export type MatchAction = "match" | "extra" | "dismiss" | "clear";
@@ -32,6 +41,11 @@ export interface PerfFact {
   source: string; entityId: string; date: string; text: string;
   permalink: string | null; metrics: Record<string, number>;
 }
+/** 廣告／GA4／電商匯入的一列（perf_facts，source ≠ fb_page）。 */
+export interface ExtFact {
+  source: string; date: string; label: string;
+  tags: Record<string, string>; metrics: Record<string, number>;
+}
 export interface CampaignPerfStore {
   /** factKey → 企劃格 id，或 "extra"（企劃外但屬於這檔活動）。 */
   matches?: Record<string, string>;
@@ -39,6 +53,25 @@ export interface CampaignPerfStore {
   dismissed?: string[];
   /** 手動填的數字：phase → metric → value。 */
   manual?: Record<string, Record<string, number>>;
+  /** 匯入檔名稱對應：名稱含這些字的列算這檔（Meta 廣告行銷活動名稱等）。 */
+  aliases?: string[];
+  /** 活動導流網址；每一篇的追蹤連結由它加上 UTM。 */
+  landingUrl?: string | null;
+}
+
+/** 匯入的一列是不是這檔活動：UTM 帶活動代碼 → "utm"；名稱含對應字 → "alias"；別檔的 → "other"。 */
+export function campaignOf(f: { label: string; tags: Record<string, string> }, eventId: number, aliases: string[]): "utm" | "alias" | "other" | null {
+  const code = campaignCode(eventId);
+  const label = String(f.label ?? "").toLowerCase();
+  const cp = f.tags?.cp;
+  if (cp === `ev${eventId}` || new RegExp(`(^|[^a-z0-9])${code}($|[^0-9])`).test(label)) return "utm";
+  if (cp && /^ev\d+$/.test(cp)) return "other";
+  if (/(^|[^a-z0-9])ob-ev\d+/.test(label)) return "other";
+  for (const a of aliases) {
+    const t = a.trim().toLowerCase();
+    if (t.length >= 2 && label.includes(t)) return "alias";
+  }
+  return null;
 }
 
 const DAY = 86_400_000;
@@ -77,8 +110,14 @@ export interface CampaignPerfReport {
     budget: number | null;
     targets: Array<{ metric: string; target: number | null }>;
     actual: Record<string, number>;
+    /** 每個來源各自的數字（粉專／Meta 廣告／GA4…）。 */
+    bySource: Record<string, Record<string, number>>;
     manual: Record<string, number>;
   }>;
+  /** 歸進這檔的匯入資料，按來源加總。 */
+  sources: Array<{ source: string; rows: number; utm: number; alias: number; metrics: Record<string, number> }>;
+  /** 觀察期間內、還沒歸到任何活動的匯入列（按來源＋名稱合併）。 */
+  unlinked: Array<{ source: string; label: string; rows: number; metrics: Record<string, number> }>;
   items: Array<PerfItem & { status: ItemStatus; via: "published" | "confirmed" | null; fact: PerfFact | null; diffDays: number | null }>;
   extras: PerfFact[];
   candidates: Array<PerfFact & { suggestItemId: string | null; score: number }>;
@@ -93,6 +132,9 @@ export function buildCampaignPerf(args: {
   facts: PerfFact[];
   store: CampaignPerfStore;
   today: string;
+  /** 第 2 步：匯入的廣告／GA4／電商資料。 */
+  eventId?: number;
+  external?: ExtFact[];
 }): CampaignPerfReport {
   const items = args.items.filter((i) => i.enabled !== false).sort((a, b) => a.date.localeCompare(b.date));
   const matches = args.store.matches ?? {};
@@ -156,27 +198,67 @@ export function buildCampaignPerf(args: {
     })
     .sort((a, b) => b.score - a.score || a.date.localeCompare(b.date));
 
-  // 各段的實際數字：對上的＋企劃外的，照「實際發文日」歸段；再加手動填的。
+  // 匯入資料：歸這檔的（UTM／名稱對應）→ 有 ph 標籤照標籤歸段，沒有照日期；其餘列成「還沒歸檔」。
+  const aliases = args.store.aliases ?? [];
+  const phaseIds = new Set(phaseWin.map((w) => w.id));
+  const linked: Array<ExtFact & { phase: string | null }> = [];
+  const srcAgg = new Map<string, { source: string; rows: number; utm: number; alias: number; metrics: Record<string, number> }>();
+  const unl = new Map<string, { source: string; label: string; rows: number; metrics: Record<string, number> }>();
+  const addTo = (into: Record<string, number>, m: Record<string, number>) => {
+    for (const [k, v] of Object.entries(m)) if (typeof v === "number" && Number.isFinite(v)) into[k] = (into[k] ?? 0) + v;
+  };
+  for (const f of args.external ?? []) {
+    if (f.date < window.from || f.date > window.to) continue;
+    const how = args.eventId ? campaignOf(f, args.eventId, aliases) : null;
+    if (how === "other") continue;
+    if (!how) {
+      const k = `${f.source}|${f.label}`;
+      const u = unl.get(k) ?? { source: f.source, label: f.label, rows: 0, metrics: {} };
+      u.rows++; addTo(u.metrics, f.metrics); unl.set(k, u);
+      continue;
+    }
+    const ph = f.tags?.ph && phaseIds.has(f.tags.ph) ? f.tags.ph : phaseOfDate(f.date);
+    linked.push({ ...f, phase: ph });
+    const s = srcAgg.get(f.source) ?? { source: f.source, rows: 0, utm: 0, alias: 0, metrics: {} };
+    s.rows++; s[how]++; addTo(s.metrics, f.metrics); srcAgg.set(f.source, s);
+  }
+  const weight = (m: Record<string, number>) => (m.revenue ?? 0) + (m.spend ?? 0) * 2 + (m.orders ?? 0) * 500 + (m.clicks ?? 0) + (m.sessions ?? 0);
+
+  // 各段的實際數字：對上的＋企劃外的貼文照「實際發文日」歸段，加上歸這檔的匯入資料。
   const counted = [...outItems.filter((i) => i.fact).map((i) => i.fact!), ...extras];
   const phases = phaseWin.map((w) => {
-    const actual: Record<string, number> = {};
+    const bySource: Record<string, Record<string, number>> = {};
     for (const f of counted) {
       if (phaseOfDate(f.date) !== w.id) continue;
-      for (const m of PAGE_METRICS) if (typeof f.metrics[m] === "number") actual[m] = (actual[m] ?? 0) + f.metrics[m]!;
+      const row = (bySource[f.source] ??= {});
+      for (const m of PAGE_METRICS) if (typeof f.metrics[m] === "number") row[m] = (row[m] ?? 0) + f.metrics[m]!;
     }
+    for (const f of linked) if (f.phase === w.id) addTo((bySource[f.source] ??= {}), f.metrics);
+    const actual: Record<string, number> = {};
+    for (const row of Object.values(bySource)) addTo(actual, row);
     const manual = args.store.manual?.[w.id] ?? {};
     const k = args.kpiPhases?.[w.id];
-    return { id: w.id, from: w.from, to: w.to, budget: k?.budget ?? null, targets: k?.metrics ?? [], actual, manual };
+    return { id: w.id, from: w.from, to: w.to, budget: k?.budget ?? null, targets: k?.metrics ?? [], actual, bySource, manual };
   });
 
   const count = (s: ItemStatus) => outItems.filter((i) => i.status === s).length;
   return {
     window, phases, items: outItems, extras, candidates,
+    sources: [...srcAgg.values()].sort((a, b) => b.rows - a.rows),
+    unlinked: [...unl.values()].sort((a, b) => weight(b.metrics) - weight(a.metrics) || b.rows - a.rows).slice(0, 30),
     counts: {
       planned: outItems.length, matched: count("matched"), moved: count("moved"),
       missing: count("missing"), upcoming: count("upcoming"), extras: extras.length, pending: candidates.length,
     },
   };
+}
+
+/** 加／拿掉一個名稱對應 → 新的 store。純函式。最多 20 個、每個 2–80 字。 */
+export function applyAlias(store: CampaignPerfStore, alias: string, op: "add" | "remove"): CampaignPerfStore {
+  const t = alias.trim().slice(0, 80);
+  const list = (store.aliases ?? []).filter((a) => a.toLowerCase() !== t.toLowerCase());
+  if (op === "add" && t.length >= 2) list.push(t);
+  return { ...store, aliases: list.slice(-20) };
 }
 
 /** 套用一個配對動作 → 新的 store。純函式。 */

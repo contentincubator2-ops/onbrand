@@ -11,11 +11,16 @@
  * 品牌大腦只知道「哪一檔活動」，不知道「哪一篇」，所以這段另外組，不塞進 brandContext。
  */
 import localPool from "../../localDb.js";
+import { campaignLink, cleanLandingUrl } from "../../performance/core/perfUtm.js";
 
 const PHASE_ZH: Record<string, string> = { teaser: "預熱", launch: "開賣", sustain: "加溫", lastcall: "倒數", encore: "返場" };
 
 export interface CampaignItemRef { eventId: number; itemId: string }
-export interface CampaignItemInfo { eventId: number; itemId: string; paid: boolean; phase: string; date: string; angle: string; phaseMessage: string }
+export interface CampaignItemInfo {
+  eventId: number; itemId: string; paid: boolean; phase: string; date: string; angle: string; phaseMessage: string;
+  /** 2026-09-30 成效第 2 步：這一篇的追蹤連結（活動設了導流網址才有）。 */
+  link?: string | null;
+}
 
 /** 企劃裡的那一篇 → 給寫手的一段說明。純函式。 */
 export function campaignItemBriefText(info: CampaignItemInfo): string {
@@ -25,6 +30,7 @@ export function campaignItemBriefText(info: CampaignItemInfo): string {
     info.paid
       ? "- 這一篇會下廣告（付費投放）。請寫成廣告文案：看到的人多半還沒追蹤這個品牌，第一句就要讓他停下來；講清楚對他有什麼好處、下一步做什麼（一個明確的行動呼籲）；不要只對老粉絲說話；避開保證效果、誇大比較、個人化指稱（例如「你是不是很胖」）這類廣告審核會擋的說法。"
       : "",
+    info.link ? `- 文中要放連結時，一律用這一個（帶追蹤碼，不要改、不要縮）：${info.link}` : "",
   ].filter(Boolean);
   return `\n\n[本篇在活動企劃中的位置]\n${lines.join("\n")}\n`;
 }
@@ -40,7 +46,9 @@ export async function loadCampaignItem(ref: CampaignItemRef, userId: number): Pr
     const plan = pos?.campaignPlan;
     const it = (plan?.items ?? []).find((i: any) => i?.id === ref.itemId);
     if (!it) return null;
+    const landing = cleanLandingUrl(pos?.campaignPerf?.landingUrl);
     return {
+      link: landing ? campaignLink(landing, { eventId: ref.eventId, itemId: ref.itemId, phase: String(it.phase ?? ""), platform: String(it.platform ?? ""), paid: !!it.paid }) : null,
       eventId: ref.eventId, itemId: ref.itemId, paid: !!it.paid,
       phase: String(it.phase ?? ""), date: String(it.date ?? ""), angle: String(it.angle ?? ""),
       phaseMessage: String(plan?.phaseMessages?.[it.phase] ?? ""),

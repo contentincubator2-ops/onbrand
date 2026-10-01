@@ -38,10 +38,10 @@ import { pivot, resolveTag, judgeValue, BUILTIN_DIMS, METRIC_LABELS, JUDGE_LABEL
 import { deriveDimensions, proposeLens, autoTag } from "../core/perfAI";
 import { parseTable, guessSource, guessMapping, buildFacts, IMPORT_SOURCES, ROWCOUNT } from "../core/perfImport";
 import { syncFbPage, resolvePage, FbSyncError, fbSyncEnabled } from "../core/fbPageSync";
-import { utmContent } from "../core/perfUtm";
+import { utmContent, campaignCode, campaignLink, cleanLandingUrl } from "../core/perfUtm";
 import {
-  buildCampaignPerf, applyMatch, loadCampaignEvent, saveCampaignPerf, publishedPosts, listCampaigns,
-  type PerfFact, type CampaignPerfStore,
+  buildCampaignPerf, applyMatch, applyAlias, loadCampaignEvent, saveCampaignPerf, publishedPosts, listCampaigns,
+  type PerfFact, type ExtFact, type CampaignPerfStore,
 } from "../core/campaignPerf";
 
 const trayInput = z.enum(TRAYS as [string, ...string[]]);
@@ -436,27 +436,70 @@ export const performanceRouter = router({
       const from = addDays(dates[0] ?? new Date().toISOString().slice(0, 10), -14);
       const to = addDays(dates[dates.length - 1] ?? new Date().toISOString().slice(0, 10), 7);
       const [rawFacts, published, page] = await Promise.all([
-        loadFacts(input.brandId, from, to, ["fb_page"]),
+        loadFacts(input.brandId, from, to),
         publishedPosts(input.brandId, items.map((i) => i.outputId ?? 0)),
         resolvePage(input.brandId).catch(() => null),
       ]);
-      const facts: PerfFact[] = rawFacts.map((f: any) => ({
+      const facts: PerfFact[] = rawFacts.filter((f: any) => f.source === "fb_page").map((f: any) => ({
         key: `${f.source}:${f.entityId}`, source: f.source, entityId: String(f.entityId), date: f.date,
         text: String(f.text ?? f.entityLabel ?? ""), permalink: f.permalink ?? null, metrics: f.metrics ?? {},
       }));
+      // 第 2 步：廣告／GA4／電商匯入，靠 UTM 或名稱對應歸檔（campaignPerf.campaignOf）。
+      const external: ExtFact[] = rawFacts.filter((f: any) => f.source !== "fb_page").map((f: any) => ({
+        source: f.source, date: f.date, label: String(f.entityLabel ?? f.entityId ?? ""),
+        tags: f.tags ?? {}, metrics: f.metrics ?? {},
+      }));
+      const store = (ev.pos?.campaignPerf ?? {}) as CampaignPerfStore;
       const kpiPhases = plan.kpi?.phases ?? null;
       const report = buildCampaignPerf({
-        items, kpiPhases, published, facts, store: (ev.pos?.campaignPerf ?? {}) as CampaignPerfStore,
+        items, kpiPhases, published, facts, store, eventId: ev.id, external,
         today: new Date().toISOString().slice(0, 10),
       });
+      const landingUrl = cleanLandingUrl(store.landingUrl);
       return {
         event: { id: ev.id, name: ev.name, startAt: ev.startAt, endAt: ev.endAt },
+        code: campaignCode(ev.id),
+        landingUrl,
+        aliases: store.aliases ?? [],
         locked: !!plan.lockedAt,
         kpi: plan.kpi ? { budget: plan.kpi.budget ?? null, goals: plan.kpi.goals ?? [] } : null,
         fbPage: page,
         fbSyncEnabled: fbSyncEnabled(),
         ...report,
+        // 每一篇的追蹤連結（設了導流網址才有）。
+        items: report.items.map((i) => ({
+          ...i,
+          link: landingUrl ? campaignLink(landingUrl, { eventId: ev.id, itemId: i.id, phase: i.phase, platform: i.platform, paid: i.paid }) : null,
+        })),
       };
+    }),
+
+  /** 活動導流網址（每一篇的追蹤連結由它加上 UTM）；null＝清掉。 */
+  campaignLanding: protectedProcedure
+    .input(z.object({ brandId: z.number().int().positive(), eventId: z.number().int().positive(), url: z.string().max(500).nullable() }))
+    .mutation(async ({ ctx, input }) => {
+      await assertBrandAccess(ctx.user!.id, input.brandId);
+      const ev = await loadCampaignEvent(input.eventId, ctx.user!.id);
+      if (!ev || ev.brandId !== input.brandId) throw new TRPCError({ code: "NOT_FOUND", message: "找不到這個活動" });
+      const url = cleanLandingUrl(input.url);
+      if (input.url && !url) throw new TRPCError({ code: "BAD_REQUEST", message: "網址要是 http:// 或 https:// 開頭" });
+      await saveCampaignPerf(input.eventId, ctx.user!.id, { ...((ev.pos?.campaignPerf ?? {}) as CampaignPerfStore), landingUrl: url });
+      return { ok: true, landingUrl: url };
+    }),
+
+  /** 匯入檔名稱對應：名稱含這幾個字的列算這檔（Meta 廣告行銷活動名稱等）。 */
+  campaignAlias: protectedProcedure
+    .input(z.object({
+      brandId: z.number().int().positive(), eventId: z.number().int().positive(),
+      alias: z.string().min(2).max(80), op: z.enum(["add", "remove"]),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertBrandAccess(ctx.user!.id, input.brandId);
+      const ev = await loadCampaignEvent(input.eventId, ctx.user!.id);
+      if (!ev || ev.brandId !== input.brandId) throw new TRPCError({ code: "NOT_FOUND", message: "找不到這個活動" });
+      const next = applyAlias((ev.pos?.campaignPerf ?? {}) as CampaignPerfStore, input.alias, input.op);
+      await saveCampaignPerf(input.eventId, ctx.user!.id, next);
+      return { ok: true, aliases: next.aliases ?? [] };
     }),
 
   /** 待確認的貼文：配對到某一格／企劃外／不是這檔／放回待確認。 */

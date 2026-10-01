@@ -521,7 +521,7 @@ function ProposalCard({ brandId, tray, proposal, origin, metricLabels, judgeLabe
 
 const IMPORT_SOURCE_OPTIONS = ["meta_ads", "google_ads", "ga4", "shopline", "91app", "shopify", "csv"];
 
-function ImportModal({ brandId, traySources, sourceLabels, metricLabels, dims, imports, onClose, onDone }: {
+export function ImportModal({ brandId, traySources, sourceLabels, metricLabels, dims, imports, onClose, onDone }: {
   brandId: number; traySources: string[]; sourceLabels: Record<string, string>; metricLabels: Record<string, string>;
   dims: Dim[]; imports: any[]; onClose: () => void; onDone: (msg: string) => void;
 }) {
