@@ -7,6 +7,7 @@
 import { channelLabel } from "../../content/lib/channelMeta";
 import type { CampaignPhaseId, CampaignPlan, CampaignPlanItem } from "./campaignSchema";
 import { phaseShort } from "./campaignStage";
+import { basisLabel, type BasisPatch } from "./campaignBasis";
 
 export type CampaignOp =
   | { op: "add"; item: CampaignPlanItem }
@@ -17,10 +18,12 @@ export interface CampaignProposal {
   ops: CampaignOp[];
   phaseMessages?: Partial<Record<CampaignPhaseId, string>>;
   smp?: string;
+  /** 策略依據（11 段活動定位）的改法；只有策略總監會給。不在企劃裡，另外存（campaign.saveBasis）。 */
+  basis?: BasisPatch;
 }
 
 export function isEmptyProposal(p: CampaignProposal | null | undefined): boolean {
-  return !p || (!p.ops.length && !p.smp && !Object.keys(p.phaseMessages ?? {}).length);
+  return !p || (!p.ops.length && !p.smp && !Object.keys(p.phaseMessages ?? {}).length && !Object.keys(p.basis ?? {}).length);
 }
 
 /** 套用提案 → 新的企劃。已寫好的那篇就算提案裡有也不動（伺服器已經擋過，這裡再保險一次）。 */
@@ -57,6 +60,10 @@ export function describeProposal(plan: CampaignPlan, p: CampaignProposal, en: bo
   if (p.smp) lines.push(L(`訴求改成「${p.smp}」`, `Core message → “${p.smp}”`));
   for (const [id, m] of Object.entries(p.phaseMessages ?? {})) {
     lines.push(L(`${phaseShort(id as CampaignPhaseId, false)}的訊息改成「${m}」`, `${phaseShort(id as CampaignPhaseId, true)} message → “${m}”`));
+  }
+  for (const [path, v] of Object.entries(p.basis ?? {})) {
+    const text = v == null ? L("（清空）", "(cleared)") : Array.isArray(v) ? v.join(L("、", ", ")) : v;
+    lines.push(L(`策略依據・${basisLabel(path, false)}：「${text}」`, `Basis · ${basisLabel(path, true)}: “${text}”`));
   }
   for (const o of p.ops) {
     if (o.op === "add") {
