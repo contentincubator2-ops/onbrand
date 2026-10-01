@@ -27,6 +27,7 @@ import { workbenchRouter } from "../strategy/routers/workbenchRouter";
 import { strategistChatRouter } from "../strategy/routers/strategistChatRouter";
 import { assetPhotoRouter } from "../strategy/routers/assetPhotoRouter";
 import { campaignRouter } from "../strategy/routers/campaignRouter";
+import { vendorRouter } from "../content/routers/vendorRouter";
 import { strategyMonitorRouter } from "../strategy/routers/strategyMonitorRouter";
 import { strategyMeetingRouter } from "../strategy/routers/strategyMeetingRouter";
 import { brandRegulationRouter } from "../strategy/routers/brandRegulationRouter";
@@ -101,6 +102,8 @@ export const appRouter = router({
   // 2026-09-25（CJ 的活動企劃改版）：活動的「設定 + 宣傳企劃」。策略層的企劃頁
   // 與內容層的活動 tray 讀的是同一筆資料，出入口只有這一支。
   campaign:      campaignRouter,
+  // 2026-10-01（CJ「用 AI 幫忙查出可以合作的廠商，可以自己接洽聯繫」）：產出旁邊的「找合作對象」。
+  vendor:        vendorRouter,
   scope:         scopeRouter,
   pipeline:      pipelineRouter,
   postFormat:    postFormatRouter,
