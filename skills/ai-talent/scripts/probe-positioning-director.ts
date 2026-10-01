@@ -12,6 +12,8 @@ import { buildBrandPositioningSteps } from "../server/strategy/core/positioningS
 import { listDirectorsForBrand } from "../server/strategy/core/strategistDirectory.js";
 import { loadDirectorPersona } from "../server/strategy/core/positioningDirector.js";
 import type { StepContext } from "../server/strategy/core/positioningJobRunner.js";
+import { getBrandRealContent } from "../server/strategy/core/brandRealContent.js";
+import { buildMarketContext } from "../server/strategy/core/marketProfiles.js";
 
 async function main() {
   const brandId = Number(process.argv[2] || 2977);
@@ -29,11 +31,21 @@ async function main() {
   console.log(`director #${pick.agentId} ${pick.name}（${pick.title}）  persona=${persona?.block.length ?? 0} chars`);
   console.log(`---- persona block (head) ----\n${(persona?.block ?? "").slice(0, 600)}\n----`);
 
+  // 跟 positioningJobRunner.runPipelineDetached 給每一步的脈絡一樣：官網真實內容、
+  // 目標市場、官方確認客群。少了這些，模型只能憑品牌名字猜（SoWork 會被猜成虛擬辦公室）。
+  let realContent: string | undefined;
+  try { const rc = await getBrandRealContent(brandId); if (rc.hasContent) realContent = rc.context; } catch { /* none */ }
+  let marketContext: string | undefined;
+  try { if (b.targetCountry) marketContext = (await buildMarketContext(b.targetCountry, b.outputLanguage, b.marketContextOverride)) || undefined; } catch { /* none */ }
+  const officialAudience = typeof b.targetAudience === "string" && b.targetAudience.trim() ? b.targetAudience.trim() : undefined;
+  console.log(`context: realContent=${realContent?.length ?? 0} chars  market=${marketContext ? "yes" : "no"}  officialAudience=${officialAudience ? "yes" : "no"}`);
+
   const steps = buildBrandPositioningSteps({ lang: "zh-TW", outputLanguage: b.outputLanguage ?? undefined });
   const base: Omit<StepContext, "directorPersona"> = {
     userId: Number(b.userId), entityKind: "brand", entityId: brandId,
     brandName: String(b.brandName ?? b.name ?? ""), industry: industry ?? undefined,
-    description: b.description ?? undefined, prevOutputs: {},
+    description: b.description ?? undefined, realContent, marketContext, officialAudience,
+    outputLanguage: b.outputLanguage ?? undefined, prevOutputs: {},
     recordUsage: async () => {},
   };
 

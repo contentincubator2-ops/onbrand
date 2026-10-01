@@ -36,6 +36,8 @@ interface Alert {
 }
 interface Overview {
   locked: boolean; brandName: string; scanIntervalDays: number;
+  /** 例：「台灣・繁體中文新聞」——依品牌目標市場決定（2026-09-30）。 */
+  newsMarket?: string;
   watches: Watch[]; alerts: Alert[]; productNames: Record<number, string>;
   lastScanAt: string | null; scanning: boolean;
 }
@@ -169,6 +171,7 @@ export default function StrategyAlertsPanel({ brandId }: { brandId: number }) {
           <h3 className="text-[14.5px] font-semibold text-neutral-900">{en ? "Strategy monitoring" : "策略監測"}</h3>
           <p className="mt-1 font-mono text-[12px] tabular-nums text-neutral-500">
             {en ? `Last scan ${fmt(data.lastScanAt, en)} · auto every ${data.scanIntervalDays}d` : `上次掃描 ${fmt(data.lastScanAt, en)} · 每 ${data.scanIntervalDays} 天自動掃一次`}
+            {data.newsMarket ? ` · ${en ? "Searching " : "搜尋"}${data.newsMarket}` : ""}
           </p>
           {data.watches[0]?.lastScanNote && (
             <p className="mt-0.5 text-[12px] text-neutral-400">{noteText(data.watches[0].lastScanNote, en)}</p>
