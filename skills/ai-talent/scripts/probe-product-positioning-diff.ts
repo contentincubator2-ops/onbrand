@@ -22,11 +22,11 @@ const clip = (s: any, n = 70) => {
 async function main() {
   const brandId = Number(process.argv[2] || 0);
   const [brandRows]: any = brandId
-    ? await localPool.execute(`SELECT id, brandName AS name FROM brands WHERE id = ?`, [brandId])
+    ? await localPool.execute(`SELECT id, name FROM brands WHERE id = ?`, [brandId])
     : await localPool.execute(
-        `SELECT b.id, b.brandName AS name FROM brands b JOIN products p ON p.brandId = b.id
+        `SELECT b.id, b.name FROM brands b JOIN products p ON p.brandId = b.id
           WHERE JSON_EXTRACT(p.positioning, '$.core') IS NOT NULL
-          GROUP BY b.id, b.brandName HAVING COUNT(*) >= 2
+          GROUP BY b.id, b.name HAVING COUNT(*) >= 2
           ORDER BY MAX(p.updatedAt) DESC LIMIT 6`);
 
   for (const b of brandRows as any[]) {
