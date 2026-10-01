@@ -41,6 +41,7 @@ import CampaignSetupForm from "./CampaignSetupForm";
 import CampaignChatCard from "./CampaignChatCard";
 import CampaignBasisPanel from "./CampaignBasisPanel";
 import KolBriefForm from "./KolBriefForm";
+import ChannelBriefForm, { type ChannelBriefSpec } from "./ChannelBriefForm";
 import type { BasisPatch, BasisValue } from "../../lib/campaignBasis";
 import { dockDirector } from "../../lib/directorDock";
 import CampaignHandoff from "./CampaignHandoff";
@@ -82,6 +83,10 @@ export default function CampaignStage({ eventId, brandId }: { eventId: number; b
   const [setupOpen, setSetupOpen] = React.useState(false);
   /** 網紅任務說明單（2026-10-01 CJ：按下網紅＝填說明單，不是調整活動設定）。 */
   const [kolOpen, setKolOpen] = React.useState(false);
+  /** 其他通路的任務說明單（2026-10-02 CJ：照網紅那張做）：打開的是哪個通路。 */
+  const [briefCh, setBriefCh] = React.useState<string | null>(null);
+  const specsQ = (trpc as any).campaign.briefSpecs.useQuery(undefined, { staleTime: Infinity, refetchOnWindowFocus: false });
+  const briefSpec: ChannelBriefSpec | undefined = briefCh ? specsQ.data?.[briefCh] : undefined;
   const [saveState, setSaveState] = React.useState<"idle" | "saving" | "saved" | "error">("idle");
   const [saveErr, setSaveErr] = React.useState("");
   const dirtyRef = React.useRef(false);
@@ -284,7 +289,7 @@ export default function CampaignStage({ eventId, brandId }: { eventId: number; b
                 return (
                   <button key={c} type="button" disabled={locked || !plan}
                     title={on ? channelLabel(c, en) : L(`加入 ${channelLabel(c, en)}：到設定裡勾選後重排，或直接跟內容企劃說`, `Add ${channelLabel(c, en)} in settings, or ask the planner`)}
-                    onClick={() => (c === "kol" ? setKolOpen(true) : setSetupOpen(true))}
+                    onClick={() => (c === "kol" ? setKolOpen(true) : specsQ.data?.[c] ? setBriefCh(c) : setSetupOpen(true))}
                     className={`w-7 h-7 rounded-lg grid place-items-center text-tiny transition disabled:cursor-default ${on ? "bg-foreground text-background" : "bg-default-100 text-default-400 hover:text-default-700"}`}>
                     <FontAwesomeIcon icon={CHANNEL_META[c]?.icon ?? faPenNib} />
                   </button>
@@ -442,6 +447,32 @@ export default function CampaignStage({ eventId, brandId }: { eventId: number; b
                 setKolOpen(false);
               }} />
           </ModalBody>
+        </ModalContent>
+      </Modal>
+
+      <Modal isOpen={!!briefSpec} onClose={() => setBriefCh(null)} size="4xl" scrollBehavior="inside">
+        <ModalContent>
+          {briefSpec && (
+            <>
+              <ModalHeader className="flex flex-col gap-1">
+                <span className="text-medium">{en ? briefSpec.en : briefSpec.zh}</span>
+                <span className="text-tiny font-normal text-default-500">{en ? briefSpec.introEn : briefSpec.introZh}</span>
+              </ModalHeader>
+              <ModalBody className="pb-6">
+                <ChannelBriefForm key={briefSpec.channel} eventId={eventId} spec={briefSpec} locked={locked} en={en}
+                  initial={data.channelBriefs?.[briefSpec.channel]}
+                  inherited={{ smp: plan?.smp, goal: settings.goal, audience: data.audience, startAt: ev.startAt, endAt: ev.endAt }}
+                  inPlan={(settings.channels ?? []).includes(briefSpec.channel) || live.some((i) => i.platform === briefSpec.channel)
+                    || (briefSpec.channel === "cobrand" && !!settings.partners?.cobrand)}
+                  onOpenSetup={() => { setBriefCh(null); setSetupOpen(true); }}
+                  onSaved={({ plan: next }) => {
+                    if (next) { planRef.current = next; setPlan(next); dirtyRef.current = false; }
+                    utils?.campaign?.get?.invalidate?.({ eventId });
+                    setBriefCh(null);
+                  }} />
+              </ModalBody>
+            </>
+          )}
         </ModalContent>
       </Modal>
 

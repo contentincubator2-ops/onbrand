@@ -13,6 +13,7 @@
 import localPool from "../../localDb.js";
 import { campaignLink, cleanLandingUrl } from "../../performance/core/perfUtm.js";
 import { cleanKolBrief, kolBriefText } from "./campaignKolBrief.js";
+import { cleanChannelBrief, channelBriefText, isBriefChannel } from "./campaignChannelBrief.js";
 
 const PHASE_ZH: Record<string, string> = { teaser: "預熱", launch: "開賣", sustain: "加溫", lastcall: "倒數", encore: "返場" };
 
@@ -24,6 +25,8 @@ export interface CampaignItemInfo {
   /** 2026-10-01 網紅那條線：這一件是給誰，以及整張網紅任務說明單（給寫手的文字）。 */
   partner?: string | null;
   kolBrief?: string | null;
+  /** 2026-10-02 其他通路的任務說明單（給寫手的文字，含平台規則）。 */
+  channelBrief?: string | null;
 }
 
 /** 企劃裡的那一篇 → 給寫手的一段說明。純函式。 */
@@ -39,6 +42,8 @@ export function campaignItemBriefText(info: CampaignItemInfo): string {
   ].filter(Boolean);
   // 網紅任務說明單：使用者填給經紀公司的需求。寫邀約、brief、追蹤時都要照這裡，不要另外編條件。
   if (info.kolBrief) lines.push(`- 以下是這檔的網紅任務說明單，裡面有的條件（時程、必提禁提、授權）照寫，沒有的標 [待補]，不要自己編；不要寫任何報價、預算或價格數字（由使用者跟對方直接談）：\n${info.kolBrief}`);
+  // 其他通路的任務說明單：使用者填給寫手的執行條件與平台規則。照做，沒寫的不要自己編。
+  if (info.channelBrief) lines.push(`- 以下是這個通路的任務說明單。這一篇若對應清單裡的某一列，就照那一列的對象與角度寫；有寫的條件照做，平台規則一定要守，沒寫的不要自己編；不要寫任何報價、預算或價格數字：\n${info.channelBrief}`);
   return `\n\n[本篇在活動企劃中的位置]\n${lines.join("\n")}\n`;
 }
 
@@ -54,12 +59,14 @@ export async function loadCampaignItem(ref: CampaignItemRef, userId: number): Pr
     const it = (plan?.items ?? []).find((i: any) => i?.id === ref.itemId);
     if (!it) return null;
     const landing = cleanLandingUrl(pos?.campaignPerf?.landingUrl);
-    const isKol = String(it.platform ?? "") === "kol";
+    const platform = String(it.platform ?? "");
+    const isKol = platform === "kol";
     return {
       link: landing ? campaignLink(landing, { eventId: ref.eventId, itemId: ref.itemId, phase: String(it.phase ?? ""), platform: String(it.platform ?? ""), paid: !!it.paid }) : null,
       eventId: ref.eventId, itemId: ref.itemId, paid: !!it.paid,
       partner: typeof it.partner === "string" && it.partner ? it.partner : null,
       kolBrief: isKol ? kolBriefText(cleanKolBrief(pos?.kolBrief)) || null : null,
+      channelBrief: isBriefChannel(platform) ? channelBriefText(platform, cleanChannelBrief(platform, pos?.channelBriefs?.[platform])) || null : null,
       phase: String(it.phase ?? ""), date: String(it.date ?? ""), angle: String(it.angle ?? ""),
       phaseMessage: String(plan?.phaseMessages?.[it.phase] ?? ""),
     };

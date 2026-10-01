@@ -135,7 +135,7 @@ export default function CampaignSetupForm({ eventId, data, brandProducts, hasPla
             {settings.channels.includes("kol") && onOpenKolBrief && (
               <button type="button" onClick={onOpenKolBrief}
                 className="mt-2 text-tiny text-default-600 hover:text-foreground underline underline-offset-2">
-                {L("填網紅任務說明單（名單或類型、預算、時程…）", "Fill in the influencer brief (who, budget, timeline…)")}
+                {L("填網紅任務說明單（名單或類型、時程、條款…）", "Fill in the influencer brief (who, timeline, terms…)")}
               </button>
             )}
           </div>

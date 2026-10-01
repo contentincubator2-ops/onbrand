@@ -26,6 +26,7 @@
 import localPool from "../../localDb.js";
 import { buildTaskCatalogIndex, type CatalogTask } from "../../content/core/taskCatalogIndex.js";
 import { influencerLabel, cleanKolBrief, type KolInfluencer, type KolBrief } from "./campaignKolBrief.js";
+import { cleanChannelBriefs, channelBriefText, briefPartners, isBriefChannel, type BriefChannel, type ChannelBrief } from "./campaignChannelBrief.js";
 import { isHiddenContentPlatform } from "../../platform/core/planGate.js";
 import {
   loadEventProducts, productScopeBrief, resolveProductScope,
@@ -326,6 +327,8 @@ export async function eventFacts(eventId: number, userId: number): Promise<{
   settings: CampaignSettings; products: ScopedProduct[];
   /** 網紅任務說明單（campaignKolBrief.ts）。 */
   kolBrief: KolBrief;
+  /** 其他通路的任務說明單（campaignChannelBrief.ts）。 */
+  channelBriefs: Partial<Record<BriefChannel, ChannelBrief>>;
 } | null> {
   const [rows]: any = await localPool.execute(
     `SELECT e.id, e.name, e.brandId, e.startAt, e.endAt, e.positioning, b.name AS brandName
@@ -348,6 +351,7 @@ export async function eventFacts(eventId: number, userId: number): Promise<{
     endAt: row.endAt ? new Date(row.endAt) : null,
     settings, products,
     kolBrief: cleanKolBrief(pos?.kolBrief),
+    channelBriefs: cleanChannelBriefs(pos?.channelBriefs),
   };
 }
 
@@ -369,8 +373,8 @@ export const PARTNER_CHANNELS: readonly string[] = [KOL_CHANNEL, COBRAND_CHANNEL
 
 type LaneStep = {
   off: number; taskId: string; angle: (hook: string) => string;
-  /** 網紅任務說明單有名單時，名單上每一位各一件，角度照他的（見 laneItems）。 */
-  each?: (r: KolInfluencer, label: string, hook: string) => string;
+  /** 說明單有名單時（網紅名單、異業合作夥伴），名單上每一位各一件，角度照他的（見 laneItems）。 */
+  each?: (r: { angle?: string }, label: string, hook: string) => string;
 };
 const LANE_STEPS: Record<string, LaneStep[]> = {
   [KOL_CHANNEL]: [
@@ -390,9 +394,17 @@ const LANE_STEPS: Record<string, LaneStep[]> = {
   ],
   [COBRAND_CHANNEL]: [
     { off: -28, taskId: "cb-30-partner-shortlist", angle: () => "列出受眾重疊、品類不衝突的合作夥伴輪廓，選定合作形式" },
-    { off: -21, taskId: "cb-30-pitch-letter", angle: (h) => (h ? `寫提案信：先講對方能得到什麼，再用「${h}」當共同理由` : "寫提案信：先講對方能得到什麼，再講我們想要什麼") },
+    {
+      off: -21, taskId: "cb-30-pitch-letter",
+      angle: (h) => (h ? `寫提案信：先講對方能得到什麼，再用「${h}」當共同理由` : "寫提案信：先講對方能得到什麼，再講我們想要什麼"),
+      // 2026-10-02：異業合作任務說明單的夥伴名單，每一位各一封（對象類型不同，提案的方案就不同）。
+      each: (r, label, h) => `寫給 ${label} 的提案信：${r.angle ? `從「${r.angle}」切入，` : h ? `用「${h}」當共同理由，` : ""}先講對方能得到什麼`,
+    },
     { off: -14, taskId: "cb-30-followup", angle: () => "提案後追蹤：沒回的補資訊、聊過的推下一步" },
-    { off: -10, taskId: "cb-30-deal-terms", angle: () => "講好分工與導流：誰出素材、誰出優惠、成效怎麼算" },
+    {
+      off: -10, taskId: "cb-30-deal-terms", angle: () => "講好分工與導流：誰出素材、誰出優惠、成效怎麼算",
+      each: (_r, label) => `跟 ${label} 講好合作條件：照說明單裡這一類要談的事，誰出什麼、成效怎麼算`,
+    },
     { off: 0, taskId: "cb-30-joint-post", angle: () => "開賣當天雙方一起發的聯合公告：同一句核心訊息、各自的開場" },
   ],
 };
@@ -406,19 +418,22 @@ export function laneItems(channel: string, args: {
   launch: string; end: string; today: string; mechanic: string; cards: CatalogTask[];
   /** 網紅任務說明單的名單（選填）。有的話，邀約與 brief 每一位各一件、一天錯開一位（最多錯開 4 天）。 */
   influencers?: KolInfluencer[];
+  /** 其他說明單的名單（異業合作夥伴；campaignChannelBrief.briefPartners）。跟 influencers 擇一。 */
+  partners?: Array<{ label: string; angle?: string }>;
 }): PlanItem[] {
   const steps = LANE_STEPS[channel] ?? [];
   const addDays = (s: string, n: number) => ymd(new Date(new Date(`${s}T00:00:00Z`).getTime() + n * DAY));
   const latest = addDays(args.end, 7);
   const hook = args.mechanic.trim().slice(0, 30);
-  const people = (args.influencers ?? []).filter((r) => r.name || r.type);
+  const people: Array<{ label: string; angle?: string }> = args.influencers?.length
+    ? args.influencers.filter((r) => r.name || r.type).map((r) => ({ label: influencerLabel(r), ...(r.angle ? { angle: r.angle } : {}) }))
+    : (args.partners ?? []).filter((p) => p.label);
   // 展開成一件一件：有名單的步驟每一位一件。
   const plan: Array<{ off: number; taskId: string; angle: string; partner?: string }> = [];
   for (const p of steps) {
     if (p.each && people.length) {
       people.forEach((r, i) => {
-        const label = influencerLabel(r);
-        plan.push({ off: p.off + Math.min(i, 4), taskId: p.taskId, angle: p.each!(r, label, hook), partner: label });
+        plan.push({ off: p.off + Math.min(i, 4), taskId: p.taskId, angle: p.each!(r, r.label, hook), partner: r.label });
       });
     } else {
       plan.push({ off: p.off, taskId: p.taskId, angle: p.angle(hook) });
@@ -624,7 +639,14 @@ export async function buildCampaignPlan(args: {
   const kol = partnerLanes.flatMap((ch) => laneItems(ch, {
     launch: launchDate, end: endDate, today, mechanic: s.mechanic, cards: partnerCards,
     ...(ch === KOL_CHANNEL ? { influencers } : {}),
+    ...(ch === COBRAND_CHANNEL ? { partners: briefPartners("cobrand", facts.channelBriefs.cobrand) } : {}),
   }));
+  // 2026-10-02：貼文通路的任務說明單（發在哪、推給誰、哪種形式…）帶進來，角度照清單排。
+  const channelBriefBlock = postChannels
+    .filter(isBriefChannel)
+    .map((c) => (facts.channelBriefs[c] ? channelBriefText(c, facts.channelBriefs[c]) : ""))
+    .filter(Boolean)
+    .join("\n\n");
 
   const cardMenu = cards
     .map((c) => `- ${c.id}｜${c.platform}｜${c.labelZh || c.labelEn}`)
@@ -650,6 +672,7 @@ export async function buildCampaignPlan(args: {
     `【活動搭配】\n${productBlock}`,
     `【要排的檔期格子】\n${beatList}`,
     `【候選任務卡（只能從這裡挑）】\n${cardMenu}`,
+    channelBriefBlock ? `【各通路任務說明單（使用者填的；有清單的通路，angle 要對準清單裡的某一列，盡量每一列都排到）】\n${channelBriefBlock}` : "",
     "",
     "請為每一格挑一張卡並寫出這一篇要講什麼，再為每一個階段寫一句這段要讓人記住的訊息。只輸出 JSON，鍵名固定如下：",
     `{"smp":"這檔活動的一句話訴求（25字內）","phases":[{"phase":"階段 id","message":"這一段要讓人記住的一句話（20字內）"}],"items":[{"beat":0,"platform":"facebook","taskId":"逐字抄自候選清單","angle":"這一篇要講什麼（20-45字）"}]}`,
