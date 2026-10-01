@@ -9,29 +9,19 @@
  * 現在：
  *   · rail 是「我要看哪一層」的開關。按品牌／產品／活動／視覺／會議／記憶＝回到
  *     品牌層，p／e 清掉。
- *   · 只有「文字」保留 p／e：產品的行銷指引、活動的創意規範就住在那一格裡，
- *     沒有別的入口。
+ *   · 2026-10-02（CJ「我按下策略層的文字，直接出現 onBrand Studio 上市活動的
+ *     文字，應該要是 SoWork 的」）：「文字」也一樣回品牌層。以前它保留 p／e，
+ *     人剛看完活動再按「文字」，得到的是活動的創意規範而不是品牌的文字。產品的
+ *     行銷指引、活動的創意與內容規範在它們自己的定位頁裡都看得到。
  *   · 人在某個產品／活動裡面時，亮的是「產品」／「活動」，不是「品牌」。
  */
-
-/** 帶著產品／活動進去仍然有自己內容的分類。 */
-const KEEPS_ENTITY = new Set(["copy"]);
 
 /** 這些分類在產品／活動底下顯示的是「那個產品／活動自己的頁面」。 */
 const ENTITY_PAGES = new Set(["positioning", "campaign", "settings", "info"]);
 
-export function strategyRailTarget(cat: string, currentSearch: string, brandId: number | null | undefined): string {
-  const cur = new URLSearchParams(currentSearch);
+export function strategyRailTarget(cat: string, _currentSearch: string, brandId: number | null | undefined): string {
   const qs: string[] = [];
-  if (brandId) {
-    qs.push(`b=${brandId}`);
-    if (KEEPS_ENTITY.has(cat)) {
-      const pid = cur.get("p");
-      const eid = cur.get("e");
-      if (pid) qs.push(`p=${pid}`);
-      if (eid) qs.push(`e=${eid}`);
-    }
-  }
+  if (brandId) qs.push(`b=${brandId}`);
   qs.push(`cat=${cat}`);
   return `/brands/edit?${qs.join("&")}`;
 }
