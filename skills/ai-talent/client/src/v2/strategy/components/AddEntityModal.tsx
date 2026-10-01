@@ -139,12 +139,6 @@ export function AddEntityModal({ isOpen, onClose, initialTab = "brand", defaultB
   const [evStart, setEvStart] = useState("");
   const [evEnd, setEvEnd] = useState("");
   const [evNote, setEvNote] = useState("");
-  useEffect(() => {
-    if (!isOpen || !eventPrefill) return;
-    setEvName(eventPrefill.name);
-    setEvStart(eventPrefill.startAt);
-    setEvEnd(eventPrefill.endAt ?? "");
-  }, [isOpen, eventPrefill]);
   // 2026-09-30（CJ「新增活動的過程中，要讓用戶可以選擇…搭配哪個產品、好幾個產品聯合
   // 或純品牌活動」）。沒選也能建立——宣傳企劃頁的第一步會再問一次同一題。
   const [evScope, setEvScope] = useState<ProductScopeValue>(UNDECIDED_SCOPE);
@@ -153,15 +147,21 @@ export function AddEntityModal({ isOpen, onClose, initialTab = "brand", defaultB
       .filter((p) => Number(p.brandId) === Number(evBrandId))
       .map((p) => ({ id: Number(p.id), name: String(p.name) }));
 
-  // Reset on open
+  // Reset on open。從活動時間軸節點「開始企劃」打開時，活動欄位改帶節點的名稱與日期——
+  // 要寫在這一步裡：另開一個 effect 帶值的話，會被這裡（宣告在後、執行在後）清掉
+  // （2026-10-02 dev 站實測踩到）。
   useEffect(() => {
     if (!isOpen) return;
     setBrandName(""); setBrandWebsite(""); setBrandTA("");
     setBrandCountry("TW"); setBrandLang("zh-TW");
     setProdBrandId(defaultBrandId ?? null); setProdName(""); setProdPositioning("");
-    setEvBrandId(defaultBrandId ?? null); setEvName(""); setEvStart(""); setEvEnd(""); setEvNote("");
+    setEvBrandId(defaultBrandId ?? null);
+    setEvName(eventPrefill?.name ?? "");
+    setEvStart(eventPrefill?.startAt ?? "");
+    setEvEnd(eventPrefill?.endAt ?? "");
+    setEvNote("");
     setEvScope(UNDECIDED_SCOPE);
-  }, [isOpen, defaultBrandId]);
+  }, [isOpen, defaultBrandId, eventPrefill]);
 
   const [busy, setBusy] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
