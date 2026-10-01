@@ -8,6 +8,7 @@
  */
 import { IllustratedEmpty } from "../../platform/components/EmptyIllustration";
 import { TaskIllustration } from "../../platform/components/TaskIllustration";
+import { TASK_MODAL_CLASSNAMES } from "../../platform/components/taskModalStyle";
 import React, { useMemo, useState, useEffect, useRef } from "react";
 import { Navigate, useParams, useOutletContext, useNavigate, useSearchParams } from "react-router-dom";
 import CalendarTabs from "../components/CalendarTabs";
@@ -2293,16 +2294,8 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
         size="2xl"
         scrollBehavior="inside"
         backdrop="blur"
-        // 2026-09-29（CJ 參考「Your inbox is clear」）：淡彩霧面底、大圓角白卡、
-        // 置中的一句大標＋手繪插畫。底色只在遮罩層，卡片本身維持白底黑字。
-        classNames={{
-          backdrop: "bg-gradient-to-br from-rose-100/70 via-emerald-50/60 to-violet-200/60 backdrop-blur-md",
-          base: "max-h-[90vh] rounded-[28px] bg-white shadow-2xl ring-1 ring-black/5",
-          body: "pt-2 pb-4 px-6",
-          footer: "bg-white pt-2 pb-5 px-6",
-          header: "pt-4 pb-3 px-6 bg-white border-b border-default-100",
-          closeButton: "top-3.5 right-4 text-default-400 hover:bg-default-100",
-        }}
+        // 2026-09-29（CJ 參考「Your inbox is clear」）：外觀定義在 taskModalStyle，活動節點視窗共用。
+        classNames={TASK_MODAL_CLASSNAMES}
       >
         <ModalContent>
           {activeTask && (
