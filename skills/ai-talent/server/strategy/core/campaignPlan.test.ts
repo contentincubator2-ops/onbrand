@@ -199,3 +199,35 @@ describe("reconcilePhaseMessages（每一段的訊息）", () => {
     expect(reconcilePhaseMessages(null, beats)).toEqual({});
   });
 });
+
+// ─── 2026-10-01 網紅是一條線（kolItems） ─────────────────────────────────
+import { kolItems, candidateCards, PLANNABLE_CHANNELS } from "./campaignPlan";
+describe("kolItems：網紅那條線", () => {
+  const cards = candidateCards(["kol"]);
+  it("kol 是可排的通路，而且有對應的任務卡", () => {
+    expect(PLANNABLE_CHANNELS).toContain("kol");
+    expect(cards.map((c) => c.id)).toEqual(expect.arrayContaining(["kl-30-invite-opener", "kl-30-influencer-brief", "kl-30-followup"]));
+  });
+  it("時間夠：以開賣日往回推，開賣前是預熱、當天是開賣、之後是加溫", () => {
+    const r = kolItems({ launch: "2026-11-01", end: "2026-12-25", today: "2026-10-01", mechanic: "免費試用每週七篇", cards });
+    expect(r.map((i) => [i.date, i.phase, i.taskId])).toEqual([
+      ["2026-10-11", "teaser", "kl-30-invite-opener"],
+      ["2026-10-18", "teaser", "kl-30-influencer-brief"],
+      ["2026-10-25", "teaser", "kl-30-followup"],
+      ["2026-11-01", "launch", "kl-30-fan-template-kit"],
+      ["2026-11-06", "sustain", "kl-30-catch-organic-fan"],
+    ]);
+    expect(r.every((i) => i.platform === "kol" && i.enabled && !i.outputId)).toBe(true);
+    expect(r[0]!.angle).toContain("免費試用每週七篇");
+  });
+  it("時間不夠：過去的日期挪到今天起、一天一件不疊在一起", () => {
+    const r = kolItems({ launch: "2026-10-05", end: "2026-10-20", today: "2026-10-01", mechanic: "", cards });
+    expect(r.map((i) => i.date)).toEqual(["2026-10-01", "2026-10-02", "2026-10-03", "2026-10-05", "2026-10-10"]);
+    expect(new Set(r.map((i) => i.id)).size).toBe(5);
+  });
+  it("找不到的卡就跳過那一件", () => {
+    const r = kolItems({ launch: "2026-11-01", end: "2026-12-25", today: "2026-10-01", mechanic: "", cards: cards.filter((c) => c.id !== "kl-30-followup") });
+    expect(r.map((i) => i.taskId)).not.toContain("kl-30-followup");
+    expect(r).toHaveLength(4);
+  });
+});

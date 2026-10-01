@@ -16,7 +16,7 @@ import {
   faFacebook, faInstagram, faLinkedin, faYoutube, faTiktok, faXTwitter, faThreads, faLine,
 } from "@fortawesome/free-brands-svg-icons";
 import {
-  faEnvelope, faBullhorn, faGlobe,
+  faEnvelope, faBullhorn, faGlobe, faUserGroup,
 } from "@fortawesome/free-solid-svg-icons";
 
 export interface ChannelMeta {
@@ -39,6 +39,9 @@ export const CHANNEL_META: Record<string, ChannelMeta> = {
   email:     { icon: faEnvelope,   route: "email", zh: "電子報",     en: "Email" },
   pr:        { icon: faBullhorn,   route: "pr",    zh: "新聞稿",     en: "PR" },
   website:   { icon: faGlobe,      route: "web",   zh: "官網",       en: "Website" },
+  // 2026-10-01 CJ「網紅合作跟 instagram 相同功能，也是可以新增的管道」：活動企劃裡的一條線
+  // （邀約、brief、追蹤、素材包、接住自然提及），任務卡是 kl- 那幾張。
+  kol:       { icon: faUserGroup,  route: "kol",   zh: "網紅",       en: "Influencers" },
 };
 
 export function channelLabel(id: string, en: boolean): string {

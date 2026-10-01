@@ -44,6 +44,8 @@ export default function CampaignSetupForm({ eventId, data, brandProducts, hasPla
   React.useEffect(() => {
     if (!data || dirty) return;
     const s = { ...EMPTY_CAMPAIGN_SETTINGS, ...(data.settings ?? {}) };
+    // 舊設定勾過「要找網紅合作」＝網紅通路（2026-10-01 起網紅是通路；server 產企劃時也這樣認）。
+    if (s.partners?.kol && !s.channels.includes("kol")) s.channels = [...s.channels, "kol"];
     setSettings(s);
     setBrief((prev) => prev || s.mechanic || "");
     setScopeValue(scopeValueFrom(data.productScope, (data.products ?? []).map((p: any) => p.id)));
@@ -116,7 +118,7 @@ export default function CampaignSetupForm({ eventId, data, brandProducts, hasPla
           <div>
             <p className="text-tiny text-default-500 mb-2">{L("要發的通路", "Channels")}</p>
             <div className="flex gap-1.5 flex-wrap">
-              {Object.keys(CHANNEL_META).filter((c) => ["facebook", "instagram", "threads", "line", "tiktok", "email", "website"].includes(c)).map((c) => {
+              {Object.keys(CHANNEL_META).filter((c) => ["facebook", "instagram", "threads", "line", "tiktok", "email", "website", "kol"].includes(c)).map((c) => {
                 const on = settings.channels.includes(c);
                 return (
                   <Chip key={c} size="sm" variant={on ? "solid" : "flat"} color="default" className="cursor-pointer"
@@ -137,7 +139,8 @@ export default function CampaignSetupForm({ eventId, data, brandProducts, hasPla
             </div>
           )}
           <div className="flex gap-5 flex-wrap">
-            {([["kol", "要找網紅合作", "Influencer collab"], ["cobrand", "要做異業合作", "Co-branding"]] as const).map(([k, zh, e2]) => (
+            {/* 2026-10-01：網紅改成上面的一個通路（企劃裡一條線），這裡只剩異業合作。 */}
+            {([["cobrand", "要做異業合作", "Co-branding"]] as const).map(([k, zh, e2]) => (
               <Checkbox key={k} size="sm" isSelected={!!(settings.partners as any)?.[k]}
                 onValueChange={(v) => patch({ partners: { ...(settings.partners ?? {}), [k]: v } })}>
                 <span className="text-small">{L(zh, e2)}</span>
