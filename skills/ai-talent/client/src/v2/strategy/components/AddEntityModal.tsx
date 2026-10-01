@@ -61,6 +61,8 @@ interface Props {
   defaultBrandId?: number | null;
   /** Callback after a successful create. Receives entity kind + new id. */
   onCreated?: (kind: AddEntityTab, id: number) => void;
+  /** 2026-10-02：從活動時間軸的節點「開始企劃」——帶入名稱與日期（仍可改）。 */
+  eventPrefill?: { name: string; startAt: string; endAt: string | null } | null;
 }
 
 // 2026-07-19 (CJ「新增活動 slug 直接用中文字元，未做 URL 編碼」): slugs must
@@ -77,7 +79,7 @@ function autoSlug(name: string, kind: string = "item"): string {
   return `${base || kind}-${Math.random().toString(36).slice(2, 6)}`;
 }
 
-export function AddEntityModal({ isOpen, onClose, initialTab = "brand", defaultBrandId, onCreated }: Props) {
+export function AddEntityModal({ isOpen, onClose, initialTab = "brand", defaultBrandId, onCreated, eventPrefill }: Props) {
   const { lang } = useLang();
   const [tab, setTab] = useState<AddEntityTab>(initialTab);
   // 2026-09-07 產品定位上限。建到第 11 個才被擋是死路，事前就要看得到「已用 N／M」。
@@ -137,6 +139,12 @@ export function AddEntityModal({ isOpen, onClose, initialTab = "brand", defaultB
   const [evStart, setEvStart] = useState("");
   const [evEnd, setEvEnd] = useState("");
   const [evNote, setEvNote] = useState("");
+  useEffect(() => {
+    if (!isOpen || !eventPrefill) return;
+    setEvName(eventPrefill.name);
+    setEvStart(eventPrefill.startAt);
+    setEvEnd(eventPrefill.endAt ?? "");
+  }, [isOpen, eventPrefill]);
   // 2026-09-30（CJ「新增活動的過程中，要讓用戶可以選擇…搭配哪個產品、好幾個產品聯合
   // 或純品牌活動」）。沒選也能建立——宣傳企劃頁的第一步會再問一次同一題。
   const [evScope, setEvScope] = useState<ProductScopeValue>(UNDECIDED_SCOPE);

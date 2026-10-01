@@ -593,6 +593,11 @@ async function runStartupMigrations() {
     for (const ddl of PERF_DDLS) await db.execute(sql.raw(ddl));
     console.log("[migrate] perf_dimensions / perf_lenses / perf_facts / perf_tag_rules / perf_imports: OK");
 
+    // 2026-10-02（CJ「活動頁用年度時間軸＋建議節點，節點也可以讓用戶自己增加」）。
+    const { BRAND_CALENDAR_NODES_DDL } = await import("./strategy/core/eventCalendar");
+    await db.execute(sql.raw(BRAND_CALENDAR_NODES_DDL));
+    console.log("[migrate] brand_calendar_nodes: OK");
+
     const { BRAND_NAV_PREFS_DDL } = await import("./platform/routers/navPrefsRouter");
     await db.execute(sql.raw(BRAND_NAV_PREFS_DDL));
     console.log("[migrate] brand_nav_prefs: OK");
