@@ -1402,7 +1402,7 @@ export default function BrandsPage() {
         {scopeMode === "brand" && activeBrandIdForLocks && (
           <>
             <StrategyToolIcon
-              active={section === "pos:home" && activeStrategyTool === "positioning"}
+              active={section === "doc" || (section === "pos:home" && activeStrategyTool === "positioning")}
               onClick={() => { switchStrategyTool("positioning"); setSection("pos:home"); }}
               icon={faTableList}
               label={lang === "en" ? "Positioning" : "定位資料"}
@@ -1420,30 +1420,42 @@ export default function BrandsPage() {
             />
           </>
         )}
-        <StrategyToolIcon
-          active={section === "doc"}
-          onClick={() => setSection("doc" as any)}
-          icon={faFileArrowUp}
-          label={lang === "en" ? "Upload your positioning doc" : "上傳定位資料"}
-          // 格式以 PositioningDocPanel 的 ACCEPT 為準（.docx/.pptx/
-          // .pdf/.md/.txt/.html）＋貼對話文字，不要在這裡承諾它吃不了的。
-          title={lang === "en"
-            ? "Upload your own positioning doc (Word / PPT / PDF / Markdown / txt / html) — or paste a ChatGPT conversation"
-            : "上傳你自己的定位文件（Word / PPT / PDF / Markdown / txt / html），或直接貼 ChatGPT 對話文字"}
-        />
-        {/* 2026-09-30（CJ「策略監測這一頁的右上方，不需要出現重新套用 SoWork 定位法」）：
-            只在「定位資料」視圖出現——它重跑的是定位卡片，跟監測情報無關。 */}
+        {/* 2026-09-30（CJ「上傳定位資料，是只有在定位資料的頁面才需要出現的，用戶可以使用 SoWork
+            定位或是自己上傳定位資料，我想要做得像是策略監測右上方的 agent 一樣的呈現方式…就是兩個
+            按鈕的選項」）：「上傳定位資料」從 chip 列移到右側，跟「品牌定位總監＋SoWork 定位法」並列
+            成二選一。只在定位資料總覽出現（策略監測、上傳頁都不顯示）。 */}
         {pipeline.status === "idle" && section !== "doc" && !(scopeMode === "brand" && activeStrategyTool === "monitor") && (
-          <PositioningTopRow
-            // 2026-05-13 (CJ「按了套用活動定位框架時，出現Event not found」):
-            // pass the scope-aware entity id, not the brand id.
-            // When scope is event/product, server looks up
-            // events.id = entityId — passing brandId here
-            // mismatched and returned "not found".
-            brandId={targetId as number | null}
-            scopeMode={scopeMode}
-            locked={!!tabLocks.positioning}
-          />
+          <div className="ml-auto flex items-start gap-3">
+            <button
+              type="button"
+              onClick={() => setSection("doc" as any)}
+              aria-label={lang === "en" ? "Upload your own positioning" : "自己上傳定位資料"}
+              // 格式以 PositioningDocPanel 的 ACCEPT 為準（.docx/.pptx/.pdf/.md/.txt/.html）＋貼對話文字。
+              title={lang === "en"
+                ? "Upload your own positioning doc (Word / PPT / PDF / Markdown / txt / html) — or paste a ChatGPT conversation"
+                : "上傳你自己的定位文件（Word / PPT / PDF / Markdown / txt / html），或直接貼 ChatGPT 對話文字"}
+              className="shrink-0 flex flex-col items-center gap-1 group"
+            >
+              <span className="block rounded-full p-[3px] ring-[3px] ring-neutral-300 transition group-hover:ring-neutral-900 group-hover:scale-105 group-active:scale-95">
+                <span className="w-12 h-12 rounded-full bg-neutral-100 flex items-center justify-center text-neutral-700">
+                  <FontAwesomeIcon icon={faFileArrowUp} style={{ fontSize: 18 }} />
+                </span>
+              </span>
+              <span className="flex flex-col items-center leading-tight">
+                <span className="text-[12px] font-semibold text-neutral-900">{lang === "en" ? "Your own" : "自己上傳"}</span>
+                <span className="text-[11px] font-semibold text-neutral-500">{lang === "en" ? "Upload doc" : "定位資料"}</span>
+              </span>
+            </button>
+            <span className="mt-6 text-[11px] text-neutral-400">{lang === "en" ? "or" : "或"}</span>
+            <PositioningTopRow
+              // 2026-05-13 (CJ「按了套用活動定位框架時，出現Event not found」):
+              // pass the scope-aware entity id, not the brand id.
+              brandId={targetId as number | null}
+              directorBrandId={activeBrandIdForLocks}
+              scopeMode={scopeMode}
+              locked={!!tabLocks.positioning}
+            />
+          </div>
         )}
       </div>
     )
@@ -4303,13 +4315,24 @@ function BrandLogoSettings({ brandId, brandName }: { brandId: number; brandName:
    runner with retry × 5 + parallel waves + cost tracking).
    ───────────────────────────────────────────────────────────────────── */
 function PositioningTopRow({
-  brandId, scopeMode, locked,
+  brandId, directorBrandId, scopeMode, locked,
 }: {
   brandId: number | null;
+  /** 挑策略總監用的品牌 id（brandId 在產品／活動 scope 時是那個實體的 id）。 */
+  directorBrandId: number | null;
   scopeMode: "brand"|"product"|"event"|"none";
   locked: boolean;
 }) {
   const { lang } = useLang();
+  // 2026-09-30（CJ「SoWork 定位要選擇成一個 agent 來執行嗎?」）：由策略總監執行——品牌（與活動）
+  // 是品牌定位總監、產品是產品價值主張總監；人選跟右下角策略總監同一支 listDirectors。
+  const directorScope = scopeMode === "product" ? "product" : "brand";
+  const directorsQ = (trpc as any).strategistChat.listDirectors.useQuery(
+    { brandId: directorBrandId ?? 0, scope: directorScope },
+    { enabled: !!directorBrandId, staleTime: 5 * 60_000, refetchOnWindowFocus: false },
+  );
+  const directors: Array<{ roleId: string; name: string; avatarUrl?: string; roleLabel?: string }> = directorsQ.data?.directors ?? [];
+  const director = directors.find((d) => d.roleId === (directorScope === "product" ? "product_value_prop" : "brand_positioning")) ?? directors[0] ?? null;
   // 2026-05-08: hooks must be called unconditionally (Rules of Hooks).
   // Previous version did `(entityKind && brandId) ? useQuery(...) : null`
   // which made hook count vary across renders → React broke silently
@@ -4373,6 +4396,10 @@ function PositioningTopRow({
 
   const handleAuto = () => {
     if (!brandId || !entityKind || locked || isRunning) return;
+    // 重跑會把定位段落整段換掉（自建卡片與文字資產保留，見 positioningJobRunner.mergePositioning）。
+    if (isDone && !confirm(lang === "en"
+      ? "Re-run the method? It rewrites the positioning sections (your own cards and copy assets stay)."
+      : "要重新套用嗎？會重寫目前的定位段落（你自建的卡片與文字資產不受影響）。")) return;
     setStartError(null);
     setOptimisticStarting(true); // instant feedback
     startMut?.mutate?.({ entityKind, entityId: brandId, lang: "zh-TW" });
@@ -4421,27 +4448,48 @@ function PositioningTopRow({
       {/* 2026-09-30（CJ「重新套用…可以縮小一點」）：跑完之後它是少用的次要動作——
           改成不帶框的小字、靠右，不再跟「定位資料／策略監測」同一個量級。
           還沒跑過（第一次套用）時維持 pill，那時它就是這一頁最該按的東西。 */}
-      <div className={`flex items-center gap-2 flex-wrap ${isDone ? "ml-auto" : ""}`}>
+      {/* 2026-09-30：策略總監頭像＝開始鍵（樣式同任務卡與策略監測：橘框＋▶，名字與動作在下方）。 */}
+      <div className="flex items-center gap-3 flex-wrap">
         <button
           onClick={handleAuto}
           disabled={!brandId || !entityKind || locked || isRunning || startMut?.isPending}
-          className={isDone && !locked ? "inline-flex items-center gap-1.5 px-1 py-1 text-[12px] text-neutral-500 hover:text-neutral-900 transition-colors cursor-pointer" : `inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-[12.5px] font-medium transition-colors ${
-            isRunning ? "bg-neutral-100 border-neutral-200 text-neutral-700 cursor-wait"
-            : locked ? "bg-neutral-100 border-neutral-200 text-neutral-400 cursor-not-allowed"
-            : "bg-white border-neutral-300 text-neutral-600 hover:border-neutral-900 hover:text-neutral-900 cursor-pointer"
-          }`}
+          aria-label={buttonLabel}
+          className="shrink-0 flex flex-col items-center gap-1 group disabled:cursor-not-allowed"
           title={
             locked
               ? (lang === "en" ? "Locked — unlock to re-run" : "已鎖定 — 解鎖後才能重跑")
               : isRunning
                 ? (lang === "en" ? `Running in the background (step ${cur}/${total})` : `背景產生中（步驟 ${cur}/${total}）`)
-                : (lang === "en"
-                    ? `Auto-fill every positioning field via a ${totalSteps}-step pipeline (background run, retry × 5)`
-                    : `自動填寫所有定位欄位（共 ${totalSteps} 步，背景執行，最多重試 5 次）`)
+                : `${director ? `${director.name}${director.roleLabel ? ` · ${director.roleLabel}` : ""}\n` : ""}${lang === "en"
+                    ? `${methodLabel}: auto-fill every positioning field (${totalSteps} steps, background run, retry × 5)`
+                    : `${methodLabel}：自動填寫所有定位欄位（共 ${totalSteps} 步，背景執行，最多重試 5 次）`}`
           }
         >
-          <GenerateIcon size={12} className={isRunning ? "animate-pulse" : ""} />
-          {buttonLabel}
+          <span className={`relative block rounded-full p-[3px] ring-[3px] transition ${locked ? "ring-neutral-300" : "ring-[#F37E4A]"} ${isRunning ? "animate-pulse" : "group-hover:scale-105 group-active:scale-95"}`}>
+            {director?.avatarUrl ? (
+              <Avatar src={director.avatarUrl} className="w-12 h-12" />
+            ) : (
+              <span className="w-12 h-12 rounded-full bg-neutral-100 flex items-center justify-center text-neutral-700">
+                <GenerateIcon size={18} />
+              </span>
+            )}
+            {!locked && (
+              <span className="absolute -right-1 -bottom-1 w-6 h-6 rounded-full bg-[#F37E4A] text-white flex items-center justify-center ring-2 ring-white">
+                <PlayIcon size={10} />
+              </span>
+            )}
+          </span>
+          <span className="flex flex-col items-center leading-tight">
+            {director && <span className="text-[12px] font-semibold text-neutral-900 max-w-[96px] truncate">{director.name}</span>}
+            <span className={`text-[11px] font-semibold ${locked ? "text-neutral-400" : "text-[#F37E4A]"}`}>
+              {locked ? (lang === "en" ? "Locked" : "已鎖定")
+                : optimisticStarting && !jobData?.status ? (lang === "en" ? "Starting…" : "啟動中…")
+                : isRunning ? (lang === "en" ? `Analyzing ${cur}/${total || totalSteps}` : `分析中 ${cur}/${total || totalSteps}`)
+                : isDone ? (lang === "en" ? "Re-apply method" : "重新套用定位法")
+                : isFailed ? (lang === "en" ? "Retry" : "重試")
+                : (lang === "en" ? "SoWork method" : "SoWork 定位法")}
+            </span>
+          </span>
         </button>
 
         {isRunning && total > 0 && (
