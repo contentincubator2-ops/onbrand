@@ -1,0 +1,41 @@
+name: Ops (DEV) — probe strategy director persona A/B + 7-day news scout (read-only)
+
+# 2026-09-30：
+#  1. probe-positioning-director：同一品牌同一步，不帶人設 vs 帶品牌定位總監人設，各跑一次（只呼叫 step.run，不寫 DB）。
+#  2. probe-strategy-news：策略監測 scout（newsOnly）＋原文發布日判斷，看抓到幾則確定 7 天內的新聞（不寫 DB）。
+# environment: dev → SSH 目標是 DEV VM、讀 dev 的 .env（真實 API key）。
+on:
+  push:
+    paths:
+      - '.github/workflows/op-probe-director-news.yml'
+  workflow_dispatch:
+    inputs:
+      brandId:
+        description: '品牌 id'
+        required: false
+        default: '2977'
+
+jobs:
+  probe:
+    runs-on: ubuntu-24.04
+    environment: dev
+    timeout-minutes: 12
+    steps:
+      - name: Run probes on the DEV VM
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 11m
+          script: |
+            set -e
+            cd /opt/onbrand/current/skills/ai-talent
+            set -a; source .env 2>/dev/null; set +a
+            echo "host=$(hostname)  commit=$(git -C /opt/onbrand/current rev-parse --short HEAD 2>/dev/null || echo '?')"
+            BID="${{ github.event.inputs.brandId }}"; BID="${BID:-2977}"
+            echo "================ director persona A/B ================"
+            timeout 400 ./node_modules/.bin/tsx scripts/probe-positioning-director.ts "$BID" competition,trends || echo "(director probe exit $?)"
+            echo
+            echo "================ 7-day news scout ================"
+            timeout 200 ./node_modules/.bin/tsx scripts/probe-strategy-news.ts "$BID" || echo "(news probe exit $?)"
