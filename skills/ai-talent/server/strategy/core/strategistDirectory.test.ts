@@ -429,3 +429,82 @@ describe("固定人選不可以同時掛在兩個角色", () => {
     expect(new Set(slugs).size).toBe(slugs.length);
   });
 });
+
+/**
+ * 2026-10-01（CJ「檢查每個頁面右下方的 ai agent，都符合該頁面的需求」）：Threads／LINE／
+ * 活動／視覺／法規／成效／內容企劃原本都落回品牌那三位，現在各有自己的三位。
+ */
+describe("逐頁補上的顧問（Threads 到內容企劃）", () => {
+  const NEW_SCOPES = ["threads", "line", "events", "visual", "regulations", "performance", "content"] as const;
+
+  it("每頁剛好三位、角色 id 全站不重複、每位都有中英三題招牌問題", async () => {
+    const { STRATEGIST_ROLES } = await import("./strategistDirectory");
+    const ids = STRATEGIST_ROLES.map((r: any) => r.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    for (const sc of NEW_SCOPES) {
+      const roles = rolesFor(sc);
+      expect(roles, sc).toHaveLength(3);
+      for (const r of roles) {
+        expect(r.fixedSlug || (r.slugPrefix && r.fallbackSlug), r.id).toBeTruthy();
+        expect(r.signatureQuestions).toHaveLength(3);
+        expect(r.signatureQuestionsEn).toHaveLength(3);
+        expect(r.promptAngle.length).toBeGreaterThan(40);
+      }
+    }
+  });
+
+  it("有產業分身的角色，fallback 本身就在那個 cohort 裡（不然產業比對與預設人選會是兩批人）", () => {
+    for (const sc of NEW_SCOPES) {
+      for (const r of rolesFor(sc)) {
+        if (!r.slugPrefix) continue;
+        // meta_ads- 的電商那位 slug 用連字號（meta-ads-ecom-…），是 mos_db 原樣，刻意例外。
+        if (r.id === "rg_platform") continue;
+        expect(r.fallbackSlug!.startsWith(r.slugPrefix), r.id).toBe(true);
+      }
+    }
+  });
+});
+
+describe("resolveRoleForSlug：同一個人是兩頁的人選時，用哪一頁的角色", () => {
+  it("roleId 對得上就用它", async () => {
+    const { resolveRoleForSlug } = await import("./strategistDirectory");
+    expect(resolveRoleForSlug("copywriter-ecom-tw-4328", { roleId: "rg_rewrite", scope: "regulations" })?.id).toBe("rg_rewrite");
+    expect(resolveRoleForSlug("copywriter-ecom-tw-4328", { roleId: "ct_copy", scope: "content" })?.id).toBe("ct_copy");
+  });
+  it("roleId 跟 scope 對不起來時不採信 roleId，改在這一頁的角色裡找", async () => {
+    const { resolveRoleForSlug } = await import("./strategistDirectory");
+    expect(resolveRoleForSlug("copywriter-ecom-tw-4328", { roleId: "ct_copy", scope: "regulations" })?.id).toBe("rg_rewrite");
+  });
+  it("只有 scope：依 slug 前綴在這一頁找；找不到（搜尋挑來的人）就掛這一頁的第一個角色", async () => {
+    const { resolveRoleForSlug } = await import("./strategistDirectory");
+    expect(resolveRoleForSlug("meta-ads-beauty-tw2-0047", { scope: "regulations" })?.id).toBe("rg_platform");
+    expect(resolveRoleForSlug("su-tingwei-social-writer", { scope: "threads" })?.id).toBe("th_replies");
+    expect(resolveRoleForSlug("someone-random", { scope: "performance" })?.id).toBe("pf_analyst");
+  });
+  it("沒有 hint 回 undefined——呼叫端照舊用全域反查，舊前端不會壞", async () => {
+    const { resolveRoleForSlug } = await import("./strategistDirectory");
+    expect(resolveRoleForSlug("pricing_strategy-ecom-tw-9298", {})).toBeUndefined();
+  });
+  it("getDirectorByAgentId 帶 scope：產品頁的定價那位拿到產品角色（原本一律落在品牌的定價角色）", async () => {
+    const d = await getDirectorByAgentId(900003, null, { scope: "product" });
+    expect(d?.roleId).toBe("product_pricing");
+  });
+});
+
+describe("2026-10-01 第二輪換人", () => {
+  it("產生器沒填完的佔位符（{ri(2,3)}、{ind_label}）不會進 prompt", () => {
+    expect(sanitizeProse("跑 {ri(2,3)} 週、{ri(1000,3000)} 轉換數，{ind_label} 產業")).toBe("跑  週、 轉換數， 產業");
+  });
+  it("平台廣告審核比對的是 tw2 那批（上線前逐句預審），不是一般 tw 投手", async () => {
+    const { STRATEGIST_ROLES } = await import("./strategistDirectory");
+    const r = STRATEGIST_ROLES.find((x: any) => x.id === "rg_platform") as any;
+    expect(r.slugPrefix).toBe("meta-ads-");
+    expect(r.localeSeg).toBe("tw2");
+  });
+  it("Threads 留言經營的守則明令禁止帶風向與假帳號（那位人選的專長裡有這些）", () => {
+    const r = rolesFor("threads").find((x) => x.id === "th_replies")!;
+    expect(r.fixedSlug).toBe("su-tingwei-social-writer");
+    expect(r.promptAngle).toMatch(/絕不建議開分身帳號/);
+    expect(r.promptAngle).toMatch(/帶風向/);
+  });
+});
