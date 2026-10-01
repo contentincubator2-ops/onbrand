@@ -62,6 +62,8 @@ export default function CampaignStage({ eventId, brandId }: { eventId: number; b
   const utils = (trpc as any).useUtils();
 
   const q = (trpc as any).campaign.get.useQuery({ eventId }, { refetchOnWindowFocus: false });
+  // 地圖上每一點滑過去的縮圖：寫好的那幾篇的圖與開頭（沒寫的用任務卡插畫，不用問）。
+  const thumbsQ = (trpc as any).campaign.itemThumbs.useQuery({ eventId }, { refetchOnWindowFocus: false, staleTime: 5 * 60_000 });
   const productsQ = (trpc as any).product?.list?.useQuery(
     { brandId: brandId ?? undefined }, { enabled: !!brandId, refetchOnWindowFocus: false },
   ) ?? { data: [] };
@@ -405,6 +407,7 @@ export default function CampaignStage({ eventId, brandId }: { eventId: number; b
                 current={cur} onPick={setCurrent} locked={locked} en={en} onPatchItem={patchItem}
                 fill
                 phaseKpi={plan.kpi?.phases ?? {}}
+                thumbs={thumbsQ.data ?? {}}
               />
             ) : (
               <div className="relative bg-default-100 p-4 sm:p-6 min-h-[420px] h-full overflow-y-auto">

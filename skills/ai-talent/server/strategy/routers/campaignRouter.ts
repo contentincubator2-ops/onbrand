@@ -40,6 +40,7 @@ import { laneItems, candidateCards, planBeats, KOL_CHANNEL, COBRAND_CHANNEL } fr
 import { BRIEF_CHANNELS, CHANNEL_BRIEF_SPECS, cleanChannelBrief, cleanChannelBriefs, briefPartners, type BriefChannel } from "../core/campaignChannelBrief";
 import { KPI_METRICS, pickKpiAgent, runKpiPlan } from "../core/campaignKpi";
 import { brandIndustry, pickPlannerAgent } from "../core/campaignTeam";
+import { buildCampaignRoster, CAMPAIGN_ROLES, ROLES } from "../core/campaignRoster";
 import { isHiddenContentPlatform, isHiddenHistoryItem } from "../../platform/core/planGate";
 import { ownedProductIds, resolveProductScope } from "../core/eventProductScope";
 import { invalidateBrandPrefix } from "../core/brandContext";
@@ -324,12 +325,16 @@ export const campaignRouter = router({
       phase: z.enum(PHASE_KEYS).nullable().optional(),
       history: z.array(z.object({
         role: z.enum(["user", "assistant"]), content: z.string().max(1200),
-        speaker: z.enum(["planner", "director"]).optional(), name: z.string().max(40).optional(),
+        speaker: z.enum(CAMPAIGN_ROLES).optional(), name: z.string().max(40).optional(),
       })).max(16).optional(),
       /** 2026-09-30：左邊同一張卡兩個人——內容企劃（預設）或策略總監。 */
-      speaker: z.enum(["planner", "director"]).optional(),
+      /** 2026-10-02：名冊上任何一位（campaignRoster.ts）。 */
+      speaker: z.enum(CAMPAIGN_ROLES).optional(),
+      from: z.enum(CAMPAIGN_ROLES).nullable().optional(),
       directorAgentId: z.number().int().positive().nullable().optional(),
       handoff: z.boolean().optional(),
+      /** 2026-10-02：這一串轉了幾手（雙向交棒，到 2 就停）。 */
+      hops: z.number().int().min(0).max(2).optional(),
       view: z.enum(["map", "basis"]).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
@@ -342,7 +347,7 @@ export const campaignRouter = router({
         return await runCampaignChat({
           eventId: input.eventId, userId: ctx.user!.id, plan,
           message: input.message, phase: input.phase ?? null, history: input.history,
-          speaker: input.speaker ?? "planner", directorAgentId: input.directorAgentId ?? null, handoff: !!input.handoff,
+          speaker: input.speaker ?? "planner", directorAgentId: input.directorAgentId ?? null, handoff: !!input.handoff, from: input.from ?? null, hops: input.hops,
           positioning: pos, view: input.view ?? "map",
         });
       } catch (e: any) {
@@ -440,9 +445,51 @@ export const campaignRouter = router({
     .query(async ({ ctx, input }) => {
       const row = await loadEvent(input.eventId, ctx.user!.id);
       const industry = await brandIndustry(Number(row.brandId));
+      const pos = parsePositioning(row.positioning);
       const director = await pickCampaignDirector(Number(row.brandId), input.directorAgentId ?? null).catch(() => null);
-      const [planner, kpi] = await Promise.all([pickPlannerAgent(industry, director?.name ?? null), pickKpiAgent(industry)]);
-      return { planner, kpi, director };
+      // 2026-10-02：名冊＝做過這份企劃的每一位（對話卡可以找任何一位），跟 campaign.chat 同一份。
+      const [planner, kpi, roster] = await Promise.all([
+        pickPlannerAgent(industry, director?.name ?? null),
+        pickKpiAgent(industry),
+        buildCampaignRoster({ brandId: Number(row.brandId), plan: (pos.campaignPlan ?? null) as CampaignPlan | null, positioning: pos, director }).catch(() => []),
+      ]);
+      return {
+        planner, kpi, director,
+        roster: roster.map((m) => ({ ...m, roleZh: ROLES[m.role].zh, roleEn: ROLES[m.role].en, duty: ROLES[m.role].duty, dutyEn: ROLES[m.role].dutyEn })),
+      };
+    }),
+
+  /**
+   * 地圖上每一點滑過去的縮圖（2026-10-02 CJ「任務點點滑過去只是一段文字，可以改成縮圖嗎」）：
+   * 寫好的那幾篇回成品的圖與開頭幾句；沒寫的畫面用任務卡插畫，不用問伺服器。
+   */
+  itemThumbs: protectedProcedure
+    .input(z.object({ eventId: z.number().int().positive() }))
+    .query(async ({ ctx, input }) => {
+      const row = await loadEvent(input.eventId, ctx.user!.id);
+      const plan = parsePositioning(row.positioning).campaignPlan as CampaignPlan | undefined;
+      const byOutput = new Map<number, string>();
+      for (const i of plan?.items ?? []) if (i.outputId) byOutput.set(Number(i.outputId), i.id);
+      if (!byOutput.size) return {} as Record<string, { image: string | null; title: string; excerpt: string }>;
+      const ids = [...byOutput.keys()].slice(0, 200);
+      // JSON_EXTRACT 遇到 JSON null 回字串 'null'——一律 NULLIF（missionRouter 縮圖的教訓）。
+      const [rows]: any = await localPool.query(
+        `SELECT mo.id, COALESCE(NULLIF(mo.title, ''), m.title) AS title, LEFT(mo.content, 400) AS content,
+                COALESCE(NULLIF(JSON_UNQUOTE(JSON_EXTRACT(mo.metadata, '$.thumbnailUrl')), 'null'),
+                         NULLIF(JSON_UNQUOTE(JSON_EXTRACT(mo.metadata, '$.imageUrl')), 'null'),
+                         m.output_image_url, m.cover_image_url) AS image
+           FROM mission_outputs mo JOIN missions m ON m.id = mo.missionId
+          WHERE mo.id IN (?) AND m.userId = ?`,
+        [ids, ctx.user!.id],
+      );
+      const out: Record<string, { image: string | null; title: string; excerpt: string }> = {};
+      for (const r of rows as any[]) {
+        const itemId = byOutput.get(Number(r.id));
+        if (!itemId) continue;
+        const excerpt = String(r.content ?? "").replace(/<[^>]+>/g, " ").replace(/[#*_>`]/g, "").replace(/\s+/g, " ").trim().slice(0, 120);
+        out[itemId] = { image: r.image && /^(https?:\/\/|\/)/.test(String(r.image)) ? String(r.image) : null, title: String(r.title ?? ""), excerpt };
+      }
+      return out;
     }),
 
   kpiAgent: protectedProcedure

@@ -2,7 +2,7 @@
  * 活動頁對話提案的套用與描述。
  */
 import { describe, it, expect } from "vitest";
-import { applyProposal, describeProposal, isEmptyProposal } from "./campaignChat";
+import { applyProposal, describeProposal, isEmptyProposal, routeMention } from "./campaignChat";
 import type { CampaignPlan, CampaignPlanItem } from "./campaignSchema";
 
 const it1: CampaignPlanItem = { id: "a", phase: "launch", date: "2026-11-01", platform: "facebook", taskId: "t", taskLabel: "t", angle: "上市公告", enabled: true, outputId: null };
@@ -48,5 +48,24 @@ describe("isEmptyProposal", () => {
   it("沒有任何改動就是空的", () => {
     expect(isEmptyProposal({ ops: [] })).toBe(true);
     expect(isEmptyProposal({ ops: [], smp: "x" })).toBe(false);
+  });
+});
+
+describe("routeMention（@ 找團隊裡的人）", () => {
+  const roster = [
+    { role: "planner", name: "朱怡君", roleZh: "內容企劃", roleEn: "Content planner" },
+    { role: "kpi", name: "謝曉雯", roleZh: "投放專家", roleEn: "Paid media" },
+    { role: "pr", name: "林雅欣", roleZh: "話題公關", roleEn: "Buzz & PR" },
+  ];
+  it("全名＋空格", () => expect(routeMention("@謝曉雯 哪幾篇下廣告？", roster)).toEqual({ to: "kpi", message: "哪幾篇下廣告？" }));
+  it("名字後面直接接字", () => expect(routeMention("@朱怡君倒數多兩篇", roster)).toEqual({ to: "planner", message: "倒數多兩篇" }));
+  it("用角色叫（前兩字也行、全形＠也行）", () => {
+    expect(routeMention("＠投放 預算集中在哪", roster)).toEqual({ to: "kpi", message: "預算集中在哪" });
+    expect(routeMention("@話題公關要不要發新聞稿", roster)).toEqual({ to: "pr", message: "要不要發新聞稿" });
+  });
+  it("名字開頭幾個字", () => expect(routeMention("@林 這樣說會不會被罵", roster).to).toBe("pr"));
+  it("沒有 @ 或認不得：照原樣", () => {
+    expect(routeMention("倒數多兩篇", roster)).toEqual({ to: null, message: "倒數多兩篇" });
+    expect(routeMention("@王小明 你好", roster)).toEqual({ to: null, message: "@王小明 你好" });
   });
 });
