@@ -147,6 +147,11 @@ interface StrategistRole {
   slugPrefix?: string;
   fallbackSlug?: string;
   fixedSlug?: string;
+  /**
+   * 2026-10-01：cohort 的語系段，預設 "tw"。Meta 投手有一批 `meta-ads-<產業>-tw2-*`
+   * （上線前逐句對 TFDA／Facebook 政策預審），語系段是 tw2，不改就比對不到。
+   */
+  localeSeg?: string;
   /** 寫進 system prompt 的角度指示——讓三位真的答得不一樣。 */
   promptAngle: string;
   /** 使用者不知道能問什麼時，面板上直接給的問題（CJ:「每位總監各自的招牌問題」）。 */
@@ -669,14 +674,19 @@ const PAGE_ROLES: StrategistRole[] = [
   // ── Threads（通路）────────────────────────────────────────────
   {
     id: "th_replies", scope: "threads", label: "留言經營", labelEn: "Reply Game",
-    slugPrefix: "community_manager-", fallbackSlug: "community_manager-food-tw-2626",
-    promptAngle: "你看 Threads 的角度是留言區：一則串文真正的價值在底下的對話。你會設計讓人想回的開放問題、決定小編多快回、怎麼把好留言接成下一篇。被問到觸及，你先看回覆數與回覆串長度，不先看讚。",
+  // 2026-10-01 第二輪（CJ「已經有 agent 的，請更換」）：4 個子代理逐角色查 mos_db 後換成更對題的人。
+    // 蘇庭威 220919：唯一明寫 Threads＋留言區生態、有實質經歷的人。他的專長也列了「風向議題操作／負面輿論稀釋」，
+    // 那些不能給中小品牌用——promptAngle 最後一句明令禁止。
+    fixedSlug: "su-tingwei-social-writer",
+    promptAngle: "你看 Threads 的角度是留言區：一則串文真正的價值在底下的對話。你會設計讓人想回的開放問題、決定小編多快回、怎麼把好留言接成下一篇。被問到觸及，你先看回覆數與回覆串長度，不先看讚。你只用品牌自己的帳號真誠互動：絕不建議開分身帳號、找人假裝路人留言、帶風向或稀釋負評。",
     signatureQuestions: ["這篇要怎麼收尾，才會有人留言？", "留言很多但都很短，要怎麼接？", "負評或酸言出現在留言區，要回嗎？"],
     signatureQuestionsEn: ["How should this post end so people reply?", "Lots of short replies — how do I keep the thread going?", "A snarky comment showed up — do I answer it?"],
   },
   {
     id: "th_creator", scope: "threads", label: "創作者合作", labelEn: "Creator Collabs",
-    slugPrefix: "kol_influencer-", fallbackSlug: "kol_influencer-ecom-tw-3981",
+    // 翁宇翔 220515：方法論是真的 KOL 分層（大網紅聲量／中腰信任／小網紅轉換）＋brief 必附禁用詞。
+    // 同樣合適的陳曉玲（資深網紅經紀人）給了活動頁——固定人選全站不可重複。
+    fixedSlug: "mkt-service-kol",
     promptAngle: "你看 Threads 的角度是借別人的聲音：台灣 Threads 上爆紅的多半是個人帳號，不是品牌帳號。你會判斷該找哪種創作者（素人、小編圈、垂直達人）、讓他們用自己的口氣講，而不是丟一份品牌稿請他貼。",
     signatureQuestions: ["Threads 上該找什麼樣的人合作？", "怎麼讓合作文不像業配？", "品牌帳號跟創作者帳號各自該講什麼？"],
     signatureQuestionsEn: ["What kind of creators should I work with on Threads?", "How do I keep a collab from reading like an ad?", "What should the brand account say vs. the creator?"],
@@ -705,7 +715,9 @@ const PAGE_ROLES: StrategistRole[] = [
   },
   {
     id: "line_crm", scope: "line", label: "會員分眾", labelEn: "Segmented Messaging",
-    slugPrefix: "crm_lifecycle-", fallbackSlug: "crm_lifecycle-ecom-tw-1150",
+    // 洪子晴 224018：LINE 分眾貼標（購買×瀏覽×加入時間）與 LINE 購後序列。原本的 crm_lifecycle- 全是
+    // Email／Klaviyo 方法論，不適用 LINE。過渡人選——理想人設的需求見 docs（三位實名參考：薛覲／陳正達／何英圻）。
+    fixedSlug: "line-marketing-retail_o2o-tw-5419",
     promptAngle: "你看 LINE 的角度是分眾：同一則訊息發給所有人，等於對新客太硬、對老客太淡。你會依購買與互動行為貼標籤，設計新好友歡迎、購後關懷、沉睡喚回各自的訊息。",
     signatureQuestions: ["好友要怎麼分群才發得準？", "新加好友的第一則訊息該說什麼？", "很久沒買的人要怎麼喚回？"],
     signatureQuestionsEn: ["How should I segment friends so messages land?", "What should a new friend's first message say?", "How do I win back people who stopped buying?"],
@@ -713,21 +725,25 @@ const PAGE_ROLES: StrategistRole[] = [
   // ── 活動（策略層 cat=events／活動頁 ?e=／內容層 /campaigns）──────────────
   {
     id: "ev_plan", scope: "events", label: "活動企劃", labelEn: "Campaign Planning",
-    slugPrefix: "event_marketing-", fallbackSlug: "event_marketing-ecom-tw-9433",
+  // 2026-10-01 第二輪（CJ「已經有 agent 的，請更換」）：4 個子代理逐角色查 mos_db 後換成更對題的人。
+    // 沈奕蓁 60001：13 年（奧美、電通、品牌端 CMO），新品上市 IMC——比 event_marketing- 的接案範本對題。
+    fixedSlug: "cmo-vivian-shen",
     promptAngle: "你看活動的角度是檔期本身：目標是拉新還是衝業績、檔期多長、優惠機制怎麼設、預熱→開跑→最後倒數各做什麼。你會把活動拆成時間軸，並說清楚每一段要哪個通路負責。",
     signatureQuestions: ["這檔活動的優惠機制要怎麼設？", "預熱要提前幾天、做什麼？", "活動目標該設業績還是新客？"],
     signatureQuestionsEn: ["How should this campaign's offer work?", "How early should teasers start, and what should they do?", "Should the goal be revenue or new customers?"],
   },
   {
     id: "ev_kol", scope: "events", label: "達人合作", labelEn: "Influencer Partners",
-    slugPrefix: "kol_influencer-", fallbackSlug: "kol_influencer-ecom-tw-3981",
+    // 陳曉玲 220920：10 年網紅經紀（台灣最大 MCN、網紅平台），方法論是完整的媒合→brief→追蹤→EMV/ROMI。
+    fixedSlug: "chen-xiaoling-kol-agent",
     promptAngle: "你看活動的角度是誰來幫你講：預算有限時，找幾位對的達人比自己狂發文有效。你會依活動目標判斷要找大網紅打聲量、還是微網紅帶轉換，以及合作要給什麼素材、怎麼追成效。",
     signatureQuestions: ["這檔活動該找大網紅還是微網紅？", "合作預算要怎麼分？", "怎麼知道達人真的有帶來訂單？"],
     signatureQuestionsEn: ["Big influencers or micro-influencers for this campaign?", "How should I split the collab budget?", "How do I know a creator actually drove orders?"],
   },
   {
     id: "ev_pr", scope: "events", label: "話題與公關", labelEn: "Buzz & PR",
-    slugPrefix: "pr_strategy-", fallbackSlug: "pr_strategy-ecom-tw-4200",
+    // 林雅欣 220916：15 年公關（奧美公關、萬博宣偉、愛德曼台灣）。原 fallback 的經歷寫的是中國媒體，不是台灣市場。
+    fixedSlug: "lin-yaxin-pr-director",
     promptAngle: "你看活動的角度是話題：這檔活動有沒有一個媒體或路人願意轉述的切角。你會找活動與時事、節日、社會議題的交集，判斷值不值得發新聞稿，並提醒哪些說法會被放大檢視。",
     signatureQuestions: ["這檔活動有什麼值得被報導的角度？", "要不要發新聞稿？", "怎麼讓活動在開跑前就有人討論？"],
     signatureQuestionsEn: ["What angle here is worth covering?", "Should we send a press release?", "How do I get people talking before launch?"],
@@ -735,7 +751,9 @@ const PAGE_ROLES: StrategistRole[] = [
   // ── 視覺（策略層 cat=visual）─────────────────────────────────────
   {
     id: "vi_identity", scope: "visual", label: "品牌視覺識別", labelEn: "Visual Identity",
-    fixedSlug: "exec-brand-k4",
+  // 2026-10-01 第二輪（CJ「已經有 agent 的，請更換」）：4 個子代理逐角色查 mos_db 後換成更對題的人。
+    // 陳品妤 220889：13 年品牌視覺（80+ 店餐飲連鎖 VIS、包裝、店裝），堅持交付非設計師也能照用的規範。
+    fixedSlug: "bdg-brand-visual-7",
     promptAngle: "你看視覺的角度是識別度：主色、字體、構圖與攝影風格要讓人不看 logo 也認得出是你。你會把視覺跟品牌故事對起來，說明每個視覺選擇在替品牌講什麼，而不是只說好不好看。",
     signatureQuestions: ["我的品牌色與字體要怎麼定？", "怎麼讓貼文不看 logo 也認得出是我們？", "這組視覺跟我們的定位對得上嗎？"],
     signatureQuestionsEn: ["How should I pick brand colors and type?", "How do I make posts recognizable without the logo?", "Does this visual match our positioning?"],
@@ -764,7 +782,9 @@ const PAGE_ROLES: StrategistRole[] = [
   },
   {
     id: "rg_platform", scope: "regulations", label: "平台廣告審核", labelEn: "Ad Platform Policy",
-    slugPrefix: "meta_ads-", fallbackSlug: "meta-ads-ecom-tw-lin-yuchen",
+  // 2026-10-01 第二輪（CJ「已經有 agent 的，請更換」）：4 個子代理逐角色查 mos_db 後換成更對題的人。
+    // meta-ads-<產業>-tw2-*：方法論有「上線前逐句對 TFDA 與 Facebook 政策禁用詞預審」，案例是降低拒登率。
+    slugPrefix: "meta-ads-", localeSeg: "tw2", fallbackSlug: "meta-ads-ecom-tw-lin-yuchen",
     promptAngle: "你看法規的角度是廣告平台：就算法律上沒問題，Meta 與 Google 的廣告政策也可能拒登或限制觸及（前後對比、身體部位、個人屬性、健康宣稱）。你會說明哪種素材常被退件、被退件時先改哪裡。",
     signatureQuestions: ["我的廣告為什麼一直被拒登？", "哪些圖片在 Meta 上容易被擋？", "被限制觸及時要怎麼申訴或改？"],
     signatureQuestionsEn: ["Why do my ads keep getting rejected?", "What images tend to get blocked on Meta?", "How do I fix or appeal limited delivery?"],
@@ -815,7 +835,9 @@ const PAGE_ROLES: StrategistRole[] = [
   },
   {
     id: "ct_copy", scope: "content", label: "文案打磨", labelEn: "Copy Polish",
-    slugPrefix: "copywriter-", fallbackSlug: "copywriter-ecom-tw-4328",
+  // 2026-10-01 第二輪（CJ「已經有 agent 的，請更換」）：4 個子代理逐角色查 mos_db 後換成更對題的人。
+    // 韓承宇 220505：9 年繁中行銷文案，方法論「Hook→問題→解法→CTA，每份三版」正好是產出頁要的。
+    fixedSlug: "mkt-service-copywriter",
     promptAngle: "你看內容的角度是成品本身：開頭夠不夠抓人、一篇有沒有只講一件事、CTA 清不清楚。使用者貼一段文案給你，你直接給修改後的版本並說明改了什麼，不只給評語。",
     signatureQuestions: ["這篇的開頭夠抓人嗎？", "幫我把這段改短一點", "這篇的 CTA 要怎麼寫？"],
     signatureQuestionsEn: ["Is this opening strong enough?", "Make this paragraph shorter", "How should this post's CTA read?"],
@@ -840,7 +862,9 @@ export function getRole(roleId: string | null | undefined): StrategistRole {
  */
 export function sanitizeProse(raw: unknown): string | null {
   if (typeof raw !== "string") return null;
-  const cleaned = raw.replace(/`/g, "").trim();
+  // 2026-10-01：mos_db 有一批 methodology／案例沒填完的產生器佔位符（{ri(2,3)}、{ind_label}），
+  // 原樣進 prompt 會讓顧問照念「跑 {ri(2,3)} 週」。拿掉佔位符本身，其餘照留。
+  const cleaned = raw.replace(/`/g, "").replace(/\{[a-z_]+(\([^)]*\))?\}/gi, "").trim();
   if (cleaned.length < 8) return null;
   if (/not (fully |explicitly )?available|was incomplete|no data available/i.test(cleaned)) {
     // 整段都是樣板句才丟；只是夾了一句的話，把那幾行挑掉、其餘留著。
@@ -963,7 +987,7 @@ async function findByIndustry(role: StrategistRole, industry: string | null): Pr
           AND slug LIKE ?
         ORDER BY CHAR_LENGTH(COALESCE(experienceDetail, '')) DESC, id ASC
         LIMIT 1`,
-      [`${role.slugPrefix}${code}-tw-%`],
+      [`${role.slugPrefix}${code}-${role.localeSeg ?? "tw"}-%`],
     );
     const hit = (rows as any[])[0];
     if (hit) return hit;
@@ -975,11 +999,11 @@ async function findByIndustry(role: StrategistRole, industry: string | null): Pr
     `SELECT ${DIRECTOR_FIELDS} FROM agents
       WHERE ${AVAILABLE}
         AND slug LIKE ?
-        AND slug LIKE '%-tw-%'
+        AND slug LIKE ?
         AND (title_zh LIKE ? OR title LIKE ? OR specialty LIKE ?)
       ORDER BY CHAR_LENGTH(COALESCE(experienceDetail, '')) DESC, id ASC
       LIMIT 1`,
-    [`${role.slugPrefix}%`, like, like, like],
+    [`${role.slugPrefix}%`, `%-${role.localeSeg ?? "tw"}-%`, like, like, like],
   );
   return (rows as any[])[0] ?? null;
 }

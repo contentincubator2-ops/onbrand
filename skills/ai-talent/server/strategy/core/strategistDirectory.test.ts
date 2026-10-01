@@ -475,8 +475,8 @@ describe("resolveRoleForSlug：同一個人是兩頁的人選時，用哪一頁�
   });
   it("只有 scope：依 slug 前綴在這一頁找；找不到（搜尋挑來的人）就掛這一頁的第一個角色", async () => {
     const { resolveRoleForSlug } = await import("./strategistDirectory");
-    expect(resolveRoleForSlug("kol_influencer-food-tw-1", { scope: "events" })?.id).toBe("ev_kol");
-    expect(resolveRoleForSlug("kol_influencer-food-tw-1", { scope: "threads" })?.id).toBe("th_creator");
+    expect(resolveRoleForSlug("meta-ads-beauty-tw2-0047", { scope: "regulations" })?.id).toBe("rg_platform");
+    expect(resolveRoleForSlug("su-tingwei-social-writer", { scope: "threads" })?.id).toBe("th_replies");
     expect(resolveRoleForSlug("someone-random", { scope: "performance" })?.id).toBe("pf_analyst");
   });
   it("沒有 hint 回 undefined——呼叫端照舊用全域反查，舊前端不會壞", async () => {
@@ -486,5 +486,23 @@ describe("resolveRoleForSlug：同一個人是兩頁的人選時，用哪一頁�
   it("getDirectorByAgentId 帶 scope：產品頁的定價那位拿到產品角色（原本一律落在品牌的定價角色）", async () => {
     const d = await getDirectorByAgentId(900003, null, { scope: "product" });
     expect(d?.roleId).toBe("product_pricing");
+  });
+});
+
+describe("2026-10-01 第二輪換人", () => {
+  it("產生器沒填完的佔位符（{ri(2,3)}、{ind_label}）不會進 prompt", () => {
+    expect(sanitizeProse("跑 {ri(2,3)} 週、{ri(1000,3000)} 轉換數，{ind_label} 產業")).toBe("跑  週、 轉換數， 產業");
+  });
+  it("平台廣告審核比對的是 tw2 那批（上線前逐句預審），不是一般 tw 投手", async () => {
+    const { STRATEGIST_ROLES } = await import("./strategistDirectory");
+    const r = STRATEGIST_ROLES.find((x: any) => x.id === "rg_platform") as any;
+    expect(r.slugPrefix).toBe("meta-ads-");
+    expect(r.localeSeg).toBe("tw2");
+  });
+  it("Threads 留言經營的守則明令禁止帶風向與假帳號（那位人選的專長裡有這些）", () => {
+    const r = rolesFor("threads").find((x) => x.id === "th_replies")!;
+    expect(r.fixedSlug).toBe("su-tingwei-social-writer");
+    expect(r.promptAngle).toMatch(/絕不建議開分身帳號/);
+    expect(r.promptAngle).toMatch(/帶風向/);
   });
 });
