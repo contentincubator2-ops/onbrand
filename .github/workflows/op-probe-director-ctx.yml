@@ -1,0 +1,38 @@
+name: Ops (DEV) — probe director persona A/B with full pipeline context (read-only)
+
+# 2026-09-30：probe-positioning-director 的修正版（補上官網真實內容／市場／官方客群）還沒部署，
+# 這支把分支上的腳本暫時複製到 DEV VM 的 scripts/ 跑一次，跑完刪掉。只呼叫 step.run，不寫 DB。
+on:
+  push:
+    paths:
+      - '.github/workflows/op-probe-director-ctx.yml'
+
+jobs:
+  probe:
+    runs-on: ubuntu-24.04
+    environment: dev
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Copy probe script to the DEV VM
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          source: skills/ai-talent/scripts/probe-positioning-director.ts
+          target: /tmp/probe-director-ctx
+          strip_components: 3
+      - name: Run it
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 10m
+          script: |
+            cd /opt/onbrand/current/skills/ai-talent
+            set -a; source .env 2>/dev/null; set +a
+            cp /tmp/probe-director-ctx/probe-positioning-director.ts scripts/_probe_director_ctx.ts
+            timeout 500 ./node_modules/.bin/tsx scripts/_probe_director_ctx.ts 2977 competition,trends || echo "(exit $?)"
+            rm -f scripts/_probe_director_ctx.ts; rm -rf /tmp/probe-director-ctx
