@@ -23,3 +23,32 @@ export function withUtm(url: string, opts: { source: string; medium?: string; ca
   if (c) u.searchParams.set("utm_content", c);
   return u.toString();
 }
+
+// ─── 2026-09-30 活動追蹤連結（成效第 2 步） ───────────────────────────────
+// utm_campaign＝活動代碼 ob-ev<活動 id>；utm_content＝cp.ev<id>~it.<那一篇>~ph.<階段>。
+// GA4／電商匯出檔只要帶著其中一個，那一列就自動歸回這檔活動、這一段（campaignPerf）。
+
+/** 活動代碼：寫進 utm_campaign。 */
+export const campaignCode = (eventId: number) => `ob-ev${eventId}`;
+
+const codeSafe = (s: string) => String(s ?? "").toLowerCase().replace(/[^a-z0-9-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 39);
+
+/** 活動企劃裡某一篇的追蹤連結。付費的那幾篇 utm_medium 用 paid_social。網址不合法 → 原樣回傳。 */
+export function campaignLink(url: string, o: { eventId: number; itemId: string; phase: string; platform: string; paid?: boolean }): string {
+  const tags: Record<string, string> = { cp: `ev${o.eventId}` };
+  const it = codeSafe(o.itemId);
+  const ph = codeSafe(o.phase);
+  if (it) tags.it = it;
+  if (ph) tags.ph = ph;
+  return withUtm(url, { source: codeSafe(o.platform) || "social", medium: o.paid ? "paid_social" : "social", campaign: campaignCode(o.eventId), tags });
+}
+
+/** 只收 http(s) 網址。 */
+export function cleanLandingUrl(s: string | null | undefined): string | null {
+  const t = String(s ?? "").trim();
+  if (!t) return null;
+  try {
+    const u = new URL(t);
+    return u.protocol === "http:" || u.protocol === "https:" ? u.toString() : null;
+  } catch { return null; }
+}

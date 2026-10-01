@@ -107,8 +107,9 @@ export const TRAY_SOURCES: Record<string, string[]> = {
   ga: ["ga4"],
   attribution: [],
   fanpage_monthly: ["fb_page"],
-  // 2026-09-30 活動：活動企劃 vs 真的發出去的貼文（目前只有粉專；廣告、GA4／電商是下一步）。
-  campaign: ["fb_page"],
+  // 2026-09-30 活動：活動企劃 vs 真的發出去的貼文（粉專），加上帶活動 UTM 或名稱對應的
+  // 廣告／GA4／電商匯入（campaignPerf.campaignOf）。
+  campaign: ["fb_page", "meta_ads", "google_ads", "ga4", "shopline", "91app", "shopify", "csv"],
 };
 export const TRAYS = Object.keys(TRAY_SOURCES);
 

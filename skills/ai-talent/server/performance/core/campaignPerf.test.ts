@@ -95,3 +95,74 @@ describe("textSimilarity", () => {
     expect(textSimilarity("", "abc")).toBe(0);
   });
 });
+
+// ─── 第 2 步：廣告／GA4／電商匯入歸檔 ───────────────────────────────────
+import { campaignOf, applyAlias, type ExtFact } from "./campaignPerf";
+import { campaignLink, campaignCode, cleanLandingUrl } from "./perfUtm";
+import { parseUtmTags } from "./perfImport";
+
+describe("活動追蹤連結", () => {
+  it("每一篇的連結帶活動代碼、那一篇、那一段；廣告篇是 paid_social", () => {
+    const u = new URL(campaignLink("https://onbrand.sowork.ai/?ref=x", { eventId: 31, itemId: "launch-2026-11-01-3", phase: "launch", platform: "facebook", paid: true }));
+    expect(u.searchParams.get("utm_campaign")).toBe(campaignCode(31));
+    expect(u.searchParams.get("utm_source")).toBe("facebook");
+    expect(u.searchParams.get("utm_medium")).toBe("paid_social");
+    expect(u.searchParams.get("ref")).toBe("x");
+    // 匯入時解得回來
+    expect(parseUtmTags(u.searchParams.get("utm_content")!)).toEqual({ cp: "ev31", it: "launch-2026-11-01-3", ph: "launch" });
+  });
+  it("導流網址只收 http(s)", () => {
+    expect(cleanLandingUrl("javascript:alert(1)")).toBeNull();
+    expect(cleanLandingUrl("  ")).toBeNull();
+    expect(cleanLandingUrl("https://a.com/p")).toBe("https://a.com/p");
+  });
+});
+
+describe("campaignOf：匯入的一列是不是這檔", () => {
+  it("UTM 標籤或名稱帶代碼 → utm；別檔的代碼 → other；名稱對應 → alias；都沒有 → null", () => {
+    expect(campaignOf({ label: "x", tags: { cp: "ev31" } }, 31, [])).toBe("utm");
+    expect(campaignOf({ label: "google / ob-ev31", tags: {} }, 31, [])).toBe("utm");
+    expect(campaignOf({ label: "ob-ev310", tags: {} }, 31, [])).toBe("other");
+    expect(campaignOf({ label: "x", tags: { cp: "ev7" } }, 31, ["x"])).toBe("other");
+    expect(campaignOf({ label: "2026 年末試用｜轉換", tags: {} }, 31, ["年末試用"])).toBe("alias");
+    expect(campaignOf({ label: "品牌常態", tags: {} }, 31, ["年末試用"])).toBeNull();
+  });
+  it("applyAlias：不分大小寫去重、拿得掉", () => {
+    let s = applyAlias({}, "Year-End", "add");
+    s = applyAlias(s, "year-end", "add");
+    expect(s.aliases).toEqual(["year-end"]);
+    expect(applyAlias(s, "YEAR-END", "remove").aliases).toEqual([]);
+  });
+});
+
+describe("buildCampaignPerf：匯入資料歸段", () => {
+  const ext: ExtFact[] = [
+    // GA4：帶 ph 標籤 → 照標籤歸開賣（日期其實落在加溫）
+    { source: "ga4", date: "2026-11-22", label: "ob-ev9 / cp.ev9~ph.launch", tags: { cp: "ev9", ph: "launch" }, metrics: { sessions: 120, orders: 3, revenue: 4500 } },
+    // Meta 廣告：名稱對應 → 照日期歸開賣
+    { source: "meta_ads", date: "2026-11-05", label: "年末試用 - 轉換", tags: {}, metrics: { spend: 8000, clicks: 300, reach: 5000 } },
+    // 別檔
+    { source: "ga4", date: "2026-11-06", label: "ob-ev12", tags: {}, metrics: { sessions: 999 } },
+    // 還沒歸檔
+    { source: "meta_ads", date: "2026-11-07", label: "品牌常態", tags: {}, metrics: { spend: 500 } },
+    { source: "meta_ads", date: "2026-11-08", label: "品牌常態", tags: {}, metrics: { spend: 700 } },
+    // 期間外
+    { source: "meta_ads", date: "2026-06-01", label: "年末試用", tags: {}, metrics: { spend: 1 } },
+  ];
+  const r = buildCampaignPerf({
+    items, published: { 101: ["901"], 102: ["pg_902"] }, facts, store: { aliases: ["年末試用"] }, today: "2026-11-25",
+    eventId: 9, external: ext, kpiPhases: null,
+  });
+  it("開賣段：粉專＋Meta 廣告＋GA4（照 ph 標籤）分來源也有總和", () => {
+    const launch = r.phases.find((p) => p.id === "launch")!;
+    expect(launch.bySource.meta_ads).toEqual({ spend: 8000, clicks: 300, reach: 5000 });
+    expect(launch.bySource.ga4).toEqual({ sessions: 120, orders: 3, revenue: 4500 });
+    expect(launch.actual.reach).toBe(5800);                 // 粉專 800 + 廣告 5000
+    expect(launch.actual.revenue).toBe(4500);
+    expect(r.phases.find((p) => p.id === "sustain")!.bySource.ga4).toBeUndefined();
+  });
+  it("來源摘要與還沒歸檔：別檔、期間外的不列；同名合併", () => {
+    expect(r.sources.map((s) => [s.source, s.rows, s.utm, s.alias])).toEqual([["ga4", 1, 1, 0], ["meta_ads", 1, 0, 1]]);
+    expect(r.unlinked).toEqual([{ source: "meta_ads", label: "品牌常態", rows: 2, metrics: { spend: 1200 } }]);
+  });
+});

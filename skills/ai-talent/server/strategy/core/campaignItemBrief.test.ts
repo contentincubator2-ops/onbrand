@@ -21,3 +21,11 @@ describe("campaignItemBriefText", () => {
     expect(t).toContain("屬於開賣期\n");
   });
 });
+
+describe("追蹤連結", () => {
+  it("有連結時要求文中用這一個；沒有就不提", () => {
+    const base = { eventId: 1, itemId: "a", paid: false, phase: "launch", date: "2026-11-01", angle: "上市", phaseMessage: "" };
+    expect(campaignItemBriefText({ ...base, link: "https://a.com/?utm_campaign=ob-ev1" })).toContain("https://a.com/?utm_campaign=ob-ev1");
+    expect(campaignItemBriefText(base)).not.toContain("連結");
+  });
+});
