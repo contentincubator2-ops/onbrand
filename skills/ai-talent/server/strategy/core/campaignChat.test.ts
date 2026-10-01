@@ -91,7 +91,13 @@ describe("訊息", () => {
 describe("parseChatReply（回覆被截斷也救得回來）", () => {
   it("完整的 JSON：照常解析，帶 askDirector", () => {
     const r = parseChatReply('{"reply":"好","ops":[{"op":"remove","id":"a"}],"askDirector":"訴求要不要改？"}');
-    expect(r).toEqual({ reply: "好", ops: [{ op: "remove", id: "a" }], phaseMessages: undefined, askDirector: "訴求要不要改？", truncated: false });
+    expect(r).toEqual({ reply: "好", ops: [{ op: "remove", id: "a" }], phaseMessages: undefined, askDirector: "訴求要不要改？", smp: undefined, truncated: false });
+  });
+
+  it("策略總監的回覆：帶新的一句話訴求與各段訊息", () => {
+    const r = parseChatReply('{"reply":"拿掉免費，改講時機。","smp":"上市期間開放申請","phaseMessages":{"launch":"現在進來剛好"},"ops":[]}')!;
+    expect(r.smp).toBe("上市期間開放申請");
+    expect(r.phaseMessages).toEqual({ launch: "現在進來剛好" });
   });
 
   it("被截斷：救回完整的那幾條，最後半條丟掉", () => {

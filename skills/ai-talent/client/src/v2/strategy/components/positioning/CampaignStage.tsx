@@ -39,6 +39,7 @@ import { LockToggle } from "./LockToggle";
 import CampaignMap from "./CampaignMap";
 import CampaignSetupForm from "./CampaignSetupForm";
 import CampaignChatCard from "./CampaignChatCard";
+import { dockDirector } from "../../lib/directorDock";
 import CampaignHandoff from "./CampaignHandoff";
 import CampaignKpiPanel from "./CampaignKpiPanel";
 import { money, metricLine } from "../../lib/campaignKpi";
@@ -126,7 +127,11 @@ export default function CampaignStage({ eventId, brandId }: { eventId: number; b
     };
   }, [full]);
 
-  /** 對話提案按了「套用」：換掉企劃、馬上存（不等停手）。 */
+  // 2026-09-30（CJ「都在左邊完成回答…在同一個地方換人」）：策略總監在左邊的對話卡裡，
+  // 這一頁右下角的總監收起來。
+  React.useEffect(() => dockDirector(), []);
+
+  /** 對話帶來的修改：換掉企劃、馬上存（不等停手）。 */
   const applyPlan = (next: CampaignPlan) => {
     if (timer.current) clearTimeout(timer.current);
     planRef.current = next;
@@ -333,7 +338,7 @@ export default function CampaignStage({ eventId, brandId }: { eventId: number; b
             </>)}
 
             {plan && (
-              <CampaignChatCard eventId={eventId} plan={plan} phase={cur} notes={notes} locked={locked} en={en} onApply={applyPlan} grow
+              <CampaignChatCard eventId={eventId} brandId={brandId} plan={plan} phase={cur} notes={notes} locked={locked} en={en} onApply={applyPlan} grow
                 expanded={chatExpanded} onToggleExpand={() => setChatExpanded((v) => !v)} />
             )}
 
