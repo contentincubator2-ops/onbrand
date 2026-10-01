@@ -1,0 +1,45 @@
+name: Ops (DEV) — probe product positioning diff
+
+# 2026-10-02（CJ「產品頁面當中，每一個產品產出的定位，怎麼都是一樣的」）：
+# 用 DEV 真資料並排印出同品牌各產品的定位輸入與產出，標出完全相同的欄位。
+# 唯讀、不呼叫任何模型。腳本從這個 commit 帶上 VM 跑（不依賴已部署版本）。
+on:
+  push:
+    paths:
+      - '.github/workflows/op-probe-product-positioning-diff.yml'
+      - 'skills/ai-talent/scripts/probe-product-positioning-diff.ts'
+  workflow_dispatch:
+    inputs:
+      brandId:
+        description: '只看某個品牌（留空＝掃最近有產品定位的品牌）'
+        required: false
+
+jobs:
+  probe:
+    runs-on: ubuntu-24.04
+    environment: dev
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - name: Encode probe script
+        id: enc
+        run: echo "b64=$(base64 -w0 skills/ai-talent/scripts/probe-product-positioning-diff.ts)" >> "$GITHUB_OUTPUT"
+      - name: Run probe on DEV VM
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          PROBE_B64: ${{ steps.enc.outputs.b64 }}
+          BRAND_ID: ${{ github.event.inputs.brandId }}
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          envs: PROBE_B64,BRAND_ID
+          command_timeout: 7m
+          script: |
+            set -e
+            cd /opt/onbrand/current/skills/ai-talent
+            set -a; source .env 2>/dev/null; set +a
+            F=scripts/_probe-product-positioning-diff.$$.ts
+            echo "$PROBE_B64" | base64 -d > "$F"
+            trap 'rm -f "$F"' EXIT
+            ./node_modules/.bin/tsx "$F" "$BRAND_ID"
