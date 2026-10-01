@@ -35,6 +35,10 @@ describe("taskIdOf / platformOf", () => {
     expect(taskIdOf("null", "[task:fb-30-x] 30s 任務")).toBe("fb-30-x");
     expect(taskIdOf(null, "no tag")).toBeNull();
   });
+  it("七日發布台每天一個 id，一律併成一張", () => {
+    expect(taskIdOf("theater-facebook-2026-08-06", null)).toBe("theater");
+    expect(taskIdOf(null, "[task:theater-line-2026-08-07] theater 任務")).toBe("theater");
+  });
   it("舊 fb-100 id 併入 fb-99", () => expect(taskIdOf("fb-100-carousel-5", null)).toBe(taskIdOf("fb-99-carousel-5", null)));
   it("七通路以外歸其他", () => {
     expect(platformOf("Threads")).toBe("threads");

@@ -74,11 +74,20 @@ export function stageOf(r: Pick<ProjectIndexRow, "progress" | "status" | "spPubl
   return "draft";
 }
 
+/**
+ * 舊「七日發布台」的 task id 帶日期（theater-facebook-2026-08-06），每天一個。
+ * dev 實測 179 個不同 id 裡 126 個是它，會把「常用任務卡」排行整個洗掉——
+ * 一律併成一張；平台已經是另一個篩選面，不用再按通路拆。
+ */
+export const THEATER_TASK_ID = "theater";
+export const THEATER_TASK_LABEL = "七日發布台";
+
 /** 從 metadata.taskId 或舊資料 description 的 [task:<id>] 取出、並 normalize（fb-100-* → fb-99-*）。 */
 export function taskIdOf(metaTaskId: unknown, description: unknown): string | null {
   let raw: string | null = null;
   if (typeof metaTaskId === "string" && metaTaskId && metaTaskId !== "null") raw = metaTaskId;
   else if (typeof description === "string") raw = /\[task:([^\]]+)\]/.exec(description)?.[1] ?? null;
+  if (raw && raw.startsWith(`${THEATER_TASK_ID}-`)) return THEATER_TASK_ID;
   return raw ? normalizeTaskId(raw) : null;
 }
 
