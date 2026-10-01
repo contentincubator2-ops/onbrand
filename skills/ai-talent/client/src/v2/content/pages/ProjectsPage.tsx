@@ -1,61 +1,82 @@
 /**
- * ProjectsPage — simplified path A (CJ 2026-05-07).
+ * ProjectsPage — 執行過的產出，一次執行一張卡。
  *
- * Replaces the previous Canva-faithful clone (sub-nav / 4 filter pills /
- * sync sources / 12-item card menu / Designs+Images+Videos sections /
- * grid+list view toggle / brand folders) with ONE clean page:
- *
- *   1 hero + 1 search bar
- *   ── 最近活動 ──  (12 most recent missions across all brands)
- *   ── 按品牌 ──   (one chip per brand with mission count)
- *   1 「+ 新任務」 button bottom-right
- *
- * Data: every task run from /30s, /60s, /100s, /theater now writes to
- * mission_outputs via recordTaskRun, so this page actually reflects the
- * user's work.
+ * 2026-10-02 (CJ「難以按照平台、做到哪裡、自己常用的任務，看執行過的專案」)：
+ *   · 篩選改成 平台／進度／任務卡（常用置頂）／產品／時間＋搜尋＋排序，
+ *     篩選、計數、分頁都在伺服器（mission.listProjects → projectFilters）。
+ *     舊版只拿最近 60 筆、畫 18 張，更早的產出怎麼篩都找不到。
+ *   · 條件寫在網址（?platform=&stage=&task=…），重新整理不丟、其他頁可直接連進來。
+ *   · 拿掉：品牌 chips（全站品牌切換已決定品牌）、族群（策略工作台 9/30 已刪，永遠空）、
+ *     頂部產品／活動 scope（useScopeState 已不管 p/e）。
+ *   · 多次執行仍各一張卡，每張可單獨刪除（output.delete，只封存這一次的產出）。
+ *     舊版刪除打的是 mission.delete，會把同一張任務卡的所有執行一起刪掉。
  */
 import { useEffect, useMemo, useState } from "react";
 import { showToastGlobal } from "../../../components/ui/Toast";
-import { useNavigate, useOutletContext } from "react-router-dom";
+import { useNavigate, useOutletContext, useSearchParams } from "react-router-dom";
 import { trpc } from "../../../lib/trpc";
 import { useLang } from "../../../lib/i18n";
 import type { ShellOutletCtx } from "../../app/shell/ShellLayout";
 import { Skeleton } from "@heroui/react";
-import { CopyIcon, DeleteIcon, EditIcon, FolderIcon, InfoIcon, SearchIcon, WaitingIcon } from "../../platform/components/icons";
+import { CopyIcon, DeleteIcon, EditIcon, FolderIcon, InfoIcon, SearchIcon } from "../../platform/components/icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faFacebook, faInstagram, faYoutube, faTiktok, faLinkedin, faThreads } from "@fortawesome/free-brands-svg-icons";
-import { faGlobe, faNewspaper, faEnvelope, faPenNib } from "@fortawesome/free-solid-svg-icons";
-import { HelpTip } from "../../platform/components/HelpTip";
+import { faFacebook, faInstagram, faTiktok, faThreads, faLine } from "@fortawesome/free-brands-svg-icons";
+import { faGlobe, faEnvelope, faPenNib } from "@fortawesome/free-solid-svg-icons";
 import { IllustratedEmpty } from "../../platform/components/EmptyIllustration";
 
-interface MissionRow {
-  id: number;            // mission_outputs.id (output row) — NOT the mission PK
-  missionId?: number;    // the real missions.id — use for mission.* mutations
-  title?: string | null;
-  description?: string | null;
-  workspace?: string | null;
-  brandId?: number | null;
-  brandName?: string | null;
-  status?: string | null;
-  updatedAt?: string;
+type Lang = "zh-TW" | "en";
+type Stage = "generating" | "failed" | "draft" | "planned" | "scheduled" | "published";
+type Period = "7d" | "30d" | "older";
+
+interface ProjectRow {
+  id: number;            // mission_outputs.id — 一次執行
+  missionId: number;     // missions.id — 同一品牌×通路×任務卡
+  title: string | null;
+  workspace: string | null;
+  platform: string;
+  stage: Stage;
+  brandId: number | null;
+  brandName: string | null;
+  createdAt: string;
+  taskId: string | null;
+  taskLabel: string | null;
+  productName: string | null;
   thumbnailUrl?: string | null;
 }
 
-const WORKSPACE_ICONS: Record<string, any> = {
-  facebook: faFacebook, instagram: faInstagram, youtube: faYoutube,
-  tiktok: faTiktok, linkedin: faLinkedin, threads: faThreads,
-  email: faEnvelope, press: faNewspaper, brand: faPenNib, audience: faPenNib,
-  website: faGlobe, theater: faPenNib,
+const PLATFORM_META: Record<string, { icon: any; zh: string; en: string }> = {
+  facebook:  { icon: faFacebook,  zh: "Facebook", en: "Facebook" },
+  instagram: { icon: faInstagram, zh: "Instagram", en: "Instagram" },
+  threads:   { icon: faThreads,   zh: "Threads",  en: "Threads" },
+  line:      { icon: faLine,      zh: "LINE",     en: "LINE" },
+  tiktok:    { icon: faTiktok,    zh: "TikTok",   en: "TikTok" },
+  email:     { icon: faEnvelope,  zh: "電子報",    en: "Newsletter" },
+  website:   { icon: faGlobe,     zh: "官網",      en: "Website" },
+  other:     { icon: faPenNib,    zh: "其他",      en: "Other" },
 };
 
-const WORKSPACE_TONE: Record<string, string> = {
-  facebook: "#18181b", instagram: "#18181b", youtube: "#18181b",
-  tiktok: "#000000", linkedin: "#18181b", threads: "#000000",
-  email: "#18181b", press: "#64748B", brand: "#18181b", audience: "#18181b",
-  website: "#18181b", theater: "#18181b",
+const STAGE_LABEL: Record<Stage, { zh: string; en: string }> = {
+  generating: { zh: "生成中",     en: "Generating" },
+  failed:     { zh: "失敗",       en: "Failed" },
+  draft:      { zh: "草稿",       en: "Draft" },
+  planned:    { zh: "已排入企劃", en: "In weekly plan" },
+  scheduled:  { zh: "已排程",     en: "Scheduled" },
+  published:  { zh: "已發布",     en: "Published" },
 };
 
-function formatRelative(dateStr: string | undefined, lang: "zh-TW" | "en"): string {
+const PERIOD_LABEL: Record<Period, { zh: string; en: string }> = {
+  "7d":  { zh: "近 7 天",  en: "Last 7 days" },
+  "30d": { zh: "8–30 天", en: "8–30 days" },
+  older: { zh: "更早",     en: "Older" },
+};
+
+/** 任務卡面：用過次數前幾名直接擺成 chip，其餘收進下拉。 */
+const TOP_TASKS = 3;
+const PAGE_SIZE = 24;
+
+const FILTER_KEYS = ["platform", "stage", "task", "product", "period", "q", "sort"] as const;
+
+function formatRelative(dateStr: string | undefined, lang: Lang): string {
   if (!dateStr) return "";
   const diff = Date.now() - new Date(dateStr).getTime();
   const mins  = Math.floor(diff / 60000);
@@ -70,191 +91,121 @@ function formatRelative(dateStr: string | undefined, lang: "zh-TW" | "en"): stri
   return new Date(dateStr).toLocaleDateString(isEn ? "en-US" : "zh-TW", { month: "short", day: "numeric" });
 }
 
-function brandColor(seed: string): string {
-  const palette = ["#18181b","#27272a","#3f3f46","#52525b","#71717a","#27272a","#3f3f46","#52525b"];
-  let h = 0;
-  for (let i = 0; i < seed.length; i++) h = seed.charCodeAt(i) + ((h << 5) - h);
-  return palette[Math.abs(h) % palette.length]!;
-}
-
 export default function ProjectsPage() {
   const navigate = useNavigate();
   const { lang } = useLang();
+  const en = lang === "en";
   const ctx = useOutletContext<ShellOutletCtx>();
-  const shellBrands = ctx?.brands ?? [];
-  const shellBrandId = ctx?.brandId ?? null;
-  // 2026-05-11 (CJ「選了 product/event 也要 filter projects」): scope filter.
-  const shellProductId = (ctx as any)?.scope?.productId ?? null;
-  const shellEventId = (ctx as any)?.scope?.eventId ?? null;
+  const brandId = ctx?.brandId ?? null;
 
-  // 2026-05-19 (CJ「任務完成沒有按儲存也要出現在專案」):
-  // refetchOnWindowFocus: true → 從 /run 切回 /projects 立刻拿最新清單。
-  // interval 縮到 8s (was 15s) 讓背景任務更快出現。
-  const allQuery = (trpc as any).mission?.listAllForUser?.useQuery(
-    undefined,
-    { refetchOnWindowFocus: true, refetchInterval: 8_000 },
-  );
-  const fallbackQuery = trpc.mission.listByBrand.useQuery(
-    { brandId: shellBrands?.[0]?.id ?? 0 },
-    { enabled: !allQuery && !!shellBrands?.[0]?.id, refetchOnWindowFocus: true },
-  );
+  const [params, setParams] = useSearchParams();
+  const platform = params.get("platform");
+  const stage = params.get("stage") as Stage | null;
+  const taskId = params.get("task");
+  const productId = Number(params.get("product")) || null;
+  const period = params.get("period") as Period | null;
+  const sort = params.get("sort") === "old" ? "old" : "new";
+  const q = params.get("q") ?? "";
 
-  const rows: MissionRow[] = useMemo(() => {
-    if (allQuery?.data) return allQuery.data as MissionRow[];
-    return (fallbackQuery.data as MissionRow[]) ?? [];
-  }, [allQuery?.data, fallbackQuery.data]);
-
-  const [search, setSearch] = useState("");
-  // 2026-05-11 (CJ「切換品牌應該全局切換」): default filter follows the
-  // shell's active brand. If shell brand is set, filter to it on mount.
-  const [activeBrandId, setActiveBrandId] = useState<number | "all">(
-    shellBrandId ?? "all",
-  );
-  // Sync filter when user switches brand in the top bar.
+  // 搜尋框打字不要每個字都改網址＋打 API；停 300ms 再寫回。
+  const [searchDraft, setSearchDraft] = useState(q);
+  useEffect(() => { setSearchDraft(q); }, [q]);
   useEffect(() => {
-    if (shellBrandId !== null && shellBrandId !== activeBrandId) {
-      setActiveBrandId(shellBrandId);
-    }
-    // Intentionally don't run when activeBrandId changes locally (user
-    // can still manually pick 'all' or another brand within ProjectsPage
-    // without it getting overridden until shell brand changes again).
+    if (searchDraft.trim() === q) return;
+    const t = setTimeout(() => setParam("q", searchDraft.trim() || null), 300);
+    return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [shellBrandId]);
-  // createOpen state removed 2026-05-14 along with CreateMissionModal.
+  }, [searchDraft]);
 
-  // 2026-08-11 (CJ「專案要能按族群、產品區分」): in-page filters, separate
-  // from the shell's global scope. The shell narrows everything at once;
-  // these let you slice the project list without changing global context.
-  const [activeAudience, setActiveAudience] = useState<string | "all">("all");
-  const [activeProduct, setActiveProduct] = useState<number | "all">("all");
+  // 只有在有「生成中」的卡時才輪詢，背景收尾完成就會自動換成草稿。
+  const [polling, setPolling] = useState(false);
 
-  // Filter
-  const filtered = useMemo(() => {
-    let r = rows;
-    // Only show missions that have an actual output run (mo.id != null).
-    // Template/seed missions with no runs have id = null in the query result
-    // and show nothing when clicked — exclude them entirely.
-    r = r.filter((m) => !!m.id);
-    if (activeBrandId !== "all") r = r.filter((m) => m.brandId === activeBrandId);
-    // 2026-05-11 (CJ): when shell scope has product/event, narrow projects too
-    if (shellProductId) {
-      r = r.filter((m) => (m as any).scopeProductId === shellProductId);
-    }
-    if (shellEventId) {
-      r = r.filter((m) => (m as any).scopeEventId === shellEventId);
-    }
-    if (activeAudience !== "all") {
-      r = r.filter((m) => ((m as any).audienceLabel ?? null) === activeAudience);
-    }
-    if (activeProduct !== "all") {
-      r = r.filter((m) => ((m as any).scopeProductId ?? null) === activeProduct);
-    }
-    if (search.trim()) {
-      const q = search.trim().toLowerCase();
-      r = r.filter((m) =>
-        (m.title ?? "").toLowerCase().includes(q) ||
-        (m.brandName ?? "").toLowerCase().includes(q) ||
-        (m.workspace ?? "").toLowerCase().includes(q)
-      );
-    }
-    return r;
-  }, [rows, activeBrandId, search, shellProductId, shellEventId, activeAudience, activeProduct]);
-
-  /**
-   * Audience / product facets, counted against everything the brand filter
-   * already allows — so the counts match what clicking would actually show.
-   *
-   * Audience is only present on runs started from a strategy-workbench sweet
-   * spot, so most historical work has none. The facet row hides itself when
-   * there's nothing to slice by, rather than showing a lone 未標記 chip that
-   * looks like something is broken.
-   */
-  const scopedRows = useMemo(
-    () => rows.filter((m) => !!m.id && (activeBrandId === "all" || m.brandId === activeBrandId)),
-    [rows, activeBrandId],
+  const query = trpc.mission.listProjects.useInfiniteQuery(
+    {
+      brandId,
+      platform: platform || null,
+      stage: stage || null,
+      taskId: taskId || null,
+      productId,
+      period: period || null,
+      q: q || null,
+      sort,
+      limit: PAGE_SIZE,
+    },
+    {
+      getNextPageParam: (last) => last.nextCursor ?? undefined,
+      refetchOnWindowFocus: true,
+      refetchInterval: polling ? 8_000 : false,
+    },
   );
-  const audienceFacets = useMemo(() => {
-    const counts = new Map<string, number>();
-    scopedRows.forEach((m) => {
-      const a = (m as any).audienceLabel;
-      if (a) counts.set(a, (counts.get(a) ?? 0) + 1);
-    });
-    return [...counts.entries()]
-      .map(([label, count]) => ({ label, count }))
-      .sort((a, b) => b.count - a.count);
-  }, [scopedRows]);
-  const productFacets = useMemo(() => {
-    const counts = new Map<number, { name: string; count: number }>();
-    scopedRows.forEach((m) => {
-      const id = (m as any).scopeProductId;
-      if (!id) return;
-      const name = (m as any).scopeProductName || `#${id}`;
-      const prev = counts.get(id);
-      counts.set(id, { name, count: (prev?.count ?? 0) + 1 });
-    });
-    return [...counts.entries()]
-      .map(([id, v]) => ({ id, ...v }))
-      .sort((a, b) => b.count - a.count);
-  }, [scopedRows]);
 
-  // Brand chips with counts
-  const brandsWithCount = useMemo(() => {
-    const counts = new Map<number, number>();
-    rows.forEach((m) => {
-      if (m.brandId) counts.set(m.brandId, (counts.get(m.brandId) ?? 0) + 1);
-    });
-    return (shellBrands as any[])
-      .map((b) => ({ id: b.id, name: b.name as string, count: counts.get(b.id) ?? 0 }))
-      .sort((a, b) => b.count - a.count);
-  }, [rows, shellBrands]);
+  const pages = query.data?.pages ?? [];
+  const items = useMemo(() => pages.flatMap((p) => p.items as ProjectRow[]), [pages]);
+  const total = pages[0]?.total ?? 0;
+  const facets = pages[0]?.facets;
 
-  const recent = filtered.slice(0, 18);
+  useEffect(() => {
+    setPolling(items.some((m) => m.stage === "generating"));
+  }, [items]);
 
-  const goToMission = (m: MissionRow) => {
-    const ws = m.workspace || "_";
-    // 2026-05-14: row.id is now mission_output.id (per-run unique); the
-    // mission-detail page key lives on row.missionId. Fall back to row.id
-    // for legacy callers that still ship mission rows.
-    const missionId = (m as any).missionId ?? m.id;
-    if (m.brandId) navigate(`/b/${m.brandId}/${ws}/m/${missionId}`);
-    else navigate(`/m/${missionId}`);
+  function setParam(key: (typeof FILTER_KEYS)[number], value: string | null) {
+    setParams((prev) => {
+      const next = new URLSearchParams(prev);
+      if (value) next.set(key, value); else next.delete(key);
+      return next;
+    }, { replace: true });
+  }
+  const toggle = (key: (typeof FILTER_KEYS)[number], value: string) =>
+    setParam(key, params.get(key) === value ? null : value);
+
+  const anyFilter = FILTER_KEYS.some((k) => k !== "sort" && params.get(k));
+  const clearFilters = () => {
+    setSearchDraft("");
+    setParams((prev) => {
+      const next = new URLSearchParams(prev);
+      FILTER_KEYS.forEach((k) => next.delete(k));
+      return next;
+    }, { replace: true });
   };
 
-  const isLoading = !!allQuery && allQuery.isLoading;
+  const taskFacets = facets?.task ?? [];
+  const topTasks = taskFacets.slice(0, TOP_TASKS);
+  const moreTasks = taskFacets.slice(TOP_TASKS);
+  // 選中的卡在「更多」裡時，下拉要顯示它；選中的卡被其他條件篩到 0 時仍保留選取。
+  const selectedInMore = !!taskId && !topTasks.some((t) => t.key === taskId);
+
+  const goToMission = (m: ProjectRow) => {
+    const ws = m.workspace || "_";
+    if (m.brandId) navigate(`/b/${m.brandId}/${ws}/m/${m.missionId}`);
+    else navigate(`/m/${m.missionId}`);
+  };
+
+  const isInitialLoading = query.isLoading;
+  const hasAnyWork = total > 0 || anyFilter;
 
   return (
     <div style={{ minHeight: "100vh", background: "#FAFAFA" }}>
-      {/* ─── Hero (matches /30s / /brands rhythm) ─────────────────── */}
+      {/* ─── Hero ─────────────────────────────────────────────────── */}
       <div className="relative pt-10 pb-5 px-6 text-center">
         <div className="relative z-10 flex flex-col items-center max-w-[1100px] mx-auto">
-          {/* 2026-05-11 (CJ): canonical header template — same as /30s / /60s / /99s. */}
           <h1
-            className="font-semibold tracking-tight leading-none mb-3"
-            style={{
-              fontSize: "clamp(1.6rem, 3vw, 2.25rem)",
-              background: "#171717",
-              WebkitBackgroundClip: "text",
-              WebkitTextFillColor: "transparent",
-              backgroundClip: "text",
-            }}
+            className="font-semibold tracking-tight leading-none mb-5"
+            style={{ fontSize: "clamp(1.6rem, 3vw, 2.25rem)", color: "#171717" }}
           >
-            {lang === "en" ? "Projects" : "專案"}
+            {en ? "Projects" : "專案"}
           </h1>
-          <div className="mb-2" />
-
-          {/* Single search bar */}
           <div className="w-full" style={{ maxWidth: 720 }}>
             <div className="flex items-center gap-3 px-5 bg-white rounded-[20px] border border-default-100 shadow-md" style={{ height: 56 }}>
               <SearchIcon size={18} className="text-default-400 shrink-0" />
               <input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder={lang === "en" ? "Search projects, brands, channels…" : "搜尋專案 / 品牌 / 平台…"}
+                value={searchDraft}
+                onChange={(e) => setSearchDraft(e.target.value)}
+                placeholder={en ? "Search titles, task cards, products…" : "搜尋標題 / 任務卡 / 產品…"}
                 className="flex-1 bg-transparent text-sm outline-none"
               />
-              {search && (
-                <button onClick={() => setSearch("")} className="text-default-400 hover:text-default-700 text-sm shrink-0">
-                  {lang === "en" ? "Clear" : "清除"}
+              {searchDraft && (
+                <button onClick={() => setSearchDraft("")} className="text-default-400 hover:text-default-700 text-sm shrink-0">
+                  {en ? "Clear" : "清除"}
                 </button>
               )}
             </div>
@@ -262,230 +213,205 @@ export default function ProjectsPage() {
         </div>
       </div>
 
-      {/* ─── Brand filter chips ─────────────────────────────────────── */}
-      {brandsWithCount.length > 0 && (
-        <div className="max-w-[1100px] mx-auto px-6 mb-6">
+      {/* ─── Filters ──────────────────────────────────────────────── */}
+      {facets && hasAnyWork && (
+        <div className="max-w-[1100px] mx-auto px-6 mb-6 flex flex-col gap-2.5">
+          <FacetRow label={en ? "Channel" : "平台"}>
+            {facets.platform.map((p) => {
+              const meta = PLATFORM_META[p.key] ?? PLATFORM_META.other!;
+              return (
+                <FacetChip
+                  key={p.key}
+                  active={platform === p.key}
+                  onClick={() => toggle("platform", p.key)}
+                  text={`${en ? meta.en : meta.zh} · ${p.count}`}
+                  icon={meta.icon}
+                />
+              );
+            })}
+          </FacetRow>
+
+          <FacetRow label={en ? "Status" : "進度"}>
+            {facets.stage.map((s) => (
+              <FacetChip
+                key={s.key}
+                active={stage === s.key}
+                onClick={() => toggle("stage", s.key)}
+                text={`${en ? STAGE_LABEL[s.key as Stage].en : STAGE_LABEL[s.key as Stage].zh} · ${s.count}`}
+                danger={s.key === "failed"}
+              />
+            ))}
+          </FacetRow>
+
+          {taskFacets.length > 0 && (
+            <FacetRow label={en ? "Task card" : "任務卡"}>
+              {topTasks.map((t) => (
+                <FacetChip
+                  key={t.key}
+                  active={taskId === t.key}
+                  onClick={() => toggle("task", t.key)}
+                  text={`${shorten(t.label)} · ${t.count}`}
+                  title={t.label}
+                />
+              ))}
+              {(moreTasks.length > 0 || selectedInMore) && (
+                <FacetSelect
+                  active={selectedInMore}
+                  value={selectedInMore ? taskId! : ""}
+                  onChange={(v) => setParam("task", v || null)}
+                  placeholder={en ? `More (${moreTasks.length})` : `更多（${moreTasks.length}）`}
+                  options={[
+                    ...(selectedInMore && !moreTasks.some((t) => t.key === taskId)
+                      ? [{ value: taskId!, label: en ? "Selected card · 0" : "已選的任務卡 · 0" }]
+                      : []),
+                    ...moreTasks.map((t) => ({ value: t.key, label: `${t.label} · ${t.count}` })),
+                  ]}
+                />
+              )}
+            </FacetRow>
+          )}
+
           <div className="flex items-center gap-2 flex-wrap">
-            <button
-              onClick={() => setActiveBrandId("all")}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition border ${
-                activeBrandId === "all"
-                  ? "bg-default-900 text-white border-default-900"
-                  : "bg-white text-default-700 border-default-200 hover:border-default-400"
-              }`}
-            >
-              {lang === "en" ? "All" : "全部"} · {rows.length}
-            </button>
-            {brandsWithCount
-              // When a brand is active in shell, only show that brand chip
-              // (hide other brands — user already knows their context).
-              .filter((b) => {
-                if (b.count === 0) return false;
-                if (shellBrandId && shellBrandId !== b.id) return false;
-                return true;
-              })
-              .map((b) => {
-                const active = activeBrandId === b.id;
-                return (
-                  <button
-                    key={b.id}
-                    onClick={() => setActiveBrandId(b.id)}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition border ${
-                      active
-                        ? "bg-default-900 text-white border-default-900"
-                        : "bg-white text-default-700 border-default-200 hover:border-default-400"
-                    }`}
-                  >
-                    <span className="w-2 h-2 rounded-full" style={{ background: brandColor(b.name) }} />
-                    {b.name} · {b.count}
-                  </button>
-                );
-              })}
+            {facets.product.length > 0 && (
+              <FacetSelect
+                active={!!productId}
+                value={productId ? String(productId) : ""}
+                onChange={(v) => setParam("product", v || null)}
+                placeholder={en ? "All products" : "全部產品"}
+                options={facets.product.map((p) => ({ value: String(p.id), label: `${p.name} · ${p.count}` }))}
+              />
+            )}
+            <FacetSelect
+              active={!!period}
+              value={period ?? ""}
+              onChange={(v) => setParam("period", v || null)}
+              placeholder={en ? "Any time" : "全部時間"}
+              options={facets.period.map((p) => ({
+                value: p.key,
+                label: `${en ? PERIOD_LABEL[p.key as Period].en : PERIOD_LABEL[p.key as Period].zh} · ${p.count}`,
+              }))}
+            />
+            <FacetSelect
+              active={false}
+              value={sort}
+              onChange={(v) => setParam("sort", v === "old" ? "old" : null)}
+              options={[
+                { value: "new", label: en ? "Newest first" : "新到舊" },
+                { value: "old", label: en ? "Oldest first" : "舊到新" },
+              ]}
+            />
+            {anyFilter && (
+              <button onClick={clearFilters} className="text-xs text-default-500 hover:text-default-800 hover:underline ml-1">
+                {en ? "Clear filters" : "清除篩選"}
+              </button>
+            )}
           </div>
         </div>
       )}
 
-      {/* ─── Audience / product facets ───────────────────────────────────
-          2026-08-11 (CJ「專案要能按族群、產品區分」). Each row renders only
-          when there's more than one thing to slice by — a single chip is a
-          label, not a filter, and an empty row reads as broken. */}
-      {scopedRows.length > 0 && (
-        <div className="max-w-[1100px] mx-auto px-6 mb-6 flex flex-col gap-2">
-          {/* 2026-08-11 revision: these rows used to hide themselves unless
-              there were 2+ values to slice by. That made the whole feature
-              invisible — existing work predates audience tagging, so both rows
-              vanished and it looked like nothing had shipped. Now the row
-              always renders and, when empty, says WHY and how to populate it.
-              An explained empty state beats a missing control. */}
-          <FacetRow
-            label={lang === "en" ? "Audience" : "族群"}
-            hint={lang === "en"
-              ? "Audiences come from the strategy workbench: open a task from a sweet spot to tag its output."
-              : "族群來自策略工作台：從甜蜜點點「內容角度」開任務，產出就會記住寫給哪個族群"}
-          >
-            {audienceFacets.length === 0 ? (
-              <span className="text-[12px] text-default-400">
-                {lang === "en" ? "None yet" : "尚無標記"}
-              </span>
-            ) : (
-              <>
-                <FacetChip
-                  active={activeAudience === "all"}
-                  onClick={() => setActiveAudience("all")}
-                  text={`${lang === "en" ? "All" : "全部"} · ${scopedRows.length}`}
-                />
-                {audienceFacets.map((a) => (
-                  <FacetChip
-                    key={a.label}
-                    active={activeAudience === a.label}
-                    onClick={() => setActiveAudience(a.label)}
-                    // Anchors run long (up to 600 chars); the chip shows a
-                    // readable head and the full text lives in the tooltip.
-                    text={`${a.label.length > 18 ? `${a.label.slice(0, 18)}…` : a.label} · ${a.count}`}
-                    title={a.label}
-                  />
-                ))}
-              </>
-            )}
-          </FacetRow>
-          <FacetRow
-            label={lang === "en" ? "Product" : "產品"}
-            hint={lang === "en" ? "Pick a product in the task modal and its output is filed here." : "在任務視窗選擇產品後，產出就會歸到該產品"}
-          >
-            {productFacets.length === 0 ? (
-              <span className="text-[12px] text-default-400">
-                {lang === "en" ? "None yet" : "尚無產出"}
-              </span>
-            ) : (
-              <>
-                <FacetChip
-                  active={activeProduct === "all"}
-                  onClick={() => setActiveProduct("all")}
-                  text={`${lang === "en" ? "All" : "全部"} · ${scopedRows.length}`}
-                />
-                {productFacets.map((p) => (
-                  <FacetChip
-                    key={p.id}
-                    active={activeProduct === p.id}
-                    onClick={() => setActiveProduct(p.id)}
-                    text={`${p.name} · ${p.count}`}
-                    title={p.name}
-                  />
-                ))}
-              </>
-            )}
-          </FacetRow>
-        </div>
-      )}
-
-      {/* ─── Recent activity ─────────────────────────────────────────── */}
+      {/* ─── Grid ─────────────────────────────────────────────────── */}
       <div className="max-w-[1100px] mx-auto px-6 pb-24">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2">
-            <WaitingIcon size={14} className="text-default-500" />
-            <h2 className="text-sm font-semibold text-default-700">
-              {activeBrandId === "all"
-                ? (lang === "en" ? "Recent" : "最近活動")
-                : (lang === "en" ? "Activity" : "活動")}
-              <span className="text-default-400 font-normal ml-2">
-                {lang === "en" ? `${filtered.length} items` : `${filtered.length} 個`}
-              </span>
-            </h2>
+        {!isInitialLoading && hasAnyWork && (
+          <div className="text-[12px] text-default-500 mb-3">
+            {en ? `${total} items` : `共 ${total} 個`}
           </div>
-        </div>
+        )}
 
-        {isLoading ? (
+        {isInitialLoading ? (
           <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
             {Array.from({ length: 8 }).map((_, i) => (
               <Skeleton key={i} className="rounded-xl" style={{ height: 140 }} />
             ))}
           </div>
-        ) : filtered.length === 0 ? (
-          <EmptyState
-            search={search}
-            onClear={() => { setSearch(""); setActiveBrandId("all"); }}
-            onCreate={() => navigate("/tasks/fb")}
-            lang={lang}
-          />
+        ) : items.length === 0 ? (
+          anyFilter ? (
+            <div className="flex flex-col items-center justify-center py-20 text-center">
+              <FolderIcon size={56} className="text-default-300 mb-4" strokeWidth={1.2} />
+              <p className="text-default-700 font-medium mb-4">
+                {en ? "No projects match these filters" : "沒有符合條件的專案"}
+              </p>
+              <button onClick={clearFilters} className="text-xs text-zinc-600 hover:underline">
+                {en ? "Clear filters" : "清除篩選"}
+              </button>
+            </div>
+          ) : (
+            <IllustratedEmpty
+              kind="projects"
+              title={en ? "Nothing on the wall yet" : "作品牆還沒掛上任何一張"}
+              action={{ label: en ? "Open your first task card" : "去開第一張任務卡", onPress: () => navigate("/tasks/fb") }}
+            />
+          )
         ) : (
-          <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-            {recent.map((m) => (
-              <ProjectCard key={m.id} mission={m} onClick={() => goToMission(m)} lang={lang} />
-            ))}
-          </div>
+          <>
+            <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+              {items.map((m) => (
+                <ProjectCard
+                  key={m.id}
+                  mission={m}
+                  showBrand={brandId == null}
+                  onClick={() => goToMission(m)}
+                  lang={lang}
+                />
+              ))}
+            </div>
+            {query.hasNextPage && (
+              <div className="flex justify-center mt-6">
+                <button
+                  onClick={() => query.fetchNextPage()}
+                  disabled={query.isFetchingNextPage}
+                  className="px-5 py-2 rounded-full text-xs font-medium border border-default-200 bg-white text-default-700 hover:border-default-400 disabled:opacity-50"
+                >
+                  {query.isFetchingNextPage
+                    ? (en ? "Loading…" : "載入中…")
+                    : (en ? `Load more (${total - items.length} left)` : `載入更多（還有 ${total - items.length} 個）`)}
+                </button>
+              </div>
+            )}
+          </>
         )}
       </div>
-
-      {/* 2026-05-14 (CJ): retired the +New FAB and CreateMissionModal.
-          Users enter tasks via the sidebar /30s /60s /99s pages instead;
-          /projects is now read-only history. */}
     </div>
   );
 }
 
+function shorten(s: string, n = 16): string {
+  return s.length > n ? `${s.slice(0, n)}…` : s;
+}
+
 /* ─────────────────────── ProjectCard ─────────────────────── */
-function ProjectCard({ mission, onClick, lang }: { mission: MissionRow; onClick: () => void; lang: "zh-TW" | "en" }) {
+function ProjectCard({ mission, showBrand, onClick, lang }: { mission: ProjectRow; showBrand: boolean; onClick: () => void; lang: Lang }) {
+  const en = lang === "en";
   const [menuOpen, setMenuOpen] = useState(false);
-  // A stored thumbnail URL that 404s must fall back to the coloured tile
-  // rather than leaving an empty grey box. Reset when the URL changes so a
-  // recycled card doesn't inherit the previous row's failure.
+  // 縮圖 404 退回平台色塊，不要留一個空灰框。
   const [thumbFailed, setThumbFailed] = useState(false);
   useEffect(() => { setThumbFailed(false); }, [mission.thumbnailUrl]);
-  // 2026-05-14 (CJ「專案名稱要可以編輯」): inline rename mode + optimistic UI.
   const [editing, setEditing] = useState(false);
   const [draftTitle, setDraftTitle] = useState<string>(mission.title ?? "");
-  // Optimistic title displayed while the mutation is in flight.
-  // Cleared once mission.title (from refetched server data) catches up.
+  // 改名送出到伺服器回來之間先顯示新名字。
   const [optimisticTitle, setOptimisticTitle] = useState<string | null>(null);
   useEffect(() => {
-    // Server caught up → drop the optimistic value.
-    if (optimisticTitle !== null && mission.title === optimisticTitle) {
-      setOptimisticTitle(null);
-    }
+    if (optimisticTitle !== null && mission.title === optimisticTitle) setOptimisticTitle(null);
   }, [mission.title, optimisticTitle]);
-  const utils = trpc.useUtils();
-  const renameMut = (trpc as any).output?.updateTitle?.useMutation
-    ? (trpc as any).output.updateTitle.useMutation({
-        onSuccess: () => {
-          (utils as any).mission?.listAllForUser?.invalidate?.();
-        },
-        onError: (e: any) => {
-          // Revert the optimistic value + tell the user
-          setOptimisticTitle(null);
-          showToastGlobal(
-            (lang === "en" ? "Rename failed: " : "重新命名失敗：") + (e?.message ?? e),
-          );
-        },
-      })
-    : null;
 
-  // 2026-05-16 (CJ「任務的四個按鍵，只有重新命名有用」→「建立複本失敗：
-  // Mission not found」): 建立複本 + 移到垃圾桶 were dead; first wiring
-  // passed mission.id but listAllForUser returns id=mission_outputs.id
-  // and missionId=missions.id, so mission.duplicate/delete (keyed on
-  // missions.id) said "Mission not found". Rename worked because it
-  // targets the OUTPUT row. Use the real missions PK here.
-  const realMissionId = (mission as any).missionId ?? mission.id;
-  const duplicateMut = (trpc as any).mission?.duplicate?.useMutation
-    ? (trpc as any).mission.duplicate.useMutation({
-        onSuccess: () => {
-          (utils as any).mission?.listAllForUser?.invalidate?.();
-          showToastGlobal(lang === "en" ? "Duplicate created" : "已建立複本", "success");
-        },
-        onError: (e: any) =>
-          showToastGlobal((lang === "en" ? "Duplicate failed: " : "建立複本失敗：") + (e?.message ?? e)),
-      })
-    : null;
-  const deleteMut = (trpc as any).mission?.delete?.useMutation
-    ? (trpc as any).mission.delete.useMutation({
-        onSuccess: () => {
-          (utils as any).mission?.listAllForUser?.invalidate?.();
-          showToastGlobal(lang === "en" ? "Moved to trash" : "已移到垃圾桶", "success");
-        },
-        onError: (e: any) =>
-          showToastGlobal((lang === "en" ? "Delete failed: " : "刪除失敗：") + (e?.message ?? e)),
-      })
-    : null;
+  const utils = trpc.useUtils();
+  const refresh = () => utils.mission.listProjects.invalidate();
+  const renameMut = trpc.output.updateTitle.useMutation({
+    onSuccess: refresh,
+    onError: (e) => {
+      setOptimisticTitle(null);
+      showToastGlobal((en ? "Rename failed: " : "重新命名失敗：") + e.message);
+    },
+  });
+  // 建立複本是 mission 層級（missions.id）；刪除是這一次執行（mission_outputs.id）。
+  const duplicateMut = trpc.mission.duplicate.useMutation({
+    onSuccess: () => { refresh(); showToastGlobal(en ? "Duplicate created" : "已建立複本", "success"); },
+    onError: (e) => showToastGlobal((en ? "Duplicate failed: " : "建立複本失敗：") + e.message),
+  });
+  const deleteMut = trpc.output.delete.useMutation({
+    onSuccess: () => { refresh(); showToastGlobal(en ? "Deleted" : "已刪除", "success"); },
+    onError: (e) => showToastGlobal((en ? "Delete failed: " : "刪除失敗：") + e.message),
+  });
+
   const displayTitle = optimisticTitle ?? mission.title ?? "";
   const startEditing = (e?: React.MouseEvent) => {
     e?.stopPropagation();
@@ -494,41 +420,31 @@ function ProjectCard({ mission, onClick, lang }: { mission: MissionRow; onClick:
   };
   const commitEdit = () => {
     const next = draftTitle.trim();
-    if (!next) { setEditing(false); return; }
-    if (next === displayTitle.trim()) { setEditing(false); return; }
-    setOptimisticTitle(next); // show the new name immediately
-    if (renameMut) {
-      renameMut.mutate({ id: mission.id, title: next.slice(0, 120) });
-    } else {
-      // No mutation available (e.g. type stub) — keep optimistic, no save.
-      console.warn("[rename] output.updateTitle mutation not available");
-    }
     setEditing(false);
+    if (!next || next === displayTitle.trim()) return;
+    setOptimisticTitle(next);
+    renameMut.mutate({ id: mission.id, title: next.slice(0, 120) });
   };
-  const cancelEdit = (e?: React.KeyboardEvent | React.FocusEvent) => {
+  const cancelEdit = (e?: React.KeyboardEvent) => {
     e?.stopPropagation();
     setEditing(false);
     setDraftTitle(displayTitle);
   };
 
-  const ws = (mission.workspace ?? "other").toLowerCase();
-  const icon = WORKSPACE_ICONS[ws] ?? faPenNib;
-  const tone = WORKSPACE_TONE[ws] ?? "#64748B";
+  const meta = PLATFORM_META[mission.platform] ?? PLATFORM_META.other!;
+  const stageText = en ? STAGE_LABEL[mission.stage].en : STAGE_LABEL[mission.stage].zh;
+  const failed = mission.stage === "failed";
+  const subline = [mission.taskLabel, mission.productName, showBrand ? mission.brandName : null]
+    .filter(Boolean).join(" · ");
 
   return (
     <div
       className="group relative rounded-xl bg-white border border-default-100 hover:shadow-md hover:border-default-300 transition overflow-hidden cursor-pointer"
       onClick={editing ? undefined : onClick}
     >
-      {/* Thumbnail (or coloured fallback).
-          2026-08-11 (CJ「每一個任務，應該都可以出現縮圖才對」): the old onError
-          just did style.display='none', which left a bare grey #F4F4F5 box —
-          no icon, no title, nothing. A whole grid of those reads as broken.
-          Failing over to the same coloured platform tile we use when there's
-          no thumbnail at all means a card always shows SOMETHING. */}
       <div
         className="relative aspect-[4/3] flex items-center justify-center overflow-hidden"
-        style={{ background: mission.thumbnailUrl && !thumbFailed ? "#F4F4F5" : `${tone}14` }}
+        style={{ background: mission.thumbnailUrl && !thumbFailed ? "#F4F4F5" : "#18181b14" }}
       >
         {mission.thumbnailUrl && !thumbFailed ? (
           <img
@@ -538,19 +454,17 @@ function ProjectCard({ mission, onClick, lang }: { mission: MissionRow; onClick:
             onError={() => setThumbFailed(true)}
           />
         ) : (
-          <FontAwesomeIcon icon={icon} style={{ color: tone, fontSize: 36, opacity: 0.55 }} />
+          <FontAwesomeIcon icon={meta.icon} style={{ color: "#18181b", fontSize: 36, opacity: 0.55 }} />
         )}
-        {/* Workspace tag */}
-        <span
-          className="absolute top-2 left-2 flex items-center gap-1 text-[12px] font-medium px-2 py-0.5 rounded-full bg-white/95 shadow-sm"
-          style={{ color: tone }}
-        >
-          <FontAwesomeIcon icon={icon} className="text-[12px]" />
-          {ws}
+        {/* 平台＋進度：一眼看出是哪個通路、做到哪裡。只有失敗用狀態色。 */}
+        <span className="absolute top-2 left-2 flex items-center gap-1 text-[12px] font-medium px-2 py-0.5 rounded-full bg-white/95 shadow-sm text-default-800">
+          <FontAwesomeIcon icon={meta.icon} className="text-[12px]" />
+          {en ? meta.en : meta.zh}
+          <span className="text-default-300">·</span>
+          <span className={failed ? "text-danger" : "text-default-600"}>{stageText}</span>
         </span>
       </div>
 
-      {/* Body */}
       <div className="p-3">
         {editing ? (
           <input
@@ -566,46 +480,38 @@ function ProjectCard({ mission, onClick, lang }: { mission: MissionRow; onClick:
             }}
             onBlur={commitEdit}
             maxLength={120}
-            placeholder={lang === "en" ? "Untitled" : "未命名"}
+            placeholder={en ? "Untitled" : "未命名"}
             className="w-full text-sm font-medium text-default-900 mb-0.5 px-1 py-0.5 -mx-1 -my-0.5 rounded border-2 border-primary-400 bg-white focus:outline-none focus:border-primary-600"
           />
         ) : (
-          /* 2026-05-14 (CJ「按標題的地方跟點進去任務的地方一樣，無法編輯」):
-             single-click title was racing with card onClick and always lost.
-             Title text → still navigates (matches user expectation: "click
-             the card to open it"). Rename is now an explicit pencil-icon
-             button that appears on card hover — also still available via
-             kebab menu's 「重新命名」. Double-click also works as a power-user
-             shortcut. */
           <div className="relative flex items-start gap-1 mb-0.5">
             <h3
               className="text-sm font-medium text-default-900 line-clamp-1 flex-1 min-w-0"
               title={displayTitle}
               onDoubleClick={startEditing}
             >
-              {displayTitle || (lang === "en" ? "(Untitled)" : "（未命名）")}
+              {displayTitle || (en ? "(Untitled)" : "（未命名）")}
             </h3>
             <button
               onClick={(e) => { e.stopPropagation(); startEditing(); }}
               className="shrink-0 opacity-0 group-hover:opacity-100 transition w-5 h-5 rounded hover:bg-default-100 flex items-center justify-center text-default-400 hover:text-default-700"
-              title={lang === "en" ? "Rename" : "重新命名"}
-              aria-label={lang === "en" ? "Rename" : "重新命名"}
+              title={en ? "Rename" : "重新命名"}
+              aria-label={en ? "Rename" : "重新命名"}
             >
               <EditIcon size={11} />
             </button>
           </div>
         )}
-        <div className="flex items-center justify-between text-[12px] text-default-500">
-          <span className="truncate">{mission.brandName ?? (lang === "en" ? "(No brand)" : "（未指定品牌）")}</span>
-          <span className="shrink-0">{formatRelative(mission.updatedAt, lang)}</span>
+        <div className="flex items-center justify-between gap-2 text-[12px] text-default-500">
+          <span className="truncate" title={subline}>{subline}</span>
+          <span className="shrink-0">{formatRelative(mission.createdAt, lang)}</span>
         </div>
       </div>
 
-      {/* 3-dot kebab — minimal menu (CJ 2026-05-07: 12 → 3 items) */}
       <button
         onClick={(e) => { e.stopPropagation(); setMenuOpen((v) => !v); }}
         className="absolute top-2 right-2 w-7 h-7 rounded-full bg-white/0 group-hover:bg-white shadow-sm hover:shadow flex items-center justify-center text-default-500 transition opacity-0 group-hover:opacity-100"
-        title={lang === "en" ? "Actions" : "動作選單"}
+        title={en ? "Actions" : "動作選單"}
       >
         ⋯
       </button>
@@ -617,40 +523,37 @@ function ProjectCard({ mission, onClick, lang }: { mission: MissionRow; onClick:
             className="absolute top-9 right-2 z-50 bg-white rounded-lg border border-default-200 shadow-lg py-1 w-36"
           >
             <button onClick={(e) => { e.stopPropagation(); setMenuOpen(false); onClick(); }} className="w-full px-3 py-1.5 text-xs text-left hover:bg-default-50 flex items-center gap-2">
-              <InfoIcon size={11} /> {lang === "en" ? "View details" : "查看詳細"}
+              <InfoIcon size={11} /> {en ? "View details" : "查看詳細"}
             </button>
             <button
               onClick={(e) => { e.stopPropagation(); setMenuOpen(false); startEditing(); }}
               className="w-full px-3 py-1.5 text-xs text-left hover:bg-default-50 flex items-center gap-2"
             >
-              <EditIcon size={11} /> {lang === "en" ? "Rename" : "重新命名"}
+              <EditIcon size={11} /> {en ? "Rename" : "重新命名"}
             </button>
             <button
-              onClick={(e) => {
-                e.stopPropagation(); setMenuOpen(false);
-                duplicateMut?.mutate?.({ id: realMissionId });
-              }}
-              disabled={duplicateMut?.isPending}
+              onClick={(e) => { e.stopPropagation(); setMenuOpen(false); duplicateMut.mutate({ id: mission.missionId }); }}
+              disabled={duplicateMut.isPending}
               className="w-full px-3 py-1.5 text-xs text-left hover:bg-default-50 flex items-center gap-2 text-default-600 disabled:opacity-50"
             >
-              <CopyIcon size={11} /> {lang === "en" ? "Duplicate" : "建立複本"}
+              <CopyIcon size={11} /> {en ? "Duplicate" : "建立複本"}
             </button>
             <div className="border-t border-default-100 my-1" />
             <button
               onClick={(e) => {
                 e.stopPropagation(); setMenuOpen(false);
-                const name = (optimisticTitle ?? mission.title ?? "").slice(0, 40);
+                const name = displayTitle.slice(0, 40);
                 if (!window.confirm(
-                  lang === "en"
-                    ? `Move "${name}" to trash? This cannot be undone.`
-                    : `確定把「${name}」移到垃圾桶？此動作無法復原。`
+                  en
+                    ? `Delete "${name}"? Only this run is removed — other runs of the same task card stay.`
+                    : `確定刪除「${name}」？只會刪除這一次的產出，同一張任務卡的其他次執行不受影響。`,
                 )) return;
-                deleteMut?.mutate?.({ id: realMissionId });
+                deleteMut.mutate({ id: mission.id });
               }}
-              disabled={deleteMut?.isPending}
+              disabled={deleteMut.isPending}
               className="w-full px-3 py-1.5 text-xs text-left hover:bg-danger-50 flex items-center gap-2 text-danger disabled:opacity-50"
             >
-              <DeleteIcon size={11} /> {lang === "en" ? "Move to trash" : "移到垃圾桶"}
+              <DeleteIcon size={11} /> {en ? "Delete" : "刪除"}
             </button>
           </div>
         </>
@@ -659,60 +562,64 @@ function ProjectCard({ mission, onClick, lang }: { mission: MissionRow; onClick:
   );
 }
 
-/* ─────────────────────── EmptyState ─────────────────────── */
-function EmptyState({ search, onClear, onCreate, lang }: { search: string; onClear: () => void; onCreate: () => void; lang: "zh-TW" | "en" }) {
-  if (!search) {
-    return (
-      <IllustratedEmpty
-        kind="projects"
-        title={lang === "en" ? "Nothing on the wall yet" : "作品牆還沒掛上任何一張"}
-        action={{ label: lang === "en" ? "Open your first task card" : "去開第一張任務卡", onPress: onCreate }}
-      />
-    );
-  }
-  return (
-    <div className="flex flex-col items-center justify-center py-20 text-center">
-      <FolderIcon size={56} className="text-default-300 mb-4" strokeWidth={1.2} />
-      <p className="text-default-700 font-medium mb-1">
-        {lang === "en" ? `No projects match "${search}"` : `找不到符合「${search}」的專案`}
-      </p>
-      <div className="mb-4" />
-      <button onClick={onClear} className="text-xs text-zinc-600 hover:underline">
-        {lang === "en" ? "Clear search" : "清除搜尋"}
-      </button>
-    </div>
-  );
-}
-
-/* ─── Facet filter primitives (2026-08-11) ─────────────────────────────────
-   Kept visually identical to the brand chips above so the three filter rows
-   read as one control group rather than three different mechanisms. */
-function FacetRow({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
+/* ─── Filter primitives ─────────────────────────────────────────────────── */
+function FacetRow({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="flex items-center gap-2 flex-wrap">
-      <span className="text-[12px] font-semibold text-default-400 uppercase tracking-wider shrink-0">
+      <span className="text-[12px] font-semibold text-default-400 tracking-wider shrink-0 w-12">
         {label}
       </span>
-      {hint && <HelpTip>{hint}</HelpTip>}
       {children}
     </div>
   );
 }
 
+const chipClass = (active: boolean) =>
+  `flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition border ${
+    active
+      ? "bg-default-900 text-white border-default-900"
+      : "bg-white text-default-700 border-default-200 hover:border-default-400"
+  }`;
+
 function FacetChip({
-  active, onClick, text, title,
-}: { active: boolean; onClick: () => void; text: string; title?: string }) {
+  active, onClick, text, title, icon, danger,
+}: { active: boolean; onClick: () => void; text: string; title?: string; icon?: any; danger?: boolean }) {
   return (
     <button
       onClick={onClick}
       title={title}
-      className={`px-3 py-1.5 rounded-full text-xs font-medium transition border ${
-        active
-          ? "bg-default-900 text-white border-default-900"
-          : "bg-white text-default-700 border-default-200 hover:border-default-400"
-      }`}
+      aria-pressed={active}
+      className={`${chipClass(active)} ${danger && !active ? "text-danger" : ""}`}
     >
+      {icon && <FontAwesomeIcon icon={icon} className="text-[12px]" />}
       {text}
     </button>
+  );
+}
+
+function FacetSelect({
+  active, value, onChange, options, placeholder,
+}: {
+  active: boolean;
+  value: string;
+  onChange: (v: string) => void;
+  options: { value: string; label: string }[];
+  placeholder?: string;
+}) {
+  return (
+    <select
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      className={`${chipClass(active)} appearance-none pr-7 cursor-pointer bg-no-repeat`}
+      style={{
+        backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='${active ? "%23fff" : "%2371717a"}' fill='none' stroke-width='1.5'/%3E%3C/svg%3E")`,
+        backgroundPosition: "right 10px center",
+      }}
+    >
+      {placeholder !== undefined && <option value="">{placeholder}</option>}
+      {options.map((o) => (
+        <option key={o.value} value={o.value}>{o.label}</option>
+      ))}
+    </select>
   );
 }
