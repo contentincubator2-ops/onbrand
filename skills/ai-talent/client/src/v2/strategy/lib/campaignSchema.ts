@@ -166,6 +166,8 @@ export interface CampaignPlanItem {
   inPlanner?: boolean;
   /** 這一篇要下廣告。 */
   paid?: boolean;
+  /** 合作類的線：這一件是給誰（網紅任務說明單裡的那一位／那一類）。 */
+  partner?: string;
 }
 
 export interface CampaignPartnerBlock {

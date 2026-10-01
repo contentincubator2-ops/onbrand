@@ -25,6 +25,7 @@
  */
 import localPool from "../../localDb.js";
 import { buildTaskCatalogIndex, type CatalogTask } from "../../content/core/taskCatalogIndex.js";
+import { influencerLabel, cleanKolBrief, type KolInfluencer, type KolBrief } from "./campaignKolBrief.js";
 import { isHiddenContentPlatform } from "../../platform/core/planGate.js";
 import {
   loadEventProducts, productScopeBrief, resolveProductScope,
@@ -84,6 +85,8 @@ export interface PlanItem extends Beat {
   inPlanner?: boolean;
   /** 這一篇要下廣告（投放專家提議、用戶可改）；只有 PAID_CHANNELS 的通路能下。 */
   paid?: boolean;
+  /** 合作類的線：這一件是給誰（網紅任務說明單裡的那一位／那一類）。 */
+  partner?: string;
 }
 
 export interface PartnerStep { id: string; text: string; taskId?: string; taskLabel?: string; done?: boolean }
@@ -321,6 +324,8 @@ export function safeJSON<T>(text: string, fallback: T): T {
 export async function eventFacts(eventId: number, userId: number): Promise<{
   name: string; brandId: number; brandName: string; startAt: Date | null; endAt: Date | null;
   settings: CampaignSettings; products: ScopedProduct[];
+  /** 網紅任務說明單（campaignKolBrief.ts）。 */
+  kolBrief: KolBrief;
 } | null> {
   const [rows]: any = await localPool.execute(
     `SELECT e.id, e.name, e.brandId, e.startAt, e.endAt, e.positioning, b.name AS brandName
@@ -342,6 +347,7 @@ export async function eventFacts(eventId: number, userId: number): Promise<{
     startAt: row.startAt ? new Date(row.startAt) : null,
     endAt: row.endAt ? new Date(row.endAt) : null,
     settings, products,
+    kolBrief: cleanKolBrief(pos?.kolBrief),
   };
 }
 
@@ -361,11 +367,23 @@ export const COBRAND_CHANNEL = "cobrand";
 /** 合作類的線：排的是品牌要做的事，日期跟著開賣日走，不佔模型的檔期格子。 */
 export const PARTNER_CHANNELS: readonly string[] = [KOL_CHANNEL, COBRAND_CHANNEL];
 
-type LaneStep = { off: number; taskId: string; angle: (hook: string) => string };
+type LaneStep = {
+  off: number; taskId: string; angle: (hook: string) => string;
+  /** 網紅任務說明單有名單時，名單上每一位各一件，角度照他的（見 laneItems）。 */
+  each?: (r: KolInfluencer, label: string, hook: string) => string;
+};
 const LANE_STEPS: Record<string, LaneStep[]> = {
   [KOL_CHANNEL]: [
-    { off: -21, taskId: "kl-30-invite-opener", angle: (h) => (h ? `邀約開場：用「${h}」當合作理由，第一句就讓對方想回` : "邀約開場：第一句就讓對方想回") },
-    { off: -14, taskId: "kl-30-influencer-brief", angle: () => "給合作網紅的 brief：這檔要說什麼、不能說什麼、什麼時候交稿" },
+    {
+      off: -21, taskId: "kl-30-invite-opener",
+      angle: (h) => (h ? `邀約開場：用「${h}」當合作理由，第一句就讓對方想回` : "邀約開場：第一句就讓對方想回"),
+      each: (r, label, h) => `邀約 ${label}：${r.angle ? `從「${r.angle}」切入` : h ? `用「${h}」當合作理由` : "講清楚為什麼是他"}，第一句就讓對方想回`,
+    },
+    {
+      off: -14, taskId: "kl-30-influencer-brief",
+      angle: () => "給合作網紅的 brief：這檔要說什麼、不能說什麼、什麼時候交稿",
+      each: (r, label) => `給 ${label} 的 brief：${r.angle ? `角度「${r.angle}」，` : ""}這檔要說什麼、不能說什麼、什麼時候交稿`,
+    },
     { off: -7, taskId: "kl-30-followup", angle: () => "回覆與追蹤：報價、檔期、交稿前的確認" },
     { off: 0, taskId: "kl-30-fan-template-kit", angle: () => "開賣當天給網紅與粉絲的素材包：照著就能發" },
     { off: 5, taskId: "kl-30-catch-organic-fan", angle: () => "接住自然提到你的粉絲與創作者，邀他們一起加入這波" },
@@ -386,26 +404,43 @@ const LANE_STEPS: Record<string, LaneStep[]> = {
  */
 export function laneItems(channel: string, args: {
   launch: string; end: string; today: string; mechanic: string; cards: CatalogTask[];
+  /** 網紅任務說明單的名單（選填）。有的話，邀約與 brief 每一位各一件、一天錯開一位（最多錯開 4 天）。 */
+  influencers?: KolInfluencer[];
 }): PlanItem[] {
   const steps = LANE_STEPS[channel] ?? [];
   const addDays = (s: string, n: number) => ymd(new Date(new Date(`${s}T00:00:00Z`).getTime() + n * DAY));
   const latest = addDays(args.end, 7);
   const hook = args.mechanic.trim().slice(0, 30);
+  const people = (args.influencers ?? []).filter((r) => r.name || r.type);
+  // 展開成一件一件：有名單的步驟每一位一件。
+  const plan: Array<{ off: number; taskId: string; angle: string; partner?: string }> = [];
+  for (const p of steps) {
+    if (p.each && people.length) {
+      people.forEach((r, i) => {
+        const label = influencerLabel(r);
+        plan.push({ off: p.off + Math.min(i, 4), taskId: p.taskId, angle: p.each!(r, label, hook), partner: label });
+      });
+    } else {
+      plan.push({ off: p.off, taskId: p.taskId, angle: p.angle(hook) });
+    }
+  }
   const out: PlanItem[] = [];
   let prev = "";
-  steps.forEach((p, n) => {
+  plan.forEach((p, n) => {
     const card = args.cards.find((c) => c.id === p.taskId);
     if (!card) return;
     let date = addDays(args.launch, p.off);
-    if (date < args.today) date = args.today;
-    if (date <= prev) date = addDays(prev, 1);       // 往後挪的時候不要疊在同一天
+    // 已經過去的：從今天起一天一件往後排，不要全部疊在今天。沒過去的照原定日期（同一天可以有好幾件）。
+    if (date < args.today) date = prev && prev >= args.today ? addDays(prev, 1) : args.today;
+    else if (date < prev) date = prev;
     if (date > latest) return;
     prev = date;
     const phase: CampaignPhaseId = date < args.launch ? "teaser" : date === args.launch ? "launch" : "sustain";
     out.push({
       id: `${phase}-${date}-${channel}${n}`, phase, date, platform: channel,
-      taskId: card.id, taskLabel: card.labelZh || card.labelEn || card.id, angle: p.angle(hook),
+      taskId: card.id, taskLabel: card.labelZh || card.labelEn || card.id, angle: p.angle.slice(0, 200),
       enabled: true, outputId: null, scheduledAt: null,
+      ...(p.partner ? { partner: p.partner } : {}),
     });
   });
   return out;
@@ -585,7 +620,11 @@ export async function buildCampaignPlan(args: {
   const today = ymd(args.today ?? new Date());
   const launchDate = beats.find((b) => b.phase === "launch")?.date ?? (facts.startAt ? ymd(facts.startAt) : today);
   const endDate = facts.endAt ? ymd(facts.endAt) : launchDate;
-  const kol = partnerLanes.flatMap((ch) => laneItems(ch, { launch: launchDate, end: endDate, today, mechanic: s.mechanic, cards: partnerCards }));
+  const influencers = (facts.kolBrief?.influencers ?? []) as KolInfluencer[];
+  const kol = partnerLanes.flatMap((ch) => laneItems(ch, {
+    launch: launchDate, end: endDate, today, mechanic: s.mechanic, cards: partnerCards,
+    ...(ch === KOL_CHANNEL ? { influencers } : {}),
+  }));
 
   const cardMenu = cards
     .map((c) => `- ${c.id}｜${c.platform}｜${c.labelZh || c.labelEn}`)

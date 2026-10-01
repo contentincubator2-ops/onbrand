@@ -40,6 +40,7 @@ import CampaignMap from "./CampaignMap";
 import CampaignSetupForm from "./CampaignSetupForm";
 import CampaignChatCard from "./CampaignChatCard";
 import CampaignBasisPanel from "./CampaignBasisPanel";
+import KolBriefForm from "./KolBriefForm";
 import type { BasisPatch, BasisValue } from "../../lib/campaignBasis";
 import { dockDirector } from "../../lib/directorDock";
 import CampaignHandoff from "./CampaignHandoff";
@@ -79,6 +80,8 @@ export default function CampaignStage({ eventId, brandId }: { eventId: number; b
   /** 對話卡展開＝佔滿左欄（CJ 2026-09-30）；左欄其他東西先收起來。 */
   const [chatExpanded, setChatExpanded] = React.useState(false);
   const [setupOpen, setSetupOpen] = React.useState(false);
+  /** 網紅任務說明單（2026-10-01 CJ：按下網紅＝填說明單，不是調整活動設定）。 */
+  const [kolOpen, setKolOpen] = React.useState(false);
   const [saveState, setSaveState] = React.useState<"idle" | "saving" | "saved" | "error">("idle");
   const [saveErr, setSaveErr] = React.useState("");
   const dirtyRef = React.useRef(false);
@@ -281,7 +284,7 @@ export default function CampaignStage({ eventId, brandId }: { eventId: number; b
                 return (
                   <button key={c} type="button" disabled={locked || !plan}
                     title={on ? channelLabel(c, en) : L(`加入 ${channelLabel(c, en)}：到設定裡勾選後重排，或直接跟內容企劃說`, `Add ${channelLabel(c, en)} in settings, or ask the planner`)}
-                    onClick={() => setSetupOpen(true)}
+                    onClick={() => (c === "kol" ? setKolOpen(true) : setSetupOpen(true))}
                     className={`w-7 h-7 rounded-lg grid place-items-center text-tiny transition disabled:cursor-default ${on ? "bg-foreground text-background" : "bg-default-100 text-default-400 hover:text-default-700"}`}>
                     <FontAwesomeIcon icon={CHANNEL_META[c]?.icon ?? faPenNib} />
                   </button>
@@ -424,12 +427,31 @@ export default function CampaignStage({ eventId, brandId }: { eventId: number; b
         </ModalContent>
       </Modal>
 
+      <Modal isOpen={kolOpen} onClose={() => setKolOpen(false)} size="4xl" scrollBehavior="inside">
+        <ModalContent>
+          <ModalHeader className="flex flex-col gap-1">
+            <span className="text-medium">{L("網紅任務說明單", "Influencer brief")}</span>
+            <span className="text-tiny font-normal text-default-500">{L("要交給網紅經紀公司或網紅本人的需求單。全部選填，填越多，邀約與 brief 越能為每一位量身寫。", "What you'd hand a talent agency. All optional — the more you fill, the more tailored each invite and brief.")}</span>
+          </ModalHeader>
+          <ModalBody className="pb-6">
+            <KolBriefForm eventId={eventId} initial={data.kolBrief} locked={locked} en={en}
+              prefill={{ smp: plan?.smp, goal: settings.goal, audience: data.audience, startAt: ev.startAt, endAt: ev.endAt }}
+              onSaved={({ plan: next }) => {
+                if (next) { planRef.current = next; setPlan(next); dirtyRef.current = false; }
+                utils?.campaign?.get?.invalidate?.({ eventId });
+                setKolOpen(false);
+              }} />
+          </ModalBody>
+        </ModalContent>
+      </Modal>
+
       <Modal isOpen={setupOpen} onClose={() => setSetupOpen(false)} size="2xl" scrollBehavior="inside">
         <ModalContent>
           <ModalHeader className="text-medium">{L("調整活動設定", "Campaign settings")}</ModalHeader>
           <ModalBody className="pb-6">
             <CampaignSetupForm eventId={eventId} data={data} brandProducts={brandProducts} hasPlan en={en}
-              onPlanned={() => { setSetupOpen(false); setCurrent(null); dirtyRef.current = false; }} />
+              onPlanned={() => { setSetupOpen(false); setCurrent(null); dirtyRef.current = false; }}
+              onOpenKolBrief={() => { setSetupOpen(false); setKolOpen(true); }} />
           </ModalBody>
         </ModalContent>
       </Modal>
