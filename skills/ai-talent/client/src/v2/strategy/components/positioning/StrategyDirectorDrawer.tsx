@@ -59,6 +59,7 @@ import StrategyDirectorChat from "./StrategyDirectorChat";
 import { DirectorRoster, DirectorProfile } from "./StrategyDirectorPicker";
 import StrategyHistoryModal from "./StrategyHistoryModal";
 import { CloseIcon } from "../../../platform/components/icons";
+import { useDirectorDocked } from "../../lib/directorDock";
 
 /** 三個檢視共用的高度——切換檢視時面板不會變大變小。 */
 const PANEL_HEIGHT = 440;
@@ -85,6 +86,7 @@ export default function StrategyDirectorDrawer({ brandId }: { brandId: number | 
   // 2026-10-01：設定／後台這類頁面不掛顧問（見 isAdvisorHiddenPath）。hooks 照跑，只在 render 前 return。
   const hiddenHere = isAdvisorHiddenPath(pathname);
 
+  const docked = useDirectorDocked();
   const [open, setOpen] = React.useState(false);
   const [view, setView] = React.useState<View>("chat");
   // 2026-09-30（CJ「內容企劃…跟右下方的策略總監，是否會衝突」）：活動頁的內容企劃被問到
@@ -179,7 +181,9 @@ export default function StrategyDirectorDrawer({ brandId }: { brandId: number | 
     setView("chat");
   };
 
-  if (!brandId || hiddenHere) return null;
+  // 活動頁把總監收進左邊的對話卡了（directorDock.ts）：右下角不再開第二個對話框。
+  // 設定／後台這類頁面不掛顧問（isAdvisorHiddenPath）。
+  if (!brandId || docked || hiddenHere) return null;
 
   const headerBtn = (active: boolean): React.CSSProperties => ({
     fontSize: 11.5, fontWeight: 600, border: "1px solid #D4D4D4", borderRadius: 999, padding: "3px 10px",
