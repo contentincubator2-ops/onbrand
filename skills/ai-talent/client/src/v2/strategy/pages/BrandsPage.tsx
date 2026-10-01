@@ -4331,7 +4331,7 @@ function PositioningTopRow({
     { brandId: directorBrandId ?? 0, scope: directorScope },
     { enabled: !!directorBrandId, staleTime: 5 * 60_000, refetchOnWindowFocus: false },
   );
-  const directors: Array<{ roleId: string; name: string; avatarUrl?: string; roleLabel?: string }> = directorsQ.data?.directors ?? [];
+  const directors: Array<{ agentId: number; roleId: string; name: string; avatarUrl?: string; roleLabel?: string }> = directorsQ.data?.directors ?? [];
   const director = directors.find((d) => d.roleId === (directorScope === "product" ? "product_value_prop" : "brand_positioning")) ?? directors[0] ?? null;
   // 2026-05-08: hooks must be called unconditionally (Rules of Hooks).
   // Previous version did `(entityKind && brandId) ? useQuery(...) : null`
@@ -4402,7 +4402,8 @@ function PositioningTopRow({
       : "要重新套用嗎？會重寫目前的定位段落（你自建的卡片與文字資產不受影響）。")) return;
     setStartError(null);
     setOptimisticStarting(true); // instant feedback
-    startMut?.mutate?.({ entityKind, entityId: brandId, lang: "zh-TW" });
+    // 2026-09-30（CJ「總監的人設應該會影響產出」）：把按下的這位總監帶給 pipeline。
+    startMut?.mutate?.({ entityKind, entityId: brandId, lang: "zh-TW", ...(director?.agentId ? { directorAgentId: director.agentId } : {}) });
   };
 
   // 2026-05-17: brand pipeline = 10 steps (one per BRAND_SEGMENTS id).
