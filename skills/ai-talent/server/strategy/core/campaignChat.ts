@@ -254,8 +254,9 @@ const SYSTEM = `你是這檔活動的內容企劃。策略（一句話訴求、�
 - 一句話訴求、主角、目標客群、定位、策略依據這類「方向」的問題不是你改的——那是策略總監的工作，他就在同一個對話裡。使用者問到這些時，ops 回空陣列，reply 一句話說你請總監（叫他的名字）來回答，並在 askDirector 寫一句要請策略總監回答的問題（把使用者的原意帶過去）。
 - 前面的對話裡策略總監已經定下的方向，照著排，不要再改回去。
 - 策略總監轉給你的指示（加篇、刪篇、挪日期、換通路），照著用操作排好，reply 說你排了什麼。
+- kol 是網紅合作那條線：排的是品牌要做的事（邀約、給 brief、追蹤、給素材包、接住自然提及），不是品牌自己發的貼文；任務卡一樣只能挑 kol 的卡。
 - ops 最多 12 條，每條 angle 20–45 字；使用者要改很多篇時，先改最重要的 12 篇，reply 說明其餘下一輪再改。
-- reply 用繁體中文一到三句：你打算改什麼、為什麼。不要列清單，清單畫面會自己列。
+- reply 用繁體中文一到三句：你打算改什麼、為什麼。不要列清單，清單畫面會自己列。不要寫企劃的 id，要指某一篇就說日期和通路。
 - 只輸出 JSON，不要任何說明文字。`;
 
 // 「逐篇掃」那一條：2026-09-30 dev 實測，總監拿掉「免費」時改了 6 篇、漏了官網公告頁那篇。
@@ -270,10 +271,29 @@ const DIRECTOR_SYSTEM = `你是這檔活動的策略總監，跟內容企劃在�
 - 加篇、刪篇、換通路、換日期、換任務卡是內容企劃的事，你不能動（就算寫了也會被丟掉）。使用者要這些，或你改完方向後需要加篇、刪篇、挪日期時：reply 說你請內容企劃（叫他的名字）接手，並在 askPlanner 寫一句給內容企劃的具體指示（帶上你剛定的方向、要加或刪什麼）。只是改切角就自己用 update 改，不用交棒。
 - 策略依據（活動定位 11 段：受眾、洞察、目標、SMP、訊息架構、創意、語氣與禁用元素…）也歸你管。使用者在看策略依據、或要改的是這些時，用 basis 改，鍵是【策略依據】列出的路徑（例如 audience.keyInsight），清單型的欄位給字串陣列。只改要改的格子。
 - 一句話訴求（smp）跟策略依據的 SMP 是同一件事的兩個說法：改了其中一個，另一個對不上就一起改。
-- reply 用繁體中文兩到四句，口語、不要條列、不要 markdown 粗體：你決定了什麼、為什麼。改了什麼畫面會自己列。
+- reply 用繁體中文兩到四句，口語、不要條列、不要 markdown 粗體：你決定了什麼、為什麼。改了什麼畫面會自己列。reply 裡不要寫企劃的 id，要指某一篇就說日期和通路（例如「11/01 的 Facebook」）。
+- 清單型的欄位（例如禁用元素）給完整的新清單：原本的項目逐字保留，只加或刪你要改的那幾項。
 - 只輸出 JSON，不要任何說明文字。`;
 
 const PHASE_ZH: Record<string, string> = { teaser: "預熱", launch: "開賣", sustain: "加溫", lastcall: "倒數", encore: "返場" };
+
+const CHANNEL_ZH: Record<string, string> = {
+  facebook: "Facebook", instagram: "Instagram", threads: "Threads", line: "LINE", tiktok: "TikTok", email: "電子報", website: "官網",
+};
+
+/**
+ * 回覆裡的企劃 id（launch-2026-11-01-2）換成人看得懂的「11/01 Facebook」。
+ * 2026-10-01 dev 實測：總監回覆寫了「teaser-2026-10-27-0 沒碰到免費二字」。提示詞也要求了
+ * 不要寫 id，這裡是保險。純函式。
+ */
+export function humanizeIds(reply: string, plan: Pick<CampaignPlan, "items">): string {
+  const byId = new Map(plan.items.map((i) => [i.id, i]));
+  return reply.replace(/\b(?:teaser|launch|sustain|lastcall|encore)-\d{4}-\d{2}-\d{2}-[a-z0-9]+\b/g, (id) => {
+    const it = byId.get(id);
+    if (!it) return "那一篇";
+    return `${it.date.slice(5).replace("-", "/")} ${CHANNEL_ZH[it.platform] ?? it.platform}`;
+  });
+}
 
 /** 跟內容企劃或策略總監說一句話 → 回覆＋改法（已檢查；畫面拿到就寫進企劃）。 */
 export async function runCampaignChat(args: {
@@ -397,14 +417,14 @@ export async function runCampaignChat(args: {
   });
   // 策略依據只有總監能改。
   if (speaker === "director" && parsed.basis) {
-    const b = validateBasis(parsed.basis, args.positioning ?? {});
+    const b = validateBasis(parsed.basis, args.positioning ?? {}, { preserveItems: true });
     if (Object.keys(b).length) proposal.basis = b;
   }
   // 交棒：只交給另一位，而且這一串還沒轉滿兩手。
   const question = hops >= 2 ? "" : str(speaker === "planner" ? parsed.askDirector : parsed.askPlanner, 200);
   const handoff = question ? { to: other, question } : null;
   const askDirector = handoff?.to === "director" ? handoff.question : null;
-  const reply = str(parsed.reply, 500)
+  const reply = humanizeIds(str(parsed.reply, 500), args.plan)
     || (proposal.ops.length || proposal.smp || proposal.phaseMessages || proposal.basis ? "我照你說的改好了。"
       : handoff ? `這部分我請${label(other)}接手。` : "了解。");
   return { reply, proposal, askDirector, handoff, truncated: parsed.truncated && proposal.ops.length > 0, agent, speaker };

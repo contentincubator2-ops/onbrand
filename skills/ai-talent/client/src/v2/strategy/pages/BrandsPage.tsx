@@ -43,6 +43,9 @@ import PersonaAgentPanel from "../components/positioning/PersonaAgentPanel";
 import { showToastGlobal } from "../../../components/ui/Toast";
 import AddEntityModal, { type AddEntityTab } from "../components/AddEntityModal";
 import ProductDetailModal from "../components/positioning/ProductDetailModal";
+import EventCardGrid from "../components/events/EventCardGrid";
+import EventYearTimeline, { type PlanPrefill } from "../components/events/EventYearTimeline";
+import { toYmd } from "../lib/eventTimeline";
 // Notion-style line icons
 import { LockToggle } from "../components/positioning/LockToggle";
 import { AgentIcon, MemoryIcon, RegulationIcon, AwardIcon, BundleIcon, CommentIcon, DeleteIcon, EditIcon, FontIcon, GenerateIcon, HashtagIcon, IdCardIcon, LibraryIcon, LockIcon, PaletteIcon, PeopleIcon, PlayIcon, QuoteIcon, RegenerateIcon, ShieldIcon, TargetIcon, TextIcon, DoneIcon, StopIcon, WarningIcon, CheckIcon, CloseIcon } from "../../platform/components/icons";
@@ -115,6 +118,8 @@ export default function BrandsPage() {
 
   // Add entity modal (新增品牌 / 產品 / 活動)
   const [addModal, setAddModal] = useState<{ open: boolean; tab: AddEntityTab }>({ open: false, tab: "brand" });
+  // 2026-10-02：從活動時間軸節點「開始企劃」時帶進新增活動視窗的名稱與日期。
+  const [eventPrefill, setEventPrefill] = useState<PlanPrefill | null>(null);
   // 2026-05-08: onboarding wizard for first-time users (no brands yet).
   const [onboardingOpen, setOnboardingOpen] = useState(false);
   // 2026-09-23（CJ「在看到品牌定位卡片之上，有太多按鈕了…問用戶是否需要
@@ -2438,55 +2443,50 @@ export default function BrandsPage() {
             </div>
           )}
 
-          {/* ── 活動 (events) — card grid with positioning preview ── */}
-          {derivedCategory === "events" && scopeMode === "brand" && (
-            <div style={{ padding: "8px 0 32px" }}>
-              <BrandEntityGrid
-                kind="event"
-                items={brandEventsList}
-                isLoading={brandEventsQ?.isLoading ?? false}
-                lang={lang}
-                onAdd={() => setAddModal({ open: true, tab: "event" })}
-                onOpen={(id) => {
-                  // 2026-07-28 (CJ「選活動定位卡片，跑回品牌定位頁面」follow-up):
-                  // the previous setCategory fix (functional-updater form)
-                  // still wasn't enough — react-router-dom's setSearchParams
-                  // recomputes its updater against the `searchParams` value
-                  // captured in THIS render's closure, not a truly queued
-                  // "latest" state the way React's own useState setter works.
-                  // Two separate setSearchParams calls in the same
-                  // synchronous handler (goToEntity, then setCategory) both
-                  // read that same pre-call snapshot, so the second call's
-                  // result always overwrites the first's — dropping `e`
-                  // every time. Single combined call is the only fix that
-                  // actually lands both changes atomically.
-                  // 2026-09-25（CJ「我填完活動定位後，他按下開始定位，居然跑到品牌
-                  // 的頁籤」）：活動的落點改成宣傳企劃。得獎 brief 仍在
-                  // cat=positioning，由企劃頁的「參獎／提案」進階入口進去。
-                  setSearchParams((prev) => {
-                    const sp = new URLSearchParams(prev);
-                    sp.delete("p");
-                    sp.set("e", String(id));
-                    sp.set("cat", "campaign");
-                    return sp;
-                  }, { replace: true });
-                }}
-                onDelete={(id) => evRemoveMut?.mutate?.({ id })}
-                // 2026-09-25：活動的「開始」＝進宣傳企劃頁，不是跑得獎 brief。
-                onPosition={(id) => {
-                  setSearchParams((prev) => {
-                    const sp = new URLSearchParams(prev);
-                    sp.delete("p");
-                    sp.set("e", String(id));
-                    sp.set("cat", "campaign");
-                    return sp;
-                  }, { replace: true });
-                }}
-                runningIds={posRunning.event}
-                progressMap={posProgress}
-              />
-            </div>
-          )}
+          {/* ── 活動 (events) — 年度時間軸＋活動卡 ──
+              2026-10-02（CJ「活動頁的卡片要參考品牌頁面的」「要不要用行事曆鼓勵用戶把一整年的
+              活動先建進來」「建議節點也可以讓用戶自己增加」）：上面是 12 個月時間軸（節慶＋自建
+              節點＋活動橫條），下面是照 BrandCard 版型的活動卡。點卡片／橫條都進宣傳企劃。
+              2026-09-25 的決定不變：活動的落點是宣傳企劃（cat=campaign），不是得獎 brief。
+              2026-07-28 的教訓也還在：p/e/cat 必須一次 setSearchParams 寫完，分兩次會互蓋。 */}
+          {derivedCategory === "events" && scopeMode === "brand" && (() => {
+            const openEvent = (id: number) => {
+              setSearchParams((prev) => {
+                const sp = new URLSearchParams(prev);
+                sp.delete("p");
+                sp.set("e", String(id));
+                sp.set("cat", "campaign");
+                return sp;
+              }, { replace: true });
+            };
+            const todayYmd = toYmd(new Date())!;
+            return (
+              <div style={{ padding: "8px 8px 32px" }}>
+                {activeBrandIdForLocks && (
+                  <EventYearTimeline
+                    brandId={activeBrandIdForLocks}
+                    events={brandEventsList}
+                    lang={lang}
+                    today={todayYmd}
+                    onOpenEvent={openEvent}
+                    onPlanFromNode={(prefill: PlanPrefill) => {
+                      setEventPrefill(prefill);
+                      setAddModal({ open: true, tab: "event" });
+                    }}
+                  />
+                )}
+                <EventCardGrid
+                  events={brandEventsList}
+                  isLoading={brandEventsQ?.isLoading ?? false}
+                  lang={lang}
+                  today={todayYmd}
+                  onAdd={() => { setEventPrefill(null); setAddModal({ open: true, tab: "event" }); }}
+                  onOpen={openEvent}
+                  onDelete={(id) => evRemoveMut?.mutate?.({ id })}
+                />
+              </div>
+            );
+          })()}
         </div>
       </div>
 
@@ -2515,7 +2515,8 @@ export default function BrandsPage() {
         isOpen={addModal.open}
         initialTab={addModal.tab}
         defaultBrandId={(scope?.brandId ?? brandId) ?? null}
-        onClose={() => setAddModal({ open: false, tab: addModal.tab })}
+        eventPrefill={addModal.tab === "event" ? eventPrefill : null}
+        onClose={() => { setAddModal({ open: false, tab: addModal.tab }); setEventPrefill(null); }}
         onCreated={(kind, id) => {
           if (kind === "brand") { setBrandId(id); setScope({ brandId: id, productId: null, eventId: null }); }
           // 2026-07-27 (CJ「新增產品後，突然跑到一個奇怪頁面」): goToEntity(kind, id)

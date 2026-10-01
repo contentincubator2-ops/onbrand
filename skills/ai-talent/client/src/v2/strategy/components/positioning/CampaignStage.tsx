@@ -49,7 +49,7 @@ import { money, metricLine } from "../../lib/campaignKpi";
 const ymd = (d: Date) => d.toISOString().slice(0, 10);
 const md = (s: string) => s.slice(5).replace("-", "/");
 /** 前台的七個通路（planGate 隱藏的不列）。 */
-const DOCK_CHANNELS = ["facebook", "instagram", "threads", "line", "tiktok", "email", "website"];
+const DOCK_CHANNELS = ["facebook", "instagram", "threads", "line", "tiktok", "email", "website", "kol"];
 
 export default function CampaignStage({ eventId, brandId }: { eventId: number; brandId: number | null }) {
   const { lang } = useLang();
@@ -275,7 +275,8 @@ export default function CampaignStage({ eventId, brandId }: { eventId: number; b
             <span className="w-px h-5 bg-divider" />
             <div className="flex gap-1.5" aria-label={L("通路", "Channels")}>
               {DOCK_CHANNELS.map((c) => {
-                const on = (settings.channels ?? []).includes(c) || live.some((i) => i.platform === c);
+                const on = (settings.channels ?? []).includes(c) || live.some((i) => i.platform === c)
+                  || (c === "kol" && !!settings.partners?.kol);   // 舊設定的「要找網紅合作」
                 return (
                   <button key={c} type="button" disabled={locked || !plan}
                     title={on ? channelLabel(c, en) : L(`加入 ${channelLabel(c, en)}：到設定裡勾選後重排，或直接跟內容企劃說`, `Add ${channelLabel(c, en)} in settings, or ask the planner`)}
@@ -287,7 +288,6 @@ export default function CampaignStage({ eventId, brandId }: { eventId: number; b
               })}
             </div>
             <span className="w-px h-5 bg-divider" />
-            {plan?.kol && <Button size="sm" variant="light" radius="md" onPress={() => setPartner("kol")}>{L("網紅合作", "Influencers")}</Button>}
             {plan?.cobrand && <Button size="sm" variant="light" radius="md" onPress={() => setPartner("cobrand")}>{L("異業合作", "Co-branding")}</Button>}
             {plan && (
               <Button size="sm" variant={plan.kpi ? "light" : "bordered"} radius="md" startContent={<FontAwesomeIcon icon={faBullseye} />}

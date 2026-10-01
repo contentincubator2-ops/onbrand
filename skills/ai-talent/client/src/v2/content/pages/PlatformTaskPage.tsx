@@ -8,6 +8,7 @@
  */
 import { IllustratedEmpty } from "../../platform/components/EmptyIllustration";
 import { TaskIllustration } from "../../platform/components/TaskIllustration";
+import { TASK_MODAL_CLASSNAMES } from "../../platform/components/taskModalStyle";
 import React, { useMemo, useState, useEffect, useRef } from "react";
 import { Navigate, useParams, useOutletContext, useNavigate, useSearchParams } from "react-router-dom";
 import CalendarTabs from "../components/CalendarTabs";
@@ -51,7 +52,7 @@ import {
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { HelpTip } from "../../platform/components/HelpTip";
 import {
-  faBolt, faMagnifyingGlass, faEnvelope, faBullhorn, faWandMagicSparkles, faTriangleExclamation, faGlobe, faBookBookmark, faCalendarDays, faPenToSquare,
+  faBolt, faMagnifyingGlass, faEnvelope, faBullhorn, faWandMagicSparkles, faTriangleExclamation, faGlobe, faUserGroup, faBookBookmark, faCalendarDays, faPenToSquare,
 } from "@fortawesome/free-solid-svg-icons";
 import {
   faFacebook, faInstagram, faYoutube, faTiktok, faLinkedin, faThreads, faLine,
@@ -101,6 +102,8 @@ const ROUTE_TO_PLATFORM: Record<string, string> = {
   // 2026-09-29 CJ：台灣市場加 Threads、LINE（目前只有品牌自建卡）。
   threads: "threads",
   line:    "line",
+  // 2026-10-01：活動企劃的網紅那條線（kl- 卡）從這裡開卡。
+  kol:     "kol",
   // 素材與規劃頻道。目前只有品牌任務包會用到，全域目錄沒有卡 ——
   // 沒有包的品牌走到這兩個路由會看到空清單，側邊欄也不會有入口。
   case:     "case",
@@ -144,6 +147,9 @@ const PLATFORM_META: Record<string, PlatformMeta> = {
   },
   website: {
     label: "Website", labelZh: "官網", icon: faGlobe, bg: "#18181b",
+  },
+  kol: {
+    label: "Influencers", labelZh: "網紅", icon: faUserGroup, bg: "#18181b",
   },
   // 2026-09-29 CJ：台灣市場加 Threads、LINE。目前沒有預設卡，用戶從自己的範例建卡。
   threads: {
@@ -2288,16 +2294,8 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
         size="2xl"
         scrollBehavior="inside"
         backdrop="blur"
-        // 2026-09-29（CJ 參考「Your inbox is clear」）：淡彩霧面底、大圓角白卡、
-        // 置中的一句大標＋手繪插畫。底色只在遮罩層，卡片本身維持白底黑字。
-        classNames={{
-          backdrop: "bg-gradient-to-br from-rose-100/70 via-emerald-50/60 to-violet-200/60 backdrop-blur-md",
-          base: "max-h-[90vh] rounded-[28px] bg-white shadow-2xl ring-1 ring-black/5",
-          body: "pt-2 pb-4 px-6",
-          footer: "bg-white pt-2 pb-5 px-6",
-          header: "pt-4 pb-3 px-6 bg-white border-b border-default-100",
-          closeButton: "top-3.5 right-4 text-default-400 hover:bg-default-100",
-        }}
+        // 2026-09-29（CJ 參考「Your inbox is clear」）：外觀定義在 taskModalStyle，活動節點視窗共用。
+        classNames={TASK_MODAL_CLASSNAMES}
       >
         <ModalContent>
           {activeTask && (

@@ -142,3 +142,12 @@ describe("parseChatReply：總監交回內容企劃", () => {
     expect(r.askDirector).toBeUndefined();
   });
 });
+
+import { humanizeIds } from "./campaignChat";
+describe("humanizeIds（回覆裡的企劃 id 換成日期＋通路）", () => {
+  it("認得的換成「10/27 Facebook」，認不得的換成「那一篇」", () => {
+    const plan = { items: [{ id: "teaser-2026-10-27-0", date: "2026-10-27", platform: "facebook" }] } as any;
+    expect(humanizeIds("掃了一遍，teaser-2026-10-27-0 沒碰到免費；launch-2026-11-01-c9x 也沒有", plan))
+      .toBe("掃了一遍，10/27 Facebook 沒碰到免費；那一篇 也沒有");
+  });
+});
