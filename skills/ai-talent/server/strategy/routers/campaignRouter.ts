@@ -303,6 +303,8 @@ export const campaignRouter = router({
       speaker: z.enum(["planner", "director"]).optional(),
       directorAgentId: z.number().int().positive().nullable().optional(),
       handoff: z.boolean().optional(),
+      /** 2026-10-02：這一串轉了幾手（雙向交棒，到 2 就停）。 */
+      hops: z.number().int().min(0).max(2).optional(),
       view: z.enum(["map", "basis"]).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
@@ -315,7 +317,7 @@ export const campaignRouter = router({
         return await runCampaignChat({
           eventId: input.eventId, userId: ctx.user!.id, plan,
           message: input.message, phase: input.phase ?? null, history: input.history,
-          speaker: input.speaker ?? "planner", directorAgentId: input.directorAgentId ?? null, handoff: !!input.handoff,
+          speaker: input.speaker ?? "planner", directorAgentId: input.directorAgentId ?? null, handoff: !!input.handoff, hops: input.hops,
           positioning: pos, view: input.view ?? "map",
         });
       } catch (e: any) {

@@ -114,6 +114,35 @@ describe("parseChatReply（回覆被截斷也救得回來）", () => {
   });
 });
 
+// 2026-10-02：分工由伺服器擋——策略總監只能改切角，排程交給內容企劃（askPlanner）。
+describe("策略總監只能改切角", () => {
+  const asDirector = (raw: any) => validateCampaignOps({ raw, plan, cards, window, newId, role: "director" });
+  it("加篇、刪篇丟掉；update 只留 angle，日期／通路／開關不收", () => {
+    const out = asDirector({ ops: [
+      { op: "add", phase: "sustain", date: "2026-11-10", platform: "instagram", taskId: "ig-b", angle: "總監想自己加一篇" },
+      { op: "remove", id: "launch-1" },
+      { op: "update", id: "launch-1", angle: "拿掉免費，改講上市時機", date: "2026-11-05", platform: "website", enabled: false },
+    ] });
+    expect(out.ops).toEqual([{ op: "update", id: "launch-1", patch: { angle: "拿掉免費，改講上市時機" } }]);
+  });
+  it("只改日期沒改切角：整條丟掉；已寫好的那篇照樣不能動", () => {
+    expect(asDirector({ ops: [{ op: "update", id: "launch-1", date: "2026-11-05" }] }).ops).toEqual([]);
+    expect(asDirector({ ops: [{ op: "update", id: "launch-2", angle: "改掉已寫的那篇" }] }).ops).toEqual([]);
+  });
+  it("一句話訴求與各段訊息照收", () => {
+    const out = asDirector({ smp: "上市期間開放申請", phaseMessages: { launch: "現在進來剛好" }, ops: [] });
+    expect(out).toEqual({ ops: [], smp: "上市期間開放申請", phaseMessages: { launch: "現在進來剛好" } });
+  });
+});
+
+describe("parseChatReply：總監交回內容企劃", () => {
+  it("帶 askPlanner", () => {
+    const r = parseChatReply('{"reply":"方向定了，排程請企劃接手。","smp":"新訴求","ops":[],"askPlanner":"倒數週加兩篇 IG，照新訴求寫"}')!;
+    expect(r.askPlanner).toBe("倒數週加兩篇 IG，照新訴求寫");
+    expect(r.askDirector).toBeUndefined();
+  });
+});
+
 import { humanizeIds } from "./campaignChat";
 describe("humanizeIds（回覆裡的企劃 id 換成日期＋通路）", () => {
   it("認得的換成「10/27 Facebook」，認不得的換成「那一篇」", () => {

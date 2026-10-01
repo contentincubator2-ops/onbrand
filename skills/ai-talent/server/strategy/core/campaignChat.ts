@@ -31,6 +31,14 @@ import { validateBasis, basisLines, type BasisPatch } from "./campaignBasis.js";
  *   · 兩人讀的是同一串對話（標了誰說的）；總監另外讀得到他在右下角跟使用者談過的最近幾則。
  *   · 改法照舊經過 validateCampaignOps 檢查，但畫面不再等「套用」——回覆一到就寫進企劃，
  *     留一顆「復原」。
+ *
+ * 2026-10-02（CJ「一個對話中，無法讓策略總監再交回去給內容企劃」「潘建宇提到的人，跟我們
+ * 可以換的人，人名顯示都不一樣」→ 定案：總監用策略總監那一組）：
+ *   · 交棒雙向：內容企劃 askDirector、總監 askPlanner；一串最多轉兩手（hops），不會互踢。
+ *   · 分工由伺服器擋，不只靠指令：總監只能改切角（angle），加篇／刪篇／換通路／換日期／
+ *     換卡一律丟掉，要的話交給內容企劃。
+ *   · 名冊只有一份：兩人的名字都從同一次挑人來；指令裡列出名冊、不准編別的人名；前面對話
+ *     的標籤用現在的名冊，不用畫面存的舊名字（舊名字是換人之前留下的）。
  */
 export type CampaignSpeaker = "planner" | "director";
 export interface CampaignChatTurn { role: "user" | "assistant"; content: string; speaker?: CampaignSpeaker; name?: string }
@@ -91,6 +99,8 @@ export function validateCampaignOps(args: {
   cards: CatalogTask[];
   window: { from: string; to: string };
   newId?: (phase: string, date: string, n: number) => string;
+  /** 誰提的。策略總監只能改切角——排程（加／刪／通路／日期／卡）是內容企劃的事。 */
+  role?: CampaignSpeaker;
 }): CampaignProposal {
   const { plan, cards, window } = args;
   const byId = new Map(plan.items.map((i) => [i.id, i]));
@@ -103,6 +113,17 @@ export function validateCampaignOps(args: {
   for (const o of Array.isArray(args.raw?.ops) ? args.raw.ops : []) {
     if (ops.length >= 14) break;
     const kind = String(o?.op ?? "");
+    if (args.role === "director") {
+      // 總監：只收 update 的 angle，其他欄位當沒寫。
+      if (kind !== "update") continue;
+      const id = String(o?.id ?? "");
+      const cur = editable(id);
+      const angle = str(o?.angle, 200);
+      if (!cur || touched.has(id) || angle.length < 4 || angle === cur.angle) continue;
+      ops.push({ op: "update", id, patch: { angle } });
+      touched.add(id);
+      continue;
+    }
     if (kind === "add") {
       const phase = String(o?.phase ?? "");
       const date = String(o?.date ?? "");
@@ -175,13 +196,14 @@ const ymd = (d: Date) => d.toISOString().slice(0, 10);
  * 整份丟掉。現在先照常解析；解析不了就把**完整的那幾條操作**救回來（truncated=true，
  * 畫面會說「只來得及提出前幾條」）；連 JSON 都沒有，就把文字當成一般回答。
  */
-export function parseChatReply(text: string): { reply: string; ops: any[]; phaseMessages?: any; smp?: string; basis?: any; askDirector?: string; truncated: boolean } | null {
+export function parseChatReply(text: string): { reply: string; ops: any[]; phaseMessages?: any; smp?: string; basis?: any; askDirector?: string; askPlanner?: string; truncated: boolean } | null {
   const raw = String(text ?? "");
   const whole = safeJSON<any>(raw, null);
   if (whole && typeof whole === "object") {
     return {
       reply: String(whole.reply ?? ""), ops: Array.isArray(whole.ops) ? whole.ops : [],
       phaseMessages: whole.phaseMessages, askDirector: typeof whole.askDirector === "string" ? whole.askDirector : undefined,
+      askPlanner: typeof whole.askPlanner === "string" ? whole.askPlanner : undefined,
       smp: typeof whole.smp === "string" ? whole.smp : undefined,
       ...(whole.basis && typeof whole.basis === "object" ? { basis: whole.basis } : {}),
       truncated: false,
@@ -229,8 +251,9 @@ const SYSTEM = `你是這檔活動的內容企劃。策略（一句話訴求、�
 - 不准編使用者沒給的數字、成效、顧客見證、名額限制或網址。
 - 使用者只是在問問題、還沒要你改，ops 就回空陣列，用 reply 回答。
 - 你可以改某一段的訊息（phaseMessages），那是執行層的說法；沒要改就不要填。
-- 一句話訴求、主角、目標客群、定位這類「方向」的問題不是你改的——那是策略總監的工作，他就在同一個對話裡。使用者問到這些時，ops 回空陣列，reply 一句話說你請總監來回答，並在 askDirector 寫一句要請策略總監回答的問題（把使用者的原意帶過去）。
+- 一句話訴求、主角、目標客群、定位、策略依據這類「方向」的問題不是你改的——那是策略總監的工作，他就在同一個對話裡。使用者問到這些時，ops 回空陣列，reply 一句話說你請總監（叫他的名字）來回答，並在 askDirector 寫一句要請策略總監回答的問題（把使用者的原意帶過去）。
 - 前面的對話裡策略總監已經定下的方向，照著排，不要再改回去。
+- 策略總監轉給你的指示（加篇、刪篇、挪日期、換通路），照著用操作排好，reply 說你排了什麼。
 - kol 是網紅合作那條線、cobrand 是異業合作那條線：排的是品牌要做的事（邀約、提案、brief、追蹤、分工、聯合公告…），不是品牌自己發的貼文；任務卡一樣只能挑那個通路的卡。
 - ops 最多 12 條，每條 angle 20–45 字；使用者要改很多篇時，先改最重要的 12 篇，reply 說明其餘下一輪再改。
 - reply 用繁體中文一到三句：你打算改什麼、為什麼。不要列清單，清單畫面會自己列。不要寫企劃的 id，要指某一篇就說日期和通路。
@@ -245,7 +268,7 @@ const DIRECTOR_SYSTEM = `你是這檔活動的策略總監，跟內容企劃在�
 - 改之前把【目前的企劃】從第一篇到最後一篇逐篇掃一次，每個通路（官網、電子報、LINE 也算）都要看；對不上新方向的一篇都不能漏。
 - 真的缺一個只有使用者知道的事實才能決定時（例如這次是要註冊還是預約），先用最合理的假設改好，reply 最後問那一個問題。不要只丟選項給使用者挑。
 - 不准編使用者沒給的數字、成效、顧客見證、名額限制或網址。
-- 加篇、刪篇、換通路、換日期是內容企劃的事；除非使用者明講，否則不要動。
+- 加篇、刪篇、換通路、換日期、換任務卡是內容企劃的事，你不能動（就算寫了也會被丟掉）。使用者要這些，或你改完方向後需要加篇、刪篇、挪日期時：reply 說你請內容企劃（叫他的名字）接手，並在 askPlanner 寫一句給內容企劃的具體指示（帶上你剛定的方向、要加或刪什麼）。只是改切角就自己用 update 改，不用交棒。
 - 策略依據（活動定位 11 段：受眾、洞察、目標、SMP、訊息架構、創意、語氣與禁用元素…）也歸你管。使用者在看策略依據、或要改的是這些時，用 basis 改，鍵是【策略依據】列出的路徑（例如 audience.keyInsight），清單型的欄位給字串陣列。只改要改的格子。
 - 一句話訴求（smp）跟策略依據的 SMP 是同一件事的兩個說法：改了其中一個，另一個對不上就一起改。
 - reply 用繁體中文兩到四句，口語、不要條列、不要 markdown 粗體：你決定了什麼、為什麼。改了什麼畫面會自己列。reply 裡不要寫企劃的 id，要指某一篇就說日期和通路（例如「11/01 的 Facebook」）。
@@ -284,21 +307,26 @@ export async function runCampaignChat(args: {
   speaker?: CampaignSpeaker;
   /** 策略總監是哪一位（右下角選過的那位）。 */
   directorAgentId?: number | null;
-  /** 這句是內容企劃轉給總監的，不是使用者親口說的。 */
+  /** 這句是另一位轉過來的，不是使用者親口說的。 */
   handoff?: boolean;
+  /** 這一串已經轉了幾手（使用者那句算 0）；到 2 就不再轉，免得兩人互踢。 */
+  hops?: number;
   /** 活動的 positioning（策略依據從這裡讀）。 */
   positioning?: Record<string, any> | null;
   /** 使用者右邊正在看的：企劃地圖或策略依據。 */
   view?: "map" | "basis";
-}): Promise<{ reply: string; proposal: CampaignProposal; askDirector: string | null; truncated: boolean; agent: TeamAgent | null; speaker: CampaignSpeaker }> {
+}): Promise<{ reply: string; proposal: CampaignProposal; askDirector: string | null; handoff: { to: CampaignSpeaker; question: string } | null; truncated: boolean; agent: TeamAgent | null; speaker: CampaignSpeaker }> {
   const facts = await eventFacts(args.eventId, args.userId);
   if (!facts) throw new Error("找不到這個活動");
   const speaker: CampaignSpeaker = args.speaker === "director" ? "director" : "planner";
-  // 內容企劃跟卡片上顯示的同一位（campaign.team 也是這樣挑：避開總監的名字）。
+  // 名冊：跟卡片上顯示的同一組（campaign.team 也是這樣挑：內容企劃避開總監的名字）。
   const director = await pickCampaignDirector(facts.brandId, args.directorAgentId);
-  const agent = speaker === "director"
-    ? director
-    : await pickPlannerAgent(await brandIndustry(facts.brandId), director?.name ?? null);
+  const planner = await pickPlannerAgent(await brandIndustry(facts.brandId), director?.name ?? null);
+  const team: Record<CampaignSpeaker, TeamAgent | null> = { director, planner };
+  const agent = team[speaker];
+  const other: CampaignSpeaker = speaker === "director" ? "planner" : "director";
+  const roleZh = (s: CampaignSpeaker) => (s === "director" ? "策略總監" : "內容企劃");
+  const label = (s: CampaignSpeaker) => (team[s]?.name ? `${team[s]!.name}（${roleZh(s)}）` : roleZh(s));
   const today = new Date(ymd(new Date()));
   const start = facts.startAt ? new Date(ymd(facts.startAt)) : today;
   const end = facts.endAt ? new Date(ymd(facts.endAt)) : new Date(start.getTime() + 30 * DAY);
@@ -317,17 +345,27 @@ export async function runCampaignChat(args: {
   const pm = args.plan.phaseMessages ?? {};
   const pmLines = CAMPAIGN_PHASE_IDS.filter((id) => pm[id]).map((id) => `- ${PHASE_ZH[id]}（${id}）：${pm[id]}`).join("\n");
   // 同一串對話兩個人都在講：標清楚是誰說的，「你」只指這次回答的人。
+  // 名字用現在的名冊，不用畫面送來的 h.name——那可能是換人之前的舊名字，模型會照著叫錯人。
   const who = (h: CampaignChatTurn) => {
     if (h.role === "user") return "使用者";
-    const sp = h.speaker === "director" ? "director" : "planner";
-    if (sp === speaker) return "你";
-    return `${h.name ? `${h.name}，` : ""}${sp === "director" ? "策略總監" : "內容企劃"}`;
+    const sp: CampaignSpeaker = h.speaker === "director" ? "director" : "planner";
+    return sp === speaker ? "你" : label(sp);
   };
   const history = (args.history ?? []).slice(-10)
     .map((h) => `${who(h)}：${String(h.content).slice(0, 600)}`).join("\n");
   const thread = speaker === "director" && agent ? await directorThread(args.userId, facts.brandId, agent.id) : "";
 
+  const roster = [
+    `【這個對話裡的人（只有這幾位）】`,
+    `- 你：${label(speaker)}`,
+    `- ${label(other)}`,
+    `- 使用者`,
+    `提到同事只能用上面的名字；不要編別的人名，也不要說要去找名單以外的人。`,
+  ].join("\n");
+  const hops = Math.max(0, Math.min(2, Number(args.hops ?? (args.handoff ? 1 : 0)) || 0));
+
   const user = [
+    roster,
     `【活動】${facts.name}（${facts.startAt ? ymd(facts.startAt) : "?"} ~ ${facts.endAt ? ymd(facts.endAt) : "?"}）`,
     `【優惠機制／活動內容】${facts.settings.mechanic || "（沒寫）"}`,
     `【一句話訴求】${args.plan.smp}`,
@@ -342,11 +380,12 @@ export async function runCampaignChat(args: {
     speaker === "director" ? `【策略依據（路徑｜欄位｜目前寫的）】\n${basisLines(args.positioning ?? {})}` : "",
     thread ? `【你之前在右下角跟使用者談過（最近幾則）】\n${thread}` : "",
     history ? `【這個對話前面說過的】\n${history}` : "",
-    args.handoff ? `【內容企劃轉給你的問題】${args.message.trim()}` : `【使用者現在說】${args.message.trim()}`,
+    args.handoff ? `【${label(other)}轉給你的問題】${args.message.trim()}` : `【使用者現在說】${args.message.trim()}`,
+    hops >= 2 ? `這個問題已經轉過兩手，這次不要再交棒（askDirector／askPlanner 留空），能做的自己做，做不到的在 reply 說明。` : "",
     "",
     "只輸出 JSON，鍵名固定如下：",
     speaker === "director"
-      ? `{"reply":"兩到四句","smp":"新的一句話訴求（要改才填）","phaseMessages":{"launch":"只有要改的段才填"},"ops":[{"op":"update","id":"企劃裡的 id","angle":"改寫後要講什麼（20-45字）"}],"basis":{"audience.keyInsight":"只有要改的格子才填","guidelines.forbiddenElements":["清單型給陣列"]}}`
+      ? `{"reply":"兩到四句","smp":"新的一句話訴求（要改才填）","phaseMessages":{"launch":"只有要改的段才填"},"ops":[{"op":"update","id":"企劃裡的 id","angle":"改寫後要講什麼（20-45字）"}],"basis":{"audience.keyInsight":"只有要改的格子才填","guidelines.forbiddenElements":["清單型給陣列"]},"askPlanner":"只有要加篇、刪篇、換通路或日期時才填"}`
       : `{"reply":"一到三句","ops":[{"op":"add","phase":"sustain","date":"YYYY-MM-DD","platform":"instagram","taskId":"逐字抄自候選清單","angle":"這一篇要講什麼（20-45字）"},{"op":"update","id":"企劃裡的 id","angle":"…","date":"…","enabled":true},{"op":"remove","id":"企劃裡的 id"}],"phaseMessages":{"sustain":"只有要改才填"},"askDirector":"只有方向的問題才填"}`,
   ].filter(Boolean).join("\n");
 
@@ -374,15 +413,19 @@ export async function runCampaignChat(args: {
   // 一句話訴求是策略總監的事：內容企劃提了也不收。
   const proposal = validateCampaignOps({
     raw: { ops: parsed.ops, phaseMessages: parsed.phaseMessages, ...(speaker === "director" ? { smp: parsed.smp } : {}) },
-    plan: args.plan, cards, window,
+    plan: args.plan, cards, window, role: speaker,
   });
   // 策略依據只有總監能改。
   if (speaker === "director" && parsed.basis) {
     const b = validateBasis(parsed.basis, args.positioning ?? {}, { preserveItems: true });
     if (Object.keys(b).length) proposal.basis = b;
   }
-  const askDirector = speaker === "planner" ? str(parsed.askDirector, 200) || null : null;
+  // 交棒：只交給另一位，而且這一串還沒轉滿兩手。
+  const question = hops >= 2 ? "" : str(speaker === "planner" ? parsed.askDirector : parsed.askPlanner, 200);
+  const handoff = question ? { to: other, question } : null;
+  const askDirector = handoff?.to === "director" ? handoff.question : null;
   const reply = humanizeIds(str(parsed.reply, 500), args.plan)
-    || (proposal.ops.length || proposal.smp || proposal.phaseMessages || proposal.basis ? "我照你說的改好了。" : askDirector ? "這是方向的問題，我請策略總監來回答。" : "了解。");
-  return { reply, proposal, askDirector, truncated: parsed.truncated && proposal.ops.length > 0, agent, speaker };
+    || (proposal.ops.length || proposal.smp || proposal.phaseMessages || proposal.basis ? "我照你說的改好了。"
+      : handoff ? `這部分我請${label(other)}接手。` : "了解。");
+  return { reply, proposal, askDirector, handoff, truncated: parsed.truncated && proposal.ops.length > 0, agent, speaker };
 }
