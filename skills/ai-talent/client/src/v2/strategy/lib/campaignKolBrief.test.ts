@@ -8,9 +8,11 @@ describe("網紅任務說明單", () => {
     expect(b.mustSay).toContain("#廣告");
   });
   it("已經填過就照使用者的，不覆蓋", () => {
-    expect(prefillKolBrief({ brief: { budget: "30 萬" }, smp: "x" })).toEqual({ budget: "30 萬" });
+    expect(prefillKolBrief({ brief: { review: "改 2 次" }, smp: "x" })).toEqual({ review: "改 2 次" });
   });
-  it("經紀公司要的 14 個欄位都在（分四組）", () => {
-    expect(KOL_BRIEF_GROUPS.flatMap((g) => g.fields.map((f) => f.key))).toHaveLength(14);
+  it("13 個欄位分四組，而且沒有預算（CJ 2026-10-01：不放任何估算的價格）", () => {
+    const keys = KOL_BRIEF_GROUPS.flatMap((g) => g.fields.map((f) => f.key as string));
+    expect(keys).toHaveLength(13);
+    expect(keys).not.toContain("budget");
   });
 });

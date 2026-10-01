@@ -13,7 +13,7 @@
  *   2. 合作目標與成效：要認知、互動還是導購；看什麼數字（觸及、互動、點擊、導購）；想觸及誰。
  *   3. 要說什麼：核心訊息、必提（hashtag、連結、折扣碼、業配揭露）、禁提（競品、誇大療效）。
  *   4. 產出與時程：平台與形式、數量；提案截止→名單確認→交稿→上線期間；寄送產品或體驗。
- *   5. 預算與條款：總預算／單價範圍／可否產品互惠；二次授權（可否拿去投廣告、期限）；
+ *   5. 合作條款：二次授權（可否拿去投廣告、期限）；
  *      競品排他期；審稿流程（幾次修改）；成效回報（截圖、後台數據、何時交）。
  *   台灣法規提醒：業配要標示「廣告」或「合作」（公平交易委員會）；食品、化妝品、
  *   健康食品另有不得宣稱療效的規定——必提欄位預設就帶揭露標示。
@@ -25,6 +25,9 @@
  *
  * 存在 events.positioning.kolBrief（跟活動設定分開：改說明單不該讓企劃變成「設定已改、
  * 要重排」）。
+ *
+ * 2026-10-01（CJ「我要移除預算，因為 AI 估算的預算，可能不準」）：說明單不收預算欄位，
+ * 寫手也不會拿到任何價格。網紅報價由使用者跟經紀公司直接談。
  */
 
 export type KolTier = "" | "mega" | "macro" | "mid" | "micro" | "nano";
@@ -52,7 +55,6 @@ export interface KolBrief {
   deliverables?: string;
   timeline?: string;
   samples?: string;
-  budget?: string;
   usageRights?: string;
   exclusivity?: string;
   review?: string;
@@ -75,7 +77,6 @@ export const KOL_BRIEF_FIELDS: Array<[Exclude<keyof KolBrief, "influencers">, st
   ["deliverables", "產出形式與數量"],
   ["timeline", "時程"],
   ["samples", "產品寄送／體驗"],
-  ["budget", "預算"],
   ["usageRights", "二次授權"],
   ["exclusivity", "競品排他"],
   ["review", "審稿流程"],
