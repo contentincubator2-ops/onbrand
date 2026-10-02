@@ -168,6 +168,8 @@ export interface CampaignPlanItem {
   paid?: boolean;
   /** 合作類的線：這一件是給誰（網紅任務說明單裡的那一位／那一類）。 */
   partner?: string;
+  /** 發出去之後的貼文連結（campaign.markPublished；2026-10-02）。 */
+  publishedUrl?: string | null;
 }
 
 export interface CampaignPartnerBlock {

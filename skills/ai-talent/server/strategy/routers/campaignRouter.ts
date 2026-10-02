@@ -22,6 +22,8 @@
  *   team        — 這檔活動的內容企劃與投放專家（真的 agent，見 core/campaignTeam.ts）
  *   planKpi     — 用戶填總預算／總目標 → 投放專家拆到每一段＋挑要下廣告的篇（提案，不寫入）
  *   setInPlanner— 內容層決定某一篇要不要排進本週企劃（定稿後也能改，它是排程不是企劃內容）
+ *   itemThumbs  — 寫好的那幾篇的縮圖＋走到哪一關（草稿／待審／退回／核准／已發布，core/campaignPostStatus.ts）
+ *   markPublished— 某一篇發出去了（核准過才能標），可附貼文連結
  *
  * 定稿之後 saveSettings／generate／savePlan 一律拒絕——鎖的是整份，不是只鎖
  * 畫面。markWritten 不受影響：內容層本來就是在定稿之後寫。
@@ -45,6 +47,16 @@ import { appendChat, clearChat, listChat, markUndone } from "../core/campaignCha
 import { isHiddenContentPlatform, isHiddenHistoryItem } from "../../platform/core/planGate";
 import { ownedProductIds, resolveProductScope } from "../core/eventProductScope";
 import { invalidateBrandPrefix } from "../core/brandContext";
+import { campaignPostState, canMarkPublished, type CampaignPostState } from "../core/campaignPostStatus";
+
+/** 地圖上一篇寫好的：縮圖＋走到哪一關。 */
+interface ItemThumbRow {
+  image: string | null; title: string; excerpt: string;
+  outputId: number; missionId: number; state: CampaignPostState;
+  /** 退回修改的理由（只有 state=revision 才有）。 */
+  reviewNote: string | null;
+  publishedUrl: string | null;
+}
 
 const settingsInput = z.object({
   type: z.string().max(40),
@@ -74,6 +86,7 @@ const planItemInput = z.object({
   inPlanner: z.boolean().optional(),
   paid: z.boolean().optional(),
   partner: z.string().max(80).optional(),
+  publishedUrl: z.string().max(500).nullable().optional(),
 });
 
 const PHASE_KEYS = ["teaser", "launch", "sustain", "lastcall", "encore"] as const;
@@ -303,7 +316,14 @@ export const campaignRouter = router({
       assertUnlocked(pos);
       const stored = pos.campaignPlan as CampaignPlan | undefined;
       const hidden = (stored?.items ?? []).filter(isHiddenPlanItem);
-      const incoming = (input.plan.items ?? []).filter((i: any) => !isHiddenPlanItem(i));
+      // 2026-10-02：寫好／發出去的連結只由 markWritten／markPublished 改。畫面上的企劃是
+      // 一份本地副本，寫文是在另一個視窗完成的——那份副本的 outputId 可能還是 null，
+      // 這時改一個字存檔就會把「已寫」洗掉。所以這兩欄一律沿用存著的。
+      const storedById = new Map((stored?.items ?? []).map((i: any) => [i.id, i]));
+      const incoming = (input.plan.items ?? []).filter((i: any) => !isHiddenPlanItem(i)).map((i: any) => {
+        const prev: any = storedById.get(i.id);
+        return prev ? { ...i, outputId: prev.outputId ?? null, publishedUrl: prev.publishedUrl ?? null } : i;
+      });
       await patchPositioning(input.eventId, ctx.user!.id, "campaignPlan", {
         ...input.plan,
         // 畫面沒有送回來就沿用存著的，不要因為舊畫面少送一個欄位就洗掉。
@@ -517,26 +537,35 @@ export const campaignRouter = router({
     .query(async ({ ctx, input }) => {
       const row = await loadEvent(input.eventId, ctx.user!.id);
       const plan = parsePositioning(row.positioning).campaignPlan as CampaignPlan | undefined;
-      const byOutput = new Map<number, string>();
-      for (const i of plan?.items ?? []) if (i.outputId) byOutput.set(Number(i.outputId), i.id);
-      if (!byOutput.size) return {} as Record<string, { image: string | null; title: string; excerpt: string }>;
+      const byOutput = new Map<number, CampaignPlan["items"][number]>();
+      for (const i of plan?.items ?? []) if (i.outputId) byOutput.set(Number(i.outputId), i);
+      if (!byOutput.size) return {} as Record<string, ItemThumbRow>;
       const ids = [...byOutput.keys()].slice(0, 200);
       // JSON_EXTRACT 遇到 JSON null 回字串 'null'——一律 NULLIF（missionRouter 縮圖的教訓）。
+      // 2026-10-02：順便帶這一篇走到哪一關——output.status＋審核佇列最新一筆（core/campaignPostStatus.ts）。
       const [rows]: any = await localPool.query(
-        `SELECT mo.id, COALESCE(NULLIF(mo.title, ''), m.title) AS title, LEFT(mo.content, 400) AS content,
+        `SELECT mo.id, mo.missionId, mo.status, COALESCE(NULLIF(mo.title, ''), m.title) AS title, LEFT(mo.content, 400) AS content,
                 COALESCE(NULLIF(JSON_UNQUOTE(JSON_EXTRACT(mo.metadata, '$.thumbnailUrl')), 'null'),
                          NULLIF(JSON_UNQUOTE(JSON_EXTRACT(mo.metadata, '$.imageUrl')), 'null'),
-                         m.output_image_url, m.cover_image_url) AS image
+                         m.output_image_url, m.cover_image_url) AS image,
+                (SELECT q.status FROM mission_review_queue q WHERE q.outputId = mo.id ORDER BY q.id DESC LIMIT 1) AS reviewStatus,
+                (SELECT q.revisionNote FROM mission_review_queue q WHERE q.outputId = mo.id ORDER BY q.id DESC LIMIT 1) AS reviewNote
            FROM mission_outputs mo JOIN missions m ON m.id = mo.missionId
           WHERE mo.id IN (?) AND m.userId = ?`,
         [ids, ctx.user!.id],
       );
-      const out: Record<string, { image: string | null; title: string; excerpt: string }> = {};
+      const out: Record<string, ItemThumbRow> = {};
       for (const r of rows as any[]) {
-        const itemId = byOutput.get(Number(r.id));
-        if (!itemId) continue;
+        const item = byOutput.get(Number(r.id));
+        if (!item) continue;
         const excerpt = String(r.content ?? "").replace(/<[^>]+>/g, " ").replace(/[#*_>`]/g, "").replace(/\s+/g, " ").trim().slice(0, 120);
-        out[itemId] = { image: r.image && /^(https?:\/\/|\/)/.test(String(r.image)) ? String(r.image) : null, title: String(r.title ?? ""), excerpt };
+        const state = campaignPostState(r.status, r.reviewStatus);
+        out[item.id] = {
+          image: r.image && /^(https?:\/\/|\/)/.test(String(r.image)) ? String(r.image) : null, title: String(r.title ?? ""), excerpt,
+          outputId: Number(r.id), missionId: Number(r.missionId), state,
+          reviewNote: state === "revision" && r.reviewNote ? String(r.reviewNote).slice(0, 1000) : null,
+          publishedUrl: typeof item.publishedUrl === "string" ? item.publishedUrl : null,
+        };
       }
       return out;
     }),
@@ -656,6 +685,57 @@ export const campaignRouter = router({
       const item = plan.items.find((i) => i.id === input.itemId);
       if (!item) throw new TRPCError({ code: "NOT_FOUND", message: "企劃上找不到這一格" });
       item.outputId = input.outputId;
+      if (!input.outputId) item.publishedUrl = null;
+      await patchPositioning(input.eventId, ctx.user!.id, "campaignPlan", plan);
+      return { ok: true };
+    }),
+
+  /**
+   * 這一篇發出去了（2026-10-02）。核准過才能標——團隊版的審核才有意義；個人版是自己按「定稿」。
+   * FB 粉專發文 API 只在正式站開，所以先是手動標記＋貼連結；連結之後讓成效接回這一篇。
+   * published=false＝標錯了，退回已核准。
+   */
+  markPublished: protectedProcedure
+    .input(z.object({
+      eventId: z.number().int().positive(),
+      itemId: z.string().max(80),
+      published: z.boolean(),
+      url: z.string().trim().max(500).optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const url = (input.url ?? "").trim();
+      if (url && !/^https?:\/\/\S+$/i.test(url)) throw new TRPCError({ code: "BAD_REQUEST", message: "貼文連結要是 http(s) 開頭的網址" });
+      const row = await loadEvent(input.eventId, ctx.user!.id);
+      const pos = parsePositioning(row.positioning);
+      const plan = pos.campaignPlan as CampaignPlan | undefined;
+      const item = plan?.items?.find((i) => i.id === input.itemId);
+      if (!plan || !item) throw new TRPCError({ code: "NOT_FOUND", message: "企劃上找不到這一篇" });
+      if (!item.outputId) throw new TRPCError({ code: "BAD_REQUEST", message: "這一篇還沒寫，不能標成已發布" });
+      const [rows]: any = await localPool.execute(
+        `SELECT mo.status,
+                (SELECT q.status FROM mission_review_queue q WHERE q.outputId = mo.id ORDER BY q.id DESC LIMIT 1) AS reviewStatus
+           FROM mission_outputs mo JOIN missions m ON m.id = mo.missionId
+          WHERE mo.id = ? AND m.userId = ? LIMIT 1`,
+        [item.outputId, ctx.user!.id],
+      );
+      const r = (rows as any[])[0];
+      if (!r) throw new TRPCError({ code: "NOT_FOUND", message: "找不到這一篇的內容" });
+      if (input.published) {
+        if (!canMarkPublished(campaignPostState(r.status, r.reviewStatus))) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "這一篇還沒核准，核准後才能標成已發布" });
+        }
+        await localPool.execute(
+          `UPDATE mission_outputs SET status = 'published', publishedAt = COALESCE(publishedAt, NOW()), updatedAt = NOW() WHERE id = ?`,
+          [item.outputId],
+        );
+        item.publishedUrl = url || null;
+      } else {
+        await localPool.execute(
+          `UPDATE mission_outputs SET status = 'approved', publishedAt = NULL, updatedAt = NOW() WHERE id = ? AND status = 'published'`,
+          [item.outputId],
+        );
+        item.publishedUrl = null;
+      }
       await patchPositioning(input.eventId, ctx.user!.id, "campaignPlan", plan);
       return { ok: true };
     }),

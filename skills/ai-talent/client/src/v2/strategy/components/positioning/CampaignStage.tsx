@@ -24,6 +24,10 @@
  *
  * 2026-09-30（CJ「現在選擇底圖的視覺很差，直接移除整個選擇底圖和客製化底圖的功能」）：
  * 底圖模板整組拿掉，左邊固定是傳播圈（畫的是企劃本身），右邊是中性的地圖底。
+ *
+ * 2026-10-02（CJ「看到這些文章，想要真實產出」）：放大到某一段後，每一篇可以直接在這裡寫——
+ * 「寫這篇」開任務視窗並直接開寫（PlatformTaskModal autoRun），寫好接著開 CampaignPostModal
+ * （改字、定稿／送審、標記已發布）。不用先跳到內容層找同一篇。
  */
 import React from "react";
 import { useNavigate } from "react-router-dom";
@@ -32,7 +36,7 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faMap, faPenNib, faSliders, faLockOpen, faLock, faArrowRight, faBookOpen, faExpand, faCompress, faBullseye } from "@fortawesome/free-solid-svg-icons";
 import { trpc } from "../../../../lib/trpc";
 import { useLang } from "../../../../lib/i18n";
-import { CHANNEL_META, channelLabel } from "../../../content/lib/channelMeta";
+import { CHANNEL_META, channelLabel, channelRoute } from "../../../content/lib/channelMeta";
 import { phaseOf, type CampaignPhaseId, type CampaignPlan, type CampaignPlanItem } from "../../lib/campaignSchema";
 import { stagePhases, stageLanes, countdown, stageNotes, phaseShort, type StagePhase } from "../../lib/campaignStage";
 import { LockToggle } from "./LockToggle";
@@ -46,6 +50,8 @@ import type { BasisPatch, BasisValue } from "../../lib/campaignBasis";
 import { dockDirector } from "../../lib/directorDock";
 import CampaignHandoff from "./CampaignHandoff";
 import CampaignKpiPanel from "./CampaignKpiPanel";
+import CampaignPostModal from "./CampaignPostModal";
+import { PlatformTaskModal } from "../../../content/pages/PlatformTaskPage";
 import { money, metricLine } from "../../lib/campaignKpi";
 
 const ymd = (d: Date) => d.toISOString().slice(0, 10);
@@ -97,9 +103,27 @@ export default function CampaignStage({ eventId, brandId }: { eventId: number; b
   const timer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
   React.useEffect(() => {
-    if (!q.data || dirtyRef.current) return;
-    setPlan(q.data.plan ?? null);
+    if (!q.data) return;
+    if (!dirtyRef.current) { setPlan(q.data.plan ?? null); return; }
+    // 正在改企劃（還沒存）的時候，另一個視窗寫好了一篇：只把「寫好了」併進來，不蓋掉手上的修改。
+    const server = new Map<string, any>((q.data.plan?.items ?? []).map((i: any) => [i.id, i]));
+    const cur = planRef.current;
+    if (!cur) return;
+    const merged = { ...cur, items: cur.items.map((i) => {
+      const s2 = server.get(i.id);
+      return s2 ? { ...i, outputId: s2.outputId ?? null, publishedUrl: s2.publishedUrl ?? null } : i;
+    }) };
+    planRef.current = merged;
+    setPlan(merged);
   }, [q.data]);
+
+  /** 「寫這篇」開的任務視窗，以及寫好之後開的那一篇（itemId＋outputId）。 */
+  const [writing, setWriting] = React.useState<CampaignPlanItem | null>(null);
+  const [openPost, setOpenPost] = React.useState<{ itemId: string; outputId: number } | null>(null);
+  const openItem = (it: CampaignPlanItem) => {
+    if (it.outputId) setOpenPost({ itemId: it.id, outputId: Number(it.outputId) });
+    else setWriting(it);
+  };
   React.useEffect(() => {
     if (q.data?.basis?.editable) setBasisLocal(q.data.basis.editable);
   }, [q.data?.basis?.editable]);
@@ -408,6 +432,7 @@ export default function CampaignStage({ eventId, brandId }: { eventId: number; b
                 fill
                 phaseKpi={plan.kpi?.phases ?? {}}
                 thumbs={thumbsQ.data ?? {}}
+                onOpenItem={openItem}
               />
             ) : (
               <div className="relative bg-default-100 p-4 sm:p-6 min-h-[420px] h-full overflow-y-auto">
@@ -498,6 +523,27 @@ export default function CampaignStage({ eventId, brandId }: { eventId: number; b
         />
       )}
 
+      {/* 寫這篇：任務視窗直接開寫，寫好換成「這一篇」的視窗。 */}
+      {writing && (
+        <PlatformTaskModal key={`camp-${writing.id}`}
+          route={channelRoute(writing.platform)} taskId={writing.taskId}
+          camp={{ eventId, itemId: writing.id }} topic={writing.angle || undefined} slotDate={writing.date}
+          autoRun
+          onWritten={(oid) => { setOpenPost({ itemId: writing.id, outputId: oid }); }}
+          onClose={() => { setWriting(null); thumbsQ.refetch?.(); }} />
+      )}
+      {openPost && (() => {
+        const base = items.find((i) => i.id === openPost.itemId);
+        if (!base) return null;
+        return (
+          <CampaignPostModal key={`post-${openPost.itemId}-${openPost.outputId}`}
+            eventId={eventId} brandId={brandId}
+            item={{ ...base, outputId: base.outputId ?? openPost.outputId }}
+            thumb={(thumbsQ.data ?? {})[openPost.itemId] ?? null}
+            phaseMessage={plan?.phaseMessages?.[base.phase] ?? ""}
+            en={en} onClose={() => setOpenPost(null)} />
+        );
+      })()}
     </div>
   );
 }

@@ -29,3 +29,17 @@ describe("追蹤連結", () => {
     expect(campaignItemBriefText(base)).not.toContain("連結");
   });
 });
+
+describe("同一天別的通路已定稿的底稿", () => {
+  const base = { eventId: 1, itemId: "ig-1", paid: false, phase: "teaser", date: "2026-10-27", angle: "IG 語調改寫", phaseMessage: "" };
+  it("有底稿：給寫手原文，要求訊息一致、語調照這個通路", () => {
+    const t = campaignItemBriefText({ ...base, siblingBase: { platform: "facebook", text: "你的品牌每次開口，說的都是同一件事嗎？" } });
+    expect(t).toContain("同一天 Facebook 那一篇已經定稿");
+    expect(t).toContain("你的品牌每次開口，說的都是同一件事嗎？");
+    expect(t).toContain("不要逐字照抄");
+  });
+  it("沒有底稿就不提", () => {
+    expect(campaignItemBriefText(base)).not.toContain("定稿");
+    expect(campaignItemBriefText({ ...base, siblingBase: null })).not.toContain("定稿");
+  });
+});

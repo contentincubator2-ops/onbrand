@@ -16,6 +16,11 @@
  *
  * missions.workspace 是頻道名（'facebook' / 'linkedin'…），不是租戶
  * workspace id —— 別被欄位名騙了，這裡一律走 workspace_members。
+ *
+ * 2026-10-02（活動企劃上每一篇的狀態）：送審／放行／退回順手同步
+ * mission_outputs.status（pending_review／approved／draft）。專案頁與活動地圖
+ * 讀的是那一欄；只改佇列的話，放行過的稿在那兩個地方還是「草稿」。
+ * 已經排程或發布的不動——那是更後面的關卡。
  */
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
@@ -45,6 +50,20 @@ async function canApprove(reviewerId: number, requesterId: number, reviewerIds: 
     return (rows as any[]).length > 0;
   } catch {
     return false; // 查不到就不放行 —— 預設往嚴格的方向錯
+  }
+}
+
+/** 審核結果寫回產出本身（見檔頭）。只從 from 列出的狀態改；失敗不擋審核本身。 */
+async function syncOutputStatus(outputId: number, to: string, from: string[]): Promise<void> {
+  if (!Number.isInteger(outputId) || outputId <= 0) return;
+  try {
+    const { default: localPool } = await import("../../localDb");
+    await localPool.execute(
+      `UPDATE mission_outputs SET status = ?, updatedAt = NOW() WHERE id = ? AND status IN (${from.map(() => "?").join(",")})`,
+      [to, outputId, ...from],
+    );
+  } catch (e) {
+    console.warn("[review] syncOutputStatus failed", (e as Error)?.message);
   }
 }
 
@@ -95,6 +114,7 @@ export const reviewRouter = router({
          input.reviewerIds ? JSON.stringify(input.reviewerIds) : null,
          input.isUrgent ? 1 : 0, input.note ?? null],
       );
+      await syncOutputStatus(input.outputId, "pending_review", ["draft", "approved"]);
       return { id: Number(r?.insertId ?? 0), status: "pending" as const };
     }),
 
@@ -204,7 +224,7 @@ export const reviewRouter = router({
       await assertReviewAllowed(ctx.user!.id);
       const { default: localPool } = await import("../../localDb");
       const [rows]: any = await localPool.execute(
-        `SELECT requestedBy, reviewerIds, status FROM mission_review_queue WHERE id = ? LIMIT 1`,
+        `SELECT requestedBy, reviewerIds, status, outputId FROM mission_review_queue WHERE id = ? LIMIT 1`,
         [input.id],
       );
       const row = (rows as any[])[0];
@@ -216,6 +236,7 @@ export const reviewRouter = router({
         `UPDATE mission_review_queue SET status = 'approved', approvedAt = NOW() WHERE id = ?`,
         [input.id],
       );
+      await syncOutputStatus(Number(row.outputId), "approved", ["draft", "pending_review"]);
       return { id: input.id, status: "approved" as const };
     }),
 
@@ -226,7 +247,7 @@ export const reviewRouter = router({
       await assertReviewAllowed(ctx.user!.id);
       const { default: localPool } = await import("../../localDb");
       const [rows]: any = await localPool.execute(
-        `SELECT requestedBy, reviewerIds FROM mission_review_queue WHERE id = ? LIMIT 1`,
+        `SELECT requestedBy, reviewerIds, outputId FROM mission_review_queue WHERE id = ? LIMIT 1`,
         [input.id],
       );
       const row = (rows as any[])[0];
@@ -238,6 +259,7 @@ export const reviewRouter = router({
         `UPDATE mission_review_queue SET status = 'revision_requested', revisionNote = ? WHERE id = ?`,
         [input.note, input.id],
       );
+      await syncOutputStatus(Number(row.outputId), "draft", ["pending_review"]);
       return { id: input.id, status: "revision_requested" as const };
     }),
 });
