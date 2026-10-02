@@ -339,6 +339,7 @@ export const campaignRouter = router({
       view: z.enum(["map", "basis"]).optional(),
       /** 目前這段討論；最近幾段已結束的摘要會一起給模型。 */
       threadId: z.number().int().positive().nullable().optional(),
+      lang: z.enum(["zh", "en"]).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const row = await loadEvent(input.eventId, ctx.user!.id);
@@ -352,6 +353,7 @@ export const campaignRouter = router({
           message: input.message, phase: input.phase ?? null, history: input.history,
           speaker: input.speaker ?? "planner", directorAgentId: input.directorAgentId ?? null, handoff: !!input.handoff, from: input.from ?? null, hops: input.hops,
           positioning: pos, view: input.view ?? "map",
+          lang: input.lang ?? "zh",
           earlier: await recentSummaries(input.eventId, ctx.user!.id, input.threadId ?? null).catch(() => []),
         });
       } catch (e: any) {
@@ -383,6 +385,7 @@ export const campaignRouter = router({
       eventId: z.number().int().positive(),
       /** 沒給＝開新的一段。 */
       threadId: z.number().int().positive().nullable().optional(),
+      lang: z.enum(["zh", "en"]).optional(),
       messages: z.array(z.object({
         key: z.string().min(1).max(40),
         role: z.enum(["user", "assistant", "handoff"]),
@@ -398,7 +401,7 @@ export const campaignRouter = router({
     }))
     .mutation(async ({ ctx, input }) => {
       await loadEvent(input.eventId, ctx.user!.id);
-      return await appendChat(input.eventId, ctx.user!.id, input.threadId ?? null, input.messages);
+      return await appendChat(input.eventId, ctx.user!.id, input.threadId ?? null, input.messages, input.lang ?? "zh");
     }),
 
   chatUndone: protectedProcedure
@@ -420,10 +423,10 @@ export const campaignRouter = router({
 
   /** 重新打開過去的一段，接著談。 */
   chatReopenThread: protectedProcedure
-    .input(z.object({ eventId: z.number().int().positive(), threadId: z.number().int().positive() }))
+    .input(z.object({ eventId: z.number().int().positive(), threadId: z.number().int().positive(), lang: z.enum(["zh", "en"]).optional() }))
     .mutation(async ({ ctx, input }) => {
       await loadEvent(input.eventId, ctx.user!.id);
-      if (!(await reopenThread(input.eventId, ctx.user!.id, input.threadId))) throw new TRPCError({ code: "NOT_FOUND", message: "找不到這段討論" });
+      if (!(await reopenThread(input.eventId, ctx.user!.id, input.threadId, input.lang ?? "zh"))) throw new TRPCError({ code: "NOT_FOUND", message: "找不到這段討論" });
       return { ok: true };
     }),
 

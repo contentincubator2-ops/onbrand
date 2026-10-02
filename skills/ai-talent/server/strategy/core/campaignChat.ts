@@ -360,6 +360,11 @@ export async function runCampaignChat(args: {
   view?: "map" | "basis";
   /** 最近幾段已結束的討論的摘要（2026-10-02 分段）：這段只讀這段的對話，前情用摘要補。 */
   earlier?: string[];
+  /**
+   * 使用者的介面語言（2026-10-02 CJ「英文版也能正確顯示嗎」）。en：reply 用英文、提到同事用英文名字；
+   * 企劃本身（切角、訴求、各段訊息、策略依據）照品牌原本的語言，不跟著介面換。
+   */
+  lang?: "zh" | "en";
 }): Promise<{ reply: string; proposal: CampaignProposal; askDirector: string | null; handoff: { to: CampaignSpeaker; question: string } | null; truncated: boolean; agent: TeamAgent | null; speaker: CampaignSpeaker }> {
   const facts = await eventFacts(args.eventId, args.userId);
   if (!facts) throw new Error("找不到這個活動");
@@ -413,7 +418,7 @@ export async function runCampaignChat(args: {
 
   const rosterBlock = [
     `【這檔活動的團隊（只有這幾位；交棒時 handoffTo 填角色 id）】`,
-    ...roster.map((m) => `- ${m.role === speaker ? "你：" : ""}${m.name}（${ROLES[m.role].zh}，角色 id：${m.role}）——管${ROLES[m.role].duty}；這份企劃裡${m.did}`),
+    ...roster.map((m) => `- ${m.role === speaker ? "你：" : ""}${m.name}${args.lang === "en" && m.nameEn ? `／${m.nameEn}` : ""}（${ROLES[m.role].zh}，角色 id：${m.role}）——管${ROLES[m.role].duty}；這份企劃裡${m.did}`),
     `- 使用者`,
     `提到同事只能用上面的名字；不要編別的人名，也不要說要去找名單以外的人。`,
   ].join("\n");
@@ -444,6 +449,9 @@ export async function runCampaignChat(args: {
     args.earlier?.length ? `【之前幾段討論的結論（已經做完的事，不用重做）】\n${args.earlier.map((e) => `- ${e.slice(0, 300)}`).join("\n")}` : "",
     history ? `【這段討論前面說過的】\n${history}` : "",
     args.handoff && from ? `【${label(from)}轉給你的問題】${args.message.trim()}` : `【使用者現在說】${args.message.trim()}`,
+    args.lang === "en"
+      ? "【語言】使用者用的是英文介面：reply 一律用英文寫，提到同事用斜線後面的英文名字（沒有就用中文名字）。企劃內容（angle、smp、phaseMessages、basis）照品牌原本的語言寫，不要因為介面是英文就改成英文。上面要求「繁體中文」的地方，只對企劃內容有效。"
+      : "",
     hops >= 2 ? `這個問題已經轉過兩手，這次不要再交棒（handoffTo 留空），能做的自己做，做不到的在 reply 說明。` : "",
     "",
     "只輸出 JSON，鍵名固定如下：",

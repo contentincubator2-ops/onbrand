@@ -55,6 +55,8 @@ type Speaker = string;
 interface Member {
   id: number; name: string; title: string; avatarUrl: string;
   role: Speaker; roleZh: string; roleEn: string; duty: string; dutyEn: string; did: string; didEn: string;
+  /** 英文介面用的名字與職稱（伺服器查 agents.englishName／title；查不到是空字串）。 */
+  nameEn?: string; titleEn?: string;
 }
 
 interface Msg {
@@ -159,6 +161,18 @@ export default function CampaignChatCard({ eventId, brandId, plan, phase, notes,
     if (m) return en ? m.roleEn : m.roleZh;
     return s === "director" ? L("策略總監", "Strategy director") : L("內容企劃", "Content planner");
   };
+  // 英文介面：名字與職稱用英文（有的話）。2026-10-02 CJ「英文版也能正確顯示嗎」。
+  const dn = (m: Member | null | undefined): string => (m ? (en && m.nameEn ? m.nameEn : m.name) : "");
+  const dt = (m: Member | null | undefined): string => (m ? (en ? m.titleEn || "" : m.title) : "");
+  /** 交棒／換人那一行：存的是誰交給誰（speaker＝接手的、name＝交出去的角色），顯示時才用目前的語言組字。 */
+  const handoffText = (m: Msg): string => {
+    const to = m.speaker ? byRole.get(m.speaker) : null;
+    if (!m.speaker || !to) return m.content;
+    const from = m.name ? byRole.get(m.name) : null;
+    if (from) return L(`${dn(from)}請 ${dn(to)}（${roleName(to.role)}）接手`, `${dn(from)} hands over to ${dn(to)} (${roleName(to.role)})`);
+    return L(`換 ${dn(to)}（${roleName(to.role)}）`, `Now talking to ${dn(to)} (${roleName(to.role)})`);
+  };
+  const threadName = (t: { title: string }) => (t.title === "討論" || t.title === "Discussion" ? L("討論", "Discussion") : t.title);
   const cur = byRole.get(speaker) ?? null;
 
   // 名冊換了（例如網紅線拿掉了）而目前的人不在上面：回到內容企劃。
@@ -227,7 +241,7 @@ export default function CampaignChatCard({ eventId, brandId, plan, phase, notes,
     if (!fresh.length) return;
     appending.current = true;
     fresh.forEach((m) => synced.current.add(m.key!));
-    appendMut.mutate({ eventId, threadId: threadRef.current, messages: fresh.slice(-60) }, {
+    appendMut.mutate({ eventId, threadId: threadRef.current, messages: fresh.slice(-60), lang: en ? "en" : "zh" }, {
       onSuccess: (r: any) => {
         appending.current = false;
         if (r?.threadId && r.threadId !== threadRef.current) { threadRef.current = r.threadId; setThreadId(r.threadId); }
@@ -268,7 +282,7 @@ export default function CampaignChatCard({ eventId, brandId, plan, phase, notes,
   const openThread = (id: number) => {
     if (busy) return;
     if (id === threadRef.current) { setPanel("chat"); return; }
-    reopenMut.mutate({ eventId, threadId: id }, {
+    reopenMut.mutate({ eventId, threadId: id, lang: en ? "en" : "zh" }, {
       onSuccess: () => {
         utils?.campaign?.chatThreads?.invalidate?.({ eventId });
         setThreadId(id); threadRef.current = id; setLoadFor(id); setPanel("chat");
@@ -298,7 +312,7 @@ export default function CampaignChatCard({ eventId, brandId, plan, phase, notes,
     setBusy(who);
     lastAsk.current = { who, message, opts };
     const hops = opts.hops ?? 0;
-    chatMut.mutate({ eventId, message, phase, history: history(opts.prior), speaker: who, from: opts.from ?? null, directorAgentId, handoff: !!opts.handoff, hops, view: view ?? "map", threadId: threadRef.current }, {
+    chatMut.mutate({ eventId, message, phase, history: history(opts.prior), speaker: who, from: opts.from ?? null, directorAgentId, handoff: !!opts.handoff, hops, view: view ?? "map", threadId: threadRef.current, lang: en ? "en" : "zh" }, {
       onSuccess: (r: any) => {
         const team = byRoleRef.current;
         const name = r?.agent?.name ?? team.get(who)?.name ?? "";
@@ -324,9 +338,9 @@ export default function CampaignChatCard({ eventId, brandId, plan, phase, notes,
         const to: Speaker | null = typeof r?.handoff?.to === "string" ? r.handoff.to : null;
         const question = String(r?.handoff?.question ?? "");
         if (to && to !== who && question && hops < 2) {
-          const toName = team.get(to)?.name ?? "";
-          const fromName = name || roleName(who);
-          next.push(mk({ role: "handoff", content: toName ? L(`${fromName}請 ${toName}（${roleName(to)}）接手`, `${fromName} hands over to ${toName}`) : L(`交給${roleName(to)}`, `Handing over to the ${roleName(to)}`) }));
+          const toName = dn(team.get(to));
+          const fromName = dn(team.get(who)) || name || roleName(who);
+          next.push(mk({ role: "handoff", speaker: to, name: who, content: toName ? L(`${fromName}請 ${toName}（${roleName(to)}）接手`, `${fromName} hands over to ${toName}`) : L(`交給${roleName(to)}`, `Handing over to the ${roleName(to)}`) }));
           msgsRef.current = next;
           setMsgs(next);
           setSpeaker(to);
@@ -344,13 +358,14 @@ export default function CampaignChatCard({ eventId, brandId, plan, phase, notes,
 
   /** 使用者說一句（可能 @ 某一位）。 */
   const dispatch = (raw: string) => {
-    const { to, message } = routeMention(raw, roster);
+    // @ 找人：中文名字、英文名字都認得。
+    const { to, message } = routeMention(raw, roster.flatMap((m) => (m.nameEn ? [m, { ...m, name: m.nameEn }] : [m])));
     const who = to ?? speakerRef.current;
     const prior = msgsRef.current;
     const next: Msg[] = [...prior];
     if (to && to !== speakerRef.current) {
       const a = byRoleRef.current.get(to);
-      next.push(mk({ role: "handoff", content: a ? L(`換 ${a.name}（${roleName(to)}）`, `Now talking to ${a.name} (${roleName(to)})`) : L(`換${roleName(to)}`, `Now: ${roleName(to)}`) }));
+      next.push(mk({ role: "handoff", speaker: to, content: a ? L(`換 ${dn(a)}（${roleName(to)}）`, `Now talking to ${dn(a)} (${roleName(to)})`) : L(`換${roleName(to)}`, `Now: ${roleName(to)}`) }));
       setSpeaker(to);
     }
     next.push(mk({ role: "user", content: raw.trim() }));
@@ -397,7 +412,7 @@ export default function CampaignChatCard({ eventId, brandId, plan, phase, notes,
     if (s === speaker || busy) return;
     setSpeaker(s);
     const a = byRole.get(s);
-    setMsgs((prev) => [...prev, mk({ role: "handoff", content: a ? L(`換 ${a.name}（${roleName(s)}）`, `Now talking to ${a.name} (${roleName(s)})`) : L(`換${roleName(s)}`, `Now: ${roleName(s)}`) })]);
+    setMsgs((prev) => [...prev, mk({ role: "handoff", speaker: s, content: a ? L(`換 ${dn(a)}（${roleName(s)}）`, `Now talking to ${dn(a)} (${roleName(s)})`) : L(`換${roleName(s)}`, `Now: ${roleName(s)}`) })]);
     requestAnimationFrame(() => inputRef.current?.focus());
   };
 
@@ -417,8 +432,8 @@ export default function CampaignChatCard({ eventId, brandId, plan, phase, notes,
   const suggestions = (SUGGEST[speaker] ?? SUGGEST.planner!).map(([zh, e]) => L(zh, e));
 
   const face = (a: Member | null | undefined, s: Speaker, size = "w-7 h-7") => (a?.avatarUrl
-    ? <Avatar src={a.avatarUrl} name={a.name} size="sm" className={`${size} shrink-0 ring-2 ring-background/60`} />
-    : <span className={`${size} rounded-full bg-background text-foreground grid place-items-center text-tiny font-bold shrink-0`}>{(a?.name ?? roleName(s)).slice(0, 1)}</span>);
+    ? <Avatar src={a.avatarUrl} name={dn(a)} size="sm" className={`${size} shrink-0 ring-2 ring-background/60`} />
+    : <span className={`${size} rounded-full bg-background text-foreground grid place-items-center text-tiny font-bold shrink-0`}>{(dn(a) || roleName(s)).slice(0, 1)}</span>);
 
   return (
     <div className={`rounded-2xl bg-foreground text-background px-4 py-3 flex flex-col gap-2.5 ${grow ? "flex-1 min-h-[300px]" : ""}`}>
@@ -426,8 +441,8 @@ export default function CampaignChatCard({ eventId, brandId, plan, phase, notes,
       <div className="flex items-center gap-2.5">
         {face(cur, speaker)}
         <div className="min-w-0">
-          <p className="text-small font-semibold leading-tight truncate" title={cur ? `${cur.name}｜${cur.title}` : undefined}>
-            {cur ? `${cur.name}　${roleName(speaker)}` : roleName(speaker)}
+          <p className="text-small font-semibold leading-tight truncate" title={cur ? [dn(cur), dt(cur)].filter(Boolean).join("｜") : undefined}>
+            {cur ? `${dn(cur)}　${roleName(speaker)}` : roleName(speaker)}
           </p>
           <p className="text-[11px] opacity-60 leading-tight truncate">
             {view === "basis" ? L("正在看：策略依據", "Looking at: strategy basis")
@@ -475,8 +490,8 @@ export default function CampaignChatCard({ eventId, brandId, plan, phase, notes,
                   <span className="text-[11px] whitespace-nowrap">{roleName(m.role)}</span>
                   <span role="tooltip"
                     className="pointer-events-none absolute left-0 top-full mt-1.5 z-30 w-56 rounded-xl bg-content1 text-foreground shadow-large p-2.5 text-left opacity-0 translate-y-1 group-hover:opacity-100 group-hover:translate-y-0 group-focus-visible:opacity-100 transition">
-                    <span className="block text-small font-semibold">{m.name}<span className="font-normal text-default-500">　{roleName(m.role)}</span></span>
-                    {m.title && <span className="block text-[11px] text-default-500 truncate">{m.title}</span>}
+                    <span className="block text-small font-semibold">{dn(m)}<span className="font-normal text-default-500">　{roleName(m.role)}</span></span>
+                    {dt(m) && <span className="block text-[11px] text-default-500 truncate">{dt(m)}</span>}
                     {(en ? m.dutyEn : m.duty) && <span className="block text-[11.5px] leading-snug mt-1">{en ? m.dutyEn : m.duty}</span>}
                     {(en ? m.didEn : m.did) && <span className="block text-[11px] text-default-500 mt-1">{L("這份企劃：", "On this plan: ")}{en ? m.didEn : m.did}</span>}
                   </span>
@@ -499,7 +514,7 @@ export default function CampaignChatCard({ eventId, brandId, plan, phase, notes,
           <button type="button" onClick={() => openThread(lastClosed.id)}
             className="text-left rounded-xl border border-background/25 hover:border-background/50 px-3 py-2 flex flex-col gap-0.5 transition">
             <span className="text-[11px] opacity-60">{L("上一段討論", "Last thread")}・{ago(lastClosed.updatedAt, en)}</span>
-            <span className="text-small font-semibold truncate">{lastClosed.title}</span>
+            <span className="text-small font-semibold truncate">{threadName(lastClosed)}</span>
             {lastClosed.summary && <span className="text-tiny opacity-70 line-clamp-2">{lastClosed.summary}</span>}
             <span className="text-[11px] opacity-60 pt-0.5 flex items-center gap-1"><FontAwesomeIcon icon={faRotateRight} className="text-[9px]" />{L("接著這段談", "Continue this thread")}</span>
           </button>
@@ -513,7 +528,7 @@ export default function CampaignChatCard({ eventId, brandId, plan, phase, notes,
         {msgs.map((m, k) => {
           if (!showAll && msgs.length > FOLD_AT && k < msgs.length - SHOW_LAST) return null;
           if (m.role === "handoff") {
-            return <p key={m.key ?? k} className="self-center text-[11px] opacity-50 flex items-center gap-1.5"><FontAwesomeIcon icon={faRightLeft} className="text-[9px]" />{m.content}</p>;
+            return <p key={m.key ?? k} className="self-center text-[11px] opacity-50 flex items-center gap-1.5"><FontAwesomeIcon icon={faRightLeft} className="text-[9px]" />{handoffText(m)}</p>;
           }
           const sp = m.speaker ?? "planner";
           const who = byRole.get(sp);
@@ -521,8 +536,8 @@ export default function CampaignChatCard({ eventId, brandId, plan, phase, notes,
             <div key={m.key ?? k} className={m.role === "user" ? "self-end max-w-[88%]" : "flex gap-2 items-start"}>
               {m.role === "assistant" && face(who, sp, "w-5 h-5 mt-0.5")}
               <div className={m.role === "user" ? "" : "flex flex-col gap-1.5 min-w-0 flex-1"}>
-                {m.role === "assistant" && (who?.name || m.name) && (
-                  <p className="text-[11px] opacity-60 -mb-0.5">{who?.name || m.name}・{roleName(sp)}</p>
+                {m.role === "assistant" && (dn(who) || m.name) && (
+                  <p className="text-[11px] opacity-60 -mb-0.5">{dn(who) || m.name}・{roleName(sp)}</p>
                 )}
                 {m.content && (
                   <p className={`text-small leading-relaxed whitespace-pre-line ${m.role === "user" ? "bg-background/15 rounded-xl px-3 py-1.5" : ""}`}>{m.content}</p>
@@ -540,7 +555,7 @@ export default function CampaignChatCard({ eventId, brandId, plan, phase, notes,
           );
         })}
         </>)}
-        {panel === "chat" && busy && <Thinking member={byRole.get(busy) ?? null} label={roleName(busy)} en={en} face={face(byRole.get(busy), busy, "w-5 h-5")} />}
+        {panel === "chat" && busy && <Thinking member={byRole.get(busy) ?? null} label={dn(byRole.get(busy)) || roleName(busy)} en={en} face={face(byRole.get(busy), busy, "w-5 h-5")} />}
         {queued.map((q, k) => (
           <div key={`q${k}`} className="self-end max-w-[88%] flex flex-col items-end gap-0.5 opacity-60">
             <p className="text-small leading-relaxed bg-background/10 rounded-xl px-3 py-1.5 whitespace-pre-line">{q}</p>
@@ -563,7 +578,7 @@ export default function CampaignChatCard({ eventId, brandId, plan, phase, notes,
         <p className="text-tiny opacity-60">{L("企劃已定稿。要再調整，先按標題旁的鎖頭解鎖。", "The plan is locked. Unlock it by the title to change it.")}</p>
       ) : (
         <>
-          {msgs.length === 0 && !busy && (
+          {loaded && msgs.length === 0 && !busy && (
             <div className="flex gap-1.5 flex-wrap">
               {suggestions.map((s) => (
                 <button key={s} type="button" onClick={() => send(s)}
@@ -579,7 +594,7 @@ export default function CampaignChatCard({ eventId, brandId, plan, phase, notes,
               onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); send(text); } }}
               placeholder={busy
                 ? L("可以先打下一句，回完就送出", "Type your next message — it sends when this reply finishes")
-                : cur ? L(`跟${cur.name}說…（打 @名字 找團隊裡其他人）`, `Message ${cur.name}… (@name to ask someone else)`)
+                : cur ? L(`跟${dn(cur)}說…（打 @名字 找團隊裡其他人）`, `Message ${dn(cur)}… (@name to ask someone else)`)
                   : L("跟團隊說…", "Message the team…")}
               aria-label={L(`跟${roleName(speaker)}說`, `Message the ${roleName(speaker)}`)}
               style={{ fieldSizing: "content" } as React.CSSProperties}
@@ -612,7 +627,7 @@ function Thinking({ member, label, en, face }: { member: Member | null; label: s
   return (
     <div className="flex items-center gap-2" aria-live="polite">
       {face}
-      <span className="text-small opacity-80">{member?.name ?? label}</span>
+      <span className="text-small opacity-80">{label}</span>
       <span className="flex gap-0.5" aria-hidden>
         {[0, 1, 2].map((i) => (
           <span key={i} className="w-1 h-1 rounded-full bg-background" style={{ animation: `obDot 1.2s ${i * 0.15}s infinite ease-in-out` }} />
@@ -693,7 +708,7 @@ function ThreadList({ threads, currentId, en, onOpen, onBack }: {
           <button key={t.id} type="button" onClick={() => onOpen(t.id)}
             className={`text-left rounded-xl px-3 py-2 flex flex-col gap-0.5 transition ${cur ? "bg-background/15" : "hover:bg-background/10"}`}>
             <span className="flex items-center gap-2 min-w-0">
-              <span className="text-small font-semibold truncate">{t.title}</span>
+              <span className="text-small font-semibold truncate">{t.title === "討論" || t.title === "Discussion" ? L("討論", "Discussion") : t.title}</span>
               {cur && <span className="shrink-0 text-[10.5px] rounded-full bg-background text-foreground px-1.5">{L("目前", "Current")}</span>}
               <span className="ml-auto shrink-0 text-[11px] opacity-50 tabular-nums">{ago(t.updatedAt, en)}</span>
             </span>
