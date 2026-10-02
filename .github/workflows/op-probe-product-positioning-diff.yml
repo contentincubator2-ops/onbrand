@@ -1,0 +1,59 @@
+name: Ops (DEV) — probe product positioning diff
+
+# 2026-10-02（CJ「產品頁面當中，每一個產品產出的定位，怎麼都是一樣的」）：
+# (1) diff：並排印出同品牌各產品現存的定位輸入與產出，標出完全相同的欄位（唯讀、不呼叫模型）。
+# (2) dryrun：用這個 commit 的新版 prompt 實跑「核心定位」「競爭定位」兩步，只印、不寫 DB。
+# 腳本與新版模組從這個 commit 帶上 VM 的暫存檔跑，跑完即刪（不依賴已部署版本）。
+on:
+  push:
+    paths:
+      - '.github/workflows/op-probe-product-positioning-diff.yml'
+      - 'skills/ai-talent/scripts/probe-product-positioning-*.ts'
+  workflow_dispatch:
+    inputs:
+      brandId:
+        description: '品牌 id（diff 留空＝掃最近有產品定位的品牌；dryrun 預設 2977 SoWork）'
+        required: false
+
+jobs:
+  probe:
+    runs-on: ubuntu-24.04
+    environment: dev
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Encode probe files
+        id: enc
+        run: |
+          S=skills/ai-talent
+          echo "diff=$(base64 -w0 $S/scripts/probe-product-positioning-diff.ts)" >> "$GITHUB_OUTPUT"
+          echo "dry=$(base64 -w0 $S/scripts/probe-product-positioning-dryrun.ts)" >> "$GITHUB_OUTPUT"
+          echo "steps=$(base64 -w0 $S/server/strategy/core/positioningSteps.ts)" >> "$GITHUB_OUTPUT"
+          echo "sib=$(base64 -w0 $S/server/strategy/core/productSiblings.ts)" >> "$GITHUB_OUTPUT"
+      - name: Run probes on DEV VM
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          P_DIFF: ${{ steps.enc.outputs.diff }}
+          P_DRY: ${{ steps.enc.outputs.dry }}
+          P_STEPS: ${{ steps.enc.outputs.steps }}
+          P_SIB: ${{ steps.enc.outputs.sib }}
+          BRAND_ID: ${{ github.event.inputs.brandId }}
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          envs: P_DIFF,P_DRY,P_STEPS,P_SIB,BRAND_ID
+          command_timeout: 10m
+          script: |
+            set -e
+            cd /opt/onbrand/current/skills/ai-talent
+            set -a; source .env 2>/dev/null; set +a
+            D=scripts/_probe-pp-diff.ts; R=scripts/_probe-pp-dry.ts
+            C=server/strategy/core
+            trap 'rm -f "$D" "$R" "$C/_probe_positioningSteps.ts" "$C/_probe_productSiblings.ts"' EXIT
+            echo "$P_DIFF" | base64 -d > "$D"
+            echo "$P_DRY" | base64 -d > "$R"
+            echo "$P_STEPS" | base64 -d > "$C/_probe_positioningSteps.ts"
+            echo "$P_SIB" | base64 -d > "$C/_probe_productSiblings.ts"
+            echo "================ DRY RUN（新版 prompt，不寫 DB）================"
+            ./node_modules/.bin/tsx "$R" "${BRAND_ID:-2977}"
