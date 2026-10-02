@@ -56,6 +56,10 @@ interface ItemThumbRow {
   /** 退回修改的理由（只有 state=revision 才有）。 */
   reviewNote: string | null;
   publishedUrl: string | null;
+  /** 送給誰審（最新一筆審核指定的第一位）。 */
+  reviewerName: string | null;
+  /** 排進行事曆的那一筆（還沒發布的）。 */
+  schedule: { id: number; at: string } | null;
 }
 
 const settingsInput = z.object({
@@ -572,7 +576,11 @@ export const campaignRouter = router({
                          NULLIF(JSON_UNQUOTE(JSON_EXTRACT(mo.metadata, '$.imageUrl')), 'null'),
                          m.output_image_url, m.cover_image_url) AS image,
                 (SELECT q.status FROM mission_review_queue q WHERE q.outputId = mo.id ORDER BY q.id DESC LIMIT 1) AS reviewStatus,
-                (SELECT q.revisionNote FROM mission_review_queue q WHERE q.outputId = mo.id ORDER BY q.id DESC LIMIT 1) AS reviewNote
+                (SELECT q.revisionNote FROM mission_review_queue q WHERE q.outputId = mo.id ORDER BY q.id DESC LIMIT 1) AS reviewNote,
+                (SELECT u.name FROM mission_review_queue q JOIN users u ON u.id = CAST(JSON_UNQUOTE(JSON_EXTRACT(q.reviewerIds, '$[0]')) AS UNSIGNED)
+                  WHERE q.outputId = mo.id ORDER BY q.id DESC LIMIT 1) AS reviewerName,
+                (SELECT sp.id FROM scheduled_posts sp WHERE sp.outputId = mo.id AND sp.status = 'pending' AND sp.userId = m.userId ORDER BY sp.id DESC LIMIT 1) AS scheduleId,
+                (SELECT sp.scheduledAt FROM scheduled_posts sp WHERE sp.outputId = mo.id AND sp.status = 'pending' AND sp.userId = m.userId ORDER BY sp.id DESC LIMIT 1) AS scheduledAt
            FROM mission_outputs mo JOIN missions m ON m.id = mo.missionId
           WHERE mo.id IN (?) AND m.userId = ?`,
         [ids, ctx.user!.id],
@@ -588,6 +596,8 @@ export const campaignRouter = router({
           outputId: Number(r.id), missionId: Number(r.missionId), state,
           reviewNote: state === "revision" && r.reviewNote ? String(r.reviewNote).slice(0, 1000) : null,
           publishedUrl: typeof item.publishedUrl === "string" ? item.publishedUrl : null,
+          reviewerName: r.reviewerName ? String(r.reviewerName) : null,
+          schedule: r.scheduleId ? { id: Number(r.scheduleId), at: new Date(r.scheduledAt).toISOString() } : null,
         };
       }
       return out;

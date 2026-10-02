@@ -17,6 +17,12 @@
  * missions.workspace 是頻道名（'facebook' / 'linkedin'…），不是租戶
  * workspace id —— 別被欄位名騙了，這裡一律走 workspace_members。
  *
+ * 2026-10-02（CJ「送審時要先問排的時間…我現在也不知道送審給誰？」）：
+ *   · 送審要指定一位審核人（reviewers 列出可選的人：跟我同一個 workspace、角色 owner／admin）。
+ *     指定了就只有那一位能放行／退回——「送給誰」要是真的，不是一句說明。
+ *     沒指定（舊的成品頁路徑）照舊：同 workspace 的 owner／admin 都可以。
+ *   · listPending 帶排定時間與品牌：審核人的本週企劃把待審的稿放在它要發的那一天。
+ *
  * 2026-10-02（活動企劃上每一篇的狀態）：送審／放行／退回順手同步
  * mission_outputs.status（pending_review／approved／draft）。專案頁與活動地圖
  * 讀的是那一欄；只改佇列的話，放行過的稿在那兩個地方還是「草稿」。
@@ -37,6 +43,7 @@ const REVIEW_TYPES = ["internal", "external", "legal", "client"] as const;
 /** 這個人能不能放行那個人送的審。 */
 async function canApprove(reviewerId: number, requesterId: number, reviewerIds: number[] | null) {
   if (reviewerIds?.includes(reviewerId)) return true;
+  if (reviewerIds && reviewerIds.length > 0) return false; // 指定了審核人：只有那幾位
   if (reviewerId === requesterId) return false; // 自己送的自己不能放行
   const { default: localPool } = await import("../../localDb");
   try {
@@ -67,6 +74,28 @@ async function syncOutputStatus(outputId: number, to: string, from: string[]): P
   }
 }
 
+/** 可以替這個人審稿的人：同一個 workspace、角色 owner／admin，不含自己。 */
+async function eligibleReviewers(userId: number): Promise<Array<{ userId: number; name: string; email: string; role: string }>> {
+  const { default: localPool } = await import("../../localDb");
+  try {
+    const [rows]: any = await localPool.execute(
+      `SELECT DISTINCT other.userId, other.role, u.name, u.email
+         FROM workspace_members me
+         JOIN workspace_members other ON other.workspaceId = me.workspaceId
+         JOIN users u ON u.id = other.userId
+        WHERE me.userId = ? AND other.userId <> ? AND other.role IN ('owner','admin')
+        ORDER BY FIELD(other.role, 'owner', 'admin'), u.name`,
+      [userId, userId],
+    );
+    const seen = new Set<number>();
+    return (rows as any[]).filter((r) => !seen.has(Number(r.userId)) && seen.add(Number(r.userId))).map((r) => ({
+      userId: Number(r.userId), name: String(r.name ?? "") || String(r.email ?? ""), email: String(r.email ?? ""), role: String(r.role ?? ""),
+    }));
+  } catch {
+    return [];
+  }
+}
+
 function parseReviewers(v: unknown): number[] | null {
   if (Array.isArray(v)) return v.filter((n): n is number => typeof n === "number");
   if (typeof v === "string") {
@@ -79,6 +108,9 @@ function parseReviewers(v: unknown): number[] | null {
 }
 
 export const reviewRouter = router({
+  /** 送審可以送給誰（見檔頭）。一個都沒有＝還沒邀主管進 workspace。 */
+  reviewers: protectedProcedure.query(async ({ ctx }) => eligibleReviewers(ctx.user!.id)),
+
   /** 送審。同一個 output 已經在排隊就不重複送。 */
   submit: protectedProcedure
     .input(z.object({
@@ -93,6 +125,12 @@ export const reviewRouter = router({
       await assertReviewAllowed(ctx.user!.id);
       const userId = ctx.user!.id;
       const { default: localPool } = await import("../../localDb");
+      if (input.reviewerIds?.length) {
+        const ok = new Set((await eligibleReviewers(userId)).map((r) => r.userId));
+        if (input.reviewerIds.some((id) => !ok.has(id))) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "審核人要是同一個團隊裡的管理者（owner／admin）。" });
+        }
+      }
 
       const [dup]: any = await localPool.execute(
         `SELECT id, status FROM mission_review_queue
@@ -158,10 +196,16 @@ export const reviewRouter = router({
         `SELECT q.id, q.missionId, q.outputId, q.requestedBy, q.reviewType, q.status,
                 q.reviewerIds, q.isUrgent, q.revisionNote, q.createdAt,
                 o.title AS outputTitle, o.platform, o.outputType,
-                u.name AS requesterName, u.email AS requesterEmail, ${REVIEW_TASK_COLS}
+                u.name AS requesterName, u.email AS requesterEmail, ${REVIEW_TASK_COLS},
+                m.brandId AS brandId, b.name AS brandName, LEFT(o.content, 600) AS contentHead,
+                (SELECT sp.scheduledAt FROM scheduled_posts sp
+                  WHERE sp.outputId = q.outputId AND sp.status = 'pending' ORDER BY sp.id DESC LIMIT 1) AS scheduledAt,
+                (SELECT sp.platform FROM scheduled_posts sp
+                  WHERE sp.outputId = q.outputId AND sp.status = 'pending' ORDER BY sp.id DESC LIMIT 1) AS scheduledPlatform
            FROM mission_review_queue q
            LEFT JOIN mission_outputs o ON o.id = q.outputId
            LEFT JOIN missions m ON m.id = q.missionId
+           LEFT JOIN brands b ON b.id = m.brandId
            LEFT JOIN users u ON u.id = q.requestedBy
           WHERE q.status IN ('pending','in_review')
           ORDER BY q.isUrgent DESC, q.createdAt ASC
