@@ -83,7 +83,7 @@ export default function CampaignPostModal({
   const data: any = outQ.data;
 
   // 團隊版（方案有審核工作流）才有送審；判斷跟 ReviewBar 同一份。
-  const billingQ = (trpc as any).billing?.getStatus?.useQuery?.(undefined, { staleTime: 60_000, refetchOnWindowFocus: false }) ?? { data: null };
+  const billingQ = (trpc as any).billing.getStatus.useQuery(undefined, { staleTime: 60_000, refetchOnWindowFocus: false });
   const team = !!(billingQ.data as any)?.quota?.reviewWorkflow;
 
   // ── 內容：版本陣列或策略包，取對外的那幾個版本 ──
