@@ -41,6 +41,7 @@ import { BRIEF_CHANNELS, CHANNEL_BRIEF_SPECS, cleanChannelBrief, cleanChannelBri
 import { KPI_METRICS, pickKpiAgent, runKpiPlan } from "../core/campaignKpi";
 import { brandIndustry, pickPlannerAgent } from "../core/campaignTeam";
 import { buildCampaignRoster, CAMPAIGN_ROLES, ROLES } from "../core/campaignRoster";
+import { appendChat, clearChat, listChat, markUndone } from "../core/campaignChatStore";
 import { isHiddenContentPlatform, isHiddenHistoryItem } from "../../platform/core/planGate";
 import { ownedProductIds, resolveProductScope } from "../core/eventProductScope";
 import { invalidateBrandPrefix } from "../core/brandContext";
@@ -353,6 +354,54 @@ export const campaignRouter = router({
       } catch (e: any) {
         throw new TRPCError({ code: "BAD_REQUEST", message: String(e?.message ?? e).slice(0, 300) });
       }
+    }),
+
+  /**
+   * 對話存在資料庫（2026-10-02 CJ「對話要存到資料庫中」，見 core/campaignChatStore.ts）。
+   * 畫面每多一則就送 chatAppend；讀回只給最新一次修改的快照，給「復原」用。
+   */
+  chatHistory: protectedProcedure
+    .input(z.object({ eventId: z.number().int().positive() }))
+    .query(async ({ ctx, input }) => {
+      await loadEvent(input.eventId, ctx.user!.id);
+      return { messages: await listChat(input.eventId, ctx.user!.id) };
+    }),
+
+  chatAppend: protectedProcedure
+    .input(z.object({
+      eventId: z.number().int().positive(),
+      messages: z.array(z.object({
+        key: z.string().min(1).max(40),
+        role: z.enum(["user", "assistant", "handoff"]),
+        content: z.string().max(4000),
+        speaker: z.string().max(16).optional(),
+        name: z.string().max(60).optional(),
+        proposal: z.any().optional(),
+        before: z.any().optional(),
+        beforeBasis: z.any().optional(),
+        undone: z.boolean().optional(),
+        truncated: z.boolean().optional(),
+      })).min(1).max(60),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await loadEvent(input.eventId, ctx.user!.id);
+      return { added: await appendChat(input.eventId, ctx.user!.id, input.messages) };
+    }),
+
+  chatUndone: protectedProcedure
+    .input(z.object({ eventId: z.number().int().positive(), key: z.string().min(1).max(40) }))
+    .mutation(async ({ ctx, input }) => {
+      await loadEvent(input.eventId, ctx.user!.id);
+      await markUndone(input.eventId, ctx.user!.id, input.key);
+      return { ok: true };
+    }),
+
+  chatClear: protectedProcedure
+    .input(z.object({ eventId: z.number().int().positive() }))
+    .mutation(async ({ ctx, input }) => {
+      await loadEvent(input.eventId, ctx.user!.id);
+      await clearChat(input.eventId, ctx.user!.id);
+      return { ok: true };
     }),
 
   /**

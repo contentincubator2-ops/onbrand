@@ -26,6 +26,11 @@
  *     打「@名字」直接找那一位。誰都能把話轉給名冊上的另一位。
  *   · 等待：思考列有那一位的頭像、跳動的點與秒數；別人在回時可以先打下一句，排隊送出；
  *     失敗有「再試一次」；回完游標回到輸入框。
+ *
+ * 2026-10-02（CJ「對話要存到資料庫中」）：這串改存資料庫（campaign.chatHistory／chatAppend，
+ * server/strategy/core/campaignChatStore.ts），換電腦、重新整理都還在；「復原」用的修改前快照
+ * 也存進去，重新整理後還能復原最新那一次。每則有 key，畫面多一則就補送沒送過的那幾則。
+ * 以前記在這台瀏覽器的對話，第一次打開時搬進資料庫，搬完就從瀏覽器刪掉。
  */
 import React from "react";
 import { Avatar } from "@heroui/react";
@@ -47,13 +52,15 @@ interface Member {
 }
 
 interface Msg {
+  /** 畫面產的鍵，資料庫用它認這一則（標已復原、避免重送）。 */
+  key?: string;
   role: "user" | "assistant" | "handoff";
   content: string;
   speaker?: Speaker;
   name?: string;
   /** 這則帶來的修改（已經寫進企劃）。 */
   proposal?: CampaignProposal;
-  /** 修改前的企劃，復原用；只存在這次開著的頁面裡。 */
+  /** 修改前的企劃，復原用（資料庫只回最新一次修改的）。 */
   before?: CampaignPlan;
   /** 修改前的策略依據（只有被改的那幾格），復原用。 */
   beforeBasis?: BasisPatch;
@@ -63,18 +70,21 @@ interface Msg {
 
 interface AskOpts { handoff?: boolean; from?: Speaker | null; hops?: number; prior: Msg[] }
 
-const KEY = (eventId: number) => `onbrand.campaignChat.${eventId}`;
-function loadMsgs(eventId: number): Msg[] {
+/** 舊版記在瀏覽器的這串（2026-10-02 前）；只用來搬進資料庫。 */
+const LEGACY_KEY = (eventId: number) => `onbrand.campaignChat.${eventId}`;
+function loadLegacy(eventId: number): Msg[] {
   try {
-    const raw = JSON.parse(localStorage.getItem(KEY(eventId)) ?? "[]");
+    const raw = JSON.parse(localStorage.getItem(LEGACY_KEY(eventId)) ?? "[]");
     return Array.isArray(raw) ? raw.slice(-40) : [];
   } catch { return []; }
 }
-function saveMsgs(eventId: number, msgs: Msg[]) {
-  try {
-    localStorage.setItem(KEY(eventId), JSON.stringify(msgs.slice(-40).map(({ before: _b, beforeBasis: _bb, ...m }) => m)));
-  } catch { /* 私密模式：重新整理之後對話就沒了，不影響企劃 */ }
+function dropLegacy(eventId: number) {
+  try { localStorage.removeItem(LEGACY_KEY(eventId)); } catch { /* 私密模式 */ }
 }
+let seq = 0;
+const newKey = () => `m${Date.now().toString(36)}${(seq++).toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+/** 新的一則一律經過這裡，才有 key。 */
+const mk = (m: Msg): Msg => ({ ...m, key: m.key ?? newKey() });
 
 export default function CampaignChatCard({ eventId, brandId, plan, phase, notes, locked, en, onApply, basis, onApplyBasis, view, grow, expanded, onToggleExpand }: {
   eventId: number;
@@ -102,11 +112,8 @@ export default function CampaignChatCard({ eventId, brandId, plan, phase, notes,
   onToggleExpand?: () => void;
 }) {
   const L = (zh: string, e: string) => (en ? e : zh);
-  const [msgs, setMsgs] = React.useState<Msg[]>(() => loadMsgs(eventId));
-  const [speaker, setSpeaker] = React.useState<Speaker>(() => {
-    const last = [...loadMsgs(eventId)].reverse().find((m) => m.role === "assistant");
-    return last?.speaker ?? "planner";
-  });
+  const [msgs, setMsgs] = React.useState<Msg[]>([]);
+  const [speaker, setSpeaker] = React.useState<Speaker>("planner");
   const [text, setText] = React.useState("");
   const [err, setErr] = React.useState("");
   const [busy, setBusy] = React.useState<Speaker | null>(null);
@@ -151,7 +158,46 @@ export default function CampaignChatCard({ eventId, brandId, plan, phase, notes,
     if (roster.length && !byRole.has(speaker)) setSpeaker(byRole.has("planner") ? "planner" : roster[0]!.role);
   }, [roster, byRole, speaker]);
 
-  React.useEffect(() => { saveMsgs(eventId, msgs); }, [eventId, msgs]);
+  // ── 資料庫：讀回這串；舊的瀏覽器紀錄搬進去；之後每多一則就補送 ──
+  const historyQ = (trpc as any).campaign.chatHistory.useQuery({ eventId }, { refetchOnWindowFocus: false, refetchOnMount: "always", staleTime: 0 });
+  const appendMut = (trpc as any).campaign.chatAppend.useMutation();
+  const undoneMut = (trpc as any).campaign.chatUndone.useMutation();
+  const clearMut = (trpc as any).campaign.chatClear.useMutation();
+  const synced = React.useRef<Set<string>>(new Set());
+  const [loaded, setLoaded] = React.useState(false);
+  // 換到另一檔活動：重新讀那一檔的對話。
+  React.useEffect(() => {
+    setLoaded(false);
+    setMsgs([]);
+    synced.current = new Set();
+  }, [eventId]);
+  React.useEffect(() => {
+    // 等這次打開的那一次讀完——快取裡的可能是離開之前的舊樣子。
+    if (loaded || !historyQ.data || historyQ.isFetching) return;
+    const server: Msg[] = historyQ.data.messages ?? [];
+    let start = server;
+    if (!server.length) {
+      // 第一次：把舊版記在瀏覽器的搬過來（補上 key，下面的 effect 會送進資料庫）。
+      start = loadLegacy(eventId).map(mk);
+    }
+    server.forEach((m) => m.key && synced.current.add(m.key));
+    // 讀回來之前就先送出的話（很少見）接在後面，不蓋掉。
+    setMsgs((prev) => [...start, ...prev.filter((p) => !start.some((x) => x.key === p.key))]);
+    const last = [...start].reverse().find((m) => m.role === "assistant");
+    if (last?.speaker) setSpeaker(last.speaker);
+    setLoaded(true);
+  }, [historyQ.data, historyQ.isFetching, loaded, eventId]);
+  React.useEffect(() => {
+    if (!loaded) return;
+    const fresh = msgs.filter((m) => m.key && !synced.current.has(m.key));
+    if (!fresh.length) return;
+    fresh.forEach((m) => synced.current.add(m.key!));
+    appendMut.mutate({ eventId, messages: fresh.slice(-60) }, {
+      onSuccess: () => dropLegacy(eventId),
+      // 沒送成：下次有新的一則時一起補送（伺服器用 key 去重）。
+      onError: () => fresh.forEach((m) => synced.current.delete(m.key!)),
+    });
+  }, [msgs, loaded, eventId]);
   React.useEffect(() => {
     boxRef.current?.scrollTo({ top: boxRef.current.scrollHeight, behavior: busy ? "auto" : "smooth" });
   }, [msgs.length, busy, queued.length]);
@@ -189,10 +235,10 @@ export default function CampaignChatCard({ eventId, brandId, plan, phase, notes,
             onApplyBasis(proposal.basis);
           }
         }
-        const reply: Msg = {
+        const reply: Msg = mk({
           role: "assistant", content: String(r?.reply ?? ""), speaker: who, name,
           ...(proposal ? { proposal, before, beforeBasis } : {}), truncated: !!r?.truncated,
-        };
+        });
         const next = [...msgsRef.current, reply];
         // 交棒：名冊上任何一位都能把話轉給另一位；同一張卡裡接著回答，之後使用者的話也由接手的那位回答。
         const to: Speaker | null = typeof r?.handoff?.to === "string" ? r.handoff.to : null;
@@ -200,7 +246,7 @@ export default function CampaignChatCard({ eventId, brandId, plan, phase, notes,
         if (to && to !== who && question && hops < 2) {
           const toName = team.get(to)?.name ?? "";
           const fromName = name || roleName(who);
-          next.push({ role: "handoff", content: toName ? L(`${fromName}請 ${toName}（${roleName(to)}）接手`, `${fromName} hands over to ${toName}`) : L(`交給${roleName(to)}`, `Handing over to the ${roleName(to)}`) });
+          next.push(mk({ role: "handoff", content: toName ? L(`${fromName}請 ${toName}（${roleName(to)}）接手`, `${fromName} hands over to ${toName}`) : L(`交給${roleName(to)}`, `Handing over to the ${roleName(to)}`) }));
           msgsRef.current = next;
           setMsgs(next);
           setSpeaker(to);
@@ -224,10 +270,10 @@ export default function CampaignChatCard({ eventId, brandId, plan, phase, notes,
     const next: Msg[] = [...prior];
     if (to && to !== speakerRef.current) {
       const a = byRoleRef.current.get(to);
-      next.push({ role: "handoff", content: a ? L(`換 ${a.name}（${roleName(to)}）`, `Now talking to ${a.name} (${roleName(to)})`) : L(`換${roleName(to)}`, `Now: ${roleName(to)}`) });
+      next.push(mk({ role: "handoff", content: a ? L(`換 ${a.name}（${roleName(to)}）`, `Now talking to ${a.name} (${roleName(to)})`) : L(`換${roleName(to)}`, `Now: ${roleName(to)}`) }));
       setSpeaker(to);
     }
-    next.push({ role: "user", content: raw.trim() });
+    next.push(mk({ role: "user", content: raw.trim() }));
     msgsRef.current = next;
     setMsgs(next);
     ask(who, message || raw.trim(), { prior });
@@ -264,19 +310,21 @@ export default function CampaignChatCard({ eventId, brandId, plan, phase, notes,
     if (m.before) onApply(m.before);
     if (m.beforeBasis) onApplyBasis?.(m.beforeBasis);
     setMsgs((prev) => prev.map((x, k) => (k === idx ? { ...x, undone: true, before: undefined, beforeBasis: undefined } : x)));
+    if (m.key) undoneMut.mutate({ eventId, key: m.key });
   };
 
   const switchTo = (s: Speaker) => {
     if (s === speaker || busy) return;
     setSpeaker(s);
     const a = byRole.get(s);
-    setMsgs((prev) => [...prev, { role: "handoff", content: a ? L(`換 ${a.name}（${roleName(s)}）`, `Now talking to ${a.name} (${roleName(s)})`) : L(`換${roleName(s)}`, `Now: ${roleName(s)}`) }]);
+    setMsgs((prev) => [...prev, mk({ role: "handoff", content: a ? L(`換 ${a.name}（${roleName(s)}）`, `Now talking to ${a.name} (${roleName(s)})`) : L(`換${roleName(s)}`, `Now: ${roleName(s)}`) })]);
     requestAnimationFrame(() => inputRef.current?.focus());
   };
 
   const clear = () => {
     if (busy) return;
     setMsgs([]);
+    clearMut.mutate({ eventId });
     setQueued([]);
   };
 
