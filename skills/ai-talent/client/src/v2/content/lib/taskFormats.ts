@@ -285,7 +285,6 @@ export const IG_TASK_FORMAT_MAP: Record<string, IGActiveFormat> = {
   // ── 輪播 ──────────────────────────────────────────────────────────────
   "ig-30-carousel-proof-set":    "輪播",
   "ig-30-carousel-structure":    "輪播",
-  "ig-60-carousel-7":            "輪播",
   "ig-99-save-worthy":           "輪播",
 
   // ── Reels ─────────────────────────────────────────────────────────────

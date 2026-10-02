@@ -80,28 +80,6 @@ ${IG_TONE}`,
     outputDefaults: { platform: "instagram", post_type: "reel" },
   },
 
-  // 3. IG 7 卡輪播 — Tyler Brooks, strategist: Kevin Lin
-  {
-    id: "ig-60-carousel-7",
-    tier: "60s",
-    postType: "carousel",
-    label: { en: "IG 7-Card Carousel", zh: "IG 7 卡輪播" },
-    description: { en: "Strategist plans the arc + 7 cards + unified visual tone", zh: "Strategist 規劃敘事弧 + 7 卡內容 + 統一視覺基調" },
-    agent_id: 224159, // Lukman Hakim — Social Media Strategist Beauty ID (1135 char)
-    skill_slug: "carousel-copywriter",
-    primary_question: "輪播主題？",
-    primary_input: { key: "topic", placeholder: "教學 / 清單 / 故事 / 對比 etc.", type: "textarea" },
-    inputs: [
-      { key: "topic", label: "輪播主題", type: "textarea", required: true },
-    ],
-    systemPrompt: `產出 IG 7 卡 Carousel 主貼文 caption（150-250 字 tease）。
-注意：每張卡片都要讓人想滑下一張。
-${IG_TONE}`,
-    preferredModel: "qwen",
-    maxTokens: 1100,
-    outputDefaults: { platform: "instagram", post_type: "carousel" },
-  },
-
   // 4. IG Story 完整一組 (3 frames) — Wendy Su, multi-post 3
   {
     id: "ig-60-story-3frame",
@@ -487,14 +465,6 @@ export const IG_60S_ORCHESTRA: Record<string, OrchestraConfig> = {
     aspectRatio: "9:16", variantLabels: ["教學版", "故事版", "反差版", "節奏版", "懸念版"],
     captionMinChars: 200, captionMaxChars: 400,
     extras: { replyTemplates: 5, postingTime: true, followupPost: true },
-  },
-
-  "ig-60-carousel-7": {
-    variants: 5, images: 5, runImageGen: true, imageDirectorId: IG60_DIR_OWEN,
-    aspectRatio: "1:1", variantLabels: ["教學式", "清單式", "故事式", "對比式", "金句式"],
-    captionMinChars: 150, captionMaxChars: 250,
-    strategistAgentId: 222308, // Hsin-Yi Wu — Email Marketing & CRM Strategist (1415 char)
-    extras: { replyTemplates: 5, postingTime: true, followupPost: true, narrativeArc: true },
   },
 
   "ig-60-story-3frame": {

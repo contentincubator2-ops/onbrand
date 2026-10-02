@@ -245,7 +245,6 @@ export const TASK_CARD_DATES: Record<string, string> = {
   "ig-30-story-repost-strategy": "2026-05-05",
   "ig-30-story-text": "2026-05-05",
   "ig-30-threads-cross-post": "2026-05-05",
-  "ig-60-carousel-7": "2026-05-06",
   "ig-60-countdown-5day": "2026-05-06",
   "ig-60-feed-full": "2026-05-06",
   "ig-60-highlight-suite": "2026-05-06",
