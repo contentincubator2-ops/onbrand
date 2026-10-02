@@ -17,7 +17,7 @@ describe("reviewRouter", () => {
   // mysqld_stmt_execute"，活動頁右下角一直跳載入失敗。mysql2 execute() 不吃 LIMIT 參數。
   it("SQL 裡沒有 LIMIT ? —— LIMIT 一律寫成夾過的整數", () => {
     const src = readFileSync(new URL("./reviewRouter.ts", import.meta.url), "utf8");
-    expect(src).not.toMatch(/LIMIT ?/);
+    expect(src).not.toMatch(/LIMIT\s*\?/);
   });
 
   it("建得起來，procedure 名單如預期", () => {
