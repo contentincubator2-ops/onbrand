@@ -177,6 +177,10 @@ export default function ProductDetailModal({ productId, brandId, onClose, onRepo
   });
   // Editable state
   const [tagline, setTagline] = useState("");
+  // 2026-10-02（CJ「請確保英文版能顯示正確的英文」）：英文介面的摘要先顯示定位產出的英文標語
+  // （core.enTagline）。下方編輯欄仍編 canonical 標語，所以只在使用者還沒改過時才換成英文。
+  const [enTagline, setEnTagline] = useState("");
+  const [loadedTagline, setLoadedTagline] = useState("");
   const [audience, setAudience] = useState("");
   const [usp, setUsp] = useState("");
   const [preferred, setPreferred] = useState<string[]>([]);
@@ -202,7 +206,10 @@ export default function ProductDetailModal({ productId, brandId, onClose, onRepo
     const interim = (pos._interim as any) ?? {};
     const firstText = (...values: unknown[]) =>
       values.find((value): value is string => typeof value === "string" && !!value.trim())?.trim() ?? "";
-    setTagline(firstText(pos.tagline, (pos as any).tagline?.zhTagline, pos.core?.zhTagline, pos.core?.oneLineValueProp, interim.tagline));
+    const loaded = firstText(pos.tagline, (pos as any).tagline?.zhTagline, pos.core?.zhTagline, pos.core?.oneLineValueProp, interim.tagline);
+    setTagline(loaded);
+    setLoadedTagline(loaded);
+    setEnTagline(firstText(pos.core?.enTagline, (pos as any).tagline?.enTagline));
     setAudience(firstText(pos.targetAudience, pos.audience?.primary, interim.targetAudience));
     setUsp(firstText(pos.usp, pos.competition?.uniqueUsp, pos.core?.oneLineValueProp, pos.differentiation?.functional, interim.usp));
     setPreferred(Array.isArray(pos.preferredWords) ? pos.preferredWords : []);
@@ -307,7 +314,9 @@ export default function ProductDetailModal({ productId, brandId, onClose, onRepo
                     <span className="text-[12px] font-semibold uppercase text-zinc-400 tracking-wider">
                       {en ? "Tagline" : "標語"}
                     </span>
-                    <p className="text-sm font-semibold text-neutral-900 mt-0.5">{tagline}</p>
+                    <p className="text-sm font-semibold text-neutral-900 mt-0.5">
+                      {en && enTagline && tagline === loadedTagline ? enTagline : tagline}
+                    </p>
                   </div>
                 )}
                 {usp && (
