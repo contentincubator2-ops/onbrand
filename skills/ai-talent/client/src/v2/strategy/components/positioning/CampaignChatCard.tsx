@@ -31,11 +31,17 @@
  * server/strategy/core/campaignChatStore.ts），換電腦、重新整理都還在；「復原」用的修改前快照
  * 也存進去，重新整理後還能復原最新那一次。每則有 key，畫面多一則就補送沒送過的那幾則。
  * 以前記在這台瀏覽器的對話，第一次打開時搬進資料庫，搬完就從瀏覽器刪掉。
+ *
+ * 2026-10-02（CJ「對話多了以後就很亂，也沒辦法告一個段落，整個版面很擠，也無法重新開啟對話」）：
+ *   · 一段一段的討論：「新討論」結束這段（存標題與摘要），「過去的討論」列出每一段、點一下接著談；
+ *     一段放超過一天，下次打開從新的一段開始，上一段留一張卡可一鍵接回。
+ *   · 版面：新的一段才顯示企劃檢查；一段超過 14 則只顯示最後 10 則；修改卡收成一行，只有最新那次展開。
+ *   · 模型只讀這一段，前面幾段用摘要補（伺服器 recentSummaries）。
  */
 import React from "react";
 import { Avatar } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faArrowUp, faCheck, faRotateLeft, faUpRightAndDownLeftFromCenter, faDownLeftAndUpRightToCenter, faRightLeft, faRotateRight } from "@fortawesome/free-solid-svg-icons";
+import { faArrowUp, faCheck, faRotateLeft, faUpRightAndDownLeftFromCenter, faDownLeftAndUpRightToCenter, faRightLeft, faRotateRight, faPenToSquare, faClockRotateLeft, faChevronDown } from "@fortawesome/free-solid-svg-icons";
 import { trpc } from "../../../../lib/trpc";
 import type { CampaignPhaseId, CampaignPlan } from "../../lib/campaignSchema";
 import type { StageNote } from "../../lib/campaignStage";
@@ -67,6 +73,8 @@ interface Msg {
   undone?: boolean;
   truncated?: boolean;
 }
+
+interface Thread { id: number; title: string; summary: string | null; status: "open" | "closed"; messageCount: number; changeCount: number; updatedAt: string }
 
 interface AskOpts { handoff?: boolean; from?: Speaker | null; hops?: number; prior: Msg[] }
 
@@ -158,46 +166,118 @@ export default function CampaignChatCard({ eventId, brandId, plan, phase, notes,
     if (roster.length && !byRole.has(speaker)) setSpeaker(byRole.has("planner") ? "planner" : roster[0]!.role);
   }, [roster, byRole, speaker]);
 
-  // ── 資料庫：讀回這串；舊的瀏覽器紀錄搬進去；之後每多一則就補送 ──
-  const historyQ = (trpc as any).campaign.chatHistory.useQuery({ eventId }, { refetchOnWindowFocus: false, refetchOnMount: "always", staleTime: 0 });
+  // ── 資料庫：一段一段的討論（campaign.chatThreads／chatHistory／chatAppend）──
+  // 2026-10-02（CJ「對話多了以後很亂，沒辦法告一個段落…也無法重新開啟對話」）：
+  // 結束這段＝留標題與摘要、下一句開新的一段；「過去的討論」列出每一段，點一下接著談。
+  const utils = (trpc as any).useUtils();
+  const threadsQ = (trpc as any).campaign.chatThreads.useQuery({ eventId }, { refetchOnWindowFocus: false, refetchOnMount: "always", staleTime: 0 });
   const appendMut = (trpc as any).campaign.chatAppend.useMutation();
   const undoneMut = (trpc as any).campaign.chatUndone.useMutation();
-  const clearMut = (trpc as any).campaign.chatClear.useMutation();
+  const closeMut = (trpc as any).campaign.chatCloseThread.useMutation();
+  const reopenMut = (trpc as any).campaign.chatReopenThread.useMutation();
+  const threads: Thread[] = threadsQ.data?.threads ?? [];
+  /** 目前這段（null＝還沒說話的新一段，第一句送出時伺服器開）。 */
+  const [threadId, setThreadId] = React.useState<number | null>(null);
+  const threadRef = React.useRef<number | null>(null);
+  threadRef.current = threadId;
+  /** 要從資料庫讀回哪一段（打開卡片、重新打開某一段時才設）。 */
+  const [loadFor, setLoadFor] = React.useState<number | null>(null);
+  const [panel, setPanel] = React.useState<"chat" | "threads">("chat");
   const synced = React.useRef<Set<string>>(new Set());
   const [loaded, setLoaded] = React.useState(false);
-  // 換到另一檔活動：重新讀那一檔的對話。
+  const [showAll, setShowAll] = React.useState(false);
+  // 換到另一檔活動：重新讀那一檔的討論。
   React.useEffect(() => {
-    setLoaded(false);
-    setMsgs([]);
+    setLoaded(false); setMsgs([]); setThreadId(null); setLoadFor(null); setPanel("chat");
     synced.current = new Set();
   }, [eventId]);
+  // 打開卡片：接最近那段（一天內動過、還開著）；沒有就是新的一段，舊的瀏覽器紀錄搬進來。
   React.useEffect(() => {
-    // 等這次打開的那一次讀完——快取裡的可能是離開之前的舊樣子。
-    if (loaded || !historyQ.data || historyQ.isFetching) return;
-    const server: Msg[] = historyQ.data.messages ?? [];
-    let start = server;
-    if (!server.length) {
-      // 第一次：把舊版記在瀏覽器的搬過來（補上 key，下面的 effect 會送進資料庫）。
-      start = loadLegacy(eventId).map(mk);
+    if (loaded || !threadsQ.data || threadsQ.isFetching) return;
+    const cur = threadsQ.data.currentId ?? null;
+    if (cur) { setThreadId(cur); setLoadFor(cur); return; }
+    if (!threadsQ.data.threads?.length) {
+      const legacy = loadLegacy(eventId).map(mk);
+      if (legacy.length) setMsgs(legacy);
     }
-    server.forEach((m) => m.key && synced.current.add(m.key));
-    // 讀回來之前就先送出的話（很少見）接在後面，不蓋掉。
-    setMsgs((prev) => [...start, ...prev.filter((p) => !start.some((x) => x.key === p.key))]);
-    const last = [...start].reverse().find((m) => m.role === "assistant");
-    if (last?.speaker) setSpeaker(last.speaker);
     setLoaded(true);
-  }, [historyQ.data, historyQ.isFetching, loaded, eventId]);
+  }, [threadsQ.data, threadsQ.isFetching, loaded, eventId]);
+  const historyQ = (trpc as any).campaign.chatHistory.useQuery(
+    { eventId, threadId: loadFor ?? 0 },
+    { enabled: !!loadFor, refetchOnWindowFocus: false, refetchOnMount: "always", staleTime: 0 },
+  );
   React.useEffect(() => {
-    if (!loaded) return;
+    if (!loadFor || !historyQ.data || historyQ.isFetching) return;
+    const server: Msg[] = historyQ.data.messages ?? [];
+    server.forEach((m) => m.key && synced.current.add(m.key));
+    setMsgs(server);
+    msgsRef.current = server;
+    const last = [...server].reverse().find((m) => m.role === "assistant");
+    if (last?.speaker) setSpeaker(last.speaker);
+    setShowAll(false);
+    setLoadFor(null);
+    setLoaded(true);
+  }, [historyQ.data, historyQ.isFetching, loadFor]);
+  // 每多一則就補送沒送過的。第一句送出時這段還沒有 id：等伺服器開好、回 id 之後才送下一批。
+  const appending = React.useRef(false);
+  const [retick, setRetick] = React.useState(0);
+  React.useEffect(() => {
+    if (!loaded || appending.current) return;
     const fresh = msgs.filter((m) => m.key && !synced.current.has(m.key));
     if (!fresh.length) return;
+    appending.current = true;
     fresh.forEach((m) => synced.current.add(m.key!));
-    appendMut.mutate({ eventId, messages: fresh.slice(-60) }, {
-      onSuccess: () => dropLegacy(eventId),
+    appendMut.mutate({ eventId, threadId: threadRef.current, messages: fresh.slice(-60) }, {
+      onSuccess: (r: any) => {
+        appending.current = false;
+        if (r?.threadId && r.threadId !== threadRef.current) { threadRef.current = r.threadId; setThreadId(r.threadId); }
+        dropLegacy(eventId);
+        utils?.campaign?.chatThreads?.invalidate?.({ eventId });
+        setRetick((n) => n + 1);
+      },
       // 沒送成：下次有新的一則時一起補送（伺服器用 key 去重）。
-      onError: () => fresh.forEach((m) => synced.current.delete(m.key!)),
+      onError: () => { appending.current = false; fresh.forEach((m) => synced.current.delete(m.key!)); },
     });
-  }, [msgs, loaded, eventId]);
+  }, [msgs, loaded, eventId, retick]);
+
+  /** 這段改了什麼（結束時存成摘要；畫面算，跟卡片上列的一樣）。 */
+  const summarize = (list: Msg[]): string => {
+    const lines = list.filter((m) => m.proposal && !m.undone)
+      .flatMap((m) => describeProposal(m.before ?? plan, m.proposal!, en).map((l) => l.replace(/^✎\s*/, "")));
+    if (!lines.length) {
+      const last = [...list].reverse().find((m) => m.role === "assistant")?.content ?? "";
+      return [L("只有討論，沒改企劃", "Discussion only"), last.split(/(?<=[。！？!?])/)[0]?.slice(0, 80)].filter(Boolean).join("・");
+    }
+    const head = lines.slice(0, 3).join("；");
+    return lines.length > 3 ? L(`${head}；另 ${lines.length - 3} 處`, `${head}; +${lines.length - 3} more`) : head;
+  };
+  /** 結束這段：存摘要、清空畫面，下一句就是新的一段。 */
+  const endThread = () => {
+    if (busy) return;
+    const tid = threadRef.current;
+    if (tid && msgs.length) {
+      closeMut.mutate({ eventId, threadId: tid, summary: summarize(msgs).slice(0, 600) }, {
+        onSuccess: () => utils?.campaign?.chatThreads?.invalidate?.({ eventId }),
+      });
+    }
+    setMsgs([]); msgsRef.current = []; setThreadId(null); threadRef.current = null;
+    setQueued([]); setErr(""); setPanel("chat"); setShowAll(false);
+    requestAnimationFrame(() => inputRef.current?.focus());
+  };
+  /** 重新打開過去的一段，接著談。 */
+  const openThread = (id: number) => {
+    if (busy) return;
+    if (id === threadRef.current) { setPanel("chat"); return; }
+    reopenMut.mutate({ eventId, threadId: id }, {
+      onSuccess: () => {
+        utils?.campaign?.chatThreads?.invalidate?.({ eventId });
+        setThreadId(id); threadRef.current = id; setLoadFor(id); setPanel("chat");
+      },
+    });
+  };
+  const lastClosed = threads.find((t) => t.id !== threadId) ?? null;
+  const pastCount = threads.filter((t) => t.id !== threadId).length;
+
   React.useEffect(() => {
     boxRef.current?.scrollTo({ top: boxRef.current.scrollHeight, behavior: busy ? "auto" : "smooth" });
   }, [msgs.length, busy, queued.length]);
@@ -218,7 +298,7 @@ export default function CampaignChatCard({ eventId, brandId, plan, phase, notes,
     setBusy(who);
     lastAsk.current = { who, message, opts };
     const hops = opts.hops ?? 0;
-    chatMut.mutate({ eventId, message, phase, history: history(opts.prior), speaker: who, from: opts.from ?? null, directorAgentId, handoff: !!opts.handoff, hops, view: view ?? "map" }, {
+    chatMut.mutate({ eventId, message, phase, history: history(opts.prior), speaker: who, from: opts.from ?? null, directorAgentId, handoff: !!opts.handoff, hops, view: view ?? "map", threadId: threadRef.current }, {
       onSuccess: (r: any) => {
         const team = byRoleRef.current;
         const name = r?.agent?.name ?? team.get(who)?.name ?? "";
@@ -321,13 +401,6 @@ export default function CampaignChatCard({ eventId, brandId, plan, phase, notes,
     requestAnimationFrame(() => inputRef.current?.focus());
   };
 
-  const clear = () => {
-    if (busy) return;
-    setMsgs([]);
-    clearMut.mutate({ eventId });
-    setQueued([]);
-  };
-
   const SUGGEST: Record<string, [string, string][]> = {
     director: view === "basis"
       ? [["關鍵洞察寫得更具體一點", "Make the key insight sharper"], ["禁用元素加上「免費」", "Add “free” to the don'ts"]]
@@ -362,6 +435,19 @@ export default function CampaignChatCard({ eventId, brandId, plan, phase, notes,
           </p>
         </div>
         <div className="ml-auto flex items-center gap-1 shrink-0">
+          {/* 結束這段，開新的討論；過去的討論（可以重新打開）。 */}
+          <button type="button" onClick={endThread} disabled={!!busy || !msgs.length}
+            title={L("結束這段，開新的討論", "End this thread and start a new one")}
+            className="h-7 rounded-lg px-2 flex items-center gap-1.5 text-[11.5px] opacity-80 hover:opacity-100 hover:bg-background/15 transition disabled:opacity-30">
+            <FontAwesomeIcon icon={faPenToSquare} className="text-[11px]" />{L("新討論", "New")}
+          </button>
+          <button type="button" onClick={() => setPanel(panel === "threads" ? "chat" : "threads")} disabled={!!busy}
+            aria-pressed={panel === "threads"}
+            title={L("過去的討論", "Past threads")}
+            className={`h-7 rounded-lg px-2 flex items-center gap-1.5 text-[11.5px] transition disabled:opacity-30 ${panel === "threads" ? "bg-background text-foreground" : "opacity-80 hover:opacity-100 hover:bg-background/15"}`}>
+            <FontAwesomeIcon icon={faClockRotateLeft} className="text-[11px]" />
+            {pastCount > 0 && <span className="tabular-nums">{pastCount}</span>}
+          </button>
           {onToggleExpand && (
             <button type="button" onClick={onToggleExpand}
               aria-label={expanded ? L("收回對話", "Collapse chat") : L("展開對話", "Expand chat")}
@@ -402,50 +488,59 @@ export default function CampaignChatCard({ eventId, brandId, plan, phase, notes,
       )}
 
       <div ref={boxRef} className={`flex flex-col gap-2 overflow-y-auto pr-1 -mr-1 ${grow ? "flex-1 min-h-[120px]" : "max-h-[280px]"}`}>
-        {notes.map((n, k) => <p key={`n${k}`} className="text-small leading-relaxed">{en ? n.en : n.zh}</p>)}
-        {msgs.length > 0 && !busy && (
-          <button type="button" onClick={clear} className="self-center text-[11px] opacity-50 hover:opacity-90">{L("清掉這串對話", "Clear conversation")}</button>
+        {panel === "threads" ? (
+          <ThreadList threads={threads} currentId={threadId} en={en} onOpen={openThread} onBack={() => setPanel("chat")} />
+        ) : !loaded ? (
+          <p className="text-tiny opacity-50">{L("讀取對話…", "Loading…")}</p>
+        ) : (<>
+        {/* 新的一段還沒開口：企劃檢查＋上一段的結論（一鍵接著談）。談起來之後這些收掉，版面只留對話。 */}
+        {msgs.length === 0 && notes.map((n, k) => <p key={`n${k}`} className="text-small leading-relaxed">{en ? n.en : n.zh}</p>)}
+        {msgs.length === 0 && lastClosed && (
+          <button type="button" onClick={() => openThread(lastClosed.id)}
+            className="text-left rounded-xl border border-background/25 hover:border-background/50 px-3 py-2 flex flex-col gap-0.5 transition">
+            <span className="text-[11px] opacity-60">{L("上一段討論", "Last thread")}・{ago(lastClosed.updatedAt, en)}</span>
+            <span className="text-small font-semibold truncate">{lastClosed.title}</span>
+            {lastClosed.summary && <span className="text-tiny opacity-70 line-clamp-2">{lastClosed.summary}</span>}
+            <span className="text-[11px] opacity-60 pt-0.5 flex items-center gap-1"><FontAwesomeIcon icon={faRotateRight} className="text-[9px]" />{L("接著這段談", "Continue this thread")}</span>
+          </button>
+        )}
+        {/* 一段很長時只顯示最後幾則，前面的收成一行。 */}
+        {!showAll && msgs.length > FOLD_AT && (
+          <button type="button" onClick={() => setShowAll(true)} className="self-center text-[11px] opacity-60 hover:opacity-100 border border-background/20 rounded-full px-2.5 py-0.5">
+            {L(`顯示前面 ${msgs.length - SHOW_LAST} 則`, `Show ${msgs.length - SHOW_LAST} earlier`)}
+          </button>
         )}
         {msgs.map((m, k) => {
+          if (!showAll && msgs.length > FOLD_AT && k < msgs.length - SHOW_LAST) return null;
           if (m.role === "handoff") {
-            return <p key={k} className="self-center text-[11px] opacity-60 flex items-center gap-1.5"><FontAwesomeIcon icon={faRightLeft} />{m.content}</p>;
+            return <p key={m.key ?? k} className="self-center text-[11px] opacity-50 flex items-center gap-1.5"><FontAwesomeIcon icon={faRightLeft} className="text-[9px]" />{m.content}</p>;
           }
           const sp = m.speaker ?? "planner";
           const who = byRole.get(sp);
           return (
-            <div key={k} className={m.role === "user" ? "self-end max-w-[88%]" : "flex gap-2 items-start"}>
+            <div key={m.key ?? k} className={m.role === "user" ? "self-end max-w-[88%]" : "flex gap-2 items-start"}>
               {m.role === "assistant" && face(who, sp, "w-5 h-5 mt-0.5")}
-              <div className={m.role === "user" ? "" : "flex flex-col gap-2 min-w-0 flex-1"}>
+              <div className={m.role === "user" ? "" : "flex flex-col gap-1.5 min-w-0 flex-1"}>
                 {m.role === "assistant" && (who?.name || m.name) && (
-                  <p className="text-[11px] opacity-60 -mb-1">{who?.name || m.name}・{roleName(sp)}</p>
+                  <p className="text-[11px] opacity-60 -mb-0.5">{who?.name || m.name}・{roleName(sp)}</p>
                 )}
                 {m.content && (
                   <p className={`text-small leading-relaxed whitespace-pre-line ${m.role === "user" ? "bg-background/15 rounded-xl px-3 py-1.5" : ""}`}>{m.content}</p>
                 )}
                 {m.proposal && (
-                  <div className={`rounded-xl border px-3 py-2 flex flex-col gap-1.5 ${m.undone ? "border-background/15 opacity-60" : "border-background/40"}`}>
-                    <p className="text-[11px] opacity-70 flex items-center gap-1.5">
-                      {m.undone ? L("已復原", "Undone") : <><FontAwesomeIcon icon={faCheck} />{L("已改進企劃", "Applied to the plan")}</>}
-                    </p>
-                    {m.truncated && (
-                      <p className="text-[11px] opacity-70">{L("改的篇數太多，先改了前幾條；說「繼續」改剩下的。", "Too many changes at once — did the first few. Say “continue” for the rest.")}</p>
-                    )}
-                    {describeProposal(m.before ?? plan, m.proposal, en).map((line, j) => (
-                      <p key={j} className="text-tiny leading-snug">{line}</p>
-                    ))}
-                    {k === lastChangeIdx && (m.before || m.beforeBasis) && !locked && (
-                      <button type="button" onClick={() => undo(k)}
-                        className="self-start text-tiny opacity-70 hover:opacity-100 flex items-center gap-1.5 pt-0.5">
-                        <FontAwesomeIcon icon={faRotateLeft} />{L("復原", "Undo")}
-                      </button>
-                    )}
-                  </div>
+                  <ChangeCard
+                    lines={describeProposal(m.before ?? plan, m.proposal, en)}
+                    undone={!!m.undone} truncated={!!m.truncated} en={en}
+                    defaultOpen={k === lastChangeIdx}
+                    onUndo={k === lastChangeIdx && (m.before || m.beforeBasis) && !locked ? () => undo(k) : undefined}
+                  />
                 )}
               </div>
             </div>
           );
         })}
-        {busy && <Thinking member={byRole.get(busy) ?? null} label={roleName(busy)} en={en} face={face(byRole.get(busy), busy, "w-5 h-5")} />}
+        </>)}
+        {panel === "chat" && busy && <Thinking member={byRole.get(busy) ?? null} label={roleName(busy)} en={en} face={face(byRole.get(busy), busy, "w-5 h-5")} />}
         {queued.map((q, k) => (
           <div key={`q${k}`} className="self-end max-w-[88%] flex flex-col items-end gap-0.5 opacity-60">
             <p className="text-small leading-relaxed bg-background/10 rounded-xl px-3 py-1.5 whitespace-pre-line">{q}</p>
@@ -524,6 +619,91 @@ function Thinking({ member, label, en, face }: { member: Member | null; label: s
         ))}
       </span>
       <span className="text-[11px] opacity-50 tabular-nums">{stage}・{sec}{L(" 秒", "s")}</span>
+    </div>
+  );
+}
+
+/** 一段超過這麼多則就把前面的收起來，只顯示最後 SHOW_LAST 則。 */
+const FOLD_AT = 14;
+const SHOW_LAST = 10;
+
+/** 「3 分鐘前」「昨天」「10/01」。 */
+function ago(isoStr: string, en: boolean): string {
+  const t = Date.parse(isoStr);
+  if (!Number.isFinite(t)) return "";
+  const m = Math.round((Date.now() - t) / 60000);
+  if (m < 1) return en ? "just now" : "剛剛";
+  if (m < 60) return en ? `${m}m ago` : `${m} 分鐘前`;
+  const h = Math.round(m / 60);
+  if (h < 24) return en ? `${h}h ago` : `${h} 小時前`;
+  if (h < 48) return en ? "yesterday" : "昨天";
+  const d = new Date(t);
+  return `${String(d.getMonth() + 1).padStart(2, "0")}/${String(d.getDate()).padStart(2, "0")}`;
+}
+
+/**
+ * 一則帶來的修改：收成一行「已改進企劃・N 處」，點開看每一處。最新那次預設打開、可復原；
+ * 舊的收著——一段談久了，十幾張展開的修改卡會把對話擠掉（CJ「版面很擠」）。
+ */
+function ChangeCard({ lines, undone, truncated, en, defaultOpen, onUndo }: {
+  lines: string[]; undone: boolean; truncated: boolean; en: boolean; defaultOpen: boolean; onUndo?: () => void;
+}) {
+  const L = (zh: string, e: string) => (en ? e : zh);
+  const [open, setOpen] = React.useState(defaultOpen);
+  React.useEffect(() => { setOpen(defaultOpen); }, [defaultOpen]);
+  return (
+    <div className={`rounded-xl border px-3 py-1.5 flex flex-col gap-1 ${undone ? "border-background/15 opacity-60" : "border-background/35"}`}>
+      <div className="flex items-center gap-2">
+        <button type="button" onClick={() => setOpen(!open)} aria-expanded={open}
+          className="flex items-center gap-1.5 text-[11px] opacity-75 hover:opacity-100 min-w-0">
+          {undone ? L("已復原", "Undone") : <><FontAwesomeIcon icon={faCheck} className="text-[9px]" />{L(`已改進企劃・${lines.length} 處`, `Applied · ${lines.length}`)}</>}
+          <FontAwesomeIcon icon={faChevronDown} className={`text-[8px] transition-transform ${open ? "rotate-180" : ""}`} />
+        </button>
+        {onUndo && (
+          <button type="button" onClick={onUndo} className="ml-auto text-[11px] opacity-70 hover:opacity-100 flex items-center gap-1">
+            <FontAwesomeIcon icon={faRotateLeft} className="text-[9px]" />{L("復原", "Undo")}
+          </button>
+        )}
+      </div>
+      {open && (
+        <>
+          {truncated && <p className="text-[11px] opacity-70">{L("改的篇數太多，先改了前幾條；說「繼續」改剩下的。", "Too many changes at once. Say “continue” for the rest.")}</p>}
+          {lines.map((line, j) => <p key={j} className="text-tiny leading-snug">{line}</p>)}
+        </>
+      )}
+    </div>
+  );
+}
+
+/** 過去的討論：每一段一列（標題、多久前、改了幾次、摘要），點一下重新打開接著談。 */
+function ThreadList({ threads, currentId, en, onOpen, onBack }: {
+  threads: Thread[]; currentId: number | null; en: boolean; onOpen: (id: number) => void; onBack: () => void;
+}) {
+  const L = (zh: string, e: string) => (en ? e : zh);
+  return (
+    <div className="flex flex-col gap-1.5">
+      <div className="flex items-center gap-2">
+        <p className="text-small font-semibold">{L("過去的討論", "Past threads")}</p>
+        <button type="button" onClick={onBack} className="ml-auto text-[11px] opacity-70 hover:opacity-100">{L("回到對話", "Back to chat")}</button>
+      </div>
+      {!threads.length && <p className="text-tiny opacity-60 py-2">{L("還沒有討論過。", "No threads yet.")}</p>}
+      {threads.map((t) => {
+        const cur = t.id === currentId;
+        return (
+          <button key={t.id} type="button" onClick={() => onOpen(t.id)}
+            className={`text-left rounded-xl px-3 py-2 flex flex-col gap-0.5 transition ${cur ? "bg-background/15" : "hover:bg-background/10"}`}>
+            <span className="flex items-center gap-2 min-w-0">
+              <span className="text-small font-semibold truncate">{t.title}</span>
+              {cur && <span className="shrink-0 text-[10.5px] rounded-full bg-background text-foreground px-1.5">{L("目前", "Current")}</span>}
+              <span className="ml-auto shrink-0 text-[11px] opacity-50 tabular-nums">{ago(t.updatedAt, en)}</span>
+            </span>
+            <span className="text-[11px] opacity-60">
+              {L(`${t.messageCount} 則`, `${t.messageCount} messages`)}{t.changeCount ? L(`・改了企劃 ${t.changeCount} 次`, ` · ${t.changeCount} changes`) : ""}
+            </span>
+            {t.summary && <span className="text-tiny opacity-75 line-clamp-2">{t.summary}</span>}
+          </button>
+        );
+      })}
     </div>
   );
 }

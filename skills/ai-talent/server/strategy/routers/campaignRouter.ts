@@ -41,7 +41,7 @@ import { BRIEF_CHANNELS, CHANNEL_BRIEF_SPECS, cleanChannelBrief, cleanChannelBri
 import { KPI_METRICS, pickKpiAgent, runKpiPlan } from "../core/campaignKpi";
 import { brandIndustry, pickPlannerAgent } from "../core/campaignTeam";
 import { buildCampaignRoster, CAMPAIGN_ROLES, ROLES } from "../core/campaignRoster";
-import { appendChat, clearChat, listChat, markUndone } from "../core/campaignChatStore";
+import { appendChat, closeThread, listChat, listThreads, markUndone, recentSummaries, reopenThread } from "../core/campaignChatStore";
 import { isHiddenContentPlatform, isHiddenHistoryItem } from "../../platform/core/planGate";
 import { ownedProductIds, resolveProductScope } from "../core/eventProductScope";
 import { invalidateBrandPrefix } from "../core/brandContext";
@@ -337,6 +337,8 @@ export const campaignRouter = router({
       /** 2026-10-02：這一串轉了幾手（雙向交棒，到 2 就停）。 */
       hops: z.number().int().min(0).max(2).optional(),
       view: z.enum(["map", "basis"]).optional(),
+      /** 目前這段討論；最近幾段已結束的摘要會一起給模型。 */
+      threadId: z.number().int().positive().nullable().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const row = await loadEvent(input.eventId, ctx.user!.id);
@@ -350,6 +352,7 @@ export const campaignRouter = router({
           message: input.message, phase: input.phase ?? null, history: input.history,
           speaker: input.speaker ?? "planner", directorAgentId: input.directorAgentId ?? null, handoff: !!input.handoff, from: input.from ?? null, hops: input.hops,
           positioning: pos, view: input.view ?? "map",
+          earlier: await recentSummaries(input.eventId, ctx.user!.id, input.threadId ?? null).catch(() => []),
         });
       } catch (e: any) {
         throw new TRPCError({ code: "BAD_REQUEST", message: String(e?.message ?? e).slice(0, 300) });
@@ -360,16 +363,26 @@ export const campaignRouter = router({
    * 對話存在資料庫（2026-10-02 CJ「對話要存到資料庫中」，見 core/campaignChatStore.ts）。
    * 畫面每多一則就送 chatAppend；讀回只給最新一次修改的快照，給「復原」用。
    */
-  chatHistory: protectedProcedure
+  /** 這檔的討論清單＋打開時接哪一段（2026-10-02 分段，見 core/campaignChatStore.ts）。 */
+  chatThreads: protectedProcedure
     .input(z.object({ eventId: z.number().int().positive() }))
     .query(async ({ ctx, input }) => {
       await loadEvent(input.eventId, ctx.user!.id);
-      return { messages: await listChat(input.eventId, ctx.user!.id) };
+      return await listThreads(input.eventId, ctx.user!.id);
+    }),
+
+  chatHistory: protectedProcedure
+    .input(z.object({ eventId: z.number().int().positive(), threadId: z.number().int().positive() }))
+    .query(async ({ ctx, input }) => {
+      await loadEvent(input.eventId, ctx.user!.id);
+      return { messages: await listChat(input.eventId, ctx.user!.id, input.threadId) };
     }),
 
   chatAppend: protectedProcedure
     .input(z.object({
       eventId: z.number().int().positive(),
+      /** 沒給＝開新的一段。 */
+      threadId: z.number().int().positive().nullable().optional(),
       messages: z.array(z.object({
         key: z.string().min(1).max(40),
         role: z.enum(["user", "assistant", "handoff"]),
@@ -385,7 +398,7 @@ export const campaignRouter = router({
     }))
     .mutation(async ({ ctx, input }) => {
       await loadEvent(input.eventId, ctx.user!.id);
-      return { added: await appendChat(input.eventId, ctx.user!.id, input.messages) };
+      return await appendChat(input.eventId, ctx.user!.id, input.threadId ?? null, input.messages);
     }),
 
   chatUndone: protectedProcedure
@@ -396,11 +409,21 @@ export const campaignRouter = router({
       return { ok: true };
     }),
 
-  chatClear: protectedProcedure
-    .input(z.object({ eventId: z.number().int().positive() }))
+  /** 結束這段：留摘要；下一句就是新的一段。 */
+  chatCloseThread: protectedProcedure
+    .input(z.object({ eventId: z.number().int().positive(), threadId: z.number().int().positive(), summary: z.string().max(600) }))
     .mutation(async ({ ctx, input }) => {
       await loadEvent(input.eventId, ctx.user!.id);
-      await clearChat(input.eventId, ctx.user!.id);
+      await closeThread(input.eventId, ctx.user!.id, input.threadId, input.summary);
+      return { ok: true };
+    }),
+
+  /** 重新打開過去的一段，接著談。 */
+  chatReopenThread: protectedProcedure
+    .input(z.object({ eventId: z.number().int().positive(), threadId: z.number().int().positive() }))
+    .mutation(async ({ ctx, input }) => {
+      await loadEvent(input.eventId, ctx.user!.id);
+      if (!(await reopenThread(input.eventId, ctx.user!.id, input.threadId))) throw new TRPCError({ code: "NOT_FOUND", message: "找不到這段討論" });
       return { ok: true };
     }),
 

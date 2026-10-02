@@ -358,6 +358,8 @@ export async function runCampaignChat(args: {
   positioning?: Record<string, any> | null;
   /** 使用者右邊正在看的：企劃地圖或策略依據。 */
   view?: "map" | "basis";
+  /** 最近幾段已結束的討論的摘要（2026-10-02 分段）：這段只讀這段的對話，前情用摘要補。 */
+  earlier?: string[];
 }): Promise<{ reply: string; proposal: CampaignProposal; askDirector: string | null; handoff: { to: CampaignSpeaker; question: string } | null; truncated: boolean; agent: TeamAgent | null; speaker: CampaignSpeaker }> {
   const facts = await eventFacts(args.eventId, args.userId);
   if (!facts) throw new Error("找不到這個活動");
@@ -439,7 +441,8 @@ export async function runCampaignChat(args: {
     menu ? `【候選任務卡（只能從這裡挑）】\n${menu}` : "",
     can.basis ? `【策略依據（路徑｜欄位｜目前寫的）】\n${basisLines(args.positioning ?? {})}` : "",
     thread ? `【你之前在右下角跟使用者談過（最近幾則）】\n${thread}` : "",
-    history ? `【這個對話前面說過的】\n${history}` : "",
+    args.earlier?.length ? `【之前幾段討論的結論（已經做完的事，不用重做）】\n${args.earlier.map((e) => `- ${e.slice(0, 300)}`).join("\n")}` : "",
+    history ? `【這段討論前面說過的】\n${history}` : "",
     args.handoff && from ? `【${label(from)}轉給你的問題】${args.message.trim()}` : `【使用者現在說】${args.message.trim()}`,
     hops >= 2 ? `這個問題已經轉過兩手，這次不要再交棒（handoffTo 留空），能做的自己做，做不到的在 reply 說明。` : "",
     "",
