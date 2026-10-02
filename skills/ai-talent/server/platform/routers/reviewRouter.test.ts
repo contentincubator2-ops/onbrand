@@ -9,9 +9,17 @@
  * Function.prototype / tRPC 內部字撞名的動詞。
  */
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
 import { reviewRouter } from "./reviewRouter";
 
 describe("reviewRouter", () => {
+  // 2026-10-02：listPending 用了 `LIMIT ?`，正式資料庫回 "Incorrect arguments to
+  // mysqld_stmt_execute"，活動頁右下角一直跳載入失敗。mysql2 execute() 不吃 LIMIT 參數。
+  it("SQL 裡沒有 LIMIT ? —— LIMIT 一律寫成夾過的整數", () => {
+    const src = readFileSync(new URL("./reviewRouter.ts", import.meta.url), "utf8");
+    expect(src).not.toMatch(/LIMIT ?/);
+  });
+
   it("建得起來，procedure 名單如預期", () => {
     const names = Object.keys((reviewRouter as any)._def.procedures).sort();
     expect(names).toEqual([
