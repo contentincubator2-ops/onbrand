@@ -42,6 +42,10 @@ export interface ItemThumb {
   state?: string;
   reviewNote?: string | null;
   publishedUrl?: string | null;
+  /** 送給誰審。 */
+  reviewerName?: string | null;
+  /** 排進行事曆的那一筆（還沒發布的）。 */
+  schedule?: { id: number; at: string } | null;
 }
 
 const md = (s: string) => s.slice(5).replace("-", "/");

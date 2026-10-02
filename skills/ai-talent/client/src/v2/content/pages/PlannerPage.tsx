@@ -56,7 +56,9 @@ const avatarSrc = (a: { slug: string; avatarUrl: string }) =>
 type Item =
   | { kind: "slot"; key: string; date: string; platform: string; title: string; meta: string; slot: any }
   | { kind: "campaign"; key: string; date: string; platform: string; title: string; meta: string; camp: any }
-  | { kind: "scheduled" | "published"; key: string; date: string; platform: string; title: string; meta: string; cal: any };
+  | { kind: "scheduled" | "published"; key: string; date: string; platform: string; title: string; meta: string; cal: any }
+  /** 2026-10-02：別人送給我審、排在這一週的稿（review.listPending）。點了去審核佇列。 */
+  | { kind: "review"; key: string; date: string; platform: string; title: string; meta: string; review: any };
 
 export default function PlannerPage() {
   const { lang } = useLang();
@@ -97,6 +99,9 @@ export default function PlannerPage() {
     { from: `${weekStart}T00:00:00+08:00`, to: `${addDays(weekStart, 7)}T00:00:00+08:00`, brandId: brandId ?? undefined },
     { enabled: !!brandId, refetchOnWindowFocus: false },
   ) ?? { data: null };
+  // 2026-10-02（CJ「在要審核的那個人的本周企畫上，出現待審的標籤」）：送給我審的稿，照它排的那天放上來。
+  // 不分品牌——審核人不一定能開送審人的品牌，但他要知道哪天有稿等他。
+  const reviewQ = T.review.listPending.useQuery({ limit: 100 }, { refetchOnWindowFocus: false, staleTime: 30_000 });
   const data = weekQ.data as any;
   const refresh = () => { try { utils?.planner?.week?.invalidate?.(); utils?.planner?.railStatus?.invalidate?.(); utils?.calendar?.range?.invalidate?.(); } catch { /* noop */ } };
 
@@ -151,13 +156,28 @@ export default function PlannerPage() {
       const time = new Date(it.at).toLocaleTimeString("zh-TW", { timeZone: "Asia/Taipei", hour: "2-digit", minute: "2-digit", hour12: false });
       // 送審是排程的一個狀態：排好的格子直接標出審核進度。
       const rs = it.kind === "scheduled" ? String(it.reviewStatus ?? "") : "";
-      const review = rs === "pending" || rs === "in_review" ? (en ? " · In review" : "・待審")
-        : rs === "revision_requested" ? (en ? " · Sent back" : "・退回修改")
-        : rs === "approved" ? (en ? " · Approved" : "・已放行") : "";
+      void rs; // 審核進度改成卡片上的標籤（reviewTag），不再塞在說明文字後面。
+      const review = "";
       out.push({
         kind: it.kind, key: `${it.kind}${it.id}`, date, platform: PLAT[raw] ?? raw,
         title: String(it.preview || it.missionTitle || "").slice(0, 40),
         meta: it.kind === "published" ? (en ? "Published" : "已發布") : (en ? `Scheduled ${time}${review}` : `已排程 ${time}${review}`), cal: it,
+      });
+    }
+    const weekEnd = addDays(weekStart, 7);
+    for (const r of (reviewQ.data as any[]) ?? []) {
+      if (!r.scheduledAt) continue;
+      const date = ymdTpe(new Date(r.scheduledAt));
+      if (date < weekStart || date >= weekEnd) continue;
+      const time = new Date(r.scheduledAt).toLocaleTimeString("zh-TW", { timeZone: "Asia/Taipei", hour: "2-digit", minute: "2-digit", hour12: false });
+      const who = String(r.requesterName || r.requesterEmail || "");
+      const other = r.brandId && Number(r.brandId) !== brandId ? `・${r.brandName ?? ""}` : "";
+      const head = String(r.contentHead ?? "").replace(/\\n/g, " ");
+      const cap = (head.match(/"caption"\s*:\s*"([^"]{1,60})/)?.[1] ?? "").replace(/\\n/g, " ");
+      out.push({
+        kind: "review", key: `r${r.id}`, date, platform: String(r.scheduledPlatform || r.platform || "").toLowerCase(),
+        title: (cap || String(r.outputTitle ?? "")).slice(0, 40),
+        meta: en ? `${time} · from ${who}${other}` : `${time}・${who} 送來${other}`, review: r,
       });
     }
     // 同一篇產出已經排程／發布了，就只留排程那張（格子是它的前身）。
@@ -165,7 +185,7 @@ export default function PlannerPage() {
     return out.filter((x) =>
       !((x.kind === "slot" && x.slot.outputId && onCalendar.has(Number(x.slot.outputId))) ||
         (x.kind === "campaign" && x.camp.outputId && onCalendar.has(Number(x.camp.outputId)))));
-  }, [data, calQ.data, en]);
+  }, [data, calQ.data, reviewQ.data, en, weekStart, brandId]);
 
   const days: Array<{ date: string; label: string }> = data?.days ?? Array.from({ length: 7 }, (_, i) => ({ date: addDays(weekStart, i), label: "" }));
   const thisMonday = mondayOf(ymdTpe(new Date()));
@@ -186,7 +206,20 @@ export default function PlannerPage() {
     }
   };
   const outputOf = (it: Item): number | null =>
-    it.kind === "slot" ? it.slot.outputId : it.kind === "campaign" ? it.camp.outputId : it.cal?.outputId ?? null;
+    it.kind === "slot" ? it.slot.outputId : it.kind === "campaign" ? it.camp.outputId : it.kind === "review" ? null : it.cal?.outputId ?? null;
+  /**
+   * 卡片上的審核標籤（2026-10-02 CJ）：自己送出去的是「送審中」，別人送給我的是「待審」。
+   * 行事曆上的排程都是我自己的，所以那邊只會是送審中／退回修改／已放行。
+   */
+  const reviewTag = (it: Item): { text: string; tone: "warn" | "bad" | "ok" } | null => {
+    if (it.kind === "review") return { text: en ? "To review" : "待審", tone: "warn" };
+    if (it.kind !== "scheduled") return null;
+    const rs = String(it.cal?.reviewStatus ?? "");
+    if (rs === "pending" || rs === "in_review") return { text: en ? "In review" : "送審中", tone: "warn" };
+    if (rs === "revision_requested") return { text: en ? "Sent back" : "退回修改", tone: "bad" };
+    if (rs === "approved") return { text: en ? "Approved" : "已放行", tone: "ok" };
+    return null;
+  };
 
   if (!brandId) {
     return <div className="p-10 text-[14px] text-neutral-500">{en ? "Pick a brand first." : "先選一個品牌。"}</div>;
@@ -300,7 +333,7 @@ export default function PlannerPage() {
                     const border = isTouched ? `1.5px solid ${ORANGE}` : isDraft ? `1.5px dashed #D4D4D4` : `1px solid ${LINE}`;
                     return (
                       <div key={it.key} className="relative">
-                      <button type="button" onClick={() => (canWrite(it) ? startWriting(it) : setOpen(it))}
+                      <button type="button" onClick={() => (it.kind === "review" ? navigate("/review") : canWrite(it) ? startWriting(it) : setOpen(it))}
                         className="flex w-full flex-col gap-2.5 rounded-xl bg-white p-3.5 text-left transition hover:border-neutral-400" style={{ border }}>
                         <span className={`flex w-full items-center justify-between ${canWrite(it) ? "pr-6" : ""}`}>
                           <span className="flex h-6 w-6 items-center justify-center rounded-[7px] text-[12px]" style={{ background: SOFT, color: "#404040" }}>
@@ -309,7 +342,15 @@ export default function PlannerPage() {
                           {isTouched && <span className="flex items-center gap-1 text-[11px] font-semibold" style={{ color: "#3F3F46" }}><span className="h-1.5 w-1.5 rounded-full" style={{ background: ORANGE }} />{en ? "Changed" : "剛改"}</span>}
                         </span>
                         <span className="line-clamp-3 text-[14px] font-semibold leading-snug" style={{ color: INK }}>{it.title}</span>
-                        <span className="text-[12px]" style={{ color: META }}>{it.meta}</span>
+                        <span className="flex items-center gap-1.5 flex-wrap text-[12px]" style={{ color: META }}>
+                          {(() => {
+                            const tag = reviewTag(it);
+                            if (!tag) return null;
+                            const c = tag.tone === "warn" ? { bg: "#FEF3C7", fg: "#92400E" } : tag.tone === "bad" ? { bg: "#FEE2E2", fg: "#991B1B" } : { bg: "#DCFCE7", fg: "#166534" };
+                            return <span className="rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ background: c.bg, color: c.fg }}>{tag.text}</span>;
+                          })()}
+                          {it.meta}
+                        </span>
                       </button>
                       {canWrite(it) && (
                         <button type="button" aria-label={en ? "More" : "更多"} onClick={() => setOpen(it)}

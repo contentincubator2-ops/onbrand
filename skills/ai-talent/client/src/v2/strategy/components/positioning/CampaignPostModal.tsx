@@ -13,6 +13,11 @@
  *     關掉視窗就是草稿，不用按「存草稿」。「修改中」不是狀態。
  *   · 待審核、已核准（團隊版）、已發布的本文唯讀：審核過的字被偷偷改掉，審核就沒有意義。
  *
+ * 2026-10-02（CJ「送審時要先問我應該要排的時間…在行事曆上看到該篇內容…我也不知道送審給誰」）：
+ *   送審／定稿前先定「排在哪天幾點」（預設是企劃上那天 20:00；已經排過就帶原本的時間），
+ *   團隊版再選「送給誰」（review.reviewers：同團隊的 owner／admin）。按下去＝排進行事曆
+ *   ＋送審（指定那一位），本週企劃上就會出現這一篇：自己看到「送審中」，審核人看到「待審」。
+ *
  * 放行為什麼不在這裡：活動屬於建立它的帳號（events.userId），主管開不了別人的活動頁；
  * 放行一律在審核佇列（/review），那裡本來就是主管的入口。
  */
@@ -35,6 +40,14 @@ import { postStateChip, postStateLabel, postStateOf, type CampaignPostState } fr
 import type { ItemThumb } from "./CampaignMap";
 
 const md = (s: string) => s.slice(5).replace("-", "/");
+/** ISO → 台北的日期與時間（本週企劃一律用台北時間）。 */
+const tpeParts = (iso: string) => {
+  const d = new Date(iso);
+  return {
+    date: d.toLocaleDateString("sv-SE", { timeZone: "Asia/Taipei" }),
+    time: d.toLocaleTimeString("en-GB", { timeZone: "Asia/Taipei", hour: "2-digit", minute: "2-digit", hour12: false }),
+  };
+};
 const tidy = (s: unknown) => (typeof s === "string" ? s : "").replace(/\\r\\n|\\n|\\r/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
 
 /** 活動的通路 → 預覽用哪一種貼文外框。只看通路、不猜形式（形式判斷在成品頁那一份，不再多抄一份）。 */
@@ -146,10 +159,72 @@ export default function CampaignPostModal({
   // ── 狀態動作 ──
   const statusMut = (trpc as any).output.updateStatus.useMutation({ onSuccess: refreshStatus, onError: (e: any) => showToastGlobal(e?.message ?? "") });
   const [note, setNote] = React.useState("");
-  const submitMut = (trpc as any).review.submit.useMutation({
-    onSuccess: () => { showToastGlobal(L("已送審", "Sent for review")); setNote(""); refreshStatus(); },
-    onError: (e: any) => toastWithUpgrade(e?.message ?? L("送審失敗", "Couldn't submit"), en),
-  });
+  const submitMut = (trpc as any).review.submit.useMutation();
+
+  // ── 排在哪天幾點＋送給誰 ──
+  const [when, setWhen] = React.useState(() => thumb?.schedule ? tpeParts(thumb.schedule.at) : { date: item.date, time: "20:00" });
+  React.useEffect(() => { if (thumb?.schedule) setWhen(tpeParts(thumb.schedule.at)); }, [thumb?.schedule?.at]);
+  const whenIso = `${when.date}T${when.time}:00+08:00`;
+  const whenMs = new Date(whenIso).getTime();
+  const whenBad = !when.date || !when.time || !Number.isFinite(whenMs);
+  const whenPast = !whenBad && whenMs < Date.now() + 60_000;
+  const reviewersQ = (trpc as any).review.reviewers.useQuery(undefined, { enabled: team, staleTime: 60_000, refetchOnWindowFocus: false });
+  const reviewers: Array<{ userId: number; name: string; email: string; role: string }> = reviewersQ.data ?? [];
+  const [reviewer, setReviewer] = React.useState<number | null>(null);
+  const reviewerId = reviewer ?? reviewers[0]?.userId ?? null;
+  const scheduleMut = (trpc as any).calendar.schedule.useMutation();
+  const rescheduleMut = (trpc as any).calendar.reschedule.useMutation();
+  const [working, setWorking] = React.useState(false);
+  /** 排進行事曆：還沒排就排；排過了而時間改了就改時間。 */
+  const ensureScheduled = async () => {
+    const sch = thumb?.schedule;
+    if (sch) {
+      if (new Date(sch.at).getTime() !== whenMs) await rescheduleMut.mutateAsync({ id: sch.id, scheduledAt: whenIso });
+      return;
+    }
+    await scheduleMut.mutateAsync({ outputId, ...getRunContentMutationLocator(resolved.kind, idx), platform: item.platform, scheduledAt: whenIso });
+  };
+  const afterAction = () => {
+    refreshStatus();
+    utils?.planner?.week?.invalidate?.();
+    utils?.calendar?.range?.invalidate?.();
+    utils?.review?.invalidate?.();
+  };
+  /** 團隊版：排進行事曆＋送給指定的人審。 */
+  const sendForReview = async () => {
+    if (!reviewerId || whenBad || whenPast) return;
+    flush();
+    setWorking(true);
+    try {
+      await ensureScheduled();
+      await submitMut.mutateAsync({ missionId, outputId, reviewerIds: [reviewerId], note: note.trim() || undefined });
+      const who = reviewers.find((r) => r.userId === reviewerId)?.name ?? "";
+      showToastGlobal(L(`已排在 ${md(when.date)} ${when.time}，送給 ${who} 審核`, `Scheduled ${md(when.date)} ${when.time}, sent to ${who}`));
+      setNote("");
+    } catch (e: any) {
+      toastWithUpgrade(e?.message ?? L("送審失敗", "Couldn't submit"), en);
+    } finally {
+      setWorking(false);
+      afterAction();
+    }
+  };
+  /** 個人版：排進行事曆＋定稿。 */
+  const finalize = async () => {
+    if (whenBad || whenPast) return;
+    flush();
+    setWorking(true);
+    try {
+      await ensureScheduled();
+      await statusMut.mutateAsync({ id: outputId, status: "approved" });
+      showToastGlobal(L(`已定稿，排在 ${md(when.date)} ${when.time}`, `Finalized for ${md(when.date)} ${when.time}`));
+    } catch (e: any) {
+      showToastGlobal(e?.message ?? L("沒有成功，再試一次", "Didn't work — try again"));
+    } finally {
+      setWorking(false);
+      afterAction();
+    }
+  };
+  const schedText = thumb?.schedule ? (() => { const p = tpeParts(thumb.schedule!.at); return `${md(p.date)} ${p.time}`; })() : null;
   const [url, setUrl] = React.useState(thumb?.publishedUrl ?? "");
   React.useEffect(() => { setUrl(thumb?.publishedUrl ?? ""); }, [thumb?.publishedUrl]);
   const publishMut = (trpc as any).campaign.markPublished.useMutation({
@@ -157,7 +232,7 @@ export default function CampaignPostModal({
     onError: (e: any) => showToastGlobal(e?.message ?? ""),
   });
   const missionId = Number(data?.mission?.id ?? thumb?.missionId ?? 0);
-  const busy = statusMut.isPending || submitMut.isPending || publishMut.isPending;
+  const busy = working || statusMut.isPending || publishMut.isPending;
 
   const chip = postStateChip(state);
   const imageUrl = variant?.imageUrl ?? variant?.image?.url ?? undefined;
@@ -261,31 +336,62 @@ export default function CampaignPostModal({
 
         {outputId > 0 && variant && (
           <ModalFooter className="flex-col items-stretch gap-2">
-            {(state === "draft" || state === "revision") && team && (
-              <div className="flex gap-2 items-center">
-                <Input size="sm" variant="bordered" radius="lg" value={note} onValueChange={setNote}
-                  placeholder={L("給審核的人一句話（選填）", "Note for the reviewer (optional)")} />
-                <Button radius="lg" className="bg-foreground text-background font-semibold shrink-0" isLoading={submitMut.isPending} isDisabled={busy || !missionId}
-                  onPress={() => { flush(); submitMut.mutate({ missionId, outputId, note: note.trim() || undefined }); }}>
-                  {state === "revision" ? L("改好了，再送審", "Resubmit") : L("送審", "Send for review")}
-                </Button>
-              </div>
-            )}
-            {(state === "draft" || state === "revision") && !team && (
-              <div className="flex justify-end gap-2 items-center">
-                <span className="text-tiny text-default-500 mr-auto">{L("關掉視窗就是草稿；確定這一版再按定稿。", "Closing keeps it as a draft.")}</span>
-                <Button radius="lg" className="bg-foreground text-background font-semibold" isLoading={statusMut.isPending} isDisabled={busy}
-                  onPress={() => { flush(); statusMut.mutate({ id: outputId, status: "approved" }); }}>{L("定稿", "Finalize")}</Button>
+            {(state === "draft" || state === "revision") && (
+              <div className="flex flex-col gap-2">
+                <div className="flex gap-2 items-center flex-wrap">
+                  <span className="text-small text-default-600 w-14 shrink-0">{L("排在", "Post at")}</span>
+                  <Input type="date" size="sm" variant="bordered" radius="lg" className="w-[160px]" aria-label={L("日期", "Date")}
+                    value={when.date} onValueChange={(v) => setWhen((w) => ({ ...w, date: v }))} />
+                  <Input type="time" size="sm" variant="bordered" radius="lg" className="w-[120px]" aria-label={L("時間", "Time")}
+                    value={when.time} onValueChange={(v) => setWhen((w) => ({ ...w, time: v }))} />
+                  {whenPast && <span className="text-tiny text-danger">{L("這個時間已經過了，選之後的時間。", "That time has passed.")}</span>}
+                  {!whenPast && when.date !== item.date && <span className="text-tiny text-default-500">{L(`企劃原本排在 ${md(item.date)}`, `Plan said ${md(item.date)}`)}</span>}
+                </div>
+                {team ? (
+                  <div className="flex gap-2 items-center flex-wrap">
+                    <span className="text-small text-default-600 w-14 shrink-0">{L("送給", "Reviewer")}</span>
+                    {reviewersQ.isLoading ? <Spinner size="sm" /> : reviewers.length ? (
+                      <select value={reviewerId ?? ""} onChange={(e) => setReviewer(Number(e.target.value) || null)} aria-label={L("審核人", "Reviewer")}
+                        className="h-8 rounded-lg border-2 border-default-200 bg-transparent px-2 text-small min-w-[180px]">
+                        {reviewers.map((r) => (
+                          <option key={r.userId} value={r.userId}>{r.name}{r.role === "owner" ? L("（擁有者）", " (owner)") : L("（管理者）", " (admin)")}</option>
+                        ))}
+                      </select>
+                    ) : (
+                      <span className="text-small text-default-500">
+                        {L("團隊裡還沒有可以審核的管理者。", "No admin on your team can review yet.")}
+                        <button type="button" className="underline ml-1" onClick={() => navigate("/settings/workspace")}>{L("邀請成員", "Invite")}</button>
+                      </span>
+                    )}
+                    <Input size="sm" variant="bordered" radius="lg" value={note} onValueChange={setNote} className="flex-1 min-w-[180px]"
+                      placeholder={L("給審核的人一句話（選填）", "Note for the reviewer (optional)")} />
+                    <Button radius="lg" className="bg-foreground text-background font-semibold shrink-0" isLoading={working}
+                      isDisabled={busy || !missionId || !reviewerId || whenBad || whenPast} onPress={sendForReview}>
+                      {state === "revision" ? L("改好了，再送審", "Resubmit") : L("送審", "Send for review")}
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="flex justify-end gap-2 items-center">
+                    <span className="text-tiny text-default-500 mr-auto">{L("關掉視窗就是草稿；確定這一版再按定稿，會排進本週企劃。", "Closing keeps it as a draft.")}</span>
+                    <Button radius="lg" className="bg-foreground text-background font-semibold" isLoading={working} isDisabled={busy || whenBad || whenPast} onPress={finalize}>
+                      {L("定稿並排程", "Finalize & schedule")}
+                    </Button>
+                  </div>
+                )}
               </div>
             )}
             {state === "in_review" && (
               <div className="flex items-center gap-2">
-                <span className="text-small text-default-600">{L("等待審核。主管在「審核佇列」放行或退回。", "Waiting for approval in the review queue.")}</span>
-                <Button size="sm" variant="light" className="ml-auto" onPress={() => navigate("/review")}>{L("打開審核佇列", "Open review queue")}</Button>
+                <span className="text-small text-default-600">
+                  {L(`送審中・等 ${thumb?.reviewerName ?? "主管"} 審核`, `In review · waiting for ${thumb?.reviewerName ?? "a reviewer"}`)}
+                  {schedText ? L(`・排在 ${schedText}`, ` · ${schedText}`) : ""}
+                </span>
+                <Button size="sm" variant="light" className="ml-auto" onPress={() => navigate("/planner")}>{L("看本週企劃", "Open planner")}</Button>
               </div>
             )}
             {state === "approved" && (
               <div className="flex gap-2 items-center">
+                {schedText && <span className="text-small text-default-600 shrink-0">{L(`排在 ${schedText}`, `Scheduled ${schedText}`)}</span>}
                 {!team && (
                   <Button size="sm" variant="light" isDisabled={busy} onPress={() => statusMut.mutate({ id: outputId, status: "draft" })}>{L("改回草稿", "Back to draft")}</Button>
                 )}
