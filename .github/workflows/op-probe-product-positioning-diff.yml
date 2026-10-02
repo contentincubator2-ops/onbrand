@@ -55,5 +55,12 @@ jobs:
             echo "$P_DRY" | base64 -d > "$R"
             echo "$P_STEPS" | base64 -d > "$C/_probe_positioningSteps.ts"
             echo "$P_SIB" | base64 -d > "$C/_probe_productSiblings.ts"
-            echo "================ DRY RUN（新版 prompt，不寫 DB）================"
-            ./node_modules/.bin/tsx "$R" "${BRAND_ID:-2977}"
+            echo "================ DIFF（現存資料）================"
+            ./node_modules/.bin/tsx "$D" "${BRAND_ID:-2977}"
+            echo "================ pm2 log（產品定位）================"
+            ls ~/.pm2/logs/ 2>/dev/null | head
+            tail -n 20000 ~/.pm2/logs/*out*.log ~/.pm2/logs/*error*.log 2>/dev/null | grep -E "productSiblings|positioningJobRunner.*product|director" | tail -60 || true
+            if [ "${RUN_DRY:-0}" = "1" ]; then
+              echo "================ DRY RUN（新版 prompt，不寫 DB）================"
+              ./node_modules/.bin/tsx "$R" "${BRAND_ID:-2977}"
+            fi
