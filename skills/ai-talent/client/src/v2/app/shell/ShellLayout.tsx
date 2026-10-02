@@ -836,7 +836,8 @@ function IconBar({
   //   策略 —— 照舊給 isStrategyPreview；內容一律有。
   const modeOptions = [
     ...(isStrategyPreview ? [{ id: "strategy" as const, label: isEn ? "Strategy" : "策略", icon: faBrain, to: "/brands", tip: isEn ? "Strategy — brand brain" : "策略 — 品牌大腦" }] : []),
-    { id: "content" as const, label: isEn ? "Content" : "內容", icon: ICON.content, to: "/tasks/fb", tip: isEn ? "Content production" : "內容產出" },
+    // 2026-10-02（CJ「按下內容層後，預設出現改成本週企劃頁面」）：原本落在 /tasks/fb。
+    { id: "content" as const, label: isEn ? "Content" : "內容", icon: ICON.content, to: "/planner", tip: isEn ? "Content production" : "內容產出" },
     { id: "performance" as const, label: isEn ? "Results" : "成效", icon: faChartLine, to: "/performance/overview", tip: isEn ? "Performance (sample data until connected)" : "成效數據（串接前為示意資料）" },
   ];
   // 成效對所有人開放之後，切換器至少有 2 項，一律顯示。
