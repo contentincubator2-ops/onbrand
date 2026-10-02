@@ -32,6 +32,8 @@ export const BRIEF_CHANNELS: readonly BriefChannel[] = ["facebook", "instagram",
 export const COBRAND = "cobrand";
 
 export interface BriefOption { id: string; zh: string; en: string }
+/** 平台規則（2026-10-02 CJ：補英文，用最簡潔的英文）。寫手讀中文。 */
+export interface BriefRule { zh: string; en: string }
 export interface BriefField {
   key: string; zh: string; en: string; ph: string;
   long?: boolean;
@@ -45,7 +47,7 @@ export interface BriefGroup {
   /** 只有清單裡出現這個類型時才顯示（異業合作的類型專屬那一組）。 */
   whenType?: string;
   /** 這一組附帶的平台／法規提醒。 */
-  rules?: string[];
+  rules?: BriefRule[];
 }
 export interface ChannelBriefSpec {
   channel: BriefChannel;
@@ -56,7 +58,7 @@ export interface ChannelBriefSpec {
   rows: { zh: string; en: string; hintZh: string; hintEn: string; fields: BriefField[]; max: number; addZh: string; addEn: string };
   groups: BriefGroup[];
   /** 平台規則：系統帶入、寫手一定讀得到。 */
-  rules: string[];
+  rules: BriefRule[];
 }
 
 export interface ChannelBrief {
@@ -65,6 +67,7 @@ export interface ChannelBrief {
 }
 
 const o = (id: string, zh: string, en: string): BriefOption => ({ id, zh, en });
+const r = (zh: string, en: string): BriefRule => ({ zh, en });
 const ANGLE: BriefField = { key: "angle", zh: "這裡要講的角度", en: "Angle", ph: "例：上班族下班後 10 分鐘的用法" };
 
 /** 異業合作的對象類型 → 可以談的方案。 */
@@ -108,8 +111,8 @@ export const CHANNEL_BRIEF_SPECS: Record<BriefChannel, ChannelBriefSpec> = {
       ],
     }],
     rules: [
-      "抽獎不得要求「分享」或「標記朋友」才能參加（Facebook 規範）。",
-      "業配或合作內容要標示「廣告」或「合作」（公平交易委員會）。",
+      r("抽獎不得要求「分享」或「標記朋友」才能參加（Facebook 規範）。", "Giveaways can't require sharing or tagging friends."),
+      r("業配或合作內容要標示「廣告」或「合作」（公平交易委員會）。", "Label sponsored posts as ads."),
     ],
   },
   instagram: {
@@ -137,8 +140,8 @@ export const CHANNEL_BRIEF_SPECS: Record<BriefChannel, ChannelBriefSpec> = {
       ],
     }],
     rules: [
-      "貼文內文的連結點不了；要帶連結用限動連結貼紙或個人檔案連結。",
-      "跟網紅的協作或業配貼文要開「品牌合作」標示。",
+      r("貼文內文的連結點不了；要帶連結用限動連結貼紙或個人檔案連結。", "Caption links don't work; use story links or the bio link."),
+      r("跟網紅的協作或業配貼文要開「品牌合作」標示。", "Turn on the paid partnership label for creator posts."),
     ],
   },
   threads: {
@@ -163,7 +166,7 @@ export const CHANNEL_BRIEF_SPECS: Record<BriefChannel, ChannelBriefSpec> = {
         { key: "cadence", zh: "發文密度", en: "Cadence", ph: "例：活動期間每天 1 串" },
       ],
     }],
-    rules: ["Threads 不適合硬廣：一串一個觀點，優惠放在最後一句或串文裡。"],
+    rules: [r("Threads 不適合硬廣：一串一個觀點，優惠放在最後一句或串文裡。", "No hard sell: one idea per thread, offer last.")],
   },
   line: {
     channel: "line", zh: "LINE 任務說明單", en: "LINE brief", audience: "internal",
@@ -190,8 +193,8 @@ export const CHANNEL_BRIEF_SPECS: Record<BriefChannel, ChannelBriefSpec> = {
       ],
     }],
     rules: [
-      "推播則數＝每次發送人數加總，超過方案額度要另外付費。",
-      "同一檔活動全體推播建議不超過 3 次，推太多會被封鎖；能分眾就分眾。",
+      r("推播則數＝每次發送人數加總，超過方案額度要另外付費。", "Messages = recipients per send, summed. Over quota costs extra."),
+      r("同一檔活動全體推播建議不超過 3 次，推太多會被封鎖；能分眾就分眾。", "Max 3 broadcasts per campaign or people block you. Segment when possible."),
     ],
   },
   tiktok: {
@@ -217,8 +220,8 @@ export const CHANNEL_BRIEF_SPECS: Record<BriefChannel, ChannelBriefSpec> = {
       ],
     }],
     rules: [
-      "找創作者拍的影片要開「品牌合作內容」標示。",
-      "商業帳號只能用商用音樂庫的音樂，熱門歌不一定能用。",
+      r("找創作者拍的影片要開「品牌合作內容」標示。", "Turn on the branded content label for creator videos."),
+      r("商業帳號只能用商用音樂庫的音樂，熱門歌不一定能用。", "Business accounts can only use commercial music."),
     ],
   },
   email: {
@@ -244,7 +247,7 @@ export const CHANNEL_BRIEF_SPECS: Record<BriefChannel, ChannelBriefSpec> = {
         { key: "listSize", zh: "名單大小", en: "List size", ph: "例：總共 8,000 人，老客 1,200" },
       ],
     }],
-    rules: ["每封都要有退訂連結；只能寄給同意收信的人（個資法）。"],
+    rules: [r("每封都要有退訂連結；只能寄給同意收信的人（個資法）。", "Include an unsubscribe link. Email opted-in contacts only.")],
   },
   website: {
     channel: "website", zh: "官網任務說明單", en: "Website brief", audience: "internal",
@@ -269,7 +272,7 @@ export const CHANNEL_BRIEF_SPECS: Record<BriefChannel, ChannelBriefSpec> = {
         { key: "onOffTime", zh: "上下架時間", en: "Live dates", ph: "例：10/28 晚上 8 點上線、11/8 凌晨下架" },
       ],
     }],
-    rules: ["優惠條款、截止日、數量限制要寫在頁面上（消費者保護法）。"],
+    rules: [r("優惠條款、截止日、數量限制要寫在頁面上（消費者保護法）。", "Show offer terms, deadline and limits on the page.")],
   },
   cobrand: {
     channel: "cobrand", zh: "異業合作任務說明單", en: "Co-brand brief", audience: "external",
@@ -311,7 +314,7 @@ export const CHANNEL_BRIEF_SPECS: Record<BriefChannel, ChannelBriefSpec> = {
           { key: "dataShare", zh: "名單或數據分享", en: "Data sharing", ph: "例：不交換名單，只分享兌換數字" },
           { key: "attribution", zh: "分潤與成效歸屬", en: "Attribution", ph: "例：各用自己的折扣碼，各算各的" },
         ],
-        rules: ["交換或共用會員名單，要先取得當事人同意（個資法）。"],
+        rules: [r("交換或共用會員名單，要先取得當事人同意（個資法）。", "Get consent before sharing customer lists.")],
       },
       {
         zh: "跟通路／店家談", en: "With a retailer", whenType: "retail",
@@ -329,7 +332,7 @@ export const CHANNEL_BRIEF_SPECS: Record<BriefChannel, ChannelBriefSpec> = {
           { key: "editorial", zh: "審稿權", en: "Editorial control", ph: "例：品牌可確認事實，不改編輯觀點" },
           { key: "giveaway", zh: "抽獎規則與贈品", en: "Giveaway", ph: "例：品牌提供 10 份，媒體負責抽與寄" },
         ],
-        rules: ["置入報導要標示「廣告」或「贊助」（公平交易委員會）。"],
+        rules: [r("置入報導要標示「廣告」或「贊助」（公平交易委員會）。", "Label sponsored articles as ads.")],
       },
       {
         zh: "跟企業／福委談", en: "With a company", whenType: "corporate",
@@ -345,7 +348,7 @@ export const CHANNEL_BRIEF_SPECS: Record<BriefChannel, ChannelBriefSpec> = {
           { key: "commitment", zh: "公益承諾的具體內容", en: "Commitment", ph: "例：每賣一組捐 50 元，活動結束 30 天內公布總額", long: true },
           { key: "nameUse", zh: "名義與 logo 使用", en: "Name & logo use", ph: "例：可寫「與 XX 協會合作」，logo 需對方核可" },
         ],
-        rules: ["公益行銷要寫清楚捐多少、怎麼算、何時公布，不能只寫「部分所得捐出」。"],
+        rules: [r("公益行銷要寫清楚捐多少、怎麼算、何時公布，不能只寫「部分所得捐出」。", "State how much is donated, how, and when it's reported.")],
       },
       {
         zh: "時程與條款", en: "Timeline & terms",
@@ -460,7 +463,7 @@ export function channelBriefText(channel: BriefChannel, brief: ChannelBrief | nu
   for (const g of groups) for (const f of g.fields) if (b.values?.[f.key]) lines.push(`- ${f.zh}：${b.values[f.key]}`);
   const rules = [...spec.rules, ...groups.flatMap((g) => g.rules ?? [])];
   if (!lines.length && !rules.length) return "";
-  if (rules.length) lines.push(`- 平台規則：${rules.join(" ")}`);
+  if (rules.length) lines.push(`- 平台規則：${rules.map((x) => x.zh).join(" ")}`);
   return `[${spec.zh}]\n${lines.join("\n")}`;
 }
 

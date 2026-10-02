@@ -15,6 +15,15 @@ describe("規格", () => {
       expect(new Set(keys).size).toBe(keys.length);
     }
   });
+  it("每條平台規則都有中英文（2026-10-02 CJ）", () => {
+    for (const c of BRIEF_CHANNELS) {
+      const s = CHANNEL_BRIEF_SPECS[c];
+      for (const rule of [...s.rules, ...s.groups.flatMap((g) => g.rules ?? [])]) {
+        expect(rule.zh.length).toBeGreaterThan(0);
+        expect(rule.en).toMatch(/^[\x20-\x7E]+$/);
+      }
+    }
+  });
   it("LINE 收每月可發則數（CJ 2026-10-02）；其他通路不收預算", () => {
     const keysOf = (c: (typeof BRIEF_CHANNELS)[number]) => CHANNEL_BRIEF_SPECS[c].groups.flatMap((g) => g.fields.map((f) => f.key));
     expect(keysOf("line")).toContain("quota");
