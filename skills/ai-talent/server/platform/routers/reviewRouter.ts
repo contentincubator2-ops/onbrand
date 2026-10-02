@@ -38,6 +38,9 @@ const hiddenReview = (r: any) =>
   isHiddenHistoryItem({ platform: r.platform, taskId: r.taskId }) || isHiddenHistoryItem({ platform: r.workspace });
 const REVIEW_TASK_COLS = `NULLIF(JSON_UNQUOTE(JSON_EXTRACT(o.metadata, '$.taskId')), 'null') AS taskId, m.workspace AS workspace`;
 
+/** mysql2 execute() 不吃 LIMIT 的 ? 參數（"Incorrect arguments to mysqld_stmt_execute"），一律夾成整數直接寫進 SQL。 */
+const safeLimit = (n: number | undefined) => Math.min(100, Math.max(1, Math.trunc(Number(n) || 50)));
+
 const REVIEW_TYPES = ["internal", "external", "legal", "client"] as const;
 
 /** 這個人能不能放行那個人送的審。 */
@@ -209,8 +212,8 @@ export const reviewRouter = router({
            LEFT JOIN users u ON u.id = q.requestedBy
           WHERE q.status IN ('pending','in_review')
           ORDER BY q.isUrgent DESC, q.createdAt ASC
-          LIMIT ?`,
-        [input?.limit ?? 50],
+          LIMIT ${safeLimit(input?.limit)}`,
+        [],
       );
       const out = [];
       for (const r of rows as any[]) {
@@ -235,8 +238,8 @@ export const reviewRouter = router({
            LEFT JOIN missions m ON m.id = q.missionId
           WHERE q.requestedBy = ?
           ORDER BY q.createdAt DESC
-          LIMIT ?`,
-        [ctx.user!.id, input?.limit ?? 50],
+          LIMIT ${safeLimit(input?.limit)}`,
+        [ctx.user!.id],
       );
       return (rows as any[]).filter((r) => !hiddenReview(r));
     }),
