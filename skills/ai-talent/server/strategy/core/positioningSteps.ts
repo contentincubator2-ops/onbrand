@@ -464,7 +464,8 @@ export function buildProductPositioningSteps(opts: { lang?: string; outputLangua
   const sys = SYS(lang);
   const pCtx = (c: StepContext) => {
     // audienceAnchorBlock: 產品受眾必須落在母品牌官方客群之內（2026-07-23）。
-    const base = `產品名稱：${c.brandName}\n類別：${c.industry || "未指定"}\n描述：${c.description || ""}${marketBlock(c)}${audienceAnchorBlock(c)}`;
+    // siblingContext：同品牌其他產品＋母品牌定位＋區隔規則（2026-10-02，productSiblings.ts）。
+    const base = `產品名稱：${c.brandName}\n類別：${c.industry || "未指定"}\n描述：${c.description || ""}${c.siblingContext ?? ""}${marketBlock(c)}${audienceAnchorBlock(c)}`;
     if (c.realContent) {
       return base + `\n\n${c.realContent}`;
     }

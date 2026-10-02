@@ -86,6 +86,9 @@ export interface StepContext {
   /** 2026-09-30（CJ「總監的人設應該會影響產出」）：執行這份定位的策略總監人設＋工作守則，
    *  callJSON 接在每一步的 system prompt 後面（positioningDirector.ts）。沒有＝通用 prompt。 */
   directorPersona?: string;
+  /** 2026-10-02（CJ「每一個產品產出的定位，怎麼都是一樣的」）：只有產品有——同品牌其他產品＋
+   *  母品牌定位＋區隔規則，讓每支產品的定位寫出彼此的差別（productSiblings.ts）。 */
+  siblingContext?: string;
   // outputs from already-completed steps in this run, keyed by step id
   prevOutputs: Record<string, any>;
   /** Helper to record cost — runner calls this after each LLM call. */
@@ -505,16 +508,39 @@ async function runPipelineDetached(args: {
     } catch (e: any) {
       console.warn(`[positioningJobRunner] getBrandRealContent failed for brand ${args.entityId}:`, e?.message ?? e);
     }
-  } else if (args.entityKind === "product" && args.website) {
+  }
+
+  // 2026-10-02（CJ「每一個產品產出的定位，怎麼都是一樣的」）：產品定位要跟同品牌其他產品分得開。
+  // 先讀兄弟產品＋母品牌定位；若這支產品的描述其實是好幾支產品共用的全站文字（前端渲染的站
+  // 每頁都回同一組 meta），就不再把它當產品事實餵給模型。
+  let siblingContext: string | undefined;
+  let description = args.description;
+  let sharedDescriptions = new Set<string>();
+  if (args.entityKind === "product") {
+    const { loadProductSiblingContext } = await import("./productSiblings");
+    const sib = await loadProductSiblingContext(args.entityId);
+    siblingContext = sib.block || undefined;
+    sharedDescriptions = sib.sharedDescriptions;
+    if (sib.descriptionIsSiteWide) description = undefined;
+  }
+
+  if (args.entityKind === "product" && args.website) {
     try {
       const { fetchProductMeta } = await import("./productMeta");
+      const { isSiteWideText } = await import("./productSiblings");
       const meta = await fetchProductMeta(args.website);
-      if (meta.source !== "none") {
+      // JSON-LD 的 Product 一定是這支產品自己的；og／<title> 才可能是全站共用。
+      // 標題已經是全站共用的話，同一頁的 meta 描述也是全站的，一起丟掉。
+      const pageIsSiteWide = meta.source !== "jsonld"
+        && (isSiteWideText(meta.name, sharedDescriptions) || isSiteWideText(meta.description, sharedDescriptions));
+      const name = pageIsSiteWide ? undefined : meta.name;
+      const desc = pageIsSiteWide ? undefined : meta.description;
+      if (meta.source !== "none" && (name || desc || meta.price)) {
         realContent = [
           "【商品頁資訊】",
-          meta.name ? `名稱：${meta.name}` : "",
+          name ? `名稱：${name}` : "",
           meta.price ? `價格：${meta.currency ? `${meta.currency} ` : ""}${meta.price}` : "",
-          meta.description ? `說明：${meta.description}` : "",
+          desc ? `說明：${desc}` : "",
           `商品頁：${args.website}`,
         ].filter(Boolean).join("\n");
         console.log(`[positioningJobRunner] fetched product metadata for product ${args.entityId} from ${meta.source}`);
@@ -596,8 +622,9 @@ async function runPipelineDetached(args: {
             entityId: args.entityId,
             brandName: args.brandName,
             industry: args.industry,
-            description: args.description,
+            description,
             realContent,
+            siblingContext,
             marketContext,
             outputLanguage,
             officialAudience,
