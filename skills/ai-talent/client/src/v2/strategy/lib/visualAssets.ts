@@ -75,7 +75,7 @@ export const VISUAL_ASSETS: VisualAssetSpec[] = [
   },
   {
     key: "logo", labelZh: "標誌", labelEn: "Logo", kind: "upload", icon: faPenNib,
-    whyZh: "版型與品牌變體會用到你的標誌檔", whyEn: "Used by layouts and branded variants",
+    whyZh: "版型會用到你的標誌檔", whyEn: "Used by layouts",
   },
   {
     key: "imagery_style", labelZh: "圖像風格", labelEn: "Imagery style", kind: "style", icon: faImage,
