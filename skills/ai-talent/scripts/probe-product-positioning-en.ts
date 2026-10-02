@@ -10,7 +10,12 @@ async function main() {
   const [brands]: any = await localPool.execute(
     `SELECT b.id, b.name, b.outputLanguage, b.targetCountry, COUNT(p.id) AS n
        FROM brands b JOIN products p ON p.brandId = b.id
-      WHERE b.outputLanguage LIKE 'en%' GROUP BY b.id ORDER BY n DESC LIMIT 8`);
+      WHERE (b.outputLanguage IS NOT NULL AND b.outputLanguage NOT IN ('zh-TW','zh-Hant'))
+         OR (b.targetCountry IS NOT NULL AND b.targetCountry NOT IN ('TW'))
+      GROUP BY b.id ORDER BY n DESC LIMIT 8`);
+  const [langs]: any = await localPool.execute(
+    `SELECT outputLanguage, targetCountry, COUNT(*) n FROM brands GROUP BY outputLanguage, targetCountry ORDER BY n DESC LIMIT 15`);
+  console.log("brands by lang/country:", JSON.stringify(langs));
   for (const b of brands as any[]) {
     console.log(`\n品牌 #${b.id} ${b.name} lang=${b.outputLanguage} country=${b.targetCountry} 產品=${b.n}`);
     const [ps]: any = await localPool.execute(`SELECT id, name, positioning FROM products WHERE brandId = ? ORDER BY id LIMIT 10`, [b.id]);
