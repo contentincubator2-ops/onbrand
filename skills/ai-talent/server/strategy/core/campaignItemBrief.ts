@@ -9,11 +9,17 @@
  *   · 寫完之後：產出的 metadata 帶 campaignItem.paid，產出頁與本週企劃標「廣告文案」。
  *
  * 品牌大腦只知道「哪一檔活動」，不知道「哪一篇」，所以這段另外組，不塞進 brandContext。
+ *
+ * 2026-10-02（CJ 同意「FB 定稿後，IG 那張卡以 FB 定稿為底稿來寫」）：同一天、同一段、
+ * 別的通路已經**核准**的那一篇（siblingBase），本文一起給寫手——同一個訊息換到這個通路，
+ * 核心主張與事實一致，語調與格式照這個通路重寫。只拿核准過的：草稿還會改，拿它當底稿
+ * 會讓兩篇一起帶著還沒定的東西。
  */
 import localPool from "../../localDb.js";
 import { campaignLink, cleanLandingUrl } from "../../performance/core/perfUtm.js";
 import { cleanKolBrief, kolBriefText } from "./campaignKolBrief.js";
 import { cleanChannelBrief, channelBriefText, isBriefChannel } from "./campaignChannelBrief.js";
+import { campaignPostState, firstCaption } from "./campaignPostStatus.js";
 
 const PHASE_ZH: Record<string, string> = { teaser: "預熱", launch: "開賣", sustain: "加溫", lastcall: "倒數", encore: "返場" };
 
@@ -27,7 +33,14 @@ export interface CampaignItemInfo {
   kolBrief?: string | null;
   /** 2026-10-02 其他通路的任務說明單（給寫手的文字，含平台規則）。 */
   channelBrief?: string | null;
+  /** 2026-10-02 同一天別的通路已核准的那一篇（底稿）。 */
+  siblingBase?: { platform: string; text: string } | null;
 }
+
+const PLATFORM_ZH: Record<string, string> = {
+  facebook: "Facebook", instagram: "Instagram", threads: "Threads", line: "LINE", tiktok: "TikTok",
+  email: "電子報", website: "官網", kol: "網紅", cobrand: "異業合作",
+};
 
 /** 企劃裡的那一篇 → 給寫手的一段說明。純函式。 */
 export function campaignItemBriefText(info: CampaignItemInfo): string {
@@ -44,7 +57,36 @@ export function campaignItemBriefText(info: CampaignItemInfo): string {
   if (info.kolBrief) lines.push(`- 以下是這檔的網紅任務說明單，裡面有的條件（時程、必提禁提、授權）照寫，沒有的標 [待補]，不要自己編；不要寫任何報價、預算或價格數字（由使用者跟對方直接談）：\n${info.kolBrief}`);
   // 其他通路的任務說明單：使用者填給寫手的執行條件與平台規則。照做，沒寫的不要自己編。
   if (info.channelBrief) lines.push(`- 以下是這個通路的任務說明單。這一篇若對應清單裡的某一列，就照那一列的對象與角度寫；有寫的條件照做，平台規則一定要守，沒寫的不要自己編；不要寫任何報價、預算或價格數字：\n${info.channelBrief}`);
+  if (info.siblingBase?.text) {
+    const who = PLATFORM_ZH[info.siblingBase.platform] ?? info.siblingBase.platform;
+    lines.push(`- 同一天 ${who} 那一篇已經定稿（本文在下面）。這一篇是同一個訊息換到這個通路：核心主張、事實、活動資訊要跟它一致；語調、長度、格式照這個通路重寫，不要逐字照抄，也不要另起一個新主張：\n<<<\n${info.siblingBase.text}\n>>>`);
+  }
   return `\n\n[本篇在活動企劃中的位置]\n${lines.join("\n")}\n`;
+}
+
+/** 同一天、同一段、別的通路已核准的那一篇（見檔頭）。找不到回 null。 */
+async function loadSiblingBase(items: any[], it: any, userId: number): Promise<CampaignItemInfo["siblingBase"]> {
+  const sibs = (items ?? []).filter((x: any) =>
+    x && x.id !== it.id && x.enabled !== false && x.outputId && x.date === it.date && x.phase === it.phase && x.platform !== it.platform);
+  if (!sibs.length) return null;
+  const ids = sibs.map((x: any) => Number(x.outputId)).filter((n: number) => Number.isInteger(n) && n > 0);
+  if (!ids.length) return null;
+  const [rows]: any = await localPool.query(
+    `SELECT mo.id, mo.status, mo.content,
+            (SELECT q.status FROM mission_review_queue q WHERE q.outputId = mo.id ORDER BY q.id DESC LIMIT 1) AS reviewStatus
+       FROM mission_outputs mo JOIN missions m ON m.id = mo.missionId
+      WHERE mo.id IN (?) AND m.userId = ?`,
+    [ids, userId],
+  );
+  for (const sib of sibs) {
+    const r = (rows as any[]).find((x) => Number(x.id) === Number(sib.outputId));
+    if (!r) continue;
+    const state = campaignPostState(r.status, r.reviewStatus);
+    if (state !== "approved" && state !== "published") continue;
+    const text = firstCaption(r.content).slice(0, 1500);
+    if (text) return { platform: String(sib.platform), text };
+  }
+  return null;
 }
 
 /** 讀那一篇。只讀這個帳號自己的活動；找不到就回 null（不擋寫文）。 */
@@ -61,7 +103,10 @@ export async function loadCampaignItem(ref: CampaignItemRef, userId: number): Pr
     const landing = cleanLandingUrl(pos?.campaignPerf?.landingUrl);
     const platform = String(it.platform ?? "");
     const isKol = platform === "kol";
+    // 讀底稿失敗不能連累整段說明（廣告、連結、說明單都還要給）。
+    const siblingBase = await loadSiblingBase(plan.items, it, userId).catch(() => null);
     return {
+      siblingBase,
       link: landing ? campaignLink(landing, { eventId: ref.eventId, itemId: ref.itemId, phase: String(it.phase ?? ""), platform: String(it.platform ?? ""), paid: !!it.paid }) : null,
       eventId: ref.eventId, itemId: ref.itemId, paid: !!it.paid,
       partner: typeof it.partner === "string" && it.partner ? it.partner : null,

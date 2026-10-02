@@ -376,6 +376,13 @@ export interface TaskEmbed {
   slotDate?: string;
   /** 靈感舞台：主體是某個產品／活動時，任務視窗直接選好它，不必再選一次。 */
   entity?: { kind: "product" | "event"; id: number };
+  /**
+   * 2026-10-02（CJ 活動地圖「點了再寫」）：開窗就直接開始寫，不用再按「立即產出」。
+   * 活動已經答得出所有必填才會自動開跑；缺了就停在問題上讓使用者補（不靜默失敗）。
+   */
+  autoRun?: boolean;
+  /** 寫好之後交給呼叫者（不換到成品頁）。沒給就照舊去成品頁。 */
+  onWritten?: (outputId: number) => void;
   onClose: () => void;
 }
 
@@ -865,11 +872,17 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
   // 時間」）：要預填「日期 / 時間」「為什麼參加 / 重點」就得真的去拿活動資料，
   // 所以除了 ref 還要一份 state —— ref 不會觸發 query。
   const [campaignScope, setCampaignScope] = React.useState<{ eventId: number; itemId: string } | null>(null);
+  /** 活動資料已經填進欄位（autoRun 要等這一步，不然會用空白欄位開跑）。 */
+  const [campaignPrefilled, setCampaignPrefilled] = React.useState(false);
   const campaignQ = (trpc as any).campaign?.get?.useQuery(
     { eventId: campaignScope?.eventId ?? 0 },
     { enabled: !!campaignScope?.eventId, refetchOnWindowFocus: false, staleTime: 60_000 },
   ) ?? { data: null };
-  const markWrittenMut = (trpc as any).campaign?.markWritten?.useMutation?.();
+  const campUtils = (trpc as any).useUtils?.() ?? null;
+  // 寫完回貼企劃後，活動頁的地圖與狀態要馬上跟著變（不是等使用者重新整理）。
+  const markWrittenMut = (trpc as any).campaign?.markWritten?.useMutation?.({
+    onSuccess: () => { campUtils?.campaign?.get?.invalidate?.(); campUtils?.campaign?.itemThumbs?.invalidate?.(); },
+  });
   // 2026-09-27（本週企劃）：?slot=<planned_slots.id> —— 從本週企劃「寫這篇」過來，寫完回填那一格。
   const plannerSlotRef = React.useRef<number | null>(null);
   const markSlotMut = (trpc as any).planner?.markWritten?.useMutation?.();
@@ -957,6 +970,7 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
     });
     if (Object.keys(extras).length) setExtraAnswers((prev) => ({ ...extras, ...prev }));
     if (primary) setPrimaryAnswer((prev) => (prev.trim() ? prev : primary));
+    setCampaignPrefilled(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTask, campaignScope, campaignQ.data]);
 
@@ -1475,10 +1489,12 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                 ? "Public posts weren't generated. Only internal drafts are available right now; you can regenerate them."
                 : "公開貼文未產生，目前只有內部草稿，可重新產生。");
             }
-            departToRun();
+            if (!embed?.onWritten) departToRun();
+            const doneCb = embed?.onWritten;
             closeTask();
             finishCampaignItem(Number((r as any).outputId));
-            navigate(runHref((r as any).outputId));
+            if (doneCb) doneCb(Number((r as any).outputId));
+            else navigate(runHref((r as any).outputId));
             return;
           }
           const squadErrors = Array.isArray((r as any).errors) ? (r as any).errors : [];
@@ -1535,10 +1551,12 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
             }
           }
           if (isStale()) { discardCancelledOutput(oid); return; }
-          departToRun();
+          if (!embed?.onWritten) departToRun();
+          const doneCb = embed?.onWritten;
           closeTask();
           finishCampaignItem(Number(oid));
-          navigate(runHref(oid));
+          if (doneCb) doneCb(Number(oid));
+          else navigate(runHref(oid));
           return;
         }
 
@@ -1582,6 +1600,26 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
       }
     }
   };
+
+  // 2026-10-02 autoRun（活動地圖「點了再寫」）：活動資料填進欄位之後，答得出所有必填就直接開跑。
+  // 答不出來就停在問題上——跟手動按「立即產出」走同一個 handleRun，閘門一條都沒少。
+  const autoRanRef = React.useRef(false);
+  useEffect(() => {
+    if (!embed?.autoRun || autoRanRef.current || running || !activeTask || !campaignPrefilled) return;
+    const primaryRequired = (activeTask.inputs?.[0] as any)?.required !== false;
+    const hasDerive = !!(activeTask.primary_input as any)?.derive
+      || !!(activeTask.contextSources && activeTask.contextSources.length > 0);
+    const primaryOk = !!primaryAnswer.trim() || !activeTask.primary_input?.key || !primaryRequired || hasDerive;
+    autoRanRef.current = true;
+    if (!primaryOk || taskNeedsViralSource(activeTask as any) || missingRequiredInputs(activeTask as any, extraAnswers).length > 0) {
+      showToastGlobal(lang === "en"
+        ? "This card needs one more answer before it can write."
+        : "這張卡還差一格要你補，補好按「立即產出」。");
+      return;
+    }
+    void handleRun();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [embed?.autoRun, activeTask, campaignPrefilled, primaryAnswer, extraAnswers, running]);
 
   // ── Progress / countdown ──────────────────────────────────────────────────
   const activeTierForProgress = activeTask ? effectiveTier(activeTask) : "30s";

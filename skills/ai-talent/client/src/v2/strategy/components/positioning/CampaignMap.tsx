@@ -16,20 +16,33 @@
  * 2026-10-02（CJ「右邊的任務點點，滑過去的時候只是一段文字，可以改成縮圖嗎」）：
  * 滑過（或鍵盤移到）一個點就浮出那一篇的縮圖卡——寫好的用成品的圖與開頭幾句，
  * 還沒寫的用那張任務卡的插畫＋要講什麼。點一下放大到那一段。
+ *
+ * 2026-10-02（CJ「看到這些文章，想要真實產出」→ 定案「點了再寫，一篇一篇看和觸發」）：
+ * 放大後每一篇有「寫這篇」（任務視窗直接開寫）／「打開這篇」（CampaignPostModal：
+ * 改字、定稿或送審、標記已發布）。左邊的線與標籤是這一篇走到哪一關
+ * （lib/campaignPostStatus.ts）；段落標題旁是「幾篇已完成」（核准＋發布）。
  */
 import React from "react";
 import { useNavigate } from "react-router-dom";
 import { Button, Chip, Input } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faArrowLeft, faCheck, faEllipsis, faPenNib } from "@fortawesome/free-solid-svg-icons";
+import { faArrowLeft, faEllipsis, faPenNib } from "@fortawesome/free-solid-svg-icons";
 import { CHANNEL_META, channelLabel } from "../../../content/lib/channelMeta";
 import { phaseOf, type CampaignPhaseId, type CampaignPlanItem } from "../../lib/campaignSchema";
 import { phaseShort, type StagePhase } from "../../lib/campaignStage";
 import { money, metricLine, PAID_CHANNELS, type PhaseKpi } from "../../lib/campaignKpi";
 import { TaskIllustration } from "../../../platform/components/TaskIllustration";
+import { isPostDone, postStateBorder, postStateChip, postStateLabel, postStateOf } from "../../lib/campaignPostStatus";
 
-/** 寫好的那一篇的縮圖（campaign.itemThumbs）。 */
-export interface ItemThumb { image: string | null; title: string; excerpt: string }
+/** 寫好的那一篇的縮圖＋走到哪一關（campaign.itemThumbs）。 */
+export interface ItemThumb {
+  image: string | null; title: string; excerpt: string;
+  outputId?: number; missionId?: number;
+  /** 伺服器算的狀態（server/strategy/core/campaignPostStatus.ts）。 */
+  state?: string;
+  reviewNote?: string | null;
+  publishedUrl?: string | null;
+}
 
 const md = (s: string) => s.slice(5).replace("-", "/");
 const DAY = 86_400_000;
@@ -53,7 +66,7 @@ function useSize(ref: React.RefObject<HTMLDivElement | null>): { w: number; h: n
 }
 
 export default function CampaignMap({
-  items, phases, lanes, phaseMessages, current, onPick, locked, en, onPatchItem, fill, phaseKpi = {}, thumbs = {},
+  items, phases, lanes, phaseMessages, current, onPick, locked, en, onPatchItem, fill, phaseKpi = {}, thumbs = {}, onOpenItem,
 }: {
   items: CampaignPlanItem[];
   phases: StagePhase[];
@@ -70,6 +83,8 @@ export default function CampaignMap({
   phaseKpi?: Partial<Record<CampaignPhaseId, PhaseKpi>>;
   /** 寫好的那幾篇的圖與開頭（itemId → 縮圖）。 */
   thumbs?: Record<string, ItemThumb>;
+  /** 寫這篇（還沒寫）／打開這篇（寫好了）。沒給就不出現按鈕。 */
+  onOpenItem?: (item: CampaignPlanItem) => void;
 }) {
   const L = (zh: string, e: string) => (en ? e : zh);
   const boxRef = React.useRef<HTMLDivElement>(null);
@@ -182,7 +197,7 @@ export default function CampaignMap({
                 onMouseEnter={() => setHover(it.id)} onMouseLeave={() => setHover((h) => (h === it.id ? null : h))}
                 onFocus={() => setHover(it.id)} onBlur={() => setHover((h) => (h === it.id ? null : h))}
                 onClick={() => { setHover(null); onPick(it.phase); }}>
-                <span className={`block w-3.5 h-3.5 border-[3px] transition-transform ${hover === it.id ? "scale-150" : ""} ${it.paid ? "rounded-[3px]" : "rounded-full"} ${it.outputId ? "bg-success border-success" : it.paid ? "bg-foreground border-foreground" : "bg-content1 border-foreground"} ${past && hover !== it.id ? "opacity-35" : ""}`} />
+                <span className={`block w-3.5 h-3.5 border-[3px] transition-transform ${hover === it.id ? "scale-150" : ""} ${it.paid ? "rounded-[3px]" : "rounded-full"} ${it.outputId ? (isPostDone(postStateOf(it.outputId, thumbs[it.id]?.state)) ? "bg-success border-success" : "bg-content1 border-success") : it.paid ? "bg-foreground border-foreground" : "bg-content1 border-foreground"} ${past && hover !== it.id ? "opacity-35" : ""}`} />
               </button>
               {showDate.has(it.id) && (
                 <span className={`absolute -translate-x-1/2 text-[10.5px] tabular-nums text-default-600 bg-content1/85 rounded px-1 ${past ? "opacity-50" : ""}`}
@@ -248,7 +263,7 @@ export default function CampaignMap({
           phase={phases[ci]!} message={phaseMessages[phases[ci]!.id] ?? ""}
           items={items.filter((i) => i.phase === phases[ci]!.id)} lanes={lanes}
           locked={locked} en={en} onBack={() => onPick(null)} onPatchItem={onPatchItem}
-          kpi={phaseKpi[phases[ci]!.id] ?? null}
+          kpi={phaseKpi[phases[ci]!.id] ?? null} thumbs={thumbs} onOpenItem={onOpenItem}
         />
       )}
     </div>
@@ -274,9 +289,15 @@ function PinThumb({ item, thumb, en, style }: { item: CampaignPlanItem; thumb: I
         </span>
         <span className="absolute right-2 top-2 flex gap-1">
           {item.paid && <span className="rounded-full bg-foreground text-background px-2 py-0.5 text-[10.5px]">{L("廣告", "Ad")}</span>}
-          {item.outputId
-            ? <span className="rounded-full bg-success text-success-foreground px-2 py-0.5 text-[10.5px] flex items-center gap-1"><FontAwesomeIcon icon={faCheck} className="text-[9px]" />{L("已寫", "Written")}</span>
-            : <span className="rounded-full bg-content1/90 px-2 py-0.5 text-[10.5px] text-default-600">{L("還沒寫", "Not written")}</span>}
+          {(() => {
+            const st = postStateOf(item.outputId, thumb?.state);
+            const c = postStateChip(st);
+            return (
+              <Chip size="sm" color={c.color} variant={c.variant} className={`h-5 text-[10.5px] ${c.variant === "bordered" ? "bg-content1/90" : ""}`}>
+                {postStateLabel(st, en)}
+              </Chip>
+            );
+          })()}
         </span>
       </div>
       <div className="px-3 py-2.5 flex flex-col gap-1">
@@ -284,23 +305,28 @@ function PinThumb({ item, thumb, en, style }: { item: CampaignPlanItem; thumb: I
         <p className="text-small font-semibold leading-snug line-clamp-3">{item.angle}</p>
         {thumb?.excerpt
           ? <p className="text-tiny text-default-500 leading-snug line-clamp-2">{thumb.excerpt}</p>
-          : item.outputId ? null : <p className="text-[11px] text-default-400">{L("點一下看這一段的安排", "Click to open this phase")}</p>}
+          : item.outputId ? null : <p className="text-[11px] text-default-400">{L("點一下看這一段，再按「寫這篇」", "Click to open this phase, then write it")}</p>}
         {item.partner && <p className="text-[11px] text-default-500 truncate">{L("給：", "For: ")}{item.partner}</p>}
       </div>
     </div>
   );
 }
 
-function PhaseDetail({ phase, message, items, lanes, locked, en, onBack, onPatchItem, kpi }: {
+function PhaseDetail({ phase, message, items, lanes, locked, en, onBack, onPatchItem, kpi, thumbs, onOpenItem }: {
   phase: StagePhase; message: string; items: CampaignPlanItem[]; lanes: string[];
   locked: boolean; en: boolean; onBack: () => void;
   onPatchItem: (id: string, next: Partial<CampaignPlanItem>) => void;
   kpi: PhaseKpi | null;
+  thumbs: Record<string, ItemThumb>;
+  onOpenItem?: (item: CampaignPlanItem) => void;
 }) {
   const L = (zh: string, e: string) => (en ? e : zh);
   const navigate = useNavigate();
   const [open, setOpen] = React.useState<string | null>(null);
   const spec = phaseOf(phase.id);
+  const stateOf = (i: CampaignPlanItem) => postStateOf(i.outputId, thumbs[i.id]?.state);
+  const enabled = items.filter((i) => i.enabled);
+  const doneCount = enabled.filter((i) => isPostDone(stateOf(i))).length;
   return (
     <div className="absolute inset-0 p-4 flex flex-col gap-3 overflow-y-auto animate-[fadeIn_.35s_ease_.25s_both] motion-reduce:animate-none">
       <style>{"@keyframes fadeIn{from{opacity:0}to{opacity:1}}"}</style>
@@ -312,6 +338,9 @@ function PhaseDetail({ phase, message, items, lanes, locked, en, onBack, onPatch
         <div className="row-span-2">
           <p className="text-2xl font-black leading-tight">{en ? phaseShort(phase.id, true) : `${phaseShort(phase.id, false)}期`}</p>
           <p className="text-tiny text-default-500 tabular-nums">{range(phase)}</p>
+          {enabled.length > 0 && (
+            <p className="text-tiny text-default-600 tabular-nums mt-0.5">{L(`${doneCount}／${enabled.length} 已完成`, `${doneCount}/${enabled.length} done`)}</p>
+          )}
         </div>
         <p className="text-small text-default-600">{spec?.purposeZh}</p>
         {message
@@ -342,12 +371,11 @@ function PhaseDetail({ phase, message, items, lanes, locked, en, onBack, onPatch
                 </p>
               )}
               {list.map((i) => (
-                <div key={i.id} className={`border-l-[3px] pl-2.5 flex flex-col gap-1 ${i.outputId ? "border-success" : "border-foreground"} ${i.enabled ? "" : "opacity-45"}`}>
+                <div key={i.id} className={`border-l-[3px] pl-2.5 flex flex-col gap-1 ${postStateBorder(stateOf(i))} ${i.enabled ? "" : "opacity-45"}`}>
                   <div className="flex items-center gap-2 text-tiny">
                     <b className="tabular-nums">{md(i.date)}</b>
                     <Chip size="sm" variant="flat" className="h-5 text-[10.5px] max-w-[70%]" title={i.taskLabel}>{i.taskLabel}</Chip>
                     {i.paid && <Chip size="sm" className="h-5 text-[10.5px] bg-foreground text-background">{L("廣告", "Ad")}</Chip>}
-                    {i.outputId && <FontAwesomeIcon icon={faCheck} className="text-success" />}
                     {!locked && (
                       <button type="button" className="ml-auto text-default-400 hover:text-foreground px-1"
                         aria-label={L("更多", "More")} onClick={() => setOpen(open === i.id ? null : i.id)}>
@@ -366,10 +394,24 @@ function PhaseDetail({ phase, message, items, lanes, locked, en, onBack, onPatch
                       className="text-small leading-relaxed bg-transparent resize-none outline-none rounded focus:bg-default-100 px-0.5"
                     />
                   )}
-                  {i.outputId && (
+                  {i.enabled && onOpenItem ? (
+                    // 狀態標籤放在按鈕旁（不擠在日期那一列——卡名長的時候會被推出卡片外）。
+                    <div className="flex items-center gap-2">
+                      <Button size="sm" radius="full" variant={i.outputId ? "flat" : "solid"}
+                        className={`h-7 ${i.outputId ? "" : "bg-foreground text-background"}`}
+                        startContent={!i.outputId && <FontAwesomeIcon icon={faPenNib} className="text-[11px]" />}
+                        onPress={() => onOpenItem(i)}>
+                        {i.outputId ? L("打開這篇", "Open") : L("寫這篇", "Write it")}
+                      </Button>
+                      {i.outputId && (() => {
+                        const c = postStateChip(stateOf(i));
+                        return <Chip size="sm" color={c.color} variant={c.variant} className="h-5 text-[10.5px]">{postStateLabel(stateOf(i), en)}</Chip>;
+                      })()}
+                    </div>
+                  ) : i.outputId ? (
                     <button type="button" className="self-start text-tiny text-default-500 hover:text-foreground"
                       onClick={() => navigate(`/run/${i.outputId}`)}>{L("看寫好的這篇 →", "View post →")}</button>
-                  )}
+                  ) : null}
                   {open === i.id && !locked && (
                     <div className="flex items-center gap-2 flex-wrap pt-1">
                       <Input type="date" size="sm" variant="bordered" radius="md" className="w-[150px]"
