@@ -598,6 +598,11 @@ async function runStartupMigrations() {
     await db.execute(sql.raw(BRAND_CALENDAR_NODES_DDL));
     console.log("[migrate] brand_calendar_nodes: OK");
 
+    // 2026-10-02（CJ「對話要存到資料庫中」）：活動頁對話＋復原快照。
+    const { CAMPAIGN_CHAT_DDL } = await import("./strategy/core/campaignChatStore");
+    await db.execute(sql.raw(CAMPAIGN_CHAT_DDL));
+    console.log("[migrate] campaign_chat_messages: OK");
+
     const { BRAND_NAV_PREFS_DDL } = await import("./platform/routers/navPrefsRouter");
     await db.execute(sql.raw(BRAND_NAV_PREFS_DDL));
     console.log("[migrate] brand_nav_prefs: OK");
