@@ -20,11 +20,12 @@ import type { CampaignPlan } from "../../lib/campaignSchema";
 
 type Opt = { id: string; zh: string; en: string };
 type Field = { key: string; zh: string; en: string; ph: string; long?: boolean; options?: Opt[]; optionsBy?: { field: string; map: Record<string, Opt[]> } };
-type Group = { zh: string; en: string; fields: Field[]; whenType?: string; rules?: string[] };
+type Rule = { zh: string; en: string };
+type Group = { zh: string; en: string; fields: Field[]; whenType?: string; rules?: Rule[] };
 export type ChannelBriefSpec = {
   channel: string; zh: string; en: string; introZh: string; introEn: string; audience: "internal" | "external";
   rows: { zh: string; en: string; hintZh: string; hintEn: string; fields: Field[]; max: number; addZh: string; addEn: string };
-  groups: Group[]; rules: string[];
+  groups: Group[]; rules: Rule[];
 };
 export type ChannelBrief = { rows?: Array<Record<string, string>>; values?: Record<string, string> };
 
@@ -171,7 +172,7 @@ export default function ChannelBriefForm({ eventId, spec, initial, inherited, in
         <section className="flex flex-col gap-1">
           <p className="text-small font-bold">{L("平台規則", "Platform rules")}<span className="text-tiny font-normal text-default-500 ml-2">{L("系統帶入，寫手一定會照做", "Always applied")}</span></p>
           <ul className="list-disc pl-5 text-tiny text-default-600 flex flex-col gap-0.5">
-            {rules.map((r) => <li key={r}>{r}</li>)}
+            {rules.map((r) => <li key={r.zh}>{en ? r.en : r.zh}</li>)}
           </ul>
         </section>
       )}
