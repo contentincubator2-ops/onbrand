@@ -226,8 +226,8 @@ ${input.audienceContext ? `受眾：${input.audienceContext}` : ""}
   /**
    * 2026-07-25 (CJ product-faithful gen): list the brand's products that
    * have a REAL photo — drives the「📦 使用真實產品圖」picker in the media
-   * flows. Image candidates read from positioning JSON, same locations as
-   * brandColorsRouter.generateBrandedVariants.
+   * flows. Image candidates read from positioning JSON (imageUrl / image /
+   * _interim / images[0] / _assets.photos[0]).
    */
   listProductImages: protectedProcedure
     .input(z.object({ brandId: z.number().int().positive() }))
