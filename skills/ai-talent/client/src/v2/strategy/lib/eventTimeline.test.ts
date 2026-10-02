@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { eventPhase, labelPx, overlaps, packLanes, pct, pxToDays, shiftMonth, sortEventsForCards, timelineWindow } from "./eventTimeline";
+import { eventPhase, labelPx, nodeErrorText, overlaps, packLanes, pct, pxToDays, shiftMonth, sortEventsForCards, timelineWindow } from "./eventTimeline";
 
 describe("滾動 12 個月視窗", () => {
   it("從十月開始跨到隔年九月", () => {
@@ -83,5 +83,24 @@ describe("活動狀態與卡片排序", () => {
       { id: 5, startAt: "2026-10-01", endAt: "2026-10-10" },
     ], today);
     expect(sorted.map((e) => e.id)).toEqual([5, 4, 3, 2, 1]);
+  });
+});
+
+describe("節點錯誤訊息依介面語言", () => {
+  it("找不到、數量上限、日期順序都有中英文", () => {
+    const nf = { message: "找不到這個節點", data: { code: "NOT_FOUND" } };
+    expect(nodeErrorText(nf, true)).toMatch(/no longer exists/);
+    expect(nodeErrorText(nf, false)).toMatch(/找不到這個節點/);
+    const cap = { message: "一個品牌最多 60 個自訂節點", data: { code: "BAD_REQUEST" } };
+    expect(nodeErrorText(cap, true)).toBe("A brand can have at most 60 custom dates.");
+    expect(nodeErrorText(cap, false)).toBe("一個品牌最多 60 個自訂節點。");
+    // zod refine 的錯誤是一串 JSON，裡面帶著中文訊息
+    const zod = { message: '[{"code":"custom","message":"結束日不能早於開始日","path":["endDate"]}]', data: { code: "BAD_REQUEST" } };
+    expect(nodeErrorText(zod, true)).toBe("End date is before the start.");
+  });
+  it("認不得的錯誤：英文介面不顯示中文原文", () => {
+    expect(nodeErrorText({ message: "資料庫忙碌" }, true)).toBe("Something went wrong — please try again.");
+    expect(nodeErrorText({ message: "資料庫忙碌" }, false)).toBe("資料庫忙碌");
+    expect(nodeErrorText({ message: "Network error" }, true)).toBe("Network error");
   });
 });
