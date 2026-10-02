@@ -17,7 +17,7 @@ import { showToastGlobal } from "../../../../components/ui/Toast";
 import { EmptyIllustration } from "../../../platform/components/EmptyIllustration";
 import { AddIcon, ChevronLeftIcon, ChevronRightIcon, DeleteIcon, EditIcon, FlagIcon, CommentIcon } from "../../../platform/components/icons";
 import { TASK_MODAL_CLASSNAMES, TASK_MODAL_HEADER, TASK_MODAL_INPUT, TASK_MODAL_QUESTION } from "../../../platform/components/taskModalStyle";
-import { labelPx, overlaps, packLanes, pct, pxToDays, shiftMonth, timelineWindow, toYmd } from "../../lib/eventTimeline";
+import { labelPx, nodeErrorText, overlaps, packLanes, pct, pxToDays, shiftMonth, timelineWindow, toYmd } from "../../lib/eventTimeline";
 
 export interface PlanPrefill { name: string; startAt: string; endAt: string | null }
 
@@ -76,7 +76,7 @@ export default function EventYearTimeline({ brandId, events, lang, today, onOpen
     { refetchOnWindowFocus: false, staleTime: 60_000 },
   );
   const refresh = () => utils.eventCalendar?.nodes?.invalidate?.();
-  const onErr = (e: any) => showToastGlobal(String(e?.message ?? e), "error");
+  const onErr = (e: any) => showToastGlobal(nodeErrorText(e, en), "error");
   const hideMut = (trpc as any).eventCalendar.hideBuiltin.useMutation({ onSuccess: refresh, onError: onErr });
   const showMut = (trpc as any).eventCalendar.showBuiltin.useMutation({ onSuccess: refresh, onError: onErr });
   const removeMut = (trpc as any).eventCalendar.removeNode.useMutation({ onSuccess: refresh, onError: onErr });
@@ -388,7 +388,7 @@ function NodeForm({ node, brandId, en, onSaved }: { node: CalendarNode | null; b
       else await addMut.mutateAsync({ brandId, ...payload });
       onSaved();
     } catch (e: any) {
-      setErr(String(e?.message ?? e));
+      setErr(nodeErrorText(e, en));
     }
   };
 

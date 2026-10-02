@@ -114,3 +114,26 @@ export function sortEventsForCards<T extends { startAt?: unknown; endAt?: unknow
     return (pa.days ?? 0) - (pb.days ?? 0);
   });
 }
+
+/**
+ * 節點 API 的錯誤 → 介面語言的訊息。後端（eventCalendarRouter）跟專案其他 router 一樣
+ * 只回中文，英文介面不能直接把它丟給用戶，所以在這裡依錯誤種類翻。
+ * 認不得的錯誤：中文介面照原文，英文介面原文有中文就換成通用句。
+ */
+export function nodeErrorText(e: unknown, en: boolean): string {
+  const err = e as { message?: string; data?: { code?: string } } | null;
+  const msg = String(err?.message ?? e ?? "");
+  const code = err?.data?.code;
+  if (code === "NOT_FOUND" || msg.includes("找不到這個節點")) {
+    return en ? "This date no longer exists — it may have been deleted." : "找不到這個節點，可能已經被刪除。";
+  }
+  const cap = msg.match(/最多\s*(\d+)\s*個自訂節點/);
+  if (cap) {
+    return en ? `A brand can have at most ${cap[1]} custom dates.` : `一個品牌最多 ${cap[1]} 個自訂節點。`;
+  }
+  if (msg.includes("結束日不能早於開始日")) {
+    return en ? "End date is before the start." : "結束日不能早於開始日。";
+  }
+  if (en && /[一-鿿]/.test(msg)) return "Something went wrong — please try again.";
+  return msg;
+}
