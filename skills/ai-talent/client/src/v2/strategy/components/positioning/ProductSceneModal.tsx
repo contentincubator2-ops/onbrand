@@ -12,6 +12,7 @@ import { useEffect, useState } from "react";
 import { trpc } from "../../../../lib/trpc";
 import { useLang } from "../../../../lib/i18n";
 import { CloseIcon, GenerateIcon, CheckIcon } from "../../../platform/components/icons";
+import AiImageNotice from "../../../platform/components/AiImageNotice";
 
 const INK = "#171717";
 const MUTED = "#737373";
@@ -325,7 +326,10 @@ export default function ProductSceneModal({
               </figure>
               <figure style={{ margin: 0 }}>
                 <img src={current.url} alt="" style={{ width: "100%", borderRadius: 8, border: `1px solid ${LINE}`, display: "block" }} />
-                <figcaption style={{ fontSize: 11, color: MUTED, marginTop: 4 }}>{label(`生成結果（${MODEL_NAME[current.model]}）`, `Result (${MODEL_NAME[current.model]})`)}</figcaption>
+                <figcaption style={{ fontSize: 11, color: MUTED, marginTop: 4, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6 }}>
+                  <span>{label(`生成結果（${MODEL_NAME[current.model]}）`, `Result (${MODEL_NAME[current.model]})`)}</span>
+                  <AiImageNotice />
+                </figcaption>
               </figure>
             </div>
             <div style={{ fontSize: 12, color: WARN, lineHeight: 1.6 }}>
