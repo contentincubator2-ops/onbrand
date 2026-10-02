@@ -56,12 +56,30 @@ import { ThreadsPost, ThreadsThread } from "./threads";
 import { PinterestPin, PinterestBoard, PinterestStoryPin } from "./pinterest";
 import { PodcastEpisode, PodcastShow, PodcastAudiogram } from "./podcast";
 import { UnsupportedVariantPlaceholder } from "./unsupported";
+import AiImageNotice from "../../../platform/components/AiImageNotice";
 
 export interface PlatformMockupProps extends MockupFields {
   variant: MockupVariant;
 }
 
-export function PlatformMockup({ variant, ...fields }: PlatformMockupProps) {
+/**
+ * 2026-10-02（CJ「只要生成圖時，都要有 AI 生圖，請都提供小警語的圖示」）：貼文預覽裡有圖，就在
+ * 預覽下方放 AI 生成的小警語（AiImageNotice）。放在外框這一層，不用改 27 個平台外框裡的 <img>；
+ * 警語不會被「帶版型下載」截進圖裡。
+ */
+export function PlatformMockup(props: PlatformMockupProps) {
+  const inner = <PlatformMockupFrame {...props} />;
+  const hasImage = !!props.liveImageUrl || (props.liveCards ?? []).some((c) => !!c?.image?.url);
+  if (!hasImage) return inner;
+  return (
+    <div className="flex flex-col">
+      {inner}
+      <div className="flex justify-end pt-1"><AiImageNotice /></div>
+    </div>
+  );
+}
+
+function PlatformMockupFrame({ variant, ...fields }: PlatformMockupProps) {
   const f: MockupFields = { ...fields, variantLabel: variant.label };
   const key = `${variant.platform}:${variant.format}`;
 

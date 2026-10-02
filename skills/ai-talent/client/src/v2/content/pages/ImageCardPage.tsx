@@ -19,6 +19,7 @@ import type { ShellOutletCtx } from "../../app/shell/ShellLayout";
 import type { ImageCardInfo } from "../components/imageCard/ImageCardTile";
 import { readImageCardHandoff, takeImageSubjectHandoff } from "../lib/imageCardHandoff";
 import BrandLibrary from "../../strategy/components/positioning/BrandLibrary";
+import AiImageNotice from "../../platform/components/AiImageNotice";
 
 type Model = "gpt-image-2" | "nano-banana";
 
@@ -290,7 +291,10 @@ export default function ImageCardPage() {
           <div className="mx-auto" style={{ maxWidth: card.width >= card.height ? 720 : 440 }}>
             <div className="relative w-full overflow-hidden rounded-lg border border-default-200 bg-default-100" style={{ aspectRatio: ratioCss }}>
               {current ? (
-                <img src={current.url} alt="" className="absolute inset-0 w-full h-full object-cover" />
+                <>
+                  <img src={current.url} alt="" className="absolute inset-0 w-full h-full object-cover" />
+                  <AiImageNotice overlay />
+                </>
               ) : (
                 <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-default-400 text-tiny p-6 text-center">
                   {busy ? <Spinner size="sm" /> : null}
@@ -560,7 +564,7 @@ export default function ImageCardPage() {
                     return (
                       <div key={c.id} className="text-tiny">
                         <div className="relative rounded-md overflow-hidden border border-default-200 bg-default-100" style={{ aspectRatio: `${c.width} / ${c.height}` }}>
-                          {x.status === "ready" && x.url ? <img src={x.url} alt="" className="absolute inset-0 w-full h-full object-cover" />
+                          {x.status === "ready" && x.url ? <><img src={x.url} alt="" className="absolute inset-0 w-full h-full object-cover" /><AiImageNotice overlay /></>
                             : x.status === "running" ? <div className="absolute inset-0 flex items-center justify-center"><Spinner size="sm" /></div>
                             : <div className="absolute inset-0 p-2 text-warning-700 text-[11px] overflow-hidden">{x.msg ?? "失敗"}</div>}
                         </div>

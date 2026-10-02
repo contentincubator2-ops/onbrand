@@ -18,6 +18,11 @@
  *   團隊版再選「送給誰」（review.reviewers：同團隊的 owner／admin）。按下去＝排進行事曆
  *   ＋送審（指定那一位），本週企劃上就會出現這一篇：自己看到「送審中」，審核人看到「待審」。
  *
+ * 2026-10-02（CJ「這邊可以讓它也可直接生成圖嗎？」）：點預覽的圖片區或「做圖」，直接在這裡做：
+ * 從本文產生圖片指令（image.promptFromCaption）→ 用預設模型產圖（image.generate，gpt-image-2，
+ * 兩模型政策：失敗不自動換模型）→ 存回這一篇（output.updateVariantImage，舊圖留版本可切回）。
+ * 自己寫指令、改用 Nano Banana、用真實產品照，還是在成品頁。多張卡片的貼文每張各有圖，也在成品頁做。
+ *
  * 放行為什麼不在這裡：活動屬於建立它的帳號（events.userId），主管開不了別人的活動頁；
  * 放行一律在審核佇列（/review），那裡本來就是主管的入口。
  */
@@ -25,14 +30,14 @@ import React from "react";
 import { useNavigate } from "react-router-dom";
 import { Button, Chip, Input, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader, Spinner, Textarea } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faArrowUpRightFromSquare, faPenNib, faWandMagicSparkles } from "@fortawesome/free-solid-svg-icons";
+import { faArrowUpRightFromSquare, faImage, faPenNib, faWandMagicSparkles } from "@fortawesome/free-solid-svg-icons";
 import { trpc } from "../../../../lib/trpc";
 import { showToastGlobal } from "../../../../components/ui/Toast";
 import { toastWithUpgrade } from "../../../platform/lib/upgradeToast";
 import { TASK_MODAL_CLASSNAMES, TASK_MODAL_HEADER } from "../../../platform/components/taskModalStyle";
 import { PlatformMockup } from "../../../content/components/PlatformMockup";
 import type { MockupVariant } from "../../../content/lib/inferMockup";
-import { getRunContentMutationLocator, resolveRunContent, type RunContentKind } from "../../../content/lib/strategyContentEnvelope";
+import { getIgPublicVariantImageSize, getRunContentMutationLocator, resolveRunContent, type RunContentKind } from "../../../content/lib/strategyContentEnvelope";
 import { CHANNEL_META, channelLabel } from "../../../content/lib/channelMeta";
 import { phaseShort } from "../../lib/campaignStage";
 import type { CampaignPlanItem } from "../../lib/campaignSchema";
@@ -155,6 +160,57 @@ export default function CampaignPostModal({
     },
     onError: (e: any) => toastWithUpgrade(e?.message ?? L("改寫失敗", "Rewrite failed"), en),
   });
+
+  // ── 直接做圖（2026-10-02）──
+  const promptMut = (trpc as any).image.promptFromCaption.useMutation();
+  const genMut = (trpc as any).image.generate.useMutation();
+  const saveImgMut = (trpc as any).output.updateVariantImage.useMutation();
+  const [imgStep, setImgStep] = React.useState<"" | "prompt" | "draw" | "save">("");
+  /** 活動的通路 → image.generate 的通路代碼（不認得就不帶，伺服器用預設尺寸）。 */
+  const imgChannel = ({ facebook: "fb", instagram: "ig", tiktok: "tiktok", email: "email" } as Record<string, string>)[item.platform];
+  const makeImage = async () => {
+    const brandIdOf = Number(data?.brand?.id ?? brandId ?? 0);
+    if (!brandIdOf || !variant || imgStep) return;
+    if (!caption.trim()) { showToastGlobal(L("先寫好本文，才知道要畫什麼。", "Write the post first.")); return; }
+    flush();
+    const size = getIgPublicVariantImageSize(resolved.kind, variant?.format);
+    try {
+      setImgStep("prompt");
+      const p = await promptMut.mutateAsync({
+        brandId: brandIdOf, caption: caption.slice(0, 6000),
+        ...(imgChannel ? { channel: imgChannel } : {}), ...(size ? { size } : {}),
+        ...(variant?.imageStyle ? { imageStyle: String(variant.imageStyle).slice(0, 3000) } : {}),
+      });
+      const promptZh = String(p?.promptZh || p?.prompt || "").trim();
+      if (!promptZh) throw new Error(L("這次沒產生出圖片指令", "No image prompt came back"));
+      setImgStep("draw");
+      const r = await genMut.mutateAsync({
+        brandId: brandIdOf, prompt: promptZh, modelChoice: "gpt-image-2",
+        ...(imgChannel ? { channel: imgChannel } : {}), ...(size ? { size } : {}),
+      });
+      if (r?.status === "failed" || !r?.url) {
+        showToastGlobal(r?.canSwitchTo
+          ? L("這次沒有產出圖。可以再試一次，或到成品頁改用 Nano Banana。", "No image this time — try again, or switch model in the full editor.")
+          : L("這次沒有產出圖，請再試一次。", "No image this time — please try again."));
+        return;
+      }
+      setImgStep("save");
+      await saveImgMut.mutateAsync({
+        id: outputId, ...getRunContentMutationLocator(resolved.kind, idx),
+        imageUrl: r.url, prompt: r?.effectivePrompt ?? promptZh, promptZh: r?.normalizedDisplayPrompt ?? promptZh,
+        modelId: r?.model ?? undefined, requestedModelId: r?.requestedModel ?? undefined,
+      });
+      utils?.output?.getById?.invalidate?.({ id: outputId });
+      utils?.campaign?.itemThumbs?.invalidate?.({ eventId });
+      showToastGlobal(L("圖做好了（前一張有保留，在成品頁可以切回去）。", "Image ready (the previous one is kept in the full editor)."));
+    } catch (e: any) {
+      toastWithUpgrade(e?.message ?? L("做圖失敗", "Image failed"), en);
+    } finally {
+      setImgStep("");
+    }
+  };
+  // 審核中、已發布的不動圖（跟本文同一條規則）；多張卡片的貼文到成品頁做。
+  const canMakeImage = !!variant && !cards && editable;
 
   // ── 狀態動作 ──
   const statusMut = (trpc as any).output.updateStatus.useMutation({ onSuccess: refreshStatus, onError: (e: any) => showToastGlobal(e?.message ?? "") });
@@ -280,7 +336,15 @@ export default function CampaignPostModal({
                   liveImageUrl={imageUrl ?? undefined}
                   liveImageStatus={imageStatus as any}
                   liveCards={cards as any}
+                  onGenerateImage={canMakeImage && !imgStep ? () => { void makeImage(); } : undefined}
                 />
+                {imgStep && (
+                  <p className="text-tiny text-default-500 mt-2 flex items-center gap-2"><Spinner size="sm" />
+                    {imgStep === "prompt" ? L("從本文想畫面…", "Working out the picture from the text…")
+                      : imgStep === "draw" ? L("畫圖中，大約 30–60 秒…", "Drawing — about 30–60s…")
+                      : L("存到這一篇…", "Saving…")}
+                  </p>
+                )}
                 {data?.progress === "caption_ready" && (
                   <p className="text-tiny text-default-500 mt-2 flex items-center gap-2"><Spinner size="sm" />{L("圖還在畫，好了會自動出現。", "The image is still rendering.")}</p>
                 )}
@@ -323,6 +387,13 @@ export default function CampaignPostModal({
                       startContent={!refineMut.isPending && <FontAwesomeIcon icon={faWandMagicSparkles} />}
                       onPress={() => refineMut.mutate(refinePayload())}>{L("改", "Rewrite")}</Button>
                   </div>
+                )}
+                {canMakeImage && (
+                  <Button size="sm" radius="lg" variant="flat" className="self-start" isLoading={!!imgStep}
+                    startContent={!imgStep && <FontAwesomeIcon icon={faImage} />}
+                    onPress={() => { void makeImage(); }}>
+                    {imageUrl ? L("重做這張圖", "Redo the image") : L("幫這篇做圖", "Make an image")}
+                  </Button>
                 )}
                 <button type="button" className="self-start text-tiny text-default-500 hover:text-foreground flex items-center gap-1.5"
                   onClick={() => { flush(); navigate(`/run/${outputId}`); }}>
