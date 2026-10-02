@@ -16,7 +16,7 @@ describe("reviewRouter", () => {
     const names = Object.keys((reviewRouter as any)._def.procedures).sort();
     expect(names).toEqual([
       "approve", "listMine", "listPending", "pendingCount", "requestRevision",
-      "statusFor", "submit",
+      "reviewers", "statusFor", "submit",
     ]);
   });
 

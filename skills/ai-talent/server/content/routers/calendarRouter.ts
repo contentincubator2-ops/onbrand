@@ -388,6 +388,14 @@ export const calendarRouter = router({
       if (row.status !== "pending") {
         throw new TRPCError({ code: "BAD_REQUEST", message: "此貼文已發布或已取消，無法重複發布" });
       }
+      // 2026-10-02：送審了就要等放行。審核中或被退回的稿按「立即發布」會繞過審核。
+      const [rv]: any = await localPool.execute(
+        `SELECT status FROM mission_review_queue WHERE outputId = ? ORDER BY id DESC LIMIT 1`, [row.outputId],
+      );
+      const rs = String((rv as any[])[0]?.status ?? "");
+      if (rs === "pending" || rs === "in_review" || rs === "revision_requested") {
+        throw new TRPCError({ code: "BAD_REQUEST", message: rs === "revision_requested" ? "這篇被退回修改，改好再送審、放行後才能發布" : "這篇還在審核中，放行後才能發布" });
+      }
 
       // Normalise platform
       const platformRaw: string = (row.platform ?? "").toLowerCase();
