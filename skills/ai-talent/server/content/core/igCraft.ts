@@ -86,7 +86,6 @@ export const IG_TASK_REF: Record<string, string> = {
   "ig-30-threads-cross-post":   "NASA Threads 跨貼策略 (NASA 是 Threads 平台最早採用的大型機構帳號之一)：科學內容在 Threads 文字原生格式的跨貼示範——去掉 IG 視覺依賴，改寫成「一個讓人想回覆的觀點或問題」；保留參與鉤子，換成 Threads 的對話語氣。",
   "ig-60-feed-full":            "Patagonia Instagram 完整 feed 貼文策略 (Shorty Award Best in Retail；環境品牌 IG feed 互動率最高的標竿)：完整 feed 貼文 = 真實戶外行動者故事（非模特兒廣告）+ 品牌環境使命的一個具體體現 + 行動邀請；每張圖可獨立存在，合起來建立「守護地球」的一致世界觀。",
   "ig-60-reel-full":            "Red Bull Instagram Reels 完整腳本策略 (Shorty Award Best in Sports 多屆；Red Bull Media House 運動極限類短影音標竿)：完整 Reel = 動作峰值開場（不是解釋）→ 衝突/挑戰展開 → 反轉/完成揭示 → loop 回第一幀；建在「為分享設計」的弧線上，不是為了觀看。",
-  "ig-60-carousel-7":           "HubSpot 教育型 7 卡輪播格式 (CMI Award Best Content Marketing；B2B 社群 save 率最高的內容格式之一)：7 卡 = 封面主張 → 6 張每卡一個獨立可截圖洞察 → 末卡行動邀請；每張洞察可獨立儲存，合起來構成完整框架；教育型輪播的目標是 save，不只是讚。",
   "ig-60-story-3frame":         "Headspace Instagram Story 3 幀冥想邀請 (Shorty Award Best in Health & Wellness；Headspace 的 3 幀 Story 是健康品牌最高完成率的微內容格式)：3 幀 = 問題引發（你最近睡不好？）→ 概念揭示（10 分鐘能改變一切）→ 互動/CTA（試試這個呼吸練習）；末幀互動貼紙讓 Story 從廣播變對話。",
   "ig-60-countdown-5day":       "Select Registry「Stay for the Story」(IAC 飯店)：5 天分眾升級（認知→意圖→轉換），每天獨立目標。",
   "ig-60-highlight-suite":      "Glossier Instagram Highlight 套組 (Shorty Award Best in Beauty；Glossier 把 Highlight 設計成品牌永久圖書館)：5 個 Highlight = 封面視覺一致的主題分類系統；每個 Highlight 標題即品牌語言（不是「新品」「活動」，是「Skin」「You Look」「Into The Gloss」）；讓陌生訪客 3 秒掌握品牌世界觀。",
