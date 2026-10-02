@@ -5191,8 +5191,11 @@ function BrandEntityGrid({
   const getPreview = (item: any) => {
     const p = item.positioning ?? {};
     const interim = p._interim ?? {};   // interim positioning from auto-discovery
+    // 2026-10-02（CJ「請確保英文版能顯示正確的英文」）：定位每支產品都會產一句英文標語
+    // （core.enTagline），英文介面先拿它；中文品牌的 zhTagline 在英文介面只當後備。
+    const enTaglineKeys = en ? ["core.enTagline", "tagline.enTagline"] : [];
     return {
-      tagline:  extractField(p, "tagline", "tagline.zhTagline", "core.zhTagline", "core.oneLineValueProp", "differentiation.summary")
+      tagline:  extractField(p, ...enTaglineKeys, "tagline", "tagline.zhTagline", "core.zhTagline", "core.oneLineValueProp", "differentiation.summary")
                   || interim.tagline || "",
       usp:      extractField(p, "usp", "competition.uniqueUsp", "core.oneLineValueProp", "differentiation.functional", "differentiation.summary")
                   || interim.usp || "",
