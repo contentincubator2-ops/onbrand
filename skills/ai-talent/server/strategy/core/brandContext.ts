@@ -581,18 +581,12 @@ export async function buildBrandBrain(
   brandId: number | undefined | null,
   productId?: number | null,
   eventId?: number | null,
-  /**
-   * 2026-09-26（策略會議「採用前預覽」）：用一份還沒寫進資料庫的定位算簡報。
-   * 有 override 時不讀也不寫快取。
-   */
-  opts?: { positioningOverride?: any; productPositioningOverride?: any },
 ): Promise<BrandBrain> {
   const empty: BrandBrain = { prefix: "", items: [], capacity: BRAIN_CAPACITY, usedChars: 0 };
   if (!brandId) return empty;
 
-  const hasOverride = opts?.positioningOverride !== undefined || opts?.productPositioningOverride !== undefined;
   const ck = cacheKey(brandId, productId, eventId);
-  const cached = hasOverride ? undefined : CACHE.get(ck);
+  const cached = CACHE.get(ck);
   if (cached && cached.expiresAt > Date.now()) return cached.brain;
 
   try {
@@ -611,7 +605,6 @@ export async function buildBrandBrain(
     const brandRow = Array.isArray(brandRowsRaw) ? brandRowsRaw[0] : null;
 
     const positioning: any = (() => {
-      if (opts?.positioningOverride !== undefined) return opts.positioningOverride;
       if (!brandRow?.positioning) return null;
       if (typeof brandRow.positioning === "string") return safeParse(brandRow.positioning);
       return brandRow.positioning;
@@ -816,7 +809,7 @@ export async function buildBrandBrain(
         if (p) {
           productName = p.name ?? "(未命名)";
           c.add("product", "product", "產品名稱", String(productName), 100);
-          const rawPp = opts?.productPositioningOverride !== undefined ? opts.productPositioningOverride : p.positioning;
+          const rawPp = p.positioning;
           const pp = rawPp ? (typeof rawPp === "string" ? safeParse(rawPp) : rawPp) : null;
           if (pp && typeof pp === "object") {
             // 事實欄位（售價／規格／重量／份數／網址）：路徑順序跟
@@ -978,7 +971,7 @@ export async function buildBrandBrain(
       usedChars: items.reduce((n, i) => n + i.keptChars, 0),
     };
 
-    if (!hasOverride) CACHE.set(ck, { brain, expiresAt: Date.now() + TTL_MS });
+    CACHE.set(ck, { brain, expiresAt: Date.now() + TTL_MS });
     return brain;
   } catch {
     return empty;
@@ -995,9 +988,8 @@ export async function buildBrandPrefix(
   productId?: number | null,
   eventId?: number | null,
   _mode: "core" | "full" = "full",
-  opts?: { positioningOverride?: any; productPositioningOverride?: any },
 ): Promise<string> {
-  return (await buildBrandBrain(brandId, productId, eventId, opts)).prefix;
+  return (await buildBrandBrain(brandId, productId, eventId)).prefix;
 }
 
 /**

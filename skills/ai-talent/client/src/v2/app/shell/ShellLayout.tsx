@@ -183,11 +183,9 @@ function buildNavItems(lang: "zh-TW" | "en", userEmail?: string | null, currentP
         tooltip: en ? "Voice, terms, CTA and hook libraries" : "語氣 / 用詞 / CTA / 鉤子庫" },
       { to: "/brands/edit?cat=visual", catKey: "visual", label: en ? "Visual" : "視覺", icon: <FontAwesomeIcon icon={faPaintBrush} />,
         tooltip: en ? "Logo / palette / fonts" : "Logo / 色票 / 字型" },
-      // 2026-09-26（CJ「將工具拿掉、指令庫拿掉、隱藏知識庫；定期開會變成一個新的
-      // mission tray」）：「工具」整個從 rail 拿掉。知識庫只是藏起來，資料保留；
-      // 2026-09-29 起沒有任何 AI 讀取它。
-      { to: "/brands/edit?cat=meetings", catKey: "meetings", label: en ? "Meetings" : "會議", icon: <FontAwesomeIcon icon={ICON.meeting} />,
-        tooltip: en ? "Recurring strategy meetings" : "定期策略會議" },
+      // 2026-09-26（CJ「將工具拿掉、指令庫拿掉、隱藏知識庫」）：「工具」整個從 rail 拿掉。
+      // 知識庫只是藏起來，資料保留；2026-09-29 起沒有任何 AI 讀取它。
+      // 2026-10-02（CJ「移除策略層當中的會議頁面」）：當時一併加的「會議」也拿掉了。
       // 2026-09-30（CJ「策略層加一個 mission tray，是法規……agent 寫文章前要審查」）：
       // 用戶自己加的法規來源，每條一張卡；啟用中的每一篇產文動筆前都會讀、逐條審查。
       { to: "/brands/edit?cat=regulations", catKey: "regulations", label: en ? "Regulations" : "法規", icon: <FontAwesomeIcon icon={ICON.regulation} />,

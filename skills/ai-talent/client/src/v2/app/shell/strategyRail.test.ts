@@ -18,8 +18,8 @@ describe("strategyRailTarget", () => {
       .toBe("/brands/edit?b=2977&cat=events");
   });
 
-  it("人在產品裡按「視覺」「會議」「記憶」：都是品牌層，不帶產品 id", () => {
-    for (const cat of ["visual", "meetings", "regulations", "brain", "products"]) {
+  it("人在產品裡按「視覺」「法規」「記憶」：都是品牌層，不帶產品 id", () => {
+    for (const cat of ["visual", "regulations", "brain", "products"]) {
       expect(strategyRailTarget(cat, "?b=5&p=9&cat=positioning", 5)).toBe(`/brands/edit?b=5&cat=${cat}`);
     }
   });

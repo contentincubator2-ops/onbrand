@@ -33,7 +33,6 @@ import PositioningDocPanel from "../components/positioning/PositioningDocPanel";
 import CustomCardEditor, { type EditableCard } from "../components/positioning/CustomCardEditor";
 import AssetPhotoGallery from "../components/positioning/AssetPhotoGallery";
 import { InfoTab as BrandInfoTab, DangerTab as BrandDangerTab, PublishTab as BrandPublishTab } from "../components/positioning/BrandSettingsSheet";
-import StrategyMeetingsPanel from "../components/meetings/StrategyMeetingsPanel";
 import BrainPanel from "../components/brain/BrainPanel";
 import RegulationsPanel from "../components/regulations/RegulationsPanel";
 import BrandOnboardingWizard from "../components/onboarding/BrandOnboardingWizard";
@@ -48,7 +47,7 @@ import EventYearTimeline, { type PlanPrefill } from "../components/events/EventY
 import { toYmd } from "../lib/eventTimeline";
 // Notion-style line icons
 import { LockToggle } from "../components/positioning/LockToggle";
-import { AgentIcon, MemoryIcon, RegulationIcon, AwardIcon, BundleIcon, CommentIcon, DeleteIcon, EditIcon, FontIcon, GenerateIcon, HashtagIcon, IdCardIcon, LibraryIcon, LockIcon, PaletteIcon, PeopleIcon, PlayIcon, QuoteIcon, RegenerateIcon, ShieldIcon, TargetIcon, TextIcon, DoneIcon, StopIcon, WarningIcon, CheckIcon, CloseIcon } from "../../platform/components/icons";
+import { AgentIcon, MemoryIcon, RegulationIcon, AwardIcon, BundleIcon, CommentIcon, DeleteIcon, EditIcon, FontIcon, GenerateIcon, HashtagIcon, IdCardIcon, LibraryIcon, LockIcon, PaletteIcon, PlayIcon, QuoteIcon, RegenerateIcon, ShieldIcon, TargetIcon, TextIcon, DoneIcon, StopIcon, WarningIcon, CheckIcon, CloseIcon } from "../../platform/components/icons";
 import { SCOPE_SEGMENTS, type SegmentSpec } from "../lib/positioningSchema";
 import { specOf as copySpecOf } from "../lib/copyAssets";
 import { visualSpecOf } from "../lib/visualAssets";
@@ -650,7 +649,7 @@ export default function BrandsPage() {
   // 2026-05-07 Path A simplification: 3 main tiles only (定位/文字/知識).
   // "visual" is kept in the type for legacy lock-state code paths, but
   // is no longer exposed as a tile — its contents live in Settings.
-  const category: "positioning" | "copy" | "visual" | "knowledge" | "info" | "publish" | "settings" | "products" | "events" | "meetings" | "regulations" | "brain" | "persona" | "campaign" =
+  const category: "positioning" | "copy" | "visual" | "knowledge" | "info" | "publish" | "settings" | "products" | "events" | "regulations" | "brain" | "persona" | "campaign" =
     urlCat === "copy" ? "copy"
     : urlCat === "knowledge" ? "knowledge"
     : urlCat === "visual" ? "visual"
@@ -659,7 +658,6 @@ export default function BrandsPage() {
     : urlCat === "settings" ? "settings"
     : urlCat === "products" ? "products"
     : urlCat === "events" ? "events"
-    : urlCat === "meetings" ? "meetings"
     : urlCat === "regulations" ? "regulations"
     : urlCat === "brain" ? "brain"
     : urlCat === "persona" ? "persona"
@@ -677,7 +675,7 @@ export default function BrandsPage() {
   // version clobbered it with a snapshot from BEFORE that write, dropping
   // `e` and silently falling back to brand-level positioning. Functional
   // form fixes it for every caller, not just this one site.
-  const setCategory = (next: "positioning" | "copy" | "knowledge" | "info" | "visual" | "publish" | "products" | "events" | "meetings" | "regulations" | "brain" | "persona") => {
+  const setCategory = (next: "positioning" | "copy" | "knowledge" | "info" | "visual" | "publish" | "products" | "events" | "regulations" | "brain" | "persona") => {
     setSearchParams((prev) => {
       const nextParams = new URLSearchParams(prev);
       nextParams.set("cat", next);
@@ -1667,9 +1665,6 @@ export default function BrandsPage() {
                           : scopeMode === "product" ? (lang === "en" ? "Name / brand"        : "名稱 / 品牌")
                           : (lang === "en" ? "Name / industry" : "名稱 / 產業"),
                       Icon: IdCardIcon,    scopes: ["brand", "product", "event"] },
-                  { v: "meetings"    as const, label: lang === "en" ? "Meetings" : "會議",
-                      desc: lang === "en" ? "Recurring strategy meetings" : "定期策略會議",
-                      Icon: PeopleIcon,     scopes: ["brand", "product"] },
                   { v: "regulations" as const, label: lang === "en" ? "Regulations" : "法規",
                       desc: lang === "en" ? "Checked before every draft" : "寫文前先審查",
                       Icon: RegulationIcon, scopes: ["brand"] },
@@ -2374,16 +2369,6 @@ export default function BrandsPage() {
           {derivedCategory === "publish" && scopeMode === "brand" && (
             <div style={{ padding: "8px 0 32px" }}>
               <BrandPublishTab brandId={activeBrandIdForLocks} />
-            </div>
-          )}
-
-          {/* ── 會議 (meetings) — 定期策略會議 ──
-               2026-09-26（CJ「將定期開會變成一個新的 mission tray」）：取代原本的
-               「品牌工具」。品牌與產品範圍都看得到——會議本身
-               可以選要討論品牌或某個產品。 */}
-          {derivedCategory === "meetings" && activeBrandIdForLocks && (
-            <div style={{ padding: "8px 0 32px" }}>
-              <StrategyMeetingsPanel brandId={activeBrandIdForLocks} />
             </div>
           )}
 
