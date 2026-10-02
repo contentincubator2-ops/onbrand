@@ -93,7 +93,6 @@ describe("逐頁對照：每頁右下角是哪一組顧問", () => {
     ["品牌定位", { path: "/brands/edit", cat: "positioning" }, "brand"],
     ["基本資料", { path: "/brands/edit", cat: "info" }, "brand"],
     ["記憶", { path: "/brands/edit", cat: "brain" }, "brand"],
-    ["會議", { path: "/brands/edit", cat: "meetings" }, "brand"],
     ["產品清單", { path: "/brands/edit", cat: "products" }, "product"],
     ["單一產品", { path: "/brands/edit", p: "152" }, "product"],
     ["文字", { path: "/brands/edit", cat: "copy" }, "copy"],

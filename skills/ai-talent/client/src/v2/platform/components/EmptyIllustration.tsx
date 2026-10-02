@@ -29,7 +29,7 @@ const MOTION = `
 `;
 
 export type EmptyKind =
-  | "product" | "event" | "projects" | "cards" | "clock" | "meeting"
+  | "product" | "event" | "projects" | "cards" | "clock"
   | "persona" | "photo" | "folder" | "lens" | "report" | "review" | "brief";
 
 const ART: Record<EmptyKind, ComponentType> = {
@@ -38,7 +38,6 @@ const ART: Record<EmptyKind, ComponentType> = {
   projects: EmptyFrame,
   cards: EmptyCards,
   clock: IdleClock,
-  meeting: EmptyMeeting,
   persona: EmptyBadge,
   photo: EmptyCamera,
   folder: EmptyFolder,
@@ -210,21 +209,6 @@ function IdleClock() {
         <circle cx="120" cy="94" r="4" fill={POP} />
       </g>
       <path className="ei-blink" d="M170 46 h10 l-10 12 h10 M186 30 h7 l-7 8 h7" strokeWidth={2.5} />
-    </g>
-  );
-}
-
-/** 會議：空的會議桌，兩張椅子沒人坐，只有一杯冒煙的咖啡。 */
-function EmptyMeeting() {
-  return (
-    <g>
-      <path d="M40 66 V140 M40 112 H62 V140" />
-      <path d="M200 66 V140 M200 112 H178 V140" />
-      <rect x="62" y="92" width="116" height="10" rx="3" fill={INK} />
-      <path d="M76 102 V140 M164 102 V140" />
-      <rect x="110" y="70" width="20" height="22" rx="3" fill={POP} />
-      <path d="M130 76 a6 6 0 0 1 0 10" strokeWidth={2.5} />
-      <path className="ei-blink" d="M114 60 c-3 -5 3 -8 0 -13 M124 60 c-3 -5 3 -8 0 -13" strokeWidth={2.5} />
     </g>
   );
 }

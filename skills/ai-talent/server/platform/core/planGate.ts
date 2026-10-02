@@ -31,7 +31,7 @@ export function isHiddenContentPlatform(platform: string | null | undefined): bo
 }
 
 /**
- * 歷史資料（產出、排程、企劃格、會議紀錄…）上的平台欄位寫法不一：missions.workspace
+ * 歷史資料（產出、排程、企劃格…）上的平台欄位寫法不一：missions.workspace
  * 會是 press、路由片段會是 li／yt，X 卡則記成 generic（只能靠 task id 認）。
  * CJ 2026-09-29「前台隱藏，資料保留」—— 讀歷史的地方一律過這支。
  */

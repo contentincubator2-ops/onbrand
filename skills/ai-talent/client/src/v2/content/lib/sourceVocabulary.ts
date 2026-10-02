@@ -182,7 +182,7 @@ export function sourcePillText(s: unknown, lang: string): string {
  * 後端都還是要留著」。
  *
  * 所以這裡只管「前台列不列」：得獎／標竿／長青／通路規格的卡後端照舊回傳，
- * 本週企劃、策略會議、?rerun= 之類用 id 找卡的地方都還找得到；只有卡片清單、
+ * 本週企劃、?rerun= 之類用 id 找卡的地方都還找得到；只有卡片清單、
  * 篩選、張數、選卡器不列。
  *
  *   own   ＝ 品牌自建（用戶自己建的卡 ownCardId；品牌客製包 brand-method 也算，
@@ -195,7 +195,7 @@ export const FRONT_CARD_KINDS: readonly FrontCardKind[] = ["viral", "own"];
 /**
  * 2026-09-29 CJ「爆款結構，至少要是當月的，不能太久以前的」，後來因為當月 FB 案例太少改成
  * 「視窗放寬到近 3 個月」：前台只列 source.asOf 落在「台北時間的本月＋前兩個月」的爆款卡，
- * 月份一滑出去就自動下架。舊卡後端照留（本週企劃、策略會議仍會用），只是任務頁、
+ * 月份一滑出去就自動下架。舊卡後端照留（本週企劃仍會用），只是任務頁、
  * 選卡器、張數都不算。server 端 taskSource.isRecentViral 是同一條規則。
  */
 export const VIRAL_WINDOW_MONTHS = 3;

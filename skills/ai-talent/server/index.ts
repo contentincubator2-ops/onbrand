@@ -569,13 +569,9 @@ async function runStartupMigrations() {
     await db.execute(sql.raw(STRATEGY_ALERTS_DDL));
     console.log("[migrate] strategy_watch / strategy_alerts: OK");
 
-    // 2026-09-26（CJ「會議的主題、與會人員、多久開一次由用戶設定，定期留會議紀錄」）：策略會議。
-    const { STRATEGY_MEETINGS_DDL, STRATEGY_MEETING_RUNS_DDL } = await import("./strategy/core/strategyMeetings");
-    await db.execute(sql.raw(STRATEGY_MEETINGS_DDL));
-    await db.execute(sql.raw(STRATEGY_MEETING_RUNS_DDL));
-    const { POSITIONING_VERSIONS_DDL } = await import("./strategy/core/meetingWriteback");
-    await db.execute(sql.raw(POSITIONING_VERSIONS_DDL));
-    console.log("[migrate] strategy_meetings / strategy_meeting_runs: OK");
+    // 2026-10-02（CJ「移除策略層當中的會議頁面」）：策略會議整個功能拿掉了。資料表
+    // strategy_meetings／strategy_meeting_runs／strategy_positioning_versions 不再建立，
+    // 已經存在的留著不砍（砍表是另一個決定）。
 
     // 2026-09-30（CJ「策略層加一個 mission tray，是法規……agent 寫文章前要審查」）。
     const { BRAND_REGULATIONS_DDL } = await import("./strategy/core/brandRegulations");
@@ -746,15 +742,6 @@ const server = app.listen(PORT, async () => {
       });
     }, 15 * 60_000);
     console.log("[strategyMonitor] Worker started (15m interval)");
-
-    // 策略會議 worker：每 15 分鐘挑一場到期的會開（一拍一場，一場是 N+1 次 LLM）。
-    const { tickStrategyMeetings } = await import("./strategy/core/strategyMeetings");
-    setInterval(() => {
-      tickStrategyMeetings().catch((e) => {
-        console.error("[strategyMeetings] tick error:", e?.message ?? e);
-      });
-    }, 15 * 60_000);
-    console.log("[strategyMeetings] Worker started (15m interval)");
 
     // 成效層粉專回填：每 30 分鐘挑一個超過 20 小時沒同步的品牌（一拍一個，Graph 有頻率限制）。
     const { tickFbPageSync } = await import("./performance/core/fbPageSync");

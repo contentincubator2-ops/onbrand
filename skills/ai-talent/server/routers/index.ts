@@ -29,7 +29,6 @@ import { assetPhotoRouter } from "../strategy/routers/assetPhotoRouter";
 import { campaignRouter } from "../strategy/routers/campaignRouter";
 import { vendorRouter } from "../content/routers/vendorRouter";
 import { strategyMonitorRouter } from "../strategy/routers/strategyMonitorRouter";
-import { strategyMeetingRouter } from "../strategy/routers/strategyMeetingRouter";
 import { brandRegulationRouter } from "../strategy/routers/brandRegulationRouter";
 import { eventCalendarRouter } from "../strategy/routers/eventCalendarRouter";
 import { touchpointsRouter } from "../platform/routers/touchpointsRouter";
@@ -81,7 +80,6 @@ export const appRouter = router({
   brandBrain:    brandBrainRouter,
   assetPhoto:    assetPhotoRouter,
   strategyMonitor: strategyMonitorRouter,
-  strategyMeeting: strategyMeetingRouter,
   // 2026-09-30（CJ「策略層加一個 mission tray，是法規」）：用戶自己加的法規，寫文前審查。
   brandRegulation: brandRegulationRouter,
   eventCalendar: eventCalendarRouter,

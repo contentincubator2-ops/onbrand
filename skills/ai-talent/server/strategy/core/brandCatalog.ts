@@ -60,7 +60,7 @@ function pickAny(pos: any, paths: string[], max: number): string | null {
   return null;
 }
 
-export function productLine(idx: number, row: any): string {
+function productLine(idx: number, row: any): string {
   const pos = parsePositioning(row.positioning);
   const slogan = pos ? pick(pos, "core.zhTagline", 60) : null;
   const core = pos ? pick(pos, "core.coreStatement", 160) : null;
