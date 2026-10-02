@@ -28,6 +28,7 @@ jobs:
           S=skills/ai-talent
           echo "diff=$(base64 -w0 $S/scripts/probe-product-positioning-diff.ts)" >> "$GITHUB_OUTPUT"
           echo "dry=$(base64 -w0 $S/scripts/probe-product-positioning-dryrun.ts)" >> "$GITHUB_OUTPUT"
+          echo "en=$(base64 -w0 $S/scripts/probe-product-positioning-en.ts)" >> "$GITHUB_OUTPUT"
           echo "steps=$(base64 -w0 $S/server/strategy/core/positioningSteps.ts)" >> "$GITHUB_OUTPUT"
           echo "sib=$(base64 -w0 $S/server/strategy/core/productSiblings.ts)" >> "$GITHUB_OUTPUT"
       - name: Run probes on DEV VM
@@ -36,24 +37,30 @@ jobs:
           P_DIFF: ${{ steps.enc.outputs.diff }}
           P_DRY: ${{ steps.enc.outputs.dry }}
           P_STEPS: ${{ steps.enc.outputs.steps }}
+          P_EN: ${{ steps.enc.outputs.en }}
           P_SIB: ${{ steps.enc.outputs.sib }}
           BRAND_ID: ${{ github.event.inputs.brandId }}
         with:
           host: ${{ secrets.VM_HOST }}
           username: ${{ secrets.VM_USER }}
           key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
-          envs: P_DIFF,P_DRY,P_STEPS,P_SIB,BRAND_ID
+          envs: P_DIFF,P_DRY,P_STEPS,P_SIB,P_EN,BRAND_ID
           command_timeout: 10m
           script: |
             set -e
             cd /opt/onbrand/current/skills/ai-talent
             set -a; source .env 2>/dev/null; set +a
-            D=scripts/_probe-pp-diff.ts; R=scripts/_probe-pp-dry.ts
+            D=scripts/_probe-pp-diff.ts; R=scripts/_probe-pp-dry.ts; E=scripts/_probe-pp-en.ts
             C=server/strategy/core
-            trap 'rm -f "$D" "$R" "$C/_probe_positioningSteps.ts" "$C/_probe_productSiblings.ts"' EXIT
+            trap 'rm -f "$D" "$R" "$E" "$C/_probe_positioningSteps.ts" "$C/_probe_productSiblings.ts"' EXIT
             echo "$P_DIFF" | base64 -d > "$D"
             echo "$P_DRY" | base64 -d > "$R"
             echo "$P_STEPS" | base64 -d > "$C/_probe_positioningSteps.ts"
             echo "$P_SIB" | base64 -d > "$C/_probe_productSiblings.ts"
-            echo "================ DRY RUN（新版 prompt，不寫 DB）================"
-            ./node_modules/.bin/tsx "$R" "${BRAND_ID:-2977}"
+            echo "$P_EN" | base64 -d > "$E"
+            echo "================ 英文市場品牌的產品定位（唯讀）================"
+            ./node_modules/.bin/tsx "$E"
+            if [ -n "$BRAND_ID" ]; then
+              echo "================ DRY RUN（新版 prompt，不寫 DB）brand=$BRAND_ID ================"
+              ./node_modules/.bin/tsx "$R" "$BRAND_ID"
+            fi
