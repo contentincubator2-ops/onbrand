@@ -83,7 +83,7 @@ export function describeProposal(plan: CampaignPlan, p: CampaignProposal, en: bo
       if (o.patch.angle) bits.push(L(`內容改成「${o.patch.angle}」`, `now: “${o.patch.angle}”`));
       if (o.patch.paid === true) bits.push(L("改成廣告", "promote as ad"));
       if (o.patch.paid === false) bits.push(L("改回一般貼文", "back to organic"));
-      if (bits.length) lines.push(`${L("✎", "✎")} ${md(i.date)} ${channelLabel(i.platform, en)}：${bits.join(L("，", ", "))}`);
+      if (bits.length) lines.push(`${L("✎", "✎")} ${md(i.date)} ${channelLabel(i.platform, en)}${L("：", ": ")}${bits.join(L("，", ", "))}`);
     }
   }
   return lines;

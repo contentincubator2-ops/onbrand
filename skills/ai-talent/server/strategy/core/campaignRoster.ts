@@ -13,7 +13,7 @@
  *     名字才不會對不上（10/02 #312 修過一次的那個問題）。
  */
 import type { CampaignPlan } from "./campaignPlan.js";
-import { agentByRef, brandIndustry, pickKpiAgent, pickPlannerAgent, type TeamAgent } from "./campaignTeam.js";
+import { agentByRef, brandIndustry, englishOf, pickKpiAgent, pickPlannerAgent, type TeamAgent } from "./campaignTeam.js";
 
 export const CAMPAIGN_ROLES = ["director", "author", "planner", "kpi", "kol", "cobrand", "pr"] as const;
 export type CampaignRole = (typeof CAMPAIGN_ROLES)[number];
@@ -82,6 +82,9 @@ export const ROLES: Record<CampaignRole, RoleSpec> = {
 
 export interface RosterMember extends TeamAgent {
   role: CampaignRole;
+  /** 英文介面用（查不到就是空字串，畫面退回中文）。 */
+  nameEn: string;
+  titleEn: string;
   /** 這位在這份企劃做了什麼（畫面顯示、也進指令）。 */
   did: string;
   didEn: string;
@@ -145,8 +148,10 @@ export async function buildCampaignRoster(args: {
     const a = people[k];
     if (!a || seen.has(a.id)) return;      // 同一個人只列一次（例如定位撰寫者就是總監）
     seen.add(a.id);
-    out.push({ ...a, role: s.role, did: s.did, didEn: s.didEn });
+    out.push({ ...a, role: s.role, did: s.did, didEn: s.didEn, nameEn: "", titleEn: "" });
   });
+  const en = await englishOf(out.map((m) => m.id));
+  for (const m of out) Object.assign(m, en.get(m.id) ?? {});
   return out;
 }
 

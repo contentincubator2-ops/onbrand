@@ -58,3 +58,12 @@ describe("autoSummary", () => {
     expect(autoSummary([])).toBeNull();
   });
 });
+
+describe("英文介面（伺服器自己產的字）", () => {
+  it("預設標題與自動摘要跟著語言", () => {
+    expect(threadTitle("", "en")).toBe("Discussion");
+    expect(autoSummary([{ role: "assistant", content: "Picked three posts. Because…", proposal: "{}", undone: 0 }], "en"))
+      .toBe("Changed the plan 1 time · Picked three posts.");
+    expect(autoSummary([{ role: "user", content: "q" }], "en")).toBe("Discussion only, no plan changes");
+  });
+});

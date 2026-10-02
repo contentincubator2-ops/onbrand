@@ -19,6 +19,9 @@
  */
 import localPool from "../../localDb.js";
 
+/** 介面語言：伺服器自己產的字（預設標題、自動摘要）跟著它。 */
+export type Lang = "zh" | "en";
+
 export const CAMPAIGN_CHAT_DDL = `
   CREATE TABLE IF NOT EXISTS campaign_chat_messages (
     id           INT           NOT NULL AUTO_INCREMENT PRIMARY KEY,
@@ -147,9 +150,9 @@ export function rowsToMessages(rows: any[], snapshotKey?: string | null): Stored
 }
 
 /** 一段的標題：第一句使用者說的話（純函式）。 */
-export function threadTitle(firstUserText: string | null | undefined): string {
+export function threadTitle(firstUserText: string | null | undefined, lang: Lang = "zh"): string {
   const t = String(firstUserText ?? "").replace(/^\s*[@＠]\S+\s*/, "").replace(/\s+/g, " ").trim();
-  if (!t) return "討論";
+  if (!t) return lang === "en" ? "Discussion" : "討論";
   return t.length > 28 ? `${t.slice(0, 27)}…` : t;
 }
 
@@ -250,15 +253,15 @@ export async function recentSummaries(eventId: number, userId: number, exceptThr
  * 追加幾則。threadId 沒給就開新的一段（標題取第一句使用者的話），回傳這段的 id。
  * 同一個 clientKey 再送一次（重送、補匯入）不會重複。
  */
-export async function appendChat(eventId: number, userId: number, threadId: number | null, msgs: StoredChatMsg[]): Promise<{ threadId: number; added: number }> {
+export async function appendChat(eventId: number, userId: number, threadId: number | null, msgs: StoredChatMsg[], lang: Lang = "zh"): Promise<{ threadId: number; added: number }> {
   let tid = threadId && (await ownThread(eventId, userId, threadId)) ? threadId : null;
   if (!tid) {
     // 開新的一段：還開著的舊段收起來（沒有手動結束的，用伺服器算的摘要）。
-    await closeOpenThreads(eventId, userId, null);
+    await closeOpenThreads(eventId, userId, null, lang);
     const first = msgs.find((m) => m.role === "user");
     const [res]: any = await localPool.execute(
       `INSERT INTO campaign_chat_threads (eventId, userId, title, status) VALUES (?, ?, ?, 'open')`,
-      [eventId, userId, threadTitle(first?.content)],
+      [eventId, userId, threadTitle(first?.content, lang)],
     );
     tid = Number(res.insertId);
   }
@@ -279,9 +282,9 @@ export async function appendChat(eventId: number, userId: number, threadId: numb
   // 有人說話＝這段又活起來（重新打開的、或接著談的）。
   await localPool.execute(
     `UPDATE campaign_chat_threads SET updatedAt = CURRENT_TIMESTAMP(3), status = 'open', closedAt = NULL,
-            title = IF(title = '討論' OR title = '', ?, title)
+            title = IF(title IN ('討論', 'Discussion', ''), ?, title)
       WHERE id = ?`,
-    [threadTitle(msgs.find((m) => m.role === "user")?.content), tid],
+    [threadTitle(msgs.find((m) => m.role === "user")?.content, lang), tid],
   );
   return { threadId: tid, added: n };
 }
@@ -299,7 +302,7 @@ export async function closeThread(eventId: number, userId: number, threadId: num
  * 沒手動結束就被換掉的段（開了新的一段、打開了別段）：摘要用伺服器算——改了幾處＋最後一句回覆。
  * 手動結束的段已經有畫面算好的摘要，不覆蓋。
  */
-async function closeOpenThreads(eventId: number, userId: number, exceptId: number | null): Promise<void> {
+async function closeOpenThreads(eventId: number, userId: number, exceptId: number | null, lang: Lang = "zh"): Promise<void> {
   const [open]: any = await localPool.execute(
     `SELECT id, summary FROM campaign_chat_threads WHERE eventId = ? AND userId = ? AND status = 'open' AND id <> ?`,
     [eventId, userId, exceptId ?? 0],
@@ -311,7 +314,7 @@ async function closeOpenThreads(eventId: number, userId: number, exceptId: numbe
         `SELECT role, content, proposal, undone FROM campaign_chat_messages WHERE threadId = ? AND clearedAt IS NULL ORDER BY id ASC`,
         [t.id],
       );
-      summary = autoSummary(rows as any[]);
+      summary = autoSummary(rows as any[], lang);
     }
     await localPool.execute(
       `UPDATE campaign_chat_threads SET status = 'closed', closedAt = CURRENT_TIMESTAMP(3), summary = ? WHERE id = ?`,
@@ -321,18 +324,21 @@ async function closeOpenThreads(eventId: number, userId: number, exceptId: numbe
 }
 
 /** 伺服器版摘要（純函式）：改了幾處＋最後一句回覆的開頭。 */
-export function autoSummary(rows: Array<{ role: string; content?: string | null; proposal?: string | null; undone?: number | boolean | null }>): string | null {
+export function autoSummary(rows: Array<{ role: string; content?: string | null; proposal?: string | null; undone?: number | boolean | null }>, lang: Lang = "zh"): string | null {
   if (!rows.length) return null;
   const changes = rows.filter((r) => r.proposal && !Number(r.undone)).length;
   const last = [...rows].reverse().find((r) => r.role === "assistant" && r.content)?.content ?? "";
-  const gist = String(last).replace(/\s+/g, " ").trim().split(/(?<=[。！？!?])/)[0]!.slice(0, 80);
-  return [changes ? `改了企劃 ${changes} 次` : "只有討論，沒改企劃", gist].filter(Boolean).join("・");
+  const gist = String(last).replace(/\s+/g, " ").trim().split(/(?<=[。！？!?])|(?<=\.)\s/)[0]!.slice(0, 80);
+  const head = lang === "en"
+    ? (changes ? `Changed the plan ${changes} time${changes > 1 ? "s" : ""}` : "Discussion only, no plan changes")
+    : (changes ? `改了企劃 ${changes} 次` : "只有討論，沒改企劃");
+  return [head, gist].filter(Boolean).join(lang === "en" ? " · " : "・");
 }
 
 /** 重新打開一段：其他還開著的收起來（同時只有一段在談）。 */
-export async function reopenThread(eventId: number, userId: number, threadId: number): Promise<boolean> {
+export async function reopenThread(eventId: number, userId: number, threadId: number, lang: Lang = "zh"): Promise<boolean> {
   if (!(await ownThread(eventId, userId, threadId))) return false;
-  await closeOpenThreads(eventId, userId, threadId);
+  await closeOpenThreads(eventId, userId, threadId, lang);
   await localPool.execute(
     `UPDATE campaign_chat_threads SET status = 'open', closedAt = NULL, updatedAt = CURRENT_TIMESTAMP(3) WHERE id = ?`,
     [threadId],

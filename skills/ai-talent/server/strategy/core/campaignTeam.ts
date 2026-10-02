@@ -100,3 +100,31 @@ export async function agentByRef(ref: { slug?: string; id?: number }): Promise<T
     return null;
   }
 }
+
+/**
+ * 英文介面用的名字與職稱（2026-10-02 CJ「英文版也能正確顯示嗎」）。
+ * mos_db 的 title 欄位多半是英文，但有些夾著中文產業（「Social Media Strategist – 電商 / DTC」）：
+ * 夾中文的那一段切掉。純函式。
+ */
+export function englishTitle(title: string | null | undefined): string {
+  const t = String(title ?? "").trim();
+  if (!t) return "";
+  if (!/[㐀-鿿]/.test(t)) return t;
+  const head = t.split(/\s+[–—-]\s+|｜|\|/)[0]!.trim();
+  return /[㐀-鿿]/.test(head) ? "" : head;
+}
+
+/** 一次查一批人的英文名字與職稱：id → { nameEn, titleEn }。查不到的不給。 */
+export async function englishOf(ids: number[]): Promise<Map<number, { nameEn: string; titleEn: string }>> {
+  const out = new Map<number, { nameEn: string; titleEn: string }>();
+  const list = [...new Set(ids.filter((n) => Number.isFinite(n) && n > 0))];
+  if (!list.length) return out;
+  try {
+    const [rows]: any = await localPool.query(`SELECT id, name, englishName, title FROM agents WHERE id IN (?)`, [list]);
+    for (const r of rows as any[]) {
+      const latin = (s: unknown) => (s && !/[㐀-鿿]/.test(String(s)) ? String(s).trim() : "");
+      out.set(Number(r.id), { nameEn: latin(r.englishName) || latin(r.name), titleEn: englishTitle(r.title) });
+    }
+  } catch { /* 查不到就照中文顯示 */ }
+  return out;
+}
