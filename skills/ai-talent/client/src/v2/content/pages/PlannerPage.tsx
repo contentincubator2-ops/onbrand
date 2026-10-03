@@ -22,9 +22,9 @@ import {
 } from "@fortawesome/free-brands-svg-icons";
 import { trpc } from "../../../lib/trpc";
 import { useLang } from "../../../lib/i18n";
-import { showToastGlobal } from "../../../components/ui/Toast";
+import { showToastGlobal } from "../../platform/components/Toast";
 import { friendlyError } from "../../platform/lib/friendlyError";
-import { channelRoute } from "../lib/channelMeta";
+import { channelRoute } from "../../platform/lib/channelMeta";
 import { PlatformTaskModal, type TaskEmbed } from "./PlatformTaskPage";
 import { getCalendarPublishPayload } from "../lib/strategyContentEnvelope";
 import { addDays, defaultWeek, mondayOf, ymdTpe } from "../lib/plannerWeek";

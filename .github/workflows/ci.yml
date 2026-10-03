@@ -39,6 +39,8 @@ jobs:
         run: cd skills/ai-talent/client && npx tsc --noEmit
       - name: Boundary guard — client/server
         run: ./scripts/check-client-server-boundary.sh
+      - name: Layer guard — platform < strategy < content < performance
+        run: node scripts/check-layer-boundaries.mjs
       - name: Run tests
         run: npm run test --prefix skills/ai-talent
 

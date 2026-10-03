@@ -12,7 +12,7 @@ import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure } from "../../platform/core/trpc";
 import { assertBrandOwner } from "../../platform/core/brandAuth";
-import { imageActionForRequest, reconcileImageCharge } from "../../platform/core/imageBilling";
+import { imageActionForRequest, reconcileImageCharge } from "../../platform/core/billing/imageBilling";
 import {
   IMAGE_CHANNELS,
   MAX_IMAGE_TRAY,
@@ -23,13 +23,13 @@ import {
   ratioLabel,
   resolveImageTray,
   type PlatformImageSpec,
-} from "../core/platformImageSpecs";
-import { loadBrandPositioning } from "../../platform/core/planGate";
-import { proposeImageDirections, renderImageCard } from "../core/imageCards";
-import { resolveBrandVisualContext } from "../core/imageGen";
-import { localCoverFile } from "../core/imageFetch";
+} from "../../platform/core/media/platformImageSpecs";
+import { loadBrandPositioning } from "../../platform/core/billing/planGate";
+import { proposeImageDirections, renderImageCard } from "../core/image/imageCards";
+import { resolveBrandVisualContext } from "../core/image/imageGen";
+import { localCoverFile } from "../../platform/core/media/imageFetch";
 import { brandOwnsProductPhoto } from "./imageRouter";
-import { brandOwnsLibraryPhoto } from "../../strategy/core/assetPhotos";
+import { brandOwnsLibraryPhoto } from "../../strategy/core/brand/assetPhotos";
 
 const channel = z.enum(IMAGE_CHANNELS as [string, ...string[]]);
 
@@ -139,13 +139,13 @@ export const imageCardRouter = router({
       await assertBrandOwner(ctx.user.id, input.brandId);
       const spec = specOr404(input.cardId);
       const brand = await resolveBrandVisualContext(input.brandId);
-      const { buildBrandPrefix, enforceBrandRulesOnText } = await import("../../strategy/core/brandContext");
+      const { buildBrandPrefix, enforceBrandRulesOnText } = await import("../../strategy/core/brand/brandContext");
       const brainPrefix = await buildBrandPrefix(input.brandId, null, null, "full").catch(() => "");
       try {
         const out = await proposeImageDirections({ spec, copy: input.copy, brand, productName: input.productName, brainPrefix });
         // 圖上標題是會被看見的字——跟文案一樣過禁用詞／替換對照。
         // 2026-09-30：再過法規合規檢查（圖上的字一樣會被看見）。
-        const { enforceRegulationsOnText } = await import("../core/regulationCompliance");
+        const { enforceRegulationsOnText } = await import("../core/engine/regulationCompliance");
         out.headlineZh = await enforceBrandRulesOnText(input.brandId, out.headlineZh).catch(() => out.headlineZh);
         const reg = await enforceRegulationsOnText(input.brandId, out.headlineZh);
         if (reg.record?.status === "fixed") out.headlineZh = await enforceBrandRulesOnText(input.brandId, reg.text).catch(() => reg.text);
@@ -177,7 +177,7 @@ export const imageCardRouter = router({
         throw new TRPCError({ code: "BAD_REQUEST", message: "這張產品照不屬於這個品牌。" });
       }
 
-      const { assertPoints, deductPoints } = await import("../../platform/core/pointsService");
+      const { assertPoints, deductPoints } = await import("../../platform/core/billing/pointsService");
       const action = imageActionForRequest({ modelChoice: input.modelChoice });
       await assertPoints(ctx.user.id, action);
       await deductPoints(ctx.user.id, action, { kind: "brand", id: input.brandId });

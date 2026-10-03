@@ -3,7 +3,7 @@
  *
  * 數字是合約，不是文案：2026-09-29 起前台只列爆款結構＋品牌自建兩類卡、七個通路，
  * 對外只講爆款結構卡張數與通路數（一律引用 catalogFigures，
- * 由 server/platform/core/catalogFigures.test.ts 對真實目錄鎖住）、基礎 NT$2,250／專業
+ * 由 server/platform/core/billing/catalogFigures.test.ts 對真實目錄鎖住）、基礎 NT$2,250／專業
  * NT$9,000、策略顧問導入 NT$80,000、電商營運報告 NT$48,000 ＋ 25,000／月。
  * 2026-09-07 用 buildTaskCatalogIndex() 數過與 Word 一致；之後動目錄要
  * 同步改這裡（沒有測試擋著）。
@@ -15,7 +15,7 @@ import { CATALOG } from "../lib/catalogFigures";
 import React from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { trpc } from "../../../lib/trpc";
-import { showToastGlobal } from "../../../components/ui/Toast";
+import { showToastGlobal } from "../components/Toast";
 import { useLang } from "../../../lib/i18n";
 import AddonRequestModal from "../components/AddonRequestModal";
 

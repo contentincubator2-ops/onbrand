@@ -26,26 +26,26 @@ import { assertBrandAccess } from "../../platform/core/brandAuth";
 import {
   buildPipedreamAccountsUrl,
   getPipedreamConnectTokenUrl,
-} from "../../platform/core/pipedreamConnect";
+} from "../../platform/core/connectors/pipedreamConnect";
 import {
   getPipedreamAccounts,
   getPipedreamAppSlug,
   prioritizePipedreamAccounts,
-} from "../../platform/core/pipedreamAccounts";
+} from "../../platform/core/connectors/pipedreamAccounts";
 import {
   assessPipedreamFacebookPageAccess,
   findPipedreamFacebookPage,
   probePipedreamFacebookAccounts,
-} from "../../platform/core/pipedreamFacebook";
-import { getPipedreamOAuthAppId } from "../../platform/core/pipedreamOAuth";
-import { isRuntimeFeatureEnabled } from "../../platform/core/runtimeSafety";
+} from "../../platform/core/connectors/pipedreamFacebook";
+import { getPipedreamOAuthAppId } from "../../platform/core/connectors/pipedreamOAuth";
+import { isRuntimeFeatureEnabled } from "../../platform/core/ops/runtimeSafety";
 import { outputApprovalState, APPROVAL_BLOCK_MESSAGE } from "../core/publishGate";
 import {
   contentSelectorFields,
   outputItemCaption,
   requirePlanningConfirmation,
   resolveOutputContent,
-} from "../core/outputContentEnvelope";
+} from "../core/engine/outputContentEnvelope";
 
 const ENV = process.env;
 
@@ -671,7 +671,7 @@ export const publishRouter = router({
       });
 
       // Step 4: LLM 分析語氣特徵
-      const { invokeLLM } = await import("../../localDb").then(() => import("../../platform/core/llm"));
+      const { invokeLLM } = await import("../../localDb").then(() => import("../../platform/core/llm/llm"));
       const postsForAnalysis = posts.slice(0, 20).map((p, i) => `貼文 ${i + 1}：\n${p}`).join("\n\n---\n\n");
       const analysisPrompt = `以下是「${brand.fbPageName ?? "此品牌"}」Facebook 粉絲專頁的真實貼文。
 
@@ -772,7 +772,7 @@ ${postsForAnalysis}
       );
 
       // 清除 brand context cache 讓新的語氣資料立刻生效
-      const { _clearBrandPrefixCache } = await import("../../strategy/core/brandContext");
+      const { _clearBrandPrefixCache } = await import("../../strategy/core/brand/brandContext");
       _clearBrandPrefixCache();
 
       return {

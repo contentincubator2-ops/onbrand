@@ -15,7 +15,7 @@
 import React, { useMemo, useState } from "react";
 import { useLang } from "../../../../lib/i18n";
 import { resolveSource, sourceWhy, sourcePillText,
-  FRONT_CARD_KINDS, frontCardKind, frontCardKindLabel, type FrontCardKind } from "../../../content/lib/sourceVocabulary";
+  FRONT_CARD_KINDS, frontCardKind, frontCardKindLabel, type FrontCardKind } from "../../lib/sourceVocabulary";
 import { CheckIcon, CloseIcon, LockIcon, AddIcon, SearchIcon } from "../icons";
 
 export interface PickerTask {

@@ -98,7 +98,7 @@ describe("textSimilarity", () => {
 
 // ─── 第 2 步：廣告／GA4／電商匯入歸檔 ───────────────────────────────────
 import { campaignOf, applyAlias, type ExtFact } from "./campaignPerf";
-import { campaignLink, campaignCode, cleanLandingUrl } from "./perfUtm";
+import { campaignLink, campaignCode, cleanLandingUrl } from "../../platform/core/perfUtm";
 import { parseUtmTags } from "./perfImport";
 
 describe("活動追蹤連結", () => {

@@ -21,9 +21,9 @@ import {
   aggregateBrandPalette,
   type BrandPalette,
   type BrandColorRole,
-} from "../core/brandPaletteAggregator";
-import { probeImageUrl } from "../../content/core/imageFetch";
-import { listPhotos } from "../core/assetPhotos";
+} from "../core/brand/brandPaletteAggregator";
+import { probeImageUrl } from "../../platform/core/media/imageFetch";
+import { listPhotos } from "../core/brand/assetPhotos";
 
 // ── Zod ────────────────────────────────────────────────────────────────
 
@@ -241,7 +241,7 @@ export const brandColorsRouter = router({
 
       // Hydrate full swatch records from hex (recompute RGB/LAB so display
       // stays accurate even if user pastes a new hex).
-      const { rgbToLab } = await import("../core/brandColorExtractor");
+      const { rgbToLab } = await import("../core/brand/brandColorExtractor");
       const hydrated = input.swatches.map((s, idx, arr) => {
         const r = parseInt(s.hex.slice(1, 3), 16);
         const g = parseInt(s.hex.slice(3, 5), 16);

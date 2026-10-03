@@ -10,7 +10,8 @@
 import React, { useMemo, useState } from "react";
 import { useLang } from "../../../../lib/i18n";
 import { CheckIcon, CloseIcon, SearchIcon } from "../../../platform/components/icons";
-import { RatioFrame, type ImageCardInfo } from "./ImageCardTile";
+import { RatioFrame } from "./ImageCardTile";
+import type { ImageCardInfo } from "../../../platform/lib/imageCardHandoff";
 
 export default function ImageSizePicker({
   open, onClose, cards, selected, max, onSave, saving,

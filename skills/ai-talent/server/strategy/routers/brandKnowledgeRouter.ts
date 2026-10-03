@@ -8,11 +8,11 @@
  */
 import { z } from "zod";
 import { router, protectedProcedure } from "../../platform/core/trpc";
-import { parseBrief, fieldsInBrief } from "../core/aiBrief";
-import { invokeLLM } from "../../platform/core/llm";
-import { buildBrandPrefix } from "../core/brandContext";
-import { getBrandRealContent } from "../core/brandRealContent";
-import { loadBrandMemory } from "../core/brandMemory";
+import { parseBrief, fieldsInBrief } from "../core/positioning/aiBrief";
+import { invokeLLM } from "../../platform/core/llm/llm";
+import { buildBrandPrefix } from "../core/brand/brandContext";
+import { getBrandRealContent } from "../core/brand/brandRealContent";
+import { loadBrandMemory } from "../core/brand/brandMemory";
 import localPool from "../../localDb";
 
 const ASSET_KEYS_COPY = [
@@ -107,7 +107,7 @@ async function suggestOne(args: {
   // 2026-07-18 多市場 (P2): asset copy follows the brand's outputLanguage.
   // The industry-vocab examples below are TW-market illustrations — for
   // non-zh brands instruct the model to produce local-language equivalents.
-  const { getBrandMarket, DEFAULT_BRAND_MARKET } = await import("../core/brandMarket");
+  const { getBrandMarket, DEFAULT_BRAND_MARKET } = await import("../core/brand/brandMarket");
   const mkt = await getBrandMarket(args.brandId).catch(() => DEFAULT_BRAND_MARKET);
   const langDirective = mkt.isZhTW
     ? "繁體中文"
@@ -202,7 +202,7 @@ export const brandKnowledgeRouter = router({
   /**
    * 「記憶」tray：品牌在策略層存了什麼（全部，不只 AI 讀的）＋每一種寫作情境讀到的大腦。
    * 2026-09-30（CJ「策略層有品牌、產品、活動、文字、視覺，還有其他真實存入的資料……要精細」）。
-   * 不是自己的品牌回 null。見 server/strategy/core/brandMemory.ts。
+   * 不是自己的品牌回 null。見 server/strategy/core/brand/brandMemory.ts。
    */
   memory: protectedProcedure
     .input(z.object({ brandId: z.number() }))

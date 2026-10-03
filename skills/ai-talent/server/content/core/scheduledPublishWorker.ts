@@ -19,7 +19,7 @@
  *    automatically — a half-published post must not be posted again.
  */
 import localPool from "../../localDb";
-import { isRuntimeFeatureEnabled } from "../../platform/core/runtimeSafety";
+import { isRuntimeFeatureEnabled } from "../../platform/core/ops/runtimeSafety";
 import { outputApprovalState } from "./publishGate";
 
 const GRACE_MS = 6 * 60 * 60 * 1000;

@@ -12,23 +12,23 @@ import {
   getPipedreamAppSlug,
   prioritizePipedreamAccounts,
   type PipedreamAccountSummary,
-} from "../../platform/core/pipedreamAccounts";
+} from "../../platform/core/connectors/pipedreamAccounts";
 import {
   findPipedreamFacebookPage,
   probePipedreamFacebookAccounts,
-} from "../../platform/core/pipedreamFacebook";
+} from "../../platform/core/connectors/pipedreamFacebook";
 import { router, protectedProcedure } from "../../platform/core/trpc";
-import { assertCanAct, isHiddenHistoryItem } from "../../platform/core/planGate";
+import { assertCanAct, isHiddenHistoryItem } from "../../platform/core/billing/planGate";
 import { outputApprovalState, APPROVAL_BLOCK_MESSAGE } from "../core/publishGate";
 import { getDb } from "../../db";
 import { sql } from "drizzle-orm";
 import { assertBrandOwner } from "../../platform/core/brandAuth";
 import {
   buildPipedreamAccountsUrl,
-} from "../../platform/core/pipedreamConnect";
-import { getPublishProvider } from "../core/publishProvider";
-import { createBundleSocialClient } from "../../platform/core/bundleSocial";
-import { publishViaBundleSocial } from "../core/bundlePublishService";
+} from "../../platform/core/connectors/pipedreamConnect";
+import { getPublishProvider } from "../../platform/core/connectors/publish/publishProvider";
+import { createBundleSocialClient } from "../../platform/core/connectors/bundleSocial";
+import { publishViaBundleSocial } from "../core/publish/bundlePublishService";
 import {
   contentSelectorFields,
   outputItemCaption,
@@ -36,7 +36,7 @@ import {
   requirePlanningConfirmation,
   resolveOutputContent,
   resolveStoredContentSelector,
-} from "../core/outputContentEnvelope";
+} from "../core/engine/outputContentEnvelope";
 
 const CONTENT_TYPES = [
   "fb-content",

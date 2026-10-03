@@ -17,7 +17,7 @@
 import { z } from "zod";
 import { router, protectedProcedure } from "../core/trpc";
 import { TRPCError } from "@trpc/server";
-import { PLANS, getPlan, type PlanCode } from "../core/plans";
+import { PLANS, getPlan, type PlanCode } from "../core/billing/plans";
 
 export async function loadUserPlan(userId: number): Promise<{
   planCode: PlanCode;
@@ -93,7 +93,7 @@ const QUOTA_KIND_TO_LOG: Record<string, string | null> = {
 
 export async function assertWithinPlan(
   userId: number,
-  kind: keyof import("../core/plans").PlanQuota,
+  kind: keyof import("../core/billing/plans").PlanQuota,
 ): Promise<void> {
   const u = await loadUserPlan(userId);
   const now = new Date();
@@ -190,8 +190,8 @@ export const billingRouter = router({
 
       const plan = getPlan(u.planCode);
       // 2026-05-14 (CJ「美金為準，每天匯率動」): USD = truth, TWD = USD × rate.
-      const { getEffectivePrice, currencyFromCountry } = await import("../core/plans");
-      const { getUsdToTwd } = await import("../core/fx");
+      const { getEffectivePrice, currencyFromCountry } = await import("../core/billing/plans");
+      const { getUsdToTwd } = await import("../core/billing/fx");
       const currency = currencyFromCountry(u.billingCountry);
       const usdToTwdRate = await getUsdToTwd();
       const eff = getEffectivePrice(plan, {
@@ -226,7 +226,7 @@ export const billingRouter = router({
       }
 
       // 2026-05-14: points balance + cycle info (replaces fixed quota counts)
-      const { getBalance } = await import("../core/pointsService");
+      const { getBalance } = await import("../core/billing/pointsService");
       const points = await getBalance(ctx.user!.id);
 
       // 2026-05-14 (CJ「我們使用 Stripe」): expose the user's primary

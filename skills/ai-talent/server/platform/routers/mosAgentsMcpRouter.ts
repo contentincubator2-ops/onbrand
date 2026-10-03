@@ -33,7 +33,7 @@
 import { Router, Request, Response } from "express";
 import {
   searchAgents, getAgentById, getAgentBySlug, searchSkills, getCatalogStats,
-} from "../core/mosCatalog";
+} from "../core/agents/mosCatalog";
 
 export const mosAgentsMcpRouter = Router();
 

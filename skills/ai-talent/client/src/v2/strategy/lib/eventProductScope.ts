@@ -3,9 +3,9 @@
  * 畫面在 components/positioning/EventProductScopePicker.tsx。
  *
  * 語意（為什麼「還沒選」跟「純品牌」要分開）在
- * server/strategy/core/eventProductScope.ts。
+ * server/strategy/core/entities/eventProductScope.ts。
  */
-import type { ProductScope } from "./campaignSchema";
+import type { ProductScope } from "./campaign/campaignSchema";
 
 export interface ProductScopeValue { scope: ProductScope | null; productIds: number[] }
 

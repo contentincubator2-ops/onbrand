@@ -1,20 +1,20 @@
-import { getBrandPositioning, getBrandPositioningById } from "../core/positioningBridge";
+import { getBrandPositioning, getBrandPositioningById } from "../core/positioning/positioningBridge";
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure } from "../../platform/core/trpc";
-import { executeTenStepAnalysis, getLatestJobForBrand } from "../positioning";
+import { executeTenStepAnalysis, getLatestJobForBrand } from "../core/positioning";
 import {
   analyzeBrandPositioning,
   generateCampaignPositioning,
   generateBrandContentCalendar,
   analyzeBrandCompetitors,
-} from "../core/brandEngine";
+} from "../core/brand/brandEngine";
 import { getDb } from "../../db";
 import { userApiKeys } from "../../../drizzle/schema";
 import { eq, and, sql } from "drizzle-orm";
-import { invokeLLM } from "../../platform/core/llm";
+import { invokeLLM } from "../../platform/core/llm/llm";
 import { assertBrandOwner } from "../../platform/core/brandAuth";
-import { isPositioningLocked } from "../core/positioningLock";
+import { isPositioningLocked } from "../core/positioning/positioningLock";
 
 // Helper to get user's API key
 async function getUserApiKey(userId: number): Promise<string> {
@@ -280,7 +280,7 @@ export const brandRouter = router({
         const isUnlimited = Number(row?.hasUnlimitedCredits) === 1 || row?.role === "admin" || isSoworkTeam;
         if (!isUnlimited) {
           const planCode = row?.planCode ?? "trial";
-          const { getPlan } = await import("../../platform/core/plans");
+          const { getPlan } = await import("../../platform/core/billing/plans");
           const plan = getPlan(planCode);
           const cap = plan.quota.brands;
           if (typeof cap === "number" && cap > 0) {
@@ -412,7 +412,7 @@ export const brandRouter = router({
       if (!Array.isArray(rows) || rows.length === 0) {
         throw new TRPCError({ code: "NOT_FOUND", message: `品牌 #${input.brandId} 不存在或不屬於這個帳號` });
       }
-      const { describeVisualStyle } = await import("../core/visualStyleFromImages");
+      const { describeVisualStyle } = await import("../core/brand/visualStyleFromImages");
       try {
         return await describeVisualStyle({ kind: input.kind, imageUrls: input.imageUrls });
       } catch (e: any) {
@@ -560,7 +560,7 @@ export const brandRouter = router({
       // Invalidate the real-content cache so AI 自動填寫 / 測試 picks up
       // the new URLs immediately.
       try {
-        const { invalidateBrandRealContent } = await import("../core/brandRealContent");
+        const { invalidateBrandRealContent } = await import("../core/brand/brandRealContent");
         invalidateBrandRealContent(input.brandId);
       } catch {/* non-fatal */}
 
@@ -872,8 +872,8 @@ export const brandRouter = router({
       // unlock so the pipeline can overwrite the (wrong) understanding
       await db.update(brands).set({ positioningStatus: "in_progress" } as any)
         .where(and(eq(brands.id, input.brandId), eq(brands.userId, ctx.user.id)));
-      const { startPositioningJob } = await import("../core/positioningJobRunner");
-      const { buildBrandPositioningSteps } = await import("../core/positioningSteps");
+      const { startPositioningJob } = await import("../core/positioning/positioningJobRunner");
+      const { buildBrandPositioningSteps } = await import("../core/positioning/positioningSteps");
       startPositioningJob({
         userId: ctx.user.id,
         entityKind: "brand",
@@ -1013,7 +1013,7 @@ export const brandRouter = router({
       // 2026-09-30：素材庫可以「設為標誌」任何一張——所以要確認這張真的是這個品牌的上傳，
       // 不能拿別的品牌的照片網址來當自己的標誌。
       {
-        const { brandOwnsLibraryPhoto } = await import("../core/assetPhotos");
+        const { brandOwnsLibraryPhoto } = await import("../core/brand/assetPhotos");
         if (!(await brandOwnsLibraryPhoto(input.brandId, input.logoUrl))) {
           throw new TRPCError({ code: "BAD_REQUEST", message: "這張圖不在這個品牌的素材庫裡" });
         }

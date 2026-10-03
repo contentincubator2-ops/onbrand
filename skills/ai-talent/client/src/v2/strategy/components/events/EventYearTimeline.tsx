@@ -6,14 +6,14 @@
  *     一眼看到檔期空在哪、哪裡撞在一起。
  *   - 不逼用戶一次建完一整年：上面一列是「節點」——依品牌市場算出的節慶，加上用戶自己
  *     加的節點（CJ「建議節點，也可以讓用戶自己增加」）。點節點 →「開始企劃」才建活動。
- *     節點 ≠ 活動的理由見 server/strategy/core/eventCalendar.ts。
+ *     節點 ≠ 活動的理由見 server/strategy/core/entities/eventCalendar.ts。
  *   - 節點視窗照任務卡彈跳視窗的設計（CJ「介面設計，參考任務卡按下後，彈跳視窗的設計
  *     方式」）：外觀共用 taskModalStyle；插畫＋一句大字問句；次要動作是圓形圖示鈕。
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Button, Checkbox, Input, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader, Textarea, Tooltip } from "@heroui/react";
 import { trpc } from "../../../../lib/trpc";
-import { showToastGlobal } from "../../../../components/ui/Toast";
+import { showToastGlobal } from "../../../platform/components/Toast";
 import { EmptyIllustration } from "../../../platform/components/EmptyIllustration";
 import { AddIcon, ChevronLeftIcon, ChevronRightIcon, DeleteIcon, EditIcon, FlagIcon, CommentIcon } from "../../../platform/components/icons";
 import { TASK_MODAL_CLASSNAMES, TASK_MODAL_HEADER, TASK_MODAL_INPUT, TASK_MODAL_QUESTION } from "../../../platform/components/taskModalStyle";

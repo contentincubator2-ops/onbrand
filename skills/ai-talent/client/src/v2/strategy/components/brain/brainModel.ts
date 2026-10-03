@@ -1,5 +1,5 @@
 /**
- * brainModel — 品牌大腦一行記憶的形狀（對應 server/strategy/core/brandContext.ts BrainItem）。
+ * brainModel — 品牌大腦一行記憶的形狀（對應 server/strategy/core/brand/brandContext.ts BrainItem）。
  *
  * client 不得 value-import server，所以型別在這裡另寫一份——改 server 那邊的欄位要一起改這裡。
  * 「記憶」tray 怎麼把這些行對回策略層的欄位，見 memoryModel.ts。

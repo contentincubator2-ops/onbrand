@@ -14,7 +14,7 @@
 import { useEffect, useState } from "react";
 import { trpc } from "../../../../lib/trpc";
 import { useLang } from "../../../../lib/i18n";
-import { showToastGlobal } from "../../../../components/ui/Toast";
+import { showToastGlobal } from "../Toast";
 import { toastWithUpgrade } from "../../lib/upgradeToast";
 import { CheckIcon, LockIcon, RegenerateIcon } from "../icons";
 

@@ -11,7 +11,7 @@ describe("imageCardRouter", () => {
 
   it("publicSpec tells the client when Nano Banana cannot hit the ratio", async () => {
     const { publicSpec } = await import("./imageCardRouter");
-    const { getImageSpec } = await import("../core/platformImageSpecs");
+    const { getImageSpec } = await import("../../platform/core/media/platformImageSpecs");
     expect(publicSpec(getImageSpec("web-img-og")!).nanoBanana).toBe(false);
     expect(publicSpec(getImageSpec("ig-img-feed-45")!).nanoBanana).toBe(false);
     expect(publicSpec(getImageSpec("line-img-richmsg")!).nanoBanana).toBe(true);

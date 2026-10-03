@@ -6,9 +6,9 @@
  */
 import "dotenv/config";
 import sharp from "sharp";
-import { getImageSpec } from "../server/content/core/platformImageSpecs";
-import { renderImageCard } from "../server/content/core/imageCards";
-import { localCoverFile } from "../server/content/core/imageFetch";
+import { getImageSpec } from "../server/platform/core/media/platformImageSpecs";
+import { renderImageCard } from "../server/content/core/image/imageCards";
+import { localCoverFile } from "../server/platform/core/media/imageFetch";
 import { readFileSync } from "fs";
 
 const args = process.argv.slice(2);

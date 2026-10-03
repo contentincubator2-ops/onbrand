@@ -92,7 +92,7 @@ export async function createUser(db: DB, data: {
   // 2026-05-12 (CJ「老用戶永遠保 900」): stamp earlyBird flag at register time.
   // While promo is active, all new sign-ups get the grandfathered price.
   // Flip ONBRAND_PROMO_ACTIVE=0 in env when ready to charge new users standard price (Starter US$75 / Solo US$300).
-  const { isPromoActiveForNewSignups } = await import("../core/plans");
+  const { isPromoActiveForNewSignups } = await import("../core/billing/plans");
   const earlyBird = isPromoActiveForNewSignups() ? 1 : 0;
   try {
     await db

@@ -38,11 +38,11 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faCheck, faPenNib, faCalendarDays, faChevronLeft } from "@fortawesome/free-solid-svg-icons";
 import { trpc } from "../../../lib/trpc";
 import { useLang } from "../../../lib/i18n";
-import type { ShellOutletCtx } from "../../app/shell/ShellLayout";
-import { TaskCardShell, TaskCardAvatar } from "../components/TaskCardShell";
-import { phaseOf } from "../../strategy/lib/campaignSchema";
+import type { ShellOutletCtx } from "../../platform/lib/shellContext";
+import { TaskCardShell, TaskCardAvatar } from "../../platform/components/TaskCardShell";
+import { phaseOf } from "../../strategy/lib/campaign/campaignSchema";
 import { weeksFor } from "../lib/campaignCalendar";
-import { CHANNEL_META, channelLabel, channelRoute } from "../lib/channelMeta";
+import { CHANNEL_META, channelLabel, channelRoute } from "../../platform/lib/channelMeta";
 import { HelpTip } from "../../platform/components/HelpTip";
 
 const ymd = (d: Date) => d.toISOString().slice(0, 10);

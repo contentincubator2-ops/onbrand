@@ -30,11 +30,11 @@ function isProviderKeyError(text: string): boolean {
 }
 import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure } from "../../platform/core/trpc";
-import { callLLM } from "../../platform/core/llmRouter";
-import { type GenOptions } from "../core/mediaGen";
-import { generateStillImage } from "../core/stillImageModels";
+import { callLLM } from "../../platform/core/llm/llmRouter";
+import { type GenOptions } from "../../platform/core/media/mediaGen";
+import { generateStillImage } from "../../platform/core/media/stillImageModels";
 import localPool from "../../localDb";
-import { isLocalUploadPath, probeImageUrl } from "../core/imageFetch";
+import { isLocalUploadPath, probeImageUrl } from "../../platform/core/media/imageFetch";
 
 const PRODUCT_IMAGE_CACHE_TTL_MS = 5 * 60_000;
 const PRODUCT_IMAGE_CACHE_MAX_ENTRIES = 1_000;
@@ -192,7 +192,7 @@ ${input.audienceContext ? `受眾：${input.audienceContext}` : ""}
       // so the blanket text-suppression negative is NOT sent.
       const {
         NO_TEXT_PROMPT_BLOCK, PRODUCT_FAITHFUL_PROMPT_BLOCK, NO_MIRROR_PROMPT_BLOCK,
-      } = await import("../core/imageGen");
+      } = await import("../core/image/imageGen");
       const isImage = input.kind === "image";
       const isProductSubject = isImage && input.subjectMode === "product" && !!input.imageUrl;
       const opts: GenOptions = {

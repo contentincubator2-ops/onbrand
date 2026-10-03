@@ -38,7 +38,7 @@ import { pivot, resolveTag, judgeValue, BUILTIN_DIMS, METRIC_LABELS, JUDGE_LABEL
 import { deriveDimensions, proposeLens, autoTag } from "../core/perfAI";
 import { parseTable, guessSource, guessMapping, buildFacts, IMPORT_SOURCES, ROWCOUNT } from "../core/perfImport";
 import { syncFbPage, resolvePage, FbSyncError, fbSyncEnabled } from "../core/fbPageSync";
-import { utmContent, campaignCode, campaignLink, cleanLandingUrl } from "../core/perfUtm";
+import { utmContent, campaignCode, campaignLink, cleanLandingUrl } from "../../platform/core/perfUtm";
 import {
   buildCampaignPerf, applyMatch, applyAlias, loadCampaignEvent, saveCampaignPerf, publishedPosts, listCampaigns,
   type PerfFact, type ExtFact, type CampaignPerfStore,

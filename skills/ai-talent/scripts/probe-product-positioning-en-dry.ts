@@ -5,10 +5,10 @@
  */
 import localPool from "../server/localDb.js";
 // @ts-ignore — VM 上的暫存複本
-import { buildProductPositioningSteps } from "../server/strategy/core/_probe_positioningSteps.js";
+import { buildProductPositioningSteps } from "../server/strategy/core/positioning/_probe_positioningSteps.js";
 // @ts-ignore
-import { buildSiblingBlock } from "../server/strategy/core/_probe_productSiblings.js";
-import { buildMarketContext } from "../server/strategy/core/marketProfiles.js";
+import { buildSiblingBlock } from "../server/strategy/core/entities/_probe_productSiblings.js";
+import { buildMarketContext } from "../server/strategy/core/brand/marketProfiles.js";
 
 const CJK = /[\u3400-\u9fff\uf900-\ufaff\u3000-\u303f\uff00-\uffef]/g;
 const PRODUCTS = [

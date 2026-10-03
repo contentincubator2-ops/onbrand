@@ -29,8 +29,8 @@ import { Icon, type IconName } from "../components/icons";
 // a user clicks "Start free" or "Sign in", the chunk is already cached
 // and Suspense fallback never flashes. Fire on mouseenter / focus / touchstart.
 // Failures (already loaded, network blip) are silently swallowed.
-const prefetchRegister = () => { import("../../../pages/auth/RegisterPage").catch(() => {}); };
-const prefetchLogin = () => { import("../../../pages/auth/LoginPage").catch(() => {}); };
+const prefetchRegister = () => { import("./auth/RegisterPage").catch(() => {}); };
+const prefetchLogin = () => { import("./auth/LoginPage").catch(() => {}); };
 const prefetchProps = (fn: () => void) => ({
   onMouseEnter: fn,
   onFocus: fn,
