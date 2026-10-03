@@ -589,7 +589,7 @@ export const squadAutoProcedures = {
                 publicVariants: variants,
               }, null, 2)
             : JSON.stringify(variants, null, 2);
-          const metadata = strategyPublicPolicy
+          const metadata = (await import("../../../platform/core/ops/genMetrics")).stampGenMetrics(strategyPublicPolicy
             ? {
                 latencyMs: Date.now() - startedAt,
                 contentModel: "ig-strategy-bundle",
@@ -606,7 +606,7 @@ export const squadAutoProcedures = {
                 inputs: { topic: input.topic ?? "" },
                 brandConsistency: squadBrandConsistency,
                 regulationCompliance: squadRegulationCompliance,
-              };
+              }, { durationMs: Date.now() - startedAt, ok, taskId: strategyRecordOverrides?.taskId ?? input.squadSlug });
           const persisted = await recordTaskRun({
             userId,
             brandId: input.brandId ?? null,

@@ -9,6 +9,7 @@
  * scripts/proof-metrics.ts (markdown table for pasting).
  */
 import localPool from "../../localDb";
+import { featureOfTaskId } from "./ops/genMetrics";
 
 const num = (v: unknown): number => {
   const x = Number(v);
@@ -37,6 +38,26 @@ export interface ProofMetrics {
     p95TotalMs: number | null;
   };
   cost: { usd: number; perDoneOutputUsd: number | null };
+  /** Wall-clock generation time per output (mission_outputs.metadata.durationMs). */
+  generation: {
+    n: number;
+    p50Ms: number | null;
+    p95Ms: number | null;
+    byFeature: Array<{ feature: string; n: number; p50Ms: number | null; p95Ms: number | null }>;
+  };
+  /**
+   * How much users change what the AI wrote. `editRate` counts outputs saved
+   * with a human edit (metadata.edited, set by outputRouter.updateVariantCaption);
+   * only saves made after that flag shipped are visible, so read it with N.
+   * `editedOrRevisedRate` also counts re-versioned outputs (version>1 / parent).
+   */
+  edits: {
+    n: number;
+    editRate: number | null;
+    editedOrRevisedRate: number | null;
+    editedN: number;
+    medianEditedChars: number | null;
+  };
 }
 
 export async function computeProofMetrics(days = 30): Promise<ProofMetrics> {
@@ -93,6 +114,55 @@ export async function computeProofMetrics(days = 30): Promise<ProofMetrics> {
     /* usage_log absent in some environments — report 0 spend, not an error */
   }
 
+  // ── generation duration + edits (metadata JSON; absent on old rows) ──────
+  const genMs: number[] = [];
+  const byFeature = new Map<string, number[]>();
+  try {
+    const [genRows]: any = await localPool.execute(
+      `SELECT JSON_UNQUOTE(JSON_EXTRACT(metadata, '$.genTaskId')) AS taskId,
+              JSON_EXTRACT(metadata, '$.durationMs') AS ms
+         FROM mission_outputs
+        WHERE createdAt >= NOW() - INTERVAL ${d} DAY
+          AND JSON_EXTRACT(metadata, '$.durationMs') IS NOT NULL`,
+    );
+    for (const r of genRows as any[]) {
+      const ms = num(r.ms);
+      if (ms <= 0) continue;
+      genMs.push(ms);
+      const f = featureOfTaskId(r.taskId);
+      (byFeature.get(f) ?? byFeature.set(f, []).get(f)!).push(ms);
+    }
+  } catch {
+    /* metadata not JSON-queryable in this environment — report "not measured" */
+  }
+  genMs.sort((a, b) => a - b);
+
+  let editedN = 0;
+  let editedOrRevised = 0;
+  let editTotal = 0;
+  const editChars: number[] = [];
+  try {
+    const [editRows]: any = await localPool.execute(
+      `SELECT JSON_UNQUOTE(JSON_EXTRACT(metadata, '$.edited')) AS edited,
+              JSON_EXTRACT(metadata, '$.editedChars') AS chars,
+              (COALESCE(version, 1) > 1 OR parentOutputId IS NOT NULL) AS revised
+         FROM mission_outputs
+        WHERE createdAt >= NOW() - INTERVAL ${d} DAY`,
+    );
+    for (const r of editRows as any[]) {
+      editTotal++;
+      const edited = String(r.edited) === "true";
+      if (edited) {
+        editedN++;
+        if (r.chars !== null && r.chars !== undefined) editChars.push(num(r.chars));
+      }
+      if (edited || num(r.revised) > 0) editedOrRevised++;
+    }
+  } catch {
+    /* same: leave as not measured */
+  }
+  editChars.sort((a, b) => a - b);
+
   const n = num(o.n);
   const done = num(o.done);
   return {
@@ -112,5 +182,23 @@ export async function computeProofMetrics(days = 30): Promise<ProofMetrics> {
       p95TotalMs: percentile(totals, 0.95),
     },
     cost: { usd: Math.round(usd * 100) / 100, perDoneOutputUsd: done > 0 ? Math.round((usd / done) * 1000) / 1000 : null },
+    generation: {
+      n: genMs.length,
+      p50Ms: percentile(genMs, 0.5),
+      p95Ms: percentile(genMs, 0.95),
+      byFeature: [...byFeature.entries()]
+        .map(([feature, v]) => {
+          v.sort((a, b) => a - b);
+          return { feature, n: v.length, p50Ms: percentile(v, 0.5), p95Ms: percentile(v, 0.95) };
+        })
+        .sort((a, b) => b.n - a.n),
+    },
+    edits: {
+      n: editTotal,
+      editRate: ratio(editedN, editTotal),
+      editedOrRevisedRate: ratio(editedOrRevised, editTotal),
+      editedN,
+      medianEditedChars: percentile(editChars, 0.5),
+    },
   };
 }

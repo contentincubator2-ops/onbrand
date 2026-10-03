@@ -238,13 +238,25 @@ export const outputRouter = router({
         : row.metadata;
       const touchesCompliance = input.contentKind === undefined && md && typeof md === "object"
         && (input.regulationCompliance || Array.isArray(md.regulationCompliance));
+      let nextMd: Record<string, any> | null = touchesCompliance ? md : null;
       if (touchesCompliance) {
         const { mergeComplianceRecord } = await import("../core/engine/regulationCompliance");
         const rec = input.regulationCompliance ? { variantIndex: updated.resolved.index, ...input.regulationCompliance } : null;
-        md.regulationCompliance = mergeComplianceRecord(md.regulationCompliance, updated.resolved.index, rec);
+        nextMd!.regulationCompliance = mergeComplianceRecord(nextMd!.regulationCompliance, updated.resolved.index, rec);
+      }
+      // Edit-rate telemetry: a plain save (no agent switch, no AI rewrite) whose
+      // text differs from what was stored is a human edit.
+      try {
+        const { isHumanEdit, applyEditMarker } = await import("../../platform/core/ops/editTracking");
+        if (isHumanEdit(input)) {
+          const marked = applyEditMarker(nextMd ?? md, String(updated.resolved.item?.caption ?? ""), input.caption);
+          if (marked) nextMd = marked;
+        }
+      } catch { /* telemetry must never break saving */ }
+      if (nextMd) {
         await localPool.execute(
           `UPDATE mission_outputs SET content = ?, metadata = ?, updatedAt = NOW() WHERE id = ?`,
-          [updated.content, JSON.stringify(md), input.id],
+          [updated.content, JSON.stringify(nextMd), input.id],
         );
       } else {
         await localPool.execute(

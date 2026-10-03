@@ -19,6 +19,7 @@
  * (Imagen → Flux, primary → Flux Schnell, PiAPI → OpenAI) did.
  */
 
+import { throwIfCancelled } from "../llm/runCancel";
 import { dispatchGenerate, type GenOptions, type GenResult } from "./mediaGen";
 
 export const GPT_IMAGE_2 = "openai/gpt-image-2" as const;
@@ -137,6 +138,8 @@ export async function generateStillImage(
   let kind: ImageFailureKind = "provider";
 
   for (let i = 0; i < 2; i++) {
+    // A cancelled run must not start (or retry) another image generation.
+    throwIfCancelled();
     attempts++;
     const r = await attemptOnce(modelId, opts as GenOptions, cfg);
     if ("url" in r) return { status: "ready", modelId, url: r.url, attempts };
