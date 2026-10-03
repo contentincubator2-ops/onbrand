@@ -163,6 +163,7 @@ export function PositioningEditor({
         scopeMode={scopeMode}
         scopeId={targetId ?? null}
         scopeName={scopeName}
+        brandId={brandId}
         // 2026-09-23（CJ「我寫入四格後，也沒有儲存或回到品牌頁面的按鈕。
         // 會迷路」）：寫入完成後要有一條明確的出口回總覽，不是靠使用者
         // 自己找左上角那顆返回。
