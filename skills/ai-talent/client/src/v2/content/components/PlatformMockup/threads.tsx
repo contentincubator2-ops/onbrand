@@ -28,12 +28,14 @@ interface PostProps {
   handle: string;
   body?: string;
   imageDesc?: string;
+  /** 2026-10-04：真的有圖就顯示圖（照原比例，Threads 不裁圖），沒有才畫佔位框。 */
+  imageUrl?: string | null;
   dark?: boolean;
   isReply?: boolean;
   showConnector?: boolean;
 }
 
-function ThreadPost({ brand, handle, body, imageDesc, dark = false, isReply = false, showConnector = false }: PostProps) {
+function ThreadPost({ brand, handle, body, imageDesc, imageUrl, dark = false, isReply = false, showConnector = false }: PostProps) {
   const bg   = dark ? "#101010" : "#FFFFFF";
   const text = dark ? "#F1F1F1" : TH_BLACK;
   const sub  = dark ? "#999999" : TH_GRAY;
@@ -88,7 +90,11 @@ function ThreadPost({ brand, handle, body, imageDesc, dark = false, isReply = fa
         )}
 
         {/* Optional image */}
-        {imageDesc && (
+        {imageUrl ? (
+          <div className="rounded-xl overflow-hidden mb-2 border" style={{ borderColor: bdr }}>
+            <img src={imageUrl} alt="" className="block w-full h-auto" style={{ maxHeight: 520, objectFit: "contain", backgroundColor: dark ? "#1E1E1E" : TH_LIGHT }} />
+          </div>
+        ) : imageDesc && (
           <div
             className="rounded-xl overflow-hidden mb-2 border flex items-center justify-center"
             style={{ aspectRatio: "1.91/1", borderColor: bdr, backgroundColor: dark ? "#1E1E1E" : TH_LIGHT }}
@@ -169,7 +175,7 @@ function PhoneChrome({ dark, children }: { dark: boolean; children: React.ReactN
 ───────────────────────────────────────────────────── */
 export function ThreadsPost({
   title, brandName, variantLabel,
-  liveTitle, liveCaption, liveImageDesc,
+  liveTitle, liveCaption, liveImageDesc, liveImageUrl, liveImageStatus,
 }: MockupFields) {
   const brand  = brandName ?? "品牌帳號";
   const handle = handleOf(brandName);
@@ -184,6 +190,7 @@ export function ThreadsPost({
           handle={handle}
           body={body}
           imageDesc={liveImageDesc}
+          imageUrl={liveImageUrl && liveImageStatus === "ready" ? liveImageUrl : null}
           dark
           showConnector={false}
         />

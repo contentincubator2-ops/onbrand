@@ -34,6 +34,7 @@ import { showToastGlobal } from "../../platform/components/Toast";
 import { PlatformMockup } from "../components/PlatformMockup";
 import ImageCardOffer, { IMAGE_CARD_OFFER_ID } from "../components/imageCard/ImageCardOffer";
 import type { MockupVariant } from "../lib/inferMockup";
+import { imageCardMockup } from "../lib/imageCardMockup";
 import { getStrategyPresentationMockup } from "../lib/strategyPresentation";
 import {
   getIgPublicVariantImageSize,
@@ -1518,6 +1519,14 @@ export default function RunPage() {
       return { platform: "generic" as any, format: "research-doc" as any, label: "generic:research-doc" };
     }
 
+    // 2026-10-04 圖片卡存成的「圖＋文」貼文：版型跟圖片卡頁的預覽用同一份對照。
+    const md = (data?.metadata ?? {}) as { source?: string; cardId?: string; platform?: string };
+    if (md.source === "image-card" && md.cardId && md.platform) {
+      let n = 1;
+      try { const c = JSON.parse(String(data?.content ?? "[]")); n = Array.isArray(c?.[0]?.cards) ? c[0].cards.length : 1; } catch { /* 單張 */ }
+      return imageCardMockup(md.cardId, md.platform, n);
+    }
+
     // ── Layer 1: taskId prefix → platform/format (richest mapping) ──
     const idPrefixMap: Record<string, string> = {
       fb: "facebook", ig: "instagram", yt: "youtube", tt: "tiktok",
@@ -2166,6 +2175,7 @@ export default function RunPage() {
                   copy={String(slide.caption ?? "")}
                   runId={outputId}
                   hasImage={!!slide.imageUrl}
+                  locator={getRunContentMutationLocator(selectedContentKind, activeIdx)}
                 />
               )}
               {/* 2026-09-21 (CJ「不行的時候，再讓用戶選 NANO BANANA」): gpt-image-2 failed even after the
