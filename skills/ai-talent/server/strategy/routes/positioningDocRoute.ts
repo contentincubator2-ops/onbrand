@@ -146,21 +146,60 @@ async function resolveScope(
 }
 
 /** 跑 python 抽取器。失敗要說出壞在哪 —— 靜靜回空結構比壞掉更糟。 */
-async function extractFile(path: string): Promise<{
+type ExtractedDoc = {
   name: string; kind: string; chars: number;
   sections: { level: number; heading: string; body: string }[]; text: string;
-}> {
+};
+
+async function runExtractor(path: string): Promise<ExtractedDoc> {
   const script = join(process.cwd(), "scripts", "positioning", "extract_doc.py");
-  const { stdout } = await promisify(execFile)(
-    process.env.PYTHON_BIN ?? "python3",
-    [script, path],
-    { timeout: EXTRACT_TIMEOUT_MS, maxBuffer: 32 * 1024 * 1024 },
-  );
+  let stdout: string;
+  try {
+    ({ stdout } = await promisify(execFile)(
+      process.env.PYTHON_BIN ?? "python3",
+      [script, path],
+      { timeout: EXTRACT_TIMEOUT_MS, maxBuffer: 32 * 1024 * 1024 },
+    ));
+  } catch (err: any) {
+    // 抽取器逐檔回報錯誤時 exit 1，但 JSON 在 stdout；execFile 只會丟
+    // 「Command failed: <指令>」，真正原因被吞掉。先撈 stdout，再退到 stderr。
+    let reason = "";
+    try { reason = JSON.parse(String(err?.stdout || "{}")).errors?.[0]?.error || ""; } catch { /* 不是 JSON */ }
+    if (!reason) reason = String(err?.stderr || "").trim().split("\n").slice(-3).join(" ");
+    throw new Error(reason || String(err?.message || err));
+  }
   const parsed = JSON.parse(stdout);
   if (parsed.errors?.length) throw new Error(parsed.errors[0].error || "抽取失敗");
   const doc = parsed.docs?.[0];
   if (!doc) throw new Error("抽取器沒有回傳內容");
   return doc;
+}
+
+/** 機器沒有 pdftotext 時的 PDF 備援：純 JS 取字，再交給同一支抽取器切段（當成 .txt）。 */
+async function extractPdfWithoutPoppler(path: string): Promise<ExtractedDoc> {
+  const { extractText, getDocumentProxy } = await import("unpdf");
+  const pdf = await getDocumentProxy(new Uint8Array(await fs.readFile(path)));
+  const { text } = await extractText(pdf, { mergePages: true });
+  const txtPath = path.replace(/\.pdf$/i, ".pdftext.txt");
+  assertInsideStorage(txtPath);
+  await fs.writeFile(txtPath, text, "utf-8");
+  try {
+    const doc = await runExtractor(txtPath);
+    return { ...doc, name: basename(path), kind: "pdf" };
+  } finally {
+    await fs.unlink(txtPath).catch(() => {});
+  }
+}
+
+async function extractFile(path: string): Promise<ExtractedDoc> {
+  try {
+    return await runExtractor(path);
+  } catch (err: any) {
+    if (/\.pdf$/i.test(path) && /pdftotext/.test(String(err?.message))) {
+      return extractPdfWithoutPoppler(path);
+    }
+    throw err;
+  }
 }
 
 /** 抽取結果落地：完整版進磁碟，輕量大綱進 positioning JSON。 */

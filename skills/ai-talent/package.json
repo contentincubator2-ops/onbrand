@@ -84,6 +84,7 @@
     "pdfkit": "^0.15.0",
     "sharp": "^0.33.5",
     "stripe": "^17.0.0",
+    "unpdf": "^1.8.1",
     "zod": "^3.22.0"
   },
   "devDependencies": {
