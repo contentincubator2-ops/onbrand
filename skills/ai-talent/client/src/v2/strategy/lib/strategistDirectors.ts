@@ -165,7 +165,7 @@ export function scopeFromUrl(params: { p?: string | null; cat?: string | null; p
   // 內容層的活動 tray 跟策略層的活動頁談的是同一件事——同一組活動顧問。
   if (/^\/campaigns(\/|$)/.test(path)) return "events";
   // 內容層其餘共用頁（任務頁以外）：本週企劃、靈感、專案、產出頁、圖片卡、案例、審核。
-  if (/^\/(planner|inspiration|projects|run|image|review)(\/|$)/.test(path) || /^\/tasks\/(case|calendar)(\/|$)/.test(path)) {
+  if (/^\/(planner|inspiration|projects|my-cards|run|image|review)(\/|$)/.test(path) || /^\/tasks\/(case|calendar)(\/|$)/.test(path)) {
     return "content";
   }
   const cat = params.cat ?? "";

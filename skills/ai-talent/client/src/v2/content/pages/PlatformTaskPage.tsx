@@ -60,9 +60,10 @@ import { imageCardHref, imageChannelOf } from "../../platform/lib/imageCardHando
 import CardDetailDrawer, { isRecentCard } from "../components/quickTask/CardDetailDrawer";
 import ChannelPicker from "../../platform/components/plan/ChannelPicker";
 import TaskPicker from "../../platform/components/plan/TaskPicker";
-import { LibraryIcon, AddIcon, EditIcon, TaskCardsIcon, Icon, type IconName } from "../../platform/components/icons";
+import { LibraryIcon, AddIcon, EditIcon, TaskCardsIcon, FavoriteIcon, Icon, type IconName } from "../../platform/components/icons";
 import { contextChipIcon } from "../lib/contextChipIcons";
 import { departAgentHandoff } from "../lib/agentHandoff";
+import { resolveTrayIds, toggleTrayId, taskPlatformOf } from "../lib/taskTrayClient";
 import { recordTaskUsed, getLastUsedDays, ROUTE_TO_PLATFORM, PLATFORM_META, dicebear, HOLD_FOR_IMAGES, synthesizeStages, FBTaskCard, COMPOSER_CHANNELS, trimmedExtras, chipFieldPath, getNested, setNested, CHIP_SIBLING_CANDIDATES, TaskEmbed } from "./platformTask/taskModel";
 import { PlatformPageErrorBoundary } from "./platformTask/PlatformPageErrorBoundary";
 export type { TaskEmbed } from "./platformTask/taskModel";
@@ -681,21 +682,8 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
   }, [activeTask, campaignScope, campaignQ.data]);
 
   // ── Platform inference (matches QuickTask30sPage logic) ──────────────────
-  const inferPlatform = (task: FBTaskCard): string =>
-    task.platform ??
-    (task.id?.startsWith("ig-") ? "instagram"
-      : task.id?.startsWith("yt-") ? "youtube"
-      : task.id?.startsWith("tt-") ? "tiktok"
-      : task.id?.startsWith("li-") ? "linkedin"
-      : task.id?.startsWith("em-") ? "email"
-      : task.id?.startsWith("pr-") ? "pr"
-      : task.id?.startsWith("web-") ? "website"
-      : task.id?.startsWith("x-") ? "x"
-      : task.id?.startsWith("th-") ? "threads"
-      : task.id?.startsWith("ln-") ? "line"
-      : task.id?.startsWith("br-") ? "brand"
-      : task.id?.startsWith("rs-") ? "audience"
-      : "facebook");
+  // 2026-10-04：規則搬到 taskTrayClient.taskPlatformOf——「我的任務卡」總覽頁要用同一份。
+  const inferPlatform = (task: FBTaskCard): string => taskPlatformOf(task);
 
   // ── Filtered task list ────────────────────────────────────────────────────
   /** 這個通路的全部可見卡（已過方案閘門）。托盤與選卡器都吃這一份。 */
@@ -727,27 +715,25 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
 
   /** 這個通路實際擺出來的卡 id。存過的要跟「現在看得到的」取交集 —— 降級
    *  或卡退役之後，托盤不能把方案擋掉的卡漏出來。 */
-  const trayIds = useMemo<string[]>(() => {
-    if (!trayData) return [];
-    const visible = new Set(platformTasks.map((t: any) => t.id));
-    const stored = (trayData.stored ?? []).filter((id) => visible.has(id));
-    if (stored.length) return stored;
-    // 2026-09-29：server 的預設托盤是從「全部卡」裡每個形式挑一張，但前台只列
-    // 爆款結構＋品牌自建——交集後常常只剩一兩張（FB 7 張爆款卡只擺出 2 張）。
-    // 沒存過托盤時，改從「前台看得到的卡」裡每個形式挑一張，server 的挑法當次序參考。
-    // 看得到的卡本來就不超過托盤上限時全部擺出來——IG 兩張留言卡共用同一個形式，
-    // 私訊卡又是 feed 形式，每個形式挑一張會把 8 張砍成 6 張，藏掉唯一的私訊卡。
-    if (platformTasks.length <= (trayData.maxTray ?? 12)) return platformTasks.map((t: any) => t.id);
-    const fallbackOrder = new Map((trayData.fallback ?? []).map((id, i) => [id, i] as const));
-    const byType = new Map<string, any>();
-    const ranked = [...platformTasks].sort((a: any, b: any) =>
-      (fallbackOrder.get(a.id) ?? 1e9) - (fallbackOrder.get(b.id) ?? 1e9));
-    for (const t of ranked as any[]) {
-      const k = String(t.postType ?? "other");
-      if (!byType.has(k)) byType.set(k, t);
+  // 2026-10-04：解析搬到 taskTrayClient.resolveTrayIds（「我的任務卡」總覽頁共用同一份）。
+  const trayIds = useMemo<string[]>(() => resolveTrayIds(trayData, platformTasks), [trayData, platformTasks]);
+
+  /**
+   * 卡片上的星號（2026-10-04，CJ「可以在不同的平台中，管理到自己常用的」）。
+   * 原本要加一張常用卡得開選卡器、在清單裡找到它、勾起來、存檔；星號是同一件事的一步版。
+   * 兩個擋下來的情況（到上限、最後一張）見 toggleTrayId。
+   */
+  const toggleFavorite = (taskId: string) => {
+    if (!brandId || !trayData) return;
+    const r = toggleTrayId(trayIds, taskId, trayData.maxTray ?? 12);
+    if (!r.ok) {
+      showToastGlobal(r.reason === "full"
+        ? (lang === "en" ? `You can keep up to ${trayData.maxTray ?? 12} saved cards per channel.` : `每個通路最多 ${trayData.maxTray ?? 12} 張常用卡，先拿掉一張再加。`)
+        : (lang === "en" ? "Keep at least one saved card." : "常用清單至少留一張。"));
+      return;
     }
-    return [...byType.values()].map((t: any) => t.id);
-  }, [trayData, platformTasks]);
+    setTrayMut?.mutate?.({ brandId, platform, taskIds: r.next });
+  };
 
   /**
    * 這個通路「目前這個分類」的卡 —— 只套用分類分頁（貼文／連結貼文／廣告…，
@@ -1820,6 +1806,31 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                           </span>
                         );
                       })()}
+                      {/* 2026-10-04 常用星號——左下角。右上是「我的卡」、右下是「用過」、左上是平台圖示。 */}
+                      {brandId && trayData && (() => {
+                        const fav = trayIds.includes(task.id);
+                        const label = fav
+                          ? (lang === "en" ? "Remove from saved cards" : "從常用移除")
+                          : (lang === "en" ? "Add to saved cards" : "加入常用");
+                        return (
+                          <span
+                            role="button"
+                            tabIndex={0}
+                            title={label}
+                            aria-label={label}
+                            aria-pressed={fav}
+                            onClick={(e) => { e.stopPropagation(); toggleFavorite(task.id); }}
+                            onKeyDown={(e) => {
+                              if (e.key !== "Enter" && e.key !== " ") return;
+                              e.preventDefault(); e.stopPropagation();
+                              toggleFavorite(task.id);
+                            }}
+                            className={`absolute bottom-2 left-2 flex h-6 w-6 items-center justify-center rounded-full bg-white/85 hover:bg-white cursor-pointer ${fav ? "text-neutral-900" : "text-neutral-300 hover:text-neutral-600"}`}
+                          >
+                            <FavoriteIcon size={12} />
+                          </span>
+                        );
+                      })()}
                       {/* Platform icon — top left */}
                       <div
                         className="absolute top-2 left-2 w-5 h-5 rounded-full flex items-center justify-center"
@@ -1992,6 +2003,14 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                   {showAllTasks
                     ? (lang === "en" ? "Show my cards" : "只看常用")
                     : (lang === "en" ? "Show all" : "看全部")}
+                </button>
+                <span aria-hidden className="text-neutral-300">·</span>
+                {/* 2026-10-04：跨通路的總覽（常用／自建卡的修改、複製、刪除）。 */}
+                <button
+                  onClick={() => navigate("/my-cards")}
+                  className="font-medium text-neutral-800 underline-offset-2 hover:underline"
+                >
+                  {lang === "en" ? "Manage my cards" : "管理我的任務卡"}
                 </button>
               </div>
             )}
