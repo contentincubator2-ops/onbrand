@@ -14,7 +14,7 @@ import { type MockupFields, MockupHeader, dicebear, MarkdownText } from "./share
 
 /* ─────────────── LINE Broadcast Message ─────────────── */
 
-export function LINEBroadcast({ title, brandName, variantLabel, liveCaption, liveImageDesc, liveCta }: MockupFields) {
+export function LINEBroadcast({ title, brandName, variantLabel, liveCaption, liveImageDesc, liveCta, liveImageUrl, liveImageStatus }: MockupFields) {
   const brand = brandName ?? "Your Brand";
 
   return (
@@ -44,6 +44,10 @@ export function LINEBroadcast({ title, brandName, variantLabel, liveCaption, liv
             <div className="flex gap-2">
               <Avatar src={dicebear(brand)} size="sm" className="shrink-0 mt-auto" />
               <div className="max-w-[85%] space-y-1">
+                {/* 2026-10-04：真的有圖就照原比例顯示（LINE 聊天室不裁圖），沒有才畫佔位框。 */}
+                {liveImageUrl && liveImageStatus === "ready" ? (
+                  <img src={liveImageUrl} alt="" className="block w-full h-auto rounded-2xl rounded-tl-none min-w-[220px]" style={{ maxHeight: 420, objectFit: "contain", backgroundColor: "#e0e0e0" }} />
+                ) : (
                 <div className="aspect-[16/9] w-full bg-[#e0e0e0] rounded-2xl rounded-tl-none overflow-hidden flex items-center justify-center relative min-w-[220px]">
                   <Skeleton className="absolute inset-0 rounded-none" />
                   <div className="relative z-10 text-center p-3">
@@ -53,6 +57,7 @@ export function LINEBroadcast({ title, brandName, variantLabel, liveCaption, liv
                     </p>
                   </div>
                 </div>
+                )}
               </div>
             </div>
 

@@ -12,7 +12,7 @@ import {
   ratioError,
   resolveImageTray,
 } from "./platformImageSpecs";
-import { buildImageCardPrompt, finalizeToSpec, normalizeDirections } from "../../../content/core/image/imageCards";
+import { buildImageCardPrompt, finalizeToSpec, normalizeDirections, saveTitledImage } from "../../../content/core/image/imageCards";
 
 describe("platform image specs", () => {
   it("ids are unique and every channel has image cards", () => {
@@ -112,6 +112,29 @@ describe("image card prompt", () => {
     const p = buildImageCardPrompt({ spec, scenePromptEn: "s", brand: {}, withProduct: false, reference: "previous", instruction: "暖一點" });
     expect(p).toContain("CHANGE REQUEST");
     expect(p).toContain("re-compose it natively");
+  });
+});
+
+// 2026-10-04 圖文預覽與排程：前台把疊好標題的圖傳上來存檔——只收「就是這張卡交付像素」的圖。
+describe("saveTitledImage", () => {
+  const spec = PLATFORM_IMAGE_SPECS.find((s) => s.id === "fb-img-feed-square")!; // 1080x1080
+  const dataUrl = async (w: number, h: number) =>
+    "data:image/jpeg;base64," + (await sharp({ create: { width: w, height: h, channels: 3, background: "#c96" } }).jpeg().toBuffer()).toString("base64");
+
+  it("refuses anything that is not a png/jpeg data URL", async () => {
+    for (const bad of ["https://example.com/a.jpg", "data:image/svg+xml;base64,PHN2Zz48L3N2Zz4=", "data:text/html;base64,PGI+", "data:image/jpeg;base64,***"]) {
+      expect((await saveTitledImage(bad, spec)).ok, bad).toBe(false);
+    }
+  });
+
+  it("refuses an image that is not the card's delivery size, instead of resizing or cropping it", async () => {
+    const r = await saveTitledImage(await dataUrl(1080, 1350), spec);
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.reason).toContain("1080×1080");
+  });
+
+  it("refuses bytes that are not an image", async () => {
+    expect((await saveTitledImage("data:image/jpeg;base64," + Buffer.from("not an image").toString("base64"), spec)).ok).toBe(false);
   });
 });
 
