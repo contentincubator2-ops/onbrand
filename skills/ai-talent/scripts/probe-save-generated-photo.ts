@@ -19,7 +19,7 @@ import localPool from "../server/localDb.js";
 import {
   savePhotoFromUrl, removePhoto, listPhotos, photoStorageRoot,
 } from "../server/strategy/core/assetPhotos.js";
-import { localUploadFile } from "../server/content/core/imageFetch.js";
+import { localUploadFile } from "../server/platform/core/media/imageFetch.js";
 
 async function main() {
   const brandId = Number(process.argv[2] || 2958);     // 預設：開發測試用

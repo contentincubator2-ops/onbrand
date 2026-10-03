@@ -23,7 +23,7 @@ import { resolveTask, resolveTaskTemplateSync } from "../server/content/core/tas
 import { intakeExtraFields } from "../server/content/core/taskIntake";
 import { KOL_30S_TASKS } from "../server/content/core/quickTaskKOL";
 import { WEBSITE_30S_TASKS } from "../server/content/core/quickTaskWebsite";
-import { PACKS } from "../server/strategy/core/brandPacks";
+import { PACKS } from "../server/content/core/brandPacks";
 
 const BASE = process.env.PROBE_BASE ?? "http://127.0.0.1:3101";
 

@@ -14,10 +14,10 @@ import { useNavigate, useOutletContext, useParams } from "react-router-dom";
 import { Button, Spinner, Textarea, Input, Modal, ModalBody, ModalContent, ModalHeader } from "@heroui/react";
 import { trpc } from "../../../lib/trpc";
 import { useLang } from "../../../lib/i18n";
-import { showToastGlobal } from "../../../components/ui/Toast";
-import type { ShellOutletCtx } from "../../app/shell/ShellLayout";
-import type { ImageCardInfo } from "../components/imageCard/ImageCardTile";
-import { readImageCardHandoff, takeImageSubjectHandoff } from "../lib/imageCardHandoff";
+import { showToastGlobal } from "../../platform/components/Toast";
+import type { ShellOutletCtx } from "../../platform/lib/shellContext";
+import type { ImageCardInfo } from "../../platform/lib/imageCardHandoff";
+import { readImageCardHandoff, takeImageSubjectHandoff } from "../../platform/lib/imageCardHandoff";
 import BrandLibrary from "../../strategy/components/positioning/BrandLibrary";
 import AiImageNotice from "../../platform/components/AiImageNotice";
 

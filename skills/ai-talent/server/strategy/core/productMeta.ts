@@ -1,4 +1,4 @@
-import { assertUrlSafe } from "../../content/core/urlGuard";
+import { assertUrlSafe } from "../../platform/core/web/urlGuard";
 
 export interface ProductMeta {
   name?: string;

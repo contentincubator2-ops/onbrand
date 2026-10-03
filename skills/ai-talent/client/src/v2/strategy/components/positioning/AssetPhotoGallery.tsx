@@ -16,7 +16,7 @@ import { IllustratedEmpty } from "../../../platform/components/EmptyIllustration
 import { useRef, useState } from "react";
 import { trpc } from "../../../../lib/trpc";
 import { useLang } from "../../../../lib/i18n";
-import { showToastGlobal } from "../../../../components/ui/Toast";
+import { showToastGlobal } from "../../../platform/components/Toast";
 
 interface Props {
   brandId: number;

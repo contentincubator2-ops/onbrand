@@ -24,7 +24,7 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faArrowUpRightFromSquare, faPenNib, faRotate, faCopy, faCheck, faFileImport, faXmark, faPlus } from "@fortawesome/free-solid-svg-icons";
 import { trpc } from "../../../lib/trpc";
 import { useLang } from "../../../lib/i18n";
-import { CHANNEL_META, channelLabel } from "../../content/lib/channelMeta";
+import { CHANNEL_META, channelLabel } from "../../platform/lib/channelMeta";
 import { phaseShort } from "../../strategy/lib/campaignStage";
 import { metricLabel, money, type KpiMetric } from "../../strategy/lib/campaignKpi";
 import { ImportModal } from "./LensWorkspace";

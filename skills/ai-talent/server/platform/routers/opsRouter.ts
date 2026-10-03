@@ -307,7 +307,7 @@ export const opsRouter = router({
     .mutation(async ({ ctx }) => {
       const t0 = Date.now();
       try {
-        const { recordTaskRun } = await import("../../content/core/recordTaskRun");
+        const { recordTaskRun } = await import("../core/recordTaskRun");
         const stampId = `__selftest_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
         const r = await recordTaskRun({
           userId: ctx.user.id,

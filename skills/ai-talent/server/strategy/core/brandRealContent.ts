@@ -11,8 +11,8 @@
  * latency on the bulk-suggest path which calls 12 times in a row.
  */
 import localPool from "../../localDb";
-import { fetchUrlSummary, formatUrlSummaryForPrompt } from "../../content/core/urlContext";
-import { perplexityScout } from "../../content/core/scouts/perplexityScout";
+import { fetchUrlSummary, formatUrlSummaryForPrompt } from "../../platform/core/web/urlContext";
+import { perplexityScout } from "../../platform/core/scouts/perplexityScout";
 
 const PERPLEXITY_TIMEOUT_MS = 12_000;
 

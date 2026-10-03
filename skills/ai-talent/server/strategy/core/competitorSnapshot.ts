@@ -17,8 +17,8 @@
  */
 import localPool from "../../localDb";
 import { invokeLLM } from "../../platform/core/llm";
-import { perplexityScout } from "../../content/core/scouts/perplexityScout";
-import type { IntelItem, ScoutContext } from "../../content/core/scouts/types";
+import { perplexityScout } from "../../platform/core/scouts/perplexityScout";
+import type { IntelItem, ScoutContext } from "../../platform/core/scouts/types";
 import { TOUCHPOINTS } from "../../platform/core/touchpoints";
 
 export const COMPETITOR_SNAPSHOT_DDL = `

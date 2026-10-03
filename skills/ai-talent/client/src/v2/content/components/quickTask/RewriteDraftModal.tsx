@@ -17,7 +17,7 @@ import {
 } from "@heroui/react";
 import { CheckIcon, CopyIcon, GenerateIcon } from "../../../platform/components/icons";
 import RegulationComplianceNote from "../RegulationComplianceNote";
-import { showToastGlobal } from "../../../../components/ui/Toast";
+import { showToastGlobal } from "../../../platform/components/Toast";
 
 export default function RewriteDraftModal({
   isOpen, onClose, brandId,

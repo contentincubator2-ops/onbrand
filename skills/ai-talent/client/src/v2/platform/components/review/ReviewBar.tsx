@@ -16,7 +16,7 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { trpc } from "../../../../lib/trpc";
 import { useLang } from "../../../../lib/i18n";
-import { showToastGlobal } from "../../../../components/ui/Toast";
+import { showToastGlobal } from "../Toast";
 import { toastWithUpgrade } from "../../lib/upgradeToast";
 import { DoneIcon, SendBackIcon, SendIcon, WaitingIcon } from "../icons";
 import { HelpTip } from "../HelpTip";

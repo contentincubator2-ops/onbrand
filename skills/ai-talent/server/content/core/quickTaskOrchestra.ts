@@ -14,7 +14,7 @@
  * longer apply — the tier budgets below are the live numbers.)
  */
 import { callModel, type ModelProvider } from "../../platform/core/multiModelRouter";
-import { GPT_IMAGE_2, generateStillImage, type StillImageChoice } from "./stillImageModels";
+import { GPT_IMAGE_2, generateStillImage, type StillImageChoice } from "../../platform/core/media/stillImageModels";
 import {
   captionToBilingualVisualBrief,
   loadBrandIdentityForImage,
@@ -26,17 +26,17 @@ import {
   PRODUCT_SUBJECT_UNAVAILABLE_ERROR,
   resolveProductSubjectReference,
 } from "./productSubjectPolicy";
-import { isLocalUploadPath, probeImageUrl } from "./imageFetch";
+import { isLocalUploadPath, probeImageUrl } from "../../platform/core/media/imageFetch";
 import { angleVisualLens, angleWritingBlock, checkAngle, dedupeAngleLabels, pickOwnAngleBlock, sanitizeAngleLabel } from "./variantAngles";
-import { findFirstUrl, fetchUrlSummary, formatUrlSummaryForPrompt, type UrlSummary } from "./urlContext";
+import { findFirstUrl, fetchUrlSummary, formatUrlSummaryForPrompt, type UrlSummary } from "../../platform/core/web/urlContext";
 import { detectNonDeliverable } from "./captionSanity";
 import { isAdCopyTemplate, extractRequestedUrl, buildAdCopyRule, validateAdCopy, repairAdCopy } from "./adCopyContract";
 import { adSlotOf, buildAdSlotRule, validateAdSlot, repairAdSlot } from "./adSlotContract";
 import { isShotListTemplate, buildShotListRule, normalizeShotList, validateShotList, repairShotList } from "./shotListContract";
 // 2026-08-31 五感十築：正向直述句型合約（skill 01 Hard Rule 1）。
 import { isWuganVoiceTemplate, validateWuganVoice, repairWuganVoice, buildWuganVoiceReminder } from "./wuganVoiceContract";
-import { extractYouTubeId, fetchYouTubeContext, formatYouTubeContextForPrompt } from "./youtubeContext";
-import { fetchViralPatterns, formatViralPatternsForPrompt } from "./socialListeningScout";
+import { extractYouTubeId, fetchYouTubeContext, formatYouTubeContextForPrompt } from "../../platform/core/web/youtubeContext";
+import { fetchViralPatterns, formatViralPatternsForPrompt } from "../../strategy/core/socialListeningScout";
 import { buildBrandPrefix as buildBrandContext, enforceBrandRulesOnText, enforceBrandRulesOnTextWithReport } from "../../strategy/core/brandContext";
 import { isEmailBodyTask, EDM_CRAFT_RUBRIC, edmPlaybookFor } from "./edmCraft";
 import { isInstagramTask, isInstagramBodyTask, IG_CRAFT_RUBRIC, igPlaybookFor } from "./igCraft";
@@ -53,7 +53,7 @@ import { isResearchBodyTask, RS_CRAFT_RUBRIC, rsPlaybookFor } from "./rsCraft";
 import { isCrossplatformBodyTask, CW_CRAFT_RUBRIC, cwPlaybookFor } from "./cwCraft";
 import { getBrandRealContent } from "../../strategy/core/brandRealContent";
 import { resolveAgentId } from "./agentAssignments";
-import { getCopywritingMasterPrompt, type MarketCode, type PlatformCode } from "./copywritingMaster";
+import { getCopywritingMasterPrompt, type MarketCode, type PlatformCode } from "../../strategy/core/copywritingMaster";
 import { getBrandMarket, DEFAULT_BRAND_MARKET } from "../../strategy/core/brandMarket";
 import type { FBTaskTemplate, OrchestraConfig } from "./quickTaskFB";
 import localPool from "../../localDb";
@@ -1966,7 +1966,7 @@ export async function runOrchestra(args: {
    * 要不要下廣告。由 caller 讀好（strategy/core/campaignItemBrief.ts），這裡接在品牌大腦
    * 後面，並寫進產出的 metadata（產出頁、本週企劃靠它標「廣告文案」）。
    */
-  campaignItem?: import("../../strategy/core/campaignItemBrief").CampaignItemInfo | null;
+  campaignItem?: import("./campaign/campaignItemBrief").CampaignItemInfo | null;
   /**
    * 2026-05-14 (CJ「先回 caption + brief、image 跟 QA 變 async polling」):
    * Optional checkpoint — fires AFTER captions + briefs are assembled but
@@ -2158,7 +2158,7 @@ export async function runOrchestra(args: {
           ? getBrandRealContent(args.brandId).then(r => r.context).catch(() => "")
           : Promise.resolve(""),
         args.campaignItem
-          ? import("../../strategy/core/campaignItemBrief").then((m) => m.campaignItemBriefText(args.campaignItem!))
+          ? import("./campaign/campaignItemBrief").then((m) => m.campaignItemBriefText(args.campaignItem!))
           : Promise.resolve(""),
       ]).then(([prefix, real, item]) => prefix + (real || "") + (item || "")),
       // Scout stage — only fires for 100s tier. scoutKind drives WHAT we fetch:
@@ -2714,7 +2714,7 @@ export async function runOrchestra(args: {
 
         console.log(`[orchestra:trace] task=${args.template.id} partial.ok=${partial.ok} variants=${partial.variants.length} firstCaptionLen=${partial.variants[0]?.caption?.length ?? 0}`);
         if (partial.ok) {
-          const { recordTaskRun } = await import("./recordTaskRun");
+          const { recordTaskRun } = await import("../../platform/core/recordTaskRun");
           const { titleFromCaption } = await import("./titleFromCaption");
           const idPrefix = (args.template.id ?? "").split("-")[0] ?? "";
           const idChannelMap: Record<string, string> = {
@@ -3211,7 +3211,7 @@ export async function runOrchestra(args: {
     console.log(`[orchestra:trace] task=${args.template.id} final gate: hasUsableVariant=${hasUsableVariant} persistedOutputId=${persistedOutputId} userId=${args.userId} → ${args.userId && hasUsableVariant ? "WILL SAVE" : "SKIP"}`);
     if (args.userId && hasUsableVariant) {
       try {
-        const { recordTaskRun, finaliseTaskRun } = await import("./recordTaskRun");
+        const { recordTaskRun, finaliseTaskRun } = await import("../../platform/core/recordTaskRun");
         const firstImage = result.variants.find((v) => v.image?.url)?.image?.url ?? null;
         // 2026-05-09 (CJ fix): templates have no .channel field — pull
         // platform from outputDefaults (which IS set). Fallback to

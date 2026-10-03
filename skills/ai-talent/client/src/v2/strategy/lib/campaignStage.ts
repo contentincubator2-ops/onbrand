@@ -13,7 +13,7 @@
  * 底圖（CJ「汽車業是起點到終點的地圖、餐飲是從原料做成菜、文具是零件組成一支
  * 馬克筆」）是另一層，不在這裡算。
  */
-import { CHANNEL_META } from "../../content/lib/channelMeta";
+import { CHANNEL_META } from "../../platform/lib/channelMeta";
 import { CAMPAIGN_PHASES, type CampaignPhaseId, type CampaignPlanItem } from "./campaignSchema";
 
 export interface StagePhase {

@@ -1,6 +1,6 @@
 import { addPoints, costOf } from "./pointsService";
 import type { PointAction } from "./plans";
-import { NANO_BANANA, resolveStillImageModel } from "../../content/core/stillImageModels";
+import { NANO_BANANA, resolveStillImageModel } from "./media/stillImageModels";
 
 /** One tier per still-image model: gpt-image-2 (default) and Nano Banana (user's choice). */
 export type ImagePointAction = Extract<PointAction, "image_gpt" | "image_imagen">;

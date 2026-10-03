@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { IntelItem } from "../../content/core/scouts/types";
+import type { IntelItem } from "../../platform/core/scouts/types";
 import { TOUCHPOINTS } from "../../platform/core/touchpoints";
 
 const { executeMock, scoutFetchMock, scoutAvailableMock, invokeLLMMock } = vi.hoisted(() => ({
@@ -11,7 +11,7 @@ const { executeMock, scoutFetchMock, scoutAvailableMock, invokeLLMMock } = vi.ho
 
 vi.mock("../../localDb", () => ({ default: { execute: executeMock } }));
 vi.mock("../../platform/core/llm", () => ({ invokeLLM: invokeLLMMock }));
-vi.mock("../../content/core/scouts/perplexityScout", () => ({
+vi.mock("../../platform/core/scouts/perplexityScout", () => ({
   perplexityScout: { isAvailable: scoutAvailableMock, fetch: scoutFetchMock },
 }));
 

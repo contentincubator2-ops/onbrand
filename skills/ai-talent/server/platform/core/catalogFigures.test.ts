@@ -54,8 +54,8 @@ describe("catalogFigures 對得上真實任務卡目錄", () => {
  */
 describe("面向用戶的文案沒有手寫任務卡張數", () => {
   const FILES = [
-    "client/src/pages/auth/LoginPage.tsx",
-    "client/src/pages/auth/RegisterPage.tsx",
+    "client/src/v2/platform/pages/auth/LoginPage.tsx",
+    "client/src/v2/platform/pages/auth/RegisterPage.tsx",
     "client/src/v2/platform/components/mia/miaNudgeCatalog.ts",
     "client/src/v2/platform/components/PricingInfoModal.tsx",
     "client/src/v2/platform/pages/LandingPage.tsx",

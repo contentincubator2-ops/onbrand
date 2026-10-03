@@ -10,7 +10,7 @@
  * 用法（VM 上）：cd /opt/onbrand/current/skills/ai-talent && ./node_modules/.bin/tsx scripts/probe-live-image-gen.ts
  */
 import "./../server/bootstrap-env";
-import { generateStillImage } from "../server/content/core/stillImageModels";
+import { generateStillImage } from "../server/platform/core/media/stillImageModels";
 
 async function main(): Promise<void> {
   console.log(`OPENAI_API_KEY present in this process: ${!!process.env.OPENAI_API_KEY} (len=${(process.env.OPENAI_API_KEY ?? "").length})`);

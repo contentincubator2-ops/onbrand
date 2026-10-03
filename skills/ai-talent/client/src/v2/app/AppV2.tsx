@@ -45,15 +45,16 @@ import ShellLayout from "./shell/ShellLayout";
 import MissionRedirect from "./MissionRedirect";
 import ConnectionsRedirect from "../platform/pages/ConnectionsRedirect";
 import NotFoundPage from "../platform/pages/NotFoundPage";
+import { CampaignSlotsProvider, type CampaignSlots } from "../strategy/lib/campaignSlots";
 
 // ── Lazy (route-split chunks) ────────────────────────────────────────────
 // Auth pages — heaviest among public surfaces (Google OAuth SVG, form
 // state, password rules), moved out of main bundle.
-const LoginPage = React.lazy(() => import("../../pages/auth/LoginPage"));
-const RegisterPage = React.lazy(() => import("../../pages/auth/RegisterPage"));
-const VerifyEmailPage = React.lazy(() => import("../../pages/auth/VerifyEmailPage"));
-const ForgotPasswordPage = React.lazy(() => import("../../pages/auth/ForgotPasswordPage"));
-const ResetPasswordPage = React.lazy(() => import("../../pages/auth/ResetPasswordPage"));
+const LoginPage = React.lazy(() => import("../platform/pages/auth/LoginPage"));
+const RegisterPage = React.lazy(() => import("../platform/pages/auth/RegisterPage"));
+const VerifyEmailPage = React.lazy(() => import("../platform/pages/auth/VerifyEmailPage"));
+const ForgotPasswordPage = React.lazy(() => import("../platform/pages/auth/ForgotPasswordPage"));
+const ResetPasswordPage = React.lazy(() => import("../platform/pages/auth/ResetPasswordPage"));
 const OnboardingWizard = React.lazy(() => import("../../pages/OnboardingWizard"));
 
 // Protected app surface — never loaded by anonymous visitors
@@ -69,7 +70,7 @@ const BrandSettingsPage = React.lazy(() => import("../strategy/pages/BrandSettin
 // 2026-09-25（CJ「在內容層增加活動的 mission tray」）：活動 tray 是內容層的
 // 頂層目的地，不加 /tasks/ 前綴——它的卡片來自活動企劃，不受任務包過濾。
 const CampaignTrayPage = React.lazy(() => import("../content/pages/CampaignTrayPage"));
-const SquadLabPage = React.lazy(() => import("../platform/pages/admin/SquadLabPage"));
+const SquadLabPage = React.lazy(() => import("../content/pages/SquadLabPage"));
 const PlannerPage = React.lazy(() => import("../content/pages/PlannerPage"));
 const InspirationPage = React.lazy(() => import("../content/pages/InspirationPage"));
 const AccountPage = React.lazy(() => import("../platform/pages/AccountPage"));
@@ -92,6 +93,12 @@ const TermsPage = React.lazy(() => import("../platform/pages/legal/TermsPage"));
 const PrivacyPage = React.lazy(() => import("../platform/pages/legal/PrivacyPage"));
 const RefundPage = React.lazy(() => import("../platform/pages/legal/RefundPage"));
 const PlanExpiredPage = React.lazy(() => import("../platform/pages/PlanExpiredPage"));
+
+// 策略頁的活動分頁要放內容層的企劃工作區：由這裡（app 層）提供，策略層不直接 import 內容層。
+const campaignSlots: CampaignSlots = {
+  Stage: React.lazy(() => import("../content/components/campaign/CampaignStage")),
+  LockToggle: React.lazy(() => import("../content/components/campaign/CampaignStage").then((m) => ({ default: m.CampaignLockToggle }))),
+};
 
 // ── Suspense fallback — cream-themed minimal loader matching SoWork.ai ──
 function RouteFallback() {
@@ -312,7 +319,7 @@ export default function AppV2() {
           {/* 2026-05-11 (CJ): /brands is now the manager dashboard.
               Old single-brand editor moved to /brands/edit?b=:id */}
           <Route path="/brands" element={<BrandsManagePage />} />
-          <Route path="/brands/edit" element={<BrandsPage />} />
+          <Route path="/brands/edit" element={<CampaignSlotsProvider value={campaignSlots}><BrandsPage /></CampaignSlotsProvider>} />
           {/* 2026-05-12 (CJ「加一個獨立的功能區叫做『連結』」): direct
               entry to brand settings → connector tab. */}
           <Route path="/connections" element={<ConnectionsRedirect />} />

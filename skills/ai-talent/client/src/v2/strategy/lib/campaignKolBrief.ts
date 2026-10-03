@@ -1,6 +1,6 @@
 /**
  * 網紅任務說明單（畫面用）。欄位的意義與「為什麼是這些」寫在
- * server/strategy/core/campaignKolBrief.ts；這裡是同一份欄位的標籤、提示與預填。
+ * server/content/core/campaign/campaignKolBrief.ts；這裡是同一份欄位的標籤、提示與預填。
  */
 export type KolTier = "" | "mega" | "macro" | "mid" | "micro" | "nano";
 

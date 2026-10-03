@@ -17,7 +17,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { trpc } from "../../../../lib/trpc";
 import { useLang } from "../../../../lib/i18n";
-import { showToastGlobal } from "../../../../components/ui/Toast";
+import { showToastGlobal } from "../../../platform/components/Toast";
 import { Avatar } from "@heroui/react";
 import { Icon } from "../../../platform/components/icons";
 

@@ -31,10 +31,10 @@ function isProviderKeyError(text: string): boolean {
 import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure } from "../../platform/core/trpc";
 import { callLLM } from "../../platform/core/llmRouter";
-import { type GenOptions } from "../core/mediaGen";
-import { generateStillImage } from "../core/stillImageModels";
+import { type GenOptions } from "../../platform/core/media/mediaGen";
+import { generateStillImage } from "../../platform/core/media/stillImageModels";
 import localPool from "../../localDb";
-import { isLocalUploadPath, probeImageUrl } from "../core/imageFetch";
+import { isLocalUploadPath, probeImageUrl } from "../../platform/core/media/imageFetch";
 
 const PRODUCT_IMAGE_CACHE_TTL_MS = 5 * 60_000;
 const PRODUCT_IMAGE_CACHE_MAX_ENTRIES = 1_000;

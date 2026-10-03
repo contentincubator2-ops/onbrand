@@ -18,7 +18,7 @@ import { FB_30S_TASKS } from "./quickTaskFB";
 import { WEBSITE_30S_TASKS } from "./quickTaskWebsite";
 import { ALL_99S_TASKS } from "./quickTask100";
 import { FB_60S_TASKS_V2 } from "./quickTaskFB60";
-import { PACKS } from "../../strategy/core/brandPacks";
+import { PACKS } from "./brandPacks";
 
 afterEach(() => __resetTaskSourcesForTest());
 

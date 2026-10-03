@@ -10,7 +10,7 @@
 import { useState } from "react";
 import { trpc } from "../../../../lib/trpc";
 import { useLang } from "../../../../lib/i18n";
-import { showToastGlobal } from "../../../../components/ui/Toast";
+import { showToastGlobal } from "../../../platform/components/Toast";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faGoogleDrive, faMicrosoft } from "@fortawesome/free-brands-svg-icons";
 import { faFolder, faFileVideo, faFileAudio, faChevronLeft, faPlus, faSpinner, faLink } from "@fortawesome/free-solid-svg-icons";

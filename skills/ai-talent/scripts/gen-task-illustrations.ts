@@ -18,7 +18,7 @@ import { dirname, join, resolve } from "path";
 import { fileURLToPath } from "url";
 import { buildTaskCatalogIndex } from "../server/content/core/taskCatalogIndex";
 import { resolveTaskTemplateSync } from "../server/content/core/taskRegistry";
-import { coverFilePath } from "../server/content/core/mediaGen";
+import { coverFilePath } from "../server/platform/core/media/mediaGen";
 import {
   drawIllustration, shrinkToWebp, writeIllustrationConcepts, type IllustrationCardInput,
 } from "../server/content/core/taskIllustration";

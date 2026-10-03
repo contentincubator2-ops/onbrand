@@ -24,7 +24,7 @@ import { Modal, ModalContent, ModalBody, Button, Input, Textarea, Select, Select
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faTrademark, faGlobe, faArrowRight, faCheck, faLanguage, faCubes } from "@fortawesome/free-solid-svg-icons";
 import { faFacebook } from "@fortawesome/free-brands-svg-icons";
-import RunningAgentCarousel from "../../../content/components/quickTask/RunningAgentCarousel";
+import RunningAgentCarousel from "../../../platform/components/RunningAgentCarousel";
 // 2026-09-10 (CJ 市場收斂): 選單只列 14 個焦點市場；getCountry 仍讀完整
 // COUNTRIES，舊資料的市場代號才不會變成空白。見 countries.ts marketOptions。
 import { marketOptions, getCountry } from "../../../../lib/countries";

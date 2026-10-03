@@ -16,8 +16,8 @@ import { Button } from "@heroui/react";
 import { faFacebookF, faInstagram, faThreads, faLine, faTiktok } from "@fortawesome/free-brands-svg-icons";
 import { trpc } from "../../../lib/trpc";
 import { useLang } from "../../../lib/i18n";
-import { showToastGlobal } from "../../../components/ui/Toast";
-import { channelRoute } from "../lib/channelMeta";
+import { showToastGlobal } from "../../platform/components/Toast";
+import { channelRoute } from "../../platform/lib/channelMeta";
 import { logActivation } from "../../platform/lib/activationTelemetry";
 import { PlatformTaskModal, type TaskEmbed } from "./PlatformTaskPage";
 

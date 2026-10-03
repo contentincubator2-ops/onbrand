@@ -23,11 +23,11 @@ import {
   ratioLabel,
   resolveImageTray,
   type PlatformImageSpec,
-} from "../core/platformImageSpecs";
+} from "../../platform/core/media/platformImageSpecs";
 import { loadBrandPositioning } from "../../platform/core/planGate";
 import { proposeImageDirections, renderImageCard } from "../core/imageCards";
 import { resolveBrandVisualContext } from "../core/imageGen";
-import { localCoverFile } from "../core/imageFetch";
+import { localCoverFile } from "../../platform/core/media/imageFetch";
 import { brandOwnsProductPhoto } from "./imageRouter";
 import { brandOwnsLibraryPhoto } from "../../strategy/core/assetPhotos";
 

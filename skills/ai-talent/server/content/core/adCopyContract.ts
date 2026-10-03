@@ -9,8 +9,8 @@
 // validation (retry) → deterministic repair as the last line of defence.
 
 import type { FBTaskTemplate } from "./quickTaskFB";
-import { findFirstUrl } from "./urlContext";
-import { extractYouTubeId } from "./youtubeContext";
+import { findFirstUrl } from "../../platform/core/web/urlContext";
+import { extractYouTubeId } from "../../platform/core/web/youtubeContext";
 
 const MARKER_RE = /(?:\[|【)\s*(headline|primary|cta)\s*(?:\]|】)/giu;
 

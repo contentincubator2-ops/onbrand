@@ -11,7 +11,7 @@
  * Legacy behavior is preserved: no brandId / no market fields → zh-TW.
  */
 
-import { resolveMarketCode, type MarketCode } from "../../content/core/copywritingMaster";
+import { resolveMarketCode, type MarketCode } from "./copywritingMaster";
 
 export interface BrandMarket {
   /** ISO 3166-1 alpha-2, uppercase. Defaults "TW". */

@@ -32,9 +32,9 @@
 import localPool from "../../localDb";
 import { invokeLLM } from "../../platform/core/llm";
 import { planQuotaFor } from "../../platform/core/planGate";
-import { perplexityScout } from "../../content/core/scouts/perplexityScout";
+import { perplexityScout } from "../../platform/core/scouts/perplexityScout";
 import { fetchPublishedDate, normalizeDate } from "./publishedDate";
-import type { IntelItem, ScoutContext } from "../../content/core/scouts/types";
+import type { IntelItem, ScoutContext } from "../../platform/core/scouts/types";
 
 export const STRATEGY_WATCH_DDL = `
   CREATE TABLE IF NOT EXISTS strategy_watch (

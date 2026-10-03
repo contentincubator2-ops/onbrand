@@ -10,7 +10,7 @@ import { router, protectedProcedure } from "../../platform/core/trpc";
 import localPool from "../../localDb";
 import { assertBrandAccess } from "../../platform/core/brandAuth";
 import { getBrandMarket } from "../../strategy/core/brandMarket";
-import { cleanKolBrief, kolBriefText } from "../../strategy/core/campaignKolBrief";
+import { cleanKolBrief, kolBriefText } from "../core/campaign/campaignKolBrief";
 import { defaultVendorQuery, findVendors, vendorKindFor, VENDOR_KIND_LABEL, type VendorKind } from "../core/vendorFinder";
 
 const KINDS = ["kol_agency", "cobrand_partner", "ad_agency"] as const;

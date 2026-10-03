@@ -31,8 +31,8 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 import { trpc } from "../../../lib/trpc";
 import { useLang } from "../../../lib/i18n";
-import { useScopeState } from "../../app/shell/ScopeBar";
-import { aggregate, roas, setMockBrandSeed } from "../../performance/components/perfMockData";
+import { useScopeState } from "../components/ScopeBar";
+import { aggregate, roas, setMockBrandSeed } from "../lib/perfMockData";
 
 // 2026-09-29（CJ）：內容通路只剩 FB／IG／TikTok／電子報／官網，LinkedIn／YouTube／X／新聞稿拿掉。
 const TOUCHPOINT_ICON: Record<string, any> = {

@@ -14,7 +14,7 @@ import { router, protectedProcedure } from "../../platform/core/trpc";
 import { getDb } from "../../db";
 import { sql } from "drizzle-orm";
 import { generateImage, resolveBrandVisualContext } from "../core/imageGen";
-import { fetchImageBuffer, isLocalUploadPath } from "../core/imageFetch";
+import { fetchImageBuffer, isLocalUploadPath } from "../../platform/core/media/imageFetch";
 import { assertBrandOwner } from "../../platform/core/brandAuth";
 import { imageActionForRequest, reconcileImageCharge } from "../../platform/core/imageBilling";
 import {
@@ -399,7 +399,7 @@ Rules:
       const id = Number(ins?.insertId ?? 0);
 
       try {
-        const { dispatchGenerate } = await import("../core/mediaGen");
+        const { dispatchGenerate } = await import("../../platform/core/media/mediaGen");
         const r = await dispatchGenerate("piapi/kling-try-on", {
           prompt: "",
           imageUrl: input.modelImageUrl,

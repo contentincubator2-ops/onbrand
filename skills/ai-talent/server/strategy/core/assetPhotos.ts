@@ -29,7 +29,7 @@ import localPool from "../../localDb";
 import { randomUUID } from "crypto";
 import { join, resolve } from "path";
 import { promises as fs } from "fs";
-import { detectRasterImageMime } from "../../content/core/imageFetch";
+import { detectRasterImageMime } from "../../platform/core/media/imageFetch";
 
 export type PhotoScope = "brand" | "product";
 
@@ -200,7 +200,7 @@ export async function savePhotoFromUrl(args: {
   userId: number; brandId: number; scope: PhotoScope; scopeId: number;
   sourceUrl: string; filename: string; makePrimary?: boolean; storageRoot?: string;
 }): Promise<AssetPhoto | { error: string }> {
-  const { fetchImageBuffer } = await import("../../content/core/imageFetch");
+  const { fetchImageBuffer } = await import("../../platform/core/media/imageFetch");
   let bytes: Buffer;
   try {
     ({ buffer: bytes } = await fetchImageBuffer(args.sourceUrl, { maxBytes: MAX_UPLOAD_BYTES }));

@@ -35,8 +35,8 @@ import { slackOAuthRouter } from "./platform/routes/slackOAuthRoute";
 import { cloudOAuthRouter } from "./platform/routes/cloudOAuthRoute";
 import { manusRouter } from "./platform/routers/manusRouter";
 import { mosAgentsMcpRouter } from "./platform/routers/mosAgentsMcpRouter";
-import { wellKnownRouter, mcpOAuthRouter } from "./platform/mcp/oauthRoutes";
-import { onbrandMcpRouter } from "./platform/mcp/onbrandMcpRouter";
+import { wellKnownRouter, mcpOAuthRouter } from "./gateway/mcp/oauthRoutes";
+import { onbrandMcpRouter } from "./gateway/mcp/onbrandMcpRouter";
 import { publicAgentsRoute } from "./platform/routes/publicAgentsRoute";
 import { closeDb, pingDb, pingSoworkDb, getDb } from "./db";
 import { sql } from "drizzle-orm";
@@ -580,7 +580,7 @@ async function runStartupMigrations() {
 
     // 2026-10-02（CJ「對話要存到資料庫中」）：活動頁對話＋復原快照。
     // 2026-10-02（CJ「對話多了很亂、沒辦法告一段落、無法重新開啟」）：分段討論。
-    const { CAMPAIGN_CHAT_DDL, CAMPAIGN_CHAT_THREADS_DDL, migrateCampaignChat } = await import("./strategy/core/campaignChatStore");
+    const { CAMPAIGN_CHAT_DDL, CAMPAIGN_CHAT_THREADS_DDL, migrateCampaignChat } = await import("./content/core/campaign/campaignChatStore");
     await db.execute(sql.raw(CAMPAIGN_CHAT_DDL));
     await db.execute(sql.raw(CAMPAIGN_CHAT_THREADS_DDL));
     await migrateCampaignChat();
@@ -613,8 +613,8 @@ async function runStartupMigrations() {
     console.log("[migrate] addon_requests: OK");
 
     // 2026-09-28（CJ「onbrand 變成 claude 外掛服務」）：OnBrand 連接器的 OAuth 與背景任務紀錄。
-    const { MCP_OAUTH_CLIENTS_DDL, MCP_OAUTH_CODES_DDL, MCP_OAUTH_TOKENS_DDL } = await import("./platform/mcp/oauthStore");
-    const { MCP_TASK_RUNS_DDL } = await import("./platform/mcp/onbrandTools");
+    const { MCP_OAUTH_CLIENTS_DDL, MCP_OAUTH_CODES_DDL, MCP_OAUTH_TOKENS_DDL } = await import("./gateway/mcp/oauthStore");
+    const { MCP_TASK_RUNS_DDL } = await import("./gateway/mcp/onbrandTools");
     for (const ddl of [MCP_OAUTH_CLIENTS_DDL, MCP_OAUTH_CODES_DDL, MCP_OAUTH_TOKENS_DDL, MCP_TASK_RUNS_DDL]) {
       await db.execute(sql.raw(ddl));
     }

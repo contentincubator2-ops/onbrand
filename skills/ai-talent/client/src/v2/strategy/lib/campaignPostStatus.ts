@@ -1,7 +1,7 @@
 /**
  * campaignPostStatus — 活動企劃上一篇的狀態，畫面這一側只管「怎麼叫、什麼顏色」。
  *
- * 狀態本身由伺服器算（server/strategy/core/campaignPostStatus.ts，campaign.itemThumbs 回
+ * 狀態本身由伺服器算（server/content/core/campaign/campaignPostStatus.ts，campaign.itemThumbs 回
  * state）；client 不得 value-import server，所以這裡只鏡像那五個值，外加「還沒寫」。
  *
  * 2026-10-02（CJ 定案）：狀態由系統走，不是四顆按鈕；「修改中」不是狀態；團隊版才有送審。

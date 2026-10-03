@@ -15,7 +15,7 @@ import { CATALOG } from "../lib/catalogFigures";
 import React from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { trpc } from "../../../lib/trpc";
-import { showToastGlobal } from "../../../components/ui/Toast";
+import { showToastGlobal } from "../components/Toast";
 import { useLang } from "../../../lib/i18n";
 import AddonRequestModal from "../components/AddonRequestModal";
 

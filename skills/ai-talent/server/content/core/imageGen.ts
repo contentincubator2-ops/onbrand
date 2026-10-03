@@ -23,7 +23,7 @@ import {
   toStillImageChoice,
   type ImageFailureKind,
   type StillImageChoice,
-} from "./stillImageModels";
+} from "../../platform/core/media/stillImageModels";
 
 export type ImageProvider = "openai" | "google";
 export type ImageSize = "1024x1024" | "1024x1536" | "1536x1024";

@@ -1,10 +1,10 @@
 /**
  * 活動頁對話的提案：畫面上怎麼講、按「套用」之後企劃變成什麼樣。純函式、有測試。
  *
- * 提案由 server/strategy/core/campaignChat.ts 檢查過才回來（格式一樣，兩邊各宣告一份）；
+ * 提案由 server/content/core/campaign/campaignChat.ts 檢查過才回來（格式一樣，兩邊各宣告一份）；
  * 這裡只負責套用與描述，不再判斷合不合法。
  */
-import { channelLabel } from "../../content/lib/channelMeta";
+import { channelLabel } from "../../platform/lib/channelMeta";
 import type { CampaignPhaseId, CampaignPlan, CampaignPlanItem } from "./campaignSchema";
 import { phaseShort } from "./campaignStage";
 import { basisLabel, type BasisPatch } from "./campaignBasis";

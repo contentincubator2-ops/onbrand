@@ -18,11 +18,11 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faCloudArrowUp, faCheck } from "@fortawesome/free-solid-svg-icons";
 import { useNavigate } from "react-router-dom";
 import { trpc } from "../../../../lib/trpc";
-import { showToastGlobal } from "../../../../components/ui/Toast";
+import { showToastGlobal } from "../../../platform/components/Toast";
 import { IllustratedEmpty } from "../../../platform/components/EmptyIllustration";
 import { uploadBrandPhoto, IMAGE_ACCEPT } from "../../lib/uploadBrandPhoto";
-import { imageCardHref, saveImageSubjectHandoff } from "../../../content/lib/imageCardHandoff";
-import type { ImageCardInfo } from "../../../content/components/imageCard/ImageCardTile";
+import { imageCardHref, saveImageSubjectHandoff } from "../../../platform/lib/imageCardHandoff";
+import type { ImageCardInfo } from "../../../platform/lib/imageCardHandoff";
 
 export interface LibraryItem {
   key: string;

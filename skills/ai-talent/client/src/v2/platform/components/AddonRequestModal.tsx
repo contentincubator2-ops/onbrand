@@ -16,7 +16,7 @@ import {
 } from "@heroui/react";
 import { trpc } from "../../../lib/trpc";
 import { useLang } from "../../../lib/i18n";
-import { useScopeState } from "../../app/shell/ScopeBar";
+import { useScopeState } from "./ScopeBar";
 
 const fmt = (n: number) => `NT$${n.toLocaleString("en-US")}`;
 

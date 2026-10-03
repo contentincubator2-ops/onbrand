@@ -19,7 +19,7 @@
  * base64 轉換）。**不是**拿檔名或既有欄位去猜——猜出來的風格描述看起來一樣像真的，
  * 但跟使用者上傳的圖無關。
  */
-import { fetchImageBuffer } from "../../content/core/imageFetch";
+import { fetchImageBuffer } from "../../platform/core/media/imageFetch";
 
 export type StyleKind = "imagery" | "icon";
 

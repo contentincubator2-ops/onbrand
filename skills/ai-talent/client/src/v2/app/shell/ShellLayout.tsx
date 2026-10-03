@@ -14,7 +14,7 @@ import React from "react";
 import { createPortal } from "react-dom";
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import { trpc } from "../../../lib/trpc";
-import { useScopeState, type ScopeState } from "./ScopeBar";
+import { useScopeState, type ScopeState } from "../../platform/components/ScopeBar";
 import AddEntityModal, { type AddEntityTab } from "../../strategy/components/AddEntityModal";
 import PositioningNotificationCenter from "../../platform/components/PositioningNotificationCenter";
 import ScopeSwitchOverlay from "../../platform/components/ScopeSwitchOverlay";
@@ -40,6 +40,7 @@ import { StrategyIcon, LockIcon, CheckIcon, NotifyIcon } from "../../platform/co
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { ICON } from "../../platform/components/icons";
 import { defaultWeek } from "../../content/lib/plannerWeek";
+import { isStrategyPreviewEmail, isPersonaPreviewEmail, type ShellOutletCtx } from "../../platform/lib/shellContext";
 import {
   faFolderOpen, faBrain, faWandMagicSparkles, faMicrophone, faBookBookmark, faBell, faPlus, faRightFromBracket, faLayerGroup, faGear, faXmark, faCheckDouble, faChevronRight, faCheck, faBoxOpen, faCalendarDays, faCircleInfo, faBriefcase, faShareNodes, faUsers, faLanguage, faPaintBrush, faFont, faMagnifyingGlass, faChevronDown, faEnvelope, faBullhorn, faGlobe, faChartLine, faDatabase, faFileLines,
 } from "@fortawesome/free-solid-svg-icons";
@@ -96,33 +97,6 @@ interface NavItem {
   /** 2026-09-30：記憶空間快滿／超載時，圖示右上角亮狀態點。 */
   /** near／over：記憶快滿／超載；review：有東西等用戶回來確認（法規審查重點萃取好了）。 */
   alert?: "near" | "over" | "review";
-}
-
-// 2026-08-20: 策略 (Strategy) workspace — 品牌大腦's tile strip promoted to
-// a left-rail workspace. Originally gated to a 2-account preview list.
-//
-// 2026-08-21 (CJ「所有用戶左方的mission rail上方，都改成策略和內容可切換
-// 的」): graduated from the 2-account preview to every account —
-// isStrategyPreviewEmail() now always returns true. The helper (rather than
-// inlining `true` at each of its three call sites) stays so a future
-// partial-rollout need doesn't require re-threading them again.
-// Exported so BrandsPage.tsx's in-page tile strip (hidden once the left rail
-// already lists the same 7 sections) can gate on the exact same check —
-// two independently-maintained copies of this list is how a user ends up
-// with either two switchers or none.
-export function isStrategyPreviewEmail(_email?: string | null): boolean {
-  return true;
-}
-
-// 2026-08-22 (CJ「人設的功能，我只想嘗試在媽爹講故事的帳號」): unlike the
-// 策略/內容 switcher above (graduated to everyone), the 人設 tab specifically
-// stays gated while it's still being shaken out — real bugs (missing
-// brand_integrations table, an unbounded OAuth-callback fetch) turned up in
-// the first round of testing. Exported so BrandsPage.tsx's render guard uses
-// the exact same check as the nav item, not an independently-drifting copy.
-const PERSONA_PREVIEW_EMAILS = ["marketing@momdadstory.com"];
-export function isPersonaPreviewEmail(email?: string | null): boolean {
-  return PERSONA_PREVIEW_EMAILS.includes(String(email ?? "").toLowerCase());
 }
 
 // 2026-05-26 (CJ「左欄改成平台優先」): replace tier-first nav (30s/60s/99s)
@@ -2358,19 +2332,3 @@ class RouteErrorBoundary extends React.Component<
    Exports
 ══════════════════════════════════════════════════════════════════ */
 
-export interface ShellOutletCtx {
-  brandId: number | null;
-  setBrandId: (id: number | null) => void;
-  brands: any[];
-  brandsLoaded: boolean;
-  scope: ScopeState;
-  setScope: (s: ScopeState) => void;
-  /** 2026-08-20 (Codex review, PR #119): the shell's own resolved
-   *  `/api/auth/me` email — child pages that need the strategy-preview
-   *  gate must read THIS instead of firing their own independent fetch.
-   *  Two separate requests can disagree (one fails transiently while the
-   *  other succeeds), leaving the rail and the in-page controls out of
-   *  sync with no way to recover short of a reload. Null while the
-   *  shell's own fetch hasn't resolved yet. */
-  userEmail: string | null;
-}

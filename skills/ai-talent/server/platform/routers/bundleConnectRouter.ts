@@ -13,8 +13,8 @@ import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure } from "../core/trpc";
 import { assertBrandAccess } from "../core/brandAuth";
 import { createBundleSocialClient, isBundleMissingTeamError } from "../core/bundleSocial";
-import { toBundlePlatform } from "../../content/core/bundlePublish";
-import { getPublishProvider } from "../../content/core/publishProvider";
+import { toBundlePlatform } from "../core/publish/bundlePublish";
+import { getPublishProvider } from "../core/publish/publishProvider";
 import { isRuntimeFeatureEnabled } from "../core/runtimeSafety";
 
 const PLATFORM_INPUT = z.enum(["facebook", "instagram", "linkedin"]);

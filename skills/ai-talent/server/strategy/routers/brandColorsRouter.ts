@@ -22,7 +22,7 @@ import {
   type BrandPalette,
   type BrandColorRole,
 } from "../core/brandPaletteAggregator";
-import { probeImageUrl } from "../../content/core/imageFetch";
+import { probeImageUrl } from "../../platform/core/media/imageFetch";
 import { listPhotos } from "../core/assetPhotos";
 
 // ── Zod ────────────────────────────────────────────────────────────────

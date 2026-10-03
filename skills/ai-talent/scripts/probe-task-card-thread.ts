@@ -23,7 +23,7 @@ import "./../server/bootstrap-env";
 import localPool from "../server/localDb";
 import { getJwtSecret } from "../server/platform/core/env";
 import { resolveTask } from "../server/content/core/taskRegistry";
-import { registerBrandTaskCardSource } from "../server/strategy/core/brandTaskCards";
+import { registerBrandTaskCardSource } from "../server/content/core/brandTaskCards";
 
 registerBrandTaskCardSource();
 

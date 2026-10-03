@@ -14,8 +14,8 @@ import { Navigate, useParams, useOutletContext, useNavigate, useSearchParams } f
 import CalendarTabs from "../components/CalendarTabs";
 import { trpc } from "../../../lib/trpc";
 import { useLang } from "../../../lib/i18n";
-import { showToastGlobal } from "../../../components/ui/Toast";
-import { TaskCardShell, TaskCardAvatar, CARD_SURFACE } from "../components/TaskCardShell";
+import { showToastGlobal } from "../../platform/components/Toast";
+import { TaskCardShell, TaskCardAvatar, CARD_SURFACE } from "../../platform/components/TaskCardShell";
 import { campaignPrefill } from "../lib/campaignIntakePrefill";
 import { toastWithUpgrade } from "../../platform/lib/upgradeToast";
 import { matchTaskWithSynonyms } from "../lib/taskSearchSynonyms";
@@ -23,7 +23,7 @@ import {
   resolveSource, sourceAccent, sourceWhy,
   sourcePillText, sourceTooltip,
   FRONT_CARD_KINDS, frontCardKind, frontCardKindLabel, isFrontVisibleCard, type FrontCardKind,
-} from "../lib/sourceVocabulary";
+} from "../../platform/lib/sourceVocabulary";
 import {
   FB_FORMAT_TABS as FORMAT_TABS,
   FB_TASK_FORMAT_MAP as TASK_FORMAT_MAP,
@@ -37,7 +37,7 @@ import {
   WEB_FORMAT_TABS, WEB_TASK_FORMAT_MAP, type WEBActiveFormat,
   adFormatText,
 } from "../lib/taskFormats";
-import type { ShellOutletCtx } from "../../app/shell/ShellLayout";
+import type { ShellOutletCtx } from "../../platform/lib/shellContext";
 import { buildContextChips, resolveDerive } from "../lib/taskContextResolver";
 import { getStrategyPublicGenerationState } from "../lib/strategyContentEnvelope";
 import { checkViralSource, platformLabelForTask, taskNeedsViralSource } from "../lib/viralSourceGuard";
@@ -57,10 +57,11 @@ import {
 import {
   faFacebook, faInstagram, faYoutube, faTiktok, faLinkedin, faThreads, faLine,
 } from "@fortawesome/free-brands-svg-icons";
-import RunningAgentCarousel from "../components/quickTask/RunningAgentCarousel";
-import ImageCardTile, { type ImageCardInfo } from "../components/imageCard/ImageCardTile";
+import RunningAgentCarousel from "../../platform/components/RunningAgentCarousel";
+import ImageCardTile from "../components/imageCard/ImageCardTile";
+import type { ImageCardInfo } from "../../platform/lib/imageCardHandoff";
 import ImageSizePicker from "../components/imageCard/ImageSizePicker";
-import { imageCardHref, imageChannelOf } from "../lib/imageCardHandoff";
+import { imageCardHref, imageChannelOf } from "../../platform/lib/imageCardHandoff";
 import CardDetailDrawer, { isRecentCard } from "../components/quickTask/CardDetailDrawer";
 import ChannelPicker from "../../platform/components/plan/ChannelPicker";
 import TaskPicker from "../../platform/components/plan/TaskPicker";

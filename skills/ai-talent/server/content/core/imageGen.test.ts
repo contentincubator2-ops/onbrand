@@ -11,7 +11,7 @@ vi.mock("../../db", () => ({
 
 vi.mock("../../strategy/core/decisionBridge", () => ({ loadLineage: vi.fn(async () => []) }));
 
-vi.mock("./mediaGen", () => ({
+vi.mock("../../platform/core/media/mediaGen", () => ({
   dispatchGenerate: dispatchGenerateMock,
 }));
 

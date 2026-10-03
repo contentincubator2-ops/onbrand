@@ -1,4 +1,4 @@
-import { buildBundlePostPayload, toBundlePlatform } from "./bundlePublish";
+import { buildBundlePostPayload, toBundlePlatform } from "../../platform/core/publish/bundlePublish";
 import { isBundleMissingTeamError, isBundleNotConnectedError } from "../../platform/core/bundleSocial";
 import type { BundlePost, BundleSocialClient } from "../../platform/core/bundleSocial";
 

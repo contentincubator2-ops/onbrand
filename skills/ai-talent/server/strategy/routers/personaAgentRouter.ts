@@ -33,10 +33,10 @@ import { router, protectedProcedure } from "../../platform/core/trpc";
 import localPool from "../../localDb";
 import { invokeLLM } from "../../platform/core/llm";
 import { buildBrandPrefix } from "../core/brandContext";
-import { assertUrlSafe } from "../../content/core/urlGuard";
+import { assertUrlSafe } from "../../platform/core/web/urlGuard";
 import { getValidAccessToken, CloudNotConnectedError, type CloudProvider } from "../../platform/core/cloudTokens";
 import { getCloudFileMeta, downloadCloudFile } from "../../platform/core/cloudDriveClient";
-import { transcribeBuffer, TRANSCRIBE_SIZE_LIMIT_BYTES, TranscribeTooLargeError } from "../../content/core/transcription";
+import { transcribeBuffer, TRANSCRIBE_SIZE_LIMIT_BYTES, TranscribeTooLargeError } from "../../platform/core/media/transcription";
 
 export const PERSONA_PLATFORMS = [
   "facebook", "instagram", "youtube", "threads", "tiktok", "linkedin", "email", "press",
@@ -161,7 +161,7 @@ async function fetchArticleText(rawUrl: string): Promise<{ url: string; title: s
 
 async function fetchVideoTranscript(rawUrl: string): Promise<{ url: string; title: string; text: string } | null> {
   try {
-    const { fetchYouTubeContext } = await import("../../content/core/youtubeContext");
+    const { fetchYouTubeContext } = await import("../../platform/core/web/youtubeContext");
     const ctx = await fetchYouTubeContext(rawUrl);
     if (!ctx) return null;
     const text = ctx.transcript || ctx.description || "";

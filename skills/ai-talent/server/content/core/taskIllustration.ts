@@ -13,7 +13,7 @@
  * 即時產、存 covers 目錄。兩條路都走這支，畫風只有一份。
  */
 import { invokeLLM } from "../../platform/core/llm";
-import { generateStillImage, GPT_IMAGE_2 } from "./stillImageModels";
+import { generateStillImage, GPT_IMAGE_2 } from "../../platform/core/media/stillImageModels";
 
 export interface IllustrationCardInput {
   id: string;

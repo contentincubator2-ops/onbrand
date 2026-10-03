@@ -27,7 +27,7 @@
  * 計算全是純函式（buildCampaignPerf），DB 進出在最下面。
  */
 import localPool from "../../localDb";
-import { campaignCode } from "./perfUtm";
+import { campaignCode } from "../../platform/core/perfUtm";
 
 export type ItemStatus = "matched" | "moved" | "missing" | "upcoming";
 export type MatchAction = "match" | "extra" | "dismiss" | "clear";

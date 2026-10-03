@@ -25,7 +25,7 @@ import { assertBrandOwner } from "../../platform/core/brandAuth";
 import {
   buildPipedreamAccountsUrl,
 } from "../../platform/core/pipedreamConnect";
-import { getPublishProvider } from "../core/publishProvider";
+import { getPublishProvider } from "../../platform/core/publish/publishProvider";
 import { createBundleSocialClient } from "../../platform/core/bundleSocial";
 import { publishViaBundleSocial } from "../core/bundlePublishService";
 import {

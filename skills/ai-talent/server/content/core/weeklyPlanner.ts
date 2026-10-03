@@ -15,7 +15,7 @@
  * 預設卡並標 repaired）、題目不能空。檢查不過的操作丟掉，不會讓模型直接寫進資料庫。
  */
 import localPool from "../../localDb";
-import { candidateCards } from "../../strategy/core/campaignPlan";
+import { candidateCards } from "./campaign/campaignPlan";
 import { isHiddenContentPlatform, isHiddenHistoryItem } from "../../platform/core/planGate";
 
 export const PLANNED_SLOTS_DDL = `

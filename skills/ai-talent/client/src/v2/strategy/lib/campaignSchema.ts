@@ -18,7 +18,7 @@
  * 得獎 brief 沒有被刪除，退成「參獎／提案」進階選項（舊活動打開照舊）。
  *
  * ── 這個檔案只放語彙，不放邏輯 ────────────────────────────────────────
- * 產生企劃的邏輯在 server/strategy/core/campaignPlan.ts。那支不能 import 這裡
+ * 產生企劃的邏輯在 server/content/core/campaign/campaignPlan.ts。那支不能 import 這裡
  * （client 不得被 server value-import 的反向也一樣不健康），所以它自己宣告一份
  * 同樣的 id，並由 server 側的漂移測試（campaignPlanVocab.test.ts）比對兩邊——
  * 跨邊界測試放 server 側是這個 repo 的既有規矩。

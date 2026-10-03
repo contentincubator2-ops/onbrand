@@ -2104,7 +2104,7 @@ ${leadKnowledge}
         const { ALL_99S_SQUADS } = await import("../core/quickTask100Squads");
         const matched = ALL_99S_SQUADS.find((s) => s.squad_slug === normalizeTaskId(input.squadSlug));
         if (matched) {
-          const { fetchViralPatterns, formatViralPatternsForPrompt } = await import("../core/socialListeningScout");
+          const { fetchViralPatterns, formatViralPatternsForPrompt } = await import("../../strategy/core/socialListeningScout");
           // Decide kind from squad slug pattern
           const kind: "festivals" | "trending" | "news" | "viral" =
             matched.squad_slug.includes("monthly-calendar") || matched.squad_slug.includes("countdown") ? "festivals"

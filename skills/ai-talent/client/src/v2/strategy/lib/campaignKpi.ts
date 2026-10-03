@@ -1,6 +1,6 @@
 /**
  * 活動企劃的 KPI 與預算：語彙與顯示。規則（數字從哪來）在
- * server/strategy/core/campaignKpi.ts；指標 id 兩邊各宣告一份，
+ * server/content/core/campaign/campaignKpi.ts；指標 id 兩邊各宣告一份，
  * server 側的 campaignKpiVocab.test.ts 比對。
  */
 import type { CampaignPhaseId } from "./campaignSchema";

@@ -45,7 +45,7 @@ import { X_30S_TASKS, getXOrchestraConfig } from "./quickTaskX";
 // 2026-09-29 Threads（th-）與 LINE（ln-）通路的第一批全域卡。
 import { TH_30S_TASKS, getThreadsOrchestraConfig } from "./quickTaskThreads";
 import { LN_30S_TASKS, getLineOrchestraConfig } from "./quickTaskLine";
-import { findPackTemplate, findPackOrchestraConfig } from "../../strategy/core/brandPacks";
+import { findPackTemplate, findPackOrchestraConfig } from "./brandPacks";
 
 export type TaskTier = "30s" | "60s" | "99s";
 

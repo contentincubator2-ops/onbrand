@@ -22,7 +22,7 @@ import { faGlobe } from "@fortawesome/free-solid-svg-icons";
 import { trpc } from "../../../../lib/trpc";
 import { useLang } from "../../../../lib/i18n";
 import { useNavigate } from "react-router-dom";
-import { showToastGlobal } from "../../../../components/ui/Toast";
+import { showToastGlobal } from "../../../platform/components/Toast";
 import { HelpTip } from "../../../platform/components/HelpTip";
 
 // 2026-05-30 (CJ「modal 只留設定類 tab，內容類交給主頁面」):

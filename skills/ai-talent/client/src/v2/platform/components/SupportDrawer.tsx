@@ -15,7 +15,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { trpc } from "../../../lib/trpc";
 import { useLang } from "../../../lib/i18n";
 import { CloseIcon, SendIcon, UserIcon, BugIcon } from "./icons";
-import type { ScopeState } from "../../app/shell/ScopeBar";
+import type { ScopeState } from "./ScopeBar";
 
 interface Props {
   open: boolean;

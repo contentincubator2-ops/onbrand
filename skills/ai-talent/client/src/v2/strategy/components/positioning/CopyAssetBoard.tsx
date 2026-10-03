@@ -27,7 +27,7 @@ import { Button, Card, CardBody, Chip, Modal, ModalBody, ModalContent, ModalHead
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faPlus, faCheck, faPenToSquare, faXmark } from "@fortawesome/free-solid-svg-icons";
 
-import { TaskCardShell } from "../../../content/components/TaskCardShell";
+import { TaskCardShell } from "../../../platform/components/TaskCardShell";
 import InlineAssetCard from "./InlineAssetCard";
 import {
   COPY_ASSETS, specOf, countOf, previewOf, visibleKeys, type CopyAssetSpec, type CopyShape,

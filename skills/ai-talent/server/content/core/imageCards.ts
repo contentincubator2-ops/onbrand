@@ -18,16 +18,16 @@ import {
   nanoRatioFor,
   ratioError,
   RATIO_TOLERANCE,
-} from "./platformImageSpecs";
-import { generateStillImage, resolveStillImageModel, NANO_BANANA, type StillImageModelId } from "./stillImageModels";
+} from "../../platform/core/media/platformImageSpecs";
+import { generateStillImage, resolveStillImageModel, NANO_BANANA, type StillImageModelId } from "../../platform/core/media/stillImageModels";
 import {
   NO_TEXT_PROMPT_BLOCK,
   NO_MIRROR_PROMPT_BLOCK,
   PRODUCT_FAITHFUL_PROMPT_BLOCK,
   type BrandVisualContext,
 } from "./imageGen";
-import { fetchImageBuffer } from "./imageFetch";
-import type { ImageFailureKind } from "./stillImageModels";
+import { fetchImageBuffer } from "../../platform/core/media/imageFetch";
+import type { ImageFailureKind } from "../../platform/core/media/stillImageModels";
 
 export interface ImageDirection {
   id: string;

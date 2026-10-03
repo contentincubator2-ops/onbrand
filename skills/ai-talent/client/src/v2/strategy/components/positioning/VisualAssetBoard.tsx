@@ -23,7 +23,7 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faPlus, faCheck, faPenToSquare, faXmark, faWandMagicSparkles,
 } from "@fortawesome/free-solid-svg-icons";
-import { TaskCardShell } from "../../../content/components/TaskCardShell";
+import { TaskCardShell } from "../../../platform/components/TaskCardShell";
 import InlineAssetCard from "./InlineAssetCard";
 import AssetPhotoGallery from "./AssetPhotoGallery";
 import BrandLibrary, { useBrandLibrary } from "./BrandLibrary";

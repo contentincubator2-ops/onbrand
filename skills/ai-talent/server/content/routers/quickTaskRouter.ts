@@ -17,7 +17,7 @@
  * Provider 容錯：preferred 失敗 → forge fallback（同 v2）
  */
 import { z } from "zod";
-import { loadCampaignItem } from "../../strategy/core/campaignItemBrief";
+import { loadCampaignItem } from "../core/campaign/campaignItemBrief";
 import { randomUUID } from "node:crypto";
 import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure, singleFlightPerUser } from "../../platform/core/trpc";
@@ -978,15 +978,15 @@ import { X_30S_TASKS } from "../core/quickTaskX";
 import { TH_30S_TASKS } from "../core/quickTaskThreads";
 import { LN_30S_TASKS } from "../core/quickTaskLine";
 // 2026-08-29 per-brand 任務包。有 pack 的品牌，頻道與卡片完全由 pack 決定。
-import { resolveBrandPack, expandPackCards, packNavForBrand } from "../../strategy/core/brandPacks";
+import { resolveBrandPack, expandPackCards, packNavForBrand } from "../core/brandPacks";
 // 2026-09-02: task id → template + config 的唯一解析點。這條鏈本來在這個檔案
 // 裡手抄了五次，抄第五次時漏了 KOL 的 config（KOL 任務按「換人重寫」直接炸）。
 import { resolveTaskOrThrow, resolveTaskTemplate } from "../core/taskRegistry";
 // 2026-09-04 用戶自建任務卡。listFB 疊加，執行則走 taskRegistry 的來源註冊。
-import { listBrandTaskCards, cardTemplate } from "../../strategy/core/brandTaskCards";
+import { listBrandTaskCards, cardTemplate } from "../core/brandTaskCards";
 import { assertIntakeComplete } from "../core/taskIntake";
 import { isWuganVoiceTemplate, validateWuganVoice, repairWuganVoice } from "../core/wuganVoiceContract";
-import { findFirstUrl, fetchUrlSummary, formatUrlSummaryForPrompt } from "../core/urlContext";
+import { findFirstUrl, fetchUrlSummary, formatUrlSummaryForPrompt } from "../../platform/core/web/urlContext";
 import localPool from "../../localDb";
 import { loadAgentKnowledge, loadAgentKnowledgeMany, withAgentKnowledge } from "../../platform/core/agentKnowledge";
 // 2026-05-18 (CJ「media to copy」): photo/video/doc media task catalog
@@ -1864,7 +1864,7 @@ export const quickTaskRouter = router({
           console.error("[runOrchestra60 async tail] failed:", (err as Error)?.message);
           if (checkpointFired && capturedOutputId) {
             try {
-              const { finaliseTaskRun } = await import("../core/recordTaskRun");
+              const { finaliseTaskRun } = await import("../../platform/core/recordTaskRun");
               await finaliseTaskRun({
                 outputId: capturedOutputId,
                 progress: "failed",
@@ -2071,7 +2071,7 @@ ${polishTemplate.polishHint}`
       let fetchedUrl: string | null = null;
       try {
         const { findFirstUrl, fetchUrlSummary, formatUrlSummaryForPrompt } =
-          await import("../core/urlContext");
+          await import("../../platform/core/web/urlContext");
         const url = findFirstUrl(input.text);
         if (url) {
           const summary = await fetchUrlSummary(url);
@@ -2339,7 +2339,7 @@ ${polishTemplate.polishHint}`
         const { ALL_99S_SQUADS } = await import("../core/quickTask100Squads");
         const matched = ALL_99S_SQUADS.find((s) => s.squad_slug === sqSlugNew);
         if (matched) {
-          const { fetchViralPatterns, formatViralPatternsForPrompt } = await import("../core/socialListeningScout");
+          const { fetchViralPatterns, formatViralPatternsForPrompt } = await import("../../strategy/core/socialListeningScout");
           const kind: "festivals" | "trending" | "news" | "viral" =
             matched.squad_slug.includes("monthly-calendar") || matched.squad_slug.includes("countdown") ? "festivals"
             : matched.squad_slug.includes("crisis") || matched.squad_slug.includes("kern-mass-control") ? "trending"
@@ -2841,7 +2841,7 @@ ${polishTemplate.polishHint}`
         : ok;
       if (shouldPersist) {
         try {
-          const { recordTaskRun, finaliseTaskRun } = await import("../core/recordTaskRun");
+          const { recordTaskRun, finaliseTaskRun } = await import("../../platform/core/recordTaskRun");
           const content = strategyPublicPolicy
             ? JSON.stringify({
                 schemaVersion: 2,
@@ -3095,7 +3095,7 @@ ${polishTemplate.polishHint}`
           // reject the partial so the caller sees the error.
           if (checkpointFired && capturedOutputId) {
             try {
-              const { finaliseTaskRun } = await import("../core/recordTaskRun");
+              const { finaliseTaskRun } = await import("../../platform/core/recordTaskRun");
               await finaliseTaskRun({
                 outputId: capturedOutputId,
                 // Don't pass content → keep partial caption from checkpoint

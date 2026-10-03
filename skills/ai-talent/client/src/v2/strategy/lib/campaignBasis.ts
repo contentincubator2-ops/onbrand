@@ -1,7 +1,7 @@
 /**
  * 活動頁右邊「策略依據」（舊的 11 段活動定位）的畫面用工具。
  *
- * 哪些格子能改由 server 決定（server/strategy/core/campaignBasis.ts BASIS_FIELDS，
+ * 哪些格子能改由 server 決定（server/content/core/campaign/campaignBasis.ts BASIS_FIELDS，
  * campaign.get 回的 basis.editable 就是那份清單）；這裡只負責標籤與值的轉換。標籤一律從
  * positioningSchema.ts 的 EVENT_SEGMENTS 讀，不另抄一份。
  */

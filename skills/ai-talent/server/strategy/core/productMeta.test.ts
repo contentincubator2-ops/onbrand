@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fetchProductMeta } from "./productMeta";
-import { assertUrlSafe } from "../../content/core/urlGuard";
+import { assertUrlSafe } from "../../platform/core/web/urlGuard";
 
-vi.mock("../../content/core/urlGuard", () => ({ assertUrlSafe: vi.fn(async (url: string) => new URL(url)) }));
+vi.mock("../../platform/core/web/urlGuard", () => ({ assertUrlSafe: vi.fn(async (url: string) => new URL(url)) }));
 
 function mockHtml(html: string) {
   vi.stubGlobal("fetch", vi.fn(async () => new Response(html, {

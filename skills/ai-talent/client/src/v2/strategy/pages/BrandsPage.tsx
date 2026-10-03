@@ -18,8 +18,8 @@ import React, { useMemo, useState, useRef } from "react";
 import { useNavigate, useOutletContext, useSearchParams } from "react-router-dom";
 import { trpc } from "../../../lib/trpc";
 import { useLang } from "../../../lib/i18n";
-import type { ShellOutletCtx } from "../../app/shell/ShellLayout";
-import { isStrategyPreviewEmail, isPersonaPreviewEmail } from "../../app/shell/ShellLayout";
+import type { ShellOutletCtx } from "../../platform/lib/shellContext";
+import { isStrategyPreviewEmail, isPersonaPreviewEmail } from "../../platform/lib/shellContext";
 import { Avatar, Button, Card, CardBody, Chip, Input, Textarea, Spinner, Select, SelectItem, CheckboxGroup, Checkbox, Modal, ModalContent, ModalHeader, ModalBody } from "@heroui/react";
 import SegmentEditor from "../components/positioning/SegmentEditor";
 import ThinkingOverlay from "../components/positioning/ThinkingOverlay";
@@ -39,7 +39,7 @@ import BrandOnboardingWizard from "../components/onboarding/BrandOnboardingWizar
 import AIBriefPanel from "../components/positioning/AIBriefPanel";
 import StrategyAlertsPanel from "../components/positioning/StrategyAlertsPanel";
 import PersonaAgentPanel from "../components/positioning/PersonaAgentPanel";
-import { showToastGlobal } from "../../../components/ui/Toast";
+import { showToastGlobal } from "../../platform/components/Toast";
 import AddEntityModal, { type AddEntityTab } from "../components/AddEntityModal";
 import ProductDetailModal from "../components/positioning/ProductDetailModal";
 import EventCardGrid from "../components/events/EventCardGrid";
@@ -54,7 +54,7 @@ import { visualSpecOf } from "../lib/visualAssets";
 import { strategyCrumbs, type CrumbTarget } from "../lib/strategyCrumbs";
 import { pickProductImageUrl } from "../lib/productImage";
 import { readProductFacts } from "../lib/productFacts";
-import CampaignStage, { CampaignLockToggle } from "../components/positioning/CampaignStage";
+import { useCampaignSlots } from "../lib/campaignSlots";
 import CopyAssetBoard, { COPY_ASSETS } from "../components/positioning/CopyAssetBoard";
 import VisualAssetBoard from "../components/positioning/VisualAssetBoard";
 import { pipelineFor, type PipelineStepSpec } from "../lib/positioningPipeline";
@@ -80,6 +80,7 @@ type SectionId = string;
 //   MediaGenFlow per the visual-step rule, not stored as static assets).
 
 export default function BrandsPage() {
+  const campaignSlots = useCampaignSlots();
   const { t, lang } = useLang();
   const { brandId, setBrandId, brands, scope: globalScope, setScope, userEmail } = useOutletContext<ShellOutletCtx>();
 
@@ -1592,7 +1593,9 @@ export default function BrandsPage() {
             {/* 活動的宣傳企劃：同一個位置、同一顆鎖頭，鎖的是整份企劃（定稿）。 */}
             {category === "campaign" && scopeMode === "event" && scope?.eventId && (
               <div className="mt-2 sm:mt-0 sm:absolute sm:top-1/2 sm:-translate-y-1/2 sm:left-[calc(100%+18px)]">
-                <CampaignLockToggle eventId={scope.eventId} en={lang === "en"} />
+                {campaignSlots && (
+                  <React.Suspense fallback={null}><campaignSlots.LockToggle eventId={scope.eventId} en={lang === "en"} /></React.Suspense>
+                )}
               </div>
             )}
             {(category === "positioning" || category === "copy" || category === "visual") && activeBrandIdForLocks && (() => {
@@ -2345,7 +2348,11 @@ export default function BrandsPage() {
               策略層只排不寫；定稿後「到內容層寫」才出現。 */}
           {derivedCategory === "campaign" && scopeMode === "event" && scope?.eventId && (
             <div style={{ padding: "16px 24px 32px" }}>
-              <CampaignStage eventId={scope.eventId} brandId={scope?.brandId ?? brandId ?? null} />
+              {campaignSlots && (
+                <React.Suspense fallback={null}>
+                  <campaignSlots.Stage eventId={scope.eventId} brandId={scope?.brandId ?? brandId ?? null} />
+                </React.Suspense>
+              )}
             </div>
           )}
 

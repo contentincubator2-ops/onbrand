@@ -21,8 +21,8 @@ import { planQuotaFor, isUnlimited, checkCap } from "../../platform/core/planGat
 import { router, protectedProcedure } from "../../platform/core/trpc";
 import localPool from "../../localDb";
 import { callLLM } from "../../platform/core/llmRouter";
-import { assertUrlSafe } from "../../content/core/urlGuard";
-import { fetchImageBuffer } from "../../content/core/imageFetch";
+import { assertUrlSafe } from "../../platform/core/web/urlGuard";
+import { fetchImageBuffer } from "../../platform/core/media/imageFetch";
 import { fetchProductMeta } from "../core/productMeta";
 
 // ── helpers ────────────────────────────────────────────────────────────────

@@ -1,4 +1,4 @@
-import type { BundlePlatform, BundlePostPayload } from "../../content/core/bundlePublish";
+import type { BundlePlatform, BundlePostPayload } from "./publish/bundlePublish";
 
 const DEFAULT_BASE_URL = "https://api.bundle.social";
 const DEFAULT_TIMEOUT_MS = 15_000;

@@ -22,7 +22,7 @@ import {
   buildProductPositioningSteps,
   buildEventPositioningSteps,
 } from "../core/positioningSteps";
-import { generateInterimPulse } from "../../content/core/interimQuickPulse";
+import { generateInterimPulse } from "../core/interimQuickPulse";
 import { loadBrandFullContext } from "../core/brandFullContext";
 import { invokeLLM } from "../../platform/core/llm";
 import { buildBrandPrefix } from "../core/brandContext";
