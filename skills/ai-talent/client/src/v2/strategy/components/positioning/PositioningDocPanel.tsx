@@ -25,6 +25,7 @@ import { useLang } from "../../../../lib/i18n";
 import { Button, Chip, Textarea } from "@heroui/react";
 import { CheckIcon, ChevronLeftIcon, DeleteIcon, GenerateIcon, PasteIcon, TextIcon, UploadIcon, WarningIcon } from "../../../platform/components/icons";
 import { HelpTip } from "../../../platform/components/HelpTip";
+import ConvertingToAIFormat from "./ConvertingToAIFormat";
 
 type Scope = "brand" | "product" | "event";
 
@@ -86,6 +87,7 @@ export default function PositioningDocPanel({
                    : (en ? "campaign" : "活動");
 
   const [busy, setBusy] = React.useState<string | null>(null);
+  const [convertLabel, setConvertLabel] = React.useState("");
   const [error, setError] = React.useState<string | null>(null);
   const [pasteOpen, setPasteOpen] = React.useState(false);
   const [pasteText, setPasteText] = React.useState("");
@@ -156,10 +158,19 @@ export default function PositioningDocPanel({
     return j;
   }
 
+  // 2026-10-03（CJ「解析過程增加動畫：正在轉換成AI格式」）：上傳／貼上成功後直接接著
+  // 做欄位對映，整段（抽取 → 對映）用同一個動畫蓋住，不再停在「文件清單」等用戶自己
+  // 再按一次「對映欄位」。對映失敗時文件仍在清單裡，可手動重試。
+  function startConvert(docId: string, label: string) {
+    setConvertLabel(label);
+    setBusy(`map:${docId}`);
+    proposeMut?.mutate({ scope: scopeMode, scopeId, docId });
+  }
+
   async function onFile(file: File) {
-    setError(null); setBusy("upload");
+    setError(null); setBusy("upload"); setConvertLabel(file.name);
     try {
-      await post("/api/positioning-doc/upload", {
+      const j = await post("/api/positioning-doc/upload", {
         method: "POST",
         headers: {
           "content-type": "application/octet-stream",
@@ -171,14 +182,15 @@ export default function PositioningDocPanel({
         body: file,
       });
       coverageQuery.refetch?.();
-    } catch (e: any) { setError(String(e?.message ?? e)); }
-    finally { setBusy(null); if (fileRef.current) fileRef.current.value = ""; }
+      if (j?.docId) startConvert(j.docId, file.name); else setBusy(null);
+    } catch (e: any) { setError(String(e?.message ?? e)); setBusy(null); }
+    finally { if (fileRef.current) fileRef.current.value = ""; }
   }
 
   async function onPaste() {
-    setError(null); setBusy("paste");
+    setError(null); setBusy("paste"); setConvertLabel("");
     try {
-      await post("/api/positioning-doc/paste", {
+      const j = await post("/api/positioning-doc/paste", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
@@ -188,8 +200,8 @@ export default function PositioningDocPanel({
       });
       setPasteText(""); setPasteOpen(false);
       coverageQuery.refetch?.();
-    } catch (e: any) { setError(String(e?.message ?? e)); }
-    finally { setBusy(null); }
+      if (j?.docId) startConvert(j.docId, ""); else setBusy(null);
+    } catch (e: any) { setError(String(e?.message ?? e)); setBusy(null); }
   }
 
   async function onRead(doc: DocSummary) {
@@ -211,6 +223,11 @@ export default function PositioningDocPanel({
       coverageQuery.refetch?.();
     } catch (e: any) { setError(String(e?.message ?? e)); }
     finally { setBusy(null); }
+  }
+
+  // ── 轉換中：上傳／貼上／對映期間整頁換成動畫 ─────────────────────────────
+  if (busy === "upload" || busy === "paste" || busy?.startsWith("map:")) {
+    return <ConvertingToAIFormat fileName={convertLabel} />;
   }
 
   // ── 讀文件：照用戶自己的標題階層呈現，不套我們的表格 ─────────────────────
@@ -633,7 +650,7 @@ export default function PositioningDocPanel({
                 <Button
                   size="sm" variant="flat" color="primary" startContent={<GenerateIcon size={13} />}
                   isLoading={busy === `map:${d.id}`}
-                  onPress={() => { setBusy(`map:${d.id}`); setError(null); proposeMut?.mutate({ scope: scopeMode, scopeId, docId: d.id }); }}
+                  onPress={() => { setError(null); startConvert(d.id, d.name); }}
                 >
                   {en ? "Map fields" : "對映欄位"}
                 </Button>
