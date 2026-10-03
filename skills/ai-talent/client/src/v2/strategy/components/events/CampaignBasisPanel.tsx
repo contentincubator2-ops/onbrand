@@ -93,7 +93,7 @@ export default function CampaignBasisPanel({ raw, editable, recent, locked, en, 
                       className={`rounded-lg px-2 py-1 -mx-2 transition-colors ${isNew ? "bg-default-200" : ""} ${can && editing !== path ? "hover:bg-default-100 cursor-text" : ""}`}
                       onClick={() => { if (can && editing !== path) { setEditing(path); setDraft(toText(value)); } }}>
                       <p className="text-[11px] text-default-500 flex items-center gap-1.5">
-                        {f.label.replace(/[（(][^）)]*[）)]/g, "").trim() || f.label}
+                        {en && f.labelEn ? f.labelEn.replace(/\s*\([^)]*\)/g, "").trim() || f.labelEn : f.label.replace(/[（(][^）)]*[）)]/g, "").trim() || f.label}
                         {isNew && <span className="text-[10px] font-semibold text-foreground">{L("剛改", "Updated")}</span>}
                       </p>
                       {editing === path ? (

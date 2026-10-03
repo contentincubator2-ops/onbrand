@@ -811,6 +811,13 @@ const PILLAR_STYLE: Record<string, { bg: string; text: string; dot: string }> = 
   "UGC見證":   { bg: "bg-emerald-50", text: "text-emerald-700", dot: "bg-emerald-500" },
   "權威觀點":  { bg: "bg-rose-50",    text: "text-rose-700",    dot: "bg-rose-500" },
 };
+const PILLAR_LABEL_EN: Record<string, string> = {
+  "理念WHY": "Purpose (WHY)",
+  "產品": "Product",
+  "節慶": "Seasonal",
+  "UGC見證": "UGC / Testimonial",
+  "權威觀點": "Authority",
+};
 const PILLAR_FALLBACK = { bg: "bg-default-100", text: "text-default-600", dot: "bg-default-400" };
 
 function parseCalendar(raw: string): CalPost[] {
@@ -877,7 +884,7 @@ export function FBCalendar({ title, brandName, variantLabel, liveCaption, brandL
                       <p className="text-tiny text-default-500 flex items-center gap-1.5">
                         {lang === "en" ? `Day ${p.day || i + 1}` : `第 ${p.day || i + 1} 天`}
                         <span className={`inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full ${st.bg} ${st.text}`}>
-                          <span className={`w-1.5 h-1.5 rounded-full ${st.dot}`} />{p.pillar || "—"}
+                          <span className={`w-1.5 h-1.5 rounded-full ${st.dot}`} />{(lang === "en" ? PILLAR_LABEL_EN[p.pillar] : undefined) ?? (p.pillar || "—")}
                         </span>
                         {p.format && <span className="text-[10px] text-default-400">· {p.format}</span>}
                       </p>

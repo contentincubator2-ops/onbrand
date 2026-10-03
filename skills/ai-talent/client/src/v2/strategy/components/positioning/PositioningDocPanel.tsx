@@ -21,7 +21,7 @@
 import { IllustratedEmpty } from "../../../platform/components/EmptyIllustration";
 import React from "react";
 import { trpc } from "../../../../lib/trpc";
-import { useLang } from "../../../../lib/i18n";
+import { useLang, tr } from "../../../../lib/i18n";
 import { Button, Chip, Textarea } from "@heroui/react";
 import { CheckIcon, ChevronLeftIcon, DeleteIcon, GenerateIcon, PasteIcon, TextIcon, UploadIcon, WarningIcon } from "../../../platform/components/icons";
 import { HelpTip } from "../../../platform/components/HelpTip";
@@ -63,7 +63,7 @@ function renderValue(v: any): string {
   if (typeof v === "string") return v;
   if (Array.isArray(v)) {
     if (v.length && typeof v[0] === "object") {
-      return v.map((p: any) => `「${p.ours}」（取代：${p.generic || "—"}）`).join("\n");
+      return v.map((p: any) => tr(`"${p.ours}" (replaces: ${p.generic || "—"})`, `「${p.ours}」（取代：${p.generic || "—"}）`)).join("\n");
     }
     return v.join(" · ");
   }
@@ -112,7 +112,7 @@ export default function PositioningDocPanel({
       setCreatedTitles(new Set());
       setBusy(null);
     },
-    onError: (e: any) => { setError(e?.message ?? "對映失敗"); setBusy(null); },
+    onError: (e: any) => { setError(e?.message ?? tr("Mapping failed", "對映失敗")); setBusy(null); },
   }) ?? null;
 
   // 2026-09-23（CJ「會迷路」）：原本寫入成功只是 setReview(null) 靜靜跳回主
@@ -129,7 +129,7 @@ export default function PositioningDocPanel({
       });
       setReview(null); setBusy(null); coverageQuery.refetch?.();
     },
-    onError: (e: any) => { setError(e?.message ?? "套用失敗"); setBusy(null); },
+    onError: (e: any) => { setError(e?.message ?? tr("Apply failed", "套用失敗")); setBusy(null); },
   }) ?? null;
 
   // 2026-09-23（CJ「品牌定位…也可以自訂新增欄位，或是輸入 chatgpt 對不同產品或品牌的討論」）：
@@ -137,11 +137,11 @@ export default function PositioningDocPanel({
   const [createdTitles, setCreatedTitles] = React.useState<Set<string>>(new Set());
   const createSegmentMut = (trpc as any).positioningDocs?.createCustomSegment?.useMutation?.({
     onSuccess: (_r: any, vars: any) => { setCreatedTitles((prev) => new Set(prev).add(vars.title)); setBusy(null); coverageQuery.refetch?.(); },
-    onError: (e: any) => { setError(e?.message ?? "建立卡片失敗"); setBusy(null); },
+    onError: (e: any) => { setError(e?.message ?? tr("Failed to create card", "建立卡片失敗")); setBusy(null); },
   }) ?? null;
   const removeSegmentMut = (trpc as any).positioningDocs?.removeCustomSegment?.useMutation?.({
     onSuccess: () => { setBusy(null); coverageQuery.refetch?.(); },
-    onError: (e: any) => { setError(e?.message ?? "刪除失敗"); setBusy(null); },
+    onError: (e: any) => { setError(e?.message ?? tr("Delete failed", "刪除失敗")); setBusy(null); },
   }) ?? null;
 
   if (!scopeId) {
@@ -403,7 +403,7 @@ export default function PositioningDocPanel({
                       return next;
                     })}
                   >
-                    {u.heading}（{u.chars} 字）
+                    {en ? `${u.heading} (${u.chars} chars)` : `${u.heading}（${u.chars} 字）`}
                   </Chip>
                 );
               })}
@@ -593,7 +593,7 @@ export default function PositioningDocPanel({
         <Button size="sm" variant="flat" startContent={<PasteIcon size={14} />} onPress={() => setPasteOpen((v) => !v)}>
           {en ? "Paste text" : "直接貼上"}
         </Button>
-        <span className="text-tiny text-default-400">.docx / .doc / .pptx / .ppt / .xlsx / .pdf（含掃描檔）/ .md / .txt / .html</span>
+        <span className="text-tiny text-default-400">.docx / .doc / .pptx / .ppt / .xlsx / .pdf{en ? " (incl. scans)" : "（含掃描檔）"} / .md / .txt / .html</span>
       </div>
 
       {pasteOpen && (
@@ -632,7 +632,7 @@ export default function PositioningDocPanel({
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-small font-semibold truncate">{d.name}</span>
                   <Chip size="sm" variant="flat">{d.kind}</Chip>
-                  <span className="text-tiny text-default-400">{d.chars} 字 · {d.outline.length} 節</span>
+                  <span className="text-tiny text-default-400">{en ? `${d.chars} chars · ${d.outline.length} sections` : `${d.chars} 字 · ${d.outline.length} 節`}</span>
                   {d.appliedAt && (
                     <Chip size="sm" color="success" variant="flat" startContent={<CheckIcon size={11} />}>
                       {en ? "applied" : "已套用"}

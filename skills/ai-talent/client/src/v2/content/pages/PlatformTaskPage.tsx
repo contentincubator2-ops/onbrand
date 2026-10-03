@@ -138,7 +138,7 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
   const [imagePickerOpen, setImagePickerOpen] = useState(false);
   const setImageTrayMut = trpc.imageCard.setTray.useMutation({
     onSuccess: () => { setImagePickerOpen(false); imageTrayQ.refetch(); },
-    onError: (e) => toastWithUpgrade(e?.message ?? "儲存失敗", lang === "en"),
+    onError: (e) => toastWithUpgrade(e?.message ?? (lang === "en" ? "Save failed" : "儲存失敗"), lang === "en"),
   });
   /** 實際擺出來的圖片卡。還沒載入托盤（或沒有品牌）時先只擺預設的兩張，不閃出全部。 */
   const shownImageCards = useMemo(() => {
@@ -722,7 +722,7 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
 
   const setTrayMut = (trpc as any).quickTask?.setTray?.useMutation?.({
     onSuccess: () => { setPickerOpen(false); trayQuery.refetch?.(); },
-    onError: (e: any) => toastWithUpgrade(e?.message ?? "儲存失敗", lang === "en"),
+    onError: (e: any) => toastWithUpgrade(e?.message ?? (lang === "en" ? "Save failed" : "儲存失敗"), lang === "en"),
   });
 
   /** 這個通路實際擺出來的卡 id。存過的要跟「現在看得到的」取交集 —— 降級

@@ -5,6 +5,7 @@
  * and are populated by the pipelineRouter (web fetch + scrape).
  */
 import React from "react";
+import { tr } from "../../../../lib/i18n";
 import {
   Button, Chip, Modal, ModalContent, ModalHeader, ModalBody, Card, CardBody,
 } from "@heroui/react";
@@ -53,9 +54,9 @@ export default function SourceViewer({ research, segmentTitle }: SourceViewerPro
         className="font-normal"
       >
         <span className="text-default-700">{totalUrls}</span>
-        <span className="text-default-400 mx-1">個來源</span>
+        <span className="text-default-400 mx-1">{tr(" sources", "個來源")}</span>
         <span className="text-default-700">{totalChars.toLocaleString()}</span>
-        <span className="text-default-400 ml-1">字</span>
+        <span className="text-default-400 ml-1">{tr("chars", "字")}</span>
       </Button>
 
       <Modal isOpen={open} onClose={() => setOpen(false)} size="2xl" scrollBehavior="inside">
@@ -63,19 +64,19 @@ export default function SourceViewer({ research, segmentTitle }: SourceViewerPro
           <ModalHeader className="flex flex-col gap-1">
             <Chip size="sm" variant="flat" color="default" className="uppercase tracking-wider self-start"
               startContent={<FontAwesomeIcon icon={faBookOpen} className="text-tiny ml-1" />}>
-              研究來源
+              {tr("Research sources", "研究來源")}
             </Chip>
-            <h2 className="text-medium font-semibold">{segmentTitle ?? "段落引用清單"}</h2>
+            <h2 className="text-medium font-semibold">{segmentTitle ?? tr("Section citations", "段落引用清單")}</h2>
             <div className="flex items-center gap-2 mt-1">
               <Chip size="sm" variant="flat" color={research?.satisfied?.urls ? "success" : "warning"}>
                 URL {totalUrls} / {research?.budget?.minUrls ?? "—"}
               </Chip>
               <Chip size="sm" variant="flat" color={research?.satisfied?.chars ? "success" : "warning"}>
-                字數 {totalChars.toLocaleString()} / {research?.budget?.minChars?.toLocaleString() ?? "—"}
+                {tr("Chars", "字數")} {totalChars.toLocaleString()} / {research?.budget?.minChars?.toLocaleString() ?? "—"}
               </Chip>
               {research?.finishedAt && (
                 <span className="text-tiny text-default-400">
-                  {new Date(research.finishedAt).toLocaleString("zh-TW")}
+                  {new Date(research.finishedAt).toLocaleString(tr("en-US", "zh-TW"))}
                 </span>
               )}
             </div>
@@ -92,7 +93,7 @@ export default function SourceViewer({ research, segmentTitle }: SourceViewerPro
                     {!!s.charCount && (
                       <Chip size="sm" variant="flat" color="default"
                         startContent={<FontAwesomeIcon icon={faFileLines} className="text-tiny ml-1" />}>
-                        {(s.charCount).toLocaleString()} 字
+                        {(s.charCount).toLocaleString()} {tr("chars", "字")}
                       </Chip>
                     )}
                   </div>

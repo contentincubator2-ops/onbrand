@@ -8,11 +8,12 @@
  * when each step completes.
  */
 import { Card, CardBody, Button, Chip, Progress } from "@heroui/react";
+import { tr } from "../../../../lib/i18n";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faPlay, faPause, faForward, faStop, faWandMagicSparkles, faCheck,
 } from "@fortawesome/free-solid-svg-icons";
-import type { PipelineStepSpec, PipelineStatus } from "../../lib/positioningPipeline";
+import { stepTitleText, type PipelineStepSpec, type PipelineStatus } from "../../lib/positioningPipeline";
 
 export interface PipelineState {
   status: PipelineStatus;
@@ -35,7 +36,7 @@ interface PipelineRunnerProps {
 }
 
 export default function PipelineRunner({
-  steps, state, title = "品牌定位分析", onStart, onPause, onResume, onSkip, onStop,
+  steps, state, title = tr("Brand positioning analysis", "品牌定位分析"), onStart, onPause, onResume, onSkip, onStop,
 }: PipelineRunnerProps) {
   const total = steps.length;
   const current = steps[state.cursor];
@@ -59,46 +60,46 @@ export default function PipelineRunner({
             </span>
             <p className="text-small font-medium">{title}</p>
             {state.status === "paused" && (
-              <Chip size="sm" variant="flat" color="warning">已暫停</Chip>
+              <Chip size="sm" variant="flat" color="warning">{tr("Paused", "已暫停")}</Chip>
             )}
             {state.status === "done" && (
               <Chip size="sm" variant="flat" color="success" startContent={<FontAwesomeIcon icon={faCheck} className="text-tiny ml-1" />}>
-                完成
+                {tr("Done", "完成")}
               </Chip>
             )}
           </div>
           <div className="flex items-center gap-2">
             {state.status === "idle" && (
               <Button size="sm" color="primary" startContent={<FontAwesomeIcon icon={faPlay} />} onPress={onStart}>
-                開始分析
+                {tr("Start analysis", "開始分析")}
               </Button>
             )}
             {state.status === "running" && (
               <>
                 <Button size="sm" variant="bordered" startContent={<FontAwesomeIcon icon={faPause} />} onPress={onPause}>
-                  暫停
+                  {tr("Pause", "暫停")}
                 </Button>
                 <Button size="sm" variant="bordered" startContent={<FontAwesomeIcon icon={faForward} />} onPress={onSkip}>
-                  跳過此步
+                  {tr("Skip this step", "跳過此步")}
                 </Button>
                 <Button size="sm" variant="light" startContent={<FontAwesomeIcon icon={faStop} />} onPress={onStop}>
-                  停止
+                  {tr("Stop", "停止")}
                 </Button>
               </>
             )}
             {state.status === "paused" && (
               <>
                 <Button size="sm" color="primary" startContent={<FontAwesomeIcon icon={faPlay} />} onPress={onResume}>
-                  繼續
+                  {tr("Resume", "繼續")}
                 </Button>
                 <Button size="sm" variant="light" startContent={<FontAwesomeIcon icon={faStop} />} onPress={onStop}>
-                  停止
+                  {tr("Stop", "停止")}
                 </Button>
               </>
             )}
             {state.status === "done" && (
               <Button size="sm" variant="light" onPress={onStop}>
-                關閉
+                {tr("Close", "關閉")}
               </Button>
             )}
           </div>
@@ -109,11 +110,11 @@ export default function PipelineRunner({
               size="sm"
               value={pct}
               color={state.status === "done" ? "success" : "primary"}
-              aria-label="進度"
+              aria-label={tr("Progress", "進度")}
             />
             {current && state.status !== "done" && (
               <p className="text-tiny text-default-500 truncate">
-                目前：{cleanTitle(current.title)}
+                {tr("Current: ", "目前：")}{cleanTitle(stepTitleText(current))}
               </p>
             )}
           </>

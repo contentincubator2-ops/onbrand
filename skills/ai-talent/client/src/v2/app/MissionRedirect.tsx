@@ -13,6 +13,7 @@
  * Why: PickerWorkspace was the old workflow runner. Modern UX shows
  * users their result mockup directly with an edit panel beside it.
  */
+import { tr } from "../../lib/i18n";
 import { Navigate, useParams } from "react-router-dom";
 import { trpc } from "../../lib/trpc";
 
@@ -32,7 +33,7 @@ export default function MissionRedirect() {
   if (outputsQuery.isLoading) {
     return (
       <div className="fixed inset-0 flex items-center justify-center bg-content2 text-default-500 text-small">
-        正在開啟你的產出…
+        {tr("Opening your output…", "正在開啟你的產出…")}
       </div>
     );
   }

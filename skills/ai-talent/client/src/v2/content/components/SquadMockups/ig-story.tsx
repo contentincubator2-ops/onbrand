@@ -11,6 +11,7 @@
 import { Chip } from "@heroui/react";
 import { IGStories } from "../PlatformMockup/instagram";
 import type { MockupFields } from "../PlatformMockup/shared";
+import { useLang } from "../../../../lib/i18n";
 import { SectionHeader, NotionCard, EmptyHint, type SquadMockupCommonProps } from "./shared";
 
 export type StickerKind = "poll" | "question" | "quiz" | "link" | "countdown" | "music" | "location" | "mention";
@@ -46,6 +47,17 @@ interface Props extends SquadMockupCommonProps {
   onChange?: (next: Partial<IGStorySeries>) => void;
 }
 
+const STICKER_LABEL_EN: Record<StickerKind, string> = {
+  poll:      "📊 Poll",
+  question:  "❓ Question",
+  quiz:      "🎯 Quiz",
+  link:      "🔗 Link",
+  countdown: "⏳ Countdown",
+  music:     "🎵 Music",
+  location:  "📍 Location",
+  mention:   "@ Mention",
+};
+
 const STICKER_LABEL: Record<StickerKind, string> = {
   poll:      "📊 票",
   question:  "❓ 問",
@@ -68,11 +80,12 @@ function toMockupFields(data: IGStorySeries): MockupFields {
 }
 
 export function IGStoryMockup({ data, isActive = false }: Props) {
+  const { lang } = useLang();
   if (!data || !Array.isArray(data.slides) || data.slides.length === 0) {
     return (
       <NotionCard>
-        <SectionHeader icon="📱" eyebrow="ATOMIC · IG STORY" title="IG Stories 系列" />
-        <EmptyHint>{!data ? "尚未產出 — 點擊執行此任務" : "資料不完整 — 缺 slides"}</EmptyHint>
+        <SectionHeader icon="📱" eyebrow="ATOMIC · IG STORY" title={lang === "en" ? "IG Stories series" : "IG Stories 系列"} />
+        <EmptyHint>{!data ? (lang === "en" ? "Not generated yet — click to run this task" : "尚未產出 — 點擊執行此任務") : (lang === "en" ? "Incomplete data — slides missing" : "資料不完整 — 缺 slides")}</EmptyHint>
       </NotionCard>
     );
   }
@@ -87,15 +100,15 @@ export function IGStoryMockup({ data, isActive = false }: Props) {
           <SectionHeader
             icon="📱"
             eyebrow="ATOMIC · IG STORY"
-            title={`IG Stories · ${slides.length} 張連續系列`}
+            title={lang === "en" ? `IG Stories · ${slides.length}-slide series` : `IG Stories · ${slides.length} 張連續系列`}
           />
           {isActive && (
             <Chip size="sm" variant="flat" color="primary" className="self-start">
-              ● AI 專家思考中…
+              {lang === "en" ? "● AI expert thinking…" : "● AI 專家思考中…"}
             </Chip>
           )}
         </div>
-        <p className="text-tiny text-default-500">敘事弧：{data.arcSummary || "（未填）"}</p>
+        <p className="text-tiny text-default-500">{lang === "en" ? "Narrative arc:" : "敘事弧："}{data.arcSummary || (lang === "en" ? "(not filled)" : "（未填）")}</p>
       </NotionCard>
 
       <div className="grid grid-cols-1 md:grid-cols-[280px_1fr] gap-3">
@@ -106,7 +119,7 @@ export function IGStoryMockup({ data, isActive = false }: Props) {
 
         {/* Series timeline (squad-mockup-specific) */}
         <NotionCard>
-          <SectionHeader eyebrow="STORY SERIES" title="連續腳本" />
+          <SectionHeader eyebrow="STORY SERIES" title={lang === "en" ? "Series script" : "連續腳本"} />
           <div className="flex flex-col">
             {slides.map((s) => (
               <div
@@ -134,7 +147,7 @@ export function IGStoryMockup({ data, isActive = false }: Props) {
                     <div className="flex flex-wrap gap-1 mt-0.5">
                       {s.stickers.map((st, i) => (
                         <Chip key={i} size="sm" variant="flat" className="h-4 text-tiny">
-                          {STICKER_LABEL[st.kind]} {st.text.slice(0, 12)}{st.text.length > 12 ? "…" : ""}
+                          {(lang === "en" ? STICKER_LABEL_EN : STICKER_LABEL)[st.kind]} {st.text.slice(0, 12)}{st.text.length > 12 ? "…" : ""}
                         </Chip>
                       ))}
                     </div>
@@ -148,8 +161,8 @@ export function IGStoryMockup({ data, isActive = false }: Props) {
 
       {data.highlightCover && (
         <NotionCard>
-          <SectionHeader eyebrow="HIGHLIGHT" title="精選永久封面" />
-          <p className="text-tiny text-default-700">建議用 Story #{data.highlightCover} 做 Highlight cover，分類名稱跟 arc summary 對齊。</p>
+          <SectionHeader eyebrow="HIGHLIGHT" title={lang === "en" ? "Highlight cover" : "精選永久封面"} />
+          <p className="text-tiny text-default-700">{lang === "en" ? <>Use Story #{data.highlightCover} as the Highlight cover; keep the category name aligned with the arc summary.</> : <>建議用 Story #{data.highlightCover} 做 Highlight cover，分類名稱跟 arc summary 對齊。</>}</p>
         </NotionCard>
       )}
     </div>

@@ -18,7 +18,7 @@
 import { isChunkLoadError, recoverFromStaleChunk, installStaleChunkRecovery, StaleChunkScreen } from "./staleChunk";
 import React from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
-import { LanguageProvider } from "../../lib/i18n";
+import { LanguageProvider, tr } from "../../lib/i18n";
 
 // ─────────────────────────────────────────────────────────────────────────
 // 2026-06-12 (SEO audit perf fix): route-based code splitting.
@@ -195,7 +195,7 @@ class AppErrorBoundary extends React.Component<
         <div style={{ minHeight: "100vh", padding: 32, fontFamily: "system-ui, sans-serif" }}>
           <div style={{ maxWidth: 900, margin: "0 auto", padding: 24, border: "1px solid #fca5a5", background: "#fef2f2", borderRadius: 12 }}>
             <p style={{ fontSize: 12, color: "#dc2626", textTransform: "uppercase", letterSpacing: 1 }}>RENDER ERROR</p>
-            <h2 style={{ fontSize: 18, fontWeight: 600, marginTop: 4 }}>應用程式載入失敗</h2>
+            <h2 style={{ fontSize: 18, fontWeight: 600, marginTop: 4 }}>{tr("The app failed to load", "應用程式載入失敗")}</h2>
             <p style={{ marginTop: 8, color: "#374151" }}>{this.state.error.message}</p>
             {/* 2026-05-29 (security): hide raw stack trace in production — leaks file
                 paths and internal class names. Dev mode still shows it for debugging. */}
@@ -209,13 +209,13 @@ class AppErrorBoundary extends React.Component<
                 style={{ padding: "6px 12px", background: "#18181b", color: "white", border: "none", borderRadius: 6, cursor: "pointer" }}
                 onClick={() => { this.setState({ error: null }); }}
               >
-                重試渲染
+                {tr("Retry render", "重試渲染")}
               </button>
               <button
                 style={{ padding: "6px 12px", background: "white", border: "1px solid #d1d5db", borderRadius: 6, cursor: "pointer" }}
                 onClick={() => { window.location.reload(); }}
               >
-                重新整理頁面
+                {tr("Reload page", "重新整理頁面")}
               </button>
               <button
                 style={{ padding: "6px 12px", background: "white", border: "1px solid #d1d5db", borderRadius: 6, cursor: "pointer" }}
@@ -231,16 +231,16 @@ class AppErrorBoundary extends React.Component<
                   window.location.replace("/auth/login");
                 }}
               >
-                清除登入狀態並重新登入
+                {tr("Clear session and sign in again", "清除登入狀態並重新登入")}
               </button>
               {/* 2026-05-12 pre-launch zombie audit: surface support email
                   even on error-recovery screen — users stuck here have no
                   shell/footer to reach customer service. */}
               <a
-                href={`mailto:sowork@sowork.ai?subject=${encodeURIComponent("onBrand Studio 應用程式錯誤")}&body=${encodeURIComponent("錯誤訊息：\n" + (this.state.error?.message ?? "") + "\n\n頁面：" + window.location.href)}`}
+                href={`mailto:sowork@sowork.ai?subject=${encodeURIComponent(tr("onBrand Studio app error", "onBrand Studio 應用程式錯誤"))}&body=${encodeURIComponent(tr("Error message:\n", "錯誤訊息：\n") + (this.state.error?.message ?? "") + tr("\n\nPage: ", "\n\n頁面：") + window.location.href)}`}
                 style={{ marginLeft: "auto", fontSize: 12, color: "#3f3f46", textDecoration: "underline" }}
               >
-                聯絡客服 sowork@sowork.ai
+                {tr("Contact support", "聯絡客服")} sowork@sowork.ai
               </a>
             </div>
           </div>

@@ -24,31 +24,33 @@
  * every render and screenshots stay reproducible.
  */
 
+import { tr } from "../../../lib/i18n";
+
 export type Dimension = "ta" | "appeal" | "product";
 
 export const TAS = [
-  { id: "office",  label: "忙碌上班族",   share: 0.34 },
-  { id: "family",  label: "雙薪育兒家庭", share: 0.28 },
-  { id: "host",    label: "宴客主人",     share: 0.22 },
-  { id: "single",  label: "單身外食族",   share: 0.16 },
+  { id: "office",  get label() { return tr("Busy office workers", "忙碌上班族"); },   share: 0.34 },
+  { id: "family",  get label() { return tr("Dual-income families", "雙薪育兒家庭"); }, share: 0.28 },
+  { id: "host",    get label() { return tr("Dinner hosts", "宴客主人"); },     share: 0.22 },
+  { id: "single",  get label() { return tr("Solo diners", "單身外食族"); },   share: 0.16 },
 ] as const;
 
 export const APPEALS = [
-  { id: "fast",    label: "5 分鐘上桌",    share: 0.30 },
-  { id: "chef",    label: "主廚級品質",    share: 0.24 },
-  { id: "nomess",  label: "免油煙免洗鍋",  share: 0.20 },
-  { id: "social",  label: "宴客體面",      share: 0.14 },
-  { id: "stock",   label: "一次囤好",      share: 0.12 },
+  { id: "fast",    get label() { return tr("On the table in 5 min", "5 分鐘上桌"); },    share: 0.30 },
+  { id: "chef",    get label() { return tr("Chef-grade quality", "主廚級品質"); },    share: 0.24 },
+  { id: "nomess",  get label() { return tr("No smoke, no pans to wash", "免油煙免洗鍋"); },  share: 0.20 },
+  { id: "social",  get label() { return tr("Impress your guests", "宴客體面"); },      share: 0.14 },
+  { id: "stock",   get label() { return tr("Stock up in one go", "一次囤好"); },      share: 0.12 },
 ] as const;
 
 /** `price` is the headline SKU price (the NT$240–800 band on the real site). */
 export const PRODUCTS = [
-  { id: "tongue", label: "和牛牛舌",       share: 0.24, price: 800 },
-  { id: "combo",  label: "懶人料理組合包", share: 0.26, price: 550 },
-  { id: "chicken",label: "去骨雞腿排",     share: 0.20, price: 350 },
-  { id: "rib",    label: "牛小排",         share: 0.14, price: 750 },
-  { id: "soup",   label: "火鍋湯底",       share: 0.10, price: 300 },
-  { id: "pork",   label: "鹹豬肉",         share: 0.06, price: 290 },
+  { id: "tongue", get label() { return tr("Wagyu beef tongue", "和牛牛舌"); },       share: 0.24, price: 800 },
+  { id: "combo",  get label() { return tr("Easy-meal combo pack", "懶人料理組合包"); }, share: 0.26, price: 550 },
+  { id: "chicken",get label() { return tr("Boneless chicken thigh", "去骨雞腿排"); },     share: 0.20, price: 350 },
+  { id: "rib",    get label() { return tr("Beef short rib", "牛小排"); },         share: 0.14, price: 750 },
+  { id: "soup",   get label() { return tr("Hot pot broth", "火鍋湯底"); },       share: 0.10, price: 300 },
+  { id: "pork",   get label() { return tr("Salted pork", "鹹豬肉"); },         share: 0.06, price: 290 },
 ] as const;
 
 /**
@@ -245,13 +247,13 @@ export const fmtMoney = (n: number) => "$" + Math.round(n).toLocaleString("en-US
 export const fmtPct = (n: number, d = 1) => (n * 100).toFixed(d) + "%";
 
 export const DATE_RANGES = [
-  { id: "7d",  label: "近 7 天" },
-  { id: "30d", label: "近 30 天" },
-  { id: "90d", label: "近 90 天" },
+  { id: "7d",  get label() { return tr("Last 7 days", "近 7 天"); } },
+  { id: "30d", get label() { return tr("Last 30 days", "近 30 天"); } },
+  { id: "90d", get label() { return tr("Last 90 days", "近 90 天"); } },
 ] as const;
 
 export const COMPARE_MODES = [
-  { id: "prev", label: "對比前一期" },
-  { id: "yoy",  label: "對比去年同期" },
-  { id: "none", label: "不比較" },
+  { id: "prev", get label() { return tr("Vs. previous period", "對比前一期"); } },
+  { id: "yoy",  get label() { return tr("Vs. same period last year", "對比去年同期"); } },
+  { id: "none", get label() { return tr("No comparison", "不比較"); } },
 ] as const;

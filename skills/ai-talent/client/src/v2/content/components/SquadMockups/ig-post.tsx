@@ -13,6 +13,7 @@
 import { Chip } from "@heroui/react";
 import { IGFeed, IGCarousel } from "../PlatformMockup/instagram";
 import type { MockupFields } from "../PlatformMockup/shared";
+import { useLang } from "../../../../lib/i18n";
 import { SectionHeader, NotionCard, EmptyHint, type SquadMockupCommonProps } from "./shared";
 
 export interface IGPostBrief {
@@ -54,11 +55,12 @@ function toMockupFields(data: IGPostData, idx = 0): MockupFields {
 }
 
 export function IGPostBriefMockup({ data, isActive = false }: Props) {
+  const { lang } = useLang();
   if (!data || !Array.isArray(data.briefs) || data.briefs.length === 0) {
     return (
       <NotionCard>
-        <SectionHeader icon="📷" eyebrow="ATOMIC · IG POST" title="IG 單篇貼文 / 輪播" />
-        <EmptyHint>{!data ? "尚未產出 — 點擊執行此任務" : "資料不完整 — 缺企劃摘要"}</EmptyHint>
+        <SectionHeader icon="📷" eyebrow="ATOMIC · IG POST" title={lang === "en" ? "IG single post / carousel" : "IG 單篇貼文 / 輪播"} />
+        <EmptyHint>{!data ? (lang === "en" ? "Not generated yet — click to run this task" : "尚未產出 — 點擊執行此任務") : (lang === "en" ? "Incomplete data — briefs missing" : "資料不完整 — 缺企劃摘要")}</EmptyHint>
       </NotionCard>
     );
   }
@@ -74,11 +76,11 @@ export function IGPostBriefMockup({ data, isActive = false }: Props) {
           <SectionHeader
             icon="📷"
             eyebrow={isCarousel ? "ATOMIC · IG CAROUSEL" : "ATOMIC · IG POST"}
-            title={isCarousel ? `IG 輪播 (${slides.length} 張)` : "IG 單篇貼文"}
+            title={isCarousel ? (lang === "en" ? `IG carousel (${slides.length} slides)` : `IG 輪播 (${slides.length} 張)`) : (lang === "en" ? "IG single post" : "IG 單篇貼文")}
           />
           {isActive && (
             <Chip size="sm" variant="flat" color="primary" className="self-start">
-              ● AI 專家思考中…
+              {lang === "en" ? "● AI expert thinking…" : "● AI 專家思考中…"}
             </Chip>
           )}
         </div>
@@ -90,7 +92,7 @@ export function IGPostBriefMockup({ data, isActive = false }: Props) {
       {/* Carousel slide list (squad-mockup-specific structured editing) */}
       {isCarousel && (
         <NotionCard>
-          <SectionHeader eyebrow="DECK" title="輪播每張卡片" />
+          <SectionHeader eyebrow="DECK" title={lang === "en" ? "Carousel slides" : "輪播每張卡片"} />
           <div className="flex flex-col gap-2">
             {slides.map((s, i) => (
               <div key={i} className="flex gap-2 items-start p-2 rounded-md border border-divider">
@@ -110,9 +112,9 @@ export function IGPostBriefMockup({ data, isActive = false }: Props) {
 
       {/* Full caption + hashtags + first-comment (squad-mockup additions) */}
       <NotionCard>
-        <SectionHeader eyebrow="貼文文案" title="完整貼文文字" />
+        <SectionHeader eyebrow={lang === "en" ? "Post copy" : "貼文文案"} title={lang === "en" ? "Full post text" : "完整貼文文字"} />
         <pre className="text-small leading-relaxed whitespace-pre-wrap font-sans bg-default-50 border border-divider rounded-md p-3">
-          {data.caption || "（文案未產出）"}
+          {data.caption || (lang === "en" ? "(copy not generated)" : "（文案未產出）")}
         </pre>
         {data.hashtags && data.hashtags.length > 0 && (
           <div className="flex flex-wrap gap-1.5 mt-1">
@@ -125,7 +127,7 @@ export function IGPostBriefMockup({ data, isActive = false }: Props) {
         )}
         {data.firstComment && (
           <div className="mt-2 p-2 rounded-md bg-default-50 border border-divider">
-            <p className="text-tiny text-default-500 mb-0.5">第一則自動留言（主題標籤）：</p>
+            <p className="text-tiny text-default-500 mb-0.5">{lang === "en" ? "First auto-comment (hashtags):" : "第一則自動留言（主題標籤）："}</p>
             <p className="text-tiny text-default-700">{data.firstComment}</p>
           </div>
         )}

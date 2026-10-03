@@ -14,6 +14,8 @@
  * returns exactly the right structure.
  */
 
+import { tr } from "../../../lib/i18n";
+
 export type PipelineStatus = "idle" | "running" | "paused" | "done" | "error";
 
 export interface ResearchBudget {
@@ -24,12 +26,15 @@ export interface ResearchBudget {
 export interface PipelineStepSpec {
   id: number;
   title: string;
+  /** English title for display (zh `title` is what the server receives). */
+  titleEn?: string;
   segmentTarget: string;
   segmentId: string;
   agent: string;
   researchBudget: ResearchBudget;
   promptTemplate: string;
   mockThinking: string;
+  mockThinkingEn?: string;
   mockConclusion: any;
 }
 
@@ -1019,3 +1024,87 @@ export function pipelineFor(scopeMode: "brand" | "product" | "event" | "none"): 
   if (scopeMode === "event")   return EVENT_FULL_PIPELINE;
   return [];
 }
+
+// ── English display text (UI only) ───────────────────────────────────────
+// `title` / `mockThinking` stay Chinese: `title` is sent to the server as-is
+// and the prompts are Chinese. These maps (keyed by the zh title) give the
+// text the user sees in the progress panel when the UI language is English.
+const TITLE_EN: Record<string, string> = {
+  "Step 1 — 深層動機分析（5 Whys + 情緒展開）": "Step 1 — Deep motivation analysis (5 Whys + emotional expansion)",
+  "Step 2 — 價值元素分析（功能 + 情緒）": "Step 2 — Value element analysis (functional + emotional)",
+  "Step 2.5 — 品牌核心價值觀（從信念蒸餾 4 條）": "Step 2.5 — Core brand values (4 distilled from belief)",
+  "Step 3 — 競品識別（直接 / 間接 / 潛在）": "Step 3 — Competitor identification (direct / indirect / potential)",
+  "Step 5 — 競品評分（功能 × 情緒）": "Step 5 — Competitor scoring (functional × emotional)",
+  "Step 6 — 目標族群定義": "Step 6 — Target segment definition",
+  "Step 7 — TA 痛點與需求（Gain / Pain）": "Step 7 — Audience pains and needs (Gain / Pain)",
+  "Step 8 — TA 情感需求評分矩陣": "Step 8 — Audience emotional-need scoring matrix",
+  "Step 9 — 定位矩陣（找差異化元素）": "Step 9 — Positioning matrix (find differentiating elements)",
+  "Step 10 — 標語開發（情感 / 功能各 5 句）": "Step 10 — Tagline development (5 emotional / 5 functional)",
+  "Step 10.5 — 標語評分（6 維度驗證）": "Step 10.5 — Tagline scoring (6-dimension check)",
+  "Step 11 — 品牌個性（原型 + 聲音）": "Step 11 — Brand personality (archetype + voice)",
+  "Step 11.5 — 市場趨勢與機會": "Step 11.5 — Market trends and opportunities",
+  "最後 — 蒸餾品牌黃金圈": "Final — Distill the brand golden circle",
+  "Step 1 — 產品深度調研（4P + JTBD + Design Principles）": "Step 1 — Deep product research (4P + JTBD + Design Principles)",
+  "Step 2 — 競爭對手分析（直接 + 替代 + 市場空白）": "Step 2 — Competitor analysis (direct + substitutes + market gaps)",
+  "Step 3 — 目標客群分析（Persona + MOT）": "Step 3 — Target customer analysis (Persona + MOT)",
+  "Step 4 — 功能價值分析（USP 精煉 + 三層差異化）": "Step 4 — Functional value analysis (USP refinement + 3-tier differentiation)",
+  "Step 5 — 定位方案生成（情感 + 功能雙方向）": "Step 5 — Positioning options (emotional + functional)",
+  "Step 6 — 行銷語氣指引（品牌聲音 × 產品個性 → 文字規範）": "Step 6 — Marketing tone guidelines (brand voice × product personality → copy rules)",
+  "Step 1 — 戰略 Brief（intake 自動產出活動類型 + 角色 + 摘要）": "Step 1 — Strategic brief (intake auto-produces campaign type + role + summary)",
+  "Step 2 — 背景與問題（商業背景 / 行銷現況 / 核心問題 / 根本原因）": "Step 2 — Background and problem (business context / marketing status / core problem / root cause)",
+  "Step 3 — 目標受眾（核心 / 次要 / 關鍵洞察）": "Step 3 — Target audience (core / secondary / key insight)",
+  "Step 4 — 活動目標（商業 / 行銷 / 用戶行為三層）": "Step 4 — Campaign objectives (business / marketing / user-action tiers)",
+  "Step 5 — 獎項匹配（DB-RAG 注入近期得獎案例）": "Step 5 — Award matching (DB-RAG injects recent winning cases)",
+  "Step 6 — 單一核心命題 SMP（整個活動唯一一句）": "Step 6 — Single-minded proposition, SMP (the one line for the whole campaign)",
+  "Step 7 — 訊息架構（核心 + 支撐 + 證據）": "Step 7 — Message architecture (core + support + evidence)",
+  "Step 8 — 創意概念（DB-RAG 注入 Grand Prix / Gold 標竿案例）": "Step 8 — Creative concept (DB-RAG injects Grand Prix / Gold benchmark cases)",
+  "Step 9 — 創意與內容規範（從品牌視覺 + 聲音 + 官網 tone 萃取）": "Step 9 — Creative and content guidelines (drawn from brand visuals + voice + site tone)",
+  "Step 10 — 內容與管道策略（階段 × 管道 × 內容型態）": "Step 10 — Content and channel strategy (stage × channel × content type)",
+  "Step 11 — 用戶旅程（5 step：情緒 / 接觸點 / 期望反應）": "Step 11 — User journey (5 steps: emotion / touchpoint / expected response)",
+};
+
+const THINKING_EN: Record<string, string> = {
+  "Step 1 — 深層動機分析（5 Whys + 情緒展開）": "Reading the brand description and industry, preparing the 5 Whys…\nLayer 1: why was it founded? → surface motivation\nLayer 2: why does the problem matter? → problem awareness\nLayer 3: why this solution? → method choice\nLayer 4: why believe it will work? → foundation of belief\nLayer 5: deepest emotional motivation → distilled into one universal feeling\nFinally expanding into 5 emotional value elements.",
+  "Step 2 — 價值元素分析（功能 + 情緒）": "Surveying Bain's 30 elements + emotional value, picking the most relevant 5+5 and scoring them.",
+  "Step 2.5 — 品牌核心價值觀（從信念蒸餾 4 條）": "Deriving 4 core values from the foundation of belief + value elements.",
+  "Step 3 — 競品識別（直接 / 間接 / 潛在）": "Searching for 3-5 direct competitors in the same industry…\nAnalyzing their taglines, positioning, strengths and weaknesses…\nSummarizing indirect substitutes + emerging threats…",
+  "Step 5 — 競品評分（功能 × 情緒）": "Scoring each competitor 1-10 on functional + emotional elements to find market gaps…",
+  "Step 6 — 目標族群定義": "Narrowing the candidate segments to 3 core audiences and analyzing demographics / psychographics / behavior…",
+  "Step 7 — TA 痛點與需求（Gain / Pain）": "Digging into each audience's painPoints / gainPoints / 5 Whys / functional needs / emotional needs…",
+  "Step 8 — TA 情感需求評分矩陣": "Scoring how strongly each audience needs each emotional element (1-10)…",
+  "Step 9 — 定位矩陣（找差異化元素）": "Comparing audience needs × competitor-occupied ground × brand capability to find 1-3 high-differentiation elements…",
+  "Step 10 — 標語開發（情感 / 功能各 5 句）": "Generating 2 sets (A emotional / B functional), 10 tagline options in total, from the differentiating elements…",
+  "Step 10.5 — 標語評分（6 維度驗證）": "Scoring the main tagline 1-100 across 6 dimensions (clarity / relevance / uniqueness / consistency / memorability / emotional resonance).",
+  "Step 11 — 品牌個性（原型 + 聲音）": "Picking primary + secondary archetypes from the 12 classics, defining traits / tone / attitude…",
+  "Step 11.5 — 市場趨勢與機會": "Searching recent industry reports + watching social forums + analyzing shifts in consumer behavior…",
+  "最後 — 蒸餾品牌黃金圈": "Distilling Why / How / What from the core 5 Whys motivation + differentiation + voice…",
+  "Step 1 — 產品深度調研（4P + JTBD + Design Principles）": "Crawling the product name + description + official site, cross-analyzing 4P + JTBD + design principles…",
+  "Step 2 — 競爭對手分析（直接 + 替代 + 市場空白）": "Searching similar products + substitutes, identifying 3-5 direct competitors, finding market gaps…",
+  "Step 3 — 目標客群分析（Persona + MOT）": "Inferring 2-3 core audiences, building Personas and identifying key moments of truth (MOT)…",
+  "Step 4 — 功能價值分析（USP 精煉 + 三層差異化）": "Combining Steps 1-3, classifying functional / emotional value, refining 3-5 USPs and 3-tier differentiation…",
+  "Step 5 — 定位方案生成（情感 + 功能雙方向）": "Combining all analysis from Steps 1-4, generating 2 positioning options (emotional / functional) + 5 tagline options each…",
+  "Step 6 — 行銷語氣指引（品牌聲音 × 產品個性 → 文字規範）": "Combining product positioning + target audience + brand voice to generate copy guidelines…",
+  "Step 1 — 戰略 Brief（intake 自動產出活動類型 + 角色 + 摘要）": "Reading brand + product positioning, analyzing campaign type and role...",
+  "Step 2 — 背景與問題（商業背景 / 行銷現況 / 核心問題 / 根本原因）": "Analyzing the brand / industry situation, digging out the core problem...",
+  "Step 3 — 目標受眾（核心 / 次要 / 關鍵洞察）": "Breaking down the three audience tiers, finding the psychological reframe...",
+  "Step 4 — 活動目標（商業 / 行銷 / 用戶行為三層）": "Splitting into three tiers to avoid vague goals and team misunderstanding...",
+  "Step 5 — 獎項匹配（DB-RAG 注入近期得獎案例）": "Matching award preferences by eventType and finding matches among the injected cases...",
+  "Step 6 — 單一核心命題 SMP（整個活動唯一一句）": "Finding a proposition of 18 characters or fewer at the intersection of problem / audience / brand...",
+  "Step 7 — 訊息架構（核心 + 支撐 + 證據）": "Deriving the three-tier message structure from the SMP...",
+  "Step 8 — 創意概念（DB-RAG 注入 Grand Prix / Gold 標竿案例）": "Extracting the campaign big idea from the SMP + the spirit of Grand Prix cases...",
+  "Step 9 — 創意與內容規範（從品牌視覺 + 聲音 + 官網 tone 萃取）": "Extracting guidelines and a don't-use list from brand assets + creative concept...",
+  "Step 10 — 內容與管道策略（階段 × 管道 × 內容型態）": "Splitting the channel mix by funnel stage...",
+  "Step 11 — 用戶旅程（5 step：情緒 / 接觸點 / 期望反應）": "Tying a 5-step journey together from touchpoint to conversion...",
+};
+
+for (const st of [...BRAND_FULL_PIPELINE, ...PRODUCT_FULL_PIPELINE, ...EVENT_FULL_PIPELINE]) {
+  if (!st.titleEn && TITLE_EN[st.title]) st.titleEn = TITLE_EN[st.title];
+  if (!st.mockThinkingEn && THINKING_EN[st.title]) st.mockThinkingEn = THINKING_EN[st.title];
+}
+
+/** Step title as shown to the user (the zh `title` is what the server receives). */
+export const stepTitleText = (st: { title: string; titleEn?: string }): string =>
+  tr(st.titleEn ?? st.title, st.title);
+/** Placeholder "thinking" text shown while no real reasoning came back. */
+export const stepThinkingText = (st: { mockThinking: string; mockThinkingEn?: string }): string =>
+  tr(st.mockThinkingEn ?? st.mockThinking, st.mockThinking);

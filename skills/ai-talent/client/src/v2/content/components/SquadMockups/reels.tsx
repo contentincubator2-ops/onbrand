@@ -8,6 +8,7 @@
 import { Chip } from "@heroui/react";
 import { FBReel } from "../PlatformMockup/facebook";
 import type { MockupFields } from "../PlatformMockup/shared";
+import { useLang } from "../../../../lib/i18n";
 import { SectionHeader, NotionCard, EmptyHint, type SquadMockupCommonProps } from "./shared";
 
 export interface ReelsShot {
@@ -33,12 +34,12 @@ interface Props extends SquadMockupCommonProps {
   onChange?: (next: Partial<ReelsScript>) => void;
 }
 
-const BEAT_TONE: Record<ReelsShot["beat"], { label: string; color: "primary" | "secondary" | "warning" | "success" | "default" }> = {
+const BEAT_TONE: Record<ReelsShot["beat"], { label: string; labelEn?: string; color: "primary" | "secondary" | "warning" | "success" | "default" }> = {
   hook:   { label: "🎯 Hook",   color: "primary" },
   hold:   { label: "⏱ Hold",    color: "secondary" },
   build:  { label: "📈 Build",  color: "warning" },
   payoff: { label: "💥 Payoff", color: "success" },
-  cta:    { label: "👉 行動呼籲",    color: "default" },
+  cta:    { label: "👉 行動呼籲", labelEn: "👉 CTA",    color: "default" },
 };
 
 function toMockupFields(data: ReelsScript): MockupFields {
@@ -55,11 +56,12 @@ function toMockupFields(data: ReelsScript): MockupFields {
 }
 
 export function FBReelsMockup({ data, isActive = false }: Props) {
+  const { lang } = useLang();
   if (!data || !data.shots || data.shots.length === 0) {
     return (
       <NotionCard>
-        <SectionHeader icon="🎬" eyebrow="ATOMIC · FB REELS" title="FB Reels 短影音腳本" />
-        <EmptyHint>{!data ? "尚未產出 — 點擊執行此任務" : "資料不完整 — 缺 shots"}</EmptyHint>
+        <SectionHeader icon="🎬" eyebrow="ATOMIC · FB REELS" title={lang === "en" ? "FB Reels short-video script" : "FB Reels 短影音腳本"} />
+        <EmptyHint>{!data ? (lang === "en" ? "Not generated yet — click to run this task" : "尚未產出 — 點擊執行此任務") : (lang === "en" ? "Incomplete data — shots missing" : "資料不完整 — 缺 shots")}</EmptyHint>
       </NotionCard>
     );
   }
@@ -70,12 +72,12 @@ export function FBReelsMockup({ data, isActive = false }: Props) {
     <div className="flex flex-col gap-3 max-w-5xl">
       <NotionCard>
         <div className="flex items-start justify-between gap-3 flex-wrap">
-          <SectionHeader icon="🎬" eyebrow="ATOMIC · FB REELS" title={data.topic || "FB Reels 腳本"} />
+          <SectionHeader icon="🎬" eyebrow="ATOMIC · FB REELS" title={data.topic || (lang === "en" ? "FB Reels script" : "FB Reels 腳本")} />
           <div className="flex items-center gap-1.5 self-start">
             <Chip size="sm" variant="flat" className="h-5 text-tiny">{data.duration ?? 30}s</Chip>
             {isActive && (
               <Chip size="sm" variant="flat" color="primary" className="h-5 text-tiny">
-                ● AI 專家思考中…
+                {lang === "en" ? "● AI expert thinking…" : "● AI 專家思考中…"}
               </Chip>
             )}
           </div>
@@ -88,14 +90,14 @@ export function FBReelsMockup({ data, isActive = false }: Props) {
           <FBReel {...fields} />
           {data.hookHypothesis && (
             <p className="text-tiny text-default-500 leading-relaxed px-1">
-              <span className="font-semibold">Hook 假設：</span>{data.hookHypothesis}
+              <span className="font-semibold">{lang === "en" ? "Hook hypothesis:" : "Hook 假設："}</span>{data.hookHypothesis}
             </p>
           )}
         </div>
 
         {/* Shot list (squad-mockup-specific) */}
         <NotionCard>
-          <SectionHeader eyebrow="SHOT LIST" title="逐秒分鏡" />
+          <SectionHeader eyebrow="SHOT LIST" title={lang === "en" ? "Second-by-second shot list" : "逐秒分鏡"} />
           <div className="flex flex-col">
             {data.shots.map((s, i) => {
               const beat = BEAT_TONE[s.beat] ?? BEAT_TONE.build;
@@ -109,7 +111,7 @@ export function FBReelsMockup({ data, isActive = false }: Props) {
                       {s.timecode}
                     </span>
                     <Chip size="sm" variant="flat" color={beat.color} className="h-4 text-tiny">
-                      {beat.label}
+                      {lang === "en" ? (beat.labelEn ?? beat.label) : beat.label}
                     </Chip>
                   </div>
                   <div className="flex flex-col gap-1 min-w-0">

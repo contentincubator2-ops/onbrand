@@ -12,6 +12,7 @@
 import { Chip } from "@heroui/react";
 import { TTForYou, TTCarousel, TTLive } from "../PlatformMockup/tiktok";
 import type { MockupFields } from "../PlatformMockup/shared";
+import { useLang } from "../../../../lib/i18n";
 import { SectionHeader, NotionCard, EmptyHint, type SquadMockupCommonProps } from "./shared";
 
 // ── Data shapes ──────────────────────────────────────────────────────────────
@@ -62,10 +63,11 @@ function toFields(handle: string, extra: Partial<MockupFields> = {}): MockupFiel
 interface ForYouProps extends SquadMockupCommonProps { data?: TTVideoScript; }
 
 export function TTForYouMockup({ data, isActive = false }: ForYouProps) {
+  const { lang } = useLang();
   if (!data) return (
     <NotionCard>
-      <SectionHeader icon="🎵" eyebrow="SQUAD · TT FORYOU" title="TikTok 短影音腳本" />
-      <EmptyHint>尚未產出 — 點擊執行此任務</EmptyHint>
+      <SectionHeader icon="🎵" eyebrow="SQUAD · TT FORYOU" title={lang === "en" ? "TikTok short-video script" : "TikTok 短影音腳本"} />
+      <EmptyHint>{lang === "en" ? "Not generated yet — click to run this task" : "尚未產出 — 點擊執行此任務"}</EmptyHint>
     </NotionCard>
   );
   const fields = toFields(data.creatorHandle, {
@@ -76,19 +78,19 @@ export function TTForYouMockup({ data, isActive = false }: ForYouProps) {
     <div className="flex flex-col gap-3 max-w-3xl">
       <NotionCard>
         <div className="flex items-start justify-between gap-3 flex-wrap">
-          <SectionHeader icon="🎵" eyebrow="SQUAD · TT FORYOU" title={`TikTok 短影音（${data.durationSec ?? 60}秒）`} />
-          {isActive && <Chip size="sm" variant="flat" color="secondary" className="self-start">● AI 專家思考中…</Chip>}
+          <SectionHeader icon="🎵" eyebrow="SQUAD · TT FORYOU" title={lang === "en" ? `TikTok short video (${data.durationSec ?? 60}s)` : `TikTok 短影音（${data.durationSec ?? 60}秒）`} />
+          {isActive && <Chip size="sm" variant="flat" color="secondary" className="self-start">{lang === "en" ? "● AI expert thinking…" : "● AI 專家思考中…"}</Chip>}
         </div>
         <TTForYou {...fields} />
       </NotionCard>
 
       <NotionCard>
-        <SectionHeader eyebrow="SCRIPT" title="腳本三段式結構" />
+        <SectionHeader eyebrow="SCRIPT" title={lang === "en" ? "Three-part script structure" : "腳本三段式結構"} />
         <div className="flex flex-col gap-2">
           {[
-            { label: "🪝 開場鉤（0–3s）", text: data.hook, color: "border-l-secondary" },
-            { label: "⏱ 主體段落（主體內容）", text: data.hold, color: "border-l-warning" },
-            { label: "🔁 結尾回報 / 循環 / CTA", text: data.payoff, color: "border-l-success" },
+            { label: lang === "en" ? "🪝 Opening hook (0–3s)" : "🪝 開場鉤（0–3s）", text: data.hook, color: "border-l-secondary" },
+            { label: lang === "en" ? "⏱ Main section (core content)" : "⏱ 主體段落（主體內容）", text: data.hold, color: "border-l-warning" },
+            { label: lang === "en" ? "🔁 Payoff / loop / CTA" : "🔁 結尾回報 / 循環 / CTA", text: data.payoff, color: "border-l-success" },
           ].map((row, i) => (
             <div key={i} className={`p-3 rounded-md border border-divider border-l-4 ${row.color} bg-default-50`}>
               <p className="text-tiny text-default-500 font-medium mb-0.5">{row.label}</p>
@@ -96,10 +98,10 @@ export function TTForYouMockup({ data, isActive = false }: ForYouProps) {
             </div>
           ))}
         </div>
-        {data.audioTrack && <p className="text-tiny text-default-500 mt-1">🎵 配樂方向：{data.audioTrack}</p>}
+        {data.audioTrack && <p className="text-tiny text-default-500 mt-1">{lang === "en" ? "🎵 Music direction:" : "🎵 配樂方向："}{data.audioTrack}</p>}
         {data.overlayTexts && data.overlayTexts.length > 0 && (
           <div className="mt-1">
-            <p className="text-tiny text-default-500 font-medium mb-0.5">字幕 Overlay：</p>
+            <p className="text-tiny text-default-500 font-medium mb-0.5">{lang === "en" ? "On-screen text overlay:" : "字幕 Overlay："}</p>
             <div className="flex flex-wrap gap-1.5">
               {data.overlayTexts.map((t, i) => (
                 <Chip key={i} size="sm" variant="flat" className="h-5 text-tiny">{t}</Chip>
@@ -111,7 +113,7 @@ export function TTForYouMockup({ data, isActive = false }: ForYouProps) {
 
       {data.hashtags && data.hashtags.length > 0 && (
         <NotionCard>
-          <SectionHeader eyebrow="HASHTAGS" title="標籤策略" />
+          <SectionHeader eyebrow="HASHTAGS" title={lang === "en" ? "Hashtag strategy" : "標籤策略"} />
           <div className="flex flex-wrap gap-1.5">
             {data.hashtags.map((t, i) => (
               <Chip key={i} size="sm" variant="flat" color="secondary" className="h-5 text-tiny">
@@ -130,10 +132,11 @@ export function TTForYouMockup({ data, isActive = false }: ForYouProps) {
 interface CarouselProps extends SquadMockupCommonProps { data?: TTCarouselData; }
 
 export function TTCarouselMockup({ data, isActive = false }: CarouselProps) {
+  const { lang } = useLang();
   if (!data) return (
     <NotionCard>
-      <SectionHeader icon="🖼️" eyebrow="ATOMIC · TT CAROUSEL" title="TikTok 輪播圖文" />
-      <EmptyHint>尚未產出 — 點擊執行此任務</EmptyHint>
+      <SectionHeader icon="🖼️" eyebrow="ATOMIC · TT CAROUSEL" title={lang === "en" ? "TikTok photo carousel" : "TikTok 輪播圖文"} />
+      <EmptyHint>{lang === "en" ? "Not generated yet — click to run this task" : "尚未產出 — 點擊執行此任務"}</EmptyHint>
     </NotionCard>
   );
   const fields = toFields(data.creatorHandle, {
@@ -143,14 +146,14 @@ export function TTCarouselMockup({ data, isActive = false }: CarouselProps) {
     <div className="flex flex-col gap-3 max-w-3xl">
       <NotionCard>
         <div className="flex items-start justify-between gap-3 flex-wrap">
-          <SectionHeader icon="🖼️" eyebrow="ATOMIC · TT CAROUSEL" title={`TikTok 輪播圖文（${data.slides?.length ?? 0} 張）`} />
-          {isActive && <Chip size="sm" variant="flat" color="secondary" className="self-start">● AI 專家思考中…</Chip>}
+          <SectionHeader icon="🖼️" eyebrow="ATOMIC · TT CAROUSEL" title={lang === "en" ? `TikTok photo carousel (${data.slides?.length ?? 0} slides)` : `TikTok 輪播圖文（${data.slides?.length ?? 0} 張）`} />
+          {isActive && <Chip size="sm" variant="flat" color="secondary" className="self-start">{lang === "en" ? "● AI expert thinking…" : "● AI 專家思考中…"}</Chip>}
         </div>
         <TTCarousel {...fields} />
       </NotionCard>
       {data.slides?.length > 0 && (
         <NotionCard>
-          <SectionHeader eyebrow="SLIDES" title="每張卡片內容" />
+          <SectionHeader eyebrow="SLIDES" title={lang === "en" ? "Content per slide" : "每張卡片內容"} />
           <div className="flex flex-col gap-2">
             {data.slides.map((s, i) => (
               <div key={i} className="flex gap-2 items-start p-2 rounded-md border border-divider">
@@ -175,10 +178,11 @@ export function TTCarouselMockup({ data, isActive = false }: CarouselProps) {
 interface TtLiveProps extends SquadMockupCommonProps { data?: TTLiveData; }
 
 export function TTLiveMockup({ data, isActive = false }: TtLiveProps) {
+  const { lang } = useLang();
   if (!data) return (
     <NotionCard>
-      <SectionHeader icon="🔴" eyebrow="SQUAD · TT LIVE" title="TikTok 直播企劃" />
-      <EmptyHint>尚未產出 — 點擊執行此任務</EmptyHint>
+      <SectionHeader icon="🔴" eyebrow="SQUAD · TT LIVE" title={lang === "en" ? "TikTok live plan" : "TikTok 直播企劃"} />
+      <EmptyHint>{lang === "en" ? "Not generated yet — click to run this task" : "尚未產出 — 點擊執行此任務"}</EmptyHint>
     </NotionCard>
   );
   const fields = toFields(data.creatorHandle, { title: data.streamTitle });
@@ -186,14 +190,14 @@ export function TTLiveMockup({ data, isActive = false }: TtLiveProps) {
     <div className="flex flex-col gap-3 max-w-3xl">
       <NotionCard>
         <div className="flex items-start justify-between gap-3 flex-wrap">
-          <SectionHeader icon="🔴" eyebrow="SQUAD · TT LIVE" title="TikTok 直播企劃" />
+          <SectionHeader icon="🔴" eyebrow="SQUAD · TT LIVE" title={lang === "en" ? "TikTok live plan" : "TikTok 直播企劃"} />
           {isActive && <Chip size="sm" variant="flat" color="secondary" className="self-start">● LIVE</Chip>}
         </div>
         <TTLive {...fields} />
       </NotionCard>
       {data.runOfShow?.length > 0 && (
         <NotionCard>
-          <SectionHeader eyebrow="RUN OF SHOW" title={`直播流程表（${data.expectedDurationMin ?? "?"}分鐘）`} />
+          <SectionHeader eyebrow="RUN OF SHOW" title={lang === "en" ? `Live run of show (${data.expectedDurationMin ?? "?"} min)` : `直播流程表（${data.expectedDurationMin ?? "?"}分鐘）`} />
           <div className="flex flex-col gap-1.5">
             {data.runOfShow.map((row, i) => (
               <div key={i} className="flex gap-2 p-2 rounded-md border border-divider">

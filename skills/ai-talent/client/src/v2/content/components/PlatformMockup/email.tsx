@@ -10,10 +10,12 @@ import { Button, Chip, Divider, Skeleton } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faEnvelope, faArrowRight, faAt, faInbox } from "@fortawesome/free-solid-svg-icons";
 import { type MockupFields, MockupHeader, handleOf, MarkdownText } from "./shared";
+import { useLang } from "../../../../lib/i18n";
 
 /* ─────────────── EDM / Full Email ─────────────── */
 
 export function EDMMockup({ title, brandName, variantLabel, liveCaption, liveTitle, liveCta, liveImageUrl, liveImageStatus }: MockupFields) {
+  const { lang } = useLang();
   const brand = brandName ?? "Your Brand";
   const handle = handleOf(brandName);
   const hasHeroImg = !!liveImageUrl && liveImageStatus !== "failed";
@@ -151,7 +153,7 @@ export function EDMMockup({ title, brandName, variantLabel, liveCaption, liveTit
         </div>
         <div className="flex-1 bg-content1 rounded-md px-3 py-1 text-tiny text-default-400 flex items-center gap-2">
           <FontAwesomeIcon icon={faInbox} className="text-tiny" />
-          {subject ? subject.slice(0, 60) : "主旨行 · 等待 AI 撰寫 填入"}
+          {subject ? subject.slice(0, 60) : (lang === "en" ? "Subject line · waiting for AI to fill in" : "主旨行 · 等待 AI 撰寫 填入")}
         </div>
       </div>
 
@@ -161,17 +163,17 @@ export function EDMMockup({ title, brandName, variantLabel, liveCaption, liveTit
         {/* Email meta bar */}
         <div className="px-5 py-3 border-b border-divider flex items-center gap-2 text-tiny text-default-500">
           <FontAwesomeIcon icon={faAt} />
-          <span>來自：<strong>{brand}</strong> &lt;hello@{handle}.com&gt;</span>
-          <span className="ml-auto">剛剛</span>
+          <span>{lang === "en" ? "From:" : "來自："}<strong>{brand}</strong> &lt;hello@{handle}.com&gt;</span>
+          <span className="ml-auto">{lang === "en" ? "Just now" : "剛剛"}</span>
         </div>
 
         {/* Header banner */}
         <div className="bg-default-900 px-6 py-5 flex items-center justify-between">
           <p className="text-white font-bold text-[15px] tracking-tight">{brand}</p>
           <div className="flex items-center gap-3 text-default-400 text-tiny">
-            <span className="hover:text-white cursor-pointer">產品</span>
-            <span className="hover:text-white cursor-pointer">關於我們</span>
-            <span className="hover:text-white cursor-pointer">聯絡</span>
+            <span className="hover:text-white cursor-pointer">{lang === "en" ? "Products" : "產品"}</span>
+            <span className="hover:text-white cursor-pointer">{lang === "en" ? "About us" : "關於我們"}</span>
+            <span className="hover:text-white cursor-pointer">{lang === "en" ? "Contact" : "聯絡"}</span>
           </div>
         </div>
 
@@ -213,7 +215,7 @@ export function EDMMockup({ title, brandName, variantLabel, liveCaption, liveTit
               className="bg-foreground text-background font-semibold px-8"
               endContent={<FontAwesomeIcon icon={faArrowRight} />}
             >
-              {parsedCta || "立即了解"}
+              {parsedCta || (lang === "en" ? "Learn more" : "立即了解")}
             </Button>
           </div>
         </div>
@@ -228,12 +230,12 @@ export function EDMMockup({ title, brandName, variantLabel, liveCaption, liveTit
         <div className="bg-default-50 px-8 py-5 text-center space-y-2">
           <p className="text-tiny text-default-500 font-semibold">{brand}</p>
           <p className="text-tiny text-default-400">
-            你收到這封信是因為訂閱了 {brand} 的電子報。
+            {lang === "en" ? <>You received this email because you subscribed to the {brand} newsletter.</> : <>你收到這封信是因為訂閱了 {brand} 的電子報。</>}
           </p>
           <div className="flex items-center justify-center gap-3 text-tiny text-primary mt-2">
-            <span className="cursor-pointer hover:underline">取消訂閱</span>
+            <span className="cursor-pointer hover:underline">{lang === "en" ? "Unsubscribe" : "取消訂閱"}</span>
             <span className="text-default-300">·</span>
-            <span className="cursor-pointer hover:underline">隱私政策</span>
+            <span className="cursor-pointer hover:underline">{lang === "en" ? "Privacy Policy" : "隱私政策"}</span>
           </div>
         </div>
       </div>
@@ -253,7 +255,8 @@ export function EDMMockup({ title, brandName, variantLabel, liveCaption, liveTit
 export function KOLEmailMockup({
   title, brandName, variantLabel, liveCaption, liveTitle, slotMap,
 }: MockupFields) {
-  const brand = brandName ?? "你的品牌";
+  const { lang } = useLang();
+  const brand = brandName ?? (lang === "en" ? "Your Brand" : "你的品牌");
   const handle = handleOf(brandName);
   const slotCap = slotMap?.caption;
   const captionLoading = slotCap?.status === "loading";
@@ -276,7 +279,7 @@ export function KOLEmailMockup({
         </div>
         <div className="flex-1 bg-content1 rounded-md px-3 py-1 text-tiny text-default-400 flex items-center gap-2">
           <FontAwesomeIcon icon={faInbox} className="text-tiny" />
-          {subject ? subject.slice(0, 60) : "主旨 · 等待 AI 撰寫"}
+          {subject ? subject.slice(0, 60) : (lang === "en" ? "Subject · waiting for AI" : "主旨 · 等待 AI 撰寫")}
         </div>
       </div>
 
@@ -284,20 +287,20 @@ export function KOLEmailMockup({
         {/* Header meta — 寄件人 / 收件人 / 主旨 */}
         <div className="px-6 py-4 border-b border-divider space-y-1.5 text-small">
           <div className="flex gap-2">
-            <span className="text-default-400 w-12 shrink-0">寄件人</span>
+            <span className="text-default-400 w-12 shrink-0">{lang === "en" ? "From" : "寄件人"}</span>
             <span className="text-foreground">
               <strong>{brand}</strong>
               <span className="text-default-400"> &lt;hello@{handle}.com&gt;</span>
             </span>
           </div>
           <div className="flex gap-2">
-            <span className="text-default-400 w-12 shrink-0">收件人</span>
-            <span className="text-foreground">合作 KOL／創作者 &lt;creator@example.com&gt;</span>
+            <span className="text-default-400 w-12 shrink-0">{lang === "en" ? "To" : "收件人"}</span>
+            <span className="text-foreground">{lang === "en" ? "Partner KOL / creator" : "合作 KOL／創作者"} &lt;creator@example.com&gt;</span>
           </div>
           <div className="flex gap-2">
-            <span className="text-default-400 w-12 shrink-0">主旨</span>
+            <span className="text-default-400 w-12 shrink-0">{lang === "en" ? "Subject" : "主旨"}</span>
             <span className="text-foreground font-semibold">
-              {subject || <span className="text-default-300 font-normal">（等待 AI 撰寫主旨）</span>}
+              {subject || <span className="text-default-300 font-normal">{lang === "en" ? "(waiting for AI to write the subject)" : "（等待 AI 撰寫主旨）"}</span>}
             </span>
           </div>
         </div>
@@ -316,17 +319,18 @@ export function KOLEmailMockup({
               ))}
               <div className="flex items-center gap-1 mt-1">
                 <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse inline-block" />
-                <span className="text-[10px] text-primary/70">Agent 撰寫中…</span>
+                <span className="text-[10px] text-primary/70">{lang === "en" ? "Agent is writing…" : "Agent 撰寫中…"}</span>
               </div>
             </div>
           ) : (
-            <p className="text-small text-default-400">尚無內容</p>
+            <p className="text-small text-default-400">{lang === "en" ? "No content yet" : "尚無內容"}</p>
           )}
 
           {body.trim() && (
             <p className="mt-7 text-small text-default-500">
-              誠摯期待你的回覆，<br />
-              <strong className="text-foreground">{brand}</strong> 敬上
+              {lang === "en" ? <>Looking forward to your reply,<br />
+              <strong className="text-foreground">{brand}</strong></> : <>誠摯期待你的回覆，<br />
+              <strong className="text-foreground">{brand}</strong> 敬上</>}
             </p>
           )}
         </div>
@@ -338,20 +342,21 @@ export function KOLEmailMockup({
 /* ─────────────── Email Newsletter (simpler) ─────────────── */
 
 export function EmailNewsletterMockup({ title, brandName, variantLabel, liveCaption, liveTitle }: MockupFields) {
+  const { lang } = useLang();
   const brand = brandName ?? "Your Brand";
   return (
     <div className="w-full max-w-[560px] mx-auto">
-      <MockupHeader icon={faEnvelope} label="電子報" variantLabel={variantLabel} />
+      <MockupHeader icon={faEnvelope} label={lang === "en" ? "Newsletter" : "電子報"} variantLabel={variantLabel} />
       <div className="bg-content1 border border-divider rounded-xl overflow-hidden shadow-lg">
         <div className="px-6 py-4 border-b border-divider flex items-center justify-between">
           <Chip size="sm" variant="flat" color="secondary"
             startContent={<FontAwesomeIcon icon={faEnvelope} className="ml-1 text-tiny" />}>
-            電子報 Issue
+            {lang === "en" ? "Newsletter issue" : "電子報 Issue"}
           </Chip>
           <span className="text-tiny text-default-400">{brand}</span>
         </div>
         <div className="px-8 py-8 space-y-4">
-          <p className="text-tiny text-default-400 uppercase tracking-widest font-semibold">本期重點</p>
+          <p className="text-tiny text-default-400 uppercase tracking-widest font-semibold">{lang === "en" ? "In this issue" : "本期重點"}</p>
           <h2 className="text-2xl font-bold leading-snug">{liveTitle ?? title}</h2>
           {liveCaption ? (
             <MarkdownText content={liveCaption} className="text-small text-default-600 leading-relaxed" />
@@ -364,11 +369,11 @@ export function EmailNewsletterMockup({ title, brandName, variantLabel, liveCapt
           )}
           <Button size="sm" radius="md" color="primary" variant="flat"
             endContent={<FontAwesomeIcon icon={faArrowRight} />}>
-            閱讀全文
+            {lang === "en" ? "Read more" : "閱讀全文"}
           </Button>
         </div>
         <div className="px-8 py-4 border-t border-divider bg-default-50 text-center">
-          <p className="text-tiny text-default-400">{brand} · 取消訂閱</p>
+          <p className="text-tiny text-default-400">{brand} · {lang === "en" ? "Unsubscribe" : "取消訂閱"}</p>
         </div>
       </div>
     </div>

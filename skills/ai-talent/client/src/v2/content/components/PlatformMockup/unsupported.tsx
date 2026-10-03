@@ -21,6 +21,7 @@ import {
 import type { MockupVariant, Platform } from "../../lib/inferMockup";
 import type { MockupFields } from "./shared";
 import { MockupHeader, MarkdownText } from "./shared";
+import { useLang } from "../../../../lib/i18n";
 
 const PLATFORM_ICON: Record<Platform, any> = {
   instagram:    faInstagram,
@@ -62,6 +63,14 @@ const PLATFORM_LABEL: Record<Platform, string> = {
   generic:      "通用",
 };
 
+const PLATFORM_LABEL_EN: Partial<Record<Platform, string>> = {
+  web:          "Website",
+  press:        "Press release / PR",
+  deck:         "Slide deck",
+  xiaohongshu:  "Xiaohongshu",
+  generic:      "General",
+};
+
 interface Props extends MockupFields {
   variant: MockupVariant;
 }
@@ -69,8 +78,11 @@ interface Props extends MockupFields {
 export function UnsupportedVariantPlaceholder({
   variant, steps, variantLabel, title, liveCaption,
 }: Props) {
+  const { lang } = useLang();
   const icon = PLATFORM_ICON[variant.platform];
-  const label = PLATFORM_LABEL[variant.platform];
+  const label = lang === "en"
+    ? (PLATFORM_LABEL_EN[variant.platform] ?? PLATFORM_LABEL[variant.platform])
+    : PLATFORM_LABEL[variant.platform];
   /* 2026-08-20 (CJ「這功能出現製作中…而且為什麼沒有產出內容」— seen on
    * instagram:comment): the copy WAS produced, but this placeholder rendered
    * only the squad's step list, which quick tasks don't have — so the card
@@ -93,7 +105,7 @@ export function UnsupportedVariantPlaceholder({
               className="absolute -bottom-1 left-1/2 -translate-x-1/2"
               startContent={<FontAwesomeIcon icon={faClock} className="text-tiny ml-1" />}
             >
-              即將推出
+              {lang === "en" ? "Coming soon" : "即將推出"}
             </Chip>
           </div>
 
@@ -102,8 +114,8 @@ export function UnsupportedVariantPlaceholder({
             <h2 className="text-xl font-semibold tracking-tight">{variant.label}</h2>
             <p className="text-small text-default-500 mt-2 max-w-[380px]">
               {producedCopy
-                ? "這個格式還沒有專屬的版型預覽，以下是本次實際產出的內容（可直接複製使用）。"
-                : "此格式的精準預覽正在製作中。下列是這個 squad 預期會產出的內容 — 功能本身不受影響。"}
+                ? (lang === "en" ? "This format has no dedicated layout preview yet. Below is what was actually produced this time (ready to copy)." : "這個格式還沒有專屬的版型預覽，以下是本次實際產出的內容（可直接複製使用）。")
+                : (lang === "en" ? "A precise preview for this format is in the works. Below is what this squad is expected to produce — the feature itself is unaffected." : "此格式的精準預覽正在製作中。下列是這個 squad 預期會產出的內容 — 功能本身不受影響。")}
             </p>
           </div>
 
@@ -112,7 +124,7 @@ export function UnsupportedVariantPlaceholder({
               <Divider className="w-full" />
               <div className="w-full text-left">
                 <p className="text-tiny tracking-wider uppercase text-default-500 font-medium mb-2 flex items-center gap-1.5">
-                  <FontAwesomeIcon icon={faWandMagicSparkles} /> 本次產出
+                  <FontAwesomeIcon icon={faWandMagicSparkles} /> {lang === "en" ? "Produced this time" : "本次產出"}
                 </p>
                 <div className="rounded-medium bg-default-50 border border-divider px-3 py-2.5">
                   {title && <p className="text-tiny text-default-500 mb-1">{title}</p>}
@@ -127,7 +139,7 @@ export function UnsupportedVariantPlaceholder({
               <Divider className="w-full" />
               <div className="w-full text-left">
                 <p className="text-tiny tracking-wider uppercase text-default-500 font-medium mb-2 flex items-center gap-1.5">
-                  <FontAwesomeIcon icon={faWandMagicSparkles} /> 此 squad 會產出
+                  <FontAwesomeIcon icon={faWandMagicSparkles} /> {lang === "en" ? "This squad will produce" : "此 squad 會產出"}
                 </p>
                 <ol className="space-y-1.5">
                   {steps.map((step, i) => {
@@ -164,7 +176,7 @@ export function UnsupportedVariantPlaceholder({
       </Card>
 
       <p className="text-tiny text-default-400 text-center mt-3">
-        想看其他格式預覽？切上方分頁試試 動態 / 輪播 / 限時動態 等支援格式。
+        {lang === "en" ? "Want to preview other formats? Try the tabs above for supported formats like Feed / Carousel / Story." : "想看其他格式預覽？切上方分頁試試 動態 / 輪播 / 限時動態 等支援格式。"}
       </p>
     </div>
   );

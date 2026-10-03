@@ -27,7 +27,7 @@ export function basisLabel(path: string, en: boolean): string {
   const f = fieldOf(path);
   if (!f) return path;
   const seg = en && f.seg.titleEn ? f.seg.titleEn : shortTitle(f.seg.title);
-  return `${seg}・${shortLabel(f.field.label)}`;
+  return `${seg}・${shortLabel(en && f.field.labelEn ? f.field.labelEn : f.field.label)}`;
 }
 
 /** 值 → 編輯框裡的文字（清單一行一項）。 */

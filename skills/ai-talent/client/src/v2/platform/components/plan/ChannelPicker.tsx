@@ -25,6 +25,7 @@ const LABEL_ZH: Record<string, string> = {
   tiktok: "TikTok", email: "電子報",
   website: "官網",
 };
+const LABEL_EN: Record<string, string> = { ...LABEL_ZH, email: "Email", website: "Website" };
 const ALL = Object.keys(LABEL_ZH);
 
 export default function ChannelPicker({ brandId }: { brandId: number }) {
@@ -125,7 +126,7 @@ export default function ChannelPicker({ brandId }: { brandId: number }) {
               }`}
             >
               {on && <CheckIcon size={13} />}
-              {LABEL_ZH[p] ?? p}
+              {(lang === "en" ? LABEL_EN : LABEL_ZH)[p] ?? p}
             </button>
           );
         })}

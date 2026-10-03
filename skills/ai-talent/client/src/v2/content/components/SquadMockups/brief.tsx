@@ -9,6 +9,7 @@
  *   - image direction (visual brief — feeds MediaGenFlow if approved)
  */
 import { Card, CardBody, Chip, Textarea, Input } from "@heroui/react";
+import { useLang } from "../../../../lib/i18n";
 import { SectionHeader, NotionCard, EmptyHint, type SquadMockupCommonProps } from "./shared";
 
 export interface PostBrief {
@@ -29,6 +30,13 @@ interface Props extends SquadMockupCommonProps {
 }
 
 const PILLAR_COLORS = ["#7c5dfa", "#10b981", "#f59e0b", "#3b82f6", "#ec4899"] as const;
+const FORMAT_LABEL_EN: Record<PostBrief["format"], string> = {
+  "post":      "📝 Post",
+  "reel":      "🎬 Reel",
+  "carousel":  "🖼 Carousel",
+  "long-text": "📊 Long-form",
+  "story":     "📱 Story",
+};
 const FORMAT_LABEL: Record<PostBrief["format"], string> = {
   "post":      "📝 圖文",
   "reel":      "🎬 Reel",
@@ -38,6 +46,7 @@ const FORMAT_LABEL: Record<PostBrief["format"], string> = {
 };
 
 export function FBPostBriefMockup({ data, readOnly = false, isActive = false, onChange }: Props) {
+  const { lang } = useLang();
   const briefs = data?.briefs ?? [];
 
   return (
@@ -46,20 +55,20 @@ export function FBPostBriefMockup({ data, readOnly = false, isActive = false, on
         <div className="flex items-start justify-between gap-3 flex-wrap">
           <SectionHeader
             icon="✍"
-            eyebrow="步驟 5 · 每篇企劃摘要"
-            title={`${briefs.length} 篇企劃摘要`}
+            eyebrow={lang === "en" ? "Step 5 · Per-post briefs" : "步驟 5 · 每篇企劃摘要"}
+            title={lang === "en" ? `${briefs.length} post briefs` : `${briefs.length} 篇企劃摘要`}
           />
           {isActive && (
             <Chip size="sm" variant="flat" color="primary" className="self-start">
-              ● Aiden Hsu 撰寫中…（{briefs.length}/16-20 篇）
+              {lang === "en" ? `● Aiden Hsu is writing… (${briefs.length}/16-20 posts)` : `● Aiden Hsu 撰寫中…（${briefs.length}/16-20 篇）`}
             </Chip>
           )}
         </div>
         {briefs.length === 0 ? (
-          <EmptyHint>步驟 5 跑完才會有企劃摘要</EmptyHint>
+          <EmptyHint>{lang === "en" ? "Post briefs appear after Step 5 finishes" : "步驟 5 跑完才會有企劃摘要"}</EmptyHint>
         ) : (
           <p className="text-tiny text-default-500">
-            每張卡 = 行事曆的一個時段。下游小組（fb-post-writer-from-brief）會把每張卡轉成可發布的最終貼文。
+            {lang === "en" ? "Each card = one slot on the calendar. The downstream squad (fb-post-writer-from-brief) turns each card into a publish-ready post." : "每張卡 = 行事曆的一個時段。下游小組（fb-post-writer-from-brief）會把每張卡轉成可發布的最終貼文。"}
           </p>
         )}
       </NotionCard>
@@ -85,6 +94,7 @@ function BriefCard({
   readOnly: boolean;
   onChange: (patch: Partial<PostBrief>) => void;
 }) {
+  const { lang } = useLang();
   return (
     <Card shadow="none" className="border border-divider">
       <CardBody className="p-4 gap-3">
@@ -101,7 +111,7 @@ function BriefCard({
               {brief.pillarName}
             </Chip>
             <Chip size="sm" variant="flat" color="default">
-              {FORMAT_LABEL[brief.format]}
+              {(lang === "en" ? FORMAT_LABEL_EN : FORMAT_LABEL)[brief.format]}
             </Chip>
           </div>
           {brief.eventAnchor && (
@@ -112,7 +122,7 @@ function BriefCard({
         {/* Hook */}
         <Input
           size="md" radius="md" variant="bordered"
-          label="開場鉤（開場一句吸引眼球）" labelPlacement="outside"
+          label={lang === "en" ? "Hook (one opening line that grabs attention)" : "開場鉤（開場一句吸引眼球）"} labelPlacement="outside"
           value={brief.hook}
           onValueChange={(v) => onChange({ hook: v })}
           isReadOnly={readOnly}
@@ -124,7 +134,7 @@ function BriefCard({
         {/* Copy */}
         <Textarea
           size="sm" radius="md" variant="bordered"
-          label="文案內容（200 字內）" labelPlacement="outside"
+          label={lang === "en" ? "Copy (within 200 characters)" : "文案內容（200 字內）"} labelPlacement="outside"
           minRows={3}
           value={brief.copy}
           onValueChange={(v) => onChange({ copy: v })}
@@ -142,7 +152,7 @@ function BriefCard({
           />
           <Textarea
             size="sm" radius="md" variant="bordered"
-            label="視覺方向（→ 走 MediaGenFlow 3 步驟）" labelPlacement="outside"
+            label={lang === "en" ? "Visual direction (→ runs the 3-step MediaGenFlow)" : "視覺方向（→ 走 MediaGenFlow 3 步驟）"} labelPlacement="outside"
             minRows={2}
             value={brief.imageDirection}
             onValueChange={(v) => onChange({ imageDirection: v })}

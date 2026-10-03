@@ -47,7 +47,7 @@ export default function PlanExpiredPage() {
             {lang === "en" ? "View plans →" : "查看方案 →"}
           </button>
           <a
-            href="mailto:sowork@sowork.ai?subject=onBrand Studio 升級諮詢"
+            href={`mailto:sowork@sowork.ai?subject=${encodeURIComponent(lang === "en" ? "onBrand Studio upgrade inquiry" : "onBrand Studio 升級諮詢")}`}
             className="block w-full py-2.5 rounded-full bg-default-100 text-default-700 text-sm hover:bg-default-200 transition"
           >
             {lang === "en" ? "Contact us" : "聯絡我們"}

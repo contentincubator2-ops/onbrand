@@ -7,6 +7,7 @@
  * Ratios MUST sum to 100. UI shows running total + warning if drift.
  */
 import { Input, Textarea, Chip, Progress } from "@heroui/react";
+import { useLang } from "../../../../lib/i18n";
 import { SectionHeader, NotionCard, EmptyHint, type SquadMockupCommonProps } from "./shared";
 
 export interface PillarRow {
@@ -30,6 +31,7 @@ interface Props extends SquadMockupCommonProps {
 const PILLAR_COLORS = ["#7c5dfa", "#10b981", "#f59e0b", "#3b82f6", "#ec4899"] as const;
 
 export function PillarTableMockup({ data, readOnly = false, isActive = false, onChange }: Props) {
+  const { lang } = useLang();
   const pillars = data?.pillars ?? [];
   const ratioTotal = pillars.reduce((s, p) => s + (p.ratio || 0), 0);
   const ratioOk = ratioTotal === 100;
@@ -45,18 +47,18 @@ export function PillarTableMockup({ data, readOnly = false, isActive = false, on
         <div className="flex items-start justify-between gap-3 flex-wrap">
           <SectionHeader
             icon="🏛"
-            eyebrow="步驟 3 · 內容支柱"
-            title={data?.tilt ? `傾斜主題：${data.tilt}` : "內容支柱定義"}
+            eyebrow={lang === "en" ? "Step 3 · Content pillars" : "步驟 3 · 內容支柱"}
+            title={data?.tilt ? (lang === "en" ? `Tilt theme: ${data.tilt}` : `傾斜主題：${data.tilt}`) : (lang === "en" ? "Content pillar definition" : "內容支柱定義")}
           />
           {isActive && (
             <Chip size="sm" variant="flat" color="primary" className="self-start">
-              ● Vincent Shen 思考中…
+              {lang === "en" ? "● Vincent Shen is thinking…" : "● Vincent Shen 思考中…"}
             </Chip>
           )}
         </div>
 
         {pillars.length === 0 ? (
-          <EmptyHint>尚未產出內容支柱 — 步驟 3 跑完才會填</EmptyHint>
+          <EmptyHint>{lang === "en" ? "No content pillars yet — filled in after Step 3 finishes" : "尚未產出內容支柱 — 步驟 3 跑完才會填"}</EmptyHint>
         ) : (
           <>
             <div className="flex flex-col gap-3">
@@ -74,7 +76,7 @@ export function PillarTableMockup({ data, readOnly = false, isActive = false, on
 
             {/* Ratio summary */}
             <div className={`mt-2 flex items-center justify-between text-tiny ${ratioOk ? "text-success" : "text-warning"}`}>
-              <span>比例總計</span>
+              <span>{lang === "en" ? "Ratio total" : "比例總計"}</span>
               <span className="font-semibold tabular-nums">{ratioTotal} / 100</span>
             </div>
             <Progress
@@ -84,7 +86,7 @@ export function PillarTableMockup({ data, readOnly = false, isActive = false, on
               aria-label="ratio total"
             />
             {!ratioOk && (
-              <p className="text-tiny text-warning mt-1">⚠ 比例需總和等於 100。差 {100 - ratioTotal} 點。</p>
+              <p className="text-tiny text-warning mt-1">{lang === "en" ? `⚠ Ratios must sum to 100. Off by ${100 - ratioTotal} points.` : `⚠ 比例需總和等於 100。差 ${100 - ratioTotal} 點。`}</p>
             )}
           </>
         )}
@@ -102,6 +104,7 @@ function PillarRowCard({
   readOnly: boolean;
   onChange: (patch: Partial<PillarRow>) => void;
 }) {
+  const { lang } = useLang();
   return (
     <div className="rounded-md border border-divider p-3 flex flex-col gap-2">
       <div className="flex items-start gap-3">
@@ -113,14 +116,14 @@ function PillarRowCard({
         <div className="flex-1 min-w-0 grid grid-cols-1 md:grid-cols-[1fr_120px_140px] gap-2">
           <Input
             size="sm" radius="md" variant="bordered"
-            label="支柱名稱" labelPlacement="outside"
+            label={lang === "en" ? "Pillar name" : "支柱名稱"} labelPlacement="outside"
             value={pillar.name}
             onValueChange={(v) => onChange({ name: v })}
             isReadOnly={readOnly}
           />
           <Input
             size="sm" radius="md" variant="bordered" type="number"
-            label="比例 %" labelPlacement="outside"
+            label={lang === "en" ? "Ratio %" : "比例 %"} labelPlacement="outside"
             value={String(pillar.ratio ?? 0)}
             onValueChange={(v) => onChange({ ratio: Number(v) || 0 })}
             isReadOnly={readOnly}
@@ -128,7 +131,7 @@ function PillarRowCard({
           />
           <Input
             size="sm" radius="md" variant="bordered"
-            label="目標 KPI" labelPlacement="outside"
+            label={lang === "en" ? "Target KPI" : "目標 KPI"} labelPlacement="outside"
             value={pillar.target_kpi}
             onValueChange={(v) => onChange({ target_kpi: v })}
             isReadOnly={readOnly}
@@ -138,7 +141,7 @@ function PillarRowCard({
 
       <Textarea
         size="sm" radius="md" variant="bordered"
-        label="假設（為什麼這個支柱在這個定位角是合理切入點）"
+        label={lang === "en" ? "Hypothesis (why is this pillar a sound entry point for this positioning angle?)" : "假設（為什麼這個支柱在這個定位角是合理切入點）"}
         labelPlacement="outside"
         minRows={2}
         value={pillar.hypothesis}
@@ -147,21 +150,21 @@ function PillarRowCard({
       />
 
       <div>
-        <p className="text-tiny text-default-500 mb-1">Sample 主題（5 個）</p>
+        <p className="text-tiny text-default-500 mb-1">{lang === "en" ? "Sample topics (5)" : "Sample 主題（5 個）"}</p>
         <div className="flex flex-wrap gap-1.5">
           {(pillar.sample_topics ?? []).map((t, i) => (
             <Chip key={i} size="sm" variant="flat" className="h-6">{t}</Chip>
           ))}
-          {(pillar.sample_topics ?? []).length === 0 && <EmptyHint>無</EmptyHint>}
+          {(pillar.sample_topics ?? []).length === 0 && <EmptyHint>{lang === "en" ? "None" : "無"}</EmptyHint>}
         </div>
       </div>
 
       <Textarea
         size="sm" radius="md" variant="bordered"
-        label="🎨 視覺方向（此支柱的視覺指引一致參考）"
+        label={lang === "en" ? "🎨 Visual direction (shared visual reference for this pillar)" : "🎨 視覺方向（此支柱的視覺指引一致參考）"}
         labelPlacement="outside"
         minRows={2}
-        placeholder="例：使用扁平向量、藍金色系、玩家小卡感"
+        placeholder={lang === "en" ? "e.g. flat vector style, blue-and-gold palette, collectible-card feel" : "例：使用扁平向量、藍金色系、玩家小卡感"}
         value={pillar.visualDirection ?? ""}
         onValueChange={(v) => onChange({ visualDirection: v })}
         isReadOnly={readOnly}

@@ -21,6 +21,7 @@ import {
   faWandMagicSparkles, faPen, faPlus, faArrowUpRightFromSquare, faTrash,
 } from "@fortawesome/free-solid-svg-icons";
 import { trpc } from "../../../lib/trpc";
+import { tr, useLang } from "../../../lib/i18n";
 
 type DimValue = { code: string; label: string };
 type Dim = { key: string; label: string; values: DimValue[]; origin?: string };
@@ -36,9 +37,10 @@ type Proposal = {
 const UNTAGGED = "__untagged";
 const api = () => (trpc as any).performance;
 
-const RANGES = [
-  { id: 30, label: "近 30 天" }, { id: 90, label: "近 90 天" }, { id: 180, label: "近 180 天" }, { id: 365, label: "近一年" },
-];
+const rangeLabel = (id: number) =>
+  id === 30 ? tr("Last 30 days", "近 30 天") : id === 90 ? tr("Last 90 days", "近 90 天")
+    : id === 180 ? tr("Last 180 days", "近 180 天") : tr("Last year", "近一年");
+const RANGES = [{ id: 30 }, { id: 90 }, { id: 180 }, { id: 365 }];
 
 function ymd(d: Date) { return d.toISOString().slice(0, 10); }
 function rangeOf(days: number) {
@@ -97,7 +99,7 @@ function Modal({ title, onClose, children, wide }: { title: string; onClose: () 
       <div className={`w-full ${wide ? "max-w-3xl" : "max-w-lg"} rounded-2xl bg-white p-5 shadow-xl`} onClick={(e) => e.stopPropagation()}>
         <div className="mb-3 flex items-center justify-between">
           <h3 className="text-[16px] font-semibold text-neutral-900">{title}</h3>
-          <button onClick={onClose} aria-label="關閉" className="text-neutral-500 hover:text-neutral-900"><FontAwesomeIcon icon={faXmark} /></button>
+          <button onClick={onClose} aria-label={tr("Close", "關閉")} className="text-neutral-500 hover:text-neutral-900"><FontAwesomeIcon icon={faXmark} /></button>
         </div>
         {children}
       </div>
@@ -112,6 +114,7 @@ const ghostBtn = "rounded-lg border border-neutral-300 px-3 py-1.5 text-[13px] t
 /* ───────────────────────── 主元件 ───────────────────────── */
 
 export default function LensWorkspace({ brandId, tray }: { brandId: number | null; tray: string }) {
+  useLang();
   const utils = (trpc as any).useUtils();
   const [days, setDays] = React.useState(90);
   const range = React.useMemo(() => rangeOf(days), [days]);
@@ -136,7 +139,7 @@ export default function LensWorkspace({ brandId, tray }: { brandId: number | nul
 
   const refresh = () => { utils.performance.workspace.invalidate(); utils.performance.report.invalidate(); utils.performance.connections?.invalidate?.(); };
   const sync = api().syncFacebook.useMutation({
-    onSuccess: (r: any) => { setNotice(`已回填 ${r.posts} 篇貼文${r.metricsUsed?.length ? "" : "（這個粉專的觸及／點擊指標 Meta 沒有回，先只有互動數）"}`); refresh(); },
+    onSuccess: (r: any) => { setNotice(tr(`Backfilled ${r.posts} posts${r.metricsUsed?.length ? "" : " (Meta returned no reach/click metrics for this page, so only engagement counts for now)"}`, `已回填 ${r.posts} 篇貼文${r.metricsUsed?.length ? "" : "（這個粉專的觸及／點擊指標 Meta 沒有回，先只有互動數）"}`)); refresh(); },
     onError: (e: any) => setNotice(e.message),
   });
   const tplMut = api().useTemplate.useMutation({
@@ -145,12 +148,12 @@ export default function LensWorkspace({ brandId, tray }: { brandId: number | nul
   });
   const removeLens = api().removeLens.useMutation({ onSuccess: () => { setActiveId(null); refresh(); } });
   const autoTag = api().autoTag.useMutation({
-    onSuccess: (r: any) => { setNotice(`AI 看了 ${r.looked} 筆，歸類了 ${r.tagged} 筆`); refresh(); },
+    onSuccess: (r: any) => { setNotice(tr(`AI reviewed ${r.looked} items and tagged ${r.tagged}`, `AI 看了 ${r.looked} 筆，歸類了 ${r.tagged} 筆`)); refresh(); },
     onError: (e: any) => setNotice(e.message),
   });
 
   if (!brandId) {
-    return <div className="mb-5 rounded-xl border border-neutral-200 bg-white p-4 text-[13px] text-neutral-500">先在右上角選一個品牌。</div>;
+    return <div className="mb-5 rounded-xl border border-neutral-200 bg-white p-4 text-[13px] text-neutral-500">{tr("Pick a brand at the top right first.", "先在右上角選一個品牌。")}</div>;
   }
 
   const traySources: string[] = data?.traySources ?? [];
@@ -161,16 +164,16 @@ export default function LensWorkspace({ brandId, tray }: { brandId: number | nul
     <section className="mb-5 rounded-xl border border-neutral-200 bg-white p-4">
       {/* 1. 三個入口 + 資料動作 */}
       <div className="flex flex-wrap items-end gap-3">
-        <EntryButton icon={faTableCellsLarge} label="範本" tip="從範本開始：族群 × USP、粉絲團報告、產品 × 通路……" onClick={() => setModal("template")} />
-        <EntryButton icon={faFileArrowUp} label="我的報告" tip="照你原本的報告：上傳 pptx / xlsx / csv，AI 讀出你用的維度與指標" onClick={() => setModal("report")} />
-        <EntryButton icon={faComments} label="貼對話" tip="貼 AI 對話串：把跟 ChatGPT / Claude 討論過的分析框架貼進來" onClick={() => setModal("chat")} />
+        <EntryButton icon={faTableCellsLarge} label={tr("Templates", "範本")} tip={tr("Start from a template: audience × USP, fan page report, product × channel…", "從範本開始：族群 × USP、粉絲團報告、產品 × 通路……")} onClick={() => setModal("template")} />
+        <EntryButton icon={faFileArrowUp} label={tr("My report", "我的報告")} tip={tr("Follow your existing report: upload pptx / xlsx / csv and AI reads out the dimensions and metrics you use", "照你原本的報告：上傳 pptx / xlsx / csv，AI 讀出你用的維度與指標")} onClick={() => setModal("report")} />
+        <EntryButton icon={faComments} label={tr("Paste chat", "貼對話")} tip={tr("Paste an AI conversation: bring in the analysis framework you discussed with ChatGPT / Claude", "貼 AI 對話串：把跟 ChatGPT / Claude 討論過的分析框架貼進來")} onClick={() => setModal("chat")} />
         <div className="ml-auto flex flex-wrap items-center gap-2">
           {showFbSync && data?.fbPage && data?.fbSyncEnabled !== false && (
-            <SmallAction icon={faArrowsRotate} label="同步粉專" busy={sync.isPending} onClick={() => sync.mutate({ brandId, days: 180 })} />
+            <SmallAction icon={faArrowsRotate} label={tr("Sync fan page", "同步粉專")} busy={sync.isPending} onClick={() => sync.mutate({ brandId, days: 180 })} />
           )}
-          {showImport && <SmallAction icon={faFileImport} label="匯入後台檔" onClick={() => setModal("import")} />}
+          {showImport && <SmallAction icon={faFileImport} label={tr("Import back-office file", "匯入後台檔")} onClick={() => setModal("import")} />}
           <select value={days} onChange={(e) => setDays(Number(e.target.value))} className="rounded-lg border border-neutral-200 px-2 py-1.5 text-[13px]">
-            {RANGES.map((r) => <option key={r.id} value={r.id}>{r.label}</option>)}
+            {RANGES.map((r) => <option key={r.id} value={r.id}>{rangeLabel(r.id)}</option>)}
           </select>
         </div>
       </div>
@@ -178,7 +181,7 @@ export default function LensWorkspace({ brandId, tray }: { brandId: number | nul
       {notice && (
         <div className="mt-3 flex items-start gap-2 rounded-lg bg-neutral-50 px-3 py-2 text-[13px] text-neutral-700">
           <span className="flex-1">{notice}</span>
-          <button onClick={() => setNotice(null)} aria-label="關閉"><FontAwesomeIcon icon={faXmark} /></button>
+          <button onClick={() => setNotice(null)} aria-label={tr("Close", "關閉")}><FontAwesomeIcon icon={faXmark} /></button>
         </div>
       )}
 
@@ -193,9 +196,9 @@ export default function LensWorkspace({ brandId, tray }: { brandId: number | nul
           ))}
           {active && (
             <>
-              <button onClick={() => setModal("edit")} title="編輯這個視角" aria-label="編輯這個視角" className="px-1 text-neutral-500 hover:text-neutral-900"><FontAwesomeIcon icon={faPen} /></button>
-              <button onClick={() => { if (confirm(`刪除視角「${active.name}」？數據不會被刪。`)) removeLens.mutate({ brandId, id: active.id }); }}
-                title="刪除這個視角" aria-label="刪除這個視角" className="px-1 text-neutral-500 hover:text-neutral-900"><FontAwesomeIcon icon={faTrash} /></button>
+              <button onClick={() => setModal("edit")} title={tr("Edit this lens", "編輯這個視角")} aria-label={tr("Edit this lens", "編輯這個視角")} className="px-1 text-neutral-500 hover:text-neutral-900"><FontAwesomeIcon icon={faPen} /></button>
+              <button onClick={() => { if (confirm(tr(`Delete lens "${active.name}"? The data will not be deleted.`, `刪除視角「${active.name}」？數據不會被刪。`))) removeLens.mutate({ brandId, id: active.id }); }}
+                title={tr("Delete this lens", "刪除這個視角")} aria-label={tr("Delete this lens", "刪除這個視角")} className="px-1 text-neutral-500 hover:text-neutral-900"><FontAwesomeIcon icon={faTrash} /></button>
             </>
           )}
         </div>
@@ -204,7 +207,7 @@ export default function LensWorkspace({ brandId, tray }: { brandId: number | nul
       {/* 3. 報表 */}
       {!lenses.length && !ws.isLoading && (
         // 三個入口就在正上方，不另外放按鈕
-        <IllustratedEmpty kind="lens" title="還沒決定要從哪個角度看" />
+        <IllustratedEmpty kind="lens" title={tr("No angle chosen yet", "還沒決定要從哪個角度看")} />
       )}
       {active && (
         <LensReport
@@ -220,18 +223,18 @@ export default function LensWorkspace({ brandId, tray }: { brandId: number | nul
       )}
 
       {modal === "template" && (
-        <Modal title="從範本開始" onClose={() => setModal(null)}>
+        <Modal title={tr("Start from a template", "從範本開始")} onClose={() => setModal(null)}>
           <div className="grid gap-2">
             {(data?.templates ?? []).map((t: any) => (
               <button key={t.key} disabled={tplMut.isPending}
                 onClick={() => tplMut.mutate({ brandId, tray, templateKey: t.key })}
                 className="flex items-center justify-between rounded-lg border border-neutral-200 px-3 py-2.5 text-left hover:border-neutral-900 disabled:opacity-60">
                 <span className="text-[14px] font-medium text-neutral-900">{t.name}</span>
-                {t.recommended && <span className="text-[12px] text-neutral-500">適合這裡</span>}
+                {t.recommended && <span className="text-[12px] text-neutral-500">{tr("Fits here", "適合這裡")}</span>}
               </button>
             ))}
           </div>
-          {tplMut.isPending && <p className="mt-3 text-[13px] text-neutral-500">從品牌定位整理族群與 USP…</p>}
+          {tplMut.isPending && <p className="mt-3 text-[13px] text-neutral-500">{tr("Pulling audiences and USPs from the brand positioning…", "從品牌定位整理族群與 USP…")}</p>}
         </Modal>
       )}
 
@@ -267,14 +270,15 @@ function LensReport({ lens, dims, data, report, loading, onCell, onAutoTag, auto
   lens: Lens; dims: Dim[]; data: any; report: any; loading: boolean;
   onCell: (row: DimValue, col: DimValue | null) => void; onAutoTag: () => void; autoTagging: boolean;
 }) {
+  useLang();
   const judgeLabel = data?.judgeLabels?.[lens.config.judge] ?? data?.metricLabels?.[lens.config.judge] ?? lens.config.judge;
   const dimLabel = (k?: string | null) => (k ? (dims.find((d) => d.key === k)?.label ?? data?.builtinDims?.find((d: any) => d.key === k)?.label ?? k) : "");
-  if (loading) return <p className="mt-4 text-[13px] text-neutral-500">計算中…</p>;
+  if (loading) return <p className="mt-4 text-[13px] text-neutral-500">{tr("Calculating…", "計算中…")}</p>;
   const r = report?.result;
   if (!r || r.factCount === 0) {
     return (
       <div className="mt-4 rounded-lg border border-dashed border-neutral-300 p-4 text-[13px] text-neutral-600">
-        這段期間還沒有數據。{lens.config.sources?.includes("fb_page") ? "按「同步粉專」回填貼文成效。" : "按「匯入後台檔」上傳廣告或訂單匯出檔，或到總覽同步粉專。"}
+        {tr("No data in this period yet. ", "這段期間還沒有數據。")}{lens.config.sources?.includes("fb_page") ? tr('Press "Sync fan page" to backfill post performance.', "按「同步粉專」回填貼文成效。") : tr('Press "Import back-office file" to upload an ads or orders export, or sync the fan page from the overview.', "按「匯入後台檔」上傳廣告或訂單匯出檔，或到總覽同步粉專。")}
       </div>
     );
   }
@@ -292,13 +296,13 @@ function LensReport({ lens, dims, data, report, loading, onCell, onAutoTag, auto
     <div className="mt-4">
       <div className="mb-2 flex flex-wrap items-baseline gap-x-4 gap-y-1 text-[13px] text-neutral-600">
         <span><b className="text-neutral-900">{dimLabel(lens.config.rowDim)}</b>{lens.config.colDim ? <> × <b className="text-neutral-900">{dimLabel(lens.config.colDim)}</b></> : null}・{judgeLabel}</span>
-        <span>{r.factCount.toLocaleString()} 筆數據</span>
-        <span>總計 {judgeLabel} {fmtJudge(lens.config.judge, r.total.judge)}</span>
+        <span>{tr(`${r.factCount.toLocaleString()} data rows`, `${r.factCount.toLocaleString()} 筆數據`)}</span>
+        <span>{tr("Total", "總計")} {judgeLabel} {fmtJudge(lens.config.judge, r.total.judge)}</span>
         {needsTagging && (
           <span className="inline-flex items-center gap-2">
-            標籤覆蓋率 {(cov * 100).toFixed(0)}%
+            {tr("Tag coverage", "標籤覆蓋率")} {(cov * 100).toFixed(0)}%
             <button onClick={onAutoTag} disabled={autoTagging} className="inline-flex items-center gap-1 rounded-md border border-neutral-300 px-2 py-0.5 text-[12px] hover:border-neutral-900 disabled:opacity-60">
-              <FontAwesomeIcon icon={faWandMagicSparkles} className={autoTagging ? "animate-pulse" : ""} /> AI 補標
+              <FontAwesomeIcon icon={faWandMagicSparkles} className={autoTagging ? "animate-pulse" : ""} /> {tr("AI auto-tag", "AI 補標")}
             </button>
           </span>
         )}
@@ -315,7 +319,7 @@ function LensReport({ lens, dims, data, report, loading, onCell, onAutoTag, auto
                   <span className="line-clamp-2 break-words text-center leading-snug">{c.label}</span>
                 </th>
               ))}
-              {r.cols.length > 0 && <th className="px-2 py-1 text-center font-normal text-neutral-500">合計</th>}
+              {r.cols.length > 0 && <th className="px-2 py-1 text-center font-normal text-neutral-500">{tr("Total", "合計")}</th>}
             </tr>
           </thead>
           <tbody>
@@ -346,7 +350,7 @@ function LensReport({ lens, dims, data, report, loading, onCell, onAutoTag, auto
           </tbody>
         </table>
       </div>
-      <p className="mt-1 text-[12px] text-neutral-400">格子裡小字是筆數；少於 2 筆的不參與比較。點格子看漏斗與底下的內容。</p>
+      <p className="mt-1 text-[12px] text-neutral-400">{tr("The small number in each cell is the row count; cells with fewer than 2 rows are excluded from comparison. Click a cell to see the funnel and the items beneath it.", "格子裡小字是筆數；少於 2 筆的不參與比較。點格子看漏斗與底下的內容。")}</p>
     </div>
   );
 }
@@ -357,6 +361,7 @@ function CellDrawer({ brandId, lens, dims, range, row, col, metricLabels, report
   brandId: number; lens: Lens; dims: Dim[]; range: { from: string; to: string }; row: DimValue; col: DimValue | null;
   metricLabels: Record<string, string>; report: any; onClose: () => void; onChanged: () => void;
 }) {
+  useLang();
   const q = api().cellFacts.useQuery({ brandId, lensId: lens.id, ...range, row: row.code, col: col?.code ?? null }, { refetchOnWindowFocus: false });
   const setTag = api().setFactTag.useMutation({ onSuccess: () => { q.refetch(); onChanged(); } });
   const cell: Cell | undefined = report?.result?.cells?.[`${row.code}|${col?.code ?? "*"}`];
@@ -385,14 +390,14 @@ function CellDrawer({ brandId, lens, dims, range, row, col, metricLabels, report
           })}
         </div>
       )}
-      <div className="text-[13px] text-neutral-500">{q.data ? `${q.data.total} 筆，照判讀指標排序` : "載入中…"}</div>
+      <div className="text-[13px] text-neutral-500">{q.data ? tr(`${q.data.total} items, sorted by the judging metric`, `${q.data.total} 筆，照判讀指標排序`) : tr("Loading…", "載入中…")}</div>
       <div className="mt-2 max-h-[420px] space-y-2 overflow-y-auto">
         {(q.data?.facts ?? []).map((f: any) => (
           <div key={f.id} className="rounded-lg border border-neutral-200 p-2.5 text-[13px]">
             <div className="flex items-start gap-2">
               <span className="flex-1 text-neutral-900">{f.entityLabel}</span>
               <span className="shrink-0 text-neutral-400">{f.date}</span>
-              {f.permalink && <a href={f.permalink} target="_blank" rel="noreferrer" className="shrink-0 text-neutral-500 hover:text-neutral-900" aria-label="開啟原文"><FontAwesomeIcon icon={faArrowUpRightFromSquare} /></a>}
+              {f.permalink && <a href={f.permalink} target="_blank" rel="noreferrer" className="shrink-0 text-neutral-500 hover:text-neutral-900" aria-label={tr("Open original", "開啟原文")}><FontAwesomeIcon icon={faArrowUpRightFromSquare} /></a>}
             </div>
             <div className="mt-1 flex flex-wrap gap-x-3 text-neutral-500">
               {Object.entries(f.metrics as Record<string, number>).filter(([k]) => metricLabels[k]).map(([k, v]) => (
@@ -404,8 +409,8 @@ function CellDrawer({ brandId, lens, dims, range, row, col, metricLabels, report
                 {editable.map((d) => (
                   <select key={d.key} value={f.tags?.[d.key] ?? ""} className="rounded-md border border-neutral-200 px-1.5 py-0.5 text-[12px]"
                     onChange={(e) => setTag.mutate({ brandId, factId: f.id, dimKey: d.key, value: e.target.value || null })}>
-                    <option value="">{d.label}：未標</option>
-                    {d.values.map((v) => <option key={v.code} value={v.code}>{d.label}：{v.label}</option>)}
+                    <option value="">{d.label}{tr(": untagged", "：未標")}</option>
+                    {d.values.map((v) => <option key={v.code} value={v.code}>{d.label}{tr(": ", "：")}{v.label}</option>)}
                   </select>
                 ))}
               </div>
@@ -420,6 +425,7 @@ function CellDrawer({ brandId, lens, dims, range, row, col, metricLabels, report
 /* ───────────────────────── 我的報告 / 貼對話 ───────────────────────── */
 
 function ProposeModal({ brandId, kind, onClose, onProposal }: { brandId: number; kind: "report" | "chat"; onClose: () => void; onProposal: (p: Proposal) => void }) {
+  useLang();
   const [text, setText] = React.useState("");
   const [file, setFile] = React.useState<File | null>(null);
   const [err, setErr] = React.useState<string | null>(null);
@@ -427,30 +433,30 @@ function ProposeModal({ brandId, kind, onClose, onProposal }: { brandId: number;
   const submit = async () => {
     setErr(null);
     if (kind === "chat") {
-      if (text.trim().length < 20) { setErr("貼上的內容太短"); return; }
+      if (text.trim().length < 20) { setErr(tr("The pasted content is too short", "貼上的內容太短")); return; }
       m.mutate({ brandId, kind, text });
     } else {
-      if (!file && text.trim().length < 20) { setErr("選一個檔案，或貼上報告內容"); return; }
+      if (!file && text.trim().length < 20) { setErr(tr("Choose a file, or paste the report content", "選一個檔案，或貼上報告內容")); return; }
       if (file && /\.(csv|txt)$/i.test(file.name)) m.mutate({ brandId, kind, text: await file.text() });
       else if (file) m.mutate({ brandId, kind, fileName: file.name, contentBase64: await fileToBase64(file) });
       else m.mutate({ brandId, kind, text });
     }
   };
   return (
-    <Modal title={kind === "chat" ? "貼 AI 對話串" : "照你原本的報告"} onClose={onClose}>
+    <Modal title={kind === "chat" ? tr("Paste an AI conversation", "貼 AI 對話串") : tr("Follow your existing report", "照你原本的報告")} onClose={onClose}>
       {kind === "report" && (
         <label className="mb-3 flex cursor-pointer items-center gap-3 rounded-lg border border-dashed border-neutral-300 p-4 text-[13px] text-neutral-600 hover:border-neutral-900">
           <FontAwesomeIcon icon={faFileArrowUp} className="text-[20px]" />
-          <span className="flex-1">{file ? file.name : "選擇 .pptx / .xlsx / .csv"}</span>
+          <span className="flex-1">{file ? file.name : tr("Choose .pptx / .xlsx / .csv", "選擇 .pptx / .xlsx / .csv")}</span>
           <input type="file" accept=".pptx,.xlsx,.csv,.txt" className="hidden" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
         </label>
       )}
       <textarea value={text} onChange={(e) => { setText(e.target.value); setErr(null); }} rows={kind === "chat" ? 12 : 4}
-        placeholder={kind === "chat" ? "把整段對話貼在這裡" : "或直接貼上報告裡的表格與文字"} className={inputCls} />
+        placeholder={kind === "chat" ? tr("Paste the whole conversation here", "把整段對話貼在這裡") : tr("Or paste the tables and text from the report directly", "或直接貼上報告裡的表格與文字")} className={inputCls} />
       {err && <p className="mt-2 text-[13px] text-red-600">{err}</p>}
       <div className="mt-3 flex justify-end gap-2">
-        <button onClick={onClose} className={ghostBtn}>取消</button>
-        <button onClick={submit} disabled={m.isPending} className={primaryBtn}>{m.isPending ? "AI 讀取中…" : "讀出視角"}</button>
+        <button onClick={onClose} className={ghostBtn}>{tr("Cancel", "取消")}</button>
+        <button onClick={submit} disabled={m.isPending} className={primaryBtn}>{m.isPending ? tr("AI is reading…", "AI 讀取中…") : tr("Read out lens", "讀出視角")}</button>
       </div>
     </Modal>
   );
@@ -460,6 +466,7 @@ function ProposalCard({ brandId, tray, proposal, origin, metricLabels, judgeLabe
   brandId: number; tray: string; proposal: Proposal; origin: "chat" | "report";
   metricLabels: Record<string, string>; judgeLabels: Record<string, string>; onClose: () => void; onDone: (id: number) => void;
 }) {
+  useLang();
   const [name, setName] = React.useState(proposal.name);
   const [rowVals, setRowVals] = React.useState(proposal.rowDim.values);
   const [colVals, setColVals] = React.useState(proposal.colDim?.values ?? []);
@@ -467,14 +474,14 @@ function ProposalCard({ brandId, tray, proposal, origin, metricLabels, judgeLabe
   const m = api().acceptProposal.useMutation({ onSuccess: (r: any) => onDone(r.id), onError: (e: any) => setErr(e.message) });
   const dimBlock = (d: Proposal["rowDim"], vals: DimValue[], setVals: (v: DimValue[]) => void, role: string) => (
     <div className="rounded-lg border border-neutral-200 p-3">
-      <div className="text-[12px] text-neutral-500">{role}{d.isNew ? "・新維度" : ""}</div>
+      <div className="text-[12px] text-neutral-500">{role}{d.isNew ? tr(" · new dimension", "・新維度") : ""}</div>
       <div className="text-[14px] font-medium text-neutral-900">{d.label}</div>
       {vals.length > 0 && (
         <div className="mt-2 flex flex-wrap gap-1.5">
           {vals.map((v) => (
             <span key={v.code} className="inline-flex items-center gap-1 rounded-md bg-neutral-100 px-2 py-0.5 text-[12px] text-neutral-800">
               {v.label}
-              <button onClick={() => setVals(vals.filter((x) => x.code !== v.code))} aria-label={`移除 ${v.label}`}><FontAwesomeIcon icon={faXmark} /></button>
+              <button onClick={() => setVals(vals.filter((x) => x.code !== v.code))} aria-label={tr(`Remove ${v.label}`, `移除 ${v.label}`)}><FontAwesomeIcon icon={faXmark} /></button>
             </span>
           ))}
         </div>
@@ -482,12 +489,12 @@ function ProposalCard({ brandId, tray, proposal, origin, metricLabels, judgeLabe
     </div>
   );
   return (
-    <Modal title="提議的視角" onClose={onClose} wide>
+    <Modal title={tr("Proposed lens", "提議的視角")} onClose={onClose} wide>
       <input value={name} onChange={(e) => setName(e.target.value)} className={`${inputCls} mb-2 text-[14px] font-medium`} />
       {proposal.rationale && <p className="mb-3 text-[13px] text-neutral-600">{proposal.rationale}</p>}
       <div className="grid gap-2 md:grid-cols-2">
-        {dimBlock(proposal.rowDim, rowVals, setRowVals, "列")}
-        {proposal.colDim ? dimBlock(proposal.colDim, colVals, setColVals, "欄") : <div className="rounded-lg border border-dashed border-neutral-200 p-3 text-[13px] text-neutral-400">沒有欄維度</div>}
+        {dimBlock(proposal.rowDim, rowVals, setRowVals, tr("Rows", "列"))}
+        {proposal.colDim ? dimBlock(proposal.colDim, colVals, setColVals, tr("Columns", "欄")) : <div className="rounded-lg border border-dashed border-neutral-200 p-3 text-[13px] text-neutral-400">{tr("No column dimension", "沒有欄維度")}</div>}
       </div>
       <div className="mt-3 flex flex-wrap items-center gap-1.5 text-[13px] text-neutral-700">
         {proposal.config.stages.map((s, i) => (
@@ -496,14 +503,14 @@ function ProposalCard({ brandId, tray, proposal, origin, metricLabels, judgeLabe
             <span className="rounded-md bg-neutral-100 px-2 py-0.5">{s.label || metricLabels[s.metric] || s.metric}</span>
           </React.Fragment>
         ))}
-        <span className="ml-2 text-neutral-500">判讀：{judgeLabels[proposal.config.judge] ?? metricLabels[proposal.config.judge] ?? proposal.config.judge}</span>
+        <span className="ml-2 text-neutral-500">{tr("Judge by: ", "判讀：")}{judgeLabels[proposal.config.judge] ?? metricLabels[proposal.config.judge] ?? proposal.config.judge}</span>
       </div>
       {proposal.unmapped.length > 0 && (
-        <p className="mt-2 text-[12px] text-neutral-500">原文提到、但目前資料來源沒有的指標：{proposal.unmapped.join("、")}</p>
+        <p className="mt-2 text-[12px] text-neutral-500">{tr("Metrics mentioned in the source but not available from current data sources: ", "原文提到、但目前資料來源沒有的指標：")}{proposal.unmapped.join(tr(", ", "、"))}</p>
       )}
       {err && <p className="mt-2 text-[13px] text-red-600">{err}</p>}
       <div className="mt-4 flex justify-end gap-2">
-        <button onClick={onClose} className={ghostBtn}>不用了</button>
+        <button onClick={onClose} className={ghostBtn}>{tr("No thanks", "不用了")}</button>
         <button disabled={m.isPending} className={primaryBtn} onClick={() => m.mutate({
           brandId, tray, origin, name: name.trim() || proposal.name, config: proposal.config,
           note: proposal.rationale || undefined,
@@ -511,7 +518,7 @@ function ProposalCard({ brandId, tray, proposal, origin, metricLabels, judgeLabe
             { key: proposal.rowDim.key, label: proposal.rowDim.label, values: rowVals },
             ...(proposal.colDim ? [{ key: proposal.colDim.key, label: proposal.colDim.label, values: colVals }] : []),
           ],
-        })}>{m.isPending ? "建立中…" : "確認，建立視角"}</button>
+        })}>{m.isPending ? tr("Creating…", "建立中…") : tr("Confirm and create lens", "確認，建立視角")}</button>
       </div>
     </Modal>
   );
@@ -525,6 +532,7 @@ export function ImportModal({ brandId, traySources, sourceLabels, metricLabels, 
   brandId: number; traySources: string[]; sourceLabels: Record<string, string>; metricLabels: Record<string, string>;
   dims: Dim[]; imports: any[]; onClose: () => void; onDone: (msg: string) => void;
 }) {
+  useLang();
   const [file, setFile] = React.useState<File | null>(null);
   const [b64, setB64] = React.useState("");
   const [preview, setPreview] = React.useState<any>(null);
@@ -537,10 +545,10 @@ export function ImportModal({ brandId, traySources, sourceLabels, metricLabels, 
     onError: (e: any) => setErr(e.message),
   });
   const commit = api().importCommit.useMutation({
-    onSuccess: (r: any) => onDone(`匯入 ${r.facts} 筆${r.skipped ? `（略過 ${r.skipped} 列：沒有日期、總計列或沒有數字）` : ""}`),
+    onSuccess: (r: any) => onDone(tr(`Imported ${r.facts} rows${r.skipped ? ` (skipped ${r.skipped} rows: no date, a totals row, or no numbers)` : ""}`, `匯入 ${r.facts} 筆${r.skipped ? `（略過 ${r.skipped} 列：沒有日期、總計列或沒有數字）` : ""}`)),
     onError: (e: any) => setErr(e.message),
   });
-  const removeImport = api().removeImport.useMutation({ onSuccess: () => onDone("已撤回那次匯入") });
+  const removeImport = api().removeImport.useMutation({ onSuccess: () => onDone(tr("That import was undone", "已撤回那次匯入")) });
 
   const pick = async (f: File | null) => {
     setErr(null); setPreview(null); setFile(f);
@@ -551,33 +559,33 @@ export function ImportModal({ brandId, traySources, sourceLabels, metricLabels, 
   };
 
   const fieldOptions = [
-    { v: "", l: "略過" }, { v: "date", l: "日期" }, { v: "entity", l: "名稱（活動／廣告／UTM）" },
+    { v: "", l: tr("Skip", "略過") }, { v: "date", l: tr("Date", "日期") }, { v: "entity", l: tr("Name (campaign / ad / UTM)", "名稱（活動／廣告／UTM）") },
     ...Object.entries(metricLabels).map(([v, l]) => ({ v, l })),
-    ...dims.map((d) => ({ v: `tag:${d.key}`, l: `標籤：${d.label}` })),
+    ...dims.map((d) => ({ v: `tag:${d.key}`, l: tr(`Tag: ${d.label}`, `標籤：${d.label}`) })),
   ];
   const hasDate = Object.values(mapping).includes("date");
   const rowKey = preview?.rowCountKey as string | undefined;
 
   return (
-    <Modal title="匯入後台檔" onClose={onClose} wide>
+    <Modal title={tr("Import back-office file", "匯入後台檔")} onClose={onClose} wide>
       <label className="flex cursor-pointer items-center gap-3 rounded-lg border border-dashed border-neutral-300 p-4 text-[13px] text-neutral-600 hover:border-neutral-900">
         <FontAwesomeIcon icon={faFileImport} className="text-[20px]" />
-        <span className="flex-1">{file ? file.name : "Meta 廣告／Google 廣告／GA4／SHOPLINE／91APP／Shopify 匯出的 .csv 或 .xlsx"}</span>
+        <span className="flex-1">{file ? file.name : tr("A .csv or .xlsx exported from Meta Ads / Google Ads / GA4 / SHOPLINE / 91APP / Shopify", "Meta 廣告／Google 廣告／GA4／SHOPLINE／91APP／Shopify 匯出的 .csv 或 .xlsx")}</span>
         <input type="file" accept=".csv,.xlsx,.tsv,.txt" className="hidden" onChange={(e) => pick(e.target.files?.[0] ?? null)} />
       </label>
-      {prev.isPending && <p className="mt-3 text-[13px] text-neutral-500">讀取中…</p>}
+      {prev.isPending && <p className="mt-3 text-[13px] text-neutral-500">{tr("Reading…", "讀取中…")}</p>}
       {preview && (
         <div className="mt-4">
           <div className="mb-3 flex flex-wrap items-center gap-3 text-[13px]">
-            <span className="text-neutral-600">這是</span>
+            <span className="text-neutral-600">{tr("This is an export from", "這是")}</span>
             <select value={source} onChange={(e) => setSource(e.target.value)} className="rounded-md border border-neutral-300 px-2 py-1">
               {IMPORT_SOURCE_OPTIONS.map((s) => <option key={s} value={s}>{sourceLabels[s] ?? s}</option>)}
             </select>
-            <span className="text-neutral-500">的匯出檔，共 {preview.rowCount} 列</span>
+            <span className="text-neutral-500">{tr(`, ${preview.rowCount} rows`, `的匯出檔，共 ${preview.rowCount} 列`)}</span>
           </div>
           <div className="max-h-[320px] overflow-y-auto rounded-lg border border-neutral-200">
             <table className="w-full text-[13px]">
-              <thead className="bg-neutral-50 text-neutral-500"><tr><th className="px-2 py-1.5 text-left font-normal">原欄位</th><th className="px-2 py-1.5 text-left font-normal">範例</th><th className="px-2 py-1.5 text-left font-normal">對應到</th></tr></thead>
+              <thead className="bg-neutral-50 text-neutral-500"><tr><th className="px-2 py-1.5 text-left font-normal">{tr("Source column", "原欄位")}</th><th className="px-2 py-1.5 text-left font-normal">{tr("Example", "範例")}</th><th className="px-2 py-1.5 text-left font-normal">{tr("Maps to", "對應到")}</th></tr></thead>
               <tbody>
                 {preview.headers.map((h: string, i: number) => (
                   <tr key={h + i} className="border-t border-neutral-100">
@@ -596,12 +604,12 @@ export function ImportModal({ brandId, traySources, sourceLabels, metricLabels, 
           {rowKey && (
             <label className="mt-2 flex items-center gap-2 text-[13px] text-neutral-700">
               <input type="checkbox" checked={mapping[rowKey] === "orders"} onChange={(e) => setMapping({ ...mapping, [rowKey]: e.target.checked ? "orders" : "" })} />
-              每一列算一張訂單
+              {tr("Count each row as one order", "每一列算一張訂單")}
             </label>
           )}
           {!hasDate && (
             <label className="mt-2 flex items-center gap-2 text-[13px] text-neutral-700">
-              沒有日期欄，整份算在
+              {tr("No date column; count the whole file on", "沒有日期欄，整份算在")}
               <input type="date" value={fallbackDate} onChange={(e) => setFallbackDate(e.target.value)} className="rounded-md border border-neutral-300 px-2 py-0.5" />
             </label>
           )}
@@ -609,21 +617,21 @@ export function ImportModal({ brandId, traySources, sourceLabels, metricLabels, 
       )}
       {err && <p className="mt-2 text-[13px] text-red-600">{err}</p>}
       <div className="mt-4 flex justify-end gap-2">
-        <button onClick={onClose} className={ghostBtn}>取消</button>
+        <button onClick={onClose} className={ghostBtn}>{tr("Cancel", "取消")}</button>
         <button disabled={!preview || commit.isPending} className={primaryBtn}
           onClick={() => file && commit.mutate({ brandId, fileName: file.name, contentBase64: b64, source, mapping, fallbackDate })}>
-          {commit.isPending ? "匯入中…" : "匯入"}
+          {commit.isPending ? tr("Importing…", "匯入中…") : tr("Import", "匯入")}
         </button>
       </div>
       {imports.length > 0 && (
         <div className="mt-5 border-t border-neutral-100 pt-3">
-          <div className="mb-1 text-[12px] text-neutral-500">最近的匯入</div>
+          <div className="mb-1 text-[12px] text-neutral-500">{tr("Recent imports", "最近的匯入")}</div>
           {imports.slice(0, 6).map((im: any) => (
             <div key={im.id} className="flex items-center gap-2 py-1 text-[13px] text-neutral-700">
               <span className="flex-1 truncate">{im.fileName}</span>
-              <span className="text-neutral-400">{sourceLabels[im.source] ?? im.source}・{im.rowCount} 筆</span>
-              <button onClick={() => { if (confirm("撤回這次匯入？它帶進來的數據會一起刪除。")) removeImport.mutate({ brandId, id: im.id }); }}
-                className="text-neutral-400 hover:text-neutral-900" aria-label="撤回"><FontAwesomeIcon icon={faTrash} /></button>
+              <span className="text-neutral-400">{sourceLabels[im.source] ?? im.source}{tr(` · ${im.rowCount} rows`, `・${im.rowCount} 筆`)}</span>
+              <button onClick={() => { if (confirm(tr("Undo this import? The data it brought in will be deleted too.", "撤回這次匯入？它帶進來的數據會一起刪除。"))) removeImport.mutate({ brandId, id: im.id }); }}
+                className="text-neutral-400 hover:text-neutral-900" aria-label={tr("Undo", "撤回")}><FontAwesomeIcon icon={faTrash} /></button>
             </div>
           ))}
         </div>
@@ -638,6 +646,7 @@ function LensEditor({ brandId, tray, lens, dims, builtinDims, metricLabels, judg
   brandId: number; tray: string; lens: Lens; dims: Dim[]; builtinDims: { key: string; label: string }[];
   metricLabels: Record<string, string>; judgeLabels: Record<string, string>; onClose: () => void; onSaved: () => void;
 }) {
+  useLang();
   const [name, setName] = React.useState(lens.name);
   const [cfg, setCfg] = React.useState<LensConfig>(lens.config);
   const [newVal, setNewVal] = React.useState<Record<string, string>>({});
@@ -675,28 +684,28 @@ function LensEditor({ brandId, tray, lens, dims, builtinDims, metricLabels, judg
   };
 
   return (
-    <Modal title="編輯視角" onClose={onClose} wide>
+    <Modal title={tr("Edit lens", "編輯視角")} onClose={onClose} wide>
       <input value={name} onChange={(e) => setName(e.target.value)} className={`${inputCls} mb-3 text-[14px] font-medium`} />
       <div className="grid gap-3 md:grid-cols-3">
-        <label className="text-[13px] text-neutral-600">列
+        <label className="text-[13px] text-neutral-600">{tr("Rows", "列")}
           <select value={cfg.rowDim} onChange={(e) => setCfg({ ...cfg, rowDim: e.target.value })} className={inputCls}>
             {allDims.map((d) => <option key={d.key} value={d.key}>{d.label}</option>)}
           </select>
         </label>
-        <label className="text-[13px] text-neutral-600">欄
+        <label className="text-[13px] text-neutral-600">{tr("Columns", "欄")}
           <select value={cfg.colDim ?? ""} onChange={(e) => setCfg({ ...cfg, colDim: e.target.value || null })} className={inputCls}>
-            <option value="">不交叉</option>
+            <option value="">{tr("No crossing", "不交叉")}</option>
             {allDims.filter((d) => d.key !== cfg.rowDim).map((d) => <option key={d.key} value={d.key}>{d.label}</option>)}
           </select>
         </label>
-        <label className="text-[13px] text-neutral-600">判讀指標
+        <label className="text-[13px] text-neutral-600">{tr("Judging metric", "判讀指標")}
           <select value={cfg.judge} onChange={(e) => setCfg({ ...cfg, judge: e.target.value })} className={inputCls}>
             {Object.entries(judgeLabels).map(([k, l]) => <option key={k} value={k}>{l}</option>)}
-            {Object.entries(metricLabels).map(([k, l]) => <option key={k} value={k}>{l}（加總）</option>)}
+            {Object.entries(metricLabels).map(([k, l]) => <option key={k} value={k}>{l}{tr(" (sum)", "（加總）")}</option>)}
           </select>
         </label>
       </div>
-      <div className="mt-3 text-[13px] text-neutral-600">漏斗階段</div>
+      <div className="mt-3 text-[13px] text-neutral-600">{tr("Funnel stages", "漏斗階段")}</div>
       <div className="mt-1 flex flex-wrap gap-1.5">
         {Object.entries(metricLabels).map(([k, l]) => {
           const on = cfg.stages.some((s) => s.metric === k);
@@ -708,26 +717,26 @@ function LensEditor({ brandId, tray, lens, dims, builtinDims, metricLabels, judg
       </div>
       {editableDims.map((d) => (
         <div key={d.key} className="mt-4">
-          <div className="text-[13px] text-neutral-600">{d.label} 的值</div>
+          <div className="text-[13px] text-neutral-600">{tr(`Values of ${d.label}`, `${d.label} 的值`)}</div>
           <div className="mt-1 flex flex-wrap items-center gap-1.5">
             {d.values.map((v) => (
               <span key={v.code} className="inline-flex items-center gap-1 rounded-md bg-neutral-100 px-2 py-0.5 text-[12px] text-neutral-800">
                 {v.label}<span className="text-neutral-400">{v.code}</span>
-                <button onClick={() => removeValue(d, v.code)} aria-label={`移除 ${v.label}`}><FontAwesomeIcon icon={faXmark} /></button>
+                <button onClick={() => removeValue(d, v.code)} aria-label={tr(`Remove ${v.label}`, `移除 ${v.label}`)}><FontAwesomeIcon icon={faXmark} /></button>
               </span>
             ))}
             <input value={newVal[d.key] ?? ""} onChange={(e) => setNewVal({ ...newVal, [d.key]: e.target.value })}
-              onKeyDown={(e) => { if (e.key === "Enter") addValue(d); }} placeholder="新增一個值" className="w-32 rounded-md border border-neutral-200 px-2 py-0.5 text-[12px]" />
-            <button onClick={() => addValue(d)} aria-label="新增" className="text-neutral-500 hover:text-neutral-900"><FontAwesomeIcon icon={faPlus} /></button>
+              onKeyDown={(e) => { if (e.key === "Enter") addValue(d); }} placeholder={tr("Add a value", "新增一個值")} className="w-32 rounded-md border border-neutral-200 px-2 py-0.5 text-[12px]" />
+            <button onClick={() => addValue(d)} aria-label={tr("Add", "新增")} className="text-neutral-500 hover:text-neutral-900"><FontAwesomeIcon icon={faPlus} /></button>
           </div>
         </div>
       ))}
-      <p className="mt-3 text-[12px] text-neutral-400">值旁邊的英文是代碼，會寫進 UTM（utm_content=維度.代碼），後台訂單就能歸回這個格子。</p>
+      <p className="mt-3 text-[12px] text-neutral-400">{tr("The code next to each value is written into the UTM (utm_content=dimension.code), so back-office orders can be attributed back to this cell.", "值旁邊的英文是代碼，會寫進 UTM（utm_content=維度.代碼），後台訂單就能歸回這個格子。")}</p>
       {err && <p className="mt-2 text-[13px] text-red-600">{err}</p>}
       <div className="mt-4 flex justify-end gap-2">
-        <button onClick={onClose} className={ghostBtn}>取消</button>
+        <button onClick={onClose} className={ghostBtn}>{tr("Cancel", "取消")}</button>
         <button disabled={save.isPending} className={primaryBtn}
-          onClick={() => save.mutate({ brandId, tray, id: lens.id, name: name.trim() || lens.name, config: cfg })}>儲存</button>
+          onClick={() => save.mutate({ brandId, tray, id: lens.id, name: name.trim() || lens.name, config: cfg })}>{tr("Save", "儲存")}</button>
       </div>
     </Modal>
   );

@@ -14,7 +14,7 @@
 
 import { useEffect, useState, useRef } from "react";
 import { trpc } from "../../../../lib/trpc";
-import { useLang } from "../../../../lib/i18n";
+import { useLang, tr } from "../../../../lib/i18n";
 import { AddIcon, CloseIcon, DeleteIcon, GenerateIcon, RegenerateIcon, CheckIcon } from "../../../platform/components/icons";
 import AssetPhotoGallery from "./AssetPhotoGallery";
 import ProductSceneModal from "./ProductSceneModal";
@@ -92,7 +92,7 @@ function ChipInput({
           onKeyDown={(e) => {
             if (e.key === "Enter" || e.key === ",") { e.preventDefault(); add(); }
           }}
-          placeholder={placeholder ?? "輸入後按 Enter 新增"}
+          placeholder={placeholder ?? tr("Type and press Enter to add", "輸入後按 Enter 新增")}
           className="flex-1 text-sm px-3 py-1.5 border border-neutral-200 rounded-lg focus:outline-none focus:border-zinc-400"
         />
         <button
