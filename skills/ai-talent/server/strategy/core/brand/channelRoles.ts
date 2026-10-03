@@ -77,6 +77,15 @@ export function roleChannelOfTaskId(id: unknown): RoleChannel | null {
   }
 }
 
+/**
+ * 任務卡 template → 七通路。id 前綴優先；對不上才看 template 自己宣告的 outputDefaults.platform。
+ * 兩個都對不上就是 null——**不會**退回 facebook（orchestra 的 taskChannel 預設值是 facebook，
+ * 自建卡或跨平台卡若沿用它，會被注入 FB 的角色，比不注入更糟）。
+ */
+export function roleChannelOfTemplate(t: { id?: unknown; outputDefaults?: { platform?: unknown } | null } | null | undefined): RoleChannel | null {
+  return roleChannelOfTaskId(t?.id) ?? normalizeRoleChannel(t?.outputDefaults?.platform);
+}
+
 export function isRoleChannel(s: unknown): s is RoleChannel {
   return typeof s === "string" && (ROLE_CHANNELS as readonly string[]).includes(s);
 }

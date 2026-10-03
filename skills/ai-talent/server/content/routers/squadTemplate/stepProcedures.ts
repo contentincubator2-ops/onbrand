@@ -565,7 +565,11 @@ ${leadKnowledge}
       // 整包截 800 字（產品 800、活動 1500）——99s squad 任務幾乎讀不到品牌大腦。
       // 改讀同一份品牌大腦（跟「檢查大腦」畫面同一份），產品／活動範圍一起帶。
       if (scopeBrandId) {
-        const brandPrefix = await buildBrandPrefix(scopeBrandId, scopeProductId, scopeEventId, "full").catch(() => "");
+        // 2026-10-03：squad 的 slug 前綴就是平台 → 讀該平台的「通路角色」。
+        const { roleChannelOfTaskId } = await import("../../../strategy/core/brand/channelRoles");
+        const brandPrefix = await buildBrandPrefix(
+          scopeBrandId, scopeProductId, scopeEventId, "full", roleChannelOfTaskId(stSlugNew),
+        ).catch(() => "");
         if (brandPrefix) contextParts.push(`【品牌大腦】${brandPrefix}`);
       }
       if (scopeEventId) {

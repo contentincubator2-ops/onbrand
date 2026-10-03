@@ -140,7 +140,8 @@ export const imageCardRouter = router({
       const spec = specOr404(input.cardId);
       const brand = await resolveBrandVisualContext(input.brandId);
       const { buildBrandPrefix, enforceBrandRulesOnText } = await import("../../strategy/core/brand/brandContext");
-      const brainPrefix = await buildBrandPrefix(input.brandId, null, null, "full").catch(() => "");
+      // 2026-10-03：這張圖發在哪個平台 → 讀該平台的「通路角色」（構圖與標題的取向跟著平台走）。
+      const brainPrefix = await buildBrandPrefix(input.brandId, null, null, "full", spec.channel).catch(() => "");
       try {
         const out = await proposeImageDirections({ spec, copy: input.copy, brand, productName: input.productName, brainPrefix });
         // 圖上標題是會被看見的字——跟文案一樣過禁用詞／替換對照。

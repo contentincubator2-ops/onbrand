@@ -21,7 +21,7 @@ vi.mock("../../../localDb", () => ({
 
 import { buildBrandPrefix, buildBrandBrain, _clearBrandPrefixCache } from "./brandContext";
 import {
-  normalizeRoleChannel, roleChannelOfTaskId, cleanChannelRole, isEmptyChannelRole,
+  normalizeRoleChannel, roleChannelOfTaskId, roleChannelOfTemplate, cleanChannelRole, isEmptyChannelRole,
   channelRolesOf, isVerbatimIn, CHANNEL_ROLE_FIELDS, ROLE_CHANNELS,
 } from "./channelRoles";
 
@@ -77,6 +77,46 @@ describe("buildBrandPrefix × channel", () => {
     expect(item!.group).toBe("通路角色");
     expect(item!.status).toBe("remembered");
   });
+});
+
+describe("roleChannelOfTemplate", () => {
+  it("id 前綴優先；沒有前綴才看 outputDefaults.platform", () => {
+    expect(roleChannelOfTemplate({ id: "ig-30-x", outputDefaults: { platform: "facebook" } })).toBe("instagram");
+    expect(roleChannelOfTemplate({ id: "u123-my-card", outputDefaults: { platform: "threads" } })).toBe("threads");
+  });
+  it("兩個都對不上就是 null，不會退回 facebook", () => {
+    expect(roleChannelOfTemplate({ id: "u123-my-card" })).toBeNull();
+    expect(roleChannelOfTemplate({ id: "yt-30-x", outputDefaults: { platform: "youtube" } })).toBeNull();
+    expect(roleChannelOfTemplate(null)).toBeNull();
+  });
+});
+
+describe("產文入口都有把平台帶進品牌大腦", () => {
+  // 行為測試跑不到這些入口（要 DB、LLM、整個 router），所以用最便宜的守門：
+  // 這幾支「有任務／squad／圖片卡身分」的產文入口，必須呼叫 roleChannelOf*。
+  // 新增產文入口時，要嘛接上、要嘛寫進下面 INTENTIONALLY_WITHOUT 並說明為什麼不需要。
+  const root = new URL("../../..", import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, "$1");
+  const MUST = [
+    "content/core/engine/quickTaskOrchestra.ts",
+    "content/routers/quickTask/refineProcedures.ts",
+    "content/routers/quickTask/runProcedures.ts",
+    "content/routers/quickTask/squadAutoProcedures.ts",
+    "content/routers/squadTemplate/stepProcedures.ts",
+  ];
+  it.each(MUST)("%s 讀 roleChannelOf*", async (f) => {
+    const { readFileSync } = await import("node:fs");
+    expect(readFileSync(`${root}/${f}`, "utf-8")).toMatch(/roleChannelOf(TaskId|Template)/);
+  });
+  it("圖片卡 propose 帶 spec.channel", async () => {
+    const { readFileSync } = await import("node:fs");
+    expect(readFileSync(`${root}/content/routers/imageCardRouter.ts`, "utf-8")).toMatch(/buildBrandPrefix\([^)]*spec\.channel\)/);
+  });
+  // INTENTIONALLY_WITHOUT（不帶平台是對的）：
+  //  · inspirationRouter —— 一輪同時想多個平台的切角，沒有單一平台
+  //  · campaignPlan／campaignChat／campaignKpi —— 整檔活動的跨平台企劃
+  //  · rewriteDraft —— 通用文案診斷工具，沒有平台
+  //  · agentContextLoader —— 任務對話脈絡，不是某個平台的產文
+  //  · generateVideoScript —— YouTube，不在七通路
 });
 
 describe("client 鏡像", () => {
