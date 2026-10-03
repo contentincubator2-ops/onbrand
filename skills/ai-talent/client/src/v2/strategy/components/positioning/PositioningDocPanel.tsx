@@ -71,17 +71,21 @@ function renderValue(v: any): string {
 }
 
 export default function PositioningDocPanel({
-  scopeMode, scopeId, scopeName, onBackToOverview,
+  scopeMode, scopeId, scopeName, brandId, onBackToOverview,
 }: {
   scopeMode: Scope;
   scopeId: number | null;
   scopeName: string;
+  /** 2026-10-03：產品／活動的上傳要帶「所屬品牌」做權限檢查；品牌 scope 可省略（＝scopeId）。
+   *  先前一律把 scopeId 當 brandId 送，產品 id 對不上品牌 → 後端回 Not found。 */
+  brandId?: number | null;
   /** 2026-09-23（CJ「我寫入四格後，也沒有儲存或回到品牌頁面的按鈕。會迷路」）：
    *  寫入完成後的出口。沒傳的話完成畫面只會少那顆按鈕，不會壞。 */
   onBackToOverview?: () => void;
 }) {
   const { lang } = useLang();
   const en = lang === "en";
+  const ownerBrandId = scopeMode === "brand" ? scopeId : (brandId ?? scopeId);
   const scopeLabel = scopeMode === "brand" ? (en ? "brand" : "品牌")
                    : scopeMode === "product" ? (en ? "product" : "產品")
                    : (en ? "campaign" : "活動");
@@ -174,7 +178,7 @@ export default function PositioningDocPanel({
         method: "POST",
         headers: {
           "content-type": "application/octet-stream",
-          "x-brand-id": String(scopeId),
+          "x-brand-id": String(ownerBrandId),
           "x-scope": scopeMode,
           "x-scope-id": String(scopeId),
           "x-filename": encodeURIComponent(file.name),
@@ -194,7 +198,7 @@ export default function PositioningDocPanel({
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
-          brandId: scopeId, scope: scopeMode, scopeId,
+          brandId: ownerBrandId, scope: scopeMode, scopeId,
           title: `貼上的${scopeLabel}定位`, text: pasteText,
         }),
       });
@@ -208,7 +212,7 @@ export default function PositioningDocPanel({
     setError(null); setBusy(`read:${doc.id}`);
     try {
       const j = await post(
-        `/api/positioning-doc/doc?brandId=${scopeId}&scope=${scopeMode}&scopeId=${scopeId}&docId=${doc.id}`,
+        `/api/positioning-doc/doc?brandId=${ownerBrandId}&scope=${scopeMode}&scopeId=${scopeId}&docId=${doc.id}`,
         { method: "GET" },
       );
       setReading({ name: doc.name, sections: j.doc.sections });
@@ -219,7 +223,7 @@ export default function PositioningDocPanel({
   async function onDelete(doc: DocSummary) {
     setError(null); setBusy(`del:${doc.id}`);
     try {
-      await post(`/api/positioning-doc/${scopeId}/${scopeMode}/${scopeId}/${doc.id}`, { method: "DELETE" });
+      await post(`/api/positioning-doc/${ownerBrandId}/${scopeMode}/${scopeId}/${doc.id}`, { method: "DELETE" });
       coverageQuery.refetch?.();
     } catch (e: any) { setError(String(e?.message ?? e)); }
     finally { setBusy(null); }
@@ -241,7 +245,7 @@ export default function PositioningDocPanel({
           <p className="text-small font-semibold">{reading.name}</p>
           <Chip size="sm" variant="flat">{reading.sections.length} {en ? "sections" : "節"}</Chip>
         </div>
-        <div className="rounded-medium border border-divider bg-content1 p-5 flex flex-col gap-4">
+        <div className="rounded-2xl border border-divider bg-content1 p-5 flex flex-col gap-4">
           {reading.sections.map((s, i) => (
             <div key={i}>
               {s.heading && (
@@ -271,7 +275,7 @@ export default function PositioningDocPanel({
   if (doneInfo) {
     return (
       <div className="flex flex-col gap-4">
-        <div className="rounded-medium border border-success-200 bg-success-50/60 p-5">
+        <div className="rounded-2xl border border-success-200 bg-success-50/60 p-5">
           <div className="flex items-center gap-2">
             <CheckIcon size={16} className="text-success-700" />
             <p className="text-medium font-semibold text-success-800">
@@ -345,7 +349,7 @@ export default function PositioningDocPanel({
             return (
               <label
                 key={p.path}
-                className={`rounded-medium border p-3 flex gap-3 cursor-pointer transition-colors ${
+                className={`rounded-2xl border p-3 flex gap-3 cursor-pointer transition-colors ${
                   on ? "border-primary-300 bg-primary-50/40" : "border-divider bg-content1 opacity-60"
                 }`}
               >
@@ -381,7 +385,7 @@ export default function PositioningDocPanel({
         </div>
 
         {review.unmapped.length > 0 && (
-          <div className="rounded-medium border border-divider bg-content1 p-4">
+          <div className="rounded-2xl border border-divider bg-content1 p-4">
             <p className="text-small font-semibold">{en ? "Sections with no matching field" : "對不到欄位的段落"}</p>
             <p className="text-tiny text-default-500 mt-0.5 mb-2">
               {en
@@ -412,7 +416,7 @@ export default function PositioningDocPanel({
         )}
 
         {review.suggestedSegments.length > 0 && (
-          <div className="rounded-medium border border-primary-200 bg-primary-50/40 p-4">
+          <div className="rounded-2xl border border-primary-200 bg-primary-50/40 p-4">
             <p className="text-small font-semibold text-primary-800">
               {en ? "This looks like its own topic — new cards?" : "這幾段看起來是獨立的主題 — 要開新卡嗎？"}
             </p>
@@ -425,7 +429,7 @@ export default function PositioningDocPanel({
               {review.suggestedSegments.map((s, i) => {
                 const done = createdTitles.has(s.title);
                 return (
-                  <div key={i} className={`rounded-medium border p-3 ${done ? "border-success-300 bg-success-50/40" : "border-divider bg-content1"}`}>
+                  <div key={i} className={`rounded-2xl border p-3 ${done ? "border-success-300 bg-success-50/40" : "border-divider bg-content1"}`}>
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="text-small font-semibold">{s.title}</span>
                       {s.fromHeading && <Chip size="sm" variant="flat">{en ? "from" : "來自"}「{s.fromHeading}」</Chip>}
@@ -465,7 +469,7 @@ export default function PositioningDocPanel({
         )}
 
         {review.missing.length > 0 && (
-          <div className="rounded-medium border border-warning-200 bg-warning-50/50 p-4">
+          <div className="rounded-2xl border border-warning-200 bg-warning-50/50 p-4">
             {/* 2026-09-23（CJ「你列出了16格，但卻說只要補充四格，這樣數字對不上」）：
                 16 跟 4 其實是同一個 20 格的兩半（對到 4 + 沒對到 16），但畫面上
                 一個寫在黃框標題、一個寫在按鈕，中間沒有任何一句把關係講出來，
@@ -496,7 +500,7 @@ export default function PositioningDocPanel({
             寫在同一行，而不是讓使用者自己去減。 */}
         <div className="flex gap-2 items-center flex-wrap">
           <Button
-            color="primary" size="sm"
+            size="sm" radius="full" className="bg-neutral-900 text-white font-semibold"
             isLoading={busy === "apply"}
             isDisabled={accepted.size === 0 && inject.size === 0}
             onPress={() => {
@@ -539,7 +543,7 @@ export default function PositioningDocPanel({
       </div>
 
       {error && (
-        <div className="rounded-medium border border-danger-200 bg-danger-50 px-3 py-2 text-tiny text-danger-700">
+        <div className="rounded-2xl border border-danger-200 bg-danger-50 px-3 py-2 text-tiny text-danger-700">
           {error}
         </div>
       )}
@@ -547,14 +551,14 @@ export default function PositioningDocPanel({
       {/* 2026-09-23：使用者自己開的定位卡片（從文件/對話串裡提議、確認建立的），跟固定
           欄位一樣真的會進 prompt（見 brandContext.pushCustomSegments）。 */}
       {customSegments.length > 0 && (
-        <div className="rounded-medium border border-divider bg-content1 p-4">
+        <div className="rounded-2xl border border-divider bg-content1 p-4">
           <p className="text-small font-semibold">{en ? "Your own cards" : "你自己的卡片"}</p>
           <p className="text-tiny text-default-500 mt-0.5 mb-3">
             {en ? "These are read on every task run too." : "每次跑任務都會被讀到。"}
           </p>
           <div className="flex flex-col gap-2">
             {customSegments.map((s) => (
-              <div key={s.id} className="rounded-medium border border-divider p-3 flex gap-3 items-start">
+              <div key={s.id} className="rounded-2xl border border-divider p-3 flex gap-3 items-start">
                 <div className="min-w-0 flex-1">
                   <span className="text-small font-semibold">{s.title}</span>
                   <ul className="mt-1 flex flex-col gap-0.5">
@@ -585,12 +589,12 @@ export default function PositioningDocPanel({
           onChange={(e) => { const f = e.target.files?.[0]; if (f) void onFile(f); }}
         />
         <Button
-          size="sm" color="primary" startContent={<UploadIcon size={14} />}
+          size="sm" radius="full" className="bg-neutral-900 text-white font-semibold" startContent={<UploadIcon size={14} />}
           isLoading={busy === "upload"} onPress={() => fileRef.current?.click()}
         >
           {en ? "Upload a document" : "上傳文件"}
         </Button>
-        <Button size="sm" variant="flat" startContent={<PasteIcon size={14} />} onPress={() => setPasteOpen((v) => !v)}>
+        <Button size="sm" radius="full" variant="flat" startContent={<PasteIcon size={14} />} onPress={() => setPasteOpen((v) => !v)}>
           {en ? "Paste text" : "直接貼上"}
         </Button>
         <span className="text-tiny text-default-400">.docx / .doc / .pptx / .ppt / .xlsx / .pdf（含掃描檔）/ .md / .txt / .html</span>
@@ -605,7 +609,7 @@ export default function PositioningDocPanel({
               : "把你的定位貼在這裡 —— 可以是一份文件，也可以是整段 AI 對話紀錄。標題與段落會照原樣保留。"}
           />
           <div className="flex gap-2">
-            <Button size="sm" color="primary" isLoading={busy === "paste"} isDisabled={pasteText.trim().length < 40} onPress={() => void onPaste()}>
+            <Button size="sm" radius="full" className="bg-neutral-900 text-white font-semibold" isLoading={busy === "paste"} isDisabled={pasteText.trim().length < 40} onPress={() => void onPaste()}>
               {en ? "Save" : "儲存"}
             </Button>
             <Button size="sm" variant="light" onPress={() => { setPasteOpen(false); setPasteText(""); }}>
@@ -626,7 +630,7 @@ export default function PositioningDocPanel({
       ) : (
         <div className="flex flex-col gap-2">
           {docs.map((d) => (
-            <div key={d.id} className="rounded-medium border border-divider bg-content1 p-3 flex gap-3 items-start">
+            <div key={d.id} className="rounded-2xl border border-divider bg-content1 p-3 flex gap-3 items-start">
               <TextIcon size={16} className="mt-0.5 text-default-500 shrink-0" />
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2 flex-wrap">

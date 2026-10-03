@@ -41,6 +41,7 @@ import StrategyAlertsPanel from "../components/positioning/StrategyAlertsPanel";
 import PersonaAgentPanel from "../components/positioning/PersonaAgentPanel";
 import { showToastGlobal } from "../../../components/ui/Toast";
 import AddEntityModal, { type AddEntityTab } from "../components/AddEntityModal";
+import { TASK_MODAL_CLASSNAMES, TASK_MODAL_HEADER, TASK_MODAL_QUESTION } from "../../platform/components/taskModalStyle";
 import ProductDetailModal from "../components/positioning/ProductDetailModal";
 import EventCardGrid from "../components/events/EventCardGrid";
 import EventYearTimeline, { type PlanPrefill } from "../components/events/EventYearTimeline";
@@ -2489,21 +2490,39 @@ export default function BrandsPage() {
       <Modal
         isOpen={productDocId != null}
         onClose={() => { setProductDocId(null); brandProductsQ?.refetch?.(); }}
-        size="3xl"
+        size="2xl"
         scrollBehavior="inside"
+        backdrop="blur"
+        classNames={TASK_MODAL_CLASSNAMES}
       >
         <ModalContent>
-          <ModalHeader className="text-base font-semibold">
-            {lang === "en" ? "Upload product positioning" : "上傳產品定位"}
-            {" · "}
-            {brandProductsList?.find((p: any) => p.id === productDocId)?.name ?? ""}
+          <ModalHeader className={TASK_MODAL_HEADER}>
+            <div className="flex items-center gap-2.5 min-w-0">
+              <FontAwesomeIcon icon={faFileArrowUp} className="text-neutral-900 shrink-0" style={{ fontSize: 15 }} />
+              <p className="text-[15px] text-neutral-900 truncate font-semibold">
+                {brandProductsList?.find((p: any) => p.id === productDocId)?.name ?? (lang === "en" ? "Product" : "產品")}
+              </p>
+            </div>
           </ModalHeader>
           <ModalBody className="pb-6">
+            <div className="flex items-center gap-4 pt-3 pb-1">
+              <div className="min-w-0">
+                <h2 className={TASK_MODAL_QUESTION}>
+                  {lang === "en" ? "Already have this product's positioning?" : "這個產品的定位，已經寫好了嗎？"}
+                </h2>
+                <p className="text-[13px] text-neutral-500 mt-1">
+                  {lang === "en"
+                    ? "Upload the file or paste the text — we convert it to the format our AI reads."
+                    : "上傳文件或貼上文字，我們幫你轉成 AI 讀得懂的格式。"}
+                </p>
+              </div>
+            </div>
             {productDocId != null && (
               <PositioningDocPanel
                 scopeMode="product"
                 scopeId={productDocId}
                 scopeName={brandProductsList?.find((p: any) => p.id === productDocId)?.name ?? ""}
+                brandId={activeBrandIdForLocks}
                 onBackToOverview={() => { setProductDocId(null); brandProductsQ?.refetch?.(); }}
               />
             )}
@@ -3832,6 +3851,7 @@ function PositioningEditor({
       <PositioningDocPanel
         scopeMode={scopeMode}
         scopeId={targetId ?? null}
+        brandId={brandId}
         scopeName={scopeName}
         // 2026-09-23（CJ「我寫入四格後，也沒有儲存或回到品牌頁面的按鈕。
         // 會迷路」）：寫入完成後要有一條明確的出口回總覽，不是靠使用者
