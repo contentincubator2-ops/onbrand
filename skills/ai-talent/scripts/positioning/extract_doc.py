@@ -195,7 +195,19 @@ def extract(path: str) -> dict:
         kind = "markdown"
     elif ext in (".htm", ".html"):
         from lxml import html as lxml_html
-        doc = lxml_html.parse(path).getroot()
+        # 沒宣告 charset 的 HTML，lxml 會當 latin-1 → 中文變亂碼。先自己解碼：
+        # UTF-8 優先，其次台灣常見的 Big5，最後才放寬。
+        raw_bytes = open(path, "rb").read()
+        for enc in ("utf-8-sig", "big5", "gb18030"):
+            try:
+                html_text = raw_bytes.decode(enc)
+                break
+            except UnicodeDecodeError:
+                continue
+        else:
+            html_text = raw_bytes.decode("utf-8", "replace")
+        html_text = re.sub(r"^\s*<\?xml[^>]*\?>", "", html_text)  # lxml 不收帶 encoding 宣告的 str
+        doc = lxml_html.fromstring(html_text)
         raw, cur = [], {"level": 1, "heading": "", "body": []}
         raw.append(cur)
         for el in doc.iter():

@@ -179,7 +179,11 @@ async function runExtractor(path: string): Promise<ExtractedDoc> {
 async function extractPdfWithoutPoppler(path: string): Promise<ExtractedDoc> {
   const { extractText, getDocumentProxy } = await import("unpdf");
   const pdf = await getDocumentProxy(new Uint8Array(await fs.readFile(path)));
-  const { text } = await extractText(pdf, { mergePages: true });
+  const { text: rawText } = await extractText(pdf, { mergePages: true });
+  // 部分 PDF 的字型把常用字對到「康熙部首」區（⼼ ⼀ ⾷），肉眼一樣、字碼不同，
+  // 會讓後面的比對與搜尋全部落空。pdftotext 會自動轉回來，這裡補上同樣的事。
+  // 只轉部首區，不能整段 NFKC —— 那會把全形標點「，」變成半形「,」。
+  const text = rawText.replace(/[⺀-⿟]/g, (c) => c.normalize("NFKC"));
   const txtPath = path.replace(/\.pdf$/i, ".pdftext.txt");
   assertInsideStorage(txtPath);
   await fs.writeFile(txtPath, text, "utf-8");
