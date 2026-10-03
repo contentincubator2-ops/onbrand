@@ -31,6 +31,8 @@ import BrandAssetEditor, { type AssetKey } from "../components/positioning/Brand
 import KnowledgeEditor from "../components/positioning/KnowledgeEditor";
 import PositioningDocPanel from "../components/positioning/PositioningDocPanel";
 import CustomCardEditor, { type EditableCard } from "../components/positioning/CustomCardEditor";
+import ChannelRoleModal from "../components/positioning/ChannelRoleModal";
+import { CHANNELS, normalizeRole, roleFilledCount, roleHeadline, roleIsEmpty, type ChannelId } from "../lib/channelRoles";
 import AssetPhotoGallery from "../components/positioning/AssetPhotoGallery";
 import { InfoTab as BrandInfoTab, DangerTab as BrandDangerTab, PublishTab as BrandPublishTab } from "../components/positioning/BrandSettingsSheet";
 import BrainPanel from "../components/brain/BrainPanel";
@@ -47,6 +49,7 @@ import EventYearTimeline, { type PlanPrefill } from "../components/events/EventY
 import { toYmd } from "../lib/eventTimeline";
 // Notion-style line icons
 import { LockToggle } from "../components/positioning/LockToggle";
+import { ICON } from "../../platform/components/icons";
 import { AgentIcon, MemoryIcon, RegulationIcon, AwardIcon, BundleIcon, CommentIcon, DeleteIcon, EditIcon, FontIcon, GenerateIcon, HashtagIcon, IdCardIcon, LibraryIcon, LockIcon, PaletteIcon, PlayIcon, QuoteIcon, RegenerateIcon, ShieldIcon, TargetIcon, TextIcon, DoneIcon, StopIcon, WarningIcon, CheckIcon, CloseIcon } from "../../platform/components/icons";
 import { SCOPE_SEGMENTS, type SegmentSpec } from "../lib/positioningSchema";
 import { specOf as copySpecOf } from "../lib/copyAssets";
@@ -649,7 +652,7 @@ export default function BrandsPage() {
   // 2026-05-07 Path A simplification: 3 main tiles only (定位/文字/知識).
   // "visual" is kept in the type for legacy lock-state code paths, but
   // is no longer exposed as a tile — its contents live in Settings.
-  const category: "positioning" | "copy" | "visual" | "knowledge" | "info" | "publish" | "settings" | "products" | "events" | "regulations" | "brain" | "persona" | "campaign" =
+  const category: "positioning" | "copy" | "visual" | "knowledge" | "info" | "publish" | "settings" | "products" | "events" | "regulations" | "channels" | "brain" | "persona" | "campaign" =
     urlCat === "copy" ? "copy"
     : urlCat === "knowledge" ? "knowledge"
     : urlCat === "visual" ? "visual"
@@ -659,6 +662,7 @@ export default function BrandsPage() {
     : urlCat === "products" ? "products"
     : urlCat === "events" ? "events"
     : urlCat === "regulations" ? "regulations"
+    : urlCat === "channels" ? "channels"
     : urlCat === "brain" ? "brain"
     : urlCat === "persona" ? "persona"
     // 2026-09-25（CJ「應該要在活動的 mission tray 當中，增加這個活動的任務卡」）：
@@ -675,7 +679,7 @@ export default function BrandsPage() {
   // version clobbered it with a snapshot from BEFORE that write, dropping
   // `e` and silently falling back to brand-level positioning. Functional
   // form fixes it for every caller, not just this one site.
-  const setCategory = (next: "positioning" | "copy" | "knowledge" | "info" | "visual" | "publish" | "products" | "events" | "regulations" | "brain" | "persona") => {
+  const setCategory = (next: "positioning" | "copy" | "knowledge" | "info" | "visual" | "publish" | "products" | "events" | "regulations" | "channels" | "brain" | "persona") => {
     setSearchParams((prev) => {
       const nextParams = new URLSearchParams(prev);
       nextParams.set("cat", next);
@@ -997,6 +1001,8 @@ export default function BrandsPage() {
   // 自訂卡片的編輯器開在這一層——scopeMode / targetId / coverage 的 refetch
   // 都在這裡，編輯器本身只管一張卡。null = 沒開。
   const [editingCard, setEditingCard] = React.useState<EditableCard | null>(null);
+  // 2026-10-03：通路角色（每個平台各自的定位）— 開哪一個平台的編輯視窗。null = 沒開。
+  const [editingChannel, setEditingChannel] = React.useState<ChannelId | null>(null);
 
   const utils = (trpc as any).useUtils?.() ?? null;
 
@@ -1670,6 +1676,9 @@ export default function BrandsPage() {
                   { v: "regulations" as const, label: lang === "en" ? "Regulations" : "法規",
                       desc: lang === "en" ? "Checked before every draft" : "寫文前先審查",
                       Icon: RegulationIcon, scopes: ["brand"] },
+                  { v: "channels"    as const, label: lang === "en" ? "Channels" : "通路",
+                      desc: lang === "en" ? "Each platform's role" : "每個平台的角色",
+                      Icon: CommentIcon,   scopes: ["brand"] },
                   { v: "brain"       as const, label: lang === "en" ? "Memory" : "記憶",
                       desc: lang === "en" ? "What the AI remembers" : "AI 記住了什麼、滿了怎麼清",
                       Icon: MemoryIcon,    scopes: ["brand", "product", "event"] },
@@ -2387,6 +2396,17 @@ export default function BrandsPage() {
             </div>
           )}
 
+          {/* ── 通路 (channels) — 每個平台各自的定位 ──
+               2026-10-03（CJ「不同平台的定位不同，不是加在品牌頁面，而是增加一個 mission tray，
+               呈現方式參考品牌頁面」）：七個平台各一張卡（樣式同品牌定位卡），點開編輯五格，
+               也可以在裡面與 AI 討論或貼上現成文字。只有發在該平台的任務會讀到那張卡。 */}
+          {derivedCategory === "channels" && scopeMode === "brand" && activeBrandIdForLocks && (
+            <ChannelRolesTray
+              channelRoles={positioningSegmentData.channelRoles}
+              onEdit={setEditingChannel}
+            />
+          )}
+
           {/* ── 大腦 (brain) — 檢查品牌大腦 ──
                2026-09-29（CJ「在策略端增加一個 mission tray，是檢查大腦……像手機
                記憶體的感覺」）：列出每篇產文實際讀到的品牌大腦、用了多少容量、
@@ -2572,6 +2592,17 @@ export default function BrandsPage() {
         onClose={() => setEditingCard(null)}
         onSaved={() => positioningCoverageQuery.refetch?.()}
       />
+
+      {/* 2026-10-03：通路角色編輯視窗（五格表單 + 與 AI 討論 + 貼上現成文字）。
+          存檔後重抓 scope.active，總覽的卡片才會讀到新內容。 */}
+      <ChannelRoleModal
+        open={!!editingChannel}
+        channel={editingChannel}
+        brandId={scopeMode === "brand" ? (targetId ?? null) : null}
+        saved={editingChannel ? positioningSegmentData.channelRoles?.[editingChannel] : null}
+        onClose={() => setEditingChannel(null)}
+        onSaved={() => utils?.scope?.active?.invalidate?.()}
+      />
     </main>
   );
 }
@@ -2685,6 +2716,64 @@ function TabActionBar({
 }
 
 /* ─────────────────────────── PositioningBrainBar ─────────────────────
+
+/* ─────────────────────────── ChannelRolesTray ───────────────────────────
+   2026-10-03：「通路」tray 的內容——七個平台各一張 PositioningCard（同品牌定位總覽的卡片），
+   點開是 ChannelRoleModal（五格 + 與 AI 討論 + 貼上現成文字）。資料在
+   brands.positioning.channelRoles，跟品牌定位同一份 JSON，所以讀的是上面已經載入的
+   positioningSegmentData，不另外查詢。 */
+function ChannelRolesTray({
+  channelRoles, onEdit,
+}: {
+  channelRoles?: Record<string, any>;
+  onEdit: (channel: ChannelId) => void;
+}) {
+  const { lang } = useLang();
+  const en = lang === "en";
+  return (
+    <div style={{ padding: "8px 0 32px" }}>
+      <SectionLabel
+        label={en ? "Platform roles" : "通路角色"}
+        counter={`${CHANNELS.filter((c) => !roleIsEmpty(channelRoles?.[c.id])).length} / ${CHANNELS.length}`}
+        intro={en
+          ? "The same brand plays a different role on each platform — who it talks to, what it says, what it leaves out. Only tasks that publish to a platform read that platform's card; shared brand positioning stays on the Brand page."
+          : "同一個品牌，在每個平台扮演的角色不一樣：對誰說、說什麼、不說什麼。只有發在該平台的任務會讀到那個平台的卡片；品牌共通的定位仍然放在「品牌」頁。"}
+      />
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+        {CHANNELS.map((ch) => {
+          const role = normalizeRole(channelRoles?.[ch.id]);
+          const filled = roleFilledCount(role);
+          const hasContent = filled > 0;
+          const headline = roleHeadline(role);
+          return (
+            <PositioningCard
+              key={ch.id}
+              label={en ? ch.en : ch.zh}
+              icon={ICON[ch.icon]}
+              onClick={() => onEdit(ch.id)}
+              hasContent={hasContent}
+              headline={headline ? truncate(headline, 50) : undefined}
+              rationale={en ? ch.hintEn : ch.hintZh}
+              preview={hasContent ? (
+                <ul style={{ margin: 0, padding: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: 4 }}>
+                  {role.audience && (
+                    <li><strong style={{ color: "#171717", fontWeight: 600 }}>{en ? "To: " : "對象："}</strong>{truncate(role.audience, 40)}</li>
+                  )}
+                  {role.tone && (
+                    <li><strong style={{ color: "#171717", fontWeight: 600 }}>{en ? "Tone: " : "語氣："}</strong>{truncate(role.tone, 40)}</li>
+                  )}
+                </ul>
+              ) : undefined}
+              sourceLabel={hasContent
+                ? (en ? `${filled} / 5 filled` : `已填 ${filled} / 5 格`)
+                : (en ? "Platform role" : "通路角色")}
+            />
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
 /* ─────────────────────────── PositioningGrid ───────────────────────── */
 // 品牌定位的 card grid — 速查卡/指令庫 + segments 分組顯示

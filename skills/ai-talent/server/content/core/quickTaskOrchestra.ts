@@ -38,6 +38,7 @@ import { isWuganVoiceTemplate, validateWuganVoice, repairWuganVoice, buildWuganV
 import { extractYouTubeId, fetchYouTubeContext, formatYouTubeContextForPrompt } from "./youtubeContext";
 import { fetchViralPatterns, formatViralPatternsForPrompt } from "./socialListeningScout";
 import { buildBrandPrefix as buildBrandContext, enforceBrandRulesOnText, enforceBrandRulesOnTextWithReport } from "../../strategy/core/brandContext";
+import { roleChannelOfTaskId } from "../../strategy/core/channelRoles";
 import { isEmailBodyTask, EDM_CRAFT_RUBRIC, edmPlaybookFor } from "./edmCraft";
 import { isInstagramTask, isInstagramBodyTask, IG_CRAFT_RUBRIC, igPlaybookFor } from "./igCraft";
 import { resolveTierVariantShape } from "./tierVariantShape";
@@ -2153,7 +2154,8 @@ export async function runOrchestra(args: {
       // 拿掉 2026-05-17 的 core／full 分層——每個 tier 都讀同一份品牌大腦，
       // 也就是「檢查大腦」畫面上列出來的那一份。知識庫不再注入。
       Promise.all([
-        buildBrandContext(args.brandId, args.productId, args.eventId, "full").catch(() => ""),
+        // 2026-10-03：帶上任務所在平台 → 該平台在策略層存過「通路角色」就只注入那一張。
+        buildBrandContext(args.brandId, args.productId, args.eventId, "full", roleChannelOfTaskId(args.template.id) ?? taskChannel).catch(() => ""),
         args.brandId
           ? getBrandRealContent(args.brandId).then(r => r.context).catch(() => "")
           : Promise.resolve(""),

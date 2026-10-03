@@ -190,6 +190,10 @@ function buildNavItems(lang: "zh-TW" | "en", userEmail?: string | null, currentP
       // 用戶自己加的法規來源，每條一張卡；啟用中的每一篇產文動筆前都會讀、逐條審查。
       { to: "/brands/edit?cat=regulations", catKey: "regulations", label: en ? "Regulations" : "法規", icon: <FontAwesomeIcon icon={ICON.regulation} />,
         tooltip: en ? "Regulations every draft is checked against" : "寫文前要審查的法規" },
+      // 2026-10-03（CJ「不同平台的定位不同…增加一個 mission tray，呈現方式參考品牌頁面」）：
+      // 七個平台各自的角色（對誰說、說什麼、不說什麼）；只有發在該平台的任務會讀。
+      { to: "/brands/edit?cat=channels", catKey: "channels", label: en ? "Channels" : "通路", icon: <FontAwesomeIcon icon={ICON.message} />,
+        tooltip: en ? "Each platform's role in the brand" : "每個平台在品牌裡的角色" },
       // 2026-09-29（CJ「在策略端增加一個 mission tray，是檢查大腦」）：品牌大腦記住了
       // 什麼、還能記多少——跟每篇產文讀的是同一份。
       // 2026-09-30（CJ「重新想這個 mission tray 的名字，目的在管理記憶」→「名稱就叫做『記憶』」）：
