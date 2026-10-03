@@ -2,32 +2,9 @@
  * 圖片任務卡的卡片外觀——沿用 TaskCardShell（同一種卡），圖片區畫出這個規格的
  * 實際比例外框，讓用戶一眼看出「直的、方的、寬的」。
  */
-import { TaskCardShell, CARD_MEDIA_H } from "../TaskCardShell";
+import { TaskCardShell, CARD_MEDIA_H } from "../../../platform/components/TaskCardShell";
 import { useLang } from "../../../../lib/i18n";
-
-export interface ImageCardInfo {
-  id: string;
-  channel: string;
-  placement?: "organic" | "ad";
-  pinned?: boolean;
-  labelZh: string;
-  labelEn: string;
-  descZh: string;
-  descEn: string;
-  width: number;
-  height: number;
-  ratio: string;
-  maxImages: number;
-  safeZone: { top: number; bottom: number; left: number; right: number } | null;
-  titleZone: "top" | "center" | "bottom" | "left" | "none";
-  noteZh: string;
-  format: "png" | "jpeg";
-  maxBytes: number | null;
-  nanoBanana: boolean;
-  /** 合成版型：AI 只生方形主體，其餘補背景色。 */
-  composed?: boolean;
-  source: string;
-}
+import type { ImageCardInfo } from "../../../platform/lib/imageCardHandoff";
 
 export function RatioFrame({ width, height, box = CARD_MEDIA_H - 34 }: { width: number; height: number; box?: number }) {
   const r = width / height;

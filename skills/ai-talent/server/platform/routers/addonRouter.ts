@@ -5,10 +5,10 @@ import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure } from "../core/trpc";
 import localPool from "../../localDb";
-import { addonAvailableFor } from "../core/plans";
+import { addonAvailableFor } from "../core/billing/plans";
 import {
   createEcomReportingRequest, listAddonRequests, quoteEcomReporting,
-} from "../core/addonRequests";
+} from "../core/billing/addonRequests";
 import { loadUserPlan } from "./billingRouter";
 
 const SKUS = z.number().int().min(1).max(100000);

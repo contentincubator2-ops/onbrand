@@ -15,7 +15,7 @@
  *
  * TTFV = time between #1 and #5 for the same userId.
  * 2026-09-30：七日發布台移除，#4／#5 從 first_theater_arrived／first_week_generated
- * 換成現在這兩個；後台把舊事件當別名一起算（server/platform/core/activationFunnel.ts）。
+ * 換成現在這兩個；後台把舊事件當別名一起算（server/platform/core/ops/activationFunnel.ts）。
  */
 
 export type ActivationStage =

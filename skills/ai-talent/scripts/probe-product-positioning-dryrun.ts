@@ -7,11 +7,11 @@
  */
 import localPool from "../server/localDb.js";
 // @ts-ignore — VM 上的暫存複本
-import { buildProductPositioningSteps } from "../server/strategy/core/_probe_positioningSteps.js";
+import { buildProductPositioningSteps } from "../server/strategy/core/positioning/_probe_positioningSteps.js";
 // @ts-ignore
-import { loadProductSiblingContext, isSiteWideText } from "../server/strategy/core/_probe_productSiblings.js";
-import { fetchProductMeta } from "../server/strategy/core/productMeta.js";
-import { buildMarketContext } from "../server/strategy/core/marketProfiles.js";
+import { loadProductSiblingContext, isSiteWideText } from "../server/strategy/core/entities/_probe_productSiblings.js";
+import { fetchProductMeta } from "../server/strategy/core/entities/productMeta.js";
+import { buildMarketContext } from "../server/strategy/core/brand/marketProfiles.js";
 
 const parse = (v: any) => { if (v == null) return {}; if (typeof v !== "string") return v; try { return JSON.parse(v); } catch { return {}; } };
 

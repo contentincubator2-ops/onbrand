@@ -13,19 +13,19 @@
  * are generic ("新品上市" etc) — won't produce great copy but proves the
  * orchestra/LLM/persistence chain works end-to-end.
  */
-import { FB_30S_TASKS, getOrchestraConfig } from "../server/content/core/quickTaskFB";
-import { IG_30S_TASKS, getIGOrchestraConfig } from "../server/content/core/quickTaskIG";
-import { YT_30S_TASKS, getYTOrchestraConfig } from "../server/content/core/quickTaskYT";
-import { TT_30S_TASKS, getTTOrchestraConfig } from "../server/content/core/quickTaskTikTok";
-import { LI_30S_TASKS, getLIOrchestraConfig } from "../server/content/core/quickTaskLI";
-import { EMAIL_30S_TASKS, getEmailOrchestraConfig } from "../server/content/core/quickTaskEmail";
-import { PR_30S_TASKS, getPROrchestraConfig } from "../server/content/core/quickTaskPR";
-import { BRAND_30S_TASKS, getBrandOrchestraConfig } from "../server/content/core/quickTaskBrand";
-import { RESEARCH_30S_TASKS, getResearchOrchestraConfig } from "../server/content/core/quickTaskResearch";
+import { FB_30S_TASKS, getOrchestraConfig } from "../server/content/core/catalog/quickTaskFB";
+import { IG_30S_TASKS, getIGOrchestraConfig } from "../server/content/core/catalog/quickTaskIG";
+import { YT_30S_TASKS, getYTOrchestraConfig } from "../server/content/core/catalog/quickTaskYT";
+import { TT_30S_TASKS, getTTOrchestraConfig } from "../server/content/core/catalog/quickTaskTikTok";
+import { LI_30S_TASKS, getLIOrchestraConfig } from "../server/content/core/catalog/quickTaskLI";
+import { EMAIL_30S_TASKS, getEmailOrchestraConfig } from "../server/content/core/catalog/quickTaskEmail";
+import { PR_30S_TASKS, getPROrchestraConfig } from "../server/content/core/catalog/quickTaskPR";
+import { BRAND_30S_TASKS, getBrandOrchestraConfig } from "../server/content/core/catalog/quickTaskBrand";
+import { RESEARCH_30S_TASKS, getResearchOrchestraConfig } from "../server/content/core/catalog/quickTaskResearch";
 // 60s collections
-import { FB_60S_TASKS_V2, FB_60S_ORCHESTRA } from "../server/content/core/quickTaskFB60";
-import { IG_60S_TASKS, IG_60S_ORCHESTRA } from "../server/content/core/quickTaskIG60";
-import { YT_60S_TASKS, YT_60S_ORCHESTRA } from "../server/content/core/quickTaskYT60";
+import { FB_60S_TASKS_V2, FB_60S_ORCHESTRA } from "../server/content/core/catalog/quickTaskFB60";
+import { IG_60S_TASKS, IG_60S_ORCHESTRA } from "../server/content/core/catalog/quickTaskIG60";
+import { YT_60S_TASKS, YT_60S_ORCHESTRA } from "../server/content/core/catalog/quickTaskYT60";
 import {
   TT_60S_TASKS, TT_60S_ORCHESTRA,
   LI_60S_TASKS, LI_60S_ORCHESTRA,
@@ -33,15 +33,15 @@ import {
   PR_60S_TASKS, PR_60S_ORCHESTRA,
   BRAND_60S_TASKS, BRAND_60S_ORCHESTRA,
   RESEARCH_60S_TASKS, RESEARCH_60S_ORCHESTRA,
-} from "../server/content/core/quickTaskMulti60";
+} from "../server/content/core/catalog/quickTaskMulti60";
 // 100s collections
 import {
   FB_99S_TASKS, FB_99S_ORCHESTRA,
   IG_99S_TASKS, IG_99S_ORCHESTRA,
   YT_99S_TASKS, YT_99S_ORCHESTRA,
   MULTI_99S_TASKS, MULTI_99S_ORCHESTRA,
-} from "../server/content/core/quickTask100";
-import { runOrchestra } from "../server/content/core/quickTaskOrchestra";
+} from "../server/content/core/catalog/quickTask100";
+import { runOrchestra } from "../server/content/core/engine/quickTaskOrchestra";
 
 type Mode = "pilot" | "full" | "tier-30" | "tier-60" | "tier-99" | "remaining";
 const mode: Mode = (process.argv[2] as Mode) || "pilot";

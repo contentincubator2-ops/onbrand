@@ -18,7 +18,7 @@
 import { useEffect } from "react";
 import { CloseIcon } from "../../../platform/components/icons";
 import { trpc } from "../../../../lib/trpc";
-import { resolveSource, sourceLabel, sourceWhy } from "../../lib/sourceVocabulary";
+import { resolveSource, sourceLabel, sourceWhy } from "../../../platform/lib/sourceVocabulary";
 
 interface Props {
   taskId: string | null;

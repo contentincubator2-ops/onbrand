@@ -2,7 +2,7 @@ import { z } from "zod";
 import { router, protectedProcedure } from "../../platform/core/trpc";
 import { getSoworkDb } from "../../db";
 import { sql, eq, and } from "drizzle-orm";
-import { matchAgents } from "../core/agentMatcher";
+import { matchAgents } from "../core/squad/agentMatcher";
 import localPool from "../../localDb";
 
 // ── Shared schema (single source of truth — no duplication) ───────────────

@@ -9,13 +9,13 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure } from "../../platform/core/trpc";
-import { assertStrategyMonitoringAllowed, planQuotaFor } from "../../platform/core/planGate";
+import { assertStrategyMonitoringAllowed, planQuotaFor } from "../../platform/core/billing/planGate";
 import localPool from "../../localDb";
 import {
   SCAN_INTERVAL_DAYS,
   backfillEvidenceDates, ensureWatches, listAlerts, newsMarketOf, runStrategyScan, setAlertStatus, unreadAlertSummary, updateWatch,
   type StrategyWatch,
-} from "../core/strategyMonitor";
+} from "../core/monitor/strategyMonitor";
 
 async function assertBrandOwner(userId: number, brandId: number): Promise<{ id: number; name: string }> {
   const [rows]: any = await localPool.execute(

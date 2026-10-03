@@ -174,7 +174,7 @@ authRouter.post("/register", async (req: Request, res: Response) => {
       // 2026-05-14 (CJ「TWD + USD 雙幣」): infer billing country from
       // Accept-Language. zh-* → TW (TWD), else US (USD). User can flip
       // this later in /settings/account.
-      const { inferBillingCountryFromAcceptLanguage } = await import("../core/plans");
+      const { inferBillingCountryFromAcceptLanguage } = await import("../core/billing/plans");
       const billingCountry = inferBillingCountryFromAcceptLanguage(req.header("accept-language"));
       await localPool.execute(
         `UPDATE users SET planCode='trial', planStatus='trial', planEndsAt=?, billingCountry=? WHERE id=?`,

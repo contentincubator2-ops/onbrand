@@ -23,7 +23,7 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faRocket, faCubes, faCalendarDays } from "@fortawesome/free-solid-svg-icons";
 // 2026-09-10 (CJ 市場收斂): 見 BrandOnboardingWizard 的同一則說明。
 import { marketOptions, getCountry } from "../../../lib/countries";
-import EventProductScopePicker from "./positioning/EventProductScopePicker";
+import EventProductScopePicker from "./events/EventProductScopePicker";
 import { UNDECIDED_SCOPE, type ProductScopeValue } from "../lib/eventProductScope";
 
 // 2026-07-18 (CJ 多市場): same list as BrandOnboardingWizard — common
@@ -246,7 +246,7 @@ export function AddEntityModal({ isOpen, onClose, initialTab = "brand", defaultB
         startAt: evStart || null,
         endAt: evEnd || null,
         // 搭配的產品寫進 event_products；「純品牌」沒有產品可寫，所以記在
-        // positioning.campaign.productScope（語意見 server/strategy/core/eventProductScope.ts）。
+        // positioning.campaign.productScope（語意見 server/strategy/core/entities/eventProductScope.ts）。
         ...(evScope.scope ? { productIds: evScope.productIds } : {}),
         positioning: (evNote.trim() || evScope.scope)
           ? {

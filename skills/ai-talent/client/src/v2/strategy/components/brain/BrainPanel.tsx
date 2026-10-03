@@ -9,7 +9,7 @@
  *     點進去看「存了什麼」，點欄位回策略層原頁修改
  *   · 「不要呈現沒讀到、舊版留下的問題，屬於系統面的問題」→ 沒有狀態標記、沒有清理建議
  *
- * 資料：brandKnowledge.memory（server/strategy/core/brandMemory.ts），用量的算法見 memoryModel.ts。
+ * 資料：brandKnowledge.memory（server/strategy/core/brand/brandMemory.ts），用量的算法見 memoryModel.ts。
  * 顏色只表達狀態（快滿＝琥珀、滿了＝紅），其餘一律灰階。
  */
 import { useMemo, useState } from "react";

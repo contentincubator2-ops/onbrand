@@ -22,8 +22,8 @@ import { SignJWT } from "jose";
 import "./../server/bootstrap-env";
 import localPool from "../server/localDb";
 import { getJwtSecret } from "../server/platform/core/env";
-import { resolveTask } from "../server/content/core/taskRegistry";
-import { registerBrandTaskCardSource } from "../server/strategy/core/brandTaskCards";
+import { resolveTask } from "../server/content/core/catalog/taskRegistry";
+import { registerBrandTaskCardSource } from "../server/content/core/catalog/brandTaskCards";
 
 registerBrandTaskCardSource();
 

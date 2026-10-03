@@ -12,7 +12,7 @@
  * 用法：./node_modules/.bin/tsx scripts/probe-scene-refine.ts [brandId] [productId]
  */
 import localPool from "../server/localDb.js";
-import { refineScenePrompt } from "../server/content/core/scenePromptRefiner.js";
+import { refineScenePrompt } from "../server/content/core/image/scenePromptRefiner.js";
 
 /** 使用者真的會打的東西——短、含糊、或什麼都沒寫。 */
 const CASES = ["餐桌", "有人在吃", "一家人吃飯很溫馨", ""];

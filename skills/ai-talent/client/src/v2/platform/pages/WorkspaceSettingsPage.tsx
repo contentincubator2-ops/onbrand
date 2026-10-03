@@ -12,7 +12,7 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { trpc } from "../../../lib/trpc";
 import { useLang } from "../../../lib/i18n";
-import { showToastGlobal } from "../../../components/ui/Toast";
+import { showToastGlobal } from "../components/Toast";
 import { BuildingIcon, ChevronLeftIcon, DeleteIcon, ShieldIcon, UserAddIcon } from "../components/icons";
 
 type Role = "owner" | "admin" | "editor" | "viewer";

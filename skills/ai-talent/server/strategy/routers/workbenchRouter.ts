@@ -19,12 +19,12 @@ import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure } from "../../platform/core/trpc";
 import localPool from "../../localDb";
-import { startPositioningJob, type PositioningStep, type StepContext } from "../core/positioningJobRunner";
-import { isPositioningLocked } from "../core/positioningLock";
+import { startPositioningJob, type PositioningStep, type StepContext } from "../core/positioning/positioningJobRunner";
+import { isPositioningLocked } from "../core/positioning/positioningLock";
 
 /** LLM call + JSON parse for cascade steps (cost recorded via ctx). */
 async function stepJSON(ctx: StepContext, stepId: string, sys: string, user: string, maxTokens = 1500): Promise<any | null> {
-  const { invokeLLM } = await import("../../platform/core/llm");
+  const { invokeLLM } = await import("../../platform/core/llm/llm");
   const r = await invokeLLM({
     messages: [{ role: "system", content: sys }, { role: "user", content: user }],
     maxTokens,
@@ -262,7 +262,7 @@ spots[0] 的 tagline.zh 必須是「現行${scope.entityKind === "event" ? "SMP"
 }
 spots 2-4 個（情感與功能都要有）；stakes/rivalTurf/vanity 各 1-3 個。每個 spot 的 need/gap/ours 必須構成可唸出來的因果鏈。`;
 
-      const { invokeLLM } = await import("../../platform/core/llm");
+      const { invokeLLM } = await import("../../platform/core/llm/llm");
       const r = await Promise.race([
         invokeLLM({
           messages: [
@@ -376,7 +376,7 @@ spots 2-4 個（情感與功能都要有）；stakes/rivalTurf/vanity 各 1-3 �
   "risks": [ "風險或對手可能的反應與我們的預防（≤36字）" ]
 }
 scenes 3 個、contentAngles 4-6 個、risks 2-3 個。全部必須緊扣這個甜蜜點，不可泛談。`;
-      const { invokeLLM } = await import("../../platform/core/llm");
+      const { invokeLLM } = await import("../../platform/core/llm/llm");
       const r = await Promise.race([
         invokeLLM({
           messages: [
@@ -600,7 +600,7 @@ scenes 3 個、contentAngles 4-6 個、risks 2-3 個。全部必須緊扣這個�
         `黃金圈 WHY：${String(brandPos.goldenCircle?.why ?? "").slice(0, 200)}\n` +
         `現行標語：${String(brandPos.tagline?.zhTagline ?? "")}\n` +
         `既有主受眾：${String(brandPos.audience?.primary ?? "").slice(0, 300)}`;
-      const { invokeLLM } = await import("../../platform/core/llm");
+      const { invokeLLM } = await import("../../platform/core/llm/llm");
       const SYS = "你是品牌策略研究員，繁體中文。只輸出 JSON，第一字元就是 {。研究必須以品牌定位書資料為基準，不可與之矛盾。";
       const prompts: Record<string, { user: string; maxTokens: number }> = {
         competitor: {
@@ -719,7 +719,7 @@ scenes 3 個、contentAngles 4-6 個、risks 2-3 個。全部必須緊扣這個�
 }
 三個 anchor 各出現恰好一次，順序固定為 audience、competition、differentiation。`;
 
-      const { invokeLLM } = await import("../../platform/core/llm");
+      const { invokeLLM } = await import("../../platform/core/llm/llm");
       const r = await Promise.race([
         invokeLLM({
           messages: [{ role: "system", content: sys }, { role: "user", content: "請執行獨立健檢。" }],

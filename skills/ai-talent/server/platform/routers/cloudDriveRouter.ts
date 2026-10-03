@@ -12,8 +12,8 @@ import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure } from "../core/trpc";
 import localPool from "../../localDb";
-import { getConnectionStatus, disconnectCloud, getValidAccessToken, CloudNotConnectedError } from "../core/cloudTokens";
-import { listCloudFiles } from "../core/cloudDriveClient";
+import { getConnectionStatus, disconnectCloud, getValidAccessToken, CloudNotConnectedError } from "../core/connectors/cloudTokens";
+import { listCloudFiles } from "../core/connectors/cloudDriveClient";
 
 const PROVIDERS = ["google_drive", "onedrive"] as const;
 const providerSchema = z.enum(PROVIDERS);

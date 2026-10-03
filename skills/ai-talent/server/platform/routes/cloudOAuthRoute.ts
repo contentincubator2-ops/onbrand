@@ -19,7 +19,7 @@ import { Router, type Request, type Response } from "express";
 import crypto from "node:crypto";
 import { jwtVerify } from "jose";
 import { getJwtSecret, ENV } from "../core/env";
-import { saveConnection, type CloudProvider } from "../core/cloudTokens";
+import { saveConnection, type CloudProvider } from "../core/connectors/cloudTokens";
 
 export const cloudOAuthRouter = Router();
 

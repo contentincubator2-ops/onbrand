@@ -5,7 +5,7 @@ import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure } from "../core/trpc";
 import localPool from "../../localDb";
-import { getTouchpointCoverage } from "../core/touchpoints";
+import { getTouchpointCoverage } from "../core/ops/touchpoints";
 
 async function assertBrandOwner(userId: number, brandId: number): Promise<void> {
   const [rows]: any = await localPool.execute(

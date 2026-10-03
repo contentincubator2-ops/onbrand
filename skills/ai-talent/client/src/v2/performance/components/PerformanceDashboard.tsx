@@ -26,7 +26,7 @@ import {
   taAppealMatrix, bestPairing, fmtInt, fmtMoney, fmtPct,
   DATE_RANGES, COMPARE_MODES, BREAKEVEN_ROAS, GROSS_MARGIN,
   type Filter, type Totals,
-} from "./perfMockData";
+} from "../../platform/lib/perfMockData";
 import { WarningIcon } from "../../platform/components/icons";
 
 const C = {

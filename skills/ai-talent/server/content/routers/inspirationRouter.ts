@@ -12,16 +12,16 @@ import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure } from "../../platform/core/trpc";
 import { assertBrandAccess } from "../../platform/core/brandAuth";
-import { callModel } from "../../platform/core/multiModelRouter";
-import { getBrandMarket } from "../../strategy/core/brandMarket";
-import { buildBrandPrefix } from "../../strategy/core/brandContext";
+import { callModel } from "../../platform/core/llm/multiModelRouter";
+import { getBrandMarket } from "../../strategy/core/brand/brandMarket";
+import { buildBrandPrefix } from "../../strategy/core/brand/brandContext";
 import localPool from "../../localDb";
-import { brandPlatforms, cardsFor, isYmd, PLATFORM_ZH } from "../core/weeklyPlanner";
+import { brandPlatforms, cardsFor, isYmd, PLATFORM_ZH } from "../core/planning/weeklyPlanner";
 import {
   THINKER_KEYS, LINEUP_SIZE, bump, completedAngleObjects, ideationSystemPrompt, loadPrefs, loadThinkerCards, parseAngles,
   pickCardForFormat, savePrefs, slotTopic, thinkerOf,
   type Angle, type ThinkerKey,
-} from "../core/inspirationStage";
+} from "../core/planning/inspirationStage";
 
 /** 想切角要的是判斷力，不是速度，固定用 Sonnet（Anthropic 的 provider 預設也是它；可用 env 覆寫）。 */
 const IDEATION_MODEL = process.env.INSPIRATION_MODEL || "claude-sonnet-4-6";
@@ -119,7 +119,7 @@ type RoundArgs = Parameters<typeof runRound>[0];
 async function streamRound(args: RoundArgs, onAngles: (a: Array<Angle & { thinker: ThinkerKey }>) => void): Promise<Array<Angle & { thinker: ThinkerKey }> | null> {
   const system = ideationSystemPrompt({ ...args, thinkers: args.keys.map((k) => ({ thinker: thinkerOf(k), name: args.nameOf(k) })) });
   try {
-    const { anthropicStream } = await import("../../platform/core/llm");
+    const { anthropicStream } = await import("../../platform/core/llm/llm");
     let buf = ""; let seen = 0;
     let latest: Array<Angle & { thinker: ThinkerKey }> = [];
     for await (const chunk of anthropicStream(

@@ -3,7 +3,7 @@ import ReactDOM from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider, MutationCache, QueryCache } from "@tanstack/react-query";
 import { trpc, trpcClient } from "./lib/trpc";
-import { ToastProvider, showToastGlobal } from "./components/ui/Toast";
+import { ToastProvider, showToastGlobal } from "./v2/platform/components/Toast";
 import { HeroUIProvider } from "@heroui/react";
 // v2 frontend (Sprint 1, 2026-04-25). Legacy v1 App was removed 2026-05-14
 // — see git history if you need the old behavior.

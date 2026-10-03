@@ -1,5 +1,5 @@
 /**
- * regulationModel — 法規 tray 的純資料層（對應 server/strategy/core/brandRegulations.ts）。
+ * regulationModel — 法規 tray 的純資料層（對應 server/strategy/core/brand/brandRegulations.ts）。
  *
  * client 不得 value-import server，型別與字數算法在這裡另寫一份——改 server 那邊要一起改這裡。
  * server 存檔時會再檢查一次；這裡只是讓用戶打字時就看得到還能放幾字。

@@ -9,7 +9,7 @@
  * 判斷用關鍵字而不是錯誤碼：上限錯誤有的是 BAD_REQUEST（自建卡／產品），
  * 有的是 FORBIDDEN（執行閘門），碼不一致，但訊息裡一定有這幾個詞。
  */
-import { showToastGlobal } from "../../../components/ui/Toast";
+import { showToastGlobal } from "../components/Toast";
 
 const UPGRADE_HINT = /升級|專業方案|方案與定價|upgrade|Professional plan/i;
 

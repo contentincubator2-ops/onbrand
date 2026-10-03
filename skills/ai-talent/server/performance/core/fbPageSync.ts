@@ -19,11 +19,11 @@
  * 產出時打的 perfTags 直接帶進來；其他貼文先只有 format，其餘靠補標規則或 AI 補標。
  */
 import localPool from "../../localDb";
-import { buildPipedreamAccountsUrl } from "../../platform/core/pipedreamConnect";
-import { getPipedreamAccounts, getPipedreamAppSlug, prioritizePipedreamAccounts } from "../../platform/core/pipedreamAccounts";
-import { findPipedreamFacebookPage, probePipedreamFacebookAccounts } from "../../platform/core/pipedreamFacebook";
+import { buildPipedreamAccountsUrl } from "../../platform/core/connectors/pipedreamConnect";
+import { getPipedreamAccounts, getPipedreamAppSlug, prioritizePipedreamAccounts } from "../../platform/core/connectors/pipedreamAccounts";
+import { findPipedreamFacebookPage, probePipedreamFacebookAccounts } from "../../platform/core/connectors/pipedreamFacebook";
 import { upsertFacts, type FactInput } from "./perfStore";
-import { isRuntimeFeatureEnabled } from "../../platform/core/runtimeSafety";
+import { isRuntimeFeatureEnabled } from "../../platform/core/ops/runtimeSafety";
 
 const GRAPH = "https://graph.facebook.com/v25.0";
 

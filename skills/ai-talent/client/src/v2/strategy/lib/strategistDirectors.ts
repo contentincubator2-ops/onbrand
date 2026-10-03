@@ -4,7 +4,7 @@
  * 2026-09-23（CJ「品牌頁面的右下方，品牌策略總監的三個人選」）：這裡刻意
  * 只有型別跟兩三個純函式，**沒有任何人設資料**——名字、職稱、經歷、專長
  * 全部來自 server 的 strategistChat.listDirectors（真實 mos_db agent），
- * 見 server/strategy/core/strategistDirectory.ts。
+ * 見 server/strategy/core/strategist/strategistDirectory.ts。
  *
  * 上一輪的 strategistPersonas.ts 把人設寫死在前端當佔位資料，是因為誤判
  * 「mos_db 查不到」；那個檔案現在只剩產品頁面那一位還在用（CJ:「我們先決定

@@ -13,7 +13,7 @@
  * 第一次看到就記下那個 commit 的日期。同一個 blob 只讀一次。
  *
  * 用法（在 skills/ai-talent 下）：npm run cards:dates
- * 輸出：server/content/core/taskCardDates.ts（請整份 commit，drift test 會對目錄核對）。
+ * 輸出：server/content/core/catalog/taskCardDates.ts（請整份 commit，drift test 會對目錄核對）。
  */
 import { execFileSync } from "node:child_process";
 import { writeFileSync } from "node:fs";
@@ -70,5 +70,5 @@ export function taskCardAddedAt(id: string): string | null {
   return TASK_CARD_DATES[id] ?? null;
 }
 `;
-writeFileSync(join(ROOT, "server/content/core/taskCardDates.ts"), out, "utf-8");
+writeFileSync(join(ROOT, "server/content/core/catalog/taskCardDates.ts"), out, "utf-8");
 console.log(`taskCardDates.ts：${sorted.length} 個 id，${seenBlobs.size} 個版本`);

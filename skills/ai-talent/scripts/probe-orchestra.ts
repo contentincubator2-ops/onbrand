@@ -10,21 +10,21 @@
  *
  * Exits 0 if all 3 variants come back with non-empty captions; 1 otherwise.
  */
-import { runOrchestra } from "../server/content/core/quickTaskOrchestra";
-import { FB_30S_TASKS, FB_30S_ORCHESTRA } from "../server/content/core/quickTaskFB";
-import { IG_30S_TASKS, IG_30S_ORCHESTRA } from "../server/content/core/quickTaskIG";
-import { YT_30S_TASKS, YT_30S_ORCHESTRA } from "../server/content/core/quickTaskYT";
-import { TT_30S_TASKS, TT_30S_ORCHESTRA } from "../server/content/core/quickTaskTikTok";
-import { LI_30S_TASKS, LI_30S_ORCHESTRA } from "../server/content/core/quickTaskLI";
-import { EMAIL_30S_TASKS, EMAIL_30S_ORCHESTRA } from "../server/content/core/quickTaskEmail";
-import { PR_30S_TASKS, PR_30S_ORCHESTRA } from "../server/content/core/quickTaskPR";
-import { BRAND_30S_TASKS, BRAND_30S_ORCHESTRA } from "../server/content/core/quickTaskBrand";
-import { RESEARCH_30S_TASKS, RESEARCH_30S_ORCHESTRA } from "../server/content/core/quickTaskResearch";
-import { FB_60S_TASKS_V2, FB_60S_ORCHESTRA as FB60_ORCH } from "../server/content/core/quickTaskFB60";
-import { IG_60S_TASKS, IG_60S_ORCHESTRA as IG60_ORCH } from "../server/content/core/quickTaskIG60";
-import { YT_60S_TASKS, YT_60S_ORCHESTRA as YT60_ORCH } from "../server/content/core/quickTaskYT60";
-import { MULTI_60S_TASKS, MULTI_60S_ORCHESTRA as M60_ORCH } from "../server/content/core/quickTaskMulti60";
-import { ALL_99S_TASKS, ALL_99S_ORCHESTRA as ORCH_100 } from "../server/content/core/quickTask100";
+import { runOrchestra } from "../server/content/core/engine/quickTaskOrchestra";
+import { FB_30S_TASKS, FB_30S_ORCHESTRA } from "../server/content/core/catalog/quickTaskFB";
+import { IG_30S_TASKS, IG_30S_ORCHESTRA } from "../server/content/core/catalog/quickTaskIG";
+import { YT_30S_TASKS, YT_30S_ORCHESTRA } from "../server/content/core/catalog/quickTaskYT";
+import { TT_30S_TASKS, TT_30S_ORCHESTRA } from "../server/content/core/catalog/quickTaskTikTok";
+import { LI_30S_TASKS, LI_30S_ORCHESTRA } from "../server/content/core/catalog/quickTaskLI";
+import { EMAIL_30S_TASKS, EMAIL_30S_ORCHESTRA } from "../server/content/core/catalog/quickTaskEmail";
+import { PR_30S_TASKS, PR_30S_ORCHESTRA } from "../server/content/core/catalog/quickTaskPR";
+import { BRAND_30S_TASKS, BRAND_30S_ORCHESTRA } from "../server/content/core/catalog/quickTaskBrand";
+import { RESEARCH_30S_TASKS, RESEARCH_30S_ORCHESTRA } from "../server/content/core/catalog/quickTaskResearch";
+import { FB_60S_TASKS_V2, FB_60S_ORCHESTRA as FB60_ORCH } from "../server/content/core/catalog/quickTaskFB60";
+import { IG_60S_TASKS, IG_60S_ORCHESTRA as IG60_ORCH } from "../server/content/core/catalog/quickTaskIG60";
+import { YT_60S_TASKS, YT_60S_ORCHESTRA as YT60_ORCH } from "../server/content/core/catalog/quickTaskYT60";
+import { MULTI_60S_TASKS, MULTI_60S_ORCHESTRA as M60_ORCH } from "../server/content/core/catalog/quickTaskMulti60";
+import { ALL_99S_TASKS, ALL_99S_ORCHESTRA as ORCH_100 } from "../server/content/core/catalog/quickTask100";
 
 (async () => {
   const taskId = process.env.TASK_ID || "fb-30-pure-text-hook";
