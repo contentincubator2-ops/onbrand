@@ -14,8 +14,8 @@ import {
   planBeats, reconcileItems, reconcilePhaseMessages, candidateCards, isPartCard, kolBlock, cobrandBlock,
   CAMPAIGN_PHASE_IDS,
 } from "./campaignPlan";
-import type { CatalogTask } from "../taskCatalogIndex";
-import { resolveTask } from "../taskRegistry";
+import type { CatalogTask } from "../catalog/taskCatalogIndex";
+import { resolveTask } from "../catalog/taskRegistry";
 
 const d = (s: string) => new Date(`${s}T00:00:00.000Z`);
 const card = (id: string, platform: string, tier = "30s"): CatalogTask => ({

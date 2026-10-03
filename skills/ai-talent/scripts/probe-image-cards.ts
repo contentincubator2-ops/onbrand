@@ -7,7 +7,7 @@
 import "dotenv/config";
 import sharp from "sharp";
 import { getImageSpec } from "../server/platform/core/media/platformImageSpecs";
-import { renderImageCard } from "../server/content/core/imageCards";
+import { renderImageCard } from "../server/content/core/image/imageCards";
 import { localCoverFile } from "../server/platform/core/media/imageFetch";
 import { readFileSync } from "fs";
 

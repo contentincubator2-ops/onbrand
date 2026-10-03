@@ -22,20 +22,20 @@
 
 import { z } from "zod";
 import { router, protectedProcedure } from "../../platform/core/trpc";
-import { assertTaskAllowed, type TaskGateInfo } from "../../platform/core/planGate";
+import { assertTaskAllowed, type TaskGateInfo } from "../../platform/core/billing/planGate";
 import { normalizeTaskId, legacyTaskId } from "../../platform/core/tierCompat";
 import { TRPCError } from "@trpc/server";
 import { getDb } from "../../db";
 import localPool from "../../localDb";
-import { loadAgentKnowledge } from "../../platform/core/agentKnowledge";
-import { buildBrandPrefix, enforceBrandRulesOnText } from "../../strategy/core/brandContext";
+import { loadAgentKnowledge } from "../../platform/core/agents/agentKnowledge";
+import { buildBrandPrefix, enforceBrandRulesOnText } from "../../strategy/core/brand/brandContext";
 import { sql } from "drizzle-orm";
-import { callLLM } from "../../platform/core/llmRouter";
+import { callLLM } from "../../platform/core/llm/llmRouter";
 import { randomBytes } from "crypto";
-import { loadAgentContext } from "../core/agentContextLoader";
-import { getSquadRequirements } from "../core/squadRequirements";
-import { getEmbedding, cosineSimilarity } from "../../platform/core/embedding";
-import { synthesizeAgentAsSquad, type AgentRow } from "../core/agentSquadSynth";
+import { loadAgentContext } from "../core/squad/agentContextLoader";
+import { getSquadRequirements } from "../core/squad/squadRequirements";
+import { getEmbedding, cosineSimilarity } from "../../platform/core/llm/embedding";
+import { synthesizeAgentAsSquad, type AgentRow } from "../core/squad/agentSquadSynth";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -352,7 +352,7 @@ function genAgentKey(squadUid: string, agentName: string): string {
  * 用 slug 查；查不到（DB 裡的自訂 squad）回 null，閘門不觸發。
  */
 async function squadGateInfo(slug: string): Promise<TaskGateInfo> {
-  const { ALL_99S_SQUADS } = await import("../core/quickTask100Squads");
+  const { ALL_99S_SQUADS } = await import("../core/catalog/quickTask100Squads");
   const m = ALL_99S_SQUADS.find((x) => x.squad_slug === normalizeTaskId(slug));
   return { platform: m?.platform ?? null, sourceType: (m as any)?.source?.type ?? null };
 }
@@ -2101,10 +2101,10 @@ ${leadKnowledge}
       // avoid hitting the API on every step. Per CJ direction: 100s squads
       // must have actual market data, not just LLM internal knowledge.
       try {
-        const { ALL_99S_SQUADS } = await import("../core/quickTask100Squads");
+        const { ALL_99S_SQUADS } = await import("../core/catalog/quickTask100Squads");
         const matched = ALL_99S_SQUADS.find((s) => s.squad_slug === normalizeTaskId(input.squadSlug));
         if (matched) {
-          const { fetchViralPatterns, formatViralPatternsForPrompt } = await import("../../strategy/core/socialListeningScout");
+          const { fetchViralPatterns, formatViralPatternsForPrompt } = await import("../../strategy/core/monitor/socialListeningScout");
           // Decide kind from squad slug pattern
           const kind: "festivals" | "trending" | "news" | "viral" =
             matched.squad_slug.includes("monthly-calendar") || matched.squad_slug.includes("countdown") ? "festivals"
@@ -2351,9 +2351,9 @@ ${quantityGuide}
       let output = isContent ? stripContentArtifacts(rawOutput) : rawOutput;
       // 2026-09-30（CJ「後製路徑也要合規檢查」）：會被發出去的貼文類步驟過法規合規檢查；
       // 策略／brief 類步驟是內部文件，不檢查。品牌沒有法規就不跑。
-      let regulationCompliance: import("../core/regulationCompliance").RegulationComplianceRecord | null = null;
+      let regulationCompliance: import("../core/engine/regulationCompliance").RegulationComplianceRecord | null = null;
       if (isContent && scopeBrandId && output.trim()) {
-        const { enforceRegulationsOnText } = await import("../core/regulationCompliance");
+        const { enforceRegulationsOnText } = await import("../core/engine/regulationCompliance");
         const reg = await enforceRegulationsOnText(scopeBrandId, output);
         regulationCompliance = reg.record;
         if (reg.record?.status === "fixed") {
@@ -2822,7 +2822,7 @@ ${input.question}`;
     }))
     .mutation(async ({ input }) => {
       const { ENV } = await import("../../platform/core/env");
-      const { invokeLLM, invokeVertexGrounding } = await import("../../platform/core/llm");
+      const { invokeLLM, invokeVertexGrounding } = await import("../../platform/core/llm/llm");
 
       const q = input.query
         .replace("{brand_name}",   input.brandName   ?? "")

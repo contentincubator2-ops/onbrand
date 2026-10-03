@@ -20,13 +20,13 @@ import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure } from "../../platform/core/trpc";
 import { assertBrandAccess } from "../../platform/core/brandAuth";
 import localPool from "../../localDb";
-import { buildBrandBrain, invalidateBrandPrefix, BRAIN_CAPACITY, type BrainItem } from "../core/brandContext";
+import { buildBrandBrain, invalidateBrandPrefix, BRAIN_CAPACITY, type BrainItem } from "../core/brand/brandContext";
 import {
   REG_BODY_MAX, REG_DIGEST_MAX, REG_MAX_CARDS, REG_SOURCE_MAX, REG_TITLE_MAX, REG_TOTAL_MAX,
   charLen, checkRegulationFits, getRegulation, listRegulations, loadActiveRegulations, regulationBudget,
   type BrandRegulation,
-} from "../core/brandRegulations";
-import { startRegulationExtraction } from "../core/regulationDigest";
+} from "../core/brand/brandRegulations";
+import { startRegulationExtraction } from "../core/brand/regulationDigest";
 
 /** 產品／活動太多時只算最近更新的這麼多個（跟 brandMemory 一樣）。 */
 const MAX_ENTITIES = 30;

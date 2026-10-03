@@ -11,7 +11,7 @@
  */
 import { describe, it, expect } from "vitest";
 import { CAMPAIGN_TYPE_IDS, CAMPAIGN_PHASE_IDS } from "./campaignPlan";
-import { CAMPAIGN_TYPES, CAMPAIGN_PHASES } from "../../../../client/src/v2/strategy/lib/campaignSchema";
+import { CAMPAIGN_TYPES, CAMPAIGN_PHASES } from "../../../../client/src/v2/strategy/lib/campaign/campaignSchema";
 
 describe("活動企劃語彙 client ↔ server", () => {
   it("活動類型的 id 兩邊完全一致（順序也一樣，畫面與 prompt 才對得起來）", () => {

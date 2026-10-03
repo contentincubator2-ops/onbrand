@@ -1462,7 +1462,7 @@ export default function RunPage() {
 
   // ── 2026-09-29 主筆桌（CJ「只有一個版本；右邊是主筆＋這樣寫的原因＋換人寫；要改就跟那位對話」）──
   // 左邊本文可以直接打字（自動存），右邊換人寫／請主筆改，改完直接進本文。
-  // 每位寫過的稿由伺服器留在 item.writerDrafts（server/content/core/writerDrafts.ts）。
+  // 每位寫過的稿由伺服器留在 item.writerDrafts（server/content/core/engine/writerDrafts.ts）。
   const writerDesk = !isStrategyEnvelope && !isEmptyPublicSelection;
   const deskLeadAgentId: number | undefined = (() => {
     const ca: any = (data as any)?.metadata?.captionAgent;

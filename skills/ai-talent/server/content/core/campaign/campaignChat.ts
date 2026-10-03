@@ -17,10 +17,10 @@
  */
 import { PAID_CHANNELS } from "./campaignKpi.js";
 import { candidateCards, eventFacts, safeJSON, PLANNABLE_CHANNELS, CAMPAIGN_PHASE_IDS, type CampaignPlan, type CampaignPhaseId, type PlanItem } from "./campaignPlan.js";
-import type { CatalogTask } from "../taskCatalogIndex.js";
+import type { CatalogTask } from "../catalog/taskCatalogIndex.js";
 import { brandIndustry, type TeamAgent } from "./campaignTeam.js";
 import { buildCampaignRoster, isCampaignRole, ROLES, type CampaignRole, type RosterMember } from "./campaignRoster.js";
-import { getDirectorByAgentId, listDirectorsForBrand } from "../../../strategy/core/strategistDirectory.js";
+import { getDirectorByAgentId, listDirectorsForBrand } from "../../../strategy/core/strategist/strategistDirectory.js";
 import localPool from "../../../localDb.js";
 import { validateBasis, basisLines, type BasisPatch } from "./campaignBasis.js";
 
@@ -369,7 +369,7 @@ export async function runCampaignChat(args: {
   const facts = await eventFacts(args.eventId, args.userId);
   if (!facts) throw new Error("找不到這個活動");
   // 2026-10-02（CJ「問起來還是卡卡的」）：準備工作平行跑——總監、品牌大腦互不相依。
-  const { buildBrandPrefix } = await import("../../../strategy/core/brandContext.js");
+  const { buildBrandPrefix } = await import("../../../strategy/core/brand/brandContext.js");
   const [director, brain] = await Promise.all([
     pickCampaignDirector(facts.brandId, args.directorAgentId),
     buildBrandPrefix(facts.brandId, null, args.eventId, "full").catch(() => ""),
@@ -409,7 +409,7 @@ export async function runCampaignChat(args: {
   const history = (args.history ?? []).slice(-10)
     .map((h) => `${who(h)}：${String(h.content).slice(0, 600)}`).join("\n");
 
-  const { loadAgentKnowledge, withAgentKnowledge } = await import("../../../platform/core/agentKnowledge.js");
+  const { loadAgentKnowledge, withAgentKnowledge } = await import("../../../platform/core/agents/agentKnowledge.js");
   const source = speaker === "director" ? "campaign.director" : speaker === "planner" ? "campaign.chat" : `campaign.${speaker}`;
   const [thread, knowledge] = await Promise.all([
     speaker === "director" && agent ? directorThread(args.userId, facts.brandId, agent.id) : Promise.resolve(""),
@@ -466,7 +466,7 @@ export async function runCampaignChat(args: {
   const system = agent
     ? withAgentKnowledge(`你是${agent.name}（${agent.title}），這檔活動團隊裡的${roleZh(speaker)}。\n\n${base}`, knowledge)
     : base;
-  const { invokeLLM } = await import("../../../platform/core/llm.js");
+  const { invokeLLM } = await import("../../../platform/core/llm/llm.js");
   const r = await invokeLLM({
     messages: [
       { role: "system", content: brain ? `${system}\n\n# 品牌大腦${brain}` : system },

@@ -16,9 +16,9 @@
 import { z } from "zod";
 import { router, protectedProcedure } from "../../platform/core/trpc";
 import localPool from "../../localDb";
-import { recentCatalogCards } from "../../content/core/taskCatalogIndex";
-import { isHiddenContentPlatform, isHiddenHistoryItem } from "../../platform/core/planGate";
-import { isRecentViral } from "../../content/core/taskSource";
+import { recentCatalogCards } from "../../content/core/catalog/taskCatalogIndex";
+import { isHiddenContentPlatform, isHiddenHistoryItem } from "../../platform/core/billing/planGate";
+import { isRecentViral } from "../../content/core/catalog/taskSource";
 
 export interface NotificationItem {
   id: string;

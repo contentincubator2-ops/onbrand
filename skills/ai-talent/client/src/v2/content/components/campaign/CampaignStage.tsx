@@ -37,22 +37,22 @@ import { faMap, faPenNib, faSliders, faLockOpen, faLock, faArrowRight, faBookOpe
 import { trpc } from "../../../../lib/trpc";
 import { useLang } from "../../../../lib/i18n";
 import { CHANNEL_META, channelLabel, channelRoute } from "../../../platform/lib/channelMeta";
-import { phaseOf, type CampaignPhaseId, type CampaignPlan, type CampaignPlanItem } from "../../../strategy/lib/campaignSchema";
-import { stagePhases, stageLanes, countdown, stageNotes, phaseShort, type StagePhase } from "../../../strategy/lib/campaignStage";
+import { phaseOf, type CampaignPhaseId, type CampaignPlan, type CampaignPlanItem } from "../../../strategy/lib/campaign/campaignSchema";
+import { stagePhases, stageLanes, countdown, stageNotes, phaseShort, type StagePhase } from "../../../strategy/lib/campaign/campaignStage";
 import { LockToggle } from "../../../strategy/components/positioning/LockToggle";
 import CampaignMap from "./CampaignMap";
 import CampaignSetupForm from "./CampaignSetupForm";
 import CampaignChatCard from "./CampaignChatCard";
-import CampaignBasisPanel from "../../../strategy/components/positioning/CampaignBasisPanel";
+import CampaignBasisPanel from "../../../strategy/components/events/CampaignBasisPanel";
 import KolBriefForm from "./KolBriefForm";
 import ChannelBriefForm, { type ChannelBriefSpec } from "./ChannelBriefForm";
-import type { BasisPatch, BasisValue } from "../../../strategy/lib/campaignBasis";
+import type { BasisPatch, BasisValue } from "../../../strategy/lib/campaign/campaignBasis";
 import { dockDirector } from "../../../strategy/lib/directorDock";
 import CampaignHandoff from "./CampaignHandoff";
 import CampaignKpiPanel from "./CampaignKpiPanel";
 import CampaignPostModal from "./CampaignPostModal";
 import { PlatformTaskModal } from "../../pages/PlatformTaskPage";
-import { money, metricLine } from "../../../strategy/lib/campaignKpi";
+import { money, metricLine } from "../../../strategy/lib/campaign/campaignKpi";
 
 const ymd = (d: Date) => d.toISOString().slice(0, 10);
 const md = (s: string) => s.slice(5).replace("-", "/");

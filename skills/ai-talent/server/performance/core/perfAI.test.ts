@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 
 vi.mock("../../localDb", () => ({ default: { execute: vi.fn() } }));
-vi.mock("../../platform/core/multiModelRouter", () => ({ callModel: vi.fn() }));
+vi.mock("../../platform/core/llm/multiModelRouter", () => ({ callModel: vi.fn() }));
 
 import { sanitizeProposal, toValues } from "./perfAI";
 

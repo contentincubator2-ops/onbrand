@@ -43,12 +43,12 @@ import { Avatar } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faArrowUp, faCheck, faRotateLeft, faUpRightAndDownLeftFromCenter, faDownLeftAndUpRightToCenter, faRightLeft, faRotateRight, faPenToSquare, faClockRotateLeft, faChevronDown } from "@fortawesome/free-solid-svg-icons";
 import { trpc } from "../../../../lib/trpc";
-import type { CampaignPhaseId, CampaignPlan } from "../../../strategy/lib/campaignSchema";
-import type { StageNote } from "../../../strategy/lib/campaignStage";
-import { phaseShort } from "../../../strategy/lib/campaignStage";
-import { applyProposal, describeProposal, isEmptyProposal, routeMention, type CampaignProposal } from "../../../strategy/lib/campaignChat";
+import type { CampaignPhaseId, CampaignPlan } from "../../../strategy/lib/campaign/campaignSchema";
+import type { StageNote } from "../../../strategy/lib/campaign/campaignStage";
+import { phaseShort } from "../../../strategy/lib/campaign/campaignStage";
+import { applyProposal, describeProposal, isEmptyProposal, routeMention, type CampaignProposal } from "../../../strategy/lib/campaign/campaignChat";
 import { readStoredDirector } from "../../../strategy/lib/strategistDirectors";
-import type { BasisPatch, BasisValue } from "../../../strategy/lib/campaignBasis";
+import type { BasisPatch, BasisValue } from "../../../strategy/lib/campaign/campaignBasis";
 
 /** 名冊上的角色 id（伺服器 campaignRoster.CAMPAIGN_ROLES）。 */
 type Speaker = string;

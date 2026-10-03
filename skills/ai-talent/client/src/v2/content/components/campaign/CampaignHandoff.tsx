@@ -5,15 +5,15 @@
  * 視窗，交接相關細節給…執行內容企劃的 agent」）。
  *
  * 交接單不是動畫道具：上面每一行（訴求、每一段的訊息）內容層寫每一篇時都會讀到
- * （server/strategy/core/brandContext.ts 的活動區塊）。這裡只是讓人在交出去之前看一眼。
+ * （server/strategy/core/brand/brandContext.ts 的活動區塊）。這裡只是讓人在交出去之前看一眼。
  */
 import type { ReactNode } from "react";
 import { Button, Modal, ModalContent, ModalBody } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faPenNib, faArrowRight } from "@fortawesome/free-solid-svg-icons";
 import { CHANNEL_META, channelLabel } from "../../../platform/lib/channelMeta";
-import { CAMPAIGN_PHASES, type CampaignPlan } from "../../../strategy/lib/campaignSchema";
-import { phaseShort } from "../../../strategy/lib/campaignStage";
+import { CAMPAIGN_PHASES, type CampaignPlan } from "../../../strategy/lib/campaign/campaignSchema";
+import { phaseShort } from "../../../strategy/lib/campaign/campaignStage";
 
 export default function CampaignHandoff({ open, onClose, onWrite, plan, lead, mechanic, range, en }: {
   open: boolean; onClose: () => void; onWrite: () => void;

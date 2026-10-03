@@ -25,8 +25,8 @@ import { faArrowUpRightFromSquare, faPenNib, faRotate, faCopy, faCheck, faFileIm
 import { trpc } from "../../../lib/trpc";
 import { useLang } from "../../../lib/i18n";
 import { CHANNEL_META, channelLabel } from "../../platform/lib/channelMeta";
-import { phaseShort } from "../../strategy/lib/campaignStage";
-import { metricLabel, money, type KpiMetric } from "../../strategy/lib/campaignKpi";
+import { phaseShort } from "../../strategy/lib/campaign/campaignStage";
+import { metricLabel, money, type KpiMetric } from "../../strategy/lib/campaign/campaignKpi";
 import { ImportModal } from "./LensWorkspace";
 
 const md = (s: string) => s.slice(5).replace("-", "/");

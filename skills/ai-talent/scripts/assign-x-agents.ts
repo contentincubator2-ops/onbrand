@@ -36,12 +36,12 @@
 
 import { readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { X_30S_TASKS } from "../server/content/core/quickTaskX";
+import { X_30S_TASKS } from "../server/content/core/catalog/quickTaskX";
 
 /** 與 audit-fb-agent-personas.ts 同一條門檻。改要一起改。 */
 const MIN_PERSONA_CHARS = 2200;
 
-const TARGET_FILE = "server/content/core/quickTaskX.ts";
+const TARGET_FILE = "server/content/core/catalog/quickTaskX.ts";
 
 function arg(name: string): string | undefined {
   const i = process.argv.indexOf(`--${name}`);
@@ -101,7 +101,7 @@ async function loadPersonas(ids: number[]): Promise<Map<number, { chars: number;
 }
 
 async function candidatesFor(card: any, userId: number): Promise<Candidate[]> {
-  const { matchAgents } = await import("../server/content/core/agentMatcher");
+  const { matchAgents } = await import("../server/content/core/squad/agentMatcher");
   let matches: any[] = [];
   try {
     matches = await matchAgents({

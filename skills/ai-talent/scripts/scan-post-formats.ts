@@ -18,8 +18,8 @@ import {
   resolveMarkets,
   scanOneMarket,
   type ScanMarket,
-} from "../server/content/core/postFormatScout";
-import { upsertCandidates } from "../server/content/core/postFormatStore";
+} from "../server/content/core/catalog/postFormatScout";
+import { upsertCandidates } from "../server/content/core/catalog/postFormatStore";
 
 function arg(name: string): string[] {
   const out: string[] = [];

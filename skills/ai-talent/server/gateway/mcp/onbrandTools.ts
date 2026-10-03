@@ -208,9 +208,9 @@ const listTasks: ToolDef = {
   run: async (a, ctx) => {
     const brandId = num(a.brandId, "brandId");
     await checkBrand(ctx.userId, brandId);
-    const { planQuotaFor, loadBrandPositioning, resolveChannels, filterTasksByPlan } = await import("../../platform/core/planGate");
-    const { buildTaskCatalogIndex } = await import("../../content/core/taskCatalogIndex");
-    const { listBrandTaskCards } = await import("../../content/core/brandTaskCards");
+    const { planQuotaFor, loadBrandPositioning, resolveChannels, filterTasksByPlan } = await import("../../platform/core/billing/planGate");
+    const { buildTaskCatalogIndex } = await import("../../content/core/catalog/taskCatalogIndex");
+    const { listBrandTaskCards } = await import("../../content/core/catalog/brandTaskCards");
     const quota = await planQuotaFor(ctx.userId);
     const positioning = await loadBrandPositioning(brandId);
     const allowed = filterTasksByPlan(buildTaskCatalogIndex() as any[], quota, resolveChannels(positioning, quota)) as any[];
@@ -246,8 +246,8 @@ const describeTask: ToolDef = {
   readOnly: true,
   run: async (a) => {
     const taskId = String(a.taskId ?? "").trim();
-    const { resolveTask } = await import("../../content/core/taskRegistry");
-    const { intakeExtraFields, intakePrimaryRequired } = await import("../../content/core/taskIntake");
+    const { resolveTask } = await import("../../content/core/catalog/taskRegistry");
+    const { intakeExtraFields, intakePrimaryRequired } = await import("../../content/core/catalog/taskIntake");
     const hit = taskId ? await resolveTask(taskId) : null;
     if (!hit) throw new ToolInputError(`找不到任務卡 ${taskId}。用 list_tasks 取得目前的卡片 id。`);
     const t: any = hit.template;
@@ -293,8 +293,8 @@ const runTask: ToolDef = {
     const inputs: Record<string, string> = {};
     for (const [k, v] of Object.entries(a.inputs ?? {})) if (typeof v === "string") inputs[k] = v.slice(0, 8000);
 
-    const { resolveTask } = await import("../../content/core/taskRegistry");
-    const { missingRequiredInputs } = await import("../../content/core/taskIntake");
+    const { resolveTask } = await import("../../content/core/catalog/taskRegistry");
+    const { missingRequiredInputs } = await import("../../content/core/catalog/taskIntake");
     const hit = taskId ? await resolveTask(taskId) : null;
     if (!hit) throw new ToolInputError(`找不到任務卡 ${taskId}。用 list_tasks 取得目前的卡片 id。`);
     // 缺必填在這裡就擋，不開紀錄、不扣點（mutation 也會擋，但那時已經背景化了，Claude 看不到原因）。
@@ -449,7 +449,7 @@ const teamBoard: ToolDef = {
   run: async (a, ctx) => {
     const brandId = num(a.brandId, "brandId");
     await checkBrand(ctx.userId, brandId);
-    const { mondayOf, isYmd, loadWeekSlots, weekDays } = await import("../../content/core/weeklyPlanner");
+    const { mondayOf, isYmd, loadWeekSlots, weekDays } = await import("../../content/core/planning/weeklyPlanner");
     const weekStart = isYmd(a.weekStart) ? mondayOf(a.weekStart) : mondayOf(todayTaipei());
     const [name, slots] = await Promise.all([brandName(brandId), loadWeekSlots(brandId, weekStart)]);
 
@@ -536,7 +536,7 @@ const addPlanSlots: ToolDef = {
   run: async (a, ctx) => {
     const brandId = num(a.brandId, "brandId");
     await checkBrand(ctx.userId, brandId);
-    const wp = await import("../../content/core/weeklyPlanner");
+    const wp = await import("../../content/core/planning/weeklyPlanner");
     const weekStart = wp.isYmd(a.weekStart) ? wp.mondayOf(a.weekStart) : wp.mondayOf(todayTaipei());
     const platforms = await wp.brandPlatforms(brandId);
     const cards = wp.cardsFor(platforms);

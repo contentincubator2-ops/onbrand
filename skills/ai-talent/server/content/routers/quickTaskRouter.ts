@@ -21,19 +21,19 @@ import { loadCampaignItem } from "../core/campaign/campaignItemBrief";
 import { randomUUID } from "node:crypto";
 import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure, singleFlightPerUser } from "../../platform/core/trpc";
-import { callModel, type ModelProvider } from "../../platform/core/multiModelRouter";
-import { ContentKindSchema } from "../core/outputContentEnvelope";
+import { callModel, type ModelProvider } from "../../platform/core/llm/multiModelRouter";
+import { ContentKindSchema } from "../core/engine/outputContentEnvelope";
 import {
   assertGenericRegenerationAllowed,
   preserveExistingVariantImage,
   replaceRegeneratedContent,
   selectRegenerationTarget,
-} from "../core/quickTaskRegenerateContent";
+} from "../core/engine/quickTaskRegenerateContent";
 import {
   STRATEGY_PERSISTENCE_BUDGET_MS,
   STRATEGY_SCOUT_BUDGET_MS,
   STRATEGY_STEP_DEADLINE_MS,
-} from "../../strategy/core/strategyPublicStepRouting";
+} from "../../strategy/core/positioning/strategyPublicStepRouting";
 
 type FieldDef = {
   key: string;
@@ -679,7 +679,7 @@ function fillTemplate(tpl: string, inputs: Record<string, string | number | unde
 
 // Brand context now lives in _core/brandContext.ts so every router
 // uses the same source of truth + same 1-min cache.
-import { buildBrandPrefix as buildBrandContext } from "../../strategy/core/brandContext";
+import { buildBrandPrefix as buildBrandContext } from "../../strategy/core/brand/brandContext";
 
 /**
  * 2026-08-11: turn a workbench spot reference into the audience label stored
@@ -924,74 +924,74 @@ const TASK_LABEL_EN: Record<string, string> = {
   "pr-99-newsjack":        "Newsjacking (trending news hook)",
 };
 // 2026-05-05 quick-task pivot
-import { quickTaskOutputSpec, parseQuickTaskOutput, type QuickTaskOutput } from "../core/quickTaskOutput";
-import { listAllFBTasks } from "../core/quickTaskFB";
-import { FB_60S_TASKS_V2, getFB60OrchestraConfig, getFB60Template } from "../core/quickTaskFB60";
-import { IG_60S_TASKS, getIG60OrchestraConfig, getIG60Template } from "../core/quickTaskIG60";
-import { YT_60S_TASKS, getYT60OrchestraConfig, getYT60Template } from "../core/quickTaskYT60";
-import { MULTI_60S_TASKS, getMulti60OrchestraConfig, getMulti60Template } from "../core/quickTaskMulti60";
-import { ALL_99S_TASKS, get99Template } from "../core/quickTask100";
-import { ALL_99S_SQUADS } from "../core/quickTask100Squads";
-import { is99sOrchestraListed, platformOfTaskId } from "../core/taskCatalogIndex";
+import { quickTaskOutputSpec, parseQuickTaskOutput, type QuickTaskOutput } from "../core/engine/quickTaskOutput";
+import { listAllFBTasks } from "../core/catalog/quickTaskFB";
+import { FB_60S_TASKS_V2, getFB60OrchestraConfig, getFB60Template } from "../core/catalog/quickTaskFB60";
+import { IG_60S_TASKS, getIG60OrchestraConfig, getIG60Template } from "../core/catalog/quickTaskIG60";
+import { YT_60S_TASKS, getYT60OrchestraConfig, getYT60Template } from "../core/catalog/quickTaskYT60";
+import { MULTI_60S_TASKS, getMulti60OrchestraConfig, getMulti60Template } from "../core/catalog/quickTaskMulti60";
+import { ALL_99S_TASKS, get99Template } from "../core/catalog/quickTask100";
+import { ALL_99S_SQUADS } from "../core/catalog/quickTask100Squads";
+import { is99sOrchestraListed, platformOfTaskId } from "../core/catalog/taskCatalogIndex";
 import {
   planQuotaFor, resolveChannels, filterTasksByPlan, daysUntilSwap, isUnlimited, isHiddenContentPlatform,
   loadBrandPositioning, assertTaskAllowed, type TaskGateInfo,
-} from "../../platform/core/planGate";
-import { defaultTray, storedTray, MAX_TRAY } from "../core/taskTray";
-import { buildTaskCatalogIndex } from "../core/taskCatalogIndex";
+} from "../../platform/core/billing/planGate";
+import { defaultTray, storedTray, MAX_TRAY } from "../core/catalog/taskTray";
+import { buildTaskCatalogIndex } from "../core/catalog/taskCatalogIndex";
 
-import { sourceForTemplate, ALL_CRAFT_REFS } from "../core/craftSource";
-import { taskCardAddedAt } from "../core/taskCardDates";
-import { evergreenRationaleFor } from "../core/evergreenRationale";
+import { sourceForTemplate, ALL_CRAFT_REFS } from "../core/catalog/craftSource";
+import { taskCardAddedAt } from "../core/catalog/taskCardDates";
+import { evergreenRationaleFor } from "../core/catalog/evergreenRationale";
 import { normalizeTaskId, legacyTaskId } from "../../platform/core/tierCompat";
 import {
   checkViralSource,
   platformLabelOf,
   templateNeedsViralSource,
   VIRAL_SOURCE_KEY,
-} from "../core/viralSourceGuard";
+} from "../core/engine/viralSourceGuard";
 import {
   getIgStrategyExecutionSlug,
   getIgStrategyPublicPolicy,
   getIgStrategyRecordOverrides,
   redactIgStrategySynthesisContext,
-} from "../core/igStrategyPublicOutput";
+} from "../core/engine/igStrategyPublicOutput";
 import {
   buildIgStrategyPublicSlots,
   type IgStrategyPrivateArtifact,
-} from "../core/igStrategyPublicSynthesis";
-import { synthesizeIgStrategyPublicSlots } from "../core/igStrategyPublicGeneration";
-import { IG_30S_TASKS } from "../core/quickTaskIG";
-import { YT_30S_TASKS } from "../core/quickTaskYT";
-import { TT_30S_TASKS } from "../core/quickTaskTikTok";
-import { LI_30S_TASKS } from "../core/quickTaskLI";
-import { EMAIL_30S_TASKS } from "../core/quickTaskEmail";
-import { PR_30S_TASKS } from "../core/quickTaskPR";
-import { BRAND_30S_TASKS } from "../core/quickTaskBrand";
-import { RESEARCH_30S_TASKS } from "../core/quickTaskResearch";
+} from "../core/engine/igStrategyPublicSynthesis";
+import { synthesizeIgStrategyPublicSlots } from "../core/engine/igStrategyPublicGeneration";
+import { IG_30S_TASKS } from "../core/catalog/quickTaskIG";
+import { YT_30S_TASKS } from "../core/catalog/quickTaskYT";
+import { TT_30S_TASKS } from "../core/catalog/quickTaskTikTok";
+import { LI_30S_TASKS } from "../core/catalog/quickTaskLI";
+import { EMAIL_30S_TASKS } from "../core/catalog/quickTaskEmail";
+import { PR_30S_TASKS } from "../core/catalog/quickTaskPR";
+import { BRAND_30S_TASKS } from "../core/catalog/quickTaskBrand";
+import { RESEARCH_30S_TASKS } from "../core/catalog/quickTaskResearch";
 // 2026-05-12 (CJ「KOL 提供說法不提供名單」)
-import { KOL_30S_TASKS } from "../core/quickTaskKOL";
-import { COBRAND_30S_TASKS } from "../core/quickTaskCobrand";
+import { KOL_30S_TASKS } from "../core/catalog/quickTaskKOL";
+import { COBRAND_30S_TASKS } from "../core/catalog/quickTaskCobrand";
 // 2026-08-29 官網頻道 (web-)：品牌自己的部落格長文 / 品牌專欄 / 案例 / 產品頁。
-import { WEBSITE_30S_TASKS } from "../core/quickTaskWebsite";
-import { X_30S_TASKS } from "../core/quickTaskX";
-import { TH_30S_TASKS } from "../core/quickTaskThreads";
-import { LN_30S_TASKS } from "../core/quickTaskLine";
+import { WEBSITE_30S_TASKS } from "../core/catalog/quickTaskWebsite";
+import { X_30S_TASKS } from "../core/catalog/quickTaskX";
+import { TH_30S_TASKS } from "../core/catalog/quickTaskThreads";
+import { LN_30S_TASKS } from "../core/catalog/quickTaskLine";
 // 2026-08-29 per-brand 任務包。有 pack 的品牌，頻道與卡片完全由 pack 決定。
-import { resolveBrandPack, expandPackCards, packNavForBrand } from "../core/brandPacks";
+import { resolveBrandPack, expandPackCards, packNavForBrand } from "../core/catalog/brandPacks";
 // 2026-09-02: task id → template + config 的唯一解析點。這條鏈本來在這個檔案
 // 裡手抄了五次，抄第五次時漏了 KOL 的 config（KOL 任務按「換人重寫」直接炸）。
-import { resolveTaskOrThrow, resolveTaskTemplate } from "../core/taskRegistry";
+import { resolveTaskOrThrow, resolveTaskTemplate } from "../core/catalog/taskRegistry";
 // 2026-09-04 用戶自建任務卡。listFB 疊加，執行則走 taskRegistry 的來源註冊。
-import { listBrandTaskCards, cardTemplate } from "../core/brandTaskCards";
-import { assertIntakeComplete } from "../core/taskIntake";
-import { isWuganVoiceTemplate, validateWuganVoice, repairWuganVoice } from "../core/wuganVoiceContract";
+import { listBrandTaskCards, cardTemplate } from "../core/catalog/brandTaskCards";
+import { assertIntakeComplete } from "../core/catalog/taskIntake";
+import { isWuganVoiceTemplate, validateWuganVoice, repairWuganVoice } from "../core/engine/wuganVoiceContract";
 import { findFirstUrl, fetchUrlSummary, formatUrlSummaryForPrompt } from "../../platform/core/web/urlContext";
 import localPool from "../../localDb";
-import { loadAgentKnowledge, loadAgentKnowledgeMany, withAgentKnowledge } from "../../platform/core/agentKnowledge";
+import { loadAgentKnowledge, loadAgentKnowledgeMany, withAgentKnowledge } from "../../platform/core/agents/agentKnowledge";
 // 2026-05-18 (CJ「media to copy」): photo/video/doc media task catalog
-import { MEDIA_PHOTO_TASKS, MEDIA_VIDEO_TASKS, MEDIA_DOC_TASKS } from "../core/quickTaskMedia";
-import { isRecentViral } from "../core/taskSource";
+import { MEDIA_PHOTO_TASKS, MEDIA_VIDEO_TASKS, MEDIA_DOC_TASKS } from "../core/catalog/quickTaskMedia";
+import { isRecentViral } from "../core/catalog/taskSource";
 
 function tryParseJson(s: string): any | null {
   if (!s) return null;
@@ -1801,14 +1801,14 @@ export const quickTaskRouter = router({
       }
 
       // P0-D pre-flight cost guard
-      const { preflightCostCheck } = await import("../../platform/core/llmWithBilling");
+      const { preflightCostCheck } = await import("../../platform/core/llm/llmWithBilling");
       const guard60 = await preflightCostCheck(userId);
       if (!guard60.ok) throw new TRPCError({ code: "FORBIDDEN", message: guard60.reason });
       // 2026-05-14: points-based gating (1 pt = 1 second of task compute)
-      const { assertPoints, deductPoints } = await import("../../platform/core/pointsService");
+      const { assertPoints, deductPoints } = await import("../../platform/core/billing/pointsService");
       await assertPoints(userId, "task_60s");
       await deductPoints(userId, "task_60s", { kind: "task", id: null });
-      const { runOrchestra } = await import("../core/quickTaskOrchestra");
+      const { runOrchestra } = await import("../core/engine/quickTaskOrchestra");
 
       // 2026-05-18 (CJ「所有 60s 任務都要：圖完成才展示，非套組降到 2 版」):
       // every 60s task generates images and promised a "complete post".
@@ -1864,7 +1864,7 @@ export const quickTaskRouter = router({
           console.error("[runOrchestra60 async tail] failed:", (err as Error)?.message);
           if (checkpointFired && capturedOutputId) {
             try {
-              const { finaliseTaskRun } = await import("../../platform/core/recordTaskRun");
+              const { finaliseTaskRun } = await import("../../platform/core/ops/recordTaskRun");
               await finaliseTaskRun({
                 outputId: capturedOutputId,
                 progress: "failed",
@@ -1908,9 +1908,9 @@ export const quickTaskRouter = router({
       })).max(12).optional(),
     }))
     .mutation(async ({ input }) => {
-      const { callModel } = await import("../../platform/core/multiModelRouter");
-      const { buildBrandPrefix } = await import("../../strategy/core/brandContext");
-      const { loadAgentKnowledge } = await import("../../platform/core/agentKnowledge");
+      const { callModel } = await import("../../platform/core/llm/multiModelRouter");
+      const { buildBrandPrefix } = await import("../../strategy/core/brand/brandContext");
+      const { loadAgentKnowledge } = await import("../../platform/core/agents/agentKnowledge");
       const brandPrefix = await buildBrandPrefix(input.brandId, input.productId ?? null, input.eventId ?? null, "full").catch(() => "");
 
       let agentName = input.agentName ?? "資深文案";
@@ -1928,10 +1928,10 @@ export const quickTaskRouter = router({
         agentKnowledge = await loadAgentKnowledge(agent.id, { source: "quickTask.refineCaption" }).catch(() => "");
       }
 
-      const contract = await import("../core/rewriteContract");
-      let spec: import("../core/rewriteContract").RewriteSpec = {};
+      const contract = await import("../core/engine/rewriteContract");
+      let spec: import("../core/engine/rewriteContract").RewriteSpec = {};
       if (input.taskId) {
-        const { resolveOrchestraConfig } = await import("../core/taskRegistry");
+        const { resolveOrchestraConfig } = await import("../core/catalog/taskRegistry");
         const [tpl, cfg]: any = await Promise.all([
           resolveTaskTemplate(input.taskId).catch(() => null),
           resolveOrchestraConfig(input.taskId).catch(() => null),
@@ -2001,9 +2001,9 @@ export const quickTaskRouter = router({
         // Brand-rule hard enforcement: an inline rewrite must not
         // reintroduce banned words / skip substitutions.
         // 2026-09-30（CJ「換人重寫、對話修改也要合規檢查」）：接著過法規合規檢查。
-        let regulationCompliance: import("../core/regulationCompliance").RegulationComplianceRecord | null = null;
+        let regulationCompliance: import("../core/engine/regulationCompliance").RegulationComplianceRecord | null = null;
         try {
-          const { enforceBrandAndRegulations } = await import("../core/regulationCompliance");
+          const { enforceBrandAndRegulations } = await import("../core/engine/regulationCompliance");
           const checked = await enforceBrandAndRegulations(input.brandId, rewritten);
           rewritten = checked.text;
           regulationCompliance = checked.record;
@@ -2033,13 +2033,13 @@ export const quickTaskRouter = router({
       const userId = ctx.user!.id;
       // light cost guard — this is a tiny call but still bills tokens
       try {
-        const { preflightCostCheck } = await import("../../platform/core/llmWithBilling");
+        const { preflightCostCheck } = await import("../../platform/core/llm/llmWithBilling");
         const g = await preflightCostCheck(userId);
         if (!g.ok) throw new TRPCError({ code: "FORBIDDEN", message: g.reason });
       } catch (e) { if (e instanceof TRPCError) throw e; /* guard optional */ }
 
-      const { callModel } = await import("../../platform/core/multiModelRouter");
-      const { buildBrandPrefix } = await import("../../strategy/core/brandContext");
+      const { callModel } = await import("../../platform/core/llm/multiModelRouter");
+      const { buildBrandPrefix } = await import("../../strategy/core/brand/brandContext");
       // 2026-09-29：完整品牌大腦＋這張任務選的產品／活動（以前只給精簡 digest、不帶產品）。
       const brandPrefix = await buildBrandPrefix(input.brandId, input.productId ?? null, input.eventId ?? null, "full").catch(() => "");
 
@@ -2176,7 +2176,7 @@ ${polishTemplate.polishHint}`
 
   // 2026-09-16（CJ「要讓用戶可以有地方，輸入原文後改寫就好」）：不用先挑任務卡、
   // 不用先示範三則貼文——貼上一整段既有文案，直接改寫成品牌調性版本。
-  // 邏輯在 server/content/core/rewriteDraft.ts（診斷→改寫→CTA 三段內部接力，
+  // 邏輯在 server/content/core/engine/rewriteDraft.ts（診斷→改寫→CTA 三段內部接力，
   // 只回最終結果，不需要前端驅動多次呼叫）。
   rewriteDraft: protectedProcedure
     .input(z.object({
@@ -2185,7 +2185,7 @@ ${polishTemplate.polishHint}`
       brandId: z.number().optional(),
     }))
     .mutation(async ({ input }) => {
-      const { rewriteDraft: run } = await import("../core/rewriteDraft");
+      const { rewriteDraft: run } = await import("../core/engine/rewriteDraft");
       try {
         const result = await run(input);
         return { ...result, ok: true as const };
@@ -2211,12 +2211,12 @@ ${polishTemplate.polishHint}`
     .mutation(async ({ ctx, input }) => {
       const userId = ctx.user!.id;
       try {
-        const { preflightCostCheck } = await import("../../platform/core/llmWithBilling");
+        const { preflightCostCheck } = await import("../../platform/core/llm/llmWithBilling");
         const g = await preflightCostCheck(userId);
         if (!g.ok) throw new TRPCError({ code: "FORBIDDEN", message: g.reason });
       } catch (e) { if (e instanceof TRPCError) throw e; }
 
-      const { callModel } = await import("../../platform/core/multiModelRouter");
+      const { callModel } = await import("../../platform/core/llm/multiModelRouter");
 
       const contextBlock = input.titleContext
         ? `\n\n【頻道本季其他影片方向（供參考，勿直接複製）】\n${input.titleContext}`
@@ -2268,7 +2268,7 @@ ${polishTemplate.polishHint}`
         const raw = (r.content ?? "").trim();
         if (!raw) return { script: "", ok: false, error: "empty response" };
         // 2026-09-30：腳本也是會被發出去的字——禁用詞＋法規合規檢查。
-        const { enforceBrandAndRegulations } = await import("../core/regulationCompliance");
+        const { enforceBrandAndRegulations } = await import("../core/engine/regulationCompliance");
         const checked = await enforceBrandAndRegulations(input.brandId, raw).catch(() => ({ text: raw, record: null }));
         return { script: checked.text, ok: true, regulationCompliance: checked.record };
       } catch (e: any) {
@@ -2325,21 +2325,21 @@ ${polishTemplate.polishHint}`
       // 2. Build brand context — runSquadAuto = strategic/long-form
       // squad work → full brand depth (golden circle / story /
       // competition), NOT the lean core digest.
-      const { buildBrandPrefix } = await import("../../strategy/core/brandContext");
+      const { buildBrandPrefix } = await import("../../strategy/core/brand/brandContext");
       const brandPrefix = await buildBrandPrefix(input.brandId, input.productId ?? null, input.eventId ?? null, "full").catch(() => "");
       // 2026-07-17 多市場: brand's outputLanguage drives step language +
       // whether the zh-TW deterministic sanitizer may run on step output.
-      const { getBrandMarket, DEFAULT_BRAND_MARKET } = await import("../../strategy/core/brandMarket");
+      const { getBrandMarket, DEFAULT_BRAND_MARKET } = await import("../../strategy/core/brand/brandMarket");
       const brandMarket = await getBrandMarket(input.brandId).catch(() => DEFAULT_BRAND_MARKET);
       const strategyRecordOverrides = getIgStrategyRecordOverrides(sqSlugNew, brandMarket.outputLanguage);
 
       // 3. Inject 100s scout data (real-time festivals/trending/news)
       let scoutBlock = "";
       try {
-        const { ALL_99S_SQUADS } = await import("../core/quickTask100Squads");
+        const { ALL_99S_SQUADS } = await import("../core/catalog/quickTask100Squads");
         const matched = ALL_99S_SQUADS.find((s) => s.squad_slug === sqSlugNew);
         if (matched) {
-          const { fetchViralPatterns, formatViralPatternsForPrompt } = await import("../../strategy/core/socialListeningScout");
+          const { fetchViralPatterns, formatViralPatternsForPrompt } = await import("../../strategy/core/monitor/socialListeningScout");
           const kind: "festivals" | "trending" | "news" | "viral" =
             matched.squad_slug.includes("monthly-calendar") || matched.squad_slug.includes("countdown") ? "festivals"
             : matched.squad_slug.includes("crisis") || matched.squad_slug.includes("kern-mass-control") ? "trending"
@@ -2359,7 +2359,7 @@ ${polishTemplate.polishHint}`
 
       // 4. Run each step in sequence. For the five targets these are private
       // reasoning artifacts; legacy squads still collect them as variants.
-      const { callModel, callModelStrict } = await import("../../platform/core/multiModelRouter");
+      const { callModel, callModelStrict } = await import("../../platform/core/llm/multiModelRouter");
       const variants: any[] = [];
       const errors: string[] = [];
       const stages: any[] = [];
@@ -2375,7 +2375,7 @@ ${polishTemplate.polishHint}`
       const privateArtifacts: IgStrategyPrivateArtifact[] = [];
       const privateRunId = strategyPublicPolicy ? randomUUID() : null;
       const strategyStepRouting = strategyPublicPolicy
-        ? await import("../../strategy/core/strategyPublicStepRouting")
+        ? await import("../../strategy/core/positioning/strategyPublicStepRouting")
         : null;
       // The DB owns the number of steps. Four steps stay strictly sequential:
       // 12s scout + (4 * 40s step) + ~4s persistence = ~176s, inside the 205s
@@ -2580,18 +2580,18 @@ ${polishTemplate.polishHint}`
             // 2026-07-17 多市場: zh-TW only — the sanitizer would corrupt
             // non-Chinese output (emoji strip / ！→。 / 簡→繁 rewrites).
             if (text && brandMarket.isZhTW) {
-              const { voiceSanitizeZhTW } = await import("../core/quickTaskOrchestra");
+              const { voiceSanitizeZhTW } = await import("../core/engine/quickTaskOrchestra");
               text = voiceSanitizeZhTW(text);
             } else if (text) {
               // 2026-07-18: Latin-punct markets — clean stray CJK punctuation
               // the model slips in because the step prompt is Chinese.
-              const { latinPunctLang, normalizeLatinPunct } = await import("../core/quickTaskOrchestra");
+              const { latinPunctLang, normalizeLatinPunct } = await import("../core/engine/quickTaskOrchestra");
               if (latinPunctLang(brandMarket.outputLanguage)) text = normalizeLatinPunct(text);
             }
           } catch { /* fail-safe: keep raw text */ }
           // 2026-09-29：squad 每一步的產出也過禁用詞／替換對照（以前只有 orchestra 有）。
           if (text && input.brandId) {
-            const { enforceBrandRulesOnText } = await import("../../strategy/core/brandContext");
+            const { enforceBrandRulesOnText } = await import("../../strategy/core/brand/brandContext");
             text = await enforceBrandRulesOnText(input.brandId, text).catch(() => text);
           }
           if (strategyPublicPolicy) {
@@ -2728,11 +2728,11 @@ ${polishTemplate.polishHint}`
       // 不夠 3 秒就整批記 skipped，絕不為了檢查讓任務逾時。
       const squadBrandConsistency: any[] = [];
       if (!strategyPublicPolicy && input.brandId && brandPrefix && variants.some((v) => v.caption)) {
-        const { checkBrandConsistency } = await import("../core/brandConsistency");
+        const { checkBrandConsistency } = await import("../core/engine/brandConsistency");
         const remainingMs = 205_000 - (Date.now() - routeStartedAt) - 5_000;
         const timeoutMs = Math.min(25_000, remainingMs);
         const checkStartedAt = Date.now() - startedAt;
-        const { enforceBrandRulesOnText } = await import("../../strategy/core/brandContext");
+        const { enforceBrandRulesOnText } = await import("../../strategy/core/brand/brandContext");
         const results = await Promise.all(variants.map(async (v, vi) => {
           if (!v?.caption || v.caption.length > 6000) return null;
           const res = await checkBrandConsistency({
@@ -2760,8 +2760,8 @@ ${polishTemplate.polishHint}`
       // 法規卡才跑；同樣只用剩下的時間，不夠就記 skipped。
       let squadRegulationCompliance: any[] = [];
       if (!strategyPublicPolicy && input.brandId && variants.some((v) => v.caption)) {
-        const { checkVariantsCompliance } = await import("../core/regulationCompliance");
-        const { enforceBrandRulesOnText } = await import("../../strategy/core/brandContext");
+        const { checkVariantsCompliance } = await import("../core/engine/regulationCompliance");
+        const { enforceBrandRulesOnText } = await import("../../strategy/core/brand/brandContext");
         const regStartedAt = Date.now() - startedAt;
         const remainingMs = 205_000 - (Date.now() - routeStartedAt) - 5_000;
         const recs = await checkVariantsCompliance({
@@ -2841,7 +2841,7 @@ ${polishTemplate.polishHint}`
         : ok;
       if (shouldPersist) {
         try {
-          const { recordTaskRun, finaliseTaskRun } = await import("../../platform/core/recordTaskRun");
+          const { recordTaskRun, finaliseTaskRun } = await import("../../platform/core/ops/recordTaskRun");
           const content = strategyPublicPolicy
             ? JSON.stringify({
                 schemaVersion: 2,
@@ -2878,7 +2878,7 @@ ${polishTemplate.polishHint}`
             taskLabel: strategyRecordOverrides?.taskLabel ?? squad.name ?? input.squadSlug,
             tier: "99s",
             title: strategyRecordOverrides?.taskLabel
-              ?? (await import("../core/titleFromCaption")).titleFromCaption(variants[0]?.caption, squad.name ?? input.squadSlug),
+              ?? (await import("../core/engine/titleFromCaption")).titleFromCaption(variants[0]?.caption, squad.name ?? input.squadSlug),
             content,
             metadata,
             ...(strategyPublicPolicy ? { progress: "caption_ready" as const } : {}),
@@ -3039,15 +3039,15 @@ ${polishTemplate.polishHint}`
       }
 
       // P0-D pre-flight cost guard (99s tier is the most expensive)
-      const { preflightCostCheck } = await import("../../platform/core/llmWithBilling");
+      const { preflightCostCheck } = await import("../../platform/core/llm/llmWithBilling");
       const guard100 = await preflightCostCheck(userId);
       if (!guard100.ok) throw new TRPCError({ code: "FORBIDDEN", message: guard100.reason });
       // 2026-05-12: paywall quota check (plan task_99s cap)
       // 2026-05-14: points-based gating
-      const { assertPoints, deductPoints } = await import("../../platform/core/pointsService");
+      const { assertPoints, deductPoints } = await import("../../platform/core/billing/pointsService");
       await assertPoints(userId, "task_99s");
       await deductPoints(userId, "task_99s", { kind: "task", id: null });
-      const { runOrchestra } = await import("../core/quickTaskOrchestra");
+      const { runOrchestra } = await import("../core/engine/quickTaskOrchestra");
 
       const baseArgs = { template, config, inputs: input.inputs, brandId: input.brandId, ...scope, userId, tier: "99s" as const,
         audienceTag: await resolveAudienceTag(userId, input.brandId, input.spotRef),
@@ -3095,7 +3095,7 @@ ${polishTemplate.polishHint}`
           // reject the partial so the caller sees the error.
           if (checkpointFired && capturedOutputId) {
             try {
-              const { finaliseTaskRun } = await import("../../platform/core/recordTaskRun");
+              const { finaliseTaskRun } = await import("../../platform/core/ops/recordTaskRun");
               await finaliseTaskRun({
                 outputId: capturedOutputId,
                 // Don't pass content → keep partial caption from checkpoint
@@ -3140,17 +3140,17 @@ ${polishTemplate.polishHint}`
       const userId = ctx.user!.id;
       // 2026-05-08 (P0-D): pre-flight cost guard. Trial users hitting
       // wallet floor or daily $5 cap are stopped before LLM fan-out.
-      const { preflightCostCheck } = await import("../../platform/core/llmWithBilling");
+      const { preflightCostCheck } = await import("../../platform/core/llm/llmWithBilling");
       const guard = await preflightCostCheck(userId);
       if (!guard.ok) {
         throw new TRPCError({ code: "FORBIDDEN", message: guard.reason });
       }
       // 2026-05-12: paywall quota check (plan task_30s cap)
       // 2026-05-14: points-based gating
-      const { assertPoints, deductPoints } = await import("../../platform/core/pointsService");
+      const { assertPoints, deductPoints } = await import("../../platform/core/billing/pointsService");
       await assertPoints(userId, "task_30s");
       await deductPoints(userId, "task_30s", { kind: "task", id: null });
-      const { runOrchestra } = await import("../core/quickTaskOrchestra");
+      const { runOrchestra } = await import("../core/engine/quickTaskOrchestra");
       // 這支只收 30s（60s/99s 各有自己的 mutation），所以解析完再擋 tier，
       // 而不是靠「只查 30s 目錄」來擋 —— 後者查不到時的錯誤訊息會說謊，
       // 把一個存在的 60s 任務講成 "Unknown"。
@@ -3257,7 +3257,7 @@ ${polishTemplate.polishHint}`
         get99Template(taskId)  ? "99s" :
         (getFB60Template(taskId) ?? getIG60Template(taskId) ?? getYT60Template(taskId) ?? getMulti60Template(taskId)) ? "60s" :
         "30s";
-      const { runOrchestra } = await import("../core/quickTaskOrchestra");
+      const { runOrchestra } = await import("../core/engine/quickTaskOrchestra");
       const r = await runOrchestra({
         template, config: singleConfig, inputs, brandId: row.mission_brand_id ?? undefined, userId, tier: taskTier,
         // 2026-09-29：重生時沿用原本那篇的產品／活動範圍（metadata 有存），不然重生的版本讀不到產品定位。
@@ -3283,7 +3283,7 @@ ${polishTemplate.polishHint}`
       });
       const newContent = replaceRegeneratedContent(row.content, input, replacementVariant, target);
       // 2026-09-30：重生跑的是同一個 orchestra（含法規合規檢查），結果記到這個版本上。
-      const { mergeComplianceRecord } = await import("../core/regulationCompliance");
+      const { mergeComplianceRecord } = await import("../core/engine/regulationCompliance");
       const regRec = (r as any).regulationCompliance?.[0] ?? null;
       const newMetadata = JSON.stringify({
         ...md, archivedVariants: archived, lastRegenAt: new Date().toISOString(),
@@ -3424,7 +3424,7 @@ ${polishTemplate.polishHint}`
       // 只檢查會被發出去的文字欄位，不動 JSON 結構。
       if (parsedJson && typeof parsedJson === "object" && input.brandId) {
         // 2026-09-30：加上法規合規檢查（品牌沒有法規就只跑硬規則）。各欄位平行。
-        const { enforceBrandAndRegulations } = await import("../core/regulationCompliance");
+        const { enforceBrandAndRegulations } = await import("../core/engine/regulationCompliance");
         await Promise.all((["caption", "title", "description", "cta"] as const).map(async (k) => {
           const v = (parsedJson as any)[k];
           if (typeof v === "string" && v.trim()) {

@@ -29,8 +29,8 @@
 import * as dotenv from "dotenv";
 dotenv.config();
 import localPool from "../server/localDb";
-import { startPositioningJob } from "../server/strategy/core/positioningJobRunner";
-import { buildBrandPositioningSteps } from "../server/strategy/core/positioningSteps";
+import { startPositioningJob } from "../server/strategy/core/positioning/positioningJobRunner";
+import { buildBrandPositioningSteps } from "../server/strategy/core/positioning/positioningSteps";
 
 const OWNER_EMAIL = "sowork@sowork.tw";
 

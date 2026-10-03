@@ -20,9 +20,9 @@ const assertPoints = vi.fn(async () => {});
 const preflightCostCheck = vi.fn(async () => ({ ok: true as const }));
 const runOrchestra = vi.fn(async () => ({ variants: [] }));
 
-vi.mock("../../platform/core/pointsService", () => ({ assertPoints, deductPoints }));
-vi.mock("../../platform/core/llmWithBilling", () => ({ preflightCostCheck }));
-vi.mock("../core/quickTaskOrchestra", () => ({ runOrchestra }));
+vi.mock("../../platform/core/billing/pointsService", () => ({ assertPoints, deductPoints }));
+vi.mock("../../platform/core/llm/llmWithBilling", () => ({ preflightCostCheck }));
+vi.mock("../core/engine/quickTaskOrchestra", () => ({ runOrchestra }));
 
 const { quickTaskRouter } = await import("./quickTaskRouter");
 

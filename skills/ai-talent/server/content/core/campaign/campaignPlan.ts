@@ -24,16 +24,16 @@
  * 看得出來的錯，而且那種錯不該靠重跑模型來修。
  */
 import localPool from "../../../localDb.js";
-import { buildTaskCatalogIndex, type CatalogTask } from "../taskCatalogIndex.js";
+import { buildTaskCatalogIndex, type CatalogTask } from "../catalog/taskCatalogIndex.js";
 import { influencerLabel, cleanKolBrief, type KolInfluencer, type KolBrief } from "./campaignKolBrief.js";
 import { cleanChannelBriefs, channelBriefText, briefPartners, isBriefChannel, type BriefChannel, type ChannelBrief } from "./campaignChannelBrief.js";
-import { isHiddenContentPlatform } from "../../../platform/core/planGate.js";
+import { isHiddenContentPlatform } from "../../../platform/core/billing/planGate.js";
 import {
   loadEventProducts, productScopeBrief, resolveProductScope,
   type ProductScope, type ScopedProduct,
-} from "../../../strategy/core/eventProductScope.js";
+} from "../../../strategy/core/entities/eventProductScope.js";
 
-// ── 語彙（與 client/src/v2/strategy/lib/campaignSchema.ts 同一份）───────────
+// ── 語彙（與 client/src/v2/strategy/lib/campaign/campaignSchema.ts 同一份）───────────
 // server 不能 import client 的檔案，所以這裡自己宣告一份，由
 // campaignPlanVocab.test.ts（server 側的跨邊界測試）比對兩邊不會漂移。
 export const CAMPAIGN_TYPE_IDS = [
@@ -560,7 +560,7 @@ export async function inferCampaignSettings(args: {
     `{"type":"活動類型 id","mechanic":"優惠機制（逐字保留使用者寫的數字與期限）","goal":"想達成什麼（使用者沒寫就空字串）","channels":["通路id"],"productIds":[產品id],"summary":"一行摘要（20字內，例如「促銷折扣・FB+IG・橫膈牛排、牛舌」）"}`,
   ].filter(Boolean).join("\n");
 
-  const { invokeLLM } = await import("../../../platform/core/llm.js");
+  const { invokeLLM } = await import("../../../platform/core/llm/llm.js");
   const r = await invokeLLM({
     messages: [{ role: "system", content: INFER_SYSTEM }, { role: "user", content: user }],
     maxTokens: 700,
@@ -686,9 +686,9 @@ export async function buildCampaignPlan(args: {
   // 2026-09-29（CJ「生文前都要讀取策略層的內容」）：以前只給品牌名稱＋活動設定＋
   // 5 項產品事實，每篇的「要講什麼」跟品牌定位、活動定位、文字規則都沒關係。
   // 改帶同一份品牌大腦（含這檔活動的定位）。
-  const { buildBrandPrefix } = await import("../../../strategy/core/brandContext");
+  const { buildBrandPrefix } = await import("../../../strategy/core/brand/brandContext");
   const brain = await buildBrandPrefix(facts.brandId, null, args.eventId, "full").catch(() => "");
-  const { invokeLLM } = await import("../../../platform/core/llm.js");
+  const { invokeLLM } = await import("../../../platform/core/llm/llm.js");
   // 只選了網紅：不必問模型排貼文，訴求用活動名稱，使用者之後可以跟總監改。
   let parsed: any = {};
   if (cards.length) {

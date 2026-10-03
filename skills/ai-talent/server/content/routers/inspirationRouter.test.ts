@@ -12,14 +12,14 @@ describe("inspirationRouter", () => {
 
 describe("inspirationStage", () => {
   it("every thinker has a distinct agent and framework", async () => {
-    const { THINKERS, DEFAULT_LINEUP, LINEUP_SIZE } = await import("../core/inspirationStage");
+    const { THINKERS, DEFAULT_LINEUP, LINEUP_SIZE } = await import("../core/planning/inspirationStage");
     expect(new Set(THINKERS.map((t) => t.agentId)).size).toBe(THINKERS.length);
     expect(new Set(THINKERS.map((t) => t.framework)).size).toBe(THINKERS.length);
     expect(DEFAULT_LINEUP).toHaveLength(LINEUP_SIZE);
   });
 
   it("resolveLineup drops junk, fills to five, and never refills a dropped thinker first", async () => {
-    const { resolveLineup, DEFAULT_LINEUP } = await import("../core/inspirationStage");
+    const { resolveLineup, DEFAULT_LINEUP } = await import("../core/planning/inspirationStage");
     expect(resolveLineup(null, {})).toEqual(DEFAULT_LINEUP);
     const l = resolveLineup(["story", "bogus", "story", "timing"], { founder: { adopted: 3, dropped: 0 }, direct: { adopted: 0, dropped: 1 } });
     expect(l).toHaveLength(5);
@@ -28,7 +28,7 @@ describe("inspirationStage", () => {
   });
 
   it("parseAngles keeps only requested thinkers, caps per thinker, repairs platform/format", async () => {
-    const { parseAngles } = await import("../core/inspirationStage");
+    const { parseAngles } = await import("../core/planning/inspirationStage");
     const raw = "好的：\n" + JSON.stringify({ angles: [
       { thinker: "story", answer: "下班後", title: "下雨天的第一杯", hook: "今天台北下雨。", why: "找日常片刻", platform: "tiktok", format: "長文" },
       { thinker: "story", answer: "b", title: "第二個", hook: "第二句", why: "", platform: "facebook", format: "輪播" },
@@ -49,7 +49,7 @@ describe("inspirationStage", () => {
   });
 
   it("completedAngleObjects returns only cards whose closing brace has streamed in", async () => {
-    const { completedAngleObjects, parseAngles } = await import("../core/inspirationStage");
+    const { completedAngleObjects, parseAngles } = await import("../core/planning/inspirationStage");
     const full = JSON.stringify({ angles: [
       { thinker: "story", title: "括號{不算}", hook: "他說：\"}\" 也不算", why: "" },
       { thinker: "direct", title: "第二張", hook: "第二句", why: "" },
@@ -69,14 +69,14 @@ describe("inspirationStage", () => {
   });
 
   it("unquote strips only a quote pair that wraps the whole hook", async () => {
-    const { unquote } = await import("../core/inspirationStage");
+    const { unquote } = await import("../core/planning/inspirationStage");
     expect(unquote("「啤酒已經開了。」")).toBe("啤酒已經開了。");
     expect(unquote("「你去哪間打包的？」——「我自己煎的。」")).toBe("「你去哪間打包的？」——「我自己煎的。」");
     expect(unquote("沒有引號")).toBe("沒有引號");
   });
 
   it("slotTopic fits planned_slots.topic and pickCardForFormat prefers a matching card", async () => {
-    const { slotTopic, pickCardForFormat } = await import("../core/inspirationStage");
+    const { slotTopic, pickCardForFormat } = await import("../core/planning/inspirationStage");
     expect(slotTopic({ title: "t".repeat(40), hook: "h".repeat(300) }).length).toBeLessThanOrEqual(200);
     const cards = [
       { id: "fb-30-post", platform: "facebook", labelZh: "日常貼文" },
@@ -89,7 +89,7 @@ describe("inspirationStage", () => {
   });
 
   it("one prompt carries every thinker, pins the subject, keeps the occasion as material", async () => {
-    const { ideationSystemPrompt, thinkerOf } = await import("../core/inspirationStage");
+    const { ideationSystemPrompt, thinkerOf } = await import("../core/planning/inspirationStage");
     const p = ideationSystemPrompt({
       thinkers: [{ thinker: thinkerOf("story"), name: "Grace" }, { thinker: thinkerOf("detail"), name: "周明翰" }],
       brandName: "HOTU", subjectLine: "「HOTU」的產品「色鉛筆」", brandCtx: "", occasion: "開學週",

@@ -22,7 +22,7 @@ import localPool from "../../localDb";
 import {
   type PhotoScope, MAX_UPLOAD_BYTES, maxPhotosFor,
   listPhotos, photoStorageRoot, storePhotoBytes,
-} from "../core/assetPhotos";
+} from "../core/brand/assetPhotos";
 
 export const assetPhotoRouter = Router();
 

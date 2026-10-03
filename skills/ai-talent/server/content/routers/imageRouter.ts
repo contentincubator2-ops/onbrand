@@ -13,14 +13,14 @@ import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure } from "../../platform/core/trpc";
 import { getDb } from "../../db";
 import { sql } from "drizzle-orm";
-import { generateImage, resolveBrandVisualContext } from "../core/imageGen";
+import { generateImage, resolveBrandVisualContext } from "../core/image/imageGen";
 import { fetchImageBuffer, isLocalUploadPath } from "../../platform/core/media/imageFetch";
 import { assertBrandOwner } from "../../platform/core/brandAuth";
-import { imageActionForRequest, reconcileImageCharge } from "../../platform/core/imageBilling";
+import { imageActionForRequest, reconcileImageCharge } from "../../platform/core/billing/imageBilling";
 import {
   parseBilingualBriefChoice,
   normalizeImagePromptInput,
-} from "../core/bilingualVisualBrief";
+} from "../core/image/bilingualVisualBrief";
 
 // 2026-08-02 (CJ「產圖失敗 invalid_enum_value tiktok」): this enum had
 // drifted out of sync with promptFromCaption's below — TikTok (and email)
@@ -168,7 +168,7 @@ export const imageRouter = router({
       const { modelPrompt, displayPrompt } = normalizedPrompt;
       // Per-model image point cost: gpt-image-2 (default) = 100 pts,
       // Nano Banana (only when picked) = 50 pts. Prepaid, refunded in full on failure.
-      const { assertPoints, deductPoints } = await import("../../platform/core/pointsService");
+      const { assertPoints, deductPoints } = await import("../../platform/core/billing/pointsService");
       const imageAction = imageActionForRequest(input);
       await assertPoints(ctx.user.id, imageAction);
       await deductPoints(ctx.user.id, imageAction, { kind: "brand", id: input.brandId });
@@ -245,7 +245,7 @@ export const imageRouter = router({
       await assertBrandOwner(ctx.user.id, input.brandId);
 
       const resolved = await resolveBrandVisualContext(input.brandId);
-      const { invokeLLM } = await import("../../platform/core/llm");
+      const { invokeLLM } = await import("../../platform/core/llm/llm");
 
       // 只讀「這個品牌自己的產品照」——不替任意網址代抓圖。讀不到就退回看不到照片的版本。
       let photoDataUrl: string | null = null;
@@ -331,7 +331,7 @@ Rules:
     .mutation(async ({ ctx, input }) => {
       if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED" });
       await assertBrandOwner(ctx.user.id, input.brandId);
-      const { refineScenePrompt } = await import("../core/scenePromptRefiner");
+      const { refineScenePrompt } = await import("../core/image/scenePromptRefiner");
       const refined = await refineScenePrompt({
         brandId: input.brandId, userId: ctx.user.id,
         productId: input.productId ?? null, scene: input.scene,
@@ -386,7 +386,7 @@ Rules:
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
 
-      const { assertPoints, deductPoints } = await import("../../platform/core/pointsService");
+      const { assertPoints, deductPoints } = await import("../../platform/core/billing/pointsService");
       const imageAction = imageActionForRequest({ modelChoice: "nano-banana" }); // → image_imagen（50 點級距）
       await assertPoints(ctx.user.id, imageAction);
       await deductPoints(ctx.user.id, imageAction, { kind: "brand", id: input.brandId });

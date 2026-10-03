@@ -24,7 +24,7 @@ describe("brandTaskCardRouter", () => {
   });
 
   it("匯入這個 router 就把自建卡接進 taskRegistry 了（不需要別處記得叫）", async () => {
-    const { resolveTask } = await import("../core/taskRegistry");
+    const { resolveTask } = await import("../core/catalog/taskRegistry");
     // 這裡沒有資料庫，所以自建卡那條來源會丟連線錯誤。重點是 resolveTask
     // 要把它吞掉並回 null，而不是把 mysql 的錯誤往上冒 —— 呼叫端會把那個
     // 顯示成「任務壞了」，真正的原因只留在 stack 裡。
@@ -32,7 +32,7 @@ describe("brandTaskCardRouter", () => {
   });
 
   it("內建卡不受自建卡來源影響（同步目錄先命中，根本不碰資料庫）", async () => {
-    const { resolveTask } = await import("../core/taskRegistry");
+    const { resolveTask } = await import("../core/catalog/taskRegistry");
     const r = await resolveTask("fb-30-caption-short");
     expect(r?.source).toBe("30s");
   });

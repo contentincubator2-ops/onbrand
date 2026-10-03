@@ -13,11 +13,11 @@ import { Button, Input, Select, SelectItem, Textarea, Avatar } from "@heroui/rea
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faPlus, faXmark, faBullhorn } from "@fortawesome/free-solid-svg-icons";
 import { trpc } from "../../../../lib/trpc";
-import { CAMPAIGN_PHASES, type CampaignPhaseId, type CampaignPlan } from "../../../strategy/lib/campaignSchema";
-import { phaseShort } from "../../../strategy/lib/campaignStage";
+import { CAMPAIGN_PHASES, type CampaignPhaseId, type CampaignPlan } from "../../../strategy/lib/campaign/campaignSchema";
+import { phaseShort } from "../../../strategy/lib/campaign/campaignStage";
 import {
   KPI_METRICS, metricLabel, metricLine, money, type CampaignKpi, type KpiGoal, type KpiMetric, type PhaseKpi,
-} from "../../../strategy/lib/campaignKpi";
+} from "../../../strategy/lib/campaign/campaignKpi";
 
 type Proposal = CampaignKpi & { paidIds: string[] };
 

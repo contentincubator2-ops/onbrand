@@ -16,9 +16,9 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faArrowRight } from "@fortawesome/free-solid-svg-icons";
 import { trpc } from "../../../../lib/trpc";
 import { CHANNEL_META, channelLabel } from "../../../platform/lib/channelMeta";
-import { CAMPAIGN_TYPES, EMPTY_CAMPAIGN_SETTINGS, type CampaignSettings } from "../../../strategy/lib/campaignSchema";
+import { CAMPAIGN_TYPES, EMPTY_CAMPAIGN_SETTINGS, type CampaignSettings } from "../../../strategy/lib/campaign/campaignSchema";
 import { scopeValueFrom, UNDECIDED_SCOPE, type ProductScopeValue } from "../../../strategy/lib/eventProductScope";
-import EventProductScopePicker from "../../../strategy/components/positioning/EventProductScopePicker";
+import EventProductScopePicker from "../../../strategy/components/events/EventProductScopePicker";
 
 export default function CampaignSetupForm({ eventId, data, brandProducts, hasPlan, en, onPlanned, onOpenKolBrief }: {
   eventId: number;

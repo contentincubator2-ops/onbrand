@@ -30,7 +30,7 @@ function isProviderKeyError(text: string): boolean {
 }
 import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure } from "../../platform/core/trpc";
-import { callLLM } from "../../platform/core/llmRouter";
+import { callLLM } from "../../platform/core/llm/llmRouter";
 import { type GenOptions } from "../../platform/core/media/mediaGen";
 import { generateStillImage } from "../../platform/core/media/stillImageModels";
 import localPool from "../../localDb";
@@ -192,7 +192,7 @@ ${input.audienceContext ? `受眾：${input.audienceContext}` : ""}
       // so the blanket text-suppression negative is NOT sent.
       const {
         NO_TEXT_PROMPT_BLOCK, PRODUCT_FAITHFUL_PROMPT_BLOCK, NO_MIRROR_PROMPT_BLOCK,
-      } = await import("../core/imageGen");
+      } = await import("../core/image/imageGen");
       const isImage = input.kind === "image";
       const isProductSubject = isImage && input.subjectMode === "product" && !!input.imageUrl;
       const opts: GenOptions = {

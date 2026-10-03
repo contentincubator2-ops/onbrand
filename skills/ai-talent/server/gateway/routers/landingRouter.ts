@@ -9,8 +9,8 @@
  * prompt 與 SKILL 內文一律不出 server。
  */
 import { router, publicProcedure } from "../../platform/core/trpc";
-import { buildTaskCatalogIndex, type CatalogPlatform } from "../../content/core/taskCatalogIndex";
-import { isRecentViral } from "../../content/core/taskSource";
+import { buildTaskCatalogIndex, type CatalogPlatform } from "../../content/core/catalog/taskCatalogIndex";
+import { isRecentViral } from "../../content/core/catalog/taskSource";
 import { PLATFORM_IMAGE_SPECS, IMAGE_CHANNELS } from "../../platform/core/media/platformImageSpecs";
 
 /** 首頁上線中的七個通路（與 IMAGE_CHANNELS 同一組）。 */

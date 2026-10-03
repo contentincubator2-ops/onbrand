@@ -20,9 +20,9 @@ import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure } from "../core/trpc";
 import { assertBrandAccess } from "../core/brandAuth";
-import { getPipedreamConnectTokenUrl } from "../core/pipedreamConnect";
-import { getPipedreamOAuthAppId } from "../core/pipedreamOAuth";
-import { isRuntimeFeatureEnabled } from "../core/runtimeSafety";
+import { getPipedreamConnectTokenUrl } from "../core/connectors/pipedreamConnect";
+import { getPipedreamOAuthAppId } from "../core/connectors/pipedreamOAuth";
+import { isRuntimeFeatureEnabled } from "../core/ops/runtimeSafety";
 
 const socialProcedure = protectedProcedure.use(async ({ next }) => {
   if (!isRuntimeFeatureEnabled("SOCIAL_PUBLISH_ENABLED")) {

@@ -199,13 +199,13 @@ export async function runKpiPlan(args: {
 
   let system = SYSTEM;
   if (agent) {
-    const { loadAgentKnowledge, withAgentKnowledge } = await import("../../../platform/core/agentKnowledge.js");
+    const { loadAgentKnowledge, withAgentKnowledge } = await import("../../../platform/core/agents/agentKnowledge.js");
     const knowledge = await loadAgentKnowledge(agent.id, { source: "campaign.planKpi" }).catch(() => "");
     system = withAgentKnowledge(`你是${agent.name}（${agent.title}）。\n\n${SYSTEM}`, knowledge);
   }
-  const { buildBrandPrefix } = await import("../../../strategy/core/brandContext.js");
+  const { buildBrandPrefix } = await import("../../../strategy/core/brand/brandContext.js");
   const brain = await buildBrandPrefix(facts.brandId, null, args.eventId, "full").catch(() => "");
-  const { invokeLLM } = await import("../../../platform/core/llm.js");
+  const { invokeLLM } = await import("../../../platform/core/llm/llm.js");
   const r = await invokeLLM({
     messages: [
       { role: "system", content: brain ? `${system}\n\n# 品牌大腦${brain}` : system },

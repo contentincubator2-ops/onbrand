@@ -24,8 +24,8 @@ import TrialCountdownBar from "../../platform/components/TrialCountdownBar";
 import SupportDrawer from "../../platform/components/SupportDrawer";
 // 2026-09-23（CJ「在每一頁派一個常駐的顧問…我喜歡在右上方的位置」）：
 // 跟 Mia（客服，右下角）刻意分開的第二個全域常駐入口。
-import StrategyDirectorDrawer from "../../strategy/components/positioning/StrategyDirectorDrawer";
-import StrategyMonitorNotice from "../../strategy/components/positioning/StrategyMonitorNotice";
+import StrategyDirectorDrawer from "../../strategy/components/director/StrategyDirectorDrawer";
+import StrategyMonitorNotice from "../../strategy/components/director/StrategyMonitorNotice";
 import NavItemPicker from "./NavItemPicker";
 // 2026-06-12 (CJ「Mia 細緻化 + 不要自動跳出」): unread-nudge state lives in
 // sessionStorage; this hook surfaces the count for the avatar badge and

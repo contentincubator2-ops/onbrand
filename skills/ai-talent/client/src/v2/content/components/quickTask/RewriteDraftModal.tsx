@@ -6,7 +6,7 @@
  * SKILL；這裡只改這一篇，貼上、送出、拿到結果就結束，不會產生新卡片。
  *
  * 後端只有一個 mutation（quickTask.rewriteDraft），伺服器內部依序跑
- * 診斷→改寫→CTA 三段（見 server/content/core/rewriteDraft.ts），前端不用
+ * 診斷→改寫→CTA 三段（見 server/content/core/engine/rewriteDraft.ts），前端不用
  * 自己管多階段狀態。
  */
 import React from "react";

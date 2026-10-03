@@ -13,7 +13,7 @@
  * 拿掉了競爭者比對這個篩選鏡頭——需要爬蟲精度才準的「這個通路對方有沒有
  * 活躍」查不到什麼有用的東西，CJ 判斷現階段做不出可靠版本，先回到單純呈現
  * 「我們自己的策略→內容接觸點現況」。競爭者比對的後端
- * （server/strategy/core/competitorSnapshot.ts + competitorRouter.ts）保留在
+ * （server/strategy/core/monitor/competitorSnapshot.ts + competitorRouter.ts）保留在
  * repo 裡沒有刪，已經寫好也測試過，只是先不接進這一頁；之後若有更可靠的
  * 研究方法（例如先解析出對方社群帳號再做針對性查詢）可以直接接回來。
  *

@@ -25,7 +25,7 @@ import helmet from "helmet";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 // existsSync already imported at top for env path resolution
 import { ENV } from "./platform/core/env";
-import { getBillingRetryQueueLength, flushBillingRetryQueue, loadBillingFallbackLog } from "./platform/core/llmWithBilling";
+import { getBillingRetryQueueLength, flushBillingRetryQueue, loadBillingFallbackLog } from "./platform/core/llm/llmWithBilling";
 import { createContext } from "./platform/core/trpc";
 import { authRouter } from "./platform/auth/authRouter";
 import { reportTemplateRouter } from "./performance/routes/reportTemplateRoute";
@@ -41,10 +41,10 @@ import { publicAgentsRoute } from "./platform/routes/publicAgentsRoute";
 import { closeDb, pingDb, pingSoworkDb, getDb } from "./db";
 import { sql } from "drizzle-orm";
 import { appRouter } from "./routers";
-import { resumeInterruptedPositioningJobs } from "./strategy/core/positioningJobRunner";
-import { runStartupCleanup } from "./platform/core/startupCleanup";
-import { computeMissionResources } from "./content/core/missionResourceComputer";
-import { getDisabledRuntimeFeatures, isRuntimeFeatureEnabled } from "./platform/core/runtimeSafety";
+import { resumeInterruptedPositioningJobs } from "./strategy/core/positioning/positioningJobRunner";
+import { runStartupCleanup } from "./platform/core/ops/startupCleanup";
+import { computeMissionResources } from "./content/core/engine/missionResourceComputer";
+import { getDisabledRuntimeFeatures, isRuntimeFeatureEnabled } from "./platform/core/ops/runtimeSafety";
 
 const app = express();
 
@@ -539,16 +539,16 @@ async function runStartupMigrations() {
     // 2026-08-23 (CJ「安排定期任務掃描當地熱門的 facebook 貼文，補充為 task」):
     // 每月排程掃出來的貼文形式候選佇列。DDL 的來源在 _core/postFormatStore.ts，
     // 那裡也寫了為什麼去重不看 status（否則被否決的形式每月復活）。
-    const { ASSET_PHOTO_DDL } = await import("./strategy/core/assetPhotos");
+    const { ASSET_PHOTO_DDL } = await import("./strategy/core/brand/assetPhotos");
     await db.execute(sql.raw(ASSET_PHOTO_DDL));
     console.log("[migrate] asset_photos: OK");
 
-    const { POST_FORMAT_CANDIDATES_DDL } = await import("./content/core/postFormatStore");
+    const { POST_FORMAT_CANDIDATES_DDL } = await import("./content/core/catalog/postFormatStore");
     await db.execute(sql.raw(POST_FORMAT_CANDIDATES_DDL));
     console.log("[migrate] post_format_candidates: OK");
 
     // 2026-09-08 (CJ「策略監測，定義在 9000 的方案」)：監測清單與策略提醒。
-    const { STRATEGY_WATCH_DDL, STRATEGY_ALERTS_DDL } = await import("./strategy/core/strategyMonitor");
+    const { STRATEGY_WATCH_DDL, STRATEGY_ALERTS_DDL } = await import("./strategy/core/monitor/strategyMonitor");
     await db.execute(sql.raw(STRATEGY_WATCH_DDL));
     await db.execute(sql.raw(STRATEGY_ALERTS_DDL));
     console.log("[migrate] strategy_watch / strategy_alerts: OK");
@@ -558,12 +558,12 @@ async function runStartupMigrations() {
     // 已經存在的留著不砍（砍表是另一個決定）。
 
     // 2026-09-30（CJ「策略層加一個 mission tray，是法規……agent 寫文章前要審查」）。
-    const { BRAND_REGULATIONS_DDL } = await import("./strategy/core/brandRegulations");
+    const { BRAND_REGULATIONS_DDL } = await import("./strategy/core/brand/brandRegulations");
     await db.execute(sql.raw(BRAND_REGULATIONS_DDL));
     // 2026-09-30 第二版：原文＋審查重點。補欄位、遷移第一版的卡，接著跑重啟前沒跑完的萃取。
-    const { migrateRegulationColumns } = await import("./strategy/core/brandRegulations");
+    const { migrateRegulationColumns } = await import("./strategy/core/brand/brandRegulations");
     await migrateRegulationColumns();
-    const { resumeRegulationExtractions } = await import("./strategy/core/regulationDigest");
+    const { resumeRegulationExtractions } = await import("./strategy/core/brand/regulationDigest");
     const resumed = await resumeRegulationExtractions();
     console.log(`[migrate] brand_regulations: OK (resumed ${resumed} extraction(s))`);
 
@@ -574,7 +574,7 @@ async function runStartupMigrations() {
     console.log("[migrate] perf_dimensions / perf_lenses / perf_facts / perf_tag_rules / perf_imports: OK");
 
     // 2026-10-02（CJ「活動頁用年度時間軸＋建議節點，節點也可以讓用戶自己增加」）。
-    const { BRAND_CALENDAR_NODES_DDL } = await import("./strategy/core/eventCalendar");
+    const { BRAND_CALENDAR_NODES_DDL } = await import("./strategy/core/entities/eventCalendar");
     await db.execute(sql.raw(BRAND_CALENDAR_NODES_DDL));
     console.log("[migrate] brand_calendar_nodes: OK");
 
@@ -591,24 +591,24 @@ async function runStartupMigrations() {
     console.log("[migrate] brand_nav_prefs: OK");
 
     // 2026-09-27（CJ「本週企劃取代行事曆」）：規劃格子與總主管對話。
-    const { PLANNED_SLOTS_DDL, PLANNER_MESSAGES_DDL } = await import("./content/core/weeklyPlanner");
+    const { PLANNED_SLOTS_DDL, PLANNER_MESSAGES_DDL } = await import("./content/core/planning/weeklyPlanner");
     await db.execute(sql.raw(PLANNED_SLOTS_DDL));
     await db.execute(sql.raw(PLANNER_MESSAGES_DDL));
     console.log("[migrate] planned_slots / planner_messages: OK");
 
     // 2026-09-29（CJ「七日發布台改成靈感舞台」）：每個品牌的 thinker 陣容與採用／換掉紀錄。
-    const { INSPIRATION_PREFS_DDL } = await import("./content/core/inspirationStage");
+    const { INSPIRATION_PREFS_DDL } = await import("./content/core/planning/inspirationStage");
     await db.execute(sql.raw(INSPIRATION_PREFS_DDL));
     console.log("[migrate] inspiration_prefs: OK");
 
     // 2026-09-14（CJ「選定一個競爭者，對比接觸點跟策略訴求差異」）：
     // 具名競爭者的逐接觸點比對快照（14 天內快取，不重跑研究）。
-    const { COMPETITOR_SNAPSHOT_DDL } = await import("./strategy/core/competitorSnapshot");
+    const { COMPETITOR_SNAPSHOT_DDL } = await import("./strategy/core/monitor/competitorSnapshot");
     await db.execute(sql.raw(COMPETITOR_SNAPSHOT_DDL));
     console.log("[migrate] competitor_snapshots: OK");
 
     // 2026-09-21（CJ「把『可加購成效層』接上真正的購買路徑」）：加購申請。
-    const { ADDON_REQUESTS_DDL } = await import("./platform/core/addonRequests");
+    const { ADDON_REQUESTS_DDL } = await import("./platform/core/billing/addonRequests");
     await db.execute(sql.raw(ADDON_REQUESTS_DDL));
     console.log("[migrate] addon_requests: OK");
 
@@ -719,7 +719,7 @@ const server = app.listen(PORT, async () => {
 
     // 策略監測 worker：每 15 分鐘挑一份到期的監測清單掃一次（每份至少隔 7 天）。
     // 一拍只掃一份 —— scout 與 LLM 都要錢，寧可慢。
-    const { tickStrategyMonitor } = await import("./strategy/core/strategyMonitor");
+    const { tickStrategyMonitor } = await import("./strategy/core/monitor/strategyMonitor");
     setInterval(() => {
       tickStrategyMonitor().catch((e) => {
         console.error("[strategyMonitor] tick error:", e?.message ?? e);

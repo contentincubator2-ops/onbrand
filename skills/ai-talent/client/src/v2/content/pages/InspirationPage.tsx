@@ -6,7 +6,7 @@
  *   · 陣容不是必經步驟：預設五位直接按「開始想」；想控制的人點頭像換人。
  *   · 選擇放在看完結果之後：每張切角卡有「請他再想 3 個」「換掉他」。
  *   · 切角卡只放三樣：切角名稱、開場第一句、為什麼這樣切。採用了才寫全文，沒選的不花錢。
- * 思考框架與偏好紀錄在 server/content/core/inspirationStage.ts。
+ * 思考框架與偏好紀錄在 server/content/core/planning/inspirationStage.ts。
  */
 import React from "react";
 import { useNavigate, useOutletContext } from "react-router-dom";

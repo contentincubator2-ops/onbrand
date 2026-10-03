@@ -15,18 +15,18 @@ import {
   getPositioningJob,
   getRecentJobCompletions,
   finalizeBrandAfterPipeline,
-} from "../core/positioningJobRunner";
-import { isPositioningLocked } from "../core/positioningLock";
+} from "../core/positioning/positioningJobRunner";
+import { isPositioningLocked } from "../core/positioning/positioningLock";
 import {
   buildBrandPositioningSteps,
   buildProductPositioningSteps,
   buildEventPositioningSteps,
-} from "../core/positioningSteps";
-import { generateInterimPulse } from "../core/interimQuickPulse";
-import { loadBrandFullContext } from "../core/brandFullContext";
-import { invokeLLM } from "../../platform/core/llm";
-import { buildBrandPrefix } from "../core/brandContext";
-import { getBrandRealContent } from "../core/brandRealContent";
+} from "../core/positioning/positioningSteps";
+import { generateInterimPulse } from "../core/monitor/interimQuickPulse";
+import { loadBrandFullContext } from "../core/brand/brandFullContext";
+import { invokeLLM } from "../../platform/core/llm/llm";
+import { buildBrandPrefix } from "../core/brand/brandContext";
+import { getBrandRealContent } from "../core/brand/brandRealContent";
 import localPool from "../../localDb";
 
 const entityKindSchema = z.enum(["brand", "product", "event"]);

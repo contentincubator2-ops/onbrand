@@ -31,11 +31,11 @@ import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure } from "../../platform/core/trpc";
 import localPool from "../../localDb";
-import { invokeLLM } from "../../platform/core/llm";
-import { buildBrandPrefix } from "../core/brandContext";
+import { invokeLLM } from "../../platform/core/llm/llm";
+import { buildBrandPrefix } from "../core/brand/brandContext";
 import { assertUrlSafe } from "../../platform/core/web/urlGuard";
-import { getValidAccessToken, CloudNotConnectedError, type CloudProvider } from "../../platform/core/cloudTokens";
-import { getCloudFileMeta, downloadCloudFile } from "../../platform/core/cloudDriveClient";
+import { getValidAccessToken, CloudNotConnectedError, type CloudProvider } from "../../platform/core/connectors/cloudTokens";
+import { getCloudFileMeta, downloadCloudFile } from "../../platform/core/connectors/cloudDriveClient";
 import { transcribeBuffer, TRANSCRIBE_SIZE_LIMIT_BYTES, TranscribeTooLargeError } from "../../platform/core/media/transcription";
 
 export const PERSONA_PLATFORMS = [

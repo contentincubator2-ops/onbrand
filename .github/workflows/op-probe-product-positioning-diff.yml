@@ -30,8 +30,8 @@ jobs:
           echo "dry=$(base64 -w0 $S/scripts/probe-product-positioning-dryrun.ts)" >> "$GITHUB_OUTPUT"
           echo "en=$(base64 -w0 $S/scripts/probe-product-positioning-en.ts)" >> "$GITHUB_OUTPUT"
           echo "endry=$(base64 -w0 $S/scripts/probe-product-positioning-en-dry.ts)" >> "$GITHUB_OUTPUT"
-          echo "steps=$(base64 -w0 $S/server/strategy/core/positioningSteps.ts)" >> "$GITHUB_OUTPUT"
-          echo "sib=$(base64 -w0 $S/server/strategy/core/productSiblings.ts)" >> "$GITHUB_OUTPUT"
+          echo "steps=$(base64 -w0 $S/server/strategy/core/positioning/positioningSteps.ts)" >> "$GITHUB_OUTPUT"
+          echo "sib=$(base64 -w0 $S/server/strategy/core/entities/productSiblings.ts)" >> "$GITHUB_OUTPUT"
       - name: Run probes on DEV VM
         uses: appleboy/ssh-action@v1.0.3
         env:
@@ -53,12 +53,12 @@ jobs:
             cd /opt/onbrand/current/skills/ai-talent
             set -a; source .env 2>/dev/null; set +a
             D=scripts/_probe-pp-diff.ts; R=scripts/_probe-pp-dry.ts; E=scripts/_probe-pp-en.ts; ED=scripts/_probe-pp-en-dry.ts
-            C=server/strategy/core
-            trap 'rm -f "$D" "$R" "$E" "$ED" "$C/_probe_positioningSteps.ts" "$C/_probe_productSiblings.ts"' EXIT
+            CP=server/strategy/core/positioning; CE=server/strategy/core/entities
+            trap 'rm -f "$D" "$R" "$E" "$ED" "$CP/_probe_positioningSteps.ts" "$CE/_probe_productSiblings.ts"' EXIT
             echo "$P_DIFF" | base64 -d > "$D"
             echo "$P_DRY" | base64 -d > "$R"
-            echo "$P_STEPS" | base64 -d > "$C/_probe_positioningSteps.ts"
-            echo "$P_SIB" | base64 -d > "$C/_probe_productSiblings.ts"
+            echo "$P_STEPS" | base64 -d > "$CP/_probe_positioningSteps.ts"
+            echo "$P_SIB" | base64 -d > "$CE/_probe_productSiblings.ts"
             echo "$P_EN" | base64 -d > "$E"
             echo "================ 英文市場品牌的產品定位（唯讀）================"
             ./node_modules/.bin/tsx "$E"

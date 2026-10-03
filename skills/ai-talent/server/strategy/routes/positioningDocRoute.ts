@@ -43,7 +43,7 @@ import {
   type PositioningScope, type SourceDocSummary,
   loadPositioning, savePositioningDocs, sourceDocsOf,
   MAX_DOCS_PER_SCOPE,
-} from "../core/positioningDocs";
+} from "../core/positioning/positioningDocs";
 
 export const positioningDocRouter = Router();
 

@@ -22,14 +22,14 @@
  */
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
-import { planQuotaFor, isUnlimited, assertCanAct } from "../../platform/core/planGate";
+import { planQuotaFor, isUnlimited, assertCanAct } from "../../platform/core/billing/planGate";
 import { router, protectedProcedure } from "../../platform/core/trpc";
 import { assertBrandAccess } from "../../platform/core/brandAuth";
-import { invokeLLM } from "../../platform/core/llm";
+import { invokeLLM } from "../../platform/core/llm/llm";
 import { readFileSync } from "fs";
 import { coverFilePath, saveCoverFile } from "../../platform/core/media/mediaGen";
-import { drawIllustration, shrinkToWebp, writeIllustrationConcepts } from "../core/taskIllustration";
-import { buildBrandPrefix } from "../../strategy/core/brandContext";
+import { drawIllustration, shrinkToWebp, writeIllustrationConcepts } from "../core/image/taskIllustration";
+import { buildBrandPrefix } from "../../strategy/core/brand/brandContext";
 import {
   type BrandTaskCard, type BrandTaskCardField,
   listBrandTaskCards, getBrandTaskCard, mutateBrandTaskCards,
@@ -37,7 +37,7 @@ import {
   factLeaks, redactFactLeaks, verbatimSamples, illustrationInFlight,
   MAX_CARDS_PER_BRAND, MAX_SAMPLES, MAX_SAMPLE_CHARS,
   registerBrandTaskCardSource,
-} from "../core/brandTaskCards";
+} from "../core/catalog/brandTaskCards";
 
 // 在模組載入時就把自建卡接進 taskRegistry —— 放這裡而不是 index.ts 的啟動流程，
 // 是因為這個 router 一定會被 routers/index.ts 匯入，所以「忘記註冊」不可能發生。
@@ -506,7 +506,7 @@ export const brandTaskCardRouter = router({
         throw new TRPCError({ code: "BAD_REQUEST", message: "SKILL 還沒生成完，請等進度跑完再試寫" });
       }
 
-      const { runOrchestra } = await import("../core/quickTaskOrchestra");
+      const { runOrchestra } = await import("../core/engine/quickTaskOrchestra");
       // 試寫一律只產一個版本：驗的是「像不像」，看一篇就夠，五篇只是多等四倍。
       const config = { ...cardConfig(card), variants: 1, variantLabels: ["試寫"] };
       let result: any;

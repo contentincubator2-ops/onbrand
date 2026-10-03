@@ -8,7 +8,7 @@ import { describe, it, expect } from "vitest";
 import { validateCampaignOps, parseChatReply, pickHandoff } from "./campaignChat";
 import { rosterRoles } from "./campaignRoster";
 import type { CampaignPlan } from "./campaignPlan";
-import type { CatalogTask } from "../taskCatalogIndex";
+import type { CatalogTask } from "../catalog/taskCatalogIndex";
 
 const card = (id: string, platform: string, tier = "30s"): CatalogTask => ({
   id, platform: platform as any, tier, postType: "post",

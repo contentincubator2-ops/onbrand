@@ -18,7 +18,7 @@ import { promises as fs } from "fs";
 import localPool from "../server/localDb.js";
 import {
   savePhotoFromUrl, removePhoto, listPhotos, photoStorageRoot,
-} from "../server/strategy/core/assetPhotos.js";
+} from "../server/strategy/core/brand/assetPhotos.js";
 import { localUploadFile } from "../server/platform/core/media/imageFetch.js";
 
 async function main() {

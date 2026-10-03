@@ -15,9 +15,9 @@
  */
 import "./../server/bootstrap-env";
 import localPool from "../server/localDb";
-import { runOrchestra } from "../server/content/core/quickTaskOrchestra";
-import { FB_30S_TASKS, FB_30S_ORCHESTRA } from "../server/content/core/quickTaskFB";
-import { checkAngle } from "../server/content/core/variantAngles";
+import { runOrchestra } from "../server/content/core/engine/quickTaskOrchestra";
+import { FB_30S_TASKS, FB_30S_ORCHESTRA } from "../server/content/core/catalog/quickTaskFB";
+import { checkAngle } from "../server/content/core/engine/variantAngles";
 
 const TASK_ID = process.env.TASK_ID || "fb-30-caption-short";
 const TOPIC = process.env.TASK_INPUT ||

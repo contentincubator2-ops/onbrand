@@ -28,11 +28,11 @@ import { Button, Chip, Input } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faArrowLeft, faEllipsis, faPenNib } from "@fortawesome/free-solid-svg-icons";
 import { CHANNEL_META, channelLabel } from "../../../platform/lib/channelMeta";
-import { phaseOf, type CampaignPhaseId, type CampaignPlanItem } from "../../../strategy/lib/campaignSchema";
-import { phaseShort, type StagePhase } from "../../../strategy/lib/campaignStage";
-import { money, metricLine, PAID_CHANNELS, type PhaseKpi } from "../../../strategy/lib/campaignKpi";
+import { phaseOf, type CampaignPhaseId, type CampaignPlanItem } from "../../../strategy/lib/campaign/campaignSchema";
+import { phaseShort, type StagePhase } from "../../../strategy/lib/campaign/campaignStage";
+import { money, metricLine, PAID_CHANNELS, type PhaseKpi } from "../../../strategy/lib/campaign/campaignKpi";
 import { TaskIllustration } from "../../../platform/components/TaskIllustration";
-import { isPostDone, postStateBorder, postStateChip, postStateLabel, postStateOf } from "../../../strategy/lib/campaignPostStatus";
+import { isPostDone, postStateBorder, postStateChip, postStateLabel, postStateOf } from "../../../strategy/lib/campaign/campaignPostStatus";
 
 /** 寫好的那一篇的縮圖＋走到哪一關（campaign.itemThumbs）。 */
 export interface ItemThumb {

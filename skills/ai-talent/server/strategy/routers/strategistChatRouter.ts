@@ -34,16 +34,16 @@ import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure } from "../../platform/core/trpc";
 import localPool from "../../localDb";
-import { callModel } from "../../platform/core/multiModelRouter";
-import { loadAgentKnowledge } from "../../platform/core/agentKnowledge";
+import { callModel } from "../../platform/core/llm/multiModelRouter";
+import { loadAgentKnowledge } from "../../platform/core/agents/agentKnowledge";
 import {
   listDirectorsForBrand, getDirectorByAgentId, searchDirectors as searchDirectoryAgents,
   getRole, type StrategistDirector, type StrategistScope,
   isChannelScope, type ChannelScope,
   ALL_STRATEGIST_SCOPES, isPageScope, type PageScope, type DirectorRoleHint,
-} from "../core/strategistDirectory";
-import { buildBrandPrefix } from "../core/brandContext";
-import { buildBrandCatalogBlock } from "../core/brandCatalog";
+} from "../core/strategist/strategistDirectory";
+import { buildBrandPrefix } from "../core/brand/brandContext";
+import { buildBrandCatalogBlock } from "../core/brand/brandCatalog";
 
 // ── per-user rate limit（跟 supportRouter 同一套數字，同一個理由：LLM 呼叫要花錢）──
 type RateState = { hourCount: number; hourReset: number; minCount: number; minReset: number };

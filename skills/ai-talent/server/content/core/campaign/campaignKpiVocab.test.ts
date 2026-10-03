@@ -4,7 +4,7 @@
  */
 import { describe, it, expect } from "vitest";
 import { KPI_METRICS, PAID_CHANNELS } from "./campaignKpi";
-import { KPI_METRICS as CLIENT_METRICS, PAID_CHANNELS as CLIENT_PAID, KPI_METRIC_LABEL, money, metricLine } from "../../../../client/src/v2/strategy/lib/campaignKpi";
+import { KPI_METRICS as CLIENT_METRICS, PAID_CHANNELS as CLIENT_PAID, KPI_METRIC_LABEL, money, metricLine } from "../../../../client/src/v2/strategy/lib/campaign/campaignKpi";
 
 describe("KPI 語彙", () => {
   it("指標與可下廣告通路兩邊一致，每個指標都有中英文名", () => {

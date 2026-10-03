@@ -16,8 +16,8 @@ import { Button, Input, Textarea, Select, SelectItem } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faPlus, faXmark } from "@fortawesome/free-solid-svg-icons";
 import { trpc } from "../../../../lib/trpc";
-import type { CampaignPlan } from "../../../strategy/lib/campaignSchema";
-import { KOL_BRIEF_GROUPS, KOL_TIERS, prefillKolBrief, type KolBrief, type KolInfluencer } from "../../../strategy/lib/campaignKolBrief";
+import type { CampaignPlan } from "../../../strategy/lib/campaign/campaignSchema";
+import { KOL_BRIEF_GROUPS, KOL_TIERS, prefillKolBrief, type KolBrief, type KolInfluencer } from "../../../strategy/lib/campaign/campaignKolBrief";
 
 export default function KolBriefForm({ eventId, initial, prefill, locked, en, onSaved }: {
   eventId: number;

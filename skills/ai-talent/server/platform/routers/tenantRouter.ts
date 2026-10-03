@@ -313,7 +313,7 @@ async function enforceMemberLimit(workspaceId: number): Promise<void> {
     [workspaceId],
   );
   const plan = (wsRow as any[])[0]?.planCode ?? "solo";
-  const { PLANS } = await import("../core/plans");
+  const { PLANS } = await import("../core/billing/plans");
   const limit = (PLANS as any)[plan]?.quota?.team_members ?? 1;
   if (limit < 0) return; // unlimited
   const [c]: any = await localPool.execute(

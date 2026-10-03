@@ -45,7 +45,7 @@ import ShellLayout from "./shell/ShellLayout";
 import MissionRedirect from "./MissionRedirect";
 import ConnectionsRedirect from "../platform/pages/ConnectionsRedirect";
 import NotFoundPage from "../platform/pages/NotFoundPage";
-import { CampaignSlotsProvider, type CampaignSlots } from "../strategy/lib/campaignSlots";
+import { CampaignSlotsProvider, type CampaignSlots } from "../strategy/lib/campaign/campaignSlots";
 
 // ── Lazy (route-split chunks) ────────────────────────────────────────────
 // Auth pages — heaviest among public surfaces (Google OAuth SVG, form

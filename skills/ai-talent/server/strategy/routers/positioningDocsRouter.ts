@@ -22,7 +22,7 @@ import { router, protectedProcedure } from "../../platform/core/trpc";
 import { promises as fs } from "fs";
 import { join } from "path";
 import localPool from "../../localDb";
-import { invokeLLM } from "../../platform/core/llm";
+import { invokeLLM } from "../../platform/core/llm/llm";
 import { randomUUID } from "crypto";
 import {
   type PositioningScope, type PromptField, type AppliedDocRecord, type CustomSegment,
@@ -31,7 +31,7 @@ import {
   customSegmentsOf, addCustomSegment, removeCustomSegment, updateCustomSegment,
   MAX_CUSTOM_SEGMENTS, MAX_CUSTOM_SEGMENT_FIELDS,
   MAX_CUSTOM_SEGMENT_TITLE_CHARS, MAX_CUSTOM_SEGMENT_FIELD_VALUE_CHARS,
-} from "../core/positioningDocs";
+} from "../core/positioning/positioningDocs";
 
 const STORAGE_ROOT =
   process.env.POSITIONING_DOC_DIR ?? join(process.cwd(), "storage", "positioning-docs");

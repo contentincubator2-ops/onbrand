@@ -12,10 +12,10 @@ import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure } from "../core/trpc";
 import { assertBrandAccess } from "../core/brandAuth";
-import { createBundleSocialClient, isBundleMissingTeamError } from "../core/bundleSocial";
-import { toBundlePlatform } from "../core/publish/bundlePublish";
-import { getPublishProvider } from "../core/publish/publishProvider";
-import { isRuntimeFeatureEnabled } from "../core/runtimeSafety";
+import { createBundleSocialClient, isBundleMissingTeamError } from "../core/connectors/bundleSocial";
+import { toBundlePlatform } from "../core/connectors/publish/bundlePublish";
+import { getPublishProvider } from "../core/connectors/publish/publishProvider";
+import { isRuntimeFeatureEnabled } from "../core/ops/runtimeSafety";
 
 const PLATFORM_INPUT = z.enum(["facebook", "instagram", "linkedin"]);
 

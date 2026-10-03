@@ -16,7 +16,7 @@ import { Button, Input, Textarea, Select, SelectItem } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faPlus, faXmark, faSliders } from "@fortawesome/free-solid-svg-icons";
 import { trpc } from "../../../../lib/trpc";
-import type { CampaignPlan } from "../../../strategy/lib/campaignSchema";
+import type { CampaignPlan } from "../../../strategy/lib/campaign/campaignSchema";
 
 type Opt = { id: string; zh: string; en: string };
 type Field = { key: string; zh: string; en: string; ph: string; long?: boolean; options?: Opt[]; optionsBy?: { field: string; map: Record<string, Opt[]> } };

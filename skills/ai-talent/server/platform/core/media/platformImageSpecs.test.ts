@@ -12,7 +12,7 @@ import {
   ratioError,
   resolveImageTray,
 } from "./platformImageSpecs";
-import { buildImageCardPrompt, finalizeToSpec, normalizeDirections } from "../../../content/core/imageCards";
+import { buildImageCardPrompt, finalizeToSpec, normalizeDirections } from "../../../content/core/image/imageCards";
 
 describe("platform image specs", () => {
   it("ids are unique and every channel has image cards", () => {

@@ -9,7 +9,7 @@
  * Keeps the same Scout interface so orchestrator.ts is unchanged.
  */
 
-import { invokeLLM, invokeVertexGrounding } from "../llm";
+import { invokeLLM, invokeVertexGrounding } from "../llm/llm";
 import type { Scout, ScoutContext, IntelItem, IntelItemType } from "./types";
 
 const ALLOWED: Set<IntelItemType> = new Set([

@@ -44,9 +44,9 @@ import { KPI_METRICS, pickKpiAgent, runKpiPlan } from "../core/campaign/campaign
 import { brandIndustry, pickPlannerAgent } from "../core/campaign/campaignTeam";
 import { buildCampaignRoster, CAMPAIGN_ROLES, ROLES } from "../core/campaign/campaignRoster";
 import { appendChat, closeThread, listChat, listThreads, markUndone, recentSummaries, reopenThread } from "../core/campaign/campaignChatStore";
-import { isHiddenContentPlatform, isHiddenHistoryItem } from "../../platform/core/planGate";
-import { ownedProductIds, resolveProductScope } from "../../strategy/core/eventProductScope";
-import { invalidateBrandPrefix } from "../../strategy/core/brandContext";
+import { isHiddenContentPlatform, isHiddenHistoryItem } from "../../platform/core/billing/planGate";
+import { ownedProductIds, resolveProductScope } from "../../strategy/core/entities/eventProductScope";
+import { invalidateBrandPrefix } from "../../strategy/core/brand/brandContext";
 import { campaignPostState, canMarkPublished, type CampaignPostState } from "../core/campaign/campaignPostStatus";
 
 /** 地圖上一篇寫好的：縮圖＋走到哪一關。 */

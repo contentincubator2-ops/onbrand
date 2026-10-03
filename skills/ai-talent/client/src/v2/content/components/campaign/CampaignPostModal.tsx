@@ -39,9 +39,9 @@ import { PlatformMockup } from "../PlatformMockup";
 import type { MockupVariant } from "../../lib/inferMockup";
 import { getIgPublicVariantImageSize, getRunContentMutationLocator, resolveRunContent, type RunContentKind } from "../../lib/strategyContentEnvelope";
 import { CHANNEL_META, channelLabel } from "../../../platform/lib/channelMeta";
-import { phaseShort } from "../../../strategy/lib/campaignStage";
-import type { CampaignPlanItem } from "../../../strategy/lib/campaignSchema";
-import { postStateChip, postStateLabel, postStateOf, type CampaignPostState } from "../../../strategy/lib/campaignPostStatus";
+import { phaseShort } from "../../../strategy/lib/campaign/campaignStage";
+import type { CampaignPlanItem } from "../../../strategy/lib/campaign/campaignSchema";
+import { postStateChip, postStateLabel, postStateOf, type CampaignPostState } from "../../../strategy/lib/campaign/campaignPostStatus";
 import type { ItemThumb } from "./CampaignMap";
 
 const md = (s: string) => s.slice(5).replace("-", "/");

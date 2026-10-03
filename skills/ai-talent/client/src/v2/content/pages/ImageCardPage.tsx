@@ -18,7 +18,7 @@ import { showToastGlobal } from "../../platform/components/Toast";
 import type { ShellOutletCtx } from "../../platform/lib/shellContext";
 import type { ImageCardInfo } from "../../platform/lib/imageCardHandoff";
 import { readImageCardHandoff, takeImageSubjectHandoff } from "../../platform/lib/imageCardHandoff";
-import BrandLibrary from "../../strategy/components/positioning/BrandLibrary";
+import BrandLibrary from "../../strategy/components/assets/BrandLibrary";
 import AiImageNotice from "../../platform/components/AiImageNotice";
 
 type Model = "gpt-image-2" | "nano-banana";

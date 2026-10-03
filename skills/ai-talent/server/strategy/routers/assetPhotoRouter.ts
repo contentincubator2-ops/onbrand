@@ -10,7 +10,7 @@ import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure } from "../../platform/core/trpc";
 import localPool from "../../localDb";
-import { listPhotos, listBrandLibrary, setPrimaryPhoto, removePhoto, savePhotoFromUrl, type PhotoScope } from "../core/assetPhotos";
+import { listPhotos, listBrandLibrary, setPrimaryPhoto, removePhoto, savePhotoFromUrl, type PhotoScope } from "../core/brand/assetPhotos";
 import { STORAGE_ROOT } from "../routes/assetPhotoRoute";
 
 const scopeInput = z.object({
