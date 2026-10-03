@@ -22,7 +22,7 @@ import { IllustratedEmpty } from "../../../platform/components/EmptyIllustration
 import React from "react";
 import { trpc } from "../../../../lib/trpc";
 import { useLang } from "../../../../lib/i18n";
-import { Button, Chip, Textarea, Spinner } from "@heroui/react";
+import { Button, Chip, Textarea } from "@heroui/react";
 import { CheckIcon, ChevronLeftIcon, DeleteIcon, GenerateIcon, PasteIcon, TextIcon, UploadIcon, WarningIcon } from "../../../platform/components/icons";
 import { HelpTip } from "../../../platform/components/HelpTip";
 
@@ -147,10 +147,6 @@ export default function PositioningDocPanel({
   }
 
   const docs: DocSummary[] = coverageQuery.data?.docs ?? [];
-  const filled: PromptField[] = coverageQuery.data?.filled ?? [];
-  const missing: PromptField[] = coverageQuery.data?.missing ?? [];
-  const total = coverageQuery.data?.total ?? 0;
-  const applied = coverageQuery.data?.applied ?? null;
   const customSegments: CustomSegment[] = coverageQuery.data?.customSegments ?? [];
 
   async function post(url: string, init: RequestInit): Promise<any> {
@@ -531,79 +527,13 @@ export default function PositioningDocPanel({
         </div>
       )}
 
-      {/* 落差表 —— 這是「不填完題目會不會影響結果」的誠實答案。
-          2026-09-23（CJ「引擎真正讀得到的欄位的這部分，其實我看不懂這一頁要表達的，
-          跟我們的優勢有甚麼關係」）：原本的標題與說明是用實作語彙寫的（「引擎」
-          「品牌前綴」「path」），只有寫這段程式的人看得懂，而且完全沒講「所以呢」。
-          這一版改成從使用者的角度寫兩句話：這幾格是什麼（＝你的品牌大腦）、
-          填了跟沒填差在哪（每篇文章都自動帶 vs 比較通用），並把「不必每次重貼
-          一次背景」這個相對優勢講明白——那正是這個產品跟直接用 ChatGPT 的差別。 */}
-      <div className="rounded-medium border border-divider bg-content1 p-4">
-        <div className="flex items-center gap-2 flex-wrap">
-          <p className="text-small font-semibold">
-            {en ? "Your brand brain — what AI reads before it writes anything" : "你的品牌大腦——AI 動筆前會先讀的內容"}
-          </p>
-          <Chip size="sm" color={missing.length === 0 ? "success" : filled.length ? "warning" : "default"} variant="flat">
-            {en ? `${filled.length} of ${total} filled` : `${total} 格已填 ${filled.length} 格`}
-          </Chip>
-          {coverageQuery.isLoading && <Spinner size="sm" />}
-        </div>
-        <p className="text-tiny text-default-600 mt-1.5 leading-relaxed">
-          {en
-            ? `These ${total} fields are the ${scopeLabel} context every task carries by itself — you fill them once here, and every post, script and email afterwards is written with them. That's the difference from pasting your background into ChatGPT again for every single piece.`
-            : `這 ${total} 格就是每一張任務卡都會自動帶著走的${scopeLabel}背景——在這裡填一次，之後每一篇貼文、每一支腳本、每一封信都是帶著它們寫出來的。這就是跟「每寫一篇就要再跟 ChatGPT 重貼一次品牌背景」的差別。`}
-        </p>
-        <p className="text-tiny text-default-500 mt-1.5">
-          {en
-            ? `Filled: written with your own words. Missing: never an error — the task still runs, that part just comes out generic.`
-            : `已填的那幾格：AI 會照你自己的說法寫。沒填的：不會報錯、任務照跑，只是那部分會寫得比較通用。`}
-        </p>
-        {missing.length > 0 && (
-          <>
-          <p className="text-tiny font-semibold text-default-700 mt-3">
-            {en ? `Still empty (${missing.length})` : `還沒填的 ${missing.length} 格`}
-          </p>
-          <ul className="flex flex-col gap-1 mt-1">
-            {missing.map((f) => (
-              <li key={f.path} className="text-tiny text-default-700 flex gap-2">
-                <span className="text-warning-600 shrink-0">●</span>
-                <span><span className="font-semibold">{f.label}</span>　{f.cost}</span>
-              </li>
-            ))}
-          </ul>
-          </>
-        )}
-        {filled.length > 0 && (
-          <>
-          <p className="text-tiny font-semibold text-default-700 mt-3">
-            {en ? `Already filled (${filled.length})` : `已經填好的 ${filled.length} 格`}
-          </p>
-          <div className="flex flex-wrap gap-1.5 mt-1.5">
-            {filled.map((f) => (
-              <Chip key={f.path} size="sm" variant="flat" color="success" startContent={<CheckIcon size={11} />}>
-                {f.label}
-              </Chip>
-            ))}
-          </div>
-          </>
-        )}
-        {applied?.injectedContext && (
-          <p className="text-tiny text-default-500 mt-3">
-            {en ? "Plus " : "另外還有 "}
-            {applied.injectedContext.length}
-            {en ? " chars of extra context from " : " 字的補充脈絡來自「"}
-            {applied.name}{en ? "" : "」"}
-          </p>
-        )}
-      </div>
-
       {/* 2026-09-23：使用者自己開的定位卡片（從文件/對話串裡提議、確認建立的），跟固定
           欄位一樣真的會進 prompt（見 brandContext.pushCustomSegments）。 */}
       {customSegments.length > 0 && (
         <div className="rounded-medium border border-divider bg-content1 p-4">
           <p className="text-small font-semibold">{en ? "Your own cards" : "你自己的卡片"}</p>
           <p className="text-tiny text-default-500 mt-0.5 mb-3">
-            {en ? "Same as the fields above — these are read on every task run too." : "跟上面的固定欄位一樣，每次跑任務都會被讀到。"}
+            {en ? "These are read on every task run too." : "每次跑任務都會被讀到。"}
           </p>
           <div className="flex flex-col gap-2">
             {customSegments.map((s) => (
