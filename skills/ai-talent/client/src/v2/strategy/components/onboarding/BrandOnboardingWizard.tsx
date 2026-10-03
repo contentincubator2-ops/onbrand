@@ -118,12 +118,13 @@ export default function BrandOnboardingWizard({ isOpen, onClose, onComplete }: P
   const { lang } = useLang();
   const INDUSTRIES = lang === "en" ? INDUSTRIES_EN : INDUSTRIES_ZH;
   const STEPS: Array<{ n: Step; label: string }> = [
-    { n: 1, label: lang === "en" ? "Welcome" : "歡迎" },
     { n: 2, label: lang === "en" ? "Add brand" : "建立品牌" },
     { n: 3, label: lang === "en" ? "Positioning" : "自動定位" },
     { n: 4, label: lang === "en" ? "Done" : "完成" },
   ];
-  const [step, setStep] = useState<Step>(1);
+  // Welcome step removed (the empty-state page already explains the method):
+  // new users go straight to the brand form -> one click fewer to first output.
+  const [step, setStep] = useState<Step>(2);
   const [createdBrandId, setCreatedBrandId] = useState<number | null>(null);
 
   // Form state
@@ -152,7 +153,7 @@ export default function BrandOnboardingWizard({ isOpen, onClose, onComplete }: P
   // Reset on open
   useEffect(() => {
     if (isOpen) {
-      setStep(1);
+      setStep(2);
       setCreatedBrandId(null);
       setName(""); setIndustry(""); setWebsite(""); setFbUrl("");
       setProductBand(""); setProductUrlsText(""); setProductImport({ state: "idle" });
@@ -288,7 +289,7 @@ export default function BrandOnboardingWizard({ isOpen, onClose, onComplete }: P
       isOpen={isOpen}
       onClose={onClose}
       size="2xl"
-      hideCloseButton={step !== 1 && step !== 4}
+      hideCloseButton={step !== 2 && step !== 4}
       isDismissable={false}
       backdrop="blur"
       // 2026-07-07 (CJ「送出按鈕被切一半」— short laptop viewports):
@@ -314,7 +315,7 @@ export default function BrandOnboardingWizard({ isOpen, onClose, onComplete }: P
                           : "bg-default-100 text-default-400"
                       }`}
                     >
-                      {isDone ? <FontAwesomeIcon icon={faCheck} className="text-[12px]" /> : s.n}
+                      {isDone ? <FontAwesomeIcon icon={faCheck} className="text-[12px]" /> : i + 1}
                     </div>
                     <span className={`text-xs ${isActive ? "font-semibold text-default-900" : "text-default-500"}`}>
                       {s.label}
@@ -329,89 +330,6 @@ export default function BrandOnboardingWizard({ isOpen, onClose, onComplete }: P
           </div>
 
           <div className="px-6 py-6 min-h-[420px]">
-            {/* STEP 1 — 歡迎 (2026-05-11: rewritten around SoWork brand
-                positioning method — methodology becomes the headline, not
-                tech specs). */}
-            {step === 1 && (
-              <div className="py-2">
-                <h1 style={{
-                  fontSize: 28, fontWeight: 700, color: "#171717",
-                  lineHeight: 1.15, letterSpacing: "-0.015em",
-                  marginBottom: 26, maxWidth: 520,
-                }}>
-                  {lang === "en" ? "Lock in your positioning first" : "先鎖定品牌定位"}
-                </h1>
-
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 14, marginBottom: 24 }}>
-                  {(lang === "en" ? [
-                    { num: "01", label: "Add your brand", desc: "Name, site, FB — entry points so AI pulls real content" },
-                    { num: "02", label: "Run the method", desc: "14-step deep dive: Golden Circle → Differentiation → Voice" },
-                    { num: "03", label: "Auto-generate content", desc: "Singles / Packs / Campaigns" },
-                  ] : [
-                    { num: "01", label: "建立品牌", desc: "名稱、官網、FB — 給 AI 抓真實內容的入口" },
-                    { num: "02", label: "套用定位法", desc: "14 步深度分析：黃金圈 → 差異化 → Voice" },
-                    { num: "03", label: "內容自動產出", desc: "單篇 / 套組 / 企劃" },
-                  ]).map((s, i, arr) => (
-                    <div
-                      key={s.num}
-                      style={{
-                        background: "#FFFFFF",
-                        border: "1px solid #D4D4D4",
-                        borderRadius: 8,
-                        padding: "14px 14px 12px",
-                        position: "relative",
-                      }}
-                    >
-                      <p style={{
-                        fontSize: 12, fontWeight: 700, color: "#525252",
-                        letterSpacing: "0.22em", marginBottom: 6,
-                        fontVariantNumeric: "tabular-nums",
-                      }}>
-                        STEP {s.num}
-                      </p>
-                      <p style={{ fontSize: 14, fontWeight: 600, color: "#171717", marginBottom: 4 }}>
-                        {s.label}
-                      </p>
-                      <p style={{
-                        fontSize: 12.5, lineHeight: 1.55, color: "#525252",
-                        fontFamily: '"Source Serif Pro", "Noto Serif TC", Georgia, serif',
-                      }}>
-                        {s.desc}
-                      </p>
-                      {i < arr.length - 1 && (
-                        <span aria-hidden style={{
-                          position: "absolute", right: -10, top: "50%",
-                          transform: "translateY(-50%)",
-                          color: "#525252", fontSize: 14,
-                        }}>→</span>
-                      )}
-                    </div>
-                  ))}
-                </div>
-
-                <button
-                  onClick={() => setStep(2)}
-                  style={{
-                    padding: "10px 18px",
-                    fontSize: 13, fontWeight: 600,
-                    letterSpacing: "0.04em",
-                    borderRadius: 6, cursor: "pointer",
-                    border: "1px solid #171717",
-                    background: "#171717", color: "#FFFFFF",
-                    display: "inline-flex", alignItems: "center", gap: 6,
-                  }}
-                  onMouseEnter={(e) => { e.currentTarget.style.background = "#262626"; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.background = "#171717"; }}
-                >
-                  {lang === "en" ? "Add your first brand" : "開始建立第一個品牌"}
-                  <FontAwesomeIcon icon={faArrowRight} className="text-tiny" />
-                </button>
-                <p style={{ fontSize: 12, color: "#525252", marginTop: 10 }}>
-                  {lang === "en" ? "About 2 minutes" : "預計 2 分鐘"}
-                </p>
-              </div>
-            )}
-
             {/* STEP 2 — 建品牌 */}
             {step === 2 && (
               <div>
@@ -567,7 +485,7 @@ export default function BrandOnboardingWizard({ isOpen, onClose, onComplete }: P
                 {err && <div className="mt-3 text-sm text-danger"><WarningIcon size={13} /> {err}</div>}
 
                 <div className="mt-5 flex items-center justify-between gap-2">
-                  <Button variant="light" onPress={() => setStep(1)}>{lang === "en" ? "← Back" : "← 上一步"}</Button>
+                  <span aria-hidden />
                   <Button
                     color="primary"
                     onPress={handleCreateAndAdvance}
