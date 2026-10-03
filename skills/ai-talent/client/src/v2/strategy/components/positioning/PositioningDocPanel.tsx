@@ -444,7 +444,7 @@ export default function PositioningDocPanel({
                     </ul>
                     {!done && (
                       <Button
-                        size="sm" className="mt-2" color="primary" variant="flat"
+                        size="sm" className="mt-2" color="primary"
                         isLoading={busy === `newcard:${i}`}
                         onPress={() => {
                           setBusy(`newcard:${i}`);
