@@ -177,6 +177,7 @@ export default function ImageCardPage() {
   const [schedTime, setSchedTime] = useState("20:00");
   /** 從文字任務過來的，預設把圖放回那一篇；用戶可以改成另存一篇新的。 */
   const [asNewPost, setAsNewPost] = useState(false);
+  const [postError, setPostError] = useState<string | null>(null);
   const brand = ((ctx?.brands ?? []) as any[]).find((b) => b?.id === brandId);
 
   const scenePrompt = useMemo(() => {
@@ -299,6 +300,7 @@ export default function ImageCardPage() {
       showToastGlobal(lang === "en" ? "Add the copy first." : "先填上文案，才能跟圖一起排程。");
       return;
     }
+    setPostError(null);
     const scheduledAt = `${schedDate}T${schedTime}:00+08:00`;
     if (schedule && !(new Date(scheduledAt).getTime() > Date.now())) {
       showToastGlobal(lang === "en" ? "Pick a time in the future." : "排程時間要選未來的時間。");
@@ -310,7 +312,7 @@ export default function ImageCardPage() {
         brandId, cardId: card!.id, copy,
         // 寫回來源文案時只帶一張（那一則只有一個圖位）。
         imageUrls: fromOutputId ? [urls[0]!] : urls,
-        titledFirst: titled && postImage?.startsWith("data:image/") ? postImage : undefined,
+        imageB64: titled && postImage?.startsWith("data:image/") ? postImage : undefined,
         fromOutputId,
         ...(fromOutputId ? fromLocator : {}),
       });
@@ -324,10 +326,13 @@ export default function ImageCardPage() {
       showToastGlobal(lang === "en" ? "Scheduled. See it in this week's plan." : "已排進行事曆。");
       navigate(`/planner?w=${schedDate}&ho=${saved.outputId}`);
     } catch (e: any) {
-      showToastGlobal(String(e?.message ?? e).slice(0, 200));
+      // 被閘道擋下的錯誤（例如 413）不是 tRPC 形狀，message 可能是空的或一串 JSON——一定要讓人看得到失敗。
+      const msg = String(e?.message ?? "").trim();
+      setPostError(msg && !msg.startsWith("{") && !msg.startsWith("<") ? msg.slice(0, 200) : (lang === "en" ? "Couldn't save. Please try again." : "沒有存成功，請再試一次。"));
     }
   }
   const postBusy = savePostMut.isPending || scheduleMut.isPending;
+
 
   const ratioCss = `${card.width} / ${card.height}`;
   const sameChannel = cards.filter((c) => c.channel === card.channel && c.id !== card.id);
@@ -722,6 +727,9 @@ export default function ImageCardPage() {
                     <Button color="primary" className="w-full" onPress={() => savePost(true)} isLoading={postBusy} isDisabled={!schedDate || !schedTime}>
                       {lang === "en" ? "Schedule to calendar" : "排進行事曆"}
                     </Button>
+                    {postError && (
+                      <p className="rounded-md border border-warning-300 bg-warning-50 px-2.5 py-2 text-tiny text-warning-800">{postError}</p>
+                    )}
                     <Button variant="flat" className="w-full" onPress={() => savePost(false)} isDisabled={postBusy}>
                       {lang === "en" ? "Save as a post, schedule later" : "先存成貼文，晚點再排"}
                     </Button>

@@ -225,8 +225,10 @@ export const imageCardRouter = router({
       copy: z.string().max(8000),
       /** 這一組圖（單張＝1；輪播／相簿＝多張），依序。只收本站產出的圖。 */
       imageUrls: z.array(z.string().max(2048)).min(1).max(35),
-      /** 第一張疊好標題的畫布（data URL，交付像素）。沒標題就不傳。 */
-      titledFirst: z.string().max(24_000_000).optional(),
+      /** 第一張疊好標題的畫布（data URL，交付像素）。沒標題就不傳。
+       *  欄位一定要叫 imageB64：server/index.ts 的單欄 5 萬字上限只對白名單欄位名放行圖片資料，
+       *  換名字會被擋成 413（2026-10-04 dev 實測踩到）。 */
+      imageB64: z.string().max(24_000_000).optional(),
       fromOutputId: z.number().int().positive().optional(),
       ...contentSelectorFields,
     }))
@@ -241,8 +243,8 @@ export const imageCardRouter = router({
         throw new TRPCError({ code: "BAD_REQUEST", message: `這張卡最多 ${spec.maxImages} 張。` });
       }
       const urls = [...input.imageUrls];
-      if (input.titledFirst) {
-        const saved = await saveTitledImage(input.titledFirst, spec);
+      if (input.imageB64) {
+        const saved = await saveTitledImage(input.imageB64, spec);
         if (!saved.ok) throw new TRPCError({ code: "BAD_REQUEST", message: saved.reason });
         urls[0] = saved.url;
       }
