@@ -16,6 +16,8 @@
  *   const text = await callLLM({ system: "...", user: "...", maxTokens: 4000 });
  */
 
+import { throwIfCancelled } from "./runCancel";
+
 interface CallArgs {
   system: string;
   user: string;
@@ -233,6 +235,8 @@ export async function callLLM(args: CallArgs): Promise<{ text: string; attempts:
     fn: (timeoutMs: number) => Promise<string>,
     cap: number = perProviderCap,
   ): Promise<string | null> => {
+    // A cancelled run must not start another provider attempt.
+    throwIfCancelled();
     const remaining = remainingBudget();
     if (remaining < 2000) {
       attempts.push({ provider, key: keyLabel, ok: false, durationMs: 0, error: "skipped: budget exhausted" });
@@ -245,6 +249,7 @@ export async function callLLM(args: CallArgs): Promise<{ text: string; attempts:
       attempts.push({ provider, key: keyLabel, ok: true, durationMs: Date.now() - t0 });
       return text;
     } catch (e) {
+      if ((e as any)?.cancelled) throw e;
       const msg = e instanceof Error ? e.message : String(e);
       attempts.push({ provider, key: keyLabel, ok: false, durationMs: Date.now() - t0, error: msg });
       // eslint-disable-next-line no-console

@@ -25,7 +25,35 @@ import { getIG60Template } from "../../core/catalog/quickTaskIG60";
 import { getYT60Template } from "../../core/catalog/quickTaskYT60";
 import { getMulti60Template } from "../../core/catalog/quickTaskMulti60";
 
+const RUN_KEY = z.string().min(8).max(64).regex(/^[A-Za-z0-9_-]+$/).optional();
+
+/** Register a cancellable run right after its points were charged. */
+async function beginCancellableRun(runKey: string | undefined, userId: number, action: "task_30s" | "task_60s" | "task_99s") {
+  if (!runKey) return {};
+  const { registerRun } = await import("../../../platform/core/llm/runCancel");
+  const { costOf } = await import("../../../platform/core/billing/pointsService");
+  const controller = registerRun(runKey, userId, { action, points: costOf(action) });
+  return { signal: controller.signal, runKey };
+}
+
+function unregisterRunKey(runKey: string | undefined) {
+  if (!runKey) return;
+  void import("../../../platform/core/llm/runCancel").then((m) => m.unregisterRun(runKey)).catch(() => {});
+}
+
 export const runProcedures = {
+  /**
+   * Stop a running task. The run stops issuing LLM / image calls at the next
+   * call boundary and writes no output; points are refunded if no output had
+   * been delivered yet (see cancelRefund.ts).
+   */
+  cancelRun: protectedProcedure
+    .input(z.object({ runKey: z.string().min(8).max(64).regex(/^[A-Za-z0-9_-]+$/) }))
+    .mutation(async ({ ctx, input }) => {
+      const { cancelRunAndRefund } = await import("../../../platform/core/billing/cancelRefund");
+      return cancelRunAndRefund(input.runKey, ctx.user!.id);
+    }),
+
   runAgent: protectedProcedure
     .input(
       z.object({
@@ -120,6 +148,8 @@ export const runProcedures = {
       }).optional().nullable(),
       // 2026-09-30：從活動企劃寫某一篇（見 strategy/core/campaignItemBrief.ts）。
       campaignItem: CAMPAIGN_ITEM_INPUT,
+      /** Client-generated id so cancelRun can stop this run. */
+      runKey: RUN_KEY,
       asyncMode: z.boolean().default(true),
     }))
     .mutation(async ({ ctx, input }) => {
@@ -167,6 +197,7 @@ export const runProcedures = {
       const { assertPoints, deductPoints } = await import("../../../platform/core/billing/pointsService");
       await assertPoints(userId, "task_60s");
       await deductPoints(userId, "task_60s", { kind: "task", id: null });
+      const cancelCtx = await beginCancellableRun(input.runKey, userId, "task_60s");
       const { runOrchestra } = await import("../../core/engine/quickTaskOrchestra");
 
       // 2026-05-18 (CJ「所有 60s 任務都要：圖完成才展示，非套組降到 2 版」):
@@ -192,10 +223,10 @@ export const runProcedures = {
 
       const baseArgs = { template, config, inputs: input.inputs, brandId: input.brandId, ...scope, userId, tier: "60s" as const,
         audienceTag: await resolveAudienceTag(userId, input.brandId, input.spotRef),
-        campaignItem: input.campaignItem ? await loadCampaignItem(input.campaignItem, userId) : null };
+        campaignItem: input.campaignItem ? await loadCampaignItem(input.campaignItem, userId) : null, ...cancelCtx };
 
       if (!input.asyncMode) {
-        return runOrchestra(baseArgs);
+        return runOrchestra(baseArgs).finally(() => unregisterRunKey(input.runKey));
       }
 
       // ── Async path (same as runOrchestra99) ──────────────────────
@@ -235,7 +266,8 @@ export const runProcedures = {
           } else if (!checkpointFired) {
             rejectPartial(err);
           }
-        });
+        })
+        .finally(() => unregisterRunKey(input.runKey));
 
       return await partialPromise;
     }),
@@ -262,6 +294,8 @@ export const runProcedures = {
       }).optional().nullable(),
       // 2026-09-30：從活動企劃寫某一篇（見 strategy/core/campaignItemBrief.ts）。
       campaignItem: CAMPAIGN_ITEM_INPUT,
+      /** Client-generated id so cancelRun can stop this run. */
+      runKey: RUN_KEY,
       asyncMode: z.boolean().default(true),
     }))
     .mutation(async ({ ctx, input }) => {
@@ -307,15 +341,16 @@ export const runProcedures = {
       const { assertPoints, deductPoints } = await import("../../../platform/core/billing/pointsService");
       await assertPoints(userId, "task_99s");
       await deductPoints(userId, "task_99s", { kind: "task", id: null });
+      const cancelCtx = await beginCancellableRun(input.runKey, userId, "task_99s");
       const { runOrchestra } = await import("../../core/engine/quickTaskOrchestra");
 
       const baseArgs = { template, config, inputs: input.inputs, brandId: input.brandId, ...scope, userId, tier: "99s" as const,
         audienceTag: await resolveAudienceTag(userId, input.brandId, input.spotRef),
-        campaignItem: input.campaignItem ? await loadCampaignItem(input.campaignItem, userId) : null };
+        campaignItem: input.campaignItem ? await loadCampaignItem(input.campaignItem, userId) : null, ...cancelCtx };
 
       if (!input.asyncMode) {
         // Legacy sync path — fully await, return final result.
-        return runOrchestra(baseArgs);
+        return runOrchestra(baseArgs).finally(() => unregisterRunKey(input.runKey));
       }
 
       // ── Async path ─────────────────────────────────────────────────
@@ -368,7 +403,8 @@ export const runProcedures = {
           } else if (!checkpointFired) {
             rejectPartial(err);
           }
-        });
+        })
+        .finally(() => unregisterRunKey(input.runKey));
 
       // Block on partial result only.
       return await partialPromise;
@@ -393,6 +429,7 @@ export const runProcedures = {
         }).optional().nullable(),
         // 2026-09-30：從活動企劃寫某一篇（見 strategy/core/campaignItemBrief.ts）。
         campaignItem: CAMPAIGN_ITEM_INPUT,
+        runKey: RUN_KEY,
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -410,6 +447,7 @@ export const runProcedures = {
       const { assertPoints, deductPoints } = await import("../../../platform/core/billing/pointsService");
       await assertPoints(userId, "task_30s");
       await deductPoints(userId, "task_30s", { kind: "task", id: null });
+      const cancelCtx = await beginCancellableRun(input.runKey, userId, "task_30s");
       const { runOrchestra } = await import("../../core/engine/quickTaskOrchestra");
       // 這支只收 30s（60s/99s 各有自己的 mutation），所以解析完再擋 tier，
       // 而不是靠「只查 30s 目錄」來擋 —— 後者查不到時的錯誤訊息會說謊，
@@ -440,9 +478,10 @@ export const runProcedures = {
         userId,
         audienceTag: await resolveAudienceTag(userId, input.brandId, input.spotRef),
         campaignItem: input.campaignItem ? await loadCampaignItem(input.campaignItem, userId) : null,
+        ...cancelCtx,
       };
 
-      return runOrchestra(orchestraArgs);
+      return runOrchestra(orchestraArgs).finally(() => unregisterRunKey(input.runKey));
     }),
 
   runQuick: protectedProcedure
