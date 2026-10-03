@@ -14,14 +14,14 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure } from "../../platform/core/trpc";
-import { invokeLLM } from "../../platform/core/llm";
-import { buildBrandPrefix, invalidateBrandPrefix } from "../core/brandContext";
+import { invokeLLM } from "../../platform/core/llm/llm";
+import { buildBrandPrefix, invalidateBrandPrefix } from "../core/brand/brandContext";
 import {
   ROLE_CHANNELS, CHANNEL_LABEL_ZH, CHANNEL_ROLE_FIELDS, type RoleChannel, type ChannelRole,
   cleanChannelRole, isEmptyChannelRole, channelRolesOf, channelRoleBody, isVerbatimIn,
   saveChannelRole, loadChannelRoles,
-} from "../core/channelRoles";
-import { loadPositioning } from "../core/positioningDocs";
+} from "../core/brand/channelRoles";
+import { loadPositioning } from "../core/positioning/positioningDocs";
 
 const channelInput = z.enum(ROLE_CHANNELS);
 
@@ -52,7 +52,7 @@ async function guard(userId: number): Promise<void> {
     throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: "問得太快了，稍等一下再繼續討論" });
   }
   try {
-    const { preflightCostCheck } = await import("../../platform/core/llmWithBilling");
+    const { preflightCostCheck } = await import("../../platform/core/llm/llmWithBilling");
     const g = await preflightCostCheck(userId);
     if (!g.ok) throw new TRPCError({ code: "FORBIDDEN", message: g.reason });
   } catch (e) { if (e instanceof TRPCError) throw e; /* guard optional */ }

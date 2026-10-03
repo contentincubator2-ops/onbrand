@@ -16,7 +16,7 @@
  */
 import { z } from "zod";
 import { router, protectedProcedure, publicProcedure, adminProcedure } from "../core/trpc";
-import { END_STAGE, START_STAGE, summarizeFunnel } from "../core/activationFunnel";
+import { END_STAGE, START_STAGE, summarizeFunnel } from "../core/ops/activationFunnel";
 
 // 2026-07-05 (security scan): logError is a publicProcedure (unauthenticated),
 // so it's a DB-write flood vector. Coarse global fixed-window cap: beyond
@@ -203,7 +203,7 @@ export const opsRouter = router({
   llmCircuitState: adminProcedure
     .input(z.object({}).optional())
     .query(async () => {
-      const { snapshot } = await import("../core/llmCircuitBreaker");
+      const { snapshot } = await import("../core/llm/llmCircuitBreaker");
       return snapshot();
     }),
   /** 2026-05-15: manual reset, in case a provider recovered and we want
@@ -211,7 +211,7 @@ export const opsRouter = router({
   llmCircuitReset: adminProcedure
     .input(z.object({ provider: z.string().optional() }))
     .mutation(async ({ input }) => {
-      const { reset } = await import("../core/llmCircuitBreaker");
+      const { reset } = await import("../core/llm/llmCircuitBreaker");
       reset(input.provider);
       return { ok: true };
     }),
@@ -307,7 +307,7 @@ export const opsRouter = router({
     .mutation(async ({ ctx }) => {
       const t0 = Date.now();
       try {
-        const { recordTaskRun } = await import("../../content/core/recordTaskRun");
+        const { recordTaskRun } = await import("../core/ops/recordTaskRun");
         const stampId = `__selftest_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
         const r = await recordTaskRun({
           userId: ctx.user.id,

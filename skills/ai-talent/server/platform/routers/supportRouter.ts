@@ -18,7 +18,7 @@ import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure, adminProcedure } from "../core/trpc";
 import localPool from "../../localDb";
-import { callModel } from "../core/multiModelRouter";
+import { callModel } from "../core/llm/multiModelRouter";
 
 // ── per-user rate limit (in-memory) ────────────────────────────────────────
 // Trial users can't spam Mia to burn LLM credits. 20 msgs/hour, 5 msgs/min.

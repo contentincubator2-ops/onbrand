@@ -37,7 +37,7 @@ import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure } from "../core/trpc";
 import Stripe from "stripe";
-import { isRuntimeFeatureEnabled } from "../core/runtimeSafety";
+import { isRuntimeFeatureEnabled } from "../core/ops/runtimeSafety";
 
 let _stripe: Stripe | null = null;
 function getStripe(): Stripe {
@@ -72,7 +72,7 @@ async function getUserCurrency(userId: number): Promise<"TWD" | "USD"> {
     [userId],
   );
   const country = (rows as any[])[0]?.billingCountry ?? "TW";
-  const { currencyFromCountry } = await import("../core/plans");
+  const { currencyFromCountry } = await import("../core/billing/plans");
   return currencyFromCountry(country);
 }
 
@@ -112,8 +112,8 @@ export const stripeRouter = router({
       // from today's FX rate. Resolve currency, fetch rate, then run the
       // pricing helper with both.
       const currency = await getUserCurrency(ctx.user.id);
-      const { getPlan, getEffectivePrice, toStripeUnitAmount } = await import("../core/plans");
-      const { getUsdToTwd } = await import("../core/fx");
+      const { getPlan, getEffectivePrice, toStripeUnitAmount } = await import("../core/billing/plans");
+      const { getUsdToTwd } = await import("../core/billing/fx");
       const usdToTwdRate = await getUsdToTwd();
       const [uRows]: any = await localPool.execute(
         `SELECT IFNULL(earlyBird,0) AS earlyBird, lockedPriceTwdMonthly FROM users WHERE id = ? LIMIT 1`,

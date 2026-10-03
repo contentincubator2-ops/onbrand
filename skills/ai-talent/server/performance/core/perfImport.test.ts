@@ -50,7 +50,7 @@ describe("perfImport", () => {
   });
 });
 
-import { utmContent, withUtm } from "./perfUtm";
+import { utmContent, withUtm } from "../../platform/core/perfUtm";
 import { parseUtmTags as parseBack } from "./perfImport";
 describe("perfUtm", () => {
   it("round-trips through parseUtmTags", () => {

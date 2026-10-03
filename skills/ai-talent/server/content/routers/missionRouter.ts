@@ -11,10 +11,10 @@ import { TRPCError } from "@trpc/server";
 import { getDb } from "../../db";
 import { missions, missionTaskUnits } from "../../../drizzle/schema";
 import { eq, and, desc, or, isNull, sql } from "drizzle-orm";
-import { computeMissionResources } from "../core/missionResourceComputer";
+import { computeMissionResources } from "../core/engine/missionResourceComputer";
 import { isMissingTableError } from "../../platform/core/mysqlErrors";
-import { isHiddenHistoryItem } from "../../platform/core/planGate";
-import { applyProjectFilters, PROJECT_STAGES, taskIdOf, THEATER_TASK_ID, THEATER_TASK_LABEL, type ProjectIndexRow } from "../core/projectFilters";
+import { isHiddenHistoryItem } from "../../platform/core/billing/planGate";
+import { applyProjectFilters, PROJECT_STAGES, taskIdOf, THEATER_TASK_ID, THEATER_TASK_LABEL, type ProjectIndexRow } from "../core/planning/projectFilters";
 
 /** 產出的 task id：metadata.taskId 優先，舊資料退回 description 裡的 [task:<id>]。 */
 function historyTaskId(r: { taskId?: unknown; description?: unknown }): string | null {

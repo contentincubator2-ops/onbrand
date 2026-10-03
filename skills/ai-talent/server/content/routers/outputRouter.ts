@@ -11,9 +11,9 @@ import {
   requirePlanningConfirmation,
   resolveOutputContent,
   updateOutputContent,
-} from "../core/outputContentEnvelope";
-import { applyVariantImageUpdate, selectVariantImageVersion } from "../core/variantImageUpdate";
-import { switchWriter } from "../core/writerDrafts";
+} from "../core/engine/outputContentEnvelope";
+import { applyVariantImageUpdate, selectVariantImageVersion } from "../core/image/variantImageUpdate";
+import { switchWriter } from "../core/engine/writerDrafts";
 
 /** Escape HTML special characters to prevent stored XSS in previewHtml */
 function escapeHtml(s: string): string {
@@ -239,7 +239,7 @@ export const outputRouter = router({
       const touchesCompliance = input.contentKind === undefined && md && typeof md === "object"
         && (input.regulationCompliance || Array.isArray(md.regulationCompliance));
       if (touchesCompliance) {
-        const { mergeComplianceRecord } = await import("../core/regulationCompliance");
+        const { mergeComplianceRecord } = await import("../core/engine/regulationCompliance");
         const rec = input.regulationCompliance ? { variantIndex: updated.resolved.index, ...input.regulationCompliance } : null;
         md.regulationCompliance = mergeComplianceRecord(md.regulationCompliance, updated.resolved.index, rec);
         await localPool.execute(

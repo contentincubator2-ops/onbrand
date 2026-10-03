@@ -43,7 +43,7 @@ import {
   type PositioningScope, type SourceDocSummary,
   loadPositioning, savePositioningDocs, sourceDocsOf,
   MAX_DOCS_PER_SCOPE,
-} from "../core/positioningDocs";
+} from "../core/positioning/positioningDocs";
 
 export const positioningDocRouter = Router();
 
@@ -97,7 +97,11 @@ async function canAccessScope(
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 function safeName(input: string): string {
-  const base = basename(String(input || "positioning.txt"));
+  // 客戶端用 encodeURIComponent 傳檔名（HTTP header 只能放 latin1），這裡要先解回來，
+  // 否則中文檔名會變成 %E5%93... 再被清成一串底線。
+  let raw = String(input || "positioning.txt");
+  try { raw = decodeURIComponent(raw); } catch { /* 不是編碼過的就照用 */ }
+  const base = basename(raw);
   const cleaned = base.replace(/[^\p{L}\p{N}._-]+/gu, "_").replace(/^\.+/, "");
   return (cleaned || "positioning").slice(0, 120);
 }

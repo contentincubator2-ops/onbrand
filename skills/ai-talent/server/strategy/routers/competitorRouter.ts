@@ -6,7 +6,7 @@ import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure } from "../../platform/core/trpc";
 import localPool from "../../localDb";
-import { getOrResearchCompetitorSnapshot } from "../core/competitorSnapshot";
+import { getOrResearchCompetitorSnapshot } from "../core/monitor/competitorSnapshot";
 
 /** 同一套推導規則見 strategyMonitor.ts 的 deriveDefaultWatch/namesOf —— 品牌的具名競爭者來自定位文件的 competition.direct / competition.indirect，不是另外一份清單。 */
 function namesOf(rows: unknown): string[] {

@@ -13,7 +13,7 @@
  * 其餘丟掉。模型掛了不擋流程 —— deriveDimensions 有確定性的退路。
  */
 import localPool from "../../localDb";
-import { callModel } from "../../platform/core/multiModelRouter";
+import { callModel } from "../../platform/core/llm/multiModelRouter";
 import { METRIC_LABELS, JUDGE_LABELS, BUILTIN_DIMS, slugCode, type DimValue, type Dimension, type LensConfig, type Fact } from "./perfPivot";
 
 export function parseJsonLoose(raw: string): any {

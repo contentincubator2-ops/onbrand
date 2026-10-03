@@ -10,7 +10,7 @@
  */
 
 import sgMail from "@sendgrid/mail";
-import { isRuntimeFeatureEnabled } from "../core/runtimeSafety";
+import { isRuntimeFeatureEnabled } from "../core/ops/runtimeSafety";
 
 type EmailData = {
   to: string;

@@ -14,7 +14,7 @@
  */
 import localPool from "../server/localDb.js";
 import { gatherBrandContext, buildSystemPrompt } from "../server/strategy/routers/strategistChatRouter.js";
-import { listDirectorsForBrand } from "../server/strategy/core/strategistDirectory.js";
+import { listDirectorsForBrand } from "../server/strategy/core/strategist/strategistDirectory.js";
 
 const QUESTION = "這支產品的價格帶對嗎？跟誰比？";
 
@@ -63,7 +63,7 @@ async function main() {
   const director = directors[0] ?? null;
   console.log(`\n人選：${director ? `${director.name}（${director.roleLabel}）` : "(拿不到人選，用無人設的 prompt)"}`);
 
-  const { invokeLLM } = await import("../server/platform/core/llm.js");
+  const { invokeLLM } = await import("../server/platform/core/llm/llm.js");
   const system = buildSystemPrompt(director, listCtx);
   const t0 = Date.now();
   const r = await invokeLLM({

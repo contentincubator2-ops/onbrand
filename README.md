@@ -67,16 +67,18 @@ cd skills/ai-talent/client && npm run dev
 
 ## 驗證
 
-CI（`ci.yml` 對 main，`deploy-dev.yml` 對 dev）在部署前都跑下面四項，提交前請在本地跑同一組。client 的型別檢查必須在 client 目錄執行，根目錄的 tsc 不會檢查前端。
+CI（`ci.yml` 對 main，`deploy-dev.yml` 對 dev）在部署前都跑下面五項，提交前請在本地跑同一組。client 的型別檢查必須在 client 目錄執行，根目錄的 tsc 不會檢查前端。
 
 ```bash
 cd skills/ai-talent && npm run typecheck
 cd skills/ai-talent/client && npx tsc --noEmit
 ./scripts/check-client-server-boundary.sh
+node scripts/check-layer-boundaries.mjs
 cd skills/ai-talent && npm test
 ```
 
 - client 不得 value-import server，只允許 `import type`。
+- 層間依賴是一條線性順序：platform < strategy < content < performance，每層只能引用順序在它之前的層（規則與例外處理見 [ARCHITECTURE.md](skills/ai-talent/ARCHITECTURE.md)）。
 - 分支名只能是 `dev`、`release/*`、`hotfix/*`。
 - 推到 main 由 ci.yml 通過後部署；推到 dev 由 `deploy-dev.yml` 部署。
 

@@ -15,7 +15,7 @@ import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure } from "../../platform/core/trpc";
 import localPool from "../../localDb";
-import { callLLM } from "../../platform/core/llmRouter";
+import { callLLM } from "../../platform/core/llm/llmRouter";
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 async function readPositioning(

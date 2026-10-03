@@ -17,13 +17,13 @@
 
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
-import { planQuotaFor, isUnlimited, checkCap } from "../../platform/core/planGate";
+import { planQuotaFor, isUnlimited, checkCap } from "../../platform/core/billing/planGate";
 import { router, protectedProcedure } from "../../platform/core/trpc";
 import localPool from "../../localDb";
-import { callLLM } from "../../platform/core/llmRouter";
-import { assertUrlSafe } from "../../content/core/urlGuard";
-import { fetchImageBuffer } from "../../content/core/imageFetch";
-import { fetchProductMeta } from "../core/productMeta";
+import { callLLM } from "../../platform/core/llm/llmRouter";
+import { assertUrlSafe } from "../../platform/core/web/urlGuard";
+import { fetchImageBuffer } from "../../platform/core/media/imageFetch";
+import { fetchProductMeta } from "../core/entities/productMeta";
 
 // ── helpers ────────────────────────────────────────────────────────────────
 function safeJson(s: any): any {

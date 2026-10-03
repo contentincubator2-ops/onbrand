@@ -13,9 +13,9 @@
  *   ./node_modules/.bin/tsx scripts/probe-strategy-directors.ts 2992
  */
 import localPool from "../server/localDb.js";
-import { buildBrandCatalogBlock } from "../server/strategy/core/brandCatalog.js";
-import { buildBrandPrefix } from "../server/strategy/core/brandContext.js";
-import { listDirectorsForBrand, searchDirectors, industryCodeOf, rolesFor } from "../server/strategy/core/strategistDirectory.js";
+import { buildBrandCatalogBlock } from "../server/strategy/core/brand/brandCatalog.js";
+import { buildBrandPrefix } from "../server/strategy/core/brand/brandContext.js";
+import { listDirectorsForBrand, searchDirectors, industryCodeOf, rolesFor } from "../server/strategy/core/strategist/strategistDirectory.js";
 
 function line(s = "") { console.log(s); }
 

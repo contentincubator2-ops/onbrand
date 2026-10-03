@@ -20,9 +20,9 @@
  * 用法（VM 上）：./node_modules/.bin/tsx scripts/interview-product-directors.ts [brandId]
  */
 import localPool from "../server/localDb.js";
-import { buildBrandPrefix } from "../server/strategy/core/brandContext.js";
-import { buildBrandCatalogBlock } from "../server/strategy/core/brandCatalog.js";
-import { callModel } from "../server/platform/core/multiModelRouter.js";
+import { buildBrandPrefix } from "../server/strategy/core/brand/brandContext.js";
+import { buildBrandCatalogBlock } from "../server/strategy/core/brand/brandCatalog.js";
+import { callModel } from "../server/platform/core/llm/multiModelRouter.js";
 
 /**
  * 2026-09-24 第二輪（CJ「沒有專長於產品定位的人嗎?」）：第一輪那十位全是

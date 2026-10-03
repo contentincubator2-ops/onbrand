@@ -18,7 +18,7 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { router, adminProcedure } from "../core/trpc";
-import { addPoints } from "../core/pointsService";
+import { addPoints } from "../core/billing/pointsService";
 import { pushSystemSupportMessage } from "./supportRouter";
 
 const n = (v: any) => Number(v ?? 0);
@@ -768,7 +768,7 @@ export const adminStatsRouter = router({
         }
       } catch { /* optional */ }
 
-      const { invokeLLM } = await import("../core/llm");
+      const { invokeLLM } = await import("../core/llm/llm");
       const prompt =
         `你是 onBrand Studio 的 bug 分流員。判定使用者回報是「真的系統 bug」、` +
         `「使用者操作問題（不是 bug）」還是「需要人工再看」。\n\n` +

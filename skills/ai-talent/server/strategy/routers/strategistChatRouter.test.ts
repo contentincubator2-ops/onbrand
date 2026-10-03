@@ -7,7 +7,7 @@
  */
 import { describe, expect, it } from "vitest";
 import { strategistChatRouter, buildSystemPrompt, copyOpeningText, isStaleOpening } from "./strategistChatRouter";
-import type { StrategistDirector } from "../core/strategistDirectory";
+import type { StrategistDirector } from "../core/strategist/strategistDirectory";
 
 /** 最小可用的假總監——只有 roleId 會影響工具引導那一段。 */
 const director = (roleId: string, roleLabel: string): StrategistDirector => ({

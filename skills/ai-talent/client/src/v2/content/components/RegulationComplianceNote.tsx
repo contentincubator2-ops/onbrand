@@ -4,7 +4,7 @@
  * 2026-09-30（CJ「要多加一道寫完後的合規檢查，也寫在任務卡上的顯示進度，表示有進行合規檢查」）：
  * 執行中看任務卡的進度格「合規檢查」；寫完之後在這裡留下結果——通過、自動修正了哪幾句、
  * 或是有沒修成的地方要用戶自己改。檢查沒跑完照實說，不假裝檢查過。
- * 資料是 metadata.regulationCompliance（server/content/core/regulationCompliance.ts）。
+ * 資料是 metadata.regulationCompliance（server/content/core/engine/regulationCompliance.ts）。
  */
 import { Icon } from "../../platform/components/icons";
 

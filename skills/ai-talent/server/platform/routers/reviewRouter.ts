@@ -31,7 +31,7 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure } from "../core/trpc";
-import { assertReviewAllowed, isHiddenHistoryItem } from "../core/planGate";
+import { assertReviewAllowed, isHiddenHistoryItem } from "../core/billing/planGate";
 
 /** 2026-09-29 CJ「前台隱藏，資料保留」：下架通路（LinkedIn／YouTube／新聞稿／X）的稿不列、不算紅點。 */
 const hiddenReview = (r: any) =>

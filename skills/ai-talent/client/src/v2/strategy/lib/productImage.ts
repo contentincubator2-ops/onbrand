@@ -6,8 +6,8 @@
  *
  *   1. 生成／外部圖：`https://…`（絕對網址）
  *   2. 使用者自己上傳的照片：`/static/asset-photos/product/<id>/<檔名>`（**根相對路徑**）
- *      —— 見 server/content/core/imageFetch.ts 的 ASSET_PHOTO_URL_PREFIX，
- *      以及 server/strategy/core/assetPhotos.ts 的 mirrorPrimaryToProduct()，
+ *      —— 見 server/platform/core/media/imageFetch.ts 的 ASSET_PHOTO_URL_PREFIX，
+ *      以及 server/strategy/core/brand/assetPhotos.ts 的 mirrorPrimaryToProduct()，
  *      它把主圖寫進 products.positioning.$.imageUrl，寫進去的就是這個相對路徑。
  *
  * 原本列表端的篩選條件是 `/^https?:\/\//`，於是「設為主圖」明明寫進 DB 了，

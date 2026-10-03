@@ -16,7 +16,7 @@
  * 會被讀）；只存著、AI 不讀的欄位照樣列出，但不算用量。一次寫作只讀一個產品、一個活動，
  * 所以總用量＝品牌＋文字＋基本資料＋最大的產品＋最大的活動。
  *
- * client 不得 value-import server，型別在這裡另寫一份（對應 server/strategy/core/brandMemory.ts）。
+ * client 不得 value-import server，型別在這裡另寫一份（對應 server/strategy/core/brand/brandMemory.ts）。
  */
 import { BRAND_SEGMENTS, PRODUCT_SEGMENTS, EVENT_SEGMENTS, type SegmentSpec } from "../../lib/positioningSchema";
 import { COPY_ASSETS, hasContent } from "../../lib/copyAssets";

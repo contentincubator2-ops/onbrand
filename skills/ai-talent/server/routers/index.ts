@@ -1,7 +1,7 @@
 import { router } from "../platform/core/trpc";
 import { brandRouter } from "../strategy/routers/brandRouter";
 import { creditsRouter } from "../platform/routers/creditsRouter";
-import { notificationRouter } from "../platform/routers/notificationRouter";
+import { notificationRouter } from "../gateway/routers/notificationRouter";
 import { supportRouter } from "../platform/routers/supportRouter";
 import { agentRouter } from "../content/routers/agentRouter";
 import { missionRouter } from "../content/routers/missionRouter";
@@ -23,11 +23,11 @@ import { tabLockRouter } from "../strategy/routers/tabLockRouter";
 import { positioningJobsRouter } from "../strategy/routers/positioningJobsRouter";
 import { positioningDocsRouter } from "../strategy/routers/positioningDocsRouter";
 import { channelRoleRouter } from "../strategy/routers/channelRoleRouter";
-import { brandTaskCardRouter } from "../strategy/routers/brandTaskCardRouter";
+import { brandTaskCardRouter } from "../content/routers/brandTaskCardRouter";
 import { workbenchRouter } from "../strategy/routers/workbenchRouter";
 import { strategistChatRouter } from "../strategy/routers/strategistChatRouter";
 import { assetPhotoRouter } from "../strategy/routers/assetPhotoRouter";
-import { campaignRouter } from "../strategy/routers/campaignRouter";
+import { campaignRouter } from "../content/routers/campaignRouter";
 import { vendorRouter } from "../content/routers/vendorRouter";
 import { strategyMonitorRouter } from "../strategy/routers/strategyMonitorRouter";
 import { brandRegulationRouter } from "../strategy/routers/brandRegulationRouter";
@@ -57,7 +57,7 @@ import { festivalRouter } from "../content/routers/festivalRouter";
 import { promptTemplateRouter } from "../content/routers/promptTemplateRouter";
 // 2026-06-21 (CJ「按 riverflow 標準」brand DNA): auto-extracted brand color palette.
 import { brandColorsRouter } from "../strategy/routers/brandColorsRouter";
-import { landingRouter } from "../platform/routers/landingRouter";
+import { landingRouter } from "../gateway/routers/landingRouter";
 
 // 2026-05-14: removed 28 dead routers — none of them had any v2 callers
 // after the v1 frontend deletion. See git history (commit before this)

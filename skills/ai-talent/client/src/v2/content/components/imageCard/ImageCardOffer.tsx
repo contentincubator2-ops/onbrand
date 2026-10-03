@@ -5,8 +5,8 @@
 import { useNavigate } from "react-router-dom";
 import { trpc } from "../../../../lib/trpc";
 import { useLang } from "../../../../lib/i18n";
-import { imageCardHref, imageChannelOf, saveImageCardHandoff } from "../../lib/imageCardHandoff";
-import type { ImageCardInfo } from "./ImageCardTile";
+import { imageCardHref, imageChannelOf, saveImageCardHandoff } from "../../../platform/lib/imageCardHandoff";
+import type { ImageCardInfo } from "../../../platform/lib/imageCardHandoff";
 
 export const IMAGE_CARD_OFFER_ID = "image-card-offer";
 

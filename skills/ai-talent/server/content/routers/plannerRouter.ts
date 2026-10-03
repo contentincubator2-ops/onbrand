@@ -9,17 +9,17 @@ import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure } from "../../platform/core/trpc";
 import { assertBrandAccess } from "../../platform/core/brandAuth";
-import { callModel } from "../../platform/core/multiModelRouter";
+import { callModel } from "../../platform/core/llm/multiModelRouter";
 import localPool from "../../localDb";
 import {
   addDays, applyOps, brandPlatforms, cardsFor, isYmd, loadWeekCampaignItems, loadWeekSlots,
   parsePlannerReply, plannerContext, plannerSystemPrompt, railStatusOf, validateOps, weekDays,
   type Card, type PlannerCtxArgs, type SlotRow,
-} from "../core/weeklyPlanner";
+} from "../core/planning/weeklyPlanner";
 import {
   PLANNER_AXES, advisorSystemPrompt, capAdds, isForkAxis, loadAdvisor, parseAdvisorReply, topicOverlap,
   type AdvisorCard, type ForkAxis,
-} from "../core/plannerAdvisors";
+} from "../core/planning/plannerAdvisors";
 
 const weekInput = z.object({
   brandId: z.number().int().positive(),

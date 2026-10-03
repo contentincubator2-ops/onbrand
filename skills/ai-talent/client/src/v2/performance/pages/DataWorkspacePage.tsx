@@ -18,7 +18,7 @@ import { trpc } from "../../../lib/trpc";
 import { CampaignIcon, ChartIcon, ClickIcon, PerformanceIcon, SearchIcon, ShopIcon, TargetIcon, TextIcon } from "../../platform/components/icons";
 import PerformanceDashboard from "../components/PerformanceDashboard";
 import ConnectionsPanel from "../components/ConnectionsPanel";
-import { setMockBrandSeed } from "../components/perfMockData";
+import { setMockBrandSeed } from "../../platform/lib/perfMockData";
 import FanpageMonthlyReport from "../components/FanpageMonthlyReport";
 import LensWorkspace from "../components/LensWorkspace";
 import CampaignPerformance from "../components/CampaignPerformance";

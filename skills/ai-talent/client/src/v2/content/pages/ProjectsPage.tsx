@@ -12,11 +12,11 @@
  *     舊版刪除打的是 mission.delete，會把同一張任務卡的所有執行一起刪掉。
  */
 import { useEffect, useMemo, useState } from "react";
-import { showToastGlobal } from "../../../components/ui/Toast";
+import { showToastGlobal } from "../../platform/components/Toast";
 import { useNavigate, useOutletContext, useSearchParams } from "react-router-dom";
 import { trpc } from "../../../lib/trpc";
 import { useLang } from "../../../lib/i18n";
-import type { ShellOutletCtx } from "../../app/shell/ShellLayout";
+import type { ShellOutletCtx } from "../../platform/lib/shellContext";
 import { Skeleton } from "@heroui/react";
 import { CopyIcon, DeleteIcon, EditIcon, FolderIcon, InfoIcon, SearchIcon } from "../../platform/components/icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";

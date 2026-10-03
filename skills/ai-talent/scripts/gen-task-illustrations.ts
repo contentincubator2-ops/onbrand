@@ -16,12 +16,12 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
 import { dirname, join, resolve } from "path";
 import { fileURLToPath } from "url";
-import { buildTaskCatalogIndex } from "../server/content/core/taskCatalogIndex";
-import { resolveTaskTemplateSync } from "../server/content/core/taskRegistry";
-import { coverFilePath } from "../server/content/core/mediaGen";
+import { buildTaskCatalogIndex } from "../server/content/core/catalog/taskCatalogIndex";
+import { resolveTaskTemplateSync } from "../server/content/core/catalog/taskRegistry";
+import { coverFilePath } from "../server/platform/core/media/mediaGen";
 import {
   drawIllustration, shrinkToWebp, writeIllustrationConcepts, type IllustrationCardInput,
-} from "../server/content/core/taskIllustration";
+} from "../server/content/core/image/taskIllustration";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const IMG_DIR = join(ROOT, "client/public/task-illustrations");

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { frontCardKind, isRecentViral, viralWindowStart } from "./sourceVocabulary";
+import { frontCardKind, isRecentViral, viralWindowStart } from "../../platform/lib/sourceVocabulary";
 
 // 2026-09-29 CJ：前台只列爆款結構（近 3 個月）＋品牌自建。
 describe("frontCardKind", () => {
