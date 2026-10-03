@@ -85,6 +85,44 @@ def _pptx_slides(path: str):
             yield lines[0], lines[1:]
 
 
+# ──────────────────────────────────────────────────────────────── xlsx ──
+def _xlsx_sheets(path: str):
+    """yield (sheet_name, [row lines]) — 每個工作表一節，列內以 | 分欄。"""
+    NS = "{http://schemas.openxmlformats.org/spreadsheetml/2006/main}"
+    RNS = "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}"
+    with zipfile.ZipFile(path) as z:
+        shared = []
+        if "xl/sharedStrings.xml" in z.namelist():
+            for si in etree.fromstring(z.read("xl/sharedStrings.xml")).iter(f"{NS}si"):
+                shared.append("".join(t.text or "" for t in si.iter(f"{NS}t")))
+        wb = etree.fromstring(z.read("xl/workbook.xml"))
+        rels = {
+            r.get("Id"): r.get("Target")
+            for r in etree.fromstring(z.read("xl/_rels/workbook.xml.rels"))
+        }
+        for sh in wb.iter(f"{NS}sheet"):
+            target = rels.get(sh.get(f"{RNS}id"), "")
+            member = target.lstrip("/") if target.startswith("/") else "xl/" + target
+            if member not in z.namelist():
+                continue
+            lines = []
+            for row in etree.fromstring(z.read(member)).iter(f"{NS}row"):
+                cells = []
+                for c in row.iter(f"{NS}c"):
+                    v = c.find(f"{NS}v")
+                    if c.get("t") == "s" and v is not None and v.text is not None:
+                        val = shared[int(v.text)] if int(v.text) < len(shared) else ""
+                    elif c.get("t") == "inlineStr":
+                        val = "".join(t.text or "" for t in c.iter(f"{NS}t"))
+                    else:
+                        val = v.text if v is not None and v.text else ""
+                    cells.append(_clean(val))
+                if any(cells):
+                    lines.append(" | ".join(cells).rstrip(" |"))
+            if lines:
+                yield sh.get("name") or "工作表", lines
+
+
 # ─────────────────────────────────────────────────────────── md / txt ──
 MD_HEADING = re.compile(r"^(#{1,6})\s+(.*\S)\s*$")
 # 純文字沒有樣式資訊，只能靠形狀猜：短、獨立成行、不以句讀收尾。
@@ -190,6 +228,11 @@ def extract(path: str) -> dict:
             raw.append({"level": 1, "heading": title, "body": body})
         sections = _finish(raw)
         kind = "pptx"
+    elif ext == ".xlsx":
+        sections = _finish([
+            {"level": 1, "heading": name_, "body": lines} for name_, lines in _xlsx_sheets(path)
+        ])
+        kind = "xlsx"
     elif ext in (".md", ".markdown"):
         sections = _finish(_md_sections(open(path, encoding="utf-8", errors="replace").read()))
         kind = "markdown"
@@ -227,7 +270,7 @@ def extract(path: str) -> dict:
         sections = _finish(_txt_sections(open(path, encoding="utf-8", errors="replace").read()))
         kind = "text"
     else:
-        raise RuntimeError(f"不支援的檔案格式 {ext or '(無副檔名)'} — 可用 .docx / .pptx / .pdf / .md / .txt")
+        raise RuntimeError(f"不支援的檔案格式 {ext or '(無副檔名)'} — 可用 .docx / .pptx / .xlsx / .pdf / .md / .txt")
 
     text = "\n\n".join(
         (f"## {s['heading']}\n{s['body']}" if s["heading"] else s["body"]).strip()

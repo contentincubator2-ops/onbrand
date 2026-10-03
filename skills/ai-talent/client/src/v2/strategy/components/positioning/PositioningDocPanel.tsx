@@ -56,7 +56,7 @@ interface CustomSegment {
   createdAt: string; sourceDocId: string | null;
 }
 
-const ACCEPT = ".docx,.pptx,.pdf,.md,.markdown,.txt,.html,.htm";
+const ACCEPT = ".docx,.doc,.pptx,.ppt,.xlsx,.pdf,.md,.markdown,.txt,.html,.htm";
 
 function renderValue(v: any): string {
   if (typeof v === "string") return v;
@@ -646,7 +646,7 @@ export default function PositioningDocPanel({
         <Button size="sm" variant="flat" startContent={<PasteIcon size={14} />} onPress={() => setPasteOpen((v) => !v)}>
           {en ? "Paste text" : "直接貼上"}
         </Button>
-        <span className="text-tiny text-default-400">.docx / .pptx / .pdf / .md / .txt / .html</span>
+        <span className="text-tiny text-default-400">.docx / .doc / .pptx / .ppt / .xlsx / .pdf（含掃描檔）/ .md / .txt / .html</span>
       </div>
 
       {pasteOpen && (

@@ -31,7 +31,7 @@ import { AddIcon, DeleteIcon, UploadIcon } from "../../../platform/components/ic
 import { useLang } from "../../../../lib/i18n";
 import { trpc } from "../../../../lib/trpc";
 
-const ACCEPT = ".docx,.pptx,.pdf,.md,.markdown,.txt,.html,.htm";
+const ACCEPT = ".docx,.doc,.pptx,.ppt,.xlsx,.pdf,.md,.markdown,.txt,.html,.htm";
 /** 後端 MAX_CUSTOM_SEGMENT_* 的鏡像。改後端記得一起改這裡。 */
 const MAX_TITLE = 24;
 const MAX_VALUE = 600;
