@@ -12,13 +12,6 @@
 
 import { invokeLLM } from "../../platform/core/llm";
 
-export const SQUAD_LEAD = {
-  name: "Jordan Hayes",
-  title: "AI 品牌故事 CMO",
-  slug: "sarah-brand",
-  agentId: 30002,
-};
-
 // 品牌定位步驟的來源標籤（定位任務專用）
 export const POSITIONING_STEP_NAMES: Record<number, { title: string; agent: string; sourceLabel: string }> = {
   1:  { title: "市場洞察",     agent: "市場研究員",   sourceLabel: "[來源: 業界報告 + 市場數據]" },
@@ -163,49 +156,3 @@ ${params.agentOutput.slice(0, 3500)}
   }
 }
 
-/**
- * 格式化 QA 結果為聊天訊息
- * 顯示在聊天視窗中，讓用戶看到Jordan Hayes的審核意見
- */
-export function formatQAAsMessage(qa: QAResult, opts?: { isLastStep?: boolean }): string {
-  const badge = qa.status === "pass"
-    ? `✅ QA 通過（${qa.overallScore}分）`
-    : `⚠️ QA 注意（${qa.overallScore}分）`;
-
-  const lines = [
-    `**Jordan Hayes · ${SQUAD_LEAD.title}｜${badge}**`,
-    "",
-    qa.comment,
-    "",
-  ];
-
-  if (qa.alignmentCheck || qa.contextCheck || qa.qualityCheck) {
-    lines.push(`◎ 需求對齊：${qa.alignmentCheck}`);
-    lines.push(`◎ 脈絡一致：${qa.contextCheck}`);
-    lines.push(`◎ 輸出品質：${qa.qualityCheck}`);
-  }
-
-  if (qa.suggestions.length > 0) {
-    lines.push("");
-    lines.push("建議調整：");
-    qa.suggestions.forEach(s => lines.push(`→ ${s}`));
-  }
-
-  if (qa.sourceLabel) {
-    lines.push("", qa.sourceLabel);
-  }
-
-  lines.push("", "---");
-
-  if (qa.status === "pass") {
-    if (opts?.isLastStep) {
-      lines.push("以上是這個任務的完整成果，告訴我你想調整的方向，或說「完成」結束。");
-    } else {
-      lines.push("成果已確認。告訴我「繼續」進入下一步，或說明你想調整的方向。");
-    }
-  } else {
-    lines.push("⚠️ 這個步驟有需要注意的地方，建議告訴我「調整 XXX」，或說「繼續」強制推進。");
-  }
-
-  return lines.join("\n");
-}

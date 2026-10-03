@@ -203,13 +203,3 @@ export function synthesizeAgentAsSquad(agent: AgentRow): SynthSquad {
 
 // ── Helpers for routers ────────────────────────────────────────────────────
 
-/** Is this mission slug a synthesized agent mission? */
-export function isAgentSlug(slug: string | null | undefined): boolean {
-  return !!slug && slug.startsWith("agent:");
-}
-
-/** Extract agent id (numeric or slug) from an `agent:XXX` mission slug. */
-export function parseAgentSlug(slug: string): string | null {
-  if (!isAgentSlug(slug)) return null;
-  return slug.slice("agent:".length);
-}

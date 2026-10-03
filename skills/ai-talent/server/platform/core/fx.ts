@@ -68,12 +68,6 @@ export async function getUsdToTwd(): Promise<number> {
   return inFlight;
 }
 
-/** Synchronous accessor for hot paths — only safe AFTER getUsdToTwd has
- *  resolved at least once. Returns hardcoded fallback otherwise. */
-export function getUsdToTwdSync(): number {
-  return memCache?.rate ?? HARDCODED_FALLBACK;
-}
-
 async function fetchFromProvider(): Promise<number> {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), 5000);
@@ -116,8 +110,3 @@ export async function usdToTwd(usdAmount: number): Promise<number> {
   return Math.round(usdAmount * rate);
 }
 
-/** Convert TWD → USD (e.g. for grandfathered users with lockedPriceTwdMonthly). */
-export async function twdToUsd(twdAmount: number): Promise<number> {
-  const rate = await getUsdToTwd();
-  return Math.round((twdAmount / rate) * 100) / 100; // 2-decimal USD
-}

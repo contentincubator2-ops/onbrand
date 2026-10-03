@@ -19,7 +19,7 @@
  * 2026-06-12 (CJ「Mia 細緻化 + 不要自動跳出」): created.
  */
 
-import { useEffect, useSyncExternalStore } from "react";
+import { useSyncExternalStore } from "react";
 import { NUDGE_CATALOG, type NudgeId, type NudgeDefinition, interpolate } from "./miaNudgeCatalog";
 import type { MiaAction } from "../SupportDrawer.types";
 
@@ -322,21 +322,6 @@ export function peekQueue(): QueuedNudge[] {
   return readQueue();
 }
 
-/**
- * Reset the session — clear queue + fired set. Use on logout so the next
- * user (or next login) starts with a clean slate.
- */
-export function resetNudgeSession(): void {
-  if (typeof sessionStorage === "undefined") return;
-  try {
-    sessionStorage.removeItem(QUEUE_KEY);
-    sessionStorage.removeItem(FIRED_KEY);
-  } catch {
-    /* swallow */
-  }
-  emitChange();
-}
-
 // ── React subscription hook ──────────────────────────────────────────────
 
 /**
@@ -374,14 +359,3 @@ export function useUnreadNudges(): {
   return { unreadCount, drain: drainQueue, peek: peekQueue };
 }
 
-/**
- * Optional: subscribe to specific nudge events for analytics / observers.
- * Most consumers don't need this — useUnreadNudges is enough.
- */
-export function useOnNudgeFired(handler: (queue: QueuedNudge[]) => void): void {
-  useEffect(() => {
-    const cb = () => handler(readQueue());
-    window.addEventListener(CHANGE_EVENT, cb);
-    return () => window.removeEventListener(CHANGE_EVENT, cb);
-  }, [handler]);
-}

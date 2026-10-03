@@ -4,11 +4,6 @@ export type StrategyContentKind = "planningArtifacts" | "publicVariants";
 export type RunContentKind = "legacy" | StrategyContentKind;
 export type IgPublicFormat = "feed" | "carousel" | "reel" | "story" | "live";
 
-export interface StrategyContentEnvelope<T = unknown> {
-  planningArtifacts: T[];
-  publicVariants: T[];
-}
-
 export interface ResolvedRunContent<T = unknown> {
   isStrategyEnvelope: boolean;
   planningArtifacts: T[];

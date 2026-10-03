@@ -70,9 +70,3 @@ export interface Scout {
   fetch(ctx: ScoutContext): Promise<IntelItem[]>;
 }
 
-export class ScoutError extends Error {
-  constructor(message: string, public readonly cause?: unknown) {
-    super(message);
-    this.name = "ScoutError";
-  }
-}

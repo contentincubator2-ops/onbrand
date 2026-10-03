@@ -428,6 +428,3 @@ export const ALL_99S_SQUADS: SquadIndexEntry[] = [
   ...IG_99S_SQUADS,
 ];
 
-export function get99SquadEntry(taskId: string): SquadIndexEntry | null {
-  return ALL_99S_SQUADS.find((e) => e.id === taskId) ?? null;
-}

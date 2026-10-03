@@ -535,6 +535,3 @@ export function getXOrchestraConfig(taskId: string): OrchestraConfig | null {
   return X_30S_ORCHESTRA[taskId] ?? null;
 }
 
-export function getXTemplate(taskId: string): FBTaskTemplate | null {
-  return X_30S_TASKS.find((t) => t.id === taskId) ?? null;
-}

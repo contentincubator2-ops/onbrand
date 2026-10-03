@@ -42,16 +42,6 @@ type BrainTier =
  */
 export type BrainCategoryKey = "info" | "brand" | "copy" | "product" | "event" | "regulation" | "legacy";
 
-export const BRAIN_CATEGORIES: Record<BrainCategoryKey, { zh: string; en: string }> = {
-  info:    { zh: "基本資料", en: "Info" },
-  brand:   { zh: "品牌",     en: "Brand" },
-  copy:    { zh: "文字",     en: "Copy" },
-  product: { zh: "產品",     en: "Products" },
-  event:   { zh: "活動",     en: "Campaigns" },
-  regulation: { zh: "法規",  en: "Regulations" },
-  legacy:  { zh: "舊資料",   en: "Legacy" },
-};
-
 interface Display { category: BrainCategoryKey; group: string; label: string }
 
 /**
@@ -406,13 +396,6 @@ const CACHE = new Map<string, { brain: BrandBrain; expiresAt: number }>();
 const TTL_MS = 60_000; // 1-minute cache — brand_brain edits become visible quickly
 const cacheKey = (brandId: number, productId?: number | null, eventId?: number | null) =>
   `${brandId}:${productId ?? 0}:${eventId ?? 0}`;
-
-export interface BrandSummary {
-  id: number;
-  name: string | null;
-  prefix: string; // formatted system-prompt suffix (starts with "\n\n[品牌大腦摘要]\n…")
-  entryCount: number;
-}
 
 /**
  * Returns a system-prompt suffix string ready to append to any LLM system message.
@@ -990,37 +973,6 @@ export async function buildBrandPrefix(
   _mode: "core" | "full" = "full",
 ): Promise<string> {
   return (await buildBrandBrain(brandId, productId, eventId)).prefix;
-}
-
-/**
- * Lightweight summary used by procedures that want to log or surface
- * "we did inject brand X" feedback to the client.
- */
-export async function getBrandSummary(
-  brandId: number | undefined | null
-): Promise<BrandSummary | null> {
-  if (!brandId) return null;
-  try {
-    const db = await getDb();
-    if (!db) return null;
-
-    const [nameRows] = (await db.execute(
-      sql`SELECT name FROM brands WHERE id = ${brandId} LIMIT 1`
-    )) as any;
-    const [countRows] = (await db.execute(
-      sql`SELECT COUNT(*) AS c FROM brand_brain WHERE brand_id = ${brandId}`
-    )) as any;
-
-    const prefix = await buildBrandPrefix(brandId);
-    return {
-      id: brandId,
-      name: nameRows?.[0]?.name ?? null,
-      prefix,
-      entryCount: Number(countRows?.[0]?.c ?? 0),
-    };
-  } catch {
-    return null;
-  }
 }
 
 /** Test-only: clear the cache. */

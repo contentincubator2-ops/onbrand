@@ -46,8 +46,6 @@ export const POST_FORMAT_CANDIDATES_DDL = `
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
 `;
 
-export type CandidateStatus = "pending" | "approved" | "rejected" | "shipped";
-
 export interface UpsertOutcome {
   inserted: number;
   merged: number;

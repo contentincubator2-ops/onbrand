@@ -22,15 +22,6 @@
  */
 import type { FBTaskTemplate, OrchestraConfig } from "./quickTaskFB";
 
-// Universal team IDs (used by orchestra; no need to repeat per-task)
-export const FB60_UNIVERSAL = {
-  hashtagAgentId: 30012, // Mia Su — Meta Ads Specialist (2034 char)
-  replyAgentId: 180163, // Helen Sung
-  schedulerAgentId: 30003,  // David Wang
-  followupAgentId: 60012, // Sophie Ho
-  imageDirectorId: 220887,  // Claire Chen — Brand Visual Designer (977 char)
-} as const;
-
 const FB60_TONE = `
 語氣要求：自然口語、有 hook、不要 "親愛的客戶" 或 "歡迎購買" 的官腔。
 品牌語氣若 system context 已給，務必貼合，不要用罐頭模板。

@@ -1,7 +1,7 @@
 /**
  * Toast.tsx — lightweight toast notification system
  */
-import React, { createContext, useContext, useState, useCallback } from "react";
+import React, { createContext, useState, useCallback } from "react";
 import { DoneIcon, ErrorIcon, InfoIcon, WarningIcon } from "../../v2/platform/components/icons";
 
 type ToastType = "success" | "error" | "info" | "warning";
@@ -27,10 +27,6 @@ interface ToastContextValue {
 }
 
 const ToastContext = createContext<ToastContextValue>({ showToast: () => {} });
-
-export function useToast() {
-  return useContext(ToastContext);
-}
 
 /**
  * Module-level emitter so non-React code (e.g. trpc onError handlers,

@@ -93,7 +93,6 @@ export const imageStyleDirectionSchema = z.preprocess(
   },
   z.object(imageStyleObjectShape),
 );
-export type ImageStyleDirection = z.infer<typeof imageStyleDirectionSchema>;
 
 /**
  * Video style direction — same idea for short-form video (Reels / Shorts /
@@ -113,7 +112,6 @@ export const videoStyleDirectionSchema = z.object({
   aspect_ratio: z.string().max(20).optional(),
   model_suggestion: z.string().max(40).optional(),
 });
-export type VideoStyleDirection = z.infer<typeof videoStyleDirectionSchema>;
 
 // ─── Tier-specific extras ───────────────────────────────────────────────────
 

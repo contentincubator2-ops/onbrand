@@ -56,14 +56,3 @@ export function resolveAgentId(
   return getAssignedAgent(taskId, role) ?? hardcodedFallback ?? null;
 }
 
-/** Stats for /admin endpoints */
-export function getAssignmentStats() {
-  return {
-    poolSize: data.poolSize,
-    slotCount: data.slotCount,
-    uniqueAgents: data.uniqueAgents,
-    avgThickness: data.avgThickness,
-    minThickness: data.minThickness,
-    generatedAt: data.generatedAt,
-  };
-}

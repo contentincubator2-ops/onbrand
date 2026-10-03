@@ -179,38 +179,6 @@ export async function getBrandPositioningById(
   }
 }
 
-/**
- * 格式化品牌定位上下文，供注入 agent prompt
- */
-export function formatPositioningForPrompt(pos: PositioningResult): string {
-  const lines: string[] = [
-    "\n\n【品牌定位上下文（必須貫徹到所有產出）】",
-    `品牌標語：${pos.tagline}`,
-    `品牌定位：${pos.positioningSummary}`,
-    `目標受眾：${pos.targetAudience}`,
-    `核心 USP：${pos.usp}`,
-    `品牌語調：${pos.brandVoice}`,
-    `核心價值主張：${pos.valueProposition}`,
-  ];
-
-  if (pos.goldenCircle.why) {
-    lines.push(`\n黃金圈分析：`);
-    lines.push(`  為什麼（Why）：${pos.goldenCircle.why}`);
-    lines.push(`  如何做（How）：${pos.goldenCircle.how}`);
-    lines.push(`  提供什麼（What）：${pos.goldenCircle.what}`);
-  }
-
-  if (pos.differentiators.length > 0) {
-    lines.push(`\n差異化優勢：${pos.differentiators.slice(0, 3).map((d, i) => `${i + 1}. ${d}`).join(" | ")}`);
-  }
-
-  if (pos.messagingPillars.length > 0) {
-    lines.push(`溝通支柱：${pos.messagingPillars.slice(0, 3).join(" / ")}`);
-  }
-
-  return lines.join("\n");
-}
-
 // ── Internal: AI 品牌定位分析（5 步驟簡化版） ──────────────────────────────
 
 async function runAIPositioningAnalysis(input: PositioningInput): Promise<PositioningResult> {

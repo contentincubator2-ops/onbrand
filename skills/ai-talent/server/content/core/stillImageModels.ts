@@ -29,8 +29,6 @@ export type StillImageModelId = (typeof STILL_IMAGE_MODELS)[number];
 /** Short user-facing choice ids — what the client picker and the tRPC input use. */
 export type StillImageChoice = "gpt-image-2" | "nano-banana";
 
-export const DEFAULT_STILL_IMAGE_MODEL: StillImageModelId = GPT_IMAGE_2;
-
 /**
  * Map anything a caller might still send onto one of the two models.
  *

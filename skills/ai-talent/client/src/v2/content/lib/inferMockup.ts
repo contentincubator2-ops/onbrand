@@ -524,14 +524,6 @@ export function inferMockupVariantFromSkill(skill: any): MockupVariant {
   return variant("generic", "generic");
 }
 
-/** All possible variants (for admin / debug) */
-export function getAllVariants(): MockupVariant[] {
-  return Object.keys(VARIANT_LABELS).map((k) => {
-    const [p, f] = k.split(":");
-    return variant(p as Platform, f as Format);
-  });
-}
-
 /**
  * Top variants per platform, ordered by user preference. Used in
  * PickerWorkspace to render a variant switcher Tabs row so the user
@@ -556,31 +548,6 @@ const PLATFORM_TOP_VARIANTS: Record<Platform, Format[]> = {
   podcast:   ["episode", "show", "audiogram"],
   generic:   ["generic"],
 };
-
-export function getVariantsForPlatform(platform: Platform): MockupVariant[] {
-  return PLATFORM_TOP_VARIANTS[platform].map((f) => variant(platform, f));
-}
-
-/**
- * Classify a squad step as "strategic" (research / analysis /
- * brand context / framework — should render as a Word doc) vs
- * "content" (caption / image / hashtag — should render as the
- * platform mockup).
- */
-/**
- * Step kind taxonomy:
- *   - "strategic"  → SWOT / persona / framework / report. Renders as DocMockup.
- *   - "content"    → caption / hashtag / hook / title. Feeds PlatformMockup.
- *   - "image"      → KV / banner / cover / thumbnail / carousel image.
- *                    Routes through MediaGenFlow (3-step) instead of plain LLM.
- *   - "video"      → reel / short / TVC / spokesperson clip.
- *                    Routes through MediaGenFlow (3-step) for video models.
- *
- * Per CJ direction 2026-04-29: any image/video output MUST go through the
- * 3-step flow (設計方向 → AI prompt → 模型選擇), so squad-runner detects
- * visual steps here and swaps the middle preview to MediaGenFlow inline.
- */
-export type StepKind = "strategic" | "content" | "image" | "video" | "intake" | "qa";
 
 const STRATEGIC_KEYWORDS = [
   "research", "researcher", "analysis", "analyst", "audit",
@@ -648,74 +615,3 @@ function parseHashtags(body: string): string[] {
     .map((t) => (t.startsWith("#") ? t : `#${t}`));
 }
 
-/**
- * Aggregate content-step outputs into structured mockup fields.
- * Unrecognized outputs fall through to caption (most universal).
- */
-export function aggregateMockupFields(
-  steps: any[],
-  progressByOrd: Map<number, any>,
-): AggregatedMockupFields {
-  const out: AggregatedMockupFields = {};
-  if (!Array.isArray(steps)) return out;
-
-  for (let i = 0; i < steps.length; i++) {
-    const step = steps[i];
-    const ord = i + 1;
-    const p = progressByOrd.get(ord);
-    const body: string = (p?.agentOutput ?? p?.agent_output ?? "").toString().trim();
-    if (!body) continue;
-    // Visual + strategic steps don't feed mockup text fields. Visual steps
-    // produce a media URL via MediaGenFlow; strategic steps render in the
-    // DocMockup. Only "content" body text feeds caption / hashtags / etc.
-    if (inferStepKind(step) !== "content") continue;
-
-    const haystack = [step.outputType, step.output, step.name, step.title]
-      .filter(Boolean).join(" ").toLowerCase();
-
-    let routed = false;
-    for (const r of FIELD_ROUTES) {
-      if (r.test.test(haystack)) {
-        if (r.field === "hashtags") {
-          out.hashtags = parseHashtags(body);
-        } else if (!out[r.field]) {
-          (out as any)[r.field] = body;
-        }
-        routed = true;
-        break;
-      }
-    }
-    // Fallback: stash as caption if not yet set
-    if (!routed && !out.caption) out.caption = body;
-  }
-  return out;
-}
-
-export function inferStepKind(step: any): StepKind {
-  if (!step) return "content";
-  // Explicit declaration wins over heuristics. Agents/skills that produce
-  // visual assets should set `outputKind` directly so we don't depend on
-  // keyword regex.
-  const explicit = String(step.outputKind ?? step.assignedAgent?.outputKind ?? "").toLowerCase();
-  if (explicit === "image" || explicit === "video" || explicit === "strategic" || explicit === "content") {
-    return explicit as StepKind;
-  }
-  // Intake / checkpoint / QA steps → doc format (CJ direction 2026-05-02)
-  if (explicit === "decision" || explicit === "intake") return "intake";
-  if (explicit === "qa_review" || explicit === "qa") return "qa";
-  const mv = String(step.mockupVariant ?? "");
-  if (mv === "IntakeFormMockup") return "intake";
-  if (mv === "QAReportMockup") return "qa";
-  const haystack = [
-    step.outputType, step.output, step.name, step.title,
-    step.skill, step.assignedAgentName, step.role,
-    typeof step.description === "string" ? step.description : "",
-    Array.isArray(step.requiredSkills) ? step.requiredSkills.join(" ") : "",
-  ].filter(Boolean).join(" ").toLowerCase();
-  if (!haystack) return "content";
-  // Visual checks run BEFORE strategic — a "visual brand book" step is a
-  // visual delivery, not a strategy doc.
-  if (VIDEO_KEYWORDS.some((kw) => haystack.includes(kw))) return "video";
-  if (IMAGE_KEYWORDS.some((kw) => haystack.includes(kw))) return "image";
-  return STRATEGIC_KEYWORDS.some((kw) => haystack.includes(kw)) ? "strategic" : "content";
-}

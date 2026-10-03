@@ -107,18 +107,6 @@ export function resolveDerive(
   return null;
 }
 
-/** Resolve all inputs for a task. */
-export function resolveTaskInputs(
-  ctx: any,
-  inputs: Array<{ key: string; derive?: ResolverInputDerive }>,
-): Record<string, ResolvedDerive | null> {
-  const out: Record<string, ResolvedDerive | null> = {};
-  for (const it of inputs) {
-    out[it.key] = resolveDerive(ctx, it.derive);
-  }
-  return out;
-}
-
 /**
  * Convert `contextSources` paths into human-readable chips for the
  * "我會用 X 來跑這個任務" confirmation strip. Filters out paths that

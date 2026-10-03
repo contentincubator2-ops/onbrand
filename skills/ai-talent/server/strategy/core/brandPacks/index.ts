@@ -76,16 +76,6 @@ export function findPackOrchestraConfig(taskId: string): OrchestraConfig | null 
 }
 
 /**
- * 這張 task id 是否為某個 pack 的專屬卡 —— 專屬卡不得出現在其他品牌的目錄。
- *
- * 只算 kind:"custom"。kind:"ref" 指向的本來就是全域卡，它在全域目錄裡是
- * 公開的，pack 只是把它收進來並改個標題，不該因此對別人隱藏。
- */
-export function isPackTaskId(taskId: string): boolean {
-  return findPackTemplate(taskId) !== null;
-}
-
-/**
  * 把 pack 展開成 listFB 要回傳的卡片形狀。
  *
  * `globalById` 是全域目錄（id → 卡片物件），供 kind:"ref" 的卡沿用。
