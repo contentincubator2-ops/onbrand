@@ -21,7 +21,7 @@
  */
 
 import { z } from "zod";
-import { router, protectedProcedure } from "../../platform/core/trpc";
+import { router, protectedProcedure, adminProcedure } from "../../platform/core/trpc";
 import { assertTaskAllowed, type TaskGateInfo } from "../../platform/core/planGate";
 import { normalizeTaskId, legacyTaskId } from "../../platform/core/tierCompat";
 import { TRPCError } from "@trpc/server";
@@ -388,9 +388,9 @@ export const squadTemplateRouter = router({
   // This is the canonical filter; existing listByBrand is kept for
   // back-compat but new callers should use listForFront.
   // ── Admin procedures (CJ direction 2026-04-30) ──────────────────────────
-  // /admin/squads SquadLabPage uses these. No role gate yet — any logged-in
-  // user can see drafts; tighten when role system lands.
-  listForAdmin: protectedProcedure
+  // /admin/squads SquadLabPage uses these. Gated by adminProcedure
+  // (users.role = 'admin').
+  listForAdmin: adminProcedure
     .input(z.object({
       status: z.enum(["draft", "approved", "all"]).default("all"),
       tier: z.enum(["core", "defer", "kill", "all"]).default("all"),
@@ -427,7 +427,7 @@ export const squadTemplateRouter = router({
     }),
 
   // Get single squad with full step + agent detail for the lab detail pane.
-  getForAdmin: protectedProcedure
+  getForAdmin: adminProcedure
     .input(z.object({ id: z.number() }))
     .query(async ({ input }) => {
       const [rows] = await localPool.execute(
@@ -456,7 +456,7 @@ export const squadTemplateRouter = router({
       return { ...row, agents: agentsRaw, steps: stepsRaw, agentMap };
     }),
 
-  approve: protectedProcedure
+  approve: adminProcedure
     .input(z.object({ id: z.number(), note: z.string().max(500).optional() }))
     .mutation(async ({ ctx, input }) => {
       await localPool.execute(
@@ -467,7 +467,7 @@ export const squadTemplateRouter = router({
     }),
 
   /** Soft reject — flips is_approved=0, leaves squad active so admin can edit. */
-  reject: protectedProcedure
+  reject: adminProcedure
     .input(z.object({ id: z.number(), reason: z.string().max(500).optional() }))
     .mutation(async ({ input }) => {
       await localPool.execute(
@@ -494,7 +494,7 @@ export const squadTemplateRouter = router({
    *   - parsed (best-effort JSON parse; null if LLM didn't comply)
    *   - mockupData (per outputKind, shape ready for mockup component)
    */
-  runStepLive: protectedProcedure
+  runStepLive: adminProcedure
     .input(z.object({
       squadId: z.number(),
       stepIndex: z.number().int().min(0).max(20),

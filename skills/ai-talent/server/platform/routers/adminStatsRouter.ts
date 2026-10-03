@@ -19,6 +19,7 @@ import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { router, adminProcedure } from "../core/trpc";
 import { addPoints } from "../core/pointsService";
+import { computeProofMetrics } from "../core/proofMetrics";
 import { pushSystemSupportMessage } from "./supportRouter";
 
 const n = (v: any) => Number(v ?? 0);
@@ -306,6 +307,11 @@ export const adminStatsRouter = router({
   }),
 
   /** LLM usage + cost rollup. */
+  /** Citable numbers (each with its N) for award entries and sales decks. */
+  proofMetrics: adminProcedure
+    .input(z.object({ days: z.number().int().min(1).max(365).default(30) }).optional())
+    .query(({ input }) => computeProofMetrics(input?.days ?? 30)),
+
   usageCost: adminProcedure.query(async () => {
     const { default: localPool } = await import("../../localDb");
 

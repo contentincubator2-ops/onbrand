@@ -39,7 +39,9 @@ export const opsRouter = router({
       message: z.string().max(500),
       stack: z.string().max(4000).optional(),
       fingerprint: z.string().max(64).optional(),
-      meta: z.record(z.string(), z.any()).optional(),
+      // Public endpoint: bound the serialized size so one call can't store megabytes.
+      meta: z.record(z.string(), z.any()).optional()
+        .refine((m) => !m || JSON.stringify(m).length <= 8000, "meta too large"),
     }))
     .mutation(async ({ ctx, input }) => {
       // Flood guard (see note above): cap DB writes per rolling minute.
