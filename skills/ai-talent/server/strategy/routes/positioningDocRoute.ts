@@ -36,6 +36,7 @@ import { promisify } from "util";
 import { promises as fs } from "fs";
 import { join, resolve, basename } from "path";
 import { randomUUID } from "crypto";
+import { OLE_MAGIC, docToText, pptToMarkdown, ocrPdf } from "./positioningDocOcrLegacy";
 import { getJwtSecret } from "../../platform/core/env";
 import localPool from "../../localDb";
 import {
@@ -51,7 +52,7 @@ const STORAGE_ROOT =
 // 品牌手冊偶爾夾整本 CI 手冊的圖，40MB 是實務上界；抽取器只讀文字，圖不影響。
 const MAX_BYTES = 40 * 1024 * 1024;
 const EXTRACT_TIMEOUT_MS = 90_000;
-const ALLOWED_EXT = [".docx", ".pptx", ".pdf", ".md", ".markdown", ".txt", ".html", ".htm"];
+const ALLOWED_EXT = [".docx", ".doc", ".pptx", ".ppt", ".xlsx", ".pdf", ".md", ".markdown", ".txt", ".html", ".htm"];
 
 // ── auth（與 reportTemplateRoute 同一套；express 路由不能丟 TRPCError）──
 async function userIdOf(req: Request): Promise<number | null> {
@@ -146,21 +147,106 @@ async function resolveScope(
 }
 
 /** 跑 python 抽取器。失敗要說出壞在哪 —— 靜靜回空結構比壞掉更糟。 */
-async function extractFile(path: string): Promise<{
+/** 副檔名與檔頭對不上就早退，別讓抽取器去炸。回傳錯誤訊息，沒問題回 null。 */
+function checkFileHeader(ext: string, body: Buffer): string | null {
+  if ([".docx", ".pptx", ".xlsx"].includes(ext) && !(body[0] === 0x50 && body[1] === 0x4b)) {
+    return `${ext} 的 zip 檔頭不對 — 檔案可能損毀或副檔名寫錯`;
+  }
+  if ([".doc", ".ppt"].includes(ext) && !OLE_MAGIC.every((b, i) => body[i] === b)) {
+    return `${ext} 的檔頭不對 — 檔案可能損毀、已加密，或其實是 .${ext === ".doc" ? "docx" : "pptx"}（請改副檔名）`;
+  }
+  if (ext === ".pdf" && body.subarray(0, 5).toString("latin1") !== "%PDF-") {
+    return "PDF 檔頭不對 — 檔案可能損毀或副檔名寫錯";
+  }
+  return null;
+}
+
+type ExtractedDoc = {
   name: string; kind: string; chars: number;
   sections: { level: number; heading: string; body: string }[]; text: string;
-}> {
+};
+
+async function runExtractor(path: string): Promise<ExtractedDoc> {
   const script = join(process.cwd(), "scripts", "positioning", "extract_doc.py");
-  const { stdout } = await promisify(execFile)(
-    process.env.PYTHON_BIN ?? "python3",
-    [script, path],
-    { timeout: EXTRACT_TIMEOUT_MS, maxBuffer: 32 * 1024 * 1024 },
-  );
+  let stdout: string;
+  try {
+    ({ stdout } = await promisify(execFile)(
+      process.env.PYTHON_BIN ?? "python3",
+      [script, path],
+      { timeout: EXTRACT_TIMEOUT_MS, maxBuffer: 32 * 1024 * 1024 },
+    ));
+  } catch (err: any) {
+    // 抽取器逐檔回報錯誤時 exit 1，但 JSON 在 stdout；execFile 只會丟
+    // 「Command failed: <指令>」，真正原因被吞掉。先撈 stdout，再退到 stderr。
+    let reason = "";
+    try { reason = JSON.parse(String(err?.stdout || "{}")).errors?.[0]?.error || ""; } catch { /* 不是 JSON */ }
+    if (!reason) reason = String(err?.stderr || "").trim().split("\n").slice(-3).join(" ");
+    throw new Error(reason || String(err?.message || err));
+  }
   const parsed = JSON.parse(stdout);
   if (parsed.errors?.length) throw new Error(parsed.errors[0].error || "抽取失敗");
   const doc = parsed.docs?.[0];
   if (!doc) throw new Error("抽取器沒有回傳內容");
   return doc;
+}
+
+/** 純文字 → 暫存 .txt/.md → 同一支抽取器切段。kind 由呼叫端指定（pdf / doc / ppt）。 */
+async function sectionFromText(srcPath: string, text: string, ext: ".txt" | ".md", kind: string): Promise<ExtractedDoc> {
+  const tmp = srcPath.replace(/.[^.]+$/, "") + `.fromtext${ext}`;
+  assertInsideStorage(tmp);
+  await fs.writeFile(tmp, text, "utf-8");
+  try {
+    const doc = await runExtractor(tmp);
+    return { ...doc, name: basename(srcPath), kind };
+  } finally {
+    await fs.unlink(tmp).catch(() => {});
+  }
+}
+
+/** 機器沒有 pdftotext 時的 PDF 備援：純 JS 取字。 */
+async function pdfTextWithoutPoppler(path: string): Promise<string> {
+  const { extractText, getDocumentProxy } = await import("unpdf");
+  const pdf = await getDocumentProxy(new Uint8Array(await fs.readFile(path)));
+  const { text: rawText } = await extractText(pdf, { mergePages: true });
+  // 部分 PDF 的字型把常用字對到「康熙部首」區（⼼ ⼀ ⾷），肉眼一樣、字碼不同，
+  // 會讓後面的比對與搜尋全部落空。pdftotext 會自動轉回來，這裡補上同樣的事。
+  // 只轉部首區，不能整段 NFKC —— 那會把全形標點「，」變成半形「,」。
+  return rawText.replace(/[⺀-⿟]/g, (c) => c.normalize("NFKC"));
+}
+
+const EMPTY_PDF = /一個字都沒有/;
+
+export async function extractFile(path: string): Promise<ExtractedDoc> {
+  if (/.doc$/i.test(path)) {
+    const text = (await docToText(path)).trim();
+    if (!text) throw new Error("這份 .doc 讀得到但一個字都沒有 — 可能是空白文件或只有圖片");
+    return sectionFromText(path, text, ".txt", "doc");
+  }
+  if (/.ppt$/i.test(path)) {
+    const md = (await pptToMarkdown(path)).trim();
+    if (!md) throw new Error("這份 .ppt 讀得到但一個字都沒有 — 可能全是圖片（請改上傳 .pdf 讓系統做文字辨識）");
+    return sectionFromText(path, md, ".md", "ppt");
+  }
+
+  let pdfFallbackText: string | null = null;
+  try {
+    return await runExtractor(path);
+  } catch (err: any) {
+    const msg = String(err?.message);
+    if (!/.pdf$/i.test(path)) throw err;
+    if (/pdftotext/.test(msg)) {
+      pdfFallbackText = await pdfTextWithoutPoppler(path);
+    } else if (!EMPTY_PDF.test(msg)) {
+      throw err;
+    }
+  }
+
+  // 走到這裡一定是 PDF：不是 pdftotext 缺席（已有備援文字），就是 pdftotext 回空＝掃描檔。
+  if (pdfFallbackText?.trim()) return sectionFromText(path, pdfFallbackText, ".txt", "pdf");
+  const ocr = (await ocrPdf(path)).trim();
+  if (!ocr) throw new Error("PDF 沒有文字層，文字辨識（OCR）也認不出內容 — 請確認掃描清晰度，或改貼上文字");
+  const doc = await sectionFromText(path, ocr, ".txt", "pdf");
+  return { ...doc, kind: "pdf-ocr" };
 }
 
 /** 抽取結果落地：完整版進磁碟，輕量大綱進 positioning JSON。 */
@@ -216,13 +302,8 @@ positioningDocRouter.post(
       res.status(400).json({ error: `不支援 ${ext || "(無副檔名)"} — 可用 ${ALLOWED_EXT.join(" / ")}` });
       return;
     }
-    // .docx / .pptx 是 zip；magic bytes 對不上就早退，別讓 python 去炸。
-    if ((ext === ".docx" || ext === ".pptx") && !(body[0] === 0x50 && body[1] === 0x4b)) {
-      res.status(400).json({ error: `${ext} 的 zip 檔頭不對 — 檔案可能損毀或副檔名寫錯` }); return;
-    }
-    if (ext === ".pdf" && body.subarray(0, 5).toString("latin1") !== "%PDF-") {
-      res.status(400).json({ error: "PDF 檔頭不對 — 檔案可能損毀或副檔名寫錯" }); return;
-    }
+    const badHeader = checkFileHeader(ext, body);
+    if (badHeader) { res.status(400).json({ error: badHeader }); return; }
 
     const docId = randomUUID();
     const dir = scopeDir(ctx.scope, ctx.scopeId);
@@ -274,12 +355,8 @@ positioningDocRouter.post(
       res.status(400).json({ error: `不支援 ${ext || "(無副檔名)"} — 可用 ${ALLOWED_EXT.join(" / ")}` });
       return;
     }
-    if ((ext === ".docx" || ext === ".pptx") && !(body[0] === 0x50 && body[1] === 0x4b)) {
-      res.status(400).json({ error: `${ext} 的 zip 檔頭不對 — 檔案可能損毀或副檔名寫錯` }); return;
-    }
-    if (ext === ".pdf" && body.subarray(0, 5).toString("latin1") !== "%PDF-") {
-      res.status(400).json({ error: "PDF 檔頭不對 — 檔案可能損毀或副檔名寫錯" }); return;
-    }
+    const badHeader = checkFileHeader(ext, body);
+    if (badHeader) { res.status(400).json({ error: badHeader }); return; }
 
     const dir = scopeDir(ctx.scope, ctx.scopeId);
     assertInsideStorage(dir);
