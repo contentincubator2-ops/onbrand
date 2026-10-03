@@ -20,7 +20,7 @@ import { trpc } from "../../../lib/trpc";
 import { useLang } from "../../../lib/i18n";
 import type { ShellOutletCtx } from "../../app/shell/ShellLayout";
 import { isStrategyPreviewEmail, isPersonaPreviewEmail } from "../../app/shell/ShellLayout";
-import { Avatar, Button, Card, CardBody, Chip, Input, Textarea, Spinner, Select, SelectItem, CheckboxGroup, Checkbox } from "@heroui/react";
+import { Avatar, Button, Card, CardBody, Chip, Input, Textarea, Spinner, Select, SelectItem, CheckboxGroup, Checkbox, Modal, ModalContent, ModalHeader, ModalBody } from "@heroui/react";
 import SegmentEditor from "../components/positioning/SegmentEditor";
 import ThinkingOverlay from "../components/positioning/ThinkingOverlay";
 import PipelineRunner, { type PipelineState } from "../components/positioning/PipelineRunner";
@@ -701,6 +701,8 @@ export default function BrandsPage() {
 
   // Product detail modal
   const [productDetailId, setProductDetailId] = useState<number | null>(null);
+  // 2026-10-03：產品卡「上傳定位」開的視窗（PositioningDocPanel 的 product scope）。
+  const [productDocId, setProductDocId] = useState<number | null>(null);
 
   const prodRemoveMut  = (trpc as any).product?.remove?.useMutation?.({ onSuccess: () => brandProductsQ?.refetch?.() });
   const prodStartMut   = (trpc as any).positioningJobs?.start?.useMutation?.();
@@ -2421,6 +2423,7 @@ export default function BrandsPage() {
                 onOpen={(id) => setProductDetailId(id)}
                 onDelete={(id) => prodRemoveMut?.mutate?.({ id })}
                 onPosition={(id) => kickReposition("product", id, brandProductsList?.find((p: any) => p.id === id)?.name)}
+                onUpload={(id) => setProductDocId(id)}
                 runningIds={posRunning.product}
                 progressMap={posProgress}
               />
@@ -2479,6 +2482,34 @@ export default function BrandsPage() {
           same screen corner. Same actions are reachable from the
           BrandHierarchyPill 「+ 新增品牌 / 產品 / 活動」 menu top-left.
           AddEntityModal is still mounted below (other triggers fire it). */}
+
+      {/* 2026-10-03（CJ「策略層的產品定位，每個產品也要能讓用戶上傳定位文件或純文字」）：
+          產品卡的「上傳定位」。後端 positioningDocs 本來就支援 product scope，這裡只是把
+          既有的 PositioningDocPanel 掛進視窗，不另寫第二套上傳流程。 */}
+      <Modal
+        isOpen={productDocId != null}
+        onClose={() => { setProductDocId(null); brandProductsQ?.refetch?.(); }}
+        size="3xl"
+        scrollBehavior="inside"
+      >
+        <ModalContent>
+          <ModalHeader className="text-base font-semibold">
+            {lang === "en" ? "Upload product positioning" : "上傳產品定位"}
+            {" · "}
+            {brandProductsList?.find((p: any) => p.id === productDocId)?.name ?? ""}
+          </ModalHeader>
+          <ModalBody className="pb-6">
+            {productDocId != null && (
+              <PositioningDocPanel
+                scopeMode="product"
+                scopeId={productDocId}
+                scopeName={brandProductsList?.find((p: any) => p.id === productDocId)?.name ?? ""}
+                onBackToOverview={() => { setProductDocId(null); brandProductsQ?.refetch?.(); }}
+              />
+            )}
+          </ModalBody>
+        </ModalContent>
+      </Modal>
 
       {/* ProductDetailModal — 點選產品卡片時開啟 */}
       {productDetailId && activeBrandIdForLocks && (
@@ -5144,7 +5175,7 @@ function ProductCardThumbnail({ imageUrl, name, en }: { imageUrl?: string; name:
  * 這裡原本 product／event 兩用的分支拿掉，只剩產品。
  */
 function BrandEntityGrid({
-  items, isLoading, lang, onAdd, onOpen, onDelete, onPosition,
+  items, isLoading, lang, onAdd, onOpen, onDelete, onPosition, onUpload,
   runningIds, progressMap,
 }: {
   items: any[];
@@ -5154,6 +5185,8 @@ function BrandEntityGrid({
   onOpen: (id: number) => void;
   onDelete: (id: number) => void;
   onPosition: (id: number) => void;
+  /** 2026-10-03（CJ「每個產品也要能上傳定位文件或純文字」）：有傳才顯示「上傳定位」。 */
+  onUpload?: (id: number) => void;
   /** 2026-07-24: entity ids with a positioning pipeline in flight. */
   runningIds?: number[];
   /** id-keyed (`product:id`) progress labels, e.g. "3/6". */
@@ -5313,6 +5346,15 @@ function BrandEntityGrid({
                       </button>
                     );
                   })()}
+                  {onUpload && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); onUpload(item.id); }}
+                      className="text-[12px] font-medium px-2 py-1 rounded-md bg-zinc-50 text-zinc-700 hover:bg-zinc-100 transition"
+                      title={en ? "Upload a positioning document or paste text" : "上傳定位文件，或直接貼上文字"}
+                    >
+                      {en ? "Upload" : "上傳定位"}
+                    </button>
+                  )}
                   {/* Open */}
                   <button
                     onClick={(e) => { e.stopPropagation(); onOpen(item.id); }}
