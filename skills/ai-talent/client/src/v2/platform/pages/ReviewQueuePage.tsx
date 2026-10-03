@@ -20,6 +20,7 @@ import { useLang } from "../../../lib/i18n";
 import { showToastGlobal } from "../components/Toast";
 import { ChevronLeftIcon, DoneIcon, InboxIcon, SendBackIcon, WaitingIcon, WarningIcon } from "../components/icons";
 import { HelpTip } from "../components/HelpTip";
+import { friendlyError } from "../lib/friendlyError";
 
 type Tab = "pending" | "mine";
 
@@ -73,7 +74,7 @@ export default function ReviewQueuePage() {
       showToastGlobal(isEn ? "Approved" : "已放行");
       refresh();
     },
-    onError: (e: any) => showToastGlobal(e?.message ?? (isEn ? "Failed" : "放行失敗")),
+    onError: (e: any) => showToastGlobal(friendlyError(e, isEn ? "Couldn't approve. Please try again." : "放行沒成功，再試一次。"), "error"),
   });
   const reviseMut = (trpc as any).review.requestRevision.useMutation({
     onSuccess: () => {
@@ -82,15 +83,17 @@ export default function ReviewQueuePage() {
       setNote("");
       refresh();
     },
-    onError: (e: any) => showToastGlobal(e?.message ?? (isEn ? "Failed" : "退回失敗")),
+    onError: (e: any) => showToastGlobal(friendlyError(e, isEn ? "Couldn't send back. Please try again." : "退回沒成功，再試一次。"), "error"),
   });
 
   const rows: any[] = (tab === "pending" ? pending.data : mine.data) ?? [];
   const loading = tab === "pending" ? pending.isLoading : mine.isLoading;
+  const failed = !!(tab === "pending" ? pending.isError : mine.isError);
 
   return (
     <div className="mx-auto w-full max-w-4xl px-5 py-6">
       <button
+        type="button"
         onClick={() => navigate(-1)}
         className="mb-4 inline-flex items-center gap-1 text-[14px] text-default-500 hover:text-default-800"
       >
@@ -107,10 +110,12 @@ export default function ReviewQueuePage() {
         </HelpTip>
       </h1>
 
-      <div className="mt-5 flex gap-1 border-b border-default-200">
+      <div role="tablist" aria-label={isEn ? "Review lists" : "審核清單"} className="mt-5 flex gap-1 border-b border-default-200">
         {(["pending", "mine"] as Tab[]).map((t) => (
           <button
             key={t}
+            role="tab"
+            aria-selected={tab === t}
             onClick={() => setTab(t)}
             className={`px-4 py-2 text-[14px] font-medium transition ${
               tab === t
@@ -122,7 +127,7 @@ export default function ReviewQueuePage() {
               ? (isEn ? "Waiting on me" : "等我放行")
               : (isEn ? "Sent by me" : "我送出的")}
             {t === "pending" && (pending.data?.length ?? 0) > 0 && (
-              <span className="ml-2 rounded-full bg-rose-500 px-1.5 py-0.5 text-[12px] font-semibold text-white">
+              <span aria-label={isEn ? `${pending.data.length} waiting` : `${pending.data.length} 件待放行`} className="ml-2 rounded-full bg-rose-600 px-1.5 py-0.5 text-[12px] font-semibold text-white">
                 {pending.data.length}
               </span>
             )}
@@ -130,13 +135,20 @@ export default function ReviewQueuePage() {
         ))}
       </div>
 
+      {failed && !loading && (
+        <p role="alert" className="mt-4 flex items-center gap-3 rounded-xl border border-default-200 px-4 py-3 text-[14px] text-default-800">
+          {isEn ? "The list didn't load." : "清單沒載入。"}
+          <button type="button" onClick={refresh} className="rounded-full border border-default-300 px-3 py-1 text-[13px] font-semibold">{isEn ? "Retry" : "重試"}</button>
+        </p>
+      )}
+
       {loading && (
-        <p className="py-10 text-center text-[14px] text-default-400">
+        <p role="status" aria-live="polite" className="py-10 text-center text-[14px] text-default-600">
           {isEn ? "Loading…" : "載入中…"}
         </p>
       )}
 
-      {!loading && rows.length === 0 && (
+      {!loading && !failed && rows.length === 0 && (
         <IllustratedEmpty
           kind="review"
           title={tab === "pending"
@@ -157,9 +169,9 @@ export default function ReviewQueuePage() {
               )}
               <StatusChip status={r.status} isEn={isEn} />
               {r.platform && (
-                <span className="text-[13px] text-default-400">{r.platform}</span>
+                <span className="text-[13px] text-default-600">{r.platform}</span>
               )}
-              <span className="ml-auto inline-flex items-center gap-1 text-[13px] text-default-400">
+              <span className="ml-auto inline-flex items-center gap-1 text-[13px] text-default-600">
                 <WaitingIcon size={13} />
                 {new Date(r.createdAt).toLocaleDateString()}
               </span>
@@ -205,6 +217,7 @@ export default function ReviewQueuePage() {
             {revising === r.id && (
               <div className="mt-3">
                 <textarea
+                  aria-label={isEn ? "What needs to change?" : "要改什麼？"}
                   value={note}
                   onChange={(e) => setNote(e.target.value)}
                   rows={2}

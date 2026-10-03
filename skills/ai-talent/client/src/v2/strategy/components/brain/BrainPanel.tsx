@@ -12,6 +12,7 @@
  * 資料：brandKnowledge.memory（server/strategy/core/brand/brandMemory.ts），用量的算法見 memoryModel.ts。
  * 顏色只表達狀態（快滿＝琥珀、滿了＝紅），其餘一律灰階。
  */
+import { HelpTip } from "../../../platform/components/HelpTip";
 import { useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
@@ -115,8 +116,11 @@ function Home({ view, en, T, onOpen }: { view: MemoryView; en: boolean; T: (k: S
         <div className="w-full flex-1 text-center sm:text-left">
           <div className="flex items-baseline justify-center gap-1 font-semibold tabular-nums text-neutral-900 sm:justify-start" style={{ letterSpacing: "-0.03em" }}>
             <span className="text-[56px] leading-none">{pct}</span>
-            <span className="text-[22px] text-neutral-400">%</span>
+            <span className="text-[22px] text-neutral-500">%</span>
             <span className="ml-3 text-[14px] font-semibold tracking-normal" style={{ color: tone }}>{state}</span>
+            <HelpTip>{en
+              ? "This is the one Brand Brain every writer reads — and the post-write checker reviews each draft against it."
+              : "這是所有寫手共用的同一顆品牌大腦，寫完之後的檢查也是拿它來對照每一篇。"}</HelpTip>
           </div>
           <div className="mt-2 text-[13px] tabular-nums text-neutral-500">
             {en ? `${fmtChars(view.usedChars)} of ${fmtChars(view.capacity)} characters` : `已用 ${fmtChars(view.usedChars)}／${fmtChars(view.capacity)} 字`}
@@ -150,7 +154,7 @@ function Tile({ icon, title, used, capacity, sub, en, onClick }: {
       className="flex aspect-[5/4] flex-col items-center justify-center rounded-2xl bg-neutral-100 px-3 text-center transition-colors hover:bg-neutral-200">
       <FontAwesomeIcon icon={icon} className="text-[26px] text-neutral-900" />
       <span className="mt-3 max-w-full truncate text-[14px] font-semibold text-neutral-900">{title}</span>
-      <span className="mt-0.5 text-[12px] tabular-nums text-neutral-500">
+      <span className="mt-0.5 text-[12px] tabular-nums text-neutral-600">
         {used > 0 ? `${fmtChars(used)} ${en ? "chars" : "字"}` : (sub ?? (en ? "Empty" : "空的"))}
         {used > 0 && sub ? ` · ${sub}` : ""}
       </span>

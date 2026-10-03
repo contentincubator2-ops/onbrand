@@ -17,6 +17,7 @@ import { useLang } from "../../../lib/i18n";
 import { showToastGlobal } from "../../platform/components/Toast";
 import { TaskCardShell, TaskCardAvatar } from "../../platform/components/TaskCardShell";
 import { campaignPrefill } from "../lib/campaignIntakePrefill";
+import { friendlyError } from "../../platform/lib/friendlyError";
 import { toastWithUpgrade } from "../../platform/lib/upgradeToast";
 import { matchTaskWithSynonyms } from "../lib/taskSearchSynonyms";
 import {
@@ -138,7 +139,7 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
   const [imagePickerOpen, setImagePickerOpen] = useState(false);
   const setImageTrayMut = trpc.imageCard.setTray.useMutation({
     onSuccess: () => { setImagePickerOpen(false); imageTrayQ.refetch(); },
-    onError: (e) => toastWithUpgrade(e?.message ?? "儲存失敗", lang === "en"),
+    onError: (e) => toastWithUpgrade(friendlyError(e, lang === "en" ? "Couldn't save. Please try again." : "儲存沒成功，再試一次。"), lang === "en"),
   });
   /** 實際擺出來的圖片卡。還沒載入托盤（或沒有品牌）時先只擺預設的兩張，不閃出全部。 */
   const shownImageCards = useMemo(() => {
@@ -722,7 +723,7 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
 
   const setTrayMut = (trpc as any).quickTask?.setTray?.useMutation?.({
     onSuccess: () => { setPickerOpen(false); trayQuery.refetch?.(); },
-    onError: (e: any) => toastWithUpgrade(e?.message ?? "儲存失敗", lang === "en"),
+    onError: (e: any) => toastWithUpgrade(friendlyError(e, lang === "en" ? "Couldn't save. Please try again." : "儲存沒成功，再試一次。"), lang === "en"),
   });
 
   /** 這個通路實際擺出來的卡 id。存過的要跟「現在看得到的」取交集 —— 降級
@@ -1087,7 +1088,7 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
       setEditingChip(null);
       setEditValue("");
     } catch (e: any) {
-      setErrorMsg(lang === "en" ? `Couldn't save: ${e?.message ?? e}` : `儲存失敗：${e?.message ?? e}`);
+      setErrorMsg(friendlyError(e, lang === "en" ? "Couldn't save. Please try again." : "儲存沒成功，再試一次。"));
     }
   };
 
@@ -1290,7 +1291,7 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
         : "這個任務還在開發中，請改試其他任務。");
     } catch (e: any) {
       if (!isStale()) {
-        const msg = e?.message ?? String(e);
+        const msg = friendlyError(e, lang === "en" ? "Something went wrong. Please try again." : "剛剛沒成功，再試一次。");
         setErrorMsg(msg);
         // The errorMsg card sits at the bottom of the modal body — toast it
         // too, so a server-side rejection (e.g. the viral-source guard on a
@@ -1418,7 +1419,7 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
               isClearable
               onClear={() => setSearchQuery("")}
               startContent={
-                <FontAwesomeIcon icon={faMagnifyingGlass} className="text-default-400 shrink-0" style={{ fontSize: 16 }} />
+                <FontAwesomeIcon icon={faMagnifyingGlass} className="text-default-600 shrink-0" style={{ fontSize: 16 }} />
               }
               classNames={{
                 base: "overflow-hidden rounded-[18px]",
@@ -1560,7 +1561,7 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
           })()}
 
           {/* Task count micro-label */}
-          {!imageMode && <div className="mt-3 text-tiny text-default-400">
+          {!imageMode && <div className="mt-3 text-tiny text-default-600">
             {lang === "en"
               ? `${visibleTasks.length} of ${totalForPlatform} tasks`
               : `${visibleTasks.length} / ${totalForPlatform} 個任務`}
@@ -1913,7 +1914,7 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                         </div>
                       )}
                       {(task as any).methodology && (
-                        <span className="text-[12px] text-default-400 italic inline-flex items-center gap-1"><LibraryIcon size={11} /> {(task as any).methodology}</span>
+                        <span className="text-[12px] text-default-600 italic inline-flex items-center gap-1"><LibraryIcon size={11} /> {(task as any).methodology}</span>
                       )}
                       <div className="mt-auto pt-2 flex items-center gap-2 border-t border-default-100">
                         <Avatar src={avatarSrc} size="sm" className="w-5 h-5" />
@@ -2361,7 +2362,7 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                           opts.active
                             ? "bg-neutral-900 text-white"
                             : opts.missing
-                            ? "border border-dashed border-default-300 text-default-400 group-hover:border-default-500"
+                            ? "border border-dashed border-default-300 text-default-600 group-hover:border-default-500"
                             : "bg-default-100 text-neutral-800 group-hover:bg-default-200"
                         }`}>
                           <Icon name={icon} size={16} />
@@ -2369,7 +2370,7 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                             <span className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-emerald-500" />
                           )}
                         </span>
-                        <span className={`w-full truncate text-center text-[11px] leading-tight ${opts.missing ? "text-default-400" : "text-default-600"}`}>{short}</span>
+                        <span className={`w-full truncate text-center text-[11px] leading-tight ${opts.missing ? "text-default-600" : "text-default-600"}`}>{short}</span>
                       </button>
                     </Tooltip>
                   );
@@ -2523,12 +2524,12 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                             {!editing && (
                               <p className="text-small text-default-800 whitespace-pre-wrap leading-relaxed m-0">
                                 {openChip.hasContent ? openChip.text : (
-                                  <span className="text-default-400">{lang === "en" ? "Not filled yet." : "尚未填寫。"}</span>
+                                  <span className="text-default-600">{lang === "en" ? "Not filled yet." : "尚未填寫。"}</span>
                                 )}
                               </p>
                             )}
                             {!editable && (
-                              <p className="text-[12px] text-default-400 mt-1.5 m-0">
+                              <p className="text-[12px] text-default-600 mt-1.5 m-0">
                                 {lang === "en" ? "Edit this one in the full positioning editor." : "這一項請到定位頁完整編輯。"}
                               </p>
                             )}
@@ -2536,7 +2537,7 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                               <>
                                 {siblings.length > 0 && (
                                   <div className="flex flex-wrap gap-1 mb-1.5">
-                                    <span className="text-[12px] text-default-400 self-center">
+                                    <span className="text-[12px] text-default-600 self-center">
                                       {lang === "en" ? "Pick:" : "可選用："}
                                     </span>
                                     {siblings.map((s) => (
@@ -2558,7 +2559,7 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                                   autoFocus
                                   placeholder={lang === "en" ? "Type or rewrite…" : "輸入或改寫…"}
                                 />
-                                <p className="text-[12px] text-default-400 mt-1">
+                                <p className="text-[12px] text-default-600 mt-1">
                                   {lang === "en"
                                     ? `Saves to this ${editSaveTarget?.kind ?? "brand"}'s positioning.`
                                     : `會更新此${editSaveTarget?.kind === "product" ? "產品" : editSaveTarget?.kind === "event" ? "活動" : "品牌"}的定位。`}
@@ -2620,7 +2621,7 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                     <div className="flex flex-col items-center">
                       {primaryAnswer.trim() && (
                         <p className="self-stretch mt-2 mb-0 rounded-xl bg-default-100 px-3 py-2 text-tiny text-default-600 truncate">
-                          <Icon name="quote" size={10} className="mr-1.5 text-default-400" />
+                          <Icon name="quote" size={10} className="mr-1.5 text-default-600" />
                           {primaryAnswer.trim()}
                         </p>
                       )}
@@ -2643,7 +2644,7 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                                 className={`relative w-10 h-10 rounded-xl flex items-center justify-center transition ${
                                   p.status === "done" ? "bg-neutral-900 text-white"
                                   : p.status === "running" ? "bg-[#F37E4A]/10 text-[#F37E4A] ring-2 ring-[#F37E4A]/60 animate-pulse"
-                                  : "bg-default-100 text-default-400"
+                                  : "bg-default-100 text-default-600"
                                 }`}
                               >
                                 <Icon name={p.status === "done" ? "check" : p.icon} size={15} />
