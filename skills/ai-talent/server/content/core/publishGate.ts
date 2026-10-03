@@ -37,6 +37,29 @@ export async function isSoloUser(pool: Queryable, userId: number): Promise<boole
   }
 }
 
+/**
+ * May `actorId` publish a post that `ownerId` owns?
+ * The owner always may; otherwise the actor must be an owner/admin of a
+ * workspace the owner belongs to (same join as reviewRouter.canApprove). This
+ * only decides *who may press publish* — the approval gate still applies.
+ * Fails closed when the lookup errors. Viewer-role blocking is assertCanAct's job.
+ */
+export async function canPublishFor(pool: Queryable, actorId: number, ownerId: number): Promise<boolean> {
+  if (actorId === ownerId) return true;
+  try {
+    const [rows]: any = await pool.execute(
+      `SELECT 1 FROM workspace_members me
+         JOIN workspace_members own ON own.workspaceId = me.workspaceId
+        WHERE me.userId = ? AND me.role IN ('owner','admin') AND own.userId = ?
+        LIMIT 1`,
+      [actorId, ownerId],
+    );
+    return (rows as any[]).length > 0;
+  } catch {
+    return false;
+  }
+}
+
 /** ownerId: the user publishing (or owning the scheduled post); solo users skip review. */
 export async function outputApprovalState(pool: Queryable, outputId: number, ownerId?: number): Promise<ApprovalState> {
   if (ownerId && (await isSoloUser(pool, ownerId))) return "approved";

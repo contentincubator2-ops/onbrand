@@ -130,3 +130,33 @@ describe("publishViaBundleSocial", () => {
     expect(result).toEqual({ postId: null, permalink: null });
   });
 });
+
+describe("publishViaBundleSocial multi-media", () => {
+  it("uploads every carousel image and sends carouselItems", async () => {
+    const d = deps({ post: { id: "p", status: "SCHEDULED", externalData: { INSTAGRAM: { id: "ig1", permalink: "https://instagram.com/p/1" } } } });
+    d.uploadFromUrl.mockResolvedValueOnce({ id: "u1" }).mockResolvedValueOnce({ id: "u2" });
+    const r = await publishViaBundleSocial(
+      { brandId: 1, platform: "instagram", caption: "c", imageUrls: ["https://a/1.png", "https://a/2.png"], referenceKey: "k", now: NOW },
+      d,
+    );
+    expect(d.uploadFromUrl).toHaveBeenCalledTimes(2);
+    expect(d.createPost.mock.calls[0][0].data.INSTAGRAM.carouselItems).toEqual([{ uploadId: "u1" }, { uploadId: "u2" }]);
+    expect(r.postId).toBe("ig1");
+  });
+
+  it("validates before uploading so a doomed post leaves no orphan uploads", async () => {
+    const d = deps();
+    await expect(publishViaBundleSocial(
+      { brandId: 1, platform: "x", caption: "a".repeat(400), imageUrls: ["https://a/1.png"], referenceKey: "k", now: NOW },
+      d,
+    )).rejects.toThrow(/280/);
+    expect(d.uploadFromUrl).not.toHaveBeenCalled();
+    expect(d.createPost).not.toHaveBeenCalled();
+  });
+
+  it("publishes a Threads text post and reads externalData.THREADS", async () => {
+    const d = deps({ post: { id: "p", status: "SCHEDULED", externalData: { THREADS: { id: "t1", permalink: "https://threads.net/t1" } } } });
+    const r = await publishViaBundleSocial({ brandId: 1, platform: "threads", caption: "hi", referenceKey: "k", now: NOW }, d);
+    expect(r).toEqual({ postId: "t1", permalink: "https://threads.net/t1" });
+  });
+});

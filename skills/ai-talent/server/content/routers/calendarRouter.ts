@@ -19,7 +19,9 @@ import {
 } from "../../platform/core/connectors/pipedreamFacebook";
 import { router, protectedProcedure } from "../../platform/core/trpc";
 import { assertCanAct, isHiddenHistoryItem } from "../../platform/core/billing/planGate";
-import { outputApprovalState, APPROVAL_BLOCK_MESSAGE } from "../core/publishGate";
+import { outputApprovalState, APPROVAL_BLOCK_MESSAGE, canPublishFor } from "../core/publishGate";
+import { friendlyPublishError } from "../core/publish/publishErrors";
+import { BundlePublishUserError } from "../../platform/core/connectors/publish/bundlePublish";
 import { getDb } from "../../db";
 import { sql } from "drizzle-orm";
 import { assertBrandOwner } from "../../platform/core/brandAuth";
@@ -33,6 +35,7 @@ import {
   contentSelectorFields,
   outputItemCaption,
   outputItemImageUrl,
+  outputItemMedia,
   requirePlanningConfirmation,
   resolveOutputContent,
   resolveStoredContentSelector,
@@ -157,8 +160,8 @@ export const calendarRouter = router({
       if (input.workspaceId) params.push(input.workspaceId);
 
       const [scheduled]: any = await localPool.execute(
-        `SELECT sp.id, sp.outputId, sp.variantIndex, sp.contentKind, sp.contentIndex, sp.platform,
-                sp.scheduledAt, sp.status, sp.publishedAt, sp.externalUrl,
+        `SELECT sp.id, sp.userId AS ownerId, sp.outputId, sp.variantIndex, sp.contentKind, sp.contentIndex, sp.platform,
+                sp.scheduledAt, sp.status, sp.publishedAt, sp.externalUrl, sp.lastError, sp.attempts,
                 sp.brandId, b.name AS brandName,
                 o.content AS outputContent, o.metadata AS outputMetadata,
                 m.title AS missionTitle, m.squadSlug AS missionSquadSlug,
@@ -224,6 +227,8 @@ export const calendarRouter = router({
             brandName: s.brandName,
             missionTitle: s.missionTitle,
             externalUrl: s.externalUrl,
+            lastError: s.lastError ? String(s.lastError) : null,
+            attempts: Number(s.attempts ?? 0),
             reviewStatus: s.reviewStatus ? String(s.reviewStatus) : null,
             contentKind: selector.contentKind ?? null,
             contentIndex: selector.contentIndex ?? null,
@@ -382,6 +387,37 @@ export async function publishScheduledPost(args: {
   confirmPlanningContent?: boolean;
   claimed?: boolean;
 }) {
+  try {
+    return await publishScheduledPostInner(args);
+  } catch (e: any) {
+    const code = e instanceof TRPCError ? e.code : "INTERNAL_SERVER_ERROR";
+    const friendly = friendlyPublishError(e);
+    // Record what went wrong on the row so the calendar can show it. Skipped
+    // for caller mistakes (permission, not found, not approved, already done);
+    // the worker writes its own lastError for claimed rows.
+    const callerMistake = ["BAD_REQUEST", "NOT_FOUND", "FORBIDDEN", "UNAUTHORIZED"].includes(code);
+    if (!args.claimed && !callerMistake) {
+      try {
+        const { default: localPool } = await import("../../localDb");
+        await localPool.execute(
+          `UPDATE scheduled_posts SET lastError = ?, attempts = attempts + 1 WHERE id = ? AND status = 'pending'`,
+          [friendly.slice(0, 1000), args.id],
+        );
+      } catch { /* the original error matters more */ }
+    }
+    if (friendly !== (e?.message ?? "")) {
+      throw new TRPCError({ code: code as any, message: friendly, cause: e });
+    }
+    throw e;
+  }
+}
+
+async function publishScheduledPostInner(args: {
+  id: number;
+  userId: number;
+  confirmPlanningContent?: boolean;
+  claimed?: boolean;
+}) {
   await assertCanAct(args.userId);   // 2026-09-07 viewer 只能看，不能發布／排程／建卡
   const { default: localPool } = await import("../../localDb");
 
@@ -397,16 +433,21 @@ export async function publishScheduledPost(args: {
      LEFT JOIN mission_outputs o ON o.id = sp.outputId
      LEFT JOIN missions m ON m.id = o.missionId
      LEFT JOIN brands b ON b.id = sp.brandId
-     WHERE sp.id = ? AND sp.userId = ? LIMIT 1`,
-    [args.id, args.userId],
+     WHERE sp.id = ? LIMIT 1`,
+    [args.id],
   );
   const row = (rows as any[])[0];
-  if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "排程不存在或無權限" });
+  // 2026-10-04: the owner, or an owner/admin of the owner's workspace, may publish.
+  // Same NOT_FOUND for both "missing" and "not yours" so ids can't be probed.
+  if (!row || !(await canPublishFor(localPool, args.userId, Number(row.ownerId)))) {
+    throw new TRPCError({ code: "NOT_FOUND", message: "排程不存在或無權限" });
+  }
+  const ownerId = Number(row.ownerId);
   if (row.status !== (args.claimed ? "publishing" : "pending")) {
     throw new TRPCError({ code: "BAD_REQUEST", message: "此貼文已發布或已取消，無法重複發布" });
   }
   // 2026-10-04：核准才能發布。審核中、被退回、從沒送審的稿都不能發（見 publishGate.ts）。
-  const approval = await outputApprovalState(localPool, Number(row.outputId), args.userId);
+  const approval = await outputApprovalState(localPool, Number(row.outputId), ownerId);
   if (approval !== "approved") {
     throw new TRPCError({ code: "BAD_REQUEST", message: APPROVAL_BLOCK_MESSAGE[approval] });
   }
@@ -444,7 +485,7 @@ export async function publishScheduledPost(args: {
   ) {
     await localPool.execute(
       `UPDATE scheduled_posts SET planningConfirmed = 1 WHERE id = ? AND userId = ?`,
-      [args.id, args.userId],
+      [args.id, ownerId],
     );
   }
   const caption = outputItemCaption(selected.item);
@@ -470,7 +511,7 @@ export async function publishScheduledPost(args: {
       });
     }
 
-    const bundleImageUrl = outputItemImageUrl(selected.item);
+    const bundleMedia = outputItemMedia(selected.item);
 
     try {
       const result = await publishViaBundleSocial(
@@ -478,7 +519,8 @@ export async function publishScheduledPost(args: {
           brandId: row.brandId,
           platform,
           caption,
-          imageUrl: bundleImageUrl,
+          imageUrls: bundleMedia.imageUrls,
+          videoUrl: bundleMedia.videoUrl,
           referenceKey: `onbrand-${row.id}`,
         },
         {
@@ -496,8 +538,8 @@ export async function publishScheduledPost(args: {
       permalink = result.permalink;
     } catch (e: any) {
       const message = e?.message ?? "bundle.social 發布失敗";
-      // "尚未連接" / "尚未支援" are user-fixable states, not server faults.
-      const userActionable = message.includes("尚未");
+      // "尚未連接" / "尚未支援" / media-rule violations are user-fixable states, not server faults.
+      const userActionable = e instanceof BundlePublishUserError || message.includes("尚未");
       throw new TRPCError({
         code: userActionable ? "PRECONDITION_FAILED" : "INTERNAL_SERVER_ERROR",
         message,
@@ -775,7 +817,7 @@ export async function publishScheduledPost(args: {
   try {
     await localPool.execute(
       `UPDATE scheduled_posts
-          SET status = 'published', publishedAt = NOW(3),
+          SET status = 'published', publishedAt = NOW(3), lastError = NULL,
               externalUrl = ?, externalPostId = ?
         WHERE id = ?`,
       [permalink, postId, args.id],
