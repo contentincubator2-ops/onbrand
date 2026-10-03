@@ -17,7 +17,6 @@ npm run test:watch    # 監聽模式
 |---------|------|
 | `server/tokenLedger.test.ts` | 計費計算邏輯（6個 test cases）（Sprint 1） |
 | `server/agentMatcher.test.ts` | Agent 匹配邏輯 + input validation（Sprint 2） |
-| `skills/market-intel/server/marketIntel.test.ts` | 市場情報格式化 + keyword 消毒（Sprint 2） |
 
 ### 加新測試
 
@@ -133,4 +132,3 @@ TARGET_URL=http://localhost:3001 k6 run tests/load/payment-flow.js
 | 問題 | 說明 | 預計修復 |
 |------|------|---------|
 | STAB-6 | `getCreativeCases()` 使用 `ORDER BY RAND()` | Sprint 4 |
-| QUAL-2 | `marketIntel.ts` 使用相對路徑 `../../ai-talent/server/db` | Sprint 3（monorepo workspace） |
