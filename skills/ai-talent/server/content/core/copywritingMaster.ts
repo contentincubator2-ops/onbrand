@@ -298,11 +298,6 @@ export function getCopywritingMasterPrompt(args: {
   ].join("\n");
 }
 
-/** Get just the persona one-liner, for compact contexts. */
-export function getMasterPersonaOnly(market: MarketCode = "zh-TW"): string {
-  return MASTERS[market]?.persona ?? MASTERS["zh-TW"].persona;
-}
-
 /**
  * 2026-07-17 (CJ 多市場): map a brand's outputLanguage (BCP 47) +
  * targetCountry (ISO 3166-1) to the closest master-persona MarketCode.

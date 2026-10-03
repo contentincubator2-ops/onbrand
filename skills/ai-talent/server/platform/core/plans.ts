@@ -123,15 +123,6 @@ export function toStripeUnitAmount(amount: number, currency: Currency): number {
   return Math.round(amount * 100);
 }
 
-/** Format a price for display. Always shows the user's currency. */
-export function formatPrice(amount: number, currency: Currency): string {
-  if (amount < 0) return currency === "TWD" ? "聯繫業務" : "Contact sales";
-  if (amount === 0) return currency === "TWD" ? "免費" : "Free";
-  return currency === "TWD"
-    ? `NT$ ${amount.toLocaleString("en-US")}`
-    : `US$ ${amount.toLocaleString("en-US")}`;
-}
-
 /** 2026-05-14: per-action point costs. Keep this single-source so
  *  pricing changes don't drift across the codebase. */
 export const POINT_COSTS = {
@@ -470,26 +461,6 @@ export function isPromoActiveForNewSignups(): boolean {
   const v = (process.env.ONBRAND_PROMO_ACTIVE ?? "0").toLowerCase();
   return v === "1" || v === "true" || v === "yes";
 }
-
-/** Format NTD for display: 990 → 'NT$ 990' */
-export function formatTwd(amount: number): string {
-  if (amount < 0) return "聯繫業務";
-  if (amount === 0) return "免費";
-  return `NT$ ${amount.toLocaleString("zh-TW")}`;
-}
-
-/** Format quota number: -1 → '無限', else integer with thousand sep */
-export function formatQuota(n: number): string {
-  if (n < 0) return "無限";
-  return n.toLocaleString("zh-TW");
-}
-
-export const SUPPORT_EMAIL = "sowork@sowork.ai";
-export const SUPPORT_LINE_AT = "@sowork";  // placeholder; CJ to register
-export const PARENT_DOMAIN = "https://www.sowork.ai";
-export const PRODUCT_DOMAIN = "https://onbrand.sowork.ai";
-export const COMPANY_NAME = "摘星社群行銷顧問股份有限公司";
-export const COMPANY_TAX_ID = "—";  // CJ to fill 統一編號
 
 /**
  * 2026-09-06 —— 加購方案。**兩者都必須綁 drop_pro（NT$9,000/月）訂閱。**

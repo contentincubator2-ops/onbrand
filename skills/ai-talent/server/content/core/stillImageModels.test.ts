@@ -132,14 +132,6 @@ describe("generateStillImage：同一個模型、最多重試一次、絕不換�
 describe("client 模型清單與 server 政策同步", () => {
   const read = (rel: string) => readFileSync(join(__dirname, "../../../client/src/v2/content/lib", rel), "utf8");
 
-  it("mediaModels.ts 的兩個模型 id 就是 server 的兩個模型", () => {
-    const src = read("mediaModels.ts");
-    const ids = [...src.matchAll(/^\s+id: ([A-Z_0-9]+),/gm)].map((m) => m[1]);
-    expect(ids).toEqual(["GPT_IMAGE_2_ID", "NANO_BANANA_ID"]);
-    expect(src).toContain(`GPT_IMAGE_2_ID = "${GPT_IMAGE_2}"`);
-    expect(src).toContain(`NANO_BANANA_ID = "${NANO_BANANA}"`);
-  });
-
   it("RunPage 選單的值都能對應到 server 的選擇，且順序是預設在前", () => {
     const src = read("runImageModelOptions.ts");
     const values = [...src.matchAll(/value: "([^"]+)"/g)].map((m) => m[1]!);

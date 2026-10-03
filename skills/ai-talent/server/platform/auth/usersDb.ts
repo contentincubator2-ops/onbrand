@@ -12,17 +12,6 @@ import { hashPassword, verifyPassword } from "./passwordUtils";
 // Email verification expiry: 24 hours
 export const EMAIL_VERIFICATION_EXPIRY_MS = 24 * 60 * 60 * 1000;
 
-// Password reset expiry: 1 hour
-export const PASSWORD_RESET_EXPIRY_MS = 60 * 60 * 1000;
-
-/**
- * Delete user by id — used by registration cleanup when verification
- * email send fails (so the user can re-register without "已註冊" block).
- */
-export async function deleteUserById(db: DB, id: number): Promise<void> {
-  await db.delete(users).where(eq(users.id, id));
-}
-
 /**
  * Get user by email
  */

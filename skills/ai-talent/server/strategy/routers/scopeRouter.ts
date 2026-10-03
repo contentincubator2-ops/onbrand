@@ -126,7 +126,6 @@ const MAX_INTAKE_URLS = 8;
 /** 產品數量級距。純粹用來推薦方案（products 額度：基礎 0、專業 10），
  *  不需要爬任何東西就答得出來 —— 這是 CJ 偏好問級距而非掃描的理由。 */
 export const PRODUCT_COUNT_BANDS = ["none", "1-3", "4-10", "11-30", "31-100", "100+"] as const;
-export type ProductCountBand = typeof PRODUCT_COUNT_BANDS[number];
 
 export interface ProductImportResult {
   url: string;

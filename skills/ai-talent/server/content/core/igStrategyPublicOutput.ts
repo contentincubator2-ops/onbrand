@@ -197,15 +197,6 @@ function publicSectionLabel(
   return neutralSectionLabel(stepIndex);
 }
 
-export function getIgStrategyPublicSectionLabel(
-  idOrSlug: string,
-  stepIndex: number,
-  outputLanguage = "zh-TW",
-): string | null {
-  const resolved = getIgStrategyPublicPolicy(idOrSlug);
-  return resolved ? publicSectionLabel(resolved.policy, stepIndex, outputLanguage) : null;
-}
-
 function replaceExact(text: string, privateTerm: string | null, publicTerm: string): string {
   if (!privateTerm || privateTerm === publicTerm) return text;
   return text.split(privateTerm).join(publicTerm);

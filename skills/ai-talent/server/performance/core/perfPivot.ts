@@ -130,9 +130,6 @@ export function judgeValue(judge: string, t: Totals): number | null {
   }
 }
 
-/** 判讀指標是不是「越低越好」。 */
-export const lowerIsBetter = (judge: string) => judge === "cpa";
-
 function addInto(acc: Totals, m: Record<string, number>) {
   for (const [k, v] of Object.entries(m)) {
     if (typeof v === "number" && Number.isFinite(v)) acc[k] = (acc[k] ?? 0) + v;

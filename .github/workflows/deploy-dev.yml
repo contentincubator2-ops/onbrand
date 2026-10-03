@@ -162,7 +162,6 @@ jobs:
           test -f "$ai/public/index.html"
 
           ln -sfn "$app_root/shared/.env" "$ai/.env"
-          mkdir -p "$app_root/shared/storage/boardroom-exports"
           rm -rf "$ai/storage"
           ln -s "$app_root/shared/storage" "$ai/storage"
           rm -rf "$ai/public/static/covers"

@@ -34,9 +34,6 @@ export const ADDON_REQUESTS_DDL = `
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
 `;
 
-/** 還在處理中的狀態 —— 這兩種算「已經有一筆申請在跑」。 */
-export const OPEN_STATUSES = ["new", "contacted"] as const;
-
 export interface EcomQuote {
   /** 200 品項以上（或多商店）→ 專案報價，兩個金額都是 null。 */
   projectQuote: boolean;

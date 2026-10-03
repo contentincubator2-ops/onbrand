@@ -29,10 +29,10 @@ skills/ai-talent/
 │   │   ├── core/         quickTask*（各通路卡目錄）、*Craft（出處）、taskCardDates（上架日，git 產）、
 │   │   │                 evergreenRationale（長青卡背後邏輯）、taskCatalogIndex／Registry／
 │   │   │                 Source／Tray／Intake、quickTaskOrchestra、imageGen／mediaGen、
-│   │   │                 squadRequirements／SessionManager、recordTaskRun、socialListeningScout
-│   │   │                 （爆款注入）、tools/、scouts/perplexityScout
+│   │   │                 squadRequirements、recordTaskRun、socialListeningScout
+│   │   │                 （爆款注入）、scouts/perplexityScout
 │   │   └── routers/      quickTask、squad、mission、output、image、media、promptTemplate、agent、
-│   │                     calendar、theater（七日發布台）、festival、publish、postFormat
+│   │                     planner（本週企劃）、inspiration（靈感）、imageCard、calendar、festival、publish、postFormat
 │   └── performance/  成效層（示意版；真資料在電商營運報告導入時接）
 │       ├── routers/      performance（資料來源串接狀態）
 │       └── routes/       reportTemplate（粉絲團月報版型回填）
@@ -43,8 +43,8 @@ skills/ai-talent/
     │                     components：Support（Mia）、review、plan（ChannelPicker／TaskPicker）、Trial
     ├── v2/strategy/      pages：Brands、BrandsManage、BrandSettings；components：positioning/*、
     │                     taskCard、onboarding；lib：positioningSchema／Pipeline／Prompts
-    ├── v2/content/       pages：PlatformTask、Run、Projects、Calendar、Theater；components：
-    │                     PlatformMockup、SquadMockups、media、quickTask、theater；lib：任務／mockup 工具
+    ├── v2/content/       pages：PlatformTask、Run、Projects、Planner、Inspiration、ImageCard、CampaignTray；
+    │                     components：PlatformMockup、SquadMockups、quickTask、imageCard；lib：任務／mockup 工具
     └── v2/performance/   pages：DataWorkspace；components：PerformanceDashboard、ConnectionsPanel、
                           FanpageMonthlyReport、perfMockData
 ```

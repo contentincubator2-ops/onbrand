@@ -205,15 +205,6 @@ function selectProvider(taskType: TaskType): ModelProvider {
   return "qwen"; // will throw with clear error if key missing
 }
 
-/**
- * @internal Exposed for testing / introspection.
- * Returns the resolved (provider, model) pair for a given task type.
- */
-export function selectModel(taskType: TaskType): { provider: ModelProvider; model: string } {
-  const provider = selectProvider(taskType);
-  return { provider, model: DEFAULT_MODELS[provider] };
-}
-
 // ─── Main call function ───────────────────────────────────────────────────────
 
 /**

@@ -169,33 +169,3 @@ Tagline：${brand.tagline ?? "尚無"}
   };
 }
 
-// ── 更新 agent 實例的 brand_context（執行後學習）────────────────────────────
-export async function updateAgentInstanceContext(
-  squadUid: string,
-  agentKey: string,
-  userId: number,
-  patch: Record<string, any>
-): Promise<void> {
-  const pool = getPool();
-  const [rows] = await pool.execute(
-    `SELECT brand_context FROM squad_agents
-     WHERE squad_uid = ? AND agent_key = ? AND user_id = ? LIMIT 1`,
-    [squadUid, agentKey, userId]
-  ) as any[];
-  const existing = (rows as any[])?.[0];
-  if (!existing) return;
-
-  let ctx: Record<string, any> = {};
-  try {
-    ctx = typeof existing.brand_context === "string"
-      ? JSON.parse(existing.brand_context || "{}")
-      : (existing.brand_context ?? {});
-  } catch { ctx = {}; }
-
-  const updated = { ...ctx, ...patch, _updatedAt: new Date().toISOString() };
-  await pool.execute(
-    `UPDATE squad_agents SET brand_context = ?, updated_at = NOW()
-     WHERE squad_uid = ? AND agent_key = ? AND user_id = ?`,
-    [JSON.stringify(updated), squadUid, agentKey, userId]
-  );
-}

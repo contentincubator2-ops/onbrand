@@ -82,10 +82,6 @@ export const CAMPAIGN_TYPES: CampaignTypeSpec[] = [
   },
 ];
 
-export function campaignTypeOf(id: unknown): CampaignTypeSpec | null {
-  return CAMPAIGN_TYPES.find((t) => t.id === id) ?? null;
-}
-
 /** 檔期節奏。日期由起迄日推算（campaignPlan.ts 的 planBeats）。 */
 export type CampaignPhaseId = "teaser" | "launch" | "sustain" | "lastcall" | "encore";
 
@@ -196,24 +192,3 @@ export interface CampaignPlan {
   settingsHash?: string;
 }
 
-/** 設定有沒有填到可以產生企劃的程度。缺什麼要講得出來，不能只是按鈕變灰。 */
-export function missingForPlan(s: CampaignSettings | null | undefined): string[] {
-  const missing: string[] = [];
-  if (!s?.type) missing.push("活動類型");
-  if (!s?.mechanic?.trim()) missing.push("優惠機制／活動內容");
-  if (!s?.channels?.length) missing.push("要發的通路");
-  return missing;
-}
-
-/** 設定的指紋——用來判斷「企劃是不是照現在的設定產的」。 */
-export function settingsFingerprint(s: CampaignSettings | null | undefined, productIds: number[] = []): string {
-  const norm = {
-    type: s?.type ?? "", mechanic: (s?.mechanic ?? "").trim(), goal: (s?.goal ?? "").trim(),
-    channels: [...(s?.channels ?? [])].sort(),
-    venue: (s?.venue ?? "").trim(), sessions: (s?.sessions ?? "").trim(), signupUrl: (s?.signupUrl ?? "").trim(),
-    partners: { kol: !!s?.partners?.kol, cobrand: !!s?.partners?.cobrand },
-    products: [...productIds].sort((a, b) => a - b),
-    productScope: s?.productScope ?? "",
-  };
-  return JSON.stringify(norm);
-}

@@ -52,28 +52,6 @@ export interface SquadRequirementsConfig {
   outputs: Record<string, string[]>;
 }
 
-// ─── Section display metadata ─────────────────────────────────────────────────
-
-export const SECTION_META: Record<RequirementSection, { icon: string; title: string; sub: string }> = {
-  identity: { icon: "🔍", title: "基本資訊",  sub: "讓 agents 開始研究" },
-  access:   { icon: "🔑", title: "平台授權",  sub: "授權後可代你操作" },
-  output:   { icon: "📤", title: "成果交付",  sub: "選擇輸出方式" },
-};
-
-// ─── Provider display labels ──────────────────────────────────────────────────
-
-export const PROVIDER_LABELS: Record<string, string> = {
-  "google-analytics":      "Google Analytics",
-  "google-drive":          "Google Drive",
-  "google-search-console": "Search Console",
-  "facebook-ads":          "Facebook Ads Manager",
-  "youtube":               "YouTube",
-  "linkedin":              "LinkedIn",
-  "email":                 "Email",
-  "line":                  "LINE",
-  "slack":                 "Slack",
-};
-
 // ─── Default fallback ─────────────────────────────────────────────────────────
 
 const DEFAULT_CONFIG: SquadRequirementsConfig = {
@@ -476,45 +454,3 @@ export function getSquadRequirements(
 
 const URL_RE = /https?:\/\/[^\s"'<>）]+/i;
 
-/**
- * Attempt to extract identity requirement values from assistant conversation text.
- * Ignores oauth/output fields (those require user action, not text parsing).
- */
-export function extractRequirementsFromText(
-  text: string,
-  requirements: SquadRequirement[],
-): Record<string, string> {
-  const result: Record<string, string> = {};
-
-  for (const req of requirements) {
-    // Only auto-extract identity section items
-    if (req.section !== "identity") continue;
-
-    if (req.type === "url") {
-      const m = URL_RE.exec(text);
-      if (m) result[req.id] = m[0];
-      continue;
-    }
-    if (req.type === "boolean") {
-      const label = req.label.replace(/[()（）]/g, "").trim();
-      const labelRe = new RegExp(label + "[：:]*\\s*(是|有|yes|1|否|沒有|no|0)", "i");
-      const m = labelRe.exec(text);
-      if (m && m[1]) result[req.id] = /是|有|yes|1/i.test(m[1]) ? "是" : "否";
-      continue;
-    }
-    if (req.type === "select" && req.options) {
-      for (const opt of req.options) {
-        if (text.includes(opt)) { result[req.id] = opt; break; }
-      }
-      continue;
-    }
-    if (req.type === "text") {
-      const label = req.label.replace(/[（）()]/g, "").trim();
-      const textRe = new RegExp(label + "[：:是為]\\s*([^\\n，,。？！]{4,60})", "i");
-      const m = textRe.exec(text);
-      if (m && m[1]) result[req.id] = m[1].trim();
-    }
-  }
-
-  return result;
-}

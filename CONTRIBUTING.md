@@ -20,13 +20,13 @@
 - All env vars: `SCREAMING_SNAKE_CASE` (e.g. `DB_HOST`, `ZHIPU_API_KEY`)
 - Never hardcode fallback values for sensitive vars (DB creds, API keys, `JWT_SECRET`)
 - All vars must be listed in `.env.example` with comments
-- Access `JWT_SECRET` only via `getJwtSecret()` from `_core/env.ts` — never spread or log `ENV`
+- Access `JWT_SECRET` only via `getJwtSecret()` from `platform/core/env.ts` — never spread or log `ENV`
 
 ## Import Order
 
 1. Node built-ins (`crypto`, `fs`, `path`)
 2. External packages (`drizzle-orm`, `zod`, `express`)
-3. Internal `_core` modules (`./env`, `./_core/llm`)
+3. Internal `_core` modules (`./env`, `./platform/core/llm`)
 4. Local modules (`./db`, `./tokenLedger`)
 
 ## Error Messages
@@ -65,7 +65,7 @@ External AI APIs      — OpenAI / Zhipu / Qwen / Google / Cohere / Forge
 ## Security Rules
 
 - `userApiKey` is **always** stored as a truncated SHA256 hash — never plaintext (see `tokenLedger.ts`)
-- `JWT_SECRET` is excluded from the `ENV` export — use `getJwtSecret()` (see `_core/env.ts`)
+- `JWT_SECRET` is excluded from the `ENV` export — use `getJwtSecret()` (see `platform/core/env.ts`)
 - Rate limiter requires `app.set("trust proxy", ...)` when deployed behind Nginx/CDN (see `server/index.ts`)
 - Billing fallback logs (`.jsonl`) may contain token counts; restrict file permissions in production
 

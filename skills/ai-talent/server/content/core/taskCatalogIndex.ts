@@ -200,11 +200,6 @@ export function buildTaskCatalogIndex(): CatalogTask[] {
   return out;
 }
 
-/** 單一平台的任務卡。 */
-export function tasksForPlatform(platform: CatalogPlatform): CatalogTask[] {
-  return buildTaskCatalogIndex().filter((t) => t.platform === platform);
-}
-
 /**
  * 最近 `days` 天內上架的目錄卡，新到舊。「本月新卡」與通知都走這裡，
  * 所以「新」的定義只有一個。

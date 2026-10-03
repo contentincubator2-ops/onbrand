@@ -31,15 +31,3 @@ export type MiaAction =
       auto?: boolean;
     };
 
-/**
- * A single chat-bubble Mia delivers. `role` is "mia" for system / nudge
- * messages, "assistant" for LLM replies, "user" for the user's typed
- * input. `actions` (optional) renders buttons beneath the message.
- */
-export interface MiaMessage {
-  id: number;
-  role: "mia" | "assistant" | "user" | string;
-  content: string;
-  createdAt: string;
-  actions?: MiaAction[];
-}

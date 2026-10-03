@@ -30,14 +30,14 @@ await db.transaction(async (tx) => {
 
 ### 2. JWT 認證完整實作
 
-**位置：** `skills/ai-talent/server/_core/trpc.ts`
+**位置：** `skills/ai-talent/server/platform/core/trpc.ts`
 
 **目前狀態：** `TRPCContext` 和 `protectedProcedure` 已定義，但 JWT 解析邏輯還未接入。
 
 **Sprint 2 需完成：**
 ```typescript
 // 在 createExpressMiddleware 的 createContext 中解析 JWT：
-import { getJwtSecret } from "./_core/env";
+import { getJwtSecret } from "./platform/core/env";
 import jwt from "jsonwebtoken";
 
 export function createContext({ req }: { req: express.Request }): TRPCContext {

@@ -14,7 +14,6 @@ google-service-account.json
 skills/ai-talent/.env
 skills/ai-talent/.env.local
 skills/ai-talent/.env.prod
-skills/mobile/.env
 **/.env.local
 
 # Claude Code
