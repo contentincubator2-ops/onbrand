@@ -22,6 +22,8 @@ import {
   saveChannelRole, loadChannelRoles,
 } from "../core/brand/channelRoles";
 import { loadPositioning } from "../core/positioning/positioningDocs";
+import { getDirectorByAgentId } from "../core/strategist/strategistDirectory";
+import localPool from "../../localDb";
 
 const channelInput = z.enum(ROLE_CHANNELS);
 
@@ -95,6 +97,33 @@ function currentBlock(cur: ChannelRole): string {
     : `\n【使用者目前在這個平台已填的內容（以此為基礎調整，不要無故推翻）】\n${channelRoleBody(cur)}\n`;
 }
 
+/**
+ * 指派的顧問人設：名字、職稱、一句話介紹、專長（mos_db 原文）。查不到就當沒指派——
+ * 不隨便換一位頂替，免得畫面上的頭像與實際回答的口吻對不上。
+ */
+async function personaBlock(
+  agentId: number | undefined, brandId: number, userId: number, channel: RoleChannel,
+): Promise<{ who: string; block: string }> {
+  if (!agentId) return { who: "", block: "" };
+  try {
+    const [rows]: any = await localPool.execute(
+      `SELECT industry FROM brands WHERE id = ? AND userId = ? LIMIT 1`, [brandId, userId],
+    );
+    const industry = typeof rows?.[0]?.industry === "string" && rows[0].industry.trim() ? rows[0].industry.trim() : null;
+    const d = await getDirectorByAgentId(agentId, industry, { scope: channel });
+    if (!d) return { who: "", block: "" };
+    const lines = [
+      `你的名字是 ${d.name}，職稱 ${d.title}。`,
+      d.bio ? `你的背景：${d.bio}` : "",
+      d.specialty ? `你的專長：${d.specialty}` : "",
+      "用這個人的專業視角與口吻回答，但不要在每句話自我介紹，也不要編造這個人沒有的經歷。",
+    ].filter(Boolean);
+    return { who: `（${d.name}）`, block: `\n【你的身分】\n${lines.join("\n")}\n` };
+  } catch {
+    return { who: "", block: "" };
+  }
+}
+
 export const channelRoleRouter = router({
   /** 這個品牌已經存過的通路角色（只回有填的平台）。 */
   list: protectedProcedure
@@ -123,6 +152,8 @@ export const channelRoleRouter = router({
       brandId: z.number(),
       channel: channelInput,
       current: roleInput,
+      /** 指派來討論的策略顧問（mos_db agent，來自 strategistChat.listDirectors 該通路的人選）。 */
+      agentId: z.number().int().positive().optional(),
       messages: z.array(z.object({
         role: z.enum(["user", "assistant"]),
         content: z.string().min(1).max(6000),
@@ -137,8 +168,9 @@ export const channelRoleRouter = router({
 
       const brand = await buildBrandPrefix(input.brandId).catch(() => "");
       const label = CHANNEL_LABEL_ZH[input.channel];
-      const sys = `你是這個品牌的「通路策略顧問」，正在跟使用者一起討論品牌在【${label}】這個平台上的定位——也就是：這個平台在品牌裡扮演什麼角色、主要對誰說、要傳達哪句核心訊息、語氣跟其他平台有什麼不同、有哪些事不在這個平台說。繁體中文。
-${brand}${otherChannelsBlock(channelRolesOf(pos), input.channel)}${currentBlock(cleanChannelRole(input.current))}
+      const persona = await personaBlock(input.agentId, input.brandId, userId, input.channel);
+      const sys = `你是這個品牌的「通路策略顧問」${persona.who}，正在跟使用者一起討論品牌在【${label}】這個平台上的定位——也就是：這個平台在品牌裡扮演什麼角色、主要對誰說、要傳達哪句核心訊息、語氣跟其他平台有什麼不同、有哪些事不在這個平台說。繁體中文。
+${persona.block}${brand}${otherChannelsBlock(channelRolesOf(pos), input.channel)}${currentBlock(cleanChannelRole(input.current))}
 【怎麼聊】
 - 像同事討論，不要像填問卷：一次最多問 1–2 個問題，回覆 ≤ 200 字。
 - 只根據上面的品牌資料與使用者說的話。品牌資料沒有的事實（獎項、數字、功能、價格）不准編；不確定就問。

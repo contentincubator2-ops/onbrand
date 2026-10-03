@@ -18,7 +18,7 @@
  * 4. **送出用 Ctrl／⌘+Enter，不用單獨 Enter。** 中文輸入法選字時按 Enter 會誤送。
  */
 import React from "react";
-import { Button, Textarea, Modal, ModalContent, ModalHeader, ModalBody, ModalFooter } from "@heroui/react";
+import { Avatar, Button, Textarea, Modal, ModalContent, ModalHeader, ModalBody, ModalFooter } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faPaperPlane, faWandMagicSparkles } from "@fortawesome/free-solid-svg-icons";
 import { trpc } from "../../../../lib/trpc";
@@ -74,6 +74,22 @@ export default function ChannelRoleModal({
 
   React.useEffect(() => { endRef.current?.scrollIntoView({ block: "end" }); }, [msgs, busy]);
 
+  // 指派來討論的顧問：這個通路的第一位策略總監（mos_db 真實 agent，名字／職稱／頭像都是原文）。
+  const directorsQ = trpc.strategistChat.listDirectors.useQuery(
+    { brandId: brandId ?? 0, scope: channel ?? undefined },
+    { enabled: open && !!brandId && !!channel, refetchOnWindowFocus: false, staleTime: 60_000 },
+  );
+  const director = (directorsQ.data?.directors ?? [])[0] ?? null;
+  const agentAvatar = (size: string) => (
+    <Avatar
+      src={director?.avatarUrl || undefined}
+      name={director?.name}
+      isBordered={false}
+      className={`${size} shrink-0`}
+      showFallback
+    />
+  );
+
   const discuss = trpc.channelRole.discuss.useMutation();
   const importPaste = trpc.channelRole.importPaste.useMutation();
   const save = trpc.channelRole.save.useMutation();
@@ -96,6 +112,7 @@ export default function ChannelRoleModal({
       const r = await discuss.mutateAsync({
         brandId, channel,
         current: form,
+        agentId: director?.agentId,
         messages: next.map((m) => ({ role: m.role, content: m.content })),
       });
       setMsgs([...next, { role: "assistant", content: r.reply, proposal: r.proposal ? normalizeRole(r.proposal) : null }]);
@@ -232,11 +249,23 @@ export default function ChannelRoleModal({
 
             {tab === "chat" ? (
               <div className="flex min-h-[320px] flex-1 flex-col gap-3">
+                {director && (
+                  <div className="flex items-center gap-2 border-b border-divider pb-2">
+                    {agentAvatar("h-9 w-9")}
+                    <div className="min-w-0 leading-tight">
+                      <div className="truncate text-small font-semibold">{director.name}</div>
+                      <div className="truncate text-tiny text-default-500">{director.title}</div>
+                    </div>
+                  </div>
+                )}
                 <div className="flex max-h-[380px] flex-1 flex-col gap-3 overflow-y-auto pr-1">
-                  <div className="rounded-medium bg-default-100 px-3 py-2 text-small text-default-700">
-                    {en
-                      ? `Let's work out the brand's role on ${label}. Tell me who you want to reach here and what the brand should get out of it — or have me draft one first.`
-                      : `我們來討論品牌在 ${label} 的定位。可以先說說：想在這個平台接觸誰、希望靠它達成什麼？或是直接讓我先擬一份草案。`}
+                  <div className="flex items-end gap-2">
+                    {director && agentAvatar("h-7 w-7")}
+                    <div className="rounded-medium bg-default-100 px-3 py-2 text-small text-default-700">
+                      {en
+                        ? `Let's work out the brand's role on ${label}. Tell me who you want to reach here and what the brand should get out of it — or have me draft one first.`
+                        : `我們來討論品牌在 ${label} 的定位。可以先說說：想在這個平台接觸誰、希望靠它達成什麼？或是直接讓我先擬一份草案。`}
+                    </div>
                   </div>
                   {msgs.length === 0 && (
                     <div className="flex flex-wrap gap-2">
@@ -254,7 +283,8 @@ export default function ChannelRoleModal({
                     </div>
                   )}
                   {msgs.map((m, i) => (
-                    <div key={i} className={m.role === "user" ? "flex justify-end" : "flex justify-start"}>
+                    <div key={i} className={m.role === "user" ? "flex justify-end" : "flex items-end justify-start gap-2"}>
+                      {m.role === "assistant" && director && agentAvatar("h-7 w-7")}
                       <div
                         className={`max-w-[90%] whitespace-pre-wrap rounded-medium px-3 py-2 text-small ${
                           m.role === "user" ? "bg-neutral-900 text-white" : "bg-default-100 text-default-800"
@@ -281,7 +311,10 @@ export default function ChannelRoleModal({
                     </div>
                   ))}
                   {busy === "chat" && (
-                    <div className="text-tiny text-default-500">{en ? "Thinking…" : "思考中…"}</div>
+                    <div className="flex items-center gap-2 text-tiny text-default-500">
+                      {director && agentAvatar("h-7 w-7")}
+                      {en ? "Thinking…" : "思考中…"}
+                    </div>
                   )}
                   <div ref={endRef} />
                 </div>
