@@ -14,7 +14,7 @@
  * 比例鐵律（CJ「不能生成後再裁，要嚴格限制在指令當中」）：每個尺寸都是在該尺寸的原生
  * 比例下「重新生成」（拿目前這張當參考），不是把這張裁成別的比例。
  */
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useOutletContext, useParams } from "react-router-dom";
 import { Button, Spinner, Textarea, Input, Modal, ModalBody, ModalContent, ModalHeader } from "@heroui/react";
 import { trpc } from "../../../lib/trpc";
@@ -178,6 +178,11 @@ export default function ImageCardPage() {
   /** 從文字任務過來的，預設把圖放回那一篇；用戶可以改成另存一篇新的。 */
   const [asNewPost, setAsNewPost] = useState(false);
   const [postError, setPostError] = useState<string | null>(null);
+  /**
+   * 已經存成哪一篇。存檔成功、排程那一步卻失敗（時間已過、網路斷）時，再按一次要沿用
+   * 同一篇，不能又存出一篇重複的貼文。內容（圖、文案、標題、存到哪）一變就重存。
+   */
+  const savedPostRef = useRef<{ key: string; outputId: number; locator: { variantIndex?: number; contentKind?: "planning" | "public"; contentIndex?: number } } | null>(null);
   const brand = ((ctx?.brands ?? []) as any[]).find((b) => b?.id === brandId);
 
   const scenePrompt = useMemo(() => {
@@ -308,14 +313,19 @@ export default function ImageCardPage() {
     }
     try {
       const urls = slots.map((sl) => sl.versions[sl.active]!.url);
-      const saved = await savePostMut.mutateAsync({
-        brandId, cardId: card!.id, copy,
-        // 寫回來源文案時只帶一張（那一則只有一個圖位）。
-        imageUrls: fromOutputId ? [urls[0]!] : urls,
-        imageB64: titled && postImage?.startsWith("data:image/") ? postImage : undefined,
-        fromOutputId,
-        ...(fromOutputId ? fromLocator : {}),
-      });
+      const key = JSON.stringify([card!.id, urls, fromOutputId ?? null, fromOutputId ? null : copy, titled ? [headline, darkTitle] : null]);
+      let saved = savedPostRef.current?.key === key ? savedPostRef.current : null;
+      if (!saved) {
+        const r = await savePostMut.mutateAsync({
+          brandId, cardId: card!.id, copy,
+          // 寫回來源文案時只帶一張（那一則只有一個圖位）。
+          imageUrls: fromOutputId ? [urls[0]!] : urls,
+          imageB64: titled && postImage?.startsWith("data:image/") ? postImage : undefined,
+          fromOutputId,
+          ...(fromOutputId ? fromLocator : {}),
+        });
+        saved = savedPostRef.current = { key, outputId: r.outputId, locator: r.locator };
+      }
       clearImageCardHandoff();
       if (!schedule) {
         showToastGlobal(lang === "en" ? "Saved as a post." : "已存成貼文。");
