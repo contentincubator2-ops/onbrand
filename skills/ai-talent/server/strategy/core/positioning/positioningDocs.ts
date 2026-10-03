@@ -257,7 +257,7 @@ export async function loadPositioning(
  * —— 定位 pipeline 可能正在背景寫別的 segment（personaAgentRouter 踩過這個
  * 坑，那邊的訓練跑幾十秒，競態是真的會發生而不是理論上的）。
  */
-async function patchPositioning(
+export async function patchPositioning(
   scope: PositioningScope, id: number, userId: number,
   patch: (cur: Record<string, any>) => Record<string, any>,
 ): Promise<void> {

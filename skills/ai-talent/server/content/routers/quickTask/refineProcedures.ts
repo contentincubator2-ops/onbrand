@@ -43,7 +43,12 @@ export const refineProcedures = {
       const { callModel } = await import("../../../platform/core/llm/multiModelRouter");
       const { buildBrandPrefix } = await import("../../../strategy/core/brand/brandContext");
       const { loadAgentKnowledge } = await import("../../../platform/core/agents/agentKnowledge");
-      const brandPrefix = await buildBrandPrefix(input.brandId, input.productId ?? null, input.eventId ?? null, "full").catch(() => "");
+      // 2026-10-03：改寫也要讀這張卡所在平台的「通路角色」（沒帶 taskId 就不注入）。
+      const { roleChannelOfTaskId } = await import("../../../strategy/core/brand/channelRoles");
+      const brandPrefix = await buildBrandPrefix(
+        input.brandId, input.productId ?? null, input.eventId ?? null, "full",
+        roleChannelOfTaskId(input.taskId),
+      ).catch(() => "");
 
       let agentName = input.agentName ?? "資深文案";
       let agentTitle = input.agentTitle ?? "Brand Copywriter";

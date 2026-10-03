@@ -13,6 +13,7 @@ import { getDb } from "../../../db";
 import { buildMarketContext } from "./marketProfiles";
 import { loadEventProducts, productScopeBrief, resolveProductScope, type ScopedProduct } from "../entities/eventProductScope";
 import { loadActiveRegulations, regulationLine, REG_DIGEST_MAX, REGULATION_BLOCK_HEADER } from "./brandRegulations";
+import { normalizeRoleChannel, channelRolesOf, channelRoleBody, CHANNEL_LABEL_ZH, CHANNEL_ROLE_PROMPT_MAX } from "./channelRoles";
 
 function safeParse(s: string): any {
   try { return JSON.parse(s); } catch { return null; }
@@ -33,7 +34,7 @@ function safeParse(s: string): any {
 /** 內部分層：決定容量不夠時誰先被擠掉（見 PRIORITY）。不給使用者看。 */
 type BrainTier =
   | "market" | "identity" | "voice" | "rules" | "context" | "custom" | "doc"
-  | "product" | "event" | "legacy" | "regulation";
+  | "product" | "event" | "legacy" | "regulation" | "channel";
 
 /**
  * 大腦畫面的分類——跟策略層 rail 同一套名字（2026-09-29 CJ「用詞跟策略層沒對上，
@@ -134,7 +135,7 @@ const DISPLAY: Record<string, Display> = {
 /** 自訂卡片、定位文件、舊版 brand_brain 條目這些沒有固定標籤的，依所在的頁決定分類。 */
 const SECTION_CATEGORY: Record<SectionKey, BrainCategoryKey> = {
   locked: "brand", voice: "brand", assets: "copy", context: "brand",
-  legacy: "legacy", product: "product", event: "event", regulation: "regulation",
+  legacy: "legacy", product: "product", event: "event", regulation: "regulation", channel: "brand",
 };
 
 /** 固定標籤的出處（見 BrainItem.source）。pushFrom 與動態標籤在呼叫端自己帶。 */
@@ -184,6 +185,7 @@ function displayOf(section: SectionKey, tier: BrainTier, promptLabel: string): D
   if (tier === "doc") return { category, group: "上傳的定位文件", label: "定位文件補充" };
   if (tier === "legacy") return { category: "legacy", group: "舊版品牌大腦", label: promptLabel };
   if (tier === "regulation") return { category: "regulation", group: "法規", label: promptLabel };
+  if (tier === "channel") return { category: "brand", group: "通路角色", label: promptLabel };
   if (tier === "voice" && promptLabel.startsWith("語氣範例")) {
     return { category: "brand", group: "品牌個性與溝通風格", label: promptLabel.replace("語氣範例", "溝通範例對比") };
   }
@@ -200,11 +202,11 @@ export const BRAIN_CAPACITY = 16_000;
 
 /** 割捨順序：數字越大越先被擠掉。市場設定與法規永遠保留（見 NEVER_DROP）。 */
 const PRIORITY: Record<BrainTier, number> = {
-  regulation: -1, market: 0, identity: 1, voice: 2, rules: 3, product: 4, event: 5,
+  regulation: -1, market: 0, identity: 1, voice: 2, channel: 2.5, rules: 3, product: 4, event: 5,
   context: 6, custom: 7, doc: 8, legacy: 9,
 };
 
-type SectionKey = "locked" | "voice" | "assets" | "context" | "legacy" | "product" | "event" | "regulation";
+type SectionKey = "locked" | "voice" | "assets" | "context" | "legacy" | "product" | "event" | "regulation" | "channel";
 
 /**
  * 容量不夠時也不割捨的類別。法規（2026-09-30）：寫文前的審查依據，被擠掉就等於沒審——
@@ -394,8 +396,8 @@ function applyCapacity(entries: BrainEntry[], fixedChars: number, capacity: numb
 // Cache key includes optional product/event so different scopes don't collide.
 const CACHE = new Map<string, { brain: BrandBrain; expiresAt: number }>();
 const TTL_MS = 60_000; // 1-minute cache — brand_brain edits become visible quickly
-const cacheKey = (brandId: number, productId?: number | null, eventId?: number | null) =>
-  `${brandId}:${productId ?? 0}:${eventId ?? 0}`;
+const cacheKey = (brandId: number, productId?: number | null, eventId?: number | null, channel?: string | null) =>
+  `${brandId}:${productId ?? 0}:${eventId ?? 0}:${channel ?? ""}`;
 
 /**
  * Returns a system-prompt suffix string ready to append to any LLM system message.
@@ -564,11 +566,17 @@ export async function buildBrandBrain(
   brandId: number | undefined | null,
   productId?: number | null,
   eventId?: number | null,
+  /**
+   * 這次產出要發在哪個平台（任務卡所屬通路）。帶了而且該通路在策略層存過「通路角色」，
+   * 就把那一張（只有那一張）注入；沒帶或對不上七通路就跟以前完全一樣。
+   */
+  channel?: string | null,
 ): Promise<BrandBrain> {
   const empty: BrandBrain = { prefix: "", items: [], capacity: BRAIN_CAPACITY, usedChars: 0 };
   if (!brandId) return empty;
 
-  const ck = cacheKey(brandId, productId, eventId);
+  const roleChannel = normalizeRoleChannel(channel);
+  const ck = cacheKey(brandId, productId, eventId, roleChannel);
   const cached = CACHE.get(ck);
   if (cached && cached.expiresAt > Date.now()) return cached.brain;
 
@@ -889,6 +897,16 @@ export async function buildBrandBrain(
       } catch {/* non-fatal */}
     }
 
+    // ── 通路角色（這個平台要扮演什麼、對誰說、主打哪句話）──
+    // 2026-10-03：只注入這次任務所在平台的那一張；其他平台的不進 prompt。
+    if (roleChannel) {
+      const role = channelRolesOf(positioning)[roleChannel];
+      if (role) {
+        const label = `${CHANNEL_LABEL_ZH[roleChannel]} 通路角色`;
+        c.add("channel", "channel", label, channelRoleBody(role), CHANNEL_ROLE_PROMPT_MAX, undefined, { source: `channel:${roleChannel}` });
+      }
+    }
+
     // ── 法規（寫之前先審查）──
     // 2026-09-30（CJ「agent 寫文章前要審查」）：用戶在策略層「法規」加的每一張卡。
     // 放在 prompt 最後一段、容量不夠也不割捨（見 NEVER_DROP）。讀的是用戶確認過的「審查重點」，
@@ -925,6 +943,7 @@ export async function buildBrandBrain(
       block("legacy",  "[品牌大腦補充條目]") +
       block("product", "[本次產出聚焦的產品 — 必須圍繞此產品撰寫]") +
       block("event",   "[本次產出對應的活動 — 必須提及活動 / 時程 / 主軸]") +
+      block("channel", "[本次發布平台的通路角色 — 這個平台在品牌裡負責什麼、對誰說、主打哪句話；以此調整切角與語氣，但不得違反上面的鎖定屬性、禁區與法規]") +
       block("regulation", REGULATION_BLOCK_HEADER, false);
 
     const prefix = (marketSection || body) ? "\n\n" + marketSection + body : "";
@@ -971,8 +990,9 @@ export async function buildBrandPrefix(
   productId?: number | null,
   eventId?: number | null,
   _mode: "core" | "full" = "full",
+  channel?: string | null,
 ): Promise<string> {
-  return (await buildBrandBrain(brandId, productId, eventId)).prefix;
+  return (await buildBrandBrain(brandId, productId, eventId, channel)).prefix;
 }
 
 /** Test-only: clear the cache. */

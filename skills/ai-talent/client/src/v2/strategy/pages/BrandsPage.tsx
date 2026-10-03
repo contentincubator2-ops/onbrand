@@ -27,6 +27,9 @@ import { type AssetKey } from "../components/assets/BrandAssetEditor";
 import KnowledgeEditor from "../components/assets/KnowledgeEditor";
 import PositioningDocPanel from "../components/positioning/PositioningDocPanel";
 import CustomCardEditor, { type EditableCard } from "../components/assets/CustomCardEditor";
+import ChannelRoleModal from "../components/positioning/ChannelRoleModal";
+import ChannelRolesTray from "./brands/ChannelRolesTray";
+import { type ChannelId } from "../lib/channelRoles";
 import { InfoTab as BrandInfoTab, DangerTab as BrandDangerTab, PublishTab as BrandPublishTab } from "../components/positioning/BrandSettingsSheet";
 import BrainPanel from "../components/brain/BrainPanel";
 import RegulationsPanel from "../components/regulations/RegulationsPanel";
@@ -42,7 +45,7 @@ import EventYearTimeline, { type PlanPrefill } from "../components/events/EventY
 import { toYmd } from "../lib/eventTimeline";
 // Notion-style line icons
 import { LockToggle } from "../components/positioning/LockToggle";
-import { AgentIcon, MemoryIcon, RegulationIcon, DeleteIcon, FontIcon, IdCardIcon, LockIcon, PaletteIcon, TargetIcon, DoneIcon, StopIcon, WarningIcon } from "../../platform/components/icons";
+import { AgentIcon, CommentIcon, MemoryIcon, RegulationIcon, DeleteIcon, FontIcon, IdCardIcon, LockIcon, PaletteIcon, TargetIcon, DoneIcon, StopIcon, WarningIcon } from "../../platform/components/icons";
 import { SCOPE_SEGMENTS } from "../lib/positioningSchema";
 import { specOf as copySpecOf } from "../lib/copyAssets";
 import { visualSpecOf } from "../lib/visualAssets";
@@ -648,7 +651,7 @@ export default function BrandsPage() {
   // 2026-05-07 Path A simplification: 3 main tiles only (定位/文字/知識).
   // "visual" is kept in the type for legacy lock-state code paths, but
   // is no longer exposed as a tile — its contents live in Settings.
-  const category: "positioning" | "copy" | "visual" | "knowledge" | "info" | "publish" | "settings" | "products" | "events" | "regulations" | "brain" | "persona" | "campaign" =
+  const category: "positioning" | "copy" | "visual" | "knowledge" | "info" | "publish" | "settings" | "products" | "events" | "regulations" | "channels" | "brain" | "persona" | "campaign" =
     urlCat === "copy" ? "copy"
     : urlCat === "knowledge" ? "knowledge"
     : urlCat === "visual" ? "visual"
@@ -658,6 +661,7 @@ export default function BrandsPage() {
     : urlCat === "products" ? "products"
     : urlCat === "events" ? "events"
     : urlCat === "regulations" ? "regulations"
+    : urlCat === "channels" ? "channels"
     : urlCat === "brain" ? "brain"
     : urlCat === "persona" ? "persona"
     // 2026-09-25（CJ「應該要在活動的 mission tray 當中，增加這個活動的任務卡」）：
@@ -674,7 +678,7 @@ export default function BrandsPage() {
   // version clobbered it with a snapshot from BEFORE that write, dropping
   // `e` and silently falling back to brand-level positioning. Functional
   // form fixes it for every caller, not just this one site.
-  const setCategory = (next: "positioning" | "copy" | "knowledge" | "info" | "visual" | "publish" | "products" | "events" | "regulations" | "brain" | "persona") => {
+  const setCategory = (next: "positioning" | "copy" | "knowledge" | "info" | "visual" | "publish" | "products" | "events" | "regulations" | "channels" | "brain" | "persona") => {
     setSearchParams((prev) => {
       const nextParams = new URLSearchParams(prev);
       nextParams.set("cat", next);
@@ -996,6 +1000,8 @@ export default function BrandsPage() {
   // 自訂卡片的編輯器開在這一層——scopeMode / targetId / coverage 的 refetch
   // 都在這裡，編輯器本身只管一張卡。null = 沒開。
   const [editingCard, setEditingCard] = React.useState<EditableCard | null>(null);
+  // 2026-10-03：通路角色（每個平台各自的定位）— 開哪一個平台的編輯視窗。null = 沒開。
+  const [editingChannel, setEditingChannel] = React.useState<ChannelId | null>(null);
 
   const utils = (trpc as any).useUtils?.() ?? null;
 
@@ -1671,6 +1677,9 @@ export default function BrandsPage() {
                   { v: "regulations" as const, label: lang === "en" ? "Regulations" : "法規",
                       desc: lang === "en" ? "Checked before every draft" : "寫文前先審查",
                       Icon: RegulationIcon, scopes: ["brand"] },
+                  { v: "channels"    as const, label: lang === "en" ? "Channels" : "通路",
+                      desc: lang === "en" ? "Each platform's role" : "每個平台的角色",
+                      Icon: CommentIcon,   scopes: ["brand"] },
                   { v: "brain"       as const, label: lang === "en" ? "Memory" : "記憶",
                       desc: lang === "en" ? "What the AI remembers" : "AI 記住了什麼、滿了怎麼清",
                       Icon: MemoryIcon,    scopes: ["brand", "product", "event"] },
@@ -2392,6 +2401,17 @@ export default function BrandsPage() {
             </div>
           )}
 
+          {/* ── 通路 (channels) — 每個平台各自的定位 ──
+               2026-10-03（CJ「不同平台的定位不同，不是加在品牌頁面，而是增加一個 mission tray，
+               呈現方式參考品牌頁面」）：七個平台各一張卡（樣式同品牌定位卡），點開編輯五格，
+               也可以在裡面與 AI 討論或貼上現成文字。只有發在該平台的任務會讀到那張卡。 */}
+          {derivedCategory === "channels" && scopeMode === "brand" && activeBrandIdForLocks && (
+            <ChannelRolesTray
+              channelRoles={positioningSegmentData.channelRoles}
+              onEdit={setEditingChannel}
+            />
+          )}
+
           {/* ── 大腦 (brain) — 檢查品牌大腦 ──
                2026-09-29（CJ「在策略端增加一個 mission tray，是檢查大腦……像手機
                記憶體的感覺」）：列出每篇產文實際讀到的品牌大腦、用了多少容量、
@@ -2576,6 +2596,17 @@ export default function BrandsPage() {
         scopeId={targetId ?? null}
         onClose={() => setEditingCard(null)}
         onSaved={() => positioningCoverageQuery.refetch?.()}
+      />
+
+      {/* 2026-10-03：通路角色編輯視窗（五格 + 與 AI 討論 + 貼上現成文字）。
+          存檔後重抓 scope.active，卡片才會讀到新內容。 */}
+      <ChannelRoleModal
+        open={!!editingChannel}
+        channel={editingChannel}
+        brandId={scopeMode === "brand" ? (targetId ?? null) : null}
+        saved={editingChannel ? positioningSegmentData.channelRoles?.[editingChannel] : null}
+        onClose={() => setEditingChannel(null)}
+        onSaved={() => utils?.scope?.active?.invalidate?.()}
       />
     </main>
   );
