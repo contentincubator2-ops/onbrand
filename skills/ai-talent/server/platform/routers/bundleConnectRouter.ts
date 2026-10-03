@@ -17,7 +17,7 @@ import { toBundlePlatform } from "../core/connectors/publish/bundlePublish";
 import { getPublishProvider } from "../core/connectors/publish/publishProvider";
 import { isRuntimeFeatureEnabled } from "../core/ops/runtimeSafety";
 
-const PLATFORM_INPUT = z.enum(["facebook", "instagram", "linkedin"]);
+const PLATFORM_INPUT = z.enum(["facebook", "instagram", "linkedin", "threads", "x"]);
 
 /** Portal links are one-shot; 30 minutes covers a user who gets interrupted. */
 const PORTAL_EXPIRY_MINUTES = 30;
@@ -64,6 +64,11 @@ export const bundleConnectRouter = router({
     facebook:  getPublishProvider("facebook"),
     instagram: getPublishProvider("instagram"),
     linkedin:  getPublishProvider("linkedin"),
+    // Threads / X have no Pipedream path: they only work when PUBLISH_PROVIDER_<X>=bundle.
+    // X is accepted here for admin/API use but the front stage does not list it
+    // (planGate HIDDEN_CONTENT_PLATFORMS).
+    threads:   getPublishProvider("threads"),
+    x:         getPublishProvider("x"),
   })),
 
   /**

@@ -227,6 +227,7 @@ export const calendarRouter = router({
             brandName: s.brandName,
             missionTitle: s.missionTitle,
             externalUrl: s.externalUrl,
+            variantIndex: s.variantIndex == null ? null : Number(s.variantIndex),
             lastError: s.lastError ? String(s.lastError) : null,
             attempts: Number(s.attempts ?? 0),
             reviewStatus: s.reviewStatus ? String(s.reviewStatus) : null,
@@ -305,23 +306,16 @@ export const calendarRouter = router({
       id: z.number().int().positive(),
       scheduledAt: z.string(),
     }))
-    .mutation(async ({ ctx, input }) => {
-      await assertCanAct(ctx.user!.id);   // 2026-09-07 viewer 只能看，不能發布／排程／建卡
-      const { default: localPool } = await import("../../localDb");
-      const at = new Date(input.scheduledAt);
-      if (isNaN(at.getTime())) {
-        throw new TRPCError({ code: "BAD_REQUEST", message: "Invalid date" });
-      }
-      const [r]: any = await localPool.execute(
-        `UPDATE scheduled_posts SET scheduledAt = ?
-         WHERE id = ? AND userId = ? AND status = 'pending'`,
-        [at, input.id, ctx.user.id],
-      );
-      if ((r as any).affectedRows === 0) {
-        throw new TRPCError({ code: "NOT_FOUND", message: "找不到此排程，或已發布 / 取消" });
-      }
-      return { ok: true };
-    }),
+    .mutation(async ({ ctx, input }) => rescheduleScheduledPost({ id: input.id, userId: ctx.user!.id, scheduledAt: input.scheduledAt })),
+
+  /**
+   * Put a failed post back in the queue (status failed → pending, lastError
+   * cleared, attempts kept). It does NOT publish and does not touch approval:
+   * publish still runs the approval gate. Owner or workspace owner/admin only.
+   */
+  retry: protectedProcedure
+    .input(z.object({ id: z.number().int().positive() }))
+    .mutation(async ({ ctx, input }) => retryScheduledPost({ id: input.id, userId: ctx.user!.id })),
 
   cancel: protectedProcedure
     .input(z.object({ id: z.number().int().positive() }))
@@ -410,6 +404,53 @@ export async function publishScheduledPost(args: {
     }
     throw e;
   }
+}
+
+/** Move a pending or failed post to a new time; a failed post goes back to pending. */
+export async function rescheduleScheduledPost(args: { id: number; userId: number; scheduledAt: string }) {
+  await assertCanAct(args.userId);   // 2026-09-07 viewer 只能看，不能發布／排程／建卡
+  const { default: localPool } = await import("../../localDb");
+  const at = new Date(args.scheduledAt);
+  if (isNaN(at.getTime())) {
+    throw new TRPCError({ code: "BAD_REQUEST", message: "Invalid date" });
+  }
+  // lastError is assigned before status: MySQL applies SET assignments left to right.
+  const [r]: any = await localPool.execute(
+    `UPDATE scheduled_posts
+        SET scheduledAt = ?, lastError = IF(status = 'failed', NULL, lastError), status = 'pending'
+      WHERE id = ? AND userId = ? AND status IN ('pending','failed')`,
+    [at, args.id, args.userId],
+  );
+  if ((r as any).affectedRows === 0) {
+    throw new TRPCError({ code: "NOT_FOUND", message: "找不到此排程，或已發布 / 取消" });
+  }
+  return { ok: true };
+}
+
+/** failed → pending. Never publishes and never bypasses the approval gate. */
+export async function retryScheduledPost(args: { id: number; userId: number }) {
+  await assertCanAct(args.userId);
+  const { default: localPool } = await import("../../localDb");
+  const [rows]: any = await localPool.execute(
+    `SELECT userId AS ownerId, status FROM scheduled_posts WHERE id = ? LIMIT 1`,
+    [args.id],
+  );
+  const row = (rows as any[])[0];
+  // Same NOT_FOUND for "missing" and "not yours" so ids can't be probed.
+  if (!row || !(await canPublishFor(localPool, args.userId, Number(row.ownerId)))) {
+    throw new TRPCError({ code: "NOT_FOUND", message: "排程不存在或無權限" });
+  }
+  if (row.status !== "failed") {
+    throw new TRPCError({ code: "BAD_REQUEST", message: "只有發布失敗的貼文可以重試" });
+  }
+  const [r]: any = await localPool.execute(
+    `UPDATE scheduled_posts SET status = 'pending', lastError = NULL WHERE id = ? AND status = 'failed'`,
+    [args.id],
+  );
+  if ((r as any).affectedRows === 0) {
+    throw new TRPCError({ code: "BAD_REQUEST", message: "只有發布失敗的貼文可以重試" });
+  }
+  return { ok: true };
 }
 
 async function publishScheduledPostInner(args: {

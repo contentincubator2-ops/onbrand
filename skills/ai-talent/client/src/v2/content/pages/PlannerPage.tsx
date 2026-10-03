@@ -129,6 +129,10 @@ export default function PlannerPage() {
   // 原本行事曆能做的三件事（取消／改時間／立即發布）都留在這裡，取代才不會少功能。
   const onErr = (e: any) => showToastGlobal(friendlyError(e, en ? "Something went wrong. Please try again." : "剛剛沒成功，再試一次。"), "error");
   const reschedule = T.calendar?.reschedule?.useMutation?.({ onSuccess: () => { setOpen(null); setMoveAt(""); refresh(); }, onError: onErr });
+  const retryFailed = T.calendar?.retry?.useMutation?.({
+    onSuccess: () => { setOpen(null); refresh(); showToastGlobal(en ? "Back in the queue. It still needs approval before it publishes." : "已放回排程。發布前仍需核准。", "success"); },
+    onError: onErr,
+  });
   const publishNow = T.calendar?.publish?.useMutation?.({
     onSuccess: () => { setOpen(null); refresh(); showToastGlobal(en ? "Published" : "已發布", "success"); }, onError: onErr,
   });
@@ -450,6 +454,10 @@ export default function PlannerPage() {
                     <button type="button" onClick={() => removeSlot?.mutate?.({ brandId, id: open.slot.id })}
                       className="rounded-full border px-3.5 py-2.5 text-[13.5px]" style={{ borderColor: LINE, color: "#525252" }}>{en ? "Delete" : "刪除"}</button>
                   )}
+                  {open.kind === "scheduled" && isFailedScheduled(open.cal) && (
+                    <button type="button" disabled={retryFailed?.isPending} onClick={() => retryFailed?.mutate?.({ id: open.cal.id })}
+                      className="rounded-full border px-4 py-2.5 text-[13.5px]" style={{ borderColor: LINE }}>{en ? "Retry" : "重試"}</button>
+                  )}
                   {open.kind === "scheduled" && open.cal.status === "pending" && (
                     <button type="button" disabled={publishNow?.isPending} onClick={() => publishNow?.mutate?.(getCalendarPublishPayload(open.cal.id, open.cal.contentKind))}
                       className="rounded-full border px-4 py-2.5 text-[13.5px]" style={{ borderColor: LINE }}>{en ? "Publish now" : "立即發布"}</button>
@@ -459,7 +467,7 @@ export default function PlannerPage() {
                       className="rounded-full border px-4 py-2.5 text-[13.5px]" style={{ borderColor: LINE, color: "#525252" }}>{en ? "Unschedule" : "取消排程"}</button>
                   )}
                 </div>
-                {open.kind === "scheduled" && open.cal.status === "pending" && (
+                {open.kind === "scheduled" && (open.cal.status === "pending" || isFailedScheduled(open.cal)) && (
                   <form className="mt-3 flex items-center gap-2" onSubmit={(e) => { e.preventDefault(); if (moveAt) reschedule?.mutate?.({ id: open.cal.id, scheduledAt: new Date(moveAt).toISOString() }); }}>
                     <label htmlFor="planner-move" className="text-[12px]" style={{ color: META }}>{en ? "Move to" : "改到"}</label>
                     <input id="planner-move" type="datetime-local" value={moveAt} onChange={(e) => setMoveAt(e.target.value)}

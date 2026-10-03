@@ -22,6 +22,7 @@ const INSTRUCTIONS =
   "onBrand Studio 是使用者的 AI 行銷團隊（品牌大腦＋持續更新的任務卡＋伺服器端的專屬寫手與設計）。" +
   "流程：list_brands → get_brand_context → list_tasks → describe_task（缺必填先問使用者）→ run_task → get_task_result。" +
   "使用者問團隊進度或要審稿時用 team_board。成品照原文交給使用者，不要自行改寫；品牌資訊以 get_brand_context 為準，不要自己假設。" +
+  "這個連接器只負責產稿與排進企劃，不能核准、也不能發布；使用者要審稿或發布時，請他回 onBrand Studio 操作（發布前一定要由人核准）。" +
   "跟使用者說話時，產出規模用「單篇／套組／企劃」，不要說 30s/60s/99s。";
 
 function rpcResult(id: unknown, result: unknown) { return { jsonrpc: "2.0", id, result }; }

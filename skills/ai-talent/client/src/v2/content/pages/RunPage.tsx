@@ -69,6 +69,7 @@ import WriterDesk, { type DeskWriter } from "../components/WriterDesk";
 import { friendlyError } from "../../platform/lib/friendlyError";
 import BrandConsistencyNote, { pickBrandRecord } from "../components/BrandConsistencyNote";
 import RegulationComplianceNote, { toComplianceInput, type ComplianceRecord } from "../components/RegulationComplianceNote";
+import { captionLimitHint } from "../lib/captionLimits";
 import { cancelAgentHandoff } from "../lib/agentHandoff";
 import { Mode, REWRITE_AGENTS, VariantData, sanitizeCaption, normalizeVariantData, HOLD_FOR_IMAGES, SEQUENCE_TASKS, nanoBananaJsonToPrompt, sanitizeProviderErrorForToast } from "./run/runModel";
 import { CraftChip, Divider, ToolbarBtn, StepBadge } from "./run/RunParts";
@@ -3679,6 +3680,15 @@ export default function RunPage() {
                 onChange={(e) => setScheduleAt(e.target.value)}
               />
             )}
+            {(() => {
+              const _pf = schedMode === "publish"
+                ? schedPlatform
+                : ((data as any)?.metadata?.platform ?? "");
+              const _h = captionLimitHint(_pf, (variants as any[])[activeIdx]?.caption, lang === "en");
+              return _h ? (
+                <p className={`text-[12px] ${_h.over ? "text-danger-600" : "text-default-500"}`} role={_h.over ? "alert" : undefined}>{_h.text}</p>
+              ) : null;
+            })()}
             {schedMode === "calendar" && (
               <>
                 {/* 2026-09-29 成效標籤從右欄移進來：排程時順手標，發布後成效落進成效層矩陣 */}

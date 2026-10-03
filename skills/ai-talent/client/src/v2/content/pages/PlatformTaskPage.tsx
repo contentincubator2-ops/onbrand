@@ -18,6 +18,7 @@ import { showToastGlobal } from "../../platform/components/Toast";
 import { TaskCardShell, TaskCardAvatar } from "../../platform/components/TaskCardShell";
 import { campaignPrefill } from "../lib/campaignIntakePrefill";
 import { friendlyError } from "../../platform/lib/friendlyError";
+import { cancelToastText, newRunKey } from "../lib/runCancel";
 import { toastWithUpgrade } from "../../platform/lib/upgradeToast";
 import { matchTaskWithSynonyms } from "../lib/taskSearchSynonyms";
 import {
@@ -506,6 +507,9 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
   const runOrchestra60Mut  = (trpc as any).quickTask?.runOrchestra60?.useMutation();
   const runOrchestra99Mut  = (trpc as any).quickTask?.runOrchestra99?.useMutation();
   const runSquadAutoMut    = (trpc as any).quickTask?.runSquadAuto?.useMutation();
+  const cancelRunMut       = (trpc as any).quickTask?.cancelRun?.useMutation?.();
+  // Key of the orchestra run currently in flight (null once the server answered).
+  const runKeyRef = useRef<string | null>(null);
   const holdUtils          = (trpc as any).useUtils?.() ?? null;
   // 2026-07-20 (CJ「取消的任務應該就死掉，不需要留在專案中」): cancelled
   // runs archive their output on arrival (soft delete — hidden from
@@ -1014,7 +1018,21 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
   // attempt must NEVER navigate or mutate UI state when it resolves.
   const runSeqRef = useRef(0);
 
+  // Ask the server to really stop the in-flight run (and refund when it can).
+  const cancelInFlightRun = () => {
+    const key = runKeyRef.current;
+    runKeyRef.current = null;
+    if (!key || !cancelRunMut?.mutateAsync) return;
+    cancelRunMut.mutateAsync({ runKey: key })
+      .then((r: any) => {
+        const txt = cancelToastText(r, lang === "en");
+        if (txt) showToastGlobal(txt);
+      })
+      .catch((e: any) => showToastGlobal(friendlyError(e, lang === "en" ? "Couldn't stop the task." : "沒辦法停止任務。")));
+  };
+
   const closeTask = () => {
+    cancelInFlightRun();
     setCampaignScope(null);   // 不收的話，下一張卡會沿用上一格的活動預填
     runSeqRef.current++; // invalidate any in-flight run attempt
     setActiveTask(null);
@@ -1229,7 +1247,12 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
       if (tierMut) {
         // 額外欄位先鋪、primary 後蓋 —— 萬一某張卡把 primary 的 key 又
         // 宣告了一次，主問題的答案必須贏。
-        const r = await tierMut.mutateAsync({
+        const runKey = newRunKey();
+        runKeyRef.current = runKey;
+        let r: any;
+        try {
+          r = await tierMut.mutateAsync({
+          runKey,
           taskId: activeTask.id,
           inputs: { ...trimmedExtras(extraAnswers), [inputKey]: primaryAnswer },
           brandId: brandId ?? undefined,
@@ -1240,7 +1263,11 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
           spotRef: spotRefRef.current,
           // 2026-09-30：從活動企劃開的卡，告訴寫手是哪一篇（要不要下廣告）。
           campaignItem: campaignScope ?? null,
-        });
+          });
+        } finally {
+          // Server has answered (or failed): nothing left to cancel for this attempt.
+          if (runKeyRef.current === runKey) runKeyRef.current = null;
+        }
         if (isStale()) { if ((r as any).outputId) discardCancelledOutput((r as any).outputId); return; }
 
         if ((r as any).outputId) {
@@ -2658,6 +2685,9 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                           ? (lang === "en" ? current.en : current.zh)
                           : (lang === "en" ? "Wrapping up" : "收尾中")}
                       </p>
+                      <Button size="sm" variant="flat" className="mt-1" onPress={closeTask}>
+                        {lang === "en" ? "Stop" : "停止"}
+                      </Button>
                     </div>
                   );
                 })()}

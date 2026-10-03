@@ -12,7 +12,7 @@
  * 資料：brandKnowledge.memory（server/strategy/core/brand/brandMemory.ts），用量的算法見 memoryModel.ts。
  * 顏色只表達狀態（快滿＝琥珀、滿了＝紅），其餘一律灰階。
  */
-import { HelpTip } from "../../../platform/components/HelpTip";
+import { BrainHelpTip } from "./BrainHelpTip";
 import { useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
@@ -118,9 +118,7 @@ function Home({ view, en, T, onOpen }: { view: MemoryView; en: boolean; T: (k: S
             <span className="text-[56px] leading-none">{pct}</span>
             <span className="text-[22px] text-neutral-500">%</span>
             <span className="ml-3 text-[14px] font-semibold tracking-normal" style={{ color: tone }}>{state}</span>
-            <HelpTip>{en
-              ? "This is the one Brand Brain every writer reads — and the post-write checker reviews each draft against it."
-              : "這是所有寫手共用的同一顆品牌大腦，寫完之後的檢查也是拿它來對照每一篇。"}</HelpTip>
+            <BrainHelpTip en={en} />
           </div>
           <div className="mt-2 text-[13px] tabular-nums text-neutral-500">
             {en ? `${fmtChars(view.usedChars)} of ${fmtChars(view.capacity)} characters` : `已用 ${fmtChars(view.usedChars)}／${fmtChars(view.capacity)} 字`}
