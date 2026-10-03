@@ -17,6 +17,7 @@ import { faFacebookF, faInstagram, faThreads, faLine, faTiktok } from "@fortawes
 import { trpc } from "../../../lib/trpc";
 import { useLang } from "../../../lib/i18n";
 import { showToastGlobal } from "../../platform/components/Toast";
+import { friendlyError } from "../../platform/lib/friendlyError";
 import { channelRoute } from "../../platform/lib/channelMeta";
 import { logActivation } from "../../platform/lib/activationTelemetry";
 import { PlatformTaskModal, type TaskEmbed } from "./PlatformTaskPage";
@@ -166,7 +167,7 @@ export default function InspirationPage() {
       }
     } catch (e: any) {
       if (seq === runSeq.current) setAngles(before);
-      showToastGlobal(e?.message || (en ? "Something went wrong. Try again." : "剛剛沒想好，再試一次。"));
+      showToastGlobal(friendlyError(e, en ? "Something went wrong. Try again." : "剛剛沒想好，再試一次。"));
     } finally {
       if (seq === runSeq.current) setThinking([]);
     }
@@ -206,7 +207,7 @@ export default function InspirationPage() {
         entity: subject.kind !== "brand" && subject.id ? { kind: subject.kind, id: subject.id } : undefined,
       });
     } catch (e: any) {
-      showToastGlobal(e?.message || (en ? "Couldn't add it to this week's plan." : "沒放進本週企劃，再試一次。"));
+      showToastGlobal(friendlyError(e, en ? "Couldn't add it to this week's plan." : "沒放進本週企劃，再試一次。"));
     }
   };
 

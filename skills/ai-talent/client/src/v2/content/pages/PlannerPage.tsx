@@ -23,6 +23,7 @@ import {
 import { trpc } from "../../../lib/trpc";
 import { useLang } from "../../../lib/i18n";
 import { showToastGlobal } from "../../platform/components/Toast";
+import { friendlyError } from "../../platform/lib/friendlyError";
 import { channelRoute } from "../../platform/lib/channelMeta";
 import { PlatformTaskModal, type TaskEmbed } from "./PlatformTaskPage";
 import { getCalendarPublishPayload } from "../lib/strategyContentEnvelope";
@@ -33,6 +34,10 @@ const INK = "#171717", META = "#6B6B6B", LINE = "#EAEAEA", SOFT = "#F6F6F5", ORA
 const PLATFORM_ICON: Record<string, any> = {
   facebook: faFacebook, instagram: faInstagram, linkedin: faLinkedin, youtube: faYoutube, tiktok: faTiktok,
   email: faEnvelope, pr: faBullhorn, x: faXTwitter, website: faGlobe, threads: faThreads, line: faLine,
+};
+const PLATFORM_EN: Record<string, string> = {
+  facebook: "Facebook", instagram: "Instagram", linkedin: "LinkedIn", youtube: "YouTube", tiktok: "TikTok",
+  email: "Newsletter", pr: "Press release", x: "X", website: "Website", threads: "Threads", line: "LINE",
 };
 const PLATFORM_ZH: Record<string, string> = {
   facebook: "Facebook", instagram: "Instagram", linkedin: "LinkedIn", youtube: "YouTube", tiktok: "TikTok",
@@ -107,21 +112,21 @@ export default function PlannerPage() {
 
   const send = T.planner?.send?.useMutation?.({
     onSuccess: (r: any) => { setTouched(r?.touched ?? []); setPending(null); refresh(); },
-    onError: (e: any) => { setPending(null); showToastGlobal(String(e?.message ?? "error"), "error"); },
+    onError: (e: any) => { setPending(null); showToastGlobal(friendlyError(e, en ? "Something went wrong. Please try again." : "剛剛沒成功，再試一次。"), "error"); },
   });
   const commit = T.planner?.commit?.useMutation?.({
     onSuccess: (r: any) => { showToastGlobal(en ? `${r?.count ?? 0} posts scheduled for this week` : `已排定 ${r?.count ?? 0} 篇`, "success"); setTouched([]); refresh(); },
-    onError: (e: any) => showToastGlobal(String(e?.message ?? "error"), "error"),
+    onError: (e: any) => showToastGlobal(friendlyError(e, en ? "Something went wrong. Please try again." : "剛剛沒成功，再試一次。"), "error"),
   });
   const removeSlot = T.planner?.removeSlot?.useMutation?.({ onSuccess: () => { setOpen(null); refresh(); } });
   // 分歧方案卡：選一版 → 伺服器套用那一版的格子。
   const pickFork = T.planner?.pickFork?.useMutation?.({
     onSuccess: (r: any) => { if (r?.weekStart) setWeekStart(r.weekStart); setTouched(r?.touched ?? []); refresh(); },
-    onError: (e: any) => showToastGlobal(String(e?.message ?? "error"), "error"),
+    onError: (e: any) => showToastGlobal(friendlyError(e, en ? "Something went wrong. Please try again." : "剛剛沒成功，再試一次。"), "error"),
   });
   const cancelSched = T.calendar?.cancel?.useMutation?.({ onSuccess: () => { setOpen(null); refresh(); } });
   // 原本行事曆能做的三件事（取消／改時間／立即發布）都留在這裡，取代才不會少功能。
-  const onErr = (e: any) => showToastGlobal(String(e?.message ?? "error"), "error");
+  const onErr = (e: any) => showToastGlobal(friendlyError(e, en ? "Something went wrong. Please try again." : "剛剛沒成功，再試一次。"), "error");
   const reschedule = T.calendar?.reschedule?.useMutation?.({ onSuccess: () => { setOpen(null); setMoveAt(""); refresh(); }, onError: onErr });
   const publishNow = T.calendar?.publish?.useMutation?.({
     onSuccess: () => { setOpen(null); refresh(); showToastGlobal(en ? "Published" : "已發布", "success"); }, onError: onErr,
@@ -130,6 +135,13 @@ export default function PlannerPage() {
 
   const messages: Array<{ id: number; role: string; content: string; choices: string[]; fork: ForkView | null }> = data?.messages ?? [];
   React.useEffect(() => { chatEnd.current?.scrollIntoView({ block: "end" }); }, [messages.length, pending]);
+  // Escape closes the post popup (keyboard users shouldn't need the × button).
+  React.useEffect(() => {
+    if (!open) return;
+    const onKey = (ev: KeyboardEvent) => { if (ev.key === "Escape") setOpen(null); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open]);
 
   const say = (text: string) => {
     const t = text.trim();
@@ -317,6 +329,21 @@ export default function PlannerPage() {
             </button>
           </div>
 
+          {(weekQ as any).isError && (
+            <p role="alert" className="m-0 flex items-center gap-3 rounded-xl border px-4 py-3 text-[13.5px]" style={{ borderColor: LINE, color: INK, background: "#fff" }}>
+              {en ? "This week's plan didn't load." : "這週的企劃沒載入。"}
+              <button type="button" onClick={() => (weekQ as any).refetch?.()} className="rounded-full border px-3 py-1 text-[12.5px] font-semibold" style={{ borderColor: LINE }}>{en ? "Retry" : "重試"}</button>
+            </p>
+          )}
+          {(weekQ as any).isLoading && !!brandId && (
+            <p role="status" aria-live="polite" className="m-0 text-[13px]" style={{ color: META }}>{en ? "Loading this week…" : "載入這週…"}</p>
+          )}
+          {!(weekQ as any).isLoading && !(weekQ as any).isError && !!brandId && items.length === 0 && (
+            <p className="m-0 rounded-xl border border-dashed px-4 py-3 text-[13.5px]" style={{ borderColor: "#D4D4D4", color: META }}>
+              {en ? "Nothing planned for this week yet. Tell the assistant on the left what you want to post, or press + on a day." : "這週還沒有安排。對左邊的助理說你想發什麼，或在某一天按 +。"}
+            </p>
+          )}
+
           <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(7, minmax(0, 1fr))" }}>
             {days.map((d) => {
               const dayItems = items.filter((it) => it.date === d.date);
@@ -361,9 +388,9 @@ export default function PlannerPage() {
                       </div>
                     );
                   })}
-                  <button type="button" aria-label={en ? "Add a post this day" : "這天加一篇"} onClick={() => setDraft(`${d.label || md(d.date)} 加一篇`)}
+                  <button type="button" aria-label={en ? `Add a post on ${md(d.date)}` : `${md(d.date)} 加一篇`} onClick={() => setDraft(`${d.label || md(d.date)} ${en ? "add a post" : "加一篇"}`)}
                     className="rounded-xl text-[18px] transition hover:text-neutral-500"
-                    style={{ border: "1.5px dashed #E6E6E6", color: "#C4C4C4", minHeight: dayItems.length ? 44 : 150 }}>+</button>
+                    style={{ border: "1.5px dashed #E6E6E6", color: "#737373", minHeight: dayItems.length ? 44 : 150 }}>+</button>
                 </div>
               );
             })}
@@ -372,11 +399,11 @@ export default function PlannerPage() {
           {/* ── 點開一篇 ── */}
           {open && (
             <div className="fixed inset-0 z-[1500] flex items-center justify-center bg-black/20 px-4" onClick={() => setOpen(null)}>
-              <div role="dialog" aria-label={open.title} className="w-[340px] rounded-2xl bg-white p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
+              <div role="dialog" aria-modal="true" aria-label={open.title} className="w-[min(340px,92vw)] rounded-2xl bg-white p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
                 <div className="flex items-center justify-between">
                   <span className="flex items-center gap-2">
                     <span className="flex h-6 w-6 items-center justify-center rounded-[7px] text-[12px]" style={{ background: SOFT, color: "#404040" }}><FontAwesomeIcon icon={PLATFORM_ICON[open.platform] ?? faGlobe} /></span>
-                    <span className="text-[12px]" style={{ color: META }}>{PLATFORM_ZH[open.platform] ?? open.platform}・{md(open.date)}{open.kind === "slot" && open.slot.format ? `・${open.slot.format}` : ""}</span>
+                    <span className="text-[12px]" style={{ color: META }}>{en ? (PLATFORM_EN[open.platform] ?? open.platform) : (PLATFORM_ZH[open.platform] ?? open.platform)}・{md(open.date)}{open.kind === "slot" && open.slot.format ? `・${open.slot.format}` : ""}</span>
                   </span>
                   <button type="button" aria-label={en ? "Close" : "關閉"} onClick={() => setOpen(null)} className="text-[16px] text-neutral-400 hover:text-neutral-900">×</button>
                 </div>
