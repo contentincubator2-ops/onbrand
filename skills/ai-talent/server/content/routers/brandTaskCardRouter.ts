@@ -29,8 +29,7 @@ import { invokeLLM } from "../../platform/core/llm/llm";
 import { readFileSync } from "fs";
 import { coverFilePath, saveCoverFile } from "../../platform/core/media/mediaGen";
 import { drawIllustration, shrinkToWebp, writeIllustrationConcepts } from "../core/image/taskIllustration";
-import { researchCardSources, type CardReference } from "../core/catalog/cardResearch";
-import { getBrandMarket } from "../../strategy/core/brand/brandMarket";
+import type { CardReference } from "../core/catalog/cardResearch";
 import { buildBrandPrefix } from "../../strategy/core/brand/brandContext";
 import {
   type BrandTaskCard, type BrandTaskCardField,
@@ -101,7 +100,6 @@ async function distilSkill(args: {
   primaryQuestion: string;
   askFields: BrandTaskCardField[];
   measured: BrandTaskCard["measured"];
-  references?: CardReference[];
 }): Promise<string> {
   const brandPrefix = await buildBrandPrefix(args.brandId, null, null, "core").catch(() => "");
   const fieldList = args.askFields.length
@@ -134,13 +132,8 @@ ${fieldList}
      —— 抽出文章裡的**手法**（用什麼角度、什麼順序、什麼鉤子、什麼收尾），寫成可執行的步驟。
      **絕對不可以把文章舉例用的店家、商品、場景、裝潢、人物當成要寫的內容。**
    - 兩種情況都要在 SKILL 裡寫明：貼文裡的事實（店家、商品、價格、地點、活動、環境描述）
-     只能來自 {{topic}}、額外欄位、系統查到的資料來源（若有）與品牌資料；這些來源都沒有的細節一律不寫、不推測、
+     只能來自 {{topic}}、額外欄位、執行時系統針對當次主題上網查到的「案例與說法」（若有）與品牌資料；這些來源都沒有的細節一律不寫、不推測、
      不編造，寧可少寫一句。
-${args.references?.length ? `
-【這張卡查證過的資料來源】系統已上網查到下列來源（執行時會另外附上全文，不要抄進規則）。
-SKILL 要規定：寫作時引用的事實以這些來源為準，來源沒提到的不寫；並可參考它們的手法重點來訂規則。
-${args.references.map((r, i) => `[${i + 1}] ${r.title}（${r.host}）：${r.takeaway}`).join("\n")}
-` : ""}
 【字數】範例實測 ${args.measured.count} 篇，最短 ${args.measured.minChars} 字、最長 ${args.measured.maxChars} 字、中位數 ${args.measured.medianChars} 字。
 把區間寫進規則，並說明哪些段落佔多少比重。
 
@@ -220,24 +213,9 @@ async function runDistil(brandId: number, userId: number, cardId: string): Promi
     const card = await getBrandTaskCard(brandId, cardId);
     if (!card) return;
     await patch((c) => ({ ...c, currentStep: 2, updatedAt: new Date().toISOString() }));
-    // 先上網找可查證的來源（盡力而為：失敗不擋建卡，原因寫進 researchNote 誠實顯示）。
-    let freshRefs: CardReference[] = [];
-    try {
-      const market = await getBrandMarket(brandId).catch(() => null);
-      const r = await researchCardSources({
-        name: card.name, channel: card.channel, primaryQuestion: card.primaryQuestion,
-        samples: card.samples, market: market?.outputLanguage,
-      });
-      freshRefs = r.references;
-      await patch((c) => ({ ...c, references: r.references, researchNote: r.note }));
-    } catch (e: any) {
-      console.warn(`[brandTaskCard] research failed for ${cardId}:`, String(e?.message ?? e).slice(0, 200));
-      await patch((c) => ({ ...c, researchNote: "查資料來源時出了問題，這次沒有附上來源，可以按「重新從範例生成」再查一次。" })).catch(() => {});
-    }
     const skill = await distilSkill({
       brandId, name: card.name, channel: card.channel, samples: card.samples,
       primaryQuestion: card.primaryQuestion, askFields: card.askFields, measured: card.measured,
-      references: freshRefs,
     });
     await patch((c) => ({
       ...c, skill, currentStep: TOTAL_STEPS, status: "drafting", lastError: null,
@@ -507,11 +485,6 @@ export const brandTaskCardRouter = router({
       primaryPlaceholder: z.string().max(200).optional(),
       askFields: z.array(fieldInput).max(8).optional(),
       samples: z.array(z.string().min(20).max(MAX_SAMPLE_CHARS)).min(1).max(MAX_SAMPLES).optional(),
-      // 用戶只能刪來源（或整批清空），不能自己加 —— 這份清單的賣點是「系統查到的、可查證的」。
-      references: z.array(z.object({
-        title: z.string().max(200), url: z.string().max(600), host: z.string().max(200),
-        takeaway: z.string().max(400), retrievedAt: z.string().max(40),
-      })).max(10).optional(),
       variants: z.number().int().min(1).max(5).optional(),
       agentId: z.number().nullable().optional(),
       // null＝回到自動挑。只驗形狀，場景清單在前端。
@@ -528,10 +501,6 @@ export const brandTaskCardRouter = router({
             ...c,
             name: input.name?.trim() ?? c.name,
             skill: input.skill ?? c.skill,
-            // 只認「原本就有的 url」，擋掉從 API 直接塞進去的來源。
-            references: input.references
-              ? (c.references ?? []).filter((r) => input.references!.some((x) => x.url === r.url))
-              : c.references,
             primaryQuestion: input.primaryQuestion?.trim() ?? c.primaryQuestion,
             primaryPlaceholder: input.primaryPlaceholder?.trim() ?? c.primaryPlaceholder,
             askFields: input.askFields ? fieldsFrom(input.askFields) : c.askFields,
@@ -603,6 +572,9 @@ export const brandTaskCardRouter = router({
         // 量出來的區間就是驗收標準 —— 直接告訴使用者這篇有沒有落在範圍內。
         inRange: caption.length >= card.measured.minChars && caption.length <= card.measured.maxChars,
         expected: { minChars: card.measured.minChars, maxChars: card.measured.maxChars },
+        // 這次試寫時系統上網查到的案例與說法（成品旁顯示給用戶看）；沒查到時 note 說明原因。
+        references: (result?.references ?? []) as CardReference[],
+        researchNote: (result?.researchNote ?? null) as string | null,
       };
     }),
 

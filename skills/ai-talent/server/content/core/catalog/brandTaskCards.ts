@@ -27,7 +27,6 @@ import type { FBTaskTemplate, OrchestraConfig, TaskInput } from "./quickTaskFB";
 import type { CatalogPlatform } from "./taskCatalogIndex";
 import localPool from "../../../localDb";
 import { registerTaskSource } from "./taskRegistry";
-import type { CardReference } from "./cardResearch";
 
 export type BrandTaskCardStatus = "drafting" | "ready" | "failed";
 
@@ -59,15 +58,6 @@ export interface BrandTaskCard {
   /** 額外要問的欄位，走 taskIntake 那條共用判斷渲染。 */
   askFields: BrandTaskCardField[];
 
-  /**
-   * 資料來源（2026-10-04，CJ 實測：貼了小店家行銷手法的文章，試寫卻在寫店家自己的裝潢，
-   * 而且看不出資料哪來的；「AI 自己去找可查證的資料來源，附給用戶看」）。
-   * 建卡時 AI 上網搜尋，只收搜尋服務真的回傳的網址；用戶可刪。寫作時事實只能取自這些
-   * 來源、每次輸入、品牌資料，沒有的細節不編。
-   */
-  references?: CardReference[];
-  /** 沒搜到或沒搜的原因（有 references 時為 null），誠實顯示給用戶。 */
-  researchNote?: string | null;
   /** AI 從範例反推出來的 SKILL —— 就是這張卡的 systemPrompt。 */
   skill: string;
   /** 從範例量出來的數字，不是問來的也不是猜來的。 */
@@ -154,8 +144,6 @@ export function duplicateCard(
     primaryPlaceholder: source.primaryPlaceholder,
     askFields: source.askFields.map((f) => ({ ...f })),
     skill: source.skill,
-    references: (source.references ?? []).map((r) => ({ ...r })),
-    researchNote: source.researchNote ?? null,
     measured: { ...source.measured },
     variants: source.variants,
     agentId: source.agentId,
@@ -455,25 +443,6 @@ function outputDefaultsFor(channel: string): FBTaskTemplate["outputDefaults"] {
   return CHANNEL_OUTPUT[channel] ?? { platform: "generic", post_type: "post" };
 }
 
-/**
- * 寫作時的事實來源區塊。沒有來源時不附 —— 防編造的規則在 SKILL 本文裡。
- * 放在 SKILL 後面、當成「資料」而不是「規則」：範例是學寫法，這裡是寫什麼。
- */
-export function groundingBlock(references: CardReference[] | undefined): string {
-  const refs = references ?? [];
-  if (refs.length === 0) return "";
-  const lines = refs.map((r, i) => `[${i + 1}] ${r.title}（${r.host}）\n    重點：${r.takeaway}`).join("\n");
-  return `
-
-【資料來源（這張卡查證過的依據）】
-下列是系統上網查到的來源與重點。文案裡的**事實**（做法、數據、案例、店家／商品／活動細節）只能取自：
-這些來源、這次的輸入欄位、品牌資料。這些都沒有的細節（例如店面裝潢、價格、地點、人物、活動內容）
-一律不要寫、不要推測、不要補完；寧可少寫一句，也不要編。
-範例只教你「怎麼寫」，不是「寫什麼」。來源若是在談手法的文章，就把手法套用到這次的主題，
-不要把文章舉例的店家或案例當成要寫的內容。
-${lines}`;
-}
-
 /** 一張自建卡的 label 一律標記來源，使用者要看得出這是自己做的卡。 */
 export function cardTemplate(card: BrandTaskCard): FBTaskTemplate {
   const inputs: TaskInput[] = [
@@ -503,7 +472,7 @@ export function cardTemplate(card: BrandTaskCard): FBTaskTemplate {
       type: "textarea",
     },
     inputs,
-    systemPrompt: card.skill + groundingBlock(card.references),
+    systemPrompt: card.skill,
     preferredModel: "anthropic",
     // 中位數 × 2.6 給模型足夠的產出空間；中文一字約 1.5–2 token，再留餘裕。
     maxTokens: Math.min(8000, Math.max(700, Math.round(card.measured.medianChars * 2.6))),
@@ -522,6 +491,9 @@ export function cardConfig(card: BrandTaskCard): OrchestraConfig {
     variantLabels: Array.from({ length: n }, (_, i) => `版本 ${i + 1}`),
     captionMinChars: card.measured.minChars || undefined,
     captionMaxChars: card.measured.maxChars || undefined,
+    // 2026-10-04（CJ）：每次寫（試寫與正式執行）都針對當次主題上網找案例與說法來充實內容，
+    // 查到的來源附在成品旁。不是卡片綁一份固定資料。
+    researchTopic: true,
   } as OrchestraConfig;
 }
 

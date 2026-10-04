@@ -153,6 +153,10 @@ export interface OrchestraResult {
   stages: OrchestraStage[];
   ok: boolean;
   errors: string[];
+  /** 2026-10-04：本次寫作前上網查到的案例與說法（researchTopic 任務）；附在成品旁給用戶看。 */
+  references?: Array<{ title: string; url: string; host: string; takeaway: string; retrievedAt: string }>;
+  /** 沒查到／沒搜的原因，誠實顯示。 */
+  researchNote?: string | null;
   /** Strategist output (only present for narrativeArc tasks) */
   strategist?: OrchestraStrategist | null;
   /** Specialty role agent meta (FB 60s #10/11/12) */

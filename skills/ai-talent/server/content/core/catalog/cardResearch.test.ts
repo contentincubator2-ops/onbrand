@@ -56,3 +56,20 @@ describe("dedupeHits / url 清理", () => {
     expect(cleanHttpUrl("ftp://a.com")).toBeNull();
   });
 });
+
+import { formatResearchForPrompt } from "./cardResearch";
+
+describe("formatResearchForPrompt", () => {
+  it("沒有來源就是空字串（寫作 prompt 不多一個區塊）", () => {
+    expect(formatResearchForPrompt([])).toBe("");
+  });
+  it("帶編號、出處、可引用重點，並要求只引用真的有的內容、貼文不放網址", () => {
+    const out = formatResearchForPrompt([
+      { title: "小店 IG", url: "https://a.com/x", host: "a.com", takeaway: "某咖啡店用日常小故事開場，詢問量增加。", retrievedAt: "T" },
+    ]);
+    expect(out).toContain("[1] 小店 IG（a.com）");
+    expect(out).toContain("某咖啡店用日常小故事開場");
+    expect(out).toContain("不要放網址");
+    expect(out).not.toContain("https://a.com/x");
+  });
+});

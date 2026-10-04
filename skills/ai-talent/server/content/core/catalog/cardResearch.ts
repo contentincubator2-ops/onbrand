@@ -1,8 +1,12 @@
 /**
- * cardResearch — 自建任務卡建卡時，AI 自己上網找「可查證的資料來源」。
+ * cardResearch — 自建任務卡「每次寫文案時」主動上網找與當次主題相關的案例與說法。
  *
- * 2026-10-04（CJ 實測：貼了小店家行銷手法的文章，試寫卻寫出店家裝潢，而且看不出資料
- * 哪來的；「我是要 AI 直接自己去找資料來源，蒐集可查證的資料來源後，附給用戶看」）。
+ * 2026-10-04（CJ 實測：貼了小店家行銷手法的文章，試寫卻寫出店家裝潢，內容空洞、看不出
+ * 資料哪來的。「寫範例貼文還有未來執行該任務卡的時候，應該要主動搜尋相關案例或說法的資料，
+ * 補充文案本身的內容；而不是這張任務卡都侷限在特定資料來源」）。
+ *
+ * 所以這裡的單位是「一次執行」而不是「一張卡」：試寫與每次正式執行都以當次主題搜尋，
+ * 查到的案例／說法／數據餵給寫作，來源另外附給用戶看（成品旁），卡片本身不綁固定資料。
  *
  * ── 絕不編造 ────────────────────────────────────────────────────────────
  * 沿用 postFormatScout 的規矩：
@@ -165,30 +169,49 @@ async function ask(system: string, user: string, maxTokens: number): Promise<str
   return typeof c === "string" ? c : "";
 }
 
-async function writeQueries(args: { name: string; channel: string; primaryQuestion: string; gist: string; market: string }): Promise<string[]> {
-  const fallback = [`${args.name} ${args.channel} ${args.primaryQuestion}`.slice(0, 120)];
+async function writeQueries(args: { topic: string; cardName: string; channel: string; market: string }): Promise<string[]> {
+  const fallback = [`${args.topic} ${args.cardName}`.slice(0, 120)];
   try {
     const raw = await ask(
-      `替一張寫作任務卡想 2 到 3 條網路搜尋關鍵字，目的是找「做這類內容的可查證做法、案例、數據」的文章。
-關鍵字用目標市場的語言（${args.market}）。要具體（含通路與內容類型），不要只寫品牌或商品名。
+      `替下面這次要寫的貼文主題想 2 條網路搜尋關鍵字，目的是找「可以充實這篇內容的真實案例、說法、數據、做法」。
+關鍵字用目標市場的語言（${args.market}），要具體：包含主題本身的關鍵名詞，不要只寫通路或文體。
 只輸出 JSON：{"queries":["…","…"]}`,
-      `任務卡：${args.name}\n通路：${args.channel}\n每次會問用戶：${args.primaryQuestion}\n範例開頭：${args.gist}`,
+      `貼文類型：${args.cardName}
+通路：${args.channel}
+這次的主題／輸入：${args.topic}`,
       400,
     );
     const q = extractJson(raw)?.queries;
-    const list = (Array.isArray(q) ? q : []).map((x: any) => String(x).trim()).filter(Boolean).slice(0, 3);
+    const list = (Array.isArray(q) ? q : []).map((x: any) => String(x).trim()).filter(Boolean).slice(0, 2);
     return list.length ? list : fallback;
   } catch { return fallback; }
 }
 
-export async function researchCardSources(args: {
-  name: string; channel: string; primaryQuestion: string; samples: string[]; market?: string;
+/** 餵給寫作模型的區塊。來源編號讓模型能對應，但貼文本身不放網址。 */
+export function formatResearchForPrompt(refs: CardReference[]): string {
+  if (refs.length === 0) return "";
+  const lines = refs.map((r, i) => `[${i + 1}] ${r.title}（${r.host}）
+    可引用：${r.takeaway}`).join("\n");
+  return `
+
+# 即時查到的案例與說法（本次寫作可引用，用來充實內容）
+下面是系統針對這次主題剛上網查到的真實資料。請從中挑最貼近主題的案例、說法或數據，自然地織進文案
+（例如「根據…的調查」「有間…的店家做法是…」），讓內容具體、有依據。
+規則：
+- 只能引用下列資料裡真的有的內容；不要擴寫、不要加料、不要把數字或案例改成別的樣子。
+- 文案裡不要放網址或編號 [n]；需要時用出處名稱帶過即可。
+- 資料與主題無關的就不要硬用；資料以外的事實（店家細節、價格、地點）仍只能來自使用者輸入與品牌資料，沒有就不寫。
+${lines}
+`;
+}
+
+export async function researchTopic(args: {
+  topic: string; cardName: string; channel: string; market?: string;
 }): Promise<ResearchResult> {
+  const topic = args.topic.trim().slice(0, 300);
+  if (topic.length < 2) return { references: [], note: null };
   const market = args.market || "zh-TW";
-  const queries = await writeQueries({
-    name: args.name, channel: args.channel, primaryQuestion: args.primaryQuestion,
-    gist: (args.samples[0] ?? "").slice(0, 200), market,
-  });
+  const queries = await writeQueries({ topic, cardName: args.cardName, channel: args.channel, market });
 
   let hits: RawHit[] = [];
   const errors: string[] = [];
@@ -197,30 +220,33 @@ export async function researchCardSources(args: {
     if (s.status === "fulfilled") hits.push(...s.value); else errors.push(String(s.reason?.message ?? s.reason));
   }
   if (hits.length === 0) {
-    const g = await Promise.allSettled(queries.slice(0, 2).map((q) => geminiSearch(q)));
+    const g = await Promise.allSettled(queries.map((q) => geminiSearch(q)));
     for (const s of g) {
       if (s.status === "fulfilled") hits.push(...s.value); else errors.push(String(s.reason?.message ?? s.reason));
     }
   }
-  hits = dedupeHits(hits).slice(0, 20);
+  hits = dedupeHits(hits).slice(0, 16);
 
   if (hits.length === 0) {
     const noKey = errors.length > 0 && errors.every((e) => /no (tavily|gemini) key/.test(e));
     return {
       references: [],
       note: noKey
-        ? "系統目前沒有可用的搜尋服務，沒有附上資料來源。"
-        : "這次沒有搜尋到可查證的資料來源，所以沒有附上（不會用沒有出處的內容充數）。",
+        ? "系統目前沒有可用的搜尋服務，這次文案沒有附上外部資料。"
+        : "這次沒有搜尋到可查證的相關資料，文案只依你的輸入與品牌資料寫成（不會用沒有出處的內容充數）。",
     };
   }
 
-  const list = hits.map((h, i) => `[${i + 1}] ${h.title}\n網址：${h.url}\n內文摘錄：${h.content.slice(0, 500)}`).join("\n\n");
+  const list = hits.map((h, i) => `[${i + 1}] ${h.title}
+網址：${h.url}
+內文摘錄：${h.content.slice(0, 600)}`).join("\n\n");
   let picked: CardReference[] = [];
   try {
     const raw = await ask(
-      `下面是搜尋結果，編號 [n]。我們在做一張「${args.name}」（${args.channel}）寫作任務卡，要挑出最能當**依據**的來源。
-挑選條件：內容具體（有做法、案例、數據）、和這類內容直接相關、來源看起來可信（媒體、官方、專業機構優先；內容農場、廣告頁、純商品頁不要）。
-最多挑 ${MAX_REFERENCES} 筆。每筆寫 takeaway：這個來源說了什麼可用的重點，1~2 句，**只能依該筆「內文摘錄」寫**，摘錄沒有的不要補。
+      `下面是搜尋結果，編號 [n]。我們要寫一篇「${args.cardName}」（${args.channel}），主題是「${topic}」。
+請挑出最能**充實這篇文案內容**的來源：有具體案例、說法、數據、做法，且和主題直接相關；來源要可信
+（媒體、官方、專業機構優先；內容農場、廣告頁、純商品頁不要）。最多 ${MAX_REFERENCES} 筆，沒有夠好的就少挑或不挑。
+每筆寫 takeaway：這個來源裡**可以引用的具體案例／說法／數據**，1~2 句；**只能依該筆「內文摘錄」寫**，摘錄沒有的不要補。
 你只回編號，不要寫網址。只輸出 JSON：{"picks":[{"n":2,"takeaway":"…"}]}`,
       list, 2000,
     );
@@ -229,7 +255,7 @@ export async function researchCardSources(args: {
     console.warn("[cardResearch] 挑選失敗：", String((e as any)?.message ?? e).slice(0, 200));
   }
   if (picked.length === 0) {
-    return { references: [], note: "搜尋到了網頁，但沒有一筆夠具體可以當依據，所以沒有附上。" };
+    return { references: [], note: "搜尋到了網頁，但沒有一筆夠具體、夠相關，所以沒有附上。" };
   }
   return { references: picked, note: null };
 }
