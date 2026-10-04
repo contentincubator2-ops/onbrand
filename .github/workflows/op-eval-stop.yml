@@ -1,0 +1,32 @@
+name: Ops (DEV) — stop leftover exam processes
+
+# 2026-10-04：取消 GitHub 上的評測工作不保證 VM 上的 tsx 跟著停；它會繼續打模型 API、繼續花錢。
+# 這支只做一件事：列出並關掉 scripts/eval/export-cases.ts 的殘留程序，清掉 /tmp 的暫存副本。
+# 不碰 pm2、不碰 /opt/onbrand/current。
+on:
+  push:
+    paths:
+      - '.github/workflows/op-eval-stop.yml'
+
+jobs:
+  stop:
+    runs-on: ubuntu-24.04
+    environment: dev
+    timeout-minutes: 5
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 3m
+          script: |
+            echo "--- before"
+            pgrep -af "scripts/eval/export-cases.ts" || echo "no exam process running"
+            pkill -f "scripts/eval/export-cases.ts" || true
+            sleep 3
+            pkill -9 -f "scripts/eval/export-cases.ts" || true
+            echo "--- after"
+            pgrep -af "scripts/eval/export-cases.ts" || echo "no exam process running"
+            rm -rf /tmp/onbrand-evalshadow* || true
+            ls -d /tmp/onbrand-evalshadow* 2>/dev/null || echo "no shadow copies left"
