@@ -81,7 +81,7 @@ async function canAccessBrand(userId: number, brandId: number): Promise<boolean>
   return Array.isArray(rows) && rows.length > 0;
 }
 
-/** 產品／活動要同時屬於這個使用者，才算能讀寫它的定位。 */
+/** 產品／活動要屬於「這個使用者有權限的品牌」（團隊成員建的也算），才能讀寫它的定位。 */
 async function canAccessScope(
   userId: number, brandId: number, scope: PositioningScope, scopeId: number,
 ): Promise<boolean> {
@@ -89,8 +89,8 @@ async function canAccessScope(
   if (scope === "brand") return scopeId === brandId;
   const table = scope === "product" ? "products" : "events";
   const [rows]: any = await localPool.execute(
-    `SELECT id FROM \`${table}\` WHERE id = ? AND userId = ? LIMIT 1`,
-    [scopeId, userId],
+    `SELECT id FROM \`${table}\` WHERE id = ? AND (brandId = ? OR userId = ?) LIMIT 1`,
+    [scopeId, brandId, userId],
   );
   return Array.isArray(rows) && rows.length > 0;
 }
