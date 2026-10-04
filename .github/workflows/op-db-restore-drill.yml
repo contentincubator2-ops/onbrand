@@ -1,0 +1,101 @@
+name: Ops — DB restore drill (scratch DB, manual)
+
+# 2026-10-05（11/1 上線準備）：每天有備份，但從來沒有還原過。沒演練過的
+# 備份等於沒有備份。這支把最新一份備份還原到「暫時的」資料庫，檢查
+# 資料表數量與幾張關鍵表的筆數，結束後一定把暫時資料庫刪掉。
+#
+# 完全不寫入 mos_db：對正式資料庫只做 SELECT COUNT。
+# 只能手動觸發。建議上線前跑一次、之後每月一次。
+#
+# 需要 mos_user 有 CREATE / DROP DATABASE 權限。沒有的話第一步就會失敗並
+# 說明原因，請用有權限的帳號授權後再跑：
+#   GRANT ALL PRIVILEGES ON `mos_db_restore_drill`.* TO 'mos_user'@'localhost';
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: db-restore-drill
+  cancel-in-progress: false
+
+jobs:
+  drill:
+    runs-on: [self-hosted, linux, vm-onbrand]
+    timeout-minutes: 30
+    steps:
+      - name: Restore latest backup into a scratch database
+        run: |
+          set -e
+          ENV=/opt/onbrand/app/skills/ai-talent/.env
+          set -a; source "$ENV"; set +a
+          export MYSQL_PWD="$LOCAL_DB_PASSWORD"
+          DIR=/opt/onbrand/backups
+          SCRATCH=mos_db_restore_drill
+          M() { mysql -h localhost -u mos_user -N -s "$@"; }
+
+          LATEST=$(ls -1t "$DIR"/mos_db-*.sql.gz 2>/dev/null | head -1)
+          if [ -z "$LATEST" ]; then
+            echo "❌ $DIR 裡沒有備份檔"
+            exit 1
+          fi
+          AGE_H=$(( ( $(date +%s) - $(stat -c %Y "$LATEST") ) / 3600 ))
+          GZ_BYTES=$(stat -c%s "$LATEST")
+          echo "最新備份：$LATEST（$AGE_H 小時前，$GZ_BYTES bytes）"
+          if [ "$AGE_H" -gt 30 ]; then
+            echo "❌ 最新備份超過 30 小時 — 每日備份可能沒在跑"
+            exit 1
+          fi
+
+          # 還原後的資料大約是壓縮檔的 10 倍；磁碟不夠就不要開始。
+          FREE_KB=$(df -Pk /var/lib/mysql 2>/dev/null | awk 'NR==2{print $4}')
+          NEED_KB=$(( GZ_BYTES * 12 / 1024 ))
+          echo "磁碟可用 ${FREE_KB}KB，預估需要 ${NEED_KB}KB"
+          if [ -n "$FREE_KB" ] && [ "$FREE_KB" -lt "$NEED_KB" ]; then
+            echo "❌ 磁碟空間不足以演練還原"
+            exit 1
+          fi
+
+          # 不管成功失敗，結束時都刪掉暫時資料庫。
+          cleanup() { M -e "DROP DATABASE IF EXISTS \`$SCRATCH\`" 2>/dev/null || true; }
+          trap cleanup EXIT
+
+          if ! M -e "DROP DATABASE IF EXISTS \`$SCRATCH\`; CREATE DATABASE \`$SCRATCH\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"; then
+            echo "❌ mos_user 無法建立暫時資料庫。請授權後重跑（見檔頭說明）。"
+            exit 1
+          fi
+
+          echo "── 還原中 ──"
+          START=$(date +%s)
+          gunzip -c "$LATEST" | mysql -h localhost -u mos_user --default-character-set=utf8mb4 "$SCRATCH"
+          echo "還原花了 $(( $(date +%s) - START )) 秒"
+
+          TABLES_LIVE=$(M -e "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='mos_db'")
+          TABLES_DRILL=$(M -e "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='$SCRATCH'")
+          echo "資料表數量：正式 $TABLES_LIVE／還原 $TABLES_DRILL"
+
+          FAIL=0
+          # 還原出來的表不該比正式少太多（備份之後新增的表除外）。
+          if [ "$TABLES_DRILL" -lt $(( TABLES_LIVE * 9 / 10 )) ]; then
+            echo "❌ 還原出來的資料表明顯少於正式資料庫"
+            FAIL=1
+          fi
+
+          echo "── 關鍵表筆數（正式／還原）──"
+          for T in users brands workspaces invoices missions mission_outputs; do
+            LIVE=$(M -e "SELECT COUNT(*) FROM mos_db.\`$T\`" 2>/dev/null || echo "?")
+            DRILL=$(M -e "SELECT COUNT(*) FROM \`$SCRATCH\`.\`$T\`" 2>/dev/null || echo "?")
+            echo "  $T: $LIVE／$DRILL"
+            if [ "$DRILL" = "?" ]; then
+              echo "  ❌ 還原後沒有 $T 這張表"
+              FAIL=1
+            elif [ "$LIVE" != "?" ] && [ "$LIVE" -gt 0 ] && [ "$DRILL" -lt $(( LIVE * 9 / 10 )) ]; then
+              echo "  ❌ $T 還原筆數不到正式的九成"
+              FAIL=1
+            fi
+          done
+
+          if [ "$FAIL" -ne 0 ]; then
+            echo "❌ 還原演練未通過"
+            exit 1
+          fi
+          echo "✅ 還原演練通過：備份可還原，暫時資料庫將刪除"
