@@ -26,7 +26,7 @@ import {
   type PlatformImageSpec,
 } from "../../platform/core/media/platformImageSpecs";
 import { loadBrandPositioning } from "../../platform/core/billing/planGate";
-import { proposeImageDirections, renderImageCard, saveTitledImage } from "../core/image/imageCards";
+import { proposeImageDirections, planSeriesSlides, renderImageCard, saveTitledImage, MAX_SERIES } from "../core/image/imageCards";
 import { contentSelectorFields, updateOutputContent } from "../core/engine/outputContentEnvelope";
 import { applyVariantImageUpdate } from "../core/image/variantImageUpdate";
 import { recordTaskRun } from "../../platform/core/ops/recordTaskRun";
@@ -36,6 +36,16 @@ import { brandOwnsProductPhoto } from "./imageRouter";
 import { brandOwnsLibraryPhoto } from "../../strategy/core/brand/assetPhotos";
 
 const channel = z.enum(IMAGE_CHANNELS as [string, ...string[]]);
+
+/** 圖上標題是會被看見的字——跟文案一樣過禁用詞／替換對照，再過法規合規檢查。 */
+async function cleanOverlayTitle(brandId: number, text: string): Promise<string> {
+  const { enforceBrandRulesOnText } = await import("../../strategy/core/brand/brandContext");
+  const { enforceRegulationsOnText } = await import("../core/engine/regulationCompliance");
+  let out = await enforceBrandRulesOnText(brandId, text).catch(() => text);
+  const reg = await enforceRegulationsOnText(brandId, out);
+  if (reg.record?.status === "fixed") out = await enforceBrandRulesOnText(brandId, reg.text).catch(() => reg.text);
+  return out;
+}
 
 export function publicSpec(s: PlatformImageSpec) {
   return {
@@ -137,23 +147,23 @@ export const imageCardRouter = router({
       cardId: z.string().max(60),
       copy: z.string().min(2).max(6000),
       productName: z.string().max(200).optional(),
+      /** 一組幾張（輪播／相簿）；不傳＝單張。 */
+      count: z.number().int().min(1).max(MAX_SERIES).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED" });
       await assertBrandOwner(ctx.user.id, input.brandId);
       const spec = specOr404(input.cardId);
+      if ((input.count ?? 1) > spec.maxImages) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: `這張卡最多 ${spec.maxImages} 張。` });
+      }
       const brand = await resolveBrandVisualContext(input.brandId);
-      const { buildBrandPrefix, enforceBrandRulesOnText } = await import("../../strategy/core/brand/brandContext");
+      const { buildBrandPrefix } = await import("../../strategy/core/brand/brandContext");
       // 2026-10-03：這張圖發在哪個平台 → 讀該平台的「通路角色」（構圖與標題的取向跟著平台走）。
       const brainPrefix = await buildBrandPrefix(input.brandId, null, null, "full", spec.channel).catch(() => "");
       try {
-        const out = await proposeImageDirections({ spec, copy: input.copy, brand, productName: input.productName, brainPrefix });
-        // 圖上標題是會被看見的字——跟文案一樣過禁用詞／替換對照。
-        // 2026-09-30：再過法規合規檢查（圖上的字一樣會被看見）。
-        const { enforceRegulationsOnText } = await import("../core/engine/regulationCompliance");
-        out.headlineZh = await enforceBrandRulesOnText(input.brandId, out.headlineZh).catch(() => out.headlineZh);
-        const reg = await enforceRegulationsOnText(input.brandId, out.headlineZh);
-        if (reg.record?.status === "fixed") out.headlineZh = await enforceBrandRulesOnText(input.brandId, reg.text).catch(() => reg.text);
+        const out = await proposeImageDirections({ spec, copy: input.copy, brand, productName: input.productName, brainPrefix, count: input.count });
+        out.headlineZh = await cleanOverlayTitle(input.brandId, out.headlineZh);
         return out;
       } catch (e) {
         throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: e instanceof Error ? e.message : String(e) });
@@ -169,6 +179,8 @@ export const imageCardRouter = router({
       productImageUrl: z.string().max(2048).optional(),
       /** 對話修改：上一版；延伸尺寸：來源圖。只收本站產出的圖。 */
       referenceImageUrl: z.string().max(2048).optional(),
+      /** previous＝同一張的上一版（預設）；style＝整組第 1 張，只借風格、畫面另外寫。 */
+      referenceMode: z.enum(["previous", "style"]).optional(),
       instruction: z.string().max(600).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
@@ -196,6 +208,7 @@ export const imageCardRouter = router({
           modelChoice: input.modelChoice,
           productImageUrl: input.productImageUrl,
           referenceImageUrl: input.referenceImageUrl,
+          referenceMode: input.referenceMode,
           instruction: input.instruction?.trim() || undefined,
         });
       } catch (e) {
@@ -209,6 +222,64 @@ export const imageCardRouter = router({
         .replace(/sk-[A-Za-z0-9_\-]{16,}/g, "[REDACTED]")
         .slice(0, 400);
       return { ...out, errorMsg: out.errorMsg ? scrub(out.errorMsg) : undefined, card: publicSpec(spec) };
+    }),
+
+  /**
+   * 2026-10-04（CJ「張數可以讓用戶選，選擇幾張後，AI 再提供每一張的建議」）：
+   * 整組方向選定後，依文案結構拆成 count 張，每張給角色、圖上標題與畫面。不扣點（只有文字）。
+   */
+  planSeries: protectedProcedure
+    .input(z.object({
+      brandId: z.number().int().positive(),
+      cardId: z.string().max(60),
+      copy: z.string().min(2).max(6000),
+      count: z.number().int().min(2).max(MAX_SERIES),
+      direction: z.object({
+        titleZh: z.string().max(60),
+        sceneZh: z.string().max(400),
+        paletteZh: z.string().max(200).default(""),
+        promptEn: z.string().min(2).max(4000),
+      }),
+      productName: z.string().max(200).optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED" });
+      await assertBrandOwner(ctx.user.id, input.brandId);
+      const spec = specOr404(input.cardId);
+      if (input.count > spec.maxImages) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: `這張卡最多 ${spec.maxImages} 張。` });
+      }
+      const brand = await resolveBrandVisualContext(input.brandId);
+      const { buildBrandPrefix } = await import("../../strategy/core/brand/brandContext");
+      const brainPrefix = await buildBrandPrefix(input.brandId, null, null, "full", spec.channel).catch(() => "");
+      try {
+        const slides = await planSeriesSlides({
+          spec, copy: input.copy, count: input.count, direction: input.direction,
+          brand, productName: input.productName, brainPrefix,
+        });
+        for (const sl of slides) sl.titleZh = await cleanOverlayTitle(input.brandId, sl.titleZh);
+        return { slides };
+      } catch (e) {
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: e instanceof Error ? e.message : String(e) });
+      }
+    }),
+
+  /**
+   * 組圖時每一張都可能疊了自己的標題；一張一個請求（base64 不要全塞進同一包）存成交付檔，
+   * 回傳網址，之後 saveAsPost 只收網址。欄位名一定要叫 imageB64（見 saveAsPost 的說明）。
+   */
+  uploadTitled: protectedProcedure
+    .input(z.object({
+      brandId: z.number().int().positive(),
+      cardId: z.string().max(60),
+      imageB64: z.string().max(24_000_000),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED" });
+      await assertBrandOwner(ctx.user.id, input.brandId);
+      const saved = await saveTitledImage(input.imageB64, specOr404(input.cardId));
+      if (!saved.ok) throw new TRPCError({ code: "BAD_REQUEST", message: saved.reason });
+      return { url: saved.url };
     }),
 
   /**

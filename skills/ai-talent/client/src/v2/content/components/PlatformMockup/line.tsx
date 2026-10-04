@@ -10,14 +10,16 @@ import { Avatar, Skeleton } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faLine } from "@fortawesome/free-brands-svg-icons";
 import { faImages, faBell, faQrcode, faArrowRight, faGift } from "@fortawesome/free-solid-svg-icons";
-import { type MockupFields, MockupHeader, dicebear, MarkdownText } from "./shared";
+import { type MockupFields, MockupHeader, dicebear, MarkdownText, realSlideUrls } from "./shared";
 import { useLang } from "../../../../lib/i18n";
 
 /* ─────────────── LINE Broadcast Message ─────────────── */
 
-export function LINEBroadcast({ title, brandName, variantLabel, liveCaption, liveImageDesc, liveCta, liveImageUrl, liveImageStatus }: MockupFields) {
+export function LINEBroadcast({ title, brandName, variantLabel, liveCaption, liveImageDesc, liveCta, liveImageUrl, liveImageStatus, liveCards }: MockupFields) {
   const { lang } = useLang();
   const brand = brandName ?? "Your Brand";
+  // LINE 沒有輪播貼文：多張圖＝一則一則依序送出的圖片訊息。
+  const slideUrls = realSlideUrls({ liveCards, liveImageUrl, liveImageStatus });
 
   return (
     <div className="w-full max-w-[400px] mx-auto">
@@ -47,8 +49,12 @@ export function LINEBroadcast({ title, brandName, variantLabel, liveCaption, liv
               <Avatar src={dicebear(brand)} size="sm" className="shrink-0 mt-auto" />
               <div className="max-w-[85%] space-y-1">
                 {/* 2026-10-04：真的有圖就照原比例顯示（LINE 聊天室不裁圖），沒有才畫佔位框。 */}
-                {liveImageUrl && liveImageStatus === "ready" ? (
-                  <img src={liveImageUrl} alt="" className="block w-full h-auto rounded-2xl rounded-tl-none min-w-[220px]" style={{ maxHeight: 420, objectFit: "contain", backgroundColor: "#e0e0e0" }} />
+                {slideUrls.length ? (
+                  <div className="space-y-1.5">
+                    {slideUrls.map((u, i) => (
+                      <img key={i} src={u} alt="" className={`block w-full h-auto rounded-2xl min-w-[220px] ${i === 0 ? "rounded-tl-none" : ""}`} style={{ maxHeight: 420, objectFit: "contain", backgroundColor: "#e0e0e0" }} />
+                    ))}
+                  </div>
                 ) : (
                 <div className="aspect-[16/9] w-full bg-[#e0e0e0] rounded-2xl rounded-tl-none overflow-hidden flex items-center justify-center relative min-w-[220px]">
                   <Skeleton className="absolute inset-0 rounded-none" />

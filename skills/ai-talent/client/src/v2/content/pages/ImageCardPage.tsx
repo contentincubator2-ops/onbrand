@@ -22,7 +22,7 @@ import { useLang } from "../../../lib/i18n";
 import { showToastGlobal } from "../../platform/components/Toast";
 import type { ShellOutletCtx } from "../../platform/lib/shellContext";
 import type { ImageCardInfo } from "../../platform/lib/imageCardHandoff";
-import { clearImageCardHandoff, readImageCardHandoff, takeImageSubjectHandoff } from "../../platform/lib/imageCardHandoff";
+import { clearImageCardHandoff, readImageCardHandoff, saveImageCardHandoff, saveImageSubjectHandoff, takeImageSubjectHandoff, imageCardHref } from "../../platform/lib/imageCardHandoff";
 import BrandLibrary from "../../strategy/components/assets/BrandLibrary";
 import { uploadBrandPhoto, IMAGE_ACCEPT } from "../../strategy/lib/uploadBrandPhoto";
 import { Icon } from "../../platform/components/icons";
@@ -35,6 +35,10 @@ type Model = "gpt-image-2" | "nano-banana";
 interface Direction { id: string; titleZh: string; sceneZh: string; paletteZh: string; whyZh: string; promptEn: string }
 interface Version { url: string; note: string }
 interface Slot { versions: Version[]; active: number }
+/** 整組（輪播／相簿）裡 AI 規劃的一張。 */
+interface SlidePlan { roleZh: string; titleZh: string; sceneZh: string; promptEn: string }
+/** 一組最多幾張：點數是一張一張扣的，再多也沒人會一次做。 */
+const SERIES_MAX = 10;
 
 const CHANNEL_ZH: Record<string, string> = {
   facebook: "Facebook", instagram: "Instagram", threads: "Threads", line: "LINE",
@@ -182,22 +186,38 @@ export default function ImageCardPage() {
   const [failure, setFailure] = useState<{ msg: string; canNano: boolean } | null>(null);
   const [extendPick, setExtendPick] = useState<string[]>([]);
   const [extended, setExtended] = useState<Record<string, { status: "running" | "ready" | "failed"; url?: string; msg?: string }>>({});
+  // ── 整組（輪播／相簿） ──
+  // 2026-10-04（CJ「張數可以讓用戶選，選擇幾張後，AI 再提供每一張的建議」＋「生成第一個版本後，
+  // 給我反悔的機會，可以重新選方向」）：選張數 → 提整組方向 → AI 依文案結構規劃每一張 →
+  // 先只生第 1 張（整組風格基準）→ 滿意才生其餘；不滿意可以重新選方向。
+  const [count, setCount] = useState(1);
+  const [plan, setPlan] = useState<SlidePlan[] | null>(null);
+  const [titles, setTitles] = useState<string[]>([]);
+  const [notes, setNotes] = useState<string[]>([]);
+  const [restBusy, setRestBusy] = useState(false);
+  const [restAt, setRestAt] = useState(0);
 
   // 卡片換了（從延伸結果點進另一張卡）就重來。
   useEffect(() => {
     setDirections([]); setPicked(null); setSlots([]); setActiveSlot(0); setFailure(null); setExtended({}); setExtendPick([]);
+    setCount(1); setPlan(null); setTitles([]); setNotes([]);
   }, [cardId]);
+  // 換了方向或張數，之前規劃的每一張就作廢。
+  useEffect(() => { setPlan(null); }, [picked, count]);
   useEffect(() => { if (card && !card.nanoBanana && model === "nano-banana") setModel("gpt-image-2"); }, [card, model]);
 
   const proposeMut = trpc.imageCard.propose.useMutation();
   const renderMut = trpc.imageCard.render.useMutation();
+  const planMut = trpc.imageCard.planSeries.useMutation();
+  const uploadTitledMut = trpc.imageCard.uploadTitled.useMutation();
 
   // ── 圖文預覽與排程 ──
   const savePostMut = trpc.imageCard.saveAsPost.useMutation();
   const scheduleMut = trpc.calendar.schedule.useMutation();
   const [postOpen, setPostOpen] = useState(false);
-  /** 預覽用的圖：有標題就是疊好標題的那張（data URL），沒有就是原圖。 */
-  const [postImage, setPostImage] = useState<string | null>(null);
+  /** 預覽用的圖（每一張一個，順序同 slots）：有標題就是疊好標題的那張（data URL），沒有就是原圖。 */
+  const [postImages, setPostImages] = useState<string[]>([]);
+  const [composing, setComposing] = useState(false);
   const [schedDate, setSchedDate] = useState(() => {
     const d = new Date(Date.now() + 24 * 3600_000);
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -219,7 +239,7 @@ export default function ImageCardPage() {
   }, [picked, customScene, directions]);
 
   const current: Version | null = slots[activeSlot]?.versions[slots[activeSlot].active] ?? null;
-  const busy = renderMut.isPending;
+  const busy = renderMut.isPending || restBusy;
 
   if (!listQ.isLoading && !card) {
     return (
@@ -231,11 +251,27 @@ export default function ImageCardPage() {
   }
   if (!card) return <div className="py-20 flex justify-center"><Spinner /></div>;
 
+  // ── 整組的派生值（card 一定存在，早退已在上面） ──
+  const cap = Math.min(card.maxImages, SERIES_MAX);
+  const n = Math.min(count, cap);
+  const series = n > 1;
+  /** 第 i 張的圖上標題：組圖各張有自己的，單張就是 headline。 */
+  const titleOf = (i: number) => (series ? (titles[i] ?? "") : headline);
+  const setTitleOf = (i: number, v: string) => {
+    if (series) setTitles((p) => { const a = [...p]; a[i] = v; return a; });
+    else setHeadline(v);
+  };
+  const titledAt = (i: number) => showTitle && titleOf(i).trim().length > 0 && card.titleZone !== "none";
+  /** 第 i 張要畫的場景：組圖用 AI 規劃的，單張用選定的方向。 */
+  const sceneFor = (i: number) => (series && plan?.[i] ? plan[i]!.promptEn : scenePrompt);
+  const noteOf = (i: number) => (series && notes[i]?.trim() ? `Extra note from the user for this slide: ${notes[i]!.trim()}` : undefined);
+  const productNameForLLM = products.some((p) => p.imageUrl === product?.imageUrl) ? product?.name : undefined;
+
   async function propose() {
     if (!brandId) { showToastGlobal(lang === "en" ? "Pick a brand first." : "請先選擇品牌。"); return; }
     if (copy.trim().length < 2) { showToastGlobal(lang === "en" ? "Paste the copy first." : "先貼上文案。"); return; }
     try {
-      const r = await proposeMut.mutateAsync({ brandId, cardId: card!.id, copy: copy.trim(), productName: products.some((p) => p.imageUrl === product?.imageUrl) ? product?.name : undefined });
+      const r = await proposeMut.mutateAsync({ brandId, cardId: card!.id, copy: copy.trim(), productName: productNameForLLM, count: series ? n : undefined });
       setDirections(r.directions as Direction[]);
       setPicked((r.directions[0] as Direction | undefined)?.id ?? null);
       if (!headline) setHeadline(r.headlineZh);
@@ -244,14 +280,35 @@ export default function ImageCardPage() {
     }
   }
 
-  async function render(opts: { reference?: string; instruction?: string; newSlot?: boolean; targetCard?: ImageCardInfo; useModel?: Model }) {
-    if (!brandId || !scenePrompt) return null;
+  /** 整組：方向選定後，AI 依文案結構規劃每一張（角色、標題、畫面）。 */
+  async function planSlides() {
+    if (!brandId || !scenePrompt) return;
+    const d = picked === "custom"
+      ? { titleZh: lang === "en" ? "Custom" : "自訂", sceneZh: customScene.trim(), paletteZh: "", promptEn: customScene.trim() }
+      : directions.find((x) => x.id === picked);
+    if (!d) return;
+    try {
+      const r = await planMut.mutateAsync({
+        brandId, cardId: card!.id, copy: copy.trim(), count: n, productName: productNameForLLM,
+        direction: { titleZh: d.titleZh, sceneZh: d.sceneZh, paletteZh: d.paletteZh, promptEn: d.promptEn },
+      });
+      setPlan(r.slides as SlidePlan[]);
+      setTitles(r.slides.map((x) => x.titleZh));
+      setNotes(r.slides.map(() => ""));
+    } catch (e: any) {
+      showToastGlobal(String(e?.message ?? e).slice(0, 160));
+    }
+  }
+
+  async function render(opts: { reference?: string; referenceMode?: "previous" | "style"; instruction?: string; scene?: string; targetCard?: ImageCardInfo; useModel?: Model }) {
+    const scene = opts.scene ?? scenePrompt;
+    if (!brandId || !scene) return null;
     const target = opts.targetCard ?? card!;
     const m = opts.useModel ?? (target.nanoBanana ? model : "gpt-image-2");
     const r = await renderMut.mutateAsync({
-      brandId, cardId: target.id, scenePromptEn: scenePrompt, modelChoice: m,
+      brandId, cardId: target.id, scenePromptEn: scene, modelChoice: m,
       productImageUrl: opts.reference ? undefined : product?.imageUrl,
-      referenceImageUrl: opts.reference, instruction: opts.instruction,
+      referenceImageUrl: opts.reference, referenceMode: opts.referenceMode, instruction: opts.instruction,
     });
     return r;
   }
@@ -259,7 +316,7 @@ export default function ImageCardPage() {
   async function generateFirst(useModel?: Model) {
     setFailure(null);
     try {
-      const r = await render({ useModel });
+      const r = await render({ useModel, scene: sceneFor(0), instruction: noteOf(0) });
       if (r?.status === "ready" && r.url) {
         setSlots([{ versions: [{ url: r.url, note: lang === "en" ? "First draft" : "初稿" }], active: 0 }]);
         setActiveSlot(0);
@@ -269,31 +326,44 @@ export default function ImageCardPage() {
     } catch (e: any) { setFailure({ msg: String(e?.message ?? e), canNano: false }); }
   }
 
+  /** 整組：第 1 張滿意後，其餘每張以第 1 張當風格基準、各畫各的場景。失敗就停在那張，可接著重試。 */
+  async function generateRest() {
+    if (!plan || !slots[0]) return;
+    const base = slots[0].versions[slots[0].active]!.url;
+    const from = slots.length;
+    setFailure(null); setRestBusy(true);
+    try {
+      for (let i = from; i < n; i++) {
+        setRestAt(i + 1);
+        const r = await render({ scene: plan[i]!.promptEn, reference: base, referenceMode: "style", instruction: noteOf(i) });
+        if (r?.status === "ready" && r.url) {
+          setSlots((prev) => [...prev, { versions: [{ url: r.url!, note: plan[i]!.roleZh }], active: 0 }]);
+          setActiveSlot(i);
+        } else {
+          setFailure({ msg: r?.errorMsg ?? "", canNano: false });
+          break;
+        }
+      }
+    } catch (e: any) { setFailure({ msg: String(e?.message ?? e), canNano: false }); }
+    finally { setRestBusy(false); }
+  }
+
+  /** 反悔：整組（或單張）作廢，回到「選方向」；方向清單、文案、產品照都留著。 */
+  function rePickDirection() {
+    if (slots.length > 1 && !window.confirm(lang === "en" ? "Discard the images generated so far and pick a direction again?" : "已生成的圖會放掉，回到選方向重來。確定嗎？")) return;
+    setSlots([]); setActiveSlot(0); setFailure(null); setPlan(null); setExtended({}); setExtendPick([]);
+  }
+
   async function refine(instruction: string) {
     if (!current || !instruction.trim()) return;
     setFailure(null);
     try {
-      const r = await render({ reference: current.url, instruction: instruction.trim() });
+      const r = await render({ reference: current.url, instruction: instruction.trim(), scene: sceneFor(activeSlot) });
       if (r?.status === "ready" && r.url) {
         setSlots((prev) => prev.map((s, i) => i !== activeSlot ? s : {
           versions: [...s.versions, { url: r.url!, note: instruction.trim() }], active: s.versions.length,
         }));
         setEditText("");
-      } else if (r) setFailure({ msg: r.errorMsg ?? "", canNano: false });
-    } catch (e: any) { setFailure({ msg: String(e?.message ?? e), canNano: false }); }
-  }
-
-  async function addToSeries() {
-    if (!current) return;
-    setFailure(null);
-    try {
-      const r = await render({
-        reference: current.url,
-        instruction: "Next image in the same series: a different angle, moment or detail of the same story, same palette, lighting and style.",
-      });
-      if (r?.status === "ready" && r.url) {
-        setSlots((prev) => [...prev, { versions: [{ url: r.url!, note: lang === "en" ? "Series" : "同系列" }], active: 0 }]);
-        setActiveSlot(slots.length);
       } else if (r) setFailure({ msg: r.errorMsg ?? "", canNano: false });
     } catch (e: any) { setFailure({ msg: String(e?.message ?? e), canNano: false }); }
   }
@@ -304,7 +374,7 @@ export default function ImageCardPage() {
     for (const t of targets) {
       setExtended((p) => ({ ...p, [t.id]: { status: "running" } }));
       try {
-        const r = await render({ reference: current.url, targetCard: t });
+        const r = await render({ reference: current.url, targetCard: t, scene: sceneFor(activeSlot) });
         setExtended((p) => ({ ...p, [t.id]: r?.status === "ready" ? { status: "ready", url: r.url } : { status: "failed", msg: r?.errorMsg } }));
       } catch (e: any) {
         setExtended((p) => ({ ...p, [t.id]: { status: "failed", msg: String(e?.message ?? e) } }));
@@ -312,18 +382,21 @@ export default function ImageCardPage() {
     }
   }
 
-  const titled = showTitle && headline.trim().length > 0 && card.titleZone !== "none";
   const fromOutputId = !asNewPost && fromRunId != null && Number.isFinite(Number(fromRunId)) ? Number(fromRunId) : undefined;
+  const setComplete = slots.length >= n;
 
+  /** 預覽前先把每一張的標題疊好（用的就是之後排程存檔的那一張）。 */
   async function openPost() {
     if (!current) return;
-    // 一組多張時，貼文的主圖是第一張；標題也只疊在第一張。
-    const base = slots[0]!.versions[slots[0]!.active]!.url;
-    setPostImage(base);
+    const bases = slots.map((sl) => sl.versions[sl.active]!.url);
+    setPostImages(bases);
     setPostOpen(true);
-    if (!titled) return;
-    try { setPostImage(await composeTitled(card!, base, headline, darkTitle)); }
-    catch { showToastGlobal(lang === "en" ? "Could not draw the title on the image." : "標題疊不上去，先用沒有標題的圖預覽。"); }
+    if (!bases.some((_, i) => titledAt(i))) return;
+    setComposing(true);
+    try {
+      setPostImages(await Promise.all(bases.map((u, i) => (titledAt(i) ? composeTitled(card!, u, titleOf(i), darkTitle) : Promise.resolve(u)))));
+    } catch { showToastGlobal(lang === "en" ? "Could not draw the title on the image." : "標題疊不上去，先用沒有標題的圖預覽。"); }
+    finally { setComposing(false); }
   }
 
   /** 把圖＋文案存成一篇產出（或寫回來源那篇）。schedule=true 再排進行事曆。 */
@@ -340,15 +413,23 @@ export default function ImageCardPage() {
       return;
     }
     try {
-      const urls = slots.map((sl) => sl.versions[sl.active]!.url);
-      const key = JSON.stringify([card!.id, urls, fromOutputId ?? null, fromOutputId ? null : copy, titled ? [headline, darkTitle] : null]);
+      const bases = slots.map((sl) => sl.versions[sl.active]!.url);
+      const key = JSON.stringify([card!.id, bases, fromOutputId ?? null, fromOutputId ? null : copy, bases.map((_, i) => (titledAt(i) ? titleOf(i) : null)), darkTitle]);
       let saved = savedPostRef.current?.key === key ? savedPostRef.current : null;
       if (!saved) {
+        // 每一張疊好標題的各自存成交付檔（一張一個請求），之後只傳網址。
+        const urls = [...bases];
+        const last = fromOutputId ? 1 : bases.length;
+        for (let i = 0; i < last; i++) {
+          const data = postImages[i];
+          if (titledAt(i) && data?.startsWith("data:image/")) {
+            urls[i] = (await uploadTitledMut.mutateAsync({ brandId, cardId: card!.id, imageB64: data })).url;
+          }
+        }
         const r = await savePostMut.mutateAsync({
           brandId, cardId: card!.id, copy,
           // 寫回來源文案時只帶一張（那一則只有一個圖位）。
           imageUrls: fromOutputId ? [urls[0]!] : urls,
-          imageB64: titled && postImage?.startsWith("data:image/") ? postImage : undefined,
           fromOutputId,
           ...(fromOutputId ? fromLocator : {}),
         });
@@ -369,10 +450,14 @@ export default function ImageCardPage() {
       setPostError(msg && !msg.startsWith("{") && !msg.startsWith("<") ? msg.slice(0, 200) : (lang === "en" ? "Couldn't save. Please try again." : "沒有存成功，請再試一次。"));
     }
   }
-  const postBusy = savePostMut.isPending || scheduleMut.isPending;
+  const postBusy = savePostMut.isPending || scheduleMut.isPending || uploadTitledMut.isPending || composing;
 
 
   const ratioCss = `${card.width} / ${card.height}`;
+  /** 這張卡只能單張時，同通路（非廣告）有沒有可以做多張的卡——給「想一次做多張」的捷徑。 */
+  const multiCard = card.maxImages <= 1
+    ? cards.find((c) => c.channel === card.channel && c.maxImages > 1 && (c.placement ?? "organic") === "organic")
+    : undefined;
   const sameChannel = cards.filter((c) => c.channel === card.channel && c.id !== card.id);
   const otherChannels = cards.filter((c) => c.channel !== card.channel);
   const step = current ? 2 : 1;
@@ -432,7 +517,7 @@ export default function ImageCardPage() {
                   {card.safeZone.right > 0 && <div className="absolute right-0 top-0 bottom-0 bg-black/15 pointer-events-none" style={{ width: `${card.safeZone.right * 100}%` }} />}
                 </>
               )}
-              {current && showTitle && headline.trim() && card.titleZone !== "none" && (
+              {current && titledAt(activeSlot) && (
                 <div style={overlayStyle(card.titleZone)} className="pointer-events-none">
                   <span
                     className="font-bold leading-tight"
@@ -442,7 +527,7 @@ export default function ImageCardPage() {
                       textShadow: darkTitle ? "0 0 10px rgba(255,255,255,.5)" : "0 1px 12px rgba(0,0,0,.45)",
                     }}
                   >
-                    {headline}
+                    {titleOf(activeSlot)}
                   </span>
                 </div>
               )}
@@ -466,17 +551,24 @@ export default function ImageCardPage() {
             )}
 
             {/* 多圖（輪播／相簿） */}
-            {card.maxImages > 1 && slots.length > 0 && (
+            {series && slots.length > 0 && (
               <div className="mt-3">
                 <p className="text-tiny text-default-500 mb-1.5">
-                  {lang === "en" ? `Set: ${slots.length} / ${card.maxImages}` : `這一組：${slots.length} / ${card.maxImages} 張`}
+                  {lang === "en" ? `Set: ${slots.length} / ${n}` : `這一組：${slots.length} / ${n} 張`}
+                  {plan?.[activeSlot] ? ` · ${plan[activeSlot]!.roleZh}` : ""}
                 </p>
                 <div className="flex gap-2 overflow-x-auto pb-1">
-                  {slots.map((s, i) => (
+                  {Array.from({ length: n }, (_, i) => slots[i] ? (
                     <button key={i} onClick={() => setActiveSlot(i)}
-                      className={`shrink-0 rounded-md overflow-hidden border-2 ${activeSlot === i ? "border-default-900" : "border-transparent"}`}>
-                      <img src={s.versions[s.active].url} alt="" style={{ height: 64, aspectRatio: ratioCss, objectFit: "cover" }} />
+                      className={`relative shrink-0 rounded-md overflow-hidden border-2 ${activeSlot === i ? "border-default-900" : "border-transparent"}`}>
+                      <img src={slots[i]!.versions[slots[i]!.active].url} alt="" style={{ height: 64, aspectRatio: ratioCss, objectFit: "cover" }} />
+                      <span className="absolute left-0.5 top-0.5 w-4 h-4 rounded-full bg-black/60 text-white text-[10px] leading-4 text-center">{i + 1}</span>
                     </button>
+                  ) : (
+                    <div key={i} className="shrink-0 rounded-md border-2 border-dashed border-default-200 flex items-center justify-center text-[11px] text-default-400"
+                      style={{ height: 64, aspectRatio: ratioCss }}>
+                      {restBusy && restAt === i + 1 ? <Spinner size="sm" /> : i + 1}
+                    </div>
                   ))}
                 </div>
               </div>
@@ -572,6 +664,36 @@ export default function ImageCardPage() {
                   )}
                 </div>
               </div>
+              {cap > 1 ? (
+                <div>
+                  <p className="text-tiny text-default-500 mb-1.5">
+                    {lang === "en" ? "How many images" : "出幾張圖"}
+                    <span className="ml-1.5 text-default-400">
+                      {series
+                        ? (lang === "en" ? `· a set of ${n}; AI plans each one from your copy` : `· 一組 ${n} 張，AI 會依文案結構規劃每一張`)
+                        : (lang === "en" ? "· single image" : "· 單張")}
+                    </span>
+                  </p>
+                  <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label={lang === "en" ? "Number of images" : "張數"}>
+                    {Array.from({ length: cap }, (_, i) => i + 1).map((k) => (
+                      <button key={k} type="button" role="radio" aria-checked={n === k} onClick={() => setCount(k)}
+                        disabled={busy || slots.length > 0}
+                        className={`w-9 h-9 rounded-lg border-2 text-small tabular-nums disabled:opacity-40 ${n === k ? "border-default-900 bg-default-900 text-white" : "border-default-200 text-default-600 hover:border-default-400"}`}>
+                        {k}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ) : multiCard ? (
+                <button type="button" className="text-tiny text-default-500 underline underline-offset-2 text-left"
+                  onClick={() => {
+                    saveImageCardHandoff({ copy, fromRunId, locator: fromLocator });
+                    if (product) saveImageSubjectHandoff({ url: product.imageUrl, label: product.name });
+                    navigate(imageCardHref(multiCard.id));
+                  }}>
+                  {lang === "en" ? `Want several images in one post? Use “${multiCard.labelEn}”` : `想一次做多張？改用「${multiCard.labelZh}」`}
+                </button>
+              ) : null}
               <div className="flex flex-wrap items-center gap-2 text-tiny">
                 <span className="text-default-500">{lang === "en" ? "Model" : "模型"}</span>
                 <select className="border border-default-200 rounded-md px-2 py-1 bg-white" value={model} onChange={(e) => setModel(e.target.value as Model)}>
@@ -585,7 +707,11 @@ export default function ImageCardPage() {
                 {lang === "en" ? "Brand colours and imagery style are applied automatically." : "品牌色與圖像風格會自動套用（在品牌視覺頁設定）。"}
               </p>
               <Button color="primary" onPress={propose} isLoading={proposeMut.isPending} isDisabled={!brandId}>
-                {directions.length ? (lang === "en" ? "Suggest again" : "重新提方向") : (lang === "en" ? "Suggest 3 directions" : "先提 3 個畫面方向")}
+                {directions.length
+                  ? (lang === "en" ? "Suggest again" : "重新提方向")
+                  : series
+                    ? (lang === "en" ? "Suggest 3 directions for the set" : "先提 3 個整組的視覺方向")
+                    : (lang === "en" ? "Suggest 3 directions" : "先提 3 個畫面方向")}
               </Button>
 
               {directions.length > 0 && (
@@ -606,19 +732,86 @@ export default function ImageCardPage() {
                         placeholder={lang === "en" ? "e.g. morning light on a wooden table…" : "例：木桌上的晨光，產品放在手邊…"} />
                     )}
                   </button>
-                  <Input label={lang === "en" ? "Title on the image (editable, not drawn by AI)" : "圖上標題（可改，不會讓 AI 畫字）"}
-                    value={headline} onValueChange={setHeadline} size="sm" />
-                  <Button color="primary" className="w-full" onPress={() => generateFirst()} isLoading={busy} isDisabled={!scenePrompt}>
-                    {lang === "en" ? "Generate this direction" : "生成這個方向"}
-                  </Button>
+                  {!series && (
+                    <Input label={lang === "en" ? "Title on the image (editable, not drawn by AI)" : "圖上標題（可改，不會讓 AI 畫字）"}
+                      value={headline} onValueChange={setHeadline} size="sm" />
+                  )}
+                  {!series && (
+                    <Button color="primary" className="w-full" onPress={() => generateFirst()} isLoading={busy} isDisabled={!scenePrompt}>
+                      {lang === "en" ? "Generate this direction" : "生成這個方向"}
+                    </Button>
+                  )}
+                  {series && !plan && (
+                    <Button color="primary" className="w-full" onPress={planSlides} isLoading={planMut.isPending} isDisabled={!scenePrompt}>
+                      {lang === "en" ? `Plan the ${n} images from my copy` : `讓 AI 依文案規劃這 ${n} 張`}
+                    </Button>
+                  )}
+                  {series && plan && (
+                    <div className="space-y-2.5 pt-1">
+                      <p className="text-small font-semibold">{lang === "en" ? `AI's plan for ${n} images` : `AI 建議的 ${n} 張內容`}</p>
+                      <p className="text-[11px] text-default-400 leading-relaxed">
+                        {lang === "en"
+                          ? "Edit any title, or add a note for a slide. Slide 1 is generated first and sets the look of the whole set."
+                          : "標題可以直接改，也可以替某一張補一句畫面要求。先生成第 1 張，它會決定整組的風格。"}
+                      </p>
+                      {plan.map((sl, i) => (
+                        <div key={i} className="rounded-lg border border-default-200 p-2.5 space-y-1.5">
+                          <div className="flex items-center gap-2">
+                            <span className="w-5 h-5 rounded-full bg-default-900 text-white text-[11px] leading-5 text-center tabular-nums">{i + 1}</span>
+                            <span className="text-tiny font-semibold">{sl.roleZh}</span>
+                          </div>
+                          <p className="text-tiny text-default-600 leading-relaxed">{sl.sceneZh}</p>
+                          {card.titleZone !== "none" && (
+                            <Input size="sm" label={lang === "en" ? "Title on the image" : "圖上標題"} value={titles[i] ?? ""} onValueChange={(v) => setTitleOf(i, v)} />
+                          )}
+                          <Input size="sm" label={lang === "en" ? "Note for this slide (optional)" : "想調整這張的畫面？（選填）"} value={notes[i] ?? ""}
+                            onValueChange={(v) => setNotes((p) => { const a = [...p]; a[i] = v; return a; })} />
+                        </div>
+                      ))}
+                      <Button color="primary" className="w-full" onPress={() => generateFirst()} isLoading={busy}>
+                        {lang === "en" ? "Generate slide 1 (cover) first" : "先生成第 1 張（封面）"}
+                      </Button>
+                    </div>
+                  )}
                 </div>
               )}
             </section>
           )}
 
+          {current && series && plan && !setComplete && (
+            <section className="rounded-lg border border-default-300 bg-default-50 p-3 space-y-2">
+              <p className="text-small font-semibold">
+                {slots.length === 1
+                  ? (lang === "en" ? "Slide 1 sets the look of the whole set" : "第 1 張是整組的風格基準")
+                  : (lang === "en" ? `${slots.length} of ${n} done` : `已完成 ${slots.length} / ${n} 張`)}
+              </p>
+              <p className="text-[11px] text-default-500 leading-relaxed">
+                {lang === "en"
+                  ? `Happy with it? Generate the other ${n - slots.length}. Not quite? Edit below, or pick a direction again — nothing else is charged yet.`
+                  : `滿意就生成其餘 ${n - slots.length} 張；不滿意可以用下面的對話修改，或重新選方向——其餘張數還沒扣點。`}
+              </p>
+              <div className="flex gap-2 flex-wrap">
+                <Button color="primary" onPress={generateRest} isLoading={restBusy}>
+                  {restBusy
+                    ? (lang === "en" ? `Generating ${restAt} / ${n}…` : `生成第 ${restAt} / ${n} 張…`)
+                    : slots.length === 1
+                      ? (lang === "en" ? `Looks good — generate the other ${n - 1}` : `滿意，生成其餘 ${n - 1} 張`)
+                      : (lang === "en" ? `Continue with the other ${n - slots.length}` : `繼續生成其餘 ${n - slots.length} 張`)}
+                </Button>
+                <Button variant="bordered" onPress={rePickDirection} isDisabled={busy}>
+                  {lang === "en" ? "Pick a direction again" : "重新選方向"}
+                </Button>
+              </div>
+            </section>
+          )}
+
           {current && (
             <section className="space-y-3">
-              <p className="text-small font-semibold">{lang === "en" ? "What should change?" : "想怎麼改？"}</p>
+              <p className="text-small font-semibold">
+                {series && plan?.[activeSlot]
+                  ? (lang === "en" ? `Edit slide ${activeSlot + 1} · ${plan[activeSlot]!.roleZh}` : `修改第 ${activeSlot + 1} 張・${plan[activeSlot]!.roleZh}`)
+                  : (lang === "en" ? "What should change?" : "想怎麼改？")}
+              </p>
               <div className="flex flex-wrap gap-1.5">
                 {QUICK_EDITS.map(([zhQ, enQ]) => { const q = lang === "en" ? enQ : zhQ; return (
                   <button key={zhQ} disabled={busy} onClick={() => refine(q)}
@@ -633,22 +826,24 @@ export default function ImageCardPage() {
                   {lang === "en" ? "Apply" : "修改"}
                 </Button>
               </div>
-              <Input label={lang === "en" ? "Title on the image" : "圖上標題"} value={headline} onValueChange={setHeadline} size="sm" />
+              {card.titleZone !== "none" && (
+                <Input label={lang === "en" ? "Title on the image" : "圖上標題"} value={titleOf(activeSlot)} onValueChange={(v) => setTitleOf(activeSlot, v)} size="sm" />
+              )}
               {/* 2026-10-04：圖做好後的主要出口是「跟文案一起預覽、排程」，下載退成次要。 */}
-              <Button color="primary" className="w-full" onPress={openPost} isDisabled={busy || !brandId}>
-                {lang === "en" ? "Preview with copy & schedule" : "圖文預覽與排程"}
+              <Button color="primary" className="w-full" onPress={openPost} isDisabled={busy || !brandId || !setComplete}>
+                {series
+                  ? (lang === "en" ? `Preview all ${n} on ${CHANNEL_EN[card.channel] ?? card.channel} & schedule` : `預覽 ${n} 張在 ${CHANNEL_ZH[card.channel] ?? card.channel} 的樣子，並排程`)
+                  : (lang === "en" ? "Preview with copy & schedule" : "圖文預覽與排程")}
               </Button>
+              {series && !setComplete && (
+                <p className="text-[11px] text-default-400 -mt-1.5">{lang === "en" ? "Available once all images are generated." : "整組都生成完才能預覽。"}</p>
+              )}
               <div className="flex gap-2 flex-wrap">
-                <Button size="sm" variant="flat" onPress={() => downloadWithTitle(card, current.url, showTitle ? headline : "", darkTitle).catch(() => showToastGlobal(lang === "en" ? "Download failed" : "下載失敗"))}>
+                <Button size="sm" variant="flat" onPress={() => downloadWithTitle(card, current.url, titledAt(activeSlot) ? titleOf(activeSlot) : "", darkTitle).catch(() => showToastGlobal(lang === "en" ? "Download failed" : "下載失敗"))}>
                   {lang === "en" ? "Download" : "下載"}{lang === "en" ? ` (${card.width}×${card.height})` : `（${card.width}×${card.height}）`}
                 </Button>
-                {card.maxImages > 1 && slots.length < card.maxImages && (
-                  <Button size="sm" variant="bordered" onPress={addToSeries} isDisabled={busy}>
-                    {lang === "en" ? "+ Next image in the set" : "＋ 再做一張同系列"}
-                  </Button>
-                )}
-                <Button size="sm" variant="light" onPress={() => { setSlots([]); setActiveSlot(0); }}>
-                  {lang === "en" ? "Change direction" : "換方向"}
+                <Button size="sm" variant="bordered" onPress={rePickDirection} isDisabled={busy}>
+                  {lang === "en" ? "Not right? Pick a direction again" : "不滿意？重新選方向"}
                 </Button>
               </div>
             </section>
@@ -708,7 +903,7 @@ export default function ImageCardPage() {
                         <p className="mt-1 text-default-600">{(lang === "en" ? CHANNEL_EN : CHANNEL_ZH)[c.channel]}・{lang === "en" ? c.labelEn : c.labelZh}</p>
                         {x.status === "ready" && x.url && (
                           <div className="flex gap-2">
-                            <button className="underline text-default-500" onClick={() => downloadWithTitle(c, x.url!, showTitle ? headline : "", darkTitle)}>
+                            <button className="underline text-default-500" onClick={() => downloadWithTitle(c, x.url!, titledAt(activeSlot) ? titleOf(activeSlot) : "", darkTitle)}>
                               {lang === "en" ? "Download" : "下載"}
                             </button>
                           </div>
@@ -739,10 +934,10 @@ export default function ImageCardPage() {
                       brandName={brand?.name ?? null}
                       brandLogoUrl={brand?.logoUrl ?? brand?.logo_url ?? null}
                       liveCaption={copy}
-                      liveImageUrl={postImage ?? current?.url}
+                      liveImageUrl={postImages[0] ?? current?.url}
                       liveImageStatus="ready"
                       liveCards={!fromOutputId && slots.length > 1
-                        ? slots.map((sl, i) => ({ headline: "", body: "", image: { style: null, url: i === 0 && postImage ? postImage : sl.versions[sl.active]!.url, status: "ready" } }))
+                        ? slots.map((sl, i) => ({ headline: "", body: "", image: { style: null, url: postImages[i] ?? sl.versions[sl.active]!.url, status: "ready" } }))
                         : undefined}
                     />
                   </div>
@@ -783,9 +978,6 @@ export default function ImageCardPage() {
                     <Button variant="flat" className="w-full" onPress={() => savePost(false)} isDisabled={postBusy}>
                       {lang === "en" ? "Save as a post, schedule later" : "先存成貼文，晚點再排"}
                     </Button>
-                    {!fromOutputId && slots.length > 1 && titled && (
-                      <p className="text-[11px] text-default-400">{lang === "en" ? "The title is placed on the first image only." : "標題只會放在第一張。"}</p>
-                    )}
                   </div>
                 </div>
               </ModalBody>

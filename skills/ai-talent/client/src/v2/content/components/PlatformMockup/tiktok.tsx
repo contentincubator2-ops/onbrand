@@ -3,6 +3,7 @@
  * PR2.2: foryou, profile (carousel/live still fall to foryou)
  * Reference: SashenJayathilaka/TIK-TOK-Clone (MIT)
  */
+import React from "react";
 import { Avatar, Button, Skeleton } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faTiktok } from "@fortawesome/free-brands-svg-icons";
@@ -10,7 +11,7 @@ import {
   faVideo, faHeart, faComment, faShareNodes, faMusic, faPlus,
   faPlay, faLock, faShare, faGear,
 } from "@fortawesome/free-solid-svg-icons";
-import { type MockupFields, MockupHeader, dicebear, MarkdownText, ImageGenSlot } from "./shared";
+import { type MockupFields, MockupHeader, dicebear, MarkdownText, ImageGenSlot, realSlideUrls } from "./shared";
 import { useLang } from "../../../../lib/i18n";
 import { getPostTitleFallback } from "../../lib/mockupTitle";
 
@@ -148,8 +149,13 @@ export function TTProfile({ brandName, brandLogoUrl, variantLabel, liveCaption }
 
 /* ─────────────── TT Photo Carousel ─────────────── */
 
-export function TTCarousel({ title, brandName, variantLabel, liveImageStyle, liveImageStatus, liveImageUrl, onGenerateImage }: MockupFields) {
+export function TTCarousel({ title, brandName, variantLabel, liveImageStyle, liveImageStatus, liveImageUrl, liveCards, onGenerateImage }: MockupFields) {
   const { lang } = useLang();
+  const slideUrls = realSlideUrls({ liveCards, liveImageUrl, liveImageStatus });
+  const [slideIdx, setSlideIdx] = React.useState(0);
+  const realMulti = slideUrls.length > 1;
+  const at = Math.min(slideIdx, Math.max(0, slideUrls.length - 1));
+  const total = realMulti ? slideUrls.length : 8;
   const handle = (brandName ?? "your_brand").toLowerCase().replace(/\s+/g, "_");
   return (
     <div className="w-full max-w-[400px] mx-auto">
@@ -160,8 +166,8 @@ export function TTCarousel({ title, brandName, variantLabel, liveImageStyle, liv
         </div>
         {/* 2026-07-17 (CJ「盤查生圖佔位」): standardized ImageGenSlot（圖文輪播
             第 1 格 — 產出是圖片，非影片，故不加 videoFrame 註記） */}
-        {liveImageUrl && liveImageStatus === "ready" ? (
-          <img src={liveImageUrl} alt="" className="absolute inset-0 w-full h-full object-cover opacity-90" />
+        {slideUrls.length ? (
+          <img src={slideUrls[at]} alt="" className="absolute inset-0 w-full h-full object-cover opacity-90" />
         ) : (
           <div className="absolute inset-0">
             <ImageGenSlot
@@ -173,12 +179,20 @@ export function TTCarousel({ title, brandName, variantLabel, liveImageStyle, liv
             />
           </div>
         )}
+        {realMulti && (
+          <>
+            <button type="button" aria-label="previous" disabled={at === 0} onClick={() => setSlideIdx(at - 1)}
+              className="absolute left-0 top-12 bottom-32 w-1/4 z-10 disabled:pointer-events-none" />
+            <button type="button" aria-label="next" disabled={at >= slideUrls.length - 1} onClick={() => setSlideIdx(at + 1)}
+              className="absolute right-12 top-12 bottom-32 w-1/4 z-10 disabled:pointer-events-none" />
+          </>
+        )}
         <div className="absolute top-12 right-3 z-10 bg-black/50 backdrop-blur-sm text-white text-tiny px-2 py-0.5 rounded-full">
-          1/8
+          {realMulti ? at + 1 : 1}/{total}
         </div>
         <div className="absolute bottom-32 left-1/2 -translate-x-1/2 z-10 flex items-center gap-1">
-          {[0, 1, 2, 3, 4, 5, 6, 7].map((i) => (
-            <span key={i} className={`rounded-full w-1 h-1 ${i === 0 ? "bg-white" : "bg-white/40"}`} />
+          {Array.from({ length: total }, (_, i) => (
+            <span key={i} className={`rounded-full w-1 h-1 ${i === (realMulti ? at : 0) ? "bg-white" : "bg-white/40"}`} />
           ))}
         </div>
         <div className="absolute right-2 bottom-24 z-10 flex flex-col items-center gap-4">

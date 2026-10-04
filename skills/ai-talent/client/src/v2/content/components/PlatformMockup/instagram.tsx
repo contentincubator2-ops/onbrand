@@ -21,7 +21,7 @@ import { faInstagram } from "@fortawesome/free-brands-svg-icons";
 import { faHeart, faComment, faPaperPlane, faBookmark, faImages, faCircleCheck, faMusic, faChevronLeft, faXmark, faVolumeHigh, faTableCellsLarge, faVideo, faTag, faUserGroup, faEye } from "@fortawesome/free-solid-svg-icons";
 import {
   type MockupFields, MockupHeader, StoryRingAvatar, VerticalActionRail,
-  dicebear, handleOf, SlotContent, MarkdownText, ImageGenSlot,
+  dicebear, handleOf, SlotContent, MarkdownText, ImageGenSlot, realSlideUrls,
   SHOW_IMAGE_STYLE_OVERLAY,
 } from "./shared";
 import { useLang } from "../../../../lib/i18n";
@@ -209,12 +209,18 @@ export function IGFeed({ title, brandName, brandLogoUrl, variantLabel, liveCapti
 
 /* ─────────────── IG Carousel ─────────────── */
 
-export function IGCarousel({ title, brandName, brandLogoUrl, variantLabel, liveCaption, liveHashtags, liveImageDesc, liveImageStyle, liveImageUrl, liveImageStatus, onGenerateImage }: MockupFields) {
+export function IGCarousel({ title, brandName, brandLogoUrl, variantLabel, liveCaption, liveHashtags, liveImageDesc, liveImageStyle, liveImageUrl, liveImageStatus, liveCards, onGenerateImage }: MockupFields) {
   const { lang } = useLang();
+  const slideUrls = realSlideUrls({ liveCards, liveImageUrl, liveImageStatus });
+  const [slideIdx, setSlideIdx] = useState(0);
+  const [slideRatio, setSlideRatio] = useState(1);
+  const realMulti = slideUrls.length > 1;
+  const at = Math.min(slideIdx, Math.max(0, slideUrls.length - 1));
   const handle = handleOf(brandName);
   const avatarSrc = brandLogoUrl || dicebear(brandName ?? "brand");
   const postTitleFallback = getPostTitleFallback(title, liveCaption);
-  const carouselCount = 9;
+  // 沒有真實多張圖（舊的單張預覽）時維持原本的示意：1/9。
+  const carouselCount = realMulti ? slideUrls.length : 9;
   return (
     <div className="w-full max-w-[420px] mx-auto">
       <MockupHeader icon={faInstagram} label="Instagram" variantLabel={variantLabel} />
@@ -238,11 +244,13 @@ export function IGCarousel({ title, brandName, brandLogoUrl, variantLabel, liveC
             when no image yet; use full aspect-square only when image ready. */}
         <div
           className={`relative bg-default-100 overflow-hidden ${
-            liveImageUrl && liveImageStatus === "ready" ? "aspect-square" : "h-32"
+            slideUrls.length ? "" : "h-32"
           }`}
+          style={slideUrls.length ? { aspectRatio: String(slideRatio) } : undefined}
         >
-          {liveImageUrl && liveImageStatus === "ready" ? (
-            <img src={liveImageUrl} alt="" className="absolute inset-0 w-full h-full object-cover" />
+          {slideUrls.length ? (
+            <img src={slideUrls[at]} alt="" className="absolute inset-0 w-full h-full object-cover"
+              onLoad={(e) => { const w = e.currentTarget.naturalWidth, h = e.currentTarget.naturalHeight; if (w && h) setSlideRatio(Math.min(1.91, Math.max(0.8, w / h))); }} />
           ) : (
             // 2026-07-17 (CJ「盤查生圖佔位」): standardized ImageGenSlot
             <div className="absolute inset-0">
@@ -255,13 +263,25 @@ export function IGCarousel({ title, brandName, brandLogoUrl, variantLabel, liveC
             </div>
           )}
           <div className="absolute top-2.5 right-2.5 bg-black/55 text-white text-tiny font-medium px-2 py-0.5 rounded-full backdrop-blur-sm">
-            1/{carouselCount}
+            {realMulti ? at + 1 : 1}/{carouselCount}
           </div>
+          {realMulti && at > 0 && (
+            <button type="button" aria-label="previous" onClick={() => setSlideIdx(at - 1)}
+              className="absolute left-2 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-white/85 text-black shadow flex items-center justify-center">
+              <FontAwesomeIcon icon={faChevronLeft} className="text-tiny" />
+            </button>
+          )}
+          {realMulti && at < slideUrls.length - 1 && (
+            <button type="button" aria-label="next" onClick={() => setSlideIdx(at + 1)}
+              className="absolute right-2 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-white/85 text-black shadow flex items-center justify-center">
+              <FontAwesomeIcon icon={faChevronLeft} className="text-tiny rotate-180" />
+            </button>
+          )}
         </div>
 
         <div className="flex items-center justify-center gap-1 py-1.5">
-          {[0, 1, 2, 3, 4].map((i) => (
-            <span key={i} className={`rounded-full ${i === 0 ? "bg-primary w-1.5 h-1.5" : "bg-default-300 w-1.5 h-1.5 opacity-70"}`} />
+          {(realMulti ? slideUrls.map((_, i) => i) : [0, 1, 2, 3, 4]).map((i) => (
+            <span key={i} className={`rounded-full ${i === (realMulti ? at : 0) ? "bg-primary w-1.5 h-1.5" : "bg-default-300 w-1.5 h-1.5 opacity-70"}`} />
           ))}
         </div>
 

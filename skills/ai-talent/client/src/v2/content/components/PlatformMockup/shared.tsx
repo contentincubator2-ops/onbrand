@@ -443,3 +443,14 @@ export function VerticalActionRail({ items }: {
     </div>
   );
 }
+
+
+/**
+ * 輪播／相簿預覽用的「真的有幾張圖」：liveCards 裡有圖就用它們（依序），沒有就退回單張 liveImageUrl。
+ * 2026-10-04（CJ「生成好之後可以預覽圖片和文章在該平台的示意圖」）：IG／TikTok／Threads／LINE 以前只畫第一張。
+ */
+export function realSlideUrls(f: Pick<MockupFields, "liveCards" | "liveImageUrl" | "liveImageStatus">): string[] {
+  const fromCards = (f.liveCards ?? []).map((c) => c?.image?.url).filter((u): u is string => !!u);
+  if (fromCards.length) return fromCards;
+  return f.liveImageUrl && f.liveImageStatus === "ready" ? [f.liveImageUrl] : [];
+}
