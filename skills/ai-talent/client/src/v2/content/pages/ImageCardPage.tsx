@@ -24,6 +24,8 @@ import type { ShellOutletCtx } from "../../platform/lib/shellContext";
 import type { ImageCardInfo } from "../../platform/lib/imageCardHandoff";
 import { clearImageCardHandoff, readImageCardHandoff, takeImageSubjectHandoff } from "../../platform/lib/imageCardHandoff";
 import BrandLibrary from "../../strategy/components/assets/BrandLibrary";
+import { uploadBrandPhoto, IMAGE_ACCEPT } from "../../strategy/lib/uploadBrandPhoto";
+import { Icon } from "../../platform/components/icons";
 import AiImageNotice from "../../platform/components/AiImageNotice";
 import { PlatformMockup } from "../components/PlatformMockup";
 import { imageCardMockup } from "../lib/imageCardMockup";
@@ -140,6 +142,25 @@ export default function ImageCardPage() {
   // 或在這裡按「從素材庫挑」的——不一定是某個產品的照片，所以另外記著，縮圖列才畫得出來。
   const [libraryOpen, setLibraryOpen] = useState(false);
   const [libraryPick, setLibraryPick] = useState<{ name: string; imageUrl: string } | null>(null);
+  // 2026-10-04（CJ「除了不用圖、從素材庫挑，可以增加立刻上傳」）：上傳走素材庫同一支（asset_photos），
+  // 傳完直接當主體照，之後也在素材庫裡找得到。
+  const uploadRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+  async function uploadSubject(files: FileList | null) {
+    const f = Array.from(files ?? []).find((x) => x.type.startsWith("image/") || !x.type);
+    if (!f || !brandId) return;
+    setUploading(true);
+    try {
+      const up = await uploadBrandPhoto(brandId, f);
+      const picked = { name: f.name, imageUrl: up.url };
+      setLibraryPick(picked); setProduct(picked);
+    } catch (e: any) {
+      showToastGlobal(String(e?.message ?? e).slice(0, 200), "error");
+    } finally {
+      setUploading(false);
+      if (uploadRef.current) uploadRef.current.value = "";
+    }
+  }
   useEffect(() => {
     const h = takeImageSubjectHandoff();
     if (h?.url) {
@@ -494,9 +515,10 @@ export default function ImageCardPage() {
                   {product && <span className="ml-1.5 text-default-700">· {product.name}</span>}
                 </p>
                 <div className="flex flex-wrap gap-2">
-                  <button type="button" onClick={() => setProduct(null)}
-                    className={`w-16 h-16 rounded-lg border-2 text-[11px] text-default-500 bg-default-50 flex items-center justify-center ${!product ? "border-default-900" : "border-default-200 hover:border-default-400"}`}>
-                    {lang === "en" ? "None" : "不使用"}
+                  <button type="button" onClick={() => setProduct(null)} title={lang === "en" ? "No photo" : "不使用照片"}
+                    className={`w-16 h-16 rounded-lg border-2 bg-default-50 flex flex-col items-center justify-center gap-1 text-default-500 ${!product ? "border-default-900 text-default-900" : "border-default-200 hover:border-default-400"}`}>
+                    <Icon name="forbidden" size={18} />
+                    <span className="text-[10px] leading-none">{lang === "en" ? "None" : "不使用"}</span>
                   </button>
                   {libraryPick && !products.some((p) => p.imageUrl === libraryPick.imageUrl) && (
                     <button type="button" title={libraryPick.name}
@@ -518,11 +540,22 @@ export default function ImageCardPage() {
                     );
                   })}
                   {brandId && (
-                    <button type="button" onClick={() => setLibraryOpen(true)}
-                      className="w-16 h-16 rounded-lg border-2 border-dashed border-default-300 text-[11px] leading-tight text-default-500 bg-white hover:border-default-500 hover:text-default-700 flex items-center justify-center text-center px-1">
-                      {lang === "en" ? "From library" : "從素材庫挑"}
+                    <button type="button" onClick={() => uploadRef.current?.click()} disabled={uploading}
+                      title={lang === "en" ? "Upload a photo now" : "立刻上傳照片"}
+                      className="w-16 h-16 rounded-lg border-2 border-dashed border-default-300 bg-white text-default-500 hover:border-default-500 hover:text-default-800 flex flex-col items-center justify-center gap-1">
+                      {uploading ? <Spinner size="sm" /> : <Icon name="upload" size={18} />}
+                      <span className="text-[10px] leading-none">{lang === "en" ? "Upload" : "上傳"}</span>
                     </button>
                   )}
+                  {brandId && (
+                    <button type="button" onClick={() => setLibraryOpen(true)}
+                      title={lang === "en" ? "Pick from your asset library" : "從素材庫挑一張"}
+                      className="w-16 h-16 rounded-lg border-2 border-dashed border-default-300 bg-white text-default-500 hover:border-default-500 hover:text-default-800 flex flex-col items-center justify-center gap-1">
+                      <Icon name="images" size={18} />
+                      <span className="text-[10px] leading-none">{lang === "en" ? "Library" : "素材庫"}</span>
+                    </button>
+                  )}
+                  <input ref={uploadRef} type="file" hidden accept={IMAGE_ACCEPT} onChange={(e) => void uploadSubject(e.target.files)} />
                   {brandId && (
                     <Modal isOpen={libraryOpen} onClose={() => setLibraryOpen(false)} size="4xl" scrollBehavior="inside">
                       <ModalContent>
