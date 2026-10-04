@@ -61,7 +61,7 @@ export async function preflightCostCheck(userId: number): Promise<{ ok: true } |
         return { ok: false, reason:
           "免費試用已到期。升級方案即可繼續使用 —— 前往「方案」頁面開通（基礎 NT$2,250／月 · 專業 NT$9,000／月）。" };
       }
-      if (p?.planStatus === "active") {
+      if (p?.planStatus === "active" || p?.planStatus === "past_due") {
         return { ok: false, reason:
           "訂閱已到期或續訂失敗，請至「方案」頁面更新付款方式以恢復使用。" };
       }

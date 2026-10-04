@@ -193,3 +193,50 @@ export async function sendPasswordReset(data: {
     html,
   });
 }
+
+/** HTML-escape a value interpolated into an email body. */
+function esc(s: string): string {
+  return s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
+}
+
+/**
+ * A renewal charge failed. Sent from the Stripe webhook (invoice.payment_failed).
+ */
+export async function sendPaymentFailed(data: {
+  to: string;
+  name: string;
+  accountUrl: string;
+}): Promise<void> {
+  const html = `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>訂閱扣款未成功</title>
+      </head>
+      <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <div style="background: #18181b; padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
+          <h1 style="color: white; margin: 0; font-size: 24px;">訂閱扣款未成功</h1>
+        </div>
+        <div style="background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px;">
+          <p style="font-size: 16px; margin-bottom: 20px;">您好 <strong>${esc(data.name)}</strong>，</p>
+          <p style="font-size: 16px; margin-bottom: 20px;">這一期的 onBrand Studio 訂閱費用沒有扣款成功，常見原因是信用卡過期或額度不足。在付款方式更新之前，產出任務會先暫停，您的品牌資料與內容都還在。</p>
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${data.accountUrl}" style="display: inline-block; background: #18181b; color: white; padding: 15px 40px; text-decoration: none; border-radius: 5px; font-size: 16px; font-weight: bold;">更新付款方式</a>
+          </div>
+          <p style="font-size: 14px; color: #666; margin-top: 20px;">更新後系統會自動重新扣款並恢復使用。有任何問題請回信或寫信到 sowork@sowork.ai。</p>
+        </div>
+        <div style="text-align: center; margin-top: 30px; font-size: 12px; color: #999;">
+          <p>&copy; onBrand Studio</p>
+        </div>
+      </body>
+    </html>
+  `;
+
+  await sendEmail({
+    to: data.to,
+    subject: "訂閱扣款未成功，請更新付款方式 - onBrand Studio",
+    html,
+  });
+}

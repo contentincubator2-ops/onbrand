@@ -39,6 +39,27 @@ export default function AccountPage() {
       })
     : null;
 
+  // ─── Resume a scheduled cancel ────────────────────────────────
+  const resumeMut = (trpc as any).billing?.resumeSubscription?.useMutation
+    ? (trpc as any).billing.resumeSubscription.useMutation({
+        onSuccess: () => {
+          showToastGlobal(lang === "en" ? "Subscription resumed" : "訂閱已恢復", "success");
+          (statusQuery as any)?.refetch?.();
+        },
+        onError: (e: any) =>
+          showToastGlobal((lang === "en" ? "Couldn't resume: " : "恢復失敗：") + (e?.message ?? e)),
+      })
+    : null;
+
+  // ─── Stripe billing portal (update card, receipts) ────────────
+  const portalMut = (trpc as any).stripe?.createPortalSession?.useMutation
+    ? (trpc as any).stripe.createPortalSession.useMutation({
+        onSuccess: (data: any) => { if (data?.url) window.location.href = data.url; },
+        onError: (e: any) =>
+          showToastGlobal((lang === "en" ? "Couldn't open billing: " : "無法開啟付款設定：") + (e?.message ?? e)),
+      })
+    : null;
+
   // ─── Export data ──────────────────────────────────────────────
   const exportMut = (trpc as any).billing?.exportData?.useMutation
     ? (trpc as any).billing.exportData.useMutation({
@@ -145,8 +166,10 @@ export default function AccountPage() {
                 <span className="text-neutral-500">{lang === "en" ? "Status" : "狀態"}</span>
                 <span className="font-medium">
                   {status.planStatus === "trial" && <span className="text-zinc-600">{lang === "en" ? "Trial" : "試用中"}</span>}
-                  {status.planStatus === "active" && <span className="text-emerald-600">{lang === "en" ? "Active" : "使用中"}</span>}
-                  {status.planStatus === "canceled" && <span className="text-amber-600">{lang === "en" ? "Canceled (active until period end)" : "已取消（當期到期前可繼續使用）"}</span>}
+                  {status.planStatus === "active" && !status.cancelAtPeriodEnd && <span className="text-emerald-600">{lang === "en" ? "Active" : "使用中"}</span>}
+                  {status.planStatus === "active" && status.cancelAtPeriodEnd && <span className="text-amber-600">{lang === "en" ? "Canceled (active until period end)" : "已取消（當期到期前可繼續使用）"}</span>}
+                  {status.planStatus === "canceled" && <span className="text-red-600">{lang === "en" ? "Canceled" : "已取消"}</span>}
+                  {status.planStatus === "past_due" && <span className="text-red-600">{lang === "en" ? "Payment failed" : "付款失敗"}</span>}
                   {status.planStatus === "expired" && <span className="text-red-600">{lang === "en" ? "Expired" : "已到期"}</span>}
                 </span>
               </div>
@@ -154,7 +177,9 @@ export default function AccountPage() {
                 <span className="text-neutral-500">
                   {status.planStatus === "trial"
                     ? (lang === "en" ? "Trial ends" : "試用到期")
-                    : (lang === "en" ? "Next renewal" : "下次續扣")}
+                    : status.cancelAtPeriodEnd || status.planStatus === "canceled"
+                      ? (lang === "en" ? "Access ends" : "使用到期日")
+                      : (lang === "en" ? "Next renewal" : "下次續扣")}
                 </span>
                 <span className="font-medium text-neutral-900">
                   {status.planEndsAt ? new Date(status.planEndsAt).toLocaleDateString(lang === "en" ? "en-US" : "zh-TW") : "—"}
@@ -179,7 +204,25 @@ export default function AccountPage() {
                 {t("pricing_upgrade_cta")}
               </Link>
             )}
-            {status?.planStatus === "active" && cancelMut && (
+            {status?.planStatus === "active" && status?.cancelAtPeriodEnd && resumeMut && (
+              <button
+                onClick={() => resumeMut.mutate({})}
+                disabled={resumeMut.isPending}
+                className="px-4 py-2 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-white text-sm font-medium transition disabled:opacity-50"
+              >
+                {lang === "en" ? "Resume subscription" : "恢復訂閱"}
+              </button>
+            )}
+            {(status?.planStatus === "active" || status?.planStatus === "past_due") && portalMut && (
+              <button
+                onClick={() => portalMut.mutate({})}
+                disabled={portalMut.isPending}
+                className="px-4 py-2 rounded-lg border border-neutral-300 hover:border-neutral-500 text-sm text-neutral-700 transition disabled:opacity-50"
+              >
+                {lang === "en" ? "Payment method & receipts" : "付款方式與收據"}
+              </button>
+            )}
+            {status?.planStatus === "active" && !status?.cancelAtPeriodEnd && cancelMut && (
               <button
                 onClick={() => {
                   if (confirm(lang === "en" ? "Cancel your subscription? You'll keep access until the period ends." : "確定要取消訂閱？當期到期前仍可繼續使用。")) {

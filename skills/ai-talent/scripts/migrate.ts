@@ -1504,6 +1504,8 @@ async function main() {
     await ensureCol("users", "planCode",   "VARCHAR(32) NOT NULL DEFAULT 'trial'");
     await ensureCol("users", "planStatus", "VARCHAR(16) NOT NULL DEFAULT 'trial'");
     await ensureCol("users", "planEndsAt", "DATETIME(3) NULL");
+    // 2026-10: 1 = 已按取消訂閱、當期到期前仍可用（planStatus 仍是 active）。
+    await ensureCol("users", "cancelAtPeriodEnd", "TINYINT NOT NULL DEFAULT 0");
     await conn.execute(`
       UPDATE users
       SET planEndsAt = DATE_ADD(createdAt, INTERVAL 7 DAY)
