@@ -31,6 +31,32 @@ import { buildTaskCatalogIndex } from "../../server/content/core/catalog/taskCat
 import { isRecentViral } from "../../server/content/core/catalog/taskSource";
 import { resolveTaskTemplate, resolveOrchestraConfig } from "../../server/content/core/catalog/taskRegistry";
 import { buildBrandPrefix } from "../../server/strategy/core/brand/brandContext";
+import { listDirectorsForBrand, getRole, type StrategistScope } from "../../server/strategy/core/strategist/strategistDirectory";
+import { gatherBrandContext, buildSystemPrompt } from "../../server/strategy/routers/strategistChatRouter";
+import { loadAgentKnowledge } from "../../server/platform/core/agents/agentKnowledge";
+import { callModel } from "../../server/platform/core/llm/multiModelRouter";
+import { quickTaskRouter } from "../../server/content/routers/quickTaskRouter";
+
+/** 右下角顧問出現的 15 種頁面（前台看得到的；li／yt／pr／x 已下架不考）。 */
+const ADVISOR_SCOPES: Array<[StrategistScope, string]> = [
+  ["brand", "品牌定位頁"], ["product", "產品頁"], ["copy", "文字頁"],
+  ["facebook", "Facebook 任務頁"], ["instagram", "Instagram 任務頁"], ["threads", "Threads 任務頁"],
+  ["line", "LINE 任務頁"], ["tiktok", "TikTok 任務頁"], ["email", "電子報任務頁"], ["website", "官網任務頁"],
+  ["events", "活動頁"], ["visual", "視覺頁"], ["regulations", "法規頁"], ["performance", "成效層"],
+  ["content", "內容企劃頁（本週企劃／靈感／專案）"],
+];
+const emit = (row: Record<string, unknown>) =>
+  console.log(`EVALCASE ${Buffer.from(JSON.stringify(row), "utf8").toString("base64")}`);
+
+/**
+ * 使用者實際拿到的全部內容。第一輪只匯出第一個版本，結果「電子報主旨給 5 個」那種卡
+ * 被評成「沒有 5 種主旨」——那是考卷不公平，不是產出的問題。多版本全部帶上並標號。
+ */
+function allVariantsText(variants: any[]): string {
+  const texts = (variants ?? []).map(variantText).filter(Boolean);
+  if (texts.length <= 1) return texts[0] ?? "";
+  return texts.map((t, i) => `【版本 ${i + 1}】\n${t}`).join("\n\n");
+}
 
 const CHANNEL_ZH: Record<string, string> = {
   facebook: "Facebook", instagram: "Instagram", threads: "Threads", line: "LINE 官方帳號",
@@ -57,7 +83,10 @@ function variantText(v: any): string {
 (async () => {
   const brandIds = String(process.env.BRAND_IDS ?? "").split(",").map((s) => Number(s.trim())).filter((n) => n > 0);
   if (!brandIds.length) throw new Error("BRAND_IDS 沒給");
-  const perChannel = Math.max(1, Number(process.env.PER_CHANNEL ?? 2));
+  // PER_CHANNEL=0 → 這個通路前台列出的卡全部考。
+  const perChannelRaw = Number(process.env.PER_CHANNEL ?? 2);
+  const perChannel = perChannelRaw <= 0 ? 999 : perChannelRaw;
+  const suites = new Set(String(process.env.SUITES ?? "cards,advisors,rewrite").split(",").map((x) => x.trim()).filter(Boolean));
   const channels = String(process.env.CHANNELS ?? Object.keys(CHANNEL_ZH).join(",")).split(",").map((s) => s.trim()).filter(Boolean);
   // 可指定只跑哪幾張卡（重跑不及格的題目時用）。
   const onlyTasks = new Set(String(process.env.TASK_IDS ?? "").split(",").map((s) => s.trim()).filter(Boolean));
@@ -67,7 +96,7 @@ function variantText(v: any): string {
 
   let n = 0, empty = 0;
   for (const brandId of brandIds) {
-    const [bRows]: any = await localPool.execute(`SELECT id, name, industry FROM brands WHERE id = ? LIMIT 1`, [brandId]);
+    const [bRows]: any = await localPool.execute(`SELECT id, name, industry, userId FROM brands WHERE id = ? LIMIT 1`, [brandId]);
     const brand = (bRows as any[])[0];
     if (!brand) { console.log(`SKIP brand ${brandId}: 不存在`); continue; }
     const [pRows]: any = await localPool.execute(`SELECT id, name FROM products WHERE brandId = ? ORDER BY id ASC LIMIT 6`, [brandId]);
@@ -75,8 +104,12 @@ function variantText(v: any): string {
     console.log(`BRAND ${brandId} ${brand.name}｜產業 ${brand.industry ?? "?"}｜產品 ${products.length}`);
 
     let turn = 0;
-    for (const ch of channels) {
-      const cards = catalog.filter((t) => t.platform === ch && (!onlyTasks.size || onlyTasks.has(t.id))).slice(0, onlyTasks.size ? 99 : perChannel);
+    /** 第一篇寫成功的貼文——給「換人重寫」當原稿。 */
+    let rewriteBase: { taskId: string; caption: string; channel: string; productId: number | null; topic: string } | null = null;
+    for (const ch of suites.has("cards") || suites.has("rewrite") ? channels : []) {
+      // 只考「換人重寫」時，只需要一篇原稿。
+      if (!suites.has("cards") && rewriteBase) break;
+      const cards = catalog.filter((t) => t.platform === ch && (!onlyTasks.size || onlyTasks.has(t.id))).slice(0, !suites.has("cards") ? 1 : onlyTasks.size ? 99 : perChannel);
       for (const card of cards) {
         const template: any = await resolveTaskTemplate(card.id);
         const config: any = await resolveOrchestraConfig(card.id);
@@ -90,7 +123,7 @@ function variantText(v: any): string {
         const inputKey = template.primary_input?.key ?? template.inputs?.[0]?.key ?? "topic";
 
         const started = Date.now();
-        let response = "", err = "";
+        let response = "", err = "", agentName = "", variantCount = 0, firstVariant = "";
         try {
           const result: any = await runOrchestra({
             template,
@@ -100,7 +133,10 @@ function variantText(v: any): string {
             ...(product ? { productId: product.id } : {}),
             tier: "30s",
           });
-          response = variantText(result?.variants?.[0]);
+          response = allVariantsText(result?.variants ?? []);
+          firstVariant = variantText(result?.variants?.[0]);
+          variantCount = (result?.variants ?? []).length;
+          agentName = String(result?.captionAgent?.name ?? "");
           if (!response) err = `ok=${result?.ok} errors=${JSON.stringify(result?.errors ?? []).slice(0, 200)}`;
         } catch (e: any) {
           err = String(e?.message ?? e).slice(0, 200);
@@ -111,6 +147,7 @@ function variantText(v: any): string {
           `【任務】通路：${CHANNEL_ZH[ch] ?? ch}。任務卡：${text(template.label) || card.labelZh}（形式 ${card.postType}）。`,
           text(template.description) ? `任務說明：${text(template.description)}` : "",
           `使用者這次的輸入：${topic}`,
+          variantCount > 1 ? `這張卡一次產出 ${variantCount} 個版本供使用者挑選，下面的回應是全部版本；請以「使用者拿到這一整份」來評。` : "",
           `目標市場：台灣（繁體中文）。`,
           `【品牌資料】`,
           brain || `品牌：${brand.name}（沒有讀到品牌資料）`,
@@ -118,13 +155,104 @@ function variantText(v: any): string {
 
         // 空白產出照樣出題：任務顯示成功、產出空白，正是要被評成不及格的失敗。
         if (!response) { empty++; response = "（產出為空白）"; }
+        if (firstVariant && !rewriteBase && firstVariant.length >= 60) {
+          rewriteBase = { taskId: card.id, caption: firstVariant, channel: ch, productId: product?.id ?? null, topic };
+        }
+        if (!suites.has("cards")) continue;
         const row = {
+          suite: "cards", agent: agentName || null, variantCount,
           id: `${brandId}:${card.id}`, brandId, brandName: brand.name, channel: ch, taskId: card.id,
           taskLabel: text(template.label) || card.labelZh, topic, query, response,
           empty: response === "（產出為空白）", error: err || null, latencyMs: Date.now() - started,
         };
-        console.log(`EVALCASE ${Buffer.from(JSON.stringify(row), "utf8").toString("base64")}`);
-        console.log(`  ${row.id} ${row.empty ? "EMPTY " + err : response.length + " 字"} ${(row.latencyMs / 1000).toFixed(1)}s`);
+        emit(row);
+        console.log(`  ${row.id} [${agentName}] ${row.empty ? "EMPTY " + err : response.length + " 字／" + variantCount + " 版"} ${(row.latencyMs / 1000).toFixed(1)}s`);
+        n++;
+      }
+    }
+
+    // ── 右下角顧問：每個頁面的三位，各問他自己的第一題招牌問題 ─────────────────
+    // 照 strategistChat.sendMessage 的組法（同一份 system prompt、同一條模型路由），
+    // 但不建對話、不寫訊息——考的是回答，不是對話紀錄。
+    if (suites.has("advisors")) {
+      const ownerId = Number(brand.userId);
+      for (const [scope, pageLabel] of ADVISOR_SCOPES) {
+        const directors = await listDirectorsForBrand(brand.industry ?? null, scope).catch(() => []);
+        if (!directors.length) console.log(`SKIP advisors ${scope}: 沒有人選`);
+        for (const d of directors) {
+          const role = getRole(d.roleId);
+          const question = d.signatureQuestions?.[0];
+          if (!question) continue;
+          const productId = scope === "product" && products.length ? products[0]!.id : null;
+          const started = Date.now();
+          let response = "", err = "", brandCtx = "";
+          try {
+            brandCtx = await gatherBrandContext(brandId, ownerId, productId);
+            const knowledge = await loadAgentKnowledge(d.agentId, { source: "probe" } as any).catch(() => "");
+            const r: any = await callModel([
+              { role: "system", content: buildSystemPrompt(d, brandCtx, knowledge) },
+              { role: "user", content: question },
+            ], "general");
+            // 面板上不會顯示的控制標記拿掉（跟 parseActions 同一組標記）。
+            response = String(r?.content ?? "").replace(/<<action:[a-z_0-9]+>>[^\n<]*/gi, "").replace(/<<ask>>[^\n<]*/gi, "").trim();
+          } catch (e: any) { err = String(e?.message ?? e).slice(0, 200); }
+          const query = [
+            `【頁面】${pageLabel}。使用者在這一頁打開右下角的顧問發問。`,
+            `【顧問】${d.name}（${d.title}），在這一頁負責的角度：${d.roleLabel}。`,
+            `這個角度的定義：${role.promptAngle}`,
+            `【使用者的問題】${question}`,
+            `目標市場：台灣（繁體中文）。`,
+            `【品牌資料】`,
+            brandCtx.slice(0, BRAIN_MAX) || `品牌：${brand.name}（沒有讀到品牌資料）`,
+          ].join("\n");
+          if (!response) { empty++; response = "（產出為空白）"; }
+          emit({
+            suite: "advisors", agent: d.name, agentId: d.agentId, roleId: d.roleId, scope,
+            id: `${brandId}:advisor:${d.roleId}`, brandId, brandName: brand.name, question, query, response,
+            empty: response === "（產出為空白）", error: err || null, latencyMs: Date.now() - started,
+          });
+          console.log(`  advisor ${scope}/${d.roleId} [${d.name}] ${response.length} 字 ${((Date.now() - started) / 1000).toFixed(1)}s ${err}`);
+          n++;
+        }
+      }
+    }
+
+    // ── 換人重寫：成品頁的五位寫手，各自重寫同一篇原稿 ─────────────────────────
+    if (suites.has("rewrite")) {
+      const base = rewriteBase;
+      let writers: any[] = [];
+      try { writers = (await import("../../client/src/v2/content/pages/run/runModel")).REWRITE_AGENTS as any[]; }
+      catch (e: any) { console.log(`SKIP rewrite: 讀不到寫手名單（${String(e?.message ?? e).slice(0, 120)}）`); }
+      if (!base) console.log("SKIP rewrite: 沒有可當原稿的貼文");
+      const caller: any = quickTaskRouter.createCaller({ user: { id: Number(brand.userId) } } as any);
+      const brain = base ? (await buildBrandPrefix(brandId, base.productId, null, "full", base.channel).catch(() => "")).slice(0, BRAIN_MAX) : "";
+      for (const w of base ? writers : []) {
+        const started = Date.now();
+        let response = "", err = "";
+        try {
+          const r: any = await caller.refineCaption({
+            currentCaption: base!.caption, userFeedback: w.instruction, agentId: w.agentId,
+            agentName: w.name, agentTitle: w.title, brandId, taskId: base!.taskId,
+            ...(base!.productId ? { productId: base!.productId } : {}),
+          });
+          response = String(r?.rewritten ?? "").trim();
+        } catch (e: any) { err = String(e?.message ?? e).slice(0, 200); }
+        const query = [
+          `【任務】通路：${CHANNEL_ZH[base!.channel] ?? base!.channel}。這是「換人重寫」：寫手 ${w.name}（${w.title}）要把下面的原稿用自己的風格重寫。`,
+          `重寫指示：${w.instruction}`,
+          `原本的主題：${base!.topic}`,
+          `【原稿】\n${base!.caption}`,
+          `目標市場：台灣（繁體中文）。`,
+          `【品牌資料】`,
+          brain || `品牌：${brand.name}（沒有讀到品牌資料）`,
+        ].join("\n");
+        if (!response) { empty++; response = "（產出為空白）"; }
+        emit({
+          suite: "rewrite", agent: w.name, agentId: w.agentId,
+          id: `${brandId}:rewrite:${w.agentId}`, brandId, brandName: brand.name, taskId: base!.taskId, query, response,
+          empty: response === "（產出為空白）", error: err || null, latencyMs: Date.now() - started,
+        });
+        console.log(`  rewrite [${w.name}] ${response.length} 字 ${((Date.now() - started) / 1000).toFixed(1)}s ${err}`);
         n++;
       }
     }

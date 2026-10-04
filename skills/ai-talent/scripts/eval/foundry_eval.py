@@ -84,7 +84,8 @@ def main() -> int:
     evaluator_name = f"{rubric['name']}-{ts}-{uuid.uuid4().hex[:6]}"
 
     with (
-        DefaultAzureCredential() as credential,
+        # process_timeout：本機走 az CLI 取 token，預設 10 秒在 Windows 上常常不夠。
+        DefaultAzureCredential(process_timeout=90) as credential,
         AIProjectClient(endpoint=endpoint, credential=credential) as project,
         project.get_openai_client() as oai,
     ):
