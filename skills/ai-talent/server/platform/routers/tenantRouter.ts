@@ -26,6 +26,13 @@ import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure } from "../core/trpc";
 
 const RoleEnum = z.enum(["owner", "admin", "editor", "viewer"]);
+/** Same wording as the team settings page (WorkspaceSettingsPage ROLE_LABEL_ZH). */
+const ROLE_LABEL: Record<z.infer<typeof RoleEnum>, string> = {
+  owner: "Owner",
+  admin: "Admin",
+  editor: "Editor",
+  viewer: "Viewer（僅查看）",
+};
 
 export const tenantRouter = router({
   /** Workspaces the calling user is a member of.
@@ -124,7 +131,7 @@ export const tenantRouter = router({
       }
       await enforceMemberLimit(input.workspaceId);
       const [uRows]: any = await localPool.execute(
-        `SELECT id FROM users WHERE email = ? LIMIT 1`,
+        `SELECT id, name FROM users WHERE email = ? LIMIT 1`,
         [input.email],
       );
       const invitee = (uRows as any[])[0];
@@ -149,6 +156,19 @@ export const tenantRouter = router({
           );
         }
       }
+      // Tell the invitee — otherwise the new team just appears with no explanation.
+      void (async () => {
+        const [wRows]: any = await localPool.execute(`SELECT name FROM workspaces WHERE id = ? LIMIT 1`, [input.workspaceId]);
+        const { sendWorkspaceInvite } = await import("../auth/emailService");
+        await sendWorkspaceInvite({
+          to: input.email,
+          name: invitee.name ?? "",
+          inviterName: (ctx.user as any).name ?? (ctx.user as any).email ?? "團隊管理員",
+          workspaceName: (wRows as any[])[0]?.name ?? "團隊",
+          roleLabel: ROLE_LABEL[input.role],
+          appUrl: process.env.APP_URL ?? "https://onbrand.sowork.ai",
+        });
+      })().catch((e) => console.warn("[tenant.invite] invite email not sent:", (e as Error)?.message));
       return { ok: true, userId: invitee.id };
     }),
 

@@ -20,7 +20,7 @@ import { eq } from "drizzle-orm";
 import { getDb } from "../../db";
 import { users } from "../../../drizzle/schema";
 import { getUserByEmail, createUser, verifyUserEmail, setEmailVerificationToken, getUserByEmailVerificationToken, getUserByPasswordResetToken, setPasswordResetToken, updateUserPassword, updateLastLoginIp, updatePreferredLang, verifyEmailPassword, upsertGoogleUser, EMAIL_VERIFICATION_EXPIRY_MS } from "./usersDb";
-import { sendEmailVerification, sendPasswordReset } from "./emailService";
+import { sendEmailVerification, sendPasswordReset, sendWelcome } from "./emailService";
 import { getJwtSecret } from "../core/env";
 
 export const authRouter = Router();
@@ -485,6 +485,15 @@ authRouter.post("/verifyEmail", async (req: Request, res: Response) => {
 
     // Activate user
     await verifyUserEmail(db, user.openId);
+
+    // Welcome mail is a courtesy — never let it fail the verification.
+    if (user.email) {
+      void sendWelcome({
+        to: user.email,
+        name: user.name ?? "",
+        appUrl: process.env.APP_URL ?? "https://onbrand.sowork.ai",
+      }).catch((e) => console.warn("[auth] welcome email not sent:", (e as Error)?.message));
+    }
 
     // Auto-login after verification
     const sessionToken = await createSessionToken(user.id, user.openId);
