@@ -73,6 +73,7 @@ def main() -> int:
     ap.add_argument("--rubric", default=HERE / "rubric.json", type=Path)
     ap.add_argument("--out", default=Path("eval-results.json"), type=Path)
     ap.add_argument("--suite", default="", help="只評考卷裡 suite 欄位等於這個值的題目（cards／advisors／rewrite）")
+    ap.add_argument("--batch", default=40, type=int, help="每批幾題")
     ap.add_argument("--keep", action="store_true", help="跑完不刪 Foundry 上的評估與評估器（要在入口網站看報表時用）")
     args = ap.parse_args()
 
@@ -132,50 +133,58 @@ def main() -> int:
                 )
             ],
         )
-        run = oai.evals.runs.create(
-            eval_id=ev.id,
-            name=f"{evaluator_name}-run",
-            data_source=CreateEvalJSONLRunDataSourceParam(
-                type="jsonl",
-                source=SourceFileContent(
-                    type="file_content",
-                    content=[
-                        SourceFileContentContent(item={"id": str(c.get("id", i)), "query": c["query"], "response": c["response"]})
-                        for i, c in enumerate(cases)
-                    ],
-                ),
-            ),
-        )
-        print(f"評估執行 {run.id}，{len(cases)} 題…")
-        while run.status not in TERMINAL:
-            time.sleep(8)
-            run = oai.evals.runs.retrieve(run_id=run.id, eval_id=ev.id)
-        print(f"狀態 {run.status}；報表 {getattr(run, 'report_url', None)}")
-
+        # 分批送：題目連同品牌資料一題就好幾 KB，289 題一次內嵌會被服務以 413 拒收。
         by_id = {str(c.get("id")): c for c in cases}
         items = []
-        for it in oai.evals.runs.output_items.list(run_id=run.id, eval_id=ev.id):
-            d = it.model_dump() if hasattr(it, "model_dump") else dict(it)
-            src = d.get("datasource_item") or {}
-            res = (d.get("results") or [{}])[0]
-            sample = res.get("sample")
-            meta = by_id.get(str(src.get("id")), {})
-            items.append({
-                "id": src.get("id"),
-                "suite": meta.get("suite"), "agent": meta.get("agent"), "agentId": meta.get("agentId"),
-                "taskId": meta.get("taskId"), "roleId": meta.get("roleId"), "scope": meta.get("scope"),
-                "channel": meta.get("channel"), "empty": meta.get("empty"),
-                "score": res.get("score"),
-                "passed": res.get("passed"),
-                "label": res.get("label"),
-                "reason": res.get("reason"),
-                "dimensions": [
-                    {k: ds.get(k) for k in ("id", "score", "applicable", "weight", "reason")}
-                    for ds in ((res.get("properties") or {}).get("dimension_scores") or [])
-                ],
-                # 評審自己出錯（逾時、內容過濾）時這裡會有訊息——跟「產出不及格」是兩回事，要分開看。
-                "error": (sample or {}).get("error") if isinstance(sample, dict) else None,
-            })
+        report_urls = []
+        run_statuses = []
+        batches = [cases[i:i + args.batch] for i in range(0, len(cases), args.batch)]
+        for bi, batch in enumerate(batches, 1):
+            run = oai.evals.runs.create(
+                eval_id=ev.id,
+                name=f"{evaluator_name}-run-{bi}",
+                data_source=CreateEvalJSONLRunDataSourceParam(
+                    type="jsonl",
+                    source=SourceFileContent(
+                        type="file_content",
+                        content=[
+                            SourceFileContentContent(item={"id": str(c.get("id", i)), "query": c["query"], "response": c["response"]})
+                            for i, c in enumerate(batch)
+                        ],
+                    ),
+                ),
+            )
+            print(f"第 {bi}/{len(batches)} 批：{run.id}，{len(batch)} 題…", flush=True)
+            while run.status not in TERMINAL:
+                time.sleep(8)
+                run = oai.evals.runs.retrieve(run_id=run.id, eval_id=ev.id)
+            url = getattr(run, "report_url", None)
+            print(f"狀態 {run.status}；報表 {url}", flush=True)
+            report_urls.append(url)
+            run_statuses.append(run.status)
+            for it in oai.evals.runs.output_items.list(run_id=run.id, eval_id=ev.id):
+                d = it.model_dump() if hasattr(it, "model_dump") else dict(it)
+                src = d.get("datasource_item") or {}
+                res = (d.get("results") or [{}])[0]
+                sample = res.get("sample")
+                meta = by_id.get(str(src.get("id")), {})
+                items.append({
+                    "id": src.get("id"),
+                    "suite": meta.get("suite"), "agent": meta.get("agent"), "agentId": meta.get("agentId"),
+                    "taskId": meta.get("taskId"), "roleId": meta.get("roleId"), "scope": meta.get("scope"),
+                    "channel": meta.get("channel"), "empty": meta.get("empty"),
+                    "score": res.get("score"),
+                    "passed": res.get("passed"),
+                    "label": res.get("label"),
+                    "reason": res.get("reason"),
+                    "dimensions": [
+                        {k: ds.get(k) for k in ("id", "score", "applicable", "weight", "reason")}
+                        for ds in ((res.get("properties") or {}).get("dimension_scores") or [])
+                    ],
+                    # 評審自己出錯（逾時、內容過濾）時這裡會有訊息——跟「產出不及格」是兩回事，要分開看。
+                    "error": (sample or {}).get("error") if isinstance(sample, dict) else None,
+                })
+        all_completed = all(st == "completed" for st in run_statuses)
 
         if not args.keep:
             try:
@@ -195,7 +204,8 @@ def main() -> int:
         "passed": len(passed),
         "passRate": round(len(passed) / len(scored), 3) if scored else None,
         "meanScore": round(sum(x["score"] for x in scored) / len(scored), 3) if scored else None,
-        "runStatus": run.status,
+        "runStatus": "completed" if all_completed else ",".join(run_statuses),
+        "reportUrls": report_urls,
     }
     by_dim: dict[str, list[float]] = {}
     for x in scored:
@@ -207,7 +217,7 @@ def main() -> int:
     args.out.write_text(json.dumps({"summary": summary, "items": items}, ensure_ascii=False, indent=2), encoding="utf-8")
     print(json.dumps(summary, ensure_ascii=False, indent=2))
     # 評審沒評到的題目不算通過也不算失敗，但要讓呼叫端知道這次結果不完整。
-    return 0 if run.status == "completed" and len(scored) == len(cases) else 2
+    return 0 if all_completed and len(scored) == len(cases) else 2
 
 
 if __name__ == "__main__":
