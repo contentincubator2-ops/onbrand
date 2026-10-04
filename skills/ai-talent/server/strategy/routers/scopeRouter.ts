@@ -537,6 +537,17 @@ export const eventRouter = router({
         ?? (input.productIds && input.productIds.length > 0 ? input.productIds[0]! : null);
       let eventId: number;
       if (input.id) {
+        // The UPDATE below is user-scoped, but the event_products rewrite
+        // further down is keyed by eventId alone — so stop here if the event
+        // is not the caller's. (affectedRows can't tell us: MySQL reports 0
+        // for an unchanged row too.)
+        const [mine]: any = await localPool.execute(
+          `SELECT id FROM events WHERE id = ? AND userId = ? LIMIT 1`,
+          [input.id, userId],
+        );
+        if ((mine as any[]).length === 0) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "找不到這個活動" });
+        }
         await localPool.execute(
           `UPDATE events
               SET brandId = ?, productId = ?, slug = ?, name = ?,

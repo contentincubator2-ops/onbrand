@@ -744,7 +744,8 @@ export const supportRouter = router({
         `SELECT email FROM users WHERE id = ? LIMIT 1`, [userId],
       );
       const userEmail = (uRow as any[])[0]?.email ?? null;
-      const convId = input.conversationId ?? await ensureOpenConversation(userId, null);
+      const ownConv = input.conversationId ? await loadConversation(input.conversationId, userId) : null;
+      const convId = ownConv?.id ?? await ensureOpenConversation(userId, null);
 
       const [ins]: any = await localPool.execute(
         `INSERT INTO bug_reports

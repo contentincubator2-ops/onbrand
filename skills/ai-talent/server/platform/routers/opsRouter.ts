@@ -177,7 +177,7 @@ export const opsRouter = router({
 
   /** Legacy: kept for back-compat with any caller still pointing at the
    *  old name. Prefer ops.listForAdmin in new code. */
-  listRecentErrors: protectedProcedure
+  listRecentErrors: adminProcedure
     .input(z.object({
       limit: z.number().min(1).max(200).default(50),
       source: z.string().optional(),

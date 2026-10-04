@@ -151,7 +151,27 @@ export const protectedProcedure = t.procedure
     // Logging userId on every tRPC call creates extensive personal data
     // processing records. Errors are still captured via errorLoggerMiddleware.
     return next({ ctx });
+  })
+  // 2026-10 tenant isolation: any brandId / productId / eventId / missionId in
+  // the input must belong to the caller. See tenantGuard.ts for why this lives
+  // here instead of in each procedure.
+  .use(async ({ ctx, next, path, getRawInput }) => {
+    const { assertInputScopes } = await import("./tenantGuard");
+    await assertInputScopes(ctx.user.id, path, await getRawInput(), { isAdmin: isAdminUser });
+    return next({ ctx });
   });
+
+/** users.role = 'admin', or a SoWork staff mailbox. */
+export async function isAdminUser(userId: number, fallbackEmail?: string | null): Promise<boolean> {
+  const { default: localPool } = await import("../../localDb");
+  const [rows]: any = await localPool.execute(
+    `SELECT role, email FROM users WHERE id = ? LIMIT 1`,
+    [userId],
+  );
+  const u = (rows as any[])[0] ?? {};
+  const email = String(u.email ?? fallbackEmail ?? "");
+  return u.role === "admin" || /@sowork\.(tw|ai)$/i.test(email);
+}
 
 /**
  * 2026-08-19 — process-local per-user concurrency guard.
@@ -250,21 +270,11 @@ export function singleFlightPerUser(
  * the error-tracking dashboard + future admin tools.
  */
 export const adminProcedure = protectedProcedure.use(async ({ ctx, next }) => {
-  const { default: localPool } = await import("../../localDb");
-  const [rows]: any = await localPool.execute(
-    `SELECT role, email FROM users WHERE id = ? LIMIT 1`,
-    [ctx.user.id],
-  );
-  const u = (rows as any[])[0] ?? {};
   // 2026-05-29 (security): removed hardcoded userId 199 check — that's a
   // magic-number IDOR risk (anyone who learns user 199 exists can craft tokens
   // if the secret ever leaks). Admin access is now strictly role- or
   // email-domain based. Set users.role='admin' via DB migration for staff.
-  const email = String(u.email ?? ctx.user.email ?? "");
-  const isAdmin =
-    u.role === "admin" ||
-    /@sowork\.(tw|ai)$/i.test(email);
-  if (!isAdmin) {
+  if (!(await isAdminUser(ctx.user.id, ctx.user.email))) {
     throw new TRPCError({ code: "FORBIDDEN", message: "Admin only" });
   }
   return next({ ctx });
