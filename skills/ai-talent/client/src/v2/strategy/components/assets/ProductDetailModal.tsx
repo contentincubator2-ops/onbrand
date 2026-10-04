@@ -408,13 +408,15 @@ export default function ProductDetailModal({ productId, brandId, onClose, onRepo
           <div className="ml-auto flex items-center gap-2 shrink-0">
             {onUpload && (
               <button type="button" onClick={() => onUpload(productId)}
-                className="inline-flex items-center gap-1.5 h-8 px-3 rounded-full bg-default-100 text-[12.5px] text-neutral-700 hover:bg-default-200 transition">
-                <UploadIcon size={13} />{en ? "Upload" : "上傳定位"}
+                title={en ? "Upload / paste positioning" : "上傳定位"} aria-label={en ? "Upload positioning" : "上傳定位"}
+                className="w-8 h-8 rounded-full flex items-center justify-center text-neutral-500 hover:bg-default-100 hover:text-neutral-900 transition">
+                <UploadIcon size={15} />
               </button>
             )}
             <button type="button" onClick={() => onReposition(productId)}
-              className="inline-flex items-center gap-1.5 h-8 px-3 rounded-full bg-default-100 text-[12.5px] text-neutral-700 hover:bg-default-200 transition">
-              <RegenerateIcon size={13} />{en ? "Re-run" : "重新定位"}
+              title={en ? "Re-run positioning" : "重新定位"} aria-label={en ? "Re-run positioning" : "重新定位"}
+              className="w-8 h-8 rounded-full flex items-center justify-center text-neutral-500 hover:bg-default-100 hover:text-neutral-900 transition">
+              <RegenerateIcon size={15} />
             </button>
           </div>
           </div>
