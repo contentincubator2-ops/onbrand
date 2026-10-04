@@ -198,6 +198,24 @@ export function outputItemImageUrl(item: Record<string, any>): string | null {
   return typeof value === "string" && value.trim() ? value : null;
 }
 
+/**
+ * Everything a post can carry, in publish order: carousel cards (ready images
+ * only) win over the single cover image; a video is reported separately.
+ */
+export function outputItemMedia(item: Record<string, any>): { imageUrls: string[]; videoUrl: string | null } {
+  const cardUrls = Array.isArray(item.cards)
+    ? item.cards
+        .filter((c: any) => c?.image?.status === "ready" || (c?.image?.status === undefined && c?.image?.url))
+        .map((c: any) => c?.image?.url)
+        .filter((u: unknown): u is string => typeof u === "string" && !!u.trim())
+    : [];
+  const single = outputItemImageUrl(item);
+  const imageUrls = cardUrls.length > 0 ? cardUrls : single ? [single] : [];
+  const rawVideo = item.videoUrl ?? item.video?.url ?? null;
+  const videoUrl = typeof rawVideo === "string" && rawVideo.trim() ? rawVideo : null;
+  return { imageUrls, videoUrl };
+}
+
 export function requirePlanningConfirmation(
   resolved: ResolvedOutputContent,
   confirmed: boolean | undefined,

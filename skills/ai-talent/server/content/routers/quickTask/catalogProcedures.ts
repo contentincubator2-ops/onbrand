@@ -15,6 +15,7 @@ import { planQuotaFor, loadBrandPositioning, resolveChannels, filterTasksByPlan,
 import { isRecentViral } from "../../core/catalog/taskSource";
 import { storedTray, defaultTray, MAX_TRAY } from "../../core/catalog/taskTray";
 import localPool from "../../../localDb";
+import { assertBrandAccess } from "../../../platform/core/brandAuth";
 import { listBrandTaskCards, cardTemplate } from "../../core/catalog/brandTaskCards";
 import { listAllFBTasks } from "../../core/catalog/quickTaskFB";
 import { IG_30S_TASKS } from "../../core/catalog/quickTaskIG";
@@ -144,6 +145,8 @@ export const catalogProcedures = {
   tray: protectedProcedure
     .input(z.object({ brandId: z.number(), platform: z.string().min(1).max(24) }))
     .query(async ({ ctx, input }) => {
+      // 2026-10-04：原本沒驗品牌歸屬——任何登入的人都讀得到別人品牌的托盤。
+      await assertBrandAccess(ctx.user!.id, input.brandId);
       const quota = await planQuotaFor(ctx.user!.id);
       const positioning = await loadBrandPositioning(input.brandId);
       const channels = resolveChannels(positioning, quota);
@@ -163,6 +166,26 @@ export const catalogProcedures = {
       };
     }),
 
+  /**
+   * 全部通路的托盤，一次拿完。給「我的任務卡」總覽頁用（2026-10-04，CJ「可以在
+   * 不同的平台中，管理到自己常用的」）——那一頁要同時列七個通路，一個通路打一次
+   * tray 等於七次重算方案閘門。解析同樣交給 client（理由見 tray）。
+   */
+  trays: protectedProcedure
+    .input(z.object({ brandId: z.number(), platforms: z.array(z.string().min(1).max(24)).min(1).max(16) }))
+    .query(async ({ ctx, input }) => {
+      await assertBrandAccess(ctx.user!.id, input.brandId);
+      const quota = await planQuotaFor(ctx.user!.id);
+      const positioning = await loadBrandPositioning(input.brandId);
+      const channels = resolveChannels(positioning, quota);
+      const allowed = filterTasksByPlan(buildTaskCatalogIndex() as any[], quota, channels);
+      const byPlatform: Record<string, { stored: string[] | null; fallback: string[] }> = {};
+      for (const p of new Set(input.platforms)) {
+        byPlatform[p] = { stored: storedTray(positioning, p), fallback: defaultTray(allowed as any[], p) };
+      }
+      return { maxTray: MAX_TRAY, byPlatform };
+    }),
+
   /** 存這個通路的托盤。空陣列＝回到系統預設。 */
   setTray: protectedProcedure
     .input(z.object({
@@ -170,7 +193,9 @@ export const catalogProcedures = {
       platform: z.string().min(1).max(24),
       taskIds: z.array(z.string().min(1).max(80)).max(MAX_TRAY),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      // 2026-10-04：原本沒驗品牌歸屬就整欄覆寫 positioning。
+      await assertBrandAccess(ctx.user!.id, input.brandId);
       const positioning = (await loadBrandPositioning(input.brandId)) ?? {};
       const base = typeof positioning === "object" && positioning ? positioning : {};
       const tray = { ...((base as any).__tray ?? {}) };

@@ -6,10 +6,15 @@
  *   2. 對話修改：直接說「暖一點」「產品放大」——每改一次留一版，可切回。不給參數面板。
  *   3. 輸出：標題是可編輯疊層（AI 圖一律不烤字）；可延伸成同平台／其他平台的其他尺寸。
  *
+ * 2026-10-04（CJ「產出圖片後，想要有圖文搭配預覽，並且一起排程……目前圖片修改完後，就直接
+ * 下載而已，無法一起排程到行事曆」）：圖做好後多一步「圖文預覽與排程」——用該平台的貼文外框
+ * 看圖＋文案擺在一起的樣子，選時間排進本週企劃。行事曆排的是「產出」，所以排之前先把圖
+ * （含疊好的標題）和文案存成一篇（imageCard.saveAsPost）；從文字任務過來的就寫回那一篇。
+ *
  * 比例鐵律（CJ「不能生成後再裁，要嚴格限制在指令當中」）：每個尺寸都是在該尺寸的原生
  * 比例下「重新生成」（拿目前這張當參考），不是把這張裁成別的比例。
  */
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useOutletContext, useParams } from "react-router-dom";
 import { Button, Spinner, Textarea, Input, Modal, ModalBody, ModalContent, ModalHeader } from "@heroui/react";
 import { trpc } from "../../../lib/trpc";
@@ -17,9 +22,11 @@ import { useLang } from "../../../lib/i18n";
 import { showToastGlobal } from "../../platform/components/Toast";
 import type { ShellOutletCtx } from "../../platform/lib/shellContext";
 import type { ImageCardInfo } from "../../platform/lib/imageCardHandoff";
-import { readImageCardHandoff, takeImageSubjectHandoff } from "../../platform/lib/imageCardHandoff";
+import { clearImageCardHandoff, readImageCardHandoff, takeImageSubjectHandoff } from "../../platform/lib/imageCardHandoff";
 import BrandLibrary from "../../strategy/components/assets/BrandLibrary";
 import AiImageNotice from "../../platform/components/AiImageNotice";
+import { PlatformMockup } from "../components/PlatformMockup";
+import { imageCardMockup } from "../lib/imageCardMockup";
 
 type Model = "gpt-image-2" | "nano-banana";
 
@@ -60,8 +67,8 @@ async function loadImage(url: string): Promise<HTMLImageElement> {
   });
 }
 
-/** 下載：原圖＋（選擇性）標題疊層，輸出成規格像素。 */
-async function downloadWithTitle(card: ImageCardInfo, url: string, title: string, dark: boolean) {
+/** 原圖＋（選擇性）標題疊層，畫成規格像素，回傳 data URL。下載、圖文預覽、排程存檔都用這一張。 */
+async function composeTitled(card: ImageCardInfo, url: string, title: string, dark: boolean): Promise<string> {
   const img = await loadImage(url);
   const c = document.createElement("canvas");
   c.width = card.width; c.height = card.height;
@@ -93,8 +100,12 @@ async function downloadWithTitle(card: ImageCardInfo, url: string, title: string
     lines.forEach((l, i) => g.fillText(l, x, y0 + i * lh));
   }
   const mime = card.format === "png" ? "image/png" : "image/jpeg";
+  return c.toDataURL(mime, 0.92);
+}
+
+async function downloadWithTitle(card: ImageCardInfo, url: string, title: string, dark: boolean) {
   const a = document.createElement("a");
-  a.href = c.toDataURL(mime, 0.92);
+  a.href = await composeTitled(card, url, title, dark);
   a.download = `${card.id}-${card.width}x${card.height}.${card.format === "png" ? "png" : "jpg"}`;
   a.click();
 }
@@ -117,9 +128,10 @@ export default function ImageCardPage() {
 
   const [copy, setCopy] = useState("");
   const [fromRunId, setFromRunId] = useState<string | number | undefined>();
+  const [fromLocator, setFromLocator] = useState<{ variantIndex?: number; contentKind?: "planning" | "public"; contentIndex?: number }>({});
   useEffect(() => {
     const h = readImageCardHandoff();
-    if (h?.copy) { setCopy(h.copy); setFromRunId(h.fromRunId); }
+    if (h?.copy) { setCopy(h.copy); setFromRunId(h.fromRunId); setFromLocator(h.locator ?? {}); }
   }, []);
 
   const [model, setModel] = useState<Model>("gpt-image-2");
@@ -158,6 +170,27 @@ export default function ImageCardPage() {
 
   const proposeMut = trpc.imageCard.propose.useMutation();
   const renderMut = trpc.imageCard.render.useMutation();
+
+  // ── 圖文預覽與排程 ──
+  const savePostMut = trpc.imageCard.saveAsPost.useMutation();
+  const scheduleMut = trpc.calendar.schedule.useMutation();
+  const [postOpen, setPostOpen] = useState(false);
+  /** 預覽用的圖：有標題就是疊好標題的那張（data URL），沒有就是原圖。 */
+  const [postImage, setPostImage] = useState<string | null>(null);
+  const [schedDate, setSchedDate] = useState(() => {
+    const d = new Date(Date.now() + 24 * 3600_000);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  });
+  const [schedTime, setSchedTime] = useState("20:00");
+  /** 從文字任務過來的，預設把圖放回那一篇；用戶可以改成另存一篇新的。 */
+  const [asNewPost, setAsNewPost] = useState(false);
+  const [postError, setPostError] = useState<string | null>(null);
+  /**
+   * 已經存成哪一篇。存檔成功、排程那一步卻失敗（時間已過、網路斷）時，再按一次要沿用
+   * 同一篇，不能又存出一篇重複的貼文。內容（圖、文案、標題、存到哪）一變就重存。
+   */
+  const savedPostRef = useRef<{ key: string; outputId: number; locator: { variantIndex?: number; contentKind?: "planning" | "public"; contentIndex?: number } } | null>(null);
+  const brand = ((ctx?.brands ?? []) as any[]).find((b) => b?.id === brandId);
 
   const scenePrompt = useMemo(() => {
     if (picked === "custom") return customScene.trim();
@@ -258,6 +291,66 @@ export default function ImageCardPage() {
     }
   }
 
+  const titled = showTitle && headline.trim().length > 0 && card.titleZone !== "none";
+  const fromOutputId = !asNewPost && fromRunId != null && Number.isFinite(Number(fromRunId)) ? Number(fromRunId) : undefined;
+
+  async function openPost() {
+    if (!current) return;
+    // 一組多張時，貼文的主圖是第一張；標題也只疊在第一張。
+    const base = slots[0]!.versions[slots[0]!.active]!.url;
+    setPostImage(base);
+    setPostOpen(true);
+    if (!titled) return;
+    try { setPostImage(await composeTitled(card!, base, headline, darkTitle)); }
+    catch { showToastGlobal(lang === "en" ? "Could not draw the title on the image." : "標題疊不上去，先用沒有標題的圖預覽。"); }
+  }
+
+  /** 把圖＋文案存成一篇產出（或寫回來源那篇）。schedule=true 再排進行事曆。 */
+  async function savePost(schedule: boolean) {
+    if (!brandId || !current) return;
+    if (!fromOutputId && copy.trim().length < 2) {
+      showToastGlobal(lang === "en" ? "Add the copy first." : "先填上文案，才能跟圖一起排程。");
+      return;
+    }
+    setPostError(null);
+    const scheduledAt = `${schedDate}T${schedTime}:00+08:00`;
+    if (schedule && !(new Date(scheduledAt).getTime() > Date.now())) {
+      showToastGlobal(lang === "en" ? "Pick a time in the future." : "排程時間要選未來的時間。");
+      return;
+    }
+    try {
+      const urls = slots.map((sl) => sl.versions[sl.active]!.url);
+      const key = JSON.stringify([card!.id, urls, fromOutputId ?? null, fromOutputId ? null : copy, titled ? [headline, darkTitle] : null]);
+      let saved = savedPostRef.current?.key === key ? savedPostRef.current : null;
+      if (!saved) {
+        const r = await savePostMut.mutateAsync({
+          brandId, cardId: card!.id, copy,
+          // 寫回來源文案時只帶一張（那一則只有一個圖位）。
+          imageUrls: fromOutputId ? [urls[0]!] : urls,
+          imageB64: titled && postImage?.startsWith("data:image/") ? postImage : undefined,
+          fromOutputId,
+          ...(fromOutputId ? fromLocator : {}),
+        });
+        saved = savedPostRef.current = { key, outputId: r.outputId, locator: r.locator };
+      }
+      clearImageCardHandoff();
+      if (!schedule) {
+        showToastGlobal(lang === "en" ? "Saved as a post." : "已存成貼文。");
+        navigate(`/run/${saved.outputId}`);
+        return;
+      }
+      await scheduleMut.mutateAsync({ outputId: saved.outputId, ...saved.locator, platform: card!.channel, scheduledAt });
+      showToastGlobal(lang === "en" ? "Scheduled. See it in this week's plan." : "已排進行事曆。");
+      navigate(`/planner?w=${schedDate}&ho=${saved.outputId}`);
+    } catch (e: any) {
+      // 被閘道擋下的錯誤（例如 413）不是 tRPC 形狀，message 可能是空的或一串 JSON——一定要讓人看得到失敗。
+      const msg = String(e?.message ?? "").trim();
+      setPostError(msg && !msg.startsWith("{") && !msg.startsWith("<") ? msg.slice(0, 200) : (lang === "en" ? "Couldn't save. Please try again." : "沒有存成功，請再試一次。"));
+    }
+  }
+  const postBusy = savePostMut.isPending || scheduleMut.isPending;
+
+
   const ratioCss = `${card.width} / ${card.height}`;
   const sameChannel = cards.filter((c) => c.channel === card.channel && c.id !== card.id);
   const otherChannels = cards.filter((c) => c.channel !== card.channel);
@@ -287,7 +380,7 @@ export default function ImageCardPage() {
 
       {/* 步驟列 */}
       <ol className="mt-4 flex items-center gap-2 text-tiny text-default-500">
-        {[lang === "en" ? "1 Direction" : "1 選方向", lang === "en" ? "2 Refine" : "2 對話修改", lang === "en" ? "3 Export & resize" : "3 輸出與延伸尺寸"].map((s, i) => (
+        {[lang === "en" ? "1 Direction" : "1 選方向", lang === "en" ? "2 Refine" : "2 對話修改", lang === "en" ? "3 Preview, schedule & resize" : "3 圖文預覽・排程・延伸尺寸"].map((s, i) => (
           <li key={s} className={`px-2.5 py-1 rounded-full ${(i === 0 && step === 1) || (i > 0 && step === 2) ? "bg-default-900 text-white" : "bg-default-100"}`}>{s}</li>
         ))}
       </ol>
@@ -508,6 +601,10 @@ export default function ImageCardPage() {
                 </Button>
               </div>
               <Input label={lang === "en" ? "Title on the image" : "圖上標題"} value={headline} onValueChange={setHeadline} size="sm" />
+              {/* 2026-10-04：圖做好後的主要出口是「跟文案一起預覽、排程」，下載退成次要。 */}
+              <Button color="primary" className="w-full" onPress={openPost} isDisabled={busy || !brandId}>
+                {lang === "en" ? "Preview with copy & schedule" : "圖文預覽與排程"}
+              </Button>
               <div className="flex gap-2 flex-wrap">
                 <Button size="sm" variant="flat" onPress={() => downloadWithTitle(card, current.url, showTitle ? headline : "", darkTitle).catch(() => showToastGlobal(lang === "en" ? "Download failed" : "下載失敗"))}>
                   {lang === "en" ? "Download" : "下載"}{lang === "en" ? ` (${card.width}×${card.height})` : `（${card.width}×${card.height}）`}
@@ -590,6 +687,77 @@ export default function ImageCardPage() {
               )}
             </section>
           )}
+
+          <Modal isOpen={postOpen} onClose={() => { if (!postBusy) setPostOpen(false); }} size="4xl" scrollBehavior="inside">
+            <ModalContent>
+              <ModalHeader className="flex-col items-start gap-0.5">
+                <span>{lang === "en" ? "Preview with copy & schedule" : "圖文預覽與排程"}</span>
+                <span className="text-tiny font-normal text-default-500">
+                  {CHANNEL_ZH[card.channel] ?? card.channel}・{lang === "en" ? card.labelEn : card.labelZh}
+                  {slots.length > 1 ? (lang === "en" ? ` · ${slots.length} images` : `・共 ${slots.length} 張`) : ""}
+                </span>
+              </ModalHeader>
+              <ModalBody className="pb-6">
+                <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_300px] gap-6">
+                  <div className="min-w-0">
+                    <PlatformMockup
+                      variant={imageCardMockup(card.id, card.channel, fromOutputId ? 1 : slots.length)}
+                      title="" brief=""
+                      brandName={brand?.name ?? null}
+                      brandLogoUrl={brand?.logoUrl ?? brand?.logo_url ?? null}
+                      liveCaption={copy}
+                      liveImageUrl={postImage ?? current?.url}
+                      liveImageStatus="ready"
+                      liveCards={!fromOutputId && slots.length > 1
+                        ? slots.map((sl, i) => ({ headline: "", body: "", image: { style: null, url: i === 0 && postImage ? postImage : sl.versions[sl.active]!.url, status: "ready" } }))
+                        : undefined}
+                    />
+                  </div>
+                  <div className="space-y-4">
+                    {fromOutputId ? (
+                      <div className="text-tiny text-default-500 leading-relaxed">
+                        {lang === "en"
+                          ? "This image goes back onto the post you came from; its copy stays as written there."
+                          : "這張圖會放回你帶文案過來的那一篇（文案以那一篇為準，要改請回文案頁）。"}
+                        <div className="mt-1.5 flex gap-3">
+                          <button className="underline underline-offset-2" onClick={() => navigate(`/run/${fromOutputId}`)}>
+                            {lang === "en" ? "Open that post" : "看那一篇"}
+                          </button>
+                          <button className="underline underline-offset-2" onClick={() => setAsNewPost(true)}>
+                            {lang === "en" ? "Save as a new post instead" : "改成另存一篇新貼文"}
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <Textarea label={lang === "en" ? "Post copy" : "文案"} minRows={5} maxRows={12} value={copy} onValueChange={setCopy}
+                        placeholder={lang === "en" ? "The copy that goes out with this image." : "跟這張圖一起發出去的文案。"} />
+                    )}
+                    <div>
+                      <p className="text-tiny text-default-500 mb-1.5">{lang === "en" ? "Publish time (Taipei)" : "發布時間（台北時間）"}</p>
+                      <div className="flex gap-2">
+                        <input type="date" value={schedDate} onChange={(e) => setSchedDate(e.target.value)}
+                          className="flex-1 min-w-0 border border-default-200 rounded-md px-2 py-1.5 text-small bg-white" />
+                        <input type="time" value={schedTime} onChange={(e) => setSchedTime(e.target.value)}
+                          className="w-[104px] border border-default-200 rounded-md px-2 py-1.5 text-small bg-white" />
+                      </div>
+                    </div>
+                    <Button color="primary" className="w-full" onPress={() => savePost(true)} isLoading={postBusy} isDisabled={!schedDate || !schedTime}>
+                      {lang === "en" ? "Schedule to calendar" : "排進行事曆"}
+                    </Button>
+                    {postError && (
+                      <p className="rounded-md border border-warning-300 bg-warning-50 px-2.5 py-2 text-tiny text-warning-800">{postError}</p>
+                    )}
+                    <Button variant="flat" className="w-full" onPress={() => savePost(false)} isDisabled={postBusy}>
+                      {lang === "en" ? "Save as a post, schedule later" : "先存成貼文，晚點再排"}
+                    </Button>
+                    {!fromOutputId && slots.length > 1 && titled && (
+                      <p className="text-[11px] text-default-400">{lang === "en" ? "The title is placed on the first image only." : "標題只會放在第一張。"}</p>
+                    )}
+                  </div>
+                </div>
+              </ModalBody>
+            </ModalContent>
+          </Modal>
 
           <p className="text-[11px] text-default-400">
             {lang === "en" ? "Spec source: " : "規格依據："}

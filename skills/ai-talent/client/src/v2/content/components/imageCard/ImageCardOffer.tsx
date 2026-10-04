@@ -10,11 +10,13 @@ import type { ImageCardInfo } from "../../../platform/lib/imageCardHandoff";
 
 export const IMAGE_CARD_OFFER_ID = "image-card-offer";
 
-export default function ImageCardOffer({ platform, copy, runId, hasImage }: {
+export default function ImageCardOffer({ platform, copy, runId, hasImage, locator }: {
   platform: string | null | undefined;
   copy: string;
   runId?: string | number;
   hasImage?: boolean;
+  /** 目前這一則在產出裡的位置——圖做好後寫回同一則。 */
+  locator?: { variantIndex?: number; contentKind?: "planning" | "public"; contentIndex?: number };
 }) {
   const { lang } = useLang();
   const navigate = useNavigate();
@@ -23,13 +25,19 @@ export default function ImageCardOffer({ platform, copy, runId, hasImage }: {
     { channel: (channel ?? "facebook") as any },
     { enabled: !!channel, staleTime: 5 * 60_000 },
   );
-  const cards = (q.data?.cards ?? []) as ImageCardInfo[];
+  const all = (q.data?.cards ?? []) as ImageCardInfo[];
+  // 2026-10-04：尺寸補齊後一個平台有二三十張卡，全列出來會把這一區塞爆——
+  // 只列預設的那兩張，其餘到圖片分類自己挑。
+  const pinned = all.filter((c) => c.pinned);
+  const cards = pinned.length ? pinned : all.slice(0, 2);
   if (!channel || !copy.trim() || !cards.length) return null;
 
+  const handoff = () => saveImageCardHandoff({ copy, fromRunId: runId, locator });
   const open = (id: string) => {
-    saveImageCardHandoff({ copy, fromRunId: runId });
+    handoff();
     navigate(imageCardHref(id));
   };
+  const SLUG: Record<string, string> = { facebook: "fb", instagram: "ig", threads: "threads", line: "line", tiktok: "tt", email: "email", website: "web" };
 
   return (
     <div id={IMAGE_CARD_OFFER_ID} className="mx-4 mt-3 rounded-lg border border-default-200 bg-white px-3.5 py-3 scroll-mt-24">
@@ -51,6 +59,12 @@ export default function ImageCardOffer({ platform, copy, runId, hasImage }: {
             <span className="ml-1.5 text-default-400 tabular-nums">{c.ratio}</span>
           </button>
         ))}
+        {all.length > cards.length && SLUG[channel] && (
+          <button onClick={() => { handoff(); navigate(`/tasks/${SLUG[channel]}?view=images`); }}
+            className="px-3 py-1.5 rounded-full text-tiny text-default-500 underline underline-offset-2 hover:text-default-800">
+            {lang === "en" ? `More sizes (${all.length})` : `其他尺寸（共 ${all.length} 種）`}
+          </button>
+        )}
       </div>
     </div>
   );

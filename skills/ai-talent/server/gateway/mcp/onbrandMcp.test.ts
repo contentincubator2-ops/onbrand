@@ -255,3 +255,11 @@ describe("IP boundary", () => {
     for (const t of TOOLS) expect(JSON.stringify(t.inputSchema)).not.toMatch(/systemPrompt|skill/i);
   });
 });
+
+describe("human-approval boundary", () => {
+  it("exposes no approve or publish tool, and the board tool says it cannot approve", () => {
+    for (const t of TOOLS) expect(t.name).not.toMatch(/approve|publish|release|send/i);
+    const board = TOOLS.find((t) => t.name === "team_board")!;
+    expect(board.description).toMatch(/不能代為核准或發布/);
+  });
+});

@@ -121,7 +121,7 @@ export function WebLanding({ title, brandName, variantLabel, liveTitle, liveDesc
 
 /* ─────────────── Blog Post ─────────────── */
 
-export function WebBlog({ title, brandName, variantLabel, liveTitle, liveCaption, liveImageDesc }: MockupFields) {
+export function WebBlog({ title, brandName, variantLabel, liveTitle, liveCaption, liveImageDesc, liveImageUrl, liveImageStatus }: MockupFields) {
   const { lang } = useLang();
   const brand = brandName ?? "Your Brand";
 
@@ -157,6 +157,10 @@ export function WebBlog({ title, brandName, variantLabel, liveTitle, liveCaption
             <span>·</span>
             <span>{new Date().toLocaleDateString(lang === "en" ? "en-US" : "zh-TW")}</span>
           </div>
+          {/* 2026-10-04：真的有圖就照原比例顯示，沒有才畫佔位框。 */}
+          {liveImageUrl && liveImageStatus === "ready" ? (
+            <img src={liveImageUrl} alt="" className="block w-full h-auto rounded-xl mb-6 bg-default-100" style={{ maxHeight: 520, objectFit: "contain" }} />
+          ) : (
           <div className="aspect-[16/7] bg-default-100 rounded-xl mb-6 flex items-center justify-center relative overflow-hidden">
             <Skeleton className="absolute inset-0 rounded-none" />
             <div className="relative z-10 text-center">
@@ -164,6 +168,7 @@ export function WebBlog({ title, brandName, variantLabel, liveTitle, liveCaption
               <p className="text-tiny text-default-400 mt-1">{liveImageDesc ?? (lang === "en" ? "Cover image" : "封面圖")}</p>
             </div>
           </div>
+          )}
           {liveCaption ? (
             <div className="prose prose-sm max-w-none text-foreground">
               <p className="leading-relaxed whitespace-pre-wrap">{liveCaption}</p>

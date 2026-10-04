@@ -21,6 +21,7 @@
 import localPool from "../../localDb";
 import { isRuntimeFeatureEnabled } from "../../platform/core/ops/runtimeSafety";
 import { outputApprovalState } from "./publishGate";
+import { friendlyPublishError } from "./publish/publishErrors";
 
 const GRACE_MS = 6 * 60 * 60 * 1000;
 const BATCH = 5;
@@ -59,7 +60,7 @@ export async function tickScheduledPublish(): Promise<number> {
       await publishScheduledPost({ id, userId: Number(r.userId), claimed: true });
       published++;
     } catch (e: any) {
-      const msg = String(e?.message ?? e).slice(0, 1000);
+      const msg = friendlyPublishError(e).slice(0, 1000);
       await localPool.execute(
         `UPDATE scheduled_posts SET status = 'failed', lastError = ? WHERE id = ? AND status = 'publishing'`,
         [msg, id],

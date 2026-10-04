@@ -10,6 +10,7 @@
  *   - story: justinTsugranes/project_instagram-stories-ui-tailwind (MIT)
  *   - reel: 9:16 + side rail pattern from SashenJayathilaka/TIK-TOK-Clone (MIT)
  */
+import { useState } from "react";
 import {
   Avatar, AvatarGroup, Button, Skeleton,
 } from "@heroui/react";
@@ -43,6 +44,10 @@ export function IGFeed({ title, brandName, brandLogoUrl, variantLabel, liveCapti
   const effectiveHashtags  = hashtagSlot?.status === "filled" ? hashtagSlot.value as string[] : liveHashtags;
   const effectiveImageDesc = imageSlot?.status   === "filled" ? imageSlot.value  as string : liveImageDesc;
   const postTitleFallback = getPostTitleFallback(title, effectiveCaption);
+  // 2026-10-04：IG 動態照圖片自己的比例顯示（3:4～1.91:1），不再一律裁成方形——
+  // 4:5／3:4 的圖在預覽裡被切掉上下，跟實際發出去的樣子不一樣。讀到圖之前先當方形。
+  const [imgRatio, setImgRatio] = useState<number | null>(null);
+  const feedRatio = Math.min(1.91, Math.max(0.75, imgRatio ?? 1));
 
   return (
     <div className="w-full max-w-[420px] mx-auto">
@@ -68,12 +73,14 @@ export function IGFeed({ title, brandName, brandLogoUrl, variantLabel, liveCapti
             when no image yet; use full aspect-square only when image ready. */}
         <div
           className={`relative bg-default-100 overflow-hidden ${
-            liveImageUrl && liveImageStatus === "ready" ? "aspect-square" : "h-32"
+            liveImageUrl && liveImageStatus === "ready" ? "" : "h-32"
           }`}
+          style={liveImageUrl && liveImageStatus === "ready" ? { aspectRatio: String(feedRatio) } : undefined}
         >
           {liveImageUrl && liveImageStatus === "ready" ? (
             <>
-              <img src={liveImageUrl} alt={liveImageStyle ?? "generated"} className="absolute inset-0 w-full h-full object-cover" />
+              <img src={liveImageUrl} alt={liveImageStyle ?? "generated"} className="absolute inset-0 w-full h-full object-cover"
+                onLoad={(e) => { const i = e.currentTarget; if (i.naturalWidth && i.naturalHeight) setImgRatio(i.naturalWidth / i.naturalHeight); }} />
               {/* 2026-08-19: hidden behind SHOW_IMAGE_STYLE_OVERLAY — the
                   Chinese style text never produced this image. Flip the flag
                   in shared.tsx to restore. */}
