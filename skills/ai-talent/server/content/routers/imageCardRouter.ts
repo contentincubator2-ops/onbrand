@@ -26,7 +26,8 @@ import {
   type PlatformImageSpec,
 } from "../../platform/core/media/platformImageSpecs";
 import { loadBrandPositioning } from "../../platform/core/billing/planGate";
-import { proposeImageDirections, planSeriesSlides, renderImageCard, saveTitledImage, MAX_SERIES } from "../core/image/imageCards";
+import { proposeImageDirections, planSeriesSlides, renderImageCard, saveTitledImage, fitPhotoToCard, solidBackgroundForCard, MAX_SERIES } from "../core/image/imageCards";
+import { IMAGE_STYLES, IMAGE_STYLE_IDS } from "../core/image/imageStyles";
 import { contentSelectorFields, updateOutputContent } from "../core/engine/outputContentEnvelope";
 import { applyVariantImageUpdate } from "../core/image/variantImageUpdate";
 import { recordTaskRun } from "../../platform/core/ops/recordTaskRun";
@@ -118,7 +119,11 @@ export const imageCardRouter = router({
       const specs = input?.channel
         ? PLATFORM_IMAGE_SPECS.filter((s) => s.channel === input.channel)
         : PLATFORM_IMAGE_SPECS;
-      return { cards: specs.map(publicSpec) };
+      return {
+        cards: specs.map(publicSpec),
+        /** 畫面樣式清單（換底圖／換樣式的選項）；只給 id 與名稱，prompt 留在伺服器。 */
+        styles: IMAGE_STYLES.map((x) => ({ id: x.id, labelZh: x.labelZh, labelEn: x.labelEn })),
+      };
     }),
 
   /** 這個品牌在這個通路擺哪幾張圖片卡（沒挑過＝每通路預設兩張）。 */
@@ -200,7 +205,9 @@ export const imageCardRouter = router({
       /** 對話修改：上一版；延伸尺寸：來源圖。只收本站產出的圖。 */
       referenceImageUrl: z.string().max(2048).optional(),
       /** previous＝同一張的上一版（預設）；style＝整組第 1 張，只借風格、畫面另外寫。 */
-      referenceMode: z.enum(["previous", "style"]).optional(),
+      referenceMode: z.enum(["previous", "style", "restyle"]).optional(),
+      /** 畫面樣式（imageStyles 的 id）；不傳＝不指定。 */
+      styleId: z.enum(IMAGE_STYLE_IDS).optional(),
       instruction: z.string().max(600).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
@@ -229,6 +236,7 @@ export const imageCardRouter = router({
           productImageUrl: input.productImageUrl,
           referenceImageUrl: input.referenceImageUrl,
           referenceMode: input.referenceMode,
+          styleId: input.styleId,
           instruction: input.instruction?.trim() || undefined,
         });
       } catch (e) {
@@ -284,6 +292,62 @@ export const imageCardRouter = router({
       } catch (e) {
         throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: e instanceof Error ? e.message : String(e) });
       }
+    }),
+
+  /** 換底圖：純色／漸層底，不經 AI、不扣點。 */
+  solidBackground: protectedProcedure
+    .input(z.object({
+      brandId: z.number().int().positive(),
+      cardId: z.string().max(60),
+      color: z.string().max(7),
+      color2: z.string().max(7).optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED" });
+      await assertBrandOwner(ctx.user.id, input.brandId);
+      const out = await solidBackgroundForCard({ spec: specOr404(input.cardId), color: input.color, color2: input.color2 });
+      if (!out.ok) throw new TRPCError({ code: "BAD_REQUEST", message: out.reason });
+      return { url: out.url };
+    }),
+
+  /** 品牌色（換底圖的純色底色票）：取自品牌視覺設定，沒有就空陣列。 */
+  brandColours: protectedProcedure
+    .input(z.object({ brandId: z.number().int().positive() }))
+    .query(async ({ ctx, input }) => {
+      if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED" });
+      await assertBrandOwner(ctx.user.id, input.brandId);
+      const bc = await resolveBrandVisualContext(input.brandId);
+      const hexes = (bc.colourHints ?? []).flatMap((h) => String(h).match(/#[0-9a-fA-F]{6}/g) ?? []).map((h) => h.toUpperCase());
+      return { colours: Array.from(new Set(hexes)).slice(0, 8) };
+    }),
+
+  /**
+   * 「原圖直接用」：不經 AI、不扣點，把用戶自己的照片放進這張卡的畫布（見 fitPhotoToCard）。
+   * 照片必須是這個品牌的（上傳／素材庫／產品照）。
+   */
+  fitPhoto: protectedProcedure
+    .input(z.object({
+      brandId: z.number().int().positive(),
+      cardId: z.string().max(60),
+      photoUrl: z.string().max(2048),
+      fit: z.enum(["cover", "contain"]).default("cover"),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED" });
+      await assertBrandOwner(ctx.user.id, input.brandId);
+      const spec = specOr404(input.cardId);
+      if (!(await productPhotoAllowed(input.brandId, input.photoUrl))) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "這張照片不屬於這個品牌。" });
+      }
+      let buffer: Buffer;
+      try {
+        ({ buffer } = await fetchImageBuffer(input.photoUrl, { timeoutMs: 20_000, maxBytes: 25 * 1024 * 1024 }));
+      } catch (e) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: e instanceof Error ? e.message : "讀不到這張照片。" });
+      }
+      const out = await fitPhotoToCard({ buffer, spec, fit: input.fit });
+      if (!out.ok) throw new TRPCError({ code: "BAD_REQUEST", message: out.reason });
+      return { url: out.url, card: publicSpec(spec) };
     }),
 
   /**

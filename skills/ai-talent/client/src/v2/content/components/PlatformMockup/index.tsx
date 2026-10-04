@@ -60,6 +60,8 @@ import AiImageNotice from "../../../platform/components/AiImageNotice";
 
 export interface PlatformMockupProps extends MockupFields {
   variant: MockupVariant;
+  /** 圖是用戶自己的照片（沒經 AI）時不掛「AI 生成」小警語。 */
+  noAiNotice?: boolean;
 }
 
 /**
@@ -67,10 +69,10 @@ export interface PlatformMockupProps extends MockupFields {
  * 預覽下方放 AI 生成的小警語（AiImageNotice）。放在外框這一層，不用改 27 個平台外框裡的 <img>；
  * 警語不會被「帶版型下載」截進圖裡。
  */
-export function PlatformMockup(props: PlatformMockupProps) {
+export function PlatformMockup({ noAiNotice, ...props }: PlatformMockupProps) {
   const inner = <PlatformMockupFrame {...props} />;
   const hasImage = !!props.liveImageUrl || (props.liveCards ?? []).some((c) => !!c?.image?.url);
-  if (!hasImage) return inner;
+  if (!hasImage || noAiNotice) return inner;
   return (
     <div className="flex flex-col">
       {inner}
