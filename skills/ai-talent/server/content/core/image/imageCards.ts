@@ -38,6 +38,12 @@ export interface ImageDirection {
   promptEn: string;
 }
 
+/** 使用者訊息：有主體照片就把圖一起附上（文字在前），沒有就維持純文字。 */
+export function withSubjectImage(text: string, dataUrl?: string): any {
+  if (!dataUrl) return text;
+  return [{ type: "text", text }, { type: "image_url", image_url: { url: dataUrl } }];
+}
+
 export interface ProposeResult {
   headlineZh: string;
   directions: ImageDirection[];
@@ -98,7 +104,7 @@ ${series}
 - paletteZh：色調一句話（優先用品牌色）
 - whyZh：為什麼適合這篇文案 20–40 字
 - promptEn：給圖片模型的英文場景描述 60–120 字（主體、環境、光線、鏡頭、情緒），必須符合這張卡的構圖規則：${spec.compositionEn}
-${spec.compose ? "- 這是細長 Banner 的方形主體圖：promptEn 只描述單一主體，放在一整片純色背景上（不要場景、桌面、窗戶、地平線），四周留白。\n" : ""}${withProduct ? "- 使用者會附上真實產品照：promptEn 只描述產品以外的場景、光線、擺放位置，不要重新描述或改寫產品外觀。\n" : ""}
+${spec.compose ? "- 這是細長 Banner 的方形主體圖：promptEn 只描述單一主體，放在一整片純色背景上（不要場景、桌面、窗戶、地平線），四周留白。\n" : ""}${withProduct ? "- 使用者附上了一張真實照片（會一起給你看）：先看懂照片裡的主體是什麼，3 個方向都必須以這個主體為主角，sceneZh 要寫出主體在畫面裡怎麼出現；promptEn 只描述主體以外的場景、光線、擺放位置，不要重新描述或改寫主體的外觀。\n" : ""}
 另外給 headlineZh：從文案濃縮一句 6–14 字的圖上標題（會疊在圖上，不是畫進圖裡）。
 
 規則：畫面裡不能有任何文字、招牌字、logo 字樣；不要提到競品品牌。
@@ -118,14 +124,16 @@ export async function proposeImageDirections(args: {
   brainPrefix?: string;
   /** 一組幾張（輪播／相簿）；預設單張。 */
   count?: number;
+  /** 用戶選的主體照片（縮小後的 data URL）。給了就讓 AI 真的看到它，方向以它為主角。 */
+  subjectImageDataUrl?: string;
 }): Promise<ProposeResult> {
   const { invokeLLM } = await import("../../../platform/core/llm/llm");
   const brain = args.brainPrefix?.trim() ? `品牌大腦（標題的用詞、語氣與畫面方向都要符合）：${args.brainPrefix}\n\n` : "";
   const user = `${brain}品牌資訊：\n${brandBlock(args.brand) || "（尚未設定）"}\n\n${args.productName ? `產品：${args.productName}\n\n` : ""}文案：\n${args.copy}`;
   const res = await invokeLLM({
     messages: [
-      { role: "system", content: directionsSystemPrompt(args.spec, !!args.productName, args.count ?? 1) },
-      { role: "user", content: user },
+      { role: "system", content: directionsSystemPrompt(args.spec, !!args.productName || !!args.subjectImageDataUrl, args.count ?? 1) },
+      { role: "user", content: withSubjectImage(user, args.subjectImageDataUrl) },
     ],
     maxTokens: 2200,
   });
@@ -393,7 +401,7 @@ ${count === 2 ? "（只有 2 張時：封面＋收尾。）" : ""}
 - titleZh：圖上標題 6–14 字，從文案濃縮；標題之間要接得起來、不重複
 - sceneZh：這張的畫面 30–60 字，讓不懂攝影的人看得懂
 - promptEn：給圖片模型的英文場景描述 50–110 字。每張的畫面都要不同，但共用方向的色調、光線與質感；必須符合構圖規則：${spec.compositionEn}
-${withProduct ? "使用者有真實產品照：只有第 1 張會帶入產品；其餘張的 promptEn 不要重新描述產品外觀，需要出現產品時寫「the same product as in the reference」。" : ""}
+${withProduct ? "使用者附上了一張真實照片（會一起給你看）：只有第 1 張會直接帶入這個主體，第 1 張要以它為主角；其餘張的 promptEn 不要重新描述主體外觀，需要出現時寫「the same subject as in the reference」。" : ""}
 規則：畫面裡不能有任何文字、招牌字、logo 字樣；不要提到競品品牌。
 只輸出 JSON：{"slides":[{"roleZh":"...","titleZh":"...","sceneZh":"...","promptEn":"..."}]}`;
 }
@@ -420,6 +428,7 @@ export async function planSeriesSlides(args: {
   brand: BrandVisualContext;
   productName?: string;
   brainPrefix?: string;
+  subjectImageDataUrl?: string;
 }): Promise<SeriesSlide[]> {
   const { invokeLLM } = await import("../../../platform/core/llm/llm");
   const brain = args.brainPrefix?.trim() ? `品牌大腦（標題的用詞、語氣與畫面方向都要符合）：${args.brainPrefix}
@@ -441,8 +450,8 @@ ${args.productName ? `產品：${args.productName}
 ${args.copy}`;
   const res = await invokeLLM({
     messages: [
-      { role: "system", content: seriesSystemPrompt(args.spec, args.count, !!args.productName) },
-      { role: "user", content: user },
+      { role: "system", content: seriesSystemPrompt(args.spec, args.count, !!args.productName || !!args.subjectImageDataUrl) },
+      { role: "user", content: withSubjectImage(user, args.subjectImageDataUrl) },
     ],
     maxTokens: 400 + args.count * 450,
   });

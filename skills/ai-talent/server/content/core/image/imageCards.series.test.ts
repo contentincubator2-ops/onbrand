@@ -13,7 +13,7 @@ vi.mock("../../../platform/core/llm/llm", () => ({
   },
 }));
 
-import { buildImageCardPrompt, directionsSystemPrompt, normalizeSeriesSlides, planSeriesSlides, seriesSystemPrompt } from "./imageCards";
+import { buildImageCardPrompt, directionsSystemPrompt, normalizeSeriesSlides, planSeriesSlides, proposeImageDirections, seriesSystemPrompt, withSubjectImage } from "./imageCards";
 
 const spec: any = { labelZh: "輪播貼文", width: 1080, height: 1350, compositionEn: "vertical 4:5" };
 const slide = (n: number) => ({ roleZh: `角色${n}`, titleZh: `標題${n}`, sceneZh: `畫面${n}`, promptEn: `scene ${n}` });
@@ -63,5 +63,28 @@ describe("prompt", () => {
     const prev = buildImageCardPrompt({ ...base, reference: "previous" });
     expect(prev).toContain("previous version");
     expect(prev).not.toContain("multi-image set");
+  });
+});
+
+describe("主體照片要讓 AI 真的看到（CJ「上傳了照片，三個方向都沒有用到」）", () => {
+  it("withSubjectImage：有圖附上 image_url，沒圖維持純文字", () => {
+    expect(withSubjectImage("hi")).toBe("hi");
+    const m = withSubjectImage("hi", "data:image/jpeg;base64,AAAA");
+    expect(m[0]).toEqual({ type: "text", text: "hi" });
+    expect(m[1].image_url.url).toContain("base64");
+  });
+  it("提方向：附了照片，圖進使用者訊息、系統 prompt 要求以主體為主角（即使不是產品清單的產品）", async () => {
+    seen.length = 0; reply = { headlineZh: "標題", directions: [{ id: "a", titleZh: "方向", sceneZh: "場景", paletteZh: "色", whyZh: "因", promptEn: "scene" }] };
+    await proposeImageDirections({ spec, copy: "文案", brand: {} as any, subjectImageDataUrl: "data:image/jpeg;base64,AAAA" });
+    const sys = seen[0].messages.find((m: any) => m.role === "system").content;
+    const user = seen[0].messages.find((m: any) => m.role === "user").content;
+    expect(sys).toContain("以這個主體為主角");
+    expect(Array.isArray(user) && user.some((p: any) => p.type === "image_url")).toBe(true);
+  });
+  it("沒附照片：維持純文字、不提主體", async () => {
+    seen.length = 0;
+    await proposeImageDirections({ spec, copy: "文案", brand: {} as any });
+    expect(typeof seen[0].messages.find((m: any) => m.role === "user").content).toBe("string");
+    expect(seen[0].messages.find((m: any) => m.role === "system").content).not.toContain("以這個主體為主角");
   });
 });

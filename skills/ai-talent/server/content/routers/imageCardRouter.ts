@@ -31,11 +31,26 @@ import { contentSelectorFields, updateOutputContent } from "../core/engine/outpu
 import { applyVariantImageUpdate } from "../core/image/variantImageUpdate";
 import { recordTaskRun } from "../../platform/core/ops/recordTaskRun";
 import { resolveBrandVisualContext } from "../core/image/imageGen";
-import { localCoverFile } from "../../platform/core/media/imageFetch";
+import { localCoverFile, fetchImageBuffer } from "../../platform/core/media/imageFetch";
 import { brandOwnsProductPhoto } from "./imageRouter";
 import { brandOwnsLibraryPhoto } from "../../strategy/core/brand/assetPhotos";
 
 const channel = z.enum(IMAGE_CHANNELS as [string, ...string[]]);
+
+/**
+ * 用戶選的主體照片 → 給 LLM 看的縮圖（data URL）。必須是這個品牌的照片；讀不到就當沒有（不擋提方向）。
+ * 2026-10-04（CJ「上傳了照片，三個方向都沒有用到」）：以前只有「產品清單裡的產品」才會讓 AI 知道有照片，
+ * 上傳／素材庫挑的照片根本沒傳進提方向，方向全是憑文案想像。
+ */
+async function subjectPhotoForLLM(brandId: number, url?: string): Promise<string | undefined> {
+  if (!url || !(await productPhotoAllowed(brandId, url))) return undefined;
+  try {
+    const { buffer } = await fetchImageBuffer(url, { timeoutMs: 15_000, maxBytes: 20 * 1024 * 1024 });
+    const sharp = (await import("sharp")).default;
+    const small = await sharp(buffer).rotate().resize({ width: 1024, height: 1024, fit: "inside", withoutEnlargement: true }).jpeg({ quality: 82 }).toBuffer();
+    return `data:image/jpeg;base64,${small.toString("base64")}`;
+  } catch { return undefined; }
+}
 
 /** 圖上標題是會被看見的字——跟文案一樣過禁用詞／替換對照，再過法規合規檢查。 */
 async function cleanOverlayTitle(brandId: number, text: string): Promise<string> {
@@ -149,6 +164,8 @@ export const imageCardRouter = router({
       productName: z.string().max(200).optional(),
       /** 一組幾張（輪播／相簿）；不傳＝單張。 */
       count: z.number().int().min(1).max(MAX_SERIES).optional(),
+      /** 用戶選的主體照片（上傳／素材庫／產品照都算）；給了 AI 會看這張照片再提方向。 */
+      subjectImageUrl: z.string().max(2048).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED" });
@@ -162,7 +179,10 @@ export const imageCardRouter = router({
       // 2026-10-03：這張圖發在哪個平台 → 讀該平台的「通路角色」（構圖與標題的取向跟著平台走）。
       const brainPrefix = await buildBrandPrefix(input.brandId, null, null, "full", spec.channel).catch(() => "");
       try {
-        const out = await proposeImageDirections({ spec, copy: input.copy, brand, productName: input.productName, brainPrefix, count: input.count });
+        const out = await proposeImageDirections({
+          spec, copy: input.copy, brand, productName: input.productName, brainPrefix, count: input.count,
+          subjectImageDataUrl: await subjectPhotoForLLM(input.brandId, input.subjectImageUrl),
+        });
         out.headlineZh = await cleanOverlayTitle(input.brandId, out.headlineZh);
         return out;
       } catch (e) {
@@ -241,6 +261,7 @@ export const imageCardRouter = router({
         promptEn: z.string().min(2).max(4000),
       }),
       productName: z.string().max(200).optional(),
+      subjectImageUrl: z.string().max(2048).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED" });
@@ -256,6 +277,7 @@ export const imageCardRouter = router({
         const slides = await planSeriesSlides({
           spec, copy: input.copy, count: input.count, direction: input.direction,
           brand, productName: input.productName, brainPrefix,
+          subjectImageDataUrl: await subjectPhotoForLLM(input.brandId, input.subjectImageUrl),
         });
         for (const sl of slides) sl.titleZh = await cleanOverlayTitle(input.brandId, sl.titleZh);
         return { slides };

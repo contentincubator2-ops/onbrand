@@ -196,6 +196,8 @@ export default function ImageCardPage() {
   const [notes, setNotes] = useState<string[]>([]);
   const [restBusy, setRestBusy] = useState(false);
   const [restAt, setRestAt] = useState(0);
+  /** 提方向當下用的主體照片；之後換了照片，方向就不是看著這張提的，要提醒重提。 */
+  const [directionsPhoto, setDirectionsPhoto] = useState<string | null>(null);
 
   // 卡片換了（從延伸結果點進另一張卡）就重來。
   useEffect(() => {
@@ -271,8 +273,9 @@ export default function ImageCardPage() {
     if (!brandId) { showToastGlobal(lang === "en" ? "Pick a brand first." : "請先選擇品牌。"); return; }
     if (copy.trim().length < 2) { showToastGlobal(lang === "en" ? "Paste the copy first." : "先貼上文案。"); return; }
     try {
-      const r = await proposeMut.mutateAsync({ brandId, cardId: card!.id, copy: copy.trim(), productName: productNameForLLM, count: series ? n : undefined });
+      const r = await proposeMut.mutateAsync({ brandId, cardId: card!.id, copy: copy.trim(), productName: productNameForLLM, count: series ? n : undefined, subjectImageUrl: product?.imageUrl });
       setDirections(r.directions as Direction[]);
+      setDirectionsPhoto(product?.imageUrl ?? null);
       setPicked((r.directions[0] as Direction | undefined)?.id ?? null);
       if (!headline) setHeadline(r.headlineZh);
     } catch (e: any) {
@@ -289,7 +292,7 @@ export default function ImageCardPage() {
     if (!d) return;
     try {
       const r = await planMut.mutateAsync({
-        brandId, cardId: card!.id, copy: copy.trim(), count: n, productName: productNameForLLM,
+        brandId, cardId: card!.id, copy: copy.trim(), count: n, productName: productNameForLLM, subjectImageUrl: product?.imageUrl,
         direction: { titleZh: d.titleZh, sceneZh: d.sceneZh, paletteZh: d.paletteZh, promptEn: d.promptEn },
       });
       setPlan(r.slides as SlidePlan[]);
@@ -706,6 +709,11 @@ export default function ImageCardPage() {
               <p className="text-[11px] text-default-400">
                 {lang === "en" ? "Brand colours and imagery style are applied automatically." : "品牌色與圖像風格會自動套用（在品牌視覺頁設定）。"}
               </p>
+              {directions.length > 0 && directionsPhoto !== (product?.imageUrl ?? null) && (
+                <p className="text-tiny text-warning-700">
+                  {lang === "en" ? "You changed the photo — suggest directions again so they are built around it." : "照片換過了，請重新提方向，方向才會以這張照片為主。"}
+                </p>
+              )}
               <Button color="primary" onPress={propose} isLoading={proposeMut.isPending} isDisabled={!brandId}>
                 {directions.length
                   ? (lang === "en" ? "Suggest again" : "重新提方向")
