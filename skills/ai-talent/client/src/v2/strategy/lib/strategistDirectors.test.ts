@@ -106,6 +106,7 @@ describe("逐頁對照：每頁右下角是哪一組顧問", () => {
     ["本週企劃", { path: "/planner" }, "content"],
     ["靈感舞台", { path: "/inspiration" }, "content"],
     ["專案", { path: "/projects" }, "content"],
+    ["我的任務卡", { path: "/my-cards" }, "content"],
     ["產出頁", { path: "/run/123" }, "content"],
     ["圖片卡", { path: "/image/ig-1x1" }, "content"],
     ["審核", { path: "/review" }, "content"],

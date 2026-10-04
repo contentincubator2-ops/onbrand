@@ -33,7 +33,7 @@ import { buildBrandPrefix } from "../../strategy/core/brand/brandContext";
 import {
   type BrandTaskCard, type BrandTaskCardField,
   listBrandTaskCards, getBrandTaskCard, mutateBrandTaskCards,
-  measureSamples, slugifyCardName, cardTemplate, cardConfig,
+  measureSamples, slugifyCardName, cardTemplate, cardConfig, duplicateCard,
   factLeaks, redactFactLeaks, verbatimSamples, illustrationInFlight,
   MAX_CARDS_PER_BRAND, MAX_SAMPLES, MAX_SAMPLE_CHARS,
   registerBrandTaskCardSource,
@@ -605,6 +605,46 @@ export const brandTaskCardRouter = router({
           ? { ...c, status: "drafting", updatedAt: new Date().toISOString() }
           : c)));
       return { ok: true };
+    }),
+
+  /**
+   * 把一張自建卡複製一份（可以換通路）。2026-10-04，CJ「可以在不同的平台中，管理到
+   * 自己常用的，或進行修改」——同一套寫法想拿到 IG 用，不該從貼範例重來一次。
+   *
+   * 連 SKILL 一起複製、不重新反推：反推要花一次 LLM，而且同一批範例反推兩次會得到
+   * 兩份不一樣的規則，使用者調過的 SKILL 就丟了。字數區間照原卡（量自同一批範例）——
+   * 換到篇幅差很多的通路時，使用者在編輯畫面改範例就會重量。
+   */
+  duplicate: protectedProcedure
+    .input(z.object({
+      brandId: z.number(),
+      cardId: z.string(),
+      channel: z.enum(CHANNELS),
+      name: z.string().min(1).max(60).optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const userId = ctx.user!.id;
+      await assertBrandAccess(userId, input.brandId);
+      await assertCanAct(userId);
+      const existing = await listBrandTaskCards(input.brandId);
+      const source = existing.find((c) => c.id === input.cardId);
+      if (!source) throw new TRPCError({ code: "NOT_FOUND", message: "找不到這張卡" });
+      const quota = await planQuotaFor(userId);
+      const cardCap = isUnlimited(quota.ownTaskCards)
+        ? MAX_CARDS_PER_BRAND
+        : Math.min(quota.ownTaskCards, MAX_CARDS_PER_BRAND);
+      if (existing.length >= cardCap) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: `你的方案最多 ${cardCap} 張自建任務卡（目前 ${existing.length}）。`
+            + `升級後可以增加，或先刪掉用不到的。`,
+        });
+      }
+      const card = duplicateCard(source, existing, {
+        channel: input.channel as BrandTaskCard["channel"], name: input.name, userId,
+      });
+      await mutateBrandTaskCards(input.brandId, userId, (cards) => [...cards, card]);
+      return { cardId: card.id, card };
     }),
 
   remove: protectedProcedure

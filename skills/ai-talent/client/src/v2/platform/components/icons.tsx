@@ -81,6 +81,7 @@ export const ICON = {
   partner: faHandshake,
   project: faFolderOpen,
   taskCards: faLayerGroup,
+  favorite: faStar,           // 常用任務卡（星號）
   meeting: faComments,
   regulation: faScaleBalanced,
   review: faClipboardCheck,
@@ -255,6 +256,7 @@ export const StopIcon = make("stop");
 export const WorkingIcon = make("working");
 export const SampleIcon = make("sample");
 export const TaskCardsIcon = make("taskCards");
+export const FavoriteIcon = make("favorite");
 export const MeetingIcon = make("meeting");
 export const RegulationIcon = make("regulation");
 export const ShareIcon = make("share");
