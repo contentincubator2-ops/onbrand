@@ -15,6 +15,7 @@
  *     改稿、換人重寫、生圖、存回本週企劃都沿用，不另做一套。
  *   · 陣容偏好存在 inspiration_prefs：換掉的人不再排進預設，常被採用的人排前面。
  */
+import { englishFromRow } from "../../../platform/core/agents/agentEnglish.js";
 import localPool from "../../../localDb";
 
 export const INSPIRATION_PREFS_DDL = `
@@ -166,7 +167,7 @@ export function bump(stats: StatsMap, key: ThinkerKey, field: keyof ThinkerStats
 // ─── 顯示資料 ────────────────────────────────────────────────────────
 
 export interface ThinkerCard {
-  key: ThinkerKey; agentId: number; name: string; title: string; avatarUrl: string;
+  key: ThinkerKey; agentId: number; name: string; title: string; nameEn: string; titleEn: string; avatarUrl: string;
   school: string; schoolEn: string; pitch: string; pitchEn: string;
 }
 
@@ -175,7 +176,7 @@ export async function loadThinkerCards(): Promise<ThinkerCard[]> {
   try {
     const ids = THINKERS.map((t) => t.agentId);
     const [rows]: any = await localPool.execute(
-      `SELECT id, name, name_zh, englishName, title, title_zh, avatarUrl FROM agents WHERE id IN (${ids.map(() => "?").join(",")})`, ids,
+      `SELECT id, name, name_zh, englishName, title, title_zh, englishTitle, avatarUrl FROM agents WHERE id IN (${ids.map(() => "?").join(",")})`, ids,
     );
     for (const r of rows as any[]) byId.set(Number(r.id), r);
   } catch { /* 查不到就用預設名稱 */ }
@@ -185,6 +186,7 @@ export async function loadThinkerCards(): Promise<ThinkerCard[]> {
       key: t.key, agentId: t.agentId,
       name: String(r?.name_zh || r?.name || r?.englishName || t.fallbackName),
       title: String(r?.title_zh || r?.title || ""),
+      ...englishFromRow(r),
       avatarUrl: String(r?.avatarUrl ?? ""),
       school: t.school, schoolEn: t.schoolEn, pitch: t.pitch, pitchEn: t.pitchEn,
     };

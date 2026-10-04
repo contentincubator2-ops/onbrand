@@ -39,6 +39,7 @@ import {
 } from "../../platform/core/connectors/pipedreamFacebook";
 import { getPipedreamOAuthAppId } from "../../platform/core/connectors/pipedreamOAuth";
 import { isRuntimeFeatureEnabled } from "../../platform/core/ops/runtimeSafety";
+import { outputApprovalState, APPROVAL_BLOCK_MESSAGE } from "../core/publishGate";
 import {
   contentSelectorFields,
   outputItemCaption,
@@ -98,6 +99,10 @@ export const publishRouter = router({
       );
       const row = (rows as any[])[0];
       if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "output 不存在或無權限" });
+      const approval = await outputApprovalState(localPool, input.outputId, ctx.user.id);
+      if (approval !== "approved") {
+        throw new TRPCError({ code: "BAD_REQUEST", message: APPROVAL_BLOCK_MESSAGE[approval] });
+      }
 
       const selected = resolveOutputContent(row.content, input);
       requirePlanningConfirmation(selected, input.confirmPlanningContent, "publish");

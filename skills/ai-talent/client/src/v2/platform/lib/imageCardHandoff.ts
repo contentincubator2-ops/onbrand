@@ -10,6 +10,11 @@ export interface ImageCardHandoff {
   copy: string;
   /** 來源文字任務（回上一頁用）。 */
   fromRunId?: string | number;
+  /**
+   * 文案是那篇產出裡的哪一則（2026-10-04）。圖做好要寫回同一則、一起排程，
+   * 沒帶就當第一則。形狀同 getRunContentMutationLocator。
+   */
+  locator?: { variantIndex?: number; contentKind?: "planning" | "public"; contentIndex?: number };
 }
 
 /** 文字任務的通路 → 圖片卡通路。不在清單裡的通路不提供圖片卡。 */
@@ -38,6 +43,11 @@ export function readImageCardHandoff(): ImageCardHandoff | null {
     const v = JSON.parse(raw);
     return typeof v?.copy === "string" ? v : null;
   } catch { return null; }
+}
+
+/** 圖已經存回／排程後清掉——不然下次直接開圖片卡，會把圖寫回這一篇舊文案。 */
+export function clearImageCardHandoff(): void {
+  try { sessionStorage.removeItem(KEY); } catch { /* 無痕或被擋：略過 */ }
 }
 
 export function imageCardHref(cardId: string): string {

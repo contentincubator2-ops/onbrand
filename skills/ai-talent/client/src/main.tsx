@@ -10,6 +10,7 @@ import { HeroUIProvider } from "@heroui/react";
 import AppV2 from "./v2/app/AppV2";
 import "./index.css";
 import { WarningIcon } from "./v2/platform/components/icons";
+import { detectLocale } from "./lib/i18n";
 
 // 2026-05-08 (P1-2): global mutation / query error toast.
 // Caught the silent-fail bug where many components used
@@ -52,7 +53,7 @@ function shouldSilentSkip(err: any): boolean {
       if (!w.__staleBundleReloading) {
         w.__staleBundleReloading = true;
         try {
-          showToastGlobal("應用程式已更新，正在重新載入…", "error");
+          showToastGlobal(detectLocale() === "en" ? "App updated — reloading…" : "應用程式已更新，正在重新載入…", "error");
         } catch {}
         // Wait 1.5s so the user sees the toast, then hard-reload
         setTimeout(() => { window.location.reload(); }, 1500);
@@ -63,7 +64,7 @@ function shouldSilentSkip(err: any): boolean {
   return false;
 }
 function formatErr(err: any): string {
-  return String(err?.message ?? err?.shape?.message ?? err ?? "未知錯誤").slice(0, 240);
+  return String(err?.message ?? err?.shape?.message ?? err ?? (detectLocale() === "en" ? "Unknown error" : "未知錯誤")).slice(0, 240);
 }
 
 /**
@@ -88,10 +89,10 @@ function friendlyErr(err: any, proc: string): string {
     const issues = JSON.parse(err?.message ?? "");
     if (Array.isArray(issues) && issues.length > 0) {
       const parts = issues.slice(0, 3).map((i: any) => {
-        const path = Array.isArray(i.path) && i.path.length ? i.path.join(".") : "(整個輸入)";
-        return `${path}: ${i.message}${i.received ? `（收到 ${i.received}）` : ""}`;
+        const path = Array.isArray(i.path) && i.path.length ? i.path.join(".") : (detectLocale() === "en" ? "(whole input)" : "(整個輸入)");
+        return `${path}: ${i.message}${i.received ? (detectLocale() === "en" ? ` (received ${i.received})` : `（收到 ${i.received}）`) : ""}`;
       });
-      return `${where}參數錯誤 · ${parts.join("；")}`;
+      return `${where}${detectLocale() === "en" ? "Invalid parameters" : "參數錯誤"} · ${parts.join(detectLocale() === "en" ? "; " : "；")}`;
     }
   } catch { /* not a zod payload — fall through */ }
   return `${where}${raw}`;
@@ -102,7 +103,7 @@ const queryClient = new QueryClient({
       if (shouldSilentSkip(err)) return;
       // If caller defined its own onError, skip — they're handling it
       if ((mutation as any)?.options?.onError) return;
-      showToastGlobal(`操作失敗：${formatErr(err)}`, "error");
+      showToastGlobal(`${detectLocale() === "en" ? "Action failed: " : "操作失敗："}${formatErr(err)}`, "error");
     },
   }),
   queryCache: new QueryCache({
@@ -123,7 +124,7 @@ const queryClient = new QueryClient({
       // real, the user-initiated action will surface its own error UI.
       const msg = String(err?.message ?? "");
       if (/\b50[234]\b|伺服器忙碌|ECONNRESET|fetch failed|Network error/.test(msg)) return;
-      showToastGlobal(`載入失敗：${friendlyErr(err, procOf(query))}`, "error");
+      showToastGlobal(`${detectLocale() === "en" ? "Failed to load: " : "載入失敗："}${friendlyErr(err, procOf(query))}`, "error");
       // Full context to the console — the toast is length-capped, and a zod
       // failure is far easier to fix with the input that caused it.
       console.error("[query error]", procOf(query), { error: err, input: (query as any)?.queryKey?.[1]?.input });
@@ -155,7 +156,7 @@ class AppErrorBoundary extends React.Component<
           background: "#FFF1F0", border: "1px solid #FFA39E", borderRadius: 8,
         }}>
           <div style={{ fontSize: 18, fontWeight: 700, color: "#CF1322", marginBottom: 12 }}>
-            <WarningIcon size={18} /> 應用程式載入失敗 (render error)
+            <WarningIcon size={18} /> {detectLocale() === "en" ? "App failed to load" : "應用程式載入失敗"} (render error)
           </div>
           <pre style={{ fontSize: 12, color: "#5c0011", whiteSpace: "pre-wrap", marginBottom: 16 }}>
             {this.state.error.message}
@@ -170,7 +171,7 @@ class AppErrorBoundary extends React.Component<
               border: "none", borderRadius: 6, cursor: "pointer", fontSize: 13,
             }}
           >
-            重新載入
+            {detectLocale() === "en" ? "Reload" : "重新載入"}
           </button>
         </div>
       );

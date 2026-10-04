@@ -1,7 +1,7 @@
 /**
  * 小隊流程的步驟：執行、進度、復原、編輯與提問。
  */
-import { protectedProcedure } from "../../../platform/core/trpc";
+import { protectedProcedure, adminProcedure } from "../../../platform/core/trpc";
 import { z } from "zod";
 import localPool from "../../../localDb";
 import { TRPCError } from "@trpc/server";
@@ -33,7 +33,7 @@ export const stepProcedures = {
    *   - parsed (best-effort JSON parse; null if LLM didn't comply)
    *   - mockupData (per outputKind, shape ready for mockup component)
    */
-  runStepLive: protectedProcedure
+  runStepLive: adminProcedure
     .input(z.object({
       squadId: z.number(),
       stepIndex: z.number().int().min(0).max(20),

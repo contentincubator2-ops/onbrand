@@ -13,6 +13,7 @@ import { type IgStrategyPrivateArtifact, buildIgStrategyPublicSlots } from "../.
 import { randomUUID } from "node:crypto";
 import { loadAgentKnowledgeMany, withAgentKnowledge } from "../../../platform/core/agents/agentKnowledge";
 import { synthesizeIgStrategyPublicSlots } from "../../core/engine/igStrategyPublicGeneration";
+import { englishFromRow } from "../../../platform/core/agents/agentEnglish";
 
 export const squadAutoProcedures = {
   // 99s squad auto-run. Legacy squads still expose one variant per step.
@@ -160,15 +161,15 @@ export const squadAutoProcedures = {
       const agentIds = Array.from(new Set(stepsRaw
         .map((s: any) => Number(s.assignedAgentId))
         .filter((n: number) => Number.isFinite(n) && n > 0)));
-      const agentMap: Record<number, { name: string; title: string; specialty?: string; methodology?: string; avatarUrl?: string | null }> = {};
+      const agentMap: Record<number, { name: string; title: string; specialty?: string; methodology?: string; avatarUrl?: string | null; nameEn?: string; titleEn?: string }> = {};
       if (agentIds.length > 0) {
         const ph = agentIds.map(() => "?").join(",");
         const [aRows]: any = await localPool.execute(
-          `SELECT id, name, title, specialty, methodology, avatarUrl FROM agents WHERE id IN (${ph})`,
+          `SELECT id, name, title, englishName, englishTitle, specialty, methodology, avatarUrl FROM agents WHERE id IN (${ph})`,
           agentIds,
         );
         for (const a of aRows as any[]) {
-          agentMap[a.id] = { name: a.name, title: a.title, specialty: a.specialty, methodology: a.methodology, avatarUrl: a.avatarUrl ?? null };
+          agentMap[a.id] = { name: a.name, title: a.title, ...englishFromRow(a), specialty: a.specialty, methodology: a.methodology, avatarUrl: a.avatarUrl ?? null };
         }
       }
       const agentKnowledge = await loadAgentKnowledgeMany(agentIds, { source: "quickTask.runSquadAuto" });
@@ -380,7 +381,7 @@ export const squadAutoProcedures = {
               caption: text,
               hashtags: [],
               image: { style: null, url: null, status: "skipped" },
-              agent: a ? { id: aid, name: a.name, title: a.title, avatarUrl: a.avatarUrl } : null,
+              agent: a ? { id: aid, name: a.name, title: a.title, nameEn: a.nameEn ?? "", titleEn: a.titleEn ?? "", avatarUrl: a.avatarUrl } : null,
             };
             stepOutputs[i] = `【${variant.label}】${variant.caption.slice(0, 800)}`;
             variants.push(variant);
@@ -419,7 +420,7 @@ export const squadAutoProcedures = {
               caption: "",
               hashtags: [],
               image: { style: null, url: null, status: "failed" },
-              agent: a ? { id: aid, name: a.name, title: a.title, avatarUrl: a.avatarUrl } : null,
+              agent: a ? { id: aid, name: a.name, title: a.title, nameEn: a.nameEn ?? "", titleEn: a.titleEn ?? "", avatarUrl: a.avatarUrl } : null,
             });
           }
           stages.push({ key: stageKey, label: publicStageLabel, startedAt: stageStart, completedAt: Date.now() - startedAt, status: "failed" });
@@ -558,15 +559,15 @@ export const squadAutoProcedures = {
       let captionAgent: any = null;
       if (!strategyPublicPolicy && squad.lead_agent_id) {
         const lead = agentMap[squad.lead_agent_id];
-        if (lead) captionAgent = { id: squad.lead_agent_id, name: lead.name, title: lead.title, avatarUrl: lead.avatarUrl };
+        if (lead) captionAgent = { id: squad.lead_agent_id, name: lead.name, title: lead.title, nameEn: lead.nameEn ?? "", titleEn: lead.titleEn ?? "", avatarUrl: lead.avatarUrl };
         else {
           try {
             const [r]: any = await localPool.execute(
-              `SELECT id, name, title, avatarUrl FROM agents WHERE id = ? LIMIT 1`,
+              `SELECT id, name, title, englishName, englishTitle, avatarUrl FROM agents WHERE id = ? LIMIT 1`,
               [squad.lead_agent_id],
             );
             const a = (r as any[])?.[0];
-            if (a) captionAgent = { id: a.id, name: a.name, title: a.title, avatarUrl: a.avatarUrl ?? null };
+            if (a) captionAgent = { id: a.id, name: a.name, title: a.title, ...englishFromRow(a), avatarUrl: a.avatarUrl ?? null };
           } catch {}
         }
       }
@@ -593,7 +594,7 @@ export const squadAutoProcedures = {
                 publicVariants: variants,
               }, null, 2)
             : JSON.stringify(variants, null, 2);
-          const metadata = strategyPublicPolicy
+          const metadata = (await import("../../../platform/core/ops/genMetrics")).stampGenMetrics(strategyPublicPolicy
             ? {
                 latencyMs: Date.now() - startedAt,
                 contentModel: "ig-strategy-bundle",
@@ -610,7 +611,7 @@ export const squadAutoProcedures = {
                 inputs: { topic: input.topic ?? "" },
                 brandConsistency: squadBrandConsistency,
                 regulationCompliance: squadRegulationCompliance,
-              };
+              }, { durationMs: Date.now() - startedAt, ok, taskId: strategyRecordOverrides?.taskId ?? input.squadSlug });
           const persisted = await recordTaskRun({
             userId,
             brandId: input.brandId ?? null,

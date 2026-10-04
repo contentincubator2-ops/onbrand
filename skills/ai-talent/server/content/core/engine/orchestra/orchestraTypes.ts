@@ -38,6 +38,9 @@ export interface AgentMeta {
   id: number;
   name: string;
   title: string;
+  /** 英文介面用（沒有就空字串或缺省）。 */
+  nameEn?: string;
+  titleEn?: string;
   avatarUrl: string | null;
 }
 

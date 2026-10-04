@@ -2,6 +2,7 @@
  * 定位頁頂端：進度、動作與完成後的銜接。
  */
 import { useNavigate } from "react-router-dom";
+import { agentLabel, agentShortName } from "../../../platform/lib/agentName";
 import { useLang } from "../../../../lib/i18n";
 import { trpc } from "../../../../lib/trpc";
 import { useState } from "react";
@@ -110,7 +111,7 @@ export function PositioningTopRow({
     { brandId: directorBrandId ?? 0, scope: directorScope },
     { enabled: !!directorBrandId, staleTime: 5 * 60_000, refetchOnWindowFocus: false },
   );
-  const directors: Array<{ agentId: number; roleId: string; name: string; avatarUrl?: string; roleLabel?: string }> = directorsQ.data?.directors ?? [];
+  const directors: Array<{ agentId: number; roleId: string; name: string; nameEn?: string; avatarUrl?: string; roleLabel?: string }> = directorsQ.data?.directors ?? [];
   const director = directors.find((d) => d.roleId === (directorScope === "product" ? "product_value_prop" : "brand_positioning")) ?? directors[0] ?? null;
   // 2026-05-08: hooks must be called unconditionally (Rules of Hooks).
   // Previous version did `(entityKind && brandId) ? useQuery(...) : null`
@@ -240,14 +241,14 @@ export function PositioningTopRow({
               ? (lang === "en" ? "Locked — unlock to re-run" : "已鎖定 — 解鎖後才能重跑")
               : isRunning
                 ? (lang === "en" ? `Running in the background (step ${cur}/${total})` : `背景產生中（步驟 ${cur}/${total}）`)
-                : `${director ? `${director.name}${director.roleLabel ? ` · ${director.roleLabel}` : ""}\n` : ""}${lang === "en"
+                : `${director ? `${agentLabel(director, lang)}${director.roleLabel ? ` · ${director.roleLabel}` : ""}\n` : ""}${lang === "en"
                     ? `${methodLabel}: auto-fill every positioning field (${totalSteps} steps, background run, retry × 5)`
                     : `${methodLabel}：自動填寫所有定位欄位（共 ${totalSteps} 步，背景執行，最多重試 5 次）`}`
           }
         >
           <span className={`relative block rounded-full p-[3px] ring-[3px] transition ${locked ? "ring-neutral-300" : "ring-[#F37E4A]"} ${isRunning ? "animate-pulse" : "group-hover:scale-105 group-active:scale-95"}`}>
             {director?.avatarUrl ? (
-              <Avatar src={director.avatarUrl} className="w-12 h-12" />
+              <Avatar src={director.avatarUrl} alt={agentLabel(director, lang)} className="w-12 h-12" />
             ) : (
               <span className="w-12 h-12 rounded-full bg-neutral-100 flex items-center justify-center text-neutral-700">
                 <GenerateIcon size={18} />
@@ -260,7 +261,7 @@ export function PositioningTopRow({
             )}
           </span>
           <span className="flex flex-col items-center leading-tight">
-            {director && <span className="text-[12px] font-semibold text-neutral-900 max-w-[96px] truncate">{director.name}</span>}
+            {director && <span className="text-[12px] font-semibold text-neutral-900 max-w-[96px] truncate" title={agentLabel(director, lang)}>{agentShortName(director, lang)}</span>}
             <span className={`text-[11px] font-semibold ${locked ? "text-neutral-400" : "text-[#F37E4A]"}`}>
               {locked ? (lang === "en" ? "Locked" : "已鎖定")
                 : optimisticStarting && !jobData?.status ? (lang === "en" ? "Starting…" : "啟動中…")

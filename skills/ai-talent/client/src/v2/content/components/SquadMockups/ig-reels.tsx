@@ -11,6 +11,7 @@
 import { Chip } from "@heroui/react";
 import { IGReels } from "../PlatformMockup/instagram";
 import type { MockupFields } from "../PlatformMockup/shared";
+import { useLang } from "../../../../lib/i18n";
 import { SectionHeader, NotionCard, EmptyHint, type SquadMockupCommonProps } from "./shared";
 
 export interface ReelsShot {
@@ -39,13 +40,19 @@ interface Props extends SquadMockupCommonProps {
   onChange?: (next: Partial<IGReelsScript>) => void;
 }
 
-const BEAT_TONE: Record<ReelsShot["beat"], { label: string; color: "primary" | "secondary" | "warning" | "success" | "default" }> = {
+const BEAT_TONE: Record<ReelsShot["beat"], { label: string; labelEn?: string; color: "primary" | "secondary" | "warning" | "success" | "default" }> = {
   hook:   { label: "🎯 Hook",   color: "primary" },
   hold:   { label: "⏱ Hold",    color: "secondary" },
   build:  { label: "📈 Build",  color: "warning" },
   payoff: { label: "💥 Payoff", color: "success" },
-  cta:    { label: "👉 行動呼籲",    color: "default" },
+  cta:    { label: "👉 行動呼籲", labelEn: "👉 CTA",    color: "default" },
 };
+
+const AUDIO_LABEL_EN = {
+  original:  "🎙 Original audio",
+  trending:  "🔥 Trending audio",
+  licensed:  "🎵 Licensed music",
+} as const;
 
 const AUDIO_LABEL = {
   original:  "🎙 原創音訊",
@@ -67,11 +74,12 @@ function toMockupFields(data: IGReelsScript): MockupFields {
 }
 
 export function IGReelsMockup({ data, isActive = false }: Props) {
+  const { lang } = useLang();
   if (!data || !Array.isArray(data.shots) || data.shots.length === 0) {
     return (
       <NotionCard>
-        <SectionHeader icon="🎬" eyebrow="ATOMIC · IG REELS" title="IG Reels 短影音腳本" />
-        <EmptyHint>{!data ? "尚未產出 — 點擊執行此任務" : "資料不完整 — 缺 shots"}</EmptyHint>
+        <SectionHeader icon="🎬" eyebrow="ATOMIC · IG REELS" title={lang === "en" ? "IG Reels short-video script" : "IG Reels 短影音腳本"} />
+        <EmptyHint>{!data ? (lang === "en" ? "Not generated yet — click to run this task" : "尚未產出 — 點擊執行此任務") : (lang === "en" ? "Incomplete data — shots missing" : "資料不完整 — 缺 shots")}</EmptyHint>
       </NotionCard>
     );
   }
@@ -85,14 +93,14 @@ export function IGReelsMockup({ data, isActive = false }: Props) {
           <SectionHeader
             icon="🎬"
             eyebrow="ATOMIC · IG REELS"
-            title={data.topic || "IG Reels 腳本"}
+            title={data.topic || (lang === "en" ? "IG Reels script" : "IG Reels 腳本")}
           />
           <div className="flex items-center gap-1.5 self-start">
             <Chip size="sm" variant="flat" className="h-5 text-tiny">{data.duration ?? 30}s</Chip>
-            <Chip size="sm" variant="flat" className="h-5 text-tiny">{AUDIO_LABEL[data.audioKind] ?? "🎵"}</Chip>
+            <Chip size="sm" variant="flat" className="h-5 text-tiny">{(lang === "en" ? AUDIO_LABEL_EN : AUDIO_LABEL)[data.audioKind] ?? "🎵"}</Chip>
             {isActive && (
               <Chip size="sm" variant="flat" color="primary" className="h-5 text-tiny">
-                ● AI 專家思考中…
+                {lang === "en" ? "● AI expert thinking…" : "● AI 專家思考中…"}
               </Chip>
             )}
           </div>
@@ -105,22 +113,22 @@ export function IGReelsMockup({ data, isActive = false }: Props) {
           <IGReels {...fields} />
           {data.audioName && (
             <p className="text-tiny text-default-500 leading-relaxed px-1">
-              <span className="font-semibold">音訊：</span>{data.audioName}
+              <span className="font-semibold">{lang === "en" ? "Audio:" : "音訊："}</span>{data.audioName}
             </p>
           )}
           <p className="text-tiny text-default-500 px-1">
-            Remix 開放：{data.remixAllowed ? "✓ 是" : "✗ 否"}
+            {lang === "en" ? "Remix allowed:" : "Remix 開放："}{data.remixAllowed ? (lang === "en" ? "✓ Yes" : "✓ 是") : (lang === "en" ? "✗ No" : "✗ 否")}
           </p>
           {data.hookHypothesis && (
             <p className="text-tiny text-default-500 leading-relaxed px-1">
-              <span className="font-semibold">開場鉤假設：</span>{data.hookHypothesis}
+              <span className="font-semibold">{lang === "en" ? "Hook hypothesis:" : "開場鉤假設："}</span>{data.hookHypothesis}
             </p>
           )}
         </div>
 
         {/* Shot list (squad-mockup-specific) */}
         <NotionCard>
-          <SectionHeader eyebrow="SHOT LIST" title="逐秒分鏡" />
+          <SectionHeader eyebrow="SHOT LIST" title={lang === "en" ? "Second-by-second shot list" : "逐秒分鏡"} />
           <div className="flex flex-col">
             {data.shots.map((s, i) => {
               const beat = BEAT_TONE[s.beat] ?? BEAT_TONE.build;
@@ -134,7 +142,7 @@ export function IGReelsMockup({ data, isActive = false }: Props) {
                       {s.timecode}
                     </span>
                     <Chip size="sm" variant="flat" color={beat.color} className="h-4 text-tiny">
-                      {beat.label}
+                      {lang === "en" ? (beat.labelEn ?? beat.label) : beat.label}
                     </Chip>
                   </div>
                   <div className="flex flex-col gap-1 min-w-0">

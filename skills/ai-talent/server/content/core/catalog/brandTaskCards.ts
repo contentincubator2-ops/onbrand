@@ -116,6 +116,43 @@ export function slugifyCardName(name: string): string {
   return `card-${Date.now().toString(36)}`;
 }
 
+/**
+ * 複製一張卡（可換通路）。純函式，router 的 duplicate 用。
+ *
+ * - 名字沒給：換通路沿用原名（「促購文」在 IG 還是叫促購文），同通路加「（副本）」。
+ * - SKILL、範例、字數、要問的欄位、人設整份帶過去；狀態跟原卡（原卡已上架，副本也上架）。
+ * - 試寫紀錄不帶：那是原卡在原通路寫出來的，掛在新卡上會讓人以為這張試過了。
+ * - 現成場景帶過去；替原卡畫的插畫不帶（圖檔屬於原卡，原卡刪掉時會一起清）。
+ */
+export function duplicateCard(
+  source: BrandTaskCard,
+  existing: Pick<BrandTaskCard, "id">[],
+  opts: { channel: BrandTaskCard["channel"]; name?: string; userId: number; now?: string },
+): BrandTaskCard {
+  const name = (opts.name?.trim() || (opts.channel === source.channel ? `${source.name}（副本）` : source.name)).slice(0, 60);
+  const base = `u${source.brandId}-${slugifyCardName(name)}`;
+  let id = base;
+  for (let i = 2; existing.some((c) => c.id === id); i++) id = `${base}-${i}`;
+  const now = opts.now ?? new Date().toISOString();
+  const ready = source.status === "ready" && !!source.skill;
+  return {
+    id, brandId: source.brandId, name, channel: opts.channel,
+    status: ready ? "ready" : "drafting",
+    currentStep: source.currentStep, totalSteps: source.totalSteps, lastError: null,
+    samples: [...source.samples],
+    primaryQuestion: source.primaryQuestion,
+    primaryPlaceholder: source.primaryPlaceholder,
+    askFields: source.askFields.map((f) => ({ ...f })),
+    skill: source.skill,
+    measured: { ...source.measured },
+    variants: source.variants,
+    agentId: source.agentId,
+    scene: source.scene ?? null,
+    createdAt: now, updatedAt: now, createdBy: opts.userId,
+    lastDryRun: null,
+  };
+}
+
 // ─────────────────────────────────────────────────────────────────────
 // 讀寫（brands.positioning._taskCards[]）
 // ─────────────────────────────────────────────────────────────────────

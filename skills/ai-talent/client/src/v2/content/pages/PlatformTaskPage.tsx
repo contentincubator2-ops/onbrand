@@ -14,9 +14,13 @@ import { Navigate, useParams, useOutletContext, useNavigate, useSearchParams } f
 import CalendarTabs from "../components/CalendarTabs";
 import { trpc } from "../../../lib/trpc";
 import { useLang } from "../../../lib/i18n";
+import { agentLabel, agentShortName } from "../../platform/lib/agentName";
+import { taskQuestion, taskPlaceholder, taskInputText, localizeSource } from "../lib/taskEn";
 import { showToastGlobal } from "../../platform/components/Toast";
 import { TaskCardShell, TaskCardAvatar } from "../../platform/components/TaskCardShell";
 import { campaignPrefill } from "../lib/campaignIntakePrefill";
+import { friendlyError } from "../../platform/lib/friendlyError";
+import { cancelToastText, newRunKey } from "../lib/runCancel";
 import { toastWithUpgrade } from "../../platform/lib/upgradeToast";
 import { matchTaskWithSynonyms } from "../lib/taskSearchSynonyms";
 import {
@@ -60,9 +64,10 @@ import { imageCardHref, imageChannelOf } from "../../platform/lib/imageCardHando
 import CardDetailDrawer, { isRecentCard } from "../components/quickTask/CardDetailDrawer";
 import ChannelPicker from "../../platform/components/plan/ChannelPicker";
 import TaskPicker from "../../platform/components/plan/TaskPicker";
-import { LibraryIcon, AddIcon, EditIcon, TaskCardsIcon, Icon, type IconName } from "../../platform/components/icons";
+import { LibraryIcon, AddIcon, EditIcon, TaskCardsIcon, FavoriteIcon, Icon, type IconName } from "../../platform/components/icons";
 import { contextChipIcon } from "../lib/contextChipIcons";
 import { departAgentHandoff } from "../lib/agentHandoff";
+import { resolveTrayIds, toggleTrayId, taskPlatformOf } from "../lib/taskTrayClient";
 import { recordTaskUsed, getLastUsedDays, ROUTE_TO_PLATFORM, PLATFORM_META, dicebear, HOLD_FOR_IMAGES, synthesizeStages, FBTaskCard, COMPOSER_CHANNELS, trimmedExtras, chipFieldPath, getNested, setNested, CHIP_SIBLING_CANDIDATES, TaskEmbed } from "./platformTask/taskModel";
 import { PlatformPageErrorBoundary } from "./platformTask/PlatformPageErrorBoundary";
 export type { TaskEmbed } from "./platformTask/taskModel";
@@ -138,7 +143,7 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
   const [imagePickerOpen, setImagePickerOpen] = useState(false);
   const setImageTrayMut = trpc.imageCard.setTray.useMutation({
     onSuccess: () => { setImagePickerOpen(false); imageTrayQ.refetch(); },
-    onError: (e) => toastWithUpgrade(e?.message ?? "儲存失敗", lang === "en"),
+    onError: (e) => toastWithUpgrade(friendlyError(e, lang === "en" ? "Couldn't save. Please try again." : "儲存沒成功，再試一次。"), lang === "en"),
   });
   /** 實際擺出來的圖片卡。還沒載入托盤（或沒有品牌）時先只擺預設的兩張，不閃出全部。 */
   const shownImageCards = useMemo(() => {
@@ -505,6 +510,9 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
   const runOrchestra60Mut  = (trpc as any).quickTask?.runOrchestra60?.useMutation();
   const runOrchestra99Mut  = (trpc as any).quickTask?.runOrchestra99?.useMutation();
   const runSquadAutoMut    = (trpc as any).quickTask?.runSquadAuto?.useMutation();
+  const cancelRunMut       = (trpc as any).quickTask?.cancelRun?.useMutation?.();
+  // Key of the orchestra run currently in flight (null once the server answered).
+  const runKeyRef = useRef<string | null>(null);
   const holdUtils          = (trpc as any).useUtils?.() ?? null;
   // 2026-07-20 (CJ「取消的任務應該就死掉，不需要留在專案中」): cancelled
   // runs archive their output on arrival (soft delete — hidden from
@@ -681,21 +689,8 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
   }, [activeTask, campaignScope, campaignQ.data]);
 
   // ── Platform inference (matches QuickTask30sPage logic) ──────────────────
-  const inferPlatform = (task: FBTaskCard): string =>
-    task.platform ??
-    (task.id?.startsWith("ig-") ? "instagram"
-      : task.id?.startsWith("yt-") ? "youtube"
-      : task.id?.startsWith("tt-") ? "tiktok"
-      : task.id?.startsWith("li-") ? "linkedin"
-      : task.id?.startsWith("em-") ? "email"
-      : task.id?.startsWith("pr-") ? "pr"
-      : task.id?.startsWith("web-") ? "website"
-      : task.id?.startsWith("x-") ? "x"
-      : task.id?.startsWith("th-") ? "threads"
-      : task.id?.startsWith("ln-") ? "line"
-      : task.id?.startsWith("br-") ? "brand"
-      : task.id?.startsWith("rs-") ? "audience"
-      : "facebook");
+  // 2026-10-04：規則搬到 taskTrayClient.taskPlatformOf——「我的任務卡」總覽頁要用同一份。
+  const inferPlatform = (task: FBTaskCard): string => taskPlatformOf(task);
 
   // ── Filtered task list ────────────────────────────────────────────────────
   /** 這個通路的全部可見卡（已過方案閘門）。托盤與選卡器都吃這一份。 */
@@ -722,32 +717,30 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
 
   const setTrayMut = (trpc as any).quickTask?.setTray?.useMutation?.({
     onSuccess: () => { setPickerOpen(false); trayQuery.refetch?.(); },
-    onError: (e: any) => toastWithUpgrade(e?.message ?? "儲存失敗", lang === "en"),
+    onError: (e: any) => toastWithUpgrade(friendlyError(e, lang === "en" ? "Couldn't save. Please try again." : "儲存沒成功，再試一次。"), lang === "en"),
   });
 
   /** 這個通路實際擺出來的卡 id。存過的要跟「現在看得到的」取交集 —— 降級
    *  或卡退役之後，托盤不能把方案擋掉的卡漏出來。 */
-  const trayIds = useMemo<string[]>(() => {
-    if (!trayData) return [];
-    const visible = new Set(platformTasks.map((t: any) => t.id));
-    const stored = (trayData.stored ?? []).filter((id) => visible.has(id));
-    if (stored.length) return stored;
-    // 2026-09-29：server 的預設托盤是從「全部卡」裡每個形式挑一張，但前台只列
-    // 爆款結構＋品牌自建——交集後常常只剩一兩張（FB 7 張爆款卡只擺出 2 張）。
-    // 沒存過托盤時，改從「前台看得到的卡」裡每個形式挑一張，server 的挑法當次序參考。
-    // 看得到的卡本來就不超過托盤上限時全部擺出來——IG 兩張留言卡共用同一個形式，
-    // 私訊卡又是 feed 形式，每個形式挑一張會把 8 張砍成 6 張，藏掉唯一的私訊卡。
-    if (platformTasks.length <= (trayData.maxTray ?? 12)) return platformTasks.map((t: any) => t.id);
-    const fallbackOrder = new Map((trayData.fallback ?? []).map((id, i) => [id, i] as const));
-    const byType = new Map<string, any>();
-    const ranked = [...platformTasks].sort((a: any, b: any) =>
-      (fallbackOrder.get(a.id) ?? 1e9) - (fallbackOrder.get(b.id) ?? 1e9));
-    for (const t of ranked as any[]) {
-      const k = String(t.postType ?? "other");
-      if (!byType.has(k)) byType.set(k, t);
+  // 2026-10-04：解析搬到 taskTrayClient.resolveTrayIds（「我的任務卡」總覽頁共用同一份）。
+  const trayIds = useMemo<string[]>(() => resolveTrayIds(trayData, platformTasks), [trayData, platformTasks]);
+
+  /**
+   * 卡片上的星號（2026-10-04，CJ「可以在不同的平台中，管理到自己常用的」）。
+   * 原本要加一張常用卡得開選卡器、在清單裡找到它、勾起來、存檔；星號是同一件事的一步版。
+   * 兩個擋下來的情況（到上限、最後一張）見 toggleTrayId。
+   */
+  const toggleFavorite = (taskId: string) => {
+    if (!brandId || !trayData) return;
+    const r = toggleTrayId(trayIds, taskId, trayData.maxTray ?? 12);
+    if (!r.ok) {
+      showToastGlobal(r.reason === "full"
+        ? (lang === "en" ? `You can keep up to ${trayData.maxTray ?? 12} saved cards per channel.` : `每個通路最多 ${trayData.maxTray ?? 12} 張常用卡，先拿掉一張再加。`)
+        : (lang === "en" ? "Keep at least one saved card." : "常用清單至少留一張。"));
+      return;
     }
-    return [...byType.values()].map((t: any) => t.id);
-  }, [trayData, platformTasks]);
+    setTrayMut?.mutate?.({ brandId, platform, taskIds: r.next });
+  };
 
   /**
    * 這個通路「目前這個分類」的卡 —— 只套用分類分頁（貼文／連結貼文／廣告…，
@@ -1013,7 +1006,21 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
   // attempt must NEVER navigate or mutate UI state when it resolves.
   const runSeqRef = useRef(0);
 
+  // Ask the server to really stop the in-flight run (and refund when it can).
+  const cancelInFlightRun = () => {
+    const key = runKeyRef.current;
+    runKeyRef.current = null;
+    if (!key || !cancelRunMut?.mutateAsync) return;
+    cancelRunMut.mutateAsync({ runKey: key })
+      .then((r: any) => {
+        const txt = cancelToastText(r, lang === "en");
+        if (txt) showToastGlobal(txt);
+      })
+      .catch((e: any) => showToastGlobal(friendlyError(e, lang === "en" ? "Couldn't stop the task." : "沒辦法停止任務。")));
+  };
+
   const closeTask = () => {
+    cancelInFlightRun();
     setCampaignScope(null);   // 不收的話，下一張卡會沿用上一格的活動預填
     runSeqRef.current++; // invalidate any in-flight run attempt
     setActiveTask(null);
@@ -1087,7 +1094,7 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
       setEditingChip(null);
       setEditValue("");
     } catch (e: any) {
-      setErrorMsg(lang === "en" ? `Couldn't save: ${e?.message ?? e}` : `儲存失敗：${e?.message ?? e}`);
+      setErrorMsg(friendlyError(e, lang === "en" ? "Couldn't save. Please try again." : "儲存沒成功，再試一次。"));
     }
   };
 
@@ -1228,7 +1235,12 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
       if (tierMut) {
         // 額外欄位先鋪、primary 後蓋 —— 萬一某張卡把 primary 的 key 又
         // 宣告了一次，主問題的答案必須贏。
-        const r = await tierMut.mutateAsync({
+        const runKey = newRunKey();
+        runKeyRef.current = runKey;
+        let r: any;
+        try {
+          r = await tierMut.mutateAsync({
+          runKey,
           taskId: activeTask.id,
           inputs: { ...trimmedExtras(extraAnswers), [inputKey]: primaryAnswer },
           brandId: brandId ?? undefined,
@@ -1239,7 +1251,11 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
           spotRef: spotRefRef.current,
           // 2026-09-30：從活動企劃開的卡，告訴寫手是哪一篇（要不要下廣告）。
           campaignItem: campaignScope ?? null,
-        });
+          });
+        } finally {
+          // Server has answered (or failed): nothing left to cancel for this attempt.
+          if (runKeyRef.current === runKey) runKeyRef.current = null;
+        }
         if (isStale()) { if ((r as any).outputId) discardCancelledOutput((r as any).outputId); return; }
 
         if ((r as any).outputId) {
@@ -1290,7 +1306,7 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
         : "這個任務還在開發中，請改試其他任務。");
     } catch (e: any) {
       if (!isStale()) {
-        const msg = e?.message ?? String(e);
+        const msg = friendlyError(e, lang === "en" ? "Something went wrong. Please try again." : "剛剛沒成功，再試一次。");
         setErrorMsg(msg);
         // The errorMsg card sits at the bottom of the modal body — toast it
         // too, so a server-side rejection (e.g. the viral-source guard on a
@@ -1418,7 +1434,7 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
               isClearable
               onClear={() => setSearchQuery("")}
               startContent={
-                <FontAwesomeIcon icon={faMagnifyingGlass} className="text-default-400 shrink-0" style={{ fontSize: 16 }} />
+                <FontAwesomeIcon icon={faMagnifyingGlass} className="text-default-600 shrink-0" style={{ fontSize: 16 }} />
               }
               classNames={{
                 base: "overflow-hidden rounded-[18px]",
@@ -1560,7 +1576,7 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
           })()}
 
           {/* Task count micro-label */}
-          {!imageMode && <div className="mt-3 text-tiny text-default-400">
+          {!imageMode && <div className="mt-3 text-tiny text-default-600">
             {lang === "en"
               ? `${visibleTasks.length} of ${totalForPlatform} tasks`
               : `${visibleTasks.length} / ${totalForPlatform} 個任務`}
@@ -1820,6 +1836,31 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                           </span>
                         );
                       })()}
+                      {/* 2026-10-04 常用星號——左下角。右上是「我的卡」、右下是「用過」、左上是平台圖示。 */}
+                      {brandId && trayData && (() => {
+                        const fav = trayIds.includes(task.id);
+                        const label = fav
+                          ? (lang === "en" ? "Remove from saved cards" : "從常用移除")
+                          : (lang === "en" ? "Add to saved cards" : "加入常用");
+                        return (
+                          <span
+                            role="button"
+                            tabIndex={0}
+                            title={label}
+                            aria-label={label}
+                            aria-pressed={fav}
+                            onClick={(e) => { e.stopPropagation(); toggleFavorite(task.id); }}
+                            onKeyDown={(e) => {
+                              if (e.key !== "Enter" && e.key !== " ") return;
+                              e.preventDefault(); e.stopPropagation();
+                              toggleFavorite(task.id);
+                            }}
+                            className={`absolute bottom-2 left-2 flex h-6 w-6 items-center justify-center rounded-full bg-white/85 hover:bg-white cursor-pointer ${fav ? "text-neutral-900" : "text-neutral-300 hover:text-neutral-600"}`}
+                          >
+                            <FavoriteIcon size={12} />
+                          </span>
+                        );
+                      })()}
                       {/* Platform icon — top left */}
                       <div
                         className="absolute top-2 left-2 w-5 h-5 rounded-full flex items-center justify-center"
@@ -1838,7 +1879,7 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                       {/* 結構來源 —— 用戶看得到「這張卡憑什麼這樣寫」。
                           有具體出處就印出處（那才是賣點），沒有就印分類名。 */}
                       {(() => {
-                        const src = resolveSource((task as any).source);
+                        const src = resolveSource(localizeSource((task as any).source ?? {}, task as any, lang));
                         const acc = sourceAccent(src.type);
                         // 自建卡沒有 source，resolveSource 會退回「長青公式」—— 印成品牌自建。
                         const isOwn = frontCardKind(task) === "own";
@@ -1877,7 +1918,7 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                           爆款卡直接印數字＋量測年月，不用點進詳情才看得到。副標題就是 description。
                           （2026-09-30 CJ「備註的地方都拿掉」：前台不印 caveat，只留在 server 資料層。） */}
                       {frontCardKind(task) === "viral" && (() => {
-                        const raw = (task as any).source ?? {};
+                        const raw = localizeSource((task as any).source ?? {}, task as any, lang);
                         return (
                           <div className="flex flex-col gap-0.5">
                             {(raw.metric || raw.asOf) && (
@@ -1913,11 +1954,11 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                         </div>
                       )}
                       {(task as any).methodology && (
-                        <span className="text-[12px] text-default-400 italic inline-flex items-center gap-1"><LibraryIcon size={11} /> {(task as any).methodology}</span>
+                        <span className="text-[12px] text-default-600 italic inline-flex items-center gap-1"><LibraryIcon size={11} /> {(task as any).methodology}</span>
                       )}
                       <div className="mt-auto pt-2 flex items-center gap-2 border-t border-default-100">
-                        <Avatar src={avatarSrc} size="sm" className="w-5 h-5" />
-                        <span className="text-tiny font-medium text-default-700 truncate">{agentName}</span>
+                        <Avatar src={avatarSrc} alt={agentLabel(task.agent, lang) || agentName} size="sm" className="w-5 h-5" />
+                        <span className="text-tiny font-medium text-default-700 truncate" title={agentLabel(task.agent, lang)}>{task.agent ? agentShortName(task.agent, lang) : agentName}</span>
                         {/* 2026-09-08 出處詳情：點開看這張卡憑什麼、什麼時候用、上架日。
                             2026-09-30（CJ「出處與說明改成出處，放右下角跟 agent 姓名對稱」）。
                             用 span 而不是巢狀 button（button 不能包 button）。 */}
@@ -1938,10 +1979,10 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                       {(task as any).team && (task as any).team.length > 1 && (
                         <div className="flex items-center gap-1.5 -mt-1">
                           <div className="flex -space-x-2">
-                            {((task as any).team as Array<{ id: number; name: string; avatarUrl: string | null }>)
+                            {((task as any).team as Array<{ id: number; name: string; nameEn?: string; avatarUrl: string | null }>)
                               .slice(0, 4)
                               .map((m) => (
-                                <Avatar key={m.id} src={m.avatarUrl || dicebear(m.name)} size="sm" className="w-5 h-5 ring-1 ring-white" title={m.name} />
+                                <Avatar key={m.id} src={m.avatarUrl || dicebear(m.name)} size="sm" className="w-5 h-5 ring-1 ring-white" title={agentLabel(m, lang)} alt={agentLabel(m, lang)} />
                               ))}
                           </div>
                           <span className="text-[12px] text-default-500">
@@ -1992,6 +2033,14 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                   {showAllTasks
                     ? (lang === "en" ? "Show my cards" : "只看常用")
                     : (lang === "en" ? "Show all" : "看全部")}
+                </button>
+                <span aria-hidden className="text-neutral-300">·</span>
+                {/* 2026-10-04：跨通路的總覽（常用／自建卡的修改、複製、刪除）。 */}
+                <button
+                  onClick={() => navigate("/my-cards")}
+                  className="font-medium text-neutral-800 underline-offset-2 hover:underline"
+                >
+                  {lang === "en" ? "Manage my cards" : "管理我的任務卡"}
                 </button>
               </div>
             )}
@@ -2074,8 +2123,8 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                       <TaskIllustration card={activeTask} width={104} />
                     </div>
                     <h2 className="min-w-0 text-[20px] leading-snug font-bold text-neutral-900">
-                      {activeTask.primary_question
-                        ?? (lang === "en" ? (activeTask.label_en ?? activeTask.label) : (activeTask.label_zh ?? activeTask.label))}
+                      {taskQuestion(activeTask, activeTask.primary_question, lang)
+                        || (lang === "en" ? (activeTask.label_en ?? activeTask.label) : (activeTask.label_zh ?? activeTask.label))}
                     </h2>
                   </div>
                 )}
@@ -2120,7 +2169,7 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                       <div className="relative">
                         {activeTask.primary_input.type === "textarea" ? (
                           <Textarea
-                            placeholder={activeTask.primary_input.placeholder ?? ""}
+                            placeholder={taskPlaceholder(activeTask, activeTask.primary_input.placeholder, lang)}
                             value={primaryAnswer}
                             onChange={(e) => { setPrimaryAnswer(e.target.value); if (inputError) setInputError(null); }}
                             minRows={3}
@@ -2130,7 +2179,7 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                           />
                         ) : (
                           <Input
-                            placeholder={activeTask.primary_input.placeholder ?? ""}
+                            placeholder={taskPlaceholder(activeTask, activeTask.primary_input.placeholder, lang)}
                             value={primaryAnswer}
                             onChange={(e) => { setPrimaryAnswer(e.target.value); if (inputError) setInputError(null); }}
                             autoFocus
@@ -2177,14 +2226,14 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                   const renderField = (f: IntakeField) => (
                     <div key={f.key} className="space-y-1">
                       <p className="text-tiny font-medium text-default-700">
-                        {f.label}
+                        {taskInputText(activeTask, f.key, "label", f.label, lang)}
                         {f.required && <span className="text-danger-500 ml-1">*</span>}
                       </p>
                       {f.type === "textarea" ? (
                         <Textarea
                           size="sm"
                           minRows={2}
-                          placeholder={f.placeholder}
+                          placeholder={taskInputText(activeTask, f.key, "placeholder", f.placeholder, lang)}
                           value={extraAnswers[f.key] ?? ""}
                           onChange={(e) => {
                             setExtraAnswers((prev) => ({ ...prev, [f.key]: e.target.value }));
@@ -2194,7 +2243,7 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                       ) : (
                         <Input
                           size="sm"
-                          placeholder={f.placeholder}
+                          placeholder={taskInputText(activeTask, f.key, "placeholder", f.placeholder, lang)}
                           value={extraAnswers[f.key] ?? ""}
                           onChange={(e) => {
                             setExtraAnswers((prev) => ({ ...prev, [f.key]: e.target.value }));
@@ -2361,7 +2410,7 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                           opts.active
                             ? "bg-neutral-900 text-white"
                             : opts.missing
-                            ? "border border-dashed border-default-300 text-default-400 group-hover:border-default-500"
+                            ? "border border-dashed border-default-300 text-default-600 group-hover:border-default-500"
                             : "bg-default-100 text-neutral-800 group-hover:bg-default-200"
                         }`}>
                           <Icon name={icon} size={16} />
@@ -2369,7 +2418,7 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                             <span className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-emerald-500" />
                           )}
                         </span>
-                        <span className={`w-full truncate text-center text-[11px] leading-tight ${opts.missing ? "text-default-400" : "text-default-600"}`}>{short}</span>
+                        <span className={`w-full truncate text-center text-[11px] leading-tight ${opts.missing ? "text-default-600" : "text-default-600"}`}>{short}</span>
                       </button>
                     </Tooltip>
                   );
@@ -2427,7 +2476,7 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                           </span>
                           {/* 2026-09-30（CJ「Yawen 的名字要跟人像對齊」）：名字從標題列搬到頭像正下方 */}
                           <span className="flex flex-col items-center leading-tight">
-                            {agent && <span className="text-[12px] font-semibold text-neutral-900 max-w-[96px] truncate">{agent.name}</span>}
+                            {agent && <span className="text-[12px] font-semibold text-neutral-900 max-w-[96px] truncate" title={agentLabel(agent, lang)}>{agentShortName(agent, lang)}</span>}
                             <span className="text-[11px] font-semibold text-[#F37E4A]">{t("qt_run_btn")}</span>
                           </span>
                         </button>
@@ -2523,12 +2572,12 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                             {!editing && (
                               <p className="text-small text-default-800 whitespace-pre-wrap leading-relaxed m-0">
                                 {openChip.hasContent ? openChip.text : (
-                                  <span className="text-default-400">{lang === "en" ? "Not filled yet." : "尚未填寫。"}</span>
+                                  <span className="text-default-600">{lang === "en" ? "Not filled yet." : "尚未填寫。"}</span>
                                 )}
                               </p>
                             )}
                             {!editable && (
-                              <p className="text-[12px] text-default-400 mt-1.5 m-0">
+                              <p className="text-[12px] text-default-600 mt-1.5 m-0">
                                 {lang === "en" ? "Edit this one in the full positioning editor." : "這一項請到定位頁完整編輯。"}
                               </p>
                             )}
@@ -2536,7 +2585,7 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                               <>
                                 {siblings.length > 0 && (
                                   <div className="flex flex-wrap gap-1 mb-1.5">
-                                    <span className="text-[12px] text-default-400 self-center">
+                                    <span className="text-[12px] text-default-600 self-center">
                                       {lang === "en" ? "Pick:" : "可選用："}
                                     </span>
                                     {siblings.map((s) => (
@@ -2558,7 +2607,7 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                                   autoFocus
                                   placeholder={lang === "en" ? "Type or rewrite…" : "輸入或改寫…"}
                                 />
-                                <p className="text-[12px] text-default-400 mt-1">
+                                <p className="text-[12px] text-default-600 mt-1">
                                   {lang === "en"
                                     ? `Saves to this ${editSaveTarget?.kind ?? "brand"}'s positioning.`
                                     : `會更新此${editSaveTarget?.kind === "product" ? "產品" : editSaveTarget?.kind === "event" ? "活動" : "品牌"}的定位。`}
@@ -2590,10 +2639,10 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                   const stagesNow = orchestraStages && orchestraStages.length > 0
                     ? orchestraStages
                     : synthesizeStages(tickMs, tier, lang, activeRegulationCount > 0);
-                  const agentRoster: Array<{ id?: number; name: string; title?: string; avatarUrl?: string | null; role?: string }> = [];
+                  const agentRoster: Array<{ id?: number; name: string; nameEn?: string; titleEn?: string; title?: string; avatarUrl?: string | null; role?: string }> = [];
                   const cap = agentMeta ?? activeTask.agent;
-                  if (cap) agentRoster.push({ id: cap.id, name: cap.name, title: cap.title, avatarUrl: cap.avatarUrl, role: lang === "en" ? "Writing caption" : "撰寫文案" });
-                  if (imageAgentMeta) agentRoster.push({ id: imageAgentMeta.id, name: imageAgentMeta.name, title: imageAgentMeta.title, avatarUrl: imageAgentMeta.avatarUrl, role: lang === "en" ? "Visual direction" : "視覺方向" });
+                  if (cap) agentRoster.push({ id: cap.id, name: cap.name, nameEn: cap.nameEn, titleEn: cap.titleEn, title: cap.title, avatarUrl: cap.avatarUrl, role: lang === "en" ? "Writing caption" : "撰寫文案" });
+                  if (imageAgentMeta) agentRoster.push({ id: imageAgentMeta.id, name: imageAgentMeta.name, nameEn: imageAgentMeta.nameEn, titleEn: imageAgentMeta.titleEn, title: imageAgentMeta.title, avatarUrl: imageAgentMeta.avatarUrl, role: lang === "en" ? "Visual direction" : "視覺方向" });
                   const PHASES: Array<{ key: string; stageKeys: string[]; icon: IconName; zh: string; en: string }> = [
                     { key: "plan",   stageKeys: ["scout", "pre", "strategist"], icon: "strategy", zh: "策略", en: "Plan" },
                     { key: "write",  stageKeys: ["caption"],                   icon: "content",  zh: "文案", en: "Copy" },
@@ -2620,7 +2669,7 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                     <div className="flex flex-col items-center">
                       {primaryAnswer.trim() && (
                         <p className="self-stretch mt-2 mb-0 rounded-xl bg-default-100 px-3 py-2 text-tiny text-default-600 truncate">
-                          <Icon name="quote" size={10} className="mr-1.5 text-default-400" />
+                          <Icon name="quote" size={10} className="mr-1.5 text-default-600" />
                           {primaryAnswer.trim()}
                         </p>
                       )}
@@ -2643,7 +2692,7 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                                 className={`relative w-10 h-10 rounded-xl flex items-center justify-center transition ${
                                   p.status === "done" ? "bg-neutral-900 text-white"
                                   : p.status === "running" ? "bg-[#F37E4A]/10 text-[#F37E4A] ring-2 ring-[#F37E4A]/60 animate-pulse"
-                                  : "bg-default-100 text-default-400"
+                                  : "bg-default-100 text-default-600"
                                 }`}
                               >
                                 <Icon name={p.status === "done" ? "check" : p.icon} size={15} />
@@ -2657,6 +2706,9 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                           ? (lang === "en" ? current.en : current.zh)
                           : (lang === "en" ? "Wrapping up" : "收尾中")}
                       </p>
+                      <Button size="sm" variant="flat" className="mt-1" onPress={closeTask}>
+                        {lang === "en" ? "Stop" : "停止"}
+                      </Button>
                     </div>
                   );
                 })()}

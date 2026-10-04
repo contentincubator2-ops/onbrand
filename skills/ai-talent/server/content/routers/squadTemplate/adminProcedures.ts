@@ -1,7 +1,7 @@
 /**
  * 小隊管理：審核、後台清單、用量與分析。
  */
-import { protectedProcedure } from "../../../platform/core/trpc";
+import { protectedProcedure, adminProcedure } from "../../../platform/core/trpc";
 import { z } from "zod";
 import localPool from "../../../localDb";
 import { TRPCError } from "@trpc/server";
@@ -41,7 +41,7 @@ export const adminProcedures = {
   // ── Admin procedures (CJ direction 2026-04-30) ──────────────────────────
   // /admin/squads SquadLabPage uses these. No role gate yet — any logged-in
   // user can see drafts; tighten when role system lands.
-  listForAdmin: protectedProcedure
+  listForAdmin: adminProcedure
     .input(z.object({
       status: z.enum(["draft", "approved", "all"]).default("all"),
       tier: z.enum(["core", "defer", "kill", "all"]).default("all"),
@@ -78,7 +78,7 @@ export const adminProcedures = {
     }),
 
   // Get single squad with full step + agent detail for the lab detail pane.
-  getForAdmin: protectedProcedure
+  getForAdmin: adminProcedure
     .input(z.object({ id: z.number() }))
     .query(async ({ input }) => {
       const [rows] = await localPool.execute(
@@ -107,7 +107,7 @@ export const adminProcedures = {
       return { ...row, agents: agentsRaw, steps: stepsRaw, agentMap };
     }),
 
-  approve: protectedProcedure
+  approve: adminProcedure
     .input(z.object({ id: z.number(), note: z.string().max(500).optional() }))
     .mutation(async ({ ctx, input }) => {
       await localPool.execute(
@@ -118,7 +118,7 @@ export const adminProcedures = {
     }),
 
   /** Soft reject — flips is_approved=0, leaves squad active so admin can edit. */
-  reject: protectedProcedure
+  reject: adminProcedure
     .input(z.object({ id: z.number(), reason: z.string().max(500).optional() }))
     .mutation(async ({ input }) => {
       await localPool.execute(
@@ -131,7 +131,7 @@ export const adminProcedures = {
   // ── getStepsAdmin ─────────────────────────────────────────────────────────
   // Returns the full steps array for a squad so the admin can view/edit
   // outputType per step. Uses localPool (mos_db).
-  getStepsAdmin: protectedProcedure
+  getStepsAdmin: adminProcedure
     .input(z.object({ squadId: z.number() }))
     .query(async ({ input }) => {
       const [[row]] = await localPool.execute(
@@ -156,7 +156,7 @@ export const adminProcedures = {
   // ── setStepOutputType ─────────────────────────────────────────────────────
   // Patches a single step's outputType inside the steps JSON.
   // Matches by step index (0-based) or step.order / step.step field.
-  setStepOutputType: protectedProcedure
+  setStepOutputType: adminProcedure
     .input(z.object({
       squadId:    z.number(),
       stepIndex:  z.number(),       // 0-based index in the steps array

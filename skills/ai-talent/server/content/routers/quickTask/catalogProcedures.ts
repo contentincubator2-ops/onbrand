@@ -7,6 +7,7 @@ import { resolveTaskTemplate } from "../../core/catalog/taskRegistry";
 import { TRPCError } from "@trpc/server";
 import { sourceForTemplate, ALL_CRAFT_REFS } from "../../core/catalog/craftSource";
 import { platformOfTaskId, buildTaskCatalogIndex, is99sOrchestraListed } from "../../core/catalog/taskCatalogIndex";
+import { taskEnFor, VARIANT_LABEL_EN_ALL } from "../../core/catalog/en";
 import { evergreenRationaleFor } from "../../core/catalog/evergreenRationale";
 import { taskCardAddedAt } from "../../core/catalog/taskCardDates";
 import { TASKS, TASK_LABEL_EN } from "./taskDefs";
@@ -15,6 +16,7 @@ import { planQuotaFor, loadBrandPositioning, resolveChannels, filterTasksByPlan,
 import { isRecentViral } from "../../core/catalog/taskSource";
 import { storedTray, defaultTray, MAX_TRAY } from "../../core/catalog/taskTray";
 import localPool from "../../../localDb";
+import { assertBrandAccess } from "../../../platform/core/brandAuth";
 import { listBrandTaskCards, cardTemplate } from "../../core/catalog/brandTaskCards";
 import { listAllFBTasks } from "../../core/catalog/quickTaskFB";
 import { IG_30S_TASKS } from "../../core/catalog/quickTaskIG";
@@ -40,8 +42,17 @@ import { ALL_99S_TASKS } from "../../core/catalog/quickTask100";
 import { MULTI_60S_TASKS, getMulti60OrchestraConfig } from "../../core/catalog/quickTaskMulti60";
 import { MEDIA_PHOTO_TASKS, MEDIA_VIDEO_TASKS, MEDIA_DOC_TASKS } from "../../core/catalog/quickTaskMedia";
 import { callWithFallback, tryParseJson } from "./helpers";
+import { englishFromRow } from "../../../platform/core/agents/agentEnglish";
+
+const SQUAD_DEFAULT_EN = {
+  question: "What do you want to deliver? Briefly state the topic, campaign and goal (AI experts will research festivals and trends)",
+  placeholder: "e.g. May Mother's Day limited offer / new launch / customer stories",
+} as const;
 
 export const catalogProcedures = {
+  /** 版本名稱（存在產出裡是中文）→ 英文；整張表很小，client 抓一次就好。 */
+  variantLabelsEn: protectedProcedure.query(() => VARIANT_LABEL_EN_ALL),
+
   /**
    * 一張卡的「憑什麼」：用途、出處、模型實際被餵的參考、長青的背後邏輯、
    * 需要的輸入、上架日、方案。給 CardDetailDrawer 用。
@@ -68,6 +79,7 @@ export const catalogProcedures = {
         descriptionZh: pick(t.description, "zh"),
         descriptionEn: pick(t.description, "en"),
         source,
+        en: taskEnFor(id),
         /** 得獎／標竿：模型實際被餵的那一則參考（craftSource 的來源）。 */
         craftRef: source.type === "award" || source.type === "benchmark" ? (ALL_CRAFT_REFS[id] ?? null) : null,
         /** 長青：背後邏輯。 */
@@ -144,6 +156,8 @@ export const catalogProcedures = {
   tray: protectedProcedure
     .input(z.object({ brandId: z.number(), platform: z.string().min(1).max(24) }))
     .query(async ({ ctx, input }) => {
+      // 2026-10-04：原本沒驗品牌歸屬——任何登入的人都讀得到別人品牌的托盤。
+      await assertBrandAccess(ctx.user!.id, input.brandId);
       const quota = await planQuotaFor(ctx.user!.id);
       const positioning = await loadBrandPositioning(input.brandId);
       const channels = resolveChannels(positioning, quota);
@@ -163,6 +177,26 @@ export const catalogProcedures = {
       };
     }),
 
+  /**
+   * 全部通路的托盤，一次拿完。給「我的任務卡」總覽頁用（2026-10-04，CJ「可以在
+   * 不同的平台中，管理到自己常用的」）——那一頁要同時列七個通路，一個通路打一次
+   * tray 等於七次重算方案閘門。解析同樣交給 client（理由見 tray）。
+   */
+  trays: protectedProcedure
+    .input(z.object({ brandId: z.number(), platforms: z.array(z.string().min(1).max(24)).min(1).max(16) }))
+    .query(async ({ ctx, input }) => {
+      await assertBrandAccess(ctx.user!.id, input.brandId);
+      const quota = await planQuotaFor(ctx.user!.id);
+      const positioning = await loadBrandPositioning(input.brandId);
+      const channels = resolveChannels(positioning, quota);
+      const allowed = filterTasksByPlan(buildTaskCatalogIndex() as any[], quota, channels);
+      const byPlatform: Record<string, { stored: string[] | null; fallback: string[] }> = {};
+      for (const p of new Set(input.platforms)) {
+        byPlatform[p] = { stored: storedTray(positioning, p), fallback: defaultTray(allowed as any[], p) };
+      }
+      return { maxTray: MAX_TRAY, byPlatform };
+    }),
+
   /** 存這個通路的托盤。空陣列＝回到系統預設。 */
   setTray: protectedProcedure
     .input(z.object({
@@ -170,7 +204,9 @@ export const catalogProcedures = {
       platform: z.string().min(1).max(24),
       taskIds: z.array(z.string().min(1).max(80)).max(MAX_TRAY),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      // 2026-10-04：原本沒驗品牌歸屬就整欄覆寫 positioning。
+      await assertBrandAccess(ctx.user!.id, input.brandId);
       const positioning = (await loadBrandPositioning(input.brandId)) ?? {};
       const base = typeof positioning === "object" && positioning ? positioning : {};
       const tray = { ...((base as any).__tray ?? {}) };
@@ -513,16 +549,16 @@ export const catalogProcedures = {
       ...Object.values(teamIdsByTask).flat(),
       ...squadTeamIds,
     ]));
-    const agentMap: Record<number, { id: number; name: string; title: string; avatarUrl: string | null }> = {};
+    const agentMap: Record<number, { id: number; name: string; title: string; nameEn: string; titleEn: string; avatarUrl: string | null }> = {};
     if (agentIds.length > 0) {
       const placeholders = agentIds.map(() => "?").join(",");
       try {
         const [rows]: any = await localPool.execute(
-          `SELECT id, name, title, avatarUrl FROM agents WHERE id IN (${placeholders})`,
+          `SELECT id, name, title, englishName, englishTitle, avatarUrl FROM agents WHERE id IN (${placeholders})`,
           agentIds,
         );
         for (const r of (rows as any[])) {
-          agentMap[r.id] = { id: r.id, name: r.name, title: r.title, avatarUrl: r.avatarUrl ?? null };
+          agentMap[r.id] = { id: r.id, name: r.name, title: r.title, ...englishFromRow(r), avatarUrl: r.avatarUrl ?? null };
         }
       } catch { /* agent metadata failure non-fatal — UI shows fallback */ }
     }
@@ -562,6 +598,8 @@ export const catalogProcedures = {
         // 一律顯示「長青公式」而且沒有任何東西會報錯。未標記的卡由
         // resolveTaskSource 補成 evergreen，所以前台永遠拿得到值。
         source: sourceForTemplate(t),
+        /** 英文旁路：問題／佔位字／欄位標籤／來源文字；沒有就 null，client 退回中文。 */
+        en: taskEnFor(String(t.id)),
       };
       if (t.kind === "squad") {
         // 100s squad tasks: surface lead agent + team roster + a primary
@@ -573,6 +611,7 @@ export const catalogProcedures = {
         const squadLabelEn = typeof t.label === "object" && t.label?.en ? t.label.en : (TASK_LABEL_EN[t.id] ?? null);
         return {
           ...base,
+          en: base.en ?? SQUAD_DEFAULT_EN,
           label_en: squadLabelEn,
           label_zh: typeof t.label === "object" && t.label?.zh ? t.label.zh : null,
           squad_slug: t.squad_slug,

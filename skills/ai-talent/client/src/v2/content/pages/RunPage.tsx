@@ -16,6 +16,7 @@
  *   🪄 重生  🎚️ 設定  📋 複製  💾 存
  *   ↻ 重跑  ✕ 關閉
  */
+import { localizeSource } from "../lib/taskEn";
 import React, { useMemo, useState, useEffect, useRef } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import {
@@ -30,10 +31,12 @@ import { HelpTip } from "../../platform/components/HelpTip";
 import { CommentIcon, CopyIcon, EditIcon, ImageIcon, LibraryIcon, RegenerateIcon, RewriteAsIcon, PuzzleIcon, WaitingIcon, UserIcon, TextIcon, CheckIcon, BundleIcon, WarningIcon, DoneIcon, ErrorIcon, WorkingIcon, LinkIcon, PartnerIcon } from "../../platform/components/icons";
 import VendorFinder, { vendorKindOf } from "../components/VendorFinder";
 import { trpc } from "../../../lib/trpc";
+import { useVariantLabel } from "../lib/variantLabelEn";
 import { showToastGlobal } from "../../platform/components/Toast";
 import { PlatformMockup } from "../components/PlatformMockup";
 import ImageCardOffer, { IMAGE_CARD_OFFER_ID } from "../components/imageCard/ImageCardOffer";
 import type { MockupVariant } from "../lib/inferMockup";
+import { imageCardMockup } from "../lib/imageCardMockup";
 import { getStrategyPresentationMockup } from "../lib/strategyPresentation";
 import {
   getIgPublicVariantImageSize,
@@ -65,11 +68,19 @@ import { fireNudge } from "../../platform/components/mia/miaNudges";
 import ReviewBar from "../../platform/components/review/ReviewBar";
 import PerfTagPicker from "../components/PerfTagPicker";
 import WriterDesk, { type DeskWriter } from "../components/WriterDesk";
+import { agentLabel, agentTitle } from "../../platform/lib/agentName";
+import { friendlyError } from "../../platform/lib/friendlyError";
+import BrandConsistencyNote, { pickBrandRecord } from "../components/BrandConsistencyNote";
 import RegulationComplianceNote, { toComplianceInput, type ComplianceRecord } from "../components/RegulationComplianceNote";
+import { captionLimitHint } from "../lib/captionLimits";
 import { cancelAgentHandoff } from "../lib/agentHandoff";
 import { Mode, REWRITE_AGENTS, VariantData, sanitizeCaption, normalizeVariantData, HOLD_FOR_IMAGES, SEQUENCE_TASKS, nanoBananaJsonToPrompt, sanitizeProviderErrorForToast } from "./run/runModel";
 import { CraftChip, Divider, ToolbarBtn, StepBadge } from "./run/RunParts";
 
+
+/** Toast-safe error text (no raw TRPC/zod noise). */
+const friendlyErr = (e: unknown, en: boolean) =>
+  friendlyError(e, en ? "Something went wrong. Please try again." : "剛剛沒成功，再試一次。");
 
 export default function RunPage() {
   const { outputId } = useParams<{ outputId: string }>();
@@ -113,7 +124,7 @@ export default function RunPage() {
   // 2026-05-14 (CJ「async polling」): when the orchestra wrote a partial
   // row (progress='caption_ready'), poll every 4s so image / QA show up
   // as they complete. Stop polling once progress reaches done/failed.
-  const { data, isLoading, error } = trpc.output.getById.useQuery(
+  const { data, isLoading, error, refetch: refetchRun } = trpc.output.getById.useQuery(
     { id },
     {
       enabled: !!id,
@@ -135,10 +146,16 @@ export default function RunPage() {
   // 則是平台通則的既有理由）。跟報價頁「249 張任務卡中 208 張可追溯結構
   // 出處」是同一件事，只是第一次真的顯示給跑完任務的人看。
   const sourceTaskId = String(data?.mission?.taskId ?? "");
+  const vl = useVariantLabel();
   const cardDetailQ = trpc.quickTask.cardDetail.useQuery(
     { taskId: sourceTaskId },
     { enabled: !!sourceTaskId },
   );
+  // English UI: show the card's English name when the stored mission title is the (Chinese) card label.
+  const cardEnName = lang === "en" ? String((cardDetailQ.data as any)?.labelEn ?? "") : "";
+  const cardZhName = String((cardDetailQ.data as any)?.labelZh ?? "");
+  const taskName = (zh: string): string =>
+    cardEnName && zh && (zh === cardZhName || zh === (data as any)?.mission?.taskLabel) ? cardEnName : zh;
 
   // ── Mia contextual nudges for RunPage ────────────────────────────────
   // Fires when output first loads: tells user what they can do right now
@@ -335,7 +352,7 @@ export default function RunPage() {
       utils.output.getById.invalidate({ id });
     },
     onError: (e) => showToastGlobal(
-      lang === "en" ? `Save failed: ${e.message}` : `儲存失敗：${e.message}`
+      lang === "en" ? `Save failed: ${friendlyErr(e, true)}` : `儲存失敗：${friendlyErr(e, false)}`
     ),
   });
   const refineMut = (trpc as any).quickTask?.refineCaption?.useMutation
@@ -348,7 +365,7 @@ export default function RunPage() {
           if (r.ok) { setGeneratedScript(r.script); setScriptCompliance(r.regulationCompliance ?? null); }
           else showToastGlobal(lang === "en" ? `Script failed: ${typeof r.error === "string" ? r.error : "unknown error"}` : `腳本生成失敗：${typeof r.error === "string" ? r.error : "未知錯誤"}`);
         },
-        onError: (e: any) => showToastGlobal(lang === "en" ? `Script error: ${e.message}` : `腳本錯誤：${e.message}`),
+        onError: (e: any) => showToastGlobal(lang === "en" ? `Script error: ${friendlyErr(e, true)}` : `腳本錯誤：${friendlyErr(e, false)}`),
       })
     : null;
   const emailMut = trpc.output.emailToTeam.useMutation({
@@ -361,7 +378,7 @@ export default function RunPage() {
       );
     },
     onError: (e) => showToastGlobal(
-      lang === "en" ? `Send failed: ${e.message}` : `寄送失敗：${e.message}`
+      lang === "en" ? `Send failed: ${friendlyErr(e, true)}` : `寄送失敗：${friendlyErr(e, false)}`
     ),
   });
   const scheduleMut = trpc.output.scheduleIcs.useMutation({
@@ -379,7 +396,7 @@ export default function RunPage() {
       utils.output.getById.invalidate({ id });
     },
     onError: (e) => showToastGlobal(
-      lang === "en" ? `Schedule failed: ${e.message}` : `排程失敗：${e.message}`
+      lang === "en" ? `Schedule failed: ${friendlyErr(e, true)}` : `排程失敗：${friendlyErr(e, false)}`
     ),
   });
   // 2026-05-09 (P3): regen single variant
@@ -393,7 +410,7 @@ export default function RunPage() {
           setOverrides({});
         },
         onError: (e: any) => showToastGlobal(
-          lang === "en" ? `Rewrite failed: ${e?.message ?? e}` : `重生失敗：${e?.message ?? e}`
+          lang === "en" ? `Rewrite failed: ${friendlyErr(e, true)}` : `重生失敗：${friendlyErr(e, false)}`
         ),
       })
     : { mutate: () => {}, isPending: false };
@@ -488,8 +505,8 @@ export default function RunPage() {
     onError: (e: any) => {
       showToastGlobal(
         lang === "en"
-          ? `Schedule failed: ${e?.message ?? e}`
-          : `排程失敗：${e?.message ?? e}`
+          ? `Schedule failed: ${friendlyErr(e, true)}`
+          : `排程失敗：${friendlyErr(e, false)}`
       );
     },
   }) ?? { mutateAsync: async () => {}, isPending: false };
@@ -559,7 +576,7 @@ export default function RunPage() {
           showToastGlobal(lang === "en" ? "Switched back (no regeneration)" : "已切回這張圖（不用重新生成）");
         },
         onError: (e: any) => showToastGlobal(
-          lang === "en" ? `Couldn't switch image: ${String(e?.message ?? e).slice(0, 120)}` : `切換圖片失敗：${String(e?.message ?? e).slice(0, 120)}`
+          lang === "en" ? `Couldn't switch image: ${friendlyErr(e, true)}` : `切換圖片失敗：${friendlyErr(e, false)}`
         ),
       })
     : { mutate: () => {}, isPending: false };
@@ -689,7 +706,7 @@ export default function RunPage() {
           }
         },
         onError: (e: any) => showToastGlobal(
-          lang === "en" ? `Couldn't generate prompt: ${e?.message ?? e}` : `產生失敗：${e?.message ?? e}`
+          lang === "en" ? `Couldn't generate prompt: ${friendlyErr(e, true)}` : `產生失敗：${friendlyErr(e, false)}`
         ),
       })
     : { mutate: () => {}, isPending: false };
@@ -726,7 +743,7 @@ export default function RunPage() {
       setPickedRunProduct({ productId: validRunProduct.productId, name: validRunProduct.name, imageUrl: String(json.photo.url) });
       showToastGlobal(lang === "en" ? "Photo added to this product" : "已加進這個產品的照片", "success");
     } catch (e: any) {
-      showToastGlobal(String(e?.message ?? e), "error");
+      showToastGlobal(friendlyErr(e, lang === "en"), "error");
     } finally {
       setUploadingPhoto(false);
       if (conflictFileRef.current) conflictFileRef.current.value = "";
@@ -763,7 +780,7 @@ export default function RunPage() {
       showToastGlobal(lang === "en" ? "Scheduled and sent for review" : "已排程並送審", "success");
       reviewStatusQ.refetch?.();
     } catch (e: any) {
-      showToastGlobal(lang === "en" ? `Scheduled, but review failed: ${e?.message ?? e}` : `已排程，但送審失敗：${e?.message ?? e}`);
+      showToastGlobal(lang === "en" ? `Scheduled, but review failed: ${friendlyErr(e, true)}` : `已排程，但送審失敗：${friendlyErr(e, false)}`);
     }
   };
   const [schedPlatform, setSchedPlatform] = useState("facebook");
@@ -1151,6 +1168,7 @@ export default function RunPage() {
     const name = (typeof ca === "object" ? ca?.name : ca) || (lang === "en" ? "Lead writer" : "主筆");
     return {
       key: "lead", name: String(name),
+      nameEn: typeof ca === "object" ? ca?.nameEn : undefined, titleEn: typeof ca === "object" ? ca?.titleEn : undefined,
       title: String((typeof ca === "object" ? ca?.title : "") ?? ""),
       avatarUrl: typeof ca === "object" ? ca?.avatarUrl ?? null : null,
     };
@@ -1176,7 +1194,7 @@ export default function RunPage() {
   }, [hasData, writerDesk]);
   const deskPendingRef = useRef<{ timer: ReturnType<typeof setTimeout>; text: string } | null>(null);
   const saveCaptionQuietMut = trpc.output.updateVariantCaption.useMutation({
-    onError: (e) => showToastGlobal(lang === "en" ? `Save failed: ${e.message}` : `儲存失敗：${e.message}`),
+    onError: (e) => showToastGlobal(lang === "en" ? `Save failed: ${friendlyErr(e, true)}` : `儲存失敗：${friendlyErr(e, false)}`),
   });
   useEffect(() => {
     setDeskUndo(null);
@@ -1261,7 +1279,7 @@ export default function RunPage() {
       setDeskUndo(null); setChatHistory([]);
       await commitDeskCaption(r.rewritten, w, r.regulationCompliance);
     } catch (e: any) {
-      showToastGlobal(lang === "en" ? `Error: ${e?.message ?? String(e)}` : `錯誤：${e?.message ?? String(e)}`);
+      showToastGlobal(lang === "en" ? `Error: ${friendlyErr(e, true)}` : `錯誤：${friendlyErr(e, false)}`);
     } finally {
       setDeskBusyKey(null);
     }
@@ -1296,7 +1314,7 @@ export default function RunPage() {
       await commitDeskCaption(r.rewritten, undefined, r.regulationCompliance);
       return true;
     } catch (e: any) {
-      showToastGlobal(lang === "en" ? `Error: ${e?.message ?? String(e)}` : `錯誤：${e?.message ?? String(e)}`);
+      showToastGlobal(lang === "en" ? `Error: ${friendlyErr(e, true)}` : `錯誤：${friendlyErr(e, false)}`);
       return false;
     } finally {
       setDeskChatBusy(false);
@@ -1518,6 +1536,14 @@ export default function RunPage() {
       return { platform: "generic" as any, format: "research-doc" as any, label: "generic:research-doc" };
     }
 
+    // 2026-10-04 圖片卡存成的「圖＋文」貼文：版型跟圖片卡頁的預覽用同一份對照。
+    const md = (data?.metadata ?? {}) as { source?: string; cardId?: string; platform?: string };
+    if (md.source === "image-card" && md.cardId && md.platform) {
+      let n = 1;
+      try { const c = JSON.parse(String(data?.content ?? "[]")); n = Array.isArray(c?.[0]?.cards) ? c[0].cards.length : 1; } catch { /* 單張 */ }
+      return imageCardMockup(md.cardId, md.platform, n);
+    }
+
     // ── Layer 1: taskId prefix → platform/format (richest mapping) ──
     const idPrefixMap: Record<string, string> = {
       fb: "facebook", ig: "instagram", yt: "youtube", tt: "tiktok",
@@ -1697,12 +1723,19 @@ export default function RunPage() {
     return <div className="p-12 text-center text-default-500">{lang === "en" ? "Invalid run ID" : "無效的 run ID"}</div>;
   }
   if (isLoading) {
-    return <div className="p-12 flex justify-center"><Spinner size="lg" /></div>;
+    return <div role="status" aria-live="polite" aria-label={lang === "en" ? "Loading" : "載入中"} className="p-12 flex justify-center"><Spinner size="lg" /></div>;
   }
   if (error || !data) {
+    const notFound = (error as any)?.data?.code === "NOT_FOUND" || (error as any)?.data?.code === "FORBIDDEN";
     return (
-      <div className="p-12 flex flex-col items-center gap-3 text-default-500">
-        <p>{lang === "en" ? "Run not found (it may have been removed or you don't have access)" : "找不到這個 run（可能已被移除或無權限）"}</p>
+      <div role="alert" className="p-12 flex flex-col items-center gap-3 text-default-600 text-center">
+        {!notFound && !!error && (
+          <>
+            <p>{lang === "en" ? "This output didn't load. Check your connection and try again." : "這份產出沒載入，請檢查網路後再試一次。"}</p>
+            <Button variant="flat" onPress={() => refetchRun?.()}>{lang === "en" ? "Retry" : "重試"}</Button>
+          </>
+        )}
+        {(notFound || !error) && <p>{lang === "en" ? "Run not found (it may have been removed or you don't have access)" : "找不到這個 run（可能已被移除或無權限）"}</p>}
         <Button variant="flat" onPress={() => navigate("/projects")}>{lang === "en" ? "Back to Projects" : "回專案"}</Button>
       </div>
     );
@@ -1715,7 +1748,7 @@ export default function RunPage() {
     const detail: any = cardDetailQ.data;
     if (cardDetailQ.isLoading) return <p className="text-[12.5px] text-default-500">{lang === "en" ? "Loading…" : "載入中…"}</p>;
     if (!detail) return <p className="text-[12.5px] text-default-500">{lang === "en" ? "No registered source for this card." : "這張卡沒有登記出處。"}</p>;
-    const src = detail.source ?? { type: "evergreen" };
+    const src = localizeSource(detail.source ?? { type: "evergreen" }, detail, lang);
     return (
       <div className="space-y-1.5 rounded-lg bg-default-50 p-2.5 text-[12.5px] leading-relaxed text-default-800">
         <p className="font-medium">{sourceLabel(src.type, lang, { long: true })}</p>
@@ -1773,9 +1806,9 @@ export default function RunPage() {
             <button
               onClick={() => navigate("/projects")}
               className="hover:text-default-900 transition truncate max-w-[260px]"
-              title={String((data as any).mission.title ?? "")}
+              title={taskName(String((data as any).mission.title ?? ""))}
             >
-              {String((data as any).mission.title ?? "")}
+              {taskName(String((data as any).mission.title ?? ""))}
             </button>
           </>
         )}
@@ -1845,13 +1878,13 @@ export default function RunPage() {
       <div className="flex items-center gap-2 mb-3 px-1">
         <p
           className="text-tiny text-default-500 truncate flex-1 min-w-0"
-          title={currentEmailSubject ? `主旨：${currentEmailSubject}` : (data.title || data.mission?.taskLabel || "")}
+          title={currentEmailSubject ? `主旨：${currentEmailSubject}` : (data.title || taskName(data.mission?.taskLabel || ""))}
         >
           {(() => {
             // For email tasks: show current slide's email subject (updates on tab switch)
             const raw = currentEmailSubject
               ? `主旨：${currentEmailSubject}`
-              : data.title || data.mission?.taskLabel || (lang === "en" ? "(Untitled)" : "(無標題)");
+              : data.title || taskName(data.mission?.taskLabel || "") || (lang === "en" ? "(Untitled)" : "(無標題)");
             const cps = Array.from(raw);
             return cps.length > 40 ? cps.slice(0, 38).join("") + "…" : raw;
           })()}
@@ -1890,7 +1923,7 @@ export default function RunPage() {
                   isStrategyEnvelope,
                   format: v.format,
                   index: i,
-                  fallbackLabel: v.label,
+                  fallbackLabel: vl(v.label),
                   language: lang === "en" ? "en" : "zh",
                 })}
               </button>
@@ -1912,7 +1945,7 @@ export default function RunPage() {
                     : "bg-white text-default-700 border-default-200 hover:border-secondary"
                 }`}
               >
-                {v.label || (lang === "en" ? `Plan ${i + 1}` : `策略 ${i + 1}`)}
+                {v.label ? vl(v.label) : (lang === "en" ? `Plan ${i + 1}` : `策略 ${i + 1}`)}
               </button>
             ))}
             <button
@@ -1929,7 +1962,7 @@ export default function RunPage() {
           </div>
           {selectedContentKind === "publicVariants" && publicVariants.length > 1 && (
             <div className="flex flex-wrap items-center gap-1.5 pl-2 border-l-2 border-primary-100">
-              <span className="text-[12px] text-default-400 mr-1">
+              <span className="text-[12px] text-default-600 mr-1">
                 {lang === "en" ? "Posts:" : "貼文："}
               </span>
               {publicVariants.map((v, i) => (
@@ -1942,7 +1975,7 @@ export default function RunPage() {
                       : "bg-white text-default-600 border-default-200 hover:border-primary"
                   }`}
                 >
-                  {v.label || (lang === "en" ? `Post ${i + 1}` : `貼文 ${i + 1}`)}
+                  {v.label ? vl(v.label) : (lang === "en" ? `Post ${i + 1}` : `貼文 ${i + 1}`)}
                 </button>
               ))}
             </div>
@@ -1976,7 +2009,7 @@ export default function RunPage() {
                     : "bg-white text-default-700 border-default-200 hover:border-secondary"
                 }`}
               >
-                {v.label}
+                {vl(v.label)}
               </button>
             ))}
             {pool && more > 0 && (
@@ -2036,7 +2069,7 @@ export default function RunPage() {
               {(slide?.hashtags?.length ?? 0) > 0 && (
                 <p className="mt-2 text-[14px] text-default-500">{(slide?.hashtags ?? []).map((h) => (h.startsWith("#") ? h : `#${h}`)).join(" ")}</p>
               )}
-              <div className="mt-3 flex items-center justify-between border-t border-default-100 pt-2 text-[12px] text-default-400">
+              <div className="mt-3 flex items-center justify-between border-t border-default-100 pt-2 text-[12px] text-default-600">
                 <span>{lang === "en" ? `${(slide?.caption ?? "").length} characters` : `${(slide?.caption ?? "").length} 字`}</span>
                 <span>
                   {deskBusyKey || deskChatBusy
@@ -2061,7 +2094,7 @@ export default function RunPage() {
                     <p className="text-small font-medium text-default-700">
                       {lang === "en" ? "Crafting your complete post…" : "完整貼文生成中…"}
                     </p>
-                    <p className="text-tiny text-default-400 max-w-xs">
+                    <p className="text-tiny text-default-600 max-w-xs">
                       {lang === "en"
                         ? "Copy is done — images are rendering. The full post (copy + image) will appear here automatically (~30-60s)."
                         : "文案已完成，圖片生成中。完整貼文（文案＋圖片）會在這裡自動顯示（約 30-60 秒）"}
@@ -2166,6 +2199,7 @@ export default function RunPage() {
                   copy={String(slide.caption ?? "")}
                   runId={outputId}
                   hasImage={!!slide.imageUrl}
+                  locator={getRunContentMutationLocator(selectedContentKind, activeIdx)}
                 />
               )}
               {/* 2026-09-21 (CJ「不行的時候，再讓用戶選 NANO BANANA」): gpt-image-2 failed even after the
@@ -2415,12 +2449,12 @@ export default function RunPage() {
                   <span className="text-small font-semibold text-default-700">
                     {lang === "en" ? "12 Video Titles" : "12 支影片 title"}
                   </span>
-                  <span className="text-tiny text-default-400">{rows.length} 支</span>
+                  <span className="text-tiny text-default-600">{rows.length} 支</span>
                 </div>
                 <div className="divide-y divide-default-100">
                   {rows.map((row, i) => (
                     <div key={i} className="flex items-center gap-3 px-4 py-2.5 hover:bg-default-50 transition group">
-                      <span className="text-default-400 text-tiny font-mono w-5 shrink-0">{row.num}</span>
+                      <span className="text-default-600 text-tiny font-mono w-5 shrink-0">{row.num}</span>
                       <span className="flex-1 text-small text-default-800 leading-snug">{row.title}</span>
                       <button
                         onClick={() => {
@@ -2610,7 +2644,7 @@ export default function RunPage() {
                     const ca: any = data.metadata?.captionAgent;
                     const name = typeof ca === "object" ? ca?.name : ca;
                     const av = typeof ca === "object" ? ca?.avatarUrl : null;
-                    return <Avatar src={av || `https://api.dicebear.com/9.x/notionists/svg?seed=${encodeURIComponent(name ?? "Caption")}`} className="w-7 h-7" />;
+                    return <Avatar src={av || `https://api.dicebear.com/9.x/notionists/svg?seed=${encodeURIComponent(name ?? "Caption")}`} alt={typeof ca === "object" ? agentLabel(ca, lang) : name} className="w-7 h-7" />;
                   })()}
                 </button>
               </Tooltip>
@@ -2623,7 +2657,7 @@ export default function RunPage() {
                     const ia: any = data.metadata?.imageAgent;
                     const name = typeof ia === "object" ? ia?.name : ia;
                     const av = typeof ia === "object" ? ia?.avatarUrl : null;
-                    return <Avatar src={av || `https://api.dicebear.com/9.x/notionists/svg?seed=${encodeURIComponent(name ?? "Visual")}`} className="w-7 h-7" />;
+                    return <Avatar src={av || `https://api.dicebear.com/9.x/notionists/svg?seed=${encodeURIComponent(name ?? "Visual")}`} alt={typeof ia === "object" ? agentLabel(ia, lang) : name} className="w-7 h-7" />;
                   })()}
                 </button>
               </Tooltip>
@@ -2672,6 +2706,11 @@ export default function RunPage() {
                   ? (data as any).metadata.regulationCompliance : [];
                 const rec = recs.find((r) => r.variantIndex === activeIdx);
                 return rec ? <RegulationComplianceNote rec={rec} en={lang === "en"} /> : null;
+              })()}
+              {/* 品牌一致性檢查（brandConsistency.ts）：同一份品牌大腦寫、也審。skipped 顯示「未檢查」。 */}
+              {mode !== "image" && (() => {
+                const brec = pickBrandRecord((data as any)?.metadata?.brandConsistency, activeIdx);
+                return brec ? <BrandConsistencyNote rec={brec} en={lang === "en"} /> : null;
               })()}
               {writerDesk && mode !== "image" && (
                 <WriterDesk
@@ -2764,7 +2803,7 @@ export default function RunPage() {
                         }
                       } catch (e: any) {
                         showToastGlobal(
-                          lang === "en" ? `Error: ${e.message ?? String(e)}` : `錯誤：${e.message ?? String(e)}`
+                          lang === "en" ? `Error: ${friendlyErr(e, true)}` : `錯誤：${friendlyErr(e, false)}`
                         );
                       }
                     }}
@@ -2997,7 +3036,7 @@ export default function RunPage() {
                               }
                             } catch (e: any) {
                               showToastGlobal(
-                                lang === "en" ? `Couldn't apply template: ${e?.message ?? e}` : `套用失敗：${e?.message ?? e}`
+                                lang === "en" ? `Couldn't apply template: ${friendlyErr(e, true)}` : `套用失敗：${friendlyErr(e, false)}`
                               );
                             }
                           }}
@@ -3182,7 +3221,8 @@ export default function RunPage() {
                 const focusedAgName = focusedAg?.name ?? (focusedAgent === "image"
                   ? (lang === "en" ? "Visual AI" : "視覺 AI 專家")
                   : (lang === "en" ? "Caption agent" : "撰寫者"));
-                const focusedAgTitle = focusedAg?.title ?? "";
+                const focusedAgTitle = focusedAg ? agentTitle(focusedAg, lang) : "";
+                const focusedAgLabel = focusedAg?.name ? agentLabel(focusedAg, lang) : focusedAgName;
                 const stages: Array<{key: string; label: string; status: string; startedAt?: number; completedAt?: number}> = Array.isArray(md.stages) ? md.stages : [];
                 const totalMs = md.latencyMs ?? 0;
                 const fetchedUrl = typeof md.fetchedUrl === "string"
@@ -3199,8 +3239,8 @@ export default function RunPage() {
                         className="w-7 h-7"
                       />
                       <span className="flex flex-col leading-tight">
-                        <span>{focusedAgName}</span>
-                        {focusedAgTitle && <span className="text-[12px] text-default-400 font-normal">{focusedAgTitle}</span>}
+                        <span>{focusedAgLabel}</span>
+                        {focusedAgTitle && <span className="text-[12px] text-default-600 font-normal">{focusedAgTitle}</span>}
                       </span>
                     </p>
                     {/* Real orchestra stage timeline */}
@@ -3213,7 +3253,7 @@ export default function RunPage() {
                             const statusColor =
                               s.status === "done" ? "text-success" :
                               s.status === "failed" ? "text-danger" :
-                              s.status === "running" ? "text-warning" : "text-default-400";
+                              s.status === "running" ? "text-warning" : "text-default-600";
                             const dot =
                               s.status === "done" ? <DoneIcon size={11} /> :
                               s.status === "failed" ? <ErrorIcon size={11} /> :
@@ -3223,7 +3263,7 @@ export default function RunPage() {
                                 <span className={`${statusColor} font-mono text-sm leading-none mt-0.5`}>{dot}</span>
                                 <span className="flex-1 min-w-0">
                                   <span className="block text-default-800">{s.label}</span>
-                                  <span className="block text-[12px] text-default-400 font-mono">
+                                  <span className="block text-[12px] text-default-600 font-mono">
                                     {s.status === "done" && dur > 0 ? `${(dur/1000).toFixed(1)}s` : s.status}
                                   </span>
                                 </span>
@@ -3290,7 +3330,7 @@ export default function RunPage() {
                 if (!detail) {
                   return <p className="text-[12px] text-default-500">{lang === "en" ? "Source info unavailable for this task." : "這個任務目前拿不到出處資訊。"}</p>;
                 }
-                const src = detail.source ?? { type: "evergreen" };
+                const src = localizeSource(detail.source ?? { type: "evergreen" }, detail, lang);
                 return (
                   <>
                     <p className="text-tiny font-semibold">{sourceLabel(src.type, lang, { long: true })}</p>
@@ -3324,7 +3364,7 @@ export default function RunPage() {
                     {lang === "en" ? "Rewrite this version" : "重生這段文案"}
                     <HelpTip>
                       {lang === "en"
-                        ? <>The same agent rewrites &quot;{slide?.label ?? `Version ${activeIdx + 1}`}&quot;. The original is archived.</>
+                        ? <>The same agent rewrites &quot;{slide?.label ? vl(slide.label) : `Version ${activeIdx + 1}`}&quot;. The original is archived.</>
                         : <>同一位 AI 專家重寫「{slide?.label ?? `版本 ${activeIdx + 1}`}」。原版會歸檔到歷史。</>}
                     </HelpTip>
                   </p>
@@ -3395,7 +3435,7 @@ export default function RunPage() {
                               );
                             }
                           } catch (e: any) {
-                            showToastGlobal(lang === "en" ? `Error: ${e.message ?? String(e)}` : `錯誤：${e.message ?? String(e)}`);
+                            showToastGlobal(lang === "en" ? `Error: ${friendlyErr(e, true)}` : `錯誤：${friendlyErr(e, false)}`);
                           } finally {
                             setRewriteBusy(null);
                           }
@@ -3465,7 +3505,7 @@ export default function RunPage() {
                           // After binding, schedule to calendar instead of direct publish
                           await handleScheduleToCalendar("facebook");
                         } catch (e: any) {
-                          showToastGlobal(`Error: ${String(e?.message ?? e).slice(0, 100)}`);
+                          showToastGlobal(friendlyErr(e, true));
                         }
                       }}
                     >
@@ -3526,7 +3566,7 @@ export default function RunPage() {
               </Button>
 
               {/* Auto-save note — always true, no action needed */}
-              <div className="text-[12px] text-default-400 text-center px-1 leading-relaxed">
+              <div className="text-[12px] text-default-600 text-center px-1 leading-relaxed">
                 <CheckIcon size={11} /> {lang === "en" ? "Auto-saved" : "已自動儲存"}
               </div>
               </>)}
@@ -3635,8 +3675,8 @@ export default function RunPage() {
                         className="flex items-center justify-between px-3 py-2 text-[12px]"
                         style={i < variants.length - 1 ? { borderBottom: "1px solid #F5F5F5" } : undefined}
                       >
-                        <span className="font-medium text-default-700">{v.label ?? `Day ${i + 1}`}</span>
-                        <span className="text-default-400">{dateStr}</span>
+                        <span className="font-medium text-default-700">{v.label ? vl(v.label) : `Day ${i + 1}`}</span>
+                        <span className="text-default-600">{dateStr}</span>
                       </div>
                     );
                   })}
@@ -3651,6 +3691,15 @@ export default function RunPage() {
                 onChange={(e) => setScheduleAt(e.target.value)}
               />
             )}
+            {(() => {
+              const _pf = schedMode === "publish"
+                ? schedPlatform
+                : ((data as any)?.metadata?.platform ?? "");
+              const _h = captionLimitHint(_pf, (variants as any[])[activeIdx]?.caption, lang === "en");
+              return _h ? (
+                <p className={`text-[12px] ${_h.over ? "text-danger-600" : "text-default-500"}`} role={_h.over ? "alert" : undefined}>{_h.text}</p>
+              ) : null;
+            })()}
             {schedMode === "calendar" && (
               <>
                 {/* 2026-09-29 成效標籤從右欄移進來：排程時順手標，發布後成效落進成效層矩陣 */}

@@ -169,7 +169,15 @@ app.post(
 // 1024x1024 high-quality PNGs come back as 8-15MB base64 strings; 25MB
 // wasn't always enough. 50MB covers the worst case; per-field check below
 // is the real DoS guard.
-app.use(express.json({ limit: '50mb' }));
+// 2026-10-04: the 50MB allowance is only needed by /trpc (base64 images from
+// the image models, uploaded report files). tRPC batches several procedures in
+// one body, so it can't be narrowed below the whole /trpc mount. Every other
+// JSON route (MCP, OAuth, webhooks, ops) gets 2MB. body-parser skips a request
+// that an earlier parser already consumed, so order here is what matters.
+app.use("/trpc", express.json({ limit: '50mb' }));
+// positioningDocRoute /paste takes pasted ChatGPT transcripts (its own 8MB cap).
+app.use("/api/positioning-doc/paste", express.json({ limit: '8mb' }));
+app.use(express.json({ limit: '2mb' }));
 
 // SEC-B-08 v2 (2026-05-05): per-field string cap. The 1MB body limit alone
 // allowed e.g. a 999KB string in a single field to slip through and burn
@@ -181,7 +189,8 @@ const MAX_FIELD_CHARS = 50_000;
 // 2026-05-12: image data URLs (data:image/png;base64,…) routinely run 2-7M
 // chars. Whitelist by field name so legitimate gpt-image-1 / Flux b64
 // payloads pass through. Still capped by the overall 25MB body limit above.
-const IMAGE_DATA_FIELDS = /(^|\.)(imageUrl|imageB64|b64|publicUrl|url)$/;
+// contentBase64: report files for performance import (bounded by the 50MB /trpc body limit).
+const IMAGE_DATA_FIELDS = /(^|\.)(imageUrl|imageB64|b64|publicUrl|url|contentBase64)$/;
 function deepCheckStringLengths(obj: any, path: string = ""): string | null {
   if (obj == null) return null;
   if (typeof obj === "string") {
@@ -735,6 +744,19 @@ const server = app.listen(PORT, async () => {
       });
     }, 30 * 60_000);
     console.log("[fbPageSync] Worker started (30m interval)");
+
+    // 核准後的貼文到時間自動發布。預設關閉：要在該環境設 AUTOPUBLISH_SCHEDULED=on。
+    const { tickScheduledPublish, isAutoPublishEnabled } = await import("./content/core/scheduledPublishWorker");
+    if (isAutoPublishEnabled()) {
+      setInterval(() => {
+        tickScheduledPublish().catch((e) => {
+          console.error("[scheduledPublish] tick error:", e?.message ?? e);
+        });
+      }, 60_000);
+      console.log("[scheduledPublish] Worker started (60s interval)");
+    } else {
+      console.log("[scheduledPublish] disabled (set AUTOPUBLISH_SCHEDULED=on to enable)");
+    }
   }
 
   if (isRuntimeFeatureEnabled("LIVE_BILLING_ENABLED")) {

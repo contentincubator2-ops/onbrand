@@ -1,4 +1,5 @@
 import { ENV } from "../env";
+import { throwIfCancelled, isRunCancelled, currentRunSignal, CancelledError } from "./runCancel";
 
 export type Role = "system" | "user" | "assistant" | "tool" | "function";
 
@@ -701,7 +702,10 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
   const { shouldAttempt, recordOutcome } = await import("./llmCircuitBreaker");
 
   const errors: string[] = [];
+  const runSignal = params.signal ?? currentRunSignal();
   for (const provider of chain) {
+    // A cancelled run must not start another provider attempt.
+    throwIfCancelled();
     // Skip providers whose key isn't configured
     const cfg = PROVIDER_CONFIG[provider];
     if (!cfg || !cfg.getKey()) continue;
@@ -716,8 +720,8 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
       // exist on Azure Foundry; we want gpt-5.4 there instead).
       const isOriginalProvider = pinned && provider === pinned;
       const callParams = isOriginalProvider
-        ? { ...params, provider: provider as any }
-        : { ...params, provider: provider as any, model: undefined };
+        ? { ...params, provider: provider as any, ...(runSignal ? { signal: runSignal } : {}) }
+        : { ...params, provider: provider as any, model: undefined, ...(runSignal ? { signal: runSignal } : {}) };
       const out = await invokeLLMOnce(callParams);
       // Empty content = soft failure (e.g. gpt-5.4 used its budget on
       // reasoning, never emitted final answer). Cascade moves on.
@@ -743,6 +747,9 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
       recordOutcome(provider, true);
       return out;
     } catch (e: any) {
+      // Cancelled mid-flight: stop the cascade, don't count it against the
+      // provider's circuit breaker.
+      if (isRunCancelled()) throw new CancelledError();
       const msg = String(e?.message ?? e);
       errors.push(`${provider}: ${msg.slice(0, 120)}`);
       // Permanent failures (DeploymentNotFound, invalid endpoint) are NOT
@@ -773,6 +780,7 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
  * the normal provider cascade.
  */
 export async function invokeLLMSingleProvider(params: InvokeParams): Promise<InvokeResult> {
+  throwIfCancelled();
   const provider = resolveProvider(params.provider as any);
   const config = PROVIDER_CONFIG[provider];
   if (!config || !config.getKey()) throw new Error("LLM provider not configured");

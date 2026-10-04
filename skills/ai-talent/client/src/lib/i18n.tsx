@@ -43,7 +43,12 @@ function readUrlLang(): Lang | null {
   }
 }
 
-function detectLocale(): Lang {
+/** Pick en/zh text outside React (error boundaries, global toasts). */
+export function tr(en: string, zh: string): string {
+  try { return detectLocale() === "en" ? en : zh; } catch { return zh; }
+}
+
+export function detectLocale(): Lang {
   // 1. URL query takes priority — Google indexes ?lang=en as the canonical
   //    English page, so the rendered content MUST match.
   const urlLang = readUrlLang();

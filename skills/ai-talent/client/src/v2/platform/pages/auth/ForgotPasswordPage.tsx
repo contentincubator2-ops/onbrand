@@ -6,6 +6,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useLang } from "../../../../lib/i18n";
 import { WarningIcon } from "../../components/icons";
+import { serverMessageText } from "../../lib/serverMessageEn";
 
 export default function ForgotPasswordPage() {
   const { t, lang, setLang } = useLang();
@@ -35,7 +36,7 @@ export default function ForgotPasswordPage() {
       const data = await res.json();
 
       if (!res.ok) {
-        setError((typeof data.error === "string" ? data.error : data.error?.message) || (lang === "en" ? "Couldn't send the link — try again." : "請求失敗，請稍後再試"));
+        setError(serverMessageText(typeof data.error === "string" ? data.error : data.error?.message, lang) || (lang === "en" ? "Couldn't send the link — try again." : "請求失敗，請稍後再試"));
         return;
       }
 

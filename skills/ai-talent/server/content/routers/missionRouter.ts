@@ -14,6 +14,8 @@ import { eq, and, desc, or, isNull, sql } from "drizzle-orm";
 import { computeMissionResources } from "../core/engine/missionResourceComputer";
 import { isMissingTableError } from "../../platform/core/mysqlErrors";
 import { isHiddenHistoryItem } from "../../platform/core/billing/planGate";
+import { resolveTaskTemplateSync } from "../core/catalog/taskRegistry";
+import { TASK_LABEL_EN } from "./quickTask/taskDefs";
 import { applyProjectFilters, PROJECT_STAGES, taskIdOf, THEATER_TASK_ID, THEATER_TASK_LABEL, type ProjectIndexRow } from "../core/planning/projectFilters";
 
 /** 產出的 task id：metadata.taskId 優先，舊資料退回 description 裡的 [task:<id>]。 */
@@ -27,6 +29,14 @@ function historyTaskId(r: { taskId?: unknown; description?: unknown }): string |
 function isHiddenMissionRow(r: any): boolean {
   return isHiddenHistoryItem({ platform: r.workspace, taskId: historyTaskId(r) })
     || isHiddenHistoryItem({ platform: r.outputPlatform });
+}
+
+/** 目錄裡這張卡的英文名；查不到回 null，client 退回中文。 */
+function taskLabelEnOf(taskId: string | null | undefined): string | null {
+  if (!taskId) return null;
+  const t: any = resolveTaskTemplateSync(taskId);
+  const en = t && typeof t.label === "object" ? t.label?.en : null;
+  return en || TASK_LABEL_EN[taskId] || null;
 }
 
 export const missionRouter = router({
@@ -118,6 +128,7 @@ export const missionRouter = router({
           createdAt: r.createdAt,
           taskId: r.taskId,
           taskLabel: r.taskId === THEATER_TASK_ID ? THEATER_TASK_LABEL : r.taskLabel ?? null,
+          taskLabelEn: taskLabelEnOf(r.taskId),
           productId: r.productId ? Number(r.productId) : null,
           productName: r.productName ?? null,
           progress: r.progress ?? null,

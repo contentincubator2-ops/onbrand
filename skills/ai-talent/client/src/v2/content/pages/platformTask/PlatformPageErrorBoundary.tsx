@@ -1,6 +1,7 @@
 /**
  * 平台任務頁的錯誤邊界。
  */
+import { tr } from "../../../../lib/i18n";
 import React from "react";
 
 // ── Error boundary ───────────────────────────────────────────────────────────
@@ -19,13 +20,13 @@ export class PlatformPageErrorBoundary extends React.Component<
             <p style={{ fontSize: 12, color: "#dc2626", textTransform: "uppercase" }}>
               /tasks/{this.props.platform} render error
             </p>
-            <h2 style={{ fontSize: 18, fontWeight: 600, marginTop: 4 }}>頁面載入失敗</h2>
+            <h2 style={{ fontSize: 18, fontWeight: 600, marginTop: 4 }}>{tr("Page failed to load", "頁面載入失敗")}</h2>
             <p style={{ marginTop: 8 }}>{e.message}</p>
             <button
               style={{ marginTop: 12, padding: "6px 12px", background: "#18181b", color: "white", border: "none", borderRadius: 6, cursor: "pointer" }}
               onClick={() => this.setState({ error: null })}
             >
-              重試渲染
+              {tr("Retry render", "重試渲染")}
             </button>
           </div>
         </div>

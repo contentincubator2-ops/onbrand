@@ -1,4 +1,4 @@
-import { buildBundlePostPayload, toBundlePlatform } from "../../../platform/core/connectors/publish/bundlePublish";
+import { assertBundleMediaPlan, buildBundlePostPayload, BundlePublishUserError, toBundlePlatform } from "../../../platform/core/connectors/publish/bundlePublish";
 import { isBundleMissingTeamError, isBundleNotConnectedError } from "../../../platform/core/connectors/bundleSocial";
 import type { BundlePost, BundleSocialClient } from "../../../platform/core/connectors/bundleSocial";
 
@@ -44,6 +44,9 @@ export async function publishViaBundleSocial(
     platform: string;
     caption: string;
     imageUrl?: string | null;
+    /** Multi-image / carousel. Takes precedence over imageUrl when non-empty. */
+    imageUrls?: string[];
+    videoUrl?: string | null;
     referenceKey: string;
     now?: Date;
   },
@@ -51,8 +54,14 @@ export async function publishViaBundleSocial(
 ): Promise<BundlePublishResult> {
   const platform = toBundlePlatform(input.platform);
   if (!platform) {
-    throw new Error(`${input.platform} 尚未支援透過 bundle.social 發布`);
+    throw new BundlePublishUserError(`${input.platform} 尚未支援透過 bundle.social 發布 / ${input.platform} is not supported for publishing yet`);
   }
+
+  const imageUrls = (input.imageUrls?.length ? input.imageUrls : input.imageUrl ? [input.imageUrl] : [])
+    .filter((u) => typeof u === "string" && u.trim());
+  const videoUrls = input.videoUrl ? [input.videoUrl] : [];
+  // Validate before uploading anything so a doomed post does not leave orphan uploads.
+  assertBundleMediaPlan(platform, input.caption, imageUrls.length, videoUrls.length);
 
   const teamId = await deps.getBundleTeamId(input.brandId);
   if (!teamId) {
@@ -60,9 +69,14 @@ export async function publishViaBundleSocial(
   }
 
   const uploadIds: string[] = [];
-  if (input.imageUrl) {
-    const upload = await deps.client.uploadFromUrl({ teamId, url: input.imageUrl });
+  for (const url of imageUrls) {
+    const upload = await deps.client.uploadFromUrl({ teamId, url });
     uploadIds.push(upload.id);
+  }
+  const videoUploadIds: string[] = [];
+  for (const url of videoUrls) {
+    const upload = await deps.client.uploadFromUrl({ teamId, url });
+    videoUploadIds.push(upload.id);
   }
 
   const payload = buildBundlePostPayload({
@@ -70,6 +84,7 @@ export async function publishViaBundleSocial(
     platform: input.platform,
     caption: input.caption,
     uploadIds,
+    videoUploadIds,
     postDate: (input.now ?? new Date()).toISOString(),
     referenceKey: input.referenceKey,
   });

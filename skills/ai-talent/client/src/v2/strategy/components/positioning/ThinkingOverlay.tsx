@@ -12,6 +12,7 @@
  * Parent controls phase + text. Calls onComplete when typewriter ends.
  */
 import React from "react";
+import { tr } from "../../../../lib/i18n";
 import { Card, CardBody, Chip, Spinner } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
@@ -103,20 +104,20 @@ export default function ThinkingOverlay({
               <>
                 <Spinner size="sm" color="primary" />
                 <span className="text-tiny text-default-500">
-                  Anthropic 分析中…<span className="font-mono ml-1">{elapsedSec}s</span>
+                  {tr("Anthropic analyzing…", "Anthropic 分析中…")}<span className="font-mono ml-1">{elapsedSec}s</span>
                 </span>
               </>
             )}
             {phase === "typing" && !done && (
-              <span className="text-tiny text-default-400 animate-pulse">推理 streaming…</span>
+              <span className="text-tiny text-default-400 animate-pulse">{tr("Reasoning streaming…", "推理 streaming…")}</span>
             )}
             {phase === "typing" && done && (
-              <Chip size="sm" variant="flat" color="default">推理完成</Chip>
+              <Chip size="sm" variant="flat" color="default">{tr("Reasoning complete", "推理完成")}</Chip>
             )}
             {phase === "writing" && (
               <Chip size="sm" variant="flat" color="success"
                 startContent={<FontAwesomeIcon icon={faPenNib} className="text-tiny ml-1" />}>
-                正在寫入欄位…
+                {tr("Writing to fields…", "正在寫入欄位…")}
               </Chip>
             )}
           </div>
@@ -124,14 +125,14 @@ export default function ThinkingOverlay({
 
         {phase === "loading" && (
           <div className="text-small text-default-600 leading-relaxed">
-            <p>系統正在執行：</p>
+            <p>{tr("The system is running:", "系統正在執行：")}</p>
             <ul className="list-disc list-inside mt-1 space-y-1 text-default-500">
-              <li>Web search 抓取產業 / 競品 / 受眾資料</li>
-              <li>Anthropic Claude Sonnet 4.5 推理（依本步驟的指令 規範）</li>
-              <li>結構化輸出符合 segment schema 的 JSON</li>
+              <li>{tr("Web search for industry / competitor / audience data", "Web search 抓取產業 / 競品 / 受眾資料")}</li>
+              <li>{tr("Anthropic Claude Sonnet 4.5 reasoning (following this step's instructions)", "Anthropic Claude Sonnet 4.5 推理（依本步驟的指令 規範）")}</li>
+              <li>{tr("Structured JSON output matching the segment schema", "結構化輸出符合 segment schema 的 JSON")}</li>
             </ul>
             <p className="mt-2 text-tiny text-default-400">
-              這個步驟通常需要 <strong>20-60 秒</strong>。請耐心等候 — 系統不是當機，是在認真思考。
+              {tr("This step usually takes ", "這個步驟通常需要 ")}<strong>{tr("20-60 seconds", "20-60 秒")}</strong>{tr(". Please wait — the system hasn't frozen, it's thinking carefully.", "。請耐心等候 — 系統不是當機，是在認真思考。")}
             </p>
           </div>
         )}
@@ -145,7 +146,7 @@ export default function ThinkingOverlay({
 
         {phase === "writing" && (
           <p className="text-small text-default-600 leading-relaxed">
-            分析完成。正在把結論寫入下方欄位 — 請看下方表單。
+            {tr("Analysis complete. Writing conclusions into the fields below — see the form below.", "分析完成。正在把結論寫入下方欄位 — 請看下方表單。")}
           </p>
         )}
       </CardBody>

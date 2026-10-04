@@ -42,6 +42,8 @@ import { stripPlaceholderBrackets, voiceSanitizeZhTW, looksNonChineseForZhTWBran
 import { timeoutPromise, callCaptionWriter, callImageDirector, callCarouselCards, callReplyTemplates, callPostingTime, callFollowupPost, callStrategist, callCompareTable, callTimingAdvisor, callLegalAssistant } from "./orchestra/stageCalls";
 import { safeOutputTypeForPostType, loadProductImageUrl, genOneImage } from "./orchestra/imageStep";
 import { mergeCalendarPosts, expandCalendarVariants } from "./orchestra/calendarVariants";
+import { runWithCancel, isRunCancelled, markRunDelivered } from "../../../platform/core/llm/runCancel";
+import { stampGenMetrics, logGenCompleted } from "../../../platform/core/ops/genMetrics";
 export { aiModelToProvider } from "./orchestra/orchestraTypes";
 export type { OrchestraTier, AgentMeta, OrchestraStage, OrchestraVariant, OrchestraStrategist, OrchestraResult } from "./orchestra/orchestraTypes";
 export { loadAgent } from "./orchestra/agentLoader";
@@ -84,7 +86,7 @@ export { stripPlaceholderBrackets, voiceSanitizeZhTW, looksNonChineseForZhTWBran
 
 // ── Main entry ───────────────────────────────────────────────────────────
 
-export async function runOrchestra(args: {
+async function runOrchestraInner(args: {
   template: FBTaskTemplate;
   config: OrchestraConfig;
   inputs: Record<string, string>;
@@ -138,6 +140,10 @@ export async function runOrchestra(args: {
    *   - extras: undefined    — runs after checkpoint
    */
   onCheckpoint?: (partial: OrchestraResult) => void;
+  /** Caller-owned cancel signal (see platform/core/llm/runCancel.ts). */
+  signal?: AbortSignal;
+  /** Registry key of this run, so checkpoint can mark output as delivered. */
+  runKey?: string;
 }): Promise<OrchestraResult> {
   // Tier-based config scaling (additive, doesn't mutate original config).
   // 60s/100s bumps variants 3 → 5 but task config typically only has 3
@@ -867,7 +873,7 @@ export async function runOrchestra(args: {
         };
 
         console.log(`[orchestra:trace] task=${args.template.id} partial.ok=${partial.ok} variants=${partial.variants.length} firstCaptionLen=${partial.variants[0]?.caption?.length ?? 0}`);
-        if (partial.ok) {
+        if (partial.ok && !isRunCancelled()) {
           const { recordTaskRun } = await import("../../../platform/core/ops/recordTaskRun");
           const { titleFromCaption } = await import("./titleFromCaption");
           const idPrefix = (args.template.id ?? "").split("-")[0] ?? "";
@@ -920,13 +926,14 @@ export async function runOrchestra(args: {
           });
           persistedOutputId = persisted.outputId;
           persistedMissionId = persisted.missionId;
+          if (persistedOutputId) markRunDelivered(args.runKey);
           console.log(`[orchestra:trace] task=${args.template.id} checkpoint recordTaskRun returned outputId=${persistedOutputId} missionId=${persistedMissionId}`);
           (partial as any).outputId = persistedOutputId;
           (partial as any).missionId = persistedMissionId;
           (partial as any).progress = "caption_ready";
         }
 
-        args.onCheckpoint(partial);
+        if (!isRunCancelled()) args.onCheckpoint(partial);
       } catch (e) {
         console.warn("[orchestra] onCheckpoint persistence failed (non-fatal):", (e as Error)?.message);
       }
@@ -1363,7 +1370,16 @@ export async function runOrchestra(args: {
     // (always go to /run/:id). Filtering on result.ok hid valid runs.
     const hasUsableVariant = result.variants.some((v) => (v.caption ?? "").trim().length > 0);
     console.log(`[orchestra:trace] task=${args.template.id} final gate: hasUsableVariant=${hasUsableVariant} persistedOutputId=${persistedOutputId} userId=${args.userId} → ${args.userId && hasUsableVariant ? "WILL SAVE" : "SKIP"}`);
-    if (args.userId && hasUsableVariant) {
+    if (isRunCancelled()) {
+      // Cancelled: never write (or finalise) an output. A checkpoint row that
+      // already exists is closed out so the UI stops polling it.
+      if (persistedOutputId) {
+        try {
+          const { finaliseTaskRun } = await import("../../../platform/core/ops/recordTaskRun");
+          await finaliseTaskRun({ outputId: persistedOutputId, progress: "failed", progressDetail: "cancelled" });
+        } catch { /* best effort */ }
+      }
+    } else if (args.userId && hasUsableVariant) {
       try {
         const { recordTaskRun, finaliseTaskRun } = await import("../../../platform/core/ops/recordTaskRun");
         const firstImage = result.variants.find((v) => v.image?.url)?.image?.url ?? null;
@@ -1387,7 +1403,7 @@ export async function runOrchestra(args: {
           ? args.template.label
           : (args.template.label?.zh ?? args.template.label?.en ?? args.template.id);
         const titleFor = (await import("./titleFromCaption")).titleFromCaption(result.variants[0]?.caption, flatLabel);
-        const fullMetadata = {
+        const fullMetadata = stampGenMetrics({
           latencyMs: result.totalLatencyMs,
           // 2026-05-09 (P2 — agent thinking panel): persist FULL agent
           // objects (id/name/title/avatarUrl) + stages + fetchedUrl so
@@ -1425,7 +1441,7 @@ export async function runOrchestra(args: {
           // any variant the transform chain modified — diff against content
           // to identify the corrupting layer.
           rawCaptions: (result as any).rawCaptions ?? [],
-        };
+        }, { durationMs: Date.now() - startedAt, ok: result.ok ?? true, taskId: args.template.id });
 
         if (persistedOutputId) {
           // 2026-05-14 (async path): row was inserted at checkpoint with
@@ -1480,3 +1496,39 @@ export async function runOrchestra(args: {
   }
 }
 
+
+
+/**
+ * Public entry. Runs the orchestra inside a cancel scope: every LLM / image
+ * call checks the scope's signal first, so a cancelled run stops issuing
+ * provider calls and writes no output. When never cancelled this is identical
+ * to the previous behaviour (plus duration telemetry).
+ */
+export async function runOrchestra(args: Parameters<typeof runOrchestraInner>[0]): Promise<OrchestraResult> {
+  const controller = new AbortController();
+  const outer = args.signal;
+  const onOuterAbort = () => controller.abort();
+  if (outer) {
+    if (outer.aborted) controller.abort();
+    else outer.addEventListener("abort", onOuterAbort, { once: true });
+  }
+  const t0 = Date.now();
+  let result: OrchestraResult | null = null;
+  try {
+    result = await runWithCancel(controller.signal, () => runOrchestraInner(args));
+    const cancelled = outer?.aborted === true;
+    if (cancelled) {
+      result = { ...result, ok: false, errors: [...(result.errors ?? []), "cancelled"] };
+      (result as any).cancelled = true;
+    }
+    return result;
+  } finally {
+    const cancelled = outer?.aborted === true;
+    // Stop work left running after the hard budget fired.
+    controller.abort();
+    outer?.removeEventListener("abort", onOuterAbort);
+    try {
+      logGenCompleted({ durationMs: Date.now() - t0, ok: result?.ok ?? false, taskId: args.template.id, cancelled });
+    } catch { /* telemetry must never break generation */ }
+  }
+}

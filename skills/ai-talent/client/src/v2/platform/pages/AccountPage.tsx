@@ -7,6 +7,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { trpc } from "../../../lib/trpc";
 import { showToastGlobal } from "../components/Toast";
 import { useLang } from "../../../lib/i18n";
+import { planNameText } from "../lib/serverMessageEn";
 import { tierLabel } from "../lib/tierVocabulary";
 import { ChevronLeftIcon, DeleteIcon, DownloadIcon, WarningIcon } from "../components/icons";
 import { HelpTip } from "../components/HelpTip";
@@ -138,7 +139,7 @@ export default function AccountPage() {
             <div className="space-y-3 text-sm">
               <div className="flex justify-between">
                 <span className="text-neutral-500">{lang === "en" ? "Current plan" : "當前方案"}</span>
-                <span className="font-semibold text-neutral-900">{status.planName ?? "—"}</span>
+                <span className="font-semibold text-neutral-900">{planNameText(status.planName ?? "—", lang)}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-neutral-500">{lang === "en" ? "Status" : "狀態"}</span>
@@ -237,24 +238,24 @@ export default function AccountPage() {
           (() => {
             const q = (status as any).quota as Record<string, number | boolean>;
             const fmt = (n: number | boolean | undefined) =>
-              n === -1 || n === undefined ? "不限" : String(n);
+              n === -1 || n === undefined ? (lang === "en" ? "Unlimited" : "不限") : String(n);
             const rows: Array<[string, string]> = [
-              ["同時開通路", fmt(q.platforms as number)],
-              ["自建任務卡", `${fmt(q.ownTaskCards as number)} 張`],
-              ["爆款結構卡", q.viralTaskCards === false ? "專業方案" : "可用"],
-              ["產品定位", fmt(q.products as number)],
-              ["活動定位", q.eventsPerCycle === -1 ? "不限" : `每月 ${q.eventsPerCycle}`],
-              ["席次", fmt(q.team_members as number)],
-              ["審核工作流", q.reviewWorkflow ? "有" : "專業方案"],
-              ["策略監測", q.strategyMonitoring ? "有" : "專業方案"],
-              ["品牌", fmt(q.brands as number)],
+              [lang === "en" ? "Active channels" : "同時開通路", fmt(q.platforms as number)],
+              [lang === "en" ? "Own task cards" : "自建任務卡", lang === "en" ? fmt(q.ownTaskCards as number) : `${fmt(q.ownTaskCards as number)} 張`],
+              [lang === "en" ? "Viral-structure cards" : "爆款結構卡", q.viralTaskCards === false ? (lang === "en" ? "Professional plan" : "專業方案") : (lang === "en" ? "Available" : "可用")],
+              [lang === "en" ? "Product positioning" : "產品定位", fmt(q.products as number)],
+              [lang === "en" ? "Event positioning" : "活動定位", q.eventsPerCycle === -1 ? (lang === "en" ? "Unlimited" : "不限") : (lang === "en" ? `${q.eventsPerCycle} / month` : `每月 ${q.eventsPerCycle}`)],
+              [lang === "en" ? "Seats" : "席次", fmt(q.team_members as number)],
+              [lang === "en" ? "Review workflow" : "審核工作流", q.reviewWorkflow ? (lang === "en" ? "Included" : "有") : (lang === "en" ? "Professional plan" : "專業方案")],
+              [lang === "en" ? "Strategy monitoring" : "策略監測", q.strategyMonitoring ? (lang === "en" ? "Included" : "有") : (lang === "en" ? "Professional plan" : "專業方案")],
+              [lang === "en" ? "Brands" : "品牌", fmt(q.brands as number)],
             ];
             return (
               <section className="mb-6 rounded-xl border border-neutral-200 bg-white p-5">
                 <div className="mb-3 flex items-baseline justify-between">
-                  <h2 className="text-[15px] font-semibold text-neutral-900">方案額度</h2>
+                  <h2 className="text-[15px] font-semibold text-neutral-900">{lang === "en" ? "Plan limits" : "方案額度"}</h2>
                   <span className="text-[13px] text-neutral-500">
-                    {String((status as any)?.planName ?? "")}
+                    {planNameText(String((status as any)?.planName ?? ""), lang)}
                   </span>
                 </div>
                 <dl className="grid grid-cols-2 gap-x-6 gap-y-2 sm:grid-cols-3">
@@ -266,14 +267,14 @@ export default function AccountPage() {
                   ))}
                 </dl>
                 <p className="mt-3 text-[13px] text-neutral-500">
-                  要增加額度，到
+                  {lang === "en" ? "To raise your limits, go to" : "要增加額度，到"}
                   <button
                     onClick={() => navigate("/pricing")}
                     className="mx-1 font-medium text-neutral-900 underline-offset-2 hover:underline"
                   >
-                    方案與定價
+                    {lang === "en" ? "Plans & pricing" : "方案與定價"}
                   </button>
-                  升級。
+                  {lang === "en" ? "and upgrade." : "升級。"}
                 </p>
               </section>
             );

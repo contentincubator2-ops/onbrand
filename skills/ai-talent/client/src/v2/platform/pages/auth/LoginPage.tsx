@@ -15,6 +15,7 @@ import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useLang } from "../../../../lib/i18n";
 import { WarningIcon } from "../../components/icons";
+import { serverMessageText } from "../../lib/serverMessageEn";
 
 // ── SoWork.ai design tokens (single source of truth) ────────────────────
 const C = {
@@ -89,10 +90,10 @@ export default function LoginPage() {
         body: JSON.stringify({ email }),
       });
       const d = await r.json();
-      if (!r.ok) setResendMsg(d.error || "重發失敗，請稍後再試");
-      else       setResendMsg(d.message || "驗證信已寄出，請檢查信箱");
+      if (!r.ok) setResendMsg(serverMessageText(d.error, lang) || (lang === "en" ? "Couldn't resend — please try again later" : "重發失敗，請稍後再試"));
+      else       setResendMsg(d.message || (lang === "en" ? "Verification email sent — please check your inbox" : "驗證信已寄出，請檢查信箱"));
     } catch {
-      setResendMsg("網路錯誤，請稍後再試");
+      setResendMsg(lang === "en" ? "Network error — please try again later" : "網路錯誤，請稍後再試");
     } finally {
       setResendBusy(false);
     }
@@ -118,7 +119,7 @@ export default function LoginPage() {
       const data = await res.json();
 
       if (!res.ok) {
-        setError((typeof data.error === "string" ? data.error : data.error?.message) || t("auth_err_wrong_creds"));
+        setError(serverMessageText(typeof data.error === "string" ? data.error : data.error?.message, lang) || t("auth_err_wrong_creds"));
         if (res.status === 403 && data.needsVerification) {
           setNeedsVerification(true);
         }

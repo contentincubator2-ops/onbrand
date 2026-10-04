@@ -6,6 +6,7 @@
  * string and routes to the right component here.
  */
 import type { SquadMockupVariant } from "./shared";
+import { useLang } from "../../../../lib/i18n";
 import { IntakeFormMockup, type IntakeFormData } from "./intake";
 import { PillarTableMockup, type PillarRow } from "./pillar";
 import { CalendarGridMockup } from "./calendar";
@@ -74,7 +75,10 @@ export interface SquadMockupProps {
  *  before LLM result arrives). Centralizes the null-check so individual
  *  variant components don't all need defensive guards. */
 function EmptyStateForVariant({ variant, isActive }: { variant: SquadMockupVariant; isActive?: boolean }) {
-  const label = isActive ? "等待 LLM 回應…" : "尚未產出 — 點擊「即時執行」以查看結果";
+  const { lang } = useLang();
+  const label = isActive
+    ? (lang === "en" ? "Waiting for LLM response…" : "等待 LLM 回應…")
+    : (lang === "en" ? "Not generated yet — click \"Run live\" to see results" : "尚未產出 — 點擊「即時執行」以查看結果");
   return (
     <div className="rounded-md border border-dashed border-divider p-6 text-center bg-default-50">
       <p className="text-tiny text-default-500 uppercase tracking-wider">{variant}</p>

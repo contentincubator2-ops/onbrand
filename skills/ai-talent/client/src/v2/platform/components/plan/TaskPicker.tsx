@@ -12,6 +12,7 @@
  *
  * 單色。全站紀律是「4A 代理商專業感，不要彩色」，這裡只用墨色深淺與邊框。
  */
+import { localizeSource } from "../../../content/lib/taskEn";
 import React, { useMemo, useState } from "react";
 import { useLang } from "../../../../lib/i18n";
 import { resolveSource, sourceWhy, sourcePillText,
@@ -23,6 +24,7 @@ export interface PickerTask {
   label?: string;
   description?: string;
   source?: unknown;
+  en?: import("../../../content/lib/taskEn").TaskEn | null;
   tier?: string;
   ownCardId?: string | null;
 }
@@ -157,7 +159,7 @@ export default function TaskPicker({
               <div className="grid gap-2 sm:grid-cols-2">
                 {items.map((t) => {
                   const on = draft.includes(t.id);
-                  const src = resolveSource(t.source);
+                  const src = resolveSource(localizeSource((t.source ?? {}) as Record<string, any>, t, lang));
                   return (
                     <button
                       key={t.id}

@@ -16,7 +16,9 @@ import { Button } from "@heroui/react";
 import { faFacebookF, faInstagram, faThreads, faLine, faTiktok } from "@fortawesome/free-brands-svg-icons";
 import { trpc } from "../../../lib/trpc";
 import { useLang } from "../../../lib/i18n";
+import { agentLabel, agentShortName } from "../../platform/lib/agentName";
 import { showToastGlobal } from "../../platform/components/Toast";
+import { friendlyError } from "../../platform/lib/friendlyError";
 import { channelRoute } from "../../platform/lib/channelMeta";
 import { logActivation } from "../../platform/lib/activationTelemetry";
 import { PlatformTaskModal, type TaskEmbed } from "./PlatformTaskPage";
@@ -40,7 +42,7 @@ const dayLabel = (ymd: string, en: boolean) => {
 };
 
 type ThinkerKey = string;
-interface ThinkerCard { key: ThinkerKey; name: string; avatarUrl: string; school: string; schoolEn: string; pitch: string; pitchEn: string }
+interface ThinkerCard { key: ThinkerKey; name: string; nameEn?: string; titleEn?: string; title?: string; full?: string; avatarUrl: string; school: string; schoolEn: string; pitch: string; pitchEn: string }
 interface AngleView { id: string; thinker: ThinkerKey; answer?: string; title: string; hook: string; why: string; platform: string; format: string; adopted?: { date: string } }
 type Subject = { kind: "brand" | "product" | "event"; id: number | null };
 
@@ -75,7 +77,11 @@ export default function InspirationPage() {
   const rosterQ = T.inspiration?.roster?.useQuery({ brandId: brandId ?? 0 }, { enabled: !!brandId, refetchOnWindowFocus: false }) ?? { data: null };
   const productsQ = T.product?.list?.useQuery({ brandId: brandId ?? undefined }, { enabled: !!brandId, refetchOnWindowFocus: false }) ?? { data: [] };
   const eventsQ = T.event?.list?.useQuery({ brandId: brandId ?? undefined }, { enabled: !!brandId, refetchOnWindowFocus: false }) ?? { data: [] };
-  const thinkers: ThinkerCard[] = rosterQ.data?.thinkers ?? [];
+  // 英文介面：name＝英文名（短），full＝「English (中文原名)」放 tooltip / aria / 寬版位置；中文介面不變。
+  const thinkers: ThinkerCard[] = React.useMemo(
+    () => ((rosterQ.data?.thinkers ?? []) as ThinkerCard[]).map((t) => ({ ...t, name: agentShortName(t, lang), full: agentLabel(t, lang) })),
+    [rosterQ.data, lang],
+  );
   const platforms: Array<{ id: string; label: string }> = rosterQ.data?.platforms ?? [];
   const products: any[] = (productsQ.data as any[]) ?? [];
   const events: any[] = (eventsQ.data as any[]) ?? [];
@@ -166,7 +172,7 @@ export default function InspirationPage() {
       }
     } catch (e: any) {
       if (seq === runSeq.current) setAngles(before);
-      showToastGlobal(e?.message || (en ? "Something went wrong. Try again." : "剛剛沒想好，再試一次。"));
+      showToastGlobal(friendlyError(e, en ? "Something went wrong. Try again." : "剛剛沒想好，再試一次。"));
     } finally {
       if (seq === runSeq.current) setThinking([]);
     }
@@ -206,7 +212,7 @@ export default function InspirationPage() {
         entity: subject.kind !== "brand" && subject.id ? { kind: subject.kind, id: subject.id } : undefined,
       });
     } catch (e: any) {
-      showToastGlobal(e?.message || (en ? "Couldn't add it to this week's plan." : "沒放進本週企劃，再試一次。"));
+      showToastGlobal(friendlyError(e, en ? "Couldn't add it to this week's plan." : "沒放進本週企劃，再試一次。"));
     }
   };
 
@@ -345,7 +351,7 @@ export default function InspirationPage() {
                   <button type="button" onClick={() => setSwapFor(swapFor === k ? null : k)} disabled={busy}
                     className="flex items-center gap-2.5 rounded-full border py-1.5 pl-1.5 pr-3.5 text-left transition hover:border-neutral-900 disabled:opacity-60"
                     style={{ borderColor: swapFor === k ? INK : LINE, background: "#FFFFFF" }}
-                    aria-expanded={swapFor === k} aria-label={en ? `Swap ${t?.name ?? k}` : `換掉 ${t?.name ?? k}`}>
+                    aria-expanded={swapFor === k} aria-label={en ? `Swap ${t?.full ?? k}` : `換掉 ${t?.name ?? k}`} title={t?.full}>
                     <Avatar t={t} size={30} />
                     <span className="flex flex-col">
                       <span className="text-[13px] font-semibold leading-tight" style={{ color: INK }}>{t?.name ?? k}</span>
@@ -451,7 +457,7 @@ function SwapMenu({ en, bench, onPick, onClose, onRemove }: {
           className="flex w-full items-start gap-2.5 rounded-xl px-2 py-2 text-left hover:bg-neutral-50">
           <Avatar t={t} size={30} />
           <span className="flex min-w-0 flex-col">
-            <span className="text-[13px] font-semibold" style={{ color: INK }}>{t.name}・{en ? t.schoolEn : t.school}</span>
+            <span className="text-[13px] font-semibold" style={{ color: INK }}>{t.full ?? t.name}・{en ? t.schoolEn : t.school}</span>
             <span className="text-[12px] leading-snug" style={{ color: META }}>{en ? t.pitchEn : t.pitch}</span>
           </span>
         </button>
@@ -475,7 +481,7 @@ function AngleCard({ a, t, en, busy, inLineup, platformLabel, onAdopt, onMore, o
       <div className="flex items-center gap-2.5">
         <Avatar t={t} />
         <div className="min-w-0">
-          <p className="m-0 truncate text-[13px] font-semibold" style={{ color: INK }}>{t?.name ?? a.thinker}</p>
+          <p className="m-0 truncate text-[13px] font-semibold" style={{ color: INK }} title={t?.full}>{t?.full ?? a.thinker}</p>
           <p className="m-0 truncate text-[12px]" style={{ color: META }}>{en ? t?.schoolEn : t?.school}</p>
         </div>
         <span className="ml-auto flex shrink-0 items-center gap-1.5 text-[12px]" style={{ color: META }}>
@@ -526,6 +532,12 @@ function AdoptDialog({ en, a, platforms, busy, onCancel, onConfirm }: {
   const days = Array.from({ length: 14 }, (_, i) => addDays(today, i));
   const [date, setDate] = React.useState(addDays(today, 1));
   const [platform, setPlatform] = React.useState(platforms.some((p) => p.id === a.platform) ? a.platform : platforms[0]?.id ?? "facebook");
+  const dlgRef = React.useRef<HTMLDivElement>(null);
+  React.useEffect(() => {
+    const opener = document.activeElement as HTMLElement | null;
+    dlgRef.current?.focus();
+    return () => opener?.focus?.();
+  }, []);
   React.useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onCancel(); };
     document.addEventListener("keydown", onKey);
@@ -533,14 +545,14 @@ function AdoptDialog({ en, a, platforms, busy, onCancel, onConfirm }: {
   }, [onCancel]);
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4" onMouseDown={(e) => { if (e.target === e.currentTarget) onCancel(); }}>
-      <div role="dialog" aria-modal="true" aria-labelledby="adopt-title" className="w-full max-w-[440px] rounded-2xl bg-white p-6 shadow-xl">
+      <div ref={dlgRef} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="adopt-title" className="max-h-[90vh] w-full max-w-[440px] overflow-y-auto rounded-2xl bg-white p-6 shadow-xl outline-none">
         <h2 id="adopt-title" className="m-0 text-[16px] font-bold" style={{ color: INK }}>{en ? "Put it in the weekly plan" : "放進本週企劃"}</h2>
         <p className="m-0 mt-1.5 text-[13.5px] leading-relaxed" style={{ color: META }}>{a.title}</p>
 
         <p className="m-0 mt-5 text-[12px] font-semibold" style={{ color: INK }}>{en ? "Which day?" : "哪一天發？"}</p>
         <div className="mt-2 flex flex-wrap gap-1.5">
           {days.map((d) => (
-            <button key={d} type="button" onClick={() => setDate(d)}
+            <button key={d} type="button" aria-pressed={date === d} onClick={() => setDate(d)}
               className="rounded-full border px-3 py-1.5 text-[12.5px]"
               style={date === d ? { borderColor: INK, background: INK, color: "#FFFFFF" } : { borderColor: LINE, color: "#404040" }}>
               {d === today ? (en ? "Today" : "今天") : dayLabel(d, en)}
@@ -551,7 +563,7 @@ function AdoptDialog({ en, a, platforms, busy, onCancel, onConfirm }: {
         <p className="m-0 mt-5 text-[12px] font-semibold" style={{ color: INK }}>{en ? "Where?" : "發在哪？"}</p>
         <div className="mt-2 flex flex-wrap gap-1.5">
           {platforms.map((p) => (
-            <button key={p.id} type="button" onClick={() => setPlatform(p.id)}
+            <button key={p.id} type="button" aria-pressed={platform === p.id} onClick={() => setPlatform(p.id)}
               className="flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[12.5px]"
               style={platform === p.id ? { borderColor: INK, background: INK, color: "#FFFFFF" } : { borderColor: LINE, color: "#404040" }}>
               {PLATFORM_ICON[p.id] && <FontAwesomeIcon icon={PLATFORM_ICON[p.id]} />}{p.label}

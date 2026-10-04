@@ -29,6 +29,7 @@
  */
 import React from "react";
 import { Card, CardBody, Chip } from "@heroui/react";
+import { useLang } from "../../../../lib/i18n";
 import { SectionHeader, NotionCard, EmptyHint, type SquadMockupCommonProps } from "./shared";
 
 export interface CalendarEntry {
@@ -51,6 +52,14 @@ interface Props extends SquadMockupCommonProps {
 
 const PILLAR_COLORS = ["#7c5dfa", "#10b981", "#f59e0b", "#3b82f6", "#ec4899"] as const;
 
+const FORMAT_LABEL_EN: Record<CalendarEntry["format"], string> = {
+  "post":      "📝 Post",
+  "reel":      "🎬 Reel",
+  "carousel":  "🖼 Carousel",
+  "long-text": "📊 Long-form",
+  "story":     "📱 Story",
+};
+
 const FORMAT_LABEL: Record<CalendarEntry["format"], string> = {
   "post":      "📝 圖文",
   "reel":      "🎬 Reel",
@@ -61,6 +70,7 @@ const FORMAT_LABEL: Record<CalendarEntry["format"], string> = {
 
 const WEEKDAYS_SHORT = ["S", "M", "T", "W", "T", "F", "S"];
 const WEEKDAYS_ZH    = ["週日", "週一", "週二", "週三", "週四", "週五", "週六"];
+const WEEKDAYS_EN    = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 interface DayCell {
   iso: string;      // YYYY-MM-DD
@@ -110,14 +120,15 @@ function buildMonthGrid(targetStart: string, targetEnd: string, entries: Calenda
 }
 
 export function CalendarGridMockup({ data, readOnly = false, isActive = false }: Props) {
+  const { lang } = useLang();
   const [selectedIso, setSelectedIso] = React.useState<string | null>(null);
 
   // Guard partial data — LLM may return {} or missing required fields
   if (!data || !data.targetDateStart || !data.targetDateEnd || !Array.isArray(data.entries)) {
     return (
       <NotionCard>
-        <SectionHeader icon="📅" eyebrow="步驟 4 · 行事曆" title="月度排程" />
-        <EmptyHint>{!data ? "步驟 4 跑完才有行事曆" : "資料不完整 — 缺 targetDateStart / targetDateEnd / entries"}</EmptyHint>
+        <SectionHeader icon="📅" eyebrow={lang === "en" ? "Step 4 · Calendar" : "步驟 4 · 行事曆"} title={lang === "en" ? "Monthly schedule" : "月度排程"} />
+        <EmptyHint>{!data ? (lang === "en" ? "The calendar appears after Step 4 finishes" : "步驟 4 跑完才有行事曆") : (lang === "en" ? "Incomplete data — missing targetDateStart / targetDateEnd / entries" : "資料不完整 — 缺 targetDateStart / targetDateEnd / entries")}</EmptyHint>
       </NotionCard>
     );
   }
@@ -155,12 +166,12 @@ export function CalendarGridMockup({ data, readOnly = false, isActive = false }:
         <div className="flex items-start justify-between gap-3 flex-wrap">
           <SectionHeader
             icon="📅"
-            eyebrow="步驟 4 · 編輯行事曆"
-            title={`${rangeLabel} · ${totalPosts} 篇`}
+            eyebrow={lang === "en" ? "Step 4 · Edit calendar" : "步驟 4 · 編輯行事曆"}
+            title={lang === "en" ? `${rangeLabel} · ${totalPosts} posts` : `${rangeLabel} · ${totalPosts} 篇`}
           />
           {isActive && (
             <Chip size="sm" variant="flat" color="primary" className="self-start">
-              ● Phoebe Yang 編排中…
+              {lang === "en" ? "● Phoebe Yang is scheduling…" : "● Phoebe Yang 編排中…"}
             </Chip>
           )}
         </div>
@@ -194,7 +205,7 @@ export function CalendarGridMockup({ data, readOnly = false, isActive = false }:
         {/* Pillar legend */}
         {data.pillars && data.pillars.length > 0 && (
           <div className="flex flex-wrap gap-2 items-center mt-4 pt-3 border-t border-divider">
-            <span className="text-tiny text-default-500 mr-1">支柱：</span>
+            <span className="text-tiny text-default-500 mr-1">{lang === "en" ? "Pillars:" : "支柱："}</span>
             {data.pillars.map((p, i) => (
               <Chip
                 key={i}
@@ -222,7 +233,7 @@ export function CalendarGridMockup({ data, readOnly = false, isActive = false }:
 
       {!readOnly && (
         <p className="text-tiny text-default-400 px-1">
-          💡 點擊有貼文的日期看詳細；拖拽切換日期（互動 phase 2 接）
+          {lang === "en" ? "💡 Click a day with posts to see details; drag to move dates (interaction coming in phase 2)" : "💡 點擊有貼文的日期看詳細；拖拽切換日期（互動 phase 2 接）"}
         </p>
       )}
     </div>
@@ -291,8 +302,9 @@ function DayButton({
 
 /* ─────────────── SelectedDayCard ─────────────── */
 function SelectedDayCard({ cell }: { cell: DayCell }) {
+  const { lang } = useLang();
   const d = new Date(cell.iso);
-  const weekday = !isNaN(d.getTime()) ? WEEKDAYS_ZH[d.getDay()] : "";
+  const weekday = !isNaN(d.getTime()) ? (lang === "en" ? WEEKDAYS_EN : WEEKDAYS_ZH)[d.getDay()] : "";
   const dateLabel = !isNaN(d.getTime()) ? `${d.getMonth() + 1}/${d.getDate()}` : cell.iso;
 
   return (
@@ -303,10 +315,10 @@ function SelectedDayCard({ cell }: { cell: DayCell }) {
             <span className="tabular-nums">{dateLabel}</span>
             <span className="text-default-500 text-small ml-2">{weekday}</span>
           </p>
-          <span className="text-tiny text-default-500">{cell.entries.length} 篇貼文</span>
+          <span className="text-tiny text-default-500">{lang === "en" ? `${cell.entries.length} ${cell.entries.length === 1 ? "post" : "posts"}` : `${cell.entries.length} 篇貼文`}</span>
         </div>
         {cell.entries.length === 0 ? (
-          <EmptyHint>這天無排程</EmptyHint>
+          <EmptyHint>{lang === "en" ? "Nothing scheduled this day" : "這天無排程"}</EmptyHint>
         ) : (
           <div className="flex flex-col gap-1.5">
             {cell.entries.map((entry, i) => (
@@ -320,6 +332,7 @@ function SelectedDayCard({ cell }: { cell: DayCell }) {
 }
 
 function PostRow({ entry }: { entry: CalendarEntry }) {
+  const { lang } = useLang();
   const color = PILLAR_COLORS[entry.pillarIndex % 5]!;
   return (
     <div
@@ -331,7 +344,7 @@ function PostRow({ entry }: { entry: CalendarEntry }) {
         {entry.pillarName}
       </Chip>
       <Chip size="sm" variant="flat" color="default" className="shrink-0">
-        {FORMAT_LABEL[entry.format]}
+        {(lang === "en" ? FORMAT_LABEL_EN : FORMAT_LABEL)[entry.format]}
       </Chip>
       <div className="text-small text-foreground truncate flex-1 min-w-0">
         {entry.topic ?? <span className="text-default-400">—</span>}

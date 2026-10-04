@@ -12,6 +12,7 @@ import { router, publicProcedure } from "../../platform/core/trpc";
 import { buildTaskCatalogIndex, type CatalogPlatform } from "../../content/core/catalog/taskCatalogIndex";
 import { isRecentViral } from "../../content/core/catalog/taskSource";
 import { PLATFORM_IMAGE_SPECS, IMAGE_CHANNELS } from "../../platform/core/media/platformImageSpecs";
+import { taskEnFor } from "../../content/core/catalog/en";
 
 /** 首頁上線中的七個通路（與 IMAGE_CHANNELS 同一組）。 */
 const LANDING_CHANNELS = new Set<CatalogPlatform>(IMAGE_CHANNELS);
@@ -26,6 +27,10 @@ export interface LandingViralCard {
   asOf: string;
   caveat: string | null;
   url: string | null;
+  /** 英文旁路；沒有就是 null，首頁退回中文。 */
+  shortEn: string | null;
+  metricEn: string | null;
+  caveatEn: string | null;
 }
 
 /**
@@ -54,6 +59,9 @@ export function pickLandingViralCards(limit = 4, now: Date = new Date()): Landin
     asOf: t.source.asOf ?? "",
     caveat: t.source.caveat ?? null,
     url: t.source.url ?? null,
+    shortEn: taskEnFor(t.id)?.source?.short ?? null,
+    metricEn: taskEnFor(t.id)?.source?.metric ?? null,
+    caveatEn: taskEnFor(t.id)?.source?.caveat ?? null,
   }));
 }
 

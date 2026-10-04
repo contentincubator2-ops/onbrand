@@ -8,6 +8,7 @@
  *   - Budget meter (X/8 URLs · Y/12000 chars)
  */
 import { Chip, Progress, Card, CardBody, Spinner } from "@heroui/react";
+import { useLang } from "../../../../lib/i18n";
 import { SectionHeader, NotionCard, EmptyHint, type SquadMockupCommonProps } from "./shared";
 
 export interface ResearchSource {
@@ -30,11 +31,12 @@ interface Props extends SquadMockupCommonProps {
 }
 
 export function ResearchPanelMockup({ data, isActive = false }: Props) {
+  const { lang } = useLang();
   if (!data || (!data.thinking && !data.conclusion && (!data.sources || data.sources.length === 0))) {
     return (
       <NotionCard>
-        <SectionHeader icon="🔬" eyebrow="步驟 2 · 研究分析" title="支柱受眾 × 競品缺口深度研究" />
-        <EmptyHint>{isActive ? "Stacy Lin 研究中…" : "步驟 2 跑完才會有研究內容"}</EmptyHint>
+        <SectionHeader icon="🔬" eyebrow={lang === "en" ? "Step 2 · Research & analysis" : "步驟 2 · 研究分析"} title={lang === "en" ? "Pillar audience × competitor gap deep research" : "支柱受眾 × 競品缺口深度研究"} />
+        <EmptyHint>{isActive ? (lang === "en" ? "Stacy Lin is researching…" : "Stacy Lin 研究中…") : (lang === "en" ? "Research content appears after Step 2 finishes" : "步驟 2 跑完才會有研究內容")}</EmptyHint>
       </NotionCard>
     );
   }
@@ -54,8 +56,8 @@ export function ResearchPanelMockup({ data, isActive = false }: Props) {
         <div className="flex items-start justify-between gap-3 flex-wrap">
           <SectionHeader
             icon="🔬"
-            eyebrow="步驟 2 · 研究分析"
-            title="支柱受眾 × 競品缺口深度研究"
+            eyebrow={lang === "en" ? "Step 2 · Research & analysis" : "步驟 2 · 研究分析"}
+            title={lang === "en" ? "Pillar audience × competitor gap deep research" : "支柱受眾 × 競品缺口深度研究"}
           />
           {(isActive || data.isStreaming) && (
             <Chip
@@ -64,7 +66,7 @@ export function ResearchPanelMockup({ data, isActive = false }: Props) {
               color="primary"
               startContent={<Spinner size="sm" classNames={{ wrapper: "scale-75" }} />}
             >
-              ● Stacy Lin 研究中…
+              {lang === "en" ? "● Stacy Lin is researching…" : "● Stacy Lin 研究中…"}
             </Chip>
           )}
         </div>
@@ -73,7 +75,7 @@ export function ResearchPanelMockup({ data, isActive = false }: Props) {
         <div className="flex flex-col gap-2 mt-1">
           <div>
             <div className="flex items-center justify-between text-tiny mb-1">
-              <span className="text-default-500">URL 來源</span>
+              <span className="text-default-500">{lang === "en" ? "URL sources" : "URL 來源"}</span>
               <span className={urlsOk ? "text-success font-semibold" : "text-default-700"}>
                 {sources.length} / {budget.minUrls}
               </span>
@@ -82,7 +84,7 @@ export function ResearchPanelMockup({ data, isActive = false }: Props) {
           </div>
           <div>
             <div className="flex items-center justify-between text-tiny mb-1">
-              <span className="text-default-500">內容字數</span>
+              <span className="text-default-500">{lang === "en" ? "Content length" : "內容字數"}</span>
               <span className={charsOk ? "text-success font-semibold" : "text-default-700"}>
                 {totalChars.toLocaleString()} / {budget.minChars.toLocaleString()}
               </span>
@@ -95,7 +97,7 @@ export function ResearchPanelMockup({ data, isActive = false }: Props) {
       {/* Conclusion */}
       {data.conclusion && (
         <NotionCard>
-          <p className="text-tiny text-default-500 uppercase tracking-wider mb-1">研究結論</p>
+          <p className="text-tiny text-default-500 uppercase tracking-wider mb-1">{lang === "en" ? "Research conclusion" : "研究結論"}</p>
           <pre className="text-small text-default-700 leading-relaxed whitespace-pre-wrap font-sans m-0">
             {data.conclusion}
           </pre>
@@ -105,7 +107,7 @@ export function ResearchPanelMockup({ data, isActive = false }: Props) {
       {/* Thinking trace */}
       {data.thinking && (
         <NotionCard>
-          <p className="text-tiny text-default-500 uppercase tracking-wider mb-1">推理軌跡</p>
+          <p className="text-tiny text-default-500 uppercase tracking-wider mb-1">{lang === "en" ? "Reasoning trace" : "推理軌跡"}</p>
           <pre className="text-tiny text-default-600 leading-relaxed whitespace-pre-wrap font-sans m-0 max-h-[260px] overflow-y-auto">
             {data.thinking}
           </pre>
@@ -116,7 +118,7 @@ export function ResearchPanelMockup({ data, isActive = false }: Props) {
       {sources.length > 0 && (
         <NotionCard>
           <p className="text-tiny text-default-500 uppercase tracking-wider mb-2">
-            來源（{sources.length} 筆 · {totalChars.toLocaleString()} 字）
+            {lang === "en" ? `Sources (${sources.length} · ${totalChars.toLocaleString()} chars)` : `來源（${sources.length} 筆 · ${totalChars.toLocaleString()} 字）`}
           </p>
           <div className="flex flex-col gap-2">
             {sources.map((s, i) => (
@@ -132,7 +134,7 @@ export function ResearchPanelMockup({ data, isActive = false }: Props) {
                       {s.title || s.url}
                     </a>
                     <Chip size="sm" variant="flat" className="shrink-0 h-5 text-tiny tabular-nums">
-                      {s.charCount.toLocaleString()} 字
+                      {s.charCount.toLocaleString()} {lang === "en" ? "chars" : "字"}
                     </Chip>
                   </div>
                   <p className="text-tiny text-default-500 truncate">{s.url}</p>

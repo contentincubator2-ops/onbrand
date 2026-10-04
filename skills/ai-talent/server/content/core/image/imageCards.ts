@@ -270,6 +270,29 @@ function saveFinal(buf: Buffer, spec: PlatformImageSpec): string {
   return `${COVERS_URL_PREFIX}/${name}`;
 }
 
+/**
+ * 帶標題的成品圖（2026-10-04 CJ「圖文搭配預覽，並且一起排程」）。標題是前台疊上去的
+ * （AI 圖不烤字），排程／發布要用的卻是伺服器上的檔案——所以前台把疊好標題的畫布傳上來，
+ * 這裡確認它就是這張卡的交付像素，再依規格轉檔存檔。不符尺寸一律拒收，不縮放、不裁切。
+ */
+export async function saveTitledImage(dataUrl: string, spec: PlatformImageSpec): Promise<
+  { ok: true; url: string; bytes: number } | { ok: false; reason: string }
+> {
+  const m = /^data:image\/(png|jpeg);base64,([A-Za-z0-9+/=]+)$/.exec(dataUrl);
+  if (!m) return { ok: false, reason: "帶標題的圖片格式不正確" };
+  const buffer = Buffer.from(m[2]!, "base64");
+  const sharp = (await import("sharp")).default;
+  const meta = await sharp(buffer).metadata().catch(() => null);
+  if (!meta?.width || !meta.height) return { ok: false, reason: "讀不到帶標題圖片的尺寸" };
+  if (meta.width !== spec.width || meta.height !== spec.height) {
+    return { ok: false, reason: `帶標題的圖片是 ${meta.width}×${meta.height}，不是這張卡的 ${spec.width}×${spec.height}` };
+  }
+  // 已經是交付尺寸：只做轉檔與檔案上限（合成版型也一樣，這時不再走「方形主體」那條路）。
+  const fin = await finalizeToSpec(buffer, { ...spec, compose: undefined });
+  if (!fin.ok) return fin;
+  return { ok: true, url: saveFinal(fin.buffer, spec), bytes: fin.bytes };
+}
+
 export async function renderImageCard(args: {
   spec: PlatformImageSpec;
   scenePromptEn: string;

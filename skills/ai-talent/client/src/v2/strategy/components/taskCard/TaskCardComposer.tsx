@@ -20,7 +20,7 @@
  */
 import React from "react";
 import { trpc } from "../../../../lib/trpc";
-import { useLang } from "../../../../lib/i18n";
+import { useLang, tr } from "../../../../lib/i18n";
 import {
   Button, Chip, Input, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader,
   Progress, Textarea,
@@ -35,13 +35,20 @@ import { AddIcon, CheckIcon, ChevronLeftIcon, CopyIcon, DeleteIcon, GenerateIcon
  * 主路徑是把整串貼進來讓我們抽（少三個步驟、而且結果攤開來可以確認）。這段是
  * 給已經習慣在 ChatGPT 裡收尾的人 —— 收在摺疊區，不搶主路徑的視線。
  */
-const CLEANUP_PROMPT = `請把我們這串對話裡「可以直接發布的成品」整理出來。
+const CLEANUP_PROMPT_ZH = `請把我們這串對話裡「可以直接發布的成品」整理出來。
 
 規則：
 1. 只要完整的成品（一篇貼文／文案／文章），不要指令、解釋、大綱、分析。
 2. 同一篇改過很多版的，只留最後一版。
 3. 一字不改地照抄原文，不要修飾、不要合併、不要補完。
 4. 每篇之間用一行「---」隔開，前後不要加任何說明文字。`;
+const CLEANUP_PROMPT_EN = `From this conversation, pull out the "finished pieces that can be published as-is".
+
+Rules:
+1. Only complete finished pieces (one post / copy / article each) — no instructions, explanations, outlines or analysis.
+2. If a piece went through many revisions, keep only the final version.
+3. Copy the original text word for word — do not polish, merge or complete anything.
+4. Separate pieces with a single line of "---", and add no explanatory text before or after.`;
 
 export type ComposerChannel =
   | "facebook" | "instagram" | "threads" | "linkedin" | "tiktok"
@@ -154,32 +161,32 @@ export default function TaskCardComposer({
       setSampleMode("one-by-one");
       setExtractNote(
         r.dropped > 0
-          ? `抽出 ${r.samples.length} 篇（另有 ${r.dropped} 段跟原文對不上，已略過）。請確認一下，不要的直接刪掉。`
-          : `抽出 ${r.samples.length} 篇。請確認一下，不要的直接刪掉。`,
+          ? tr(`Extracted ${r.samples.length} pieces (${r.dropped} other passages didn't match the original and were skipped). Please review and delete any you don't want.`, `抽出 ${r.samples.length} 篇（另有 ${r.dropped} 段跟原文對不上，已略過）。請確認一下，不要的直接刪掉。`)
+          : tr(`Extracted ${r.samples.length} pieces. Please review and delete any you don't want.`, `抽出 ${r.samples.length} 篇。請確認一下，不要的直接刪掉。`),
       );
       setBusy(null);
     },
-    onError: (e: any) => { setError(e?.message ?? "抽取失敗"); setBusy(null); },
+    onError: (e: any) => { setError(e?.message ?? tr("Extraction failed", "抽取失敗")); setBusy(null); },
   }) ?? null;
 
   const createMut = (trpc as any).brandTaskCard?.create?.useMutation?.({
     onSuccess: (r: any) => { setCardId(r.cardId); setStep(2); setBusy(null); },
-    onError: (e: any) => { setError(e?.message ?? "建立失敗"); setBusy(null); },
+    onError: (e: any) => { setError(e?.message ?? tr("Create failed", "建立失敗")); setBusy(null); },
   }) ?? null;
   const updateMut = (trpc as any).brandTaskCard?.update?.useMutation?.({
-    onError: (e: any) => setError(e?.message ?? "儲存失敗"),
+    onError: (e: any) => setError(e?.message ?? tr("Save failed", "儲存失敗")),
   }) ?? null;
   const distilMut = (trpc as any).brandTaskCard?.distil?.useMutation?.({
     onSuccess: () => { setSkillDraft(""); setBusy(null); cardQuery.refetch?.(); },
-    onError: (e: any) => { setError(e?.message ?? "重新生成失敗"); setBusy(null); },
+    onError: (e: any) => { setError(e?.message ?? tr("Regeneration failed", "重新生成失敗")); setBusy(null); },
   }) ?? null;
   const dryRunMut = (trpc as any).brandTaskCard?.dryRun?.useMutation?.({
     onSuccess: (r: any) => { setDryResult(r); setBusy(null); },
-    onError: (e: any) => { setError(e?.message ?? "試寫失敗"); setBusy(null); },
+    onError: (e: any) => { setError(e?.message ?? tr("Trial write failed", "試寫失敗")); setBusy(null); },
   }) ?? null;
   const illustrateMut = (trpc as any).brandTaskCard?.generateIllustration?.useMutation?.({
     onSuccess: () => cardQuery.refetch?.(),
-    onError: (e: any) => setError(e?.message ?? "插畫生成失敗"),
+    onError: (e: any) => setError(e?.message ?? tr("Illustration generation failed", "插畫生成失敗")),
   }) ?? null;
   const drawAI = () => {
     if (!brandId || !cardId) return;
@@ -203,7 +210,7 @@ export default function TaskCardComposer({
       reset();
       onClose();
     },
-    onError: (e: any) => { setError(e?.message ?? "上架失敗"); setBusy(null); },
+    onError: (e: any) => { setError(e?.message ?? tr("Publish failed", "上架失敗")); setBusy(null); },
   }) ?? null;
 
   function reset(): void {
@@ -375,14 +382,14 @@ export default function TaskCardComposer({
                       </summary>
                       <div className="mt-2 space-y-2">
                         <pre className="text-tiny whitespace-pre-wrap bg-content2 rounded-medium p-2 text-default-700">
-                          {CLEANUP_PROMPT}
+                          {lang === "en" ? CLEANUP_PROMPT_EN : CLEANUP_PROMPT_ZH}
                         </pre>
                         <Button
                           size="sm" variant="flat"
                           startContent={copied ? <CheckIcon size={13} /> : <CopyIcon size={13} />}
                           onPress={async () => {
                             try {
-                              await navigator.clipboard.writeText(CLEANUP_PROMPT);
+                              await navigator.clipboard.writeText(lang === "en" ? CLEANUP_PROMPT_EN : CLEANUP_PROMPT_ZH);
                               setCopied(true);
                               setTimeout(() => setCopied(false), 2000);
                             } catch {

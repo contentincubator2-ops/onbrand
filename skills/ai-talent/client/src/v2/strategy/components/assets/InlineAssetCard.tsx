@@ -13,6 +13,7 @@
  * auto-fill is handled by parent CopyTabInline.
  */
 import type { ComponentType } from "react";
+import { tr } from "../../../../lib/i18n";
 import { AddIcon, CloseIcon, GenerateIcon } from "../../../platform/components/icons";
 
 type Shape = "text" | "items" | "pairs";
@@ -143,7 +144,7 @@ export default function InlineAssetCard({
 function TextField({ v, onChange }: { v: any; onChange: (next: any) => void }) {
   return (
     <textarea
-      placeholder="點此輸入，或按上方「自動填寫」交給 AI"
+      placeholder={tr("Click to type, or press “Auto-fill” above to let AI do it", "點此輸入，或按上方「自動填寫」交給 AI")}
       value={v?.text ?? ""}
       onChange={(e) => onChange({ ...v, text: e.target.value })}
       rows={5}
@@ -177,7 +178,7 @@ function ListField({ v, onChange }: { v: any; onChange: (next: any) => void }) {
           padding: "4px 0",
           fontFamily: '"Source Serif Pro", "Noto Serif TC", Georgia, serif',
         }}>
-          尚未填寫
+          {tr("Not filled in yet", "尚未填寫")}
         </div>
       )}
       {items.map((it, i) => (
@@ -192,7 +193,7 @@ function ListField({ v, onChange }: { v: any; onChange: (next: any) => void }) {
             type="text"
             value={it}
             onChange={(e) => setItems(items.map((x, j) => j === i ? e.target.value : x))}
-            placeholder={`條目 ${i + 1}`}
+            placeholder={tr(`Item ${i + 1}`, `條目 ${i + 1}`)}
             style={{
               flex: 1, background: "transparent", border: "none", outline: "none",
               fontSize: 13, color: "#171717", padding: "2px 0",
@@ -200,7 +201,7 @@ function ListField({ v, onChange }: { v: any; onChange: (next: any) => void }) {
           />
           <button
             onClick={() => setItems(items.filter((_, j) => j !== i))}
-            title="刪除"
+            title={tr("Delete", "刪除")}
             style={{
               background: "transparent", border: "none", cursor: "pointer",
               color: "#525252", padding: 2, display: "flex",
@@ -223,7 +224,7 @@ function ListField({ v, onChange }: { v: any; onChange: (next: any) => void }) {
         onMouseEnter={(e) => { e.currentTarget.style.color = "#171717"; }}
         onMouseLeave={(e) => { e.currentTarget.style.color = "#525252"; }}
       >
-        <AddIcon size={11} /> 新增條目
+        <AddIcon size={11} /> {tr("Add item", "新增條目")}
       </button>
     </div>
   );
@@ -240,27 +241,27 @@ function PairListField({ v, onChange }: { v: any; onChange: (next: any) => void 
           padding: "4px 0",
           fontFamily: '"Source Serif Pro", "Noto Serif TC", Georgia, serif',
         }}>
-          尚未填寫
+          {tr("Not filled in yet", "尚未填寫")}
         </div>
       )}
       {pairs.map((p, i) => (
         <div key={i} style={{ display: "flex", alignItems: "center", gap: 6, borderBottom: "1px solid #D4D4D4", padding: "4px 0" }}>
           <input
-            type="text" placeholder="原本說的"
+            type="text" placeholder={tr("Originally said", "原本說的")}
             value={p.from}
             onChange={(e) => setPairs(pairs.map((x, j) => j === i ? { ...x, from: e.target.value } : x))}
             style={{ flex: 1, background: "transparent", border: "none", outline: "none", fontSize: 13, color: "#404040", padding: "2px 0" }}
           />
           <span style={{ color: "#525252", fontSize: 12, flexShrink: 0 }}>→</span>
           <input
-            type="text" placeholder="改成說的"
+            type="text" placeholder={tr("Change to", "改成說的")}
             value={p.to}
             onChange={(e) => setPairs(pairs.map((x, j) => j === i ? { ...x, to: e.target.value } : x))}
             style={{ flex: 1, background: "transparent", border: "none", outline: "none", fontSize: 13, color: "#171717", fontWeight: 500, padding: "2px 0" }}
           />
           <button
             onClick={() => setPairs(pairs.filter((_, j) => j !== i))}
-            title="刪除"
+            title={tr("Delete", "刪除")}
             style={{ background: "transparent", border: "none", cursor: "pointer", color: "#525252", padding: 2, display: "flex" }}
             onMouseEnter={(e) => { e.currentTarget.style.color = "#B91C1C"; }}
             onMouseLeave={(e) => { e.currentTarget.style.color = "#525252"; }}
@@ -280,7 +281,7 @@ function PairListField({ v, onChange }: { v: any; onChange: (next: any) => void 
         onMouseEnter={(e) => { e.currentTarget.style.color = "#171717"; }}
         onMouseLeave={(e) => { e.currentTarget.style.color = "#525252"; }}
       >
-        <AddIcon size={11} /> 新增對照
+        <AddIcon size={11} /> {tr("Add pair", "新增對照")}
       </button>
     </div>
   );

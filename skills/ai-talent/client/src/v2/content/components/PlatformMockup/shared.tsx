@@ -10,6 +10,7 @@ import remarkGfm from "remark-gfm";
 import { Skeleton } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { useLang } from "../../../../lib/i18n";
+import { useVariantLabel } from "../../lib/variantLabelEn";
 
 /* ── SHOW_IMAGE_STYLE_OVERLAY ───────────────────────────────────────────────
  *
@@ -205,6 +206,7 @@ export function SlotContent({
   skeletonLines?: number;
   skeletonClassName?: string;
 }) {
+  const { lang } = useLang();
   const slot = slotMap?.[slotKey];
 
   // No slot map wired yet — fall back to old liveXxx prop behaviour (children handles it)
@@ -222,7 +224,7 @@ export function SlotContent({
         {/* Pulse label */}
         <div className="flex items-center gap-1 mt-1">
           <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse inline-block" />
-          <span className="text-[10px] text-primary/70">Agent 生成中…</span>
+          <span className="text-[10px] text-primary/70">{lang === "en" ? "Agent is generating…" : "Agent 生成中…"}</span>
         </div>
       </div>
     );
@@ -397,11 +399,13 @@ export function MockupHeader({
   label: string;
   variantLabel?: string;
 }) {
+  const { lang } = useLang();
+  const vl = useVariantLabel();
   return (
     <div className="text-center mb-3">
       <span className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-default-500">
         <FontAwesomeIcon icon={icon} className="text-default-400" />
-        {variantLabel ?? `${label} 預覽`}
+        {(variantLabel != null ? vl(variantLabel) : undefined) ?? (lang === "en" ? `${label} preview` : `${label} 預覽`)}
       </span>
     </div>
   );

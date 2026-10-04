@@ -13,10 +13,13 @@
  */
 import { useEffect, useState, useMemo } from "react";
 import { Avatar } from "@heroui/react";
+import { agentLabel, agentTitle } from "../lib/agentName";
 
 interface AgentLike {
   id?: number;
   name: string;
+  nameEn?: string;
+  titleEn?: string;
   title?: string;
   avatarUrl?: string | null;
   role?: string;
@@ -180,10 +183,10 @@ export default function RunningAgentCarousel({
       {/* Agent name + role */}
       <div className="mt-4 text-center">
         <div className="text-sm font-semibold text-default-900 leading-tight">
-          {activeAgent.name}
+          {agentLabel(activeAgent, lang)}
         </div>
         <div className="text-tiny text-default-500 mt-0.5">
-          {activeAgent.role ?? activeAgent.title ?? (lang === "en" ? "Agent" : "AI 專家")}
+          {activeAgent.role ?? agentTitle(activeAgent, lang) ?? (lang === "en" ? "Agent" : "AI 專家")}
         </div>
       </div>
 
@@ -222,10 +225,11 @@ export default function RunningAgentCarousel({
                 opacity: i === activeIdx ? 1 : 0.45,
                 boxShadow: i === activeIdx ? `0 0 0 2px ${accentColor}` : "none",
               }}
-              title={`${a.name} · ${a.role ?? a.title ?? ""}`}
+              title={`${agentLabel(a, lang)} · ${a.role ?? agentTitle(a, lang) ?? ""}`}
             >
               <Avatar
                 src={a.avatarUrl || dicebear(a.name)}
+                alt={agentLabel(a, lang)}
                 className="w-full h-full"
                 classNames={{ base: "w-full h-full" }}
               />

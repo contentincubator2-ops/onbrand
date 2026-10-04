@@ -11,15 +11,17 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faLine } from "@fortawesome/free-brands-svg-icons";
 import { faImages, faBell, faQrcode, faArrowRight, faGift } from "@fortawesome/free-solid-svg-icons";
 import { type MockupFields, MockupHeader, dicebear, MarkdownText } from "./shared";
+import { useLang } from "../../../../lib/i18n";
 
 /* ─────────────── LINE Broadcast Message ─────────────── */
 
-export function LINEBroadcast({ title, brandName, variantLabel, liveCaption, liveImageDesc, liveCta }: MockupFields) {
+export function LINEBroadcast({ title, brandName, variantLabel, liveCaption, liveImageDesc, liveCta, liveImageUrl, liveImageStatus }: MockupFields) {
+  const { lang } = useLang();
   const brand = brandName ?? "Your Brand";
 
   return (
     <div className="w-full max-w-[400px] mx-auto">
-      <MockupHeader icon={faLine} label="LINE 訊息" variantLabel={variantLabel} />
+      <MockupHeader icon={faLine} label={lang === "en" ? "LINE message" : "LINE 訊息"} variantLabel={variantLabel} />
 
       {/* Phone chrome */}
       <div className="bg-[#1b1b1b] rounded-[36px] p-3 shadow-2xl">
@@ -31,7 +33,7 @@ export function LINEBroadcast({ title, brandName, variantLabel, liveCaption, liv
               <Avatar src={dicebear(brand)} size="sm" className="border-2 border-white shrink-0" />
               <div className="flex-1 min-w-0">
                 <p className="text-white text-small font-bold truncate">{brand}</p>
-                <p className="text-[#b2dfb4] text-tiny">官方帳號</p>
+                <p className="text-[#b2dfb4] text-tiny">{lang === "en" ? "Official Account" : "官方帳號"}</p>
               </div>
               <FontAwesomeIcon icon={faBell} className="text-white text-sm" />
             </div>
@@ -44,15 +46,20 @@ export function LINEBroadcast({ title, brandName, variantLabel, liveCaption, liv
             <div className="flex gap-2">
               <Avatar src={dicebear(brand)} size="sm" className="shrink-0 mt-auto" />
               <div className="max-w-[85%] space-y-1">
+                {/* 2026-10-04：真的有圖就照原比例顯示（LINE 聊天室不裁圖），沒有才畫佔位框。 */}
+                {liveImageUrl && liveImageStatus === "ready" ? (
+                  <img src={liveImageUrl} alt="" className="block w-full h-auto rounded-2xl rounded-tl-none min-w-[220px]" style={{ maxHeight: 420, objectFit: "contain", backgroundColor: "#e0e0e0" }} />
+                ) : (
                 <div className="aspect-[16/9] w-full bg-[#e0e0e0] rounded-2xl rounded-tl-none overflow-hidden flex items-center justify-center relative min-w-[220px]">
                   <Skeleton className="absolute inset-0 rounded-none" />
                   <div className="relative z-10 text-center p-3">
                     <FontAwesomeIcon icon={faImages} className="text-[#9e9e9e] text-2xl mb-1" />
                     <p className="text-[10px] text-[#757575] line-clamp-2">
-                      {liveImageDesc ?? "訊息圖 · 等待 AI 圖像"}
+                      {liveImageDesc ?? (lang === "en" ? "Message image · waiting for AI image" : "訊息圖 · 等待 AI 圖像")}
                     </p>
                   </div>
                 </div>
+                )}
               </div>
             </div>
 
@@ -79,13 +86,13 @@ export function LINEBroadcast({ title, brandName, variantLabel, liveCaption, liv
               <Avatar src={dicebear(brand)} size="sm" className="shrink-0 mt-auto" />
               <div className="max-w-[85%]">
                 <button className="bg-white rounded-2xl rounded-tl-none px-5 py-3 shadow-sm border-b-2 border-[#4CAF50] flex items-center gap-2 text-[#4CAF50] text-small font-semibold">
-                  {liveCta ?? "了解更多"}
+                  {liveCta ?? (lang === "en" ? "Learn more" : "了解更多")}
                   <FontAwesomeIcon icon={faArrowRight} className="text-tiny" />
                 </button>
               </div>
             </div>
 
-            <p className="text-[10px] text-[#757575] text-center">剛剛</p>
+            <p className="text-[10px] text-[#757575] text-center">{lang === "en" ? "Just now" : "剛剛"}</p>
           </div>
 
           {/* Input bar */}
@@ -106,6 +113,7 @@ export function LINEBroadcast({ title, brandName, variantLabel, liveCaption, liv
 /* ─────────────── LINE Flex Message Card ─────────────── */
 
 export function LINECard({ title, brandName, variantLabel, liveTitle, liveDescription, liveCta, liveImageDesc }: MockupFields) {
+  const { lang } = useLang();
   const brand = brandName ?? "Your Brand";
 
   return (
@@ -124,7 +132,7 @@ export function LINECard({ title, brandName, variantLabel, liveTitle, liveDescri
                 <Skeleton className="absolute inset-0 rounded-none" />
                 <div className="relative z-10 text-center p-3">
                   <FontAwesomeIcon icon={faImages} className="text-[#9e9e9e] text-2xl mb-1" />
-                  <p className="text-[10px] text-[#757575]">{liveImageDesc ?? "商品 / 活動圖"}</p>
+                  <p className="text-[10px] text-[#757575]">{liveImageDesc ?? (lang === "en" ? "Product / event image" : "商品 / 活動圖")}</p>
                 </div>
               </div>
 
@@ -147,7 +155,7 @@ export function LINECard({ title, brandName, variantLabel, liveTitle, liveDescri
               <div className="px-4 pb-3">
                 <button className="w-full bg-[#4CAF50] text-white text-small font-semibold py-2 rounded-xl flex items-center justify-center gap-2">
                   <FontAwesomeIcon icon={faGift} />
-                  {liveCta ?? "立即領取"}
+                  {liveCta ?? (lang === "en" ? "Claim now" : "立即領取")}
                 </button>
               </div>
             </div>
@@ -161,14 +169,15 @@ export function LINECard({ title, brandName, variantLabel, liveTitle, liveDescri
 /* ─────────────── LINE Rich Menu ─────────────── */
 
 export function LINERichMenu({ title, brandName, variantLabel }: MockupFields) {
+  const { lang } = useLang();
   const brand = brandName ?? "Your Brand";
   const menuItems = [
-    { icon: faImages, label: "最新優惠" },
-    { icon: faGift, label: "兌換禮物" },
-    { icon: faQrcode, label: "會員卡" },
-    { icon: faBell, label: "活動通知" },
-    { icon: faLine, label: "聯繫客服" },
-    { icon: faArrowRight, label: "官方網站" },
+    { icon: faImages, label: lang === "en" ? "Latest offers" : "最新優惠" },
+    { icon: faGift, label: lang === "en" ? "Redeem gifts" : "兌換禮物" },
+    { icon: faQrcode, label: lang === "en" ? "Member card" : "會員卡" },
+    { icon: faBell, label: lang === "en" ? "Event alerts" : "活動通知" },
+    { icon: faLine, label: lang === "en" ? "Contact support" : "聯繫客服" },
+    { icon: faArrowRight, label: lang === "en" ? "Website" : "官方網站" },
   ];
 
   return (
@@ -182,7 +191,7 @@ export function LINERichMenu({ title, brandName, variantLabel }: MockupFields) {
           </div>
           <div className="bg-[#c8e6c9] px-3 py-4 min-h-[140px] flex items-end">
             <div className="bg-white rounded-2xl rounded-tl-none px-4 py-3 text-small text-[#333] shadow-sm max-w-[85%]">
-              嗨！歡迎加入 {brand} 的 LINE 官方帳號 👋
+              {lang === "en" ? <>Hi! Welcome to the {brand} LINE Official Account 👋</> : <>嗨！歡迎加入 {brand} 的 LINE 官方帳號 👋</>}
             </div>
           </div>
           {/* Rich Menu panel */}

@@ -1,6 +1,7 @@
 /**
  * 路由層的錯誤邊界。
  */
+import { tr } from "../../../lib/i18n";
 import React from "react";
 import { recoverFromStaleChunk, isChunkLoadError, StaleChunkScreen } from "../staleChunk";
 
@@ -48,12 +49,12 @@ export class RouteErrorBoundary extends React.Component<
       return (
         <div style={{ padding: "32px 24px", maxWidth: 720, margin: "0 auto" }}>
           <div style={{ padding: 20, border: "1px solid #fca5a5", background: "#fef2f2", borderRadius: 12 }}>
-            <p style={{ fontSize: 12, color: "#dc2626", textTransform: "uppercase", letterSpacing: 1.5, fontWeight: 600 }}>頁面載入失敗</p>
+            <p style={{ fontSize: 12, color: "#dc2626", textTransform: "uppercase", letterSpacing: 1.5, fontWeight: 600 }}>{tr("Page failed to load", "頁面載入失敗")}</p>
             <h2 style={{ fontSize: 16, fontWeight: 600, marginTop: 6, color: "#0f172a" }}>
-              這個頁面目前無法顯示
+              {tr("This page can't be displayed right now", "這個頁面目前無法顯示")}
             </h2>
             <p style={{ marginTop: 6, color: "#475569", fontSize: 13, lineHeight: 1.6 }}>
-              側邊欄還能用 — 試著切到別的功能，或按下方「重試」再渲染一次。
+              {tr("The sidebar still works — try another section, or press Retry below to render again.", "側邊欄還能用 — 試著切到別的功能，或按下方「重試」再渲染一次。")}
               <br />
               {this.state.error.message}
             </p>
@@ -62,19 +63,19 @@ export class RouteErrorBoundary extends React.Component<
                 style={{ padding: "6px 12px", background: "#18181b", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontSize: 13 }}
                 onClick={() => this.setState({ error: null, resetKey: this.state.resetKey + 1 })}
               >
-                重試
+                {tr("Retry", "重試")}
               </button>
               <button
                 style={{ padding: "6px 12px", background: "white", border: "1px solid #cbd5e1", borderRadius: 6, cursor: "pointer", fontSize: 13 }}
                 onClick={() => window.location.assign("/planner")}
               >
-                回到首頁
+                {tr("Back to home", "回到首頁")}
               </button>
               <a
-                href={`mailto:sowork@sowork.ai?subject=${encodeURIComponent("onBrand Studio 頁面錯誤 " + window.location.pathname)}&body=${encodeURIComponent("錯誤訊息：\n" + (this.state.error?.message ?? "") + "\n\n頁面：" + window.location.href)}`}
+                href={`mailto:sowork@sowork.ai?subject=${encodeURIComponent(tr("onBrand Studio page error ", "onBrand Studio 頁面錯誤 ") + window.location.pathname)}&body=${encodeURIComponent(tr("Error message:\n", "錯誤訊息：\n") + (this.state.error?.message ?? "") + tr("\n\nPage: ", "\n\n頁面：") + window.location.href)}`}
                 style={{ fontSize: 12, color: "#3f3f46", textDecoration: "underline", marginLeft: "auto", alignSelf: "center" }}
               >
-                聯絡客服
+                {tr("Contact support", "聯絡客服")}
               </a>
             </div>
           </div>

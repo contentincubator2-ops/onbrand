@@ -13,6 +13,7 @@ import {
   faEllipsis, faImage,
 } from "@fortawesome/free-solid-svg-icons";
 import { type MockupFields, MockupHeader, handleOf, MarkdownText } from "./shared";
+import { useLang } from "../../../../lib/i18n";
 
 const TH_BLACK = "#000000";
 const TH_GRAY  = "#666666";
@@ -28,12 +29,15 @@ interface PostProps {
   handle: string;
   body?: string;
   imageDesc?: string;
+  /** 2026-10-04：真的有圖就顯示圖（照原比例，Threads 不裁圖），沒有才畫佔位框。 */
+  imageUrl?: string | null;
   dark?: boolean;
   isReply?: boolean;
   showConnector?: boolean;
 }
 
-function ThreadPost({ brand, handle, body, imageDesc, dark = false, isReply = false, showConnector = false }: PostProps) {
+function ThreadPost({ brand, handle, body, imageDesc, imageUrl, dark = false, isReply = false, showConnector = false }: PostProps) {
+  const { lang } = useLang();
   const bg   = dark ? "#101010" : "#FFFFFF";
   const text = dark ? "#F1F1F1" : TH_BLACK;
   const sub  = dark ? "#999999" : TH_GRAY;
@@ -63,7 +67,7 @@ function ThreadPost({ brand, handle, body, imageDesc, dark = false, isReply = fa
               {brand}
             </span>
             {!isReply && (
-              <span className="text-[12px]" style={{ color: sub }}>· 剛剛</span>
+              <span className="text-[12px]" style={{ color: sub }}>{lang === "en" ? "· Just now" : "· 剛剛"}</span>
             )}
           </div>
           <FontAwesomeIcon icon={faEllipsis} className="text-[15px]" style={{ color: sub }} />
@@ -88,7 +92,11 @@ function ThreadPost({ brand, handle, body, imageDesc, dark = false, isReply = fa
         )}
 
         {/* Optional image */}
-        {imageDesc && (
+        {imageUrl ? (
+          <div className="rounded-xl overflow-hidden mb-2 border" style={{ borderColor: bdr }}>
+            <img src={imageUrl} alt="" className="block w-full h-auto" style={{ maxHeight: 520, objectFit: "contain", backgroundColor: dark ? "#1E1E1E" : TH_LIGHT }} />
+          </div>
+        ) : imageDesc && (
           <div
             className="rounded-xl overflow-hidden mb-2 border flex items-center justify-center"
             style={{ aspectRatio: "1.91/1", borderColor: bdr, backgroundColor: dark ? "#1E1E1E" : TH_LIGHT }}
@@ -103,10 +111,10 @@ function ThreadPost({ brand, handle, body, imageDesc, dark = false, isReply = fa
         {/* Action row */}
         <div className="flex items-center gap-5 mt-1">
           {[
-            { icon: faHeart,      label: "讚" },
-            { icon: faComment,    label: "留言" },
-            { icon: faRepeat,     label: "轉發" },
-            { icon: faPaperPlane, label: "分享" },
+            { icon: faHeart,      label: lang === "en" ? "Like" : "讚" },
+            { icon: faComment,    label: lang === "en" ? "Comment" : "留言" },
+            { icon: faRepeat,     label: lang === "en" ? "Repost" : "轉發" },
+            { icon: faPaperPlane, label: lang === "en" ? "Share" : "分享" },
           ].map((a, i) => (
             <button key={i} className="flex items-center gap-1">
               <FontAwesomeIcon icon={a.icon} className="text-[18px]" style={{ color: sub }} />
@@ -116,7 +124,7 @@ function ThreadPost({ brand, handle, body, imageDesc, dark = false, isReply = fa
 
         {/* Likes count */}
         <p className="text-[12px] mt-1.5" style={{ color: sub }}>
-          {isReply ? "234 個讚" : "1,204 個讚"}
+          {isReply ? (lang === "en" ? "234 likes" : "234 個讚") : (lang === "en" ? "1,204 likes" : "1,204 個讚")}
         </p>
       </div>
     </div>
@@ -125,6 +133,7 @@ function ThreadPost({ brand, handle, body, imageDesc, dark = false, isReply = fa
 
 /* ─── Phone chrome wrapper ─── */
 function PhoneChrome({ dark, children }: { dark: boolean; children: React.ReactNode }) {
+  const { lang } = useLang();
   return (
     <div className="bg-[#1A1A1A] rounded-[36px] p-3 shadow-2xl">
       <div className="rounded-[28px] overflow-hidden" style={{ backgroundColor: dark ? "#101010" : "#FFFFFF" }}>
@@ -150,7 +159,7 @@ function PhoneChrome({ dark, children }: { dark: boolean; children: React.ReactN
             @
           </div>
           <div className="flex gap-4">
-            {["首頁", "搜索", "發文", "通知", "我"].map((item, i) => (
+            {(lang === "en" ? ["Home", "Search", "Post", "Activity", "Me"] : ["首頁", "搜索", "發文", "通知", "我"]).map((item, i) => (
               <button key={i} className="text-[11px]" style={{ color: i === 0 ? (dark ? "#F1F1F1" : TH_BLACK) : TH_GRAY }}>
                 {item}
               </button>
@@ -169,26 +178,28 @@ function PhoneChrome({ dark, children }: { dark: boolean; children: React.ReactN
 ───────────────────────────────────────────────────── */
 export function ThreadsPost({
   title, brandName, variantLabel,
-  liveTitle, liveCaption, liveImageDesc,
+  liveTitle, liveCaption, liveImageDesc, liveImageUrl, liveImageStatus,
 }: MockupFields) {
-  const brand  = brandName ?? "品牌帳號";
+  const { lang } = useLang();
+  const brand  = brandName ?? (lang === "en" ? "Brand account" : "品牌帳號");
   const handle = handleOf(brandName);
   const body   = liveCaption ?? liveTitle ?? title;
 
   return (
     <div className="w-full max-w-[375px] mx-auto">
-      <MockupHeader icon={faHeart} label="Threads · 貼文" variantLabel={variantLabel} />
+      <MockupHeader icon={faHeart} label={lang === "en" ? "Threads · Post" : "Threads · 貼文"} variantLabel={variantLabel} />
       <PhoneChrome dark>
         <ThreadPost
           brand={brand}
           handle={handle}
           body={body}
           imageDesc={liveImageDesc}
+          imageUrl={liveImageUrl && liveImageStatus === "ready" ? liveImageUrl : null}
           dark
           showConnector={false}
         />
         <div className="px-4 py-2 border-t" style={{ borderColor: "#2A2A2A" }}>
-          <p className="text-[13px]" style={{ color: "#999" }}>回覆 @{handle} ...</p>
+          <p className="text-[13px]" style={{ color: "#999" }}>{lang === "en" ? "Reply to" : "回覆"} @{handle} ...</p>
         </div>
       </PhoneChrome>
     </div>
@@ -202,17 +213,18 @@ export function ThreadsThread({
   title, brandName, variantLabel,
   liveTitle, liveCaption, liveDescription, liveImageDesc,
 }: MockupFields) {
-  const brand  = brandName ?? "品牌帳號";
+  const { lang } = useLang();
+  const brand  = brandName ?? (lang === "en" ? "Brand account" : "品牌帳號");
   const handle = handleOf(brandName);
 
   const replies = [
-    liveDescription ?? "延伸補充：具體說明這則 Threads 的後續內容，提供更多細節或互動問題。",
-    "感謝大家的支持！歡迎留言分享你的想法 ❤️",
+    liveDescription ?? (lang === "en" ? "Follow-up: spell out what comes next in this Threads post, with more detail or a question to spark replies." : "延伸補充：具體說明這則 Threads 的後續內容，提供更多細節或互動問題。"),
+    lang === "en" ? "Thanks for all the support! Share your thoughts in the comments ❤️" : "感謝大家的支持！歡迎留言分享你的想法 ❤️",
   ];
 
   return (
     <div className="w-full max-w-[375px] mx-auto">
-      <MockupHeader icon={faComment} label="Threads · 串文" variantLabel={variantLabel} />
+      <MockupHeader icon={faComment} label={lang === "en" ? "Threads · Thread" : "Threads · 串文"} variantLabel={variantLabel} />
       <PhoneChrome dark={false}>
         {/* Root post */}
         <ThreadPost
@@ -250,7 +262,7 @@ export function ThreadsThread({
 
         {/* Footer */}
         <div className="px-4 py-3 border-t" style={{ borderColor: TH_BORDER }}>
-          <p className="text-[13px]" style={{ color: TH_GRAY }}>回覆 @{handle} ...</p>
+          <p className="text-[13px]" style={{ color: TH_GRAY }}>{lang === "en" ? "Reply to" : "回覆"} @{handle} ...</p>
         </div>
       </PhoneChrome>
     </div>

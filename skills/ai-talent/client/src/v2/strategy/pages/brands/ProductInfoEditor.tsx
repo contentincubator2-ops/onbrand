@@ -3,6 +3,7 @@
  */
 import React, { useState } from "react";
 import { trpc } from "../../../../lib/trpc";
+import { tr } from "../../../../lib/i18n";
 import { Spinner, Input, Textarea, Button } from "@heroui/react";
 import { CheckIcon } from "../../../platform/components/icons";
 
@@ -59,7 +60,7 @@ export function ProductInfoEditor({ productId, brandName, en }: { productId: num
       id: productId,
       brandId: p?.brandId ?? undefined,
       slug: p?.slug ?? String(productId),
-      name: name.trim() || (p?.name ?? "未命名產品"),
+      name: name.trim() || (p?.name ?? tr("Untitled product", "未命名產品")),
       // 2026-08-21: spread existing positioning so imageUrl / price /
       // pipeline segments survive an edit. Cleared fields are sent as null
       // (not undefined) — the server's merge drops undefined keys, so null

@@ -16,6 +16,8 @@
  *   const text = await callLLM({ system: "...", user: "...", maxTokens: 4000 });
  */
 
+import { throwIfCancelled } from "./runCancel";
+
 interface CallArgs {
   system: string;
   user: string;
@@ -207,12 +209,34 @@ export async function callLLM(args: CallArgs): Promise<{ text: string; attempts:
 
   const remainingBudget = () => Math.max(0, budgetMs - (Date.now() - startedAt));
 
+  // Success telemetry for the proof-metrics report (first-try rate, fallback
+  // rate, latency). info-level, fire-and-forget. Calls that needed a fallback
+  // are always recorded; clean first-try calls are sampled to keep error_log
+  // small — `sampleRate` lets readers re-weight.
+  const finish = (text: string) => {
+    const fellBack = attempts.length > 1;
+    const sampleRate = fellBack ? 1 : 0.2;
+    if (Math.random() < sampleRate) {
+      void import("../../routers/opsRouter")
+        .then(({ logError }) => logError({
+          source: "llm.attempts",
+          level: "info",
+          message: fellBack ? "llm fallback used" : "llm first-try ok",
+          meta: { fellBack, attempts: attempts.length, totalMs: Date.now() - startedAt, provider: attempts[attempts.length - 1]?.provider, sampleRate },
+        }))
+        .catch(() => { /* telemetry must never break generation */ });
+    }
+    return { text, attempts };
+  };
+
   const tryProvider = async (
     provider: Provider,
     keyLabel: string,
     fn: (timeoutMs: number) => Promise<string>,
     cap: number = perProviderCap,
   ): Promise<string | null> => {
+    // A cancelled run must not start another provider attempt.
+    throwIfCancelled();
     const remaining = remainingBudget();
     if (remaining < 2000) {
       attempts.push({ provider, key: keyLabel, ok: false, durationMs: 0, error: "skipped: budget exhausted" });
@@ -225,6 +249,7 @@ export async function callLLM(args: CallArgs): Promise<{ text: string; attempts:
       attempts.push({ provider, key: keyLabel, ok: true, durationMs: Date.now() - t0 });
       return text;
     } catch (e) {
+      if ((e as any)?.cancelled) throw e;
       const msg = e instanceof Error ? e.message : String(e);
       attempts.push({ provider, key: keyLabel, ok: false, durationMs: Date.now() - t0, error: msg });
       // eslint-disable-next-line no-console
@@ -241,7 +266,7 @@ export async function callLLM(args: CallArgs): Promise<{ text: string; attempts:
           callAnthropic(ANTHROPIC_KEYS[i]!, { ...args, timeoutMs: t }),
           anthropicCap,
         );
-        if (text) return { text, attempts };
+        if (text) return finish(text);
         // Backup keys help against auth/billing failures, NOT timeouts.
         // A slow request on Anthropic infra won't get faster on key-2.
         // Bail to next provider after first timeout.
@@ -251,14 +276,14 @@ export async function callLLM(args: CallArgs): Promise<{ text: string; attempts:
       }
     } else if (provider === "azure-foundry") {
       const text = await tryProvider("azure-foundry", "default", (t) => callAzureFoundry({ ...args, timeoutMs: t }));
-      if (text) return { text, attempts };
+      if (text) return finish(text);
     } else if (provider === "azure-openai") {
       const text = await tryProvider("azure-openai", "default", (t) => callAzureOpenAI({ ...args, timeoutMs: t }));
-      if (text) return { text, attempts };
+      if (text) return finish(text);
     } else if (provider === "openrouter") {
       if (!OPENROUTER_KEY) continue;
       const text = await tryProvider("openrouter", "default", (t) => callOpenRouter({ ...args, timeoutMs: t }));
-      if (text) return { text, attempts };
+      if (text) return finish(text);
     }
   }
 

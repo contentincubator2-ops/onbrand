@@ -324,6 +324,7 @@ export const zh = {
   run_mode_image:          "改配圖",
   run_mode_video:          "故事板",
   run_mode_agent:          "AI 對話",
+  run_mode_regen:          "重寫",
   run_save_btn:            "儲存修改",
   run_revert:              "還原",
   run_image_make:          "立即產圖",
