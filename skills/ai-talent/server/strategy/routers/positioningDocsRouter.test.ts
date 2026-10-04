@@ -20,7 +20,7 @@ describe("positioningDocsRouter", () => {
     const names = Object.keys((positioningDocsRouter as any)._def.procedures);
     // 2026-09-24：加了 updateCustomSegment（自訂卡片可以改標題/內容，不必刪掉重建）。2026-10-04：加了 updateFields（產品視窗逐格編輯固定欄位）。
     expect(names.sort()).toEqual([
-      "applyMapping", "coverage", "createCustomSegment", "propose", "removeCustomSegment", "updateCustomSegment",
+      "applyMapping", "coverage", "createCustomSegment", "propose", "removeCustomSegment", "updateCustomSegment", "updateFields",
     ]);
   });
 
