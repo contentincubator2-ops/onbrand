@@ -1,0 +1,61 @@
+name: Ops (DEV) — export evaluation cases (runs real task cards, text only)
+
+# 2026-10-04（CJ「第一步，我選擇 microsoft foundry」）：在 dev VM 上用真的品牌跑真的任務卡，
+# 把「題目＋品牌資料＋產出」印成考卷，交給 scripts/eval/foundry_eval.py 用 Microsoft Foundry 評分。
+#
+# 會花 LLM 額度（每題一次文字生成；圖片關掉）。不落地、不扣點——runOrchestra 不帶 userId。
+#
+# 腳本用 base64 帶上 VM 而不是讀 /opt/onbrand/current 裡的那份：這樣不必先合併部署就能跑，
+# 改考題的挑法也不用等一輪部署。跑的仍然是 VM 上「已部署的」server 程式——要評的就是它。
+on:
+  push:
+    paths:
+      - '.github/workflows/op-eval-export-cases.yml'
+      - 'skills/ai-talent/scripts/eval/export-cases.ts'
+  workflow_dispatch:
+    inputs:
+      brandIds:
+        description: "Brand ids (comma separated)"
+        required: false
+        default: '2972'
+      perChannel:
+        description: "Cards per channel"
+        required: false
+        default: '2'
+      taskIds:
+        description: "Only these task ids (comma separated, optional)"
+        required: false
+        default: ''
+
+jobs:
+  export:
+    runs-on: ubuntu-24.04
+    environment: dev
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - name: Pack the script
+        run: echo "SCRIPT_B64=$(base64 -w0 skills/ai-talent/scripts/eval/export-cases.ts)" >> "$GITHUB_ENV"
+      - uses: appleboy/ssh-action@v1.0.3
+        env:
+          SCRIPT_B64: ${{ env.SCRIPT_B64 }}
+          BRAND_IDS: ${{ github.event.inputs.brandIds || '2972' }}
+          PER_CHANNEL: ${{ github.event.inputs.perChannel || '2' }}
+          TASK_IDS: ${{ github.event.inputs.taskIds || '' }}
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 35m
+          envs: SCRIPT_B64,BRAND_IDS,PER_CHANNEL,TASK_IDS
+          script: |
+            set -e
+            cd /opt/onbrand/current/skills/ai-talent
+            set -a; source .env 2>/dev/null; set +a
+            export BRAND_IDS PER_CHANNEL TASK_IDS
+            echo "commit on box: $(readlink -f /opt/onbrand/current | sed 's#.*/##')"
+            mkdir -p scripts/eval
+            F=scripts/eval/.export-cases.run.ts
+            echo "$SCRIPT_B64" | base64 -d > "$F"
+            trap 'rm -f "$F"' EXIT
+            ./node_modules/.bin/tsx "$F"
