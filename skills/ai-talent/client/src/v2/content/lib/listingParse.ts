@@ -112,3 +112,14 @@ export function downloadTextFile(filename: string, text: string, mime = "text/cs
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   } catch { /* 下載失敗不影響頁面 */ }
 }
+
+/**
+ * 把欄位組回標準排版的 caption（【欄位名】換行內容，欄位之間空一行）。
+ * 內容是空的欄位不輸出標題——審核頁會把它顯示成「沒寫出來」，而不是存一個空標題。
+ */
+export function composeListingCaption(rows: Array<Pick<ListingRow, "label" | "value">>): string {
+  return rows
+    .filter((r) => r.value != null && r.value.trim() !== "")
+    .map((r) => `【${r.label}】\n${r.value!.trim()}`)
+    .join("\n\n");
+}

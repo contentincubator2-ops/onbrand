@@ -65,6 +65,7 @@ const RunPage = React.lazy(() => import("../content/pages/RunPage"));
 const ImageCardPage = React.lazy(() => import("../content/pages/ImageCardPage"));
 const ProjectsPage = React.lazy(() => import("../content/pages/ProjectsPage"));
 const MyTaskCardsPage = React.lazy(() => import("../content/pages/MyTaskCardsPage"));
+const ListingBatchPage = React.lazy(() => import("../content/pages/ListingBatchPage"));
 const BrandsPage = React.lazy(() => import("../strategy/pages/BrandsPage"));
 const BrandsManagePage = React.lazy(() => import("../strategy/pages/BrandsManagePage"));
 const BrandSettingsPage = React.lazy(() => import("../strategy/pages/BrandSettingsPage"));
@@ -319,6 +320,8 @@ export default function AppV2() {
           <Route path="/projects" element={<ProjectsPage />} />
           {/* 2026-10-04：跨通路的任務卡總覽（常用／自建卡的管理）。 */}
           <Route path="/my-cards" element={<MyTaskCardsPage />} />
+          {/* 2026-10-05：商品頁批次產出的審核頁（逐筆核准、匯出）。 */}
+          <Route path="/batch/:batchId" element={<ListingBatchPage />} />
           {/* 2026-05-11 (CJ): /brands is now the manager dashboard.
               Old single-brand editor moved to /brands/edit?b=:id */}
           <Route path="/brands" element={<BrandsManagePage />} />

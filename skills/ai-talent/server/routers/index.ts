@@ -25,6 +25,7 @@ import { positioningDocsRouter } from "../strategy/routers/positioningDocsRouter
 import { channelRoleRouter } from "../strategy/routers/channelRoleRouter";
 import { brandTaskCardRouter } from "../content/routers/brandTaskCardRouter";
 import { customChannelRouter } from "../content/routers/customChannelRouter";
+import { listingBatchRouter } from "../content/routers/listingBatchRouter";
 import { workbenchRouter } from "../strategy/routers/workbenchRouter";
 import { strategistChatRouter } from "../strategy/routers/strategistChatRouter";
 import { assetPhotoRouter } from "../strategy/routers/assetPhotoRouter";
@@ -117,6 +118,8 @@ export const appRouter = router({
   brandTaskCard:   brandTaskCardRouter,
   // 2026-10-04（CJ）：用戶自己新增 mission tray（蝦皮／momo／網紅合作等平台範本，或自訂）。
   customChannel:   customChannelRouter,
+  // 2026-10-05：商品頁卡的批次產出（選商品 → 背景逐筆寫 → 逐筆核准 → 匯出）。
+  listingBatch:    listingBatchRouter,
   workbench: workbenchRouter,
   strategistChat: strategistChatRouter,
   brandKnowledge:  brandKnowledgeRouter,
