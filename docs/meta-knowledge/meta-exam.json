@@ -1,0 +1,712 @@
+{
+  "source_note": "原創題目，依 Meta 認證考試公開範圍命題，非真實考題",
+  "exam_sources": [
+    {
+      "code": "600-101",
+      "name": "Meta Certified Community Management",
+      "url": "https://www.facebook.com/business/learn/certification/exams/600-101-exam",
+      "used_for": "posts"
+    },
+    {
+      "code": "300-101",
+      "name": "Meta Certified Creative Strategy Professional",
+      "url": "https://www.facebook.com/business/learn/certification/exams/300-101-exam",
+      "used_for": "posts, ads"
+    },
+    {
+      "code": "100-101",
+      "name": "Meta Certified Digital Marketing Associate",
+      "url": "https://www.facebook.com/business/learn/certification/exams/100-101-exam",
+      "used_for": "posts, ads"
+    },
+    {
+      "code": "410-101",
+      "name": "Meta Certified Media Buying Professional",
+      "url": "https://www.facebook.com/business/learn/certification/exams/410-101-exam",
+      "used_for": "ads"
+    }
+  ],
+  "source_detail": "Meta 的認證考試頁只公布考試領域與配分，沒有公布題目。本卷每一題都是依知識包（pack-posts.md、pack-ads.md）中的守則原創命題；exam 與 domain 欄位標示該守則對應的 Meta 認證與公開考試領域，tests 欄位標示守則編號與來源事實編號。沒有使用任何真實試題、模擬試題或題庫。查證日期 2026-10-04。",
+  "questions": [
+    {
+      "id": "P01",
+      "pack": "posts",
+      "type": "scenario",
+      "exam": "Meta Certified Community Management（600-101）",
+      "domain": "領域 3 Make strategic content decisions",
+      "tests": "posts 守則 2（600-101 F3、F4；300-101 F38）",
+      "question": "台中一家手工皂小品牌要發新品預告，希望貼文有人留言。下列哪一句結尾可以用？",
+      "options": {
+        "A": "喜歡薰衣草的按讚，喜歡檸檬草的按愛心，我們來投票！",
+        "B": "想要的請在下面留言「＋1」，留越多越快上架。",
+        "C": "分享這篇給三位朋友，讓更多人看到我們。",
+        "D": "下一款你最希望我們做哪種香味？直接留言告訴我們，我們會認真看。"
+      },
+      "answer": "D",
+      "why": "按讚＋1、指定留言字、要求分享、用表情投票都是互動誘餌會被降觸及，真心徵求建議的直接提問則可以。"
+    },
+    {
+      "id": "P02",
+      "pack": "posts",
+      "type": "scenario",
+      "exam": "Meta Certified Community Management（600-101）",
+      "domain": "領域 3 Make strategic content decisions",
+      "tests": "posts 守則 1（600-101 F5、F6）",
+      "question": "高雄一家烘焙坊下週推出鹹蛋黃肉鬆蛋糕，小編要寫貼文第一句。哪一句符合守則？",
+      "options": {
+        "A": "你絕對猜不到我們這次加了什麼……",
+        "B": "鹹蛋黃肉鬆蛋糕下週三開賣，每日限量 30 條，現在可私訊預訂。",
+        "C": "全台最震撼的蛋糕來了，吃過的人都哭了！",
+        "D": "老闆說這款不能公開，想知道的人點進來看。"
+      },
+      "answer": "B",
+      "why": "第一句要如實預告是什麼、不藏關鍵資訊也不誇大，並把希望讀者做的行動直接寫出來。"
+    },
+    {
+      "id": "P03",
+      "pack": "posts",
+      "type": "scenario",
+      "exam": "Meta Certified Community Management（600-101）",
+      "domain": "領域 3 Make strategic content decisions",
+      "tests": "posts 守則 3（600-101 F11）",
+      "question": "一家寵物用品小店的粉專，過去一個月幾乎都在轉貼網路上別人的可愛貓狗影片，觸及一路下滑。依知識包，最合理的調整是？",
+      "options": {
+        "A": "改成以店家自己拍攝的原創內容為主，例如店貓日常與商品實拍。",
+        "B": "繼續轉貼，但每篇多加二十個主題標籤。",
+        "C": "把別人的影片下載後重新上傳，當成自己的影片發。",
+        "D": "轉貼的頻率加倍，用數量把觸及補回來。"
+      },
+      "answer": "A",
+      "why": "以原創內容為主的粉專觸及最多，一再轉貼會失去觸及，重複影片還會被降排序讓位給原版。"
+    },
+    {
+      "id": "P04",
+      "pack": "posts",
+      "type": "scenario",
+      "exam": "Meta Certified Community Management（600-101）",
+      "domain": "領域 4 Engage and moderate the community（Adhere to community standards and terms of service）",
+      "tests": "posts 守則 18（600-101 F22、F23、F24；100-101 F49）",
+      "question": "台南一家茶飲品牌要在 Facebook 粉專辦週年抽獎。下列哪一種活動辦法符合守則？",
+      "options": {
+        "A": "公開分享本篇並標記兩位朋友，即可參加抽獎。",
+        "B": "標記越多朋友，中獎機率越高；本活動由 Facebook 協辦。",
+        "C": "在本篇留言回答「你最常點哪一杯」即可參加；寫明規則與資格，並聲明活動非由 Meta 贊助、背書或管理，與 Meta 無關，參加者同意免除其責任。",
+        "D": "不寫規則，得獎者由小編私下決定，避免爭議。"
+      },
+      "answer": "C",
+      "why": "Facebook 粉專促銷不得要求或獎勵分享、轉貼、標記他人，且要寫明規則資格並加上與 Meta 無關的免責聲明。"
+    },
+    {
+      "id": "P05",
+      "pack": "posts",
+      "type": "scenario",
+      "exam": "Meta Certified Community Management（600-101）",
+      "domain": "領域 4 Engage and moderate the community（Adhere to community standards and terms of service）",
+      "tests": "posts 守則 18（600-101 F22、F23、F24；100-101 F49）",
+      "question": "一家飾品品牌要在 Instagram 辦贈獎，文案草稿寫「請在照片上標記自己，就算你不在照片裡也可以」。這句話的問題是什麼？",
+      "options": {
+        "A": "沒有問題，Instagram 對標記沒有任何規範。",
+        "B": "這是鼓勵用戶不實標註內容，違反 Instagram 促銷規範；應刪除，並補上規則、資格與「非由 Instagram 贊助、背書或管理」的聲明。",
+        "C": "只要把聲明對象寫成 Meta 而不是 Instagram 就可以保留這句。",
+        "D": "問題只在於句子太長，縮短就能用。"
+      },
+      "answer": "B",
+      "why": "Instagram 的促銷規範是不得不實標註內容也不得鼓勵用戶這樣做，免責聲明的對象要寫 Instagram。"
+    },
+    {
+      "id": "P06",
+      "pack": "posts",
+      "type": "scenario",
+      "exam": "Meta Certified Community Management（600-101）",
+      "domain": "領域 4 Engage and moderate the community（Adhere to community standards and terms of service）",
+      "tests": "posts 守則 17（600-101 F14；100-101 F53）",
+      "question": "一家線上課程工作室想衝粉絲數，提出四個點子。哪一個可以做？",
+      "options": {
+        "A": "追蹤並分享本帳號，才能解鎖獨家講義。",
+        "B": "每按一個讚就抽一位送 500 元現金。",
+        "C": "留言就送等值 300 元的禮券，留越多次領越多。",
+        "D": "直接把一份免費講義的重點整理成貼文，文末請有興趣的人到官網看完整版。"
+      },
+      "answer": "D",
+      "why": "不能用現金或等同現金的東西換互動，也不能設按讚、分享、追蹤才能看內容的門檻。"
+    },
+    {
+      "id": "P07",
+      "pack": "posts",
+      "type": "scenario",
+      "exam": "Meta Certified Community Management（600-101）",
+      "domain": "領域 4 Engage and moderate the community",
+      "tests": "posts 守則 20（600-101 F13、F16）",
+      "question": "一家民宿的貼文下有人留言「房間有霉味，根本不值這個價」。小編請 AI 擬回覆。哪一則可以用？",
+      "options": {
+        "A": "謝謝你告訴我們，霉味的問題我們會檢查那間房的除濕與通風，方便私訊入住日期讓我們處理嗎？",
+        "B": "看你的名字就知道是外地人，難怪不懂這裡的氣候。",
+        "C": "你這種年紀的人本來就比較挑剔，我們不跟你計較。",
+        "D": "這則回覆是 AI 寫的，所以不受社群守則限制，可以講重一點。"
+      },
+      "answer": "A",
+      "why": "可以回應批評但不攻擊人，尤其不針對國籍、年齡等特質，AI 產生的內容同樣適用社群守則。"
+    },
+    {
+      "id": "P08",
+      "pack": "posts",
+      "type": "scenario",
+      "exam": "Meta Certified Community Management（600-101）",
+      "domain": "領域 4 Engage and moderate the community（Adhere to community standards and terms of service）",
+      "tests": "posts 守則 22（600-101 F25；100-101 F50）",
+      "question": "一家親子餐廳要發貼文徵求家長填表，蒐集姓名、電話與孩子年齡，用來寄送試吃邀請。文案必須包含哪一項？",
+      "options": {
+        "A": "寫「本表單由 Facebook 官方蒐集」，讓家長比較放心。",
+        "B": "不用說明誰在蒐集，表單連結放上去即可。",
+        "C": "寫清楚資料是餐廳自己蒐集（不是 Facebook），並請填寫者表示同意。",
+        "D": "只要註明「資料絕不外流」，就不需要取得同意。"
+      },
+      "answer": "C",
+      "why": "蒐集資料的貼文要寫清楚是品牌自己在蒐集而不是 Facebook，並請對方表示同意。"
+    },
+    {
+      "id": "P09",
+      "pack": "posts",
+      "type": "scenario",
+      "exam": "Meta Certified Community Management（600-101）",
+      "domain": "領域 6 Monetization",
+      "tests": "posts 守則 23（600-101 F26、F28；100-101 F51）",
+      "question": "一位美食創作者收了某醬料品牌的贈品與酬勞，要發一支 Reels。AI 交稿時應該在稿件上註明什麼？",
+      "options": {
+        "A": "不用註明，只要文案沒有出現「廣告」兩個字就不算業配。",
+        "B": "發布時必須使用品牌置入內容工具並標註合作夥伴、依法揭露商業性質，影片前三秒不要放標題卡。",
+        "C": "只收贈品不算有對價，可以當成一般心得發。",
+        "D": "在影片第一秒放大大的品牌標題卡，才算有揭露。"
+      },
+      "answer": "B",
+      "why": "收費或收贈品都算有對價的合作，須用品牌置入內容工具標註夥伴並揭露，且這類影片前三秒不得放標題卡。"
+    },
+    {
+      "id": "P10",
+      "pack": "posts",
+      "type": "scenario",
+      "exam": "Meta Certified Digital Marketing Associate（100-101）",
+      "domain": "D3 Advertising fundamentals（常見廣告政策）",
+      "tests": "posts 守則 25（600-101 F33；100-101 F40）",
+      "question": "一家記帳與理財諮詢工作室的貼文之後可能會加強推廣。哪一句開頭可以用？",
+      "options": {
+        "A": "你是不是也被卡債壓得喘不過氣？",
+        "B": "四十歲的你，存款還不到六位數嗎？",
+        "C": "身為單親媽媽的你，一定很擔心錢不夠用。",
+        "D": "我們提供一對一的債務整理諮詢，幫你把每月還款排出順序。"
+      },
+      "answer": "D",
+      "why": "不對讀者點名年齡、財務狀況等個人特質，要寫這項服務做什麼。"
+    },
+    {
+      "id": "P11",
+      "pack": "posts",
+      "type": "scenario",
+      "exam": "Meta Certified Digital Marketing Associate（100-101）",
+      "domain": "D3 Advertising fundamentals（常見廣告政策）",
+      "tests": "posts 守則 26（600-101 F34；100-101 F41）",
+      "question": "一家賣代餐奶昔的小品牌要寫貼文，並打算之後下廣告。哪一種寫法符合守則？",
+      "options": {
+        "A": "介紹每份的熱量與蛋白質含量、適合當哪一餐，不貶低身材、不保證期限內成果；廣告受眾鎖定十八歲以上。",
+        "B": "七天保證瘦五公斤，沒瘦退費，不需運動。",
+        "C": "受不了自己的大腿和小腹嗎？這杯救你。",
+        "D": "國高中生也適用，開學前快速變瘦。"
+      },
+      "answer": "A",
+      "why": "不貶低外貌或身體部位、不寫沒有但書的期限保證，且減重類產品的廣告必須鎖定十八歲以上。"
+    },
+    {
+      "id": "P12",
+      "pack": "posts",
+      "type": "scenario",
+      "exam": "Meta Certified Community Management（600-101）",
+      "domain": "領域 3 Make strategic content decisions",
+      "tests": "posts 守則 15（600-101 F9）",
+      "question": "一家花藝工作室週五晚上要開 Facebook 直播教包花束，請 AI 寫預告貼文。哪一則最符合守則？",
+      "options": {
+        "A": "週五晚上有驚喜，記得鎖定我們！",
+        "B": "直播當天才公布主題，敬請期待。",
+        "C": "週五晚上八點直播：示範用三種花材包一束母親節花束。有想問的包法或花材問題，先留在這篇留言，我們直播時回答。",
+        "D": "週五直播，分享本篇並標記朋友才能收到連結。"
+      },
+      "answer": "C",
+      "why": "直播預告的標題與說明要直接講這場談什麼，並請觀眾先把問題留在留言。"
+    },
+    {
+      "id": "P13",
+      "pack": "posts",
+      "type": "knowledge",
+      "exam": "Meta Certified Community Management（600-101）",
+      "domain": "領域 3 Make strategic content decisions",
+      "tests": "posts 守則 5（600-101 F7）",
+      "question": "關於「最佳發文時間、每週篇數、最好的貼文形式」，知識包記載 Meta 的說法是？",
+      "options": {
+        "A": "每天晚上八點發文觸及最高。",
+        "B": "沒有人人適用的最佳時間、篇數或形式，不應把這類說法寫成定律。",
+        "C": "每週固定發五篇是官方建議的最低篇數。",
+        "D": "影片永遠比照片好，應該全部改成影片。"
+      },
+      "answer": "B",
+      "why": "Meta 明說沒有人人適用的最佳時間、篇數或形式。"
+    },
+    {
+      "id": "P14",
+      "pack": "posts",
+      "type": "knowledge",
+      "exam": "Meta Certified Community Management（600-101）",
+      "domain": "領域 3 Make strategic content decisions",
+      "tests": "posts 守則 4（600-101 F10）",
+      "question": "下列哪一種說明文字的寫法，知識包指出會讓觸及下降？",
+      "options": {
+        "A": "又長又分散注意力的說明文字，再配上過多的主題標籤。",
+        "B": "第一句就把重點講完的短說明。",
+        "C": "在文末直接寫出希望讀者做的行動。",
+        "D": "用品牌自己拍的照片搭配一句說明。"
+      },
+      "answer": "A",
+      "why": "冗長分心的說明文字配上過多主題標籤會讓觸及下降。"
+    },
+    {
+      "id": "P15",
+      "pack": "posts",
+      "type": "knowledge",
+      "exam": "Meta Certified Creative Strategy Professional（300-101）",
+      "domain": "領域 1 Mobile-first fundamentals",
+      "tests": "posts 守則 8（300-101 F2、F5）",
+      "question": "寫 Reels 或影片腳本時，知識包對開頭與長度的建議是？",
+      "options": {
+        "A": "前十秒先鋪陳背景故事，品牌放在結尾才出現。",
+        "B": "影片越長越好，至少三分鐘才有完整訊息。",
+        "C": "開頭先放五秒品牌片頭動畫，再進入內容。",
+        "D": "開頭就放最吸睛的畫面、品牌及早出現，整個訊息盡量在十五秒內講完。"
+      },
+      "answer": "D",
+      "why": "行動裝置影片要開頭吸睛、品牌及早出現，訊息盡量在十五秒內講完。"
+    },
+    {
+      "id": "P16",
+      "pack": "posts",
+      "type": "knowledge",
+      "exam": "Meta Certified Creative Strategy Professional（300-101）",
+      "domain": "領域 1 Mobile-first fundamentals",
+      "tests": "posts 守則 9（300-101 F3、F10）",
+      "question": "關於影片腳本的聲音設計，哪一項敘述符合知識包？",
+      "options": {
+        "A": "Reels 預設靜音，所以完全不用設計聲音。",
+        "B": "只要有旁白就好，不需要字幕或字卡。",
+        "C": "腳本要關掉聲音也看得懂（字幕、畫面字卡），同時也要設計聲音，因為 Reels 預設開聲音。",
+        "D": "字幕會干擾畫面，應該避免使用。"
+      },
+      "answer": "C",
+      "why": "要設計成無聲也能懂，同時因 Reels 預設開聲音也要設計聲音。"
+    },
+    {
+      "id": "P17",
+      "pack": "posts",
+      "type": "knowledge",
+      "exam": "Meta Certified Creative Strategy Professional（300-101）",
+      "domain": "領域 3 Brief development（版位與格式）",
+      "tests": "posts 守則 10 與規格「9:16 安全區」（300-101 F12；100-101 F13、F16、F17）",
+      "question": "在 9:16 的限時動態或 Reels 畫面上放文字，哪一種做法符合知識包？",
+      "options": {
+        "A": "把主標放在畫面最底部，貼齊下緣最醒目。",
+        "B": "避開頂端、底部與兩側，一個畫面只放一個訊息，字夠大且與底色對比清楚、不蓋住主體。",
+        "C": "一個畫面同時放價格、活動辦法、門市地址三個訊息，資訊才完整。",
+        "D": "把標誌放在畫面最頂端的角落，貼齊上緣。"
+      },
+      "answer": "B",
+      "why": "頂端、底部與兩側會被大頭貼和按鈕蓋住，且一個畫面只放一個訊息。"
+    },
+    {
+      "id": "P18",
+      "pack": "posts",
+      "type": "knowledge",
+      "exam": "Meta Certified Creative Strategy Professional（300-101）",
+      "domain": "領域 3 Brief development（版位與格式）",
+      "tests": "posts 守則 12（300-101 F16；100-101 F15）",
+      "question": "知識包列出輪播適合的三種用途，並對卡片有一項一致性要求。哪一項敘述正確？",
+      "options": {
+        "A": "輪播只適合放單一張主視覺的不同裁切，每張比例可以各自不同。",
+        "B": "輪播適合放長篇文字，比例不重要。",
+        "C": "輪播只能用來說品牌故事，不適合展示商品。",
+        "D": "展示多項商品、說明單一商品／服務／促銷的細節、分段說品牌故事；每張卡片比例保持一致。"
+      },
+      "answer": "D",
+      "why": "輪播的三種用途是多項商品、單一項目的細節、分段說故事，且各卡片比例要一致。"
+    },
+    {
+      "id": "P19",
+      "pack": "posts",
+      "type": "knowledge",
+      "exam": "Meta Certified Digital Marketing Associate（100-101）",
+      "domain": "D4 Create and manage ads（加強推廣貼文）",
+      "tests": "posts 守則 24（100-101 F4、F7、F9、F38）",
+      "question": "一篇自然貼文被「加強推廣」之後，它的性質是什麼？",
+      "options": {
+        "A": "被加強推廣的貼文就是廣告，要過廣告審查，所以可能被推廣的貼文一開始就要照廣告政策寫。",
+        "B": "仍然是自然貼文，不受廣告政策約束。",
+        "C": "只有圖片要審查，文字不在審查範圍內。",
+        "D": "只要原本貼文沒有被檢舉，推廣時就免審查。"
+      },
+      "answer": "A",
+      "why": "加強推廣的貼文就是廣告，必須通過廣告審查。"
+    },
+    {
+      "id": "P20",
+      "pack": "posts",
+      "type": "knowledge",
+      "exam": "Meta Certified Community Management（600-101）",
+      "domain": "領域 4 Engage and moderate the community",
+      "tests": "posts 守則 21（600-101 F17、F18）",
+      "question": "遇到惡意或不雅留言時，知識包要 AI 在交稿時提醒小編可以使用哪些工具？",
+      "options": {
+        "A": "向 Meta 申請關閉該用戶的帳號。",
+        "B": "公開貼出對方的個人資料讓大家評理。",
+        "C": "隱藏留言、關鍵字過濾、髒話過濾（Instagram／Threads 是「隱藏字詞」）。",
+        "D": "付費購買留言清除服務。"
+      },
+      "answer": "C",
+      "why": "知識包列出的留言管理工具是隱藏留言、關鍵字過濾與髒話過濾（Instagram／Threads 為隱藏字詞）。"
+    },
+    {
+      "id": "A01",
+      "pack": "ads",
+      "type": "scenario",
+      "exam": "Meta Certified Digital Marketing Associate（100-101）",
+      "domain": "建立與管理廣告（目標）",
+      "tests": "ads 守則 1（DMA F1；MB F1）",
+      "question": "一家新竹的手沖咖啡豆品牌丟來一句「幫我寫一則 Facebook 廣告」，沒有說廣告目標。AI 應該怎麼做？",
+      "options": {
+        "A": "預設是銷售目標，直接寫「立即購買」。",
+        "B": "先問清楚這則廣告屬於哪一種目標，再下筆。",
+        "C": "六種目標各寫一句，全部塞進同一則廣告。",
+        "D": "不需要目標，文案寫得吸引人就好。"
+      },
+      "answer": "B",
+      "why": "動筆前要先確認廣告屬於六種目標的哪一種，任務沒寫就先問，不要自己猜。"
+    },
+    {
+      "id": "A02",
+      "pack": "ads",
+      "type": "scenario",
+      "exam": "Meta Certified Media Buying Professional（410-101）",
+      "domain": "Campaign Activation（目標）",
+      "tests": "ads 守則 2（DMA F2、F3；MB F2、F3）",
+      "question": "一家室內設計工作室要投「名單」目標的廣告，希望有裝潢需求的人留下聯絡方式。哪一句行動呼籲最合適？",
+      "options": {
+        "A": "記住我們的名字，下次裝潢想到我們。",
+        "B": "立即加入購物車，今天下單享折扣。",
+        "C": "點進來看看我們的網站。",
+        "D": "填寫表單留下坪數與預算，設計師三個工作天內與你聯絡。"
+      },
+      "answer": "D",
+      "why": "行動呼籲跟著目標走，名單型要講明是傳訊、來電還是填表。"
+    },
+    {
+      "id": "A03",
+      "pack": "ads",
+      "type": "scenario",
+      "exam": "Meta Certified Creative Strategy Professional（300-101）",
+      "domain": "Brief development",
+      "tests": "ads 守則 4（CS F17）",
+      "question": "一家新開的宜蘭露營區要投「品牌認知」目標的影片廣告，小編把開幕日期與地點只寫在標題欄。這樣做的問題是？",
+      "options": {
+        "A": "認知、觸及類目標的影片廣告，標題、說明和按鈕在手機上不會顯示，關鍵訊息要寫進主要文字或畫面。",
+        "B": "沒有問題，標題欄是所有版位最醒目的位置。",
+        "C": "標題欄只能放英文，中文會被系統刪除。",
+        "D": "認知目標的廣告不允許出現日期與地點。"
+      },
+      "answer": "A",
+      "why": "認知、觸及類目標的影片廣告在手機上不顯示標題、說明和按鈕，關鍵訊息不能只放標題。"
+    },
+    {
+      "id": "A04",
+      "pack": "ads",
+      "type": "scenario",
+      "exam": "Meta Certified Digital Marketing Associate（100-101）",
+      "domain": "建立與管理廣告（版位與格式）",
+      "tests": "ads 守則 7（DMA F7、F16；MB F22）",
+      "question": "一家瑜珈教室的廣告草稿：主要文字寫「加 LINE 問課表」，標題寫「立即報名體驗課」，按鈕選「來電」。應該怎麼修？",
+      "options": {
+        "A": "三個都保留，給讀者越多選擇越好。",
+        "B": "再加一句「也歡迎追蹤我們的 Instagram」。",
+        "C": "只給一個行動呼籲，讓主要文字、標題與按鈕都指向同一個動作。",
+        "D": "把三個行動都搬到主要文字裡，標題留白。"
+      },
+      "answer": "C",
+      "why": "一則廣告只給一個行動呼籲，主要文字、標題與按鈕要指向同一個動作。"
+    },
+    {
+      "id": "A05",
+      "pack": "ads",
+      "type": "scenario",
+      "exam": "Meta Certified Media Buying Professional（410-101）",
+      "domain": "Creative Strategy（創意最佳作法）",
+      "tests": "ads 守則 8（DMA F10；MB F18；CS F23）",
+      "question": "一家保養品小品牌同一則廣告要同時投 Facebook 動態、Instagram 限時動態與 Reels。文案應該怎麼交？",
+      "options": {
+        "A": "寫一段三行的主要文字，三個版位共用。",
+        "B": "依版位分開寫：限時動態用更短的文案，Reels 的第一句必須能獨立成立。",
+        "C": "Reels 的文案要寫最長，因為觀眾停留最久。",
+        "D": "只寫 Facebook 動態的版本，其他版位由投手自行截短。"
+      },
+      "answer": "B",
+      "why": "投多個版位要分開寫，限時動態更短，Reels 可見文字極短所以第一句必須獨立成立。"
+    },
+    {
+      "id": "A06",
+      "pack": "ads",
+      "type": "scenario",
+      "exam": "Meta Certified Creative Strategy Professional（300-101）",
+      "domain": "Brief development",
+      "tests": "ads 守則 9（CS F16）",
+      "question": "一家茶葉品牌做了五張輪播廣告，依序講「採茶、萎凋、揉捻、烘焙、沖泡」的故事。AI 交稿時應在備註提醒投手什麼？",
+      "options": {
+        "A": "開啟所有自動化選項，讓系統決定卡片順序。",
+        "B": "把五張卡片的比例設成各不相同，增加變化。",
+        "C": "卡片數要補到十二張才夠完整。",
+        "D": "關閉「依成效自動排序卡片」，否則故事順序會被打亂。"
+      },
+      "answer": "D",
+      "why": "有順序的接龍故事輪播，要提醒關閉依成效自動排序卡片。"
+    },
+    {
+      "id": "A07",
+      "pack": "ads",
+      "type": "scenario",
+      "exam": "Meta Certified Media Buying Professional（410-101）",
+      "domain": "Creative Strategy（創意最佳作法）",
+      "tests": "ads 守則 10（DMA F11；MB F19；CS F18）",
+      "question": "一家保健食品品牌的廣告文案裡有一句依法必須原文照登的警語。AI 交稿時應該提醒什麼？",
+      "options": {
+        "A": "提醒投手檢查 Advantage+ 的文字強化設定；開啟時上傳的文字可能被系統調整，可逐項關閉。",
+        "B": "不必提醒，上傳的文字系統一律不會更動。",
+        "C": "把警語拿掉，改放在留言區。",
+        "D": "把警語寫成圖片上最底部的小字即可，不用管設定。"
+      },
+      "answer": "A",
+      "why": "Advantage+ 文字強化開啟時可能調整上傳的文字，有不能被改動的字句要提醒投手檢查並可逐項關閉。"
+    },
+    {
+      "id": "A08",
+      "pack": "ads",
+      "type": "scenario",
+      "exam": "Meta Certified Media Buying Professional（410-101）",
+      "domain": "Campaign Optimization（廣告品質）",
+      "tests": "ads 守則 15（DMA F29；MB F8、F9、F30）",
+      "question": "一家賣收納箱的網路商店要下廣告，提出四個標題。哪一個不屬於 Meta 列出的低品質寫法？",
+      "options": {
+        "A": "家裡亂的真正原因，第三點你一定想不到……",
+        "B": "震驚！全台媽媽都瘋了的神物！",
+        "C": "可堆疊收納箱三入組，每個承重 20 公斤，附滑輪。",
+        "D": "覺得實用的留言「要」，並標記你最亂的朋友。"
+      },
+      "answer": "C",
+      "why": "隱瞞關鍵資訊吊胃口、聳動用語、互動誘餌是三種低品質特徵，具體說明產品則不是。"
+    },
+    {
+      "id": "A09",
+      "pack": "ads",
+      "type": "scenario",
+      "exam": "Meta Certified Digital Marketing Associate（100-101）",
+      "domain": "建立與管理廣告（受眾）",
+      "tests": "ads 守則 19（DMA F33、F34）",
+      "question": "一家手工果醬品牌要寫兩個分眾版本：一個投給「曾經買過的人」的自訂受眾，一個投給類似受眾。哪一種寫法正確？",
+      "options": {
+        "A": "兩個版本用同一段文案，受眾差異不影響寫法。",
+        "B": "自訂受眾版先花三行介紹品牌是誰，類似受眾版直接寫「回購享九折」。",
+        "C": "兩個版本都不提產品，只講品牌理念。",
+        "D": "自訂受眾版直接接續產品與優惠（例如新口味與回購優惠），類似受眾版先交代品牌是誰、賣什麼。"
+      },
+      "answer": "D",
+      "why": "自訂受眾是已互動過的人可直接接續產品與優惠，類似受眾是新對象要先交代你是誰、賣什麼。"
+    },
+    {
+      "id": "A10",
+      "pack": "ads",
+      "type": "scenario",
+      "exam": "Meta Certified Digital Marketing Associate（100-101）",
+      "domain": "廣告基本概念（常見廣告政策）",
+      "tests": "ads 守則 22（DMA F40；MB F35）",
+      "question": "一家心理諮商所要投廣告，請 AI 寫主要文字。哪一句可以用？",
+      "options": {
+        "A": "你是不是也有憂鬱症，卻不敢告訴家人？",
+        "B": "提供憂鬱與焦慮的一對一諮商，線上與實體皆可預約。",
+        "C": "三十五歲還單身的你，是不是常常覺得焦慮？",
+        "D": "我們知道你最近失眠、情緒低落，讓我們幫你。"
+      },
+      "answer": "B",
+      "why": "不對讀者點名身心健康、年齡等個人特質，要寫服務本身。"
+    },
+    {
+      "id": "A11",
+      "pack": "ads",
+      "type": "scenario",
+      "exam": "Meta Certified Media Buying Professional（410-101）",
+      "domain": "Creative Strategy（廣告政策）",
+      "tests": "ads 守則 24（DMA F42；MB F37）",
+      "question": "一家賣氣炸鍋的小家電品牌要寫促銷廣告，任務資料只寫了「售價 2,990 元」。哪一則文案可以用？",
+      "options": {
+        "A": "氣炸鍋 4.5 公升，售價 2,990 元，點擊前往官網選購。",
+        "B": "原價 8,990，今日下殺 2,990！（任務資料沒有原價）",
+        "C": "某知名主廚也在用！（未取得該主廚授權）",
+        "D": "買來轉賣保證賺，零風險的副業首選。"
+      },
+      "answer": "A",
+      "why": "不寫不實定價、未經授權的背書與保證報酬或零風險的說法，價格與見證都要有任務資料可對。"
+    },
+    {
+      "id": "A12",
+      "pack": "ads",
+      "type": "scenario",
+      "exam": "Meta Certified Media Buying Professional（410-101）",
+      "domain": "Campaign Activation（特殊廣告類別）",
+      "tests": "ads 守則 26（DMA F43、F44、F47；MB F5、F40）",
+      "question": "一家連鎖早午餐店要投徵才廣告，老闆希望文案寫「限 25 歲以下女性」。AI 應該怎麼處理？",
+      "options": {
+        "A": "照寫，徵才廣告的條件由雇主決定。",
+        "B": "把條件改成暗示性的說法，例如「適合年輕有活力的女孩」。",
+        "C": "在備註提醒就業廣告可能屬於特殊廣告類別、受眾選項與年齡會受限，文案不得以性別、年齡等條件排除任何群體，改寫成職務內容與工作條件。",
+        "D": "文案不寫，但提醒投手在受眾設定裡排除男性與年長者。"
+      },
+      "answer": "C",
+      "why": "就業屬可能的特殊廣告類別，受眾選項會受限，文案也不得以性別、年齡等條件排除或貶抑任何群體。"
+    },
+    {
+      "id": "A13",
+      "pack": "ads",
+      "type": "knowledge",
+      "exam": "Meta Certified Digital Marketing Associate（100-101）",
+      "domain": "建立與管理廣告（目標）",
+      "tests": "ads 守則 1（DMA F1；MB F1）",
+      "question": "知識包列出的六種廣告目標是哪六種？",
+      "options": {
+        "A": "曝光、點擊、按讚、分享、留言、觀看。",
+        "B": "觸及、頻率、轉換、再行銷、類似受眾、自訂受眾。",
+        "C": "動態、限時動態、Reels、輪播、插播、訊息。",
+        "D": "品牌認知、流量、互動、名單、應用程式推廣、銷售。"
+      },
+      "answer": "D",
+      "why": "六種目標是品牌認知、流量、互動、名單、應用程式推廣、銷售。"
+    },
+    {
+      "id": "A14",
+      "pack": "ads",
+      "type": "knowledge",
+      "exam": "Meta Certified Media Buying Professional（410-101）",
+      "domain": "Campaign Optimization（拍賣）",
+      "tests": "ads 守則 14（DMA F28；MB F6、F7）",
+      "question": "廣告在拍賣中能不能勝出，看的是哪三項？",
+      "options": {
+        "A": "出價、預估行動率、廣告品質；相關性高的廣告可以贏過出價更高的。",
+        "B": "出價、粉絲數、帳號年資；出價最高者一定勝出。",
+        "C": "預算、投放天數、素材數量。",
+        "D": "按讚數、分享數、留言數。"
+      },
+      "answer": "A",
+      "why": "拍賣看出價、預估行動率與廣告品質三項，相關性高的廣告可以贏過出價更高的。"
+    },
+    {
+      "id": "A15",
+      "pack": "ads",
+      "type": "knowledge",
+      "exam": "Meta Certified Digital Marketing Associate（100-101）",
+      "domain": "建立與管理廣告（版位與格式）",
+      "tests": "ads 守則 6（DMA F8、F9；MB F15、F16；CS F24）",
+      "question": "關於廣告文案欄位，哪一項敘述符合知識包？",
+      "options": {
+        "A": "欄位留白最安全，系統會自動隱藏空白欄位。",
+        "B": "重點放在說明欄最保險，因為所有版位都會顯示說明。",
+        "C": "每個欄位都要交稿；留白時系統可能自動抓到達網址的文字且不能改，而 Instagram 廣告不使用說明欄。",
+        "D": "超過建議長度的文字一定會被系統退件。"
+      },
+      "answer": "C",
+      "why": "欄位留白時系統可能自動抓到達網址文字且不能改，Instagram 廣告不使用說明欄，所以重點不能只藏在說明裡。"
+    },
+    {
+      "id": "A16",
+      "pack": "ads",
+      "type": "knowledge",
+      "exam": "Meta Certified Media Buying Professional（410-101）",
+      "domain": "Campaign Optimization",
+      "tests": "ads 守則 17（DMA F10；MB F17）",
+      "question": "主要文字、標題、說明各交多個版本時，寫法上要注意什麼？",
+      "options": {
+        "A": "把主要文字與標題寫成上下句，讀者才會讀完整則。",
+        "B": "每個版本都要能和其他欄位的任一版本搭配，因為系統會依每個人挑選顯示。",
+        "C": "每個版本只要換一個標點符號即可。",
+        "D": "版本一固定搭配標題一，版本二固定搭配標題二。"
+      },
+      "answer": "B",
+      "why": "系統會依每個人挑選各欄位的版本組合，所以不能寫成彼此依賴的上下句。"
+    },
+    {
+      "id": "A17",
+      "pack": "ads",
+      "type": "knowledge",
+      "exam": "Meta Certified Media Buying Professional（410-101）",
+      "domain": "Campaign Optimization（學習階段）",
+      "tests": "ads 守則 20 與規格「學習階段」（MB F12、F13；DMA F38）",
+      "question": "關於學習階段與上線後修改，哪一項敘述符合知識包？",
+      "options": {
+        "A": "上線後每天微調文案，可以加速學習。",
+        "B": "學習階段固定為三十天，期間不能做任何編輯。",
+        "C": "編輯投放中的廣告不需要重新送審。",
+        "D": "學習階段反覆修改會讓成效不穩，編輯投放中的廣告也會重新送審，所以版本要一次交足；廣告組合通常在最後一次重大編輯後一週內累積約 50 個成果後結束學習。"
+      },
+      "answer": "D",
+      "why": "學習階段反覆修改會讓成效不穩且編輯會重新送審，通常約 50 個成果後結束學習。"
+    },
+    {
+      "id": "A18",
+      "pack": "ads",
+      "type": "knowledge",
+      "exam": "Meta Certified Creative Strategy Professional（300-101）",
+      "domain": "Evaluation and measurement",
+      "tests": "ads 守則 18 與規格「A/B 測試版本上限」（CS F28）",
+      "question": "寫 A/B 對照版本時，哪一項符合知識包？",
+      "options": {
+        "A": "每一版的差異要清楚可辨（例如切角或訴求不同），才比得出哪個元素有效；官方的 A/B 測試上限是 5 個版本。",
+        "B": "版本之間差異越小越好，最好只差一個字。",
+        "C": "版本數沒有上限，交越多越好。",
+        "D": "A/B 測試只能測圖片，不能測文案。"
+      },
+      "answer": "A",
+      "why": "A/B 版本的差異要清楚可辨才能判斷有效元素，官方上限為 5 個版本。"
+    },
+    {
+      "id": "A19",
+      "pack": "ads",
+      "type": "knowledge",
+      "exam": "Meta Certified Media Buying Professional（410-101）",
+      "domain": "Campaign Optimization（廣告品質）",
+      "tests": "ads 守則 16（MB F11；DMA F38）",
+      "question": "關於到達頁與廣告品質，哪一項敘述符合知識包？",
+      "options": {
+        "A": "廣告審查只看廣告本身，點擊後的頁面不在範圍內。",
+        "B": "一則廣告被判低品質，只影響那一則，不會波及其他廣告。",
+        "C": "到達頁也列入審查與品質評估；一再刊登低品質或違規廣告，可能讓同一粉專、網域或廣告帳號的所有廣告都被視為較低品質。",
+        "D": "只要出價夠高，到達頁品質不影響投放。"
+      },
+      "answer": "C",
+      "why": "到達頁同樣列入審查與品質評估，一再刊登低品質廣告可能連帶影響同粉專、網域或帳號的所有廣告。"
+    },
+    {
+      "id": "A20",
+      "pack": "ads",
+      "type": "knowledge",
+      "exam": "Meta Certified Digital Marketing Associate（100-101）",
+      "domain": "廣告基本概念（常見廣告政策）",
+      "tests": "ads 守則 25（DMA F45、F46、F48；MB F38、F39）",
+      "question": "下列哪一種寫法符合知識包對髒話與危機事件的規定？",
+      "options": {
+        "A": "把髒話中間的字換成「＊」或表情符號就可以用。",
+        "B": "不用髒話（符號、錯字、表情符號變形也不行），也不借危機或爭議事件做商業利用或使用助長恐慌的急迫語言。",
+        "C": "颱風來襲時寫「再不囤貨就來不及了」能有效提高轉換，可以使用。",
+        "D": "故意把髒話打成錯字，系統就不算違規。"
+      },
+      "answer": "B",
+      "why": "髒話用符號、錯字、表情符號變形也不行，且不得借危機做商業利用或用助長恐慌的急迫語言。"
+    }
+  ]
+}
