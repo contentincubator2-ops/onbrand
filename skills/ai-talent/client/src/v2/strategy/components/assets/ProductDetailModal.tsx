@@ -20,7 +20,7 @@ import { Modal, ModalBody, ModalContent, ModalFooter, ModalHeader } from "@herou
 import { TASK_MODAL_CLASSNAMES, TASK_MODAL_HEADER, TASK_MODAL_QUESTION } from "../../../platform/components/taskModalStyle";
 import { EmptyIllustration } from "../../../platform/components/EmptyIllustration";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faBox, faBullseye, faUsers, faGem, faTrophy, faComment, faTag, faImages, faFont, faCalendarDays, faLayerGroup } from "@fortawesome/free-solid-svg-icons";
+import { faBox, faBullseye, faUsers, faGem, faTrophy, faComment, faTag, faImages, faFont, faCalendarDays } from "@fortawesome/free-solid-svg-icons";
 import type { IconDefinition } from "@fortawesome/fontawesome-svg-core";
 import AssetPhotoGallery from "./AssetPhotoGallery";
 import ProductSceneModal from "./ProductSceneModal";
@@ -91,7 +91,8 @@ function FieldEditor({ field, en, edits, setEdits }: {
           value={shown}
           rows={Math.min(8, Math.max(2, shown.split("\n").length + (shown.length > 60 ? 1 : 0)))}
           onChange={(e) => { const v = e.target.value; setEdits((prev) => ({ ...prev, [field.path]: v })); }}
-          className="w-full text-sm px-3 py-2 mt-0.5 bg-white rounded-xl resize-none border border-default-200 focus:outline-none focus:border-zinc-500"
+          className="w-full text-sm px-3 py-2 mt-0.5 bg-white rounded-xl resize-none border border-default-200 focus:outline-none focus:border-zinc-500"
+
         />
       ) : (
         <p className="text-sm text-neutral-800 mt-0.5 whitespace-pre-wrap">{shown}</p>
@@ -368,9 +369,18 @@ export default function ProductDetailModal({ productId, brandId, onClose, onRepo
     { key: "marketing",   prefix: "marketing.",   zh: "語氣用詞", en: "Voice",    icon: faComment },
     { key: "facts",       prefix: "facts.",       zh: "售價規格", en: "Facts",    icon: faTag },
   ];
+  // 2026-10-04（CJ「自訂卡片不是獨立欄位，而是上傳定位或增加內容後，被填入前方的其他欄位中、取代前方欄位」）：
+  // 自訂卡片的每一格依標籤對上固定欄位（對上了就取代那一格的內容）；對不上的歸到「核心定位」。
+  const normLabel = (x: string) => String(x ?? "").replace(/[\s:：]/g, "").toLowerCase();
+  const customRows = customSegments.flatMap((seg) => seg.fields.map((fl) => {
+    const hit = allFields.find((f) => normLabel(f.label) === normLabel(fl.label) || normLabel(f.label) === normLabel(seg.title));
+    return { segId: seg.id, key: fl.key, label: fl.label, value: fl.value, path: hit?.path ?? null, groupKey: hit ? (FIELD_GROUPS.find((g) => hit.path.startsWith(g.prefix))?.key ?? "core") : "core" };
+  }));
+  const customRowsOf = (key: string) => customRows.filter((r) => r.groupKey === key);
   const fieldGroupOf = (key: string) => {
     const g = FIELD_GROUPS.find((x) => x.key === key);
-    return g ? allFields.filter((f) => f.path.startsWith(g.prefix)) : [];
+    const covered = new Set(customRowsOf(key).map((r) => r.path).filter(Boolean));
+    return g ? allFields.filter((f) => f.path.startsWith(g.prefix) && !covered.has(f.path)) : [];
   };
   const groups: { key: string; label: string; icon: IconDefinition; filled: boolean }[] = [
     { key: "photos", label: en ? "Photos" : "產品照片", icon: faImages, filled: !!productPositioning.imageUrl },
@@ -378,24 +388,35 @@ export default function ProductDetailModal({ productId, brandId, onClose, onRepo
       .filter((g) => allFields.some((f) => f.path.startsWith(g.prefix)))
       .map((g) => ({
         key: g.key, label: en ? g.en : g.zh, icon: g.icon,
-        filled: filledFields.some((f) => f.path.startsWith(g.prefix)),
+        filled: filledFields.some((f) => f.path.startsWith(g.prefix)) || customRowsOf(g.key).length > 0,
       })),
     { key: "words", label: en ? "Words" : "詞彙", icon: faFont, filled: preferred.length + forbidden.length > 0 },
     { key: "periods", label: en ? "Dates" : "推廣時間", icon: faCalendarDays, filled: periods.length > 0 },
-    ...(customSegments.length > 0
-      ? [{ key: "custom", label: en ? "Custom" : "自訂卡片", icon: faLayerGroup, filled: true }]
-      : []),
   ];
 
   return (
     <Modal isOpen onClose={onClose} size="2xl" scrollBehavior="inside" backdrop="blur" classNames={TASK_MODAL_CLASSNAMES}>
       <ModalContent>
         <ModalHeader className={TASK_MODAL_HEADER}>
+          <div className="flex items-center gap-3 w-full">
           <div className="flex items-center gap-2.5 min-w-0">
             <FontAwesomeIcon icon={faBox} className="text-neutral-900 shrink-0" style={{ fontSize: 14 }} />
             <p className="text-[15px] text-neutral-900 truncate font-semibold">
               {productQ?.isLoading ? "…" : product?.name ?? "—"}
             </p>
+          </div>
+          <div className="ml-auto flex items-center gap-2 shrink-0">
+            {onUpload && (
+              <button type="button" onClick={() => onUpload(productId)}
+                className="inline-flex items-center gap-1.5 h-8 px-3 rounded-full bg-default-100 text-[12.5px] text-neutral-700 hover:bg-default-200 transition">
+                <UploadIcon size={13} />{en ? "Upload" : "上傳定位"}
+              </button>
+            )}
+            <button type="button" onClick={() => onReposition(productId)}
+              className="inline-flex items-center gap-1.5 h-8 px-3 rounded-full bg-default-100 text-[12.5px] text-neutral-700 hover:bg-default-200 transition">
+              <RegenerateIcon size={13} />{en ? "Re-run" : "重新定位"}
+            </button>
+          </div>
           </div>
         </ModalHeader>
 
@@ -406,7 +427,7 @@ export default function ProductDetailModal({ productId, brandId, onClose, onRepo
             <div className="shrink-0"><EmptyIllustration kind="product" width={104} /></div>
             <div className="min-w-0">
               <h2 className={TASK_MODAL_QUESTION}>
-                {en ? "This is how the AI understands it" : "AI 是這樣理解這個產品的"}
+                {en ? `${product?.name ?? "Product"} positioning` : `${product?.name ?? "產品"}的產品定位`}
               </h2>
               <p className="text-[13px] text-neutral-500 mt-1">
                 {en
@@ -524,31 +545,20 @@ export default function ProductDetailModal({ productId, brandId, onClose, onRepo
             </div>
                 </div>
               )}
-              {openKey === "custom" && (
-                <div className="grid gap-3">
-              {customSegments.map((seg) => (
-                <div key={seg.id} className="rounded-xl bg-white p-3">
-                  <span className="text-[12px] font-bold text-neutral-700">{seg.title}</span>
-                  <div className="mt-1.5 grid gap-2">
-                    {seg.fields.map((fl) => (
-                      <label key={fl.key} className="block">
-                        <span className="text-[12px] font-semibold text-zinc-400">{fl.label}</span>
-                        <textarea
-                          rows={2}
-                          value={segEdits[seg.id]?.[fl.key] ?? fl.value}
-                          onChange={(e) => {
-                            const v = e.target.value;
-                            setSegEdits((prev) => ({ ...prev, [seg.id]: { ...(prev[seg.id] ?? {}), [fl.key]: v } }));
-                          }}
-                          className="w-full text-sm px-3 py-2 mt-0.5 bg-white rounded-xl resize-none border border-default-200 focus:outline-none focus:border-zinc-500"
-                        />
-                      </label>
-                    ))}
-                  </div>
-                </div>
+              {customRowsOf(openKey).map((r) => (
+                <label key={`${r.segId}-${r.key}`} className="block">
+                  <span className="text-[12px] font-semibold text-zinc-400 tracking-wider">{r.label}</span>
+                  <textarea
+                    rows={2}
+                    value={segEdits[r.segId]?.[r.key] ?? r.value}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      setSegEdits((prev) => ({ ...prev, [r.segId]: { ...(prev[r.segId] ?? {}), [r.key]: v } }));
+                    }}
+                    className="w-full text-sm px-3 py-2 mt-0.5 bg-white rounded-xl resize-none border border-default-200 focus:outline-none focus:border-zinc-500"
+                  />
+                </label>
               ))}
-                </div>
-              )}
               {fieldGroupOf(openKey).map((f) => (
                 <FieldEditor key={f.path} field={f} en={en} edits={edits} setEdits={setEdits} />
               ))}
@@ -570,15 +580,6 @@ export default function ProductDetailModal({ productId, brandId, onClose, onRepo
                 <FontAwesomeIcon icon={g.icon} style={{ fontSize: 15 }} />
               </ChipAction>
             ))}
-            <span className="self-stretch w-px bg-default-200 mx-1" aria-hidden />
-            {onUpload && (
-              <ChipAction label={en ? "Upload" : "上傳定位"} onPress={() => onUpload(productId)}>
-                <UploadIcon size={15} />
-              </ChipAction>
-            )}
-            <ChipAction label={en ? "Re-run" : "重新定位"} onPress={() => onReposition(productId)}>
-              <RegenerateIcon size={15} />
-            </ChipAction>
           </div>
           <button
             onClick={() => void handleSave()}
