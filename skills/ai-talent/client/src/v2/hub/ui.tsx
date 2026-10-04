@@ -137,6 +137,54 @@ export function Avatar({ name, seed, size = 32 }: { name: string; seed?: string;
   );
 }
 
+/**
+ * 業務的照片（CJ 2026-10-04「每個人都是一張 avatar 照片」）。沒有照片的人退回
+ * 縮寫，但用柔和的暖色漸層而不是一塊深灰——名單是一面人像牆，空的那幾格不該
+ * 看起來像壞掉的圖。
+ */
+const PHOTO_TONES = [
+  "from-amber-200 to-orange-300 text-orange-900",
+  "from-stone-200 to-stone-300 text-stone-700",
+  "from-sky-100 to-sky-200 text-sky-900",
+  "from-emerald-100 to-teal-200 text-teal-900",
+  "from-rose-100 to-orange-200 text-rose-900",
+];
+export function RepPhoto({ name, seed, photoUrl, size, className, rounded = "rounded-full" }: {
+  name: string;
+  seed?: string;
+  photoUrl?: string | null;
+  /** 固定像素；不給就填滿父層（卡片的方形照片區）。 */
+  size?: number;
+  className?: string;
+  rounded?: string;
+}) {
+  const style = size ? { width: size, height: size } : undefined;
+  if (photoUrl) {
+    return (
+      <img
+        src={photoUrl}
+        alt={name}
+        loading="lazy"
+        className={cx("shrink-0 bg-stone-100 object-cover", rounded, !size && "h-full w-full", className)}
+        style={style}
+      />
+    );
+  }
+  const latin = name.match(/[A-Za-z][A-Za-z]+(?:\s+[A-Za-z]+)?/)?.[0] ?? name;
+  const initials = latin.split(/\s+/).map((p) => p[0]).join("").slice(0, 2).toUpperCase();
+  const tone = PHOTO_TONES[(seed ?? name).split("").reduce((a, c) => a + c.charCodeAt(0), 0) % PHOTO_TONES.length];
+  return (
+    <span
+      role="img"
+      aria-label={name}
+      className={cx("flex shrink-0 items-center justify-center bg-gradient-to-br font-semibold", tone, rounded, !size && "h-full w-full", className)}
+      style={{ ...style, fontSize: size ? Math.round(size * 0.36) : undefined }}
+    >
+      <span className={size ? undefined : "text-[44px]"}>{initials}</span>
+    </span>
+  );
+}
+
 export function ChannelLabel({ channel }: { channel: string }) {
   const names: Record<string, string> = { linkedin: "LinkedIn", facebook: "Facebook", instagram: "Instagram", line: "LINE" };
   return <span className="text-[12px] font-medium text-stone-700">{names[channel] ?? channel}</span>;

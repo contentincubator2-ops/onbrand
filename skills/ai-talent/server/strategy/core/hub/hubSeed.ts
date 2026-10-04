@@ -194,6 +194,20 @@ export async function seedHub(opts: { reset?: boolean } = {}) {
     console.log(`[hub-seed] rep industry coverage: ${filled} backfilled`);
   }
 
+  // 2026-10-04：示範業務的履歷與個人寫法。同樣只補空的——理由同上。
+  {
+    const { DEMO_REP_PROFILES } = await import("../../../platform/core/hub/repProfile");
+    let filled = 0;
+    for (const [seed, profile] of Object.entries(DEMO_REP_PROFILES)) {
+      const { affectedRows } = await exec(
+        `UPDATE hub_reps SET profile = ? WHERE org_id = ? AND avatar_seed = ? AND profile IS NULL`,
+        [JSON.stringify(profile), org.id, seed],
+      );
+      filled += affectedRows;
+    }
+    console.log(`[hub-seed] rep profiles: ${filled} filled`);
+  }
+
   /**
    * 2026-09-23：把產品與用詞的舊紀錄表併進通用的 hub_strategy_edits。
    *

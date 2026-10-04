@@ -1,10 +1,12 @@
 import React, { useCallback, useState } from "react";
+import { Link } from "react-router-dom";
 import { Check, Circle, Clock, Eye, Hand, Link2, Lock, MessageCircle, PenLine, Scale, Send, UserCheck } from "lucide-react";
 import { trpc } from "../../../lib/trpc";
-import { Avatar, Card, DemoTag, ErrorNote, Loading, PageHeader, Pill, SectionTitle, cx, fmt } from "../ui";
+import { Card, RepPhoto, DemoTag, ErrorNote, Loading, PageHeader, Pill, SectionTitle, cx, fmt } from "../ui";
 import { LiveTag } from "../components/ov-LiveTag";
 import InviteModal from "../components/reps-InviteModal";
 import HermesTokens, { type RepRow } from "../components/reps-HermesTokens";
+import RepPhotoGrid from "../components/reps-PhotoGrid";
 
 const th = "px-2.5 py-2 font-medium whitespace-nowrap";
 const td = "px-2.5 py-2.5 align-middle";
@@ -97,9 +99,17 @@ export default function HubRepsPage() {
             ))}
           </div>
 
+          <section>
+            <SectionTitle
+              title="Team"
+              hint="Open a rep to see their profile, how their AI writes for them, and their brand-brain access QR."
+            />
+            <RepPhotoGrid reps={rows} />
+          </section>
+
           <Card pad={false} className="min-w-0">
             <div className="px-5 pt-5">
-              <SectionTitle title="Team" hint="Connections are the rep's choice. Posts and clicks cover the last 21 days." />
+              <SectionTitle title="Connections" hint="Connections are the rep's choice. Posts and clicks cover the last 21 days." />
             </div>
             <div className="overflow-x-auto">
               <table className="w-full min-w-[960px] text-left text-[13px]">
@@ -124,11 +134,15 @@ export default function HubRepsPage() {
                       <tr key={r.id} className="border-b border-stone-100 last:border-0 hover:bg-stone-50/60">
                         <td className={cx(td, "pl-5")}>
                           <div className="flex items-center gap-2.5">
-                            <Avatar name={String(r.name)} seed={r.avatarSeed ? String(r.avatarSeed) : undefined} size={30} />
+                            <RepPhoto name={String(r.name)} seed={r.avatarSeed ? String(r.avatarSeed) : undefined} photoUrl={r.photoUrl} size={30} />
                             <div className="min-w-0">
-                              <div className="whitespace-nowrap font-medium text-stone-900" title={String(r.title ?? "")}>
+                              <Link
+                                to={`/hub/reps/${r.id}`}
+                                className="whitespace-nowrap font-medium text-stone-900 hover:text-orange-700 hover:underline"
+                                title={String(r.title ?? "")}
+                              >
                                 {r.name}
-                              </div>
+                              </Link>
                               {r.isDemo ? <div className="mt-0.5"><DemoTag /></div> : null}
                             </div>
                           </div>

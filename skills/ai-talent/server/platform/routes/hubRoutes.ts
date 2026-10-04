@@ -7,6 +7,9 @@
  *   GET  /r/:code             tracked short link → logs the click → /scan/:code
  *   GET  /r/:code/qr.svg      QR for the booth
  *   GET  /api/hub/scan/:code  public attribution card for the scan page
+ *   GET  /hub-photo/:key.jpg  rep photo (unguessable key, rotates on every upload)
+ *   GET  /join/:code/qr.svg   the rep's brand-brain access QR (→ /join/:code page)
+ *   GET  /api/hub/join/:code  public card for the join page (bind code = the key)
  *   POST /mcp                 MCP (Streamable HTTP, stateless) for Hermes profiles,
  *                             bearer = the rep's own token
  *
@@ -165,6 +168,86 @@ hubPublicRouter.get("/r/:code", clickLimiter, async (req, res) => {
   } catch (err: any) {
     console.error("[hub.r] click failed:", err?.message ?? err);
     res.redirect(302, "/scan/unknown");
+  }
+});
+
+// ── rep profile: photo + brand-brain access (2026-10-04) ──────────────────────
+
+hubPublicRouter.get("/hub-photo/:file", clickLimiter, async (req, res) => {
+  const key = String(req.params.file).replace(/\.jpg$/, "");
+  const { readPhotoByKey } = await import("../core/hub/repProfile");
+  const photo = await readPhotoByKey(key).catch(() => null);
+  if (!photo) {
+    res.status(404).end();
+    return;
+  }
+  res.setHeader("Content-Type", photo.mime);
+  // 鑰匙每次換照片都會換，所以同一個網址的內容永遠不會變。
+  res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+  res.send(photo.body);
+});
+
+/**
+ * 綁定碼是 6 碼十六進位，等於這個公開頁面的鑰匙。限流比點擊連結嚴：
+ * 每分鐘 20 次讓猜碼不划算，正常人一次掃碼只會打一兩次。
+ */
+const joinLimiter = rateLimit({ windowMs: 60_000, max: 20, standardHeaders: true, validate: false });
+
+hubPublicRouter.get("/join/:code/qr.svg", clickLimiter, async (req, res) => {
+  const code = String(req.params.code).toUpperCase().slice(0, 6);
+  const { BIND_CODE_RE } = await import("../core/hub/repProfile");
+  if (!BIND_CODE_RE.test(code)) {
+    res.status(404).end();
+    return;
+  }
+  const QRCode = (await import("qrcode")).default;
+  const svg = await QRCode.toString(`${publicBaseUrl()}/join/${code}`, { type: "svg", margin: 1, errorCorrectionLevel: "M" });
+  res.setHeader("Content-Type", "image/svg+xml");
+  res.setHeader("Cache-Control", "no-store");
+  res.send(svg);
+});
+
+hubPublicRouter.get("/api/hub/join/:code", joinLimiter, async (req, res) => {
+  const code = String(req.params.code).toUpperCase().slice(0, 6);
+  try {
+    const { BIND_CODE_RE, lineBasicId, lineBindUrl, normaliseRepProfile, photoUrl } = await import("../core/hub/repProfile");
+    if (!BIND_CODE_RE.test(code)) {
+      res.status(404).json({ error: "not_found" });
+      return;
+    }
+    const [row] = await q(
+      `SELECT id, org_id, name, title, team, market, photo_key, profile FROM hub_reps WHERE bind_code = ? AND line_user_id IS NULL LIMIT 1`,
+      [code],
+    );
+    if (!row) {
+      res.status(404).json({ error: "not_found" });
+      return;
+    }
+    const org = await getOrg();
+    const { listSkills, listWording } = await import("../core/hub/hubStore");
+    const { packFor } = await import("../../content/core/hub/policyPacks");
+    const [solutions, skills, wording, basicId] = await Promise.all([
+      listSolutions(org.id), listSkills(org.id), listWording(org.id, row.market), lineBasicId(),
+    ]);
+    const profile = normaliseRepProfile(row.profile);
+    res.setHeader("Cache-Control", "no-store");
+    res.json({
+      // 只給這張卡需要的：名字、職稱、照片、他自己的寫法。不回 id、不回產業標籤。
+      rep: { name: row.name, title: row.title, team: row.team, market: row.market, photoUrl: photoUrl(row.photo_key) },
+      voice: { tone: profile.voice.tone, headline: profile.headline, stories: profile.stories.length },
+      org: { name: org.name, disclaimer: org.disclaimer },
+      brain: {
+        solutions: solutions.length,
+        skills: skills.filter((s) => s.status === "approved" && s.markets.includes(row.market)).length,
+        wording: wording.length,
+        policy: packFor(row.market).name,
+      },
+      code,
+      line: basicId ? { basicId, url: lineBindUrl(basicId, code) } : null,
+    });
+  } catch (err: any) {
+    console.error("[hub.join] lookup failed:", err?.message ?? err);
+    res.status(500).json({ error: "unavailable" });
   }
 });
 

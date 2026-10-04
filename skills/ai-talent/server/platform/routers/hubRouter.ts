@@ -924,12 +924,130 @@ const adminRouter = router({
     const org = await getOrg();
     const { getLeaderboard } = await import("../../performance/core/hub/hubStats");
     const board = await getLeaderboard(org.id);
-    const codes = await q(`SELECT id, bind_code, mcp_token_hash IS NOT NULL has_mcp FROM hub_reps WHERE org_id = ?`, [org.id]);
+    const codes = await q(
+      `SELECT id, bind_code, mcp_token_hash IS NOT NULL has_mcp, photo_key, profile FROM hub_reps WHERE org_id = ?`,
+      [org.id],
+    );
+    const { normaliseRepProfile, photoUrl, profileCompleteness } = await import("../core/hub/repProfile");
     return board.map((r) => {
       const c = codes.find((x) => x.id === r.id);
-      return { ...r, bindCode: c?.bind_code ?? null, hasMcpToken: Boolean(c?.has_mcp) };
+      const profile = normaliseRepProfile(c?.profile);
+      return {
+        ...r, bindCode: c?.bind_code ?? null, hasMcpToken: Boolean(c?.has_mcp),
+        photoUrl: photoUrl(c?.photo_key), headline: profile.headline, location: profile.location,
+        expertise: profile.expertise.slice(0, 3), completeness: profileCompleteness(profile),
+      };
     });
   }),
+
+  /**
+   * 業務個人頁（CJ 2026-10-04「點進去有履歷，也有該人的品牌大腦 Access QR CODE」）。
+   *
+   * access：還沒綁 LINE 的人才有。QR 指向公開的 /join/<綁定碼>，綁定碼就是
+   * 一次性的鑰匙；綁完它就作廢，這一欄也跟著變 null——已經進來的人不需要
+   * 再掃一次，留著一張還能用的 QR 只是多一個能被別人拿去綁的入口。
+   */
+  repProfile: adminProcedure.input(z.object({ repId: z.number().int().positive() })).query(async ({ input }) => {
+    const org = await getOrg();
+    const rep = await getRep(input.repId);
+    if (!rep || rep.orgId !== org.id) throw new TRPCError({ code: "NOT_FOUND" });
+    const { getRepProfileRow, photoUrl, profileCompleteness } = await import("../core/hub/repProfile");
+    const { getLeaderboard } = await import("../../performance/core/hub/hubStats");
+    const { publicBaseUrl } = await import("../core/hub/hubStore");
+    const { industryLabel } = await import("../../strategy/core/hub/industries");
+    const [row, board, posts] = await Promise.all([
+      getRepProfileRow(rep.id),
+      getLeaderboard(org.id),
+      q(
+        `SELECT p.id, p.channel, p.caption, p.verdict, p.status, p.created_at, s.name_en solution_en, s.name_zh solution_zh
+           FROM hub_posts p LEFT JOIN hub_solutions s ON s.id = p.solution_id
+          WHERE p.rep_id = ? ORDER BY p.created_at DESC LIMIT 4`,
+        [rep.id],
+      ),
+    ]);
+    const profile = row!.profile;
+    const rank = board.findIndex((b) => b.id === rep.id);
+    const stats = board[rank];
+    return {
+      rep: {
+        id: rep.id, name: rep.name, title: rep.title, team: rep.team, market: rep.market,
+        avatarSeed: rep.avatarSeed, isDemo: rep.isDemo, networkSize: rep.networkSize,
+        consented: Boolean(rep.consentAt), lineBound: Boolean(rep.lineUserId),
+        linkedin: rep.linkedinStatus, instagram: rep.instagramStatus, facebook: rep.facebookStatus,
+        industries: rep.industries.map((k) => ({ key: k, en: industryLabel(k, false), zh: industryLabel(k, true) })),
+      },
+      profile,
+      completeness: profileCompleteness(profile),
+      photoUrl: photoUrl(row!.photoKey),
+      stats: {
+        rank: rank >= 0 ? rank + 1 : null, teamSize: board.length,
+        posts: stats?.posts ?? 0, compliantPosts: stats?.compliantPosts ?? 0,
+        clicks: stats?.clicks ?? 0, leads: stats?.leads ?? 0,
+      },
+      access: !rep.lineUserId && rep.bindCode
+        ? { code: rep.bindCode, url: `${publicBaseUrl()}/join/${rep.bindCode}`, qrPath: `/join/${rep.bindCode}/qr.svg` }
+        : null,
+      recentPosts: posts.map((p: any) => ({
+        id: p.id, channel: p.channel, caption: String(p.caption ?? "").slice(0, 220), verdict: p.verdict,
+        status: p.status, createdAt: p.created_at, solutionEn: p.solution_en, solutionZh: p.solution_zh,
+      })),
+    };
+  }),
+
+  updateRepProfile: adminProcedure
+    .input(z.object({
+      repId: z.number().int().positive(),
+      title: z.string().trim().min(1).max(160).optional(),
+      team: z.string().trim().min(1).max(120).optional(),
+      // 形狀與上限由 normaliseRepProfile 收斂；這裡只擋明顯過大的輸入。
+      profile: z.record(z.any()).refine((v) => JSON.stringify(v).length < 20_000, "Profile is too long."),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const org = await getOrg();
+      const rep = await getRep(input.repId);
+      if (!rep || rep.orgId !== org.id) throw new TRPCError({ code: "NOT_FOUND" });
+      const { saveRepProfile, normaliseRepProfile } = await import("../core/hub/repProfile");
+      await saveRepProfile(rep.id, normaliseRepProfile(input.profile));
+      if (input.title || input.team) {
+        await exec(`UPDATE hub_reps SET title = COALESCE(?, title), team = COALESCE(?, team) WHERE id = ?`,
+          [input.title ?? null, input.team ?? null, rep.id]);
+      }
+      const [u] = await q(`SELECT email FROM users WHERE id = ? LIMIT 1`, [(ctx as any).user?.id ?? 0]);
+      await logEvent(org.id, rep.id, "profile_updated", `by ${u?.email ?? "admin"}`);
+      return { ok: true };
+    }),
+
+  setRepPhoto: adminProcedure
+    .input(z.object({ repId: z.number().int().positive(), dataUrl: z.string().max(800_000).nullable() }))
+    .mutation(async ({ input }) => {
+      const org = await getOrg();
+      const rep = await getRep(input.repId);
+      if (!rep || rep.orgId !== org.id) throw new TRPCError({ code: "NOT_FOUND" });
+      const { setRepPhoto, photoUrl } = await import("../core/hub/repProfile");
+      try {
+        return { photoUrl: photoUrl(await setRepPhoto(rep.id, input.dataUrl)) };
+      } catch (e: any) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: e?.message ?? "Invalid photo." });
+      }
+    }),
+
+  /** 只給虛構的示範業務；真人上傳照片（見 generateDemoPortrait）。 */
+  generateRepPortrait: adminProcedure
+    .input(z.object({ repId: z.number().int().positive() }))
+    .mutation(async ({ input }) => {
+      const org = await getOrg();
+      const rep = await getRep(input.repId);
+      if (!rep || rep.orgId !== org.id) throw new TRPCError({ code: "NOT_FOUND" });
+      const { generateDemoPortrait, getRepProfileRow, photoUrl } = await import("../core/hub/repProfile");
+      try {
+        const row = await getRepProfileRow(rep.id);
+        const key = await generateDemoPortrait(rep, row!.profile);
+        await logEvent(org.id, rep.id, "portrait_generated", "AI portrait (demo rep)");
+        return { photoUrl: photoUrl(key) };
+      } catch (e: any) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: e?.message ?? "Portrait generation failed." });
+      }
+    }),
 
   issueBindCode: adminProcedure.input(z.object({ repId: z.number().int() })).mutation(async ({ input }) => {
     return { code: await issueBindCode(input.repId) };

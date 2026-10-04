@@ -439,6 +439,20 @@ export const HUB_ALTERS: string[] = [
   `ALTER TABLE hub_reps ADD COLUMN industries JSON NULL`,
 
   /**
+   * 2026-10-04 (CJ「銷售的列表，每個人都是一張 avatar 照片，點進去有履歷，
+   * 也有該人的品牌大腦 Access QR CODE」)。
+   *
+   * profile：履歷 + 個人寫法（RepProfile，見 repProfile.ts）。一個 JSON，理由
+   * 跟 hub_solutions.profile 一樣——欄位清單還會長。
+   * photo：縮好的 data URL（前端壓到 512px JPEG，伺服器再擋一次大小）。
+   * photo_key：照片的公開網址用這把隨機鑰匙，不用流水號——不能從 id 一路列舉
+   * 出整個業務團隊的大頭照。每次換照片都換鑰匙，快取自然失效。
+   */
+  `ALTER TABLE hub_reps ADD COLUMN profile JSON NULL`,
+  `ALTER TABLE hub_reps ADD COLUMN photo MEDIUMTEXT NULL`,
+  `ALTER TABLE hub_reps ADD COLUMN photo_key CHAR(24) NULL`,
+
+  /**
    * 2026-09-23 (CJ「要做推播，是由建置該消息的用戶，設定推播的銷售業務員群組
    * 還有頻率」)。
    *

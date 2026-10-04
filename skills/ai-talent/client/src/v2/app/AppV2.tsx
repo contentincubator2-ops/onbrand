@@ -61,6 +61,8 @@ const HubShell = React.lazy(() => import("../hub/HubShell"));
 const HubOverviewPage = React.lazy(() => import("../hub/pages/HubOverviewPage"));
 const HubRepsPage = React.lazy(() => import("../hub/pages/HubRepsPage"));
 const HubRepViewPage = React.lazy(() => import("../hub/pages/HubRepViewPage"));
+const HubRepProfilePage = React.lazy(() => import("../hub/pages/HubRepProfilePage"));
+const HubJoinPage = React.lazy(() => import("../hub/pages/JoinPage"));
 const HubStrategyBrandPage = React.lazy(() => import("../hub/pages/strategy/StrategyBrandPage"));
 const HubStrategyProductsPage = React.lazy(() => import("../hub/pages/strategy/StrategyProductsPage"));
 const HubStrategyWordingPage = React.lazy(() => import("../hub/pages/strategy/StrategyWordingPage"));
@@ -83,7 +85,7 @@ const isHubHost = typeof window !== "undefined" && window.location.hostname.star
 // 2026-09-16 (CJ「login 之後找不到 experthub」): on the demo host, login lands on
 // /theater like the rest of OnBrand. Anything outside the demo's own routes
 // goes to /hub instead, so the booth never shows the OnBrand app.
-const HUB_HOST_PATHS = ["/hub", "/scan/", "/liff/", "/booth/", "/auth/", "/login", "/plan-expired", "/for-sales"];
+const HUB_HOST_PATHS = ["/hub", "/scan/", "/join/", "/liff/", "/booth/", "/auth/", "/login", "/plan-expired", "/for-sales"];
 function HubHostGuard() {
   const { pathname } = useLocation();
   if (!isHubHost || HUB_HOST_PATHS.some((p) => pathname === p || pathname.startsWith(p))) return null;
@@ -393,6 +395,8 @@ export default function AppV2() {
 
         {/* Sales Hub — public: tracked-link landing + LIFF pages opened inside LINE */}
         <Route path="/scan/:code" element={<HubScanPage />} />
+        {/* 業務掃自己的「品牌大腦 Access」QR 落在這裡。網址裡的一次性綁定碼就是身分。 */}
+        <Route path="/join/:code" element={<HubJoinPage />} />
         {/* 展場訪客貼自己文章的地方。網址裡的 token 就是身分，不需要登入。 */}
         <Route path="/booth/style/:token" element={<BoothStylePage />} />
         <Route path="/liff/write" element={<HubLiffWritePage />} />
@@ -402,6 +406,7 @@ export default function AppV2() {
           {/* 總管理 HQ */}
           <Route path="/hub" element={<HubOverviewPage />} />
           <Route path="/hub/reps" element={<HubRepsPage />} />
+          <Route path="/hub/reps/:repId" element={<HubRepProfilePage />} />
           <Route path="/hub/rep-view" element={<HubRepViewPage />} />
           {/* 策略 Strategy tray */}
           <Route path="/hub/strategy" element={<Navigate to="/hub/strategy/brand" replace />} />

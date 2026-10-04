@@ -19,6 +19,7 @@ import {
 } from "./complianceContract";
 import { packFor } from "./policyPacks";
 import { normaliseProfile, postSafeProfileLines } from "../../../strategy/core/hub/solutionProfile";
+import { getRepProfileRow, personaPromptLines, type RepProfile } from "../../../platform/core/hub/repProfile";
 import {
   createLink,
   exec,
@@ -122,6 +123,7 @@ function wordingPrompt(wording: HubWording[], market: string, zh: boolean): stri
 function buildMessages(args: {
   org: HubOrg;
   rep: HubRep;
+  persona: RepProfile | null;
   solution: HubSolution;
   facts: HubFact[];
   wording: HubWording[];
@@ -133,7 +135,7 @@ function buildMessages(args: {
   destinations: Array<{ label: string; url: string; useWhen: string }>;
   quietPeriods: Array<{ label: string; startsOn: string; endsOn: string; topics: string[] }>;
 }) {
-  const { org, rep, solution, facts, wording, skillMd, channel, angle, trackedLink, identity, destinations, quietPeriods } = args;
+  const { org, rep, persona, solution, facts, wording, skillMd, channel, angle, trackedLink, identity, destinations, quietPeriods } = args;
   const pack = packFor(rep.market);
   const zh = pack.language === "zh-TW";
   const pos = org.positioning ?? {};
@@ -185,7 +187,9 @@ function buildMessages(args: {
     factLines,
     "",
     zh ? "## 發文者" : "## Author",
-    `${rep.name}, ${rep.title} (${rep.team})`,
+    // 2026-10-04：人設（履歷、語氣、親身經歷）。排在所有公司規則之後，
+    // personaPromptLines 自己會寫明公司規則優先。沒填人設就只剩名字職稱。
+    ...(persona ? personaPromptLines(rep, persona, zh) : [`${rep.name}, ${rep.title} (${rep.team})`]),
     "",
     zh ? `## 專屬追蹤連結（放在結尾）\n${trackedLink}` : `## Tracked link (put it at the end)\n${trackedLink}`,
     // 公司與產品的寫法。法務對商標形式是認真的，而這是模型最常無聲寫錯的地方
@@ -279,13 +283,15 @@ export async function generateRepPost(input: GeneratePostInput): Promise<Generat
   const ctx = complianceContextFor({ market: rep.market, solutions, facts, wording, trackedLink });
   const { approvedDestinations, activeQuietPeriods, namingRules } = await import("../../../strategy/core/hub/brandAssets");
   // 品牌資料是選填的：表還沒建或一筆都沒填，就當成沒有這兩段，不該讓寫作失敗。
-  const [identity, destinations, quietPeriods] = await Promise.all([
+  const [identity, destinations, quietPeriods, personaRow] = await Promise.all([
     namingRules(org.id).catch(() => []),
     approvedDestinations(org.id).catch(() => []),
     activeQuietPeriods(org.id).catch(() => []),
+    // 人設也是選填：讀不到就照舊只用名字職稱寫，不讓寫作失敗。
+    getRepProfileRow(rep.id).catch(() => null),
   ]);
   const { system, user } = buildMessages({
-    org, rep, solution, facts, wording, skillMd: skill.skillMd, channel: input.channel,
+    org, rep, persona: personaRow?.profile ?? null, solution, facts, wording, skillMd: skill.skillMd, channel: input.channel,
     angle: input.angle?.trim() || null, trackedLink, identity, destinations, quietPeriods,
   });
 
