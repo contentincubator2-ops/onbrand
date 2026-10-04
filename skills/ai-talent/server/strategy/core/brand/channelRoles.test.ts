@@ -21,7 +21,7 @@ vi.mock("../../../localDb", () => ({
 
 import { buildBrandPrefix, buildBrandBrain, _clearBrandPrefixCache } from "./brandContext";
 import {
-  normalizeRoleChannel, roleChannelOfTaskId, roleChannelOfTemplate, cleanChannelRole, isEmptyChannelRole,
+  normalizeRoleChannel, roleChannelOfTaskId, roleChannelOfTemplate, cleanChannelRole, clampField, isEmptyChannelRole,
   channelRolesOf, isVerbatimIn, CHANNEL_ROLE_FIELDS, ROLE_CHANNELS,
 } from "./channelRoles";
 
@@ -170,5 +170,26 @@ describe("helpers", () => {
     expect(isVerbatimIn("25-35 歲的年輕人", src)).toBe(true);
     expect(isVerbatimIn("25 到 35 歲的年輕族群", src)).toBe(false);
     expect(isVerbatimIn("a", src)).toBe(false);
+  });
+});
+
+describe("clampField", () => {
+  it("沒超過上限原樣回傳", () => {
+    expect(clampField("很短的一句。", 200)).toBe("很短的一句。");
+  });
+  it("超過上限時停在句尾，不攔腰截斷", () => {
+    const text = "第一句話在這裡。".repeat(10) + "最後一句沒有寫完所以不該出現在結果裡而且很長很長很長";
+    const out = clampField(text, 50);
+    expect([...out].length).toBeLessThanOrEqual(50);
+    expect(out.endsWith("。")).toBe(true);
+  });
+  it("句尾落在前半段以前就硬截（不為了句尾丟掉大半內容）", () => {
+    const text = "短。" + "字".repeat(300);
+    expect([...clampField(text, 100)].length).toBe(100);
+  });
+  it("cleanChannelRole 也走同一套", () => {
+    const r = cleanChannelRole({ avoid: "條款一。".repeat(100) });
+    expect(r.avoid.endsWith("。")).toBe(true);
+    expect([...r.avoid].length).toBeLessThanOrEqual(300);
   });
 });

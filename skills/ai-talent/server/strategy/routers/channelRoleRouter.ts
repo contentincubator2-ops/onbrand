@@ -80,7 +80,7 @@ async function callJson(system: string, messages: { role: "user" | "assistant"; 
 }
 
 const FIELD_GUIDE = CHANNEL_ROLE_FIELDS
-  .map((f) => `- "${f.key}"（${f.label}，≤${f.max} 字）`)
+  .map((f) => `- "${f.key}"（${f.label}，**硬上限 ${f.max} 字**）`)
   .join("\n");
 
 /** 其他平台已定下的角色——讓 AI 知道要跟它們區隔，而不是每個平台都產出同一套話。 */
@@ -185,7 +185,7 @@ ${persona.block}${brand}${otherChannelsBlock(channelRolesOf(pos), input.channel)
 ${FIELD_GUIDE}
   }
 }
-proposal 的每一格都要簡潔、可以直接放進表單；沒有把握的格給空字串，不要硬湊。`;
+proposal 的每一格都要簡潔、可以直接放進表單。**每格有字數硬上限，超過的部分會被系統截掉**——寫短、寫完整的句子，不要寫到一半被截；沒有把握的格給空字串，不要硬湊。`;
 
       let text = "";
       try {
