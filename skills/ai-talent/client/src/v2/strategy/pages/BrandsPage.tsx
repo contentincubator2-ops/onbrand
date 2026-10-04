@@ -2564,6 +2564,7 @@ export default function BrandsPage() {
           brandId={activeBrandIdForLocks}
           onClose={() => setProductDetailId(null)}
           onImageUpdated={() => brandProductsQ?.refetch?.()}
+          onUpload={(id) => { setProductDetailId(null); setProductDocId(id); }}
           onReposition={(id) => {
             setProductDetailId(null);
             kickReposition("product", id, brandProductsList?.find((p: any) => p.id === id)?.name);

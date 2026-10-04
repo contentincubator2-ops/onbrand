@@ -85,6 +85,10 @@ export default function PositioningDocPanel({
 }) {
   const { lang } = useLang();
   const en = lang === "en";
+  // 2026-10-04（CJ「用戶上傳自己的定位資料後，請用用戶的資料完全取代掉原來的產品定位」）：
+  // 產品寫入＝取代。文件對到的格寫進去，其餘格清空（舊內容備份在 _replacedBackup）；
+  // 品牌／活動維持逐格合併。
+  const replaceMode = scopeMode === "product";
   const ownerBrandId = scopeMode === "brand" ? scopeId : (brandId ?? scopeId);
   const scopeLabel = scopeMode === "brand" ? (en ? "brand" : "品牌")
                    : scopeMode === "product" ? (en ? "product" : "產品")
@@ -288,11 +292,15 @@ export default function PositioningDocPanel({
             {en
               ? `These ${doneInfo.written} fields are now part of your ${scopeLabel} brain — every task run reads them from here on. `
                 + (doneInfo.missing > 0
-                    ? `The other ${doneInfo.missing} of ${doneInfo.total} weren't in this document and were left untouched.`
+                    ? (replaceMode
+                        ? `The other ${doneInfo.missing} of ${doneInfo.total} weren't in this document, so they are now empty.`
+                        : `The other ${doneInfo.missing} of ${doneInfo.total} weren't in this document and were left untouched.`)
                     : "")
               : `這 ${doneInfo.written} 格已經存進${scopeLabel}大腦，之後每次跑任務都會讀到。`
                 + (doneInfo.missing > 0
-                    ? `${doneInfo.total} 格裡其餘的 ${doneInfo.missing} 格這份文件沒有寫到，維持原樣沒有被動到——不用現在處理。`
+                    ? (replaceMode
+                        ? `${doneInfo.total} 格裡其餘的 ${doneInfo.missing} 格這份文件沒有寫到，已清空——產品定位現在完全以你的文件為準。`
+                        : `${doneInfo.total} 格裡其餘的 ${doneInfo.missing} 格這份文件沒有寫到，維持原樣沒有被動到——不用現在處理。`)
                     : "")}
           </p>
           {doneInfo.injected > 0 && (
@@ -336,6 +344,14 @@ export default function PositioningDocPanel({
             </Chip>
           )}
         </div>
+
+        {replaceMode && (
+          <div className="rounded-2xl border border-warning-200 bg-warning-50/60 px-4 py-3 text-small text-warning-800">
+            {en
+              ? `Writing replaces this product's current positioning: only the ${accepted.size} fields ticked below will remain; everything else is cleared (photos, preferred / forbidden words and promotion periods are kept).`
+              : `寫入後會用你的文件取代這個產品現有的定位：只留下下面勾選的 ${accepted.size} 格，其餘欄位會清空（產品照片、常用／禁用詞彙、推廣時間不受影響）。`}
+          </div>
+        )}
 
         <p className="text-tiny text-default-500">
           {en
@@ -484,7 +500,7 @@ export default function PositioningDocPanel({
                 ? `${review.proposals.length} found + ${review.missing.length} not found = ${review.total} fields the engine reads. `
                   + "Not an error, and nothing to do right now — these stay exactly as they are. Two ways to fill them later: upload another document that covers them, or run the SoWork positioning method from the overview."
                 : `對到 ${review.proposals.length} 格 ＋ 沒對到 ${review.missing.length} 格 ＝ 這個${scopeLabel}的 ${review.total} 格。`
-                  + "不是錯誤，也不用現在處理——這幾格會維持原樣、不會被清掉。之後要補有兩條路：再上傳一份有寫到的文件，或回總覽用 SoWork 定位法自動產生。"}
+                  + "不是錯誤。" + (replaceMode ? "這幾格寫入後會是空的，之後可以在產品視窗手動補。" : "這幾格會維持原樣、不會被清掉。") + "之後要補有兩條路：再上傳一份有寫到的文件，或回總覽用 SoWork 定位法自動產生。"}
             </p>
             <ul className="flex flex-col gap-1">
               {review.missing.map((f) => (
@@ -512,6 +528,7 @@ export default function PositioningDocPanel({
                   .filter((p) => accepted.has(p.path))
                   .map((p) => ({ path: p.path, value: p.value })),
                 injectSections: [...inject],
+                replace: replaceMode,
               });
             }}
           >
@@ -520,8 +537,8 @@ export default function PositioningDocPanel({
           <Button size="sm" variant="flat" onPress={() => setReview(null)}>{en ? "Cancel" : "取消"}</Button>
           <span className="text-tiny text-default-500">
             {en
-              ? `Writing ${accepted.size} of ${review.total}; the other ${review.total - accepted.size} stay as they are.`
-              : `${review.total} 格中寫入 ${accepted.size} 格，其餘 ${review.total - accepted.size} 格維持原樣。`}
+              ? `Writing ${accepted.size} of ${review.total}; the other ${review.total - accepted.size} ${replaceMode ? "will be cleared." : "stay as they are."}`
+              : `${review.total} 格中寫入 ${accepted.size} 格，其餘 ${review.total - accepted.size} 格${replaceMode ? "會清空。" : "維持原樣。"}`}
           </span>
         </div>
       </div>
@@ -625,7 +642,7 @@ export default function PositioningDocPanel({
           kind="folder"
           size="sm"
           title={en ? "No positioning documents yet" : "還沒收到任何定位文件"}
-          action={{ label: en ? "Upload a document" : "上傳文件", onPress: () => fileRef.current?.click() }}
+          // 2026-10-04：上方工具列已有「上傳文件」，空狀態不再重複放第二顆。
         />
       ) : (
         <div className="flex flex-col gap-2">
