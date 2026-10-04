@@ -340,22 +340,25 @@ describe("整串對話：編號挑範圍（2026-10-04）", () => {
   });
 });
 
-describe("參考資料來源（2026-10-04）", () => {
-  it("沒填就不附區塊，systemPrompt 維持 SKILL 原文", () => {
-    expect(groundingBlock("")).toBe("");
-    expect(groundingBlock("   ")).toBe("");
-    expect(cardTemplate(makeCard({ skill: "規則", sources: "" })).systemPrompt).toBe("規則");
+describe("資料來源（AI 上網查到的，2026-10-04）", () => {
+  const ref = { title: "小店 IG 經營", url: "https://example.com/a", host: "example.com", takeaway: "用日常小故事開場，轉換率較高。", retrievedAt: "2026-10-04T00:00:00Z" };
+
+  it("沒有來源就不附區塊，systemPrompt 維持 SKILL 原文", () => {
+    expect(groundingBlock(undefined)).toBe("");
+    expect(groundingBlock([])).toBe("");
+    expect(cardTemplate(makeCard({ skill: "規則", references: [] })).systemPrompt).toBe("規則");
   });
 
-  it("有填就接在 SKILL 後面，並明說資料以外不准編", () => {
-    const t = cardTemplate(makeCard({ skill: "規則", sources: "本店位於高雄，主打手沖咖啡。" }));
+  it("有來源就接在 SKILL 後面，附編號與重點，並明說來源以外不准編", () => {
+    const t = cardTemplate(makeCard({ skill: "規則", references: [ref] }));
     expect(t.systemPrompt.startsWith("規則")).toBe(true);
-    expect(t.systemPrompt).toContain("本店位於高雄，主打手沖咖啡。");
+    expect(t.systemPrompt).toContain("[1] 小店 IG 經營（example.com）");
+    expect(t.systemPrompt).toContain(ref.takeaway);
     expect(t.systemPrompt).toContain("不要編");
   });
 
-  it("複製卡時參考資料一起帶走", () => {
-    const copy = duplicateCard(makeCard({ sources: "資料 A" }), [], { channel: "instagram", userId: 1 });
-    expect(copy.sources).toBe("資料 A");
+  it("複製卡時來源一起帶走", () => {
+    const copy = duplicateCard(makeCard({ references: [ref] }), [], { channel: "instagram", userId: 1 });
+    expect(copy.references).toEqual([ref]);
   });
 });
