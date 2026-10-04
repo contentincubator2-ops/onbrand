@@ -45,6 +45,24 @@ const ADVISOR_SCOPES: Array<[StrategistScope, string]> = [
   ["events", "活動頁"], ["visual", "視覺頁"], ["regulations", "法規頁"], ["performance", "成效層"],
   ["content", "內容企劃頁（本週企劃／靈感／專案）"],
 ];
+/**
+ * 顧問的招牌問題有些預設「使用者已經貼了東西」（「這句文案有沒有誇大的問題？」「這個月的數字…」）。
+ * 第一輪直接拿去問，顧問回「請先貼給我」——合理的回答，卻被評成不及格（法規 0.34、內容企劃 0.50）。
+ * 那是考卷的問題。這裡替這類題目附上使用者會貼的東西；素材刻意帶著該被指出的毛病。
+ */
+function advisorAttachment(question: string, brandName: string, productName: string | null): string {
+  const p = productName ?? brandName;
+  if (/數字|數據|指標|報表|後台/.test(question) && /這個月|上個月|這週|本月/.test(question)) {
+    return "（使用者貼上的數據）本月：觸及 12,400（上月 15,100）、互動率 2.1%（上月 2.8%）、連結點擊 310（上月 420）、訂單 86 筆（上月 80 筆）、廣告花費 18,000 元（上月 18,000 元）。";
+  }
+  if (/這句|這段文案|這篇文案|這段|幫我把/.test(question) && /誇大|療效|合規|安全|改/.test(question)) {
+    return `（使用者貼上的文案）「${p}每天吃，保證讓你精神變好、提升免疫力，全台最便宜，吃過的人都說比餐廳好吃一百倍！」`;
+  }
+  if (/這篇|這則|這句|這段|這張|這支|這一頁|這組/.test(question)) {
+    return `（使用者貼上的草稿）「${brandName}的${p}開賣了。退冰就能下鍋，五分鐘上桌。想第一次試試看的人，現在可以下單。」`;
+  }
+  return "";
+}
 const emit = (row: Record<string, unknown>) =>
   console.log(`EVALCASE ${Buffer.from(JSON.stringify(row), "utf8").toString("base64")}`);
 
@@ -217,8 +235,11 @@ function variantText(v: any): string {
         if (!directors.length) console.log(`SKIP advisors ${scope}: 沒有人選`);
         for (const d of directors) {
           const role = getRole(d.roleId);
-          const question = d.signatureQuestions?.[0];
-          if (!question) continue;
+          const baseQuestion = d.signatureQuestions?.[0];
+          if (!baseQuestion) continue;
+          const attachment = advisorAttachment(baseQuestion, brand.name, products[0]?.name ?? null);
+          const question = attachment ? `${baseQuestion}
+${attachment}` : baseQuestion;
           const productId = scope === "product" && products.length ? products[0]!.id : null;
           const started = Date.now();
           let response = "", err = "", brandCtx = "";
