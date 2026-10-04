@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { outputApprovalState } from "./publishGate";
+import { canPublishFor, outputApprovalState } from "./publishGate";
 
 const pool = (queue: string | null, output: string | null, hasReviewer = true) => ({
   execute: async (sql: string) => [sql.includes("workspace_members")
@@ -28,5 +28,28 @@ describe("outputApprovalState", () => {
   });
   it("users with a reviewer available still need approval", async () => {
     expect(await outputApprovalState(pool(null, "draft", true), 1, 7)).toBe("not_submitted");
+  });
+});
+
+describe("canPublishFor", () => {
+  const joinPool = (found: boolean, fail = false) => ({
+    execute: async () => { if (fail) throw new Error("db down"); return [found ? [{ 1: 1 }] : []]; },
+  });
+  it("owner always may, without touching the db", async () => {
+    expect(await canPublishFor(joinPool(false, true), 5, 5)).toBe(true);
+  });
+  it("workspace owner/admin may publish a teammate's post", async () => {
+    expect(await canPublishFor(joinPool(true), 1, 2)).toBe(true);
+  });
+  it("others (members/viewers, strangers) may not", async () => {
+    expect(await canPublishFor(joinPool(false), 1, 2)).toBe(false);
+  });
+  it("fails closed when the lookup errors", async () => {
+    expect(await canPublishFor(joinPool(true, true), 1, 2)).toBe(false);
+  });
+  it("the query only accepts owner/admin actors", async () => {
+    let seen = "";
+    await canPublishFor({ execute: async (sql: string) => { seen = sql; return [[]]; } }, 1, 2);
+    expect(seen).toMatch(/me\.role IN \('owner','admin'\)/);
   });
 });

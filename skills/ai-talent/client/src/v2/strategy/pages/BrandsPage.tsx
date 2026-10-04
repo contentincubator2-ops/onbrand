@@ -32,6 +32,7 @@ import ChannelRolesTray from "./brands/ChannelRolesTray";
 import { type ChannelId } from "../lib/channelRoles";
 import { InfoTab as BrandInfoTab, DangerTab as BrandDangerTab, PublishTab as BrandPublishTab } from "../components/positioning/BrandSettingsSheet";
 import BrainPanel from "../components/brain/BrainPanel";
+import { BrainHelpTip } from "../components/brain/BrainHelpTip";
 import RegulationsPanel from "../components/regulations/RegulationsPanel";
 import BrandOnboardingWizard from "../components/onboarding/BrandOnboardingWizard";
 import AIBriefPanel from "../components/positioning/AIBriefPanel";
@@ -1428,6 +1429,7 @@ export default function BrandsPage() {
                 ? (lang === "en" ? `${monitorUnread} new alert${monitorUnread === 1 ? "" : "s"}` : `${monitorUnread} 則新情報還沒看`)
                 : undefined}
             />
+            <BrainHelpTip en={lang === "en"} />
           </>
         )}
         {/* 2026-09-30（CJ「上傳定位資料，是只有在定位資料的頁面才需要出現的，用戶可以使用 SoWork

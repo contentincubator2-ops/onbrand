@@ -7,6 +7,17 @@
  * 任務卡的 systemPrompt、agent 人設、SKILL 內文一律不出伺服器：Claude 只拿得到
  * 卡片名稱、要問哪幾格、跑完的成品。產稿在伺服器跑，Claude 只負責調度。
  *
+ * ── 刻意不提供「核准」與「發布」工具（人工核准邊界，不要「順手」加）────────
+ * 這個連接器只能：讀品牌大腦、列／查任務卡、交辦產稿、查成品、看團隊看板、把題目排進本週企劃。
+ * 它沒有 approve／publish／schedule-publish 的工具，原因：
+ *  1. 發布到客戶真實粉專前，必須由人在 onBrand Studio 內核准（publishGate：多人團隊要由作者以外的
+ *     人放行；單人帳號才免審）。讓 AI 代理人自己核准自己的稿，等於拆掉這道閘門。
+ *  2. 發布需要「已核准的成品」＋「該品牌已完成平台連接」，兩者都是使用者在 onBrand Studio 內才能
+ *     確認的狀態，MCP 呼叫端看不到也不該代為決定。
+ *  3. team_board 的「待審成品」只是顯示；要審、要放行、要發布，一律請使用者回 onBrand Studio 操作。
+ * 若日後真要開放，必須走使用者逐次明確同意的流程，並沿用 publishGate／canPublishFor／assertCanAct，
+ * 不可另寫一條繞過核准的路。
+ *
  * ── 計費 ──────────────────────────────────────────────────────────
  * run_task 走既有的 quickTask.runOrchestra* mutation（createCaller），所以方案閘門、
  * 必填檢查、成本護欄、扣點全部沿用，不另寫一套；其他工具是讀取或排格子，不扣點。
@@ -435,7 +446,7 @@ const teamBoard: ToolDef = {
   title: "團隊看板",
   description:
     "在對話中顯示這個品牌的 onBrand Studio 行銷團隊看板：本週企劃、每位成員正在做的事、待審成品。" +
-    "使用者問「團隊在忙什麼」「這週進度」「有什麼要我審」時呼叫。",
+    "使用者問「團隊在忙什麼」「這週進度」「有什麼要我審」時呼叫。只是顯示：核准與發布要請使用者回 onBrand Studio 親自操作，這個連接器不能代為核准或發布。",
   inputSchema: {
     type: "object",
     properties: {

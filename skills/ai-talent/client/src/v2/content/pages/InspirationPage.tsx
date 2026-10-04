@@ -527,6 +527,12 @@ function AdoptDialog({ en, a, platforms, busy, onCancel, onConfirm }: {
   const days = Array.from({ length: 14 }, (_, i) => addDays(today, i));
   const [date, setDate] = React.useState(addDays(today, 1));
   const [platform, setPlatform] = React.useState(platforms.some((p) => p.id === a.platform) ? a.platform : platforms[0]?.id ?? "facebook");
+  const dlgRef = React.useRef<HTMLDivElement>(null);
+  React.useEffect(() => {
+    const opener = document.activeElement as HTMLElement | null;
+    dlgRef.current?.focus();
+    return () => opener?.focus?.();
+  }, []);
   React.useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onCancel(); };
     document.addEventListener("keydown", onKey);
@@ -534,14 +540,14 @@ function AdoptDialog({ en, a, platforms, busy, onCancel, onConfirm }: {
   }, [onCancel]);
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4" onMouseDown={(e) => { if (e.target === e.currentTarget) onCancel(); }}>
-      <div role="dialog" aria-modal="true" aria-labelledby="adopt-title" className="w-full max-w-[440px] rounded-2xl bg-white p-6 shadow-xl">
+      <div ref={dlgRef} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="adopt-title" className="max-h-[90vh] w-full max-w-[440px] overflow-y-auto rounded-2xl bg-white p-6 shadow-xl outline-none">
         <h2 id="adopt-title" className="m-0 text-[16px] font-bold" style={{ color: INK }}>{en ? "Put it in the weekly plan" : "放進本週企劃"}</h2>
         <p className="m-0 mt-1.5 text-[13.5px] leading-relaxed" style={{ color: META }}>{a.title}</p>
 
         <p className="m-0 mt-5 text-[12px] font-semibold" style={{ color: INK }}>{en ? "Which day?" : "哪一天發？"}</p>
         <div className="mt-2 flex flex-wrap gap-1.5">
           {days.map((d) => (
-            <button key={d} type="button" onClick={() => setDate(d)}
+            <button key={d} type="button" aria-pressed={date === d} onClick={() => setDate(d)}
               className="rounded-full border px-3 py-1.5 text-[12.5px]"
               style={date === d ? { borderColor: INK, background: INK, color: "#FFFFFF" } : { borderColor: LINE, color: "#404040" }}>
               {d === today ? (en ? "Today" : "今天") : dayLabel(d, en)}
@@ -552,7 +558,7 @@ function AdoptDialog({ en, a, platforms, busy, onCancel, onConfirm }: {
         <p className="m-0 mt-5 text-[12px] font-semibold" style={{ color: INK }}>{en ? "Where?" : "發在哪？"}</p>
         <div className="mt-2 flex flex-wrap gap-1.5">
           {platforms.map((p) => (
-            <button key={p.id} type="button" onClick={() => setPlatform(p.id)}
+            <button key={p.id} type="button" aria-pressed={platform === p.id} onClick={() => setPlatform(p.id)}
               className="flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[12.5px]"
               style={platform === p.id ? { borderColor: INK, background: INK, color: "#FFFFFF" } : { borderColor: LINE, color: "#404040" }}>
               {PLATFORM_ICON[p.id] && <FontAwesomeIcon icon={PLATFORM_ICON[p.id]} />}{p.label}

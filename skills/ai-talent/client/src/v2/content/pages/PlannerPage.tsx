@@ -27,6 +27,7 @@ import { friendlyError } from "../../platform/lib/friendlyError";
 import { channelRoute } from "../../platform/lib/channelMeta";
 import { PlatformTaskModal, type TaskEmbed } from "./PlatformTaskPage";
 import { getCalendarPublishPayload } from "../lib/strategyContentEnvelope";
+import { failedNote, isFailedScheduled } from "../lib/plannerFailed";
 import { addDays, defaultWeek, mondayOf, ymdTpe } from "../lib/plannerWeek";
 
 const INK = "#171717", META = "#6B6B6B", LINE = "#EAEAEA", SOFT = "#F6F6F5", ORANGE = "#18181B";
@@ -118,16 +119,20 @@ export default function PlannerPage() {
     onSuccess: (r: any) => { showToastGlobal(en ? `${r?.count ?? 0} posts scheduled for this week` : `已排定 ${r?.count ?? 0} 篇`, "success"); setTouched([]); refresh(); },
     onError: (e: any) => showToastGlobal(friendlyError(e, en ? "Something went wrong. Please try again." : "剛剛沒成功，再試一次。"), "error"),
   });
-  const removeSlot = T.planner?.removeSlot?.useMutation?.({ onSuccess: () => { setOpen(null); refresh(); } });
+  const removeSlot = T.planner?.removeSlot?.useMutation?.({ onSuccess: () => { setOpen(null); refresh(); }, onError: (e: any) => showToastGlobal(friendlyError(e, en ? "Something went wrong. Please try again." : "剛剛沒成功，再試一次。"), "error") });
   // 分歧方案卡：選一版 → 伺服器套用那一版的格子。
   const pickFork = T.planner?.pickFork?.useMutation?.({
     onSuccess: (r: any) => { if (r?.weekStart) setWeekStart(r.weekStart); setTouched(r?.touched ?? []); refresh(); },
     onError: (e: any) => showToastGlobal(friendlyError(e, en ? "Something went wrong. Please try again." : "剛剛沒成功，再試一次。"), "error"),
   });
-  const cancelSched = T.calendar?.cancel?.useMutation?.({ onSuccess: () => { setOpen(null); refresh(); } });
+  const cancelSched = T.calendar?.cancel?.useMutation?.({ onSuccess: () => { setOpen(null); refresh(); }, onError: (e: any) => showToastGlobal(friendlyError(e, en ? "Something went wrong. Please try again." : "剛剛沒成功，再試一次。"), "error") });
   // 原本行事曆能做的三件事（取消／改時間／立即發布）都留在這裡，取代才不會少功能。
   const onErr = (e: any) => showToastGlobal(friendlyError(e, en ? "Something went wrong. Please try again." : "剛剛沒成功，再試一次。"), "error");
   const reschedule = T.calendar?.reschedule?.useMutation?.({ onSuccess: () => { setOpen(null); setMoveAt(""); refresh(); }, onError: onErr });
+  const retryFailed = T.calendar?.retry?.useMutation?.({
+    onSuccess: () => { setOpen(null); refresh(); showToastGlobal(en ? "Back in the queue. It still needs approval before it publishes." : "已放回排程。發布前仍需核准。", "success"); },
+    onError: onErr,
+  });
   const publishNow = T.calendar?.publish?.useMutation?.({
     onSuccess: () => { setOpen(null); refresh(); showToastGlobal(en ? "Published" : "已發布", "success"); }, onError: onErr,
   });
@@ -136,6 +141,23 @@ export default function PlannerPage() {
   const messages: Array<{ id: number; role: string; content: string; choices: string[]; fork: ForkView | null }> = data?.messages ?? [];
   React.useEffect(() => { chatEnd.current?.scrollIntoView({ block: "end" }); }, [messages.length, pending]);
   // Escape closes the post popup (keyboard users shouldn't need the × button).
+  // Focus moves into the dialog on open, Tab is trapped inside, and focus returns to the opener on close.
+  const dialogRef = React.useRef<HTMLDivElement>(null);
+  React.useEffect(() => {
+    if (!open) return;
+    const opener = document.activeElement as HTMLElement | null;
+    dialogRef.current?.focus();
+    const onTab = (ev: KeyboardEvent) => {
+      if (ev.key !== "Tab" || !dialogRef.current) return;
+      const f = Array.from(dialogRef.current.querySelectorAll<HTMLElement>("button:not([disabled]), input:not([disabled]), a[href]"));
+      if (!f.length) return;
+      const first = f[0], last = f[f.length - 1];
+      if (ev.shiftKey && (document.activeElement === first || document.activeElement === dialogRef.current)) { ev.preventDefault(); last.focus(); }
+      else if (!ev.shiftKey && document.activeElement === last) { ev.preventDefault(); first.focus(); }
+    };
+    window.addEventListener("keydown", onTab);
+    return () => { window.removeEventListener("keydown", onTab); opener?.focus?.(); };
+  }, [open]);
   React.useEffect(() => {
     if (!open) return;
     const onKey = (ev: KeyboardEvent) => { if (ev.key === "Escape") setOpen(null); };
@@ -162,7 +184,7 @@ export default function PlannerPage() {
     }
     const PLAT: Record<string, string> = { fb: "facebook", ig: "instagram", li: "linkedin", yt: "youtube", tt: "tiktok" };
     for (const it of (calQ.data as any[]) ?? []) {
-      if (it.kind === "scheduled" && it.status !== "pending") continue;   // 已取消的不顯示；已發布的由 published 那份帶
+      if (it.kind === "scheduled" && it.status !== "pending" && !isFailedScheduled(it)) continue;   // 已取消的不顯示；已發布的由 published 那份帶
       const raw = String(it.platform ?? "").toLowerCase();
       const date = ymdTpe(new Date(it.at));
       const time = new Date(it.at).toLocaleTimeString("zh-TW", { timeZone: "Asia/Taipei", hour: "2-digit", minute: "2-digit", hour12: false });
@@ -173,7 +195,7 @@ export default function PlannerPage() {
       out.push({
         kind: it.kind, key: `${it.kind}${it.id}`, date, platform: PLAT[raw] ?? raw,
         title: String(it.preview || it.missionTitle || "").slice(0, 40),
-        meta: it.kind === "published" ? (en ? "Published" : "已發布") : (en ? `Scheduled ${time}${review}` : `已排程 ${time}${review}`), cal: it,
+        meta: it.kind === "published" ? (en ? "Published" : "已發布") : isFailedScheduled(it) ? (en ? `Failed ${time}` : `失敗 ${time}`) : (en ? `Scheduled ${time}${review}` : `已排程 ${time}${review}`), cal: it,
       });
     }
     const weekEnd = addDays(weekStart, 7);
@@ -226,6 +248,7 @@ export default function PlannerPage() {
   const reviewTag = (it: Item): { text: string; tone: "warn" | "bad" | "ok" } | null => {
     if (it.kind === "review") return { text: en ? "To review" : "待審", tone: "warn" };
     if (it.kind !== "scheduled") return null;
+    if (isFailedScheduled(it.cal)) return { text: en ? "Failed" : "發布失敗", tone: "bad" };
     const rs = String(it.cal?.reviewStatus ?? "");
     if (rs === "pending" || rs === "in_review") return { text: en ? "In review" : "送審中", tone: "warn" };
     if (rs === "revision_requested") return { text: en ? "Sent back" : "退回修改", tone: "bad" };
@@ -248,14 +271,14 @@ export default function PlannerPage() {
   );
 
   return (
-    <div className="flex flex-col bg-white" style={{ height: "calc(100vh - 64px)" }}>
-      <header className="flex h-16 shrink-0 items-center px-7" style={{ borderBottom: `1px solid ${LINE}` }}>
+    <div className="flex flex-col bg-white lg:h-[calc(100vh-64px)]">
+      <header className="flex h-16 shrink-0 items-center px-4 lg:px-7" style={{ borderBottom: `1px solid ${LINE}` }}>
         <h1 className="m-0 text-[17px] font-bold" style={{ color: INK }}>{en ? "Weekly plan" : "本週企劃"}</h1>
       </header>
 
-      <div className="flex min-h-0 flex-1">
+      <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
         {/* ── 左：對話 ── */}
-        <section aria-label={en ? "Chat" : "對話"} className="flex w-[400px] shrink-0 flex-col p-6" style={{ borderRight: `1px solid ${LINE}` }}>
+        <section aria-label={en ? "Chat" : "對話"} className="flex max-h-[60vh] w-full shrink-0 flex-col border-b border-neutral-200 p-4 lg:max-h-none lg:w-[400px] lg:border-b-0 lg:border-r lg:p-6">
           <div className="flex items-center gap-2.5 pb-4" style={{ borderBottom: `1px solid ${LINE}` }}>
             {avatar}
             <p className="m-0 text-[14px] font-semibold" style={{ color: INK }}>{en ? "Content director" : "內容總監"}</p>
@@ -276,7 +299,7 @@ export default function PlannerPage() {
             ) : (
               <>
                 {messages.map((m) => m.role === "user" ? (
-                  <div key={m.id} className="max-w-[280px] self-end rounded-2xl rounded-br px-3.5 py-2.5 text-[14px] leading-relaxed" style={{ background: SOFT }}>{m.content}</div>
+                  <div key={m.id} className="max-w-[min(280px,85%)] self-end rounded-2xl rounded-br px-3.5 py-2.5 text-[14px] leading-relaxed" style={{ background: SOFT }}>{m.content}</div>
                 ) : (
                   <React.Fragment key={m.id}>
                     <div className="flex items-start gap-2.5">{avatar}<p className="m-0 mt-1.5 max-w-[280px] whitespace-pre-wrap text-[14px] leading-relaxed" style={{ color: "#262626" }}>{m.content}</p></div>
@@ -311,8 +334,8 @@ export default function PlannerPage() {
         </section>
 
         {/* ── 右：這一週 ── */}
-        <section aria-label={en ? "This week" : "這一週"} className="relative flex min-w-0 flex-1 flex-col gap-4 overflow-y-auto px-7 py-6" style={{ background: "#FCFCFB" }}>
-          <div className="flex items-center justify-between gap-4">
+        <section aria-label={en ? "This week" : "這一週"} className="relative flex min-w-0 flex-1 flex-col gap-4 overflow-y-auto px-4 py-6 lg:px-7" style={{ background: "#FCFCFB" }}>
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-2">
               <button type="button" aria-label={en ? "Previous week" : "上一週"} onClick={() => { setWeekStart(addDays(weekStart, -7)); setTouched([]); setOpen(null); }}
                 className="flex h-8 w-8 items-center justify-center rounded-full border text-[12px] text-neutral-500 hover:text-neutral-900" style={{ borderColor: LINE }}><FontAwesomeIcon icon={faChevronLeft} /></button>
@@ -344,7 +367,7 @@ export default function PlannerPage() {
             </p>
           )}
 
-          <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(7, minmax(0, 1fr))" }}>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
             {days.map((d) => {
               const dayItems = items.filter((it) => it.date === d.date);
               const [wd, dt] = (d.label || "").split(" ");
@@ -381,7 +404,7 @@ export default function PlannerPage() {
                       </button>
                       {canWrite(it) && (
                         <button type="button" aria-label={en ? "More" : "更多"} onClick={() => setOpen(it)}
-                          className="absolute right-2 top-2.5 flex h-7 w-7 items-center justify-center rounded-full text-[13px] text-neutral-400 transition hover:bg-neutral-100 hover:text-neutral-900">
+                          className="absolute right-2 top-2.5 flex h-7 w-7 items-center justify-center rounded-full text-[13px] text-neutral-500 transition hover:bg-neutral-100 hover:text-neutral-900">
                           <FontAwesomeIcon icon={faEllipsis} />
                         </button>
                       )}
@@ -399,13 +422,13 @@ export default function PlannerPage() {
           {/* ── 點開一篇 ── */}
           {open && (
             <div className="fixed inset-0 z-[1500] flex items-center justify-center bg-black/20 px-4" onClick={() => setOpen(null)}>
-              <div role="dialog" aria-modal="true" aria-label={open.title} className="w-[min(340px,92vw)] rounded-2xl bg-white p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
+              <div ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label={open.title} className="max-h-[90vh] w-[min(340px,92vw)] overflow-y-auto rounded-2xl bg-white p-5 shadow-xl outline-none" onClick={(e) => e.stopPropagation()}>
                 <div className="flex items-center justify-between">
                   <span className="flex items-center gap-2">
                     <span className="flex h-6 w-6 items-center justify-center rounded-[7px] text-[12px]" style={{ background: SOFT, color: "#404040" }}><FontAwesomeIcon icon={PLATFORM_ICON[open.platform] ?? faGlobe} /></span>
                     <span className="text-[12px]" style={{ color: META }}>{en ? (PLATFORM_EN[open.platform] ?? open.platform) : (PLATFORM_ZH[open.platform] ?? open.platform)}・{md(open.date)}{open.kind === "slot" && open.slot.format ? `・${open.slot.format}` : ""}</span>
                   </span>
-                  <button type="button" aria-label={en ? "Close" : "關閉"} onClick={() => setOpen(null)} className="text-[16px] text-neutral-400 hover:text-neutral-900">×</button>
+                  <button type="button" aria-label={en ? "Close" : "關閉"} onClick={() => setOpen(null)} className="flex h-8 w-8 items-center justify-center rounded-full text-[18px] text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900">×</button>
                 </div>
                 <p className="m-0 mt-3 text-[17px] font-bold leading-snug" style={{ color: INK }}>{open.title}</p>
                 {open.kind === "slot" && open.slot.reason && <p className="m-0 mt-2 text-[13.5px] leading-relaxed" style={{ color: "#404040" }}>{open.slot.reason}</p>}
@@ -414,9 +437,12 @@ export default function PlannerPage() {
                   {open.kind === "slot" ? `${en ? "Task card" : "任務卡"}・${open.slot.taskLabel ?? open.slot.taskId}`
                     : open.kind === "campaign" ? `${en ? "Task card" : "任務卡"}・${open.camp.taskLabel}` : open.meta}
                 </p>
-                <div className="mt-4 flex gap-2">
+                {isFailedScheduled(open.kind === "scheduled" ? open.cal : null) && (
+                  <p role="alert" className="m-0 mt-2 rounded-lg px-3 py-2 text-[12.5px] leading-relaxed" style={{ background: "#FEE2E2", color: "#991B1B" }}>{failedNote(open.kind === "scheduled" ? open.cal : null, en)}</p>
+                )}
+                <div className="mt-4 flex flex-wrap gap-2">
                   {outputOf(open) ? (
-                    <button type="button" onClick={() => navigate(`/run/${outputOf(open)}`)} className="flex-1 rounded-full py-2.5 text-[13.5px] font-semibold text-white" style={{ background: INK }}>{en ? "Open" : "看成品"}</button>
+                    <button type="button" onClick={() => navigate(`/run/${outputOf(open)}`)} className="flex-1 rounded-full py-2.5 text-[13.5px] font-semibold text-white" style={{ background: INK }}>{isFailedScheduled(open.kind === "scheduled" ? open.cal : null) ? (en ? "Open & reschedule" : "開啟並重新排程") : (en ? "Open" : "看成品")}</button>
                   ) : (open.kind === "slot" || open.kind === "campaign") ? (
                     <button type="button" onClick={() => startWriting(open)} className="flex-1 rounded-full py-2.5 text-[13.5px] font-semibold text-white" style={{ background: INK }}>{en ? "Write it" : "寫這篇"}</button>
                   ) : null}
@@ -428,6 +454,10 @@ export default function PlannerPage() {
                     <button type="button" onClick={() => removeSlot?.mutate?.({ brandId, id: open.slot.id })}
                       className="rounded-full border px-3.5 py-2.5 text-[13.5px]" style={{ borderColor: LINE, color: "#525252" }}>{en ? "Delete" : "刪除"}</button>
                   )}
+                  {open.kind === "scheduled" && isFailedScheduled(open.cal) && (
+                    <button type="button" disabled={retryFailed?.isPending} onClick={() => retryFailed?.mutate?.({ id: open.cal.id })}
+                      className="rounded-full border px-4 py-2.5 text-[13.5px]" style={{ borderColor: LINE }}>{en ? "Retry" : "重試"}</button>
+                  )}
                   {open.kind === "scheduled" && open.cal.status === "pending" && (
                     <button type="button" disabled={publishNow?.isPending} onClick={() => publishNow?.mutate?.(getCalendarPublishPayload(open.cal.id, open.cal.contentKind))}
                       className="rounded-full border px-4 py-2.5 text-[13.5px]" style={{ borderColor: LINE }}>{en ? "Publish now" : "立即發布"}</button>
@@ -437,7 +467,7 @@ export default function PlannerPage() {
                       className="rounded-full border px-4 py-2.5 text-[13.5px]" style={{ borderColor: LINE, color: "#525252" }}>{en ? "Unschedule" : "取消排程"}</button>
                   )}
                 </div>
-                {open.kind === "scheduled" && open.cal.status === "pending" && (
+                {open.kind === "scheduled" && (open.cal.status === "pending" || isFailedScheduled(open.cal)) && (
                   <form className="mt-3 flex items-center gap-2" onSubmit={(e) => { e.preventDefault(); if (moveAt) reschedule?.mutate?.({ id: open.cal.id, scheduledAt: new Date(moveAt).toISOString() }); }}>
                     <label htmlFor="planner-move" className="text-[12px]" style={{ color: META }}>{en ? "Move to" : "改到"}</label>
                     <input id="planner-move" type="datetime-local" value={moveAt} onChange={(e) => setMoveAt(e.target.value)}
