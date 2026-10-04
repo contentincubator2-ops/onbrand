@@ -23,8 +23,9 @@ import { trpc } from "../../../../lib/trpc";
 import { useLang, tr } from "../../../../lib/i18n";
 import {
   Button, Chip, Input, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader,
-  Progress, Textarea,
+  Textarea,
 } from "@heroui/react";
+import ConvertingToAIFormat from "../positioning/ConvertingToAIFormat";
 import { IllustrationImage, SceneArt } from "../../../platform/components/TaskIllustration";
 import { SCENE_OPTIONS, isTaskScene, pickTaskScene, type TaskScene } from "../../../platform/components/taskScene";
 import { AddIcon, CheckIcon, ChevronLeftIcon, CopyIcon, DeleteIcon, GenerateIcon, MeetingIcon, SampleIcon, TextIcon, WarningIcon } from "../../../platform/components/icons";
@@ -536,21 +537,15 @@ export default function TaskCardComposer({
           {step === 2 && (
             <>
               {!card?.skill && card?.status !== "failed" && (
-                <div className="space-y-2 py-4">
-                  <p className="text-small font-medium">
-                    {en ? "Reading your samples…" : "正在讀你的範例，反推寫作規則…"}
-                  </p>
-                  <Progress
-                    size="sm" color="primary"
-                    aria-label={en ? "Distilling" : "生成中"}
-                    value={((card?.currentStep ?? 1) / (card?.totalSteps ?? 3)) * 100}
-                  />
-                  <p className="text-tiny text-default-500">
-                    {en
-                      ? "Usually 20–60 seconds. You can keep this open."
-                      : "通常 20–60 秒。這個視窗可以開著等。"}
-                  </p>
-                </div>
+                <ConvertingToAIFormat
+                  title={en ? "Distilling into a SKILL" : "正在總結成 AI SKILL"}
+                  stages={en
+                    ? ["Reading your samples…", "Finding the structure behind them…", "Working out the writing rules…", "Writing the SKILL…"]
+                    : ["讀取你的範例…", "拆解結構與語氣…", "反推寫作規則…", "寫成 SKILL…"]}
+                  hint={en
+                    ? "Usually 20–60 seconds. You can keep this open. You review the SKILL before it goes live."
+                    : "通常 20–60 秒，這個視窗可以開著等。生成後由你檢查，確認前不會上架。"}
+                />
               )}
 
               {card?.status === "failed" && (
