@@ -12,7 +12,7 @@
  *
  * 單色。全站紀律是「4A 代理商專業感，不要彩色」，這裡只用墨色深淺與邊框。
  */
-import { localizeSource } from "../../../content/lib/taskEn";
+import { localizeSource } from "../../lib/taskEn";
 import React, { useMemo, useState } from "react";
 import { useLang } from "../../../../lib/i18n";
 import { resolveSource, sourceWhy, sourcePillText,
@@ -24,7 +24,7 @@ export interface PickerTask {
   label?: string;
   description?: string;
   source?: unknown;
-  en?: import("../../../content/lib/taskEn").TaskEn | null;
+  en?: import("../../lib/taskEn").TaskEn | null;
   tier?: string;
   ownCardId?: string | null;
 }

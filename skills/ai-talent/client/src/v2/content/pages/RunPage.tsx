@@ -16,7 +16,7 @@
  *   🪄 重生  🎚️ 設定  📋 複製  💾 存
  *   ↻ 重跑  ✕ 關閉
  */
-import { localizeSource } from "../lib/taskEn";
+import { localizeSource } from "../../platform/lib/taskEn";
 import React, { useMemo, useState, useEffect, useRef } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import {

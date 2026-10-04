@@ -163,7 +163,7 @@ export interface FBTaskCard {
   inputs?: any[];
   primary_question?: string | null;
   /** server 附的英文旁路；沒有就 null／undefined。 */
-  en?: import("../../lib/taskEn").TaskEn | null;
+  en?: import("../../../platform/lib/taskEn").TaskEn | null;
   /** 2026-09-30：自建卡用戶自選的插畫場景；null＝依題目自動挑。 */
   scene?: string | null;
   /** 自建卡的 AI 插畫；內建卡的圖走 taskIllustrationIds.json。 */
