@@ -91,8 +91,19 @@ function variantText(v: any): string {
   // 可指定只跑哪幾張卡（重跑不及格的題目時用）。
   const onlyTasks = new Set(String(process.env.TASK_IDS ?? "").split(",").map((s) => s.trim()).filter(Boolean));
 
-  const catalog = buildTaskCatalogIndex().filter((t) =>
-    channels.includes(String(t.platform)) && String(t.tier) === "30s" && isRecentViral(t.source as any));
+  // ALL_CARDS=1（CJ「我要你測試過 onbrand 上使用到的所有 Agent」「每個任務卡都是不同 agent」）：
+  // 目錄裡的每一張卡都考——不分通路、不分層級、不管前台現在列不列。305 張卡綁了 161 位不同的 agent，
+  // 只考前台那 38 張等於只考了一小部分人。
+  const allCards = process.env.ALL_CARDS === "1";
+  const concurrency = Math.max(1, Math.min(6, Number(process.env.CONCURRENCY ?? 3)));
+  const fullCatalog = buildTaskCatalogIndex();
+  const catalog = allCards
+    ? fullCatalog
+    : fullCatalog.filter((t) => channels.includes(String(t.platform)) && String(t.tier) === "30s" && isRecentViral(t.source as any));
+  const cardChannels = allCards ? Array.from(new Set(fullCatalog.map((t) => String(t.platform)))) : channels;
+  /** 主問題是「貼上你的資料／網址」的卡：我們給的一句話主題不是它要的輸入，分數不能跟別的卡一起算。 */
+  const needsPastedData = (tpl: any): boolean =>
+    /貼上|貼入|網址|連結|url|paste|上傳|截圖/i.test(`${text(tpl?.primary_question)} ${String(tpl?.primary_input?.placeholder ?? "")}`);
 
   let n = 0, empty = 0;
   for (const brandId of brandIds) {
@@ -106,17 +117,25 @@ function variantText(v: any): string {
     let turn = 0;
     /** 第一篇寫成功的貼文——給「換人重寫」當原稿。 */
     let rewriteBase: { taskId: string; caption: string; channel: string; productId: number | null; topic: string } | null = null;
-    for (const ch of suites.has("cards") || suites.has("rewrite") ? channels : []) {
-      // 只考「換人重寫」時，只需要一篇原稿。
-      if (!suites.has("cards") && rewriteBase) break;
-      const cards = catalog.filter((t) => t.platform === ch && (!onlyTasks.size || onlyTasks.has(t.id))).slice(0, !suites.has("cards") ? 1 : onlyTasks.size ? 99 : perChannel);
+    // 先把要跑的卡排好（連同輪到哪個產品），再用小型工作池跑——305 張一張一張跑要兩三個小時。
+    const jobs: Array<{ card: (typeof catalog)[number]; ch: string; product: { id: number; name: string } | null }> = [];
+    for (const ch of suites.has("cards") || suites.has("rewrite") ? cardChannels : []) {
+      const cards = catalog.filter((t) => t.platform === ch && (!onlyTasks.size || onlyTasks.has(t.id)))
+        .slice(0, !suites.has("cards") ? 1 : onlyTasks.size || allCards ? 999 : perChannel);
       for (const card of cards) {
+        jobs.push({ card, ch, product: products.length ? products[turn % products.length]! : null });
+        turn++;
+      }
+    }
+    if (!suites.has("cards")) jobs.splice(3);     // 只考「換人重寫」時，有一篇原稿就夠（留三次機會）
+    console.log(`CARDS ${jobs.length} 張，併發 ${concurrency}`);
+
+    const runCard = async ({ card, ch, product }: (typeof jobs)[number]): Promise<void> => {
+        if (!suites.has("cards") && rewriteBase) return;
         const template: any = await resolveTaskTemplate(card.id);
         const config: any = await resolveOrchestraConfig(card.id);
-        if (!template || !config) { console.log(`SKIP ${card.id}: 沒有 template／config`); continue; }
+        if (!template || !config) { console.log(`SKIP ${card.id}: 沒有 template／config（${card.tier}）`); return; }
 
-        const product = products.length ? products[turn % products.length]! : null;
-        turn++;
         const topic = product
           ? `這次主打「${product.name}」，想吸引第一次購買的人`
           : `介紹${brand.name}，讓沒聽過的人想多了解`;
@@ -131,7 +150,7 @@ function variantText(v: any): string {
             inputs: { [inputKey]: topic },
             brandId,
             ...(product ? { productId: product.id } : {}),
-            tier: "30s",
+            tier: (["30s", "60s", "99s"].includes(String(card.tier)) ? String(card.tier) : "30s") as any,
           });
           response = allVariantsText(result?.variants ?? []);
           firstVariant = variantText(result?.variants?.[0]);
@@ -158,9 +177,12 @@ function variantText(v: any): string {
         if (firstVariant && !rewriteBase && firstVariant.length >= 60) {
           rewriteBase = { taskId: card.id, caption: firstVariant, channel: ch, productId: product?.id ?? null, topic };
         }
-        if (!suites.has("cards")) continue;
+        if (!suites.has("cards")) return;
         const row = {
           suite: "cards", agent: agentName || null, variantCount,
+          agentId: Number(template.agent_id ?? 0) || null, tier: String(card.tier),
+          sourceType: String((card.source as any)?.type ?? ""), frontVisible: isRecentViral(card.source as any),
+          needsData: needsPastedData(template),
           id: `${brandId}:${card.id}`, brandId, brandName: brand.name, channel: ch, taskId: card.id,
           taskLabel: text(template.label) || card.labelZh, topic, query, response,
           empty: response === "（產出為空白）", error: err || null, latencyMs: Date.now() - started,
@@ -168,8 +190,16 @@ function variantText(v: any): string {
         emit(row);
         console.log(`  ${row.id} [${agentName}] ${row.empty ? "EMPTY " + err : response.length + " 字／" + variantCount + " 版"} ${(row.latencyMs / 1000).toFixed(1)}s`);
         n++;
+    };
+    // 工作池：一張卡壞掉（丟例外）不能拖垮整輪。
+    let cursor = 0;
+    await Promise.all(Array.from({ length: Math.min(concurrency, jobs.length || 1) }, async () => {
+      while (cursor < jobs.length) {
+        const job = jobs[cursor++]!;
+        try { await runCard(job); }
+        catch (e: any) { console.log(`CARDFAIL ${job.card.id}: ${String(e?.message ?? e).slice(0, 160)}`); }
       }
-    }
+    }));
 
     // ── 右下角顧問：每個頁面的三位，各問他自己的第一題招牌問題 ─────────────────
     // 照 strategistChat.sendMessage 的組法（同一份 system prompt、同一條模型路由），
@@ -219,7 +249,8 @@ function variantText(v: any): string {
 
     // ── 換人重寫：成品頁的五位寫手，各自重寫同一篇原稿 ─────────────────────────
     if (suites.has("rewrite")) {
-      const base = rewriteBase;
+      // 在 runCard 的閉包裡賦值，TS 的流程分析看不到——明講型別。
+      const base = rewriteBase as { taskId: string; caption: string; channel: string; productId: number | null; topic: string } | null;
       let writers: any[] = [];
       try { writers = (await import("../../client/src/v2/content/pages/run/runModel")).REWRITE_AGENTS as any[]; }
       catch (e: any) { console.log(`SKIP rewrite: 讀不到寫手名單（${String(e?.message ?? e).slice(0, 120)}）`); }

@@ -22,16 +22,33 @@ on:
         description: "Cards per channel"
         required: false
         default: '0'
+      allCards:
+        description: "1 = every card in the catalog (all tiers, all channels)"
+        required: false
+        default: '1'
+      suites:
+        description: "cards,advisors,rewrite"
+        required: false
+        default: 'cards'
+      concurrency:
+        description: "Cards in parallel (1-6)"
+        required: false
+        default: '3'
       taskIds:
         description: "Only these task ids (comma separated, optional)"
         required: false
         default: ''
 
+# 同一時間只跑一輪：兩輪一起跑會在 dev VM 上搶同一條模型額度，逾時的題目會被當成空白產出。
+concurrency:
+  group: op-eval-export-cases
+  cancel-in-progress: false
+
 jobs:
   export:
     runs-on: ubuntu-24.04
     environment: dev
-    timeout-minutes: 120
+    timeout-minutes: 330
     steps:
       - uses: actions/checkout@v4
       - name: Pack the script
@@ -42,17 +59,20 @@ jobs:
           BRAND_IDS: ${{ github.event.inputs.brandIds || '2972' }}
           PER_CHANNEL: ${{ github.event.inputs.perChannel || '0' }}
           TASK_IDS: ${{ github.event.inputs.taskIds || '' }}
+          ALL_CARDS: ${{ github.event.inputs.allCards || '1' }}
+          SUITES: ${{ github.event.inputs.suites || 'cards' }}
+          CONCURRENCY: ${{ github.event.inputs.concurrency || '3' }}
         with:
           host: ${{ secrets.VM_HOST }}
           username: ${{ secrets.VM_USER }}
           key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
-          command_timeout: 110m
-          envs: SCRIPT_B64,BRAND_IDS,PER_CHANNEL,TASK_IDS
+          command_timeout: 320m
+          envs: SCRIPT_B64,BRAND_IDS,PER_CHANNEL,TASK_IDS,ALL_CARDS,SUITES,CONCURRENCY
           script: |
             set -e
             cd /opt/onbrand/current/skills/ai-talent
             set -a; source .env 2>/dev/null; set +a
-            export BRAND_IDS PER_CHANNEL TASK_IDS
+            export BRAND_IDS PER_CHANNEL TASK_IDS ALL_CARDS SUITES CONCURRENCY
             echo "commit on box: $(readlink -f /opt/onbrand/current | sed 's#.*/##')"
             mkdir -p scripts/eval
             F=scripts/eval/.export-cases.run.ts

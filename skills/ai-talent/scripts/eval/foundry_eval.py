@@ -72,6 +72,7 @@ def main() -> int:
     ap.add_argument("--cases", required=True, type=Path)
     ap.add_argument("--rubric", default=HERE / "rubric.json", type=Path)
     ap.add_argument("--out", default=Path("eval-results.json"), type=Path)
+    ap.add_argument("--suite", default="", help="只評考卷裡 suite 欄位等於這個值的題目（cards／advisors／rewrite）")
     ap.add_argument("--keep", action="store_true", help="跑完不刪 Foundry 上的評估與評估器（要在入口網站看報表時用）")
     args = ap.parse_args()
 
@@ -79,6 +80,10 @@ def main() -> int:
     model = os.environ["FOUNDRY_MODEL_NAME"]
     rubric = json.loads(args.rubric.read_text(encoding="utf-8"))
     cases = load_cases(args.cases)
+    if args.suite:
+        cases = [c for c in cases if c.get("suite") == args.suite]
+        if not cases:
+            raise SystemExit(f"考卷裡沒有 suite={args.suite} 的題目")
 
     ts = datetime.now(tz=timezone.utc).strftime("%Y%m%d%H%M%S")
     evaluator_name = f"{rubric['name']}-{ts}-{uuid.uuid4().hex[:6]}"
@@ -147,14 +152,19 @@ def main() -> int:
             run = oai.evals.runs.retrieve(run_id=run.id, eval_id=ev.id)
         print(f"狀態 {run.status}；報表 {getattr(run, 'report_url', None)}")
 
+        by_id = {str(c.get("id")): c for c in cases}
         items = []
         for it in oai.evals.runs.output_items.list(run_id=run.id, eval_id=ev.id):
             d = it.model_dump() if hasattr(it, "model_dump") else dict(it)
             src = d.get("datasource_item") or {}
             res = (d.get("results") or [{}])[0]
             sample = res.get("sample")
+            meta = by_id.get(str(src.get("id")), {})
             items.append({
                 "id": src.get("id"),
+                "suite": meta.get("suite"), "agent": meta.get("agent"), "agentId": meta.get("agentId"),
+                "taskId": meta.get("taskId"), "roleId": meta.get("roleId"), "scope": meta.get("scope"),
+                "channel": meta.get("channel"), "empty": meta.get("empty"),
                 "score": res.get("score"),
                 "passed": res.get("passed"),
                 "label": res.get("label"),
