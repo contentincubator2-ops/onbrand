@@ -25,6 +25,7 @@
  * 用法（VM）：
  *   BRAND_IDS=2972 PER_CHANNEL=2 ./node_modules/.bin/tsx scripts/eval/export-cases.ts
  */
+import fs from "node:fs";
 import localPool from "../../server/localDb";
 import { runOrchestra } from "../../server/content/core/engine/quickTaskOrchestra";
 import { buildTaskCatalogIndex } from "../../server/content/core/catalog/taskCatalogIndex";
@@ -118,10 +119,19 @@ function variantText(v: any): string {
   const catalog = allCards
     ? fullCatalog
     : fullCatalog.filter((t) => channels.includes(String(t.platform)) && String(t.tier) === "30s" && isRecentViral(t.source as any));
-  const cardChannels = allCards ? Array.from(new Set(fullCatalog.map((t) => String(t.platform)))) : channels;
+  // ALL_CARDS 時有明講 CHANNELS 就只考那幾個通路（例如先考內容層七通路），沒講才是全部通路。
+  const cardChannels = allCards && !process.env.CHANNELS ? Array.from(new Set(fullCatalog.map((t) => String(t.platform)))) : channels;
   /** 主問題是「貼上你的資料／網址」的卡：我們給的一句話主題不是它要的輸入，分數不能跟別的卡一起算。 */
   const needsPastedData = (tpl: any): boolean =>
     /貼上|貼入|網址|連結|url|paste|上傳|截圖/i.test(`${text(tpl?.primary_question)} ${String(tpl?.primary_input?.placeholder ?? "")}`);
+
+  // ── 考題檔（EXAM_FILE）──────────────────────────────────────────────────
+  // 每張卡自己的幾組輸入（gen_exam_inputs.py 產的，可人工改）。有給就用它，不再用那句通用主題。
+  // REPEATS：同一題跑幾次。同一張卡兩次的分數可以差 0.5，只跑一次分不出「卡有問題」跟「這次寫壞」。
+  const examFile = String(process.env.EXAM_FILE ?? "").trim();
+  const exam: Record<string, Array<Record<string, string>>> = examFile ? JSON.parse(fs.readFileSync(examFile, "utf8")) : {};
+  const repeats = Math.max(1, Math.min(5, Number(process.env.REPEATS ?? 1)));
+  if (examFile) console.log(`EXAM ${examFile}：${Object.keys(exam).length} 張卡有考題，每題跑 ${repeats} 次`);
 
   let n = 0, empty = 0;
   for (const brandId of brandIds) {
@@ -136,11 +146,29 @@ function variantText(v: any): string {
     /** 第一篇寫成功的貼文——給「換人重寫」當原稿。 */
     let rewriteBase: { taskId: string; caption: string; channel: string; productId: number | null; topic: string } | null = null;
     // 先把要跑的卡排好（連同輪到哪個產品），再用小型工作池跑——305 張一張一張跑要兩三個小時。
-    const jobs: Array<{ card: (typeof catalog)[number]; ch: string; product: { id: number; name: string } | null }> = [];
+    const jobs: Array<{
+      card: (typeof catalog)[number]; ch: string; product: { id: number; name: string } | null;
+      /** 考題檔的那一組輸入；沒有考題檔時是 undefined（用通用主題）。 */
+      inputs?: Record<string, string>; inputIdx?: number; rep?: number;
+    }> = [];
+    /** 輸入裡提到哪支產品，就把那支產品的定位帶進去（跟使用者在任務視窗選了產品一樣）；都沒提到就只用品牌。 */
+    const productMentioned = (inp: Record<string, string>) => {
+      const all = Object.values(inp).join(" ");
+      const core = (name: string) => name.replace(/【[^】]*】/g, "").trim();
+      return products.find((p) => core(p.name).length >= 2 && all.includes(core(p.name))) ?? null;
+    };
     for (const ch of suites.has("cards") || suites.has("rewrite") ? cardChannels : []) {
       const cards = catalog.filter((t) => t.platform === ch && (!onlyTasks.size || onlyTasks.has(t.id)))
         .slice(0, !suites.has("cards") ? 1 : onlyTasks.size || allCards ? 999 : perChannel);
       for (const card of cards) {
+        if (examFile) {
+          const sets = exam[card.id];
+          if (!sets?.length) { console.log(`SKIP ${card.id}: 考題檔沒有這張卡`); continue; }
+          sets.forEach((inputs, inputIdx) => {
+            for (let rep = 0; rep < repeats; rep++) jobs.push({ card, ch, product: productMentioned(inputs), inputs, inputIdx, rep });
+          });
+          continue;
+        }
         jobs.push({ card, ch, product: products.length ? products[turn % products.length]! : null });
         turn++;
       }
@@ -148,16 +176,20 @@ function variantText(v: any): string {
     if (!suites.has("cards")) jobs.splice(3);     // 只考「換人重寫」時，有一篇原稿就夠（留三次機會）
     console.log(`CARDS ${jobs.length} 張，併發 ${concurrency}`);
 
-    const runCard = async ({ card, ch, product }: (typeof jobs)[number]): Promise<void> => {
+    const runCard = async ({ card, ch, product, inputs: examInputs, inputIdx, rep }: (typeof jobs)[number]): Promise<void> => {
         if (!suites.has("cards") && rewriteBase) return;
         const template: any = await resolveTaskTemplate(card.id);
         const config: any = await resolveOrchestraConfig(card.id);
         if (!template || !config) { console.log(`SKIP ${card.id}: 沒有 template／config（${card.tier}）`); return; }
 
-        const topic = product
-          ? `這次主打「${product.name}」，想吸引第一次購買的人`
-          : `介紹${brand.name}，讓沒聽過的人想多了解`;
         const inputKey = template.primary_input?.key ?? template.inputs?.[0]?.key ?? "topic";
+        const fieldLabel = (k: string) => text((template.inputs ?? []).find((i: any) => i.key === k)?.label) || k;
+        const topic = examInputs
+          ? Object.entries(examInputs).map(([k, v]) => (Object.keys(examInputs).length > 1 ? `［${fieldLabel(k)}］${v}` : v)).join("\n")
+          : product
+            ? `這次主打「${product.name}」，想吸引第一次購買的人`
+            : `介紹${brand.name}，讓沒聽過的人想多了解`;
+        const runInputs: Record<string, string> = examInputs ?? { [inputKey]: topic };
 
         const started = Date.now();
         let response = "", err = "", agentName = "", variantCount = 0, firstVariant = "";
@@ -167,7 +199,7 @@ function variantText(v: any): string {
           const result: any = await runOrchestra({
             template,
             config: { ...config, runImageGen: false },
-            inputs: { [inputKey]: topic },
+            inputs: runInputs,
             brandId,
             ...(product ? { productId: product.id } : {}),
             tier: (["30s", "60s", "99s"].includes(String(card.tier)) ? String(card.tier) : "30s") as any,
@@ -189,7 +221,8 @@ function variantText(v: any): string {
         const query = [
           `【任務】通路：${CHANNEL_ZH[ch] ?? ch}。任務卡：${text(template.label) || card.labelZh}（形式 ${card.postType}）。`,
           text(template.description) ? `任務說明：${text(template.description)}` : "",
-          `使用者這次的輸入：${topic}`,
+          text(template.primary_question) ? `任務卡問使用者的問題：${text(template.primary_question)}` : "",
+          `使用者這次的輸入（這裡出現的事實是使用者自己提供的，可以用）：${topic}`,
           variantCount > 1 ? `這張卡一次產出 ${variantCount} 個版本供使用者挑選，下面的回應是全部版本；請以「使用者拿到這一整份」來評。` : "",
           `目標市場：台灣（繁體中文）。`,
           `【品牌資料】`,
@@ -206,8 +239,9 @@ function variantText(v: any): string {
           suite: "cards", agent: agentName || null, variantCount,
           agentId: Number(template.agent_id ?? 0) || null, tier: String(card.tier),
           sourceType: String((card.source as any)?.type ?? ""), frontVisible: isRecentViral(card.source as any),
-          needsData: needsPastedData(template), check,
-          id: `${brandId}:${card.id}`, brandId, brandName: brand.name, channel: ch, taskId: card.id,
+          needsData: examInputs ? false : needsPastedData(template), check,
+          ...(examInputs ? { inputIdx, rep } : {}),
+          id: examInputs ? `${brandId}:${card.id}#i${inputIdx}r${rep}` : `${brandId}:${card.id}`, brandId, brandName: brand.name, channel: ch, taskId: card.id,
           taskLabel: text(template.label) || card.labelZh, topic, query, response,
           empty: response === "（產出為空白）", error: err || null, latencyMs: Date.now() - started,
         };

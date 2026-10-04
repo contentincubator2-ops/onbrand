@@ -1,51 +1,24 @@
-name: Ops (DEV) — export evaluation cases (runs real task cards, text only)
+name: Ops (DEV) — agent exam run (real task cards on the DEV VM, text only)
 
-# 2026-10-04（CJ「第一步，我選擇 microsoft foundry」）：在 dev VM 上用真的品牌跑真的任務卡，
-# 把「題目＋品牌資料＋產出」印成考卷，交給 scripts/eval/foundry_eval.py 用 Microsoft Foundry 評分。
+# 2026-10-04。用 dev VM 的真品牌、真模型鏈跑任務卡／顧問／重寫寫手，把「題目＋品牌資料＋產出」
+# 印成考卷（EVALCASE 行），再由 scripts/eval/foundry_eval.py 用 Microsoft Foundry 評分。
 #
-# 會花 LLM 額度（每題一次文字生成；圖片關掉）。不落地、不扣點——runOrchestra 不帶 userId。
+# 怎麼觸發：改 skills/ai-talent/scripts/eval/run-request.json 然後 push（任何分支）。
+#   workflow 不在 main 上，不能用 workflow_dispatch；而且「改一個檔就是一次評測請求」讓多個
+#   agent 各自在自己的分支上送請求，互不干擾（concurrency 以分支為單位）。
 #
-# 腳本用 base64 帶上 VM 而不是讀 /opt/onbrand/current 裡的那份：這樣不必先合併部署就能跑，
-# 改考題的挑法也不用等一輪部署。跑的仍然是 VM 上「已部署的」server 程式——要評的就是它。
+# 跑的是哪份程式：這個 commit 的 server 程式，放在 VM 的 /tmp 暫存副本（每次一個獨立目錄）。
+#   不動 /opt/onbrand/current、不重啟服務。這樣改了任務卡的指令，不必合併部署就能看分數。
+#
+# 會花 LLM 額度；不落地、不扣點（runOrchestra 不帶 userId）；圖片關掉。
 on:
   push:
     paths:
-      - '.github/workflows/op-eval-export-cases.yml'
-      - 'skills/ai-talent/scripts/eval/export-cases.ts'
-  workflow_dispatch:
-    inputs:
-      brandIds:
-        description: "Brand ids (comma separated)"
-        required: false
-        default: '2972'
-      perChannel:
-        description: "Cards per channel"
-        required: false
-        default: '0'
-      allCards:
-        description: "1 = every card in the catalog (all tiers, all channels)"
-        required: false
-        default: '1'
-      suites:
-        description: "cards,advisors,rewrite"
-        required: false
-        default: 'cards'
-      concurrency:
-        description: "Cards in parallel (1-6)"
-        required: false
-        default: '3'
-      useBranch:
-        description: "1 = run this commit's server code from a temp copy; 0 = run the deployed dev code"
-        required: false
-        default: '1'
-      taskIds:
-        description: "Only these task ids (comma separated, optional)"
-        required: false
-        default: ''
+      - 'skills/ai-talent/scripts/eval/run-request.json'
 
-# 同一時間只跑一輪：兩輪一起跑會在 dev VM 上搶同一條模型額度，逾時的題目會被當成空白產出。
+# 同一個分支同時只跑一輪（後送的排隊）。不同分支可以同時跑。
 concurrency:
-  group: op-eval-export-cases
+  group: op-eval-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
@@ -55,52 +28,51 @@ jobs:
     timeout-minutes: 330
     steps:
       - uses: actions/checkout@v4
-      - name: Pack the script
-        run: echo "SCRIPT_B64=$(base64 -w0 skills/ai-talent/scripts/eval/export-cases.ts)" >> "$GITHUB_ENV"
+      - name: Read the run request
+        run: |
+          R=skills/ai-talent/scripts/eval/run-request.json
+          cat "$R"
+          get() { node -e 'const r=require("./'"$R"'");const v=r[process.argv[1]];process.stdout.write(v===undefined||v===null?process.argv[2]:String(v))' "$1" "$2"; }
+          {
+            echo "TAG=$(get tag untagged)"
+            echo "BRAND_IDS=$(get brandIds 2972)"
+            echo "CHANNELS=$(get channels '')"
+            echo "ALL_CARDS=$(get allCards 1)"
+            echo "TASK_IDS=$(get taskIds '')"
+            echo "EXAM_FILE=$(get examFile '')"
+            echo "REPEATS=$(get repeats 1)"
+            echo "CONCURRENCY=$(get concurrency 3)"
+            echo "SUITES=$(get suites cards)"
+            echo "DELIVERY_CHECK=$(get deliveryCheck 0)"
+          } >> "$GITHUB_ENV"
       - uses: appleboy/ssh-action@v1.0.3
         env:
-          SCRIPT_B64: ${{ env.SCRIPT_B64 }}
-          BRAND_IDS: ${{ github.event.inputs.brandIds || '2972' }}
-          PER_CHANNEL: ${{ github.event.inputs.perChannel || '0' }}
-          TASK_IDS: ${{ github.event.inputs.taskIds || '' }}
-          ALL_CARDS: ${{ github.event.inputs.allCards || '1' }}
-          SUITES: ${{ github.event.inputs.suites || 'cards' }}
-          CONCURRENCY: ${{ github.event.inputs.concurrency || '3' }}
-          # USE_BRANCH=1：跑「這個 commit」的 server 程式（放在 /tmp 的暫存副本），不是 dev 站已部署的那份。
-          # 用來在合併前比較修改前後的分數；不動 /opt/onbrand/current，也不重啟任何服務。
-          USE_BRANCH: ${{ github.event.inputs.useBranch || '1' }}
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           GH_SHA: ${{ github.sha }}
+          RUN_ID: ${{ github.run_id }}
         with:
           host: ${{ secrets.VM_HOST }}
           username: ${{ secrets.VM_USER }}
           key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
           command_timeout: 320m
-          envs: SCRIPT_B64,BRAND_IDS,PER_CHANNEL,TASK_IDS,ALL_CARDS,SUITES,CONCURRENCY,USE_BRANCH,GH_TOKEN,GH_REPO,GH_SHA
+          envs: TAG,BRAND_IDS,CHANNELS,ALL_CARDS,TASK_IDS,EXAM_FILE,REPEATS,CONCURRENCY,SUITES,DELIVERY_CHECK,GH_TOKEN,GH_REPO,GH_SHA,RUN_ID
           script: |
             set -e
-            cd /opt/onbrand/current/skills/ai-talent
+            LIVE=/opt/onbrand/current/skills/ai-talent
+            cd "$LIVE"
             set -a; source .env 2>/dev/null; set +a
-            export BRAND_IDS PER_CHANNEL TASK_IDS ALL_CARDS SUITES CONCURRENCY
-            echo "commit on box: $(readlink -f /opt/onbrand/current | sed 's#.*/##')"
-            if [ "$USE_BRANCH" = "1" ]; then
-              LIVE=$(pwd)
-              SHADOW=/tmp/onbrand-evalshadow
-              rm -rf "$SHADOW" && mkdir -p "$SHADOW"
-              trap 'rm -rf /tmp/onbrand-evalshadow' EXIT
-              curl -sfL -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" \
-                "https://api.github.com/repos/$GH_REPO/tarball/$GH_SHA" \
-                | tar -xz -C "$SHADOW" --strip-components=1 --wildcards '*/skills/ai-talent/*'
-              cd "$SHADOW/skills/ai-talent"
-              ln -s "$LIVE/node_modules" node_modules
-              cp "$LIVE/.env" .env
-              echo "shadow: branch commit $GH_SHA ($(find server -name '*.ts' | wc -l) server files)"
-              ./node_modules/.bin/tsx scripts/eval/export-cases.ts
-              exit 0
-            fi
-            mkdir -p scripts/eval
-            F=scripts/eval/.export-cases.run.ts
-            echo "$SCRIPT_B64" | base64 -d > "$F"
-            trap 'rm -f "$F"' EXIT
-            ./node_modules/.bin/tsx "$F"
+            export BRAND_IDS ALL_CARDS TASK_IDS EXAM_FILE REPEATS CONCURRENCY SUITES DELIVERY_CHECK
+            # 空字串的 CHANNELS 不要匯出——腳本用「有沒有設」判斷要不要限制通路。
+            if [ -n "$CHANNELS" ]; then export CHANNELS; else unset CHANNELS; fi
+            echo "EVALRUN tag=$TAG sha=$GH_SHA deployed=$(readlink -f /opt/onbrand/current | sed 's#.*/##')"
+            SHADOW=/tmp/onbrand-evalshadow-$RUN_ID
+            rm -rf "$SHADOW" && mkdir -p "$SHADOW"
+            trap 'rm -rf "$SHADOW"' EXIT
+            curl -sfL -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" \
+              "https://api.github.com/repos/$GH_REPO/tarball/$GH_SHA" \
+              | tar -xz -C "$SHADOW" --strip-components=1 --wildcards '*/skills/ai-talent/*'
+            cd "$SHADOW/skills/ai-talent"
+            ln -s "$LIVE/node_modules" node_modules
+            cp "$LIVE/.env" .env
+            ./node_modules/.bin/tsx scripts/eval/export-cases.ts

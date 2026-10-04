@@ -746,9 +746,10 @@ export async function runOrchestra(args: {
       const stCheck = stage("brandcheck", "品牌一致性檢查");
       const remaining = tierBudget - (Date.now() - startedAt) - 15_000;
       // 2026-10-04 交付前檢查：同一次呼叫多查「是不是任務卡要的形式」「能不能直接發布」，事實從嚴
-      // （見 brandConsistency.ts 的 SYSTEM_DELIVERY）。DELIVERY_CHECK=0 可關回原本只查品牌一致性。
+      // （見 brandConsistency.ts 的 SYSTEM_DELIVERY）。**預設關閉**：2026-10-04 實測 251 張卡 0.58→0.56、延遲加倍，
+      // 沒有效果（審稿把 598 版裡 471 版判成要改）。留著程式是為了之後在評測裡再試不同寫法；DELIVERY_CHECK=1 才開。
       // 形式錯的稿子要改寫，給的時間比原本多（上限 40 秒，仍然只用剩餘預算）。
-      const deliveryCheck = process.env.DELIVERY_CHECK !== "0";
+      const deliveryCheck = process.env.DELIVERY_CHECK === "1";
       const timeoutMs = Math.min(deliveryCheck ? 40_000 : 25_000, remaining);
       const { checkBrandConsistency } = await import("./brandConsistency");
       // label／description 可能是 {zh,en} 物件——直接 String() 會變成 "[object Object]"。
