@@ -20,6 +20,7 @@ import { detectNonDeliverable } from "./captionSanity";
 import { isAdCopyTemplate, extractRequestedUrl, validateAdCopy, repairAdCopy } from "./adCopyContract";
 import { adSlotOf, repairAdSlot } from "./adSlotContract";
 import { isShotListTemplate, normalizeShotList, validateShotList, repairShotList } from "./shotListContract";
+import { isListingTemplate, normalizeListing, repairListing } from "./listingContract";
 // 2026-08-31 五感十築：正向直述句型合約（skill 01 Hard Rule 1）。
 import { extractYouTubeId, fetchYouTubeContext, formatYouTubeContextForPrompt } from "../../../platform/core/web/youtubeContext";
 import { fetchViralPatterns, formatViralPatternsForPrompt } from "../../../strategy/core/monitor/socialListeningScout";
@@ -261,6 +262,9 @@ async function runOrchestraInner(args: {
     // 跟 adCopy / shotList 一樣，改寫後要再修補一次。
     const adSlotTask = adSlotOf((args.template as any)?.id);
     const shotListTask = isShotListTemplate(args.template);
+    // 2026-10-04：商品頁（電商／開店平台 tray）交付的是欄位；每個會改寫文字的後處理都要再修補一次，
+    // 而且段落去重、佔位符清理這類「把貼文弄乾淨」的步驟會把欄位結構吃掉，要跳過。
+    const listingSpec = isListingTemplate(args.template) ? args.template.listingSpec! : null;
     const requestedUrl = adCopyTask ? extractRequestedUrl(args.inputs) : null;
     const ytUrlInput = inputValues.find((v) => !!extractYouTubeId(v));
     const firstUrl = ytUrlInput
@@ -570,6 +574,7 @@ async function runOrchestraInner(args: {
             // 跑不到這一關，所以只有正式環境現形。
             v.caption = adCopyTask ? repairAdCopy(report.text, requestedUrl)
               : shotListTask ? repairShotList(report.text)
+              : listingSpec ? repairListing(report.text, listingSpec)
               : adSlotTask ? repairAdSlot(report.text, adSlotTask)
               : report.text;
             if (adCopyTask) {
@@ -802,6 +807,7 @@ async function runOrchestraInner(args: {
           let fixed = await enforceBrandRulesOnText(args.brandId, res.caption).catch(() => res.caption);
           fixed = adCopyTask ? repairAdCopy(fixed, requestedUrl)
             : shotListTask ? repairShotList(fixed)
+            : listingSpec ? repairListing(fixed, listingSpec)
             : adSlotTask ? repairAdSlot(fixed, adSlotTask)
             : fixed;
           v.caption = fixed;
@@ -837,6 +843,7 @@ async function runOrchestraInner(args: {
             let fixed = await enforceBrandRulesOnText(args.brandId, text).catch(() => text);
             fixed = adCopyTask ? repairAdCopy(fixed, requestedUrl)
               : shotListTask ? repairShotList(fixed)
+              : listingSpec ? repairListing(fixed, listingSpec)
               : adSlotTask ? repairAdSlot(fixed, adSlotTask)
               : fixed;
             captions[vi]!.caption = fixed;
@@ -958,6 +965,8 @@ async function runOrchestraInner(args: {
               references: researchRefs,
               researchNote,
               regulationCompliance: (captions as any).__regulationCompliance ?? [],
+              // 商品頁：欄位規格（成品頁據此拆欄位、標出超過上限的欄位）。
+              listing: listingSpec,
             },
             thumbnailUrl: null,
             progress: "caption_ready",
@@ -1088,14 +1097,15 @@ async function runOrchestraInner(args: {
       // internal-dedupe even when no separate articleBody. Catches the
       // writer LLM duplicating its own hook + hashtag groups within a
       // single output.
-      if (caption) caption = deduplicateInternalCaption(caption);
+      if (caption && !listingSpec) caption = deduplicateInternalCaption(caption);
       // 2026-06-10 (CJ「資訊不夠時不要用 [請補充] 佔位符」改造):
       // Strip placeholder brackets from body captions.
       // 99s strategy docs (calendar / toolkit / playbook) legitimately use
       // [請補充：來源] for user fill-in — skip those by tier.
       const isStrategyDoc = (args.template.id ?? "").includes("-99-") &&
         /calendar|toolkit|playbook|策略|月曆|工具包/.test(args.template.id ?? "");
-      if (caption && !isStrategyDoc) caption = stripPlaceholderBrackets(caption);
+      // 商品頁跳過：stripPlaceholderBrackets 會把 \s{2,}（含換行）壓成一個空格，條列會黏成一行。
+      if (caption && !isStrategyDoc && !listingSpec) caption = stripPlaceholderBrackets(caption);
       if (caption && _voiceGated) caption = voiceSanitizeZhTW(caption);
       // 2026-07-18 多市場: Latin-punctuation markets get stray CJK
       // punctuation cleaned (writer prompt scaffolding is Chinese, the
@@ -1106,6 +1116,8 @@ async function runOrchestraInner(args: {
       // 都會重排段落，實測會把「下一格的時間戳」黏回上一格「字卡：」那行，
       // 整份腳本只認得出 1 格。在上游修沒有用 —— 這裡才是持久化前最後一點。
       if (caption && shotListTask) caption = normalizeShotList(caption);
+      // 商品頁同理：最後一步把欄位標題與條列排回標準格式。
+      if (caption && listingSpec) caption = normalizeListing(caption, listingSpec);
       if (!caption) {
         errors.push(`variant ${i} (${label}) caption 兩次嘗試都失敗`);
       }
@@ -1456,6 +1468,7 @@ async function runOrchestraInner(args: {
           // 2026-10-04：寫作前上網查到的案例與說法（成品頁顯示「資料來源」）。
           references: result.references ?? [],
           researchNote: result.researchNote ?? null,
+          listing: isListingTemplate(args.template) ? args.template.listingSpec : null,
           errors: result.errors ?? [],
           ok: result.ok ?? true,
           variantCount: result.variants.length,

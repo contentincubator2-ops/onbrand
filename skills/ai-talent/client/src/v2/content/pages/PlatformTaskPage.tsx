@@ -2794,6 +2794,7 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
         brandId={brandId ?? null}
         channel={platform as ComposerChannel}
         channelLabel={lang === "en" ? meta.label : meta.labelZh}
+        format={customChannel?.format === "listing" ? "listing" : "post"}
         initialCardId={resumeCardId}
         onPublished={() => { void listQuery?.refetch?.(); void ownCardsQuery?.refetch?.(); }}
       />

@@ -50,6 +50,7 @@ import { LINEBroadcast, LINECard, LINERichMenu } from "./line";
 import { WebLanding, WebBlog, WebProduct } from "./web";
 import { PressRelease, DeckMockup, QAMockup, SpeechMockup, FactSheetMockup, WebAboutMockup, NewsHookMockup } from "./press";
 import { GenericMockup } from "./generic";
+import { ListingMockup } from "./listing";
 import { ProposalCover, ProposalSpec, ResearchDoc, PersonaCard } from "./proposal";
 import { XHSNote, XHSVideo, XHSSearch } from "./xiaohongshu";
 import { ThreadsPost, ThreadsThread } from "./threads";
@@ -228,6 +229,8 @@ function PlatformMockupFrame({ variant, ...fields }: PlatformMockupProps) {
 
     // ── Generic ───────────────────────────────────────────────────────
     case "generic:generic": return <GenericMockup {...f} />;
+    // 2026-10-04：電商／開店平台 tray 的商品頁，一個欄位一張卡。
+    case "generic:listing": return <ListingMockup {...f} />;
 
     // ── Proposal-style for Brand + Research tasks (2026-05-09) ──────
     case "generic:proposal-cover": return <ProposalCover {...f} />;

@@ -1484,6 +1484,12 @@ export default function RunPage() {
     const strategyReportMockup = getStrategyPresentationMockup(data?.metadata, taskId);
     if (strategyReportMockup) return strategyReportMockup as any;
 
+    // 2026-10-04：商品頁（電商／開店平台 tray）。伺服器在成品 metadata 放了欄位規格，
+    // 有它就是欄位卡——排在 taskId 推斷之前，自建卡 id（u<brandId>-…）本來就推不出任何平台。
+    if ((data?.metadata as any)?.listing?.fields?.length) {
+      return { platform: "generic" as any, format: "listing" as any, label: "generic:listing" };
+    }
+
     // 2026-05-18 (CJ「改成用 word 形式，不要 ppt」): these FB squads are
     // strategy plans / reports / playbooks, NOT postable social content
     // → render as a written document (Word-style), not a slide deck.
@@ -1673,6 +1679,8 @@ export default function RunPage() {
       slide?.format,
     );
     if (strategySelectionMockup) return strategySelectionMockup;
+    // 商品頁不被版本標籤的關鍵字改版型（標籤含「Facebook」「IG」之類的字時會被認成貼文）。
+    if (mockupVariant?.format === ("listing" as any)) return mockupVariant;
     const lbl = String(slide?.label ?? "");
     const v = (platform: string, format: string): MockupVariant =>
       ({ platform: platform as any, format: format as any, label: `${platform}:${format}` });
@@ -2176,6 +2184,7 @@ export default function RunPage() {
                 brandName={(data as any).product?.name ?? data.brand?.name ?? ""}
                 brandLogoUrl={(data as any).product?.logoUrl ?? data.brand?.logoUrl ?? null}
                 liveCaption={slide.caption}
+                liveListing={(data?.metadata as any)?.listing ?? null}
                 liveSourceComment={sourceComment}
                 liveHashtags={slide.hashtags}
                 liveImageStyle={slide.imageStyle}

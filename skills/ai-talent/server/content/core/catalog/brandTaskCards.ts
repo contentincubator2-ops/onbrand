@@ -28,6 +28,13 @@ import type { CatalogPlatform } from "./taskCatalogIndex";
 import localPool from "../../../localDb";
 import { registerTaskSource } from "./taskRegistry";
 import type { CustomChannelId } from "../../../platform/core/customChannelId";
+import { DEFAULT_LISTING_FIELDS, sanitizeListingFields, type ListingField, type ListingSpec } from "../engine/listingContract";
+
+/** 這張卡的商品頁欄位規格；不是商品頁卡就回 null。 */
+export function listingSpecOf(card: Pick<BrandTaskCard, "format" | "listingFields">): ListingSpec | null {
+  if (card.format !== "listing") return null;
+  return { fields: sanitizeListingFields(card.listingFields ?? DEFAULT_LISTING_FIELDS) };
+}
 
 export type BrandTaskCardStatus = "drafting" | "ready" | "failed";
 
@@ -64,6 +71,13 @@ export interface BrandTaskCard {
   skill: string;
   /** 從範例量出來的數字，不是問來的也不是猜來的。 */
   measured: { count: number; minChars: number; maxChars: number; medianChars: number };
+  /**
+   * 這張卡產出的東西長什麼樣（跟著通路的 format）。沒有＝post（貼文，舊卡都是）。
+   * listing＝商品頁：交付一組欄位（標題／賣點／規格／描述…），走 engine/listingContract。
+   */
+  format?: "post" | "listing";
+  /** 商品頁卡的欄位與各欄上限（上限由用戶填，留空不驗）。沒有＝DEFAULT_LISTING_FIELDS。 */
+  listingFields?: ListingField[];
   /** 一次產幾個版本。預設抓範例數，上限 5。 */
   variants: number;
   /** 綁哪個 agent 的人設（可空）。 */
@@ -147,6 +161,8 @@ export function duplicateCard(
     askFields: source.askFields.map((f) => ({ ...f })),
     skill: source.skill,
     measured: { ...source.measured },
+    ...(source.format ? { format: source.format } : {}),
+    ...(source.listingFields ? { listingFields: source.listingFields.map((f) => ({ ...f })) } : {}),
     variants: source.variants,
     agentId: source.agentId,
     scene: source.scene ?? null,
@@ -465,6 +481,8 @@ export function cardTemplate(card: BrandTaskCard): FBTaskTemplate {
     },
     agent_id: card.agentId ?? undefined,
     skill_slug: card.id,
+    // 商品頁卡：交付的是一組欄位。caption 呼叫看到這個就改走 listingContract。
+    listingSpec: listingSpecOf(card) ?? undefined,
     primary_question: card.primaryQuestion,
     scene: card.scene ?? undefined,
     illustration_url: card.illustrationStatus === "ready" && card.illustrationUrl ? card.illustrationUrl : undefined,
@@ -477,7 +495,8 @@ export function cardTemplate(card: BrandTaskCard): FBTaskTemplate {
     systemPrompt: card.skill,
     preferredModel: "anthropic",
     // 中位數 × 2.6 給模型足夠的產出空間；中文一字約 1.5–2 token，再留餘裕。
-    maxTokens: Math.min(8000, Math.max(700, Math.round(card.measured.medianChars * 2.6))),
+    // 商品頁一次要寫完五六個欄位，下限放寬，不然短範例會讓後面的欄位被截斷。
+    maxTokens: Math.min(8000, Math.max(card.format === "listing" ? 2200 : 700, Math.round(card.measured.medianChars * 2.6))),
     outputDefaults: outputDefaultsFor(card.channel),
   };
 }
@@ -491,8 +510,10 @@ export function cardConfig(card: BrandTaskCard): OrchestraConfig {
     imageDirectorId: null,
     aspectRatio: null,
     variantLabels: Array.from({ length: n }, (_, i) => `版本 ${i + 1}`),
-    captionMinChars: card.measured.minChars || undefined,
-    captionMaxChars: card.measured.maxChars || undefined,
+    // 商品頁不套「整篇字數」：那會讓 ≤60 字的第一行截斷把整份欄位壓成一句話。
+    // 各欄上限寫在欄位規格裡（listingContract），由用戶填。
+    captionMinChars: card.format === "listing" ? undefined : (card.measured.minChars || undefined),
+    captionMaxChars: card.format === "listing" ? undefined : (card.measured.maxChars || undefined),
     // 2026-10-04（CJ）：每次寫（試寫與正式執行）都針對當次主題上網找案例與說法來充實內容，
     // 查到的來源附在成品旁。不是卡片綁一份固定資料。
     researchTopic: true,

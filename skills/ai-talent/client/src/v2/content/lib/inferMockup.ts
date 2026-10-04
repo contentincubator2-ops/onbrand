@@ -109,6 +109,8 @@ export type Format =
   | "episode"          // single episode player
   | "show"             // show/channel page with episode list
   | "audiogram"        // square audiogram social card
+  // 2026-10-04：電商／開店平台 tray 的商品頁（欄位卡）。只由成品 metadata.listing 觸發，不走關鍵字推斷。
+  | "listing"
   // fallback
   | "generic";
 

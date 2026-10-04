@@ -52,6 +52,7 @@ export default function MyTaskCardsPage() {
     ],
     [customChannels],
   );
+  const isListingChannel = (platform: string) => customChannels.find((c) => c.id === platform)?.format === "listing";
   const metaOf = (platform: string) =>
     PLATFORM_META[platform] ?? customPlatformMeta(customChannels.find((c) => c.id === platform)?.name ?? platform);
   const platforms = useMemo(() => channels.map((c) => c.platform), [channels]);
@@ -281,7 +282,8 @@ export default function MyTaskCardsPage() {
                           {copying === row.id && (
                             <div className="flex w-full flex-wrap items-center gap-1.5 pl-10">
                               <span className="text-[12px] text-neutral-500">{en ? "Copy to:" : "複製到："}</span>
-                              {channels.filter((c) => isComposerChannel(c.platform)).map((c) => (
+                              {/* 商品頁的卡（逐欄 SKILL）與貼文卡不能互相複製，server 也會擋；這裡只列同型態的通路。 */}
+                              {channels.filter((c) => isComposerChannel(c.platform) && isListingChannel(c.platform) === isListingChannel(s.platform)).map((c) => (
                                 <button
                                   key={c.platform}
                                   className={btn}
@@ -312,6 +314,7 @@ export default function MyTaskCardsPage() {
           brandId={brandId}
           channel={composer.channel as ComposerChannel}
           channelLabel={(en ? metaOf(composer.channel).label : metaOf(composer.channel).labelZh) ?? composer.channel}
+          format={customChannels.find((c) => c.id === composer.channel)?.format === "listing" ? "listing" : "post"}
           initialCardId={composer.cardId}
           onPublished={refetchAll}
         />
