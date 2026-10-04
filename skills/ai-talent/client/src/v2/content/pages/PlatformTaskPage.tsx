@@ -15,7 +15,7 @@ import CalendarTabs from "../components/CalendarTabs";
 import { trpc } from "../../../lib/trpc";
 import { useLang } from "../../../lib/i18n";
 import { agentLabel, agentShortName } from "../../platform/lib/agentName";
-import { taskQuestion, taskPlaceholder, taskInputText, localizeSource } from "../lib/taskEn";
+import { taskQuestion, taskPlaceholder, taskInputText, localizeSource } from "../../platform/lib/taskEn";
 import { showToastGlobal } from "../../platform/components/Toast";
 import { TaskCardShell, TaskCardAvatar } from "../../platform/components/TaskCardShell";
 import { campaignPrefill } from "../lib/campaignIntakePrefill";
