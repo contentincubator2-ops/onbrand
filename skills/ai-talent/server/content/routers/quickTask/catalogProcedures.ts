@@ -154,7 +154,7 @@ export const catalogProcedures = {
    * 預設仍由 server 算：預設只會挑全域卡，catalogue 就夠了。
    */
   tray: protectedProcedure
-    .input(z.object({ brandId: z.number(), platform: z.string().min(1).max(24) }))
+    .input(z.object({ brandId: z.number(), platform: z.string().min(1).max(48) }))
     .query(async ({ ctx, input }) => {
       // 2026-10-04：原本沒驗品牌歸屬——任何登入的人都讀得到別人品牌的托盤。
       await assertBrandAccess(ctx.user!.id, input.brandId);
@@ -183,7 +183,7 @@ export const catalogProcedures = {
    * tray 等於七次重算方案閘門。解析同樣交給 client（理由見 tray）。
    */
   trays: protectedProcedure
-    .input(z.object({ brandId: z.number(), platforms: z.array(z.string().min(1).max(24)).min(1).max(16) }))
+    .input(z.object({ brandId: z.number(), platforms: z.array(z.string().min(1).max(48)).min(1).max(32) }))
     .query(async ({ ctx, input }) => {
       await assertBrandAccess(ctx.user!.id, input.brandId);
       const quota = await planQuotaFor(ctx.user!.id);
@@ -201,7 +201,7 @@ export const catalogProcedures = {
   setTray: protectedProcedure
     .input(z.object({
       brandId: z.number(),
-      platform: z.string().min(1).max(24),
+      platform: z.string().min(1).max(48),
       taskIds: z.array(z.string().min(1).max(80)).max(MAX_TRAY),
     }))
     .mutation(async ({ ctx, input }) => {

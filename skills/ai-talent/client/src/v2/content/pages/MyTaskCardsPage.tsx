@@ -27,7 +27,8 @@ import { IllustratedEmpty } from "../../platform/components/EmptyIllustration";
 import { AddIcon, CopyIcon, DeleteIcon, EditIcon, FavoriteIcon } from "../../platform/components/icons";
 import { isFrontVisibleCard } from "../../platform/lib/sourceVocabulary";
 import TaskCardComposer, { type ComposerChannel } from "../../strategy/components/taskCard/TaskCardComposer";
-import { ROUTE_TO_PLATFORM, PLATFORM_META, COMPOSER_CHANNELS, type FBTaskCard } from "./platformTask/taskModel";
+import { ROUTE_TO_PLATFORM, PLATFORM_META, isComposerChannel, customPlatformMeta, type FBTaskCard } from "./platformTask/taskModel";
+import { useCustomChannels } from "../lib/customChannels";
 import { resolveTrayIds, toggleTrayId, taskPlatformOf, isDefaultTray, type TrayData } from "../lib/taskTrayClient";
 import { buildMyCardRows, type MyCardRow, type OwnCardLite } from "../lib/myTaskCards";
 
@@ -42,10 +43,17 @@ export default function MyTaskCardsPage() {
   const brandId = ctx?.brandId ?? null;
   const brandName = (ctx?.brands ?? []).find((b: any) => b.id === brandId)?.name ?? null;
 
+  // 2026-10-04：用戶自己加的通路（蝦皮、momo…）接在七個內建通路後面；路由片段就是它的 id。
+  const { channels: customChannels } = useCustomChannels(brandId);
   const channels = useMemo(
-    () => CHANNEL_ROUTES.map((route) => ({ route, platform: ROUTE_TO_PLATFORM[route]! })),
-    [],
+    () => [
+      ...CHANNEL_ROUTES.map((route) => ({ route: route as string, platform: ROUTE_TO_PLATFORM[route]! })),
+      ...customChannels.map((c) => ({ route: c.id, platform: c.id })),
+    ],
+    [customChannels],
   );
+  const metaOf = (platform: string) =>
+    PLATFORM_META[platform] ?? customPlatformMeta(customChannels.find((c) => c.id === platform)?.name ?? platform);
   const platforms = useMemo(() => channels.map((c) => c.platform), [channels]);
 
   const listQ = trpc.quickTask.listFB.useQuery(
@@ -129,7 +137,7 @@ export default function MyTaskCardsPage() {
       {/* 通路篩選 */}
       <div className="mt-5 flex flex-wrap gap-2">
         {[{ platform: "all", label: en ? "All" : "全部", n: totalRows },
-          ...sections.map((s) => ({ platform: s.platform, label: en ? PLATFORM_META[s.platform]?.label : PLATFORM_META[s.platform]?.labelZh, n: s.rows.length }))]
+          ...sections.map((s) => ({ platform: s.platform, label: en ? metaOf(s.platform).label : metaOf(s.platform).labelZh, n: s.rows.length }))]
           .map((c) => (
             <button
               key={c.platform}
@@ -146,8 +154,8 @@ export default function MyTaskCardsPage() {
       ) : (
         <div className="mt-8 flex flex-col gap-8">
           {visibleSections.map((s) => {
-            const meta = PLATFORM_META[s.platform];
-            const canCompose = COMPOSER_CHANNELS.has(s.platform);
+            const meta = metaOf(s.platform);
+            const canCompose = isComposerChannel(s.platform);
             return (
               <section key={s.platform}>
                 <div className="flex items-center gap-2">
@@ -273,14 +281,14 @@ export default function MyTaskCardsPage() {
                           {copying === row.id && (
                             <div className="flex w-full flex-wrap items-center gap-1.5 pl-10">
                               <span className="text-[12px] text-neutral-500">{en ? "Copy to:" : "複製到："}</span>
-                              {channels.filter((c) => COMPOSER_CHANNELS.has(c.platform)).map((c) => (
+                              {channels.filter((c) => isComposerChannel(c.platform)).map((c) => (
                                 <button
                                   key={c.platform}
                                   className={btn}
                                   disabled={duplicateMut.isPending}
                                   onClick={() => { duplicateMut.mutate({ brandId, cardId: row.id, channel: c.platform }); setCopying(null); }}
                                 >
-                                  {en ? PLATFORM_META[c.platform]?.label : PLATFORM_META[c.platform]?.labelZh}
+                                  {en ? metaOf(c.platform).label : metaOf(c.platform).labelZh}
                                   {c.platform === s.platform ? (en ? " (same)" : "（同通路）") : ""}
                                 </button>
                               ))}
@@ -303,7 +311,7 @@ export default function MyTaskCardsPage() {
           onClose={() => { setComposer(null); refetchAll(); }}
           brandId={brandId}
           channel={composer.channel as ComposerChannel}
-          channelLabel={(en ? PLATFORM_META[composer.channel]?.label : PLATFORM_META[composer.channel]?.labelZh) ?? composer.channel}
+          channelLabel={(en ? metaOf(composer.channel).label : metaOf(composer.channel).labelZh) ?? composer.channel}
           initialCardId={composer.cardId}
           onPublished={refetchAll}
         />

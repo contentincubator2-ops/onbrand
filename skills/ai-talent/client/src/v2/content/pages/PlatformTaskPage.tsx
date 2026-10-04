@@ -69,7 +69,8 @@ import { LibraryIcon, AddIcon, EditIcon, TaskCardsIcon, FavoriteIcon, Icon, type
 import { contextChipIcon } from "../lib/contextChipIcons";
 import { departAgentHandoff } from "../lib/agentHandoff";
 import { resolveTrayIds, toggleTrayId, taskPlatformOf } from "../lib/taskTrayClient";
-import { recordTaskUsed, getLastUsedDays, ROUTE_TO_PLATFORM, PLATFORM_META, dicebear, HOLD_FOR_IMAGES, synthesizeStages, FBTaskCard, COMPOSER_CHANNELS, trimmedExtras, chipFieldPath, getNested, setNested, CHIP_SIBLING_CANDIDATES, TaskEmbed } from "./platformTask/taskModel";
+import { useCustomChannels, isCustomChannelId } from "../lib/customChannels";
+import { recordTaskUsed, getLastUsedDays, routeToPlatform, isComposerChannel, customPlatformMeta, PLATFORM_META, dicebear, HOLD_FOR_IMAGES, synthesizeStages, FBTaskCard, trimmedExtras, chipFieldPath, getNested, setNested, CHIP_SIBLING_CANDIDATES, TaskEmbed } from "./platformTask/taskModel";
 import { PlatformPageErrorBoundary } from "./platformTask/PlatformPageErrorBoundary";
 export type { TaskEmbed } from "./platformTask/taskModel";
 
@@ -102,11 +103,15 @@ export type { TaskEmbed } from "./platformTask/taskModel";
 function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
   const { platform: urlRoute = "fb" } = useParams<{ platform: string }>();
   const routeParam = embed?.route ?? urlRoute;
-  const platform = ROUTE_TO_PLATFORM[routeParam] ?? "facebook";
-  const meta = PLATFORM_META[platform] ?? PLATFORM_META.facebook;
+  const platform = routeToPlatform(routeParam) ?? "facebook";
 
   const { t, lang } = useLang();
   const ctx = useOutletContext<ShellOutletCtx>();
+  // 2026-10-04：自訂通路（c<brandId>-<slug>）的標題用戶自己取，要從通路清單查。
+  const customChannelsHook = useCustomChannels((ctx?.brandId as number | null) ?? null);
+  const customChannel = customChannelsHook.channels.find((c) => c.id === platform) ?? null;
+  const meta = PLATFORM_META[platform]
+    ?? (isCustomChannelId(platform) ? customPlatformMeta(customChannel?.name ?? "…") : PLATFORM_META.facebook);
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -495,7 +500,7 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
   const ownCardsQuery = (trpc as any).brandTaskCard?.list?.useQuery
     ? (trpc as any).brandTaskCard.list.useQuery(
         { brandId: brandId ?? 0, channel: platform },
-        { enabled: !!brandId && COMPOSER_CHANNELS.has(platform), refetchOnWindowFocus: false },
+        { enabled: !!brandId && isComposerChannel(platform), refetchOnWindowFocus: false },
       )
     : { data: null };
   const unfinishedOwnCards: any[] = ((ownCardsQuery.data as any[]) ?? [])
@@ -1366,7 +1371,11 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
   if (needsOnboardingRedirect && !embed) return <Navigate to="/brands" replace />;
 
   // Redirect unknown platform params
-  if (!ROUTE_TO_PLATFORM[routeParam]) return <Navigate to="/tasks/fb" replace />;
+  if (!routeToPlatform(routeParam)) return <Navigate to="/tasks/fb" replace />;
+  // 自訂通路載入後發現已被刪除（書籤、舊連結）：導回 FB，不要停在一個沒有入口的空頁。
+  if (isCustomChannelId(platform) && !!brandId && !customChannelsHook.isLoading && !customChannel) {
+    return <Navigate to="/tasks/fb" replace />;
+  }
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
@@ -1387,7 +1396,7 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
 
             沒選品牌就只顯示提示不給按 —— 卡是掛在品牌下面的，先問「哪個品牌」
             比按下去才說「請先選品牌」好。 */}
-        {COMPOSER_CHANNELS.has(platform) && (
+        {isComposerChannel(platform) && (
           <div className="absolute top-6 right-6 z-20 flex items-center gap-2">
             {brandId ? (
               <>
@@ -1700,10 +1709,10 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                     ? (lang === "en"
                       ? `${trayData!.viralLocked} viral-structure cards here are on the Pro plan.`
                       : `這個通路有 ${trayData!.viralLocked} 張爆款結構卡，屬於專業方案。`)
-                    : !(COMPOSER_CHANNELS.has(platform) && brandId)
+                    : !(isComposerChannel(platform) && brandId)
                       ? (lang === "en" ? "Coming soon." : "即將上線。")
                       : undefined}
-                  action={COMPOSER_CHANNELS.has(platform) && brandId
+                  action={isComposerChannel(platform) && brandId
                     ? { label: lang === "en" ? "+ New card" : "＋ 新增任務卡", onPress: () => { setResumeCardId(null); setComposerOpen(true); } }
                     : undefined}
                 />
@@ -2083,7 +2092,7 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
         saving={setTrayMut?.isPending}
         onSave={(ids) => setTrayMut?.mutate?.({ brandId: brandId ?? 0, platform, taskIds: ids })}
         onDetail={(id) => setDetailTaskId(id)}
-        onCreateOwn={COMPOSER_CHANNELS.has(platform)
+        onCreateOwn={isComposerChannel(platform)
           ? () => { setPickerOpen(false); setResumeCardId(null); setComposerOpen(true); }
           : undefined}
       />
