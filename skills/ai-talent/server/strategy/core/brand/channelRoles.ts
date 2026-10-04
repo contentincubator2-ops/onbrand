@@ -77,8 +77,32 @@ export function roleChannelOfTaskId(id: unknown): RoleChannel | null {
   }
 }
 
+/**
+ * 任務卡 template → 七通路。id 前綴優先；對不上才看 template 自己宣告的 outputDefaults.platform。
+ * 兩個都對不上就是 null——**不會**退回 facebook（orchestra 的 taskChannel 預設值是 facebook，
+ * 自建卡或跨平台卡若沿用它，會被注入 FB 的角色，比不注入更糟）。
+ */
+export function roleChannelOfTemplate(t: { id?: unknown; outputDefaults?: { platform?: unknown } | null } | null | undefined): RoleChannel | null {
+  return roleChannelOfTaskId(t?.id) ?? normalizeRoleChannel(t?.outputDefaults?.platform);
+}
+
 export function isRoleChannel(s: unknown): s is RoleChannel {
   return typeof s === "string" && (ROLE_CHANNELS as readonly string[]).includes(s);
+}
+
+/**
+ * 截到單格上限；盡量停在句尾（。！？；或換行），不要攔腰截斷。
+ * 2026-10-04 dev 實測：AI 草案常超過上限，原本直接 slice，「不在這裡說的事」被截在「更像一」。
+ * 句尾落在上限的後半段內才採用（落太前面會丟掉太多內容，那就寧可硬截）。
+ */
+export function clampField(v: string, max: number): string {
+  const chars = [...v];
+  if (chars.length <= max) return v;
+  const head = chars.slice(0, max);
+  for (let i = head.length - 1; i >= Math.floor(max * 0.5); i--) {
+    if ("。！？；\n".includes(head[i]!)) return head.slice(0, i + 1).join("").trimEnd();
+  }
+  return head.join("");
 }
 
 /** 收斂成固定五格、各自截到上限。LLM 回傳與 client 送來的資料都走這裡。 */
@@ -86,7 +110,7 @@ export function cleanChannelRole(input: any): ChannelRole {
   const out: ChannelRole = { role: "", audience: "", coreMessage: "", tone: "", avoid: "" };
   for (const f of CHANNEL_ROLE_FIELDS) {
     const v = typeof input?.[f.key] === "string" ? input[f.key].trim() : "";
-    out[f.key] = [...v].slice(0, f.max).join("");
+    out[f.key] = clampField(v, f.max);
   }
   return out;
 }

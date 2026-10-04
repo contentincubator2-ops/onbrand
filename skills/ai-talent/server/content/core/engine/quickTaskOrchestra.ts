@@ -24,7 +24,7 @@ import { isShotListTemplate, normalizeShotList, validateShotList, repairShotList
 import { extractYouTubeId, fetchYouTubeContext, formatYouTubeContextForPrompt } from "../../../platform/core/web/youtubeContext";
 import { fetchViralPatterns, formatViralPatternsForPrompt } from "../../../strategy/core/monitor/socialListeningScout";
 import { buildBrandPrefix as buildBrandContext, enforceBrandRulesOnText, enforceBrandRulesOnTextWithReport } from "../../../strategy/core/brand/brandContext";
-import { roleChannelOfTaskId } from "../../../strategy/core/brand/channelRoles";
+import { roleChannelOfTemplate } from "../../../strategy/core/brand/channelRoles";
 import { isEmailBodyTask } from "../catalog/edmCraft";
 import { isInstagramBodyTask } from "../catalog/igCraft";
 import { resolveTierVariantShape } from "./tierVariantShape";
@@ -313,7 +313,7 @@ async function runOrchestraInner(args: {
       // 也就是「檢查大腦」畫面上列出來的那一份。知識庫不再注入。
       Promise.all([
         // 2026-10-03：帶上任務所在平台 → 該平台在策略層存過「通路角色」就只注入那一張。
-        buildBrandContext(args.brandId, args.productId, args.eventId, "full", roleChannelOfTaskId(args.template.id) ?? taskChannel).catch(() => ""),
+        buildBrandContext(args.brandId, args.productId, args.eventId, "full", roleChannelOfTemplate(args.template)).catch(() => ""),
         args.brandId
           ? getBrandRealContent(args.brandId).then(r => r.context).catch(() => "")
           : Promise.resolve(""),

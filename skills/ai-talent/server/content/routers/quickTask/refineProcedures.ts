@@ -178,7 +178,11 @@ export const refineProcedures = {
       const { callModel } = await import("../../../platform/core/llm/multiModelRouter");
       const { buildBrandPrefix } = await import("../../../strategy/core/brand/brandContext");
       // 2026-09-29：完整品牌大腦＋這張任務選的產品／活動（以前只給精簡 digest、不帶產品）。
-      const brandPrefix = await buildBrandPrefix(input.brandId, input.productId ?? null, input.eventId ?? null, "full").catch(() => "");
+      // 2026-10-03：潤稿也讀這張卡所在平台的「通路角色」。
+      const { roleChannelOfTaskId } = await import("../../../strategy/core/brand/channelRoles");
+      const brandPrefix = await buildBrandPrefix(
+        input.brandId, input.productId ?? null, input.eventId ?? null, "full", roleChannelOfTaskId(input.taskId),
+      ).catch(() => "");
 
       // 2026-09-01 (CJ「AI 潤稿當中的十築，根本不是官網定義的十築」):
       // brandPrefix 是通用的品牌 digest，沒有任何任務專屬知識，所以模型會

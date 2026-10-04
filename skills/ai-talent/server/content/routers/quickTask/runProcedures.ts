@@ -6,6 +6,7 @@ import { z } from "zod";
 import { normalizeTaskId } from "../../../platform/core/tierCompat";
 import { TASKS, fillTemplate, CAMPAIGN_ITEM_INPUT } from "./taskDefs";
 import { buildBrandPrefix as buildBrandContext } from "../../../strategy/core/brand/brandContext";
+import { roleChannelOfTaskId } from "../../../strategy/core/brand/channelRoles";
 import { buildPriorContext, callWithFallback, tryParseJson, gateInfoFor, resolveAudienceTag } from "./helpers";
 import { resolveTaskOrThrow, resolveTaskTemplate } from "../../core/catalog/taskRegistry";
 import { assertTaskAllowed } from "../../../platform/core/billing/planGate";
@@ -80,7 +81,8 @@ export const runProcedures = {
       const agent = stage.agents.find((a) => a.id === input.agentId);
       if (!agent) throw new Error(`Unknown agentId: ${input.agentId}`);
 
-      const brandPrefix = await buildBrandContext(input.brandId);
+      // 2026-10-03：讀該任務所在平台的「通路角色」。
+      const brandPrefix = await buildBrandContext(input.brandId, null, null, "full", roleChannelOfTaskId(input.taskId));
       const priorContext = buildPriorContext(input.prior ?? []);
       const filledUser = fillTemplate(agent.userTemplate, input.inputs ?? {});
       const userMsg = priorContext + (priorContext ? "\n\n[原始企劃摘要]\n" : "") + filledUser;
@@ -570,7 +572,8 @@ export const runProcedures = {
       }
 
       // Build prompt
-      const brandPrefix = await buildBrandContext(input.brandId);
+      // 2026-10-03：讀該任務所在平台的「通路角色」。
+      const brandPrefix = await buildBrandContext(input.brandId, null, null, "full", roleChannelOfTaskId(input.taskId));
       const userMsg =
         Object.entries(input.inputs)
           .map(([k, v]) => `[${k}] ${v}`)

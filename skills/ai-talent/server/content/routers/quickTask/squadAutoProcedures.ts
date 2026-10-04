@@ -66,7 +66,11 @@ export const squadAutoProcedures = {
       // squad work → full brand depth (golden circle / story /
       // competition), NOT the lean core digest.
       const { buildBrandPrefix } = await import("../../../strategy/core/brand/brandContext");
-      const brandPrefix = await buildBrandPrefix(input.brandId, input.productId ?? null, input.eventId ?? null, "full").catch(() => "");
+      // 2026-10-03：squad 的 slug 前綴就是平台（fb-99-… / ig-…）→ 讀該平台的「通路角色」。
+      const { roleChannelOfTaskId } = await import("../../../strategy/core/brand/channelRoles");
+      const brandPrefix = await buildBrandPrefix(
+        input.brandId, input.productId ?? null, input.eventId ?? null, "full", roleChannelOfTaskId(sqSlugNew),
+      ).catch(() => "");
       // 2026-07-17 多市場: brand's outputLanguage drives step language +
       // whether the zh-TW deterministic sanitizer may run on step output.
       const { getBrandMarket, DEFAULT_BRAND_MARKET } = await import("../../../strategy/core/brand/brandMarket");
