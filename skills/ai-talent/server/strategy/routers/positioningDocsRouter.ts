@@ -26,7 +26,7 @@ import { invokeLLM } from "../../platform/core/llm/llm";
 import { randomUUID } from "crypto";
 import {
   type PositioningScope, type PromptField, type AppliedDocRecord, type CustomSegment,
-  loadPositioning, sourceDocsOf, appliedDocOf, coverageOf, applyMapping,
+  loadPositioning, sourceDocsOf, appliedDocOf, coverageOf, applyMapping, readPath,
   promptFieldsFor, MAX_INJECTED_CHARS,
   customSegmentsOf, addCustomSegment, removeCustomSegment, updateCustomSegment,
   MAX_CUSTOM_SEGMENTS, MAX_CUSTOM_SEGMENT_FIELDS,
@@ -140,7 +140,9 @@ export const positioningDocsRouter = router({
       const pos = await loadPositioning(input.scope, input.scopeId, ctx.user!.id);
       const { filled, missing } = coverageOf(pos, input.scope);
       return {
-        filled, missing,
+        // 2026-10-04：filled 連同目前的值一起回，產品視窗要把「AI 讀到的定位」全部列出來。
+        filled: filled.map((f) => ({ ...f, value: readPath(pos, f.path) })),
+        missing,
         total: filled.length + missing.length,
         docs: sourceDocsOf(pos),
         applied: appliedDocOf(pos),

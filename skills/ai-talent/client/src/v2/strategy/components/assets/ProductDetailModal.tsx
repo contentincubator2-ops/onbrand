@@ -15,7 +15,9 @@
 import { useEffect, useState, useRef } from "react";
 import { trpc } from "../../../../lib/trpc";
 import { useLang, tr } from "../../../../lib/i18n";
-import { AddIcon, CloseIcon, DeleteIcon, GenerateIcon, RegenerateIcon, CheckIcon } from "../../../platform/components/icons";
+import { AddIcon, CloseIcon, DeleteIcon, GenerateIcon, RegenerateIcon, CheckIcon, UploadIcon } from "../../../platform/components/icons";
+import { Modal, ModalBody, ModalContent, ModalFooter, ModalHeader } from "@heroui/react";
+import { TASK_MODAL_CLASSNAMES, TASK_MODAL_HEADER } from "../../../platform/components/taskModalStyle";
 import AssetPhotoGallery from "./AssetPhotoGallery";
 import ProductSceneModal from "./ProductSceneModal";
 
@@ -42,6 +44,21 @@ interface Props {
   onClose: () => void;
   onReposition: (productId: number) => void;
   onImageUpdated?: () => void;
+  /** 2026-10-04：從這個視窗直接開「上傳定位」。 */
+  onUpload?: (productId: number) => void;
+}
+
+/** 把 positioning 裡各種形狀的值（字串／字串陣列／物件陣列）攤成可讀文字。 */
+function showVal(v: any): string {
+  if (v == null) return "";
+  if (typeof v === "string") return v;
+  if (Array.isArray(v)) {
+    return v.map((x) => (x && typeof x === "object"
+      ? Object.values(x).filter((y) => typeof y === "string" && y).join(" · ")
+      : String(x))).join("\n");
+  }
+  if (typeof v === "object") return Object.values(v).filter((y) => typeof y === "string" && y).join(" · ");
+  return String(v);
 }
 
 // ── Chip Input ────────────────────────────────────────────────────────────────
@@ -93,7 +110,7 @@ function ChipInput({
             if (e.key === "Enter" || e.key === ",") { e.preventDefault(); add(); }
           }}
           placeholder={placeholder ?? tr("Type and press Enter to add", "輸入後按 Enter 新增")}
-          className="flex-1 text-sm px-3 py-1.5 border border-neutral-200 rounded-lg focus:outline-none focus:border-zinc-400"
+          className="flex-1 text-sm px-3 py-1.5 border border-transparent bg-default-100 rounded-2xl focus:outline-none focus:bg-white focus:border-zinc-400"
         />
         <button
           onClick={add}
@@ -125,19 +142,19 @@ function PeriodRow({
         value={period.label}
         onChange={(e) => onChange({ ...period, label: e.target.value })}
         placeholder={lang === "en" ? "Label (e.g. Mother's Day)" : "名稱（如：母親節）"}
-        className="text-sm px-2.5 py-1.5 border border-neutral-200 rounded-lg focus:outline-none focus:border-zinc-400"
+        className="text-sm px-2.5 py-1.5 border border-transparent bg-default-100 rounded-2xl focus:outline-none focus:bg-white focus:border-zinc-400"
       />
       <input
         type="date"
         value={period.startDate}
         onChange={(e) => onChange({ ...period, startDate: e.target.value })}
-        className="text-xs px-2 py-1.5 border border-neutral-200 rounded-lg focus:outline-none focus:border-zinc-400"
+        className="text-xs px-2 py-1.5 border border-transparent bg-default-100 rounded-2xl focus:outline-none focus:bg-white focus:border-zinc-400"
       />
       <input
         type="date"
         value={period.endDate}
         onChange={(e) => onChange({ ...period, endDate: e.target.value })}
-        className="text-xs px-2 py-1.5 border border-neutral-200 rounded-lg focus:outline-none focus:border-zinc-400"
+        className="text-xs px-2 py-1.5 border border-transparent bg-default-100 rounded-2xl focus:outline-none focus:bg-white focus:border-zinc-400"
       />
       <button onClick={onRemove} className="p-1.5 text-neutral-400 hover:text-red-500 transition">
         <DeleteIcon size={13} />
@@ -147,7 +164,7 @@ function PeriodRow({
 }
 
 // ── Main Modal ─────────────────────────────────────────────────────────────────
-export default function ProductDetailModal({ productId, brandId, onClose, onReposition, onImageUpdated }: Props) {
+export default function ProductDetailModal({ productId, brandId, onClose, onReposition, onImageUpdated, onUpload }: Props) {
   const { lang } = useLang();
   const en = lang === "en";
   const [sceneOpen, setSceneOpen] = useState(false);
@@ -166,6 +183,19 @@ export default function ProductDetailModal({ productId, brandId, onClose, onRepo
     } catch { return {}; }
   })();
   const price = typeof productPositioning.price === "string" ? productPositioning.price : "";
+
+  // 2026-10-04（CJ「貼完解析成功、增加很多欄位後，產品定位的內容並沒有太多改變、欄位也都一樣」）：
+  // 這個視窗以前只畫六個寫死的欄位（標語／受眾／賣點／詞彙…），上傳文件寫進去的
+  // 二十幾格（核心功能、痛點、競品…）與自訂卡片根本沒地方顯示。改成把引擎讀得到的欄位
+  // 連同目前的值全部列出來。
+  const coverageQ = (trpc as any).positioningDocs?.coverage?.useQuery(
+    { scope: "product", scopeId: productId },
+    { enabled: !!productId, refetchOnWindowFocus: false },
+  );
+  const filledFields: { path: string; label: string; value: any }[] = coverageQ?.data?.filled ?? [];
+  const customSegments: { id: string; title: string; fields: { key: string; label: string; value: string }[] }[] =
+    coverageQ?.data?.customSegments ?? [];
+  const missingCount: number = coverageQ?.data?.missing?.length ?? 0;
 
   // Upsert mutation
   const upsertMut = (trpc as any).product?.upsert?.useMutation?.({
@@ -257,85 +287,78 @@ export default function ProductDetailModal({ productId, brandId, onClose, onRepo
   }, [onClose]);
 
   return (
-    <div
-      className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4"
-      onClick={onClose}
-    >
-      <div
-        className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Header */}
-        <div className="px-6 py-5 border-b border-neutral-100 flex items-start justify-between gap-3 flex-shrink-0">
-          <div>
-            <p className="text-[12px] font-semibold uppercase tracking-widest text-neutral-400 mb-0.5">
+    <Modal isOpen onClose={onClose} size="2xl" scrollBehavior="inside" backdrop="blur" classNames={TASK_MODAL_CLASSNAMES}>
+      <ModalContent>
+        <ModalHeader className={TASK_MODAL_HEADER}>
+          <div className="min-w-0">
+            <p className="text-[12px] font-semibold uppercase tracking-widest text-neutral-400">
               {en ? "PRODUCT" : "產品"}
             </p>
-            <h2 className="text-xl font-bold text-neutral-900">
+            <p className="text-[18px] text-neutral-900 truncate font-bold">
               {productQ?.isLoading ? "…" : product?.name ?? "—"}
-            </h2>
+            </p>
           </div>
-          <div className="flex items-center gap-2 mt-1">
-            <button
-              onClick={() => onReposition(productId)}
-              title={en ? "Re-run positioning" : "重新執行定位"}
-              className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border border-zinc-200 text-zinc-600 hover:bg-zinc-50 transition"
-            >
-              <RegenerateIcon size={12} />
-              {en ? "Re-position" : "重新定位"}
-            </button>
-            <button
-              onClick={onClose}
-              className="w-8 h-8 flex items-center justify-center rounded-full text-neutral-400 hover:bg-neutral-100 transition"
-            >
-              <CloseIcon size={16} />
-            </button>
-          </div>
-        </div>
+        </ModalHeader>
 
         {/* Body — scrollable */}
-        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-6">
+        <ModalBody className="px-6 py-4 gap-6">
 
-          {/* AI Positioning Summary */}
-          {(tagline || audience || usp || price) && (
-            <div className="bg-neutral-50 rounded-xl p-4 border border-zinc-100">
-              <div className="flex items-center gap-1.5 mb-3">
+          {/* 引擎讀得到的定位：上傳／貼上／AI 產出寫進來的欄位全列出來 */}
+          <div className="rounded-2xl bg-default-100 p-4">
+            <div className="flex items-center justify-between gap-2 mb-3">
+              <div className="flex items-center gap-1.5">
                 <GenerateIcon size={13} className="text-zinc-500" />
                 <span className="text-[12px] font-bold uppercase tracking-widest text-zinc-600">
-                  {en ? "AI Positioning Summary" : "AI 定位摘要"}
+                  {en ? "What the AI reads" : "AI 讀到的定位"}
                 </span>
-              </div>
-              <div className="grid gap-2">
-                {price && (
-                  <p className="text-xs font-medium text-neutral-500">{en ? "Price" : "價格"}：{price}</p>
-                )}
-                {tagline && (
-                  <div>
-                    <span className="text-[12px] font-semibold uppercase text-zinc-400 tracking-wider">
-                      {en ? "Tagline" : "標語"}
-                    </span>
-                    <p className="text-sm font-semibold text-neutral-900 mt-0.5">
-                      {en && enTagline && tagline === loadedTagline ? enTagline : tagline}
-                    </p>
-                  </div>
-                )}
-                {usp && (
-                  <div>
-                    <span className="text-[12px] font-semibold uppercase text-zinc-400 tracking-wider">USP</span>
-                    <p className="text-sm text-neutral-700 mt-0.5">{usp}</p>
-                  </div>
-                )}
-                {audience && (
-                  <div>
-                    <span className="text-[12px] font-semibold uppercase text-zinc-400 tracking-wider">
-                      {en ? "Audience" : "目標受眾"}
-                    </span>
-                    <p className="text-sm text-neutral-600 mt-0.5">{audience}</p>
-                  </div>
+                {filledFields.length > 0 && (
+                  <span className="text-[12px] text-neutral-400">
+                    {en ? `${filledFields.length} fields` : `${filledFields.length} 格`}
+                  </span>
                 )}
               </div>
+              {onUpload && (
+                <button
+                  type="button"
+                  onClick={() => onUpload(productId)}
+                  className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full bg-white text-neutral-800 hover:bg-neutral-50 shadow-sm"
+                >
+                  <UploadIcon size={12} />{en ? "Upload / paste" : "上傳／貼上定位"}
+                </button>
+              )}
             </div>
-          )}
+            {filledFields.length === 0 && customSegments.length === 0 ? (
+              <p className="text-xs text-neutral-500">
+                {en ? "Nothing written yet. Upload a document, paste text, or re-run positioning." : "還沒有任何定位內容。可以上傳文件、貼上文字，或按「重新定位」讓 AI 產出。"}
+              </p>
+            ) : (
+              <div className="grid gap-3">
+                {filledFields.map((f) => (
+                  <div key={f.path}>
+                    <span className="text-[12px] font-semibold text-zinc-400 tracking-wider">{f.label}</span>
+                    <p className="text-sm text-neutral-800 mt-0.5 whitespace-pre-wrap">{showVal(f.value)}</p>
+                  </div>
+                ))}
+                {customSegments.map((seg) => (
+                  <div key={seg.id} className="rounded-xl bg-white p-3">
+                    <span className="text-[12px] font-bold text-neutral-700">{seg.title}</span>
+                    <ul className="mt-1 grid gap-0.5">
+                      {seg.fields.map((fl) => (
+                        <li key={fl.key} className="text-sm text-neutral-700">
+                          <span className="font-semibold">{fl.label}：</span>{fl.value}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ))}
+              </div>
+            )}
+            {missingCount > 0 && filledFields.length > 0 && (
+              <p className="text-[12px] text-neutral-400 mt-3">
+                {en ? `${missingCount} other fields aren't written yet.` : `另有 ${missingCount} 格還沒有內容。`}
+              </p>
+            )}
+          </div>
 
           {/* ── Editable Section ── */}
           <div className="space-y-5">
@@ -383,7 +406,7 @@ export default function ProductDetailModal({ productId, brandId, onClose, onRepo
                 value={tagline}
                 onChange={(e) => { setTagline(e.target.value); mark(); }}
                 placeholder={en ? "e.g. Fresh from the farm, direct to your table" : "例：直送農場新鮮，品牌最短距離"}
-                className="w-full text-sm px-3 py-2 border border-neutral-200 rounded-lg focus:outline-none focus:border-zinc-400"
+                className="w-full text-sm px-3 py-2 border border-transparent bg-default-100 rounded-2xl focus:outline-none focus:bg-white focus:border-zinc-400"
               />
             </div>
 
@@ -397,7 +420,7 @@ export default function ProductDetailModal({ productId, brandId, onClose, onRepo
                 onChange={(e) => { setAudience(e.target.value); mark(); }}
                 placeholder={en ? "Who is this product for?" : "這個產品是給誰的？描述主要受眾的特徵、需求和痛點"}
                 rows={3}
-                className="w-full text-sm px-3 py-2 border border-neutral-200 rounded-lg resize-none focus:outline-none focus:border-zinc-400"
+                className="w-full text-sm px-3 py-2 border border-transparent bg-default-100 rounded-2xl resize-none focus:outline-none focus:bg-white focus:border-zinc-400"
               />
             </div>
 
@@ -411,7 +434,7 @@ export default function ProductDetailModal({ productId, brandId, onClose, onRepo
                 onChange={(e) => { setUsp(e.target.value); mark(); }}
                 placeholder={en ? "What makes this product uniquely valuable?" : "這個產品跟競品最大的差異是什麼？為什麼值得選擇？"}
                 rows={3}
-                className="w-full text-sm px-3 py-2 border border-neutral-200 rounded-lg resize-none focus:outline-none focus:border-zinc-400"
+                className="w-full text-sm px-3 py-2 border border-transparent bg-default-100 rounded-2xl resize-none focus:outline-none focus:bg-white focus:border-zinc-400"
               />
             </div>
 
@@ -482,30 +505,39 @@ export default function ProductDetailModal({ productId, brandId, onClose, onRepo
               )}
             </div>
           </div>
-        </div>
+        </ModalBody>
 
-        {/* Footer */}
-        <div className="px-6 py-4 border-t border-neutral-100 flex items-center gap-3 flex-shrink-0">
+        <ModalFooter className="justify-between items-center">
           <button
-            onClick={onClose}
-            className="px-4 py-2 rounded-xl border border-neutral-200 text-sm text-neutral-600 hover:border-neutral-400 transition"
+            onClick={() => onReposition(productId)}
+            title={en ? "Re-run positioning" : "重新執行定位"}
+            className="inline-flex items-center gap-1.5 text-[13px] font-medium text-neutral-500 hover:text-neutral-900 px-1"
           >
-            {en ? "Cancel" : "取消"}
+            <RegenerateIcon size={12} />
+            {en ? "Re-position" : "重新定位"}
           </button>
-          <button
-            onClick={handleSave}
-            disabled={!dirty && !saved || upsertMut?.isPending}
-            className="flex-1 py-2 rounded-xl text-sm font-semibold transition disabled:opacity-50"
-            style={{ background: saved ? "#10B981" : "#171717", color: "white" }}
-          >
-            {upsertMut?.isPending
-              ? (en ? "Saving…" : "儲存中…")
-              : saved
-                ? <span className="inline-flex items-center gap-1"><CheckIcon size={11} />{en ? "Saved" : "已儲存"}</span>
-                : (en ? "Save changes" : "儲存修改")}
-          </button>
-        </div>
-      </div>
-    </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={onClose}
+              className="h-11 px-5 rounded-full text-sm text-neutral-600 hover:bg-neutral-100 transition"
+            >
+              {en ? "Cancel" : "取消"}
+            </button>
+            <button
+              onClick={handleSave}
+              disabled={!dirty && !saved || upsertMut?.isPending}
+              className="h-11 px-6 rounded-full text-sm font-semibold transition disabled:opacity-50"
+              style={{ background: saved ? "#10B981" : "#171717", color: "white" }}
+            >
+              {upsertMut?.isPending
+                ? (en ? "Saving…" : "儲存中…")
+                : saved
+                  ? <span className="inline-flex items-center gap-1"><CheckIcon size={11} />{en ? "Saved" : "已儲存"}</span>
+                  : (en ? "Save changes" : "儲存修改")}
+            </button>
+          </div>
+        </ModalFooter>
+      </ModalContent>
+    </Modal>
   );
 }
