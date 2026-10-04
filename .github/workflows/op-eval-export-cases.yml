@@ -45,6 +45,8 @@ jobs:
             echo "SUITES=$(get suites cards)"
             echo "DELIVERY_CHECK=$(get deliveryCheck 0)"
             echo "CERT_KNOWLEDGE=$(get certKnowledge 1)"
+            echo "PROMPT_DUMP=$(get promptDump 0)"
+            echo "EXAM_MAX_INPUTS=$(get maxInputs 9)"
           } >> "$GITHUB_ENV"
       - uses: appleboy/ssh-action@v1.0.3
         env:
@@ -57,13 +59,15 @@ jobs:
           username: ${{ secrets.VM_USER }}
           key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
           command_timeout: 320m
-          envs: TAG,BRAND_IDS,CHANNELS,ALL_CARDS,TASK_IDS,EXAM_FILE,REPEATS,CONCURRENCY,SUITES,DELIVERY_CHECK,CERT_KNOWLEDGE,GH_TOKEN,GH_REPO,GH_SHA,RUN_ID
+          envs: TAG,BRAND_IDS,CHANNELS,ALL_CARDS,TASK_IDS,EXAM_FILE,REPEATS,CONCURRENCY,SUITES,DELIVERY_CHECK,CERT_KNOWLEDGE,PROMPT_DUMP,EXAM_MAX_INPUTS,GH_TOKEN,GH_REPO,GH_SHA,RUN_ID
           script: |
             set -e
             LIVE=/opt/onbrand/current/skills/ai-talent
             cd "$LIVE"
             set -a; source .env 2>/dev/null; set +a
-            export BRAND_IDS ALL_CARDS TASK_IDS EXAM_FILE REPEATS CONCURRENCY SUITES DELIVERY_CHECK CERT_KNOWLEDGE
+            export BRAND_IDS ALL_CARDS TASK_IDS EXAM_FILE REPEATS CONCURRENCY SUITES DELIVERY_CHECK CERT_KNOWLEDGE EXAM_MAX_INPUTS
+            # promptDump=1：只組出寫作指令、不呼叫任何模型（不產生 API 費用）。
+            if [ "$PROMPT_DUMP" = "1" ]; then export EVAL_NO_LLM=1 EVAL_PROMPT_DUMP=1; fi
             # 空字串的 CHANNELS 不要匯出——腳本用「有沒有設」判斷要不要限制通路。
             if [ -n "$CHANNELS" ]; then export CHANNELS; else unset CHANNELS; fi
             echo "EVALRUN tag=$TAG sha=$GH_SHA deployed=$(readlink -f /opt/onbrand/current | sed 's#.*/##')"

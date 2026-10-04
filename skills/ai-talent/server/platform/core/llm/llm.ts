@@ -676,6 +676,9 @@ function isRetryableLLMError(msg: string): boolean {
 }
 
 export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
+  // 2026-10-04 評測用：EVAL_NO_LLM=1 時任何模型呼叫都立刻失敗——「只組出寫作指令、不花 API 費用」的模式
+  // （scripts/eval 的 PROMPT_DUMP）靠這一行保證真的一次都沒打出去。正式環境不會設這個變數。
+  if (process.env.EVAL_NO_LLM === "1") throw new Error("EVAL_NO_LLM: model calls are disabled for this run");
   // 2026-05-12 (CJ「all agents should fallback too」): always cascade on
   // failure, regardless of whether the caller pinned a provider. A pinned
   // provider just becomes tier-1 in the chain. The rest of the default
@@ -773,6 +776,9 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
  * the normal provider cascade.
  */
 export async function invokeLLMSingleProvider(params: InvokeParams): Promise<InvokeResult> {
+  // 2026-10-04 評測用：EVAL_NO_LLM=1 時任何模型呼叫都立刻失敗——「只組出寫作指令、不花 API 費用」的模式
+  // （scripts/eval 的 PROMPT_DUMP）靠這一行保證真的一次都沒打出去。正式環境不會設這個變數。
+  if (process.env.EVAL_NO_LLM === "1") throw new Error("EVAL_NO_LLM: model calls are disabled for this run");
   const provider = resolveProvider(params.provider as any);
   const config = PROVIDER_CONFIG[provider];
   if (!config || !config.getKey()) throw new Error("LLM provider not configured");

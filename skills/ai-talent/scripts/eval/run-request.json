@@ -1,13 +1,15 @@
 {
-  "tag": "fb-cert-1",
+  "tag": "fb-prompts-cert-on",
   "brandIds": "2972",
   "channels": "facebook",
   "allCards": "1",
   "taskIds": "",
   "examFile": "scripts/eval/data/exam-inputs.tom.json",
-  "repeats": 2,
-  "concurrency": 4,
+  "repeats": 1,
+  "maxInputs": 1,
+  "concurrency": 6,
   "suites": "cards",
   "deliveryCheck": "0",
-  "certKnowledge": "1"
+  "certKnowledge": "1",
+  "promptDump": "1"
 }

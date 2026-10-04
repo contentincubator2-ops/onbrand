@@ -164,7 +164,7 @@ function variantText(v: any): string {
         if (examFile) {
           const sets = exam[card.id];
           if (!sets?.length) { console.log(`SKIP ${card.id}: 考題檔沒有這張卡`); continue; }
-          sets.forEach((inputs, inputIdx) => {
+          sets.slice(0, Math.max(1, Number(process.env.EXAM_MAX_INPUTS ?? 9))).forEach((inputs, inputIdx) => {
             for (let rep = 0; rep < repeats; rep++) jobs.push({ card, ch, product: productMentioned(inputs), inputs, inputIdx, rep });
           });
           continue;

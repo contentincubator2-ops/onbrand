@@ -406,6 +406,12 @@ export async function callOneVariant(args: {
     + (adSlot ? buildAdSlotRule(adSlot) : "")
     + (shotList ? buildShotListRule() : "");
 
+  // 2026-10-04 評測用：把這一版實際要送給模型的完整指令印出來（搭配 EVAL_NO_LLM，不呼叫模型）。
+  // 用途：改由 Claude Code 這邊的 agent 依同一份指令寫稿（走 Max 方案，不走 API 計費）。
+  if (process.env.EVAL_PROMPT_DUMP === "1") {
+    console.log(`EVALPROMPT ${Buffer.from(JSON.stringify({ taskId: template.id, label, system, user: userMsg }), "utf8").toString("base64")}`);
+  }
+
   // Provider + model selection priority:
   //   1. Agent's aiModel (from JSON-assigned real-person agent) — uses both
   //      provider mapping AND the exact model string (so claude-haiku stays
