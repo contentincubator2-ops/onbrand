@@ -21,10 +21,18 @@ const STAGES = {
 const FIELD_COUNT = 6;
 const LINE_WIDTHS = [92, 78, 86, 64, 90, 72, 56];
 
-export default function ConvertingToAIFormat({ fileName }: { fileName?: string }) {
+interface Props {
+  fileName?: string;
+  /** 覆寫標題／階段文案／底部提示——讓其他「把文字變成 AI 可用結構」的等待共用這個動畫。 */
+  title?: string;
+  stages?: string[];
+  hint?: string;
+}
+
+export default function ConvertingToAIFormat({ fileName, title, stages: stagesOverride, hint }: Props) {
   const { lang } = useLang();
   const en = lang === "en";
-  const stages = en ? STAGES.en : STAGES.zh;
+  const stages = stagesOverride ?? (en ? STAGES.en : STAGES.zh);
   const [stage, setStage] = React.useState(0);
 
   React.useEffect(() => {
@@ -85,7 +93,7 @@ export default function ConvertingToAIFormat({ fileName }: { fileName?: string }
 
       <div className="text-center">
         <p className="text-medium font-semibold text-default-900">
-          {en ? "Converting to AI format" : "正在轉換成 AI 格式"}
+          {title ?? (en ? "Converting to AI format" : "正在轉換成 AI 格式")}
         </p>
         <p className="text-small text-default-600 mt-1 min-h-[20px]" key={stage}>{stages[stage]}</p>
         {fileName && <p className="text-tiny text-default-400 mt-1 truncate max-w-[320px]">{fileName}</p>}
@@ -96,9 +104,9 @@ export default function ConvertingToAIFormat({ fileName }: { fileName?: string }
       </div>
 
       <p className="text-tiny text-default-400 text-center max-w-[360px]">
-        {en
+        {hint ?? (en
           ? "Takes about 10–30 seconds. Nothing is written to your positioning until you confirm."
-          : "約需 10–30 秒。轉換完成後由你確認，確認前不會寫進任何定位欄位。"}
+          : "約需 10–30 秒。轉換完成後由你確認，確認前不會寫進任何定位欄位。")}
       </p>
     </div>
   );
