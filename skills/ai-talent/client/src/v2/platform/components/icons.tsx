@@ -27,6 +27,7 @@ import {
   faPause, faForwardStep, faStop, faCircleXmark, faLink, faLockOpen, faFlag, faPuzzlePiece, faMemory, faLightbulb,
   faCommentDots, faCompass, faMasksTheater, faBan, faGem, faStar, faChessKnight, faArrowTrendUp, faHeart, faMessage,
   faScaleBalanced, faHandshake,
+  faCamera, faLeaf, faSquare, faPen, faDroplet, faCube, faFilm, faShapes, faClockRotateLeft, faExpand, faFillDrip,
 } from "@fortawesome/free-solid-svg-icons";
 import {
   faFacebook, faInstagram, faThreads, faLine, faTiktok, faYoutube, faLinkedin, faGoogle,
@@ -149,6 +150,20 @@ export const ICON = {
   newsletter: faEnvelope,
   website: faGlobe,
   store: faStore,
+  // 圖片卡的工具列與畫面樣式（2026-10-04）
+  toolTitle: faFont,
+  toolEdit: faPenToSquare,
+  toolVersions: faClockRotateLeft,
+  toolSizes: faExpand,
+  toolFill: faFillDrip,
+  styleCamera: faCamera,
+  styleFresh: faLeaf,
+  styleMinimal: faSquare,
+  styleIllustration: faPen,
+  styleWatercolor: faDroplet,
+  style3d: faCube,
+  styleFilm: faFilm,
+  styleBlock: faShapes,
 } satisfies Record<string, IconDefinition>;
 
 export type IconName = keyof typeof ICON;

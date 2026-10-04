@@ -88,3 +88,75 @@ describe("主體照片要讓 AI 真的看到（CJ「上傳了照片，三個方�
     expect(seen[0].messages.find((m: any) => m.role === "system").content).not.toContain("以這個主體為主角");
   });
 });
+
+describe("fitPhotoToCard：原圖直接用（不經 AI）", () => {
+  it("cover 與 contain 都剛好輸出這張卡的交付尺寸", async () => {
+    const { mkdtempSync, readFileSync } = await import("fs");
+    const { tmpdir } = await import("os");
+    const { join } = await import("path");
+    const dir = mkdtempSync(join(tmpdir(), "imgcard-"));
+    process.env.COVERS_DIR = dir;
+    process.env.COVERS_URL_PREFIX = "/static/covers";
+    vi.resetModules();
+    const { fitPhotoToCard } = await import("./imageCards");
+    const sharp = (await import("sharp")).default;
+    // 橫式 300×200 的照片放進 4:5 直式畫布。
+    const photo = await sharp({ create: { width: 300, height: 200, channels: 3, background: { r: 200, g: 40, b: 40 } } }).png().toBuffer();
+    const card: any = { id: "ig-test", width: 1080, height: 1350, format: "jpeg", maxImages: 1, compose: undefined };
+    for (const fit of ["cover", "contain"] as const) {
+      const r = await fitPhotoToCard({ buffer: photo, spec: card, fit });
+      expect(r.ok).toBe(true);
+      if (!r.ok) continue;
+      const file = join(dir, r.url.split("/").pop()!);
+      const meta = await sharp(readFileSync(file)).metadata();
+      expect([meta.width, meta.height]).toEqual([1080, 1350]);
+    }
+  }, 60_000);
+  it("讀不出來的檔案回失敗，不丟例外", async () => {
+    const { fitPhotoToCard } = await import("./imageCards");
+    const r = await fitPhotoToCard({ buffer: Buffer.from("not an image"), spec: { width: 100, height: 100, format: "jpeg" } as any, fit: "cover" });
+    expect(r.ok).toBe(false);
+  });
+});
+
+describe("畫面樣式與純色底（CJ「底圖的樣式要多點選擇」）", () => {
+  it("樣式清單 id 不重複，且每個都有名稱與 prompt", async () => {
+    const { IMAGE_STYLES } = await import("./imageStyles");
+    expect(IMAGE_STYLES.length).toBeGreaterThanOrEqual(8);
+    expect(new Set(IMAGE_STYLES.map((s) => s.id)).size).toBe(IMAGE_STYLES.length);
+    for (const s of IMAGE_STYLES) { expect(s.labelZh && s.labelEn && s.promptEn).toBeTruthy(); }
+  });
+  it("指定樣式會進 prompt；沒指定就沒有；重新上風格的參考圖寫明保留內容", () => {
+    const base = { spec, scenePromptEn: "a scene", brand: {} as any, withProduct: false };
+    expect(buildImageCardPrompt({ ...base, styleId: "watercolor" })).toContain("ART STYLE");
+    expect(buildImageCardPrompt({ ...base, styleId: "watercolor" })).toContain("watercolour");
+    expect(buildImageCardPrompt(base)).not.toContain("ART STYLE");
+    expect(buildImageCardPrompt({ ...base, styleId: "film", reference: "restyle" })).toContain("Keep the same subject, scene content and composition");
+    expect(buildImageCardPrompt({ ...base, styleId: "不存在的樣式" })).not.toContain("ART STYLE");
+  });
+  it("帶產品照時樣式要提醒主體保真", () => {
+    const p = buildImageCardPrompt({ spec, scenePromptEn: "s", brand: {} as any, withProduct: true, styleId: "illustration" });
+    expect(p).toContain("faithful");
+  });
+  it("solidBackgroundForCard：單色與漸層都輸出交付尺寸；顏色格式不對直接拒絕", async () => {
+    const { mkdtempSync, readFileSync } = await import("fs");
+    const { tmpdir } = await import("os");
+    const { join } = await import("path");
+    const dir = mkdtempSync(join(tmpdir(), "imgcard-solid-"));
+    process.env.COVERS_DIR = dir;
+    process.env.COVERS_URL_PREFIX = "/static/covers";
+    vi.resetModules();
+    const { solidBackgroundForCard } = await import("./imageCards");
+    const sharp = (await import("sharp")).default;
+    const card: any = { id: "ig-test", width: 1080, height: 1350, format: "jpeg", maxImages: 1 };
+    for (const c2 of [undefined, "#F5EFE6"]) {
+      const r = await solidBackgroundForCard({ spec: card, color: "#F26522", color2: c2 });
+      expect(r.ok).toBe(true);
+      if (!r.ok) continue;
+      const meta = await sharp(readFileSync(join(dir, r.url.split("/").pop()!))).metadata();
+      expect([meta.width, meta.height]).toEqual([1080, 1350]);
+    }
+    expect((await solidBackgroundForCard({ spec: card, color: "red" })).ok).toBe(false);
+    expect((await solidBackgroundForCard({ spec: card, color: "#FFFFFF", color2: "#zzzzzz" })).ok).toBe(false);
+  }, 60_000);
+});

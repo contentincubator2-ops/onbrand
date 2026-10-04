@@ -28,17 +28,20 @@ import { uploadBrandPhoto, IMAGE_ACCEPT } from "../../strategy/lib/uploadBrandPh
 import { Icon } from "../../platform/components/icons";
 import AiImageNotice from "../../platform/components/AiImageNotice";
 import { PlatformMockup } from "../components/PlatformMockup";
+import { ToolTabs, StylePanel, BasePanel, type ToolId, type PickedPhoto } from "../components/imageCard/ImageTools";
 import { imageCardMockup } from "../lib/imageCardMockup";
 
 type Model = "gpt-image-2" | "nano-banana";
 
 interface Direction { id: string; titleZh: string; sceneZh: string; paletteZh: string; whyZh: string; promptEn: string }
-interface Version { url: string; note: string }
+interface Version { url: string; note: string; /** 用戶自己的照片（沒經 AI）。 */ real?: boolean }
 interface Slot { versions: Version[]; active: number }
 /** 整組（輪播／相簿）裡 AI 規劃的一張。 */
 interface SlidePlan { roleZh: string; titleZh: string; sceneZh: string; promptEn: string }
 /** 一組最多幾張：點數是一張一張扣的，再多也沒人會一次做。 */
 const SERIES_MAX = 10;
+/** 沒有選定方向（原圖直接用）時，要 AI 改圖或延伸尺寸的場景描述：維持原照片，只做用戶要的改動。 */
+const KEEP_PHOTO_SCENE = "Keep the same photo: same subject, setting and composition. Only apply the change request, if any.";
 
 const CHANNEL_ZH: Record<string, string> = {
   facebook: "Facebook", instagram: "Instagram", threads: "Threads", line: "LINE",
@@ -173,6 +176,10 @@ export default function ImageCardPage() {
       setProduct(picked);
     }
   }, []);
+  // 產品清單裡的產品照預設 AI 構圖（產品保真）；用戶自己上傳／從素材庫挑的照片預設原圖直接用。
+  useEffect(() => {
+    setPhotoMode(product && !products.some((p) => p.imageUrl === product.imageUrl) ? "asis" : "ai");
+  }, [product?.imageUrl]); // eslint-disable-line react-hooks/exhaustive-deps
   const [directions, setDirections] = useState<Direction[]>([]);
   const [picked, setPicked] = useState<string | null>(null);
   const [customScene, setCustomScene] = useState("");
@@ -198,6 +205,17 @@ export default function ImageCardPage() {
   const [restAt, setRestAt] = useState(0);
   /** 提方向當下用的主體照片；之後換了照片，方向就不是看著這張提的，要提醒重提。 */
   const [directionsPhoto, setDirectionsPhoto] = useState<string | null>(null);
+  // 照片怎麼用：ai＝以照片為主角、AI 重新構圖；asis＝原圖直接放進畫布（不經 AI、不扣點）。
+  const [photoMode, setPhotoMode] = useState<"ai" | "asis">("ai");
+  const [photoFit, setPhotoFit] = useState<"cover" | "contain">("cover");
+  // ── 生成後的工具列（底圖／樣式／標題／修改／版本／尺寸） ──
+  const [tool, setTool] = useState<ToolId | null>("edit");
+  const [styleSel, setStyleSel] = useState<string | null>(null);
+  const [styleScope, setStyleScope] = useState<"slide" | "all">("all");
+  const [basePending, setBasePending] = useState<PickedPhoto | null>(null);
+  const [baseFit, setBaseFit] = useState<"cover" | "contain">("cover");
+  /** 素材庫視窗是替「主體照片」挑，還是替「某一張的底圖」挑。 */
+  const [libraryFor, setLibraryFor] = useState<"subject" | "base">("subject");
 
   // 卡片換了（從延伸結果點進另一張卡）就重來。
   useEffect(() => {
@@ -211,6 +229,10 @@ export default function ImageCardPage() {
   const proposeMut = trpc.imageCard.propose.useMutation();
   const renderMut = trpc.imageCard.render.useMutation();
   const planMut = trpc.imageCard.planSeries.useMutation();
+  const fitMut = trpc.imageCard.fitPhoto.useMutation();
+  const solidMut = trpc.imageCard.solidBackground.useMutation();
+  const coloursQ = trpc.imageCard.brandColours.useQuery({ brandId: brandId ?? 0 }, { enabled: !!brandId && tool === "base", staleTime: 5 * 60_000, refetchOnWindowFocus: false });
+  const styleList = (listQ.data?.styles ?? []) as Array<{ id: string; labelZh: string; labelEn: string }>;
   const uploadTitledMut = trpc.imageCard.uploadTitled.useMutation();
 
   // ── 圖文預覽與排程 ──
@@ -241,7 +263,7 @@ export default function ImageCardPage() {
   }, [picked, customScene, directions]);
 
   const current: Version | null = slots[activeSlot]?.versions[slots[activeSlot].active] ?? null;
-  const busy = renderMut.isPending || restBusy;
+  const busy = renderMut.isPending || restBusy || fitMut.isPending || solidMut.isPending;
 
   if (!listQ.isLoading && !card) {
     return (
@@ -303,15 +325,15 @@ export default function ImageCardPage() {
     }
   }
 
-  async function render(opts: { reference?: string; referenceMode?: "previous" | "style"; instruction?: string; scene?: string; targetCard?: ImageCardInfo; useModel?: Model }) {
+  async function render(opts: { reference?: string; referenceMode?: "previous" | "style" | "restyle"; instruction?: string; scene?: string; targetCard?: ImageCardInfo; useModel?: Model; styleId?: string; photo?: string }) {
     const scene = opts.scene ?? scenePrompt;
     if (!brandId || !scene) return null;
     const target = opts.targetCard ?? card!;
     const m = opts.useModel ?? (target.nanoBanana ? model : "gpt-image-2");
     const r = await renderMut.mutateAsync({
       brandId, cardId: target.id, scenePromptEn: scene, modelChoice: m,
-      productImageUrl: opts.reference ? undefined : product?.imageUrl,
-      referenceImageUrl: opts.reference, referenceMode: opts.referenceMode, instruction: opts.instruction,
+      productImageUrl: opts.reference ? undefined : (opts.photo ?? product?.imageUrl),
+      referenceImageUrl: opts.reference, referenceMode: opts.referenceMode, instruction: opts.instruction, styleId: opts.styleId,
     });
     return r;
   }
@@ -351,6 +373,92 @@ export default function ImageCardPage() {
     finally { setRestBusy(false); }
   }
 
+  /** 原圖直接用：不經 AI、不扣點，把用戶的照片放進這張卡的畫布。 */
+  async function useAsIs() {
+    if (!brandId || !product) return;
+    setFailure(null);
+    try {
+      const r = await fitMut.mutateAsync({ brandId, cardId: card!.id, photoUrl: product.imageUrl, fit: photoFit });
+      setSlots([{ versions: [{ url: r.url, note: lang === "en" ? "Your photo" : "原圖", real: true }], active: 0 }]);
+      setActiveSlot(0);
+    } catch (e: any) { setFailure({ msg: String(e?.message ?? e), canNano: false }); }
+  }
+
+  /** 在第 i 張後面加一個版本（舊版留著，可在「版本」切回）。 */
+  function pushVersion(i: number, v: Version) {
+    setSlots((prev) => prev.map((s, si) => si !== i ? s : { versions: [...s.versions, v], active: s.versions.length }));
+  }
+  const failWith = (e: any) => setFailure({ msg: String(e?.message ?? e), canNano: false });
+
+  /** 換底圖・換場景：只重做目前這一張。整組裡第 2 張起仍以第 1 張當風格基準。 */
+  async function swapScene(text: string) {
+    const i = activeSlot;
+    const base0 = slots[0]?.versions[slots[0].active]?.url;
+    const styleRef = series && i > 0 ? base0 : undefined;
+    const t = text.trim();
+    const scene = t || sceneFor(i);
+    if (!scene) return;
+    setFailure(null);
+    try {
+      const r = await render({
+        scene, reference: styleRef, referenceMode: styleRef ? "style" : undefined,
+        instruction: t ? undefined : "Create a clearly different composition, camera angle and setting from the previous version of this slide.",
+      });
+      if (r?.status === "ready" && r.url) pushVersion(i, { url: r.url, note: lang === "en" ? "New scene" : "新場景" });
+      else if (r) setFailure({ msg: r.errorMsg ?? "", canNano: false });
+    } catch (e) { failWith(e); }
+  }
+
+  /** 換底圖・用自己的照片（上傳／素材庫／產品照）：原圖直接用（免點數）或 AI 重新構圖。 */
+  async function useBasePhoto(mode: "asis" | "ai") {
+    if (!basePending || !brandId) return;
+    const i = activeSlot;
+    setFailure(null);
+    try {
+      if (mode === "asis") {
+        const r = await fitMut.mutateAsync({ brandId, cardId: card!.id, photoUrl: basePending.url, fit: baseFit });
+        pushVersion(i, { url: r.url, note: lang === "en" ? "My photo" : "我的照片", real: true });
+      } else {
+        const r = await render({ scene: sceneFor(i) || KEEP_PHOTO_SCENE, photo: basePending.url });
+        if (r?.status === "ready" && r.url) pushVersion(i, { url: r.url, note: lang === "en" ? "AI recompose" : "AI 構圖" });
+        else if (r) setFailure({ msg: r.errorMsg ?? "", canNano: false });
+      }
+    } catch (e) { failWith(e); }
+  }
+
+  /** 換底圖・純色／漸層底（免點數）。 */
+  async function useSolid(color: string, color2?: string) {
+    if (!brandId) return;
+    setFailure(null);
+    try {
+      const r = await solidMut.mutateAsync({ brandId, cardId: card!.id, color, color2 });
+      pushVersion(activeSlot, { url: r.url, note: lang === "en" ? "Solid colour" : "純色底", real: true });
+    } catch (e) { failWith(e); }
+  }
+
+  /** 換樣式：這一張或整組。每張都拿自己目前的版本當參考，只換「怎麼畫」，不換內容。 */
+  async function applyStyle() {
+    if (!styleSel) return;
+    const idxs = series && styleScope === "all" ? slots.map((_, i) => i) : [activeSlot];
+    if (idxs.length > 1 && !window.confirm(lang === "en"
+      ? `This regenerates ${idxs.length} images, one charge each. Continue?`
+      : `會重新生成 ${idxs.length} 張，每張各扣一次點數。確定嗎？`)) return;
+    const info = styleList.find((x) => x.id === styleSel);
+    const note = info ? (lang === "en" ? info.labelEn : info.labelZh) : styleSel;
+    setFailure(null); setRestBusy(true);
+    try {
+      for (const i of idxs) {
+        const cur = slots[i]?.versions[slots[i]!.active];
+        if (!cur) continue;
+        setRestAt(i + 1);
+        const r = await render({ scene: sceneFor(i) || KEEP_PHOTO_SCENE, reference: cur.url, referenceMode: "restyle", styleId: styleSel });
+        if (r?.status === "ready" && r.url) pushVersion(i, { url: r.url, note });
+        else { setFailure({ msg: r?.errorMsg ?? "", canNano: false }); break; }
+      }
+    } catch (e) { failWith(e); }
+    finally { setRestBusy(false); }
+  }
+
   /** 反悔：整組（或單張）作廢，回到「選方向」；方向清單、文案、產品照都留著。 */
   function rePickDirection() {
     if (slots.length > 1 && !window.confirm(lang === "en" ? "Discard the images generated so far and pick a direction again?" : "已生成的圖會放掉，回到選方向重來。確定嗎？")) return;
@@ -361,7 +469,7 @@ export default function ImageCardPage() {
     if (!current || !instruction.trim()) return;
     setFailure(null);
     try {
-      const r = await render({ reference: current.url, instruction: instruction.trim(), scene: sceneFor(activeSlot) });
+      const r = await render({ reference: current.url, instruction: instruction.trim(), scene: sceneFor(activeSlot) || KEEP_PHOTO_SCENE });
       if (r?.status === "ready" && r.url) {
         setSlots((prev) => prev.map((s, i) => i !== activeSlot ? s : {
           versions: [...s.versions, { url: r.url!, note: instruction.trim() }], active: s.versions.length,
@@ -377,7 +485,7 @@ export default function ImageCardPage() {
     for (const t of targets) {
       setExtended((p) => ({ ...p, [t.id]: { status: "running" } }));
       try {
-        const r = await render({ reference: current.url, targetCard: t, scene: sceneFor(activeSlot) });
+        const r = await render({ reference: current.url, targetCard: t, scene: sceneFor(activeSlot) || KEEP_PHOTO_SCENE });
         setExtended((p) => ({ ...p, [t.id]: r?.status === "ready" ? { status: "ready", url: r.url } : { status: "failed", msg: r?.errorMsg } }));
       } catch (e: any) {
         setExtended((p) => ({ ...p, [t.id]: { status: "failed", msg: String(e?.message ?? e) } }));
@@ -387,6 +495,8 @@ export default function ImageCardPage() {
 
   const fromOutputId = !asNewPost && fromRunId != null && Number.isFinite(Number(fromRunId)) ? Number(fromRunId) : undefined;
   const setComplete = slots.length >= n;
+  /** 選了照片、選「原圖直接用」、單張：不提方向，直接放進畫布。 */
+  const asisActive = !!product && photoMode === "asis" && !series;
 
   /** 預覽前先把每一張的標題疊好（用的就是之後排程存檔的那一張）。 */
   async function openPost() {
@@ -502,7 +612,7 @@ export default function ImageCardPage() {
               {current ? (
                 <>
                   <img src={current.url} alt="" className="absolute inset-0 w-full h-full object-cover" />
-                  <AiImageNotice overlay />
+                  {!current.real && <AiImageNotice overlay />}
                 </>
               ) : (
                 <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-default-400 text-tiny p-6 text-center">
@@ -538,20 +648,6 @@ export default function ImageCardPage() {
                 <div className="absolute inset-0 bg-white/50 flex items-center justify-center"><Spinner /></div>
               )}
             </div>
-
-            {/* 版本列（對話修改的每一版） */}
-            {slots[activeSlot] && slots[activeSlot].versions.length > 1 && (
-              <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
-                {slots[activeSlot].versions.map((v, i) => (
-                  <button key={v.url} onClick={() => setSlots((p) => p.map((s, si) => si !== activeSlot ? s : { ...s, active: i }))}
-                    title={v.note}
-                    className={`shrink-0 rounded-md overflow-hidden border-2 ${slots[activeSlot].active === i ? "border-default-900" : "border-transparent"}`}>
-                    <img src={v.url} alt="" style={{ height: 56, aspectRatio: ratioCss, objectFit: "cover" }} />
-                    <span className="block text-[10px] text-default-500 px-1 py-0.5 truncate max-w-[90px]">v{i + 1} · {v.note}</span>
-                  </button>
-                ))}
-              </div>
-            )}
 
             {/* 多圖（輪播／相簿） */}
             {series && slots.length > 0 && (
@@ -643,7 +739,7 @@ export default function ImageCardPage() {
                     </button>
                   )}
                   {brandId && (
-                    <button type="button" onClick={() => setLibraryOpen(true)}
+                    <button type="button" onClick={() => { setLibraryFor("subject"); setLibraryOpen(true); }}
                       title={lang === "en" ? "Pick from your asset library" : "從素材庫挑一張"}
                       className="w-16 h-16 rounded-lg border-2 border-dashed border-default-300 bg-white text-default-500 hover:border-default-500 hover:text-default-800 flex flex-col items-center justify-center gap-1">
                       <Icon name="images" size={18} />
@@ -651,22 +747,36 @@ export default function ImageCardPage() {
                     </button>
                   )}
                   <input ref={uploadRef} type="file" hidden accept={IMAGE_ACCEPT} onChange={(e) => void uploadSubject(e.target.files)} />
-                  {brandId && (
-                    <Modal isOpen={libraryOpen} onClose={() => setLibraryOpen(false)} size="4xl" scrollBehavior="inside">
-                      <ModalContent>
-                        <ModalHeader>{lang === "en" ? "Pick from your asset library" : "從素材庫挑一張"}</ModalHeader>
-                        <ModalBody className="pb-6">
-                          <BrandLibrary brandId={brandId} lang={lang === "en" ? "en" : "zh-TW"} mode="pick"
-                            onPick={(it) => {
-                              const picked = { name: it.source === "product" ? it.sourceLabel : (lang === "en" ? "Library" : "素材庫"), imageUrl: it.url };
-                              setLibraryPick(picked); setProduct(picked); setLibraryOpen(false);
-                            }} />
-                        </ModalBody>
-                      </ModalContent>
-                    </Modal>
-                  )}
                 </div>
               </div>
+              {product && !series && (
+                <div>
+                  <p className="text-tiny text-default-500 mb-1.5">{lang === "en" ? "How to use the photo" : "照片怎麼用"}</p>
+                  <div className="flex gap-2" role="radiogroup" aria-label={lang === "en" ? "How to use the photo" : "照片怎麼用"}>
+                    {([
+                      ["asis", "image", lang === "en" ? "Use as is" : "原圖直接用", lang === "en" ? "Your photo goes onto the canvas untouched. No AI, no points." : "你的照片原封不動放進畫布，不經 AI、不扣點。"],
+                      ["ai", "generate", lang === "en" ? "AI recompose" : "AI 重新構圖", lang === "en" ? "AI builds a new scene around the photo's subject." : "AI 以照片主體為主角，重新畫一個場景。"],
+                    ] as const).map(([k, icon, label, tip]) => (
+                      <button key={k} type="button" role="radio" aria-checked={photoMode === k} title={tip} onClick={() => setPhotoMode(k)}
+                        className={`w-24 h-16 rounded-lg border-2 flex flex-col items-center justify-center gap-1 ${photoMode === k ? "border-default-900 text-default-900" : "border-default-200 text-default-500 hover:border-default-400"}`}>
+                        <Icon name={icon} size={18} />
+                        <span className="text-[10px] leading-none">{label}</span>
+                      </button>
+                    ))}
+                  </div>
+                  {photoMode === "asis" && (
+                    <div className="mt-2 flex flex-wrap items-center gap-1.5 text-tiny">
+                      {([
+                        ["cover", lang === "en" ? "Fill the canvas (edges may be cropped)" : "填滿畫面（超出的邊會裁掉）"],
+                        ["contain", lang === "en" ? "Keep the whole photo (blurred fill)" : "完整保留（四周補糊化底）"],
+                      ] as const).map(([k, label]) => (
+                        <button key={k} type="button" onClick={() => setPhotoFit(k)}
+                          className={`px-2.5 py-1 rounded-full border ${photoFit === k ? "border-default-900 bg-default-900 text-white" : "border-default-200 text-default-600 hover:border-default-400"}`}>{label}</button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
               {cap > 1 ? (
                 <div>
                   <p className="text-tiny text-default-500 mb-1.5">
@@ -709,6 +819,17 @@ export default function ImageCardPage() {
               <p className="text-[11px] text-default-400">
                 {lang === "en" ? "Brand colours and imagery style are applied automatically." : "品牌色與圖像風格會自動套用（在品牌視覺頁設定）。"}
               </p>
+              {asisActive ? (
+                <div className="space-y-2.5">
+                  {card.titleZone !== "none" && (
+                    <Input label={lang === "en" ? "Title on the image (optional)" : "圖上標題（選填）"} value={headline} onValueChange={setHeadline} size="sm" />
+                  )}
+                  <Button color="primary" className="w-full" onPress={useAsIs} isLoading={fitMut.isPending} isDisabled={!brandId}>
+                    {lang === "en" ? "Use this photo (no points)" : "直接用這張照片（免點數）"}
+                  </Button>
+                </div>
+              ) : (
+              <>
               {directions.length > 0 && directionsPhoto !== (product?.imageUrl ?? null) && (
                 <p className="text-tiny text-warning-700">
                   {lang === "en" ? "You changed the photo — suggest directions again so they are built around it." : "照片換過了，請重新提方向，方向才會以這張照片為主。"}
@@ -783,6 +904,8 @@ export default function ImageCardPage() {
                   )}
                 </div>
               )}
+              </>
+              )}
             </section>
           )}
 
@@ -817,60 +940,84 @@ export default function ImageCardPage() {
             <section className="space-y-3">
               <p className="text-small font-semibold">
                 {series && plan?.[activeSlot]
-                  ? (lang === "en" ? `Edit slide ${activeSlot + 1} · ${plan[activeSlot]!.roleZh}` : `修改第 ${activeSlot + 1} 張・${plan[activeSlot]!.roleZh}`)
-                  : (lang === "en" ? "What should change?" : "想怎麼改？")}
+                  ? (lang === "en" ? `Slide ${activeSlot + 1} · ${plan[activeSlot]!.roleZh}` : `第 ${activeSlot + 1} 張・${plan[activeSlot]!.roleZh}`)
+                  : series
+                    ? (lang === "en" ? `Slide ${activeSlot + 1}` : `第 ${activeSlot + 1} 張`)
+                    : (lang === "en" ? "Refine this image" : "調整這張圖")}
               </p>
-              <div className="flex flex-wrap gap-1.5">
-                {QUICK_EDITS.map(([zhQ, enQ]) => { const q = lang === "en" ? enQ : zhQ; return (
-                  <button key={zhQ} disabled={busy} onClick={() => refine(q)}
-                    className="px-2.5 py-1 rounded-full text-tiny border border-default-200 hover:border-default-400 disabled:opacity-50">{q}</button>
-                ); })}
-              </div>
-              <div className="flex gap-2">
-                <Input size="sm" value={editText} onValueChange={setEditText}
-                  placeholder={lang === "en" ? "e.g. make the product bigger" : "例：產品再大一點、背景換成戶外"}
-                  onKeyDown={(e) => { if (e.key === "Enter") refine(editText); }} />
-                <Button size="sm" color="primary" onPress={() => refine(editText)} isLoading={busy} isDisabled={!editText.trim()}>
-                  {lang === "en" ? "Apply" : "修改"}
-                </Button>
-              </div>
-              {card.titleZone !== "none" && (
-                <Input label={lang === "en" ? "Title on the image" : "圖上標題"} value={titleOf(activeSlot)} onValueChange={(v) => setTitleOf(activeSlot, v)} size="sm" />
-              )}
-              {/* 2026-10-04：圖做好後的主要出口是「跟文案一起預覽、排程」，下載退成次要。 */}
-              <Button color="primary" className="w-full" onPress={openPost} isDisabled={busy || !brandId || !setComplete}>
-                {series
-                  ? (lang === "en" ? `Preview all ${n} on ${CHANNEL_EN[card.channel] ?? card.channel} & schedule` : `預覽 ${n} 張在 ${CHANNEL_ZH[card.channel] ?? card.channel} 的樣子，並排程`)
-                  : (lang === "en" ? "Preview with copy & schedule" : "圖文預覽與排程")}
-              </Button>
-              {series && !setComplete && (
-                <p className="text-[11px] text-default-400 -mt-1.5">{lang === "en" ? "Available once all images are generated." : "整組都生成完才能預覽。"}</p>
-              )}
-              <div className="flex gap-2 flex-wrap">
-                <Button size="sm" variant="flat" onPress={() => downloadWithTitle(card, current.url, titledAt(activeSlot) ? titleOf(activeSlot) : "", darkTitle).catch(() => showToastGlobal(lang === "en" ? "Download failed" : "下載失敗"))}>
-                  {lang === "en" ? "Download" : "下載"}{lang === "en" ? ` (${card.width}×${card.height})` : `（${card.width}×${card.height}）`}
-                </Button>
-                <Button size="sm" variant="bordered" onPress={rePickDirection} isDisabled={busy}>
-                  {lang === "en" ? "Not right? Pick a direction again" : "不滿意？重新選方向"}
-                </Button>
-              </div>
-            </section>
-          )}
+              <ToolTabs lang={lang} tool={tool} setTool={setTool}
+                badges={{ versions: (slots[activeSlot]?.versions.length ?? 0) > 1 ? slots[activeSlot]!.versions.length : 0 }} />
 
-          {failure && (
-            <div className="rounded-lg border border-warning-300 bg-warning-50 px-3 py-2.5 space-y-2">
-              <p className="text-tiny font-semibold text-warning-800">{lang === "en" ? "This image wasn't generated." : "這張圖沒有產出成功（點數已退回）。"}</p>
-              {failure.msg && <p className="text-[12px] text-warning-700 whitespace-pre-line">{failure.msg}</p>}
-              {failure.canNano && !current && (
-                <Button size="sm" variant="bordered" onPress={() => { setModel("nano-banana"); generateFirst("nano-banana"); }}>
-                  {lang === "en" ? "Try Nano Banana" : "改用 Nano Banana"}
-                </Button>
+              {tool === "base" && (
+                <BasePanel lang={lang} brandId={brandId} busy={busy}
+                  products={products.map((p) => ({ name: p.name, imageUrl: p.imageUrl }))}
+                  colours={coloursQ.data?.colours ?? []}
+                  canKeepScene={!!sceneFor(activeSlot)}
+                  pending={basePending} setPending={setBasePending} fit={baseFit} setFit={setBaseFit}
+                  onOpenLibrary={() => { setLibraryFor("base"); setLibraryOpen(true); }}
+                  onScene={swapScene} onUsePhoto={useBasePhoto} onSolid={useSolid} />
               )}
-            </div>
-          )}
 
-          {current && (
-            <section className="space-y-2 border-t border-default-200 pt-4">
+              {tool === "style" && (
+                <StylePanel lang={lang} styles={styleList} selected={styleSel} onSelect={setStyleSel}
+                  scope={styleScope} setScope={setStyleScope} slideNo={activeSlot + 1} total={series ? slots.length : 1}
+                  busy={busy} onApply={applyStyle} />
+              )}
+
+              {tool === "title" && (
+                <div className="space-y-2">
+                  {card.titleZone === "none" ? (
+                    <p className="text-[11px] text-default-400">{lang === "en" ? "This format doesn't carry a title on the image." : "這個版型的圖上不放標題。"}</p>
+                  ) : (
+                    <>
+                      <Input label={lang === "en" ? "Title on the image" : "圖上標題"} value={titleOf(activeSlot)} onValueChange={(v) => setTitleOf(activeSlot, v)} size="sm" />
+                      <div className="flex gap-4 text-tiny text-default-600">
+                        <label className="flex items-center gap-1.5"><input type="checkbox" checked={showTitle} onChange={(e) => setShowTitle(e.target.checked)} />{lang === "en" ? "Show title" : "顯示標題"}</label>
+                        <label className="flex items-center gap-1.5"><input type="checkbox" checked={darkTitle} onChange={(e) => setDarkTitle(e.target.checked)} />{lang === "en" ? "Dark text" : "黑字"}</label>
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+
+              {tool === "edit" && (
+                <div className="space-y-2.5">
+                  <div className="flex flex-wrap gap-1.5">
+                    {QUICK_EDITS.map(([zhQ, enQ]) => { const q = lang === "en" ? enQ : zhQ; return (
+                      <button key={zhQ} disabled={busy} onClick={() => refine(q)}
+                        className="px-2.5 py-1 rounded-full text-tiny border border-default-200 hover:border-default-400 disabled:opacity-50">{q}</button>
+                    ); })}
+                  </div>
+                  <div className="flex gap-2">
+                    <Input size="sm" value={editText} onValueChange={setEditText}
+                      placeholder={lang === "en" ? "e.g. make the product bigger" : "例：產品再大一點、背景換成戶外"}
+                      onKeyDown={(e) => { if (e.key === "Enter") refine(editText); }} />
+                    <Button size="sm" color="primary" onPress={() => refine(editText)} isLoading={busy} isDisabled={!editText.trim()}>
+                      {lang === "en" ? "Apply" : "修改"}
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {tool === "versions" && (
+                (slots[activeSlot]?.versions.length ?? 0) > 1 ? (
+                  <div className="flex gap-2 overflow-x-auto pb-1">
+                    {slots[activeSlot]!.versions.map((v, i) => (
+                      <button key={v.url} onClick={() => setSlots((p) => p.map((s, si) => si !== activeSlot ? s : { ...s, active: i }))}
+                        title={v.note}
+                        className={`shrink-0 rounded-md overflow-hidden border-2 ${slots[activeSlot]!.active === i ? "border-default-900" : "border-transparent"}`}>
+                        <img src={v.url} alt="" style={{ height: 64, aspectRatio: ratioCss, objectFit: "cover" }} />
+                        <span className="block text-[10px] text-default-500 px-1 py-0.5 truncate max-w-[90px]">v{i + 1} · {v.note}</span>
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-[11px] text-default-400">{lang === "en" ? "Every background swap, style change or edit adds a version here, so you can always go back." : "每次換底圖、換樣式或修改都會多一個版本放在這裡，隨時可以切回。"}</p>
+                )
+              )}
+
+              {tool === "sizes" && (
+                <div className="space-y-2">
               <p className="text-small font-semibold">{lang === "en" ? "Extend to other sizes" : "延伸成其他尺寸"}</p>
               <p className="text-[11px] text-default-400 leading-relaxed">
                 {lang === "en"
@@ -921,7 +1068,56 @@ export default function ImageCardPage() {
                   })}
                 </div>
               )}
+                </div>
+              )}
+
+              {/* 2026-10-04：圖做好後的主要出口是「跟文案一起預覽、排程」，下載退成次要。 */}
+              <Button color="primary" className="w-full" onPress={openPost} isDisabled={busy || !brandId || !setComplete}>
+                {series
+                  ? (lang === "en" ? `Preview all ${n} on ${CHANNEL_EN[card.channel] ?? card.channel} & schedule` : `預覽 ${n} 張在 ${CHANNEL_ZH[card.channel] ?? card.channel} 的樣子，並排程`)
+                  : (lang === "en" ? "Preview with copy & schedule" : "圖文預覽與排程")}
+              </Button>
+              {series && !setComplete && (
+                <p className="text-[11px] text-default-400 -mt-1.5">{lang === "en" ? "Available once all images are generated." : "整組都生成完才能預覽。"}</p>
+              )}
+              <div className="flex gap-2 flex-wrap">
+                <Button size="sm" variant="flat" onPress={() => downloadWithTitle(card, current.url, titledAt(activeSlot) ? titleOf(activeSlot) : "", darkTitle).catch(() => showToastGlobal(lang === "en" ? "Download failed" : "下載失敗"))}>
+                  {lang === "en" ? "Download" : "下載"}{lang === "en" ? ` (${card.width}×${card.height})` : `（${card.width}×${card.height}）`}
+                </Button>
+                <Button size="sm" variant="bordered" onPress={rePickDirection} isDisabled={busy}>
+                  {lang === "en" ? "Not right? Pick a direction again" : "不滿意？重新選方向"}
+                </Button>
+              </div>
             </section>
+          )}
+
+          {failure && (
+            <div className="rounded-lg border border-warning-300 bg-warning-50 px-3 py-2.5 space-y-2">
+              <p className="text-tiny font-semibold text-warning-800">{lang === "en" ? "This image wasn't generated." : "這張圖沒有產出成功（點數已退回）。"}</p>
+              {failure.msg && <p className="text-[12px] text-warning-700 whitespace-pre-line">{failure.msg}</p>}
+              {failure.canNano && !current && (
+                <Button size="sm" variant="bordered" onPress={() => { setModel("nano-banana"); generateFirst("nano-banana"); }}>
+                  {lang === "en" ? "Try Nano Banana" : "改用 Nano Banana"}
+                </Button>
+              )}
+            </div>
+          )}
+
+          {brandId && (
+            <Modal isOpen={libraryOpen} onClose={() => setLibraryOpen(false)} size="4xl" scrollBehavior="inside">
+              <ModalContent>
+                <ModalHeader>{lang === "en" ? "Pick from your asset library" : "從素材庫挑一張"}</ModalHeader>
+                <ModalBody className="pb-6">
+                  <BrandLibrary brandId={brandId} lang={lang === "en" ? "en" : "zh-TW"} mode="pick"
+                    onPick={(it) => {
+                      const picked = { name: it.source === "product" ? it.sourceLabel : (lang === "en" ? "Library" : "素材庫"), imageUrl: it.url };
+                      if (libraryFor === "base") setBasePending({ name: picked.name, url: picked.imageUrl });
+                      else { setLibraryPick(picked); setProduct(picked); }
+                      setLibraryOpen(false);
+                    }} />
+                </ModalBody>
+              </ModalContent>
+            </Modal>
           )}
 
           <Modal isOpen={postOpen} onClose={() => { if (!postBusy) setPostOpen(false); }} size="4xl" scrollBehavior="inside">
@@ -944,6 +1140,7 @@ export default function ImageCardPage() {
                       liveCaption={copy}
                       liveImageUrl={postImages[0] ?? current?.url}
                       liveImageStatus="ready"
+                      noAiNotice={slots.length > 0 && slots.every((sl) => sl.versions[sl.active]?.real)}
                       liveCards={!fromOutputId && slots.length > 1
                         ? slots.map((sl, i) => ({ headline: "", body: "", image: { style: null, url: postImages[i] ?? sl.versions[sl.active]!.url, status: "ready" } }))
                         : undefined}

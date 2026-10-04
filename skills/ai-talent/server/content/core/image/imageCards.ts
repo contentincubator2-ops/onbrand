@@ -27,6 +27,7 @@ import {
   type BrandVisualContext,
 } from "./imageGen";
 import { fetchImageBuffer } from "../../../platform/core/media/imageFetch";
+import { getImageStyle } from "./imageStyles";
 import type { ImageFailureKind } from "../../../platform/core/media/stillImageModels";
 
 export interface ImageDirection {
@@ -148,8 +149,10 @@ export function buildImageCardPrompt(args: {
   scenePromptEn: string;
   brand: BrandVisualContext;
   withProduct: boolean;
-  reference?: "previous" | "style" | null;
+  reference?: "previous" | "style" | "restyle" | null;
   instruction?: string;
+  /** 畫面樣式（imageStyles.ts 的 id）。 */
+  styleId?: string | null;
 }): string {
   const lines: string[] = [];
   if (args.withProduct) { lines.push(PRODUCT_FAITHFUL_PROMPT_BLOCK, ""); }
@@ -169,6 +172,21 @@ export function buildImageCardPrompt(args: {
       "REFERENCE IMAGE: the attached image is slide 1 of a multi-image set. Match its colour palette, lighting, " +
       "art direction, texture and mood exactly so every slide looks like one family. Do NOT copy its subject or " +
       "composition: depict the NEW scene below. If the same product or object appears, keep it identical to the reference.",
+      "",
+    );
+  }
+  if (args.reference === "restyle") {
+    lines.push(
+      "REFERENCE IMAGE: the attached image is the current version. Keep the same subject, scene content and composition, " +
+      "but re-render the WHOLE image in the ART STYLE below (colours may shift to suit the style).",
+      "",
+    );
+  }
+  const style = getImageStyle(args.styleId);
+  if (style) {
+    lines.push(
+      `ART STYLE (applies to the whole image): ${style.promptEn}` +
+      (args.withProduct ? " Apply it to the scene, lighting and rendering; keep any real product or subject from the reference photo faithful." : ""),
       "",
     );
   }
@@ -316,6 +334,57 @@ export async function saveTitledImage(dataUrl: string, spec: PlatformImageSpec):
   return { ok: true, url: saveFinal(fin.buffer, spec), bytes: fin.bytes };
 }
 
+/**
+ * 原圖直接用（2026-10-04 CJ「上傳了照片，還是沒用到，也是自己合成新的圖」）：不經 AI，把用戶自己的照片
+ * 放進這張卡的畫布。cover＝填滿（會裁掉超出的邊，置中）；contain＝完整保留（照片置中，
+ * 四周用同一張照片放大糊化的底補滿）。標題一樣是前台疊層。
+ */
+export async function fitPhotoToCard(args: {
+  buffer: Buffer;
+  spec: PlatformImageSpec;
+  fit: "cover" | "contain";
+}): Promise<{ ok: true; url: string; bytes: number } | { ok: false; reason: string }> {
+  const sharp = (await import("sharp")).default;
+  const { spec } = args;
+  const W = spec.width, H = spec.height;
+  let canvas: Buffer;
+  try {
+    if (args.fit === "cover") {
+      canvas = await sharp(args.buffer).rotate().resize(W, H, { fit: "cover", position: "centre" }).png().toBuffer();
+    } else {
+      const bg = await sharp(args.buffer).rotate().resize(W, H, { fit: "cover" }).blur(40).modulate({ brightness: 0.75 }).png().toBuffer();
+      const fg = await sharp(args.buffer).rotate().resize(W, H, { fit: "inside" }).png().toBuffer();
+      canvas = await sharp(bg).composite([{ input: fg, gravity: "centre" }]).png().toBuffer();
+    }
+  } catch {
+    return { ok: false, reason: "這張照片讀不出來，請換一張（PNG／JPG／WebP）。" };
+  }
+  // 已經是交付尺寸：只做轉檔與檔案上限。
+  const fin = await finalizeToSpec(canvas, { ...spec, compose: undefined });
+  if (!fin.ok) return fin;
+  return { ok: true, url: saveFinal(fin.buffer, spec), bytes: fin.bytes };
+}
+
+/** 純色／雙色漸層底（不經 AI）：換底圖的選項之一，純文字的輪播頁最適合。 */
+export async function solidBackgroundForCard(args: {
+  spec: PlatformImageSpec;
+  color: string;
+  color2?: string;
+}): Promise<{ ok: true; url: string; bytes: number } | { ok: false; reason: string }> {
+  const hex = /^#[0-9a-fA-F]{6}$/;
+  if (!hex.test(args.color) || (args.color2 && !hex.test(args.color2))) return { ok: false, reason: "顏色格式不正確。" };
+  const { spec } = args;
+  const fill = args.color2
+    ? `<defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${args.color}"/><stop offset="1" stop-color="${args.color2}"/></linearGradient></defs><rect width="100%" height="100%" fill="url(#g)"/>`
+    : `<rect width="100%" height="100%" fill="${args.color}"/>`;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${spec.width}" height="${spec.height}">${fill}</svg>`;
+  const sharp = (await import("sharp")).default;
+  const canvas = await sharp(Buffer.from(svg)).png().toBuffer();
+  const fin = await finalizeToSpec(canvas, { ...spec, compose: undefined });
+  if (!fin.ok) return fin;
+  return { ok: true, url: saveFinal(fin.buffer, spec), bytes: fin.bytes };
+}
+
 export async function renderImageCard(args: {
   spec: PlatformImageSpec;
   scenePromptEn: string;
@@ -326,8 +395,9 @@ export async function renderImageCard(args: {
   /** 上一版（對話修改）或來源圖（延伸尺寸）。只接受本站產出的圖。 */
   referenceImageUrl?: string;
   /** previous＝同一張的上一版（預設）；style＝整組的第 1 張，只借風格、畫面另外寫。 */
-  referenceMode?: "previous" | "style";
+  referenceMode?: "previous" | "style" | "restyle";
   instruction?: string;
+  styleId?: string;
 }): Promise<RenderOutcome> {
   const modelId = resolveStillImageModel(args.modelChoice);
   const gen = generationSize(args.spec);
@@ -348,6 +418,7 @@ export async function renderImageCard(args: {
     withProduct: !!args.productImageUrl,
     reference: args.referenceImageUrl ? (args.referenceMode ?? "previous") : null,
     instruction: args.instruction,
+    styleId: args.styleId,
   });
   const outcome = await generateStillImage(modelId, {
     prompt,
