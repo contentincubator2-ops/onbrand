@@ -2,6 +2,7 @@
  * 編排器每一階段的 LLM 呼叫：總監、寫手、視覺簡報、輪播、回覆範本、發文時間等。
  */
 import type { FBTaskTemplate, OrchestraConfig } from "../../catalog/quickTaskFB";
+import { certMissionOf, certKnowledgeBlock, MISSING_INFO_RULE_NO_FABRICATION, FACT_DISCIPLINE_RULE } from "../../catalog/platformCertKnowledge";
 import { type MarketCode, type PlatformCode, getCopywritingMasterPrompt } from "../../../../strategy/core/brand/copywritingMaster";
 import { isAdCopyTemplate, buildAdCopyRule, validateAdCopy, repairAdCopy } from "../adCopyContract";
 import { adSlotOf, buildAdSlotRule, validateAdSlot, repairAdSlot } from "../adSlotContract";
@@ -63,6 +64,11 @@ export async function callOneVariant(args: {
   siblingLabels?: readonly string[];
 }): Promise<{ label: string; caption: string; hashtags?: string[] }> {
   const { template, config, label, captionPersona, brandPrefix, urlContext, userMsg, inputKeys, agentAiModel, strategistAnchor, market, isZhTW } = args;
+  // 2026-10-04（CJ「讓它們都熟讀這些考題」，從 Facebook 這個 mission 開始）：這張卡所屬的平台如果已經
+  // 整理好認證範圍的知識，就把那份知識、不誘發編造的缺資訊處理、以及事實紀律一起帶進去。
+  // CERT_KNOWLEDGE=0 可整組關掉（評測時用同一個 commit 比較開與關）。還沒整理到的平台＝null＝行為不變。
+  const certMission = process.env.CERT_KNOWLEDGE === "0" ? null : certMissionOf(template);
+  const certBlock = certKnowledgeBlock(certMission);
   const adCopy = isAdCopyTemplate(template);
   // 2026-09-25（CJ「剛剛生出來的文案，顯示得很奇怪」）：單欄位廣告卡（標題／
   // 說明／CTA）的字數在 systemPrompt 裡寫了，但沒有任何東西在驗證——adCopy 那套
@@ -303,6 +309,7 @@ export async function callOneVariant(args: {
       edmBlock +
       igBlock +
       fbBlock +
+      certBlock +
       liBlock +
       ttBlock +
       ytBlock +
@@ -334,6 +341,7 @@ export async function callOneVariant(args: {
     edmBlock +
     igBlock +
     fbBlock +
+    certBlock +
     liBlock +
     ttBlock +
     ytBlock +
@@ -371,14 +379,16 @@ export async function callOneVariant(args: {
     // New version: 3-step smart fallback (素材 → 場景 → 對話起手式).
     // Placeholders forbidden entirely; defensive scrub also strips them
     // post-LLM (see sanitizeCaption regex below).
-    `\n【缺資訊時的處理 — 三步降級，禁用任何佔位符】\n` +
-    `**絕對不准**輸出「[待補：xxx]」「[請補充：xxx]」「[填入：xxx]」「[ASSUMPTION]」這類括號標記。\n` +
-    `缺具體事實（日期 / 數字 / 人名 / 連結）時，按順序降級：\n` +
-    `1. 先從〈品牌大腦〉〈URL 抓到的內容〉抓真實素材填空。\n` +
-    `2. 還是不夠 → **用具體場景敘述**取代「具體數據宣稱」。\n` +
-    `   ✗ 壞：「87% 的人都這樣」（沒來源不准寫數字）\n` +
-    `   ✓ 好：「晚上 8 點打開冰箱，看到剩半盒...」（場景畫面不需來源）\n` +
-    `3. 場景也想不出 → 用「對話起手式」：「我跟一位 [TA 角色] 聊到...」「上週客人說了一句話讓我想很久...」\n\n` +
+    (certMission ? MISSING_INFO_RULE_NO_FABRICATION : (
+      `\n【缺資訊時的處理 — 三步降級，禁用任何佔位符】\n` +
+      `**絕對不准**輸出「[待補：xxx]」「[請補充：xxx]」「[填入：xxx]」「[ASSUMPTION]」這類括號標記。\n` +
+      `缺具體事實（日期 / 數字 / 人名 / 連結）時，按順序降級：\n` +
+      `1. 先從〈品牌大腦〉〈URL 抓到的內容〉抓真實素材填空。\n` +
+      `2. 還是不夠 → **用具體場景敘述**取代「具體數據宣稱」。\n` +
+      `   ✗ 壞：「87% 的人都這樣」（沒來源不准寫數字）\n` +
+      `   ✓ 好：「晚上 8 點打開冰箱，看到剩半盒...」（場景畫面不需來源）\n` +
+      `3. 場景也想不出 → 用「對話起手式」：「我跟一位 [TA 角色] 聊到...」「上週客人說了一句話讓我想很久...」\n\n`
+    )) +
     `輸出嚴格 JSON 物件（不是陣列）：\n` +
     (config.pickOwnAngle
       ? `{"label":"<你自選的版本名稱>","caption":"<完整貼文>","hashtags":["..."]}\n`
@@ -388,7 +398,10 @@ export async function callOneVariant(args: {
     (hasUrl ? `\n# URL 抓到的內容（本次主題來源 — 必須以此為主）\n${urlContext}` : "");
   // Ad-copy contract goes LAST so it is the freshest instruction and wins
   // over the social scaffold's「不要排成結構化卡片」rule.
+  // 事實紀律放在工藝準則之後、格式合約之前：它要壓過「用數字開場／量化結果」，
+  // 但廣告／分鏡的格式合約仍然要是最後一條。
   const system = promptCore + deliverableOnlyRule
+    + (certMission ? FACT_DISCIPLINE_RULE : "")
     + (adCopy ? buildAdCopyRule(requestedUrl) : "")
     + (adSlot ? buildAdSlotRule(adSlot) : "")
     + (shotList ? buildShotListRule() : "");

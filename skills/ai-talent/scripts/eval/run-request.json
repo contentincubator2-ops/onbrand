@@ -1,12 +1,13 @@
 {
-  "tag": "content-baseline-1",
+  "tag": "fb-cert-1",
   "brandIds": "2972",
-  "channels": "facebook,instagram,threads,line,tiktok,email,website",
+  "channels": "facebook",
   "allCards": "1",
   "taskIds": "",
   "examFile": "scripts/eval/data/exam-inputs.tom.json",
   "repeats": 2,
   "concurrency": 4,
   "suites": "cards",
-  "deliveryCheck": "0"
+  "deliveryCheck": "0",
+  "certKnowledge": "1"
 }
