@@ -175,6 +175,43 @@ export async function recordQuotaUsage(
   }
 }
 
+/** Stripe client, or null where billing is switched off / not configured (cloned envs, comp accounts). */
+async function billingStripe(): Promise<import("../core/billing/stripeLifecycle").StripeLike | null> {
+  const { isRuntimeFeatureEnabled } = await import("../core/ops/runtimeSafety");
+  if (!isRuntimeFeatureEnabled("LIVE_BILLING_ENABLED") || !process.env.STRIPE_SECRET_KEY) return null;
+  const { getStripe } = await import("./stripeRouter");
+  return getStripe();
+}
+
+/** Turn renewal off (cancel) or back on (resume), at Stripe first and then in our records. */
+async function changeRenewal(userId: number, cancel: boolean): Promise<{ hasSubscription: boolean; periodEnd: Date | null }> {
+  const { default: localPool } = await import("../../localDb");
+  const stripe = await billingStripe();
+  if (stripe) {
+    const { setCancelAtPeriodEnd } = await import("../core/billing/stripeLifecycle");
+    let out: { hasSubscription: boolean; periodEnd: Date | null };
+    try {
+      out = await setCancelAtPeriodEnd(localPool, stripe, userId, cancel);
+    } catch (e) {
+      console.error("[billing.changeRenewal] Stripe refused:", (e as Error)?.message);
+      throw new TRPCError({
+        code: "INTERNAL_SERVER_ERROR",
+        message: "金流服務暫時無法處理，訂閱狀態未變更。請稍後再試或聯絡 sowork@sowork.ai。",
+      });
+    }
+    if (out.hasSubscription) return out;
+  }
+  // No Stripe subscription (comp / manual plan): nothing bills, so only record the intent.
+  if (cancel) {
+    try {
+      await localPool.execute(`UPDATE users SET cancelAtPeriodEnd = 1 WHERE id = ?`, [userId]);
+    } catch (e) {
+      console.warn("[billing.changeRenewal] cancelAtPeriodEnd not written:", (e as Error)?.message);
+    }
+  }
+  return { hasSubscription: false, periodEnd: null };
+}
+
 export const billingRouter = router({
   /** Plan + days-left + per-quota usage for top-bar trial countdown + /settings/account quota bar */
   getStatus: protectedProcedure
@@ -283,10 +320,21 @@ export const billingRouter = router({
         console.warn("[billing.getStatus] workspace lookup skipped:", (e as Error).message);
       }
 
+      // Late column — a DB that has not migrated yet reads as "not scheduled".
+      let cancelAtPeriodEnd = false;
+      try {
+        const [cRows]: any = await localPool.execute(
+          `SELECT cancelAtPeriodEnd FROM users WHERE id = ? LIMIT 1`,
+          [ctx.user!.id],
+        );
+        cancelAtPeriodEnd = Number((cRows as any[])[0]?.cancelAtPeriodEnd ?? 0) === 1;
+      } catch { /* column missing */ }
+
       return {
         planCode: u.planCode,
         planName: plan.name,
         planStatus: u.planStatus,
+        cancelAtPeriodEnd: cancelAtPeriodEnd && u.planStatus === "active",
         planEndsAt: u.planEndsAt?.toISOString() ?? null,
         daysLeft,
         expired,
@@ -382,15 +430,25 @@ export const billingRouter = router({
       return { ok: true, planEndsAt: ends.toISOString() };
     }),
 
-  /** Cancel subscription (stub — actual cancel via 綠界 tomorrow) */
+  /**
+   * Stop the subscription renewing. Access stays until planEndsAt, so
+   * planStatus stays 'active' with users.cancelAtPeriodEnd=1; the Stripe
+   * `customer.subscription.deleted` webhook flips it to 'canceled' at the end.
+   */
   cancelSubscription: protectedProcedure
     .mutation(async ({ ctx }) => {
-      const { default: localPool } = await import("../../localDb");
-      await localPool.execute(
-        `UPDATE users SET planStatus='canceled' WHERE id=?`,
-        [ctx.user!.id],
-      );
-      return { ok: true, message: "訂閱已取消，當期到期前仍可繼續使用" };
+      const { periodEnd } = await changeRenewal(ctx.user!.id, true);
+      return { ok: true, periodEnd: periodEnd?.toISOString() ?? null, message: "訂閱已取消，當期到期前仍可繼續使用" };
+    }),
+
+  /** Undo a scheduled cancel before the period ends. */
+  resumeSubscription: protectedProcedure
+    .mutation(async ({ ctx }) => {
+      const { hasSubscription } = await changeRenewal(ctx.user!.id, false);
+      if (!hasSubscription) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "找不到可恢復的訂閱，請重新訂閱。" });
+      }
+      return { ok: true, message: "訂閱已恢復，將於到期日自動續訂" };
     }),
 
   /** Invoice list for /settings/account */
@@ -449,6 +507,22 @@ export const billingRouter = router({
         throw new TRPCError({
           code: "BAD_REQUEST",
           message: "請輸入正確的帳號 email 確認刪除",
+        });
+      }
+      // A deleted account must not keep being charged. Fail the deletion
+      // rather than leave a live subscription behind an inactive account.
+      try {
+        const stripe = await billingStripe();
+        if (stripe) {
+          const { findCurrentSubscription, cancelSubscriptionNow } = await import("../core/billing/stripeLifecycle");
+          const current = await findCurrentSubscription(localPool, stripe, ctx.user!.id);
+          if (current) await cancelSubscriptionNow(stripe, current.subscriptionId);
+        }
+      } catch (e) {
+        console.error("[billing.deleteAccount] could not cancel Stripe subscription:", (e as Error)?.message);
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "無法停止訂閱扣款，帳號尚未刪除。請稍後再試或聯絡 sowork@sowork.ai。",
         });
       }
       await localPool.execute(

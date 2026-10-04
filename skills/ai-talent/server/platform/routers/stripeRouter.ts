@@ -32,6 +32,16 @@
  * ─── Idempotency ───────────────────────────────────────────
  * `invoices.merchantTradeNo` stores the Stripe session.id. Webhooks
  * may fire multiple times; second + N attempts noop when status='paid'.
+ *
+ * ─── After the first payment ───────────────────────────────
+ * Renewals, failed charges, cancellation and refunds are handled by
+ * core/billing/stripeLifecycle.ts. The Stripe endpoint must be subscribed
+ * to: checkout.session.completed, checkout.session.async_payment_succeeded,
+ * invoice.paid, invoice.payment_failed, customer.subscription.updated,
+ * customer.subscription.deleted, charge.refunded.
+ *
+ * STRIPE_REQUIRE_LIVE=true (set on production at go-live) refuses to run
+ * with a test key, so a mis-copied .env cannot hand out plans for free.
  */
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
@@ -40,7 +50,7 @@ import Stripe from "stripe";
 import { isRuntimeFeatureEnabled } from "../core/ops/runtimeSafety";
 
 let _stripe: Stripe | null = null;
-function getStripe(): Stripe {
+export function getStripe(): Stripe {
   if (!isRuntimeFeatureEnabled("LIVE_BILLING_ENABLED")) {
     throw new TRPCError({
       code: "PRECONDITION_FAILED",
@@ -55,8 +65,21 @@ function getStripe(): Stripe {
       message: "金流服務尚未啟用，請稍後再試或聯絡 sowork@sowork.ai。",
     });
   }
+  if (!stripeKeyAllowed(key, process.env.STRIPE_REQUIRE_LIVE)) {
+    console.error("[stripe] STRIPE_REQUIRE_LIVE is set but STRIPE_SECRET_KEY is not a live key");
+    throw new TRPCError({
+      code: "PRECONDITION_FAILED",
+      message: "金流服務設定有誤，請聯絡 sowork@sowork.ai。",
+    });
+  }
   _stripe = new Stripe(key, { apiVersion: "2024-12-18.acacia" as any });
   return _stripe;
+}
+
+/** With STRIPE_REQUIRE_LIVE on, only live secret / restricted keys may be used. */
+export function stripeKeyAllowed(key: string, requireLive: string | undefined): boolean {
+  const strict = ["1", "true", "yes", "on"].includes((requireLive ?? "").trim().toLowerCase());
+  return !strict || /^(sk|rk)_live_/.test(key);
 }
 
 const PLAN_LABEL: Record<string, string> = {
@@ -164,6 +187,15 @@ export const stripeRouter = router({
         // 本來就會自動開 invoice;這裡補上台灣 B2B 需要的稅籍欄位。
         billing_address_collection: "required",
         tax_id_collection: { enabled: true },
+        // Copied onto the subscription so renewal / cancel webhooks can find the owner.
+        subscription_data: {
+          metadata: {
+            userId: String(ctx.user.id),
+            workspaceId: String(input.workspaceId),
+            planCode: input.planCode,
+            billingCycle: interval === "year" ? "annual" : "monthly",
+          },
+        },
         metadata: {
           invoiceId: String(invoiceId),
           userId: String(ctx.user.id),
@@ -185,6 +217,27 @@ export const stripeRouter = router({
       );
 
       return { url: session.url, sessionId: session.id };
+    }),
+
+  /**
+   * Stripe-hosted page to update the card or download receipts. This is where
+   * a past_due user fixes their payment method.
+   */
+  createPortalSession: protectedProcedure
+    .mutation(async ({ ctx }) => {
+      const stripe = getStripe();
+      const appUrl = process.env.APP_URL ?? "https://onbrand.sowork.ai";
+      const { default: localPool } = await import("../../localDb");
+      const { findCurrentSubscription } = await import("../core/billing/stripeLifecycle");
+      const current = await findCurrentSubscription(localPool, stripe, ctx.user.id);
+      if (!current?.customerId) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "找不到訂閱紀錄，請聯絡 sowork@sowork.ai。" });
+      }
+      const portal = await stripe.billingPortal.sessions.create({
+        customer: current.customerId,
+        return_url: `${appUrl}/settings/account`,
+      });
+      return { url: portal.url };
     }),
 
   /** Frontend can poll this after redirect to confirm status. */
@@ -265,9 +318,8 @@ export async function handleStripeWebhook(rawBody: Buffer, signature: string): P
     return { ok: false, message: "signature verification failed" };
   }
 
-  // Only act on completed checkouts.
   if (event.type !== "checkout.session.completed" && event.type !== "checkout.session.async_payment_succeeded") {
-    return { ok: true }; // ignored, but ack
+    return handleLifecycleEvent(stripe, event);
   }
 
   const session = event.data.object as Stripe.Checkout.Session;
@@ -344,6 +396,64 @@ export async function handleStripeWebhook(rawBody: Buffer, signature: string): P
     console.log("[stripe.webhook] subscription activated", {
       sessionId, userId: invoice.userId, planCode: invoice.planCode, days,
     });
+    await cancelSupersededSubscription(stripe, session, invoice);
   }
+  return { ok: true };
+}
+
+/**
+ * Upgrading (基礎 → 專業) goes through a fresh checkout, which creates a second
+ * subscription. Stop the previous one or the customer is billed for both. The
+ * days already paid for were carried over by the GREATEST(...) above.
+ */
+async function cancelSupersededSubscription(
+  stripe: Stripe,
+  session: Stripe.Checkout.Session,
+  invoice: { id: number; userId: number },
+): Promise<void> {
+  const newSubId = typeof session.subscription === "string" ? session.subscription : session.subscription?.id;
+  try {
+    const { default: localPool } = await import("../../localDb");
+    const { findCurrentSubscription, cancelSubscriptionNow } = await import("../core/billing/stripeLifecycle");
+    const previous = await findCurrentSubscription(localPool, stripe, invoice.userId, { beforeInvoiceId: invoice.id });
+    if (!previous || previous.subscriptionId === newSubId) return;
+    await cancelSubscriptionNow(stripe, previous.subscriptionId);
+    console.log("[stripe.webhook] previous subscription canceled after upgrade", {
+      userId: invoice.userId, previous: previous.subscriptionId,
+    });
+  } catch (e) {
+    // The new plan is already active; a human must stop the old one.
+    await logFailedWebhook({
+      sessionId: session.id,
+      eventType: "checkout.session.completed",
+      reason: `previous subscription NOT canceled after upgrade: ${(e as Error)?.message ?? ""}`,
+      userId: invoice.userId,
+    });
+  }
+}
+
+/** Renewals, failed charges, cancellation, refunds — see core/billing/stripeLifecycle.ts. */
+async function handleLifecycleEvent(stripe: Stripe, event: Stripe.Event): Promise<{ ok: boolean; message?: string }> {
+  const { classifyStripeEvent, applyLifecycleAction } = await import("../core/billing/stripeLifecycle");
+  const action = classifyStripeEvent(event);
+  if (action.kind === "ignore") return { ok: true };
+
+  const { default: localPool } = await import("../../localDb");
+  const result = await applyLifecycleAction(localPool, stripe, action, {
+    flagForReview: (reason, userId) => logFailedWebhook({ eventId: event.id, eventType: event.type, reason, userId }),
+    onPaymentFailed: async (userId) => {
+      const [rows]: any = await localPool.execute(`SELECT email, name FROM users WHERE id = ? LIMIT 1`, [userId]);
+      const u = (rows as any[])[0];
+      if (!u?.email) return;
+      const { sendPaymentFailed } = await import("../auth/emailService");
+      await sendPaymentFailed({
+        to: u.email,
+        name: u.name ?? "",
+        accountUrl: `${process.env.APP_URL ?? "https://onbrand.sowork.ai"}/settings/account`,
+      });
+    },
+  });
+  console.log("[stripe.webhook] lifecycle", { type: event.type, ...result });
+  // An unknown subscription is logged for review, not retried — retrying cannot fix it.
   return { ok: true };
 }
