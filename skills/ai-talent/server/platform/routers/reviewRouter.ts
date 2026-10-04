@@ -135,6 +135,15 @@ export const reviewRouter = router({
         }
       }
 
+      // tenantGuard has verified the mission is the caller's; the output has to be in it.
+      const [own]: any = await localPool.execute(
+        `SELECT id FROM mission_outputs WHERE id = ? AND missionId = ? LIMIT 1`,
+        [input.outputId, input.missionId],
+      );
+      if ((own as any[]).length === 0) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "找不到這則產出。" });
+      }
+
       const [dup]: any = await localPool.execute(
         `SELECT id, status FROM mission_review_queue
           WHERE outputId = ? AND status IN ('pending','in_review') LIMIT 1`,
@@ -170,11 +179,16 @@ export const reviewRouter = router({
     .query(async ({ ctx, input }) => {
       const { default: localPool } = await import("../../localDb");
       const [rows]: any = await localPool.execute(
-        `SELECT id, status, requestedBy, reviewerIds, revisionNote, approvedAt, createdAt
-           FROM mission_review_queue
-          WHERE outputId = ?
-          ORDER BY id DESC LIMIT 1`,
-        [input.outputId],
+        // Only the author, the output's owner, or a named reviewer may read it.
+        `SELECT q.id, q.status, q.requestedBy, q.reviewerIds, q.revisionNote, q.approvedAt, q.createdAt
+           FROM mission_review_queue q
+          WHERE q.outputId = ?
+            AND (q.requestedBy = ?
+                 OR JSON_CONTAINS(q.reviewerIds, CAST(? AS JSON))
+                 OR EXISTS (SELECT 1 FROM mission_outputs o JOIN missions m ON m.id = o.missionId
+                             WHERE o.id = q.outputId AND m.userId = ?))
+          ORDER BY q.id DESC LIMIT 1`,
+        [input.outputId, ctx.user!.id, String(ctx.user!.id), ctx.user!.id],
       );
       const r = (rows as any[])[0];
       if (!r) return null;

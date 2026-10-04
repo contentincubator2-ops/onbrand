@@ -929,7 +929,7 @@ export const brandRouter = router({
 
       // Authorize — must be a brand the user owns or is a member of
       try {
-        await assertBrandOwner(input.brandId, ctx.user.id);
+        await assertBrandOwner(ctx.user.id, input.brandId);
       } catch {
         throw new TRPCError({ code: "FORBIDDEN", message: "你沒有這個品牌的編輯權限" });
       }
@@ -1003,7 +1003,7 @@ export const brandRouter = router({
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       const { brands } = await import("../../../drizzle/schema");
       try {
-        await assertBrandOwner(input.brandId, ctx.user.id);
+        await assertBrandOwner(ctx.user.id, input.brandId);
       } catch {
         throw new TRPCError({ code: "FORBIDDEN", message: "你沒有這個品牌的編輯權限" });
       }
