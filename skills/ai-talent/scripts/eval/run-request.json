@@ -1,5 +1,5 @@
 {
-  "tag": "fb-prompts-cert-off",
+  "tag": "fb-prompts-cert-on",
   "brandIds": "2972",
   "channels": "facebook",
   "allCards": "1",
@@ -10,6 +10,6 @@
   "concurrency": 6,
   "suites": "cards",
   "deliveryCheck": "0",
-  "certKnowledge": "0",
+  "certKnowledge": "1",
   "promptDump": "1"
 }

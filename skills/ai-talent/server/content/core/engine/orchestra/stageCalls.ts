@@ -409,7 +409,11 @@ export async function callOneVariant(args: {
   // 2026-10-04 評測用：把這一版實際要送給模型的完整指令印出來（搭配 EVAL_NO_LLM，不呼叫模型）。
   // 用途：改由 Claude Code 這邊的 agent 依同一份指令寫稿（走 Max 方案，不走 API 計費）。
   if (process.env.EVAL_PROMPT_DUMP === "1") {
-    console.log(`EVALPROMPT ${Buffer.from(JSON.stringify({ taskId: template.id, label, system, user: userMsg }), "utf8").toString("base64")}`);
+    // 分段印：整份指令的 base64 有幾萬字元，CI log 會把太長的一行截斷。
+    const b64 = Buffer.from(JSON.stringify({ taskId: template.id, label, system, user: userMsg }), "utf8").toString("base64");
+    const key = `${template.id}|${Buffer.from(String(label), "utf8").toString("hex").slice(0, 24)}`;
+    const parts = Math.ceil(b64.length / 3000);
+    for (let i = 0; i < parts; i++) console.log(`EVALPROMPTPART ${key} ${i} ${parts} ${b64.slice(i * 3000, (i + 1) * 3000)}`);
   }
 
   // Provider + model selection priority:
