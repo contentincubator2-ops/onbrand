@@ -121,6 +121,14 @@ export default function PlannerPage() {
     onError: (e: any) => showToastGlobal(friendlyError(e, en ? "Something went wrong. Please try again." : "剛剛沒成功，再試一次。"), "error"),
   });
   const removeSlot = T.planner?.removeSlot?.useMutation?.({ onSuccess: () => { setOpen(null); refresh(); }, onError: (e: any) => showToastGlobal(friendlyError(e, en ? "Something went wrong. Please try again." : "剛剛沒成功，再試一次。"), "error") });
+  // 2026-10-04：用戶自己指定這一格用哪張任務卡（不必經總監）。
+  const setSlotCard = T.planner?.setSlotCard?.useMutation?.({
+    onSuccess: (r: any) => {
+      setOpen((cur) => (cur && cur.kind === "slot" ? { ...cur, slot: { ...cur.slot, taskId: r.taskId, taskLabel: r.taskLabel } } : cur));
+      refresh();
+    },
+    onError: (e: any) => showToastGlobal(friendlyError(e, en ? "Something went wrong. Please try again." : "剛剛沒成功，再試一次。"), "error"),
+  });
   // 分歧方案卡：選一版 → 伺服器套用那一版的格子。
   const pickFork = T.planner?.pickFork?.useMutation?.({
     onSuccess: (r: any) => { if (r?.weekStart) setWeekStart(r.weekStart); setTouched(r?.touched ?? []); refresh(); },
@@ -434,8 +442,24 @@ export default function PlannerPage() {
                 <p className="m-0 mt-3 text-[17px] font-bold leading-snug" style={{ color: INK }}>{open.title}</p>
                 {open.kind === "slot" && open.slot.reason && <p className="m-0 mt-2 text-[13.5px] leading-relaxed" style={{ color: "#404040" }}>{open.slot.reason}</p>}
                 {open.kind === "campaign" && <p className="m-0 mt-2 text-[13.5px] leading-relaxed" style={{ color: "#404040" }}>{en ? "From campaign" : "來自活動"}「{open.camp.eventName}」</p>}
+                {open.kind === "slot" && open.slot.status !== "written" && (() => {
+                  const opts = ((data?.cards ?? []) as Array<{ id: string; platform: string; labelZh: string }>).filter((c) => c.platform === open.platform);
+                  if (!opts.length) return null;
+                  const cur = open.slot.taskId as string;
+                  return (
+                    <label className="mt-2 flex items-center gap-2 text-[12px]" style={{ color: META }}>
+                      <span className="shrink-0">{en ? "Task card" : "任務卡"}</span>
+                      <select value={cur} disabled={setSlotCard?.isPending} aria-label={en ? "Task card for this post" : "這一篇用的任務卡"}
+                        onChange={(e) => setSlotCard?.mutate?.({ slotId: open.slot.id, taskId: e.target.value })}
+                        className="min-w-0 flex-1 rounded-lg border bg-white px-2 py-1.5 text-[12.5px]" style={{ borderColor: LINE, color: INK }}>
+                        {!opts.some((c) => c.id === cur) && <option value={cur}>{open.slot.taskLabel ?? cur}</option>}
+                        {opts.map((c) => <option key={c.id} value={c.id}>{c.labelZh}</option>)}
+                      </select>
+                    </label>
+                  );
+                })()}
                 <p className="m-0 mt-2 text-[12px]" style={{ color: META }}>
-                  {open.kind === "slot" ? `${en ? "Task card" : "任務卡"}・${open.slot.taskLabel ?? open.slot.taskId}`
+                  {open.kind === "slot" ? (open.slot.status !== "written" ? "" : `${en ? "Task card" : "任務卡"}・${open.slot.taskLabel ?? open.slot.taskId}`)
                     : open.kind === "campaign" ? `${en ? "Task card" : "任務卡"}・${open.camp.taskLabel}` : open.meta}
                 </p>
                 {isFailedScheduled(open.kind === "scheduled" ? open.cal : null) && (

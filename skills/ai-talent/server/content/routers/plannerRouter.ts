@@ -141,7 +141,7 @@ export const plannerRouter = router({
         loadMessages(input.brandId, userId),
         brandPlatforms(input.brandId),
       ]);
-      return { days: weekDays(input.weekStart), slots, campaign, messages, platforms, hasDrafts: slots.some((s) => s.status === "draft") };
+      return { days: weekDays(input.weekStart), slots, campaign, messages, platforms, cards: cardsFor(platforms), hasDrafts: slots.some((s) => s.status === "draft") };
     }),
 
   /** 側欄儀表：這週排了幾篇、寫好幾篇、各平台還有幾篇沒寫。 */
@@ -291,6 +291,27 @@ export const plannerRouter = router({
         [input.id, input.brandId],
       );
       return { ok: true };
+    }),
+
+  /**
+   * 用戶自己指定這一格用哪張任務卡（不經總監）。只能換成同平台、目前可用的卡；
+   * 已寫好的格子不能換（成品跟格子會對不上）。
+   */
+  setSlotCard: protectedProcedure
+    .input(z.object({ slotId: z.number().int().positive(), taskId: z.string().min(1).max(100) }))
+    .mutation(async ({ ctx, input }) => {
+      const [rows]: any = await localPool.execute(`SELECT brandId, platform, status FROM planned_slots WHERE id = ? LIMIT 1`, [input.slotId]);
+      const slot = (rows as any[])[0];
+      if (!slot) throw new TRPCError({ code: "NOT_FOUND", message: "找不到這一格" });
+      await assertBrandAccess(ctx.user!.id, Number(slot.brandId));
+      if (slot.status !== "draft" && slot.status !== "planned") throw new TRPCError({ code: "BAD_REQUEST", message: "這一篇已經寫好，不能換任務卡" });
+      const card = cardsFor(await brandPlatforms(Number(slot.brandId))).find((c) => c.id === input.taskId && c.platform === slot.platform);
+      if (!card) throw new TRPCError({ code: "BAD_REQUEST", message: "這張任務卡不適用這個平台" });
+      await localPool.execute(
+        `UPDATE planned_slots SET taskId = ?, taskLabel = ? WHERE id = ? AND status IN ('draft','planned')`,
+        [card.id, card.labelZh, input.slotId],
+      );
+      return { ok: true, taskId: card.id, taskLabel: card.labelZh };
     }),
 
   /** 任務卡寫完這一格：回填產出、標成已寫。失敗不擋使用者（前端吞掉）。 */
