@@ -1,0 +1,33 @@
+name: "Ops — User usage (read-only)"
+on:
+  workflow_dispatch:
+    inputs:
+      email:
+        description: "User email"
+        default: "sowork@sowork.tw"
+      days:
+        description: "Lookback days"
+        default: "7"
+jobs:
+  usage:
+    runs-on: [self-hosted, linux, vm-onbrand]
+    steps:
+      - name: Read-only usage report
+        env:
+          EMAIL: ${{ github.event.inputs.email }}
+          DAYS: ${{ github.event.inputs.days }}
+        run: |
+          source /opt/onbrand/app/skills/ai-talent/.env 2>/dev/null || true
+          H="${LOCAL_DB_HOST:-127.0.0.1}"; U="${LOCAL_DB_USER:-mos_user}"
+          P="${LOCAL_DB_PASSWORD}"; D="${LOCAL_DB_NAME:-mos_db}"
+          q() { mysql -h"$H" -u"$U" -p"$P" "$D" -e "$1" 2>&1 | grep -v 'Using a password'; }
+          UID_SQL="(SELECT id FROM users WHERE email='$EMAIL' LIMIT 1)"
+          echo "=== user ==="; q "SELECT id,email,planCode,planStatus FROM users WHERE email='$EMAIL';"
+          echo "=== usage_log by day ==="
+          q "SELECT DATE(ts) d, COUNT(*) calls, ROUND(SUM(costUsd),3) usd FROM usage_log WHERE userId=$UID_SQL AND ts > NOW() - INTERVAL $DAYS DAY GROUP BY d ORDER BY d;"
+          echo "=== usage_log by kind/model ==="
+          q "SELECT kind, model, COUNT(*) calls, ROUND(SUM(costUsd),3) usd FROM usage_log WHERE userId=$UID_SQL AND ts > NOW() - INTERVAL $DAYS DAY GROUP BY kind, model ORDER BY usd DESC;"
+          echo "=== total ==="
+          q "SELECT COUNT(*) calls, ROUND(SUM(costUsd),3) usd, MIN(ts) first_ts, MAX(ts) last_ts FROM usage_log WHERE userId=$UID_SQL AND ts > NOW() - INTERVAL $DAYS DAY;"
+          echo "=== outputs by day ==="
+          q "SELECT DATE(o.createdAt) d, COUNT(*) outputs FROM mission_outputs o JOIN missions m ON m.id=o.missionId WHERE m.userId=$UID_SQL AND o.createdAt > NOW() - INTERVAL $DAYS DAY GROUP BY d ORDER BY d;"
