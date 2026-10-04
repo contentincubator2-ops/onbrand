@@ -20,7 +20,8 @@ import { Modal, ModalBody, ModalContent, ModalFooter, ModalHeader } from "@herou
 import { TASK_MODAL_CLASSNAMES, TASK_MODAL_HEADER, TASK_MODAL_QUESTION } from "../../../platform/components/taskModalStyle";
 import { EmptyIllustration } from "../../../platform/components/EmptyIllustration";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faBox } from "@fortawesome/free-solid-svg-icons";
+import { faBox, faBullseye, faUsers, faGem, faTrophy, faComment, faTag, faImages, faFont, faCalendarDays, faLayerGroup } from "@fortawesome/free-solid-svg-icons";
+import type { IconDefinition } from "@fortawesome/fontawesome-svg-core";
 import AssetPhotoGallery from "./AssetPhotoGallery";
 import ProductSceneModal from "./ProductSceneModal";
 
@@ -99,14 +100,18 @@ function FieldEditor({ field, en, edits, setEdits }: {
   );
 }
 
-/** 任務卡視窗底部那種「圓形小圖示＋下方小字」的動作鍵。 */
-function ChipAction({ label, onPress, children }: { label: string; onPress: () => void; children: React.ReactNode }) {
+/** 任務卡視窗底部那種「圓角小圖示＋下方小字」的動作鍵；dot＝有內容（綠點），active＝目前展開。 */
+function ChipAction({ label, onPress, children, active, dot }: {
+  label: string; onPress: () => void; children: React.ReactNode; active?: boolean; dot?: boolean;
+}) {
   return (
-    <button type="button" onClick={onPress} className="flex flex-col items-center gap-1 group">
-      <span className="w-10 h-10 rounded-xl bg-default-100 text-neutral-700 flex items-center justify-center group-hover:bg-default-200 transition">
+    <button type="button" onClick={onPress} aria-pressed={active} className="flex flex-col items-center gap-1 group">
+      <span className={`relative w-10 h-10 rounded-xl flex items-center justify-center transition ${
+        active ? "bg-neutral-900 text-white" : "bg-default-100 text-neutral-700 group-hover:bg-default-200"}`}>
         {children}
+        {dot && <span className="absolute top-1 right-1 w-[7px] h-[7px] rounded-full bg-emerald-500" />}
       </span>
-      <span className="text-[11px] text-neutral-500">{label}</span>
+      <span className="text-[11px] text-neutral-500 whitespace-nowrap">{label}</span>
     </button>
   );
 }
@@ -255,7 +260,6 @@ export default function ProductDetailModal({ productId, brandId, onClose, onRepo
   // 裡的 core.zhTagline／audience.primary／competition.uniqueUsp，統一在那邊編輯。
   const [edits, setEdits] = useState<Record<string, string>>({});
   const [segEdits, setSegEdits] = useState<Record<string, Record<string, string>>>({});
-  const [showMissing, setShowMissing] = useState(false);
   const [preferred, setPreferred] = useState<string[]>([]);
   const [forbidden, setForbidden] = useState<string[]>([]);
   const [periods, setPeriods] = useState<PromotionPeriod[]>([]);
@@ -352,6 +356,37 @@ export default function ProductDetailModal({ productId, brandId, onClose, onRepo
     return () => window.removeEventListener("keydown", handler);
   }, [onClose]);
 
+  // 2026-10-04（CJ「參考 Facebook 任務視窗，底下許多品牌等等的詳細說明都是 icon，需要修改時才點選展開」）：
+  // 欄位依路徑前綴收成幾個圖示，預設全部收起；有內容的圖示右上角亮綠點。
+  const [openKey, setOpenKey] = useState<string | null>(null);
+  const allFields = [...filledFields, ...missingFields.map((f) => ({ ...f, value: undefined as any }))];
+  const FIELD_GROUPS: { key: string; prefix: string; zh: string; en: string; icon: IconDefinition }[] = [
+    { key: "core",        prefix: "core.",        zh: "核心定位", en: "Core",     icon: faBullseye },
+    { key: "audience",    prefix: "audience.",    zh: "受眾",     en: "Audience", icon: faUsers },
+    { key: "value",       prefix: "value.",       zh: "價值",     en: "Value",    icon: faGem },
+    { key: "competition", prefix: "competition.", zh: "賣點競品", en: "Edge",     icon: faTrophy },
+    { key: "marketing",   prefix: "marketing.",   zh: "語氣用詞", en: "Voice",    icon: faComment },
+    { key: "facts",       prefix: "facts.",       zh: "售價規格", en: "Facts",    icon: faTag },
+  ];
+  const fieldGroupOf = (key: string) => {
+    const g = FIELD_GROUPS.find((x) => x.key === key);
+    return g ? allFields.filter((f) => f.path.startsWith(g.prefix)) : [];
+  };
+  const groups: { key: string; label: string; icon: IconDefinition; filled: boolean }[] = [
+    { key: "photos", label: en ? "Photos" : "產品照片", icon: faImages, filled: !!productPositioning.imageUrl },
+    ...FIELD_GROUPS
+      .filter((g) => allFields.some((f) => f.path.startsWith(g.prefix)))
+      .map((g) => ({
+        key: g.key, label: en ? g.en : g.zh, icon: g.icon,
+        filled: filledFields.some((f) => f.path.startsWith(g.prefix)),
+      })),
+    { key: "words", label: en ? "Words" : "詞彙", icon: faFont, filled: preferred.length + forbidden.length > 0 },
+    { key: "periods", label: en ? "Dates" : "推廣時間", icon: faCalendarDays, filled: periods.length > 0 },
+    ...(customSegments.length > 0
+      ? [{ key: "custom", label: en ? "Custom" : "自訂卡片", icon: faLayerGroup, filled: true }]
+      : []),
+  ];
+
   return (
     <Modal isOpen onClose={onClose} size="2xl" scrollBehavior="inside" backdrop="blur" classNames={TASK_MODAL_CLASSNAMES}>
       <ModalContent>
@@ -365,9 +400,8 @@ export default function ProductDetailModal({ productId, brandId, onClose, onRepo
         </ModalHeader>
 
         {/* Body — scrollable */}
-        <ModalBody className="px-6 py-4 gap-6">
-
-          {/* 任務卡視窗的版式：左邊插畫、右邊一句大字問句，下面是淡灰底的輸入區。 */}
+        <ModalBody className="px-6 py-4 gap-4">
+          {/* 任務卡視窗的版式：左邊插畫、右邊一句大字問句；細項收在底下的圖示，要改再點開。 */}
           <div className="flex items-center gap-4 pt-1">
             <div className="shrink-0"><EmptyIllustration kind="product" width={104} /></div>
             <div className="min-w-0">
@@ -375,67 +409,18 @@ export default function ProductDetailModal({ productId, brandId, onClose, onRepo
                 {en ? "This is how the AI understands it" : "AI 是這樣理解這個產品的"}
               </h2>
               <p className="text-[13px] text-neutral-500 mt-1">
-                {filledFields.length > 0
-                  ? (en ? `${filledFields.length} fields read — edit anything below.` : `共讀到 ${filledFields.length} 格，直接改就會存進去。`)
-                  : (en ? "Nothing written yet." : "還沒有任何內容。")}
+                {en
+                  ? "Tap an icon below to see and edit that part."
+                  : "點下面的圖示，展開那一塊來看、來改。"}
               </p>
             </div>
           </div>
 
-          <div className="rounded-2xl bg-default-100 p-4">
-            {filledFields.length === 0 && customSegments.length === 0 && !showMissing ? (
-              <p className="text-xs text-neutral-500">
-                {en ? "Nothing written yet. Upload a document, paste text, or re-run positioning." : "還沒有任何定位內容。可以上傳文件、貼上文字，或按「重新定位」讓 AI 產出。"}
-              </p>
-            ) : null}
-            <div className="grid gap-3">
-              {filledFields.map((f) => (
-                <FieldEditor key={f.path} field={f} en={en} edits={edits} setEdits={setEdits} />
-              ))}
-              {customSegments.map((seg) => (
-                <div key={seg.id} className="rounded-xl bg-white p-3">
-                  <span className="text-[12px] font-bold text-neutral-700">{seg.title}</span>
-                  <div className="mt-1.5 grid gap-2">
-                    {seg.fields.map((fl) => (
-                      <label key={fl.key} className="block">
-                        <span className="text-[12px] font-semibold text-zinc-400">{fl.label}</span>
-                        <textarea
-                          rows={2}
-                          value={segEdits[seg.id]?.[fl.key] ?? fl.value}
-                          onChange={(e) => {
-                            const v = e.target.value;
-                            setSegEdits((prev) => ({ ...prev, [seg.id]: { ...(prev[seg.id] ?? {}), [fl.key]: v } }));
-                          }}
-                          className="w-full text-sm px-3 py-2 mt-0.5 bg-white rounded-xl resize-none border border-default-200 focus:outline-none focus:border-zinc-500"
-                        />
-                      </label>
-                    ))}
-                  </div>
-                </div>
-              ))}
-              {showMissing && missingFields.map((f) => (
-                <FieldEditor key={f.path} field={{ ...f, value: undefined }} en={en} edits={edits} setEdits={setEdits} />
-              ))}
-            </div>
-            {missingCount > 0 && (
-              <button
-                type="button"
-                onClick={() => setShowMissing((v) => !v)}
-                className="mt-3 text-[12px] font-medium text-neutral-500 hover:text-neutral-900"
-              >
-                {showMissing
-                  ? (en ? "Hide empty fields" : "收起還沒內容的欄位")
-                  : (en ? `+ Fill in ${missingCount} empty fields` : `＋ 補充另外 ${missingCount} 個空欄位`)}
-              </button>
-            )}
-          </div>
-
-          {/* ── Editable Section ── */}
-          <div className="space-y-5">
-            <p className="text-xs font-semibold text-neutral-500 uppercase tracking-wider border-b border-neutral-100 pb-2">
-              {en ? "Edit & Refine" : "手動編輯與精修"}
-            </p>
-
+          {openKey && (
+            <div className="rounded-2xl bg-default-100 p-4 grid gap-3">
+              <p className="text-[13px] font-bold text-neutral-800">{groups.find((g) => g.key === openKey)?.label}</p>
+              {openKey === "photos" && (
+                <div>
             {/*
               2026-09-10 (CJ「允許用戶上傳照片到品牌或個別產品。我們的 AI 不用
               再從網站爬產品照片了」)：貼網址改成真的上傳。主圖仍然鏡射進
@@ -444,9 +429,6 @@ export default function ProductDetailModal({ productId, brandId, onClose, onRepo
               「產品縮圖」跟著刷新。
             */}
             <div>
-              <label className="block text-xs font-semibold text-neutral-600 mb-1.5">
-                {en ? "Product photos" : "產品照片"}
-              </label>
               <AssetPhotoGallery
                 brandId={brandId}
                 scope="product"
@@ -467,6 +449,10 @@ export default function ProductDetailModal({ productId, brandId, onClose, onRepo
               )}
             </div>
 
+                </div>
+              )}
+              {openKey === "words" && (
+                <div className="grid gap-4">
             {/* Preferred words */}
             <ChipInput
               label={en ? "Preferred Words / Phrases" : "常用詞彙"}
@@ -485,7 +471,10 @@ export default function ProductDetailModal({ productId, brandId, onClose, onRepo
               color="red"
             />
 
-            {/* Promotion periods */}
+                </div>
+              )}
+              {openKey === "periods" && (
+                <div>
             <div>
               <div className="flex items-center justify-between mb-2">
                 <label className="text-xs font-semibold text-neutral-600">
@@ -533,12 +522,55 @@ export default function ProductDetailModal({ productId, brandId, onClose, onRepo
                 </div>
               )}
             </div>
-          </div>
+                </div>
+              )}
+              {openKey === "custom" && (
+                <div className="grid gap-3">
+              {customSegments.map((seg) => (
+                <div key={seg.id} className="rounded-xl bg-white p-3">
+                  <span className="text-[12px] font-bold text-neutral-700">{seg.title}</span>
+                  <div className="mt-1.5 grid gap-2">
+                    {seg.fields.map((fl) => (
+                      <label key={fl.key} className="block">
+                        <span className="text-[12px] font-semibold text-zinc-400">{fl.label}</span>
+                        <textarea
+                          rows={2}
+                          value={segEdits[seg.id]?.[fl.key] ?? fl.value}
+                          onChange={(e) => {
+                            const v = e.target.value;
+                            setSegEdits((prev) => ({ ...prev, [seg.id]: { ...(prev[seg.id] ?? {}), [fl.key]: v } }));
+                          }}
+                          className="w-full text-sm px-3 py-2 mt-0.5 bg-white rounded-xl resize-none border border-default-200 focus:outline-none focus:border-zinc-500"
+                        />
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              ))}
+                </div>
+              )}
+              {fieldGroupOf(openKey).map((f) => (
+                <FieldEditor key={f.path} field={f} en={en} edits={edits} setEdits={setEdits} />
+              ))}
+            </div>
+          )}
         </ModalBody>
 
         {saveError && <p className="px-6 pb-1 text-xs text-danger-600">{saveError}</p>}
-        <ModalFooter className="justify-between items-end">
-          <div className="flex items-end gap-3">
+        <ModalFooter className="justify-between items-end gap-3">
+          <div className="flex flex-wrap items-end gap-x-2.5 gap-y-2">
+            {groups.map((g) => (
+              <ChipAction
+                key={g.key}
+                label={g.label}
+                active={openKey === g.key}
+                dot={g.filled}
+                onPress={() => setOpenKey((cur) => (cur === g.key ? null : g.key))}
+              >
+                <FontAwesomeIcon icon={g.icon} style={{ fontSize: 15 }} />
+              </ChipAction>
+            ))}
+            <span className="self-stretch w-px bg-default-200 mx-1" aria-hidden />
             {onUpload && (
               <ChipAction label={en ? "Upload" : "上傳定位"} onPress={() => onUpload(productId)}>
                 <UploadIcon size={15} />
@@ -551,7 +583,7 @@ export default function ProductDetailModal({ productId, brandId, onClose, onRepo
           <button
             onClick={() => void handleSave()}
             disabled={(!dirty && !saved && Object.keys(edits).length === 0 && Object.keys(segEdits).length === 0) || saving}
-            className="h-12 px-7 rounded-full text-sm font-semibold transition disabled:opacity-40"
+            className="h-12 px-7 rounded-full text-sm font-semibold transition disabled:opacity-40 shrink-0"
             style={{ background: saved ? "#10B981" : "#171717", color: "white" }}
           >
             {saving
