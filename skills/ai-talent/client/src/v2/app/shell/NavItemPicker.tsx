@@ -39,7 +39,7 @@ function apiLabel(api: PickerPreset["api"], en: boolean): string | null {
   return null;
 }
 
-export default function NavItemPicker({ open, en, brandName, catalog, selected, saving, onClose, onSave, presets = [], createdPresets = [], onCreateChannel, onRemoveChannel }: {
+export default function NavItemPicker({ open, en, brandName, catalog, selected, saving, onClose, onSave, presets = [], createdPresets = [], onCreateChannel, onRemoveChannel, onRenameChannel }: {
   open: boolean;
   en: boolean;
   brandName?: string | null;
@@ -54,7 +54,10 @@ export default function NavItemPicker({ open, en, brandName, catalog, selected, 
   /** 建通路（範本或自訂名字）。回新通路的 id，失敗回 null。 */
   onCreateChannel?: (input: { preset?: string; name?: string }) => Promise<string | null>;
   onRemoveChannel?: (id: string) => Promise<void>;
+  /** 改自己加的通路的名字（側欄上顯示的名字）。 */
+  onRenameChannel?: (id: string, name: string) => Promise<void>;
 }) {
+  const [renaming, setRenaming] = React.useState<{ id: string; value: string } | null>(null);
   const [draft, setDraft] = React.useState<string[]>(selected);
   const [customName, setCustomName] = React.useState("");
   const [busy, setBusy] = React.useState(false);
@@ -191,7 +194,29 @@ export default function NavItemPicker({ open, en, brandName, catalog, selected, 
                   <li key={id} className="flex items-center gap-2 rounded-lg bg-white px-2 py-1.5 text-[13px]">
                     <span className="w-4 text-right font-mono text-[11px] text-neutral-400">{i + 1}</span>
                     <span className="flex h-5 w-5 items-center justify-center text-neutral-600">{c.icon}</span>
-                    <span className="flex-1 font-medium text-neutral-900">{c.label}</span>
+                    {renaming?.id === id ? (
+                      <input
+                        autoFocus
+                        value={renaming.value}
+                        maxLength={30}
+                        onChange={(e) => setRenaming({ id, value: e.target.value })}
+                        onKeyDown={async (e) => {
+                          if (e.key === "Escape") setRenaming(null);
+                          if (e.key === "Enter" && renaming.value.trim() && onRenameChannel) {
+                            const v = renaming.value; setRenaming(null);
+                            await onRenameChannel(id, v);
+                          }
+                        }}
+                        onBlur={() => setRenaming(null)}
+                        className="min-w-0 flex-1 rounded border border-neutral-400 px-1.5 py-0.5 text-[13px] outline-none focus:border-neutral-900"
+                      />
+                    ) : (
+                      <span className="flex-1 font-medium text-neutral-900">{c.label}</span>
+                    )}
+                    {c.custom && onRenameChannel && renaming?.id !== id && (
+                      <button type="button" onClick={() => setRenaming({ id, value: c.label })}
+                        className="px-1 text-[11px] text-neutral-400 hover:text-neutral-900">{en ? "Rename" : "改名"}</button>
+                    )}
                     <button type="button" disabled={i === 0} onClick={() => move(i, -1)} className="px-1 text-neutral-400 hover:text-neutral-900 disabled:opacity-30" aria-label={en ? "Move up" : "上移"}>↑</button>
                     <button type="button" disabled={i === draft.length - 1} onClick={() => move(i, 1)} className="px-1 text-neutral-400 hover:text-neutral-900 disabled:opacity-30" aria-label={en ? "Move down" : "下移"}>↓</button>
                     <button type="button" onClick={() => toggle(id)} className="px-1 text-neutral-400 hover:text-neutral-900" aria-label={en ? "Remove" : "拿掉"}><CloseIcon size={12} /></button>

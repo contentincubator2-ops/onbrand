@@ -26,6 +26,7 @@ import {
   Textarea,
 } from "@heroui/react";
 import ConvertingToAIFormat from "../positioning/ConvertingToAIFormat";
+import ListingFieldsEditor, { DEFAULT_LISTING_DRAFT, draftFromFields, fieldsFromDraft, type ListingFieldDraft } from "./ListingFieldsEditor";
 import { IllustrationImage, SceneArt } from "../../../platform/components/TaskIllustration";
 import ResearchSources, { type ResearchReference } from "../../../platform/components/ResearchSources";
 import { SCENE_OPTIONS, isTaskScene, pickTaskScene, type TaskScene } from "../../../platform/components/taskScene";
@@ -84,7 +85,7 @@ function measure(samples: string[]): { count: number; min: number; max: number }
 }
 
 export default function TaskCardComposer({
-  isOpen, onClose, brandId, channel, channelLabel, onPublished, initialCardId,
+  isOpen, onClose, brandId, channel, channelLabel, onPublished, initialCardId, format = "post",
 }: {
   isOpen: boolean;
   onClose: () => void;
@@ -92,6 +93,8 @@ export default function TaskCardComposer({
   channel: ComposerChannel;
   channelLabel: string;
   onPublished?: () => void;
+  /** 2026-10-04：這個通路產出的東西。listing＝商品頁（電商／開店平台 tray）：逐欄交付、不看整篇字數。 */
+  format?: "post" | "listing";
   /**
    * 接續一張已經建好但還沒上架的卡。沒有這條路，使用者中途關掉視窗後那張卡
    * 就無處可回 —— 它不在任務頁（只列 ready），也沒有別的入口。
@@ -115,11 +118,13 @@ export default function TaskCardComposer({
   const [primaryPlaceholder, setPrimaryPlaceholder] = React.useState("");
   const [askFields, setAskFields] = React.useState<AskField[]>([]);
   const [variants, setVariants] = React.useState(1);
+  const isListing = format === "listing";
+  const [listingDraft, setListingDraft] = React.useState<ListingFieldDraft[]>(() => DEFAULT_LISTING_DRAFT.map((f) => ({ ...f })));
 
   const [cardId, setCardId] = React.useState<string | null>(initialCardId ?? null);
   const [skillDraft, setSkillDraft] = React.useState("");
   const [dryInputs, setDryInputs] = React.useState<Record<string, string>>({});
-  const [dryResult, setDryResult] = React.useState<{ caption: string; chars: number; inRange: boolean; expected: { minChars: number; maxChars: number }; references?: ResearchReference[]; researchNote?: string | null } | null>(null);
+  const [dryResult, setDryResult] = React.useState<{ caption: string; chars: number; inRange: boolean; expected: { minChars: number; maxChars: number }; references?: ResearchReference[]; researchNote?: string | null; listing?: { fields: Array<{ key: string; label: string; kind: string; value: string | null; length: number; maxChars?: number; over: boolean }> } | null } | null>(null);
   const [busy, setBusy] = React.useState<string | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   // 卡片插畫：null＝跟著卡名自動挑。選單預設收起，只秀目前那張。
@@ -133,6 +138,13 @@ export default function TaskCardComposer({
     if (initialCardId) { setCardId(initialCardId); setStep(2); setSkillDraft(""); }
     else { setCardId(null); setStep(1); }
     setError(null); setDryResult(null); setBusy(null);
+    // 商品頁：先備好「模型不能編」的事實欄位，用戶不用從空白開始想要問什麼。
+    if (isListing && !initialCardId) {
+      setAskFields((prev) => prev.length > 0 ? prev : [
+        { label: tr("Specs / size / ingredients", "規格／尺寸／成分"), type: "textarea", required: false, placeholder: "" },
+        { label: tr("Price and promotion", "價格與優惠"), type: "text", required: false, placeholder: "" },
+      ]);
+    }
   }, [isOpen, initialCardId]);
 
   const utils = (trpc as any).useUtils?.() ?? null;
@@ -152,6 +164,10 @@ export default function TaskCardComposer({
   React.useEffect(() => {
     setSceneChoice(isTaskScene(card?.scene) ? card!.scene as TaskScene : null);
   }, [card?.id, card?.scene]);
+  // 接續一張已存在的商品頁卡：把它存的欄位灌進編輯器。
+  React.useEffect(() => {
+    if (card && (card as any).format === "listing") setListingDraft(draftFromFields((card as any).listingFields));
+  }, [card?.id]);
 
   // SKILL 一生出來就灌進可編輯的草稿框（只灌一次，別蓋掉使用者的編輯）。
   React.useEffect(() => {
@@ -226,6 +242,7 @@ export default function TaskCardComposer({
     setStep(1); setName(""); setSamples([""]); setPrimaryQuestion("");
     setSampleMode("one-by-one"); setThreadText(""); setExtractNote(null);
     setPrimaryPlaceholder(""); setAskFields([]); setVariants(1);
+    setListingDraft(DEFAULT_LISTING_DRAFT.map((f) => ({ ...f })));
     setCardId(null); setSkillDraft(""); setDryInputs({}); setDryResult(null);
     setBusy(null); setError(null);
     setSceneChoice(null); setScenePickerOpen(false);
@@ -247,6 +264,7 @@ export default function TaskCardComposer({
         .filter((f) => f.label.trim())
         .map((f) => ({ label: f.label.trim(), type: f.type, required: f.required, placeholder: f.placeholder.trim() })),
       variants,
+      ...(isListing ? { listingFields: fieldsFromDraft(listingDraft) } : {}),
     });
   }
 
@@ -479,6 +497,8 @@ export default function TaskCardComposer({
                 />
               </div>
 
+              {isListing && <ListingFieldsEditor value={listingDraft} onChange={setListingDraft} en={en} />}
+
               <div className="space-y-2">
                 <p className="text-small font-medium">
                   {en ? "Extra fields (optional)" : "額外要問的欄位（選填）"}
@@ -585,11 +605,26 @@ export default function TaskCardComposer({
                       {en ? "SKILL ready" : "SKILL 已生成"}
                     </Chip>
                     <Chip size="sm" variant="flat">
-                      {en
-                        ? `${card.measured.count} samples · target ${card.measured.minChars}–${card.measured.maxChars} chars`
-                        : `依 ${card.measured.count} 篇範例 · 目標 ${card.measured.minChars}–${card.measured.maxChars} 字`}
+                      {isListing
+                        ? (en ? `${card.measured.count} samples` : `依 ${card.measured.count} 篇範例`)
+                        : en
+                          ? `${card.measured.count} samples · target ${card.measured.minChars}–${card.measured.maxChars} chars`
+                          : `依 ${card.measured.count} 篇範例 · 目標 ${card.measured.minChars}–${card.measured.maxChars} 字`}
                     </Chip>
                   </div>
+                  {isListing && (
+                    <div className="rounded-medium border border-divider p-3 space-y-2">
+                      <ListingFieldsEditor value={listingDraft} onChange={setListingDraft} en={en} />
+                      <Button size="sm" variant="flat" isLoading={busy === "fields"}
+                        onPress={async () => {
+                          setBusy("fields"); setError(null);
+                          try { await updateMut?.mutateAsync({ brandId: brandId!, cardId: cardId!, listingFields: fieldsFromDraft(listingDraft) }); await cardQuery.refetch?.(); }
+                          finally { setBusy(null); }
+                        }}>
+                        {en ? "Save fields" : "儲存欄位"}
+                      </Button>
+                    </div>
+                  )}
                   <p className="text-tiny text-default-500">
                     {en
                       ? "This is what the card will follow every run. Edit anything that got the wrong idea — you know your writing better than the model does."
@@ -732,21 +767,44 @@ export default function TaskCardComposer({
 
               {dryResult && (
                 <div className="rounded-medium border border-divider bg-content1 p-3 space-y-2">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <Chip
-                      size="sm" variant="flat"
-                      color={dryResult.inRange ? "success" : "warning"}
-                      startContent={dryResult.inRange ? <CheckIcon size={12} /> : <WarningIcon size={12} />}
-                    >
-                      {dryResult.chars} {en ? "chars" : "字"}
-                    </Chip>
-                    <span className="text-tiny text-default-500">
-                      {en
-                        ? `your samples: ${dryResult.expected.minChars}–${dryResult.expected.maxChars}`
-                        : `你的範例區間：${dryResult.expected.minChars}–${dryResult.expected.maxChars} 字`}
-                    </span>
-                  </div>
-                  <p className="text-small text-default-800 whitespace-pre-wrap">{dryResult.caption}</p>
+                  {dryResult.listing ? (
+                    // 商品頁：逐欄看字數與是否超標；沒有「整篇字數」。
+                    <div className="space-y-2">
+                      {dryResult.listing.fields.map((f) => (
+                        <div key={f.key}>
+                          <div className="flex items-center justify-between gap-2">
+                            <p className="text-tiny font-semibold text-default-700">{f.label}</p>
+                            {f.value != null && (
+                              <span className={`text-tiny tabular-nums ${f.over ? "font-semibold text-danger" : "text-default-400"}`}>
+                                {f.maxChars ? `${f.length}／${f.maxChars}` : f.length}{en ? " chars" : " 字"}
+                              </span>
+                            )}
+                          </div>
+                          {f.value == null
+                            ? <p className="text-tiny text-warning-700">{en ? "Not written" : "沒寫出來"}</p>
+                            : <p className="text-small text-default-800 whitespace-pre-wrap">{f.value}</p>}
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <Chip
+                          size="sm" variant="flat"
+                          color={dryResult.inRange ? "success" : "warning"}
+                          startContent={dryResult.inRange ? <CheckIcon size={12} /> : <WarningIcon size={12} />}
+                        >
+                          {dryResult.chars} {en ? "chars" : "字"}
+                        </Chip>
+                        <span className="text-tiny text-default-500">
+                          {en
+                            ? `your samples: ${dryResult.expected.minChars}–${dryResult.expected.maxChars}`
+                            : `你的範例區間：${dryResult.expected.minChars}–${dryResult.expected.maxChars} 字`}
+                        </span>
+                      </div>
+                      <p className="text-small text-default-800 whitespace-pre-wrap">{dryResult.caption}</p>
+                    </>
+                  )}
                   <ResearchSources refs={dryResult.references ?? []} note={dryResult.researchNote ?? null} en={en} />
                   <p className="text-tiny text-default-400">
                     {en

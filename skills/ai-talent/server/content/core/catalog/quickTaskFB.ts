@@ -64,6 +64,11 @@ export type AdFormat = "image" | "video" | "carousel" | "collection";
 
 export interface FBTaskTemplate {
   id: string;                              // e.g. "fb-30-caption-short"
+  /**
+   * 2026-10-04：商品頁類任務（用戶自訂的電商／開店平台 tray 底下的卡）的欄位規格。
+   * 有這個 = 交付物是一組欄位而不是貼文，caption 呼叫會改走 engine/listingContract。
+   */
+  listingSpec?: import("../engine/listingContract").ListingSpec;
   tier: "30s" | "60s" | "90s" | "99s";
   postType: string;                        // matches mockup format key
   /**

@@ -34,9 +34,12 @@ import { buildBrandPrefix } from "../../strategy/core/brand/brandContext";
 import { CUSTOM_CHANNEL_RE, isCustomChannelId, brandIdOfChannelId } from "../../platform/core/customChannelId";
 import { listCustomChannels } from "../core/catalog/customChannels";
 import {
+  DEFAULT_LISTING_FIELDS, sanitizeListingFields, parseListing, type ListingSpec,
+} from "../core/engine/listingContract";
+import {
   type BrandTaskCard, type BrandTaskCardField,
   listBrandTaskCards, getBrandTaskCard, mutateBrandTaskCards,
-  measureSamples, slugifyCardName, cardTemplate, cardConfig, duplicateCard,
+  measureSamples, slugifyCardName, cardTemplate, cardConfig, duplicateCard, listingSpecOf,
   factLeaks, redactFactLeaks, verbatimSamples, illustrationInFlight,
   numberThread, renderNumbered, chunkLineRanges, parsePieceRanges, sliceByRanges,
   MAX_CARDS_PER_BRAND, MAX_SAMPLES, MAX_SAMPLE_CHARS,
@@ -68,6 +71,21 @@ async function assertChannelUsable(brandId: number, channel: string): Promise<vo
     && (await listCustomChannels(brandId)).some((c) => c.id === channel);
   if (!owned) throw new TRPCError({ code: "BAD_REQUEST", message: "找不到這個通路（可能已被刪除）" });
 }
+
+/** 這個通路產出的東西：商品頁（listing）或貼文。內建通路一律是貼文。 */
+async function channelCardFormat(brandId: number, channel: string): Promise<"post" | "listing"> {
+  if (!isCustomChannelId(channel)) return "post";
+  const ch = (await listCustomChannels(brandId)).find((c) => c.id === channel);
+  return ch?.format === "listing" ? "listing" : "post";
+}
+
+/** 商品頁欄位。zod 只驗形狀，內容整理（去重、補「待補資料」、上限）交給 sanitizeListingFields。 */
+const listingFieldsInput = z.array(z.object({
+  key: z.string().max(24).optional(),
+  label: z.string().min(1).max(20),
+  kind: z.enum(["text", "bullets", "long"]).default("text"),
+  maxChars: z.number().int().min(1).max(5000).nullable().optional(),
+})).max(10);
 
 const fieldInput = z.object({
   label: z.string().min(1).max(40),
@@ -116,8 +134,22 @@ async function distilSkill(args: {
   primaryQuestion: string;
   askFields: BrandTaskCardField[];
   measured: BrandTaskCard["measured"];
+  /** 商品頁卡的欄位規格；貼文卡是 null。 */
+  listing?: ListingSpec | null;
 }): Promise<string> {
   const brandPrefix = await buildBrandPrefix(args.brandId, null, null, "core").catch(() => "");
+  // 商品頁：範例是「整頁商品介紹」，SKILL 要**逐欄**教寫法，而不是一整篇的結構與字數。
+  const listingBlock = args.listing
+    ? `\n【這是商品頁（電商賣場／官網商品頁），不是貼文】\n` +
+      `範例是一整頁商品介紹，每次執行要交付這幾個欄位（依序）：${args.listing.fields.map((f) => `【${f.label}】`).join("")}。\n` +
+      `SKILL 要**逐欄**寫規則：每個欄位各自有「結構、句型、開頭與收尾方式、能不能用符號與 emoji、要放哪些資訊」的可檢查規則，` +
+      `例如標題的字數與資訊順序（品牌／品名／核心賣點／規格）、賣點每條的開頭方式與長度、描述的段落結構、關鍵字的數量與放法。` +
+      `不要寫成「一篇貼文」的結構，也不要寫整體字數。\n` +
+      `規格、成分、尺寸、價格、保固這類事實一律來自當次輸入、額外欄位與品牌資料；沒有就不寫，並要在「待補資料」欄列出缺什麼。\n`
+    : "";
+  const lengthBlock = args.listing
+    ? ""
+    : `【字數】範例實測 ${args.measured.count} 篇，最短 ${args.measured.minChars} 字、最長 ${args.measured.maxChars} 字、中位數 ${args.measured.medianChars} 字。\n把區間寫進規則，並說明哪些段落佔多少比重。\n`;
   const fieldList = args.askFields.length
     ? args.askFields.map((f) => `- {{${f.key}}}：${f.label}${f.required ? "（必填）" : "（選填，可能是空的）"}`).join("\n")
     : "（沒有額外欄位）";
@@ -150,9 +182,7 @@ ${fieldList}
    - 兩種情況都要在 SKILL 裡寫明：貼文裡的事實（店家、商品、價格、地點、活動、環境描述）
      只能來自 {{topic}}、額外欄位、執行時系統針對當次主題上網查到的「案例與說法」（若有）與品牌資料；這些來源都沒有的細節一律不寫、不推測、
      不編造，寧可少寫一句。
-【字數】範例實測 ${args.measured.count} 篇，最短 ${args.measured.minChars} 字、最長 ${args.measured.maxChars} 字、中位數 ${args.measured.medianChars} 字。
-把區間寫進規則，並說明哪些段落佔多少比重。
-
+${listingBlock}${lengthBlock}
 【輸出格式】直接輸出 SKILL 本文（純文字，可用短標題與條列），不要 JSON、不要前言、
 不要「以下是…」。開頭第一行就是規則。內容要包含：
 - 這張卡在產出什麼（一句話）
@@ -232,6 +262,7 @@ async function runDistil(brandId: number, userId: number, cardId: string): Promi
     const skill = await distilSkill({
       brandId, name: card.name, channel: card.channel, samples: card.samples,
       primaryQuestion: card.primaryQuestion, askFields: card.askFields, measured: card.measured,
+      listing: listingSpecOf(card),
     });
     await patch((c) => ({
       ...c, skill, currentStep: TOTAL_STEPS, status: "drafting", lastError: null,
@@ -420,12 +451,15 @@ export const brandTaskCardRouter = router({
       askFields: z.array(fieldInput).max(8).default([]),
       variants: z.number().int().min(1).max(5).default(1),
       agentId: z.number().nullable().default(null),
+      // 商品頁通路才用：要產出哪些欄位、各欄上限（用戶填）。沒給＝預設欄位。
+      listingFields: listingFieldsInput.optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const userId = ctx.user!.id;
       await assertBrandAccess(userId, input.brandId);
       await assertCanAct(userId);   // 2026-09-07 viewer 不能建卡
       await assertChannelUsable(input.brandId, input.channel);
+      const format = await channelCardFormat(input.brandId, input.channel);
 
       const existing = await listBrandTaskCards(input.brandId);
       // 2026-09-06：上限改成跟著方案走（基礎 3 張 / 專業 10 張）。
@@ -460,6 +494,9 @@ export const brandTaskCardRouter = router({
         askFields: fieldsFrom(input.askFields),
         skill: "",
         measured: measureSamples(samples),
+        ...(format === "listing"
+          ? { format: "listing" as const, listingFields: sanitizeListingFields(input.listingFields ?? DEFAULT_LISTING_FIELDS) }
+          : {}),
         variants: input.variants,
         agentId: input.agentId,
         createdAt: now, updatedAt: now, createdBy: userId,
@@ -507,6 +544,8 @@ export const brandTaskCardRouter = router({
       samples: z.array(z.string().min(20).max(MAX_SAMPLE_CHARS)).min(1).max(MAX_SAMPLES).optional(),
       variants: z.number().int().min(1).max(5).optional(),
       agentId: z.number().nullable().optional(),
+      // 商品頁卡：改欄位或各欄上限。貼文卡忽略。
+      listingFields: listingFieldsInput.optional(),
       // null＝回到自動挑。只驗形狀，場景清單在前端。
       scene: z.string().regex(/^[a-z]{2,16}$/).nullable().optional(),
     }))
@@ -531,6 +570,7 @@ export const brandTaskCardRouter = router({
             samples,
             measured: input.samples ? measureSamples(samples) : c.measured,
             variants: input.variants ?? c.variants,
+            ...(c.format === "listing" && input.listingFields ? { listingFields: sanitizeListingFields(input.listingFields) } : {}),
             agentId: input.agentId !== undefined ? input.agentId : c.agentId,
             scene: input.scene !== undefined ? input.scene : (c.scene ?? null),
             updatedAt: new Date().toISOString(),
@@ -590,11 +630,14 @@ export const brandTaskCardRouter = router({
       await mutateBrandTaskCards(input.brandId, userId, (list) =>
         list.map((c) => (c.id === input.cardId ? { ...c, lastDryRun: { at, caption }, updatedAt: at } : c)));
 
+      const listing = listingSpecOf(card);
       return {
         caption,
         chars: caption.length,
+        // 商品頁：逐欄的字數與是否超標（沒有「整篇字數」這回事）。
+        listing: listing ? parseListing(caption, listing) : null,
         // 量出來的區間就是驗收標準 —— 直接告訴使用者這篇有沒有落在範圍內。
-        inRange: caption.length >= card.measured.minChars && caption.length <= card.measured.maxChars,
+        inRange: listing ? true : caption.length >= card.measured.minChars && caption.length <= card.measured.maxChars,
         expected: { minChars: card.measured.minChars, maxChars: card.measured.maxChars },
         // 這次試寫時系統上網查到的案例與說法（成品旁顯示給用戶看）；沒查到時 note 說明原因。
         references: (result?.references ?? []) as CardReference[],
@@ -687,6 +730,15 @@ export const brandTaskCardRouter = router({
       const existing = await listBrandTaskCards(input.brandId);
       const source = existing.find((c) => c.id === input.cardId);
       if (!source) throw new TRPCError({ code: "NOT_FOUND", message: "找不到這張卡" });
+      // 商品頁卡的 SKILL 是逐欄寫的，貼文卡的是整篇結構 —— 兩種不能互相複製，複製過去只會寫出怪東西。
+      if ((source.format ?? "post") !== (await channelCardFormat(input.brandId, input.channel))) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: source.format === "listing"
+            ? "商品頁的卡只能複製到商品頁類型的通路（電商、開店平台）。"
+            : "貼文的卡只能複製到貼文類型的通路。",
+        });
+      }
       const quota = await planQuotaFor(userId);
       const cardCap = isUnlimited(quota.ownTaskCards)
         ? MAX_CARDS_PER_BRAND

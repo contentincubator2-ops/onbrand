@@ -100,6 +100,16 @@ export function IconBar({
       return null;
     }
   };
+  const renameChannel = (trpc as any).customChannel.rename.useMutation();
+  const onRenameChannel = async (id: string, name: string) => {
+    if (!scope.brandId || !name.trim()) return;
+    try {
+      await renameChannel.mutateAsync({ brandId: scope.brandId, id, name: name.trim() });
+      await refetchCustomChannels();
+    } catch (e: any) {
+      showToastGlobal(e?.message ?? (isEn ? "Couldn't rename it" : "改名失敗"));
+    }
+  };
   const onRemoveChannel = async (id: string) => {
     if (!scope.brandId) return;
     try {
@@ -472,6 +482,7 @@ export function IconBar({
         createdPresets={customChannels.map((c) => c.preset).filter(Boolean) as string[]}
         onCreateChannel={onCreateChannel}
         onRemoveChannel={onRemoveChannel}
+        onRenameChannel={onRenameChannel}
         selected={userNavItems}
         saving={saveNav?.isPending}
         onClose={() => setPickerOpen(false)}
