@@ -212,6 +212,22 @@ async function changeRenewal(userId: number, cancel: boolean): Promise<{ hasSubs
   return { hasSubscription: false, periodEnd: null };
 }
 
+/** Confirmation mail after 「取消訂閱」. The end date falls back to our own planEndsAt. */
+async function notifyCanceled(userId: number, periodEnd: Date | null): Promise<void> {
+  const { default: localPool } = await import("../../localDb");
+  const [rows]: any = await localPool.execute(`SELECT email, name, planEndsAt FROM users WHERE id = ? LIMIT 1`, [userId]);
+  const u = (rows as any[])[0];
+  if (!u?.email) return;
+  const end: Date | null = periodEnd ?? (u.planEndsAt ? new Date(u.planEndsAt) : null);
+  const { sendSubscriptionCanceled } = await import("../auth/emailService");
+  await sendSubscriptionCanceled({
+    to: u.email,
+    name: u.name ?? "",
+    endsOn: end ? end.toLocaleDateString("zh-TW", { timeZone: "Asia/Taipei", year: "numeric", month: "long", day: "numeric" }) : null,
+    accountUrl: `${process.env.APP_URL ?? "https://onbrand.sowork.ai"}/settings/account`,
+  });
+}
+
 export const billingRouter = router({
   /** Plan + days-left + per-quota usage for top-bar trial countdown + /settings/account quota bar */
   getStatus: protectedProcedure
@@ -438,6 +454,8 @@ export const billingRouter = router({
   cancelSubscription: protectedProcedure
     .mutation(async ({ ctx }) => {
       const { periodEnd } = await changeRenewal(ctx.user!.id, true);
+      void notifyCanceled(ctx.user!.id, periodEnd)
+        .catch((e) => console.warn("[billing.cancelSubscription] email not sent:", (e as Error)?.message));
       return { ok: true, periodEnd: periodEnd?.toISOString() ?? null, message: "訂閱已取消，當期到期前仍可繼續使用" };
     }),
 
