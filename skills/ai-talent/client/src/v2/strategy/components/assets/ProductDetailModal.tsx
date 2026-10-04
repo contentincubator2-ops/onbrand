@@ -17,7 +17,10 @@ import { trpc } from "../../../../lib/trpc";
 import { useLang, tr } from "../../../../lib/i18n";
 import { AddIcon, CloseIcon, DeleteIcon, GenerateIcon, RegenerateIcon, CheckIcon, UploadIcon } from "../../../platform/components/icons";
 import { Modal, ModalBody, ModalContent, ModalFooter, ModalHeader } from "@heroui/react";
-import { TASK_MODAL_CLASSNAMES, TASK_MODAL_HEADER } from "../../../platform/components/taskModalStyle";
+import { TASK_MODAL_CLASSNAMES, TASK_MODAL_HEADER, TASK_MODAL_QUESTION } from "../../../platform/components/taskModalStyle";
+import { EmptyIllustration } from "../../../platform/components/EmptyIllustration";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faBox } from "@fortawesome/free-solid-svg-icons";
 import AssetPhotoGallery from "./AssetPhotoGallery";
 import ProductSceneModal from "./ProductSceneModal";
 
@@ -87,12 +90,24 @@ function FieldEditor({ field, en, edits, setEdits }: {
           value={shown}
           rows={Math.min(8, Math.max(2, shown.split("\n").length + (shown.length > 60 ? 1 : 0)))}
           onChange={(e) => { const v = e.target.value; setEdits((prev) => ({ ...prev, [field.path]: v })); }}
-          className="w-full text-sm px-3 py-2 mt-0.5 bg-default-100 rounded-2xl resize-none border border-transparent focus:outline-none focus:bg-white focus:border-zinc-400"
+          className="w-full text-sm px-3 py-2 mt-0.5 bg-white rounded-xl resize-none border border-default-200 focus:outline-none focus:border-zinc-500"
         />
       ) : (
         <p className="text-sm text-neutral-800 mt-0.5 whitespace-pre-wrap">{shown}</p>
       )}
     </label>
+  );
+}
+
+/** 任務卡視窗底部那種「圓形小圖示＋下方小字」的動作鍵。 */
+function ChipAction({ label, onPress, children }: { label: string; onPress: () => void; children: React.ReactNode }) {
+  return (
+    <button type="button" onClick={onPress} className="flex flex-col items-center gap-1 group">
+      <span className="w-10 h-10 rounded-xl bg-default-100 text-neutral-700 flex items-center justify-center group-hover:bg-default-200 transition">
+        {children}
+      </span>
+      <span className="text-[11px] text-neutral-500">{label}</span>
+    </button>
   );
 }
 
@@ -341,11 +356,9 @@ export default function ProductDetailModal({ productId, brandId, onClose, onRepo
     <Modal isOpen onClose={onClose} size="2xl" scrollBehavior="inside" backdrop="blur" classNames={TASK_MODAL_CLASSNAMES}>
       <ModalContent>
         <ModalHeader className={TASK_MODAL_HEADER}>
-          <div className="min-w-0">
-            <p className="text-[12px] font-semibold uppercase tracking-widest text-neutral-400">
-              {en ? "PRODUCT" : "產品"}
-            </p>
-            <p className="text-[18px] text-neutral-900 truncate font-bold">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <FontAwesomeIcon icon={faBox} className="text-neutral-900 shrink-0" style={{ fontSize: 14 }} />
+            <p className="text-[15px] text-neutral-900 truncate font-semibold">
               {productQ?.isLoading ? "…" : product?.name ?? "—"}
             </p>
           </div>
@@ -354,30 +367,22 @@ export default function ProductDetailModal({ productId, brandId, onClose, onRepo
         {/* Body — scrollable */}
         <ModalBody className="px-6 py-4 gap-6">
 
-          {/* 引擎讀得到的定位：上傳／貼上／AI 產出寫進來的欄位全列出來 */}
-          <div className="rounded-2xl bg-default-100 p-4">
-            <div className="flex items-center justify-between gap-2 mb-3">
-              <div className="flex items-center gap-1.5">
-                <GenerateIcon size={13} className="text-zinc-500" />
-                <span className="text-[12px] font-bold uppercase tracking-widest text-zinc-600">
-                  {en ? "What the AI reads" : "AI 讀到的定位"}
-                </span>
-                {filledFields.length > 0 && (
-                  <span className="text-[12px] text-neutral-400">
-                    {en ? `${filledFields.length} fields` : `${filledFields.length} 格`}
-                  </span>
-                )}
-              </div>
-              {onUpload && (
-                <button
-                  type="button"
-                  onClick={() => onUpload(productId)}
-                  className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full bg-white text-neutral-800 hover:bg-neutral-50 shadow-sm"
-                >
-                  <UploadIcon size={12} />{en ? "Upload / paste" : "上傳／貼上定位"}
-                </button>
-              )}
+          {/* 任務卡視窗的版式：左邊插畫、右邊一句大字問句，下面是淡灰底的輸入區。 */}
+          <div className="flex items-center gap-4 pt-1">
+            <div className="shrink-0"><EmptyIllustration kind="product" width={104} /></div>
+            <div className="min-w-0">
+              <h2 className={TASK_MODAL_QUESTION}>
+                {en ? "This is how the AI understands it" : "AI 是這樣理解這個產品的"}
+              </h2>
+              <p className="text-[13px] text-neutral-500 mt-1">
+                {filledFields.length > 0
+                  ? (en ? `${filledFields.length} fields read — edit anything below.` : `共讀到 ${filledFields.length} 格，直接改就會存進去。`)
+                  : (en ? "Nothing written yet." : "還沒有任何內容。")}
+              </p>
             </div>
+          </div>
+
+          <div className="rounded-2xl bg-default-100 p-4">
             {filledFields.length === 0 && customSegments.length === 0 && !showMissing ? (
               <p className="text-xs text-neutral-500">
                 {en ? "Nothing written yet. Upload a document, paste text, or re-run positioning." : "還沒有任何定位內容。可以上傳文件、貼上文字，或按「重新定位」讓 AI 產出。"}
@@ -401,7 +406,7 @@ export default function ProductDetailModal({ productId, brandId, onClose, onRepo
                             const v = e.target.value;
                             setSegEdits((prev) => ({ ...prev, [seg.id]: { ...(prev[seg.id] ?? {}), [fl.key]: v } }));
                           }}
-                          className="w-full text-sm px-3 py-2 mt-0.5 bg-default-100 rounded-2xl resize-none border border-transparent focus:outline-none focus:bg-white focus:border-zinc-400"
+                          className="w-full text-sm px-3 py-2 mt-0.5 bg-white rounded-xl resize-none border border-default-200 focus:outline-none focus:border-zinc-500"
                         />
                       </label>
                     ))}
@@ -532,35 +537,29 @@ export default function ProductDetailModal({ productId, brandId, onClose, onRepo
         </ModalBody>
 
         {saveError && <p className="px-6 pb-1 text-xs text-danger-600">{saveError}</p>}
-        <ModalFooter className="justify-between items-center">
-          <button
-            onClick={() => onReposition(productId)}
-            title={en ? "Re-run positioning" : "重新執行定位"}
-            className="inline-flex items-center gap-1.5 text-[13px] font-medium text-neutral-500 hover:text-neutral-900 px-1"
-          >
-            <RegenerateIcon size={12} />
-            {en ? "Re-position" : "重新定位"}
-          </button>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={onClose}
-              className="h-11 px-5 rounded-full text-sm text-neutral-600 hover:bg-neutral-100 transition"
-            >
-              {en ? "Cancel" : "取消"}
-            </button>
-            <button
-              onClick={() => void handleSave()}
-              disabled={(!dirty && !saved && Object.keys(edits).length === 0 && Object.keys(segEdits).length === 0) || saving}
-              className="h-11 px-6 rounded-full text-sm font-semibold transition disabled:opacity-50"
-              style={{ background: saved ? "#10B981" : "#171717", color: "white" }}
-            >
-              {saving
-                ? (en ? "Saving…" : "儲存中…")
-                : saved
-                  ? <span className="inline-flex items-center gap-1"><CheckIcon size={11} />{en ? "Saved" : "已儲存"}</span>
-                  : (en ? "Save changes" : "儲存修改")}
-            </button>
+        <ModalFooter className="justify-between items-end">
+          <div className="flex items-end gap-3">
+            {onUpload && (
+              <ChipAction label={en ? "Upload" : "上傳定位"} onPress={() => onUpload(productId)}>
+                <UploadIcon size={15} />
+              </ChipAction>
+            )}
+            <ChipAction label={en ? "Re-run" : "重新定位"} onPress={() => onReposition(productId)}>
+              <RegenerateIcon size={15} />
+            </ChipAction>
           </div>
+          <button
+            onClick={() => void handleSave()}
+            disabled={(!dirty && !saved && Object.keys(edits).length === 0 && Object.keys(segEdits).length === 0) || saving}
+            className="h-12 px-7 rounded-full text-sm font-semibold transition disabled:opacity-40"
+            style={{ background: saved ? "#10B981" : "#171717", color: "white" }}
+          >
+            {saving
+              ? (en ? "Saving…" : "儲存中…")
+              : saved
+                ? <span className="inline-flex items-center gap-1"><CheckIcon size={11} />{en ? "Saved" : "已儲存"}</span>
+                : (en ? "Save" : "儲存")}
+          </button>
         </ModalFooter>
       </ModalContent>
     </Modal>
