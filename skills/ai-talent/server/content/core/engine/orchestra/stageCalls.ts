@@ -61,6 +61,8 @@ export async function callOneVariant(args: {
   requestedUrl?: string | null;
   /** Labels of ALL versions written in parallel (this one included) — so each call knows what it must differ from. */
   siblingLabels?: readonly string[];
+  /** 2026-10-04：當次主題上網查到的案例與說法（已格式化的 prompt 區塊）。獨立於 urlContext —— 不能觸發「主題看 URL、品牌只取語氣」那套覆寫。 */
+  researchContext?: string;
 }): Promise<{ label: string; caption: string; hashtags?: string[] }> {
   const { template, config, label, captionPersona, brandPrefix, urlContext, userMsg, inputKeys, agentAiModel, strategistAnchor, market, isZhTW } = args;
   const adCopy = isAdCopyTemplate(template);
@@ -388,7 +390,7 @@ export async function callOneVariant(args: {
     (hasUrl ? `\n# URL 抓到的內容（本次主題來源 — 必須以此為主）\n${urlContext}` : "");
   // Ad-copy contract goes LAST so it is the freshest instruction and wins
   // over the social scaffold's「不要排成結構化卡片」rule.
-  const system = promptCore + deliverableOnlyRule
+  const system = promptCore + (args.researchContext ?? "") + deliverableOnlyRule
     + (adCopy ? buildAdCopyRule(requestedUrl) : "")
     + (adSlot ? buildAdSlotRule(adSlot) : "")
     + (shotList ? buildShotListRule() : "");
@@ -651,6 +653,7 @@ export async function callCaptionWriter(args: {
   market?: MarketCode | null;
   isZhTW: boolean;
   requestedUrl?: string | null;
+  researchContext?: string;
 }): Promise<Array<{ label: string; caption: string; hashtags?: string[] }>> {
   const labels = args.config.variantLabels.slice(0, args.config.variants);
   // Parallel fanout — each variant in its own LLM call.

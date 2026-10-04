@@ -292,7 +292,7 @@ async function runOrchestraInner(args: {
     const resolvedStrategistId = resolveAgentId(taskId, "strategist",   args.config.strategistAgentId);
     const resolvedSpecialtyId  = resolveAgentId(taskId, "specialty",    args.config.specialtyAgentId);
 
-    const [captionLoad, imageLoad, ytContext, urlSummary, brandPrefix, viralPatterns, brandMarket] = await Promise.all([
+    const [captionLoad, imageLoad, ytContext, urlSummary, brandPrefix, viralPatterns, brandMarket, topicResearch] = await Promise.all([
       loadAgent(resolvedLeadId),
       loadAgent(resolvedImageDirId),
       ytUrlInput
@@ -350,7 +350,40 @@ async function runOrchestraInner(args: {
       // 2026-07-17 多市場: brand's targetCountry/outputLanguage → master
       // persona market + zh-TW sanitizer gate. Fail-safe zh-TW default.
       getBrandMarket(args.brandId).catch(() => DEFAULT_BRAND_MARKET),
+      // 2026-10-04（CJ）：researchTopic 任務寫作前先針對當次主題上網找案例與說法。
+      // 有時間上限、失敗不擋寫作 —— 沒查到就誠實回 note，文案照常依輸入與品牌資料寫。
+      args.config.researchTopic && (inputValues[0] ?? "").trim().length >= 2
+        ? (async () => {
+            try {
+              const { researchTopic } = await import("../catalog/cardResearch");
+              const market = await getBrandMarket(args.brandId).catch(() => DEFAULT_BRAND_MARKET);
+              return await Promise.race([
+                researchTopic({
+                  topic: Object.values(args.inputs).filter((v) => typeof v === "string" && v.trim()).join("；").slice(0, 300),
+                  cardName: typeof args.template.label === "string" ? args.template.label : (args.template.label?.zh ?? args.template.id),
+                  channel: taskChannel,
+                  market: market.outputLanguage,
+                }),
+                timeoutPromise<null>(22_000, "topic-research"),
+              ]);
+            } catch (e) {
+              console.warn("[orchestra] topic research failed:", String((e as any)?.message ?? e).slice(0, 200));
+              return null;
+            }
+          })()
+        : Promise.resolve(null),
     ]);
+
+    if (args.config.researchTopic) {
+      const stRes = stage("research", "上網查當次主題的案例與說法");
+      stRes.status = topicResearch && topicResearch.references.length > 0 ? "done" : "failed";
+      stRes.completedAt = Date.now() - startedAt;
+    }
+    const researchContext = topicResearch ? (await import("../catalog/cardResearch")).formatResearchForPrompt(topicResearch.references) : "";
+    const researchRefs = topicResearch?.references ?? [];
+    const researchNote = topicResearch
+      ? topicResearch.note
+      : (args.config.researchTopic ? "這次查資料逾時或失敗，文案只依你的輸入與品牌資料寫成。" : null);
 
     // Record scout stage for 100s
     if (isResearchTier) {
@@ -448,6 +481,7 @@ async function runOrchestraInner(args: {
         agentAiModel: captionLoad.aiModel, // ← drives provider selection (qwen/Kimi/glm)
         brandPrefix,
         urlContext,
+        researchContext,
         userMsg,
         inputKeys,
         strategistAnchor: strategistAnchor || undefined,
@@ -863,6 +897,8 @@ async function runOrchestraInner(args: {
           stages: [...stages],
           ok: partialVariants.some((v) => v.caption.length > 0),
           errors: [...errors],
+          references: researchRefs,
+          researchNote,
           strategist: strategistMeta && strategistAnchor
             ? { agentName: strategistMeta.name, agentTitle: strategistMeta.title, anchor: strategistAnchor }
             : null,
@@ -919,6 +955,8 @@ async function runOrchestraInner(args: {
               campaignItem: args.campaignItem
                 ? { eventId: args.campaignItem.eventId, itemId: args.campaignItem.itemId, paid: args.campaignItem.paid }
                 : null,
+              references: researchRefs,
+              researchNote,
               regulationCompliance: (captions as any).__regulationCompliance ?? [],
             },
             thumbnailUrl: null,
@@ -1320,6 +1358,8 @@ async function runOrchestraInner(args: {
       errors,
       // 2026-06-05 (CJ「不阻擋，事後解釋」): expose brand-rule fixes so
       // RunPage can trigger a friendly Mia nudge after generation.
+      references: researchRefs,
+      researchNote,
       brandFixes: (captions as any).__brandFixes ?? [],
       brandConsistency: (captions as any).__brandConsistency ?? [],
       regulationCompliance: (captions as any).__regulationCompliance ?? [],
@@ -1413,6 +1453,9 @@ async function runOrchestraInner(args: {
           stages: result.stages ?? [],
           fetchedUrl: result.fetchedUrl ?? null,
           urlFetchFailure: result.urlFetchFailure ?? null,
+          // 2026-10-04：寫作前上網查到的案例與說法（成品頁顯示「資料來源」）。
+          references: result.references ?? [],
+          researchNote: result.researchNote ?? null,
           errors: result.errors ?? [],
           ok: result.ok ?? true,
           variantCount: result.variants.length,

@@ -1474,6 +1474,11 @@ export interface OrchestraConfig {
    *  latency / 502 risk that silently drops the last fanout variants. */
   disableScout?: boolean;
   /**
+   * 2026-10-04（CJ「寫文案時主動搜尋相關案例或說法，補充文案本身的內容」）：寫作前針對當次主題
+   * 上網查案例／說法／數據，餵給寫作並把來源附在成品旁。目前自建任務卡開啟。
+   */
+  researchTopic?: boolean;
+  /**
    * 2026-05-18 (CJ「承諾是完整貼文 → 圖完成才展示 mockup」): when true,
    * the deliverable is a complete post (copy + image) and the UI must NOT
    * show the mockup at the caption-ready checkpoint — it stays in a

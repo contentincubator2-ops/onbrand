@@ -58,12 +58,6 @@ export interface BrandTaskCard {
   /** 額外要問的欄位，走 taskIntake 那條共用判斷渲染。 */
   askFields: BrandTaskCardField[];
 
-  /**
-   * 參考資料／事實來源（2026-10-04，CJ 實測：貼了小店家行銷手法的文章，試寫卻在寫店家
-   * 自己的裝潢，而且看不出資料哪來的）。用戶自己貼的文字：店家介紹、商品資訊、活動資訊…
-   * 寫作時事實只能取自這裡、每次輸入、品牌資料，資料裡沒有的細節不准編。
-   */
-  sources?: string;
   /** AI 從範例反推出來的 SKILL —— 就是這張卡的 systemPrompt。 */
   skill: string;
   /** 從範例量出來的數字，不是問來的也不是猜來的。 */
@@ -104,7 +98,6 @@ export function illustrationInFlight(card: Pick<BrandTaskCard, "illustrationStat
   return Number.isFinite(t) && now - t < ILLUSTRATION_STALE_MS;
 }
 export const MAX_SAMPLES = 20;
-export const MAX_SOURCES_CHARS = 12_000;
 export const MAX_SAMPLE_CHARS = 8_000;
 export const CARD_ID_RE = /^u(\d+)-[a-z0-9][a-z0-9-]{0,48}$/;
 
@@ -151,7 +144,6 @@ export function duplicateCard(
     primaryPlaceholder: source.primaryPlaceholder,
     askFields: source.askFields.map((f) => ({ ...f })),
     skill: source.skill,
-    sources: source.sources ?? "",
     measured: { ...source.measured },
     variants: source.variants,
     agentId: source.agentId,
@@ -451,25 +443,6 @@ function outputDefaultsFor(channel: string): FBTaskTemplate["outputDefaults"] {
   return CHANNEL_OUTPUT[channel] ?? { platform: "generic", post_type: "post" };
 }
 
-/**
- * 寫作時的事實來源區塊。只有用戶填了參考資料才附 —— 沒填時防編造的規則在 SKILL 本文裡。
- * 放在 SKILL 後面、當成「資料」而不是「規則」：範例是學寫法，這裡是寫什麼。
- */
-export function groundingBlock(sources: string | undefined): string {
-  const t = (sources ?? "").trim();
-  if (!t) return "";
-  return `
-
-【參考資料（這張卡的事實來源）】
-以下是使用者提供的資料。文案裡出現的店家／商品／活動／數字等**事實**，只能取自：這份資料、這次的輸入欄位、品牌資料。
-資料裡沒有的細節（例如店面裝潢、價格、地點、人物、活動內容）一律不要寫、不要推測、不要補完；
-寧可少寫一句，也不要編出資料裡沒有的東西。範例只教你「怎麼寫」，不是「寫什麼」。
-若這份資料是在講行銷手法或做法的文章，就把那些手法套用到這次的主題上，不要把文章裡舉的店家或案例當成要寫的內容。
----
-${t.slice(0, MAX_SOURCES_CHARS)}
----`;
-}
-
 /** 一張自建卡的 label 一律標記來源，使用者要看得出這是自己做的卡。 */
 export function cardTemplate(card: BrandTaskCard): FBTaskTemplate {
   const inputs: TaskInput[] = [
@@ -499,7 +472,7 @@ export function cardTemplate(card: BrandTaskCard): FBTaskTemplate {
       type: "textarea",
     },
     inputs,
-    systemPrompt: card.skill + groundingBlock(card.sources),
+    systemPrompt: card.skill,
     preferredModel: "anthropic",
     // 中位數 × 2.6 給模型足夠的產出空間；中文一字約 1.5–2 token，再留餘裕。
     maxTokens: Math.min(8000, Math.max(700, Math.round(card.measured.medianChars * 2.6))),
@@ -518,6 +491,9 @@ export function cardConfig(card: BrandTaskCard): OrchestraConfig {
     variantLabels: Array.from({ length: n }, (_, i) => `版本 ${i + 1}`),
     captionMinChars: card.measured.minChars || undefined,
     captionMaxChars: card.measured.maxChars || undefined,
+    // 2026-10-04（CJ）：每次寫（試寫與正式執行）都針對當次主題上網找案例與說法來充實內容，
+    // 查到的來源附在成品旁。不是卡片綁一份固定資料。
+    researchTopic: true,
   } as OrchestraConfig;
 }
 

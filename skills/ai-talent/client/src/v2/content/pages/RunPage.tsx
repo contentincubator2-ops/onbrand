@@ -71,6 +71,7 @@ import WriterDesk, { type DeskWriter } from "../components/WriterDesk";
 import { agentLabel, agentTitle } from "../../platform/lib/agentName";
 import { friendlyError } from "../../platform/lib/friendlyError";
 import BrandConsistencyNote, { pickBrandRecord } from "../components/BrandConsistencyNote";
+import ResearchSources from "../../platform/components/ResearchSources";
 import RegulationComplianceNote, { toComplianceInput, type ComplianceRecord } from "../components/RegulationComplianceNote";
 import { captionLimitHint } from "../lib/captionLimits";
 import { cancelAgentHandoff } from "../lib/agentHandoff";
@@ -2706,6 +2707,12 @@ export default function RunPage() {
                   ? (data as any).metadata.regulationCompliance : [];
                 const rec = recs.find((r) => r.variantIndex === activeIdx);
                 return rec ? <RegulationComplianceNote rec={rec} en={lang === "en"} /> : null;
+              })()}
+              {/* 2026-10-04：寫作前針對當次主題上網查到的案例與說法（researchTopic 任務才有）。 */}
+              {mode !== "image" && (() => {
+                const md = (data as any)?.metadata;
+                const refs = Array.isArray(md?.references) ? md.references : [];
+                return <ResearchSources refs={refs} note={typeof md?.researchNote === "string" ? md.researchNote : null} en={lang === "en"} />;
               })()}
               {/* 品牌一致性檢查（brandConsistency.ts）：同一份品牌大腦寫、也審。skipped 顯示「未檢查」。 */}
               {mode !== "image" && (() => {

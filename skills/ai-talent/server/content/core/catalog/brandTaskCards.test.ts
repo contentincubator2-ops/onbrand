@@ -9,7 +9,7 @@ import { describe, expect, it } from "vitest";
 import {
   brandIdOfCardId, slugifyCardName, measureSamples,
   cardTemplate, cardConfig, illustrationInFlight, factLeaks, redactFactLeaks, verbatimSamples, type BrandTaskCard,
-  numberThread, renderNumbered, chunkLineRanges, parsePieceRanges, sliceByRanges, groundingBlock, duplicateCard,
+  numberThread, renderNumbered, chunkLineRanges, parsePieceRanges, sliceByRanges, duplicateCard,
 } from "./brandTaskCards";
 
 function makeCard(over: Partial<BrandTaskCard> = {}): BrandTaskCard {
@@ -340,22 +340,12 @@ describe("整串對話：編號挑範圍（2026-10-04）", () => {
   });
 });
 
-describe("參考資料來源（2026-10-04）", () => {
-  it("沒填就不附區塊，systemPrompt 維持 SKILL 原文", () => {
-    expect(groundingBlock("")).toBe("");
-    expect(groundingBlock("   ")).toBe("");
-    expect(cardTemplate(makeCard({ skill: "規則", sources: "" })).systemPrompt).toBe("規則");
+describe("每次執行上網查資料（2026-10-04）", () => {
+  it("自建卡的 config 開啟 researchTopic（試寫與正式執行都會查）", () => {
+    expect((cardConfig(makeCard()) as any).researchTopic).toBe(true);
   });
 
-  it("有填就接在 SKILL 後面，並明說資料以外不准編", () => {
-    const t = cardTemplate(makeCard({ skill: "規則", sources: "本店位於高雄，主打手沖咖啡。" }));
-    expect(t.systemPrompt.startsWith("規則")).toBe(true);
-    expect(t.systemPrompt).toContain("本店位於高雄，主打手沖咖啡。");
-    expect(t.systemPrompt).toContain("不要編");
-  });
-
-  it("複製卡時參考資料一起帶走", () => {
-    const copy = duplicateCard(makeCard({ sources: "資料 A" }), [], { channel: "instagram", userId: 1 });
-    expect(copy.sources).toBe("資料 A");
+  it("systemPrompt 仍是 SKILL 原文 —— 查到的資料是每次執行才附，不綁在卡上", () => {
+    expect(cardTemplate(makeCard({ skill: "規則" })).systemPrompt).toBe("規則");
   });
 });
