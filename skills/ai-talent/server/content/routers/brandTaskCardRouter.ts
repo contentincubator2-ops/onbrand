@@ -484,6 +484,9 @@ export const brandTaskCardRouter = router({
       primaryQuestion: z.string().min(2).max(200).optional(),
       primaryPlaceholder: z.string().max(200).optional(),
       askFields: z.array(fieldInput).max(8).optional(),
+      // 只改既有欄位的標題、key 不動（2026-10-04：任務視窗裡改欄位標題）。askFields 會依標題重生 key，
+      // 改標題若走那條，key 一變，舊產出存的 inputs 就對不上了。
+      askFieldLabels: z.record(z.string(), z.string().trim().min(1).max(40)).optional(),
       samples: z.array(z.string().min(20).max(MAX_SAMPLE_CHARS)).min(1).max(MAX_SAMPLES).optional(),
       variants: z.number().int().min(1).max(5).optional(),
       agentId: z.number().nullable().optional(),
@@ -503,7 +506,11 @@ export const brandTaskCardRouter = router({
             skill: input.skill ?? c.skill,
             primaryQuestion: input.primaryQuestion?.trim() ?? c.primaryQuestion,
             primaryPlaceholder: input.primaryPlaceholder?.trim() ?? c.primaryPlaceholder,
-            askFields: input.askFields ? fieldsFrom(input.askFields) : c.askFields,
+            askFields: input.askFields
+              ? fieldsFrom(input.askFields)
+              : input.askFieldLabels
+                ? c.askFields.map((f) => ({ ...f, label: input.askFieldLabels![f.key] ?? f.label }))
+                : c.askFields,
             samples,
             measured: input.samples ? measureSamples(samples) : c.measured,
             variants: input.variants ?? c.variants,

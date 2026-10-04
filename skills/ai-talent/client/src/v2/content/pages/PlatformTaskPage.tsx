@@ -49,6 +49,7 @@ import { intakeExtraFields, missingRequiredInputs, type IntakeField } from "../l
 import TaskCardComposer, { type ComposerChannel } from "../../strategy/components/taskCard/TaskCardComposer";
 import { AddEntityModal } from "../../strategy/components/AddEntityModal";
 import RewriteDraftModal from "../components/quickTask/RewriteDraftModal";
+import OwnCardLabelsEditor from "../components/quickTask/OwnCardLabelsEditor";
 import {
   Avatar, Button, Card, CardBody, Chip, Input, Modal, ModalBody,
   ModalContent, ModalHeader, Textarea, Tooltip,
@@ -287,6 +288,8 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
 
   // Task modal state
   const [activeTask, setActiveTask] = useState<FBTaskCard | null>(null);
+  // 自建卡在任務視窗裡改標題／欄位標題（只有 ownCardId 的卡才有入口）。
+  const [editingLabels, setEditingLabels] = useState(false);
   const [primaryAnswer, setPrimaryAnswer] = useState("");
   // 2026-09-02: primary 以外的欄位。在這之前 intake 只渲染也只送出
   // primary_input 一格，225 張卡裡有 24 張宣告了額外欄位、其中 7 張還是必填 ——
@@ -1024,6 +1027,7 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
     setCampaignScope(null);   // 不收的話，下一張卡會沿用上一格的活動預填
     runSeqRef.current++; // invalidate any in-flight run attempt
     setActiveTask(null);
+    setEditingLabels(false);
     setRunning(false);
     setInputError(null);
     setCountdownStart(null);
@@ -2107,6 +2111,19 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                         : (activeTask.label_zh ?? activeTask.label)}
                     </p>
                   </div>
+                  {activeTask.ownCardId && !running && brandId && (
+                    <Tooltip content={lang === "en" ? "Edit titles" : "修改標題與欄位名稱"}>
+                      <button
+                        type="button"
+                        onClick={() => setEditingLabels((v) => !v)}
+                        aria-label={lang === "en" ? "Edit titles" : "修改標題與欄位名稱"}
+                        aria-pressed={editingLabels}
+                        className={`shrink-0 w-7 h-7 rounded-md flex items-center justify-center transition ${editingLabels ? "bg-neutral-900 text-white" : "text-default-500 hover:bg-default-100 hover:text-default-800"}`}
+                      >
+                        <FontAwesomeIcon icon={faPenToSquare} className="text-tiny" />
+                      </button>
+                    </Tooltip>
+                  )}
                 </div>
               </ModalHeader>
 
@@ -2117,6 +2134,30 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                       2. 輸入框，「AI 完善提示詞」是框內右下角的橘色 ✨
                       3. 品牌脈絡圖示列（點開才看全文／改寫）＋ agent 頭像＝開始鍵
                     執行中同一個 modal 原地變形：輸入收成一行引用，頭像到正中間變進度環。 */}
+                {!running && editingLabels && activeTask.ownCardId && brandId && (
+                  <OwnCardLabelsEditor
+                    key={activeTask.id}
+                    brandId={brandId}
+                    cardId={activeTask.ownCardId}
+                    name={typeof activeTask.label === "string" ? activeTask.label : (activeTask.label_zh ?? "")}
+                    primaryQuestion={activeTask.primary_question ?? ""}
+                    fields={(activeTask.inputs ?? []).slice(1).map((f: any) => ({ key: f.key, label: f.label }))}
+                    en={lang === "en"}
+                    onCancel={() => setEditingLabels(false)}
+                    onSaved={(patch) => {
+                      // 視窗當下就換上新字；目錄重抓一次，卡片列表也跟著更新。
+                      setActiveTask((t) => t && ({
+                        ...t,
+                        label: patch.name, label_zh: patch.name, label_en: patch.name,
+                        primary_question: patch.primaryQuestion,
+                        inputs: (t.inputs ?? []).map((f: any, i: number) =>
+                          i === 0 ? f : ({ ...f, label: patch.fieldLabels[f.key] ?? f.label })),
+                      } as FBTaskCard));
+                      setEditingLabels(false);
+                      listQuery?.refetch?.();
+                    }}
+                  />
+                )}
                 {!running && (
                   <div className="flex items-center gap-4 pt-3 pb-1">
                     <div className="shrink-0">
