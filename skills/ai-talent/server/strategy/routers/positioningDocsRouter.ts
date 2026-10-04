@@ -26,7 +26,7 @@ import { invokeLLM } from "../../platform/core/llm/llm";
 import { randomUUID } from "crypto";
 import {
   type PositioningScope, type PromptField, type AppliedDocRecord, type CustomSegment,
-  loadPositioning, sourceDocsOf, appliedDocOf, coverageOf, applyMapping, readPath,
+  loadPositioning, sourceDocsOf, appliedDocOf, coverageOf, applyMapping, setFieldValues, readPath,
   promptFieldsFor, MAX_INJECTED_CHARS,
   customSegmentsOf, addCustomSegment, removeCustomSegment, updateCustomSegment,
   MAX_CUSTOM_SEGMENTS, MAX_CUSTOM_SEGMENT_FIELDS,
@@ -332,6 +332,8 @@ ${targets}
       accepted: z.array(z.object({ path: z.string(), value: z.any() })).max(40),
       /** 對不到欄位、但用戶要求照樣餵進 prompt 的節（section index）。 */
       injectSections: z.array(z.number().int().min(0)).max(40).default([]),
+      /** 2026-10-04：true＝用這份文件完全取代現有定位（只對產品生效）。 */
+      replace: z.boolean().default(false),
     }))
     .mutation(async ({ ctx, input }) => {
       const userId = ctx.user!.id;
@@ -372,11 +374,46 @@ ${targets}
         missing: fields.filter((f) => !filled.includes(f.path)).map((f) => f.path),
         injectedContext: injected,
       };
-      await applyMapping({ scope: input.scope, id: input.scopeId, userId, segments, applied });
+      await applyMapping({
+        scope: input.scope, id: input.scopeId, userId, segments, applied,
+        replace: input.replace && input.scope === "product",
+      });
 
       const pos = await loadPositioning(input.scope, input.scopeId, userId);
       const { filled: nowFilled, missing } = coverageOf(pos, input.scope);
       return { ok: true, applied, coverage: { filled: nowFilled, missing, total: fields.length } };
+    }),
+
+  /**
+   * 2026-10-04（CJ「新列出的欄位也能直接在視窗裡編輯」）：產品視窗逐格編輯固定欄位。
+   * 路徑必須在登錄表上；形狀照欄位定義收斂（text 一律字串、list 一律字串陣列）。
+   * pairs／table 形狀目前不開放手改（結構複雜，請走重新上傳）。空值＝清掉這格。
+   */
+  updateFields: protectedProcedure
+    .input(scopeInput.omit({ brandId: true }).extend({
+      fields: z.array(z.object({ path: z.string(), value: z.any() })).min(1).max(40),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const userId = ctx.user!.id;
+      await assertScope(userId, input.scope, input.scopeId);
+      const byPath = new Map(promptFieldsFor(input.scope).map((f) => [f.path, f]));
+      const values: { path: string; value: any | null }[] = [];
+      for (const a of input.fields) {
+        const f = byPath.get(a.path);
+        if (!f || (f.shape !== "text" && f.shape !== "list")) continue;
+        if (f.shape === "text") {
+          const s = typeof a.value === "string" ? a.value.trim().slice(0, 4000) : "";
+          values.push({ path: a.path, value: s || null });
+        } else {
+          const arr = Array.isArray(a.value)
+            ? a.value.filter((x: unknown) => typeof x === "string" && x.trim()).map((x: string) => x.trim().slice(0, 500)).slice(0, 30)
+            : [];
+          values.push({ path: a.path, value: arr.length ? arr : null });
+        }
+      }
+      if (values.length === 0) throw new TRPCError({ code: "BAD_REQUEST", message: "沒有可更新的欄位" });
+      await setFieldValues({ scope: input.scope, id: input.scopeId, userId, values });
+      return { ok: true, updated: values.length };
     }),
 
   /**

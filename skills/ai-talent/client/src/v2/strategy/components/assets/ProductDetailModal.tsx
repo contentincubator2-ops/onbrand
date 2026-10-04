@@ -12,7 +12,7 @@
  * 儲存透過 product.upsert 將 positioning JSON patch 回 DB。
  */
 
-import { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { trpc } from "../../../../lib/trpc";
 import { useLang, tr } from "../../../../lib/i18n";
 import { AddIcon, CloseIcon, DeleteIcon, GenerateIcon, RegenerateIcon, CheckIcon, UploadIcon } from "../../../platform/components/icons";
@@ -59,6 +59,41 @@ function showVal(v: any): string {
   }
   if (typeof v === "object") return Object.values(v).filter((y) => typeof y === "string" && y).join(" · ");
   return String(v);
+}
+
+/** 一格可編輯的固定欄位。text＝多行文字；list＝一行一項；其他形狀（競品表等）只讀。 */
+function toText(v: any): string {
+  if (v == null) return "";
+  if (typeof v === "string") return v;
+  if (Array.isArray(v) && v.every((x) => typeof x === "string")) return v.join("\n");
+  return showVal(v);
+}
+function FieldEditor({ field, en, edits, setEdits }: {
+  field: { path: string; label: string; shape: string; value: any };
+  en: boolean;
+  edits: Record<string, string>;
+  setEdits: React.Dispatch<React.SetStateAction<Record<string, string>>>;
+}) {
+  const editable = field.shape === "text" || field.shape === "list";
+  const shown = edits[field.path] ?? toText(field.value);
+  return (
+    <label className="block">
+      <span className="text-[12px] font-semibold text-zinc-400 tracking-wider">
+        {field.label}
+        {field.shape === "list" && <span className="ml-1 font-normal">{en ? "(one per line)" : "（一行一項）"}</span>}
+      </span>
+      {editable ? (
+        <textarea
+          value={shown}
+          rows={Math.min(8, Math.max(2, shown.split("\n").length + (shown.length > 60 ? 1 : 0)))}
+          onChange={(e) => { const v = e.target.value; setEdits((prev) => ({ ...prev, [field.path]: v })); }}
+          className="w-full text-sm px-3 py-2 mt-0.5 bg-default-100 rounded-2xl resize-none border border-transparent focus:outline-none focus:bg-white focus:border-zinc-400"
+        />
+      ) : (
+        <p className="text-sm text-neutral-800 mt-0.5 whitespace-pre-wrap">{shown}</p>
+      )}
+    </label>
+  );
 }
 
 // ── Chip Input ────────────────────────────────────────────────────────────────
@@ -182,7 +217,6 @@ export default function ProductDetailModal({ productId, brandId, onClose, onRepo
         : (product?.positioning ?? {});
     } catch { return {}; }
   })();
-  const price = typeof productPositioning.price === "string" ? productPositioning.price : "";
 
   // 2026-10-04（CJ「貼完解析成功、增加很多欄位後，產品定位的內容並沒有太多改變、欄位也都一樣」）：
   // 這個視窗以前只畫六個寫死的欄位（標語／受眾／賣點／詞彙…），上傳文件寫進去的
@@ -192,32 +226,27 @@ export default function ProductDetailModal({ productId, brandId, onClose, onRepo
     { scope: "product", scopeId: productId },
     { enabled: !!productId, refetchOnWindowFocus: false },
   );
-  const filledFields: { path: string; label: string; value: any }[] = coverageQ?.data?.filled ?? [];
+  const filledFields: { path: string; label: string; shape: string; value: any }[] = coverageQ?.data?.filled ?? [];
   const customSegments: { id: string; title: string; fields: { key: string; label: string; value: string }[] }[] =
     coverageQ?.data?.customSegments ?? [];
-  const missingCount: number = coverageQ?.data?.missing?.length ?? 0;
+  const missingFields: { path: string; label: string; shape: string }[] = coverageQ?.data?.missing ?? [];
+  const missingCount = missingFields.length;
 
   // Upsert mutation
   const upsertMut = (trpc as any).product?.upsert?.useMutation?.({
-    onSuccess: () => {
-      productQ?.refetch?.();
-      setSaved(true);
-      setTimeout(() => setSaved(false), 2000);
-    },
   });
   // Editable state
-  const [tagline, setTagline] = useState("");
-  // 2026-10-02（CJ「請確保英文版能顯示正確的英文」）：英文介面的摘要先顯示定位產出的英文標語
-  // （core.enTagline）。下方編輯欄仍編 canonical 標語，所以只在使用者還沒改過時才換成英文。
-  const [enTagline, setEnTagline] = useState("");
-  const [loadedTagline, setLoadedTagline] = useState("");
-  const [audience, setAudience] = useState("");
-  const [usp, setUsp] = useState("");
+  // 2026-10-04：標語／受眾／賣點不再有各自寫死的輸入框——它們就是下方「AI 讀到的定位」
+  // 裡的 core.zhTagline／audience.primary／competition.uniqueUsp，統一在那邊編輯。
+  const [edits, setEdits] = useState<Record<string, string>>({});
+  const [segEdits, setSegEdits] = useState<Record<string, Record<string, string>>>({});
+  const [showMissing, setShowMissing] = useState(false);
   const [preferred, setPreferred] = useState<string[]>([]);
   const [forbidden, setForbidden] = useState<string[]>([]);
   const [periods, setPeriods] = useState<PromotionPeriod[]>([]);
   const [saved, setSaved] = useState(false);
   const [dirty, setDirty] = useState(false);
+  const [listsDirty, setListsDirty] = useState(false);
   const initialised = useRef(false);
 
   // Hydrate from product data
@@ -231,52 +260,74 @@ export default function ProductDetailModal({ productId, brandId, onClose, onRepo
           : (product.positioning ?? {});
       } catch { return {}; }
     })();
-    // Interim positioning is stored under _interim (auto-discovery quick-pulse).
-    // Full positioning overwrites these; fall back to _interim if not yet done.
-    const interim = (pos._interim as any) ?? {};
-    const firstText = (...values: unknown[]) =>
-      values.find((value): value is string => typeof value === "string" && !!value.trim())?.trim() ?? "";
-    const loaded = firstText(pos.tagline, (pos as any).tagline?.zhTagline, pos.core?.zhTagline, pos.core?.oneLineValueProp, interim.tagline);
-    setTagline(loaded);
-    setLoadedTagline(loaded);
-    setEnTagline(firstText(pos.core?.enTagline, (pos as any).tagline?.enTagline));
-    setAudience(firstText(pos.targetAudience, pos.audience?.primary, interim.targetAudience));
-    setUsp(firstText(pos.usp, pos.competition?.uniqueUsp, pos.core?.oneLineValueProp, pos.differentiation?.functional, interim.usp));
     setPreferred(Array.isArray(pos.preferredWords) ? pos.preferredWords : []);
     setForbidden(Array.isArray(pos.forbiddenWords) ? pos.forbiddenWords : []);
     setPeriods(Array.isArray(pos.promotionPeriods) ? pos.promotionPeriods : []);
   }, [product]);
 
   // Mark dirty when user edits
-  const mark = () => { if (initialised.current) setDirty(true); };
+  const mark = () => { if (initialised.current) { setDirty(true); setListsDirty(true); } };
 
-  const handleSave = () => {
+  const fieldUpdateMut = (trpc as any).positioningDocs?.updateFields?.useMutation?.();
+  const segUpdateMut = (trpc as any).positioningDocs?.updateCustomSegment?.useMutation?.();
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  const handleSave = async () => {
     if (!product) return;
-    const existingPos: ProductPositioning = (() => {
-      try {
-        return typeof product.positioning === "string"
-          ? JSON.parse(product.positioning)
-          : (product.positioning ?? {});
-      } catch { return {}; }
-    })();
-    // Merge: preserve AI-generated fields, overwrite the user-edited ones
-    const newPos: ProductPositioning = {
-      ...existingPos,
-      tagline: tagline.trim() || undefined,
-      targetAudience: audience.trim() || undefined,
-      usp: usp.trim() || undefined,
-      preferredWords: preferred.length > 0 ? preferred : undefined,
-      forbiddenWords: forbidden.length > 0 ? forbidden : undefined,
-      promotionPeriods: periods.length > 0 ? periods : undefined,
-    };
-    upsertMut?.mutate?.({
-      id: productId,
-      brandId,
-      slug: product.slug ?? `product-${productId}`,
-      name: product.name,
-      positioning: newPos,
-    });
-    setDirty(false);
+    setSaving(true); setSaveError(null);
+    try {
+      // 1) 詞彙／推廣時段走既有 upsert（它會整包寫回 positioning，所以必須排在欄位更新之前，
+      //    否則會用載入當下的舊快照蓋掉剛改的欄位）。
+      if (listsDirty) {
+        const existingPos: ProductPositioning = (() => {
+          try {
+            return typeof product.positioning === "string"
+              ? JSON.parse(product.positioning)
+              : (product.positioning ?? {});
+          } catch { return {}; }
+        })();
+        await upsertMut?.mutateAsync?.({
+          id: productId,
+          brandId,
+          slug: product.slug ?? `product-${productId}`,
+          name: product.name,
+          positioning: {
+            ...existingPos,
+            preferredWords: preferred.length > 0 ? preferred : undefined,
+            forbiddenWords: forbidden.length > 0 ? forbidden : undefined,
+            promotionPeriods: periods.length > 0 ? periods : undefined,
+          },
+        });
+      }
+      // 2) 固定欄位逐格更新（server 重新讀最新的 positioning 再寫，不會蓋掉別人）。
+      const shapeOf = new Map<string, string>([...filledFields, ...missingFields].map((f) => [f.path, f.shape]));
+      const changed = Object.entries(edits).map(([path, text]) => ({
+        path,
+        value: shapeOf.get(path) === "list"
+          ? text.split("\n").map((x) => x.trim()).filter(Boolean)
+          : text,
+      }));
+      if (changed.length > 0) await fieldUpdateMut?.mutateAsync?.({ scope: "product", scopeId: productId, fields: changed });
+      // 3) 自訂卡片
+      for (const seg of customSegments) {
+        const e = segEdits[seg.id];
+        if (!e) continue;
+        await segUpdateMut?.mutateAsync?.({
+          scope: "product", scopeId: productId, segmentId: seg.id, title: seg.title,
+          fields: seg.fields.map((f) => ({ label: f.label, value: (e[f.key] ?? f.value).trim() || f.value })),
+        });
+      }
+      setEdits({}); setSegEdits({}); setListsDirty(false); setDirty(false);
+      await Promise.all([productQ?.refetch?.(), coverageQ?.refetch?.()]);
+      onImageUpdated?.();
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } catch (e: any) {
+      setSaveError(String(e?.message ?? "儲存失敗"));
+    } finally {
+      setSaving(false);
+    }
   };
 
   // Escape key to close
@@ -327,36 +378,50 @@ export default function ProductDetailModal({ productId, brandId, onClose, onRepo
                 </button>
               )}
             </div>
-            {filledFields.length === 0 && customSegments.length === 0 ? (
+            {filledFields.length === 0 && customSegments.length === 0 && !showMissing ? (
               <p className="text-xs text-neutral-500">
                 {en ? "Nothing written yet. Upload a document, paste text, or re-run positioning." : "還沒有任何定位內容。可以上傳文件、貼上文字，或按「重新定位」讓 AI 產出。"}
               </p>
-            ) : (
-              <div className="grid gap-3">
-                {filledFields.map((f) => (
-                  <div key={f.path}>
-                    <span className="text-[12px] font-semibold text-zinc-400 tracking-wider">{f.label}</span>
-                    <p className="text-sm text-neutral-800 mt-0.5 whitespace-pre-wrap">{showVal(f.value)}</p>
+            ) : null}
+            <div className="grid gap-3">
+              {filledFields.map((f) => (
+                <FieldEditor key={f.path} field={f} en={en} edits={edits} setEdits={setEdits} />
+              ))}
+              {customSegments.map((seg) => (
+                <div key={seg.id} className="rounded-xl bg-white p-3">
+                  <span className="text-[12px] font-bold text-neutral-700">{seg.title}</span>
+                  <div className="mt-1.5 grid gap-2">
+                    {seg.fields.map((fl) => (
+                      <label key={fl.key} className="block">
+                        <span className="text-[12px] font-semibold text-zinc-400">{fl.label}</span>
+                        <textarea
+                          rows={2}
+                          value={segEdits[seg.id]?.[fl.key] ?? fl.value}
+                          onChange={(e) => {
+                            const v = e.target.value;
+                            setSegEdits((prev) => ({ ...prev, [seg.id]: { ...(prev[seg.id] ?? {}), [fl.key]: v } }));
+                          }}
+                          className="w-full text-sm px-3 py-2 mt-0.5 bg-default-100 rounded-2xl resize-none border border-transparent focus:outline-none focus:bg-white focus:border-zinc-400"
+                        />
+                      </label>
+                    ))}
                   </div>
-                ))}
-                {customSegments.map((seg) => (
-                  <div key={seg.id} className="rounded-xl bg-white p-3">
-                    <span className="text-[12px] font-bold text-neutral-700">{seg.title}</span>
-                    <ul className="mt-1 grid gap-0.5">
-                      {seg.fields.map((fl) => (
-                        <li key={fl.key} className="text-sm text-neutral-700">
-                          <span className="font-semibold">{fl.label}：</span>{fl.value}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                ))}
-              </div>
-            )}
-            {missingCount > 0 && filledFields.length > 0 && (
-              <p className="text-[12px] text-neutral-400 mt-3">
-                {en ? `${missingCount} other fields aren't written yet.` : `另有 ${missingCount} 格還沒有內容。`}
-              </p>
+                </div>
+              ))}
+              {showMissing && missingFields.map((f) => (
+                <FieldEditor key={f.path} field={{ ...f, value: undefined }} en={en} edits={edits} setEdits={setEdits} />
+              ))}
+            </div>
+            {missingCount > 0 && (
+              <button
+                type="button"
+                onClick={() => setShowMissing((v) => !v)}
+                className="mt-3 text-[12px] font-medium text-neutral-500 hover:text-neutral-900"
+              >
+                {showMissing
+                  ? (en ? "Hide empty fields" : "收起還沒內容的欄位")
+                  : (en ? `+ Fill in ${missingCount} empty fields` : `＋ 補充另外 ${missingCount} 個空欄位`)}
+              </button>
             )}
           </div>
 
@@ -395,47 +460,6 @@ export default function ProductDetailModal({ productId, brandId, onClose, onRepo
               {sceneOpen && (
                 <ProductSceneModal brandId={brandId} productId={productId} onClose={() => setSceneOpen(false)} />
               )}
-            </div>
-
-            {/* Tagline */}
-            <div>
-              <label className="block text-xs font-semibold text-neutral-600 mb-1.5">
-                {en ? "Tagline / Slogan" : "標語 / Slogan"}
-              </label>
-              <input
-                value={tagline}
-                onChange={(e) => { setTagline(e.target.value); mark(); }}
-                placeholder={en ? "e.g. Fresh from the farm, direct to your table" : "例：直送農場新鮮，品牌最短距離"}
-                className="w-full text-sm px-3 py-2 border border-transparent bg-default-100 rounded-2xl focus:outline-none focus:bg-white focus:border-zinc-400"
-              />
-            </div>
-
-            {/* Audience */}
-            <div>
-              <label className="block text-xs font-semibold text-neutral-600 mb-1.5">
-                {en ? "Target Audience" : "目標受眾"}
-              </label>
-              <textarea
-                value={audience}
-                onChange={(e) => { setAudience(e.target.value); mark(); }}
-                placeholder={en ? "Who is this product for?" : "這個產品是給誰的？描述主要受眾的特徵、需求和痛點"}
-                rows={3}
-                className="w-full text-sm px-3 py-2 border border-transparent bg-default-100 rounded-2xl resize-none focus:outline-none focus:bg-white focus:border-zinc-400"
-              />
-            </div>
-
-            {/* USP */}
-            <div>
-              <label className="block text-xs font-semibold text-neutral-600 mb-1.5">
-                {en ? "Unique Selling Point (USP)" : "獨特賣點"}
-              </label>
-              <textarea
-                value={usp}
-                onChange={(e) => { setUsp(e.target.value); mark(); }}
-                placeholder={en ? "What makes this product uniquely valuable?" : "這個產品跟競品最大的差異是什麼？為什麼值得選擇？"}
-                rows={3}
-                className="w-full text-sm px-3 py-2 border border-transparent bg-default-100 rounded-2xl resize-none focus:outline-none focus:bg-white focus:border-zinc-400"
-              />
             </div>
 
             {/* Preferred words */}
@@ -507,6 +531,7 @@ export default function ProductDetailModal({ productId, brandId, onClose, onRepo
           </div>
         </ModalBody>
 
+        {saveError && <p className="px-6 pb-1 text-xs text-danger-600">{saveError}</p>}
         <ModalFooter className="justify-between items-center">
           <button
             onClick={() => onReposition(productId)}
@@ -524,12 +549,12 @@ export default function ProductDetailModal({ productId, brandId, onClose, onRepo
               {en ? "Cancel" : "取消"}
             </button>
             <button
-              onClick={handleSave}
-              disabled={!dirty && !saved || upsertMut?.isPending}
+              onClick={() => void handleSave()}
+              disabled={(!dirty && !saved && Object.keys(edits).length === 0 && Object.keys(segEdits).length === 0) || saving}
               className="h-11 px-6 rounded-full text-sm font-semibold transition disabled:opacity-50"
               style={{ background: saved ? "#10B981" : "#171717", color: "white" }}
             >
-              {upsertMut?.isPending
+              {saving
                 ? (en ? "Saving…" : "儲存中…")
                 : saved
                   ? <span className="inline-flex items-center gap-1"><CheckIcon size={11} />{en ? "Saved" : "已儲存"}</span>

@@ -293,13 +293,44 @@ export async function savePositioningDocs(
  * 用戶的文件只填得到 audience.primary 時，不該把已經跑出來的 audience.matrix
  * 一起清掉。
  */
+/** 「取代」模式下仍保留的頂層欄位：圖片，以及用戶手動維護、文件不會涵蓋的詞彙與推廣時段。 */
+const REPLACE_KEEP_KEYS = ["imageUrl", "image", "images", "promotionPeriods", "preferredWords", "forbiddenWords"];
+/** 底線開頭的是系統資料（來源文件、自訂卡、素材…）；只有這兩個要隨定位一起清掉。 */
+const REPLACE_DROP_SYSTEM_KEYS = ["_interim", "_sourceDoc", "_replacedBackup"];
+
+/**
+ * 2026-10-04（CJ「用戶上傳自己的定位資料後，請用用戶的資料完全取代掉原來的產品定位」）：
+ * 回傳「取代後的底稿」——舊的定位內容整批拿掉，只留圖片／手動詞彙／系統資料。
+ * 被拿掉的內容（不含系統資料）原樣放進 `_replacedBackup`，只留最近一份，萬一按錯可以人工找回。
+ */
+export function replacedBase(cur: Record<string, any>): Record<string, any> {
+  const base: Record<string, any> = {};
+  const backup: Record<string, any> = {};
+  for (const [k, v] of Object.entries(cur)) {
+    const isSystem = k.startsWith("_");
+    if (isSystem) {
+      if (!REPLACE_DROP_SYSTEM_KEYS.includes(k)) base[k] = v;
+    } else if (REPLACE_KEEP_KEYS.includes(k)) {
+      base[k] = v;
+    } else {
+      backup[k] = v;
+    }
+  }
+  if (Object.keys(backup).length > 0) {
+    base._replacedBackup = { at: new Date().toISOString(), positioning: backup };
+  }
+  return base;
+}
+
 export async function applyMapping(args: {
   scope: PositioningScope; id: number; userId: number;
   segments: Record<string, Record<string, any>>;
   applied: AppliedDocRecord;
+  /** true＝用文件內容完全取代現有定位（目前只有產品用）；false＝逐 segment 淺層合併。 */
+  replace?: boolean;
 }): Promise<void> {
   await patchPositioning(args.scope, args.id, args.userId, (cur) => {
-    const next: Record<string, any> = { ...cur };
+    const next: Record<string, any> = args.replace ? replacedBase(cur) : { ...cur };
     for (const [segId, fields] of Object.entries(args.segments)) {
       const prior = (next[segId] && typeof next[segId] === "object" && !Array.isArray(next[segId]))
         ? next[segId] : {};
@@ -308,6 +339,36 @@ export async function applyMapping(args: {
     next._sourceDoc = args.applied;
     next._sourceDocs = sourceDocsOf(cur).map((d) =>
       d.id === args.applied.docId ? { ...d, appliedAt: args.applied.appliedAt } : d);
+    return next;
+  });
+}
+
+/**
+ * 用戶在產品視窗直接改欄位。value 為 null／空＝清掉這格。
+ * 產品舊版視窗把標語／受眾／賣點寫在頂層（tagline／targetAudience／usp），而且讀取端
+ * 優先讀頂層——不一起清掉的話，改了 canonical 欄位畫面卻不變。
+ */
+const LEGACY_TOP_LEVEL: Record<string, string> = {
+  "core.zhTagline": "tagline",
+  "audience.primary": "targetAudience",
+  "competition.uniqueUsp": "usp",
+};
+export async function setFieldValues(args: {
+  scope: PositioningScope; id: number; userId: number;
+  values: { path: string; value: any | null }[];
+}): Promise<void> {
+  await patchPositioning(args.scope, args.id, args.userId, (cur) => {
+    const next: Record<string, any> = { ...cur };
+    for (const { path, value } of args.values) {
+      const i = path.indexOf(".");
+      const segId = path.slice(0, i), key = path.slice(i + 1);
+      const prior = (next[segId] && typeof next[segId] === "object" && !Array.isArray(next[segId]))
+        ? { ...next[segId] } : {};
+      if (value == null) delete prior[key]; else prior[key] = value;
+      next[segId] = prior;
+      const legacy = args.scope === "product" ? LEGACY_TOP_LEVEL[path] : undefined;
+      if (legacy && typeof next[legacy] === "string") delete next[legacy];
+    }
     return next;
   });
 }
