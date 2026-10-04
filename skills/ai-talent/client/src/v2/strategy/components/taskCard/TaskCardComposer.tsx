@@ -27,6 +27,7 @@ import {
 } from "@heroui/react";
 import ConvertingToAIFormat from "../positioning/ConvertingToAIFormat";
 import { IllustrationImage, SceneArt } from "../../../platform/components/TaskIllustration";
+import ResearchSources, { type ResearchReference } from "../../../platform/components/ResearchSources";
 import { SCENE_OPTIONS, isTaskScene, pickTaskScene, type TaskScene } from "../../../platform/components/taskScene";
 import { AddIcon, CheckIcon, ChevronLeftIcon, CopyIcon, DeleteIcon, GenerateIcon, MeetingIcon, SampleIcon, TextIcon, WarningIcon } from "../../../platform/components/icons";
 
@@ -64,8 +65,6 @@ interface CardRecord {
   samples: string[]; primaryQuestion: string; primaryPlaceholder: string;
   askFields: { key: string; label: string; type: "text" | "textarea"; required: boolean; placeholder: string }[];
   skill: string;
-  references?: { title: string; url: string; host: string; takeaway: string; retrievedAt: string }[];
-  researchNote?: string | null;
   measured: { count: number; minChars: number; maxChars: number; medianChars: number };
   variants: number;
   lastDryRun: { at: string; caption: string } | null;
@@ -80,53 +79,6 @@ function measure(samples: string[]): { count: number; min: number; max: number }
   const lens = samples.map((s) => s.trim().length).filter((n) => n > 0);
   if (lens.length === 0) return { count: 0, min: 0, max: 0 };
   return { count: lens.length, min: Math.min(...lens), max: Math.max(...lens) };
-}
-
-/**
- * AI 上網查到的資料來源。網址一律是搜尋服務實際回傳的，用戶只能刪、不能自己加；
- * 沒查到就誠實說，不拿沒有出處的內容充數。
- */
-function ReferenceList({ card, onRemove, en }: { card: CardRecord; onRemove?: (url: string) => void; en: boolean }) {
-  const refs = card.references ?? [];
-  return (
-    <div className="rounded-medium border border-divider p-3 space-y-2">
-      <p className="text-small font-medium">
-        {en ? "Sources the AI found (verifiable)" : "AI 查到的資料來源（可查證）"}
-      </p>
-      {refs.length === 0 ? (
-        <p className="text-tiny text-default-500">
-          {card.researchNote ?? (en ? "No sources were attached." : "沒有附上資料來源。")}
-        </p>
-      ) : (
-        <>
-          <p className="text-tiny text-default-500">
-            {en
-              ? "The card writes facts only from these, your answers, and your brand profile. Remove any you don't trust."
-              : "這張卡寫文案時，事實只會取自這些來源、你每次的回答和品牌資料。不信任的來源可以刪掉。"}
-          </p>
-          <ul className="space-y-2">
-            {refs.map((r, i) => (
-              <li key={r.url} className="flex gap-2 items-start">
-                <span className="text-tiny text-default-400 mt-0.5">[{i + 1}]</span>
-                <div className="min-w-0 flex-1">
-                  <a href={r.url} target="_blank" rel="noopener noreferrer" className="text-small font-medium underline break-words">
-                    {r.title}
-                  </a>
-                  <p className="text-tiny text-default-400">{r.host}</p>
-                  <p className="text-tiny text-default-600">{r.takeaway}</p>
-                </div>
-                {onRemove && (
-                  <Button size="sm" variant="light" isIconOnly onPress={() => onRemove(r.url)}>
-                    <DeleteIcon size={14} className="text-danger-500" />
-                  </Button>
-                )}
-              </li>
-            ))}
-          </ul>
-        </>
-      )}
-    </div>
-  );
 }
 
 export default function TaskCardComposer({
@@ -165,7 +117,7 @@ export default function TaskCardComposer({
   const [cardId, setCardId] = React.useState<string | null>(initialCardId ?? null);
   const [skillDraft, setSkillDraft] = React.useState("");
   const [dryInputs, setDryInputs] = React.useState<Record<string, string>>({});
-  const [dryResult, setDryResult] = React.useState<{ caption: string; chars: number; inRange: boolean; expected: { minChars: number; maxChars: number } } | null>(null);
+  const [dryResult, setDryResult] = React.useState<{ caption: string; chars: number; inRange: boolean; expected: { minChars: number; maxChars: number }; references?: ResearchReference[]; researchNote?: string | null } | null>(null);
   const [busy, setBusy] = React.useState<string | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   // 卡片插畫：null＝跟著卡名自動挑。選單預設收起，只秀目前那張。
@@ -294,15 +246,6 @@ export default function TaskCardComposer({
         .map((f) => ({ label: f.label.trim(), type: f.type, required: f.required, placeholder: f.placeholder.trim() })),
       variants,
     });
-  }
-
-  function removeReference(url: string): void {
-    if (!brandId || !cardId || !card) return;
-    const keep = (card.references ?? []).filter((r) => r.url !== url);
-    updateMut?.mutate(
-      { brandId, cardId, references: keep },
-      { onSuccess: () => cardQuery.refetch?.() },
-    );
   }
 
   async function goToDryRun(): Promise<void> {
@@ -579,8 +522,8 @@ export default function TaskCardComposer({
 
               <p className="text-tiny text-default-500">
                 {en
-                  ? "When you continue, the AI also searches the web for verifiable sources on this kind of content and shows them to you — the card won't invent facts without a source."
-                  : "按下一步後，AI 會自己上網查這類內容的可查證資料來源並附給你看；沒有出處的事實，這張卡不會編。"}
+                  ? "Every time this card runs, the AI also searches the web for cases and claims on that run's topic to enrich the copy, and shows you the sources next to the result."
+                  : "這張卡每次執行時，AI 都會針對當次主題主動上網查相關案例與說法來充實文案，並把來源附在成品旁給你看。"}
               </p>
 
               <div className="flex items-center gap-2">
@@ -645,7 +588,6 @@ export default function TaskCardComposer({
                         : `依 ${card.measured.count} 篇範例 · 目標 ${card.measured.minChars}–${card.measured.maxChars} 字`}
                     </Chip>
                   </div>
-                  <ReferenceList card={card} en={en} onRemove={removeReference} />
                   <p className="text-tiny text-default-500">
                     {en
                       ? "This is what the card will follow every run. Edit anything that got the wrong idea — you know your writing better than the model does."
@@ -684,8 +626,6 @@ export default function TaskCardComposer({
                   ? "Answer the card's own question, then test-write. Nothing is saved to your projects and no credits are used."
                   : "回答這張卡自己的問題，然後試寫。試寫不會存進專案、也不扣點數。"}
               </p>
-
-              <ReferenceList card={card} en={en} />
 
               {/* 2026-09-30（CJ「品牌自建的也要有自己創造的插畫，用 image 2 生；他也可以自己選」）：
                   進這步就自動用 gpt-image-2 畫一張；可以重畫，也可以改挑現成場景。 */}
@@ -805,6 +745,7 @@ export default function TaskCardComposer({
                     </span>
                   </div>
                   <p className="text-small text-default-800 whitespace-pre-wrap">{dryResult.caption}</p>
+                  <ResearchSources refs={dryResult.references ?? []} note={dryResult.researchNote ?? null} en={en} />
                   <p className="text-tiny text-default-400">
                     {en
                       ? "Not what you wanted? Go back and edit the SKILL, then test again."
