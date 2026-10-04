@@ -30,7 +30,7 @@ export interface PhaseKpi {
   metrics: Array<{ metric: KpiMetric; target: number | null }>;
   note: string;
 }
-export interface KpiAgent { id: number; slug: string; name: string; title: string; avatarUrl: string }
+export interface KpiAgent { id: number; slug: string; name: string; title: string; avatarUrl: string; nameEn?: string; titleEn?: string }
 export interface CampaignKpi {
   budget: number | null;
   goals: KpiGoal[];

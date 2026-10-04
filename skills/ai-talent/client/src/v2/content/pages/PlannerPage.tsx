@@ -22,6 +22,7 @@ import {
 } from "@fortawesome/free-brands-svg-icons";
 import { trpc } from "../../../lib/trpc";
 import { useLang } from "../../../lib/i18n";
+import { agentLabel, agentTitle, agentTooltip } from "../../platform/lib/agentName";
 import { showToastGlobal } from "../../platform/components/Toast";
 import { friendlyError } from "../../platform/lib/friendlyError";
 import { channelRoute } from "../../platform/lib/channelMeta";
@@ -52,7 +53,7 @@ const md = (ymd: string) => { const [, m, d] = ymd.split("-"); return `${Number(
 type ForkView = {
   axis: string; weekStart?: string; question: string; chosen: number | null;
   options: Array<{
-    advisor: { slug: string; name: string; title: string; avatarUrl: string };
+    advisor: { slug: string; name: string; title: string; nameEn?: string; titleEn?: string; avatarUrl: string };
     stance: string; why: string; preview: Array<{ date: string; platform: string; topic: string; format: string }>;
   }>;
 };
@@ -496,6 +497,7 @@ function ForkCards({ fork, en, busy, onPick }: {
   messageId: number; fork: ForkView; en: boolean; busy: boolean; onPick: (i: 0 | 1) => void;
 }) {
   const chosen = fork.chosen;
+  const lang = en ? "en" : "zh";
   return (
     <div className="flex flex-col gap-2.5 pl-[42px]">
       {fork.options.map((o, i) => {
@@ -505,10 +507,10 @@ function ForkCards({ fork, en, busy, onPick }: {
           <div key={o.advisor.slug} className="rounded-xl bg-white p-3.5 transition"
             style={{ border: isChosen ? `1.5px solid ${INK}` : `1px solid ${LINE}`, opacity: dim ? 0.45 : 1 }}>
             <div className="flex items-center gap-2.5">
-              <img src={avatarSrc(o.advisor)} alt="" className="h-8 w-8 shrink-0 rounded-full" style={{ background: SOFT }} />
+              <img src={avatarSrc(o.advisor)} alt={agentLabel(o.advisor, lang)} className="h-8 w-8 shrink-0 rounded-full" style={{ background: SOFT }} />
               <div className="min-w-0">
-                <p className="m-0 truncate text-[13px] font-semibold" style={{ color: INK }}>{o.advisor.name}</p>
-                <p className="m-0 truncate text-[11.5px]" style={{ color: META }}>{o.advisor.title}</p>
+                <p className="m-0 truncate text-[13px] font-semibold" style={{ color: INK }} title={agentTooltip(o.advisor, lang)}>{agentLabel(o.advisor, lang)}</p>
+                <p className="m-0 truncate text-[11.5px]" style={{ color: META }}>{agentTitle(o.advisor, lang)}</p>
               </div>
             </div>
             <p className="m-0 mt-3 text-[15px] font-bold" style={{ color: INK }}>{o.stance}</p>

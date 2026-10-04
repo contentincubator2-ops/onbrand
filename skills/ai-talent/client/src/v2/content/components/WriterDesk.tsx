@@ -15,12 +15,16 @@
  */
 import React, { useLayoutEffect, useRef, useState } from "react";
 import { landAgentHandoff } from "../lib/agentHandoff";
+import { agentLabel, agentShortName, agentTitle } from "../../platform/lib/agentName";
 import { Avatar, Button, Spinner, Textarea } from "@heroui/react";
 
 export interface DeskWriter {
   key: string;
   name: string;
   title: string;
+  /** 英文介面用（主筆來自 DB agent 才有；沒有就照原文）。 */
+  nameEn?: string;
+  titleEn?: string;
   /** 一句話說這位的寫法（主筆沒有，主筆的理由看出處） */
   pitch?: string;
   avatarUrl?: string | null;
@@ -74,8 +78,8 @@ export default function WriterDesk({
         <div className="min-w-0 flex-1 leading-tight">
           <p className="text-[12px] text-default-500">{isLead ? (en ? "Lead writer" : "主筆") : (en ? "Rewritten by" : "改寫")}</p>
           <p className="truncate text-[15px] font-semibold text-default-900">
-            {active.name}
-            {active.title && <span className="ml-1.5 text-[13px] font-normal text-default-500">{active.title}</span>}
+            {agentLabel(active, en ? "en" : "zh")}
+            {active.title && <span className="ml-1.5 text-[13px] font-normal text-default-500">{agentTitle(active, en ? "en" : "zh")}</span>}
           </p>
         </div>
       </div>
@@ -87,7 +91,7 @@ export default function WriterDesk({
           <>
             <p className="text-[13px] leading-relaxed text-default-700">
               {en
-                ? <>{active.name} rewrote {lead.name}&rsquo;s draft in their own style — {active.pitch}. Facts and structure stay the same.</>
+                ? <>{agentShortName(active, "en")} rewrote {agentShortName(lead, "en")}&rsquo;s draft in their own style — {active.pitch}. Facts and structure stay the same.</>
                 : <>{active.name} 以 {lead.name} 的稿為底，改成自己的寫法：{active.pitch}。事實與結構不變。</>}
             </p>
             <details className="text-[12px]">
@@ -111,7 +115,7 @@ export default function WriterDesk({
                 type="button"
                 disabled={busy && busyKey !== w.key}
                 onClick={() => { if (!on) onPick(w.key); }}
-                title={`${w.name}｜${w.title}${w.pitch ? `｜${w.pitch}` : ""}`}
+                title={`${agentLabel(w, en ? "en" : "zh")}｜${agentTitle(w, en ? "en" : "zh")}${w.pitch ? `｜${w.pitch}` : ""}`}
                 className={`group flex w-[58px] flex-col items-center gap-1 rounded-lg p-1 transition ${on ? "bg-default-100" : "hover:bg-default-50"} disabled:opacity-40`}
               >
                 <span className={`relative rounded-full ring-2 ${on ? "ring-default-900" : "ring-transparent group-hover:ring-default-300"}`}>
@@ -136,13 +140,13 @@ export default function WriterDesk({
       {/* ── 跟這位說哪裡要改 ── */}
       <div className="space-y-2 border-t border-default-100 pt-3">
         <p className="text-[13px] font-semibold text-default-800">
-          {en ? `Tell ${active.name} what to change` : `跟 ${active.name} 說哪裡要改`}
+          {en ? `Tell ${agentShortName(active, "en")} what to change` : `跟 ${active.name} 說哪裡要改`}
         </p>
         {chatHistory.length > 0 && (
           <div className="max-h-40 space-y-1.5 overflow-y-auto rounded-lg bg-default-50 p-2">
             {chatHistory.slice(-4).map((m, i) => (
               <p key={i} className="text-[12.5px] leading-relaxed text-default-800">
-                <span className="mr-1 font-semibold">{m.role === "user" ? (en ? "You" : "你") : active.name}{en ? ":" : "："}</span>
+                <span className="mr-1 font-semibold">{m.role === "user" ? (en ? "You" : "你") : agentShortName(active, en ? "en" : "zh")}{en ? ":" : "："}</span>
                 {m.content.slice(0, 180)}{m.content.length > 180 ? "…" : ""}
               </p>
             ))}

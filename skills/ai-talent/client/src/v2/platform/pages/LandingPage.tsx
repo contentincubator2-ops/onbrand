@@ -544,6 +544,7 @@ function PillarsSection({ en }: { en: boolean }) {
 type ViralCard = {
   id: string; platform: string; labelZh: string; labelEn: string;
   short: string; metric: string; asOf: string; caveat: string | null; url: string | null;
+  shortEn?: string | null; metricEn?: string | null; caveatEn?: string | null;
 };
 
 function ViralWall({ en, cards, loading, failed }: {
@@ -583,14 +584,14 @@ function ViralWall({ en, cards, loading, failed }: {
                       {en ? c.labelEn || c.labelZh : c.labelZh}
                     </h3>
                     <div className="text-[12px] mb-2" style={{ color: C.inkSoft }}>
-                      {en ? "Reference: " : "參考貼文："}{c.short}
+                      {en ? "Reference: " : "參考貼文："}{en ? (c.shortEn || c.short) : c.short}
                     </div>
                     <div className="text-[20px] font-black leading-snug mb-3" style={{ color: C.orangeDark }}>
-                      {c.metric}
+                      {en ? (c.metricEn || c.metric) : c.metric}
                     </div>
                     {c.caveat && (
                       <div className="text-[12px] leading-relaxed mb-3" style={{ color: C.muted }}>
-                        {en ? "Note: " : "註："}{c.caveat}
+                        {en ? "Note: " : "註："}{en ? (c.caveatEn || c.caveat) : c.caveat}
                       </div>
                     )}
                     {c.url && (

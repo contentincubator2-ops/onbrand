@@ -15,6 +15,7 @@
  * 資料全部來自 quickTask.cardDetail：出處是模型實際被餵的那一則參考，長青的
  * 邏輯來自 evergreenRationale，日期來自 git 歷史。這裡只負責排版，不另外編故事。
  */
+import { localizeSource } from "../../lib/taskEn";
 import { useEffect } from "react";
 import { CloseIcon } from "../../../platform/components/icons";
 import { trpc } from "../../../../lib/trpc";
@@ -87,7 +88,7 @@ export default function CardDetailDrawer({ taskId, lang, onClose, onRun }: Props
     : { data: null, isLoading: false, error: null };
   const d = q.data as any;
   const src = resolveSource(d?.source);
-  const full = (d?.source ?? {}) as { short?: string; takeaway?: string; metric?: string; asOf?: string; url?: string; postUrl?: string };
+  const full = localizeSource(d?.source ?? {}, d, lang) as { short?: string; takeaway?: string; metric?: string; asOf?: string; url?: string; postUrl?: string };
   const age = daysSince(d?.addedAt);
   const isNew = isRecentCard(d?.addedAt);
   const srcAgeMonths = full.asOf

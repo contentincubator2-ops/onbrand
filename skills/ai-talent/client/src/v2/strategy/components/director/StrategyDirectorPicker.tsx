@@ -26,6 +26,7 @@
 import React from "react";
 import { BackIcon, CheckIcon, SearchIcon } from "../../../platform/components/icons";
 import { trpc } from "../../../../lib/trpc";
+import { agentLabel, agentTitle } from "../../../platform/lib/agentName";
 import { useLang } from "../../../../lib/i18n";
 import { type StrategistDirector, avatarSrcOf, roleLabelOf, signatureQuestionsOf, localeLabelOf } from "../../lib/strategistDirectors";
 
@@ -84,10 +85,10 @@ export function DirectorRoster({
           const isCurrent = d.agentId === currentAgentId;
           return (
             <div key={d.agentId} style={{ ...CARD, borderColor: isCurrent ? "#171717" : "#E5E5E5" }}>
-              <img src={avatarSrcOf(d)} alt="" style={{ width: 38, height: 38, borderRadius: "50%", flexShrink: 0 }} />
+              <img src={avatarSrcOf(d)} alt={agentLabel(d, lang)} style={{ width: 38, height: 38, borderRadius: "50%", flexShrink: 0 }} />
               <div style={{ minWidth: 0, flex: 1 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-                  <span style={{ fontSize: 13, fontWeight: 700, color: "#171717" }}>{d.name}</span>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: "#171717" }}>{agentLabel(d, lang)}</span>
                   <span style={{
                     fontSize: 10.5, fontWeight: 700, color: "#525252", background: "#F5F4F2",
                     border: "1px solid #E5E5E5", borderRadius: 999, padding: "1px 7px",
@@ -98,7 +99,7 @@ export function DirectorRoster({
                     </span>
                   )}
                 </div>
-                <div style={{ fontSize: 11, color: "#737373", marginTop: 2 }}>{d.title}</div>
+                <div style={{ fontSize: 11, color: "#737373", marginTop: 2 }}>{agentTitle(d, lang)}</div>
                 {d.specialty && (
                   <div style={{ fontSize: 11.5, color: "#525252", marginTop: 4, lineHeight: 1.5,
                     display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
@@ -122,16 +123,16 @@ export function DirectorRoster({
                           <button
                             key={alt.agentId}
                             onClick={() => onPick(alt)}
-                            title={alt.title}
+                            title={`${agentLabel(alt, lang)} · ${alt.title}`}
                             style={{
                               fontSize: 11, border: "1px solid #D4D4D4", borderRadius: 999,
                               padding: "3px 9px", background: "#fff", color: "#404040", cursor: "pointer",
                               maxWidth: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
                             }}
                           >
-                            {alt.name}
+                            {agentLabel(alt, lang)}
                             <span style={{ color: "#a3a3a3" }}>
-                              {"　"}{alt.title.replace(/^[^｜|]*[｜|]\s*/, "")}{loc ? `・${loc}` : ""}
+                              {"　"}{en ? agentTitle(alt, lang) : alt.title.replace(/^[^｜|]*[｜|]\s*/, "")}{loc ? `・${loc}` : ""}
                             </span>
                           </button>
                         );
@@ -214,8 +215,8 @@ export function DirectorProfile({
         </button>
         <img src={avatarSrcOf(director)} alt="" style={{ width: 30, height: 30, borderRadius: "50%" }} />
         <div style={{ minWidth: 0 }}>
-          <div style={{ fontSize: 13, fontWeight: 700, color: "#171717" }}>{director.name}</div>
-          <div style={{ fontSize: 10.5, color: "#737373" }}>{director.title}</div>
+          <div style={{ fontSize: 13, fontWeight: 700, color: "#171717" }}>{agentLabel(director, lang)}</div>
+          <div style={{ fontSize: 10.5, color: "#737373" }}>{agentTitle(director, lang)}</div>
         </div>
       </div>
 

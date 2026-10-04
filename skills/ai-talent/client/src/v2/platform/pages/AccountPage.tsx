@@ -7,6 +7,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { trpc } from "../../../lib/trpc";
 import { showToastGlobal } from "../components/Toast";
 import { useLang } from "../../../lib/i18n";
+import { planNameText } from "../lib/serverMessageEn";
 import { tierLabel } from "../lib/tierVocabulary";
 import { ChevronLeftIcon, DeleteIcon, DownloadIcon, WarningIcon } from "../components/icons";
 import { HelpTip } from "../components/HelpTip";
@@ -138,7 +139,7 @@ export default function AccountPage() {
             <div className="space-y-3 text-sm">
               <div className="flex justify-between">
                 <span className="text-neutral-500">{lang === "en" ? "Current plan" : "當前方案"}</span>
-                <span className="font-semibold text-neutral-900">{status.planName ?? "—"}</span>
+                <span className="font-semibold text-neutral-900">{planNameText(status.planName ?? "—", lang)}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-neutral-500">{lang === "en" ? "Status" : "狀態"}</span>
@@ -254,7 +255,7 @@ export default function AccountPage() {
                 <div className="mb-3 flex items-baseline justify-between">
                   <h2 className="text-[15px] font-semibold text-neutral-900">{lang === "en" ? "Plan limits" : "方案額度"}</h2>
                   <span className="text-[13px] text-neutral-500">
-                    {String((status as any)?.planName ?? "")}
+                    {planNameText(String((status as any)?.planName ?? ""), lang)}
                   </span>
                 </div>
                 <dl className="grid grid-cols-2 gap-x-6 gap-y-2 sm:grid-cols-3">

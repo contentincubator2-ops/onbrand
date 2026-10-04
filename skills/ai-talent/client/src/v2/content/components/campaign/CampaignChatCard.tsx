@@ -47,6 +47,7 @@ import type { CampaignPhaseId, CampaignPlan } from "../../../strategy/lib/campai
 import type { StageNote } from "../../../strategy/lib/campaign/campaignStage";
 import { phaseShort } from "../../../strategy/lib/campaign/campaignStage";
 import { applyProposal, describeProposal, isEmptyProposal, routeMention, type CampaignProposal } from "../../../strategy/lib/campaign/campaignChat";
+import { agentLabel } from "../../../platform/lib/agentName";
 import { readStoredDirector } from "../../../strategy/lib/strategistDirectors";
 import type { BasisPatch, BasisValue } from "../../../strategy/lib/campaign/campaignBasis";
 
@@ -163,6 +164,8 @@ export default function CampaignChatCard({ eventId, brandId, plan, phase, notes,
   };
   // 英文介面：名字與職稱用英文（有的話）。2026-10-02 CJ「英文版也能正確顯示嗎」。
   const dn = (m: Member | null | undefined): string => (m ? (en && m.nameEn ? m.nameEn : m.name) : "");
+  /** 完整標籤（tooltip／alt）：英文介面「English (中文原名)」。 */
+  const df = (m: Member | null | undefined): string => (m ? agentLabel(m, en ? "en" : "zh") : "");
   const dt = (m: Member | null | undefined): string => (m ? (en ? m.titleEn || "" : m.title) : "");
   /** 交棒／換人那一行：存的是誰交給誰（speaker＝接手的、name＝交出去的角色），顯示時才用目前的語言組字。 */
   const handoffText = (m: Msg): string => {
@@ -432,7 +435,7 @@ export default function CampaignChatCard({ eventId, brandId, plan, phase, notes,
   const suggestions = (SUGGEST[speaker] ?? SUGGEST.planner!).map(([zh, e]) => L(zh, e));
 
   const face = (a: Member | null | undefined, s: Speaker, size = "w-7 h-7") => (a?.avatarUrl
-    ? <Avatar src={a.avatarUrl} name={dn(a)} size="sm" className={`${size} shrink-0 ring-2 ring-background/60`} />
+    ? <Avatar src={a.avatarUrl} name={df(a)} size="sm" className={`${size} shrink-0 ring-2 ring-background/60`} />
     : <span className={`${size} rounded-full bg-background text-foreground grid place-items-center text-tiny font-bold shrink-0`}>{(dn(a) || roleName(s)).slice(0, 1)}</span>);
 
   return (
@@ -441,7 +444,7 @@ export default function CampaignChatCard({ eventId, brandId, plan, phase, notes,
       <div className="flex items-center gap-2.5">
         {face(cur, speaker)}
         <div className="min-w-0">
-          <p className="text-small font-semibold leading-tight truncate" title={cur ? [dn(cur), dt(cur)].filter(Boolean).join("｜") : undefined}>
+          <p className="text-small font-semibold leading-tight truncate" title={cur ? [df(cur), dt(cur)].filter(Boolean).join("｜") : undefined}>
             {cur ? `${dn(cur)}　${roleName(speaker)}` : roleName(speaker)}
           </p>
           <p className="text-[11px] opacity-60 leading-tight truncate">
@@ -490,7 +493,7 @@ export default function CampaignChatCard({ eventId, brandId, plan, phase, notes,
                   <span className="text-[11px] whitespace-nowrap">{roleName(m.role)}</span>
                   <span role="tooltip"
                     className="pointer-events-none absolute left-0 top-full mt-1.5 z-30 w-56 rounded-xl bg-content1 text-foreground shadow-large p-2.5 text-left opacity-0 translate-y-1 group-hover:opacity-100 group-hover:translate-y-0 group-focus-visible:opacity-100 transition">
-                    <span className="block text-small font-semibold">{dn(m)}<span className="font-normal text-default-500">　{roleName(m.role)}</span></span>
+                    <span className="block text-small font-semibold">{df(m)}<span className="font-normal text-default-500">　{roleName(m.role)}</span></span>
                     {dt(m) && <span className="block text-[11px] text-default-500 truncate">{dt(m)}</span>}
                     {(en ? m.dutyEn : m.duty) && <span className="block text-[11.5px] leading-snug mt-1">{en ? m.dutyEn : m.duty}</span>}
                     {(en ? m.didEn : m.did) && <span className="block text-[11px] text-default-500 mt-1">{L("這份企劃：", "On this plan: ")}{en ? m.didEn : m.did}</span>}

@@ -38,6 +38,7 @@
  * 讓 UI 直接不顯示該區塊——是「沒有這段資料」，不是「編一段補上」。
  */
 import localPool from "../../../localDb.js";
+import { englishFromRow } from "../../../platform/core/agents/agentEnglish.js";
 
 /** UI 要用到的欄位；跟 mosCatalog.ts 的 AGENT_PUBLIC_FIELDS 是同一批公開業務欄位的子集。 */
 const DIRECTOR_FIELDS = [
@@ -56,6 +57,9 @@ export interface StrategistDirector {
   /** 顯示用職稱——優先繁中。 */
   title: string;
   avatarUrl: string;
+  /** 英文介面用的英文名／職稱（沒有就空字串，畫面退回中文）。 */
+  nameEn: string;
+  titleEn: string;
   /** 一句話介紹（mos_db 原文，繁中優先）。查不到就是 null。 */
   bio: string | null;
   /** 【工作經歷】【認證】這一段（mos_db 原文）。查不到就是 null。 */
@@ -902,6 +906,7 @@ function toDirector(
     name: String(row.name_zh || row.name || row.englishName || "策略總監"),
     title: String(row.title_zh || row.title || row.englishTitle || role.label),
     avatarUrl: String(row.avatarUrl ?? ""),
+    ...englishFromRow(row),
     bio: sanitizeProse(row.bio_zh) ?? sanitizeProse(row.bio) ?? sanitizeProse(row.bio_en),
     experience: sanitizeProse(row.experienceDetail),
     specialty: sanitizeProse(row.specialty) ?? sanitizeProse(row.specialtySummary),

@@ -17,6 +17,9 @@ export interface StrategistDirector {
   name: string;
   title: string;
   avatarUrl: string;
+  /** 英文介面用（沒有就空字串）。 */
+  nameEn?: string;
+  titleEn?: string;
   /** 以下四個欄位是 mos_db 原文，查不到就是 null——UI 直接不顯示該區塊，不補假的。 */
   bio: string | null;
   experience: string | null;

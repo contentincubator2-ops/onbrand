@@ -40,6 +40,7 @@ interface ProjectRow {
   createdAt: string;
   taskId: string | null;
   taskLabel: string | null;
+  taskLabelEn?: string | null;
   productName: string | null;
   thumbnailUrl?: string | null;
 }
@@ -168,7 +169,10 @@ export default function ProjectsPage() {
     }, { replace: true });
   };
 
-  const taskFacets = facets?.task ?? [];
+  const taskFacets = (facets?.task ?? []).map((t) => ({
+    ...t,
+    label: en && (t as any).labelEn ? String((t as any).labelEn) : t.label,
+  }));
   const topTasks = taskFacets.slice(0, TOP_TASKS);
   const moreTasks = taskFacets.slice(TOP_TASKS);
   // 選中的卡在「更多」裡時，下拉要顯示它；選中的卡被其他條件篩到 0 時仍保留選取。
@@ -434,7 +438,7 @@ function ProjectCard({ mission, showBrand, onClick, lang }: { mission: ProjectRo
   const meta = PLATFORM_META[mission.platform] ?? PLATFORM_META.other!;
   const stageText = en ? STAGE_LABEL[mission.stage].en : STAGE_LABEL[mission.stage].zh;
   const failed = mission.stage === "failed";
-  const subline = [mission.taskLabel, mission.productName, showBrand ? mission.brandName : null]
+  const subline = [en && mission.taskLabelEn ? mission.taskLabelEn : mission.taskLabel, mission.productName, showBrand ? mission.brandName : null]
     .filter(Boolean).join(" · ");
 
   return (

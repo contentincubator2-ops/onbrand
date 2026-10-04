@@ -24,6 +24,7 @@ import { getFB60Template } from "../../core/catalog/quickTaskFB60";
 import { getIG60Template } from "../../core/catalog/quickTaskIG60";
 import { getYT60Template } from "../../core/catalog/quickTaskYT60";
 import { getMulti60Template } from "../../core/catalog/quickTaskMulti60";
+import { englishFromRow } from "../../../platform/core/agents/agentEnglish";
 
 const RUN_KEY = z.string().min(8).max(64).regex(/^[A-Za-z0-9_-]+$/).optional();
 
@@ -509,16 +510,16 @@ export const runProcedures = {
       // 2026-05-05: load the bound agent persona (if set) and prepend to
       // the system prompt so the output really sounds like that agent.
       let agentPersona = "";
-      let agentMeta: { id: number; name: string; title: string; avatarUrl: string | null } | null = null;
+      let agentMeta: { id: number; name: string; title: string; nameEn: string; titleEn: string; avatarUrl: string | null } | null = null;
       if (template.agent_id) {
         try {
           const [agentRows]: any = await localPool.execute(
-            `SELECT id, name, title, bio, specialty, methodology, avatarUrl FROM agents WHERE id = ? LIMIT 1`,
+            `SELECT id, name, title, englishName, englishTitle, bio, specialty, methodology, avatarUrl FROM agents WHERE id = ? LIMIT 1`,
             [template.agent_id],
           );
           const a = (agentRows as any[])?.[0];
           if (a) {
-            agentMeta = { id: a.id, name: a.name, title: a.title, avatarUrl: a.avatarUrl ?? null };
+            agentMeta = { id: a.id, name: a.name, title: a.title, ...englishFromRow(a), avatarUrl: a.avatarUrl ?? null };
             agentPersona =
               `你是 ${a.name}，${a.title}。\n` +
               (a.bio ? `背景：${a.bio}\n` : "") +

@@ -15,6 +15,7 @@ import { faPlus, faXmark, faBullhorn } from "@fortawesome/free-solid-svg-icons";
 import { trpc } from "../../../../lib/trpc";
 import { CAMPAIGN_PHASES, type CampaignPhaseId, type CampaignPlan } from "../../../strategy/lib/campaign/campaignSchema";
 import { phaseShort } from "../../../strategy/lib/campaign/campaignStage";
+import { agentLabel, agentShortName, agentTitle } from "../../../platform/lib/agentName";
 import {
   KPI_METRICS, metricLabel, metricLine, money, type CampaignKpi, type KpiGoal, type KpiMetric, type PhaseKpi,
 } from "../../../strategy/lib/campaign/campaignKpi";
@@ -110,10 +111,10 @@ export default function CampaignKpiPanel({ eventId, plan, locked, en, onApply }:
     <div className="flex flex-col gap-5">
       {agent && (
         <div className="flex items-center gap-3">
-          <Avatar src={agent.avatarUrl || undefined} name={agent.name} size="sm" />
+          <Avatar src={agent.avatarUrl || undefined} name={agentLabel(agent, en ? "en" : "zh")} size="sm" />
           <div className="min-w-0">
-            <p className="text-small font-semibold">{agent.name}</p>
-            <p className="text-tiny text-default-500 truncate">{agent.title}　·　{L("協助你把總數拆到每一段", "Splits your totals across phases")}</p>
+            <p className="text-small font-semibold">{agentLabel(agent, en ? "en" : "zh")}</p>
+            <p className="text-tiny text-default-500 truncate">{agentTitle(agent, en ? "en" : "zh")}　·　{L("協助你把總數拆到每一段", "Splits your totals across phases")}</p>
           </div>
         </div>
       )}
@@ -163,7 +164,7 @@ export default function CampaignKpiPanel({ eventId, plan, locked, en, onApply }:
               onPress={run}>
               {planMut.isPending
                 ? L("拆解中…約 20 秒", "Working… ~20s")
-                : agent ? L(`請 ${agent.name} 拆到每一段`, `Ask ${agent.name} to split it`) : L("拆到每一段", "Split across phases")}
+                : agent ? L(`請 ${agent.name} 拆到每一段`, `Ask ${agentShortName(agent, "en")} to split it`) : L("拆到每一段", "Split across phases")}
             </Button>
             {!Number(budget) && !cleanGoals.length && (
               <span className="text-tiny text-default-500">{L("至少填總預算或一個目標數字。", "Fill in a budget or at least one target.")}</span>

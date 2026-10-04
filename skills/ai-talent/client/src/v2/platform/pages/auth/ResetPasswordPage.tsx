@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { useSearchParams, Link } from "react-router-dom";
 import { useLang } from "../../../../lib/i18n";
 import { WarningIcon } from "../../components/icons";
+import { serverMessageText } from "../../lib/serverMessageEn";
 
 export default function ResetPasswordPage() {
   const { t, lang } = useLang();
@@ -59,7 +60,7 @@ export default function ResetPasswordPage() {
       const data = await res.json();
 
       if (!res.ok) {
-        setError((typeof data.error === "string" ? data.error : data.error?.message) || (lang === "en" ? "Couldn't reset — try again." : "重設失敗，請稍後再試"));
+        setError(serverMessageText(typeof data.error === "string" ? data.error : data.error?.message, lang) || (lang === "en" ? "Couldn't reset — try again." : "重設失敗，請稍後再試"));
         return;
       }
 

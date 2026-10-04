@@ -17,6 +17,7 @@ import { useNavigate, Link } from "react-router-dom";
 import { useLang } from "../../../../lib/i18n";
 import { logActivation } from "../../lib/activationTelemetry";
 import { WarningIcon } from "../../components/icons";
+import { serverMessageText } from "../../lib/serverMessageEn";
 
 // SoWork.ai design tokens
 const C = {
@@ -117,7 +118,7 @@ export default function RegisterPage() {
       const data = await res.json();
 
       if (!res.ok) {
-        setError((typeof data.error === "string" ? data.error : data.error?.message) || (lang === "en" ? "Sign-up failed — please try again." : "註冊失敗，請稍後再試"));
+        setError(serverMessageText(typeof data.error === "string" ? data.error : data.error?.message, lang) || (lang === "en" ? "Sign-up failed — please try again." : "註冊失敗，請稍後再試"));
         return;
       }
 

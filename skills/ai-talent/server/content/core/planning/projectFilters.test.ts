@@ -88,8 +88,14 @@ describe("applyProjectFilters", () => {
 
   it("任務卡面依使用次數排序（常用在前）並帶名稱", () => {
     const r = applyProjectFilters(rows, {}, NOW);
-    expect(r.facets.task[0]).toEqual({ key: "fb-30-single-post", label: "FB 短貼文", count: 3 });
+    expect(r.facets.task[0]).toEqual({ key: "fb-30-single-post", label: "FB 短貼文", labelEn: null, count: 3 });
     expect(applyProjectFilters(rows, { taskId: "ig-60-carousel" }, NOW).items.map((x) => x.id)).toEqual([3]);
+  });
+
+  it("英文卡名帶進卡面，也能用英文卡名搜尋", () => {
+    const en = [row({ id: 91, taskLabelEn: "Short post", title: "x" }), row({ id: 92, taskLabelEn: null, title: "y" })];
+    expect(applyProjectFilters(en, {}, NOW).facets.task[0]?.labelEn).toBe("Short post");
+    expect(applyProjectFilters(en, { q: "short post" }, NOW).items.map((x) => x.id)).toEqual([91]);
   });
 
   it("產品、時間、搜尋", () => {
