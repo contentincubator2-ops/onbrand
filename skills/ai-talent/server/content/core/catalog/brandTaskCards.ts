@@ -58,6 +58,12 @@ export interface BrandTaskCard {
   /** 額外要問的欄位，走 taskIntake 那條共用判斷渲染。 */
   askFields: BrandTaskCardField[];
 
+  /**
+   * 參考資料／事實來源（2026-10-04，CJ 實測：貼了小店家行銷手法的文章，試寫卻在寫店家
+   * 自己的裝潢，而且看不出資料哪來的）。用戶自己貼的文字：店家介紹、商品資訊、活動資訊…
+   * 寫作時事實只能取自這裡、每次輸入、品牌資料，資料裡沒有的細節不准編。
+   */
+  sources?: string;
   /** AI 從範例反推出來的 SKILL —— 就是這張卡的 systemPrompt。 */
   skill: string;
   /** 從範例量出來的數字，不是問來的也不是猜來的。 */
@@ -98,6 +104,7 @@ export function illustrationInFlight(card: Pick<BrandTaskCard, "illustrationStat
   return Number.isFinite(t) && now - t < ILLUSTRATION_STALE_MS;
 }
 export const MAX_SAMPLES = 20;
+export const MAX_SOURCES_CHARS = 12_000;
 export const MAX_SAMPLE_CHARS = 8_000;
 export const CARD_ID_RE = /^u(\d+)-[a-z0-9][a-z0-9-]{0,48}$/;
 
@@ -144,6 +151,7 @@ export function duplicateCard(
     primaryPlaceholder: source.primaryPlaceholder,
     askFields: source.askFields.map((f) => ({ ...f })),
     skill: source.skill,
+    sources: source.sources ?? "",
     measured: { ...source.measured },
     variants: source.variants,
     agentId: source.agentId,
@@ -270,6 +278,102 @@ export function verbatimSamples(candidates: string[], source: string): string[] 
   return out;
 }
 
+/**
+ * 整串對話 → 編號行 → 讓模型只回「第幾行到第幾行是成品」。
+ *
+ * 2026-10-04（CJ 實測：貼整串 AI 對話一直「抽取失敗」）。舊做法是叫模型把每一篇成品
+ * 整篇照抄進 JSON —— 輸出長度等於所有成品的總長：十篇就上萬字，撞 maxTokens 被截斷
+ * → JSON 不完整 → 整個失敗；撞 120 秒 timeout 也是失敗；成品裡的引號與換行還會弄壞
+ * JSON。改成編號之後模型只回幾組數字：輸出幾十個 token、不會被截、不會超時，
+ * 而且成品是我們從原文切出來的，**逐字出自原文是結構保證**，不再靠事後比對擋改寫。
+ */
+export interface ThreadLines {
+  /** 原文逐行（含空行），用來把範圍還原成原文片段。 */
+  raw: string[];
+  /** 非空行在 raw 裡的位置。編號 n（1 起算）對應 raw[index[n-1]]。 */
+  index: number[];
+}
+
+export function numberThread(text: string): ThreadLines {
+  const raw = text.replace(/\r\n?/g, "\n").split("\n");
+  const index: number[] = [];
+  raw.forEach((l, i) => { if (l.trim()) index.push(i); });
+  return { raw, index };
+}
+
+const LINE_PREVIEW_CHARS = 400;
+
+/** 給模型看的編號版本。一行太長只秀開頭 —— 判斷「這是不是成品」不需要全文。 */
+export function renderNumbered(t: ThreadLines, from: number, to: number): string {
+  const out: string[] = [];
+  for (let n = from; n <= to; n++) {
+    const line = t.raw[t.index[n - 1]!]!.trim();
+    out.push(`[${n}] ${line.length > LINE_PREVIEW_CHARS ? `${line.slice(0, LINE_PREVIEW_CHARS)}…` : line}`);
+  }
+  return out.join("\n");
+}
+
+/** 切成每塊不超過 maxChars（顯示字數）的編號區間。 */
+export function chunkLineRanges(t: ThreadLines, maxChars = 50_000): { from: number; to: number }[] {
+  const chunks: { from: number; to: number }[] = [];
+  let from = 1, size = 0;
+  for (let n = 1; n <= t.index.length; n++) {
+    const len = Math.min(LINE_PREVIEW_CHARS, t.raw[t.index[n - 1]!]!.trim().length) + 8;
+    if (size + len > maxChars && n > from) { chunks.push({ from, to: n - 1 }); from = n; size = 0; }
+    size += len;
+  }
+  if (t.index.length > 0) chunks.push({ from, to: t.index.length });
+  return chunks;
+}
+
+/**
+ * 解析模型回的範圍。寬鬆：優先 {"pieces":[{"from":3,"to":9}]}，也吃 [[3,9]]、"3-9"。
+ * 不在 [lo, hi] 內或顛倒的範圍丟掉（回報給呼叫端當 invalid）。
+ */
+export function parsePieceRanges(body: string, lo: number, hi: number): { ranges: [number, number][]; invalid: number } {
+  const found: [number, number][] = [];
+  const start = body.search(/[\[{]/);
+  const tryJson = (): boolean => {
+    for (const [open, close] of [["{", "}"], ["[", "]"]] as const) {
+      const a = body.indexOf(open), b = body.lastIndexOf(close);
+      if (a < 0 || b <= a) continue;
+      try {
+        const parsed = JSON.parse(body.slice(a, b + 1));
+        const list: unknown[] = Array.isArray(parsed) ? parsed : Array.isArray(parsed?.pieces) ? parsed.pieces : [];
+        for (const it of list) {
+          if (Array.isArray(it) && it.length >= 2) found.push([Number(it[0]), Number(it[1])]);
+          else if (it && typeof it === "object") found.push([Number((it as any).from), Number((it as any).to)]);
+          else if (typeof it === "string") {
+            const m = /(\d+)\s*[-–~到]\s*(\d+)/.exec(it);
+            if (m) found.push([Number(m[1]), Number(m[2])]);
+          }
+        }
+        return true;
+      } catch { /* 試下一種 */ }
+    }
+    return false;
+  };
+  if (start >= 0) tryJson();
+  if (found.length === 0) {
+    // 截斷或夾雜說明文字的 JSON：直接撈 "from": 3, "to": 9 或 3-9
+    for (const m of body.matchAll(/"?from"?\s*[:=]\s*(\d+)[^\d]{1,12}"?to"?\s*[:=]\s*(\d+)/gi)) found.push([Number(m[1]), Number(m[2])]);
+  }
+  const ranges: [number, number][] = [];
+  let invalid = 0;
+  for (const [a, b] of found) {
+    if (!Number.isInteger(a) || !Number.isInteger(b) || a < lo || b > hi || a > b) { invalid++; continue; }
+    ranges.push([a, b]);
+  }
+  return { ranges, invalid };
+}
+
+/** 把範圍還原成原文片段（保留段落間的空行）。 */
+export function sliceByRanges(t: ThreadLines, ranges: [number, number][]): string[] {
+  return ranges
+    .map(([a, b]) => t.raw.slice(t.index[a - 1]!, t.index[b - 1]! + 1).join("\n").trim())
+    .filter(Boolean);
+}
+
 // ─────────────────────────────────────────────────────────────────────
 // 事實洩漏檢查
 // ─────────────────────────────────────────────────────────────────────
@@ -347,6 +451,25 @@ function outputDefaultsFor(channel: string): FBTaskTemplate["outputDefaults"] {
   return CHANNEL_OUTPUT[channel] ?? { platform: "generic", post_type: "post" };
 }
 
+/**
+ * 寫作時的事實來源區塊。只有用戶填了參考資料才附 —— 沒填時防編造的規則在 SKILL 本文裡。
+ * 放在 SKILL 後面、當成「資料」而不是「規則」：範例是學寫法，這裡是寫什麼。
+ */
+export function groundingBlock(sources: string | undefined): string {
+  const t = (sources ?? "").trim();
+  if (!t) return "";
+  return `
+
+【參考資料（這張卡的事實來源）】
+以下是使用者提供的資料。文案裡出現的店家／商品／活動／數字等**事實**，只能取自：這份資料、這次的輸入欄位、品牌資料。
+資料裡沒有的細節（例如店面裝潢、價格、地點、人物、活動內容）一律不要寫、不要推測、不要補完；
+寧可少寫一句，也不要編出資料裡沒有的東西。範例只教你「怎麼寫」，不是「寫什麼」。
+若這份資料是在講行銷手法或做法的文章，就把那些手法套用到這次的主題上，不要把文章裡舉的店家或案例當成要寫的內容。
+---
+${t.slice(0, MAX_SOURCES_CHARS)}
+---`;
+}
+
 /** 一張自建卡的 label 一律標記來源，使用者要看得出這是自己做的卡。 */
 export function cardTemplate(card: BrandTaskCard): FBTaskTemplate {
   const inputs: TaskInput[] = [
@@ -376,7 +499,7 @@ export function cardTemplate(card: BrandTaskCard): FBTaskTemplate {
       type: "textarea",
     },
     inputs,
-    systemPrompt: card.skill,
+    systemPrompt: card.skill + groundingBlock(card.sources),
     preferredModel: "anthropic",
     // 中位數 × 2.6 給模型足夠的產出空間；中文一字約 1.5–2 token，再留餘裕。
     maxTokens: Math.min(8000, Math.max(700, Math.round(card.measured.medianChars * 2.6))),

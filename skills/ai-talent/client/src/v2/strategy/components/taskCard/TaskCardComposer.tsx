@@ -63,6 +63,7 @@ interface CardRecord {
   samples: string[]; primaryQuestion: string; primaryPlaceholder: string;
   askFields: { key: string; label: string; type: "text" | "textarea"; required: boolean; placeholder: string }[];
   skill: string;
+  sources?: string;
   measured: { count: number; minChars: number; maxChars: number; medianChars: number };
   variants: number;
   lastDryRun: { at: string; caption: string } | null;
@@ -111,6 +112,9 @@ export default function TaskCardComposer({
   const [primaryPlaceholder, setPrimaryPlaceholder] = React.useState("");
   const [askFields, setAskFields] = React.useState<AskField[]>([]);
   const [variants, setVariants] = React.useState(1);
+  // 參考資料（事實來源）。步驟 1 填；步驟 2 可再改，存在 sourcesDraft。
+  const [sources, setSources] = React.useState("");
+  const [sourcesDraft, setSourcesDraft] = React.useState<string | null>(null);
 
   const [cardId, setCardId] = React.useState<string | null>(initialCardId ?? null);
   const [skillDraft, setSkillDraft] = React.useState("");
@@ -128,7 +132,7 @@ export default function TaskCardComposer({
     if (!isOpen) return;
     if (initialCardId) { setCardId(initialCardId); setStep(2); setSkillDraft(""); }
     else { setCardId(null); setStep(1); }
-    setError(null); setDryResult(null); setBusy(null);
+    setError(null); setDryResult(null); setBusy(null); setSourcesDraft(null);
   }, [isOpen, initialCardId]);
 
   const utils = (trpc as any).useUtils?.() ?? null;
@@ -153,6 +157,10 @@ export default function TaskCardComposer({
   React.useEffect(() => {
     if (card?.skill && !skillDraft) setSkillDraft(card.skill);
   }, [card?.skill]);
+  // 接續舊卡時，參考資料也從卡片帶進來（只帶一次，別蓋掉使用者正在改的）。
+  React.useEffect(() => {
+    if (card && sourcesDraft === null) setSourcesDraft(card.sources ?? "");
+  }, [card?.id]);
 
   const extractMut = (trpc as any).brandTaskCard?.extractSamples?.useMutation?.({
     onSuccess: (r: { samples: string[]; dropped: number }) => {
@@ -217,6 +225,7 @@ export default function TaskCardComposer({
     setStep(1); setName(""); setSamples([""]); setPrimaryQuestion("");
     setSampleMode("one-by-one"); setThreadText(""); setExtractNote(null);
     setPrimaryPlaceholder(""); setAskFields([]); setVariants(1);
+    setSources(""); setSourcesDraft(null);
     setCardId(null); setSkillDraft(""); setDryInputs({}); setDryResult(null);
     setBusy(null); setError(null);
     setSceneChoice(null); setScenePickerOpen(false);
@@ -237,13 +246,23 @@ export default function TaskCardComposer({
       askFields: askFields
         .filter((f) => f.label.trim())
         .map((f) => ({ label: f.label.trim(), type: f.type, required: f.required, placeholder: f.placeholder.trim() })),
+      sources: sources.trim(),
       variants,
     });
+  }
+
+  /** 參考資料有改就先存，之後的反推與試寫才會吃到眼前這一份。 */
+  async function saveSourcesIfChanged(): Promise<void> {
+    if (!brandId || !cardId || sourcesDraft === null) return;
+    if (sourcesDraft.trim() === (card?.sources ?? "").trim()) return;
+    await updateMut?.mutateAsync({ brandId, cardId, sources: sourcesDraft.trim() });
+    cardQuery.refetch?.();
   }
 
   async function goToDryRun(): Promise<void> {
     if (!brandId || !cardId) return;
     setError(null);
+    try { await saveSourcesIfChanged(); } catch { return; }
     // 使用者改過 SKILL 就先存 —— 試寫必須用他眼前那一份，不是 AI 原本那份。
     if (skillDraft.trim() && skillDraft.trim() !== card?.skill) {
       setBusy("save");
@@ -513,6 +532,27 @@ export default function TaskCardComposer({
                 </Button>
               </div>
 
+              <div className="space-y-2">
+                <p className="text-small font-medium">
+                  {en ? "Reference material (optional)" : "參考資料來源（選填）"}
+                </p>
+                <p className="text-tiny text-default-500">
+                  {en
+                    ? "Facts the card may rely on: shop intro, product info, promo details. Without it the model can only use your answers and brand profile — it won't invent the rest. Paste text (links aren't fetched)."
+                    : "這張卡寫文案時可以引用的事實：店家介紹、商品資訊、活動內容…。沒填的話，模型只能用你每次的回答和品牌資料，其餘細節不會亂編。請貼文字（網址不會自動讀取）。"}
+                </p>
+                <Textarea
+                  minRows={3}
+                  maxRows={10}
+                  placeholder={en ? "Paste the source text here" : "把資料文字貼這裡"}
+                  value={sources}
+                  onValueChange={setSources}
+                />
+                {sources.length > 0 && (
+                  <p className="text-tiny text-default-400">{sources.length} / 12000</p>
+                )}
+              </div>
+
               <div className="flex items-center gap-2">
                 <p className="text-small font-medium">{en ? "Versions per run" : "每次產幾個版本"}</p>
                 <div className="flex gap-1">
@@ -581,6 +621,25 @@ export default function TaskCardComposer({
                         : `依 ${card.measured.count} 篇範例 · 目標 ${card.measured.minChars}–${card.measured.maxChars} 字`}
                     </Chip>
                   </div>
+                  <details className="rounded-medium border border-divider px-3 py-2" open={!!(sourcesDraft ?? "").trim()}>
+                    <summary className="text-small font-medium cursor-pointer select-none">
+                      {en ? "Reference material (facts the card may rely on)" : "參考資料來源（卡片寫作時可引用的事實）"}
+                    </summary>
+                    <div className="mt-2 space-y-1">
+                      <p className="text-tiny text-default-500">
+                        {en
+                          ? "Anything not in here, your answers, or the brand profile will not be written. Saved when you regenerate or go to the trial write."
+                          : "這裡、你每次的回答、品牌資料都沒有的細節，卡片不會寫。按「重新從範例生成」或進入試寫時會一併儲存。"}
+                      </p>
+                      <Textarea
+                        minRows={3}
+                        maxRows={12}
+                        placeholder={en ? "Paste the source text here" : "把資料文字貼這裡"}
+                        value={sourcesDraft ?? ""}
+                        onValueChange={setSourcesDraft}
+                      />
+                    </div>
+                  </details>
                   <p className="text-tiny text-default-500">
                     {en
                       ? "This is what the card will follow every run. Edit anything that got the wrong idea — you know your writing better than the model does."
@@ -602,7 +661,11 @@ export default function TaskCardComposer({
                   <Button
                     size="sm" variant="light" startContent={<GenerateIcon size={13} />}
                     isLoading={busy === "distil"}
-                    onPress={() => { setBusy("distil"); setError(null); distilMut?.mutate({ brandId: brandId!, cardId: cardId! }); }}
+                    onPress={async () => {
+                      setBusy("distil"); setError(null);
+                      try { await saveSourcesIfChanged(); } catch { setBusy(null); return; }
+                      distilMut?.mutate({ brandId: brandId!, cardId: cardId! });
+                    }}
                   >
                     {en ? "Regenerate from samples" : "重新從範例生成"}
                   </Button>
