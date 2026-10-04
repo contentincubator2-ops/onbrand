@@ -52,14 +52,15 @@ export default function ChangelogPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch("/static/changelog.md", { cache: "no-store" })
-      .then((r) => {
-        if (!r.ok) throw new Error(`HTTP ${r.status}`);
-        return r.text();
-      })
+    const load = (url: string) => fetch(url, { cache: "no-store" }).then((r) => {
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      return r.text();
+    });
+    // 英文介面讀英文版；沒有就退回中文版。
+    (isEn ? load("/static/changelog.en.md").catch(() => load("/static/changelog.md")) : load("/static/changelog.md"))
       .then((md) => setEntries(parseChangelog(md)))
       .catch((e) => setError(String(e.message ?? e)));
-  }, []);
+  }, [isEn]);
 
   return (
     <div style={{ minHeight: "calc(100vh - 60px)", background: "#fafafa" }}>

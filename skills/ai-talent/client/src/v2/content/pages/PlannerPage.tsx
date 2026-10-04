@@ -268,7 +268,7 @@ export default function PlannerPage() {
   );
   const avatar = (
     <span aria-hidden="true" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[13px] font-bold"
-      style={{ background: SOFT, border: `1px solid ${LINE}`, color: "#525252" }}>總</span>
+      style={{ background: SOFT, border: `1px solid ${LINE}`, color: "#525252" }}>{en ? "D" : "總"}</span>
   );
 
   return (
