@@ -31,6 +31,8 @@ import { coverFilePath, saveCoverFile } from "../../platform/core/media/mediaGen
 import { drawIllustration, shrinkToWebp, writeIllustrationConcepts } from "../core/image/taskIllustration";
 import type { CardReference } from "../core/catalog/cardResearch";
 import { buildBrandPrefix } from "../../strategy/core/brand/brandContext";
+import { CUSTOM_CHANNEL_RE, isCustomChannelId, brandIdOfChannelId } from "../../platform/core/customChannelId";
+import { listCustomChannels } from "../core/catalog/customChannels";
 import {
   type BrandTaskCard, type BrandTaskCardField,
   listBrandTaskCards, getBrandTaskCard, mutateBrandTaskCards,
@@ -52,6 +54,20 @@ const CHANNELS = [
   // 2026-09-29 CJ：台灣市場加 LINE（官方帳號群發訊息）。
   "line",
 ] as const;
+
+/**
+ * 內建通路，或這個品牌自己加的通路（`c<brandId>-<slug>`，見 customChannelRouter）。
+ * 形狀在這裡驗；「這個通路真的存在、而且是這個品牌的」要到 assertChannelUsable 才驗，
+ * 因為那需要 brandId 與一次讀取。
+ */
+const channelInput = z.union([z.enum(CHANNELS), z.string().regex(CUSTOM_CHANNEL_RE)]);
+
+async function assertChannelUsable(brandId: number, channel: string): Promise<void> {
+  if (!isCustomChannelId(channel)) return;
+  const owned = brandIdOfChannelId(channel) === brandId
+    && (await listCustomChannels(brandId)).some((c) => c.id === channel);
+  if (!owned) throw new TRPCError({ code: "BAD_REQUEST", message: "找不到這個通路（可能已被刪除）" });
+}
 
 const fieldInput = z.object({
   label: z.string().min(1).max(40),
@@ -375,7 +391,7 @@ export const brandTaskCardRouter = router({
     }),
 
   list: protectedProcedure
-    .input(z.object({ brandId: z.number(), channel: z.enum(CHANNELS).optional() }))
+    .input(z.object({ brandId: z.number(), channel: channelInput.optional() }))
     .query(async ({ ctx, input }) => {
       await assertBrandAccess(ctx.user!.id, input.brandId);
       const cards = await listBrandTaskCards(input.brandId);
@@ -397,7 +413,7 @@ export const brandTaskCardRouter = router({
     .input(z.object({
       brandId: z.number(),
       name: z.string().min(1).max(60),
-      channel: z.enum(CHANNELS),
+      channel: channelInput,
       samples: z.array(z.string().min(20).max(MAX_SAMPLE_CHARS)).min(1).max(MAX_SAMPLES),
       primaryQuestion: z.string().min(2).max(200),
       primaryPlaceholder: z.string().max(200).default(""),
@@ -409,6 +425,7 @@ export const brandTaskCardRouter = router({
       const userId = ctx.user!.id;
       await assertBrandAccess(userId, input.brandId);
       await assertCanAct(userId);   // 2026-09-07 viewer 不能建卡
+      await assertChannelUsable(input.brandId, input.channel);
 
       const existing = await listBrandTaskCards(input.brandId);
       // 2026-09-06：上限改成跟著方案走（基礎 3 張 / 專業 10 張）。
@@ -659,13 +676,14 @@ export const brandTaskCardRouter = router({
     .input(z.object({
       brandId: z.number(),
       cardId: z.string(),
-      channel: z.enum(CHANNELS),
+      channel: channelInput,
       name: z.string().min(1).max(60).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const userId = ctx.user!.id;
       await assertBrandAccess(userId, input.brandId);
       await assertCanAct(userId);
+      await assertChannelUsable(input.brandId, input.channel);
       const existing = await listBrandTaskCards(input.brandId);
       const source = existing.find((c) => c.id === input.cardId);
       if (!source) throw new TRPCError({ code: "NOT_FOUND", message: "找不到這張卡" });

@@ -27,6 +27,7 @@ import type { FBTaskTemplate, OrchestraConfig, TaskInput } from "./quickTaskFB";
 import type { CatalogPlatform } from "./taskCatalogIndex";
 import localPool from "../../../localDb";
 import { registerTaskSource } from "./taskRegistry";
+import type { CustomChannelId } from "../../../platform/core/customChannelId";
 
 export type BrandTaskCardStatus = "drafting" | "ready" | "failed";
 
@@ -43,7 +44,8 @@ export interface BrandTaskCard {
   id: string;                       // u<brandId>-<slug>
   brandId: number;
   name: string;
-  channel: CatalogPlatform;
+  /** 內建通路，或用戶自己加的通路 id（`c<brandId>-<slug>`，見 customChannels.ts）。 */
+  channel: CatalogPlatform | CustomChannelId;
   status: BrandTaskCardStatus;
   /** 訓練進度。人設 Agent 的 UI 慣例，前端照這兩個數字畫進度條。 */
   currentStep: number;

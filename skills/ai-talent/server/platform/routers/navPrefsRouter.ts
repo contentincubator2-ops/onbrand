@@ -15,6 +15,7 @@ import { z } from "zod";
 import { router, protectedProcedure } from "../core/trpc";
 import localPool from "../../localDb";
 import { assertBrandAccess } from "../core/brandAuth";
+import { isCustomChannelId, brandIdOfChannelId } from "../core/customChannelId";
 
 export const BRAND_NAV_PREFS_DDL = `
   CREATE TABLE IF NOT EXISTS brand_nav_prefs (
@@ -33,12 +34,18 @@ export const NAV_ITEM_IDS = ["fb", "ig", "threads", "line", "tt", "email", "web"
 export type NavItemId = (typeof NAV_ITEM_IDS)[number];
 export const DEFAULT_NAV_ITEMS: NavItemId[] = ["fb", "ig"];
 
-/** 只留認得的 id、去重、保留使用者排的順序。 */
-export function sanitizeNavItems(raw: unknown): NavItemId[] {
-  const out: NavItemId[] = [];
+/**
+ * 只留認得的 id、去重、保留使用者排的順序。
+ * 2026-10-04：自訂通路（`c<brandId>-<slug>`）也認得，而且必須是**這個品牌**的 —— 否則
+ * 用戶能把別的品牌的通路 id 塞進自己的側欄。通路本身還在不在，由前端照通路清單濾。
+ */
+export function sanitizeNavItems(raw: unknown, brandId?: number): (NavItemId | string)[] {
+  const out: (NavItemId | string)[] = [];
   for (const x of Array.isArray(raw) ? raw : []) {
     const id = String(x);
-    if ((NAV_ITEM_IDS as readonly string[]).includes(id) && !out.includes(id as NavItemId)) out.push(id as NavItemId);
+    const known = (NAV_ITEM_IDS as readonly string[]).includes(id)
+      || (isCustomChannelId(id) && (brandId == null || brandIdOfChannelId(id) === brandId));
+    if (known && !out.includes(id)) out.push(id);
   }
   return out;
 }
@@ -53,15 +60,15 @@ export const navPrefsRouter = router({
       const r = (rows as any[])[0];
       if (!r) return { items: DEFAULT_NAV_ITEMS, isDefault: true };
       const raw = typeof r.items === "string" ? (() => { try { return JSON.parse(r.items); } catch { return []; } })() : r.items;
-      return { items: sanitizeNavItems(raw), isDefault: false };
+      return { items: sanitizeNavItems(raw, input.brandId), isDefault: false };
     }),
 
   /** 存整份清單（含順序）。允許存空清單——使用者可以把所有通路都拿掉。 */
   save: protectedProcedure
-    .input(z.object({ brandId: z.number().int().positive(), items: z.array(z.string().max(20)).max(20) }))
+    .input(z.object({ brandId: z.number().int().positive(), items: z.array(z.string().max(48)).max(32) }))
     .mutation(async ({ ctx, input }) => {
       await assertBrandAccess(ctx.user!.id, input.brandId);
-      const items = sanitizeNavItems(input.items);
+      const items = sanitizeNavItems(input.items, input.brandId);
       await localPool.execute(
         `INSERT INTO brand_nav_prefs (brandId, items, updatedBy) VALUES (?, ?, ?)
          ON DUPLICATE KEY UPDATE items = VALUES(items), updatedBy = VALUES(updatedBy)`,

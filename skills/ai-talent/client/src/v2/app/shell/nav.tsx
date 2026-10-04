@@ -65,7 +65,7 @@ export const CHANNEL_TO_TASK_ROUTE: Record<string, string> = {
  *   顯示全部（今天的行為）。非 null 時，不在名單裡的頻道整個不渲染 ——
  *   建設公司的側邊欄不該出現 TikTok。非 /tasks 的項目一律不受影響。
  */
-export function buildNavItems(lang: "zh-TW" | "en", userEmail?: string | null, currentPath?: string, allowedTaskRoutes?: Set<string> | null, userNavItems?: string[]): NavItem[] {
+export function buildNavItems(lang: "zh-TW" | "en", userEmail?: string | null, currentPath?: string, allowedTaskRoutes?: Set<string> | null, userNavItems?: string[], customChannels?: { id: string; name: string }[]): NavItem[] {
   const en = lang === "en";
   const isStrategyPreview = isStrategyPreviewEmail(userEmail);
   const isPersonaPreview = isPersonaPreviewEmail(userEmail);
@@ -150,7 +150,7 @@ export function buildNavItems(lang: "zh-TW" | "en", userEmail?: string | null, c
   //   上段：這個品牌自己加的（navPrefs，預設 Facebook＋Instagram），可增刪排序
   //   下段：固定的專案、行事曆（排程與發布＋當月規劃合一）、活動
   // 首頁頁籤 9/27 已拿掉；品牌大腦在策略層（isStrategyPreview 現在恆為 true）。
-  const catalog = navCatalog(lang, allowedTaskRoutes);
+  const catalog = navCatalog(lang, allowedTaskRoutes, customChannels);
   const byId = new Map(catalog.map((c) => [c.id!, c]));
   const userItems = (userNavItems ?? []).map((id) => byId.get(id)).filter(Boolean) as NavItem[];
   // 2026-09-27（CJ「用本週企劃取代行事曆」「登入後直接落在本週企劃」）：本週企劃排第一，
@@ -178,7 +178,7 @@ export function buildNavItems(lang: "zh-TW" | "en", userEmail?: string | null, c
  * 內容層可以自行加入的入口（挑選清單的內容）。任務包限定頻道的品牌只列包裡有的；
  * 案例只在包裡有 case 時列——全域目錄沒有案例卡，沒有包的品牌加了也是空頁。
  */
-export function navCatalog(lang: "zh-TW" | "en", allowedTaskRoutes?: Set<string> | null): NavItem[] {
+export function navCatalog(lang: "zh-TW" | "en", allowedTaskRoutes?: Set<string> | null, customChannels?: { id: string; name: string }[]): NavItem[] {
   const en = lang === "en";
   // 2026-09-29 CJ：內容通路只留 FB／IG／Threads／LINE／TikTok／電子報／官網。LinkedIn／
   // YouTube／新聞稿／X 拿掉（server planGate.HIDDEN_CONTENT_PLATFORMS 同一份決定）；
@@ -203,9 +203,17 @@ export function navCatalog(lang: "zh-TW" | "en", allowedTaskRoutes?: Set<string>
     // 2026-09-30 CJ：靈感舞台改成固定入口（＋ 下方），不再是可自選項目；
     // 存過 "theater" 的品牌設定在 userNavItems 會被濾掉，不用搬資料。
   ];
-  return all.filter((it) => {
+  const builtin = all.filter((it) => {
     if (!it.to.startsWith("/tasks/")) return true;
     if (it.id === "case") return !!allowedTaskRoutes?.has(it.to);
     return !allowedTaskRoutes || allowedTaskRoutes.has(it.to);
   });
+  // 2026-10-04（CJ「用戶也可自己增加 mission tray，例如蝦皮、momo、網紅合作」）：用戶自己加的通路。
+  // 不受任務包的 allowedTaskRoutes 過濾 —— 那是「包宣告了哪些內建通路」，自訂通路是用戶自己的。
+  const custom: NavItem[] = (customChannels ?? []).map((c) => ({
+    id: c.id, kind: "channel" as const, to: `/tasks/${c.id}`, label: c.name, short: c.name.slice(0, 4),
+    icon: <FontAwesomeIcon icon={ICON.store} />, matchPrefix: `/tasks/${c.id}`,
+    tooltip: en ? "A tray you added" : "你自己加的 mission tray",
+  }));
+  return [...builtin, ...custom];
 }

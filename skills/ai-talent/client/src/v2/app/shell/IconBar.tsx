@@ -14,6 +14,8 @@ import { Tooltip, Avatar } from "@heroui/react";
 import OnBrandLogo from "../../platform/components/OnBrandLogo";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import NavItemPicker from "./NavItemPicker";
+import { useCustomChannels, type ChannelPresetLite } from "../../content/lib/customChannels";
+import { showToastGlobal } from "../../platform/components/Toast";
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import { fetchAuthMe } from "../../../lib/authMe";
@@ -69,7 +71,9 @@ export function IconBar({
     { enabled: !!scope.brandId, refetchOnWindowFocus: false, staleTime: 300_000 },
   ) ?? { data: null };
   const utils = (trpc as any).useUtils?.();
-  const catalog = React.useMemo(() => navCatalog(lang, allowedTaskRoutes), [lang, allowedTaskRoutes]);
+  // 2026-10-04：用戶自己加的 mission tray（蝦皮、momo、網紅合作…或自訂）。
+  const { channels: customChannels, refetch: refetchCustomChannels } = useCustomChannels(scope.brandId ?? null);
+  const catalog = React.useMemo(() => navCatalog(lang, allowedTaskRoutes, customChannels), [lang, allowedTaskRoutes, customChannels]);
   const userNavItems = React.useMemo<string[]>(() => {
     const d = navPrefsQ.data as { items: string[]; isDefault: boolean } | null | undefined;
     if (!d) return [];
@@ -81,6 +85,31 @@ export function IconBar({
   const saveNav = (trpc as any).navPrefs?.save?.useMutation?.({
     onSuccess: () => { try { utils?.navPrefs?.get?.invalidate?.(); } catch { /* noop */ } setPickerOpen(false); },
   });
+  // 2026-10-04：「＋」裡的平台範本（蝦皮、momo、露天、SHOPLINE…）與自訂 tray。範本是 server 給的資料。
+  const presetsQ = (trpc as any).customChannel.presets.useQuery(undefined, { enabled: pickerOpen, refetchOnWindowFocus: false, staleTime: Infinity });
+  const createChannel = (trpc as any).customChannel.create.useMutation();
+  const removeChannel = (trpc as any).customChannel.remove.useMutation();
+  const onCreateChannel = async (input: { preset?: string; name?: string }): Promise<string | null> => {
+    if (!scope.brandId) return null;
+    try {
+      const r = await createChannel.mutateAsync({ brandId: scope.brandId, ...input });
+      await refetchCustomChannels();
+      return (r?.channel?.id as string) ?? null;
+    } catch (e: any) {
+      showToastGlobal(e?.message ?? (isEn ? "Couldn't add it" : "新增失敗"));
+      return null;
+    }
+  };
+  const onRemoveChannel = async (id: string) => {
+    if (!scope.brandId) return;
+    try {
+      await removeChannel.mutateAsync({ brandId: scope.brandId, id });
+      await refetchCustomChannels();
+      try { utils?.navPrefs?.get?.invalidate?.(); } catch { /* noop */ }
+    } catch (e: any) {
+      showToastGlobal(e?.message ?? (isEn ? "Couldn't remove it" : "刪除失敗"));
+    }
+  };
   const brandName = (brands ?? []).find((b: any) => b?.id === scope.brandId)?.name ?? null;
   // 2026-09-30（CJ「超出記憶容量時，這邊會提醒用戶」）：在策略層任何一頁，記憶空間的
   // rail 圖示都會亮狀態點——用戶在別頁把內容填爆時，不用點進去就看得到。
@@ -104,10 +133,10 @@ export function IconBar({
   );
   const regulationAlert: "review" | undefined = (regReviewQ.data?.count ?? 0) > 0 ? "review" : undefined;
   const NAV_ITEMS = React.useMemo(
-    () => buildNavItems(lang, userEmail, currentPath, allowedTaskRoutes, userNavItems)
+    () => buildNavItems(lang, userEmail, currentPath, allowedTaskRoutes, userNavItems, customChannels)
       .map((it) => (it.catKey === "brain" && memoryAlert ? { ...it, alert: memoryAlert }
         : it.catKey === "regulations" && regulationAlert ? { ...it, alert: regulationAlert } : it)),
-    [lang, userEmail, currentPath, allowedTaskRoutes, userNavItems, memoryAlert, regulationAlert],
+    [lang, userEmail, currentPath, allowedTaskRoutes, userNavItems, customChannels, memoryAlert, regulationAlert],
   );
   // 2026-09-30（CJ 參考 Tesla「電量」）：本週企劃的進度與各平台待寫篇數，真資料來自 planner.railStatus。
   // 週次用跟 PlannerPage 同一個 defaultWeek()；換頁就重抓（寫完一篇回來數字要跟著變）。
@@ -438,7 +467,11 @@ export function IconBar({
         open={pickerOpen}
         en={isEn}
         brandName={brandName}
-        catalog={catalog.map((c) => ({ id: c.id!, label: c.label, tooltip: c.tooltip, icon: c.icon, kind: c.kind }))}
+        catalog={catalog.map((c) => ({ id: c.id!, label: c.label, tooltip: c.tooltip, icon: c.icon, kind: c.kind, custom: customChannels.some((cc) => cc.id === c.id) }))}
+        presets={(presetsQ.data as ChannelPresetLite[] | null) ?? []}
+        createdPresets={customChannels.map((c) => c.preset).filter(Boolean) as string[]}
+        onCreateChannel={onCreateChannel}
+        onRemoveChannel={onRemoveChannel}
         selected={userNavItems}
         saving={saveNav?.isPending}
         onClose={() => setPickerOpen(false)}

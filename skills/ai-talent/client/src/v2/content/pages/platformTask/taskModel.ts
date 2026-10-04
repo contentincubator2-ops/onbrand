@@ -2,7 +2,8 @@
  * 平台任務頁的資料與純函式：平台對照、最近使用、欄位路徑、階段合成。
  */
 import { faFacebook, faInstagram, faLinkedin, faYoutube, faTiktok, faThreads, faLine } from "@fortawesome/free-brands-svg-icons";
-import { faEnvelope, faBullhorn, faBookBookmark, faCalendarDays, faGlobe, faUserGroup, faHandshake } from "@fortawesome/free-solid-svg-icons";
+import { faEnvelope, faBullhorn, faBookBookmark, faCalendarDays, faGlobe, faUserGroup, faHandshake, faStore } from "@fortawesome/free-solid-svg-icons";
+import { isCustomChannelId } from "../../lib/customChannelId";
 
 // ── Recently used tasks helpers ─────────────────────────────────────────────
 export const LAST_USED_KEY = "onbrand_last_used_tasks_v1";
@@ -195,6 +196,24 @@ export const COMPOSER_CHANNELS = new Set<string>([
   "facebook", "instagram", "threads", "linkedin", "tiktok",
   "youtube", "email", "pr", "website", "line",
 ]);
+
+/** 這個通路能不能自建卡：內建清單，或用戶自己加的通路（2026-10-04）。 */
+export function isComposerChannel(platform: string): boolean {
+  return COMPOSER_CHANNELS.has(platform) || isCustomChannelId(platform);
+}
+
+/**
+ * 路由片段 → 平台代號。內建通路查表；自訂通路的路由片段就是它的 id（/tasks/c12-shopee）。
+ * 都不是就回 undefined（頁面據此導回 /tasks/fb）。
+ */
+export function routeToPlatform(route: string): string | undefined {
+  return ROUTE_TO_PLATFORM[route] ?? (isCustomChannelId(route) ? route : undefined);
+}
+
+/** 自訂通路的標頭資料。用戶取的名字當標題；圖示用通用的店面，不假裝成某個平台的 logo。 */
+export function customPlatformMeta(name: string): PlatformMeta {
+  return { label: name, labelZh: name, icon: faStore, bg: "#18181b" };
+}
 
 export function trimmedExtras(bag: Record<string, string>): Record<string, string> {
   const out: Record<string, string> = {};

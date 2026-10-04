@@ -18,6 +18,7 @@
  */
 import { TRPCError } from "@trpc/server";
 import { PLANS, type PlanCode, type PlanQuota } from "./plans";
+import { isCustomChannelId } from "../customChannelId";
 
 /**
  * 2026-09-29 CJ「內容任務卡只要留下 Facebook、Instagram、TikTok、電子報、官網
@@ -158,7 +159,9 @@ export function filterTasksByPlan<
   return tasks.filter((t) => {
     if (isHiddenContentPlatform(t.platform)) return false;
     if (quota.viralTaskCards === false && t.source?.type === "viral") return false;
-    if (allowPlatform && t.platform && !allowPlatform.has(t.platform)) return false;
+    // 2026-10-04：自訂通路不受「7 選 N」通路額度管 —— 底下只有用戶自建卡，已受
+    // ownTaskCards 上限約束；不放行的話受限方案的用戶自建的蝦皮 tray 會整個看不到。
+    if (allowPlatform && t.platform && !isCustomChannelId(t.platform) && !allowPlatform.has(t.platform)) return false;
     return true;
   });
 }

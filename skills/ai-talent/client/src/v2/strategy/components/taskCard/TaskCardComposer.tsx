@@ -54,7 +54,9 @@ Rules:
 
 export type ComposerChannel =
   | "facebook" | "instagram" | "threads" | "linkedin" | "tiktok"
-  | "youtube" | "email" | "pr" | "website";
+  | "youtube" | "email" | "pr" | "website"
+  // 2026-10-04：用戶自己加的通路 id（c<brandId>-<slug>）。
+  | (string & {});
 
 interface AskField { label: string; type: "text" | "textarea"; required: boolean; placeholder: string }
 
