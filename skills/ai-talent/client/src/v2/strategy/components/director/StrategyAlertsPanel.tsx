@@ -16,6 +16,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { trpc } from "../../../../lib/trpc";
+import { agentLabel, agentShortName } from "../../../platform/lib/agentName";
 import { useLang } from "../../../../lib/i18n";
 import { showToastGlobal } from "../../../platform/components/Toast";
 import { Avatar } from "@heroui/react";
@@ -124,7 +125,7 @@ export default function StrategyAlertsPanel({ brandId }: { brandId: number }) {
     { brandId, scope: "brand" },
     { staleTime: 5 * 60_000, refetchOnWindowFocus: false },
   );
-  const directors: Array<{ roleId: string; name: string; avatarUrl?: string; roleLabel?: string }> = directorsQ.data?.directors ?? [];
+  const directors: Array<{ roleId: string; name: string; nameEn?: string; avatarUrl?: string; roleLabel?: string }> = directorsQ.data?.directors ?? [];
   const scanDirector = directors.find((d) => d.roleId === "brand_positioning") ?? directors[0] ?? null;
 
   // 監測清單的編輯草稿（逗號分隔字串）
@@ -190,12 +191,12 @@ export default function StrategyAlertsPanel({ brandId }: { brandId: number }) {
                 disabled={busy}
                 onClick={() => scanNow?.mutate?.({ brandId })}
                 aria-label={en ? "Start a scan" : "開始掃描"}
-                title={scanDirector ? `${scanDirector.name}${scanDirector.roleLabel ? ` · ${scanDirector.roleLabel}` : ""}` : undefined}
+                title={scanDirector ? `${agentLabel(scanDirector, lang)}${scanDirector.roleLabel ? ` · ${scanDirector.roleLabel}` : ""}` : undefined}
                 className="shrink-0 flex flex-col items-center gap-1 group disabled:cursor-wait"
               >
                 <span className={`relative block rounded-full p-[3px] ring-[3px] ring-[#F37E4A] transition ${busy ? "animate-pulse" : "group-hover:scale-105 group-active:scale-95"}`}>
                   {scanDirector?.avatarUrl ? (
-                    <Avatar src={scanDirector.avatarUrl} className="w-12 h-12" />
+                    <Avatar src={scanDirector.avatarUrl} alt={agentLabel(scanDirector, lang)} className="w-12 h-12" />
                   ) : (
                     <span className="w-12 h-12 rounded-full bg-neutral-100 flex items-center justify-center text-neutral-700">
                       <Icon name="agent" size={20} />
@@ -206,7 +207,7 @@ export default function StrategyAlertsPanel({ brandId }: { brandId: number }) {
                   </span>
                 </span>
                 <span className="flex flex-col items-center leading-tight">
-                  {scanDirector && <span className="text-[12px] font-semibold text-neutral-900 max-w-[96px] truncate">{scanDirector.name}</span>}
+                  {scanDirector && <span className="text-[12px] font-semibold text-neutral-900 max-w-[96px] truncate" title={agentLabel(scanDirector, lang)}>{agentShortName(scanDirector, lang)}</span>}
                   <span className="text-[11px] font-semibold text-[#F37E4A]">
                     {busy ? (en ? "Scanning…" : "掃描中…") : (en ? "Start scan" : "開始掃描")}
                   </span>

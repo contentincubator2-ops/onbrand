@@ -4,6 +4,7 @@ import { getSoworkDb } from "../../db";
 import { sql, eq, and } from "drizzle-orm";
 import { matchAgents } from "../core/squad/agentMatcher";
 import localPool from "../../localDb";
+import { englishFromRow } from "../../platform/core/agents/agentEnglish";
 
 // ── Shared schema (single source of truth — no duplication) ───────────────
 import { soworkAgents } from "../../platform/core/_schemas/soworkAgents";
@@ -142,7 +143,7 @@ export const agentRouter = router({
       try {
         const placeholders = input.ids.map(() => "?").join(",");
         const [rows]: any = await localPool.execute(
-          `SELECT id, slug, name, title, avatarUrl, primarySkill
+          `SELECT id, slug, name, title, englishName, englishTitle, avatarUrl, primarySkill
              FROM agents WHERE id IN (${placeholders})`,
           input.ids,
         );
@@ -151,6 +152,7 @@ export const agentRouter = router({
           slug:      r.slug ?? null,
           name:      r.name,
           title:     r.title,
+          ...englishFromRow(r),
           avatarUrl: r.avatarUrl ?? null,
           primarySkill: r.primarySkill ?? null,
         }));

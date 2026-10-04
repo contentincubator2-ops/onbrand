@@ -38,6 +38,7 @@ export interface ProjectIndexRow {
   createdAt: Date | string;
   taskId: string | null;         // 已 normalize
   taskLabel: string | null;      // missions.title（建立 mission 時寫的是任務卡名稱）
+  taskLabelEn?: string | null;   // 目錄裡的英文卡名（查得到才有），英文介面優先顯示
   productId: number | null;
   productName: string | null;
   progress: string | null;       // caption_ready / done / failed
@@ -110,7 +111,7 @@ function matches(d: Decorated, f: ProjectFilterInput, skip: Dim | null): boolean
   if (skip !== "period" && f.period && d.period !== f.period) return false;
   if (skip !== "q" && f.q && f.q.trim()) {
     const q = f.q.trim().toLowerCase();
-    const hay = [d.row.title, d.row.taskLabel, d.row.brandName, d.row.productName]
+    const hay = [d.row.title, d.row.taskLabel, d.row.taskLabelEn, d.row.brandName, d.row.productName]
       .map((s) => (s ?? "").toLowerCase());
     if (!hay.some((s) => s.includes(q))) return false;
   }
@@ -154,7 +155,11 @@ export function applyProjectFilters(rows: ProjectIndexRow[], f: ProjectFilterInp
   const taskBase = except("task");
   const taskCounts = count(taskBase, (d) => d.row.taskId);
   const taskLabels = new Map<string, string>();
-  for (const d of taskBase) if (d.row.taskId && d.row.taskLabel && !taskLabels.has(d.row.taskId)) taskLabels.set(d.row.taskId, d.row.taskLabel);
+  const taskLabelsEn = new Map<string, string>();
+  for (const d of taskBase) {
+    if (d.row.taskId && d.row.taskLabel && !taskLabels.has(d.row.taskId)) taskLabels.set(d.row.taskId, d.row.taskLabel);
+    if (d.row.taskId && d.row.taskLabelEn && !taskLabelsEn.has(d.row.taskId)) taskLabelsEn.set(d.row.taskId, d.row.taskLabelEn);
+  }
 
   const productBase = except("product");
   const productCounts = count(productBase, (d) => d.row.productId);
@@ -173,7 +178,7 @@ export function applyProjectFilters(rows: ProjectIndexRow[], f: ProjectFilterInp
         .filter((x) => x.count > 0),
       // 用過次數多的在前——「常用」就是前幾名。
       task: [...taskCounts.entries()]
-        .map(([key, n]) => ({ key, label: taskLabels.get(key) ?? key, count: n }))
+        .map(([key, n]) => ({ key, label: taskLabels.get(key) ?? key, labelEn: taskLabelsEn.get(key) ?? null, count: n }))
         .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label)),
       product: [...productCounts.entries()]
         .map(([id, n]) => ({ id, name: productNames.get(id)!, count: n }))

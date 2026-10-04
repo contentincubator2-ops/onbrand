@@ -162,6 +162,8 @@ export interface FBTaskCard {
   kind: "fast" | "mid" | "squad";
   inputs?: any[];
   primary_question?: string | null;
+  /** server 附的英文旁路；沒有就 null／undefined。 */
+  en?: import("../../lib/taskEn").TaskEn | null;
   /** 2026-09-30：自建卡用戶自選的插畫場景；null＝依題目自動挑。 */
   scene?: string | null;
   /** 自建卡的 AI 插畫；內建卡的圖走 taskIllustrationIds.json。 */
@@ -169,8 +171,8 @@ export interface FBTaskCard {
   primary_input?: { key: string; placeholder?: string; type: "text" | "textarea"; derive?: any } | null;
   agent_id?: number | null;
   skill_slug?: string | null;
-  agent?: { id: number; name: string; title: string; avatarUrl: string | null } | null;
-  team?: Array<{ id: number; name: string; title: string; avatarUrl: string | null }>;
+  agent?: { id: number; name: string; title: string; nameEn?: string; titleEn?: string; avatarUrl: string | null } | null;
+  team?: Array<{ id: number; name: string; title: string; nameEn?: string; titleEn?: string; avatarUrl: string | null }>;
   squad_slug?: string;
   methodology?: string;
   /** 2026-09-04：非 null 代表這是使用者自己建的卡，可以編輯。 */

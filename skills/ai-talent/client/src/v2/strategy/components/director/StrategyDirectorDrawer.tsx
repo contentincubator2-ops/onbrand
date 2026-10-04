@@ -50,6 +50,7 @@
 import React from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { trpc } from "../../../../lib/trpc";
+import { agentLabel, agentTitle } from "../../../platform/lib/agentName";
 import { useLang } from "../../../../lib/i18n";
 import {
   type StrategistDirector, avatarSrcOf, roleLabelOf, readStoredDirector, writeStoredDirector, scopeFromUrl,
@@ -234,7 +235,7 @@ export default function StrategyDirectorDrawer({ brandId }: { brandId: number | 
             transition: "box-shadow 0.15s",
           }}
         >
-          <img src={avatarSrcOf(current)} alt={current?.name ?? ""} style={{ width: "100%", height: "100%", borderRadius: "50%", display: "block" }} />
+          <img src={avatarSrcOf(current)} alt={agentLabel(current, lang)} style={{ width: "100%", height: "100%", borderRadius: "50%", display: "block" }} />
           {!open && (
             <span aria-hidden style={{
               position: "absolute", bottom: 2, right: 2, width: 11, height: 11,
@@ -260,14 +261,14 @@ export default function StrategyDirectorDrawer({ brandId }: { brandId: number | 
                 <img src={avatarSrcOf(current)} alt="" style={{ width: 36, height: 36, borderRadius: "50%", flexShrink: 0 }} />
                 <div style={{ minWidth: 0 }}>
                   <div style={{ fontSize: 13.5, fontWeight: 700, color: "#171717", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    {current?.name
+                    {(current ? agentLabel(current, lang) : null)
                       ?? ((listQ?.isLoading || listQ?.isFetching)
                             ? (en ? "Loading…" : "載入中…")
                             : advisorLabelOf(scope, en))}
                   </div>
                   <div style={{ fontSize: 11, color: "#737373", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                     {current
-                      ? `${roleLabelOf(current, en)}・${current.title}`
+                      ? `${roleLabelOf(current, en)}・${agentTitle(current, lang)}`
                       : advisorSubtitleOf(scope, en)}
                   </div>
                 </div>

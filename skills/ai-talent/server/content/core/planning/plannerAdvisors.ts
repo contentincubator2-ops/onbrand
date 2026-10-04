@@ -10,6 +10,7 @@
  *   2. 每位的指令要求「站在你的立場排，不要折衷」，並且看得到對方的立場。
  *   3. 兩版排完後比題目重疊度（topicOverlap）；太像就叫第二位重排一次，並把第一版的題目給他看。
  */
+import { englishFromRow } from "../../../platform/core/agents/agentEnglish.js";
 import localPool from "../../../localDb";
 
 export type ForkAxis = "consistency" | "conversion" | "volume" | "voice";
@@ -66,21 +67,21 @@ export function isForkAxis(s: unknown): s is ForkAxis {
   return typeof s === "string" && (FORK_AXES as string[]).includes(s);
 }
 
-export interface AdvisorCard { slug: string; name: string; title: string; avatarUrl: string }
+export interface AdvisorCard { slug: string; name: string; title: string; nameEn: string; titleEn: string; avatarUrl: string }
 
 /** 顧問的顯示資料；查不到（被下架）就用立場當名字，不讓整張卡消失。 */
 export async function loadAdvisor(slug: string, fallbackTitle: string): Promise<AdvisorCard> {
   try {
     const [rows]: any = await localPool.execute(
-      `SELECT slug, name, name_zh, englishName, title, title_zh, avatarUrl FROM agents WHERE slug = ? LIMIT 1`, [slug],
+      `SELECT slug, name, name_zh, englishName, title, title_zh, englishTitle, avatarUrl FROM agents WHERE slug = ? LIMIT 1`, [slug],
     );
     const r = (rows as any[])[0];
     if (r) return {
       slug, name: String(r.name_zh || r.name || r.englishName || fallbackTitle),
-      title: String(r.title_zh || r.title || ""), avatarUrl: String(r.avatarUrl ?? ""),
+      title: String(r.title_zh || r.title || ""), ...englishFromRow(r), avatarUrl: String(r.avatarUrl ?? ""),
     };
   } catch { /* fall through */ }
-  return { slug, name: fallbackTitle, title: "", avatarUrl: "" };
+  return { slug, name: fallbackTitle, title: "", nameEn: "", titleEn: "", avatarUrl: "" };
 }
 
 /** 兩版題目的重疊度 0–1：題目兩兩比字元雙字組 Jaccard，取每題最高再平均。 */

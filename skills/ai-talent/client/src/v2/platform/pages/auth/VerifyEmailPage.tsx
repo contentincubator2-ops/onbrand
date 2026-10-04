@@ -5,6 +5,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useLang } from "../../../../lib/i18n";
+import { serverMessageText } from "../../lib/serverMessageEn";
 
 export default function VerifyEmailPage() {
   const { lang } = useLang();
@@ -35,7 +36,7 @@ export default function VerifyEmailPage() {
 
         if (!res.ok || !data.success) {
           setStatus("error");
-          setMessage(data.error || (lang === "en" ? "Verification failed" : "驗證失敗"));
+          setMessage(serverMessageText(data.error, lang) || (lang === "en" ? "Verification failed" : "驗證失敗"));
           return;
         }
 

@@ -26,6 +26,7 @@
 import React from "react";
 import { SendIcon, WarningIcon } from "../../../platform/components/icons";
 import { trpc } from "../../../../lib/trpc";
+import { agentShortName } from "../../../platform/lib/agentName";
 import { useLang } from "../../../../lib/i18n";
 import { type StrategistDirector, type StrategistScope, signatureQuestionsOf } from "../../lib/strategistDirectors";
 
@@ -230,7 +231,7 @@ export default function StrategyDirectorChat({
         {messages.length === 0 && !convQ?.isLoading && (
           <p style={{ fontSize: 13, color: "#737373", fontStyle: "italic", margin: 0 }}>
             {en
-              ? `Ask ${director?.name ?? "the Strategy Director"} anything about this brand's strategy.`
+              ? `Ask ${agentShortName(director, lang) || "the Strategy Director"} anything about this brand's strategy.`
               : `問${director?.name ?? "策略總監"}任何跟這個品牌策略有關的問題。`}
           </p>
         )}
@@ -279,7 +280,7 @@ export default function StrategyDirectorChat({
         ))}
         {sending && (
           <div style={{ fontSize: 12.5, color: "#a3a3a3" }}>
-            {en ? `${director?.name ?? "Strategy Director"} is typing…` : `${director?.name ?? "策略總監"}輸入中…`}
+            {en ? `${agentShortName(director, lang) || "Strategy Director"} is typing…` : `${director?.name ?? "策略總監"}輸入中…`}
           </div>
         )}
       </div>

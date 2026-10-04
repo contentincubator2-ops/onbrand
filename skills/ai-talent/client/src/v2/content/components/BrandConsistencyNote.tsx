@@ -40,6 +40,9 @@ export function pickBrandRecord(list: unknown, variantIndex: number): BrandConsi
   return r ? (r as BrandConsistencyRecord) : null;
 }
 
+/** 檢查面向由模型以中文寫入（語氣|原型|受眾|禁用|價值|事實）；英文介面顯示時換成英文。 */
+const ASPECT_EN: Record<string, string> = { 語氣: "Tone", 原型: "Archetype", 受眾: "Audience", 禁用: "Avoid list", 價值: "Value", 事實: "Facts" };
+
 export default function BrandConsistencyNote({ rec, en }: { rec: BrandConsistencyRecord; en: boolean }) {
   const s = brandCheckSummary(rec, en);
   const issues = Array.isArray(rec.issues) ? rec.issues : [];
@@ -54,7 +57,7 @@ export default function BrandConsistencyNote({ rec, en }: { rec: BrandConsistenc
           <summary className="cursor-pointer select-none text-default-600">{en ? "What was checked" : "檢查到哪些地方"}</summary>
           <ul className="mt-1 space-y-1">
             {issues.map((i, n) => (
-              <li key={n}><span className="text-default-900">{i.aspect}</span>{i.detail && <span>{en ? " — " : "——"}{i.detail}</span>}</li>
+              <li key={n}><span className="text-default-900">{en ? (ASPECT_EN[i.aspect] ?? i.aspect) : i.aspect}</span>{i.detail && <span>{en ? " — " : "——"}{i.detail}</span>}</li>
             ))}
           </ul>
         </details>

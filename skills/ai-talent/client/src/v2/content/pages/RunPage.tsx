@@ -16,6 +16,7 @@
  *   🪄 重生  🎚️ 設定  📋 複製  💾 存
  *   ↻ 重跑  ✕ 關閉
  */
+import { localizeSource } from "../lib/taskEn";
 import React, { useMemo, useState, useEffect, useRef } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import {
@@ -30,6 +31,7 @@ import { HelpTip } from "../../platform/components/HelpTip";
 import { CommentIcon, CopyIcon, EditIcon, ImageIcon, LibraryIcon, RegenerateIcon, RewriteAsIcon, PuzzleIcon, WaitingIcon, UserIcon, TextIcon, CheckIcon, BundleIcon, WarningIcon, DoneIcon, ErrorIcon, WorkingIcon, LinkIcon, PartnerIcon } from "../../platform/components/icons";
 import VendorFinder, { vendorKindOf } from "../components/VendorFinder";
 import { trpc } from "../../../lib/trpc";
+import { useVariantLabel } from "../lib/variantLabelEn";
 import { showToastGlobal } from "../../platform/components/Toast";
 import { PlatformMockup } from "../components/PlatformMockup";
 import ImageCardOffer, { IMAGE_CARD_OFFER_ID } from "../components/imageCard/ImageCardOffer";
@@ -66,6 +68,7 @@ import { fireNudge } from "../../platform/components/mia/miaNudges";
 import ReviewBar from "../../platform/components/review/ReviewBar";
 import PerfTagPicker from "../components/PerfTagPicker";
 import WriterDesk, { type DeskWriter } from "../components/WriterDesk";
+import { agentLabel, agentTitle } from "../../platform/lib/agentName";
 import { friendlyError } from "../../platform/lib/friendlyError";
 import BrandConsistencyNote, { pickBrandRecord } from "../components/BrandConsistencyNote";
 import RegulationComplianceNote, { toComplianceInput, type ComplianceRecord } from "../components/RegulationComplianceNote";
@@ -143,10 +146,16 @@ export default function RunPage() {
   // 則是平台通則的既有理由）。跟報價頁「249 張任務卡中 208 張可追溯結構
   // 出處」是同一件事，只是第一次真的顯示給跑完任務的人看。
   const sourceTaskId = String(data?.mission?.taskId ?? "");
+  const vl = useVariantLabel();
   const cardDetailQ = trpc.quickTask.cardDetail.useQuery(
     { taskId: sourceTaskId },
     { enabled: !!sourceTaskId },
   );
+  // English UI: show the card's English name when the stored mission title is the (Chinese) card label.
+  const cardEnName = lang === "en" ? String((cardDetailQ.data as any)?.labelEn ?? "") : "";
+  const cardZhName = String((cardDetailQ.data as any)?.labelZh ?? "");
+  const taskName = (zh: string): string =>
+    cardEnName && zh && (zh === cardZhName || zh === (data as any)?.mission?.taskLabel) ? cardEnName : zh;
 
   // ── Mia contextual nudges for RunPage ────────────────────────────────
   // Fires when output first loads: tells user what they can do right now
@@ -1159,6 +1168,7 @@ export default function RunPage() {
     const name = (typeof ca === "object" ? ca?.name : ca) || (lang === "en" ? "Lead writer" : "主筆");
     return {
       key: "lead", name: String(name),
+      nameEn: typeof ca === "object" ? ca?.nameEn : undefined, titleEn: typeof ca === "object" ? ca?.titleEn : undefined,
       title: String((typeof ca === "object" ? ca?.title : "") ?? ""),
       avatarUrl: typeof ca === "object" ? ca?.avatarUrl ?? null : null,
     };
@@ -1738,7 +1748,7 @@ export default function RunPage() {
     const detail: any = cardDetailQ.data;
     if (cardDetailQ.isLoading) return <p className="text-[12.5px] text-default-500">{lang === "en" ? "Loading…" : "載入中…"}</p>;
     if (!detail) return <p className="text-[12.5px] text-default-500">{lang === "en" ? "No registered source for this card." : "這張卡沒有登記出處。"}</p>;
-    const src = detail.source ?? { type: "evergreen" };
+    const src = localizeSource(detail.source ?? { type: "evergreen" }, detail, lang);
     return (
       <div className="space-y-1.5 rounded-lg bg-default-50 p-2.5 text-[12.5px] leading-relaxed text-default-800">
         <p className="font-medium">{sourceLabel(src.type, lang, { long: true })}</p>
@@ -1796,9 +1806,9 @@ export default function RunPage() {
             <button
               onClick={() => navigate("/projects")}
               className="hover:text-default-900 transition truncate max-w-[260px]"
-              title={String((data as any).mission.title ?? "")}
+              title={taskName(String((data as any).mission.title ?? ""))}
             >
-              {String((data as any).mission.title ?? "")}
+              {taskName(String((data as any).mission.title ?? ""))}
             </button>
           </>
         )}
@@ -1868,13 +1878,13 @@ export default function RunPage() {
       <div className="flex items-center gap-2 mb-3 px-1">
         <p
           className="text-tiny text-default-500 truncate flex-1 min-w-0"
-          title={currentEmailSubject ? `主旨：${currentEmailSubject}` : (data.title || data.mission?.taskLabel || "")}
+          title={currentEmailSubject ? `主旨：${currentEmailSubject}` : (data.title || taskName(data.mission?.taskLabel || ""))}
         >
           {(() => {
             // For email tasks: show current slide's email subject (updates on tab switch)
             const raw = currentEmailSubject
               ? `主旨：${currentEmailSubject}`
-              : data.title || data.mission?.taskLabel || (lang === "en" ? "(Untitled)" : "(無標題)");
+              : data.title || taskName(data.mission?.taskLabel || "") || (lang === "en" ? "(Untitled)" : "(無標題)");
             const cps = Array.from(raw);
             return cps.length > 40 ? cps.slice(0, 38).join("") + "…" : raw;
           })()}
@@ -1913,7 +1923,7 @@ export default function RunPage() {
                   isStrategyEnvelope,
                   format: v.format,
                   index: i,
-                  fallbackLabel: v.label,
+                  fallbackLabel: vl(v.label),
                   language: lang === "en" ? "en" : "zh",
                 })}
               </button>
@@ -1935,7 +1945,7 @@ export default function RunPage() {
                     : "bg-white text-default-700 border-default-200 hover:border-secondary"
                 }`}
               >
-                {v.label || (lang === "en" ? `Plan ${i + 1}` : `策略 ${i + 1}`)}
+                {v.label ? vl(v.label) : (lang === "en" ? `Plan ${i + 1}` : `策略 ${i + 1}`)}
               </button>
             ))}
             <button
@@ -1965,7 +1975,7 @@ export default function RunPage() {
                       : "bg-white text-default-600 border-default-200 hover:border-primary"
                   }`}
                 >
-                  {v.label || (lang === "en" ? `Post ${i + 1}` : `貼文 ${i + 1}`)}
+                  {v.label ? vl(v.label) : (lang === "en" ? `Post ${i + 1}` : `貼文 ${i + 1}`)}
                 </button>
               ))}
             </div>
@@ -1999,7 +2009,7 @@ export default function RunPage() {
                     : "bg-white text-default-700 border-default-200 hover:border-secondary"
                 }`}
               >
-                {v.label}
+                {vl(v.label)}
               </button>
             ))}
             {pool && more > 0 && (
@@ -2634,7 +2644,7 @@ export default function RunPage() {
                     const ca: any = data.metadata?.captionAgent;
                     const name = typeof ca === "object" ? ca?.name : ca;
                     const av = typeof ca === "object" ? ca?.avatarUrl : null;
-                    return <Avatar src={av || `https://api.dicebear.com/9.x/notionists/svg?seed=${encodeURIComponent(name ?? "Caption")}`} className="w-7 h-7" />;
+                    return <Avatar src={av || `https://api.dicebear.com/9.x/notionists/svg?seed=${encodeURIComponent(name ?? "Caption")}`} alt={typeof ca === "object" ? agentLabel(ca, lang) : name} className="w-7 h-7" />;
                   })()}
                 </button>
               </Tooltip>
@@ -2647,7 +2657,7 @@ export default function RunPage() {
                     const ia: any = data.metadata?.imageAgent;
                     const name = typeof ia === "object" ? ia?.name : ia;
                     const av = typeof ia === "object" ? ia?.avatarUrl : null;
-                    return <Avatar src={av || `https://api.dicebear.com/9.x/notionists/svg?seed=${encodeURIComponent(name ?? "Visual")}`} className="w-7 h-7" />;
+                    return <Avatar src={av || `https://api.dicebear.com/9.x/notionists/svg?seed=${encodeURIComponent(name ?? "Visual")}`} alt={typeof ia === "object" ? agentLabel(ia, lang) : name} className="w-7 h-7" />;
                   })()}
                 </button>
               </Tooltip>
@@ -3211,7 +3221,8 @@ export default function RunPage() {
                 const focusedAgName = focusedAg?.name ?? (focusedAgent === "image"
                   ? (lang === "en" ? "Visual AI" : "視覺 AI 專家")
                   : (lang === "en" ? "Caption agent" : "撰寫者"));
-                const focusedAgTitle = focusedAg?.title ?? "";
+                const focusedAgTitle = focusedAg ? agentTitle(focusedAg, lang) : "";
+                const focusedAgLabel = focusedAg?.name ? agentLabel(focusedAg, lang) : focusedAgName;
                 const stages: Array<{key: string; label: string; status: string; startedAt?: number; completedAt?: number}> = Array.isArray(md.stages) ? md.stages : [];
                 const totalMs = md.latencyMs ?? 0;
                 const fetchedUrl = typeof md.fetchedUrl === "string"
@@ -3228,7 +3239,7 @@ export default function RunPage() {
                         className="w-7 h-7"
                       />
                       <span className="flex flex-col leading-tight">
-                        <span>{focusedAgName}</span>
+                        <span>{focusedAgLabel}</span>
                         {focusedAgTitle && <span className="text-[12px] text-default-600 font-normal">{focusedAgTitle}</span>}
                       </span>
                     </p>
@@ -3319,7 +3330,7 @@ export default function RunPage() {
                 if (!detail) {
                   return <p className="text-[12px] text-default-500">{lang === "en" ? "Source info unavailable for this task." : "這個任務目前拿不到出處資訊。"}</p>;
                 }
-                const src = detail.source ?? { type: "evergreen" };
+                const src = localizeSource(detail.source ?? { type: "evergreen" }, detail, lang);
                 return (
                   <>
                     <p className="text-tiny font-semibold">{sourceLabel(src.type, lang, { long: true })}</p>
@@ -3353,7 +3364,7 @@ export default function RunPage() {
                     {lang === "en" ? "Rewrite this version" : "重生這段文案"}
                     <HelpTip>
                       {lang === "en"
-                        ? <>The same agent rewrites &quot;{slide?.label ?? `Version ${activeIdx + 1}`}&quot;. The original is archived.</>
+                        ? <>The same agent rewrites &quot;{slide?.label ? vl(slide.label) : `Version ${activeIdx + 1}`}&quot;. The original is archived.</>
                         : <>同一位 AI 專家重寫「{slide?.label ?? `版本 ${activeIdx + 1}`}」。原版會歸檔到歷史。</>}
                     </HelpTip>
                   </p>
@@ -3664,7 +3675,7 @@ export default function RunPage() {
                         className="flex items-center justify-between px-3 py-2 text-[12px]"
                         style={i < variants.length - 1 ? { borderBottom: "1px solid #F5F5F5" } : undefined}
                       >
-                        <span className="font-medium text-default-700">{v.label ?? `Day ${i + 1}`}</span>
+                        <span className="font-medium text-default-700">{v.label ? vl(v.label) : `Day ${i + 1}`}</span>
                         <span className="text-default-600">{dateStr}</span>
                       </div>
                     );

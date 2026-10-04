@@ -4,6 +4,7 @@
 import localPool from "../../../../localDb";
 import { loadAgentKnowledge } from "../../../../platform/core/agents/agentKnowledge";
 import { AgentMeta } from "./orchestraTypes";
+import { englishFromRow } from "../../../../platform/core/agents/agentEnglish";
 
 /**
  * Field-level char caps so a single huge field can't blow the persona
@@ -66,7 +67,7 @@ export async function loadAgent(id: number | null | undefined): Promise<{ meta: 
       `SELECT id, name, title, bio, specialty, methodology, taskSystemPrompt,
               experienceDetail, workingPrinciples, specialtySummary,
               tool_instructions, bio_zh, caseStudies,
-              aiModel, avatarUrl
+              aiModel, avatarUrl, englishName, englishTitle
        FROM agents WHERE id = ? LIMIT 1`,
       [id],
     );
@@ -121,7 +122,7 @@ export async function loadAgent(id: number | null | undefined): Promise<{ meta: 
       `\n用你的口氣寫，不要寫得像通用 AI。\n\n`;
 
     return {
-      meta: { id: a.id, name: a.name, title: a.title, avatarUrl: a.avatarUrl ?? null },
+      meta: { id: a.id, name: a.name, title: a.title, ...englishFromRow(a), avatarUrl: a.avatarUrl ?? null },
       persona,
       aiModel: a.aiModel ?? null,
     };

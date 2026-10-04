@@ -16,6 +16,7 @@ import { Button } from "@heroui/react";
 import { faFacebookF, faInstagram, faThreads, faLine, faTiktok } from "@fortawesome/free-brands-svg-icons";
 import { trpc } from "../../../lib/trpc";
 import { useLang } from "../../../lib/i18n";
+import { agentLabel, agentShortName } from "../../platform/lib/agentName";
 import { showToastGlobal } from "../../platform/components/Toast";
 import { friendlyError } from "../../platform/lib/friendlyError";
 import { channelRoute } from "../../platform/lib/channelMeta";
@@ -41,7 +42,7 @@ const dayLabel = (ymd: string, en: boolean) => {
 };
 
 type ThinkerKey = string;
-interface ThinkerCard { key: ThinkerKey; name: string; avatarUrl: string; school: string; schoolEn: string; pitch: string; pitchEn: string }
+interface ThinkerCard { key: ThinkerKey; name: string; nameEn?: string; titleEn?: string; title?: string; full?: string; avatarUrl: string; school: string; schoolEn: string; pitch: string; pitchEn: string }
 interface AngleView { id: string; thinker: ThinkerKey; answer?: string; title: string; hook: string; why: string; platform: string; format: string; adopted?: { date: string } }
 type Subject = { kind: "brand" | "product" | "event"; id: number | null };
 
@@ -76,7 +77,11 @@ export default function InspirationPage() {
   const rosterQ = T.inspiration?.roster?.useQuery({ brandId: brandId ?? 0 }, { enabled: !!brandId, refetchOnWindowFocus: false }) ?? { data: null };
   const productsQ = T.product?.list?.useQuery({ brandId: brandId ?? undefined }, { enabled: !!brandId, refetchOnWindowFocus: false }) ?? { data: [] };
   const eventsQ = T.event?.list?.useQuery({ brandId: brandId ?? undefined }, { enabled: !!brandId, refetchOnWindowFocus: false }) ?? { data: [] };
-  const thinkers: ThinkerCard[] = rosterQ.data?.thinkers ?? [];
+  // 英文介面：name＝英文名（短），full＝「English (中文原名)」放 tooltip / aria / 寬版位置；中文介面不變。
+  const thinkers: ThinkerCard[] = React.useMemo(
+    () => ((rosterQ.data?.thinkers ?? []) as ThinkerCard[]).map((t) => ({ ...t, name: agentShortName(t, lang), full: agentLabel(t, lang) })),
+    [rosterQ.data, lang],
+  );
   const platforms: Array<{ id: string; label: string }> = rosterQ.data?.platforms ?? [];
   const products: any[] = (productsQ.data as any[]) ?? [];
   const events: any[] = (eventsQ.data as any[]) ?? [];
@@ -346,7 +351,7 @@ export default function InspirationPage() {
                   <button type="button" onClick={() => setSwapFor(swapFor === k ? null : k)} disabled={busy}
                     className="flex items-center gap-2.5 rounded-full border py-1.5 pl-1.5 pr-3.5 text-left transition hover:border-neutral-900 disabled:opacity-60"
                     style={{ borderColor: swapFor === k ? INK : LINE, background: "#FFFFFF" }}
-                    aria-expanded={swapFor === k} aria-label={en ? `Swap ${t?.name ?? k}` : `換掉 ${t?.name ?? k}`}>
+                    aria-expanded={swapFor === k} aria-label={en ? `Swap ${t?.full ?? k}` : `換掉 ${t?.name ?? k}`} title={t?.full}>
                     <Avatar t={t} size={30} />
                     <span className="flex flex-col">
                       <span className="text-[13px] font-semibold leading-tight" style={{ color: INK }}>{t?.name ?? k}</span>
@@ -452,7 +457,7 @@ function SwapMenu({ en, bench, onPick, onClose, onRemove }: {
           className="flex w-full items-start gap-2.5 rounded-xl px-2 py-2 text-left hover:bg-neutral-50">
           <Avatar t={t} size={30} />
           <span className="flex min-w-0 flex-col">
-            <span className="text-[13px] font-semibold" style={{ color: INK }}>{t.name}・{en ? t.schoolEn : t.school}</span>
+            <span className="text-[13px] font-semibold" style={{ color: INK }}>{t.full ?? t.name}・{en ? t.schoolEn : t.school}</span>
             <span className="text-[12px] leading-snug" style={{ color: META }}>{en ? t.pitchEn : t.pitch}</span>
           </span>
         </button>
@@ -476,7 +481,7 @@ function AngleCard({ a, t, en, busy, inLineup, platformLabel, onAdopt, onMore, o
       <div className="flex items-center gap-2.5">
         <Avatar t={t} />
         <div className="min-w-0">
-          <p className="m-0 truncate text-[13px] font-semibold" style={{ color: INK }}>{t?.name ?? a.thinker}</p>
+          <p className="m-0 truncate text-[13px] font-semibold" style={{ color: INK }} title={t?.full}>{t?.full ?? a.thinker}</p>
           <p className="m-0 truncate text-[12px]" style={{ color: META }}>{en ? t?.schoolEn : t?.school}</p>
         </div>
         <span className="ml-auto flex shrink-0 items-center gap-1.5 text-[12px]" style={{ color: META }}>

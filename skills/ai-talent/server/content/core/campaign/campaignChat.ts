@@ -56,7 +56,7 @@ export async function pickCampaignDirector(brandId: number, agentId?: number | n
   const industry = await brandIndustry(brandId);
   const d = (agentId ? await getDirectorByAgentId(agentId, industry).catch(() => null) : null)
     ?? (await listDirectorsForBrand(industry, "brand").catch(() => []))[0] ?? null;
-  return d ? { id: d.agentId, slug: d.slug, name: d.name, title: d.title, avatarUrl: d.avatarUrl } : null;
+  return d ? { id: d.agentId, slug: d.slug, name: d.name, title: d.title, avatarUrl: d.avatarUrl, nameEn: d.nameEn, titleEn: d.titleEn } : null;
 }
 
 /** 總監在右下角跟使用者談過的最近幾則（目前那一串），讓左邊接得上。讀不到就空字串。 */

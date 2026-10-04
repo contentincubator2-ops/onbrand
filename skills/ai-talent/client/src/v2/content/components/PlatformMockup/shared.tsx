@@ -10,6 +10,7 @@ import remarkGfm from "remark-gfm";
 import { Skeleton } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { useLang } from "../../../../lib/i18n";
+import { useVariantLabel } from "../../lib/variantLabelEn";
 
 /* ── SHOW_IMAGE_STYLE_OVERLAY ───────────────────────────────────────────────
  *
@@ -399,11 +400,12 @@ export function MockupHeader({
   variantLabel?: string;
 }) {
   const { lang } = useLang();
+  const vl = useVariantLabel();
   return (
     <div className="text-center mb-3">
       <span className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-default-500">
         <FontAwesomeIcon icon={icon} className="text-default-400" />
-        {variantLabel ?? (lang === "en" ? `${label} preview` : `${label} 預覽`)}
+        {(variantLabel != null ? vl(variantLabel) : undefined) ?? (lang === "en" ? `${label} preview` : `${label} 預覽`)}
       </span>
     </div>
   );

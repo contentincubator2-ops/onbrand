@@ -14,6 +14,8 @@ import { Navigate, useParams, useOutletContext, useNavigate, useSearchParams } f
 import CalendarTabs from "../components/CalendarTabs";
 import { trpc } from "../../../lib/trpc";
 import { useLang } from "../../../lib/i18n";
+import { agentLabel, agentShortName } from "../../platform/lib/agentName";
+import { taskQuestion, taskPlaceholder, taskInputText, localizeSource } from "../lib/taskEn";
 import { showToastGlobal } from "../../platform/components/Toast";
 import { TaskCardShell, TaskCardAvatar } from "../../platform/components/TaskCardShell";
 import { campaignPrefill } from "../lib/campaignIntakePrefill";
@@ -1877,7 +1879,7 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                       {/* 結構來源 —— 用戶看得到「這張卡憑什麼這樣寫」。
                           有具體出處就印出處（那才是賣點），沒有就印分類名。 */}
                       {(() => {
-                        const src = resolveSource((task as any).source);
+                        const src = resolveSource(localizeSource((task as any).source ?? {}, task as any, lang));
                         const acc = sourceAccent(src.type);
                         // 自建卡沒有 source，resolveSource 會退回「長青公式」—— 印成品牌自建。
                         const isOwn = frontCardKind(task) === "own";
@@ -1916,7 +1918,7 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                           爆款卡直接印數字＋量測年月，不用點進詳情才看得到。副標題就是 description。
                           （2026-09-30 CJ「備註的地方都拿掉」：前台不印 caveat，只留在 server 資料層。） */}
                       {frontCardKind(task) === "viral" && (() => {
-                        const raw = (task as any).source ?? {};
+                        const raw = localizeSource((task as any).source ?? {}, task as any, lang);
                         return (
                           <div className="flex flex-col gap-0.5">
                             {(raw.metric || raw.asOf) && (
@@ -1955,8 +1957,8 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                         <span className="text-[12px] text-default-600 italic inline-flex items-center gap-1"><LibraryIcon size={11} /> {(task as any).methodology}</span>
                       )}
                       <div className="mt-auto pt-2 flex items-center gap-2 border-t border-default-100">
-                        <Avatar src={avatarSrc} size="sm" className="w-5 h-5" />
-                        <span className="text-tiny font-medium text-default-700 truncate">{agentName}</span>
+                        <Avatar src={avatarSrc} alt={agentLabel(task.agent, lang) || agentName} size="sm" className="w-5 h-5" />
+                        <span className="text-tiny font-medium text-default-700 truncate" title={agentLabel(task.agent, lang)}>{task.agent ? agentShortName(task.agent, lang) : agentName}</span>
                         {/* 2026-09-08 出處詳情：點開看這張卡憑什麼、什麼時候用、上架日。
                             2026-09-30（CJ「出處與說明改成出處，放右下角跟 agent 姓名對稱」）。
                             用 span 而不是巢狀 button（button 不能包 button）。 */}
@@ -1977,10 +1979,10 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                       {(task as any).team && (task as any).team.length > 1 && (
                         <div className="flex items-center gap-1.5 -mt-1">
                           <div className="flex -space-x-2">
-                            {((task as any).team as Array<{ id: number; name: string; avatarUrl: string | null }>)
+                            {((task as any).team as Array<{ id: number; name: string; nameEn?: string; avatarUrl: string | null }>)
                               .slice(0, 4)
                               .map((m) => (
-                                <Avatar key={m.id} src={m.avatarUrl || dicebear(m.name)} size="sm" className="w-5 h-5 ring-1 ring-white" title={m.name} />
+                                <Avatar key={m.id} src={m.avatarUrl || dicebear(m.name)} size="sm" className="w-5 h-5 ring-1 ring-white" title={agentLabel(m, lang)} alt={agentLabel(m, lang)} />
                               ))}
                           </div>
                           <span className="text-[12px] text-default-500">
@@ -2121,8 +2123,8 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                       <TaskIllustration card={activeTask} width={104} />
                     </div>
                     <h2 className="min-w-0 text-[20px] leading-snug font-bold text-neutral-900">
-                      {activeTask.primary_question
-                        ?? (lang === "en" ? (activeTask.label_en ?? activeTask.label) : (activeTask.label_zh ?? activeTask.label))}
+                      {taskQuestion(activeTask, activeTask.primary_question, lang)
+                        || (lang === "en" ? (activeTask.label_en ?? activeTask.label) : (activeTask.label_zh ?? activeTask.label))}
                     </h2>
                   </div>
                 )}
@@ -2167,7 +2169,7 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                       <div className="relative">
                         {activeTask.primary_input.type === "textarea" ? (
                           <Textarea
-                            placeholder={activeTask.primary_input.placeholder ?? ""}
+                            placeholder={taskPlaceholder(activeTask, activeTask.primary_input.placeholder, lang)}
                             value={primaryAnswer}
                             onChange={(e) => { setPrimaryAnswer(e.target.value); if (inputError) setInputError(null); }}
                             minRows={3}
@@ -2177,7 +2179,7 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                           />
                         ) : (
                           <Input
-                            placeholder={activeTask.primary_input.placeholder ?? ""}
+                            placeholder={taskPlaceholder(activeTask, activeTask.primary_input.placeholder, lang)}
                             value={primaryAnswer}
                             onChange={(e) => { setPrimaryAnswer(e.target.value); if (inputError) setInputError(null); }}
                             autoFocus
@@ -2224,14 +2226,14 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                   const renderField = (f: IntakeField) => (
                     <div key={f.key} className="space-y-1">
                       <p className="text-tiny font-medium text-default-700">
-                        {f.label}
+                        {taskInputText(activeTask, f.key, "label", f.label, lang)}
                         {f.required && <span className="text-danger-500 ml-1">*</span>}
                       </p>
                       {f.type === "textarea" ? (
                         <Textarea
                           size="sm"
                           minRows={2}
-                          placeholder={f.placeholder}
+                          placeholder={taskInputText(activeTask, f.key, "placeholder", f.placeholder, lang)}
                           value={extraAnswers[f.key] ?? ""}
                           onChange={(e) => {
                             setExtraAnswers((prev) => ({ ...prev, [f.key]: e.target.value }));
@@ -2241,7 +2243,7 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                       ) : (
                         <Input
                           size="sm"
-                          placeholder={f.placeholder}
+                          placeholder={taskInputText(activeTask, f.key, "placeholder", f.placeholder, lang)}
                           value={extraAnswers[f.key] ?? ""}
                           onChange={(e) => {
                             setExtraAnswers((prev) => ({ ...prev, [f.key]: e.target.value }));
@@ -2474,7 +2476,7 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                           </span>
                           {/* 2026-09-30（CJ「Yawen 的名字要跟人像對齊」）：名字從標題列搬到頭像正下方 */}
                           <span className="flex flex-col items-center leading-tight">
-                            {agent && <span className="text-[12px] font-semibold text-neutral-900 max-w-[96px] truncate">{agent.name}</span>}
+                            {agent && <span className="text-[12px] font-semibold text-neutral-900 max-w-[96px] truncate" title={agentLabel(agent, lang)}>{agentShortName(agent, lang)}</span>}
                             <span className="text-[11px] font-semibold text-[#F37E4A]">{t("qt_run_btn")}</span>
                           </span>
                         </button>
@@ -2637,10 +2639,10 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                   const stagesNow = orchestraStages && orchestraStages.length > 0
                     ? orchestraStages
                     : synthesizeStages(tickMs, tier, lang, activeRegulationCount > 0);
-                  const agentRoster: Array<{ id?: number; name: string; title?: string; avatarUrl?: string | null; role?: string }> = [];
+                  const agentRoster: Array<{ id?: number; name: string; nameEn?: string; titleEn?: string; title?: string; avatarUrl?: string | null; role?: string }> = [];
                   const cap = agentMeta ?? activeTask.agent;
-                  if (cap) agentRoster.push({ id: cap.id, name: cap.name, title: cap.title, avatarUrl: cap.avatarUrl, role: lang === "en" ? "Writing caption" : "撰寫文案" });
-                  if (imageAgentMeta) agentRoster.push({ id: imageAgentMeta.id, name: imageAgentMeta.name, title: imageAgentMeta.title, avatarUrl: imageAgentMeta.avatarUrl, role: lang === "en" ? "Visual direction" : "視覺方向" });
+                  if (cap) agentRoster.push({ id: cap.id, name: cap.name, nameEn: cap.nameEn, titleEn: cap.titleEn, title: cap.title, avatarUrl: cap.avatarUrl, role: lang === "en" ? "Writing caption" : "撰寫文案" });
+                  if (imageAgentMeta) agentRoster.push({ id: imageAgentMeta.id, name: imageAgentMeta.name, nameEn: imageAgentMeta.nameEn, titleEn: imageAgentMeta.titleEn, title: imageAgentMeta.title, avatarUrl: imageAgentMeta.avatarUrl, role: lang === "en" ? "Visual direction" : "視覺方向" });
                   const PHASES: Array<{ key: string; stageKeys: string[]; icon: IconName; zh: string; en: string }> = [
                     { key: "plan",   stageKeys: ["scout", "pre", "strategist"], icon: "strategy", zh: "策略", en: "Plan" },
                     { key: "write",  stageKeys: ["caption"],                   icon: "content",  zh: "文案", en: "Copy" },
