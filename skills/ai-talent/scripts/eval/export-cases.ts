@@ -143,6 +143,8 @@ function variantText(v: any): string {
 
         const started = Date.now();
         let response = "", err = "", agentName = "", variantCount = 0, firstVariant = "";
+        /** 交付前檢查對每一版做了什麼（consistent／fixed／flagged／skipped＋問題類別）。 */
+        let check: Array<{ s: string; a: string[]; r?: string }> = [];
         try {
           const result: any = await runOrchestra({
             template,
@@ -156,6 +158,10 @@ function variantText(v: any): string {
           firstVariant = variantText(result?.variants?.[0]);
           variantCount = (result?.variants ?? []).length;
           agentName = String(result?.captionAgent?.name ?? "");
+          check = (result?.brandConsistency ?? []).map((c: any) => ({
+            s: String(c?.status ?? ""), a: (c?.issues ?? []).map((i: any) => String(i?.aspect ?? "")),
+            ...(c?.reason ? { r: String(c.reason).slice(0, 80) } : {}),
+          }));
           if (!response) err = `ok=${result?.ok} errors=${JSON.stringify(result?.errors ?? []).slice(0, 200)}`;
         } catch (e: any) {
           err = String(e?.message ?? e).slice(0, 200);
@@ -182,7 +188,7 @@ function variantText(v: any): string {
           suite: "cards", agent: agentName || null, variantCount,
           agentId: Number(template.agent_id ?? 0) || null, tier: String(card.tier),
           sourceType: String((card.source as any)?.type ?? ""), frontVisible: isRecentViral(card.source as any),
-          needsData: needsPastedData(template),
+          needsData: needsPastedData(template), check,
           id: `${brandId}:${card.id}`, brandId, brandName: brand.name, channel: ch, taskId: card.id,
           taskLabel: text(template.label) || card.labelZh, topic, query, response,
           empty: response === "（產出為空白）", error: err || null, latencyMs: Date.now() - started,

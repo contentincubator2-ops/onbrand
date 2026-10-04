@@ -745,17 +745,35 @@ export async function runOrchestra(args: {
         && !args.config.calendarMerge && !isStrategyDocTask) {
       const stCheck = stage("brandcheck", "品牌一致性檢查");
       const remaining = tierBudget - (Date.now() - startedAt) - 15_000;
-      const timeoutMs = Math.min(25_000, remaining);
+      // 2026-10-04 交付前檢查：同一次呼叫多查「是不是任務卡要的形式」「能不能直接發布」，事實從嚴
+      // （見 brandConsistency.ts 的 SYSTEM_DELIVERY）。DELIVERY_CHECK=0 可關回原本只查品牌一致性。
+      // 形式錯的稿子要改寫，給的時間比原本多（上限 40 秒，仍然只用剩餘預算）。
+      const deliveryCheck = process.env.DELIVERY_CHECK !== "0";
+      const timeoutMs = Math.min(deliveryCheck ? 40_000 : 25_000, remaining);
       const { checkBrandConsistency } = await import("./brandConsistency");
+      // label／description 可能是 {zh,en} 物件——直接 String() 會變成 "[object Object]"。
+      const tplText = (x: unknown): string =>
+        typeof x === "string" ? x : (x && typeof x === "object" ? String((x as any).zh ?? (x as any).en ?? "") : "");
+      const taskLabelText = tplText((args.template as any).label) || String(args.template.id);
+      const lengthLine = args.config.captionMaxChars > 0
+        ? `長度：${args.config.captionMinChars}-${args.config.captionMaxChars} 字。` : "";
       const results = await Promise.all(captions.map(async (v, vi) => {
         if (!v?.caption || v.caption.length > 6000) return null;
+        const taskSpec = deliveryCheck ? [
+          `任務卡：${taskLabelText}`,
+          tplText((args.template as any).description) ? `說明：${tplText((args.template as any).description)}` : "",
+          captions.length > 1 ? `這張卡一次產出 ${captions.length} 個版本，現在檢查的是其中一版「${v.label ?? vi + 1}」——只需要是這一版自己完整的成品。` : "",
+          lengthLine,
+          `寫法要求（任務卡給寫手的指令，節錄）：\n${String(args.template.systemPrompt ?? "").replace(/\{label\}/g, String(v.label ?? "")).slice(0, 2400)}`,
+        ].filter(Boolean).join("\n") : undefined;
         const res = await checkBrandConsistency({
           caption: v.caption,
           brandPrefix,
           userMsg,
-          taskLabel: String((args.template as any).label ?? args.template.id),
+          taskLabel: taskLabelText,
           isZhTW: brandMarket.isZhTW,
           timeoutMs,
+          ...(taskSpec ? { taskSpec } : {}),
         });
         if (res.status === "fixed") {
           // 修正稿一樣要過品牌硬規則與格式合約，跟禁用詞改寫後同一套修補。

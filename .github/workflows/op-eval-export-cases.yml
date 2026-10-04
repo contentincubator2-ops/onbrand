@@ -34,6 +34,10 @@ on:
         description: "Cards in parallel (1-6)"
         required: false
         default: '3'
+      useBranch:
+        description: "1 = run this commit's server code from a temp copy; 0 = run the deployed dev code"
+        required: false
+        default: '1'
       taskIds:
         description: "Only these task ids (comma separated, optional)"
         required: false
@@ -62,18 +66,39 @@ jobs:
           ALL_CARDS: ${{ github.event.inputs.allCards || '1' }}
           SUITES: ${{ github.event.inputs.suites || 'cards' }}
           CONCURRENCY: ${{ github.event.inputs.concurrency || '3' }}
+          # USE_BRANCH=1：跑「這個 commit」的 server 程式（放在 /tmp 的暫存副本），不是 dev 站已部署的那份。
+          # 用來在合併前比較修改前後的分數；不動 /opt/onbrand/current，也不重啟任何服務。
+          USE_BRANCH: ${{ github.event.inputs.useBranch || '1' }}
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          GH_SHA: ${{ github.sha }}
         with:
           host: ${{ secrets.VM_HOST }}
           username: ${{ secrets.VM_USER }}
           key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
           command_timeout: 320m
-          envs: SCRIPT_B64,BRAND_IDS,PER_CHANNEL,TASK_IDS,ALL_CARDS,SUITES,CONCURRENCY
+          envs: SCRIPT_B64,BRAND_IDS,PER_CHANNEL,TASK_IDS,ALL_CARDS,SUITES,CONCURRENCY,USE_BRANCH,GH_TOKEN,GH_REPO,GH_SHA
           script: |
             set -e
             cd /opt/onbrand/current/skills/ai-talent
             set -a; source .env 2>/dev/null; set +a
             export BRAND_IDS PER_CHANNEL TASK_IDS ALL_CARDS SUITES CONCURRENCY
             echo "commit on box: $(readlink -f /opt/onbrand/current | sed 's#.*/##')"
+            if [ "$USE_BRANCH" = "1" ]; then
+              LIVE=$(pwd)
+              SHADOW=/tmp/onbrand-evalshadow
+              rm -rf "$SHADOW" && mkdir -p "$SHADOW"
+              trap 'rm -rf /tmp/onbrand-evalshadow' EXIT
+              curl -sfL -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" \
+                "https://api.github.com/repos/$GH_REPO/tarball/$GH_SHA" \
+                | tar -xz -C "$SHADOW" --strip-components=1 --wildcards '*/skills/ai-talent/*'
+              cd "$SHADOW/skills/ai-talent"
+              ln -s "$LIVE/node_modules" node_modules
+              cp "$LIVE/.env" .env
+              echo "shadow: branch commit $GH_SHA ($(find server -name '*.ts' | wc -l) server files)"
+              ./node_modules/.bin/tsx scripts/eval/export-cases.ts
+              exit 0
+            fi
             mkdir -p scripts/eval
             F=scripts/eval/.export-cases.run.ts
             echo "$SCRIPT_B64" | base64 -d > "$F"
