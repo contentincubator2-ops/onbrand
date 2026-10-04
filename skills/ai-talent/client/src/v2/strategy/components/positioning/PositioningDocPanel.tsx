@@ -625,7 +625,7 @@ export default function PositioningDocPanel({
           kind="folder"
           size="sm"
           title={en ? "No positioning documents yet" : "還沒收到任何定位文件"}
-          action={{ label: en ? "Upload a document" : "上傳文件", onPress: () => fileRef.current?.click() }}
+          // 2026-10-04：上方工具列已有「上傳文件」，空狀態不再重複放第二顆。
         />
       ) : (
         <div className="flex flex-col gap-2">
