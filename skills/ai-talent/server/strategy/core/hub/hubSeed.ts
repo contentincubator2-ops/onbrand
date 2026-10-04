@@ -44,7 +44,7 @@ export async function seedHub(opts: { reset?: boolean } = {}) {
   if (opts.reset) {
     const [org] = await q(`SELECT id FROM hub_org WHERE slug = ?`, [HUB_ORG.slug]);
     if (org) {
-      for (const t of ["hub_events", "hub_metrics", "hub_clicks", "hub_links", "hub_posts", "hub_skills", "hub_facts", "hub_reps", "hub_wording", "hub_regulations"]) {
+      for (const t of ["hub_messages", "hub_events", "hub_metrics", "hub_clicks", "hub_links", "hub_posts", "hub_skills", "hub_facts", "hub_reps", "hub_wording", "hub_regulations"]) {
         await exec(`DELETE FROM ${t} WHERE org_id = ?`, [org.id]);
       }
       await exec(`DELETE p FROM hub_prices p JOIN hub_solutions s ON s.id = p.solution_id WHERE s.org_id = ?`, [org.id]);
@@ -206,6 +206,12 @@ export async function seedHub(opts: { reset?: boolean } = {}) {
       filled += affectedRows;
     }
     console.log(`[hub-seed] rep profiles: ${filled} filled`);
+  }
+
+  // 2026-10-04：示範業務的對話紀錄（只給還沒有任何紀錄的人）。
+  {
+    const { seedDemoConversations } = await import("../../../platform/core/hub/conversationLog");
+    console.log(`[hub-seed] demo conversations: ${await seedDemoConversations(org.id)} messages`);
   }
 
   /**

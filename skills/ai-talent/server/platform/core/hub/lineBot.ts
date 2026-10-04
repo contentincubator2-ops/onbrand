@@ -493,6 +493,17 @@ export async function processLineEvent(event: any): Promise<void> {
     // Reply tokens last about a minute; slow generations fall back to push.
     if (Date.now() - started < 50_000 && event.replyToken) await lineReply(event.replyToken, messages);
     else await linePush(userId, messages);
+    // 2026-10-04：逐則存進 hub_messages，給業務個人頁的對話紀錄。送出之後才記，
+    // 而且吞錯——紀錄寫不進去不能讓業務收不到回覆。綁定那一句（還沒有 rep）
+    // 由綁定後的 rep 承接，所以重新查一次。
+    const who = rep ?? (await getRepByLineUser(userId));
+    if (who) {
+      const log = await import("./conversationLog");
+      const kind = event.type === "postback" ? "postback" : event.type === "follow" ? "follow" : "text";
+      const text = event.type === "postback" ? String(event.postback?.data ?? "") : event.type === "follow" ? "(followed the account)" : String(event.message?.text ?? "");
+      await log.recordInbound({ orgId: who.orgId, repId: who.id, channel: "line", kind, text });
+      await log.recordOutbound({ orgId: who.orgId, repId: who.id, channel: "line", messages });
+    }
   } catch (err: any) {
     console.error("[hub.line] event failed:", err?.message ?? err);
     const fallback: BotMessage[] = [{ type: "text", text: T(rep, "抱歉，剛剛處理失敗了，請再試一次。", "Sorry, that failed — please try again.") }];

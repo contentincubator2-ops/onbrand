@@ -28,6 +28,14 @@ import { POLICY_PACKS, publicPack } from "../../content/core/hub/policyPacks";
 
 const channel = z.enum(["linkedin", "facebook", "instagram", "line"]);
 
+/** 總部手機模擬器的往來也進對話紀錄（channel = simulator），個人頁看得到。 */
+async function logSimulator(rep: HubRep | null, kind: "menu" | "postback" | "text", text: string, out: any[]) {
+  if (!rep) return;
+  const log = await import("../core/hub/conversationLog");
+  await log.recordInbound({ orgId: rep.orgId, repId: rep.id, channel: "simulator", kind, text });
+  await log.recordOutbound({ orgId: rep.orgId, repId: rep.id, channel: "simulator", messages: out });
+}
+
 async function isAdminUser(userId: number | undefined): Promise<boolean> {
   if (!userId) return false;
   const [u] = await q(`SELECT role, email FROM users WHERE id = ? LIMIT 1`, [userId]);
@@ -994,6 +1002,15 @@ const adminRouter = router({
     };
   }),
 
+  /** 業務個人頁的對話紀錄：一段一段，每則出去的訊息已轉成 WhatsApp payload。 */
+  repConversations: adminProcedure.input(z.object({ repId: z.number().int().positive() })).query(async ({ input }) => {
+    const org = await getOrg();
+    const rep = await getRep(input.repId);
+    if (!rep || rep.orgId !== org.id) throw new TRPCError({ code: "NOT_FOUND" });
+    const { listRepConversations } = await import("../core/hub/conversationLog");
+    return { market: rep.market, orgName: org.name, sessions: await listRepConversations(rep.id, rep.market) };
+  }),
+
   updateRepProfile: adminProcedure
     .input(z.object({
       repId: z.number().int().positive(),
@@ -1111,21 +1128,30 @@ const adminRouter = router({
     .input(z.object({ repId: z.number().int(), action: z.enum(["write", "featured", "lookup", "share", "stats", "ask"]) }))
     .mutation(async ({ input }) => {
       const bot = await import("../core/hub/lineBot");
-      return bot.handleMenu(await bot.simulatorContext(input.repId), input.action);
+      const ctx = await bot.simulatorContext(input.repId);
+      const out = await bot.handleMenu(ctx, input.action);
+      await logSimulator(ctx.rep, "menu", `a=${input.action}`, out);
+      return out;
     }),
 
   simulatorPostback: adminProcedure
     .input(z.object({ repId: z.number().int(), data: z.string().max(300) }))
     .mutation(async ({ input }) => {
       const bot = await import("../core/hub/lineBot");
-      return bot.handlePostback(await bot.simulatorContext(input.repId), input.data);
+      const ctx = await bot.simulatorContext(input.repId);
+      const out = await bot.handlePostback(ctx, input.data);
+      await logSimulator(ctx.rep, "postback", input.data, out);
+      return out;
     }),
 
   simulatorSay: adminProcedure
     .input(z.object({ repId: z.number().int(), text: z.string().min(1).max(2000) }))
     .mutation(async ({ input }) => {
       const bot = await import("../core/hub/lineBot");
-      return bot.handleText(await bot.simulatorContext(input.repId), input.text);
+      const ctx = await bot.simulatorContext(input.repId);
+      const out = await bot.handleText(ctx, input.text);
+      await logSimulator(ctx.rep, "text", input.text, out);
+      return out;
     }),
 
   integrations: adminProcedure.query(async () => {

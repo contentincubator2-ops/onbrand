@@ -17,6 +17,7 @@ import { Card, ChannelLabel, DemoTag, ErrorNote, Loading, Pill, RepPhoto, Sectio
 import { useHubLang, useT } from "../lang";
 import { CopyButton } from "../components/reps-CopyButton";
 import ProfileEditModal, { photoFileToDataUrl } from "../components/reps-ProfileEditModal";
+import ConversationHistory from "../components/reps-ConversationHistory";
 
 function Chip({ children }: { children: React.ReactNode }) {
   return (
@@ -265,6 +266,7 @@ export default function HubRepProfilePage() {
               <Empty>{t("No stories yet — posts will fall back to the company's voice.", "還沒有故事——貼文會只用公司的語氣。")}</Empty>
             )}
           </Card>
+          <ConversationHistory repId={repId} firstName={firstName} />
         </div>
 
         {/* ── right: their AI and their access ───────────────────────────── */}

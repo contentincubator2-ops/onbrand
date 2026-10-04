@@ -362,6 +362,30 @@ export const HUB_DDL: string[] = [
    * 我們只有一個商業組合，所以不存 parent BSUID —— 那是給「母帳號底下多個組合
    * 共用同一個用戶 ID」用的。
    */
+  /**
+   * 2026-10-04 (CJ「人設卡上還可以查到對話紀錄，按下去後模擬出 WhatsApp 的對話介面」)。
+   *
+   * 之前 bot 的往來只在 hub_events 留一行摘要（menu_tap / ask_ai 前 120 字），
+   * bot 回了什麼完全沒存。這張表逐則存：進來的存文字或 postback data，出去的
+   * 存通道無關的 BotMessage[]——要給 WhatsApp 看就當場用 toWhatsAppMessages
+   * 轉，跟真的送出去走同一支程式，畫面就不會跟實際行為對不上。
+   *
+   * channel：line / whatsapp / simulator（總部的手機模擬器）。
+   */
+  `CREATE TABLE IF NOT EXISTS hub_messages (
+    id              BIGINT       NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    org_id          INT          NOT NULL,
+    rep_id          INT          NOT NULL,
+    channel         VARCHAR(16)  NOT NULL,
+    direction       VARCHAR(3)   NOT NULL,
+    kind            VARCHAR(12)  NOT NULL,
+    text            TEXT         NULL,
+    payload         JSON         NULL,
+    is_demo         TINYINT      NOT NULL DEFAULT 0,
+    created_at      DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    INDEX idx_rep_created (rep_id, created_at)
+  ) ${TAIL}`,
+
   `CREATE TABLE IF NOT EXISTS hub_channel_identities (
     id              INT          NOT NULL AUTO_INCREMENT PRIMARY KEY,
     org_id          INT          NOT NULL,
