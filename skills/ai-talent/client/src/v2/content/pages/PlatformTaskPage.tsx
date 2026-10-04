@@ -47,6 +47,7 @@ import { getStrategyPublicGenerationState } from "../lib/strategyContentEnvelope
 import { checkViralSource, platformLabelForTask, taskNeedsViralSource } from "../lib/viralSourceGuard";
 import { intakeExtraFields, missingRequiredInputs, type IntakeField } from "../lib/taskIntake";
 import TaskCardComposer, { type ComposerChannel } from "../../strategy/components/taskCard/TaskCardComposer";
+import ListingBatchModal from "../components/batch/ListingBatchModal";
 import { AddEntityModal } from "../../strategy/components/AddEntityModal";
 import RewriteDraftModal from "../components/quickTask/RewriteDraftModal";
 import OwnCardLabelsEditor from "../components/quickTask/OwnCardLabelsEditor";
@@ -306,6 +307,7 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
   // 比較明顯的右上方」): 自建任務卡的入口。
   const [composerOpen, setComposerOpen] = useState(false);
   const [rewriteOpen, setRewriteOpen] = useState(false);
+  const [batchOpen, setBatchOpen] = useState(false);
   const [resumeCardId, setResumeCardId] = useState<string | null>(null);
   const [running, setRunning] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -1411,6 +1413,12 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                 >
                   {lang === "en" ? "Rewrite my text" : "改寫原文"}
                 </Button>
+                {/* 2026-10-05：商品頁（電商／開店平台）的批次產出——同一張卡、很多個商品，逐筆核准後匯出。 */}
+                {customChannel?.format === "listing" && (
+                  <Button size="sm" variant="flat" onPress={() => setBatchOpen(true)}>
+                    {lang === "en" ? "Batch write" : "批次產出"}
+                  </Button>
+                )}
                 {/* 2026-09-29（CJ「新增任務卡有兩個地方，功能重複」）：右上角的
                     「新增任務卡」拿掉，只留卡片旁邊那張虛線卡；品牌自建從那張卡
                     打開的選卡器裡進。 */}
@@ -2798,6 +2806,15 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
         initialCardId={resumeCardId}
         onPublished={() => { void listQuery?.refetch?.(); void ownCardsQuery?.refetch?.(); }}
       />
+      {customChannel?.format === "listing" && !!brandId && (
+        <ListingBatchModal
+          isOpen={batchOpen}
+          onClose={() => setBatchOpen(false)}
+          brandId={brandId}
+          channelId={platform}
+          channelLabel={lang === "en" ? meta.label : meta.labelZh}
+        />
+      )}
 
       <RewriteDraftModal
         isOpen={rewriteOpen}

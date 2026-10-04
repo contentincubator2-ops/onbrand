@@ -149,7 +149,8 @@ export default function NavItemPicker({ open, en, brandName, catalog, selected, 
           {items.map((c) => {
             const on = draft.includes(c.id);
             return (
-              <button key={c.id} type="button" onClick={() => toggle(c.id)}
+              <div key={c.id} className="flex flex-col">
+              <button type="button" onClick={() => toggle(c.id)}
                 className={`flex items-start gap-3 rounded-xl border px-3 py-2.5 text-left transition ${on ? "border-neutral-900 bg-neutral-50" : "border-neutral-200 bg-white hover:border-neutral-400"}`}>
                 <span className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-[15px] ${on ? "bg-neutral-900 text-white" : "bg-neutral-100 text-neutral-500"}`}>{c.icon}</span>
                 <span className="min-w-0 flex-1">
@@ -158,6 +159,17 @@ export default function NavItemPicker({ open, en, brandName, catalog, selected, 
                 </span>
                 <span className={`mt-1 flex h-4 w-4 shrink-0 items-center justify-center rounded border text-[11px] ${on ? "border-neutral-900 bg-neutral-900 text-white" : "border-neutral-300"}`}>{on ? <CheckIcon size={9} /> : null}</span>
               </button>
+              {/* 自己加的 tray 不論有沒有放在側欄，都能在這裡刪（底下有任務卡時伺服器會擋）。 */}
+              {c.custom && onRemoveChannel && (
+                <button type="button" disabled={busy}
+                  onClick={async () => {
+                    if (!window.confirm(en ? `Delete the "${c.label}" tray? (Only possible when it has no cards.)` : `刪除「${c.label}」這個 tray？（底下沒有任務卡才能刪）`)) return;
+                    setBusy(true);
+                    try { await onRemoveChannel(c.id); setDraft((d) => d.filter((x) => x !== c.id)); } finally { setBusy(false); }
+                  }}
+                  className="mt-1 self-end px-1 text-[11px] text-neutral-400 hover:text-red-600 disabled:opacity-40">{en ? "Delete tray" : "刪除這個 tray"}</button>
+              )}
+              </div>
             );
           })}
         </div>

@@ -43,6 +43,74 @@ function unregisterRunKey(runKey: string | undefined) {
   void import("../../../platform/core/llm/runCancel").then((m) => m.unregisterRun(runKey)).catch(() => {});
 }
 
+export interface RunSingleTaskInput {
+  taskId: string;
+  inputs: Record<string, string>;
+  brandId?: number;
+  productId?: number | null;
+  eventId?: number | null;
+  spotRef?: { scenarioId: string; spotIndex: number } | null;
+  campaignItem?: z.infer<typeof CAMPAIGN_ITEM_INPUT>;
+  runKey?: string;
+}
+
+/**
+ * 單篇（30s）任務的完整執行：成本預檢 → 扣點 → 解析任務 → 方案閘門 → 必填檢查 → 編排。
+ *
+ * 2026-10-05：從 runOrchestra mutation 抽出來，讓「批次產出」（listingBatchRunner）走**同一條**
+ * 路徑——扣點、方案閘門、必填檢查、產出落地全部一致，不另寫一套會漂掉的版本。
+ */
+export async function runSingleTask(userId: number, rawInput: RunSingleTaskInput) {
+  const input = { ...rawInput, taskId: normalizeTaskId(rawInput.taskId) }; // 100s→99s compat
+  // 2026-05-08 (P0-D): pre-flight cost guard. Trial users hitting
+  // wallet floor or daily $5 cap are stopped before LLM fan-out.
+  const { preflightCostCheck } = await import("../../../platform/core/llm/llmWithBilling");
+  const guard = await preflightCostCheck(userId);
+  if (!guard.ok) {
+    throw new TRPCError({ code: "FORBIDDEN", message: guard.reason });
+  }
+  // 2026-05-12: paywall quota check (plan task_30s cap)
+  // 2026-05-14: points-based gating
+  const { assertPoints, deductPoints } = await import("../../../platform/core/billing/pointsService");
+  await assertPoints(userId, "task_30s");
+  await deductPoints(userId, "task_30s", { kind: "task", id: null });
+  const cancelCtx = await beginCancellableRun(input.runKey, userId, "task_30s");
+  const { runOrchestra } = await import("../../core/engine/quickTaskOrchestra");
+  // 這支只收 30s（60s/99s 各有自己的 mutation），所以解析完再擋 tier，
+  // 而不是靠「只查 30s 目錄」來擋 —— 後者查不到時的錯誤訊息會說謊，
+  // 把一個存在的 60s 任務講成 "Unknown"。
+  const resolved = await resolveTaskOrThrow(input.taskId);
+  // 2026-09-07 執行層方案閘門：列表看不到不等於不能用。
+  await assertTaskAllowed({
+    userId,
+    brandId: input.brandId ?? null,
+    info: gateInfoFor(input.taskId),
+  });
+  if (resolved.tier !== "30s") {
+    throw new Error(`任務「${input.taskId}」是 ${resolved.tier}，這個入口只收 30s（請走 runOrchestra60 / runOrchestra99）`);
+  }
+  const template = resolved.template;
+  const config = resolved.config;
+  // Required-field check
+  // 只驗 modal 真的渲染得出來的欄位（taskIntake 是 client/server 共用的
+  // 那一份判斷），所以不會擋一格使用者根本看不到的必填。
+  assertIntakeComplete(template, input.inputs);
+  const orchestraArgs = {
+    template,
+    config,
+    inputs: input.inputs,
+    brandId: input.brandId,
+    productId: input.productId ?? null,
+    eventId: input.eventId ?? null,
+    userId,
+    audienceTag: await resolveAudienceTag(userId, input.brandId, input.spotRef),
+    campaignItem: input.campaignItem ? await loadCampaignItem(input.campaignItem, userId) : null,
+    ...cancelCtx,
+  };
+
+  return runOrchestra(orchestraArgs).finally(() => unregisterRunKey(input.runKey));
+}
+
 export const runProcedures = {
   /**
    * Stop a running task. The run stops issuing LLM / image calls at the next
@@ -435,57 +503,7 @@ export const runProcedures = {
         runKey: RUN_KEY,
       }),
     )
-    .mutation(async ({ ctx, input }) => {
-      input = { ...input, taskId: normalizeTaskId(input.taskId) }; // 100s→99s compat
-      const userId = ctx.user!.id;
-      // 2026-05-08 (P0-D): pre-flight cost guard. Trial users hitting
-      // wallet floor or daily $5 cap are stopped before LLM fan-out.
-      const { preflightCostCheck } = await import("../../../platform/core/llm/llmWithBilling");
-      const guard = await preflightCostCheck(userId);
-      if (!guard.ok) {
-        throw new TRPCError({ code: "FORBIDDEN", message: guard.reason });
-      }
-      // 2026-05-12: paywall quota check (plan task_30s cap)
-      // 2026-05-14: points-based gating
-      const { assertPoints, deductPoints } = await import("../../../platform/core/billing/pointsService");
-      await assertPoints(userId, "task_30s");
-      await deductPoints(userId, "task_30s", { kind: "task", id: null });
-      const cancelCtx = await beginCancellableRun(input.runKey, userId, "task_30s");
-      const { runOrchestra } = await import("../../core/engine/quickTaskOrchestra");
-      // 這支只收 30s（60s/99s 各有自己的 mutation），所以解析完再擋 tier，
-      // 而不是靠「只查 30s 目錄」來擋 —— 後者查不到時的錯誤訊息會說謊，
-      // 把一個存在的 60s 任務講成 "Unknown"。
-      const resolved = await resolveTaskOrThrow(input.taskId);
-      // 2026-09-07 執行層方案閘門：列表看不到不等於不能用。
-      await assertTaskAllowed({
-        userId: ctx.user!.id,
-        brandId: (input as any).brandId ?? null,
-        info: gateInfoFor(input.taskId),
-      });
-      if (resolved.tier !== "30s") {
-        throw new Error(`任務「${input.taskId}」是 ${resolved.tier}，這個入口只收 30s（請走 runOrchestra60 / runOrchestra99）`);
-      }
-      const template = resolved.template;
-      const config = resolved.config;
-      // Required-field check
-      // 只驗 modal 真的渲染得出來的欄位（taskIntake 是 client/server 共用的
-      // 那一份判斷），所以不會擋一格使用者根本看不到的必填。
-      assertIntakeComplete(template, input.inputs);
-      const orchestraArgs = {
-        template,
-        config,
-        inputs: input.inputs,
-        brandId: input.brandId,
-        productId: input.productId ?? null,
-        eventId: input.eventId ?? null,
-        userId,
-        audienceTag: await resolveAudienceTag(userId, input.brandId, input.spotRef),
-        campaignItem: input.campaignItem ? await loadCampaignItem(input.campaignItem, userId) : null,
-        ...cancelCtx,
-      };
-
-      return runOrchestra(orchestraArgs).finally(() => unregisterRunKey(input.runKey));
-    }),
+    .mutation(async ({ ctx, input }) => runSingleTask(ctx.user!.id, input)),
 
   runQuick: protectedProcedure
     .input(
