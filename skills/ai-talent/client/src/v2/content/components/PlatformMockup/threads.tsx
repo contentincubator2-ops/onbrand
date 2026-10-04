@@ -12,7 +12,7 @@ import {
   faHeart, faComment, faRepeat, faPaperPlane,
   faEllipsis, faImage,
 } from "@fortawesome/free-solid-svg-icons";
-import { type MockupFields, MockupHeader, handleOf, MarkdownText } from "./shared";
+import { type MockupFields, MockupHeader, handleOf, MarkdownText, realSlideUrls } from "./shared";
 import { useLang } from "../../../../lib/i18n";
 
 const TH_BLACK = "#000000";
@@ -31,12 +31,14 @@ interface PostProps {
   imageDesc?: string;
   /** 2026-10-04：真的有圖就顯示圖（照原比例，Threads 不裁圖），沒有才畫佔位框。 */
   imageUrl?: string | null;
+  /** 多張圖（輪播）：Threads 是橫向可滑的一排，每張照原比例。給了就優先於 imageUrl。 */
+  imageUrls?: string[];
   dark?: boolean;
   isReply?: boolean;
   showConnector?: boolean;
 }
 
-function ThreadPost({ brand, handle, body, imageDesc, imageUrl, dark = false, isReply = false, showConnector = false }: PostProps) {
+function ThreadPost({ brand, handle, body, imageDesc, imageUrl, imageUrls, dark = false, isReply = false, showConnector = false }: PostProps) {
   const { lang } = useLang();
   const bg   = dark ? "#101010" : "#FFFFFF";
   const text = dark ? "#F1F1F1" : TH_BLACK;
@@ -92,7 +94,15 @@ function ThreadPost({ brand, handle, body, imageDesc, imageUrl, dark = false, is
         )}
 
         {/* Optional image */}
-        {imageUrl ? (
+        {imageUrls && imageUrls.length > 1 ? (
+          <div className="flex gap-2 overflow-x-auto mb-2 snap-x snap-mandatory">
+            {imageUrls.map((u, i) => (
+              <div key={i} className="shrink-0 snap-start rounded-xl overflow-hidden border" style={{ borderColor: bdr, width: "78%" }}>
+                <img src={u} alt="" className="block w-full h-auto" style={{ maxHeight: 420, objectFit: "contain", backgroundColor: dark ? "#1E1E1E" : TH_LIGHT }} />
+              </div>
+            ))}
+          </div>
+        ) : imageUrl ? (
           <div className="rounded-xl overflow-hidden mb-2 border" style={{ borderColor: bdr }}>
             <img src={imageUrl} alt="" className="block w-full h-auto" style={{ maxHeight: 520, objectFit: "contain", backgroundColor: dark ? "#1E1E1E" : TH_LIGHT }} />
           </div>
@@ -178,12 +188,13 @@ function PhoneChrome({ dark, children }: { dark: boolean; children: React.ReactN
 ───────────────────────────────────────────────────── */
 export function ThreadsPost({
   title, brandName, variantLabel,
-  liveTitle, liveCaption, liveImageDesc, liveImageUrl, liveImageStatus,
+  liveTitle, liveCaption, liveImageDesc, liveImageUrl, liveImageStatus, liveCards,
 }: MockupFields) {
   const { lang } = useLang();
   const brand  = brandName ?? (lang === "en" ? "Brand account" : "品牌帳號");
   const handle = handleOf(brandName);
   const body   = liveCaption ?? liveTitle ?? title;
+  const slideUrls = realSlideUrls({ liveCards, liveImageUrl, liveImageStatus });
 
   return (
     <div className="w-full max-w-[375px] mx-auto">
@@ -195,6 +206,7 @@ export function ThreadsPost({
           body={body}
           imageDesc={liveImageDesc}
           imageUrl={liveImageUrl && liveImageStatus === "ready" ? liveImageUrl : null}
+          imageUrls={slideUrls.length > 1 ? slideUrls : undefined}
           dark
           showConnector={false}
         />

@@ -6,7 +6,7 @@ describe("imageCardRouter", () => {
   it("builds and exposes list / propose / render / saveAsPost / tray / setTray", async () => {
     const { imageCardRouter } = await import("./imageCardRouter");
     const procs = Object.keys((imageCardRouter as any)._def.procedures);
-    expect(procs.sort()).toEqual(["list", "propose", "render", "saveAsPost", "setTray", "tray"]);
+    expect(procs.sort()).toEqual(["list", "planSeries", "propose", "render", "saveAsPost", "setTray", "tray", "uploadTitled"]);
   }, 60_000);
 
   it("publicSpec tells the client when Nano Banana cannot hit the ratio", async () => {

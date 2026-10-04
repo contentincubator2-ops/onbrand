@@ -38,6 +38,12 @@ export interface ImageDirection {
   promptEn: string;
 }
 
+/** 使用者訊息：有主體照片就把圖一起附上（文字在前），沒有就維持純文字。 */
+export function withSubjectImage(text: string, dataUrl?: string): any {
+  if (!dataUrl) return text;
+  return [{ type: "text", text }, { type: "image_url", image_url: { url: dataUrl } }];
+}
+
 export interface ProposeResult {
   headlineZh: string;
   directions: ImageDirection[];
@@ -83,8 +89,13 @@ export function normalizeDirections(raw: any, copy: string): ProposeResult {
   return { headlineZh, directions };
 }
 
-export function directionsSystemPrompt(spec: PlatformImageSpec, withProduct: boolean): string {
-  return `你是資深商業攝影美術指導。使用者貼了一段社群文案，要做一張「${spec.labelZh}」（${spec.width}×${spec.height}）。
+export function directionsSystemPrompt(spec: PlatformImageSpec, withProduct: boolean, count = 1): string {
+  const series = count > 1
+    ? `這次是一組 ${count} 張的系列圖（輪播／相簿）：每個方向要是「能貫穿整組」的視覺概念（統一的色調、光線、構圖語言），之後會再逐張規劃每一張的內容。promptEn 描述整組的共同風格與第一張（封面）的畫面。
+`
+    : "";
+  return `你是資深商業攝影美術指導。使用者貼了一段社群文案，要做${count > 1 ? `一組 ${count} 張的` : "一張"}「${spec.labelZh}」（${spec.width}×${spec.height}）。
+${series}
 先不要生圖——提出 3 個截然不同的畫面方向讓使用者挑（場景、構圖、光線、情緒要真的不同，不能只換顏色）。
 
 每個方向：
@@ -93,7 +104,7 @@ export function directionsSystemPrompt(spec: PlatformImageSpec, withProduct: boo
 - paletteZh：色調一句話（優先用品牌色）
 - whyZh：為什麼適合這篇文案 20–40 字
 - promptEn：給圖片模型的英文場景描述 60–120 字（主體、環境、光線、鏡頭、情緒），必須符合這張卡的構圖規則：${spec.compositionEn}
-${spec.compose ? "- 這是細長 Banner 的方形主體圖：promptEn 只描述單一主體，放在一整片純色背景上（不要場景、桌面、窗戶、地平線），四周留白。\n" : ""}${withProduct ? "- 使用者會附上真實產品照：promptEn 只描述產品以外的場景、光線、擺放位置，不要重新描述或改寫產品外觀。\n" : ""}
+${spec.compose ? "- 這是細長 Banner 的方形主體圖：promptEn 只描述單一主體，放在一整片純色背景上（不要場景、桌面、窗戶、地平線），四周留白。\n" : ""}${withProduct ? "- 使用者附上了一張真實照片（會一起給你看）：先看懂照片裡的主體是什麼，3 個方向都必須以這個主體為主角，sceneZh 要寫出主體在畫面裡怎麼出現；promptEn 只描述主體以外的場景、光線、擺放位置，不要重新描述或改寫主體的外觀。\n" : ""}
 另外給 headlineZh：從文案濃縮一句 6–14 字的圖上標題（會疊在圖上，不是畫進圖裡）。
 
 規則：畫面裡不能有任何文字、招牌字、logo 字樣；不要提到競品品牌。
@@ -111,14 +122,18 @@ export async function proposeImageDirections(args: {
    * （buildBrandPrefix，也就是「大腦」tray 上列出的那一份）。
    */
   brainPrefix?: string;
+  /** 一組幾張（輪播／相簿）；預設單張。 */
+  count?: number;
+  /** 用戶選的主體照片（縮小後的 data URL）。給了就讓 AI 真的看到它，方向以它為主角。 */
+  subjectImageDataUrl?: string;
 }): Promise<ProposeResult> {
   const { invokeLLM } = await import("../../../platform/core/llm/llm");
   const brain = args.brainPrefix?.trim() ? `品牌大腦（標題的用詞、語氣與畫面方向都要符合）：${args.brainPrefix}\n\n` : "";
   const user = `${brain}品牌資訊：\n${brandBlock(args.brand) || "（尚未設定）"}\n\n${args.productName ? `產品：${args.productName}\n\n` : ""}文案：\n${args.copy}`;
   const res = await invokeLLM({
     messages: [
-      { role: "system", content: directionsSystemPrompt(args.spec, !!args.productName) },
-      { role: "user", content: user },
+      { role: "system", content: directionsSystemPrompt(args.spec, !!args.productName || !!args.subjectImageDataUrl, args.count ?? 1) },
+      { role: "user", content: withSubjectImage(user, args.subjectImageDataUrl) },
     ],
     maxTokens: 2200,
   });
@@ -133,7 +148,7 @@ export function buildImageCardPrompt(args: {
   scenePromptEn: string;
   brand: BrandVisualContext;
   withProduct: boolean;
-  reference?: "previous" | null;
+  reference?: "previous" | "style" | null;
   instruction?: string;
 }): string {
   const lines: string[] = [];
@@ -146,6 +161,14 @@ export function buildImageCardPrompt(args: {
       "REFERENCE IMAGE: the attached image is the previous version of this visual. Keep the same subject, " +
       "product, palette, lighting and mood, but re-compose it natively for the CANVAS above (do not stretch, " +
       "letterbox, or simply crop it).",
+      "",
+    );
+  }
+  if (args.reference === "style") {
+    lines.push(
+      "REFERENCE IMAGE: the attached image is slide 1 of a multi-image set. Match its colour palette, lighting, " +
+      "art direction, texture and mood exactly so every slide looks like one family. Do NOT copy its subject or " +
+      "composition: depict the NEW scene below. If the same product or object appears, keep it identical to the reference.",
       "",
     );
   }
@@ -302,6 +325,8 @@ export async function renderImageCard(args: {
   productImageUrl?: string;
   /** 上一版（對話修改）或來源圖（延伸尺寸）。只接受本站產出的圖。 */
   referenceImageUrl?: string;
+  /** previous＝同一張的上一版（預設）；style＝整組的第 1 張，只借風格、畫面另外寫。 */
+  referenceMode?: "previous" | "style";
   instruction?: string;
 }): Promise<RenderOutcome> {
   const modelId = resolveStillImageModel(args.modelChoice);
@@ -321,7 +346,7 @@ export async function renderImageCard(args: {
     scenePromptEn: args.scenePromptEn,
     brand: args.brand,
     withProduct: !!args.productImageUrl,
-    reference: args.referenceImageUrl ? "previous" : null,
+    reference: args.referenceImageUrl ? (args.referenceMode ?? "previous") : null,
     instruction: args.instruction,
   });
   const outcome = await generateStillImage(modelId, {
@@ -346,4 +371,91 @@ export async function renderImageCard(args: {
     status: "ready", modelId, url: saveFinal(fin.buffer, args.spec),
     width: args.spec.width, height: args.spec.height, bytes: fin.bytes,
   };
+}
+
+
+// ── 整組（輪播／相簿）：依文案結構逐張規劃 ──────────────────────────────
+
+export interface SeriesSlide {
+  /** 這張在整組裡的角色：封面／重點／結尾（給人看的一個詞）。 */
+  roleZh: string;
+  /** 圖上標題（會疊在圖上，不是 AI 畫的）。 */
+  titleZh: string;
+  /** 這張畫什麼（給人看的說明）。 */
+  sceneZh: string;
+  /** 給圖片模型的英文場景描述。 */
+  promptEn: string;
+}
+
+export const MAX_SERIES = 10;
+
+export function seriesSystemPrompt(spec: PlatformImageSpec, count: number, withProduct: boolean): string {
+  return `你是社群內容的資深美術指導。使用者貼了一段文案，要把它做成一組 ${count} 張的「${spec.labelZh}」（${spec.width}×${spec.height}），而且已經選定了整組的視覺方向。
+請「依文案的結構」把內容拆成恰好 ${count} 張，每張只講一件事：
+- 第 1 張＝封面：用最能讓人停下來的那句話／概念。
+- 中間幾張＝依文案原本的順序，一張一個重點（不要自己編文案沒有的事實、數字、人名）。
+- 最後 1 張＝收尾：結論、行動呼籲或情緒收束。
+${count === 2 ? "（只有 2 張時：封面＋收尾。）" : ""}
+每張輸出：
+- roleZh：角色，2–4 字（封面／重點一／重點二…／收尾）
+- titleZh：圖上標題 6–14 字，從文案濃縮；標題之間要接得起來、不重複
+- sceneZh：這張的畫面 30–60 字，讓不懂攝影的人看得懂
+- promptEn：給圖片模型的英文場景描述 50–110 字。每張的畫面都要不同，但共用方向的色調、光線與質感；必須符合構圖規則：${spec.compositionEn}
+${withProduct ? "使用者附上了一張真實照片（會一起給你看）：只有第 1 張會直接帶入這個主體，第 1 張要以它為主角；其餘張的 promptEn 不要重新描述主體外觀，需要出現時寫「the same subject as in the reference」。" : ""}
+規則：畫面裡不能有任何文字、招牌字、logo 字樣；不要提到競品品牌。
+只輸出 JSON：{"slides":[{"roleZh":"...","titleZh":"...","sceneZh":"...","promptEn":"..."}]}`;
+}
+
+/** 把 LLM 回覆整理成恰好 count 張；缺欄位的張直接丟掉，數量對不上就回空（由呼叫端報錯，不補假內容）。 */
+export function normalizeSeriesSlides(raw: any, count: number): SeriesSlide[] {
+  const list: any[] = Array.isArray(raw?.slides) ? raw.slides : [];
+  const slides = list
+    .map((d) => ({
+      roleZh: clip(d?.roleZh ?? d?.role, 8),
+      titleZh: clip(d?.titleZh ?? d?.title, 24),
+      sceneZh: clip(d?.sceneZh ?? d?.scene, 160),
+      promptEn: clip(d?.promptEn ?? d?.prompt, 1500),
+    }))
+    .filter((d) => d.titleZh && d.sceneZh && d.promptEn);
+  return slides.length >= count ? slides.slice(0, count) : [];
+}
+
+export async function planSeriesSlides(args: {
+  spec: PlatformImageSpec;
+  copy: string;
+  count: number;
+  direction: { titleZh: string; sceneZh: string; paletteZh: string; promptEn: string };
+  brand: BrandVisualContext;
+  productName?: string;
+  brainPrefix?: string;
+  subjectImageDataUrl?: string;
+}): Promise<SeriesSlide[]> {
+  const { invokeLLM } = await import("../../../platform/core/llm/llm");
+  const brain = args.brainPrefix?.trim() ? `品牌大腦（標題的用詞、語氣與畫面方向都要符合）：${args.brainPrefix}
+
+` : "";
+  const d = args.direction;
+  const user = `${brain}品牌資訊：
+${brandBlock(args.brand) || "（尚未設定）"}
+
+${args.productName ? `產品：${args.productName}
+
+` : ""}`
+    + `已選定的整組方向：${d.titleZh}
+畫面：${d.sceneZh}
+色調：${d.paletteZh}
+風格 prompt：${d.promptEn}
+
+文案：
+${args.copy}`;
+  const res = await invokeLLM({
+    messages: [
+      { role: "system", content: seriesSystemPrompt(args.spec, args.count, !!args.productName || !!args.subjectImageDataUrl) },
+      { role: "user", content: withSubjectImage(user, args.subjectImageDataUrl) },
+    ],
+    maxTokens: 400 + args.count * 450,
+  });
+  const slides = normalizeSeriesSlides(parseJsonLoose(res.choices?.[0]?.message?.content as any), args.count);
+  if (!slides.length) throw new Error(`AI 沒有規劃出 ${args.count} 張可用的內容，請再試一次。`);
+  return slides;
 }
