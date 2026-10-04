@@ -35,7 +35,8 @@ import {
   listBrandTaskCards, getBrandTaskCard, mutateBrandTaskCards,
   measureSamples, slugifyCardName, cardTemplate, cardConfig, duplicateCard,
   factLeaks, redactFactLeaks, verbatimSamples, illustrationInFlight,
-  MAX_CARDS_PER_BRAND, MAX_SAMPLES, MAX_SAMPLE_CHARS,
+  numberThread, renderNumbered, chunkLineRanges, parsePieceRanges, sliceByRanges,
+  MAX_CARDS_PER_BRAND, MAX_SAMPLES, MAX_SAMPLE_CHARS, MAX_SOURCES_CHARS,
   registerBrandTaskCardSource,
 } from "../core/catalog/brandTaskCards";
 
@@ -98,6 +99,7 @@ async function distilSkill(args: {
   primaryQuestion: string;
   askFields: BrandTaskCardField[];
   measured: BrandTaskCard["measured"];
+  sources?: string;
 }): Promise<string> {
   const brandPrefix = await buildBrandPrefix(args.brandId, null, null, "core").catch(() => "");
   const fieldList = args.askFields.length
@@ -112,7 +114,7 @@ async function distilSkill(args: {
 額外欄位：
 ${fieldList}
 
-【最重要的兩條】
+【最重要的三條】
 1. **規則要可逐字檢查。** 不要寫「語氣溫暖專業」這種形容詞 —— 要寫「開場不用問句」
    「每段不超過三句」「CTA 一律放最後一行且用祈使句」「不用驚嘆號」這種能逐條核對的規則。
    寫完自問：另一個人拿這份規則檢查一篇稿，能不能明確說出「這條有遵守 / 沒遵守」？不能就重寫。
@@ -123,7 +125,22 @@ ${fieldList}
    舉要價格的例子時寫「兩盒 X 元」或「引用當次輸入的價格」，**不要寫「兩盒 499」**。
    交稿前自己掃一遍：規則裡出現的每一個兩位數以上的數字，都必須是字數或段落數，
    不能是範例裡的價格或數量。
-
+3. **先判斷範例是哪一種，再決定這份 SKILL 教什麼。**
+   - 如果範例本身就是貼文／文案成品：學它們的寫法（骨架）。
+   - 如果範例其實是在**介紹行銷手法、做法、案例的文章**（例如「小店家怎麼做 IG」「五個促購技巧」）：
+     那它們不是要被模仿的貼文。SKILL 要教的是「把這些手法套用到每次輸入的主題上，寫出一篇貼文」
+     —— 抽出文章裡的**手法**（用什麼角度、什麼順序、什麼鉤子、什麼收尾），寫成可執行的步驟。
+     **絕對不可以把文章舉例用的店家、商品、場景、裝潢、人物當成要寫的內容。**
+   - 兩種情況都要在 SKILL 裡寫明：貼文裡的事實（店家、商品、價格、地點、活動、環境描述）
+     只能來自 {{topic}}、額外欄位、下方的【參考資料】與品牌資料；這些來源都沒有的細節一律不寫、不推測、
+     不編造，寧可少寫一句。
+${args.sources?.trim() ? `
+【這張卡的參考資料】使用者提供了事實來源（見下）。SKILL 要規定：寫作時引用的事實以這份資料為準，
+資料沒提到的不寫。不要把資料的內容抄進規則（它會在執行時另外附上），只規定「怎麼用它」。
+---
+${args.sources.trim().slice(0, 4000)}
+---
+` : ""}
 【字數】範例實測 ${args.measured.count} 篇，最短 ${args.measured.minChars} 字、最長 ${args.measured.maxChars} 字、中位數 ${args.measured.medianChars} 字。
 把區間寫進規則，並說明哪些段落佔多少比重。
 
@@ -206,6 +223,7 @@ async function runDistil(brandId: number, userId: number, cardId: string): Promi
     const skill = await distilSkill({
       brandId, name: card.name, channel: card.channel, samples: card.samples,
       primaryQuestion: card.primaryQuestion, askFields: card.askFields, measured: card.measured,
+      sources: card.sources,
     });
     await patch((c) => ({
       ...c, skill, currentStep: TOTAL_STEPS, status: "drafting", lastError: null,
@@ -235,46 +253,67 @@ async function runDistil(brandId: number, userId: number, cardId: string): Promi
  * 模型很愛順手把成品「整理得更好」再交出來。那樣抽到的就不是使用者真的發過的文，
  * 而這張卡的全部價值就建立在「學你真的寫過的東西」。所以 LLM 回來之後還要過
  * `verbatimSamples()` 這道確定性檢查，改寫過的一律丟掉 —— 寧可少幾篇。
+ *
+ * 2026-10-04 改版：不再叫模型抄寫成品，只回「第幾行到第幾行」（見 brandTaskCards.numberThread）。
+ * 舊版輸出長度＝所有成品總長，會被 maxTokens 截斷成壞 JSON，是整串貼上一直「抽取失敗」的主因。
  */
 async function extractFromThread(text: string): Promise<{ samples: string[]; raw: number }> {
-  const sys = `使用者貼了一段他跟 AI 助手的對話紀錄。請從裡面挑出「可以直接發布的成品」。
+  const t = numberThread(text);
+  if (t.index.length === 0) return { samples: [], raw: 0 };
+
+  const sys = `使用者貼了一段他跟 AI 助手的對話紀錄，每一行前面有編號 [n]。請找出哪幾行是「可以直接發布的成品」。
 
 【什麼算成品】
 完整的一篇貼文／文案／文章 —— 也就是他當初就是要 AI 幫他生出來的那個東西。
 
 【什麼不算，要略過】
-- 使用者自己下的指令與追問（「幫我寫十篇」「太長了改短一點」）
+- 使用者自己下的指令與追問（「幫我寫十篇」「太長了改短一點」）、使用者貼進來當參考的文章
 - AI 的解釋、開場白、收尾詢問（「好的，我幫你寫了三個版本」「需要我再調整嗎？」）
 - 被後面版本取代的舊稿 —— 同一篇改了三次只取**最後一版**
 - 大綱、條列的建議、分析、檢討
 
-【最重要的規則：逐字照抄】
-每一篇都必須**一字不改**地從原文複製出來。不可以修飾、不可以合併、不可以補完。
-你只是在畫線標記哪幾段是成品，不是在編輯它們。改寫過的會被系統丟掉。
+【怎麼回答】
+你不用抄任何內容，只回每一篇成品的「起訖行號」（含頭尾，必須連續）。
+輸出 JSON：{"pieces":[{"from":12,"to":18},{"from":25,"to":31}]}
+挑不到任何成品就回 {"pieces":[]}。直接輸出 JSON，第一個字元就是 {。`;
 
-【輸出 JSON】
-{"samples": ["第一篇的完整原文", "第二篇的完整原文"]}
-挑不到任何成品就回 {"samples": []}。直接輸出 JSON，第一個字元就是 {。`;
+  const askChunk = async (from: number, to: number): Promise<{ ranges: [number, number][]; invalid: number }> => {
+    const call = async () => {
+      const r = await Promise.race([
+        invokeLLM({
+          messages: [
+            { role: "system", content: sys },
+            { role: "user", content: renderNumbered(t, from, to) },
+          ],
+          maxTokens: 1500,
+        }),
+        new Promise<never>((_, rej) => setTimeout(() => rej(new Error("LLM timeout")), 90_000)),
+      ]);
+      const out = r.choices[0]?.message?.content;
+      return parsePieceRanges(typeof out === "string" ? out : "", from, to);
+    };
+    try { return await call(); }
+    catch (e) {
+      console.warn(`[brandTaskCard] extract chunk ${from}-${to} 失敗，重試一次：`, String((e as any)?.message ?? e).slice(0, 200));
+      return await call();
+    }
+  };
 
-  const r = await Promise.race([
-    invokeLLM({
-      messages: [
-        { role: "system", content: sys },
-        { role: "user", content: text.slice(0, 100_000) },
-      ],
-      maxTokens: 8000,
-    }),
-    new Promise<never>((_, rej) => setTimeout(() => rej(new Error("LLM timeout")), 120_000)),
-  ]);
-  const out = r.choices[0]?.message?.content;
-  const body = typeof out === "string" ? out : "";
-  const start = body.indexOf("{"), end = body.lastIndexOf("}");
-  if (start < 0 || end <= start) throw new Error("模型沒有回 JSON，可以重試");
-  const parsed = JSON.parse(body.slice(start, end + 1));
-  const candidates: string[] = Array.isArray(parsed?.samples)
-    ? parsed.samples.filter((x: any) => typeof x === "string")
-    : [];
-  return { samples: verbatimSamples(candidates, text), raw: candidates.length };
+  // 長對話分塊平行問。編號是全域的，所以各塊的結果可以直接合併。
+  const chunks = chunkLineRanges(t);
+  const settled = await Promise.allSettled(chunks.map((c) => askChunk(c.from, c.to)));
+  const ok = settled.filter((x): x is PromiseFulfilledResult<{ ranges: [number, number][]; invalid: number }> => x.status === "fulfilled");
+  if (ok.length === 0) {
+    const first = settled[0] as PromiseRejectedResult;
+    throw new Error(String(first?.reason?.message ?? first?.reason ?? "模型沒有回應"));
+  }
+  const ranges = ok.flatMap((x) => x.value.ranges).sort((a, b) => a[0] - b[0]);
+  const invalid = ok.reduce((n, x) => n + x.value.invalid, 0);
+  const pieces = sliceByRanges(t, ranges);
+  // 太長的丟掉（會讓 create 的長度驗證失敗）；數量超過上限就留前面的。
+  const usable = pieces.filter((p) => p.length <= MAX_SAMPLE_CHARS);
+  const samples = verbatimSamples(usable, text).slice(0, MAX_SAMPLES);
+  return { samples, raw: pieces.length + invalid };
 }
 
 /**
@@ -331,9 +370,8 @@ export const brandTaskCardRouter = router({
         throw new TRPCError({
           code: "BAD_REQUEST",
           message: result.raw > 0
-            // 這是「模型改寫了原文所以被 verbatim 檢查丟掉」的情況，要說清楚，
-            // 不然使用者會以為自己貼的東西有問題。
-            ? "抽到的內容跟原文對不上（模型把它改寫過了），請重試一次；連續失敗的話改成一篇一篇貼。"
+            // 挑到了段落但全被濾掉（太短、單篇超過上限、範圍不合法）。
+            ? `挑到的段落都不能用（太短，或單篇超過 ${MAX_SAMPLE_CHARS} 字）。請重試一次；連續失敗的話改成一篇一篇貼。`
             : "在這段對話裡找不到可以直接發布的成品。確認一下有沒有貼到完整的產出，或改成一篇一篇貼。",
         });
       }
@@ -372,6 +410,7 @@ export const brandTaskCardRouter = router({
       primaryQuestion: z.string().min(2).max(200),
       primaryPlaceholder: z.string().max(200).default(""),
       askFields: z.array(fieldInput).max(8).default([]),
+      sources: z.string().max(MAX_SOURCES_CHARS).default(""),
       variants: z.number().int().min(1).max(5).default(1),
       agentId: z.number().nullable().default(null),
     }))
@@ -412,6 +451,7 @@ export const brandTaskCardRouter = router({
         primaryPlaceholder: input.primaryPlaceholder.trim(),
         askFields: fieldsFrom(input.askFields),
         skill: "",
+        sources: input.sources.trim(),
         measured: measureSamples(samples),
         variants: input.variants,
         agentId: input.agentId,
@@ -455,6 +495,7 @@ export const brandTaskCardRouter = router({
       primaryPlaceholder: z.string().max(200).optional(),
       askFields: z.array(fieldInput).max(8).optional(),
       samples: z.array(z.string().min(20).max(MAX_SAMPLE_CHARS)).min(1).max(MAX_SAMPLES).optional(),
+      sources: z.string().max(MAX_SOURCES_CHARS).optional(),
       variants: z.number().int().min(1).max(5).optional(),
       agentId: z.number().nullable().optional(),
       // null＝回到自動挑。只驗形狀，場景清單在前端。
@@ -471,6 +512,7 @@ export const brandTaskCardRouter = router({
             ...c,
             name: input.name?.trim() ?? c.name,
             skill: input.skill ?? c.skill,
+            sources: input.sources !== undefined ? input.sources.trim() : (c.sources ?? ""),
             primaryQuestion: input.primaryQuestion?.trim() ?? c.primaryQuestion,
             primaryPlaceholder: input.primaryPlaceholder?.trim() ?? c.primaryPlaceholder,
             askFields: input.askFields ? fieldsFrom(input.askFields) : c.askFields,

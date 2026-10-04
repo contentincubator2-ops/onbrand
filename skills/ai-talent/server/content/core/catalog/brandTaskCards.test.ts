@@ -9,6 +9,7 @@ import { describe, expect, it } from "vitest";
 import {
   brandIdOfCardId, slugifyCardName, measureSamples,
   cardTemplate, cardConfig, illustrationInFlight, factLeaks, redactFactLeaks, verbatimSamples, type BrandTaskCard,
+  numberThread, renderNumbered, chunkLineRanges, parsePieceRanges, sliceByRanges, groundingBlock, duplicateCard,
 } from "./brandTaskCards";
 
 function makeCard(over: Partial<BrandTaskCard> = {}): BrandTaskCard {
@@ -257,5 +258,104 @@ AI：我幫你加長：
   it("完全沒抽到也不會炸", () => {
     expect(verbatimSamples([], thread)).toEqual([]);
     expect(verbatimSamples([null as any, undefined as any, 123 as any], thread)).toEqual([]);
+  });
+});
+
+describe("整串對話：編號挑範圍（2026-10-04）", () => {
+  const thread = [
+    "我：幫我寫兩篇促購文",
+    "",
+    "AI：好的，兩篇如下：",
+    "",
+    "冷氣團來了。",
+    "",
+    "冰箱最上層那排熱可可，是我們去年冬天賣得最好的東西。",
+    "",
+    "週末前下單，兩盒免運。",
+    "",
+    "---",
+    "有人問我們為什麼不做無糖版。",
+    "因為甜度砍掉之後可可的厚度就不見了。",
+    "",
+    "需要我再調整嗎？",
+  ].join("\n");
+
+  it("編號只算非空行，範圍還原成原文（保留段落間空行）", () => {
+    const t = numberThread(thread);
+    // 非空行：1 我：… 2 AI：… 3 冷氣團 4 冰箱 5 週末 6 --- 7 有人問 8 因為 9 需要
+    expect(t.index).toHaveLength(9);
+    const out = sliceByRanges(t, [[3, 5], [7, 8]]);
+    expect(out[0]).toBe("冷氣團來了。\n\n冰箱最上層那排熱可可，是我們去年冬天賣得最好的東西。\n\n週末前下單，兩盒免運。");
+    expect(out[1]).toBe("有人問我們為什麼不做無糖版。\n因為甜度砍掉之後可可的厚度就不見了。");
+  });
+
+  it("還原的片段一定逐字出自原文 —— 通過 verbatimSamples", () => {
+    const t = numberThread(thread);
+    const out = sliceByRanges(t, [[3, 5], [7, 8]]);
+    expect(verbatimSamples(out, thread)).toHaveLength(2);
+  });
+
+  it("CRLF 也能處理", () => {
+    expect(numberThread("甲\r\n\r\n乙").index).toHaveLength(2);
+  });
+
+  it("parsePieceRanges 吃標準 JSON、陣列、字串範圍", () => {
+    expect(parsePieceRanges('{"pieces":[{"from":3,"to":5},{"from":7,"to":8}]}', 1, 9).ranges).toEqual([[3, 5], [7, 8]]);
+    expect(parsePieceRanges("[[3,5],[7,8]]", 1, 9).ranges).toEqual([[3, 5], [7, 8]]);
+    expect(parsePieceRanges('{"pieces":["3-5","7–8"]}', 1, 9).ranges).toEqual([[3, 5], [7, 8]]);
+  });
+
+  it("前後夾雜說明文字、或被截斷的 JSON 也撈得到已完成的範圍", () => {
+    expect(parsePieceRanges('好的，結果：{"pieces":[{"from":3,"to":5}]} 以上', 1, 9).ranges).toEqual([[3, 5]]);
+    const cut = '{"pieces":[{"from":3,"to":5},{"from":7,"to":8},{"from":9,"to"';
+    expect(parsePieceRanges(cut, 1, 9).ranges).toEqual([[3, 5], [7, 8]]);
+  });
+
+  it("超出本塊範圍、顛倒、非整數的丟掉並計數", () => {
+    const r = parsePieceRanges('{"pieces":[{"from":3,"to":5},{"from":8,"to":99},{"from":6,"to":2},{"from":1.5,"to":3}]}', 1, 9);
+    expect(r.ranges).toEqual([[3, 5]]);
+    expect(r.invalid).toBe(3);
+  });
+
+  it("空結果與亂碼不會炸", () => {
+    expect(parsePieceRanges('{"pieces":[]}', 1, 9)).toEqual({ ranges: [], invalid: 0 });
+    expect(parsePieceRanges("我找不到", 1, 9)).toEqual({ ranges: [], invalid: 0 });
+  });
+
+  it("chunkLineRanges 長對話會分塊、編號連續不重疊", () => {
+    const long = Array.from({ length: 400 }, (_, i) => `第${i}行${"字".repeat(380)}`).join("\n");
+    const t = numberThread(long);
+    const chunks = chunkLineRanges(t, 50_000);
+    expect(chunks.length).toBeGreaterThan(1);
+    expect(chunks[0]!.from).toBe(1);
+    expect(chunks[chunks.length - 1]!.to).toBe(400);
+    for (let i = 1; i < chunks.length; i++) expect(chunks[i]!.from).toBe(chunks[i - 1]!.to + 1);
+  });
+
+  it("renderNumbered：過長的行只秀開頭", () => {
+    const t = numberThread("短行\n" + "長".repeat(1000));
+    const view = renderNumbered(t, 1, 2);
+    expect(view).toContain("[1] 短行");
+    expect(view.split("\n")[1]!.length).toBeLessThan(420);
+  });
+});
+
+describe("參考資料來源（2026-10-04）", () => {
+  it("沒填就不附區塊，systemPrompt 維持 SKILL 原文", () => {
+    expect(groundingBlock("")).toBe("");
+    expect(groundingBlock("   ")).toBe("");
+    expect(cardTemplate(makeCard({ skill: "規則", sources: "" })).systemPrompt).toBe("規則");
+  });
+
+  it("有填就接在 SKILL 後面，並明說資料以外不准編", () => {
+    const t = cardTemplate(makeCard({ skill: "規則", sources: "本店位於高雄，主打手沖咖啡。" }));
+    expect(t.systemPrompt.startsWith("規則")).toBe(true);
+    expect(t.systemPrompt).toContain("本店位於高雄，主打手沖咖啡。");
+    expect(t.systemPrompt).toContain("不要編");
+  });
+
+  it("複製卡時參考資料一起帶走", () => {
+    const copy = duplicateCard(makeCard({ sources: "資料 A" }), [], { channel: "instagram", userId: 1 });
+    expect(copy.sources).toBe("資料 A");
   });
 });
