@@ -16,9 +16,10 @@
  * Theater's BrainBar / PlatformCell.
  */
 import React from "react";
+import { tr } from "../../../../lib/i18n";
 import { Avatar, Button, Progress } from "@heroui/react";
 import { CurrentIcon, DoneIcon, PauseIcon, PlayIcon, SkipIcon, StopIcon } from "../../../platform/components/icons";
-import type { PipelineStepSpec, PipelineStatus } from "../../lib/positioningPipeline";
+import { stepTitleText, type PipelineStepSpec, type PipelineStatus } from "../../lib/positioningPipeline";
 
 export interface PipelineThinkingPanelProps {
   steps: PipelineStepSpec[];
@@ -99,7 +100,7 @@ export default function PipelineThinkingPanel({
   const elapsedSec = startedAt ? Math.max(0, Math.floor((now - startedAt) / 1000)) : 0;
 
   // Persona — stable strategist avatar seeded by brand name.
-  const personaName = "策略總監";
+  const personaName = tr("Strategy Director", "策略總監");
   const personaSeed = `Strategist-${brandName ?? "Drop"}`;
   const personaAvatar = `https://api.dicebear.com/7.x/notionists/svg?seed=${encodeURIComponent(personaSeed)}`;
 
@@ -113,7 +114,7 @@ export default function PipelineThinkingPanel({
     bodyRef.current.scrollTop = bodyRef.current.scrollHeight;
   }, [typed]);
 
-  const stepTitle = cleanTitle(current?.title) || (status === "done" ? "完成" : "—");
+  const stepTitle = cleanTitle(current ? stepTitleText(current) : undefined) || (status === "done" ? tr("Done", "完成") : "—");
 
   return (
     <section className="relative">
@@ -131,7 +132,7 @@ export default function PipelineThinkingPanel({
             className="absolute -bottom-2 -right-2 px-2 py-0.5 text-[12px] font-bold text-white rounded-md whitespace-nowrap"
             style={{ background: "#111", border: "1.5px solid #111" }}
           >
-            策略總監
+            {personaName}
           </div>
         </div>
 
@@ -178,22 +179,22 @@ export default function PipelineThinkingPanel({
               <div className="flex items-center gap-1.5">
                 {status === "running" && (
                   <>
-                    <IconBtn label="暫停" onClick={onPause}><PauseIcon size={13} /></IconBtn>
-                    <IconBtn label="跳過" onClick={onSkip}><SkipIcon size={13} /></IconBtn>
-                    <IconBtn label="停止" onClick={onStop}><StopIcon size={13} /></IconBtn>
+                    <IconBtn label={tr("Pause", "暫停")} onClick={onPause}><PauseIcon size={13} /></IconBtn>
+                    <IconBtn label={tr("Skip", "跳過")} onClick={onSkip}><SkipIcon size={13} /></IconBtn>
+                    <IconBtn label={tr("Stop", "停止")} onClick={onStop}><StopIcon size={13} /></IconBtn>
                   </>
                 )}
                 {status === "paused" && (
                   <>
-                    <Button size="sm" className="bg-neutral-900 text-white font-semibold h-7" startContent={<PlayIcon size={12} fill="currentColor" />} onPress={onResume}>繼續</Button>
-                    <IconBtn label="停止" onClick={onStop}><StopIcon size={13} /></IconBtn>
+                    <Button size="sm" className="bg-neutral-900 text-white font-semibold h-7" startContent={<PlayIcon size={12} fill="currentColor" />} onPress={onResume}>{tr("Resume", "繼續")}</Button>
+                    <IconBtn label={tr("Stop", "停止")} onClick={onStop}><StopIcon size={13} /></IconBtn>
                   </>
                 )}
                 {status === "done" && (
-                  <Button size="sm" variant="light" className="h-7" onPress={onStop}>關閉</Button>
+                  <Button size="sm" variant="light" className="h-7" onPress={onStop}>{tr("Close", "關閉")}</Button>
                 )}
                 {status === "idle" && (
-                  <Button size="sm" className="bg-neutral-900 text-white font-semibold h-7" startContent={<PlayIcon size={12} fill="currentColor" />} onPress={onStart}>開始分析</Button>
+                  <Button size="sm" className="bg-neutral-900 text-white font-semibold h-7" startContent={<PlayIcon size={12} fill="currentColor" />} onPress={onStart}>{tr("Start analysis", "開始分析")}</Button>
                 )}
               </div>
             </div>
@@ -235,9 +236,9 @@ export default function PipelineThinkingPanel({
         {/* LEFT — reasoning */}
         <div className="px-7 py-6 lg:border-r border-neutral-200 min-h-[280px]">
           <p className="text-[12px] font-semibold uppercase tracking-[0.25em] text-neutral-700 mb-3">
-            {phase === "loading" && "Anthropic 啟動推理鏈"}
+            {phase === "loading" && tr("Starting Anthropic reasoning chain", "Anthropic 啟動推理鏈")}
             {phase === "typing"  && "Reasoning · streaming"}
-            {phase === "writing" && "寫入欄位中"}
+            {phase === "writing" && tr("Writing to fields", "寫入欄位中")}
             {status === "done"   && "Final reasoning"}
           </p>
 
@@ -250,7 +251,7 @@ export default function PipelineThinkingPanel({
           >
             {phase === "loading" && !typed && (
               <div className="text-neutral-700 italic text-sm">
-                推導本步驟中，通常 20–60 秒。
+                {tr("Working on this step, usually 20–60 seconds.", "推導本步驟中，通常 20–60 秒。")}
               </div>
             )}
             {/* 2026-05-11 (CJ「你好中文按了品牌定位後，一直停留在 0/14」):
@@ -265,8 +266,8 @@ export default function PipelineThinkingPanel({
                   fontSize: 12.5, color: "#92400E", lineHeight: 1.55,
                 }}
               >
-                <strong>這一步比平常久（{elapsedSec}s）</strong>
-                ：系統會在 90 秒後自動跳過，也可以按右上方「跳過」立即略過 — 之後可單獨重跑此段。
+                <strong>{tr(`This step is taking longer than usual (${elapsedSec}s)`, `這一步比平常久（${elapsedSec}s）`)}</strong>
+                {tr(": it will be skipped automatically after 90 seconds, or press “Skip” at the top right to skip now — you can re-run this section on its own later.", "：系統會在 90 秒後自動跳過，也可以按右上方「跳過」立即略過 — 之後可單獨重跑此段。")}
               </div>
             )}
             {typed}
@@ -304,7 +305,7 @@ export default function PipelineThinkingPanel({
             <div className="mb-4">
               <p className="text-[12px] uppercase tracking-[0.2em] text-neutral-700 mb-1">Next</p>
               <p className="text-sm text-neutral-700 leading-snug pl-5">
-                {cleanTitle(next.title)}
+                {cleanTitle(stepTitleText(next))}
               </p>
             </div>
           )}
@@ -338,7 +339,7 @@ export default function PipelineThinkingPanel({
                     <span className="font-mono text-[12px] text-neutral-700 w-5 shrink-0">
                       {String(i + 1).padStart(2, "0")}
                     </span>
-                    <span className="truncate">{cleanTitle(s.title)}</span>
+                    <span className="truncate">{cleanTitle(stepTitleText(s))}</span>
                   </li>
                 );
               })}

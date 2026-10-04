@@ -1,6 +1,7 @@
 import { Card, CardBody, Divider, Skeleton } from "@heroui/react";
 import { faNewspaper } from "@fortawesome/free-solid-svg-icons";
 import { type MockupFields, MockupHeader, MarkdownText, titleEchoesCaption } from "./shared";
+import { useLang } from "../../../../lib/i18n";
 
 /**
  * GenericMockup — the universal "show the produced copy" card.
@@ -15,6 +16,7 @@ import { type MockupFields, MockupHeader, MarkdownText, titleEchoesCaption } fro
 export function GenericMockup({
   title, brief, variantLabel, liveCaption, slotMap,
 }: MockupFields) {
+  const { lang } = useLang();
   const slotCap = slotMap?.caption;
   const captionLoading = slotCap?.status === "loading";
   const caption =
@@ -27,7 +29,7 @@ export function GenericMockup({
 
   return (
     <div className="w-full max-w-[520px] mx-auto">
-      <MockupHeader icon={faNewspaper} label="輸出" variantLabel={variantLabel} />
+      <MockupHeader icon={faNewspaper} label={lang === "en" ? "Output" : "輸出"} variantLabel={variantLabel} />
       <Card shadow="lg" radius="lg" className="border border-divider">
         <CardBody className="p-6 gap-3">
           {showTitle && <h2 className="text-medium font-semibold">{title}</h2>}
@@ -42,7 +44,7 @@ export function GenericMockup({
               <Skeleton className="h-3 w-[68%] rounded" />
               <div className="flex items-center gap-1 mt-1">
                 <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse inline-block" />
-                <span className="text-[10px] text-primary/70">Agent 生成中…</span>
+                <span className="text-[10px] text-primary/70">{lang === "en" ? "Agent is generating…" : "Agent 生成中…"}</span>
               </div>
             </div>
           ) : brief ? (

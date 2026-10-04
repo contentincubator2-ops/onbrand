@@ -14,10 +14,12 @@ import {
   faChartBar, faBookmark,
 } from "@fortawesome/free-solid-svg-icons";
 import { type MockupFields, MockupHeader, dicebear, MarkdownText } from "./shared";
+import { useLang } from "../../../../lib/i18n";
 
 /* ─────────────── Tweet Card ─────────────── */
 
 export function XTweet({ title, brandName, variantLabel, liveCaption, liveHashtags, liveImageDesc }: MockupFields) {
+  const { lang } = useLang();
   const brand = brandName ?? "Your Brand";
   const handle = brand.toLowerCase().replace(/\s+/g, "_");
 
@@ -31,8 +33,8 @@ export function XTweet({ title, brandName, variantLabel, liveCaption, liveHashta
         <div className="flex items-center justify-between px-4 py-3 border-b border-[#2f3336]">
           <FontAwesomeIcon icon={faXTwitter} className="text-white text-xl" />
           <div className="flex gap-6 text-[#71767b] text-small">
-            <span className="text-white font-bold border-b-2 border-[#1d9bf0] pb-3">為你推薦</span>
-            <span>追蹤中</span>
+            <span className="text-white font-bold border-b-2 border-[#1d9bf0] pb-3">{lang === "en" ? "For you" : "為你推薦"}</span>
+            <span>{lang === "en" ? "Following" : "追蹤中"}</span>
           </div>
           <div className="w-6" />
         </div>
@@ -52,7 +54,7 @@ export function XTweet({ title, brandName, variantLabel, liveCaption, liveHashta
                 <path d="M22.25 12c0-1.43-.88-2.67-2.19-3.34.46-1.39.2-2.9-.81-3.91s-2.52-1.27-3.91-.81c-.66-1.31-1.91-2.19-3.34-2.19s-2.67.88-3.33 2.19c-1.4-.46-2.91-.2-3.92.81s-1.26 2.52-.8 3.91C2.88 9.33 2 10.57 2 12s.88 2.67 2.19 3.34c-.46 1.39-.2 2.9.81 3.91s2.52 1.26 3.91.81c.66 1.31 1.91 2.19 3.34 2.19s2.67-.88 3.33-2.19c1.4.46 2.91.2 3.92-.81s1.26-2.52.8-3.91C21.37 14.67 22.25 13.43 22.25 12z" />
               </svg>
               <span className="text-[#71767b] text-small">@{handle}</span>
-              <span className="text-[#71767b] text-small">· 剛剛</span>
+              <span className="text-[#71767b] text-small">{lang === "en" ? "· Just now" : "· 剛剛"}</span>
               <FontAwesomeIcon icon={faEllipsis} className="text-[#71767b] ml-auto" />
             </div>
 
@@ -78,7 +80,7 @@ export function XTweet({ title, brandName, variantLabel, liveCaption, liveHashta
               <div className="relative z-10 text-center p-4">
                 <FontAwesomeIcon icon={faImages} className="text-[#71767b] text-2xl mb-1" />
                 <p className="text-[#71767b] text-tiny line-clamp-2">
-                  {liveImageDesc ?? "推文圖 · 等待 AI 圖像"}
+                  {liveImageDesc ?? (lang === "en" ? "Tweet image · waiting for AI image" : "推文圖 · 等待 AI 圖像")}
                 </p>
               </div>
             </div>
@@ -144,6 +146,7 @@ export function XTweet({ title, brandName, variantLabel, liveCaption, liveHashta
 /* ─────────────── X Thread ─────────────── */
 
 export function XThread({ title, brandName, variantLabel, liveCaption }: MockupFields) {
+  const { lang } = useLang();
   const brand = brandName ?? "Your Brand";
   const handle = brand.toLowerCase().replace(/\s+/g, "_");
   const tweets = liveCaption ? liveCaption.split("\n\n").slice(0, 4) : [];
@@ -156,7 +159,7 @@ export function XThread({ title, brandName, variantLabel, liveCaption }: MockupF
           <FontAwesomeIcon icon={faXTwitter} className="text-white" />
           <span className="text-white text-small font-bold">Thread</span>
           <Chip size="sm" variant="flat" className="bg-[#1d9bf01a] text-[#1d9bf0] ml-auto">
-            {tweets.length > 0 ? `${tweets.length} 則推文` : "等待生成"}
+            {tweets.length > 0 ? (lang === "en" ? `${tweets.length} tweets` : `${tweets.length} 則推文`) : (lang === "en" ? "Waiting to generate" : "等待生成")}
           </Chip>
         </div>
         {tweets.length > 0 ? (

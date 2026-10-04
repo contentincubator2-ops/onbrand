@@ -137,7 +137,7 @@ function positioningGroups(pos: any, segments: SegmentSpec[], read: Set<string>,
   const groups: MemGroup[] = segments.map((seg) => ({
     title: (en && seg.titleEn) || seg.title,
     rows: makeRows(seg.fields.map((f) => ({
-      id: `${prefix}-${seg.id}.${f.key}`, label: f.label, text: textOf(p[seg.id]?.[f.key]), source: `pos:${seg.id}.${f.key}`,
+      id: `${prefix}-${seg.id}.${f.key}`, label: (en && f.labelEn) || f.label, text: textOf(p[seg.id]?.[f.key]), source: `pos:${seg.id}.${f.key}`,
       focus: `seg:${seg.id}`,
     })), read, href),
   }));

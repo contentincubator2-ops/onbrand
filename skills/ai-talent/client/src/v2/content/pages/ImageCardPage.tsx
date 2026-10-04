@@ -38,8 +38,15 @@ const CHANNEL_ZH: Record<string, string> = {
   facebook: "Facebook", instagram: "Instagram", threads: "Threads", line: "LINE",
   tiktok: "TikTok", email: "電子報", website: "官網",
 };
+const CHANNEL_EN: Record<string, string> = {
+  facebook: "Facebook", instagram: "Instagram", threads: "Threads", line: "LINE",
+  tiktok: "TikTok", email: "Email", website: "Website",
+};
 
-const QUICK_EDITS = ["暖一點", "背景乾淨一點", "產品放大", "光線更明亮", "換一個場景"];
+const QUICK_EDITS: Array<[string, string]> = [
+  ["暖一點", "Warmer"], ["背景乾淨一點", "Cleaner background"], ["產品放大", "Bigger product"],
+  ["光線更明亮", "Brighter light"], ["換一個場景", "Change the scene"],
+];
 
 /** 標題疊層的位置：跟卡片規格的 titleZone 一致（prompt 也是在那裡留白）。 */
 function overlayStyle(zone: ImageCardInfo["titleZone"]): React.CSSProperties {
@@ -355,7 +362,7 @@ export default function ImageCardPage() {
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <p className="text-tiny text-default-500">
-            {CHANNEL_ZH[card.channel] ?? card.channel} · {lang === "en" ? "Image" : "圖片"}
+            {(lang === "en" ? CHANNEL_EN : CHANNEL_ZH)[card.channel] ?? card.channel} · {lang === "en" ? "Image" : "圖片"}
           </p>
           <h1 className="text-xl font-semibold text-default-900 mt-0.5">{lang === "en" ? card.labelEn : card.labelZh}</h1>
           <p className="text-tiny text-default-500 mt-1 tabular-nums">
@@ -580,10 +587,10 @@ export default function ImageCardPage() {
             <section className="space-y-3">
               <p className="text-small font-semibold">{lang === "en" ? "What should change?" : "想怎麼改？"}</p>
               <div className="flex flex-wrap gap-1.5">
-                {QUICK_EDITS.map((q) => (
-                  <button key={q} disabled={busy} onClick={() => refine(q)}
+                {QUICK_EDITS.map(([zhQ, enQ]) => { const q = lang === "en" ? enQ : zhQ; return (
+                  <button key={zhQ} disabled={busy} onClick={() => refine(q)}
                     className="px-2.5 py-1 rounded-full text-tiny border border-default-200 hover:border-default-400 disabled:opacity-50">{q}</button>
-                ))}
+                ); })}
               </div>
               <div className="flex gap-2">
                 <Input size="sm" value={editText} onValueChange={setEditText}
@@ -599,8 +606,8 @@ export default function ImageCardPage() {
                 {lang === "en" ? "Preview with copy & schedule" : "圖文預覽與排程"}
               </Button>
               <div className="flex gap-2 flex-wrap">
-                <Button size="sm" variant="flat" onPress={() => downloadWithTitle(card, current.url, showTitle ? headline : "", darkTitle).catch(() => showToastGlobal("下載失敗"))}>
-                  {lang === "en" ? "Download" : "下載"}（{card.width}×{card.height}）
+                <Button size="sm" variant="flat" onPress={() => downloadWithTitle(card, current.url, showTitle ? headline : "", darkTitle).catch(() => showToastGlobal(lang === "en" ? "Download failed" : "下載失敗"))}>
+                  {lang === "en" ? "Download" : "下載"}{lang === "en" ? ` (${card.width}×${card.height})` : `（${card.width}×${card.height}）`}
                 </Button>
                 {card.maxImages > 1 && slots.length < card.maxImages && (
                   <Button size="sm" variant="bordered" onPress={addToSeries} isDisabled={busy}>
@@ -634,17 +641,17 @@ export default function ImageCardPage() {
                   ? "Each size is regenerated natively at its own ratio from this image — never cropped."
                   : "每個尺寸都用這張當參考、在該尺寸的原生比例重新生成，不是裁切。每張各扣一次點數。"}
               </p>
-              {[{ title: CHANNEL_ZH[card.channel], list: sameChannel }, { title: lang === "en" ? "Other channels" : "其他通路", list: otherChannels }]
+              {[{ title: (lang === "en" ? CHANNEL_EN : CHANNEL_ZH)[card.channel], list: sameChannel }, { title: lang === "en" ? "Other channels" : "其他通路", list: otherChannels }]
                 .filter((g) => g.list.length)
                 .map((g) => (
                   <details key={g.title} open={g.list === sameChannel}>
-                    <summary className="text-tiny text-default-600 cursor-pointer py-1">{g.title}（{g.list.length}）</summary>
+                    <summary className="text-tiny text-default-600 cursor-pointer py-1">{g.title}{lang === "en" ? ` (${g.list.length})` : `（${g.list.length}）`}</summary>
                     <div className="grid grid-cols-1 gap-1 mt-1">
                       {g.list.map((c) => (
                         <label key={c.id} className="flex items-center gap-2 text-tiny">
                           <input type="checkbox" checked={extendPick.includes(c.id)}
                             onChange={(e) => setExtendPick((p) => e.target.checked ? [...p, c.id] : p.filter((x) => x !== c.id))} />
-                          <span>{g.list === otherChannels ? `${CHANNEL_ZH[c.channel]}・` : ""}{c.labelZh}</span>
+                          <span>{g.list === otherChannels ? `${(lang === "en" ? CHANNEL_EN : CHANNEL_ZH)[c.channel]}・` : ""}{lang === "en" ? c.labelEn : c.labelZh}</span>
                           <span className="text-default-400 tabular-nums">{c.ratio} · {c.width}×{c.height}</span>
                         </label>
                       ))}
@@ -663,9 +670,9 @@ export default function ImageCardPage() {
                         <div className="relative rounded-md overflow-hidden border border-default-200 bg-default-100" style={{ aspectRatio: `${c.width} / ${c.height}` }}>
                           {x.status === "ready" && x.url ? <><img src={x.url} alt="" className="absolute inset-0 w-full h-full object-cover" /><AiImageNotice overlay /></>
                             : x.status === "running" ? <div className="absolute inset-0 flex items-center justify-center"><Spinner size="sm" /></div>
-                            : <div className="absolute inset-0 p-2 text-warning-700 text-[11px] overflow-hidden">{x.msg ?? "失敗"}</div>}
+                            : <div className="absolute inset-0 p-2 text-warning-700 text-[11px] overflow-hidden">{x.msg ?? (lang === "en" ? "Failed" : "失敗")}</div>}
                         </div>
-                        <p className="mt-1 text-default-600">{CHANNEL_ZH[c.channel]}・{c.labelZh}</p>
+                        <p className="mt-1 text-default-600">{(lang === "en" ? CHANNEL_EN : CHANNEL_ZH)[c.channel]}・{lang === "en" ? c.labelEn : c.labelZh}</p>
                         {x.status === "ready" && x.url && (
                           <div className="flex gap-2">
                             <button className="underline text-default-500" onClick={() => downloadWithTitle(c, x.url!, showTitle ? headline : "", darkTitle)}>

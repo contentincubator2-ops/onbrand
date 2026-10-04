@@ -16,6 +16,7 @@ import { IllustratedEmpty } from "../../platform/components/EmptyIllustration";
 import React from "react";
 import { useSearchParams } from "react-router-dom";
 import { WarningIcon } from "../../platform/components/icons";
+import { tr, useLang } from "../../../lib/i18n";
 
 type SlotRef = { slide: number; x: number; y: number; w: number; h: number; shape: string };
 type Slot = {
@@ -50,10 +51,18 @@ const TYPE_COLOR: Record<string, string> = {
   scalar: "#18181b", tableGroup: "#3f3f46", chart: "#52525b",
   image: "#71717a", marker: "#a1a1aa", slideGroup: "#475569",
 };
-const TYPE_ZH: Record<string, string> = {
+const TYPE_EN: Record<string, string> = {
+  scalar: "Single value", tableGroup: "Table group", chart: "Chart",
+  image: "Image", marker: "Marker", slideGroup: "Repeating slide",
+};
+const TYPE_ZH_MAP: Record<string, string> = {
   scalar: "單值", tableGroup: "表格群組", chart: "圖表",
   image: "圖片", marker: "標記", slideGroup: "整頁重複",
 };
+/** Read at render time so the label follows the current UI language. */
+const TYPE_ZH = new Proxy({} as Record<string, string>, {
+  get: (_t, k: string) => (TYPE_ZH_MAP[k] ? tr(TYPE_EN[k]!, TYPE_ZH_MAP[k]!) : undefined),
+});
 const FIND_COLOR: Record<string, string> = {
   stable: "#059669", variableCardinality: "#3f3f46", repeatingSlides: "#475569",
   imageHeavy: "#d97706", tightBudget: "#b45309", shapeRenamed: "#52525b", manualOnly: "#6b7280",
@@ -70,6 +79,7 @@ function fmtMB(b: number) { return (b / 1024 / 1024).toFixed(1) + " MB"; }
 function pct(v: number, total: number) { return (v / total * 100).toFixed(2) + "%"; }
 
 export default function FanpageMonthlyReport() {
+  const { lang } = useLang();
   const [searchParams] = useSearchParams();
   const brandId = Number(searchParams.get("b") ?? 0) || null;
 
@@ -97,10 +107,10 @@ export default function FanpageMonthlyReport() {
     setErr(null);
     for (const f of Array.from(files)) {
       if (!f.name.toLowerCase().endsWith(".pptx")) {
-        setErr(`「${f.name}」不是 .pptx，已略過`);
+        setErr(tr(`"${f.name}" is not a .pptx file and was skipped`, `「${f.name}」不是 .pptx，已略過`));
         continue;
       }
-      setBusy(`上傳中：${f.name}`);
+      setBusy(tr(`Uploading: ${f.name}`, `上傳中：${f.name}`));
       try {
         const r = await fetch("/api/report-template/upload", {
           method: "POST",
@@ -116,7 +126,7 @@ export default function FanpageMonthlyReport() {
         if (!r.ok) throw new Error(j.error ?? `HTTP ${r.status}`);
         setDecks(j.decks ?? []);
       } catch (e: any) {
-        setErr(`${f.name}：${e?.message ?? "上傳失敗"}`);
+        setErr(`${f.name}${tr(": ", "：")}${e?.message ?? tr("Upload failed", "上傳失敗")}`);
       }
     }
     setBusy(null);
@@ -125,7 +135,7 @@ export default function FanpageMonthlyReport() {
 
   async function remove(name: string) {
     if (!brandId) return;
-    setBusy("刪除中…");
+    setBusy(tr("Deleting…", "刪除中…"));
     try {
       const r = await fetch(`/api/report-template/${brandId}/${encodeURIComponent(name)}`, {
         method: "DELETE", credentials: "include",
@@ -137,7 +147,7 @@ export default function FanpageMonthlyReport() {
 
   async function analyze() {
     if (!brandId) return;
-    setBusy("解析中…（第一次比對多份月報約需 1–2 分鐘）");
+    setBusy(tr("Analyzing… (the first comparison across several monthly reports takes about 1–2 minutes)", "解析中…（第一次比對多份月報約需 1–2 分鐘）"));
     setErr(null);
     try {
       const r = await fetch("/api/report-template/analyze", {
@@ -154,15 +164,15 @@ export default function FanpageMonthlyReport() {
       const first = (j.slots as Slot[]).find(s => s.ref?.slide)?.ref?.slide;
       setPage(first ?? 1);
     } catch (e: any) {
-      setErr(e?.message ?? "解析失敗");
+      setErr(e?.message ?? tr("Analysis failed", "解析失敗"));
     } finally { setBusy(null); }
   }
 
   if (!brandId) {
     return (
       <div style={{ ...card, borderColor: "#fde68a", background: "#fffbeb", color: "#92400e" }}>
-        網址缺少 <b>?b=品牌ID</b>。請先在右上角選擇品牌，或用
-        <code style={{ margin: "0 4px" }}>/performance/fanpage_monthly?b=2975</code>開啟。
+        {tr("The URL is missing ", "網址缺少 ")}<b>{tr("?b=brandId", "?b=品牌ID")}</b>{tr(". Pick a brand at the top right first, or open", "。請先在右上角選擇品牌，或用")}
+        <code style={{ margin: "0 4px" }}>/performance/fanpage_monthly?b=2975</code>{tr(".", "開啟。")}
       </div>
     );
   }
@@ -183,10 +193,10 @@ export default function FanpageMonthlyReport() {
     <div>
       {/* ── 上傳 ─────────────────────────────────────────────────────── */}
       <div style={card}>
-        <div style={kicker}>STEP 1 · 上傳你現在在用的月報</div>
+        <div style={kicker}>STEP 1 · {tr("Upload the monthly report you use now", "上傳你現在在用的月報")}</div>
         <p style={{ margin: "6px 0 12px", fontSize: 13, color: "#6b7280" }}>
-          上傳同一份月報的<b>不同月份</b>（建議 4 份以上）。系統靠跨月比對判斷哪些位置每月會變 ——
-          每月都一樣的是版型，會變的才是要自動填的欄位。只上傳一份無法比對。
+          {lang === "en" ? (<>Upload <b>different months</b> of the same monthly report (4 or more recommended). The system compares across months to find which positions change each month: what stays the same every month is the template, and what changes is the field to auto-fill. A single file can't be compared.</>) : (<>上傳同一份月報的<b>不同月份</b>（建議 4 份以上）。系統靠跨月比對判斷哪些位置每月會變 ——
+          每月都一樣的是版型，會變的才是要自動填的欄位。只上傳一份無法比對。</>)}
         </p>
 
         <input ref={fileRef} type="file" accept=".pptx" multiple style={{ display: "none" }}
@@ -195,13 +205,13 @@ export default function FanpageMonthlyReport() {
                 style={{ border: "1px solid #111827", background: "#111827", color: "#fff",
                          borderRadius: 9, padding: "8px 16px", fontSize: 13, fontWeight: 700,
                          cursor: busy ? "not-allowed" : "pointer" }}>
-          選擇 .pptx（可多選）
+          {tr("Choose .pptx (multiple allowed)", "選擇 .pptx（可多選）")}
         </button>
         <button onClick={() => void analyze()} disabled={!!busy || decks.length === 0}
                 style={{ marginLeft: 8, border: "1px solid #e5e7eb", background: "#fff", color: "#111827",
                          borderRadius: 9, padding: "8px 16px", fontSize: 13, fontWeight: 700,
                          cursor: (busy || !decks.length) ? "not-allowed" : "pointer" }}>
-          開始分析（{decks.length} 份）
+          {tr(`Start analysis (${decks.length})`, `開始分析（${decks.length} 份）`)}
         </button>
 
         {busy && <div style={{ marginTop: 10, fontSize: 12, color: "#18181b" }}>{busy}</div>}
@@ -216,7 +226,7 @@ export default function FanpageMonthlyReport() {
                 <span style={{ fontSize: 12, color: "#9ca3af" }}>{fmtMB(d.bytes)}</span>
                 <button onClick={() => void remove(d.name)} disabled={!!busy}
                         style={{ border: "none", background: "none", color: "#9ca3af",
-                                 cursor: "pointer", fontSize: 12 }}>移除</button>
+                                 cursor: "pointer", fontSize: 12 }}>{tr("Remove", "移除")}</button>
               </div>
             ))}
           </div>
@@ -226,7 +236,7 @@ export default function FanpageMonthlyReport() {
       {!analysis && (
         // 「開始分析」按鈕就在上面的上傳區，這裡不重複放
         <div style={card}>
-          <IllustratedEmpty kind="report" size="sm" title="這個月的報告還沒寫" />
+          <IllustratedEmpty kind="report" size="sm" title={tr("This month's report isn't written yet", "這個月的報告還沒寫")} />
         </div>
       )}
 
@@ -234,9 +244,9 @@ export default function FanpageMonthlyReport() {
         <>
           {/* ── 體檢報告 ───────────────────────────────────────────── */}
           <div style={card}>
-            <div style={kicker}>STEP 2 · 版型體檢報告</div>
+            <div style={kicker}>STEP 2 · {tr("Template health report", "版型體檢報告")}</div>
             <h3 style={{ margin: "6px 0 10px", fontSize: 16, fontWeight: 850 }}>
-              比對 {analysis.health.decksAnalyzed} 個月，找到 {analysis.slots.length} 個可填欄位
+              {tr(`Compared ${analysis.health.decksAnalyzed} months and found ${analysis.slots.length} fillable fields`, `比對 ${analysis.health.decksAnalyzed} 個月，找到 ${analysis.slots.length} 個可填欄位`)}
             </h3>
             <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 12 }}>
               {Object.entries(typeCounts).sort((a, b) => b[1] - a[1]).map(([k, v]) => (
@@ -259,7 +269,7 @@ export default function FanpageMonthlyReport() {
 
           {/* ── 逐頁檢視 ───────────────────────────────────────────── */}
           <div style={card}>
-            <div style={kicker}>STEP 3 · 逐頁確認每個區塊要填什麼</div>
+            <div style={kicker}>STEP 3 · {tr("Check page by page what each block needs", "逐頁確認每個區塊要填什麼")}</div>
             <div style={{ display: "grid", gridTemplateColumns: "104px minmax(0,1fr) 300px", gap: 12, marginTop: 10 }}>
               {/* page rail */}
               <div style={{ maxHeight: 520, overflowY: "auto", paddingRight: 4 }}>
@@ -317,16 +327,16 @@ export default function FanpageMonthlyReport() {
                   ))}
                 </div>
                 <div style={{ fontSize: 12, color: "#9ca3af", marginTop: 6 }}>
-                  第 {page} 頁 · 依原檔真實座標繪製的示意圖（非像素縮圖）。點框看該欄位的設定。
+                  {tr(`Page ${page} · schematic drawn from the original file's real coordinates (not a pixel thumbnail). Click a box to see that field's settings.`, `第 ${page} 頁 · 依原檔真實座標繪製的示意圖（非像素縮圖）。點框看該欄位的設定。`)}
                 </div>
               </div>
 
               {/* inspector */}
               <div style={{ maxHeight: 520, overflowY: "auto" }}>
-                <div style={kicker}>第 {page} 頁 · {pageSlots.length} 個欄位</div>
+                <div style={kicker}>{tr(`Page ${page} · ${pageSlots.length} fields`, `第 ${page} 頁 · ${pageSlots.length} 個欄位`)}</div>
                 {pageSlots.length === 0 && (
                   <div style={{ fontSize: 12, color: "#9ca3af", marginTop: 8 }}>
-                    這頁沒有偵測到會變動的欄位 —— 全部都是每月固定的樣板內容。
+                    {tr("No changing fields were detected on this page; it is all fixed template content every month.", "這頁沒有偵測到會變動的欄位 —— 全部都是每月固定的樣板內容。")}
                   </div>
                 )}
                 {pageSlots.map(s => (
@@ -340,38 +350,38 @@ export default function FanpageMonthlyReport() {
                     </div>
                     <div style={{ fontSize: 12, color: "#6b7280", marginTop: 3 }}>
                       {s.observedValues?.[0]
-                        ?? (s.type === "tableGroup" ? `${s.cardinality?.min}–${s.cardinality?.max} 項 · ${(s.fields ?? []).map(f => f.key).filter(Boolean).join("/")}`
+                        ?? (s.type === "tableGroup" ? tr(`${s.cardinality?.min}–${s.cardinality?.max} items · ${(s.fields ?? []).map(f => f.key).filter(Boolean).join("/")}`, `${s.cardinality?.min}–${s.cardinality?.max} 項 · ${(s.fields ?? []).map(f => f.key).filter(Boolean).join("/")}`)
                         : s.type === "chart" ? `${s.chartKind} · ${(s.series ?? []).map(x => x.name).join("/")}`
-                        : s.type === "image" ? `${s.distinctImages ?? "?"} 個月各不相同 → 每月換圖`
-                        : s.type === "marker" ? "位置隨排名移動" : "")}
+                        : s.type === "image" ? tr(`${s.distinctImages ?? "?"} months all differ → image changes monthly`, `${s.distinctImages ?? "?"} 個月各不相同 → 每月換圖`)
+                        : s.type === "marker" ? tr("Position moves with ranking", "位置隨排名移動") : "")}
                     </div>
                   </div>
                 ))}
 
                 {selected && (
                   <div style={{ border: "1px solid #18181b", borderRadius: 8, padding: "10px 11px", marginTop: 12, background: "#fff" }}>
-                    <div style={kicker}>欄位設定</div>
+                    <div style={kicker}>{tr("Field settings", "欄位設定")}</div>
                     <table style={{ width: "100%", fontSize: 12, borderCollapse: "collapse", marginTop: 6 }}>
                       <tbody>
-                        <tr><td style={{ color: "#9ca3af", width: 68 }}>型別</td><td><b>{TYPE_ZH[selected.type]}</b></td></tr>
-                        <tr><td style={{ color: "#9ca3af" }}>來源</td><td>{selected.ref?.shape}</td></tr>
-                        <tr><td style={{ color: "#9ca3af" }}>跨月穩定</td><td>{selected.stability}</td></tr>
+                        <tr><td style={{ color: "#9ca3af", width: 68 }}>{tr("Type", "型別")}</td><td><b>{TYPE_ZH[selected.type]}</b></td></tr>
+                        <tr><td style={{ color: "#9ca3af" }}>{tr("Source", "來源")}</td><td>{selected.ref?.shape}</td></tr>
+                        <tr><td style={{ color: "#9ca3af" }}>{tr("Stability across months", "跨月穩定")}</td><td>{selected.stability}</td></tr>
                         {selected.charBudget && (
-                          <tr><td style={{ color: "#9ca3af" }}>字數上限</td>
-                              <td><b>{selected.charBudget.max}</b> 字（各月 {(selected.charBudget.derivedFrom?.observed ?? []).join("/")}）</td></tr>
+                          <tr><td style={{ color: "#9ca3af" }}>{tr("Character limit", "字數上限")}</td>
+                              <td><b>{selected.charBudget.max}</b> {tr("chars", "字")}{tr(" (by month ", "（各月 ")}{(selected.charBudget.derivedFrom?.observed ?? []).join("/")}{tr(")", "）")}</td></tr>
                         )}
                         {selected.cardinality && (
-                          <tr><td style={{ color: "#9ca3af" }}>項目數</td>
-                              <td><b>{selected.cardinality.min}～{selected.cardinality.max}</b> · 依實際資料筆數</td></tr>
+                          <tr><td style={{ color: "#9ca3af" }}>{tr("Item count", "項目數")}</td>
+                              <td><b>{selected.cardinality.min}～{selected.cardinality.max}</b> · {tr("based on actual data rows", "依實際資料筆數")}</td></tr>
                         )}
                         {selected.observedValues?.length && (
-                          <tr><td style={{ color: "#9ca3af" }}>歷月實際值</td>
+                          <tr><td style={{ color: "#9ca3af" }}>{tr("Past monthly values", "歷月實際值")}</td>
                               <td>{selected.observedValues.map((v, i) => <div key={i}>{v}</div>)}</td></tr>
                         )}
                       </tbody>
                     </table>
                     <div style={{ fontSize: 12, color: "#9ca3af", marginTop: 8 }}>
-                      綁定資料來源（Meta / GA4 / 輿情 / GEO）與 AI 洞察撰寫在下一版開放。
+                      {tr("Binding data sources (Meta / GA4 / social listening / GEO) and AI insight writing open in the next release.", "綁定資料來源（Meta / GA4 / 輿情 / GEO）與 AI 洞察撰寫在下一版開放。")}
                     </div>
                   </div>
                 )}

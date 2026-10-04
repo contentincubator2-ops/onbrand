@@ -16,7 +16,7 @@
 import React, { useMemo, useState } from "react";
 import { useOutletContext, useSearchParams } from "react-router-dom";
 import { trpc } from "../../../lib/trpc";
-import { useLang } from "../../../lib/i18n";
+import { useLang, tr } from "../../../lib/i18n";
 import type { ShellOutletCtx } from "../../platform/lib/shellContext";
 import { isStrategyPreviewEmail, isPersonaPreviewEmail } from "../../platform/lib/shellContext";
 import { Modal, ModalContent, ModalHeader, ModalBody } from "@heroui/react";
@@ -53,7 +53,7 @@ import { visualSpecOf } from "../lib/visualAssets";
 import { strategyCrumbs, type CrumbTarget } from "../lib/strategyCrumbs";
 import { useCampaignSlots } from "../lib/campaign/campaignSlots";
 import VisualAssetBoard from "../components/assets/VisualAssetBoard";
-import { pipelineFor, type PipelineStepSpec } from "../lib/positioningPipeline";
+import { pipelineFor, stepTitleText, stepThinkingText, type PipelineStepSpec } from "../lib/positioningPipeline";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faPlus, faTableList, faBullhorn, faWandMagicSparkles, faGear, faSatelliteDish, faFileArrowUp } from "@fortawesome/free-solid-svg-icons";
 import { TabActionBar, StrategyToolIcon, VisualNavItem } from "./brands/tabChrome";
@@ -243,9 +243,9 @@ export default function BrandsPage() {
       const story = [bo.founderStory, bo.rootBelief, bo.triggerMoment]
         .filter(Boolean).join("\n\n");
       const belief5Layers = [
-        bo.rootBelief && { layer: "根信念", body: bo.rootBelief },
-        bo.founderStory && { layer: "創辦故事", body: bo.founderStory },
-        bo.triggerMoment && { layer: "觸發時刻", body: bo.triggerMoment },
+        bo.rootBelief && { layer: tr("Root belief", "根信念"), body: bo.rootBelief },
+        bo.founderStory && { layer: tr("Founder story", "創辦故事"), body: bo.founderStory },
+        bo.triggerMoment && { layer: tr("Trigger moment", "觸發時刻"), body: bo.triggerMoment },
       ].filter(Boolean);
       setIfEmpty("origin", { story, belief5Layers });
     }
@@ -302,7 +302,7 @@ export default function BrandsPage() {
       setIfEmpty("tagline", {
         zhTagline: recommended,
         enTagline: "",
-        story: others.length ? `其他候選：\n${others.map((c: string) => "· " + c).join("\n")}` : "",
+        story: others.length ? `${tr("Other candidates:", "其他候選：")}\n${others.map((c: string) => "· " + c).join("\n")}` : "",
         type: "",
         scenes: [],
         competitorDiff: "",
@@ -1128,7 +1128,7 @@ export default function BrandsPage() {
       // already updated by the time typing finishes.
       utils?.scope?.active?.invalidate?.();
 
-      const text = realThinking ?? step.mockThinking ?? "";
+      const text = realThinking ?? stepThinkingText(step) ?? "";
       setThinkingPhase("typing");
       setLiveThinking(text);
 
@@ -1342,7 +1342,7 @@ export default function BrandsPage() {
           startedAt: thinkingStartedAt,
           stepNum: pipeline.cursor + 1,
           stepTotal: pipelineSteps.length,
-          stepTitle: pipelineSteps[pipeline.cursor]!.title,
+          stepTitle: stepTitleText(pipelineSteps[pipeline.cursor]!),
         }
       : null;
 
@@ -1847,7 +1847,7 @@ export default function BrandsPage() {
                   onMouseLeave={e => { e.currentTarget.style.background = active ? "rgba(24,24,27,0.06)" : "none"; }}
                 >
                   <FontAwesomeIcon icon={faGear} style={{ fontSize: 12, color: active ? "rgb(24,24,27)" : "#A8A29E" }} />
-                  設定
+                  {tr("Settings", "設定")}
                 </button>
               );
             })()}

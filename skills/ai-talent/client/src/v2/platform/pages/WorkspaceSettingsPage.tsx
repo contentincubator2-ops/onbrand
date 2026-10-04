@@ -30,6 +30,16 @@ const ROLE_LABEL_EN: Record<Role, string> = {
   viewer: "Viewer (read-only)",
 };
 
+const PLAN_LABEL_EN: Record<string, string> = {
+  trial:        "Trial",
+  solo:         "Solo",
+  drop_starter: "onBrand Studio Basic",
+  drop_pro:     "onBrand Studio Professional",
+  enterprise:   "Enterprise",
+};
+function planLabel(code: string, lang: string): string | undefined {
+  return lang === "en" ? PLAN_LABEL_EN[code] : PLAN_LABEL[code];
+}
 const PLAN_LABEL: Record<string, string> = {
   trial:        "Trial",
   solo:         "Solo",
@@ -96,7 +106,7 @@ export default function WorkspaceSettingsPage() {
                     <BuildingIcon size={14} /> {w.name}
                   </div>
                   <div className={`text-xs mt-0.5 ${selectedId === w.id ? "text-neutral-300" : "text-neutral-400"}`}>
-                    {PLAN_LABEL[w.planCode] ?? w.planCode} · {lang === "en"
+                    {planLabel(w.planCode, lang) ?? w.planCode} · {lang === "en"
                       ? `${w.memberCount} members · ${w.brandCount} brands`
                       : `${w.memberCount} 位成員 · ${w.brandCount} 品牌`}
                   </div>
@@ -178,7 +188,7 @@ function WorkspaceDetail({ detail, onChanged }: { detail: any; onChanged: () => 
           <div>
             <h2 className="text-lg font-semibold text-neutral-900">{ws.name}</h2>
             <p className="text-xs text-neutral-500 mt-1">
-              {lang === "en" ? "Plan: " : "方案："}{PLAN_LABEL[ws.planCode] ?? ws.planCode} ·
+              {lang === "en" ? "Plan: " : "方案："}{planLabel(ws.planCode, lang) ?? ws.planCode} ·
               {lang === "en" ? " Your role:" : "你的角色："}<span className="font-medium ml-1">{ROLE_LABEL[myRole]}</span>
             </p>
           </div>

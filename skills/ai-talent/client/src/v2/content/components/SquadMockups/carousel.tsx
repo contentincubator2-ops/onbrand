@@ -8,6 +8,7 @@
 import { Chip } from "@heroui/react";
 import { FBCarousel } from "../PlatformMockup/facebook";
 import type { MockupFields } from "../PlatformMockup/shared";
+import { useLang } from "../../../../lib/i18n";
 import { SectionHeader, NotionCard, EmptyHint, type SquadMockupCommonProps } from "./shared";
 
 export interface CarouselSlide {
@@ -53,11 +54,12 @@ function toMockupFields(data: CarouselDeck): MockupFields {
 }
 
 export function FBCarouselMockup({ data, isActive = false }: Props) {
+  const { lang } = useLang();
   if (!data || !data.slides || data.slides.length === 0) {
     return (
       <NotionCard>
-        <SectionHeader icon="🖼" eyebrow="ATOMIC · FB CAROUSEL" title="FB 輪播圖文" />
-        <EmptyHint>{!data ? "尚未產出 — 點擊執行此任務" : "資料不完整 — 缺 slides"}</EmptyHint>
+        <SectionHeader icon="🖼" eyebrow="ATOMIC · FB CAROUSEL" title={lang === "en" ? "FB carousel post" : "FB 輪播圖文"} />
+        <EmptyHint>{!data ? (lang === "en" ? "Not generated yet — click to run this task" : "尚未產出 — 點擊執行此任務") : (lang === "en" ? "Incomplete data — slides missing" : "資料不完整 — 缺 slides")}</EmptyHint>
       </NotionCard>
     );
   }
@@ -69,17 +71,17 @@ export function FBCarouselMockup({ data, isActive = false }: Props) {
     <div className="flex flex-col gap-3 max-w-3xl">
       <NotionCard>
         <div className="flex items-start justify-between gap-3 flex-wrap">
-          <SectionHeader icon="🖼" eyebrow="ATOMIC · FB CAROUSEL" title={data.topic || "FB 輪播圖文"} />
+          <SectionHeader icon="🖼" eyebrow="ATOMIC · FB CAROUSEL" title={data.topic || (lang === "en" ? "FB carousel post" : "FB 輪播圖文")} />
           {isActive && (
             <Chip size="sm" variant="flat" color="primary" className="self-start">
-              ● AI 專家思考中…
+              {lang === "en" ? "● AI expert thinking…" : "● AI 專家思考中…"}
             </Chip>
           )}
         </div>
         <div className="flex items-center gap-2 text-tiny text-default-500">
-          <span>共 {slides.length} 張</span>
+          <span>{lang === "en" ? `${slides.length} slides` : `共 ${slides.length} 張`}</span>
           <span>·</span>
-          <span>敘事弧：{data.arcSummary || "（未填）"}</span>
+          <span>{lang === "en" ? "Narrative arc:" : "敘事弧："}{data.arcSummary || (lang === "en" ? "(not filled)" : "（未填）")}</span>
         </div>
         {data.hookLine && (
           <p className="text-medium font-semibold leading-snug mt-1">{data.hookLine}</p>
@@ -90,7 +92,7 @@ export function FBCarouselMockup({ data, isActive = false }: Props) {
 
       {/* Per-slide arc tagging — squad-mockup-specific structured editing */}
       <NotionCard>
-        <SectionHeader eyebrow="DECK" title="每張卡片 + 敘事弧位置" />
+        <SectionHeader eyebrow="DECK" title={lang === "en" ? "Each slide + narrative arc position" : "每張卡片 + 敘事弧位置"} />
         <div className="flex flex-col gap-2">
           {slides.map((s) => {
             const arc = ARC_TONE[s.arcPosition] ?? ARC_TONE.build;

@@ -1,4 +1,5 @@
 import { createTRPCReact } from "@trpc/react-query";
+import { tr } from "./i18n";
 import { httpBatchLink } from "@trpc/client";
 import type { AppRouter } from "../../../server/routers";
 
@@ -47,7 +48,7 @@ const authAwareFetch: typeof fetch = async (input, init) => {
     res = await fetch(input, init);
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Network error";
-    return new Response(JSON.stringify(buildBatchErrorEnvelope(`網路連線失敗：${msg}`, 0, batchN)), {
+    return new Response(JSON.stringify(buildBatchErrorEnvelope(tr(`Network connection failed: ${msg}`, `網路連線失敗：${msg}`), 0, batchN)), {
       status: 200,
       headers: { "Content-Type": "application/json" },
     });
@@ -79,8 +80,8 @@ const authAwareFetch: typeof fetch = async (input, init) => {
     const text = await res.text().catch(() => "");
     const isHtml = /<\s*html|<\s*body/i.test(text);
     const userMsg = isHtml
-      ? `伺服器忙碌（${res.status}），請稍後重試。如果反覆出現，可能是任務太重（超過 60 秒）或服務正在重啟。`
-      : `伺服器錯誤 ${res.status}：${text.slice(0, 120)}`;
+      ? tr(`Server busy (${res.status}). Please retry shortly. If it keeps happening, the task may be too heavy or the service may be restarting.`, `伺服器忙碌（${res.status}），請稍後重試。如果反覆出現，可能是任務太重（超過 60 秒）或服務正在重啟。`)
+      : tr(`Server error ${res.status}: ${text.slice(0, 120)}`, `伺服器錯誤 ${res.status}：${text.slice(0, 120)}`);
     return new Response(JSON.stringify(buildBatchErrorEnvelope(userMsg, res.status, batchN)), {
       status: 200,
       headers: { "Content-Type": "application/json" },

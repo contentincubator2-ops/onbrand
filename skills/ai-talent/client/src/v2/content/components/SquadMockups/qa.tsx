@@ -8,6 +8,7 @@
  *   4. Per-item checklist with accept / 退回 button
  */
 import { Chip, Progress, Button } from "@heroui/react";
+import { useLang } from "../../../../lib/i18n";
 import { SectionHeader, NotionCard, EmptyHint, type SquadMockupCommonProps } from "./shared";
 
 export type QAVerdict = "pending" | "needs_revision" | "approved";
@@ -44,10 +45,10 @@ interface Props extends SquadMockupCommonProps {
   onRetryStep?: (stepOrder: number) => void;
 }
 
-const VERDICT_CHIP: Record<QAVerdict, { label: string; color: "success" | "warning" | "default" }> = {
-  pending:        { label: "等待審核",     color: "default" },
-  needs_revision: { label: "需要修訂",     color: "warning" },
-  approved:       { label: "✓ 已通過",     color: "success" },
+const VERDICT_CHIP: Record<QAVerdict, { label: string; labelEn: string; color: "success" | "warning" | "default" }> = {
+  pending:        { label: "等待審核", labelEn: "Awaiting review",     color: "default" },
+  needs_revision: { label: "需要修訂", labelEn: "Needs revision",     color: "warning" },
+  approved:       { label: "✓ 已通過", labelEn: "✓ Approved",     color: "success" },
 };
 
 const STATUS_COLOR = {
@@ -63,11 +64,12 @@ const STATUS_ICON = {
 } as const;
 
 export function QAReportMockup({ data, readOnly = false, isActive = false, onAccept, onReject }: Props) {
+  const { lang } = useLang();
   if (!data || !data.verdict) {
     return (
       <NotionCard>
-        <SectionHeader icon="🛡" eyebrow="步驟 6 · 品質審核" title="小組組長終審" />
-        <EmptyHint>{!data ? "Step 6 跑完才會有 QA 報告" : "資料不完整 — 缺 verdict"}</EmptyHint>
+        <SectionHeader icon="🛡" eyebrow={lang === "en" ? "Step 6 · Quality review" : "步驟 6 · 品質審核"} title={lang === "en" ? "Squad lead final review" : "小組組長終審"} />
+        <EmptyHint>{!data ? (lang === "en" ? "The QA report appears after Step 6 finishes" : "Step 6 跑完才會有 QA 報告") : (lang === "en" ? "Incomplete data — verdict missing" : "資料不完整 — 缺 verdict")}</EmptyHint>
       </NotionCard>
     );
   }
@@ -83,17 +85,17 @@ export function QAReportMockup({ data, readOnly = false, isActive = false, onAcc
       {/* Section 1: Overall verdict */}
       <NotionCard>
         <div className="flex items-start justify-between gap-3 flex-wrap">
-          <SectionHeader icon="🛡" eyebrow="步驟 6 · 品質審核" title="Squad Lead 終審" />
+          <SectionHeader icon="🛡" eyebrow={lang === "en" ? "Step 6 · Quality review" : "步驟 6 · 品質審核"} title={lang === "en" ? "Squad Lead final review" : "Squad Lead 終審"} />
           {isActive && (
             <Chip size="sm" variant="flat" color="primary" className="self-start">
-              ● Claire Hsu 審核中…
+              {lang === "en" ? "● Claire Hsu is reviewing…" : "● Claire Hsu 審核中…"}
             </Chip>
           )}
         </div>
         <div className="flex items-center justify-between gap-3 flex-wrap">
-          <Chip size="lg" variant="flat" color={v.color}>{v.label}</Chip>
+          <Chip size="lg" variant="flat" color={v.color}>{lang === "en" ? v.labelEn : v.label}</Chip>
           <div className="flex items-center gap-2">
-            <span className="text-tiny text-default-500">總分</span>
+            <span className="text-tiny text-default-500">{lang === "en" ? "Total score" : "總分"}</span>
             <span className="text-large font-bold tabular-nums">{overallScore} / 100</span>
           </div>
         </div>
@@ -107,7 +109,7 @@ export function QAReportMockup({ data, readOnly = false, isActive = false, onAcc
 
       {/* Section 2: Per-pillar */}
       <NotionCard>
-        <SectionHeader eyebrow="支柱比例審核" title="比例與內容多樣性" />
+        <SectionHeader eyebrow={lang === "en" ? "Pillar ratio review" : "支柱比例審核"} title={lang === "en" ? "Ratio and content variety" : "比例與內容多樣性"} />
         <div className="flex flex-col gap-3">
           {pillarChecks.map((p, i) => {
             const ratioOk = p.actualRatio === p.expectedRatio;
@@ -117,7 +119,7 @@ export function QAReportMockup({ data, readOnly = false, isActive = false, onAcc
                   <span className="font-medium text-foreground">{p.pillarName}</span>
                   <div className="flex items-center gap-2">
                     <span className={ratioOk ? "text-success" : "text-warning"}>
-                      實際 {p.actualRatio}% / 預期 {p.expectedRatio}%
+                      {lang === "en" ? `Actual ${p.actualRatio}% / Expected ${p.expectedRatio}%` : `實際 ${p.actualRatio}% / 預期 ${p.expectedRatio}%`}
                     </span>
                     <span className="font-semibold tabular-nums">{p.score}/100</span>
                   </div>
@@ -133,7 +135,7 @@ export function QAReportMockup({ data, readOnly = false, isActive = false, onAcc
       {/* Section 3: Per-event */}
       {eventChecks.length > 0 && (
         <NotionCard>
-          <SectionHeader eyebrow="EVENT CHECKS" title="活動整合度" />
+          <SectionHeader eyebrow="EVENT CHECKS" title={lang === "en" ? "Event integration" : "活動整合度"} />
           <div className="flex flex-col gap-2">
             {eventChecks.map((e, i) => (
               <div
@@ -146,7 +148,7 @@ export function QAReportMockup({ data, readOnly = false, isActive = false, onAcc
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
                   <span className="text-tiny text-default-500">
-                    覆蓋 {e.posts} / 期望 {e.expectedPosts} 篇
+                    {lang === "en" ? `Covered ${e.posts} / Expected ${e.expectedPosts} posts` : `覆蓋 ${e.posts} / 期望 ${e.expectedPosts} 篇`}
                   </span>
                   <Chip size="sm" variant="flat" color={e.score >= 80 ? "success" : "warning"}>
                     {e.score}
@@ -160,7 +162,7 @@ export function QAReportMockup({ data, readOnly = false, isActive = false, onAcc
 
       {/* Section 4: Item-level checklist */}
       <NotionCard>
-        <SectionHeader eyebrow="ITEM CHECKLIST" title="逐項審核清單" />
+        <SectionHeader eyebrow="ITEM CHECKLIST" title={lang === "en" ? "Item-by-item checklist" : "逐項審核清單"} />
         <div className="flex flex-col gap-2">
           {itemChecklist.map((item) => (
             <div
@@ -179,10 +181,10 @@ export function QAReportMockup({ data, readOnly = false, isActive = false, onAcc
               {!readOnly && (
                 <div className="flex gap-1 shrink-0">
                   <Button size="sm" variant="flat" color="success" onPress={() => onAccept?.(item.id)}>
-                    接受
+                    {lang === "en" ? "Accept" : "接受"}
                   </Button>
                   <Button size="sm" variant="flat" color="warning" onPress={() => onReject?.(item.id)}>
-                    退回
+                    {lang === "en" ? "Send back" : "退回"}
                   </Button>
                 </div>
               )}

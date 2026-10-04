@@ -10,6 +10,7 @@
  * row with the full session context attached. CJ sees it in
  * /admin/support and replies; the reply comes back into the same thread.
  */
+import { MIA_ACTION_LABEL_EN } from "./mia/miaNudgeCatalog";
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { trpc } from "../../../lib/trpc";
@@ -198,7 +199,7 @@ export default function SupportDrawer({ open, onClose, scope, pendingNudges, onN
         ...m,
         {
           id: Date.now() + 1, role: "mia",
-          content: `（連線出狀況：${String(e?.message ?? e).slice(0, 80)}。你可以點下方「我要找真人 →」直接給 SoWork 看。）`,
+          content: isEn ? `(Connection problem: ${String(e?.message ?? e).slice(0, 80)}. You can tap "Talk to a human →" below to show SoWork directly.)` : `（連線出狀況：${String(e?.message ?? e).slice(0, 80)}。你可以點下方「我要找真人 →」直接給 SoWork 看。）`,
           createdAt: new Date().toISOString(),
         },
       ]);
@@ -425,7 +426,7 @@ export default function SupportDrawer({ open, onClose, scope, pendingNudges, onN
           </span>
           <span style={{ flex: 1, minWidth: 0 }}>
             {isEn
-              ? <>Navigating to <strong>{pendingAuto.action.kind === "navigate" ? pendingAuto.action.url : pendingAuto.action.label}</strong>…</>
+              ? <>Navigating to <strong>{pendingAuto.action.kind === "navigate" ? pendingAuto.action.url : ((MIA_ACTION_LABEL_EN[pendingAuto.action.label]) || pendingAuto.action.label)}</strong>…</>
               : <>{pendingAuto.secondsLeft} 秒後帶你去 <strong>{pendingAuto.action.kind === "navigate" ? pendingAuto.action.url : pendingAuto.action.label}</strong></>}
           </span>
           <button
@@ -607,6 +608,7 @@ export default function SupportDrawer({ open, onClose, scope, pendingNudges, onN
 }
 
 function MessageBubble({ message, onAction }: { message: Message; onAction: (a: MiaAction, sourceNudgeId?: string) => void }) {
+  const { lang } = useLang();
   const isUser = message.role === "user";
   const isAdmin = message.role === "admin";
   const showAvatar = !isUser;
@@ -674,7 +676,7 @@ function MessageBubble({ message, onAction }: { message: Message; onAction: (a: 
                 }}
               >
                 <span style={{ fontSize: 13 }}>→</span>
-                <span>{a.label}</span>
+                <span>{(lang === "en" && MIA_ACTION_LABEL_EN[a.label]) || a.label}</span>
               </button>
             ))}
           </div>

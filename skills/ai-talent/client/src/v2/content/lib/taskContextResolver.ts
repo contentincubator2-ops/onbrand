@@ -1,3 +1,4 @@
+import { detectLocale } from "../../../lib/i18n";
 /**
  * taskContextResolver — given a task's `derive` / `contextSources`
  * metadata + a resolved scope.active payload, returns:
@@ -156,18 +157,44 @@ const PATH_LABELS: Record<string, string> = {
   "brand.positioning.context.coreProblem":           "核心問題",
 };
 
+const PATH_LABELS_EN: Record<string, string> = {
+  "brand.name": "Brand",
+  "brand.industry": "Industry",
+  "brand.positioning.goldenCircle": "Golden Circle",
+  "brand.positioning.goldenCircle.why": "WHY",
+  "brand.positioning.tagline.zhTagline": "Tagline",
+  "brand.positioning.audience.primary": "Primary audience",
+  "brand.positioning.audience.matrix": "Emotion matrix",
+  "brand.positioning.competition.direct": "Direct rivals",
+  "brand.positioning.competition.indirect": "Indirect rivals",
+  "brand.positioning.differentiation": "Differentiation",
+  "brand.positioning.differentiation.summary": "Differentiation",
+  "brand.positioning.trends": "Trends",
+  "brand.positioning.core.coreStatement": "Core positioning",
+  "brand.positioning.core.oneLineValueProp": "Core promise",
+  "brand.positioning.value.userFeeling": "User feeling",
+  "brand.positioning.value.primaryEmotion": "Emotional value",
+  "brand.positioning.competition.uniqueUsp": "Unique USP",
+  "brand.positioning.marketing.style": "Communication style",
+  "brand.positioning.audience.primaryAudience": "Core audience",
+  "brand.positioning.messaging.coreMessage": "Core message",
+  "brand.positioning.creative.coreTranslation": "Creative hook",
+  "brand.positioning.context.coreProblem": "Core problem",
+};
+
 export function buildContextChips(ctx: any, sources: string[] | undefined): ContextChip[] {
+  const isEn = detectLocale() === "en";
   if (!sources || sources.length === 0) return [];
   const chips: ContextChip[] = [];
   for (const path of sources) {
     const raw = pickByPath(ctx, path);
     const shaped = shapeValue(raw);
-    const baseLabel = PATH_LABELS[path] ?? path.split(".").slice(-1)[0]!;
+    const baseLabel = (isEn ? PATH_LABELS_EN[path] : undefined) ?? PATH_LABELS[path] ?? path.split(".").slice(-1)[0]!;
     if (shaped) {
       const preview = shaped.length > 38 ? shaped.slice(0, 38) + "…" : shaped;
       chips.push({ label: `${baseLabel} · ${preview}`, source: path, hasContent: true, name: baseLabel, text: shaped });
     } else {
-      chips.push({ label: `${baseLabel} · 尚未填寫`, source: path, hasContent: false, name: baseLabel, text: "" });
+      chips.push({ label: `${baseLabel} · ${isEn ? "not filled in yet" : "尚未填寫"}`, source: path, hasContent: false, name: baseLabel, text: "" });
     }
   }
   return chips;

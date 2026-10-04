@@ -89,10 +89,10 @@ export default function LoginPage() {
         body: JSON.stringify({ email }),
       });
       const d = await r.json();
-      if (!r.ok) setResendMsg(d.error || "重發失敗，請稍後再試");
-      else       setResendMsg(d.message || "驗證信已寄出，請檢查信箱");
+      if (!r.ok) setResendMsg(d.error || (lang === "en" ? "Couldn't resend — please try again later" : "重發失敗，請稍後再試"));
+      else       setResendMsg(d.message || (lang === "en" ? "Verification email sent — please check your inbox" : "驗證信已寄出，請檢查信箱"));
     } catch {
-      setResendMsg("網路錯誤，請稍後再試");
+      setResendMsg(lang === "en" ? "Network error — please try again later" : "網路錯誤，請稍後再試");
     } finally {
       setResendBusy(false);
     }

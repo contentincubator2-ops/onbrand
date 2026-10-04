@@ -17,6 +17,7 @@ import { getPostTitleFallback } from "../../lib/mockupTitle";
 /* ─────────────── TT For-You ─────────────── */
 
 export function TTForYou({ title, brandName, brandLogoUrl, variantLabel, liveCaption, liveImageStyle, liveImageUrl, liveImageStatus, onGenerateImage }: MockupFields) {
+  const { lang } = useLang();
   const handle = (brandName ?? "your_brand").toLowerCase().replace(/\s+/g, "_");
   const avatarSrc = brandLogoUrl || dicebear(brandName ?? "brand");
   const postTitleFallback = getPostTitleFallback(title, liveCaption);
@@ -25,8 +26,8 @@ export function TTForYou({ title, brandName, brandLogoUrl, variantLabel, liveCap
       <MockupHeader icon={faTiktok} label="TikTok" variantLabel={variantLabel} />
       <div className="relative bg-black rounded-xl overflow-hidden shadow-lg" style={{ aspectRatio: "9 / 16" }}>
         <div className="absolute top-0 inset-x-0 z-10 flex items-center justify-center gap-4 pt-3 text-white text-small">
-          <span className="opacity-60">追蹤中</span>
-          <span className="font-semibold border-b-2 border-white pb-1">為你推薦</span>
+          <span className="opacity-60">{lang === "en" ? "Following" : "追蹤中"}</span>
+          <span className="font-semibold border-b-2 border-white pb-1">{lang === "en" ? "For You" : "為你推薦"}</span>
         </div>
         {liveImageUrl && liveImageStatus === "ready" ? (
           <img src={liveImageUrl} alt="" className="absolute inset-0 w-full h-full object-cover opacity-90" />
@@ -58,7 +59,7 @@ export function TTForYou({ title, brandName, brandLogoUrl, variantLabel, liveCap
           </div>
           <RailIcon icon={faHeart}      count="123.4K" />
           <RailIcon icon={faComment}    count="2,345"  />
-          <RailIcon icon={faShareNodes} count="分享"   />
+          <RailIcon icon={faShareNodes} count={lang === "en" ? "Share" : "分享"}   />
           <span className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-600 to-pink-500 flex items-center justify-center text-white border-2 border-black">
             <FontAwesomeIcon icon={faMusic} className="text-medium" />
           </span>
@@ -70,7 +71,7 @@ export function TTForYou({ title, brandName, brandLogoUrl, variantLabel, liveCap
           )}
           <div className="flex items-center gap-1 text-tiny">
             <FontAwesomeIcon icon={faMusic} className="text-tiny" />
-            <span>原創音訊 · @{handle}</span>
+            <span>{lang === "en" ? "Original audio" : "原創音訊"} · @{handle}</span>
           </div>
         </div>
       </div>
@@ -90,6 +91,7 @@ function RailIcon({ icon, count }: { icon: any; count: string }) {
 /* ─────────────── TT Profile (3-col grid) ─────────────── */
 
 export function TTProfile({ brandName, brandLogoUrl, variantLabel, liveCaption }: MockupFields) {
+  const { lang } = useLang();
   const handle = (brandName ?? "your_brand").toLowerCase().replace(/\s+/g, "_");
   const avatarSrc = brandLogoUrl || dicebear(brandName ?? "brand");
   return (
@@ -107,23 +109,23 @@ export function TTProfile({ brandName, brandLogoUrl, variantLabel, liveCaption }
           <Avatar src={avatarSrc} size="lg" className="mx-auto" />
           <p className="text-medium font-bold">@{handle}</p>
           <div className="flex items-center justify-center gap-4 text-small">
-            <div><span className="font-bold">12</span> <span className="text-default-500">追蹤中</span></div>
-            <div><span className="font-bold">12.3K</span> <span className="text-default-500">粉絲</span></div>
-            <div><span className="font-bold">456K</span> <span className="text-default-500">獲贊</span></div>
+            <div><span className="font-bold">12</span> <span className="text-default-500">{lang === "en" ? "Following" : "追蹤中"}</span></div>
+            <div><span className="font-bold">12.3K</span> <span className="text-default-500">{lang === "en" ? "Followers" : "粉絲"}</span></div>
+            <div><span className="font-bold">456K</span> <span className="text-default-500">{lang === "en" ? "Likes" : "獲贊"}</span></div>
           </div>
           <div className="flex items-center justify-center gap-2 pt-1">
-            <Button color="danger" size="sm" radius="md" className="bg-[#FE2C55]">追蹤</Button>
-            <Button variant="bordered" size="sm" radius="md">傳訊息</Button>
+            <Button color="danger" size="sm" radius="md" className="bg-[#FE2C55]">{lang === "en" ? "Follow" : "追蹤"}</Button>
+            <Button variant="bordered" size="sm" radius="md">{lang === "en" ? "Message" : "傳訊息"}</Button>
           </div>
           {liveCaption ? (
             <p className="text-sm text-default-700 whitespace-pre-line leading-relaxed pt-1">{liveCaption}</p>
           ) : (
-            <p className="text-tiny text-default-500 pt-1">{brandName ?? "Your Brand"} · 點擊查看簡介</p>
+            <p className="text-tiny text-default-500 pt-1">{brandName ?? "Your Brand"} · {lang === "en" ? "Tap to view bio" : "點擊查看簡介"}</p>
           )}
         </div>
         {/* Tabs */}
         <div className="flex items-center justify-around border-t border-divider text-default-500">
-          <button className="flex-1 py-2 border-b-2 border-foreground text-foreground">影片</button>
+          <button className="flex-1 py-2 border-b-2 border-foreground text-foreground">{lang === "en" ? "Videos" : "影片"}</button>
           <button className="flex-1 py-2"><FontAwesomeIcon icon={faLock} /></button>
           <button className="flex-1 py-2"><FontAwesomeIcon icon={faHeart} /></button>
         </div>
@@ -147,13 +149,14 @@ export function TTProfile({ brandName, brandLogoUrl, variantLabel, liveCaption }
 /* ─────────────── TT Photo Carousel ─────────────── */
 
 export function TTCarousel({ title, brandName, variantLabel, liveImageStyle, liveImageStatus, liveImageUrl, onGenerateImage }: MockupFields) {
+  const { lang } = useLang();
   const handle = (brandName ?? "your_brand").toLowerCase().replace(/\s+/g, "_");
   return (
     <div className="w-full max-w-[400px] mx-auto">
       <MockupHeader icon={faTiktok} label="TikTok" variantLabel={variantLabel} />
       <div className="relative bg-black rounded-xl overflow-hidden shadow-lg" style={{ aspectRatio: "9 / 16" }}>
         <div className="absolute top-0 inset-x-0 z-10 flex items-center justify-center gap-4 pt-3 text-white text-small">
-          <span className="font-semibold border-b-2 border-white pb-1">為你推薦</span>
+          <span className="font-semibold border-b-2 border-white pb-1">{lang === "en" ? "For You" : "為你推薦"}</span>
         </div>
         {/* 2026-07-17 (CJ「盤查生圖佔位」): standardized ImageGenSlot（圖文輪播
             第 1 格 — 產出是圖片，非影片，故不加 videoFrame 註記） */}
@@ -187,14 +190,14 @@ export function TTCarousel({ title, brandName, variantLabel, liveImageStyle, liv
           </div>
           <RailItem icon={faHeart} count="98K" />
           <RailItem icon={faComment} count="1,234" />
-          <RailItem icon={faShareNodes} count="分享" />
+          <RailItem icon={faShareNodes} count={lang === "en" ? "Share" : "分享"} />
         </div>
         <div className="absolute bottom-0 inset-x-0 z-10 p-3 pr-16 text-white space-y-1 bg-gradient-to-t from-black/80 to-transparent">
           <p className="text-small font-semibold">@{handle}</p>
           <p className="text-small line-clamp-2">{title}</p>
           <div className="flex items-center gap-1 text-tiny">
             <FontAwesomeIcon icon={faMusic} className="text-tiny" />
-            <span>原創音訊 · @{handle}</span>
+            <span>{lang === "en" ? "Original audio" : "原創音訊"} · @{handle}</span>
           </div>
         </div>
       </div>
@@ -214,6 +217,7 @@ function RailItem({ icon, count }: { icon: any; count: string }) {
 /* ─────────────── TT Live (LIVE chip + viewers + gifts) ─────────────── */
 
 export function TTLive({ title, brandName, brandLogoUrl, variantLabel, liveCaption, liveImageStyle, liveImageUrl, liveImageStatus, onGenerateImage }: MockupFields) {
+  const { lang } = useLang();
   const handle = (brandName ?? "your_brand").toLowerCase().replace(/\s+/g, "_");
   const avatarSrc = brandLogoUrl || dicebear(brandName ?? "brand");
   void title;
@@ -249,7 +253,7 @@ export function TTLive({ title, brandName, brandLogoUrl, variantLabel, liveCapti
         )}
         {liveCaption && (
           <div className="absolute top-12 inset-x-3 z-10 bg-black/55 backdrop-blur-sm rounded-medium p-2.5 max-h-[55%] overflow-y-auto">
-            <p className="text-[10px] uppercase tracking-wider text-white/60 mb-1">開場腳本</p>
+            <p className="text-[10px] uppercase tracking-wider text-white/60 mb-1">{lang === "en" ? "Opening script" : "開場腳本"}</p>
             <p className="text-sm text-white whitespace-pre-line leading-relaxed">{liveCaption}</p>
           </div>
         )}
@@ -262,9 +266,9 @@ export function TTLive({ title, brandName, brandLogoUrl, variantLabel, liveCapti
         {/* Chat bubbles bottom-left */}
         <div className="absolute bottom-20 left-3 z-10 space-y-1.5 max-w-[60%]">
           {[
-            { user: "fan_01", msg: "好厲害!" },
-            { user: "fan_02", msg: "送你 🌹" },
-            { user: "fan_03", msg: "下次什麼時候開播?" },
+            { user: "fan_01", msg: lang === "en" ? "So good!" : "好厲害!" },
+            { user: "fan_02", msg: lang === "en" ? "Sending you 🌹" : "送你 🌹" },
+            { user: "fan_03", msg: lang === "en" ? "When is the next stream?" : "下次什麼時候開播?" },
           ].map((c, i) => (
             <div key={i} className="bg-black/50 backdrop-blur-sm text-white text-tiny px-2 py-1 rounded-medium">
               <span className="font-semibold text-[#FE2C55]">{c.user}</span> {c.msg}
@@ -274,7 +278,7 @@ export function TTLive({ title, brandName, brandLogoUrl, variantLabel, liveCapti
         {/* Bottom: input + gift button */}
         <div className="absolute bottom-3 inset-x-3 z-10 flex items-center gap-2">
           <div className="flex-1 bg-white/15 border border-white/30 rounded-full px-3 py-1.5 text-tiny text-white/70">
-            說點什麼…
+            {lang === "en" ? "Say something…" : "說點什麼…"}
           </div>
           <span className="w-9 h-9 rounded-full bg-[#FE2C55] flex items-center justify-center text-white text-medium">🎁</span>
           <FontAwesomeIcon icon={faShareNodes} className="text-white text-medium" />
@@ -297,6 +301,7 @@ export function TTLive({ title, brandName, brandLogoUrl, variantLabel, liveCapti
  * and a storyboard is only useful when you can see the sequence at a glance.
  */
 export function TTStoryboard({ title, brandName, variantLabel, liveCards }: MockupFields) {
+  const { lang } = useLang();
   const frames = Array.isArray(liveCards) ? liveCards : [];
   return (
     <div className="w-full max-w-[520px] mx-auto">
@@ -304,10 +309,10 @@ export function TTStoryboard({ title, brandName, variantLabel, liveCards }: Mock
       <div className="bg-content1 border border-divider rounded-xl overflow-hidden shadow-lg">
         <div className="px-4 pt-3 pb-2 flex items-center justify-between">
           <p className="text-small font-semibold leading-tight line-clamp-1">
-            {title || "分鏡表"}
+            {title || (lang === "en" ? "Storyboard" : "分鏡表")}
           </p>
           <span className="text-tiny text-default-500 shrink-0 ml-2">
-            {brandName ?? "你的帳號"}
+            {brandName ?? (lang === "en" ? "Your account" : "你的帳號")}
           </span>
         </div>
         {frames.length === 0 ? (
@@ -340,16 +345,16 @@ export function TTStoryboard({ title, brandName, variantLabel, liveCards }: Mock
                         <FontAwesomeIcon icon={faVideo} className="text-xl mb-1" />
                         <p className="text-[10px] line-clamp-4">
                           {c.image?.status === "failed" || c.image?.status === "timeout"
-                            ? "此格畫面生成失敗"
+                            ? (lang === "en" ? "Frame generation failed" : "此格畫面生成失敗")
                             : c.image?.style
                               ? c.image.style
-                              : "分鏡畫面 9:16"}
+                              : (lang === "en" ? "Storyboard frame 9:16" : "分鏡畫面 9:16")}
                         </p>
                       </div>
                     </>
                   )}
                   <span className="absolute top-1.5 left-1.5 bg-black/80 text-white text-tiny font-semibold px-1.5 py-0.5 rounded z-10">
-                    鏡頭 {i + 1}
+                    {lang === "en" ? `Shot ${i + 1}` : `鏡頭 ${i + 1}`}
                   </span>
                 </div>
                 <div className="px-2 py-1.5 border-t border-divider">

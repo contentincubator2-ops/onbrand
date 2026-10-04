@@ -192,7 +192,7 @@ export default function PricingInfoModal({ isOpen, onClose }: Props) {
                 size="sm"
                 variant="bordered"
                 as="a"
-                href="mailto:sowork@sowork.ai?subject=onBrand Studio 方案升級"
+                href={`mailto:sowork@sowork.ai?subject=${encodeURIComponent(lang === "en" ? "onBrand Studio plan upgrade" : "onBrand Studio 方案升級")}`}
                 startContent={<MailIcon size={12} />}
                 className="font-medium"
               >

@@ -23,6 +23,7 @@
  */
 import React from "react";
 import { Button, Chip, Skeleton } from "@heroui/react";
+import { useLang } from "../../../../lib/i18n";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -56,24 +57,25 @@ export interface ImageGenSlotProps {
 
 // ── Step label mapping ────────────────────────────────────────────────────────
 
-const STEP_LABELS: Record<ImageGenPhase, { step: number; label: string; icon: string }> = {
-  idle:       { step: 0, label: "等待 AI",      icon: "🎨" },
-  designing:  { step: 1, label: "設計方向提案",     icon: "🤔" },
-  direction:  { step: 1, label: "設計方向確認",     icon: "✅" },
-  prompting:  { step: 2, label: "畫面描述生成",  icon: "✍️" },
-  generating: { step: 3, label: "模型執行中",       icon: "🤖" },
-  done:       { step: 3, label: "圖片完成",         icon: "✨" },
-  error:      { step: 3, label: "生成失敗",         icon: "⚠️" },
+const STEP_LABELS: Record<ImageGenPhase, { step: number; label: string; labelEn: string; icon: string }> = {
+  idle:       { step: 0, label: "等待 AI", labelEn: "Waiting for AI",      icon: "🎨" },
+  designing:  { step: 1, label: "設計方向提案", labelEn: "Proposing design direction",     icon: "🤔" },
+  direction:  { step: 1, label: "設計方向確認", labelEn: "Design direction confirmed",     icon: "✅" },
+  prompting:  { step: 2, label: "畫面描述生成", labelEn: "Writing image description",  icon: "✍️" },
+  generating: { step: 3, label: "模型執行中", labelEn: "Model running",       icon: "🤖" },
+  done:       { step: 3, label: "圖片完成", labelEn: "Image ready",         icon: "✨" },
+  error:      { step: 3, label: "生成失敗", labelEn: "Generation failed",         icon: "⚠️" },
 };
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
 /** 3-step progress indicator strip shown at the top of the slot */
 function StepStrip({ phase }: { phase: ImageGenPhase }) {
+  const { lang } = useLang();
   const steps = [
-    { n: 1, label: "設計方向" },
-    { n: 2, label: "畫面描述" },
-    { n: 3, label: "模型執行" },
+    { n: 1, label: lang === "en" ? "Design direction" : "設計方向" },
+    { n: 2, label: lang === "en" ? "Image description" : "畫面描述" },
+    { n: 3, label: lang === "en" ? "Model run" : "模型執行" },
   ];
   const current = STEP_LABELS[phase].step;
   return (
@@ -104,6 +106,7 @@ function StepStrip({ phase }: { phase: ImageGenPhase }) {
 
 /** Text content block shown inside the slot overlay */
 function OverlayContent({ phase, designDirection, aiPrompt, modelName, errorMsg, onRetry }: ImageGenSlotProps) {
+  const { lang } = useLang();
   if (phase === "idle") return null;
 
   return (
@@ -112,7 +115,7 @@ function OverlayContent({ phase, designDirection, aiPrompt, modelName, errorMsg,
       {(phase === "designing" || phase === "direction" || phase === "prompting" || phase === "generating" || phase === "done") && (
         <div className="space-y-1">
           <p className="text-[10px] font-semibold text-white/60 uppercase tracking-wider">
-            {phase === "designing" ? "🤔 設計方向思考中…" : "🎨 設計方向"}
+            {phase === "designing" ? (lang === "en" ? "🤔 Thinking about design direction…" : "🤔 設計方向思考中…") : (lang === "en" ? "🎨 Design direction" : "🎨 設計方向")}
           </p>
           {phase === "designing" ? (
             <div className="flex gap-1 items-center">
@@ -135,7 +138,7 @@ function OverlayContent({ phase, designDirection, aiPrompt, modelName, errorMsg,
       {(phase === "prompting" || phase === "generating" || phase === "done") && (
         <div className="space-y-1 border-t border-white/10 pt-2">
           <p className="text-[10px] font-semibold text-white/60 uppercase tracking-wider">
-            {phase === "prompting" ? "✍️ 畫面描述生成中…" : "✍️ 畫面描述"}
+            {phase === "prompting" ? (lang === "en" ? "✍️ Writing image description…" : "✍️ 畫面描述生成中…") : (lang === "en" ? "✍️ Image description" : "✍️ 畫面描述")}
           </p>
           {aiPrompt ? (
             <p className="text-[11px] text-white/80 leading-snug font-mono break-all">{aiPrompt}</p>
@@ -154,7 +157,7 @@ function OverlayContent({ phase, designDirection, aiPrompt, modelName, errorMsg,
         <div className="space-y-1 border-t border-white/10 pt-2">
           <div className="flex items-center gap-2">
             <p className="text-[10px] font-semibold text-white/60 uppercase tracking-wider">
-              {phase === "generating" ? "🤖 模型執行中…" : "🤖 模型"}
+              {phase === "generating" ? (lang === "en" ? "🤖 Model running…" : "🤖 模型執行中…") : (lang === "en" ? "🤖 Model" : "🤖 模型")}
             </p>
             {modelName && (
               <Chip size="sm" className="h-4 text-[9px] bg-white/20 text-white border-0">
@@ -173,10 +176,10 @@ function OverlayContent({ phase, designDirection, aiPrompt, modelName, errorMsg,
       {/* Error */}
       {phase === "error" && (
         <div className="space-y-2">
-          <p className="text-[11px] text-danger font-medium">⚠️ {errorMsg ?? "圖片生成失敗"}</p>
+          <p className="text-[11px] text-danger font-medium">⚠️ {errorMsg ?? (lang === "en" ? "Image generation failed" : "圖片生成失敗")}</p>
           {onRetry && (
             <Button size="sm" color="danger" variant="flat" onPress={onRetry} className="h-6 text-tiny">
-              重新生成
+              {lang === "en" ? "Regenerate" : "重新生成"}
             </Button>
           )}
         </div>
@@ -198,6 +201,7 @@ export function ImageGenSlot({
   className = "",
   onRetry,
 }: ImageGenSlotProps) {
+  const { lang } = useLang();
   const isActive = phase !== "idle" && phase !== "done" && phase !== "error";
   const isDone = phase === "done" && !!resultUrl;
   const showOverlay = phase !== "idle" && !isDone;
@@ -211,7 +215,7 @@ export function ImageGenSlot({
       {isDone ? (
         <img
           src={resultUrl}
-          alt="AI 生成圖片"
+          alt={lang === "en" ? "AI-generated image" : "AI 生成圖片"}
           className="absolute inset-0 w-full h-full object-cover"
           style={{ animation: "fadeIn 0.5s ease" }}
         />
@@ -223,7 +227,7 @@ export function ImageGenSlot({
       {phase === "idle" && (
         <div className="absolute inset-0 flex items-center justify-center text-default-400 flex-col gap-1">
           <span className="text-3xl">🎨</span>
-          <p className="text-tiny text-center px-4">圖片方向 · 等待 AI 產出</p>
+          <p className="text-tiny text-center px-4">{lang === "en" ? "Image direction · waiting for AI" : "圖片方向 · 等待 AI 產出"}</p>
         </div>
       )}
 
@@ -248,7 +252,7 @@ export function ImageGenSlot({
       {isDone && (
         <div className="absolute top-2 right-2">
           <Chip size="sm" color="success" variant="solid" className="text-[10px] h-5">
-            ✨ AI 生成
+            {lang === "en" ? "✨ AI generated" : "✨ AI 生成"}
           </Chip>
         </div>
       )}

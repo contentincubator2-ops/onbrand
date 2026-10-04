@@ -647,3 +647,17 @@ export function interpolate(
     vars[name] != null ? String(vars[name]) : `{${name}}`,
   );
 }
+
+/** English labels for nudge action buttons, keyed by the zh-TW label. */
+export const MIA_ACTION_LABEL_EN: Record<string, string> = {
+  "做 3 個變體 →": "Make 3 variants →",
+  "做完整套組 →": "Make the full pack →",
+  "做系列 →": "Make a series →",
+  "做完整序列 →": "Make the full sequence →",
+  "去靈感舞台 →": "Go to the Inspiration stage →",
+  "連結平台 →": "Connect a platform →",
+  "看本週企劃 →": "See this week's plan →",
+  "進入執行模式 →": "Enter execution mode →",
+  "調整品牌定位 →": "Adjust brand positioning →",
+  "看更新日誌 →": "See the changelog →",
+};
