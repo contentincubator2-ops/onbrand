@@ -109,6 +109,26 @@ describe("parseChatReply（回覆被截斷也救得回來）", () => {
     expect(r.ops).toEqual([{ op: "update", id: "a", angle: "講真實的{週一}" }, { op: "update", id: "b", angle: "第二條" }]);
   });
 
+  // 2026-10-05 dev：Lucas 請總監照 Brief 改策略依據，回覆斷在 basis 中間，修改整包不見。
+  it("被截斷在策略依據中間：寫完整的那幾格、訴求、各段訊息都救回來", () => {
+    const cut = '{"reply":"我把對不上 Brief 的格子都對齊了。","smp":"十週年，回到曠野","phaseMessages":{"launch":"兩天，兩隻傳說"},"ops":[],"basis":{"audience.keyInsight":"訓練家要的是「一起出門」的理由，不是{獎勵}, 清單","guidelines.forbiddenElements":["免費","保證 [必中]"],"objective.business":"帶動入場券銷';
+    const r = parseChatReply(cut)!;
+    expect(r.truncated).toBe(true);
+    expect(r.smp).toBe("十週年，回到曠野");
+    expect(r.phaseMessages).toEqual({ launch: "兩天，兩隻傳說" });
+    expect(r.basis).toEqual({
+      "audience.keyInsight": "訓練家要的是「一起出門」的理由，不是{獎勵}, 清單",
+      "guidelines.forbiddenElements": ["免費", "保證 [必中]"],
+    });
+  });
+
+  it("被截斷在策略依據的第一格：沒有東西可救，basis 不出現", () => {
+    const r = parseChatReply('{"reply":"都改好了。","ops":[],"basis":{"audience.keyInsight":"寫到一')!;
+    expect(r.truncated).toBe(true);
+    expect(r.basis).toBeUndefined();
+    expect(r.ops).toEqual([]);
+  });
+
   it("沒有 JSON：整段當一般回答；什麼都沒有：null", () => {
     expect(parseChatReply("這週先別加篇數比較好。")).toEqual({ reply: "這週先別加篇數比較好。", ops: [], truncated: false });
     expect(parseChatReply("   ")).toBeNull();

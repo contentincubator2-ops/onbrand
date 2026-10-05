@@ -1,6 +1,13 @@
 name: Ops (DEV) — probe campaign chat handoffs (read-only)
 
-# 活動頁對話：交棒之後有沒有人接著回。只讀 dev 的資料庫與 pm2 記錄。
+# 活動頁對話：交棒之後接手的那位有沒有回、說「改好了」是不是真的有改。
+# 2026-10-05 Lucas 的對話（活動 34）：朱怡君請潘建宇接手後沒有下文；再問一次，潘建宇說
+# 策略依據「全部對齊了」，畫面上一格都沒動。
+#
+# 這支拿同一檔活動、同一句話，在 DEV VM 上實際問兩次：
+#   OLD＝VM 上正在跑的那版 campaignChat.ts
+#   NEW＝這個分支的 campaignChat.ts（放在旁邊的暫存資料夾，跑完就刪）
+# runCampaignChat 只回提案、不寫入；企劃與策略依據都不會被改到。
 # Path-scoped push，跟 op-probe-dev-brand.yml 同一個做法（environment: dev 才會連到 DEV VM）。
 on:
   push:
@@ -11,34 +18,76 @@ jobs:
   probe:
     runs-on: ubuntu-24.04
     environment: dev
-    timeout-minutes: 5
+    timeout-minutes: 8
     steps:
-      - name: Read-only look at recent campaign chat
+      - uses: actions/checkout@v4
+      - name: Pack this branch's campaignChat.ts
+        run: echo "PATCH_B64=$(gzip -c skills/ai-talent/server/content/core/campaign/campaignChat.ts | base64 -w0)" >> "$GITHUB_ENV"
+      - name: Ask the same question with the old and the new code
         uses: appleboy/ssh-action@v1.0.3
+        env:
+          PATCH_B64: ${{ env.PATCH_B64 }}
         with:
           host: ${{ secrets.VM_HOST }}
           username: ${{ secrets.VM_USER }}
           key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
-          command_timeout: 4m
+          command_timeout: 6m
+          envs: PATCH_B64
           script: |
             set +e
             cd /opt/onbrand/current/skills/ai-talent
             set -a; source .env 2>/dev/null; set +a
             echo "host=$(hostname)  app=$(readlink -f /opt/onbrand/current)  now=$(date -u +%FT%TZ)"
-            node -e "
-              const mysql = require('mysql2/promise');
-              (async () => {
-                const c = await mysql.createConnection({
-                  host: process.env.LOCAL_DB_HOST || '127.0.0.1',
-                  port: Number(process.env.LOCAL_DB_PORT || 3306),
-                  user: process.env.LOCAL_DB_USER || 'mos_user',
-                  password: process.env.LOCAL_DB_PASSWORD,
-                  database: process.env.LOCAL_DB_NAME || 'mos_db',
+            P=server/content/core/campaign__probe
+            rm -rf "$P"; cp -r server/content/core/campaign "$P"
+            echo "$PATCH_B64" | base64 -d | gunzip > "$P/campaignChat.ts"
+            echo "patched bytes=$(wc -c < "$P/campaignChat.ts")  live bytes=$(wc -c < server/content/core/campaign/campaignChat.ts)"
+            cat > "$P/_probe.ts" <<'TS'
+            import localPool from "../../../localDb.js";
+            const EVENT = 34, USER = 1238310;
+            const MSG = "請根據戰略Brief的內容，幫我調整其他策略依據的部分";
+            const show = (label: string, ms: number, r: any) => {
+              const p = r.proposal ?? {};
+              console.log(`[${label}] ${(ms / 1000).toFixed(1)}s speaker=${r.speaker} agent=${r.agent?.name ?? "-"} truncated=${r.truncated}`);
+              console.log(`[${label}] reply: ${r.reply}`);
+              console.log(`[${label}] basis keys (${Object.keys(p.basis ?? {}).length}): ${Object.keys(p.basis ?? {}).join(", ") || "-"}`);
+              console.log(`[${label}] ops=${(p.ops ?? []).length} smp=${p.smp ? "yes" : "-"} phaseMessages=${Object.keys(p.phaseMessages ?? {}).length} handoff=${r.handoff ? `${r.handoff.to}: ${r.handoff.question}` : "-"}`);
+            };
+            (async () => {
+              const [rows]: any = await localPool.execute("SELECT positioning FROM events WHERE id = ? AND userId = ? LIMIT 1", [EVENT, USER]);
+              if (!rows[0]) { console.log("event not found"); process.exit(0); }
+              const pos = typeof rows[0].positioning === "string" ? JSON.parse(rows[0].positioning) : rows[0].positioning;
+              const plan = pos.campaignPlan;
+              console.log(`event ${EVENT}: items=${plan?.items?.length} locked=${!!pos.campaignLocked}`);
+              const base = { eventId: EVENT, userId: USER, plan, positioning: pos, view: "map" as const, lang: "zh" as const };
+              const run = async (label: string, mod: any, extra: any) => {
+                const t0 = Date.now();
+                try { const r = await mod.runCampaignChat({ ...base, ...extra }); show(label, Date.now() - t0, r); return r; }
+                catch (e: any) { console.log(`[${label}] FAILED after ${((Date.now() - t0) / 1000).toFixed(1)}s: ${e?.message}`); return null; }
+              };
+              const oldMod = await import("../campaign/campaignChat.js");
+              const newMod = await import("./campaignChat.js");
+              // 舊版：Lucas 第二次直接問總監的那一句（對話第 55、56 則）。
+              await run("OLD director", oldMod, { message: MSG, speaker: "director" });
+              // 新版：照畫面的走法——先問內容企劃，她交棒，再帶著她的指示問總監。
+              const first = await run("NEW planner", newMod, { message: MSG, speaker: "planner" });
+              const q = first?.handoff?.to === "director" ? first.handoff.question : MSG;
+              const second = await run("NEW director (handoff)", newMod, {
+                message: q, speaker: "director", handoff: true, from: "planner", hops: 1,
+                history: [{ role: "user", content: MSG }, ...(first ? [{ role: "assistant", content: first.reply, speaker: "planner" }] : [])],
+              });
+              // 接著說「繼續」：下一批是不是改別的格子。
+              if (second) {
+                // 第一批先套進去（只在記憶體裡），總監才看得到哪幾格已經改過。
+                const { applyBasis } = await import("./campaignBasis.js");
+                await run("NEW director (繼續)", newMod, {
+                  message: "繼續", speaker: "director", positioning: applyBasis(pos, second.proposal?.basis ?? {}),
+                  history: [{ role: "user", content: MSG }, { role: "assistant", content: second.reply, speaker: "director" }],
                 });
-                const [m] = await c.query(
-                  'SELECT id, eventId, threadId, role, speaker, name, truncated, undone, CHAR_LENGTH(content) AS contentLen, content, CHAR_LENGTH(proposal) AS proposalLen, LEFT(proposal, 1500) AS proposal, (beforeBasis IS NOT NULL) AS hasBeforeBasis, createdAt FROM campaign_chat_messages WHERE id >= 51 ORDER BY id');
-                console.log('ROWS n=' + m.length);
-                for (const r of m) console.log(JSON.stringify(r));
-                await c.end();
-              })().catch(e => { console.log('PROBE FAILED', e.message); process.exit(0); });
-            "
+              }
+              process.exit(0);
+            })().catch((e) => { console.log("PROBE FAILED", e?.message); process.exit(0); });
+            TS
+            ./node_modules/.bin/tsx "$P/_probe.ts" 2>&1 | grep -vE "^\s*$" | cut -c1-1200
+            rm -rf "$P"
+            echo "cleanup: $([ -e "$P" ] && echo STILL_THERE || echo removed)"
