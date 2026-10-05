@@ -20,7 +20,7 @@ import { CAMPAIGN_TYPES, EMPTY_CAMPAIGN_SETTINGS, type CampaignSettings } from "
 import { scopeValueFrom, UNDECIDED_SCOPE, type ProductScopeValue } from "../../../strategy/lib/eventProductScope";
 import EventProductScopePicker from "../../../strategy/components/events/EventProductScopePicker";
 
-export default function CampaignSetupForm({ eventId, data, brandProducts, hasPlan, en, onPlanned, onOpenKolBrief, autoBrief, onAutoDrafting }: {
+export default function CampaignSetupForm({ eventId, data, brandProducts, hasPlan, en, onPlanned, onOpenKolBrief, prefillBrief }: {
   eventId: number;
   /** campaign.get 的結果 */
   data: any;
@@ -31,12 +31,11 @@ export default function CampaignSetupForm({ eventId, data, brandProducts, hasPla
   /** 選了網紅時，打開「網紅任務說明單」（2026-10-01）。 */
   onOpenKolBrief?: () => void;
   /**
-   * 活動定位剛跑完帶過來的那段話（2026-10-05 CJ「定位完成後，可以直接到左邊對話右邊企劃草稿的
-   * 地方嗎」）：有給、而且還沒有企劃，就不等使用者按——推斷設定、存、排企劃一路做完。排出來的
-   * 是草稿，類型與通路猜錯可以在「調整設定」改，或直接跟左邊的內容企劃說。失敗就停在這張表單。
+   * 活動定位裡寫好的那段話（campaignBasis.briefFromBasis）。使用者還沒寫說明時先帶進來，不用把
+   * 定位寫過的事重寫一次。只帶字、不替他按——2026-10-05 CJ「不需要第一版，只呈現完整企畫的
+   * 版本就可」：不自動排一份猜出來的草稿，類型與通路照舊由他確認後才排。
    */
-  autoBrief?: string;
-  onAutoDrafting?: (running: boolean) => void;
+  prefillBrief?: string;
 }) {
   const L = (zh: string, e: string) => (en ? e : zh);
   const utils = (trpc as any).useUtils();
@@ -77,41 +76,11 @@ export default function CampaignSetupForm({ eventId, data, brandProducts, hasPla
     onError: (e: any) => setErr(e?.message ?? ""),
   });
 
-  const [auto, setAuto] = React.useState<"idle" | "running" | "failed">("idle");
-  const autoFired = React.useRef(false);
+  const [prefilled, setPrefilled] = React.useState(false);
   React.useEffect(() => {
-    if (!autoBrief || hasPlan || autoFired.current || !data) return;
-    autoFired.current = true;
-    const stop = () => { setAuto("failed"); onAutoDrafting?.(false); };
-    const done = () => { setAuto("idle"); onAutoDrafting?.(false); };
-    setAuto("running");
-    onAutoDrafting?.(true);
-    const s: CampaignSettings = { ...EMPTY_CAMPAIGN_SETTINGS, ...(data.settings ?? {}) };
-    // 設定早就齊了（只是還沒排）：直接排，不重猜一次。
-    if (s.type && s.channels.length > 0 && s.mechanic?.trim()) {
-      generateMut.mutate({ eventId }, { onSuccess: done, onError: stop });
-      return;
-    }
-    const text = (s.mechanic || autoBrief).trim();
-    setBrief(text);
-    inferMut.mutate({ eventId, brief: text }, {
-      onError: stop,
-      onSuccess: (r: any) => {
-        // 使用者選過搭配什麼就照他的，沒選才用推斷的（跟手動那條路同一條規則）。
-        const picked = scopeValueFrom(data.productScope, (data.products ?? []).map((p: any) => p.id));
-        const sv = picked.scope === null ? scopeValueFrom(r.productScope, r.productIds ?? []) : picked;
-        const { productScope: _stale, ...rest } = s;
-        const next = {
-          ...rest, type: r.type, mechanic: (r.mechanic || text).trim().slice(0, 600), goal: r.goal ?? "", channels: r.channels,
-          ...(sv.scope ? { productScope: sv.scope } : {}),
-        };
-        saveSettingsMut.mutate({ eventId, settings: next, productIds: sv.productIds }, {
-          onError: stop,
-          onSuccess: () => generateMut.mutate({ eventId }, { onSuccess: done, onError: stop }),
-        });
-      },
-    });
-  }, [autoBrief, data, hasPlan]);   // eslint-disable-line react-hooks/exhaustive-deps
+    if (!prefillBrief || hasPlan || dirty || !data || data.settings?.mechanic) return;
+    setBrief((prev) => { if (prev) return prev; setPrefilled(true); return prefillBrief; });
+  }, [prefillBrief, data, hasPlan]);   // eslint-disable-line react-hooks/exhaustive-deps
 
   const configured = !!settings.type && settings.channels.length > 0;
   const ready = configured && !!(settings.mechanic || brief).trim();
@@ -132,27 +101,20 @@ export default function CampaignSetupForm({ eventId, data, brandProducts, hasPla
 
   return (
     <div className="flex flex-col gap-4">
-      {auto === "running" && (
-        <p className="text-small text-default-600 leading-relaxed" role="status">
-          {L("活動定位完成了。正在依定位排出第一版企劃草稿，大約 30 秒——排好之後，左邊可以直接用對話修改。",
-             "Positioning is done. Building a first draft plan from it (about 30s) — then edit it by chatting on the left.")}
-        </p>
-      )}
-      {auto === "failed" && (
-        <p className="text-small text-default-600 leading-relaxed">
-          {L("沒能自動排出企劃。下面是從活動定位帶過來的說明，補上優惠與期限後再按一次。",
-             "Couldn't build the plan automatically. The text below came from your positioning — add the offer and dates, then try again.")}
-        </p>
-      )}
       <div className="flex flex-col gap-2">
         <p className="text-medium font-semibold">{L("這檔活動在賣什麼、優惠是什麼？", "What's on offer?")}</p>
         <Textarea
           value={brief}
-          onValueChange={(v) => { setBrief(v); setDirty(true); }}
+          onValueChange={(v) => { setBrief(v); setDirty(true); setPrefilled(false); }}
           minRows={2} maxRows={6} maxLength={800} variant="bordered" radius="md"
           placeholder={L("例：中秋檔期，橫膈牛排＋厚切牛舌組合早鳥 8 折，9/20–9/28，數量有限",
                          "e.g. Mid-Autumn bundle, 20% off early bird, 9/20–9/28, limited stock")}
         />
+        {prefilled && (
+          <p className="text-tiny text-default-500">
+            {L("這段是從活動定位帶過來的，補上優惠與期限會排得更準。", "Carried over from your positioning — add the offer and dates for a sharper plan.")}
+          </p>
+        )}
       </div>
 
       <EventProductScopePicker

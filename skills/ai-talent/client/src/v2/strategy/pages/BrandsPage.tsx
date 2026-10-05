@@ -1162,7 +1162,8 @@ export default function BrandsPage() {
   // 2026-10-05（CJ「活動定位總覽的地方，有點太複雜，當定位完成後，可以直接到左邊對話右邊
   // 企劃草稿的地方嗎? 讓用戶可以對話改」）：活動定位整套跑完，直接進這檔活動的宣傳企劃
   // （cat=campaign）——左邊跟團隊對話、右邊企劃草稿，11 段定位在那一頁的「策略依據」裡照樣
-  // 看得到、可以請總監改。draft=1 讓那一頁在還沒有企劃時用定位排出第一版（CampaignStage）。
+  // 看得到、可以請總監改。還沒有企劃的活動，那一頁的設定表單會先帶入定位裡寫好的說明，
+  // 但不自動排（CJ 同日「不需要第一版，只呈現完整企畫的版本就可」）。
   // 只補單一段（自動填寫）不算「定位完成」，留在原地。
   const singleFillRef = React.useRef(false);
   const goCampaignAfterPositioning = () => {
@@ -1170,7 +1171,6 @@ export default function BrandsPage() {
     setSearchParams((prev) => {
       const sp = new URLSearchParams(prev);
       sp.set("cat", "campaign");
-      sp.set("draft", "1");
       return sp;
     });
   };
