@@ -610,6 +610,11 @@ async function runStartupMigrations() {
     await db.execute(sql.raw(INSPIRATION_PREFS_DDL));
     console.log("[migrate] inspiration_prefs: OK");
 
+    // 2026-10-06（CJ「網紅 mission tray：讀懂網紅連結，給每位網紅可講的產品特色和獨特切角」）。
+    const { INFLUENCER_BATCHES_DDL } = await import("./content/core/influencer/influencerAngles");
+    await db.execute(sql.raw(INFLUENCER_BATCHES_DDL));
+    console.log("[migrate] influencer_batches: OK");
+
     // 2026-09-14（CJ「選定一個競爭者，對比接觸點跟策略訴求差異」）：
     // 具名競爭者的逐接觸點比對快照（14 天內快取，不重跑研究）。
     const { COMPETITOR_SNAPSHOT_DDL } = await import("./strategy/core/monitor/competitorSnapshot");

@@ -1,0 +1,319 @@
+/**
+ * influencerRouter — 「網紅切角」的 tRPC 介面。規則在 core/influencer/influencerAngles.ts。
+ *
+ * latest：這個品牌最近一批的結果（重新整理不會不見）。
+ * parseSheet：上傳的名單檔（.xlsx／.csv／.txt）→ 名單，還沒開始寫。
+ * analyzeStart／analyzePoll：讀每一位的連結、分組寫切角與邀約信；開始後立刻回 jobId，
+ *   寫好一組就能被 poll 拿走一組。帶 batchId＝在原來那一批裡補寫／重寫指定的人。
+ * savePerson：用戶改了某一位的名字／Email／邀約信，存回這一批（匯出用改過的版本）。
+ * exportFile：整批匯出成 .xlsx 或 .docx。
+ */
+import { randomUUID } from "node:crypto";
+import { z } from "zod";
+import { TRPCError } from "@trpc/server";
+import { router, protectedProcedure } from "../../platform/core/trpc";
+import { assertBrandAccess } from "../../platform/core/brandAuth";
+import { callModel, callModelStrict } from "../../platform/core/llm/multiModelRouter";
+import { getBrandMarket } from "../../strategy/core/brand/brandMarket";
+import { buildBrandPrefix } from "../../strategy/core/brand/brandContext";
+import localPool from "../../localDb";
+import { classifyLink, PLATFORM_LABEL } from "../core/influencer/influencerLink";
+import { readInfluencer } from "../core/influencer/influencerReader";
+import {
+  CHUNK, MAX_PEOPLE, NOTES_MAX, anglesSystemPrompt, materialEnough, parsePeopleAngles, personLabel,
+  type ChunkPerson, type PersonResult,
+} from "../core/influencer/influencerAngles";
+import { buildDocx, buildXlsx, parseSheet } from "../core/influencer/influencerSheet";
+
+/** 跟靈感舞台同一個理由：這是判斷題，固定用 Sonnet（可用 env 覆寫）。 */
+const MODEL = process.env.INFLUENCER_MODEL || process.env.INSPIRATION_MODEL || "claude-sonnet-4-6";
+const READ_CONCURRENCY = 4;
+const SHEET_MAX_BYTES = 2 * 1024 * 1024;
+
+const brandInput = z.object({ brandId: z.number().int().positive() });
+const subjectZ = z.object({
+  kind: z.enum(["brand", "product", "event"]),
+  id: z.number().int().positive().nullable(),
+});
+const personZ = z.object({
+  id: z.string().min(1).max(40),
+  url: z.string().trim().min(4).max(600),
+  name: z.string().trim().max(60).optional(),
+  email: z.string().trim().max(160).optional(),
+  notes: z.string().max(NOTES_MAX).optional(),
+});
+
+// 每位使用者每小時 12 批（一批最多 30 位＝30 次連結讀取＋6 次模型呼叫）。
+const rate = new Map<number, number[]>();
+function checkRate(userId: number): void {
+  const now = Date.now();
+  const hits = (rate.get(userId) ?? []).filter((t) => now - t < 3_600_000);
+  if (hits.length >= 12) throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: "這一小時跑太多批了，晚點再來。" });
+  hits.push(now);
+  rate.set(userId, hits);
+}
+
+/** 主體的名稱；產品／活動必須屬於這個品牌。（與 inspirationRouter.resolveSubject 同規則。） */
+async function resolveSubject(brandId: number, subject: z.infer<typeof subjectZ>) {
+  const [bRows]: any = await localPool.execute(`SELECT name FROM brands WHERE id = ? LIMIT 1`, [brandId]);
+  const brandName = String((bRows as any[])[0]?.name ?? "");
+  if (subject.kind === "brand" || !subject.id) {
+    return { brandName, subjectLine: `品牌「${brandName}」本身（不是單一產品）`, subjectName: brandName, productId: null, eventId: null };
+  }
+  const table = subject.kind === "product" ? "products" : "events";
+  const [rows]: any = await localPool.execute(`SELECT name FROM ${table} WHERE id = ? AND brandId = ? LIMIT 1`, [subject.id, brandId]);
+  const name = (rows as any[])[0]?.name;
+  if (!name) throw new TRPCError({ code: "NOT_FOUND", message: subject.kind === "product" ? "找不到這個產品" : "找不到這個活動" });
+  return subject.kind === "product"
+    ? { brandName, subjectLine: `「${brandName}」的產品「${name}」`, subjectName: String(name), productId: subject.id, eventId: null }
+    : { brandName, subjectLine: `「${brandName}」的活動「${name}」`, subjectName: String(name), productId: null, eventId: subject.id };
+}
+
+// ─── 批次存取 ─────────────────────────────────────────────────────────
+
+interface BatchRow { id: number; subjectKind: "brand" | "product" | "event"; subjectId: number | null; people: PersonResult[]; updatedAt: string }
+
+function parsePeople(raw: unknown): PersonResult[] {
+  try { const v = typeof raw === "string" ? JSON.parse(raw) : raw; return Array.isArray(v) ? v : []; } catch { return []; }
+}
+async function loadBatch(brandId: number, batchId?: number): Promise<BatchRow | null> {
+  const [rows]: any = batchId
+    ? await localPool.execute(`SELECT * FROM influencer_batches WHERE id = ? AND brandId = ? LIMIT 1`, [batchId, brandId])
+    : await localPool.execute(`SELECT * FROM influencer_batches WHERE brandId = ? ORDER BY updatedAt DESC LIMIT 1`, [brandId]);
+  const r = (rows as any[])[0];
+  if (!r) return null;
+  // 伺服器重啟時還在跑的人不會有人接手寫完：讀出來時改成「沒寫成」，讓用戶可以重試。
+  const people = parsePeople(r.people).map((p) =>
+    (["queued", "reading", "thinking"].includes(p.status) && !isRunning(Number(r.id)) ? { ...p, status: "failed" as const } : p));
+  return { id: Number(r.id), subjectKind: r.subjectKind, subjectId: r.subjectId == null ? null : Number(r.subjectId), people, updatedAt: String(r.updatedAt) };
+}
+async function saveBatch(batchId: number, people: PersonResult[]): Promise<void> {
+  await localPool.execute(`UPDATE influencer_batches SET people = ? WHERE id = ?`, [JSON.stringify(people), batchId]);
+}
+
+// ─── 背景工作 ─────────────────────────────────────────────────────────
+// 伺服器是單一 pm2 process（同 inspirationRouter 的說明），進度放記憶體，結果每一組寫回資料庫。
+
+interface Job { userId: number; batchId: number; people: PersonResult[]; done: boolean; createdAt: number }
+const jobs = new Map<string, Job>();
+const JOB_TTL_MS = 30 * 60_000;
+function sweepJobs(): void {
+  const now = Date.now();
+  for (const [id, j] of jobs) if (j.done && now - j.createdAt > JOB_TTL_MS) jobs.delete(id);
+}
+function isRunning(batchId: number): boolean {
+  for (const j of jobs.values()) if (j.batchId === batchId && !j.done) return true;
+  return false;
+}
+
+async function writeChunk(args: Omit<Parameters<typeof anglesSystemPrompt>[0], "people"> & { people: ChunkPerson[] }) {
+  const ids = args.people.map((p) => p.id);
+  const messages = [{ role: "system" as const, content: anglesSystemPrompt(args) }, { role: "user" as const, content: "請開始。" }];
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      // 一組五位、每位含一封信，輸出約 5–6 千 token；callModel 的預設上限 4096 會截斷。
+      const r = attempt === 0
+        ? await callModelStrict(messages, "anthropic", MODEL, { maxTokens: 8000 })
+        : await callModel(messages, "creative_writing", "anthropic");
+      const got = parsePeopleAngles(String(r.content ?? ""), ids);
+      if (got.size) return got;
+    } catch (e) {
+      console.warn("[influencer] chunk failed:", (e as Error)?.message?.slice(0, 160));
+    }
+  }
+  return new Map() as ReturnType<typeof parsePeopleAngles>;
+}
+
+async function runJob(job: Job, targets: string[], base: {
+  brandName: string; subjectLine: string; brandCtx: string; outputLanguage: string; direction?: string;
+}): Promise<void> {
+  const byId = (id: string) => job.people.find((p) => p.id === id)!;
+  const patch = (id: string, v: Partial<PersonResult>) => { Object.assign(byId(id), v); };
+  try {
+    // 1) 讀連結（併發有上限，別對同一個網站一次開太多連線）。
+    const material = new Map<string, string>();
+    let cursor = 0;
+    await Promise.all(Array.from({ length: Math.min(READ_CONCURRENCY, targets.length) }, async () => {
+      while (cursor < targets.length) {
+        const id = targets[cursor++]!;
+        const p = byId(id);
+        patch(id, { status: "reading" });
+        const { link, read } = await readInfluencer(p.url);
+        if (!link) { patch(id, { status: "invalid_link", platform: null, handle: null }); continue; }
+        const notes = (p.notes ?? "").trim();
+        const text = [read.material, notes ? `用戶補充的素材（這位網紅的貼文或介紹）：\n${notes}` : ""].filter(Boolean).join("\n\n");
+        patch(id, {
+          platform: link.platform, handle: link.handle, followers: read.followers, displayName: read.displayName,
+          source: read.source !== "none" ? read.source : notes ? "user_notes" : "none",
+        });
+        if (!materialEnough(text)) { patch(id, { status: "needs_material" }); continue; }
+        material.set(id, text);
+        patch(id, { status: "thinking" });
+      }
+    }));
+    await saveBatch(job.batchId, job.people).catch(() => {});
+
+    // 2) 分組寫。後面的組拿得到前面（與這一批原本就有的）已用掉的切角。
+    const ready = targets.filter((id) => material.has(id));
+    const used = job.people.filter((p) => p.status === "done" && p.angle && !targets.includes(p.id)).map((p) => p.angle!);
+    for (let i = 0; i < ready.length; i += CHUNK) {
+      const ids = ready.slice(i, i + CHUNK);
+      const people: ChunkPerson[] = ids.map((id) => {
+        const p = byId(id);
+        return { id, label: personLabel(p), platform: p.platform ? PLATFORM_LABEL[p.platform] : "", followers: p.followers, material: material.get(id)! };
+      });
+      let got = await writeChunk({ ...base, people, avoid: used });
+      // 模型漏掉的人：只替他們再問一次。
+      const missing = people.filter((p) => !got.has(p.id));
+      if (missing.length && missing.length < people.length) {
+        const more = await writeChunk({ ...base, people: missing, avoid: [...used, ...[...got.values()].map((a) => a.angle)] });
+        got = new Map([...got, ...more]);
+      }
+      for (const id of ids) {
+        const a = got.get(id);
+        if (a) { patch(id, { ...a, status: "done" }); used.push(a.angle); }
+        else patch(id, { status: "failed" });
+      }
+      await saveBatch(job.batchId, job.people).catch(() => {});
+    }
+  } catch (e) {
+    console.warn("[influencer] job failed:", (e as Error)?.message?.slice(0, 160));
+  } finally {
+    for (const id of targets) if (["queued", "reading", "thinking"].includes(byId(id).status)) patch(id, { status: "failed" });
+    job.done = true;
+    await saveBatch(job.batchId, job.people).catch(() => {});
+  }
+}
+
+export const influencerRouter = router({
+  latest: protectedProcedure
+    .input(brandInput)
+    .query(async ({ ctx, input }) => {
+      await assertBrandAccess(ctx.user!.id, input.brandId);
+      const b = await loadBatch(input.brandId);
+      if (!b) return null;
+      let jobId: string | null = null;
+      for (const [id, j] of jobs) if (j.batchId === b.id && !j.done && j.userId === ctx.user!.id) jobId = id;
+      return { batchId: b.id, subject: { kind: b.subjectKind, id: b.subjectId }, people: b.people, jobId };
+    }),
+
+  parseSheet: protectedProcedure
+    .input(brandInput.extend({ filename: z.string().max(200), contentBase64: z.string().max(Math.ceil(SHEET_MAX_BYTES * 1.4)) }))
+    .mutation(async ({ ctx, input }) => {
+      await assertBrandAccess(ctx.user!.id, input.brandId);
+      const buf = Buffer.from(input.contentBase64, "base64");
+      if (buf.length > SHEET_MAX_BYTES) throw new TRPCError({ code: "PAYLOAD_TOO_LARGE", message: "名單檔太大了（上限 2MB）。" });
+      if (!/\.(xlsx|csv|tsv|txt)$/i.test(input.filename)) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "請上傳 .xlsx、.csv 或 .txt（舊版 .xls 請先另存成 .xlsx）。" });
+      }
+      try {
+        return parseSheet(buf, input.filename);
+      } catch {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "這個檔案讀不出來，請確認是 .xlsx 或 .csv。" });
+      }
+    }),
+
+  analyzeStart: protectedProcedure
+    .input(brandInput.extend({
+      subject: subjectZ,
+      people: z.array(personZ).min(1).max(MAX_PEOPLE),
+      /** 用戶補充的合作方向（選填）。 */
+      direction: z.string().trim().max(160).optional(),
+      /** 有帶＝在這一批裡補寫／重寫 people 這幾位；沒帶＝開新的一批。 */
+      batchId: z.number().int().positive().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const userId = ctx.user!.id;
+      await assertBrandAccess(userId, input.brandId);
+      checkRate(userId);
+      const ids = input.people.map((p) => p.id);
+      if (new Set(ids).size !== ids.length) throw new TRPCError({ code: "BAD_REQUEST", message: "名單裡有重複的人。" });
+
+      const [subject, market] = await Promise.all([resolveSubject(input.brandId, input.subject), getBrandMarket(input.brandId)]);
+      const brandCtx = await buildBrandPrefix(input.brandId, subject.productId, subject.eventId, "full").catch(() => "");
+
+      const fresh: PersonResult[] = input.people.map((p) => {
+        const link = classifyLink(p.url);
+        return {
+          ...p, url: link?.url ?? p.url, status: "queued",
+          platform: link?.platform ?? null, handle: link?.handle ?? null, followers: null, source: "none", displayName: null,
+        };
+      });
+
+      let batchId: number;
+      let people: PersonResult[];
+      if (input.batchId) {
+        const b = await loadBatch(input.brandId, input.batchId);
+        if (!b) throw new TRPCError({ code: "NOT_FOUND", message: "找不到這一批名單" });
+        if (isRunning(b.id)) throw new TRPCError({ code: "CONFLICT", message: "這一批還在寫，等它寫完再補。" });
+        const keep = b.people.filter((p) => !ids.includes(p.id));
+        if (keep.length + fresh.length > MAX_PEOPLE) throw new TRPCError({ code: "BAD_REQUEST", message: `一批最多 ${MAX_PEOPLE} 位。` });
+        // 重寫的人留在原來的位置，新加的人排在後面。
+        people = [...b.people.map((p) => fresh.find((f) => f.id === p.id) ?? p), ...fresh.filter((f) => !b.people.some((p) => p.id === f.id))];
+        batchId = b.id;
+        await localPool.execute(`UPDATE influencer_batches SET subjectKind = ?, subjectId = ?, people = ? WHERE id = ?`,
+          [input.subject.kind, subject.productId ?? subject.eventId, JSON.stringify(people), batchId]);
+      } else {
+        people = fresh;
+        const [r]: any = await localPool.execute(
+          `INSERT INTO influencer_batches (userId, brandId, subjectKind, subjectId, people) VALUES (?, ?, ?, ?, ?)`,
+          [userId, input.brandId, input.subject.kind, subject.productId ?? subject.eventId, JSON.stringify(people)],
+        );
+        batchId = Number(r.insertId);
+      }
+
+      sweepJobs();
+      const jobId = randomUUID();
+      const job: Job = { userId, batchId, people, done: false, createdAt: Date.now() };
+      jobs.set(jobId, job);
+      void runJob(job, ids, {
+        brandName: subject.brandName, subjectLine: subject.subjectLine, brandCtx,
+        outputLanguage: market.outputLanguage, direction: input.direction || undefined,
+      });
+      return { jobId, batchId };
+    }),
+
+  analyzePoll: protectedProcedure
+    .input(z.object({ jobId: z.string().uuid() }))
+    .query(({ ctx, input }) => {
+      const job = jobs.get(input.jobId);
+      // 找不到＝伺服器重啟或過期；別人的 job 也當成找不到。前端改讀 latest。
+      if (!job || job.userId !== ctx.user!.id) return { people: [] as PersonResult[], done: true, lost: true };
+      return { people: job.people, done: job.done, lost: false };
+    }),
+
+  savePerson: protectedProcedure
+    .input(brandInput.extend({
+      batchId: z.number().int().positive(), id: z.string().max(40),
+      name: z.string().trim().max(60).optional(), email: z.string().trim().max(160).optional(),
+      emailSubject: z.string().trim().max(60).optional(), emailBody: z.string().trim().max(1200).optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertBrandAccess(ctx.user!.id, input.brandId);
+      const b = await loadBatch(input.brandId, input.batchId);
+      if (!b) throw new TRPCError({ code: "NOT_FOUND", message: "找不到這一批名單" });
+      if (isRunning(b.id)) throw new TRPCError({ code: "CONFLICT", message: "這一批還在寫，等它寫完再改。" });
+      const { brandId: _b, batchId: _id, id, ...fields } = input;
+      const changes = Object.fromEntries(Object.entries(fields).filter(([, v]) => v !== undefined));
+      await saveBatch(b.id, b.people.map((p) => (p.id === id ? { ...p, ...changes } : p)));
+      return { ok: true };
+    }),
+
+  exportFile: protectedProcedure
+    .input(brandInput.extend({ batchId: z.number().int().positive(), format: z.enum(["xlsx", "docx"]) }))
+    .mutation(async ({ ctx, input }) => {
+      await assertBrandAccess(ctx.user!.id, input.brandId);
+      const b = await loadBatch(input.brandId, input.batchId);
+      if (!b || !b.people.length) throw new TRPCError({ code: "NOT_FOUND", message: "這一批沒有可以匯出的內容" });
+      const subject = await resolveSubject(input.brandId, { kind: b.subjectKind, id: b.subjectId }).catch(() => null);
+      const title = `${subject?.subjectName ?? "品牌"} 網紅切角`;
+      const buf = input.format === "xlsx" ? buildXlsx(b.people, title) : buildDocx(b.people, title);
+      return {
+        filename: `${title.replace(/[\\/:*?"<>|]/g, " ")}.${input.format}`,
+        mime: input.format === "xlsx"
+          ? "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+          : "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        base64: buf.toString("base64"),
+      };
+    }),
+});
