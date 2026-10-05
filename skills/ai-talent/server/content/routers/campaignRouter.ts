@@ -37,7 +37,7 @@ import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure } from "../../platform/core/trpc";
 import localPool from "../../localDb";
 import { buildCampaignPlan, inferCampaignSettings, type CampaignPlan } from "../core/campaign/campaignPlan";
-import { runCampaignChat, pickCampaignDirector, campaignWindow, draftManualItem } from "../core/campaign/campaignChat";
+import { runCampaignChat, pickCampaignDirector, chatWindow, draftManualItem } from "../core/campaign/campaignChat";
 import { validateBasis, applyBasis, basisSnapshot } from "../core/campaign/campaignBasis";
 import { cleanKolBrief } from "../core/campaign/campaignKolBrief";
 import { laneItems, candidateCards, planBeats, KOL_CHANNEL, COBRAND_CHANNEL, PLANNABLE_CHANNELS } from "../core/campaign/campaignPlan";
@@ -140,6 +140,12 @@ async function patchPositioning(eventId: number, userId: number, key: string, va
     `UPDATE events SET positioning = ? WHERE id = ? AND userId = ?`,
     [JSON.stringify(pos), eventId, userId],
   );
+}
+
+/** 這檔活動現在可以排文的日期範圍——跟對話加篇同一條（campaignChat.chatWindow）。 */
+function eventWindow(row: EventRow): { from: string; to: string } {
+  const day = (d: any) => (d ? new Date(d).toISOString().slice(0, 10) : null);
+  return chatWindow(day(row.startAt), day(row.endAt), new Date().toISOString().slice(0, 10));
 }
 
 function lockedAtOf(pos: Record<string, any>): string | null {
@@ -343,7 +349,7 @@ export const campaignRouter = router({
 
   /**
    * 手動加一篇的選單（2026-10-05 CJ「在某通路欄位底下，自己在該日期按+」）：日期範圍跟
-   * 對話加篇同一條（campaignWindow），任務卡是那個通路整篇可以發的卡（candidateCards）。
+   * 對話加篇同一條（chatWindow），任務卡是那個通路整篇可以發的卡（candidateCards）。
    */
   addOptions: protectedProcedure
     .input(z.object({ eventId: z.number().int().positive() }))
@@ -354,7 +360,7 @@ export const campaignRouter = router({
         (cards[c.platform] ??= []).push({ id: c.id, labelZh: c.labelZh || c.labelEn || c.id, labelEn: c.labelEn || c.labelZh || c.id, tier: c.tier });
       }
       return {
-        window: campaignWindow(row.startAt ? new Date(row.startAt) : null, row.endAt ? new Date(row.endAt) : null),
+        window: eventWindow(row),
         cards,
       };
     }),
@@ -374,7 +380,7 @@ export const campaignRouter = router({
       const pos = parsePositioning(row.positioning);
       assertUnlocked(pos);
       if (!pos.campaignPlan) throw new TRPCError({ code: "BAD_REQUEST", message: "還沒有企劃，先排出企劃再加" });
-      const window = campaignWindow(row.startAt ? new Date(row.startAt) : null, row.endAt ? new Date(row.endAt) : null);
+      const window = eventWindow(row);
       const r = draftManualItem({ input, cards: candidateCards([input.platform]), window });
       if (!r.ok) {
         const why: Record<typeof r.reason, string> = {
@@ -387,6 +393,36 @@ export const campaignRouter = router({
         throw new TRPCError({ code: "BAD_REQUEST", message: why[r.reason] });
       }
       return { item: r.item };
+    }),
+
+  /**
+   * 改活動本身的開始／結束日。對話裡提的日期（campaignChat 的 dates）與它的「復原」走這一支；
+   * 企劃裡每一篇的日期另外由 savePlan 存。定稿後擋。
+   */
+  setDates: protectedProcedure
+    .input(z.object({
+      eventId: z.number().int().positive(),
+      startAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable(),
+      endAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const row = await loadEvent(input.eventId, ctx.user!.id);
+      assertUnlocked(parsePositioning(row.positioning));
+      const day = (s: string | null) => {
+        if (!s) return null;
+        const d = new Date(s);
+        if (Number.isNaN(d.getTime()) || d.toISOString().slice(0, 10) !== s) throw new TRPCError({ code: "BAD_REQUEST", message: `日期不存在：${s}` });
+        return d;
+      };
+      const startAt = day(input.startAt);
+      const endAt = day(input.endAt);
+      if (startAt && endAt && endAt < startAt) throw new TRPCError({ code: "BAD_REQUEST", message: "結束日不能早於開始日" });
+      await localPool.execute(
+        `UPDATE events SET startAt = ?, endAt = ? WHERE id = ? AND userId = ?`,
+        [startAt, endAt, input.eventId, ctx.user!.id],
+      );
+      if (row.brandId) invalidateBrandPrefix(Number(row.brandId));
+      return { ok: true, startAt: input.startAt, endAt: input.endAt };
     }),
 
   /**

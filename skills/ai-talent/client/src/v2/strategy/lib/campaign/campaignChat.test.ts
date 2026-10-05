@@ -69,3 +69,23 @@ describe("routeMention（@ 找團隊裡的人）", () => {
     expect(routeMention("@王小明 你好", roster)).toEqual({ to: null, message: "@王小明 你好" });
   });
 });
+
+describe("活動日期（2026-10-05 對話可以改活動日期）", () => {
+  const dates = { startAt: "2026-10-25", endAt: "2026-11-07", from: { startAt: "2026-11-01", endAt: "2026-11-14" } };
+  it("只改活動日期也算有改", () => {
+    expect(isEmptyProposal({ ops: [], dates })).toBe(false);
+  });
+  it("講一句新舊日期；跟著挪的那幾篇合成一句，另外改了內容的照舊列", () => {
+    const lines = describeProposal(plan, { dates, ops: [
+      { op: "update", id: "a", patch: { date: "2026-10-25" } },
+      { op: "update", id: "b", patch: { date: "2026-10-26", angle: "改講提早開跑" } },
+    ] }, false);
+    expect(lines[0]).toBe("活動日期改成 10/25–11/07（原本 11/01–11/14）");
+    expect(lines[1]).toBe("還沒寫的 1 篇跟著挪日期");
+    expect(lines).toHaveLength(3);
+    expect(lines[2]).toContain("改講提早開跑");
+  });
+  it("沒改活動日期時，挪某一篇照舊逐條列", () => {
+    expect(describeProposal(plan, { ops: [{ op: "update", id: "a", patch: { date: "2026-10-25" } }] }, false)).toHaveLength(1);
+  });
+});

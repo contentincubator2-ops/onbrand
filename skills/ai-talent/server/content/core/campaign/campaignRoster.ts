@@ -32,6 +32,8 @@ export interface RoleSpec {
     phaseMessages?: boolean;
     basis?: boolean;
     paid?: boolean;
+    /** 活動本身的開始／結束日（整檔提早、延後、拉長、縮短）。 */
+    dates?: boolean;
   };
 }
 
@@ -40,7 +42,7 @@ export const ROLES: Record<CampaignRole, RoleSpec> = {
     zh: "策略總監", en: "Strategy director",
     duty: "方向：一句話訴求、每一段的訊息、對誰說、策略依據",
     dutyEn: "Direction: core message, phase messages, audience, strategy basis",
-    can: { angle: "all", smp: true, phaseMessages: true, basis: true },
+    can: { angle: "all", smp: true, phaseMessages: true, basis: true, dates: true },
   },
   author: {
     zh: "活動定位", en: "Campaign positioning",
@@ -52,7 +54,7 @@ export const ROLES: Record<CampaignRole, RoleSpec> = {
     zh: "內容企劃", en: "Content planner",
     duty: "排程：哪一天、哪個通路、用哪張任務卡、這一篇講什麼",
     dutyEn: "Schedule: date, channel, task card and angle for each post",
-    can: { schedule: true, angle: "all", phaseMessages: true },
+    can: { schedule: true, angle: "all", phaseMessages: true, dates: true },
   },
   kpi: {
     zh: "投放專家", en: "Paid media",

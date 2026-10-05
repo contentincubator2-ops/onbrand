@@ -1159,7 +1159,35 @@ export default function BrandsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pipeline.status, pipeline.cursor]);
 
+  // 2026-10-05（CJ「活動定位總覽的地方，有點太複雜，當定位完成後，可以直接到左邊對話右邊
+  // 企劃草稿的地方嗎? 讓用戶可以對話改」）：活動定位整套跑完，直接進這檔活動的宣傳企劃
+  // （cat=campaign）——左邊跟團隊對話、右邊企劃草稿，11 段定位在那一頁的「策略依據」裡照樣
+  // 看得到、可以請總監改。draft=1 讓那一頁在還沒有企劃時用定位排出第一版（CampaignStage）。
+  // 只補單一段（自動填寫）不算「定位完成」，留在原地。
+  const singleFillRef = React.useRef(false);
+  const goCampaignAfterPositioning = () => {
+    utils?.campaign?.get?.invalidate?.();
+    setSearchParams((prev) => {
+      const sp = new URLSearchParams(prev);
+      sp.set("cat", "campaign");
+      sp.set("draft", "1");
+      return sp;
+    });
+  };
+  const prevPipelineStatus = React.useRef(pipeline.status);
+  React.useEffect(() => {
+    const prev = prevPipelineStatus.current;
+    prevPipelineStatus.current = pipeline.status;
+    if (pipeline.status !== "done" || prev !== "running") return;
+    const single = singleFillRef.current;
+    singleFillRef.current = false;
+    if (single || scopeMode !== "event" || !scope?.eventId || category !== "positioning") return;
+    goCampaignAfterPositioning();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pipeline.status]);
+
   const startPipeline = () => {
+    singleFillRef.current = false;
     setFailedStepIds([]); // reset error trail on fresh start
     setSmpCheckpointActive(false); // clear stale SMP gate
     setPipeline({ status: "running", cursor: 0, completed: [] });
@@ -1221,6 +1249,12 @@ export default function BrandsPage() {
     if (autoPosPhase === "interim-done" && autoPosJobStatus?.data?.status === "done") {
       setAutoPosPhase("full-done");
       utils?.scope?.active?.invalidate?.();
+      // 活動：背景定位跑完也一樣直接進宣傳企劃（人還停在定位總覽時才帶，正在看某一段就不打斷）；
+      // 人已經在宣傳企劃頁的話，只把那一頁的策略依據更新成剛寫好的。
+      if (scopeMode === "event" && scope?.eventId) {
+        if (category === "positioning" && section === "pos:home") goCampaignAfterPositioning();
+        else utils?.campaign?.get?.invalidate?.();
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoPosJobStatus?.data?.status, autoPosPhase]);
@@ -1326,6 +1360,7 @@ export default function BrandsPage() {
     if (scopeMode === "none" || pipelineSteps.length === 0) return;
     const targetIdx = pipelineSteps.findIndex((s) => s.segmentId === segmentId);
     if (targetIdx < 0) return;
+    singleFillRef.current = true;
     setAutoFillStopAt(targetIdx);
     setPipeline({
       status: "running",

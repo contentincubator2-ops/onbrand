@@ -20,10 +20,18 @@ export interface CampaignProposal {
   smp?: string;
   /** 策略依據（11 段活動定位）的改法；只有策略總監會給。不在企劃裡，另外存（campaign.saveBasis）。 */
   basis?: BasisPatch;
+  /** 活動本身的新日期；from＝改之前的（復原用）。不在企劃裡，另外存（campaign.setDates）。 */
+  dates?: CampaignDates;
+}
+
+export interface CampaignDates {
+  startAt: string;
+  endAt: string;
+  from: { startAt: string | null; endAt: string | null };
 }
 
 export function isEmptyProposal(p: CampaignProposal | null | undefined): boolean {
-  return !p || (!p.ops.length && !p.smp && !Object.keys(p.phaseMessages ?? {}).length && !Object.keys(p.basis ?? {}).length);
+  return !p || (!p.ops.length && !p.smp && !p.dates && !Object.keys(p.phaseMessages ?? {}).length && !Object.keys(p.basis ?? {}).length);
 }
 
 /** 套用提案 → 新的企劃。已寫好的那篇就算提案裡有也不動（伺服器已經擋過，這裡再保險一次）。 */
@@ -57,6 +65,13 @@ export function describeProposal(plan: CampaignPlan, p: CampaignProposal, en: bo
   const L = (zh: string, e: string) => (en ? e : zh);
   const byId = new Map(plan.items.map((i) => [i.id, i]));
   const lines: string[] = [];
+  if (p.dates) {
+    const was = p.dates.from.startAt ? L(`（原本 ${md(p.dates.from.startAt)}–${p.dates.from.endAt ? md(p.dates.from.endAt) : "?"}）`, ` (was ${md(p.dates.from.startAt)}–${p.dates.from.endAt ? md(p.dates.from.endAt) : "?"})`) : "";
+    lines.push(L(`活動日期改成 ${md(p.dates.startAt)}–${md(p.dates.endAt)}${was}`, `Campaign dates → ${md(p.dates.startAt)}–${md(p.dates.endAt)}${was}`));
+    // 跟著活動日期挪的那幾篇不逐條列（常常二三十條）；另外還改了別的那幾篇照舊列出。
+    const moved = p.ops.filter((o) => o.op === "update" && byId.has(o.id) && Object.keys(o.patch).length === 1 && !!o.patch.date).length;
+    if (moved) lines.push(L(`還沒寫的 ${moved} 篇跟著挪日期`, `${moved} unwritten post(s) moved with it`));
+  }
   if (p.smp) lines.push(L(`訴求改成「${p.smp}」`, `Core message → “${p.smp}”`));
   for (const [id, m] of Object.entries(p.phaseMessages ?? {})) {
     lines.push(L(`${phaseShort(id as CampaignPhaseId, false)}的訊息改成「${m}」`, `${phaseShort(id as CampaignPhaseId, true)} message → “${m}”`));
@@ -75,6 +90,7 @@ export function describeProposal(plan: CampaignPlan, p: CampaignProposal, en: bo
     } else {
       const i = byId.get(o.id);
       if (!i) continue;
+      if (p.dates && Object.keys(o.patch).length === 1 && o.patch.date) continue;
       const bits: string[] = [];
       if (o.patch.date) bits.push(L(`改到 ${md(o.patch.date)}`, `move to ${md(o.patch.date)}`));
       if (o.patch.platform) bits.push(L(`改發 ${channelLabel(o.patch.platform, false)}`, `switch to ${channelLabel(o.patch.platform, true)}`));

@@ -5,7 +5,7 @@
  * 通路真的有的、寫好的不能動。這支是「對話會不會把企劃改壞」的唯一守門員。
  */
 import { describe, it, expect } from "vitest";
-import { validateCampaignOps, parseChatReply, pickHandoff, campaignWindow, draftManualItem } from "./campaignChat";
+import { validateCampaignOps, parseChatReply, pickHandoff, chatWindow, validateDates, reflowForDates, reportNote, draftManualItem, type CampaignOpsReport } from "./campaignChat";
 import { rosterRoles } from "./campaignRoster";
 import type { CampaignPlan } from "./campaignPlan";
 import type { CatalogTask } from "../catalog/taskCatalogIndex";
@@ -107,6 +107,26 @@ describe("parseChatReply（回覆被截斷也救得回來）", () => {
     expect(r.truncated).toBe(true);
     expect(r.reply).toBe("每一段都改了，重點放在「一人行銷」的處境");
     expect(r.ops).toEqual([{ op: "update", id: "a", angle: "講真實的{週一}" }, { op: "update", id: "b", angle: "第二條" }]);
+  });
+
+  // 2026-10-05 dev：Lucas 請總監照 Brief 改策略依據，回覆斷在 basis 中間，修改整包不見。
+  it("被截斷在策略依據中間：寫完整的那幾格、訴求、各段訊息都救回來", () => {
+    const cut = '{"reply":"我把對不上 Brief 的格子都對齊了。","smp":"十週年，回到曠野","phaseMessages":{"launch":"兩天，兩隻傳說"},"ops":[],"basis":{"audience.keyInsight":"訓練家要的是「一起出門」的理由，不是{獎勵}, 清單","guidelines.forbiddenElements":["免費","保證 [必中]"],"objective.business":"帶動入場券銷';
+    const r = parseChatReply(cut)!;
+    expect(r.truncated).toBe(true);
+    expect(r.smp).toBe("十週年，回到曠野");
+    expect(r.phaseMessages).toEqual({ launch: "兩天，兩隻傳說" });
+    expect(r.basis).toEqual({
+      "audience.keyInsight": "訓練家要的是「一起出門」的理由，不是{獎勵}, 清單",
+      "guidelines.forbiddenElements": ["免費", "保證 [必中]"],
+    });
+  });
+
+  it("被截斷在策略依據的第一格：沒有東西可救，basis 不出現", () => {
+    const r = parseChatReply('{"reply":"都改好了。","ops":[],"basis":{"audience.keyInsight":"寫到一')!;
+    expect(r.truncated).toBe(true);
+    expect(r.basis).toBeUndefined();
+    expect(r.ops).toEqual([]);
   });
 
   it("沒有 JSON：整段當一般回答；什麼都沒有：null", () => {
@@ -243,13 +263,133 @@ describe("手動加一篇（draftManualItem）", () => {
   });
 });
 
-describe("campaignWindow", () => {
-  const d = (s: string) => new Date(`${s}T00:00:00Z`);
-  it("開跑前兩週到結束後一週；開跑前兩週已經過了就從今天起", () => {
-    expect(campaignWindow(d("2026-11-01"), d("2026-11-30"), d("2026-10-05"))).toEqual({ from: "2026-10-18", to: "2026-12-07" });
-    expect(campaignWindow(d("2026-11-01"), d("2026-11-30"), d("2026-11-10"))).toEqual({ from: "2026-11-10", to: "2026-12-07" });
+/**
+ * 2026-10-05（CJ「用戶在對話當中想要提早時間…被框架住，只能在活動前後」→「我要對話可以改日期」）。
+ */
+describe("活動日期可以在對話裡改", () => {
+  const today = "2026-10-05";
+  const event = { startAt: "2026-11-01", endAt: "2026-11-14", today };
+  const p3: CampaignPlan = {
+    smp: "訴求", generatedAt: "",
+    items: [
+      { id: "t", phase: "teaser", date: "2026-10-27", platform: "facebook", taskId: "fb-a", taskLabel: "x", angle: "預熱一篇", enabled: true, outputId: null },
+      { id: "l", phase: "launch", date: "2026-11-01", platform: "facebook", taskId: "fb-a", taskLabel: "x", angle: "開賣一篇", enabled: true, outputId: null },
+      { id: "w", phase: "launch", date: "2026-11-02", platform: "instagram", taskId: "ig-a", taskLabel: "x", angle: "寫好的", enabled: true, outputId: 55 },
+      { id: "s", phase: "sustain", date: "2026-11-07", platform: "instagram", taskId: "ig-a", taskLabel: "x", angle: "加溫一篇", enabled: true, outputId: null },
+      { id: "c", phase: "lastcall", date: "2026-11-14", platform: "facebook", taskId: "fb-a", taskLabel: "x", angle: "倒數一篇", enabled: true, outputId: null },
+      { id: "e", phase: "encore", date: "2026-11-15", platform: "facebook", taskId: "fb-a", taskLabel: "x", angle: "返場一篇", enabled: true, outputId: null },
+    ],
+  };
+  const go = (raw: any, role?: any) => {
+    const report: CampaignOpsReport = { outOfWindow: [], writtenKept: 0, window: chatWindow(event.startAt, event.endAt, today) };
+    const out = validateCampaignOps({ raw, plan: p3, cards, window: report.window, newId, role, event, report });
+    return { out, report };
+  };
+  const dateOf = (out: any) => Object.fromEntries(out.ops.filter((o: any) => o.op === "update").map((o: any) => [o.id, o.patch.date]));
+
+  it("可以排的範圍：開始前 60 天（不早於今天）～結束後 7 天", () => {
+    expect(chatWindow("2026-11-01", "2026-11-14", "2026-08-01")).toEqual({ from: "2026-09-02", to: "2026-11-21" });
+    expect(chatWindow("2026-11-01", "2026-11-14", today)).toEqual({ from: today, to: "2026-11-21" });
   });
-  it("沒有起訖日：今天起算 30 天，再加一週", () => {
-    expect(campaignWindow(null, null, d("2026-10-05"))).toEqual({ from: "2026-10-05", to: "2026-11-11" });
+
+  it("開賣前三週的預熱現在排得進去（以前只收前 14 天）", () => {
+    const { out, report } = go({ ops: [{ op: "add", phase: "teaser", date: "2026-10-10", platform: "facebook", taskId: "fb-a", angle: "提早三週先講為什麼做這檔" }] });
+    expect(out.ops).toHaveLength(1);
+    expect(report.outOfWindow).toEqual([]);
+  });
+
+  it("整檔提早一週：還沒寫的跟著挪、寫好的不動、記下舊日期給復原用", () => {
+    const { out, report } = go({ ops: [], dates: { startAt: "2026-10-25", endAt: "2026-11-07" } });
+    expect(out.dates).toEqual({ startAt: "2026-10-25", endAt: "2026-11-07", from: { startAt: "2026-11-01", endAt: "2026-11-14" } });
+    expect(dateOf(out)).toEqual({ t: "2026-10-20", l: "2026-10-25", s: "2026-10-31", c: "2026-11-07", e: "2026-11-08" });
+    expect(report.writtenKept).toBe(1);
+  });
+
+  it("只提早開始（拉長）：前段跟開始日走、尾段不動、中段照比例", () => {
+    const { out } = go({ dates: { startAt: "2026-10-18" } });
+    expect(out.dates).toMatchObject({ startAt: "2026-10-18", endAt: "2026-11-14" });
+    const d = dateOf(out);
+    expect(d.t).toBe("2026-10-13");
+    expect(d.l).toBe("2026-10-18");
+    expect(d.c).toBeUndefined();
+    expect(d.e).toBeUndefined();
+    expect(d.s > "2026-10-18" && d.s < "2026-11-14").toBe(true);
+  });
+
+  it("新日期的範圍馬上生效：同一輪可以加一篇落在新檔期前面的", () => {
+    const far = { startAt: "2027-02-01", endAt: "2027-02-14", today };
+    const out = validateCampaignOps({
+      raw: { dates: { startAt: "2026-12-01", endAt: "2026-12-14" }, ops: [{ op: "add", phase: "teaser", date: "2026-10-20", platform: "facebook", taskId: "fb-a", angle: "新檔期前六週的預告" }] },
+      plan: p3, cards, window: chatWindow(far.startAt, far.endAt, today), newId, event: far,
+    });
+    expect(out.ops.some((o) => o.op === "add")).toBe(true);
+  });
+
+  it("模型這一輪自己指定日期的那篇照模型的；只改切角的那篇還是會跟著挪", () => {
+    const { out } = go({
+      dates: { startAt: "2026-10-25", endAt: "2026-11-07" },
+      ops: [{ op: "update", id: "t", date: "2026-10-12" }, { op: "update", id: "l", angle: "開賣改講提早開跑的理由" }, { op: "remove", id: "e" }],
+    });
+    const d = dateOf(out);
+    expect(d.t).toBe("2026-10-12");
+    expect(d.l).toBe("2026-10-25");
+    expect(out.ops.filter((o) => (o as any).id === "e")).toEqual([{ op: "remove", id: "e" }]);
+  });
+
+  it("策略總監也能改活動日期（篇跟著挪），但他自己指定某一篇的日期照舊不收", () => {
+    const { out } = go({ dates: { startAt: "2026-10-25", endAt: "2026-11-07" }, ops: [{ op: "update", id: "t", date: "2026-10-06" }] }, "director");
+    expect(out.dates?.startAt).toBe("2026-10-25");
+    expect(dateOf(out).t).toBe("2026-10-20");
+  });
+
+  it("管不到日期的人提了也不收", () => {
+    expect(go({ dates: { startAt: "2026-10-25", endAt: "2026-11-07" } }, "kpi").out.dates).toBeUndefined();
+    expect(go({ dates: { startAt: "2026-10-25", endAt: "2026-11-07" } }, "pr").out.dates).toBeUndefined();
+  });
+
+  it("不合理的日期不收", () => {
+    const cur = { startAt: "2026-11-01", endAt: "2026-11-14" };
+    expect(validateDates({ startAt: "2026-11-20", endAt: "2026-11-10" }, cur, today)).toBeNull();      // 開始晚於結束
+    expect(validateDates({ startAt: "2026-09-01", endAt: "2026-09-10" }, cur, today)).toBeNull();      // 整檔在過去
+    expect(validateDates({ startAt: "2026-02-30", endAt: "2026-11-14" }, cur, today)).toBeNull();      // 不存在的日子
+    expect(validateDates({ startAt: "2026-11-01", endAt: "2026-11-14" }, cur, today)).toBeNull();      // 沒變
+    expect(validateDates({ startAt: "2026-11-01", endAt: "2028-01-01" }, cur, today)).toBeNull();      // 超過一年
+    expect(validateDates({ endAt: "2026-11-20" }, { startAt: null, endAt: null }, today)).toBeNull();  // 沒有開始日
+  });
+
+  it("只給開始、而且晚於原本的結束：整檔平移，長度不變", () => {
+    expect(validateDates({ startAt: "2026-12-01" }, { startAt: "2026-11-01", endAt: "2026-11-14" }, today))
+      .toMatchObject({ startAt: "2026-12-01", endAt: "2026-12-14" });
+  });
+
+  it("挪完還是收在可以排的範圍裡（不會排到今天以前）", () => {
+    const dates = { startAt: "2026-10-06", endAt: "2026-10-19", from: { startAt: "2026-11-01", endAt: "2026-11-14" } };
+    const moved = reflowForDates(p3.items, dates, chatWindow(dates.startAt, dates.endAt, today));
+    expect(moved.get("t")).toBe(today);
+    expect(moved.has("w")).toBe(false);
+  });
+
+  it("超出範圍的日期不再無聲消失：記下來，回覆會講", () => {
+    const { out, report } = go({ ops: [
+      { op: "add", phase: "teaser", date: "2026-09-01", platform: "facebook", taskId: "fb-a", angle: "太早的一篇排不進去" },
+      { op: "update", id: "t", date: "2027-03-01" },
+    ] });
+    expect(out.ops).toEqual([]);
+    expect(report.outOfWindow).toEqual(["2026-09-01", "2027-03-01"]);
+    const note = reportNote(report, false, false);
+    expect(note).toContain("09/01、03/01");
+    expect(note).toContain("10/05～11/21");
+    expect(reportNote({ outOfWindow: [], writtenKept: 2, window: report.window }, true, false)).toBe("已經寫好的 2 篇日期沒有動。");
+    expect(reportNote({ outOfWindow: [], writtenKept: 2, window: report.window }, false, false)).toBe("");
+  });
+
+  it("沒給活動資料的舊呼叫端：dates 不收，其他照舊", () => {
+    const out = validateCampaignOps({ raw: { dates: { startAt: "2026-10-25", endAt: "2026-11-07" } }, plan: p3, cards, window, newId });
+    expect(out).toEqual({ ops: [] });
+  });
+
+  it("parseChatReply 把 dates 帶出來", () => {
+    expect(parseChatReply(`{"reply":"好","ops":[],"dates":{"startAt":"2026-10-25","endAt":"2026-11-07"}}`)?.dates)
+      .toEqual({ startAt: "2026-10-25", endAt: "2026-11-07" });
   });
 });

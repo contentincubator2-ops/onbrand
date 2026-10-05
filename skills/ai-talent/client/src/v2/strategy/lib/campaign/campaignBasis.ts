@@ -45,3 +45,20 @@ export function fromText(text: string, list: boolean): BasisValue | null {
 
 export const sameValue = (a: BasisValue | null | undefined, b: BasisValue | null | undefined) =>
   JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
+
+/**
+ * 活動定位 → 排企劃用的那一段話（2026-10-05 CJ「定位完成後，可以直接到左邊對話右邊企劃草稿
+ * 的地方嗎」）：定位跑完直接排第一版企劃，不再請使用者把同一件事重寫一次。只抄定位裡寫好的
+ * 字，不加任何東西；長度壓在設定欄位的上限（mechanic 600 字）內。定位是空的就回空字串——
+ * 那就照舊請使用者自己寫。
+ */
+export function briefFromBasis(raw: Record<string, any> | null | undefined): string {
+  const str = (v: unknown) => (typeof v === "string" ? v.trim() : "");
+  const parts = [
+    str(raw?.brief?.briefSummary),
+    str(raw?.smp?.singleMindedProposition),
+    str(raw?.messaging?.coreMessage),
+    str(raw?.objectives?.marketingGoal),
+  ].filter(Boolean);
+  return [...new Set(parts)].join("\n").slice(0, 600).trim();
+}
