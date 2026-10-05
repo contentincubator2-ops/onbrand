@@ -44,7 +44,7 @@ export type CampaignTypeId = (typeof CAMPAIGN_TYPE_IDS)[number];
 export const CAMPAIGN_PHASE_IDS = ["teaser", "launch", "sustain", "lastcall", "encore"] as const;
 export type CampaignPhaseId = (typeof CAMPAIGN_PHASE_IDS)[number];
 
-const PHASE_PURPOSE: Record<CampaignPhaseId, string> = {
+export const PHASE_PURPOSE: Record<CampaignPhaseId, string> = {
   teaser:   "還不講折數，先把「為什麼現在該注意」說出來，累積想買的人",
   launch:   "機制一次講清楚：買什麼、優惠是什麼、到什麼時候、去哪買",
   sustain:  "換角度再說一次——使用情境、顧客回饋、比較與選購建議",

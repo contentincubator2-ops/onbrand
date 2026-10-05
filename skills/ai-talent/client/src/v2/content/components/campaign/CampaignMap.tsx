@@ -25,15 +25,26 @@
  * 2026-10-05（CJ「在某通路欄位底下，自己在該日期按+」）：放大後每個通路欄位底下有
  * 「＋ 新增一篇」——自己選日期、選那個通路的任務卡、寫這一篇要講什麼，不用經過對話。
  * 驗證在伺服器（campaign.draftItem），日期範圍見 campaignStage.addDateRange。
+ *
+ * 2026-10-06（CJ「這一頁的時間軸，希望可以讓用戶可以新增、或是拖曳或刪除，但拖曳後，要問
+ * 用戶，是否要按照該階段策略調整內容」）：總覽上直接動手，不用先放大。
+ *   · 新增：在某條通路的線上點空白處——日期照點的位置帶進去，表單跟放大後那張同一張。
+ *   · 拖曳：點沿著自己那條通路左右拖，換日期；拖進另一段就換到那一段。放開後如果換了段，
+ *     問一句「要不要照這一段的策略調整這一篇要講什麼」（campaign.retuneItem，說好才改）。
+ *     寫好的那一篇可以挪日期，但成品不會跟著改，所以只提醒、不改。換通路不在這裡做
+ *     （換通路＝換任務卡）。日期怎麼算見 campaignStage.dateInPhase。
+ *   · 刪除：拖到右下角的垃圾桶，或選到那個點按 Delete；放大後在「⋯」裡。只有還沒寫的能刪
+ *     （寫好的用「這篇不做」），刪完下方有「復原」。
+ * 定稿後這三樣都停住。
  */
 import React from "react";
 import { useNavigate } from "react-router-dom";
 import { Button, Chip, Input } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faArrowLeft, faEllipsis, faPenNib, faPlus } from "@fortawesome/free-solid-svg-icons";
+import { faArrowLeft, faEllipsis, faPenNib, faPlus, faTrashCan } from "@fortawesome/free-solid-svg-icons";
 import { CHANNEL_META, channelLabel } from "../../../platform/lib/channelMeta";
 import { phaseOf, type CampaignPhaseId, type CampaignPlanItem } from "../../../strategy/lib/campaign/campaignSchema";
-import { phaseShort, addDateRange, type StagePhase } from "../../../strategy/lib/campaign/campaignStage";
+import { phaseShort, addDateRange, dateInPhase, type StagePhase } from "../../../strategy/lib/campaign/campaignStage";
 import { money, metricLine, PAID_CHANNELS, type PhaseKpi } from "../../../strategy/lib/campaign/campaignKpi";
 import { TaskIllustration } from "../../../platform/components/TaskIllustration";
 import { tierLabel } from "../../../platform/lib/tierVocabulary";
@@ -65,6 +76,7 @@ const md = (s: string) => s.slice(5).replace("-", "/");
 const DAY = 86_400_000;
 const dayNo = (s: string) => Math.round(new Date(`${s}T00:00:00Z`).getTime() / DAY);
 const todayYmd = () => new Date().toISOString().slice(0, 10);
+const shiftDay = (s: string, n: number) => new Date((dayNo(s) + n) * DAY).toISOString().slice(0, 10);
 const range = (p: StagePhase) => (p.from === p.to ? md(p.from) : `${md(p.from)} – ${md(p.to)}`);
 
 /** 量容器大小——地圖的點與線要用同一套座標。 */
@@ -84,7 +96,7 @@ function useSize(ref: React.RefObject<HTMLDivElement | null>): { w: number; h: n
 
 export default function CampaignMap({
   items, phases, lanes, phaseMessages, current, onPick, locked, en, onPatchItem, fill, phaseKpi = {}, thumbs = {}, onOpenItem,
-  addOptions, onAddItem,
+  addOptions, onAddItem, onRemoveItem, onRestoreItem, onRetuneItem,
 }: {
   items: CampaignPlanItem[];
   phases: StagePhase[];
@@ -106,10 +118,32 @@ export default function CampaignMap({
   /** 手動加一篇：選單與送出。兩個都給才會出現「＋ 新增一篇」。失敗就 throw，表單會顯示原因。 */
   addOptions?: AddOptions | null;
   onAddItem?: (input: NewItemInput) => Promise<void>;
+  /** 刪掉一篇（只會拿還沒寫的來叫）／把剛刪的放回去。 */
+  onRemoveItem?: (id: string) => void;
+  onRestoreItem?: (item: CampaignPlanItem) => void;
+  /** 拖到另一段之後，照那一段的策略改寫要講什麼；回新的一句（不寫入）。失敗就 throw。 */
+  onRetuneItem?: (item: CampaignPlanItem, from: CampaignPhaseId) => Promise<string>;
 }) {
   const L = (zh: string, e: string) => (en ? e : zh);
   const boxRef = React.useRef<HTMLDivElement>(null);
   const [hover, setHover] = React.useState<string | null>(null);
+  /** 正在拖的那個點：現在的位置、落在哪一段、會變成哪一天（null＝那一段不能放）、是不是在垃圾桶上。 */
+  const [drag, setDrag] = React.useState<DragAt | null>(null);
+  const dragRef = React.useRef<{ id: string; sx: number; sy: number; moved: boolean; last: DragAt | null } | null>(null);
+  const justDragged = React.useRef(false);
+  const trashRef = React.useRef<HTMLDivElement>(null);
+  /** 剛拖到另一段的那一篇（問要不要照那一段調整）。 */
+  const [moved, setMoved] = React.useState<MovedInfo | null>(null);
+  /** 線上滑鼠指到的空白處（顯示「＋ 日期」）與點下去後打開的新增表單。 */
+  const [ghost, setGhost] = React.useState<{ li: number; x: number; date: string } | null>(null);
+  const [adding, setAdding] = React.useState<{ lane: string; pi: number; date: string; x: number; y: number } | null>(null);
+  /** 剛刪掉的那一篇（下方的「復原」）。 */
+  const [removed, setRemoved] = React.useState<CampaignPlanItem | null>(null);
+  React.useEffect(() => {
+    if (!removed) return;
+    const t = setTimeout(() => setRemoved(null), 8000);
+    return () => clearTimeout(t);
+  }, [removed]);
   const { w: W, h: boxH } = useSize(boxRef);
 
   const G = W < 520 ? 44 : 112;                 // 左邊通路名稱那一欄
@@ -170,6 +204,74 @@ export default function CampaignMap({
   const cx = ci >= 0 ? G + (ci + 0.5) * BW : W / 2;
   const cy = HEAD + (lanes.length * laneH) / 2;
 
+  // ── 在總覽上直接動手（新增／拖曳／刪除）。定稿、或日期範圍還沒讀到，就都不開。 ──
+  const canEdit = !locked && !!addOptions && ci < 0 && W > 0 && phases.length > 0;
+  const rangeOf = (pi: number) => (addOptions ? addDateRange(phases, phases[pi]!.id, addOptions.window) : null);
+  /** 地圖上的 x → 落在哪一段、是哪一天。 */
+  const at = (x: number): { pi: number; date: string | null } => {
+    const pi = Math.max(0, Math.min(n - 1, Math.floor((x - G) / BW)));
+    const inner = BW - 2 * pad;
+    const frac = inner > 0 ? (x - (G + pi * BW + pad)) / inner : 0.5;
+    return { pi, date: dateInPhase(phases[pi]!, frac, rangeOf(pi)) };
+  };
+  const localX = (clientX: number) => {
+    const r = boxRef.current?.getBoundingClientRect();
+    return Math.max(G, Math.min(W - 16, clientX - (r?.left ?? 0)));
+  };
+  const remove = (it: CampaignPlanItem) => {
+    if (!onRemoveItem || it.outputId) return;
+    onRemoveItem(it.id);
+    setRemoved(it); setMoved(null); setHover(null);
+  };
+  /** 換日期（＋換段）。換了段就問要不要照那一段調整。 */
+  const move = (it: CampaignPlanItem, pi: number, date: string) => {
+    const to = phases[pi]!.id;
+    if (date === it.date && to === it.phase) return;
+    onPatchItem(it.id, { date, phase: to });
+    setMoved(to !== it.phase ? { id: it.id, from: it.phase, fromDate: it.date, fromAngle: it.angle } : null);
+  };
+  const dragStart = (it: CampaignPlanItem, e: React.PointerEvent<HTMLButtonElement>) => {
+    if (!canEdit || e.button !== 0) return;
+    dragRef.current = { id: it.id, sx: e.clientX, sy: e.clientY, moved: false, last: null };
+    e.currentTarget.setPointerCapture?.(e.pointerId);
+  };
+  const dragMove = (it: CampaignPlanItem, e: React.PointerEvent<HTMLButtonElement>) => {
+    const d = dragRef.current;
+    if (!d || d.id !== it.id) return;
+    // 手抖的幾個像素不算拖——那是點一下（放大到那一段）。
+    if (!d.moved && Math.hypot(e.clientX - d.sx, e.clientY - d.sy) < 5) return;
+    d.moved = true;
+    const x = localX(e.clientX);
+    const t = trashRef.current?.getBoundingClientRect();
+    const trash = !!t && !it.outputId && e.clientX >= t.left && e.clientX <= t.right && e.clientY >= t.top && e.clientY <= t.bottom;
+    d.last = { id: it.id, x, ...at(x), trash };
+    setHover(null); setGhost(null); setAdding(null);
+    setDrag(d.last);
+  };
+  const dragEnd = (it: CampaignPlanItem) => {
+    const d = dragRef.current;
+    dragRef.current = null;
+    setDrag(null);
+    if (!d?.moved || !d.last) return;
+    justDragged.current = true;           // 放開後瀏覽器還會送一次 click，那一次不算「點一下放大」
+    setTimeout(() => { justDragged.current = false; }, 0);
+    if (d.last.trash) remove(it);
+    else if (d.last.date) move(it, d.last.pi, d.last.date);
+  };
+  /** 鍵盤：左右鍵挪一天（留在自己那一段），Delete 刪掉。 */
+  const pinKey = (it: CampaignPlanItem, e: React.KeyboardEvent) => {
+    if (!canEdit) return;
+    if ((e.key === "Delete" || e.key === "Backspace") && !it.outputId && onRemoveItem) { e.preventDefault(); remove(it); return; }
+    if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+    const pi = phases.findIndex((p) => p.id === it.phase);
+    const r = pi >= 0 ? rangeOf(pi) : null;
+    if (!r) return;
+    e.preventDefault();
+    const next = shiftDay(it.date, e.key === "ArrowLeft" ? -1 : 1);
+    if (next >= r.min && next <= r.max) move(it, pi, next);
+  };
+  const movedPin = moved ? pins.find((p) => p.it.id === moved.id) ?? null : null;
+
   // overflow-clip 而不是 hidden：hidden 仍是可捲動的容器，放大後底下那張總覽比框大，欄位一取得焦點
   // （例如打開「＋ 新增一篇」）瀏覽器就把整個框捲歪，而且沒有捲軸可以捲回來（2026-10-05 dev 實測）。
   return (
@@ -199,8 +301,38 @@ export default function CampaignMap({
               </span>
               {G > 60 && <span className="truncate">{channelLabel(c, en)}</span>}
             </div>
+            {/* 線上的空白處：點一下，在那一天加一篇（點在既有的點上是那個點的事，點比這一層高）。 */}
+            {canEdit && onAddItem && !!addOptions?.cards[c]?.length && (
+              <div className="absolute cursor-copy" style={{ left: G, right: 16, top: HEAD + j * laneH + laneH / 2 - 14, height: 28 }}
+                onMouseMove={(e) => {
+                  if (dragRef.current) return;
+                  const x = localX(e.clientX);
+                  const { date } = at(x);
+                  setGhost(date ? { li: j, x, date } : null);
+                }}
+                onMouseLeave={() => setGhost(null)}
+                onClick={(e) => {
+                  const x = localX(e.clientX);
+                  const { pi, date } = at(x);
+                  if (!date) return;
+                  setMoved(null); setGhost(null);
+                  setAdding({ lane: c, pi, date, x, y: HEAD + j * laneH + laneH / 2 });
+                }} />
+            )}
           </React.Fragment>
         ))}
+        {/* 拖曳中：會落在哪一段。 */}
+        {drag && !drag.trash && (
+          <div className={`absolute rounded-2xl border-2 pointer-events-none ${drag.date ? "border-foreground/50" : "border-dashed border-default-400"}`}
+            style={{ left: G + drag.pi * BW + 3, top: 8, width: BW - 6, height: HEAD + lanes.length * laneH }} aria-hidden />
+        )}
+        {ghost && !drag && !adding && (
+          <span className="absolute -translate-x-1/2 -translate-y-1/2 pointer-events-none flex flex-col items-center gap-0.5 z-[1]"
+            style={{ left: ghost.x, top: HEAD + ghost.li * laneH + laneH / 2 - 11 }} aria-hidden>
+            <span className="text-[10.5px] tabular-nums bg-foreground text-background rounded px-1.5 py-0.5 whitespace-nowrap">＋ {md(ghost.date)}</span>
+            <span className="w-3.5 h-3.5 rounded-full border-2 border-dashed border-foreground bg-content1" />
+          </span>
+        )}
         {W > 0 && todayX != null && (
           <>
             <div className="absolute w-0.5 bg-foreground/70 rounded-full" style={{ left: todayX - 1, top: HEAD - 6, height: lanes.length * laneH + 12 }} aria-hidden />
@@ -208,22 +340,34 @@ export default function CampaignMap({
               style={{ left: todayX, top: HEAD + lanes.length * laneH + 8 }}>{L("今天", "Today")} {md(today)}</span>
           </>
         )}
-        {W > 0 && pins.map(({ it, x, y }) => {
+        {W > 0 && pins.map(({ it, x: restX, y }) => {
           const past = it.date < today && !it.outputId;
+          const dragging = drag?.id === it.id ? drag : null;
+          const x = dragging ? dragging.x : restX;
           return (
             <React.Fragment key={it.id}>
               {/* 點本身小，感應區放大到 28px，滑鼠不用瞄準；滑過去看縮圖（PinThumb）。 */}
               <button type="button"
-                className="absolute -translate-x-1/2 -translate-y-1/2 w-7 h-7 grid place-items-center rounded-full focus-visible:outline focus-visible:outline-2 focus-visible:outline-foreground z-[1]"
+                className={`absolute -translate-x-1/2 -translate-y-1/2 w-7 h-7 grid place-items-center rounded-full focus-visible:outline focus-visible:outline-2 focus-visible:outline-foreground touch-none ${dragging ? "z-[3] cursor-grabbing" : `z-[2] ${canEdit ? "cursor-grab" : ""}`}`}
                 style={{ left: x, top: y }}
-                aria-label={`${md(it.date)} ${channelLabel(it.platform, en)}${it.paid ? `・${L("廣告", "Ad")}` : ""}：${it.angle}`}
-                onMouseEnter={() => setHover(it.id)} onMouseLeave={() => setHover((h) => (h === it.id ? null : h))}
-                onFocus={() => setHover(it.id)} onBlur={() => setHover((h) => (h === it.id ? null : h))}
-                onClick={() => { setHover(null); onPick(it.phase); }}>
+                aria-label={`${md(it.date)} ${channelLabel(it.platform, en)}${it.paid ? `・${L("廣告", "Ad")}` : ""}：${it.angle}${canEdit ? L("（左右拖曳或按左右鍵換日期）", " (drag or use arrow keys to change the date)") : ""}`}
+                onMouseEnter={() => { if (!dragRef.current) setHover(it.id); }} onMouseLeave={() => setHover((h) => (h === it.id ? null : h))}
+                onFocus={() => { if (!dragRef.current) setHover(it.id); }} onBlur={() => setHover((h) => (h === it.id ? null : h))}
+                onPointerDown={(e) => dragStart(it, e)} onPointerMove={(e) => dragMove(it, e)}
+                onPointerUp={() => dragEnd(it)} onPointerCancel={() => { dragRef.current = null; setDrag(null); }}
+                onKeyDown={(e) => pinKey(it, e)}
+                onClick={() => { if (justDragged.current) return; setHover(null); onPick(it.phase); }}>
                 <span className={`block w-3.5 h-3.5 border-[3px] transition-transform ${hover === it.id ? "scale-150" : ""} ${it.paid ? "rounded-[3px]" : "rounded-full"} ${it.outputId ? (isPostDone(postStateOf(it.outputId, thumbs[it.id]?.state)) ? "bg-success border-success" : "bg-content1 border-success") : it.paid ? "bg-foreground border-foreground" : "bg-content1 border-foreground"} ${past && hover !== it.id ? "opacity-35" : ""}`} />
               </button>
-              {showDate.has(it.id) && (
-                <span className={`absolute -translate-x-1/2 text-[10.5px] tabular-nums text-default-600 bg-content1/85 rounded px-1 ${past ? "opacity-50" : ""}`}
+              {dragging ? (
+                <span className="absolute -translate-x-1/2 text-[10.5px] tabular-nums bg-foreground text-background rounded px-1.5 py-0.5 whitespace-nowrap z-[3] pointer-events-none"
+                  style={{ left: x, top: y - 32 }}>
+                  {dragging.trash ? L("放開就刪除", "Release to delete")
+                    : dragging.date ? `${md(dragging.date)}・${phaseShort(phases[dragging.pi]!.id, en)}`
+                    : L("這一段已經過了，不能放", "This phase is over")}
+                </span>
+              ) : showDate.has(it.id) && (
+                <span className={`absolute -translate-x-1/2 text-[10.5px] tabular-nums text-default-600 bg-content1/85 rounded px-1 pointer-events-none ${past ? "opacity-50" : ""}`}
                   style={{ left: x, top: y + 10 }}>{md(it.date)}</span>
               )}
             </React.Fragment>
@@ -262,10 +406,18 @@ export default function CampaignMap({
             <div key={k}><b className="block text-medium font-black leading-tight tabular-nums">{v}</b><span className="text-[11px] text-default-500">{k}</span></div>
           ))}
         </div>
+        {/* 拖曳中才出現的垃圾桶（寫好的那一篇不能刪，所以拖它的時候不出現）。 */}
+        {drag && onRemoveItem && !items.find((i) => i.id === drag.id)?.outputId && (
+          <div ref={trashRef}
+            className={`absolute right-4 bottom-4 rounded-2xl border-2 border-dashed px-5 py-3 flex items-center gap-2 text-small transition ${drag.trash ? "border-danger bg-danger-50 text-danger scale-105" : "border-default-400 bg-content1 text-default-600"}`}>
+            <FontAwesomeIcon icon={faTrashCan} />
+            {L("拖到這裡刪除", "Drop here to delete")}
+          </div>
+        )}
       </div>
 
       {/* ── 滑過一個點：那一篇的縮圖 ── */}
-      {ci < 0 && hover && (() => {
+      {ci < 0 && hover && !drag && !adding && hover !== moved?.id && (() => {
         const pin = pins.find((p) => p.it.id === hover);
         if (!pin) return null;
         const CW = 240;
@@ -280,6 +432,42 @@ export default function CampaignMap({
         );
       })()}
 
+      {/* ── 點線上空白處：在那一天加一篇 ── */}
+      {ci < 0 && adding && onAddItem && addOptions?.cards[adding.lane]?.length && (() => {
+        const range = rangeOf(adding.pi);
+        if (!range) return null;
+        return (
+          <div className="absolute z-20 w-[272px] bg-content1 rounded-2xl shadow-large p-3" style={popStyle(adding.x, adding.y, 272, 300, W, Math.max(H, boxH))}>
+            <AddItemForm key={`${adding.lane}-${adding.pi}-${adding.date}`}
+              phase={phases[adding.pi]!} platform={adding.lane} cards={addOptions.cards[adding.lane]!} range={range} en={en}
+              onAdd={onAddItem} initialDate={adding.date} onClose={() => setAdding(null)} />
+          </div>
+        );
+      })()}
+
+      {/* ── 剛拖到另一段：要不要照那一段的策略調整 ── */}
+      {ci < 0 && moved && movedPin && !drag && (
+        <MovedPrompt key={`${moved.id}-${movedPin.it.phase}`}
+          item={movedPin.it} moved={moved} message={phaseMessages[movedPin.it.phase] ?? ""} en={en}
+          style={popStyle(movedPin.x, movedPin.y, 300, 280, W, Math.max(H, boxH))}
+          onClose={() => setMoved(null)}
+          onPatch={(next) => onPatchItem(moved.id, next)}
+          onRetune={onRetuneItem ? () => onRetuneItem(movedPin.it, moved.from) : undefined}
+          onOpenItem={onOpenItem}
+        />
+      )}
+
+      {/* ── 剛刪掉一篇：復原 ── */}
+      {removed && (
+        <div role="status" className="absolute left-1/2 -translate-x-1/2 bottom-4 z-30 bg-foreground text-background rounded-full shadow-large pl-4 pr-1.5 py-1.5 flex items-center gap-3 text-small">
+          <span className="truncate max-w-[280px]">{L(`已刪除 ${md(removed.date)} ${channelLabel(removed.platform, false)} 這一篇`, `Deleted the ${md(removed.date)} ${channelLabel(removed.platform, true)} post`)}</span>
+          {onRestoreItem && (
+            <button type="button" className="rounded-full bg-background text-foreground px-3 py-1 text-tiny font-semibold"
+              onClick={() => { onRestoreItem(removed); setRemoved(null); }}>{L("復原", "Undo")}</button>
+          )}
+        </div>
+      )}
+
       {/* ── 放大：這一段的通路、訊息與內容安排 ── */}
       {ci >= 0 && (
         <PhaseDetail
@@ -287,9 +475,98 @@ export default function CampaignMap({
           items={items.filter((i) => i.phase === phases[ci]!.id)} lanes={lanes}
           locked={locked} en={en} onBack={() => onPick(null)} onPatchItem={onPatchItem}
           kpi={phaseKpi[phases[ci]!.id] ?? null} thumbs={thumbs} onOpenItem={onOpenItem}
-          addCards={addOptions?.cards} onAddItem={onAddItem}
+          addCards={addOptions?.cards} onAddItem={onAddItem} onRemoveItem={onRemoveItem ? remove : undefined}
           addRange={addOptions ? addDateRange(phases, phases[ci]!.id, addOptions.window) : null}
         />
+      )}
+    </div>
+  );
+}
+
+interface DragAt { id: string; x: number; pi: number; date: string | null; trash: boolean }
+/** 剛換了段的那一篇：原本在哪一段、哪一天、講什麼（「放回原位」「改回原本的」要用）。 */
+interface MovedInfo { id: string; from: CampaignPhaseId; fromDate: string; fromAngle: string }
+
+/** 浮在某個點旁邊的小卡放哪：左右不超出地圖，下面放不下就放上面。 */
+function popStyle(x: number, y: number, w: number, h: number, W: number, boxHeight: number): React.CSSProperties {
+  const left = Math.max(8, Math.min(W - w - 8, x - w / 2));
+  return y + 20 + h < boxHeight ? { left, top: y + 18 } : { left, bottom: Math.max(8, boxHeight - y + 18) };
+}
+
+/**
+ * 一篇剛被拖到另一段：問要不要照那一段的策略調整「這一篇要講什麼」。
+ * 說好才改（伺服器改寫，回來先給看新舊兩句，可以改回去）；寫好的那一篇只提醒，不改。
+ */
+function MovedPrompt({ item, moved, message, en, style, onClose, onPatch, onRetune, onOpenItem }: {
+  item: CampaignPlanItem; moved: MovedInfo; message: string; en: boolean; style: React.CSSProperties;
+  onClose: () => void;
+  onPatch: (next: Partial<CampaignPlanItem>) => void;
+  onRetune?: () => Promise<string>;
+  onOpenItem?: (item: CampaignPlanItem) => void;
+}) {
+  const L = (zh: string, e: string) => (en ? e : zh);
+  const [step, setStep] = React.useState<"ask" | "busy" | "done">("ask");
+  const [err, setErr] = React.useState("");
+  const name = en ? phaseShort(item.phase, true) : `${phaseShort(item.phase, false)}期`;
+  const putBack = () => { onPatch({ phase: moved.from, date: moved.fromDate, angle: moved.fromAngle }); onClose(); };
+  const retune = async () => {
+    if (!onRetune) return;
+    setStep("busy"); setErr("");
+    try {
+      onPatch({ angle: await onRetune() });
+      setStep("done");
+    } catch (e: any) {
+      setErr(e?.message || L("沒有改成，原本的內容還在", "Couldn't adjust it — the original is unchanged"));
+      setStep("ask");
+    }
+  };
+  return (
+    <div role="dialog" aria-label={L("照這一段調整內容", "Adjust to this phase")} style={style}
+      className="absolute z-20 w-[300px] bg-content1 rounded-2xl shadow-large p-3.5 flex flex-col gap-2 animate-[pinIn_.16s_ease-out] motion-reduce:animate-none">
+      <style>{"@keyframes pinIn{from{opacity:0;transform:translateY(4px) scale(.98)}to{opacity:1;transform:none}}"}</style>
+      <p className="text-small font-semibold">{L(`已移到${name}・${md(item.date)}`, `Moved to ${name} · ${md(item.date)}`)}</p>
+      {item.outputId ? (
+        <>
+          <p className="text-tiny text-default-600 leading-relaxed">
+            {L(`這一篇已經寫好了，成品不會跟著改。要照${name}的策略重寫，請打開這一篇。`, `This post is already written, so it won't change. Open it to rewrite it for ${name}.`)}
+          </p>
+          <div className="flex items-center gap-2 flex-wrap">
+            {onOpenItem && (
+              <Button size="sm" radius="full" className="h-7 bg-foreground text-background" onPress={() => { onOpenItem(item); onClose(); }}>{L("打開這篇", "Open")}</Button>
+            )}
+            <Button size="sm" radius="full" variant="flat" className="h-7" onPress={onClose}>{L("知道了", "Got it")}</Button>
+            <Button size="sm" radius="full" variant="light" className="h-7" onPress={putBack}>{L("放回原位", "Put it back")}</Button>
+          </div>
+        </>
+      ) : step === "done" ? (
+        <>
+          <p className="text-tiny text-default-500">{L(`已照${name}的策略改成：`, `Adjusted for ${name}:`)}</p>
+          <p className="text-small leading-relaxed">{item.angle}</p>
+          <p className="text-tiny text-default-400 leading-relaxed line-through decoration-default-300">{moved.fromAngle}</p>
+          <div className="flex items-center gap-2 flex-wrap">
+            <Button size="sm" radius="full" className="h-7 bg-foreground text-background" onPress={onClose}>{L("完成", "Done")}</Button>
+            <Button size="sm" radius="full" variant="light" className="h-7" onPress={() => { onPatch({ angle: moved.fromAngle }); onClose(); }}>{L("改回原本的", "Revert")}</Button>
+          </div>
+        </>
+      ) : (
+        <>
+          <p className="text-small leading-relaxed">{L(`要照${name}的策略，調整這一篇要講什麼嗎？`, `Adjust what this post says to fit ${name}?`)}</p>
+          <p className="text-tiny text-default-500 leading-relaxed">
+            {L("這一段要做到：", "This phase: ")}{phaseOf(item.phase)?.purposeZh}
+            {message && <span className="block">{L("訊息：", "Message: ")}{message}</span>}
+          </p>
+          <p className="text-tiny text-default-600 leading-relaxed border-l-2 border-default-300 pl-2 line-clamp-3">{item.angle}</p>
+          {err && <p className="text-tiny text-danger">{err}</p>}
+          <div className="flex items-center gap-2 flex-wrap">
+            {onRetune && (
+              <Button size="sm" radius="full" className="h-7 bg-foreground text-background" isLoading={step === "busy"} onPress={retune}>
+                {err ? L("再試一次", "Try again") : L("照這一段調整", "Adjust")}
+              </Button>
+            )}
+            <Button size="sm" radius="full" variant="flat" className="h-7" isDisabled={step === "busy"} onPress={onClose}>{L("維持原內容", "Keep as is")}</Button>
+            <Button size="sm" radius="full" variant="light" className="h-7" isDisabled={step === "busy"} onPress={putBack}>{L("放回原位", "Put it back")}</Button>
+          </div>
+        </>
       )}
     </div>
   );
@@ -338,16 +615,21 @@ function PinThumb({ item, thumb, en, style }: { item: CampaignPlanItem; thumb: I
 }
 
 /** 通路欄位底下的「＋ 新增一篇」：日期、任務卡、這一篇要講什麼。 */
-function AddItemForm({ phase, platform, cards, range, en, onAdd }: {
+function AddItemForm({ phase, platform, cards, range, en, onAdd, initialDate, onClose }: {
   phase: StagePhase; platform: string; cards: AddOptions["cards"][string];
   range: { min: string; max: string }; en: boolean;
   onAdd: (input: NewItemInput) => Promise<void>;
+  /** 總覽上點空白處打開的那一張：一開始就是打開的、日期照點的位置，關掉時通知外面。 */
+  initialDate?: string;
+  onClose?: () => void;
 }) {
   const L = (zh: string, e: string) => (en ? e : zh);
   const firstDate = phase.from < range.min ? range.min : phase.from > range.max ? range.max : phase.from;
   const firstCard = (cards.find((c) => c.tier === "30s") ?? cards[0])!.id;
-  const [open, setOpen] = React.useState(false);
-  const [date, setDate] = React.useState(firstDate);
+  const floating = !!onClose;
+  const [open, setOpen] = React.useState(floating);
+  const [date, setDate] = React.useState(initialDate ?? firstDate);
+  const close = () => (onClose ? onClose() : setOpen(false));
   const [taskId, setTaskId] = React.useState(firstCard);
   const [angle, setAngle] = React.useState("");
   const [busy, setBusy] = React.useState(false);
@@ -370,7 +652,7 @@ function AddItemForm({ phase, platform, cards, range, en, onAdd }: {
     setBusy(true); setErr("");
     try {
       await onAdd({ phase: phase.id, date, platform, taskId, angle: angle.trim() });
-      setOpen(false);
+      close();
     } catch (e: any) {
       setErr(e?.message || L("加不進去，請再試一次", "Couldn't add it — try again"));
     } finally { setBusy(false); }
@@ -382,8 +664,11 @@ function AddItemForm({ phase, platform, cards, range, en, onAdd }: {
     [tierLabel("60s", lang), cards.filter((c) => c.tier !== "30s")],
   ];
   return (
-    <div className="mt-auto flex flex-col gap-2 rounded-xl border border-divider p-2.5">
-      <p className="text-tiny font-semibold">{L(`新增一篇 ${name}`, `New ${name} post`)}</p>
+    <div className={floating ? "flex flex-col gap-2" : "mt-auto flex flex-col gap-2 rounded-xl border border-divider p-2.5"}>
+      <p className="text-tiny font-semibold">
+        {L(`新增一篇 ${name}`, `New ${name} post`)}
+        {floating && <span className="font-normal text-default-500">・{en ? phaseShort(phase.id, true) : `${phaseShort(phase.id, false)}期`}</span>}
+      </p>
       <Input type="date" size="sm" variant="bordered" radius="md" aria-label={L("日期", "Date")}
         min={range.min} max={range.max} value={date} onValueChange={setDate}
         isInvalid={!dateOk} errorMessage={L(`要在 ${md(range.min)}–${md(range.max)} 之間`, `Pick ${md(range.min)}–${md(range.max)}`)} />
@@ -406,7 +691,7 @@ function AddItemForm({ phase, platform, cards, range, en, onAdd }: {
         <Button size="sm" radius="full" className="h-7 bg-foreground text-background" isDisabled={!ready} isLoading={busy} onPress={submit}>
           {L("加入企劃", "Add")}
         </Button>
-        <Button size="sm" radius="full" variant="light" className="h-7" isDisabled={busy} onPress={() => setOpen(false)}>
+        <Button size="sm" radius="full" variant="light" className="h-7" isDisabled={busy} onPress={close}>
           {L("取消", "Cancel")}
         </Button>
       </div>
@@ -414,7 +699,7 @@ function AddItemForm({ phase, platform, cards, range, en, onAdd }: {
   );
 }
 
-function PhaseDetail({ phase, message, items, lanes, locked, en, onBack, onPatchItem, kpi, thumbs, onOpenItem, addCards, addRange, onAddItem }: {
+function PhaseDetail({ phase, message, items, lanes, locked, en, onBack, onPatchItem, kpi, thumbs, onOpenItem, addCards, addRange, onAddItem, onRemoveItem }: {
   phase: StagePhase; message: string; items: CampaignPlanItem[]; lanes: string[];
   locked: boolean; en: boolean; onBack: () => void;
   onPatchItem: (id: string, next: Partial<CampaignPlanItem>) => void;
@@ -425,6 +710,8 @@ function PhaseDetail({ phase, message, items, lanes, locked, en, onBack, onPatch
   /** 這一段可以加的日期；null＝這一段已經過了，不出現「＋」。 */
   addRange?: { min: string; max: string } | null;
   onAddItem?: (input: NewItemInput) => Promise<void>;
+  /** 刪掉一篇（還沒寫的才有這顆；刪完地圖下方有「復原」）。 */
+  onRemoveItem?: (item: CampaignPlanItem) => void;
 }) {
   const L = (zh: string, e: string) => (en ? e : zh);
   const navigate = useNavigate();
@@ -528,6 +815,13 @@ function PhaseDetail({ phase, message, items, lanes, locked, en, onBack, onPatch
                       {PAID_CHANNELS.includes(i.platform) && (
                         <Button size="sm" variant="bordered" radius="md" onPress={() => onPatchItem(i.id, { paid: !i.paid })}>
                           {i.paid ? L("改為一般貼文", "Make organic") : L("這篇下廣告", "Promote as ad")}
+                        </Button>
+                      )}
+                      {onRemoveItem && !i.outputId && (
+                        <Button size="sm" variant="light" radius="md" className="text-danger"
+                          startContent={<FontAwesomeIcon icon={faTrashCan} className="text-[11px]" />}
+                          onPress={() => { setOpen(null); onRemoveItem(i); }}>
+                          {L("刪除這篇", "Delete")}
                         </Button>
                       )}
                     </div>

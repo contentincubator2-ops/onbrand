@@ -2,7 +2,7 @@
  * 策略層活動頁要算的東西：階段、通路、倒數、提醒。
  */
 import { describe, it, expect } from "vitest";
-import { stagePhases, stageLanes, countdown, stageNotes, addDateRange } from "./campaignStage";
+import { stagePhases, stageLanes, countdown, stageNotes, addDateRange, dateInPhase } from "./campaignStage";
 import type { CampaignPlanItem } from "./campaignSchema";
 
 const item = (date: string, phase: any, platform: string, enabled = true): CampaignPlanItem => ({
@@ -85,5 +85,32 @@ describe("addDateRange（手動加一篇可以選的日期）", () => {
   });
   it("找不到這一段：null", () => {
     expect(addDateRange(ps.filter((p) => p.id !== "launch"), "launch", window)).toBeNull();
+  });
+});
+
+describe("dateInPhase（地圖上的位置 → 日期）", () => {
+  const ps = stagePhases(plan);
+  const sustain = ps.find((p) => p.id === "sustain")!;   // 11/03 – 11/28
+  const launch = ps.find((p) => p.id === "launch")!;     // 只有 11/01
+  const wide = { min: "2026-10-18", max: "2027-01-02" };
+  const window = { from: wide.min, to: wide.max };
+  it("照那一段的起迄日按比例", () => {
+    expect(dateInPhase(sustain, 0, wide)).toBe("2026-11-03");
+    expect(dateInPhase(sustain, 1, wide)).toBe("2026-11-28");
+    expect(dateInPhase(sustain, 0.4, wide)).toBe("2026-11-13");
+  });
+  it("拖出第一篇與最後一篇之外：照同一個比例往外延伸，夾在允許的範圍裡", () => {
+    expect(dateInPhase(sustain, -0.04, wide)).toBe("2026-11-02");
+    expect(dateInPhase(sustain, -1, addDateRange(ps, "sustain", window))).toBe("2026-11-01");
+    expect(dateInPhase(sustain, 3, addDateRange(ps, "sustain", window))).toBe("2026-12-24");
+  });
+  it("只有一天的那一段：中間是那一天，左右各三天", () => {
+    expect(dateInPhase(launch, 0.5, wide)).toBe("2026-11-01");
+    expect(dateInPhase(launch, 0, wide)).toBe("2026-10-29");
+    expect(dateInPhase(launch, 1, wide)).toBe("2026-11-04");
+    expect(dateInPhase(launch, 1, addDateRange(ps, "launch", window))).toBe("2026-11-03");
+  });
+  it("那一段已經過了（沒有可以排的日期）：null", () => {
+    expect(dateInPhase(sustain, 0.5, null)).toBeNull();
   });
 });
