@@ -23,8 +23,8 @@ export async function assertBrandOwner(userId: number, brandId: number): Promise
 }
 
 /**
- * Throws NOT_FOUND unless the user owns the brand or belongs to it through
- * brand_members. Use this for tenant-scoped integrations shared by a team.
+ * Throws NOT_FOUND unless the user owns the brand, belongs to it through
+ * brand_members, or reaches it through a team workspace (teamAccess.ts).
  */
 export async function assertBrandAccess(userId: number, brandId: number): Promise<void> {
   const db = await getDb();
@@ -38,8 +38,10 @@ export async function assertBrandAccess(userId: number, brandId: number): Promis
           AND (b.userId = ${userId} OR bm.userId IS NOT NULL)
         LIMIT 1`
   )) as any;
-  if (!rows?.length)
-    throw new TRPCError({ code: "NOT_FOUND", message: "Brand not found" });
+  if (rows?.length) return;
+  const { teamAccessCached } = await import("./teamAccess");
+  if (await teamAccessCached(userId, brandId)) return;
+  throw new TRPCError({ code: "NOT_FOUND", message: "Brand not found" });
 }
 
 async function rowsOf(query: ReturnType<typeof sql>): Promise<any[]> {
@@ -91,8 +93,19 @@ export async function assertScopeAccess(
   if (pos(scope.eventId)) await assertEventAccess(userId, scope.eventId);
 }
 
-/** Throws NOT_FOUND unless the mission was created by `userId`. */
+/**
+ * Throws NOT_FOUND unless the mission is `userId`'s own, or it belongs to a
+ * team brand they can reach (a member's work on a team brand is stored under
+ * the brand owner — see teamAccess.ts).
+ */
 export async function assertMissionOwner(userId: number, missionId: number): Promise<void> {
-  const rows = await rowsOf(sql`SELECT id FROM missions WHERE id = ${missionId} AND userId = ${userId} LIMIT 1`);
-  if (!rows.length) throw new TRPCError({ code: "NOT_FOUND", message: "Mission not found" });
+  const rows = await rowsOf(sql`SELECT userId, brandId FROM missions WHERE id = ${missionId} LIMIT 1`);
+  const m = rows[0];
+  if (m && Number(m.userId) === userId) return;
+  if (m?.brandId != null) {
+    const { teamAccessCached } = await import("./teamAccess");
+    const access = await teamAccessCached(userId, Number(m.brandId));
+    if (access && access.ownerId === Number(m.userId)) return;
+  }
+  throw new TRPCError({ code: "NOT_FOUND", message: "Mission not found" });
 }

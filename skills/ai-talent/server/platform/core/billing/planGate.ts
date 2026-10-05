@@ -84,7 +84,14 @@ export async function planQuotaFor(userId: number): Promise<PlanQuota> {
   );
   const r = (rows as any[])[0];
   const isInternal = typeof r?.email === "string" && /@sowork\.(tw|ai)$/i.test(r.email);
-  const code: PlanCode = isInternal ? "enterprise" : ((r?.planCode ?? "trial") as PlanCode);
+  let code: PlanCode = isInternal ? "enterprise" : ((r?.planCode ?? "trial") as PlanCode);
+  // A team member rides on the team owner's plan (seats are part of it).
+  if (!isInternal) {
+    const { teamPlanFor } = await import("../teamAccess");
+    const team = await teamPlanFor(userId);
+    const rank: Record<string, number> = { trial: 0, drop_starter: 1, drop_pro: 2, enterprise: 3 };
+    if (team && (rank[team.planCode] ?? 0) > (rank[code] ?? 0)) code = team.planCode as PlanCode;
+  }
   return (PLANS[code] ?? PLANS.trial).quota;
 }
 

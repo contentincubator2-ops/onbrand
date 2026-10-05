@@ -18,15 +18,15 @@ import { BuildingIcon, ChevronLeftIcon, DeleteIcon, ShieldIcon, UserAddIcon } fr
 type Role = "owner" | "admin" | "editor" | "viewer";
 
 const ROLE_LABEL_ZH: Record<Role, string> = {
-  owner: "Owner",
-  admin: "Admin",
-  editor: "Editor",
-  viewer: "Viewer (僅查看)",
+  owner: "擁有者",
+  admin: "管理者（全部權限）",
+  editor: "編輯者（撰寫內容）",
+  viewer: "檢視者（僅查看）",
 };
 const ROLE_LABEL_EN: Record<Role, string> = {
   owner: "Owner",
-  admin: "Admin",
-  editor: "Editor",
+  admin: "Admin (everything)",
+  editor: "Editor (writes content)",
   viewer: "Viewer (read-only)",
 };
 
@@ -163,6 +163,10 @@ function WorkspaceDetail({ detail, onChanged }: { detail: any; onChanged: () => 
     onSuccess: () => { showToastGlobal(lang === "en" ? "Role updated" : "角色已更新", "success"); onChanged(); },
     onError: (e: any) => showToastGlobal(e?.message ?? (lang === "en" ? "Update failed" : "更新失敗")),
   });
+  const setPermsMut = (trpc as any).tenant?.setPermissions?.useMutation?.({
+    onSuccess: () => { showToastGlobal(lang === "en" ? "Permissions updated" : "權限已更新", "success"); onChanged(); },
+    onError: (e: any) => showToastGlobal(e?.message ?? (lang === "en" ? "Update failed" : "更新失敗")),
+  });
   const removeMut = (trpc as any).tenant?.removeMember?.useMutation?.({
     onSuccess: () => { showToastGlobal(lang === "en" ? "Removed" : "已移除", "success"); onChanged(); },
     onError: (e: any) => showToastGlobal(e?.message ?? (lang === "en" ? "Couldn't remove" : "移除失敗")),
@@ -175,6 +179,9 @@ function WorkspaceDetail({ detail, onChanged }: { detail: any; onChanged: () => 
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole, setInviteRole] = useState<Role>("viewer");
   const [inviteBrandIds, setInviteBrandIds] = useState<number[]>([]);
+  const [inviteStrategy, setInviteStrategy] = useState(false);
+  const [invitePublish, setInvitePublish] = useState(false);
+  const brandName = (id: number) => brands.find((b) => b.id === id)?.name ?? `#${id}`;
   const [wlName, setWlName] = useState(ws.whiteLabelName ?? "");
   const [wlLogo, setWlLogo] = useState(ws.whiteLabelLogo ?? "");
 
@@ -210,6 +217,7 @@ function WorkspaceDetail({ detail, onChanged }: { detail: any; onChanged: () => 
                 <th className="text-left py-2">{lang === "en" ? "Name" : "姓名"}</th>
                 <th className="text-left py-2">Email</th>
                 <th className="text-left py-2">{lang === "en" ? "Role" : "角色"}</th>
+                <th className="text-left py-2">{lang === "en" ? "Permissions" : "權限"}</th>
                 <th className="text-right py-2"></th>
               </tr>
             </thead>
@@ -235,6 +243,47 @@ function WorkspaceDetail({ detail, onChanged }: { detail: any; onChanged: () => 
                       </select>
                     ) : (
                       <span className="text-xs text-neutral-700">{ROLE_LABEL[m.role as Role]}</span>
+                    )}
+                  </td>
+                  <td className="py-2">
+                    {m.role === "editor" ? (
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        {([
+                          ["canEditStrategy", lang === "en" ? "Edit positioning" : "修改定位"],
+                          ["canPublish", lang === "en" ? "Publish" : "發布"],
+                        ] as const).map(([key, label]) => {
+                          const enabled = !!m.permissions?.[key];
+                          return (
+                            <button
+                              key={key}
+                              type="button"
+                              disabled={!canManage || setPermsMut?.isPending}
+                              aria-pressed={enabled}
+                              onClick={() => setPermsMut?.mutate({ workspaceId: ws.id, userId: m.userId, [key]: !enabled })}
+                              className={`text-xs px-2 py-1 rounded-full border transition disabled:cursor-default ${
+                                enabled
+                                  ? "bg-neutral-900 text-white border-neutral-900"
+                                  : "border-neutral-300 text-neutral-500 hover:border-neutral-500"
+                              }`}
+                            >
+                              {label}{enabled ? (lang === "en" ? ": on" : "：開") : (lang === "en" ? ": off" : "：關")}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <span className="text-xs text-neutral-500">
+                        {m.role === "viewer"
+                          ? (lang === "en" ? "Read only" : "只能查看")
+                          : (lang === "en" ? "Everything" : "全部")}
+                      </span>
+                    )}
+                    {(m.role === "editor" || m.role === "viewer") && (
+                      <p className="text-xs text-neutral-400 mt-1">
+                        {(m.brandIds ?? []).length === 0
+                          ? (lang === "en" ? "All brands" : "所有品牌")
+                          : (lang === "en" ? "Brands: " : "品牌：") + (m.brandIds as number[]).map(brandName).join("、")}
+                      </p>
                     )}
                   </td>
                   <td className="py-2 text-right">
@@ -288,10 +337,14 @@ function WorkspaceDetail({ detail, onChanged }: { detail: any; onChanged: () => 
                     workspaceId: ws.id,
                     email: inviteEmail,
                     role: inviteRole,
-                    brandIds: inviteBrandIds.length > 0 ? inviteBrandIds : undefined,
+                    canEditStrategy: inviteRole === "editor" ? inviteStrategy : undefined,
+                    canPublish: inviteRole === "editor" ? invitePublish : undefined,
+                    brandIds: inviteRole !== "admin" && inviteBrandIds.length > 0 ? inviteBrandIds : undefined,
                   });
                   setInviteEmail("");
                   setInviteBrandIds([]);
+                  setInviteStrategy(false);
+                  setInvitePublish(false);
                 }}
                 disabled={!inviteEmail || inviteMut?.isPending}
                 className="px-4 py-2 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-white text-sm font-medium transition disabled:opacity-50"
@@ -301,6 +354,30 @@ function WorkspaceDetail({ detail, onChanged }: { detail: any; onChanged: () => 
                   : (lang === "en" ? "Invite" : "邀請")}
               </button>
             </div>
+            {/* What this role can do, and the two editor switches */}
+            <p className="mt-3 text-xs text-neutral-500">
+              {inviteRole === "viewer" && (lang === "en"
+                ? "Viewer: sees the brand's positioning, task cards and content. Cannot write, change or publish."
+                : "檢視者：看得到品牌定位、任務卡與內容，不能撰寫、修改或發布。")}
+              {inviteRole === "editor" && (lang === "en"
+                ? "Editor: sees everything and writes content with the brand. Choose below whether they may also change positioning or publish."
+                : "編輯者：看得到全部，並可用這個品牌撰寫內容。下面決定是否也能修改定位、是否能發布。")}
+              {inviteRole === "admin" && (lang === "en"
+                ? "Admin: everything, including positioning, publishing, connecting social accounts and reviewing."
+                : "管理者：全部權限，包含修改定位、發布、連結社群帳號與審核。")}
+            </p>
+            {inviteRole === "editor" && (
+              <div className="mt-2 flex flex-wrap gap-4">
+                <label className="flex items-center gap-2 text-sm text-neutral-700 cursor-pointer">
+                  <input type="checkbox" checked={inviteStrategy} onChange={(e) => setInviteStrategy(e.target.checked)} />
+                  {lang === "en" ? "May edit positioning, products and events" : "可以修改品牌定位、產品與活動"}
+                </label>
+                <label className="flex items-center gap-2 text-sm text-neutral-700 cursor-pointer">
+                  <input type="checkbox" checked={invitePublish} onChange={(e) => setInvitePublish(e.target.checked)} />
+                  {lang === "en" ? "May schedule and publish" : "可以排程與發布"}
+                </label>
+              </div>
+            )}
             {/* Brand scoping (for viewer/editor) */}
             {inviteRole !== "admin" && brands.length > 0 && (
               <div className="mt-3">

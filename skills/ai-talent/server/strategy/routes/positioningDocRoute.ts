@@ -125,8 +125,8 @@ async function resolveScope(
   req: Request, res: Response,
   src: "query" | "body" | "headers" | "params",
 ): Promise<{ userId: number; brandId: number; scope: PositioningScope; scopeId: number } | null> {
-  const userId = await userIdOf(req);
-  if (!userId) { res.status(401).json({ error: "Unauthorized" }); return null; }
+  const callerId = await userIdOf(req);
+  if (!callerId) { res.status(401).json({ error: "Unauthorized" }); return null; }
 
   const bag: any =
     src === "query" ? req.query
@@ -144,6 +144,12 @@ async function resolveScope(
   if (!Number.isFinite(brandId) || !Number.isFinite(scopeId)) {
     res.status(400).json({ error: "brandId / scopeId required" }); return null;
   }
+  // A team member acts on the owner's rows: reading needs membership, changing
+  // positioning documents needs the strategy permission (teamAccess.ts).
+  const { actingUserForBrand } = await import("../../platform/core/teamAccess");
+  const acting = await actingUserForBrand(callerId, brandId, req.method === "GET" ? "view" : "strategy");
+  if (acting.denied) { res.status(403).json({ error: acting.denied }); return null; }
+  const userId = acting.userId;
   if (!(await canAccessScope(userId, brandId, scopeRaw, scopeId))) {
     res.status(404).json({ error: "Not found" }); return null;
   }

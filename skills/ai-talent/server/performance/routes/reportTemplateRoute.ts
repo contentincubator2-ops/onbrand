@@ -54,7 +54,7 @@ async function userIdOf(req: Request): Promise<number | null> {
  * 與 _core/brandAuth.assertBrandAccess 同一條 SQL 的布林版本 —— 那支丟 TRPCError，
  * 在 express 路由裡不能用。擁有者或 brand_members 成員都算有權。
  */
-async function canAccessBrand(userId: number, brandId: number): Promise<boolean> {
+async function canAccessBrand(userId: number, brandId: number, need: "view" | "write" = "view"): Promise<boolean> {
   const [rows]: any = await localPool.execute(
     `SELECT b.id
        FROM brands b
@@ -63,7 +63,11 @@ async function canAccessBrand(userId: number, brandId: number): Promise<boolean>
       LIMIT 1`,
     [userId, brandId, userId],
   );
-  return Array.isArray(rows) && rows.length > 0;
+  if (Array.isArray(rows) && rows.length > 0) return true;
+  // Team members reach the owner's brand through a workspace; viewers only read.
+  const { actingUserForBrand } = await import("../../platform/core/teamAccess");
+  const acting = await actingUserForBrand(userId, brandId, need);
+  return !acting.denied && acting.userId !== userId;
 }
 
 // ── helpers ──────────────────────────────────────────────────────────────────
@@ -110,7 +114,7 @@ reportTemplateRouter.post(
 
     const brandId = parseInt(String(req.headers["x-brand-id"] ?? ""), 10);
     if (!Number.isFinite(brandId)) { res.status(400).json({ error: "x-brand-id required" }); return; }
-    if (!(await canAccessBrand(userId, brandId))) { res.status(404).json({ error: "Brand not found" }); return; }
+    if (!(await canAccessBrand(userId, brandId, "write"))) { res.status(404).json({ error: "Brand not found" }); return; }
 
     const body = req.body as Buffer;
     if (!Buffer.isBuffer(body) || body.length === 0) {
@@ -172,7 +176,7 @@ reportTemplateRouter.post("/analyze", async (req: Request, res: Response) => {
   if (!userId) { res.status(401).json({ error: "Unauthorized" }); return; }
   const brandId = parseInt(String((req.body as any)?.brandId ?? ""), 10);
   if (!Number.isFinite(brandId)) { res.status(400).json({ error: "brandId required" }); return; }
-  if (!(await canAccessBrand(userId, brandId))) { res.status(404).json({ error: "Brand not found" }); return; }
+  if (!(await canAccessBrand(userId, brandId, "write"))) { res.status(404).json({ error: "Brand not found" }); return; }
 
   const decks = await listDecks(brandId);
   if (decks.length === 0) { res.status(400).json({ error: "尚未上傳任何版型" }); return; }

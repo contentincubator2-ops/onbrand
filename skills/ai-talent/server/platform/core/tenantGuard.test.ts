@@ -22,7 +22,11 @@ vi.mock("./brandAuth", () => ({
 let adminIds: number[] = [];
 vi.mock("../../localDb", () => ({
   default: {
-    execute: async (_sql: string, params: any[]) => [[{ role: adminIds.includes(params[0]) ? "admin" : "user", email: "u@example.com" }]],
+    // Only the admin lookup returns a row; nobody here is in a team (teamAccess.ts).
+    execute: async (sql: string, params: any[]) =>
+      /FROM users WHERE id/.test(sql)
+        ? [[{ role: adminIds.includes(params[0]) ? "admin" : "user", email: "u@example.com" }]]
+        : [[]],
   },
 }));
 

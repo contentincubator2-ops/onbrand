@@ -56,10 +56,20 @@ export async function loadUserPlan(userId: number): Promise<{
       billingCountry: r?.billingCountry ?? "TW",
     };
   }
-  return {
+  const own = {
     planCode: (r?.planCode ?? "trial") as PlanCode,
-    planStatus: r?.planStatus ?? "trial",
-    planEndsAt: r?.planEndsAt instanceof Date ? r.planEndsAt : (r?.planEndsAt ? new Date(r.planEndsAt) : null),
+    planStatus: (r?.planStatus ?? "trial") as string,
+    planEndsAt: r?.planEndsAt instanceof Date ? r.planEndsAt : (r?.planEndsAt ? new Date(r.planEndsAt) : null) as Date | null,
+  };
+  // An invited team member rides on the team owner's subscription, so their
+  // own expired trial must not lock them out (teamAccess.ts).
+  const { teamPlanFor, teamPlanWins } = await import("../core/teamAccess");
+  const team = await teamPlanFor(userId);
+  const eff = teamPlanWins(own, team) ? { ...own, ...team!, planCode: team!.planCode as PlanCode } : own;
+  return {
+    planCode: eff.planCode,
+    planStatus: eff.planStatus,
+    planEndsAt: eff.planEndsAt,
     isActive: Number(r?.isActive ?? 0) === 1,
     earlyBird: Number(r?.earlyBird ?? 0),
     lockedPriceTwdMonthly: r?.lockedPriceTwdMonthly ?? null,
