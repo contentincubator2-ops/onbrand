@@ -90,7 +90,11 @@ export interface PersonResult extends PersonInput, Partial<PersonAngle> {
   displayName: string | null;
 }
 
-/** 邀約信內文超過這個字數就退回重寫（提示詞要求 180–280）。 */
+/**
+ * 邀約信內文超過這個字數就退回重寫。提示詞寫的目標比這個短很多（6 句、220 字）：
+ * 2026-10-06 dev 實測，要求「180–280 字」時模型交 429 字，退回重寫後還是超過——
+ * 模型數中文字數不準，用句數管比較有效，目標也要留餘裕。
+ */
 export const EMAIL_MAX_CHARS = 340;
 /** 切角超過這個字數就退回重寫（提示詞要求 24 字內）。 */
 export const ANGLE_MAX_CHARS = 40;
@@ -118,7 +122,7 @@ export function unsupportedQuotes(a: PersonAngle, material: string, brandCtx: st
 export function angleIssues(a: PersonAngle, material: string, brandCtx: string): string[] {
   const issues = unsupportedQuotes(a, material, brandCtx)
     .map((q) => `「${q}」在素材裡找不到——不可以替他編話；改成只提他做過的內容標題，或拿掉這句。`);
-  if (a.emailBody.length > EMAIL_MAX_CHARS) issues.push(`emailBody 有 ${a.emailBody.length} 字，太長；刪到 280 字內。`);
+  if (a.emailBody.length > EMAIL_MAX_CHARS) issues.push(`emailBody 有 ${a.emailBody.length} 字，太長；整封刪到 6 句、220 字內：稱呼、為什麼找他、主體是什麼、想一起做什麼、請他回覆，各一句。`);
   if (a.angle.length > ANGLE_MAX_CHARS) issues.push(`angle 有 ${a.angle.length} 字，太長；24 字內說清楚這支內容在講什麼。`);
   return issues;
 }
@@ -167,7 +171,7 @@ export function anglesSystemPrompt(args: {
     `6. hook：用他的口吻示範開場第一句，40 字內。不要編他沒做過的經歷，也不要寫成他已經用過產品。`,
     `7. format：建議的內容形式，照他平常做的形式挑（例如「開箱長片」「Reels 短影音」「圖文貼文」「Podcast 口播」），12 字內。`,
     `8. emailSubject：邀約信主旨，28 字內，看得出是誰找他、為了什麼。`,
-    `9. emailBody：邀約信內文，180–280 字（超過 ${EMAIL_MAX_CHARS} 字會被退回重寫；對方是在手機上看的陌生來信，短才會被讀完）。開頭稱呼他；第二句提到他一則具體的內容（來自素材）說明為什麼找他；接著一句話介紹主體；再說想跟他一起做的切角；最後請他回覆是否有興趣與方便的聯絡方式。`,
+    `9. emailBody：邀約信內文，最多 6 句、220 字內（超過 ${EMAIL_MAX_CHARS} 字會被退回重寫；一句只講一件事，不要鋪陳；對方是在手機上看的陌生來信，短才會被讀完）。開頭稱呼他；第二句提到他一則具體的內容（來自素材）說明為什麼找他；接著一句話介紹主體；再說想跟他一起做的切角；最後請他回覆是否有興趣與方便的聯絡方式。`,
     `   提到他的內容時，只能說「你做過哪一支／哪一篇」（用素材裡的標題）；素材裡沒有他的原話，就不要寫「你說過『…』」——不可以替他編一句話。`,
     `   不要提費用、預算、報價；不要承諾成效；不要寫「久仰大名」這類客套；署名用「${args.brandName} 團隊」。沒有名字的人用「您好」開頭。`,
     `10. name：素材裡看得出來的名字或頻道名（12 字內）；看不出來就留空字串。`,

@@ -6,10 +6,14 @@
  *
  * 上面是「側欄上的順序」（可上移／下移／拿掉），下面是全部可以加的項目，分「通路」與
  * 「工具」兩組，每項一句話說明它能做什麼——使用者要知道加了會得到什麼，才選得下去。
+ *
+ * 2026-10-06（CJ「新增的 mission tray 列表當中，要有網紅」）：合作類範本（網紅合作）直接列在
+ * 「通路」那一組，跟 Facebook、Instagram 並排，勾了就建好並放上側欄——不用再點進
+ * 「新增自訂 → 從平台範本開始」才找得到。電商／開店平台範本照舊收在裡面（10/5 的決定）。
  */
 import React from "react";
 import { createPortal } from "react-dom";
-import { CheckIcon, CloseIcon } from "../../platform/components/icons";
+import { CheckIcon, CloseIcon, Icon } from "../../platform/components/icons";
 
 export interface PickerItem {
   id: string;
@@ -88,7 +92,7 @@ export default function NavItemPicker({ open, en, brandName, catalog, selected, 
     } finally { setBusy(false); }
   };
 
-  /** 新增 tray：平台範本（電商、開店平台、網紅合作）＋自訂名字。已經建過的範本不再列。 */
+  /** 新增 tray：平台範本（電商、開店平台）＋自訂名字。已經建過的範本不再列。合作類範本直接列在「通路」。 */
   const addTraySection = () => {
     if (!onCreateChannel) return null;
     if (!addOpen) {
@@ -103,7 +107,6 @@ export default function NavItemPicker({ open, en, brandName, catalog, selected, 
     const groups: { key: PickerPreset["group"]; title: string }[] = [
       { key: "marketplace", title: en ? "E-commerce marketplaces" : "電商平台" },
       { key: "storefront", title: en ? "Store builders" : "開店平台" },
-      { key: "partner", title: en ? "Partnerships" : "合作" },
     ];
     return (
       <div className="mt-6 border-t border-neutral-200 pt-4">
@@ -132,7 +135,7 @@ export default function NavItemPicker({ open, en, brandName, catalog, selected, 
           </button>
         </div>
 
-        {!showPresets && presets.some((p) => !createdPresets.includes(p.key)) && (
+        {!showPresets && presets.some((p) => p.group !== "partner" && !createdPresets.includes(p.key)) && (
           <button type="button" onClick={() => setShowPresets(true)} className="mt-3 text-[12px] text-neutral-400 hover:text-neutral-900">
             {en ? "Start from a platform template…" : "從平台範本開始…"}
           </button>
@@ -166,9 +169,13 @@ export default function NavItemPicker({ open, en, brandName, catalog, selected, 
     );
   };
 
+  /** 直接列在「通路」裡的範本：合作類、這個品牌還沒建過的。 */
+  const featured = onCreateChannel ? presets.filter((p) => p.group === "partner" && !createdPresets.includes(p.key)) : [];
+
   const section = (kind: "channel" | "tool", title: string) => {
     const items = catalog.filter((c) => (c.kind ?? "channel") === kind);
-    if (!items.length) return null;
+    const extra = kind === "channel" ? featured : [];
+    if (!items.length && !extra.length) return null;
     return (
       <div className="mt-4">
         <p className="mb-2 text-[12px] font-semibold uppercase tracking-widest text-neutral-400">{title}</p>
@@ -199,6 +206,17 @@ export default function NavItemPicker({ open, en, brandName, catalog, selected, 
               </div>
             );
           })}
+          {extra.map((p) => (
+            <button key={`preset-${p.key}`} type="button" disabled={busy} onClick={() => void create({ preset: p.key })}
+              className="flex items-start gap-3 rounded-xl border border-neutral-200 bg-white px-3 py-2.5 text-left transition hover:border-neutral-400 disabled:opacity-50">
+              <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-neutral-100 text-[15px] text-neutral-500"><Icon name="people" size={14} /></span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-[13.5px] font-semibold text-neutral-900">{en ? p.en : p.zh}</span>
+                <span className="mt-0.5 block text-[12px] leading-snug text-neutral-500">{en ? p.note.en : p.note.zh}</span>
+              </span>
+              <span className="mt-1 flex h-4 w-4 shrink-0 items-center justify-center rounded border border-neutral-300 text-[11px]" />
+            </button>
+          ))}
         </div>
       </div>
     );
