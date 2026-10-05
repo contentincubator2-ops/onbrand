@@ -73,9 +73,13 @@ export interface PersonAngle {
   format: string;
   emailSubject: string;
   emailBody: string;
+  /** 模型從素材裡認出的名字（用戶沒填、連結也沒讀到名稱時拿來稱呼）。 */
+  detectedName?: string;
 }
 
 export interface PersonResult extends PersonInput, Partial<PersonAngle> {
+  /** 重寫一次後，信裡仍有在素材中找不到的引用——卡片上提醒用戶寄出前核對。 */
+  quoteWarning?: boolean;
   status: PersonStatus;
   platform: InfluencerPlatform | null;
   handle: string | null;
@@ -84,6 +88,39 @@ export interface PersonResult extends PersonInput, Partial<PersonAngle> {
   source: ReadSource | "user_notes";
   /** 讀到的顯示名稱（用戶沒填名字時拿來稱呼）。 */
   displayName: string | null;
+}
+
+/** 邀約信內文超過這個字數就退回重寫（提示詞要求 180–280）。 */
+export const EMAIL_MAX_CHARS = 340;
+/** 切角超過這個字數就退回重寫（提示詞要求 24 字內）。 */
+export const ANGLE_MAX_CHARS = 40;
+/** 引號裡至少這麼長才當成「引用」來查（短的多半是強調用的詞）。 */
+const QUOTE_MIN_CHARS = 10;
+
+const squash = (v: string) => v.replace(/[\s\p{P}\p{S}]/gu, "").toLowerCase();
+
+/**
+ * 信與依據裡的引用，哪幾句在素材裡找不到。
+ * 2026-10-06 dev 實測：素材只有影片標題，模型卻在信裡寫「你說的『規格強是一回事…』」——
+ * 替網紅編一句他沒說過的話，寄出去比沒寄更糟。品牌資料與這一位自己的切角／開場裡有的不算。
+ */
+export function unsupportedQuotes(a: PersonAngle, material: string, brandCtx: string): string[] {
+  const known = squash([material, brandCtx, a.angle, a.hook, a.angleWhy, ...a.talkingPoints].join("\n"));
+  const out: string[] = [];
+  for (const m of `${a.evidence}\n${a.emailBody}`.matchAll(/[「『“"]([^「」『』“”"\n]+)[」』”"]/g)) {
+    const q = m[1] ?? "";
+    if (squash(q).length >= QUOTE_MIN_CHARS && !known.includes(squash(q)) && !out.includes(q)) out.push(q);
+  }
+  return out;
+}
+
+/** 這一位的稿子有哪些要退回重寫的問題（空陣列＝過關）。 */
+export function angleIssues(a: PersonAngle, material: string, brandCtx: string): string[] {
+  const issues = unsupportedQuotes(a, material, brandCtx)
+    .map((q) => `「${q}」在素材裡找不到——不可以替他編話；改成只提他做過的內容標題，或拿掉這句。`);
+  if (a.emailBody.length > EMAIL_MAX_CHARS) issues.push(`emailBody 有 ${a.emailBody.length} 字，太長；刪到 280 字內。`);
+  if (a.angle.length > ANGLE_MAX_CHARS) issues.push(`angle 有 ${a.angle.length} 字，太長；24 字內說清楚這支內容在講什麼。`);
+  return issues;
 }
 
 export function materialEnough(material: string): boolean {
@@ -104,10 +141,13 @@ export function anglesSystemPrompt(args: {
   avoid?: string[];
   /** 用戶補充的合作方向（選填）。 */
   direction?: string;
+  /** 重寫：上一版每個人被檢查出的問題（id → 問題）。 */
+  fixes?: Record<string, string[]>;
 }): string {
   const lang = args.outputLanguage || "zh-TW";
   const roster = args.people.map((p) =>
-    `■ id=${p.id}｜${p.label || "（沒有名字）"}｜${p.platform}${p.followers ? `｜${p.followers}` : ""}\n${p.material}`).join("\n\n");
+    `■ id=${p.id}｜${p.label || "（沒有名字）"}｜${p.platform}${p.followers ? `｜${p.followers}` : ""}\n${p.material}`
+    + (args.fixes?.[p.id]?.length ? `\n【上一版的問題，這次一定要改掉】\n${args.fixes[p.id]!.map((f) => `- ${f}`).join("\n")}` : "")).join("\n\n");
   return [
     `你是「${args.brandName}」的網紅合作企劃。下面有 ${args.people.length} 位網紅的素材，請替每一位各設計一個合作切角，並寫一封邀約信。`,
     `【這次要請他們講的主體】${args.subjectLine}——每一位的切角都必須在講這個主體。`,
@@ -120,18 +160,22 @@ export function anglesSystemPrompt(args: {
     ``,
     `做法（每一位都照做）：`,
     `1. profile：先讀他的素材，用 80 字內說清楚他是哪一種創作者——常做什麼題材、說話方式、觀眾大概是誰。只寫素材裡看得出來的，看不出來的不要補。`,
-    `2. evidence：指出你是從哪兩三則內容看出來的（引用素材裡的標題或原話，60 字內）。`,
+    `2. evidence：指出你是從哪兩三則內容看出來的，60 字內。引用時只能照抄素材裡的標題或原句。`,
     `3. talkingPoints：從品牌資料裡挑 2–3 個「跟他的題材接得上」的產品特色，每點 40 字內。產品名稱、成分、規格、價格、產地、活動日期照品牌資料寫，資料沒有的不要編，不要編功效與數字。`,
     `4. angle：只有他講才成立的切角，24 字內，說清楚這支內容在講什麼（不是口號）。檢查方法：把他的名字換成名單上另一位，如果切角照樣成立，就是太泛，重想。`,
     `5. angleWhy：為什麼是他（他的哪個題材或習慣＋產品的哪個特色接在一起），60 字內。`,
     `6. hook：用他的口吻示範開場第一句，40 字內。不要編他沒做過的經歷，也不要寫成他已經用過產品。`,
     `7. format：建議的內容形式，照他平常做的形式挑（例如「開箱長片」「Reels 短影音」「圖文貼文」「Podcast 口播」），12 字內。`,
     `8. emailSubject：邀約信主旨，28 字內，看得出是誰找他、為了什麼。`,
-    `9. emailBody：邀約信內文，180–280 字。開頭稱呼他；第二句提到他一則具體的內容（來自素材）說明為什麼找他；接著一句話介紹主體；再說想跟他一起做的切角；最後請他回覆是否有興趣與方便的聯絡方式。`,
+    `9. emailBody：邀約信內文，180–280 字（超過 ${EMAIL_MAX_CHARS} 字會被退回重寫；對方是在手機上看的陌生來信，短才會被讀完）。開頭稱呼他；第二句提到他一則具體的內容（來自素材）說明為什麼找他；接著一句話介紹主體；再說想跟他一起做的切角；最後請他回覆是否有興趣與方便的聯絡方式。`,
+    `   提到他的內容時，只能說「你做過哪一支／哪一篇」（用素材裡的標題）；素材裡沒有他的原話，就不要寫「你說過『…』」——不可以替他編一句話。`,
     `   不要提費用、預算、報價；不要承諾成效；不要寫「久仰大名」這類客套；署名用「${args.brandName} 團隊」。沒有名字的人用「您好」開頭。`,
+    `10. name：素材裡看得出來的名字或頻道名（12 字內）；看不出來就留空字串。`,
     `- 任兩位的 angle 不能講同一件事。`,
+    `- 字數上限是硬規定，超過的欄位會被截斷。`,
+    `- 素材看不出性別時不要寫「他」或「她」，用名字或「這位創作者」。`,
     `- 全部用 ${lang} 寫。`,
-    `只輸出 JSON，不要前言：{"people":[{"id":"${args.people[0]?.id ?? "p1"}","profile":"…","evidence":"…","talkingPoints":["…","…"],"angle":"…","angleWhy":"…","hook":"…","format":"…","emailSubject":"…","emailBody":"…"}]}`,
+    `只輸出 JSON，不要前言：{"people":[{"id":"${args.people[0]?.id ?? "p1"}","profile":"…","evidence":"…","talkingPoints":["…","…"],"angle":"…","angleWhy":"…","hook":"…","format":"…","emailSubject":"…","emailBody":"…","name":"…"}]}`,
   ].filter(Boolean).join("\n");
 }
 
@@ -163,15 +207,18 @@ export function parsePeopleAngles(raw: string, ids: string[]): Map<string, Perso
     const id = String(x?.id ?? "");
     if (!ids.includes(id) || out.has(id)) continue;
     const talkingPoints = (Array.isArray(x.talkingPoints) ? x.talkingPoints : [])
-      .map((t: unknown) => oneLine(t, 80)).filter(Boolean).slice(0, 3);
+      .map((t: unknown) => oneLine(t, 140)).filter(Boolean).slice(0, 3);
     const a: PersonAngle = {
-      profile: oneLine(x.profile, 160), evidence: oneLine(x.evidence, 140), talkingPoints,
-      angle: oneLine(x.angle, 48), angleWhy: oneLine(x.angleWhy, 120), hook: oneLine(x.hook, 80),
+      // 上限比提示詞要求的寬：模型常多寫幾個字，硬切會切在句子中間（2026-10-06 dev 實測切角被切成「…模式究」）。
+      profile: oneLine(x.profile, 220), evidence: oneLine(x.evidence, 220), talkingPoints,
+      angle: oneLine(x.angle, 90), angleWhy: oneLine(x.angleWhy, 200), hook: oneLine(x.hook, 120),
       format: oneLine(x.format, 24),
       emailSubject: oneLine(x.emailSubject, 60),
       emailBody: clip(String(x.emailBody ?? "").replace(/\r/g, "").replace(/\n{3,}/g, "\n\n"), 900),
     };
     if (!a.profile || !a.angle || !a.talkingPoints.length || a.emailBody.length < 40) continue;
+    const detectedName = oneLine(x.name, 24);
+    if (detectedName) a.detectedName = detectedName;
     out.set(id, a);
   }
   return out;

@@ -20,7 +20,7 @@ import localPool from "../../localDb";
 import { classifyLink, PLATFORM_LABEL } from "../core/influencer/influencerLink";
 import { readInfluencer } from "../core/influencer/influencerReader";
 import {
-  CHUNK, MAX_PEOPLE, NOTES_MAX, anglesSystemPrompt, materialEnough, parsePeopleAngles, personLabel,
+  CHUNK, MAX_PEOPLE, NOTES_MAX, angleIssues, anglesSystemPrompt, materialEnough, parsePeopleAngles, personLabel, unsupportedQuotes,
   type ChunkPerson, type PersonResult,
 } from "../core/influencer/influencerAngles";
 import { buildDocx, buildXlsx, parseSheet } from "../core/influencer/influencerSheet";
@@ -169,10 +169,33 @@ async function runJob(job: Job, targets: string[], base: {
         const more = await writeChunk({ ...base, people: missing, avoid: [...used, ...[...got.values()].map((a) => a.angle)] });
         got = new Map([...got, ...more]);
       }
+      // 檢查（編出來的引用、信太長、切角太長）→ 有問題的人帶著問題重寫一次；重寫後問題變少才換。
+      const fixes: Record<string, string[]> = {};
+      for (const [id, a] of got) {
+        const issues = angleIssues(a, material.get(id)!, base.brandCtx);
+        if (issues.length) fixes[id] = issues;
+      }
+      const redo = people.filter((p) => fixes[p.id]);
+      if (redo.length) {
+        const again = await writeChunk({
+          ...base, people: redo, fixes,
+          avoid: [...used, ...[...got].filter(([id]) => !fixes[id]).map(([, a]) => a.angle)],
+        });
+        for (const [id, a] of again) {
+          if (angleIssues(a, material.get(id)!, base.brandCtx).length < fixes[id]!.length) got.set(id, a);
+        }
+      }
       for (const id of ids) {
         const a = got.get(id);
-        if (a) { patch(id, { ...a, status: "done" }); used.push(a.angle); }
-        else patch(id, { status: "failed" });
+        if (!a) { patch(id, { status: "failed" }); continue; }
+        const { detectedName, ...angle } = a;
+        const p = byId(id);
+        patch(id, {
+          ...angle, status: "done",
+          quoteWarning: unsupportedQuotes(a, material.get(id)!, base.brandCtx).length > 0,
+          ...(!p.name && !p.displayName && detectedName ? { displayName: detectedName } : {}),
+        });
+        used.push(a.angle);
       }
       await saveBatch(job.batchId, job.people).catch(() => {});
     }

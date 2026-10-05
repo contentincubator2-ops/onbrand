@@ -31,7 +31,7 @@ interface Person {
   status: Status;
   platform?: string | null; handle?: string | null; followers?: string | null; displayName?: string | null; source?: string;
   profile?: string; evidence?: string; talkingPoints?: string[]; angle?: string; angleWhy?: string; hook?: string; format?: string;
-  emailSubject?: string; emailBody?: string;
+  emailSubject?: string; emailBody?: string; quoteWarning?: boolean;
 }
 
 const RUNNING: Status[] = ["queued", "reading", "thinking"];
@@ -55,6 +55,14 @@ const labelOf = (p: Person) => (p.name || p.displayName || (p.handle ? `@${p.han
 function mailtoHref(p: Person): string {
   return `mailto:${encodeURIComponent((p.email ?? "").trim()).replace(/%40/g, "@")}`
     + `?subject=${encodeURIComponent(p.emailSubject ?? "")}&body=${encodeURIComponent((p.emailBody ?? "").replace(/\n/g, "\r\n"))}`;
+}
+/**
+ * mailto 連結太長時（Windows 交給信箱程式的網址上限約 2,000 字元；中文一個字編碼後 9 個字元），
+ * 信箱會打不開或內文被切掉。超過就只帶收件人與主旨，內文改放剪貼簿讓用戶貼上。
+ */
+const MAILTO_MAX = 1800;
+function mailtoSubjectOnly(p: Person): string {
+  return `mailto:${encodeURIComponent((p.email ?? "").trim()).replace(/%40/g, "@")}?subject=${encodeURIComponent(p.emailSubject ?? "")}`;
 }
 function gmailHref(p: Person): string {
   return `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent((p.email ?? "").trim())}`
@@ -257,8 +265,8 @@ export default function InfluencerPage() {
     }
   };
 
-  const copy = async (text: string) => {
-    try { await navigator.clipboard.writeText(text); showToastGlobal(L("已複製。", "Copied.")); }
+  const copy = async (text: string, okMessage?: string) => {
+    try { await navigator.clipboard.writeText(text); showToastGlobal(okMessage ?? L("已複製。", "Copied.")); }
     catch { showToastGlobal(L("複製失敗，請手動選取。", "Couldn't copy. Select the text manually."), "error"); }
   };
 
@@ -437,7 +445,7 @@ function StatusLine({ p, en }: { p: Person; en: boolean }) {
 
 function PersonCard({ p, en, busy, onPatch, onBlurSave, onRemove, onRun, onCopy }: {
   p: Person; en: boolean; busy: boolean;
-  onPatch: (v: Partial<Person>) => void; onBlurSave: () => void; onRemove: () => void; onRun: () => void; onCopy: (t: string) => void;
+  onPatch: (v: Partial<Person>) => void; onBlurSave: () => void; onRemove: () => void; onRun: () => void; onCopy: (t: string, okMessage?: string) => void;
 }) {
   const L = (zh: string, e: string) => (en ? e : zh);
   const running = RUNNING.includes(p.status);
@@ -448,6 +456,7 @@ function PersonCard({ p, en, busy, onPatch, onBlurSave, onRemove, onRun, onCopy 
   const platform = p.platform ? (PLATFORM_NAME[p.platform] ?? (p.platform === "web" ? L("網站", "Website") : p.platform)) : null;
   const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test((p.email ?? "").trim());
   const field = "rounded-lg border px-2.5 py-1.5 text-[13px] outline-none focus:border-neutral-900 disabled:opacity-60";
+  const mailLong = mailtoHref(p).length > MAILTO_MAX;
 
   return (
     <article className="flex flex-col gap-3 rounded-2xl border bg-white p-5" style={{ borderColor: LINE }}>
@@ -505,6 +514,12 @@ function PersonCard({ p, en, busy, onPatch, onBlurSave, onRemove, onRun, onCopy 
               {(p.talkingPoints ?? []).map((t, i) => <li key={i}>{t}</li>)}
             </ul>
           </div>
+          {p.quoteWarning && (
+            <p className="m-0 flex items-start gap-1.5 text-[12.5px] leading-relaxed" style={{ color: "#B45309" }}>
+              <Icon name="warning" size={12} className="mt-0.5" />
+              <span>{L("邀約信裡有一句引用，在我們讀到的內容裡找不到。寄出前請核對，或直接刪掉那一句。", "The outreach quotes a line we couldn't find in what we read. Check it before sending, or remove it.")}</span>
+            </p>
+          )}
           <details className="rounded-xl border" style={{ borderColor: LINE }}>
             <summary className="cursor-pointer select-none px-3.5 py-2.5 text-[13px] font-semibold" style={{ color: INK }}>
               {L("邀約信", "Outreach email")}<span className="ml-2 font-normal" style={{ color: META }}>{p.emailSubject}</span>
@@ -517,7 +532,9 @@ function PersonCard({ p, en, busy, onPatch, onBlurSave, onRemove, onRun, onCopy 
             </div>
           </details>
           <div className="flex flex-wrap items-center gap-2">
-            <a href={mailtoHref(p)} className="flex items-center gap-1.5 rounded-full px-3.5 py-2 text-[13px] font-semibold text-white" style={{ background: INK }}
+            <a href={mailLong ? mailtoSubjectOnly(p) : mailtoHref(p)}
+              onClick={mailLong ? () => onCopy(p.emailBody ?? "", L("信箱已開啟。內文已複製，在信裡貼上就可以寄。", "Mail app opened. The body is copied — paste it into the message.")) : undefined}
+              className="flex items-center gap-1.5 rounded-full px-3.5 py-2 text-[13px] font-semibold text-white" style={{ background: INK }}
               title={emailOk ? undefined : L("還沒填 Email，信箱打開後自己填收件人", "No email yet — add the recipient in your mail app")}>
               <Icon name="mail" size={12} /> {L("開啟我的信箱寄出", "Open in my mail app")}
             </a>
