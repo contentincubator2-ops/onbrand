@@ -30,7 +30,7 @@
  * （改字、定稿／送審、標記已發布）。不用先跳到內容層找同一篇。
  */
 import React from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Button, Modal, ModalContent, ModalHeader, ModalBody, Spinner } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faMap, faPenNib, faSliders, faLockOpen, faLock, faArrowRight, faBookOpen, faExpand, faCompress, faBullseye } from "@fortawesome/free-solid-svg-icons";
@@ -46,7 +46,7 @@ import CampaignChatCard from "./CampaignChatCard";
 import CampaignBasisPanel from "../../../strategy/components/events/CampaignBasisPanel";
 import KolBriefForm from "./KolBriefForm";
 import ChannelBriefForm, { type ChannelBriefSpec } from "./ChannelBriefForm";
-import type { BasisPatch, BasisValue } from "../../../strategy/lib/campaign/campaignBasis";
+import { briefFromBasis, type BasisPatch, type BasisValue } from "../../../strategy/lib/campaign/campaignBasis";
 import { dockDirector } from "../../../strategy/lib/directorDock";
 import CampaignHandoff from "./CampaignHandoff";
 import CampaignKpiPanel from "./CampaignKpiPanel";
@@ -73,6 +73,20 @@ export default function CampaignStage({ eventId, brandId }: { eventId: number; b
   const productsQ = (trpc as any).product?.list?.useQuery(
     { brandId: brandId ?? undefined }, { enabled: !!brandId, refetchOnWindowFocus: false },
   ) ?? { data: [] };
+
+  /**
+   * 2026-10-05（CJ「活動定位總覽的地方，有點太複雜，當定位完成後，可以直接到左邊對話右邊
+   * 企劃草稿的地方嗎? 讓用戶可以對話改」）：活動定位跑完會帶 ?draft=1 過來。還沒有企劃的話就
+   * 用定位直接排第一版（CampaignSetupForm 的 autoBrief），排好左邊對話卡就在。記號只用一次，
+   * 讀完馬上從網址拿掉——重新整理不會再排一次。
+   */
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [autoDraft] = React.useState(() => searchParams.get("draft") === "1");
+  const [drafting, setDrafting] = React.useState(false);
+  React.useEffect(() => {
+    if (searchParams.get("draft") !== "1") return;
+    setSearchParams((prev) => { const sp = new URLSearchParams(prev); sp.delete("draft"); return sp; }, { replace: true });
+  }, [searchParams, setSearchParams]);
 
   const [plan, setPlan] = React.useState<CampaignPlan | null>(null);
   const [current, setCurrent] = React.useState<CampaignPhaseId | null>(null);
@@ -402,8 +416,12 @@ export default function CampaignStage({ eventId, brandId }: { eventId: number; b
                 </>
               ) : (
                 <>
-                  <p className="text-[11px] tracking-widest text-default-500">{L("還沒有企劃", "NO PLAN YET")}</p>
-                  <p className="text-large font-bold leading-snug">{L("在右邊寫一段話，排出這檔活動的宣傳企劃。", "Describe the campaign on the right to build its plan.")}</p>
+                  <p className="text-[11px] tracking-widest text-default-500">{drafting ? L("排企劃中", "PLANNING") : L("還沒有企劃", "NO PLAN YET")}</p>
+                  <p className="text-large font-bold leading-snug">
+                    {drafting
+                      ? L("正在依活動定位排出企劃草稿。排好之後，在這裡用對話修改。", "Building the draft plan from your positioning. You'll edit it by chatting here.")
+                      : L("在右邊寫一段話，排出這檔活動的宣傳企劃。", "Describe the campaign on the right to build its plan.")}
+                  </p>
                 </>
               )}
             </div>
@@ -437,7 +455,8 @@ export default function CampaignStage({ eventId, brandId }: { eventId: number; b
             ) : (
               <div className="relative bg-default-100 p-4 sm:p-6 min-h-[420px] h-full overflow-y-auto">
                 <div className="relative bg-content1 rounded-2xl shadow-small p-5 max-w-[620px]">
-                  <CampaignSetupForm eventId={eventId} data={data} brandProducts={brandProducts} hasPlan={false} en={en} />
+                  <CampaignSetupForm eventId={eventId} data={data} brandProducts={brandProducts} hasPlan={false} en={en}
+                    autoBrief={autoDraft && !q.isFetching ? briefFromBasis(data.basis?.raw) : undefined} onAutoDrafting={setDrafting} />
                 </div>
               </div>
             )}
