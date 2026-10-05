@@ -365,6 +365,8 @@ export async function runCampaignChat(args: {
    * 企劃本身（切角、訴求、各段訊息、策略依據）照品牌原本的語言，不跟著介面換。
    */
   lang?: "zh" | "en";
+  /** 使用者貼的連結、上傳的檔案讀出來的那一段（campaignChatSources.formatSourcesForPrompt，已排版）。 */
+  sources?: string;
 }): Promise<{ reply: string; proposal: CampaignProposal; askDirector: string | null; handoff: { to: CampaignSpeaker; question: string } | null; truncated: boolean; agent: TeamAgent | null; speaker: CampaignSpeaker }> {
   const facts = await eventFacts(args.eventId, args.userId);
   if (!facts) throw new Error("找不到這個活動");
@@ -447,6 +449,7 @@ export async function runCampaignChat(args: {
     can.basis ? `【策略依據（路徑｜欄位｜目前寫的）】\n${basisLines(args.positioning ?? {})}` : "",
     thread ? `【你之前在右下角跟使用者談過（最近幾則）】\n${thread}` : "",
     args.earlier?.length ? `【之前幾段討論的結論（已經做完的事，不用重做）】\n${args.earlier.map((e) => `- ${e.slice(0, 300)}`).join("\n")}` : "",
+    args.sources || "",
     history ? `【這段討論前面說過的】\n${history}` : "",
     args.handoff && from ? `【${label(from)}轉給你的問題】${args.message.trim()}` : `【使用者現在說】${args.message.trim()}`,
     args.lang === "en"

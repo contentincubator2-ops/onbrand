@@ -44,6 +44,7 @@ import { KPI_METRICS, pickKpiAgent, runKpiPlan } from "../core/campaign/campaign
 import { brandIndustry, pickPlannerAgent } from "../core/campaign/campaignTeam";
 import { buildCampaignRoster, CAMPAIGN_ROLES, ROLES } from "../core/campaign/campaignRoster";
 import { appendChat, closeThread, listChat, listThreads, markUndone, recentSummaries, reopenThread } from "../core/campaign/campaignChatStore";
+import { addSource, formatSourcesForPrompt, listSources, loadSourceDocs, readLinksInMessage, removeSource, MAX_STORED_CHARS, type LinkRead } from "../core/campaign/campaignChatSources";
 import { isHiddenContentPlatform, isHiddenHistoryItem } from "../../platform/core/billing/planGate";
 import { ownedProductIds, resolveProductScope } from "../../strategy/core/entities/eventProductScope";
 import { invalidateBrandPrefix } from "../../strategy/core/brand/brandContext";
@@ -371,8 +372,14 @@ export const campaignRouter = router({
       assertUnlocked(pos);
       const plan = visiblePlan((pos.campaignPlan ?? null) as CampaignPlan | null);
       if (!plan?.items?.length) throw new TRPCError({ code: "BAD_REQUEST", message: "還沒有企劃，先排出企劃再來討論" });
+      // 2026-10-05：使用者這句話裡的連結先去讀（另一位轉過來的話不是使用者打的，不讀）；
+      // 讀到的跟之前上傳的檔案一起給模型，讀不到的也照實告訴它（見 core/campaignChatSources.ts）。
+      const none: { read: LinkRead[]; failed: string[] } = { read: [], failed: [] };
+      const links = input.handoff ? none : await readLinksInMessage(input.eventId, ctx.user!.id, input.message).catch(() => none);
+      const sources = formatSourcesForPrompt(await loadSourceDocs(input.eventId, ctx.user!.id).catch(() => []), links.failed);
       try {
-        return await runCampaignChat({
+        const out = await runCampaignChat({
+          sources,
           eventId: input.eventId, userId: ctx.user!.id, plan,
           message: input.message, phase: input.phase ?? null, history: input.history,
           speaker: input.speaker ?? "planner", directorAgentId: input.directorAgentId ?? null, handoff: !!input.handoff, from: input.from ?? null, hops: input.hops,
@@ -380,6 +387,7 @@ export const campaignRouter = router({
           lang: input.lang ?? "zh",
           earlier: await recentSummaries(input.eventId, ctx.user!.id, input.threadId ?? null).catch(() => []),
         });
+        return { ...out, links };
       } catch (e: any) {
         throw new TRPCError({ code: "BAD_REQUEST", message: String(e?.message ?? e).slice(0, 300) });
       }
@@ -402,6 +410,42 @@ export const campaignRouter = router({
     .query(async ({ ctx, input }) => {
       await loadEvent(input.eventId, ctx.user!.id);
       return { messages: await listChat(input.eventId, ctx.user!.id, input.threadId) };
+    }),
+
+  /**
+   * 這檔活動的對話讀得到的參考資料（2026-10-05，見 core/campaignChatSources.ts）。
+   * 連結由 chat 自己讀；檔案由畫面先抽成文字（/api/positioning-doc/extract-text）再存進來。
+   */
+  chatSources: protectedProcedure
+    .input(z.object({ eventId: z.number().int().positive() }))
+    .query(async ({ ctx, input }) => {
+      await loadEvent(input.eventId, ctx.user!.id);
+      return { sources: await listSources(input.eventId, ctx.user!.id) };
+    }),
+
+  chatAddSource: protectedProcedure
+    .input(z.object({
+      eventId: z.number().int().positive(),
+      name: z.string().min(1).max(200),
+      text: z.string().min(1).max(MAX_STORED_CHARS),
+      /** 原檔的總字數（比 text 長＝只讀進前面一段，畫面會說）。 */
+      chars: z.number().int().min(0).max(50_000_000).optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await loadEvent(input.eventId, ctx.user!.id);
+      try {
+        return await addSource(input.eventId, ctx.user!.id, { kind: "file", name: input.name, text: input.text, chars: input.chars });
+      } catch (e: any) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: String(e?.message ?? e).slice(0, 300) });
+      }
+    }),
+
+  chatRemoveSource: protectedProcedure
+    .input(z.object({ eventId: z.number().int().positive(), id: z.number().int().positive() }))
+    .mutation(async ({ ctx, input }) => {
+      await loadEvent(input.eventId, ctx.user!.id);
+      await removeSource(input.eventId, ctx.user!.id, input.id);
+      return { ok: true };
     }),
 
   chatAppend: protectedProcedure
