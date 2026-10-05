@@ -148,6 +148,13 @@ export default function CampaignStage({ eventId, brandId }: { eventId: number; b
     return () => clearTimeout(t);
   }, [basisRecent]);
 
+  // 對話改了活動本身的日期（或復原）：存完重讀，倒數與檔期跟著變。
+  const setDatesMut = (trpc as any).campaign.setDates.useMutation({
+    onSuccess: () => { utils?.campaign?.get?.invalidate?.({ eventId }); utils?.scope?.invalidate?.(); },
+    onError: (e: any) => { setSaveState("error"); setSaveErr(e?.message ?? ""); utils?.campaign?.get?.invalidate?.({ eventId }); },
+  });
+  const applyDates = (d: { startAt: string | null; endAt: string | null }) => setDatesMut.mutate({ eventId, ...d });
+
   const savePlanMut = (trpc as any).campaign.savePlan.useMutation({
     onSuccess: () => { dirtyRef.current = false; setSaveState("saved"); utils?.campaign?.get?.invalidate?.({ eventId }); },
     onError: (e: any) => { setSaveState("error"); setSaveErr(e?.message ?? ""); },
@@ -413,7 +420,7 @@ export default function CampaignStage({ eventId, brandId }: { eventId: number; b
 
             {plan && (
               <CampaignChatCard eventId={eventId} brandId={brandId} plan={plan} phase={cur} notes={notes} locked={locked} en={en} onApply={applyPlan} grow
-                basis={basisLocal} onApplyBasis={(p) => applyBasis(p, true)} view={view}
+                basis={basisLocal} onApplyBasis={(p) => applyBasis(p, true)} onApplyDates={applyDates} view={view}
                 expanded={chatExpanded} onToggleExpand={() => setChatExpanded((v) => !v)} />
             )}
 

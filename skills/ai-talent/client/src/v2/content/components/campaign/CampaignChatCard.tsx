@@ -97,7 +97,7 @@ const newKey = () => `m${Date.now().toString(36)}${(seq++).toString(36)}${Math.r
 /** 新的一則一律經過這裡，才有 key。 */
 const mk = (m: Msg): Msg => ({ ...m, key: m.key ?? newKey() });
 
-export default function CampaignChatCard({ eventId, brandId, plan, phase, notes, locked, en, onApply, basis, onApplyBasis, view, grow, expanded, onToggleExpand }: {
+export default function CampaignChatCard({ eventId, brandId, plan, phase, notes, locked, en, onApply, basis, onApplyBasis, onApplyDates, view, grow, expanded, onToggleExpand }: {
   eventId: number;
   brandId: number | null;
   plan: CampaignPlan;
@@ -111,6 +111,8 @@ export default function CampaignChatCard({ eventId, brandId, plan, phase, notes,
   basis?: Record<string, BasisValue | null>;
   /** 寫進策略依據：父層存、右邊切到策略依據並標出剛改的格子。 */
   onApplyBasis?: (patch: BasisPatch) => void;
+  /** 改活動本身的開始／結束日（對話提的，或復原回原本的）：父層存。 */
+  onApplyDates?: (dates: { startAt: string | null; endAt: string | null }) => void;
   /** 右邊正在看的：企劃地圖或策略依據（總監據此判斷「這裡」指哪裡）。 */
   view?: "map" | "basis";
   /** 撐滿父層剩下的高度（活動頁左欄）；對話區跟著長，而不是固定一小格。 */
@@ -331,6 +333,8 @@ export default function CampaignChatCard({ eventId, brandId, plan, phase, notes,
             beforeBasis = Object.fromEntries(Object.keys(proposal.basis).map((p) => [p, basisRef.current?.[p] ?? null]));
             onApplyBasis(proposal.basis);
           }
+          // 活動日期不在企劃裡，另外存；改之前的日期就在 proposal.dates.from，復原讀它。
+          if (proposal.dates && onApplyDates) onApplyDates({ startAt: proposal.dates.startAt, endAt: proposal.dates.endAt });
         }
         const reply: Msg = mk({
           role: "assistant", content: String(r?.reply ?? ""), speaker: who, name,
@@ -404,9 +408,10 @@ export default function CampaignChatCard({ eventId, brandId, plan, phase, notes,
   const lastChangeIdx = (() => { for (let i = msgs.length - 1; i >= 0; i--) if (msgs[i]!.proposal && !msgs[i]!.undone) return i; return -1; })();
   const undo = (idx: number) => {
     const m = msgs[idx];
-    if (!m || (!m.before && !m.beforeBasis) || locked) return;
+    if (!m || (!m.before && !m.beforeBasis && !m.proposal?.dates) || locked) return;
     if (m.before) onApply(m.before);
     if (m.beforeBasis) onApplyBasis?.(m.beforeBasis);
+    if (m.proposal?.dates) onApplyDates?.(m.proposal.dates.from);
     setMsgs((prev) => prev.map((x, k) => (k === idx ? { ...x, undone: true, before: undefined, beforeBasis: undefined } : x)));
     if (m.key) undoneMut.mutate({ eventId, key: m.key });
   };
@@ -550,7 +555,7 @@ export default function CampaignChatCard({ eventId, brandId, plan, phase, notes,
                     lines={describeProposal(m.before ?? plan, m.proposal, en)}
                     undone={!!m.undone} truncated={!!m.truncated} en={en}
                     defaultOpen={k === lastChangeIdx}
-                    onUndo={k === lastChangeIdx && (m.before || m.beforeBasis) && !locked ? () => undo(k) : undefined}
+                    onUndo={k === lastChangeIdx && (m.before || m.beforeBasis || m.proposal.dates) && !locked ? () => undo(k) : undefined}
                   />
                 )}
               </div>
