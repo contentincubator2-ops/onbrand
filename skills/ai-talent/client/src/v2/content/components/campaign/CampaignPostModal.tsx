@@ -320,7 +320,7 @@ export default function CampaignPostModal({
           ) : !variant ? (
             <div className="py-8 text-center flex flex-col items-center gap-3">
               <p className="text-small text-default-500">{L("這一篇的內容格式要在成品頁看。", "Open this one in the full editor.")}</p>
-              <Button size="sm" variant="bordered" onPress={() => navigate(`/run/${outputId}`)}>{L("打開成品頁", "Open full editor")}</Button>
+              <Button size="sm" variant="bordered" onPress={() => navigate(`/run/${outputId}`)}>{L("進階修改", "Advanced edit")}</Button>
             </div>
           ) : (
             <div className="grid gap-5 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] items-start">
@@ -398,7 +398,7 @@ export default function CampaignPostModal({
                 <button type="button" className="self-start text-tiny text-default-500 hover:text-foreground flex items-center gap-1.5"
                   onClick={() => { flush(); navigate(`/run/${outputId}`); }}>
                   <FontAwesomeIcon icon={faArrowUpRightFromSquare} className="text-[10px]" />
-                  {L("在成品頁打開（換圖、換人重寫、排程）", "Open full editor (images, writers, scheduling)")}
+                  {L("進階修改（換圖、換人重寫、排程）", "Advanced edit (images, writers, scheduling)")}
                 </button>
               </div>
             </div>
