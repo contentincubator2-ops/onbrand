@@ -10,10 +10,17 @@
  * savePlan 會擋，所以定稿後的對話也不可能改到企劃）。
  * 2026-09-30 起畫面拿到就寫（不再等「套用」），留「復原」——見下面 CJ 那段。
  *
- *   · add：階段要是真的階段；日期在活動期間前後（前 14 天可以預熱、後 7 天可以返場）；
+ *   · add：階段要是真的階段；日期在活動期間前後（前 60 天可以預熱、後 7 天可以返場）；
  *     通路是前台的七個之一；任務卡要是那個通路真的有的，不是就換成預設卡並標 repaired。
  *   · update／remove：只能動還沒寫的那幾篇——寫好的換掉，成品就跟企劃對不上了。
  *   · 訊息（每一段、一句話訴求）可以一起提，但只收企劃裡有的段。
+ *
+ * 2026-10-05（CJ「用戶在對話當中想要提早時間，甚至要提前於活動之前，但被框架住，只能在
+ * 活動前後」→「我要對話可以改日期」）：
+ *   · 活動本身的開始／結束日可以在對話裡改（dates；內容企劃與策略總監都能提）。還沒寫的篇
+ *     由伺服器照新日期等比例挪（reflowForDates），不靠模型一篇一篇改；寫好的不動。
+ *   · 可以排的範圍從開始前 14 天放寬到 60 天，而且跟著新的活動日期算。
+ *   · 日期超出範圍的改法以前是靜靜丟掉；現在回覆最後會說哪幾天沒排進去、最早能排到哪天。
  */
 import { PAID_CHANNELS } from "./campaignKpi.js";
 import { candidateCards, eventFacts, safeJSON, PLANNABLE_CHANNELS, CAMPAIGN_PHASE_IDS, type CampaignPlan, type CampaignPhaseId, type PlanItem } from "./campaignPlan.js";
@@ -88,10 +95,103 @@ export interface CampaignProposal {
   smp?: string;
   /** 策略依據（11 段活動定位）的改法：路徑（段.欄位）→ 新值。只有策略總監會給。 */
   basis?: BasisPatch;
+  /** 活動本身的新日期；from＝改之前的（復原用）。不在企劃裡，另外存（campaign.setDates）。 */
+  dates?: CampaignDates;
+}
+
+export interface CampaignDates {
+  startAt: string;
+  endAt: string;
+  from: { startAt: string | null; endAt: string | null };
 }
 
 const YMD = /^\d{4}-\d{2}-\d{2}$/;
 const str = (v: unknown, n: number) => String(v ?? "").trim().slice(0, n);
+const DAY = 86_400_000;
+const ymd = (d: Date) => d.toISOString().slice(0, 10);
+const realDay = (s: unknown): string | null => {
+  const v = String(s ?? "").trim();
+  if (!YMD.test(v)) return null;
+  const d = new Date(v);
+  return Number.isNaN(d.getTime()) || ymd(d) !== v ? null : v;
+};
+const addDays = (s: string, n: number) => ymd(new Date(new Date(s).getTime() + n * DAY));
+const daysBetween = (a: string, b: string) => Math.round((new Date(b).getTime() - new Date(a).getTime()) / DAY);
+
+/** 開始前幾天可以排預熱、結束後幾天可以排返場。 */
+export const CHAT_LEAD_DAYS = 60;
+export const CHAT_TAIL_DAYS = 7;
+
+/** 對話裡可以排的日期範圍：活動開始前 60 天（不早於今天）～結束後 7 天。純函式。 */
+export function chatWindow(startAt: string | null, endAt: string | null, today: string): { from: string; to: string } {
+  const start = startAt ?? today;
+  const end = endAt ?? addDays(start, 30);
+  const lead = addDays(start, -CHAT_LEAD_DAYS);
+  return { from: lead > today ? lead : today, to: addDays(end, CHAT_TAIL_DAYS) };
+}
+
+/**
+ * 模型提的活動日期 → 可以存的日期，不合理就 null。純函式。
+ *   · 只給一頭：另一頭照原本的；只給開始而原本的結束會落在它之前，就整檔平移（長度不變）。
+ *   · 開始不能晚於結束、整檔最長一年、結束日不能早於今天（整檔搬到過去沒有東西可排）。
+ */
+export function validateDates(
+  raw: any,
+  cur: { startAt: string | null; endAt: string | null },
+  today: string,
+): CampaignDates | null {
+  if (!raw || typeof raw !== "object") return null;
+  const s = realDay(raw.startAt);
+  const e = realDay(raw.endAt);
+  if (!s && !e) return null;
+  const startAt = s ?? cur.startAt;
+  if (!startAt) return null;
+  let endAt = e ?? cur.endAt;
+  if (!e && cur.startAt && cur.endAt && endAt! < startAt) endAt = addDays(startAt, daysBetween(cur.startAt, cur.endAt));
+  if (!endAt) endAt = addDays(startAt, 13);
+  if (endAt < startAt || endAt < today || daysBetween(startAt, endAt) > 366) return null;
+  if (startAt === cur.startAt && endAt === cur.endAt) return null;
+  return { startAt, endAt, from: { startAt: cur.startAt, endAt: cur.endAt } };
+}
+
+/**
+ * 活動日期改了 → 還沒寫的每一篇該挪到哪一天（id → 新日期；沒變的不列）。純函式。
+ * 開始日（含）以前的跟著開始日走、結束日（含）以後的跟著結束日走、中間的照比例落在新檔期裡，
+ * 最後收進可以排的範圍。原本沒有開始日就沒有基準可以挪，回空的。
+ */
+export function reflowForDates(
+  items: Array<Pick<PlanItem, "id" | "date" | "outputId">>,
+  dates: CampaignDates,
+  window: { from: string; to: string },
+): Map<string, string> {
+  const out = new Map<string, string>();
+  const oldStart = dates.from.startAt;
+  if (!oldStart) return out;
+  const oldEnd = dates.from.endAt && dates.from.endAt >= oldStart ? dates.from.endAt : oldStart;
+  const oldSpan = daysBetween(oldStart, oldEnd);
+  const newSpan = daysBetween(dates.startAt, dates.endAt);
+  for (const it of items) {
+    if (it.outputId || !realDay(it.date)) continue;
+    let next: string;
+    if (it.date <= oldStart) next = addDays(dates.startAt, daysBetween(oldStart, it.date));
+    else if (it.date >= oldEnd) next = addDays(dates.endAt, daysBetween(oldEnd, it.date));
+    else next = addDays(dates.startAt, Math.round((daysBetween(oldStart, it.date) / oldSpan) * newSpan));
+    if (next < window.from) next = window.from;
+    if (next > window.to) next = window.to;
+    if (next !== it.date) out.set(it.id, next);
+  }
+  return out;
+}
+
+/** 檢查時順便記下來、要跟使用者說的事（runCampaignChat 接在回覆後面）。 */
+export interface CampaignOpsReport {
+  /** 日期超出範圍、沒排進去的那幾天。 */
+  outOfWindow: string[];
+  /** 活動日期改了，但已經寫好所以沒跟著挪的篇數。 */
+  writtenKept: number;
+  /** 這次檢查實際用的範圍（活動日期一起改的話，是新日期的範圍）。 */
+  window: { from: string; to: string };
+}
 
 function pickCard(platform: string, taskId: unknown, cards: CatalogTask[]): { card: CatalogTask | null; repaired: boolean } {
   const own = cards.filter((c) => c.platform === platform);
@@ -109,16 +209,25 @@ export function validateCampaignOps(args: {
   newId?: (phase: string, date: string, n: number) => string;
   /** 誰提的。能改什麼照 campaignRoster.ROLES——排程（加／刪／通路／日期／卡）只有內容企劃。 */
   role?: CampaignSpeaker;
+  /** 活動現在的日期＋今天：給了才收 dates（改活動日期）。 */
+  event?: { startAt: string | null; endAt: string | null; today: string };
+  /** 要跟使用者說的事記在這裡（有給才記）。 */
+  report?: CampaignOpsReport;
 }): CampaignProposal {
-  const { plan, cards, window } = args;
+  const { plan, cards } = args;
+  // 沒指定角色（舊呼叫端與測試）：內容企劃的權限＋一句話訴求，跟改版前一樣。
+  const can = args.role ? ROLES[args.role].can : { ...ROLES.planner.can, smp: true };
+  // 活動日期先定：這一輪其他改法的日期範圍跟著新日期算。
+  const dates = can.dates && args.event ? validateDates(args.raw?.dates, args.event, args.event.today) : null;
+  const window = dates && args.event ? chatWindow(dates.startAt, dates.endAt, args.event.today) : args.window;
+  if (args.report) args.report.window = window;
+  const miss = (d: unknown) => { const v = realDay(d); if (v && args.report && !args.report.outOfWindow.includes(v)) args.report.outOfWindow.push(v); };
   const byId = new Map(plan.items.map((i) => [i.id, i]));
   const editable = (id: string) => { const it = byId.get(id); return it && !it.outputId ? it : null; };
   const inWindow = (d: string) => YMD.test(d) && d >= window.from && d <= window.to;
   const newId = args.newId ?? ((phase, date, n) => `${phase}-${date}-c${Date.now().toString(36)}${n}`);
   const ops: CampaignOp[] = [];
   const touched = new Set<string>();
-  // 沒指定角色（舊呼叫端與測試）：內容企劃的權限＋一句話訴求，跟改版前一樣。
-  const can = args.role ? ROLES[args.role].can : { ...ROLES.planner.can, smp: true };
 
   for (const o of Array.isArray(args.raw?.ops) ? args.raw.ops : []) {
     if (ops.length >= 14) break;
@@ -144,7 +253,8 @@ export function validateCampaignOps(args: {
       const platform = String(o?.platform ?? "").toLowerCase();
       const angle = str(o?.angle, 200);
       if (!(CAMPAIGN_PHASE_IDS as readonly string[]).includes(phase)) continue;
-      if (!inWindow(date) || !(PLANNABLE_CHANNELS as readonly string[]).includes(platform) || angle.length < 4) continue;
+      if (!inWindow(date)) { miss(date); continue; }
+      if (!(PLANNABLE_CHANNELS as readonly string[]).includes(platform) || angle.length < 4) continue;
       const { card, repaired } = pickCard(platform, o?.taskId, cards);
       if (!card) continue;
       ops.push({
@@ -162,7 +272,8 @@ export function validateCampaignOps(args: {
       const patch: Extract<CampaignOp, { op: "update" }>["patch"] = {};
       const angle = str(o?.angle, 200);
       if (angle.length >= 4 && angle !== cur.angle) patch.angle = angle;
-      if (o?.date != null && inWindow(String(o.date)) && String(o.date) !== cur.date) patch.date = String(o.date);
+      if (o?.date != null && !inWindow(String(o.date))) miss(o.date);
+      else if (o?.date != null && String(o.date) !== cur.date) patch.date = String(o.date);
       if (typeof o?.enabled === "boolean" && o.enabled !== cur.enabled) patch.enabled = o.enabled;
       const platform = o?.platform != null ? String(o.platform).toLowerCase() : "";
       if (platform && platform !== cur.platform && (PLANNABLE_CHANNELS as readonly string[]).includes(platform)) {
@@ -177,6 +288,18 @@ export function validateCampaignOps(args: {
       const id = String(o?.id ?? "");
       if (editable(id) && !touched.has(id)) { ops.push({ op: "remove", id }); touched.add(id); }
     }
+  }
+
+  // 活動日期改了：還沒寫的篇跟著挪。模型這一輪自己指定了日期或刪掉的那幾篇，照模型的。
+  if (dates) {
+    const moved = reflowForDates(plan.items, dates, window);
+    const mine = new Map<string, CampaignOp>(ops.filter((o) => o.op !== "add").map((o) => [(o as any).id, o]));
+    for (const [id, date] of moved) {
+      const own = mine.get(id);
+      if (!own) ops.push({ op: "update", id, patch: { date } });
+      else if (own.op === "update" && !own.patch.date) own.patch.date = date;
+    }
+    if (args.report) args.report.writtenKept = plan.items.filter((i) => i.outputId).length;
   }
 
   // 訊息只收套用之後企劃裡還有的段。
@@ -196,11 +319,27 @@ export function validateCampaignOps(args: {
   }
   const smp = can.smp ? str(args.raw?.smp, 60) : "";
   if (smp && smp !== plan.smp) out.smp = smp;
+  if (dates) out.dates = dates;
   return out;
 }
 
-const DAY = 86_400_000;
-const ymd = (d: Date) => d.toISOString().slice(0, 10);
+/** 檢查時記下來的事 → 接在回覆後面的一兩句。沒事就空字串。純函式。 */
+export function reportNote(report: CampaignOpsReport, changedDates: boolean, en: boolean): string {
+  const md = (s: string) => s.slice(5).replace("-", "/");
+  const bits: string[] = [];
+  if (report.outOfWindow.length) {
+    const days = report.outOfWindow.slice(0, 4).map(md).join(en ? ", " : "、");
+    bits.push(en
+      ? `${days} is outside what I can schedule (${md(report.window.from)}–${md(report.window.to)}), so it was left out. To go earlier, ask me to move the campaign dates.`
+      : `${days} 超出可以排的範圍（${md(report.window.from)}～${md(report.window.to)}），沒有排進去。要再更早，可以請我把活動日期往前挪。`);
+  }
+  if (changedDates && report.writtenKept) {
+    bits.push(en
+      ? `${report.writtenKept} post(s) already written kept their dates.`
+      : `已經寫好的 ${report.writtenKept} 篇日期沒有動。`);
+  }
+  return bits.join(en ? " " : "");
+}
 
 /**
  * 模型的回覆 → { reply, ops, phaseMessages, askDirector }。純函式。
@@ -210,7 +349,7 @@ const ymd = (d: Date) => d.toISOString().slice(0, 10);
  * 整份丟掉。現在先照常解析；解析不了就把**完整的那幾條操作**救回來（truncated=true，
  * 畫面會說「只來得及提出前幾條」）；連 JSON 都沒有，就把文字當成一般回答。
  */
-export function parseChatReply(text: string): { reply: string; ops: any[]; phaseMessages?: any; smp?: string; basis?: any; askDirector?: string; askPlanner?: string; handoffTo?: string; ask?: string; truncated: boolean } | null {
+export function parseChatReply(text: string): { reply: string; ops: any[]; phaseMessages?: any; smp?: string; basis?: any; dates?: any; askDirector?: string; askPlanner?: string; handoffTo?: string; ask?: string; truncated: boolean } | null {
   const raw = String(text ?? "");
   const whole = safeJSON<any>(raw, null);
   if (whole && typeof whole === "object") {
@@ -222,6 +361,7 @@ export function parseChatReply(text: string): { reply: string; ops: any[]; phase
       ask: typeof whole.ask === "string" ? whole.ask : undefined,
       smp: typeof whole.smp === "string" ? whole.smp : undefined,
       ...(whole.basis && typeof whole.basis === "object" ? { basis: whole.basis } : {}),
+      ...(whole.dates && typeof whole.dates === "object" ? { dates: whole.dates } : {}),
       truncated: false,
     };
   }
@@ -262,7 +402,8 @@ const SYSTEM = `你是這檔活動的內容企劃。策略（一句話訴求、�
 鐵則：
 - 只能用操作改企劃：add（加一篇）、update（改一篇）、remove（刪一篇）。不要重寫整份。
 - taskId 必須逐字抄自候選任務卡清單，而且要是那個通路的卡。
-- 日期格式 YYYY-MM-DD，而且要在允許的日期範圍內。
+- 日期格式 YYYY-MM-DD，而且要在允許的日期範圍內（活動開始前 ${CHAT_LEAD_DAYS} 天～結束後 ${CHAT_TAIL_DAYS} 天，不早於今天）。使用者要的日期超出範圍時，不要默默換成別天：reply 說最早能排到哪一天，並問要不要把活動日期往前挪。
+- 使用者要整檔活動提早、延後、拉長或縮短（改的是活動的開始／結束日，不是某一篇）：填 dates，startAt 與 endAt 都要給；使用者沒說要動的那一頭照原本的。還沒寫的篇會自動跟著新日期挪，不用一篇一篇 update；允許的日期範圍也跟著新日期算。結束日不能早於今天。只是某幾篇要提早，就 update 那幾篇的 date，不要動活動日期。
 - 標了（已寫）的那幾篇不能改、不能刪。
 - 不准編使用者沒給的數字、成效、顧客見證、名額限制或網址。
 - 使用者只是在問問題、還沒要你改，ops 就回空陣列，用 reply 回答。
@@ -285,7 +426,8 @@ const DIRECTOR_SYSTEM = `你是這檔活動的策略總監，跟這檔活動的�
 - 改之前把【目前的企劃】從第一篇到最後一篇逐篇掃一次，每個通路（官網、電子報、LINE 也算）都要看；對不上新方向的一篇都不能漏。
 - 真的缺一個只有使用者知道的事實才能決定時（例如這次是要註冊還是預約），先用最合理的假設改好，reply 最後問那一個問題。不要只丟選項給使用者挑。
 - 不准編使用者沒給的數字、成效、顧客見證、名額限制或網址。
-- 加篇、刪篇、換通路、換日期、換任務卡是內容企劃的事，你不能動（就算寫了也會被丟掉）。使用者要這些，或你改完方向後需要加篇、刪篇、挪日期時：reply 說你請內容企劃（叫他的名字）接手，handoffTo 填 planner，ask 寫一句給內容企劃的具體指示（帶上你剛定的方向、要加或刪什麼）。名冊上其他專家（投放、網紅、異業、公關）的專業問題也可以交給他們。只是改切角就自己用 update 改，不用交棒。
+- 活動本身的開始／結束日（檔期）你可以改：使用者要整檔提早、延後、拉長或縮短時填 dates，startAt 與 endAt 都要給（YYYY-MM-DD），沒說要動的那一頭照原本的，結束日不能早於今天。還沒寫的篇會自動跟著挪，不用交給內容企劃。
+- 加篇、刪篇、換通路、個別某一篇換日期、換任務卡是內容企劃的事，你不能動（就算寫了也會被丟掉）。使用者要這些，或你改完方向後需要加篇、刪篇、挪日期時：reply 說你請內容企劃（叫他的名字）接手，handoffTo 填 planner，ask 寫一句給內容企劃的具體指示（帶上你剛定的方向、要加或刪什麼）。名冊上其他專家（投放、網紅、異業、公關）的專業問題也可以交給他們。只是改切角就自己用 update 改，不用交棒。
 - 策略依據（活動定位 11 段：受眾、洞察、目標、SMP、訊息架構、創意、語氣與禁用元素…）也歸你管。使用者在看策略依據、或要改的是這些時，用 basis 改，鍵是【策略依據】列出的路徑（例如 audience.keyInsight），清單型的欄位給字串陣列。只改要改的格子。
 - 一句話訴求（smp）跟策略依據的 SMP 是同一件事的兩個說法：改了其中一個，另一個對不上就一起改。
 - reply 用繁體中文兩到四句，口語、不要條列、不要 markdown 粗體：你決定了什麼、為什麼。改了什麼畫面會自己列。reply 裡不要寫企劃的 id，要指某一篇就說日期和通路（例如「11/01 的 Facebook」）。
@@ -382,13 +524,12 @@ export async function runCampaignChat(args: {
   const agent: TeamAgent | null = byRole.get(speaker) ?? null;
   const roleZh = (s: CampaignSpeaker) => ROLES[s].zh;
   const label = (s: CampaignSpeaker) => (byRole.get(s)?.name ? `${byRole.get(s)!.name}（${roleZh(s)}）` : roleZh(s));
-  const today = new Date(ymd(new Date()));
-  const start = facts.startAt ? new Date(ymd(facts.startAt)) : today;
-  const end = facts.endAt ? new Date(ymd(facts.endAt)) : new Date(start.getTime() + 30 * DAY);
-  const window = {
-    from: ymd(new Date(Math.max(today.getTime(), start.getTime() - 14 * DAY))),
-    to: ymd(new Date(end.getTime() + 7 * DAY)),
+  const event = {
+    startAt: facts.startAt ? ymd(facts.startAt) : null,
+    endAt: facts.endAt ? ymd(facts.endAt) : null,
+    today: ymd(new Date()),
   };
+  const window = chatWindow(event.startAt, event.endAt, event.today);
   const cards = candidateCards([...PLANNABLE_CHANNELS]);
   // 候選卡清單很長（每通路 30 張），只有會加篇換卡的內容企劃需要——其他人少讀一大段，回得快。
   const menu = speaker === "planner"
@@ -433,7 +574,8 @@ export async function runCampaignChat(args: {
 
   const user = [
     rosterBlock,
-    `【活動】${facts.name}（${facts.startAt ? ymd(facts.startAt) : "?"} ~ ${facts.endAt ? ymd(facts.endAt) : "?"}）`,
+    `【活動】${facts.name}（${event.startAt ?? "?"} ~ ${event.endAt ?? "?"}）`,
+    `【今天】${event.today}`,
     `【優惠機制／活動內容】${facts.settings.mechanic || "（沒寫）"}`,
     `【一句話訴求】${args.plan.smp}`,
     pmLines ? `【每一段的訊息】\n${pmLines}` : "",
@@ -459,9 +601,9 @@ export async function runCampaignChat(args: {
     "",
     "只輸出 JSON，鍵名固定如下：",
     speaker === "director"
-      ? `{"reply":"兩到四句","smp":"新的一句話訴求（要改才填）","phaseMessages":{"launch":"只有要改的段才填"},"ops":[{"op":"update","id":"企劃裡的 id","angle":"改寫後要講什麼（20-45字）"}],"basis":{"audience.keyInsight":"只有要改的格子才填","guidelines.forbiddenElements":["清單型給陣列"]},"handoffTo":"要交棒才填：planner 或名冊上的角色 id","ask":"給接手那位的一句具體指示"}`
+      ? `{"reply":"兩到四句","smp":"新的一句話訴求（要改才填）","dates":{"startAt":"YYYY-MM-DD","endAt":"YYYY-MM-DD（要改活動日期才填 dates）"},"phaseMessages":{"launch":"只有要改的段才填"},"ops":[{"op":"update","id":"企劃裡的 id","angle":"改寫後要講什麼（20-45字）"}],"basis":{"audience.keyInsight":"只有要改的格子才填","guidelines.forbiddenElements":["清單型給陣列"]},"handoffTo":"要交棒才填：planner 或名冊上的角色 id","ask":"給接手那位的一句具體指示"}`
       : speaker === "planner"
-        ? `{"reply":"一到三句","ops":[{"op":"add","phase":"sustain","date":"YYYY-MM-DD","platform":"instagram","taskId":"逐字抄自候選清單","angle":"這一篇要講什麼（20-45字）"},{"op":"update","id":"企劃裡的 id","angle":"…","date":"…","enabled":true},{"op":"remove","id":"企劃裡的 id"}],"phaseMessages":{"sustain":"只有要改才填"},"handoffTo":"要交棒才填：director 或名冊上的角色 id","ask":"給接手那位的一句具體指示"}`
+        ? `{"reply":"一到三句","ops":[{"op":"add","phase":"sustain","date":"YYYY-MM-DD","platform":"instagram","taskId":"逐字抄自候選清單","angle":"這一篇要講什麼（20-45字）"},{"op":"update","id":"企劃裡的 id","angle":"…","date":"…","enabled":true},{"op":"remove","id":"企劃裡的 id"}],"phaseMessages":{"sustain":"只有要改才填"},"dates":{"startAt":"YYYY-MM-DD","endAt":"YYYY-MM-DD（要改活動日期才填 dates）"},"handoffTo":"要交棒才填：director 或名冊上的角色 id","ask":"給接手那位的一句具體指示"}`
         : specialistJson,
   ].filter(Boolean).join("\n");
 
@@ -482,9 +624,10 @@ export async function runCampaignChat(args: {
   const parsed = parseChatReply(text);
   if (!parsed) throw new Error("這次沒有收到回覆，請再說一次");
   // 能改什麼由角色決定（smp 只有總監、排程只有內容企劃…），validateCampaignOps 照表擋。
+  const report: CampaignOpsReport = { outOfWindow: [], writtenKept: 0, window };
   const proposal = validateCampaignOps({
-    raw: { ops: parsed.ops, phaseMessages: parsed.phaseMessages, smp: parsed.smp },
-    plan: args.plan, cards, window, role: speaker,
+    raw: { ops: parsed.ops, phaseMessages: parsed.phaseMessages, smp: parsed.smp, dates: parsed.dates },
+    plan: args.plan, cards, window, role: speaker, event, report,
   });
   if (can.basis && parsed.basis) {
     const b = validateBasis(parsed.basis, args.positioning ?? {}, { preserveItems: true });
@@ -492,9 +635,12 @@ export async function runCampaignChat(args: {
   }
   const handoff = hops >= 2 ? null : pickHandoff(parsed, speaker, new Set(byRole.keys()));
   const askDirector = handoff?.to === "director" ? handoff.question : null;
-  const reply = humanizeIds(str(parsed.reply, 500), args.plan)
-    || (proposal.ops.length || proposal.smp || proposal.phaseMessages || proposal.basis ? "我照你說的改好了。"
+  const said = humanizeIds(str(parsed.reply, 500), args.plan)
+    || (proposal.ops.length || proposal.smp || proposal.phaseMessages || proposal.basis || proposal.dates ? "我照你說的改好了。"
       : handoff ? `這部分我請${label(handoff.to)}接手。` : "了解。");
+  // 被擋掉的日期、沒跟著挪的篇：講出來，不要讓改法無聲消失。
+  const note = reportNote(report, !!proposal.dates, args.lang === "en");
+  const reply = note ? `${said}${args.lang === "en" ? " " : ""}${note}` : said;
   return { reply, proposal, askDirector, handoff, truncated: parsed.truncated && proposal.ops.length > 0, agent, speaker };
 }
 

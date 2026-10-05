@@ -341,6 +341,36 @@ export const campaignRouter = router({
     }),
 
   /**
+   * 改活動本身的開始／結束日。對話裡提的日期（campaignChat 的 dates）與它的「復原」走這一支；
+   * 企劃裡每一篇的日期另外由 savePlan 存。定稿後擋。
+   */
+  setDates: protectedProcedure
+    .input(z.object({
+      eventId: z.number().int().positive(),
+      startAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable(),
+      endAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const row = await loadEvent(input.eventId, ctx.user!.id);
+      assertUnlocked(parsePositioning(row.positioning));
+      const day = (s: string | null) => {
+        if (!s) return null;
+        const d = new Date(s);
+        if (Number.isNaN(d.getTime()) || d.toISOString().slice(0, 10) !== s) throw new TRPCError({ code: "BAD_REQUEST", message: `日期不存在：${s}` });
+        return d;
+      };
+      const startAt = day(input.startAt);
+      const endAt = day(input.endAt);
+      if (startAt && endAt && endAt < startAt) throw new TRPCError({ code: "BAD_REQUEST", message: "結束日不能早於開始日" });
+      await localPool.execute(
+        `UPDATE events SET startAt = ?, endAt = ? WHERE id = ? AND userId = ?`,
+        [startAt, endAt, input.eventId, ctx.user!.id],
+      );
+      if (row.brandId) invalidateBrandPrefix(Number(row.brandId));
+      return { ok: true, startAt: input.startAt, endAt: input.endAt };
+    }),
+
+  /**
    * 跟內容企劃說一句話。只回提案、不寫入——套用由畫面送 savePlan（見 core/campaignChat.ts）。
    * 定稿後不能再改企劃，所以對話也跟著擋，免得提了一份套用不了的提案。
    */
