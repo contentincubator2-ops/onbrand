@@ -1419,6 +1419,12 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                     {lang === "en" ? "Batch write" : "批次產出"}
                   </Button>
                 )}
+                {/* 2026-10-06：網紅合作 tray 的「網紅切角」——貼連結或上傳名單，逐位配產品特色、切角與邀約信。 */}
+                {customChannel?.preset === "influencer" && (
+                  <Button size="sm" variant="flat" onPress={() => navigate("/influencers")}>
+                    {lang === "en" ? "Angles per creator" : "讀網紅連結配切角"}
+                  </Button>
+                )}
                 {/* 2026-09-29（CJ「新增任務卡有兩個地方，功能重複」）：右上角的
                     「新增任務卡」拿掉，只留卡片旁邊那張虛線卡；品牌自建從那張卡
                     打開的選卡器裡進。 */}

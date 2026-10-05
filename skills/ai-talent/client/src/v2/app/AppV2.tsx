@@ -75,6 +75,7 @@ const CampaignTrayPage = React.lazy(() => import("../content/pages/CampaignTrayP
 const SquadLabPage = React.lazy(() => import("../content/pages/SquadLabPage"));
 const PlannerPage = React.lazy(() => import("../content/pages/PlannerPage"));
 const InspirationPage = React.lazy(() => import("../content/pages/InspirationPage"));
+const InfluencerPage = React.lazy(() => import("../content/pages/InfluencerPage"));
 const AccountPage = React.lazy(() => import("../platform/pages/AccountPage"));
 const WorkspaceSettingsPage = React.lazy(() => import("../platform/pages/WorkspaceSettingsPage"));
 const ReviewQueuePage = React.lazy(() => import("../platform/pages/ReviewQueuePage"));
@@ -353,6 +354,7 @@ export default function AppV2() {
           {/* 2026-09-27（CJ「用本週企劃取代行事曆」）：行事曆併進本週企劃的週曆。 */}
           <Route path="/planner" element={<PlannerPage />} />
           <Route path="/inspiration" element={<InspirationPage />} />
+          <Route path="/influencers" element={<InfluencerPage />} />
           <Route path="/calendar" element={<Navigate to="/planner" replace />} />
           {/* 2026-05-10 account settings */}
           <Route path="/settings/account" element={<AccountPage />} />

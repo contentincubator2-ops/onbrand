@@ -38,6 +38,7 @@ import { touchpointsRouter } from "../platform/routers/touchpointsRouter";
 import { navPrefsRouter } from "../platform/routers/navPrefsRouter";
 import { plannerRouter } from "../content/routers/plannerRouter";
 import { inspirationRouter } from "../content/routers/inspirationRouter";
+import { influencerRouter } from "../content/routers/influencerRouter";
 import { competitorRouter } from "../strategy/routers/competitorRouter";
 import { brandKnowledgeRouter } from "../strategy/routers/brandKnowledgeRouter";
 import { personaAgentRouter } from "../strategy/routers/personaAgentRouter";
@@ -90,6 +91,8 @@ export const appRouter = router({
   navPrefs:      navPrefsRouter,
   planner:       plannerRouter,
   inspiration:   inspirationRouter,
+  // 2026-10-06 網紅切角：讀連結 → 每位網紅的產品特色＋獨特切角＋邀約信。
+  influencer:    influencerRouter,
   competitor:    competitorRouter,
   calendar:      calendarRouter,
   bundleConnect: bundleConnectRouter,
