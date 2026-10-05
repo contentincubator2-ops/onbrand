@@ -14,6 +14,10 @@ name: "Ops — ExpertHub demo viewer accounts (one-off)"
 # Branch-push triggered (not workflow_dispatch) so it runs without landing
 # on main first; the branch name itself is the trigger, picked so this
 # never collides with release/experthub-demo's own deploy trigger.
+#
+# 2026-10-05 (attempt 2): attempt 1 assumed app_root=/opt/onbrand-demo per
+# deploy-experthub-demo.yml's own script, but that path didn't exist on
+# the VM ("No such file or directory") — find it for real before retrying.
 
 on:
   push:
@@ -23,26 +27,15 @@ jobs:
   create-accounts:
     runs-on: ubuntu-latest
     steps:
-      - name: demo1@sowork.tw
+      - name: locate the experthub release on the VM
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.VM_HOST }}
           username: ${{ secrets.VM_USER }}
           key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
-          command_timeout: 90s
+          command_timeout: 60s
           script: |
-            set -e
-            cd /opt/onbrand-demo/current/skills/ai-talent
-            HUB_ADMIN_EMAIL='demo1@sowork.tw' HUB_ADMIN_PASSWORD='SoWork888' ./node_modules/.bin/tsx scripts/hub-admin.ts
-
-      - name: demo2@sowork.tw
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.VM_HOST }}
-          username: ${{ secrets.VM_USER }}
-          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
-          command_timeout: 90s
-          script: |
-            set -e
-            cd /opt/onbrand-demo/current/skills/ai-talent
-            HUB_ADMIN_EMAIL='demo2@sowork.tw' HUB_ADMIN_PASSWORD='SoWork888' ./node_modules/.bin/tsx scripts/hub-admin.ts
+            echo "== pm2 =="; pm2 ls 2>/dev/null | grep -i experthub || echo "(no match)"
+            echo "== pm2 describe =="; pm2 describe onbrand-experthub 2>/dev/null | grep -iE "cwd|script path" || echo "(no match)"
+            echo "== /opt =="; ls -la /opt/ 2>&1
+            echo "== find =="; sudo find /opt -maxdepth 2 \( -iname "*onbrand*" -o -iname "*experthub*" \) 2>&1
