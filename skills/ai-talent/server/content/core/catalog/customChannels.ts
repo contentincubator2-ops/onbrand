@@ -97,7 +97,7 @@ export function slugifyChannelName(name: string): string {
 export function buildChannel(
   brandId: number,
   existing: Pick<CustomChannel, "id">[],
-  opts: { preset?: string; name?: string; userId: number; now?: string },
+  opts: { preset?: string; name?: string; format?: ChannelFormat; userId: number; now?: string },
 ): CustomChannel {
   const preset = opts.preset ? presetByKey(opts.preset) : undefined;
   if (opts.preset && !preset) throw new Error(`unknown preset: ${opts.preset}`);
@@ -110,7 +110,8 @@ export function buildChannel(
   return {
     id, brandId, name,
     preset: preset?.key ?? null,
-    format: preset?.format ?? "post",
+    // 範本自帶型態；用戶自己命名的，由他選（貼文／商品頁），沒選就是貼文。
+    format: preset?.format ?? (opts.format === "listing" ? "listing" : "post"),
     createdAt: opts.now ?? new Date().toISOString(),
     createdBy: opts.userId,
   };

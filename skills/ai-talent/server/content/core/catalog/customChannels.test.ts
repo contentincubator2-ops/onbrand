@@ -85,6 +85,14 @@ describe("buildChannel", () => {
     expect(ch.format).toBe("post");
   });
 
+  it("自己命名時可以選型態：商品頁（listing）或貼文（預設）；範本以範本自己的型態為準", () => {
+    expect(buildChannel(7, [], { name: "Pinkoi 賣場", format: "listing", userId: 1 }).format).toBe("listing");
+    expect(buildChannel(7, [], { name: "Pinkoi 賣場", userId: 1 }).format).toBe("post");
+    expect(buildChannel(7, [], { name: "x1", format: "post", userId: 1 }).format).toBe("post");
+    // 帶了 preset 就以範本為準，不被 format 蓋掉
+    expect(buildChannel(7, [], { preset: "shopee", format: "post", userId: 1 }).format).toBe("listing");
+  });
+
   it("英文名取 slug；撞名加序號", () => {
     const a = buildChannel(7, [], { name: "Pinkoi Shop", userId: 1 });
     expect(a.id).toBe("c7-pinkoi-shop");
