@@ -1,0 +1,48 @@
+name: "Ops — ExpertHub demo viewer accounts (one-off)"
+
+# 2026-10-05: create/reset two demo-viewer logins for
+# https://experthub.onbrand.sowork.ai so people outside SoWork can log in
+# and see the Sales Hub demo.
+#
+# Both emails are @sowork.tw, which already passes the Hub's existing
+# adminProcedure check (role='admin' OR email domain sowork.tw/.ai) — no
+# code change needed. Reuses scripts/hub-admin.ts, already shipped on the
+# VM as part of every experthub deploy; it's idempotent (upserts the user,
+# resets the password if the account already exists) and only ever touches
+# the experthub_demo database — never production (mos_db).
+#
+# Branch-push triggered (not workflow_dispatch) so it runs without landing
+# on main first; the branch name itself is the trigger, picked so this
+# never collides with release/experthub-demo's own deploy trigger.
+
+on:
+  push:
+    branches: [ops/experthub-demo-accounts]
+
+jobs:
+  create-accounts:
+    runs-on: ubuntu-latest
+    steps:
+      - name: demo1@sowork.tw
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 90s
+          script: |
+            set -e
+            cd /opt/onbrand-demo/current/skills/ai-talent
+            HUB_ADMIN_EMAIL='demo1@sowork.tw' HUB_ADMIN_PASSWORD='SoWork888' ./node_modules/.bin/tsx scripts/hub-admin.ts
+
+      - name: demo2@sowork.tw
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 90s
+          script: |
+            set -e
+            cd /opt/onbrand-demo/current/skills/ai-talent
+            HUB_ADMIN_EMAIL='demo2@sowork.tw' HUB_ADMIN_PASSWORD='SoWork888' ./node_modules/.bin/tsx scripts/hub-admin.ts
