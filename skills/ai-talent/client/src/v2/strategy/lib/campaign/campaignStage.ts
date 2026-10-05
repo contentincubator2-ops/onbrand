@@ -138,3 +138,24 @@ export function addDateRange(
   const max = next && next < window.to ? next : window.to;
   return min <= max ? { min, max } : null;
 }
+
+const addDays = (s: string, n: number) => new Date(toDate(s).getTime() + n * DAY).toISOString().slice(0, 10);
+
+/** 只有一天的那一段，地圖上左右各留幾天的空間可以拖（不然整段只有一個位置）。 */
+export const SINGLE_DAY_REACH = 3;
+
+/**
+ * 地圖上某一段裡的橫向位置 → 日期（2026-10-06：拖曳一篇、點空白處加一篇）。
+ *
+ * frac 是那一段可排區域裡的比例（0＝第一篇那天、1＝最後一篇那天），可以小於 0 或大於 1——
+ * 拖到比第一篇更左邊就是更早，這樣一段才拉得長。只有一天的那一段，中間是那一天、左右各
+ * SINGLE_DAY_REACH 天。算出來的日期夾在 range 裡（addDateRange：不超過前後兩段、不早於今天）；
+ * range 是 null（那一段已經過了）就回 null——不能放。
+ */
+export function dateInPhase(phase: StagePhase, frac: number, range: { min: string; max: string } | null): string | null {
+  if (!range) return null;
+  const span = daysBetween(phase.from, phase.to);
+  const offset = span > 0 ? Math.round(frac * span) : Math.round((frac - 0.5) * 2 * SINGLE_DAY_REACH);
+  const date = addDays(phase.from, offset);
+  return date < range.min ? range.min : date > range.max ? range.max : date;
+}

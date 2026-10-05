@@ -243,6 +243,30 @@ export default function CampaignStage({ eventId, brandId }: { eventId: number; b
     applyPlan({ ...p, items: [...p.items, item as CampaignPlanItem].sort((a, b) => a.date.localeCompare(b.date)) });
   };
 
+  /**
+   * 總覽上直接刪一篇／復原（2026-10-06 CJ「時間軸可以新增、拖曳或刪除」）：只刪還沒寫的——
+   * 寫好的那一篇有成品掛著，用「這篇不做」。馬上存，復原就是把同一格放回去。
+   */
+  const removeItem = (id: string) => {
+    const p = planRef.current;
+    if (!p || p.items.some((i) => i.id === id && i.outputId)) return;
+    applyPlan({ ...p, items: p.items.filter((i) => i.id !== id) });
+  };
+  const restoreItem = (item: CampaignPlanItem) => {
+    const p = planRef.current;
+    if (!p || p.items.some((i) => i.id === item.id)) return;
+    applyPlan({ ...p, items: [...p.items, item].sort((a, b) => a.date.localeCompare(b.date)) });
+  };
+  /** 拖到另一段之後照那一段的策略改寫（使用者說好才叫）：只回新的一句，套用由地圖走 patchItem。 */
+  const retuneMut = (trpc as any).campaign.retuneItem.useMutation();
+  const retuneItem = async (it: CampaignPlanItem, from: CampaignPhaseId): Promise<string> => {
+    const r = await retuneMut.mutateAsync({
+      eventId, itemId: it.id, phase: it.phase, fromPhase: from, date: it.date,
+      platform: it.platform, taskLabel: it.taskLabel, angle: it.angle,
+    });
+    return String(r.angle);
+  };
+
   // 定稿那一刻（鎖頭在標題旁，由 CampaignLockToggle 按）跳出交接單。第一次載入就已經
   // 定稿的不跳——那不是「剛交接」。
   const [handoffOpen, setHandoffOpen] = React.useState(false);
@@ -472,6 +496,7 @@ export default function CampaignStage({ eventId, brandId }: { eventId: number; b
                 thumbs={thumbsQ.data ?? {}}
                 onOpenItem={openItem}
                 addOptions={addOptsQ.data ?? null} onAddItem={addItem}
+                onRemoveItem={removeItem} onRestoreItem={restoreItem} onRetuneItem={retuneItem}
               />
             ) : (
               <div className="relative bg-default-100 p-4 sm:p-6 min-h-[420px] h-full overflow-y-auto">

@@ -20,6 +20,7 @@
  *   chat        — 跟內容企劃對話：回覆＋提案（不寫入；套用走 savePlan）
  *   addOptions  — 手動加一篇要用的選單：可以排的日期範圍＋每個通路能選的任務卡
  *   draftItem   — 使用者自己加一篇：驗證後回那一格（不寫入；併進企劃走 savePlan）
+ *   retuneItem  — 一篇拖到另一段後，照那一段的策略改寫要講什麼（不寫入；套用走 savePlan）
  *   kpiAgent    — 會協助拆 KPI 的投放專家是誰（打開 KPI 視窗時先讓用戶看到）
  *   team        — 這檔活動的內容企劃與投放專家（真的 agent，見 core/campaignTeam.ts）
  *   planKpi     — 用戶填總預算／總目標 → 投放專家拆到每一段＋挑要下廣告的篇（提案，不寫入）
@@ -38,6 +39,7 @@ import { router, protectedProcedure } from "../../platform/core/trpc";
 import localPool from "../../localDb";
 import { buildCampaignPlan, inferCampaignSettings, type CampaignPlan } from "../core/campaign/campaignPlan";
 import { runCampaignChat, pickCampaignDirector, chatWindow, draftManualItem } from "../core/campaign/campaignChat";
+import { retuneItemAngle } from "../core/campaign/campaignRetune";
 import { validateBasis, applyBasis, basisSnapshot } from "../core/campaign/campaignBasis";
 import { cleanKolBrief } from "../core/campaign/campaignKolBrief";
 import { laneItems, candidateCards, planBeats, KOL_CHANNEL, COBRAND_CHANNEL, PLANNABLE_CHANNELS } from "../core/campaign/campaignPlan";
@@ -393,6 +395,44 @@ export const campaignRouter = router({
         throw new TRPCError({ code: "BAD_REQUEST", message: why[r.reason] });
       }
       return { item: r.item };
+    }),
+
+  /**
+   * 一篇被拖到另一段之後，照新那一段的策略改寫「這一篇要講什麼」（2026-10-06，見
+   * core/campaignRetune.ts）。只回新的一句、不寫入——畫面併進企劃後送 savePlan。
+   * 那一篇的內容由畫面送來：拖完的日期與階段可能還沒存進資料庫。
+   */
+  retuneItem: protectedProcedure
+    .input(z.object({
+      eventId: z.number().int().positive(),
+      itemId: z.string().max(80),
+      phase: z.enum(PHASE_KEYS),
+      fromPhase: z.enum(PHASE_KEYS).nullable().optional(),
+      date: z.string().max(20),
+      platform: z.string().max(40),
+      taskLabel: z.string().max(200),
+      angle: z.string().min(1).max(400),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const row = await loadEvent(input.eventId, ctx.user!.id);
+      const pos = parsePositioning(row.positioning);
+      assertUnlocked(pos);
+      const plan = visiblePlan((pos.campaignPlan ?? null) as CampaignPlan | null);
+      if (!plan) throw new TRPCError({ code: "BAD_REQUEST", message: "還沒有企劃" });
+      // 寫好的那一篇不改：成品已經照原本的方向寫了，只改企劃上的一句會讓兩邊對不上。
+      if (plan.items.some((i) => i.id === input.itemId && i.outputId)) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "這一篇已經寫好了，要改請打開這一篇重寫" });
+      }
+      try {
+        const angle = await retuneItemAngle({
+          input: { ...input, fromPhase: input.fromPhase ?? null },
+          plan, mechanic: String(pos.campaign?.mechanic ?? ""), eventName: row.name,
+          brandId: Number(row.brandId), eventId: input.eventId,
+        });
+        return { angle };
+      } catch (e: any) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: String(e?.message ?? e).slice(0, 300) });
+      }
     }),
 
   /**
