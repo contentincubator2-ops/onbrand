@@ -92,6 +92,19 @@ function loadLegacy(eventId: number): Msg[] {
 function dropLegacy(eventId: number) {
   try { localStorage.removeItem(LEGACY_KEY(eventId)); } catch { /* 私密模式 */ }
 }
+/**
+ * 還在等回覆的那一問（每檔活動最多一個），放在模組層、不跟著卡片消失。
+ *
+ * 2026-10-05（CJ「朱怡君移交給策略總監後，就沒有回覆了」）：dev 實測——總監改策略依據想了 54 秒，
+ * 使用者等到第 21 秒切去別的分頁再回來，卡片是新的一張；原本那張等的回覆回來時沒人接，
+ * 畫面就停在「朱怡君請 潘建宇 接手」。問題其實還在伺服器上跑：回來的那張接著等同一個回覆，
+ * 不重問、不丟。整頁重新整理（這張表也沒了）就靠畫面上的「再請一次」。
+ */
+interface PendingAsk { eventId: number; who: Speaker; opts: AskOpts; threadId: number | null; at: number; promise: Promise<any> }
+const pendingAsks = new Map<number, PendingAsk>();
+/** 等超過這麼久的不接了（回來時企劃可能已經改過好幾輪）。 */
+const PENDING_MAX_MS = 10 * 60_000;
+
 let seq = 0;
 const newKey = () => `m${Date.now().toString(36)}${(seq++).toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 /** 新的一則一律經過這裡，才有 key。 */
@@ -130,6 +143,12 @@ export default function CampaignChatCard({ eventId, brandId, plan, phase, notes,
   const [text, setText] = React.useState("");
   const [err, setErr] = React.useState("");
   const [busy, setBusy] = React.useState<Speaker | null>(null);
+  /** 這一問是幾點問的（離開再回來，秒數接著算）。 */
+  const [busyAt, setBusyAt] = React.useState(0);
+  const alive = React.useRef(true);
+  React.useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
+  const eventRef = React.useRef(eventId);
+  eventRef.current = eventId;
   const [queued, setQueued] = React.useState<string[]>([]);
   const lastAsk = React.useRef<{ who: Speaker; message: string; opts: AskOpts } | null>(null);
   const boxRef = React.useRef<HTMLDivElement>(null);
@@ -311,56 +330,112 @@ export default function CampaignChatCard({ eventId, brandId, plan, phase, notes,
   queueRef.current = queued;
   const drainRef = React.useRef<() => void>(() => {});
 
+  /** 回覆回來了：寫進對話、套用修改；有交棒就接著問下一位。 */
+  const onReply = (who: Speaker, hops: number, r: any) => {
+    const team = byRoleRef.current;
+    const name = r?.agent?.name ?? team.get(who)?.name ?? "";
+    const proposal: CampaignProposal | undefined = isEmptyProposal(r?.proposal) ? undefined : r.proposal;
+    let before: CampaignPlan | undefined;
+    let beforeBasis: BasisPatch | undefined;
+    if (proposal && !locked) {
+      if (proposal.ops.length || proposal.smp || Object.keys(proposal.phaseMessages ?? {}).length) {
+        before = planRef.current;
+        onApply(applyProposal(planRef.current, proposal));
+      }
+      if (proposal.basis && Object.keys(proposal.basis).length && onApplyBasis) {
+        beforeBasis = Object.fromEntries(Object.keys(proposal.basis).map((p) => [p, basisRef.current?.[p] ?? null]));
+        onApplyBasis(proposal.basis);
+      }
+      // 活動日期不在企劃裡，另外存；改之前的日期就在 proposal.dates.from，復原讀它。
+      if (proposal.dates && onApplyDates) onApplyDates({ startAt: proposal.dates.startAt, endAt: proposal.dates.endAt });
+    }
+    const reply: Msg = mk({
+      role: "assistant", content: String(r?.reply ?? ""), speaker: who, name,
+      ...(proposal ? { proposal, before, beforeBasis } : {}), truncated: !!r?.truncated,
+    });
+    const next = [...msgsRef.current, reply];
+    // 交棒：名冊上任何一位都能把話轉給另一位；同一張卡裡接著回答，之後使用者的話也由接手的那位回答。
+    const to: Speaker | null = typeof r?.handoff?.to === "string" ? r.handoff.to : null;
+    const question = String(r?.handoff?.question ?? "");
+    if (to && to !== who && question && hops < 2) {
+      const toName = dn(team.get(to));
+      const fromName = dn(team.get(who)) || name || roleName(who);
+      next.push(mk({ role: "handoff", speaker: to, name: who, content: toName ? L(`${fromName}請 ${toName}（${roleName(to)}）接手`, `${fromName} hands over to ${toName}`) : L(`交給${roleName(to)}`, `Handing over to the ${roleName(to)}`) }));
+      msgsRef.current = next;
+      setMsgs(next);
+      setSpeaker(to);
+      ask(to, question, { handoff: true, from: who, hops: hops + 1, prior: next });
+      return;
+    }
+    msgsRef.current = next;
+    setMsgs(next);
+    setBusy(null);
+    drainRef.current();
+  };
+
+  /**
+   * 等這一問的回覆。只有還掛著、而且還在同一檔活動的那張卡片會接；卡片不在了就留在 pendingAsks，
+   * 回來的那張接（見檔案上方 pendingAsks 的說明）。
+   */
+  const attach = (entry: PendingAsk) => {
+    const mine = () => alive.current && eventRef.current === entry.eventId && pendingAsks.get(entry.eventId) === entry;
+    entry.promise.then(
+      (r) => { if (!mine()) return; pendingAsks.delete(entry.eventId); onReply(entry.who, entry.opts.hops ?? 0, r); },
+      (e: any) => {
+        if (!mine()) return;
+        pendingAsks.delete(entry.eventId);
+        setBusy(null);
+        setErr(String(e?.message ?? "").slice(0, 160) || L("這次沒有回應", "No response this time"));
+      },
+    );
+  };
+
   /** 問某一位。handoff＝另一位轉過來的，不是使用者親口說的；hops＝這一串轉了幾手。 */
   const ask = (who: Speaker, message: string, opts: AskOpts) => {
     setErr("");
     setBusy(who);
+    setBusyAt(Date.now());
     lastAsk.current = { who, message, opts };
     const hops = opts.hops ?? 0;
-    chatMut.mutate({ eventId, message, phase, history: history(opts.prior), speaker: who, from: opts.from ?? null, directorAgentId, handoff: !!opts.handoff, hops, view: view ?? "map", threadId: threadRef.current, lang: en ? "en" : "zh" }, {
-      onSuccess: (r: any) => {
-        const team = byRoleRef.current;
-        const name = r?.agent?.name ?? team.get(who)?.name ?? "";
-        const proposal: CampaignProposal | undefined = isEmptyProposal(r?.proposal) ? undefined : r.proposal;
-        let before: CampaignPlan | undefined;
-        let beforeBasis: BasisPatch | undefined;
-        if (proposal && !locked) {
-          if (proposal.ops.length || proposal.smp || Object.keys(proposal.phaseMessages ?? {}).length) {
-            before = planRef.current;
-            onApply(applyProposal(planRef.current, proposal));
-          }
-          if (proposal.basis && Object.keys(proposal.basis).length && onApplyBasis) {
-            beforeBasis = Object.fromEntries(Object.keys(proposal.basis).map((p) => [p, basisRef.current?.[p] ?? null]));
-            onApplyBasis(proposal.basis);
-          }
-          // 活動日期不在企劃裡，另外存；改之前的日期就在 proposal.dates.from，復原讀它。
-          if (proposal.dates && onApplyDates) onApplyDates({ startAt: proposal.dates.startAt, endAt: proposal.dates.endAt });
-        }
-        const reply: Msg = mk({
-          role: "assistant", content: String(r?.reply ?? ""), speaker: who, name,
-          ...(proposal ? { proposal, before, beforeBasis } : {}), truncated: !!r?.truncated,
-        });
-        const next = [...msgsRef.current, reply];
-        // 交棒：名冊上任何一位都能把話轉給另一位；同一張卡裡接著回答，之後使用者的話也由接手的那位回答。
-        const to: Speaker | null = typeof r?.handoff?.to === "string" ? r.handoff.to : null;
-        const question = String(r?.handoff?.question ?? "");
-        if (to && to !== who && question && hops < 2) {
-          const toName = dn(team.get(to));
-          const fromName = dn(team.get(who)) || name || roleName(who);
-          next.push(mk({ role: "handoff", speaker: to, name: who, content: toName ? L(`${fromName}請 ${toName}（${roleName(to)}）接手`, `${fromName} hands over to ${toName}`) : L(`交給${roleName(to)}`, `Handing over to the ${roleName(to)}`) }));
-          msgsRef.current = next;
-          setMsgs(next);
-          setSpeaker(to);
-          ask(to, question, { handoff: true, from: who, hops: hops + 1, prior: next });
-          return;
-        }
-        msgsRef.current = next;
-        setMsgs(next);
-        setBusy(null);
-        drainRef.current();
-      },
-      onError: (e: any) => { setBusy(null); setErr(String(e?.message ?? "").slice(0, 160) || L("這次沒有回應", "No response this time")); },
-    });
+    const entry: PendingAsk = {
+      eventId, who, opts, threadId: threadRef.current, at: Date.now(),
+      promise: chatMut.mutateAsync({ eventId, message, phase, history: history(opts.prior), speaker: who, from: opts.from ?? null, directorAgentId, handoff: !!opts.handoff, hops, view: view ?? "map", threadId: threadRef.current, lang: en ? "en" : "zh" }),
+    };
+    pendingAsks.set(eventId, entry);
+    attach(entry);
+  };
+
+  // 回到這檔活動時上一張卡片問的還沒回來：接著等，不重問。
+  React.useEffect(() => {
+    if (!loaded) return;
+    const p = pendingAsks.get(eventId);
+    if (!p || lastAsk.current?.opts === p.opts) return;
+    const otherThread = p.threadId != null && threadRef.current != null && p.threadId !== threadRef.current;
+    if (Date.now() - p.at > PENDING_MAX_MS || otherThread) { pendingAsks.delete(eventId); return; }
+    lastAsk.current = { who: p.who, message: "", opts: p.opts };
+    setBusy(p.who);
+    setBusyAt(p.at);
+    setSpeaker(p.who);
+    attach(p);
+  }, [loaded, eventId]);
+
+  /**
+   * 交棒了但接手的那位沒回（整頁重新整理、連線斷了）：這段的最後一則是「A 請 B 接手」。
+   * 不自動重問——另一個分頁可能正在等同一題，重問會把同一份修改套兩次；給一顆「再請一次」。
+   */
+  const lastMsg = msgs[msgs.length - 1];
+  const dangling = loaded && !busy && !locked && !pendingAsks.has(eventId)
+    && lastMsg?.role === "handoff" && !!lastMsg.name && !!lastMsg.speaker && byRole.has(lastMsg.speaker)
+    ? lastMsg : null;
+  const resumeHandoff = () => {
+    if (!dangling || busy) return;
+    const prior = msgsRef.current;
+    const pick = (role: Msg["role"]) => [...prior].reverse().find((m) => m.role === role && m.content)?.content ?? "";
+    // 當初交棒的那句指示沒有存；用使用者原本那句話（接手的人看得到前面的對話）。
+    const question = (pick("user") || pick("assistant")).trim().slice(0, 800);
+    if (!question) return;
+    setSpeaker(dangling.speaker!);
+    ask(dangling.speaker!, question, { handoff: true, from: byRole.has(dangling.name!) ? dangling.name! : null, hops: 1, prior });
   };
 
   /** 使用者說一句（可能 @ 某一位）。 */
@@ -400,7 +475,7 @@ export default function CampaignChatCard({ eventId, brandId, plan, phase, notes,
 
   const retry = () => {
     const last = lastAsk.current;
-    if (!last || busy) return;
+    if (!last || busy || !last.message) return;
     ask(last.who, last.message, last.opts);
   };
 
@@ -563,7 +638,15 @@ export default function CampaignChatCard({ eventId, brandId, plan, phase, notes,
           );
         })}
         </>)}
-        {panel === "chat" && busy && <Thinking member={byRole.get(busy) ?? null} label={dn(byRole.get(busy)) || roleName(busy)} en={en} face={face(byRole.get(busy), busy, "w-5 h-5")} />}
+        {panel === "chat" && dangling && !err && (
+          <div className="flex items-center gap-2 text-tiny">
+            <span className="opacity-70">{L(`${dn(byRole.get(dangling.speaker!)) || roleName(dangling.speaker!)}還沒接著回答`, `${dn(byRole.get(dangling.speaker!)) || roleName(dangling.speaker!)} hasn't answered yet`)}</span>
+            <button type="button" onClick={resumeHandoff} className="flex items-center gap-1 opacity-80 hover:opacity-100 underline underline-offset-2">
+              <FontAwesomeIcon icon={faRotateRight} />{L("再請一次", "Ask again")}
+            </button>
+          </div>
+        )}
+        {panel === "chat" && busy && <Thinking since={busyAt} member={byRole.get(busy) ?? null} label={dn(byRole.get(busy)) || roleName(busy)} en={en} face={face(byRole.get(busy), busy, "w-5 h-5")} />}
         {queued.map((q, k) => (
           <div key={`q${k}`} className="self-end max-w-[88%] flex flex-col items-end gap-0.5 opacity-60">
             <p className="text-small leading-relaxed bg-background/10 rounded-xl px-3 py-1.5 whitespace-pre-line">{q}</p>
@@ -573,7 +656,7 @@ export default function CampaignChatCard({ eventId, brandId, plan, phase, notes,
         {err && (
           <div className="flex items-center gap-2 text-tiny">
             <span className="text-danger-300">{err}</span>
-            {lastAsk.current && !busy && (
+            {lastAsk.current?.message && !busy && (
               <button type="button" onClick={retry} className="flex items-center gap-1 opacity-80 hover:opacity-100 underline underline-offset-2">
                 <FontAwesomeIcon icon={faRotateRight} />{L("再試一次", "Retry")}
               </button>
@@ -620,14 +703,16 @@ export default function CampaignChatCard({ eventId, brandId, plan, phase, notes,
 }
 
 /** 思考列：那一位的頭像、跳動的點、秒數；等久了說明在做什麼，不讓人以為卡住。 */
-function Thinking({ member, label, en, face }: { member: Member | null; label: string; en: boolean; face: React.ReactNode }) {
+function Thinking({ member, label, en, face, since }: { member: Member | null; label: string; en: boolean; face: React.ReactNode; since?: number }) {
   const L = (zh: string, e: string) => (en ? e : zh);
-  const [sec, setSec] = React.useState(0);
+  const elapsed = (t0: number) => Math.max(0, Math.floor((Date.now() - t0) / 1000));
+  const [sec, setSec] = React.useState(() => (since ? elapsed(since) : 0));
   React.useEffect(() => {
-    const t0 = Date.now();
-    const t = window.setInterval(() => setSec(Math.floor((Date.now() - t0) / 1000)), 1000);
+    const t0 = since || Date.now();
+    setSec(elapsed(t0));
+    const t = window.setInterval(() => setSec(elapsed(t0)), 1000);
     return () => window.clearInterval(t);
-  }, [member?.id, label]);
+  }, [member?.id, label, since]);
   const stage = sec < 4 ? L("讀企劃與品牌大腦", "Reading the plan")
     : sec < 15 ? L("想怎麼改", "Working it out")
       : sec < 30 ? L("寫回覆、順便改企劃", "Writing and updating the plan")
@@ -690,7 +775,7 @@ function ChangeCard({ lines, undone, truncated, en, defaultOpen, onUndo }: {
       </div>
       {open && (
         <>
-          {truncated && <p className="text-[11px] opacity-70">{L("改的篇數太多，先改了前幾條；說「繼續」改剩下的。", "Too many changes at once. Say “continue” for the rest.")}</p>}
+          {truncated && <p className="text-[11px] opacity-70">{L("要改的地方太多，這次只寫進下面這幾處；說「繼續」改剩下的。", "Too many changes at once — only these were applied. Say “continue” for the rest.")}</p>}
           {lines.map((line, j) => <p key={j} className="text-tiny leading-snug">{line}</p>)}
         </>
       )}
