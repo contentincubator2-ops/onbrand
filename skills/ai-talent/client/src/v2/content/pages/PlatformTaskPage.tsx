@@ -2129,11 +2129,11 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                     </p>
                   </div>
                   {activeTask.ownCardId && !running && brandId && (
-                    <Tooltip content={lang === "en" ? "Edit titles" : "修改標題與欄位名稱"}>
+                    <Tooltip content={lang === "en" ? "Edit this card (titles, SKILL)" : "編輯這張卡（標題、SKILL）"}>
                       <button
                         type="button"
                         onClick={() => setEditingLabels((v) => !v)}
-                        aria-label={lang === "en" ? "Edit titles" : "修改標題與欄位名稱"}
+                        aria-label={lang === "en" ? "Edit this card (titles, SKILL)" : "編輯這張卡（標題、SKILL）"}
                         aria-pressed={editingLabels}
                         className={`shrink-0 w-7 h-7 rounded-md flex items-center justify-center transition ${editingLabels ? "bg-neutral-900 text-white" : "text-default-500 hover:bg-default-100 hover:text-default-800"}`}
                       >
@@ -2161,6 +2161,11 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                     fields={(activeTask.inputs ?? []).slice(1).map((f: any) => ({ key: f.key, label: f.label }))}
                     en={lang === "en"}
                     onCancel={() => setEditingLabels(false)}
+                    onEditSkill={() => {
+                      // 作者視窗疊在任務視窗上面開；關掉後回到同一張卡，可以直接照新的 SKILL 寫。
+                      setResumeCardId(activeTask.ownCardId!);
+                      setComposerOpen(true);
+                    }}
                     onSaved={(patch) => {
                       // 視窗當下就換上新字；目錄重抓一次，卡片列表也跟著更新。
                       setActiveTask((t) => t && ({

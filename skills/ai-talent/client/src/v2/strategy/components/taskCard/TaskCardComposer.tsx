@@ -130,6 +130,10 @@ export default function TaskCardComposer({
   // 卡片插畫：null＝跟著卡名自動挑。選單預設收起，只秀目前那張。
   const [sceneChoice, setSceneChoice] = React.useState<TaskScene | null>(null);
   const [scenePickerOpen, setScenePickerOpen] = React.useState(false);
+  // 2026-10-06（CJ「編輯只能調整標題，找不到地方可以編輯 skill」）：打開的是一張已上架的卡＝編輯，
+  // 不是新增。這時第 2 步要能「改完直接存」，不必再走一次試寫＋確認新增。
+  const [editingLive, setEditingLive] = React.useState(false);
+  const [skillSavedAt, setSkillSavedAt] = React.useState<number | null>(null);
 
   // 每次開窗同步一次起始狀態。帶 initialCardId 就直接跳到步驟 2 —— 那張卡的
   // 範例早就貼過了，再走一次步驟 1 等於要求使用者重貼。
@@ -138,6 +142,7 @@ export default function TaskCardComposer({
     if (initialCardId) { setCardId(initialCardId); setStep(2); setSkillDraft(""); }
     else { setCardId(null); setStep(1); }
     setError(null); setDryResult(null); setBusy(null);
+    setEditingLive(false); setSkillSavedAt(null);
     // 商品頁：先備好「模型不能編」的事實欄位，用戶不用從空白開始想要問什麼。
     if (isListing && !initialCardId) {
       setAskFields((prev) => prev.length > 0 ? prev : [
@@ -169,10 +174,18 @@ export default function TaskCardComposer({
     if (card && (card as any).format === "listing") setListingDraft(draftFromFields((card as any).listingFields));
   }, [card?.id]);
 
-  // SKILL 一生出來就灌進可編輯的草稿框（只灌一次，別蓋掉使用者的編輯）。
+  // 開窗當下就已上架的卡才算「編輯」；中途重新生成讓它暫時回到草稿，仍然是同一趟編輯。
   React.useEffect(() => {
-    if (card?.skill && !skillDraft) setSkillDraft(card.skill);
-  }, [card?.skill]);
+    if (initialCardId && card?.id === initialCardId && card.status === "ready") setEditingLive(true);
+  }, [initialCardId, card?.id]);
+
+  // SKILL 一生出來就灌進可編輯的草稿框（只灌一次，別蓋掉使用者的編輯）。
+  // 2026-10-06：重開同一張卡時 card.skill 沒變，舊寫法（只看 card.skill、且要求草稿是空的）
+  // 不會再灌一次，編輯框就是空的。改成開窗也算一次；card.skill 只在儲存（＝草稿本身）
+  // 或重新生成（本來就該換掉）時才變，所以不會蓋掉打到一半的字。
+  React.useEffect(() => {
+    if (isOpen && card?.skill) setSkillDraft(card.skill);
+  }, [card?.skill, isOpen, card?.id]);
 
   const extractMut = (trpc as any).brandTaskCard?.extractSamples?.useMutation?.({
     onSuccess: (r: { samples: string[]; dropped: number }) => {
@@ -272,18 +285,34 @@ export default function TaskCardComposer({
     if (!brandId || !cardId) return;
     setError(null);
     // 使用者改過 SKILL 就先存 —— 試寫必須用他眼前那一份，不是 AI 原本那份。
-    if (skillDraft.trim() && skillDraft.trim() !== card?.skill) {
-      setBusy("save");
-      try { await updateMut?.mutateAsync({ brandId, cardId, skill: skillDraft.trim() }); }
-      finally { setBusy(null); }
-    }
+    if (!(await saveSkill())) return;
     setStep(3);
+  }
+
+  const skillDirty = !!card?.skill && skillDraft.trim().length > 0 && skillDraft.trim() !== card.skill;
+
+  /** 把眼前這份 SKILL 存回卡片。回傳 false＝沒存成（錯誤已顯示），呼叫端不要往下走。 */
+  async function saveSkill(): Promise<boolean> {
+    if (!brandId || !cardId) return false;
+    if (!skillDirty) return true;
+    if (skillDraft.trim().length < 50) {
+      setError(tr("The SKILL is too short (at least 50 characters).", "SKILL 太短了（至少 50 字）。"));
+      return false;
+    }
+    setBusy("save");
+    try {
+      await updateMut?.mutateAsync({ brandId, cardId, skill: skillDraft.trim() });
+      await cardQuery.refetch?.();
+      setSkillSavedAt(Date.now());
+      return true;
+    } catch { return false; /* onError 已顯示 */ }
+    finally { setBusy(null); }
   }
 
   // ── 畫面 ──────────────────────────────────────────────────────────
   const stepLabel = en
-    ? ["Paste your examples", "Review the SKILL", "Test-write it"][step - 1]
-    : ["貼上你的範例", "檢查 SKILL", "試寫看看"][step - 1];
+    ? ["Paste your examples", editingLive ? "Edit the SKILL" : "Review the SKILL", "Test-write it"][step - 1]
+    : ["貼上你的範例", editingLive ? "編輯 SKILL" : "檢查 SKILL", "試寫看看"][step - 1];
 
   return (
     <Modal
@@ -302,9 +331,11 @@ export default function TaskCardComposer({
           <div className="flex items-center gap-2">
             <GenerateIcon size={16} className="text-primary-500" />
             <span className="text-medium font-semibold">
-              {en ? `New ${channelLabel} task card` : `新增${channelLabel}任務卡`}
+              {editingLive
+                ? (en ? `Edit task card${card?.name ? `: ${card.name}` : ""}` : `編輯任務卡${card?.name ? `：${card.name}` : ""}`)
+                : (en ? `New ${channelLabel} task card` : `新增${channelLabel}任務卡`)}
             </span>
-            <Chip size="sm" variant="flat">{en ? `Step ${step} / 3` : `第 ${step} / 3 步`}</Chip>
+            {!editingLive && <Chip size="sm" variant="flat">{en ? `Step ${step} / 3` : `第 ${step} / 3 步`}</Chip>}
           </div>
           <p className="text-tiny text-default-500 font-normal">{stepLabel}</p>
         </ModalHeader>
@@ -643,13 +674,29 @@ export default function TaskCardComposer({
                       input: "h-full text-small leading-relaxed font-mono resize-none",
                     }}
                   />
-                  <Button
-                    size="sm" variant="light" startContent={<GenerateIcon size={13} />}
-                    isLoading={busy === "distil"}
-                    onPress={() => { setBusy("distil"); setError(null); distilMut?.mutate({ brandId: brandId!, cardId: cardId! }); }}
-                  >
-                    {en ? "Regenerate from samples" : "重新從範例生成"}
-                  </Button>
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <Button
+                      size="sm" variant="light" startContent={<GenerateIcon size={13} />}
+                      isLoading={busy === "distil"}
+                      onPress={() => { setBusy("distil"); setError(null); setSkillSavedAt(null); distilMut?.mutate({ brandId: brandId!, cardId: cardId! }); }}
+                    >
+                      {en ? "Regenerate from samples" : "重新從範例生成"}
+                    </Button>
+                    {editingLive && (
+                      <span className="text-tiny text-default-400">
+                        {en
+                          ? "Regenerating replaces your edits and takes the card off the shelf until you confirm it again."
+                          : "重新生成會蓋掉你手改的內容，而且這張卡會先下架，走到最後一步確認後才會回來。"}
+                      </span>
+                    )}
+                    <span className="text-tiny ml-auto tabular-nums text-default-400">
+                      {skillDirty
+                        ? (en ? "Unsaved changes" : "有尚未儲存的修改")
+                        : skillSavedAt
+                          ? (en ? "Saved — the card follows this from its next run." : "已儲存，下一次執行就會照這份寫。")
+                          : `${skillDraft.trim().length} ${en ? "chars" : "字"}`}
+                    </span>
+                  </div>
                 </>
               )}
             </>
@@ -818,7 +865,8 @@ export default function TaskCardComposer({
         </ModalBody>
 
         <ModalFooter className="gap-2">
-          {step > 1 && (
+          {/* 接續／編輯既有的卡沒有第 1 步可回（範例早就貼過了，那一頁會是空白表單）。 */}
+          {(step === 3 || (step === 2 && !initialCardId)) && (
             <Button
               variant="light" size="sm" startContent={<ChevronLeftIcon size={14} />}
               onPress={() => setStep((s) => (s === 3 ? 2 : 1) as 1 | 2 | 3)}
@@ -839,7 +887,26 @@ export default function TaskCardComposer({
               {en ? "Distil into a SKILL" : "讓 AI 總結成 SKILL"}
             </Button>
           )}
-          {step === 2 && (
+          {step === 2 && editingLive && card?.status === "ready" && (
+            <>
+              <Button
+                variant="bordered" size="sm"
+                isDisabled={!card?.skill || busy === "save"}
+                onPress={() => void goToDryRun()}
+              >
+                {en ? "Save & test-write" : "儲存並試寫"}
+              </Button>
+              <Button
+                color="primary" size="sm"
+                isLoading={busy === "save"}
+                isDisabled={!skillDirty}
+                onPress={() => { setError(null); void saveSkill(); }}
+              >
+                {en ? "Save SKILL" : "儲存 SKILL"}
+              </Button>
+            </>
+          )}
+          {step === 2 && !(editingLive && card?.status === "ready") && (
             <Button
               color="primary" size="sm"
               isLoading={busy === "save"}
@@ -849,14 +916,20 @@ export default function TaskCardComposer({
               {en ? "Next: test-write" : "下一步：試寫"}
             </Button>
           )}
-          {step === 3 && (
+          {step === 3 && card?.status === "ready" && (
+            // 已上架的卡：SKILL 在進這一步前就存好了，這裡沒有東西要「新增」。
+            <Button color="primary" size="sm" onPress={() => { onPublished?.(); onClose(); }}>
+              {en ? "Done" : "完成"}
+            </Button>
+          )}
+          {step === 3 && card?.status !== "ready" && (
             <Button
               color="primary" size="sm"
               isLoading={busy === "publish"}
               isDisabled={!cardId}
               onPress={() => { setBusy("publish"); setError(null); publishMut?.mutate({ brandId: brandId!, cardId }); }}
             >
-              {en ? "Add the card" : "確認新增"}
+              {editingLive ? (en ? "Confirm & republish" : "確認並重新上架") : (en ? "Add the card" : "確認新增")}
             </Button>
           )}
         </ModalFooter>
