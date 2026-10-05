@@ -5,7 +5,7 @@
  * 通路真的有的、寫好的不能動。這支是「對話會不會把企劃改壞」的唯一守門員。
  */
 import { describe, it, expect } from "vitest";
-import { validateCampaignOps, parseChatReply, pickHandoff } from "./campaignChat";
+import { validateCampaignOps, parseChatReply, pickHandoff, campaignWindow, draftManualItem } from "./campaignChat";
 import { rosterRoles } from "./campaignRoster";
 import type { CampaignPlan } from "./campaignPlan";
 import type { CatalogTask } from "../catalog/taskCatalogIndex";
@@ -214,5 +214,42 @@ describe("rosterRoles（誰上名冊）", () => {
   });
   it("定位撰寫者就是總監：不重複列", () => {
     expect(rosterRoles({ plan: { items: [] }, positioning: { _director: { agentId: 7 } }, directorId: 7 }).some((r) => r.role === "author")).toBe(false);
+  });
+});
+
+// 2026-10-05：使用者自己在某個通路加一篇（通路欄位底下的＋）。
+describe("手動加一篇（draftManualItem）", () => {
+  const draft = (over: Partial<{ phase: string; date: string; platform: string; taskId: string; angle: string }> = {}) => draftManualItem({
+    input: { phase: "sustain", date: "2026-11-10", platform: "instagram", taskId: "ig-b", angle: "一人行銷團隊的週一", ...over },
+    cards, window, newId: (p, d) => `${p}-${d}-m`,
+  });
+  it("合法：回一格可以直接併進企劃的 item，卡名來自目錄", () => {
+    expect(draft()).toEqual({ ok: true, item: {
+      id: "sustain-2026-11-10-m", phase: "sustain", date: "2026-11-10", platform: "instagram",
+      taskId: "ig-b", taskLabel: "ig-b 中文", angle: "一人行銷團隊的週一", enabled: true, outputId: null, scheduledAt: null,
+    } });
+  });
+  it("卡不是那個通路的：直接拒絕，不默默換成預設卡", () => {
+    expect(draft({ taskId: "fb-a" })).toEqual({ ok: false, reason: "card" });
+    expect(draft({ taskId: "不存在" })).toEqual({ ok: false, reason: "card" });
+  });
+  it("日期超出範圍、格式不對、通路不在清單、切角太短、階段不存在：各有各的理由", () => {
+    expect(draft({ date: "2026-10-01" })).toEqual({ ok: false, reason: "date" });
+    expect(draft({ date: "2027-01-01" })).toEqual({ ok: false, reason: "date" });
+    expect(draft({ date: "11/10" })).toEqual({ ok: false, reason: "date" });
+    expect(draft({ platform: "linkedin" })).toEqual({ ok: false, reason: "platform" });
+    expect(draft({ angle: " 短 " })).toEqual({ ok: false, reason: "angle" });
+    expect(draft({ phase: "warmup" })).toEqual({ ok: false, reason: "phase" });
+  });
+});
+
+describe("campaignWindow", () => {
+  const d = (s: string) => new Date(`${s}T00:00:00Z`);
+  it("開跑前兩週到結束後一週；開跑前兩週已經過了就從今天起", () => {
+    expect(campaignWindow(d("2026-11-01"), d("2026-11-30"), d("2026-10-05"))).toEqual({ from: "2026-10-18", to: "2026-12-07" });
+    expect(campaignWindow(d("2026-11-01"), d("2026-11-30"), d("2026-11-10"))).toEqual({ from: "2026-11-10", to: "2026-12-07" });
+  });
+  it("沒有起訖日：今天起算 30 天，再加一週", () => {
+    expect(campaignWindow(null, null, d("2026-10-05"))).toEqual({ from: "2026-10-05", to: "2026-11-11" });
   });
 });

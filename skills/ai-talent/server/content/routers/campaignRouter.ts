@@ -18,6 +18,8 @@
  *   markWritten — 某一格寫完了，回貼產出（策略層的 ✓ 從這裡來）
  *   setLock     — 定稿／解鎖（2026-09-30 CJ「定稿一次鎖整份」）
  *   chat        — 跟內容企劃對話：回覆＋提案（不寫入；套用走 savePlan）
+ *   addOptions  — 手動加一篇要用的選單：可以排的日期範圍＋每個通路能選的任務卡
+ *   draftItem   — 使用者自己加一篇：驗證後回那一格（不寫入；併進企劃走 savePlan）
  *   kpiAgent    — 會協助拆 KPI 的投放專家是誰（打開 KPI 視窗時先讓用戶看到）
  *   team        — 這檔活動的內容企劃與投放專家（真的 agent，見 core/campaignTeam.ts）
  *   planKpi     — 用戶填總預算／總目標 → 投放專家拆到每一段＋挑要下廣告的篇（提案，不寫入）
@@ -35,10 +37,10 @@ import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure } from "../../platform/core/trpc";
 import localPool from "../../localDb";
 import { buildCampaignPlan, inferCampaignSettings, type CampaignPlan } from "../core/campaign/campaignPlan";
-import { runCampaignChat, pickCampaignDirector } from "../core/campaign/campaignChat";
+import { runCampaignChat, pickCampaignDirector, campaignWindow, draftManualItem } from "../core/campaign/campaignChat";
 import { validateBasis, applyBasis, basisSnapshot } from "../core/campaign/campaignBasis";
 import { cleanKolBrief } from "../core/campaign/campaignKolBrief";
-import { laneItems, candidateCards, planBeats, KOL_CHANNEL, COBRAND_CHANNEL } from "../core/campaign/campaignPlan";
+import { laneItems, candidateCards, planBeats, KOL_CHANNEL, COBRAND_CHANNEL, PLANNABLE_CHANNELS } from "../core/campaign/campaignPlan";
 import { BRIEF_CHANNELS, CHANNEL_BRIEF_SPECS, cleanChannelBrief, cleanChannelBriefs, briefPartners, type BriefChannel } from "../core/campaign/campaignChannelBrief";
 import { KPI_METRICS, pickKpiAgent, runKpiPlan } from "../core/campaign/campaignKpi";
 import { brandIndustry, pickPlannerAgent } from "../core/campaign/campaignTeam";
@@ -337,6 +339,54 @@ export const campaignRouter = router({
         lockedAt: null,
       });
       return { ok: true };
+    }),
+
+  /**
+   * 手動加一篇的選單（2026-10-05 CJ「在某通路欄位底下，自己在該日期按+」）：日期範圍跟
+   * 對話加篇同一條（campaignWindow），任務卡是那個通路整篇可以發的卡（candidateCards）。
+   */
+  addOptions: protectedProcedure
+    .input(z.object({ eventId: z.number().int().positive() }))
+    .query(async ({ ctx, input }) => {
+      const row = await loadEvent(input.eventId, ctx.user!.id);
+      const cards: Record<string, Array<{ id: string; labelZh: string; labelEn: string; tier: string }>> = {};
+      for (const c of candidateCards([...PLANNABLE_CHANNELS])) {
+        (cards[c.platform] ??= []).push({ id: c.id, labelZh: c.labelZh || c.labelEn || c.id, labelEn: c.labelEn || c.labelZh || c.id, tier: c.tier });
+      }
+      return {
+        window: campaignWindow(row.startAt ? new Date(row.startAt) : null, row.endAt ? new Date(row.endAt) : null),
+        cards,
+      };
+    }),
+
+  /** 使用者自己加一篇：只驗證、回那一格，不寫入——畫面併進企劃後送 savePlan。 */
+  draftItem: protectedProcedure
+    .input(z.object({
+      eventId: z.number().int().positive(),
+      phase: z.enum(PHASE_KEYS),
+      date: z.string().max(20),
+      platform: z.string().max(40),
+      taskId: z.string().max(120),
+      angle: z.string().max(400),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const row = await loadEvent(input.eventId, ctx.user!.id);
+      const pos = parsePositioning(row.positioning);
+      assertUnlocked(pos);
+      if (!pos.campaignPlan) throw new TRPCError({ code: "BAD_REQUEST", message: "還沒有企劃，先排出企劃再加" });
+      const window = campaignWindow(row.startAt ? new Date(row.startAt) : null, row.endAt ? new Date(row.endAt) : null);
+      const r = draftManualItem({ input, cards: candidateCards([input.platform]), window });
+      if (!r.ok) {
+        const why: Record<typeof r.reason, string> = {
+          phase: "找不到這一段",
+          date: `日期要在 ${window.from} 到 ${window.to} 之間`,
+          platform: "這個通路不能排進企劃",
+          card: "這張任務卡不是這個通路的卡，請重新選一張",
+          angle: "「這一篇要講什麼」至少寫 4 個字",
+        };
+        throw new TRPCError({ code: "BAD_REQUEST", message: why[r.reason] });
+      }
+      return { item: r.item };
     }),
 
   /**

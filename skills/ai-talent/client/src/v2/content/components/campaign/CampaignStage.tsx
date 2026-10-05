@@ -40,7 +40,7 @@ import { CHANNEL_META, channelLabel, channelRoute } from "../../../platform/lib/
 import { phaseOf, type CampaignPhaseId, type CampaignPlan, type CampaignPlanItem } from "../../../strategy/lib/campaign/campaignSchema";
 import { stagePhases, stageLanes, countdown, stageNotes, phaseShort, type StagePhase } from "../../../strategy/lib/campaign/campaignStage";
 import { LockToggle } from "../../../strategy/components/positioning/LockToggle";
-import CampaignMap from "./CampaignMap";
+import CampaignMap, { type NewItemInput } from "./CampaignMap";
 import CampaignSetupForm from "./CampaignSetupForm";
 import CampaignChatCard from "./CampaignChatCard";
 import CampaignBasisPanel from "../../../strategy/components/events/CampaignBasisPanel";
@@ -207,6 +207,19 @@ export default function CampaignStage({ eventId, brandId }: { eventId: number; b
     setSaveState("saving");
     const { lockedAt: _l, ...body } = next as any;
     savePlanMut.mutate({ eventId, plan: body });
+  };
+
+  /**
+   * 手動加一篇（2026-10-05 CJ「在某通路欄位底下，自己在該日期按+」）：伺服器驗證後回那一格，
+   * 併進手上的企劃（含還沒存的修改）馬上存。失敗就 throw，表單會顯示伺服器給的原因。
+   */
+  const addOptsQ = (trpc as any).campaign.addOptions.useQuery({ eventId }, { enabled: !!plan, refetchOnWindowFocus: false, staleTime: 5 * 60_000 });
+  const draftItemMut = (trpc as any).campaign.draftItem.useMutation();
+  const addItem = async (input: NewItemInput) => {
+    const { item } = await draftItemMut.mutateAsync({ eventId, ...input });
+    const p = planRef.current;
+    if (!p) return;
+    applyPlan({ ...p, items: [...p.items, item as CampaignPlanItem].sort((a, b) => a.date.localeCompare(b.date)) });
   };
 
   // 定稿那一刻（鎖頭在標題旁，由 CampaignLockToggle 按）跳出交接單。第一次載入就已經
@@ -433,6 +446,7 @@ export default function CampaignStage({ eventId, brandId }: { eventId: number; b
                 phaseKpi={plan.kpi?.phases ?? {}}
                 thumbs={thumbsQ.data ?? {}}
                 onOpenItem={openItem}
+                addOptions={addOptsQ.data ?? null} onAddItem={addItem}
               />
             ) : (
               <div className="relative bg-default-100 p-4 sm:p-6 min-h-[420px] h-full overflow-y-auto">

@@ -21,15 +21,19 @@
  * 放大後每一篇有「寫這篇」（任務視窗直接開寫）／「打開這篇」（CampaignPostModal：
  * 改字、定稿或送審、標記已發布）。左邊的線與標籤是這一篇走到哪一關
  * （lib/campaignPostStatus.ts）；段落標題旁是「幾篇已完成」（核准＋發布）。
+ *
+ * 2026-10-05（CJ「在某通路欄位底下，自己在該日期按+」）：放大後每個通路欄位底下有
+ * 「＋ 新增一篇」——自己選日期、選那個通路的任務卡、寫這一篇要講什麼，不用經過對話。
+ * 驗證在伺服器（campaign.draftItem），日期範圍見 campaignStage.addDateRange。
  */
 import React from "react";
 import { useNavigate } from "react-router-dom";
 import { Button, Chip, Input } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faArrowLeft, faEllipsis, faPenNib } from "@fortawesome/free-solid-svg-icons";
+import { faArrowLeft, faEllipsis, faPenNib, faPlus } from "@fortawesome/free-solid-svg-icons";
 import { CHANNEL_META, channelLabel } from "../../../platform/lib/channelMeta";
 import { phaseOf, type CampaignPhaseId, type CampaignPlanItem } from "../../../strategy/lib/campaign/campaignSchema";
-import { phaseShort, type StagePhase } from "../../../strategy/lib/campaign/campaignStage";
+import { phaseShort, addDateRange, type StagePhase } from "../../../strategy/lib/campaign/campaignStage";
 import { money, metricLine, PAID_CHANNELS, type PhaseKpi } from "../../../strategy/lib/campaign/campaignKpi";
 import { TaskIllustration } from "../../../platform/components/TaskIllustration";
 import { isPostDone, postStateBorder, postStateChip, postStateLabel, postStateOf } from "../../../strategy/lib/campaign/campaignPostStatus";
@@ -47,6 +51,14 @@ export interface ItemThumb {
   /** 排進行事曆的那一筆（還沒發布的）。 */
   schedule?: { id: number; at: string } | null;
 }
+
+/** 手動加一篇要用的選單（campaign.addOptions）：可以排的日期範圍＋每個通路能選的任務卡。 */
+export interface AddOptions {
+  window: { from: string; to: string };
+  cards: Record<string, Array<{ id: string; labelZh: string; labelEn: string; tier: string }>>;
+}
+/** 手動加的那一篇（還沒有 id；伺服器驗證後才變成企劃裡的一格）。 */
+export interface NewItemInput { phase: CampaignPhaseId; date: string; platform: string; taskId: string; angle: string }
 
 const md = (s: string) => s.slice(5).replace("-", "/");
 const DAY = 86_400_000;
@@ -71,6 +83,7 @@ function useSize(ref: React.RefObject<HTMLDivElement | null>): { w: number; h: n
 
 export default function CampaignMap({
   items, phases, lanes, phaseMessages, current, onPick, locked, en, onPatchItem, fill, phaseKpi = {}, thumbs = {}, onOpenItem,
+  addOptions, onAddItem,
 }: {
   items: CampaignPlanItem[];
   phases: StagePhase[];
@@ -89,6 +102,9 @@ export default function CampaignMap({
   thumbs?: Record<string, ItemThumb>;
   /** 寫這篇（還沒寫）／打開這篇（寫好了）。沒給就不出現按鈕。 */
   onOpenItem?: (item: CampaignPlanItem) => void;
+  /** 手動加一篇：選單與送出。兩個都給才會出現「＋ 新增一篇」。失敗就 throw，表單會顯示原因。 */
+  addOptions?: AddOptions | null;
+  onAddItem?: (input: NewItemInput) => Promise<void>;
 }) {
   const L = (zh: string, e: string) => (en ? e : zh);
   const boxRef = React.useRef<HTMLDivElement>(null);
@@ -268,6 +284,8 @@ export default function CampaignMap({
           items={items.filter((i) => i.phase === phases[ci]!.id)} lanes={lanes}
           locked={locked} en={en} onBack={() => onPick(null)} onPatchItem={onPatchItem}
           kpi={phaseKpi[phases[ci]!.id] ?? null} thumbs={thumbs} onOpenItem={onOpenItem}
+          addCards={addOptions?.cards} onAddItem={onAddItem}
+          addRange={addOptions ? addDateRange(phases, phases[ci]!.id, addOptions.window) : null}
         />
       )}
     </div>
@@ -316,13 +334,93 @@ function PinThumb({ item, thumb, en, style }: { item: CampaignPlanItem; thumb: I
   );
 }
 
-function PhaseDetail({ phase, message, items, lanes, locked, en, onBack, onPatchItem, kpi, thumbs, onOpenItem }: {
+/** 通路欄位底下的「＋ 新增一篇」：日期、任務卡、這一篇要講什麼。 */
+function AddItemForm({ phase, platform, cards, range, en, onAdd }: {
+  phase: StagePhase; platform: string; cards: AddOptions["cards"][string];
+  range: { min: string; max: string }; en: boolean;
+  onAdd: (input: NewItemInput) => Promise<void>;
+}) {
+  const L = (zh: string, e: string) => (en ? e : zh);
+  const firstDate = phase.from < range.min ? range.min : phase.from > range.max ? range.max : phase.from;
+  const firstCard = (cards.find((c) => c.tier === "30s") ?? cards[0])!.id;
+  const [open, setOpen] = React.useState(false);
+  const [date, setDate] = React.useState(firstDate);
+  const [taskId, setTaskId] = React.useState(firstCard);
+  const [angle, setAngle] = React.useState("");
+  const [busy, setBusy] = React.useState(false);
+  const [err, setErr] = React.useState("");
+  const name = channelLabel(platform, en);
+
+  if (!open) {
+    return (
+      <button type="button" onClick={() => { setDate(firstDate); setTaskId(firstCard); setAngle(""); setErr(""); setOpen(true); }}
+        className="mt-auto flex items-center justify-center gap-1.5 rounded-xl border border-dashed border-divider py-2 text-tiny text-default-500 hover:text-foreground hover:border-default-400">
+        <FontAwesomeIcon icon={faPlus} className="text-[10px]" />
+        {L("新增一篇", "Add a post")}
+      </button>
+    );
+  }
+  const dateOk = date >= range.min && date <= range.max;
+  const ready = dateOk && angle.trim().length >= 4 && !busy;
+  const submit = async () => {
+    if (!ready) return;
+    setBusy(true); setErr("");
+    try {
+      await onAdd({ phase: phase.id, date, platform, taskId, angle: angle.trim() });
+      setOpen(false);
+    } catch (e: any) {
+      setErr(e?.message || L("加不進去，請再試一次", "Couldn't add it — try again"));
+    } finally { setBusy(false); }
+  };
+  // 單篇／套組：用戶可見文案不寫 30s／60s。
+  const groups: Array<[string, typeof cards]> = [
+    [L("單篇", "Single"), cards.filter((c) => c.tier === "30s")],
+    [L("套組", "Pack"), cards.filter((c) => c.tier !== "30s")],
+  ];
+  return (
+    <div className="mt-auto flex flex-col gap-2 rounded-xl border border-divider p-2.5">
+      <p className="text-tiny font-semibold">{L(`新增一篇 ${name}`, `New ${name} post`)}</p>
+      <Input type="date" size="sm" variant="bordered" radius="md" aria-label={L("日期", "Date")}
+        min={range.min} max={range.max} value={date} onValueChange={setDate}
+        isInvalid={!dateOk} errorMessage={L(`要在 ${md(range.min)}–${md(range.max)} 之間`, `Pick ${md(range.min)}–${md(range.max)}`)} />
+      <select value={taskId} onChange={(e) => setTaskId(e.target.value)} aria-label={L("任務卡", "Task card")}
+        className="h-8 w-full min-w-0 rounded-lg border-2 border-default-200 bg-transparent px-2 text-small outline-none focus:border-foreground">
+        {groups.filter(([, list]) => list.length).map(([label, list]) => (
+          <optgroup key={label} label={label}>
+            {list.map((c) => <option key={c.id} value={c.id}>{en ? c.labelEn : c.labelZh}</option>)}
+          </optgroup>
+        ))}
+      </select>
+      <textarea value={angle} rows={2} autoFocus maxLength={200}
+        style={{ fieldSizing: "content" } as React.CSSProperties}
+        onChange={(e) => setAngle(e.target.value)}
+        placeholder={L("這一篇要講什麼（至少 4 個字）", "What this post says")}
+        aria-label={L("這一篇要講什麼", "What this post says")}
+        className="text-small leading-relaxed rounded-lg border-2 border-default-200 bg-transparent px-2 py-1.5 resize-none outline-none focus:border-foreground" />
+      {err && <p className="text-tiny text-danger">{err}</p>}
+      <div className="flex items-center gap-2">
+        <Button size="sm" radius="full" className="h-7 bg-foreground text-background" isDisabled={!ready} isLoading={busy} onPress={submit}>
+          {L("加入企劃", "Add")}
+        </Button>
+        <Button size="sm" radius="full" variant="light" className="h-7" isDisabled={busy} onPress={() => setOpen(false)}>
+          {L("取消", "Cancel")}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function PhaseDetail({ phase, message, items, lanes, locked, en, onBack, onPatchItem, kpi, thumbs, onOpenItem, addCards, addRange, onAddItem }: {
   phase: StagePhase; message: string; items: CampaignPlanItem[]; lanes: string[];
   locked: boolean; en: boolean; onBack: () => void;
   onPatchItem: (id: string, next: Partial<CampaignPlanItem>) => void;
   kpi: PhaseKpi | null;
   thumbs: Record<string, ItemThumb>;
   onOpenItem?: (item: CampaignPlanItem) => void;
+  addCards?: AddOptions["cards"];
+  /** 這一段可以加的日期；null＝這一段已經過了，不出現「＋」。 */
+  addRange?: { min: string; max: string } | null;
+  onAddItem?: (input: NewItemInput) => Promise<void>;
 }) {
   const L = (zh: string, e: string) => (en ? e : zh);
   const navigate = useNavigate();
@@ -432,6 +530,9 @@ function PhaseDetail({ phase, message, items, lanes, locked, en, onBack, onPatch
                   )}
                 </div>
               ))}
+              {!locked && onAddItem && addRange && !!addCards?.[c]?.length && (
+                <AddItemForm key={`${phase.id}-${c}`} phase={phase} platform={c} cards={addCards[c]!} range={addRange} en={en} onAdd={onAddItem} />
+              )}
             </div>
           );
         })}
