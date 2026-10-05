@@ -3,7 +3,11 @@
  *
  * 2026-10-04（CJ「如果反悔的話，應該給用戶有修改標題、填寫欄位標題的機會，只有自建的卡片才可以」）。
  * 只改文字：卡片名稱、主問題（視窗大標）、額外欄位的標題。欄位的 key 不動（走 askFieldLabels），
- * 否則舊產出存的 inputs 會對不上。SKILL 與範例要改仍走「我的卡」編輯。
+ * 否則舊產出存的 inputs 會對不上。
+ *
+ * 2026-10-06（CJ「編輯只能調整標題，找不到地方可以編輯 skill」）：SKILL 的編輯器在作者視窗
+ * （全螢幕那一頁），這裡放一顆明講的按鈕帶過去——原本只有卡片角落的「我的卡」會到那裡，
+ * 從任務視窗按鉛筆進來的人只看得到標題欄位。
  */
 import * as React from "react";
 import { Button, Input } from "@heroui/react";
@@ -16,7 +20,7 @@ export interface OwnCardLabelsPatch {
 }
 
 export default function OwnCardLabelsEditor({
-  brandId, cardId, name, primaryQuestion, fields, en, onSaved, onCancel,
+  brandId, cardId, name, primaryQuestion, fields, en, onSaved, onCancel, onEditSkill,
 }: {
   brandId: number;
   cardId: string;
@@ -27,6 +31,8 @@ export default function OwnCardLabelsEditor({
   en: boolean;
   onSaved: (patch: OwnCardLabelsPatch) => void;
   onCancel: () => void;
+  /** 打開這張卡的 SKILL 編輯器。 */
+  onEditSkill?: () => void;
 }) {
   const [nameV, setNameV] = React.useState(name);
   const [qV, setQV] = React.useState(primaryQuestion);
@@ -65,8 +71,8 @@ export default function OwnCardLabelsEditor({
     <div className="rounded-2xl border border-default-200 bg-default-50 p-3 space-y-2" data-own-card-editor>
       <p className="text-tiny text-default-500">
         {en
-          ? "Only the wording changes — your SKILL and samples stay as they are."
-          : "只改文字，不會動到這張卡的 SKILL 與範例。"}
+          ? "These fields only change the wording. To change how the card writes, edit its SKILL."
+          : "這裡只改文字。要調整這張卡怎麼寫，請編輯 SKILL。"}
       </p>
       <Input size="sm" label={en ? "Card name" : "卡片名稱"} value={nameV} onValueChange={setNameV} maxLength={60} />
       <Input size="sm" label={en ? "Main question (the big title)" : "主問題（視窗大標題）"} value={qV} onValueChange={setQV} maxLength={200} />
@@ -80,7 +86,12 @@ export default function OwnCardLabelsEditor({
         />
       ))}
       {error && <p className="text-tiny text-danger-500">{error}</p>}
-      <div className="flex justify-end gap-2">
+      <div className="flex items-center justify-end gap-2">
+        {onEditSkill && (
+          <Button size="sm" variant="bordered" className="mr-auto" onPress={onEditSkill}>
+            {en ? "Edit SKILL (writing rules)" : "編輯 SKILL（寫作規則）"}
+          </Button>
+        )}
         <Button size="sm" variant="light" onPress={onCancel}>{en ? "Cancel" : "取消"}</Button>
         <Button size="sm" color="primary" isLoading={!!mut?.isLoading} isDisabled={!valid || !changed} onPress={save}>
           {en ? "Save" : "儲存"}

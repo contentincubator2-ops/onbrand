@@ -244,7 +244,7 @@ export default function MyTaskCardsPage() {
                                   {en ? "Rename" : "改名"}
                                 </button>
                                 <button className={btn} onClick={() => setComposer({ channel: s.platform, cardId: row.id })}>
-                                  <EditIcon size={11} /> {en ? "Edit" : "編輯"}
+                                  <EditIcon size={11} /> {en ? "Edit SKILL" : "編輯 SKILL"}
                                 </button>
                                 <button className={btn} disabled={busy} onClick={() => setCopying(copying === row.id ? null : row.id)}>
                                   <CopyIcon size={11} /> {en ? "Copy to…" : "複製到…"}
