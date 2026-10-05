@@ -170,9 +170,27 @@ export default function CampaignStage({ eventId, brandId }: { eventId: number; b
   const applyDates = (d: { startAt: string | null; endAt: string | null }) => setDatesMut.mutate({ eventId, ...d });
 
   const savePlanMut = (trpc as any).campaign.savePlan.useMutation({
-    onSuccess: () => { dirtyRef.current = false; setSaveState("saved"); utils?.campaign?.get?.invalidate?.({ eventId }); },
     onError: (e: any) => { setSaveState("error"); setSaveErr(e?.message ?? ""); },
   });
+  /**
+   * 存手上的企劃。存完才算「沒有未存的修改」——但只有在這次存檔送出後沒有再改過的時候。
+   *
+   * 2026-10-06 dev 實測：拖完一篇馬上按「放回原位」，放不回去。第一次存檔回來時把「有未存的
+   * 修改」清掉並重讀，重讀到的是伺服器上還沒放回去的那一版，蓋掉了畫面上剛放回去的；接著
+   * 第二次存檔就把那一版存了回去。所以每改一次記一個序號，存檔回來時序號對不上就什麼都不做
+   * （後面那一次存檔會收尾）。
+   */
+  const editSeq = React.useRef(0);
+  const savePlan = (p: CampaignPlan) => {
+    const seq = editSeq.current;
+    const { lockedAt: _l, ...body } = p as any;
+    savePlanMut.mutate({ eventId, plan: body }, {
+      onSuccess: () => {
+        if (seq !== editSeq.current) return;
+        dirtyRef.current = false; setSaveState("saved"); utils?.campaign?.get?.invalidate?.({ eventId });
+      },
+    });
+  };
 
   /** 改了就存（停手 0.8 秒後）。標題旁的鎖頭隨時可能被按，不能留一份沒存的改動。 */
   const patchItem = (id: string, next: Partial<CampaignPlanItem>) => {
@@ -182,12 +200,10 @@ export default function CampaignStage({ eventId, brandId }: { eventId: number; b
     planRef.current = updated;
     setPlan(updated);
     dirtyRef.current = true;
+    editSeq.current += 1;
     setSaveState("saving");
     if (timer.current) clearTimeout(timer.current);
-    timer.current = setTimeout(() => {
-      const { lockedAt: _l, ...body } = planRef.current as any;
-      savePlanMut.mutate({ eventId, plan: body });
-    }, 800);
+    timer.current = setTimeout(() => { if (planRef.current) savePlan(planRef.current); }, 800);
   };
   React.useEffect(() => () => { if (timer.current) clearTimeout(timer.current); }, []);
 
@@ -225,9 +241,9 @@ export default function CampaignStage({ eventId, brandId }: { eventId: number; b
     planRef.current = next;
     setPlan(next);
     dirtyRef.current = true;
+    editSeq.current += 1;
     setSaveState("saving");
-    const { lockedAt: _l, ...body } = next as any;
-    savePlanMut.mutate({ eventId, plan: body });
+    savePlan(next);
   };
 
   /**
