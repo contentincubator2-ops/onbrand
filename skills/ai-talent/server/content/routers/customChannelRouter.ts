@@ -39,6 +39,8 @@ export const customChannelRouter = router({
       brandId: z.number().int().positive(),
       preset: z.string().max(30).optional(),
       name: z.string().min(1).max(30).optional(),
+      // 自己命名時選型態：貼文（預設）或商品頁（逐欄交付、可批次產出）。從範本建的以範本為準。
+      format: z.enum(["post", "listing"]).optional(),
     }).refine((v) => !!v.preset || !!v.name, { message: "preset or name required" }))
     .mutation(async ({ ctx, input }) => {
       const userId = ctx.user!.id;
@@ -53,7 +55,7 @@ export const customChannelRouter = router({
           throw new TRPCError({ code: "BAD_REQUEST", message: `每個品牌最多 ${MAX_CUSTOM_CHANNELS_PER_BRAND} 個自訂通路。` });
         }
         try {
-          created = buildChannel(input.brandId, cur, { preset: input.preset, name: input.name, userId });
+          created = buildChannel(input.brandId, cur, { preset: input.preset, name: input.name, format: input.format, userId });
         } catch (e: any) {
           throw new TRPCError({ code: "BAD_REQUEST", message: String(e?.message ?? e) });
         }

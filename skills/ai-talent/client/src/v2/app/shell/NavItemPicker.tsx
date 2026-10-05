@@ -52,7 +52,7 @@ export default function NavItemPicker({ open, en, brandName, catalog, selected, 
   /** 這個品牌已經建過的範本 key；已建的不再列。 */
   createdPresets?: string[];
   /** 建通路（範本或自訂名字）。回新通路的 id，失敗回 null。 */
-  onCreateChannel?: (input: { preset?: string; name?: string }) => Promise<string | null>;
+  onCreateChannel?: (input: { preset?: string; name?: string; format?: "post" | "listing" }) => Promise<string | null>;
   onRemoveChannel?: (id: string) => Promise<void>;
   /** 改自己加的通路的名字（側欄上顯示的名字）。 */
   onRenameChannel?: (id: string, name: string) => Promise<void>;
@@ -61,6 +61,11 @@ export default function NavItemPicker({ open, en, brandName, catalog, selected, 
   const [draft, setDraft] = React.useState<string[]>(selected);
   const [customName, setCustomName] = React.useState("");
   const [busy, setBusy] = React.useState(false);
+  // 2026-10-05（CJ「先著重在社群平台與官網長文，電商平台先不顯示，用戶要設立時有機制即可」）：
+  // 新增 tray 的區塊預設收起，不主動在畫面上推電商平台；用戶點開才看得到。
+  const [addOpen, setAddOpen] = React.useState(false);
+  const [showPresets, setShowPresets] = React.useState(false);
+  const [newFormat, setNewFormat] = React.useState<"post" | "listing">("post");
   React.useEffect(() => { if (open) setDraft(selected.filter((id) => catalog.some((c) => c.id === id))); }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
   if (!open) return null;
 
@@ -74,7 +79,7 @@ export default function NavItemPicker({ open, en, brandName, catalog, selected, 
     return next;
   });
 
-  const create = async (input: { preset?: string; name?: string }) => {
+  const create = async (input: { preset?: string; name?: string; format?: "post" | "listing" }) => {
     if (!onCreateChannel || busy) return;
     setBusy(true);
     try {
@@ -86,6 +91,15 @@ export default function NavItemPicker({ open, en, brandName, catalog, selected, 
   /** 新增 tray：平台範本（電商、開店平台、網紅合作）＋自訂名字。已經建過的範本不再列。 */
   const addTraySection = () => {
     if (!onCreateChannel) return null;
+    if (!addOpen) {
+      return (
+        <div className="mt-5 border-t border-neutral-200 pt-3">
+          <button type="button" onClick={() => setAddOpen(true)} className="text-[12.5px] text-neutral-400 hover:text-neutral-900">
+            {en ? "+ Add a custom tray…" : "＋ 新增自訂 mission tray…"}
+          </button>
+        </div>
+      );
+    }
     const groups: { key: PickerPreset["group"]; title: string }[] = [
       { key: "marketplace", title: en ? "E-commerce marketplaces" : "電商平台" },
       { key: "storefront", title: en ? "Store builders" : "開店平台" },
@@ -95,9 +109,35 @@ export default function NavItemPicker({ open, en, brandName, catalog, selected, 
       <div className="mt-6 border-t border-neutral-200 pt-4">
         <p className="text-[12px] font-semibold uppercase tracking-widest text-neutral-400">{en ? "Add a new tray" : "新增 mission tray"}</p>
         <p className="mt-1 text-[12px] text-neutral-500">
-          {en ? "Pick a platform to start from, or name your own. You teach it your style by pasting examples." : "從平台開始，或自己命名。接著貼上你理想中的範例，AI 就會學會你的寫法。"}
+          {en ? "Name your own tray, then teach it your style by pasting examples." : "自己命名，接著貼上你理想中的範例，AI 就會學會你的寫法。"}
         </p>
-        {groups.map((g) => {
+
+        {/* 自己命名＋選型態：貼文（預設），或商品頁（賣場、官網商品介紹：逐欄交付、可批次產出）。 */}
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <input
+            value={customName}
+            onChange={(e) => setCustomName(e.target.value.slice(0, 30))}
+            onKeyDown={(e) => { if (e.key === "Enter" && customName.trim()) void create({ name: customName.trim(), format: newFormat }); }}
+            placeholder={en ? "Tray name" : "tray 的名字"}
+            className="min-w-[160px] flex-1 rounded-lg border border-neutral-300 px-3 py-1.5 text-[13px] outline-none focus:border-neutral-900"
+          />
+          <select value={newFormat} onChange={(e) => setNewFormat(e.target.value as "post" | "listing")}
+            className="h-8 rounded-lg border border-neutral-300 bg-white px-2 text-[12.5px]" aria-label={en ? "Type" : "型態"}>
+            <option value="post">{en ? "Posts" : "貼文"}</option>
+            <option value="listing">{en ? "Product page (fields)" : "商品頁（逐欄）"}</option>
+          </select>
+          <button type="button" disabled={busy || !customName.trim()} onClick={() => void create({ name: customName.trim(), format: newFormat })}
+            className="rounded-full bg-neutral-900 px-4 py-1.5 text-[13px] font-medium text-white hover:bg-neutral-700 disabled:opacity-40">
+            {en ? "Add" : "新增"}
+          </button>
+        </div>
+
+        {!showPresets && presets.some((p) => !createdPresets.includes(p.key)) && (
+          <button type="button" onClick={() => setShowPresets(true)} className="mt-3 text-[12px] text-neutral-400 hover:text-neutral-900">
+            {en ? "Start from a platform template…" : "從平台範本開始…"}
+          </button>
+        )}
+        {showPresets && groups.map((g) => {
           const items = presets.filter((p) => p.group === g.key && !createdPresets.includes(p.key));
           if (!items.length) return null;
           return (
@@ -122,19 +162,6 @@ export default function NavItemPicker({ open, en, brandName, catalog, selected, 
             </div>
           );
         })}
-        <div className="mt-4 flex items-center gap-2">
-          <input
-            value={customName}
-            onChange={(e) => setCustomName(e.target.value.slice(0, 30))}
-            onKeyDown={(e) => { if (e.key === "Enter" && customName.trim()) void create({ name: customName.trim() }); }}
-            placeholder={en ? "Or name your own tray (e.g. Pinkoi shop)" : "或自己命名（例如：Pinkoi 賣場）"}
-            className="min-w-0 flex-1 rounded-lg border border-neutral-300 px-3 py-1.5 text-[13px] outline-none focus:border-neutral-900"
-          />
-          <button type="button" disabled={busy || !customName.trim()} onClick={() => void create({ name: customName.trim() })}
-            className="rounded-full bg-neutral-900 px-4 py-1.5 text-[13px] font-medium text-white hover:bg-neutral-700 disabled:opacity-40">
-            {en ? "Add" : "新增"}
-          </button>
-        </div>
       </div>
     );
   };
