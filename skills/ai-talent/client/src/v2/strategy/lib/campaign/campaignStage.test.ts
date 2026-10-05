@@ -2,7 +2,7 @@
  * 策略層活動頁要算的東西：階段、通路、倒數、提醒。
  */
 import { describe, it, expect } from "vitest";
-import { stagePhases, stageLanes, countdown, stageNotes } from "./campaignStage";
+import { stagePhases, stageLanes, countdown, stageNotes, addDateRange } from "./campaignStage";
 import type { CampaignPlanItem } from "./campaignSchema";
 
 const item = (date: string, phase: any, platform: string, enabled = true): CampaignPlanItem => ({
@@ -67,5 +67,23 @@ describe("stageNotes", () => {
   it("沒有問題時講一句狀態，不硬擠提醒", () => {
     const n = stageNotes(plan, ["facebook"], "launch").map((x) => x.zh);
     expect(n).toEqual(["這一段 1 篇，沒有明顯的空窗。"]);
+  });
+});
+
+describe("addDateRange（手動加一篇可以選的日期）", () => {
+  const ps = stagePhases(plan);
+  const window = { from: "2026-10-18", to: "2027-01-02" };
+  it("夾在前一段最後一篇與下一段第一篇之間", () => {
+    expect(addDateRange(ps, "sustain", window)).toEqual({ min: "2026-11-01", max: "2026-12-24" });
+  });
+  it("第一段從允許範圍的第一天起，最後一段到允許範圍的最後一天", () => {
+    expect(addDateRange(ps, "teaser", window)).toEqual({ min: "2026-10-18", max: "2026-11-01" });
+    expect(addDateRange(ps, "encore", window)).toEqual({ min: "2026-12-24", max: "2027-01-02" });
+  });
+  it("整段已經過去（今天比下一段的第一篇還晚）：null", () => {
+    expect(addDateRange(ps, "teaser", { from: "2026-11-15", to: "2027-01-02" })).toBeNull();
+  });
+  it("找不到這一段：null", () => {
+    expect(addDateRange(ps.filter((p) => p.id !== "launch"), "launch", window)).toBeNull();
   });
 });

@@ -121,3 +121,20 @@ export function phaseShort(id: CampaignPhaseId, en: boolean): string {
   const p = PHASE_SHORT[id];
   return p ? (en ? p.en : p.zh) : id;
 }
+
+/**
+ * 手動在某一段加一篇時，日期可以選的範圍（2026-10-05）：伺服器允許的範圍（campaign.addOptions
+ * 的 window），再夾在前一段的最後一篇與下一段的第一篇之間——不然加在預熱期的一篇落到開賣日
+ * 之後，地圖上兩段就疊在一起。整段都落在範圍外（多半是已經過去的那一段）回 null。
+ */
+export function addDateRange(
+  phases: StagePhase[], phaseId: CampaignPhaseId, window: { from: string; to: string },
+): { min: string; max: string } | null {
+  const i = phases.findIndex((p) => p.id === phaseId);
+  if (i < 0) return null;
+  const prev = phases[i - 1]?.to;
+  const next = phases[i + 1]?.from;
+  const min = prev && prev > window.from ? prev : window.from;
+  const max = next && next < window.to ? next : window.to;
+  return min <= max ? { min, max } : null;
+}

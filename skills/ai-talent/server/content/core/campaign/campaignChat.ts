@@ -342,6 +342,40 @@ export function reportNote(report: CampaignOpsReport, changedDates: boolean, en:
 }
 
 /**
+ * 使用者自己在某個通路加一篇（2026-10-05 CJ「在某通路欄位底下，自己在該日期按+」）。
+ *
+ * 規則跟對話加篇同一套（日期範圍、通路、切角至少 4 個字），差別只有一個：卡是使用者
+ * 親手選的，對不到就明講，不像模型挑錯時那樣默默換成預設卡。
+ * 只回這一格、不寫入——畫面把它併進手上的企劃再送 savePlan（跟對話的提案同一條路）。
+ */
+export function draftManualItem(args: {
+  input: { phase: string; date: string; platform: string; taskId: string; angle: string };
+  cards: CatalogTask[];
+  window: { from: string; to: string };
+  newId?: (phase: string, date: string) => string;
+}): { ok: true; item: PlanItem } | { ok: false; reason: "phase" | "date" | "platform" | "card" | "angle" } {
+  const phase = String(args.input.phase ?? "");
+  const date = String(args.input.date ?? "");
+  const platform = String(args.input.platform ?? "").toLowerCase();
+  const angle = str(args.input.angle, 200);
+  if (!(CAMPAIGN_PHASE_IDS as readonly string[]).includes(phase)) return { ok: false, reason: "phase" };
+  if (!YMD.test(date) || date < args.window.from || date > args.window.to) return { ok: false, reason: "date" };
+  if (!(PLANNABLE_CHANNELS as readonly string[]).includes(platform)) return { ok: false, reason: "platform" };
+  const card = args.cards.find((c) => c.platform === platform && c.id === String(args.input.taskId ?? ""));
+  if (!card) return { ok: false, reason: "card" };
+  if (angle.length < 4) return { ok: false, reason: "angle" };
+  const newId = args.newId ?? ((ph, d) => `${ph}-${d}-m${Date.now().toString(36)}`);
+  return {
+    ok: true,
+    item: {
+      id: newId(phase, date), phase: phase as CampaignPhaseId, date, platform,
+      taskId: card.id, taskLabel: card.labelZh || card.labelEn || card.id, angle,
+      enabled: true, outputId: null, scheduledAt: null,
+    },
+  };
+}
+
+/**
  * 模型的回覆 → { reply, ops, phaseMessages, askDirector }。純函式。
  *
  * 2026-09-30（CJ「我請內容企劃調整方向，結果她回復：內容企劃的回覆讀不懂」）：
