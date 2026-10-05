@@ -37,6 +37,7 @@ import { phaseShort, addDateRange, type StagePhase } from "../../../strategy/lib
 import { money, metricLine, PAID_CHANNELS, type PhaseKpi } from "../../../strategy/lib/campaign/campaignKpi";
 import { TaskIllustration } from "../../../platform/components/TaskIllustration";
 import { isPostDone, postStateBorder, postStateChip, postStateLabel, postStateOf } from "../../../strategy/lib/campaign/campaignPostStatus";
+import { tierLabel } from "../../../platform/lib/tierVocabulary";
 
 /** 寫好的那一篇的縮圖＋走到哪一關（campaign.itemThumbs）。 */
 export interface ItemThumb {
@@ -374,8 +375,8 @@ function AddItemForm({ phase, platform, cards, range, en, onAdd }: {
   };
   // 單篇／套組：用戶可見文案不寫 30s／60s。
   const groups: Array<[string, typeof cards]> = [
-    [L("單篇", "Single"), cards.filter((c) => c.tier === "30s")],
-    [L("套組", "Pack"), cards.filter((c) => c.tier !== "30s")],
+    [tierLabel("30s", en ? "en" : "zh"), cards.filter((c) => c.tier === "30s")],
+    [tierLabel("60s", en ? "en" : "zh"), cards.filter((c) => c.tier !== "30s")],
   ];
   return (
     <div className="mt-auto flex flex-col gap-2 rounded-xl border border-divider p-2.5">
