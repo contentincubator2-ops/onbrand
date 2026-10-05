@@ -1930,6 +1930,9 @@ async function main() {
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     `);
     console.log("[migrate] workspace_members: OK");
+    // 2026-10 團隊共用品牌：editor 的兩個開關（NULL = 依角色預設，見 teamAccess.ts）。
+    await ensureCol("workspace_members", "canEditStrategy", "TINYINT NULL");
+    await ensureCol("workspace_members", "canPublish", "TINYINT NULL");
 
     // workspace_member_brands — restricts editor/viewer to specific brands.
     // Empty (no rows for a member) = full access to all workspace brands.

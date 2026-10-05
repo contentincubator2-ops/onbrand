@@ -90,6 +90,17 @@ const authAwareFetch: typeof fetch = async (input, init) => {
   return res;
 };
 
+function activeBrandId(): number | null {
+  try {
+    const fromUrl = Number(new URLSearchParams(window.location.search).get("b"));
+    if (Number.isInteger(fromUrl) && fromUrl > 0) return fromUrl;
+    const stored = Number(localStorage.getItem("sowork.scope.brandId"));
+    return Number.isInteger(stored) && stored > 0 ? stored : null;
+  } catch {
+    return null;
+  }
+}
+
 export const trpcClient = trpc.createClient({
   links: [
     httpBatchLink({
@@ -98,7 +109,14 @@ export const trpcClient = trpc.createClient({
       headers() {
         // SEC-1: Use Bearer token from JWT login flow
         const token = localStorage.getItem("authToken");
-        return token ? { authorization: `Bearer ${token}` } : {};
+        const headers: Record<string, string> = token ? { authorization: `Bearer ${token}` } : {};
+        // Which brand the user has open (same order of truth as useScopeState:
+        // ?b= then localStorage). The server uses it to tell "a team member
+        // working on the owner's brand" from "working on my own" for calls
+        // that carry no brand id. It is a hint only — access is re-checked.
+        const brand = activeBrandId();
+        if (brand) headers["x-onbrand-brand"] = String(brand);
+        return headers;
       },
     }),
   ],

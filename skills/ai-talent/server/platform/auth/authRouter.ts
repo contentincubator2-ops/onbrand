@@ -420,6 +420,25 @@ authRouter.post("/me", async (req: Request, res: Response) => {
       brandCount = Number(planRow?.brandCount ?? 0);
     } catch { /* non-fatal — return user without plan info */ }
 
+    // Team members (teamAccess.ts): brands they reach through a team count as
+    // "has a brand", and the team owner's plan stands in for their own expired
+    // trial — otherwise an invited member lands on "create a brand" or on the
+    // plan-expired page.
+    try {
+      const { listTeamBrands, teamPlanFor, teamPlanWins } = await import("../core/teamAccess");
+      brandCount += (await listTeamBrands(session.userId)).length;
+      const team = await teamPlanFor(session.userId);
+      const own = {
+        planCode: String((user[0] as any)?.planCode ?? "trial"),
+        planStatus: planStatus ?? "trial",
+        planEndsAt: planEndsAt ? new Date(planEndsAt) : null,
+      };
+      if (team && teamPlanWins(own, team)) {
+        planStatus = team.planStatus;
+        planEndsAt = team.planEndsAt ? team.planEndsAt.toISOString() : null;
+      }
+    } catch { /* non-fatal */ }
+
     res.json({ user: { ...user[0], planStatus, planEndsAt }, brandCount });
   } catch (err) {
     console.error("[auth] me error:", err);

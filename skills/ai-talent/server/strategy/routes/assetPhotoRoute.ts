@@ -66,10 +66,15 @@ assetPhotoRouter.post(
   "/upload",
   express.raw({ type: () => true, limit: MAX_UPLOAD_BYTES + 1024 }),
   async (req: Request, res: Response) => {
-    const userId = await userIdOf(req);
-    if (!userId) { res.status(401).json({ error: "Unauthorized" }); return; }
+    const callerId = await userIdOf(req);
+    if (!callerId) { res.status(401).json({ error: "Unauthorized" }); return; }
 
     const brandId = parseInt(String(req.headers["x-brand-id"] ?? ""), 10);
+    // A team member with strategy permission uploads into the owner's brand.
+    const { actingUserForBrand } = await import("../../platform/core/teamAccess");
+    const acting = await actingUserForBrand(callerId, brandId, "strategy");
+    if (acting.denied) { res.status(403).json({ error: acting.denied }); return; }
+    const userId = acting.userId;
     const scope = String(req.headers["x-scope"] ?? "") as PhotoScope;
     const scopeId = parseInt(String(req.headers["x-scope-id"] ?? ""), 10);
     if (!["brand", "product"].includes(scope)) { res.status(400).json({ error: "scope must be brand | product" }); return; }

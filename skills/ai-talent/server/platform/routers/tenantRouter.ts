@@ -99,8 +99,9 @@ export const tenantRouter = router({
       );
       const ws = (wRows as any[])[0];
       if (!ws) throw new TRPCError({ code: "NOT_FOUND", message: "Workspace not found" });
-      const [members]: any = await localPool.execute(
+      const [memberRows]: any = await localPool.execute(
         `SELECT m.userId, m.role, m.invitedAt, m.joinedAt, m.invitedBy,
+                m.canEditStrategy, m.canPublish,
                 u.name, u.email
          FROM workspace_members m
          JOIN users u ON u.id = m.userId
@@ -108,11 +109,19 @@ export const tenantRouter = router({
          ORDER BY m.role = 'owner' DESC, m.joinedAt ASC`,
         [input.workspaceId],
       );
-      const [brands]: any = await localPool.execute(
-        `SELECT id, name, workspaceId, userId AS ownerUserId, createdAt
-         FROM brands WHERE workspaceId = ? ORDER BY id DESC`,
+      const [limitRows]: any = await localPool.execute(
+        `SELECT userId, brandId FROM workspace_member_brands WHERE workspaceId = ?`,
         [input.workspaceId],
       );
+      const { resolvePermissions } = await import("../core/teamAccess");
+      const members = (memberRows as any[]).map((m) => ({
+        ...m,
+        // What this member can actually do, after role presets are applied.
+        permissions: resolvePermissions(String(m.role), m),
+        // Empty = every brand of the team.
+        brandIds: (limitRows as any[]).filter((l) => Number(l.userId) === Number(m.userId)).map((l) => Number(l.brandId)),
+      }));
+      const brands = await workspaceBrands(input.workspaceId);
       return { workspace: ws, members, brands, myRole };
     }),
 
@@ -121,6 +130,11 @@ export const tenantRouter = router({
       workspaceId: z.number().int().positive(),
       email: z.string().email(),
       role: RoleEnum.default("viewer"),
+      /** Editor only: may change positioning / products / events. */
+      canEditStrategy: z.boolean().optional(),
+      /** Editor only: may schedule and publish. */
+      canPublish: z.boolean().optional(),
+      /** Limit an editor / viewer to these brands. Omitted or empty = all brands of the team. */
       brandIds: z.array(z.number().int().positive()).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
@@ -129,6 +143,10 @@ export const tenantRouter = router({
       if (myRole !== "owner" && myRole !== "admin") {
         throw new TRPCError({ code: "FORBIDDEN", message: "只有 owner / admin 可以邀請成員" });
       }
+      if (input.role === "owner" && myRole !== "owner") {
+        throw new TRPCError({ code: "FORBIDDEN", message: "只有 owner 可以指定另一位 owner" });
+      }
+      await assertBrandsInWorkspace(input.workspaceId, input.brandIds);
       await enforceMemberLimit(input.workspaceId);
       const [uRows]: any = await localPool.execute(
         `SELECT id, name FROM users WHERE email = ? LIMIT 1`,
@@ -142,20 +160,15 @@ export const tenantRouter = router({
         });
       }
       await localPool.execute(
-        `INSERT INTO workspace_members (workspaceId, userId, role, invitedBy, joinedAt)
-         VALUES (?, ?, ?, ?, NOW(3))
-         ON DUPLICATE KEY UPDATE role = VALUES(role)`,
-        [input.workspaceId, invitee.id, input.role, ctx.user.id],
+        `INSERT INTO workspace_members (workspaceId, userId, role, invitedBy, joinedAt, canEditStrategy, canPublish)
+         VALUES (?, ?, ?, ?, NOW(3), ?, ?)
+         ON DUPLICATE KEY UPDATE role = VALUES(role),
+           canEditStrategy = VALUES(canEditStrategy), canPublish = VALUES(canPublish)`,
+        [input.workspaceId, invitee.id, input.role, ctx.user.id,
+         flagValue(input.canEditStrategy), flagValue(input.canPublish)],
       );
-      if (input.brandIds && input.brandIds.length > 0) {
-        for (const bid of input.brandIds) {
-          await localPool.execute(
-            `INSERT IGNORE INTO workspace_member_brands (workspaceId, userId, brandId)
-             VALUES (?, ?, ?)`,
-            [input.workspaceId, invitee.id, bid],
-          );
-        }
-      }
+      await replaceMemberBrands(input.workspaceId, invitee.id, input.brandIds ?? []);
+      await permissionsChanged();
       // Tell the invitee — otherwise the new team just appears with no explanation.
       void (async () => {
         const [wRows]: any = await localPool.execute(`SELECT name FROM workspaces WHERE id = ? LIMIT 1`, [input.workspaceId]);
@@ -197,6 +210,48 @@ export const tenantRouter = router({
         `UPDATE workspace_members SET role = ? WHERE workspaceId = ? AND userId = ?`,
         [input.role, input.workspaceId, input.userId],
       );
+      await permissionsChanged();
+      return { ok: true };
+    }),
+
+  /**
+   * Change what an existing member may do: the two editor switches and which
+   * brands they see. Owner or admin; nobody edits the owner, and an admin
+   * cannot edit another admin.
+   */
+  setPermissions: protectedProcedure
+    .input(z.object({
+      workspaceId: z.number().int().positive(),
+      userId: z.number().int().positive(),
+      canEditStrategy: z.boolean().optional(),
+      canPublish: z.boolean().optional(),
+      /** Omit to leave the brand list alone; [] = all brands of the team. */
+      brandIds: z.array(z.number().int().positive()).optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const { default: localPool } = await import("../../localDb");
+      const myRole = await getMemberRole(input.workspaceId, ctx.user.id);
+      if (myRole !== "owner" && myRole !== "admin") {
+        throw new TRPCError({ code: "FORBIDDEN", message: "只有 owner / admin 可以調整成員權限" });
+      }
+      const targetRole = await getMemberRole(input.workspaceId, input.userId);
+      if (!targetRole) throw new TRPCError({ code: "NOT_FOUND", message: "這位成員不在團隊裡" });
+      if (targetRole === "owner" || (targetRole === "admin" && myRole !== "owner")) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "owner 與 admin 擁有全部權限，不能個別調整" });
+      }
+      await assertBrandsInWorkspace(input.workspaceId, input.brandIds);
+      const sets: string[] = [];
+      const vals: any[] = [];
+      if (input.canEditStrategy !== undefined) { sets.push("canEditStrategy = ?"); vals.push(flagValue(input.canEditStrategy)); }
+      if (input.canPublish !== undefined) { sets.push("canPublish = ?"); vals.push(flagValue(input.canPublish)); }
+      if (sets.length > 0) {
+        await localPool.execute(
+          `UPDATE workspace_members SET ${sets.join(", ")} WHERE workspaceId = ? AND userId = ?`,
+          [...vals, input.workspaceId, input.userId],
+        );
+      }
+      if (input.brandIds !== undefined) await replaceMemberBrands(input.workspaceId, input.userId, input.brandIds);
+      await permissionsChanged();
       return { ok: true };
     }),
 
@@ -233,6 +288,7 @@ export const tenantRouter = router({
         `DELETE FROM workspace_member_brands WHERE workspaceId = ? AND userId = ?`,
         [input.workspaceId, input.userId],
       );
+      await permissionsChanged();
       return { ok: true };
     }),
 
@@ -304,6 +360,54 @@ export const tenantRouter = router({
       return { ok: true };
     }),
 });
+
+const flagValue = (b: boolean | undefined): number | null => (b === undefined ? null : b ? 1 : 0);
+
+/** Brands that belong to this team — same rule teamAccess.ts uses to grant access. */
+async function workspaceBrands(workspaceId: number): Promise<Array<{ id: number; name: string; workspaceId: number | null; ownerUserId: number; createdAt: Date }>> {
+  const { default: localPool } = await import("../../localDb");
+  const [rows]: any = await localPool.execute(
+    `SELECT b.id, b.name, b.workspaceId, b.userId AS ownerUserId, b.createdAt
+       FROM brands b
+       JOIN workspaces w ON w.id = ?
+      WHERE b.workspaceId = w.id OR (b.workspaceId IS NULL AND b.userId = w.ownerUserId)
+      ORDER BY b.id DESC`,
+    [workspaceId],
+  );
+  return rows as any[];
+}
+
+/** A member can only be limited to brands the team actually has. */
+async function assertBrandsInWorkspace(workspaceId: number, brandIds: number[] | undefined): Promise<void> {
+  if (!brandIds || brandIds.length === 0) return;
+  const mine = new Set((await workspaceBrands(workspaceId)).map((b) => Number(b.id)));
+  if (brandIds.some((id) => !mine.has(id))) {
+    throw new TRPCError({ code: "BAD_REQUEST", message: "只能指定這個團隊底下的品牌" });
+  }
+}
+
+async function replaceMemberBrands(workspaceId: number, userId: number, brandIds: number[]): Promise<void> {
+  const { default: localPool } = await import("../../localDb");
+  await localPool.execute(
+    `DELETE FROM workspace_member_brands WHERE workspaceId = ? AND userId = ?`,
+    [workspaceId, userId],
+  );
+  for (const bid of [...new Set(brandIds)]) {
+    await localPool.execute(
+      `INSERT IGNORE INTO workspace_member_brands (workspaceId, userId, brandId) VALUES (?, ?, ?)`,
+      [workspaceId, userId, bid],
+    );
+  }
+}
+
+/** Access decisions are cached for 30s; drop them so a change applies at once. */
+async function permissionsChanged(): Promise<void> {
+  const [{ clearTeamAccessCache }, { _resetGrantCache }] = await Promise.all([
+    import("../core/teamAccess"), import("../core/tenantGuard"),
+  ]);
+  clearTeamAccessCache();
+  _resetGrantCache();
+}
 
 async function tableExists(name: string): Promise<boolean> {
   const { default: localPool } = await import("../../localDb");

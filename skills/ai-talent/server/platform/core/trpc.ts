@@ -7,8 +7,31 @@ import { initTRPC, TRPCError } from "@trpc/server";
 import type { Request } from "express";
 import * as jose from "jose"; // lightweight JWT library
 
+/** The real caller, when a team member's call runs on the brand owner's data (teamAccess.ts). */
+export interface TeamActor {
+  id: number;
+  email?: string;
+  brandId: number;
+  workspaceId: number;
+  perms: import("./teamAccess").TeamPermissions;
+}
+
 export interface TRPCContext {
   user: { id: number; email?: string } | null;
+  /** Brand the user has open in the UI (x-onbrand-brand). A hint only — access is always re-checked. */
+  activeBrandId?: number | null;
+  /** Set only while a member acts on a team brand; `user` is then the brand owner. */
+  actor?: TeamActor;
+}
+
+/** Who is really making this call. Use for attribution, admin checks and per-person limits. */
+export function actorIdOf(ctx: { user: { id: number } | null; actor?: TeamActor }): number {
+  return ctx.actor?.id ?? ctx.user?.id ?? 0;
+}
+
+function activeBrandFrom(req: Request): number | null {
+  const n = Number(req.headers["x-onbrand-brand"]);
+  return Number.isInteger(n) && n > 0 ? n : null;
 }
 
 export async function createContext({ req }: { req: Request }): Promise<TRPCContext> {
@@ -36,7 +59,7 @@ export async function createContext({ req }: { req: Request }): Promise<TRPCCont
       const devUserId = parseInt((req.headers["x-user-id"] as string) ?? "0");
       if (devUserId > 0) {
         console.log('[auth] Using dev auth for userId:', devUserId);
-        return { user: { id: devUserId } };
+        return { user: { id: devUserId }, activeBrandId: activeBrandFrom(req) };
       }
     }
     return { user: null };
@@ -56,6 +79,7 @@ export async function createContext({ req }: { req: Request }): Promise<TRPCCont
         id: Number(payload.sub ?? (payload as any).userId ?? 0),
         email: typeof payload.email === "string" ? payload.email : undefined,
       },
+      activeBrandId: activeBrandFrom(req),
     };
   } catch (err) {
     // P1-7: Structured logging for JWT verification failures (no token content)
@@ -159,6 +183,26 @@ export const protectedProcedure = t.procedure
     const { assertInputScopes } = await import("./tenantGuard");
     await assertInputScopes(ctx.user.id, path, await getRawInput(), { isAdmin: isAdminUser });
     return next({ ctx });
+  })
+  // 2026-10 team brands: a member working on a brand they reach through a
+  // workspace runs on the owner's data, within the permissions the owner set.
+  // Runs AFTER the guard above, which checked the ids against the real caller.
+  .use(async ({ ctx, next, path, type, getRawInput }) => {
+    const team = await import("./teamAccess");
+    if (ctx.actor || team.isPersonalPath(path)) return next({ ctx });
+    const { collectScopeIds } = await import("./tenantGuard");
+    const brandId = await team.resolveTargetBrand(path, await getRawInput(), ctx.activeBrandId, { collect: collectScopeIds });
+    if (!brandId) return next({ ctx });
+    const access = await team.teamAccessCached(ctx.user.id, brandId);
+    if (!access) return next({ ctx }); // own brand, or no team route to it
+    team.assertTeamPermission(access.perms, path, type);
+    return next({
+      ctx: {
+        ...ctx,
+        user: { id: access.ownerId },
+        actor: { id: ctx.user.id, email: ctx.user.email, brandId, workspaceId: access.workspaceId, perms: access.perms },
+      },
+    });
   });
 
 /** users.role = 'admin', or a SoWork staff mailbox. */
@@ -216,7 +260,9 @@ export function singleFlightPerUser(
 
   const inFlight = new Map<number, Map<symbol, number>>();
   return t.middleware(async ({ ctx, next }) => {
-    const userId = ctx.user?.id;
+    // Per person, not per data owner: one member's long run must not lock out
+    // the rest of the team working on the same brand.
+    const userId = ctx.actor?.id ?? ctx.user?.id;
     // Unauthenticated calls are rejected by protectedProcedure anyway; not
     // holding a slot for them keeps this guard free of a null-key bucket.
     if (!userId) return next();
@@ -274,7 +320,8 @@ export const adminProcedure = protectedProcedure.use(async ({ ctx, next }) => {
   // magic-number IDOR risk (anyone who learns user 199 exists can craft tokens
   // if the secret ever leaks). Admin access is now strictly role- or
   // email-domain based. Set users.role='admin' via DB migration for staff.
-  if (!(await isAdminUser(ctx.user.id, ctx.user.email))) {
+  // The real caller, never the brand owner a team member is acting for.
+  if (!(await isAdminUser(actorIdOf(ctx), ctx.actor ? ctx.actor.email : ctx.user.email))) {
     throw new TRPCError({ code: "FORBIDDEN", message: "Admin only" });
   }
   return next({ ctx });

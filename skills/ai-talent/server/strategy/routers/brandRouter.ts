@@ -1241,7 +1241,18 @@ export const brandRouter = router({
 
         console.log('[brand.listByMember] Found', rows?.length ?? 0, 'brands for user', ctx.user.id);
 
-        return rows ?? [];
+        // Brands reached through a team workspace. `team` tells the client it
+        // is someone else's brand and what this member may do with it.
+        const own = (rows ?? []) as any[];
+        const seen = new Set(own.map((b) => Number(b.id)));
+        const { listTeamBrands } = await import("../../platform/core/teamAccess");
+        const shared = (await listTeamBrands(ctx.user.id))
+          .filter((b) => !seen.has(Number(b.id)))
+          .map(({ perms, teamWorkspaceId, teamName, ownerId, workspaceId, ...brand }) => ({
+            ...brand,
+            team: { workspaceId: teamWorkspaceId, name: teamName, ...perms },
+          }));
+        return [...own, ...shared];
       } catch (error) {
         console.error('[brand.listByMember] Error:', error);
         throw new TRPCError({
