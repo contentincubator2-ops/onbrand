@@ -393,8 +393,50 @@ export function parseChatReply(text: string): { reply: string; ops: any[]; phase
       if (!next || next[1] === "]") break;
     }
   }
-  if (!reply && !ops.length) return null;
-  return { reply, ops, truncated: true };
+  // 2026-10-05（Lucas 請總監「照 Brief 調整其他策略依據」，總監回「全部對齊了」、畫面一格都沒動）：
+  // 十一格一起改，回覆在 basis 寫到一半被截斷；原本截斷時只救 reply 與 ops，smp、phaseMessages、
+  // basis 整個丟掉——話說完了、修改不見了。寫完整的那幾格一樣救回來。
+  const smpM = raw.match(/"smp"\s*:\s*"((?:[^"\\]|\\.)*)"/);
+  let smp: string | undefined;
+  if (smpM) { try { smp = JSON.parse(`"${smpM[1]}"`); } catch { smp = smpM[1]; } }
+  const phaseMessages = salvageObject(raw, "phaseMessages");
+  const basis = salvageObject(raw, "basis");
+  if (!reply && !ops.length && !smp && !phaseMessages && !basis) return null;
+  return { reply, ops, ...(smp ? { smp } : {}), ...(phaseMessages ? { phaseMessages } : {}), ...(basis ? { basis } : {}), truncated: true };
+}
+
+/**
+ * 被截斷的 JSON 裡，把 "key":{…} 那個物件寫完整的幾格救回來（寫到一半的最後一格丟掉）。純函式。
+ */
+export function salvageObject(raw: string, key: string): Record<string, unknown> | undefined {
+  const at = raw.search(new RegExp(`"${key}"\\s*:\\s*\\{`));
+  if (at < 0) return undefined;
+  const out: Record<string, unknown> = {};
+  let i = raw.indexOf("{", at) + 1;
+  while (i < raw.length) {
+    const km = raw.slice(i).match(/^\s*,?\s*"((?:[^"\\]|\\.)*)"\s*:\s*/);
+    if (!km) break;
+    const vStart = i + km[0].length;
+    // 這一格的值到哪裡結束（略過字串裡的括號與逗號）
+    let depth = 0, inStr = false, esc = false, end = -1;
+    for (let k = vStart; k < raw.length; k++) {
+      const ch = raw[k]!;
+      if (inStr) {
+        if (esc) esc = false; else if (ch === "\\") esc = true;
+        else if (ch === '"') { inStr = false; if (depth === 0) { end = k + 1; break; } }
+        continue;
+      }
+      if (ch === '"') inStr = true;
+      else if (ch === "[" || ch === "{") depth++;
+      else if (ch === "]" || ch === "}") { if (depth === 0) { end = k; break; } depth--; if (depth === 0) { end = k + 1; break; } }
+      else if (ch === "," && depth === 0) { end = k; break; }
+    }
+    if (end < 0) break;                           // 被截斷的最後一格：丟掉
+    try { out[JSON.parse(`"${km[1]}"`)] = JSON.parse(raw.slice(vStart, end)); } catch { /* 壞的那格跳過 */ }
+    i = end;
+    if (/^\s*\}/.test(raw.slice(i))) break;
+  }
+  return Object.keys(out).length ? out : undefined;
 }
 
 const SYSTEM = `你是這檔活動的內容企劃。策略（一句話訴求、主角、每一段的訊息）是策略總監跟使用者談定的，寫在下面；你負責把它排成可以執行的貼文——哪一天、哪個通路、用哪張任務卡、這一篇講什麼。
@@ -417,6 +459,14 @@ const SYSTEM = `你是這檔活動的內容企劃。策略（一句話訴求、�
 - reply 用繁體中文一到三句：你打算改什麼、為什麼。不要列清單，清單畫面會自己列。不要寫企劃的 id，要指某一篇就說日期和通路。
 - 只輸出 JSON，不要任何說明文字。`;
 
+/**
+ * 策略依據一次改幾格。2026-10-05 dev 實測：「照 Brief 調整其他策略依據」總監一口氣改十一格，
+ * 寫了 54 秒、回覆超過長度上限被截斷，修改全沒寫進去（而且再久一點反向代理 60 秒就斷）。
+ * 分批改：每一批都寫得完、三十秒內回得來。
+ */
+export const BASIS_BATCH = 4;
+const BASIS_BATCH_RULE = `策略依據一次最多改 ${BASIS_BATCH} 格，每格照原本的長度寫、不要越寫越長。要改的不只 ${BASIS_BATCH} 格時，先改最關鍵的 ${BASIS_BATCH} 格，reply 說清楚這次改了哪幾格、還剩哪幾格，請使用者說「繼續」再改下一批。沒寫進 basis 的格子，reply 不可以說已經改了。`;
+
 // 「逐篇掃」那一條：2026-09-30 dev 實測，總監拿掉「免費」時改了 6 篇、漏了官網公告頁那篇。
 const DIRECTOR_SYSTEM = `你是這檔活動的策略總監，跟這檔活動的團隊（內容企劃與幾位專家，名冊在下面）在同一個對話裡。你管方向：一句話訴求（smp）、每一段要讓人記住的那句話（phaseMessages）、對誰說、主角是誰。內容企劃管怎麼排。
 
@@ -429,6 +479,7 @@ const DIRECTOR_SYSTEM = `你是這檔活動的策略總監，跟這檔活動的�
 - 活動本身的開始／結束日（檔期）你可以改：使用者要整檔提早、延後、拉長或縮短時填 dates，startAt 與 endAt 都要給（YYYY-MM-DD），沒說要動的那一頭照原本的，結束日不能早於今天。還沒寫的篇會自動跟著挪，不用交給內容企劃。
 - 加篇、刪篇、換通路、個別某一篇換日期、換任務卡是內容企劃的事，你不能動（就算寫了也會被丟掉）。使用者要這些，或你改完方向後需要加篇、刪篇、挪日期時：reply 說你請內容企劃（叫他的名字）接手，handoffTo 填 planner，ask 寫一句給內容企劃的具體指示（帶上你剛定的方向、要加或刪什麼）。名冊上其他專家（投放、網紅、異業、公關）的專業問題也可以交給他們。只是改切角就自己用 update 改，不用交棒。
 - 策略依據（活動定位 11 段：受眾、洞察、目標、SMP、訊息架構、創意、語氣與禁用元素…）也歸你管。使用者在看策略依據、或要改的是這些時，用 basis 改，鍵是【策略依據】列出的路徑（例如 audience.keyInsight），清單型的欄位給字串陣列。只改要改的格子。
+- ${BASIS_BATCH_RULE}
 - 一句話訴求（smp）跟策略依據的 SMP 是同一件事的兩個說法：改了其中一個，另一個對不上就一起改。
 - reply 用繁體中文兩到四句，口語、不要條列、不要 markdown 粗體：你決定了什麼、為什麼。改了什麼畫面會自己列。reply 裡不要寫企劃的 id，要指某一篇就說日期和通路（例如「11/01 的 Facebook」）。
 - 清單型的欄位（例如禁用元素）給完整的新清單：原本的項目逐字保留，只加或刪你要改的那幾項。
@@ -470,7 +521,7 @@ function specialistSystem(role: CampaignRole): string {
 
 鐵則：
 - 用你自己的專業回答，講具體的判斷，不要講空話。使用者只是在問，就用 reply 回答、ops 回空陣列。
-- 你能直接改的只有：${may.length ? may.join("；") : "（沒有——你只給意見）"}。其他的寫了也會被丟掉。
+- 你能直接改的只有：${may.length ? may.join("；") : "（沒有——你只給意見）"}。其他的寫了也會被丟掉。${can.basis ? `\n- ${BASIS_BATCH_RULE}` : ""}
 - 加篇、刪篇、挪日期、換通路、換任務卡是內容企劃的事；一句話訴求與各段訊息是策略總監的事。需要這些時：reply 說你請誰（叫他的名字）接手，handoffTo 填他的角色 id，ask 寫一句給他的具體指示（帶上你的判斷）。
 - 前面的對話裡別人已經定下的事，照著做，不要改回去。
 - 不准編使用者沒給的數字、成效、顧客見證、名額限制、報價或網址。
@@ -635,13 +686,25 @@ export async function runCampaignChat(args: {
   }
   const handoff = hops >= 2 ? null : pickHandoff(parsed, speaker, new Set(byRole.keys()));
   const askDirector = handoff?.to === "director" ? handoff.question : null;
+  const changed = proposal.ops.length + Object.keys(proposal.basis ?? {}).length + Object.keys(proposal.phaseMessages ?? {}).length + (proposal.smp ? 1 : 0) + (proposal.dates ? 1 : 0);
+  // 回覆被截斷（JSON 不完整，或模型寫到長度上限）。
+  const cut = parsed.truncated || /^(length|max_tokens)$/.test(String(r.choices?.[0]?.finish_reason ?? ""));
+  // JSON 斷在修改那一段、而且一處都沒救回來：模型的 reply 是先寫的，會說「都改好了」——不能照著講。
+  if (parsed.truncated && !changed && !handoff) {
+    return {
+      reply: args.lang === "en"
+        ? "That was too much to change in one go — my reply got cut off and nothing was applied. Tell me which two or three fields to start with and I'll go through them in batches."
+        : "這次要改的地方太多，回覆寫到一半被截斷，一處都還沒寫進去。先告訴我從哪兩三格開始（例如「先改受眾和關鍵洞察」），我分批改。",
+      proposal, askDirector: null, handoff: null, truncated: false, agent, speaker,
+    };
+  }
   const said = humanizeIds(str(parsed.reply, 500), args.plan)
-    || (proposal.ops.length || proposal.smp || proposal.phaseMessages || proposal.basis || proposal.dates ? "我照你說的改好了。"
+    || (changed ? "我照你說的改好了。"
       : handoff ? `這部分我請${label(handoff.to)}接手。` : "了解。");
   // 被擋掉的日期、沒跟著挪的篇：講出來，不要讓改法無聲消失。
   const note = reportNote(report, !!proposal.dates, args.lang === "en");
   const reply = note ? `${said}${args.lang === "en" ? " " : ""}${note}` : said;
-  return { reply, proposal, askDirector, handoff, truncated: parsed.truncated && proposal.ops.length > 0, agent, speaker };
+  return { reply, proposal, askDirector, handoff, truncated: cut && changed > 0, agent, speaker };
 }
 
 /**
