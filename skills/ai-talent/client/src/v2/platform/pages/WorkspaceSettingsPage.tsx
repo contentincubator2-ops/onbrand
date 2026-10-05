@@ -17,17 +17,20 @@ import { BuildingIcon, ChevronLeftIcon, DeleteIcon, ShieldIcon, UserAddIcon } fr
 
 type Role = "owner" | "admin" | "editor" | "viewer";
 
-const ROLE_LABEL_ZH: Record<Role, string> = {
-  owner: "擁有者",
-  admin: "管理者（全部權限）",
-  editor: "編輯者（撰寫內容）",
-  viewer: "檢視者（僅查看）",
-};
-const ROLE_LABEL_EN: Record<Role, string> = {
-  owner: "Owner",
-  admin: "Admin (everything)",
-  editor: "Editor (writes content)",
-  viewer: "Viewer (read-only)",
+// 中英放同一張表（englishCoverage.test.ts 要看得出這些中文有英文對照）。
+const ROLE_LABELS: Record<"zh" | "en", Record<Role, string>> = {
+  zh: {
+    owner: "擁有者",
+    admin: "管理者（全部權限）",
+    editor: "編輯者（撰寫內容）",
+    viewer: "檢視者（僅查看）",
+  },
+  en: {
+    owner: "Owner",
+    admin: "Admin (everything)",
+    editor: "Editor (writes content)",
+    viewer: "Viewer (read-only)",
+  },
 };
 
 const PLAN_LABEL_EN: Record<string, string> = {
@@ -139,7 +142,7 @@ export default function WorkspaceSettingsPage() {
 
 function WorkspaceDetail({ detail, onChanged }: { detail: any; onChanged: () => void }) {
   const { lang } = useLang();
-  const ROLE_LABEL = lang === "en" ? ROLE_LABEL_EN : ROLE_LABEL_ZH;
+  const ROLE_LABEL = ROLE_LABELS[lang === "en" ? "en" : "zh"];
   const ws = detail.workspace;
   const myRole: Role = detail.myRole;
   const members = (detail.members ?? []) as any[];
