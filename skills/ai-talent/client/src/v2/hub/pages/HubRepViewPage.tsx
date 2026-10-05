@@ -60,9 +60,9 @@ export default function HubRepViewPage() {
   return (
     <div>
       <PageHeader
-        eyebrow="Rep's LINE bot"
+        eyebrow="Rep's WhatsApp bot"
         title="Every rep gets a personal AI marketing team — in the chat app they already use"
-        subtitle="One company bot, six buttons. Everything below runs the same code as the live LINE bot."
+        subtitle="One company bot, six menu actions. Everything below runs the same handlers as the live bot."
       />
 
       <div className="grid gap-6 xl:grid-cols-[390px_minmax(0,1fr)] xl:items-start">

@@ -1,37 +1,36 @@
 /**
- * Booth phone simulator — a LINE-looking chat that drives the SAME server
- * handlers as the real LINE webhook (hub.admin.simulatorMenu / Postback / Say
- * → lineBot.handleMenu / handlePostback / handleText).
+ * Booth phone simulator — a WhatsApp-looking chat that drives the SAME server
+ * handlers the real LINE bot uses today (hub.admin.simulatorMenu / Postback /
+ * Say → lineBot.handleMenu / handlePostback / handleText — see
+ * sim-Architecture.tsx for what's actually wired channel by channel). The
+ * skin is WhatsApp because that's the channel this demo shows to customers;
+ * the six menu actions and their answers are channel-agnostic.
  *
  * The parent remounts this with `key={rep.id}` to reset the conversation.
  */
 import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
 import {
+  ArrowLeft,
+  BadgeCheck,
   BatteryFull,
-  ChevronDown,
-  ChevronLeft,
-  ChevronUp,
-  LayoutGrid,
-  Menu as MenuIcon,
-  Search,
-  SendHorizontal,
-  ShieldCheck,
+  List as ListIcon,
+  Phone,
   Signal,
+  Smile,
+  Video,
   Wifi,
 } from "lucide-react";
 import { trpc } from "../../../lib/trpc";
 import { ChatBubble, type BotAction, type BotMessage, type ChatItem } from "../BotMessages";
-import { cx } from "../ui";
-import RichMenu, { MENU_ITEMS, type MenuAction, type MenuItem } from "./sim-RichMenu";
+import { OptionsSheet, WA, type SheetRow } from "./wa-ui";
+import { MENU_ITEMS, type MenuAction, type MenuItem } from "./sim-RichMenu";
 
 export const SIM_BOT_NAME = "ExpertHub AI Team";
-
-/** A softened version of LINE's blue-grey chat wallpaper (stone-900 text ≈ 8.9:1). */
-const CHAT_BG = "#A3BBDD";
 
 type SimItem = ChatItem | { from: "error"; detail: string } | { from: "note"; text: string };
 
 type Pending = { kind: "gen" | "normal"; startedAt: number } | null;
+type Sheet = { title: string; rows: SheetRow[]; onSelect: (id: string) => void } | null;
 
 export interface SimRep {
   id: number;
@@ -52,12 +51,15 @@ export function firstName(name: string): string {
 function welcomeMessage(rep: SimRep): BotMessage {
   const n = firstName(rep.name);
   return rep.market === "US"
-    ? { type: "text", text: `Hi ${n}! The menu below is your AI marketing team. Every post is checked against company policy before you share it.` }
-    : { type: "text", text: `嗨 ${n}！下方選單就是你的 AI 行銷團隊。發文前，我會先幫你檢查公司社群政策。` };
+    ? { type: "text", text: `Hi ${n}! Tap Menu below for your AI marketing team. Every post is checked against company policy before you share it.` }
+    : { type: "text", text: `嗨 ${n}！點下方 Menu 開啟你的 AI 行銷團隊。發文前，我會先幫你檢查公司社群政策。` };
 }
 
 /**
  * LIFF links from the bot → the local preview page, impersonating the rep.
+ * The real LINE bot's answers still carry liff.line.me URIs (that's the
+ * channel actually wired server-side); this just resolves them to a local
+ * preview regardless of which chat skin is showing them.
  *   https://liff.line.me/<liffId>/write?s=3  → /liff/write?s=3&rep=<repId>
  *   https://host/liff/share?p=12             → /liff/share?p=12&rep=<repId>
  */
@@ -71,15 +73,7 @@ export function simulatorLiffHref(uri: string, repId: number): string | null {
   return `/liff/${m[1]}?${qs.toString()}`;
 }
 
-function BotAvatar() {
-  return (
-    <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-stone-900 text-[10px] font-bold text-white" aria-hidden>
-      AI
-    </div>
-  );
-}
-
-function TypingIndicator({ pending, market }: { pending: NonNullable<Pending>; market: string }) {
+function TypingIndicator({ pending }: { pending: NonNullable<Pending> }) {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     if (pending.kind !== "gen") return;
@@ -88,19 +82,16 @@ function TypingIndicator({ pending, market }: { pending: NonNullable<Pending>; m
   }, [pending.kind]);
   const seconds = Math.max(0, Math.round((now - pending.startedAt) / 1000));
   return (
-    <div className="flex items-start gap-2" role="status" aria-live="polite">
-      <BotAvatar />
-      <div className="max-w-[80%] rounded-2xl rounded-tl-sm bg-white px-3 py-2">
+    <div className="flex justify-start" role="status" aria-live="polite">
+      <div className="rounded-lg rounded-tl-none bg-white px-3 py-2.5 shadow-[0_1px_0.5px_rgba(11,20,26,0.13)]">
         <div className="flex h-3 items-center gap-1" aria-hidden>
           {[0, 150, 300].map((d) => (
             <span key={d} className="h-1.5 w-1.5 animate-bounce rounded-full bg-stone-400" style={{ animationDelay: `${d}ms` }} />
           ))}
         </div>
         {pending.kind === "gen" ? (
-          <div className="mt-1.5 text-[12px] leading-snug text-stone-700">
-            {market === "TW" ? <div>寫作中，並檢查公司政策…</div> : null}
-            <div className={market === "TW" ? "text-[11px] text-stone-500" : undefined}>Writing your post and checking company policy…</div>
-            <div className="mt-0.5 text-[11px] tabular-nums text-stone-400">{seconds}s · usually 8–25s</div>
+          <div className="mt-1.5 text-[11px] leading-snug text-stone-500">
+            Writing your post and checking company policy… <span className="tabular-nums">{seconds}s</span>
           </div>
         ) : (
           <span className="sr-only">Bot is typing</span>
@@ -114,7 +105,7 @@ const PhoneSimulator = forwardRef<PhoneSimulatorHandle, { rep: SimRep }>(functio
   const utils = trpc.useUtils();
   const [items, setItems] = useState<SimItem[]>(() => [{ from: "bot", message: welcomeMessage(rep) }]);
   const [pending, setPending] = useState<Pending>(null);
-  const [menuOpen, setMenuOpen] = useState(true);
+  const [sheet, setSheet] = useState<Sheet>(null);
   const [draft, setDraft] = useState("");
   const busyRef = useRef(false);
   const mountedRef = useRef(true);
@@ -130,7 +121,7 @@ const PhoneSimulator = forwardRef<PhoneSimulatorHandle, { rep: SimRep }>(functio
   useEffect(() => {
     const el = scrollRef.current;
     if (el) el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
-  }, [items, pending, menuOpen]);
+  }, [items, pending]);
 
   const push = useCallback((...next: SimItem[]) => {
     if (mountedRef.current) setItems((prev) => [...prev, ...next]);
@@ -158,7 +149,7 @@ const PhoneSimulator = forwardRef<PhoneSimulatorHandle, { rep: SimRep }>(functio
 
   const tapMenu = useCallback(
     (item: MenuItem) =>
-      run(`${item.zh} ${item.en}`, () => utils.client.hub.admin.simulatorMenu.mutate({ repId: rep.id, action: item.action }) as Promise<BotMessage[]>),
+      run(item.en, () => utils.client.hub.admin.simulatorMenu.mutate({ repId: rep.id, action: item.action }) as Promise<BotMessage[]>),
     [run, utils, rep.id],
   );
 
@@ -183,9 +174,27 @@ const PhoneSimulator = forwardRef<PhoneSimulatorHandle, { rep: SimRep }>(functio
       }
       const liffHref = simulatorLiffHref(a.uri, rep.id);
       window.open(liffHref ?? a.uri, "_blank", "noopener");
-      push({ from: "note", text: `Opened “${a.label}” in a new tab${liffHref ? " (LIFF page, preview mode)" : ""}` });
+      push({ from: "note", text: `Opened "${a.label}" in a new tab${liffHref ? " (preview mode)" : ""}` });
     },
     [run, utils, rep.id, push],
+  );
+
+  const onOpenList = useCallback(
+    (title: string, rows: SheetRow[], onSelect: (id: string) => void) => setSheet({ title, rows, onSelect }),
+    [],
+  );
+
+  const openMenu = useCallback(
+    () =>
+      setSheet({
+        title: "Menu",
+        rows: MENU_ITEMS.map((m) => ({ id: m.action, title: m.en, description: m.description })),
+        onSelect: (id) => {
+          const item = MENU_ITEMS.find((m) => m.action === id);
+          if (item) void tapMenu(item);
+        },
+      }),
+    [tapMenu],
   );
 
   useImperativeHandle(
@@ -208,13 +217,12 @@ const PhoneSimulator = forwardRef<PhoneSimulatorHandle, { rep: SimRep }>(functio
   };
 
   const busy = pending !== null;
-  const lastIndex = items.length - 1;
 
   return (
     <div className="mx-auto flex h-[760px] max-h-[calc(100svh-140px)] min-h-[600px] w-full max-w-[380px] flex-col overflow-hidden rounded-[36px] border-[9px] border-stone-900 bg-stone-900 shadow-xl">
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-[27px] bg-white">
+      <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-[27px] bg-white">
         {/* status bar */}
-        <div className="flex items-center justify-between bg-[#f4f5f7] px-5 pb-0.5 pt-1.5 text-[11px] font-semibold text-stone-900" aria-hidden>
+        <div className="flex items-center justify-between px-5 pb-0.5 pt-1.5 text-[11px] font-semibold text-white" style={{ background: WA.header }} aria-hidden>
           <span className="tabular-nums">9:41</span>
           <span className="flex items-center gap-1">
             <Signal className="h-3 w-3" />
@@ -224,100 +232,105 @@ const PhoneSimulator = forwardRef<PhoneSimulatorHandle, { rep: SimRep }>(functio
         </div>
 
         {/* chat header */}
-        <div className="flex items-center gap-2 border-b border-stone-200 bg-[#f4f5f7] px-2 py-2">
-          <ChevronLeft className="h-5 w-5 shrink-0 text-stone-700" aria-hidden />
-          <div className="min-w-0 flex-1">
-            <div className="truncate text-[14px] font-semibold leading-tight text-stone-900">{SIM_BOT_NAME}</div>
-            <div className="flex items-center gap-1 text-[10px] leading-tight text-stone-500">
-              <ShieldCheck className="h-3 w-3" aria-hidden />
-              Official account
+        <div className="flex items-center gap-2 px-2 py-2 text-white" style={{ background: WA.header }}>
+          <ArrowLeft className="h-5 w-5 shrink-0" aria-hidden />
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white text-[11px] font-bold text-stone-900" aria-hidden>
+            AI
+          </span>
+          <div className="min-w-0 flex-1 leading-tight">
+            <div className="flex items-center gap-1 truncate text-[15px] font-semibold">
+              {SIM_BOT_NAME} <BadgeCheck className="h-4 w-4 shrink-0 text-[#25d366]" fill="white" aria-label="verified business" />
             </div>
+            <div className="truncate text-[11.5px] text-white/80">{busy ? "typing…" : "Business account"}</div>
           </div>
-          <Search className="h-4 w-4 shrink-0 text-stone-600" aria-hidden />
-          <MenuIcon className="ml-2 mr-1 h-4 w-4 shrink-0 text-stone-600" aria-hidden />
+          <Video className="h-5 w-5 shrink-0 opacity-90" aria-hidden />
+          <Phone className="ml-3 mr-1 h-[18px] w-[18px] shrink-0 opacity-90" aria-hidden />
         </div>
 
         {/* chat */}
         <div
           ref={scrollRef}
-          className="min-h-0 flex-1 space-y-3 overflow-y-auto overflow-x-hidden px-3 py-3 [&_.text-stone-600]:text-stone-800"
-          style={{ background: CHAT_BG }}
+          className="min-h-0 flex-1 space-y-2 overflow-y-auto overflow-x-hidden px-3 py-3"
+          style={{ background: WA.wallpaper, backgroundImage: "radial-gradient(rgba(0,0,0,0.035) 1px, transparent 1px)", backgroundSize: "14px 14px" }}
           aria-live="polite"
         >
           <div className="flex justify-center">
-            <span className="rounded-full bg-white/50 px-2.5 py-0.5 text-[10px] font-medium text-stone-800">Today</span>
+            <span className="rounded-md bg-white/90 px-2.5 py-1 text-[11px] font-medium text-stone-600 shadow-[0_1px_0.5px_rgba(11,20,26,0.13)]">Today</span>
           </div>
           {items.map((item, i) => {
             if (item.from === "note") {
               return (
                 <div key={i} className="flex justify-center">
-                  <span className="rounded-full bg-white/50 px-2.5 py-0.5 text-center text-[10px] text-stone-800">{item.text}</span>
+                  <span className="rounded-full bg-white/70 px-2.5 py-0.5 text-center text-[10px] text-stone-800">{item.text}</span>
                 </div>
               );
             }
             if (item.from === "error") {
               return (
-                <div key={i} className="flex items-start gap-2">
-                  <BotAvatar />
-                  <div className="min-w-0 flex-1">
-                    <div className="mb-0.5 text-[10px] text-stone-800">{SIM_BOT_NAME}</div>
-                    <div className="max-w-[92%] rounded-2xl rounded-tl-sm bg-white px-3 py-2">
-                      <div className="text-[13px] text-stone-900">Sorry, that failed — try again.</div>
-                      <div className="mt-1 break-words text-[11px] text-stone-500">{item.detail}</div>
-                    </div>
+                <div key={i} className="flex justify-start">
+                  <div className="rounded-lg rounded-tl-none bg-white px-3 py-2 shadow-[0_1px_0.5px_rgba(11,20,26,0.13)]">
+                    <div className="text-[13.5px] text-stone-900">Sorry, that failed — try again.</div>
+                    <div className="mt-1 break-words text-[11px] text-stone-500">{item.detail}</div>
                   </div>
                 </div>
               );
             }
-            // Like LINE, quick replies only stay tappable on the latest message.
-            const shown: ChatItem =
-              item.from === "bot" && item.message.type === "text" && item.message.quickReplies && i !== lastIndex
-                ? { from: "bot", message: { type: "text", text: item.message.text } }
-                : item;
-            return <ChatBubble key={i} item={shown} onAction={onAction} botName={SIM_BOT_NAME} />;
+            return <ChatBubble key={i} item={item} onAction={onAction} onOpenList={onOpenList} />;
           })}
-          {pending ? <TypingIndicator pending={pending} market={rep.market} /> : null}
+          {pending ? <TypingIndicator pending={pending} /> : null}
         </div>
 
         {/* input bar */}
-        <div className="flex items-center gap-1.5 border-t border-stone-200 bg-white px-2 py-1.5">
+        <div className="flex items-center gap-1.5 px-2 py-1.5" style={{ background: "#f0f2f5" }}>
           <button
             type="button"
-            onClick={() => setMenuOpen((v) => !v)}
-            aria-expanded={menuOpen}
-            aria-label={menuOpen ? "Hide menu" : "Show menu"}
-            className="flex shrink-0 items-center gap-1 rounded-md px-1.5 py-1.5 text-[12px] font-medium text-stone-700 hover:bg-stone-100"
+            onClick={openMenu}
+            aria-label="Menu"
+            className="flex shrink-0 items-center gap-1 rounded-full bg-white px-2.5 py-1.5 text-[12px] font-medium text-stone-700 shadow-[0_1px_0.5px_rgba(11,20,26,0.13)] hover:bg-stone-50"
           >
-            <LayoutGrid className="h-4 w-4" aria-hidden />
+            <ListIcon className="h-4 w-4" aria-hidden />
             Menu
-            {menuOpen ? <ChevronDown className="h-3.5 w-3.5" aria-hidden /> : <ChevronUp className="h-3.5 w-3.5" aria-hidden />}
           </button>
-          <input
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing && e.keyCode !== 229) {
-                e.preventDefault();
-                send();
-              }
-            }}
-            placeholder={rep.market === "US" ? "Ask your AI team…" : "輸入訊息…"}
-            aria-label="Message"
-            maxLength={2000}
-            className="min-w-0 flex-1 rounded-full bg-stone-100 px-3 py-1.5 text-[13px] text-stone-900 outline-none placeholder:text-stone-400 focus:ring-2 focus:ring-stone-300"
-          />
+          <div className="flex min-w-0 flex-1 items-center gap-1.5 rounded-full bg-white px-3 py-1.5">
+            <Smile className="h-4 w-4 shrink-0 text-stone-400" aria-hidden />
+            <input
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing && e.keyCode !== 229) {
+                  e.preventDefault();
+                  send();
+                }
+              }}
+              placeholder="Message"
+              aria-label="Message"
+              maxLength={2000}
+              className="min-w-0 flex-1 text-[13px] text-stone-900 outline-none placeholder:text-stone-400"
+            />
+          </div>
           <button
             type="button"
             onClick={send}
             disabled={!draft.trim() || busy}
             aria-label="Send"
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-stone-800 hover:bg-stone-100 disabled:text-stone-300 disabled:hover:bg-transparent"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-white disabled:opacity-40"
+            style={{ background: WA.header }}
           >
-            <SendHorizontal className="h-4 w-4" aria-hidden />
+            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="currentColor" aria-hidden><path d="M2 21l21-9L2 3v7l15 2-15 2v7z" /></svg>
           </button>
         </div>
 
-        {menuOpen ? <RichMenu onTap={(item) => void tapMenu(item)} disabled={busy} /> : null}
+        {sheet ? (
+          <OptionsSheet
+            title={sheet.title}
+            rows={sheet.rows}
+            onClose={() => setSheet(null)}
+            onSelect={(id) => {
+              setSheet(null);
+              sheet.onSelect(id);
+            }}
+          />
+        ) : null}
       </div>
     </div>
   );
