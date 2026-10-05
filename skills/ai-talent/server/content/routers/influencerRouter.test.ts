@@ -74,6 +74,37 @@ describe("influencerAngles", () => {
     expect(parsePeopleAngles("不是 JSON", ["p1"]).size).toBe(0);
   });
 
+  it("flags quotes that are not in the material, and over-long emails and angles", async () => {
+    const { unsupportedQuotes, angleIssues, EMAIL_MAX_CHARS } = await import("../core/influencer/influencerAngles");
+    const material = "YouTube 頻道：小明\n- 一台超過40萬的Mac！蘋果史上最強晶片到底有多強？";
+    const base = { profile: "科技開箱", talkingPoints: ["整合 44 個大數據來源"], angle: "用值不值得買的邏輯拆解顧問服務", angleWhy: "", hook: "", format: "", emailSubject: "" };
+    const a = {
+      ...base,
+      evidence: "從「一台超過40萬的Mac！蘋果史上最強晶片到底有多強？」看得出來",
+      emailBody: "你說的「規格強是一回事，但對工作流程意味著什麼才是重點」讓我們印象很深。我們想用「值不值得買」來談，也就是「用值不值得買的邏輯拆解顧問服務」。",
+    };
+    // 標題照抄＝有依據；短的強調詞不查；自己的切角不算；編出來的那句被抓到。
+    expect(unsupportedQuotes(a, material, "")).toEqual(["規格強是一回事，但對工作流程意味著什麼才是重點"]);
+    expect(unsupportedQuotes({ ...a, emailBody: "我們是「讓資深顧問思維以 AI 規模運作」的團隊。" }, material, "品牌：讓資深顧問思維以AI規模運作")).toEqual([]);
+    const issues = angleIssues({ ...a, emailBody: "字".repeat(EMAIL_MAX_CHARS + 1), angle: "角".repeat(60) }, material, "");
+    expect(issues).toHaveLength(2);
+    expect(angleIssues({ ...a, emailBody: "很短但沒有引用的信。".repeat(5) }, material, "")).toEqual([]);
+  });
+
+  it("feeds last round's problems back into the prompt and reads the detected name", async () => {
+    const { anglesSystemPrompt, parsePeopleAngles } = await import("../core/influencer/influencerAngles");
+    const prompt = anglesSystemPrompt({
+      brandName: "測試品牌", subjectLine: "x", brandCtx: "", outputLanguage: "zh-TW",
+      people: [{ id: "p1", label: "", platform: "網站", followers: null, material: "素材" }],
+      fixes: { p1: ["emailBody 太長"] },
+    });
+    expect(prompt).toContain("上一版的問題");
+    expect(prompt).toContain("- emailBody 太長");
+    expect(prompt).toContain("不可以替他編一句話");
+    const raw = JSON.stringify({ people: [{ id: "p1", profile: "a", evidence: "b", talkingPoints: ["c"], angle: "d", emailSubject: "e", emailBody: "x".repeat(60), name: "蔡阿嘎" }] });
+    expect(parsePeopleAngles(raw, ["p1"]).get("p1")!.detectedName).toBe("蔡阿嘎");
+  });
+
   it("materialEnough ignores whitespace", async () => {
     const { materialEnough, MIN_MATERIAL_CHARS } = await import("../core/influencer/influencerAngles");
     expect(materialEnough(" \n".repeat(500))).toBe(false);

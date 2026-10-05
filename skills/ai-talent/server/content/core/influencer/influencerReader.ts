@@ -122,7 +122,8 @@ async function readWeb(url: string): Promise<InfluencerRead> {
     s.description ? `頁面描述：${s.description}` : "",
     s.body_usable !== false && s.body_excerpt ? `內文摘錄：${s.body_excerpt}` : "",
   ].filter(Boolean);
-  return { source: "web", displayName: s.og.site_name ?? s.title ?? null, followers: null, material: decodeEntities(lines.join("\n")).slice(0, MATERIAL_CAP) };
+  // 網頁標題不是人名（維基頁會是「某某 - 維基百科…」），名字交給模型從內文認（detectedName）。
+  return { source: "web", displayName: null, followers: null, material: decodeEntities(lines.join("\n")).slice(0, MATERIAL_CAP) };
 }
 
 /** 讀一條連結。任何失敗都回 source:"none"，不丟錯。 */
