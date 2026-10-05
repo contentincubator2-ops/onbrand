@@ -170,8 +170,10 @@ export default function CampaignMap({
   const cx = ci >= 0 ? G + (ci + 0.5) * BW : W / 2;
   const cy = HEAD + (lanes.length * laneH) / 2;
 
+  // overflow-clip 而不是 hidden：hidden 仍是可捲動的容器，放大後底下那張總覽比框大，欄位一取得焦點
+  // （例如打開「＋ 新增一篇」）瀏覽器就把整個框捲歪，而且沒有捲軸可以捲回來（2026-10-05 dev 實測）。
   return (
-    <div ref={boxRef} className={`relative w-full overflow-hidden bg-default-100 ${fill ? "h-full" : ""}`} style={fill ? { minHeight: H } : { height: H }}>
+    <div ref={boxRef} className={`relative w-full overflow-clip bg-default-100 ${fill ? "h-full" : ""}`} style={fill ? { minHeight: H } : { height: H }}>
 
       {/* ── 總覽地圖（放大時整層往那一段放大、淡出） ── */}
       <div
