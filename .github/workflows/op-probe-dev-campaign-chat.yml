@@ -1,0 +1,62 @@
+name: Ops (DEV) — probe campaign chat handoffs (read-only)
+
+# 活動頁對話：交棒之後有沒有人接著回。只讀 dev 的資料庫與 pm2 記錄。
+# Path-scoped push，跟 op-probe-dev-brand.yml 同一個做法（environment: dev 才會連到 DEV VM）。
+on:
+  push:
+    paths:
+      - '.github/workflows/op-probe-dev-campaign-chat.yml'
+
+jobs:
+  probe:
+    runs-on: ubuntu-24.04
+    environment: dev
+    timeout-minutes: 5
+    steps:
+      - name: Read-only look at recent campaign chat
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 4m
+          script: |
+            set +e
+            cd /opt/onbrand/current/skills/ai-talent
+            set -a; source .env 2>/dev/null; set +a
+            echo "host=$(hostname)  app=$(readlink -f /opt/onbrand/current)  now=$(date -u +%FT%TZ)"
+            node -e "
+              const mysql = require('mysql2/promise');
+              (async () => {
+                const c = await mysql.createConnection({
+                  host: process.env.LOCAL_DB_HOST || '127.0.0.1',
+                  port: Number(process.env.LOCAL_DB_PORT || 3306),
+                  user: process.env.LOCAL_DB_USER || 'mos_user',
+                  password: process.env.LOCAL_DB_PASSWORD,
+                  database: process.env.LOCAL_DB_NAME || 'mos_db',
+                });
+                const [m] = await c.query(
+                  'SELECT m.id, m.eventId, m.userId, u.email, m.threadId, m.role, m.speaker, m.name, LEFT(m.content, 260) AS content, (m.proposal IS NOT NULL) AS hasProposal, m.createdAt FROM campaign_chat_messages m LEFT JOIN users u ON u.id = m.userId WHERE m.createdAt > NOW() - INTERVAL 3 DAY ORDER BY m.id DESC LIMIT 120');
+                console.log('MESSAGES n=' + m.length);
+                for (const r of m.reverse()) console.log(JSON.stringify(r));
+                const [h] = await c.query(
+                  'SELECT h.id, h.eventId, h.userId, h.threadId, h.speaker, h.name, h.createdAt, (SELECT COUNT(*) FROM campaign_chat_messages n WHERE n.eventId = h.eventId AND n.userId = h.userId AND n.id > h.id AND n.role = \'assistant\' AND n.speaker = h.speaker AND n.createdAt < h.createdAt + INTERVAL 5 MINUTE) AS answered FROM campaign_chat_messages h WHERE h.role = \'handoff\' AND h.name IS NOT NULL AND h.createdAt > NOW() - INTERVAL 14 DAY ORDER BY h.id DESC LIMIT 80');
+                console.log('HANDOFFS(14d) n=' + h.length + ' unanswered=' + h.filter(r => !Number(r.answered)).length);
+                for (const r of h) console.log(JSON.stringify(r));
+                try {
+                  const [e] = await c.query('SELECT * FROM error_log WHERE level IN (\'error\',\'warn\') AND createdAt > NOW() - INTERVAL 1 DAY ORDER BY id DESC LIMIT 40');
+                  console.log('ERROR_LOG(24h) n=' + e.length);
+                  for (const r of e) console.log(JSON.stringify(r).slice(0, 700));
+                } catch (err) { console.log('error_log read failed', err.message); }
+                await c.end();
+              })().catch(e => { console.log('PROBE FAILED', e.message); process.exit(0); });
+            "
+            echo ""
+            echo "═══════ pm2: campaign / timeout / LLM lines (last 3000) ═══════"
+            pm2 logs onbrand-dev --lines 3000 --nostream 2>/dev/null \
+              | grep -iE "campaign|沒有收到回覆|timeout|timed out|ETIMEDOUT|504|circuit|cascade.*fail|all providers" \
+              | tail -80
+            echo ""
+            echo "═══════ nginx: campaign.chat (last 40) ═══════"
+            sudo -n grep -h "campaign.chat" /var/log/nginx/*access*.log 2>/dev/null | tail -40 | cut -c1-260
+            sudo -n grep -h "campaign.chat" /var/log/nginx/*error*.log 2>/dev/null | tail -20 | cut -c1-400
