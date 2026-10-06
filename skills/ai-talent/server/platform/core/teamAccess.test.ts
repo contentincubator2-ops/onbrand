@@ -75,7 +75,7 @@ vi.mock("./brandAuth", async () => {
 });
 
 import {
-  assertTeamPermission, bestTeamPlan, brandAllowed, clearTeamAccessCache, isAllowed, isPersonalPath,
+  assertTeamPermission, bestTeamPlan, brandAllowed, canRemovePhoto, clearTeamAccessCache, isAllowed, isPersonalPath,
   listTeamBrands, permissionNeeded, PHOTO_UPLOAD_NEED, resolvePermissions, resolveTargetBrand, teamAccessForBrand, teamPlanWins,
 } from "./teamAccess";
 import { _resetGrantCache, collectScopeIds } from "./tenantGuard";
@@ -118,10 +118,20 @@ describe("上傳照片：編輯者不必有定位權限", () => {
     expect(isAllowed(resolvePermissions("editor"), PHOTO_UPLOAD_NEED)).toBe(true);
     expect(isAllowed(resolvePermissions("viewer"), PHOTO_UPLOAD_NEED)).toBe(false);
   });
-  it("editor 可以把生成圖存進照片庫，但不能刪照片", () => {
+  it("editor 可以把生成圖存進照片庫，但不能換主圖", () => {
     const editor = resolvePermissions("editor");
     expect(() => assertTeamPermission(editor, "assetPhoto.saveGeneratedImage", "mutation")).not.toThrow();
-    expect(() => assertTeamPermission(editor, "assetPhoto.remove", "mutation")).toThrow(/修改品牌定位/);
+    expect(() => assertTeamPermission(editor, "assetPhoto.setPrimary", "mutation")).toThrow(/修改品牌定位/);
+  });
+  it("刪照片：editor 只能刪自己上傳的；有定位權限或用自己的品牌則都能刪", () => {
+    const editor = { id: 7, perms: resolvePermissions("editor") };
+    expect(canRemovePhoto(editor, 7)).toBe(true);
+    expect(canRemovePhoto(editor, 8)).toBe(false);
+    expect(canRemovePhoto(editor, null)).toBe(false);   // 舊照片沒有上傳者紀錄
+    expect(canRemovePhoto({ id: 7, perms: resolvePermissions("editor", { canEditStrategy: 1 }) }, 8)).toBe(true);
+    expect(canRemovePhoto({ id: 7, perms: resolvePermissions("admin") }, null)).toBe(true);
+    expect(canRemovePhoto({ id: 7, perms: resolvePermissions("viewer") }, 7)).toBe(false);
+    expect(canRemovePhoto(undefined, null)).toBe(true);
   });
 });
 
@@ -134,7 +144,7 @@ describe("permissionNeeded：每種呼叫需要什麼權限", () => {
     ["product.upsert", "mutation", "strategy"],
     ["positioningJobs.start", "mutation", "strategy"],
     ["assetPhoto.saveGeneratedImage", "mutation", "write"],
-    ["assetPhoto.remove", "mutation", "strategy"],
+    ["assetPhoto.remove", "mutation", "write"],
     ["assetPhoto.setPrimary", "mutation", "strategy"],
     ["publish.toFacebook", "mutation", "publish"],
     ["calendar.schedule", "mutation", "publish"],

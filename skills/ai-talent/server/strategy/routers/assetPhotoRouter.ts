@@ -8,9 +8,10 @@
  */
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
-import { router, protectedProcedure } from "../../platform/core/trpc";
+import { router, protectedProcedure, actorIdOf } from "../../platform/core/trpc";
+import { canRemovePhoto, REMOVE_OTHERS_PHOTO_DENIED } from "../../platform/core/teamAccess";
 import localPool from "../../localDb";
-import { listPhotos, listBrandLibrary, setPrimaryPhoto, removePhoto, savePhotoFromUrl, type PhotoScope } from "../core/brand/assetPhotos";
+import { listPhotos, listBrandLibrary, setPrimaryPhoto, removePhoto, savePhotoFromUrl, photoUploaderId, type PhotoScope } from "../core/brand/assetPhotos";
 import { STORAGE_ROOT } from "../routes/assetPhotoRoute";
 
 const scopeInput = z.object({
@@ -103,6 +104,7 @@ export const assetPhotoRouter = router({
         filename: input.filename ?? `AI 場景圖-${new Date().toISOString().slice(0, 10)}`,
         makePrimary: input.makePrimary ?? false,
         storageRoot: STORAGE_ROOT,
+        uploadedBy: actorIdOf(ctx),
       });
       // 存不進去是「結果」不是例外（檔案太大、張數滿了…），訊息要原樣帶回前端顯示。
       if ("error" in saved) throw new TRPCError({ code: "BAD_REQUEST", message: saved.error });
@@ -113,6 +115,10 @@ export const assetPhotoRouter = router({
     .input(scopeInput.extend({ photoId: z.string().min(1).max(64) }))
     .mutation(async ({ ctx, input }) => {
       await assertScopeOwner(ctx.user!.id, input.brandId, input.scope, input.scopeId);
+      // 沒有定位權限的團隊成員只能刪自己上傳的（2026-10-06 CJ「小編也該能刪自己傳錯的照片」）。
+      if (ctx.actor && !canRemovePhoto(ctx.actor, await photoUploaderId(input.photoId))) {
+        throw new TRPCError({ code: "FORBIDDEN", message: REMOVE_OTHERS_PHOTO_DENIED });
+      }
       await removePhoto({ userId: ctx.user!.id, scope: input.scope, scopeId: input.scopeId, photoId: input.photoId, storageRoot: STORAGE_ROOT });
       return { ok: true };
     }),
