@@ -2,6 +2,7 @@
  * influencerRouter — 「網紅切角」的 tRPC 介面。規則在 core/influencer/influencerAngles.ts。
  *
  * readable：除了 YouTube 與一般網頁，伺服器現在還讀得到哪些社群平台（有接數據商才有）。
+ * roster／removeFromRoster：品牌的網紅庫——研究過的人存著，下次直接勾選（內容與口吻不重讀）。
  * usps：這個主體在定位裡現成的賣點（用戶可以取消勾選、自己加）。
  * latest：這個品牌最近一批的結果（重新整理不會不見）。
  * parseSheet：上傳的名單檔（.xlsx／.csv／.txt）→ 名單，還沒開始寫。
@@ -28,6 +29,9 @@ import {
   type PersonResult,
 } from "../core/influencer/influencerAngles";
 import { buildDocx, buildXlsx, parseSheet } from "../core/influencer/influencerSheet";
+import {
+  backfillFromBatches, isFresh, loadRoster, loadSaved, removeProfile, upsertProfile, urlKeyOf,
+} from "../core/influencer/influencerRoster";
 import { MAX_USPS, USP_MAX_CHARS, cleanUsps, loadUsps, matchPrompt, parseMatches, type MatchPerson } from "../core/influencer/influencerUsps";
 
 /** 跟靈感舞台同一個理由：這是判斷題，固定用 Sonnet（可用 env 覆寫）。 */
@@ -119,7 +123,7 @@ function pub(people: PersonResult[]): PersonResult[] {
 // ─── 背景工作 ─────────────────────────────────────────────────────────
 // 伺服器是單一 pm2 process（同 inspirationRouter 的說明），進度放記憶體，結果每一組寫回資料庫。
 
-interface Job { userId: number; batchId: number; people: PersonResult[]; done: boolean; createdAt: number }
+interface Job { userId: number; brandId: number; batchId: number; people: PersonResult[]; done: boolean; createdAt: number }
 const jobs = new Map<string, Job>();
 const JOB_TTL_MS = 30 * 60_000;
 function sweepJobs(): void {
@@ -165,11 +169,18 @@ async function ask(system: string, user: string, maxTokens: number): Promise<str
   return null;
 }
 
-type Base = { brandName: string; subjectLine: string; brandCtx: string; outputLanguage: string; direction?: string; usps: string[] };
+type Base = {
+  brandName: string; subjectLine: string; brandCtx: string; outputLanguage: string; direction?: string; usps: string[];
+  /** 不用網紅庫裡存的內容，重讀連結（用戶按「更新他的資料」）。 */
+  refresh: boolean;
+};
 
-/** 一位：口吻卡 → 當他本人想三個點子。點子解析不出來就再想一次；還是不行回 null。 */
-async function researchPerson(p: PersonResult, material: string, base: Base, avoid: string[]) {
-  const voice = await ask(voicePrompt(base.outputLanguage), material.slice(0, 4000), 900);
+/**
+ * 一位：口吻卡 → 當他本人想三個點子。點子解析不出來就再想一次；還是不行回 null。
+ * savedVoice：網紅庫裡已經有口吻卡、內容也沒重讀，就不重新整理一次。
+ */
+async function researchPerson(p: PersonResult, material: string, base: Base, avoid: string[], savedVoice?: string) {
+  const voice = savedVoice || await ask(voicePrompt(base.outputLanguage), material.slice(0, 4000), 900);
   if (!voice) return null;
   const system = ideasPrompt({
     ...base, label: personLabel(p), platform: p.platform ? PLATFORM_LABEL[p.platform] : "", followers: p.followers,
@@ -188,22 +199,45 @@ async function runJob(job: Job, targets: string[], base: Base): Promise<void> {
   const patch = (id: string, v: Partial<PersonResult>) => { Object.assign(byId(id), v); };
   try {
     // 1) 讀連結（併發有上限，別對同一個網站一次開太多連線）。
+    //    網紅庫裡有、而且還新鮮的，直接用存的內容與口吻卡——不重讀、不重付數據商的錢。
     const material = new Map<string, string>();
+    const saved = await loadSaved(job.brandId, targets.map((id) => byId(id).url)).catch(() => new Map() as Awaited<ReturnType<typeof loadSaved>>);
+    /** 這次真的重讀了連結的人（存回網紅庫時才更新「讀取時間」）。 */
+    const reread = new Set<string>();
+    const voiceOf = new Map<string, string>();
     let cursor = 0;
     await Promise.all(Array.from({ length: Math.min(READ_CONCURRENCY, targets.length) }, async () => {
       while (cursor < targets.length) {
         const id = targets[cursor++]!;
         const p = byId(id);
         patch(id, { status: "reading" });
-        const { link, read } = await readInfluencer(p.url);
+        const had = saved.get(urlKeyOf(p.url));
+        let link = classifyLink(p.url);
+        let read: Awaited<ReturnType<typeof readInfluencer>>["read"];
+        if (link && had && isFresh(had.readAt) && !base.refresh) {
+          read = { source: (had.source as any) ?? "none", displayName: had.displayName, followers: had.followers, material: had.material };
+          if (had.voice) voiceOf.set(id, had.voice);
+        } else {
+          ({ link, read } = await readInfluencer(p.url));
+          if (read.material) reread.add(id);
+          // 重讀失敗（平台改版、數據商壞掉）但庫裡有舊內容：舊的總比沒有好。
+          else if (had) read = { source: (had.source as any) ?? "none", displayName: had.displayName, followers: had.followers, material: had.material };
+        }
         if (!link) { patch(id, { status: "invalid_link", platform: null, handle: null }); continue; }
         const notes = (p.notes ?? "").trim();
-        const text = [read.material, notes ? `用戶補充的素材（這位網紅的貼文或介紹）：\n${notes}` : ""].filter(Boolean).join("\n\n");
+        // 存的內容裡可能已經有他上次補的貼文，不重複接一次。
+        const text = [read.material, notes && !read.material.includes(notes) ? `用戶補充的素材（這位網紅的貼文或介紹）：\n${notes}` : ""].filter(Boolean).join("\n\n");
+        if (notes && !read.material.includes(notes)) voiceOf.delete(id);   // 多了新素材，口吻要重整理
         patch(id, {
           platform: link.platform, handle: link.handle, followers: read.followers, displayName: read.displayName,
           source: read.source !== "none" ? read.source : notes ? "user_notes" : "none",
         });
-        if (!materialEnough(text)) { patch(id, { status: "needs_material" }); continue; }
+        if (!materialEnough(text)) {
+          patch(id, { status: "needs_material" });
+          // 讀不到的人也記進網紅庫：下次不用再貼連結，補上貼文就能研究。
+          await upsertProfile(job.brandId, byId(id)).catch(() => {});
+          continue;
+        }
         material.set(id, text);
         patch(id, { status: "thinking" });
       }
@@ -236,7 +270,7 @@ async function runJob(job: Job, targets: string[], base: Base): Promise<void> {
       while (next < ready.length) {
         const id = ready[next++]!;
         const text = material.get(id)!;
-        const got = await researchPerson(byId(id), text, base, used.slice(-30)).catch(() => null);
+        const got = await researchPerson(byId(id), text, base, used.slice(-30), voiceOf.get(id)).catch(() => null);
         if (!got) { patch(id, { status: "failed" }); continue; }
         const { detectedName, ...ideas } = got.ideas;
         const p = byId(id);
@@ -246,6 +280,7 @@ async function runJob(job: Job, targets: string[], base: Base): Promise<void> {
         });
         used.push(...ideas.ideas.map((i) => i.title));
         await saveBatch(job.batchId, job.people).catch(() => {});
+        await upsertProfile(job.brandId, byId(id), { material: text, voice: got.voice, fresh: reread.has(id) }).catch(() => {});
       }
     }));
   } catch (e) {
@@ -260,6 +295,24 @@ async function runJob(job: Job, targets: string[], base: Base): Promise<void> {
 export const influencerRouter = router({
   readable: protectedProcedure
     .query(() => ({ social: providerPlatforms() as string[] })),
+
+  roster: protectedProcedure
+    .input(brandInput)
+    .query(async ({ ctx, input }) => {
+      await assertBrandAccess(ctx.user!.id, input.brandId);
+      let rows = await loadRoster(input.brandId);
+      // 網紅庫上線前研究過的人只存在批次裡：第一次打開時帶進來。
+      if (!rows.length && (await backfillFromBatches(input.brandId).catch(() => 0)) > 0) rows = await loadRoster(input.brandId);
+      return rows;
+    }),
+
+  removeFromRoster: protectedProcedure
+    .input(brandInput.extend({ id: z.number().int().positive() }))
+    .mutation(async ({ ctx, input }) => {
+      await assertBrandAccess(ctx.user!.id, input.brandId);
+      await removeProfile(input.brandId, input.id);
+      return { ok: true };
+    }),
 
   usps: protectedProcedure
     .input(brandInput.extend({ subject: subjectZ }))
@@ -305,6 +358,8 @@ export const influencerRouter = router({
       direction: z.string().trim().max(160).optional(),
       /** 這次要請網紅講的賣點（定位裡勾選的＋用戶自己加的）。空的＝不分配賣點。 */
       usps: z.array(z.string().max(USP_MAX_CHARS)).max(MAX_USPS).default([]),
+      /** 不用網紅庫裡存的內容，重讀這幾位的連結。 */
+      refresh: z.boolean().default(false),
       /** 有帶＝在這一批裡補寫／重寫 people 這幾位；沒帶＝開新的一批。 */
       batchId: z.number().int().positive().optional(),
     }))
@@ -350,11 +405,11 @@ export const influencerRouter = router({
 
       sweepJobs();
       const jobId = randomUUID();
-      const job: Job = { userId, batchId, people, done: false, createdAt: Date.now() };
+      const job: Job = { userId, brandId: input.brandId, batchId, people, done: false, createdAt: Date.now() };
       jobs.set(jobId, job);
       void runJob(job, ids, {
         brandName: subject.brandName, subjectLine: subject.subjectLine, brandCtx,
-        outputLanguage: market.outputLanguage, direction: input.direction || undefined, usps: cleanUsps(input.usps),
+        outputLanguage: market.outputLanguage, direction: input.direction || undefined, usps: cleanUsps(input.usps), refresh: input.refresh,
       });
       return { jobId, batchId };
     }),
@@ -418,6 +473,12 @@ export const influencerRouter = router({
       const { brandId, batchId, id, ...fields } = input;
       const changes = Object.fromEntries(Object.entries(fields).filter(([, v]) => v !== undefined));
       await applyChange(brandId, batchId, id, changes);
+      // 名字與 Email 跟著人走：存回網紅庫，下次研究同一位不用再填。
+      if (fields.name !== undefined || fields.email !== undefined) {
+        const b = await loadBatch(brandId, batchId).catch(() => null);
+        const p = b?.people.find((x) => x.id === id);
+        if (p) await upsertProfile(brandId, p).catch(() => {});
+      }
       return { ok: true };
     }),
 

@@ -623,6 +623,10 @@ async function runStartupMigrations() {
     const { INFLUENCER_BATCHES_DDL } = await import("./content/core/influencer/influencerAngles");
     await db.execute(sql.raw(INFLUENCER_BATCHES_DDL));
     console.log("[migrate] influencer_batches: OK");
+    // 2026-10-06（CJ「上傳過的網紅，不用重複上傳」）：品牌的網紅庫。
+    const { INFLUENCER_PROFILES_DDL } = await import("./content/core/influencer/influencerRoster");
+    await db.execute(sql.raw(INFLUENCER_PROFILES_DDL));
+    console.log("[migrate] influencer_profiles: OK");
 
     // 2026-09-14（CJ「選定一個競爭者，對比接觸點跟策略訴求差異」）：
     // 具名競爭者的逐接觸點比對快照（14 天內快取，不重跑研究）。

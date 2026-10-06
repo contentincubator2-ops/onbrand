@@ -6,7 +6,7 @@ describe("influencerRouter", () => {
   it("builds and exposes its procedures", async () => {
     const { influencerRouter } = await import("./influencerRouter");
     const procs = Object.keys((influencerRouter as any)._def.procedures);
-    expect(procs.sort()).toEqual(["analyzePoll", "analyzeStart", "exportFile", "latest", "parseSheet", "pickIdea", "readable", "savePerson", "usps"]);
+    expect(procs.sort()).toEqual(["analyzePoll", "analyzeStart", "exportFile", "latest", "parseSheet", "pickIdea", "readable", "removeFromRoster", "roster", "savePerson", "usps"]);
   }, 60_000);
 });
 
@@ -258,6 +258,32 @@ describe("influencerUsps", () => {
     expect(prompt).toContain("1：已有 2 位在講");
     expect(prompt).toContain("不要讓超過一半的人擠在同一個");
     expect(prompt).toContain("id=p1｜小美｜Instagram｜3.2 萬粉絲");
+  });
+});
+
+describe("influencerRoster", () => {
+  it("treats different spellings of the same profile as one entry", async () => {
+    const { urlKeyOf } = await import("../core/influencer/influencerRoster");
+    const k = urlKeyOf("https://www.instagram.com/Some.One/");
+    expect(urlKeyOf("instagram.com/some.one")).toBe(k);
+    expect(urlKeyOf("https://instagram.com/some.one?igsh=abc123")).toBe(k);
+    expect(urlKeyOf("https://m.instagram.com/some.one/")).toBe(k);
+    expect(urlKeyOf("https://www.instagram.com/someone_else/")).not.toBe(k);
+    expect(urlKeyOf("https://www.threads.net/@some.one")).not.toBe(k);   // 不同平台是不同筆
+    // YouTube 影片與一般網頁：查詢參數是內容的一部分。
+    expect(urlKeyOf("https://www.youtube.com/watch?v=aaaaaaaaaaa")).not.toBe(urlKeyOf("https://www.youtube.com/watch?v=bbbbbbbbbbb"));
+    expect(urlKeyOf("https://www.youtube.com/@joeman/videos")).not.toBe(urlKeyOf("https://www.youtube.com/@joeman"));
+    expect(urlKeyOf("https://www.youtube.com/@Joeman/")).toBe(urlKeyOf("youtube.com/@joeman"));
+  });
+
+  it("saved content counts as fresh for 30 days", async () => {
+    const { isFresh, FRESH_DAYS } = await import("../core/influencer/influencerRoster");
+    const now = Date.parse("2026-10-06T00:00:00Z");
+    expect(isFresh(new Date(now - 86_400_000), now)).toBe(true);
+    expect(isFresh(new Date(now - (FRESH_DAYS + 1) * 86_400_000), now)).toBe(false);
+    expect(isFresh("2026-10-01T00:00:00Z", now)).toBe(true);
+    expect(isFresh(null, now)).toBe(false);            // 從舊批次帶進來的：不知道什麼時候讀的，當成舊的
+    expect(isFresh("not a date", now)).toBe(false);
   });
 });
 
