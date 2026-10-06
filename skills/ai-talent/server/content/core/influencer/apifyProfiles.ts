@@ -43,6 +43,7 @@ const oneLine = (v: unknown, n: number) => str(v).replace(/\s+/g, " ").slice(0, 
 export function followersText(n: unknown): string | null {
   const v = typeof n === "number" ? n : Number(n);
   if (!Number.isFinite(v) || v <= 0) return null;
+  if (v >= 100_000_000) return `${(v / 100_000_000).toFixed(1).replace(/\.0$/, "")} 億粉絲`;
   if (v >= 10_000) return `${(v / 10_000).toFixed(v >= 100_000 ? 0 : 1).replace(/\.0$/, "")} 萬粉絲`;
   return `${Math.round(v).toLocaleString("en-US")} 粉絲`;
 }
@@ -70,7 +71,8 @@ export const ACTORS: Partial<Record<InfluencerPlatform, ActorSpec>> = {
         material: build([
           `Instagram：${name ?? ""}（@${str(p.username) || handle}）${followers ? `｜${followers}` : ""}${p.verified ? "｜已驗證" : ""}`,
           bio ? `自介：${bio}` : "",
-          str(p.businessCategoryName) ? `類別：${str(p.businessCategoryName)}` : "",
+          // actor 沒有類別時回字串 "None"。
+          str(p.businessCategoryName) && str(p.businessCategoryName) !== "None" ? `類別：${str(p.businessCategoryName)}` : "",
           p.private ? "（私人帳號，看不到貼文）" : "",
         ], posts, "則貼文"),
       };

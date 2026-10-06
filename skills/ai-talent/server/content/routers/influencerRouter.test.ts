@@ -48,17 +48,19 @@ describe("influencerReader parsers", () => {
 describe("apifyProfiles", () => {
   it("turns each actor's items into material, and returns null when there is nothing to read", async () => {
     const { ACTORS, followersText } = await import("../core/influencer/apifyProfiles");
+    expect(followersText(268_440_000)).toBe("2.7 億粉絲");
     expect([followersText(286_0000), followersText(12_345), followersText(980), followersText(0), followersText("x")])
       .toEqual(["286 萬粉絲", "1.2 萬粉絲", "980 粉絲", null, null]);
 
     const ig = ACTORS.instagram!.toRead([{
-      username: "Mei", fullName: "小美", biography: "兩寶媽\n共讀紀錄", followersCount: 52000, verified: true,
+      username: "Mei", fullName: "小美", businessCategoryName: "None", biography: "兩寶媽\n共讀紀錄", followersCount: 52000, verified: true,
       latestPosts: [{ caption: "睡前 20 分鐘是我們家的固定儀式" }, { caption: "" }, { caption: "長途開車救星清單" }],
     }], "mei")!;
     expect(ig.displayName).toBe("小美");
     expect(ig.followers).toBe("5.2 萬粉絲");
     expect(ig.material).toContain("自介：兩寶媽 共讀紀錄");
     expect(ig.material).toContain("最近 2 則貼文：");
+    expect(ig.material).not.toContain("類別");
     expect(ig.material).toContain("- 長途開車救星清單");
     // 私人帳號、查無此人、actor 回錯誤：沒有內容就是讀不到。
     expect(ACTORS.instagram!.toRead([{ username: "mei", private: true, latestPosts: [] }], "mei")).toBeNull();
