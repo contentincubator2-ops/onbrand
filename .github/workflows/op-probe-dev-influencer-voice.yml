@@ -38,7 +38,8 @@ jobs:
             import { callModelStrict } from "../../../platform/core/llm/multiModelRouter";
 
             const BRAND = 2977;
-            const LINKS = ["https://www.instagram.com/joemanweng/", "https://www.threads.net/@joemanweng"];
+            // 第二輪：CJ 貼的那個例子——旅遊創作者 Dribs & Drabs × 產品 OnBrand Studio。
+            const LINKS = ["https://www.instagram.com/dribs__drabs/"];
             const MODEL = process.env.INFLUENCER_MODEL || process.env.INSPIRATION_MODEL || "claude-sonnet-4-6";
             const ask = async (system: string, user: string, maxTokens: number) => {
               const t0 = Date.now();
@@ -49,7 +50,10 @@ jobs:
             (async () => {
               const [b]: any = await localPool.execute("SELECT name FROM brands WHERE id = ? LIMIT 1", [BRAND]);
               const brandName = String(b[0]?.name ?? "");
-              const brandCtx = (await buildBrandPrefix(BRAND, null, null, "full").catch(() => "")).slice(0, 6000);
+              const [pr]: any = await localPool.execute("SELECT id, name FROM products WHERE brandId = ? AND name LIKE '%OnBrand%' ORDER BY id LIMIT 1", [BRAND]);
+              const product = pr[0] ?? null;
+              console.log(`product: ${product ? `${product.id} ${product.name}` : "(not found — using brand)"}`);
+              const brandCtx = (await buildBrandPrefix(BRAND, product?.id ?? null, null, "full").catch(() => "")).slice(0, 6000);
               const reads = await Promise.all(LINKS.map((u) => readInfluencer(u)));
               const material = reads.map((r) => r.read.material).filter(Boolean).join("\n\n");
               console.log(`material chars=${material.length}`);
@@ -74,12 +78,13 @@ jobs:
               const pitch = await ask(
                 [
                   "你現在就是下面這位創作者本人。有個品牌來找你合作，你要想：如果接了，我會想怎麼做這支內容，我的觀眾才不會覺得是業配而滑掉？",
+                  "注意：內容是做給「你的觀眾」看的，不是品牌在對你推銷。先想你的觀眾是誰、他們為什麼追蹤你，再想這個產品跟他們的生活有什麼交集；交集很小就老實從你自己的工作日常切（例如你怎麼經營這個帳號）。",
                   "",
                   "【你怎麼說話（口吻卡）】", voice,
                   "",
                   "【你最近發的內容】", material.slice(0, 2500),
                   "",
-                  `【來找你的品牌：${brandName}（產品事實只能用這裡有的，沒有的不要編）】`, brandCtx,
+                  `【來找你的品牌：${brandName}${product ? `，要請你講的產品是「${product.name}」` : ""}（產品事實只能用這裡有的，沒有的不要編）】`, brandCtx,
                   "",
                   "請用三個不同的出發點各想一個點子：",
                   "A. 從你自己最近真的做過的一支內容延伸（指名是哪一支）",
