@@ -75,8 +75,8 @@ vi.mock("./brandAuth", async () => {
 });
 
 import {
-  assertTeamPermission, bestTeamPlan, brandAllowed, clearTeamAccessCache, isPersonalPath,
-  listTeamBrands, permissionNeeded, resolvePermissions, resolveTargetBrand, teamAccessForBrand, teamPlanWins,
+  assertTeamPermission, bestTeamPlan, brandAllowed, clearTeamAccessCache, isAllowed, isPersonalPath,
+  listTeamBrands, permissionNeeded, PHOTO_UPLOAD_NEED, resolvePermissions, resolveTargetBrand, teamAccessForBrand, teamPlanWins,
 } from "./teamAccess";
 import { _resetGrantCache, collectScopeIds } from "./tenantGuard";
 import { adminProcedure, protectedProcedure, router } from "./trpc";
@@ -112,6 +112,19 @@ describe("brandAllowed：成員看得到哪些品牌", () => {
   });
 });
 
+describe("上傳照片：編輯者不必有定位權限", () => {
+  it("上傳路由要的是 write；editor 可以、viewer 不行", () => {
+    expect(PHOTO_UPLOAD_NEED).toBe("write");
+    expect(isAllowed(resolvePermissions("editor"), PHOTO_UPLOAD_NEED)).toBe(true);
+    expect(isAllowed(resolvePermissions("viewer"), PHOTO_UPLOAD_NEED)).toBe(false);
+  });
+  it("editor 可以把生成圖存進照片庫，但不能刪照片", () => {
+    const editor = resolvePermissions("editor");
+    expect(() => assertTeamPermission(editor, "assetPhoto.saveGeneratedImage", "mutation")).not.toThrow();
+    expect(() => assertTeamPermission(editor, "assetPhoto.remove", "mutation")).toThrow(/修改品牌定位/);
+  });
+});
+
 describe("permissionNeeded：每種呼叫需要什麼權限", () => {
   it.each([
     ["brand.get", "query", "view"],
@@ -120,6 +133,9 @@ describe("permissionNeeded：每種呼叫需要什麼權限", () => {
     ["brand.update", "mutation", "strategy"],
     ["product.upsert", "mutation", "strategy"],
     ["positioningJobs.start", "mutation", "strategy"],
+    ["assetPhoto.saveGeneratedImage", "mutation", "write"],
+    ["assetPhoto.remove", "mutation", "strategy"],
+    ["assetPhoto.setPrimary", "mutation", "strategy"],
     ["publish.toFacebook", "mutation", "publish"],
     ["calendar.schedule", "mutation", "publish"],
     ["calendar.cancel", "mutation", "write"],

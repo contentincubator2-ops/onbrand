@@ -363,8 +363,8 @@ function WorkspaceDetail({ detail, onChanged }: { detail: any; onChanged: () => 
                 ? "Viewer: sees the brand's positioning, task cards and content. Cannot write, change or publish."
                 : "檢視者：看得到品牌定位、任務卡與內容，不能撰寫、修改或發布。")}
               {inviteRole === "editor" && (lang === "en"
-                ? "Editor: sees everything and writes content with the brand. Choose below whether they may also change positioning or publish."
-                : "編輯者：看得到全部，並可用這個品牌撰寫內容。下面決定是否也能修改定位、是否能發布。")}
+                ? "Editor: sees everything, writes content with the brand and uploads photos. Choose below whether they may also change positioning or publish."
+                : "編輯者：看得到全部，並可用這個品牌撰寫內容、上傳照片。下面決定是否也能修改定位、是否能發布。")}
               {inviteRole === "admin" && (lang === "en"
                 ? "Admin: everything, including positioning, publishing, connecting social accounts and reviewing."
                 : "管理者：全部權限，包含修改定位、發布、連結社群帳號與審核。")}
