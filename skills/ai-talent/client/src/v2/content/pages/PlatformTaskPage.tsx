@@ -1379,6 +1379,9 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
     return <Navigate to="/tasks/fb" replace />;
   }
 
+  // 2026-10-06：網紅合作不是任務卡頁，是「網紅切角」（照靈感舞台的設計）。舊連結、書籤一律轉過去。
+  if (customChannel?.preset === "influencer") return <Navigate to="/influencers" replace />;
+
   // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div>
@@ -1417,12 +1420,6 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                 {customChannel?.format === "listing" && (
                   <Button size="sm" variant="flat" onPress={() => setBatchOpen(true)}>
                     {lang === "en" ? "Batch write" : "批次產出"}
-                  </Button>
-                )}
-                {/* 2026-10-06：網紅合作 tray 的「網紅切角」——貼連結或上傳名單，逐位配產品特色、切角與邀約信。 */}
-                {customChannel?.preset === "influencer" && (
-                  <Button size="sm" variant="flat" onPress={() => navigate("/influencers")}>
-                    {lang === "en" ? "Angles per creator" : "讀網紅連結配切角"}
                   </Button>
                 )}
                 {/* 2026-09-29（CJ「新增任務卡有兩個地方，功能重複」）：右上角的

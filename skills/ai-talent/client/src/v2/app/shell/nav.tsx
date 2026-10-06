@@ -210,10 +210,18 @@ export function navCatalog(lang: "zh-TW" | "en", allowedTaskRoutes?: Set<string>
   });
   // 2026-10-04（CJ「用戶也可自己增加 mission tray，例如蝦皮、momo、網紅合作」）：用戶自己加的通路。
   // 不受任務包的 allowedTaskRoutes 過濾 —— 那是「包宣告了哪些內建通路」，自訂通路是用戶自己的。
-  const custom: NavItem[] = (customChannels ?? []).map((c) => ({
-    id: c.id, kind: "channel" as const, to: `/tasks/${c.id}`, label: c.name, short: c.name.slice(0, 4),
-    icon: <FontAwesomeIcon icon={c.preset === "influencer" ? ICON.people : ICON.store} />, matchPrefix: `/tasks/${c.id}`,
-    tooltip: en ? "A tray you added" : "你自己加的 mission tray",
-  }));
+  // 2026-10-06（CJ「目前的網紅合作，跟我們規劃的參考靈感牆的設計不相同，回到任務卡的設計概念了」）：
+  // 網紅合作不是任務卡頁——點了直接進「網紅切角」（/influencers，版面照靈感舞台）。
+  const custom: NavItem[] = (customChannels ?? []).map((c) => (c.preset === "influencer"
+    ? {
+      id: c.id, kind: "channel" as const, to: "/influencers", label: c.name, short: c.name.slice(0, 4),
+      icon: <FontAwesomeIcon icon={ICON.people} />, matchPrefix: "/influencers", alsoMatch: [`/tasks/${c.id}`],
+      tooltip: en ? "Read each creator's links; one angle each" : "讀每位網紅的連結，一人配一個切角",
+    }
+    : {
+      id: c.id, kind: "channel" as const, to: `/tasks/${c.id}`, label: c.name, short: c.name.slice(0, 4),
+      icon: <FontAwesomeIcon icon={ICON.store} />, matchPrefix: `/tasks/${c.id}`,
+      tooltip: en ? "A tray you added" : "你自己加的 mission tray",
+    }));
   return [...builtin, ...custom];
 }

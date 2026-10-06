@@ -63,7 +63,7 @@ export const CHANNEL_PRESETS: readonly ChannelPreset[] = [
     note: { zh: "官網商品頁文案；API 要向 91APP 申請金鑰，沒找到公開商品文件，先匯出", en: "Storefront product copy; API key from 91APP required, export first" } },
   // ── 合作 ────────────────────────────────────────────────────────
   { key: "influencer", zh: "網紅合作", en: "Influencer collab", group: "partner", format: "partner", api: "n/a",
-    note: { zh: "讀網紅連結配切角 / 合作 brief / 邀約信 / 審稿意見", en: "Angles per creator from their links / collab brief / outreach / review feedback" } },
+    note: { zh: "貼上網紅連結 / 一人配一個切角 / 邀約信 / 匯出", en: "Paste creator links / one angle each / outreach email / export" } },
 ];
 
 export function presetByKey(key: string): ChannelPreset | undefined {
