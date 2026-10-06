@@ -2,6 +2,7 @@
  * influencerRouter — 「網紅切角」的 tRPC 介面。規則在 core/influencer/influencerAngles.ts。
  *
  * readable：除了 YouTube 與一般網頁，伺服器現在還讀得到哪些社群平台（有接數據商才有）。
+ * usps：這個主體在定位裡現成的賣點（用戶可以取消勾選、自己加）。
  * latest：這個品牌最近一批的結果（重新整理不會不見）。
  * parseSheet：上傳的名單檔（.xlsx／.csv／.txt）→ 名單，還沒開始寫。
  * analyzeStart／analyzePoll：讀每一位的連結 → 整理口吻 → 當他本人想三個點子；開始後立刻回 jobId，
@@ -27,6 +28,7 @@ import {
   type PersonResult,
 } from "../core/influencer/influencerAngles";
 import { buildDocx, buildXlsx, parseSheet } from "../core/influencer/influencerSheet";
+import { MAX_USPS, USP_MAX_CHARS, cleanUsps, loadUsps, matchPrompt, parseMatches, type MatchPerson } from "../core/influencer/influencerUsps";
 
 /** 跟靈感舞台同一個理由：這是判斷題，固定用 Sonnet（可用 env 覆寫）。 */
 const MODEL = process.env.INFLUENCER_MODEL || process.env.INSPIRATION_MODEL || "claude-sonnet-4-6";
@@ -35,6 +37,8 @@ const READ_CONCURRENCY = 4;
 const WRITE_CONCURRENCY = 3;
 /** 存下來給寫信用的素材摘錄長度。 */
 const DIGEST_CHARS = 2000;
+/** 分配賣點時每位給模型看多少素材（一次看整批，30 位 × 這個長度）。 */
+const MATCH_DIGEST_CHARS = 500;
 const SHEET_MAX_BYTES = 2 * 1024 * 1024;
 
 const brandInput = z.object({ brandId: z.number().int().positive() });
@@ -161,7 +165,7 @@ async function ask(system: string, user: string, maxTokens: number): Promise<str
   return null;
 }
 
-type Base = { brandName: string; subjectLine: string; brandCtx: string; outputLanguage: string; direction?: string };
+type Base = { brandName: string; subjectLine: string; brandCtx: string; outputLanguage: string; direction?: string; usps: string[] };
 
 /** 一位：口吻卡 → 當他本人想三個點子。點子解析不出來就再想一次；還是不行回 null。 */
 async function researchPerson(p: PersonResult, material: string, base: Base, avoid: string[]) {
@@ -169,7 +173,7 @@ async function researchPerson(p: PersonResult, material: string, base: Base, avo
   if (!voice) return null;
   const system = ideasPrompt({
     ...base, label: personLabel(p), platform: p.platform ? PLATFORM_LABEL[p.platform] : "", followers: p.followers,
-    material, voice, avoid,
+    material, voice, avoid, usp: p.usp,
   });
   for (let attempt = 0; attempt < 2; attempt++) {
     const raw = await ask(system, "請開始。", 1600);
@@ -206,8 +210,26 @@ async function runJob(job: Job, targets: string[], base: Base): Promise<void> {
     }));
     await saveBatch(job.batchId, job.people).catch(() => {});
 
-    // 2) 一位一位想（同時 WRITE_CONCURRENCY 位）。後面的人拿得到已經用掉的點子，免得整批撞題。
     const ready = targets.filter((id) => material.has(id));
+
+    // 2) 有賣點清單：先看完整批再分配誰講哪一個（一位一位各自挑，大家都會挑最顯眼的那個）。
+    //    這一批原本就配好的人算進去，補寫的人才不會又擠到同一個賣點。
+    for (const id of targets) patch(id, { usp: undefined, uspWhy: undefined });
+    if (base.usps.length && ready.length) {
+      const taken: Record<string, number> = {};
+      for (const p of job.people) if (p.usp && !targets.includes(p.id) && base.usps.includes(p.usp)) taken[p.usp] = (taken[p.usp] ?? 0) + 1;
+      const people: MatchPerson[] = ready.map((id) => {
+        const p = byId(id);
+        return { id, label: personLabel(p), platform: p.platform ? PLATFORM_LABEL[p.platform] : "", followers: p.followers, digest: material.get(id)!.slice(0, MATCH_DIGEST_CHARS) };
+      });
+      const raw = base.usps.length > 1
+        ? await ask(matchPrompt({ brandName: base.brandName, subjectLine: base.subjectLine, usps: base.usps, people, taken, outputLanguage: base.outputLanguage }), "請開始。", 1500)
+        : null;
+      for (const [id, m] of parseMatches(raw, base.usps, ready, taken)) patch(id, { usp: m.usp, uspWhy: m.why });
+      await saveBatch(job.batchId, job.people).catch(() => {});
+    }
+
+    // 3) 一位一位想（同時 WRITE_CONCURRENCY 位）。後面的人拿得到已經用掉的點子，免得整批撞題。
     const used = job.people.filter((p) => p.status === "done" && !targets.includes(p.id)).flatMap((p) => (p.ideas ?? []).map((i) => i.title));
     let next = 0;
     await Promise.all(Array.from({ length: Math.min(WRITE_CONCURRENCY, ready.length) }, async () => {
@@ -238,6 +260,13 @@ async function runJob(job: Job, targets: string[], base: Base): Promise<void> {
 export const influencerRouter = router({
   readable: protectedProcedure
     .query(() => ({ social: providerPlatforms() as string[] })),
+
+  usps: protectedProcedure
+    .input(brandInput.extend({ subject: subjectZ }))
+    .query(async ({ ctx, input }) => {
+      await assertBrandAccess(ctx.user!.id, input.brandId);
+      return { usps: await loadUsps(input.brandId, input.subject), max: MAX_USPS };
+    }),
 
   latest: protectedProcedure
     .input(brandInput)
@@ -274,6 +303,8 @@ export const influencerRouter = router({
       people: z.array(personZ).min(1).max(MAX_PEOPLE),
       /** 用戶補充的合作方向（選填）。 */
       direction: z.string().trim().max(160).optional(),
+      /** 這次要請網紅講的賣點（定位裡勾選的＋用戶自己加的）。空的＝不分配賣點。 */
+      usps: z.array(z.string().max(USP_MAX_CHARS)).max(MAX_USPS).default([]),
       /** 有帶＝在這一批裡補寫／重寫 people 這幾位；沒帶＝開新的一批。 */
       batchId: z.number().int().positive().optional(),
     }))
@@ -323,7 +354,7 @@ export const influencerRouter = router({
       jobs.set(jobId, job);
       void runJob(job, ids, {
         brandName: subject.brandName, subjectLine: subject.subjectLine, brandCtx,
-        outputLanguage: market.outputLanguage, direction: input.direction || undefined,
+        outputLanguage: market.outputLanguage, direction: input.direction || undefined, usps: cleanUsps(input.usps),
       });
       return { jobId, batchId };
     }),
@@ -355,10 +386,10 @@ export const influencerRouter = router({
       ]);
       const brandCtx = await buildBrandPrefix(input.brandId, subject.productId, subject.eventId, "full").catch(() => "");
       const material = p.materialDigest || [p.profile, p.evidence, idea.basedOn].filter(Boolean).join("\n");
-      const known = [material, brandCtx, idea.title, idea.hook, idea.productPoint, idea.basedOn ?? ""];
+      const known = [material, brandCtx, idea.title, idea.hook, idea.productPoint, idea.basedOn ?? "", p.usp ?? ""];
       const args = {
         brandName: subject.brandName, subjectLine: subject.subjectLine, brandCtx, label: personLabel(p), material, idea,
-        outputLanguage: market.outputLanguage,
+        outputLanguage: market.outputLanguage, usp: p.usp,
       };
       let mail = parseEmail((await ask(emailPrompt(args), "請開始。", 900)) ?? "");
       if (!mail) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "這封信沒寫成，請再選一次。" });

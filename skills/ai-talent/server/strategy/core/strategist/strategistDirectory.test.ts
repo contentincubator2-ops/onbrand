@@ -435,7 +435,7 @@ describe("固定人選不可以同時掛在兩個角色", () => {
  * 活動／視覺／法規／成效／內容企劃原本都落回品牌那三位，現在各有自己的三位。
  */
 describe("逐頁補上的顧問（Threads 到內容企劃）", () => {
-  const NEW_SCOPES = ["threads", "line", "events", "visual", "regulations", "performance", "content"] as const;
+  const NEW_SCOPES = ["threads", "line", "events", "visual", "regulations", "performance", "content", "influencer"] as const;
 
   it("每頁剛好三位、角色 id 全站不重複、每位都有中英三題招牌問題", async () => {
     const { STRATEGIST_ROLES } = await import("./strategistDirectory");

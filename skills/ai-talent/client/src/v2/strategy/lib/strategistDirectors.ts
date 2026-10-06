@@ -58,7 +58,7 @@ export const CHANNEL_ROUTE_SCOPE = {
 } as const;
 export type ChannelScope = (typeof CHANNEL_ROUTE_SCOPE)[keyof typeof CHANNEL_ROUTE_SCOPE];
 /** 不是發文通路的頁面顧問（活動／視覺／法規／成效層／內容層共用頁）。跟 server PAGE_SCOPES 同一份。 */
-export type PageScope = "events" | "visual" | "regulations" | "performance" | "content";
+export type PageScope = "events" | "visual" | "regulations" | "performance" | "content" | "influencer";
 export type StrategistScope = "brand" | "product" | "copy" | ChannelScope | PageScope;
 
 const CHANNEL_NAME: Record<ChannelScope, { zh: string; en: string }> = {
@@ -73,6 +73,7 @@ const PAGE_NAME: Record<PageScope, { zh: string; en: string }> = {
   regulations: { zh: "法規顧問", en: "Compliance Advisors" },
   performance: { zh: "成效顧問", en: "Performance Advisors" },
   content: { zh: "內容企劃顧問", en: "Content Advisors" },
+  influencer: { zh: "網紅合作顧問", en: "Creator Collab Advisors" },
 };
 export function isChannelScope(s: StrategistScope): s is ChannelScope {
   return s in CHANNEL_NAME;
@@ -167,6 +168,8 @@ export function scopeFromUrl(params: { p?: string | null; cat?: string | null; p
   if (/^\/performance(\/|$)/.test(path)) return "performance";
   // 內容層的活動 tray 跟策略層的活動頁談的是同一件事——同一組活動顧問。
   if (/^\/campaigns(\/|$)/.test(path)) return "events";
+  // 2026-10-06（CJ「網紅合作的右下方，應該是網紅相關專家」）：網紅切角頁有自己的三位。
+  if (/^\/influencers(\/|$)/.test(path)) return "influencer";
   // 內容層其餘共用頁（任務頁以外）：本週企劃、靈感、專案、產出頁、圖片卡、案例、審核。
   if (/^\/(planner|inspiration|projects|my-cards|run|image|review)(\/|$)/.test(path) || /^\/tasks\/(case|calendar)(\/|$)/.test(path)) {
     return "content";

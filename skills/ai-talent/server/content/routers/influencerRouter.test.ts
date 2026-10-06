@@ -6,7 +6,7 @@ describe("influencerRouter", () => {
   it("builds and exposes its procedures", async () => {
     const { influencerRouter } = await import("./influencerRouter");
     const procs = Object.keys((influencerRouter as any)._def.procedures);
-    expect(procs.sort()).toEqual(["analyzePoll", "analyzeStart", "exportFile", "latest", "parseSheet", "pickIdea", "readable", "savePerson"]);
+    expect(procs.sort()).toEqual(["analyzePoll", "analyzeStart", "exportFile", "latest", "parseSheet", "pickIdea", "readable", "savePerson", "usps"]);
   }, 60_000);
 });
 
@@ -119,6 +119,14 @@ describe("influencerAngles", () => {
     expect(p).toContain("私人生活");
     expect(p).toContain("品牌簡報用語");
     expect(p).toContain("主體只能做它本來做的事");
+    expect(p).not.toContain("主打的賣點");
+    // 配了賣點：三個點子都帶同一個。
+    const withUsp = ideasPrompt({
+      brandName: "測試品牌", subjectLine: "x", brandCtx: "", outputLanguage: "zh-TW", label: "小美", platform: "Instagram", followers: null,
+      material: MATERIAL, voice: "v", usp: "一鍵產出品牌定位",
+    });
+    expect(withUsp).toContain("【品牌這次想請你主打的賣點】一鍵產出品牌定位");
+    expect(withUsp).toContain("三個點子都要帶到這一個賣點");
     for (const k of IDEA_KINDS) expect(p).toContain(`${k.key}：`);
     expect(voicePrompt("zh-TW")).toContain("照抄 3 句");
   });
@@ -179,6 +187,74 @@ describe("influencerAngles", () => {
   });
 });
 
+describe("influencerUsps", () => {
+  it("splits a positioning field only at clear separators and never mid-sentence", async () => {
+    const { splitUspText, USP_MAX_CHARS } = await import("../core/influencer/influencerUsps");
+    expect(splitUspText("整合 44 個大數據來源\n顧問與 AI 一起判斷")).toEqual(["整合 44 個大數據來源", "顧問與 AI 一起判斷"]);
+    expect(splitUspText("1. 一鍵產出品牌定位 2. 法規自動檢查；3、多市場語言")).toEqual(["一鍵產出品牌定位", "法規自動檢查", "多市場語言"]);
+    expect(splitUspText("• 冷壓初榨 • 單一產區 · 當季現採")).toEqual(["冷壓初榨", "單一產區", "當季現採"]);
+    expect(splitUspText(["陣列裡的第一條賣點", "", 3, "陣列裡的第二條賣點"])).toEqual(["陣列裡的第一條賣點", "陣列裡的第二條賣點"]);
+    // 一整段沒有分隔的長文不硬切，只在太長時截尾。
+    const long = "這是一段沒有任何分隔符號的長文字" + "，一直寫下去".repeat(30);
+    const out = splitUspText(long);
+    expect(out).toHaveLength(1);
+    expect(out[0]!.length).toBe(USP_MAX_CHARS);
+    expect(splitUspText("加熱速度快 3.5 倍；44 個數據來源")).toEqual(["加熱速度快 3.5 倍", "44 個數據來源"]);   // 小數與數量不是編號
+    expect(splitUspText(null)).toEqual([]);
+    expect(splitUspText("好")).toEqual([]);
+  });
+
+  it("reads the right fields per subject, most distinctive first, de-duplicated", async () => {
+    const { uspsFromPositioning, MAX_USPS } = await import("../core/influencer/influencerUsps");
+    const product = { competition: { uniqueUsp: "獨家配方\n三年保固", rareUsp: "三年保固；台灣製造", commonUsp: "大家都說的" }, value: { coreFunctions: ["快速加熱", "自動斷電"] } };
+    expect(uspsFromPositioning("product", JSON.stringify(product))).toEqual([
+      { text: "獨家配方", from: "獨家賣點" }, { text: "三年保固", from: "獨家賣點" },
+      { text: "台灣製造", from: "少數競品也說的賣點" },
+      { text: "快速加熱", from: "核心功能" }, { text: "自動斷電", from: "核心功能" },
+    ]);
+    expect(uspsFromPositioning("brand", { differentiation: { discriminator: "唯一敢公開成分來源", summary: "不讀這格" } }))
+      .toEqual([{ text: "唯一敢公開成分來源", from: "唯一致勝理由" }]);
+    expect(uspsFromPositioning("event", { smp: { singleMindedProposition: "買一送一只到週日" } })[0]!.from).toBe("單一主張");
+    expect(uspsFromPositioning("product", { competition: { uniqueUsp: Array.from({ length: 20 }, (_, i) => `第 ${i + 1} 個賣點`).join("\n") } })).toHaveLength(MAX_USPS);
+    expect(uspsFromPositioning("product", null)).toEqual([]);
+    expect(uspsFromPositioning("product", "不是 JSON")).toEqual([]);
+  });
+
+  it("cleanUsps trims, de-duplicates and caps what the user sends", async () => {
+    const { cleanUsps, MAX_USPS } = await import("../core/influencer/influencerUsps");
+    expect(cleanUsps(["  三年  保固 ", "三年保固", "", "x", "台灣製造"])).toEqual(["三年 保固", "台灣製造"]);
+    expect(cleanUsps(Array.from({ length: 20 }, (_, i) => `賣點 ${i}`))).toHaveLength(MAX_USPS);
+    expect(cleanUsps("不是陣列")).toEqual([]);
+  });
+
+  it("parseMatches keeps valid picks and gives everyone left over the least-used selling point", async () => {
+    const { parseMatches, matchPrompt } = await import("../core/influencer/influencerUsps");
+    const usps = ["獨家配方", "三年保固", "台灣製造"];
+    const raw = "好的：" + JSON.stringify({ matches: [
+      { id: "p1", usp: 1, why: "常做成分解析" }, { id: "p1", usp: 2, why: "重複" }, { id: "zz", usp: 1 }, { id: "p2", usp: 9, why: "編號不存在" },
+    ] });
+    const out = parseMatches(raw, usps, ["p1", "p2", "p3", "p4"]);
+    expect(out.get("p1")).toEqual({ usp: "獨家配方", why: "常做成分解析" });
+    // p2（編號不存在）、p3、p4（模型漏掉）：補到目前最少人講的，理由留空。
+    expect([out.get("p2"), out.get("p3"), out.get("p4")]).toEqual([
+      { usp: "三年保固", why: "" }, { usp: "台灣製造", why: "" }, { usp: "獨家配方", why: "" },
+    ]);
+    // 模型整個失敗：全部用補的，照樣分散。
+    expect([...parseMatches(null, usps, ["a", "b", "c"]).values()].map((m) => m.usp)).toEqual(usps);
+    // 這一批已經有兩位在講第一個：補寫的人不再擠過去。
+    expect(parseMatches(null, usps, ["a"], { 獨家配方: 2, 三年保固: 1 }).get("a")!.usp).toBe("台灣製造");
+    expect(parseMatches(raw, [], ["p1"]).size).toBe(0);
+    const prompt = matchPrompt({
+      brandName: "測試品牌", subjectLine: "產品 A", usps, outputLanguage: "zh-TW", taken: { 獨家配方: 2 },
+      people: [{ id: "p1", label: "小美", platform: "Instagram", followers: "3.2 萬粉絲", digest: "旅遊清單" }],
+    });
+    expect(prompt).toContain("1. 獨家配方");
+    expect(prompt).toContain("1：已有 2 位在講");
+    expect(prompt).toContain("不要讓超過一半的人擠在同一個");
+    expect(prompt).toContain("id=p1｜小美｜Instagram｜3.2 萬粉絲");
+  });
+});
+
 describe("influencerSheet", () => {
   it("zip round-trips", async () => {
     const { zip, unzip } = await import("../core/influencer/miniZip");
@@ -207,7 +283,7 @@ describe("influencerSheet", () => {
     const people: any[] = [{
       id: "p1", url: "https://www.youtube.com/@ming", name: "小明 <A&B>", email: "ming@example.com", status: "done",
       platform: "youtube", handle: "ming", followers: "10萬位訂閱者", source: "youtube_channel", displayName: "Ming",
-      profile: "科技開箱", evidence: "Mac 開箱", format: "開箱長片", picked: 1,
+      profile: "科技開箱", evidence: "Mac 開箱", format: "開箱長片", picked: 1, usp: "三年保固", uspWhy: "常做耐用度實測",
       ideas: [
         { kind: "own", title: "延伸點子", hook: "開場一", productPoint: "特色一", why: "w1", basedOn: "Mac 開箱" },
         { kind: "method", title: "方法點子", hook: "開場三", productPoint: "特色三", why: "w3" },
@@ -220,19 +296,23 @@ describe("influencerSheet", () => {
     }, { id: "p2", url: "https://www.instagram.com/mei", status: "needs_material", platform: "instagram", handle: "mei", followers: null, source: "none", displayName: null }];
     const { rows } = readXlsx(buildXlsx(people, "測試/產品 網紅切角"));
     expect(rows[0]!.slice(0, 3)).toEqual(["網紅", "平台", "連結"]);
-    expect(rows[0]![6]).toBe("點子一（從他做過的內容延伸）");
+    expect(rows[0]![6]).toBe("主打賣點");
+    expect(rows[0]![7]).toBe("點子一（從他做過的內容延伸）");
     expect(rows[1]![0]).toBe("小明 <A&B>");
-    expect(rows[1]![6]).toBe("延伸點子\n「開場一」\n帶到：特色一");
-    expect(rows[1]![7]).toBe("");                              // 沒有 contrast 那一個
-    expect(rows[1]![8]).toBe("方法點子\n「開場三」\n帶到：特色三");
-    expect(rows[1]![9]).toBe("方法點子");                       // picked: 1
-    expect(rows[1]![12]).toBe("第一段\n\n第二段");
-    expect(rows[2]![6]).toBe("舊切角\n「舊開場」\n帶到：甲、乙");
-    expect(rows[2]![9]).toBe("舊切角");
-    expect(rows[3]![13]).toBe("資料不足，請補貼文");
+    expect(rows[1]![6]).toBe("三年保固\n為什麼是他：常做耐用度實測");
+    expect(rows[1]![7]).toBe("延伸點子\n「開場一」\n帶到：特色一");
+    expect(rows[1]![8]).toBe("");                              // 沒有 contrast 那一個
+    expect(rows[1]![9]).toBe("方法點子\n「開場三」\n帶到：特色三");
+    expect(rows[1]![10]).toBe("方法點子");                      // picked: 1
+    expect(rows[1]![13]).toBe("第一段\n\n第二段");
+    expect(rows[2]![6]).toBe("");
+    expect(rows[2]![7]).toBe("舊切角\n「舊開場」\n帶到：甲、乙");
+    expect(rows[2]![10]).toBe("舊切角");
+    expect(rows[3]![14]).toBe("資料不足，請補貼文");
     const doc = unzip(buildDocx(people, "測試 網紅切角")).get("word/document.xml")!.toString("utf8");
     expect(doc).toContain("小明 &lt;A&amp;B&gt;");
     expect(doc).toContain("點子 2（已選）");
+    expect(doc).toContain("三年保固");
     expect(doc).toContain("舊切角");
     expect(doc).toContain("資料不足，請補貼文");
     expect(doc).not.toContain("\u0007");

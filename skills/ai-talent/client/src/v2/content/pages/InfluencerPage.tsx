@@ -18,7 +18,12 @@
  * 2026-10-06（CJ：「現在的 DEMO 寫起來很生硬，不有趣…直接生成 agent 模擬該用戶，看會怎麼寫？」→ 三個）：
  *   · 每位三個點子，是模型當他本人、用三個不同出發點想的；卡面只放點子標題與開場。
  *   · 跟靈感舞台一樣是「挑一個」：挑了才寫邀約信，沒被挑的不花錢。
- * 規則與提示詞在 server/content/core/influencer/influencerAngles.ts。
+ *
+ * 2026-10-06（CJ：「目前都是用同一個產品特色去講，所以看來會太一致性…直接套用定位裡的 USP 或是讓用戶
+ * 選擇 USP，當然也可以新增，然後你自由幫忙策略性匹配」「並且標註在卡片上」）：
+ *   · 主體下面列出定位裡現成的賣點，預設全選；可以取消、可以自己加。
+ *   · 研究時先看完整批名單，替每位配一個賣點；卡片上標「主打」。
+ * 規則與提示詞在 server/content/core/influencer/influencerAngles.ts、influencerUsps.ts。
  */
 import React from "react";
 import { useOutletContext } from "react-router-dom";
@@ -41,6 +46,8 @@ interface Person {
   status: Status;
   platform?: string | null; handle?: string | null; followers?: string | null; displayName?: string | null; source?: string;
   profile?: string; evidence?: string; format?: string; voice?: string;
+  /** 配給他主打的賣點與理由。 */
+  usp?: string; uspWhy?: string;
   ideas?: Idea[]; picked?: number;
   emailSubject?: string; emailBody?: string; quoteWarning?: boolean;
   /** 2026-10-06 改寫前的舊資料：一位一個切角。 */
@@ -150,6 +157,14 @@ export default function InfluencerPage() {
   const exportFile = T.influencer.exportFile.useMutation();
 
   const [subject, setSubject] = React.useState<Subject>({ kind: "brand", id: null });
+  /** 定位裡的賣點被取消勾選的、用戶自己加的。換主體就重來。 */
+  const [uspOff, setUspOff] = React.useState<string[]>([]);
+  const [uspCustom, setUspCustom] = React.useState<string[]>([]);
+  const [uspDraft, setUspDraft] = React.useState("");
+  const uspsQ = T.influencer.usps.useQuery(
+    { brandId: brandId ?? 0, subject },
+    { enabled: !!brandId && (subject.kind === "brand" || !!subject.id), refetchOnWindowFocus: false, staleTime: 60_000 },
+  );
   const [direction, setDirection] = React.useState("");
   const [paste, setPaste] = React.useState("");
   const [people, setPeople] = React.useState<Person[]>([]);
@@ -206,6 +221,28 @@ export default function InfluencerPage() {
     if (d.jobId) { setBusy(true); void poll(d.jobId, ++runSeq.current); }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [latestQ.data, latestQ.dataUpdatedAt, latestQ.isLoading, brandId]);
+
+  const uspList: Array<{ text: string; from?: string }> = uspsQ.data?.usps ?? [];
+  const uspMax: number = uspsQ.data?.max ?? 8;
+  const subjectKey = `${brandId}:${subject.kind}:${subject.id ?? ""}`;
+  React.useEffect(() => { setUspOff([]); setUspCustom([]); setUspDraft(""); }, [subjectKey]);
+  // 讀回上一批時，卡片上有、定位清單裡沒有的賣點＝當時用戶自己加的，補回清單（不然重新研究會少掉它）。
+  React.useEffect(() => {
+    if (!uspsQ.data) return;
+    const known = new Set([...uspList.map((u) => u.text), ...uspCustom]);
+    const extra = Array.from(new Set(people.map((p) => p.usp).filter((u): u is string => !!u && !known.has(u))));
+    if (extra.length) setUspCustom((cur) => [...cur, ...extra].slice(0, uspMax));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [people, uspsQ.data]);
+  const uspSelected = [...uspList.map((u) => u.text).filter((t) => !uspOff.includes(t)), ...uspCustom].slice(0, uspMax);
+  const addUsp = () => {
+    const text = uspDraft.replace(/\s+/g, " ").trim().slice(0, 120);
+    if (text.length < 2) return;
+    if (uspSelected.length >= uspMax) { showToastGlobal(L(`最多 ${uspMax} 個賣點。`, `Up to ${uspMax} selling points.`), "error"); return; }
+    if (![...uspList.map((u) => u.text), ...uspCustom].includes(text)) setUspCustom((cur) => [...cur, text]);
+    setUspOff((cur) => cur.filter((t) => t !== text));
+    setUspDraft("");
+  };
 
   const subjectName = subject.kind === "product" ? products.find((p) => p.id === subject.id)?.name
     : subject.kind === "event" ? events.find((e) => e.id === subject.id)?.name : null;
@@ -284,7 +321,7 @@ export default function InfluencerPage() {
     setPeople((cur) => cur.map((p) => (targets.some((t) => t.id === p.id) ? { ...p, status: "queued" } : p)));
     try {
       const r = await analyzeStart.mutateAsync({
-        brandId, subject, direction: direction.trim() || undefined, batchId: batchId ?? undefined,
+        brandId, subject, direction: direction.trim() || undefined, batchId: batchId ?? undefined, usps: uspSelected,
         people: targets.map((p) => ({ id: p.id, url: p.url, name: p.name?.trim() || undefined, email: p.email?.trim() || undefined, notes: p.notes?.trim().slice(0, NOTES_MAX) || undefined })),
       });
       setBatchId(r.batchId);
@@ -403,6 +440,48 @@ export default function InfluencerPage() {
                 <Icon name="chevronRight" size={10} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 rotate-90" color={META} />
               </label>
             )}
+          </div>
+          <div className="flex flex-col gap-2">
+            <p className="m-0 flex items-center gap-1.5 text-[12px]" style={{ color: META }}>
+              {L("要請網紅講哪些賣點？", "Which selling points should they carry?")}
+              <HelpTip>
+                {L("這些賣點來自你的定位。我們會看完整批名單，替每一位配一個最適合由他來講的，卡片上會標出來。不想用的點一下取消，也可以自己加。",
+                  "These come from your positioning. We look at the whole list and give each creator the one they can carry best — it's tagged on their card. Tap to drop one, or add your own.")}
+              </HelpTip>
+              {uspSelected.length > 0 && <span>{uspSelected.length}／{uspMax}</span>}
+            </p>
+            {uspList.length + uspCustom.length > 0 ? (
+              <div className="flex flex-wrap gap-2">
+                {[...uspList, ...uspCustom.map((text) => ({ text, from: L("自己加的", "Added by you") }))].map((u) => {
+                  const on = uspSelected.includes(u.text);
+                  const mine = uspCustom.includes(u.text);
+                  return (
+                    <button key={u.text} type="button" disabled={busy} aria-pressed={on} title={u.from}
+                      onClick={() => (mine
+                        ? setUspCustom((cur) => cur.filter((t) => t !== u.text))
+                        : setUspOff((cur) => (cur.includes(u.text) ? cur.filter((t) => t !== u.text) : [...cur, u.text])))}
+                      className="flex max-w-full items-start gap-1.5 rounded-2xl border px-3 py-1.5 text-left text-[13px] leading-snug transition disabled:opacity-50"
+                      style={{ borderColor: on ? INK : LINE, background: on ? SOFT : "#FFFFFF", color: on ? INK : META }}>
+                      <span className="mt-[3px] shrink-0"><Icon name={on ? "check" : "add"} size={10} /></span>
+                      <span>{u.text}</span>
+                      {mine && <span className="mt-[3px] shrink-0" aria-label={L("拿掉", "Remove")}><Icon name="close" size={9} /></span>}
+                    </button>
+                  );
+                })}
+              </div>
+            ) : !uspsQ.isLoading && (
+              <p className="m-0 text-[12.5px]" style={{ color: META }}>
+                {L("定位裡還沒有寫賣點。可以在下面自己加；不加也能研究，只是每位不會分配不同的賣點。",
+                  "Your positioning has no selling points yet. Add some below — or go ahead without, and creators won't be given different ones.")}
+              </p>
+            )}
+            <div className="flex gap-2">
+              <input value={uspDraft} disabled={busy} onChange={(e) => setUspDraft(e.target.value.slice(0, 120))}
+                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addUsp(); } }}
+                placeholder={L("自己加一個賣點", "Add a selling point")} aria-label={L("自己加一個賣點", "Add a selling point")}
+                className="min-w-0 flex-1 rounded-xl border px-3.5 py-2 text-[13px] outline-none focus:border-neutral-900" style={{ borderColor: LINE }} />
+              <Button size="sm" variant="flat" onPress={addUsp} isDisabled={busy || uspDraft.trim().length < 2}>{L("加入", "Add")}</Button>
+            </div>
           </div>
           <label className="flex flex-col gap-1.5">
             <span className="text-[12px]" style={{ color: META }}>{L("這次合作有特別想要的方向嗎？（選填）", "Any direction for this collaboration? (optional)")}</span>
@@ -550,6 +629,13 @@ function PersonCard({ p, en, busy, readable, pickingIndex, onPatch, onBlurSave, 
         )}
       </header>
 
+      {p.usp && (
+        <p className="m-0 flex items-start gap-2 text-[12.5px] leading-snug">
+          <span className="shrink-0 rounded-full px-2 py-0.5 text-[11.5px] font-semibold" style={{ background: INK, color: "#FFFFFF" }}>{L("主打", "Leads with")}</span>
+          <span style={{ color: INK }}>{p.usp}</span>
+        </p>
+      )}
+
       <StatusLine p={p} en={en} readable={readable} />
 
       {showNotes && (
@@ -636,6 +722,12 @@ function PersonCard({ p, en, busy, readable, pickingIndex, onPatch, onBlurSave, 
                   {chosen.productPoint && <p className="m-0 text-[13px] leading-relaxed" style={{ color: INK }}>{L("會帶到：", "Brings in: ")}{chosen.productPoint}</p>}
                   {chosen.why && <p className="m-0 text-[13px] leading-relaxed" style={{ color: INK }}>{L("觀眾為什麼會看：", "Why their audience watches: ")}{chosen.why}</p>}
                   {chosen.basedOn && <p className="m-0 text-[12px] leading-relaxed" style={{ color: META }}>{L("延伸自：", "Builds on: ")}{chosen.basedOn}</p>}
+                </div>
+              )}
+              {p.uspWhy && (
+                <div className="flex flex-col gap-1">
+                  <span className={label} style={{ color: META }}>{L("為什麼由他講這個賣點", "Why this selling point for them")}</span>
+                  <p className="m-0 text-[13px] leading-relaxed" style={{ color: INK }}>{p.uspWhy}</p>
                 </div>
               )}
               {(p.profile || p.evidence) && (
