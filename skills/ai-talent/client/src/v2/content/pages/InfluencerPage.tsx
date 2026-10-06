@@ -9,6 +9,11 @@
  *   · 版面照靈感舞台：標題區 → 主體 → 名單 → 結果卡。
  *   · IG／Threads／TikTok／FB 伺服器讀不到：那幾列直接展開「貼上他的貼文」欄，不讓用戶按了才知道。
  *   · 資料不足就不寫，卡片上明講，補了素材可以只重寫那一位。
+ *
+ * 2026-10-06（CJ 實際用過後：「輸入連結後，底下沒有按開始研究的按鈕」「底下太複雜，字太多」）：
+ *   · 「開始研究」放在貼連結的框旁邊，一顆按鈕＝把貼的連結加進名單並開始；右上角那顆拿掉。
+ *   · 卡面只留四樣：誰、切角、開場示範、可以講的幾點。個人特色、依據、稱呼／Email、邀約信全文
+ *     收進「看細節」。名單格式的說明收進「?」。
  * 規則與提示詞在 server/content/core/influencer/influencerAngles.ts。
  */
 import React from "react";
@@ -17,6 +22,7 @@ import { Button } from "@heroui/react";
 import { trpc } from "../../../lib/trpc";
 import { useLang } from "../../../lib/i18n";
 import { Icon } from "../../platform/components/icons";
+import { HelpTip } from "../../platform/components/HelpTip";
 import { showToastGlobal } from "../../platform/components/Toast";
 import { friendlyError } from "../../platform/lib/friendlyError";
 
@@ -188,14 +194,30 @@ export default function InfluencerPage() {
     return added;
   };
 
-  const addFromPaste = () => {
-    const lines = paste.split(/[\n,，\s]+/).map((s) => s.trim()).filter(Boolean);
-    const urls = lines.filter(looksLikeUrl);
-    if (!urls.length) { showToastGlobal(L("沒有看到連結。請貼上網紅的主頁網址，一行一位。", "No links found. Paste one profile URL per line."), "error"); return; }
-    const room = MAX_PEOPLE - people.length;
-    addPeople(urls.map((url) => ({ url })));
+  /** 框裡貼的連結（去掉名單裡已經有的、超過上限的）。 */
+  const pastedUrls = React.useMemo(() => {
+    const seen = new Set(people.map((p) => p.url.replace(/\/$/, "")));
+    const out: string[] = [];
+    for (const raw of paste.split(/[\n,，\s]+/)) {
+      const url = raw.trim();
+      const key = url.replace(/\/$/, "");
+      if (!url || !looksLikeUrl(url) || seen.has(key) || people.length + out.length >= MAX_PEOPLE) continue;
+      seen.add(key); out.push(url);
+    }
+    return out;
+  }, [paste, people]);
+
+  /** 「開始研究」：把框裡的連結加進名單，連同名單裡還沒研究的一起送出。 */
+  const startResearch = () => {
+    if (paste.trim() && !pastedUrls.length && !pending.length) {
+      showToastGlobal(L("沒有看到連結。請貼上網紅的主頁網址，一行一位。", "No links found. Paste one profile URL per line."), "error");
+      return;
+    }
+    const fresh: Person[] = pastedUrls.map((url) => ({ id: newId(), url, status: "draft" }));
+    const all = [...people, ...fresh];
+    setPeople(all);
     setPaste("");
-    if (urls.length > room) showToastGlobal(L(`一批最多 ${MAX_PEOPLE} 位，多的沒有加進來。`, `Up to ${MAX_PEOPLE} per batch; the rest were left out.`));
+    void run(undefined, all);
   };
 
   const onFile = async (file: File | undefined) => {
@@ -219,9 +241,9 @@ export default function InfluencerPage() {
   };
 
   /** 送去寫：ids 沒給＝所有還沒寫成的人。 */
-  const run = async (ids?: string[]) => {
+  const run = async (ids?: string[], list: Person[] = people) => {
     if (!brandId || busy) return;
-    const targets = people.filter((p) => (ids ? ids.includes(p.id) : p.status !== "done"));
+    const targets = list.filter((p) => (ids ? ids.includes(p.id) : p.status !== "done"));
     if (!targets.length) return;
     if (subject.kind !== "brand" && !subject.id) { showToastGlobal(L("請先選一個產品或活動。", "Pick a product or campaign first."), "error"); return; }
     const seqNo = ++runSeq.current;
@@ -272,7 +294,8 @@ export default function InfluencerPage() {
 
   const pending = people.filter((p) => p.status !== "done" && !RUNNING.includes(p.status));
   const doneCount = people.filter((p) => p.status === "done").length;
-  const canStart = !!brandId && !busy && pending.length > 0;
+  const toResearch = pending.length + pastedUrls.length;
+  const canStart = !!brandId && !busy && (toResearch > 0 || !!paste.trim());
 
   const subjectBtn = (kind: Subject["kind"], label: string) => {
     const list = kind === "product" ? products : kind === "event" ? events : null;
@@ -312,12 +335,6 @@ export default function InfluencerPage() {
               {L("手上已有網紅名單 · 要寄出第一封邀約 · 同一檔活動找多位網紅", "You already have a shortlist · First outreach · Several creators on one campaign")}
             </p>
           </div>
-          <div className="flex items-center gap-2">
-            <Button color="primary" onPress={() => run()} isDisabled={!canStart}
-              startContent={busy ? undefined : <Icon name="play" size={13} />}>
-              {busy ? L("正在讀與寫…", "Reading and writing…") : pending.length ? L(`開始寫（${pending.length} 位）`, `Write (${pending.length})`) : L("開始寫", "Write")}
-            </Button>
-          </div>
         </div>
       </div>
 
@@ -351,34 +368,34 @@ export default function InfluencerPage() {
         {/* ── 名單 ── */}
         <section aria-label={L("網紅名單", "Creators")} className="flex flex-col gap-3 rounded-2xl border bg-white p-5" style={{ borderColor: LINE }}>
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <p className="m-0 text-[13px] font-semibold" style={{ color: INK }}>
-              {L("網紅名單", "Creators")}
-              <span className="ml-2 font-normal" style={{ color: META }}>{people.length}／{MAX_PEOPLE}</span>
+            <p className="m-0 flex items-center gap-1.5 text-[13px] font-semibold" style={{ color: INK }}>
+              {L("要研究哪幾位？", "Who should we look at?")}
+              <HelpTip>
+                {L(
+                  "YouTube、部落格、個人網站我們會自己讀。Instagram、Threads、TikTok、Facebook 的個人頁讀不到，加進來後請貼上他的幾則貼文。名單檔可用 Excel 或 CSV，一列一位，有連結就行。",
+                  "We read YouTube, blogs and personal sites ourselves. Instagram, Threads, TikTok and Facebook profiles can't be read — paste a few of their posts after adding them. Lists can be Excel or CSV, one creator per row with a link.",
+                )}
+              </HelpTip>
+              {people.length > 0 && <span className="font-normal" style={{ color: META }}>{people.length}／{MAX_PEOPLE}</span>}
             </p>
             {people.length > 0 && !busy && (
               <button type="button" onClick={startOver} className="text-[12.5px] underline underline-offset-2" style={{ color: META }}>
-                {L("清空，開新的一批", "Clear and start a new batch")}
+                {L("清空重來", "Clear all")}
               </button>
             )}
           </div>
-          <div className="flex flex-col gap-2 md:flex-row md:items-start">
-            <textarea value={paste} disabled={busy} onChange={(e) => setPaste(e.target.value)} rows={3}
-              placeholder={L("貼上網紅的主頁連結，一行一位\nhttps://www.youtube.com/@…\nhttps://www.instagram.com/…", "Paste profile links, one per line\nhttps://www.youtube.com/@…\nhttps://www.instagram.com/…")}
-              className="min-h-[84px] flex-1 rounded-xl border px-3.5 py-2.5 text-[14px] outline-none focus:border-neutral-900" style={{ borderColor: LINE }} />
-            <div className="flex shrink-0 flex-row gap-2 md:flex-col">
-              <Button variant="flat" onPress={addFromPaste} isDisabled={busy || !paste.trim() || people.length >= MAX_PEOPLE}
-                startContent={<Icon name="add" size={12} />}>{L("加入名單", "Add")}</Button>
-              <Button variant="flat" onPress={() => fileRef.current?.click()} isDisabled={busy || people.length >= MAX_PEOPLE} isLoading={parseSheet.isPending}
-                startContent={parseSheet.isPending ? undefined : <Icon name="upload" size={12} />}>{L("上傳名單", "Upload a list")}</Button>
-              <input ref={fileRef} type="file" accept=".xlsx,.csv,.tsv,.txt" className="hidden" onChange={(e) => onFile(e.target.files?.[0])} />
-            </div>
+          <textarea value={paste} disabled={busy} onChange={(e) => setPaste(e.target.value)} rows={3}
+            placeholder={L("貼上網紅的主頁連結，一行一位", "Paste profile links, one per line")}
+            className="min-h-[84px] rounded-xl border px-3.5 py-2.5 text-[14px] outline-none focus:border-neutral-900" style={{ borderColor: LINE }} />
+          <div className="flex flex-wrap items-center gap-2">
+            <Button color="primary" onPress={startResearch} isDisabled={!canStart}
+              startContent={busy ? undefined : <Icon name="play" size={13} />}>
+              {busy ? L("研究中…", "Researching…") : toResearch ? L(`開始研究（${toResearch} 位）`, `Start research (${toResearch})`) : L("開始研究", "Start research")}
+            </Button>
+            <Button variant="flat" onPress={() => fileRef.current?.click()} isDisabled={busy || people.length >= MAX_PEOPLE} isLoading={parseSheet.isPending}
+              startContent={parseSheet.isPending ? undefined : <Icon name="upload" size={12} />}>{L("上傳 Excel 名單", "Upload an Excel list")}</Button>
+            <input ref={fileRef} type="file" accept=".xlsx,.csv,.tsv,.txt" className="hidden" onChange={(e) => onFile(e.target.files?.[0])} />
           </div>
-          <p className="m-0 text-[12px] leading-relaxed" style={{ color: META }}>
-            {L(
-              "名單檔支援 Excel（.xlsx）與 CSV：每一列一位，有連結就行；有「名字」「Email」「備註」欄會一起帶進來。YouTube、部落格、個人網站我們會自己讀；Instagram、Threads、TikTok、Facebook 的個人頁讀不到，請在那一列貼上他的幾則貼文。",
-              "Lists can be Excel (.xlsx) or CSV: one creator per row, a link is enough; Name, Email and Notes columns come along. We read YouTube, blogs and personal sites ourselves; Instagram, Threads, TikTok and Facebook profiles can't be read, so paste a few of their posts on that row.",
-            )}
-          </p>
         </section>
 
         {/* ── 每一位 ── */}
@@ -387,7 +404,7 @@ export default function InfluencerPage() {
             {doneCount > 0 && (
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <p className="m-0 text-[13px]" style={{ color: META }}>
-                  {L(`已寫好 ${doneCount} 位`, `${doneCount} written`)}
+                  {L(`已研究 ${doneCount} 位`, `${doneCount} done`)}
                 </p>
                 <div className="flex gap-2">
                   <Button size="sm" variant="flat" isDisabled={busy} isLoading={exportFile.isPending && exportFile.variables?.format === "xlsx"}
@@ -397,7 +414,7 @@ export default function InfluencerPage() {
                 </div>
               </div>
             )}
-            <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(380px, 1fr))" }}>
+            <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))" }}>
               {people.map((p) => (
                 <PersonCard key={p.id} p={p} en={en} busy={busy}
                   onPatch={(v) => patch(p.id, v)}
@@ -413,8 +430,8 @@ export default function InfluencerPage() {
         {people.length === 0 && (
           <p className="m-0 py-10 text-center text-[14px]" style={{ color: META }}>
             {en
-              ? `Add a few creators and press "Write" — each gets their own angle on ${subjectName ?? "your brand"}.`
-              : `加入幾位網紅後按「開始寫」，每一位會針對${subjectName ? `「${subjectName}」` : "品牌"}各有一個切角。`}
+              ? `Paste a few links and press "Start research" — each creator gets their own angle on ${subjectName ?? "your brand"}.`
+              : `貼上幾位網紅的連結後按「開始研究」，每一位會針對${subjectName ? `「${subjectName}」` : "品牌"}各有一個切角。`}
           </p>
         )}
       </div>
@@ -426,10 +443,10 @@ function StatusLine({ p, en }: { p: Person; en: boolean }) {
   const L = (zh: string, e: string) => (en ? e : zh);
   const text: Record<Status, string> = {
     draft: isWalled(p.url) && !(p.notes ?? "").trim()
-      ? L("這個平台我們讀不到，請在下面貼上他的幾則貼文", "We can't read this platform. Paste a few of their posts below.")
-      : L("還沒寫", "Not written yet"),
-    queued: L("排隊中…", "Queued…"), reading: L("正在讀他的內容…", "Reading their content…"), thinking: L("正在寫切角與邀約信…", "Writing the angle and outreach…"),
-    done: "", needs_material: L("資料不足：連結讀不到內容。貼上他的幾則貼文或自我介紹後再寫。", "Not enough to go on: the link gave us nothing. Paste a few posts or a bio, then write again."),
+      ? L("這個平台讀不到，請貼上他的幾則貼文。", "We can't read this platform. Paste a few of their posts.")
+      : L("還沒研究", "Not researched yet"),
+    queued: L("排隊中…", "Queued…"), reading: L("正在讀他的內容…", "Reading their content…"), thinking: L("正在想切角…", "Working out the angle…"),
+    done: "", needs_material: L("資料不足，請貼上他的幾則貼文。", "Not enough to go on. Paste a few of their posts."),
     invalid_link: L("這個連結無法辨識，請確認是完整的網址。", "We couldn't recognise this link. Check it's a full URL."),
     failed: L("這一位沒寫成，請再試一次。", "This one didn't finish. Try again."),
   };
@@ -451,23 +468,23 @@ function PersonCard({ p, en, busy, onPatch, onBlurSave, onRemove, onRun, onCopy 
   const running = RUNNING.includes(p.status);
   const done = p.status === "done";
   const walled = isWalled(p.url);
-  const [notesOpen, setNotesOpen] = React.useState(false);
-  const showNotes = !done && !running && (notesOpen || walled || p.status === "needs_material" || !!(p.notes ?? "").trim());
+  const [open, setOpen] = React.useState(false);
+  const showNotes = !done && !running && (walled || p.status === "needs_material" || !!(p.notes ?? "").trim());
   const platform = p.platform ? (PLATFORM_NAME[p.platform] ?? (p.platform === "web" ? L("網站", "Website") : p.platform)) : null;
-  const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test((p.email ?? "").trim());
   const field = "rounded-lg border px-2.5 py-1.5 text-[13px] outline-none focus:border-neutral-900 disabled:opacity-60";
   const mailLong = mailtoHref(p).length > MAILTO_MAX;
+  const label = "text-[11.5px] font-semibold tracking-wide";
 
   return (
     <article className="flex flex-col gap-3 rounded-2xl border bg-white p-5" style={{ borderColor: LINE }}>
       <header className="flex items-start justify-between gap-3">
-        <div className="flex min-w-0 flex-col gap-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-[15px] font-semibold" style={{ color: INK }}>{labelOf(p) || L("（還沒有名字）", "(no name yet)")}</span>
-            {platform && <span className="rounded-full px-2 py-0.5 text-[11.5px]" style={{ background: SOFT, color: META }}>{platform}</span>}
-            {p.followers && <span className="text-[12px]" style={{ color: META }}>{p.followers}</span>}
-          </div>
-          <a href={p.url} target="_blank" rel="noreferrer noopener" className="truncate text-[12px] underline underline-offset-2" style={{ color: META }}>{p.url}</a>
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
+          <a href={p.url} target="_blank" rel="noreferrer noopener" title={p.url}
+            className="truncate text-[14px] font-semibold hover:underline" style={{ color: INK }}>
+            {labelOf(p) || p.url.replace(/^https?:\/\/(www\.)?/, "")}
+          </a>
+          {platform && <span className="rounded-full px-2 py-0.5 text-[11.5px]" style={{ background: SOFT, color: META }}>{platform}</span>}
+          {p.followers && <span className="text-[12px]" style={{ color: META }}>{p.followers}</span>}
         </div>
         {!running && !busy && (
           <button type="button" onClick={onRemove} aria-label={L("從名單拿掉", "Remove")} title={L("從名單拿掉", "Remove")}
@@ -477,93 +494,89 @@ function PersonCard({ p, en, busy, onPatch, onBlurSave, onRemove, onRun, onCopy 
         )}
       </header>
 
-      <div className="grid grid-cols-2 gap-2">
-        <input value={p.name ?? ""} disabled={running} onChange={(e) => onPatch({ name: e.target.value.slice(0, 60) })} onBlur={onBlurSave}
-          placeholder={L("怎麼稱呼他（選填）", "Name (optional)")} aria-label={L("名字", "Name")} className={field} style={{ borderColor: LINE }} />
-        <input value={p.email ?? ""} disabled={running} onChange={(e) => onPatch({ email: e.target.value.slice(0, 160) })} onBlur={onBlurSave}
-          placeholder={L("Email（寄信用，選填）", "Email (optional)")} aria-label="Email" type="email" className={field} style={{ borderColor: LINE }} />
-      </div>
-
       <StatusLine p={p} en={en} />
 
       {showNotes && (
-        <label className="flex flex-col gap-1.5">
-          <span className="text-[12px]" style={{ color: META }}>{L("他的貼文或自我介紹（貼 3–5 則最準）", "Their posts or bio (3–5 posts works best)")}</span>
-          <textarea value={p.notes ?? ""} onChange={(e) => onPatch({ notes: e.target.value.slice(0, NOTES_MAX) })} rows={4}
-            placeholder={L("把他最近幾則貼文的文字貼在這裡，一則一段", "Paste the text of a few recent posts, one per paragraph")}
-            className="rounded-xl border px-3 py-2 text-[13px] leading-relaxed outline-none focus:border-neutral-900" style={{ borderColor: LINE }} />
-        </label>
+        <textarea value={p.notes ?? ""} onChange={(e) => onPatch({ notes: e.target.value.slice(0, NOTES_MAX) })} rows={4}
+          aria-label={L("他的貼文", "Their posts")}
+          placeholder={L("貼上他最近 3–5 則貼文的文字", "Paste the text of 3–5 recent posts")}
+          className="rounded-xl border px-3 py-2 text-[13px] leading-relaxed outline-none focus:border-neutral-900" style={{ borderColor: LINE }} />
+      )}
+
+      {!done && !running && (
+        <div>
+          <Button size="sm" variant="flat" onPress={onRun} isDisabled={busy}>
+            {p.status === "draft" ? L("研究這一位", "Research this one") : L("再試一次", "Try again")}
+          </Button>
+        </div>
       )}
 
       {done && (
         <>
-          <div className="flex flex-col gap-1">
-            <span className="text-[11.5px] font-semibold tracking-wide" style={{ color: META }}>{L("個人特色", "Who they are")}</span>
-            <p className="m-0 text-[13.5px] leading-relaxed" style={{ color: INK }}>{p.profile}</p>
-            {p.evidence && <p className="m-0 text-[12px] leading-relaxed" style={{ color: META }}>{L("依據：", "Based on: ")}{p.evidence}</p>}
-          </div>
-          <div className="flex flex-col gap-1 rounded-xl p-3.5" style={{ background: SOFT }}>
-            <span className="text-[11.5px] font-semibold tracking-wide" style={{ color: META }}>{L("獨特切角", "Their angle")}{p.format ? `・${p.format}` : ""}</span>
-            <p className="m-0 text-[16px] font-semibold leading-snug" style={{ color: INK }}>{p.angle}</p>
-            {p.angleWhy && <p className="m-0 text-[12.5px] leading-relaxed" style={{ color: META }}>{p.angleWhy}</p>}
-            {p.hook && <p className="m-0 mt-1 text-[13.5px] leading-relaxed" style={{ color: INK, fontFamily: '"Source Serif Pro", "Noto Serif TC", Georgia, serif' }}>「{p.hook}」</p>}
-          </div>
-          <div className="flex flex-col gap-1">
-            <span className="text-[11.5px] font-semibold tracking-wide" style={{ color: META }}>{L("他可以講的產品特色", "Selling points they can carry")}</span>
-            <ul className="m-0 flex list-disc flex-col gap-0.5 pl-5 text-[13.5px] leading-relaxed" style={{ color: INK }}>
-              {(p.talkingPoints ?? []).map((t, i) => <li key={i}>{t}</li>)}
-            </ul>
-          </div>
+          {/* 卡面：切角、開場示範、可以講的幾點。 */}
+          <p className="m-0 text-[17px] font-semibold leading-snug" style={{ color: INK }}>{p.angle}</p>
+          {p.hook && (
+            <p className="m-0 text-[13.5px] leading-relaxed" style={{ color: META, fontFamily: '"Source Serif Pro", "Noto Serif TC", Georgia, serif' }}>「{p.hook}」</p>
+          )}
+          <ul className="m-0 flex list-disc flex-col gap-0.5 pl-5 text-[13px] leading-relaxed" style={{ color: INK }}>
+            {(p.talkingPoints ?? []).map((t, i) => <li key={i}>{t}</li>)}
+          </ul>
           {p.quoteWarning && (
             <p className="m-0 flex items-start gap-1.5 text-[12.5px] leading-relaxed" style={{ color: "#B45309" }}>
               <Icon name="warning" size={12} className="mt-0.5" />
-              <span>{L("邀約信裡有一句引用，在我們讀到的內容裡找不到。寄出前請核對，或直接刪掉那一句。", "The outreach quotes a line we couldn't find in what we read. Check it before sending, or remove it.")}</span>
+              <span>{L("信裡有一句引用查不到出處，寄出前請核對。", "The email quotes a line we couldn't trace. Check before sending.")}</span>
             </p>
           )}
-          <details className="rounded-xl border" style={{ borderColor: LINE }}>
-            <summary className="cursor-pointer select-none px-3.5 py-2.5 text-[13px] font-semibold" style={{ color: INK }}>
-              {L("邀約信", "Outreach email")}<span className="ml-2 font-normal" style={{ color: META }}>{p.emailSubject}</span>
-            </summary>
-            <div className="flex flex-col gap-2 px-3.5 pb-3.5">
-              <input value={p.emailSubject ?? ""} onChange={(e) => onPatch({ emailSubject: e.target.value.slice(0, 60) })} onBlur={onBlurSave}
-                aria-label={L("主旨", "Subject")} className={field} style={{ borderColor: LINE }} />
-              <textarea value={p.emailBody ?? ""} onChange={(e) => onPatch({ emailBody: e.target.value.slice(0, 1200) })} onBlur={onBlurSave} rows={9}
-                aria-label={L("內文", "Body")} className="rounded-lg border px-2.5 py-2 text-[13px] leading-relaxed outline-none focus:border-neutral-900" style={{ borderColor: LINE }} />
-            </div>
-          </details>
-          <div className="flex flex-wrap items-center gap-2">
+
+          <div className="mt-auto flex flex-wrap items-center gap-2 pt-1">
             <a href={mailLong ? mailtoSubjectOnly(p) : mailtoHref(p)}
               onClick={mailLong ? () => onCopy(p.emailBody ?? "", L("信箱已開啟。內文已複製，在信裡貼上就可以寄。", "Mail app opened. The body is copied — paste it into the message.")) : undefined}
-              className="flex items-center gap-1.5 rounded-full px-3.5 py-2 text-[13px] font-semibold text-white" style={{ background: INK }}
-              title={emailOk ? undefined : L("還沒填 Email，信箱打開後自己填收件人", "No email yet — add the recipient in your mail app")}>
-              <Icon name="mail" size={12} /> {L("開啟我的信箱寄出", "Open in my mail app")}
-            </a>
-            <a href={gmailHref(p)} target="_blank" rel="noreferrer noopener" className="rounded-full border px-3.5 py-2 text-[13px]" style={{ borderColor: LINE, color: INK }}>
-              {L("用 Gmail 開", "Open in Gmail")}
+              className="flex items-center gap-1.5 rounded-full px-3.5 py-2 text-[13px] font-semibold text-white" style={{ background: INK }}>
+              <Icon name="mail" size={12} /> {L("寄邀約信", "Send outreach")}
             </a>
             <button type="button" onClick={() => onCopy(`${p.emailSubject ?? ""}\n\n${p.emailBody ?? ""}`)}
               className="flex items-center gap-1.5 rounded-full border px-3.5 py-2 text-[13px]" style={{ borderColor: LINE, color: INK }}>
-              <Icon name="copy" size={12} /> {L("複製（私訊用）", "Copy (for DMs)")}
+              <Icon name="copy" size={12} /> {L("複製", "Copy")}
             </button>
-            <button type="button" onClick={onRun} disabled={busy}
-              className="ml-auto flex items-center gap-1.5 text-[12.5px] underline underline-offset-2 disabled:opacity-40" style={{ color: META }}>
-              <Icon name="regenerate" size={11} /> {L("重寫這一位", "Rewrite")}
+            <button type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open}
+              className="ml-auto text-[12.5px] underline underline-offset-2" style={{ color: META }}>
+              {open ? L("收起", "Hide") : L("看細節", "Details")}
             </button>
           </div>
-        </>
-      )}
 
-      {!done && !running && (
-        <div className="flex flex-wrap items-center gap-3">
-          <Button size="sm" variant="flat" onPress={onRun} isDisabled={busy}>
-            {p.status === "draft" ? L("只寫這一位", "Write this one") : L("再寫一次", "Write again")}
-          </Button>
-          {!showNotes && (
-            <button type="button" onClick={() => setNotesOpen(true)} className="text-[12.5px] underline underline-offset-2" style={{ color: META }}>
-              {L("我想補充他的貼文", "Add some of their posts")}
-            </button>
+          {open && (
+            <div className="flex flex-col gap-3 border-t pt-3" style={{ borderColor: LINE }}>
+              <div className="flex flex-col gap-1">
+                <span className={label} style={{ color: META }}>{L("為什麼是他", "Why them")}{p.format ? `・${p.format}` : ""}</span>
+                <p className="m-0 text-[13px] leading-relaxed" style={{ color: INK }}>{p.angleWhy}</p>
+              </div>
+              <div className="flex flex-col gap-1">
+                <span className={label} style={{ color: META }}>{L("個人特色", "Who they are")}</span>
+                <p className="m-0 text-[13px] leading-relaxed" style={{ color: INK }}>{p.profile}</p>
+                {p.evidence && <p className="m-0 text-[12px] leading-relaxed" style={{ color: META }}>{L("依據：", "Based on: ")}{p.evidence}</p>}
+              </div>
+              <div className="flex flex-col gap-2">
+                <span className={label} style={{ color: META }}>{L("邀約信", "Outreach email")}</span>
+                <div className="grid grid-cols-2 gap-2">
+                  <input value={p.name ?? ""} onChange={(e) => onPatch({ name: e.target.value.slice(0, 60) })} onBlur={onBlurSave}
+                    placeholder={L("怎麼稱呼他", "Name")} aria-label={L("名字", "Name")} className={field} style={{ borderColor: LINE }} />
+                  <input value={p.email ?? ""} onChange={(e) => onPatch({ email: e.target.value.slice(0, 160) })} onBlur={onBlurSave}
+                    placeholder={L("他的 Email", "Their email")} aria-label="Email" type="email" className={field} style={{ borderColor: LINE }} />
+                </div>
+                <input value={p.emailSubject ?? ""} onChange={(e) => onPatch({ emailSubject: e.target.value.slice(0, 60) })} onBlur={onBlurSave}
+                  aria-label={L("主旨", "Subject")} className={field} style={{ borderColor: LINE }} />
+                <textarea value={p.emailBody ?? ""} onChange={(e) => onPatch({ emailBody: e.target.value.slice(0, 1200) })} onBlur={onBlurSave} rows={8}
+                  aria-label={L("內文", "Body")} className="rounded-lg border px-2.5 py-2 text-[13px] leading-relaxed outline-none focus:border-neutral-900" style={{ borderColor: LINE }} />
+              </div>
+              <div className="flex flex-wrap items-center gap-3 text-[12.5px]" style={{ color: META }}>
+                <a href={gmailHref(p)} target="_blank" rel="noreferrer noopener" className="underline underline-offset-2">{L("用 Gmail 開", "Open in Gmail")}</a>
+                <button type="button" onClick={onRun} disabled={busy} className="flex items-center gap-1.5 underline underline-offset-2 disabled:opacity-40">
+                  <Icon name="regenerate" size={11} /> {L("重新研究這一位", "Research again")}
+                </button>
+              </div>
+            </div>
           )}
-        </div>
+        </>
       )}
     </article>
   );
