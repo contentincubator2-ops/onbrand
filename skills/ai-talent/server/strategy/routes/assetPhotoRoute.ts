@@ -97,6 +97,7 @@ assetPhotoRouter.post(
       bytes: Buffer.isBuffer(body) ? body : Buffer.alloc(0),
       filename: String(req.headers["x-filename"] ?? "photo"),
       storageRoot: STORAGE_ROOT,
+      uploadedBy: callerId,
     });
     if ("error" in stored) { res.status(400).json({ error: stored.error }); return; }
     res.json({ ok: true, photo: stored });
