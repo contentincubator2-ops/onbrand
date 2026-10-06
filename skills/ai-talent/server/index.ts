@@ -550,6 +550,15 @@ async function runStartupMigrations() {
     // 那裡也寫了為什麼去重不看 status（否則被否決的形式每月復活）。
     const { ASSET_PHOTO_DDL } = await import("./strategy/core/brand/assetPhotos");
     await db.execute(sql.raw(ASSET_PHOTO_DDL));
+    const [apCols] = await db.execute(sql`
+      SELECT COLUMN_NAME FROM information_schema.COLUMNS
+      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'asset_photos' AND COLUMN_NAME = 'uploadedBy'
+    `) as any;
+    if ((apCols as any[]).length === 0) {
+      const { ASSET_PHOTO_UPLOADED_BY_DDL } = await import("./strategy/core/brand/assetPhotos");
+      await db.execute(sql.raw(ASSET_PHOTO_UPLOADED_BY_DDL));
+      console.log("[migrate] asset_photos.uploadedBy: added");
+    }
     console.log("[migrate] asset_photos: OK");
 
     const { POST_FORMAT_CANDIDATES_DDL } = await import("./content/core/catalog/postFormatStore");

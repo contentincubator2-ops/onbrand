@@ -42,7 +42,7 @@ export interface TeamPermissions {
   role: TeamRole;
   /** Run tasks, create and edit content, add photos to the brand / product library. */
   canWrite: boolean;
-  /** Change positioning, products, events, regulations, brand memory; remove photos or change the main one. */
+  /** Change positioning, products, events, regulations, brand memory; remove other people's photos or change the main one. */
   canEditStrategy: boolean;
   /** Schedule and publish to connected channels. */
   canPublish: boolean;
@@ -102,10 +102,12 @@ const MANAGE_NAMESPACES = new Set(["bundleConnect", "platformConnect"]);
 const PUBLISH_PATHS = new Set(["calendar.schedule", "calendar.reschedule", "calendar.retry", "calendar.publish"]);
 /**
  * Adding a photo is part of making a post, so it only needs `write` even
- * though the photo library sits in a strategy namespace. Removing a photo or
- * changing the main one still needs the strategy permission.
+ * though the photo library sits in a strategy namespace. Removing is `write`
+ * too, but assetPhotoRouter narrows it with canRemovePhoto: without the
+ * strategy permission a member removes only what they uploaded themselves.
+ * Changing the main photo still needs the strategy permission.
  */
-const WRITE_PATHS = new Set(["assetPhoto.saveGeneratedImage"]);
+const WRITE_PATHS = new Set(["assetPhoto.saveGeneratedImage", "assetPhoto.remove"]);
 /** What the upload route (assetPhotoRoute.ts) asks for — kept here so both entrances agree. */
 export const PHOTO_UPLOAD_NEED = "write" as const;
 
@@ -143,6 +145,21 @@ export function isAllowed(perms: TeamPermissions, need: Need): boolean {
     case "publish": return perms.canPublish;
     case "manage": return perms.canManage;
   }
+}
+
+export const REMOVE_OTHERS_PHOTO_DENIED =
+  "你只能刪除自己上傳的照片。要刪其他人的照片，請找團隊擁有者，或請他開啟你的「修改品牌定位」權限。";
+
+/**
+ * May this caller remove a photo uploaded by `uploadedBy`?
+ * `actor` is undefined when the caller works on their own brand (always yes).
+ */
+export function canRemovePhoto(
+  actor: { id: number; perms: TeamPermissions } | undefined,
+  uploadedBy: number | null,
+): boolean {
+  if (!actor || actor.perms.canEditStrategy) return true;
+  return actor.perms.canWrite && uploadedBy != null && uploadedBy === actor.id;
 }
 
 export function assertTeamPermission(perms: TeamPermissions, path: string, type: string): void {

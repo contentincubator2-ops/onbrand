@@ -57,11 +57,19 @@ export const ASSET_PHOTO_DDL = `
     mimeType    VARCHAR(64)  NOT NULL,
     sizeBytes   INT          NOT NULL,
     isPrimary   TINYINT(1)   NOT NULL DEFAULT 0,
+    uploadedBy  INT          NULL,
     createdAt   DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     KEY idx_asset_photos_scope (scope, scopeId, createdAt),
     KEY idx_asset_photos_brand (brandId)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
 `;
+
+/**
+ * uploadedBy = 真正按下上傳的那個人（userId 是資料的擁有者，團隊成員上傳時兩者不同）。
+ * 2026-10-06 CJ「小編也該能刪自己傳錯的照片」：沒有定位權限的編輯者只能刪 uploadedBy
+ * 是自己的照片。較晚加的欄位——舊照片是 NULL，等於「不是任何成員傳的」。
+ */
+export const ASSET_PHOTO_UPLOADED_BY_DDL = `ALTER TABLE asset_photos ADD COLUMN uploadedBy INT NULL`;
 
 export const MAX_UPLOAD_BYTES = 15 * 1024 * 1024;
 /** 一個 scope（一個品牌，或一個產品）最多留幾張——防止無限堆積硬碟。 */
@@ -156,7 +164,7 @@ export function safePhotoFilename(input: string): string {
  */
 export async function storePhotoBytes(args: {
   userId: number; brandId: number; scope: PhotoScope; scopeId: number;
-  bytes: Buffer; filename: string; storageRoot?: string;
+  bytes: Buffer; filename: string; storageRoot?: string; uploadedBy?: number;
 }): Promise<AssetPhoto | { error: string }> {
   const check = validateUploadedImage(args.bytes);
   if ("error" in check) return check;
@@ -181,6 +189,7 @@ export async function storePhotoBytes(args: {
     url: `${photoUrlPrefix()}/${args.scope}/${args.scopeId}/${fileId}`,
     filename: safePhotoFilename(args.filename),
     mimeType: check.mime, sizeBytes: args.bytes.length,
+    uploadedBy: args.uploadedBy,
   });
 }
 
@@ -198,7 +207,7 @@ export async function storePhotoBytes(args: {
  */
 export async function savePhotoFromUrl(args: {
   userId: number; brandId: number; scope: PhotoScope; scopeId: number;
-  sourceUrl: string; filename: string; makePrimary?: boolean; storageRoot?: string;
+  sourceUrl: string; filename: string; makePrimary?: boolean; storageRoot?: string; uploadedBy?: number;
 }): Promise<AssetPhoto | { error: string }> {
   const { fetchImageBuffer } = await import("../../../platform/core/media/imageFetch");
   let bytes: Buffer;
@@ -219,16 +228,27 @@ export async function savePhotoFromUrl(args: {
 /** 新增一張照片；scope 內第一張自動當主圖。超過上限先擋在 route 層，這裡不重複檢查。 */
 export async function insertPhoto(args: {
   userId: number; brandId: number; scope: PhotoScope; scopeId: number;
-  url: string; filename: string; mimeType: string; sizeBytes: number;
+  url: string; filename: string; mimeType: string; sizeBytes: number; uploadedBy?: number;
 }): Promise<AssetPhoto> {
   const id = randomUUID();
   const existing = await listPhotos(args.scope, args.scopeId);
   const isPrimary = existing.length === 0;
-  await localPool.execute(
-    `INSERT INTO asset_photos (id, userId, brandId, scope, scopeId, url, filename, mimeType, sizeBytes, isPrimary)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [id, args.userId, args.brandId, args.scope, args.scopeId, args.url, args.filename, args.mimeType, args.sizeBytes, isPrimary ? 1 : 0],
-  );
+  const values = [id, args.userId, args.brandId, args.scope, args.scopeId, args.url, args.filename, args.mimeType, args.sizeBytes, isPrimary ? 1 : 0];
+  try {
+    await localPool.execute(
+      `INSERT INTO asset_photos (id, userId, brandId, scope, scopeId, url, filename, mimeType, sizeBytes, isPrimary, uploadedBy)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [...values, args.uploadedBy ?? args.userId],
+    );
+  } catch (e: any) {
+    // uploadedBy 是較晚加的欄位；還沒跑過 migration 的資料庫照舊存，只是不記上傳者。
+    if (e?.code !== "ER_BAD_FIELD_ERROR") throw e;
+    await localPool.execute(
+      `INSERT INTO asset_photos (id, userId, brandId, scope, scopeId, url, filename, mimeType, sizeBytes, isPrimary)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      values,
+    );
+  }
   if (isPrimary && args.scope === "product") await mirrorPrimaryToProduct(args.userId, args.scopeId, args.url);
   return { id, scope: args.scope, scopeId: args.scopeId, url: args.url, filename: args.filename, mimeType: args.mimeType, sizeBytes: args.sizeBytes, isPrimary, createdAt: new Date().toISOString() };
 }
@@ -242,6 +262,18 @@ export async function setPrimaryPhoto(args: { userId: number; scope: PhotoScope;
   if (!target) throw new Error("找不到這張照片");
   await localPool.execute(`UPDATE asset_photos SET isPrimary = (id = ?) WHERE scope = ? AND scopeId = ?`, [args.photoId, args.scope, args.scopeId]);
   if (args.scope === "product") await mirrorPrimaryToProduct(args.userId, args.scopeId, target.url);
+}
+
+/** 這張照片是誰上傳的；查不到、舊照片或欄位還沒加都回 null。 */
+export async function photoUploaderId(photoId: string): Promise<number | null> {
+  try {
+    const [rows]: any = await localPool.execute(`SELECT uploadedBy FROM asset_photos WHERE id = ? LIMIT 1`, [photoId]);
+    const v = (rows as any[])[0]?.uploadedBy;
+    return v == null ? null : Number(v);
+  } catch (e: any) {
+    if (e?.code !== "ER_BAD_FIELD_ERROR") throw e;
+    return null;
+  }
 }
 
 /** 刪掉一張照片（連同磁碟檔案）。刪的若是主圖，自動把最新一張遞補；沒有照片了就把 imageUrl 清空。 */
