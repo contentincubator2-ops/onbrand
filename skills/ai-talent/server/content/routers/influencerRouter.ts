@@ -1,6 +1,7 @@
 /**
  * influencerRouter — 「網紅切角」的 tRPC 介面。規則在 core/influencer/influencerAngles.ts。
  *
+ * readable：除了 YouTube 與一般網頁，伺服器現在還讀得到哪些社群平台（有接數據商才有）。
  * latest：這個品牌最近一批的結果（重新整理不會不見）。
  * parseSheet：上傳的名單檔（.xlsx／.csv／.txt）→ 名單，還沒開始寫。
  * analyzeStart／analyzePoll：讀每一位的連結、分組寫切角與邀約信；開始後立刻回 jobId，
@@ -19,6 +20,7 @@ import { buildBrandPrefix } from "../../strategy/core/brand/brandContext";
 import localPool from "../../localDb";
 import { classifyLink, PLATFORM_LABEL } from "../core/influencer/influencerLink";
 import { readInfluencer } from "../core/influencer/influencerReader";
+import { providerPlatforms } from "../core/influencer/apifyProfiles";
 import {
   CHUNK, MAX_PEOPLE, NOTES_MAX, angleIssues, anglesSystemPrompt, materialEnough, parsePeopleAngles, personLabel, unsupportedQuotes,
   type ChunkPerson, type PersonResult,
@@ -209,6 +211,9 @@ async function runJob(job: Job, targets: string[], base: {
 }
 
 export const influencerRouter = router({
+  readable: protectedProcedure
+    .query(() => ({ social: providerPlatforms() as string[] })),
+
   latest: protectedProcedure
     .input(brandInput)
     .query(async ({ ctx, input }) => {

@@ -32,6 +32,8 @@ const envSchema = z.object({
   ZHIPU_API_KEY:          z.string().optional(),
   QWEN_API_KEY:           z.string().optional(),
   PERPLEXITY_API_KEY:     z.string().optional(),
+  // 網紅切角：讀 Instagram／Threads／TikTok 個人頁（沒設＝這些平台請用戶貼貼文）。
+  APIFY_API_TOKEN:        z.string().optional(),
   GOOGLE_AI_API_KEY:      z.string().optional(),
   COHERE_API_KEY:         z.string().optional(),
   OPENAI_API_KEY:         z.string().optional(),
