@@ -1,0 +1,96 @@
+name: Ops (DEV) — probe influencer angles end to end (read-only)
+
+# 網紅切角整條流程在 DEV VM 上實跑一次，不經過瀏覽器：
+#   讀幾位台灣網紅的 IG／Threads／YouTube 連結（Apify＋自己讀）→ 用品牌 2977（SoWork）的品牌資料
+#   寫切角與邀約信 → 印出每一位讀到多少字、各欄位字數、有沒有被檢查出問題。
+# 跑的是 VM 上已部署的程式（不帶這個分支的檔案）。不寫資料庫、不存名單。
+# 花費：幾次 Apify 呼叫＋一到兩次模型呼叫。
+# Path-scoped push，跟 op-probe-dev-campaign-chat.yml 同一個做法（environment: dev 才會連到 DEV VM）。
+on:
+  push:
+    paths:
+      - '.github/workflows/op-probe-dev-influencer.yml'
+
+jobs:
+  probe:
+    runs-on: ubuntu-24.04
+    environment: dev
+    timeout-minutes: 12
+    steps:
+      - name: Read real profiles and write angles on the DEV VM
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 10m
+          script: |
+            set +e
+            cd /opt/onbrand/current/skills/ai-talent
+            set -a; source .env 2>/dev/null; set +a
+            echo "host=$(hostname)  app=$(readlink -f /opt/onbrand/current)  now=$(date -u +%FT%TZ)"
+            F=server/content/core/influencer/_probe_tmp.ts
+            cat > "$F" <<'TS'
+            import localPool from "../../../localDb";
+            import { readInfluencer } from "./influencerReader";
+            import { providerPlatforms } from "./apifyProfiles";
+            import { PLATFORM_LABEL } from "./influencerLink";
+            import { anglesSystemPrompt, angleIssues, materialEnough, parsePeopleAngles, personLabel } from "./influencerAngles";
+            import { buildBrandPrefix } from "../../../strategy/core/brand/brandContext";
+            import { callModelStrict } from "../../../platform/core/llm/multiModelRouter";
+
+            const BRAND = 2977;
+            const LINKS = [
+              "https://www.instagram.com/joemanweng/",
+              "https://www.instagram.com/tsaiaga/",
+              "https://www.threads.net/@joemanweng",
+              "https://www.threads.net/@tsaiaga",
+              "https://www.youtube.com/@joeman",
+              "https://www.instagram.com/this_account_should_not_exist_zz9/",
+            ];
+            (async () => {
+              console.log("provider platforms:", providerPlatforms().join(",") || "(none)");
+              const [b]: any = await localPool.execute("SELECT name FROM brands WHERE id = ? LIMIT 1", [BRAND]);
+              const brandName = String(b[0]?.name ?? "");
+              const people: any[] = [];
+              await Promise.all(LINKS.map(async (url, i) => {
+                const t0 = Date.now();
+                const { link, read } = await readInfluencer(url);
+                const ok = materialEnough(read.material);
+                people[i] = { id: `p${i + 1}`, url, link, read, ok };
+                console.log(`\n[read p${i + 1}] ${url}\n  ${((Date.now() - t0) / 1000).toFixed(1)}s platform=${link?.platform} handle=${link?.handle} source=${read.source} name=${read.displayName} followers=${read.followers} chars=${read.material.length} enough=${ok}`);
+                if (read.material) console.log("  " + read.material.slice(0, 260).replace(/\n/g, "\n  "));
+              }));
+              const chunk = people.filter((p) => p.ok).slice(0, 5).map((p) => ({
+                id: p.id, label: personLabel({ name: undefined, displayName: p.read.displayName, handle: p.link.handle }),
+                platform: PLATFORM_LABEL[p.link.platform as keyof typeof PLATFORM_LABEL], followers: p.read.followers, material: p.read.material,
+              }));
+              if (!chunk.length) { console.log("\nnothing readable — stop"); process.exit(0); }
+              const brandCtx = await buildBrandPrefix(BRAND, null, null, "full").catch(() => "");
+              console.log(`\nbrand=${brandName} brandCtx chars=${brandCtx.length} writing for ${chunk.length} people…`);
+              const system = anglesSystemPrompt({ brandName, subjectLine: `品牌「${brandName}」本身（不是單一產品）`, brandCtx, people: chunk, outputLanguage: "zh-TW" });
+              const t0 = Date.now();
+              const r = await callModelStrict([{ role: "system", content: system }, { role: "user", content: "請開始。" }], "anthropic",
+                process.env.INFLUENCER_MODEL || process.env.INSPIRATION_MODEL || "claude-sonnet-4-6", { maxTokens: 8000, includeFinishReason: true });
+              console.log(`LLM ${((Date.now() - t0) / 1000).toFixed(1)}s model=${r.model} finish=${r.finishReason} chars=${r.content.length}`);
+              const got = parsePeopleAngles(r.content, chunk.map((c) => c.id));
+              for (const c of chunk) {
+                const a = got.get(c.id);
+                if (!a) { console.log(`\n[angle ${c.id}] ${c.label}: MISSING from model output`); continue; }
+                const issues = angleIssues(a, c.material, brandCtx);
+                console.log(`\n[angle ${c.id}] ${c.label}（${c.platform}）`);
+                console.log(`  切角(${a.angle.length}): ${a.angle}`);
+                console.log(`  開場(${a.hook.length}): ${a.hook}`);
+                a.talkingPoints.forEach((t, k) => console.log(`  可講${k + 1}(${t.length}): ${t}`));
+                console.log(`  為什麼(${a.angleWhy.length}): ${a.angleWhy}`);
+                console.log(`  特色(${a.profile.length}): ${a.profile}`);
+                console.log(`  依據(${a.evidence.length}): ${a.evidence}`);
+                console.log(`  信(${a.emailBody.length}): ${a.emailBody.replace(/\n+/g, " / ")}`);
+                console.log(`  第一輪檢查: ${issues.length ? issues.join(" | ") : "過關"}`);
+              }
+              process.exit(0);
+            })().catch((e) => { console.log("probe failed:", e?.message); process.exit(1); });
+            TS
+            timeout 540 ./node_modules/.bin/tsx "$F"
+            echo "probe exit=$?"
+            rm -f "$F"

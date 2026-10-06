@@ -178,6 +178,8 @@ export function anglesSystemPrompt(args: {
     `- 任兩位的 angle 不能講同一件事。`,
     `- 字數上限是硬規定，超過的欄位會被截斷。這些欄位是顯示在小卡片上給人掃一眼的（2026-10-06 CJ：「字太多」），寧短勿長。`,
     `- 素材看不出性別時不要寫「他」或「她」，用名字或「這位創作者」。`,
+    // 2026-10-06 DEV 實跑：Threads 素材裡有一則感情聲明，被寫進「判讀依據」。品牌寄陌生邀約信提這個很失禮。
+    `- 素材裡的私人生活（感情、家庭、健康、爭議與道歉聲明）一律不引用、不提及，也不拿來當依據；只看他做的內容題材。`,
     `- 全部用 ${lang} 寫。`,
     `只輸出 JSON，不要前言：{"people":[{"id":"${args.people[0]?.id ?? "p1"}","profile":"…","evidence":"…","talkingPoints":["…","…"],"angle":"…","angleWhy":"…","hook":"…","format":"…","emailSubject":"…","emailBody":"…","name":"…"}]}`,
   ].filter(Boolean).join("\n");
