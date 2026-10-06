@@ -6,7 +6,7 @@ describe("influencerRouter", () => {
   it("builds and exposes its procedures", async () => {
     const { influencerRouter } = await import("./influencerRouter");
     const procs = Object.keys((influencerRouter as any)._def.procedures);
-    expect(procs.sort()).toEqual(["analyzePoll", "analyzeStart", "exportFile", "latest", "parseSheet", "savePerson"]);
+    expect(procs.sort()).toEqual(["analyzePoll", "analyzeStart", "exportFile", "latest", "parseSheet", "readable", "savePerson"]);
   }, 60_000);
 });
 
@@ -42,6 +42,60 @@ describe("influencerReader parsers", () => {
     const xml = `<feed><entry><title>第一支 &amp; 開箱</title><media:group><media:description>說明\n第二行</media:description></media:group></entry>`
       + `<entry><title>第二支</title><media:group><media:description></media:description></media:group></entry></feed>`;
     expect(parseChannelFeed(xml)).toEqual([{ title: "第一支 & 開箱", description: "說明 第二行" }, { title: "第二支", description: "" }]);
+  });
+});
+
+describe("apifyProfiles", () => {
+  it("turns each actor's items into material, and returns null when there is nothing to read", async () => {
+    const { ACTORS, followersText } = await import("../core/influencer/apifyProfiles");
+    expect([followersText(286_0000), followersText(12_345), followersText(980), followersText(0), followersText("x")])
+      .toEqual(["286 萬粉絲", "1.2 萬粉絲", "980 粉絲", null, null]);
+
+    const ig = ACTORS.instagram!.toRead([{
+      username: "Mei", fullName: "小美", biography: "兩寶媽\n共讀紀錄", followersCount: 52000, verified: true,
+      latestPosts: [{ caption: "睡前 20 分鐘是我們家的固定儀式" }, { caption: "" }, { caption: "長途開車救星清單" }],
+    }], "mei")!;
+    expect(ig.displayName).toBe("小美");
+    expect(ig.followers).toBe("5.2 萬粉絲");
+    expect(ig.material).toContain("自介：兩寶媽 共讀紀錄");
+    expect(ig.material).toContain("最近 2 則貼文：");
+    expect(ig.material).toContain("- 長途開車救星清單");
+    // 私人帳號、查無此人、actor 回錯誤：沒有內容就是讀不到。
+    expect(ACTORS.instagram!.toRead([{ username: "mei", private: true, latestPosts: [] }], "mei")).toBeNull();
+    expect(ACTORS.instagram!.toRead([{ error: "not_found" }], "mei")).toBeNull();
+
+    const tt = ACTORS.tiktok!.toRead([
+      { text: "開箱新玩具", authorMeta: { name: "mei", nickName: "小美", signature: "育兒日常", fans: 3000 } },
+      { text: "一日 vlog", authorMeta: { name: "mei" } },
+    ], "mei")!;
+    expect(tt.followers).toBe("3,000 粉絲");
+    expect(tt.material).toContain("最近 2 支影片的說明：");
+
+    // Threads：只收這個帳號自己的貼文（回文串裡別人的不算）。
+    const th = ACTORS.threads!.toRead([
+      { text: "今天聊一人行銷部", username: "mei", user_full_name: "小美" },
+      { text: "別人的回覆", username: "someone_else" },
+    ], "mei")!;
+    expect(th.material).toContain("最近 1 則貼文：");
+    expect(th.material).not.toContain("別人的回覆");
+    expect(ACTORS.threads!.toRead([], "mei")).toBeNull();
+  });
+
+  it("is off without a token, and never calls out for a malformed handle", async () => {
+    const { providerPlatforms, readSocialProfile } = await import("../core/influencer/apifyProfiles");
+    const saved = [process.env.APIFY_API_TOKEN, process.env.APIFY_TOKEN];
+    delete process.env.APIFY_API_TOKEN; delete process.env.APIFY_TOKEN;
+    try {
+      expect(providerPlatforms()).toEqual([]);
+      expect(await readSocialProfile("instagram", "mei")).toBeNull();
+      process.env.APIFY_API_TOKEN = "test-token";
+      expect(providerPlatforms().sort()).toEqual(["instagram", "threads", "tiktok"]);
+      expect(await readSocialProfile("instagram", "../../etc/passwd")).toBeNull();
+      expect(await readSocialProfile("facebook", "mei")).toBeNull();
+    } finally {
+      if (saved[0] === undefined) delete process.env.APIFY_API_TOKEN; else process.env.APIFY_API_TOKEN = saved[0];
+      if (saved[1] !== undefined) process.env.APIFY_TOKEN = saved[1];
+    }
   });
 });
 
