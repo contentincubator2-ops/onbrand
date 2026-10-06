@@ -1,0 +1,103 @@
+name: Ops (DEV) — probe influencer "write as the creator" experiment (read-only)
+
+# CJ 2026-10-06：「現在的 DEMO 寫起來很生硬，不有趣，是否要換專家來寫角度，或是直接生成 agent
+# 模擬該用戶，看會怎麼寫？」
+# 這支是對照實驗，不改產品：同一位網紅、同一個品牌（2977 SoWork），用新的兩步做法寫一次——
+#   第 1 步：從他真實的貼文整理「他怎麼說話」（口吻卡，附原句）
+#   第 2 步：請模型當他本人，用三種不同的出發點各想一個他真的會想做的點子，照他的口吻寫開場
+# 印出來跟現在產品的寫法（op-probe-dev-influencer.yml 的輸出）比。不寫資料庫。
+# Path-scoped push（environment: dev 才會連到 DEV VM）。
+on:
+  push:
+    paths:
+      - '.github/workflows/op-probe-dev-influencer-voice.yml'
+
+jobs:
+  probe:
+    runs-on: ubuntu-24.04
+    environment: dev
+    timeout-minutes: 12
+    steps:
+      - name: Voice card + in-voice pitches on the DEV VM
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 10m
+          script: |
+            set +e
+            cd /opt/onbrand/current/skills/ai-talent
+            set -a; source .env 2>/dev/null; set +a
+            echo "host=$(hostname)  app=$(readlink -f /opt/onbrand/current)  now=$(date -u +%FT%TZ)"
+            F=server/content/core/influencer/_probe_voice_tmp.ts
+            cat > "$F" <<'TS'
+            import localPool from "../../../localDb";
+            import { readInfluencer } from "./influencerReader";
+            import { buildBrandPrefix } from "../../../strategy/core/brand/brandContext";
+            import { callModelStrict } from "../../../platform/core/llm/multiModelRouter";
+
+            const BRAND = 2977;
+            const LINKS = ["https://www.instagram.com/joemanweng/", "https://www.threads.net/@joemanweng"];
+            const MODEL = process.env.INFLUENCER_MODEL || process.env.INSPIRATION_MODEL || "claude-sonnet-4-6";
+            const ask = async (system: string, user: string, maxTokens: number) => {
+              const t0 = Date.now();
+              const r = await callModelStrict([{ role: "system", content: system }, { role: "user", content: user }], "anthropic", MODEL, { maxTokens });
+              console.log(`  (LLM ${((Date.now() - t0) / 1000).toFixed(1)}s, ${r.content.length} chars)`);
+              return r.content;
+            };
+            (async () => {
+              const [b]: any = await localPool.execute("SELECT name FROM brands WHERE id = ? LIMIT 1", [BRAND]);
+              const brandName = String(b[0]?.name ?? "");
+              const brandCtx = (await buildBrandPrefix(BRAND, null, null, "full").catch(() => "")).slice(0, 6000);
+              const reads = await Promise.all(LINKS.map((u) => readInfluencer(u)));
+              const material = reads.map((r) => r.read.material).filter(Boolean).join("\n\n");
+              console.log(`material chars=${material.length}`);
+              if (material.length < 200) { console.log("not enough material"); process.exit(0); }
+
+              console.log("\n===== 第 1 步：口吻卡 =====");
+              const voice = await ask(
+                [
+                  "你是幫品牌研究創作者的編輯。下面是一位創作者最近的公開貼文。請只根據這些貼文，整理「他怎麼說話」。",
+                  "輸出（繁體中文，條列，總共 200 字內）：",
+                  "1. 句子長短與節奏（短句連發？長句？）",
+                  "2. 常見的開頭方式（直接丟結論？先講數字？問句？）",
+                  "3. 語氣（吐槽、自嘲、熱血、冷靜…）與常用的語助詞、驚嘆號、emoji、hashtag 習慣",
+                  "4. 他會拿什麼當賣點（價格、體驗、挑戰、第一手實測…）",
+                  "5. 照抄 3 句最能代表他口吻的原句（一字不改）",
+                  "素材裡的私人生活（感情、家庭、道歉聲明）不要用。看不出來的不要補。",
+                ].join("\n"),
+                material, 900);
+              console.log(voice);
+
+              console.log("\n===== 第 2 步：當他本人，想三個他真的會想做的點子 =====");
+              const pitch = await ask(
+                [
+                  "你現在就是下面這位創作者本人。有個品牌來找你合作，你要想：如果接了，我會想怎麼做這支內容，我的觀眾才不會覺得是業配而滑掉？",
+                  "",
+                  "【你怎麼說話（口吻卡）】", voice,
+                  "",
+                  "【你最近發的內容】", material.slice(0, 2500),
+                  "",
+                  `【來找你的品牌：${brandName}（產品事實只能用這裡有的，沒有的不要編）】`, brandCtx,
+                  "",
+                  "請用三個不同的出發點各想一個點子：",
+                  "A. 從你自己最近真的做過的一支內容延伸（指名是哪一支）",
+                  "B. 反差或吐槽：這個品類大家以為對、其實不對的一件事",
+                  "C. 你觀眾會想存下來的判斷方法或實測",
+                  "每個點子寫四行：",
+                  "點子：一句話，18 字內，像你會下的標題，不是品牌口號",
+                  "開場：你影片或貼文的第一句，照你平常的口吻寫，口語、可以吐槽、可以用你習慣的語助詞；35 字內",
+                  "會提到品牌的哪一點：一個短語，15 字內",
+                  "為什麼觀眾會看：一句，25 字內",
+                  "規則：不要寫成你已經用過這個產品；不要編你沒做過的經歷；不要出現「洞見」「賦能」「策略夥伴」這種品牌簡報用語——用你自己會講的話。",
+                  "只輸出這三個點子，不要前言。",
+                ].join("\n"),
+                "請開始。", 1200);
+              console.log(pitch);
+              process.exit(0);
+            })().catch((e) => { console.log("probe failed:", e?.message); process.exit(1); });
+            TS
+            timeout 540 ./node_modules/.bin/tsx "$F"
+            echo "probe exit=$?"
+            rm -f "$F"
