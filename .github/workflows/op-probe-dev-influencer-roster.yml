@@ -1,0 +1,87 @@
+name: Ops (DEV) — probe influencer roster SQL (self-cleaning)
+
+# 網紅庫（influencer_profiles）的 SQL 在本機跑不了（本機沒有資料庫），這支在 DEV VM 上實際跑一輪：
+#   建表（CREATE TABLE IF NOT EXISTS，跟啟動時的 migration 同一句）→ 存一位測試用的人 → 再存一次只改名字
+#   （內容與讀取時間應該留著）→ 用另一種寫法的同一條連結查 → 列出網紅庫 → 刪掉測試資料。
+# 用的是這個分支的 influencerRoster.ts。測試資料掛在品牌 2977（SoWork）底下，連結是不存在的帳號，跑完就刪。
+# Path-scoped push（environment: dev 才會連到 DEV VM）。
+on:
+  push:
+    paths:
+      - '.github/workflows/op-probe-dev-influencer-roster.yml'
+
+jobs:
+  probe:
+    runs-on: ubuntu-24.04
+    environment: dev
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - name: Pack this branch's influencerRoster.ts
+        run: echo "PATCH_B64=$(gzip -c skills/ai-talent/server/content/core/influencer/influencerRoster.ts | base64 -w0)" >> "$GITHUB_ENV"
+      - name: Round-trip a test profile through the roster table
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          PATCH_B64: ${{ env.PATCH_B64 }}
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 4m
+          envs: PATCH_B64
+          script: |
+            set +e
+            cd /opt/onbrand/current/skills/ai-talent
+            set -a; source .env 2>/dev/null; set +a
+            echo "host=$(hostname)  app=$(readlink -f /opt/onbrand/current)  now=$(date -u +%FT%TZ)"
+            D=server/content/core/influencer
+            echo "$PATCH_B64" | base64 -d | gunzip > "$D/_probeRoster.ts"
+            cat > "$D/_probe_roster_tmp.ts" <<'TS'
+            import localPool from "../../../localDb";
+            import { INFLUENCER_PROFILES_DDL, backfillFromBatches, isFresh, loadRoster, loadSaved, removeProfile, upsertProfile, urlKeyOf } from "./_probeRoster";
+
+            const BRAND = 2977;
+            const URL_A = "https://www.instagram.com/zz_probe_roster_test_9/";
+            const URL_B = "instagram.com/ZZ_probe_roster_test_9?igsh=abc";   // 同一位的另一種寫法
+            const ok = (label: string, cond: boolean, extra = "") => console.log(`${cond ? "PASS" : "FAIL"}  ${label}${extra ? `  — ${extra}` : ""}`);
+            (async () => {
+              await localPool.query(INFLUENCER_PROFILES_DDL);
+              const base: any = { url: URL_A, name: undefined, email: undefined, platform: "instagram", handle: "zz_probe_roster_test_9", followers: "1.2 萬粉絲", displayName: "探測用", profile: "測試", source: "data_provider" };
+              await upsertProfile(BRAND, base, { material: "第一次讀到的內容".repeat(20), voice: "口吻卡 v1", fresh: true });
+              let saved = await loadSaved(BRAND, [URL_B]);
+              const s1 = saved.get(urlKeyOf(URL_B));
+              ok("存進去後，用另一種寫法的連結查得到", !!s1, `material=${s1?.material.length} voice=${s1?.voice}`);
+              ok("剛讀的內容算新的", isFresh(s1?.readAt), String(s1?.readAt));
+              // 只改名字與 Email：內容、口吻、讀取時間都要留著
+              await upsertProfile(BRAND, { ...base, name: "小測", email: "probe@example.com", followers: null });
+              saved = await loadSaved(BRAND, [URL_A]);
+              const s2 = saved.get(urlKeyOf(URL_A));
+              ok("只改名字時內容與口吻留著", s2?.material === s1?.material && s2?.voice === "口吻卡 v1");
+              ok("只改名字時讀取時間留著", !!s2?.readAt && s2.readAt.getTime() === s1?.readAt?.getTime());
+              ok("沒帶粉絲數時舊的留著", s2?.followers === "1.2 萬粉絲", String(s2?.followers));
+              // 沒重讀（fresh:false）但換了口吻卡：口吻更新、讀取時間不動
+              await upsertProfile(BRAND, base, { material: s1!.material, voice: "口吻卡 v2", fresh: false });
+              const s3 = (await loadSaved(BRAND, [URL_A])).get(urlKeyOf(URL_A));
+              ok("沒重讀時口吻可更新、讀取時間不動", s3?.voice === "口吻卡 v2" && s3?.readAt?.getTime() === s1?.readAt?.getTime());
+              const roster = await loadRoster(BRAND);
+              const mine = roster.filter((r) => r.handle === "zz_probe_roster_test_9");
+              ok("同一位只有一筆", mine.length === 1, `roster total=${roster.length}`);
+              ok("清單帶得出名字、Email、有內容、不算過期", mine[0]?.name === "小測" && mine[0]?.email === "probe@example.com" && mine[0]?.hasMaterial === true && mine[0]?.stale === false, JSON.stringify(mine[0]));
+              if (mine[0]) await removeProfile(BRAND, mine[0].id);
+              const after = (await loadRoster(BRAND)).filter((r) => r.handle === "zz_probe_roster_test_9");
+              ok("刪得掉", after.length === 0);
+              // 舊批次帶入：只在庫裡完全沒人時才會跑，這裡只看查詢本身不會炸
+              const [b]: any = await localPool.execute("SELECT COUNT(*) AS n FROM influencer_batches WHERE brandId = ?", [BRAND]);
+              console.log(`batches for brand ${BRAND}: ${b[0]?.n}; roster now: ${(await loadRoster(BRAND)).length}`);
+              if (!(await loadRoster(BRAND)).length) {
+                const n = await backfillFromBatches(BRAND);
+                const r2 = await loadRoster(BRAND);
+                ok("舊批次的人帶得進來", r2.length > 0 || n === 0, `backfilled=${n} roster=${r2.length}`);
+                for (const r of r2.slice(0, 8)) console.log(`  · ${r.name ?? r.displayName ?? r.handle ?? r.url}｜${r.platform}｜hasMaterial=${r.hasMaterial} stale=${r.stale}`);
+              }
+              process.exit(0);
+            })().catch((e) => { console.log("probe failed:", e?.message); process.exit(1); });
+            TS
+            timeout 200 ./node_modules/.bin/tsx "$D/_probe_roster_tmp.ts"
+            echo "probe exit=$?"
+            rm -f "$D/_probe_roster_tmp.ts" "$D/_probeRoster.ts"

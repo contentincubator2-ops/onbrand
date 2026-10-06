@@ -23,7 +23,11 @@
  * 選擇 USP，當然也可以新增，然後你自由幫忙策略性匹配」「並且標註在卡片上」）：
  *   · 主體下面列出定位裡現成的賣點，預設全選；可以取消、可以自己加。
  *   · 研究時先看完整批名單，替每位配一個賣點；卡片上標「主打」。
- * 規則與提示詞在 server/content/core/influencer/influencerAngles.ts、influencerUsps.ts。
+ *
+ * 2026-10-06（CJ：「讓用戶上傳過的網紅，不用重複上傳」「我還是想要一次看到很多位，要有滿滿 IDEA 的感覺」）：
+ *   · 網紅庫：研究過的人存在品牌底下，名單區直接點選加入；存的內容 30 天內不重讀。
+ *   · 牆更密：卡片只放名字、主打、三個點子的標題；點標題才展開開場與「選這個」。
+ * 規則與提示詞在 server/content/core/influencer/influencerAngles.ts、influencerUsps.ts、influencerRoster.ts。
  */
 import React from "react";
 import { useOutletContext } from "react-router-dom";
@@ -44,6 +48,8 @@ type Status = "draft" | "queued" | "reading" | "thinking" | "done" | "needs_mate
 interface Person {
   id: string; url: string; name?: string; email?: string; notes?: string;
   status: Status;
+  /** 從網紅庫加進來、庫裡已經有他的內容（不用先貼貼文）。只在前端用。 */
+  saved?: boolean;
   platform?: string | null; handle?: string | null; followers?: string | null; displayName?: string | null; source?: string;
   profile?: string; evidence?: string; format?: string; voice?: string;
   /** 配給他主打的賣點與理由。 */
@@ -88,6 +94,15 @@ function isWalled(url: string, readable: string[]): boolean {
 function looksLikeUrl(s: string): boolean {
   return /^(https?:\/\/)?[\w-]+(\.[\w-]+)+(\/|\?|$)/i.test(s.trim());
 }
+
+/** 判斷兩條連結是不是同一位（大小寫、結尾斜線、www、追蹤參數不算）。以伺服器的 urlKeyOf 為準，這裡只用來不重複顯示。 */
+function sameKey(url: string): string {
+  try {
+    const u = new URL(/^https?:\/\//i.test(url) ? url : `https://${url}`);
+    return `${u.hostname.replace(/^(www|m|mobile)\./, "")}${u.pathname.replace(/\/+$/, "")}`.toLowerCase();
+  } catch { return url.trim().toLowerCase(); }
+}
+interface RosterRow { id: number; url: string; name: string | null; email: string | null; platform: string | null; handle: string | null; followers: string | null; displayName: string | null; hasMaterial: boolean; stale: boolean }
 
 let seq = 0;
 const newId = () => `p${Date.now().toString(36)}${(seq++).toString(36)}`;
@@ -150,6 +165,9 @@ export default function InfluencerPage() {
   const utils = T.useUtils();
   const parseSheet = T.influencer.parseSheet.useMutation();
   const analyzeStart = T.influencer.analyzeStart.useMutation();
+  const rosterQ = T.influencer.roster.useQuery({ brandId: brandId ?? 0 }, { enabled: !!brandId, refetchOnWindowFocus: false });
+  const removeFromRoster = T.influencer.removeFromRoster.useMutation();
+  const [rosterEdit, setRosterEdit] = React.useState(false);
   const savePerson = T.influencer.savePerson.useMutation();
   const pickIdea = T.influencer.pickIdea.useMutation();
   /** 正在替誰的第幾個點子寫信。 */
@@ -188,14 +206,14 @@ export default function InfluencerPage() {
       if (r.lost) break;
       // job.people 是整批；本機還沒送出的草稿接在後面。
       setPeople((cur) => [...(r.people as Person[]), ...cur.filter((p) => !(r.people as Person[]).some((x) => x.id === p.id))]);
-      if (r.done) { setBusy(false); return; }
+      if (r.done) { setBusy(false); void rosterQ.refetch(); return; }
     }
     // 伺服器重啟或斷線：改讀存下來的那一批。
     const saved = (await latestQ.refetch().catch(() => null))?.data;
     if (runSeq.current !== seqNo) return;
     if (saved) setPeople(saved.people as Person[]);
     setBusy(false);
-  }, [utils, latestQ]);
+  }, [utils, latestQ, rosterQ]);
 
   const busyRef = React.useRef(false);
   busyRef.current = busy;
@@ -249,14 +267,14 @@ export default function InfluencerPage() {
 
   const patch = (id: string, v: Partial<Person>) => setPeople((cur) => cur.map((p) => (p.id === id ? { ...p, ...v } : p)));
 
-  const addPeople = (list: Array<{ url: string; name?: string; email?: string; notes?: string }>): number => {
+  const addPeople = (list: Array<{ url: string; name?: string; email?: string; notes?: string; saved?: boolean; platform?: string | null; handle?: string | null; followers?: string | null; displayName?: string | null }>): number => {
     let added = 0;
     setPeople((cur) => {
       const next = [...cur];
       for (const x of list) {
         const url = x.url.trim();
-        if (!url || next.length >= MAX_PEOPLE || next.some((p) => p.url.replace(/\/$/, "") === url.replace(/\/$/, ""))) continue;
-        next.push({ id: newId(), url, name: x.name, email: x.email, notes: x.notes, status: "draft" });
+        if (!url || next.length >= MAX_PEOPLE || next.some((p) => sameKey(p.url) === sameKey(url))) continue;
+        next.push({ ...x, id: newId(), url, status: "draft" });
         added++;
       }
       return next;
@@ -311,7 +329,7 @@ export default function InfluencerPage() {
   };
 
   /** 送去寫：ids 沒給＝所有還沒寫成的人。 */
-  const run = async (ids?: string[], list: Person[] = people) => {
+  const run = async (ids?: string[], list: Person[] = people, refresh = false) => {
     if (!brandId || busy) return;
     const targets = list.filter((p) => (ids ? ids.includes(p.id) : p.status !== "done"));
     if (!targets.length) return;
@@ -321,7 +339,7 @@ export default function InfluencerPage() {
     setPeople((cur) => cur.map((p) => (targets.some((t) => t.id === p.id) ? { ...p, status: "queued" } : p)));
     try {
       const r = await analyzeStart.mutateAsync({
-        brandId, subject, direction: direction.trim() || undefined, batchId: batchId ?? undefined, usps: uspSelected,
+        brandId, subject, direction: direction.trim() || undefined, batchId: batchId ?? undefined, usps: uspSelected, refresh,
         people: targets.map((p) => ({ id: p.id, url: p.url, name: p.name?.trim() || undefined, email: p.email?.trim() || undefined, notes: p.notes?.trim().slice(0, NOTES_MAX) || undefined })),
       });
       setBatchId(r.batchId);
@@ -374,6 +392,19 @@ export default function InfluencerPage() {
   const copy = async (text: string, okMessage?: string) => {
     try { await navigator.clipboard.writeText(text); showToastGlobal(okMessage ?? L("已複製。", "Copied.")); }
     catch { showToastGlobal(L("複製失敗，請手動選取。", "Couldn't copy. Select the text manually."), "error"); }
+  };
+
+  const roster: RosterRow[] = (rosterQ.data as RosterRow[] | undefined) ?? [];
+  const inList = new Set(people.map((p) => sameKey(p.url)));
+  const rosterLeft = roster.filter((r) => !inList.has(sameKey(r.url)));
+  const fromRoster = (r: RosterRow) => ({
+    url: r.url, name: r.name ?? undefined, email: r.email ?? undefined, saved: r.hasMaterial,
+    platform: r.platform, handle: r.handle, followers: r.followers, displayName: r.displayName,
+  });
+  const dropFromRoster = async (r: RosterRow) => {
+    if (!brandId) return;
+    try { await removeFromRoster.mutateAsync({ brandId, id: r.id }); await rosterQ.refetch(); }
+    catch (e) { showToastGlobal(friendlyError(e, L("沒有移除，請再試一次。", "Couldn't remove. Try again.")), "error"); }
   };
 
   const pending = people.filter((p) => p.status !== "done" && !RUNNING.includes(p.status));
@@ -523,6 +554,51 @@ export default function InfluencerPage() {
               startContent={parseSheet.isPending ? undefined : <Icon name="upload" size={12} />}>{L("上傳 Excel 名單", "Upload an Excel list")}</Button>
             <input ref={fileRef} type="file" accept=".xlsx,.csv,.tsv,.txt" className="hidden" onChange={(e) => onFile(e.target.files?.[0])} />
           </div>
+
+          {/* 網紅庫：研究過的人，點一下加進這次的名單（不用再貼連結）。 */}
+          {roster.length > 0 && (
+            <div className="flex flex-col gap-2 border-t pt-3" style={{ borderColor: LINE }}>
+              <div className="flex flex-wrap items-center gap-3">
+                <p className="m-0 flex items-center gap-1.5 text-[12px]" style={{ color: META }}>
+                  {L(`網紅庫 ${roster.length} 位`, `Saved creators (${roster.length})`)}
+                  <HelpTip>
+                    {L("研究過的網紅會留在這裡。換產品或活動時點一下就能加入，不用再貼連結；我們存的內容 30 天內不會重讀，所以也比較快。",
+                      "Creators you've researched stay here. Tap to add them for another product or campaign — no need to paste links again. What we saved is reused for 30 days, so it's faster too.")}
+                  </HelpTip>
+                </p>
+                {rosterLeft.length > 1 && !busy && !rosterEdit && (
+                  <button type="button" onClick={() => addPeople(rosterLeft.map(fromRoster))} className="text-[12.5px] underline underline-offset-2" style={{ color: META }}>
+                    {L("全部加入", "Add all")}
+                  </button>
+                )}
+                <button type="button" onClick={() => setRosterEdit((v) => !v)} className="ml-auto text-[12.5px] underline underline-offset-2" style={{ color: META }}>
+                  {rosterEdit ? L("完成", "Done") : L("整理", "Manage")}
+                </button>
+              </div>
+              {rosterLeft.length > 0 ? (
+                <div className="flex max-h-[132px] flex-wrap gap-2 overflow-y-auto">
+                  {rosterLeft.map((r) => {
+                    const name = (r.name || r.displayName || (r.handle ? `@${r.handle}` : r.url.replace(/^https?:\/\/(www\.)?/, ""))).slice(0, 28);
+                    return (
+                      <button key={r.id} type="button" disabled={busy || (!rosterEdit && people.length >= MAX_PEOPLE)} title={r.url}
+                        onClick={() => (rosterEdit ? void dropFromRoster(r) : addPeople([fromRoster(r)]))}
+                        className="flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[13px] transition hover:border-neutral-900 disabled:opacity-40"
+                        style={{ borderColor: LINE, color: INK }}>
+                        <Icon name={rosterEdit ? "close" : "add"} size={10} color={META} />
+                        <span>{name}</span>
+                        {r.platform && <span className="text-[11.5px]" style={{ color: META }}>{PLATFORM_NAME[r.platform] ?? (r.platform === "web" ? L("網站", "Website") : r.platform)}</span>}
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="m-0 text-[12.5px]" style={{ color: META }}>{L("網紅庫裡的人都已經在這次的名單裡了。", "Everyone saved is already on this list.")}</p>
+              )}
+              {rosterEdit && rosterLeft.length > 0 && (
+                <p className="m-0 text-[12px]" style={{ color: META }}>{L("點一下就從網紅庫移除（之前的研究結果不受影響）。", "Tap to remove from saved creators (past results aren't affected).")}</p>
+              )}
+            </div>
+          )}
         </section>
 
         {/* ── 每一位 ── */}
@@ -541,7 +617,7 @@ export default function InfluencerPage() {
                 </div>
               </div>
             )}
-            <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))" }}>
+            <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(264px, 1fr))" }}>
               {people.map((p) => (
                 <PersonCard key={p.id} p={p} en={en} busy={busy} readable={readable} pickingIndex={picking[p.id]}
                   onPick={(i) => pick(p, i)}
@@ -549,6 +625,7 @@ export default function InfluencerPage() {
                   onBlurSave={() => persist(p)}
                   onRemove={() => setPeople((cur) => cur.filter((x) => x.id !== p.id))}
                   onRun={() => run([p.id])}
+                  onRefresh={() => run([p.id], people, true)}
                   onCopy={copy} />
               ))}
             </div>
@@ -570,7 +647,7 @@ export default function InfluencerPage() {
 function StatusLine({ p, en, readable }: { p: Person; en: boolean; readable: string[] }) {
   const L = (zh: string, e: string) => (en ? e : zh);
   const text: Record<Status, string> = {
-    draft: isWalled(p.url, readable) && !(p.notes ?? "").trim()
+    draft: !p.saved && isWalled(p.url, readable) && !(p.notes ?? "").trim()
       ? L("這個平台讀不到，請貼上他的幾則貼文。", "We can't read this platform. Paste a few of their posts.")
       : L("還沒研究", "Not researched yet"),
     queued: L("排隊中…", "Queued…"), reading: L("正在讀他的內容…", "Reading their content…"), thinking: L("正在想他會怎麼做…", "Working out what they'd make…"),
@@ -579,7 +656,7 @@ function StatusLine({ p, en, readable }: { p: Person; en: boolean; readable: str
     failed: L("這一位沒寫成，請再試一次。", "This one didn't finish. Try again."),
   };
   if (!text[p.status]) return null;
-  const warn = p.status === "needs_material" || p.status === "invalid_link" || p.status === "failed" || (p.status === "draft" && isWalled(p.url, readable) && !(p.notes ?? "").trim());
+  const warn = p.status === "needs_material" || p.status === "invalid_link" || p.status === "failed" || (p.status === "draft" && !p.saved && isWalled(p.url, readable) && !(p.notes ?? "").trim());
   return (
     <p className="m-0 flex items-start gap-1.5 text-[12.5px] leading-relaxed" style={{ color: warn ? "#B45309" : META }} aria-live="polite">
       {RUNNING.includes(p.status) ? <Icon name="working" size={12} className="mt-0.5 animate-spin" /> : warn ? <Icon name="warning" size={12} className="mt-0.5" /> : null}
@@ -588,18 +665,22 @@ function StatusLine({ p, en, readable }: { p: Person; en: boolean; readable: str
   );
 }
 
-function PersonCard({ p, en, busy, readable, pickingIndex, onPatch, onBlurSave, onRemove, onRun, onCopy, onPick }: {
+function PersonCard({ p, en, busy, readable, pickingIndex, onPatch, onBlurSave, onRemove, onRun, onRefresh, onCopy, onPick }: {
   p: Person; en: boolean; busy: boolean; readable: string[];
   /** 正在替第幾個點子寫信（沒有＝undefined）。 */
   pickingIndex: number | undefined;
   onPatch: (v: Partial<Person>) => void; onBlurSave: () => void; onRemove: () => void; onRun: () => void;
+  /** 不用網紅庫裡存的內容，重讀他的連結再研究。 */
+  onRefresh: () => void;
   onCopy: (t: string, okMessage?: string) => void; onPick: (index: number) => void;
 }) {
   const L = (zh: string, e: string) => (en ? e : zh);
   const running = RUNNING.includes(p.status);
   const done = p.status === "done";
-  const walled = isWalled(p.url, readable);
+  const walled = !p.saved && isWalled(p.url, readable);
   const [open, setOpen] = React.useState(false);
+  /** 展開看開場的是第幾個點子（一次一個；牆上預設只有標題）。 */
+  const [peek, setPeek] = React.useState<number | null>(null);
   const showNotes = !done && !running && (walled || p.status === "needs_material" || !!(p.notes ?? "").trim());
   const platform = p.platform ? (PLATFORM_NAME[p.platform] ?? (p.platform === "web" ? L("網站", "Website") : p.platform)) : null;
   const field = "rounded-lg border px-2.5 py-1.5 text-[13px] outline-none focus:border-neutral-900 disabled:opacity-60";
@@ -655,32 +736,45 @@ function PersonCard({ p, en, busy, readable, pickingIndex, onPatch, onBlurSave, 
 
       {done && (
         <>
-          {/* 卡面：三個點子，各一句標題＋他的口吻的開場。挑一個才寫邀約信。 */}
-          <div className="flex flex-col gap-2" role="radiogroup" aria-label={L("挑一個點子", "Pick an idea")}>
+          {/* 牆上只放三個點子的標題；點一下才展開他的口吻的開場與「選這個」。 */}
+          <div className="flex flex-col" role="list" aria-label={L("三個點子", "Three ideas")}>
             {ideas.map((idea, i) => {
               const on = picked === i;
               const busyHere = pickingIndex === i;
+              const shown = peek === i || busyHere;
+              const kind = idea.kind ? KIND_LABEL[idea.kind] : undefined;
               return (
-                <button key={i} type="button" role="radio" aria-checked={on} disabled={writing}
-                  onClick={() => { if (!on && p.ideas?.length) onPick(i); }}
-                  className="flex flex-col gap-1 rounded-xl border px-3.5 py-3 text-left transition hover:border-neutral-400 disabled:opacity-60"
-                  style={{ borderColor: on || busyHere ? INK : LINE, background: on ? SOFT : "#FFFFFF" }}>
-                  {idea.kind && KIND_LABEL[idea.kind] && (
-                    <span className="flex items-center gap-1.5 text-[11.5px]" style={{ color: META }}>
-                      {on && <Icon name="check" size={10} />}
-                      {en ? KIND_LABEL[idea.kind]![1] : KIND_LABEL[idea.kind]![0]}
+                <div key={i} role="listitem" className="border-t first:border-t-0" style={{ borderColor: LINE }}>
+                  <button type="button" onClick={() => setPeek(shown ? null : i)} aria-expanded={shown}
+                    className="flex w-full items-start gap-2 py-2.5 text-left">
+                    <span className="mt-[5px] flex h-[14px] w-[14px] shrink-0 items-center justify-center rounded-full"
+                      style={{ background: on ? INK : "transparent", border: on ? "none" : `1px solid ${LINE}`, color: "#FFFFFF" }}>
+                      {on && <Icon name="check" size={8} />}
                     </span>
-                  )}
-                  <span className="text-[15px] font-semibold leading-snug" style={{ color: INK }}>{idea.title}</span>
-                  {idea.hook && (
-                    <span className="text-[13px] leading-relaxed" style={{ color: META, fontFamily: '"Source Serif Pro", "Noto Serif TC", Georgia, serif' }}>「{idea.hook}」</span>
-                  )}
-                  {busyHere && (
-                    <span className="mt-0.5 flex items-center gap-1.5 text-[12px]" style={{ color: META }} aria-live="polite">
-                      <Icon name="working" size={11} className="animate-spin" /> {L("正在寫邀約信…", "Writing the outreach email…")}
+                    <span className="flex min-w-0 flex-col">
+                      <span className="text-[14.5px] leading-snug" style={{ color: INK, fontWeight: on ? 700 : 600 }}>{idea.title}</span>
+                      {kind && <span className="text-[11px]" style={{ color: META }}>{en ? kind[1] : kind[0]}</span>}
                     </span>
+                  </button>
+                  {shown && (
+                    <div className="flex flex-col gap-2 pb-3 pl-[22px]">
+                      {idea.hook && (
+                        <p className="m-0 text-[13px] leading-relaxed" style={{ color: META, fontFamily: '"Source Serif Pro", "Noto Serif TC", Georgia, serif' }}>「{idea.hook}」</p>
+                      )}
+                      {busyHere ? (
+                        <span className="flex items-center gap-1.5 text-[12px]" style={{ color: META }} aria-live="polite">
+                          <Icon name="working" size={11} className="animate-spin" /> {L("正在寫邀約信…", "Writing the outreach email…")}
+                        </span>
+                      ) : !on && !!p.ideas?.length && (
+                        <div>
+                          <Button size="sm" variant="flat" onPress={() => onPick(i)} isDisabled={writing}>
+                            {hasEmail ? L("改選這個，重寫邀約信", "Switch to this one") : L("選這個，寫邀約信", "Pick this, write the email")}
+                          </Button>
+                        </div>
+                      )}
+                    </div>
                   )}
-                </button>
+                </div>
               );
             })}
           </div>
@@ -705,8 +799,8 @@ function PersonCard({ p, en, busy, readable, pickingIndex, onPatch, onBlurSave, 
                   <Icon name="copy" size={12} /> {L("複製", "Copy")}
                 </button>
               </>
-            ) : !writing && (
-              <span className="text-[12.5px]" style={{ color: META }}>{L("挑一個，就幫你寫邀約信。", "Pick one and we'll write the outreach email.")}</span>
+            ) : !writing && peek === null && (
+              <span className="text-[12px]" style={{ color: META }}>{L("點一個點子看開場", "Tap an idea to see the opening")}</span>
             )}
             <button type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open}
               className="ml-auto text-[12.5px] underline underline-offset-2" style={{ color: META }}>
@@ -762,7 +856,11 @@ function PersonCard({ p, en, busy, readable, pickingIndex, onPatch, onBlurSave, 
               <div className="flex flex-wrap items-center gap-3 text-[12.5px]" style={{ color: META }}>
                 {hasEmail && <a href={gmailHref(p)} target="_blank" rel="noreferrer noopener" className="underline underline-offset-2">{L("用 Gmail 開", "Open in Gmail")}</a>}
                 <button type="button" onClick={onRun} disabled={busy} className="flex items-center gap-1.5 underline underline-offset-2 disabled:opacity-40">
-                  <Icon name="regenerate" size={11} /> {L("重新研究這一位", "Research again")}
+                  <Icon name="regenerate" size={11} /> {L("換三個點子", "Three new ideas")}
+                </button>
+                <button type="button" onClick={onRefresh} disabled={busy} className="underline underline-offset-2 disabled:opacity-40"
+                  title={L("重新讀他的連結（他最近發了新內容時用）", "Re-read their link (use when they've posted new content)")}>
+                  {L("更新他的資料", "Refresh their content")}
                 </button>
               </div>
             </div>
