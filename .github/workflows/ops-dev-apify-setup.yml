@@ -1,0 +1,95 @@
+name: Ops (DEV) — write Apify token + probe social profile reads
+
+# 網紅切角讀 Instagram／Threads／TikTok 個人頁要用 Apify（server/content/core/influencer/apifyProfiles.ts）。
+# 這支做兩件事：
+#   1. 把 repo secret APIFY_API_TOKEN 寫進 DEV VM 的 .env 並重啟 onbrand-dev。
+#      金鑰只從 secret 來，不從 workflow input（input 會明碼留在執行紀錄）；全程不印出來。
+#   2. 用這個分支的 apifyProfiles.ts 在 VM 上實際各讀一個公開帳號，印出讀到多少字與前幾行。
+#      讀不到時印出 HTTP 狀態與回傳的欄位名稱，方便對 actor 的格式。
+# 每跑一次會花三次 actor 呼叫（合計不到 US$0.05）。
+# Path-scoped push，跟 op-probe-dev-campaign-chat.yml 同一個做法（environment: dev 才會連到 DEV VM）。
+on:
+  push:
+    paths:
+      - '.github/workflows/ops-dev-apify-setup.yml'
+
+jobs:
+  setup:
+    runs-on: ubuntu-24.04
+    environment: dev
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Pack this branch's apifyProfiles.ts
+        run: echo "PATCH_B64=$(gzip -c skills/ai-talent/server/content/core/influencer/apifyProfiles.ts | base64 -w0)" >> "$GITHUB_ENV"
+      - name: Write token to DEV .env, restart, probe
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          APIFY_API_TOKEN: ${{ secrets.APIFY_API_TOKEN }}
+          PATCH_B64: ${{ env.PATCH_B64 }}
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 8m
+          envs: APIFY_API_TOKEN,PATCH_B64
+          script: |
+            set +e
+            ENV=/opt/onbrand/shared/.env
+            echo "host=$(hostname)  app=$(readlink -f /opt/onbrand/current)  now=$(date -u +%FT%TZ)"
+            if [ -z "$APIFY_API_TOKEN" ]; then echo "x secret APIFY_API_TOKEN is empty or missing"; exit 1; fi
+            if [ ! -f "$ENV" ]; then echo "x .env not found at $ENV"; exit 1; fi
+            echo "token length=${#APIFY_API_TOKEN}"
+
+            # 1) 寫進 .env（原地改寫，保留檔案權限；先備份）
+            cp -p "$ENV" "${ENV}.bak.apify"
+            grep -v '^APIFY_API_TOKEN=' "$ENV" > "${ENV}.tmp.apify"
+            printf 'APIFY_API_TOKEN=%s\n' "$APIFY_API_TOKEN" >> "${ENV}.tmp.apify"
+            cat "${ENV}.tmp.apify" > "$ENV"
+            rm -f "${ENV}.tmp.apify"
+            echo "env: APIFY_API_TOKEN written ($(grep -c '^APIFY_API_TOKEN=' "$ENV") line)"
+
+            # 2) 用這個分支的程式實際讀三個公開帳號
+            cd /opt/onbrand/current/skills/ai-talent
+            P=server/content/core/influencer__probe
+            rm -rf "$P"; mkdir -p "$P"
+            echo "$PATCH_B64" | base64 -d | gunzip > "$P/apifyProfiles.ts"
+            cat > "$P/_probe.ts" <<'TS'
+            import { ACTORS, readSocialProfile, apifyToken } from "./apifyProfiles";
+            const CASES: Array<[any, string]> = [["instagram", "natgeo"], ["threads", "zuck"], ["tiktok", "tiktok"]];
+            (async () => {
+              console.log("token present:", !!apifyToken());
+              for (const [platform, handle] of CASES) {
+                const t0 = Date.now();
+                const r = await readSocialProfile(platform, handle);
+                const s = ((Date.now() - t0) / 1000).toFixed(1);
+                if (r) {
+                  console.log(`\n[${platform}] OK ${s}s name=${r.displayName} followers=${r.followers} chars=${r.material.length}`);
+                  console.log(r.material.slice(0, 500));
+                  continue;
+                }
+                console.log(`\n[${platform}] NULL after ${s}s — raw call:`);
+                const spec = (ACTORS as any)[platform];
+                try {
+                  const res = await fetch(`https://api.apify.com/v2/acts/${spec.actor}/run-sync-get-dataset-items?timeout=75&format=json&clean=true`, {
+                    method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${apifyToken()}` },
+                    body: JSON.stringify(spec.input(handle)), signal: AbortSignal.timeout(90_000),
+                  });
+                  const text = await res.text();
+                  console.log(`  HTTP ${res.status} bytes=${text.length}`);
+                  let items: any = null; try { items = JSON.parse(text); } catch { /* not json */ }
+                  if (Array.isArray(items)) console.log(`  items=${items.length} keys(first)=${Object.keys(items[0] ?? {}).slice(0, 40).join(",")}`);
+                  else console.log(`  body: ${text.slice(0, 400)}`);
+                } catch (e: any) { console.log(`  raw call failed: ${e?.message}`); }
+              }
+              process.exit(0);
+            })();
+            TS
+            APIFY_API_TOKEN="$APIFY_API_TOKEN" timeout 420 ./node_modules/.bin/tsx "$P/_probe.ts"
+            echo "probe exit=$?"
+            rm -rf "$P"
+
+            # 3) 重啟讓站台吃到新的環境變數
+            pm2 restart onbrand-dev --update-env >/dev/null 2>&1
+            timeout 60 bash -c 'until curl --fail --silent http://127.0.0.1:3101/health >/dev/null; do sleep 3; done' \
+              && echo "restart: health OK" || echo "x restart: health check FAILED"

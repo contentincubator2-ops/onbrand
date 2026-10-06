@@ -46,9 +46,17 @@ const PLATFORM_NAME: Record<string, string> = {
   x: "X", linkedin: "LinkedIn", podcast: "Podcast",
 };
 /** 伺服器讀不到的平台（同 server influencerLink.classifyLink 的 serverReadable；以伺服器為準，這裡只用來先提示）。 */
-const WALLED = /(^|\.)(instagram\.com|threads\.net|threads\.com|tiktok\.com|facebook\.com|fb\.com|x\.com|twitter\.com|linkedin\.com)$/;
-function isWalled(url: string): boolean {
-  try { return WALLED.test(new URL(/^https?:\/\//i.test(url) ? url : `https://${url}`).hostname.toLowerCase()); } catch { return false; }
+const WALLED: Array<[RegExp, string]> = [
+  [/(^|\.)instagram\.com$/, "instagram"], [/(^|\.)threads\.(net|com)$/, "threads"], [/(^|\.)tiktok\.com$/, "tiktok"],
+  [/(^|\.)(facebook|fb)\.com$/, "facebook"], [/(^|\.)(x|twitter)\.com$/, "x"], [/(^|\.)linkedin\.com$/, "linkedin"],
+];
+/** readable：伺服器接了數據商、現在讀得到的社群平台（server influencer.readable）。 */
+function isWalled(url: string, readable: string[]): boolean {
+  try {
+    const host = new URL(/^https?:\/\//i.test(url) ? url : `https://${url}`).hostname.toLowerCase();
+    const platform = WALLED.find(([re]) => re.test(host))?.[1];
+    return !!platform && !readable.includes(platform);
+  } catch { return false; }
 }
 function looksLikeUrl(s: string): boolean {
   return /^(https?:\/\/)?[\w-]+(\.[\w-]+)+(\/|\?|$)/i.test(s.trim());
@@ -106,6 +114,8 @@ export default function InfluencerPage() {
 
   const productsQ = T.product?.list?.useQuery({ brandId: brandId ?? undefined }, { enabled: !!brandId, refetchOnWindowFocus: false }) ?? { data: [] };
   const eventsQ = T.event?.list?.useQuery({ brandId: brandId ?? undefined }, { enabled: !!brandId, refetchOnWindowFocus: false }) ?? { data: [] };
+  const readableQ = T.influencer.readable.useQuery(undefined, { refetchOnWindowFocus: false, staleTime: 10 * 60_000 });
+  const readable: string[] = readableQ.data?.social ?? [];
   const latestQ = T.influencer.latest.useQuery({ brandId: brandId ?? 0 }, { enabled: !!brandId, refetchOnWindowFocus: false });
   const products: any[] = (productsQ.data as any[]) ?? [];
   const events: any[] = (eventsQ.data as any[]) ?? [];
@@ -371,10 +381,11 @@ export default function InfluencerPage() {
             <p className="m-0 flex items-center gap-1.5 text-[13px] font-semibold" style={{ color: INK }}>
               {L("要研究哪幾位？", "Who should we look at?")}
               <HelpTip>
-                {L(
-                  "YouTube、部落格、個人網站我們會自己讀。Instagram、Threads、TikTok、Facebook 的個人頁讀不到，加進來後請貼上他的幾則貼文。名單檔可用 Excel 或 CSV，一列一位，有連結就行。",
-                  "We read YouTube, blogs and personal sites ourselves. Instagram, Threads, TikTok and Facebook profiles can't be read — paste a few of their posts after adding them. Lists can be Excel or CSV, one creator per row with a link.",
-                )}
+                {readable.length
+                  ? L("貼上連結我們就會去讀他的公開內容。少數讀不到的（例如 Facebook 個人頁、私人帳號），卡片上會請你貼上他的幾則貼文。名單檔可用 Excel 或 CSV，一列一位，有連結就行。",
+                    "Paste a link and we read their public content. The few we can't read (Facebook profiles, private accounts) will ask you to paste some posts on the card. Lists can be Excel or CSV, one creator per row with a link.")
+                  : L("YouTube、部落格、個人網站我們會自己讀。Instagram、Threads、TikTok、Facebook 的個人頁讀不到，加進來後請貼上他的幾則貼文。名單檔可用 Excel 或 CSV，一列一位，有連結就行。",
+                    "We read YouTube, blogs and personal sites ourselves. Instagram, Threads, TikTok and Facebook profiles can't be read — paste a few of their posts after adding them. Lists can be Excel or CSV, one creator per row with a link.")}
               </HelpTip>
               {people.length > 0 && <span className="font-normal" style={{ color: META }}>{people.length}／{MAX_PEOPLE}</span>}
             </p>
@@ -416,7 +427,7 @@ export default function InfluencerPage() {
             )}
             <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))" }}>
               {people.map((p) => (
-                <PersonCard key={p.id} p={p} en={en} busy={busy}
+                <PersonCard key={p.id} p={p} en={en} busy={busy} readable={readable}
                   onPatch={(v) => patch(p.id, v)}
                   onBlurSave={() => persist(p)}
                   onRemove={() => setPeople((cur) => cur.filter((x) => x.id !== p.id))}
@@ -439,10 +450,10 @@ export default function InfluencerPage() {
   );
 }
 
-function StatusLine({ p, en }: { p: Person; en: boolean }) {
+function StatusLine({ p, en, readable }: { p: Person; en: boolean; readable: string[] }) {
   const L = (zh: string, e: string) => (en ? e : zh);
   const text: Record<Status, string> = {
-    draft: isWalled(p.url) && !(p.notes ?? "").trim()
+    draft: isWalled(p.url, readable) && !(p.notes ?? "").trim()
       ? L("這個平台讀不到，請貼上他的幾則貼文。", "We can't read this platform. Paste a few of their posts.")
       : L("還沒研究", "Not researched yet"),
     queued: L("排隊中…", "Queued…"), reading: L("正在讀他的內容…", "Reading their content…"), thinking: L("正在想切角…", "Working out the angle…"),
@@ -451,7 +462,7 @@ function StatusLine({ p, en }: { p: Person; en: boolean }) {
     failed: L("這一位沒寫成，請再試一次。", "This one didn't finish. Try again."),
   };
   if (!text[p.status]) return null;
-  const warn = p.status === "needs_material" || p.status === "invalid_link" || p.status === "failed" || (p.status === "draft" && isWalled(p.url) && !(p.notes ?? "").trim());
+  const warn = p.status === "needs_material" || p.status === "invalid_link" || p.status === "failed" || (p.status === "draft" && isWalled(p.url, readable) && !(p.notes ?? "").trim());
   return (
     <p className="m-0 flex items-start gap-1.5 text-[12.5px] leading-relaxed" style={{ color: warn ? "#B45309" : META }} aria-live="polite">
       {RUNNING.includes(p.status) ? <Icon name="working" size={12} className="mt-0.5 animate-spin" /> : warn ? <Icon name="warning" size={12} className="mt-0.5" /> : null}
@@ -460,14 +471,14 @@ function StatusLine({ p, en }: { p: Person; en: boolean }) {
   );
 }
 
-function PersonCard({ p, en, busy, onPatch, onBlurSave, onRemove, onRun, onCopy }: {
-  p: Person; en: boolean; busy: boolean;
+function PersonCard({ p, en, busy, readable, onPatch, onBlurSave, onRemove, onRun, onCopy }: {
+  p: Person; en: boolean; busy: boolean; readable: string[];
   onPatch: (v: Partial<Person>) => void; onBlurSave: () => void; onRemove: () => void; onRun: () => void; onCopy: (t: string, okMessage?: string) => void;
 }) {
   const L = (zh: string, e: string) => (en ? e : zh);
   const running = RUNNING.includes(p.status);
   const done = p.status === "done";
-  const walled = isWalled(p.url);
+  const walled = isWalled(p.url, readable);
   const [open, setOpen] = React.useState(false);
   const showNotes = !done && !running && (walled || p.status === "needs_material" || !!(p.notes ?? "").trim());
   const platform = p.platform ? (PLATFORM_NAME[p.platform] ?? (p.platform === "web" ? L("網站", "Website") : p.platform)) : null;
@@ -494,7 +505,7 @@ function PersonCard({ p, en, busy, onPatch, onBlurSave, onRemove, onRun, onCopy 
         )}
       </header>
 
-      <StatusLine p={p} en={en} />
+      <StatusLine p={p} en={en} readable={readable} />
 
       {showNotes && (
         <textarea value={p.notes ?? ""} onChange={(e) => onPatch({ notes: e.target.value.slice(0, NOTES_MAX) })} rows={4}

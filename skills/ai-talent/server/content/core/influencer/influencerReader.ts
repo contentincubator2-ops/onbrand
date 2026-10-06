@@ -4,16 +4,19 @@
  *   · YouTube 頻道：頻道頁（名稱、簡介、訂閱數）＋公開 RSS 的最近 15 支影片標題與說明。不需金鑰。
  *   · YouTube 影片：沿用 youtubeContext（標題、說明、字幕）。
  *   · 一般網頁（部落格、個人站、媒體報導、Podcast 頁）：沿用 urlContext。
- *   · IG／Threads／TikTok／FB／X／LinkedIn：不讀（登入牆＋條款），回 readable:false，
- *     由用戶補貼文；付費數據商接上後在這裡加一支 reader。
+ *   · IG／Threads／TikTok：伺服器自己讀不到（登入牆），有設 Apify 金鑰時交給 apifyProfiles 讀；
+ *     沒設、或那邊也讀不到，就由用戶補貼文。
+ *   · FB／X／LinkedIn：不讀，由用戶補貼文。
  *
  * 讀不到就是讀不到——不拿帳號名稱去猜這個人是誰（no silent fallback）。
  */
 import { fetchUrlSummary, hasMeaningfulUrlContent } from "../../../platform/core/web/urlContext";
 import { extractYouTubeId, fetchYouTubeContext } from "../../../platform/core/web/youtubeContext";
 import { classifyLink, isPrivateHost, type InfluencerLink } from "./influencerLink";
+import { readSocialProfile } from "./apifyProfiles";
 
-export type ReadSource = "youtube_channel" | "youtube_video" | "web" | "none";
+/** data_provider＝付費數據商（apifyProfiles）讀到的社群個人頁。 */
+export type ReadSource = "youtube_channel" | "youtube_video" | "web" | "data_provider" | "none";
 
 export interface InfluencerRead {
   source: ReadSource;
@@ -129,7 +132,12 @@ async function readWeb(url: string): Promise<InfluencerRead> {
 /** 讀一條連結。任何失敗都回 source:"none"，不丟錯。 */
 export async function readInfluencer(rawUrl: string): Promise<{ link: InfluencerLink | null; read: InfluencerRead }> {
   const link = classifyLink(rawUrl);
-  if (!link || !link.serverReadable) return { link, read: NONE };
+  if (!link) return { link, read: NONE };
+  if (!link.serverReadable) {
+    if (!link.handle) return { link, read: NONE };
+    const r = await readSocialProfile(link.platform, link.handle);
+    return { link, read: r ? { source: "data_provider", ...r } : NONE };
+  }
   try {
     const work = link.platform === "youtube"
       ? (extractYouTubeId(link.url) ? readYouTubeVideo(link.url) : readYouTubeChannel(link))
