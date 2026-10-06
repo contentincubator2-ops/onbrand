@@ -214,7 +214,7 @@ async function runJob(job: Job, targets: string[], base: Base): Promise<void> {
 
     // 2) 有賣點清單：先看完整批再分配誰講哪一個（一位一位各自挑，大家都會挑最顯眼的那個）。
     //    這一批原本就配好的人算進去，補寫的人才不會又擠到同一個賣點。
-    for (const id of targets) patch(id, { usp: undefined, uspWhy: undefined });
+    for (const id of targets) patch(id, { usp: undefined, uspTag: undefined, uspWhy: undefined });
     if (base.usps.length && ready.length) {
       const taken: Record<string, number> = {};
       for (const p of job.people) if (p.usp && !targets.includes(p.id) && base.usps.includes(p.usp)) taken[p.usp] = (taken[p.usp] ?? 0) + 1;
@@ -225,7 +225,7 @@ async function runJob(job: Job, targets: string[], base: Base): Promise<void> {
       const raw = base.usps.length > 1
         ? await ask(matchPrompt({ brandName: base.brandName, subjectLine: base.subjectLine, usps: base.usps, people, taken, outputLanguage: base.outputLanguage }), "請開始。", 1500)
         : null;
-      for (const [id, m] of parseMatches(raw, base.usps, ready, taken)) patch(id, { usp: m.usp, uspWhy: m.why });
+      for (const [id, m] of parseMatches(raw, base.usps, ready, taken)) patch(id, { usp: m.usp, uspTag: m.tag, uspWhy: m.why });
       await saveBatch(job.batchId, job.people).catch(() => {});
     }
 

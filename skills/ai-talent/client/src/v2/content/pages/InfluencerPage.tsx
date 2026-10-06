@@ -47,7 +47,7 @@ interface Person {
   platform?: string | null; handle?: string | null; followers?: string | null; displayName?: string | null; source?: string;
   profile?: string; evidence?: string; format?: string; voice?: string;
   /** 配給他主打的賣點與理由。 */
-  usp?: string; uspWhy?: string;
+  usp?: string; uspTag?: string; uspWhy?: string;
   ideas?: Idea[]; picked?: number;
   emailSubject?: string; emailBody?: string; quoteWarning?: boolean;
   /** 2026-10-06 改寫前的舊資料：一位一個切角。 */
@@ -456,14 +456,14 @@ export default function InfluencerPage() {
                   const on = uspSelected.includes(u.text);
                   const mine = uspCustom.includes(u.text);
                   return (
-                    <button key={u.text} type="button" disabled={busy} aria-pressed={on} title={u.from}
+                    <button key={u.text} type="button" disabled={busy} aria-pressed={on} title={u.from ? `${u.from}｜${u.text}` : u.text}
                       onClick={() => (mine
                         ? setUspCustom((cur) => cur.filter((t) => t !== u.text))
                         : setUspOff((cur) => (cur.includes(u.text) ? cur.filter((t) => t !== u.text) : [...cur, u.text])))}
                       className="flex max-w-full items-start gap-1.5 rounded-2xl border px-3 py-1.5 text-left text-[13px] leading-snug transition disabled:opacity-50"
                       style={{ borderColor: on ? INK : LINE, background: on ? SOFT : "#FFFFFF", color: on ? INK : META }}>
                       <span className="mt-[3px] shrink-0"><Icon name={on ? "check" : "add"} size={10} /></span>
-                      <span>{u.text}</span>
+                      <span className="line-clamp-2">{u.text}</span>
                       {mine && <span className="mt-[3px] shrink-0" aria-label={L("拿掉", "Remove")}><Icon name="close" size={9} /></span>}
                     </button>
                   );
@@ -632,7 +632,7 @@ function PersonCard({ p, en, busy, readable, pickingIndex, onPatch, onBlurSave, 
       {p.usp && (
         <p className="m-0 flex items-start gap-2 text-[12.5px] leading-snug">
           <span className="shrink-0 rounded-full px-2 py-0.5 text-[11.5px] font-semibold" style={{ background: INK, color: "#FFFFFF" }}>{L("主打", "Leads with")}</span>
-          <span style={{ color: INK }}>{p.usp}</span>
+          <span className="font-semibold" style={{ color: INK }} title={p.usp}>{p.uspTag || p.usp}</span>
         </p>
       )}
 
@@ -724,10 +724,11 @@ function PersonCard({ p, en, busy, readable, pickingIndex, onPatch, onBlurSave, 
                   {chosen.basedOn && <p className="m-0 text-[12px] leading-relaxed" style={{ color: META }}>{L("延伸自：", "Builds on: ")}{chosen.basedOn}</p>}
                 </div>
               )}
-              {p.uspWhy && (
+              {p.usp && (p.uspWhy || p.uspTag) && (
                 <div className="flex flex-col gap-1">
-                  <span className={label} style={{ color: META }}>{L("為什麼由他講這個賣點", "Why this selling point for them")}</span>
-                  <p className="m-0 text-[13px] leading-relaxed" style={{ color: INK }}>{p.uspWhy}</p>
+                  <span className={label} style={{ color: META }}>{L("主打的賣點", "The selling point they lead with")}</span>
+                  <p className="m-0 text-[13px] leading-relaxed" style={{ color: INK }}>{p.usp}</p>
+                  {p.uspWhy && <p className="m-0 text-[12px] leading-relaxed" style={{ color: META }}>{L("為什麼是他：", "Why them: ")}{p.uspWhy}</p>}
                 </div>
               )}
               {(p.profile || p.evidence) && (

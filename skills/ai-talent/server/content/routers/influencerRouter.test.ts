@@ -192,6 +192,7 @@ describe("influencerUsps", () => {
     const { splitUspText, USP_MAX_CHARS } = await import("../core/influencer/influencerUsps");
     expect(splitUspText("整合 44 個大數據來源\n顧問與 AI 一起判斷")).toEqual(["整合 44 個大數據來源", "顧問與 AI 一起判斷"]);
     expect(splitUspText("1. 一鍵產出品牌定位 2. 法規自動檢查；3、多市場語言")).toEqual(["一鍵產出品牌定位", "法規自動檢查", "多市場語言"]);
+    expect(splitUspText("不只是檔案夾，而是系統可讀取的結構。結合個人 IP 方法論，一致性不靠人工審查。")).toEqual(["不只是檔案夾，而是系統可讀取的結構", "結合個人 IP 方法論，一致性不靠人工審查"]);
     expect(splitUspText("• 冷壓初榨 • 單一產區 · 當季現採")).toEqual(["冷壓初榨", "單一產區", "當季現採"]);
     expect(splitUspText(["陣列裡的第一條賣點", "", 3, "陣列裡的第二條賣點"])).toEqual(["陣列裡的第一條賣點", "陣列裡的第二條賣點"]);
     // 一整段沒有分隔的長文不硬切，只在太長時截尾。
@@ -234,11 +235,16 @@ describe("influencerUsps", () => {
       { id: "p1", usp: 1, why: "常做成分解析" }, { id: "p1", usp: 2, why: "重複" }, { id: "zz", usp: 1 }, { id: "p2", usp: 9, why: "編號不存在" },
     ] });
     const out = parseMatches(raw, usps, ["p1", "p2", "p3", "p4"]);
-    expect(out.get("p1")).toEqual({ usp: "獨家配方", why: "常做成分解析" });
+    expect(out.get("p1")).toEqual({ usp: "獨家配方", tag: "獨家配方", why: "常做成分解析" });
     // p2（編號不存在）、p3、p4（模型漏掉）：補到目前最少人講的，理由留空。
     expect([out.get("p2"), out.get("p3"), out.get("p4")]).toEqual([
-      { usp: "三年保固", why: "" }, { usp: "台灣製造", why: "" }, { usp: "獨家配方", why: "" },
+      { usp: "三年保固", tag: "三年保固", why: "" }, { usp: "台灣製造", tag: "台灣製造", why: "" }, { usp: "獨家配方", tag: "獨家配方", why: "" },
     ]);
+    // 短稱：模型給的就用（同一個賣點每位都一樣）；沒給或太長就取到第一個停頓。
+    const long = ["把品牌規則變成創作護欄，每次輸出都自動對齊品牌標準", "整合個人 IP 方法論"];
+    const tagged = parseMatches(JSON.stringify({ tags: ["品牌護欄", "x".repeat(40)], matches: [{ id: "a", usp: 1 }, { id: "b", usp: 2 }, { id: "c", usp: 1 }] }), long, ["a", "b", "c"]);
+    expect([tagged.get("a")!.tag, tagged.get("b")!.tag, tagged.get("c")!.tag]).toEqual(["品牌護欄", "整合個人 IP 方法論", "品牌護欄"]);
+    expect(parseMatches(null, long, ["a"]).get("a")!.tag).toBe("把品牌規則變成創作護欄");
     // 模型整個失敗：全部用補的，照樣分散。
     expect([...parseMatches(null, usps, ["a", "b", "c"]).values()].map((m) => m.usp)).toEqual(usps);
     // 這一批已經有兩位在講第一個：補寫的人不再擠過去。
@@ -283,7 +289,7 @@ describe("influencerSheet", () => {
     const people: any[] = [{
       id: "p1", url: "https://www.youtube.com/@ming", name: "小明 <A&B>", email: "ming@example.com", status: "done",
       platform: "youtube", handle: "ming", followers: "10萬位訂閱者", source: "youtube_channel", displayName: "Ming",
-      profile: "科技開箱", evidence: "Mac 開箱", format: "開箱長片", picked: 1, usp: "三年保固", uspWhy: "常做耐用度實測",
+      profile: "科技開箱", evidence: "Mac 開箱", format: "開箱長片", picked: 1, usp: "三年保固，壞了直接換新", uspTag: "三年保固", uspWhy: "常做耐用度實測",
       ideas: [
         { kind: "own", title: "延伸點子", hook: "開場一", productPoint: "特色一", why: "w1", basedOn: "Mac 開箱" },
         { kind: "method", title: "方法點子", hook: "開場三", productPoint: "特色三", why: "w3" },
@@ -299,7 +305,7 @@ describe("influencerSheet", () => {
     expect(rows[0]![6]).toBe("主打賣點");
     expect(rows[0]![7]).toBe("點子一（從他做過的內容延伸）");
     expect(rows[1]![0]).toBe("小明 <A&B>");
-    expect(rows[1]![6]).toBe("三年保固\n為什麼是他：常做耐用度實測");
+    expect(rows[1]![6]).toBe("【三年保固】\n三年保固，壞了直接換新\n為什麼是他：常做耐用度實測");
     expect(rows[1]![7]).toBe("延伸點子\n「開場一」\n帶到：特色一");
     expect(rows[1]![8]).toBe("");                              // 沒有 contrast 那一個
     expect(rows[1]![9]).toBe("方法點子\n「開場三」\n帶到：特色三");

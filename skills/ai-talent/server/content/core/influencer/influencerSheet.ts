@@ -173,7 +173,7 @@ const COLUMNS: Array<[string, number, (p: PersonResult) => string]> = [
   ["Email", 24, (p) => p.email ?? ""],
   ["粉絲／訂閱", 14, (p) => p.followers ?? ""],
   ["個人特色", 36, (p) => p.profile ?? ""],
-  ["主打賣點", 34, (p) => [p.usp ?? "", p.uspWhy ? `為什麼是他：${p.uspWhy}` : ""].filter(Boolean).join("\n")],
+  ["主打賣點", 34, (p) => [p.uspTag && p.uspTag !== p.usp ? `【${p.uspTag}】` : "", p.usp ?? "", p.uspWhy ? `為什麼是他：${p.uspWhy}` : ""].filter(Boolean).join("\n")],
   ...IDEA_KINDS.map((k, n): [string, number, (p: PersonResult) => string] =>
     [`點子${"一二三"[n]}（${k.zh}）`, 40, (p) => ideaText(p.ideas?.length ? p.ideas.find((i) => i.kind === k.key) : n === 0 ? ideasOf(p)[0] : undefined)]),
   ["選定的點子", 30, (p) => pickedIdea(p)?.title ?? ""],

@@ -114,6 +114,8 @@ export interface PersonResult extends PersonInput, Partial<Omit<PersonIdeas, "de
   voice?: string;
   /** 配給他主打的賣點（influencerUsps）；沒有賣點清單時沒有這一欄。 */
   usp?: string;
+  /** 賣點的短稱（卡片上標的）。 */
+  uspTag?: string;
   /** 為什麼由他講這個賣點。模型沒給理由（程式補配的）就是空字串。 */
   uspWhy?: string;
   /** 寫信時要用的素材摘錄（挑點子是另一次請求，不重讀連結、不重複付數據商的錢）。不回給前端。 */

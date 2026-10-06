@@ -49,7 +49,7 @@ const squash = (s: string) => s.replace(/[\s\p{P}\p{S}]/gu, "").toLowerCase();
 
 /**
  * 一格定位文字 → 幾條賣點。定位欄位是自由填的：可能是一句話、條列、編號，或用「·」「；」串起來。
- * 只在明確的分隔處切（換行、分號、條列符號、編號）；一整段沒有分隔的長文不硬切——
+ * 只在明確的分隔處切（換行、句號、分號、條列符號、編號）；一句話再長也不從中間切——
  * 切在句子中間的半句話不是賣點。
  */
 export function splitUspText(raw: unknown): string[] {
@@ -60,7 +60,7 @@ export function splitUspText(raw: unknown): string[] {
   const NUM = String.raw`(?:\d{1,2}(?:[、)）]|\.(?!\d))|[（(]\d{1,2}[)）]|[①-⑩])`;
   const BULLET = String.raw`[•●▪◆■\-–—]`;
   return text
-    .split(new RegExp(String.raw`\n+|[；;]|\s·\s|(?:^|\s)${BULLET}\s+|(?:^|\s)${NUM}\s*`, "u"))
+    .split(new RegExp(String.raw`\n+|[。；;]|\s·\s|(?:^|\s)${BULLET}\s+|(?:^|\s)${NUM}\s*`, "u"))
     // 分號切開後，後半段開頭可能還帶著自己的編號或條列符號。
     .map((s) => (s ?? "").replace(/\s+/g, " ").trim().replace(new RegExp(String.raw`^(?:${NUM}|${BULLET}\s)\s*`, "u"), "")
       .replace(/^[\s:：、，,。.]+|[\s、，,；;]+$/g, "").trim())
@@ -121,7 +121,18 @@ export function cleanUsps(list: unknown): string[] {
 // ─── 策略性匹配 ──────────────────────────────────────────────────────
 
 export interface MatchPerson { id: string; label: string; platform: string; followers: string | null; digest: string }
-export interface UspMatch { usp: string; why: string }
+export interface UspMatch {
+  usp: string;
+  /** 卡片上標的短稱（定位裡的賣點常是一整句話，卡片放不下）。 */
+  tag: string;
+  why: string;
+}
+
+/** 模型沒給短稱時的退路：取到第一個停頓為止。 */
+export function shortTag(usp: string): string {
+  const head = usp.split(/[，,、：:；;（(]|——|\s[-–—]\s/)[0]!.trim();
+  return (head.length >= 4 ? head : usp).slice(0, 16);
+}
 
 export function matchPrompt(args: {
   brandName: string; subjectLine: string; usps: string[]; people: MatchPerson[];
@@ -145,9 +156,10 @@ export function matchPrompt(args: {
     `- 看他平常的題材與觀眾：這個賣點由他講，觀眾會不會信、會不會想聽。題材接得上比粉絲多重要。`,
     `- 分散：每個賣點盡量至少有一位在講；除非真的只有一個賣點適合，不要讓超過一半的人擠在同一個。`,
     `- 同一位只配一個賣點。`,
+    `- tags：先替每個賣點各取一個短稱，12 字內，一看就知道是哪一個賣點（名詞短語，不是口號；不要加原文沒有的意思）。順序跟賣點一樣。`,
     `- why：為什麼是他講這一個，一句、30 字內，要講到他的題材或觀眾（不是重複賣點）。用 ${args.outputLanguage || "zh-TW"} 寫。`,
     `- 素材裡的私人生活不要拿來當理由；看不出性別就不要寫「他」或「她」。`,
-    `只輸出 JSON，不要前言：{"matches":[{"id":"${args.people[0]?.id ?? "p1"}","usp":1,"why":"…"}]}`,
+    `只輸出 JSON，不要前言：{"tags":[${args.usps.map(() => '"…"').join(",")}],"matches":[{"id":"${args.people[0]?.id ?? "p1"}","usp":1,"why":"…"}]}`,
   ].filter((x) => x !== "").join("\n");
 }
 
@@ -168,18 +180,23 @@ export function parseMatches(
   const out = new Map<string, UspMatch>();
   if (!usps.length) return out;
   const count = new Map(usps.map((u) => [u, taken[u] ?? 0]));
-  const list = raw ? firstJson(raw)?.matches : null;
+  const j = raw ? firstJson(raw) : null;
+  const list = j?.matches;
+  const tagOf = (usp: string) => {
+    const t = String((Array.isArray(j?.tags) ? j.tags[usps.indexOf(usp)] : "") ?? "").replace(/\s+/g, " ").trim();
+    return t.length >= 2 && t.length <= 24 ? t : shortTag(usp);
+  };
   for (const m of Array.isArray(list) ? list : []) {
     const id = String(m?.id ?? "");
     const usp = usps[Number(m?.usp) - 1];
     if (!ids.includes(id) || out.has(id) || !usp) continue;
-    out.set(id, { usp, why: String(m?.why ?? "").replace(/\s+/g, " ").trim().slice(0, 90) });
+    out.set(id, { usp, tag: tagOf(usp), why: String(m?.why ?? "").replace(/\s+/g, " ").trim().slice(0, 90) });
     count.set(usp, (count.get(usp) ?? 0) + 1);
   }
   for (const id of ids) {
     if (out.has(id)) continue;
     const usp = usps.reduce((best, u) => ((count.get(u) ?? 0) < (count.get(best) ?? 0) ? u : best), usps[0]!);
-    out.set(id, { usp, why: "" });
+    out.set(id, { usp, tag: tagOf(usp), why: "" });
     count.set(usp, (count.get(usp) ?? 0) + 1);
   }
   return out;

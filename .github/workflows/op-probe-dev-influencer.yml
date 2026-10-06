@@ -78,7 +78,7 @@ jobs:
               }), "請開始。", 1500)).text : null;
               const matches = parseMatches(mraw, usps, ok.map((r) => r.id));
               console.log(`\n--- 賣點分配（${usps.length} 個賣點、${ok.length} 位）`);
-              for (const r of ok) console.log(`${r.id} ${r.read.displayName ?? r.url} → ${matches.get(r.id)?.usp ?? "(沒有賣點)"}｜${matches.get(r.id)?.why || "(程式補配)"}`);
+              for (const r of ok) console.log(`${r.id} ${r.read.displayName ?? r.url} → 【${matches.get(r.id)?.tag ?? "-"}】${matches.get(r.id)?.usp ?? "(沒有賣點)"}｜${matches.get(r.id)?.why || "(程式補配)"}`);
               const used: string[] = [];
               for (const r of ok) {
                 const { link, read, url } = r as any;
