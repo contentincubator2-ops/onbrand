@@ -118,6 +118,7 @@ describe("influencerAngles", () => {
     expect(p).toContain("想主打送禮");
     expect(p).toContain("私人生活");
     expect(p).toContain("品牌簡報用語");
+    expect(p).toContain("主體只能做它本來做的事");
     for (const k of IDEA_KINDS) expect(p).toContain(`${k.key}：`);
     expect(voicePrompt("zh-TW")).toContain("照抄 3 句");
   });
@@ -166,6 +167,7 @@ describe("influencerAngles", () => {
     expect(p).toContain("- 內文太長");
     expect(p).toContain("不提費用、預算、報價");
     expect(p).toContain("不可以替他編一句話");
+    expect(p).toContain("主體只能做它本來做的事");
     expect(parseEmail(JSON.stringify({ subject: "主旨", body: "x".repeat(60) }))).toEqual({ subject: "主旨", body: "x".repeat(60) });
     expect(parseEmail(JSON.stringify({ subject: "主旨", body: "太短" }))).toBeNull();
   });

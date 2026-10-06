@@ -6,6 +6,7 @@ name: Ops (DEV) — probe influencer ideas end to end (read-only)
 # 所以改提示詞可以在合併前先看產出。不寫資料庫、不存名單。
 # 例子：CJ 2026-10-06 貼的那張卡（旅遊創作者 Dribs & Drabs × 品牌 2977 的產品 OnBrand Studio），
 # 再加一位科技開箱（@joemanweng）對照。
+# 第 2 次跑：加了「主體只能做它本來做的事」之後。
 # 花費：兩次 Apify 呼叫（6 小時內重跑不重抓）＋每位三到四次模型呼叫。
 # Path-scoped push，跟 op-probe-dev-campaign-chat.yml 同一個做法（environment: dev 才會連到 DEV VM）。
 on:
