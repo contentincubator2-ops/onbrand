@@ -106,7 +106,8 @@ export type StrategistRoleId =
   | "vi_identity" | "vi_brief" | "vi_ugc"
   | "rg_claims" | "rg_platform" | "rg_rewrite"
   | "pf_analyst" | "pf_attribution" | "pf_testing"
-  | "ct_plan" | "ct_trend" | "ct_copy";
+  | "ct_plan" | "ct_trend" | "ct_copy"
+  | "if_match" | "if_brief" | "if_measure";
 
 /** 品牌頁與產品頁各有自己的三個角色（CJ 2026-09-24 定案，見 STRATEGIST_ROLES）。 */
 /**
@@ -126,7 +127,8 @@ export function isChannelScope(s: string): s is ChannelScope {
  * 2026-10-01：非通路的頁面顧問（活動／視覺／法規／成效層／內容層共用頁）。
  * 跟通路頁一樣是「這一頁上能做的事」，但不是某個發文通路，所以分開一組。
  */
-export const PAGE_SCOPES = ["events", "visual", "regulations", "performance", "content"] as const;
+// 2026-10-06（CJ「網紅合作的右下方，應該是網紅相關專家」）：網紅切角頁（/influencers）自己的三位。
+export const PAGE_SCOPES = ["events", "visual", "regulations", "performance", "content", "influencer"] as const;
 export type PageScope = (typeof PAGE_SCOPES)[number];
 export function isPageScope(s: string): s is PageScope {
   return (PAGE_SCOPES as readonly string[]).includes(s);
@@ -845,6 +847,33 @@ const PAGE_ROLES: StrategistRole[] = [
     promptAngle: "你看內容的角度是成品本身：開頭夠不夠抓人、一篇有沒有只講一件事、CTA 清不清楚。使用者貼一段文案給你，你直接給修改後的版本並說明改了什麼，不只給評語。",
     signatureQuestions: ["這篇的開頭夠抓人嗎？", "幫我把這段改短一點", "這篇的 CTA 要怎麼寫？"],
     signatureQuestionsEn: ["Is this opening strong enough?", "Make this paragraph shorter", "How should this post's CTA read?"],
+  },
+  // ── 網紅切角（內容層 /influencers）──────────────────────────────
+  // 2026-10-06（CJ「網紅合作的右下方，應該是網紅相關專家」）。原本落在內容企劃那三位。
+  // 固定人選全站不可重複：陳曉玲（chen-xiaoling-kol-agent）在活動頁、翁宇翔（mkt-service-kol）在 Threads，這裡不再用。
+  {
+    id: "if_match", scope: "influencer", label: "網紅媒合", labelEn: "Creator Matching",
+    // kol_influencer-<產業>-tw-*：KOL／網紅行銷專員，每個產業一位（電商、美妝、保健、旅遊、零售…）。
+    slugPrefix: "kol_influencer-", fallbackSlug: "kol_influencer-ecom-tw-3981",
+    promptAngle: "你看網紅合作的角度是誰講哪一個賣點：同一個產品有好幾個賣點，不該每位網紅都講同一句。你會看每位創作者平常的題材與觀眾，判斷他最適合講哪一個賣點、哪一個他講了沒人信，並提醒只看粉絲數會踩的坑（互動率、受眾真實性）。",
+    signatureQuestions: ["這幾位網紅各自該主打哪個賣點？", "名單裡誰其實不適合這個產品？", "大網紅跟微網紅要怎麼搭？"],
+    signatureQuestionsEn: ["Which selling point should each creator lead with?", "Who on this list is actually a poor fit?", "How should I mix big and micro creators?"],
+  },
+  {
+    id: "if_brief", scope: "influencer", label: "合作提案", labelEn: "Collab Pitch",
+    // 施博元 220513：專長網紅媒合、合作提案、口碑規劃；踩過「只看粉絲數找大網紅」的坑，改用互動率與受眾真實性篩選。
+    fixedSlug: "mkt-tech-kol",
+    promptAngle: "你看網紅合作的角度是怎麼開口：第一封邀約信決定對方回不回。你會把點子寫成對方看得出「為什麼是我」的提案，分清楚哪些要品牌定（必提、禁提、揭露標示）、哪些要留給創作者自己發揮，並提醒 brief 寫太死會讓內容像業配。",
+    signatureQuestions: ["這封邀約信要怎麼改，對方才會回？", "給網紅的 brief 哪些該寫、哪些該留白？", "業配揭露要怎麼標才合規又不突兀？"],
+    signatureQuestionsEn: ["How do I rewrite this outreach so they reply?", "What belongs in the brief and what should stay open?", "How do I disclose a paid collab without it feeling awkward?"],
+  },
+  {
+    id: "if_measure", scope: "influencer", label: "合作成效", labelEn: "Collab Results",
+    // 羅欣妍 239100：Micro-Influencer Performance System——把微網紅合作做成可量測的系統。
+    fixedSlug: "pr-millen-kol-blueprint-lead-4ijh4h",
+    promptAngle: "你看網紅合作的角度是怎麼知道有沒有用：合作前就要決定看什麼數字（觸及、互動、點擊、導購），以及用折扣碼、專屬連結還是 UTM 來分辨是誰帶來的。你會幫使用者設一個做得到的追蹤方式，並清楚分開「看得到的數字」跟「要對方提供後台截圖才知道的」。",
+    signatureQuestions: ["這批網紅合作要看哪些數字？", "怎麼知道是哪一位帶來訂單？", "合作結束後要請網紅提供什麼？"],
+    signatureQuestionsEn: ["Which numbers should I track for this batch?", "How do I tell which creator drove orders?", "What should I ask creators to send after the collab?"],
   },
 ];
 

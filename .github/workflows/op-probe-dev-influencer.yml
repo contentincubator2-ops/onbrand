@@ -1,11 +1,12 @@
 name: Ops (DEV) — probe influencer ideas end to end (read-only)
 
 # 網紅切角整條流程在 DEV VM 上實跑一次，不經過瀏覽器、不需要登入：
-#   讀連結（Apify＋自己讀）→ 口吻卡 → 當他本人想三個點子 → 挑第一個寫邀約信 → 檢查。
-# 用「這個分支」的 influencerAngles.ts（提示詞與解析）＋ VM 上已部署的讀取程式與品牌資料，
+#   讀連結（Apify＋自己讀）→ 從定位拿賣點、替每位配一個 → 口吻卡 → 當他本人想三個點子 → 挑第一個寫邀約信 → 檢查。
+# 用「這個分支」的 influencerAngles.ts／influencerUsps.ts（提示詞與解析）＋ VM 上已部署的讀取程式與品牌資料，
 # 所以改提示詞可以在合併前先看產出。不寫資料庫、不存名單。
 # 例子：CJ 2026-10-06 貼的那張卡（旅遊創作者 Dribs & Drabs × 品牌 2977 的產品 OnBrand Studio），
 # 再加一位科技開箱（@joemanweng）對照。
+# 第 5 次跑：own 點子不編只有本人才知道的細節。
 # 第 2 次跑：加了「主體只能做它本來做的事」之後。
 # 花費：兩次 Apify 呼叫（6 小時內重跑不重抓）＋每位三到四次模型呼叫。
 # Path-scoped push，跟 op-probe-dev-campaign-chat.yml 同一個做法（environment: dev 才會連到 DEV VM）。
@@ -21,18 +22,21 @@ jobs:
     timeout-minutes: 12
     steps:
       - uses: actions/checkout@v4
-      - name: Pack this branch's influencerAngles.ts
-        run: echo "PATCH_B64=$(gzip -c skills/ai-talent/server/content/core/influencer/influencerAngles.ts | base64 -w0)" >> "$GITHUB_ENV"
+      - name: Pack this branch's influencerAngles.ts and influencerUsps.ts
+        run: |
+          echo "PATCH_B64=$(gzip -c skills/ai-talent/server/content/core/influencer/influencerAngles.ts | base64 -w0)" >> "$GITHUB_ENV"
+          echo "USPS_B64=$(gzip -c skills/ai-talent/server/content/core/influencer/influencerUsps.ts | base64 -w0)" >> "$GITHUB_ENV"
       - name: Read, pitch as the creator, write the email
         uses: appleboy/ssh-action@v1.0.3
         env:
           PATCH_B64: ${{ env.PATCH_B64 }}
+          USPS_B64: ${{ env.USPS_B64 }}
         with:
           host: ${{ secrets.VM_HOST }}
           username: ${{ secrets.VM_USER }}
           key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
           command_timeout: 10m
-          envs: PATCH_B64
+          envs: PATCH_B64,USPS_B64
           script: |
             set +e
             cd /opt/onbrand/current/skills/ai-talent
@@ -40,6 +44,7 @@ jobs:
             echo "host=$(hostname)  app=$(readlink -f /opt/onbrand/current)  now=$(date -u +%FT%TZ)"
             D=server/content/core/influencer
             echo "$PATCH_B64" | base64 -d | gunzip > "$D/_probeAngles.ts"
+            echo "$USPS_B64" | base64 -d | gunzip > "$D/_probeUsps.ts"
             cat > "$D/_probe_tmp.ts" <<'TS'
             import localPool from "../../../localDb";
             import { readInfluencer } from "./influencerReader";
@@ -47,9 +52,10 @@ jobs:
             import { buildBrandPrefix } from "../../../strategy/core/brand/brandContext";
             import { callModelStrict } from "../../../platform/core/llm/multiModelRouter";
             import { emailIssues, emailPrompt, ideasPrompt, materialEnough, parseEmail, parseIdeas, voicePrompt } from "./_probeAngles";
+            import { loadUsps, matchPrompt, parseMatches } from "./_probeUsps";
 
             const BRAND = 2977;
-            const LINKS = ["https://www.instagram.com/dribs__drabs/", "https://www.instagram.com/joemanweng/"];
+            const LINKS = ["https://www.instagram.com/dribs__drabs/", "https://www.instagram.com/joemanweng/", "https://zh.wikipedia.org/zh-tw/蔡阿嘎"];
             const MODEL = process.env.INFLUENCER_MODEL || process.env.INSPIRATION_MODEL || "claude-sonnet-4-6";
             const ask = async (system: string, user: string, maxTokens: number) => {
               const t0 = Date.now();
@@ -64,15 +70,25 @@ jobs:
               const subjectLine = product ? `「${brandName}」的產品「${product.name}」` : `品牌「${brandName}」本身（不是單一產品）`;
               const brandCtx = await buildBrandPrefix(BRAND, product?.id ?? null, null, "full").catch(() => "");
               console.log(`subject: ${subjectLine}  brandCtx chars=${brandCtx.length}`);
+              const usps = (await loadUsps(BRAND, { kind: product ? "product" : "brand", id: product?.id ?? null })).map((u) => { console.log(`賣點（${u.from}）: ${u.text}`); return u.text; });
+              const reads = await Promise.all(LINKS.map((u) => readInfluencer(u)));
+              const ok = reads.map((r, i) => ({ id: `p${i + 1}`, url: LINKS[i]!, ...r })).filter((r) => r.link && materialEnough(r.read.material));
+              const mraw = usps.length > 1 ? (await ask(matchPrompt({
+                brandName, subjectLine, usps, outputLanguage: "zh-TW",
+                people: ok.map((r) => ({ id: r.id, label: r.read.displayName ?? "", platform: PLATFORM_LABEL[r.link!.platform], followers: r.read.followers, digest: r.read.material.slice(0, 500) })),
+              }), "請開始。", 1500)).text : null;
+              const matches = parseMatches(mraw, usps, ok.map((r) => r.id));
+              console.log(`\n--- 賣點分配（${usps.length} 個賣點、${ok.length} 位）`);
+              for (const r of ok) console.log(`${r.id} ${r.read.displayName ?? r.url} → 【${matches.get(r.id)?.tag ?? "-"}】${matches.get(r.id)?.usp ?? "(沒有賣點)"}｜${matches.get(r.id)?.why || "(程式補配)"}`);
               const used: string[] = [];
-              for (const url of LINKS) {
-                const { link, read } = await readInfluencer(url);
-                console.log(`\n================ ${url}\nread: source=${read.source} name=${read.displayName} followers=${read.followers} chars=${read.material.length}`);
-                if (!link || !materialEnough(read.material)) { console.log("not enough material"); continue; }
+              for (const r of ok) {
+                const { link, read, url } = r as any;
+                const usp = matches.get(r.id)?.usp;
+                console.log(`\n================ ${url}\nread: source=${read.source} name=${read.displayName} followers=${read.followers} chars=${read.material.length}\n主打：${usp ?? "-"}`);
                 const v = await ask(voicePrompt("zh-TW"), read.material.slice(0, 4000), 900);
                 console.log(`\n--- 口吻卡 (${v.s}s, ${v.text.length} 字)\n${v.text}`);
                 const base = { brandName, subjectLine, brandCtx, outputLanguage: "zh-TW" };
-                const i = await ask(ideasPrompt({ ...base, label: read.displayName ?? "", platform: PLATFORM_LABEL[link.platform], followers: read.followers, material: read.material, voice: v.text, avoid: used }), "請開始。", 1600);
+                const i = await ask(ideasPrompt({ ...base, label: read.displayName ?? "", platform: PLATFORM_LABEL[link.platform], followers: read.followers, material: read.material, voice: v.text, avoid: used, usp }), "請開始。", 1600);
                 const ideas = parseIdeas(i.text, read.material);
                 if (!ideas) { console.log(`\n--- 點子 (${i.s}s) PARSE FAILED. raw:\n${i.text.slice(0, 800)}`); continue; }
                 console.log(`\n--- 三個點子 (${i.s}s)  name=${ideas.detectedName ?? "-"}  形式=${ideas.format}`);
@@ -82,8 +98,8 @@ jobs:
                   used.push(x.title);
                 }
                 const idea = ideas.ideas[0]!;
-                const known = [read.material, brandCtx, idea.title, idea.hook, idea.productPoint, idea.basedOn ?? ""];
-                const args = { ...base, label: read.displayName ?? "", material: read.material.slice(0, 2000), idea };
+                const known = [read.material, brandCtx, idea.title, idea.hook, idea.productPoint, idea.basedOn ?? "", usp ?? ""];
+                const args = { ...base, label: read.displayName ?? "", material: read.material.slice(0, 2000), idea, usp };
                 const m = await ask(emailPrompt(args), "請開始。", 900);
                 let mail = parseEmail(m.text);
                 if (!mail) { console.log(`\n--- 信 PARSE FAILED: ${m.text.slice(0, 400)}`); continue; }
@@ -100,4 +116,4 @@ jobs:
             TS
             timeout 540 ./node_modules/.bin/tsx "$D/_probe_tmp.ts"
             echo "probe exit=$?"
-            rm -f "$D/_probe_tmp.ts" "$D/_probeAngles.ts"
+            rm -f "$D/_probe_tmp.ts" "$D/_probeAngles.ts" "$D/_probeUsps.ts"

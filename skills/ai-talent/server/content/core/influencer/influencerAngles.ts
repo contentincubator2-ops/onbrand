@@ -66,7 +66,8 @@ export interface PersonInput {
 /** 三個點子的出發點。順序就是卡片上的順序。 */
 export const IDEA_KINDS = [
   { key: "own", zh: "從他做過的內容延伸", en: "Builds on their own work",
-    ask: "從你自己最近真的做過的一支內容延伸（basedOn 寫出是哪一支，照抄素材裡的標題或開頭）" },
+    // 2026-10-06 CJ 最喜歡的點子是「整理 26 間餐廳，我是怎麼不讓自己亂的」：真實的數字＋做那則內容時的一個具體麻煩。
+    ask: "你最近真的做過的一則內容的「幕後」：帶上那一則裡真實的數字或名稱，講做這種內容「一定會遇到」的一個麻煩或取捨——從素材看得出來的工作量（要整理幾間、要比幾台、要跑幾個點），不要編只有本人才知道的細節（跟誰對稿、傳了幾封訊息、當時多崩潰）（basedOn 照抄素材裡的標題或開頭）；主體只在「解決那個麻煩」的地方出現" },
   { key: "contrast", zh: "反差吐槽", en: "Contrarian take",
     ask: "反差或吐槽：這個品類大家以為對、其實不完全對的一件事" },
   { key: "method", zh: "觀眾會存的方法", en: "A method worth saving",
@@ -111,6 +112,12 @@ export interface PersonResult extends PersonInput, Partial<Omit<PersonIdeas, "de
   displayName: string | null;
   /** 口吻卡：他怎麼說話。 */
   voice?: string;
+  /** 配給他主打的賣點（influencerUsps）；沒有賣點清單時沒有這一欄。 */
+  usp?: string;
+  /** 賣點的短稱（卡片上標的）。 */
+  uspTag?: string;
+  /** 為什麼由他講這個賣點。模型沒給理由（程式補配的）就是空字串。 */
+  uspWhy?: string;
   /** 寫信時要用的素材摘錄（挑點子是另一次請求，不重讀連結、不重複付數據商的錢）。不回給前端。 */
   materialDigest?: string;
   /** 用戶挑了第幾個點子（ideas 的索引）；還沒挑＝沒有這個欄位。 */
@@ -164,6 +171,8 @@ export function ideasPrompt(args: {
   avoid?: string[];
   /** 用戶補充的合作方向（選填）。 */
   direction?: string;
+  /** 配給這一位主打的賣點（沒有賣點清單時不帶）。 */
+  usp?: string;
 }): string {
   const lang = args.outputLanguage || "zh-TW";
   return [
@@ -180,6 +189,7 @@ export function ideasPrompt(args: {
     `【來找你的是】${args.subjectLine}`,
     `【品牌資料（產品事實的唯一來源，沒有的不要編，不要編功效與數字）】`,
     args.brandCtx.slice(0, 6000),
+    args.usp ? `【品牌這次想請你主打的賣點】${args.usp}\n三個點子都要帶到這一個賣點（換的是出發點，不是賣點）；productPoint 寫你會講到它的哪一面。品牌資料裡的其他賣點這次不用提。` : "",
     args.direction ? `【品牌希望的合作方向】${args.direction}` : "",
     args.avoid?.length ? `【這一批其他創作者已經用掉的點子——不要重複，也不要換句話說】\n${args.avoid.map((a) => `- ${a}`).join("\n")}` : "",
     ``,
@@ -301,6 +311,8 @@ export const EMAIL_MAX_CHARS = 340;
 export function emailPrompt(args: {
   brandName: string; subjectLine: string; brandCtx: string;
   label: string; material: string; idea: Idea; outputLanguage: string;
+  /** 配給這一位主打的賣點。 */
+  usp?: string;
   /** 重寫：上一版被檢查出的問題。 */
   fixes?: string[];
 }): string {
@@ -309,6 +321,7 @@ export function emailPrompt(args: {
     `【想請他講的主體】${args.subjectLine}`,
     `【想跟他一起做的點子】${args.idea.title}`,
     args.idea.basedOn ? `（延伸自他做過的：${args.idea.basedOn}）` : "",
+    args.usp ? `【想請他主打的賣點】${args.usp}（信裡介紹主體時講這一個，不要列一串賣點）` : "",
     `【會帶到主體的哪一點】${args.idea.productPoint}`,
     `【他最近的內容（提到他的事只能用這裡有的）】`,
     args.material.slice(0, 2000),
