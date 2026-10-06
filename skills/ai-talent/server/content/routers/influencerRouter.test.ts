@@ -112,6 +112,7 @@ describe("influencerAngles", () => {
     expect(p).toContain("產品特色的唯一來源");
     expect(p).toContain("個人特色的唯一來源");
     expect(p).toContain("不要提費用、預算、報價");
+    expect(p).toContain("私人生活");
     expect(p).toContain("- 已用切角");
     expect(p).toContain("id=p1");
   });
