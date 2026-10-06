@@ -4,8 +4,9 @@
  * readable：除了 YouTube 與一般網頁，伺服器現在還讀得到哪些社群平台（有接數據商才有）。
  * latest：這個品牌最近一批的結果（重新整理不會不見）。
  * parseSheet：上傳的名單檔（.xlsx／.csv／.txt）→ 名單，還沒開始寫。
- * analyzeStart／analyzePoll：讀每一位的連結、分組寫切角與邀約信；開始後立刻回 jobId，
- *   寫好一組就能被 poll 拿走一組。帶 batchId＝在原來那一批裡補寫／重寫指定的人。
+ * analyzeStart／analyzePoll：讀每一位的連結 → 整理口吻 → 當他本人想三個點子；開始後立刻回 jobId，
+ *   想好一位就能被 poll 拿走一位。帶 batchId＝在原來那一批裡補寫／重寫指定的人。
+ * pickIdea：用戶挑了某一位的第幾個點子 → 這時才寫那封邀約信。
  * savePerson：用戶改了某一位的名字／Email／邀約信，存回這一批（匯出用改過的版本）。
  * exportFile：整批匯出成 .xlsx 或 .docx。
  */
@@ -22,14 +23,18 @@ import { classifyLink, PLATFORM_LABEL } from "../core/influencer/influencerLink"
 import { readInfluencer } from "../core/influencer/influencerReader";
 import { providerPlatforms } from "../core/influencer/apifyProfiles";
 import {
-  CHUNK, MAX_PEOPLE, NOTES_MAX, angleIssues, anglesSystemPrompt, materialEnough, parsePeopleAngles, personLabel, unsupportedQuotes,
-  type ChunkPerson, type PersonResult,
+  MAX_PEOPLE, NOTES_MAX, emailIssues, emailPrompt, ideasPrompt, materialEnough, parseEmail, parseIdeas, personLabel, voicePrompt,
+  type PersonResult,
 } from "../core/influencer/influencerAngles";
 import { buildDocx, buildXlsx, parseSheet } from "../core/influencer/influencerSheet";
 
 /** 跟靈感舞台同一個理由：這是判斷題，固定用 Sonnet（可用 env 覆寫）。 */
 const MODEL = process.env.INFLUENCER_MODEL || process.env.INSPIRATION_MODEL || "claude-sonnet-4-6";
 const READ_CONCURRENCY = 4;
+/** 同時替幾位想點子（每位兩次模型呼叫，約 20 秒）。 */
+const WRITE_CONCURRENCY = 3;
+/** 存下來給寫信用的素材摘錄長度。 */
+const DIGEST_CHARS = 2000;
 const SHEET_MAX_BYTES = 2 * 1024 * 1024;
 
 const brandInput = z.object({ brandId: z.number().int().positive() });
@@ -45,7 +50,7 @@ const personZ = z.object({
   notes: z.string().max(NOTES_MAX).optional(),
 });
 
-// 每位使用者每小時 12 批（一批最多 30 位＝30 次連結讀取＋6 次模型呼叫）。
+// 每位使用者每小時 12 批（一批最多 30 位＝30 次連結讀取＋60 次模型呼叫）。
 const rate = new Map<number, number[]>();
 function checkRate(userId: number): void {
   const now = Date.now();
@@ -71,6 +76,16 @@ async function resolveSubject(brandId: number, subject: z.infer<typeof subjectZ>
     : { brandName, subjectLine: `「${brandName}」的活動「${name}」`, subjectName: String(name), productId: null, eventId: subject.id };
 }
 
+// 挑點子寫信：每位使用者每小時 120 封（一封一到兩次模型呼叫）。
+const pickRate = new Map<number, number[]>();
+function checkPickRate(userId: number): void {
+  const now = Date.now();
+  const hits = (pickRate.get(userId) ?? []).filter((t) => now - t < 3_600_000);
+  if (hits.length >= 120) throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: "這一小時寫太多封了，晚點再來。" });
+  hits.push(now);
+  pickRate.set(userId, hits);
+}
+
 // ─── 批次存取 ─────────────────────────────────────────────────────────
 
 interface BatchRow { id: number; subjectKind: "brand" | "product" | "event"; subjectId: number | null; people: PersonResult[]; updatedAt: string }
@@ -92,6 +107,10 @@ async function loadBatch(brandId: number, batchId?: number): Promise<BatchRow | 
 async function saveBatch(batchId: number, people: PersonResult[]): Promise<void> {
   await localPool.execute(`UPDATE influencer_batches SET people = ? WHERE id = ?`, [JSON.stringify(people), batchId]);
 }
+/** 回給前端的名單：寫信用的素材摘錄不外送（只有伺服器用得到，一批 30 位會多幾十 KB）。 */
+function pub(people: PersonResult[]): PersonResult[] {
+  return people.map(({ materialDigest: _m, ...p }) => p);
+}
 
 // ─── 背景工作 ─────────────────────────────────────────────────────────
 // 伺服器是單一 pm2 process（同 inspirationRouter 的說明），進度放記憶體，結果每一組寫回資料庫。
@@ -108,27 +127,59 @@ function isRunning(batchId: number): boolean {
   return false;
 }
 
-async function writeChunk(args: Omit<Parameters<typeof anglesSystemPrompt>[0], "people"> & { people: ChunkPerson[] }) {
-  const ids = args.people.map((p) => p.id);
-  const messages = [{ role: "system" as const, content: anglesSystemPrompt(args) }, { role: "user" as const, content: "請開始。" }];
-  for (let attempt = 0; attempt < 2; attempt++) {
-    try {
-      // 一組五位、每位含一封信，輸出約 5–6 千 token；callModel 的預設上限 4096 會截斷。
-      const r = attempt === 0
-        ? await callModelStrict(messages, "anthropic", MODEL, { maxTokens: 8000 })
-        : await callModel(messages, "creative_writing", "anthropic");
-      const got = parsePeopleAngles(String(r.content ?? ""), ids);
-      if (got.size) return got;
-    } catch (e) {
-      console.warn("[influencer] chunk failed:", (e as Error)?.message?.slice(0, 160));
-    }
-  }
-  return new Map() as ReturnType<typeof parsePeopleAngles>;
+function runningJob(batchId: number): Job | null {
+  for (const j of jobs.values()) if (j.batchId === batchId && !j.done) return j;
+  return null;
 }
 
-async function runJob(job: Job, targets: string[], base: {
-  brandName: string; subjectLine: string; brandCtx: string; outputLanguage: string; direction?: string;
-}): Promise<void> {
+/**
+ * 改某一位的欄位。這一批還在跑的時候，背景工作手上那份才是最後會寫回資料庫的——兩邊都要改，
+ * 不然用戶在別人還在研究時挑的點子、改的 Email 會被整批覆蓋掉。
+ */
+async function applyChange(brandId: number, batchId: number, id: string, changes: Partial<PersonResult>): Promise<void> {
+  const live = runningJob(batchId)?.people.find((p) => p.id === id);
+  if (live) Object.assign(live, changes);
+  const b = await loadBatch(brandId, batchId);
+  if (!b) throw new TRPCError({ code: "NOT_FOUND", message: "找不到這一批名單" });
+  await saveBatch(b.id, b.people.map((p) => (p.id === id ? { ...p, ...changes } : p)));
+}
+
+/** 問一次模型。指定的模型在這個環境沒開通時，改用 provider 預設再試一次；都不行回 null。 */
+async function ask(system: string, user: string, maxTokens: number): Promise<string | null> {
+  const messages = [{ role: "system" as const, content: system }, { role: "user" as const, content: user }];
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const r = attempt === 0
+        ? await callModelStrict(messages, "anthropic", MODEL, { maxTokens })
+        : await callModel(messages, "creative_writing", "anthropic");
+      const text = String(r.content ?? "").trim();
+      if (text) return text;
+    } catch (e) {
+      console.warn("[influencer] model call failed:", (e as Error)?.message?.slice(0, 160));
+    }
+  }
+  return null;
+}
+
+type Base = { brandName: string; subjectLine: string; brandCtx: string; outputLanguage: string; direction?: string };
+
+/** 一位：口吻卡 → 當他本人想三個點子。點子解析不出來就再想一次；還是不行回 null。 */
+async function researchPerson(p: PersonResult, material: string, base: Base, avoid: string[]) {
+  const voice = await ask(voicePrompt(base.outputLanguage), material.slice(0, 4000), 900);
+  if (!voice) return null;
+  const system = ideasPrompt({
+    ...base, label: personLabel(p), platform: p.platform ? PLATFORM_LABEL[p.platform] : "", followers: p.followers,
+    material, voice, avoid,
+  });
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const raw = await ask(system, "請開始。", 1600);
+    const ideas = raw ? parseIdeas(raw, material) : null;
+    if (ideas) return { voice: voice.slice(0, 900), ideas };
+  }
+  return null;
+}
+
+async function runJob(job: Job, targets: string[], base: Base): Promise<void> {
   const byId = (id: string) => job.people.find((p) => p.id === id)!;
   const patch = (id: string, v: Partial<PersonResult>) => { Object.assign(byId(id), v); };
   try {
@@ -155,52 +206,26 @@ async function runJob(job: Job, targets: string[], base: {
     }));
     await saveBatch(job.batchId, job.people).catch(() => {});
 
-    // 2) 分組寫。後面的組拿得到前面（與這一批原本就有的）已用掉的切角。
+    // 2) 一位一位想（同時 WRITE_CONCURRENCY 位）。後面的人拿得到已經用掉的點子，免得整批撞題。
     const ready = targets.filter((id) => material.has(id));
-    const used = job.people.filter((p) => p.status === "done" && p.angle && !targets.includes(p.id)).map((p) => p.angle!);
-    for (let i = 0; i < ready.length; i += CHUNK) {
-      const ids = ready.slice(i, i + CHUNK);
-      const people: ChunkPerson[] = ids.map((id) => {
-        const p = byId(id);
-        return { id, label: personLabel(p), platform: p.platform ? PLATFORM_LABEL[p.platform] : "", followers: p.followers, material: material.get(id)! };
-      });
-      let got = await writeChunk({ ...base, people, avoid: used });
-      // 模型漏掉的人：只替他們再問一次。
-      const missing = people.filter((p) => !got.has(p.id));
-      if (missing.length && missing.length < people.length) {
-        const more = await writeChunk({ ...base, people: missing, avoid: [...used, ...[...got.values()].map((a) => a.angle)] });
-        got = new Map([...got, ...more]);
-      }
-      // 檢查（編出來的引用、信太長、切角太長）→ 有問題的人帶著問題重寫一次；重寫後問題變少才換。
-      const fixes: Record<string, string[]> = {};
-      for (const [id, a] of got) {
-        const issues = angleIssues(a, material.get(id)!, base.brandCtx);
-        if (issues.length) fixes[id] = issues;
-      }
-      const redo = people.filter((p) => fixes[p.id]);
-      if (redo.length) {
-        const again = await writeChunk({
-          ...base, people: redo, fixes,
-          avoid: [...used, ...[...got].filter(([id]) => !fixes[id]).map(([, a]) => a.angle)],
-        });
-        for (const [id, a] of again) {
-          if (angleIssues(a, material.get(id)!, base.brandCtx).length < fixes[id]!.length) got.set(id, a);
-        }
-      }
-      for (const id of ids) {
-        const a = got.get(id);
-        if (!a) { patch(id, { status: "failed" }); continue; }
-        const { detectedName, ...angle } = a;
+    const used = job.people.filter((p) => p.status === "done" && !targets.includes(p.id)).flatMap((p) => (p.ideas ?? []).map((i) => i.title));
+    let next = 0;
+    await Promise.all(Array.from({ length: Math.min(WRITE_CONCURRENCY, ready.length) }, async () => {
+      while (next < ready.length) {
+        const id = ready[next++]!;
+        const text = material.get(id)!;
+        const got = await researchPerson(byId(id), text, base, used.slice(-30)).catch(() => null);
+        if (!got) { patch(id, { status: "failed" }); continue; }
+        const { detectedName, ...ideas } = got.ideas;
         const p = byId(id);
         patch(id, {
-          ...angle, status: "done",
-          quoteWarning: unsupportedQuotes(a, material.get(id)!, base.brandCtx).length > 0,
+          ...ideas, voice: got.voice, materialDigest: text.slice(0, DIGEST_CHARS), status: "done",
           ...(!p.name && !p.displayName && detectedName ? { displayName: detectedName } : {}),
         });
-        used.push(a.angle);
+        used.push(...ideas.ideas.map((i) => i.title));
+        await saveBatch(job.batchId, job.people).catch(() => {});
       }
-      await saveBatch(job.batchId, job.people).catch(() => {});
-    }
+    }));
   } catch (e) {
     console.warn("[influencer] job failed:", (e as Error)?.message?.slice(0, 160));
   } finally {
@@ -222,7 +247,9 @@ export const influencerRouter = router({
       if (!b) return null;
       let jobId: string | null = null;
       for (const [id, j] of jobs) if (j.batchId === b.id && !j.done && j.userId === ctx.user!.id) jobId = id;
-      return { batchId: b.id, subject: { kind: b.subjectKind, id: b.subjectId }, people: b.people, jobId };
+      // 還在跑的那一批，以背景工作手上那份為準（資料庫裡的要等它寫回才是新的）。
+      const people = runningJob(b.id)?.people ?? b.people;
+      return { batchId: b.id, subject: { kind: b.subjectKind, id: b.subjectId }, people: pub(people), jobId };
     }),
 
   parseSheet: protectedProcedure
@@ -307,7 +334,46 @@ export const influencerRouter = router({
       const job = jobs.get(input.jobId);
       // 找不到＝伺服器重啟或過期；別人的 job 也當成找不到。前端改讀 latest。
       if (!job || job.userId !== ctx.user!.id) return { people: [] as PersonResult[], done: true, lost: true };
-      return { people: job.people, done: job.done, lost: false };
+      return { people: pub(job.people), done: job.done, lost: false };
+    }),
+
+  /** 用戶挑了第幾個點子：這時才寫邀約信（沒被挑的點子不花錢寫信）。 */
+  pickIdea: protectedProcedure
+    .input(brandInput.extend({ batchId: z.number().int().positive(), id: z.string().max(40), index: z.number().int().min(0).max(2) }))
+    .mutation(async ({ ctx, input }) => {
+      const userId = ctx.user!.id;
+      await assertBrandAccess(userId, input.brandId);
+      checkPickRate(userId);
+      const b = await loadBatch(input.brandId, input.batchId);
+      if (!b) throw new TRPCError({ code: "NOT_FOUND", message: "找不到這一批名單" });
+      const p = runningJob(b.id)?.people.find((x) => x.id === input.id) ?? b.people.find((x) => x.id === input.id);
+      const idea = p?.status === "done" ? p.ideas?.[input.index] : undefined;
+      if (!p || !idea) throw new TRPCError({ code: "BAD_REQUEST", message: "這一位還沒有這個點子。" });
+
+      const [subject, market] = await Promise.all([
+        resolveSubject(input.brandId, { kind: b.subjectKind, id: b.subjectId }), getBrandMarket(input.brandId),
+      ]);
+      const brandCtx = await buildBrandPrefix(input.brandId, subject.productId, subject.eventId, "full").catch(() => "");
+      const material = p.materialDigest || [p.profile, p.evidence, idea.basedOn].filter(Boolean).join("\n");
+      const known = [material, brandCtx, idea.title, idea.hook, idea.productPoint, idea.basedOn ?? ""];
+      const args = {
+        brandName: subject.brandName, subjectLine: subject.subjectLine, brandCtx, label: personLabel(p), material, idea,
+        outputLanguage: market.outputLanguage,
+      };
+      let mail = parseEmail((await ask(emailPrompt(args), "請開始。", 900)) ?? "");
+      if (!mail) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "這封信沒寫成，請再選一次。" });
+      // 檢查（替他編的話、太長）→ 帶著問題重寫一次；重寫後問題變少才換。
+      const issues = emailIssues(mail.body, known);
+      if (issues.length) {
+        const again = parseEmail((await ask(emailPrompt({ ...args, fixes: issues }), "請開始。", 900)) ?? "");
+        if (again && emailIssues(again.body, known).length < issues.length) mail = again;
+      }
+      const changes = {
+        picked: input.index, emailSubject: mail.subject, emailBody: mail.body,
+        quoteWarning: emailIssues(mail.body, known).some((x) => x.includes("找不到")),
+      };
+      await applyChange(input.brandId, b.id, input.id, changes);
+      return changes;
     }),
 
   savePerson: protectedProcedure
@@ -318,12 +384,9 @@ export const influencerRouter = router({
     }))
     .mutation(async ({ ctx, input }) => {
       await assertBrandAccess(ctx.user!.id, input.brandId);
-      const b = await loadBatch(input.brandId, input.batchId);
-      if (!b) throw new TRPCError({ code: "NOT_FOUND", message: "找不到這一批名單" });
-      if (isRunning(b.id)) throw new TRPCError({ code: "CONFLICT", message: "這一批還在寫，等它寫完再改。" });
-      const { brandId: _b, batchId: _id, id, ...fields } = input;
+      const { brandId, batchId, id, ...fields } = input;
       const changes = Object.fromEntries(Object.entries(fields).filter(([, v]) => v !== undefined));
-      await saveBatch(b.id, b.people.map((p) => (p.id === id ? { ...p, ...changes } : p)));
+      await applyChange(brandId, batchId, id, changes);
       return { ok: true };
     }),
 

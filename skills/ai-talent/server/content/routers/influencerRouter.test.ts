@@ -6,7 +6,7 @@ describe("influencerRouter", () => {
   it("builds and exposes its procedures", async () => {
     const { influencerRouter } = await import("./influencerRouter");
     const procs = Object.keys((influencerRouter as any)._def.procedures);
-    expect(procs.sort()).toEqual(["analyzePoll", "analyzeStart", "exportFile", "latest", "parseSheet", "readable", "savePerson"]);
+    expect(procs.sort()).toEqual(["analyzePoll", "analyzeStart", "exportFile", "latest", "parseSheet", "pickIdea", "readable", "savePerson"]);
   }, 60_000);
 });
 
@@ -102,63 +102,72 @@ describe("apifyProfiles", () => {
 });
 
 describe("influencerAngles", () => {
-  it("keeps the two fact sources and the no-price rule in the prompt", async () => {
-    const { anglesSystemPrompt } = await import("../core/influencer/influencerAngles");
-    const p = anglesSystemPrompt({
+  const MATERIAL = "Instagram：小美（@mei）\n- 苗栗 26 間森林系景觀餐廳，快存起來\n- 空間看似粗獷，細節卻很溫柔。";
+
+  it("the ideas prompt puts the model in the creator's seat and keeps the two fact sources apart", async () => {
+    const { ideasPrompt, voicePrompt, IDEA_KINDS } = await import("../core/influencer/influencerAngles");
+    const p = ideasPrompt({
       brandName: "測試品牌", subjectLine: "「測試品牌」的產品「A」", brandCtx: "品牌資料內容", outputLanguage: "zh-TW",
-      people: [{ id: "p1", label: "小明", platform: "YouTube", followers: "10萬位訂閱者", material: "YouTube 頻道：小明" }],
-      avoid: ["已用切角"],
+      label: "小美", platform: "Instagram", followers: "3.2 萬粉絲", material: MATERIAL, voice: "語氣溫柔平靜", avoid: ["已用點子"], direction: "想主打送禮",
     });
-    expect(p).toContain("產品特色的唯一來源");
-    expect(p).toContain("個人特色的唯一來源");
-    expect(p).toContain("不要提費用、預算、報價");
-    expect(p).toContain("- 已用切角");
-    expect(p).toContain("id=p1");
+    expect(p).toContain("你現在就是下面這位創作者本人");
+    expect(p).toContain("做給「你的觀眾」看的，不是品牌在對你推銷");
+    expect(p).toContain("產品事實的唯一來源");
+    expect(p).toContain("語氣溫柔平靜");
+    expect(p).toContain("- 已用點子");
+    expect(p).toContain("想主打送禮");
+    expect(p).toContain("私人生活");
+    expect(p).toContain("品牌簡報用語");
+    for (const k of IDEA_KINDS) expect(p).toContain(`${k.key}：`);
+    expect(voicePrompt("zh-TW")).toContain("照抄 3 句");
   });
 
-  it("parsePeopleAngles keeps only requested ids, one each, and drops incomplete ones", async () => {
-    const { parsePeopleAngles } = await import("../core/influencer/influencerAngles");
-    const ok = { profile: "科技開箱", evidence: "Mac 開箱", talkingPoints: ["a", "b", "c", "d"], angle: "切角", angleWhy: "因為", hook: "開場", format: "長片", emailSubject: "主旨", emailBody: "x".repeat(60) };
-    const raw = "好的：\n```json\n" + JSON.stringify({ people: [
-      { id: "p1", ...ok }, { id: "p1", ...ok, angle: "重複的" }, { id: "zz", ...ok },
-      { id: "p2", ...ok, talkingPoints: [] }, { id: "p3", ...ok, emailBody: "太短" },
-    ] }) + "\n```";
-    const out = parsePeopleAngles(raw, ["p1", "p2", "p3"]);
-    expect([...out.keys()]).toEqual(["p1"]);
-    expect(out.get("p1")!.angle).toBe("切角");
-    expect(out.get("p1")!.talkingPoints).toHaveLength(3);
-    expect(parsePeopleAngles("不是 JSON", ["p1"]).size).toBe(0);
+  it("parseIdeas keeps one idea per starting point in a fixed order and needs at least two", async () => {
+    const { parseIdeas } = await import("../core/influencer/influencerAngles");
+    const idea = (kind: string, title: string) => ({ kind, title, hook: "「開場句」", productPoint: "一鍵產出品牌定位", why: "會想存", basedOn: "苗栗 26 間森林系景觀餐廳" });
+    const raw = "好的：\n```json\n" + JSON.stringify({
+      name: "小美", profile: "旅遊攝影創作者", evidence: "「苗栗 26 間森林系景觀餐廳」", format: "圖文貼文",
+      ideas: [idea("method", "方法"), idea("own", "延伸"), idea("own", "重複的"), idea("bogus", "不認得"), { kind: "contrast", title: "沒有開場", hook: "" }],
+    }) + "\n```";
+    const out = parseIdeas(raw, MATERIAL)!;
+    expect(out.ideas.map((i) => [i.kind, i.title])).toEqual([["own", "延伸"], ["method", "方法"]]);
+    expect(out.ideas[0]!.hook).toBe("開場句");               // 包住整句的引號拿掉
+    expect(out.ideas[0]!.basedOn).toBe("苗栗 26 間森林系景觀餐廳");
+    expect(out.ideas[1]!.basedOn).toBeUndefined();            // 只有 own 留 basedOn
+    expect(out.evidence).toBe("「苗栗 26 間森林系景觀餐廳」");
+    expect(out.detectedName).toBe("小美");
+    // 依據引了一句素材裡沒有的話：整句拿掉。
+    const fake = parseIdeas(JSON.stringify({ evidence: "「她說旅行是為了找回自己的節奏」", ideas: [idea("own", "a"), idea("method", "b")] }), MATERIAL)!;
+    expect(fake.evidence).toBe("");
+    expect(parseIdeas(JSON.stringify({ ideas: [idea("own", "只有一個")] }), MATERIAL)).toBeNull();
+    expect(parseIdeas("不是 JSON", MATERIAL)).toBeNull();
   });
 
-  it("flags quotes that are not in the material, and over-long emails and angles", async () => {
-    const { unsupportedQuotes, angleIssues, EMAIL_MAX_CHARS } = await import("../core/influencer/influencerAngles");
-    const material = "YouTube 頻道：小明\n- 一台超過40萬的Mac！蘋果史上最強晶片到底有多強？";
-    const base = { profile: "科技開箱", talkingPoints: ["整合 44 個大數據來源"], angle: "用值不值得買的邏輯拆解顧問服務", angleWhy: "", hook: "", format: "", emailSubject: "" };
-    const a = {
-      ...base,
-      evidence: "從「一台超過40萬的Mac！蘋果史上最強晶片到底有多強？」看得出來",
-      emailBody: "你說的「規格強是一回事，但對工作流程意味著什麼才是重點」讓我們印象很深。我們想用「值不值得買」來談，也就是「用值不值得買的邏輯拆解顧問服務」。",
-    };
-    // 標題照抄＝有依據；短的強調詞不查；自己的切角不算；編出來的那句被抓到。
-    expect(unsupportedQuotes(a, material, "")).toEqual(["規格強是一回事，但對工作流程意味著什麼才是重點"]);
-    expect(unsupportedQuotes({ ...a, emailBody: "我們是「讓資深顧問思維以 AI 規模運作」的團隊。" }, material, "品牌：讓資深顧問思維以AI規模運作")).toEqual([]);
-    const issues = angleIssues({ ...a, emailBody: "字".repeat(EMAIL_MAX_CHARS + 1), angle: "角".repeat(60) }, material, "");
-    expect(issues).toHaveLength(2);
-    expect(angleIssues({ ...a, emailBody: "很短但沒有引用的信。".repeat(5) }, material, "")).toEqual([]);
+  it("flags quotes that are not in what we read, and over-long emails", async () => {
+    const { unsupportedQuotes, emailIssues, EMAIL_MAX_CHARS } = await import("../core/influencer/influencerAngles");
+    const known = [MATERIAL, "品牌：一鍵產出品牌定位"];
+    const body = "看到你做的「苗栗 26 間森林系景觀餐廳，快存起來」；你說的「旅行是為了找回自己的節奏，這句話我記了很久」讓我們印象很深。我們想聊「快存」。";
+    // 標題照抄＝有依據；短的強調詞不查；編出來的那句被抓到。
+    expect(unsupportedQuotes(body, known)).toEqual(["旅行是為了找回自己的節奏，這句話我記了很久"]);
+    expect(emailIssues(body, known)).toHaveLength(1);
+    expect(emailIssues("字".repeat(EMAIL_MAX_CHARS + 1), known)).toHaveLength(1);
+    expect(emailIssues("很短、沒有引用的信。".repeat(5), known)).toEqual([]);
   });
 
-  it("feeds last round's problems back into the prompt and reads the detected name", async () => {
-    const { anglesSystemPrompt, parsePeopleAngles } = await import("../core/influencer/influencerAngles");
-    const prompt = anglesSystemPrompt({
-      brandName: "測試品牌", subjectLine: "x", brandCtx: "", outputLanguage: "zh-TW",
-      people: [{ id: "p1", label: "", platform: "網站", followers: null, material: "素材" }],
-      fixes: { p1: ["emailBody 太長"] },
+  it("the email prompt carries the picked idea, last round's problems, and the no-price rule", async () => {
+    const { emailPrompt, parseEmail } = await import("../core/influencer/influencerAngles");
+    const p = emailPrompt({
+      brandName: "測試品牌", subjectLine: "x", brandCtx: "品牌資料", label: "小美", material: MATERIAL, outputLanguage: "zh-TW",
+      idea: { kind: "own", title: "整理 26 間餐廳，我怎麼不讓自己亂", hook: "h", productPoint: "一鍵產出品牌定位", why: "w", basedOn: "苗栗 26 間" },
+      fixes: ["內文太長"],
     });
-    expect(prompt).toContain("上一版的問題");
-    expect(prompt).toContain("- emailBody 太長");
-    expect(prompt).toContain("不可以替他編一句話");
-    const raw = JSON.stringify({ people: [{ id: "p1", profile: "a", evidence: "b", talkingPoints: ["c"], angle: "d", emailSubject: "e", emailBody: "x".repeat(60), name: "蔡阿嘎" }] });
-    expect(parsePeopleAngles(raw, ["p1"]).get("p1")!.detectedName).toBe("蔡阿嘎");
+    expect(p).toContain("整理 26 間餐廳，我怎麼不讓自己亂");
+    expect(p).toContain("延伸自他做過的：苗栗 26 間");
+    expect(p).toContain("- 內文太長");
+    expect(p).toContain("不提費用、預算、報價");
+    expect(p).toContain("不可以替他編一句話");
+    expect(parseEmail(JSON.stringify({ subject: "主旨", body: "x".repeat(60) }))).toEqual({ subject: "主旨", body: "x".repeat(60) });
+    expect(parseEmail(JSON.stringify({ subject: "主旨", body: "太短" }))).toBeNull();
   });
 
   it("materialEnough ignores whitespace", async () => {
@@ -196,19 +205,37 @@ describe("influencerSheet", () => {
     const people: any[] = [{
       id: "p1", url: "https://www.youtube.com/@ming", name: "小明 <A&B>", email: "ming@example.com", status: "done",
       platform: "youtube", handle: "ming", followers: "10萬位訂閱者", source: "youtube_channel", displayName: "Ming",
-      profile: "科技開箱", evidence: "Mac 開箱", talkingPoints: ["特色一", "特色二"], angle: "切角", angleWhy: "因為", hook: "開場",
-      format: "開箱長片", emailSubject: "主旨", emailBody: "第一段\n\n第二段\u0007",
+      profile: "科技開箱", evidence: "Mac 開箱", format: "開箱長片", picked: 1,
+      ideas: [
+        { kind: "own", title: "延伸點子", hook: "開場一", productPoint: "特色一", why: "w1", basedOn: "Mac 開箱" },
+        { kind: "method", title: "方法點子", hook: "開場三", productPoint: "特色三", why: "w3" },
+      ],
+      emailSubject: "主旨", emailBody: "第一段\n\n第二段\u0007",
+    }, {
+      // 2026-10-06 改寫前的舊資料：一位一個切角。
+      id: "p0", url: "https://www.youtube.com/@old", name: "舊資料", status: "done", platform: "youtube", handle: "old", followers: null, source: "youtube_channel", displayName: null,
+      angle: "舊切角", hook: "舊開場", talkingPoints: ["甲", "乙"], angleWhy: "因為", emailSubject: "s", emailBody: "b".repeat(50),
     }, { id: "p2", url: "https://www.instagram.com/mei", status: "needs_material", platform: "instagram", handle: "mei", followers: null, source: "none", displayName: null }];
     const { rows } = readXlsx(buildXlsx(people, "測試/產品 網紅切角"));
-    expect(rows[0].slice(0, 3)).toEqual(["網紅", "平台", "連結"]);
-    expect(rows[1][0]).toBe("小明 <A&B>");
-    expect(rows[1][7]).toBe("1. 特色一\n2. 特色二");
-    expect(rows[1][13]).toBe("第一段\n\n第二段");
-    expect(rows[2][14]).toBe("資料不足，請補貼文");
+    expect(rows[0]!.slice(0, 3)).toEqual(["網紅", "平台", "連結"]);
+    expect(rows[0]![6]).toBe("點子一（從他做過的內容延伸）");
+    expect(rows[1]![0]).toBe("小明 <A&B>");
+    expect(rows[1]![6]).toBe("延伸點子\n「開場一」\n帶到：特色一");
+    expect(rows[1]![7]).toBe("");                              // 沒有 contrast 那一個
+    expect(rows[1]![8]).toBe("方法點子\n「開場三」\n帶到：特色三");
+    expect(rows[1]![9]).toBe("方法點子");                       // picked: 1
+    expect(rows[1]![12]).toBe("第一段\n\n第二段");
+    expect(rows[2]![6]).toBe("舊切角\n「舊開場」\n帶到：甲、乙");
+    expect(rows[2]![9]).toBe("舊切角");
+    expect(rows[3]![13]).toBe("資料不足，請補貼文");
     const doc = unzip(buildDocx(people, "測試 網紅切角")).get("word/document.xml")!.toString("utf8");
     expect(doc).toContain("小明 &lt;A&amp;B&gt;");
+    expect(doc).toContain("點子 2（已選）");
+    expect(doc).toContain("舊切角");
     expect(doc).toContain("資料不足，請補貼文");
     expect(doc).not.toContain("\u0007");
+    // 自己匯出的表再匯入：「個人特色」欄不會被當成用戶補的素材。
+    expect(rowsToPeople(rows).people[0]).toEqual({ url: "https://www.youtube.com/@ming", name: "小明 <A&B>", email: "ming@example.com", notes: undefined });
     // 顯示文字是名字、連結藏在超連結裡的儲存格。
     const r = rowsToPeople([["名字", "信箱"], ["小華", "hua@example.com"]], new Map([["A2", "https://www.tiktok.com/@hua"]]));
     expect(r.people).toEqual([{ url: "https://www.tiktok.com/@hua", name: "小華", email: "hua@example.com", notes: undefined }]);

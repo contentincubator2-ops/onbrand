@@ -7,7 +7,7 @@
  */
 import { unzip, zip } from "./miniZip";
 import { classifyLink, PLATFORM_LABEL } from "./influencerLink";
-import { MAX_PEOPLE, NOTES_MAX, personLabel, type PersonResult } from "./influencerAngles";
+import { IDEA_KINDS, MAX_PEOPLE, NOTES_MAX, personLabel, type Idea, type PersonResult } from "./influencerAngles";
 
 export interface SheetPerson { url: string; name?: string; email?: string; notes?: string }
 export interface SheetParse { people: SheetPerson[]; skipped: number; truncated: number }
@@ -17,7 +17,7 @@ const HEAD = {
   url: /連結|網址|url|link|頻道|主頁|profile/i,
   name: /名稱|名字|姓名|網紅|創作者|帳號|name|creator|kol|influencer/i,
   email: /e-?mail|信箱|郵件/i,
-  notes: /備註|說明|特色|貼文|簡介|note|memo|bio/i,
+  notes: /備註|說明|貼文|簡介|note|memo|bio/i,
 };
 
 function xmlText(s: string): string {
@@ -126,7 +126,9 @@ export function rowsToPeople(rows: string[][], links: Map<string, string> = new 
     const email = (cEmail >= 0 && EMAIL_RE.test(at(cEmail)) ? at(cEmail) : rest.find(({ v }) => EMAIL_RE.test(v))?.v) || undefined;
     const others = rest.filter(({ v }) => !EMAIL_RE.test(v));
     const name = (cName >= 0 ? at(cName) : others.find(({ v }) => v.length <= 40)?.v) || undefined;
-    const notes = (cNotes >= 0 ? at(cNotes) : others.filter(({ v }) => v !== name).map(({ v }) => v).join("\n")) || undefined;
+    // 有標題列就只認「備註」那一欄：其他欄是什麼我們不知道（例如把我們匯出的表再匯入，
+    // 裡面的個人特色、點子不是用戶補的素材）。沒有標題列才把剩下的文字都當備註。
+    const notes = (cNotes >= 0 ? at(cNotes) : head ? "" : others.filter(({ v }) => v !== name).map(({ v }) => v).join("\n")) || undefined;
     people.push({ url, name: name?.slice(0, 60), email, notes: notes?.slice(0, NOTES_MAX) });
   }
   const truncated = Math.max(0, people.length - MAX_PEOPLE);
@@ -151,8 +153,18 @@ const esc = (s: unknown) => String(s ?? "")
 
 const STATUS_ZH: Record<string, string> = {
   done: "完成", needs_material: "資料不足，請補貼文", invalid_link: "連結無法辨識", failed: "沒寫成，請重試",
-  queued: "排隊中", reading: "讀取中", thinking: "撰寫中",
+  queued: "排隊中", reading: "讀取中", thinking: "研究中",
 };
+
+/** 這一位的點子。2026-10-06 改寫前的舊資料只有一個切角，當成一個點子。 */
+function ideasOf(p: PersonResult): Array<Pick<Idea, "title" | "hook" | "productPoint" | "why">> {
+  if (p.ideas?.length) return p.ideas;
+  return p.angle ? [{ title: p.angle, hook: p.hook ?? "", productPoint: (p.talkingPoints ?? []).join("、"), why: p.angleWhy ?? "" }] : [];
+}
+const ideaText = (i?: Pick<Idea, "title" | "hook" | "productPoint">) =>
+  (i ? [i.title, i.hook ? `「${i.hook}」` : "", i.productPoint ? `帶到：${i.productPoint}` : ""].filter(Boolean).join("\n") : "");
+/** 用戶挑的那一個；舊資料只有一個，就是它。 */
+const pickedIdea = (p: PersonResult) => (p.picked !== undefined ? ideasOf(p)[p.picked] : p.ideas?.length ? undefined : ideasOf(p)[0]);
 
 const COLUMNS: Array<[string, number, (p: PersonResult) => string]> = [
   ["網紅", 18, (p) => personLabel(p)],
@@ -160,12 +172,10 @@ const COLUMNS: Array<[string, number, (p: PersonResult) => string]> = [
   ["連結", 34, (p) => p.url],
   ["Email", 24, (p) => p.email ?? ""],
   ["粉絲／訂閱", 14, (p) => p.followers ?? ""],
-  ["個人特色", 40, (p) => p.profile ?? ""],
-  ["判讀依據", 36, (p) => p.evidence ?? ""],
-  ["可以講的產品特色", 44, (p) => (p.talkingPoints ?? []).map((t, i) => `${i + 1}. ${t}`).join("\n")],
-  ["獨特切角", 30, (p) => p.angle ?? ""],
-  ["為什麼是他", 36, (p) => p.angleWhy ?? ""],
-  ["開場示範", 32, (p) => p.hook ?? ""],
+  ["個人特色", 36, (p) => p.profile ?? ""],
+  ...IDEA_KINDS.map((k, n): [string, number, (p: PersonResult) => string] =>
+    [`點子${"一二三"[n]}（${k.zh}）`, 40, (p) => ideaText(p.ideas?.length ? p.ideas.find((i) => i.kind === k.key) : n === 0 ? ideasOf(p)[0] : undefined)]),
+  ["選定的點子", 30, (p) => pickedIdea(p)?.title ?? ""],
   ["建議形式", 14, (p) => p.format ?? ""],
   ["邀約信主旨", 30, (p) => p.emailSubject ?? ""],
   ["邀約信內文", 60, (p) => p.emailBody ?? ""],
@@ -212,11 +222,13 @@ export function buildDocx(people: PersonResult[], title: string): Buffer {
       p.status !== "done" ? para(run(STATUS_ZH[p.status] ?? p.status, { color: "B45309" })) : "",
       field("個人特色", p.profile ?? ""),
       field("判讀依據", p.evidence ?? ""),
-      p.talkingPoints?.length ? para(run("可以講的產品特色", { bold: true }), 40) + p.talkingPoints.map((t, k) => para(run(`${k + 1}. ${t}`), 40)).join("") : "",
-      field("獨特切角", p.angle ?? ""),
-      field("為什麼是他", p.angleWhy ?? ""),
-      field("開場示範", p.hook ? `「${p.hook}」` : ""),
       field("建議形式", p.format ?? ""),
+      ...ideasOf(p).map((i, k) => {
+        const chosen = pickedIdea(p) === i;
+        return para(run(`點子 ${k + 1}${chosen ? "（已選）" : ""}　`, { bold: true }) + run(i.title, { bold: chosen }), 40)
+          + (i.hook ? para(run(`「${i.hook}」`), 40) : "")
+          + para(run([i.productPoint ? `帶到：${i.productPoint}` : "", i.why ? `觀眾為什麼會看：${i.why}` : ""].filter(Boolean).join("｜"), { color: "6B6B6B", size: 20 }));
+      }),
       p.emailBody ? para(run("邀約信", { bold: true }), 40) + field("主旨", p.emailSubject ?? "") + para(run(p.emailBody)) : "",
     ].join("")),
   ].join("");
