@@ -40,9 +40,9 @@ export type TeamRole = "owner" | "admin" | "editor" | "viewer";
 
 export interface TeamPermissions {
   role: TeamRole;
-  /** Run tasks, create and edit content. */
+  /** Run tasks, create and edit content, add photos to the brand / product library. */
   canWrite: boolean;
-  /** Change positioning, products, events, regulations, brand memory. */
+  /** Change positioning, products, events, regulations, brand memory; remove photos or change the main one. */
   canEditStrategy: boolean;
   /** Schedule and publish to connected channels. */
   canPublish: boolean;
@@ -100,6 +100,14 @@ const STRATEGY_NAMESPACES = new Set([
 ]);
 const MANAGE_NAMESPACES = new Set(["bundleConnect", "platformConnect"]);
 const PUBLISH_PATHS = new Set(["calendar.schedule", "calendar.reschedule", "calendar.retry", "calendar.publish"]);
+/**
+ * Adding a photo is part of making a post, so it only needs `write` even
+ * though the photo library sits in a strategy namespace. Removing a photo or
+ * changing the main one still needs the strategy permission.
+ */
+const WRITE_PATHS = new Set(["assetPhoto.saveGeneratedImage"]);
+/** What the upload route (assetPhotoRoute.ts) asks for — kept here so both entrances agree. */
+export const PHOTO_UPLOAD_NEED = "write" as const;
 
 const namespaceOf = (path: string) => path.split(".")[0] ?? "";
 
@@ -115,6 +123,7 @@ export function permissionNeeded(path: string, type: string): Need {
   const ns = namespaceOf(path);
   if (MANAGE_NAMESPACES.has(ns)) return "manage";
   if (ns === "publish" || PUBLISH_PATHS.has(path)) return "publish";
+  if (WRITE_PATHS.has(path)) return "write";
   if (STRATEGY_NAMESPACES.has(ns)) return "strategy";
   return "write";
 }

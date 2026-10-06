@@ -70,9 +70,10 @@ assetPhotoRouter.post(
     if (!callerId) { res.status(401).json({ error: "Unauthorized" }); return; }
 
     const brandId = parseInt(String(req.headers["x-brand-id"] ?? ""), 10);
-    // A team member with strategy permission uploads into the owner's brand.
-    const { actingUserForBrand } = await import("../../platform/core/teamAccess");
-    const acting = await actingUserForBrand(callerId, brandId, "strategy");
+    // A team member who may write content uploads into the owner's brand —
+    // adding a photo is part of making a post (2026-10-06 CJ).
+    const { actingUserForBrand, PHOTO_UPLOAD_NEED } = await import("../../platform/core/teamAccess");
+    const acting = await actingUserForBrand(callerId, brandId, PHOTO_UPLOAD_NEED);
     if (acting.denied) { res.status(403).json({ error: acting.denied }); return; }
     const userId = acting.userId;
     const scope = String(req.headers["x-scope"] ?? "") as PhotoScope;
