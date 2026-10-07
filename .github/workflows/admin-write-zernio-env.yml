@@ -117,10 +117,10 @@ jobs:
             value = os.environ["ZERNIO_ENV_VALUE"]
             if "\n" in value or "\r" in value:
                 raise SystemExit("Invalid multiline environment value")
-            # dotenv supports single quotes and backticks without expanding backslash escapes.
-            quote = next((q for q in ("'", "`") if q not in value), None)
-            if quote is None:
-                raise SystemExit("Unsupported environment value quoting")
+            # Single quotes keep this value safe for both dotenv and bash source.
+            if "'" in value:
+                raise SystemExit("value contains a single quote")
+            quote = "'"
             path = pathlib.Path(sys.argv[1])
             lines = [line for line in path.read_text().splitlines() if not line.startswith(key + "=")]
             lines.append(key + "=" + quote + value + quote)
@@ -195,10 +195,10 @@ jobs:
           value = os.environ["ZERNIO_ENV_VALUE"]
           if "\n" in value or "\r" in value:
               raise SystemExit("Invalid multiline environment value")
-          # dotenv supports single quotes and backticks without expanding backslash escapes.
-          quote = next((q for q in ("'", "`") if q not in value), None)
-          if quote is None:
-              raise SystemExit("Unsupported environment value quoting")
+          # Single quotes keep this value safe for both dotenv and bash source.
+          if "'" in value:
+              raise SystemExit("value contains a single quote")
+          quote = "'"
           path = pathlib.Path(sys.argv[1])
           lines = [line for line in path.read_text().splitlines() if not line.startswith(key + "=")]
           lines.append(key + "=" + quote + value + quote)
