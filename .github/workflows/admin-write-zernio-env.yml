@@ -51,6 +51,13 @@ on:
         default: keep
         options: [pipedream, bundle, zernio, keep]
 
+      social_publish:
+        description: "SOCIAL_PUBLISH_ENABLED 社群連接與發布總開關（keep 保留現值）"
+        required: true
+        type: choice
+        default: keep
+        options: [keep, on, off]
+
 permissions:
   contents: read
 
@@ -75,12 +82,13 @@ jobs:
           PROVIDER_THREADS: ${{ inputs.threads }}
           PROVIDER_YOUTUBE: ${{ inputs.youtube }}
           PROVIDER_TIKTOK: ${{ inputs.tiktok }}
+          SOCIAL_PUBLISH: ${{ inputs.social_publish }}
         with:
           host: ${{ secrets.VM_HOST }}
           username: ${{ secrets.VM_USER }}
           key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
           command_timeout: 120s
-          envs: ZERNIO_API_KEY,PROVIDER_FACEBOOK,PROVIDER_INSTAGRAM,PROVIDER_LINKEDIN,PROVIDER_THREADS,PROVIDER_YOUTUBE,PROVIDER_TIKTOK
+          envs: ZERNIO_API_KEY,PROVIDER_FACEBOOK,PROVIDER_INSTAGRAM,PROVIDER_LINKEDIN,PROVIDER_THREADS,PROVIDER_YOUTUBE,PROVIDER_TIKTOK,SOCIAL_PUBLISH
           script: |
             set +x
             set -euo pipefail
@@ -137,6 +145,11 @@ jobs:
             upsert PUBLISH_PROVIDER_THREADS "$PROVIDER_THREADS"
             upsert PUBLISH_PROVIDER_YOUTUBE "$PROVIDER_YOUTUBE"
             upsert PUBLISH_PROVIDER_TIKTOK "$PROVIDER_TIKTOK"
+            case "${SOCIAL_PUBLISH:-keep}" in
+              on|off) upsert SOCIAL_PUBLISH_ENABLED "$SOCIAL_PUBLISH" ;;
+              keep|"") echo "  ⊘ SOCIAL_PUBLISH_ENABLED (kept)" ;;
+              *) echo "❌ Invalid social_publish choice."; exit 1 ;;
+            esac
 
             pm2 restart onbrand-dev --update-env >/dev/null 2>&1
             if ! timeout 60 bash -c 'until curl --fail --silent --max-time 5 http://127.0.0.1:3101/health >/dev/null; do sleep 3; done'; then
@@ -159,6 +172,7 @@ jobs:
           PROVIDER_THREADS: ${{ inputs.threads }}
           PROVIDER_YOUTUBE: ${{ inputs.youtube }}
           PROVIDER_TIKTOK: ${{ inputs.tiktok }}
+          SOCIAL_PUBLISH: ${{ inputs.social_publish }}
         run: |
           set +x
           set -euo pipefail
@@ -215,6 +229,11 @@ jobs:
           upsert PUBLISH_PROVIDER_THREADS "$PROVIDER_THREADS"
           upsert PUBLISH_PROVIDER_YOUTUBE "$PROVIDER_YOUTUBE"
           upsert PUBLISH_PROVIDER_TIKTOK "$PROVIDER_TIKTOK"
+          case "${SOCIAL_PUBLISH:-keep}" in
+            on|off) upsert SOCIAL_PUBLISH_ENABLED "$SOCIAL_PUBLISH" ;;
+            keep|"") echo "  ⊘ SOCIAL_PUBLISH_ENABLED (kept)" ;;
+            *) echo "❌ Invalid social_publish choice."; exit 1 ;;
+          esac
 
           pm2 restart onbrand --update-env >/dev/null 2>&1
           if ! timeout 60 bash -c 'until curl --fail --silent --max-time 5 http://127.0.0.1:3101/health >/dev/null; do sleep 3; done'; then
