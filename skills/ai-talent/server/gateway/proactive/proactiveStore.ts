@@ -129,21 +129,27 @@ export function rowToEvent(r: any): ProactiveEventRow {
  */
 export async function createEvent(e: NewProactiveEvent): Promise<boolean> {
   if (await isMuted(e.userId, e.kind)) return false;
+  const key = e.dedupeKey.slice(0, 191);
+  // 分兩步，不用 ON DUPLICATE KEY UPDATE：mysql2 預設回報「符合的列數」，重複鍵而沒改動也回 1，
+  // 分不出是新增還是已存在（2026-10-07 DEV 探測抓到——每一拍都把舊事件算成新的）。
   const [r]: any = await localPool.execute(
-    `INSERT INTO proactive_events (userId, brandId, aspect, kind, dedupeKey, urgency, title, body, payload, navUrl, dueAt)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-     ON DUPLICATE KEY UPDATE
-       title   = IF(status = 'open' AND VALUES(urgency) = 'urgent' AND urgency <> 'urgent', VALUES(title), title),
-       body    = IF(status = 'open' AND VALUES(urgency) = 'urgent' AND urgency <> 'urgent', VALUES(body), body),
-       urgency = IF(status = 'open' AND VALUES(urgency) = 'urgent', 'urgent', urgency)`,
+    `INSERT IGNORE INTO proactive_events (userId, brandId, aspect, kind, dedupeKey, urgency, title, body, payload, navUrl, dueAt)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
-      e.userId, e.brandId, e.aspect, e.kind, e.dedupeKey.slice(0, 191), e.urgency ?? "normal",
+      e.userId, e.brandId, e.aspect, e.kind, key, e.urgency ?? "normal",
       e.title.slice(0, 255), e.body ?? null, e.payload ? JSON.stringify(e.payload) : null,
       e.navUrl ? e.navUrl.slice(0, 500) : null, e.dueAt ?? null,
     ],
   );
-  // mysql2：新增 affectedRows = 1；重複鍵且有改動 = 2；重複鍵沒改動 = 0。
-  return Number(r?.affectedRows ?? 0) === 1;
+  if (Number(r?.affectedRows ?? 0) > 0) return true;
+  if (e.urgency === "urgent") {
+    await localPool.execute(
+      `UPDATE proactive_events SET urgency = 'urgent', title = ?, body = ?
+        WHERE userId = ? AND dedupeKey = ? AND status = 'open' AND urgency <> 'urgent'`,
+      [e.title.slice(0, 255), e.body ?? null, e.userId, key],
+    );
+  }
+  return false;
 }
 
 /** 這個 key 有沒有出現過（任何狀態）。花錢的檢查器在動手前先問，免得白做一次。 */

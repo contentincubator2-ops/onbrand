@@ -1,12 +1,14 @@
 name: Ops (DEV) — probe proactive inbox write path (self-cleaning)
 
-# 主動收件匣的寫入路徑在 DEV VM 上實跑一次，用的是 VM 上「已部署」的程式（不帶這個分支的檔案）：
+# 主動收件匣的寫入路徑在 DEV VM 上實跑一次。第 1 段用「這個分支」的 proactiveStore.ts（放在旁邊、跑完就刪），
+# 第 2 段用 VM 上已部署的程式：
 #   0. 部署狀態：三張表在不在、引擎開關目前是開還是關
 #   1. 事件表：新增／重複不重開／變急件／列表與件數／關閉一次有效／過期自動收掉
 #   2. 發文節奏整條：替「開發測試用」品牌（#2958）真的排一版 → 收件匣看得到 → 按「排定這週」→ 格子變已排定
 #      再排一版 → 按「這週不用」→ 那幾格收掉
 # 會寫入 DEV 資料庫，但只動 #2958 與 dedupeKey 以 probe: 開頭的事件，結束時（含失敗）把自己建的
 # 事件、格子、對話訊息全部刪掉。不開引擎開關、不寄信。花費：兩次模型呼叫。
+# 第 2 次跑：第 1 次抓到 createEvent 把已存在的事件回報成新增（mysql2 回報符合列數），改成 INSERT IGNORE 後重驗。
 # Path-scoped push，跟 op-probe-dev-proactive.yml 同一個做法（environment: dev 才會連到 DEV VM）。
 on:
   push:
@@ -19,9 +21,15 @@ jobs:
     environment: dev
     timeout-minutes: 8
     steps:
+      - uses: actions/checkout@v4
+      - name: Pack this branch's proactiveStore.ts
+        run: echo "PATCH_B64=$(gzip -c skills/ai-talent/server/gateway/proactive/proactiveStore.ts | base64 -w0)" >> "$GITHUB_ENV"
       - name: Exercise the write path on DEV and clean up
         uses: appleboy/ssh-action@v1.0.3
+        env:
+          PATCH_B64: ${{ env.PATCH_B64 }}
         with:
+          envs: PATCH_B64
           host: ${{ secrets.VM_HOST }}
           username: ${{ secrets.VM_USER }}
           key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
@@ -34,10 +42,11 @@ jobs:
             set -a; source .env 2>/dev/null; set +a
             ls server/gateway/proactive/ || { echo "proactive code is not deployed yet"; exit 1; }
             D=server/gateway/proactive
+            echo "$PATCH_B64" | base64 -d | gunzip > "$D/_probeStore.ts"
             cat > "$D/_probe_tmp.ts" <<'TS'
             import localPool from "../../localDb";
             import { addDays, mondayOf } from "../../content/core/planning/weeklyPlanner";
-            import { closeEvent, countOpen, createEvent, eventExists, expireOverdue, getOwn, listOpen } from "./proactiveStore";
+            import { closeEvent, countOpen, createEvent, eventExists, expireOverdue, getOwn, listOpen } from "./_probeStore";
             import { planWeekFor, targetWeek, weekKey } from "./weekPlanCheck";
             import { taipeiParts } from "./proactiveTime";
             import { proactiveRouter } from "../routers/proactiveRouter";
@@ -69,8 +78,9 @@ jobs:
                 check("新增回 true", (await createEvent({ ...base, dedupeKey: k1 })) === true);
                 check("同一個 key 再新增回 false", (await createEvent({ ...base, dedupeKey: k1, title: "不該蓋掉" })) === false);
                 check("eventExists", await eventExists(userId, k1));
-                await createEvent({ ...base, dedupeKey: k1, urgency: "urgent", title: "變急了" });
+                const urgentAgain = await createEvent({ ...base, dedupeKey: k1, urgency: "urgent", title: "變急了" });
                 const open1 = (await listOpen(userId)).find((e) => e.title === "變急了" || e.title === "探測用事件");
+                check("變急件那一次也回 false（不是新事件）", urgentAgain === false);
                 check("時間逼近時升成急件並換標題", open1?.urgency === "urgent" && open1?.title === "變急了", JSON.stringify({ u: open1?.urgency, t: open1?.title }));
                 const c1 = await countOpen(userId);
                 check("件數含這一則且算進急件", c1.open >= 1 && c1.urgent >= 1, JSON.stringify(c1));
@@ -143,5 +153,5 @@ jobs:
             timeout 300 ./node_modules/.bin/tsx "$D/_probe_tmp.ts"
             RC=$?
             echo "probe exit=$RC"
-            rm -f "$D/_probe_tmp.ts"
+            rm -f "$D/_probe_tmp.ts" "$D/_probeStore.ts"
             exit $RC
