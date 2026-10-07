@@ -3,6 +3,7 @@ import {
   bigint,
   int,
   index,
+  uniqueIndex,
   tinyint,
   mysqlEnum,
   mysqlTable,
@@ -1058,3 +1059,32 @@ export const artifactReviews = mysqlTable("artifact_reviews", {
 });
 export type ArtifactReview = typeof artifactReviews.$inferSelect;
 export type InsertArtifactReview = typeof artifactReviews.$inferInsert;
+
+// Provider-neutral publish bindings; legacy brand fields remain in use.
+export const brandPublishTenants = mysqlTable("brand_publish_tenants", {
+  id: bigint("id", { mode: "number" }).autoincrement().primaryKey(),
+  brandId: int("brandId").notNull(),
+  provider: varchar("provider", { length: 24 }).notNull(),
+  tenantId: varchar("tenantId", { length: 128 }).notNull(),
+  createdAt: datetime("createdAt", { fsp: 3 }).notNull().default(sql`CURRENT_TIMESTAMP(3)`),
+  updatedAt: datetime("updatedAt", { fsp: 3 }).notNull().default(sql`CURRENT_TIMESTAMP(3)`).$onUpdate(() => new Date()),
+}, (t) => [uniqueIndex("uq_bpt_brand_provider").on(t.brandId, t.provider)]);
+
+export const brandPublishConnections = mysqlTable("brand_publish_connections", {
+  id: bigint("id", { mode: "number" }).autoincrement().primaryKey(),
+  brandId: int("brandId").notNull(),
+  provider: varchar("provider", { length: 24 }).notNull(),
+  platform: varchar("platform", { length: 24 }).notNull(),
+  accountId: varchar("accountId", { length: 128 }).notNull(),
+  accountLabel: varchar("accountLabel", { length: 255 }),
+  accountUsername: varchar("accountUsername", { length: 255 }),
+  status: varchar("status", { length: 16 }).notNull().default("connected"),
+  connectedAt: datetime("connectedAt", { fsp: 3 }),
+  disconnectedAt: datetime("disconnectedAt", { fsp: 3 }),
+  meta: json("meta"),
+  createdAt: datetime("createdAt", { fsp: 3 }).notNull().default(sql`CURRENT_TIMESTAMP(3)`),
+  updatedAt: datetime("updatedAt", { fsp: 3 }).notNull().default(sql`CURRENT_TIMESTAMP(3)`).$onUpdate(() => new Date()),
+}, (t) => [
+  uniqueIndex("uq_bpc_brand_provider_platform_account").on(t.brandId, t.provider, t.platform, t.accountId),
+  index("idx_bpc_lookup").on(t.brandId, t.provider, t.platform, t.status),
+]);

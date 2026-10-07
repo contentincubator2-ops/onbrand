@@ -31,3 +31,9 @@ describe("getPublishProvider", () => {
     expect(getPublishProvider("FaceBook", { PUBLISH_PROVIDER_FACEBOOK: "bundle" })).toBe("bundle");
   });
 });
+
+it("accepts zernio globally and isolates a YouTube override", () => {
+  expect(getPublishProvider("facebook", { PUBLISH_PROVIDER: "zernio" })).toBe("zernio");
+  expect(getPublishProvider("youtube", { PUBLISH_PROVIDER_YOUTUBE: " ZERNIO " })).toBe("zernio");
+  expect(getPublishProvider("facebook", { PUBLISH_PROVIDER_YOUTUBE: "zernio" })).toBe("pipedream");
+});

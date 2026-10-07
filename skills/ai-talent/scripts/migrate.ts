@@ -2590,6 +2590,42 @@ async function main() {
     `);
     console.log("[migrate] brand_integrations: OK");
 
+    // ─── 2026-10-07: brand publish tenants / connections ────────────────────
+    // Zernio uses provider-neutral bindings; keep legacy brand columns intact.
+    await conn.execute(`
+      CREATE TABLE IF NOT EXISTS brand_publish_tenants (
+        id          BIGINT AUTO_INCREMENT PRIMARY KEY,
+        brandId     INT          NOT NULL,
+        provider    VARCHAR(24)  NOT NULL,                 -- 'zernio' | 'bundle' | 'pipedream' | ...
+        tenantId    VARCHAR(128) NOT NULL,
+        createdAt   DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+        updatedAt   DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+        UNIQUE KEY uq_bpt_brand_provider (brandId, provider)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+    console.log("[migrate] brand_publish_tenants: OK");
+
+    await conn.execute(`
+      CREATE TABLE IF NOT EXISTS brand_publish_connections (
+        id              BIGINT AUTO_INCREMENT PRIMARY KEY,
+        brandId         INT          NOT NULL,
+        provider        VARCHAR(24)  NOT NULL,
+        platform        VARCHAR(24)  NOT NULL,             -- onBrand 內部值：facebook | instagram | linkedin | threads | x | youtube | tiktok
+        accountId       VARCHAR(128) NOT NULL,             -- 供應商端帳號 id（Zernio account _id）
+        accountLabel    VARCHAR(255) NULL,                 -- displayName，給 UI
+        accountUsername VARCHAR(255) NULL,
+        status          VARCHAR(16)  NOT NULL DEFAULT 'connected',   -- 'connected' | 'disconnected'
+        connectedAt     DATETIME(3)  NULL,
+        disconnectedAt  DATETIME(3)  NULL,
+        meta            JSON         NULL,                 -- 供應商專屬雜項（profileUrl 等），不再開新欄位
+        createdAt       DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+        updatedAt       DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+        UNIQUE KEY uq_bpc_brand_provider_platform_account (brandId, provider, platform, accountId),
+        KEY idx_bpc_lookup (brandId, provider, platform, status)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+    console.log("[migrate] brand_publish_connections: OK");
+
     console.log("[migrate] All migrations applied successfully.");
   } finally {
     conn.release();

@@ -1,3 +1,5 @@
+import { PublishUserError } from "../../platform/core/connectors/publish/publishAdapter";
+import { randomUUID } from "node:crypto";
 import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
 
 /**
@@ -19,11 +21,12 @@ const db = {
   outputsPublished: [] as number[],
 };
 const publishViaBundle = vi.fn();
+const publishViaZernio = vi.fn();
 
 function postRow(p: Post) {
   return {
     id: p.id, ownerId: p.userId, outputId: p.outputId, variantIndex: 0, contentKind: null, contentIndex: null,
-    planningConfirmed: 0, platform: p.platform, status: p.status, brandId: 3,
+    planningConfirmed: 0, platform: p.platform, status: p.status, brandId: 3, attempts: p.attempts,
     outputContent: JSON.stringify([{ caption: "hello world" }]), outputMetadata: null, missionSquadSlug: null,
     brand_fb_page_id: null, brand_fb_page_name: null, brandName: "B",
   };
@@ -89,6 +92,10 @@ vi.mock("../../platform/core/billing/planGate", () => ({ assertCanAct: vi.fn(asy
 vi.mock("../../platform/routers/opsRouter", () => ({ logError: vi.fn() }));
 vi.mock("./publish/bundlePublishService", () => ({ publishViaBundleSocial: (...a: any[]) => publishViaBundle(...a) }));
 
+vi.mock("../../platform/core/connectors/publish/zernioAdapter", () => ({
+  createZernioAdapter: () => ({ publish: (...a: any[]) => publishViaZernio(...a) }),
+}));
+
 import { publishScheduledPost, retryScheduledPost, rescheduleScheduledPost } from "../routers/calendarRouter";
 import { tickScheduledPublish } from "./scheduledPublishWorker";
 
@@ -102,7 +109,7 @@ const mk = (over: Partial<Post> = {}): Post => ({
 describe("publish flow (approval gate, retry, worker)", () => {
   const env = { ...process.env };
   beforeEach(() => {
-    execute.mockClear(); publishViaBundle.mockReset();
+    execute.mockClear(); publishViaBundle.mockReset(); publishViaZernio.mockReset();
     publishViaBundle.mockResolvedValue({ postId: "p1", permalink: "https://threads.net/p1" });
     db.posts.clear(); db.review = { 9: "approved", 10: "pending" }; db.adminOfOwner = false;
     db.otherAdminsExist = true; db.outputsPublished = [];
@@ -124,6 +131,59 @@ describe("publish flow (approval gate, retry, worker)", () => {
     expect(p.status).toBe("published");
     expect(p.externalUrl).toBe("https://threads.net/p1");
     expect(db.outputsPublished).toEqual([9]);
+  });
+
+  it("routes Zernio and persists the external URL", async () => {
+    process.env.PUBLISH_PROVIDER_THREADS = "zernio";
+    process.env.ZERNIO_API_KEY = randomUUID();
+    publishViaZernio.mockResolvedValueOnce({ postId: "z1", permalink: "https://example.com/z1" });
+    db.posts.set(50, mk());
+    expect((await publishScheduledPost({ id: 50, userId: OWNER })).ok).toBe(true);
+    expect(publishViaZernio).toHaveBeenCalledWith(expect.objectContaining({ scheduledPostId: 50, brandId: 3, platform: "threads", caption: "hello world", attempt: 1 }));
+    expect(publishViaBundle).not.toHaveBeenCalled();
+    expect(db.posts.get(50)?.externalUrl).toBe("https://example.com/z1");
+    expect(db.posts.get(50)?.status).toBe("published");
+  });
+
+  it.each(["worker", "manual"])("uses a new attempt after a worker failure then %s retry", async retryVia => {
+    process.env.PUBLISH_PROVIDER_THREADS = "zernio";
+    process.env.ZERNIO_API_KEY = randomUUID();
+    db.posts.set(50, mk());
+    publishViaZernio.mockRejectedValueOnce(new Error("Zernio partial publish failure"))
+      .mockResolvedValueOnce({ postId: "z2", permalink: "https://example.com/z2" });
+    expect(await tickScheduledPublish()).toBe(0);
+    expect(db.posts.get(50)).toMatchObject({ status: "failed", attempts: 1 });
+    await retryScheduledPost({ id: 50, userId: OWNER });
+    if (retryVia === "worker") expect(await tickScheduledPublish()).toBe(1);
+    else expect((await publishScheduledPost({ id: 50, userId: OWNER })).ok).toBe(true);
+    expect(publishViaZernio.mock.calls.map(([i]) => i.attempt)).toEqual([1, 2]);
+    expect(db.posts.get(50)?.status).toBe("published");
+    expect(execute.mock.calls.some(([query]) => query.includes("sp.attempts"))).toBe(true);
+  });
+
+  it("advances the attempt when a manual publish is retried", async () => {
+    process.env.PUBLISH_PROVIDER_THREADS = "zernio";
+    process.env.ZERNIO_API_KEY = randomUUID();
+    db.posts.set(50, mk());
+    publishViaZernio.mockRejectedValueOnce(new Error("Zernio partial publish failure"))
+      .mockResolvedValueOnce({ postId: "z2", permalink: "https://example.com/z2" });
+    await expect(publishScheduledPost({ id: 50, userId: OWNER })).rejects.toMatchObject({ code: "INTERNAL_SERVER_ERROR" });
+    expect(db.posts.get(50)).toMatchObject({ status: "pending", attempts: 1 });
+    expect((await publishScheduledPost({ id: 50, userId: OWNER })).ok).toBe(true);
+    expect(publishViaZernio.mock.calls.map(([i]) => i.attempt)).toEqual([1, 2]);
+  });
+
+  it("Zernio reports missing configuration and user-fixable media errors", async () => {
+    process.env.PUBLISH_PROVIDER_THREADS = "zernio";
+    delete process.env.ZERNIO_API_KEY;
+    db.posts.set(50, mk());
+    await expect(publishScheduledPost({ id: 50, userId: OWNER })).rejects.toMatchObject({ code: "PRECONDITION_FAILED", message: "發布服務尚未啟用，請聯絡 sowork@sowork.ai。" });
+    process.env.ZERNIO_API_KEY = randomUUID();
+    publishViaZernio.mockRejectedValueOnce(new PublishUserError("需要影片才能發布。"));
+    await expect(publishScheduledPost({ id: 50, userId: OWNER })).rejects.toMatchObject({ code: "PRECONDITION_FAILED", message: "需要影片才能發布。" });
+    publishViaZernio.mockRejectedValueOnce(new Error("zernio 502: unavailable"));
+    await expect(publishScheduledPost({ id: 50, userId: OWNER })).rejects.toMatchObject({ code: "INTERNAL_SERVER_ERROR" });
+    expect(db.posts.get(50)?.status).toBe("pending");
   });
 
   it("unapproved post is blocked: nothing is sent and the row stays pending", async () => {

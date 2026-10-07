@@ -1,3 +1,4 @@
+import { zernioConnectRouter } from "../platform/routers/zernioConnectRouter";
 import { router } from "../platform/core/trpc";
 import { brandRouter } from "../strategy/routers/brandRouter";
 import { creditsRouter } from "../platform/routers/creditsRouter";
@@ -95,6 +96,7 @@ export const appRouter = router({
   influencer:    influencerRouter,
   competitor:    competitorRouter,
   calendar:      calendarRouter,
+  zernioConnect: zernioConnectRouter,
   bundleConnect: bundleConnectRouter,
   image:         imageRouter,
   // 2026-09-29 各通路「圖片」類別的圖片任務卡。
