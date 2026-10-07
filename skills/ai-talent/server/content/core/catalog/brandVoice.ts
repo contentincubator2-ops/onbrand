@@ -154,6 +154,37 @@ export function splitArticles(text: string): string[] {
 // ─────────────────────────────────────────────────────────────────────
 // 自動分類
 // ─────────────────────────────────────────────────────────────────────
+/**
+ * 拿掉幾乎一樣的文章（同一篇貼了兩次、同一篇的不同版本）。留先出現的那篇。
+ *
+ * 2026-10-07 DEV 用真實範例實跑：四篇「品牌故事」裡有三篇是同一篇的改版，於是
+ * 「反覆出現的常用詞」量到的全是那一篇的內文（「從一個車庫裡的實驗」×3），
+ * 字數區間與結構也等於只看了一篇。學寫法要的是**不同文章之間**的共同點。
+ *
+ * 判斷：把文章切成 8 字的片段，兩篇共有的片段佔較短那篇的一半以上就算同一篇。
+ */
+export function dropNearDuplicates(articles: string[]): string[] {
+  const grams = (t: string): Set<string> => {
+    const chars = [...squash(t)];
+    const set = new Set<string>();
+    for (let i = 0; i + 8 <= chars.length; i += 4) set.add(chars.slice(i, i + 8).join(""));
+    return set;
+  };
+  const kept: { text: string; g: Set<string> }[] = [];
+  for (const a of articles) {
+    const g = grams(a);
+    const dup = kept.some((k) => {
+      const [small, big] = g.size <= k.g.size ? [g, k.g] : [k.g, g];
+      if (small.size === 0) return squash(a) === squash(k.text);
+      let shared = 0;
+      for (const x of small) if (big.has(x)) shared++;
+      return shared / small.size >= 0.5;
+    });
+    if (!dup) kept.push({ text: a, g });
+  }
+  return kept.map((k) => k.text);
+}
+
 /** 給分類模型看的編號清單。只秀開頭——判斷類別不需要全文。 */
 export function renderForClassify(articles: string[], previewChars = 500): string {
   return articles

@@ -1,0 +1,47 @@
+name: Ops (DEV) — probe brand voice full chain on the real DB
+
+# 「丟參考文章學品牌寫法」整條流程，在 DEV VM 上對真實品牌、真資料庫、正在跑的 server 跑一次：
+#   分類 → 兩類同時反推＋試寫 → 不像重修一輪 → 確認上架 → 語氣寫進品牌口吻 → 生文 prompt 讀得到
+# 並確認 positioning 其他 key 全程沒被動到、voice 卡不佔自建卡額度。
+# 走 HTTP 打部署上去的 server（所以要先合併並部署到 dev 才有東西可驗）。
+# 會寫資料庫：在品牌 2977 上建兩張 voice 卡、改品牌口吻；結束時把 `_taskCards` 與 `_assets`
+# 兩個 key 還原成開始前的快照並比對。
+# 花費：約 9 次文字模型呼叫＋兩張卡片插畫。
+# 第 3 次跑（第 2 次腳本字串寫壞，沒跑到）：改用品牌 2977 既有任務卡裡的真實範例當文章（同品牌的文章配同品牌的大腦，才看得出像不像）。
+# 腳本本體在 skills/ai-talent/scripts/probe-brand-voice.ts，這裡把這個分支的那一份送上去跑。
+on:
+  push:
+    paths:
+      - '.github/workflows/op-probe-dev-brand-voice-e2e.yml'
+
+jobs:
+  probe:
+    runs-on: ubuntu-24.04
+    environment: dev
+    timeout-minutes: 16
+    steps:
+      - uses: actions/checkout@v4
+      - name: Pack this branch's probe script
+        run: |
+          echo "PROBE_B64=$(gzip -c skills/ai-talent/scripts/probe-brand-voice.ts | base64 -w0)" >> "$GITHUB_ENV"
+      - name: Run the full chain
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          PROBE_B64: ${{ env.PROBE_B64 }}
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 14m
+          envs: PROBE_B64
+          script: |
+            set +e
+            cd /opt/onbrand/current/skills/ai-talent
+            set -a; source .env 2>/dev/null; set +a
+            echo "host=$(hostname)  app=$(readlink -f /opt/onbrand/current)  now=$(date -u +%FT%TZ)"
+            ls server/content/routers/brandVoiceRouter.ts >/dev/null 2>&1 || { echo "這一版還沒有 brandVoiceRouter，先部署再跑"; exit 1; }
+            echo "$PROBE_B64" | base64 -d | gunzip > scripts/_probe_brand_voice_tmp.ts
+            timeout 780 ./node_modules/.bin/tsx scripts/_probe_brand_voice_tmp.ts 2977 own
+            CODE=$?
+            rm -f scripts/_probe_brand_voice_tmp.ts
+            exit $CODE

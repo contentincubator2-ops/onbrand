@@ -9,7 +9,7 @@ vi.mock("../../../localDb", () => ({ default: { execute: vi.fn() } }));
 import {
   VOICE_CATEGORIES, VOICE_BLOCK_START, VOICE_BLOCK_END,
   splitArticles, parseClassification, groupByCategory, verifiedPhrases, parseVoiceProfile,
-  pickTrialTopic, buildVoiceBlock, mergeVoiceText, countsTowardCardQuota, voiceCardId, voiceCategory,
+  pickTrialTopic, buildVoiceBlock, mergeVoiceText, countsTowardCardQuota, voiceCardId, voiceCategory, dropNearDuplicates,
 } from "./brandVoice";
 import { CARD_ID_RE, brandIdOfCardId, withBrandLock } from "./brandTaskCards";
 
@@ -47,6 +47,33 @@ describe("splitArticles", () => {
 
   it("Windows 換行也切得開", () => {
     expect(splitArticles(`${A}\r\n---\r\n${B}`)).toEqual([A, B]);
+  });
+});
+
+describe("dropNearDuplicates —— 同一篇的不同版本只算一篇", () => {
+  const base = "從一個車庫裡的實驗，一路打拼到進駐歷史老街的極簡精品咖啡品牌。創辦人最早其實是一位攝影師，因為對咖啡的熱愛，在自己家裡的公寓車庫設置了一台小型烘豆機。";
+
+  it("一字不差的重複丟掉，留先出現的", () => {
+    expect(dropNearDuplicates([A, B, A])).toEqual([A, B]);
+  });
+
+  it("改了開頭、加了結尾的改版也算同一篇", () => {
+    const v2 = `這是一個關於咖啡品牌背後真正的創業故事：${base}
+
+#coffee #story`;
+    expect(dropNearDuplicates([base, v2, B])).toEqual([base, B]);
+  });
+
+  it("只是差在空白與換行，算同一篇", () => {
+    expect(dropNearDuplicates([A, A.replace("，", "，\n\n")])).toEqual([A]);
+  });
+
+  it("同一個品牌寫的不同文章（有共同的招呼語與 hashtag）不會被誤殺", () => {
+    const x = `嗨茶友們，${A}
+#山茶日常`;
+    const y = `嗨茶友們，${B}
+#山茶日常`;
+    expect(dropNearDuplicates([x, y])).toEqual([x, y]);
   });
 });
 
