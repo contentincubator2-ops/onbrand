@@ -123,6 +123,12 @@ export interface FBTaskTemplate {
   scene?: string;
   /** 自建卡的 AI 插畫（內建卡的圖走前端 taskIllustrationIds.json，不經這裡）。 */
   illustration_url?: string;
+  /**
+   * 這張卡的寫法是從品牌自己發過的文章學來的（見 brandVoice.ts）。產出後不過
+   * TikTok／YouTube 那道「沉穩觀察者」聲音守門（移除 emoji、！→。、改寫招呼語開場）——
+   * 那道守門是替沒有自己寫法的內建卡擋浮誇腔用的，套在這裡只會把品牌的習慣洗掉。
+   */
+  keepOwnVoice?: boolean;
   primary_input?: { key: string; placeholder?: string; type: "text" | "textarea"; derive?: InputDerive };
   inputs: TaskInput[];
   /**
