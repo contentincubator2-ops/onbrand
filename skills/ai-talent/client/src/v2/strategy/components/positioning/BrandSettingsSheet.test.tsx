@@ -3,9 +3,10 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
-  providers: {} as Record<string, string>, status: vi.fn(), connect: vi.fn(), disconnect: vi.fn(), lang: "en",
+  providers: {} as Record<string, string>, bundleProviders: {} as Record<string, string>, status: vi.fn(), connect: vi.fn(), disconnect: vi.fn(), lang: "en",
 }));
 vi.mock("../../../../lib/trpc", () => ({ trpc: {
+  bundleConnect: { getProviders: { useQuery: () => ({ data: mocks.bundleProviders }) } },
   zernioConnect: {
     getProviders: { useQuery: () => ({ data: mocks.providers }) },
     getConnectUrl: { useMutation: () => ({ mutateAsync: mocks.connect }) },
@@ -33,6 +34,7 @@ describe("PublishTab Zernio focus refresh", () => {
   let root: Root | null;
   beforeEach(() => {
     (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
+    mocks.bundleProviders = {};
     mocks.lang = "en";
     mocks.disconnect.mockReset().mockResolvedValue(undefined);
     mocks.providers = { facebook: "zernio", linkedin: "zernio", instagram: "pipedream" };
@@ -158,6 +160,19 @@ describe("PublishTab Zernio focus refresh", () => {
     await act(async () => root!.render(<PublishTab brandId={3} />));
     expect(window.location.search).toBe("?b=3&cat=publish");
     expect(mocks.status).toHaveBeenCalledWith({ brandId: 3, platform: "facebook" });
+  });
+
+  it.each(["zernio", "bundle", "pipedream"])("shows only the four supported cards and gates Threads for %s", async provider => {
+    mocks.providers = { facebook: provider, instagram: provider, linkedin: provider, threads: provider,
+      youtube: "zernio", tiktok: "zernio", x: "zernio" };
+    mocks.bundleProviders = { threads: provider };
+    await act(async () => root!.render(<PublishTab brandId={3} />));
+    const connectButtons = Array.from(container.querySelectorAll("button"))
+      .map(button => button.textContent).filter(text => text?.startsWith("Connect "));
+    expect(connectButtons).toEqual(["Connect Facebook", "Connect Instagram", "Connect LinkedIn",
+      ...(provider === "pipedream" ? [] : ["Connect Threads"])]);
+    expect(container.textContent).not.toContain("YouTube");
+    expect(container.textContent).not.toContain("TikTok");
   });
 
 });

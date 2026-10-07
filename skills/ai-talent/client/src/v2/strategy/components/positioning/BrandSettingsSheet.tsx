@@ -683,13 +683,10 @@ export function PublishTab({ brandId }: { brandId: number | null }) {
     { key: "facebook",  label: "Facebook",  color: "#18181b", icon: faFacebook,  desc: en ? "Publish to your Facebook Page"              : "發布到 Facebook 粉專"        },
     { key: "instagram", label: "Instagram", color: "#18181b", icon: faInstagram, desc: en ? "Publish to Instagram Business account"       : "發布到 Instagram 商業帳號"   },
     { key: "linkedin",  label: "LinkedIn",  color: "#18181b", icon: faLinkedin,  desc: en ? "Publish to your LinkedIn profile or page"    : "發布到 LinkedIn 帳號或企業頁面" },
-    { key: "youtube",   label: "YouTube",   color: "#18181b", icon: faYoutube,   desc: en ? "Upload videos to your YouTube channel"       : "上傳影片到 YouTube 頻道"     },
-    // Threads publishes only through bundle.social, so the tile shows only when the server routes it there.
+    // Threads is visible when routed through Zernio or bundle.social.
     // X is a hidden front-stage channel (planGate) and is intentionally not listed.
     { key: "threads",   label: "Threads",   color: "#18181b", icon: faThreads,   desc: en ? "Publish to your Threads account (500 characters max)" : "發布到 Threads 帳號（上限 500 字）" },
-    { key: "tiktok", label: "TikTok", color: "#18181b", icon: faTiktok, desc: en ? "Upload videos to TikTok" : "上傳影片到 TikTok" },
-  ].filter((p) => (p.key !== "threads" || usesBundle("threads") || usesZernio("threads"))
-    && (p.key !== "tiktok" || usesZernio("tiktok")));
+  ].filter((p) => p.key !== "threads" || usesBundle("threads") || usesZernio("threads"));
 
   // ── After OAuth: poll until Pipedream registers the connection ───────────
   // Pipedream's API can lag 5-20s after OAuth completes. Poll every 2s
