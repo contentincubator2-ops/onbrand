@@ -378,7 +378,7 @@ export const brandRouter = router({
         if (ownedBrand) {
           const { disconnectBrand } = await import("../../platform/core/connectors/publish/zernioLifecycle");
           const { default: pool } = await import("../../localDb");
-          await disconnectBrand(pool, input.id);
+          void disconnectBrand(pool, input.id);
         }
       }
       await db.delete(brands).where(and(eq(brands.id, input.id), eq(brands.userId, ctx.user.id)));

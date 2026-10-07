@@ -1,5 +1,3 @@
-import { disconnectBrandsForOwner } from "../connectors/publish/zernioLifecycle";
-
 /**
  * stripeLifecycle — everything that happens to a subscription AFTER the first
  * checkout: renewals, failed charges, cancellation, refunds.
@@ -24,6 +22,8 @@ import { disconnectBrandsForOwner } from "../connectors/publish/zernioLifecycle"
  *
  * Everything takes `db` and `stripe` as arguments so the tests can pass fakes.
  */
+
+import { disconnectBrandsForOwner } from "../connectors/publish/zernioLifecycle";
 
 export interface Db {
   execute(sql: string, params?: any[]): Promise<any>;
@@ -313,7 +313,7 @@ export async function applyLifecycleAction(
       }
       await setPlanStatus(db, owner, "canceled");
       await setCancelFlag(db, owner.userId, false);
-      await disconnectBrandsForOwner(db, { userId: owner.userId, workspaceId: owner.workspaceId });
+      void disconnectBrandsForOwner(db, { userId: owner.userId, workspaceId: owner.workspaceId });
       return { applied: true, kind: "ended", userId: owner.userId };
     }
   }
