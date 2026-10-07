@@ -1,3 +1,5 @@
+import { disconnectBrandsForOwner } from "../connectors/publish/zernioLifecycle";
+
 /**
  * stripeLifecycle — everything that happens to a subscription AFTER the first
  * checkout: renewals, failed charges, cancellation, refunds.
@@ -311,6 +313,7 @@ export async function applyLifecycleAction(
       }
       await setPlanStatus(db, owner, "canceled");
       await setCancelFlag(db, owner.userId, false);
+      await disconnectBrandsForOwner(db, { userId: owner.userId, workspaceId: owner.workspaceId });
       return { applied: true, kind: "ended", userId: owner.userId };
     }
   }
