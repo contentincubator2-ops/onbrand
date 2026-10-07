@@ -25,6 +25,7 @@ import { positioningJobsRouter } from "../strategy/routers/positioningJobsRouter
 import { positioningDocsRouter } from "../strategy/routers/positioningDocsRouter";
 import { channelRoleRouter } from "../strategy/routers/channelRoleRouter";
 import { brandTaskCardRouter } from "../content/routers/brandTaskCardRouter";
+import { brandVoiceRouter } from "../content/routers/brandVoiceRouter";
 import { customChannelRouter } from "../content/routers/customChannelRouter";
 import { listingBatchRouter } from "../content/routers/listingBatchRouter";
 import { workbenchRouter } from "../strategy/routers/workbenchRouter";
@@ -121,6 +122,8 @@ export const appRouter = router({
   // 2026-10-03：每個平台各自的定位（通路角色）。
   channelRole:     channelRoleRouter,
   brandTaskCard:   brandTaskCardRouter,
+  // 2026-10-07（CJ）：建品牌時丟參考文章，學成品牌自己的寫法（每類一張任務卡＋語氣進大腦）。
+  brandVoice:      brandVoiceRouter,
   // 2026-10-04（CJ）：用戶自己新增 mission tray（蝦皮／momo／網紅合作等平台範本，或自訂）。
   customChannel:   customChannelRouter,
   // 2026-10-05：商品頁卡的批次產出（選商品 → 背景逐筆寫 → 逐筆核准 → 匯出）。

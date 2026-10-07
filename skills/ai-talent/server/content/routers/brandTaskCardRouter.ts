@@ -45,6 +45,7 @@ import {
   MAX_CARDS_PER_BRAND, MAX_SAMPLES, MAX_SAMPLE_CHARS,
   registerBrandTaskCardSource,
 } from "../core/catalog/brandTaskCards";
+import { countsTowardCardQuota } from "../core/catalog/brandVoice";
 
 // 在模組載入時就把自建卡接進 taskRegistry —— 放這裡而不是 index.ts 的啟動流程，
 // 是因為這個 router 一定會被 routers/index.ts 匯入，所以「忘記註冊」不可能發生。
@@ -126,7 +127,7 @@ const TOTAL_STEPS = 3;   // 1 量測範例 / 2 生成 SKILL / 3 寫回
  * 另外明文禁止把範例裡的**具體事實**寫進規則（商品名、日期、價格）——
  * 那會讓這張卡永遠在寫同一篇。卡要學的是骨架，不是那批內容。
  */
-async function distilSkill(args: {
+export async function distilSkill(args: {
   brandId: number;
   name: string;
   channel: string;
@@ -360,7 +361,7 @@ async function extractFromThread(text: string): Promise<{ samples: string[]; raw
  * 狀態寫回卡片，前端輪詢 get 看 illustrationStatus。失敗不擋任何流程，卡片照樣
  * 可以上架，modal 就退回現成的 SVG 場景。
  */
-async function drawCardIllustration(brandId: number, userId: number, cardId: string): Promise<void> {
+export async function drawCardIllustration(brandId: number, userId: number, cardId: string): Promise<void> {
   const set = (patch: Record<string, unknown>) =>
     mutateBrandTaskCards(brandId, userId, (list) =>
       list.map((c) => (c.id === cardId ? { ...c, ...patch } : c)));
@@ -469,10 +470,12 @@ export const brandTaskCardRouter = router({
       const cardCap = isUnlimited(ownQuota.ownTaskCards)
         ? MAX_CARDS_PER_BRAND
         : Math.min(ownQuota.ownTaskCards, MAX_CARDS_PER_BRAND);
-      if (existing.length >= cardCap) {
+      // 從參考文章學來的卡（origin: voice）是品牌設定的一部分，不佔這個額度。
+      const ownCount = existing.filter(countsTowardCardQuota).length;
+      if (ownCount >= cardCap || existing.length >= MAX_CARDS_PER_BRAND) {
         throw new TRPCError({
           code: "BAD_REQUEST",
-          message: `你的方案最多 ${cardCap} 張自建任務卡（目前 ${existing.length}）。`
+          message: `你的方案最多 ${cardCap} 張自建任務卡（目前 ${ownCount}）。`
             + `升級後可以增加，或先刪掉用不到的。`,
         });
       }
@@ -743,10 +746,11 @@ export const brandTaskCardRouter = router({
       const cardCap = isUnlimited(quota.ownTaskCards)
         ? MAX_CARDS_PER_BRAND
         : Math.min(quota.ownTaskCards, MAX_CARDS_PER_BRAND);
-      if (existing.length >= cardCap) {
+      const ownCount = existing.filter(countsTowardCardQuota).length;
+      if (ownCount >= cardCap || existing.length >= MAX_CARDS_PER_BRAND) {
         throw new TRPCError({
           code: "BAD_REQUEST",
-          message: `你的方案最多 ${cardCap} 張自建任務卡（目前 ${existing.length}）。`
+          message: `你的方案最多 ${cardCap} 張自建任務卡（目前 ${ownCount}）。`
             + `升級後可以增加，或先刪掉用不到的。`,
         });
       }

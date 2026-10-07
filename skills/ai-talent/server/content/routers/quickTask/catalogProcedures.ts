@@ -18,6 +18,7 @@ import { storedTray, defaultTray, MAX_TRAY } from "../../core/catalog/taskTray";
 import localPool from "../../../localDb";
 import { assertBrandAccess } from "../../../platform/core/brandAuth";
 import { listBrandTaskCards, cardTemplate } from "../../core/catalog/brandTaskCards";
+import { countsTowardCardQuota } from "../../core/catalog/brandVoice";
 import { listAllFBTasks } from "../../core/catalog/quickTaskFB";
 import { IG_30S_TASKS } from "../../core/catalog/quickTaskIG";
 import { YT_30S_TASKS } from "../../core/catalog/quickTaskYT";
@@ -236,7 +237,7 @@ export const catalogProcedures = {
       // 2026-09-07 自建卡「已用 N / 上限 M」。由 server 算：前台手上的
       // ownCardsQuery 是單一通路的清單，拿它對全品牌的上限會算錯。
       let ownUsed = 0;
-      try { ownUsed = (await listBrandTaskCards(input.brandId)).length; } catch { /* 顯示用，讀不到就 0 */ }
+      try { ownUsed = (await listBrandTaskCards(input.brandId)).filter(countsTowardCardQuota).length; } catch { /* 顯示用，讀不到就 0 */ }
       return {
         platforms: sel.platforms,
         limit: quota.platforms,
