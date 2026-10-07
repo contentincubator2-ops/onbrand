@@ -92,6 +92,7 @@ const AdminActivationPage = React.lazy(() => import("../platform/pages/AdminActi
 
 // Public-but-not-first-paint (legal / pricing / plan-expired)
 const PricingPage = React.lazy(() => import("../platform/pages/PricingPage"));
+const InspireDemoPage = React.lazy(() => import("../platform/pages/InspireDemoPage"));
 const TermsPage = React.lazy(() => import("../platform/pages/legal/TermsPage"));
 const PrivacyPage = React.lazy(() => import("../platform/pages/legal/PrivacyPage"));
 const RefundPage = React.lazy(() => import("../platform/pages/legal/RefundPage"));
@@ -102,6 +103,12 @@ const campaignSlots: CampaignSlots = {
   Stage: React.lazy(() => import("../content/components/campaign/CampaignStage")),
   LockToggle: React.lazy(() => import("../content/components/campaign/CampaignStage").then((m) => ({ default: m.CampaignLockToggle }))),
 };
+
+// 2026-10-07: the login-free doctor demo is also reachable as inspire.<host>/
+// (QR code target) once DNS points that name here; /inspire works regardless.
+function isInspireHost(): boolean {
+  try { return window.location.hostname.startsWith("inspire."); } catch { return false; }
+}
 
 // ── Suspense fallback — cream-themed minimal loader matching SoWork.ai ──
 function RouteFallback() {
@@ -273,7 +280,8 @@ export default function AppV2() {
         {/* 2026-05-16 (CJ「主打品牌定位鎖定」): public marketing landing
             at /. Cold traffic used to hit /auth/login directly (funnel
             leak). LandingPage self-redirects authed users to /planner. */}
-        <Route path="/" element={<LandingPage />} />
+        <Route path="/" element={isInspireHost() ? <InspireDemoPage /> : <LandingPage />} />
+        <Route path="/inspire" element={<InspireDemoPage />} />
 
         {/* 2026-05-10: Public legal + pricing pages (no auth required so
             unregistered prospects can read T&C / Privacy / Refund + see pricing) */}
