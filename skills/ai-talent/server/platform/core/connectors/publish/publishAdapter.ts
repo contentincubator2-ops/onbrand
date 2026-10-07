@@ -17,8 +17,9 @@ export class PublishUserError extends Error {
 }
 export interface PublishProviderAdapter {
   readonly provider: PublishProvider;
-  getConnectUrl(i: { brandId: number; platform: string; redirectUrl: string }): Promise<{ url: string }>;
-  syncConnections(i: { brandId: number; platform: string }): Promise<PublishConnection[]>;
-  disconnect(i: { brandId: number; platform: string; accountId: string }): Promise<void>;
+  getConnectUrl(i: { brandId: number; platform: string; redirectUrl: string; mode?: "connect" | "reconnect" | "replace" }): Promise<{ url: string }>;
+  syncConnection(i: { brandId: number; platform: string }): Promise<PublishConnection | null>;
+  disconnect(i: { brandId: number; platform: string }): Promise<void>;
+  disconnectAll(i: { brandId: number }): Promise<{ disconnected: number; failed: number }>;
   publish(i: PublishInput): Promise<PublishResult>;
 }
