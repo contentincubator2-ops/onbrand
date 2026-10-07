@@ -1067,7 +1067,7 @@ export const brandPublishTenants = mysqlTable("brand_publish_tenants", {
   provider: varchar("provider", { length: 24 }).notNull(),
   tenantId: varchar("tenantId", { length: 128 }).notNull(),
   createdAt: datetime("createdAt", { fsp: 3 }).notNull().default(sql`CURRENT_TIMESTAMP(3)`),
-  updatedAt: datetime("updatedAt", { fsp: 3 }).notNull().default(sql`CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3)`),
+  updatedAt: datetime("updatedAt", { fsp: 3 }).notNull().default(sql`CURRENT_TIMESTAMP(3)`).$onUpdate(() => new Date()),
 }, (t) => [uniqueIndex("uq_bpt_brand_provider").on(t.brandId, t.provider)]);
 
 export const brandPublishConnections = mysqlTable("brand_publish_connections", {
@@ -1083,7 +1083,7 @@ export const brandPublishConnections = mysqlTable("brand_publish_connections", {
   disconnectedAt: datetime("disconnectedAt", { fsp: 3 }),
   meta: json("meta"),
   createdAt: datetime("createdAt", { fsp: 3 }).notNull().default(sql`CURRENT_TIMESTAMP(3)`),
-  updatedAt: datetime("updatedAt", { fsp: 3 }).notNull().default(sql`CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3)`),
+  updatedAt: datetime("updatedAt", { fsp: 3 }).notNull().default(sql`CURRENT_TIMESTAMP(3)`).$onUpdate(() => new Date()),
 }, (t) => [
   uniqueIndex("uq_bpc_brand_provider_platform_account").on(t.brandId, t.provider, t.platform, t.accountId),
   index("idx_bpc_lookup").on(t.brandId, t.provider, t.platform, t.status),

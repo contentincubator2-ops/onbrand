@@ -3,6 +3,7 @@ import type { PublishConnection } from "./connectionStore";
 
 export type PublishInput = {
   scheduledPostId: number;
+  attempt?: number;
   brandId: number;
   platform: string;
   caption: string;

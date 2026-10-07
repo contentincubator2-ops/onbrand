@@ -17,6 +17,7 @@ export function assertZernioMediaPlan(platform: string, caption: string, imageCo
   if (!mapped) throw new PublishUserError(`${platform} 尚未支援透過 Zernio 發布。`);
   const limit = CAPTION_LIMIT[mapped];
   if (limit && Array.from(caption).length > limit) throw new PublishUserError(`${platform} 文案最多 ${limit} 字，請縮短後再發布。`);
+  if (mapped === "instagram" && imageCount > 10) throw new PublishUserError("Instagram 輪播最多 10 張圖片。");
   if (mapped === "instagram" && imageCount + videoCount === 0) throw new PublishUserError("Instagram 需要至少一張圖片或一支影片才能發布。");
   if ((mapped === "youtube" || mapped === "tiktok") && videoCount === 0) throw new PublishUserError(`${platform} 需要影片才能發布。`);
 }

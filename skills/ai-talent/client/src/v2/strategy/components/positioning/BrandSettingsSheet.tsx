@@ -485,6 +485,23 @@ export function PublishTab({ brandId }: { brandId: number | null }) {
     return () => { ++zernioGeneration.current; };
   }, [brandId, zernioProvidersQ.data]);
 
+  // OAuth may outlast the 30-second poll, especially when selecting a Page.
+  useEffect(() => {
+    if (!brandId || !zernioProvidersQ.data) return;
+    const platforms = (Object.keys(zernioProvidersQ.data) as ZernioPlatformKey[]).filter(usesZernio);
+    if (!platforms.length) return;
+    const generation = zernioGeneration.current;
+    const refreshOnFocus = () => {
+      for (const platform of platforms) {
+        void zernioApiRef.current.status({ brandId, platform }).then(status => {
+          if (generation === zernioGeneration.current) setZernioStatus(m => ({ ...m, [platform]: status }));
+        }).catch(() => {});
+      }
+    };
+    window.addEventListener("focus", refreshOnFocus);
+    return () => window.removeEventListener("focus", refreshOnFocus);
+  }, [brandId, zernioProvidersQ.data]);
+
   useEffect(() => {
     if (!brandId || !zernioProvidersQ.data) return;
     const url = new URL(window.location.href);

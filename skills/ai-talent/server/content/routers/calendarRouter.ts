@@ -1,6 +1,3 @@
-import { createZernioClient } from "../../platform/core/connectors/zernio";
-import { createZernioAdapter } from "../../platform/core/connectors/publish/zernioAdapter";
-import { PublishUserError } from "../../platform/core/connectors/publish/publishAdapter";
 /**
  * calendarRouter — Content Calendar aggregate.
  *
@@ -33,6 +30,9 @@ import {
 } from "../../platform/core/connectors/pipedreamConnect";
 import { getPublishProvider } from "../../platform/core/connectors/publish/publishProvider";
 import { createBundleSocialClient } from "../../platform/core/connectors/bundleSocial";
+import { createZernioClient } from "../../platform/core/connectors/zernio";
+import { createZernioAdapter } from "../../platform/core/connectors/publish/zernioAdapter";
+import { PublishUserError } from "../../platform/core/connectors/publish/publishAdapter";
 import { publishViaBundleSocial } from "../core/publish/bundlePublishService";
 import {
   contentSelectorFields,
@@ -468,7 +468,7 @@ async function publishScheduledPostInner(args: {
   // Load scheduled_post + verify ownership
   const [rows]: any = await localPool.execute(
     `SELECT sp.id, sp.outputId, sp.variantIndex, sp.contentKind, sp.contentIndex,
-            sp.planningConfirmed, sp.platform, sp.status, sp.brandId,
+            sp.planningConfirmed, sp.platform, sp.status, sp.brandId, sp.attempts,
             o.content AS outputContent, o.metadata AS outputMetadata,
             m.squadSlug AS missionSquadSlug,
             b.fbPageId AS brand_fb_page_id, b.fbPageName AS brand_fb_page_name,
@@ -553,6 +553,9 @@ async function publishScheduledPostInner(args: {
       });
       const result = await adapter.publish({ scheduledPostId: row.id, brandId: row.brandId,
         platform, caption, imageUrls: media.imageUrls, videoUrl: media.videoUrl,
+        // Workers increment before publishing; manual attempts increment on failure.
+        // Normalize both paths so a manual retry after a worker failure gets a new key.
+        attempt: Number(row.attempts ?? 0) + (args.claimed ? 0 : 1),
       });
       postId = result.postId;
       permalink = result.permalink;
@@ -561,12 +564,11 @@ async function publishScheduledPostInner(args: {
         message: e instanceof Error ? e.message : "Zernio 發布失敗",
       });
     }
-  } else
   // ── bundle.social: opt in per platform via PUBLISH_PROVIDER_<PLATFORM> ─
   // Pipedream's managed Meta app cannot publish (see
   // docs/facebook-publish-provider-evaluation-2026-07-25.md). This branch
   // routes a platform to bundle.social without touching the paths below.
-  if (getPublishProvider(platform) === "bundle") {
+  } else if (getPublishProvider(platform) === "bundle") {
     const apiKey = process.env.BUNDLE_SOCIAL_API_KEY;
     if (!apiKey) {
       console.error("[calendar.publish] missing env: BUNDLE_SOCIAL_API_KEY");

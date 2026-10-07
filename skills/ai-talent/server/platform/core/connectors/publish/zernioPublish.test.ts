@@ -19,6 +19,11 @@ describe("Zernio publish functions", () => {
     expect(() => assertZernioMediaPlan("threads", "文".repeat(501), 0, 0)).toThrow(PublishUserError);
     expect(() => assertZernioMediaPlan("x", "x".repeat(281), 0, 0)).toThrow(PublishUserError);
   });
+  it("allows ten Instagram images and rejects eleven before publishing", () => {
+    expect(() => assertZernioMediaPlan("instagram", "hello", 10, 0)).not.toThrow();
+    expect(() => assertZernioMediaPlan("instagram", "hello", 11, 0)).toThrow(PublishUserError);
+    expect(() => assertZernioMediaPlan("ig", "hello", 11, 0)).toThrow("Instagram 輪播最多 10 張圖片。");
+  });
   it("builds minimal image/video payloads and platform options", () => {
     const input = { platform: "facebook", accountId: "a", caption: "hello", imageUrls: ["https://example.com/a.jpg"], videoUrl: null };
     expect(buildZernioPostPayload(input)).toEqual({ content: "hello", mediaItems: [{ type: "image", url: input.imageUrls[0] }], platforms: [{ platform: "facebook", accountId: "a" }], publishNow: true });
