@@ -6,12 +6,12 @@
  *
  * 跟靈感舞台（planning/inspirationStage.ts）的差別：
  *   · 沒有品牌、沒有帳號：主體是「醫師本人＋一個高血壓議題」，事實只來自 inspireRegulations 的白名單。
- *   · 「誰來想」不是思考派別，而是各平台的說話風格（inspirePersonas.ts）。
+ *   · 「誰來想」是 100 位創作者 agent（inspirePersonas.ts），每位帶自己的完整人設各呼叫一次。
  *   · 採用後不排進本週企劃，直接寫成該平台的成稿，再逐條過法規審查。
- * 沿用靈感舞台的做法：一輪一次呼叫、每人先回答自己的問題再長出切角（原因見那邊的檔頭）。
+ *   · 審查只提建議（哪一句、為什麼、建議怎麼改），要不要改由醫師決定。
  */
 import { INSPIRE_FACTS, FACT_SOURCE, type InspireRegulation, type RiskHit } from "./inspireRegulations";
-import { PERSONA_KEYS, personaOf, type InspirePersona, type InspirePlatform } from "./inspirePersonas";
+import { leaksPersona, type InspirePersona, type InspirePlatform } from "./inspirePersonas";
 
 // ─── 議題 ──────────────────────────────────────────────────────────────
 
@@ -63,10 +63,12 @@ export function doctorByline(name: string): string {
 
 export interface InspireIdea {
   persona: string;
-  /** 這個風格的問題的答案——切角的錨。 */
+  /** 這位 agent 的問題的答案——切角的錨。 */
   answer: string;
   title: string;
   hook: string;
+  /** 怎麼做：橋段、畫面、道具、段落安排——看了就能開拍或開寫。 */
+  concept: string;
   why: string;
   format: string;
 }
@@ -78,44 +80,10 @@ const GROUND_RULES = [
   `- 不提任何藥品商品名或廠牌；不說任何食物、保健食品、偏方能降血壓或取代藥物。`,
   `- 不保證效果，不用「根治、保證、一定、最有效、不用吃藥」這類說法。`,
   `- 不寫認得出是誰的病人故事；要舉例就用「門診常被問到」「很多人以為」這種泛稱。`,
-  `- 數字、統計、標準值只能用下面白名單裡的，而且要寫對；白名單沒有的事，用不帶數字的說法。`,
+  `- 數字、統計、標準值只能用白名單裡的，而且要寫對；白名單沒有的事，用不帶數字的說法。`,
   `- 不給個人化的用藥或劑量建議；提到調整用藥一律請讀者與自己的醫師討論。`,
+  `- 挑戰、實驗、整人這類形式只能用在安全、人人做得到的事（量血壓、記錄、買菜、看標示、走路），不能拿健康冒險，也不能拿病情開玩笑。`,
 ].join("\n");
-
-/**
- * 一輪只打一次模型：選到的風格全部放進同一份提示詞（多樣性的理由同 inspirationStage）。
- * 風格只描述「怎麼說」，不出現任何真實人名——模型不知道是誰，就不會寫出來。
- */
-export function inspireIdeationPrompt(args: {
-  doctor: string; topic: { label: string; hint: string };
-  personas: InspirePersona[]; count: number; avoid?: string[]; direction?: string;
-}): string {
-  const solo = args.personas.length === 1;
-  const roster = args.personas.map((p) =>
-    `■ ${p.key}｜${p.label}｜${PLATFORM_LABEL[p.platform]}\n  先回答：${p.question}\n  說話方式：${p.style}`).join("\n");
-  return [
-    `你要替「${doctorByline(args.doctor)}」想自媒體內容的切角——只想切角，不寫全文。內容一律是醫師本人第一人稱說話。`,
-    `【這次固定講的議題】${args.topic.label}${args.topic.hint ? `（${args.topic.hint}）` : ""}——每個切角都必須在講這個議題，不能換題目。`,
-    solo
-      ? `這次只用一種說話風格，照它想 ${args.count} 個不同的切角；每個切角的 answer 都要是那個問題的另一個答案，同一個答案換句話說不算：`
-      : `下面每一種說話風格各想 ${args.count} 個切角。風格只決定「怎麼開場、怎麼安排」，講的仍然是醫師自己的專業：`,
-    roster,
-    ``,
-    args.direction ? `【醫師希望往這個方向再想】${args.direction}` : "",
-    args.avoid?.length ? `【畫面上已經有的切角——不要重複，也不要換句話說】\n${args.avoid.map((a) => `- ${a}`).join("\n")}` : "",
-    `【可以用的事實（白名單，出處：${FACT_SOURCE.label}）】\n${factsBlock()}`,
-    `【一定要守的規則】\n${GROUND_RULES}`,
-    ``,
-    `做法：`,
-    `1. answer：先用一句話回答那個風格的問題（25 字內），要具體到只屬於這個議題。`,
-    `2. 從 answer 長出切角。title：切角名稱，20 字內，說清楚這一篇講什麼；hook：成品的第一句，40 字內，要聽得出那個風格；why：為什麼這個風格這樣切，60 字內。`,
-    `3. format 填那個風格所在平台的形式：${Object.entries(PLATFORM_FORMAT).map(([k, v]) => `${PLATFORM_LABEL[k as InspirePlatform]}＝${v}`).join("、")}。`,
-    `4. 寫完自己檢查：任兩個切角如果可以互換、或是講同一件事，就重想其中一個。`,
-    `- 不要寫出任何真實網紅、名人、頻道的名字，也不要模仿特定人的口頭禪。`,
-    `- 全部用台灣的繁體中文。`,
-    `只輸出 JSON，不要前言：{"ideas":[{"persona":"${args.personas[0]?.key ?? ""}","answer":"…","title":"…","hook":"…","why":"…","format":"…"}]}`,
-  ].filter(Boolean).join("\n");
-}
 
 export const PLATFORM_LABEL: Record<InspirePlatform, string> = {
   facebook: "Facebook", youtube: "YouTube", instagram: "Instagram", tiktok: "TikTok",
@@ -124,6 +92,56 @@ export const PLATFORM_LABEL: Record<InspirePlatform, string> = {
 export const PLATFORM_FORMAT: Record<InspirePlatform, string> = {
   facebook: "貼文", youtube: "影片腳本", instagram: "輪播", tiktok: "短影音腳本",
 };
+
+/** 寫給每一位 agent 的共同交代：身分不外露、主角是醫師。接在 agentPrompt 後面。 */
+function agentFrame(p: InspirePersona, doctor: string): string {
+  return [
+    p.agentPrompt,
+    ``,
+    `【這次的工作】`,
+    `你現在替「${doctorByline(doctor)}」做內容企劃。出鏡、說話、署名的都是醫師本人，你出的是你的腦袋：你的形式、你的開場、你的節奏。`,
+    `你的名字、帳號、頻道名、招牌口頭禪都不能出現在任何產出裡，也不要提到你是在模仿誰。`,
+    `全部用台灣的繁體中文。`,
+  ].join("\n");
+}
+
+/**
+ * 一位 agent 一次呼叫，一次想 count 個點子。
+ * 2026-10-07（CJ「產出的靈感都很無聊，看起來也沒什麼可以選擇」）：第一版把所有風格放進同一次
+ * 呼叫、每個風格只有一百多字的描述，DEV 實跑出來四張卡都在重講 722 的規則本身。現在每位各自
+ * 帶完整人設呼叫，並要求點子具體到「看了就能開拍」——有橋段、有畫面、有道具，而不是把衛教
+ * 重點換個標題。
+ */
+export function personaIdeationPrompt(args: {
+  doctor: string; topic: { label: string; hint: string };
+  persona: InspirePersona; count: number; avoid?: string[]; direction?: string;
+}): string {
+  const p = args.persona;
+  return [
+    agentFrame(p, args.doctor),
+    ``,
+    `【議題】${args.topic.label}${args.topic.hint ? `（${args.topic.hint}）` : ""}——每個點子都必須在講這個議題，不能換題目。`,
+    `【平台與形式】${PLATFORM_LABEL[p.platform]}・${PLATFORM_FORMAT[p.platform]}`,
+    args.direction ? `【醫師希望往這個方向想】${args.direction}` : "",
+    args.avoid?.length ? `【已經有的點子——不要重複，也不要換句話說】\n${args.avoid.map((a) => `- ${a}`).join("\n")}` : "",
+    ``,
+    `請用你自己的方法，替這個議題想 ${args.count} 個點子。做法：`,
+    `1. 先回答你每次都會問自己的那個問題：「${p.question}」。${args.count} 個點子要是 ${args.count} 個不同的答案，而且各用你不同的招牌形式或題材轉換法——同一招換句話說不算。`,
+    `2. 點子要具體到看了就能開拍或開寫：誰在什麼場景、手上拿什麼、第一個畫面是什麼、中間怎麼轉、最後怎麼收。`,
+    `3. 不要交這種東西：「你知道嗎」「XX 的重要性」「三個重點一次看」「醫師教你」這類衛教口吻的標題；只是把規則念一遍的點子；拿掉平台名稱就看不出是誰想的點子。`,
+    `4. 每個點子給：`,
+    `   answer：你那個問題的答案（30 字內）。`,
+    `   title：點子名稱（22 字內），要聽得出是你的形式。`,
+    `   hook：成品的第一句話或第一個畫面的字卡（40 字內），可以直接用。`,
+    `   concept：怎麼做（120 字內）：場景、道具、橋段順序、反轉或收尾。`,
+    `   why：為什麼這樣做會有人看完（50 字內）。`,
+    ``,
+    `【可以用的事實（白名單，出處：${FACT_SOURCE.label}）】\n${factsBlock()}`,
+    `【一定要守的規則——形式再大膽，這幾條不能破】\n${GROUND_RULES}`,
+    ``,
+    `只輸出 JSON，不要前言：{"ideas":[{"answer":"…","title":"…","hook":"…","concept":"…","why":"…"}]}`,
+  ].filter(Boolean).join("\n");
+}
 
 const clip = (v: unknown, n: number) => String(v ?? "").replace(/\s+/g, " ").trim().slice(0, n);
 
@@ -143,27 +161,29 @@ function unquote(s: string): string {
   return s;
 }
 
-/** 模型回覆 → 每個風格的切角；只收要求的風格，每個最多 perPersona 個。解析不了回空陣列。 */
-export function parseIdeas(raw: string, args: { keys: string[]; perPersona: number }): InspireIdea[] {
+/**
+ * 一位 agent 的回覆 → 點子。最多收 max 個；露出本人名字、帳號或口頭禪的點子不收。
+ * 解析不了回空陣列。
+ */
+export function parseIdeas(raw: string, persona: InspirePersona, max: number): InspireIdea[] {
   const obj = parseObject(raw);
   const list: any[] = Array.isArray(obj?.ideas) ? obj.ideas : Array.isArray(obj) ? obj : [];
   const out: InspireIdea[] = [];
-  const per = new Map<string, number>();
   for (const a of list) {
-    const k = String(a?.persona ?? "").trim();
-    const key = args.keys.includes(k) ? k : args.keys.length === 1 ? args.keys[0]! : null;
-    if (!key || !PERSONA_KEYS.includes(key) || (per.get(key) ?? 0) >= args.perPersona) continue;
-    const title = clip(a?.title, 40);
+    if (out.length >= max) break;
+    const title = clip(a?.title, 44);
     const hook = unquote(clip(a?.hook, 80));
     if (title.length < 2 || hook.length < 2) continue;
-    out.push({
-      persona: key, answer: clip(a?.answer, 60), title, hook, why: clip(a?.why, 120),
+    const idea: InspireIdea = {
+      persona: persona.key, answer: clip(a?.answer, 60), title, hook,
+      concept: clip(a?.concept, 240), why: clip(a?.why, 100),
       // 形式跟著平台走，不採信模型填的值。
-      format: PLATFORM_FORMAT[personaOf(key)!.platform],
-    });
-    per.set(key, (per.get(key) ?? 0) + 1);
+      format: PLATFORM_FORMAT[persona.platform],
+    };
+    if (leaksPersona(`${idea.answer}\n${idea.title}\n${idea.hook}\n${idea.concept}\n${idea.why}`, persona)) continue;
+    out.push(idea);
   }
-  return out.sort((x, y) => args.keys.indexOf(x.persona) - args.keys.indexOf(y.persona));
+  return out;
 }
 
 // ─── 成稿 ──────────────────────────────────────────────────────────────
@@ -180,23 +200,24 @@ export const EDUCATION_NOTE = "※ 本文是衛教資訊，不能取代看診。
 
 export function inspireWritePrompt(args: {
   doctor: string; topic: { label: string; hint: string }; persona: InspirePersona;
-  idea: Pick<InspireIdea, "title" | "hook" | "answer" | "why">;
+  idea: Pick<InspireIdea, "title" | "hook" | "answer" | "why"> & { concept?: string };
 }): string {
   const p = args.persona;
   return [
-    `你是「${doctorByline(args.doctor)}」的自媒體寫手。這一篇以醫師本人第一人稱寫，讀者是一般民眾。`,
+    agentFrame(p, args.doctor),
+    ``,
+    `醫師採用了你的這個點子，現在把它寫成成稿。以醫師本人第一人稱寫，讀者是一般民眾。`,
     `【議題】${args.topic.label}${args.topic.hint ? `（${args.topic.hint}）` : ""}`,
-    `【這一篇的切角】${args.idea.title}`,
-    `【開場句（照這個意思開場，可以微調字句）】${args.idea.hook}`,
-    args.idea.answer ? `【切角的核心】${args.idea.answer}` : "",
-    `【說話風格：${p.label}】${p.style}`,
-    `風格只用在節奏、開場、結構與用字；不要寫出任何真實網紅、名人、頻道的名字，也不要模仿特定人的口頭禪。醫師的專業與穩重要留著——風格再活潑，也不能拿病情開玩笑、不能嚇人。`,
+    `【點子】${args.idea.title}`,
+    `【開場（照這個意思開場，可以微調字句）】${args.idea.hook}`,
+    args.idea.concept ? `【怎麼做】${args.idea.concept}` : "",
+    args.idea.answer ? `【核心】${args.idea.answer}` : "",
     `【形式】${PLATFORM_SPEC[p.platform]}`,
+    `照你的結構節拍與語言指紋寫——醫師讀起來要覺得「這不是一般的衛教文」。醫師的專業與穩重要留著：形式可以大膽，但不能拿病情開玩笑、不能嚇人。`,
     `【可以用的事實（白名單，出處：${FACT_SOURCE.label}）】\n${factsBlock()}`,
     `【一定要守的規則】\n${GROUND_RULES}`,
     `- 自稱用「我」；需要署名時用「${doctorByline(args.doctor)}」。不要編醫師的學經歷、科別、服務院所或看診經驗的數字。`,
-    `- 全部用台灣的繁體中文；不要用 Markdown 符號（#、**、-）。`,
-    `- 不要自己加免責聲明，系統會補。`,
+    `- 不要用 Markdown 符號（#、**、-）。不要自己加免責聲明，系統會補。`,
     `只輸出成稿本身，不要前言或說明。`,
   ].filter(Boolean).join("\n");
 }
@@ -206,12 +227,8 @@ export function finalizeDraft(raw: string): string {
   const body = String(raw ?? "")
     .replace(/^```[a-z]*\s*/i, "").replace(/\s*```\s*$/i, "")
     .replace(/\*\*(.+?)\*\*/g, "$1").replace(/^#{1,6}\s+/gm, "")
-    .replace(/\n{3,}/g, "\n\n").trim();
+    .replace(/[ \t]+$/gm, "").replace(/\n{3,}/g, "\n\n").trim();
   return body.includes(EDUCATION_NOTE) ? body : `${body}\n\n${EDUCATION_NOTE}`;
-}
-
-export function stripEducationNote(text: string): string {
-  return String(text ?? "").replace(EDUCATION_NOTE, "").trim();
 }
 
 // ─── 逐條審查 ──────────────────────────────────────────────────────────
@@ -219,13 +236,19 @@ export function stripEducationNote(text: string): string {
 export interface ReviewIssue {
   /** 違反哪一條（InspireRegulation.id）。 */
   regulationId: string;
-  /** 成稿裡的原句（照抄）。 */
+  /** 成稿裡的原句（照抄，一定找得到）。 */
   quote: string;
   /** 為什麼（40 字內）。 */
   detail: string;
+  /** 建議改成的句子；空字串＝建議整句刪除。只是建議，由醫師決定要不要改。 */
+  suggestion: string;
 }
 
-/** 一次審一組條文（同一部法）：只判斷有沒有落在條文的範圍，不評文筆。 */
+/**
+ * 一次審一組條文（同一部法）：只判斷有沒有落在條文的範圍，不評文筆。
+ * 2026-10-07（CJ「審查後不要直接改寫，要提出建議，看醫生自己是否要改寫」）：
+ * 審查只交出「哪一句、為什麼、建議怎麼改」，成稿原封不動。
+ */
 export function reviewPrompt(items: InspireRegulation[], hits: RiskHit[]): string {
   const ids = items.map((r) => r.id);
   const own = hits.filter((h) => ids.includes(h.regulationId));
@@ -240,48 +263,23 @@ export function reviewPrompt(items: InspireRegulation[], hits: RiskHit[]): strin
     `1. 逐條讀，逐句對照成稿。只有「成稿的說法落在判斷標準描述的範圍」才算；條文沒提到的不要自己延伸。`,
     `2. 同義改寫、暗示、疑問句包裝一樣算。`,
     `3. 成稿最後那句「本文是衛教資訊……」是系統加的提醒，不用審。`,
-    `4. quote 要照抄成稿裡的原句，不能改字；detail 40 字內說為什麼。`,
-    `只輸出 JSON，不要前言：{"issues":[]} 或 {"issues":[{"regulationId":"${ids[0] ?? ""}","quote":"…","detail":"…"}]}`,
+    `4. quote 要照抄成稿裡的原句（從上一個句號或換行之後，到這一句的句號為止），一個字都不能改；detail 用 40 字內說為什麼。`,
+    `5. suggestion 是給醫師參考的改法：把那一句改成合規、意思接近、語氣與原文一致的一句話，長度接近原句；如果那一句拿掉最好，就填空字串。你不要改成稿，只提建議。`,
+    `只輸出 JSON，不要前言：{"issues":[]} 或 {"issues":[{"regulationId":"${ids[0] ?? ""}","quote":"…","detail":"…","suggestion":"…"}]}`,
   ].filter(Boolean).join("\n");
 }
 
-const squash = (s: string) => s.replace(/\s+/g, "");
-
-/** 模型回的 issues 清乾淨：條號要在這一組裡、quote 要真的出現在成稿裡，否則不收。 */
+/** 模型回的 issues 清乾淨：條號要在這一組裡、quote 要一字不差出現在成稿裡，否則不收。 */
 export function parseReviewIssues(raw: string, args: { ids: string[]; text: string }): ReviewIssue[] | null {
   const obj = parseObject(raw);
   if (!obj || !Array.isArray(obj.issues)) return null;
-  const hay = squash(args.text);
   return (obj.issues as any[])
     .map((i) => ({
       regulationId: String(i?.regulationId ?? "").trim(),
-      quote: String(i?.quote ?? "").trim().slice(0, 200),
+      quote: String(i?.quote ?? "").trim().slice(0, 300),
       detail: clip(i?.detail, 80),
+      suggestion: String(i?.suggestion ?? "").trim().slice(0, 300),
     }))
-    .filter((i) => args.ids.includes(i.regulationId) && i.quote.length >= 2 && hay.includes(squash(i.quote)))
+    .filter((i) => args.ids.includes(i.regulationId) && i.quote.length >= 2 && args.text.includes(i.quote) && i.suggestion !== i.quote)
     .slice(0, 6);
-}
-
-/** 有問題時的最小幅度修正：只改被點名的句子。 */
-export function fixPrompt(issues: Array<ReviewIssue & { law: string }>): string {
-  return [
-    `你是醫療內容的編輯。下面這篇高血壓衛教內容有幾句不符合法規，請做最小幅度修正。`,
-    ...issues.map((i) => `- 原句：${i.quote}\n  問題（${i.law}）：${i.detail}`),
-    ``,
-    `做法：`,
-    `1. 只改被點名的句子，換成合規、意思接近的說法；改不了就刪掉那一句。其餘文字、段落、換行、格式標記（例如「第 1 張｜」「0–3 秒｜」）、hashtag 全部保留。`,
-    `2. 修正後不能再出現被點名的原句。數字只能用這幾條：\n${factsBlock()}`,
-    `3. 不要加任何說明或免責聲明。`,
-    `只輸出修正後的全文。`,
-  ].join("\n");
-}
-
-/** 修正稿可不可以收：長度沒有大幅縮水、沒有殘留被點名的原句。回傳拒收原因；可以收回 null。 */
-export function rejectFix(original: string, revised: string, issues: ReviewIssue[]): string | null {
-  const a = stripEducationNote(original); const b = stripEducationNote(revised);
-  if (b.length < 40) return "empty";
-  if (b.length < a.length * 0.6 || b.length > a.length * 1.4) return "length";
-  const hay = squash(b);
-  if (issues.some((i) => hay.includes(squash(i.quote)))) return "kept violating sentence";
-  return null;
 }

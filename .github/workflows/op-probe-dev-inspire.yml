@@ -1,27 +1,46 @@
 name: Ops (DEV) — probe doctor inspire demo end to end (read-only)
 
 # 醫師自媒體示範頁（/inspire）整條流程在 DEV VM 上實跑一次，不經過瀏覽器：
-#   四種風格各想一個切角 → 挑兩個寫成稿 → 逐組條文審查 → 另外拿一篇故意違規的稿子確認審查抓得到。
-# 用「這個分支」的 content/core/inspire/*.ts（題庫、風格、條文、提示詞與解析）＋ VM 上的模型金鑰，
-# 所以改提示詞或條文可以在合併前先看產出。不讀寫資料庫。
-# 花費：約 14 次模型呼叫。
+#   幾位創作者 agent 各自想三個點子 → 挑兩個寫成稿 → 逐組條文審查（只提建議、不改稿）
+#   → 另外拿一篇故意違規的稿子確認審查抓得到、建議套得回去。
+# 用「這個分支」的 content/core/inspire/*.ts（題庫、agent 人設、條文、提示詞與解析）＋ VM 上的模型金鑰，
+# 所以改提示詞、人設或條文可以在合併前先看產出。不讀寫資料庫。
+# 100 位的人設檔很大，只把這次要跑的幾位打包上去（PROBE_KEYS）。
+# 第 2 次跑：改成每位 agent 各自呼叫＋審查附建議之後。
+# 花費：約 20 次模型呼叫。
 # Path-scoped push，跟 op-probe-dev-influencer.yml 同一個做法（environment: dev 才會連到 DEV VM）。
 on:
   push:
     paths:
       - '.github/workflows/op-probe-dev-inspire.yml'
 
+env:
+  PROBE_KEYS: "tw-fb-02,us-yt-01,tw-yt-04,us-ig-01,tw-tt-13,us-tt-12"
+
 jobs:
   probe:
     runs-on: ubuntu-24.04
     environment: dev
-    timeout-minutes: 12
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
-      - name: Pack this branch's inspire core files
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Pack this branch's inspire core files (only the probed agents)
         run: |
           D=skills/ai-talent/server/content/core/inspire
-          echo "CORE_B64=$(tar -czf - -C "$D" doctorInspire.ts inspirePersonas.ts inspireRegulations.ts | base64 -w0)" >> "$GITHUB_ENV"
+          mkdir -p /tmp/pack && cp "$D/doctorInspire.ts" "$D/inspirePersonas.ts" "$D/inspireRegulations.ts" /tmp/pack/
+          cat > /tmp/slim.mts <<'TS'
+          import { writeFileSync } from "node:fs";
+          const { PERSONA_DATA } = await import(process.cwd() + "/skills/ai-talent/server/content/core/inspire/inspirePersonaData.ts");
+          const keys = String(process.env.PROBE_KEYS).split(",");
+          const picked = PERSONA_DATA.filter((p: any) => keys.includes(p.key));
+          console.log(`total=${PERSONA_DATA.length} picked=${picked.map((p: any) => p.key).join(",")}`);
+          writeFileSync("/tmp/pack/inspirePersonaData.ts", `export const PERSONA_DATA: any[] = ${JSON.stringify(picked)};\n`);
+          TS
+          npx --yes tsx /tmp/slim.mts
+          echo "CORE_B64=$(tar -czf - -C /tmp/pack . | base64 -w0)" >> "$GITHUB_ENV"
       - name: Ideate, write, review
         uses: appleboy/ssh-action@v1.0.3
         env:
@@ -30,7 +49,7 @@ jobs:
           host: ${{ secrets.VM_HOST }}
           username: ${{ secrets.VM_USER }}
           key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
-          command_timeout: 10m
+          command_timeout: 12m
           envs: CORE_B64
           script: |
             set +e
@@ -41,16 +60,18 @@ jobs:
             mkdir -p "$D"
             echo "$CORE_B64" | base64 -d | tar -xzf - -C "$D"
             cat > "$D/_probe_tmp.ts" <<'TS'
-            import { callModel } from "../../../platform/core/llm/multiModelRouter";
-            import { finalizeDraft, fixPrompt, inspireIdeationPrompt, inspireWritePrompt, parseIdeas, parseReviewIssues, rejectFix, resolveTopic, reviewPrompt } from "./doctorInspire";
-            import { personaOf } from "./inspirePersonas";
-            import { ALL_REVIEW_ITEMS, REGULATION_GROUPS, itemsOfGroup, scanRiskTerms } from "./inspireRegulations";
+            import { invokeLLM } from "../../../platform/core/llm/llm";
+            import { finalizeDraft, inspireWritePrompt, parseIdeas, parseReviewIssues, personaIdeationPrompt, resolveTopic, reviewPrompt } from "./doctorInspire";
+            import { INSPIRE_PERSONAS, leaksPersona } from "./inspirePersonas";
+            import { REGULATION_GROUPS, itemsOfGroup, scanRiskTerms } from "./inspireRegulations";
 
             const MODEL = process.env.INSPIRE_MODEL || "claude-sonnet-4-6";
+            // 直接看實際回覆的是哪個 provider／模型（callModel 回的是「要求的」那個，退到別家時看不出來）。
             const ask = async (system: string, user: string) => {
               const t0 = Date.now();
-              const r = await callModel([{ role: "system", content: system }, { role: "user", content: user }], "creative_writing", "anthropic", MODEL);
-              return { text: String(r.content ?? ""), s: ((Date.now() - t0) / 1000).toFixed(1), via: `${r.provider}/${r.model}` };
+              const r: any = await invokeLLM({ provider: "anthropic", model: MODEL, messages: [{ role: "system", content: system }, { role: "user", content: user }] } as any);
+              const c = r?.choices?.[0]?.message?.content;
+              return { text: typeof c === "string" ? c : "", s: ((Date.now() - t0) / 1000).toFixed(1), via: String(r?.model ?? "?") };
             };
             const review = async (text: string) => {
               const hits = scanRiskTerms(text);
@@ -59,8 +80,8 @@ jobs:
                 const items = itemsOfGroup(g.id);
                 const r = await ask(reviewPrompt(items, hits), `# 待審查的成稿\n${text}`);
                 const issues = parseReviewIssues(r.text, { ids: items.map((x) => x.id), text });
-                console.log(`  [${g.label}] ${r.s}s → ${issues === null ? `PARSE FAILED: ${r.text.slice(0, 200)}` : issues.length ? "有疑慮" : "通過"}`);
-                for (const i of issues ?? []) console.log(`      ${i.regulationId}｜${i.quote}｜${i.detail}`);
+                console.log(`  [${g.label}] ${r.s}s ${r.via} → ${issues === null ? `PARSE FAILED: ${r.text.slice(0, 200)}` : issues.length ? "有疑慮" : "通過"}`);
+                for (const i of issues ?? []) console.log(`      ${i.regulationId}｜原句：${i.quote}\n        原因：${i.detail}\n        建議：${i.suggestion || "（拿掉這一句）"}`);
                 all.push(...(issues ?? []));
               }
               return all;
@@ -68,23 +89,22 @@ jobs:
             (async () => {
               const doctor = "王小明";
               const topic = resolveTopic({ topicId: "722" })!;
-              const keys = ["fb-tw-neighborhood", "yt-us-challenge", "ig-us-routine", "tt-tw-result-first"];
-              const i = await ask(inspireIdeationPrompt({ doctor, topic, personas: keys.map((k) => personaOf(k)!), count: 1 }), "請開始想。");
-              const ideas = parseIdeas(i.text, { keys, perPersona: 1 });
-              console.log(`\n=== 切角（${i.s}s，${i.via}）${ideas.length}/${keys.length}`);
-              if (!ideas.length) console.log(`PARSE FAILED. raw:\n${i.text.slice(0, 800)}`);
-              for (const a of ideas) console.log(`[${a.persona}｜${personaOf(a.persona)!.label}｜${a.format}]\n  答: ${a.answer}\n  切角(${a.title.length}): ${a.title}\n  開場(${a.hook.length}): ${a.hook}\n  為什麼(${a.why.length}): ${a.why}`);
-              for (const a of ideas.filter((x) => ["fb-tw-neighborhood", "tt-tw-result-first"].includes(x.persona))) {
-                const w = await ask(inspireWritePrompt({ doctor, topic, persona: personaOf(a.persona)!, idea: a }), "請開始寫。");
+              console.log(`agents: ${INSPIRE_PERSONAS.map((p) => `${p.key}(${p.agentPrompt.length}字)`).join(" ")}`);
+              const rounds = await Promise.all(INSPIRE_PERSONAS.map(async (p) => {
+                const r = await ask(personaIdeationPrompt({ doctor, topic, persona: p, count: 3 }), "請開始想。");
+                return { p, r, ideas: parseIdeas(r.text, p, 3) };
+              }));
+              for (const { p, r, ideas } of rounds) {
+                console.log(`\n=== ${p.key}｜${p.label}｜${p.reference}（${r.s}s，${r.via}）${ideas.length}/3`);
+                if (!ideas.length) console.log(`NO USABLE IDEAS. raw:\n${r.text.slice(0, 600)}`);
+                for (const a of ideas) console.log(`・${a.title}\n    開場：${a.hook}\n    怎麼做：${a.concept}\n    為什麼：${a.why}`);
+              }
+              for (const { p, ideas } of rounds.filter((x) => x.ideas.length).slice(0, 2)) {
+                const a = ideas[0]!;
+                const w = await ask(inspireWritePrompt({ doctor, topic, persona: p, idea: a }), "請開始寫。");
                 const text = finalizeDraft(w.text);
-                console.log(`\n=== 成稿 ${a.persona}（${w.s}s，${text.length} 字）\n${text}\n--- 逐條審查`);
-                const issues = await review(text);
-                if (issues.length) {
-                  const withLaw = issues.map((x) => ({ ...x, law: ALL_REVIEW_ITEMS.find((r) => r.id === x.regulationId)?.law ?? "" }));
-                  const f = await ask(fixPrompt(withLaw), `# 原稿\n${text}`);
-                  const revised = finalizeDraft(f.text);
-                  console.log(`--- 改寫（${f.s}s）拒收原因: ${rejectFix(text, revised, issues) ?? "無，收下"}\n${revised}`);
-                }
+                console.log(`\n=== 成稿 ${p.key}「${a.title}」（${w.s}s，${w.via}，${text.length} 字，露出人名：${leaksPersona(text, p) ?? "沒有"}）\n${text}\n--- 逐條審查（只提建議）`);
+                await review(text);
               }
               const bad = finalizeDraft([
                 "很多人問我血壓藥是不是要吃一輩子。",
@@ -93,14 +113,15 @@ jobs:
                 "研究顯示每天喝兩杯芹菜汁可以降血壓 20%，比吃藥還好。",
                 "現在私訊我預約，本月前十名免費諮詢。",
               ].join("\n"));
-              console.log(`\n=== 對照組：故意違規的稿子\n${bad}\n--- 關鍵字掃描`);
-              for (const h of scanRiskTerms(bad)) console.log(`  ${h.regulationId}｜${h.why}｜${h.quote}`);
-              console.log(`--- 逐條審查`);
+              console.log(`\n=== 對照組：故意違規的稿子\n${bad}\n--- 逐條審查（只提建議）`);
               const found = await review(bad);
-              console.log(`抓到 ${found.length} 句；涵蓋條文: ${Array.from(new Set(found.map((x) => x.regulationId))).join(", ")}`);
+              let fixed = bad;
+              const done = new Set<string>();
+              for (const i of found) if (!done.has(i.quote) && fixed.includes(i.quote)) { fixed = fixed.replace(i.quote, i.suggestion); done.add(i.quote); }
+              console.log(`抓到 ${found.length} 筆、${done.size} 句；涵蓋條文: ${Array.from(new Set(found.map((x) => x.regulationId))).join(", ")}\n--- 全部照建議改之後\n${fixed}`);
               process.exit(0);
             })().catch((e) => { console.log("probe failed:", e?.message); process.exit(1); });
             TS
-            timeout 540 ./node_modules/.bin/tsx "$D/_probe_tmp.ts"
+            timeout 660 ./node_modules/.bin/tsx "$D/_probe_tmp.ts"
             echo "probe exit=$?"
             rm -rf "$D"

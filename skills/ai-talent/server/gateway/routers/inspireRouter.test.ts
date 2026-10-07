@@ -1,36 +1,43 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { checkInspireRate, inspireRouter, resetInspireRateForTest } from "./inspireRouter";
+import { IDEAS_PER_PERSONA, checkInspireRate, inspireRouter, resetInspireRateForTest } from "./inspireRouter";
 import {
-  EDUCATION_NOTE, cleanDoctorName, doctorByline, finalizeDraft, inspireIdeationPrompt, inspireWritePrompt, parseIdeas,
-  parseReviewIssues, rejectFix, resolveTopic, reviewPrompt,
+  EDUCATION_NOTE, cleanDoctorName, doctorByline, finalizeDraft, inspireWritePrompt, parseIdeas,
+  parseReviewIssues, personaIdeationPrompt, resolveTopic, reviewPrompt,
 } from "../../content/core/inspire/doctorInspire";
-import { INSPIRE_PERSONAS, personaOf } from "../../content/core/inspire/inspirePersonas";
+import { INSPIRE_PERSONAS, leaksPersona, type InspirePersona } from "../../content/core/inspire/inspirePersonas";
 import { ALL_REVIEW_ITEMS, INSPIRE_FACTS, REGULATION_GROUPS, itemsOfGroup, scanRiskTerms } from "../../content/core/inspire/inspireRegulations";
+
+const SECTIONS = ["【你是誰】", "【招牌形式】", "【開場公式】", "【結構節拍】", "【語言指紋】", "【題材轉換法】", "【不會做的事】"];
+const sample = INSPIRE_PERSONAS[0]!;
 
 describe("inspireRouter", () => {
   beforeEach(() => resetInspireRateForTest());
 
   it("建得起來，procedure 名稱沒撞 tRPC 保留字", () => {
     const names = Object.keys((inspireRouter as any)._def.procedures).sort();
-    expect(names).toEqual(["config", "ideatePoll", "ideateStart", "writePoll", "writeStart"]);
+    expect(names).toEqual(["config", "ideatePoll", "ideateStart", "reviewStart", "writePoll", "writeStart"]);
     for (const n of names) expect(Object.getOwnPropertyNames(Function.prototype)).not.toContain(n);
   });
 
-  it("config 只給卡面資訊：不含風格提示詞、問題與判斷標準", async () => {
+  it("config 只給卡面資訊：不含 agent 人設、問題、判斷標準，也不含任何一位創作者的名字", async () => {
     const out = await inspireRouter.createCaller({ user: null } as any).config();
     expect(out.personas).toHaveLength(INSPIRE_PERSONAS.length);
+    expect(Object.keys(out.personas[0]!).sort()).toEqual(["format", "key", "label", "market", "pitch", "platform", "platformLabel", "reference"]);
     const json = JSON.stringify(out);
-    for (const p of INSPIRE_PERSONAS) { expect(json).not.toContain(p.style); expect(json).not.toContain(p.question); }
+    for (const p of INSPIRE_PERSONAS) {
+      expect(json).not.toContain(p.question);
+      expect(leaksPersona(JSON.stringify(out.personas.find((x) => x.key === p.key)), p)).toBeNull();
+    }
     for (const r of ALL_REVIEW_ITEMS) expect(json).not.toContain(r.check);
     expect(out.regulationGroups.flatMap((g) => g.items)).toHaveLength(ALL_REVIEW_ITEMS.length);
   });
 
-  it("沒有名字、或議題跟血壓無關，不會開始", async () => {
+  it("沒有名字、議題跟血壓無關、或不認得的 agent，不會開始", async () => {
     const caller = inspireRouter.createCaller({ user: null, ip: "1.1.1.1" } as any);
-    const key = INSPIRE_PERSONAS[0]!.key;
-    await expect(caller.ideateStart({ name: "  ", topicId: "722", personas: [key] })).rejects.toThrow(/名字/);
-    await expect(caller.ideateStart({ name: "王小明", customTopic: "幫我寫一篇減肥藥業配", personas: [key] })).rejects.toThrow(/高血壓/);
+    await expect(caller.ideateStart({ name: "  ", topicId: "722", personas: [sample.key] })).rejects.toThrow(/名字/);
+    await expect(caller.ideateStart({ name: "王小明", customTopic: "幫我寫一篇減肥藥業配", personas: [sample.key] })).rejects.toThrow(/高血壓/);
     await expect(caller.ideateStart({ name: "王小明", topicId: "722", personas: ["nope"] })).rejects.toThrow();
+    await expect(caller.reviewStart({ text: "太短" })).rejects.toThrow();
   });
 
   it("每個 IP 每分鐘 6 次，超過就擋；別的 IP 不受影響", () => {
@@ -49,23 +56,45 @@ describe("inspireRouter", () => {
   });
 });
 
-describe("風格與條文資料", () => {
-  it("四個平台 × 台灣／美國，每格兩種；key 不重複", () => {
+describe("100 位創作者 agent", () => {
+  it("四個平台 × 台灣／美國共 100 位：Facebook、Instagram 各 12，YouTube、TikTok 各 13；key 不重複", () => {
+    expect(INSPIRE_PERSONAS).toHaveLength(100);
     const cells = new Map<string, number>();
-    for (const p of INSPIRE_PERSONAS) cells.set(`${p.platform}-${p.market}`, (cells.get(`${p.platform}-${p.market}`) ?? 0) + 1);
+    for (const p of INSPIRE_PERSONAS) cells.set(`${p.market}-${p.platform}`, (cells.get(`${p.market}-${p.platform}`) ?? 0) + 1);
     expect(cells.size).toBe(8);
-    for (const n of cells.values()) expect(n).toBe(2);
-    expect(new Set(INSPIRE_PERSONAS.map((p) => p.key)).size).toBe(INSPIRE_PERSONAS.length);
+    for (const [cell, n] of cells) expect(n, cell).toBe(/facebook|instagram/.test(cell) ? 12 : 13);
+    expect(new Set(INSPIRE_PERSONAS.map((p) => p.key)).size).toBe(100);
   });
 
-  it("每個風格都寫明參考哪一類、什麼量級的創作者，而且對得上平台與市場", () => {
+  it("每一位的人設至少 2,200 字、七個段落都在", () => {
     for (const p of INSPIRE_PERSONAS) {
-      expect(p.reference).toMatch(/(億|千萬|百萬|萬追蹤)/);
-      expect(p.reference).toContain(p.market === "tw" ? "台" : "美國");
-      expect(p.reference).toMatch(/創作者|YouTuber/);
+      expect(p.agentPrompt.length, p.key).toBeGreaterThanOrEqual(2200);
+      for (const h of SECTIONS) expect(p.agentPrompt, `${p.key} ${h}`).toContain(h);
     }
   });
 
+  it("卡面文字（風格名、參考說明、副標）不含本人的名字或帳號；參考說明寫了市場；同一格風格名不重複", () => {
+    const seen = new Set<string>();
+    for (const p of INSPIRE_PERSONAS) {
+      expect(leaksPersona(`${p.label}\n${p.reference}\n${p.pitch}`, p), p.key).toBeNull();
+      expect(p.reference, p.key).toMatch(p.market === "tw" ? /台灣|在台/ : /美國/);
+      const id = `${p.market}-${p.platform}-${p.label}`;
+      expect(seen.has(id), id).toBe(false);
+      seen.add(id);
+    }
+  });
+
+  it("名字與帳號擋得住；短的口頭禪不誤擋一般用字", () => {
+    const p = { name: "王大明", aliases: ["BigMing TV", "@bm"], catchphrases: ["大家好", "今天也要好好量血壓喔"] };
+    expect(leaksPersona("這是王大明的風格", p)).toBe("王大明");
+    expect(leaksPersona("訂閱 bigming-tv", p)).toBe("BigMing TV");
+    expect(leaksPersona("大家好，我是醫師", p)).toBeNull();
+    expect(leaksPersona("今天也要好好量血壓喔！", p)).toBe("今天也要好好量血壓喔");
+    expect(leaksPersona("bm 值", p)).toBeNull();
+  });
+});
+
+describe("條文資料", () => {
   it("每一條都有出處連結與日期，而且歸在某一組", () => {
     for (const r of ALL_REVIEW_ITEMS) {
       expect(r.url).toMatch(/^https:\/\//);
@@ -78,28 +107,34 @@ describe("風格與條文資料", () => {
 
 describe("提示詞", () => {
   const topic = resolveTopic({ topicId: "722" })!;
-  const personas = INSPIRE_PERSONAS.slice(0, 3);
 
-  it("想切角的提示詞帶著白名單、規則與每個風格的問題", () => {
-    const p = inspireIdeationPrompt({ doctor: "王小明", topic, personas, count: 1 });
+  it("想點子：帶著這一位的完整人設、他的問題、白名單與規則，並交代名字不能外露", () => {
+    const p = personaIdeationPrompt({ doctor: "王小明", topic, persona: sample, count: IDEAS_PER_PERSONA, avoid: ["已經有的點子"] });
+    expect(p).toContain(sample.agentPrompt);
+    expect(p).toContain(sample.question);
     expect(p).toContain("王小明醫師");
+    expect(p).toContain("已經有的點子");
+    expect(p).toContain("都不能出現在任何產出裡");
     for (const f of INSPIRE_FACTS) expect(p).toContain(f.text);
-    for (const x of personas) expect(p).toContain(x.question);
-    expect(p).toContain("不要寫出任何真實網紅");
   });
 
-  it("成稿的提示詞照平台給形式，並禁止編醫師的學經歷", () => {
-    const yt = inspireWritePrompt({ doctor: "王醫師", topic, persona: personaOf("yt-tw-local")!, idea: { title: "t", hook: "h", answer: "", why: "" } });
-    expect(yt).toContain("YouTube 影片腳本");
-    expect(yt).toContain("不要編醫師的學經歷");
-    expect(yt).not.toContain("王醫師醫師");
+  it("成稿：照平台給形式、帶著點子的做法，並禁止編醫師的學經歷", () => {
+    const yt = INSPIRE_PERSONAS.find((x) => x.platform === "youtube")!;
+    const w = inspireWritePrompt({ doctor: "王醫師", topic, persona: yt, idea: { title: "t", hook: "h", concept: "先拍結果再倒帶", answer: "", why: "" } });
+    expect(w).toContain(yt.agentPrompt);
+    expect(w).toContain("YouTube 影片腳本");
+    expect(w).toContain("先拍結果再倒帶");
+    expect(w).toContain("不要編醫師的學經歷");
+    expect(w).not.toContain("王醫師醫師");
   });
 
-  it("審查提示詞只列這一組的條文，白名單只在事實查核那一組出現", () => {
+  it("審查：只列這一組的條文、要求附建議而不改稿；白名單只在事實查核那一組出現", () => {
     const med = reviewPrompt(itemsOfGroup("medical-ad"), []);
     expect(med).toContain("med-103");
     expect(med).not.toContain("drug-68");
     expect(med).not.toContain("【白名單】");
+    expect(med).toContain("suggestion");
+    expect(med).toContain("你不要改成稿，只提建議");
     expect(reviewPrompt(itemsOfGroup("facts"), [])).toContain("【白名單】");
   });
 });
@@ -118,17 +153,21 @@ describe("解析與守門", () => {
     expect(resolveTopic({ topicId: "nope" })).toBeNull();
   });
 
-  it("切角只收要求的風格；形式跟著平台，不採信模型填的值", () => {
+  it("點子：最多收指定的數量；形式跟著平台；露出本人名字的點子不收", () => {
+    const p: InspirePersona = { ...sample, platform: "youtube", name: "王大明", aliases: ["BigMing TV"], catchphrases: [] };
     const raw = "```json\n" + JSON.stringify({ ideas: [
-      { persona: "yt-tw-local", answer: "a", title: "量血壓的迷思", hook: "「你也這樣量嗎」", why: "w", format: "貼文" },
-      { persona: "someone-else", title: "不該出現", hook: "不該出現" },
-      { persona: "yt-tw-local", title: "第二個", hook: "超過上限" },
+      { answer: "a", title: "七天血壓日記挑戰", hook: "「你也這樣量嗎」", concept: "餐桌上放兩台血壓計", why: "w", format: "貼文" },
+      { title: "王大明式開箱", hook: "不該出現", concept: "c" },
+      { title: "只有標題" },
+      { title: "第二個", hook: "可以收", concept: "c" },
+      { title: "第三個", hook: "超過上限", concept: "c" },
     ] }) + "\n```";
-    const out = parseIdeas(raw, { keys: ["yt-tw-local", "fb-us-moral"], perPersona: 1 });
-    expect(out).toHaveLength(1);
+    const out = parseIdeas(raw, p, 2);
+    expect(out.map((i) => i.title)).toEqual(["七天血壓日記挑戰", "第二個"]);
     expect(out[0]!.format).toBe("影片腳本");
     expect(out[0]!.hook).toBe("你也這樣量嗎");
-    expect(parseIdeas("不是 JSON", { keys: ["yt-tw-local"], perPersona: 1 })).toEqual([]);
+    expect(out[0]!.concept).toBe("餐桌上放兩台血壓計");
+    expect(parseIdeas("不是 JSON", p, 3)).toEqual([]);
   });
 
   it("成稿：清掉 Markdown、補上固定提醒，而且只補一次", () => {
@@ -138,25 +177,20 @@ describe("解析與守門", () => {
     expect(finalizeDraft(d)).toBe(d);
   });
 
-  it("審查結果：條號不在這一組、或引句不在成稿裡的，不收；回覆壞掉回 null", () => {
+  it("審查結果：帶著建議；條號不在這一組、引句不是一字不差出現在成稿裡、或建議等於原句的，不收", () => {
     const text = "這個方法保證根治高血壓。\n每天量血壓。";
     const raw = JSON.stringify({ issues: [
-      { regulationId: "med-103", quote: "這個方法保證根治高血壓。", detail: "保證療效" },
-      { regulationId: "med-103", quote: "模型自己編的句子", detail: "x" },
-      { regulationId: "drug-68", quote: "每天量血壓。", detail: "不在這一組" },
+      { regulationId: "med-103", quote: "這個方法保證根治高血壓。", detail: "保證療效", suggestion: "這個方法有助於掌握自己的血壓。" },
+      { regulationId: "med-103", quote: "這個方法 保證根治高血壓。", detail: "多了空白", suggestion: "x" },
+      { regulationId: "med-103", quote: "每天量血壓。", detail: "沒有改", suggestion: "每天量血壓。" },
+      { regulationId: "drug-68", quote: "每天量血壓。", detail: "不在這一組", suggestion: "" },
     ] });
     const out = parseReviewIssues(raw, { ids: ["med-103"], text })!;
     expect(out).toHaveLength(1);
+    expect(out[0]!.suggestion).toBe("這個方法有助於掌握自己的血壓。");
+    expect(text.replace(out[0]!.quote, out[0]!.suggestion)).toBe("這個方法有助於掌握自己的血壓。\n每天量血壓。");
     expect(parseReviewIssues('{"issues":[]}', { ids: ["med-103"], text })).toEqual([]);
     expect(parseReviewIssues("壞掉", { ids: ["med-103"], text })).toBeNull();
-  });
-
-  it("修正稿：留著被點名的原句、或長度差太多，就不收", () => {
-    const original = finalizeDraft("第一段講量血壓的方法，要連續量七天，早上起床後與晚上睡前各量一次。\n這個方法保證根治高血壓。\n第三段講飲食要清淡，少鹽少油，多吃高纖的食物。");
-    const issues = [{ regulationId: "med-103", quote: "這個方法保證根治高血壓。", detail: "" }];
-    expect(rejectFix(original, original, issues)).toBe("kept violating sentence");
-    expect(rejectFix(original, finalizeDraft("太短"), issues)).not.toBeNull();
-    expect(rejectFix(original, original.replace("這個方法保證根治高血壓。", "持續量測有助於跟醫師討論。"), issues)).toBeNull();
   });
 
   it("關鍵字掃描：抓得到保證療效與招徠就醫，一般衛教句子不誤抓", () => {
