@@ -84,7 +84,7 @@ Zernio client `listAccounts` 加 `sort`／`order` 可選參數（OpenAPI：`sort
 
 ### 4.2 退訂（`platform/core/billing/stripeLifecycle.ts` 的 `ended` action）
 
-`customer.subscription.deleted` → `applyLifecycleAction` 處理 `kind === "ended"` 的地方，於既有邏輯之後：用 `resolveSubscriptionOwner` 得到的 `userId`／`workspaceId`，找出該 owner 的所有品牌（`brands.userId = ?`，若 brands 有 workspaceId 欄位則優先用 workspaceId），逐一 `disconnectAll`。同樣失敗只記 log 不丟。為了可測，把這段抽成 `platform/core/connectors/publish/zernioLifecycle.ts` 的 `disconnectBrandsForOwner(pool, { userId, workspaceId })`，stripeLifecycle 只呼叫它；單元測試 mock 掉即可，**不要**讓 stripeLifecycle.test.ts 現有測試壞掉。
+`customer.subscription.deleted` → `applyLifecycleAction` 的 `case "ended"`。**先確認該客戶沒有其他有效訂閱**：既有程式已用 `findCurrentSubscription` 判斷「被更新的訂閱取代」（升級時舊訂閱的 deleted 事件），那條 `note: "superseded by a newer subscription"` 的提前 return **絕對不能解除連線**。解除只放在真正走到 `setPlanStatus(db, owner, "canceled")` 的那條路徑，且在它之後：用 `resolveSubscriptionOwner` 得到的 `userId`／`workspaceId`，找出該 owner 的所有品牌（`brands.userId = ?`，若 brands 有 workspaceId 欄位則優先用 workspaceId），逐一 `disconnectAll`。同樣失敗只記 log 不丟。為了可測，把這段抽成 `platform/core/connectors/publish/zernioLifecycle.ts` 的 `disconnectBrandsForOwner(pool, { userId, workspaceId })`，stripeLifecycle 只呼叫它；單元測試 mock 掉即可，**不要**讓 stripeLifecycle.test.ts 現有測試壞掉。
 
 ### 4.3 每日對帳（新檔 `platform/core/connectors/publish/zernioReconcileWorker.ts`）
 
@@ -120,7 +120,7 @@ Zernio client `listAccounts` 加 `sort`／`order` 可選參數（OpenAPI：`sort
 | `zernio.test.ts` | `listAccounts` 的 sort／order query；`getConnectUrl` 的 `reconnectAccountId`；`listAllAccounts` 翻頁。 |
 | `zernioReconcileWorker.test.ts` | 三類異常各一條；`staleLocal` 自動標 disconnected；孤兒不呼叫 delete。 |
 | `zernioLifecycle.test.ts` | `disconnectBrandsForOwner` 找對品牌、失敗不丟。 |
-| `stripeLifecycle.test.ts` | 既有測試全過（mock `zernioLifecycle`）。 |
+| `stripeLifecycle.test.ts` | 既有測試全過（mock `zernioLifecycle`）。**新增兩條**：(1)「升級時不解除」：`customer.subscription.deleted` 但 `findCurrentSubscription` 回另一個較新的 subscriptionId → `disconnectBrandsForOwner` **不被呼叫**；(2) 真正退訂（沒有較新訂閱）→ 被呼叫一次且帶正確的 userId／workspaceId。 |
 | `BrandSettingsSheet.test.tsx` | 新回傳形狀；`legacyConnected` 顯示「待重新授權」。 |
 | `scripts/migrate.ts` | 無單元測試，但 `npx tsc --noEmit` 要過；ALTER 邏輯用 information_schema 判斷，手動 review。 |
 
