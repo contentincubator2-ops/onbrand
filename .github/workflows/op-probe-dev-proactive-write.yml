@@ -1,14 +1,16 @@
 name: Ops (DEV) — probe proactive inbox write path (self-cleaning)
 
-# 主動收件匣的寫入路徑在 DEV VM 上實跑一次。第 1 段用「這個分支」的 proactiveStore.ts（放在旁邊、跑完就刪），
-# 第 2 段用 VM 上已部署的程式：
+# 主動收件匣的寫入路徑在 DEV VM 上實跑一次，全部用 VM 上「已部署」的程式：
 #   0. 部署狀態：三張表在不在、引擎開關目前是開還是關
 #   1. 事件表：新增／重複不重開／變急件／列表與件數／關閉一次有效／過期自動收掉
 #   2. 發文節奏整條：替「開發測試用」品牌（#2958）真的排一版 → 收件匣看得到 → 按「排定這週」→ 格子變已排定
 #      再排一版 → 按「這週不用」→ 那幾格收掉
+#   3. 通知偏好：關掉一類後不再替這個人開那一類；連續三則都說不用會建議整類關掉
+#   4. 節慶檔期：替 #2958 最近的節點想方向 → 寫成事件 → 收件匣看得到主軸與題目 → 按「今年不做」
 # 會寫入 DEV 資料庫，但只動 #2958 與 dedupeKey 以 probe: 開頭的事件，結束時（含失敗）把自己建的
-# 事件、格子、對話訊息全部刪掉。不開引擎開關、不寄信。花費：兩次模型呼叫。
+# 事件、格子、對話訊息全部刪掉。不開引擎開關、不寄信。花費：三次模型呼叫。
 # 第 2 次跑：第 1 次抓到 createEvent 把已存在的事件回報成新增（mysql2 回報符合列數），改成 INSERT IGNORE 後重驗。
+# 第 3 次跑：#427 部署後，改成全用已部署的程式，加第 3、4 段。
 # Path-scoped push，跟 op-probe-dev-proactive.yml 同一個做法（environment: dev 才會連到 DEV VM）。
 on:
   push:
@@ -21,15 +23,9 @@ jobs:
     environment: dev
     timeout-minutes: 8
     steps:
-      - uses: actions/checkout@v4
-      - name: Pack this branch's proactiveStore.ts
-        run: echo "PATCH_B64=$(gzip -c skills/ai-talent/server/gateway/proactive/proactiveStore.ts | base64 -w0)" >> "$GITHUB_ENV"
       - name: Exercise the write path on DEV and clean up
         uses: appleboy/ssh-action@v1.0.3
-        env:
-          PATCH_B64: ${{ env.PATCH_B64 }}
         with:
-          envs: PATCH_B64
           host: ${{ secrets.VM_HOST }}
           username: ${{ secrets.VM_USER }}
           key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
@@ -42,11 +38,11 @@ jobs:
             set -a; source .env 2>/dev/null; set +a
             ls server/gateway/proactive/ || { echo "proactive code is not deployed yet"; exit 1; }
             D=server/gateway/proactive
-            echo "$PATCH_B64" | base64 -d | gunzip > "$D/_probeStore.ts"
             cat > "$D/_probe_tmp.ts" <<'TS'
             import localPool from "../../localDb";
             import { addDays, mondayOf } from "../../content/core/planning/weeklyPlanner";
-            import { closeEvent, countOpen, createEvent, eventExists, expireOverdue, getOwn, listOpen } from "./_probeStore";
+            import { closeEvent, countOpen, createEvent, dismissStreak, eventExists, expireOverdue, getOwn, isMuted, listMuted, listOpen, setMuted } from "./proactiveStore";
+            import { draftFestivalIdeas, festivalEvent, festivalKey, openNodesFor } from "./festivalCheck";
             import { planWeekFor, targetWeek, weekKey } from "./weekPlanCheck";
             import { taipeiParts } from "./proactiveTime";
             import { proactiveRouter } from "../routers/proactiveRouter";
@@ -62,6 +58,7 @@ jobs:
               console.log("tables:", tables.join(", ") || "(none)");
               check("proactive_events 表已建立", tables.includes("proactive_events"));
               check("proactive_digests 表已建立", tables.includes("proactive_digests"));
+              check("proactive_mutes 表已建立", tables.includes("proactive_mutes"));
               console.log("existing events by kind/status:", JSON.stringify(await one("SELECT kind, status, COUNT(*) AS n FROM proactive_events GROUP BY kind, status")));
 
               const b = (await one("SELECT id, userId, name FROM brands WHERE id = ? LIMIT 1", [BRAND]))[0];
@@ -70,6 +67,8 @@ jobs:
               console.log(`brand #${b.id} ${b.name} owner=${userId}`);
               const stamp = Date.now();
               const created = { slots: [] as number[], weekKeys: [] as string[] };
+              const mutedBefore = await listMuted(userId);
+              console.log(`這位用戶原本關掉的類別: ${mutedBefore.join(", ") || "（沒有）"}`);
 
               try {
                 console.log("\n================ 1. 事件表");
@@ -134,8 +133,55 @@ jobs:
                   await localPool.execute("DELETE FROM proactive_events WHERE userId = ? AND dedupeKey = ?", [userId, key]);
                   if (slotIds.length) await localPool.execute(`DELETE FROM planned_slots WHERE id IN (${slotIds.map(() => "?").join(",")})`, slotIds);
                 }
+
+                console.log("\n================ 3. 通知偏好");
+                const K = "publish_unapproved" as const;
+                if (mutedBefore.includes(K)) console.log("這位用戶本來就關了這一類，跳過第 3 段（不動真的設定）");
+                else {
+                  const prefs0 = await caller.prefs();
+                  check("偏好列出四類事件＋彙整信", prefs0.kinds.length === 5 && prefs0.kinds.every((k: any) => k.muted === mutedBefore.includes(k.kind)), prefs0.kinds.map((k: any) => `${k.kind}:${k.muted ? "off" : "on"}`).join(" "));
+                  for (let i = 0; i < 3; i++) {
+                    const k = `probe:${stamp}:s${i}`;
+                    await createEvent({ ...base, dedupeKey: k });
+                    const id = Number((await one("SELECT id FROM proactive_events WHERE userId = ? AND dedupeKey = ?", [userId, k]))[0].id);
+                    const r = await caller.act({ id, action: "dismiss" });
+                    if (i < 2) check(`第 ${i + 1} 次按不用：還不問`, r.suggestMute === false);
+                    else check("連續第 3 次按不用：建議整類關掉", r.suggestMute === true);
+                  }
+                  await caller.setMuted({ kind: K, muted: true });
+                  check("關掉後 isMuted", await isMuted(userId, K));
+                  check("關掉後不再替這個人開這一類", (await createEvent({ ...base, dedupeKey: `probe:${stamp}:m` })) === false && !(await eventExists(userId, `probe:${stamp}:m`)));
+                  check("別類不受影響", (await createEvent({ ...base, kind: "review_overdue", dedupeKey: `probe:${stamp}:o` })) === true);
+                  await caller.setMuted({ kind: K, muted: false });
+                  check("恢復後又會開", (await createEvent({ ...base, dedupeKey: `probe:${stamp}:u` })) === true);
+                }
+
+                console.log("\n================ 4. 節慶檔期");
+                const today = taipeiParts(new Date()).ymd;
+                const nodes = await openNodesFor(BRAND, today, 45);
+                console.log(`#${BRAND} 45 天內該提的節點: ${nodes.map((n) => `${n.nameZh} ${n.date}`).join("、") || "（沒有）"}`);
+                const node = nodes[0];
+                if (!node) console.log("沒有節點可試，跳過第 4 段");
+                else if (await eventExists(userId, festivalKey(BRAND, node))) console.log("這個節點已經有真的事件，跳過第 4 段（不動真的資料）");
+                else {
+                  const ideas = await draftFestivalIdeas(cand, node, today);
+                  if (!ideas || !ideas.angle) console.log(`模型${ideas ? "判斷搭不上" : "沒回或解析失敗"}，跳過後續`);
+                  else {
+                    created.weekKeys.push(festivalKey(BRAND, node));
+                    check("節慶事件寫入", (await createEvent(festivalEvent(cand, node, ideas, today))) === true);
+                    const fit = (await caller.inbox()).items.find((i: any) => i.kind === "festival_node" && i.brandId === BRAND);
+                    check("收件匣帶著主軸與題目", !!fit?.festival && fit.festival.angle === ideas.angle && fit.festival.ideas.length === ideas.ideas.length, fit ? `${fit.title}` : "");
+                    console.log(`     ${fit?.festival?.date}｜${fit?.festival?.angle}`);
+                    for (const x of fit?.festival?.ideas ?? []) console.log(`     ・${x}`);
+                    console.log(`     navUrl=${fit?.navUrl}`);
+                    check("只能去處理，不能直接照做", fit?.actions?.approve === false && fit?.actions?.open === true);
+                    const r = await caller.act({ id: Number(fit!.id), action: "dismiss" });
+                    check("按「今年不做」後離開收件匣且不會再出現", r.ok && !(await caller.inbox()).items.some((i: any) => i.id === fit!.id) && (await createEvent(festivalEvent(cand, node, ideas, today))) === false);
+                  }
+                }
               } finally {
                 console.log("\n================ 清理");
+                await localPool.execute("DELETE FROM proactive_mutes WHERE userId = ? AND kind = 'publish_unapproved' AND ? = 0", [userId, mutedBefore.includes("publish_unapproved") ? 1 : 0]).catch(() => {});
                 const [e]: any = await localPool.execute("DELETE FROM proactive_events WHERE userId = ? AND dedupeKey LIKE ?", [userId, `probe:${stamp}:%`]);
                 let ew = 0;
                 for (const k of new Set(created.weekKeys)) { const [x]: any = await localPool.execute("DELETE FROM proactive_events WHERE userId = ? AND dedupeKey = ?", [userId, k]); ew += x.affectedRows; }
@@ -153,5 +199,5 @@ jobs:
             timeout 300 ./node_modules/.bin/tsx "$D/_probe_tmp.ts"
             RC=$?
             echo "probe exit=$RC"
-            rm -f "$D/_probe_tmp.ts" "$D/_probeStore.ts"
+            rm -f "$D/_probe_tmp.ts"
             exit $RC
