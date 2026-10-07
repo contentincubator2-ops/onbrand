@@ -1,6 +1,6 @@
-export type PublishProvider = "pipedream" | "bundle";
+export type PublishProvider = "pipedream" | "bundle" | "zernio";
 
-const KNOWN_PROVIDERS = new Set<string>(["pipedream", "bundle"]);
+const KNOWN_PROVIDERS = new Set<string>(["pipedream", "bundle", "zernio"]);
 
 /**
  * Decide which backend publishes a given platform.
