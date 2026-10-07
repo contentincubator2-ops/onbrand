@@ -51,6 +51,7 @@ import { opsRouter } from "../platform/routers/opsRouter";
 import { adminStatsRouter } from "../platform/routers/adminStatsRouter";
 // 2026-05-11 (CJ「Team / Agency 方案 + 多客戶 workspace」): multi-tenant container.
 import { reviewRouter } from "../platform/routers/reviewRouter";
+import { approvalRouter } from "../content/routers/approvalRouter";
 import { performanceRouter } from "../performance/routers/performanceRouter";
 import { tenantRouter } from "../platform/routers/tenantRouter";
 // 2026-05-14 (CJ「我們使用 Stripe」): Stripe Checkout + webhook.
@@ -136,6 +137,7 @@ export const appRouter = router({
   ops:             opsRouter,
   adminStats:      adminStatsRouter,
   review:          reviewRouter,
+  approval:        approvalRouter,
   performance:     performanceRouter,
   tenant:          tenantRouter,
   stripe:          stripeRouter,

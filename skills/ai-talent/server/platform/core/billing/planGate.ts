@@ -351,6 +351,21 @@ export async function assertReviewAllowed(userId: number): Promise<void> {
   if (!quota.reviewWorkflow) throw new TRPCError({ code: "FORBIDDEN", message: REVIEW_BLOCK_MESSAGE });
 }
 
+export const APPROVAL_LINK_BLOCK_MESSAGE =
+  "客戶核准連結是付費方案的功能。升級後可以把排好的貼文用一條連結交給客戶核准。";
+
+/**
+ * 建立客戶核准連結前呼叫（2026-10-07，所有付費方案都有、試用沒有）。
+ * 只擋「建立」：已經發出去的連結，客戶照樣打得開——方案到期不該讓客戶那一頭壞掉。
+ * 與 assertReviewAllowed 同一個 fail-open 原則。
+ */
+export async function assertApprovalLinkAllowed(userId: number): Promise<void> {
+  let quota: PlanQuota;
+  try { quota = await planQuotaFor(userId); }
+  catch (e) { console.warn("[planGate] assertApprovalLinkAllowed: planQuotaFor failed, fail-open", (e as Error)?.message); return; }
+  if (!quota.approvalLinks) throw new TRPCError({ code: "FORBIDDEN", message: APPROVAL_LINK_BLOCK_MESSAGE });
+}
+
 export const STRATEGY_MONITOR_BLOCK_MESSAGE =
   "策略監測屬於專業方案（品牌、產品與競爭者有變化時提醒你調整）。升級後可以設定監測與手動掃描。";
 

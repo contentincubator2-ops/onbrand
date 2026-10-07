@@ -264,6 +264,16 @@ export const outputRouter = router({
           [updated.content, input.id],
         );
       }
+      // 2026-10-07 客戶核准連結：這一篇如果正交給客戶看，團隊這次改了什麼也要留紀錄，
+      // 客戶那邊的狀態退回待確認（他核准的是舊文字）。永不丟錯。
+      {
+        const { recordTeamCaptionEdit } = await import("../core/approval/approvalStore");
+        const { actorIdOf } = await import("../../platform/core/trpc");
+        await recordTeamCaptionEdit(localPool, {
+          outputId: input.id, rawBefore: row.content, kind: updated.resolved.kind, index: updated.resolved.index,
+          before: outputItemCaption(updated.resolved.item), after: input.caption, actorId: actorIdOf(ctx),
+        });
+      }
       return {
         ok: true,
         variantIndex: input.variantIndex,

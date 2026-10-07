@@ -92,6 +92,7 @@ const AdminActivationPage = React.lazy(() => import("../platform/pages/AdminActi
 
 // Public-but-not-first-paint (legal / pricing / plan-expired)
 const PricingPage = React.lazy(() => import("../platform/pages/PricingPage"));
+const ClientApprovalPage = React.lazy(() => import("../content/pages/ClientApprovalPage"));
 const TermsPage = React.lazy(() => import("../platform/pages/legal/TermsPage"));
 const PrivacyPage = React.lazy(() => import("../platform/pages/legal/PrivacyPage"));
 const RefundPage = React.lazy(() => import("../platform/pages/legal/RefundPage"));
@@ -281,6 +282,8 @@ export default function AppV2() {
         <Route path="/terms" element={<TermsPage />} />
         <Route path="/privacy" element={<PrivacyPage />} />
         <Route path="/refund" element={<RefundPage />} />
+        {/* 2026-10-07 客戶核准連結：免登入，憑連結上的 token 進來。 */}
+        <Route path="/approve/:token" element={<ClientApprovalPage />} />
 
         {/* Plan expired — accessible without full auth gate so expired users
             can see the upgrade page instead of being stuck in a redirect loop */}

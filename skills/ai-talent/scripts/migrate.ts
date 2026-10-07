@@ -2626,6 +2626,69 @@ async function main() {
     `);
     console.log("[migrate] brand_publish_connections: OK");
 
+    // ─── 2026-10-07: 客戶核准連結（approvalRouter.ts）──────────────────────
+    // 一條免登入連結對多篇貼文；每篇的留言／修改／核准都記在 approval_events。
+    await conn.execute(`
+      CREATE TABLE IF NOT EXISTS approval_links (
+        id          BIGINT       NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        token       VARCHAR(64)  NOT NULL,
+        userId      INT          NOT NULL,                 -- 資料擁有者（團隊成員建立時＝品牌擁有者）
+        createdBy   INT          NOT NULL,                 -- 實際按下建立的人
+        brandId     INT          NOT NULL,
+        title       VARCHAR(120) NOT NULL,
+        note        VARCHAR(600) NULL,                     -- 給客戶的一句話
+        expiresAt   DATETIME(3)  NOT NULL,
+        revokedAt   DATETIME(3)  NULL,
+        lastViewedAt DATETIME(3) NULL,
+        createdAt   DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+        UNIQUE KEY uq_al_token (token),
+        INDEX idx_al_owner (userId, brandId, createdAt)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+    console.log("[migrate] approval_links: OK");
+
+    await conn.execute(`
+      CREATE TABLE IF NOT EXISTS approval_link_items (
+        id              BIGINT       NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        linkId          BIGINT       NOT NULL,
+        outputId        INT          NOT NULL,
+        variantIndex    INT          NOT NULL DEFAULT 0,
+        contentKind     VARCHAR(16)  NULL,
+        contentIndex    INT          NULL,
+        scheduledPostId BIGINT       NULL,
+        platform        VARCHAR(24)  NOT NULL DEFAULT 'other',
+        position        INT          NOT NULL DEFAULT 0,
+        decision        VARCHAR(20)  NOT NULL DEFAULT 'pending',   -- pending | approved | changes_requested
+        decidedBy       VARCHAR(60)  NULL,
+        decidedAt       DATETIME(3)  NULL,
+        createdAt       DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+        INDEX idx_ali_link (linkId, position),
+        INDEX idx_ali_output (outputId)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+    console.log("[migrate] approval_link_items: OK");
+
+    await conn.execute(`
+      CREATE TABLE IF NOT EXISTS approval_events (
+        id           BIGINT       NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        linkId       BIGINT       NOT NULL,
+        itemId       BIGINT       NOT NULL,
+        outputId     INT          NOT NULL,
+        kind         VARCHAR(20)  NOT NULL,                -- comment | edit | restore | approved | changes_requested | reopened
+        authorType   VARCHAR(8)   NOT NULL,                -- client | team
+        authorName   VARCHAR(60)  NOT NULL,
+        authorUserId INT          NULL,
+        body         TEXT         NULL,
+        beforeText   MEDIUMTEXT   NULL,
+        afterText    MEDIUMTEXT   NULL,
+        createdAt    DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+        INDEX idx_ae_item (itemId, id),
+        INDEX idx_ae_link (linkId, id),
+        INDEX idx_ae_output (outputId, id)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+    console.log("[migrate] approval_events: OK");
+
     console.log("[migrate] All migrations applied successfully.");
   } finally {
     conn.release();
