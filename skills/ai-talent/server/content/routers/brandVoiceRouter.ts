@@ -167,7 +167,12 @@ async function runTrial(brandId: number, userId: number, cardId: string): Promis
     const card = await getBrandTaskCard(brandId, cardId);
     if (!card?.voice || !card.skill) return;
     await patchCard(brandId, userId, cardId, (c) => setVoice({ ...c, currentStep: 3, lastError: null }, { phase: "writing" }));
-    let caption = await trialWrite(card, card.voice.topic);
+    // 2026-10-08 DEV 實跑：重寫那一輪模型回了空白，整張卡就停在「失敗」等人按重試。
+    // 空白多半是供應商一時的狀況（逾時、降級），再試一次通常就好；兩次都不行才算失敗。
+    let caption = await trialWrite(card, card.voice.topic).catch((err) => {
+      console.warn(`[brandVoice] ${cardId} 試寫失敗，重試一次：`, String((err as any)?.message ?? err).slice(0, 200));
+      return trialWrite(card, card.voice!.topic);
+    });
     // 字數區間在生文那一層只是提示詞裡的一句話，沒有驗收。試寫要拿來跟原文左右對照，
     // 長度差一截第一眼就「不像」，所以超出區間就帶著實際字數再寫一次，取比較靠近區間的那篇。
     const { minChars, maxChars } = card.measured;
@@ -418,7 +423,11 @@ export const brandVoiceRouter = router({
       await assertCanAct(userId);
       const card = await mustVoiceCard(input.brandId, input.cardId);
       if (isBusy(card)) throw new TRPCError({ code: "BAD_REQUEST", message: "這一類還在處理中，等它寫完再回覆。" });
-      if (!card.lastDryRun) throw new TRPCError({ code: "BAD_REQUEST", message: "這一類還沒有試寫可以評。" });
+      // 只有「等你看」的卡能評。失敗的卡手上那篇是上一輪的舊稿（或根本沒有），
+      // 對它按像會把一份沒驗過的寫法上架。
+      if (viewOf(card).phase !== "review" || !card.lastDryRun) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "這一類上一次沒有寫成功，請先按重試，看到新的試寫再回覆。" });
+      }
 
       if (input.verdict === "like") {
         await patchCard(input.brandId, userId, input.cardId, (c) => setVoice(c, { verdict: "like" }));
@@ -470,7 +479,7 @@ export const brandVoiceRouter = router({
       await assertBrandAccess(userId, input.brandId);
       await assertCanAct(userId);
       const liked = voiceCards(await listBrandTaskCards(input.brandId))
-        .filter((c) => c.voice!.verdict === "like" && !!c.skill && !isBusy(c));
+        .filter((c) => c.voice!.verdict === "like" && !!c.skill && viewOf(c).phase === "review");
       if (liked.length === 0) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "還沒有任何一類按「像」。至少確認一類才能完成。" });
       }
