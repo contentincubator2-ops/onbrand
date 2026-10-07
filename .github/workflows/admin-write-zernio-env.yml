@@ -1,0 +1,223 @@
+# dev 與 prod 應使用不同 Zernio team 的 key，避免品牌 profile 與真實帳號混用。
+# 目前 ZERNIO_API_KEY 存在 repo 層級；要讓 dev 使用另一把時執行：
+#   gh secret set ZERNIO_API_KEY --env dev
+# environment secret 會覆蓋 repo 層級；key 僅從 secrets 取得，不接受 input。
+# 回滾：選相同 target，各平台選回 pipedream 或 bundle 再跑一次即可。
+name: Admin — Write Zernio env vars to VM
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: "目標環境"
+        required: true
+        type: choice
+        default: dev
+        options: [dev, prod]
+      facebook:
+        description: "facebook 發布供應商（keep 保留現值）"
+        required: true
+        type: choice
+        default: keep
+        options: [pipedream, bundle, zernio, keep]
+      instagram:
+        description: "instagram 發布供應商（keep 保留現值）"
+        required: true
+        type: choice
+        default: keep
+        options: [pipedream, bundle, zernio, keep]
+      linkedin:
+        description: "linkedin 發布供應商（keep 保留現值）"
+        required: true
+        type: choice
+        default: keep
+        options: [pipedream, bundle, zernio, keep]
+      threads:
+        description: "threads 發布供應商（keep 保留現值）"
+        required: true
+        type: choice
+        default: keep
+        options: [pipedream, bundle, zernio, keep]
+      youtube:
+        description: "youtube 發布供應商（keep 保留現值）"
+        required: true
+        type: choice
+        default: keep
+        options: [pipedream, bundle, zernio, keep]
+      tiktok:
+        description: "tiktok 發布供應商（keep 保留現值）"
+        required: true
+        type: choice
+        default: keep
+        options: [pipedream, bundle, zernio, keep]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: admin-write-zernio-env-${{ inputs.target }}
+  cancel-in-progress: false
+
+jobs:
+  write-dev:
+    if: inputs.target == 'dev'
+    environment: dev
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Write Zernio env and restart
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          ZERNIO_API_KEY: ${{ secrets.ZERNIO_API_KEY }}
+          PROVIDER_FACEBOOK: ${{ inputs.facebook }}
+          PROVIDER_INSTAGRAM: ${{ inputs.instagram }}
+          PROVIDER_LINKEDIN: ${{ inputs.linkedin }}
+          PROVIDER_THREADS: ${{ inputs.threads }}
+          PROVIDER_YOUTUBE: ${{ inputs.youtube }}
+          PROVIDER_TIKTOK: ${{ inputs.tiktok }}
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 120s
+          envs: ZERNIO_API_KEY,PROVIDER_FACEBOOK,PROVIDER_INSTAGRAM,PROVIDER_LINKEDIN,PROVIDER_THREADS,PROVIDER_YOUTUBE,PROVIDER_TIKTOK
+          script: |
+            set +x
+            set -euo pipefail
+            umask 077
+            ENV=/opt/onbrand/shared/.env
+            if [ ! -f "$ENV" ]; then
+              echo "❌ .env not found at $ENV"; exit 1
+            fi
+            if [ -z "${ZERNIO_API_KEY:-}" ]; then
+              echo "❌ ZERNIO_API_KEY secret is empty."; exit 1
+            fi
+            # Validate every choice before changing the file.
+            for provider in "$PROVIDER_FACEBOOK" "$PROVIDER_INSTAGRAM" "$PROVIDER_LINKEDIN" "$PROVIDER_THREADS" "$PROVIDER_YOUTUBE" "$PROVIDER_TIKTOK"; do
+              case "$provider" in
+                pipedream|bundle|zernio|keep) ;;
+                *) echo "❌ Invalid provider choice."; exit 1 ;;
+              esac
+            done
+            cp -p "$ENV" "${ENV}.bak.zernio.$(date +%s%N)"
+
+            upsert() {
+              local KEY="$1"; local VAL="$2"
+              if [ "$KEY" != "ZERNIO_API_KEY" ] && [ "$VAL" = "keep" ]; then
+                echo "  ⊘ $KEY (kept)"; return
+              fi
+              # Pass the value through the environment, not source code or command arguments.
+              # In-place write preserves permissions and symlinks; no sed replacement expansion.
+              ZERNIO_ENV_KEY="$KEY" ZERNIO_ENV_VALUE="$VAL" python3 - "$ENV" <<'PYENV'
+            import os
+            import pathlib
+            import sys
+
+            key = os.environ["ZERNIO_ENV_KEY"]
+            value = os.environ["ZERNIO_ENV_VALUE"]
+            if "\n" in value or "\r" in value:
+                raise SystemExit("Invalid multiline environment value")
+            # Single quotes keep this value safe for both dotenv and bash source.
+            if "'" in value:
+                raise SystemExit("value contains a single quote")
+            quote = "'"
+            path = pathlib.Path(sys.argv[1])
+            lines = [line for line in path.read_text().splitlines() if not line.startswith(key + "=")]
+            lines.append(key + "=" + quote + value + quote)
+            path.write_text("\n".join(lines) + "\n")
+            PYENV
+              echo "  ↻ $KEY (written)"
+            }
+
+            echo "  API key received (${#ZERNIO_API_KEY} chars)"
+            upsert ZERNIO_API_KEY "$ZERNIO_API_KEY"
+            upsert PUBLISH_PROVIDER_FACEBOOK "$PROVIDER_FACEBOOK"
+            upsert PUBLISH_PROVIDER_INSTAGRAM "$PROVIDER_INSTAGRAM"
+            upsert PUBLISH_PROVIDER_LINKEDIN "$PROVIDER_LINKEDIN"
+            upsert PUBLISH_PROVIDER_THREADS "$PROVIDER_THREADS"
+            upsert PUBLISH_PROVIDER_YOUTUBE "$PROVIDER_YOUTUBE"
+            upsert PUBLISH_PROVIDER_TIKTOK "$PROVIDER_TIKTOK"
+
+            pm2 restart onbrand-dev --update-env >/dev/null 2>&1
+            if ! timeout 60 bash -c 'until curl --fail --silent --max-time 5 http://127.0.0.1:3101/health >/dev/null; do sleep 3; done'; then
+              echo "❌ Restart health check failed."; exit 1
+            fi
+            echo "✓ Restart: health OK"
+
+  write-prod:
+    if: inputs.target == 'prod'
+    runs-on: [self-hosted, linux, vm-onbrand]
+    timeout-minutes: 5
+    steps:
+      - name: Write Zernio env and restart
+        shell: bash
+        env:
+          ZERNIO_API_KEY: ${{ secrets.ZERNIO_API_KEY }}
+          PROVIDER_FACEBOOK: ${{ inputs.facebook }}
+          PROVIDER_INSTAGRAM: ${{ inputs.instagram }}
+          PROVIDER_LINKEDIN: ${{ inputs.linkedin }}
+          PROVIDER_THREADS: ${{ inputs.threads }}
+          PROVIDER_YOUTUBE: ${{ inputs.youtube }}
+          PROVIDER_TIKTOK: ${{ inputs.tiktok }}
+        run: |
+          set +x
+          set -euo pipefail
+          umask 077
+          ENV=/opt/onbrand/app/skills/ai-talent/.env
+          if [ ! -f "$ENV" ]; then
+            echo "❌ .env not found at $ENV"; exit 1
+          fi
+          if [ -z "${ZERNIO_API_KEY:-}" ]; then
+            echo "❌ ZERNIO_API_KEY secret is empty."; exit 1
+          fi
+          # Validate every choice before changing the file.
+          for provider in "$PROVIDER_FACEBOOK" "$PROVIDER_INSTAGRAM" "$PROVIDER_LINKEDIN" "$PROVIDER_THREADS" "$PROVIDER_YOUTUBE" "$PROVIDER_TIKTOK"; do
+            case "$provider" in
+              pipedream|bundle|zernio|keep) ;;
+              *) echo "❌ Invalid provider choice."; exit 1 ;;
+            esac
+          done
+          cp -p "$ENV" "${ENV}.bak.zernio.$(date +%s%N)"
+
+          upsert() {
+            local KEY="$1"; local VAL="$2"
+            if [ "$KEY" != "ZERNIO_API_KEY" ] && [ "$VAL" = "keep" ]; then
+              echo "  ⊘ $KEY (kept)"; return
+            fi
+            # Pass the value through the environment, not source code or command arguments.
+            # In-place write preserves permissions and symlinks; no sed replacement expansion.
+            ZERNIO_ENV_KEY="$KEY" ZERNIO_ENV_VALUE="$VAL" python3 - "$ENV" <<'PYENV'
+          import os
+          import pathlib
+          import sys
+
+          key = os.environ["ZERNIO_ENV_KEY"]
+          value = os.environ["ZERNIO_ENV_VALUE"]
+          if "\n" in value or "\r" in value:
+              raise SystemExit("Invalid multiline environment value")
+          # Single quotes keep this value safe for both dotenv and bash source.
+          if "'" in value:
+              raise SystemExit("value contains a single quote")
+          quote = "'"
+          path = pathlib.Path(sys.argv[1])
+          lines = [line for line in path.read_text().splitlines() if not line.startswith(key + "=")]
+          lines.append(key + "=" + quote + value + quote)
+          path.write_text("\n".join(lines) + "\n")
+          PYENV
+            echo "  ↻ $KEY (written)"
+          }
+
+          echo "  API key received (${#ZERNIO_API_KEY} chars)"
+          upsert ZERNIO_API_KEY "$ZERNIO_API_KEY"
+          upsert PUBLISH_PROVIDER_FACEBOOK "$PROVIDER_FACEBOOK"
+          upsert PUBLISH_PROVIDER_INSTAGRAM "$PROVIDER_INSTAGRAM"
+          upsert PUBLISH_PROVIDER_LINKEDIN "$PROVIDER_LINKEDIN"
+          upsert PUBLISH_PROVIDER_THREADS "$PROVIDER_THREADS"
+          upsert PUBLISH_PROVIDER_YOUTUBE "$PROVIDER_YOUTUBE"
+          upsert PUBLISH_PROVIDER_TIKTOK "$PROVIDER_TIKTOK"
+
+          pm2 restart onbrand --update-env >/dev/null 2>&1
+          if ! timeout 60 bash -c 'until curl --fail --silent --max-time 5 http://127.0.0.1:3101/health >/dev/null; do sleep 3; done'; then
+            echo "❌ Restart health check failed."; exit 1
+          fi
+          echo "✓ Restart: health OK"
