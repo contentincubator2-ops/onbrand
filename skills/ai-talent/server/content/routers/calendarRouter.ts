@@ -1,3 +1,6 @@
+import { createZernioClient } from "../../platform/core/connectors/zernio";
+import { createZernioAdapter } from "../../platform/core/connectors/publish/zernioAdapter";
+import { PublishUserError } from "../../platform/core/connectors/publish/publishAdapter";
 /**
  * calendarRouter — Content Calendar aggregate.
  *
@@ -538,6 +541,27 @@ async function publishScheduledPostInner(args: {
   let permalink: string | null = null;
   let postId: string | null = null;
 
+  if (getPublishProvider(platform) === "zernio") {
+    const apiKey = process.env.ZERNIO_API_KEY;
+    if (!apiKey) throw new TRPCError({
+      code: "PRECONDITION_FAILED", message: "發布服務尚未啟用，請聯絡 sowork@sowork.ai。",
+    });
+    const media = outputItemMedia(selected.item);
+    try {
+      const adapter = createZernioAdapter({ client: createZernioClient({ apiKey }), pool: localPool,
+        brandNameOf: async () => row.brandName ?? "",
+      });
+      const result = await adapter.publish({ scheduledPostId: row.id, brandId: row.brandId,
+        platform, caption, imageUrls: media.imageUrls, videoUrl: media.videoUrl,
+      });
+      postId = result.postId;
+      permalink = result.permalink;
+    } catch (e) {
+      throw new TRPCError({ code: e instanceof PublishUserError ? "PRECONDITION_FAILED" : "INTERNAL_SERVER_ERROR",
+        message: e instanceof Error ? e.message : "Zernio 發布失敗",
+      });
+    }
+  } else
   // ── bundle.social: opt in per platform via PUBLISH_PROVIDER_<PLATFORM> ─
   // Pipedream's managed Meta app cannot publish (see
   // docs/facebook-publish-provider-evaluation-2026-07-25.md). This branch

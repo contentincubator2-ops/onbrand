@@ -9,6 +9,11 @@
 
 const RULES: Array<{ test: RegExp; zh: string; en: string }> = [
   {
+    test: /account_limit_exceeded/i,
+    zh: "連接帳號數已達供應商上限，請解除不使用的帳號或升級方案。",
+    en: "The provider account limit has been reached. Disconnect unused accounts or upgrade the plan.",
+  },
+  {
     test: /\b(401|403)\b|oauth|access token|token (has )?expired|session has expired|reauthori[sz]e|re-?auth|invalid[_ ]token|permission/i,
     zh: "這個平台的授權已失效或權限不足，請到品牌設定重新連接後再試。",
     en: "The platform authorization expired or lacks permission. Reconnect it in brand settings and try again.",
@@ -48,6 +53,11 @@ const RULES: Array<{ test: RegExp; zh: string; en: string }> = [
     zh: "發布服務暫時異常，請稍後再試。",
     en: "The publishing service is temporarily unavailable. Try again later.",
   },
+  {
+    test: /platform_error/i,
+    zh: "平台拒絕發布，請檢查帳號授權與貼文內容後再試。",
+    en: "The platform rejected the post. Check the account authorization and content before retrying.",
+  },
 ];
 
 /** Pull a readable sentence out of a JSON body, or null when it is not JSON. */
@@ -69,7 +79,7 @@ export function friendlyPublishError(raw: unknown): string {
   const text = String((raw as any)?.message ?? raw ?? "").trim();
   if (!text) return "發布失敗，請稍後再試。 / Publishing failed. Please try again later.";
   // Already written for users by our own code.
-  if (HAS_CJK.test(text) && !/\{.*\}/.test(text) && !/bundle\.social \d{3}/.test(text)) return text;
+  if (HAS_CJK.test(text) && !/\{.*\}/.test(text) && !/bundle\.social \d{3}/.test(text) && !/zernio \d{3}/.test(text)) return text;
 
   const inner = messageFromJson(text);
   const haystack = `${text} ${inner ?? ""}`;
