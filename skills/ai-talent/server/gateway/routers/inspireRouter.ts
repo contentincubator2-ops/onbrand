@@ -200,7 +200,7 @@ export const inspireRouter = router({
     // 只給卡面上的東西；風格的提示詞與參考來源不出 server。
     personas: INSPIRE_PERSONAS.map((p) => ({
       key: p.key, platform: p.platform, platformLabel: PLATFORM_LABEL[p.platform], market: p.market,
-      label: p.label, pitch: p.pitch, format: PLATFORM_FORMAT[p.platform],
+      label: p.label, reference: p.reference, pitch: p.pitch, format: PLATFORM_FORMAT[p.platform],
     })),
     regulationGroups: REGULATION_GROUPS.map((g) => ({
       ...g,

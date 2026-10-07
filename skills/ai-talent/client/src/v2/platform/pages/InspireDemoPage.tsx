@@ -2,14 +2,17 @@
  * InspireDemoPage — 醫師自媒體示範頁（/inspire），免登入。
  *
  * 2026-10-07（CJ「醫生掃 QR code、輸入自己的名字後，選主要議題、搭配不同網紅語調，產出文章內容」
- * 「真實網紅名字不要露出」「展現出正在審查哪些條文」→「mobile first 的介面，Tesla UI」）。
- *   · 手機優先、一步一個畫面：名字 → 議題 → 風格 → 靈感 → 成稿。主要按鈕固定在畫面底部，拇指按得到。
- *   · 視覺只取 Tesla 訂車流程的做法（白底、大標題、灰色面板、4px 圓角、單一藍色主按鈕、
- *     選項用外框表示選取），不使用它的字體、標誌或素材。這頁刻意不跟 OnBrand 外框。
- *   · 靈感卡只放三樣（切角、開場第一句、為什麼這樣切）；採用了才寫成稿，沒選的不花錢。
- *   · 成稿審完才顯示；審查面板逐組列出條文與出處連結，狀態對應伺服器真的那一次審查。
- * 題庫、風格、條文都在 server/content/core/inspire/，這裡不留副本。
- * 這頁只給台灣醫師用，所以只有中文。
+ * 「真實網紅名字不要露出」「展現出正在審查哪些條文」→「mobile first，Tesla UI」→
+ * 「整個設計要更像 Tesla UI」「每個風格寫上參考哪一類、什麼量級的網紅」）。
+ *
+ * 版面照 Tesla 官網的兩種畫面做，只取做法，不使用它的字體、標誌或素材：
+ *   · 首頁＝全螢幕深色主視覺：標題在上、兩顆並排按鈕在最下面。
+ *   · 設定頁＝訂車設定器：上面一塊「目前的設定」預覽，下面一段一段置中的小標（議題／平台／說話風格），
+ *     平台用圓形色票式的選鈕，選取＝外圈；最底下固定一條「摘要＋主按鈕」。
+ *   · 靈感牆＝庫存車卡片：灰底卡、標題、三格規格列、兩顆按鈕。
+ * 靈感卡只放切角、開場第一句、為什麼這樣切；採用了才寫成稿。成稿審完才顯示，
+ * 審查面板逐組列出條文與出處，狀態對應伺服器真的那一次審查。
+ * 題庫、風格、條文都在 server/content/core/inspire/，這裡不留副本。這頁只給台灣醫師用，所以只有中文。
  */
 import React from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
@@ -19,9 +22,10 @@ import {
 import { faFacebookF, faInstagram, faTiktok, faYoutube } from "@fortawesome/free-brands-svg-icons";
 import { trpc } from "../../../lib/trpc";
 
-const INK = "#171A20", SUB = "#5C5E62", FAINT = "#8E8E8E", PANEL = "#F4F4F4", LINE = "#E2E3E3", BLUE = "#3E6AE1";
+const INK = "#171A20", SUB = "#5C5E62", FAINT = "#8E8E8E", PANEL = "#F4F4F4", LINE = "#D0D1D2", BLUE = "#3E6AE1";
 const OK = "#12BB00", WARN = "#B45309";
 const FONT = `system-ui, -apple-system, "Segoe UI", "PingFang TC", "Noto Sans TC", "Microsoft JhengHei", sans-serif`;
+const GLASS = { background: "rgba(255,255,255,0.86)", backdropFilter: "blur(16px)", WebkitBackdropFilter: "blur(16px)" } as const;
 
 const PLATFORM_ICON: Record<string, any> = { facebook: faFacebookF, youtube: faYoutube, instagram: faInstagram, tiktok: faTiktok };
 const PLATFORM_ORDER = ["facebook", "youtube", "instagram", "tiktok"];
@@ -29,13 +33,13 @@ const MARKETS: Array<{ id: string; label: string }> = [{ id: "all", label: "全�
 const MARKET_LABEL: Record<string, string> = { tw: "台灣", us: "美國" };
 
 interface Topic { id: string; label: string; hint: string }
-interface Persona { key: string; platform: string; platformLabel: string; market: string; label: string; pitch: string; format: string }
+interface Persona { key: string; platform: string; platformLabel: string; market: string; label: string; reference: string; pitch: string; format: string }
 interface RegItem { id: string; law: string; article: string; title: string; gist: string; url: string; amended: string; secondary: boolean }
 interface RegGroup { id: string; label: string; note: string; items: RegItem[] }
 type Subject = { topicId?: string; customTopic?: string };
-interface Idea { id: string; persona: string; answer: string; title: string; hook: string; why: string; format: string; subject: Subject }
+interface Idea { id: string; persona: string; answer: string; title: string; hook: string; why: string; format: string; subject: Subject; topicLabel: string }
 interface Issue { regulationId: string; quote: string; detail: string }
-type Step = "topic" | "style" | "wall";
+type View = "studio" | "wall";
 
 const NAME_KEY = "inspire.doctorName";
 const readName = () => { try { return localStorage.getItem(NAME_KEY) ?? ""; } catch { return ""; } };
@@ -45,53 +49,52 @@ let seq = 0;
 const newId = () => `i${Date.now().toString(36)}${(seq++).toString(36)}`;
 const byline = (name: string) => (/醫師|醫生|Dr\.?/i.test(name) ? name : `${name} 醫師`);
 const errText = (e: any) => String(e?.message ?? "").slice(0, 80) || "出了一點問題，請再試一次。";
+const toTop = () => { try { window.scrollTo({ top: 0 }); } catch { /* 舊瀏覽器 */ } };
 
 // ── 共用零件 ──
 
-function Frame({ children }: { children: React.ReactNode }) {
+function Frame({ children, dark }: { children: React.ReactNode; dark?: boolean }) {
   return (
-    <div className="min-h-[100dvh] w-full" style={{ background: "#fff", color: INK, fontFamily: FONT }}>
-      <div className="mx-auto flex min-h-[100dvh] w-full max-w-[480px] flex-col">{children}</div>
+    <div className="min-h-[100dvh] w-full" style={{ background: dark ? "#000" : "#fff", color: dark ? "#fff" : INK, fontFamily: FONT }}>
+      <div className="relative mx-auto flex min-h-[100dvh] w-full max-w-[480px] flex-col">{children}</div>
     </div>
   );
 }
 
-function TopBar({ onBack, right, progress }: { onBack?: () => void; right?: React.ReactNode; progress?: number }) {
+function Wordmark() {
+  return <span className="text-[15px] font-medium uppercase" style={{ letterSpacing: "0.32em" }}>onBrand</span>;
+}
+
+function Nav({ onBack, right }: { onBack?: () => void; right?: React.ReactNode }) {
   return (
-    <header className="sticky top-0 z-20" style={{ background: "rgba(255,255,255,0.92)", backdropFilter: "blur(12px)" }}>
-      <div className="flex h-14 items-center justify-between px-2">
-        <div className="flex w-20 items-center">
-          {onBack ? (
-            <button type="button" onClick={onBack} aria-label="上一步" className="flex h-11 w-11 items-center justify-center rounded" style={{ color: INK }}>
-              <FontAwesomeIcon icon={faChevronLeft} />
-            </button>
-          ) : null}
-        </div>
-        <div className="text-[13px] font-medium uppercase" style={{ letterSpacing: "0.28em" }}>onBrand</div>
-        <div className="flex w-20 items-center justify-end pr-2 text-[13px] font-medium" style={{ color: SUB }}>{right}</div>
+    <header className="sticky top-0 z-20 flex h-14 items-center justify-between px-6" style={GLASS}>
+      <div className="flex items-center gap-2">
+        {onBack ? (
+          <button type="button" onClick={onBack} aria-label="上一步" className="-ml-3 flex h-10 w-10 items-center justify-center rounded" style={{ color: INK }}>
+            <FontAwesomeIcon icon={faChevronLeft} />
+          </button>
+        ) : null}
+        <Wordmark />
       </div>
-      {progress != null ? (
-        <div className="h-[2px] w-full" style={{ background: PANEL }}>
-          <div className="h-full transition-all duration-300" style={{ width: `${progress}%`, background: INK }} />
-        </div>
-      ) : null}
+      <div className="text-[13px] font-medium" style={{ color: INK }}>{right}</div>
     </header>
   );
 }
 
-function Heading({ title, sub }: { title: React.ReactNode; sub?: React.ReactNode }) {
+/** 設定器裡每一段的置中小標。 */
+function Section({ title, caption, children }: { title: string; caption?: React.ReactNode; children: React.ReactNode }) {
   return (
-    <div className="px-6 pb-6 pt-8 text-center">
-      <h1 className="text-[28px] font-medium leading-[1.25]" style={{ letterSpacing: "-0.01em" }}>{title}</h1>
-      {sub ? <p className="mx-auto mt-2 max-w-[340px] text-[14px] leading-relaxed" style={{ color: SUB }}>{sub}</p> : null}
-    </div>
+    <section className="px-6 pt-12">
+      <h2 className="text-center text-[24px] font-medium" style={{ letterSpacing: "-0.01em" }}>{title}</h2>
+      <div className="mt-6">{children}</div>
+      {caption ? <div className="mt-5 text-center text-[13px] leading-relaxed" style={{ color: SUB }}>{caption}</div> : null}
+    </section>
   );
 }
 
-/** 固定在底部的按鈕列。 */
 function BottomBar({ children }: { children: React.ReactNode }) {
   return (
-    <div className="sticky bottom-0 z-20 mt-auto px-6 pt-3" style={{ background: "rgba(255,255,255,0.92)", backdropFilter: "blur(12px)", paddingBottom: "max(16px, env(safe-area-inset-bottom))" }}>
+    <div className="sticky bottom-0 z-20 mt-auto px-6 pt-3" style={{ ...GLASS, boxShadow: `inset 0 1px 0 ${PANEL}`, paddingBottom: "max(16px, env(safe-area-inset-bottom))" }}>
       <div className="flex flex-col gap-2">{children}</div>
     </div>
   );
@@ -103,46 +106,69 @@ function Btn({ kind = "primary", disabled, onClick, children, type = "button" }:
   const primary = kind === "primary";
   return (
     <button type={type} disabled={disabled} onClick={onClick}
-      className="flex h-12 w-full items-center justify-center gap-2 rounded text-[14px] font-medium transition-colors"
-      style={{ background: disabled ? PANEL : primary ? BLUE : PANEL, color: disabled ? FAINT : primary ? "#fff" : INK }}>
+      className="flex h-11 w-full items-center justify-center gap-2 rounded px-4 text-[14px] font-medium"
+      style={{ background: disabled ? PANEL : primary ? BLUE : PANEL, color: disabled ? FAINT : primary ? "#fff" : "#393C41" }}>
       {children}
     </button>
   );
 }
 
-/** 選項：選取＝藍色外框（不改底色）。 */
+/** 選項：選取＝藍色粗外框（不改底色、不加動畫，低階手機也一致）。 */
 function Option({ on, disabled, onClick, children }: { on: boolean; disabled?: boolean; onClick: () => void; children: React.ReactNode }) {
   return (
     <button type="button" aria-pressed={on} disabled={disabled} onClick={onClick}
-      className="w-full rounded px-4 py-3.5 text-left transition-shadow disabled:opacity-40"
-      style={{ background: "#fff", boxShadow: on ? `inset 0 0 0 2px ${BLUE}` : `inset 0 0 0 1px ${LINE}` }}>
+      className="w-full rounded px-4 py-3.5 text-left disabled:opacity-40"
+      style={{ background: "#fff", boxShadow: on ? `inset 0 0 0 3px ${BLUE}` : `inset 0 0 0 1px ${LINE}` }}>
       {children}
     </button>
   );
 }
 
-// ── 第 0 步：名字 ──
+// ── 首頁：全螢幕主視覺 ──
 
-function NameStep({ onDone }: { onDone: (name: string) => void }) {
+/** 主視覺：一條血壓波形（自己畫的線條，不是任何品牌素材）。 */
+function PulseArt() {
+  return (
+    <svg viewBox="0 0 480 260" className="w-full" aria-hidden="true">
+      <defs>
+        <linearGradient id="inspire-pulse" x1="0" x2="1" y1="0" y2="0">
+          <stop offset="0" stopColor="#fff" stopOpacity="0" />
+          <stop offset="0.25" stopColor="#fff" stopOpacity="0.9" />
+          <stop offset="0.75" stopColor="#fff" stopOpacity="0.9" />
+          <stop offset="1" stopColor="#fff" stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      {[60, 110, 160, 210].map((y) => <line key={y} x1="0" x2="480" y1={y} y2={y} stroke="#fff" strokeOpacity="0.06" />)}
+      <path d="M0 150 H120 l14 -8 l12 8 h20 l10 26 l18 -130 l18 150 l12 -46 h26 l16 -22 l18 22 H480" fill="none" stroke="url(#inspire-pulse)" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
+      <text x="240" y="236" textAnchor="middle" fill="#fff" fillOpacity="0.5" fontSize="12" letterSpacing="4">130 / 80 mmHg</text>
+    </svg>
+  );
+}
+
+function Hero({ onDone, onBasis }: { onDone: (name: string) => void; onBasis: () => void }) {
   const [v, setV] = React.useState("");
   const ok = v.trim().length >= 1;
   return (
-    <Frame>
-      <TopBar />
-      <form className="flex flex-1 flex-col" onSubmit={(e) => { e.preventDefault(); if (ok) onDone(v.trim()); }}>
-        <div className="flex flex-1 flex-col justify-center pb-10">
-          <Heading title={<>同一個高血壓議題<br />換一種說法</>} sub="挑幾種各平台熱門創作者的說話風格，AI 各想一個切角，再寫成可以直接用的內容，並逐條對照醫療法規。" />
-          <div className="px-6">
-            <label htmlFor="inspire-name" className="mb-2 block text-[13px] font-medium" style={{ color: SUB }}>怎麼稱呼您</label>
-            <div className="flex items-center gap-3 rounded px-4" style={{ background: PANEL }}>
-              <input id="inspire-name" value={v} onChange={(e) => setV(e.target.value)} maxLength={20} autoComplete="off" placeholder="王小明"
-                className="h-12 min-w-0 flex-1 bg-transparent text-[16px] font-medium outline-none" style={{ color: INK }} />
-              <span className="shrink-0 text-[14px]" style={{ color: SUB }}>醫師</span>
-            </div>
-            <p className="mt-3 text-[12px]" style={{ color: FAINT }}>名字只用來署名，存在這支手機上，不需要註冊。</p>
-          </div>
+    <Frame dark>
+      <div className="absolute inset-0" style={{ background: "radial-gradient(120% 70% at 50% 45%, #2A2D34 0%, #101114 55%, #000 100%)" }} />
+      <header className="relative z-10 flex h-14 items-center px-6"><Wordmark /></header>
+      <div className="relative z-10 px-6 pt-10 text-center">
+        <h1 className="text-[40px] font-medium leading-[1.15]" style={{ letterSpacing: "-0.02em" }}>換一種說法</h1>
+        <p className="mt-2 text-[15px]" style={{ color: "rgba(255,255,255,0.8)" }}>高血壓衛教 × 各平台熱門創作者的說話風格</p>
+      </div>
+      <div className="relative z-10 flex flex-1 items-center"><PulseArt /></div>
+      <form className="relative z-10 px-6" style={{ paddingBottom: "max(24px, env(safe-area-inset-bottom))" }} onSubmit={(e) => { e.preventDefault(); if (ok) onDone(v.trim()); }}>
+        <label htmlFor="inspire-name" className="mb-2 block text-center text-[13px]" style={{ color: "rgba(255,255,255,0.7)" }}>怎麼稱呼您</label>
+        <div className="flex items-center gap-3 rounded px-4" style={{ background: "rgba(255,255,255,0.14)", backdropFilter: "blur(12px)" }}>
+          <input id="inspire-name" value={v} onChange={(e) => setV(e.target.value)} maxLength={20} autoComplete="off" placeholder="王小明"
+            className="h-11 min-w-0 flex-1 bg-transparent text-center text-[16px] font-medium text-white outline-none placeholder:text-white/40" />
+          <span className="shrink-0 text-[14px]" style={{ color: "rgba(255,255,255,0.7)" }}>醫師</span>
         </div>
-        <BottomBar><Btn type="submit" disabled={!ok}>開始</Btn></BottomBar>
+        <div className="mt-3 flex gap-3">
+          <button type="submit" disabled={!ok} className="h-11 flex-1 rounded text-[14px] font-medium text-white" style={{ background: BLUE, opacity: ok ? 1 : 0.5 }}>開始設定</button>
+          <button type="button" onClick={onBasis} className="h-11 flex-1 rounded text-[14px] font-medium" style={{ background: "rgba(244,244,244,0.9)", color: "#393C41" }}>審查依據</button>
+        </div>
+        <p className="mt-3 text-center text-[11px]" style={{ color: "rgba(255,255,255,0.5)" }}>名字只用來署名，存在這支手機上，不需要註冊。</p>
       </form>
     </Frame>
   );
@@ -308,6 +334,37 @@ function DraftSheet({ doctor, idea, persona, groups, onClose }: { doctor: string
   );
 }
 
+
+function BasisSheet({ groups, facts, factSource, checkedAt, onClose }: { groups: RegGroup[]; facts: any[]; factSource?: { url: string; label: string }; checkedAt?: string; onClose: () => void }) {
+  return (
+    <Sheet title="審查依據" kicker="每一篇成稿會逐條對照這些條文" onClose={onClose}>
+      <RegulationList groups={groups} />
+      <div className="rounded p-4 text-[12px] leading-relaxed" style={{ background: PANEL, color: SUB }}>
+        <div className="mb-2 text-[14px] font-medium" style={{ color: INK }}>事實白名單</div>
+        <ul className="list-disc space-y-1 pl-4">{facts.map((f: any) => <li key={f.id}>{f.text}</li>)}</ul>
+        {factSource ? (
+          <a href={factSource.url} target="_blank" rel="noopener noreferrer" className="mt-3 inline-block font-medium underline decoration-[#D0D1D2] underline-offset-4" style={{ color: INK }}>出處：{factSource.label}</a>
+        ) : null}
+      </div>
+      <p className="text-[12px] leading-relaxed" style={{ color: FAINT }}>條文最後核對日期：{checkedAt}。條文重點是我們寫的摘要，原文以連結的官方頁面為準。</p>
+    </Sheet>
+  );
+}
+
+/** 規格列：上面大字、下面小字（靈感卡與預覽共用）。 */
+function Specs({ items }: { items: Array<{ value: React.ReactNode; label: string }> }) {
+  return (
+    <div className="flex">
+      {items.map((s, i) => (
+        <div key={i} className="min-w-0 flex-1 px-1 text-center">
+          <div className="truncate text-[15px] font-medium">{s.value}</div>
+          <div className="mt-0.5 text-[11px]" style={{ color: SUB }}>{s.label}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // ── 主頁 ──
 
 export default function InspireDemoPage() {
@@ -319,7 +376,7 @@ export default function InspireDemoPage() {
   const groups: RegGroup[] = cfg.data?.regulationGroups ?? [];
   const maxPersonas: number = cfg.data?.maxPersonas ?? 4;
 
-  const [step, setStep] = React.useState<Step>("topic");
+  const [view, setView] = React.useState<View>("studio");
   const [topicId, setTopicId] = React.useState<string>("");
   const [custom, setCustom] = React.useState("");
   const [platform, setPlatform] = React.useState<string>("facebook");
@@ -333,10 +390,11 @@ export default function InspireDemoPage() {
   const [showBasis, setShowBasis] = React.useState(false);
 
   const subject: Subject = custom.trim() ? { customTopic: custom.trim() } : { topicId };
-  // 切角屬於想的當下那個議題；之後換議題，舊卡採用時仍照原議題寫。
-  const runSubject = React.useRef<Subject>(subject);
   const hasTopic = !!custom.trim() || !!topicId;
-  const topicLabel = custom.trim() || topics.find((t) => t.id === topicId)?.label || "";
+  const topic = topics.find((t) => t.id === topicId);
+  const topicLabel = custom.trim() || topic?.label || "";
+  // 切角屬於想的當下那個議題；之後換議題，舊卡採用時仍照原議題寫。
+  const runCtx = React.useRef<{ subject: Subject; topicLabel: string }>({ subject, topicLabel });
   const personaOf = (k: string) => personas.find((p) => p.key === k);
 
   const start = T.inspire.ideateStart.useMutation({
@@ -347,7 +405,7 @@ export default function InspireDemoPage() {
   React.useEffect(() => {
     const d = poll.data as any;
     if (!jobId || !d?.done) return;
-    const got: Idea[] = (d.ideas ?? []).map((a: any) => ({ ...a, id: newId(), subject: runSubject.current }));
+    const got: Idea[] = (d.ideas ?? []).map((a: any) => ({ ...a, id: newId(), ...runCtx.current }));
     setIdeas((cur) => [...got, ...cur]);
     if (d.lost) setNotice("這一輪的進度不見了（伺服器剛更新），請再按一次。");
     else if (!got.length) setNotice("這一輪沒有想出來，請再按一次。");
@@ -356,116 +414,136 @@ export default function InspireDemoPage() {
   }, [poll.data, jobId]);
 
   const busy = start.isPending || !!jobId;
-  const run = (keys: string[], count: number) => {
-    if (busy || !hasTopic || !keys.length) return;
-    setNotice(""); setPending(keys); setStep("wall");
-    runSubject.current = subject;
-    start.mutate({ name: doctor, ...subject, personas: keys, count, avoid: ideas.map((i) => i.title).slice(0, 30) });
-    try { window.scrollTo({ top: 0 }); } catch { /* 舊瀏覽器 */ }
+  const run = (keys: string[], count: number, ctx = { subject, topicLabel }) => {
+    if (busy || !keys.length || !(ctx.subject.customTopic || ctx.subject.topicId)) return;
+    setNotice(""); setPending(keys); setView("wall");
+    runCtx.current = ctx;
+    start.mutate({ name: doctor, ...ctx.subject, personas: keys, count, avoid: ideas.map((i) => i.title).slice(0, 30) });
+    toTop();
   };
   const toggle = (k: string) => setPicked((cur) => (cur.includes(k) ? cur.filter((x) => x !== k) : cur.length >= maxPersonas ? cur : [...cur, k]));
-  const go = (s: Step) => { setStep(s); try { window.scrollTo({ top: 0 }); } catch { /* 舊瀏覽器 */ } };
+  const go = (v: View) => { setView(v); toTop(); };
 
-  if (!doctor) return <NameStep onDone={(n) => { saveName(n); setDoctor(n); }} />;
+  const basis = showBasis ? (
+    <BasisSheet groups={groups} facts={cfg.data?.facts ?? []} factSource={cfg.data?.factSource} checkedAt={cfg.data?.checkedAt} onClose={() => setShowBasis(false)} />
+  ) : null;
 
-  const basisLink = (
-    <button type="button" onClick={() => setShowBasis(true)} className="mx-auto mt-6 block text-[12px] font-medium underline decoration-[#D0D1D2] underline-offset-4" style={{ color: SUB }}>
-      審查依據與事實出處
-    </button>
-  );
+  if (!doctor) return <><Hero onDone={(n) => { saveName(n); setDoctor(n); }} onBasis={() => setShowBasis(true)} />{basis}</>;
+
+  const tab = personas.find((p) => p.platform === platform);
   const shown = personas.filter((p) => p.platform === platform && (market === "all" || p.market === market));
+  const pickedPersonas = picked.map(personaOf).filter(Boolean) as Persona[];
+  const ready = hasTopic && picked.length > 0;
 
   return (
     <Frame>
-      {step === "topic" ? (
+      {view === "studio" ? (
         <>
-          <TopBar progress={33} right={<button type="button" onClick={() => { saveName(""); setDoctor(""); }}>換名字</button>} />
-          <Heading title={<>{byline(doctor)}<br />今天想講什麼</>} sub="選一個高血壓議題，或自己寫一個。" />
-          <div className="space-y-2 px-6 pb-6">
-            {topics.map((t) => {
-              const on = !custom.trim() && topicId === t.id;
-              return (
-                <Option key={t.id} on={on} onClick={() => { setTopicId(t.id); setCustom(""); }}>
-                  <div className="text-[15px] font-medium">{t.label}</div>
-                  <div className="mt-0.5 text-[12px]" style={{ color: SUB }}>{t.hint}</div>
-                </Option>
-              );
-            })}
-            <div className="rounded px-4" style={{ background: PANEL, boxShadow: custom.trim() ? `inset 0 0 0 2px ${BLUE}` : undefined }}>
-              <input value={custom} onChange={(e) => setCustom(e.target.value)} maxLength={60} placeholder="自己寫一個跟血壓有關的題目"
-                className="h-12 w-full bg-transparent text-[15px] outline-none" style={{ color: INK }} />
-            </div>
-            {basisLink}
-          </div>
-          <BottomBar>
-            <Btn disabled={!hasTopic} onClick={() => go("style")}>下一步</Btn>
-            {ideas.length ? <Btn kind="secondary" onClick={() => go("wall")}>回到靈感牆（{ideas.length}）</Btn> : null}
-          </BottomBar>
-        </>
-      ) : null}
+          <Nav right={<button type="button" onClick={() => { saveName(""); setDoctor(""); }}>換名字</button>} />
 
-      {step === "style" ? (
-        <>
-          <TopBar progress={66} onBack={() => go("topic")} right={`${picked.length}／${maxPersonas}`} />
-          <Heading title="換誰的說法" sub={<>最多選 {maxPersonas} 種。風格取自各平台排行榜前段創作者的公開手法，不使用任何人的名字或肖像，寫出來的都是您本人的口吻。</>} />
-          <div className="sticky top-[58px] z-10 px-6 pb-3 pt-1" style={{ background: "rgba(255,255,255,0.92)", backdropFilter: "blur(12px)" }}>
-            <div className="flex" style={{ boxShadow: `inset 0 -1px 0 ${LINE}` }} role="tablist">
+          {/* 目前的設定——相當於設定器最上面那張車圖 */}
+          <div className="px-6 pb-2 pt-6 text-center">
+            <div className="text-[13px]" style={{ color: SUB }}>{byline(doctor)}的內容設定</div>
+            <h1 className="mx-auto mt-2 max-w-[360px] text-[32px] font-medium leading-[1.2]" style={{ letterSpacing: "-0.02em" }}>{topicLabel || "今天想講什麼"}</h1>
+            <div className="mt-6 rounded py-5" style={{ background: PANEL }}>
+              <Specs items={[
+                { value: hasTopic ? "已選" : "未選", label: "議題" },
+                { value: `${picked.length}／${maxPersonas}`, label: "說話風格" },
+                { value: pickedPersonas.length ? Array.from(new Set(pickedPersonas.map((p) => p.platformLabel))).length : 0, label: "平台" },
+              ]} />
+            </div>
+          </div>
+
+          <Section title="議題" caption={custom.trim() ? "自訂議題" : topic?.hint ?? "選一個高血壓議題，或在下面自己寫"}>
+            <div className="grid grid-cols-2 gap-2">
+              {topics.map((t) => (
+                <Option key={t.id} on={!custom.trim() && topicId === t.id} onClick={() => { setTopicId(t.id); setCustom(""); }}>
+                  <div className="text-[14px] font-medium leading-snug">{t.label}</div>
+                </Option>
+              ))}
+            </div>
+            <div className="mt-2 rounded px-4" style={{ background: PANEL, boxShadow: custom.trim() ? `inset 0 0 0 3px ${BLUE}` : undefined }}>
+              <input value={custom} onChange={(e) => setCustom(e.target.value)} maxLength={60} placeholder="自己寫一個跟血壓有關的題目"
+                className="h-11 w-full bg-transparent text-center text-[14px] outline-none" style={{ color: INK }} />
+            </div>
+          </Section>
+
+          <Section title="平台" caption={tab ? <><span className="font-medium" style={{ color: INK }}>{tab.platformLabel}</span><br />寫成{tab.format}</> : null}>
+            <div className="flex justify-center gap-4" role="tablist">
               {PLATFORM_ORDER.map((pf) => {
                 const on = platform === pf;
                 const n = picked.filter((k) => personaOf(k)?.platform === pf).length;
                 return (
-                  <button key={pf} type="button" role="tab" aria-selected={on} onClick={() => setPlatform(pf)}
-                    className="flex h-11 flex-1 items-center justify-center gap-1.5 text-[13px] font-medium"
-                    style={{ color: on ? INK : SUB, boxShadow: on ? `inset 0 -2px 0 ${INK}` : undefined }}>
-                    <FontAwesomeIcon icon={PLATFORM_ICON[pf]} />
-                    {n ? <span className="flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] text-white" style={{ background: BLUE }}>{n}</span> : null}
+                  <button key={pf} type="button" role="tab" aria-selected={on} aria-label={pf} onClick={() => setPlatform(pf)}
+                    className="relative flex h-14 w-14 items-center justify-center rounded-full"
+                    style={{ boxShadow: on ? `0 0 0 3px #fff, 0 0 0 5px ${BLUE}` : undefined }}>
+                    <span className="flex h-full w-full items-center justify-center rounded-full text-[18px]" style={{ background: on ? INK : PANEL, color: on ? "#fff" : INK }}>
+                      <FontAwesomeIcon icon={PLATFORM_ICON[pf]} />
+                    </span>
+                    {n ? <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-[11px] font-medium text-white" style={{ background: BLUE }}>{n}</span> : null}
                   </button>
                 );
               })}
             </div>
-            <div className="mt-3 flex items-center justify-between">
-              <div className="flex gap-1 rounded p-1" style={{ background: PANEL }}>
-                {MARKETS.map((m) => (
-                  <button key={m.id} type="button" aria-pressed={market === m.id} onClick={() => setMarket(m.id)}
-                    className="h-8 rounded px-3 text-[12px] font-medium" style={{ background: market === m.id ? "#fff" : "transparent", color: market === m.id ? INK : SUB }}>
-                    {m.label}
-                  </button>
-                ))}
-              </div>
-              <span className="text-[12px]" style={{ color: SUB }}>{personas.find((p) => p.platform === platform)?.platformLabel}・寫成{personas.find((p) => p.platform === platform)?.format}</span>
+          </Section>
+
+          <Section title="說話風格" caption={<>最多選 {maxPersonas} 種，可以跨平台。<br />風格取自排行榜前段創作者的公開手法，不使用任何人的名字或肖像，寫出來的都是您本人的口吻。</>}>
+            <div className="mb-4 flex rounded p-1" style={{ background: PANEL }}>
+              {MARKETS.map((m) => (
+                <button key={m.id} type="button" aria-pressed={market === m.id} onClick={() => setMarket(m.id)}
+                  className="h-9 flex-1 rounded text-[13px] font-medium" style={{ background: market === m.id ? "#fff" : "transparent", color: market === m.id ? INK : SUB }}>
+                  {m.label}
+                </button>
+              ))}
             </div>
+            <div className="space-y-2">
+              {shown.map((p) => {
+                const on = picked.includes(p.key);
+                return (
+                  <Option key={p.key} on={on} disabled={!on && picked.length >= maxPersonas} onClick={() => toggle(p.key)}>
+                    <div className="flex items-baseline justify-between gap-3">
+                      <span className="text-[16px] font-medium">{p.label}</span>
+                      <span className="shrink-0 text-[12px]" style={{ color: SUB }}>{MARKET_LABEL[p.market]}</span>
+                    </div>
+                    <div className="mt-1 text-[12px] font-medium" style={{ color: "#393C41" }}>參考：{p.reference}</div>
+                    <div className="mt-1 text-[12px] leading-relaxed" style={{ color: SUB }}>{p.pitch}</div>
+                  </Option>
+                );
+              })}
+              {!shown.length ? <div className="py-8 text-center text-[13px]" style={{ color: FAINT }}>這個組合目前沒有風格。</div> : null}
+            </div>
+          </Section>
+
+          <div className="px-6 pb-8 pt-10 text-center">
+            <button type="button" onClick={() => setShowBasis(true)} className="text-[13px] font-medium underline decoration-[#D0D1D2] underline-offset-4" style={{ color: "#393C41" }}>審查依據與事實出處</button>
+            {ideas.length ? <div className="mt-4"><button type="button" onClick={() => go("wall")} className="text-[13px] font-medium underline decoration-[#D0D1D2] underline-offset-4" style={{ color: "#393C41" }}>回到靈感牆（{ideas.length}）</button></div> : null}
           </div>
-          <div className="space-y-2 px-6 pb-6">
-            {shown.map((p) => {
-              const on = picked.includes(p.key);
-              return (
-                <Option key={p.key} on={on} disabled={!on && picked.length >= maxPersonas} onClick={() => toggle(p.key)}>
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="text-[15px] font-medium">{p.label}</span>
-                    <span className="shrink-0 text-[11px] font-medium" style={{ color: FAINT }}>{MARKET_LABEL[p.market]}</span>
-                  </div>
-                  <div className="mt-0.5 text-[12px] leading-relaxed" style={{ color: SUB }}>{p.pitch}</div>
-                </Option>
-              );
-            })}
-            {!shown.length ? <div className="py-10 text-center text-[13px]" style={{ color: FAINT }}>這個組合目前沒有風格。</div> : null}
+
+          {/* 底部摘要列：左邊是目前的設定，右邊是主按鈕 */}
+          <div className="sticky bottom-0 z-20 mt-auto flex items-center gap-4 px-6 pt-3" style={{ ...GLASS, boxShadow: `inset 0 1px 0 ${PANEL}`, paddingBottom: "max(16px, env(safe-area-inset-bottom))" }}>
+            <div className="min-w-0 flex-1">
+              <div className="truncate text-[15px] font-medium">{picked.length ? `${picked.length} 種風格` : "還沒選風格"}</div>
+              <div className="truncate text-[12px]" style={{ color: SUB }}>{topicLabel || "還沒選議題"}</div>
+            </div>
+            <button type="button" disabled={busy || !ready} onClick={() => run(picked, 1)}
+              className="h-11 shrink-0 rounded px-6 text-[14px] font-medium" style={{ background: ready && !busy ? BLUE : PANEL, color: ready && !busy ? "#fff" : FAINT }}>
+              產生靈感
+            </button>
           </div>
-          <BottomBar>
-            <Btn disabled={busy || !picked.length} onClick={() => run(picked, 1)}>
-              {picked.length ? `請 ${picked.length} 種風格各想一個切角` : "至少選一種風格"}
-            </Btn>
-          </BottomBar>
         </>
       ) : null}
 
-      {step === "wall" ? (
+      {view === "wall" ? (
         <>
-          <TopBar progress={100} onBack={() => go("style")} right={ideas.length ? `${ideas.length} 個` : undefined} />
-          <Heading title="靈感牆" sub={topicLabel} />
-          <div className="space-y-3 px-6 pb-6">
-            {notice ? <div className="rounded px-4 py-3 text-[13px]" style={{ background: PANEL, color: WARN }}>{notice}</div> : null}
+          <Nav onBack={() => go("studio")} right={ideas.length ? `${ideas.length} 個切角` : undefined} />
+          <div className="px-6 pb-6 pt-8 text-center">
+            <h1 className="text-[32px] font-medium" style={{ letterSpacing: "-0.02em" }}>靈感牆</h1>
+            <p className="mt-1 text-[14px]" style={{ color: SUB }}>{byline(doctor)}・{runCtx.current.topicLabel || topicLabel}</p>
+          </div>
+          <div className="space-y-4 px-6 pb-8">
+            {notice ? <div className="rounded px-4 py-3 text-center text-[13px]" style={{ background: PANEL, color: WARN }}>{notice}</div> : null}
             {pending.map((k) => (
-              <div key={`p-${k}`} className="flex items-center gap-3 rounded p-5 text-[14px] font-medium" style={{ background: PANEL, color: SUB }}>
+              <div key={`p-${k}`} className="flex items-center justify-center gap-3 rounded py-10 text-[14px] font-medium" style={{ background: PANEL, color: SUB }}>
                 <FontAwesomeIcon icon={faCircleNotch} spin style={{ color: BLUE }} />{personaOf(k)?.label}正在想
               </div>
             ))}
@@ -473,47 +551,33 @@ export default function InspireDemoPage() {
             {ideas.map((i) => {
               const p = personaOf(i.persona);
               return (
-                <article key={i.id} className="rounded p-5" style={{ background: PANEL }}>
-                  <div className="flex items-center gap-1.5 text-[12px] font-medium" style={{ color: SUB }}>
-                    {p ? <FontAwesomeIcon icon={PLATFORM_ICON[p.platform]} /> : null}
-                    <span>{p?.platformLabel}・{p?.label}</span>
-                  </div>
-                  <h3 className="mt-3 text-[20px] font-medium leading-snug">{i.title}</h3>
-                  <p className="mt-3 text-[15px] leading-relaxed">「{i.hook}」</p>
+                <article key={i.id} className="rounded px-5 pb-5 pt-6" style={{ background: PANEL }}>
+                  <h3 className="text-[22px] font-medium leading-snug" style={{ letterSpacing: "-0.01em" }}>{i.title}</h3>
+                  <p className="mt-1 text-[12px]" style={{ color: SUB }}>{p?.label}・參考{p?.reference}</p>
+                  <p className="mt-4 text-[15px] leading-relaxed">「{i.hook}」</p>
                   {i.why ? <p className="mt-2 text-[12px] leading-relaxed" style={{ color: SUB }}>{i.why}</p> : null}
-                  <div className="mt-4 flex gap-2">
-                    <button type="button" onClick={() => setOpen(i)} className="h-11 flex-1 rounded text-[14px] font-medium text-white" style={{ background: BLUE }}>採用，寫成{i.format}</button>
-                    <button type="button" disabled={busy} onClick={() => run([i.persona], 3)} className="h-11 shrink-0 rounded px-4 text-[13px] font-medium disabled:opacity-40" style={{ background: "#fff", color: INK }}>再想 3 個</button>
+                  <div className="my-5 h-px" style={{ background: LINE }} />
+                  <Specs items={[
+                    { value: <><FontAwesomeIcon icon={p ? PLATFORM_ICON[p.platform] : faCheck} className="mr-1.5 text-[13px]" />{p?.platformLabel}</>, label: "平台" },
+                    { value: i.format, label: "形式" },
+                    { value: p ? MARKET_LABEL[p.market] : "", label: "風格市場" },
+                  ]} />
+                  <div className="mt-5 flex gap-3">
+                    <button type="button" onClick={() => setOpen(i)} className="h-11 flex-1 rounded text-[14px] font-medium text-white" style={{ background: BLUE }}>採用並寫成稿</button>
+                    <button type="button" disabled={busy} onClick={() => run([i.persona], 3, { subject: i.subject, topicLabel: i.topicLabel })}
+                      className="h-11 flex-1 rounded text-[14px] font-medium disabled:opacity-40" style={{ background: "#fff", color: "#393C41" }}>再想 3 個</button>
                   </div>
                 </article>
               );
             })}
-            {basisLink}
             <p className="pt-2 text-center text-[11px] leading-relaxed" style={{ color: FAINT }}>示範頁：內容由 AI 產生，僅供醫師參考與改寫，不是醫療建議，也不是法律意見。</p>
           </div>
-          <BottomBar>
-            <Btn kind="secondary" disabled={busy} onClick={() => go("topic")}>換一個議題</Btn>
-          </BottomBar>
+          <BottomBar><Btn kind="secondary" disabled={busy} onClick={() => go("studio")}>調整議題與風格</Btn></BottomBar>
         </>
       ) : null}
 
       {open ? <DraftSheet key={open.id} doctor={doctor} idea={open} persona={personaOf(open.persona)} groups={groups} onClose={() => setOpen(null)} /> : null}
-
-      {showBasis ? (
-        <Sheet title="審查依據" kicker="每一篇成稿會逐條對照這些條文" onClose={() => setShowBasis(false)}>
-          <RegulationList groups={groups} />
-          <div className="rounded p-4 text-[12px] leading-relaxed" style={{ background: PANEL, color: SUB }}>
-            <div className="mb-2 text-[14px] font-medium" style={{ color: INK }}>事實白名單</div>
-            <ul className="list-disc space-y-1 pl-4">
-              {(cfg.data?.facts ?? []).map((f: any) => <li key={f.id}>{f.text}</li>)}
-            </ul>
-            {cfg.data?.factSource ? (
-              <a href={cfg.data.factSource.url} target="_blank" rel="noopener noreferrer" className="mt-3 inline-block font-medium underline decoration-[#D0D1D2] underline-offset-4" style={{ color: INK }}>出處：{cfg.data.factSource.label}</a>
-            ) : null}
-          </div>
-          <p className="text-[12px] leading-relaxed" style={{ color: FAINT }}>條文最後核對日期：{cfg.data?.checkedAt}。條文重點是我們寫的摘要，原文以連結的官方頁面為準。</p>
-        </Sheet>
-      ) : null}
+      {basis}
     </Frame>
   );
 }

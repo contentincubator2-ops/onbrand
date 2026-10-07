@@ -58,6 +58,14 @@ describe("風格與條文資料", () => {
     expect(new Set(INSPIRE_PERSONAS.map((p) => p.key)).size).toBe(INSPIRE_PERSONAS.length);
   });
 
+  it("每個風格都寫明參考哪一類、什麼量級的創作者，而且對得上平台與市場", () => {
+    for (const p of INSPIRE_PERSONAS) {
+      expect(p.reference).toMatch(/(億|千萬|百萬|萬追蹤)/);
+      expect(p.reference).toContain(p.market === "tw" ? "台" : "美國");
+      expect(p.reference).toMatch(/創作者|YouTuber/);
+    }
+  });
+
   it("每一條都有出處連結與日期，而且歸在某一組", () => {
     for (const r of ALL_REVIEW_ITEMS) {
       expect(r.url).toMatch(/^https:\/\//);
