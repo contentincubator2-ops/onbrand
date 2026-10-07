@@ -1,3 +1,5 @@
+import { PublishUserError } from "../../platform/core/connectors/publish/publishAdapter";
+import { randomUUID } from "node:crypto";
 import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
 
 /**
@@ -19,6 +21,7 @@ const db = {
   outputsPublished: [] as number[],
 };
 const publishViaBundle = vi.fn();
+const publishViaZernio = vi.fn();
 
 function postRow(p: Post) {
   return {
@@ -89,6 +92,10 @@ vi.mock("../../platform/core/billing/planGate", () => ({ assertCanAct: vi.fn(asy
 vi.mock("../../platform/routers/opsRouter", () => ({ logError: vi.fn() }));
 vi.mock("./publish/bundlePublishService", () => ({ publishViaBundleSocial: (...a: any[]) => publishViaBundle(...a) }));
 
+vi.mock("../../platform/core/connectors/publish/zernioAdapter", () => ({
+  createZernioAdapter: () => ({ publish: (...a: any[]) => publishViaZernio(...a) }),
+}));
+
 import { publishScheduledPost, retryScheduledPost, rescheduleScheduledPost } from "../routers/calendarRouter";
 import { tickScheduledPublish } from "./scheduledPublishWorker";
 
@@ -124,6 +131,31 @@ describe("publish flow (approval gate, retry, worker)", () => {
     expect(p.status).toBe("published");
     expect(p.externalUrl).toBe("https://threads.net/p1");
     expect(db.outputsPublished).toEqual([9]);
+  });
+
+  it("routes Zernio and persists the external URL", async () => {
+    process.env.PUBLISH_PROVIDER_THREADS = "zernio";
+    process.env.ZERNIO_API_KEY = randomUUID();
+    publishViaZernio.mockResolvedValueOnce({ postId: "z1", permalink: "https://example.com/z1" });
+    db.posts.set(50, mk());
+    expect((await publishScheduledPost({ id: 50, userId: OWNER })).ok).toBe(true);
+    expect(publishViaZernio).toHaveBeenCalledWith(expect.objectContaining({ scheduledPostId: 50, brandId: 3, platform: "threads", caption: "hello world" }));
+    expect(publishViaBundle).not.toHaveBeenCalled();
+    expect(db.posts.get(50)?.externalUrl).toBe("https://example.com/z1");
+    expect(db.posts.get(50)?.status).toBe("published");
+  });
+
+  it("Zernio reports missing configuration and user-fixable media errors", async () => {
+    process.env.PUBLISH_PROVIDER_THREADS = "zernio";
+    delete process.env.ZERNIO_API_KEY;
+    db.posts.set(50, mk());
+    await expect(publishScheduledPost({ id: 50, userId: OWNER })).rejects.toMatchObject({ code: "PRECONDITION_FAILED", message: "發布服務尚未啟用，請聯絡 sowork@sowork.ai。" });
+    process.env.ZERNIO_API_KEY = randomUUID();
+    publishViaZernio.mockRejectedValueOnce(new PublishUserError("需要影片才能發布。"));
+    await expect(publishScheduledPost({ id: 50, userId: OWNER })).rejects.toMatchObject({ code: "PRECONDITION_FAILED", message: "需要影片才能發布。" });
+    publishViaZernio.mockRejectedValueOnce(new Error("zernio 502: unavailable"));
+    await expect(publishScheduledPost({ id: 50, userId: OWNER })).rejects.toMatchObject({ code: "INTERNAL_SERVER_ERROR" });
+    expect(db.posts.get(50)?.status).toBe("pending");
   });
 
   it("unapproved post is blocked: nothing is sent and the row stays pending", async () => {

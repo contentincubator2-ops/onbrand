@@ -472,6 +472,7 @@ export function PublishTab({ brandId }: { brandId: number | null }) {
     const generation = ++zernioGeneration.current;
     zernioUrlRef.current = {};
     setZernioStatus({});
+    setVerifyingPlatform(null);
     if (!brandId || !zernioProvidersQ.data) return;
     const keys = (Object.keys(zernioProvidersQ.data) as ZernioPlatformKey[]).filter(usesZernio);
     for (const platform of keys) {
@@ -534,6 +535,7 @@ export function PublishTab({ brandId }: { brandId: number | null }) {
   }
   async function disconnectZernio(platform: ZernioPlatformKey) {
     if (!brandId || !confirm(en ? "Disconnect this platform from this brand? Published posts won't be deleted." : "確定要解除此品牌的平台連接？已發出的貼文不受影響。")) return;
+    const generation = zernioGeneration.current;
     try {
       // No account selector in this release: disconnect the entire platform card.
       for (const account of zernioStatus[platform]?.accounts ?? []) {
@@ -543,7 +545,7 @@ export function PublishTab({ brandId }: { brandId: number | null }) {
     finally {
       try {
         const status = await zernioApiRef.current.status({ brandId, platform });
-        setZernioStatus(m => ({ ...m, [platform]: status }));
+        if (generation === zernioGeneration.current) setZernioStatus(m => ({ ...m, [platform]: status }));
       } catch { /* Keep the previous state if the service is unavailable. */ }
     }
   }
@@ -700,6 +702,10 @@ export function PublishTab({ brandId }: { brandId: number | null }) {
   function connectWithSDK(platform: PlatformCfg) {
     if (!brandId) { alert(en ? "Please save the brand first." : "請先儲存品牌。"); return; }
 
+    if (!zernioProvidersRef.current) {
+      alert(en ? "Loading platform settings — please try again shortly." : "正在載入平台設定，請稍候再試。");
+      return;
+    }
     if (usesZernio(platform.key)) {
       connectZernio(platform.key as ZernioPlatformKey);
       return;
