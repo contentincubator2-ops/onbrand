@@ -763,6 +763,22 @@ const server = app.listen(PORT, async () => {
     }, 30 * 60_000);
     console.log("[fbPageSync] Worker started (30m interval)");
 
+    if (process.env.ZERNIO_API_KEY) {
+      const { tickZernioReconcile } = await import("./platform/core/connectors/publish/zernioReconcileWorker");
+      const reconcile = () => {
+        tickZernioReconcile().catch(() => {
+          console.error("[zernio.reconcile] tick failed; retry on next daily run");
+        });
+      };
+      setTimeout(() => {
+        reconcile();
+        setInterval(reconcile, 24 * 60 * 60_000);
+      }, 10 * 60_000);
+      console.log("[zernio.reconcile] Worker started (24h interval, first run in 10m)");
+    } else {
+      console.log("[zernio.reconcile] disabled (provider not configured)");
+    }
+
     // 核准後的貼文到時間自動發布。預設關閉：要在該環境設 AUTOPUBLISH_SCHEDULED=on。
     const { tickScheduledPublish, isAutoPublishEnabled } = await import("./content/core/scheduledPublishWorker");
     if (isAutoPublishEnabled()) {
