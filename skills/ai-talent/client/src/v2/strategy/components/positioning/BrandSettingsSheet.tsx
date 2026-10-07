@@ -445,6 +445,109 @@ export function PublishTab({ brandId }: { brandId: number | null }) {
   const [bundleConnectedMap, setBundleConnectedMap] = useState<Record<string, boolean>>({});
   const usesBundle = (key: string) => bundleProvidersQ?.data?.[key] === "bundle";
 
+  // Zernio keeps connection state separate from legacy brand bindings.
+  const zernioProvidersQ = trpc.zernioConnect.getProviders.useQuery();
+  type ZernioPlatformKey = keyof NonNullable<typeof zernioProvidersQ.data>;
+  type ZernioStatus = { connected: boolean; accounts: Array<{ accountId: string; name: string; username: string | null }> };
+  const zernioConnectM = trpc.zernioConnect.getConnectUrl.useMutation();
+  const zernioStatusM = trpc.zernioConnect.getConnectionStatus.useMutation();
+  const zernioDisconnectM = trpc.zernioConnect.disconnect.useMutation();
+  const zernioProvidersRef = useRef(zernioProvidersQ.data);
+  zernioProvidersRef.current = zernioProvidersQ.data;
+  const usesZernio = (key: string) => zernioProvidersRef.current?.[key as ZernioPlatformKey] === "zernio";
+  const zernioUrlRef = useRef<Record<string, string | undefined>>({});
+  const [zernioStatus, setZernioStatus] = useState<Record<string, ZernioStatus>>({});
+  const zernioGeneration = useRef(0);
+  const zernioApiRef = useRef({ connect: zernioConnectM.mutateAsync, status: zernioStatusM.mutateAsync });
+  zernioApiRef.current = { connect: zernioConnectM.mutateAsync, status: zernioStatusM.mutateAsync };
+
+  const warmZernio = async (platform: ZernioPlatformKey, generation = zernioGeneration.current) => {
+    if (!brandId) return;
+    try {
+      const { url } = await zernioApiRef.current.connect({ brandId, platform, redirectUrl: window.location.href });
+      if (generation === zernioGeneration.current) zernioUrlRef.current[platform] = url;
+    } catch { /* Retry from the connect button. */ }
+  };
+  useEffect(() => {
+    const generation = ++zernioGeneration.current;
+    zernioUrlRef.current = {};
+    setZernioStatus({});
+    if (!brandId || !zernioProvidersQ.data) return;
+    const keys = (Object.keys(zernioProvidersQ.data) as ZernioPlatformKey[]).filter(usesZernio);
+    for (const platform of keys) {
+      if (platform === "x") continue;
+      void warmZernio(platform, generation);
+      void zernioApiRef.current.status({ brandId, platform }).then(status => {
+        if (generation === zernioGeneration.current) setZernioStatus(m => ({ ...m, [platform]: status }));
+      }).catch(() => {});
+    }
+    return () => { ++zernioGeneration.current; };
+  }, [brandId, zernioProvidersQ.data]);
+
+  useEffect(() => {
+    if (!brandId || !zernioProvidersQ.data) return;
+    const url = new URL(window.location.href);
+    const rawPlatform = url.searchParams.get("connected") ?? url.searchParams.get("platform");
+    const platform = (rawPlatform === "twitter" ? "x" : rawPlatform) as ZernioPlatformKey | null;
+    if (!platform || !usesZernio(platform) || (!url.searchParams.has("connected") && !url.searchParams.has("error"))) return;
+    const generation = zernioGeneration.current;
+    if (url.searchParams.has("error")) alert(url.searchParams.get("error_message") || (en ? "Authorization failed." : "授權失敗，請重新連接。"));
+    void zernioApiRef.current.status({ brandId, platform }).then(status => {
+      if (generation === zernioGeneration.current) setZernioStatus(m => ({ ...m, [platform]: status }));
+    }).catch((e: Error) => alert(e.message));
+    for (const key of ["connected", "profileId", "accountId", "username", "request_id", "stage", "error", "platform", "error_message", "is_user_fixable", "error_reason"]) url.searchParams.delete(key);
+    window.history.replaceState(window.history.state, "", url.pathname + url.search + url.hash);
+  }, [brandId, zernioProvidersQ.data, en]);
+
+  function connectZernio(platform: ZernioPlatformKey) {
+    if (!brandId) return;
+    const url = zernioUrlRef.current[platform];
+    if (!url) {
+      void warmZernio(platform);
+      alert(en ? "Preparing authorization — please try again shortly." : "正在準備授權，請稍候再試。");
+      return;
+    }
+    window.open(url, "_blank", "noopener");
+    delete zernioUrlRef.current[platform];
+    setVerifyingPlatform(platform);
+    const generation = zernioGeneration.current;
+    const deadline = Date.now() + 30_000;
+    void (async () => {
+      try {
+        while (Date.now() < deadline) {
+          await new Promise<void>(resolve => setTimeout(resolve, 2000));
+          if (generation !== zernioGeneration.current || Date.now() > deadline) return;
+          try {
+            const status = await zernioApiRef.current.status({ brandId, platform });
+            if (generation !== zernioGeneration.current) return;
+            setZernioStatus(m => ({ ...m, [platform]: status }));
+            if (status.connected) return;
+          } catch { /* OAuth registration may not be visible yet. */ }
+        }
+      } finally {
+        if (generation === zernioGeneration.current) {
+          setVerifyingPlatform(null);
+          void warmZernio(platform);
+        }
+      }
+    })();
+  }
+  async function disconnectZernio(platform: ZernioPlatformKey) {
+    if (!brandId || !confirm(en ? "Disconnect this platform from this brand? Published posts won't be deleted." : "確定要解除此品牌的平台連接？已發出的貼文不受影響。")) return;
+    try {
+      // No account selector in this release: disconnect the entire platform card.
+      for (const account of zernioStatus[platform]?.accounts ?? []) {
+        await zernioDisconnectM.mutateAsync({ brandId, platform, accountId: account.accountId });
+      }
+    } catch (e) { alert(e instanceof Error ? e.message : String(e)); }
+    finally {
+      try {
+        const status = await zernioApiRef.current.status({ brandId, platform });
+        setZernioStatus(m => ({ ...m, [platform]: status }));
+      } catch { /* Keep the previous state if the service is unavailable. */ }
+    }
+  }
+
   // ── Local state ───────────────────────────────────────────────────────
   const [pendingPlatform, setPendingPlatform]   = useState<string | null>(null);
   /** Platform currently being verified post-OAuth (polling Pipedream) */
@@ -471,6 +574,7 @@ export function PublishTab({ brandId }: { brandId: number | null }) {
   // so we never store or depend on connectLinkUrl.
   const prefetchTokens = useCallback(async () => {
     if (!brandId) return;
+    if (!zernioProvidersRef.current) return;
 
     // bundle.social platforms: warm a portal URL (so the click can call
     // window.open synchronously) and read back the current connection state,
@@ -492,6 +596,7 @@ export function PublishTab({ brandId }: { brandId: number | null }) {
     }
 
     // Facebook — uses publish.getFacebookConnectUrl (has server-side validation)
+    if (!usesZernio("facebook")) {
     if (!usesBundle("facebook")) try {
       const r = await fbConnectUrlM?.mutateAsync?.({ brandId });
       if (r?.token) {
@@ -505,8 +610,10 @@ export function PublishTab({ brandId }: { brandId: number | null }) {
         };
       }
     } catch { /* silent — will fetch fresh on click */ }
+    }
     // Instagram / LinkedIn / YouTube — only those still on the Pipedream path
     for (const key of ["instagram", "linkedin", "youtube"] as const) {
+      if (usesZernio(key)) continue;
       if (usesBundle(key)) continue;
       try {
         const r = await getConnectTkM?.mutateAsync?.({ platform: key, brandId });
@@ -525,6 +632,7 @@ export function PublishTab({ brandId }: { brandId: number | null }) {
   }, [brandId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { prefetchTokens(); }, [prefetchTokens]);
+  useEffect(() => { if (zernioProvidersQ.data) void prefetchTokens(); }, [zernioProvidersQ.data, prefetchTokens]);
 
   // ── Platform config ────────────────────────────────────────────────────
   type PlatformCfg = { key: string; label: string; color: string; icon: any; desc: string };
@@ -536,7 +644,9 @@ export function PublishTab({ brandId }: { brandId: number | null }) {
     // Threads publishes only through bundle.social, so the tile shows only when the server routes it there.
     // X is a hidden front-stage channel (planGate) and is intentionally not listed.
     { key: "threads",   label: "Threads",   color: "#18181b", icon: faThreads,   desc: en ? "Publish to your Threads account (500 characters max)" : "發布到 Threads 帳號（上限 500 字）" },
-  ].filter((p) => p.key !== "threads" || usesBundle("threads"));
+    { key: "tiktok", label: "TikTok", color: "#18181b", icon: faTiktok, desc: en ? "Upload videos to TikTok" : "上傳影片到 TikTok" },
+  ].filter((p) => (p.key !== "threads" || usesBundle("threads") || usesZernio("threads"))
+    && (p.key !== "tiktok" || usesZernio("tiktok")));
 
   // ── After OAuth: poll until Pipedream registers the connection ───────────
   // Pipedream's API can lag 5-20s after OAuth completes. Poll every 2s
@@ -589,6 +699,11 @@ export function PublishTab({ brandId }: { brandId: number | null }) {
   // will throw "Must be inside iframe". The official SDK handles this correctly.
   function connectWithSDK(platform: PlatformCfg) {
     if (!brandId) { alert(en ? "Please save the brand first." : "請先儲存品牌。"); return; }
+
+    if (usesZernio(platform.key)) {
+      connectZernio(platform.key as ZernioPlatformKey);
+      return;
+    }
 
     // bundle.social hosts OAuth and channel picking itself — open its portal in
     // a new tab. window.open must run synchronously here or the browser blocks
@@ -735,7 +850,7 @@ export function PublishTab({ brandId }: { brandId: number | null }) {
           // For Facebook, "connected" also means brand has a page binding
           // On the bundle.social path the connection lives in bundle.social,
           // not in brands.fbPageId / Pipedream, so read it from its own map.
-          const fullyConnected = usesBundle(p.key)
+          const fullyConnected = usesZernio(p.key) ? !!zernioStatus[p.key]?.connected : usesBundle(p.key)
             ? !!bundleConnectedMap[p.key]
             : p.key === "facebook" ? fbConnected : pdConnected;
           const isPending   = pendingPlatform   === p.key;
@@ -785,6 +900,15 @@ export function PublishTab({ brandId }: { brandId: number | null }) {
               </div>
 
               {/* Connected state: account name + last connected indicator */}
+              {fullyConnected && usesZernio(p.key) && (
+                <div className="text-xs text-default-500 bg-default-50 rounded-lg px-3 py-2">
+                  {zernioStatus[p.key]?.accounts[0]?.name}
+                  {(zernioStatus[p.key]?.accounts.length ?? 0) > 1 && (en
+                    ? ` and others (${zernioStatus[p.key]?.accounts.length} accounts)`
+                    : ` 等 ${zernioStatus[p.key]?.accounts.length} 個`)}
+                </div>
+              )}
+              {!usesZernio(p.key) && <>
               {fullyConnected && (() => {
                 const connectedAtRaw = p.key === "facebook" ? (fbStatus as any)?.connectedAt : null;
                 const daysSince = connectedAtRaw
@@ -815,6 +939,8 @@ export function PublishTab({ brandId }: { brandId: number | null }) {
                 );
               })()}
 
+              </>}
+
               {/* Connect / Re-authorize button */}
               <div className="flex gap-2">
                 <Button
@@ -835,6 +961,13 @@ export function PublishTab({ brandId }: { brandId: number | null }) {
                         ? (en ? "Re-authorize" : "重新授權")
                         : (en ? `Connect ${p.label}` : `連接 ${p.label}`)}
                 </Button>
+                {usesZernio(p.key) && fullyConnected && (
+                  <Button size="sm" variant="light" color="danger" isLoading={zernioDisconnectM.isPending}
+                    onPress={() => void disconnectZernio(p.key as ZernioPlatformKey)}>
+                    {en ? "Disconnect" : "解除連接"}
+                  </Button>
+                )}
+                {!usesZernio(p.key) && <>
                 {/* Disconnect — only Facebook has DB binding to clear */}
                 {p.key === "facebook" && fbConnected && (
                   <Button
@@ -845,9 +978,11 @@ export function PublishTab({ brandId }: { brandId: number | null }) {
                     {en ? "Disconnect" : "解除"}
                   </Button>
                 )}
+                </>}
               </div>
 
               {/* ── 匯入語氣範例 (Facebook only, fully connected) ── */}
+              {!usesZernio(p.key) && <>
               {p.key === "facebook" && fullyConnected && (
                 <div className="rounded-xl border border-zinc-200 bg-zinc-50/60 px-3 py-3 space-y-2">
                   <p className="text-[12px] text-zinc-800 font-medium leading-relaxed">
@@ -890,6 +1025,7 @@ export function PublishTab({ brandId }: { brandId: number | null }) {
                   </Button>
                 </div>
               )}
+              </>}
             </div>
           );
         })}
