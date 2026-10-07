@@ -100,6 +100,7 @@ Zernio client `listAccounts` 加 `sort`／`order` 可選參數（OpenAPI：`sort
 
 ## 5. 前端（`BrandSettingsSheet.tsx` 的 `PublishTab`，只動 Zernio 分支）
 
+- **平台卡片只列四個**：facebook、instagram、linkedin、threads（2026-10-07 Shawn：目前只串這四個）。`PLATFORMS` 清單移除 youtube 與 tiktok 卡片；threads 在 provider 為 zernio 或 bundle 時顯示。後端對 youtube／tiktok／x 的支援保留不動，只是 UI 不露出。
 - `zernioStatus[key]` 型別改成 `{ connected, account, pendingScheduled, legacyConnected }`。
 - 卡片狀態：
   - **已連接**：顯示帳號名稱；按鈕「重新授權」（`mode: "reconnect"`）、「換帳號」（`mode: "replace"`，先 confirm「換成其他帳號後，目前的帳號會自動解除並停止計費。」）、「解除連接」。
