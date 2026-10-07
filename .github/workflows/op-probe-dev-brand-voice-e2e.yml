@@ -7,6 +7,7 @@ name: Ops (DEV) — probe brand voice full chain on the real DB
 # 會寫資料庫：在品牌 2977 上建兩張 voice 卡、改品牌口吻；結束時把 `_taskCards` 與 `_assets`
 # 兩個 key 還原成開始前的快照並比對。
 # 花費：約 9 次文字模型呼叫＋兩張卡片插畫。
+# 第 2 次跑：改用品牌 2977 既有任務卡裡的真實範例當文章（同品牌的文章配同品牌的大腦，才看得出像不像）。
 # 腳本本體在 skills/ai-talent/scripts/probe-brand-voice.ts，這裡把這個分支的那一份送上去跑。
 on:
   push:
@@ -40,7 +41,7 @@ jobs:
             echo "host=$(hostname)  app=$(readlink -f /opt/onbrand/current)  now=$(date -u +%FT%TZ)"
             ls server/content/routers/brandVoiceRouter.ts >/dev/null 2>&1 || { echo "這一版還沒有 brandVoiceRouter，先部署再跑"; exit 1; }
             echo "$PROBE_B64" | base64 -d | gunzip > scripts/_probe_brand_voice_tmp.ts
-            timeout 780 ./node_modules/.bin/tsx scripts/_probe_brand_voice_tmp.ts 2977
+            timeout 780 ./node_modules/.bin/tsx scripts/_probe_brand_voice_tmp.ts 2977 own
             CODE=$?
             rm -f scripts/_probe_brand_voice_tmp.ts
             exit $CODE

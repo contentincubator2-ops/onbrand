@@ -42,14 +42,16 @@ function check(ok: boolean, label: string, detail = ""): void {
   else    { fail++; console.log(`  ❌ ${label}${detail ? ` — ${detail}` : ""}`); }
 }
 
-const ARTICLES = [
+let ARTICLES = [
   "嗨茶友們，新朋友報到！\n這支「山嵐冷泡烏龍」我們試了十幾輪才定下來。茶湯清清的，尾巴帶一點蘭花香，冰箱放一晚，隔天帶出門剛剛好。\n一包泡一瓶，不用算茶葉、不用看時間。\n喝起來順順的～\n\n#山茶日常 #冷泡茶",
   "嗨茶友們，蜜香紅茶回來了。\n夏天被小綠葉蟬咬過的茶葉，會自己長出蜜味，不加糖也甜甜的。早上配吐司、下午配餅乾都可以。\n這一批量不多，兩罐 499，喜歡的茶友手腳要快一點喔。\n喝起來順順的～\n\n#山茶日常 #蜜香紅茶",
   "嗨茶友們，很多人敲碗的隨身茶罐來了。\n霧面的、不沾指紋，大小剛好放得進包包側袋。蓋子有矽膠圈，倒過來也不會漏。\n裝茶葉、裝茶包都行，出門旅行帶著就不怕喝不到熟悉的味道。\n\n#山茶日常 #茶罐",
   "嗨茶友們，週一了。\n我們辦公室今天的狀態是：三個人泡茶、兩個人還在找杯子、一個人說他要喝咖啡（被瞪）。\n你們呢？週一都靠什麼撐過去？\n\n#山茶日常",
   "嗨茶友們，下雨天問個問題：\n熱茶派還是冷泡派？\n小編自己是冬天也喝冷泡的那種，常常被同事說怪。留言讓我知道我不孤單好嗎。\n\n#山茶日常",
 ];
-const WANT = ["product", "product", "product", "chat", "chat"];
+let WANT: string[] | null = ["product", "product", "product", "chat", "chat"];
+/** 第三個參數給 own：改用這個品牌既有任務卡裡的真實範例當文章（同一個品牌的文章配同一個品牌的大腦，才看得出像不像）。 */
+const OWN = process.argv[3] === "own";
 
 const parse = (p: any): any => {
   if (p == null) return {};
@@ -111,7 +113,23 @@ async function main(): Promise<void> {
     return unwrap(r, await r.json().catch(() => ({})));
   };
   const status = async (): Promise<any[]> => (await query("brandVoice.status", { brandId: brand.id })).data ?? [];
-  const mine = [voiceCardId(brand.id, "product"), voiceCardId(brand.id, "chat")];
+  if (OWN) {
+    const seen = new Set<string>();
+    ARTICLES = (snap._taskCards ?? [])
+      .filter((c: any) => c?.origin !== "voice")
+      .flatMap((c: any) => (Array.isArray(c?.samples) ? c.samples : []))
+      .map((x: any) => String(x ?? "").trim())
+      .filter((x: string) => x.length >= 20 && x.length <= 8000 && !seen.has(x) && !!seen.add(x))
+      .slice(0, 14);
+    WANT = null;
+    console.log(`  改用這個品牌既有任務卡的真實範例：${ARTICLES.length} 篇（${ARTICLES.map((a) => a.length).join("、")} 字）`);
+    if (ARTICLES.length < 4) { console.log("  ❌ 既有範例不到 4 篇，沒辦法做這個測試"); process.exit(1); }
+  }
+  let groups: { category: string; samples: string[] }[] = [
+    { category: "product", samples: ARTICLES.slice(0, 3) },
+    { category: "chat", samples: ARTICLES.slice(3) },
+  ];
+  let mine = [voiceCardId(brand.id, "product"), voiceCardId(brand.id, "chat")];
   /** 等指定的卡都離開「處理中」。回傳最後一次看到的狀態。 */
   const waitSettled = async (ids: string[], ms: number): Promise<any[]> => {
     const deadline = Date.now() + ms;
@@ -134,16 +152,29 @@ async function main(): Promise<void> {
     const cls = await call("brandVoice.classify", { brandId: brand.id, articles: ARTICLES });
     check(cls.ok && Array.isArray(cls.data?.assignments), "classify 有回應", cls.ok ? `failed=${cls.data.failed}` : cls.err);
     const got: (string | null)[] = cls.data?.assignments ?? [];
-    const right = WANT.filter((w, i) => got[i] === w).length;
-    check(right >= 4, `分對 ${right}/5`, got.join(","));
+    if (WANT) {
+      const right = WANT.filter((w, i) => got[i] === w).length;
+      check(right >= 4, `分對 ${right}/5`, got.join(","));
+    } else {
+      got.forEach((g, i) => console.log(`  [${i + 1}] ${g ?? "未分類"}｜${ARTICLES[i]!.replace(/\s+/g, " ").slice(0, 40)}`));
+      const by = new Map<string, string[]>();
+      got.forEach((g, i) => { if (g) by.set(g, [...(by.get(g) ?? []), ARTICLES[i]!]); });
+      // 分類結果裡篇數最多的兩類（每類至少 2 篇）；湊不到兩類就把全部文章對半當兩類，照樣驗流程。
+      const top = [...by.entries()].filter(([, v]) => v.length >= 2).sort((a, b) => b[1].length - a[1].length).slice(0, 2);
+      if (top.length === 2) groups = top.map(([category, samples]) => ({ category, samples: samples.slice(0, 5) }));
+      else {
+        const half = Math.ceil(ARTICLES.length / 2);
+        groups = [{ category: "product", samples: ARTICLES.slice(0, half).slice(0, 5) }, { category: "chat", samples: ARTICLES.slice(half).slice(0, 5) }];
+        console.log("  分類後不到兩類各 2 篇，改把文章對半分成兩類來驗流程");
+      }
+      mine = groups.map((g) => voiceCardId(brand.id, g.category as any));
+      console.log(`  用來學的兩類：${groups.map((g) => `${g.category}×${g.samples.length}`).join("、")}`);
+    }
 
     console.log("\n=== 2. 開始學（兩類同時在背景跑）===");
     const started = await call("brandVoice.start", {
       brandId: brand.id, channel: "facebook",
-      groups: [
-        { category: "product", samples: ARTICLES.slice(0, 3) },
-        { category: "chat", samples: ARTICLES.slice(3) },
-      ],
+      groups,
     });
     check(started.ok && canon(started.data?.cardIds) === canon(mine), "建出兩張卡，id 固定", started.ok ? started.data.cardIds.join(", ") : started.err);
     if (!started.ok) throw new Error("start 失敗，後面沒得驗");
@@ -165,6 +196,10 @@ async function main(): Promise<void> {
       console.log(`  語氣：${c.profile?.tone ?? "（沒量出來）"}`);
       console.log(`  結構：${c.profile?.structure ?? "（沒量出來）"}`);
       console.log(`  常用詞：${(c.profile?.phrases ?? []).map((p: any) => `${p.text}×${p.count}`).join("、") || "（無）"}`);
+      if (OWN) console.log(`  原文第 1 篇（${c.samples[0].length} 字）：
+${String(c.samples[0]).split("
+").map((l: string) => `    ${l}`).join("
+")}`);
       console.log(`  試寫（${String(c.trial ?? "").length} 字，${c.trialInRange ? "在區間內" : "不在區間內"}）：\n${String(c.trial ?? "").split("\n").map((l: string) => `    ${l}`).join("\n")}`);
       check(String(c.trial ?? "").length >= 30, `${c.category} 試寫有內容`);
       check(!String(c.trial ?? "").includes("499"), `${c.category} 試寫沒有冒出範例的價格`);
@@ -188,6 +223,7 @@ async function main(): Promise<void> {
     check(!!after?.trial && after.trial !== trialBefore, "重寫了一篇");
     console.log(`  重寫（${String(after?.trial ?? "").length} 字）：\n${String(after?.trial ?? "").split("\n").map((l: string) => `    ${l}`).join("\n")}`);
     check(!/[!！]/.test(String(after?.trial ?? "")), "重寫的那篇沒有驚嘆號（照意見修）");
+    console.log(`  重寫後字數 ${String(after?.trial ?? "").length}，原文區間 ${after?.measured?.minChars}–${after?.measured?.maxChars}（${after?.trialInRange ? "在區間內" : "不在區間內"}）`);
 
     console.log("\n=== 4. 確認 → 上架＋寫進品牌大腦 ===");
     const early = await call("brandVoice.finish", { brandId: brand.id });
