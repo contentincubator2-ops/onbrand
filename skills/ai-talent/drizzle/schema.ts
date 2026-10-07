@@ -1085,6 +1085,6 @@ export const brandPublishConnections = mysqlTable("brand_publish_connections", {
   createdAt: datetime("createdAt", { fsp: 3 }).notNull().default(sql`CURRENT_TIMESTAMP(3)`),
   updatedAt: datetime("updatedAt", { fsp: 3 }).notNull().default(sql`CURRENT_TIMESTAMP(3)`).$onUpdate(() => new Date()),
 }, (t) => [
-  uniqueIndex("uq_bpc_brand_provider_platform_account").on(t.brandId, t.provider, t.platform, t.accountId),
+  uniqueIndex("uq_bpc_brand_provider_platform").on(t.brandId, t.provider, t.platform),
   index("idx_bpc_lookup").on(t.brandId, t.provider, t.platform, t.status),
 ]);

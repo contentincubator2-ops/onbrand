@@ -2620,10 +2620,30 @@ async function main() {
         meta            JSON         NULL,                 -- 供應商專屬雜項（profileUrl 等），不再開新欄位
         createdAt       DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
         updatedAt       DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
-        UNIQUE KEY uq_bpc_brand_provider_platform_account (brandId, provider, platform, accountId),
+        UNIQUE KEY uq_bpc_brand_provider_platform (brandId, provider, platform),
         KEY idx_bpc_lookup (brandId, provider, platform, status)
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     `);
+    const [connectionIndexes]: any = await conn.execute(`
+      SELECT DISTINCT INDEX_NAME FROM information_schema.STATISTICS
+      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'brand_publish_connections'
+        AND INDEX_NAME IN ('uq_bpc_brand_provider_platform_account', 'uq_bpc_brand_provider_platform')
+    `);
+    const indexNames = new Set(connectionIndexes.map((row: { INDEX_NAME: string }) => row.INDEX_NAME));
+    if (indexNames.has("uq_bpc_brand_provider_platform")) {
+      console.log("[migrate] uq_bpc_brand_provider_platform: already exists, skipped");
+    } else {
+      // Keep the latest row, including disconnected history, for each platform.
+      await conn.execute(`DELETE older FROM brand_publish_connections older
+        JOIN brand_publish_connections newer
+          ON older.brandId = newer.brandId AND older.provider = newer.provider
+          AND older.platform = newer.platform AND older.id < newer.id`);
+      await conn.execute(`ALTER TABLE brand_publish_connections
+        ${indexNames.has("uq_bpc_brand_provider_platform_account")
+          ? "DROP INDEX uq_bpc_brand_provider_platform_account," : ""}
+        ADD UNIQUE KEY uq_bpc_brand_provider_platform (brandId, provider, platform)`);
+      console.log("[migrate] uq_bpc_brand_provider_platform: added");
+    }
     console.log("[migrate] brand_publish_connections: OK");
 
     console.log("[migrate] All migrations applied successfully.");
