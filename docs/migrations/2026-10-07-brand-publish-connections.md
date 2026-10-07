@@ -1,7 +1,8 @@
 # 品牌發布供應商連線表
 
-在目標環境手動執行一次；僅建立新表，不修改或回填 brands 舊欄位。
-部署新程式前先完成此 migration。dev 與 prod 分別執行。
+由 scripts/migrate.ts 於部署時自動執行；本文件僅供查閱。
+
+僅建立新表，不修改或回填 brands 舊欄位。
 
 ```sql
 -- 品牌在某供應商那邊的「租戶」：Zernio profileId、bundle teamId、Pipedream external user id……
