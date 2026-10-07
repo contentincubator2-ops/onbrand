@@ -1,0 +1,157 @@
+name: Ops (DEV) — probe proactive inbox write path (self-cleaning)
+
+# 主動收件匣的寫入路徑在 DEV VM 上實跑一次。第 1 段用「這個分支」的 proactiveStore.ts（放在旁邊、跑完就刪），
+# 第 2 段用 VM 上已部署的程式：
+#   0. 部署狀態：三張表在不在、引擎開關目前是開還是關
+#   1. 事件表：新增／重複不重開／變急件／列表與件數／關閉一次有效／過期自動收掉
+#   2. 發文節奏整條：替「開發測試用」品牌（#2958）真的排一版 → 收件匣看得到 → 按「排定這週」→ 格子變已排定
+#      再排一版 → 按「這週不用」→ 那幾格收掉
+# 會寫入 DEV 資料庫，但只動 #2958 與 dedupeKey 以 probe: 開頭的事件，結束時（含失敗）把自己建的
+# 事件、格子、對話訊息全部刪掉。不開引擎開關、不寄信。花費：兩次模型呼叫。
+# 第 2 次跑：第 1 次抓到 createEvent 把已存在的事件回報成新增（mysql2 回報符合列數），改成 INSERT IGNORE 後重驗。
+# Path-scoped push，跟 op-probe-dev-proactive.yml 同一個做法（environment: dev 才會連到 DEV VM）。
+on:
+  push:
+    paths:
+      - '.github/workflows/op-probe-dev-proactive-write.yml'
+
+jobs:
+  probe:
+    runs-on: ubuntu-24.04
+    environment: dev
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - name: Pack this branch's proactiveStore.ts
+        run: echo "PATCH_B64=$(gzip -c skills/ai-talent/server/gateway/proactive/proactiveStore.ts | base64 -w0)" >> "$GITHUB_ENV"
+      - name: Exercise the write path on DEV and clean up
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          PATCH_B64: ${{ env.PATCH_B64 }}
+        with:
+          envs: PATCH_B64
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 6m
+          script: |
+            set +e
+            cd /opt/onbrand/current/skills/ai-talent
+            echo "host=$(hostname)  app=$(readlink -f /opt/onbrand/current)  now=$(date -u +%FT%TZ)"
+            echo "engine flag in .env: $(grep -E '^PROACTIVE_(ENGINE|DIGEST_EMAIL)=' .env || echo '(not set → disabled)')"
+            set -a; source .env 2>/dev/null; set +a
+            ls server/gateway/proactive/ || { echo "proactive code is not deployed yet"; exit 1; }
+            D=server/gateway/proactive
+            echo "$PATCH_B64" | base64 -d | gunzip > "$D/_probeStore.ts"
+            cat > "$D/_probe_tmp.ts" <<'TS'
+            import localPool from "../../localDb";
+            import { addDays, mondayOf } from "../../content/core/planning/weeklyPlanner";
+            import { closeEvent, countOpen, createEvent, eventExists, expireOverdue, getOwn, listOpen } from "./_probeStore";
+            import { planWeekFor, targetWeek, weekKey } from "./weekPlanCheck";
+            import { taipeiParts } from "./proactiveTime";
+            import { proactiveRouter } from "../routers/proactiveRouter";
+
+            const BRAND = 2958;
+            let fails = 0;
+            const check = (name: string, ok: boolean, extra = "") => { if (!ok) fails++; console.log(`${ok ? "PASS" : "FAIL"}  ${name}${extra ? `  ${extra}` : ""}`); };
+            const one = async (sql: string, p: any[] = []) => ((await localPool.execute(sql, p)) as any)[0] as any[];
+
+            (async () => {
+              console.log("\n================ 0. 部署狀態");
+              const tables = (await one("SHOW TABLES LIKE 'proactive_%'")).map((r) => Object.values(r)[0]);
+              console.log("tables:", tables.join(", ") || "(none)");
+              check("proactive_events 表已建立", tables.includes("proactive_events"));
+              check("proactive_digests 表已建立", tables.includes("proactive_digests"));
+              console.log("existing events by kind/status:", JSON.stringify(await one("SELECT kind, status, COUNT(*) AS n FROM proactive_events GROUP BY kind, status")));
+
+              const b = (await one("SELECT id, userId, name FROM brands WHERE id = ? LIMIT 1", [BRAND]))[0];
+              if (!b) { console.log(`brand #${BRAND} not found`); process.exit(1); }
+              const userId = Number(b.userId);
+              console.log(`brand #${b.id} ${b.name} owner=${userId}`);
+              const stamp = Date.now();
+              const created = { slots: [] as number[], weekKeys: [] as string[] };
+
+              try {
+                console.log("\n================ 1. 事件表");
+                const k1 = `probe:${stamp}:a`;
+                const base = { userId, brandId: BRAND, aspect: "review" as const, kind: "publish_unapproved" as const, title: "探測用事件", body: "內文", navUrl: "/inbox" };
+                check("新增回 true", (await createEvent({ ...base, dedupeKey: k1 })) === true);
+                check("同一個 key 再新增回 false", (await createEvent({ ...base, dedupeKey: k1, title: "不該蓋掉" })) === false);
+                check("eventExists", await eventExists(userId, k1));
+                const urgentAgain = await createEvent({ ...base, dedupeKey: k1, urgency: "urgent", title: "變急了" });
+                const open1 = (await listOpen(userId)).find((e) => e.title === "變急了" || e.title === "探測用事件");
+                check("變急件那一次也回 false（不是新事件）", urgentAgain === false);
+                check("時間逼近時升成急件並換標題", open1?.urgency === "urgent" && open1?.title === "變急了", JSON.stringify({ u: open1?.urgency, t: open1?.title }));
+                const c1 = await countOpen(userId);
+                check("件數含這一則且算進急件", c1.open >= 1 && c1.urgent >= 1, JSON.stringify(c1));
+                check("別人拿不到這一則", (await getOwn(userId + 999_999, open1!.id)) === null);
+                check("關閉第一次有效", (await closeEvent(userId, open1!.id, "dismissed", "dismiss")) === true);
+                check("關閉第二次無效", (await closeEvent(userId, open1!.id, "dismissed", "dismiss")) === false);
+                check("被略過的不會因為重跑而復活", (await createEvent({ ...base, dedupeKey: k1 })) === false && !(await listOpen(userId)).some((e) => e.id === open1!.id));
+                const k2 = `probe:${stamp}:b`;
+                await createEvent({ ...base, dedupeKey: k2, dueAt: new Date(Date.now() - 60_000) });
+                const expired = await expireOverdue();
+                const st = (await one("SELECT status FROM proactive_events WHERE userId = ? AND dedupeKey = ?", [userId, k2]))[0]?.status;
+                check("過了期限自動收掉", st === "expired", `expired=${expired} status=${st}`);
+
+                console.log("\n================ 2. 發文節奏整條");
+                let target = targetWeek(new Date());
+                if (!target) { const next = addDays(mondayOf(taipeiParts(new Date()).ymd), 7); target = { weekStart: next, fromDate: next }; }
+                console.log(`target: ${JSON.stringify(target)}`);
+                const before = await one("SELECT COUNT(*) AS n FROM planned_slots WHERE brandId = ? AND status <> 'dismissed' AND slotDate >= ? AND slotDate < ?", [BRAND, target.weekStart, addDays(target.weekStart, 7)]);
+                console.log(`這週原本的格子: ${before[0].n}`);
+                const caller = proactiveRouter.createCaller({ user: { id: userId, email: "probe@local" } } as any);
+                const cand = { brandId: BRAND, userId, brandName: String(b.name) };
+                const key = weekKey(BRAND, target.weekStart);
+                if (await eventExists(userId, key)) { console.log("這個品牌這週已經有真的事件，跳過第 2 段（不動真的資料）"); }
+                else for (const action of ["approve", "dismiss"] as const) {
+                  const t0 = Date.now();
+                  const n = await planWeekFor(cand, target.weekStart, target.fromDate);
+                  created.weekKeys.push(key);
+                  console.log(`\n--- ${action}：排了 ${n} 篇（${((Date.now() - t0) / 1000).toFixed(1)}s）`);
+                  if (!n) { check(`planWeekFor 排得出來（${action}）`, false); continue; }
+                  const inbox = await caller.inbox();
+                  const it = inbox.items.find((i: any) => i.kind === "week_plan_ready" && i.brandId === BRAND);
+                  check("收件匣看得到排好的一週", !!it && it.weekItems.length === n, it ? `${it.title}｜${it.lead}` : "");
+                  for (const w of it?.weekItems ?? []) console.log(`     ${w.date} ${w.platform}｜${w.topic}｜${w.format}`);
+                  const ev = (await one("SELECT id, payload, navUrl, dueAt FROM proactive_events WHERE userId = ? AND dedupeKey = ?", [userId, key]))[0];
+                  const payload = typeof ev.payload === "string" ? JSON.parse(ev.payload) : ev.payload;
+                  const slotIds: number[] = payload.slotIds ?? [];
+                  created.slots.push(...slotIds);
+                  console.log(`     navUrl=${ev.navUrl} dueAt=${new Date(ev.dueAt).toISOString()} slotIds=${slotIds.join(",")}`);
+                  const cnt = await caller.count();
+                  check("側欄件數有算到", cnt.open >= 1, JSON.stringify(cnt));
+                  const r = await caller.act({ id: Number(ev.id), action });
+                  const statuses = (await one(`SELECT status FROM planned_slots WHERE id IN (${slotIds.map(() => "?").join(",")})`, slotIds)).map((x) => x.status);
+                  const want = action === "approve" ? "planned" : "dismissed";
+                  check(`按「${action === "approve" ? "排定這週" : "這週不用"}」後格子全部變 ${want}`, statuses.length === n && statuses.every((s) => s === want), `changed=${r.changed} statuses=${statuses.join(",")}`);
+                  const again = await caller.act({ id: Number(ev.id), action });
+                  check("同一則再按一次不會重做", again.already === true);
+                  check("處理完就離開收件匣", !(await caller.inbox()).items.some((i: any) => i.id === Number(ev.id)));
+                  const msg = (await one("SELECT content FROM planner_messages WHERE brandId = ? AND userId = ? AND role = 'lead' ORDER BY id DESC LIMIT 1", [BRAND, userId]))[0]?.content;
+                  console.log(`     本週企劃對話裡留的話：${msg}`);
+                  // 第二輪要能再排一次：把這一輪自己建的事件與格子清掉。
+                  await localPool.execute("DELETE FROM proactive_events WHERE userId = ? AND dedupeKey = ?", [userId, key]);
+                  if (slotIds.length) await localPool.execute(`DELETE FROM planned_slots WHERE id IN (${slotIds.map(() => "?").join(",")})`, slotIds);
+                }
+              } finally {
+                console.log("\n================ 清理");
+                const [e]: any = await localPool.execute("DELETE FROM proactive_events WHERE userId = ? AND dedupeKey LIKE ?", [userId, `probe:${stamp}:%`]);
+                let ew = 0;
+                for (const k of new Set(created.weekKeys)) { const [x]: any = await localPool.execute("DELETE FROM proactive_events WHERE userId = ? AND dedupeKey = ?", [userId, k]); ew += x.affectedRows; }
+                let s = 0;
+                if (created.slots.length) { const [x]: any = await localPool.execute(`DELETE FROM planned_slots WHERE id IN (${created.slots.map(() => "?").join(",")})`, created.slots); s = x.affectedRows; }
+                const [m]: any = await localPool.execute("DELETE FROM planner_messages WHERE brandId = ? AND userId = ? AND role = 'lead' AND JSON_EXTRACT(meta, '$.proactive') = true AND createdAt > NOW() - INTERVAL 15 MINUTE", [BRAND, userId]);
+                await localPool.execute("DELETE FROM error_log WHERE source LIKE 'proactive.%' AND userId = ? AND createdAt > NOW() - INTERVAL 15 MINUTE", [userId]).catch(() => {});
+                console.log(`deleted: probe events=${e.affectedRows} week events=${ew} slots=${s} planner messages=${m.affectedRows}`);
+                console.log("left behind:", JSON.stringify(await one("SELECT kind, status, COUNT(*) AS n FROM proactive_events GROUP BY kind, status")));
+              }
+              console.log(`\n${fails === 0 ? "ALL PASS" : `${fails} FAILED`}`);
+              process.exit(fails === 0 ? 0 : 1);
+            })().catch((e) => { console.log("probe failed:", e?.stack ?? e?.message); process.exit(1); });
+            TS
+            timeout 300 ./node_modules/.bin/tsx "$D/_probe_tmp.ts"
+            RC=$?
+            echo "probe exit=$RC"
+            rm -f "$D/_probe_tmp.ts" "$D/_probeStore.ts"
+            exit $RC

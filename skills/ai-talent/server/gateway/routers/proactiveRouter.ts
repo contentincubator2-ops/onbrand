@@ -11,13 +11,17 @@ import { router, protectedProcedure } from "../../platform/core/trpc";
 import { assertBrandAccess } from "../../platform/core/brandAuth";
 import localPool from "../../localDb";
 import { addDays, isYmd } from "../../content/core/planning/weeklyPlanner";
-import { closeEvent, countOpen, getOwn, listOpen, track, type ProactiveEventRow, type ProactiveKind } from "../proactive/proactiveStore";
+import {
+  PROACTIVE_KINDS, closeEvent, countOpen, dismissStreak, getOwn, listMuted, listOpen, setMuted, track,
+  type ProactiveEventRow, type ProactiveKind,
+} from "../proactive/proactiveStore";
 
 /** 每種事件在收件匣上可以按什麼。approve＝照 AI 做好的往下走；open＝帶去處理的那一頁。 */
 export const KIND_ACTIONS: Record<ProactiveKind, { approve: boolean; open: boolean }> = {
   week_plan_ready:    { approve: true,  open: true },
   review_overdue:     { approve: false, open: true },
   publish_unapproved: { approve: false, open: true },
+  festival_node:      { approve: false, open: true },
 };
 
 const ids = (v: unknown): number[] => (Array.isArray(v) ? v.map(Number).filter((n) => Number.isInteger(n) && n > 0) : []);
@@ -57,6 +61,9 @@ export const proactiveRouter = router({
           ? (e.payload.items as Array<{ date: string; platform: string; topic: string; format: string }>)
           : [],
         lead: e.kind === "week_plan_ready" ? String(e.payload.lead ?? "") : "",
+        festival: e.kind === "festival_node"
+          ? { name: String(e.payload.name ?? ""), date: String(e.payload.date ?? ""), angle: String(e.payload.angle ?? ""), ideas: (Array.isArray(e.payload.ideas) ? e.payload.ideas : []).map(String) }
+          : null,
         actions: KIND_ACTIONS[e.kind] ?? { approve: false, open: true },
       })),
     };
@@ -75,7 +82,7 @@ export const proactiveRouter = router({
       const userId = ctx.user!.id;
       const e = await getOwn(userId, input.id);
       if (!e) throw new TRPCError({ code: "NOT_FOUND", message: "找不到這則事項" });
-      if (e.status !== "open") return { ok: true, already: true, changed: 0 };
+      if (e.status !== "open") return { ok: true, already: true, changed: 0, kind: e.kind, suggestMute: false };
       if (input.action === "approve" && !KIND_ACTIONS[e.kind]?.approve) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "這則事項要到對應的頁面處理" });
       }
@@ -87,6 +94,23 @@ export const proactiveRouter = router({
       }
       const closed = await closeEvent(userId, e.id, input.action === "approve" ? "done" : "dismissed", input.action);
       if (closed) void track("acted", userId, { kind: e.kind, aspect: e.aspect, brandId: e.brandId, action: input.action, changed });
-      return { ok: true, already: !closed, changed };
+      // 連續三則都說不用：問他要不要整類關掉（由前端問，不替他決定）。
+      const suggestMute = closed && input.action === "dismiss" ? await dismissStreak(userId, e.kind).catch(() => false) : false;
+      return { ok: true, already: !closed, changed, kind: e.kind, suggestMute };
+    }),
+
+  /** 通知偏好：哪幾類關掉了（digest＝每日彙整信）。 */
+  prefs: protectedProcedure.query(async ({ ctx }) => {
+    const muted = new Set(await listMuted(ctx.user!.id));
+    return { kinds: [...PROACTIVE_KINDS, "digest" as const].map((kind) => ({ kind, muted: muted.has(kind) })) };
+  }),
+
+  /** 這類不用再提醒／恢復提醒。只影響之後的事件；已經在收件匣裡的留著。 */
+  setMuted: protectedProcedure
+    .input(z.object({ kind: z.enum(["week_plan_ready", "review_overdue", "publish_unapproved", "festival_node", "digest"]), muted: z.boolean() }))
+    .mutation(async ({ ctx, input }) => {
+      await setMuted(ctx.user!.id, input.kind, input.muted);
+      void track("acted", ctx.user!.id, { kind: input.kind, action: input.muted ? "mute" : "unmute" });
+      return { ok: true };
     }),
 });
