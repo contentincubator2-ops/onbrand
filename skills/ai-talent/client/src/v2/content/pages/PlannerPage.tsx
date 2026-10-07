@@ -30,6 +30,7 @@ import { PlatformTaskModal, type TaskEmbed } from "./PlatformTaskPage";
 import { getCalendarPublishPayload } from "../lib/strategyContentEnvelope";
 import { failedNote, isFailedScheduled } from "../lib/plannerFailed";
 import { addDays, defaultWeek, mondayOf, ymdTpe } from "../lib/plannerWeek";
+import ApprovalLinkModal, { type ApprovalCandidate } from "../components/approval/ApprovalLinkModal";
 
 const INK = "#171717", META = "#6B6B6B", LINE = "#EAEAEA", SOFT = "#F6F6F5", ORANGE = "#18181B";
 
@@ -109,6 +110,32 @@ export default function PlannerPage() {
   // 2026-10-02（CJ「在要審核的那個人的本周企畫上，出現待審的標籤」）：送給我審的稿，照它排的那天放上來。
   // 不分品牌——審核人不一定能開送審人的品牌，但他要知道哪天有稿等他。
   const reviewQ = T.review.listPending.useQuery({ limit: 100 }, { refetchOnWindowFocus: false, staleTime: 30_000 });
+  // 2026-10-07 客戶核准連結：這個品牌發出去的連結，卡片上要標「客戶已核准／要修改」。
+  const approvalQ = T.approval.list.useQuery({ brandId: brandId ?? 0 }, { enabled: !!brandId, refetchOnWindowFocus: true, staleTime: 30_000 });
+  const [approvalOpen, setApprovalOpen] = React.useState(false);
+  /** 排程編號 → 客戶的決定。同一篇在多條有效連結上時，取最新那一條（list 由新到舊）。 */
+  const clientDecision = React.useMemo(() => {
+    const m = new Map<number, string>();
+    for (const l of (approvalQ.data as any[]) ?? []) {
+      if (l.state !== "active") continue;
+      for (const it of l.items ?? []) if (it.scheduledPostId && !m.has(it.scheduledPostId)) m.set(it.scheduledPostId, it.decision);
+    }
+    return m;
+  }, [approvalQ.data]);
+  /** 這一週可以交給客戶看的：排好、還沒發出去的。 */
+  const approvalCandidates: ApprovalCandidate[] = React.useMemo(() => {
+    const PLAT: Record<string, string> = { fb: "facebook", ig: "instagram", li: "linkedin", yt: "youtube", tt: "tiktok" };
+    return ((calQ.data as any[]) ?? [])
+      .filter((it) => it.kind === "scheduled" && it.status === "pending" && it.outputId)
+      .map((it) => {
+        const raw = String(it.platform ?? "").toLowerCase();
+        return {
+          scheduledPostId: Number(it.id), outputId: Number(it.outputId), variantIndex: Number(it.variantIndex ?? 0),
+          contentKind: it.contentKind ?? null, contentIndex: it.contentIndex ?? null,
+          platform: PLAT[raw] ?? raw, at: String(it.at), preview: String(it.preview || it.missionTitle || "").slice(0, 80),
+        };
+      });
+  }, [calQ.data]);
   const data = weekQ.data as any;
   const refresh = () => { try { utils?.planner?.week?.invalidate?.(); utils?.planner?.railStatus?.invalidate?.(); utils?.calendar?.range?.invalidate?.(); } catch { /* noop */ } };
 
@@ -262,6 +289,11 @@ export default function PlannerPage() {
     if (rs === "pending" || rs === "in_review") return { text: en ? "In review" : "送審中", tone: "warn" };
     if (rs === "revision_requested") return { text: en ? "Sent back" : "退回修改", tone: "bad" };
     if (rs === "approved") return { text: en ? "Approved" : "已放行", tone: "ok" };
+    // 沒有團隊內部審核的狀態要標，才標客戶那一頭的（一張卡只放一個標籤）。
+    const cd = clientDecision.get(Number(it.cal?.id ?? 0));
+    if (cd === "approved") return { text: en ? "Client approved" : "客戶已核准", tone: "ok" };
+    if (cd === "changes_requested") return { text: en ? "Client wants changes" : "客戶要修改", tone: "bad" };
+    if (cd === "pending") return { text: en ? "With client" : "客戶確認中", tone: "warn" };
     return null;
   };
 
@@ -354,11 +386,17 @@ export default function PlannerPage() {
               <button type="button" aria-label={en ? "Next week" : "下一週"} onClick={() => { setWeekStart(addDays(weekStart, 7)); setTouched([]); setOpen(null); }}
                 className="flex h-8 w-8 items-center justify-center rounded-full border text-[12px] text-neutral-500 hover:text-neutral-900" style={{ borderColor: LINE }}><FontAwesomeIcon icon={faChevronRight} /></button>
             </div>
-            <button type="button" disabled={!hasDrafts || commit?.isPending} onClick={() => commit?.mutate?.({ brandId, weekStart })}
-              className="rounded-full px-5 py-2.5 text-[13.5px] font-semibold transition disabled:cursor-default"
-              style={hasDrafts ? { background: INK, color: "#FFFFFF" } : { background: "#EDEDED", color: "#A3A3A3" }}>
-              {en ? "Lock in this week" : "排定這週"}
-            </button>
+            <div className="flex flex-wrap items-center gap-2">
+              <button type="button" onClick={() => setApprovalOpen(true)}
+                className="rounded-full border bg-white px-4 py-2.5 text-[13.5px] font-semibold transition hover:border-neutral-900" style={{ borderColor: LINE, color: INK }}>
+                {en ? "Client approval" : "請客戶核准"}
+              </button>
+              <button type="button" disabled={!hasDrafts || commit?.isPending} onClick={() => commit?.mutate?.({ brandId, weekStart })}
+                className="rounded-full px-5 py-2.5 text-[13.5px] font-semibold transition disabled:cursor-default"
+                style={hasDrafts ? { background: INK, color: "#FFFFFF" } : { background: "#EDEDED", color: "#A3A3A3" }}>
+                {en ? "Lock in this week" : "排定這週"}
+              </button>
+            </div>
           </div>
 
           {(weekQ as any).isError && (
@@ -505,6 +543,12 @@ export default function PlannerPage() {
           )}
         </section>
       </div>
+      {approvalOpen && brandId && (
+        <ApprovalLinkModal brandId={brandId} en={en} candidates={approvalCandidates}
+          brandName={String(ctx?.brands?.find((b: any) => Number(b.id) === brandId)?.name ?? "")}
+          rangeLabel={`${md(weekStart)}–${md(addDays(weekStart, 6))}`}
+          onClose={() => { setApprovalOpen(false); try { utils?.approval?.list?.invalidate?.(); } catch { /* noop */ } }} />
+      )}
       {writing && brandId && (
         <PlatformTaskModal key={`${writing.taskId}-${writing.slotId ?? writing.camp?.itemId ?? ""}`}
           {...writing} onClose={() => { setWriting(null); refresh(); }} />
