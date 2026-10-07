@@ -185,6 +185,27 @@ async function mergePositioning(kind: EntityKind, id: number, userId: number, pa
   }
   const table = kind === "brand" ? "brands" : kind === "product" ? "products" : "events";
   const col = "positioning";
+
+  // 2026-10-07：先試「只改這幾個 key」。下面那段讀-改-寫是把整份 JSON 蓋回去，
+  // 這條 pipeline 跑九分鐘，期間別的流程（建品牌時的學寫法會寫 _taskCards 與 _assets）
+  // 只要剛好落在讀與寫之間，就會被這裡抹掉。JSON_SET 在資料庫裡原地改，效果跟
+  // 頂層 spread 一樣（同名 key 整個換掉、其他 key 不動）。key 不是單純識別字、
+  // 或舊資料不是合法 JSON 而失敗時，照舊走下面的整份寫回。
+  const entries = Object.entries(patch).filter(([, v]) => v !== undefined);
+  if (entries.length > 0 && entries.every(([k]) => /^[A-Za-z_][A-Za-z0-9_]*$/.test(k))) {
+    try {
+      const sets = entries.map(([k]) => `'$.${k}', CAST(? AS JSON)`).join(", ");
+      const [res]: any = await localPool.execute(
+        `UPDATE \`${table}\` SET \`${col}\` = JSON_SET(IF(JSON_TYPE(\`${col}\`) = 'OBJECT', \`${col}\`, JSON_OBJECT()), ${sets}) WHERE id = ? AND userId = ?`,
+        [...entries.map(([, v]) => JSON.stringify(v)), id, userId],
+      );
+      if (res?.affectedRows > 0 || res?.changedRows > 0) return;
+      // affectedRows 0：找不到這筆（或值完全沒變）。交給下面的路徑判斷，它會在找不到時丟錯。
+    } catch (err) {
+      console.warn(`[positioningJobRunner] JSON_SET merge 失敗，改整份寫回：`, String((err as any)?.message ?? err).slice(0, 200));
+    }
+  }
+
   const [rows]: any = await localPool.execute(
     `SELECT \`${col}\` AS payload FROM \`${table}\` WHERE id = ? AND userId = ? LIMIT 1`,
     [id, userId],

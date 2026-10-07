@@ -102,6 +102,13 @@ export interface BrandTaskCard {
   createdBy: number;
   /** 最後一次試寫，讓用戶關掉 modal 再回來還看得到。 */
   lastDryRun: { at: string; caption: string } | null;
+  /**
+   * 這張卡的來歷。voice＝建品牌時從參考文章學來的（一類一張，見 brandVoice.ts）；
+   * 沒有＝用戶自己開的卡。voice 卡不佔方案的自建卡額度。
+   */
+  origin?: "voice";
+  /** 學寫法流程的狀態（只有 origin === "voice" 的卡有）。 */
+  voice?: import("./brandVoice").VoiceState;
 }
 
 export const MAX_CARDS_PER_BRAND = 40;
@@ -208,21 +215,67 @@ export async function mutateBrandTaskCards(
   userId: number,
   patch: (cards: BrandTaskCard[]) => BrandTaskCard[],
 ): Promise<BrandTaskCard[]> {
-  const [rows]: any = await localPool.execute(
-    `SELECT positioning AS p FROM brands WHERE id = ? AND userId = ? LIMIT 1`,
-    [brandId, userId],
-  );
-  const row = (rows as any[])[0];
-  if (!row) throw new Error(`brand ${brandId} not found`);
-  let pos: any = row.p;
-  if (typeof pos === "string") { try { pos = JSON.parse(pos); } catch { pos = {}; } }
-  pos = pos ?? {};
-  const next = patch(Array.isArray(pos._taskCards) ? pos._taskCards : []);
-  await localPool.execute(
-    `UPDATE brands SET positioning = ? WHERE id = ? AND userId = ?`,
-    [JSON.stringify({ ...pos, _taskCards: next }), brandId, userId],
-  );
-  return next;
+  return withBrandLock(brandId, async () => {
+    const [rows]: any = await localPool.execute(
+      `SELECT positioning AS p FROM brands WHERE id = ? AND userId = ? LIMIT 1`,
+      [brandId, userId],
+    );
+    const row = (rows as any[])[0];
+    if (!row) throw new Error(`brand ${brandId} not found`);
+    let pos: any = row.p;
+    if (typeof pos === "string") { try { pos = JSON.parse(pos); } catch { pos = {}; } }
+    pos = pos ?? {};
+    const next = patch(Array.isArray(pos._taskCards) ? pos._taskCards : []);
+    await writePositioningKey(brandId, userId, pos, "_taskCards", next);
+    return next;
+  });
+}
+
+/**
+ * 同一個品牌的「讀-改-寫」排隊做。
+ *
+ * 2026-10-07：學寫法一次有五張卡在背景各自反推、試寫，每一步都要寫回同一個
+ * `_taskCards` 陣列。不排隊的話兩張卡各自讀到舊陣列、先後寫回，後寫的會把先寫的
+ * 那張卡的進度蓋掉（卡片退回上一步，畫面就卡在那裡）。單卡流程以前幾乎碰不到，
+ * 五張同時跑就是必然。
+ */
+const BRAND_LOCKS = new Map<number, Promise<unknown>>();
+export function withBrandLock<T>(brandId: number, fn: () => Promise<T>): Promise<T> {
+  const prev = BRAND_LOCKS.get(brandId) ?? Promise.resolve();
+  const run = prev.then(fn, fn);
+  const tail = run.catch(() => {});
+  BRAND_LOCKS.set(brandId, tail);
+  void tail.then(() => { if (BRAND_LOCKS.get(brandId) === tail) BRAND_LOCKS.delete(brandId); });
+  return run;
+}
+
+/**
+ * 只改 positioning 的一個頂層 key，不把整份 JSON 蓋回去。
+ *
+ * 建品牌當下，完整定位在背景跑九分鐘、一步一步寫 positioning；學寫法也在同一段時間
+ * 寫 `_taskCards`。整份蓋回去的寫法，手上那份只要舊了幾毫秒就會把對方剛寫的東西抹掉。
+ * JSON_SET 在資料庫裡原地改那一個 key，兩邊互不相干。
+ *
+ * 舊資料若不是合法 JSON，JSON_SET 會失敗，這時退回整份寫回（跟以前一樣）。
+ */
+export async function writePositioningKey(
+  brandId: number, userId: number, currentPos: any, key: string, value: unknown,
+): Promise<void> {
+  if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(key)) throw new Error(`bad positioning key: ${key}`);
+  try {
+    await localPool.execute(
+      `UPDATE brands
+          SET positioning = JSON_SET(IF(JSON_TYPE(positioning) = 'OBJECT', positioning, JSON_OBJECT()), '$.${key}', CAST(? AS JSON))
+        WHERE id = ? AND userId = ?`,
+      [JSON.stringify(value), brandId, userId],
+    );
+  } catch (err) {
+    console.warn(`[brandTaskCards] JSON_SET ${key} 失敗，改整份寫回：`, String((err as any)?.message ?? err).slice(0, 200));
+    await localPool.execute(
+      `UPDATE brands SET positioning = ? WHERE id = ? AND userId = ?`,
+      [JSON.stringify({ ...(currentPos ?? {}), [key]: value }), brandId, userId],
+    );
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────
@@ -475,10 +528,15 @@ export function cardTemplate(card: BrandTaskCard): FBTaskTemplate {
     tier: "30s",
     postType: outputDefaultsFor(card.channel).post_type,
     label: { zh: card.name, en: card.name },
-    description: {
-      zh: `你自己建立的任務卡（依 ${card.measured.count} 篇範例反推）`,
-      en: `Your own card (distilled from ${card.measured.count} samples)`,
-    },
+    description: card.origin === "voice"
+      ? {
+          zh: `照你自己的寫法寫（依 ${card.measured.count} 篇參考文章）`,
+          en: `Written your way (learned from ${card.measured.count} of your articles)`,
+        }
+      : {
+          zh: `你自己建立的任務卡（依 ${card.measured.count} 篇範例反推）`,
+          en: `Your own card (distilled from ${card.measured.count} samples)`,
+        },
     agent_id: card.agentId ?? undefined,
     skill_slug: card.id,
     // 商品頁卡：交付的是一組欄位。caption 呼叫看到這個就改走 listingContract。
