@@ -196,10 +196,7 @@ async function main(): Promise<void> {
       console.log(`  語氣：${c.profile?.tone ?? "（沒量出來）"}`);
       console.log(`  結構：${c.profile?.structure ?? "（沒量出來）"}`);
       console.log(`  常用詞：${(c.profile?.phrases ?? []).map((p: any) => `${p.text}×${p.count}`).join("、") || "（無）"}`);
-      if (OWN) console.log(`  原文第 1 篇（${c.samples[0].length} 字）：
-${String(c.samples[0]).split("
-").map((l: string) => `    ${l}`).join("
-")}`);
+      if (OWN) console.log(`  原文第 1 篇（${c.samples[0].length} 字）：\n${String(c.samples[0]).split("\n").map((l: string) => `    ${l}`).join("\n")}`);
       console.log(`  試寫（${String(c.trial ?? "").length} 字，${c.trialInRange ? "在區間內" : "不在區間內"}）：\n${String(c.trial ?? "").split("\n").map((l: string) => `    ${l}`).join("\n")}`);
       check(String(c.trial ?? "").length >= 30, `${c.category} 試寫有內容`);
       check(!String(c.trial ?? "").includes("499"), `${c.category} 試寫沒有冒出範例的價格`);

@@ -7,7 +7,7 @@ name: Ops (DEV) — probe brand voice full chain on the real DB
 # 會寫資料庫：在品牌 2977 上建兩張 voice 卡、改品牌口吻；結束時把 `_taskCards` 與 `_assets`
 # 兩個 key 還原成開始前的快照並比對。
 # 花費：約 9 次文字模型呼叫＋兩張卡片插畫。
-# 第 2 次跑：改用品牌 2977 既有任務卡裡的真實範例當文章（同品牌的文章配同品牌的大腦，才看得出像不像）。
+# 第 3 次跑（第 2 次腳本字串寫壞，沒跑到）：改用品牌 2977 既有任務卡裡的真實範例當文章（同品牌的文章配同品牌的大腦，才看得出像不像）。
 # 腳本本體在 skills/ai-talent/scripts/probe-brand-voice.ts，這裡把這個分支的那一份送上去跑。
 on:
   push:
