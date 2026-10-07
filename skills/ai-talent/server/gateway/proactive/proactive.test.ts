@@ -101,3 +101,56 @@ describe("proactive · 每日彙整時段", () => {
     expect(inDigestWindow(taipei("2026-10-07", 12))).toBe(false);
   });
 });
+
+// ─── 節慶檔期 ─────────────────────────────────────────────────────────
+import { builtinNodes, type CalendarNode } from "../../strategy/core/entities/eventCalendar";
+import { coveredByCampaign, festivalEvent, festivalKey, festivalPrompt, parseFestivalIdeas, upcomingNodes } from "./festivalCheck";
+
+describe("proactive · 節慶檔期", () => {
+  const today = "2026-10-15";
+  const tw = builtinNodes("TW", today, "2026-12-01");
+  const d11 = tw.find((n) => n.builtinKey === "tw:double-11")!;
+
+  it("只提 3–30 天內、重要度 4 以上的節點", () => {
+    const up = upcomingNodes(tw, today);
+    expect(up.map((n) => n.builtinKey)).toEqual(["tw:double-11"]); // 萬聖節重要度 3，不提
+    expect(upcomingNodes(tw, "2026-11-09")).toEqual([]);            // 剩 2 天：來不及了
+    expect(upcomingNodes(tw, "2026-10-01")).toEqual([]);            // 還有 41 天：太早
+  });
+
+  it("已經有活動蓋到那一天、或在前四週內開始，就不提", () => {
+    expect(coveredByCampaign(d11, [])).toBe(false);
+    expect(coveredByCampaign(d11, [{ name: "年終回饋", startAt: "2026-11-01", endAt: "2026-11-15" }])).toBe(true);
+    expect(coveredByCampaign(d11, [{ name: "暖身檔", startAt: "2026-10-20", endAt: "2026-10-25" }])).toBe(true);
+    expect(coveredByCampaign(d11, [{ name: "夏季特賣", startAt: "2026-07-01", endAt: "2026-07-10" }])).toBe(false);
+  });
+
+  it("活動名稱就寫了這個節點也算；去年同名的不算", () => {
+    expect(coveredByCampaign(d11, [{ name: "雙 11 預購", startAt: null, endAt: null }])).toBe(true);
+    expect(coveredByCampaign(d11, [{ name: "雙 11 預購", startAt: "2025-11-01", endAt: "2025-11-11" }])).toBe(false);
+  });
+
+  it("模型回覆：有主軸就要有題目；說搭不上回空主軸", () => {
+    expect(parseFestivalIdeas('```json\n{"angle":"把湖光裝進禮盒","ideas":["a1","b2","c3","d4"]}\n```')).toEqual({ angle: "把湖光裝進禮盒", ideas: ["a1", "b2", "c3"] });
+    expect(parseFestivalIdeas('{"angle":"","ideas":[]}')).toEqual({ angle: "", ideas: [] });
+    expect(parseFestivalIdeas('{"angle":"有主軸沒題目","ideas":[]}')).toBeNull();
+    expect(parseFestivalIdeas("抱歉")).toBeNull();
+  });
+
+  it("事件：標題寫剩幾天，帶去活動頁並預填名稱與日期", () => {
+    const e = festivalEvent({ brandId: 7, userId: 5 }, d11, { angle: "主軸", ideas: ["題目一", "題目二"] }, today);
+    expect(e.title).toBe("雙 11還有 27 天，方向先想好了");
+    expect(e.dedupeKey).toBe(festivalKey(7, d11));
+    expect(e.dedupeKey).toBe("festival:7:builtin:tw:double-11:2026");
+    const url = new URL(`https://x${e.navUrl}`);
+    expect(url.pathname).toBe("/brands/edit");
+    expect(Object.fromEntries(url.searchParams)).toEqual({ b: "7", cat: "events", plan: "雙 11", ps: "2026-11-11" });
+    expect(e.dueAt?.toISOString()).toBe("2026-11-10T16:00:00.000Z");
+  });
+
+  it("提示詞講明不能編促銷", () => {
+    const p = festivalPrompt({ brandName: "X", brandCtx: "", node: d11 as CalendarNode, daysLeft: 27 });
+    expect(p).toContain("不要編折扣");
+    expect(p).toContain('{"angle":"","ideas":[]}');
+  });
+});

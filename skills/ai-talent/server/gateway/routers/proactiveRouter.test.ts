@@ -4,9 +4,9 @@ import { isPersonalPath } from "../../platform/core/teamAccess";
 
 describe("proactiveRouter", () => {
   // tRPC 保留字（apply／call／bind…）會讓 router 在建構期就炸，而 tsc 與其他測試全綠。
-  it("router 建得起來，三支 procedure 都在", () => {
+  it("router 建得起來，procedure 都在", () => {
     const names = Object.keys((proactiveRouter as any)._def.procedures ?? (proactiveRouter as any)._def.record ?? {});
-    expect(names.sort()).toEqual(["act", "count", "inbox"]);
+    expect(names.sort()).toEqual(["act", "count", "inbox", "prefs", "setMuted"]);
   });
 
   it("收件匣是個人的：團隊成員看自己的，不切成品牌擁有者", () => {

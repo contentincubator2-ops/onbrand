@@ -170,6 +170,27 @@ export default function BrandsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // 2026-10-07：待確認事項的節慶檔期按「開始企劃」帶 ?plan=<名稱>&ps=<開始日>&pe=<結束日> 過來——
+  // 跟在時間軸節點上按「開始企劃」同一件事：開新增活動視窗、帶入名稱與日期。用完就把參數拿掉，
+  // 重新整理不會再跳一次。
+  const planFromUrl = searchParams.get("plan");
+  React.useEffect(() => {
+    if (!planFromUrl) return;
+    const ps = searchParams.get("ps") ?? "";
+    const pe = searchParams.get("pe");
+    const isDay = (s: string | null) => !!s && /^\d{4}-\d{2}-\d{2}$/.test(s);
+    if (isDay(ps)) {
+      setEventPrefill({ name: planFromUrl.slice(0, 60), startAt: ps, endAt: isDay(pe) ? pe : null });
+      setAddModal({ open: true, tab: "event" });
+    }
+    setSearchParams((prev) => {
+      const sp = new URLSearchParams(prev);
+      sp.delete("plan"); sp.delete("ps"); sp.delete("pe");
+      return sp;
+    }, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [planFromUrl]);
+
   // Tab locks (定位 / 文字 / 視覺) — fetched per-brand
   const activeBrandIdForLocks = scope?.brandId ?? brandId ?? null;
   // 2026-09-30：策略監測 chip 上的未讀數。跟側欄「品牌」圖示、左下角通知同一支查詢（react-query 共用快取）。

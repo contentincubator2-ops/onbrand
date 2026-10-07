@@ -620,10 +620,11 @@ async function runStartupMigrations() {
     console.log("[migrate] inspiration_prefs: OK");
 
     // 2026-10-07（CJ「整個要有 instinct 的主動性」）：主動收件匣的事件與每日彙整紀錄。
-    const { PROACTIVE_EVENTS_DDL, PROACTIVE_DIGESTS_DDL } = await import("./gateway/proactive/proactiveStore");
+    const { PROACTIVE_EVENTS_DDL, PROACTIVE_DIGESTS_DDL, PROACTIVE_MUTES_DDL } = await import("./gateway/proactive/proactiveStore");
     await db.execute(sql.raw(PROACTIVE_EVENTS_DDL));
     await db.execute(sql.raw(PROACTIVE_DIGESTS_DDL));
-    console.log("[migrate] proactive_events / proactive_digests: OK");
+    await db.execute(sql.raw(PROACTIVE_MUTES_DDL));
+    console.log("[migrate] proactive_events / proactive_digests / proactive_mutes: OK");
 
     // 2026-10-06（CJ「網紅 mission tray：讀懂網紅連結，給每位網紅可講的產品特色和獨特切角」）。
     const { INFLUENCER_BATCHES_DDL } = await import("./content/core/influencer/influencerAngles");

@@ -1,11 +1,12 @@
 /**
  * proactiveEngine — 主動引擎的排程：定時跑各面向的檢查器，把結果寫成收件匣事件。
  *
- * 一拍做四件事，前三件只查資料庫：
+ * 一拍做五件事，前三件只查資料庫：
  *   1. 過期的事件收掉
  *   2. 審核與發布（reviewChecks）——全部重算，新增的寫入、不再成立的收掉
  *   3. 每日彙整信（另一個開關）
  *   4. 發文節奏（weekPlanCheck）——要叫模型，一拍只排一個品牌
+ *   5. 節慶檔期（festivalCheck）——要叫模型，一拍只想一個節點
  *
  * 預設關閉：該環境要設 PROACTIVE_ENGINE=on。它會替用戶的品牌排草稿、叫模型花錢，
  * 每個環境要自己決定打開。彙整信再多一道 PROACTIVE_DIGEST_EMAIL=on（會寄信給真的用戶）。
@@ -15,6 +16,7 @@ import { isRuntimeFeatureEnabled } from "../../platform/core/ops/runtimeSafety";
 import { createEvent, expireOverdue, resolveGone, track, type NewProactiveEvent } from "./proactiveStore";
 import { collectReviewEvents } from "./reviewChecks";
 import { tickWeekPlan } from "./weekPlanCheck";
+import { tickFestival } from "./festivalCheck";
 import { taipeiParts } from "./proactiveTime";
 
 const on = (v: string | undefined) => v?.trim().toLowerCase() === "on";
@@ -54,7 +56,8 @@ export async function tickDigest(now: Date): Promise<number> {
     `SELECT e.userId, u.email, u.name FROM proactive_events e
        JOIN users u ON u.id = e.userId
        LEFT JOIN proactive_digests d ON d.userId = e.userId AND d.ymd = ?
-      WHERE e.status = 'open' AND d.userId IS NULL AND u.email IS NOT NULL
+       LEFT JOIN proactive_mutes mu ON mu.userId = e.userId AND mu.kind = 'digest'
+      WHERE e.status = 'open' AND d.userId IS NULL AND mu.userId IS NULL AND u.email IS NOT NULL
       GROUP BY e.userId, u.email, u.name LIMIT 20`,
     [ymd],
   );
@@ -109,6 +112,14 @@ export async function tickProactive(now: Date = new Date()): Promise<{ created: 
     out.created += await tickWeekPlan(now);
   } catch (err: any) {
     console.error("[proactive] week plan failed:", err?.message ?? err);
+  }
+
+  try {
+    const f = await tickFestival(now);
+    out.created += f.created;
+    out.resolved += await resolveGone(["festival_node"], f.stillTrue);
+  } catch (err: any) {
+    console.error("[proactive] festival failed:", err?.message ?? err);
   }
   return out;
 }

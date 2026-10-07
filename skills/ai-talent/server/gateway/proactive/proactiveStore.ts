@@ -53,9 +53,25 @@ export const PROACTIVE_DIGESTS_DDL = `
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
 `;
 
+/**
+ * 「這類不用再提醒」：有這一列＝這位用戶關掉了這一種事件（kind='digest'＝不收每日彙整信）。
+ * 關掉之後檢查器照跑，只是不替這個人開事件；已經開著的留著讓他處理完。
+ */
+export const PROACTIVE_MUTES_DDL = `
+  CREATE TABLE IF NOT EXISTS proactive_mutes (
+    userId    INT         NOT NULL,
+    kind      VARCHAR(40) NOT NULL,
+    createdAt DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    PRIMARY KEY (userId, kind)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+`;
+
 /** 行銷人員要顧的面向（規劃裡的 F1–F13）。先開用得到的，其餘做到再加。 */
-export type ProactiveAspect = "rhythm" | "review";
-export type ProactiveKind = "week_plan_ready" | "review_overdue" | "publish_unapproved";
+export type ProactiveAspect = "rhythm" | "review" | "festival";
+export type ProactiveKind = "week_plan_ready" | "review_overdue" | "publish_unapproved" | "festival_node";
+export const PROACTIVE_KINDS: ProactiveKind[] = ["week_plan_ready", "review_overdue", "publish_unapproved", "festival_node"];
+/** 偏好設定裡可以關掉的項目：每一種事件，加上每日彙整信。 */
+export type MutableKind = ProactiveKind | "digest";
 export type ProactiveUrgency = "normal" | "urgent";
 export type ProactiveStatus = "open" | "done" | "dismissed" | "resolved" | "expired";
 
@@ -108,10 +124,11 @@ export function rowToEvent(r: any): ProactiveEventRow {
 }
 
 /**
- * 新增一則事件。已經有同一個 (userId, dedupeKey) 就什麼都不做並回 false——
+ * 新增一則事件。收件人關掉了這一類、或已經有同一個 (userId, dedupeKey)，就什麼都不做並回 false——
  * 唯一的例外是還開著的事件變急了（排程時間逼近），那只更新急迫程度與內容。
  */
 export async function createEvent(e: NewProactiveEvent): Promise<boolean> {
+  if (await isMuted(e.userId, e.kind)) return false;
   const [r]: any = await localPool.execute(
     `INSERT INTO proactive_events (userId, brandId, aspect, kind, dedupeKey, urgency, title, body, payload, navUrl, dueAt)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -214,4 +231,36 @@ export async function track(name: "created" | "acted" | "digest", userId: number
     const { logError } = await import("../../platform/routers/opsRouter");
     void logError({ source: `proactive.${name}`, message: String(meta.kind ?? name), userId, meta, level: "info" });
   } catch { /* telemetry only */ }
+}
+
+// ─── 偏好：這類不用再提醒 ─────────────────────────────────────────────
+
+export async function listMuted(userId: number): Promise<MutableKind[]> {
+  try {
+    const [rows]: any = await localPool.execute(`SELECT kind FROM proactive_mutes WHERE userId = ?`, [userId]);
+    return (rows as any[]).map((r) => String(r.kind) as MutableKind);
+  } catch { return []; } // 表還沒建：當作沒關任何一類
+}
+
+export async function isMuted(userId: number, kind: MutableKind): Promise<boolean> {
+  try {
+    const [rows]: any = await localPool.execute(`SELECT 1 FROM proactive_mutes WHERE userId = ? AND kind = ? LIMIT 1`, [userId, kind]);
+    return (rows as any[]).length > 0;
+  } catch { return false; }
+}
+
+export async function setMuted(userId: number, kind: MutableKind, muted: boolean): Promise<void> {
+  if (muted) await localPool.execute(`INSERT IGNORE INTO proactive_mutes (userId, kind) VALUES (?, ?)`, [userId, kind]);
+  else await localPool.execute(`DELETE FROM proactive_mutes WHERE userId = ? AND kind = ?`, [userId, kind]);
+}
+
+/** 最近處理掉的這一類事件，是不是連續 n 則都被按「不用」。是的話前端會問要不要整類關掉——不替用戶決定。 */
+export async function dismissStreak(userId: number, kind: ProactiveKind, n = 3): Promise<boolean> {
+  const [rows]: any = await localPool.execute(
+    `SELECT status FROM proactive_events
+      WHERE userId = ? AND kind = ? AND status IN ('done','dismissed')
+      ORDER BY actedAt DESC, id DESC LIMIT ${Math.max(2, Math.min(10, Math.trunc(n)))}`,
+    [userId, kind],
+  );
+  return (rows as any[]).length >= n && (rows as any[]).every((r) => r.status === "dismissed");
 }
