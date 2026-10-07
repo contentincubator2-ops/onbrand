@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { addDays, campaignItemsInWeek, mondayOf, parsePlannerReply, railStatusOf, validateOps, weekDays, type SlotRow } from "./weeklyPlanner";
+import { PLANNER_FALLBACK, addDays, campaignItemsInWeek, mondayOf, parsePlannerReply, plannerHistory, railStatusOf, validateOps, weekDays, type SlotRow } from "./weeklyPlanner";
 import { FORK_AXES, PLANNER_AXES, isForkAxis, topicOverlap } from "./plannerAdvisors";
 import { plannerRouter } from "../../routers/plannerRouter";
 
@@ -55,6 +55,40 @@ describe("parsePlannerReply", () => {
     expect(r?.reply).toBe("排好了。");
     expect(r?.choices).toHaveLength(3);
     expect(parsePlannerReply('{"choices":[]}')).toBeNull();
+    expect(parsePlannerReply("")).toBeNull();
+  });
+  it("有排格子但沒寫 reply：補一句，不整輪作廢", () => {
+    const r = parsePlannerReply('{"reply":"","choices":[],"ops":[{"op":"add","date":"2026-10-09","platform":"facebook","taskId":"x","topic":"t"}]}');
+    expect(r?.reply).toBeTruthy();
+    expect(r?.ops).toHaveLength(1);
+  });
+  it("沒照格式直接講話：那段話就是 reply", () => {
+    expect(parsePlannerReply("週五、週六各排一篇，要打哪個產品？")?.reply).toBe("週五、週六各排一篇，要打哪個產品？");
+  });
+  it("JSON 被截斷：救回 reply 與寫完整的 ops，寫到一半的丟掉", () => {
+    const r = parsePlannerReply('{"reply":"排了兩篇廣告文。","choices":[],"fork":null,"ops":[{"op":"add","date":"2026-10-09","platform":"facebook","taskId":"a","topic":"含 } 的題目"},{"op":"add","date":"2026-10-10","platf');
+    expect(r?.reply).toBe("排了兩篇廣告文。");
+    expect(r?.ops).toEqual([{ op: "add", date: "2026-10-09", platform: "facebook", taskId: "a", topic: "含 } 的題目" }]);
+  });
+});
+
+describe("plannerHistory", () => {
+  it("沒接好的那一輪整輪拿掉；開頭一定是使用者", () => {
+    const h = plannerHistory([
+      { role: "lead", content: "排在哪兩天？" },
+      { role: "user", content: "週五＋週六" },
+      { role: "lead", content: "選哪個方向？" },
+      { role: "user", content: "打OnBrand Studio" },
+      { role: "lead", content: PLANNER_FALLBACK },
+      { role: "user", content: "打OnBrand Studio" },
+      { role: "lead", content: "x", failed: true },
+      { role: "user", content: "打OnBrand Studio" },
+    ]);
+    expect(h).toEqual([
+      { role: "user", content: "週五＋週六" },
+      { role: "assistant", content: "選哪個方向？" },
+      { role: "user", content: "打OnBrand Studio" },
+    ]);
   });
 });
 
