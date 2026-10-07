@@ -2,7 +2,10 @@
  * 訂閱在第一次付款之後會發生的事：續約、扣款失敗、取消、退款。
  * 用假的 Stripe 與假的資料庫，檢查每個事件最後寫進我們紀錄的結果。
  */
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+vi.mock("../connectors/publish/zernioLifecycle", () => ({ disconnectBrandsForOwner: vi.fn().mockResolvedValue(undefined) }));
+import { disconnectBrandsForOwner } from "../connectors/publish/zernioLifecycle";
+beforeEach(() => vi.mocked(disconnectBrandsForOwner).mockClear());
 import {
   applyLifecycleAction, cancelSubscriptionNow, classifyStripeEvent,
   findCurrentSubscription, setCancelAtPeriodEnd, type StripeLike,
@@ -11,7 +14,7 @@ import {
 const PERIOD_END = 1_800_000_000; // unix seconds
 
 /** 一位用戶（id 7）、一張已付款的結帳單 cs_1 → 訂閱 sub_1。 */
-function world(opts: { paidSessions?: Array<{ id: number; session: string; sub: string }> } = {}) {
+function world(opts: { workspaceId?: number; paidSessions?: Array<{ id: number; session: string; sub: string }> } = {}) {
   const paid = opts.paidSessions ?? [{ id: 10, session: "cs_1", sub: "sub_1" }];
   const user = { id: 7, planStatus: "active", planEndsAt: null as Date | null, cancelAtPeriodEnd: 0 };
   const receipts: string[] = [];
@@ -22,12 +25,13 @@ function world(opts: { paidSessions?: Array<{ id: number; session: string; sub: 
       const q = sql.replace(/\s+/g, " ").trim();
       if (q.startsWith("SELECT userId, workspaceId, planCode, billingCycle FROM invoices")) {
         const hit = paid.find((p) => p.session === params[0]);
-        return [hit ? [{ userId: 7, workspaceId: null, planCode: "drop_pro", billingCycle: "monthly" }] : []];
+        return [hit ? [{ userId: 7, workspaceId: opts.workspaceId ?? null, planCode: "drop_pro", billingCycle: "monthly" }] : []];
       }
       if (q.startsWith("SELECT merchantTradeNo FROM invoices")) {
         const rows = paid.filter((p) => p.id < params[1]).sort((a, b) => b.id - a.id);
         return [rows.slice(0, 1).map((p) => ({ merchantTradeNo: p.session }))];
       }
+      if (q.startsWith("UPDATE workspaces SET planStatus")) return [{}];
       if (q.startsWith("UPDATE users SET cancelAtPeriodEnd")) { user.cancelAtPeriodEnd = params[0]; return [{}]; }
       if (q.startsWith("UPDATE users SET planStatus = 'active', planEndsAt")) {
         user.planStatus = "active";
@@ -178,6 +182,23 @@ describe("applyLifecycleAction", () => {
     const r = await applyLifecycleAction(w.db, w.stripe, classifyStripeEvent(ev("customer.subscription.deleted", { id: "sub_1" })));
     expect(r).toMatchObject({ applied: true, note: "superseded by a newer subscription" });
     expect(w.user.planStatus).toBe("active");
+  });
+
+  it("升級時不解除：舊訂閱 deleted 事件遇到較新訂閱", async () => {
+    const w = world({ paidSessions: [{ id: 10, session: "cs_1", sub: "sub_1" }, { id: 11, session: "cs_2", sub: "sub_2" }] });
+    const result = await applyLifecycleAction(w.db, w.stripe, classifyStripeEvent(ev("customer.subscription.deleted", { id: "sub_1" })));
+    expect(result).toMatchObject({ note: "superseded by a newer subscription" });
+    expect(disconnectBrandsForOwner).not.toHaveBeenCalled();
+  });
+
+  it.each([undefined, 19])("真正退訂只解除一次，帶入正確 userId 與 workspaceId (%s)", async workspaceId => {
+    const w = world({ workspaceId });
+    vi.mocked(disconnectBrandsForOwner).mockImplementationOnce(async () => {
+      expect(w.user).toMatchObject({ planStatus: "canceled", cancelAtPeriodEnd: 0 });
+    });
+    await applyLifecycleAction(w.db, w.stripe, classifyStripeEvent(ev("customer.subscription.deleted", { id: "sub_1" })));
+    expect(disconnectBrandsForOwner).toHaveBeenCalledOnce();
+    expect(disconnectBrandsForOwner).toHaveBeenCalledWith(w.db, { userId: 7, workspaceId: workspaceId ?? null });
   });
 
   it("找不到對應用戶的訂閱 → 不改資料，留給人工", async () => {

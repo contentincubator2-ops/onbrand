@@ -34,6 +34,35 @@ describe("Zernio client", () => {
     expect(fetchImpl.mock.calls[2]![0]).toBe("https://zernio.com/api/v1/accounts/account%2Fone");
     expect(fetchImpl.mock.calls[2]![1]?.method).toBe("DELETE");
   });
+  it("adds reconnectAccountId and sorted pagination parameters", async () => {
+    const { client, fetchImpl } = setup({ authUrl: "https://example.com/connect", accounts: [], pagination: { pages: 1 } });
+    await client.getConnectUrl({ platform: "facebook", profileId: "p", redirectUrl: "https://example.com", reconnectAccountId: "a & b" });
+    expect(new URL(fetchImpl.mock.calls[0]![0] as string).searchParams.get("reconnectAccountId")).toBe("a & b");
+    await client.listAccounts({ profileId: "p", platform: "facebook", status: "connected", sort: "connected", order: "desc" });
+    expect(Object.fromEntries(new URL(fetchImpl.mock.calls[1]![0] as string).searchParams)).toEqual({
+      profileId: "p", platform: "facebook", status: "connected", sort: "connected", order: "desc", limit: "100", page: "1",
+    });
+  });
+  it.each([false, true])("reads every account page in order (filtered: %s)", async filtered => {
+    const { client, fetchImpl } = setup({});
+    fetchImpl.mockResolvedValueOnce(new Response(JSON.stringify({ accounts: [{ _id: "first" }], pagination: { pages: 2 } })))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ accounts: [{ _id: "last" }], pagination: { pages: 2 } })));
+    const accounts = filtered ? await client.listAccounts({ profileId: "p", platform: "facebook", sort: "connected", order: "desc" }) : await client.listAllAccounts();
+    expect(accounts.map(a => a._id)).toEqual(["first", "last"]);
+    expect(fetchImpl.mock.calls.map(([url]) => new URL(url as string).searchParams.get("page"))).toEqual(["1", "2"]);
+    for (const [url] of fetchImpl.mock.calls) {
+      const query = new URL(url as string).searchParams;
+      expect(query.get("limit")).toBe("100");
+      expect(query.get("status")).toBe("connected");
+      expect(query.has("profileId")).toBe(filtered);
+    }
+  });
+  it("does not return a partial snapshot when a later page fails", async () => {
+    const { client, fetchImpl } = setup({});
+    fetchImpl.mockResolvedValueOnce(new Response(JSON.stringify({ accounts: [{ _id: "first" }], pagination: { pages: 2 } })))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ error: "Unavailable" }), { status: 503 }));
+    await expect(client.listAllAccounts()).rejects.toBeInstanceOf(ZernioApiError);
+  });
   it.each([200, 201, 207])("preserves publish HTTP %i and body", async httpStatus => {
     const body = { post: { _id: "post", status: "published" } };
     const { client, fetchImpl } = setup(body, httpStatus);
