@@ -84,7 +84,7 @@ export function brandAllowed(role: string, restrictedTo: readonly number[], bran
  */
 const PERSONAL_NAMESPACES = new Set([
   "credits", "notifications", "support", "navPrefs", "billing", "addon", "ops", "adminStats",
-  "review", "tenant", "stripe", "festival", "promptTemplate", "landing", "agent", "cloudDrive",
+  "review", "tenant", "stripe", "festival", "promptTemplate", "landing", "agent", "cloudDrive", "proactive",
 ]);
 /** Brand procedures that are about "my brands", not about one brand's data. */
 const PERSONAL_PATHS = new Set([

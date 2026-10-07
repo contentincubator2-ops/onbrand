@@ -742,6 +742,10 @@ export function AccountPopup({ onLogout, onClose, onOpenSupport }: {
     : { data: 0 };
   const pendingReviews = Number((pendingReviewQ as any)?.data ?? 0);
 
+  // 2026-10-07 主動收件匣：AI 已經做好、等這個人點頭的事有幾件（急件另外算）。
+  const inboxCountQ = (trpc as any).proactive.count.useQuery(undefined, { refetchInterval: 60_000 });
+  const inboxOpen = Number((inboxCountQ as any)?.data?.open ?? 0);
+
   // 2026-05-12 (CJ「通盤檢查每個 S 按鈕選項都要有地方去」):
   // 全部 7 項本來有 4 個是死按鈕（即將推出 toast / modal）。重整後每個都有
   // 真實的地方去，並補上「連結社群帳號」「我的成就」「客服」三個原本沒入口
@@ -778,6 +782,11 @@ export function AccountPopup({ onLogout, onClose, onOpenSupport }: {
     {
       icon: faUsers, label: isEn ? "Team & permissions" : "成員與權限", arrow: true, badge: null, danger: false,
       action: () => { navigate("/settings/workspace"); onClose(); },
+    },
+    {
+      icon: ICON.inbox, label: isEn ? "Waiting on you" : "待確認事項", arrow: true,
+      badge: inboxOpen > 0 ? String(inboxOpen) : null, danger: false,
+      action: () => { navigate("/inbox"); onClose(); },
     },
     {
       // 2026-09-07：審核佇列本來只能從某一則產出頁的送審列點進去，主管找不到。

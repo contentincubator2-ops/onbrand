@@ -79,6 +79,7 @@ const InfluencerPage = React.lazy(() => import("../content/pages/InfluencerPage"
 const AccountPage = React.lazy(() => import("../platform/pages/AccountPage"));
 const WorkspaceSettingsPage = React.lazy(() => import("../platform/pages/WorkspaceSettingsPage"));
 const ReviewQueuePage = React.lazy(() => import("../platform/pages/ReviewQueuePage"));
+const InboxPage = React.lazy(() => import("../platform/pages/InboxPage"));
 const ChangelogPage = React.lazy(() => import("../platform/pages/ChangelogPage"));
 
 // Admin (heaviest — adminProcedure-gated, almost never needed by general traffic)
@@ -360,6 +361,7 @@ export default function AppV2() {
           <Route path="/settings/account" element={<AccountPage />} />
           <Route path="/settings/workspace" element={<WorkspaceSettingsPage />} />
           <Route path="/review" element={<ReviewQueuePage />} />
+          <Route path="/inbox" element={<InboxPage />} />
           {/* 2026-05-13 — Layer 3 (admin support inbox) + Layer 5 (public changelog) */}
           <Route path="/admin/support" element={<AdminSupportPage />} />
           <Route path="/changelog" element={<ChangelogPage />} />

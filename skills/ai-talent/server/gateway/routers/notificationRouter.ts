@@ -22,7 +22,7 @@ import { isRecentViral } from "../../content/core/catalog/taskSource";
 
 export interface NotificationItem {
   id: string;
-  kind: "positioning_done" | "positioning_failed" | "task_complete" | "festival_upcoming" | "card_published" | "strategy_alert" | "regulation_review";
+  kind: "positioning_done" | "positioning_failed" | "task_complete" | "festival_upcoming" | "card_published" | "strategy_alert" | "regulation_review" | "proactive";
   title: string;
   excerpt: string;
   createdAtIso: string;
@@ -41,6 +41,7 @@ const AVATAR_PALETTE: Record<NotificationItem["kind"], { avatar: string; avatarC
   card_published:     { avatar: "＋", avatarColor: "#171717" }, // ink：新卡上架
   strategy_alert:     { avatar: "◆", avatarColor: "#171717" }, // ink：策略提醒
   regulation_review:  { avatar: "§", avatarColor: "#171717" }, // ink：法規審查重點待確認
+  proactive:          { avatar: "→", avatarColor: "#171717" }, // ink：AI 已做好、等你確認
 };
 
 /** /tasks/:platform 的路由代號。與 PlatformTaskPage 的 ROUTE_TO_PLATFORM 反向。 */
@@ -296,6 +297,32 @@ export const notificationRouter = router({
         }
       } catch (e) {
         console.warn("[notifications] brand_regulations query failed:", (e as Error).message);
+      }
+
+      // 7. 主動收件匣（2026-10-07）：AI 已經做好、等這個人確認的事。處理完或條件消失就不再列。
+      try {
+        const [rows]: any = await localPool.execute(
+          `SELECT e.id, e.title, e.urgency, e.createdAt, b.name AS brandName
+             FROM proactive_events e LEFT JOIN brands b ON b.id = e.brandId
+            WHERE e.userId = ? AND e.status = 'open'
+            ORDER BY (e.urgency = 'urgent') DESC, e.createdAt DESC LIMIT 10`,
+          [userId],
+        );
+        for (const r of rows as any[]) {
+          const iso = new Date(r.createdAt).toISOString();
+          items.push({
+            id: `pe-${r.id}`,
+            kind: "proactive",
+            title: isEn ? `Waiting on you · ${r.brandName ?? ""}` : `待確認 · ${r.brandName ?? ""}`,
+            excerpt: String(r.title ?? "").slice(0, 80),
+            createdAtIso: iso,
+            navUrl: "/inbox",
+            unread: new Date(iso) > lastSeen,
+            ...AVATAR_PALETTE.proactive,
+          });
+        }
+      } catch (e) {
+        console.warn("[notifications] proactive_events query failed:", (e as Error).message);
       }
 
       // 4. 新任務卡上架（純計算，不打 DB）

@@ -3,6 +3,7 @@ import { router } from "../platform/core/trpc";
 import { brandRouter } from "../strategy/routers/brandRouter";
 import { creditsRouter } from "../platform/routers/creditsRouter";
 import { notificationRouter } from "../gateway/routers/notificationRouter";
+import { proactiveRouter } from "../gateway/routers/proactiveRouter";
 import { supportRouter } from "../platform/routers/supportRouter";
 import { agentRouter } from "../content/routers/agentRouter";
 import { missionRouter } from "../content/routers/missionRouter";
@@ -77,6 +78,7 @@ export const appRouter = router({
   brand:         brandRouter,
   credits:       creditsRouter,
   notifications: notificationRouter,
+  proactive:     proactiveRouter,
   support:       supportRouter,
   agent:         agentRouter,
   mission:       missionRouter,
