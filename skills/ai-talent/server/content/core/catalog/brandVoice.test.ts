@@ -105,7 +105,18 @@ describe("verifiedPhrases —— 常用詞只留真的出現在原文的", () =>
   });
 
   it("含價格／日期這類數字的不收，太短或整句照抄的也不收", () => {
-    expect(verifiedPhrases(["499 元", "嗨", "嗨茶友們，今天來聊冷泡。喝起來順順的～"], samples)).toEqual([]);
+    expect(verifiedPhrases(["499 元", "嗨茶", "嗨茶友們，今天來聊冷泡。喝起來順順的～"], samples)).toEqual([]);
+  });
+
+  it("每個品牌都會用的兩字普通詞不收（DEV 實跑冒出「我們」「故事」「留言」）", () => {
+    expect(verifiedPhrases(["我們", "故事"], ["我們的故事很長", "我們說個故事"])).toEqual([]);
+  });
+
+  it("被較長的詞整個包住、篇數又沒有比較多的不重複留", () => {
+    expect(verifiedPhrases(["茶友們", "嗨茶友們"], samples).map((p) => p.text)).toEqual(["嗨茶友們"]);
+    // 短的出現在更多篇＝它自己就是習慣，留著
+    const more = [...samples, "各位茶友們午安"];
+    expect(verifiedPhrases(["茶友們", "嗨茶友們"], more).map((p) => p.text)).toEqual(["茶友們", "嗨茶友們"]);
   });
 
   it("原文有空白或換行、模型回的沒有，照樣對得上；重複的只算一次", () => {
@@ -125,6 +136,10 @@ describe("parseVoiceProfile", () => {
   it("不是 JSON 或兩格都空＝null（這一類不顯示語氣，不擋流程）", () => {
     expect(parseVoiceProfile("我覺得語氣很溫暖", [])).toBeNull();
     expect(parseVoiceProfile(`{"tone":"","structure":""}`, [])).toBeNull();
+  });
+
+  it("句尾標點拿掉（之後用「；」接成一行）", () => {
+    expect(parseVoiceProfile(`{"tone":"像朋友分享。","structure":"招呼→重點，"}`, [])).toMatchObject({ tone: "像朋友分享", structure: "招呼→重點" });
   });
 
   it("太長的語氣會截短", () => {

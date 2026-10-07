@@ -221,7 +221,8 @@ const squash = (t: string) => t.replace(/[\s　]+/g, "");
  * 另外丟掉：
  *   - 只出現在一篇的（那是那一篇的內容，不是習慣）
  *   - 含兩位數以上數字的（價格、日期、數量——跟 SKILL 的事實洩漏是同一件事）
- *   - 太短（一個字）或太長（整句照抄）
+ *   - 太短（兩個字以下：「我們」「故事」「留言」這種每個品牌都會用的普通詞）或太長（整句照抄）
+ *   - 被另一個留下來的詞整個包住、出現篇數又沒有比較多的（留「嗨茶友們」就不必再留「茶友」）
  */
 export function verifiedPhrases(candidates: unknown[], samples: string[], max = 10): VoiceProfile["phrases"] {
   const hay = samples.map(squash);
@@ -230,7 +231,7 @@ export function verifiedPhrases(candidates: unknown[], samples: string[], max = 
   for (const c of candidates) {
     const text = String((c as any)?.text ?? c ?? "").trim();
     const needle = squash(text);
-    if ([...needle].length < 2 || [...needle].length > 14) continue;
+    if ([...needle].length < 3 || [...needle].length > 14) continue;
     if (/\d{2,}/.test(needle)) continue;
     if (seen.has(needle)) continue;
     const count = hay.filter((h) => h.includes(needle)).length;
@@ -238,13 +239,16 @@ export function verifiedPhrases(candidates: unknown[], samples: string[], max = 
     seen.add(needle);
     out.push({ text, count });
   }
-  return out.sort((x, y) => y.count - x.count).slice(0, max);
+  const kept = out.filter((p) => !out.some((q) =>
+    q !== p && squash(q.text).length > squash(p.text).length && squash(q.text).includes(squash(p.text)) && q.count >= p.count));
+  return kept.sort((x, y) => y.count - x.count).slice(0, max);
 }
 
 const TONE_MAX = 90;
 const STRUCTURE_MAX = 110;
 const clipText = (t: unknown, max: number) => {
-  const s = String(t ?? "").replace(/\s+/g, " ").trim();
+  // 句尾標點拿掉：這幾句之後會用「；」接成一行，留著會變成「。；」。
+  const s = String(t ?? "").replace(/\s+/g, " ").trim().replace(/[。.；;，,、]+$/, "");
   const chars = [...s];
   return chars.length <= max ? s : `${chars.slice(0, max - 1).join("")}…`;
 };
