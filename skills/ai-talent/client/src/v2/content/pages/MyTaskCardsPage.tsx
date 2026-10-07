@@ -24,9 +24,11 @@ import type { ShellOutletCtx } from "../../platform/lib/shellContext";
 import { showToastGlobal } from "../../platform/components/Toast";
 import { toastWithUpgrade } from "../../platform/lib/upgradeToast";
 import { IllustratedEmpty } from "../../platform/components/EmptyIllustration";
-import { AddIcon, CopyIcon, DeleteIcon, EditIcon, FavoriteIcon } from "../../platform/components/icons";
+import { AddIcon, CopyIcon, DeleteIcon, EditIcon, FavoriteIcon, SampleIcon } from "../../platform/components/icons";
 import { isFrontVisibleCard } from "../../platform/lib/sourceVocabulary";
 import TaskCardComposer, { type ComposerChannel } from "../../strategy/components/taskCard/TaskCardComposer";
+import BrandVoiceFlow from "../../strategy/components/onboarding/BrandVoiceFlow";
+import { Modal, ModalBody, ModalContent } from "@heroui/react";
 import { ROUTE_TO_PLATFORM, PLATFORM_META, isComposerChannel, customPlatformMeta, type FBTaskCard } from "./platformTask/taskModel";
 import { useCustomChannels } from "../lib/customChannels";
 import { resolveTrayIds, toggleTrayId, taskPlatformOf, isDefaultTray, type TrayData } from "../lib/taskTrayClient";
@@ -87,6 +89,8 @@ export default function MyTaskCardsPage() {
   const [renaming, setRenaming] = useState<{ id: string; value: string } | null>(null);
   const [copying, setCopying] = useState<string | null>(null);      // 正在選「複製到哪個通路」的卡
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+  // 2026-10-07：丟參考文章學品牌寫法。建品牌時跳過的人、或想換一批文章重學的人從這裡進。
+  const [voiceOpen, setVoiceOpen] = useState(false);
 
   const shown: FBTaskCard[] = useMemo(
     () => ((listQ.data as any[]) ?? []).filter(isFrontVisibleCard) as FBTaskCard[],
@@ -133,7 +137,12 @@ export default function MyTaskCardsPage() {
 
   return (
     <div className="max-w-[1100px] mx-auto px-6 pt-10 pb-24">
-      <h1 className="text-[26px] font-bold text-neutral-900">{en ? "My task cards" : "我的任務卡"}</h1>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-[26px] font-bold text-neutral-900">{en ? "My task cards" : "我的任務卡"}</h1>
+        <button className={btn} onClick={() => setVoiceOpen(true)}>
+          <SampleIcon size={11} /> {en ? "Learn from my articles" : "用我的文章學寫法"}
+        </button>
+      </div>
 
       {/* 通路篩選 */}
       <div className="mt-5 flex flex-wrap gap-2">
@@ -305,6 +314,23 @@ export default function MyTaskCardsPage() {
             );
           })}
         </div>
+      )}
+
+      {voiceOpen && (
+        <Modal
+          isOpen
+          onClose={() => { setVoiceOpen(false); refetchAll(); }}
+          size="4xl"
+          scrollBehavior="inside"
+          isDismissable={false}
+          classNames={{ base: "max-h-[90dvh]" }}
+        >
+          <ModalContent>
+            <ModalBody className="px-6 py-6">
+              <BrandVoiceFlow brandId={brandId} onDone={() => { setVoiceOpen(false); refetchAll(); }} />
+            </ModalBody>
+          </ModalContent>
+        </Modal>
       )}
 
       {composer && (

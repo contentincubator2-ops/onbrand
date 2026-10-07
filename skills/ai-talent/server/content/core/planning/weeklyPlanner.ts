@@ -156,20 +156,83 @@ export function validateOps(args: {
   return out;
 }
 
-/** 模型回覆：{"reply","choices","ops"}；解析失敗回 null。 */
+/** 模型沒接好時的退場句。存進對話時會標 failed，下一輪不再餵回給模型。 */
+export const PLANNER_FALLBACK = "我這邊剛剛沒接好，再說一次看看？";
+/** 模型有排格子卻沒寫 reply 時補上的一句（prompt 叫它「改了什麼不用逐條描述」，它有時乾脆不說）。 */
+const DEFAULT_REPLY = "排好了，看右邊。";
+
+/** 被截斷或壞掉的 JSON：把 reply 與寫完整的 ops 救回來（寫到一半的最後一條丟掉）。 */
+function salvagePlannerReply(raw: string): { reply: string; ops: unknown[] } {
+  const m = raw.match(/"reply"\s*:\s*"((?:[^"\\]|\\.)*)"/);
+  let reply = "";
+  if (m) { try { reply = JSON.parse(`"${m[1]}"`); } catch { reply = m[1]!; } }
+  const ops: unknown[] = [];
+  const at = raw.search(/"ops"\s*:\s*\[/);
+  let i = at < 0 ? raw.length : raw.indexOf("[", at) + 1;
+  while (i < raw.length) {
+    const open = raw.indexOf("{", i);
+    if (open < 0) break;
+    let depth = 0, inStr = false, esc = false, end = -1;
+    for (let k = open; k < raw.length; k++) {
+      const ch = raw[k]!;
+      if (inStr) { if (esc) esc = false; else if (ch === "\\") esc = true; else if (ch === '"') inStr = false; continue; }
+      if (ch === '"') inStr = true;
+      else if (ch === "{") depth++;
+      else if (ch === "}") { depth--; if (depth === 0) { end = k; break; } }
+    }
+    if (end < 0) break;
+    try { ops.push(JSON.parse(raw.slice(open, end + 1))); } catch { /* 壞的那條跳過 */ }
+    i = end + 1;
+    const next = raw.slice(i).match(/^\s*([,\]])/);
+    if (!next || next[1] === "]") break;
+  }
+  return { reply, ops };
+}
+
+/**
+ * 模型回覆：{"reply","choices","ops"}；真的沒東西可用才回 null。
+ * 2026-10-07（CJ「常常出現我沒接好」）：原本只要 JSON 解不開或 reply 是空的就整輪作廢。
+ * 現在三種情況都接得住——有排格子但沒寫 reply（補一句）、沒照格式直接講話（那段話就是 reply）、
+ * JSON 被截斷（救回 reply 與寫完整的 ops）。
+ */
 export function parsePlannerReply(raw: string): { reply: string; choices: string[]; ops: unknown[]; fork: string | null } | null {
   const cleaned = String(raw ?? "").replace(/^```(?:json)?\s*/i, "").replace(/\s*```\s*$/i, "").trim();
+  if (!cleaned) return null;
   let obj: any = null;
   try { obj = JSON.parse(cleaned); } catch {
     const s = cleaned.indexOf("{"); const e = cleaned.lastIndexOf("}");
     if (s >= 0 && e > s) { try { obj = JSON.parse(cleaned.slice(s, e + 1)); } catch { obj = null; } }
   }
-  if (!obj || typeof obj !== "object") return null;
-  const reply = str(obj.reply, 300);
-  if (!reply) return null;
+  if (!obj || typeof obj !== "object" || Array.isArray(obj)) {
+    if (!cleaned.includes("{")) return { reply: str(cleaned, 300), choices: [], ops: [], fork: null };
+    const saved = salvagePlannerReply(cleaned);
+    if (!saved.reply && !saved.ops.length) return null;
+    return { reply: str(saved.reply, 300) || DEFAULT_REPLY, choices: [], ops: saved.ops, fork: null };
+  }
   const choices = (Array.isArray(obj.choices) ? obj.choices : []).map((c: unknown) => str(c, 24)).filter((c: string) => c.length >= 2).slice(0, 3);
   const fork = typeof obj.fork === "string" && obj.fork.trim() ? obj.fork.trim() : null;
-  return { reply, choices, ops: Array.isArray(obj.ops) ? obj.ops : [], fork };
+  const ops = Array.isArray(obj.ops) ? obj.ops : [];
+  const reply = str(obj.reply, 300) || (ops.length || fork || choices.length ? DEFAULT_REPLY : "");
+  if (!reply) return null;
+  return { reply, choices, ops, fork };
+}
+
+/**
+ * 餵給模型的對話：沒接好的那一輪（退場句＋它沒回到的那句話）整輪拿掉——使用者會再說一次，
+ * 留著只會讓模型看到同一句話重複、還學著回退場句。開頭一定是使用者的話（Anthropic 的格式要求）。
+ */
+export function plannerHistory(messages: Array<{ role: string; content: string; failed?: boolean }>, keep = 10): Array<{ role: "user" | "assistant"; content: string }> {
+  const kept: Array<{ role: "user" | "assistant"; content: string }> = [];
+  for (const m of messages) {
+    if (m.role !== "user" && (m.failed || m.content === PLANNER_FALLBACK)) {
+      if (kept[kept.length - 1]?.role === "user") kept.pop();
+      continue;
+    }
+    kept.push({ role: m.role === "user" ? "user" : "assistant", content: m.content });
+  }
+  const out = kept.slice(-keep);
+  while (out.length && out[0]!.role !== "user") out.shift();
+  return out;
 }
 
 // ─── 資料存取 ─────────────────────────────────────────────────────────

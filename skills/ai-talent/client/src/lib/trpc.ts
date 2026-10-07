@@ -60,7 +60,8 @@ const authAwareFetch: typeof fetch = async (input, init) => {
     // /login. Only redirect when the visitor is on a PROTECTED route.
     const PUBLIC_PATHS = ["/", "/pricing", "/terms", "/privacy", "/refund", "/plan-expired", "/login"];
     const path = window.location.pathname;
-    const isPublic = PUBLIC_PATHS.includes(path) || path.startsWith("/auth/");
+    // /approve/:token 是給沒有帳號的客戶看的核准頁，絕對不能把他踢去登入。
+    const isPublic = PUBLIC_PATHS.includes(path) || path.startsWith("/auth/") || path.startsWith("/approve/");
     const w = window as any;
     if (!isPublic && !w.__authRedirecting) {
       w.__authRedirecting = true;

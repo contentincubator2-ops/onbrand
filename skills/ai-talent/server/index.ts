@@ -619,6 +619,12 @@ async function runStartupMigrations() {
     await db.execute(sql.raw(INSPIRATION_PREFS_DDL));
     console.log("[migrate] inspiration_prefs: OK");
 
+    // 2026-10-07（CJ「整個要有 instinct 的主動性」）：主動收件匣的事件與每日彙整紀錄。
+    const { PROACTIVE_EVENTS_DDL, PROACTIVE_DIGESTS_DDL } = await import("./gateway/proactive/proactiveStore");
+    await db.execute(sql.raw(PROACTIVE_EVENTS_DDL));
+    await db.execute(sql.raw(PROACTIVE_DIGESTS_DDL));
+    console.log("[migrate] proactive_events / proactive_digests: OK");
+
     // 2026-10-06（CJ「網紅 mission tray：讀懂網紅連結，給每位網紅可講的產品特色和獨特切角」）。
     const { INFLUENCER_BATCHES_DDL } = await import("./content/core/influencer/influencerAngles");
     await db.execute(sql.raw(INFLUENCER_BATCHES_DDL));
@@ -762,6 +768,19 @@ const server = app.listen(PORT, async () => {
       });
     }, 30 * 60_000);
     console.log("[fbPageSync] Worker started (30m interval)");
+
+    // 主動引擎：每 10 分鐘跑一次各面向的檢查，寫成收件匣事件。預設關閉：要在該環境設 PROACTIVE_ENGINE=on。
+    const { tickProactive, isProactiveEnabled } = await import("./gateway/proactive/proactiveEngine");
+    if (isProactiveEnabled()) {
+      setInterval(() => {
+        tickProactive().catch((e) => {
+          console.error("[proactive] tick error:", e?.message ?? e);
+        });
+      }, 10 * 60_000);
+      console.log("[proactive] Worker started (10m interval)");
+    } else {
+      console.log("[proactive] disabled (set PROACTIVE_ENGINE=on to enable)");
+    }
 
     // 核准後的貼文到時間自動發布。預設關閉：要在該環境設 AUTOPUBLISH_SCHEDULED=on。
     const { tickScheduledPublish, isAutoPublishEnabled } = await import("./content/core/scheduledPublishWorker");

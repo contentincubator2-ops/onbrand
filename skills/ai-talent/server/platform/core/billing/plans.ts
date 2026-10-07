@@ -74,6 +74,12 @@ export interface PlanQuota {
    */
   reviewWorkflow: boolean;
   /**
+   * 2026-10-07（CJ「下放到所有付費方案」）：客戶核准連結——把排好的貼文用一條免登入連結
+   * 交給客戶留言、直接修改、核准。試用沒有；付費方案都有（跟 reviewWorkflow 的團隊內部
+   * 審核是兩回事：那個要席次，這個不用）。approvalRouter.create 用 assertApprovalLinkAllowed 擋。
+   */
+  approvalLinks: boolean;
+  /**
    * 2026-09-08 (CJ「策略監測，定義在 9000 的方案」)：為品牌與產品設監測，
    * 受眾或競爭者有變化時亮出情報並提醒回工作台調整錨點。基礎沒有 ——
    * 它是「有一組人在替你看市場」的承諾，跟策略工作台同一級。
@@ -204,6 +210,7 @@ export const PLANS: Record<PlanCode, Plan> = {
       products: 0,
       eventsPerCycle: 0,
       reviewWorkflow: false,
+      approvalLinks: true,
       strategyMonitoring: false,
     },
     features: [
@@ -253,6 +260,7 @@ export const PLANS: Record<PlanCode, Plan> = {
       products: 0,
       eventsPerCycle: 0,
       reviewWorkflow: false,
+      approvalLinks: false,
       strategyMonitoring: false,
     },
     features: [
@@ -310,6 +318,7 @@ export const PLANS: Record<PlanCode, Plan> = {
       products: 10,
       eventsPerCycle: 1,
       reviewWorkflow: true,
+      approvalLinks: true,
       strategyMonitoring: true,
     },
     features: [
@@ -347,6 +356,7 @@ export const PLANS: Record<PlanCode, Plan> = {
       products: -1,
       eventsPerCycle: -1,
       reviewWorkflow: true,
+      approvalLinks: true,
       strategyMonitoring: true,
     },
     features: [
