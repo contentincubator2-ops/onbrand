@@ -147,6 +147,14 @@ async function reviewInto(job: WriteJob): Promise<void> {
       slot.status = "skipped";
     }
   }
+  // 2026-10-07 DEV 實跑：模型把前三句各報了兩三條，最明顯的「私訊我預約、前十名免費諮詢」反而沒報。
+  // 關鍵字掃描命中、但審查沒有點到的句子，一律補成一筆建議——由醫師判斷，不讓它無聲通過。
+  for (const h of hits) {
+    if (all.some((i) => i.quote.includes(h.quote) || h.quote.includes(i.quote)) || !text.includes(h.quote)) continue;
+    all.push({ regulationId: h.regulationId, quote: h.quote, detail: `關鍵字掃描標出：${h.why}。請您判斷是否需要調整。`, suggestion: "" });
+    const slot = job.review.find((r) => itemsOfGroup(r.group).some((x) => x.id === h.regulationId));
+    if (slot && slot.status === "pass") slot.status = "issue";
+  }
   job.issues = all;
   job.verdict = job.review.some((r) => r.status === "skipped") ? "partial" : all.length ? "issues" : "compliant";
 }

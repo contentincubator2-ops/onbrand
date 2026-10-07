@@ -217,7 +217,7 @@ export function inspireWritePrompt(args: {
     `【可以用的事實（白名單，出處：${FACT_SOURCE.label}）】\n${factsBlock()}`,
     `【一定要守的規則】\n${GROUND_RULES}`,
     `- 自稱用「我」；需要署名時用「${doctorByline(args.doctor)}」。不要編醫師的學經歷、科別、服務院所或看診經驗的數字。`,
-    `- 不要用 Markdown 符號（#、**、-）。不要自己加免責聲明，系統會補。`,
+    `- 不要用 Markdown 的標題、粗體或項目符號；hashtag 前面的 # 照常要寫。不要自己加免責聲明，系統會補。`,
     `只輸出成稿本身，不要前言或說明。`,
   ].filter(Boolean).join("\n");
 }
@@ -264,7 +264,8 @@ export function reviewPrompt(items: InspireRegulation[], hits: RiskHit[]): strin
     `2. 同義改寫、暗示、疑問句包裝一樣算。`,
     `3. 成稿最後那句「本文是衛教資訊……」是系統加的提醒，不用審。`,
     `4. quote 要照抄成稿裡的原句（從上一個句號或換行之後，到這一句的句號為止），一個字都不能改；detail 用 40 字內說為什麼。`,
-    `5. suggestion 是給醫師參考的改法：把那一句改成合規、意思接近、語氣與原文一致的一句話，長度接近原句；如果那一句拿掉最好，就填空字串。你不要改成稿，只提建議。`,
+    `5. suggestion 是給醫師參考的改法：把那一句改成合規、意思接近、語氣與原文一致的一句話，長度接近原句；如果那一句拿掉最好，就填空字串。建議裡不可以加進原句沒有的事實、數字或「研究顯示」這類說法。你不要改成稿，只提建議。`,
+    `6. 同一句在這一組只報一次，regulationId 填最直接相關的那一條，其他相關的條文寫在 detail 裡。每一句有疑慮的話都要報，不要因為前面報過別句就略過。`,
     `只輸出 JSON，不要前言：{"issues":[]} 或 {"issues":[{"regulationId":"${ids[0] ?? ""}","quote":"…","detail":"…","suggestion":"…"}]}`,
   ].filter(Boolean).join("\n");
 }
@@ -281,5 +282,5 @@ export function parseReviewIssues(raw: string, args: { ids: string[]; text: stri
       suggestion: String(i?.suggestion ?? "").trim().slice(0, 300),
     }))
     .filter((i) => args.ids.includes(i.regulationId) && i.quote.length >= 2 && args.text.includes(i.quote) && i.suggestion !== i.quote)
-    .slice(0, 6);
+    .slice(0, 20);
 }

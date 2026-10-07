@@ -8,6 +8,7 @@ name: Ops (DEV) — probe doctor inspire demo end to end (read-only)
 # 100 位的人設檔很大，只把這次要跑的幾位打包上去（PROBE_KEYS）。
 # 第 2 次跑：改成每位 agent 各自呼叫＋審查附建議之後。
 # 第 3 次跑：CJ 補了 DEV 的模型額度之後（確認實際回覆的是哪個模型）。
+# 第 4 次跑：審查每組上限 6→20、同一句一組只報一次之後（上一次漏了「私訊我預約」那一句）。
 # 花費：約 20 次模型呼叫。
 # Path-scoped push，跟 op-probe-dev-influencer.yml 同一個做法（environment: dev 才會連到 DEV VM）。
 on:
