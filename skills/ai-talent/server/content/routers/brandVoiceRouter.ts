@@ -33,7 +33,7 @@ import {
   VOICE_CATEGORIES, VOICE_CATEGORY_IDS, VOICE_MAX_ARTICLES, VOICE_MAX_PER_CATEGORY,
   VOICE_MIN_ARTICLE_CHARS, VOICE_MIN_PER_CATEGORY,
   voiceCategory, voiceCardId, renderForClassify, parseClassification, parseVoiceProfile,
-  pickTrialTopic, buildVoiceBlock, mergeVoiceText, classifyPrompt, profilePrompt, revisePrompt,
+  pickTrialTopic, buildVoiceBlock, mergeVoiceText, classifyPrompt, profilePrompt, revisePrompt, dropNearDuplicates,
 } from "../core/catalog/brandVoice";
 import { distilSkill, drawCardIllustration } from "./brandTaskCardRouter";
 
@@ -167,7 +167,18 @@ async function runTrial(brandId: number, userId: number, cardId: string): Promis
     const card = await getBrandTaskCard(brandId, cardId);
     if (!card?.voice || !card.skill) return;
     await patchCard(brandId, userId, cardId, (c) => setVoice({ ...c, currentStep: 3, lastError: null }, { phase: "writing" }));
-    const caption = await trialWrite(card, card.voice.topic);
+    let caption = await trialWrite(card, card.voice.topic);
+    // 字數區間在生文那一層只是提示詞裡的一句話，沒有驗收。試寫要拿來跟原文左右對照，
+    // 長度差一截第一眼就「不像」，所以超出區間就帶著實際字數再寫一次，取比較靠近區間的那篇。
+    const { minChars, maxChars } = card.measured;
+    const off = (t: string) => (t.length < minChars ? minChars - t.length : t.length > maxChars ? t.length - maxChars : 0);
+    if (off(caption) > 0) {
+      const hint = `${card.voice.topic}
+
+（篇幅要求：全文 ${minChars}–${maxChars} 字。上一版寫了 ${caption.length} 字，${caption.length > maxChars ? "太長" : "太短"}，請照這個篇幅重寫。）`;
+      const second = await trialWrite(card, hint).catch(() => "");
+      if (second && off(second) < off(caption)) caption = second;
+    }
     const at = new Date().toISOString();
     await patchCard(brandId, userId, cardId, (c) =>
       setVoice({ ...c, currentStep: TOTAL_STEPS, lastDryRun: { at, caption } }, { phase: "review", verdict: null }));
@@ -318,6 +329,18 @@ export const brandVoiceRouter = router({
         const list = byCat.get(g.category) ?? [];
         for (const s of g.samples) { const t = s.trim(); if (t && !list.includes(t)) list.push(t); }
         byCat.set(g.category, list.slice(0, VOICE_MAX_PER_CATEGORY));
+      }
+      // 同一篇的不同版本只算一篇；去掉之後不到兩篇的類別就不學（一篇量不出共同點）。
+      for (const [cat, list] of [...byCat]) {
+        const distinct = dropNearDuplicates(list);
+        if (distinct.length >= VOICE_MIN_PER_CATEGORY) byCat.set(cat, distinct);
+        else byCat.delete(cat);
+      }
+      if (byCat.size === 0) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "這些文章的內容幾乎一樣（像是同一篇的不同版本）。每一類請放至少兩篇不同的文章。",
+        });
       }
 
       const topics = new Map<VoiceCategoryId, string>();

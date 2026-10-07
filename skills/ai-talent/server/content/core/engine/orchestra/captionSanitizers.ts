@@ -21,11 +21,16 @@ export function stripPlaceholderBrackets(s: string): string {
   if (!s) return s;
   return s
     // With content: "[請補充：日期]" + optional trailing punctuation
-    .replace(/[\[【]\s*(?:請補充|待補|請填入|TODO|ASSUMPTION|TBD|placeholder)[：:][^\[\]【】\n]*[\]】][。，,\.\s]*/g, "")
+    // （尾巴只吃同一行的空白，不吃換行——佔位符在段尾時，後面的空行是分段。）
+    .replace(/[\[【]\s*(?:請補充|待補|請填入|TODO|ASSUMPTION|TBD|placeholder)[：:][^\[\]【】\n]*[\]】][。，,\. \t]*/g, "")
     // Without content: "[請補充]" + optional trailing punctuation
-    .replace(/[\[【]\s*(?:請補充|待補|請填入|TODO|ASSUMPTION|TBD|placeholder)\s*[\]】][。，,\.\s]*/g, "")
+    .replace(/[\[【]\s*(?:請補充|待補|請填入|TODO|ASSUMPTION|TBD|placeholder)\s*[\]】][。，,\. \t]*/g, "")
     // Cleanup
-    .replace(/\s{2,}/g, " ")
+    // 2026-10-07：只收同一行裡多出來的空白。原本寫 \s{2,}，換行也算空白，
+    // 於是段落之間的空行（\n\n）整個被壓成一個空格——每一篇單篇／套組文案的分段都不見，
+    // 下一行「三個以上換行收成兩個」也永遠輪不到。
+    .replace(/[ \t\u3000]{2,}/g, " ")
+    .replace(/[ \t]+\n/g, "\n")
     .replace(/\n\s*\n\s*\n+/g, "\n\n")
     .trim();
 }
