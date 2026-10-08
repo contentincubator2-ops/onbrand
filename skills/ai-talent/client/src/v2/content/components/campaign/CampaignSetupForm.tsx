@@ -16,7 +16,7 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faArrowRight } from "@fortawesome/free-solid-svg-icons";
 import { trpc } from "../../../../lib/trpc";
 import { CHANNEL_META, channelLabel } from "../../../platform/lib/channelMeta";
-import { CAMPAIGN_TYPES, EMPTY_CAMPAIGN_SETTINGS, type CampaignSettings } from "../../../strategy/lib/campaign/campaignSchema";
+import { CAMPAIGN_CHANNELS, CAMPAIGN_TYPES, EMPTY_CAMPAIGN_SETTINGS, type CampaignSettings } from "../../../strategy/lib/campaign/campaignSchema";
 import { briefFromEvent } from "../../../strategy/lib/campaign/campaignBasis";
 import { scopeValueFrom, UNDECIDED_SCOPE, type ProductScopeValue } from "../../../strategy/lib/eventProductScope";
 import EventProductScopePicker from "../../../strategy/components/events/EventProductScopePicker";
@@ -67,7 +67,8 @@ export default function CampaignSetupForm({ eventId, data, brandProducts, hasPla
 
   const inferMut = (trpc as any).campaign.infer.useMutation({
     onSuccess: (r: any) => {
-      setSettings((s) => ({ ...s, type: r.type, mechanic: r.mechanic || brief, goal: r.goal ?? "", channels: r.channels }));
+      // 類型、通路在新增活動時選過就照選的，沒選才用推斷的（2026-10-08）。
+      setSettings((s) => ({ ...s, type: s.type || r.type, mechanic: r.mechanic || brief, goal: r.goal ?? "", channels: s.channels.length ? s.channels : r.channels }));
       if (scopeRef.current.scope === null) setScopeValue(scopeValueFrom(r.productScope, r.productIds ?? []));
       setDirty(true);
     },
@@ -106,7 +107,8 @@ export default function CampaignSetupForm({ eventId, data, brandProducts, hasPla
         const sv = picked.scope === null ? scopeValueFrom(r.productScope, r.productIds ?? []) : picked;
         const { productScope: _stale, ...rest } = s;
         const next = {
-          ...rest, type: r.type, mechanic: (r.mechanic || text).trim().slice(0, 600), goal: r.goal ?? "", channels: r.channels,
+          ...rest, type: s.type || r.type, mechanic: (r.mechanic || text).trim().slice(0, 600), goal: r.goal ?? "",
+          channels: s.channels.length ? s.channels : r.channels,
           ...(sv.scope ? { productScope: sv.scope } : {}),
         };
         saveSettingsMut.mutate({ eventId, settings: next, productIds: sv.productIds }, {
@@ -186,7 +188,7 @@ export default function CampaignSetupForm({ eventId, data, brandProducts, hasPla
           <div>
             <p className="text-tiny text-default-500 mb-2">{L("要發的通路", "Channels")}</p>
             <div className="flex gap-1.5 flex-wrap">
-              {Object.keys(CHANNEL_META).filter((c) => ["facebook", "instagram", "threads", "line", "tiktok", "email", "website", "kol", "cobrand"].includes(c)).map((c) => {
+              {CAMPAIGN_CHANNELS.filter((c) => CHANNEL_META[c]).map((c) => {
                 const on = settings.channels.includes(c);
                 return (
                   <Chip key={c} size="sm" variant={on ? "solid" : "flat"} color="default" className="cursor-pointer"
