@@ -571,6 +571,26 @@ async function runPipelineDetached(args: {
     }
   }
 
+  // 2026-10-08（CJ「新建活動時，要增加可以提供連結的功能」「要包括詢問是否有目標受眾」）：
+  // 這檔活動的參考資料（新增活動時給的連結、上傳的過往資料）當定位基礎；新增活動時寫的那段話
+  // 以前也沒進定位（描述是空的），一起補上。
+  let eventAudience: string | undefined;
+  if (args.entityKind === "event") {
+    try {
+      const { loadEventIntake } = await import("../entities/eventIntake");
+      const intake = await loadEventIntake(args.entityId);
+      if (!description && intake.note) description = intake.note;
+      if (intake.audience) eventAudience = intake.audience;
+      const { loadSourceDocs, formatSourcesForPrompt } = await import("../../../content/core/campaign/campaignChatSources");
+      const sources = formatSourcesForPrompt(await loadSourceDocs(args.entityId, args.userId).catch(() => []));
+      // 定位有 11 步、每一步都帶這一段，所以只給前 6,000 字（排企劃與對話讀的是完整的 20,000 字）。
+      if (sources) realContent = sources.slice(0, 6000);
+      console.log(`[positioningJobRunner] event ${args.entityId} intake: audience=${intake.audience ? "yes" : "no"} sources=${sources.length} chars`);
+    } catch (e: any) {
+      console.warn(`[positioningJobRunner] event intake load failed (non-fatal):`, e?.message ?? e);
+    }
+  }
+
   // 2026-07-17 多市場: load the entity's market ONCE per pipeline and inject
   // into every step's ctx so competitor / trend / audience research is
   // scoped to the brand's target market (product/event inherit from the
@@ -606,6 +626,8 @@ async function runPipelineDetached(args: {
   } catch (e: any) {
     console.warn(`[positioningJobRunner] market load failed (non-fatal):`, e?.message ?? e);
   }
+  // 這檔活動自己指定了受眾：以活動的為準（一檔活動常只打品牌客群裡的某一塊，或一群新的人）。
+  if (eventAudience) officialAudience = eventAudience;
 
   // Build adjacency: id → step
   const completed = new Set<string>();

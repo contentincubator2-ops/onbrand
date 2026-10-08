@@ -20,7 +20,7 @@ import { trpc } from "../../../lib/trpc";
 import { useLang } from "../../../lib/i18n";
 import { Modal, ModalBody, ModalContent, ModalFooter, ModalHeader, Button, Chip, Input, Textarea, Select, SelectItem, Autocomplete, AutocompleteItem, Tooltip } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faRocket, faCubes, faCalendarDays, faTag, faShareNodes, faPaperclip, faXmark, faFileLines } from "@fortawesome/free-solid-svg-icons";
+import { faRocket, faCubes, faCalendarDays, faTag, faShareNodes, faPaperclip, faXmark, faFileLines, faUsers, faLink } from "@fortawesome/free-solid-svg-icons";
 // 2026-09-10 (CJ 市場收斂): 見 BrandOnboardingWizard 的同一則說明。
 import { marketOptions, getCountry } from "../../../lib/countries";
 import EventProductScopePicker from "./events/EventProductScopePicker";
@@ -54,6 +54,9 @@ const COMMON_LANGS: Array<{ code: string; label: string }> = [
   { code: "ar",    label: "العربية" },
   { code: "hi",    label: "हिन्दी" },
 ];
+
+/** 新增活動時最多給幾條連結（跟 server 的 INTAKE_LINKS_MAX 一致；加上 5 份檔案剛好是參考資料上限）。 */
+const EVENT_LINKS_MAX = 3;
 
 export type AddEntityTab = "brand" | "product" | "event";
 
@@ -169,7 +172,15 @@ export function AddEntityModal({ isOpen, onClose, initialTab = "brand", defaultB
   const [evFiles, setEvFiles] = useState<Array<{ name: string; text: string; chars: number }>>([]);
   const [evUploading, setEvUploading] = useState("");
   const [evFileNote, setEvFileNote] = useState<{ text: string; bad: boolean } | null>(null);
-  const [evPanel, setEvPanel] = useState<"brand" | "dates" | "scope" | "type" | "channels" | null>(null);
+  const [evPanel, setEvPanel] = useState<"brand" | "dates" | "scope" | "type" | "channels" | "audience" | "links" | null>(null);
+  // 2026-10-08（CJ「新建活動時，要增加可以提供連結的功能」「要包括詢問是否有目標受眾」）：兩格都在
+  // 圖示後面、都可以不填。受眾沒寫＝照品牌的受眾（存在 positioning.targetAudience，見 server 的
+  // eventIntake.ts）。連結一行一個，活動建好後由伺服器去讀，讀到的跟上傳的檔案一樣存成這檔活動的
+  // 參考資料（campaign.chatAddLinks）。
+  const [evAudience, setEvAudience] = useState("");
+  const [evLinks, setEvLinks] = useState("");
+  const evLinkList = evLinks.split(/[\s,，、;；]+/).map((x) => x.trim()).filter(Boolean);
+  const addLinksMut = (trpc as any).campaign?.chatAddLinks?.useMutation?.();
   const evFileRef = useRef<HTMLInputElement>(null);
   const addSourceMut = (trpc as any).campaign?.chatAddSource?.useMutation?.();
   const onEventFiles = async (list: FileList | null) => {
@@ -243,6 +254,7 @@ export function AddEntityModal({ isOpen, onClose, initialTab = "brand", defaultB
     setEvType("");
     setEvOffline({ venue: "", sessions: "", signupUrl: "" });
     setEvFiles([]); setEvUploading(""); setEvFileNote(null);
+    setEvAudience(""); setEvLinks("");
     setEvPanel(defaultBrandId ? null : "brand");
   }, [isOpen, defaultBrandId, eventPrefill]);
 
@@ -323,6 +335,7 @@ export function AddEntityModal({ isOpen, onClose, initialTab = "brand", defaultB
     setBusy(true); setErrorMsg(null);
     try {
       const note = evNote.trim();
+      const audience = evAudience.trim();
       const campaign: Record<string, unknown> = {
         ...(evScope.scope ? { productScope: evScope.scope } : {}),
         ...(evType ? { type: evType } : {}),
@@ -342,8 +355,8 @@ export function AddEntityModal({ isOpen, onClose, initialTab = "brand", defaultB
         // 搭配的產品寫進 event_products；「純品牌」沒有產品可寫，所以記在
         // positioning.campaign.productScope（語意見 server/strategy/core/entities/eventProductScope.ts）。
         ...(evScope.scope ? { productIds: evScope.productIds } : {}),
-        positioning: (note || Object.keys(campaign).length)
-          ? { ...(note ? { note } : {}), ...(Object.keys(campaign).length ? { campaign } : {}) }
+        positioning: (note || audience || Object.keys(campaign).length)
+          ? { ...(note ? { note } : {}), ...(audience ? { targetAudience: audience } : {}), ...(Object.keys(campaign).length ? { campaign } : {}) }
           : undefined,
       });
       const newId = Number(r?.id ?? 0);
@@ -360,6 +373,18 @@ export function AddEntityModal({ isOpen, onClose, initialTab = "brand", defaultB
         showToastGlobal(lang === "en"
           ? `${lost} reference file(s) couldn't be saved — re-upload them from the chat box on the campaign page.`
           : `有 ${lost} 份參考資料沒存進去，可以在企劃頁的對話框重新上傳。`, "error");
+      }
+      // 連結也一樣：先讀完存好再進企劃頁。讀不到的（要登入、擋機器人、不是網頁）不擋建立，但要講是哪幾條。
+      const links = evLinkList.slice(0, EVENT_LINKS_MAX);
+      if (newId && links.length && addLinksMut) {
+        let unread: string[] = links;
+        try { unread = (await addLinksMut.mutateAsync({ eventId: newId, urls: links }))?.failed ?? []; }
+        catch { /* 整批失敗＝全部沒讀到 */ }
+        if (unread.length > 0) {
+          showToastGlobal(lang === "en"
+            ? `Couldn't read ${unread.length} link(s): ${unread.join(", ").slice(0, 200)} — upload a file or paste the key points in the chat on the campaign page.`
+            : `有 ${unread.length} 條連結讀不到：${unread.join("、").slice(0, 200)}。可以在企劃頁的對話框改上傳檔案，或把重點貼進去。`, "error");
+        }
       }
       await refreshLists();
       triggerPositioning("event", newId);
@@ -544,6 +569,10 @@ export function AddEntityModal({ isOpen, onClose, initialTab = "brand", defaultB
                 tip: typeSpec ? (en ? typeSpec.en : typeSpec.zh) : L("沒選就依你寫的內容判斷", "Leave empty and we'll work it out") },
               { id: "channels" as const, icon: faShareNodes, label: L("通路", "Channels"), on: evChannels.length > 0,
                 tip: evChannels.map((c) => channelLabel(c, en)).join("、") || L("沒選就依你寫的內容判斷", "Leave empty and we'll pick") },
+              { id: "audience" as const, icon: faUsers, label: L("受眾", "Audience"), on: !!evAudience.trim(),
+                tip: evAudience.trim().slice(0, 60) || L("這檔活動有特別想對誰說嗎？沒寫就照品牌的受眾", "Is this campaign for someone specific? Empty = the brand's audience") },
+              { id: "links" as const, icon: faLink, label: L("連結", "Links"), on: evLinkList.length > 0,
+                tip: evLinkList.length ? L(`${Math.min(evLinkList.length, EVENT_LINKS_MAX)} 條連結`, `${Math.min(evLinkList.length, EVENT_LINKS_MAX)} link(s)`) : L("活動頁、報名頁、商品頁的網址，AI 會去讀", "Campaign, sign-up or product page URLs for the AI to read") },
             ];
             const canAttach = !!evBrandId && !busy && !evUploading && evFiles.length < EVENT_FILES_MAX;
             return (
@@ -680,6 +709,32 @@ export function AddEntityModal({ isOpen, onClose, initialTab = "brand", defaultB
                           ))}
                         </div>
                       )}
+                    </div>
+                  )}
+                  {evPanel === "audience" && (
+                    <div>
+                      <label className="text-xs font-medium text-default-700 block mb-1">{L("這檔活動有特別想對誰說嗎？", "Is this campaign for someone specific?")}</label>
+                      <Textarea value={evAudience} onValueChange={setEvAudience} minRows={2} maxRows={4} maxLength={300} isDisabled={busy}
+                        aria-label={L("這檔活動的目標受眾", "Target audience for this campaign")}
+                        placeholder={L("例：30–40 歲、要送長輩中秋禮的上班族；已經買過一次的老顧客", "e.g. office workers in their 30s buying a Mid-Autumn gift for their parents; returning customers")} />
+                      <p className="text-tiny text-default-500 mt-1">
+                        {L("可以不填，沒寫就照品牌的目標受眾。有寫的話，這檔活動的定位、企劃與每一篇貼文都會對著這群人寫。",
+                           "Optional — leave empty to use the brand's audience. If you name one, the positioning, plan and every post for this campaign are written for them.")}
+                      </p>
+                    </div>
+                  )}
+                  {evPanel === "links" && (
+                    <div>
+                      <label className="text-xs font-medium text-default-700 block mb-1">{L(`活動相關連結（一行一個，最多 ${EVENT_LINKS_MAX} 條）`, `Links about this campaign (one per line, up to ${EVENT_LINKS_MAX})`)}</label>
+                      <Textarea value={evLinks} onValueChange={setEvLinks} minRows={2} maxRows={4} isDisabled={busy}
+                        aria-label={L("活動相關連結", "Links about this campaign")}
+                        placeholder={L("https://…（活動頁、報名頁、商品頁、新聞稿）", "https://… (campaign page, sign-up page, product page, press release)")} />
+                      <p className={`text-tiny mt-1 ${evLinkList.length > EVENT_LINKS_MAX ? "text-danger" : "text-default-500"}`}>
+                        {evLinkList.length > EVENT_LINKS_MAX
+                          ? L(`只會讀前 ${EVENT_LINKS_MAX} 條。`, `Only the first ${EVENT_LINKS_MAX} will be read.`)
+                          : L("建立時 AI 會去讀這些頁面，內容用在活動定位、企劃與之後的對話。要登入才看得到的頁面讀不到，讀不到會告訴你。",
+                              "On create, the AI reads these pages and uses them for the positioning, the plan and later chats. Pages behind a login can't be read — we'll tell you which.")}
+                      </p>
                     </div>
                   )}
                   {evPanel === "channels" && (

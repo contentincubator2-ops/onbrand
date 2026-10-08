@@ -228,7 +228,11 @@ export async function removeSource(eventId: number, userId: number, id: number):
  * 回這次讀到的與讀不到的，畫面與指令都會用到。
  */
 export async function readLinksInMessage(eventId: number, userId: number, message: string): Promise<{ read: LinkRead[]; failed: string[] }> {
-  const urls = findUrls(message);
+  return readLinks(eventId, userId, findUrls(message));
+}
+
+/** 同上，但網址是呼叫端給的（新增活動視窗填的活動連結）。 */
+export async function readLinks(eventId: number, userId: number, urls: string[]): Promise<{ read: LinkRead[]; failed: string[] }> {
   const read: LinkRead[] = [];
   const failed: string[] = [];
   await Promise.all(urls.map(async (url) => {
