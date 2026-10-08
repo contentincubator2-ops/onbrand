@@ -11,6 +11,7 @@ import { buildPriorContext, callWithFallback, tryParseJson, gateInfoFor, resolve
 import { resolveTaskOrThrow, resolveTaskTemplate } from "../../core/catalog/taskRegistry";
 import { assertTaskAllowed } from "../../../platform/core/billing/planGate";
 import { assertIntakeComplete } from "../../core/catalog/taskIntake";
+import { TASK_ATTACHMENTS_INPUT, type TaskAttachment } from "../../core/catalog/taskAttachments";
 import { templateNeedsViralSource, checkViralSource, VIRAL_SOURCE_KEY, platformLabelOf } from "../../core/engine/viralSourceGuard";
 import { TRPCError } from "@trpc/server";
 import { loadCampaignItem } from "../../core/campaign/campaignItemBrief";
@@ -51,6 +52,8 @@ export interface RunSingleTaskInput {
   eventId?: number | null;
   spotRef?: { scenarioId: string; spotIndex: number } | null;
   campaignItem?: z.infer<typeof CAMPAIGN_ITEM_INPUT>;
+  /** 任務卡上傳的素材（已解析成文字），見 core/catalog/taskAttachments.ts。 */
+  attachments?: TaskAttachment[];
   runKey?: string;
 }
 
@@ -105,6 +108,7 @@ export async function runSingleTask(userId: number, rawInput: RunSingleTaskInput
     userId,
     audienceTag: await resolveAudienceTag(userId, input.brandId, input.spotRef),
     campaignItem: input.campaignItem ? await loadCampaignItem(input.campaignItem, userId) : null,
+    attachments: input.attachments ?? null,
     ...cancelCtx,
   };
 
@@ -219,6 +223,7 @@ export const runProcedures = {
       }).optional().nullable(),
       // 2026-09-30：從活動企劃寫某一篇（見 strategy/core/campaignItemBrief.ts）。
       campaignItem: CAMPAIGN_ITEM_INPUT,
+      attachments: TASK_ATTACHMENTS_INPUT,
       /** Client-generated id so cancelRun can stop this run. */
       runKey: RUN_KEY,
       asyncMode: z.boolean().default(true),
@@ -294,7 +299,8 @@ export const runProcedures = {
 
       const baseArgs = { template, config, inputs: input.inputs, brandId: input.brandId, ...scope, userId, tier: "60s" as const,
         audienceTag: await resolveAudienceTag(userId, input.brandId, input.spotRef),
-        campaignItem: input.campaignItem ? await loadCampaignItem(input.campaignItem, userId) : null, ...cancelCtx };
+        campaignItem: input.campaignItem ? await loadCampaignItem(input.campaignItem, userId) : null,
+        attachments: input.attachments ?? null, ...cancelCtx };
 
       if (!input.asyncMode) {
         return runOrchestra(baseArgs).finally(() => unregisterRunKey(input.runKey));
@@ -365,6 +371,7 @@ export const runProcedures = {
       }).optional().nullable(),
       // 2026-09-30：從活動企劃寫某一篇（見 strategy/core/campaignItemBrief.ts）。
       campaignItem: CAMPAIGN_ITEM_INPUT,
+      attachments: TASK_ATTACHMENTS_INPUT,
       /** Client-generated id so cancelRun can stop this run. */
       runKey: RUN_KEY,
       asyncMode: z.boolean().default(true),
@@ -417,7 +424,8 @@ export const runProcedures = {
 
       const baseArgs = { template, config, inputs: input.inputs, brandId: input.brandId, ...scope, userId, tier: "99s" as const,
         audienceTag: await resolveAudienceTag(userId, input.brandId, input.spotRef),
-        campaignItem: input.campaignItem ? await loadCampaignItem(input.campaignItem, userId) : null, ...cancelCtx };
+        campaignItem: input.campaignItem ? await loadCampaignItem(input.campaignItem, userId) : null,
+        attachments: input.attachments ?? null, ...cancelCtx };
 
       if (!input.asyncMode) {
         // Legacy sync path — fully await, return final result.
@@ -500,6 +508,7 @@ export const runProcedures = {
         }).optional().nullable(),
         // 2026-09-30：從活動企劃寫某一篇（見 strategy/core/campaignItemBrief.ts）。
         campaignItem: CAMPAIGN_ITEM_INPUT,
+        attachments: TASK_ATTACHMENTS_INPUT,
         runKey: RUN_KEY,
       }),
     )

@@ -51,6 +51,8 @@ import ListingBatchModal from "../components/batch/ListingBatchModal";
 import { AddEntityModal } from "../../strategy/components/AddEntityModal";
 import RewriteDraftModal from "../components/quickTask/RewriteDraftModal";
 import OwnCardLabelsEditor from "../components/quickTask/OwnCardLabelsEditor";
+import TaskAttachments from "../components/quickTask/TaskAttachments";
+import { type AttachmentItem, readyAttachments, attachmentsBusy } from "../lib/taskAttachments";
 import {
   Avatar, Button, Card, CardBody, Chip, Input, Modal, ModalBody,
   ModalContent, ModalHeader, Textarea, Tooltip,
@@ -302,6 +304,9 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
   // 那些格子沒有任何 UI 可以填，模型只好自己編（例如「新品上市全套」從來不問
   // 活動什麼時候辦）。要問哪幾格由 lib/taskIntake 決定，server 用同一份判斷驗。
   const [extraAnswers, setExtraAnswers] = useState<Record<string, string>>({});
+  // 2026-10-08：任務卡上傳的素材（影片、Word、Excel、圖片…）。選檔當下就解析成文字，
+  // 這裡拿著結果，按生成時跟 inputs 一起送（lib/taskAttachments）。
+  const [attachments, setAttachments] = useState<AttachmentItem[]>([]);
 
   // 2026-09-04 (CJ「加任務卡的符號，要在 facebook, instagram 等等頁面中，
   // 比較明顯的右上方」): 自建任務卡的入口。
@@ -1003,6 +1008,7 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
     if (strategyTopic) prefill = strategyTopic;
     setPrimaryAnswer(prefill);
     setExtraAnswers({});
+    setAttachments([]);
     setErrorMsg(null);
     setInputError(null);
     setLatencyMs(null);
@@ -1151,7 +1157,14 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
         return;
       }
     }
-    if (!primaryAnswer.trim() && activeTask.primary_input?.key && primaryRequired && !hasDerive) {
+    // 2026-10-08：素材還在傳或解析時不能跑——跑了就是沒讀素材的一篇。
+    if (attachmentsBusy(attachments)) {
+      rejectIntake(lang === "en" ? "Your files are still being read — one moment." : "素材還在解析，等它讀完再生成");
+      return;
+    }
+    const readyFiles = readyAttachments(attachments);
+    // 有素材時主問題可以空著：素材本身就是這一篇要寫的內容。
+    if (!primaryAnswer.trim() && activeTask.primary_input?.key && primaryRequired && !hasDerive && readyFiles.length === 0) {
       rejectIntake(lang === "en" ? "Answer the question first, then we'll make it." : "請先回答這個問題再生成");
       return;
     }
@@ -1253,7 +1266,15 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
           r = await tierMut.mutateAsync({
           runKey,
           taskId: activeTask.id,
-          inputs: { ...trimmedExtras(extraAnswers), [inputKey]: primaryAnswer },
+          inputs: {
+            ...trimmedExtras(extraAnswers),
+            [inputKey]: primaryAnswer.trim() || readyFiles.length === 0
+              ? primaryAnswer
+              : (lang === "en"
+                  ? `Write from the uploaded material: ${readyFiles.map((f) => f.name).join(", ")}`
+                  : `依上傳的素材撰寫：${readyFiles.map((f) => f.name).join("、")}`),
+          },
+          attachments: readyFiles.length > 0 ? readyFiles : undefined,
           brandId: brandId ?? undefined,
           productId: taskProductId,
           eventId: taskEventId,
@@ -1342,7 +1363,8 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
     const primaryRequired = (activeTask.inputs?.[0] as any)?.required !== false;
     const hasDerive = !!(activeTask.primary_input as any)?.derive
       || !!(activeTask.contextSources && activeTask.contextSources.length > 0);
-    const primaryOk = !!primaryAnswer.trim() || !activeTask.primary_input?.key || !primaryRequired || hasDerive;
+    const primaryOk = !!primaryAnswer.trim() || !activeTask.primary_input?.key || !primaryRequired || hasDerive
+      || readyAttachments(attachments).length > 0;
     autoRanRef.current = true;
     if (!primaryOk || taskNeedsViralSource(activeTask as any) || missingRequiredInputs(activeTask as any, extraAnswers).length > 0) {
       showToastGlobal(lang === "en"
@@ -2273,6 +2295,13 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                     </div>
                   );
                 })()}
+
+                {/* 2026-10-08 — 上傳素材（影片、Word、Excel、圖片…）。企劃類的 squad 卡走
+                    另一套執行引擎（squadTemplateRouter），還沒接素材，所以不顯示——
+                    顯示了卻沒被讀，比沒有這個功能更糟。 */}
+                {!running && !(activeTask.kind === "squad" && (activeTask as any).squad_slug) && (
+                  <TaskAttachments lang={lang} items={attachments} setItems={setAttachments} />
+                )}
 
                 {/* 2026-09-02 — primary 以外的欄位。
                     在這之前 intake 只渲染 primary_input 一格，`template.inputs[]`

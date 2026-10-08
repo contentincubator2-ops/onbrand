@@ -47,7 +47,7 @@ import {
 
 export const positioningDocRouter = Router();
 
-const STORAGE_ROOT =
+export const STORAGE_ROOT =
   process.env.POSITIONING_DOC_DIR ?? join(process.cwd(), "storage", "positioning-docs");
 // 品牌手冊偶爾夾整本 CI 手冊的圖，40MB 是實務上界；抽取器只讀文字，圖不影響。
 const MAX_BYTES = 40 * 1024 * 1024;
@@ -55,7 +55,7 @@ const EXTRACT_TIMEOUT_MS = 90_000;
 const ALLOWED_EXT = [".docx", ".doc", ".pptx", ".ppt", ".xlsx", ".pdf", ".md", ".markdown", ".txt", ".html", ".htm"];
 
 // ── auth（與 reportTemplateRoute 同一套；express 路由不能丟 TRPCError）──
-async function userIdOf(req: Request): Promise<number | null> {
+export async function userIdOf(req: Request): Promise<number | null> {
   const auth = req.headers.authorization;
   const raw = auth?.startsWith("Bearer ")
     ? auth.slice(7)
@@ -158,7 +158,7 @@ async function resolveScope(
 
 /** 跑 python 抽取器。失敗要說出壞在哪 —— 靜靜回空結構比壞掉更糟。 */
 /** 副檔名與檔頭對不上就早退，別讓抽取器去炸。回傳錯誤訊息，沒問題回 null。 */
-function checkFileHeader(ext: string, body: Buffer): string | null {
+export function checkFileHeader(ext: string, body: Buffer): string | null {
   if ([".docx", ".pptx", ".xlsx"].includes(ext) && !(body[0] === 0x50 && body[1] === 0x4b)) {
     return `${ext} 的 zip 檔頭不對 — 檔案可能損毀或副檔名寫錯`;
   }

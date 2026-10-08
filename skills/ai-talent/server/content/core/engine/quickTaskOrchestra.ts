@@ -124,6 +124,11 @@ async function runOrchestraInner(args: {
    */
   campaignItem?: import("../campaign/campaignItemBrief").CampaignItemInfo | null;
   /**
+   * 2026-10-08：使用者在任務卡上傳的素材（影片、Word、Excel、圖片…），已由
+   * routes/taskAttachmentRoute.ts 解析成文字。接在參考連結內容後面進每一段指令。
+   */
+  attachments?: import("../catalog/taskAttachments").TaskAttachment[] | null;
+  /**
    * 2026-05-14 (CJ「先回 caption + brief、image 跟 QA 變 async polling」):
    * Optional checkpoint — fires AFTER captions + briefs are assembled but
    * BEFORE image gen / extras / QA. Caller can persist this partial result,
@@ -434,6 +439,13 @@ async function runOrchestraInner(args: {
     if (viralPatterns && viralPatterns.patterns.length > 0) {
       urlContext += "\n\n" + formatViralPatternsForPrompt(viralPatterns, args.config.scoutKind ?? "viral") + "\n\n";
     }
+    // 2026-10-08：使用者上傳的素材。**不併進 urlContext**——urlContext 一有內容，寫手就會
+    // 切到「主題看 URL、品牌只取語氣、不准提品牌產品」那套覆寫（為了別人的影片連結設的）。
+    // 使用者上傳的多半是自己的產品規格、訪談、數字，品牌大腦要照常生效。所以跟
+    // researchContext 走同一條獨立通道。
+    const attachmentsContext = args.attachments?.length
+      ? "\n\n" + (await import("../catalog/taskAttachments")).formatAttachmentsForPrompt(args.attachments) + "\n\n"
+      : "";
 
     // ── Stage 1.5: Strategist (FB 60s narrativeArc tasks) ─────────────
     // Runs synchronously BEFORE caption_writer fanout; output piped as
@@ -457,7 +469,7 @@ async function runOrchestraInner(args: {
           strategistPersona: stratLoad.persona,
           brandPrefix,
           urlContext,
-          userMsg,
+          userMsg: userMsg + attachmentsContext,
           postLabels: labels,
           deliverable: args.config.strategistDeliverable,
           unit: args.config.strategistUnit,
@@ -485,7 +497,7 @@ async function runOrchestraInner(args: {
         agentAiModel: captionLoad.aiModel, // ← drives provider selection (qwen/Kimi/glm)
         brandPrefix,
         urlContext,
-        researchContext,
+        researchContext: researchContext + attachmentsContext,
         userMsg,
         inputKeys,
         strategistAnchor: strategistAnchor || undefined,

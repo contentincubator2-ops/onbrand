@@ -636,7 +636,7 @@ export async function callOneVariant(args: {
           // 數據版一定要用數字開場，沒有就帶著原因重寫一次；數字必須對得回素材。最後一次照實出貨
           // （不為了切角把整個變體弄成空白）。
           const effectiveLabel = config.pickOwnAngle ? sanitizeAngleLabel(out.label, label) : label;
-          const angleMiss = checkAngle(effectiveLabel, caption, template.systemPrompt, [userMsg, urlContext, brandPrefix].join("\n"));
+          const angleMiss = checkAngle(effectiveLabel, caption, template.systemPrompt, [userMsg, urlContext, brandPrefix, args.researchContext ?? ""].join("\n"));
           if (angleMiss && attempt < 2) {
             lastErr = new Error(`angle miss for ${effectiveLabel}: ${angleMiss}`);
             angleIssue = angleMiss;
