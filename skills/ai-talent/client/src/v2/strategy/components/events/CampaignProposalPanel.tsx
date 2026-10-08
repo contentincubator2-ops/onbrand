@@ -23,7 +23,7 @@ import type { CampaignPlan, CampaignPlanItem } from "../../lib/campaign/campaign
 import { phaseLabel } from "../../lib/campaign/campaignStage";
 import { money, metricLine } from "../../lib/campaign/campaignKpi";
 import {
-  downloadProposal, draftProgress, proposalDocHtml, proposalFilename, scheduleRows,
+  downloadProposal, draftProgress, proposalDocHtml, proposalFilename, scheduleRows, splitSections, PROPOSAL_FILL_IDS,
   type CampaignProposal, type ProposalPost, type ProposalSection,
 } from "../../lib/campaign/campaignProposal";
 
@@ -149,6 +149,25 @@ export default function CampaignProposalPanel({ proposal, plan, posts, postsLoad
     proposalDocHtml({ eventName, range, smp: plan.smp, sections, kpiLines, rows, en }),
     proposalFilename(eventName, en),
   );
+  const { head, tail } = splitSections(sections);
+  const sectionCards = (list: ProposalSection[], from: number) => list.map((s, i) => (
+            <section key={s.id} className="rounded-xl bg-content1 border border-divider px-4 py-3 flex flex-col gap-1.5">
+              <div className="flex items-baseline gap-2">
+                <span className="text-small text-default-400 tabular-nums">{String(from + i + 1).padStart(2, "0")}</span>
+                <input value={s.title} maxLength={40} onChange={(e) => edit(s.id, { title: e.target.value })} onBlur={save}
+                  aria-label={L("段落標題", "Section title")}
+                  className="flex-1 min-w-0 text-medium font-bold bg-transparent outline-none rounded px-1 -mx-1 focus:bg-default-100" />
+              </div>
+              <textarea value={s.body} rows={3} maxLength={6000} onChange={(e) => edit(s.id, { body: e.target.value })} onBlur={save}
+                style={{ fieldSizing: "content" } as React.CSSProperties}
+                placeholder={L("這一段的資料不夠，AI 先空著沒有寫。請自己填。", "There wasn't enough to go on, so this was left blank. Fill it in yourself.")}
+                aria-label={s.title}
+                className="w-full text-small leading-relaxed bg-transparent resize-none outline-none rounded px-1 -mx-1 focus:bg-default-100" />
+              {PROPOSAL_FILL_IDS.includes(s.id) && (
+                <p className="text-tiny text-default-400">{L("空格（＿＿）請直接填上數字。已經設定過的預算與 KPI 會自動帶進來；重新草擬不會洗掉你填的。", "Fill in the blanks (＿＿). Budget and KPIs you've already set are carried in; redrafting keeps what you filled.")}</p>
+              )}
+            </section>
+  ));
   const when = (iso: string) => new Date(iso).toLocaleString(en ? "en-US" : "zh-TW", { dateStyle: "short", timeStyle: "short" });
   const busy = drafting != null;
 
@@ -182,7 +201,7 @@ export default function CampaignProposalPanel({ proposal, plan, posts, postsLoad
         </div>
         {confirm && !busy && (
           <div className="basis-full flex items-center gap-2 flex-wrap rounded-lg bg-default-100 px-3 py-2">
-            <span className="text-tiny text-default-700">{L("重新草擬會換掉上面七段，包含你改過的地方。排程與每一篇的內容不受影響。", "Redrafting replaces the sections above, including your edits. The schedule and posts are not affected.")}</span>
+            <span className="text-tiny text-default-700">{L("重新草擬會換掉 AI 寫的每一段，包含你改過的地方。你在預算與廣告預算分配填的數字、排程與每一篇的內容不受影響。", "Redrafting replaces every AI-written section, including your edits. Numbers you filled into the budget tables, the schedule and the posts are kept.")}</span>
             <Button size="sm" radius="full" className="h-7 bg-foreground text-background" onPress={() => { setConfirm(false); setDirty(false); onRedraft(); }}>{L("確定重新草擬", "Redraft")}</Button>
             <Button size="sm" radius="full" variant="light" className="h-7" onPress={() => setConfirm(false)}>{L("取消", "Cancel")}</Button>
           </div>
@@ -212,23 +231,9 @@ export default function CampaignProposalPanel({ proposal, plan, posts, postsLoad
             </section>
           )}
 
-          {sections.map((s, i) => (
-            <section key={s.id} className="rounded-xl bg-content1 border border-divider px-4 py-3 flex flex-col gap-1.5">
-              <div className="flex items-baseline gap-2">
-                <span className="text-small text-default-400 tabular-nums">{String(i + 1).padStart(2, "0")}</span>
-                <input value={s.title} maxLength={40} onChange={(e) => edit(s.id, { title: e.target.value })} onBlur={save}
-                  aria-label={L("段落標題", "Section title")}
-                  className="flex-1 min-w-0 text-medium font-bold bg-transparent outline-none rounded px-1 -mx-1 focus:bg-default-100" />
-              </div>
-              <textarea value={s.body} rows={3} maxLength={6000} onChange={(e) => edit(s.id, { body: e.target.value })} onBlur={save}
-                style={{ fieldSizing: "content" } as React.CSSProperties}
-                placeholder={L("這一段還是空的，可以自己寫。", "This section is empty — write it yourself.")}
-                aria-label={s.title}
-                className="w-full text-small leading-relaxed bg-transparent resize-none outline-none rounded px-1 -mx-1 focus:bg-default-100" />
-            </section>
-          ))}
+          {sectionCards(head, 0)}
 
-          {kpiLines.length > 0 && (
+          {kpiLines.length > 0 && !tail.some((s) => s.id === "budget") && (
             <section className="rounded-xl bg-content1 border border-divider px-4 py-3 flex flex-col gap-1">
               <p className="text-medium font-bold">{L("預算與 KPI", "Budget & KPIs")}</p>
               {kpiLines.map((l) => <p key={l} className="text-small leading-relaxed tabular-nums">{l}</p>)}
@@ -294,6 +299,8 @@ export default function CampaignProposalPanel({ proposal, plan, posts, postsLoad
               );
             })}
           </section>
+
+          {sectionCards(tail, head.length)}
         </div>
       </div>
     </div>

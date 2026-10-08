@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
-  PROPOSAL_SECTIONS, cleanProposalSections, cleanSavedSections, outputPlainText, phaseNameOf, planMark, proposalPrompt, unsourcedNumbers,
+  BLANK, PROPOSAL_SECTIONS, adBudgetTemplate, aiSections, budgetTemplate, cleanProposalSections, cleanSavedSections, outputPlainText, phaseNameOf, planMark,
+  proposalPrompt, referenceCaseLines, unsourcedNumbers,
 } from "./campaignProposal";
+import { PROPOSAL_FILL_IDS, PROPOSAL_TAIL_IDS } from "../../../../client/src/v2/strategy/lib/campaign/campaignProposal";
 
 const item = (over: Record<string, any> = {}) => ({
   id: "teaser-2026-10-08-0", phase: "teaser" as const, date: "2026-10-08", platform: "facebook",
@@ -73,27 +75,97 @@ describe("proposalPrompt", () => {
     expect(text).toContain("- 核心受眾：回鍋的訓練家");
     expect(text).not.toContain("（空）");
   });
-  it("要模型回的鍵就是提案的每一段", () => {
-    for (const s of PROPOSAL_SECTIONS) expect(text).toContain(`"${s.id}":"`);
+  it("要模型回的鍵是 AI 寫的那幾段；填空表不問模型；沒有得獎案例就沒有借鏡", () => {
+    for (const s of aiSections(false)) expect(text).toContain(`"${s.id}":"`);
+    expect(text).not.toContain(`"budget":"`);
+    expect(text).not.toContain(`"adBudget":"`);
+    expect(text).not.toContain(`"reference":"`);
+    expect(text).not.toContain("參考的得獎案例");
+  });
+  it("有得獎案例就帶進去，並多一段借鏡", () => {
+    const withCase = proposalPrompt({
+      facts, plan: plan(), posts: {},
+      positioning: { creative: { referenceCases: [{ title: "Fearless Girl", award: "Grand Prix", description: "一座銅像對著華爾街銅牛" }] } },
+    });
+    expect(withCase).toContain("- Fearless Girl｜Grand Prix｜一座銅像對著華爾街銅牛");
+    expect(withCase).toContain(`"reference":"`);
+  });
+});
+
+describe("referenceCaseLines", () => {
+  it("沒有、不是陣列、太短的都不算", () => {
+    expect(referenceCaseLines({})).toEqual([]);
+    expect(referenceCaseLines({ creative: { referenceCases: "x" } })).toEqual([]);
+    expect(referenceCaseLines({ creative: { referenceCases: [{ title: "ab" }, null] } })).toEqual([]);
+  });
+});
+
+describe("填空表", () => {
+  it("沒設定預算與 KPI：金額與指標都留空格，階段用使用者取的名稱", () => {
+    const b = budgetTemplate(plan({ phaseNames: { teaser: "暖身" } }));
+    expect(b).toContain(`・總預算：NT$${BLANK}`);
+    expect(b).toContain(`・主要 KPI：${BLANK}`);
+    expect(b).toContain(`・暖身：${BLANK}`);
+    expect(b).toContain(`・開賣：${BLANK}`);
+  });
+  it("設定過的帶進來", () => {
+    const kpi = { budget: 300000, goals: [{ metric: "reach", target: 50000 }], phases: { teaser: { share: 40, budget: 120000, metrics: [{ metric: "engagement", target: null }], note: "" } } };
+    const b = budgetTemplate(plan({ kpi }));
+    expect(b).toContain("・總預算：NT$300,000");
+    expect(b).toContain("・觸及人數：50,000");
+    expect(b).toContain("・預熱：互動數");
+    const a = adBudgetTemplate(plan({ kpi }));
+    expect(a).toContain("廣告總預算：NT$300,000");
+    expect(a).toContain("・預熱：NT$120,000（40%）");
+    expect(a).toContain(`・開賣：NT$${BLANK}（${BLANK}%）`);
+  });
+  it("廣告預算分配：只列可以下廣告的通路，標了廣告的貼文逐篇列出", () => {
+    const a = adBudgetTemplate(plan({ items: [item({ paid: true }), item({ id: "e", platform: "email" })] }));
+    expect(a).toContain(`・Facebook：NT$${BLANK}（${BLANK}%）`);
+    expect(a).not.toContain("電子報：NT$");
+    expect(a).toContain(`・10/08 Facebook｜用冷知識口吻講不同流星雨對應不同訪客：NT$${BLANK}`);
+    expect(adBudgetTemplate(plan())).toContain("還沒有標記要下廣告的貼文");
   });
 });
 
 describe("cleanProposalSections", () => {
   const body = "這是一段夠長的內容，用來確認這一段會被留下來而不是被當成空的。";
-  const full = Object.fromEntries(PROPOSAL_SECTIONS.map((s) => [s.id, body]));
-  it("讀得出來就照固定順序回每一段，標題照介面語言", () => {
-    const zh = cleanProposalSections("```json\n" + JSON.stringify(full) + "\n```", false)!;
-    expect(zh.map((s) => s.id)).toEqual(PROPOSAL_SECTIONS.map((s) => s.id));
-    expect(zh[0]!.title).toBe("活動背景");
-    expect(cleanProposalSections(JSON.stringify(full), true)![0]!.title).toBe("Background");
+  const full = Object.fromEntries(aiSections(true).map((s) => [s.id, body]));
+  it("照固定順序回每一段（含填空表），標題照介面語言；沒有得獎案例就沒有借鏡", () => {
+    const zh = cleanProposalSections("```json\n" + JSON.stringify(full) + "\n```", false, { plan: plan() })!;
+    expect(zh.map((s) => s.id)).toEqual(PROPOSAL_SECTIONS.filter((s) => s.id !== "reference").map((s) => s.id));
+    expect(zh[0]!.title).toBe("一頁摘要");
+    expect(zh[zh.length - 1]!.id).toBe("recap");
+    expect(zh.find((s) => s.id === "adBudget")!.body).toContain("廣告總預算");
+    const en = cleanProposalSections(JSON.stringify(full), true, { plan: plan(), hasCases: true })!;
+    expect(en.map((s) => s.id)).toEqual(PROPOSAL_SECTIONS.map((s) => s.id));
+    expect(en[1]!.title).toBe("Background & challenge");
+  });
+  it("模型空著的那一段照樣留著（空的，讓使用者填）", () => {
+    const s = cleanProposalSections(JSON.stringify({ ...full, competitors: "" }), false, { plan: plan() })!;
+    expect(s.find((x) => x.id === "competitors")).toEqual({ id: "competitors", title: "競爭者分析", body: "" });
+  });
+  it("重新草擬：填空表裡使用者填過的沿用，AI 寫的換新", () => {
+    const prev = [{ id: "adBudget", title: "廣告預算分配", body: "廣告總預算：NT$80,000" }, { id: "background", title: "活動背景", body: "舊的背景" }];
+    const s = cleanProposalSections(JSON.stringify(full), false, { plan: plan(), prev })!;
+    expect(s.find((x) => x.id === "adBudget")!.body).toBe("廣告總預算：NT$80,000");
+    expect(s.find((x) => x.id === "budget")!.body).toContain("總預算");
+    expect(s.find((x) => x.id === "background")!.body).toBe(body);
   });
   it("拿掉 Markdown 記號，條列改成「・」", () => {
     const s = cleanProposalSections(JSON.stringify({ ...full, channels: "## 通路\n- **Facebook** 負責預熱的說明，把來龍去脈講清楚\n* Instagram 負責倒數" }), false)!;
     expect(s.find((x) => x.id === "channels")!.body).toBe("通路\n・Facebook 負責預熱的說明，把來龍去脈講清楚\n・Instagram 負責倒數");
   });
-  it("讀不成 JSON、或大部分段落是空的，就當作沒寫成", () => {
+  it("讀不成 JSON、或有寫的段落太少，就當作沒寫成", () => {
     expect(cleanProposalSections("抱歉，我沒辦法", false)).toBeNull();
-    expect(cleanProposalSections(JSON.stringify({ background: body, strategy: body }), false)).toBeNull();
+    expect(cleanProposalSections(JSON.stringify({ background: body, strategy: body }), false, { plan: plan() })).toBeNull();
+  });
+});
+
+describe("段落語彙 client ↔ server", () => {
+  it("排在排程後面的段落、填空表的 id 兩邊一致", () => {
+    expect(PROPOSAL_TAIL_IDS).toEqual(PROPOSAL_SECTIONS.filter((s) => "tail" in s && s.tail).map((s) => s.id));
+    expect(PROPOSAL_FILL_IDS).toEqual(PROPOSAL_SECTIONS.filter((s) => s.kind === "fill").map((s) => s.id));
   });
 });
 

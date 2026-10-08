@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { draftProgress, proposalDocHtml, proposalFilename, scheduleRows } from "./campaignProposal";
+import { draftProgress, proposalDocHtml, proposalFilename, scheduleRows, splitSections } from "./campaignProposal";
 
 const item = (over: Record<string, any> = {}) => ({
   id: "a", phase: "teaser" as const, date: "2026-10-08", platform: "facebook", taskId: "t", taskLabel: "單篇貼文",
@@ -43,6 +43,26 @@ describe("proposalDocHtml", () => {
   it("空的段落、沒設定的 KPI 不出現", () => {
     expect(html).not.toContain("關鍵洞察");
     expect(html).not.toContain("預算與 KPI");
+  });
+});
+
+describe("排程前後的段落", () => {
+  const sections = [
+    { id: "background", title: "背景與挑戰", body: "背景內文" },
+    { id: "adBudget", title: "廣告預算分配", body: "廣告總預算：NT$＿＿" },
+    { id: "recap", title: "整體回顧", body: "回顧內文" },
+  ];
+  it("預算、廣告預算分配、整體回顧排在排程後面", () => {
+    const { head, tail } = splitSections(sections);
+    expect(head.map((s) => s.id)).toEqual(["background"]);
+    expect(tail.map((s) => s.id)).toEqual(["adBudget", "recap"]);
+  });
+  it("下載的檔案照同一個順序：策略 → 排程 → 每篇 → 預算 → 回顧", () => {
+    const html = proposalDocHtml({ eventName: "活動", range: "", smp: "", sections, kpiLines: ["總預算：NT$1"], rows: [], en: false });
+    const at = (t: string) => html.indexOf(t);
+    expect(at("背景內文")).toBeLessThan(at("<h2>內容排程</h2>"));
+    expect(at("<h2>每一篇的內容</h2>")).toBeLessThan(at("<h2>廣告預算分配</h2>"));
+    expect(at("<h2>廣告預算分配</h2>")).toBeLessThan(at("<h2>整體回顧</h2>"));
   });
 });
 

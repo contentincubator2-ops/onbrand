@@ -892,7 +892,10 @@ export const campaignRouter = router({
       if (!plan?.items?.some((i) => i.enabled)) throw new TRPCError({ code: "BAD_REQUEST", message: "還沒有企劃，先排出企劃再草擬提案" });
       let proposal: CampaignProposal;
       try {
-        proposal = await draftCampaignProposal({ eventId: input.eventId, userId: ctx.user!.id, plan, positioning: pos, lang: input.lang ?? "zh" });
+        proposal = await draftCampaignProposal({
+          eventId: input.eventId, userId: ctx.user!.id, plan, positioning: pos, lang: input.lang ?? "zh",
+          prev: (pos.campaignProposal as CampaignProposal | undefined)?.sections,
+        });
       } catch (e: any) {
         throw new TRPCError({ code: "BAD_REQUEST", message: String(e?.message ?? e).slice(0, 300) });
       }
@@ -905,7 +908,7 @@ export const campaignRouter = router({
   saveProposal: protectedProcedure
     .input(z.object({
       eventId: z.number().int().positive(),
-      sections: z.array(z.object({ id: z.string().max(40), title: z.string().max(80), body: z.string().max(8000) })).min(1).max(12),
+      sections: z.array(z.object({ id: z.string().max(40), title: z.string().max(80), body: z.string().max(8000) })).min(1).max(20),
     }))
     .mutation(async ({ ctx, input }) => {
       const row = await loadEvent(input.eventId, ctx.user!.id);
