@@ -443,6 +443,8 @@ app.get("/health", healthLimiter, async (req, res) => {
         process.env.AUTOPUBLISH_SCHEDULED?.trim().toLowerCase() === "on",
       zernioConfigured: !!process.env.ZERNIO_API_KEY?.trim(),
     },
+    // 媒體相對路徑會掛在這個網域下給發布服務抓；是公開網址，不是秘密。
+    publicUrl: process.env.APP_URL ?? null,
     uptimeSec: Math.floor(process.uptime()),
     memMb:     Math.round(mem.rss / 1024 / 1024),
     ts:        new Date().toISOString(),
