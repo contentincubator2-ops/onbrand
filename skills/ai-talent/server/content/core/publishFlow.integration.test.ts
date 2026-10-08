@@ -5,7 +5,7 @@ import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
 /**
  * Publish flow end to end with the REAL publishGate, calendarRouter functions and
  * scheduledPublishWorker, against a small stateful fake of the database. Only the
- * outside world is mocked (the DB, plan checks, the bundle.social call), so
+ * outside world is mocked (the DB, plan checks, the zernio call), so
  * nothing here can post anywhere.
  */
 
@@ -20,7 +20,6 @@ const db = {
   otherAdminsExist: true,                              // false = solo user (review exempt)
   outputsPublished: [] as number[],
 };
-const publishViaBundle = vi.fn();
 const publishViaZernio = vi.fn();
 
 function postRow(p: Post) {
@@ -28,7 +27,7 @@ function postRow(p: Post) {
     id: p.id, ownerId: p.userId, outputId: p.outputId, variantIndex: 0, contentKind: null, contentIndex: null,
     planningConfirmed: 0, platform: p.platform, status: p.status, brandId: 3, attempts: p.attempts,
     outputContent: JSON.stringify([{ caption: "hello world" }]), outputMetadata: null, missionSquadSlug: null,
-    brand_fb_page_id: null, brand_fb_page_name: null, brandName: "B",
+    brandName: "B",
   };
 }
 
@@ -104,7 +103,6 @@ const execute = vi.fn(async (sql: string, params: any[] = []) => {
   if (q.includes("other.role")) return [db.otherAdminsExist ? [{ 1: 1 }] : []];        // isSoloUser
   if (q.includes("mission_review_queue")) { const s = db.review[params[0]]; return [s ? [{ status: s }] : []]; }
   if (q.includes("FROM mission_outputs")) return [[{ status: "draft" }]];
-  if (q.includes("bundleTeamId")) return [[{ bundleTeamId: "team_1" }]];
   return [[]];
 });
 
@@ -116,7 +114,6 @@ vi.mock("../../platform/core/brandAuth", async (importOriginal) => ({
 }));
 vi.mock("../../platform/core/billing/planGate", () => ({ assertCanAct: vi.fn(async () => {}), isHiddenHistoryItem: () => false }));
 vi.mock("../../platform/routers/opsRouter", () => ({ logError: vi.fn() }));
-vi.mock("./publish/bundlePublishService", () => ({ publishViaBundleSocial: (...a: any[]) => publishViaBundle(...a) }));
 
 vi.mock("../../platform/core/connectors/publish/zernioAdapter", () => ({
   createZernioAdapter: () => ({ publish: (...a: any[]) => publishViaZernio(...a) }),
@@ -135,24 +132,23 @@ const mk = (over: Partial<Post> = {}): Post => ({
 describe("publish flow (approval gate, retry, worker)", () => {
   const env = { ...process.env };
   beforeEach(() => {
-    execute.mockClear(); publishViaBundle.mockReset(); publishViaZernio.mockReset();
-    publishViaBundle.mockResolvedValue({ postId: "p1", permalink: "https://threads.net/p1" });
+    execute.mockClear(); publishViaZernio.mockReset();
+    publishViaZernio.mockResolvedValue({ postId: "p1", permalink: "https://threads.net/p1" });
     db.posts.clear(); db.review = { 9: "approved", 10: "pending" }; db.adminOfOwner = false;
     db.otherAdminsExist = true; db.outputsPublished = [];
-    process.env.PUBLISH_PROVIDER_THREADS = "bundle";
-    process.env.BUNDLE_SOCIAL_API_KEY = "test-key-not-real";
+    process.env.ZERNIO_API_KEY = randomUUID();
     process.env.AUTOPUBLISH_SCHEDULED = "on";
     delete process.env.SOCIAL_PUBLISH_ENABLED;
     vi.spyOn(console, "error").mockImplementation(() => {});
   });
   afterEach(() => { process.env = { ...env }; vi.restoreAllMocks(); });
 
-  it("approved post: publishScheduledPost goes through the bundle path and the row becomes published", async () => {
+  it("approved post: publishScheduledPost goes through the Zernio path and the row becomes published", async () => {
     db.posts.set(50, mk());
     const r = await publishScheduledPost({ id: 50, userId: OWNER });
     expect(r.ok).toBe(true);
-    expect(publishViaBundle).toHaveBeenCalledTimes(1);
-    expect(publishViaBundle.mock.calls[0][0]).toMatchObject({ platform: "threads", caption: "hello world" });
+    expect(publishViaZernio).toHaveBeenCalledTimes(1);
+    expect(publishViaZernio.mock.calls[0][0]).toMatchObject({ platform: "threads", caption: "hello world" });
     const p = db.posts.get(50)!;
     expect(p.status).toBe("published");
     expect(p.externalUrl).toBe("https://threads.net/p1");
@@ -166,7 +162,6 @@ describe("publish flow (approval gate, retry, worker)", () => {
     db.posts.set(50, mk());
     expect((await publishScheduledPost({ id: 50, userId: OWNER })).ok).toBe(true);
     expect(publishViaZernio).toHaveBeenCalledWith(expect.objectContaining({ scheduledPostId: 50, brandId: 3, platform: "threads", caption: "hello world", attempt: 1 }));
-    expect(publishViaBundle).not.toHaveBeenCalled();
     expect(db.posts.get(50)?.externalUrl).toBe("https://example.com/z1");
     expect(db.posts.get(50)?.status).toBe("published");
   });
@@ -215,7 +210,7 @@ describe("publish flow (approval gate, retry, worker)", () => {
   it("unapproved post is blocked: nothing is sent and the row stays pending", async () => {
     db.posts.set(51, mk({ id: 51, outputId: 10 }));
     await expect(publishScheduledPost({ id: 51, userId: OWNER })).rejects.toMatchObject({ code: "BAD_REQUEST" });
-    expect(publishViaBundle).not.toHaveBeenCalled();
+    expect(publishViaZernio).not.toHaveBeenCalled();
     expect(db.posts.get(51)!.status).toBe("pending");
   });
 
@@ -233,7 +228,7 @@ describe("publish flow (approval gate, retry, worker)", () => {
     expect(p.status).toBe("pending");
     expect(p.lastError).toBeNull();
     expect(p.attempts).toBe(2);
-    expect(publishViaBundle).not.toHaveBeenCalled();
+    expect(publishViaZernio).not.toHaveBeenCalled();
   });
 
   it("retry only accepts failed rows", async () => {
@@ -257,7 +252,7 @@ describe("publish flow (approval gate, retry, worker)", () => {
     db.posts.set(51, mk({ id: 51, outputId: 10, status: "failed", lastError: "boom" }));
     await retryScheduledPost({ id: 51, userId: OWNER });
     await expect(publishScheduledPost({ id: 51, userId: OWNER })).rejects.toMatchObject({ code: "BAD_REQUEST" });
-    expect(publishViaBundle).not.toHaveBeenCalled();
+    expect(publishViaZernio).not.toHaveBeenCalled();
   });
 
   it("reschedule moves a failed row back to pending; published rows and strangers are refused", async () => {
@@ -276,7 +271,7 @@ describe("publish flow (approval gate, retry, worker)", () => {
     expect(await tickScheduledPublish()).toEqual({ published: 1, awaitingApproval: 1 });
     expect(db.posts.get(50)!.status).toBe("published");
     expect(db.posts.get(51)).toMatchObject({ status: "pending", lastError: APPROVAL_HINT, attempts: 0 });
-    expect(publishViaBundle).toHaveBeenCalledTimes(1);
+    expect(publishViaZernio).toHaveBeenCalledTimes(1);
   });
 
   it.each([APPROVAL_HINT, "provider error", null])("reschedule clears only the approval hint on pending rows (%s)", async (lastError) => {
@@ -287,7 +282,7 @@ describe("publish flow (approval gate, retry, worker)", () => {
       lastError: lastError === APPROVAL_HINT ? null : lastError,
     });
     expect(await tickScheduledPublish()).toEqual({ published: 0, awaitingApproval: 0 });
-    expect(publishViaBundle).not.toHaveBeenCalled();
+    expect(publishViaZernio).not.toHaveBeenCalled();
   });
 
   it("approval on the next tick publishes and clears the stored hint", async () => {
@@ -297,7 +292,7 @@ describe("publish flow (approval gate, retry, worker)", () => {
     db.review[10] = "approved";
     expect(await tickScheduledPublish()).toEqual({ published: 1, awaitingApproval: 0 });
     expect(db.posts.get(51)).toMatchObject({ status: "published", lastError: null, attempts: 1 });
-    expect(publishViaBundle).toHaveBeenCalledTimes(1);
+    expect(publishViaZernio).toHaveBeenCalledTimes(1);
   });
 
   it.each([
@@ -319,7 +314,7 @@ describe("publish flow (approval gate, retry, worker)", () => {
 
   it("worker marks a provider failure failed, and a person can then retry it", async () => {
     db.posts.set(50, mk());
-    publishViaBundle.mockRejectedValueOnce(new Error("bundle.social 502: bad gateway"));
+    publishViaZernio.mockRejectedValueOnce(new Error("zernio 502: bad gateway"));
     expect(await tickScheduledPublish()).toEqual({ published: 0, awaitingApproval: 0 });
     expect(db.posts.get(50)).toMatchObject({ status: "failed", attempts: 1 });
     expect(db.posts.get(50)!.lastError).toBeTruthy();
