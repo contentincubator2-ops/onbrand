@@ -98,6 +98,7 @@ describe("100 位創作者 agent", () => {
     const p = { key: "tw-fb-02", name: "某對夫妻", aliases: ["洋蔥", "雪碧", "筆電"], catchphrases: ["留言告訴我", "真的假的", "Wait for it"] };
     expect(leaksPersona("少鹽料理可以多用洋蔥提味，別配雪碧。看完留言告訴我，真的假的？wait for it", p)).toBeNull();
     expect(leaksPersona("妮妮從旁邊走過", p)).toBe("妮妮");
+    expect(leaksPersona("地表最強小三的腰圍大挑戰", { name: "x", aliases: [], catchphrases: ["地表最強小三"] })).toBe("地表最強小三");
   });
 
   it("每一位 agent 的擋字清單都不會擋掉一段普通的衛教點子", () => {
