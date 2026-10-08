@@ -17,6 +17,7 @@
  *   ↻ 重跑  ✕ 關閉
  */
 import { publishSettingsUrl } from "../../platform/lib/publishSettingsUrl";
+import { shouldShowConnectHint } from "../lib/shouldShowConnectHint";
 import { localizeSource } from "../../platform/lib/taskEn";
 import React, { useMemo, useState, useEffect, useRef } from "react";
 import { Link, useParams, useNavigate, useSearchParams } from "react-router-dom";
@@ -137,6 +138,12 @@ export default function RunPage() {
         return false;
       },
     },
+  );
+
+  const publishBrandId = data?.mission?.brandId ?? data?.brand?.id;
+  const connectionsQ = trpc.zernioConnect.connections.useQuery(
+    { brandId: publishBrandId ?? 0 },
+    { enabled: !!publishBrandId },
   );
 
   const [activeIdx, setActiveIdx] = useState(0);
@@ -3412,10 +3419,10 @@ export default function RunPage() {
             </CardBody>
           </Card>
 
-          {(data?.mission?.brandId ?? data?.brand?.id) && (
+          {!!publishBrandId && shouldShowConnectHint(effectiveVariant?.platform, connectionsQ.isSuccess ? connectionsQ.data : undefined) && (
             <p className="text-small text-default-500">
               {lang === "en" ? "Need to connect a publishing account? " : "發布帳號尚未連接？"}
-              <Link className="text-primary underline" to={publishSettingsUrl(data?.mission?.brandId ?? data?.brand?.id)}>
+              <Link className="text-primary underline" to={publishSettingsUrl(publishBrandId)}>
                 {lang === "en" ? "Connect" : "去連接"}
               </Link>
             </p>
@@ -3656,5 +3663,4 @@ export default function RunPage() {
     </div>
   );
 }
-
 
