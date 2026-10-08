@@ -1,0 +1,63 @@
+name: "Op — Probe prod publish stats (read-only)"
+# 2026-10-08（Shawn「正式環境真的已經有在使用社群平台發文功能了嗎？還是都沒有成功過」）：
+# 唯讀統計。只跑 SELECT 聚合（COUNT / MIN / MAX），不讀貼文內容、不讀任何憑證、不寫入任何東西。
+# 用來在 Pipedream／bundle.social → Zernio 切換前，確認 prod 是否有品牌真的靠舊流程發過文。
+# 注意：main 上的 bundle 流程只要沒有立即報錯就會標 published，所以「published 筆數」是上限，
+# 「有 externalPostId 的筆數」才比較接近真的發出去。
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 90s
+          script: |
+            set +x
+            AI=/opt/onbrand/app/skills/ai-talent
+            envval() {
+              grep -E "^$1=" "$AI/.env" | head -1 | cut -d= -f2- | sed 's/^"//; s/"$//' | sed "s/^'//; s/'$//"
+            }
+            DB_HOST=$(envval LOCAL_DB_HOST); DB_HOST=${DB_HOST:-localhost}
+            DB_PORT=$(envval LOCAL_DB_PORT); DB_PORT=${DB_PORT:-3306}
+            DB_USER=$(envval LOCAL_DB_USER); DB_USER=${DB_USER:-mos_user}
+            DB_NAME=$(envval LOCAL_DB_NAME); DB_NAME=${DB_NAME:-mos_db}
+            DB_PASS=$(envval LOCAL_DB_PASSWORD)
+            echo "host=$(hostname) db=$DB_NAME now=$(date -u +%FT%TZ)"
+            run() {
+              MYSQL_PWD="$DB_PASS" mysql -u"$DB_USER" -h "$DB_HOST" -P "$DB_PORT" "$DB_NAME" --table -e "$1" 2>&1 || echo "(query failed)"
+            }
+
+            echo "════ 1. scheduled_posts 依狀態／平台 ════"
+            run "SELECT status, platform, COUNT(*) AS post_count, MIN(createdAt) AS earliest_created, MAX(createdAt) AS latest_created FROM scheduled_posts GROUP BY status, platform ORDER BY status, platform;"
+
+            echo "════ 2. 有平台貼文 id 的（較接近真的發出去）════"
+            run "SELECT status, platform, COUNT(*) AS posts_with_external_id, MIN(publishedAt) AS earliest_published, MAX(publishedAt) AS latest_published FROM scheduled_posts WHERE NULLIF(TRIM(externalPostId), '') IS NOT NULL GROUP BY status, platform;"
+
+            echo "════ 3. 標成 published 的：有無連結／id ════"
+            run "SELECT platform, COUNT(*) AS published, SUM(NULLIF(TRIM(externalUrl), '') IS NOT NULL) AS with_url, SUM(NULLIF(TRIM(externalPostId), '') IS NOT NULL) AS with_post_id, COUNT(DISTINCT brandId) AS brands, COUNT(DISTINCT userId) AS users, MIN(publishedAt) AS earliest, MAX(publishedAt) AS latest FROM scheduled_posts WHERE status = 'published' GROUP BY platform;"
+
+            echo "════ 4. 發布失敗或卡住的 ════"
+            run "SELECT status, platform, COUNT(*) AS n, SUM(lastError IS NOT NULL) AS with_error, MAX(updatedAt) AS latest FROM scheduled_posts WHERE status IN ('failed','publishing') GROUP BY status, platform;"
+
+            echo "════ 5. 品牌的舊連線 ════"
+            run "SELECT COUNT(*) AS brand_count, COUNT(NULLIF(TRIM(fbPageId), '')) AS brands_with_fb_page_id, COUNT(NULLIF(TRIM(bundleTeamId), '')) AS brands_with_bundle_team_id, COUNT(bundleConnectedAt) AS brands_bundle_connected FROM brands;"
+
+            echo "════ 6. mission_outputs 標成 published 的（舊的直接發布路徑只會留在這裡）════"
+            run "SELECT COUNT(*) AS outputs_published, SUM(JSON_EXTRACT(metadata, '\$.publish.postId') IS NOT NULL AND JSON_UNQUOTE(JSON_EXTRACT(metadata, '\$.publish.postId')) <> 'null') AS with_post_id, MIN(publishedAt) AS earliest, MAX(publishedAt) AS latest FROM mission_outputs WHERE status = 'published';"
+
+            echo "════ 7. 目前生效的發布相關開關（只印名稱與非機密值）════"
+            grep -E '^(PUBLISH_PROVIDER[A-Z_]*|SOCIAL_PUBLISH_ENABLED|AUTOPUBLISH_SCHEDULED|BACKGROUND_WORKERS_ENABLED)=' "$AI/.env" || echo "(none set)"
+            for k in BUNDLE_SOCIAL_API_KEY PIPEDREAM_CLIENT_ID PIPEDREAM_FACEBOOK_OAUTH_APP_ID ZERNIO_API_KEY; do
+              if grep -qE "^$k=.+" "$AI/.env"; then echo "$k: set"; else echo "$k: not set"; fi
+            done
