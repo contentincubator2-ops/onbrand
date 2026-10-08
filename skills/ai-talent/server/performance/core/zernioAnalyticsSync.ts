@@ -2,7 +2,7 @@ import { createZernioClient, ZernioApiError, type ZernioClient, type ZernioAnaly
 import { listConnectedByBrand, type Queryable } from "../../platform/core/connectors/publish/connectionStore";
 import { isRuntimeFeatureEnabled } from "../../platform/core/ops/runtimeSafety";
 import type { logError } from "../../platform/routers/opsRouter";
-import { taipeiDate } from "./fbPageSync";
+import { taipeiDate } from "./perfDates";
 import { upsertFacts, type FactInput } from "./perfStore";
 import { ownTagsFor } from "./ownTags";
 

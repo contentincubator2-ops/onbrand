@@ -778,15 +778,6 @@ const server = app.listen(PORT, async () => {
     }, 15 * 60_000);
     console.log("[strategyMonitor] Worker started (15m interval)");
 
-    // 成效層粉專回填：每 30 分鐘挑一個超過 20 小時沒同步的品牌（一拍一個，Graph 有頻率限制）。
-    const { tickFbPageSync } = await import("./performance/core/fbPageSync");
-    setInterval(() => {
-      tickFbPageSync().catch((e) => {
-        console.error("[fbPageSync] tick error:", e?.message ?? e);
-      });
-    }, 30 * 60_000);
-    console.log("[fbPageSync] Worker started (30m interval)");
-
     const { tickZernioAnalyticsSync, zernioAnalyticsEnabled } = await import("./performance/core/zernioAnalyticsSync");
     if (zernioAnalyticsEnabled()) {
       setInterval(() => {
