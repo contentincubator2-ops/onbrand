@@ -612,6 +612,11 @@ async function runStartupMigrations() {
     await migrateCampaignChat();
     console.log("[migrate] campaign_chat_messages / campaign_chat_threads: OK");
 
+    // 2026-10-05（CJ「對話要能讀取官網連結、或是上傳檔案解析」）：對話的參考資料。
+    const { CAMPAIGN_CHAT_SOURCES_DDL } = await import("./content/core/campaign/campaignChatSources");
+    await db.execute(sql.raw(CAMPAIGN_CHAT_SOURCES_DDL));
+    console.log("[migrate] campaign_chat_sources: OK");
+
     // 2026-10-08（CJ「他似乎沒有辦法記錄我前幾次的意見」）：請 AI 改的歷史修改意見。
     const { CAPTION_REFINE_NOTES_DDL } = await import("./content/core/engine/refineNotes");
     await db.execute(sql.raw(CAPTION_REFINE_NOTES_DDL));
