@@ -1194,6 +1194,8 @@ export default function RunPage() {
           : `改寫失敗：${typeof r.error === "string" ? r.error : "未知錯誤"}`);
         return;
       }
+      // 2026-10-08：回來的不是能發的文案（AI 在反問）→ 不動本文。
+      if (!r.rewritten) { showToastGlobal(lang === "en" ? "The rewrite didn't come back — try again." : "這次沒改成，再試一次。"); return; }
       if (!shouldApplyMutationPreview(activeSelectionKeyRef.current, locator)) return;
       setDeskUndo(null); setChatHistory([]);
       await commitDeskCaption(r.rewritten, w, r.regulationCompliance);
@@ -1227,6 +1229,14 @@ export default function RunPage() {
         return false;
       }
       if (!shouldApplyMutationPreview(activeSelectionKeyRef.current, locator)) return false;
+      // 2026-10-08：AI 回的是話不是文案（反問／說明）→ 只進對話，本文原樣不動。
+      if (!r.rewritten) {
+        setChatHistory((h) => [...h,
+          { role: "user", content: text },
+          { role: "assistant", content: r.explanation || (lang === "en" ? "I didn't change the draft — tell me which part to change." : "這次沒有動本文，再跟我說要改哪裡。") },
+        ]);
+        return true;
+      }
       setChatHistory((h) => [...h,
         { role: "user", content: text },
         { role: "assistant", content: r.explanation || (lang === "en" ? "Done — updated the draft." : "改好了，已更新本文。") },
@@ -2731,7 +2741,7 @@ export default function RunPage() {
                               { role: "user", content: chatPrompt },
                               { role: "assistant", content: r.explanation || (lang === "en" ? "(rewritten)" : "(已改寫)") },
                             ]);
-                            setAiPreview({ text: r.rewritten, locator, compliance: r.regulationCompliance });
+                            if (r.rewritten) setAiPreview({ text: r.rewritten, locator, compliance: r.regulationCompliance });
                             setChatPrompt("");
                           }
                         } else {
@@ -3363,7 +3373,9 @@ export default function RunPage() {
                               productId: (data as any)?.metadata?.productId ?? undefined,
                               eventId: (data as any)?.metadata?.eventId ?? undefined,
                             });
-                            if (r.ok) {
+                            if (r.ok && !r.rewritten) {
+                              showToastGlobal(lang === "en" ? "The rewrite didn't come back — try again." : "這次沒改成，再試一次。");
+                            } else if (r.ok) {
                               if (shouldApplyMutationPreview(activeSelectionKeyRef.current, locator)) {
                                 setRewritePreview({ agent: a.name, text: r.rewritten, locator, compliance: r.regulationCompliance });
                               }
