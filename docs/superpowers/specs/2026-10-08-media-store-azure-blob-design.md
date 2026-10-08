@@ -105,6 +105,9 @@ Ops workflow：仿 `admin-write-zernio-env.yml` 新增 `.github/workflows/admin-
 
 ## 6. 上線步驟（Claude／Shawn）
 
+**前置（Claude 已用 az 做好，2026-10-08）**：Storage account 的 Blob service 已加 CORS 規則——來源 `https://dev.onbrand.sowork.ai`、`https://onbrand.sowork.ai`，方法 GET／HEAD／OPTIONS。原因：`ImageCardPage.tsx` 以 `crossOrigin="anonymous"` 把圖畫上 canvas 再 `toDataURL`，圖片改放 Blob 後沒有 CORS 會載入失敗或 canvas 被污染。前端 CSP 的 `img-src` 已允許任何 https，不用改。
+
+
 1. 合進 dev 部署後，跑 `admin-write-media-env`：target=dev、media_storage=azure-blob。
 2. 在 dev 產一張圖，確認網址是 `https://stonbrandmediadev.blob.core.windows.net/onbrand-media/covers/...`，瀏覽器可開、客戶核准頁可見、Zernio 發布成功。
 3. prod：建 `stonbrandmediaprod`，連線字串放 repo 層級 secret，再切。
