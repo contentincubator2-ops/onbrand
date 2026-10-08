@@ -23,33 +23,38 @@ export async function upsertTenant(pool: Queryable, brandId: number, provider: s
   await pool.execute(`INSERT INTO brand_publish_tenants (brandId, provider, tenantId) VALUES (?, ?, ?)
     ON DUPLICATE KEY UPDATE tenantId = VALUES(tenantId)`, [brandId, provider, tenantId]);
 }
-export async function listConnections(pool: Queryable, brandId: number, provider: string, platform: string,
-  status: "connected" | "disconnected" = "connected"): Promise<PublishConnection[]> {
-  const [rows] = await pool.execute(`SELECT id, brandId, provider, platform, accountId, accountLabel,
-    accountUsername, status, connectedAt, disconnectedAt, meta FROM brand_publish_connections
-    WHERE brandId = ? AND provider = ? AND platform = ? AND status = ? ORDER BY connectedAt DESC, id DESC`,
-  [brandId, provider, platform, status]);
+const CONNECTION_COLUMNS = `id, brandId, provider, platform, accountId, accountLabel,
+  accountUsername, status, connectedAt, disconnectedAt, meta`;
+export async function getConnection(pool: Queryable, brandId: number, provider: string, platform: string): Promise<PublishConnection | null> {
+  const [rows] = await pool.execute(`SELECT ${CONNECTION_COLUMNS} FROM brand_publish_connections
+    WHERE brandId = ? AND provider = ? AND platform = ? AND status = 'connected' LIMIT 1`,
+  [brandId, provider, platform]);
+  return rows[0] ?? null;
+}
+export async function setConnection(pool: Queryable, brandId: number, provider: string, platform: string,
+  account: PublishAccount): Promise<void> {
+  // MySQL evaluates assignments left-to-right: compare the OLD account/status first.
+  await pool.execute(`INSERT INTO brand_publish_connections
+    (brandId, provider, platform, accountId, accountLabel, accountUsername, status, connectedAt, meta)
+    VALUES (?, ?, ?, ?, ?, ?, 'connected', NOW(3), ?)
+    ON DUPLICATE KEY UPDATE
+    connectedAt = IF(accountId <> VALUES(accountId) OR status = 'disconnected', NOW(3), connectedAt),
+    accountId = VALUES(accountId), accountLabel = VALUES(accountLabel), accountUsername = VALUES(accountUsername),
+    status = 'connected', disconnectedAt = NULL, meta = VALUES(meta)`,
+  [brandId, provider, platform, account.accountId, account.accountLabel ?? null, account.accountUsername ?? null,
+    account.meta == null ? null : JSON.stringify(account.meta)]);
+}
+export async function markDisconnected(pool: Queryable, brandId: number, provider: string, platform: string): Promise<void> {
+  await pool.execute(`UPDATE brand_publish_connections SET status = 'disconnected', disconnectedAt = NOW(3)
+    WHERE brandId = ? AND provider = ? AND platform = ? AND status = 'connected'`, [brandId, provider, platform]);
+}
+export async function listConnectedByBrand(pool: Queryable, brandId: number, provider: string): Promise<PublishConnection[]> {
+  const [rows] = await pool.execute(`SELECT ${CONNECTION_COLUMNS} FROM brand_publish_connections
+    WHERE brandId = ? AND provider = ? AND status = 'connected'`, [brandId, provider]);
   return rows;
 }
-export async function upsertConnections(pool: Queryable, brandId: number, provider: string, platform: string,
-  accounts: PublishAccount[]): Promise<void> {
-  const ids = accounts.map(a => a.accountId);
-  await pool.execute(`UPDATE brand_publish_connections SET status = 'disconnected', disconnectedAt = NOW(3)
-    WHERE brandId = ? AND provider = ? AND platform = ? AND status = 'connected'${ids.length ? ` AND accountId NOT IN (${ids.map(() => "?").join(", ")})` : ""}`,
-  [brandId, provider, platform, ...ids]);
-  for (const a of accounts) {
-    // Preserve first connection time during polling; stamp again only on reconnection.
-    await pool.execute(`INSERT INTO brand_publish_connections
-      (brandId, provider, platform, accountId, accountLabel, accountUsername, status, connectedAt, meta)
-      VALUES (?, ?, ?, ?, ?, ?, 'connected', NOW(3), ?)
-      ON DUPLICATE KEY UPDATE accountLabel = VALUES(accountLabel), accountUsername = VALUES(accountUsername),
-      connectedAt = IF(status = 'disconnected' OR connectedAt IS NULL, NOW(3), connectedAt),
-      status = 'connected', disconnectedAt = NULL, meta = VALUES(meta)`,
-    [brandId, provider, platform, a.accountId, a.accountLabel ?? null, a.accountUsername ?? null,
-      a.meta == null ? null : JSON.stringify(a.meta)]);
-  }
-}
-export async function markDisconnected(pool: Queryable, brandId: number, provider: string, platform: string, accountId: string): Promise<void> {
-  await pool.execute(`UPDATE brand_publish_connections SET status = 'disconnected', disconnectedAt = NOW(3)
-    WHERE brandId = ? AND provider = ? AND platform = ? AND accountId = ?`, [brandId, provider, platform, accountId]);
+export async function listAllConnected(pool: Queryable, provider: string): Promise<PublishConnection[]> {
+  const [rows] = await pool.execute(`SELECT ${CONNECTION_COLUMNS} FROM brand_publish_connections
+    WHERE provider = ? AND status = 'connected'`, [provider]);
+  return rows;
 }

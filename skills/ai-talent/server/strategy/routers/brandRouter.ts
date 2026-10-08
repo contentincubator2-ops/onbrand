@@ -372,6 +372,15 @@ export const brandRouter = router({
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       const { brands } = await import("../../../drizzle/schema");
+      if (process.env.ZERNIO_API_KEY) {
+        const [ownedBrand] = await db.select({ id: brands.id }).from(brands)
+          .where(and(eq(brands.id, input.id), eq(brands.userId, ctx.user.id))).limit(1);
+        if (ownedBrand) {
+          const { disconnectBrand } = await import("../../platform/core/connectors/publish/zernioLifecycle");
+          const { default: pool } = await import("../../localDb");
+          void disconnectBrand(pool, input.id);
+        }
+      }
       await db.delete(brands).where(and(eq(brands.id, input.id), eq(brands.userId, ctx.user.id)));
       return { success: true };
     }),

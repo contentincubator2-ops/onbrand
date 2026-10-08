@@ -448,7 +448,8 @@ export function PublishTab({ brandId }: { brandId: number | null }) {
   // Zernio keeps connection state separate from legacy brand bindings.
   const zernioProvidersQ = trpc.zernioConnect.getProviders.useQuery();
   type ZernioPlatformKey = keyof NonNullable<typeof zernioProvidersQ.data>;
-  type ZernioStatus = { connected: boolean; accounts: Array<{ accountId: string; name: string; username: string | null }> };
+  type ZernioStatus = { connected: boolean; account: { accountId: string; name: string; username: string | null } | null;
+    pendingScheduled: number; legacyConnected: boolean };
   const zernioConnectM = trpc.zernioConnect.getConnectUrl.useMutation();
   const zernioStatusM = trpc.zernioConnect.getConnectionStatus.useMutation();
   const zernioDisconnectM = trpc.zernioConnect.disconnect.useMutation();
@@ -517,16 +518,35 @@ export function PublishTab({ brandId }: { brandId: number | null }) {
     window.history.replaceState(window.history.state, "", url.pathname + url.search + url.hash);
   }, [brandId, zernioProvidersQ.data, en]);
 
-  function connectZernio(platform: ZernioPlatformKey) {
+  async function connectZernio(platform: ZernioPlatformKey, mode: "connect" | "reconnect" | "replace" = zernioStatus[platform]?.connected ? "reconnect" : "connect") {
     if (!brandId) return;
-    const url = zernioUrlRef.current[platform];
-    if (!url) {
-      void warmZernio(platform);
-      alert(en ? "Preparing authorization — please try again shortly." : "正在準備授權，請稍候再試。");
+    if (mode === "replace" && !confirm(en
+      ? "Switching accounts will automatically disconnect the current account and stop its billing."
+      : "換成其他帳號後，目前的帳號會自動解除並停止計費。")) return;
+    const generationAtClick = zernioGeneration.current;
+    const previousAccountId = zernioStatus[platform]?.account?.accountId;
+    // Open synchronously to retain the user gesture while fetching a mode-specific URL.
+    const popup = window.open("about:blank", "_blank");
+    if (!popup) {
+      alert(en ? "Please allow pop-ups to authorize this account." : "請允許開啟彈出視窗以完成授權。");
       return;
     }
-    window.open(url, "_blank", "noopener");
-    delete zernioUrlRef.current[platform];
+    popup.opener = null;
+    setPendingPlatform(platform);
+    try {
+      const url = mode === "connect" && zernioUrlRef.current[platform]
+        ? zernioUrlRef.current[platform]!
+        : (await zernioApiRef.current.connect({ brandId, platform, mode, redirectUrl: window.location.href })).url;
+      if (generationAtClick !== zernioGeneration.current) { popup.close(); return; }
+      popup.location.href = url;
+      delete zernioUrlRef.current[platform];
+    } catch (e) {
+      popup.close();
+      if (generationAtClick === zernioGeneration.current) alert(e instanceof Error ? e.message : String(e));
+      return;
+    } finally {
+      if (generationAtClick === zernioGeneration.current) setPendingPlatform(null);
+    }
     setVerifyingPlatform(platform);
     const generation = zernioGeneration.current;
     const deadline = Date.now() + 30_000;
@@ -539,7 +559,7 @@ export function PublishTab({ brandId }: { brandId: number | null }) {
             const status = await zernioApiRef.current.status({ brandId, platform });
             if (generation !== zernioGeneration.current) return;
             setZernioStatus(m => ({ ...m, [platform]: status }));
-            if (status.connected) return;
+            if (status.connected && (!previousAccountId || status.account?.accountId !== previousAccountId || popup.closed)) return;
           } catch { /* OAuth registration may not be visible yet. */ }
         }
       } finally {
@@ -551,13 +571,17 @@ export function PublishTab({ brandId }: { brandId: number | null }) {
     })();
   }
   async function disconnectZernio(platform: ZernioPlatformKey) {
-    if (!brandId || !confirm(en ? "Disconnect this platform from this brand? Published posts won't be deleted." : "確定要解除此品牌的平台連接？已發出的貼文不受影響。")) return;
+    if (!brandId) return;
+    const pending = zernioStatus[platform]?.pendingScheduled ?? 0;
+    const message = pending > 0
+      ? (en ? `There are ${pending} scheduled posts. They will fail when due after disconnection. Zernio billing stops; published posts are unaffected. Disconnect anyway?`
+        : `目前有 ${pending} 篇排程，解除後到時間會標記失敗。解除後 Zernio 停止計費，已發出的貼文不受影響。仍要解除？`)
+      : (en ? "Zernio billing stops after disconnection; published posts are unaffected. Disconnect?"
+        : "解除後 Zernio 停止計費，已發出的貼文不受影響。確定解除？");
+    if (!confirm(message)) return;
     const generation = zernioGeneration.current;
     try {
-      // No account selector in this release: disconnect the entire platform card.
-      for (const account of zernioStatus[platform]?.accounts ?? []) {
-        await zernioDisconnectM.mutateAsync({ brandId, platform, accountId: account.accountId });
-      }
+      await zernioDisconnectM.mutateAsync({ brandId, platform });
     } catch (e) { alert(e instanceof Error ? e.message : String(e)); }
     finally {
       try {
@@ -659,13 +683,10 @@ export function PublishTab({ brandId }: { brandId: number | null }) {
     { key: "facebook",  label: "Facebook",  color: "#18181b", icon: faFacebook,  desc: en ? "Publish to your Facebook Page"              : "發布到 Facebook 粉專"        },
     { key: "instagram", label: "Instagram", color: "#18181b", icon: faInstagram, desc: en ? "Publish to Instagram Business account"       : "發布到 Instagram 商業帳號"   },
     { key: "linkedin",  label: "LinkedIn",  color: "#18181b", icon: faLinkedin,  desc: en ? "Publish to your LinkedIn profile or page"    : "發布到 LinkedIn 帳號或企業頁面" },
-    { key: "youtube",   label: "YouTube",   color: "#18181b", icon: faYoutube,   desc: en ? "Upload videos to your YouTube channel"       : "上傳影片到 YouTube 頻道"     },
-    // Threads publishes only through bundle.social, so the tile shows only when the server routes it there.
+    // Threads is visible when routed through Zernio or bundle.social.
     // X is a hidden front-stage channel (planGate) and is intentionally not listed.
     { key: "threads",   label: "Threads",   color: "#18181b", icon: faThreads,   desc: en ? "Publish to your Threads account (500 characters max)" : "發布到 Threads 帳號（上限 500 字）" },
-    { key: "tiktok", label: "TikTok", color: "#18181b", icon: faTiktok, desc: en ? "Upload videos to TikTok" : "上傳影片到 TikTok" },
-  ].filter((p) => (p.key !== "threads" || usesBundle("threads") || usesZernio("threads"))
-    && (p.key !== "tiktok" || usesZernio("tiktok")));
+  ].filter((p) => p.key !== "threads" || usesBundle("threads") || usesZernio("threads"));
 
   // ── After OAuth: poll until Pipedream registers the connection ───────────
   // Pipedream's API can lag 5-20s after OAuth completes. Poll every 2s
@@ -876,6 +897,7 @@ export function PublishTab({ brandId }: { brandId: number | null }) {
           const fullyConnected = usesZernio(p.key) ? !!zernioStatus[p.key]?.connected : usesBundle(p.key)
             ? !!bundleConnectedMap[p.key]
             : p.key === "facebook" ? fbConnected : pdConnected;
+          const legacyZernio = usesZernio(p.key) && !fullyConnected && !!zernioStatus[p.key]?.legacyConnected;
           const isPending   = pendingPlatform   === p.key;
           const isVerifying = verifyingPlatform === p.key;
           const connectedAccount = connectedMap[p.key];
@@ -910,6 +932,10 @@ export function PublishTab({ brandId }: { brandId: number | null }) {
                   <span className="flex items-center gap-1 text-[12px] text-success-700 bg-success-100 border border-success-300 px-2 py-0.5 rounded-full flex-shrink-0 font-medium">
                     <DoneIcon size={11} /> {en ? "Connected" : "已連接"}
                   </span>
+                ) : legacyZernio ? (
+                  <span className="text-[12px] text-warning-700 bg-warning-50 border border-warning-200 px-2 py-0.5 rounded-full">
+                    {en ? "Re-authorization required" : "待重新授權"}
+                  </span>
                 ) : isVerifying ? (
                   <span className="flex items-center gap-1 text-[12px] text-primary-600 bg-primary-50 border border-primary-200 px-2 py-0.5 rounded-full flex-shrink-0 font-medium animate-pulse">
                     <span className="w-1.5 h-1.5 rounded-full bg-primary-400 flex-shrink-0" />
@@ -922,13 +948,13 @@ export function PublishTab({ brandId }: { brandId: number | null }) {
                 )}
               </div>
 
+              {legacyZernio && <p className="text-xs text-warning-700">
+                {en ? "Our publishing service has been upgraded. Please re-authorize once." : "發布服務已升級，請重新授權一次。"}
+              </p>}
               {/* Connected state: account name + last connected indicator */}
               {fullyConnected && usesZernio(p.key) && (
                 <div className="text-xs text-default-500 bg-default-50 rounded-lg px-3 py-2">
-                  {zernioStatus[p.key]?.accounts[0]?.name}
-                  {(zernioStatus[p.key]?.accounts.length ?? 0) > 1 && (en
-                    ? ` and others (${zernioStatus[p.key]?.accounts.length} accounts)`
-                    : ` 等 ${zernioStatus[p.key]?.accounts.length} 個`)}
+                  {zernioStatus[p.key]?.account?.name}
                 </div>
               )}
               {!usesZernio(p.key) && <>
@@ -980,16 +1006,20 @@ export function PublishTab({ brandId }: { brandId: number | null }) {
                     ? (en ? `Connecting ${p.label}…` : `連接 ${p.label} 中…`)
                     : isVerifying
                       ? (en ? "Verifying connection…" : "確認授權中…")
-                      : fullyConnected
+                      : fullyConnected || legacyZernio
                         ? (en ? "Re-authorize" : "重新授權")
                         : (en ? `Connect ${p.label}` : `連接 ${p.label}`)}
                 </Button>
-                {usesZernio(p.key) && fullyConnected && (
+                {usesZernio(p.key) && fullyConnected && (<>
+                  <Button size="sm" variant="bordered" isDisabled={isPending || isVerifying}
+                    onPress={() => void connectZernio(p.key as ZernioPlatformKey, "replace")}>
+                    {en ? "Switch account" : "換帳號"}
+                  </Button>
                   <Button size="sm" variant="light" color="danger" isLoading={zernioDisconnectM.isPending}
                     onPress={() => void disconnectZernio(p.key as ZernioPlatformKey)}>
                     {en ? "Disconnect" : "解除連接"}
                   </Button>
-                )}
+                </>)}
                 {!usesZernio(p.key) && <>
                 {/* Disconnect — only Facebook has DB binding to clear */}
                 {p.key === "facebook" && fbConnected && (

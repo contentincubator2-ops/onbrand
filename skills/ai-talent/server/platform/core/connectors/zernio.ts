@@ -4,7 +4,7 @@ export const DEFAULT_TIMEOUT_MS = 15_000;
 const PUBLISH_TIMEOUT_MS = 30_000;
 export type ZernioAccount = {
   _id: string; platform: ZernioPlatform; username?: string; displayName?: string;
-  profileUrl?: string; isActive?: boolean; profileId?: { _id: string; name?: string };
+  profileUrl?: string; isActive?: boolean; platformUserId?: string; profileId?: string | { _id: string; name?: string };
 };
 export class ZernioApiError extends Error {
   constructor(public status: number, error: string, public type?: string, public code?: string, public details?: Record<string, unknown>) {
@@ -36,6 +36,15 @@ export function createZernioClient({ apiKey, baseUrl = "https://zernio.com/api",
       typeof body?.error === "string" ? body.error : "Request failed", body?.type, body?.code, body?.details);
     return { httpStatus: response.status, body: body as T };
   }
+  async function paginatedAccounts(filters: Record<string, string>): Promise<ZernioAccount[]> {
+    const accounts: ZernioAccount[] = [];
+    for (let page = 1; ; page++) {
+      const query = new URLSearchParams({ ...filters, limit: "100", page: String(page) });
+      const { body } = await request<{ accounts: ZernioAccount[]; pagination?: { pages: number } }>(`/v1/accounts?${query}`);
+      accounts.push(...body.accounts);
+      if (body.pagination ? page >= body.pagination.pages : body.accounts.length < 100) return accounts;
+    }
+  }
   return {
     async createProfile(input: { name: string; idempotencyKey: string }): Promise<{ _id: string }> {
       try {
@@ -48,13 +57,20 @@ export function createZernioClient({ apiKey, baseUrl = "https://zernio.com/api",
         throw e;
       }
     },
-    async getConnectUrl(input: { platform: ZernioPlatform; profileId: string; redirectUrl: string }): Promise<{ authUrl: string }> {
+    async getConnectUrl(input: { platform: ZernioPlatform; profileId: string; redirectUrl: string; reconnectAccountId?: string }): Promise<{ authUrl: string }> {
       const query = new URLSearchParams({ profileId: input.profileId, redirect_url: input.redirectUrl, scopes: "posting" });
+      if (input.reconnectAccountId) query.set("reconnectAccountId", input.reconnectAccountId);
       return (await request<{ authUrl: string }>(`/v1/connect/${input.platform}?${query}`)).body;
     },
-    async listAccounts(input: { profileId: string; platform: ZernioPlatform }): Promise<ZernioAccount[]> {
-      const query = new URLSearchParams({ ...input, status: "connected" });
+    async listAccounts(input: { profileId: string; platform: ZernioPlatform; status?: "connected" | "disconnected";
+      sort?: "account" | "platform" | "profile" | "status" | "connected"; order?: "asc" | "desc" }): Promise<ZernioAccount[]> {
+      const filters = { status: "connected", ...input };
+      if (input.sort || input.order) return paginatedAccounts(filters);
+      const query = new URLSearchParams(filters);
       return (await request<{ accounts: ZernioAccount[] }>(`/v1/accounts?${query}`)).body.accounts;
+    },
+    async listAllAccounts(): Promise<ZernioAccount[]> {
+      return paginatedAccounts({ status: "connected" });
     },
     async deleteAccount(accountId: string): Promise<void> {
       await request(`/v1/accounts/${encodeURIComponent(accountId)}`, { method: "DELETE" });

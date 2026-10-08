@@ -23,6 +23,8 @@
  * Everything takes `db` and `stripe` as arguments so the tests can pass fakes.
  */
 
+import { disconnectBrandsForOwner } from "../connectors/publish/zernioLifecycle";
+
 export interface Db {
   execute(sql: string, params?: any[]): Promise<any>;
 }
@@ -311,6 +313,7 @@ export async function applyLifecycleAction(
       }
       await setPlanStatus(db, owner, "canceled");
       await setCancelFlag(db, owner.userId, false);
+      void disconnectBrandsForOwner(db, { userId: owner.userId, workspaceId: owner.workspaceId });
       return { applied: true, kind: "ended", userId: owner.userId };
     }
   }

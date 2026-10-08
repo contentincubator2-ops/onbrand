@@ -43,7 +43,7 @@ export const zernioConnectRouter = router({
     linkedin: getPublishProvider("linkedin"), threads: getPublishProvider("threads"), x: getPublishProvider("x"),
     youtube: getPublishProvider("youtube"), tiktok: getPublishProvider("tiktok"),
   })),
-  getConnectUrl: socialProcedure.input(connectionInput.extend({ redirectUrl: httpsUrl.optional() }))
+  getConnectUrl: socialProcedure.input(connectionInput.extend({ redirectUrl: httpsUrl.optional(), mode: z.enum(["connect", "reconnect", "replace"]).default("connect") }))
     .mutation(async ({ ctx, input }) => {
       await assertBrandAccess(ctx.user.id, input.brandId);
       return connectAction(async () => {
@@ -56,13 +56,27 @@ export const zernioConnectRouter = router({
   getConnectionStatus: socialProcedure.input(connectionInput).mutation(async ({ ctx, input }) => {
     await assertBrandAccess(ctx.user.id, input.brandId);
     return connectAction(async () => {
-      const accounts = await (await requireAdapter()).syncConnections(input);
-      return { connected: accounts.length > 0, accounts: accounts.map(a => ({
-        accountId: a.accountId, name: a.accountLabel ?? a.accountUsername ?? a.accountId, username: a.accountUsername ?? null,
-      })) };
+      const account = await (await requireAdapter()).syncConnection(input);
+      const { default: pool } = await import("../../localDb");
+      const aliases: Record<typeof input.platform, string[]> = {
+        facebook: ["facebook", "fb"], instagram: ["instagram", "ig"], linkedin: ["linkedin", "li"],
+        threads: ["threads"], x: ["x", "twitter"], youtube: ["youtube", "yt"], tiktok: ["tiktok", "tt"],
+      };
+      const platforms = aliases[input.platform];
+      const [pending]: any = await pool.execute(`SELECT COUNT(*) AS pendingScheduled FROM scheduled_posts
+        WHERE brandId = ? AND platform IN (${platforms.map(() => "?").join(", ")}) AND status = 'pending'`,
+      [input.brandId, ...platforms]);
+      const [brands]: any = await pool.execute("SELECT fbPageId, bundleTeamId FROM brands WHERE id = ? LIMIT 1", [input.brandId]);
+      const brand = brands[0];
+      return { connected: account !== null, account: account ? {
+        accountId: account.accountId, name: account.accountLabel ?? account.accountUsername ?? account.accountId,
+        username: account.accountUsername ?? null,
+      } : null, pendingScheduled: Number(pending[0]?.pendingScheduled ?? 0),
+      legacyConnected: !account && !!brand && (brand.bundleTeamId != null || (input.platform === "facebook" && brand.fbPageId != null)) };
+
     });
   }),
-  disconnect: socialProcedure.input(connectionInput.extend({ accountId: z.string().min(1).max(128) }))
+  disconnect: socialProcedure.input(connectionInput)
     .mutation(async ({ ctx, input }) => {
       await assertBrandAccess(ctx.user.id, input.brandId);
       return connectAction(async () => (await requireAdapter()).disconnect(input));

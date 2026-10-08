@@ -1,5 +1,5 @@
 import { ZernioApiError, type ZernioAccount, type ZernioClient } from "../zernio";
-import { getTenant, upsertTenant, listConnections, upsertConnections, markDisconnected, type Queryable } from "./connectionStore";
+import { getTenant, upsertTenant, getConnection, setConnection, listConnectedByBrand, markDisconnected, type Queryable } from "./connectionStore";
 import { PublishUserError, type PublishProviderAdapter } from "./publishAdapter";
 import { assertZernioMediaPlan, buildZernioPostPayload, readZernioPublishResult, toZernioPlatform } from "./zernioPublish";
 
@@ -23,7 +23,9 @@ export function createZernioAdapter({ client, pool, brandNameOf }: {
         return profileId;
       }
       if (!tenantId) tenantId = await createAndStoreProfile();
-      const connect = (profileId: string) => client.getConnectUrl({ platform: platform.remote, profileId, redirectUrl: input.redirectUrl });
+      const current = input.mode === "reconnect" ? await getConnection(pool, input.brandId, "zernio", platform.local) : null;
+      const connect = (profileId: string) => client.getConnectUrl({ platform: platform.remote, profileId,
+        redirectUrl: input.redirectUrl, ...(current ? { reconnectAccountId: current.accountId } : {}) });
       try {
         return { url: (await connect(tenantId)).authUrl };
       } catch (e) {
@@ -33,37 +35,56 @@ export function createZernioAdapter({ client, pool, brandNameOf }: {
         return { url: (await connect(replacementId)).authUrl };
       }
     },
-    async syncConnections(input) {
+    async syncConnection(input) {
       const platform = requirePlatform(input.platform);
       const tenantId = await getTenant(pool, input.brandId, "zernio");
-      if (!tenantId) return [];
-      const accounts = await client.listAccounts({ profileId: tenantId, platform: platform.remote }).catch((e): ZernioAccount[] => {
+      const accounts = tenantId ? await client.listAccounts({ profileId: tenantId, platform: platform.remote,
+        status: "connected", sort: "connected", order: "desc" }).catch((e): ZernioAccount[] => {
         if (e instanceof ZernioApiError && e.status === 404) return [];
         throw e;
+      }) : [];
+      const [current, ...obsolete] = accounts.filter(a => a.isActive !== false && a.platform === platform.remote);
+      if (!current) {
+        await markDisconnected(pool, input.brandId, "zernio", platform.local);
+        return null;
+      }
+      await setConnection(pool, input.brandId, "zernio", platform.local, {
+        accountId: current._id, accountLabel: current.displayName ?? current.username ?? null,
+        accountUsername: current.username, meta: { profileUrl: current.profileUrl ?? null },
       });
-      await upsertConnections(pool, input.brandId, "zernio", platform.local,
-        accounts.filter(a => a.isActive !== false && a.platform === platform.remote).map(a => ({
-          accountId: a._id, accountLabel: a.displayName ?? a.username ?? null,
-          accountUsername: a.username, meta: { profileUrl: a.profileUrl ?? null },
-        })));
-      return accounts.length ? listConnections(pool, input.brandId, "zernio", platform.local) : [];
+      for (const account of obsolete) {
+        await client.deleteAccount(account._id);
+        console.warn(`[zernio.sync] brand ${input.brandId}: removed obsolete ${platform.local} account ${account._id}`);
+      }
+      return getConnection(pool, input.brandId, "zernio", platform.local);
     },
     async disconnect(input) {
       const platform = requirePlatform(input.platform);
-      // A team-level credential may only delete an account bound to this brand/platform.
-      const accounts = await listConnections(pool, input.brandId, "zernio", platform.local);
-      if (!accounts.some(a => a.accountId === input.accountId)) throw new PublishUserError("此品牌尚未連接此帳號。");
-      await client.deleteAccount(input.accountId);
-      await markDisconnected(pool, input.brandId, "zernio", platform.local, input.accountId);
+      const account = await getConnection(pool, input.brandId, "zernio", platform.local);
+      if (!account) throw new PublishUserError("此品牌尚未連接此平台。");
+      await client.deleteAccount(account.accountId);
+      await markDisconnected(pool, input.brandId, "zernio", platform.local);
+    },
+    async disconnectAll({ brandId }) {
+      const accounts = await listConnectedByBrand(pool, brandId, "zernio");
+      let disconnected = 0, failed = 0;
+      for (const account of accounts) {
+        try {
+          await client.deleteAccount(account.accountId);
+          await markDisconnected(pool, brandId, "zernio", account.platform);
+          disconnected++;
+        } catch {
+          failed++;
+          console.warn(`[zernio.lifecycle] brand ${brandId}: failed to disconnect ${account.platform} account ${account.accountId}`);
+        }
+      }
+      return { disconnected, failed };
     },
     async publish(input) {
       const platform = requirePlatform(input.platform);
       assertZernioMediaPlan(platform.remote, input.caption, input.imageUrls.length, input.videoUrl ? 1 : 0);
-      const accounts = await listConnections(pool, input.brandId, "zernio", platform.local);
-      if (!accounts.length) throw new PublishUserError("此品牌尚未連接此平台，請先到品牌設定完成連接。");
-      if (accounts.length > 1) console.warn(`[zernio.publish] brand ${input.brandId}: multiple ${platform.local} accounts; using latest connection`);
-      const account = [...accounts].sort((a, b) =>
-        new Date(b.connectedAt ?? 0).getTime() - new Date(a.connectedAt ?? 0).getTime() || b.id - a.id)[0]!;
+      const account = await getConnection(pool, input.brandId, "zernio", platform.local);
+      if (!account) throw new PublishUserError("此品牌尚未連接此平台，請先到品牌設定完成連接。");
       const result = await client.createPost(buildZernioPostPayload({ ...input, accountId: account.accountId }),
         { idempotencyKey: `onbrand-sp-${input.scheduledPostId}-a${input.attempt ?? 0}` });
       return readZernioPublishResult({ ...result, platform: platform.remote });
