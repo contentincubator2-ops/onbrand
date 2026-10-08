@@ -1,6 +1,8 @@
 import type { PublishProvider } from "./publishProvider";
 import type { PublishConnection } from "./connectionStore";
 
+export const NOT_CONNECTED_MESSAGE = "此品牌尚未連接此平台，請先到品牌設定完成連接。";
+
 export type PublishInput = {
   scheduledPostId: number;
   attempt?: number;
