@@ -122,12 +122,17 @@ const daysBetween = (a: string, b: string) => Math.round((new Date(b).getTime() 
 export const CHAT_LEAD_DAYS = 60;
 export const CHAT_TAIL_DAYS = 7;
 
-/** 對話裡可以排的日期範圍：活動開始前 60 天（不早於今天）～結束後 7 天。純函式。 */
+/**
+ * 對話裡可以排的日期範圍：活動開始前 60 天（不早於今天）～結束後 7 天。純函式。
+ * 活動的開始日已經過了（使用者把檔期往前挪到今天以前），就從開始日起算——不然還沒寫的篇
+ * 全被擠在今天，地圖的時間軸也不會跟著往前。
+ */
 export function chatWindow(startAt: string | null, endAt: string | null, today: string): { from: string; to: string } {
   const start = startAt ?? today;
   const end = endAt ?? addDays(start, 30);
   const lead = addDays(start, -CHAT_LEAD_DAYS);
-  return { from: lead > today ? lead : today, to: addDays(end, CHAT_TAIL_DAYS) };
+  const floor = start < today ? start : today;
+  return { from: lead > floor ? lead : floor, to: addDays(end, CHAT_TAIL_DAYS) };
 }
 
 /**
@@ -538,7 +543,7 @@ const SYSTEM = `你是這檔活動的內容企劃。策略（一句話訴求、�
 鐵則：
 - 只能用操作改企劃：add（加一篇）、update（改一篇）、remove（刪一篇）。不要重寫整份。
 - taskId 必須逐字抄自候選任務卡清單，而且要是那個通路的卡。
-- 日期格式 YYYY-MM-DD，而且要在允許的日期範圍內（活動開始前 ${CHAT_LEAD_DAYS} 天～結束後 ${CHAT_TAIL_DAYS} 天，不早於今天）。使用者要的日期超出範圍時，不要默默換成別天：reply 說最早能排到哪一天，並問要不要把活動日期往前挪。
+- 日期格式 YYYY-MM-DD，而且要在允許的日期範圍內（活動開始前 ${CHAT_LEAD_DAYS} 天～結束後 ${CHAT_TAIL_DAYS} 天，不早於今天；活動已經開始的話從開始日起）。實際範圍以下面【允許的日期範圍】為準。使用者要的日期超出範圍時，不要默默換成別天：reply 說最早能排到哪一天，並問要不要把活動日期往前挪。
 - 使用者要整檔活動提早、延後、拉長或縮短（改的是活動的開始／結束日，不是某一篇）：填 dates，startAt 與 endAt 都要給；使用者沒說要動的那一頭照原本的。還沒寫的篇會自動跟著新日期挪，不用一篇一篇 update；允許的日期範圍也跟著新日期算。結束日不能早於今天。只是某幾篇要提早，就 update 那幾篇的 date，不要動活動日期。
 - 標了（已寫）的那幾篇不能改、不能刪。
 - 不准編使用者沒給的數字、成效、顧客見證、名額限制或網址。
