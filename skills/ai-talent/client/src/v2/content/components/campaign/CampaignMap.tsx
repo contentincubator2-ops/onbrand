@@ -36,15 +36,19 @@
  *   · 刪除：拖到右下角的垃圾桶，或選到那個點按 Delete；放大後在「⋯」裡。只有還沒寫的能刪
  *     （寫好的用「這篇不做」），刪完下方有「復原」。
  * 定稿後這三樣都停住。
+ *
+ * 2026-10-08（CJ「右邊的每個階段的名稱，都可以新增和修改」）：每一段的名稱與那一段的訊息可以
+ * 直接改——總覽上每段標題右上角的筆，或放大後直接點標題與訊息。名稱清空就用回預設的
+ * （預熱／開賣…）；原本沒有訊息的那一段也可以自己補上。存檔跟改一篇同一條路（onPatchPhase）。
  */
 import React from "react";
 import { useNavigate } from "react-router-dom";
 import { Button, Chip, Input } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faArrowLeft, faEllipsis, faPenNib, faPlus, faTrashCan } from "@fortawesome/free-solid-svg-icons";
+import { faArrowLeft, faEllipsis, faPen, faPenNib, faPlus, faTrashCan } from "@fortawesome/free-solid-svg-icons";
 import { CHANNEL_META, channelLabel } from "../../../platform/lib/channelMeta";
 import { phaseOf, type CampaignPhaseId, type CampaignPlanItem } from "../../../strategy/lib/campaign/campaignSchema";
-import { phaseShort, addDateRange, dateInPhase, type StagePhase } from "../../../strategy/lib/campaign/campaignStage";
+import { phaseShort, phaseLabel, phaseLabelLong, addDateRange, dateInPhase, type PhaseNames, type StagePhase } from "../../../strategy/lib/campaign/campaignStage";
 import { money, metricLine, PAID_CHANNELS, type PhaseKpi } from "../../../strategy/lib/campaign/campaignKpi";
 import { TaskIllustration } from "../../../platform/components/TaskIllustration";
 import { tierLabel } from "../../../platform/lib/tierVocabulary";
@@ -96,8 +100,12 @@ function useSize(ref: React.RefObject<HTMLDivElement | null>): { w: number; h: n
 
 export default function CampaignMap({
   items, phases, lanes, phaseMessages, current, onPick, locked, en, onPatchItem, fill, phaseKpi = {}, thumbs = {}, onOpenItem,
-  addOptions, onAddItem, onRemoveItem, onRestoreItem, onRetuneItem,
+  addOptions, onAddItem, onRemoveItem, onRestoreItem, onRetuneItem, phaseNames, onPatchPhase,
 }: {
+  /** 使用者替階段取的名稱；沒取的用預設。 */
+  phaseNames?: PhaseNames;
+  /** 改某一段的名稱／訊息（空字串＝清掉）。沒給就不能改。 */
+  onPatchPhase?: (id: CampaignPhaseId, next: { name?: string; message?: string }) => void;
   items: CampaignPlanItem[];
   phases: StagePhase[];
   lanes: string[];
@@ -139,6 +147,9 @@ export default function CampaignMap({
   const [adding, setAdding] = React.useState<{ lane: string; pi: number; date: string; x: number; y: number } | null>(null);
   /** 剛刪掉的那一篇（下方的「復原」）。 */
   const [removed, setRemoved] = React.useState<CampaignPlanItem | null>(null);
+  /** 總覽上正在改名稱／訊息的那一段。 */
+  const [editingPhase, setEditingPhase] = React.useState<CampaignPhaseId | null>(null);
+  const canEditPhase = !locked && !!onPatchPhase;
   React.useEffect(() => {
     if (!removed) return;
     const t = setTimeout(() => setRemoved(null), 8000);
@@ -363,7 +374,7 @@ export default function CampaignMap({
                 <span className="absolute -translate-x-1/2 text-[10.5px] tabular-nums bg-foreground text-background rounded px-1.5 py-0.5 whitespace-nowrap z-[3] pointer-events-none"
                   style={{ left: x, top: y - 32 }}>
                   {dragging.trash ? L("放開就刪除", "Release to delete")
-                    : dragging.date ? `${md(dragging.date)}・${phaseShort(phases[dragging.pi]!.id, en)}`
+                    : dragging.date ? `${md(dragging.date)}・${phaseLabel(phaseNames, phases[dragging.pi]!.id, en)}`
                     : L("這一段已經過了，不能放", "This phase is over")}
                 </span>
               ) : showDate.has(it.id) && (
@@ -375,11 +386,12 @@ export default function CampaignMap({
         })}
         {W > 0 && phases.map((p, i) => {
           return (
-            <button key={p.id} type="button" onClick={() => onPick(p.id)}
+            <React.Fragment key={p.id}>
+            <button type="button" onClick={() => onPick(p.id)}
               className="absolute text-left rounded-xl px-2 py-1.5 hover:bg-content1/70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-foreground transition flex flex-col gap-0.5"
               style={{ left: G + i * BW + 6, top: 14, width: BW - 12 }}
-              aria-label={L(`放大${phaseShort(p.id, false)}`, `Zoom into ${phaseShort(p.id, true)}`)}>
-              <span className="text-small font-semibold">{phaseShort(p.id, en)}</span>
+              aria-label={L(`放大${phaseLabel(phaseNames, p.id, false)}`, `Zoom into ${phaseLabel(phaseNames, p.id, true)}`)}>
+              <span className={`text-small font-semibold ${canEditPhase ? "pr-6" : ""}`}>{phaseLabel(phaseNames, p.id, en)}</span>
               <span className="text-[11px] text-default-500 tabular-nums">{range(p)}</span>
               {phaseMessages[p.id] && BW > 90 && (
                 <span className={`text-[11.5px] leading-snug text-default-700 ${hasKpi ? "line-clamp-2" : "line-clamp-3"}`}>{phaseMessages[p.id]}</span>
@@ -391,6 +403,17 @@ export default function CampaignMap({
                 </span>
               )}
             </button>
+            {/* 改這一段的名稱與訊息（按鈕不能包按鈕，所以是標題旁邊的另一顆）。 */}
+            {canEditPhase && (
+              <button type="button" onClick={() => { setAdding(null); setMoved(null); setEditingPhase(editingPhase === p.id ? null : p.id); }}
+                className="absolute w-6 h-6 grid place-items-center rounded-md text-default-400 hover:text-foreground hover:bg-content1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-foreground z-[2]"
+                style={{ left: G + (i + 1) * BW - 34, top: 18 }}
+                aria-label={L(`修改${phaseLabel(phaseNames, p.id, false)}的名稱與訊息`, `Edit the name and message of ${phaseLabel(phaseNames, p.id, true)}`)}
+                title={L("改這一段的名稱與訊息", "Edit this phase's name and message")}>
+                <FontAwesomeIcon icon={faPen} className="text-[10px]" />
+              </button>
+            )}
+            </React.Fragment>
           );
         })}
         <div className="absolute left-4 bottom-4 bg-content1 rounded-2xl shadow-small px-4 py-2.5 flex items-center gap-6">
@@ -426,9 +449,25 @@ export default function CampaignMap({
         const below = pin.y + 20 + 270 < boxHeight;
         return (
           <PinThumb
-            item={pin.it} thumb={thumbs[pin.it.id] ?? null} en={en}
+            item={pin.it} thumb={thumbs[pin.it.id] ?? null} en={en} phaseNames={phaseNames}
             style={below ? { left, top: pin.y + 18 } : { left, bottom: boxHeight - pin.y + 18 }}
           />
+        );
+      })()}
+
+      {/* ── 總覽上改某一段的名稱與訊息 ── */}
+      {ci < 0 && editingPhase && canEditPhase && (() => {
+        const pi = phases.findIndex((p) => p.id === editingPhase);
+        if (pi < 0) return null;
+        const w = 272;
+        return (
+          <div role="dialog" aria-label={L("這一段的名稱與訊息", "Phase name and message")}
+            className="absolute z-20 bg-content1 rounded-2xl shadow-large p-3 flex flex-col gap-2"
+            style={{ width: w, top: 48, left: Math.max(8, Math.min(W - w - 8, G + pi * BW + 6)) }}>
+            <PhaseFields id={editingPhase} name={phaseNames?.[editingPhase] ?? ""} message={phaseMessages[editingPhase] ?? ""} en={en}
+              onPatch={(next) => onPatchPhase!(editingPhase, next)} autoFocus />
+            <Button size="sm" radius="full" className="h-7 self-start bg-foreground text-background" onPress={() => setEditingPhase(null)}>{L("完成", "Done")}</Button>
+          </div>
         );
       })()}
 
@@ -440,7 +479,7 @@ export default function CampaignMap({
           <div className="absolute z-20 w-[272px] bg-content1 rounded-2xl shadow-large p-3" style={popStyle(adding.x, adding.y, 272, 300, W, Math.max(H, boxH))}>
             <AddItemForm key={`${adding.lane}-${adding.pi}-${adding.date}`}
               phase={phases[adding.pi]!} platform={adding.lane} cards={addOptions.cards[adding.lane]!} range={range} en={en}
-              onAdd={onAddItem} initialDate={adding.date} onClose={() => setAdding(null)} />
+              onAdd={onAddItem} initialDate={adding.date} onClose={() => setAdding(null)} phaseNames={phaseNames} />
           </div>
         );
       })()}
@@ -448,7 +487,7 @@ export default function CampaignMap({
       {/* ── 剛拖到另一段：要不要照那一段的策略調整 ── */}
       {ci < 0 && moved && movedPin && !drag && (
         <MovedPrompt key={`${moved.id}-${movedPin.it.phase}`}
-          item={movedPin.it} moved={moved} message={phaseMessages[movedPin.it.phase] ?? ""} en={en}
+          item={movedPin.it} moved={moved} message={phaseMessages[movedPin.it.phase] ?? ""} en={en} phaseNames={phaseNames}
           style={popStyle(movedPin.x, movedPin.y, 300, 280, W, Math.max(H, boxH))}
           onClose={() => setMoved(null)}
           onPatch={(next) => onPatchItem(moved.id, next)}
@@ -477,6 +516,7 @@ export default function CampaignMap({
           kpi={phaseKpi[phases[ci]!.id] ?? null} thumbs={thumbs} onOpenItem={onOpenItem}
           addCards={addOptions?.cards} onAddItem={onAddItem} onRemoveItem={onRemoveItem ? remove : undefined}
           addRange={addOptions ? addDateRange(phases, phases[ci]!.id, addOptions.window) : null}
+          phaseNames={phaseNames} onPatchPhase={canEditPhase ? onPatchPhase : undefined}
         />
       )}
     </div>
@@ -497,8 +537,8 @@ function popStyle(x: number, y: number, w: number, h: number, W: number, boxHeig
  * 一篇剛被拖到另一段：問要不要照那一段的策略調整「這一篇要講什麼」。
  * 說好才改（伺服器改寫，回來先給看新舊兩句，可以改回去）；寫好的那一篇只提醒，不改。
  */
-function MovedPrompt({ item, moved, message, en, style, onClose, onPatch, onRetune, onOpenItem }: {
-  item: CampaignPlanItem; moved: MovedInfo; message: string; en: boolean; style: React.CSSProperties;
+function MovedPrompt({ item, moved, message, en, style, onClose, onPatch, onRetune, onOpenItem, phaseNames }: {
+  item: CampaignPlanItem; moved: MovedInfo; message: string; en: boolean; style: React.CSSProperties; phaseNames?: PhaseNames;
   onClose: () => void;
   onPatch: (next: Partial<CampaignPlanItem>) => void;
   onRetune?: () => Promise<string>;
@@ -507,7 +547,7 @@ function MovedPrompt({ item, moved, message, en, style, onClose, onPatch, onRetu
   const L = (zh: string, e: string) => (en ? e : zh);
   const [step, setStep] = React.useState<"ask" | "busy" | "done">("ask");
   const [err, setErr] = React.useState("");
-  const name = en ? phaseShort(item.phase, true) : `${phaseShort(item.phase, false)}期`;
+  const name = phaseLabelLong(phaseNames, item.phase, en);
   const putBack = () => { onPatch({ phase: moved.from, date: moved.fromDate, angle: moved.fromAngle }); onClose(); };
   const retune = async () => {
     if (!onRetune) return;
@@ -573,7 +613,7 @@ function MovedPrompt({ item, moved, message, en, style, onClose, onPatch, onRetu
 }
 
 /** 地圖上一個點的縮圖卡：像一則縮小的貼文——上面是圖，下面是這一篇要講什麼。 */
-function PinThumb({ item, thumb, en, style }: { item: CampaignPlanItem; thumb: ItemThumb | null; en: boolean; style: React.CSSProperties }) {
+function PinThumb({ item, thumb, en, style, phaseNames }: { item: CampaignPlanItem; thumb: ItemThumb | null; en: boolean; style: React.CSSProperties; phaseNames?: PhaseNames }) {
   const L = (zh: string, e: string) => (en ? e : zh);
   const [broken, setBroken] = React.useState(false);
   const img = thumb?.image && !broken ? thumb.image : null;
@@ -603,7 +643,7 @@ function PinThumb({ item, thumb, en, style }: { item: CampaignPlanItem; thumb: I
         </span>
       </div>
       <div className="px-3 py-2.5 flex flex-col gap-1">
-        <p className="text-[11px] text-default-500 tabular-nums truncate">{md(item.date)}・{phaseShort(item.phase, en)}・{item.taskLabel}</p>
+        <p className="text-[11px] text-default-500 tabular-nums truncate">{md(item.date)}・{phaseLabel(phaseNames, item.phase, en)}・{item.taskLabel}</p>
         <p className="text-small font-semibold leading-snug line-clamp-3">{item.angle}</p>
         {thumb?.excerpt
           ? <p className="text-tiny text-default-500 leading-snug line-clamp-2">{thumb.excerpt}</p>
@@ -615,7 +655,8 @@ function PinThumb({ item, thumb, en, style }: { item: CampaignPlanItem; thumb: I
 }
 
 /** 通路欄位底下的「＋ 新增一篇」：日期、任務卡、這一篇要講什麼。 */
-function AddItemForm({ phase, platform, cards, range, en, onAdd, initialDate, onClose }: {
+function AddItemForm({ phase, platform, cards, range, en, onAdd, initialDate, onClose, phaseNames }: {
+  phaseNames?: PhaseNames;
   phase: StagePhase; platform: string; cards: AddOptions["cards"][string];
   range: { min: string; max: string }; en: boolean;
   onAdd: (input: NewItemInput) => Promise<void>;
@@ -667,7 +708,7 @@ function AddItemForm({ phase, platform, cards, range, en, onAdd, initialDate, on
     <div className={floating ? "flex flex-col gap-2" : "mt-auto flex flex-col gap-2 rounded-xl border border-divider p-2.5"}>
       <p className="text-tiny font-semibold">
         {L(`新增一篇 ${name}`, `New ${name} post`)}
-        {floating && <span className="font-normal text-default-500">・{en ? phaseShort(phase.id, true) : `${phaseShort(phase.id, false)}期`}</span>}
+        {floating && <span className="font-normal text-default-500">・{phaseLabelLong(phaseNames, phase.id, en)}</span>}
       </p>
       <Input type="date" size="sm" variant="bordered" radius="md" aria-label={L("日期", "Date")}
         min={range.min} max={range.max} value={date} onValueChange={setDate}
@@ -699,7 +740,46 @@ function AddItemForm({ phase, platform, cards, range, en, onAdd, initialDate, on
   );
 }
 
-function PhaseDetail({ phase, message, items, lanes, locked, en, onBack, onPatchItem, kpi, thumbs, onOpenItem, addCards, addRange, onAddItem, onRemoveItem }: {
+/**
+ * 一段的名稱與訊息兩格。名稱空著＝用預設的（placeholder 就是預設名）；訊息空著＝這一段沒有訊息。
+ * 總覽上的小視窗與放大後的標題區共用。
+ */
+function PhaseFields({ id, name, message, en, onPatch, autoFocus, large }: {
+  id: CampaignPhaseId; name: string; message: string; en: boolean;
+  onPatch: (next: { name?: string; message?: string }) => void;
+  autoFocus?: boolean;
+  /** 放大後的標題區：字大、沒有框。 */
+  large?: boolean;
+}) {
+  const L = (zh: string, e: string) => (en ? e : zh);
+  const field = large
+    ? "bg-transparent outline-none rounded-lg px-1.5 -mx-1.5 hover:bg-default-100 focus:bg-default-100"
+    : "rounded-lg border-2 border-default-200 bg-transparent px-2 py-1 outline-none focus:border-foreground";
+  return (
+    <>
+      <label className="flex flex-col gap-0.5 min-w-0">
+        {!large && <span className="text-[11px] text-default-500">{L("階段名稱", "Phase name")}</span>}
+        <input value={name} maxLength={12} autoFocus={autoFocus} onChange={(e) => onPatch({ name: e.target.value })}
+          placeholder={large ? phaseLabelLong(null, id, en) : phaseShort(id, en)}
+          aria-label={L("階段名稱", "Phase name")} title={large ? L("點一下改名稱", "Click to rename") : undefined}
+          className={`${field} ${large ? "text-2xl font-black leading-tight w-[7.5em] max-w-full placeholder:text-foreground" : "text-small font-semibold w-full"}`} />
+      </label>
+      <label className={`flex flex-col gap-0.5 min-w-0 ${large ? "flex-1 basis-[220px]" : ""}`}>
+        {!large && <span className="text-[11px] text-default-500">{L("這一段要讓人記住的訊息", "Message for this phase")}</span>}
+        <textarea value={message} rows={1} maxLength={60} onChange={(e) => onPatch({ message: e.target.value.replace(/[\r\n]+/g, "") })}
+          style={{ fieldSizing: "content" } as React.CSSProperties}
+          placeholder={L("寫一句這一段要讓人記住的話", "One line people should remember")}
+          aria-label={L("這一段的訊息", "Phase message")}
+          className={`${field} resize-none w-full ${large ? "text-medium font-bold" : "text-small leading-snug"}`} />
+      </label>
+    </>
+  );
+}
+
+function PhaseDetail({ phase, message, items, lanes, locked, en, onBack, onPatchItem, kpi, thumbs, onOpenItem, addCards, addRange, onAddItem, onRemoveItem, phaseNames, onPatchPhase }: {
+  phaseNames?: PhaseNames;
+  /** 改這一段的名稱／訊息；沒給（定稿後）就只顯示。 */
+  onPatchPhase?: (id: CampaignPhaseId, next: { name?: string; message?: string }) => void;
   phase: StagePhase; message: string; items: CampaignPlanItem[]; lanes: string[];
   locked: boolean; en: boolean; onBack: () => void;
   onPatchItem: (id: string, next: Partial<CampaignPlanItem>) => void;
@@ -727,9 +807,28 @@ function PhaseDetail({ phase, message, items, lanes, locked, en, onBack, onPatch
         startContent={<FontAwesomeIcon icon={faArrowLeft} className="text-tiny" />} onPress={onBack}>
         {L("回總覽", "Overview")}
       </Button>
+      {onPatchPhase ? (
+      <div className="bg-content1 rounded-2xl shadow-small px-4 py-3 flex flex-col gap-1">
+        <div className="flex items-baseline gap-3 flex-wrap">
+          <PhaseFields id={phase.id} name={phaseNames?.[phase.id] ?? ""} message={message} en={en} large
+            onPatch={(next) => onPatchPhase(phase.id, next)} />
+        </div>
+        <p className="text-tiny text-default-500 tabular-nums">
+          {range(phase)}{enabled.length > 0 ? L(`　${doneCount}／${enabled.length} 已完成`, `　${doneCount}/${enabled.length} done`) : ""}
+          <span className="ml-3 text-default-400">{spec?.purposeZh}</span>
+        </p>
+        {kpi && (
+          <div className="flex items-center gap-2 flex-wrap pt-1">
+            <Chip size="sm" variant="flat" className="tabular-nums">{L("預算 ", "Budget ")}{money(kpi.budget, en)}（{kpi.share}%）</Chip>
+            {kpi.metrics.map((m) => <Chip key={m.metric} size="sm" variant="bordered" className="tabular-nums">{metricLine(m, en)}</Chip>)}
+            {kpi.note && <span className="text-tiny text-default-500">{kpi.note}</span>}
+          </div>
+        )}
+      </div>
+      ) : (
       <div className="bg-content1 rounded-2xl shadow-small px-4 py-3 grid grid-cols-[auto_minmax(0,1fr)] gap-x-5 gap-y-1">
         <div className="row-span-2">
-          <p className="text-2xl font-black leading-tight">{en ? phaseShort(phase.id, true) : `${phaseShort(phase.id, false)}期`}</p>
+          <p className="text-2xl font-black leading-tight">{phaseLabelLong(phaseNames, phase.id, en)}</p>
           <p className="text-tiny text-default-500 tabular-nums">{range(phase)}</p>
           {enabled.length > 0 && (
             <p className="text-tiny text-default-600 tabular-nums mt-0.5">{L(`${doneCount}／${enabled.length} 已完成`, `${doneCount}/${enabled.length} done`)}</p>
@@ -747,6 +846,7 @@ function PhaseDetail({ phase, message, items, lanes, locked, en, onBack, onPatch
           </div>
         )}
       </div>
+      )}
       <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))" }}>
         {lanes.map((c) => {
           const list = items.filter((i) => i.platform === c).sort((a, b) => (a.date < b.date ? -1 : 1));
