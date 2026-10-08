@@ -43,7 +43,8 @@ function pageIdFromMeta(meta: unknown): string | undefined {
 }
 
 export function analyticsFact(post: ZernioAnalyticsPost, platform: AnalyticsPlatform, accountId: string,
-  tagsByPost: Record<string, Record<string, string>> = {}, pageId?: string): { fact: FactInput; tagged: boolean } | null {
+  tagsByPost: Record<string, Record<string, string>> = {}, ownIds: Set<string> = new Set(),
+  pageId?: string): { fact: FactInput; tagged: boolean } | null {
   const targets = post.platformAnalytics?.length ? post.platformAnalytics : post.platforms ?? [];
   const idOf = (value: string | { _id: string } | null | undefined) => typeof value === "string" ? value : value?._id;
   // External posts are flat; the account is already scoped by listAnalytics(accountId).
@@ -71,6 +72,8 @@ export function analyticsFact(post: ZernioAnalyticsPost, platform: AnalyticsPlat
   // Pending/unavailable data without metrics must not erase an existing snapshot.
   if (!Object.keys(metrics).length) return null;
   const own = tagsByPost[entityId] ?? (platform === "facebook" ? tagsByPost[entityId.split("_").pop()!] : undefined) ?? {};
+  const origin = ownIds.has(entityId) || (platform === "facebook" && ownIds.has(entityId.split("_").pop()!))
+    || post.isExternal === false || !!post.latePostId ? "onbrand" : "external";
   const content = post.content ?? "";
   return {
     tagged: Object.keys(own).length > 0,
@@ -78,12 +81,12 @@ export function analyticsFact(post: ZernioAnalyticsPost, platform: AnalyticsPlat
       source: SOURCE_BY_PLATFORM[platform], entityType: "post", entityId,
       entityLabel: content.replace(/\s+/g, " ").trim().slice(0, 60) || "(無文字貼文)",
       text: content, date: taipeiDate(post.publishedAt), permalink,
-      tags: { ...own, format: analyticsFormatOf(post.mediaType) }, metrics,
+      tags: { ...own, format: analyticsFormatOf(post.mediaType), origin }, metrics,
     },
   };
 }
 
-export type ZernioAnalyticsSyncResult = { platforms: Array<{ platform: AnalyticsPlatform; posts: number; tagged: number; skipped: number; error?: string }> };
+export type ZernioAnalyticsSyncResult = { platforms: Array<{ platform: AnalyticsPlatform; posts: number; tagged: number; onbrand: number; skipped: number; error?: string }> };
 export type ZernioAnalyticsDeps = {
   pool?: Queryable;
   client?: Pick<ZernioClient, "listAnalytics" | "syncExternalPosts">;
@@ -100,7 +103,7 @@ export async function syncBrandZernioAnalytics(brandId: number, days = 120, deps
   const write = deps.upsert ?? upsertFacts;
   const log = deps.log ?? (await import("../../platform/routers/opsRouter")).logError;
   const connections = (await listConnectedByBrand(pool, brandId, "zernio")).filter(c => isAnalyticsPlatform(c.platform));
-  const tags = await ownTagsFor(brandId, pool);
+  const { tags, ownIds } = await ownTagsFor(brandId, pool);
   const now = (deps.now ?? (() => new Date()))();
   const toDate = taipeiDate(now.toISOString());
   const fromDate = taipeiDate(new Date(now.getTime() - days * 86_400_000).toISOString());
@@ -129,20 +132,21 @@ export async function syncBrandZernioAnalytics(brandId: number, days = 120, deps
       const converted: Array<{ fact: FactInput; tagged: boolean }> = [];
       for (const post of posts) {
         try {
-          const entry = analyticsFact(post, platform, connection.accountId, tags, pageId);
+          const entry = analyticsFact(post, platform, connection.accountId, tags, ownIds, pageId);
           if (entry) converted.push(entry);
           else skipped++;
         } catch { skipped++; /* 單篇轉換失敗不影響同平台其他貼文，也不記錄原始回應。 */ }
       }
       await write(brandId, converted.map(p => p.fact));
-      result.platforms.push({ platform, posts: converted.length, tagged: converted.filter(p => p.tagged).length, skipped });
+      result.platforms.push({ platform, posts: converted.length, tagged: converted.filter(p => p.tagged).length,
+        onbrand: converted.filter(p => p.fact.tags?.origin === "onbrand").length, skipped });
     } catch (error) {
       // 不記錄供應商回應、原始 exception 或憑證；保留安全的 HTTP 狀態供排查。
       const message = error instanceof ZernioApiError
         ? `社群成效同步失敗（HTTP ${error.status}），請確認帳號授權後重試。`
         : error instanceof ZernioAnalyticsSyncError ? error.message : "社群成效同步失敗，請稍後重試。";
       await log({ source: "zernio.analytics", level: "warn", message, meta: { brandId, platform } });
-      result.platforms.push({ platform, posts: 0, tagged: 0, skipped, error: message });
+      result.platforms.push({ platform, posts: 0, tagged: 0, onbrand: 0, skipped, error: message });
     }
   }
   return result;

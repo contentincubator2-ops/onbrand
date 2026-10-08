@@ -3,7 +3,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { analyticsFact, analyticsFormatOf, syncBrandZernioAnalytics, tickZernioAnalyticsSync,
   zernioAnalyticsEnabled, ZERNIO_ANALYTICS_PLATFORMS, SOURCE_BY_PLATFORM, type AnalyticsPlatform } from "./zernioAnalyticsSync";
 import { ZernioApiError, type ZernioAnalyticsPost, type ZernioAnalyticsPage } from "../../platform/core/connectors/zernio";
-import { ownTagsFor } from "./ownTags";
 
 vi.mock("../../localDb", () => ({ default: { execute: vi.fn() } }));
 
@@ -37,13 +36,37 @@ beforeEach(() => { vi.stubEnv("SOCIAL_PUBLISH_ENABLED", "true"); vi.stubEnv("ZER
 afterEach(() => { vi.unstubAllEnvs(); });
 
 describe("Zernio analytics facts", () => {
+  it.each(ZERNIO_ANALYTICS_PLATFORMS)("recognizes %s own ids without perfTags even when marked external", platform => {
+    const id = platform === "facebook" ? "123_456" : `${platform}-native`;
+    const result = analyticsFact(post(platform, { isExternal: true }), platform, `${platform}-account`, {}, new Set([id]));
+    expect(result).toMatchObject({ tagged: false, fact: { tags: { origin: "onbrand" } } });
+  });
+  it.each(["123_456", "456"])("recognizes Facebook id %s without perfTags", id => {
+    expect(analyticsFact(post("facebook"), "facebook", "facebook-account", {}, new Set([id])))
+      .toMatchObject({ tagged: false, fact: { tags: { origin: "onbrand" } } });
+  });
+  it.each([
+    { isExternal: false }, { latePostId: "late-id" }, { isExternal: true, latePostId: "late-id" },
+  ])("recognizes provider origin evidence without a local match: %j", evidence => {
+    expect(analyticsFact(post("instagram", evidence), "instagram", "instagram-account"))
+      .toMatchObject({ tagged: false, fact: { tags: { origin: "onbrand" } } });
+  });
+  it.each([{}, { isExternal: true }, { latePostId: "" }, { latePostId: null }])("defaults to external without origin evidence: %j", evidence => {
+    expect(analyticsFact(post("instagram", evidence), "instagram", "instagram-account")?.fact.tags?.origin).toBe("external");
+  });
+  it("does not match a non-Facebook id by suffix and overrides user origin", () => {
+    const p = externalPost("instagram");
+    p.platformPostId = "123_456";
+    expect(analyticsFact(p, "instagram", "instagram-account", { "123_456": { origin: "onbrand" } }, new Set(["456"]))?.fact.tags)
+      .toEqual({ format: "image", origin: "external" });
+  });
   it.each(ZERNIO_ANALYTICS_PLATFORMS)("converts %s with native id, Taipei day and own tags", platform => {
     const id = platform === "facebook" ? "123_456" : `${platform}-native`;
-    const result = analyticsFact(post(platform), platform, `${platform}-account`, { [id]: { ta: "owners", format: "old" } });
+    const result = analyticsFact(post(platform), platform, `${platform}-account`, { [id]: { ta: "owners", format: "old", origin: "external" } }, new Set([id]));
     expect(result).toEqual({ tagged: true, fact: {
       source: SOURCE_BY_PLATFORM[platform], entityType: "post", entityId: id, entityLabel: "Hello world",
       text: "  Hello\n world  ", date: "2026-10-08", permalink: "https://example.com/post",
-      tags: { ta: "owners", format: "image" },
+      tags: { ta: "owners", format: "image", origin: "onbrand" },
       metrics: { reactions: 10, comments: 3, shares: 2, engagement: 15, reach: 90,
         impressions: platform === "threads" ? 80 : 100, views: 80, saves: 4, clicks: 1 },
     } });
@@ -55,9 +78,9 @@ describe("Zernio analytics facts", () => {
     const p = post("facebook");
     p.platforms = [{ ...p.platformAnalytics![0]!, accountId: "other", analytics: { likes: 800 } }, ...p.platformAnalytics!];
     delete p.platformAnalytics;
-    const result = analyticsFact(p, "facebook", "facebook-account", { "456": { ta: "owners" } });
+    const result = analyticsFact(p, "facebook", "facebook-account", { "456": { ta: "owners" } }, new Set(["456"]));
     expect(result?.fact.metrics.reactions).toBe(10);
-    expect(result?.fact.tags).toEqual({ ta: "owners", format: "image" });
+    expect(result?.fact.tags).toEqual({ ta: "owners", format: "image", origin: "onbrand" });
     expect(result?.tagged).toBe(true);
   });
   it("normalizes object account ids in platforms and still rejects unrelated or null accounts", () => {
@@ -72,9 +95,9 @@ describe("Zernio analytics facts", () => {
     expect(analyticsFact(p, "instagram", "missing-account")).toBeNull();
   });
   it.each(ZERNIO_ANALYTICS_PLATFORMS)("converts flat external %s posts using top-level analytics", platform => {
-    const result = analyticsFact(externalPost(platform), platform, `${platform}-account`, { "456": { ta: "owners" } });
+    const result = analyticsFact(externalPost(platform), platform, `${platform}-account`, { "456": { ta: "owners" } }, new Set(["456"]));
     expect(result).toMatchObject({ tagged: true, fact: { source: SOURCE_BY_PLATFORM[platform], entityId: "456",
-      entityLabel: "External post", date: "2026-10-08", tags: { ta: "owners", format: "image" },
+      entityLabel: "External post", date: "2026-10-08", tags: { ta: "owners", format: "image", origin: "onbrand" },
       metrics: { reactions: 10, engagement: 15, impressions: platform === "threads" ? 80 : 100 } } });
   });
   it("rejects flat posts for another platform or without a native id and never falls back around unmatched targets", () => {
@@ -113,8 +136,8 @@ describe("Zernio analytics facts", () => {
     const p = post("facebook");
     Object.assign(p.platformAnalytics![0]!, { platformPostId: id, platformPostUrl: "https://www.facebook.com/my-page/posts/pfbidExample" });
     for (const key of [id, `123_${id}`]) {
-      expect(analyticsFact(p, "facebook", "facebook-account", { [key]: { ta: "owners" } }, "123"))
-        .toMatchObject({ tagged: true, fact: { entityId: `123_${id}`, tags: { ta: "owners" } } });
+      expect(analyticsFact(p, "facebook", "facebook-account", { [key]: { ta: "owners" } }, new Set([key]), "123"))
+        .toMatchObject({ tagged: true, fact: { entityId: `123_${id}`, tags: { ta: "owners", origin: "onbrand" } } });
     }
   });
   it.each(["456", "pfbidExample"])("keeps the original Facebook id %s without page metadata", id => {
@@ -123,20 +146,32 @@ describe("Zernio analytics facts", () => {
   });
   it.each(["123_456", "123_pfbidExample"])("does not prepend the page id to the composite native id %s", id => {
     const p = { ...externalPost("facebook"), platformPostId: id };
-    expect(analyticsFact(p, "facebook", "facebook-account", {}, "789")?.fact.entityId).toBe(id);
-  });
-  it("loads tags despite one malformed metadata row", async () => {
-    const pool = { execute: vi.fn().mockResolvedValue([[{ externalPostId: "bad", metadata: "{" },
-      { externalPostId: "native", metadata: { perfTags: { ta: "owners", bad: 2 } } }]]) };
-    expect(await ownTagsFor(7, pool)).toEqual({ native: { ta: "owners" } });
-    expect(pool.execute).toHaveBeenCalledWith(expect.stringContaining("sp.brandId = ?"), [7]);
+    expect(analyticsFact(p, "facebook", "facebook-account", {}, new Set(), "789")?.fact.entityId).toBe(id);
   });
 });
 
 describe("Zernio brand sync", () => {
+  it.each(ZERNIO_ANALYTICS_PLATFORMS)("counts %s onbrand separately from user tags and skipped posts", async platform => {
+    const deps = setup([platform]);
+    deps.pool.execute.mockResolvedValueOnce([[{ platform, accountId: `${platform}-account` }]])
+      .mockResolvedValueOnce([[{ externalPostId: "456", metadata: null }]]);
+    const p = externalPost(platform);
+    deps.client.listAnalytics.mockResolvedValueOnce(pageOf([
+      p,
+      { ...p, platformPostId: "provider-owned", isExternal: false },
+      { ...p, platformPostId: "late-owned", latePostId: "late-id" },
+      { ...p, platformPostId: "elsewhere", isExternal: true },
+      { ...p, platformPostId: "invalid", isExternal: false, publishedAt: "invalid" },
+    ]));
+    expect(await syncBrandZernioAnalytics(7, 120, deps)).toEqual({
+      platforms: [{ platform, posts: 4, tagged: 0, onbrand: 3, skipped: 1 }],
+    });
+    expect(deps.upsert.mock.calls[0]![1].map((fact: { tags: { origin: string } }) => fact.tags.origin))
+      .toEqual(["onbrand", "onbrand", "onbrand", "external"]);
+  });
   it("syncs only the four supported connections with dates, source=all and own tags", async () => {
     const deps = setup([...ZERNIO_ANALYTICS_PLATFORMS, "youtube", "tiktok", "x"]);
-    expect(await syncBrandZernioAnalytics(7, 120, deps)).toEqual({ platforms: ZERNIO_ANALYTICS_PLATFORMS.map(platform => ({ platform, posts: 1, tagged: platform === "facebook" ? 1 : 0, skipped: 0 })) });
+    expect(await syncBrandZernioAnalytics(7, 120, deps)).toEqual({ platforms: ZERNIO_ANALYTICS_PLATFORMS.map(platform => ({ platform, posts: 1, tagged: platform === "facebook" ? 1 : 0, onbrand: platform === "facebook" ? 1 : 0, skipped: 0 })) });
     expect(deps.pool.execute).toHaveBeenCalledWith(expect.stringContaining("status = 'connected'"), [7, "zernio"]);
     expect(deps.client.listAnalytics).toHaveBeenCalledTimes(4);
     expect(deps.client.listAnalytics).toHaveBeenCalledWith({ accountId: "facebook-account", fromDate: "2026-06-10", toDate: "2026-10-08", source: "all", page: 1, limit: 100 });
@@ -155,7 +190,7 @@ describe("Zernio brand sync", () => {
     const meta = { profileUrl: "https://www.facebook.com/my-page", platformUserId: "123" };
     deps.pool.execute.mockResolvedValueOnce([[{ platform: "facebook", accountId: "facebook-account", meta: json ? JSON.stringify(meta) : meta }]]);
     deps.client.listAnalytics.mockResolvedValueOnce(pageOf([externalPost("facebook")]));
-    expect(await syncBrandZernioAnalytics(7, 120, deps)).toEqual({ platforms: [{ platform: "facebook", posts: 1, tagged: 1, skipped: 0 }] });
+    expect(await syncBrandZernioAnalytics(7, 120, deps)).toEqual({ platforms: [{ platform: "facebook", posts: 1, tagged: 1, onbrand: 1, skipped: 0 }] });
     expect(deps.upsert.mock.calls[0]![1][0]).toMatchObject({ entityId: "123_456", tags: { ta: "owners" } });
   });
   it.each([undefined, null, "{", { platformUserId: null }])("uses the raw native id with missing or malformed metadata %j", async meta => {
@@ -179,8 +214,8 @@ describe("Zernio brand sync", () => {
       { ...externalPost("facebook"), platformPostId: "789" },
     ]));
     expect(await syncBrandZernioAnalytics(7, 120, deps)).toEqual({ platforms: [
-      { platform: "facebook", posts: 2, tagged: 1, skipped: 2 },
-      { platform: "threads", posts: 1, tagged: 0, skipped: 0 },
+      { platform: "facebook", posts: 2, tagged: 1, onbrand: 1, skipped: 2 },
+      { platform: "threads", posts: 1, tagged: 0, onbrand: 0, skipped: 0 },
     ] });
     expect(deps.upsert.mock.calls[0]![1].map((fact: { entityId: string }) => fact.entityId)).toEqual(["456", "789"]);
     expect(deps.log).not.toHaveBeenCalled();
@@ -190,7 +225,7 @@ describe("Zernio brand sync", () => {
     const sensitive = randomUUID();
     deps.client.listAnalytics.mockRejectedValueOnce(new ZernioApiError(403, sensitive));
     const result = await syncBrandZernioAnalytics(7, 120, deps);
-    expect(result.platforms[0]).toMatchObject({ platform: "facebook", posts: 0, tagged: 0, error: expect.stringContaining("403") });
+    expect(result.platforms[0]).toMatchObject({ platform: "facebook", posts: 0, tagged: 0, onbrand: 0, error: expect.stringContaining("403") });
     expect(result.platforms.slice(1).every(p => p.posts === 1 && !p.error)).toBe(true);
     expect(deps.log).toHaveBeenCalledWith(expect.objectContaining({ source: "zernio.analytics", level: "warn", meta: { brandId: 7, platform: "facebook" } }));
     expect(JSON.stringify([result, deps.log.mock.calls])).not.toContain(sensitive);
@@ -206,7 +241,7 @@ describe("Zernio brand sync", () => {
   it.each([false, true])("bootstraps an empty first sync once (still empty: %s)", async stillEmpty => {
     const deps = setup(["instagram"]);
     deps.client.listAnalytics.mockResolvedValueOnce(pageOf([])).mockResolvedValueOnce(pageOf(stillEmpty ? [] : [post("instagram")]));
-    expect(await syncBrandZernioAnalytics(7, 120, deps)).toEqual({ platforms: [{ platform: "instagram", posts: stillEmpty ? 0 : 1, tagged: 0, skipped: 0 }] });
+    expect(await syncBrandZernioAnalytics(7, 120, deps)).toEqual({ platforms: [{ platform: "instagram", posts: stillEmpty ? 0 : 1, tagged: 0, onbrand: 0, skipped: 0 }] });
     expect(deps.client.syncExternalPosts).toHaveBeenCalledOnce();
     expect(deps.client.syncExternalPosts).toHaveBeenCalledWith({ accountId: "instagram-account" });
     expect(deps.client.listAnalytics).toHaveBeenCalledTimes(2);

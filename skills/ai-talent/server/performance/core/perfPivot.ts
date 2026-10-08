@@ -23,15 +23,25 @@ export const BUILTIN_DIMS: Record<string, { label: string; labelEn: string }> = 
   month:  { label: "月份",     labelEn: "Month" },
   source: { label: "資料來源", labelEn: "Source" },
   format: { label: "貼文形式", labelEn: "Post format" },
+  origin: { label: "發布來源", labelEn: "Published by" },
 };
 
 export const SOURCE_LABELS: Record<string, string> = {
   fb_page: "粉專貼文", meta_ads: "Meta 廣告", google_ads: "Google 廣告", ga4: "GA4",
+  ig_account: "Instagram 貼文", threads_account: "Threads 貼文", linkedin_page: "LinkedIn 貼文",
   shopline: "SHOPLINE", "91app": "91APP", shopify: "Shopify", csv: "匯入檔",
 };
 
 export const FORMAT_LABELS: Record<string, string> = {
   photo: "圖片", album: "相簿", video: "影片", reel: "Reels", link: "連結", status: "純文字", event: "活動", other: "其他",
+};
+
+export const ORIGIN_LABELS: Record<string, string> = {
+  onbrand: "onBrand 發布", external: "原本自行發布",
+};
+
+export const ORIGIN_LABELS_EN: Record<string, string> = {
+  onbrand: "Published via onBrand", external: "Published elsewhere",
 };
 
 /**
@@ -109,6 +119,7 @@ export function resolveTag(fact: Fact, dimKey: string, rules: TagRule[]): string
   if (dimKey === "month") return fact.date.slice(0, 7);
   if (dimKey === "source") return fact.source;
   if (dimKey === "format") return fact.tags?.format || UNTAGGED;
+  if (dimKey === "origin") return fact.tags?.origin || UNTAGGED;
   const hay = `${fact.entityLabel ?? ""}\n${fact.text ?? ""}`;
   for (const r of rules) {
     if (r.dimKey === dimKey && ruleMatches(r, hay)) return r.valueCode;
@@ -136,10 +147,11 @@ function addInto(acc: Totals, m: Record<string, number>) {
   }
 }
 
-function labelFor(dimKey: string, code: string, dims: Dimension[]): string {
+export function labelFor(dimKey: string, code: string, dims: Dimension[], lang: "zh" | "en" = "zh"): string {
   if (code === UNTAGGED) return "未歸類";
   if (dimKey === "source") return SOURCE_LABELS[code] ?? code;
   if (dimKey === "format") return FORMAT_LABELS[code] ?? code;
+  if (dimKey === "origin") return (lang === "en" ? ORIGIN_LABELS_EN : ORIGIN_LABELS)[code] ?? code;
   if (dimKey === "month") return code;
   const d = dims.find((x) => x.key === dimKey);
   return d?.values.find((v) => v.code === code)?.label ?? code;

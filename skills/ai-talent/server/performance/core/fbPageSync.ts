@@ -184,12 +184,14 @@ export async function syncFbPage(brandId: number, days = 120): Promise<FbSyncRes
 
   // OnBrand 發出去的貼文 → 產出時的 perfTags
   const tagsByPost: Record<string, Record<string, string>> = {};
+  const ownIds = new Set<string>();
   try {
     const [rows]: any = await localPool.execute(
       `SELECT sp.externalPostId, mo.metadata
          FROM scheduled_posts sp JOIN mission_outputs mo ON mo.id = sp.outputId
         WHERE sp.brandId = ? AND sp.externalPostId IS NOT NULL`, [brandId],
     );
+    for (const r of rows as any[]) ownIds.add(String(r.externalPostId));
     for (const r of rows as any[]) {
       const meta = typeof r.metadata === "string" ? JSON.parse(r.metadata) : r.metadata;
       const t = meta?.perfTags;
@@ -211,13 +213,14 @@ export async function syncFbPage(brandId: number, days = 120): Promise<FbSyncRes
     for (const k of Object.keys(INSIGHT_CANDIDATES)) { const v = pick(k); if (v != null) metrics[k] = v; }
     const suffix = String(p.id).split("_").pop()!;
     const own = tagsByPost[p.id] ?? tagsByPost[suffix] ?? {};
+    const origin = ownIds.has(String(p.id)) || ownIds.has(suffix) ? "onbrand" : "external";
     if (Object.keys(own).length) tagged++;
     const msg = String(p.message ?? "");
     return {
       source: "fb_page", entityType: "post", entityId: String(p.id),
       entityLabel: msg.replace(/\s+/g, " ").slice(0, 60) || "(無文字貼文)",
       text: msg, date: taipeiDate(p.created_time), permalink: p.permalink_url ?? null,
-      tags: { ...own, format: formatOf(p) }, metrics,
+      tags: { ...own, format: formatOf(p), origin }, metrics,
     };
   });
   await upsertFacts(brandId, facts);
