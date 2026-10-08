@@ -23,7 +23,7 @@
  *   · 日期超出範圍的改法以前是靜靜丟掉；現在回覆最後會說哪幾天沒排進去、最早能排到哪天。
  */
 import { PAID_CHANNELS } from "./campaignKpi.js";
-import { candidateCards, eventFacts, safeJSON, PLANNABLE_CHANNELS, CAMPAIGN_PHASE_IDS, type CampaignPlan, type CampaignPhaseId, type PlanItem } from "./campaignPlan.js";
+import { candidateCards, eventFacts, safeJSON, PLANNABLE_CHANNELS, PARTNER_CHANNELS, CAMPAIGN_PHASE_IDS, type CampaignPlan, type CampaignPhaseId, type PlanItem } from "./campaignPlan.js";
 import type { CatalogTask } from "../catalog/taskCatalogIndex.js";
 import { brandIndustry, type TeamAgent } from "./campaignTeam.js";
 import { buildCampaignRoster, isCampaignRole, ROLES, type CampaignRole, type RosterMember } from "./campaignRoster.js";
@@ -191,6 +191,52 @@ export interface CampaignOpsReport {
   writtenKept: number;
   /** 這次檢查實際用的範圍（活動日期一起改的話，是新日期的範圍）。 */
   window: { from: string; to: string };
+  /** 這檔活動沒選、使用者也沒點名，所以沒排進去的通路。 */
+  offChannel?: string[];
+}
+
+/**
+ * 使用者的話裡點名了哪些通路。只認明確的叫法——「脆」單一個字不算（食品品牌常寫「脆皮」）。
+ */
+const CHANNEL_ASKED: Record<string, RegExp> = {
+  facebook: /facebook|\bfb\b|臉書|粉專|粉絲團|粉絲專頁/i,
+  instagram: /instagram|\big\b|限動|限時動態|\breels?\b/i,
+  threads: /threads|脆文|串文/i,
+  line: /\bline\b/i,
+  tiktok: /tiktok|抖音|\btt\b/i,
+  email: /e-?mail|電子報|\bedm\b|newsletter/i,
+  website: /官網|網站|website|部落格|\bblog\b/i,
+  kol: /\bkols?\b|網紅|創作者|團購主|influencer/i,
+  cobrand: /異業|聯名|co-?brand/i,
+};
+
+/**
+ * 對話可以把貼文排進哪些通路（2026-10-08 CJ「只選了 FB，請他新增 FB 貼文，他自己跳出
+ * Instagram 的貼文」）。
+ *
+ * 原本提示詞列的是全部通路，輸出範例還寫死 instagram，模型就照抄。現在：
+ *   · own   ＝這檔活動選的通路＋企劃裡已經有的通路——加篇、換通路預設只能落在這裡；
+ *   · asked ＝使用者這幾句話裡親口點名、但活動沒選的通路——他要加才放行；
+ * 活動沒有任何設定（舊資料）就退回全部通路，跟改版前一樣。純函式。
+ */
+export function chatChannels(args: {
+  selected: string[];
+  partners?: { kol?: boolean; cobrand?: boolean } | null;
+  plan: Pick<CampaignPlan, "items">;
+  /** 使用者說的話（這一句＋這段討論前面他說過的幾句）。 */
+  said: string[];
+}): { own: string[]; asked: string[]; allowed: string[] } {
+  const picked = new Set<string>([
+    ...args.selected.map((c) => String(c).toLowerCase()),
+    ...(args.partners?.kol ? ["kol"] : []),
+    ...(args.partners?.cobrand ? ["cobrand"] : []),
+    ...args.plan.items.map((i) => i.platform),
+  ]);
+  const own = (PLANNABLE_CHANNELS as readonly string[]).filter((c) => picked.has(c));
+  if (!own.length) return { own: [...PLANNABLE_CHANNELS], asked: [], allowed: [...PLANNABLE_CHANNELS] };
+  const text = args.said.join("\n");
+  const asked = (PLANNABLE_CHANNELS as readonly string[]).filter((c) => !picked.has(c) && CHANNEL_ASKED[c]?.test(text));
+  return { own, asked, allowed: [...own, ...asked] };
 }
 
 function pickCard(platform: string, taskId: unknown, cards: CatalogTask[]): { card: CatalogTask | null; repaired: boolean } {
@@ -213,8 +259,16 @@ export function validateCampaignOps(args: {
   event?: { startAt: string | null; endAt: string | null; today: string };
   /** 要跟使用者說的事記在這裡（有給才記）。 */
   report?: CampaignOpsReport;
+  /** 加篇、換通路只能落在這幾個通路（chatChannels 的 allowed）；沒給＝全部通路。 */
+  channels?: readonly string[];
 }): CampaignProposal {
   const { plan, cards } = args;
+  const channelOk = (p: string) => {
+    if (!(PLANNABLE_CHANNELS as readonly string[]).includes(p)) return false;
+    if (!args.channels || args.channels.includes(p)) return true;
+    if (args.report && !(args.report.offChannel ??= []).includes(p)) args.report.offChannel.push(p);
+    return false;
+  };
   // 沒指定角色（舊呼叫端與測試）：內容企劃的權限＋一句話訴求，跟改版前一樣。
   const can = args.role ? ROLES[args.role].can : { ...ROLES.planner.can, smp: true };
   // 活動日期先定：這一輪其他改法的日期範圍跟著新日期算。
@@ -254,7 +308,7 @@ export function validateCampaignOps(args: {
       const angle = str(o?.angle, 200);
       if (!(CAMPAIGN_PHASE_IDS as readonly string[]).includes(phase)) continue;
       if (!inWindow(date)) { miss(date); continue; }
-      if (!(PLANNABLE_CHANNELS as readonly string[]).includes(platform) || angle.length < 4) continue;
+      if (angle.length < 4 || !channelOk(platform)) continue;
       const { card, repaired } = pickCard(platform, o?.taskId, cards);
       if (!card) continue;
       ops.push({
@@ -276,7 +330,7 @@ export function validateCampaignOps(args: {
       else if (o?.date != null && String(o.date) !== cur.date) patch.date = String(o.date);
       if (typeof o?.enabled === "boolean" && o.enabled !== cur.enabled) patch.enabled = o.enabled;
       const platform = o?.platform != null ? String(o.platform).toLowerCase() : "";
-      if (platform && platform !== cur.platform && (PLANNABLE_CHANNELS as readonly string[]).includes(platform)) {
+      if (platform && platform !== cur.platform && channelOk(platform)) {
         const { card, repaired } = pickCard(platform, o?.taskId, cards);
         if (card) Object.assign(patch, { platform, taskId: card.id, taskLabel: card.labelZh || card.labelEn || card.id, repaired });
       } else if (o?.taskId != null && String(o.taskId) !== cur.taskId) {
@@ -332,6 +386,12 @@ export function reportNote(report: CampaignOpsReport, changedDates: boolean, en:
     bits.push(en
       ? `${days} is outside what I can schedule (${md(report.window.from)}–${md(report.window.to)}), so it was left out. To go earlier, ask me to move the campaign dates.`
       : `${days} 超出可以排的範圍（${md(report.window.from)}～${md(report.window.to)}），沒有排進去。要再更早，可以請我把活動日期往前挪。`);
+  }
+  if (report.offChannel?.length) {
+    const names = report.offChannel.map((c) => (en ? CHANNEL_EN[c] : CHANNEL_ZH[c]) ?? c).join(en ? ", " : "、");
+    bits.push(en
+      ? `This campaign doesn't use ${names}, so nothing was scheduled there. If you do want it, tell me to add a ${names} post.`
+      : `這檔活動沒有選 ${names}，所以沒有排進去。要加的話，直接跟我說要加 ${names} 的貼文。`);
   }
   if (changedDates && report.writtenKept) {
     bits.push(en
@@ -523,6 +583,10 @@ const PHASE_ZH: Record<string, string> = { teaser: "預熱", launch: "開賣", s
 
 const CHANNEL_ZH: Record<string, string> = {
   facebook: "Facebook", instagram: "Instagram", threads: "Threads", line: "LINE", tiktok: "TikTok", email: "電子報", website: "官網",
+  kol: "網紅合作", cobrand: "異業合作",
+};
+const CHANNEL_EN: Record<string, string> = {
+  ...CHANNEL_ZH, email: "newsletter", website: "website", kol: "influencer", cobrand: "co-branding",
 };
 
 /**
@@ -615,8 +679,14 @@ export async function runCampaignChat(args: {
   const window = chatWindow(event.startAt, event.endAt, event.today);
   const cards = candidateCards([...PLANNABLE_CHANNELS]);
   // 候選卡清單很長（每通路 30 張），只有會加篇換卡的內容企劃需要——其他人少讀一大段，回得快。
+  // 這段討論裡使用者親口說的話：只有他點名的通路才會在活動選的通路之外放行（轉手的指示不算）。
+  const userSaid = [
+    ...(args.history ?? []).filter((h) => h.role === "user").slice(-3).map((h) => String(h.content)),
+    ...(args.handoff ? [] : [args.message]),
+  ];
+  const chans = chatChannels({ selected: facts.settings.channels ?? [], partners: facts.settings.partners, plan: args.plan, said: userSaid });
   const menu = speaker === "planner"
-    ? PLANNABLE_CHANNELS.flatMap((p) => cards.filter((c) => c.platform === p).slice(0, 30))
+    ? chans.allowed.flatMap((p) => cards.filter((c) => c.platform === p).slice(0, 30))
       .map((c) => `- ${c.id}｜${c.platform}｜${c.labelZh || c.labelEn}`).join("\n")
     : "";
   const planLines = [...args.plan.items]
@@ -663,7 +733,8 @@ export async function runCampaignChat(args: {
     `【一句話訴求】${args.plan.smp}`,
     pmLines ? `【每一段的訊息】\n${pmLines}` : "",
     speaker === "planner" ? `【允許的日期範圍】${window.from} ~ ${window.to}` : "",
-    speaker === "planner" ? `【可以用的通路】${PLANNABLE_CHANNELS.join("、")}` : "",
+    speaker === "planner" ? `【這檔活動選的通路】${chans.own.join("、")}（加篇、換通路只能用這幾個；使用者沒說通路，就用他正在談的那個通路）` : "",
+    speaker === "planner" && chans.asked.length ? `【使用者這次點名要加的通路】${chans.asked.join("、")}（活動原本沒選，他要加才用）` : "",
     speaker === "kpi" && kpi ? `【目前的預算與 KPI】${JSON.stringify(kpi).slice(0, 1500)}` : "",
     speaker === "kol" && args.positioning?.kolBrief ? `【網紅任務說明單】${JSON.stringify(args.positioning.kolBrief).slice(0, 2000)}` : "",
     args.view === "basis"
@@ -685,7 +756,7 @@ export async function runCampaignChat(args: {
     speaker === "director"
       ? `{"reply":"兩到四句","smp":"新的一句話訴求（要改才填）","dates":{"startAt":"YYYY-MM-DD","endAt":"YYYY-MM-DD（要改活動日期才填 dates）"},"phaseMessages":{"launch":"只有要改的段才填"},"ops":[{"op":"update","id":"企劃裡的 id","angle":"改寫後要講什麼（20-45字）"}],"basis":{"audience.keyInsight":"只有要改的格子才填","guidelines.forbiddenElements":["清單型給陣列"]},"handoffTo":"要交棒才填：planner 或名冊上的角色 id","ask":"給接手那位的一句具體指示"}`
       : speaker === "planner"
-        ? `{"reply":"一到三句","ops":[{"op":"add","phase":"sustain","date":"YYYY-MM-DD","platform":"instagram","taskId":"逐字抄自候選清單","angle":"這一篇要講什麼（20-45字）"},{"op":"update","id":"企劃裡的 id","angle":"…","date":"…","enabled":true},{"op":"remove","id":"企劃裡的 id"}],"phaseMessages":{"sustain":"只有要改才填"},"dates":{"startAt":"YYYY-MM-DD","endAt":"YYYY-MM-DD（要改活動日期才填 dates）"},"handoffTo":"要交棒才填：director 或名冊上的角色 id","ask":"給接手那位的一句具體指示"}`
+        ? `{"reply":"一到三句","ops":[{"op":"add","phase":"sustain","date":"YYYY-MM-DD","platform":"${chans.own.find((c) => !PARTNER_CHANNELS.includes(c)) ?? chans.own[0]}","taskId":"逐字抄自候選清單","angle":"這一篇要講什麼（20-45字）"},{"op":"update","id":"企劃裡的 id","angle":"…","date":"…","enabled":true},{"op":"remove","id":"企劃裡的 id"}],"phaseMessages":{"sustain":"只有要改才填"},"dates":{"startAt":"YYYY-MM-DD","endAt":"YYYY-MM-DD（要改活動日期才填 dates）"},"handoffTo":"要交棒才填：director 或名冊上的角色 id","ask":"給接手那位的一句具體指示"}`
         : specialistJson,
   ].filter(Boolean).join("\n");
 
@@ -709,7 +780,7 @@ export async function runCampaignChat(args: {
   const report: CampaignOpsReport = { outOfWindow: [], writtenKept: 0, window };
   const proposal = validateCampaignOps({
     raw: { ops: parsed.ops, phaseMessages: parsed.phaseMessages, smp: parsed.smp, dates: parsed.dates },
-    plan: args.plan, cards, window, role: speaker, event, report,
+    plan: args.plan, cards, window, role: speaker, event, report, channels: chans.allowed,
   });
   if (can.basis && parsed.basis) {
     const b = validateBasis(parsed.basis, args.positioning ?? {}, { preserveItems: true });
