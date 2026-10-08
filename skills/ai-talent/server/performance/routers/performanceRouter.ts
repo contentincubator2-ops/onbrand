@@ -37,10 +37,8 @@ import {
 import { pivot, resolveTag, judgeValue, BUILTIN_DIMS, METRIC_LABELS, JUDGE_LABELS, SOURCE_LABELS, UNTAGGED, type LensConfig } from "../core/perfPivot";
 import { deriveDimensions, proposeLens, autoTag } from "../core/perfAI";
 import { parseTable, guessSource, guessMapping, buildFacts, IMPORT_SOURCES, ROWCOUNT } from "../core/perfImport";
-import { syncFbPage, resolvePage, FbSyncError, fbSyncEnabled } from "../core/fbPageSync";
-import { ensureFreshZernioAnalytics, syncBrandZernioAnalytics, ZernioAnalyticsSyncError, isAnalyticsPlatform, SOURCE_BY_PLATFORM } from "../core/zernioAnalyticsSync";
+import { ensureFreshZernioAnalytics, syncBrandZernioAnalytics, ZernioAnalyticsSyncError, zernioAnalyticsEnabled, isAnalyticsPlatform, SOURCE_BY_PLATFORM } from "../core/zernioAnalyticsSync";
 import { listConnectedByBrand } from "../../platform/core/connectors/publish/connectionStore";
-import { getPublishProvider } from "../../platform/core/connectors/publish/publishProvider";
 import { utmContent, campaignCode, campaignLink, cleanLandingUrl } from "../../platform/core/perfUtm";
 import {
   buildCampaignPerf, applyMatch, applyAlias, loadCampaignEvent, saveCampaignPerf, publishedPosts, listCampaigns,
@@ -86,6 +84,11 @@ async function syncSocial(input: z.infer<typeof syncInput>) {
   }
 }
 
+async function socialAccounts(brandId: number) {
+  const { default: pool } = await import("../../localDb");
+  return (await listConnectedByBrand(pool, brandId, "zernio")).filter(c => isAnalyticsPlatform(c.platform));
+}
+
 export const performanceRouter = router({
   /** 這個品牌三個資料來源的真實狀態。 */
   connections: protectedProcedure
@@ -94,36 +97,8 @@ export const performanceRouter = router({
       await assertBrandAccess(ctx.user!.id, input.brandId);
       const { default: pool } = await import("../../localDb");
       const socialConnections = (await listConnectedByBrand(pool, input.brandId, "zernio")).filter(c => isAnalyticsPlatform(c.platform));
-      let fb: { status: string; selectedResourceId: string | null; connectedAt: any; authorizedResources: any } | null = null;
-      try {
-        const { default: localPool } = await import("../../localDb");
-        const [rows]: any = await localPool.execute(
-          `SELECT status, selectedResourceId, connectedAt, authorizedResources
-             FROM brand_integrations
-            WHERE brandId = ? AND userId = ? AND integrationType = 'facebook_pages'
-            ORDER BY id DESC LIMIT 1`,
-          [input.brandId, ctx.user!.id],
-        );
-        fb = (rows as any[])[0] ?? null;
-      } catch { fb = null; /* 讀不到就當沒連，不要讓成效頁掛掉 */ }
-
-      // 已選粉專的名稱：authorizedResources 是 JSON 清單，用 selectedResourceId 對回去
-      let pageLabel: string | null = null;
-      if (fb?.selectedResourceId) {
-        try {
-          const list = typeof fb.authorizedResources === "string"
-            ? JSON.parse(fb.authorizedResources) : fb.authorizedResources;
-          const hit = Array.isArray(list)
-            ? list.find((r: any) => String(r?.id) === String(fb!.selectedResourceId)) : null;
-          pageLabel = hit?.name ?? String(fb.selectedResourceId);
-        } catch { pageLabel = String(fb.selectedResourceId); }
-      }
-      // status enum 是 connected | disconnected | error（drizzle schema），沒有 'active'。
-      // 2026-09-29：發布流程實際用的是 brands.fbPageId（fbPageSync 也是），這裡一起算。
-      const page = await resolvePage(input.brandId).catch(() => null);
-      const fbConnected = (!!fb && fb.status === "connected" && !!fb.selectedResourceId) || !!page || socialConnections.length > 0;
-      if (!pageLabel && page) pageLabel = page.pageName ?? page.pageId;
-      if (socialConnections.length) pageLabel = socialConnections.map(c => c.accountLabel || c.accountUsername || c.accountId).join("、");
+      const fbConnected = socialConnections.length > 0;
+      const pageLabel = socialConnections.map(c => c.accountLabel || c.accountUsername || c.accountId).join("、");
       const sources = await sourceSummary(input.brandId).catch(() => ({} as Record<string, { facts: number; latest: string | null }>));
       const socialSources = Object.values(SOURCE_BY_PLATFORM);
       const fbFacts = socialSources.reduce((n, source) => n + (sources[source]?.facts ?? 0), 0);
@@ -144,7 +119,7 @@ export const performanceRouter = router({
           syncing,
           status: fbConnected ? "connected" : "not_connected",
           label: fbConnected ? pageLabel : null,
-          connectedAt: connectedAt ?? (fbConnected && fb?.connectedAt ? new Date(fb.connectedAt).toISOString() : latestSocial),
+          connectedAt: connectedAt ?? latestSocial,
           howZh: fbConnected
             ? (fbFacts ? `社群貼文成效（Facebook／Instagram／Threads／LinkedIn）：已回填 ${fbFacts} 篇，每天自動更新。` : "社群帳號已連結，按「同步成效」回填 Facebook／Instagram／Threads／LinkedIn 貼文成效，之後每天自動更新。舊連線請先到品牌設定重新授權。")
             : "社群貼文成效（Facebook／Instagram／Threads／LinkedIn）：到品牌設定連接帳號；先前已連接的帳號請重新授權一次，以取得成效讀取權限。",
@@ -189,9 +164,9 @@ export const performanceRouter = router({
     .input(z.object({ brandId: z.number().int().positive(), tray: trayInput }))
     .query(async ({ ctx, input }) => {
       await assertBrandAccess(ctx.user!.id, input.brandId);
-      const [dims, lenses, sources, rules, imports, page] = await Promise.all([
+      const [dims, lenses, sources, rules, imports, accounts] = await Promise.all([
         listDimensions(input.brandId), listLenses(input.brandId, input.tray), sourceSummary(input.brandId),
-        listRules(input.brandId), listImports(input.brandId), resolvePage(input.brandId).catch(() => null),
+        listRules(input.brandId), listImports(input.brandId), socialAccounts(input.brandId).catch(() => []),
       ]);
       const traySources = TRAY_SOURCES[input.tray] ?? [];
       const trayFacts = traySources.length
@@ -205,8 +180,8 @@ export const performanceRouter = router({
           .sort((a, b) => Number(b.trays.includes(input.tray)) - Number(a.trays.includes(input.tray)))
           .map((t) => ({ key: t.key, name: t.name, nameEn: t.nameEn, config: t.config, recommended: t.trays.includes(input.tray) })),
         sources, traySources, trayFacts, rules, imports,
-        fbPage: page,
-        fbSyncEnabled: fbSyncEnabled(),
+        socialConnected: accounts.length > 0,
+        socialSyncEnabled: zernioAnalyticsEnabled(),
         metricLabels: METRIC_LABELS, judgeLabels: JUDGE_LABELS, sourceLabels: SOURCE_LABELS,
       };
     }),
@@ -360,20 +335,6 @@ export const performanceRouter = router({
       return syncSocial(input);
     }),
 
-  /** 舊端點保留：Facebook 改走 Zernio 時，一併同步四個支援的平台。 */
-  syncFacebook: protectedProcedure
-    .input(syncInput)
-    .mutation(async ({ ctx, input }) => {
-      await assertBrandAccess(ctx.user!.id, input.brandId);
-      if (getPublishProvider("facebook") === "zernio") return syncSocial(input);
-      try {
-        return await syncFbPage(input.brandId, input.days);
-      } catch (e) {
-        if (e instanceof FbSyncError) throw new TRPCError({ code: "PRECONDITION_FAILED", message: e.message });
-        throw e;
-      }
-    }),
-
   /** 匯入第一步：解析檔案、猜平台、猜欄位對應（上次同來源的對應優先），回前 5 列預覽。 */
   importPreview: protectedProcedure
     .input(z.object({ brandId: z.number().int().positive(), fileName: z.string().max(200), contentBase64: fileInput, source: z.enum(IMPORT_SOURCES).optional() }))
@@ -473,10 +434,10 @@ export const performanceRouter = router({
       const addDays = (s: string, n: number) => new Date(new Date(`${s}T00:00:00Z`).getTime() + n * 86_400_000).toISOString().slice(0, 10);
       const from = addDays(dates[0] ?? new Date().toISOString().slice(0, 10), -14);
       const to = addDays(dates[dates.length - 1] ?? new Date().toISOString().slice(0, 10), 7);
-      const [rawFacts, published, page] = await Promise.all([
+      const [rawFacts, published, accounts] = await Promise.all([
         loadFacts(input.brandId, from, to),
         publishedPosts(input.brandId, items.map((i) => i.outputId ?? 0)),
-        resolvePage(input.brandId).catch(() => null),
+        socialAccounts(input.brandId).catch(() => []),
       ]);
       const facts: PerfFact[] = rawFacts.filter((f: any) => f.source === "fb_page").map((f: any) => ({
         key: `${f.source}:${f.entityId}`, source: f.source, entityId: String(f.entityId), date: f.date,
@@ -501,8 +462,8 @@ export const performanceRouter = router({
         aliases: store.aliases ?? [],
         locked: !!plan.lockedAt,
         kpi: plan.kpi ? { budget: plan.kpi.budget ?? null, goals: plan.kpi.goals ?? [] } : null,
-        fbPage: page,
-        fbSyncEnabled: fbSyncEnabled(),
+        socialConnected: accounts.length > 0,
+        socialSyncEnabled: zernioAnalyticsEnabled(),
         ...report,
         // 每一篇的追蹤連結（設了導流網址才有）。
         items: report.items.map((i) => ({

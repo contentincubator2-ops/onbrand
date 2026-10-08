@@ -55,7 +55,7 @@ export default function CampaignPerformance({ brandId }: { brandId: number | nul
   const refresh = () => utils?.performance?.campaignReport?.invalidate?.();
   const matchMut = (trpc as any).performance.campaignMatch.useMutation({ onSuccess: refresh });
   const manualMut = (trpc as any).performance.campaignManual.useMutation({ onSuccess: refresh });
-  const syncMut = (trpc as any).performance.syncFacebook.useMutation({ onSuccess: refresh });
+  const syncMut = (trpc as any).performance.syncSocial.useMutation({ onSuccess: refresh });
   const landingMut = (trpc as any).performance.campaignLanding.useMutation({ onSuccess: refresh });
   const aliasMut = (trpc as any).performance.campaignAlias.useMutation({ onSuccess: refresh });
   // 匯入視窗要的來源／指標名稱、維度、最近匯入，跟其他 tray 同一支。
@@ -137,13 +137,13 @@ export default function CampaignPerformance({ brandId }: { brandId: number | nul
           {noFacts && (
             <div className="rounded-2xl border border-dashed border-divider p-5 flex items-center gap-3 flex-wrap">
               <p className="text-small text-default-600 flex-1 min-w-[260px]">
-                {!r.fbSyncEnabled
+                {!r.socialSyncEnabled
                   ? L("這個環境沒有開粉專串接，看不到真實貼文數字（正式站才有）。", "Page sync is off in this environment.")
-                  : !r.fbPage
+                  : !r.socialConnected
                     ? L("還沒連上粉專。連上並同步後，活動期間的貼文會自動對照到企劃。", "Connect your Facebook page to match posts to the plan.")
                     : L("活動期間還沒有同步到任何粉專貼文。", "No page posts synced for this window yet.")}
               </p>
-              {r.fbSyncEnabled && r.fbPage && (
+              {r.socialSyncEnabled && r.socialConnected && (
                 <Button size="sm" variant="bordered" radius="md" isLoading={syncMut.isPending}
                   startContent={<FontAwesomeIcon icon={faRotate} />} onPress={() => syncMut.mutate({ brandId })}>{L("同步粉專", "Sync page")}</Button>
               )}

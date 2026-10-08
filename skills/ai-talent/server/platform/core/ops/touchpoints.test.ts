@@ -13,8 +13,8 @@ describe("touchpoints registry", () => {
     executeMock.mockReset();
   });
 
-  it("marks facebook/instagram connected only when the brand has a bundle.social team", async () => {
-    executeMock.mockResolvedValue([[{ industry: "電商", targetCountry: "US", bundleConnectedAt: "2026-09-01 00:00:00" }]]);
+  it("marks facebook/instagram connected only when the brand has connected Zernio accounts", async () => {
+    executeMock.mockResolvedValueOnce([[{ industry: "電商", targetCountry: "US" }]]).mockResolvedValueOnce([[{ platform: "facebook" }, { platform: "instagram" }]]);
 
     const coverage = await getTouchpointCoverage(42);
 
@@ -26,8 +26,17 @@ describe("touchpoints registry", () => {
     expect(coverage.targetCountry).toBe("US");
   });
 
-  it("marks every manual-copy touchpoint as manual regardless of bundle connection", async () => {
-    executeMock.mockResolvedValue([[{ industry: null, targetCountry: null, bundleConnectedAt: "2026-09-01 00:00:00" }]]);
+  it("does not mark Instagram connected just because Facebook is connected", async () => {
+    executeMock.mockResolvedValueOnce([[{ industry: null, targetCountry: null }]])
+      .mockResolvedValueOnce([[{ platform: "facebook" }]]);
+    const coverage = await getTouchpointCoverage(42);
+    expect(coverage.touchpoints.find(t => t.id === "instagram")?.deployStatus).toBe("manual");
+    expect(coverage.connectedCount).toBe(1);
+    expect(executeMock).toHaveBeenCalledWith(expect.stringMatching(/provider = 'zernio' AND status = 'connected'/), [42]);
+  });
+
+  it("marks every manual-copy touchpoint as manual regardless of Zernio connection", async () => {
+    executeMock.mockResolvedValueOnce([[{ industry: null, targetCountry: null }]]).mockResolvedValueOnce([[{ platform: "facebook" }, { platform: "instagram" }]]);
 
     const coverage = await getTouchpointCoverage(42);
 
@@ -38,8 +47,8 @@ describe("touchpoints registry", () => {
     }
   });
 
-  it("marks facebook/instagram manual when the brand has never connected bundle.social", async () => {
-    executeMock.mockResolvedValue([[{ industry: null, targetCountry: null, bundleConnectedAt: null }]]);
+  it("marks facebook/instagram manual when the brand has no connected Zernio accounts", async () => {
+    executeMock.mockResolvedValueOnce([[{ industry: null, targetCountry: null }]]).mockResolvedValueOnce([[]]);
 
     const coverage = await getTouchpointCoverage(42);
 
@@ -48,7 +57,7 @@ describe("touchpoints registry", () => {
   });
 
   it("counts connectedCount and totalCount consistently with the static registry length", async () => {
-    executeMock.mockResolvedValue([[{ industry: null, targetCountry: null, bundleConnectedAt: "2026-09-01 00:00:00" }]]);
+    executeMock.mockResolvedValueOnce([[{ industry: null, targetCountry: null }]]).mockResolvedValueOnce([[{ platform: "facebook" }, { platform: "instagram" }]]);
 
     const coverage = await getTouchpointCoverage(42);
 
@@ -58,7 +67,7 @@ describe("touchpoints registry", () => {
 
   // 2026-09-29（CJ）：內容通路只剩 FB／IG／TikTok／電子報／官網。
   it("hides linkedin / youtube / x / pr from coverage (registry keeps them)", async () => {
-    executeMock.mockResolvedValue([[{ industry: null, targetCountry: null, bundleConnectedAt: null }]]);
+    executeMock.mockResolvedValueOnce([[{ industry: null, targetCountry: null }]]).mockResolvedValueOnce([[]]);
 
     const coverage = await getTouchpointCoverage(42);
     const ids = coverage.touchpoints.map((t) => t.id);

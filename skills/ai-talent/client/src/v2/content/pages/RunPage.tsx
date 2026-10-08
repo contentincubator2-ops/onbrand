@@ -16,9 +16,10 @@
  *   🪄 重生  🎚️ 設定  📋 複製  💾 存
  *   ↻ 重跑  ✕ 關閉
  */
+import { publishSettingsUrl } from "../../platform/lib/publishSettingsUrl";
 import { localizeSource } from "../../platform/lib/taskEn";
 import React, { useMemo, useState, useEffect, useRef } from "react";
-import { useParams, useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useParams, useNavigate, useSearchParams } from "react-router-dom";
 import {
   Avatar, Button, Card, CardBody, Chip, Spinner, Textarea, Tooltip,
   Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Input,
@@ -267,19 +268,6 @@ export default function RunPage() {
     setFocusedAgent(null);
   }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
   const [copied, setCopied] = useState(false);
-  // 2026-05-28: FB flow state
-  // fbOauthDone    — OAuth popup completed this session (button switches to "發布")
-  // fbOauthPending — popup is open; show "✓ 已完成授權" confirm button instead
-  // fbPagePickerOpen — page picker shown when user clicks publish
-  // fbPages        — pages fetched from Graph API (cached after OAuth)
-  const [fbPagePickerOpen, setFbPagePickerOpen] = useState(false);
-  const [fbPages, setFbPages] = useState<Array<{
-    id: string;
-    name: string;
-    category: string;
-    publishReady?: boolean;
-    permissionError?: string;
-  }>>([]);
   /** Local override for variants — applied after save, mockup updates live. */
   const [overrides, setOverrides] = useState<Record<string, { caption: string }>>({});
   /** AI chat history per variant. */
@@ -439,62 +427,7 @@ export default function RunPage() {
         },
       })
     : null;
-  // 2026-05-09 (P5 — CJ「use pipedream for OAuth」): publish to FB via
-  // Pipedream Connect. Server hits a Pipedream webhook; Pipedream's
-  // workflow handles Meta OAuth/token, calls Graph API, returns post_id.
-  // 2026-05-12 (CJ「直接發 facebook 應該直接跳出 pipedream 授權」):
-  // On '尚未連接' error, automatically open the Pipedream Connect popup
-  // for that platform. After successful authorization, the user can press
-  // 直接發 again to publish.
-
-  // 2026-05-18 (CJ「Connect account popup blocked」): the Pipedream SDK
-  // opens its OAuth popup inside connectAccount(). Browsers block that
-  // popup if it runs AFTER an await (the user-gesture/transient
-  // activation is gone) — and the old code did `await getConnectToken`
-  // + `await import(sdk)` BEFORE connectAccount. Fix: PREFETCH the token
-  // and the SDK module (on hover/focus/mount) so the click handler can
-  // call connectAccount with NO awaits in front of it → no popup block.
-  // bundle.social connect path — which platforms use it is decided server-side.
-
-  const pdSdkRef = React.useRef<any>(null);
-
-  React.useEffect(() => {
-    import("@pipedream/sdk/browser")
-      .then((m) => { pdSdkRef.current = (m as any).PipedreamClient; })
-      .catch(() => { /* retried lazily in prefetch */ });
-  }, []);
-
-
-  // Synchronous: NO awaits before pd.connectAccount() so the popup keeps
-  // the click's user activation. If not warmed yet, warm it and ask the
-  // user to tap again (never attempt a popup that will be blocked).
-
-  // 2026-05-18 (CJ「toast 叫我點下方連接 Facebook 按鈕，但根本沒有那顆」):
-  // for Facebook there was ONLY the 直接發 button — no connect button —
-  // so the not-connected toast pointed at a button that didn't exist.
-  // Query FB status; when not connected the FB button BECOMES the
-  // connect action (clicking it IS a user gesture → popup allowed).
-  const fbBrandId = (data?.mission?.brandId ?? data?.brand?.id ?? 0) as number;
-  const fbStatusQuery = (trpc as any).publish?.getBrandFacebookStatus?.useQuery
-    ? (trpc as any).publish.getBrandFacebookStatus.useQuery(
-        { brandId: fbBrandId },
-        // 社群開關關閉的環境（dev）這支會回錯；它只決定 FB 按鈕長相，不該跳紅色「載入失敗」。
-        { enabled: fbBrandId > 0, refetchOnWindowFocus: false, staleTime: 15_000, retry: false, onError: () => {} },
-      )
-    : { data: null };
-
-  // 2026-05-30: brand-scoped platform connection status (for polling)
-
-  // fbPagesMutRef: ref so connectFacebookViaUrl's async retry loop can call
-  // the latest mutation without stale closure issues.
-  const fbPagesMutRef = useRef<any>(null);
-
-  const fbPagesMut      = (trpc as any).publish?.getFacebookPages?.useMutation?.();
-  fbPagesMutRef.current = fbPagesMut;
-  const setBrandFbPageMut = (trpc as any).publish?.setBrandFacebookPage?.useMutation?.();
-  // 2026-06-01 (CJ): Route all publishing through Calendar instead of direct Pipedream call.
-  // scheduleToCalMut: schedules the output as a "pending" scheduled_post, then user
-  // goes to 本週企劃 (/planner) where they click "立即發布" to actually push via Pipedream.
+  // Scheduling stays in Calendar; platform authorization lives in brand settings.
   const scheduleToCalMut = (trpc as any).calendar?.schedule?.useMutation?.({
     onSuccess: (_r: any) => {
       showToastGlobal(
@@ -511,8 +444,6 @@ export default function RunPage() {
       );
     },
   }) ?? { mutateAsync: async () => {}, isPending: false };
-
-  // Uses Pipedream SDK iframe — window.open popup throws "Must be inside iframe"
 
   const imageGenMut = (trpc as any).image?.generate?.useMutation
     ? (trpc as any).image.generate.useMutation({
@@ -921,27 +852,6 @@ export default function RunPage() {
       "fb";
     navigate(`/tasks/${slug}?rerun=${id}`);
   }, [data?.mission?.taskId, data?.mission?.workspace, id, lang, navigate]);
-
-  // Captures both the envelope collection and its local index. Legacy payloads
-  // omit contentKind, preserving the pre-envelope mutation contract exactly.
-  const handleScheduleToCalendar = React.useCallback(async (rowPlatform: string) => {
-    const planningWarning = getPlanningPublishWarning(
-      selectedContentKind,
-      "schedule",
-      lang === "en" ? "en" : "zh",
-    );
-    if (!confirm(planningWarning ?? (lang === "en"
-      ? `Add to Calendar as ${rowPlatform}? You can then publish from the Calendar page.`
-      : `加入日曆（${rowPlatform}）？可在日曆頁面選擇時間並發布。`))) return;
-
-    await scheduleToCalMut?.mutateAsync?.({
-      outputId: id,
-      ...getRunContentMutationLocator(selectedContentKind, activeIdx),
-      ...getPlanningConfirmationPayload(selectedContentKind),
-      platform: rowPlatform,
-      scheduledAt: new Date().toISOString(),
-    });
-  }, [lang, id, activeIdx, selectedContentKind, scheduleToCalMut]);
 
   // 2026-07-20 (CJ「FB 短貼文的『改圖』應隱藏但仍顯示、點了也不會生圖」):
   // text-only tasks (every variant image status "skipped", no url) have
@@ -3502,38 +3412,13 @@ export default function RunPage() {
             </CardBody>
           </Card>
 
-          {/* 2026-06-01: FB page picker — shown after OAuth when brand has no saved page binding.
-              After binding, schedules to calendar (unified flow) instead of direct publish. */}
-          {fbPagePickerOpen && fbPages.length > 0 && (
-            <Card className="border border-primary/40">
-              <CardBody className="space-y-2">
-                <p className="text-small font-semibold">{lang === "en" ? "Which Facebook page to bind?" : "要綁定哪個粉絲團？"}</p>
-                <div className="space-y-1.5">
-                  {fbPages.map((p) => (
-                    <Button
-                      key={p.id} fullWidth variant="flat" color="primary" size="sm"
-                      isLoading={setBrandFbPageMut?.isPending}
-                      onPress={async () => {
-                        try {
-                          await setBrandFbPageMut?.mutateAsync?.({ brandId: fbBrandId, fbPageId: p.id, fbPageName: p.name });
-                          fbStatusQuery?.refetch?.();
-                          setFbPagePickerOpen(false);
-                          // After binding, schedule to calendar instead of direct publish
-                          await handleScheduleToCalendar("facebook");
-                        } catch (e: any) {
-                          showToastGlobal(friendlyErr(e, true));
-                        }
-                      }}
-                    >
-                      <span className="text-left w-full truncate">{p.name}{p.category ? ` · ${p.category}` : ""}</span>
-                    </Button>
-                  ))}
-                </div>
-                <Button size="sm" variant="light" fullWidth onPress={() => setFbPagePickerOpen(false)}>
-                  {lang === "en" ? "Cancel" : "取消"}
-                </Button>
-              </CardBody>
-            </Card>
+          {(data?.mission?.brandId ?? data?.brand?.id) && (
+            <p className="text-small text-default-500">
+              {lang === "en" ? "Need to connect a publishing account? " : "發布帳號尚未連接？"}
+              <Link className="text-primary underline" to={publishSettingsUrl(data?.mission?.brandId ?? data?.brand?.id)}>
+                {lang === "en" ? "Connect" : "去連接"}
+              </Link>
+            </p>
           )}
 
           <Card>

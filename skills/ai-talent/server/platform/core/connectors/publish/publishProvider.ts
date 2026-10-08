@@ -1,20 +1,7 @@
-export type PublishProvider = "pipedream" | "bundle" | "zernio";
+export type PublishProvider = "zernio";
 
-const KNOWN_PROVIDERS = new Set<string>(["pipedream", "bundle", "zernio"]);
-
-/**
- * Decide which backend publishes a given platform.
- *
- * `PUBLISH_PROVIDER_<PLATFORM>` wins over the global `PUBLISH_PROVIDER` so a
- * single platform can be migrated without touching the others. Anything blank
- * or unrecognised falls back to "pipedream" — the switch must never silently
- * route traffic somewhere unexpected because of a typo.
- */
-export function getPublishProvider(
-  platform: string,
-  env: NodeJS.ProcessEnv = process.env,
-): PublishProvider {
-  const perPlatform = env[`PUBLISH_PROVIDER_${platform.toUpperCase()}`]?.trim();
-  const raw = (perPlatform || env.PUBLISH_PROVIDER?.trim() || "").toLowerCase();
-  return KNOWN_PROVIDERS.has(raw) ? (raw as PublishProvider) : "pipedream";
+/** 2026-10-08：Pipedream／bundle.social 已移除。保留單一供應商切換點；
+ * 舊環境變數 PUBLISH_PROVIDER / PUBLISH_PROVIDER_<PLATFORM> 的任何值都忽略。 */
+export function getPublishProvider(_platform: string, _env: NodeJS.ProcessEnv = process.env): PublishProvider {
+  return "zernio";
 }

@@ -11,7 +11,6 @@ import { outputRouter } from "../content/routers/outputRouter";
 import { squadTemplateRouter } from "../content/routers/squadTemplateRouter";
 import { brandBrainRouter } from "../strategy/routers/brandBrainRouter";
 import { calendarRouter } from "../content/routers/calendarRouter";
-import { bundleConnectRouter } from "../platform/routers/bundleConnectRouter";
 import { imageRouter } from "../content/routers/imageRouter";
 import { imageCardRouter } from "../content/routers/imageCardRouter";
 import { quickTaskRouter } from "../content/routers/quickTaskRouter";
@@ -20,7 +19,6 @@ import { productRouter, eventRouter, scopeRouter } from "../strategy/routers/sco
 import { pipelineRouter } from "../strategy/routers/pipelineRouter";
 import { postFormatRouter } from "../content/routers/postFormatRouter";
 import { mediaRouter } from "../content/routers/mediaRouter";
-import { platformConnectRouter } from "../platform/routers/platformConnectRouter";
 import { tabLockRouter } from "../strategy/routers/tabLockRouter";
 import { positioningJobsRouter } from "../strategy/routers/positioningJobsRouter";
 import { positioningDocsRouter } from "../strategy/routers/positioningDocsRouter";
@@ -46,7 +44,6 @@ import { competitorRouter } from "../strategy/routers/competitorRouter";
 import { brandKnowledgeRouter } from "../strategy/routers/brandKnowledgeRouter";
 import { personaAgentRouter } from "../strategy/routers/personaAgentRouter";
 import { cloudDriveRouter } from "../platform/routers/cloudDriveRouter";
-import { publishRouter } from "../content/routers/publishRouter";
 import { billingRouter } from "../platform/routers/billingRouter";
 import { addonRouter } from "../platform/routers/addonRouter";
 import { opsRouter } from "../platform/routers/opsRouter";
@@ -102,7 +99,6 @@ export const appRouter = router({
   competitor:    competitorRouter,
   calendar:      calendarRouter,
   zernioConnect: zernioConnectRouter,
-  bundleConnect: bundleConnectRouter,
   image:         imageRouter,
   // 2026-09-29 各通路「圖片」類別的圖片任務卡。
   imageCard:     imageCardRouter,
@@ -119,7 +115,6 @@ export const appRouter = router({
   pipeline:      pipelineRouter,
   postFormat:    postFormatRouter,
   media:         mediaRouter,
-  platformConnect: platformConnectRouter,
   tabLock:         tabLockRouter,
   positioningJobs: positioningJobsRouter,
   positioningDocs: positioningDocsRouter,
@@ -137,7 +132,6 @@ export const appRouter = router({
   brandKnowledge:  brandKnowledgeRouter,
   personaAgent:    personaAgentRouter,
   cloudDrive:      cloudDriveRouter,
-  publish:         publishRouter,
   billing:         billingRouter,
   addon:           addonRouter,
   ops:             opsRouter,

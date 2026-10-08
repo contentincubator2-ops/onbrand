@@ -11,7 +11,7 @@ describe("performanceRouter", () => {
       "acceptProposal", "addRule", "autoTag", "campaignAlias", "campaignLanding", "campaignList", "campaignManual", "campaignMatch", "campaignReport",
       "cellFacts", "connections", "importCommit", "importPreview",
       "outputTags", "proposeLens", "removeDimension", "removeImport", "removeLens", "removeRule", "report", "saveDimension",
-      "saveLens", "setFactTag", "syncFacebook", "syncSocial", "tagOutput", "useTemplate", "workspace",
+      "saveLens", "setFactTag", "syncSocial", "tagOutput", "useTemplate", "workspace",
     ]);
   });
 

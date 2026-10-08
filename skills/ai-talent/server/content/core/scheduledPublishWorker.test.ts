@@ -136,7 +136,7 @@ describe("scheduledPublishWorker", () => {
       .mockResolvedValueOnce([{ affectedRows: 1 }]); // claim #2
     approval.mockResolvedValue("approved");
     publishScheduledPost
-      .mockRejectedValueOnce(new Error('bundle.social 429: {"message":"slow down"}'))
+      .mockRejectedValueOnce(new Error('zernio 429: {"message":"slow down"}'))
       .mockResolvedValueOnce({ ok: true });
     expect(await tickScheduledPublish()).toEqual({ published: 1, awaitingApproval: 0 });
     const failUpdate = execute.mock.calls.find((c) => /status = 'failed'/.test(String(c[0])))!;

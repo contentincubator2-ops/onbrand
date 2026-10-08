@@ -14,7 +14,7 @@ const state = {
   row: null as any,
 };
 const updates: Array<{ sql: string; params: any[] }> = [];
-const publishViaBundle = vi.fn();
+const publishViaZernio = vi.fn();
 const assertCanAct = vi.fn(async (_id: number) => {});
 
 const execute = vi.fn(async (sql: string, params: any[] = []) => {
@@ -25,7 +25,6 @@ const execute = vi.fn(async (sql: string, params: any[] = []) => {
   if (q.includes("other.role")) return [state.otherAdminsExist ? [{ 1: 1 }] : []];        // isSoloUser
   if (q.includes("mission_review_queue")) return [state.review ? [{ status: state.review }] : []];
   if (q.includes("FROM mission_outputs")) return [[{ status: "draft" }]];
-  if (q.includes("bundleTeamId")) return [[{ bundleTeamId: "team_1" }]];
   return [[]];
 });
 
@@ -36,8 +35,8 @@ vi.mock("../../platform/core/billing/planGate", () => ({
   assertCanAct: (id: number) => assertCanAct(id),
   isHiddenHistoryItem: () => false,
 }));
-vi.mock("../core/publish/bundlePublishService", () => ({
-  publishViaBundleSocial: (...a: any[]) => publishViaBundle(...a),
+vi.mock("../../platform/core/connectors/publish/zernioAdapter", () => ({
+  createZernioAdapter: () => ({ publish: (...a: any[]) => publishViaZernio(...a) }),
 }));
 
 import { publishScheduledPost } from "./calendarRouter";
@@ -50,7 +49,7 @@ function makeRow(over: Record<string, unknown> = {}) {
     id: 50, ownerId: OWNER, outputId: 9, variantIndex: 0, contentKind: null, contentIndex: null,
     planningConfirmed: 0, platform: "threads", status: "pending", brandId: 3,
     outputContent: JSON.stringify([{ caption: "hello" }]), outputMetadata: null, missionSquadSlug: null,
-    brand_fb_page_id: null, brand_fb_page_name: null, brandName: "B",
+    brandName: "B",
     ...over,
   };
 }
@@ -58,12 +57,11 @@ function makeRow(over: Record<string, unknown> = {}) {
 describe("publishScheduledPost permissions", () => {
   const env = { ...process.env };
   beforeEach(() => {
-    execute.mockClear(); updates.length = 0; publishViaBundle.mockReset(); assertCanAct.mockReset();
+    execute.mockClear(); updates.length = 0; publishViaZernio.mockReset(); assertCanAct.mockReset();
     assertCanAct.mockResolvedValue(undefined);
-    publishViaBundle.mockResolvedValue({ postId: "p1", permalink: "https://threads.net/p1" });
+    publishViaZernio.mockResolvedValue({ postId: "p1", permalink: "https://threads.net/p1" });
     state.adminOfOwner = false; state.review = "approved"; state.otherAdminsExist = true; state.row = makeRow();
-    process.env.PUBLISH_PROVIDER_THREADS = "bundle";
-    process.env.BUNDLE_SOCIAL_API_KEY = "test-key-not-real";
+    process.env.ZERNIO_API_KEY = "test-key-not-real";
     vi.spyOn(console, "error").mockImplementation(() => {});
   });
   afterEach(() => { process.env = { ...env }; vi.restoreAllMocks(); });
@@ -71,7 +69,7 @@ describe("publishScheduledPost permissions", () => {
   it("owner publishes their own approved post", async () => {
     const r = await publishScheduledPost({ id: 50, userId: OWNER });
     expect(r.ok).toBe(true);
-    expect(publishViaBundle).toHaveBeenCalledTimes(1);
+    expect(publishViaZernio).toHaveBeenCalledTimes(1);
   });
 
   it("a workspace owner/admin can publish a teammate's approved post", async () => {
@@ -86,13 +84,13 @@ describe("publishScheduledPost permissions", () => {
   it("a non-admin teammate or stranger gets NOT_FOUND and nothing is published", async () => {
     state.adminOfOwner = false;
     await expect(publishScheduledPost({ id: 50, userId: 99 })).rejects.toMatchObject({ code: "NOT_FOUND" });
-    expect(publishViaBundle).not.toHaveBeenCalled();
+    expect(publishViaZernio).not.toHaveBeenCalled();
   });
 
   it("the approval gate still blocks an admin publishing an unapproved teammate post", async () => {
     state.adminOfOwner = true; state.review = "pending";
     await expect(publishScheduledPost({ id: 50, userId: ADMIN })).rejects.toMatchObject({ code: "BAD_REQUEST" });
-    expect(publishViaBundle).not.toHaveBeenCalled();
+    expect(publishViaZernio).not.toHaveBeenCalled();
   });
 
   it("approval is judged against the post owner, not the admin (owner not solo here)", async () => {
@@ -104,12 +102,12 @@ describe("publishScheduledPost permissions", () => {
     state.adminOfOwner = true;
     assertCanAct.mockRejectedValueOnce(new TRPCError({ code: "FORBIDDEN", message: "viewer" }));
     await expect(publishScheduledPost({ id: 50, userId: ADMIN })).rejects.toMatchObject({ code: "FORBIDDEN" });
-    expect(publishViaBundle).not.toHaveBeenCalled();
+    expect(publishViaZernio).not.toHaveBeenCalled();
     expect(execute).not.toHaveBeenCalled();
   });
 
   it("a provider failure on 'publish now' stores a friendly lastError and keeps the row pending", async () => {
-    publishViaBundle.mockRejectedValueOnce(new Error('bundle.social 429: {"message":"slow down"}'));
+    publishViaZernio.mockRejectedValueOnce(new Error('zernio 429: {"message":"slow down"}'));
     await expect(publishScheduledPost({ id: 50, userId: OWNER })).rejects.toThrow(/稍後/);
     const u = updates.find((x) => /SET lastError = \?/.test(x.sql))!;
     expect(u.sql).toMatch(/status = 'pending'/);
@@ -119,14 +117,14 @@ describe("publishScheduledPost permissions", () => {
 
   it("a claimed (worker) failure is left for the worker to record", async () => {
     state.row = makeRow({ status: "publishing" });
-    publishViaBundle.mockRejectedValueOnce(new Error("bundle.social 502: bad gateway"));
+    publishViaZernio.mockRejectedValueOnce(new Error("zernio 502: bad gateway"));
     await expect(publishScheduledPost({ id: 50, userId: OWNER, claimed: true })).rejects.toThrow(/暫時異常/);
     expect(updates.find((x) => /SET lastError/.test(x.sql))).toBeUndefined();
   });
 
   it("unsupported media for the platform is reported, not dropped (user-fixable => PRECONDITION_FAILED)", async () => {
-    const { BundlePublishUserError } = await import("../../platform/core/connectors/publish/bundlePublish");
-    publishViaBundle.mockRejectedValueOnce(new BundlePublishUserError("X 一則貼文最多 4 張圖 / X allows at most 4 images"));
+    const { PublishUserError } = await import("../../platform/core/connectors/publish/publishAdapter");
+    publishViaZernio.mockRejectedValueOnce(new PublishUserError("X 一則貼文最多 4 張圖 / X allows at most 4 images"));
     await expect(publishScheduledPost({ id: 50, userId: OWNER })).rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
   });
 });

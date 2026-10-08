@@ -118,10 +118,10 @@ export default function PrivacyPage() {
                 : "處理刷卡、寄送收據（符合 PCI-DSS 規範；我們不接觸卡號）。"}
             </li>
             <li>
-              <strong>Pipedream:</strong>{" "}
+              <strong>Zernio:</strong>{" "}
               {isEn
-                ? "holds OAuth tokens for Facebook publishing."
-                : "處理 Facebook 發布的 OAuth Token 託管。"}
+                ? "manages social platform authorization and publishing."
+                : "代管社群平台授權與發布。"}
             </li>
             <li>
               <strong>Microsoft Azure:</strong>{" "}

@@ -138,8 +138,13 @@ export default function LensWorkspace({ brandId, tray }: { brandId: number | nul
   );
 
   const refresh = () => { utils.performance.workspace.invalidate(); utils.performance.report.invalidate(); utils.performance.connections?.invalidate?.(); };
-  const sync = api().syncFacebook.useMutation({
-    onSuccess: (r: any) => { setNotice(tr(`Backfilled ${r.posts} posts${r.metricsUsed?.length ? "" : " (Meta returned no reach/click metrics for this page, so only engagement counts for now)"}`, `已回填 ${r.posts} 篇貼文${r.metricsUsed?.length ? "" : "（這個粉專的觸及／點擊指標 Meta 沒有回，先只有互動數）"}`)); refresh(); },
+  const sync = api().syncSocial.useMutation({
+    onSuccess: (r: { platforms: Array<{ posts: number; error?: string }> }) => {
+      const posts = r.platforms.reduce((total, p) => total + p.posts, 0);
+      const errors = r.platforms.flatMap(p => p.error ? [p.error] : []);
+      setNotice([tr(`Backfilled ${posts} posts`, `已回填 ${posts} 篇貼文`), ...errors].join("；"));
+      refresh();
+    },
     onError: (e: any) => setNotice(e.message),
   });
   const tplMut = api().useTemplate.useMutation({
@@ -168,7 +173,7 @@ export default function LensWorkspace({ brandId, tray }: { brandId: number | nul
         <EntryButton icon={faFileArrowUp} label={tr("My report", "我的報告")} tip={tr("Follow your existing report: upload pptx / xlsx / csv and AI reads out the dimensions and metrics you use", "照你原本的報告：上傳 pptx / xlsx / csv，AI 讀出你用的維度與指標")} onClick={() => setModal("report")} />
         <EntryButton icon={faComments} label={tr("Paste chat", "貼對話")} tip={tr("Paste an AI conversation: bring in the analysis framework you discussed with ChatGPT / Claude", "貼 AI 對話串：把跟 ChatGPT / Claude 討論過的分析框架貼進來")} onClick={() => setModal("chat")} />
         <div className="ml-auto flex flex-wrap items-center gap-2">
-          {showFbSync && data?.fbPage && data?.fbSyncEnabled !== false && (
+          {showFbSync && data?.socialConnected && data?.socialSyncEnabled !== false && (
             <SmallAction icon={faArrowsRotate} label={tr("Sync fan page", "同步粉專")} busy={sync.isPending} onClick={() => sync.mutate({ brandId, days: 180 })} />
           )}
           {showImport && <SmallAction icon={faFileImport} label={tr("Import back-office file", "匯入後台檔")} onClick={() => setModal("import")} />}

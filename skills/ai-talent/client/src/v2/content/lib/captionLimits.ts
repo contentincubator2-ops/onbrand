@@ -1,6 +1,6 @@
 /**
  * Caption length limits per platform, mirrored from the server's CAPTION_LIMIT
- * (platform/core/connectors/publish/bundlePublish.ts, counted in code points).
+ * (platform/core/connectors/publish/zernioPublish.ts, counted in code points).
  * Only used to hint in the schedule dialog; the server stays the authority.
  */
 const LIMITS: Record<string, number> = {
