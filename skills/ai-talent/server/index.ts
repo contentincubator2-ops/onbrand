@@ -433,6 +433,17 @@ app.get("/health", healthLimiter, async (req, res) => {
       llmKey:            checks.anyLLMKey ? "ok" : "no_keys",
     },
     billingQueueLength,
+    // 2026-10-08：排程貼文到時間沒發，從外面看不出 worker 有沒有在跑。內部視圖多回
+    // 關掉的功能開關與各 worker 的啟用狀態（只有旗標，沒有任何值），省得猜。
+    disabledFeatures: getDisabledRuntimeFeatures(),
+    workers: {
+      backgroundWorkers: isRuntimeFeatureEnabled("BACKGROUND_WORKERS_ENABLED"),
+      scheduledPublish:
+        isRuntimeFeatureEnabled("BACKGROUND_WORKERS_ENABLED") &&
+        isRuntimeFeatureEnabled("SOCIAL_PUBLISH_ENABLED") &&
+        process.env.AUTOPUBLISH_SCHEDULED?.trim().toLowerCase() === "on",
+      zernioConfigured: !!process.env.ZERNIO_API_KEY?.trim(),
+    },
     uptimeSec: Math.floor(process.uptime()),
     memMb:     Math.round(mem.rss / 1024 / 1024),
     ts:        new Date().toISOString(),
