@@ -8,6 +8,29 @@ export type ZernioAccount = {
   _id: string; platform: ZernioPlatform; username?: string; displayName?: string;
   profileUrl?: string; isActive?: boolean; platformUserId?: string; profileId?: string | { _id: string; name?: string };
 };
+export type ZernioAnalyticsMetrics = Partial<Record<
+  "impressions" | "reach" | "likes" | "comments" | "shares" | "saves" | "clicks" | "views" | "engagementRate",
+  number | null
+>> & { lastUpdated?: string | null };
+export type ZernioPlatformAnalytics = {
+  platform: string; status?: string; platformPostId?: string | null;
+  accountId?: string; accountUsername?: string | null; analytics?: ZernioAnalyticsMetrics | null;
+  syncStatus?: string; platformPostUrl?: string | null; errorMessage?: string | null;
+};
+export type ZernioAnalyticsPost = {
+  postId?: string; _id?: string; latePostId?: string | null; status?: string; content?: string | null;
+  publishedAt?: string | null; platform?: string; platformPostUrl?: string | null;
+  isExternal?: boolean; syncStatus?: string; mediaType?: string | null;
+  mediaItems?: Array<{ type?: string; url?: string | null; thumbnail?: string | null }>;
+  analytics?: ZernioAnalyticsMetrics | null;
+  platformAnalytics?: ZernioPlatformAnalytics[];
+  // The list response uses `platforms`; single-post responses use `platformAnalytics`.
+  platforms?: ZernioPlatformAnalytics[];
+};
+export type ZernioAnalyticsPage = {
+  posts: ZernioAnalyticsPost[];
+  pagination: { page: number; limit: number; total: number; pages: number };
+};
 export class ZernioApiError extends Error {
   constructor(public status: number, error: string, public type?: string, public code?: string, public details?: Record<string, unknown>) {
     super(`zernio ${status}: ${error}`); this.name = "ZernioApiError";
@@ -86,6 +109,16 @@ export function createZernioClient({ apiKey, baseUrl = "https://zernio.com/api",
     },
     async listAllAccounts(): Promise<ZernioAccount[]> {
       return paginatedAccounts({ status: "connected" });
+    },
+    async listAnalytics(input: { accountId: string; fromDate: string; toDate: string;
+      source?: "late" | "external" | "all"; page: number; limit: number }): Promise<ZernioAnalyticsPage> {
+      const query = new URLSearchParams({ accountId: input.accountId, fromDate: input.fromDate,
+        toDate: input.toDate, source: input.source ?? "all", page: String(input.page), limit: String(input.limit) });
+      return (await request<ZernioAnalyticsPage>(`/v1/analytics?${query}`)).body;
+    },
+    async syncExternalPosts(input: { accountId: string }): Promise<void> {
+      // Current OpenAPI path (the design document used /v1/analytics/sync-external-posts).
+      await request("/v1/posts/sync-external", { method: "POST", body: { accountId: input.accountId } });
     },
     async deleteAccount(accountId: string): Promise<void> {
       await request(`/v1/accounts/${encodeURIComponent(accountId)}`, { method: "DELETE" });
