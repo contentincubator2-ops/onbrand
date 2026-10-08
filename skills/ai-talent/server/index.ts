@@ -439,7 +439,6 @@ app.get("/health", healthLimiter, async (req, res) => {
     workers: {
       backgroundWorkers: isRuntimeFeatureEnabled("BACKGROUND_WORKERS_ENABLED"),
       scheduledPublish:
-        isRuntimeFeatureEnabled("BACKGROUND_WORKERS_ENABLED") &&
         isRuntimeFeatureEnabled("SOCIAL_PUBLISH_ENABLED") &&
         process.env.AUTOPUBLISH_SCHEDULED?.trim().toLowerCase() === "on",
       zernioConfigured: !!process.env.ZERNIO_API_KEY?.trim(),
@@ -822,18 +821,23 @@ const server = app.listen(PORT, async () => {
       console.log("[proactive] disabled (set PROACTIVE_ENGINE=on to enable)");
     }
 
-    // 核准後的貼文到時間自動發布。預設關閉：要在該環境設 AUTOPUBLISH_SCHEDULED=on。
-    const { tickScheduledPublish, isAutoPublishEnabled } = await import("./content/core/scheduledPublishWorker");
-    if (isAutoPublishEnabled()) {
-      setInterval(() => {
-        tickScheduledPublish().catch((e) => {
-          console.error("[scheduledPublish] tick error:", e?.message ?? e);
-        });
-      }, 60_000);
-      console.log("[scheduledPublish] Worker started (60s interval)");
-    } else {
-      console.log("[scheduledPublish] disabled (set AUTOPUBLISH_SCHEDULED=on to enable)");
-    }
+  }
+
+
+  // 核准後的貼文到時間自動發布。預設關閉：要在該環境設 AUTOPUBLISH_SCHEDULED=on。
+  // 2026-10-08：刻意放在 BACKGROUND_WORKERS_ENABLED 之外——dev 關掉所有背景 worker 省錢，
+  // 但發布 worker 本身已是明確 opt-in（AUTOPUBLISH_SCHEDULED）且受 SOCIAL_PUBLISH_ENABLED 控制，
+  // 不該被那個總開關一起關掉。
+  const { tickScheduledPublish, isAutoPublishEnabled } = await import("./content/core/scheduledPublishWorker");
+  if (isAutoPublishEnabled()) {
+    setInterval(() => {
+      tickScheduledPublish().catch((e) => {
+        console.error("[scheduledPublish] tick error:", e?.message ?? e);
+      });
+    }, 60_000);
+    console.log("[scheduledPublish] Worker started (60s interval)");
+  } else {
+    console.log("[scheduledPublish] disabled (set AUTOPUBLISH_SCHEDULED=on to enable)");
   }
 
   if (isRuntimeFeatureEnabled("LIVE_BILLING_ENABLED")) {
