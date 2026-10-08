@@ -391,7 +391,10 @@ export function PublishTab({ brandId }: { brandId: number | null }) {
 
   // Zernio keeps connection state separate from legacy brand bindings.
   const zernioProvidersQ = trpc.zernioConnect.getProviders.useQuery();
-  type ZernioPlatformKey = keyof NonNullable<typeof zernioProvidersQ.data>;
+  const connectionsQ = trpc.zernioConnect.connections.useQuery(
+    { brandId: brandId ?? 0 }, { enabled: !!brandId },
+  );
+  type ZernioPlatformKey = keyof NonNullable<typeof connectionsQ.data>;
   type ZernioStatus = { connected: boolean; account: { accountId: string; name: string; username: string | null } | null;
     pendingScheduled: number; legacyConnected: boolean };
   const zernioConnectM = trpc.zernioConnect.getConnectUrl.useMutation();
@@ -399,6 +402,9 @@ export function PublishTab({ brandId }: { brandId: number | null }) {
   const zernioDisconnectM = trpc.zernioConnect.disconnect.useMutation();
   const zernioUrlRef = useRef<Record<string, string | undefined>>({});
   const [zernioStatus, setZernioStatus] = useState<Record<string, ZernioStatus>>({});
+  // A successful sync overrides the local snapshot; failed syncs leave it available to every member.
+  const isConnected = (platform: ZernioPlatformKey) =>
+    zernioStatus[platform]?.connected ?? connectionsQ.data?.[platform]?.connected ?? false;
   const zernioGeneration = useRef(0);
   const zernioApiRef = useRef({ connect: zernioConnectM.mutateAsync, status: zernioStatusM.mutateAsync });
   zernioApiRef.current = { connect: zernioConnectM.mutateAsync, status: zernioStatusM.mutateAsync };
@@ -458,12 +464,12 @@ export function PublishTab({ brandId }: { brandId: number | null }) {
     if (url.searchParams.has("error")) alert(url.searchParams.get("error_message") || (en ? "Authorization failed." : "授權失敗，請重新連接。"));
     void zernioApiRef.current.status({ brandId, platform }).then(status => {
       if (generation === zernioGeneration.current) setZernioStatus(m => ({ ...m, [platform]: status }));
-    }).catch((e: Error) => alert(e.message));
+    }).catch(() => {});
     for (const key of ["connected", "profileId", "accountId", "username", "request_id", "stage", "error", "platform", "error_message", "is_user_fixable", "error_reason"]) url.searchParams.delete(key);
     window.history.replaceState(window.history.state, "", url.pathname + url.search + url.hash);
   }, [brandId, zernioProvidersQ.data, en]);
 
-  async function connectZernio(platform: ZernioPlatformKey, mode: "connect" | "reconnect" | "replace" = zernioStatus[platform]?.connected ? "reconnect" : "connect") {
+  async function connectZernio(platform: ZernioPlatformKey, mode: "connect" | "reconnect" | "replace" = isConnected(platform) ? "reconnect" : "connect") {
     if (!brandId) return;
     if (mode === "replace" && !confirm(en
       ? "Switching accounts will automatically disconnect the current account and stop its billing."
@@ -541,7 +547,7 @@ export function PublishTab({ brandId }: { brandId: number | null }) {
   /** Platform currently being verified post-OAuth (polling Zernio) */
   const [verifyingPlatform, setVerifyingPlatform] = useState<string | null>(null);
   // ── Platform config ────────────────────────────────────────────────────
-  type PlatformCfg = { key: string; label: string; color: string; icon: any; desc: string };
+  type PlatformCfg = { key: ZernioPlatformKey; label: string; color: string; icon: any; desc: string };
   const PLATFORMS: PlatformCfg[] = [
     { key: "facebook",  label: "Facebook",  color: "#18181b", icon: faFacebook,  desc: en ? "Publish to your Facebook Page"              : "發布到 Facebook 粉專"        },
     { key: "instagram", label: "Instagram", color: "#18181b", icon: faInstagram, desc: en ? "Publish to Instagram Business account"       : "發布到 Instagram 商業帳號"   },
@@ -562,7 +568,7 @@ export function PublishTab({ brandId }: { brandId: number | null }) {
       {/* Platform card grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {PLATFORMS.map((p) => {
-          const fullyConnected = !!zernioStatus[p.key]?.connected;
+          const fullyConnected = isConnected(p.key);
           const legacyZernio = !fullyConnected && !!zernioStatus[p.key]?.legacyConnected;
           const isPending   = pendingPlatform   === p.key;
           const isVerifying = verifyingPlatform === p.key;
@@ -619,7 +625,7 @@ export function PublishTab({ brandId }: { brandId: number | null }) {
               {/* Connected state: account name + last connected indicator */}
               {fullyConnected && (
                 <div className="text-xs text-default-500 bg-default-50 rounded-lg px-3 py-2">
-                  {zernioStatus[p.key]?.account?.name}
+                  {zernioStatus[p.key] ? zernioStatus[p.key].account?.name : connectionsQ.data?.[p.key]?.accountName}
                 </div>
               )}
 
