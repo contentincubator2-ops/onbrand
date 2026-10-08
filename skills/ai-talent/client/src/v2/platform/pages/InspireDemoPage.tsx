@@ -7,8 +7,8 @@
  *
  * 版面照 Tesla 官網的兩種畫面做，只取做法，不使用它的字體、標誌或素材：
  * 色系跟著平台標誌（inspire public relations，CJ 2026-10-08 提供）：主色 #E9004A 取自標誌底色，
- * 只用在主按鈕、選取外框與進行中的狀態；其餘維持白底與灰階。
- *   · 首頁＝全螢幕深色主視覺：標題在上、兩顆並排按鈕在最下面。
+ * 首頁整頁是企業色底、白字（跟標誌同一種用法），內頁白底、企業色用在主按鈕、選取外框與進行中的狀態。
+ *   · 首頁＝全螢幕企業色主視覺：標題在上、兩顆並排按鈕在最下面。
  *   · 設定頁＝訂車設定器：上面一塊「目前的設定」預覽，下面一段一段置中的小標（議題／平台／說話風格），
  *     平台用圓形色票式的選鈕，選取＝外圈；最底下固定一條「摘要＋主按鈕」。
  *   · 靈感牆＝庫存車卡片：灰底卡、標題、三格規格列、兩顆按鈕。
@@ -56,15 +56,15 @@ const toTop = () => { try { window.scrollTo({ top: 0 }); } catch { /* 舊瀏覽�
 
 function Frame({ children, dark }: { children: React.ReactNode; dark?: boolean }) {
   return (
-    <div className="min-h-[100dvh] w-full" style={{ background: dark ? "#000" : "#fff", color: dark ? "#fff" : INK, fontFamily: FONT }}>
+    <div className="min-h-[100dvh] w-full" style={{ background: dark ? BRAND : "#fff", color: dark ? "#fff" : INK, fontFamily: FONT }}>
       <div className="relative mx-auto flex min-h-[100dvh] w-full max-w-[480px] flex-col">{children}</div>
     </div>
   );
 }
 
 /** 平台標誌：用 CJ 提供的原檔，不重畫。 */
-function Wordmark() {
-  return <img src="/static/inspire/logo.png" alt="inspire public relations" width={54} height={36} style={{ height: 36, width: "auto", borderRadius: 2 }} />;
+function Wordmark({ height = 40 }: { height?: number }) {
+  return <img src="/static/inspire/logo.png" alt="inspire public relations" width={Math.round(height * 1.5125)} height={height} style={{ height, width: "auto", borderRadius: 2 }} />;
 }
 
 function Nav({ onBack, right }: { onBack?: () => void; right?: React.ReactNode }) {
@@ -140,9 +140,9 @@ function PulseArt() {
           <stop offset="1" stopColor="#fff" stopOpacity="0" />
         </linearGradient>
       </defs>
-      {[60, 110, 160, 210].map((y) => <line key={y} x1="0" x2="480" y1={y} y2={y} stroke="#fff" strokeOpacity="0.06" />)}
+      {[60, 110, 160, 210].map((y) => <line key={y} x1="0" x2="480" y1={y} y2={y} stroke="#fff" strokeOpacity="0.18" />)}
       <path d="M0 150 H120 l14 -8 l12 8 h20 l10 26 l18 -130 l18 150 l12 -46 h26 l16 -22 l18 22 H480" fill="none" stroke="url(#inspire-pulse)" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
-      <text x="240" y="236" textAnchor="middle" fill="#fff" fillOpacity="0.5" fontSize="12" letterSpacing="4">130 / 80 mmHg</text>
+      <text x="240" y="236" textAnchor="middle" fill="#fff" fillOpacity="0.9" fontSize="12" letterSpacing="4">130 / 80 mmHg</text>
     </svg>
   );
 }
@@ -152,25 +152,25 @@ function Hero({ onDone, onBasis }: { onDone: (name: string) => void; onBasis: ()
   const ok = v.trim().length >= 1;
   return (
     <Frame dark>
-      <div className="absolute inset-0" style={{ background: "radial-gradient(120% 70% at 50% 45%, #3A1622 0%, #14090D 55%, #000 100%)" }} />
-      <header className="relative z-10 flex h-14 items-center px-6"><Wordmark /></header>
+      <div className="absolute inset-0" style={{ background: "radial-gradient(120% 70% at 50% 45%, #F0336B 0%, #E9004A 60%)" }} />
+      <header className="relative z-10 flex h-20 items-center px-6"><Wordmark height={56} /></header>
       <div className="relative z-10 px-6 pt-10 text-center">
         <h1 className="text-[40px] font-medium leading-[1.15]" style={{ letterSpacing: "-0.02em" }}>換一種說法</h1>
-        <p className="mt-2 text-[15px]" style={{ color: "rgba(255,255,255,0.8)" }}>高血壓衛教 × 各平台熱門創作者的說話風格</p>
+        <p className="mt-2 text-[15px]" style={{ color: "rgba(255,255,255,0.95)" }}>高血壓衛教 × 各平台熱門創作者的說話風格</p>
       </div>
       <div className="relative z-10 flex flex-1 items-center"><PulseArt /></div>
       <form className="relative z-10 px-6" style={{ paddingBottom: "max(24px, env(safe-area-inset-bottom))" }} onSubmit={(e) => { e.preventDefault(); if (ok) onDone(v.trim()); }}>
-        <label htmlFor="inspire-name" className="mb-2 block text-center text-[13px]" style={{ color: "rgba(255,255,255,0.7)" }}>怎麼稱呼您</label>
-        <div className="flex items-center gap-3 rounded px-4" style={{ background: "rgba(255,255,255,0.14)", backdropFilter: "blur(12px)" }}>
+        <label htmlFor="inspire-name" className="mb-2 block text-center text-[13px]" style={{ color: "rgba(255,255,255,0.95)" }}>怎麼稱呼您</label>
+        <div className="flex items-center gap-3 rounded px-4" style={{ background: "rgba(255,255,255,0.2)", backdropFilter: "blur(12px)" }}>
           <input id="inspire-name" value={v} onChange={(e) => setV(e.target.value)} maxLength={20} autoComplete="off" placeholder="王小明"
-            className="h-11 min-w-0 flex-1 bg-transparent text-center text-[16px] font-medium text-white outline-none placeholder:text-white/40" />
-          <span className="shrink-0 text-[14px]" style={{ color: "rgba(255,255,255,0.7)" }}>醫師</span>
+            className="h-11 min-w-0 flex-1 bg-transparent text-center text-[16px] font-medium text-white outline-none placeholder:text-white/60" />
+          <span className="shrink-0 text-[14px]" style={{ color: "rgba(255,255,255,0.95)" }}>醫師</span>
         </div>
         <div className="mt-3 flex gap-3">
-          <button type="submit" disabled={!ok} className="h-11 flex-1 rounded text-[14px] font-medium text-white" style={{ background: BRAND, opacity: ok ? 1 : 0.5 }}>開始設定</button>
-          <button type="button" onClick={onBasis} className="h-11 flex-1 rounded text-[14px] font-medium" style={{ background: "rgba(244,244,244,0.9)", color: "#393C41" }}>審查依據</button>
+          <button type="submit" disabled={!ok} className="h-11 flex-1 rounded text-[14px] font-medium" style={{ background: "#fff", color: BRAND, opacity: ok ? 1 : 0.6 }}>開始設定</button>
+          <button type="button" onClick={onBasis} className="h-11 flex-1 rounded text-[14px] font-medium text-white" style={{ boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.9)" }}>審查依據</button>
         </div>
-        <p className="mt-3 text-center text-[11px]" style={{ color: "rgba(255,255,255,0.5)" }}>名字只用來署名，存在這支手機上，不需要註冊。</p>
+        <p className="mt-3 text-center text-[11px]" style={{ color: "rgba(255,255,255,0.9)" }}>名字只用來署名，存在這支手機上，不需要註冊。</p>
       </form>
     </Frame>
   );
