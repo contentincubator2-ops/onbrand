@@ -552,6 +552,7 @@ async function publishScheduledPostInner(args: {
     try {
       const adapter = createZernioAdapter({ client: createZernioClient({ apiKey }), pool: localPool,
         brandNameOf: async () => row.brandName ?? "",
+        publicBaseUrl: process.env.APP_URL,
       });
       const result = await adapter.publish({ scheduledPostId: row.id, brandId: row.brandId,
         platform, caption, imageUrls: media.imageUrls, videoUrl: media.videoUrl,

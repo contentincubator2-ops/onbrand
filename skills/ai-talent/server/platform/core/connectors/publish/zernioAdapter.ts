@@ -2,11 +2,14 @@ import { ZernioApiError, type ZernioAccount, type ZernioClient } from "../zernio
 import { getTenant, upsertTenant, getConnection, setConnection, listConnectedByBrand, markDisconnected, type Queryable } from "./connectionStore";
 import { PublishUserError, type PublishProviderAdapter } from "./publishAdapter";
 import { assertZernioMediaPlan, buildZernioPostPayload, readZernioPublishResult, toZernioPlatform } from "./zernioPublish";
+import { toPublicUrl, toPublicUrls } from "./publicUrl";
 
 const inFlightProfiles = new Map<number, Promise<string>>();
 
-export function createZernioAdapter({ client, pool, brandNameOf }: {
+export function createZernioAdapter({ client, pool, brandNameOf, publicBaseUrl }: {
   client: ZernioClient; pool: Queryable; brandNameOf: (brandId: number) => Promise<string>;
+  /** 站內相對路徑的媒體要掛在哪個 https 網域下給 Zernio 抓；通常是 process.env.APP_URL。 */
+  publicBaseUrl?: string | null;
 }): PublishProviderAdapter {
   function requirePlatform(value: string) {
     const platform = toZernioPlatform(value);
@@ -93,7 +96,11 @@ export function createZernioAdapter({ client, pool, brandNameOf }: {
       assertZernioMediaPlan(platform.remote, input.caption, input.imageUrls.length, input.videoUrl ? 1 : 0);
       const account = await getConnection(pool, input.brandId, "zernio", platform.local);
       if (!account) throw new PublishUserError("此品牌尚未連接此平台，請先到品牌設定完成連接。");
-      const result = await client.createPost(buildZernioPostPayload({ ...input, accountId: account.accountId }),
+      const media = {
+        imageUrls: toPublicUrls(input.imageUrls, publicBaseUrl),
+        videoUrl: input.videoUrl ? toPublicUrl(input.videoUrl, publicBaseUrl) : input.videoUrl,
+      };
+      const result = await client.createPost(buildZernioPostPayload({ ...input, ...media, accountId: account.accountId }),
         { idempotencyKey: `onbrand-sp-${input.scheduledPostId}-a${input.attempt ?? 0}` });
       return readZernioPublishResult({ ...result, platform: platform.remote });
     },
