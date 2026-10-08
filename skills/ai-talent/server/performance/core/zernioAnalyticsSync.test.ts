@@ -221,6 +221,17 @@ describe("Zernio brand sync", () => {
     expect(deps.upsert.mock.calls[0]![1].map((fact: { entityId: string }) => fact.entityId)).toEqual(["456", "789"]);
     expect(deps.log).not.toHaveBeenCalled();
   });
+  it("explains payment activation for 402 without requesting reauthorization", async () => {
+    const deps = setup();
+    const sensitive = randomUUID();
+    deps.client.listAnalytics.mockRejectedValueOnce(new ZernioApiError(402, sensitive));
+    const result = await syncBrandZernioAnalytics(7, 120, deps);
+    const message = "發布服務的方案尚未開通這項功能（需要在 Zernio 綁定付款方式），請聯絡 sowork@sowork.ai。";
+    expect(result.platforms[0]).toMatchObject({ platform: "facebook", posts: 0, error: message });
+    expect(result.platforms.slice(1).every(p => p.posts === 1 && !p.error)).toBe(true);
+    expect(deps.log).toHaveBeenCalledWith(expect.objectContaining({ message }));
+    expect(JSON.stringify([result, deps.log.mock.calls])).not.toContain(sensitive);
+  });
   it("isolates API failure and logs a warning without raw errors or credentials", async () => {
     const deps = setup();
     const sensitive = randomUUID();

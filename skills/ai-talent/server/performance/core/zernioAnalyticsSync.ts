@@ -199,7 +199,8 @@ async function runBrandZernioAnalytics(brandId: number, days: number, deps: Zern
     } catch (error) {
       // 不記錄供應商回應、原始 exception 或憑證；保留安全的 HTTP 狀態供排查。
       const message = error instanceof ZernioApiError
-        ? `社群成效同步失敗（HTTP ${error.status}），請確認帳號授權後重試。`
+        ? error.status === 402 ? "發布服務的方案尚未開通這項功能（需要在 Zernio 綁定付款方式），請聯絡 sowork@sowork.ai。"
+          : `社群成效同步失敗（HTTP ${error.status}），請確認帳號授權後重試。`
         : error instanceof ZernioAnalyticsSyncError ? error.message : "社群成效同步失敗，請稍後重試。";
       await log({ source: "zernio.analytics", level: "warn", message, meta: { brandId, platform } });
       result.platforms.push({ platform, posts: 0, tagged: 0, onbrand: 0, skipped, error: message });

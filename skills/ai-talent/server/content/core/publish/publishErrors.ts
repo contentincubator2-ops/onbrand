@@ -1,7 +1,7 @@
 /**
  * Turn whatever a publish provider threw into a sentence a user can act on.
  *
- * Providers answer with raw JSON ("bundle.social 400: {...}"), Graph API codes
+ * Providers answer with raw JSON ("zernio 400: {...}"), Graph API codes
  * and fetch exceptions. None of that belongs on a calendar card. Messages that
  * are already written for users (Chinese, from our own code) pass through
  * untouched so this is safe to apply twice.
@@ -12,6 +12,11 @@ const RULES: Array<{ test: RegExp; zh: string; en: string }> = [
     test: /account_limit_exceeded/i,
     zh: "連接帳號數已達供應商上限，請解除不使用的帳號或升級方案。",
     en: "The provider account limit has been reached. Disconnect unused accounts or upgrade the plan.",
+  },
+  {
+    test: /\b402\b|payment_required|free_tier_exceeded|analytics_addon_required/i,
+    zh: "發布服務的方案尚未開通這項功能（需要在 Zernio 綁定付款方式），請聯絡 sowork@sowork.ai。",
+    en: "The publishing service plan does not include this feature yet (a payment method is required on Zernio). Contact sowork@sowork.ai.",
   },
   {
     test: /\b(401|403)\b|oauth|access token|token (has )?expired|session has expired|reauthori[sz]e|re-?auth|invalid[_ ]token|permission/i,
@@ -79,7 +84,7 @@ export function friendlyPublishError(raw: unknown): string {
   const text = String((raw as any)?.message ?? raw ?? "").trim();
   if (!text) return "發布失敗，請稍後再試。 / Publishing failed. Please try again later.";
   // Already written for users by our own code.
-  if (HAS_CJK.test(text) && !/\{.*\}/.test(text) && !/bundle\.social \d{3}/.test(text) && !/zernio \d{3}/.test(text)) return text;
+  if (HAS_CJK.test(text) && !/\{.*\}/.test(text) && !/zernio \d{3}/.test(text)) return text;
 
   const inner = messageFromJson(text);
   const haystack = `${text} ${inner ?? ""}`;
