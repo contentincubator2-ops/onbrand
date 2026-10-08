@@ -16,6 +16,31 @@ function validName(name: string): boolean {
   return /^[\w.-]+$/.test(name) && name !== "." && name !== "..";
 }
 
+/**
+ * 生成好的圖會被下載到 COVERS_DIR，對外是 `/static/covers/<檔名>`（單層、沒有子目錄，
+ * 見 mediaGen.ts）。
+ *
+ * 2026-09-25（CJ「我想增加一個功能，可以儲存在現有產品下」）：實跑 probe 才發現這條
+ * 路是斷的——`/static/covers/…` 既不是 http(s) 也不在上傳目錄底下，於是走進 SSRF guard
+ * 被判 "invalid URL"，畫面上只會看到「存不進去」。伺服器要讀的是**自己剛剛寫下的檔案**，
+ * 本來就不該繞公開網址回打自己。
+ *
+ * 一樣只認固定前綴＋單段檔名＋不含 `..`，碰不到 covers 目錄以外的東西。
+ */
+export function localCoverFile(url: unknown): string | null {
+  if (typeof url !== "string") return null;
+  const prefix = (process.env.COVERS_URL_PREFIX ?? "/static/covers").replace(/\/+$/, "");
+  if (!url.startsWith(prefix + "/")) return null;
+  const name = url.slice(prefix.length + 1);
+  if (!/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(name) || name.includes("..")) return null;
+  return join(process.env.COVERS_DIR ?? "/opt/onbrand/covers", name);
+}
+
+/** Local legacy covers and images owned by the current backend are our generated covers. */
+export function isOwnCoverUrl(url: string): boolean {
+  return localCoverFile(url) !== null || getMediaStore().owns(url);
+}
+
 export function coverContentType(name: string): string {
   switch (extname(name).toLowerCase()) {
     case ".png": return "image/png";

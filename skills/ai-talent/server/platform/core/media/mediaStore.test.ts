@@ -129,6 +129,22 @@ describe("getMediaStore configuration", () => {
     expect(getContainerClient).toHaveBeenCalledWith(name ?? "onbrand-media");
     expect(getMediaStore()).toBe(store);
   });
+  it("recognises legacy covers and current Blob/public-base URLs, but rejects external URLs", async () => {
+    const container = fakeContainer();
+    vi.spyOn(BlobServiceClient, "fromConnectionString").mockReturnValue({
+      getContainerClient: vi.fn().mockReturnValue(container),
+    } as any);
+    vi.stubEnv("MEDIA_STORAGE", "azure-blob");
+    vi.stubEnv("AZURE_STORAGE_CONNECTION_STRING", randomUUID());
+    vi.stubEnv("MEDIA_PUBLIC_BASE_URL", "https://images.example.com");
+    vi.stubEnv("COVERS_URL_PREFIX", "/static/covers");
+    const { isOwnCoverUrl } = await import("./mediaStore");
+    expect(isOwnCoverUrl("/static/covers/old.png")).toBe(true);
+    expect(isOwnCoverUrl(`${containerUrl}/covers/new.png`)).toBe(true);
+    expect(isOwnCoverUrl("https://images.example.com/covers/new.png")).toBe(true);
+    expect(isOwnCoverUrl("https://external.example.com/covers/new.png")).toBe(false);
+    expect(isOwnCoverUrl("/static/covers/../secret.png")).toBe(false);
+  });
   it("rejects unknown backends instead of silently writing locally", async () => {
     vi.stubEnv("MEDIA_STORAGE", "typo");
     const { getMediaStore } = await import("./mediaStore");

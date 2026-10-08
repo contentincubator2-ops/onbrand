@@ -180,3 +180,59 @@ describe("generated images (relative /static/covers paths)", () => {
     expect(isLocalUploadPath("/static/covers/media-img-1.png")).toBe(false);
   });
 });
+
+describe("generated images owned by the current media store", () => {
+  const url = "https://media.example.com/onbrand-media/covers/generated.png";
+  const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+  const get = vi.fn();
+  let fetchMock: ReturnType<typeof vi.fn>;
+
+  beforeEach(async () => {
+    const mediaStore = await import("./mediaStore");
+    vi.spyOn(mediaStore, "getMediaStore").mockReturnValue({
+      backend: "azure-blob", publicBase: "https://media.example.com/onbrand-media",
+      owns: (candidate) => candidate === url, get, put: vi.fn(),
+    });
+    get.mockReset().mockResolvedValue(png);
+    fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+  });
+  afterEach(() => vi.restoreAllMocks());
+
+  it("reads owned Blob bytes directly without public HTTP or the SSRF guard", async () => {
+    const { assertUrlSafe } = await import("../web/urlGuard");
+    await expect(fetchImageBuffer(url)).resolves.toEqual({ buffer: png, mime: "image/png" });
+    expect(get).toHaveBeenCalledWith(url);
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(assertUrlSafe).not.toHaveBeenCalled();
+  });
+
+  it("falls back to the original HTTP flow only on a store miss", async () => {
+    const { assertUrlSafe } = await import("../web/urlGuard");
+    get.mockResolvedValue(null);
+    fetchMock.mockResolvedValue(new Response(png, { headers: { "content-type": "image/png" } }));
+    await expect(fetchImageBuffer(url)).resolves.toEqual({ buffer: png, mime: "image/png" });
+    expect(assertUrlSafe).toHaveBeenCalledWith(url);
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
+
+  it("continues to validate the size and raster signature of stored bytes", async () => {
+    await expect(fetchImageBuffer(url, { maxBytes: png.length - 1 })).rejects.toThrow("圖片檔案過大");
+    get.mockResolvedValue(Buffer.from("<html>invalid</html>"));
+    await expect(fetchImageBuffer(url)).rejects.toThrow("內容不是可辨識的點陣圖片");
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("propagates storage errors without making a public request", async () => {
+    get.mockRejectedValue(new Error("storage unavailable"));
+    await expect(fetchImageBuffer(url)).rejects.toThrow("storage unavailable");
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("does not read foreign URLs through the store", async () => {
+    fetchMock.mockResolvedValue(new Response(png, { headers: { "content-type": "image/png" } }));
+    await fetchImageBuffer("https://external.example.com/photo.png");
+    expect(get).not.toHaveBeenCalled();
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
+});
