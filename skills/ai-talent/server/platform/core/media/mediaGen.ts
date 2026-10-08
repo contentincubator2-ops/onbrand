@@ -8,21 +8,19 @@
  *
  * All providers are sync image providers and return ready inline（影片生成 2026-09-08 移除）.
  *
- * Generated assets are persisted to /opt/onbrand/covers/
- * media-<id>.png (same dir as squad covers / agent avatars) and a
- * relative URL like /static/covers/media-<id>.png is returned.
+ * Generated assets are persisted through mediaStore (local covers or Azure Blob).
  *
  * NOTE: default changed from /opt/marketing-os/covers → /opt/onbrand/covers
  * on 2026-05-28 to reflect infra rename. Set COVERS_DIR env var to override.
  */
 
-import { mkdirSync, writeFileSync } from "fs";
+import { readFile } from "node:fs/promises";
+import { coverContentType, getMediaStore } from "./mediaStore";
 import { join } from "path";
 import { fetchImageBuffer } from "./imageFetch";
 
 const COVERS_DIR = process.env.COVERS_DIR ?? "/opt/onbrand/covers";
 const COVERS_URL_PREFIX = process.env.COVERS_URL_PREFIX ?? "/static/covers";
-mkdirSync(COVERS_DIR, { recursive: true });
 
 function redactProviderSecrets(text: string): string {
   return String(text)
@@ -93,28 +91,37 @@ export interface GenOptions {
 export function coverFilePath(url: string): string | null {
   if (!url.startsWith(COVERS_URL_PREFIX + "/")) return null;
   const name = url.slice(COVERS_URL_PREFIX.length + 1);
-  return /^[\w.-]+$/.test(name) ? join(COVERS_DIR, name) : null;
+  return /^[\w.-]+$/.test(name) && name !== "." && name !== ".." ? join(COVERS_DIR, name) : null;
+}
+
+/** 先讀目前的 store；舊的相對路徑仍可退回本機 covers。 */
+export async function readCoverBytes(url: string): Promise<Buffer | null> {
+  const bytes = await getMediaStore().get(url);
+  if (bytes !== null) return bytes;
+  const file = coverFilePath(url);
+  if (!file) return null;
+  try {
+    return await readFile(file);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;
+    throw error;
+  }
 }
 
 /** 把已處理好的位元組存進 covers，回傳公開 URL。 */
-export function saveCoverFile(buf: Buffer, name: string): string {
-  mkdirSync(COVERS_DIR, { recursive: true });
-  writeFileSync(join(COVERS_DIR, name), buf);
-  return `${COVERS_URL_PREFIX}/${name}`;
+export async function saveCoverFile(buf: Buffer, name: string): Promise<string> {
+  return await getMediaStore().put(name, buf, coverContentType(name));
 }
 
-function saveB64(b64: string, kind: "img" | "vid"): string {
+async function saveB64(b64: string, kind: "img" | "vid"): Promise<string> {
   const ext = kind === "img" ? "png" : "mp4";
-  const id  = `${kind}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-  const filePath = join(COVERS_DIR, `media-${id}.${ext}`);
-  writeFileSync(filePath, Buffer.from(b64, "base64"));
-  return `${COVERS_URL_PREFIX}/media-${id}.${ext}`;
+  const id = `${kind}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+  return await saveCoverFile(Buffer.from(b64, "base64"), `media-${id}.${ext}`);
 }
 
 async function downloadAndSave(url: string, kind: "img" | "vid"): Promise<string> {
   const ext = kind === "img" ? "png" : "mp4";
   const id  = `${kind}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-  const filePath = join(COVERS_DIR, `media-${id}.${ext}`);
   let buf: Buffer;
   if (kind === "img") {
     // Provider result URLs can expire into an HTML landing page just like
@@ -125,8 +132,7 @@ async function downloadAndSave(url: string, kind: "img" | "vid"): Promise<string
     if (!resp.ok) throw new Error(`download ${resp.status}`);
     buf = Buffer.from(await resp.arrayBuffer());
   }
-  writeFileSync(filePath, buf);
-  return `${COVERS_URL_PREFIX}/media-${id}.${ext}`;
+  return await saveCoverFile(buf, `media-${id}.${ext}`);
 }
 
 function sizeForAspectRatio(opts: GenOptions): NonNullable<GenOptions["size"]> {
@@ -181,7 +187,7 @@ async function genOpenAIImage(opts: GenOptions): Promise<GenResult> {
   const data: any = await resp.json();
   const b64 = data?.data?.[0]?.b64_json;
   if (!b64) throw new Error("OpenAI no b64");
-  return { status: "ready", modelId: `openai/${model}`, url: saveB64(b64, "img") };
+  return { status: "ready", modelId: `openai/${model}`, url: await saveB64(b64, "img") };
 }
 
 /**
@@ -223,7 +229,7 @@ async function genOpenAIImageEdit(opts: GenOptions, key: string, size: string): 
   const data: any = await resp.json();
   const b64 = data?.data?.[0]?.b64_json;
   if (!b64) throw new Error("OpenAI no b64");
-  return { status: "ready", modelId: `openai/${OPENAI_IMAGE_MODEL}`, url: saveB64(b64, "img") };
+  return { status: "ready", modelId: `openai/${OPENAI_IMAGE_MODEL}`, url: await saveB64(b64, "img") };
 }
 
 // ── 2.5 Google Gemini 2.5 Flash Image（Nano Banana）— image edit / subject
@@ -276,7 +282,7 @@ Output aspect ratio: ${opts.aspectRatio}.` : "";
       const finish = data?.candidates?.[0]?.finishReason ?? "no image part";
       throw new Error(`NanoBanana no image (${finish})`);
     }
-    return { status: "ready", modelId: "google/nano-banana", url: saveB64(b64out, "img") };
+    return { status: "ready", modelId: "google/nano-banana", url: await saveB64(b64out, "img") };
   }
   throw new Error(errors.join("\n") || "NanoBanana failed");
 }

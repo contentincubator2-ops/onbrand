@@ -18,7 +18,7 @@ import { dirname, join, resolve } from "path";
 import { fileURLToPath } from "url";
 import { buildTaskCatalogIndex } from "../server/content/core/catalog/taskCatalogIndex";
 import { resolveTaskTemplateSync } from "../server/content/core/catalog/taskRegistry";
-import { coverFilePath } from "../server/platform/core/media/mediaGen";
+import { readCoverBytes } from "../server/platform/core/media/mediaGen";
 import {
   drawIllustration, shrinkToWebp, writeIllustrationConcepts, type IllustrationCardInput,
 } from "../server/content/core/image/taskIllustration";
@@ -102,9 +102,8 @@ async function main(): Promise<void> {
     if (!concept) { failed.push(`${c.id} (no concept)`); return; }
     const r = await drawIllustration(concept);
     if ("error" in r) { failed.push(`${c.id} (${r.error.slice(0, 120)})`); return; }
-    const file = coverFilePath(r.url);
-    if (!file) { failed.push(`${c.id} (unexpected url ${r.url})`); return; }
-    const png = readFileSync(file);
+    const png = await readCoverBytes(r.url);
+    if (!png) { failed.push(`${c.id} (unexpected url ${r.url})`); return; }
     writeFileSync(join(IMG_DIR, `${c.id}.webp`), await shrinkToWebp(png));
     done++;
     console.log(`[illus] ${done}/${todo.length} ${c.id} — ${concept}`);
