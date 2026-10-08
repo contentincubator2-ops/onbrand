@@ -8,6 +8,7 @@ name: Ops (DEV) — probe doctor inspire demo end to end (read-only)
 # 100 位的人設檔很大，只把這次要跑的幾位打包上去（PROBE_KEYS）。
 # 第 2 次跑：改成每位 agent 各自呼叫＋審查附建議之後。
 # 第 3 次跑：CJ 補了 DEV 的模型額度之後（確認實際回覆的是哪個模型）。
+# 第 5 次跑：議題從高血壓換成體重管理（肥胖症），規則加上不提任何藥品名之後。
 # 第 4 次跑：審查每組上限 6→20、同一句一組只報一次之後（上一次漏了「私訊我預約」那一句）。
 # 花費：約 20 次模型呼叫。
 # Path-scoped push，跟 op-probe-dev-influencer.yml 同一個做法（environment: dev 才會連到 DEV VM）。
@@ -90,7 +91,7 @@ jobs:
             };
             (async () => {
               const doctor = "王小明";
-              const topic = resolveTopic({ topicId: "722" })!;
+              const topic = resolveTopic({ topicId: "five-percent" })!;
               console.log(`agents: ${INSPIRE_PERSONAS.map((p) => `${p.key}(${p.agentPrompt.length}字)`).join(" ")}`);
               const rounds = await Promise.all(INSPIRE_PERSONAS.map(async (p) => {
                 const r = await ask(personaIdeationPrompt({ doctor, topic, persona: p, count: 3 }), "請開始想。");
@@ -109,10 +110,10 @@ jobs:
                 await review(text);
               }
               const bad = finalizeDraft([
-                "很多人問我血壓藥是不是要吃一輩子。",
-                "我的門診有一套獨門療程，照著做保證三個月根治高血壓，從此不用吃藥。",
-                "上個月 52 歲、在內湖科學園區當工程師的陳先生，血壓從 180 降到 110，他說這是他遇過最有效的方法。",
-                "研究顯示每天喝兩杯芹菜汁可以降血壓 20%，比吃藥還好。",
+                "很多人問我怎麼瘦最快。",
+                "我的門診有一套獨門療程，搭配瘦瘦針，保證三個月瘦 10 公斤，而且不復胖。",
+                "上個月 38 歲、在內湖科學園區當工程師的陳小姐，三個月從 82 公斤瘦到 65 公斤，她說這是她遇過最有效的方法。",
+                "研究顯示每天喝兩杯黑咖啡可以多燃燒 30% 的脂肪，比運動還有用。",
                 "現在私訊我預約，本月前十名免費諮詢。",
               ].join("\n"));
               console.log(`\n=== 對照組：故意違規的稿子\n${bad}\n--- 逐條審查（只提建議）`);

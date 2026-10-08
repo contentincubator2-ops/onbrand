@@ -90,14 +90,14 @@ export const INSPIRE_REGULATIONS: InspireRegulation[] = [
     id: "med-103", group: "medical-ad", law: "醫療法", article: "第 103 條",
     title: "虛偽、誇張的內容",
     gist: "違反醫療廣告規定處新臺幣五萬元以上二十五萬元以下罰鍰；內容虛偽、誇張、歪曲事實的，可以再處停業或廢止開業執照。",
-    check: "文案是否有保證療效或絕對化的說法：根治、治好、保證、一定、百分之百、永不復發、不用吃藥、最有效、第一、唯一、最新最好。是否誇大單一方法的效果（例如只靠某種食物或運動就能讓血壓恢復正常）。",
+    check: "文案是否有保證療效或絕對化的說法：根治、治好、保證、一定、百分之百、永不復發、不用吃藥、最有效、第一、唯一、最新最好、保證瘦、快速瘦、躺著瘦、不復胖、幾天或幾週瘦幾公斤。是否誇大單一方法的效果（例如只靠某種食物、運動或單一方法就能瘦下來、不再復胖）。",
     url: MEDICAL_ACT, amended: "115 年 9 月 23 日",
   },
   {
     id: "drug-65-67", group: "drug", law: "藥事法", article: "第 65 條、第 67 條",
     title: "藥物廣告只有藥商能做",
     gist: "不是藥商不可以做藥物廣告；需要醫師處方的藥物，廣告只能登在學術性醫療刊物。",
-    check: "文案是否出現藥品的商品名、廠牌，或推薦、比較特定藥品。說明藥物類別的一般知識（例如「降血壓藥有好幾類，醫師會依狀況選擇」）不算違規。",
+    check: "文案是否出現任何藥品的商品名、成分名、廠牌或俗稱（例如瘦瘦針、減肥針、GLP-1 這類說法），或推薦、比較、暗示特定藥品或藥物類別可以減重。只說「有需要可以和醫師討論適合的治療方式」不算違規。",
     url: PHARMA_ACT, amended: "115 年 3 月 4 日",
   },
   {
@@ -111,14 +111,14 @@ export const INSPIRE_REGULATIONS: InspireRegulation[] = [
     id: "drug-69-70", group: "drug", law: "藥事法", article: "第 69 條、第 70 條",
     title: "不是藥物不能講療效",
     gist: "不是藥事法所稱的藥物，不可以標示或宣傳醫療效能；採訪、報導或宣傳的內容暗示或影射醫療效能的，視為藥物廣告。",
-    check: "文案是否宣稱保健食品、偏方、器材、茶飲、精油等非藥物可以降血壓、治療高血壓、取代藥物，包含暗示與疑問句包裝。",
+    check: "文案是否宣稱保健食品、偏方、器材、茶飲、精油等非藥物可以減重、燃脂、消脂、治療肥胖、取代正規治療，包含暗示與疑問句包裝。",
     url: PHARMA_ACT, amended: "115 年 3 月 4 日",
   },
   {
     id: "food-28", group: "food", law: "食品安全衛生管理法", article: "第 28 條",
     title: "食品不能宣稱療效",
     gist: "食品的標示、宣傳或廣告不可以不實、誇張或讓人誤解，也不可以宣稱醫療效能。",
-    check: "文案是否說某一種食物、飲品或保健食品能「降血壓」「治療」「預防高血壓」「取代藥物」。說明飲食原則（少鹽、高纖、少加工食品）不算；點名單一食物並宣稱療效才算。",
+    check: "文案是否說某一種食物、飲品或保健食品能「減重」「燃脂」「消脂」「治療肥胖」「取代藥物」。說明飲食原則（全穀、蔬果、優質蛋白質，少油少鹽少糖）不算；點名單一食物並宣稱療效才算。",
     url: FOOD_ACT, amended: "108 年 6 月 12 日",
   },
   {
@@ -135,27 +135,36 @@ export const INSPIRE_REGULATIONS: InspireRegulation[] = [
 export interface InspireFact { id: string; text: string }
 
 export const FACT_SOURCE = {
-  label: "衛生福利部國民健康署新聞稿（112 年 5 月 15 日），引用台灣高血壓學會與中華民國心臟學會「2022 台灣高血壓指引」",
-  url: "https://mohw.gov.tw/cp-16-74604-1.html",
+  label: "衛生福利部國民健康署：成人健康體位標準、肥胖防治新聞稿（107 年、115 年）",
+  url: "https://www.hpa.gov.tw/Pages/Detail.aspx?nodeid=542&pid=9737",
 };
+
+/** 白名單每一條的出處頁面（畫面上的「審查依據」逐一列出）。 */
+export const FACT_SOURCES: Array<{ label: string; url: string }> = [
+  { label: "國民健康署「成人健康體位標準」", url: "https://www.hpa.gov.tw/Pages/Detail.aspx?nodeid=542&pid=9737" },
+  { label: "衛福部新聞稿「肥胖是慢性疾病！調整飲食及運動生活是最佳處方」（107 年 7 月 4 日，109 年更新）", url: "https://mohw.gov.tw/cp-16-42429-1.html" },
+  { label: "衛福部新聞稿「響應世界肥胖日 兩招啟動健康管理」（115 年 3 月 4 日）", url: "https://mohw.gov.tw/cp-16-85702-1.html" },
+];
 
 /** 文案裡可以出現的數字與統計，只有這幾條。 */
 export const INSPIRE_FACTS: InspireFact[] = [
-  { id: "threshold", text: "2022 台灣高血壓指引把高血壓的標準定在 130/80 mmHg（以居家血壓為準）。" },
-  { id: "722", text: "居家量血壓的 722 原則：連續量 7 天；早上起床後、晚上睡覺前各量 1 次（一天 2 次）；每次量 2 遍，取平均值。" },
-  { id: "lifestyle", text: "血壓超過 130/80 mmHg，建議先積極調整飲食、運動與作息，再與醫師討論是否需要用藥。" },
-  { id: "diet", text: "飲食原則：低油、低糖、低鹽、高纖；拒菸、酒、檳榔。" },
-  { id: "exercise", text: "一天至少運動 30 分鐘。" },
-  { id: "death", text: "110 年國人十大死因中，與高血壓相關的心臟疾病、腦血管疾病、高血壓性疾病分別排第 2、4、6 位。" },
-  { id: "unmeasured", text: "107 年調查：18 歲以上國人有 23.6% 一年內沒量過血壓。" },
+  { id: "bmi", text: "成人 BMI（體重公斤 ÷ 身高公尺的平方）：未滿 18.5 過輕；18.5 到未滿 24 是健康體重；24 到未滿 27 是過重；27 以上是肥胖。" },
+  { id: "waist", text: "腰圍：成人男性 90 公分以上、女性 80 公分以上，屬於腹部肥胖。" },
+  { id: "prevalence", text: "2020–2024 年國民營養健康調查：18 歲以上成人有 51.3% 達到過重及肥胖標準。" },
+  { id: "global", text: "世界衛生組織：全球成人過重及肥胖的比例，從 1990 年的 25% 上升到 2022 年的 43%。" },
+  { id: "risk", text: "肥胖是慢性疾病。與健康體重者相比，肥胖者罹患糖尿病、代謝症候群及血脂異常的風險超過 3 倍，罹患高血壓、心血管疾病、膝關節炎及痛風的風險約 2 倍。" },
+  { id: "five-percent", text: "肥胖者減少 5% 以上的體重，就能為健康帶來益處。" },
+  { id: "calories", text: "每天減少 500 大卡的熱量，每週約可減重 0.5 公斤；控制體重時，每日攝取熱量不應低於 1,200 大卡。" },
+  { id: "exercise", text: "成人每週累計 150 分鐘中等強度運動（稍微喘但還能說話）；過重或肥胖者建議每週累計 250 到 300 分鐘，並搭配飲食調整。" },
+  { id: "diet", text: "飲食原則：多選全穀及未精製雜糧、攝取多樣蔬果、補充優質蛋白質，避免高油、高鹽、高糖的食物。" },
 ];
 
 export const FACTS_REGULATION: InspireRegulation = {
-  id: "facts", group: "facts", law: "衛教事實白名單", article: "國健署／2022 台灣高血壓指引",
+  id: "facts", group: "facts", law: "衛教事實白名單", article: "國民健康署肥胖防治資料",
   title: "數字與統計的出處",
   gist: "文案裡的數字、統計、標準值只能來自白名單；白名單沒有的，只能用不帶數字的說法。",
-  check: "文案是否出現白名單以外的數字、百分比、統計、研究結論、標準值或劑量；是否把白名單的數字寫錯（例如 722 的三個數字、130/80）。",
-  url: FACT_SOURCE.url, amended: "112 年 5 月 15 日",
+  check: "文案是否出現白名單以外的數字、百分比、統計、研究結論、標準值、熱量或減重幅度；是否把白名單的數字寫錯（例如 BMI 24 與 27、腰圍 90 與 80、5%、500 大卡、150 分鐘）。",
+  url: FACT_SOURCE.url, amended: "115 年 3 月 4 日",
 };
 
 export const ALL_REVIEW_ITEMS: InspireRegulation[] = [...INSPIRE_REGULATIONS, FACTS_REGULATION];
@@ -169,10 +178,13 @@ export function itemsOfGroup(group: RegulationGroupId): InspireRegulation[] {
 /** 明顯違規的用語：寫完先掃一次，命中的句子直接交給審查當線索。 */
 export const RISK_TERMS: Array<{ re: RegExp; regulationId: string; why: string }> = [
   { re: /根治|治癒|治好|保證|百分之百|100\s*%|永不復發|藥到病除/, regulationId: "med-103", why: "保證療效或絕對化的說法" },
-  { re: /最有效|最好的(?:治療|方法|藥)|第一名|唯一(?:有效|方法)|不用(?:再)?吃藥|擺脫藥物|告別(?:藥物|高血壓)/, regulationId: "med-103", why: "誇大效果" },
+  { re: /最有效|最好的(?:治療|方法|藥)|第一名|唯一(?:有效|方法)|不用(?:再)?吃藥|擺脫藥物|告別(?:藥物|肥胖)/, regulationId: "med-103", why: "誇大效果" },
   { re: /(?:歡迎|快來|立即|馬上)?(?:預約|掛號)(?:我的|門診|諮詢)?|私訊(?:我)?(?:預約|諮詢|看診)|來(?:我的)?門診找我/, regulationId: "med-9-87", why: "招徠病人就醫" },
   { re: /優惠|折扣|免費(?:諮詢|檢測|體驗)|團購|限時|名額有限|贈送/, regulationId: "med-86-7", why: "促銷說法" },
   { re: /治療前後|術前術後|見證|親身分享/, regulationId: "med-86-7", why: "前後比較或見證" },
+  { re: /瘦瘦針|減肥針|減重針|週纖達|胰妥讚|善纖達|猛健樂|wegovy|ozempic|saxenda|mounjaro|rybelsus|semaglutide|tirzepatide|liraglutide|司美格魯|GLP-?1|腸泌素|減肥藥|減重藥/i, regulationId: "drug-65-67", why: "出現藥品名稱、成分或俗稱" },
+  { re: /保證瘦|快速瘦|躺著瘦|不復胖|不會復胖|(?:\d+|幾|一|兩|三)\s*(?:天|週|周|個月|月)(?:內)?(?:就)?(?:瘦|減|甩)(?:掉|了)?\s*(?:\d+|幾)\s*公斤/, regulationId: "med-103", why: "保證或誇大減重效果" },
+  { re: /減重前後|瘦身前後|前後對比|before\s*(?:and|&)?\s*after/i, regulationId: "med-86-7", why: "減重前後比較" },
   { re: /祖傳|秘方|獨門/, regulationId: "med-86", why: "秘方宣傳" },
 ];
 

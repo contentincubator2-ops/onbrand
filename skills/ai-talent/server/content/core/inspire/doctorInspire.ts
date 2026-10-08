@@ -5,7 +5,8 @@
  * 有關的議題、再選不同人的語調，產出不同的靈感給醫生參考和採用」）。
  *
  * 跟靈感舞台（planning/inspirationStage.ts）的差別：
- *   · 沒有品牌、沒有帳號：主體是「醫師本人＋一個高血壓議題」，事實只來自 inspireRegulations 的白名單。
+ *   · 沒有品牌、沒有帳號：主體是「醫師本人＋一個體重管理議題」（2026-10-09 CJ：提案對象是肥胖症領域的藥廠專案，不是高血壓——
+ *     議題與白名單整組換掉；因為贊助方是處方藥藥廠，內容一律不出現任何藥品名、成分名或俗稱），事實只來自 inspireRegulations 的白名單。
  *   · 「誰來想」是 100 位創作者 agent（inspirePersonas.ts），每位帶自己的完整人設各呼叫一次。
  *   · 採用後不排進本週企劃，直接寫成該平台的成稿，再逐條過法規審查。
  *   · 審查只提建議（哪一句、為什麼、建議怎麼改），要不要改由醫師決定。
@@ -18,32 +19,37 @@ import { leaksPersona, type InspirePersona, type InspirePlatform } from "./inspi
 export interface InspireTopic { id: string; label: string; hint: string }
 
 export const INSPIRE_TOPICS: InspireTopic[] = [
-  { id: "threshold", label: "血壓多少算高？", hint: "130/80 的新標準，為什麼跟以前聽到的不一樣" },
-  { id: "722", label: "在家怎麼量才準：722 原則", hint: "連續七天、早晚各一次、每次量兩遍" },
-  { id: "measure-mistakes", label: "量血壓最常犯的錯", hint: "量的時間、姿勢、次數，哪些習慣會讓數字失真" },
-  { id: "white-coat", label: "在診間量比較高，是高血壓嗎？", hint: "診間血壓與居家血壓的差別" },
-  { id: "silent", label: "沒有不舒服，需要理它嗎？", hint: "高血壓常常沒有症狀" },
-  { id: "salt", label: "吃清淡一點，到底是多淡？", hint: "低鹽、低油、低糖、高纖的日常做法" },
-  { id: "exercise", label: "運動對血壓的幫助", hint: "一天至少 30 分鐘，怎麼開始" },
-  { id: "young", label: "年輕人也會高血壓", hint: "不是長輩才要量血壓" },
-  { id: "medication-myth", label: "吃了藥就要吃一輩子？", hint: "對降血壓藥最常見的擔心" },
-  { id: "stop-medication", label: "血壓正常了，可以自己停藥嗎？", hint: "為什麼調藥要跟醫師討論" },
-  { id: "complications", label: "血壓高久了會怎樣", hint: "與心臟病、中風的關係" },
-  { id: "checkup", label: "多久沒量血壓了？", hint: "將近四分之一的成年人一年內沒量過" },
+  { id: "bmi", label: "我算胖嗎？BMI 與腰圍怎麼看", hint: "BMI 24 過重、27 肥胖；腰圍男 90、女 80 公分" },
+  { id: "disease", label: "肥胖是一種慢性疾病", hint: "不是意志力的問題，也不只是外表的事" },
+  { id: "waist", label: "體重正常，肚子卻很大", hint: "為什麼除了 BMI 還要量腰圍" },
+  { id: "five-percent", label: "先減 5% 就有幫助", hint: "不用一次瘦很多，健康就會有感" },
+  { id: "calories", label: "少吃多少才會瘦？", hint: "每天少 500 大卡，一週約 0.5 公斤" },
+  { id: "exercise", label: "運動要做到多少才夠", hint: "每週 150 分鐘；想減重要 250 到 300 分鐘" },
+  { id: "yoyo", label: "為什麼瘦了又胖回來", hint: "復胖不是你不夠努力" },
+  { id: "diet-myth", label: "不吃澱粉、極端節食的迷思", hint: "每日熱量不應低於 1,200 大卡" },
+  { id: "risk", label: "胖久了，身體會怎樣", hint: "糖尿病、高血壓、心血管與關節的風險" },
+  { id: "plate", label: "外食族怎麼吃", hint: "全穀、蔬果、優質蛋白質，少油少鹽少糖" },
+  { id: "when-doctor", label: "什麼時候該找醫師談體重", hint: "體重影響到健康時，可以討論有哪些做法" },
+  { id: "stigma", label: "別再說「你就是懶」", hint: "體重汙名怎麼讓人更不敢求助" },
 ];
 
 export function topicOf(id: string): InspireTopic | undefined {
   return INSPIRE_TOPICS.find((t) => t.id === id);
 }
 
-/** 自訂議題必須跟高血壓／血壓有關——這頁的白名單與法規只涵蓋這個範圍。 */
-export function isHypertensionTopic(text: string): boolean {
-  return /血壓|高血壓|降壓|收縮壓|舒張壓|量血壓|血壓計|hypertension|blood\s*pressure/i.test(String(text ?? ""));
+/** 自訂議題必須跟體重管理有關——這頁的白名單與法規只涵蓋這個範圍。 */
+export function isOnTopic(text: string): boolean {
+  return /肥胖|體重|減重|減肥|瘦|胖|BMI|腰圍|體脂|體位|復胖|熱量|卡路里|代謝症候群|obes|weight/i.test(String(text ?? ""));
+}
+
+/** 自訂議題不可以談藥品或業配——贊助方是處方藥藥廠，題目本身就不能往藥品帶。 */
+export function mentionsDrug(text: string): boolean {
+  return /藥|針|GLP|semaglutide|tirzepatide|liraglutide|業配|代言|團購/i.test(String(text ?? ""));
 }
 
 export function resolveTopic(input: { topicId?: string; customTopic?: string }): { label: string; hint: string } | null {
   const custom = String(input.customTopic ?? "").replace(/\s+/g, " ").trim().slice(0, 60);
-  if (custom) return isHypertensionTopic(custom) ? { label: custom, hint: "" } : null;
+  if (custom) return isOnTopic(custom) && !mentionsDrug(custom) ? { label: custom, hint: "" } : null;
   const t = input.topicId ? topicOf(input.topicId) : undefined;
   return t ? { label: t.label, hint: t.hint } : null;
 }
@@ -76,13 +82,15 @@ export interface InspireIdea {
 const factsBlock = () => INSPIRE_FACTS.map((f) => `- ${f.text}`).join("\n");
 
 const GROUND_RULES = [
-  `- 這是衛教內容，不是醫療廣告：不提院所名稱、不邀請掛號或預約、不提價格與優惠、不講治療成果、不用病人見證或治療前後比較。`,
-  `- 不提任何藥品商品名或廠牌；不說任何食物、保健食品、偏方能降血壓或取代藥物。`,
-  `- 不保證效果，不用「根治、保證、一定、最有效、不用吃藥」這類說法。`,
+  `- 這是衛教內容，不是醫療廣告：不提院所名稱、不邀請掛號或預約、不提價格與優惠、不講治療成果、不用病人見證或減重前後對比。`,
+  `- 不提任何藥品的商品名、成分名、廠牌或俗稱（包含瘦瘦針、減肥針、GLP-1 這類說法），也不暗示有某種藥、某種針可以解決；需要提到醫療協助時，只說「可以和醫師討論適合自己的做法」。`,
+  `- 不說任何食物、飲品、保健食品、偏方、器材能減重、燃脂或取代正規治療。`,
+  `- 不保證效果，不用「保證瘦、快速瘦、躺著瘦、不復胖、幾天瘦幾公斤、一定、最有效」這類說法。`,
+  `- 不嘲笑體型、不做身材羞辱、不把胖歸咎於懶或沒意志力；幽默只能對著情境與迷思，不能對著人的身體。`,
   `- 不寫認得出是誰的病人故事；要舉例就用「門診常被問到」「很多人以為」這種泛稱。`,
   `- 數字、統計、標準值只能用白名單裡的，而且要寫對；白名單沒有的事，用不帶數字的說法。`,
-  `- 不給個人化的用藥或劑量建議；提到調整用藥一律請讀者與自己的醫師討論。`,
-  `- 挑戰、實驗、整人這類形式只能用在安全、人人做得到的事（量血壓、記錄、買菜、看標示、走路），不能拿健康冒險，也不能拿病情開玩笑。`,
+  `- 不給個人化的熱量、體重目標或用藥建議；個人狀況一律請讀者與自己的醫師討論。`,
+  `- 挑戰、實驗、整人這類形式只能用在安全、人人做得到的事（量腰圍、算 BMI、記錄飲食、看營養標示、走路），不能做節食、斷食、極端運動或比誰瘦得快的挑戰，也不能拿病情開玩笑。`,
 ].join("\n");
 
 export const PLATFORM_LABEL: Record<InspirePlatform, string> = {
@@ -254,7 +262,7 @@ export function reviewPrompt(items: InspireRegulation[], hits: RiskHit[]): strin
   const ids = items.map((r) => r.id);
   const own = hits.filter((h) => ids.includes(h.regulationId));
   return [
-    `你是醫療內容的法規審查。這是一篇醫師寫給民眾的高血壓衛教內容。你只判斷它有沒有落在下面這幾條的禁止範圍，不評文筆、不管風格。`,
+    `你是醫療內容的法規審查。這是一篇醫師寫給民眾的體重管理（肥胖症）衛教內容。你只判斷它有沒有落在下面這幾條的禁止範圍，不評文筆、不管風格。`,
     ``,
     ...items.map((r) => `■ ${r.id}｜${r.law} ${r.article}｜${r.title}\n  條文重點：${r.gist}\n  判斷標準：${r.check}`),
     items.some((r) => r.id === "facts") ? `\n【白名單】\n${factsBlock()}` : "",

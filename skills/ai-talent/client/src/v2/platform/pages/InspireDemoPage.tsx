@@ -21,11 +21,11 @@
 import React from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
-  faArrowUpRightFromSquare, faBellSlash, faBookOpen, faBrain, faCalendarCheck, faCamera, faCheck, faChevronLeft, faCircleNotch,
-  faClapperboard, faComments, faCopy, faDumbbell, faFaceLaughBeam, faFlask, faGamepad, faHeartPulse, faHouseMedical, faLayerGroup,
-  faLightbulb, faMagnifyingGlass, faMasksTheater, faMinus, faMusic, faPaw, faPenNib, faPeopleRoof, faPersonRunning, faPills, faPlane,
-  faPrescriptionBottleMedical, faScaleBalanced, faShirt, faStethoscope, faTowerBroadcast, faTriangleExclamation, faTrophy,
-  faUserDoctor, faUserGraduate, faUsers, faUtensils, faWandMagicSparkles, faXmark,
+  faArrowUpRightFromSquare, faBookOpen, faCamera, faCheck, faChevronLeft, faCircleNotch,
+  faClapperboard, faComments, faCopy, faDumbbell, faFaceLaughBeam, faFlask, faGamepad, faHeartPulse, faLayerGroup,
+  faLightbulb, faMagnifyingGlass, faMasksTheater, faMinus, faMusic, faPaw, faPenNib, faPeopleRoof, faPersonRunning, faPlane,
+  faBan, faFire, faHandHoldingHeart, faPercent, faRotate, faRuler, faScaleBalanced, faWeightScale, faShirt, faStethoscope, faTowerBroadcast, faTriangleExclamation, faTrophy,
+  faUserDoctor, faUsers, faUtensils, faWandMagicSparkles, faXmark,
 } from "@fortawesome/free-solid-svg-icons";
 import { faFacebookF, faInstagram, faTiktok, faYoutube } from "@fortawesome/free-brands-svg-icons";
 import { trpc } from "../../../lib/trpc";
@@ -42,9 +42,8 @@ const MARKET_LABEL: Record<string, string> = { tw: "台灣", us: "美國" };
 
 /** 議題圖示（題庫在 server；這裡只是每一題配一個圖示，沒配到的用聽診器）。 */
 const TOPIC_ICON: Record<string, any> = {
-  threshold: faHeartPulse, "722": faHouseMedical, "measure-mistakes": faTriangleExclamation, "white-coat": faUserDoctor,
-  silent: faBellSlash, salt: faUtensils, exercise: faPersonRunning, young: faUserGraduate, "medication-myth": faPills,
-  "stop-medication": faPrescriptionBottleMedical, complications: faBrain, checkup: faCalendarCheck,
+  bmi: faWeightScale, disease: faStethoscope, waist: faRuler, "five-percent": faPercent, calories: faFire, exercise: faPersonRunning,
+  yoyo: faRotate, "diet-myth": faBan, risk: faHeartPulse, plate: faUtensils, "when-doctor": faUserDoctor, stigma: faHandHoldingHeart,
 };
 
 /** 風格圖示：從風格名的關鍵字判斷內容類型（100 位不逐一手配；判斷不出來用燈泡）。 */
@@ -152,7 +151,7 @@ function Option({ on, disabled, onClick, children }: { on: boolean; disabled?: b
 
 // ── 首頁：全螢幕主視覺 ──
 
-/** 主視覺：一條血壓波形（自己畫的線條，不是任何品牌素材）。 */
+/** 主視覺：一條心跳波形（自己畫的線條，不是任何品牌素材）。 */
 function PulseArt() {
   return (
     <svg viewBox="0 0 480 260" className="w-full" aria-hidden="true">
@@ -166,7 +165,7 @@ function PulseArt() {
       </defs>
       {[60, 110, 160, 210].map((y) => <line key={y} x1="0" x2="480" y1={y} y2={y} stroke="#fff" strokeOpacity="0.18" />)}
       <path d="M0 150 H120 l14 -8 l12 8 h20 l10 26 l18 -130 l18 150 l12 -46 h26 l16 -22 l18 22 H480" fill="none" stroke="url(#inspire-pulse)" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
-      <text x="240" y="236" textAnchor="middle" fill="#fff" fillOpacity="0.9" fontSize="12" letterSpacing="4">130 / 80 mmHg</text>
+      <text x="240" y="236" textAnchor="middle" fill="#fff" fillOpacity="0.9" fontSize="12" letterSpacing="4">BMI 24 ｜ 27</text>
     </svg>
   );
 }
@@ -180,7 +179,7 @@ function Hero({ onDone, onBasis }: { onDone: (name: string) => void; onBasis: ()
       <header className="relative z-10 flex h-20 items-center px-6"><Wordmark height={56} /></header>
       <div className="relative z-10 px-6 pt-10 text-center">
         <h1 className="text-[40px] font-medium leading-[1.15]" style={{ letterSpacing: "-0.02em" }}>換一種說法</h1>
-        <p className="mt-2 text-[15px]" style={{ color: "rgba(255,255,255,0.95)" }}>高血壓衛教 × 各平台熱門創作者的說話風格</p>
+        <p className="mt-2 text-[15px]" style={{ color: "rgba(255,255,255,0.95)" }}>體重管理衛教 × 各平台熱門創作者的說話風格</p>
       </div>
       <div className="relative z-10 flex flex-1 items-center"><PulseArt /></div>
       <form className="relative z-10 px-6" style={{ paddingBottom: "max(24px, env(safe-area-inset-bottom))" }} onSubmit={(e) => { e.preventDefault(); if (ok) onDone(v.trim()); }}>
@@ -467,16 +466,16 @@ function DraftSheet({ doctor, idea, persona, groups, onClose }: { doctor: string
   );
 }
 
-function BasisSheet({ groups, facts, factSource, checkedAt, onClose }: { groups: RegGroup[]; facts: any[]; factSource?: { url: string; label: string }; checkedAt?: string; onClose: () => void }) {
+function BasisSheet({ groups, facts, factSource, factSources, checkedAt, onClose }: { groups: RegGroup[]; facts: any[]; factSource?: { url: string; label: string }; factSources?: Array<{ url: string; label: string }>; checkedAt?: string; onClose: () => void }) {
   return (
     <Sheet title="審查依據" kicker="每一篇成稿會逐條對照這些條文" onClose={onClose}>
       <RegulationList groups={groups} />
       <div className="rounded p-4 text-[12px] leading-relaxed" style={{ background: PANEL, color: SUB }}>
         <div className="mb-2 text-[14px] font-medium" style={{ color: INK }}>事實白名單</div>
         <ul className="list-disc space-y-1 pl-4">{facts.map((f: any) => <li key={f.id}>{f.text}</li>)}</ul>
-        {factSource ? (
-          <a href={factSource.url} target="_blank" rel="noopener noreferrer" className="mt-3 inline-block font-medium underline decoration-[#D0D1D2] underline-offset-4" style={{ color: INK }}>出處：{factSource.label}</a>
-        ) : null}
+        {(factSources?.length ? factSources : factSource ? [factSource] : []).map((src) => (
+          <a key={src.url} href={src.url} target="_blank" rel="noopener noreferrer" className="mt-3 block font-medium underline decoration-[#D0D1D2] underline-offset-4" style={{ color: INK }}>出處：{src.label}</a>
+        ))}
       </div>
       <p className="text-[12px] leading-relaxed" style={{ color: FAINT }}>條文最後核對日期：{checkedAt}。條文重點是我們寫的摘要，原文以連結的官方頁面為準。</p>
     </Sheet>
@@ -579,7 +578,7 @@ export default function InspireDemoPage() {
   const go = (v: View) => { setView(v); toTop(); };
 
   const basis = showBasis ? (
-    <BasisSheet groups={groups} facts={cfg.data?.facts ?? []} factSource={cfg.data?.factSource} checkedAt={cfg.data?.checkedAt} onClose={() => setShowBasis(false)} />
+    <BasisSheet groups={groups} facts={cfg.data?.facts ?? []} factSource={cfg.data?.factSource} factSources={cfg.data?.factSources} checkedAt={cfg.data?.checkedAt} onClose={() => setShowBasis(false)} />
   ) : null;
 
   if (!doctor) return <><Hero onDone={(n) => { saveName(n); setDoctor(n); }} onBasis={() => setShowBasis(true)} />{basis}</>;
@@ -619,7 +618,7 @@ export default function InspireDemoPage() {
             </div>
           </div>
 
-          <Section title="議題" caption={custom.trim() ? "自訂議題" : topic?.hint ?? "選一個高血壓議題，或在下面自己寫"}>
+          <Section title="議題" caption={custom.trim() ? "自訂議題" : topic?.hint ?? "選一個體重管理議題，或在下面自己寫"}>
             <div className="grid grid-cols-2 gap-2">
               {topics.map((t) => (
                 <Option key={t.id} on={!custom.trim() && topicId === t.id} onClick={() => { setTopicId(t.id); setCustom(""); }}>
@@ -631,7 +630,7 @@ export default function InspireDemoPage() {
               ))}
             </div>
             <div className="mt-2 rounded px-4" style={{ background: PANEL, boxShadow: custom.trim() ? `inset 0 0 0 3px ${BRAND}` : undefined }}>
-              <input value={custom} onChange={(e) => setCustom(e.target.value)} maxLength={60} placeholder="自己寫一個跟血壓有關的題目"
+              <input value={custom} onChange={(e) => setCustom(e.target.value)} maxLength={60} placeholder="自己寫一個跟體重管理有關的題目"
                 className="h-11 w-full bg-transparent text-center text-[14px] outline-none" style={{ color: INK }} />
             </div>
           </Section>

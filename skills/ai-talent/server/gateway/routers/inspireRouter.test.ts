@@ -32,11 +32,12 @@ describe("inspireRouter", () => {
     expect(out.regulationGroups.flatMap((g) => g.items)).toHaveLength(ALL_REVIEW_ITEMS.length);
   });
 
-  it("沒有名字、議題跟血壓無關、或不認得的 agent，不會開始", async () => {
+  it("沒有名字、議題跟體重管理無關或談到藥品、或不認得的 agent，不會開始", async () => {
     const caller = inspireRouter.createCaller({ user: null, ip: "1.1.1.1" } as any);
-    await expect(caller.ideateStart({ name: "  ", topicId: "722", personas: [sample.key] })).rejects.toThrow(/名字/);
-    await expect(caller.ideateStart({ name: "王小明", customTopic: "幫我寫一篇減肥藥業配", personas: [sample.key] })).rejects.toThrow(/高血壓/);
-    await expect(caller.ideateStart({ name: "王小明", topicId: "722", personas: ["nope"] })).rejects.toThrow();
+    await expect(caller.ideateStart({ name: "  ", topicId: "bmi", personas: [sample.key] })).rejects.toThrow(/名字/);
+    await expect(caller.ideateStart({ name: "王小明", customTopic: "幫我寫一篇減肥藥業配", personas: [sample.key] })).rejects.toThrow(/體重管理/);
+    await expect(caller.ideateStart({ name: "王小明", customTopic: "冬天早上血壓特別高", personas: [sample.key] })).rejects.toThrow(/體重管理/);
+    await expect(caller.ideateStart({ name: "王小明", topicId: "bmi", personas: ["nope"] })).rejects.toThrow();
     await expect(caller.reviewStart({ text: "太短" })).rejects.toThrow();
   });
 
@@ -118,7 +119,7 @@ describe("條文資料", () => {
 });
 
 describe("提示詞", () => {
-  const topic = resolveTopic({ topicId: "722" })!;
+  const topic = resolveTopic({ topicId: "bmi" })!;
 
   it("想點子：帶著這一位的完整人設、他的問題、白名單與規則，並交代名字不能外露", () => {
     const p = personaIdeationPrompt({ doctor: "王小明", topic, persona: sample, count: IDEAS_PER_PERSONA, avoid: ["已經有的點子"] });
@@ -159,8 +160,10 @@ describe("解析與守門", () => {
     expect(doctorByline("王醫師")).toBe("王醫師");
   });
 
-  it("自訂議題要跟血壓有關", () => {
-    expect(resolveTopic({ customTopic: "冬天早上血壓特別高" })?.label).toBe("冬天早上血壓特別高");
+  it("自訂議題要跟體重管理有關，而且不能談藥品", () => {
+    expect(resolveTopic({ customTopic: "過年後體重回不去" })?.label).toBe("過年後體重回不去");
+    expect(resolveTopic({ customTopic: "冬天早上血壓特別高" })).toBeNull();
+    expect(resolveTopic({ customTopic: "瘦瘦針怎麼打才會瘦" })).toBeNull();
     expect(resolveTopic({ customTopic: "醫美療程推薦" })).toBeNull();
     expect(resolveTopic({ topicId: "nope" })).toBeNull();
   });
@@ -208,6 +211,8 @@ describe("解析與守門", () => {
   it("關鍵字掃描：抓得到保證療效與招徠就醫，一般衛教句子不誤抓", () => {
     const hits = scanRiskTerms("照這樣做保證根治。歡迎預約我的門診。\n連續量七天，早晚各一次。");
     expect(hits.map((h) => h.regulationId).sort()).toEqual(["med-103", "med-9-87"]);
-    expect(scanRiskTerms("血壓超過 130/80，先調整飲食與運動，再跟醫師討論。")).toEqual([]);
+    expect(scanRiskTerms("BMI 27 以上屬於肥胖，先調整飲食與運動，再跟醫師討論適合的做法。")).toEqual([]);
+    const drug = scanRiskTerms("很多人問我瘦瘦針有沒有效。\n照這樣做三個月瘦 10 公斤，保證不復胖。");
+    expect(drug.map((h) => h.regulationId).sort()).toEqual(["drug-65-67", "med-103"]);
   });
 });
