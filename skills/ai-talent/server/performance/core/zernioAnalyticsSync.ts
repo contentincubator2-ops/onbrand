@@ -135,3 +135,36 @@ export async function syncBrandZernioAnalytics(brandId: number, days = 120, deps
   }
   return result;
 }
+
+let ticking = false;
+/** 一拍一品牌：建過視角、四平台有 Zernio 連線，且最晚回填已超過 20 小時。 */
+export async function tickZernioAnalyticsSync(deps: ZernioAnalyticsDeps & {
+  sync?: typeof syncBrandZernioAnalytics;
+} = {}): Promise<void> {
+  if (!zernioAnalyticsEnabled() || ticking) return;
+  ticking = true;
+  try {
+    const pool = deps.pool ?? (await import("../../localDb")).default;
+    const [rows] = await pool.execute(
+      `SELECT b.id AS brandId, MAX(f.updatedAt) AS lastSync
+         FROM brands b
+         JOIN (SELECT DISTINCT brandId FROM perf_lenses) l ON l.brandId = b.id
+         JOIN (SELECT DISTINCT brandId FROM brand_publish_connections
+                WHERE provider = 'zernio' AND status = 'connected'
+                  AND platform IN (?, ?, ?, ?)) c ON c.brandId = b.id
+         LEFT JOIN perf_facts f ON f.brandId = b.id AND f.source IN (?, ?, ?, ?)
+        GROUP BY b.id
+       HAVING lastSync IS NULL OR lastSync < NOW() - INTERVAL 20 HOUR
+        ORDER BY lastSync IS NOT NULL, lastSync, b.id
+        LIMIT 1`,
+      [...ZERNIO_ANALYTICS_PLATFORMS, ...Object.values(SOURCE_BY_PLATFORM)],
+    );
+    if (!rows[0]) return;
+    await (deps.sync ?? syncBrandZernioAnalytics)(Number(rows[0].brandId), 120, deps);
+  } catch {
+    const log = deps.log ?? (await import("../../platform/routers/opsRouter")).logError;
+    await log({ source: "zernio.analytics", level: "warn", message: "社群成效背景同步失敗，下次排程重試。" });
+  } finally {
+    ticking = false;
+  }
+}
