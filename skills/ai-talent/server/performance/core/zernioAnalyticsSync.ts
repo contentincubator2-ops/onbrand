@@ -29,29 +29,32 @@ export function analyticsFormatOf(mediaType?: string | null): string {
 }
 
 /** Zernio accountId / postId 都不是平台原生 id，不能拿來當 perf_facts 的 key。 */
-function facebookPostId(id: string, permalink: string | null): string {
-  if (/^\d+_\d+$/.test(id)) return id;
-  if (permalink) {
-    try {
-      const url = new URL(permalink);
-      if (url.hostname === "facebook.com" || url.hostname.endsWith(".facebook.com")) {
-        const pageId = url.searchParams.get("id") ?? url.pathname.match(/^\/(\d+)\/posts\//)?.[1];
-        if (pageId && /^\d+$/.test(pageId) && /^\d+$/.test(id)) return `${pageId}_${id}`;
-      }
-    } catch { /* 無法確認粉專 id 時，不猜測或寫入另一個 key。 */ }
-  }
-  throw new ZernioAnalyticsSyncError("Facebook 貼文缺少完整原生 id，無法對回既有成效。");
+function facebookPostId(id: string, pageId?: string): string {
+  if (id.includes("_")) return id;
+  return pageId ? `${pageId}_${id}` : id;
+}
+
+function pageIdFromMeta(meta: unknown): string | undefined {
+  try {
+    const parsed = typeof meta === "string" ? JSON.parse(meta) : meta;
+    const id = parsed && typeof parsed === "object" && "platformUserId" in parsed ? parsed.platformUserId : undefined;
+    return typeof id === "string" && id.trim() ? id.trim() : undefined;
+  } catch { return undefined; /* 舊連線的 metadata 壞掉仍可使用貼文原生 id。 */ }
 }
 
 export function analyticsFact(post: ZernioAnalyticsPost, platform: AnalyticsPlatform, accountId: string,
-  tagsByPost: Record<string, Record<string, string>> = {}): { fact: FactInput; tagged: boolean } | null {
-  const targets = post.platformAnalytics ?? post.platforms ?? [];
-  const target = targets.find(p => p.platform === platform && p.accountId === accountId);
+  tagsByPost: Record<string, Record<string, string>> = {}, pageId?: string): { fact: FactInput; tagged: boolean } | null {
+  const targets = post.platformAnalytics?.length ? post.platformAnalytics : post.platforms ?? [];
+  const idOf = (value: string | { _id: string } | null | undefined) => typeof value === "string" ? value : value?._id;
+  // External posts are flat; the account is already scoped by listAnalytics(accountId).
+  const target = targets.length
+    ? targets.find(p => p.platform === platform && idOf(p.accountId) === accountId)
+    : post.platform === platform && post.platformPostId ? post : undefined;
   if (!target || (target.status && target.status !== "published") || !post.publishedAt) return null;
   if (!Number.isFinite(Date.parse(post.publishedAt))) return null;
   if (!target.platformPostId) return null;
   const permalink = target.platformPostUrl ?? post.platformPostUrl ?? null;
-  const entityId = platform === "facebook" ? facebookPostId(target.platformPostId, permalink) : target.platformPostId;
+  const entityId = platform === "facebook" ? facebookPostId(target.platformPostId, pageId) : target.platformPostId;
   // 不把跨平台加總的 analytics 寫到單一帳號；只有單一 target 時才可退回 top-level。
   const analytics = target.analytics ?? (targets.length === 1 ? post.analytics : null);
   if (!analytics) return null;
@@ -80,7 +83,7 @@ export function analyticsFact(post: ZernioAnalyticsPost, platform: AnalyticsPlat
   };
 }
 
-export type ZernioAnalyticsSyncResult = { platforms: Array<{ platform: AnalyticsPlatform; posts: number; tagged: number; error?: string }> };
+export type ZernioAnalyticsSyncResult = { platforms: Array<{ platform: AnalyticsPlatform; posts: number; tagged: number; skipped: number; error?: string }> };
 export type ZernioAnalyticsDeps = {
   pool?: Queryable;
   client?: Pick<ZernioClient, "listAnalytics" | "syncExternalPosts">;
@@ -104,13 +107,14 @@ export async function syncBrandZernioAnalytics(brandId: number, days = 120, deps
   const result: ZernioAnalyticsSyncResult = { platforms: [] };
   for (const connection of connections) {
     const platform = connection.platform as AnalyticsPlatform;
+    let skipped = 0;
     try {
       const readAll = async () => {
         const posts: ZernioAnalyticsPost[] = [];
         for (let page = 1; ; page++) {
           const data = await client.listAnalytics({ accountId: connection.accountId, fromDate, toDate, source: "all", page, limit: 100 });
           posts.push(...data.posts);
-          if (page >= data.pagination.pages || !data.posts.length) return posts;
+          if (page >= (data.pagination?.pages ?? 1) || !data.posts.length) return posts;
         }
       };
       let posts = await readAll();
@@ -121,16 +125,24 @@ export async function syncBrandZernioAnalytics(brandId: number, days = 120, deps
           posts = await readAll();
         }
       }
-      const converted = posts.map(post => analyticsFact(post, platform, connection.accountId, tags)).filter(p => p !== null);
+      const pageId = platform === "facebook" ? pageIdFromMeta(connection.meta) : undefined;
+      const converted: Array<{ fact: FactInput; tagged: boolean }> = [];
+      for (const post of posts) {
+        try {
+          const entry = analyticsFact(post, platform, connection.accountId, tags, pageId);
+          if (entry) converted.push(entry);
+          else skipped++;
+        } catch { skipped++; /* 單篇轉換失敗不影響同平台其他貼文，也不記錄原始回應。 */ }
+      }
       await write(brandId, converted.map(p => p.fact));
-      result.platforms.push({ platform, posts: converted.length, tagged: converted.filter(p => p.tagged).length });
+      result.platforms.push({ platform, posts: converted.length, tagged: converted.filter(p => p.tagged).length, skipped });
     } catch (error) {
       // 不記錄供應商回應、原始 exception 或憑證；保留安全的 HTTP 狀態供排查。
       const message = error instanceof ZernioApiError
         ? `社群成效同步失敗（HTTP ${error.status}），請確認帳號授權後重試。`
         : error instanceof ZernioAnalyticsSyncError ? error.message : "社群成效同步失敗，請稍後重試。";
       await log({ source: "zernio.analytics", level: "warn", message, meta: { brandId, platform } });
-      result.platforms.push({ platform, posts: 0, tagged: 0, error: message });
+      result.platforms.push({ platform, posts: 0, tagged: 0, skipped, error: message });
     }
   }
   return result;

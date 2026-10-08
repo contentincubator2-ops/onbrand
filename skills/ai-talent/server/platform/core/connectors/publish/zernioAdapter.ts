@@ -58,7 +58,7 @@ export function createZernioAdapter({ client, pool, brandNameOf }: {
       }
       await setConnection(pool, input.brandId, "zernio", platform.local, {
         accountId: current._id, accountLabel: current.displayName ?? current.username ?? null,
-        accountUsername: current.username, meta: { profileUrl: current.profileUrl ?? null },
+        accountUsername: current.username, meta: { profileUrl: current.profileUrl ?? null, platformUserId: current.platformUserId ?? null },
       });
       for (const account of obsolete) {
         await client.deleteAccount(account._id);

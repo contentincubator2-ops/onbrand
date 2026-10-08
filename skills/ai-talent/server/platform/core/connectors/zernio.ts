@@ -14,12 +14,12 @@ export type ZernioAnalyticsMetrics = Partial<Record<
 >> & { lastUpdated?: string | null };
 export type ZernioPlatformAnalytics = {
   platform: string; status?: string; platformPostId?: string | null;
-  accountId?: string; accountUsername?: string | null; analytics?: ZernioAnalyticsMetrics | null;
+  accountId?: string | { _id: string } | null; accountUsername?: string | null; analytics?: ZernioAnalyticsMetrics | null;
   syncStatus?: string; platformPostUrl?: string | null; errorMessage?: string | null;
 };
 export type ZernioAnalyticsPost = {
   postId?: string; _id?: string; latePostId?: string | null; status?: string; content?: string | null;
-  publishedAt?: string | null; platform?: string; platformPostUrl?: string | null;
+  publishedAt?: string | null; platform?: string; platformPostId?: string | null; platformPostUrl?: string | null;
   isExternal?: boolean; syncStatus?: string; mediaType?: string | null;
   mediaItems?: Array<{ type?: string; url?: string | null; thumbnail?: string | null }>;
   analytics?: ZernioAnalyticsMetrics | null;
@@ -29,7 +29,7 @@ export type ZernioAnalyticsPost = {
 };
 export type ZernioAnalyticsPage = {
   posts: ZernioAnalyticsPost[];
-  pagination: { page: number; limit: number; total: number; pages: number };
+  pagination?: { page: number; limit: number; total: number; pages: number };
 };
 export class ZernioApiError extends Error {
   constructor(public status: number, error: string, public type?: string, public code?: string, public details?: Record<string, unknown>) {
