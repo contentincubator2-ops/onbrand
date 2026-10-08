@@ -461,8 +461,16 @@ export function AddEntityModal({ isOpen, onClose, initialTab = "brand", defaultB
                 />
               )}
               <div>
-                <label className="text-xs font-medium text-default-700 block mb-1">{lang === "en" ? "Theme / hooks (optional)" : "活動主題 / 重點（可選）"}</label>
-                <Textarea value={evNote} onValueChange={setEvNote} placeholder={lang === "en" ? "What's the angle, theme, or perks" : "活動的訴求 / 主題 / 配套"} minRows={2} />
+                {/* 2026-10-08（CJ「新增活動時，直接寫滿我們需要進行活動定位的內容，不需要再跳一個步驟」）：
+                    這一格就是宣傳企劃頁原本第一步問的那一題。在這裡寫完，建立後直接排第一版企劃。 */}
+                <label className="text-xs font-medium text-default-700 block mb-1">{lang === "en" ? "What's on offer?" : "這檔活動在賣什麼、優惠是什麼？"}</label>
+                <Textarea value={evNote} onValueChange={setEvNote} minRows={3} maxRows={6} maxLength={800}
+                  placeholder={lang === "en" ? "e.g. Mid-Autumn bundle, 20% off early bird, 9/20–9/28, limited stock" : "例：中秋檔期，橫膈牛排＋厚切牛舌組合早鳥 8 折，9/20–9/28，數量有限"} />
+                <p className="text-tiny text-default-400 mt-1">
+                  {lang === "en"
+                    ? "Create it and we build the first draft plan from this, your brand and the products you picked — no second form. Wrong guesses can be fixed by chatting."
+                    : "建立後會用這段話、品牌資料與搭配的產品直接排出第一版企劃，不會再問一次；類型與通路猜錯可以用對話改。"}
+                </p>
               </div>
             </div>
           )}

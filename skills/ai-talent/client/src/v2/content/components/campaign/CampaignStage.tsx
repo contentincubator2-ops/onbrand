@@ -46,7 +46,7 @@ import CampaignChatCard from "./CampaignChatCard";
 import CampaignBasisPanel from "../../../strategy/components/events/CampaignBasisPanel";
 import KolBriefForm from "./KolBriefForm";
 import ChannelBriefForm, { type ChannelBriefSpec } from "./ChannelBriefForm";
-import { briefFromBasis, type BasisPatch, type BasisValue } from "../../../strategy/lib/campaign/campaignBasis";
+import { briefFromBasis, briefFromEvent, type BasisPatch, type BasisValue } from "../../../strategy/lib/campaign/campaignBasis";
 import { dockDirector } from "../../../strategy/lib/directorDock";
 import CampaignHandoff from "./CampaignHandoff";
 import CampaignKpiPanel from "./CampaignKpiPanel";
@@ -312,6 +312,8 @@ export default function CampaignStage({ eventId, brandId }: { eventId: number; b
 
   const data = q.data ?? {};
   const ev = data.event ?? {};
+  /** 自動排第一版用的那段話：有活動定位就用定位，還沒有就用新增活動時填的內容（2026-10-08）。 */
+  const basisBrief = briefFromBasis(data.basis?.raw);
   const settings = data.settings ?? { channels: [] };
   const items: CampaignPlanItem[] = plan?.items ?? [];
   const locked = !!plan?.lockedAt;
@@ -479,7 +481,7 @@ export default function CampaignStage({ eventId, brandId }: { eventId: number; b
                   <p className="text-[11px] tracking-widest text-default-500">{drafting ? L("排企劃中", "PLANNING") : L("還沒有企劃", "NO PLAN YET")}</p>
                   <p className="text-large font-bold leading-snug">
                     {drafting
-                      ? L("正在依活動定位排出企劃草稿。排好之後，在這裡用對話修改。", "Building the draft plan from your positioning. You'll edit it by chatting here.")
+                      ? L("正在排出企劃草稿。排好之後，在這裡用對話修改。", "Building the draft plan. You'll edit it by chatting here.")
                       : L("在右邊寫一段話，排出這檔活動的宣傳企劃。", "Describe the campaign on the right to build its plan.")}
                   </p>
                 </>
@@ -518,7 +520,8 @@ export default function CampaignStage({ eventId, brandId }: { eventId: number; b
               <div className="relative bg-default-100 p-4 sm:p-6 min-h-[420px] h-full overflow-y-auto">
                 <div className="relative bg-content1 rounded-2xl shadow-small p-5 max-w-[620px]">
                   <CampaignSetupForm eventId={eventId} data={data} brandProducts={brandProducts} hasPlan={false} en={en}
-                    autoBrief={autoDraft && !q.isFetching ? briefFromBasis(data.basis?.raw) : undefined} onAutoDrafting={setDrafting} />
+                    autoBrief={autoDraft && !q.isFetching ? (basisBrief || briefFromEvent(ev)) : undefined}
+                    autoFrom={basisBrief ? "positioning" : "event"} onAutoDrafting={setDrafting} />
                 </div>
               </div>
             )}

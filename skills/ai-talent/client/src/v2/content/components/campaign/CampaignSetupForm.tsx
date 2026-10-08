@@ -17,10 +17,11 @@ import { faArrowRight } from "@fortawesome/free-solid-svg-icons";
 import { trpc } from "../../../../lib/trpc";
 import { CHANNEL_META, channelLabel } from "../../../platform/lib/channelMeta";
 import { CAMPAIGN_TYPES, EMPTY_CAMPAIGN_SETTINGS, type CampaignSettings } from "../../../strategy/lib/campaign/campaignSchema";
+import { briefFromEvent } from "../../../strategy/lib/campaign/campaignBasis";
 import { scopeValueFrom, UNDECIDED_SCOPE, type ProductScopeValue } from "../../../strategy/lib/eventProductScope";
 import EventProductScopePicker from "../../../strategy/components/events/EventProductScopePicker";
 
-export default function CampaignSetupForm({ eventId, data, brandProducts, hasPlan, en, onPlanned, onOpenKolBrief, autoBrief, onAutoDrafting }: {
+export default function CampaignSetupForm({ eventId, data, brandProducts, hasPlan, en, onPlanned, onOpenKolBrief, autoBrief, autoFrom = "positioning", onAutoDrafting }: {
   eventId: number;
   /** campaign.get 的結果 */
   data: any;
@@ -36,6 +37,8 @@ export default function CampaignSetupForm({ eventId, data, brandProducts, hasPla
    * 是草稿，類型與通路猜錯可以在「調整設定」改，或直接跟左邊的內容企劃說。失敗就停在這張表單。
    */
   autoBrief?: string;
+  /** autoBrief 是哪裡來的：活動定位，或新增活動視窗填的內容（2026-10-08）。只影響說明文字。 */
+  autoFrom?: "positioning" | "event";
   onAutoDrafting?: (running: boolean) => void;
 }) {
   const L = (zh: string, e: string) => (en ? e : zh);
@@ -57,7 +60,8 @@ export default function CampaignSetupForm({ eventId, data, brandProducts, hasPla
     if (s.partners?.kol && !s.channels.includes("kol")) s.channels = [...s.channels, "kol"];
     if (s.partners?.cobrand && !s.channels.includes("cobrand")) s.channels = [...s.channels, "cobrand"];
     setSettings(s);
-    setBrief((prev) => prev || s.mechanic || "");
+    // 還沒寫過優惠機制：先帶新增活動時填的名稱與主題，不讓使用者對著空格重寫一次（2026-10-08）。
+    setBrief((prev) => prev || s.mechanic || briefFromEvent(data.event));
     setScopeValue(scopeValueFrom(data.productScope, (data.products ?? []).map((p: any) => p.id)));
   }, [data]);   // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -134,14 +138,20 @@ export default function CampaignSetupForm({ eventId, data, brandProducts, hasPla
     <div className="flex flex-col gap-4">
       {auto === "running" && (
         <p className="text-small text-default-600 leading-relaxed" role="status">
-          {L("活動定位完成了。正在依定位排出第一版企劃草稿，大約 30 秒——排好之後，左邊可以直接用對話修改。",
-             "Positioning is done. Building a first draft plan from it (about 30s) — then edit it by chatting on the left.")}
+          {autoFrom === "event"
+            ? L("活動建好了。正在用你剛填的內容、品牌資料與搭配的產品排出第一版企劃草稿，大約 30 秒——排好之後，左邊可以直接用對話修改。",
+                "Event created. Building a first draft plan from what you entered, your brand and its products (about 30s) — then edit it by chatting on the left.")
+            : L("活動定位完成了。正在依定位排出第一版企劃草稿，大約 30 秒——排好之後，左邊可以直接用對話修改。",
+                "Positioning is done. Building a first draft plan from it (about 30s) — then edit it by chatting on the left.")}
         </p>
       )}
       {auto === "failed" && (
         <p className="text-small text-default-600 leading-relaxed">
-          {L("沒能自動排出企劃。下面是從活動定位帶過來的說明，補上優惠與期限後再按一次。",
-             "Couldn't build the plan automatically. The text below came from your positioning — add the offer and dates, then try again.")}
+          {autoFrom === "event"
+            ? L("沒能自動排出企劃。下面是你新增活動時填的內容，補上優惠與期限後再按一次。",
+                "Couldn't build the plan automatically. The text below is what you entered when creating the event — add the offer and dates, then try again.")
+            : L("沒能自動排出企劃。下面是從活動定位帶過來的說明，補上優惠與期限後再按一次。",
+                "Couldn't build the plan automatically. The text below came from your positioning — add the offer and dates, then try again.")}
         </p>
       )}
       <div className="flex flex-col gap-2">

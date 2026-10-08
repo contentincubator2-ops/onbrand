@@ -224,6 +224,8 @@ export const campaignRouter = router({
           id: Number(row.id), name: row.name, brandId: Number(row.brandId),
           startAt: row.startAt ? new Date(row.startAt).toISOString().slice(0, 10) : null,
           endAt: row.endAt ? new Date(row.endAt).toISOString().slice(0, 10) : null,
+          /** 新增活動視窗裡寫的「活動主題／重點」——排企劃的那段話先帶這個，不請使用者重寫一次。 */
+          note: typeof pos?.note === "string" ? pos.note.trim().slice(0, 800) : "",
         },
         settings: visibleSettings(pos.campaign),
         plan: visiblePlan((pos.campaignPlan ?? null) as CampaignPlan | null),

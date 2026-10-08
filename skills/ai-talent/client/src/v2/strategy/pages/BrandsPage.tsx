@@ -2423,7 +2423,7 @@ export default function BrandsPage() {
             <div style={{ padding: "16px 24px 32px" }}>
               {campaignSlots && (
                 <React.Suspense fallback={null}>
-                  <campaignSlots.Stage eventId={scope.eventId} brandId={scope?.brandId ?? brandId ?? null} />
+                  <campaignSlots.Stage key={scope.eventId} eventId={scope.eventId} brandId={scope?.brandId ?? brandId ?? null} />
                 </React.Suspense>
               )}
             </div>
@@ -2658,6 +2658,9 @@ export default function BrandsPage() {
             nextParams.set("cat", "campaign");
             nextParams.delete("p");
             nextParams.set("e", String(id));
+            // 2026-10-08（CJ「當我跳出視窗輸入後，下一步又要我輸入一次」）：視窗裡填的名稱、主題、
+            // 搭配的產品已經夠排第一版——帶 draft=1，進去直接排，不再問一次同一題。
+            nextParams.set("draft", "1");
             setSearchParams(nextParams, { replace: true });
           }
           else if (kind === "product") {
