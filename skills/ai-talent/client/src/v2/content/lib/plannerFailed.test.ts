@@ -5,6 +5,7 @@ describe("plannerFailed", () => {
   it("detects only failed scheduled rows", () => {
     expect(isFailedScheduled({ kind: "scheduled", status: "failed" })).toBe(true);
     expect(isFailedScheduled({ kind: "scheduled", status: "pending" })).toBe(false);
+    expect(isFailedScheduled({ kind: "scheduled", status: "pending", awaitingApproval: true, lastError: "approval hint" })).toBe(false);
     expect(isFailedScheduled({ kind: "published", status: "failed" })).toBe(false);
     expect(isFailedScheduled(null)).toBe(false);
   });
