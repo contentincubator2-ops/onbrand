@@ -1,10 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const mocks = vi.hoisted(() => ({ execute: vi.fn(), access: vi.fn(), sync: vi.fn() }));
+const mocks = vi.hoisted(() => ({ execute: vi.fn(), access: vi.fn(), sync: vi.fn(), client: vi.fn() }));
 vi.mock("../../localDb", () => ({ default: { execute: mocks.execute } }));
 vi.mock("../core/brandAuth", () => ({ assertBrandAccess: mocks.access }));
 vi.mock("../core/tenantGuard", () => ({ assertInputScopes: vi.fn() }));
 vi.mock("../core/teamAccess", () => ({ isPersonalPath: () => true }));
+vi.mock("../core/connectors/zernio", () => ({ createZernioClient: mocks.client }));
 vi.mock("../core/connectors/publish/zernioAdapter", () => ({ createZernioAdapter: () => ({ syncConnection: mocks.sync }) }));
 
 import { zernioConnectRouter } from "./zernioConnectRouter";
@@ -21,6 +22,52 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllEnvs());
 
 describe("Zernio connection status", () => {
+  it("reads only local connected Zernio accounts and returns exactly four platforms without an API key", async () => {
+    vi.stubEnv("ZERNIO_API_KEY", "");
+    mocks.execute.mockResolvedValue([[
+      { platform: "facebook", accountId: "fb-id", accountLabel: "Page", accountUsername: "page-user" },
+      { platform: "instagram", accountId: "ig-id", accountLabel: null, accountUsername: "ig-user" },
+      { platform: "linkedin", accountId: "li-id", accountLabel: null, accountUsername: null },
+      { platform: "youtube", accountId: "yt-id", accountLabel: "Hidden" },
+    ]]);
+    expect(await caller().connections({ brandId: 7 })).toEqual({
+      facebook: { connected: true, accountName: "Page" },
+      instagram: { connected: true, accountName: "ig-user" },
+      linkedin: { connected: true, accountName: "li-id" },
+      threads: { connected: false, accountName: null },
+    });
+    expect(mocks.access).toHaveBeenCalledWith(11, 7);
+    expect(mocks.execute).toHaveBeenCalledTimes(1);
+    expect(mocks.execute).toHaveBeenCalledWith(
+      expect.stringMatching(/^SELECT[\s\S]*FROM brand_publish_connections\s+WHERE brandId = \? AND provider = \? AND status = 'connected'$/),
+      [7, "zernio"],
+    );
+    expect(mocks.client).not.toHaveBeenCalled();
+    expect(mocks.sync).not.toHaveBeenCalled();
+  });
+
+  it("returns disconnected defaults when there are no local connections", async () => {
+    expect(await caller().connections({ brandId: 7 })).toEqual({
+      facebook: { connected: false, accountName: null },
+      instagram: { connected: false, accountName: null },
+      linkedin: { connected: false, accountName: null },
+      threads: { connected: false, accountName: null },
+    });
+  });
+
+  it("checks brand access before reading connections", async () => {
+    mocks.access.mockRejectedValue(new Error("No brand access"));
+    await expect(caller().connections({ brandId: 7 })).rejects.toThrow("No brand access");
+    expect(mocks.execute).not.toHaveBeenCalled();
+  });
+
+  it("keeps the social publishing feature gate on the read-only query", async () => {
+    vi.stubEnv("SOCIAL_PUBLISH_ENABLED", "false");
+    await expect(caller().connections({ brandId: 7 })).rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
+    expect(mocks.execute).not.toHaveBeenCalled();
+    expect(mocks.client).not.toHaveBeenCalled();
+  });
+
   it("reports Zernio for every platform even with an obsolete environment switch", async () => {
     vi.stubEnv("PUBLISH_PROVIDER", "bundle");
     const providers = await caller().getProviders();

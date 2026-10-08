@@ -152,6 +152,7 @@ describe("permissionNeeded：每種呼叫需要什麼權限", () => {
     ["zernioConnect.getConnectUrl", "mutation", "manage"],
     ["zernioConnect.getConnectionStatus", "mutation", "manage"],
     ["zernioConnect.getProviders", "query", "view"],
+    ["zernioConnect.connections", "query", "view"],
   ])("%s（%s）→ %s", (path, type, need) => {
     expect(permissionNeeded(path, type)).toBe(need);
   });

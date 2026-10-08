@@ -4,10 +4,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   providers: {} as Record<string, string>, status: vi.fn(), connect: vi.fn(), disconnect: vi.fn(), lang: "en",
+  connections: {} as Record<string, { connected: boolean; accountName: string | null }>,
 }));
 vi.mock("../../../../lib/trpc", () => ({ trpc: {
   zernioConnect: {
     getProviders: { useQuery: () => ({ data: mocks.providers }) },
+    connections: { useQuery: () => ({ data: mocks.connections }) },
     getConnectUrl: { useMutation: () => ({ mutateAsync: mocks.connect }) },
     getConnectionStatus: { useMutation: () => ({ mutateAsync: mocks.status }) },
     disconnect: { useMutation: () => ({ mutateAsync: mocks.disconnect }) },
@@ -33,6 +35,8 @@ describe("PublishTab Zernio focus refresh", () => {
   beforeEach(() => {
     (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
     mocks.lang = "en";
+    mocks.connections = Object.fromEntries(["facebook", "instagram", "linkedin", "threads"].map(platform =>
+      [platform, { connected: false, accountName: null }]));
     mocks.disconnect.mockReset().mockResolvedValue(undefined);
     mocks.providers = { facebook: "zernio", linkedin: "zernio", instagram: "zernio" };
     mocks.status.mockReset().mockResolvedValue({ connected: false, account: null, pendingScheduled: 0, legacyConnected: false });
@@ -49,6 +53,30 @@ describe("PublishTab Zernio focus refresh", () => {
     vi.restoreAllMocks();
     window.history.replaceState({}, "", "/");
     delete (globalThis as any).IS_REACT_ACT_ENVIRONMENT;
+  });
+  it("keeps the local connected account visible when status sync is forbidden", async () => {
+    mocks.connections.facebook = { connected: true, accountName: "Local Page" };
+    mocks.status.mockRejectedValue(Object.assign(new Error("FORBIDDEN"), { data: { code: "FORBIDDEN" } }));
+    const alert = vi.spyOn(window, "alert").mockImplementation(() => {});
+    window.history.replaceState({}, "", "/?b=3&connected=facebook");
+    await act(async () => root!.render(<PublishTab brandId={3} />));
+    await act(async () => { window.dispatchEvent(new Event("focus")); });
+    expect(container.textContent).toContain("Local Page");
+    expect(container.textContent).toContain("Connected");
+    expect(container.textContent).not.toContain("Connect Facebook");
+    expect(container.textContent).toContain("Connect Instagram");
+    expect(container.textContent).not.toContain("Re-authorization required");
+    expect(alert).not.toHaveBeenCalled();
+  });
+  it("uses local state while syncing and lets a successful sync override it", async () => {
+    mocks.connections.facebook = { connected: true, accountName: "Local Page" };
+    let resolveStatus!: (value: unknown) => void;
+    mocks.status.mockImplementationOnce(() => new Promise(resolve => { resolveStatus = resolve; }));
+    await act(async () => root!.render(<PublishTab brandId={3} />));
+    expect(container.textContent).toContain("Local Page");
+    await act(async () => resolveStatus({ connected: false, account: null, pendingScheduled: 0, legacyConnected: false }));
+    expect(container.textContent).not.toContain("Local Page");
+    expect(container.textContent).toContain("Connect Facebook");
   });
   it("prefetches four connect URLs sequentially while querying statuses in parallel", async () => {
     const platforms = ["facebook", "instagram", "linkedin", "threads"];

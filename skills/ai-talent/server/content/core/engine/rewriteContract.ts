@@ -59,5 +59,89 @@ export function rewriteContractBlock(spec: RewriteSpec): string {
 
 /** 太長時的第二次要求。 */
 export function shortenRequest(text: string, spec: RewriteSpec): string {
-  return `這版 ${countChars(text)} 字，超過上限 ${spec.maxChars} 字。請保留你的寫法與重點，把整篇濃縮到 ${spec.maxChars} 字以內，照原本的格式（先 1–2 句說明，空三行，再給完整文案）回覆。`;
+  return `這版 ${countChars(text)} 字，超過上限 ${spec.maxChars} 字。請保留你的寫法與重點，把整篇濃縮到 ${spec.maxChars} 字以內，照原本的格式（${EXPLAIN_MARK} 1–2 句，再 ${COPY_MARK} 完整文案）回覆。`;
+}
+
+/**
+ * 2026-10-08（CJ「我請他調整，他把內心話寫在貼文了」）：用戶只說「檢查用詞」，AI 在說明之後
+ * 反問「你是想要我直接提出用詞修改清單，還是要我改寫整篇文案？」——舊的解析把空三行之後的
+ * 那段一律當文案，這句就被存成貼文本文。
+ *
+ * 同一套四件套：
+ *   1. 回覆用明確標記分段（不再靠空行猜）
+ *   2. prompt 明講不反問、文案段只能放成品
+ *   3. 驗證：文案段看起來是在跟用戶講話 → 重試一次
+ *   4. 還是不行 → 不回文案（呼叫端不覆蓋本文），那段話只進對話框
+ */
+export const EXPLAIN_MARK = "【說明】";
+export const COPY_MARK = "【文案】";
+
+/** 接在 system prompt 裡的回覆格式。 */
+export function replyFormatBlock(): string {
+  return [
+    "回覆格式（兩段都要有，標記照抄）：",
+    `${EXPLAIN_MARK}`,
+    // 用「我」當主詞：以「用戶希望…」開頭會被 llm.ts 的 CoT 偵測當成內心獨白整則退掉。
+    "用一兩句直接告訴用戶你改了哪裡，用「我」當主詞（例：我把宣告的語氣改成邀請）。",
+    `${COPY_MARK}`,
+    "完整的修改後文案（不要省略，不要寫「如下」）。",
+    "",
+    `${COPY_MARK}之後只能放可以直接發布的成品——不能出現對用戶說的話、問題、選項、修改清單。`,
+    "不要反問用戶。意見不夠具體時（例如「檢查用詞」「再順一點」），自己判斷後直接改完，改了什麼寫在說明裡。",
+    `真的沒有需要改的地方，${COPY_MARK}就放原文，並在說明裡講為什麼不用改。`,
+  ].join("\n");
+}
+
+const HR = /\n+[-—_*]{3,}\s*\n+/;
+
+/** 把模型回覆拆成「說明」與「文案」。有標記用標記；沒有才退回舊的空三行／分隔線。 */
+export function parseRewriteReply(raw: string): { explanation: string; rewritten: string } {
+  const text = (raw ?? "").trim();
+  let explanation = "";
+  let rewritten = text;
+  const at = text.indexOf(COPY_MARK);
+  if (at >= 0) {
+    explanation = text.slice(0, at);
+    rewritten = text.slice(at + COPY_MARK.length);
+  } else {
+    let parts = text.split(/\n\n\n+/);
+    // 2026-07-07（/run/2887 實測）：模型有時用 markdown 分隔線代替空行。
+    if (parts.length === 1) parts = text.split(HR);
+    if (parts.length > 1) {
+      explanation = parts[0] ?? "";
+      rewritten = parts.slice(1).join("\n\n");
+    }
+  }
+  explanation = explanation.replace(EXPLAIN_MARK, "").replace(/^[\s:：]+/, "").trim();
+  rewritten = rewritten
+    .replace(/^[\s:：]+/, "")
+    .replace(/^(?:[-—_*]{3,}\s*\n+)+/, "")
+    .replace(/\n+(?:[-—_*]{3,}\s*)+$/, "")
+    .trim();
+  return { explanation, rewritten: stripMarkdown(rewritten) };
+}
+
+/** AI 對用戶講話時才會出現的句子（成品文案的「你」是讀者，不會問讀者要不要改稿）。 */
+const TALKING_TO_USER = new RegExp([
+  "你是?想要我", "還是要我", "要我(?:直接|幫你|改寫|重寫|調整|提出)", "需要我(?:直接|幫你|改寫|重寫|調整|提出)",
+  "請(?:告訴|提供給?)我", "請問你", "我理解你的意見", "我重新檢查", "我可以(?:幫|為)你",
+  "修改(?:清單|建議)(?:如下|：|:)", "以下是(?:修改|調整|我的)",
+  "would you like me to", "do you want me to", "should i (?:rewrite|revise|list)", "let me know (?:if|which|how)",
+].join("|"), "i");
+
+/**
+ * 文案段其實是在跟用戶講話（反問、說明、清單），不是能發出去的成品。
+ * 兩個條件都要成立才算，避免誤傷正常文案：有對用戶講話的句子，而且明顯比原文短
+ * （真的改寫不會只剩一兩句）。空的也算。
+ */
+export function looksLikeReplyToUser(rewritten: string, original: string): boolean {
+  const t = (rewritten ?? "").trim();
+  if (!t) return true;
+  if (!TALKING_TO_USER.test(t)) return false;
+  return countChars(t) < Math.max(60, countChars(original ?? "") * 0.5);
+}
+
+/** 文案段不是成品時的第二次要求。 */
+export function copyOnlyRequest(): string {
+  return `你在${COPY_MARK}放的是對我說的話，不是貼文。不要問我，照你的判斷直接改完，用同樣格式回覆：${EXPLAIN_MARK} 1–2 句，再 ${COPY_MARK} 可以直接發布的完整文案。`;
 }

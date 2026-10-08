@@ -1,0 +1,94 @@
+name: Ops (DEV) — probe "ask the writer to change it" never asks back (read-only)
+
+# CJ 2026-10-08「我請他調整，他把內心話寫在貼文了」：只說「檢查用詞」，AI 反問
+# 「你是想要我直接提出用詞修改清單，還是要我改寫整篇文案？」，那句被存成貼文本文。
+# 在 DEV VM 上用「這個分支」的 rewriteContract.ts（回覆格式＋解析＋驗證）打真的模型，
+# 帶真的品牌大腦，丟幾句最模糊的意見，看文案段是不是都是能發的成品。
+# 不寫資料庫。花費：每句意見一次模型呼叫（被判定為對話的再加一次重試）。
+# Path-scoped push，跟 op-probe-dev-influencer.yml 同一個做法（environment: dev 才會連到 DEV VM）。
+on:
+  push:
+    paths:
+      - '.github/workflows/op-probe-dev-refine-no-ask-back.yml'
+
+jobs:
+  probe:
+    runs-on: ubuntu-24.04
+    environment: dev
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Pack this branch's rewriteContract.ts
+        run: echo "PATCH_B64=$(gzip -c skills/ai-talent/server/content/core/engine/rewriteContract.ts | base64 -w0)" >> "$GITHUB_ENV"
+      - name: Send vague feedback, check what lands in the copy
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          PATCH_B64: ${{ env.PATCH_B64 }}
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 8m
+          envs: PATCH_B64
+          script: |
+            set +e
+            cd /opt/onbrand/current/skills/ai-talent
+            set -a; source .env 2>/dev/null; set +a
+            echo "host=$(hostname)  app=$(readlink -f /opt/onbrand/current)  now=$(date -u +%FT%TZ)"
+            D=server/content/core/engine
+            echo "$PATCH_B64" | base64 -d | gunzip > "$D/_probeContract.ts"
+            cat > "$D/_probe_tmp.ts" <<'TS'
+            import localPool from "../../../localDb";
+            import { buildBrandPrefix } from "../../../strategy/core/brand/brandContext";
+            import { callModel } from "../../../platform/core/llm/multiModelRouter";
+            import * as contract from "./_probeContract";
+
+            const CAPTION =
+              "GO 曠野地帶回來了。訓練家們，帶上你的夥伴，一起走進這片還沒被探索過的天空之下，" +
+              "這一季最稀有的寶可夢正在等你。集合地點與時間都在活動頁，現在就約好你的隊友。\n\n" +
+              "#PokémonGO #GO曠野地帶 #訓練家集合 #ForeverForward";
+            const FEEDBACKS = ["檢查用詞", "再順一點", "你覺得呢", "幫我看看有沒有問題", "check the wording"];
+            (async () => {
+              const [b]: any = await localPool.execute("SELECT id, name FROM brands WHERE name LIKE 'Pok%mon GO%' ORDER BY id DESC LIMIT 1");
+              const brand = b[0] ?? null;
+              const brandPrefix = brand ? await buildBrandPrefix(brand.id, null, null, "full", "facebook").catch(() => "") : "";
+              console.log(`brand=${brand?.id ?? "-"} ${brand?.name ?? "(none — no brand brain)"}  brandPrefix chars=${brandPrefix.length}`);
+              const system =
+                `你是 Lukman Hakim（Social Media Strategist），正在跟用戶討論這篇文案的修改方向。\n` +
+                `任務：根據用戶的修改意見，**重寫**整篇文案。\n` +
+                contract.replyFormatBlock() + `\n\n` +
+                `重要：保留原本能用的部分，只動用戶提到的地方。語氣自然口語。\n` +
+                brandPrefix +
+                contract.rewriteContractBlock({ label: "FB 動態貼文" });
+              let bad = 0, retried = 0;
+              for (const fb of FEEDBACKS) {
+                const messages: any[] = [
+                  { role: "system", content: system },
+                  { role: "user", content: `這是目前的文案：\n\n${CAPTION}` },
+                  { role: "user", content: fb },
+                ];
+                const r = await callModel(messages, undefined, "anthropic");
+                let p = contract.parseRewriteReply(r.content ?? "");
+                const marked = (r.content ?? "").includes(contract.COPY_MARK);
+                let leaked = contract.looksLikeReplyToUser(p.rewritten, CAPTION);
+                if (leaked) {
+                  retried++;
+                  console.log(`  第一次回的是對話：${p.rewritten.slice(0, 120)}`);
+                  const r2 = await callModel([...messages, { role: "assistant", content: r.content ?? "" }, { role: "user", content: contract.copyOnlyRequest() }], undefined, "anthropic");
+                  p = contract.parseRewriteReply(r2.content ?? "");
+                  leaked = contract.looksLikeReplyToUser(p.rewritten, CAPTION);
+                }
+                if (leaked) bad++;
+                console.log(`\n=== 意見「${fb}」 model=${(r as any).model ?? "?"} 有標記=${marked} 最後仍是對話=${leaked}`);
+                console.log(`[說明] ${p.explanation}`);
+                console.log(`[文案] ${p.rewritten}`);
+              }
+              console.log(`\nRESULT ${FEEDBACKS.length - bad}/${FEEDBACKS.length} 則文案段是成品（其中 ${retried} 則靠重試）`);
+              process.exit(bad ? 1 : 0);
+            })().catch((e) => { console.log("probe failed:", e?.message); process.exit(1); });
+            TS
+            timeout 420 ./node_modules/.bin/tsx "$D/_probe_tmp.ts"
+            code=$?
+            echo "probe exit=$code"
+            rm -f "$D/_probe_tmp.ts" "$D/_probeContract.ts"
+            exit $code

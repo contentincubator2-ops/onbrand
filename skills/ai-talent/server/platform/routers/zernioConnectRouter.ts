@@ -7,6 +7,7 @@ import { createZernioClient } from "../core/connectors/zernio";
 import { createZernioAdapter } from "../core/connectors/publish/zernioAdapter";
 import { PublishUserError } from "../core/connectors/publish/publishAdapter";
 import { getPublishProvider } from "../core/connectors/publish/publishProvider";
+import { listConnectedByBrand } from "../core/connectors/publish/connectionStore";
 
 const PLATFORMS = ["facebook", "instagram", "linkedin", "threads", "x", "youtube", "tiktok"] as const;
 const connectionInput = z.object({ brandId: z.number().int().positive(), platform: z.enum(PLATFORMS) });
@@ -38,6 +39,18 @@ async function connectAction<T>(action: () => Promise<T>): Promise<T> {
   }
 }
 export const zernioConnectRouter = router({
+  connections: socialProcedure.input(z.object({ brandId: z.number().int().positive() })).query(async ({ ctx, input }) => {
+    await assertBrandAccess(ctx.user.id, input.brandId);
+    const { default: pool } = await import("../../localDb");
+    const accounts = await listConnectedByBrand(pool, input.brandId, "zernio");
+    const status = (platform: string) => {
+      const account = accounts.find(account => account.platform === platform);
+      return { connected: !!account, accountName: account
+        ? account.accountLabel ?? account.accountUsername ?? account.accountId : null };
+    };
+    return { facebook: status("facebook"), instagram: status("instagram"),
+      linkedin: status("linkedin"), threads: status("threads") };
+  }),
   getProviders: socialProcedure.query(() => ({
     facebook: getPublishProvider("facebook"), instagram: getPublishProvider("instagram"),
     linkedin: getPublishProvider("linkedin"), threads: getPublishProvider("threads"), x: getPublishProvider("x"),

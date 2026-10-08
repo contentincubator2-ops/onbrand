@@ -17,6 +17,7 @@
  *   ↻ 重跑  ✕ 關閉
  */
 import { publishSettingsUrl } from "../../platform/lib/publishSettingsUrl";
+import { shouldShowConnectHint } from "../lib/shouldShowConnectHint";
 import { localizeSource } from "../../platform/lib/taskEn";
 import React, { useMemo, useState, useEffect, useRef } from "react";
 import { Link, useParams, useNavigate, useSearchParams } from "react-router-dom";
@@ -69,6 +70,7 @@ import { fireNudge } from "../../platform/components/mia/miaNudges";
 import ReviewBar from "../../platform/components/review/ReviewBar";
 import PerfTagPicker from "../components/PerfTagPicker";
 import WriterDesk, { type DeskWriter } from "../components/WriterDesk";
+import RefineNotesList from "../components/RefineNotesList";
 import { agentLabel, agentTitle } from "../../platform/lib/agentName";
 import { friendlyError } from "../../platform/lib/friendlyError";
 import BrandConsistencyNote, { pickBrandRecord } from "../components/BrandConsistencyNote";
@@ -137,6 +139,12 @@ export default function RunPage() {
         return false;
       },
     },
+  );
+
+  const publishBrandId = data?.mission?.brandId ?? data?.brand?.id;
+  const connectionsQ = trpc.zernioConnect.connections.useQuery(
+    { brandId: publishBrandId ?? 0 },
+    { enabled: !!publishBrandId },
   );
 
   const [activeIdx, setActiveIdx] = useState(0);
@@ -1186,6 +1194,8 @@ export default function RunPage() {
           : `改寫失敗：${typeof r.error === "string" ? r.error : "未知錯誤"}`);
         return;
       }
+      // 2026-10-08：回來的不是能發的文案（AI 在反問）→ 不動本文。
+      if (!r.rewritten) { showToastGlobal(lang === "en" ? "The rewrite didn't come back — try again." : "這次沒改成，再試一次。"); return; }
       if (!shouldApplyMutationPreview(activeSelectionKeyRef.current, locator)) return;
       setDeskUndo(null); setChatHistory([]);
       await commitDeskCaption(r.rewritten, w, r.regulationCompliance);
@@ -1209,6 +1219,8 @@ export default function RunPage() {
         agentId: w.agentId, agentName: w.name, agentTitle: w.title,
         ...deskScope,
         history: chatHistory.slice(-12),
+        // 2026-10-08：帶上是哪一篇的哪個版本——先前的修改意見存在伺服器，重新整理也還在。
+        outputId: id, ...locator,
       });
       if (!r.ok) {
         showToastGlobal(lang === "en"
@@ -1217,12 +1229,21 @@ export default function RunPage() {
         return false;
       }
       if (!shouldApplyMutationPreview(activeSelectionKeyRef.current, locator)) return false;
+      // 2026-10-08：AI 回的是話不是文案（反問／說明）→ 只進對話，本文原樣不動。
+      if (!r.rewritten) {
+        setChatHistory((h) => [...h,
+          { role: "user", content: text },
+          { role: "assistant", content: r.explanation || (lang === "en" ? "I didn't change the draft — tell me which part to change." : "這次沒有動本文，再跟我說要改哪裡。") },
+        ]);
+        return true;
+      }
       setChatHistory((h) => [...h,
         { role: "user", content: text },
         { role: "assistant", content: r.explanation || (lang === "en" ? "Done — updated the draft." : "改好了，已更新本文。") },
       ]);
       setDeskUndo({ key: activeSelectionKey, caption: before });
       await commitDeskCaption(r.rewritten, undefined, r.regulationCompliance);
+      (utils as any)?.quickTask?.refineNotes?.invalidate?.({ outputId: id });
       return true;
     } catch (e: any) {
       showToastGlobal(lang === "en" ? `Error: ${friendlyErr(e, true)}` : `錯誤：${friendlyErr(e, false)}`);
@@ -2649,6 +2670,7 @@ export default function RunPage() {
                   onPick={pickDeskWriter}
                   leadReason={renderWhyWritten()}
                   chatHistory={chatHistory}
+                  notes={<RefineNotesList outputId={id} locator={getRunContentMutationLocator(selectedContentKind, activeIdx)} en={lang === "en"} />}
                   chatBusy={deskChatBusy}
                   onSend={sendDeskChat}
                   canUndo={!!deskUndo && deskUndo.key === activeSelectionKey}
@@ -2709,7 +2731,9 @@ export default function RunPage() {
                           productId: (data as any)?.metadata?.productId ?? undefined,
                           eventId: (data as any)?.metadata?.eventId ?? undefined,
                           history: chatHistory,
+                          outputId: id, ...locator,
                         });
+                        (utils as any)?.quickTask?.refineNotes?.invalidate?.({ outputId: id });
                         if (r.ok) {
                           if (shouldApplyMutationPreview(activeSelectionKeyRef.current, locator)) {
                             setChatHistory(h => [
@@ -2717,7 +2741,7 @@ export default function RunPage() {
                               { role: "user", content: chatPrompt },
                               { role: "assistant", content: r.explanation || (lang === "en" ? "(rewritten)" : "(已改寫)") },
                             ]);
-                            setAiPreview({ text: r.rewritten, locator, compliance: r.regulationCompliance });
+                            if (r.rewritten) setAiPreview({ text: r.rewritten, locator, compliance: r.regulationCompliance });
                             setChatPrompt("");
                           }
                         } else {
@@ -3349,7 +3373,9 @@ export default function RunPage() {
                               productId: (data as any)?.metadata?.productId ?? undefined,
                               eventId: (data as any)?.metadata?.eventId ?? undefined,
                             });
-                            if (r.ok) {
+                            if (r.ok && !r.rewritten) {
+                              showToastGlobal(lang === "en" ? "The rewrite didn't come back — try again." : "這次沒改成，再試一次。");
+                            } else if (r.ok) {
                               if (shouldApplyMutationPreview(activeSelectionKeyRef.current, locator)) {
                                 setRewritePreview({ agent: a.name, text: r.rewritten, locator, compliance: r.regulationCompliance });
                               }
@@ -3412,10 +3438,10 @@ export default function RunPage() {
             </CardBody>
           </Card>
 
-          {(data?.mission?.brandId ?? data?.brand?.id) && (
+          {!!publishBrandId && shouldShowConnectHint(effectiveVariant?.platform, connectionsQ.isSuccess ? connectionsQ.data : undefined) && (
             <p className="text-small text-default-500">
               {lang === "en" ? "Need to connect a publishing account? " : "發布帳號尚未連接？"}
-              <Link className="text-primary underline" to={publishSettingsUrl(data?.mission?.brandId ?? data?.brand?.id)}>
+              <Link className="text-primary underline" to={publishSettingsUrl(publishBrandId)}>
                 {lang === "en" ? "Connect" : "去連接"}
               </Link>
             </p>
@@ -3656,5 +3682,4 @@ export default function RunPage() {
     </div>
   );
 }
-
 

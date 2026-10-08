@@ -5,7 +5,7 @@
  * 通路真的有的、寫好的不能動。這支是「對話會不會把企劃改壞」的唯一守門員。
  */
 import { describe, it, expect } from "vitest";
-import { validateCampaignOps, parseChatReply, pickHandoff, chatWindow, validateDates, reflowForDates, reportNote, draftManualItem, type CampaignOpsReport } from "./campaignChat";
+import { validateCampaignOps, parseChatReply, pickHandoff, chatWindow, validateDates, reflowForDates, reportNote, draftManualItem, chatChannels, type CampaignOpsReport } from "./campaignChat";
 import { rosterRoles } from "./campaignRoster";
 import type { CampaignPlan } from "./campaignPlan";
 import type { CatalogTask } from "../catalog/taskCatalogIndex";
@@ -391,5 +391,50 @@ describe("活動日期可以在對話裡改", () => {
   it("parseChatReply 把 dates 帶出來", () => {
     expect(parseChatReply(`{"reply":"好","ops":[],"dates":{"startAt":"2026-10-25","endAt":"2026-11-07"}}`)?.dates)
       .toEqual({ startAt: "2026-10-25", endAt: "2026-11-07" });
+  });
+});
+
+describe("對話只排進這檔活動選的通路（2026-10-08 CJ：只選 FB 卻跳出 Instagram）", () => {
+  const fbOnly: CampaignPlan = { ...plan, items: plan.items.filter((i) => i.platform === "facebook") };
+  const addIg = { ops: [{ op: "add", phase: "sustain", date: "2026-11-05", platform: "instagram", taskId: "ig-a", angle: "加一篇講使用情境" }] };
+
+  it("活動只選 FB：可用通路只有 facebook，沒點名的 IG 不放行", () => {
+    const c = chatChannels({ selected: ["facebook"], plan: fbOnly, said: ["幫我多加一篇 FB 貼文"] });
+    expect(c).toEqual({ own: ["facebook"], asked: [], allowed: ["facebook"] });
+  });
+
+  it("模型還是回了 instagram：擋掉，而且記下來跟使用者說", () => {
+    const report: CampaignOpsReport = { outOfWindow: [], writtenKept: 0, window };
+    const out = validateCampaignOps({ raw: addIg, plan: fbOnly, cards, window, newId, report, channels: ["facebook"] });
+    expect(out.ops).toEqual([]);
+    expect(report.offChannel).toEqual(["instagram"]);
+    expect(reportNote(report, false, false)).toContain("沒有選 Instagram");
+  });
+
+  it("既有的篇也不能被換到沒選的通路", () => {
+    const out = validateCampaignOps({ raw: { ops: [{ op: "update", id: "launch-1", platform: "instagram" }] }, plan: fbOnly, cards, window, newId, channels: ["facebook"] });
+    expect(out.ops).toEqual([]);
+  });
+
+  it("使用者親口點名 IG：放行", () => {
+    const c = chatChannels({ selected: ["facebook"], plan: fbOnly, said: ["再幫我加一篇IG貼文"] });
+    expect(c.asked).toEqual(["instagram"]);
+    const out = validateCampaignOps({ raw: addIg, plan: fbOnly, cards, window, newId, channels: c.allowed });
+    expect(out.ops).toHaveLength(1);
+  });
+
+  it("不會把一般字眼誤認成點名通路", () => {
+    const c = chatChannels({ selected: ["facebook"], plan: fbOnly, said: ["big sale 的 headline 要講脆皮，deadline 前上線"] });
+    expect(c.asked).toEqual([]);
+  });
+
+  it("企劃裡已經有的通路、勾了網紅合作，都算這檔活動的通路", () => {
+    const c = chatChannels({ selected: ["facebook"], partners: { kol: true }, plan, said: [] });
+    expect(c.own).toEqual(["facebook", "instagram", "kol"]);
+  });
+
+  it("活動沒有任何通路設定（舊資料）：跟改版前一樣全部放行", () => {
+    const c = chatChannels({ selected: [], plan: { items: [] }, said: [] });
+    expect(c.allowed).toContain("instagram");
   });
 });
