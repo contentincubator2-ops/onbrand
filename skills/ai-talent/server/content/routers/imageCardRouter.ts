@@ -32,7 +32,8 @@ import { contentSelectorFields, updateOutputContent } from "../core/engine/outpu
 import { applyVariantImageUpdate } from "../core/image/variantImageUpdate";
 import { recordTaskRun } from "../../platform/core/ops/recordTaskRun";
 import { resolveBrandVisualContext } from "../core/image/imageGen";
-import { localCoverFile, fetchImageBuffer } from "../../platform/core/media/imageFetch";
+import { fetchImageBuffer } from "../../platform/core/media/imageFetch";
+import { isOwnCoverUrl } from "../../platform/core/media/mediaStore";
 import { brandOwnsProductPhoto } from "./imageRouter";
 import { brandOwnsLibraryPhoto } from "../../strategy/core/brand/assetPhotos";
 
@@ -214,7 +215,7 @@ export const imageCardRouter = router({
       if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED" });
       await assertBrandOwner(ctx.user.id, input.brandId);
       const spec = specOr404(input.cardId);
-      if (input.referenceImageUrl && !localCoverFile(input.referenceImageUrl)) {
+      if (input.referenceImageUrl && !isOwnCoverUrl(input.referenceImageUrl)) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "參考圖只能是這裡產出的圖片。" });
       }
       if (input.productImageUrl && !(await productPhotoAllowed(input.brandId, input.productImageUrl))) {
@@ -394,7 +395,7 @@ export const imageCardRouter = router({
       if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED" });
       await assertBrandOwner(ctx.user.id, input.brandId);
       const spec = specOr404(input.cardId);
-      if (input.imageUrls.some((u) => !localCoverFile(u))) {
+      if (input.imageUrls.some((u) => !isOwnCoverUrl(u))) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "只能存這裡產出的圖片。" });
       }
       if (input.imageUrls.length > spec.maxImages) {

@@ -14,6 +14,7 @@ import { userApiKeys } from "../../../drizzle/schema";
 import { eq, and, sql } from "drizzle-orm";
 import { invokeLLM } from "../../platform/core/llm/llm";
 import { assertBrandOwner } from "../../platform/core/brandAuth";
+import { saveCoverFile } from "../../platform/core/media/mediaGen";
 import { isPositioningLocked } from "../core/positioning/positioningLock";
 
 // Helper to get user's API key
@@ -965,29 +966,21 @@ export const brandRouter = router({
         }
 
         // Download + persist
-        const { mkdirSync, writeFileSync } = await import("fs");
-        const { join } = await import("path");
-        // 2026-05-28: updated default to match infra rename /opt/marketing-os → /opt/onbrand
-        const COVERS_DIR = process.env.COVERS_DIR ?? "/opt/onbrand/covers";
-        const COVERS_URL_PREFIX = process.env.COVERS_URL_PREFIX ?? "/static/covers";
-        mkdirSync(COVERS_DIR, { recursive: true });
         const fileId = `brand-${input.brandId}-fb-${Date.now()}.jpg`;
-        const filePath = join(COVERS_DIR, fileId);
         const buf = Buffer.from(await r.arrayBuffer());
         if (buf.length < 200) {
           throw new Error("downloaded image suspiciously small (likely a 404 placeholder)");
         }
-        writeFileSync(filePath, buf);
-        const localUrl = `${COVERS_URL_PREFIX}/${fileId}`;
+        const logoUrl = await saveCoverFile(buf, fileId);
 
         // Update brand.logoUrl
-        await db.update(brands).set({ logoUrl: localUrl })
+        await db.update(brands).set({ logoUrl })
           .where(and(eq(brands.id, input.brandId), eq(brands.userId, ctx.user.id)));
 
         return {
           ok: true,
           handle,
-          logoUrl: localUrl,
+          logoUrl,
           remoteUrl: imageUrl,
           bytes: buf.length,
         };

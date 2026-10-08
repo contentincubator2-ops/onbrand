@@ -1,6 +1,8 @@
 import { promises as fs } from "fs";
 import { join } from "path";
 import { assertUrlSafe } from "../web/urlGuard";
+import { getMediaStore, localCoverFile } from "./mediaStore";
+export { localCoverFile } from "./mediaStore";
 
 const DEFAULT_TIMEOUT_MS = 10_000;
 const DEFAULT_MAX_BYTES = 20 * 1024 * 1024;
@@ -74,26 +76,6 @@ export function localUploadFile(url: unknown): string | null {
   if (!m || m[3]!.includes("..")) return null;
   const root = process.env.ASSET_PHOTO_DIR ?? join(process.cwd(), "storage", "asset-photos");
   return join(root, m[1]!, m[2]!, m[3]!);
-}
-
-/**
- * 生成好的圖會被下載到 COVERS_DIR，對外是 `/static/covers/<檔名>`（單層、沒有子目錄，
- * 見 mediaGen.ts）。
- *
- * 2026-09-25（CJ「我想增加一個功能，可以儲存在現有產品下」）：實跑 probe 才發現這條
- * 路是斷的——`/static/covers/…` 既不是 http(s) 也不在上傳目錄底下，於是走進 SSRF guard
- * 被判 "invalid URL"，畫面上只會看到「存不進去」。伺服器要讀的是**自己剛剛寫下的檔案**，
- * 本來就不該繞公開網址回打自己。
- *
- * 一樣只認固定前綴＋單段檔名＋不含 `..`，碰不到 covers 目錄以外的東西。
- */
-export function localCoverFile(url: unknown): string | null {
-  if (typeof url !== "string") return null;
-  const prefix = (process.env.COVERS_URL_PREFIX ?? "/static/covers").replace(/\/+$/, "");
-  if (!url.startsWith(prefix + "/")) return null;
-  const name = url.slice(prefix.length + 1);
-  if (!/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(name) || name.includes("..")) return null;
-  return join(process.env.COVERS_DIR ?? "/opt/onbrand/covers", name);
 }
 
 /**
@@ -210,6 +192,16 @@ export async function fetchImageBuffer(
 ): Promise<{ buffer: Buffer; mime: string }> {
   const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   const maxBytes = options.maxBytes ?? DEFAULT_MAX_BYTES;
+  const store = getMediaStore();
+  if (store.owns(url)) {
+    const buffer = await store.get(url);
+    if (buffer !== null) {
+      if (buffer.length > maxBytes) throw new InvalidImageResponseError("產品圖片連結已失效：圖片檔案過大");
+      const mime = detectRasterImageMime(buffer);
+      if (!mime) throw invalidImageBytes();
+      return { buffer, mime };
+    }
+  }
   const local = localStaticFile(url);
   if (local) {
     let buffer: Buffer;

@@ -8,8 +8,7 @@
  * 比例鐵律見 platformImageSpecs.ts：生成當下鎖死，事後只等比縮放，比例不符就算失敗。
  */
 
-import { mkdirSync, writeFileSync } from "fs";
-import { join } from "path";
+import { coverContentType, getMediaStore } from "../../../platform/core/media/mediaStore";
 import {
   type PlatformImageSpec,
   canvasPromptBlock,
@@ -222,9 +221,6 @@ export interface RenderOutcome {
   canSwitchTo?: "nano-banana";
 }
 
-const COVERS_DIR = process.env.COVERS_DIR ?? "/opt/onbrand/covers";
-const COVERS_URL_PREFIX = process.env.COVERS_URL_PREFIX ?? "/static/covers";
-
 /**
  * 合成版型：方形主體等比縮到交付高度，放在 side 那一端；其餘畫布用主體「朝向空白那一側」
  * 邊緣顏色的中位數補滿，並把那一側 35% 寬度羽化進底色——就算模型的背景不夠平，
@@ -303,12 +299,10 @@ export async function finalizeToSpec(buffer: Buffer, spec: PlatformImageSpec): P
   return { ok: false, reason: `壓到品質 50 仍超過 ${Math.round((spec.maxBytes ?? 0) / 1024)}KB 上限` };
 }
 
-function saveFinal(buf: Buffer, spec: PlatformImageSpec): string {
-  mkdirSync(COVERS_DIR, { recursive: true });
+async function saveFinal(buf: Buffer, spec: PlatformImageSpec): Promise<string> {
   const ext = spec.format === "png" ? "png" : "jpg";
   const name = `imgcard-${spec.id}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}.${ext}`;
-  writeFileSync(join(COVERS_DIR, name), buf);
-  return `${COVERS_URL_PREFIX}/${name}`;
+  return await getMediaStore().put(name, buf, coverContentType(name));
 }
 
 /**
@@ -331,7 +325,7 @@ export async function saveTitledImage(dataUrl: string, spec: PlatformImageSpec):
   // 已經是交付尺寸：只做轉檔與檔案上限（合成版型也一樣，這時不再走「方形主體」那條路）。
   const fin = await finalizeToSpec(buffer, { ...spec, compose: undefined });
   if (!fin.ok) return fin;
-  return { ok: true, url: saveFinal(fin.buffer, spec), bytes: fin.bytes };
+  return { ok: true, url: await saveFinal(fin.buffer, spec), bytes: fin.bytes };
 }
 
 /**
@@ -362,7 +356,7 @@ export async function fitPhotoToCard(args: {
   // 已經是交付尺寸：只做轉檔與檔案上限。
   const fin = await finalizeToSpec(canvas, { ...spec, compose: undefined });
   if (!fin.ok) return fin;
-  return { ok: true, url: saveFinal(fin.buffer, spec), bytes: fin.bytes };
+  return { ok: true, url: await saveFinal(fin.buffer, spec), bytes: fin.bytes };
 }
 
 /** 純色／雙色漸層底（不經 AI）：換底圖的選項之一，純文字的輪播頁最適合。 */
@@ -382,7 +376,7 @@ export async function solidBackgroundForCard(args: {
   const canvas = await sharp(Buffer.from(svg)).png().toBuffer();
   const fin = await finalizeToSpec(canvas, { ...spec, compose: undefined });
   if (!fin.ok) return fin;
-  return { ok: true, url: saveFinal(fin.buffer, spec), bytes: fin.bytes };
+  return { ok: true, url: await saveFinal(fin.buffer, spec), bytes: fin.bytes };
 }
 
 export async function renderImageCard(args: {
@@ -439,7 +433,7 @@ export async function renderImageCard(args: {
   const fin = await finalizeToSpec(buffer, args.spec);
   if (!fin.ok) return { status: "failed", modelId, failureKind: "ratio_mismatch", errorMsg: fin.reason };
   return {
-    status: "ready", modelId, url: saveFinal(fin.buffer, args.spec),
+    status: "ready", modelId, url: await saveFinal(fin.buffer, args.spec),
     width: args.spec.width, height: args.spec.height, bytes: fin.bytes,
   };
 }

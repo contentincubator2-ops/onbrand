@@ -15,6 +15,7 @@
 import "./bootstrap-env";
 
 import { join } from "path";
+import { getMediaStore } from "./platform/core/media/mediaStore";
 import { existsSync } from "fs";
 import express from "express";
 import cors from "cors";
@@ -46,6 +47,8 @@ import { runStartupCleanup } from "./platform/core/ops/startupCleanup";
 import { computeMissionResources } from "./content/core/engine/missionResourceComputer";
 import { getDisabledRuntimeFeatures, isRuntimeFeatureEnabled } from "./platform/core/ops/runtimeSafety";
 
+// Fail before listening if the selected media backend is misconfigured.
+const mediaStore = getMediaStore();
 const app = express();
 
 // SEC-8: Trust reverse-proxy headers (Nginx / Azure Front Door / Cloudflare).
@@ -445,6 +448,7 @@ app.get("/health", healthLimiter, async (req, res) => {
     },
     // 媒體相對路徑會掛在這個網域下給發布服務抓；是公開網址，不是秘密。
     publicUrl: process.env.APP_URL ?? null,
+    media: { backend: mediaStore.backend, publicBase: mediaStore.publicBase },
     uptimeSec: Math.floor(process.uptime()),
     memMb:     Math.round(mem.rss / 1024 / 1024),
     ts:        new Date().toISOString(),

@@ -26,8 +26,7 @@ import { planQuotaFor, isUnlimited, assertCanAct } from "../../platform/core/bil
 import { router, protectedProcedure } from "../../platform/core/trpc";
 import { assertBrandAccess } from "../../platform/core/brandAuth";
 import { invokeLLM } from "../../platform/core/llm/llm";
-import { readFileSync } from "fs";
-import { coverFilePath, saveCoverFile } from "../../platform/core/media/mediaGen";
+import { readCoverBytes, saveCoverFile } from "../../platform/core/media/mediaGen";
 import { drawIllustration, shrinkToWebp, writeIllustrationConcepts } from "../core/image/taskIllustration";
 import type { CardReference } from "../core/catalog/cardResearch";
 import { buildBrandPrefix } from "../../strategy/core/brand/brandContext";
@@ -376,9 +375,9 @@ export async function drawCardIllustration(brandId: number, userId: number, card
     if (!concept) throw new Error("沒拿到畫面概念");
     const r = await drawIllustration(concept);
     if ("error" in r) throw new Error(r.error);
-    const file = coverFilePath(r.url);
-    if (!file) throw new Error("圖檔位置不對");
-    const url = saveCoverFile(await shrinkToWebp(readFileSync(file)), `taskcard-${cardId}-${Date.now()}.webp`);
+    const bytes = await readCoverBytes(r.url);
+    if (!bytes) throw new Error("圖檔位置不對");
+    const url = await saveCoverFile(await shrinkToWebp(bytes), `taskcard-${cardId}-${Date.now()}.webp`);
     await set({ illustrationUrl: url, illustrationStatus: "ready", illustrationError: null });
   } catch (e: any) {
     await set({ illustrationStatus: "failed", illustrationError: String(e?.message ?? e).slice(0, 300) }).catch(() => {});

@@ -1,24 +1,28 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { fetchImageBufferMock, writeFileSyncMock } = vi.hoisted(() => ({
+const { fetchImageBufferMock, putMock, getMock, readFileMock } = vi.hoisted(() => ({
   fetchImageBufferMock: vi.fn(),
-  writeFileSyncMock: vi.fn(),
+  putMock: vi.fn(),
+  getMock: vi.fn(),
+  readFileMock: vi.fn(),
 }));
 
-vi.mock("fs", () => ({
-  mkdirSync: vi.fn(),
-  writeFileSync: writeFileSyncMock,
+vi.mock("node:fs/promises", () => ({ readFile: readFileMock }));
+vi.mock("./mediaStore", async (importOriginal) => ({
+  ...await importOriginal<typeof import("./mediaStore")>(),
+  getMediaStore: () => ({ put: putMock, get: getMock }),
 }));
 
 vi.mock("./imageFetch", () => ({
   fetchImageBuffer: fetchImageBufferMock,
 }));
 
-import { dispatchGenerate } from "./mediaGen";
+import { coverFilePath, dispatchGenerate, readCoverBytes, saveCoverFile } from "./mediaGen";
 
 describe("mediaGen image provider request contracts", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    putMock.mockImplementation(async (name) => `https://media.example.com/covers/${name}`);
     vi.unstubAllGlobals();
     vi.stubEnv("GEMINI_API_KEY", "test-google-key");
     vi.stubEnv("GEMINI_API_KEY_POOL", "");
@@ -204,7 +208,7 @@ describe("mediaGen image provider request contracts", () => {
 
       // 供應商回來的圖要先驗證是真的圖，才存檔
       expect(fetchImageBufferMock).toHaveBeenCalledWith("https://cdn.piapi.ai/tryon-result.png", { timeoutMs: 60_000 });
-      expect(writeFileSyncMock).toHaveBeenCalledOnce();
+      expect(putMock).toHaveBeenCalledWith(expect.stringMatching(/^media-img-.*\.png$/), Buffer.from("tryon-image"), "image/png");
     });
 
     it("routes garmentSlot upper/lower to the matching field, never dress_input", async () => {
@@ -240,5 +244,56 @@ describe("mediaGen image provider request contracts", () => {
       })).rejects.toThrow(/衣服照片/);
       expect(fetchMock).not.toHaveBeenCalled();
     });
+  });
+});
+
+
+afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals(); });
+
+describe("mediaGen storage", () => {
+  beforeEach(() => { vi.resetAllMocks(); });
+  it.each([["png", "image/png"], ["jpg", "image/jpeg"], ["jpeg", "image/jpeg"], ["webp", "image/webp"], ["mp4", "video/mp4"]])(
+    "saves %s through the store and awaits the returned URL", async (ext, mime) => {
+      const bytes = Buffer.from("cover");
+      const url = `https://media.example.com/covers/sample.${ext}`;
+      putMock.mockResolvedValue(url);
+      await expect(saveCoverFile(bytes, `sample.${ext}`)).resolves.toBe(url);
+      expect(putMock).toHaveBeenCalledWith(`sample.${ext}`, bytes, mime);
+    });
+  it("saves provider base64 through the store", async () => {
+    // Provider auth is supplied at runtime only; no new credential fixtures.
+    vi.stubEnv("OPENAI_API_KEY", crypto.randomUUID());
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ data: [{ b64_json: "aW1hZ2U=" }] }))));
+    putMock.mockResolvedValue("https://media.example.com/covers/generated.png");
+    await expect(dispatchGenerate("openai/gpt-image-2", { prompt: "scene" })).resolves.toMatchObject({
+      url: "https://media.example.com/covers/generated.png",
+    });
+    expect(putMock).toHaveBeenCalledWith(expect.stringMatching(/^media-img-.*\.png$/), Buffer.from("image"), "image/png");
+  });
+  it("reads the store first without touching disk", async () => {
+    getMock.mockResolvedValue(Buffer.from("blob"));
+    await expect(readCoverBytes("https://media.example.com/covers/a.png")).resolves.toEqual(Buffer.from("blob"));
+    expect(getMock).toHaveBeenCalledWith("https://media.example.com/covers/a.png");
+    expect(readFileMock).not.toHaveBeenCalled();
+  });
+  it("falls back to the legacy local path only after a store miss", async () => {
+    getMock.mockResolvedValue(null);
+    readFileMock.mockResolvedValue(Buffer.from("old cover"));
+    const url = `${process.env.COVERS_URL_PREFIX ?? "/static/covers"}/old.png`;
+    await expect(readCoverBytes(url)).resolves.toEqual(Buffer.from("old cover"));
+    expect(readFileMock).toHaveBeenCalledWith(coverFilePath(url));
+    expect(getMock.mock.invocationCallOrder[0]).toBeLessThan(readFileMock.mock.invocationCallOrder[0]!);
+  });
+  it("returns null for unknown URLs and missing legacy files", async () => {
+    getMock.mockResolvedValue(null);
+    await expect(readCoverBytes("https://other.example.com/a.png")).resolves.toBeNull();
+    expect(readFileMock).not.toHaveBeenCalled();
+    readFileMock.mockRejectedValue({ code: "ENOENT" });
+    await expect(readCoverBytes(`${process.env.COVERS_URL_PREFIX ?? "/static/covers"}/missing.png`)).resolves.toBeNull();
+  });
+  it("propagates store failures without falling back to stale local bytes", async () => {
+    getMock.mockRejectedValue(new Error("storage unavailable"));
+    await expect(readCoverBytes("/static/covers/a.png")).rejects.toThrow("storage unavailable");
+    expect(readFileMock).not.toHaveBeenCalled();
   });
 });
