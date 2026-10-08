@@ -21,6 +21,7 @@ import { router, protectedProcedure } from "../../platform/core/trpc";
 import { assertCanAct, isHiddenHistoryItem } from "../../platform/core/billing/planGate";
 import { outputApprovalState, APPROVAL_BLOCK_MESSAGE, canPublishFor } from "../core/publishGate";
 import { friendlyPublishError } from "../core/publish/publishErrors";
+import { APPROVAL_HINT } from "../core/scheduledPublishWorker";
 import { BundlePublishUserError } from "../../platform/core/connectors/publish/bundlePublish";
 import { getDb } from "../../db";
 import { sql } from "drizzle-orm";
@@ -232,6 +233,7 @@ export const calendarRouter = router({
             externalUrl: s.externalUrl,
             variantIndex: s.variantIndex == null ? null : Number(s.variantIndex),
             lastError: s.lastError ? String(s.lastError) : null,
+            awaitingApproval: s.status === "pending" && s.lastError === APPROVAL_HINT,
             attempts: Number(s.attempts ?? 0),
             reviewStatus: s.reviewStatus ? String(s.reviewStatus) : null,
             contentKind: selector.contentKind ?? null,
@@ -420,9 +422,9 @@ export async function rescheduleScheduledPost(args: { id: number; userId: number
   // lastError is assigned before status: MySQL applies SET assignments left to right.
   const [r]: any = await localPool.execute(
     `UPDATE scheduled_posts
-        SET scheduledAt = ?, lastError = IF(status = 'failed', NULL, lastError), status = 'pending'
+        SET scheduledAt = ?, lastError = IF(status = 'failed' OR lastError = ?, NULL, lastError), status = 'pending'
       WHERE id = ? AND userId = ? AND status IN ('pending','failed')`,
-    [at, args.id, args.userId],
+    [at, APPROVAL_HINT, args.id, args.userId],
   );
   if ((r as any).affectedRows === 0) {
     throw new TRPCError({ code: "NOT_FOUND", message: "找不到此排程，或已發布 / 取消" });

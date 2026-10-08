@@ -224,14 +224,11 @@ export default function PlannerPage() {
       const raw = String(it.platform ?? "").toLowerCase();
       const date = ymdTpe(new Date(it.at));
       const time = new Date(it.at).toLocaleTimeString("zh-TW", { timeZone: "Asia/Taipei", hour: "2-digit", minute: "2-digit", hour12: false });
-      // 送審是排程的一個狀態：排好的格子直接標出審核進度。
-      const rs = it.kind === "scheduled" ? String(it.reviewStatus ?? "") : "";
-      void rs; // 審核進度改成卡片上的標籤（reviewTag），不再塞在說明文字後面。
-      const review = "";
+      const approvalHint = it.awaitingApproval ? (en ? " · awaiting approval" : " · 尚未核准") : "";
       out.push({
         kind: it.kind, key: `${it.kind}${it.id}`, date, platform: PLAT[raw] ?? raw,
         title: String(it.preview || it.missionTitle || "").slice(0, 40),
-        meta: it.kind === "published" ? (en ? "Published" : "已發布") : isFailedScheduled(it) ? (en ? `Failed ${time}` : `失敗 ${time}`) : (en ? `Scheduled ${time}${review}` : `已排程 ${time}${review}`), cal: it,
+        meta: it.kind === "published" ? (en ? "Published" : "已發布") : isFailedScheduled(it) ? (en ? `Failed ${time}` : `失敗 ${time}`) : (en ? `Scheduled ${time}${approvalHint}` : `已排程 ${time}${approvalHint}`), cal: it,
       });
     }
     const weekEnd = addDays(weekStart, 7);
@@ -500,6 +497,9 @@ export default function PlannerPage() {
                   {open.kind === "slot" ? (open.slot.status !== "written" ? "" : `${en ? "Task card" : "任務卡"}・${open.slot.taskLabel ?? open.slot.taskId}`)
                     : open.kind === "campaign" ? `${en ? "Task card" : "任務卡"}・${open.camp.taskLabel}` : open.meta}
                 </p>
+                {open.kind === "scheduled" && open.cal.awaitingApproval && (
+                  <p className="m-0 mt-2 text-[12px] leading-relaxed" style={{ color: META }}>{open.cal.lastError}</p>
+                )}
                 {isFailedScheduled(open.kind === "scheduled" ? open.cal : null) && (
                   <p role="alert" className="m-0 mt-2 rounded-lg px-3 py-2 text-[12.5px] leading-relaxed" style={{ background: "#FEE2E2", color: "#991B1B" }}>{failedNote(open.kind === "scheduled" ? open.cal : null, en)}</p>
                 )}

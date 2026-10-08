@@ -24,7 +24,9 @@ import { outputApprovalState } from "./publishGate";
 import { friendlyPublishError } from "./publish/publishErrors";
 
 const GRACE_MS = 6 * 60 * 60 * 1000;
-const BATCH = 5;
+const PUBLISH_BATCH = 5;
+const SCAN_LIMIT = 50;
+export const APPROVAL_HINT = "尚未核准，到時間不會自動發布；核准後會在一分鐘內自動發出。";
 
 export function isAutoPublishEnabled(): boolean {
   return (
@@ -33,20 +35,30 @@ export function isAutoPublishEnabled(): boolean {
   );
 }
 
-export async function tickScheduledPublish(): Promise<number> {
-  if (!isAutoPublishEnabled()) return 0;
+export async function tickScheduledPublish(): Promise<{ published: number; awaitingApproval: number }> {
+  if (!isAutoPublishEnabled()) return { published: 0, awaitingApproval: 0 };
   const [rows]: any = await localPool.execute(
     `SELECT id, userId, outputId FROM scheduled_posts
       WHERE status = 'pending'
         AND scheduledAt <= NOW(3)
         AND scheduledAt >= NOW(3) - INTERVAL ${Math.floor(GRACE_MS / 1000)} SECOND
       ORDER BY scheduledAt ASC
-      LIMIT ${BATCH}`,
+      LIMIT ${SCAN_LIMIT}`,
   );
   let published = 0;
+  let awaitingApproval = 0;
   for (const r of rows as any[]) {
+    if (published >= PUBLISH_BATCH) break;
     const id = Number(r.id);
-    if ((await outputApprovalState(localPool, Number(r.outputId), Number(r.userId))) !== "approved") continue;
+    if ((await outputApprovalState(localPool, Number(r.outputId), Number(r.userId))) !== "approved") {
+      await localPool.execute(
+        `UPDATE scheduled_posts SET lastError = ?
+          WHERE id = ? AND status = 'pending' AND (lastError IS NULL OR lastError <> ?)`,
+        [APPROVAL_HINT, id, APPROVAL_HINT],
+      );
+      awaitingApproval++;
+      continue;
+    }
 
     const [claim]: any = await localPool.execute(
       `UPDATE scheduled_posts SET status = 'publishing', attempts = attempts + 1
@@ -72,5 +84,5 @@ export async function tickScheduledPublish(): Promise<number> {
       } catch { /* telemetry only */ }
     }
   }
-  return published;
+  return { published, awaitingApproval };
 }

@@ -42,6 +42,7 @@ const execute = vi.fn(async (sql: string, params: any[] = []) => {
     return [{ affectedRows: 0 }];
   }
   if (/SET status = 'published'/.test(q)) {
+    expect(q).toContain("lastError = NULL");
     const p = db.posts.get(params[2])!; p.status = "published"; p.lastError = null; p.externalUrl = params[0];
     return [{ affectedRows: 1 }];
   }
@@ -56,9 +57,10 @@ const execute = vi.fn(async (sql: string, params: any[] = []) => {
     return [{ affectedRows: 0 }];
   }
   if (/SET scheduledAt = \?, lastError = IF/.test(q)) {
-    const p = db.posts.get(params[1]);
-    if (p && p.userId === params[2] && (p.status === "pending" || p.status === "failed")) {
-      p.scheduledAt = params[0]; if (p.status === "failed") p.lastError = null; p.status = "pending";
+    expect(q).toContain("lastError = IF(status = 'failed' OR lastError = ?, NULL, lastError)");
+    const p = db.posts.get(params[2]);
+    if (p && p.userId === params[3] && (p.status === "pending" || p.status === "failed")) {
+      p.scheduledAt = params[0]; if (p.status === "failed" || p.lastError === params[1]) p.lastError = null; p.status = "pending";
       return [{ affectedRows: 1 }];
     }
     return [{ affectedRows: 0 }];
@@ -68,10 +70,24 @@ const execute = vi.fn(async (sql: string, params: any[] = []) => {
     if (p && p.status === "pending") { p.lastError = params[0]; p.attempts++; }
     return [{ affectedRows: 1 }];
   }
+  if (/SET lastError = \?\s+WHERE/.test(q)) {
+    expect(q).toMatch(/status = 'pending' AND \(lastError IS NULL OR lastError <> \?\)/);
+    const p = db.posts.get(params[1]);
+    if (p && p.status === "pending" && (p.lastError === null || p.lastError !== params[2])) {
+      p.lastError = params[0]; return [{ affectedRows: 1 }];
+    }
+    return [{ affectedRows: 0 }];
+  }
   if (/^\s*UPDATE/i.test(q)) return [{ affectedRows: 1 }];
   // reads
   if (q.includes("SELECT id, userId, outputId FROM scheduled_posts")) {
-    return [[...db.posts.values()].filter((p) => p.status === "pending").map((p) => ({ id: p.id, userId: p.userId, outputId: p.outputId }))];
+    const now = Date.now();
+    const limit = Number(q.match(/LIMIT (\d+)/)?.[1]);
+    return [[...db.posts.values()]
+      .filter((p) => p.status === "pending" && p.scheduledAt.getTime() <= now && p.scheduledAt.getTime() >= now - 6 * 60 * 60 * 1000)
+      .sort((a, b) => a.scheduledAt.getTime() - b.scheduledAt.getTime())
+      .slice(0, limit)
+      .map((p) => ({ id: p.id, userId: p.userId, outputId: p.outputId }))];
   }
   if (q.includes("FROM scheduled_posts sp")) {
     const p = db.posts.get(params[0]);
@@ -94,7 +110,10 @@ const execute = vi.fn(async (sql: string, params: any[] = []) => {
 
 vi.mock("../../localDb", () => ({ default: { execute: (...a: any[]) => (execute as any)(...a) } }));
 vi.mock("../../db", () => ({ getDb: vi.fn() }));
-vi.mock("../../platform/core/brandAuth", () => ({ assertBrandOwner: vi.fn() }));
+vi.mock("../../platform/core/brandAuth", async (importOriginal) => ({
+  ...await importOriginal<typeof import("../../platform/core/brandAuth")>(),
+  assertBrandOwner: vi.fn(),
+}));
 vi.mock("../../platform/core/billing/planGate", () => ({ assertCanAct: vi.fn(async () => {}), isHiddenHistoryItem: () => false }));
 vi.mock("../../platform/routers/opsRouter", () => ({ logError: vi.fn() }));
 vi.mock("./publish/bundlePublishService", () => ({ publishViaBundleSocial: (...a: any[]) => publishViaBundle(...a) }));
@@ -103,8 +122,8 @@ vi.mock("../../platform/core/connectors/publish/zernioAdapter", () => ({
   createZernioAdapter: () => ({ publish: (...a: any[]) => publishViaZernio(...a) }),
 }));
 
-import { publishScheduledPost, retryScheduledPost, rescheduleScheduledPost } from "../routers/calendarRouter";
-import { tickScheduledPublish } from "./scheduledPublishWorker";
+import { calendarRouter, publishScheduledPost, retryScheduledPost, rescheduleScheduledPost } from "../routers/calendarRouter";
+import { APPROVAL_HINT, tickScheduledPublish } from "./scheduledPublishWorker";
 
 const OWNER = 2;
 const ADMIN = 1;
@@ -158,10 +177,10 @@ describe("publish flow (approval gate, retry, worker)", () => {
     db.posts.set(50, mk());
     publishViaZernio.mockRejectedValueOnce(new Error("Zernio partial publish failure"))
       .mockResolvedValueOnce({ postId: "z2", permalink: "https://example.com/z2" });
-    expect(await tickScheduledPublish()).toBe(0);
+    expect(await tickScheduledPublish()).toEqual({ published: 0, awaitingApproval: 0 });
     expect(db.posts.get(50)).toMatchObject({ status: "failed", attempts: 1 });
     await retryScheduledPost({ id: 50, userId: OWNER });
-    if (retryVia === "worker") expect(await tickScheduledPublish()).toBe(1);
+    if (retryVia === "worker") expect(await tickScheduledPublish()).toEqual({ published: 1, awaitingApproval: 0 });
     else expect((await publishScheduledPost({ id: 50, userId: OWNER })).ok).toBe(true);
     expect(publishViaZernio.mock.calls.map(([i]) => i.attempt)).toEqual([1, 2]);
     expect(db.posts.get(50)?.status).toBe("published");
@@ -251,24 +270,62 @@ describe("publish flow (approval gate, retry, worker)", () => {
     await expect(rescheduleScheduledPost({ id: 50, userId: OWNER, scheduledAt: "not a date" })).rejects.toMatchObject({ code: "BAD_REQUEST" });
   });
 
-  it("worker tick publishes the approved post and skips the unapproved one", async () => {
+  it("worker tick publishes the approved post and hints the unapproved one", async () => {
     db.posts.set(50, mk());
     db.posts.set(51, mk({ id: 51, outputId: 10 }));
-    expect(await tickScheduledPublish()).toBe(1);
+    expect(await tickScheduledPublish()).toEqual({ published: 1, awaitingApproval: 1 });
     expect(db.posts.get(50)!.status).toBe("published");
-    expect(db.posts.get(51)!.status).toBe("pending");
+    expect(db.posts.get(51)).toMatchObject({ status: "pending", lastError: APPROVAL_HINT, attempts: 0 });
     expect(publishViaBundle).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([APPROVAL_HINT, "provider error", null])("reschedule clears only the approval hint on pending rows (%s)", async (lastError) => {
+    db.posts.set(50, mk({ lastError, attempts: 2 }));
+    await rescheduleScheduledPost({ id: 50, userId: OWNER, scheduledAt: "2030-01-01T10:00:00Z" });
+    expect(db.posts.get(50)).toMatchObject({
+      status: "pending", attempts: 2, scheduledAt: new Date("2030-01-01T10:00:00Z"),
+      lastError: lastError === APPROVAL_HINT ? null : lastError,
+    });
+    expect(await tickScheduledPublish()).toEqual({ published: 0, awaitingApproval: 0 });
+    expect(publishViaBundle).not.toHaveBeenCalled();
+  });
+
+  it("approval on the next tick publishes and clears the stored hint", async () => {
+    db.posts.set(51, mk({ id: 51, outputId: 10 }));
+    expect(await tickScheduledPublish()).toEqual({ published: 0, awaitingApproval: 1 });
+    expect(db.posts.get(51)).toMatchObject({ status: "pending", lastError: APPROVAL_HINT, attempts: 0 });
+    db.review[10] = "approved";
+    expect(await tickScheduledPublish()).toEqual({ published: 1, awaitingApproval: 0 });
+    expect(db.posts.get(51)).toMatchObject({ status: "published", lastError: null, attempts: 1 });
+    expect(publishViaBundle).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    ["pending", APPROVAL_HINT, true],
+    ["pending", null, false],
+    ["pending", "provider error", false],
+    ["failed", APPROVAL_HINT, false],
+    ["published", APPROVAL_HINT, false],
+  ])("calendar range returns awaitingApproval for %s / %s", async (status, lastError, awaitingApproval) => {
+    execute.mockResolvedValueOnce([[{
+      ...postRow(mk()), scheduledAt: new Date(), status, lastError,
+    }]]).mockResolvedValueOnce([[]]);
+    const items = await calendarRouter.createCaller({ user: { id: OWNER } }).range({
+      from: "2026-10-05T00:00:00+08:00", to: "2026-10-12T00:00:00+08:00",
+    });
+    expect(items).toHaveLength(1);
+    expect(items[0]).toMatchObject({ kind: "scheduled", status, lastError, awaitingApproval });
   });
 
   it("worker marks a provider failure failed, and a person can then retry it", async () => {
     db.posts.set(50, mk());
     publishViaBundle.mockRejectedValueOnce(new Error("bundle.social 502: bad gateway"));
-    expect(await tickScheduledPublish()).toBe(0);
+    expect(await tickScheduledPublish()).toEqual({ published: 0, awaitingApproval: 0 });
     expect(db.posts.get(50)).toMatchObject({ status: "failed", attempts: 1 });
     expect(db.posts.get(50)!.lastError).toBeTruthy();
     await retryScheduledPost({ id: 50, userId: OWNER });
     expect(db.posts.get(50)!.status).toBe("pending");
-    expect(await tickScheduledPublish()).toBe(1);
+    expect(await tickScheduledPublish()).toEqual({ published: 1, awaitingApproval: 0 });
     expect(db.posts.get(50)!.status).toBe("published");
   });
 });
