@@ -25,10 +25,11 @@ import { useLang } from "../../../lib/i18n";
 import { agentLabel, agentTitle, agentTooltip } from "../../platform/lib/agentName";
 import { showToastGlobal } from "../../platform/components/Toast";
 import { friendlyError } from "../../platform/lib/friendlyError";
+import { publishSettingsUrl } from "../../platform/lib/publishSettingsUrl";
 import { channelRoute } from "../../platform/lib/channelMeta";
 import { PlatformTaskModal, type TaskEmbed } from "./PlatformTaskPage";
 import { getCalendarPublishPayload } from "../lib/strategyContentEnvelope";
-import { failedNote, isFailedScheduled } from "../lib/plannerFailed";
+import { failedNote, isFailedScheduled, isNotConnectedError } from "../lib/plannerFailed";
 import { addDays, defaultWeek, mondayOf, ymdTpe } from "../lib/plannerWeek";
 import ApprovalLinkModal, { type ApprovalCandidate } from "../components/approval/ApprovalLinkModal";
 
@@ -164,13 +165,19 @@ export default function PlannerPage() {
   const cancelSched = T.calendar?.cancel?.useMutation?.({ onSuccess: () => { setOpen(null); refresh(); }, onError: (e: any) => showToastGlobal(friendlyError(e, en ? "Something went wrong. Please try again." : "剛剛沒成功，再試一次。"), "error") });
   // 原本行事曆能做的三件事（取消／改時間／立即發布）都留在這裡，取代才不會少功能。
   const onErr = (e: any) => showToastGlobal(friendlyError(e, en ? "Something went wrong. Please try again." : "剛剛沒成功，再試一次。"), "error");
+  const onPublishError = (e: any) => {
+    const msg = friendlyError(e, en ? "Something went wrong. Please try again." : "剛剛沒成功，再試一次。");
+    showToastGlobal(msg, "error", isNotConnectedError(msg)
+      ? { label: en ? "Connect" : "去連接", onClick: () => navigate(publishSettingsUrl(brandId)) }
+      : undefined);
+  };
   const reschedule = T.calendar?.reschedule?.useMutation?.({ onSuccess: () => { setOpen(null); setMoveAt(""); refresh(); }, onError: onErr });
   const retryFailed = T.calendar?.retry?.useMutation?.({
     onSuccess: () => { setOpen(null); refresh(); showToastGlobal(en ? "Back in the queue. It still needs approval before it publishes." : "已放回排程。發布前仍需核准。", "success"); },
-    onError: onErr,
+    onError: onPublishError,
   });
   const publishNow = T.calendar?.publish?.useMutation?.({
-    onSuccess: () => { setOpen(null); refresh(); showToastGlobal(en ? "Published" : "已發布", "success"); }, onError: onErr,
+    onSuccess: () => { setOpen(null); refresh(); showToastGlobal(en ? "Published" : "已發布", "success"); }, onError: onPublishError,
   });
   const [moveAt, setMoveAt] = React.useState("");
 
@@ -501,7 +508,14 @@ export default function PlannerPage() {
                   <p className="m-0 mt-2 text-[12px] leading-relaxed" style={{ color: META }}>{open.cal.lastError}</p>
                 )}
                 {isFailedScheduled(open.kind === "scheduled" ? open.cal : null) && (
-                  <p role="alert" className="m-0 mt-2 rounded-lg px-3 py-2 text-[12.5px] leading-relaxed" style={{ background: "#FEE2E2", color: "#991B1B" }}>{failedNote(open.kind === "scheduled" ? open.cal : null, en)}</p>
+                  <p role="alert" className="m-0 mt-2 rounded-lg px-3 py-2 text-[12.5px] leading-relaxed" style={{ background: "#FEE2E2", color: "#991B1B" }}>
+                    {failedNote(open.kind === "scheduled" ? open.cal : null, en)}
+                    {open.kind === "scheduled" && isNotConnectedError(String(open.cal.lastError ?? "")) && (
+                      <button type="button" onClick={() => navigate(publishSettingsUrl(brandId))} className="ml-2 underline font-medium">
+                        {en ? "Connect" : "去連接"}
+                      </button>
+                    )}
+                  </p>
                 )}
                 <div className="mt-4 flex flex-wrap gap-2">
                   {outputOf(open) ? (

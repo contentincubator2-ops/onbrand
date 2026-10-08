@@ -38,7 +38,7 @@ import { pivot, resolveTag, judgeValue, BUILTIN_DIMS, METRIC_LABELS, JUDGE_LABEL
 import { deriveDimensions, proposeLens, autoTag } from "../core/perfAI";
 import { parseTable, guessSource, guessMapping, buildFacts, IMPORT_SOURCES, ROWCOUNT } from "../core/perfImport";
 import { syncFbPage, resolvePage, FbSyncError, fbSyncEnabled } from "../core/fbPageSync";
-import { syncBrandZernioAnalytics, ZernioAnalyticsSyncError, isAnalyticsPlatform, SOURCE_BY_PLATFORM } from "../core/zernioAnalyticsSync";
+import { ensureFreshZernioAnalytics, syncBrandZernioAnalytics, ZernioAnalyticsSyncError, isAnalyticsPlatform, SOURCE_BY_PLATFORM } from "../core/zernioAnalyticsSync";
 import { listConnectedByBrand } from "../../platform/core/connectors/publish/connectionStore";
 import { getPublishProvider } from "../../platform/core/connectors/publish/publishProvider";
 import { utmContent, campaignCode, campaignLink, cleanLandingUrl } from "../../platform/core/perfUtm";
@@ -73,6 +73,7 @@ export interface SourceConnection {
   howEn: string;
   /** true = 可以由用戶自助完成；false = 屬於導入時由我們設定。 */
   selfServe: boolean;
+  syncing?: boolean;
 }
 
 const syncInput = z.object({ brandId: z.number().int().positive(), days: z.number().int().min(7).max(365).default(120) });
@@ -131,10 +132,16 @@ export const performanceRouter = router({
         .map(d => new Date(d).toISOString()).sort().pop();
       const adsFacts = (sources.meta_ads?.facts ?? 0) + (sources.google_ads?.facts ?? 0) + (sources.ga4?.facts ?? 0);
       const shopFacts = (sources.shopline?.facts ?? 0) + (sources["91app"]?.facts ?? 0) + (sources.shopify?.facts ?? 0);
+      let syncing = false;
+      try {
+        const freshness = await ensureFreshZernioAnalytics(input.brandId);
+        syncing = freshness.reason === "started" || freshness.reason === "in_flight";
+      } catch { /* 自動同步檢查失敗不影響來源狀態回應。 */ }
 
       return [
         {
           id: "meta_page",
+          syncing,
           status: fbConnected ? "connected" : "not_connected",
           label: fbConnected ? pageLabel : null,
           connectedAt: connectedAt ?? (fbConnected && fb?.connectedAt ? new Date(fb.connectedAt).toISOString() : latestSocial),

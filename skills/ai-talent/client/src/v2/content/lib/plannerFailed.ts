@@ -1,3 +1,8 @@
+/** 共用於發布／重試的 toast 與排程失敗卡片。 */
+export function isNotConnectedError(msg: string): boolean {
+  return msg.includes("尚未連接此平台");
+}
+
 /** Planner: scheduled_posts rows that the publish worker marked failed. */
 export function isFailedScheduled(it: any): boolean {
   return it?.kind === "scheduled" && String(it?.status ?? "") === "failed";

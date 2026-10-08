@@ -15,7 +15,7 @@
 import "./bootstrap-env";
 
 import { join } from "path";
-import { getMediaStore } from "./platform/core/media/mediaStore";
+import { getMediaStore, mediaCspOrigins } from "./platform/core/media/mediaStore";
 import { existsSync } from "fs";
 import express from "express";
 import cors from "cors";
@@ -87,6 +87,7 @@ app.use(helmet({
       // the Pipedream Connect origins for frames + XHR/WS + script.
       connectSrc: [
         "'self'",
+        ...mediaCspOrigins(mediaStore),
         "https://marketing-os.sowork.ai", "https://onbrand.sowork.ai", "https://drop.sowork.ai",
         "https://api.pipedream.com", "https://*.pipedream.com", "https://*.pipedream.net",
       ],

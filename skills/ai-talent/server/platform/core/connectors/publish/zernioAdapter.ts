@@ -1,6 +1,6 @@
 import { ZernioApiError, type ZernioAccount, type ZernioClient } from "../zernio";
 import { getTenant, upsertTenant, getConnection, setConnection, listConnectedByBrand, markDisconnected, type Queryable } from "./connectionStore";
-import { PublishUserError, type PublishProviderAdapter } from "./publishAdapter";
+import { NOT_CONNECTED_MESSAGE, PublishUserError, type PublishProviderAdapter } from "./publishAdapter";
 import { assertZernioMediaPlan, buildZernioPostPayload, readZernioPublishResult, toZernioPlatform } from "./zernioPublish";
 import { toPublicUrl, toPublicUrls } from "./publicUrl";
 
@@ -95,7 +95,7 @@ export function createZernioAdapter({ client, pool, brandNameOf, publicBaseUrl }
       const platform = requirePlatform(input.platform);
       assertZernioMediaPlan(platform.remote, input.caption, input.imageUrls.length, input.videoUrl ? 1 : 0);
       const account = await getConnection(pool, input.brandId, "zernio", platform.local);
-      if (!account) throw new PublishUserError("此品牌尚未連接此平台，請先到品牌設定完成連接。");
+      if (!account) throw new PublishUserError(NOT_CONNECTED_MESSAGE);
       const media = {
         imageUrls: toPublicUrls(input.imageUrls, publicBaseUrl),
         videoUrl: input.videoUrl ? toPublicUrl(input.videoUrl, publicBaseUrl) : input.videoUrl,

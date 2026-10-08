@@ -47,7 +47,7 @@ import EventYearTimeline, { type PlanPrefill } from "../components/events/EventY
 import { toYmd } from "../lib/eventTimeline";
 // Notion-style line icons
 import { LockToggle } from "../components/positioning/LockToggle";
-import { AgentIcon, CommentIcon, MemoryIcon, RegulationIcon, DeleteIcon, FontIcon, IdCardIcon, LockIcon, PaletteIcon, TargetIcon, DoneIcon, StopIcon, WarningIcon } from "../../platform/components/icons";
+import { AgentIcon, CommentIcon, MemoryIcon, RegulationIcon, DeleteIcon, FontIcon, IdCardIcon, LockIcon, PaletteIcon, TargetIcon, DoneIcon, StopIcon, WarningIcon, ShareIcon } from "../../platform/components/icons";
 import { SCOPE_SEGMENTS } from "../lib/positioningSchema";
 import { specOf as copySpecOf } from "../lib/copyAssets";
 import { visualSpecOf } from "../lib/visualAssets";
@@ -1716,7 +1716,7 @@ export default function BrandsPage() {
                 //  - Event:   定位 + 基本資料 (same — events are seasonal overlays on a brand)
                 // CJ 2026-05-13「左上選活動時，這一頁就呈現該活動的定位等等資訊」.
                 // 2026-06-03 (CJ): Redesigned tab structure — 7 consistent tabs.
-                // 平台授權 removed (handled in Calendar connect flow).
+                // 2026-10-08：加回平台授權，讓 Zernio 社群連線有明確入口。
                 // 產品 + 活動 added as independent tabs with card grids.
                 const allTiles = [
                   { v: "positioning" as const, label: lang === "en" ? "Positioning" : "定位",
@@ -1737,6 +1737,9 @@ export default function BrandsPage() {
                           : scopeMode === "product" ? (lang === "en" ? "Name / brand"        : "名稱 / 品牌")
                           : (lang === "en" ? "Name / industry" : "名稱 / 產業"),
                       Icon: IdCardIcon,    scopes: ["brand", "product", "event"] },
+                  { v: "publish"     as const, label: lang === "en" ? "Platform auth" : "平台授權",
+                      desc: lang === "en" ? "Connect social accounts" : "連接社群帳號",
+                      Icon: ShareIcon,     scopes: ["brand"] },
                   { v: "regulations" as const, label: lang === "en" ? "Regulations" : "法規",
                       desc: lang === "en" ? "Checked before every draft" : "寫文前先審查",
                       Icon: RegulationIcon, scopes: ["brand"] },
@@ -2724,4 +2727,3 @@ export default function BrandsPage() {
    搬到 components/positioning/CopyAssetBoard.tsx 的 COPY_ASSETS——那裡沒有色票
    （設計系統：顏色只有功能性意義），而且每張多了「填了會影響什麼」，使用者才
    判斷得出要不要加那張卡。 */
-

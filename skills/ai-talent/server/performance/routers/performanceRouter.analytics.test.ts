@@ -1,14 +1,14 @@
 import { TRPCError } from "@trpc/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const mocks = vi.hoisted(() => ({ execute: vi.fn(), access: vi.fn(), summary: vi.fn(), social: vi.fn(), facebook: vi.fn(), page: vi.fn() }));
+const mocks = vi.hoisted(() => ({ execute: vi.fn(), access: vi.fn(), summary: vi.fn(), fresh: vi.fn(), social: vi.fn(), facebook: vi.fn(), page: vi.fn() }));
 vi.mock("../../localDb", () => ({ default: { execute: mocks.execute } }));
 vi.mock("../../platform/core/brandAuth", () => ({ assertBrandAccess: mocks.access }));
 vi.mock("../../platform/core/tenantGuard", () => ({ assertInputScopes: vi.fn() }));
 vi.mock("../../platform/core/teamAccess", () => ({ isPersonalPath: () => true }));
 vi.mock("../core/perfStore", async importOriginal => ({ ...await importOriginal<typeof import("../core/perfStore")>(), sourceSummary: mocks.summary }));
 vi.mock("../core/fbPageSync", async importOriginal => ({ ...await importOriginal<typeof import("../core/fbPageSync")>(), syncFbPage: mocks.facebook, resolvePage: mocks.page }));
-vi.mock("../core/zernioAnalyticsSync", async importOriginal => ({ ...await importOriginal<typeof import("../core/zernioAnalyticsSync")>(), syncBrandZernioAnalytics: mocks.social }));
+vi.mock("../core/zernioAnalyticsSync", async importOriginal => ({ ...await importOriginal<typeof import("../core/zernioAnalyticsSync")>(), ensureFreshZernioAnalytics: mocks.fresh, syncBrandZernioAnalytics: mocks.social }));
 
 import { performanceRouter } from "./performanceRouter";
 import { ZernioAnalyticsSyncError } from "../core/zernioAnalyticsSync";
@@ -17,6 +17,7 @@ const caller = () => performanceRouter.createCaller({ user: { id: 11 } });
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.access.mockResolvedValue(undefined);
+  mocks.fresh.mockResolvedValue({ started: false, reason: "fresh" });
   mocks.execute.mockResolvedValue([[]]);
   mocks.summary.mockResolvedValue({});
   mocks.page.mockResolvedValue(null);
@@ -26,6 +27,19 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllEnvs());
 
 describe("performance social connections", () => {
+  it.each(["started", "in_flight", "fresh", "disabled", "no_connection"])("reports auto sync state for %s", async reason => {
+    mocks.fresh.mockResolvedValue({ started: reason === "started", reason });
+    const conns = await caller().connections({ brandId: 7 });
+    expect(mocks.fresh).toHaveBeenCalledWith(7);
+    expect(conns[0]?.syncing).toBe(reason === "started" || reason === "in_flight");
+    expect(conns.slice(1).every(c => c.syncing === undefined)).toBe(true);
+  });
+  it("still returns connections when the freshness check fails", async () => {
+    mocks.fresh.mockRejectedValueOnce(new Error("database unavailable"));
+    const conns = await caller().connections({ brandId: 7 });
+    expect(conns).toHaveLength(3);
+    expect(conns[0]).toMatchObject({ id: "meta_page", syncing: false });
+  });
   it("includes the origin builtin dimension and social source labels in the workspace", async () => {
     const workspace = await caller().workspace({ brandId: 7, tray: "fanpage_monthly" });
     expect(workspace.builtinDims).toContainEqual({ key: "origin", label: "發布來源" });
@@ -60,6 +74,7 @@ describe("performance social connections", () => {
     }
     expect(mocks.execute).not.toHaveBeenCalled();
     expect(mocks.social).not.toHaveBeenCalled();
+    expect(mocks.fresh).not.toHaveBeenCalled();
     expect(mocks.facebook).not.toHaveBeenCalled();
   });
 });
