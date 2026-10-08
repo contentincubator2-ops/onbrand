@@ -15,7 +15,7 @@
  *   · 品牌大腦的活動段（brandContext）：每一篇貼文與活動對話都讀得到
  *
  * 同一個視窗裡填的「活動連結」不在這裡：連結讀回來的內容跟上傳的檔案一樣，存成這檔活動的
- * 參考資料（content/core/campaign/campaignChatSources.ts）。這裡只提供網址的清洗。
+ * 參考資料（strategy/core/entities/campaignChatSources.ts）。這裡只提供網址的清洗。
  */
 
 export const INTAKE_AUDIENCE_MAX = 300;
