@@ -13,9 +13,9 @@
  *
  * Opens via the gear icon top-right of Brand workspace header.
  */
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Modal, ModalContent, Button, Input, Textarea, Spinner } from "@heroui/react";
-import { CloseIcon, DeleteIcon, DoneIcon, ExternalIcon, ShareIcon, InfoIcon, CheckIcon, WarningIcon, InboxIcon } from "../../../platform/components/icons";
+import { CloseIcon, DeleteIcon, DoneIcon, ExternalIcon, ShareIcon, InfoIcon, CheckIcon, WarningIcon } from "../../../platform/components/icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faFacebook, faInstagram, faLinkedin, faYoutube, faLine, faThreads, faTiktok } from "@fortawesome/free-brands-svg-icons";
 import { faGlobe } from "@fortawesome/free-solid-svg-icons";
@@ -384,66 +384,10 @@ function BrandBasicEditor({ brandId, en }: { brandId: number | null; en: boolean
   );
 }
 
-/**
- * PublishTab — platform connection grid (Buffer-style).
- *
- * Auth flow — Pipedream SDK (simple):
- *   1. On mount: prefetch Connect tokens for all 4 platforms (silent, background)
- *   2. Click "Connect": pd.connectAccount() opens the Pipedream OAuth popup
- *   3. User completes OAuth in popup
- *   4. onSuccess callback fires — no polling needed
- *   5. Facebook only: fetch page list → user picks → save to DB
- */
+/** Platform connections and account lifecycle are managed by Zernio. */
 export function PublishTab({ brandId }: { brandId: number | null }) {
   const { lang } = useLang();
   const en = lang === "en";
-
-  // ── Queries ──────────────────────────────────────────────────────────
-  const fbStatusQ = (trpc as any).publish?.getBrandFacebookStatus?.useQuery(
-    { brandId: brandId ?? 0 },
-    { enabled: !!brandId, refetchOnWindowFocus: false, staleTime: 15_000 },
-  );
-  const platformsQ = (trpc as any).publish?.getConnectedPlatforms?.useQuery(
-    { brandId: brandId ?? 0 },
-    { enabled: !!brandId, refetchOnWindowFocus: false, staleTime: 20_000 },
-  );
-
-  // ── Mutations ─────────────────────────────────────────────────────────
-  const fbConnectUrlM   = (trpc as any).publish?.getFacebookConnectUrl?.useMutation?.();
-  const fbPagesM        = (trpc as any).publish?.getFacebookPages?.useMutation?.();
-  const importFbDnaMut  = (trpc as any).publish?.importFbPostsForDNA?.useMutation?.();
-  const [importResult, setImportResult] = useState<{ samplesImported: number; toneSummary: string } | null>(null);
-  const setFbPageM    = (trpc as any).publish?.setBrandFacebookPage?.useMutation?.({
-    onSuccess: () => { fbStatusQ?.refetch?.(); platformsQ?.refetch?.(); },
-  });
-  const unbindFbM     = (trpc as any).publish?.unbindBrandFacebook?.useMutation?.({
-    onSuccess: () => { fbStatusQ?.refetch?.(); platformsQ?.refetch?.(); },
-  });
-  const getConnectTkM = (trpc as any).platformConnect?.getConnectToken?.useMutation?.();
-
-  // ── Pre-fetched token cache ────────────────────────────────────────────
-  // Tokens are pre-fetched on mount so connectAccount() can start instantly
-  // without waiting for a round-trip when the user clicks the button.
-  type TokenCache = {
-    token: string;
-    connectLinkUrl: string;
-    appSlug: string;
-    env: string;
-    expiresAt: number;
-    oauthAppId: string | null;
-  };
-  const pdTokensRef = useRef<Record<string, TokenCache>>({});
-
-  // ── bundle.social connect path ─────────────────────────────────────────
-  // Which platforms use bundle.social is decided server-side by
-  // PUBLISH_PROVIDER_<PLATFORM>; this component just follows what it reports.
-  const bundleProvidersQ    = (trpc as any).bundleConnect?.getProviders?.useQuery();
-  const bundleConnectUrlMut = (trpc as any).bundleConnect?.getConnectUrl?.useMutation?.();
-  const bundleStatusMut     = (trpc as any).bundleConnect?.getConnectionStatus?.useMutation?.();
-  /** Portal links are single-use, so cache one per platform and refresh after use. */
-  const bundleUrlRef = useRef<Record<string, string | undefined>>({});
-  const [bundleConnectedMap, setBundleConnectedMap] = useState<Record<string, boolean>>({});
-  const usesBundle = (key: string) => bundleProvidersQ?.data?.[key] === "bundle";
 
   // Zernio keeps connection state separate from legacy brand bindings.
   const zernioProvidersQ = trpc.zernioConnect.getProviders.useQuery();
@@ -453,9 +397,6 @@ export function PublishTab({ brandId }: { brandId: number | null }) {
   const zernioConnectM = trpc.zernioConnect.getConnectUrl.useMutation();
   const zernioStatusM = trpc.zernioConnect.getConnectionStatus.useMutation();
   const zernioDisconnectM = trpc.zernioConnect.disconnect.useMutation();
-  const zernioProvidersRef = useRef(zernioProvidersQ.data);
-  zernioProvidersRef.current = zernioProvidersQ.data;
-  const usesZernio = (key: string) => zernioProvidersRef.current?.[key as ZernioPlatformKey] === "zernio";
   const zernioUrlRef = useRef<Record<string, string | undefined>>({});
   const [zernioStatus, setZernioStatus] = useState<Record<string, ZernioStatus>>({});
   const zernioGeneration = useRef(0);
@@ -475,9 +416,8 @@ export function PublishTab({ brandId }: { brandId: number | null }) {
     setZernioStatus({});
     setVerifyingPlatform(null);
     if (!brandId || !zernioProvidersQ.data) return;
-    const keys = (Object.keys(zernioProvidersQ.data) as ZernioPlatformKey[]).filter(usesZernio);
+    const keys = (Object.keys(zernioProvidersQ.data) as ZernioPlatformKey[]).filter(key => ["facebook", "instagram", "linkedin", "threads"].includes(key));
     for (const platform of keys) {
-      if (platform === "x") continue;
       void zernioApiRef.current.status({ brandId, platform }).then(status => {
         if (generation === zernioGeneration.current) setZernioStatus(m => ({ ...m, [platform]: status }));
       }).catch(() => {});
@@ -485,7 +425,6 @@ export function PublishTab({ brandId }: { brandId: number | null }) {
     void (async () => {
       for (const platform of keys) {
         if (generation !== zernioGeneration.current) return;
-        if (platform === "x") continue;
         await warmZernio(platform, generation);
       }
     })();
@@ -495,7 +434,7 @@ export function PublishTab({ brandId }: { brandId: number | null }) {
   // OAuth may outlast the 30-second poll, especially when selecting a Page.
   useEffect(() => {
     if (!brandId || !zernioProvidersQ.data) return;
-    const platforms = (Object.keys(zernioProvidersQ.data) as ZernioPlatformKey[]).filter(usesZernio);
+    const platforms = (Object.keys(zernioProvidersQ.data) as ZernioPlatformKey[]).filter(key => ["facebook", "instagram", "linkedin", "threads"].includes(key));
     if (!platforms.length) return;
     const generation = zernioGeneration.current;
     const refreshOnFocus = () => {
@@ -514,7 +453,7 @@ export function PublishTab({ brandId }: { brandId: number | null }) {
     const url = new URL(window.location.href);
     const rawPlatform = url.searchParams.get("connected") ?? url.searchParams.get("platform");
     const platform = (rawPlatform === "twitter" ? "x" : rawPlatform) as ZernioPlatformKey | null;
-    if (!platform || !usesZernio(platform) || (!url.searchParams.has("connected") && !url.searchParams.has("error"))) return;
+    if (!platform || !["facebook", "instagram", "linkedin", "threads"].includes(platform) || (!url.searchParams.has("connected") && !url.searchParams.has("error"))) return;
     const generation = zernioGeneration.current;
     if (url.searchParams.has("error")) alert(url.searchParams.get("error_message") || (en ? "Authorization failed." : "授權失敗，請重新連接。"));
     void zernioApiRef.current.status({ brandId, platform }).then(status => {
@@ -599,290 +538,17 @@ export function PublishTab({ brandId }: { brandId: number | null }) {
 
   // ── Local state ───────────────────────────────────────────────────────
   const [pendingPlatform, setPendingPlatform]   = useState<string | null>(null);
-  /** Platform currently being verified post-OAuth (polling Pipedream) */
+  /** Platform currently being verified post-OAuth (polling Zernio) */
   const [verifyingPlatform, setVerifyingPlatform] = useState<string | null>(null);
-  const [fbPages, setFbPages] = useState<Array<{
-    id: string;
-    name: string;
-    category: string;
-    publishReady?: boolean;
-    permissionError?: string;
-  }>>([]);
-  const [fbPickerOpen, setFbPickerOpen]         = useState(false);
-
-  const fbStatus    = fbStatusQ?.data;
-  const fbConnected = !!fbStatus?.connected;
-  const connectedMap: Record<string, { accountId: string; name?: string }> =
-    (platformsQ?.data as any)?.connected ?? {};
-
-  // ── Pre-warm SDK (dynamic import, non-blocking) ────────────────────────
-  useEffect(() => { import("@pipedream/sdk/browser").catch(() => {}); }, []);
-
-  // ── Pre-fetch tokens for all platforms ────────────────────────────────
-  // Only the token value matters — the URL is always built fresh via buildUrl()
-  // so we never store or depend on connectLinkUrl.
-  const prefetchTokens = useCallback(async () => {
-    if (!brandId) return;
-    if (!zernioProvidersRef.current) return;
-
-    // bundle.social platforms: warm a portal URL (so the click can call
-    // window.open synchronously) and read back the current connection state,
-    // which lives in bundle.social rather than in brands.fbPageId.
-    for (const key of ["facebook", "instagram", "linkedin", "threads"] as const) {
-      if (!usesBundle(key)) continue;
-      try {
-        const r = await bundleConnectUrlMut?.mutateAsync?.({
-          brandId,
-          platform: key,
-          redirectUrl: window.location.href,
-        });
-        if (r?.url) bundleUrlRef.current[key] = r.url;
-      } catch { /* silent — retried on click */ }
-      try {
-        const s = await bundleStatusMut?.mutateAsync?.({ brandId, platform: key });
-        setBundleConnectedMap((m) => ({ ...m, [key]: !!s?.connected }));
-      } catch { /* silent */ }
-    }
-
-    // Facebook — uses publish.getFacebookConnectUrl (has server-side validation)
-    if (!usesZernio("facebook")) {
-    if (!usesBundle("facebook")) try {
-      const r = await fbConnectUrlM?.mutateAsync?.({ brandId });
-      if (r?.token) {
-        pdTokensRef.current["facebook"] = {
-          token: r.token,
-          connectLinkUrl: "",   // unused — buildUrl() constructs from token
-          appSlug: "facebook_pages",
-          env: "production",
-          expiresAt: r.expiresAt ? new Date(r.expiresAt).getTime() : Date.now() + 300_000,
-          oauthAppId: r.oauthAppId ?? null,
-        };
-      }
-    } catch { /* silent — will fetch fresh on click */ }
-    }
-    // Instagram / LinkedIn / YouTube — only those still on the Pipedream path
-    for (const key of ["instagram", "linkedin", "youtube"] as const) {
-      if (usesZernio(key)) continue;
-      if (usesBundle(key)) continue;
-      try {
-        const r = await getConnectTkM?.mutateAsync?.({ platform: key, brandId });
-        if (r?.token) {
-          pdTokensRef.current[key] = {
-            token: r.token,
-            connectLinkUrl: "",   // unused
-            appSlug: r.appSlug ?? key,
-            env: r.env ?? "production",
-            expiresAt: r.expiresAt ? new Date(r.expiresAt).getTime() : Date.now() + 300_000,
-            oauthAppId: r.oauthAppId ?? null,
-          };
-        }
-      } catch { /* silent */ }
-    }
-  }, [brandId]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  useEffect(() => { prefetchTokens(); }, [prefetchTokens]);
-  useEffect(() => { if (zernioProvidersQ.data) void prefetchTokens(); }, [zernioProvidersQ.data, prefetchTokens]);
-
   // ── Platform config ────────────────────────────────────────────────────
   type PlatformCfg = { key: string; label: string; color: string; icon: any; desc: string };
   const PLATFORMS: PlatformCfg[] = [
     { key: "facebook",  label: "Facebook",  color: "#18181b", icon: faFacebook,  desc: en ? "Publish to your Facebook Page"              : "發布到 Facebook 粉專"        },
     { key: "instagram", label: "Instagram", color: "#18181b", icon: faInstagram, desc: en ? "Publish to Instagram Business account"       : "發布到 Instagram 商業帳號"   },
     { key: "linkedin",  label: "LinkedIn",  color: "#18181b", icon: faLinkedin,  desc: en ? "Publish to your LinkedIn profile or page"    : "發布到 LinkedIn 帳號或企業頁面" },
-    // Threads is visible when routed through Zernio or bundle.social.
     // X is a hidden front-stage channel (planGate) and is intentionally not listed.
     { key: "threads",   label: "Threads",   color: "#18181b", icon: faThreads,   desc: en ? "Publish to your Threads account (500 characters max)" : "發布到 Threads 帳號（上限 500 字）" },
-  ].filter((p) => p.key !== "threads" || usesBundle("threads") || usesZernio("threads"));
-
-  // ── After OAuth: poll until Pipedream registers the connection ───────────
-  // Pipedream's API can lag 5-20s after OAuth completes. Poll every 2s
-  // for up to 30s; for Facebook also retry getFacebookPages so the page
-  // picker appears automatically.
-  const waitAndDetect = async (platformKey: string) => {
-    const MAX = 15; // 15 × 2s = 30s
-    for (let i = 0; i < MAX; i++) {
-      await new Promise<void>(r => setTimeout(r, i === 0 ? 1500 : 2000));
-      try {
-        const result = await platformsQ?.refetch?.();
-        const nowConnected = !!(result?.data as any)?.connected?.[platformKey];
-        if (nowConnected || i === MAX - 1) {
-          if (platformKey === "facebook") {
-            let foundPublishablePage = false;
-            for (let fbTry = 0; fbTry < 5; fbTry++) {
-              try {
-                const pages = await fbPagesM?.mutateAsync?.({
-                  brandId,
-                  waitForPropagation: false,
-                });
-                const readyPages = (pages?.pages ?? [])
-                  .filter((page: any) => page.publishReady !== false);
-                if (readyPages.length > 0) {
-                  setFbPages(readyPages);
-                  setFbPickerOpen(true);
-                  foundPublishablePage = true;
-                  break;
-                }
-              } catch { /* keep retrying */ }
-              if (fbTry < 4) await new Promise<void>(r => setTimeout(r, 2000));
-            }
-            if (!foundPublishablePage) {
-              alert(en
-                ? "Facebook connected, but Meta did not grant Page read / publish permissions. Check the custom OAuth app and reconnect."
-                : "Facebook 已連接，但 Meta 未授予粉專讀取／發布權限。請檢查自訂 OAuth 應用程式後重新連接。");
-            }
-          }
-          fbStatusQ?.refetch?.();
-          prefetchTokens();
-          break;
-        }
-      } catch { /* refetch failed — keep polling */ }
-    }
-    fbStatusQ?.refetch?.();
-  };
-
-  // ── Connect via Pipedream SDK (creates a full-screen iframe overlay) ──────
-  // Pipedream's connect.html REQUIRES an iframe context — window.open popup
-  // will throw "Must be inside iframe". The official SDK handles this correctly.
-  function connectWithSDK(platform: PlatformCfg) {
-    if (!brandId) { alert(en ? "Please save the brand first." : "請先儲存品牌。"); return; }
-
-    if (!zernioProvidersRef.current) {
-      alert(en ? "Loading platform settings — please try again shortly." : "正在載入平台設定，請稍候再試。");
-      return;
-    }
-    if (usesZernio(platform.key)) {
-      connectZernio(platform.key as ZernioPlatformKey);
-      return;
-    }
-
-    // bundle.social hosts OAuth and channel picking itself — open its portal in
-    // a new tab. window.open must run synchronously here or the browser blocks
-    // it, so the URL has to come from the warm cache.
-    if (usesBundle(platform.key)) {
-      const url = bundleUrlRef.current[platform.key];
-      if (!url) {
-        void prefetchTokens();
-        alert(en
-          ? "Preparing authorization — please try again in a moment."
-          : "正在準備授權，請稍候 1-2 秒再試一次。");
-        return;
-      }
-      delete bundleUrlRef.current[platform.key];
-      window.open(url, "_blank", "noopener");
-      setVerifyingPlatform(platform.key);
-
-      void (async () => {
-        try {
-          for (let i = 0; i < 20; i++) {
-            await new Promise<void>((res) => setTimeout(res, 3000));
-            try {
-              const s = await bundleStatusMut?.mutateAsync?.({ brandId, platform: platform.key as any });
-              if (s?.connected) {
-                setBundleConnectedMap((m) => ({ ...m, [platform.key]: true }));
-                void prefetchTokens();
-                return;
-              }
-            } catch { /* keep polling */ }
-          }
-        } finally {
-          setVerifyingPlatform(null);
-        }
-      })();
-      return;
-    }
-
-    // Pipedream app slugs
-    const PD_APP_SLUG: Record<string, string> = {
-      facebook:  "facebook_pages",
-      instagram: "instagram_business",
-      linkedin:  "linkedin",
-      youtube:   "youtube",
-    };
-    const appSlug = PD_APP_SLUG[platform.key] ?? platform.key;
-
-    setPendingPlatform(platform.key);
-
-    (async () => {
-      // 1. Get a fresh token (or use valid cached one)
-      let token: string | null = null;
-      const tk = pdTokensRef.current[platform.key];
-      let oauthAppId: string | null = tk?.oauthAppId ?? null;
-      if (tk?.token && tk.expiresAt - Date.now() > 30_000) {
-        token = tk.token;
-      } else {
-        try {
-          const r = await getConnectTkM?.mutateAsync?.({ platform: platform.key as any, brandId });
-          if (r?.token) {
-            token = r.token;
-            oauthAppId = r.oauthAppId ?? null;
-          }
-        } catch { /* fall through */ }
-      }
-
-      if (!token) {
-        setPendingPlatform(null);
-        alert(en ? "Could not get authorization token. Please try again." : "無法取得授權 token，請稍後再試。");
-        return;
-      }
-
-      // 2. Load SDK and open iframe-based connect flow
-      try {
-        const { createFrontendClient } = await import("@pipedream/sdk/browser");
-        // Token is passed directly to connectAccount; tokenCallback is a no-op
-        // placeholder required by the type (it won't be called since we always
-        // pass token explicitly to connectAccount).
-        const pd = createFrontendClient({
-          externalUserId: `sowork-brand-${brandId}`,
-          tokenCallback: async () => ({
-            token,
-            expiresAt: new Date(Date.now() + 300_000),
-            connectLinkUrl: "",
-          } as any),
-        });
-
-        pd.connectAccount({
-          token,
-          app: appSlug,
-          oauthAppId: oauthAppId ?? undefined,
-          onSuccess: () => {
-            // OAuth completed — start polling for registration
-            setPendingPlatform(null);
-            setVerifyingPlatform(platform.key);
-            waitAndDetect(platform.key).finally(() => setVerifyingPlatform(null));
-          },
-          onError: (err: any) => {
-            setPendingPlatform(null);
-            console.error("[Pipedream] connect error:", err?.message ?? err);
-            alert(en ? `Authorization failed: ${err?.message ?? "Unknown error"}` : `授權失敗：${err?.message ?? "未知錯誤"}`);
-          },
-          onClose: (status: any) => {
-            // User closed without completing — clear pending state
-            if (!status?.successful) {
-              setPendingPlatform(null);
-            }
-          },
-        });
-      } catch (err: any) {
-        setPendingPlatform(null);
-        console.error("[Pipedream] SDK load error:", err);
-        alert(en ? "Could not load authorization service. Please try again." : "無法載入授權服務，請稍後再試。");
-      }
-    })();
-  }
-
-  // ── Disconnect Facebook ─────────────────────────────────────────────────
-  async function disconnectFacebook() {
-    if (!brandId) return;
-    if (!confirm(en
-      ? "Disconnect Facebook from this brand? Published posts won't be deleted."
-      : "確定要解除此品牌的 Facebook 綁定？已發出的貼文不受影響。")) return;
-    try {
-      await unbindFbM?.mutateAsync?.({ brandId });
-      platformsQ?.refetch?.();
-    } catch (e: any) {
-      alert(en ? `Failed: ${e?.message ?? "Unknown"}` : `解除失敗：${e?.message ?? "未知錯誤"}`);
-    }
-  }
+  ];
 
   return (
     <div className="max-w-[760px] mx-auto p-8">
@@ -896,17 +562,10 @@ export function PublishTab({ brandId }: { brandId: number | null }) {
       {/* Platform card grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {PLATFORMS.map((p) => {
-          const pdConnected = !!connectedMap[p.key];
-          // For Facebook, "connected" also means brand has a page binding
-          // On the bundle.social path the connection lives in bundle.social,
-          // not in brands.fbPageId / Pipedream, so read it from its own map.
-          const fullyConnected = usesZernio(p.key) ? !!zernioStatus[p.key]?.connected : usesBundle(p.key)
-            ? !!bundleConnectedMap[p.key]
-            : p.key === "facebook" ? fbConnected : pdConnected;
-          const legacyZernio = usesZernio(p.key) && !fullyConnected && !!zernioStatus[p.key]?.legacyConnected;
+          const fullyConnected = !!zernioStatus[p.key]?.connected;
+          const legacyZernio = !fullyConnected && !!zernioStatus[p.key]?.legacyConnected;
           const isPending   = pendingPlatform   === p.key;
           const isVerifying = verifyingPlatform === p.key;
-          const connectedAccount = connectedMap[p.key];
 
           return (
             <div
@@ -958,43 +617,11 @@ export function PublishTab({ brandId }: { brandId: number | null }) {
                 {en ? "Our publishing service has been upgraded. Please re-authorize once." : "發布服務已升級，請重新授權一次。"}
               </p>}
               {/* Connected state: account name + last connected indicator */}
-              {fullyConnected && usesZernio(p.key) && (
+              {fullyConnected && (
                 <div className="text-xs text-default-500 bg-default-50 rounded-lg px-3 py-2">
                   {zernioStatus[p.key]?.account?.name}
                 </div>
               )}
-              {!usesZernio(p.key) && <>
-              {fullyConnected && (() => {
-                const connectedAtRaw = p.key === "facebook" ? (fbStatus as any)?.connectedAt : null;
-                const daysSince = connectedAtRaw
-                  ? Math.floor((Date.now() - new Date(connectedAtRaw).getTime()) / 86_400_000)
-                  : null;
-                const isStale = daysSince !== null && daysSince > 60;
-                return (
-                  <div className={`text-xs rounded-lg px-3 py-2 ${isStale ? "bg-warning-50 text-warning-700" : "text-default-500 bg-default-50"}`}>
-                    <div>
-                      {p.key === "facebook" && fbStatus?.fbPageName && (
-                        <span>{en ? "Page: " : "粉專："}<strong>{fbStatus.fbPageName}</strong></span>
-                      )}
-                      {p.key !== "facebook" && connectedAccount?.name && (
-                        <span>{en ? "Account: " : "帳號："}<strong>{connectedAccount.name}</strong></span>
-                      )}
-                      {!((p.key === "facebook" && fbStatus?.fbPageName) || (p.key !== "facebook" && connectedAccount?.name)) && (
-                        <span className={isStale ? "" : "text-default-400"}>{en ? "Authorization active" : "授權生效中"}</span>
-                      )}
-                    </div>
-                    {daysSince !== null && (
-                      <div className={`mt-0.5 text-[12px] ${isStale ? "text-warning-600 font-medium" : "text-default-400"}`}>
-                        {isStale
-                          ? <><WarningIcon size={11} /> {en ? `Connected ${daysSince}d ago — consider re-authorizing` : `已連接 ${daysSince} 天，建議重新授權`}</>
-                          : (en ? `Connected ${daysSince}d ago` : `已連接 ${daysSince} 天`)}
-                      </div>
-                    )}
-                  </div>
-                );
-              })()}
-
-              </>}
 
               {/* Connect / Re-authorize button */}
               <div className="flex gap-2">
@@ -1005,7 +632,7 @@ export function PublishTab({ brandId }: { brandId: number | null }) {
                   startContent={(isPending || isVerifying) ? undefined : <ExternalIcon size={12} />}
                   isLoading={isPending || isVerifying}
                   isDisabled={isPending || isVerifying}
-                  onPress={() => connectWithSDK(p)}
+                  onPress={() => void connectZernio(p.key as ZernioPlatformKey)}
                   className="flex-1"
                 >
                   {isPending
@@ -1016,7 +643,7 @@ export function PublishTab({ brandId }: { brandId: number | null }) {
                         ? (en ? "Re-authorize" : "重新授權")
                         : (en ? `Connect ${p.label}` : `連接 ${p.label}`)}
                 </Button>
-                {usesZernio(p.key) && fullyConnected && (<>
+                {fullyConnected && (<>
                   <Button size="sm" variant="bordered" isDisabled={isPending || isVerifying}
                     onPress={() => void connectZernio(p.key as ZernioPlatformKey, "replace")}>
                     {en ? "Switch account" : "換帳號"}
@@ -1026,114 +653,17 @@ export function PublishTab({ brandId }: { brandId: number | null }) {
                     {en ? "Disconnect" : "解除連接"}
                   </Button>
                 </>)}
-                {!usesZernio(p.key) && <>
-                {/* Disconnect — only Facebook has DB binding to clear */}
-                {p.key === "facebook" && fbConnected && (
-                  <Button
-                    size="sm" variant="light" color="danger"
-                    isLoading={unbindFbM?.isPending}
-                    onPress={disconnectFacebook}
-                  >
-                    {en ? "Disconnect" : "解除"}
-                  </Button>
-                )}
-                </>}
-              </div>
-
-              {/* ── 匯入語氣範例 (Facebook only, fully connected) ── */}
-              {!usesZernio(p.key) && <>
-              {p.key === "facebook" && fullyConnected && (
-                <div className="rounded-xl border border-zinc-200 bg-zinc-50/60 px-3 py-3 space-y-2">
-                  <p className="text-[12px] text-zinc-800 font-medium leading-relaxed">
-                    <InboxIcon size={11} /> {en ? "Import voice from real posts" : "從真實貼文學習語氣"}
-                    {" "}
-                    <HelpTip>
-                      {en
-                        ? "Fetches your page's recent 20–30 posts, analyzes the writing style, and stores real examples in Brand DNA for AI to imitate."
-                        : "抓取粉絲團最近 20-30 篇貼文，分析語氣特徵，存入品牌大腦作為真實範例，之後產文會模仿這個寫作風格。"}
-                    </HelpTip>
-                  </p>
-                  {importResult && (
-                    <div className="text-[12px] text-zinc-700 bg-zinc-100 rounded-lg px-2 py-1.5 leading-relaxed">
-                      <CheckIcon size={11} /> {en
-                        ? `Imported ${importResult.samplesImported} samples. Tone: "${importResult.toneSummary}"`
-                        : `已匯入 ${importResult.samplesImported} 篇範例。語氣定位：「${importResult.toneSummary}」`}
-                    </div>
-                  )}
-                  <Button
-                    size="sm" fullWidth
-                    color="secondary" variant="flat"
-                    isLoading={importFbDnaMut?.isPending}
-                    isDisabled={importFbDnaMut?.isPending}
-                    onPress={async () => {
-                      if (!brandId) return;
-                      try {
-                        const r = await importFbDnaMut?.mutateAsync?.({ brandId });
-                        if (r?.ok) {
-                          setImportResult({ samplesImported: r.samplesImported, toneSummary: r.toneSummary });
-                          fbStatusQ?.refetch?.();
-                        }
-                      } catch (e: any) {
-                        alert(e?.message ?? String(e));
-                      }
-                    }}
-                  >
-                    {importFbDnaMut?.isPending
-                      ? (en ? "Analyzing posts…" : "分析貼文中…")
-                      : (en ? "Import voice samples" : "匯入語氣範例")}
-                  </Button>
                 </div>
-              )}
-              </>}
+
             </div>
           );
         })}
       </div>
 
-      {/* Facebook page picker — shown after polling detects auth + pages fetched */}
-      {fbPickerOpen && fbPages.length > 0 && (
-        <div className="mt-5 border border-primary-200 rounded-xl p-4 bg-primary-50">
-          <div className="text-sm font-semibold text-default-900 mb-3">
-            {en ? "Which Facebook Page should this brand publish to?" : "這個品牌要發到哪個粉絲團？"}
-          </div>
-          <div className="space-y-2">
-            {fbPages.map((page) => (
-              <Button
-                key={page.id} fullWidth variant="flat" color="primary" size="sm"
-                isLoading={setFbPageM?.isPending}
-                onPress={async () => {
-                  try {
-                    await setFbPageM?.mutateAsync?.({
-                      brandId: brandId!,
-                      fbPageId: page.id,
-                      fbPageName: page.name,
-                    });
-                    setFbPickerOpen(false);
-                    setFbPages([]);
-                  } catch (e: any) {
-                    alert(en ? `Failed: ${e?.message}` : `失敗：${e?.message}`);
-                  }
-                }}
-              >
-                <span className="text-left w-full truncate">
-                  {page.name}{page.category ? ` · ${page.category}` : ""}
-                </span>
-              </Button>
-            ))}
-          </div>
-          <Button
-            size="sm" variant="light" fullWidth className="mt-2"
-            onPress={() => { setFbPickerOpen(false); setFbPages([]); }}
-          >
-            {en ? "Cancel" : "取消"}
-          </Button>
-        </div>
-      )}
-
       <p className="mt-5 text-xs text-default-400 leading-relaxed">
         {en
-          ? "onBrand Studio never stores your passwords. OAuth tokens are managed by Pipedream, isolated per brand. To fully revoke access, go to each platform's app settings and remove Pipedream."
-          : "onBrand Studio 不會儲存你的密碼。OAuth token 由 Pipedream 代管，每個品牌獨立。要徹底撤銷，請至各平台設定頁面移除 Pipedream 的存取權限。"}
+          ? "onBrand Studio never stores your passwords. Authorization is held by our publishing service, Zernio, isolated per brand. To revoke it, use Disconnect on that platform."
+          : "onBrand Studio 不會儲存你的密碼。授權由發布服務 Zernio 代管，每個品牌獨立。要撤銷授權，按該平台的『解除連接』即可。"}
       </p>
     </div>
   );

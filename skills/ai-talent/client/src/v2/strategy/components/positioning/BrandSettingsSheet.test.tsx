@@ -3,10 +3,9 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
-  providers: {} as Record<string, string>, bundleProviders: {} as Record<string, string>, status: vi.fn(), connect: vi.fn(), disconnect: vi.fn(), lang: "en",
+  providers: {} as Record<string, string>, status: vi.fn(), connect: vi.fn(), disconnect: vi.fn(), lang: "en",
 }));
 vi.mock("../../../../lib/trpc", () => ({ trpc: {
-  bundleConnect: { getProviders: { useQuery: () => ({ data: mocks.bundleProviders }) } },
   zernioConnect: {
     getProviders: { useQuery: () => ({ data: mocks.providers }) },
     getConnectUrl: { useMutation: () => ({ mutateAsync: mocks.connect }) },
@@ -15,7 +14,6 @@ vi.mock("../../../../lib/trpc", () => ({ trpc: {
   },
 } }));
 vi.mock("../../../../lib/i18n", () => ({ useLang: () => ({ lang: mocks.lang }) }));
-vi.mock("@pipedream/sdk/browser", () => ({}));
 vi.mock("@heroui/react", () => ({
   Modal: () => null, ModalContent: () => null, Input: () => null, Textarea: () => null, Spinner: () => null,
   Button: ({ children, onPress }: { children: React.ReactNode; onPress?: () => void }) => <button onClick={onPress}>{children}</button>,
@@ -34,10 +32,9 @@ describe("PublishTab Zernio focus refresh", () => {
   let root: Root | null;
   beforeEach(() => {
     (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
-    mocks.bundleProviders = {};
     mocks.lang = "en";
     mocks.disconnect.mockReset().mockResolvedValue(undefined);
-    mocks.providers = { facebook: "zernio", linkedin: "zernio", instagram: "pipedream" };
+    mocks.providers = { facebook: "zernio", linkedin: "zernio", instagram: "zernio" };
     mocks.status.mockReset().mockResolvedValue({ connected: false, account: null, pendingScheduled: 0, legacyConnected: false });
     mocks.connect.mockReset().mockResolvedValue({ url: "https://example.com/connect" });
     container = document.createElement("div");
@@ -83,7 +80,7 @@ describe("PublishTab Zernio focus refresh", () => {
     mocks.status.mockClear().mockResolvedValue({ connected: true, account: { accountId: "a", name: "Authorized Page", username: null }, pendingScheduled: 0, legacyConnected: false });
     await act(async () => { window.dispatchEvent(new Event("focus")); });
     expect(mocks.status.mock.calls.map(([input]) => input)).toEqual([
-      { brandId: 3, platform: "facebook" }, { brandId: 3, platform: "linkedin" },
+      { brandId: 3, platform: "facebook" }, { brandId: 3, platform: "linkedin" }, { brandId: 3, platform: "instagram" },
     ]);
     expect(container.textContent).toContain("Authorized Page");
   });
@@ -103,11 +100,22 @@ describe("PublishTab Zernio focus refresh", () => {
     window.dispatchEvent(new Event("focus"));
     expect(mocks.status).not.toHaveBeenCalled();
   });
-  it("does not request Zernio status when every platform uses another provider", async () => {
-    mocks.providers = { facebook: "bundle", linkedin: "pipedream" };
+  it("does not request connections until providers load", async () => {
+    mocks.providers = undefined as any;
     await act(async () => root!.render(<PublishTab brandId={3} />));
     await act(async () => { window.dispatchEvent(new Event("focus")); });
     expect(mocks.status).not.toHaveBeenCalled();
+    expect(mocks.connect).not.toHaveBeenCalled();
+  });
+  // Historical provider name is asserted absent from the user-facing explanation.
+  it.each(["en", "zh-TW"])("explains Zernio authorization in %s", async lang => {
+    mocks.lang = lang;
+    await act(async () => root!.render(<PublishTab brandId={3} />));
+    const footer = container.querySelector("p.mt-5")!.textContent!;
+    expect(footer).toContain("Zernio");
+    expect(footer).not.toContain("Pipedream");
+    expect(footer).toContain(lang === "en" ? "Disconnect" : "解除連接");
+    for (const platform of ["Facebook", "Instagram", "LinkedIn", "Threads"]) expect(container.textContent).toContain(platform);
   });
   function click(label: string) {
     const button = Array.from(container.querySelectorAll("button")).find(b => b.textContent === label);
@@ -187,15 +195,15 @@ describe("PublishTab Zernio focus refresh", () => {
     expect(mocks.status).toHaveBeenCalledWith({ brandId: 3, platform: "facebook" });
   });
 
-  it.each(["zernio", "bundle", "pipedream"])("shows only the four supported cards and gates Threads for %s", async provider => {
-    mocks.providers = { facebook: provider, instagram: provider, linkedin: provider, threads: provider,
+  it("shows only four supported cards and never prefetches hidden platforms", async () => {
+    mocks.providers = { facebook: "zernio", instagram: "zernio", linkedin: "zernio", threads: "zernio",
       youtube: "zernio", tiktok: "zernio", x: "zernio" };
-    mocks.bundleProviders = { threads: provider };
     await act(async () => root!.render(<PublishTab brandId={3} />));
     const connectButtons = Array.from(container.querySelectorAll("button"))
       .map(button => button.textContent).filter(text => text?.startsWith("Connect "));
     expect(connectButtons).toEqual(["Connect Facebook", "Connect Instagram", "Connect LinkedIn",
-      ...(provider === "pipedream" ? [] : ["Connect Threads"])]);
+      "Connect Threads"]);
+    expect(mocks.connect.mock.calls.map(([i]) => i.platform)).toEqual(["facebook", "instagram", "linkedin", "threads"]);
     expect(container.textContent).not.toContain("YouTube");
     expect(container.textContent).not.toContain("TikTok");
   });

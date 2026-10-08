@@ -98,7 +98,7 @@ const STRATEGY_NAMESPACES = new Set([
   "positioningDocs", "channelRole", "workbench", "strategistChat", "brandKnowledge", "personaAgent",
   "brandColors", "campaign", "vendor", "customChannel",
 ]);
-const MANAGE_NAMESPACES = new Set(["bundleConnect", "platformConnect"]);
+const MANAGE_NAMESPACES = new Set(["zernioConnect"]);
 const PUBLISH_PATHS = new Set(["calendar.schedule", "calendar.reschedule", "calendar.retry", "calendar.publish"]);
 /**
  * Adding a photo is part of making a post, so it only needs `write` even
@@ -124,7 +124,7 @@ export function permissionNeeded(path: string, type: string): Need {
   if (type === "query") return "view";
   const ns = namespaceOf(path);
   if (MANAGE_NAMESPACES.has(ns)) return "manage";
-  if (ns === "publish" || PUBLISH_PATHS.has(path)) return "publish";
+  if (PUBLISH_PATHS.has(path)) return "publish";
   if (WRITE_PATHS.has(path)) return "write";
   if (STRATEGY_NAMESPACES.has(ns)) return "strategy";
   return "write";

@@ -1,12 +1,11 @@
 /**
- * touchpoints — 接觸點註冊表：把散落在 publishRouter / bundleConnectRouter /
- * ShellLayout 導覽陣列裡、各自判斷「這個通路能不能真的自動發布」的邏輯，
+ * touchpoints — 接觸點註冊表：把發布與 ShellLayout 導覽陣列裡、各自判斷「這個通路能不能真的自動發布」的邏輯，
  * 收成一張查得到的表。
  *
  * 2026-09-13（CJ「把現在寫死在各自檔案裡的隱性規則，變成一張查得到的表」）：
  * 這不是新功能，registry 本身是靜態資料（跟 mediaGen.ts 的 PIAPI_MAP 同一種
  * 「spec table + 通用查詢函式」風格），deployStatus 才是即時算出來的 ——
- * 直接讀 brands.bundleConnectedAt，不额外開表存一份會跟真實狀態脫節的副本。
+ * 直接讀 brand_publish_connections 的 Zernio 平台連線，不另存一份狀態副本。
  *
  * industry / market 只是「顯示用」的標籤：目前沒有任何一條「這個產業/國家
  * 不能用這個通路」的已驗證規則，所以 applicable 一律回 true。等有真的規則
@@ -50,25 +49,30 @@ export const TOUCHPOINTS: TouchpointDef[] = [
 interface BrandRow {
   industry: string | null;
   targetCountry: string | null;
-  bundleConnectedAt: string | null;
+  connectedPlatforms: Set<string>;
 }
 
 async function loadBrandRow(brandId: number): Promise<BrandRow> {
   const [rowsRaw]: any = await localPool.execute(
-    `SELECT industry, targetCountry, bundleConnectedAt FROM brands WHERE id = ? LIMIT 1`,
+    `SELECT industry, targetCountry FROM brands WHERE id = ? LIMIT 1`,
     [brandId],
   );
   const row = Array.isArray(rowsRaw) ? rowsRaw[0] : null;
+  const [connections]: any = await localPool.execute(
+    `SELECT platform FROM brand_publish_connections
+      WHERE brandId = ? AND provider = 'zernio' AND status = 'connected'`,
+    [brandId],
+  );
   return {
     industry: row?.industry ?? null,
     targetCountry: row?.targetCountry ? String(row.targetCountry).toUpperCase() : null,
-    bundleConnectedAt: row?.bundleConnectedAt ?? null,
+    connectedPlatforms: new Set((connections as Array<{ platform: string }>).map(c => c.platform)),
   };
 }
 
 function deployStatusFor(def: TouchpointDef, brand: BrandRow): DeployStatus {
   if (def.deployMethod !== "api-publish") return "manual";
-  return brand.bundleConnectedAt ? "connected" : "manual";
+  return brand.connectedPlatforms.has(def.id) ? "connected" : "manual";
 }
 
 export interface BrandCoverage {

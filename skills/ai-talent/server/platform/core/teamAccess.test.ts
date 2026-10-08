@@ -146,10 +146,12 @@ describe("permissionNeeded：每種呼叫需要什麼權限", () => {
     ["assetPhoto.saveGeneratedImage", "mutation", "write"],
     ["assetPhoto.remove", "mutation", "write"],
     ["assetPhoto.setPrimary", "mutation", "strategy"],
-    ["publish.toFacebook", "mutation", "publish"],
     ["calendar.schedule", "mutation", "publish"],
     ["calendar.cancel", "mutation", "write"],
-    ["platformConnect.disconnect", "mutation", "manage"],
+    ["zernioConnect.disconnect", "mutation", "manage"],
+    ["zernioConnect.getConnectUrl", "mutation", "manage"],
+    ["zernioConnect.getConnectionStatus", "mutation", "manage"],
+    ["zernioConnect.getProviders", "query", "view"],
   ])("%s（%s）→ %s", (path, type, need) => {
     expect(permissionNeeded(path, type)).toBe(need);
   });
@@ -158,7 +160,7 @@ describe("permissionNeeded：每種呼叫需要什麼權限", () => {
     const editor = resolvePermissions("editor");
     expect(() => assertTeamPermission(editor, "quickTask.runOrchestra", "mutation")).not.toThrow();
     expect(() => assertTeamPermission(editor, "brand.update", "mutation")).toThrow(/修改品牌定位/);
-    expect(() => assertTeamPermission(editor, "publish.toFacebook", "mutation")).toThrow(/發布/);
+    expect(() => assertTeamPermission(editor, "calendar.publish", "mutation")).toThrow(/發布/);
     expect(() => assertTeamPermission(resolvePermissions("viewer"), "output.update", "mutation")).toThrow(/檢視/);
     expect(() => assertTeamPermission(resolvePermissions("viewer"), "brand.get", "query")).not.toThrow();
   });
@@ -262,8 +264,8 @@ describe("protectedProcedure：成員的呼叫以擁有者的資料身分執行"
       listByMember: protectedProcedure.query(({ ctx }) => who(ctx)),
     }),
     quickTask: router({ run: protectedProcedure.input(brandOnly).mutation(({ ctx }) => who(ctx)) }),
-    publish: router({ toFacebook: protectedProcedure.input(brandOnly).mutation(({ ctx }) => who(ctx)) }),
-    platformConnect: router({ disconnect: protectedProcedure.input(brandOnly).mutation(({ ctx }) => who(ctx)) }),
+    calendar: router({ publish: protectedProcedure.input(brandOnly).mutation(({ ctx }) => who(ctx)) }),
+    zernioConnect: router({ disconnect: protectedProcedure.input(brandOnly).mutation(({ ctx }) => who(ctx)) }),
     mission: router({ list: protectedProcedure.query(({ ctx }) => who(ctx)) }),
     billing: router({ getStatus: protectedProcedure.query(({ ctx }) => who(ctx)) }),
     adminStats: router({ all: adminProcedure.query(() => "secret") }),
@@ -287,17 +289,17 @@ describe("protectedProcedure：成員的呼叫以擁有者的資料身分執行"
   it("editor：可以寫內容，不能改定位、不能發布", async () => {
     expect(await as(3).quickTask.run({ brandId: 100 })).toEqual({ dataUserId: 1, actorId: 3 });
     await expect(as(3).brand.update({ brandId: 100 })).rejects.toMatchObject({ code: "FORBIDDEN" });
-    await expect(as(3).publish.toFacebook({ brandId: 100 })).rejects.toMatchObject({ code: "FORBIDDEN" });
+    await expect(as(3).calendar.publish({ brandId: 100 })).rejects.toMatchObject({ code: "FORBIDDEN" });
   });
 
   it("editor 開了定位與發布：都可以，但仍不能動社群帳號連結", async () => {
     expect(await as(4).brand.update({ brandId: 100 })).toEqual({ dataUserId: 1, actorId: 4 });
-    expect(await as(4).publish.toFacebook({ brandId: 100 })).toEqual({ dataUserId: 1, actorId: 4 });
-    await expect(as(4).platformConnect.disconnect({ brandId: 100 })).rejects.toMatchObject({ code: "FORBIDDEN" });
+    expect(await as(4).calendar.publish({ brandId: 100 })).toEqual({ dataUserId: 1, actorId: 4 });
+    await expect(as(4).zernioConnect.disconnect({ brandId: 100 })).rejects.toMatchObject({ code: "FORBIDDEN" });
   });
 
   it("admin：全部可以", async () => {
-    expect(await as(2).platformConnect.disconnect({ brandId: 100 })).toEqual({ dataUserId: 1, actorId: 2 });
+    expect(await as(2).zernioConnect.disconnect({ brandId: 100 })).toEqual({ dataUserId: 1, actorId: 2 });
   });
 
   it("viewer：看得到，任何寫入都被擋", async () => {
