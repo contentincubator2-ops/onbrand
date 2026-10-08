@@ -48,9 +48,10 @@ import { KPI_METRICS, pickKpiAgent, runKpiPlan } from "../core/campaign/campaign
 import { brandIndustry, pickPlannerAgent } from "../core/campaign/campaignTeam";
 import { buildCampaignRoster, CAMPAIGN_ROLES, ROLES } from "../core/campaign/campaignRoster";
 import { appendChat, closeThread, listChat, listThreads, markUndone, recentSummaries, reopenThread } from "../core/campaign/campaignChatStore";
-import { addSource, formatSourcesForPrompt, listSources, loadSourceDocs, readLinksInMessage, removeSource, MAX_STORED_CHARS, type LinkRead } from "../core/campaign/campaignChatSources";
+import { addSource, formatSourcesForPrompt, listSources, loadSourceDocs, readLinks, readLinksInMessage, removeSource, MAX_STORED_CHARS, type LinkRead } from "../core/campaign/campaignChatSources";
 import { isHiddenContentPlatform, isHiddenHistoryItem } from "../../platform/core/billing/planGate";
 import { ownedProductIds, resolveProductScope } from "../../strategy/core/entities/eventProductScope";
+import { readEventIntake, cleanLinks, INTAKE_LINKS_MAX } from "../../strategy/core/entities/eventIntake";
 import { invalidateBrandPrefix } from "../../strategy/core/brand/brandContext";
 import { campaignPostState, canMarkPublished, type CampaignPostState } from "../core/campaign/campaignPostStatus";
 
@@ -227,6 +228,8 @@ export const campaignRouter = router({
           endAt: row.endAt ? new Date(row.endAt).toISOString().slice(0, 10) : null,
           /** 新增活動視窗裡寫的「活動主題／重點」——排企劃的那段話先帶這個，不請使用者重寫一次。 */
           note: typeof pos?.note === "string" ? pos.note.trim().slice(0, 800) : "",
+          /** 新增活動時指定的目標受眾（eventIntake.ts）。 */
+          targetAudience: readEventIntake(pos).audience,
         },
         settings: visibleSettings(pos.campaign),
         plan: visiblePlan((pos.campaignPlan ?? null) as CampaignPlan | null),
@@ -566,6 +569,23 @@ export const campaignRouter = router({
       } catch (e: any) {
         throw new TRPCError({ code: "BAD_REQUEST", message: String(e?.message ?? e).slice(0, 300) });
       }
+    }),
+
+  /**
+   * 新增活動視窗裡填的活動連結（2026-10-08 CJ「新建活動時，要增加可以提供連結的功能」）：伺服器去讀，
+   * 讀到的存成這檔活動的參考資料，跟上傳的檔案同一張表——排企劃、活動定位、之後的對話都讀得到。
+   * 讀不到的回在 failed，畫面要講。
+   */
+  chatAddLinks: protectedProcedure
+    .input(z.object({
+      eventId: z.number().int().positive(),
+      urls: z.array(z.string().max(1000)).min(1).max(20),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await loadEvent(input.eventId, ctx.user!.id);
+      const urls = cleanLinks(input.urls, INTAKE_LINKS_MAX);
+      if (!urls.length) return { read: [] as LinkRead[], failed: [] as string[] };
+      return readLinks(input.eventId, ctx.user!.id, urls);
     }),
 
   chatRemoveSource: protectedProcedure
