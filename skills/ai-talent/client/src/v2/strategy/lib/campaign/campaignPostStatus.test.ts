@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { POST_STATES, isPostDone, postStateLabel, postStateOf } from "./campaignPostStatus";
+import { POST_STATES, isPostDone, postStateDot, postStateLabel, postStateOf } from "./campaignPostStatus";
 
 describe("postStateOf", () => {
   it("沒寫就是未產出，不管伺服器說什麼", () => {
@@ -27,5 +27,10 @@ describe("labels", () => {
   });
   it("核准與發布才算完成", () => {
     expect(POST_STATES.filter(isPostDone)).toEqual(["approved", "published"]);
+  });
+  it("地圖上的點：每一關長得都不一樣（草稿不能跟核准一樣是綠的）", () => {
+    const dots = POST_STATES.map(postStateDot);
+    expect(new Set(dots).size).toBe(POST_STATES.length);
+    expect(postStateDot("draft")).not.toContain("success");
   });
 });
