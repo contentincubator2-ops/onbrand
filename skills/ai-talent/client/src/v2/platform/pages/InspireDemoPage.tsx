@@ -11,7 +11,8 @@
  *   · 首頁＝全螢幕企業色主視覺：標題在上、兩顆並排按鈕在最下面。
  *   · 設定頁＝訂車設定器：上面一塊「目前的設定」預覽，下面一段一段置中的小標（議題／平台／說話風格），
  *     平台用圓形色票式的選鈕，選取＝外圈；最底下固定一條「摘要＋主按鈕」。
- *   · 靈感牆＝庫存車卡片：灰底卡、標題、三格規格列、兩顆按鈕。
+ *   · 靈感牆＝庫存車卡片：企業色封面（風格圖示＋平台）、標題、三格規格列、兩顆按鈕。
+ *   · 圖示一律用 FontAwesome Free 的單色線條圖示：議題一題一個，風格從風格名的關鍵字判斷內容類型。
  * 靈感卡放點子、開場、怎麼做、為什麼；採用了才寫成稿。審查只提建議（CJ「審查後不要直接改寫，
  * 要提出建議，看醫生自己是否要改寫」）：成稿在醫師手上，逐句決定照建議改、維持原句或自己改，
  * 改過可以再審一次。審查面板逐組列出條文與出處，狀態對應伺服器真的那一次審查。
@@ -20,7 +21,11 @@
 import React from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
-  faArrowUpRightFromSquare, faCheck, faChevronLeft, faCircleNotch, faCopy, faMinus, faTriangleExclamation, faXmark,
+  faArrowUpRightFromSquare, faBellSlash, faBookOpen, faBrain, faCalendarCheck, faCamera, faCheck, faChevronLeft, faCircleNotch,
+  faClapperboard, faComments, faCopy, faDumbbell, faFaceLaughBeam, faFlask, faGamepad, faHeartPulse, faHouseMedical, faLayerGroup,
+  faLightbulb, faMagnifyingGlass, faMasksTheater, faMinus, faMusic, faPaw, faPenNib, faPeopleRoof, faPersonRunning, faPills, faPlane,
+  faPrescriptionBottleMedical, faScaleBalanced, faShirt, faStethoscope, faTowerBroadcast, faTriangleExclamation, faTrophy,
+  faUserDoctor, faUserGraduate, faUsers, faUtensils, faWandMagicSparkles, faXmark,
 } from "@fortawesome/free-solid-svg-icons";
 import { faFacebookF, faInstagram, faTiktok, faYoutube } from "@fortawesome/free-brands-svg-icons";
 import { trpc } from "../../../lib/trpc";
@@ -34,6 +39,25 @@ const PLATFORM_ICON: Record<string, any> = { facebook: faFacebookF, youtube: faY
 const PLATFORM_ORDER = ["facebook", "youtube", "instagram", "tiktok"];
 const MARKETS: Array<{ id: string; label: string }> = [{ id: "all", label: "全部" }, { id: "tw", label: "台灣" }, { id: "us", label: "美國" }];
 const MARKET_LABEL: Record<string, string> = { tw: "台灣", us: "美國" };
+
+/** 議題圖示（題庫在 server；這裡只是每一題配一個圖示，沒配到的用聽診器）。 */
+const TOPIC_ICON: Record<string, any> = {
+  threshold: faHeartPulse, "722": faHouseMedical, "measure-mistakes": faTriangleExclamation, "white-coat": faUserDoctor,
+  silent: faBellSlash, salt: faUtensils, exercise: faPersonRunning, young: faUserGraduate, "medication-myth": faPills,
+  "stop-medication": faPrescriptionBottleMedical, complications: faBrain, checkup: faCalendarCheck,
+};
+
+/** 風格圖示：從風格名的關鍵字判斷內容類型（100 位不逐一手配；判斷不出來用燈泡）。 */
+const STYLE_ICON_RULES: Array<[RegExp, any]> = [
+  [/魔術|錯視/, faWandMagicSparkles], [/料理|食譜|食材|開吃|吃播|蹭飯|路邊攤/, faUtensils], [/律師|法/, faScaleBalanced],
+  [/狗|貓|寵/, faPaw], [/舞|歌手|口技|音樂|對嘴/, faMusic], [/遊戲|闖關|關卡/, faGamepad], [/挑戰|賭|對決|比拚/, faTrophy],
+  [/實驗|工程|科普|機關/, faFlask], [/懸案|說書|故事|寓言|哲理|金句|字卡/, faBookOpen], [/健身|教練|儀式|自律/, faDumbbell],
+  [/直播|實況/, faTowerBroadcast], [/評測|實測|盲測|開箱|拆解/, faMagnifyingGlass], [/穿搭/, faShirt], [/妝|變身/, faWandMagicSparkles],
+  [/旅|行程|出門/, faPlane], [/動畫|插畫|圖文|貼圖|線條|單格|手作/, faPenNib], [/家庭|夫妻|全家|父子|兄弟|兄妹|媽媽/, faPeopleRoof],
+  [/短劇|劇場|重演|情境|惡作劇|互整|整人/, faMasksTheater], [/寫真|自拍|旅拍|花絮|輪播/, faCamera], [/閒聊|開講|碎念|自白|聊/, faComments],
+  [/搞笑|自嘲|吐槽|幹話|無厘頭|迷因/, faFaceLaughBeam], [/影片|長片|實境|企劃/, faClapperboard],
+];
+const styleIcon = (label?: string) => STYLE_ICON_RULES.find(([re]) => re.test(label ?? ""))?.[1] ?? faLightbulb;
 
 interface Topic { id: string; label: string; hint: string }
 interface Persona { key: string; platform: string; platformLabel: string; market: string; label: string; reference: string; pitch: string; format: string }
@@ -460,16 +484,35 @@ function BasisSheet({ groups, facts, factSource, checkedAt, onClose }: { groups:
 }
 
 /** 規格列：上面大字、下面小字（靈感卡與預覽共用）。 */
-function Specs({ items }: { items: Array<{ value: React.ReactNode; label: string }> }) {
+function Specs({ items }: { items: Array<{ value: React.ReactNode; label: string; icon?: any }> }) {
   return (
     <div className="flex">
       {items.map((s, i) => (
         <div key={i} className="min-w-0 flex-1 px-1 text-center">
+          {s.icon ? <FontAwesomeIcon icon={s.icon} className="mb-2 text-[18px]" style={{ color: SUB }} /> : null}
           <div className="truncate text-[15px] font-medium">{s.value}</div>
           <div className="mt-0.5 text-[11px]" style={{ color: SUB }}>{s.label}</div>
         </div>
       ))}
     </div>
+  );
+}
+
+/** 圓形圖示徽章（主視覺與卡片封面共用）。 */
+function Badge({ icon, size = 44, solid }: { icon: any; size?: number; solid?: boolean }) {
+  return (
+    <span className="flex shrink-0 items-center justify-center rounded-full" style={{ width: size, height: size, fontSize: size * 0.42, background: solid ? "#fff" : "rgba(255,255,255,0.18)", color: solid ? BRAND : "#fff" }}>
+      <FontAwesomeIcon icon={icon} />
+    </span>
+  );
+}
+
+/** 企業色封面上的波形底紋。 */
+function CoverWave() {
+  return (
+    <svg viewBox="0 0 480 160" preserveAspectRatio="none" className="absolute inset-0 h-full w-full" aria-hidden="true">
+      <path d="M0 96 H150 l12 -7 l10 7 h18 l9 22 l16 -84 l16 100 l11 -38 h22 l14 -18 l16 18 H480" fill="none" stroke="#fff" strokeOpacity="0.28" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
+    </svg>
   );
 }
 
@@ -552,15 +595,26 @@ export default function InspireDemoPage() {
         <>
           <Nav right={<button type="button" onClick={() => { saveName(""); setDoctor(""); }}>換名字</button>} />
 
-          {/* 目前的設定——相當於設定器最上面那張車圖 */}
-          <div className="px-6 pb-2 pt-6 text-center">
-            <div className="text-[13px]" style={{ color: SUB }}>{byline(doctor)}的內容設定</div>
-            <h1 className="mx-auto mt-2 max-w-[360px] text-[32px] font-medium leading-[1.2]" style={{ letterSpacing: "-0.02em" }}>{topicLabel || "今天想講什麼"}</h1>
-            <div className="mt-6 rounded py-5" style={{ background: PANEL }}>
+          {/* 目前的設定——相當於設定器最上面那張車圖：企業色封面＋議題圖示＋已選風格的圖示 */}
+          <div className="px-6 pb-2 pt-4">
+            <div className="relative overflow-hidden rounded" style={{ background: "linear-gradient(135deg, #E9004A 0%, #F0336B 100%)" }}>
+              <CoverWave />
+              <div className="relative flex flex-col items-center px-5 pb-6 pt-7 text-center text-white">
+                <Badge icon={custom.trim() ? faStethoscope : TOPIC_ICON[topicId] ?? faStethoscope} size={64} solid />
+                <div className="mt-4 text-[12px]" style={{ color: "rgba(255,255,255,0.9)" }}>{byline(doctor)}的內容設定</div>
+                <h1 className="mt-1 max-w-[340px] text-[26px] font-medium leading-[1.25]" style={{ letterSpacing: "-0.01em" }}>{topicLabel || "今天想講什麼"}</h1>
+                <div className="mt-4 flex min-h-[36px] items-center justify-center gap-2">
+                  {pickedPersonas.length
+                    ? pickedPersonas.map((p) => <Badge key={p.key} icon={styleIcon(p.label)} size={36} />)
+                    : <span className="text-[12px]" style={{ color: "rgba(255,255,255,0.85)" }}>還沒選說話風格</span>}
+                </div>
+              </div>
+            </div>
+            <div className="mt-2 rounded py-4" style={{ background: PANEL }}>
               <Specs items={[
-                { value: hasTopic ? "已選" : "未選", label: "議題" },
-                { value: `${picked.length}／${maxPersonas}`, label: "說話風格" },
-                { value: pickedPersonas.length ? Array.from(new Set(pickedPersonas.map((p) => p.platformLabel))).length : 0, label: "平台" },
+                { icon: faStethoscope, value: hasTopic ? "已選" : "未選", label: "議題" },
+                { icon: faUsers, value: `${picked.length}／${maxPersonas}`, label: "說話風格" },
+                { icon: faLayerGroup, value: pickedPersonas.length ? Array.from(new Set(pickedPersonas.map((p) => p.platformLabel))).length : 0, label: "平台" },
               ]} />
             </div>
           </div>
@@ -569,7 +623,10 @@ export default function InspireDemoPage() {
             <div className="grid grid-cols-2 gap-2">
               {topics.map((t) => (
                 <Option key={t.id} on={!custom.trim() && topicId === t.id} onClick={() => { setTopicId(t.id); setCustom(""); }}>
-                  <div className="text-[14px] font-medium leading-snug">{t.label}</div>
+                  <div className="flex items-center gap-3">
+                    <FontAwesomeIcon icon={TOPIC_ICON[t.id] ?? faStethoscope} className="w-5 shrink-0 text-[18px]" style={{ color: !custom.trim() && topicId === t.id ? BRAND : "#393C41" }} />
+                    <span className="text-[14px] font-medium leading-snug">{t.label}</span>
+                  </div>
                 </Option>
               ))}
             </div>
@@ -612,12 +669,19 @@ export default function InspireDemoPage() {
                 const on = picked.includes(p.key);
                 return (
                   <Option key={p.key} on={on} disabled={!on && picked.length >= maxPersonas} onClick={() => toggle(p.key)}>
-                    <div className="flex items-baseline justify-between gap-3">
-                      <span className="text-[16px] font-medium">{p.label}</span>
-                      <span className="shrink-0 text-[12px]" style={{ color: SUB }}>{MARKET_LABEL[p.market]}</span>
+                    <div className="flex items-start gap-3">
+                      <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded text-[18px]" style={{ background: on ? BRAND : PANEL, color: on ? "#fff" : "#393C41" }}>
+                        <FontAwesomeIcon icon={styleIcon(p.label)} />
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-baseline justify-between gap-3">
+                          <span className="text-[16px] font-medium">{p.label}</span>
+                          <span className="shrink-0 text-[12px]" style={{ color: SUB }}>{MARKET_LABEL[p.market]}</span>
+                        </div>
+                        <div className="mt-1 text-[12px] font-medium" style={{ color: "#393C41" }}>參考：{p.reference}</div>
+                        <div className="mt-1 text-[12px] leading-relaxed" style={{ color: SUB }}>{p.pitch}</div>
+                      </div>
                     </div>
-                    <div className="mt-1 text-[12px] font-medium" style={{ color: "#393C41" }}>參考：{p.reference}</div>
-                    <div className="mt-1 text-[12px] leading-relaxed" style={{ color: SUB }}>{p.pitch}</div>
                   </Option>
                 );
               })}
@@ -654,15 +718,30 @@ export default function InspireDemoPage() {
           <div className="space-y-4 px-6 pb-8">
             {notice ? <div className="rounded px-4 py-3 text-center text-[13px]" style={{ background: PANEL, color: WARN }}>{notice}</div> : null}
             {pending.map((k) => (
-              <div key={`p-${k}`} className="flex items-center justify-center gap-3 rounded py-10 text-[14px] font-medium" style={{ background: PANEL, color: SUB }}>
-                <FontAwesomeIcon icon={faCircleNotch} spin style={{ color: BRAND }} />{personaOf(k)?.label}正在想
+              <div key={`p-${k}`} className="overflow-hidden rounded" style={{ background: PANEL }}>
+                <div className="relative flex h-[72px] items-center px-5" style={{ background: "linear-gradient(135deg, #E9004A 0%, #F0336B 100%)", opacity: 0.55 }}>
+                  <CoverWave />
+                  <div className="relative"><Badge icon={styleIcon(personaOf(k)?.label)} size={44} solid /></div>
+                </div>
+                <div className="flex items-center gap-3 px-5 py-5 text-[14px] font-medium" style={{ color: SUB }}>
+                  <FontAwesomeIcon icon={faCircleNotch} spin style={{ color: BRAND }} />{personaOf(k)?.label}正在想
+                </div>
               </div>
             ))}
-            {!ideas.length && !pending.length && !notice ? <div className="py-10 text-center text-[13px]" style={{ color: FAINT }}>還沒有點子。</div> : null}
+            {!ideas.length && !pending.length && !notice ? <div className="flex flex-col items-center gap-3 py-12 text-[13px]" style={{ color: FAINT }}><FontAwesomeIcon icon={faLightbulb} className="text-[28px]" />還沒有點子。</div> : null}
             {ideas.map((i) => {
               const p = personaOf(i.persona);
               return (
-                <article key={i.id} className="rounded px-5 pb-5 pt-6" style={{ background: PANEL }}>
+                <article key={i.id} className="overflow-hidden rounded" style={{ background: PANEL }}>
+                  <div className="relative flex h-[104px] items-center justify-between px-5" style={{ background: "linear-gradient(135deg, #E9004A 0%, #F0336B 100%)" }}>
+                    <CoverWave />
+                    <div className="relative"><Badge icon={styleIcon(p?.label)} size={56} solid /></div>
+                    <div className="relative flex items-center gap-2 text-[12px] font-medium text-white">
+                      {p ? <Badge icon={PLATFORM_ICON[p.platform]} size={32} /> : null}
+                      <span>{i.format}</span>
+                    </div>
+                  </div>
+                  <div className="px-5 pb-5 pt-5">
                   <h3 className="text-[22px] font-medium leading-snug" style={{ letterSpacing: "-0.01em" }}>{i.title}</h3>
                   <p className="mt-1 text-[12px]" style={{ color: SUB }}>{p?.label}・參考{p?.reference}</p>
                   <p className="mt-4 text-[15px] leading-relaxed">「{i.hook}」</p>
@@ -670,14 +749,15 @@ export default function InspireDemoPage() {
                   {i.why ? <p className="mt-2 text-[12px] leading-relaxed" style={{ color: SUB }}>{i.why}</p> : null}
                   <div className="my-5 h-px" style={{ background: LINE }} />
                   <Specs items={[
-                    { value: <><FontAwesomeIcon icon={p ? PLATFORM_ICON[p.platform] : faCheck} className="mr-1.5 text-[13px]" />{p?.platformLabel}</>, label: "平台" },
-                    { value: i.format, label: "形式" },
-                    { value: p ? MARKET_LABEL[p.market] : "", label: "風格市場" },
+                    { icon: p ? PLATFORM_ICON[p.platform] : faCheck, value: p?.platformLabel, label: "平台" },
+                    { icon: faClapperboard, value: i.format, label: "形式" },
+                    { icon: faUsers, value: p ? MARKET_LABEL[p.market] : "", label: "風格市場" },
                   ]} />
                   <div className="mt-5 flex gap-3">
                     <button type="button" onClick={() => setOpen(i)} className="h-11 flex-1 rounded text-[14px] font-medium text-white" style={{ background: BRAND }}>採用並寫成稿</button>
                     <button type="button" disabled={busy} onClick={() => run([i.persona], { subject: i.subject, topicLabel: i.topicLabel })}
                       className="h-11 flex-1 rounded text-[14px] font-medium disabled:opacity-40" style={{ background: "#fff", color: "#393C41" }}>請他再想</button>
+                  </div>
                   </div>
                 </article>
               );
