@@ -142,14 +142,15 @@ describe("提示詞", () => {
     expect(w).not.toContain("王醫師醫師");
   });
 
-  it("審查：只列這一組的條文、要求附建議而不改稿；白名單只在事實查核那一組出現", () => {
+  it("審查：只列這一組的條文、要求附建議而不改稿；每一組都帶白名單，照白名單寫的不算違規", () => {
     const med = reviewPrompt(itemsOfGroup("medical-ad"), []);
     expect(med).toContain("med-103");
     expect(med).not.toContain("drug-68");
-    expect(med).not.toContain("【白名單】");
+    expect(med).toContain("糖尿病前期是可以逆轉的");
+    expect(med).toContain("不算違規");
     expect(med).toContain("suggestion");
     expect(med).toContain("你不要改成稿，只提建議");
-    expect(reviewPrompt(itemsOfGroup("facts"), [])).toContain("【白名單】");
+    expect(reviewPrompt(itemsOfGroup("facts"), [])).toContain("白名單）】");
   });
 });
 
