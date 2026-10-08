@@ -73,7 +73,14 @@ const execute = vi.fn(async (sql: string, params: any[] = []) => {
   if (q.includes("SELECT id, userId, outputId FROM scheduled_posts")) {
     return [[...db.posts.values()].filter((p) => p.status === "pending").map((p) => ({ id: p.id, userId: p.userId, outputId: p.outputId }))];
   }
-  if (q.includes("FROM scheduled_posts sp")) { const p = db.posts.get(params[0]); return [p ? [postRow(p)] : []]; }
+  if (q.includes("FROM scheduled_posts sp")) {
+    const p = db.posts.get(params[0]);
+    // 2026-10-08：真實 SQL 一度漏掉 sp.userId AS ownerId，canPublishFor 拿到 NaN 全部回「排程不存在或無權限」。
+    // mock 只在 SELECT 真的有選 ownerId 時才回它，避免再被 mock 蓋掉。
+    const row = p ? postRow(p) : null;
+    if (row && !q.includes("sp.userId AS ownerId")) delete (row as any).ownerId;
+    return [row ? [row] : []];
+  }
   if (q.includes("SELECT userId AS ownerId, status FROM scheduled_posts")) {
     const p = db.posts.get(params[0]); return [p ? [{ ownerId: p.userId, status: p.status }] : []];
   }
