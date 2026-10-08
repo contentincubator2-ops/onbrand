@@ -156,6 +156,16 @@ describe("permissionNeeded：每種呼叫需要什麼權限", () => {
     expect(permissionNeeded(path, type)).toBe(need);
   });
 
+  it.each(["getConnectUrl", "getConnectionStatus", "disconnect"])("Zernio %s retains owner/admin management permission", method => {
+    for (const role of ["owner", "admin"]) {
+      expect(() => assertTeamPermission(resolvePermissions(role), `zernioConnect.${method}`, "mutation")).not.toThrow();
+    }
+    for (const role of ["editor", "viewer"]) {
+      expect(() => assertTeamPermission(resolvePermissions(role, { canPublish: true, canEditStrategy: true }), `zernioConnect.${method}`, "mutation"))
+        .toThrow(/擁有者或管理者/);
+    }
+  });
+
   it("沒權限時丟 FORBIDDEN，訊息說明缺的是哪一項", () => {
     const editor = resolvePermissions("editor");
     expect(() => assertTeamPermission(editor, "quickTask.runOrchestra", "mutation")).not.toThrow();

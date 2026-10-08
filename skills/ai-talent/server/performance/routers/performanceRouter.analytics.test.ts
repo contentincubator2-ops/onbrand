@@ -44,6 +44,17 @@ describe("performance social connections", () => {
       fb_page: "粉專貼文", ig_account: "Instagram 貼文", threads_account: "Threads 貼文", linkedin_page: "LinkedIn 貼文",
     });
   });
+  it.each([true, false])("workspace uses Zernio connection and runtime gates (connected: %s)", async connected => {
+    vi.stubEnv("ZERNIO_API_KEY", "test-only");
+    vi.stubEnv("SOCIAL_PUBLISH_ENABLED", "true");
+    mocks.execute.mockImplementation(async (sql: string) => sql.includes("FROM brand_publish_connections") && connected
+      ? [[{ platform: "instagram", accountId: "ig" }]] : [[]]);
+    expect(await caller().workspace({ brandId: 7, tray: "fanpage_monthly" }))
+      .toMatchObject({ socialConnected: connected, socialSyncEnabled: true });
+    vi.stubEnv("SOCIAL_PUBLISH_ENABLED", "false");
+    expect(await caller().workspace({ brandId: 7, tray: "fanpage_monthly" }))
+      .toMatchObject({ socialConnected: connected, socialSyncEnabled: false });
+  });
   it("reports Zernio-only connections, account names and the sum of four fact sources", async () => {
     mocks.execute.mockImplementation(async (sql: string) => sql.includes("FROM brand_publish_connections") ? [[
       { platform: "facebook", accountLabel: "SoWork 粉專", connectedAt: "2026-10-08T01:00:00Z" },

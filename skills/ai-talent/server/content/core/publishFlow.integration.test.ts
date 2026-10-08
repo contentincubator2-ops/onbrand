@@ -156,7 +156,6 @@ describe("publish flow (approval gate, retry, worker)", () => {
   });
 
   it("routes Zernio and persists the external URL", async () => {
-    process.env.PUBLISH_PROVIDER_THREADS = "zernio";
     process.env.ZERNIO_API_KEY = randomUUID();
     publishViaZernio.mockResolvedValueOnce({ postId: "z1", permalink: "https://example.com/z1" });
     db.posts.set(50, mk());
@@ -167,7 +166,6 @@ describe("publish flow (approval gate, retry, worker)", () => {
   });
 
   it.each(["worker", "manual"])("uses a new attempt after a worker failure then %s retry", async retryVia => {
-    process.env.PUBLISH_PROVIDER_THREADS = "zernio";
     process.env.ZERNIO_API_KEY = randomUUID();
     db.posts.set(50, mk());
     publishViaZernio.mockRejectedValueOnce(new Error("Zernio partial publish failure"))
@@ -183,7 +181,6 @@ describe("publish flow (approval gate, retry, worker)", () => {
   });
 
   it("advances the attempt when a manual publish is retried", async () => {
-    process.env.PUBLISH_PROVIDER_THREADS = "zernio";
     process.env.ZERNIO_API_KEY = randomUUID();
     db.posts.set(50, mk());
     publishViaZernio.mockRejectedValueOnce(new Error("Zernio partial publish failure"))
@@ -195,7 +192,6 @@ describe("publish flow (approval gate, retry, worker)", () => {
   });
 
   it("Zernio reports missing configuration and user-fixable media errors", async () => {
-    process.env.PUBLISH_PROVIDER_THREADS = "zernio";
     delete process.env.ZERNIO_API_KEY;
     db.posts.set(50, mk());
     await expect(publishScheduledPost({ id: 50, userId: OWNER })).rejects.toMatchObject({ code: "PRECONDITION_FAILED", message: "發布服務尚未啟用，請聯絡 sowork@sowork.ai。" });
