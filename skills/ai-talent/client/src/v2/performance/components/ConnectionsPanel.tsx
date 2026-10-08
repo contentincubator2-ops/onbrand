@@ -33,7 +33,7 @@ type Conn = {
 };
 
 const META: Record<Conn["id"], { zh: string; en: string; icon: React.ReactNode }> = {
-  meta_page: { zh: "粉專貼文（Facebook / Instagram）", en: "Page posts (Facebook / Instagram)", icon: <TextIcon size={16} /> },
+  meta_page: { zh: "社群貼文成效", en: "Social post performance", icon: <TextIcon size={16} /> },
   meta_ads:  { zh: "廣告帳號（Meta Ads）",             en: "Ad account (Meta Ads)",             icon: <CampaignIcon size={16} /> },
   commerce:  { zh: "電商後台（SHOPLINE / 91APP / Shopify）", en: "Commerce backend (SHOPLINE / 91APP / Shopify)", icon: <ShopIcon size={16} /> },
 };
@@ -41,6 +41,16 @@ const META: Record<Conn["id"], { zh: string; en: string; icon: React.ReactNode }
 export default function ConnectionsPanel({ brandId }: { brandId: number | null }) {
   const { lang } = useLang();
   const isEn = lang === "en";
+  const utils = trpc.useUtils();
+  const sync = trpc.performance.syncSocial.useMutation({
+    onSuccess: () => {
+      void utils.performance.connections.invalidate();
+      void utils.performance.workspace.invalidate();
+      void utils.performance.report.invalidate();
+      void utils.performance.campaignReport.invalidate();
+    },
+  });
+  React.useEffect(() => { sync.reset(); }, [brandId]);
   const q = (trpc as any).performance?.connections?.useQuery
     ? (trpc as any).performance.connections.useQuery({ brandId: brandId ?? 0 }, { enabled: !!brandId, refetchOnWindowFocus: false })
     : { data: undefined };
@@ -77,6 +87,7 @@ export default function ConnectionsPanel({ brandId }: { brandId: number | null }
                 <span className="text-neutral-700">{META[c.id].icon}</span>
                 <span className="text-[14px] font-medium text-neutral-900">{isEn ? META[c.id].en : META[c.id].zh}</span>
               </div>
+              {c.id === "meta_page" && <p className="mt-1 text-[12px] text-neutral-500">Facebook / Instagram / Threads / LinkedIn</p>}
               <div className="mt-2 flex items-center gap-1.5 text-[13px]">
                 {on
                   ? <><DoneIcon size={14} className="text-neutral-900" /><span className="font-medium text-neutral-900">{isEn ? "Connected" : "已連結"}</span></>
@@ -84,6 +95,21 @@ export default function ConnectionsPanel({ brandId }: { brandId: number | null }
                 {c.label && <span className="ml-1 truncate text-neutral-500">· {c.label}</span>}
               </div>
               <p className="mt-2 text-[13px] leading-5 text-neutral-600">{isEn ? c.howEn : c.howZh}</p>
+              {c.id === "meta_page" && on && brandId && (
+                <>
+                  <button type="button" disabled={sync.isPending}
+                    onClick={() => sync.mutate({ brandId })}
+                    className="mt-2 rounded-md border border-neutral-300 px-2 py-1 text-[13px] text-neutral-700 disabled:opacity-50">
+                    {sync.isPending ? (isEn ? "Syncing…" : "同步中…") : (isEn ? "Sync performance" : "同步成效")}
+                  </button>
+                  {sync.error && <p role="alert" className="mt-2 text-[13px] text-neutral-600">{sync.error.message}</p>}
+                  {sync.data && <p role="status" className="mt-2 text-[13px] text-neutral-600">
+                    {isEn ? `Backfilled ${sync.data.platforms.reduce((n, p) => n + p.posts, 0)} posts.` : `已回填 ${sync.data.platforms.reduce((n, p) => n + p.posts, 0)} 篇貼文。`}
+                    {sync.data.platforms.filter(p => p.error).map(p => <span key={p.platform} className="block">{p.platform}: {p.error}</span>)}
+                    {!sync.data.platforms.length && (isEn ? " Connect a social account in brand settings first." : " 請先到品牌設定連接社群帳號。")}
+                  </p>}
+                </>
+              )}
               {!on && !c.selfServe && (
                 <p className="mt-2 inline-flex items-center gap-1 text-[12px] text-neutral-500">
                   <SetupBySoWorkIcon size={12} />
