@@ -12,6 +12,11 @@ export interface MediaStore {
   owns(url: string): boolean;
 }
 
+/** 下載圖片的 fetch 需要允許媒體公開 origin；本機媒體沿用 CSP self。 */
+export function mediaCspOrigins(store: Pick<MediaStore, "backend" | "publicBase">): string[] {
+  return store.backend === "azure-blob" ? [new URL(store.publicBase).origin] : [];
+}
+
 function validName(name: string): boolean {
   return /^[\w.-]+$/.test(name) && name !== "." && name !== "..";
 }

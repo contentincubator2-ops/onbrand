@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import { BlobServiceClient } from "@azure/storage-blob";
-import { AzureBlobMediaStore, LocalMediaStore } from "./mediaStore";
+import { AzureBlobMediaStore, LocalMediaStore, mediaCspOrigins } from "./mediaStore";
 
 const containerUrl = "https://media.example.com/onbrand-media";
 const bytes = Buffer.from("image bytes");
@@ -14,6 +14,15 @@ function fakeContainer() {
 }
 
 afterEach(() => { vi.unstubAllEnvs(); vi.restoreAllMocks(); });
+
+describe("mediaCspOrigins", () => {
+  it("returns only the Azure Blob public origin without the container path", () => {
+    expect(mediaCspOrigins({ backend: "azure-blob", publicBase: containerUrl })).toEqual(["https://media.example.com"]);
+  });
+  it("adds no connect origins for local media", () => {
+    expect(mediaCspOrigins({ backend: "local", publicBase: "/static/covers" })).toEqual([]);
+  });
+});
 
 describe("LocalMediaStore", () => {
   let directory: string;
