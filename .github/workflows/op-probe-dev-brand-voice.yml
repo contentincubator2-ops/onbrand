@@ -1,0 +1,165 @@
+name: Ops (DEV) — probe brand voice prompts end to end (read-only)
+
+# 「建品牌時丟參考文章」新增的三段模型呼叫，在 DEV VM 上用這個分支的提示詞實跑一次，
+# 不經過瀏覽器、不需要登入、不寫資料庫：
+#   1 自動分類：13 篇示範文章（五類＋一篇徵才，徵才應該不被分到任何一類）→ 對答案
+#   2 語氣／結構／常用詞：每一類各跑一次 → 看解析得出來嗎、常用詞有幾個被「逐字驗證」擋掉
+#   3 不像 → 修 SKILL：拿一份示範 SKILL＋「不像」的意見 → 看修出來的規則有沒有把意見寫成可檢查的規則
+# 反推 SKILL 與試寫沿用自建任務卡既有的那一段（已在 dev 驗過），這裡不重跑。
+# 用「這個分支」的 brandVoice.ts（提示詞與解析）＋ VM 上已部署的 invokeLLM，所以合併前就能看產出。
+# 花費：約 7 次文字模型呼叫。
+# Path-scoped push，跟 op-probe-dev-influencer.yml 同一個做法（environment: dev 才會連到 DEV VM）。
+on:
+  push:
+    paths:
+      - '.github/workflows/op-probe-dev-brand-voice.yml'
+
+jobs:
+  probe:
+    runs-on: ubuntu-24.04
+    environment: dev
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Pack this branch's brandVoice.ts
+        run: |
+          echo "VOICE_B64=$(gzip -c skills/ai-talent/server/content/core/catalog/brandVoice.ts | base64 -w0)" >> "$GITHUB_ENV"
+      - name: Classify, profile, revise
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          VOICE_B64: ${{ env.VOICE_B64 }}
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 8m
+          envs: VOICE_B64
+          script: |
+            set +e
+            cd /opt/onbrand/current/skills/ai-talent
+            set -a; source .env 2>/dev/null; set +a
+            echo "host=$(hostname)  app=$(readlink -f /opt/onbrand/current)  now=$(date -u +%FT%TZ)"
+            D=server/content/core/catalog
+            echo "$VOICE_B64" | base64 -d | gunzip > "$D/_probeVoice.ts"
+            cat > "$D/_probe_tmp.ts" <<'TS'
+            import { invokeLLM } from "../../../platform/core/llm/llm";
+            import { factLeaks, measureSamples } from "./brandTaskCards";
+            import {
+              VOICE_CATEGORIES, classifyPrompt, profilePrompt, revisePrompt, renderForClassify,
+              parseClassification, groupByCategory, parseVoiceProfile, buildVoiceBlock, splitArticles,
+            } from "./_probeVoice";
+
+            const SAMPLES: [string, string][] = [
+              ["product", "嗨茶友們，新朋友報到！\n這支「山嵐冷泡烏龍」我們試了十幾輪才定下來。茶湯清清的，尾巴帶一點蘭花香，冰箱放一晚，隔天帶出門剛剛好。\n一包泡一瓶，不用算茶葉、不用看時間。\n喝起來順順的～\n\n#山茶日常 #冷泡茶"],
+              ["product", "嗨茶友們，蜜香紅茶回來了。\n夏天被小綠葉蟬咬過的茶葉，會自己長出蜜味，不加糖也甜甜的。早上配吐司、下午配餅乾都可以。\n這一批量不多，喜歡的茶友手腳要快一點喔。\n喝起來順順的～\n\n#山茶日常 #蜜香紅茶"],
+              ["product", "嗨茶友們，很多人敲碗的隨身茶罐來了。\n霧面的、不沾指紋，大小剛好放得進包包側袋。蓋子有矽膠圈，倒過來也不會漏。\n裝茶葉、裝茶包都行，出門旅行帶著就不怕喝不到熟悉的味道。\n\n#山茶日常 #茶罐"],
+              ["festival", "嗨茶友們，母親節快到了。\n媽媽平常捨不得買給自己的，這次換我們準備。5/1 到 5/12，禮盒組全面 88 折，滿 1200 再送一只白瓷小杯。\n卡片我們幫你手寫，留言備註想說的話就好。\n\n#山茶日常 #母親節"],
+              ["festival", "嗨茶友們，中秋禮盒開始預購囉。\n今年一樣是兩罐茶配一盒茶點，早鳥到 8/31 前 9 折。公司行號要訂 20 盒以上的，私訊我們，另外算給你。\n送禮自用都體面，月亮下面配茶最剛好。\n\n#山茶日常 #中秋禮盒"],
+              ["festival", "嗨茶友們，週年慶抽獎來了！\n在這篇底下留言「山茶三歲生日快樂」，我們 10/20 抽三位茶友，各送一組冷泡壺。\n謝謝大家陪我們走到第三年，接下來也請多多指教。\n\n#山茶日常 #週年慶"],
+              ["knowledge", "嗨茶友們，今天來解答最常被問的問題：冷泡茶為什麼不苦？\n關鍵在水溫。茶裡的澀味來自單寧，低溫下釋出得很慢；甜味的胺基酸卻不太受影響。所以冷水泡久一點，甜的出來了，澀的還沒出來。\n記得放冰箱，不要放室溫喔。\n\n#山茶日常 #茶知識"],
+              ["knowledge", "嗨茶友們，茶葉到底要不要放冰箱？\n答案是：看茶。綠茶、清香烏龍怕熱，密封好可以冰；紅茶、熟茶放陰涼的櫃子就好，冰了反而吸到冰箱味。\n不管哪一種，三件事記好：避光、密封、遠離味道重的東西。\n\n#山茶日常 #茶知識"],
+              ["story", "嗨茶友們，說一個我們很少講的故事。\n三年前阿凱第一次上山找茶，走錯路，在產業道路上遇到正在採茶的阿水伯。阿水伯沒多問，倒了一杯茶給他。那一杯，就是後來的山嵐烏龍。\n到現在每一批茶，我們都還是自己上山去收。\n\n#山茶日常 #山茶的故事"],
+              ["story", "嗨茶友們，上週收到一封很長的信。\n一位茶友說，她爸爸住院那段時間，每天帶一瓶我們的冷泡茶去病房，父女倆什麼都不說，就一人一杯慢慢喝。\n謝謝妳願意告訴我們。做茶的人，能陪到這樣的時刻，很夠了。\n\n#山茶日常 #山茶的故事"],
+              ["chat", "嗨茶友們，週一了。\n我們辦公室今天的狀態是：三個人泡茶、兩個人還在找杯子、一個人說他要喝咖啡（被瞪）。\n你們呢？週一都靠什麼撐過去？\n\n#山茶日常"],
+              ["chat", "嗨茶友們，下雨天問個問題：\n熱茶派還是冷泡派？\n小編自己是冬天也喝冷泡的那種，常常被同事說怪。留言讓我知道我不孤單好嗎。\n\n#山茶日常"],
+              ["none", "【徵才】門市夥伴一名\n工作地點：台中西區。時間：週三到週日 11:00–20:00。需要對茶有興趣、喜歡跟人聊天。\n意者請將履歷寄到信箱，主旨註明「門市夥伴應徵」，合則約談。"],
+            ];
+
+            const ask = async (system: string, user: string, maxTokens: number) => {
+              const t0 = Date.now();
+              const r: any = await invokeLLM({ messages: [{ role: "system", content: system }, { role: "user", content: user }], maxTokens });
+              const raw = r?.choices?.[0]?.message?.content;
+              return { text: (typeof raw === "string" ? raw : "").trim(), s: ((Date.now() - t0) / 1000).toFixed(1) };
+            };
+            const hr = (t: string) => console.log(`\n══════ ${t} ══════`);
+
+            (async () => {
+              let fail = 0;
+              const articles = SAMPLES.map(([, t]) => t);
+
+              hr("0 切文章（貼成一大段，用 --- 分隔）");
+              const split = splitArticles(articles.join("\n---\n"));
+              console.log(`貼 ${articles.length} 篇 → 切出 ${split.length} 篇 ${split.length === articles.length ? "OK" : "✗"}`);
+              if (split.length !== articles.length) fail++;
+
+              hr("1 自動分類");
+              const c = await ask(classifyPrompt(), renderForClassify(articles), 1200);
+              console.log(`(${c.s}s) raw: ${c.text.slice(0, 400)}`);
+              const got = parseClassification(c.text, articles.length);
+              let right = 0;
+              SAMPLES.forEach(([want], i) => {
+                const g = got[i] ?? "none";
+                if (g === want) right++;
+                console.log(`${g === want ? "✓" : "✗"} [${i + 1}] 應為 ${want}，分到 ${g}｜${articles[i]!.split("\n")[1]?.slice(0, 24)}`);
+              });
+              console.log(`分對 ${right}/${articles.length}`);
+              if (right < articles.length - 2) fail++;
+
+              hr("2 語氣／結構／常用詞（用正確答案分組，不受第 1 步影響）");
+              const groups = groupByCategory(articles, SAMPLES.map(([w]) => (w === "none" ? null : (w as any))));
+              const entries: any[] = [];
+              for (const cat of VOICE_CATEGORIES) {
+                const samples = groups[cat.id];
+                if (samples.length < 2) continue;
+                const p = await ask(profilePrompt(cat.zh, samples.length), samples.map((s, i) => `【第 ${i + 1} 篇】\n${s}`).join("\n\n"), 900);
+                const profile = parseVoiceProfile(p.text, samples);
+                let proposed = 0;
+                try { proposed = (JSON.parse(p.text.slice(p.text.indexOf("{"), p.text.lastIndexOf("}") + 1)).phrases ?? []).length; } catch { /* 看 raw */ }
+                console.log(`\n【${cat.zh}】(${p.s}s) ${profile ? "解析 OK" : "✗ 解析失敗"}`);
+                if (!profile) { fail++; console.log(`raw: ${p.text.slice(0, 500)}`); continue; }
+                console.log(`語氣：${profile.tone}`);
+                console.log(`結構：${profile.structure}`);
+                console.log(`常用詞（模型提 ${proposed} 個，逐字驗證後留 ${profile.phrases.length} 個）：${profile.phrases.map((x) => `${x.text}×${x.count}`).join("、") || "（無）"}`);
+                entries.push({ category: cat.id, measured: measureSamples(samples), profile });
+              }
+              hr("寫進品牌口吻的那一段");
+              const block = buildVoiceBlock(entries);
+              console.log(block);
+              console.log(`（${[...block].length} 字；品牌口吻這一格 AI 最多讀 1,500 字）`);
+
+              hr("3 不像 → 修 SKILL");
+              const samples = groups.product;
+              const measured = measureSamples(samples);
+              const skill = [
+                "這張卡產出一篇產品介紹貼文。",
+                "結構：",
+                "1. 開場用一個問句吸引注意，例如「你今天喝茶了嗎？」",
+                "2. 中段用三到四句介紹產品的特色與使用情境，每句不超過 30 字。",
+                "3. 收尾用一句熱情的行動呼籲，加上驚嘆號。",
+                "寫作規則：",
+                "- 全篇使用敬語「您」稱呼讀者。",
+                "- 每段之間空一行。",
+                "- 結尾加兩個 hashtag。",
+                "- 不寫價格，除非當次輸入有提供。",
+                `- 全文 ${measured.minChars}–${measured.maxChars} 字。`,
+                "禁止事項：不使用 emoji；不提競品；事實只能來自 {{topic}} 與品牌資料。",
+              ].join("\n");
+              const trial = "您今天喝茶了嗎？\n\n為您介紹全新的高山金萱，茶湯滑順、帶有淡淡奶香，無論上班或休閒都非常適合。\n\n現在就把這份美好帶回家吧！\n\n#山茶 #金萱";
+              const notes = ["太正式了，我們都叫大家「茶友」，不會說「您」", "開頭不會用問句，我們固定用「嗨茶友們，」開場；也不用驚嘆號"];
+              const r = await ask(revisePrompt(measured), [
+                `【目前的 SKILL】\n${skill}`,
+                `【照它試寫的結果】\n${trial}`,
+                `【使用者說哪裡不像】\n${notes.map((n, i) => `${i + 1}. ${n}`).join("\n")}`,
+                `【原文】\n${samples.map((s, i) => `（第 ${i + 1} 篇）\n${s}`).join("\n\n")}`,
+              ].join("\n\n"), 4000);
+              console.log(`(${r.s}s) ${r.text.length} 字\n${r.text}`);
+              const own = [measured.count, measured.minChars, measured.maxChars, measured.medianChars];
+              const leaks = factLeaks(r.text, samples, own);
+              const checks: [string, boolean][] = [
+                ["長度 ≥ 200", r.text.length >= 200],
+                ["提到「茶友」", r.text.includes("茶友")],
+                ["不再要求用「您」當稱呼（或明寫不用）", !/使用敬語「您」稱呼/.test(r.text)],
+                ["開場不再要求問句", !/開場用一個問句/.test(r.text)],
+                ["其他規則還在（hashtag）", /hashtag/i.test(r.text)],
+                [`沒有洩漏原文數字${leaks.length ? `（${leaks.join("、")}，上線流程會確定性修補）` : ""}`, leaks.length === 0],
+              ];
+              for (const [label, ok] of checks) { console.log(`${ok ? "✓" : "✗"} ${label}`); if (!ok && !label.startsWith("沒有洩漏")) fail++; }
+
+              hr(fail === 0 ? "PROBE OK" : `PROBE FAILED（${fail} 項）`);
+              process.exit(fail === 0 ? 0 : 1);
+            })().catch((e) => { console.error("PROBE CRASHED", e); process.exit(2); });
+            TS
+            timeout 420 ./node_modules/.bin/tsx "$D/_probe_tmp.ts"
+            CODE=$?
+            rm -f "$D/_probe_tmp.ts" "$D/_probeVoice.ts"
+            exit $CODE

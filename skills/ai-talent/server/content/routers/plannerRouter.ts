@@ -13,7 +13,7 @@ import { callModel } from "../../platform/core/llm/multiModelRouter";
 import localPool from "../../localDb";
 import {
   addDays, applyOps, brandPlatforms, cardsFor, isYmd, loadWeekCampaignItems, loadWeekSlots,
-  parsePlannerReply, plannerContext, plannerSystemPrompt, railStatusOf, validateOps, weekDays,
+  PLANNER_FALLBACK, parsePlannerReply, plannerContext, plannerHistory, plannerSystemPrompt, railStatusOf, validateOps, weekDays,
   type Card, type PlannerCtxArgs, type SlotRow,
 } from "../core/planning/weeklyPlanner";
 import {
@@ -49,6 +49,7 @@ async function loadMessages(brandId: number, userId: number) {
     return {
       id: Number(m.id), role: m.role === "user" ? "user" : "lead", content: String(m.content),
       choices: (meta?.choices ?? []) as string[],
+      failed: !!meta?.failed || String(m.content) === PLANNER_FALLBACK,
       fork: meta?.fork ? publicFork(meta.fork) : null,
     };
   });
@@ -178,19 +179,34 @@ export const plannerRouter = router({
       const ctxArgs: PlannerCtxArgs = { brandName, brandCtx, weekStart: input.weekStart, platforms, cards, slots, campaign, scheduled };
       const system = plannerSystemPrompt(ctxArgs);
 
+      // 2026-10-07（CJ「常常出現我沒接好」）：原本失敗原因整個吞掉，查不到是模型掛了還是回覆解不開。
+      // 每次失敗都記下來（哪一次、花多久、是丟錯還是解不開、回覆開頭長怎樣），/admin/errors 看得到。
       let parsed: ReturnType<typeof parsePlannerReply> = null;
+      const turns = plannerHistory(history);
+      const failures: Array<Record<string, unknown>> = [];
       for (let attempt = 0; attempt < 2 && !parsed; attempt++) {
+        const t0 = Date.now();
         try {
-          const r = await callModel([
-            { role: "system", content: system },
-            ...history.slice(-10).map((m) => ({ role: (m.role === "user" ? "user" : "assistant") as "user" | "assistant", content: m.content })),
-          ], "general");
-          parsed = parsePlannerReply(String(r.content ?? ""));
-        } catch { parsed = null; }
+          const r = await callModel([{ role: "system", content: system }, ...turns], "general");
+          const raw = String(r.content ?? "");
+          parsed = parsePlannerReply(raw);
+          if (!parsed) failures.push({ attempt, kind: "unparseable", ms: Date.now() - t0, provider: r.provider, model: r.model, chars: raw.length, head: raw.slice(0, 300), tail: raw.slice(-120) });
+        } catch (e: any) {
+          failures.push({ attempt, kind: "threw", ms: Date.now() - t0, error: String(e?.message ?? e).slice(0, 400) });
+        }
+      }
+      if (failures.length) {
+        const { logError } = await import("../../platform/routers/opsRouter");
+        await logError({
+          source: "planner.send", route: "planner.send", userId, level: parsed ? "warn" : "error",
+          message: `本週企劃總監${parsed ? "第一次沒接好、重試成功" : "兩次都沒接好"}：${failures.map((f) => f.kind).join("、")}`,
+          meta: { brandId: input.brandId, systemChars: system.length, turns: turns.length, failures },
+        }).catch(() => {});
       }
       if (!parsed) {
-        const reply = "我這邊剛剛沒接好，再說一次看看？";
-        await localPool.execute(`INSERT INTO planner_messages (userId, brandId, role, content) VALUES (?, ?, 'lead', ?)`, [userId, input.brandId, reply]);
+        const reply = PLANNER_FALLBACK;
+        await localPool.execute(`INSERT INTO planner_messages (userId, brandId, role, content, meta) VALUES (?, ?, 'lead', ?, ?)`,
+          [userId, input.brandId, reply, JSON.stringify({ failed: true })]);
         return { reply, choices: [] as string[], touched: [] as number[], repaired: 0, fork: null, messageId: 0 };
       }
       // 分歧：總監不自己選，請兩位立場相反的顧問各排一版。

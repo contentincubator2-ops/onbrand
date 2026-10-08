@@ -23,7 +23,11 @@ export type ActivationStage =
   | "first_brand_created"
   | "express_brain_ready"
   | "first_inspiration_arrived"
-  | "first_angle_adopted";
+  | "first_angle_adopted"
+  // 2026-10-07：建品牌時的「參考文章」那一步。不在漏斗裡（不是每個人都有文章可丟），
+  // 只用來看有多少人學完、多少人跳過。
+  | "voice_samples_done"
+  | "voice_samples_skipped";
 
 /**
  * Fire an activation milestone. Per-user dedupe happens server-side via

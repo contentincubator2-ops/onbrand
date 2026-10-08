@@ -22,6 +22,8 @@ export interface TRPCContext {
   activeBrandId?: number | null;
   /** Set only while a member acts on a team brand; `user` is then the brand owner. */
   actor?: TeamActor;
+  /** Client IP (trust proxy 1). Only the login-free demo routers use it, for per-IP limits. */
+  ip?: string;
 }
 
 /** Who is really making this call. Use for attribution, admin checks and per-person limits. */
@@ -59,10 +61,10 @@ export async function createContext({ req }: { req: Request }): Promise<TRPCCont
       const devUserId = parseInt((req.headers["x-user-id"] as string) ?? "0");
       if (devUserId > 0) {
         console.log('[auth] Using dev auth for userId:', devUserId);
-        return { user: { id: devUserId }, activeBrandId: activeBrandFrom(req) };
+        return { user: { id: devUserId }, activeBrandId: activeBrandFrom(req), ip: req.ip };
       }
     }
-    return { user: null };
+    return { user: null, ip: req.ip };
   }
 
   try {
@@ -80,6 +82,7 @@ export async function createContext({ req }: { req: Request }): Promise<TRPCCont
         email: typeof payload.email === "string" ? payload.email : undefined,
       },
       activeBrandId: activeBrandFrom(req),
+      ip: req.ip,
     };
   } catch (err) {
     // P1-7: Structured logging for JWT verification failures (no token content)

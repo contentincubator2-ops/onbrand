@@ -15,7 +15,7 @@
  *
  * Auto-shown when user has 0 brands (replaces the simple empty state).
  */
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { trpc } from "../../../../lib/trpc";
 import { useLang } from "../../../../lib/i18n";
@@ -30,6 +30,7 @@ import RunningAgentCarousel from "../../../platform/components/RunningAgentCarou
 import { marketOptions, getCountry } from "../../../../lib/countries";
 import { DoneIcon, WarningIcon, ErrorIcon } from "../../../platform/components/icons";
 import { HelpTip } from "../../../platform/components/HelpTip";
+import BrandVoiceFlow from "./BrandVoiceFlow";
 
 const INDUSTRIES_ZH = [
   "AI / 科技軟體",
@@ -111,7 +112,8 @@ interface Props {
   onComplete: (brandId: number) => void;
 }
 
-type Step = 1 | 2 | 3 | 4;
+/** 5＝參考文章（2026-10-07 加在建立品牌之後；編號照加入順序，畫面順序看 STEPS）。 */
+type Step = 1 | 2 | 3 | 4 | 5;
 
 export default function BrandOnboardingWizard({ isOpen, onClose, onComplete }: Props) {
   const navigate = useNavigate();
@@ -119,6 +121,7 @@ export default function BrandOnboardingWizard({ isOpen, onClose, onComplete }: P
   const INDUSTRIES = lang === "en" ? INDUSTRIES_EN : INDUSTRIES_ZH;
   const STEPS: Array<{ n: Step; label: string }> = [
     { n: 2, label: lang === "en" ? "Add brand" : "建立品牌" },
+    { n: 5, label: lang === "en" ? "Your writing" : "參考文章" },
     { n: 3, label: lang === "en" ? "Positioning" : "自動定位" },
     { n: 4, label: lang === "en" ? "Done" : "完成" },
   ];
@@ -126,6 +129,9 @@ export default function BrandOnboardingWizard({ isOpen, onClose, onComplete }: P
   // new users go straight to the brand form -> one click fewer to first output.
   const [step, setStep] = useState<Step>(2);
   const [createdBrandId, setCreatedBrandId] = useState<number | null>(null);
+  // 品牌大腦初版（約 30 秒）。建好品牌就開始跑，使用者同時在貼參考文章；
+  // 學寫法的試寫與最後離開精靈都要等它。
+  const interimRef = useRef<Promise<void> | null>(null);
 
   // Form state
   const [name, setName] = useState("");
@@ -236,34 +242,48 @@ export default function BrandOnboardingWizard({ isOpen, onClose, onComplete }: P
       //         done), then route straight to /theater with firstTime=1
       //         so the user lands on the 7-day publisher with the AHA
       //         moment of 21 cards generated using the express brain.
-      setStep(3); // "正在分析品牌..." waiting screen
+      // 2026-10-07（CJ「建品牌時丟參考文章」）：品牌大腦初版在背景跑的這 30 秒，
+      // 讓使用者去貼以前發過的文章，而不是盯著等待畫面。初版好了就接著在背景跑
+      // 完整定位（約 9 分鐘，完成後左下通知）。沒文章可丟的按跳過，走原本的路。
       const interimStartMs = Date.now();
-      try {
-        await runInterimMut?.mutateAsync?.({ entityKind: "brand", entityId: newId });
-        // Activation funnel — stage 3 (only fire on success path so the
-        // metric reflects actual express-brain delivery, not just attempt).
-        logActivation("express_brain_ready", {
-          brandId: newId,
-          interimLatencyMs: Date.now() - interimStartMs,
-        });
-      } catch (e) {
-        // Interim failed — don't block; Theater can still run with whatever
-        // exists (industry-level defaults). Log for telemetry.
-        // eslint-disable-next-line no-console
-        console.warn("[onboarding] runInterim failed (non-fatal):", e);
-      }
-      // Fire full pipeline in the background — completion surfaces via
-      // Mia nudge (brand.positioning_complete fired by Theater polling).
-      startPositioningMut?.mutate?.({ entityKind: "brand", entityId: newId, lang: "zh-TW" });
-
-      // Hand control back to caller (sets scope + brandId) then jump to
-      // Theater with the first-time flag so it knows to show the
-      // oversized "Generate 7 days" CTA and progress banner.
-      onComplete(newId);
-      navigate(`/inspiration?b=${newId}`);
+      interimRef.current = (async () => {
+        try {
+          await runInterimMut?.mutateAsync?.({ entityKind: "brand", entityId: newId });
+          // Activation funnel — stage 3 (only fire on success path so the
+          // metric reflects actual express-brain delivery, not just attempt).
+          logActivation("express_brain_ready", {
+            brandId: newId,
+            interimLatencyMs: Date.now() - interimStartMs,
+          });
+        } catch (e) {
+          // Interim failed — don't block; the rest can still run with whatever
+          // exists (industry-level defaults). Log for telemetry.
+          // eslint-disable-next-line no-console
+          console.warn("[onboarding] runInterim failed (non-fatal):", e);
+        }
+        // Fire full pipeline in the background — completion surfaces via
+        // Mia nudge (brand.positioning_complete).
+        startPositioningMut?.mutate?.({ entityKind: "brand", entityId: newId, lang: "zh-TW" });
+      })();
+      setStep(5);
     } catch (e: any) {
       setErr(String(e?.message ?? e));
     }
+  };
+
+  /**
+   * 參考文章那一步結束（學完或跳過）→ 等品牌大腦初版 → 進靈感舞台。
+   * 初版通常在使用者貼文章的時候就好了；還沒好才會看到第 3 步的等待畫面。
+   */
+  const leaveWizard = async (via: "done" | "skipped") => {
+    const id = createdBrandId;
+    if (!id) return;
+    logActivation(via === "done" ? "voice_samples_done" : "voice_samples_skipped", { brandId: id });
+    setStep(3);
+    await interimRef.current;
+    // Hand control back to caller (sets scope + brandId) then jump on.
+    onComplete(id);
+    navigate(`/inspiration?b=${id}`);
   };
 
   // Poll job status while in step 3; auto-advance when done
@@ -288,7 +308,8 @@ export default function BrandOnboardingWizard({ isOpen, onClose, onComplete }: P
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      size="2xl"
+      // 參考文章那一步要左右對照原文與試寫，窄視窗放不下。
+      size={step === 5 ? "4xl" : "2xl"}
       hideCloseButton={step !== 2 && step !== 4}
       isDismissable={false}
       backdrop="blur"
@@ -305,7 +326,7 @@ export default function BrandOnboardingWizard({ isOpen, onClose, onComplete }: P
             <div className="flex items-center gap-2">
               {STEPS.map((s, i) => {
                 const isActive = s.n === step;
-                const isDone = s.n < step;
+                const isDone = i < STEPS.findIndex((x) => x.n === step);
                 return (
                   <div key={s.n} className="flex items-center gap-2 flex-1">
                     <div
@@ -498,6 +519,16 @@ export default function BrandOnboardingWizard({ isOpen, onClose, onComplete }: P
                   </Button>
                 </div>
               </div>
+            )}
+
+            {/* STEP 5 — 參考文章（2026-10-07）。畫面順序在建立品牌之後、自動定位之前。 */}
+            {step === 5 && createdBrandId && (
+              <BrandVoiceFlow
+                brandId={createdBrandId}
+                waitFor={interimRef.current}
+                onDone={() => void leaveWizard("done")}
+                onSkip={() => void leaveWizard("skipped")}
+              />
             )}
 
             {/* STEP 3 — Express Brain 分析中（~30s）

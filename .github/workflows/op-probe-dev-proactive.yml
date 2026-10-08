@@ -1,0 +1,121 @@
+name: Ops (DEV) — probe proactive engine checks (read-only)
+
+# 主動引擎的三個檢查器在 DEV VM 上用真資料實跑一次，不經過瀏覽器、不需要登入：
+#   1. 審核與發布：現在有哪些稿卡在審核超過 24 小時、哪些排程 24 小時內要發卻還沒核准
+#   2. 發文節奏：挑最近有動靜的品牌，請總監主動排這一週——只印出排了什麼
+#   3. 節慶檔期：每個有動靜的品牌 45 天內還沒有活動的節點（正式是 30 天，探測放寬才看得到雙 11），替前兩個想方向
+# 第 2 次跑：加了節慶檔期。
+# 用「這個分支」的 server/gateway/proactive/*.ts（放在旁邊的暫存資料夾，跑完就刪）＋ VM 上已部署的
+# 本週企劃、品牌資料與模型設定。只讀：不建表、不寫格子、不寫事件、不寄信。
+# 花費：發文節奏最多 2 次、節慶檔期最多 2 次模型呼叫。
+# Path-scoped push，跟 op-probe-dev-influencer.yml 同一個做法（environment: dev 才會連到 DEV VM）。
+on:
+  push:
+    paths:
+      - '.github/workflows/op-probe-dev-proactive.yml'
+
+jobs:
+  probe:
+    runs-on: ubuntu-24.04
+    environment: dev
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - name: Pack this branch's proactive checks
+        run: |
+          cd skills/ai-talent/server/gateway/proactive
+          echo "PATCH_B64=$(tar -czf - proactiveStore.ts proactiveTime.ts reviewChecks.ts weekPlanCheck.ts festivalCheck.ts | base64 -w0)" >> "$GITHUB_ENV"
+      - name: Run both checks against DEV data
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          PATCH_B64: ${{ env.PATCH_B64 }}
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 6m
+          envs: PATCH_B64
+          script: |
+            set +e
+            cd /opt/onbrand/current/skills/ai-talent
+            set -a; source .env 2>/dev/null; set +a
+            echo "host=$(hostname)  app=$(readlink -f /opt/onbrand/current)  now=$(date -u +%FT%TZ)"
+            D=server/gateway/_proactiveProbe
+            mkdir -p "$D"
+            echo "$PATCH_B64" | base64 -d | tar -xzf - -C "$D"
+            cat > "$D/_probe_tmp.ts" <<'TS'
+            import localPool from "../../localDb";
+            import { addDays, mondayOf } from "../../content/core/planning/weeklyPlanner";
+            import { collectReviewEvents } from "./reviewChecks";
+            import { draftWeekFor, targetWeek } from "./weekPlanCheck";
+            import { fmtYmd, taipeiParts } from "./proactiveTime";
+            import { activeBrands, draftFestivalIdeas, festivalEvent, openNodesFor } from "./festivalCheck";
+
+            (async () => {
+              const now = new Date();
+              console.log(`taipei now: ${JSON.stringify(taipeiParts(now))}`);
+
+              console.log("\n================ 1. 審核與發布");
+              const [q]: any = await localPool.execute("SELECT status, COUNT(*) AS n FROM mission_review_queue GROUP BY status");
+              console.log("review queue by status:", JSON.stringify(q));
+              const [sp]: any = await localPool.execute("SELECT status, COUNT(*) AS n, MIN(scheduledAt) AS first, MAX(scheduledAt) AS last FROM scheduled_posts GROUP BY status");
+              console.log("scheduled_posts by status:", JSON.stringify(sp));
+              const events = await collectReviewEvents(now);
+              console.log(`events: ${events.length}`);
+              for (const e of events.slice(0, 15)) console.log(`[${e.kind}${e.urgency === "urgent" ? "·急" : ""}] to user ${e.userId} brand ${e.brandId} key=${e.dedupeKey}\n   ${e.title}\n   ${e.body}\n   → ${e.navUrl}`);
+
+              console.log("\n================ 2. 發文節奏");
+              let target = targetWeek(now);
+              if (!target) {
+                const next = addDays(mondayOf(taipeiParts(now).ymd), 7);
+                target = { weekStart: next, fromDate: next };
+                console.log("今天不是會主動排的日子（週四、週五）；探測改排下一週。");
+              }
+              console.log(`target: ${JSON.stringify(target)}`);
+              const [brands]: any = await localPool.execute(
+                `SELECT b.id, b.userId, b.name, MAX(m.createdAt) AS lastActive,
+                        (SELECT COUNT(*) FROM planned_slots s WHERE s.brandId = b.id AND s.status <> 'dismissed' AND s.slotDate >= ? AND s.slotDate < ?) AS slotsThisWeek
+                   FROM brands b JOIN missions m ON m.brandId = b.id
+                  WHERE m.createdAt > NOW() - INTERVAL 21 DAY
+                  GROUP BY b.id, b.userId, b.name ORDER BY lastActive DESC LIMIT 8`,
+                [target.weekStart, addDays(target.weekStart, 7)],
+              );
+              console.log(`21 天內有動靜的品牌（前 8）：`);
+              for (const b of brands as any[]) console.log(`  #${b.id} ${b.name} owner=${b.userId} last=${new Date(b.lastActive).toISOString().slice(0, 10)} 這週已有格子=${b.slotsThisWeek}`);
+              const picks = (brands as any[]).filter((b) => Number(b.slotsThisWeek) === 0).slice(0, 2);
+              if (!picks.length) console.log("沒有「這週還沒排」的品牌可以試。");
+              for (const b of picks) {
+                const t0 = Date.now();
+                const d = await draftWeekFor({ brandId: Number(b.id), userId: Number(b.userId), brandName: String(b.name) }, target.weekStart, target.fromDate);
+                console.log(`\n--- #${b.id} ${b.name}（${((Date.now() - t0) / 1000).toFixed(1)}s）`);
+                if (!d) { console.log("   沒排出來（模型沒回、解析失敗、或沒有合格的新增）"); continue; }
+                console.log(`   主軸(${d.lead.length} 字): ${d.lead}`);
+                for (const o of d.ops) if (o.op === "add") console.log(`   ${fmtYmd(o.date)} ${o.platform}｜${o.topic}｜${o.format}｜卡=${o.taskId}${o.repaired ? "（換成預設卡）" : ""}\n      為什麼: ${o.reason}`);
+              }
+
+              console.log("\n================ 3. 節慶檔期（探測放寬到 45 天）");
+              const today = taipeiParts(now).ymd;
+              const act = await activeBrands();
+              console.log(`21 天內有動靜的品牌：${act.length}`);
+              let asked = 0;
+              for (const b of act) {
+                const nodes = await openNodesFor(b.brandId, today, 45).catch((e) => { console.log(`  #${b.brandId} 讀節點失敗: ${e?.message}`); return []; });
+                console.log(`  #${b.brandId} ${b.brandName}: ${nodes.map((n) => `${n.nameZh} ${n.date}（重要度 ${n.priority}${n.source === "custom" ? "・自建" : ""}）`).join("、") || "（沒有該提的節點）"}`);
+                for (const n of nodes) {
+                  if (asked >= 2) break;
+                  asked++;
+                  const t0 = Date.now();
+                  const ideas = await draftFestivalIdeas(b, n, today);
+                  console.log(`\n--- #${b.brandId} ${b.brandName} × ${n.nameZh}（${((Date.now() - t0) / 1000).toFixed(1)}s）`);
+                  if (!ideas) { console.log("   沒想出來（模型沒回或解析失敗）"); continue; }
+                  if (!ideas.angle) { console.log("   模型判斷這個節點跟品牌搭不上 → 不出事件"); continue; }
+                  const e = festivalEvent(b, n, ideas, today);
+                  console.log(`   ${e.title}\n   ${String(e.body).split("\n").join("\n   ")}\n   → ${e.navUrl}`);
+                }
+              }
+              process.exit(0);
+            })().catch((e) => { console.log("probe failed:", e?.stack ?? e?.message); process.exit(1); });
+            TS
+            timeout 300 ./node_modules/.bin/tsx "$D/_probe_tmp.ts"
+            echo "probe exit=$?"
+            rm -rf "$D"

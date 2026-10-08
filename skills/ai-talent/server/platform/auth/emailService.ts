@@ -311,3 +311,33 @@ export async function sendSubscriptionCanceled(data: {
     }),
   });
 }
+
+/**
+ * 主動收件匣的每日彙整（2026-10-07）：AI 已經做好、等這位用戶點頭的事。
+ * 一天最多一封；有幾件、哪些急，點進去是站內收件匣。
+ */
+export async function sendProactiveDigest(data: {
+  to: string; name: string; inboxUrl: string;
+  items: Array<{ brandName: string; title: string; urgent: boolean }>;
+}): Promise<void> {
+  const urgent = data.items.filter((i) => i.urgent).length;
+  const shown = data.items.slice(0, 12);
+  const list = shown
+    .map((i) => `<li>${i.urgent ? "<strong>［急］</strong>" : ""}${i.brandName ? `${esc(i.brandName)}：` : ""}${esc(i.title)}</li>`)
+    .join("");
+  await sendEmail({
+    to: data.to,
+    subject: `今天有 ${data.items.length} 件事等您確認${urgent ? `（${urgent} 件急件）` : ""} - onBrand Studio`,
+    html: noticeHtml({
+      title: `今天有 ${data.items.length} 件事等您確認`,
+      name: data.name,
+      paragraphs: [
+        "以下是已經替您準備好的事，確認後就會往下進行：",
+        `<ul style="padding-left:18px;margin:0">${list}</ul>`,
+        ...(data.items.length > shown.length ? [`另外還有 ${data.items.length - shown.length} 件。`] : []),
+      ],
+      cta: { label: "打開收件匣", url: data.inboxUrl },
+      footnote: "不想再收到每日彙整，請直接回信告訴我們。",
+    }),
+  });
+}
