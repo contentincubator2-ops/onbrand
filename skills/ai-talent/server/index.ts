@@ -68,7 +68,7 @@ app.use(helmet({
       // 'unsafe-inline' / 'unsafe-eval' tracked as S-05 in SECURITY-AUDIT.md
       // — needed by Vite + HeroUI runtime; migration to nonce-based CSP is
       // a separate workstream.
-      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://*.pipedream.com"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
       // 2026-05-14 (CJ console screenshot): allow Google Fonts stylesheet
       // load. fonts.googleapis.com serves the CSS, fonts.gstatic.com serves
       // the actual font files (woff2). Without these, the CSP blocks the
@@ -79,19 +79,13 @@ app.use(helmet({
       imgSrc: ["'self'", "data:", "https:"],
       // 2026-05-12: onbrand.sowork.ai is the new primary; drop.sowork.ai retired
       // (marketing-os kept alive for backward compat).
-      // 2026-05-16 (CJ「pipedream 授權出問題：這項內容已遭到封鎖」):
-      // Pipedream Connect (@pipedream/sdk/browser connectAccount) renders
-      // an iframe from *.pipedream.com and the SDK calls api.pipedream.com
-      // + *.pipedream.net. With no frame-src directive CSP fell back to
-      // default-src 'self' → the auth iframe was blocked outright. Allow
-      // the Pipedream Connect origins for frames + XHR/WS + script.
+      // 2026-10-08：移除舊發布供應商的授權 iframe 與網路來源。
       connectSrc: [
         "'self'",
         ...mediaCspOrigins(mediaStore),
         "https://marketing-os.sowork.ai", "https://onbrand.sowork.ai", "https://drop.sowork.ai",
-        "https://api.pipedream.com", "https://*.pipedream.com", "https://*.pipedream.net",
       ],
-      frameSrc: ["'self'", "https://pipedream.com", "https://*.pipedream.com"],
+      frameSrc: ["'self'"],
     },
   },
   hsts: {
