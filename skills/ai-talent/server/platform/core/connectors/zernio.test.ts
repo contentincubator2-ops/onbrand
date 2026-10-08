@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
-import { describe, expect, it, vi } from "vitest";
-import { createZernioClient, ZernioApiError } from "./zernio";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { createZernioClient, ZernioApiError, ZERNIO_CONNECT_SCOPES } from "./zernio";
 
 function setup(body: unknown, status = 200) {
   const credential = randomUUID();
@@ -8,6 +8,7 @@ function setup(body: unknown, status = 200) {
   return { credential, fetchImpl, client: createZernioClient({ apiKey: credential, fetchImpl }) };
 }
 describe("Zernio client", () => {
+  afterEach(() => { vi.useRealTimers(); });
   it("sends Bearer auth, profile payload and idempotency header", async () => {
     const { client, credential, fetchImpl } = setup({ profile: { _id: "profile" } }, 201);
     expect(await client.createProfile({ name: "Brand", idempotencyKey: "onbrand-brand-3" })).toEqual({ _id: "profile" });
@@ -17,17 +18,57 @@ describe("Zernio client", () => {
     expect(JSON.parse(options!.body as string)).toEqual({ name: "Brand" });
   });
   it("reuses the existing profile only for the specified conflict", async () => {
-    const { client } = setup({ error: "conflict", code: "profile_name_conflict", details: { existingProfileId: "existing" } }, 409);
+    const { client, fetchImpl } = setup({ error: "conflict", code: "profile_name_conflict", details: { existingProfileId: "existing" } }, 409);
     expect(await client.createProfile({ name: "Brand", idempotencyKey: "onbrand-brand-3" })).toEqual({ _id: "existing" });
-    const other = setup({ error: "duplicate content", code: "duplicate_content" }, 409);
+    expect(fetchImpl).toHaveBeenCalledOnce();
+    const other = setup({ error: "conflict", code: "profile_name_conflict" }, 409);
     await expect(other.client.createProfile({ name: "Brand", idempotencyKey: "id" })).rejects.toBeInstanceOf(ZernioApiError);
+    expect(other.fetchImpl).toHaveBeenCalledOnce();
+  });
+  it("polls by exact profile name every 400ms after an in-progress conflict", async () => {
+    vi.useFakeTimers();
+    const { client, fetchImpl } = setup({ profiles: [{ _id: "existing" }] });
+    fetchImpl.mockResolvedValueOnce(new Response(JSON.stringify({ error: "A request with this Idempotency-Key is already in progress" }), { status: 409 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ profiles: [] })));
+    const pending = client.createProfile({ name: "Brand & 名稱", idempotencyKey: "onbrand-brand-3" });
+    await vi.advanceTimersByTimeAsync(399);
+    expect(fetchImpl).toHaveBeenCalledOnce();
+    await vi.advanceTimersByTimeAsync(1);
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+    await vi.advanceTimersByTimeAsync(400);
+    expect(await pending).toEqual({ _id: "existing" });
+    expect(fetchImpl).toHaveBeenCalledTimes(3);
+    for (const [url, options] of fetchImpl.mock.calls.slice(1)) {
+      expect(new URL(url as string).pathname).toBe("/api/v1/profiles");
+      expect(Object.fromEntries(new URL(url as string).searchParams)).toEqual({ name: "Brand & 名稱", limit: "1" });
+      expect(options?.method).toBe("GET");
+    }
+  });
+  it("throws the original conflict after five empty profile lookups", async () => {
+    vi.useFakeTimers();
+    const { client, fetchImpl } = setup({ profiles: [] });
+    const error = "A request with this Idempotency-Key is already in progress";
+    fetchImpl.mockResolvedValueOnce(new Response(JSON.stringify({ error, code: "request_in_progress", details: { requestId: "original" } }), { status: 409 }));
+    const pending = client.createProfile({ name: "Brand", idempotencyKey: "onbrand-brand-3" });
+    const rejected = expect(pending).rejects.toMatchObject({
+      name: "ZernioApiError", message: `zernio 409: ${error}`, status: 409,
+      code: "request_in_progress", details: { requestId: "original" },
+    });
+    await vi.advanceTimersByTimeAsync(2000);
+    await rejected;
+    expect(fetchImpl).toHaveBeenCalledTimes(6);
+  });
+  it("returns null when no profile matches the name", async () => {
+    const { client } = setup({ profiles: [] });
+    expect(await client.findProfileByName("Missing Brand")).toBeNull();
   });
   it("encodes connect and account queries, and account deletion", async () => {
     const { client, fetchImpl } = setup({ authUrl: "https://example.com/connect", accounts: [] });
     await client.getConnectUrl({ platform: "twitter", profileId: "profile & one", redirectUrl: "https://example.com/brands?b=3&cat=publish" });
     const url = new URL(fetchImpl.mock.calls[0]![0] as string);
     expect(url.pathname).toBe("/api/v1/connect/twitter");
-    expect(Object.fromEntries(url.searchParams)).toEqual({ profileId: "profile & one", redirect_url: "https://example.com/brands?b=3&cat=publish", scopes: "posting" });
+    expect(ZERNIO_CONNECT_SCOPES).toBe("posting,analytics");
+    expect(Object.fromEntries(url.searchParams)).toEqual({ profileId: "profile & one", redirect_url: "https://example.com/brands?b=3&cat=publish", scopes: "posting,analytics" });
     expect(await client.listAccounts({ platform: "twitter", profileId: "profile" })).toEqual([]);
     expect(Object.fromEntries(new URL(fetchImpl.mock.calls[1]![0] as string).searchParams)).toEqual({ platform: "twitter", profileId: "profile", status: "connected" });
     await client.deleteAccount("account/one");

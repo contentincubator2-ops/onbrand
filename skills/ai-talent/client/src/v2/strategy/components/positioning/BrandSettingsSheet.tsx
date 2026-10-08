@@ -478,11 +478,17 @@ export function PublishTab({ brandId }: { brandId: number | null }) {
     const keys = (Object.keys(zernioProvidersQ.data) as ZernioPlatformKey[]).filter(usesZernio);
     for (const platform of keys) {
       if (platform === "x") continue;
-      void warmZernio(platform, generation);
       void zernioApiRef.current.status({ brandId, platform }).then(status => {
         if (generation === zernioGeneration.current) setZernioStatus(m => ({ ...m, [platform]: status }));
       }).catch(() => {});
     }
+    void (async () => {
+      for (const platform of keys) {
+        if (generation !== zernioGeneration.current) return;
+        if (platform === "x") continue;
+        await warmZernio(platform, generation);
+      }
+    })();
     return () => { ++zernioGeneration.current; };
   }, [brandId, zernioProvidersQ.data]);
 

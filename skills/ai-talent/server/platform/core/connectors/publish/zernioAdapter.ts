@@ -3,6 +3,8 @@ import { getTenant, upsertTenant, getConnection, setConnection, listConnectedByB
 import { PublishUserError, type PublishProviderAdapter } from "./publishAdapter";
 import { assertZernioMediaPlan, buildZernioPostPayload, readZernioPublishResult, toZernioPlatform } from "./zernioPublish";
 
+const inFlightProfiles = new Map<number, Promise<string>>();
+
 export function createZernioAdapter({ client, pool, brandNameOf }: {
   client: ZernioClient; pool: Queryable; brandNameOf: (brandId: number) => Promise<string>;
 }): PublishProviderAdapter {
@@ -16,11 +18,17 @@ export function createZernioAdapter({ client, pool, brandNameOf }: {
     async getConnectUrl(input) {
       const platform = requirePlatform(input.platform);
       let tenantId = await getTenant(pool, input.brandId, "zernio");
-      async function createAndStoreProfile() {
-        const name = Array.from(`onBrand Studio #${input.brandId} ${await brandNameOf(input.brandId)}`.trim()).slice(0, 80).join("");
-        const profileId = (await client.createProfile({ name, idempotencyKey: `onbrand-brand-${input.brandId}` }))._id;
-        await upsertTenant(pool, input.brandId, "zernio", profileId);
-        return profileId;
+      function createAndStoreProfile(): Promise<string> {
+        const existing = inFlightProfiles.get(input.brandId);
+        if (existing) return existing;
+        const pending = (async () => {
+          const name = Array.from(`onBrand Studio #${input.brandId} ${await brandNameOf(input.brandId)}`.trim()).slice(0, 80).join("");
+          const profileId = (await client.createProfile({ name, idempotencyKey: `onbrand-brand-${input.brandId}` }))._id;
+          await upsertTenant(pool, input.brandId, "zernio", profileId);
+          return profileId;
+        })().finally(() => { inFlightProfiles.delete(input.brandId); });
+        inFlightProfiles.set(input.brandId, pending);
+        return pending;
       }
       if (!tenantId) tenantId = await createAndStoreProfile();
       const current = input.mode === "reconnect" ? await getConnection(pool, input.brandId, "zernio", platform.local) : null;

@@ -5,6 +5,7 @@ import { PublishUserError } from "./publishAdapter";
 
 function setup() {
   const client = {
+    findProfileByName: vi.fn().mockResolvedValue(null),
     createProfile: vi.fn().mockResolvedValue({ _id: "profile" }),
     getConnectUrl: vi.fn().mockResolvedValue({ authUrl: "https://example.com/connect" }),
     listAllAccounts: vi.fn().mockResolvedValue([]),
@@ -17,6 +18,31 @@ function setup() {
 }
 const input = { scheduledPostId: 42, brandId: 3, platform: "facebook", caption: "hello", imageUrls: [] };
 describe("Zernio adapter", () => {
+  it("shares profile creation and tenant persistence across four concurrent connect requests", async () => {
+    const { client, pool, brandNameOf } = setup();
+    const results = await Promise.all(["facebook", "instagram", "linkedin", "threads"].map(platform =>
+      createZernioAdapter({ client, pool, brandNameOf }).getConnectUrl({ brandId: 3, platform, redirectUrl: "https://example.com" })));
+    expect(results).toEqual(Array(4).fill({ url: "https://example.com/connect" }));
+    expect(client.createProfile).toHaveBeenCalledOnce();
+    const tenantWrites = pool.execute.mock.calls.filter(([sql]) => sql.includes("INSERT INTO brand_publish_tenants"));
+    expect(tenantWrites).toHaveLength(1);
+    expect(tenantWrites[0]![1]).toEqual([3, "zernio", "profile"]);
+    expect(client.getConnectUrl).toHaveBeenCalledTimes(4);
+    expect(client.getConnectUrl.mock.calls.every(([input]) => input.profileId === "profile")).toBe(true);
+    // A settled promise must not prevent a later recreation.
+    await createZernioAdapter({ client, pool, brandNameOf }).getConnectUrl({ brandId: 3, platform: "facebook", redirectUrl: "https://example.com" });
+    expect(client.createProfile).toHaveBeenCalledTimes(2);
+  });
+  it.each(["create", "store"])("clears an in-flight profile after a %s failure so a later request can retry", async stage => {
+    const { adapter, client, pool } = setup();
+    const failure = new Error("Unavailable");
+    if (stage === "create") client.createProfile.mockRejectedValueOnce(failure);
+    else pool.execute.mockResolvedValueOnce([[]]).mockRejectedValueOnce(failure);
+    const input = { brandId: 3, platform: "facebook", redirectUrl: "https://example.com" };
+    await expect(adapter.getConnectUrl(input)).rejects.toBe(failure);
+    expect(await adapter.getConnectUrl(input)).toEqual({ url: "https://example.com/connect" });
+    expect(client.createProfile).toHaveBeenCalledTimes(2);
+  });
   it("creates and persists a profile before generating a connect link", async () => {
     const { adapter, client, pool } = setup();
     expect(await adapter.getConnectUrl({ brandId: 3, platform: "x", redirectUrl: "https://example.com" })).toEqual({ url: "https://example.com/connect" });

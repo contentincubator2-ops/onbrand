@@ -53,6 +53,31 @@ describe("PublishTab Zernio focus refresh", () => {
     window.history.replaceState({}, "", "/");
     delete (globalThis as any).IS_REACT_ACT_ENVIRONMENT;
   });
+  it("prefetches four connect URLs sequentially while querying statuses in parallel", async () => {
+    const platforms = ["facebook", "instagram", "linkedin", "threads"];
+    mocks.providers = Object.fromEntries(platforms.map(platform => [platform, "zernio"]));
+    const resolveConnect: Array<(value: { url: string }) => void> = [];
+    mocks.connect.mockImplementation(() => new Promise(resolve => { resolveConnect.push(resolve); }));
+    await act(async () => root!.render(<PublishTab brandId={3} />));
+    expect(mocks.status.mock.calls.map(([input]) => input.platform)).toEqual(platforms);
+    for (let index = 0; index < platforms.length; index++) {
+      expect(mocks.connect.mock.calls.map(([input]) => input.platform)).toEqual(platforms.slice(0, index + 1));
+      await act(async () => { resolveConnect[index]!({ url: "https://example.com/connect" }); });
+    }
+    expect(mocks.connect).toHaveBeenCalledTimes(4);
+  });
+  it("stops queued prefetches when the brand changes or the tab unmounts", async () => {
+    const resolveConnect: Array<(value: { url: string }) => void> = [];
+    mocks.connect.mockImplementation(() => new Promise(resolve => { resolveConnect.push(resolve); }));
+    await act(async () => root!.render(<PublishTab brandId={3} />));
+    await act(async () => root!.render(<PublishTab brandId={4} />));
+    await act(async () => { resolveConnect[0]!({ url: "https://example.com/old" }); });
+    expect(mocks.connect.mock.calls.map(([input]) => [input.brandId, input.platform])).toEqual([[3, "facebook"], [4, "facebook"]]);
+    await act(async () => root!.unmount());
+    root = null;
+    await act(async () => { resolveConnect[1]!({ url: "https://example.com/current" }); });
+    expect(mocks.connect).toHaveBeenCalledTimes(2);
+  });
   it("refreshes every Zernio platform on focus and displays the connected account", async () => {
     await act(async () => root!.render(<PublishTab brandId={3} />));
     mocks.status.mockClear().mockResolvedValue({ connected: true, account: { accountId: "a", name: "Authorized Page", username: null }, pendingScheduled: 0, legacyConnected: false });

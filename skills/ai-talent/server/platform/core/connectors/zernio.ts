@@ -1,6 +1,8 @@
 import type { ZernioPlatform, ZernioPostPayload, ZernioPostResponse } from "./publish/zernioPublish";
 
 export const DEFAULT_TIMEOUT_MS = 15_000;
+// 成效回填（performance 層）要讀各平台 insights，連接時一次要齊，避免客戶日後得重新授權。
+export const ZERNIO_CONNECT_SCOPES = "posting,analytics";
 const PUBLISH_TIMEOUT_MS = 30_000;
 export type ZernioAccount = {
   _id: string; platform: ZernioPlatform; username?: string; displayName?: string;
@@ -45,7 +47,13 @@ export function createZernioClient({ apiKey, baseUrl = "https://zernio.com/api",
       if (body.pagination ? page >= body.pagination.pages : body.accounts.length < 100) return accounts;
     }
   }
+  async function findProfileByName(name: string): Promise<{ _id: string } | null> {
+    const query = new URLSearchParams({ name, limit: "1" });
+    const { body } = await request<{ profiles: { _id: string }[] }>(`/v1/profiles?${query}`);
+    return body.profiles[0] ?? null;
+  }
   return {
+    findProfileByName,
     async createProfile(input: { name: string; idempotencyKey: string }): Promise<{ _id: string }> {
       try {
         return (await request<{ profile: { _id: string } }>("/v1/profiles", {
@@ -54,11 +62,18 @@ export function createZernioClient({ apiKey, baseUrl = "https://zernio.com/api",
       } catch (e) {
         if (e instanceof ZernioApiError && e.status === 409 && e.code === "profile_name_conflict"
             && typeof e.details?.existingProfileId === "string") return { _id: e.details.existingProfileId };
+        if (e instanceof ZernioApiError && e.status === 409 && e.code !== "profile_name_conflict") {
+          for (let attempt = 0; attempt < 5; attempt++) {
+            await new Promise<void>(resolve => setTimeout(resolve, 400));
+            const profile = await findProfileByName(input.name);
+            if (profile) return { _id: profile._id };
+          }
+        }
         throw e;
       }
     },
     async getConnectUrl(input: { platform: ZernioPlatform; profileId: string; redirectUrl: string; reconnectAccountId?: string }): Promise<{ authUrl: string }> {
-      const query = new URLSearchParams({ profileId: input.profileId, redirect_url: input.redirectUrl, scopes: "posting" });
+      const query = new URLSearchParams({ profileId: input.profileId, redirect_url: input.redirectUrl, scopes: ZERNIO_CONNECT_SCOPES });
       if (input.reconnectAccountId) query.set("reconnectAccountId", input.reconnectAccountId);
       return (await request<{ authUrl: string }>(`/v1/connect/${input.platform}?${query}`)).body;
     },
