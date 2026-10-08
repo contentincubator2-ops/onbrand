@@ -41,7 +41,7 @@
  * 2026-10-05（CJ「活動企劃當中的對話，要能讀取官網連結、或是上傳檔案解析」）：
  *   · 話裡貼網址，伺服器去讀；輸入框左邊的迴紋針上傳檔案（走既有的 extract-text 抽文字）。
  *   · 讀進來的資料跟著這檔活動，列在輸入框上方，團隊每一位、每一段討論都讀得到，可以移除。
- *   · 讀不到的連結在那一則底下直接標出來，不靠模型轉述（server/content/core/campaign/campaignChatSources.ts）。
+ *   · 讀不到的連結在那一則底下直接標出來，不靠模型轉述（server/strategy/core/entities/campaignChatSources.ts）。
  */
 import React from "react";
 import { Avatar } from "@heroui/react";

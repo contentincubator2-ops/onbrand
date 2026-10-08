@@ -398,7 +398,7 @@ const audienceLine = (intake: EventIntake) =>
 
 /** 這檔活動的參考資料（新增活動時給的連結與檔案、對話裡貼的）→ prompt 的那一段。讀不到回空字串。 */
 async function eventSourceBlock(eventId: number, userId: number): Promise<string> {
-  const { loadSourceDocs, formatSourcesForPrompt } = await import("./campaignChatSources.js");
+  const { loadSourceDocs, formatSourcesForPrompt } = await import("../../../strategy/core/entities/campaignChatSources.js");
   return formatSourcesForPrompt(await loadSourceDocs(eventId, userId).catch(() => []));
 }
 

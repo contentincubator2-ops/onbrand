@@ -51,7 +51,7 @@ import { KPI_METRICS, pickKpiAgent, runKpiPlan } from "../core/campaign/campaign
 import { brandIndustry, pickPlannerAgent } from "../core/campaign/campaignTeam";
 import { buildCampaignRoster, CAMPAIGN_ROLES, ROLES } from "../core/campaign/campaignRoster";
 import { appendChat, closeThread, listChat, listThreads, markUndone, recentSummaries, reopenThread } from "../core/campaign/campaignChatStore";
-import { addSource, formatSourcesForPrompt, listSources, loadSourceDocs, readLinks, readLinksInMessage, removeSource, MAX_STORED_CHARS, type LinkRead } from "../core/campaign/campaignChatSources";
+import { addSource, formatSourcesForPrompt, listSources, loadSourceDocs, readLinks, readLinksInMessage, removeSource, MAX_STORED_CHARS, type LinkRead } from "../../strategy/core/entities/campaignChatSources";
 import { isHiddenContentPlatform, isHiddenHistoryItem } from "../../platform/core/billing/planGate";
 import { ownedProductIds, resolveProductScope } from "../../strategy/core/entities/eventProductScope";
 import { readEventIntake, cleanLinks, INTAKE_LINKS_MAX } from "../../strategy/core/entities/eventIntake";
@@ -521,7 +521,7 @@ export const campaignRouter = router({
       const plan = visiblePlan((pos.campaignPlan ?? null) as CampaignPlan | null);
       if (!plan?.items?.length) throw new TRPCError({ code: "BAD_REQUEST", message: "還沒有企劃，先排出企劃再來討論" });
       // 2026-10-05：使用者這句話裡的連結先去讀（另一位轉過來的話不是使用者打的，不讀）；
-      // 讀到的跟之前上傳的檔案一起給模型，讀不到的也照實告訴它（見 core/campaignChatSources.ts）。
+      // 讀到的跟之前上傳的檔案一起給模型，讀不到的也照實告訴它（見 strategy/core/entities/campaignChatSources.ts）。
       const none: { read: LinkRead[]; failed: string[] } = { read: [], failed: [] };
       const links = input.handoff ? none : await readLinksInMessage(input.eventId, ctx.user!.id, input.message).catch(() => none);
       const sources = formatSourcesForPrompt(await loadSourceDocs(input.eventId, ctx.user!.id).catch(() => []), links.failed);
@@ -561,7 +561,7 @@ export const campaignRouter = router({
     }),
 
   /**
-   * 這檔活動的對話讀得到的參考資料（2026-10-05，見 core/campaignChatSources.ts）。
+   * 這檔活動的對話讀得到的參考資料（2026-10-05，見 strategy/core/entities/campaignChatSources.ts）。
    * 連結由 chat 自己讀；檔案由畫面先抽成文字（/api/positioning-doc/extract-text）再存進來。
    */
   chatSources: protectedProcedure

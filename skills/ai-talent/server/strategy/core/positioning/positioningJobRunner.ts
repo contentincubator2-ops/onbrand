@@ -581,7 +581,7 @@ async function runPipelineDetached(args: {
       const intake = await loadEventIntake(args.entityId);
       if (!description && intake.note) description = intake.note;
       if (intake.audience) eventAudience = intake.audience;
-      const { loadSourceDocs, formatSourcesForPrompt } = await import("../../../content/core/campaign/campaignChatSources");
+      const { loadSourceDocs, formatSourcesForPrompt } = await import("../entities/campaignChatSources");
       const sources = formatSourcesForPrompt(await loadSourceDocs(args.entityId, args.userId).catch(() => []));
       // 定位有 11 步、每一步都帶這一段，所以只給前 6,000 字（排企劃與對話讀的是完整的 20,000 字）。
       if (sources) realContent = sources.slice(0, 6000);
