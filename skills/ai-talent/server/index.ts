@@ -770,6 +770,18 @@ const server = app.listen(PORT, async () => {
     }, 30 * 60_000);
     console.log("[fbPageSync] Worker started (30m interval)");
 
+    const { tickZernioAnalyticsSync, zernioAnalyticsEnabled } = await import("./performance/core/zernioAnalyticsSync");
+    if (zernioAnalyticsEnabled()) {
+      setInterval(() => {
+        tickZernioAnalyticsSync().catch(() => {
+          console.error("[zernio.analytics] tick failed; retry on next run");
+        });
+      }, 30 * 60_000);
+      console.log("[zernio.analytics] Worker started (30m interval)");
+    } else {
+      console.log("[zernio.analytics] disabled (social publishing disabled or provider not configured)");
+    }
+
     if (process.env.ZERNIO_API_KEY) {
       const { tickZernioReconcile } = await import("./platform/core/connectors/publish/zernioReconcileWorker");
       const reconcile = () => {

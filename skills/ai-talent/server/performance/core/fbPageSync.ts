@@ -24,6 +24,7 @@ import { getPipedreamAccounts, getPipedreamAppSlug, prioritizePipedreamAccounts 
 import { findPipedreamFacebookPage, probePipedreamFacebookAccounts } from "../../platform/core/connectors/pipedreamFacebook";
 import { upsertFacts, type FactInput } from "./perfStore";
 import { isRuntimeFeatureEnabled } from "../../platform/core/ops/runtimeSafety";
+import { getPublishProvider } from "../../platform/core/connectors/publish/publishProvider";
 
 const GRAPH = "https://graph.facebook.com/v25.0";
 
@@ -33,7 +34,7 @@ export class FbSyncError extends Error {
 
 /** 跟 publishRouter.socialProcedure 同一個開關：dev 關掉社群連接，這裡也不去打 Pipedream／Graph。 */
 export function fbSyncEnabled(): boolean {
-  return isRuntimeFeatureEnabled("SOCIAL_PUBLISH_ENABLED");
+  return getPublishProvider("facebook") !== "zernio" && isRuntimeFeatureEnabled("SOCIAL_PUBLISH_ENABLED");
 }
 
 /** 標準指標 ← Graph insights 候選名稱（依偏好排序）。 */

@@ -9,6 +9,7 @@ function setup() {
     createProfile: vi.fn().mockResolvedValue({ _id: "profile" }),
     getConnectUrl: vi.fn().mockResolvedValue({ authUrl: "https://example.com/connect" }),
     listAllAccounts: vi.fn().mockResolvedValue([]),
+    listAnalytics: vi.fn().mockResolvedValue({ posts: [] }), syncExternalPosts: vi.fn().mockResolvedValue(undefined),
     listAccounts: vi.fn().mockResolvedValue([]), deleteAccount: vi.fn().mockResolvedValue(undefined),
     createPost: vi.fn().mockResolvedValue({ httpStatus: 201, body: { post: { status: "published", platforms: [{ platform: "facebook", status: "published", platformPostId: "external", platformPostUrl: "https://example.com/post" }] } } }),
   };
@@ -138,6 +139,16 @@ describe("Zernio adapter", () => {
     expect(client.deleteAccount.mock.calls).toEqual([["older"], ["oldest"]]);
     expect(warn).toHaveBeenCalledTimes(2);
     warn.mockRestore();
+  });
+  it("stores the native platform user id with the profile URL for analytics", async () => {
+    const { adapter, client, pool } = setup();
+    pool.execute.mockResolvedValueOnce([[{ tenantId: "profile" }]])
+      .mockResolvedValueOnce([{}]).mockResolvedValueOnce([[{ accountId: "current" }]]);
+    client.listAccounts.mockResolvedValueOnce([{ _id: "current", platform: "facebook", platformUserId: "123",
+      profileUrl: "https://www.facebook.com/my-page" }]);
+    await adapter.syncConnection({ brandId: 3, platform: "facebook" });
+    const [, params] = pool.execute.mock.calls.find(([sql]) => sql.includes("INSERT INTO brand_publish_connections"))!;
+    expect(JSON.parse(params[6])).toEqual({ profileUrl: "https://www.facebook.com/my-page", platformUserId: "123" });
   });
   it("clears the local connection for an empty remote snapshot or missing tenant", async () => {
     for (const tenant of [[], [{ tenantId: "profile" }]]) {

@@ -38,6 +38,9 @@ import { pivot, resolveTag, judgeValue, BUILTIN_DIMS, METRIC_LABELS, JUDGE_LABEL
 import { deriveDimensions, proposeLens, autoTag } from "../core/perfAI";
 import { parseTable, guessSource, guessMapping, buildFacts, IMPORT_SOURCES, ROWCOUNT } from "../core/perfImport";
 import { syncFbPage, resolvePage, FbSyncError, fbSyncEnabled } from "../core/fbPageSync";
+import { syncBrandZernioAnalytics, ZernioAnalyticsSyncError, isAnalyticsPlatform, SOURCE_BY_PLATFORM } from "../core/zernioAnalyticsSync";
+import { listConnectedByBrand } from "../../platform/core/connectors/publish/connectionStore";
+import { getPublishProvider } from "../../platform/core/connectors/publish/publishProvider";
 import { utmContent, campaignCode, campaignLink, cleanLandingUrl } from "../../platform/core/perfUtm";
 import {
   buildCampaignPerf, applyMatch, applyAlias, loadCampaignEvent, saveCampaignPerf, publishedPosts, listCampaigns,
@@ -72,11 +75,24 @@ export interface SourceConnection {
   selfServe: boolean;
 }
 
+const syncInput = z.object({ brandId: z.number().int().positive(), days: z.number().int().min(7).max(365).default(120) });
+async function syncSocial(input: z.infer<typeof syncInput>) {
+  try {
+    return await syncBrandZernioAnalytics(input.brandId, input.days);
+  } catch (error) {
+    if (error instanceof ZernioAnalyticsSyncError) throw new TRPCError({ code: "PRECONDITION_FAILED", message: error.message });
+    throw error;
+  }
+}
+
 export const performanceRouter = router({
   /** 這個品牌三個資料來源的真實狀態。 */
   connections: protectedProcedure
     .input(z.object({ brandId: z.number() }))
     .query(async ({ ctx, input }): Promise<SourceConnection[]> => {
+      await assertBrandAccess(ctx.user!.id, input.brandId);
+      const { default: pool } = await import("../../localDb");
+      const socialConnections = (await listConnectedByBrand(pool, input.brandId, "zernio")).filter(c => isAnalyticsPlatform(c.platform));
       let fb: { status: string; selectedResourceId: string | null; connectedAt: any; authorizedResources: any } | null = null;
       try {
         const { default: localPool } = await import("../../localDb");
@@ -104,10 +120,15 @@ export const performanceRouter = router({
       // status enum 是 connected | disconnected | error（drizzle schema），沒有 'active'。
       // 2026-09-29：發布流程實際用的是 brands.fbPageId（fbPageSync 也是），這裡一起算。
       const page = await resolvePage(input.brandId).catch(() => null);
-      const fbConnected = (!!fb && fb.status === "connected" && !!fb.selectedResourceId) || !!page;
+      const fbConnected = (!!fb && fb.status === "connected" && !!fb.selectedResourceId) || !!page || socialConnections.length > 0;
       if (!pageLabel && page) pageLabel = page.pageName ?? page.pageId;
+      if (socialConnections.length) pageLabel = socialConnections.map(c => c.accountLabel || c.accountUsername || c.accountId).join("、");
       const sources = await sourceSummary(input.brandId).catch(() => ({} as Record<string, { facts: number; latest: string | null }>));
-      const fbFacts = sources.fb_page?.facts ?? 0;
+      const socialSources = Object.values(SOURCE_BY_PLATFORM);
+      const fbFacts = socialSources.reduce((n, source) => n + (sources[source]?.facts ?? 0), 0);
+      const latestSocial = socialSources.map(source => sources[source]?.latest).filter((d): d is string => !!d).sort().pop() ?? null;
+      const connectedAt = socialConnections.map(c => c.connectedAt).filter((d): d is Date | string => !!d)
+        .map(d => new Date(d).toISOString()).sort().pop();
       const adsFacts = (sources.meta_ads?.facts ?? 0) + (sources.google_ads?.facts ?? 0) + (sources.ga4?.facts ?? 0);
       const shopFacts = (sources.shopline?.facts ?? 0) + (sources["91app"]?.facts ?? 0) + (sources.shopify?.facts ?? 0);
 
@@ -116,13 +137,13 @@ export const performanceRouter = router({
           id: "meta_page",
           status: fbConnected ? "connected" : "not_connected",
           label: fbConnected ? pageLabel : null,
-          connectedAt: fbConnected && fb?.connectedAt ? new Date(fb.connectedAt).toISOString() : (sources.fb_page?.latest ?? null),
+          connectedAt: connectedAt ?? (fbConnected && fb?.connectedAt ? new Date(fb.connectedAt).toISOString() : latestSocial),
           howZh: fbConnected
-            ? (fbFacts ? `已回填 ${fbFacts} 篇貼文成效，每天自動更新。` : "粉專已連結，按「同步粉專」就能回填貼文成效，之後每天自動更新。")
-            : "到日曆頁連結 Facebook 粉專。發布用的授權同時涵蓋貼文洞察，不必再授權一次。",
+            ? (fbFacts ? `社群貼文成效（Facebook／Instagram／Threads／LinkedIn）：已回填 ${fbFacts} 篇，每天自動更新。` : "社群帳號已連結，按「同步成效」回填 Facebook／Instagram／Threads／LinkedIn 貼文成效，之後每天自動更新。舊連線請先到品牌設定重新授權。")
+            : "社群貼文成效（Facebook／Instagram／Threads／LinkedIn）：到品牌設定連接帳號；先前已連接的帳號請重新授權一次，以取得成效讀取權限。",
           howEn: fbConnected
-            ? (fbFacts ? `${fbFacts} posts backfilled; refreshed daily.` : "Page connected. Sync to backfill post insights; refreshed daily after that.")
-            : "Connect your Facebook Page from the Calendar page. The publishing grant already covers post insights.",
+            ? (fbFacts ? `Social post performance (Facebook / Instagram / Threads / LinkedIn): ${fbFacts} posts backfilled; refreshed daily.` : "Social account connected. Sync performance to backfill Facebook / Instagram / Threads / LinkedIn posts, then refresh daily. Reauthorize older connections in brand settings first.")
+            : "Social post performance (Facebook / Instagram / Threads / LinkedIn): connect in brand settings. Reauthorize older connections once to grant analytics access.",
           selfServe: true,
         },
         {
@@ -324,11 +345,20 @@ export const performanceRouter = router({
       return { tagged, looked: facts.length };
     }),
 
-  /** 粉專貼文回填（手動觸發；背景 worker 每天也會跑）。 */
-  syncFacebook: protectedProcedure
-    .input(z.object({ brandId: z.number().int().positive(), days: z.number().int().min(7).max(365).default(120) }))
+  /** 四平台社群貼文回填（手動觸發；與背景 worker 共用同步）。 */
+  syncSocial: protectedProcedure
+    .input(syncInput)
     .mutation(async ({ ctx, input }) => {
       await assertBrandAccess(ctx.user!.id, input.brandId);
+      return syncSocial(input);
+    }),
+
+  /** 舊端點保留：Facebook 改走 Zernio 時，一併同步四個支援的平台。 */
+  syncFacebook: protectedProcedure
+    .input(syncInput)
+    .mutation(async ({ ctx, input }) => {
+      await assertBrandAccess(ctx.user!.id, input.brandId);
+      if (getPublishProvider("facebook") === "zernio") return syncSocial(input);
       try {
         return await syncFbPage(input.brandId, input.days);
       } catch (e) {
