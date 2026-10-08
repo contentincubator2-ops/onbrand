@@ -1,0 +1,156 @@
+# Connection string comes only from GitHub Secrets; dev uses its environment secret.
+# Rollback: select the same target and media_storage="local".
+# "keep" preserves MEDIA_STORAGE while refreshing the secret and container.
+name: Admin — Write media env vars to VM
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: "目標環境"
+        required: true
+        type: choice
+        default: "dev"
+        options: ["dev", "prod"]
+      media_storage:
+        description: "產圖儲存後端（keep 保留現值）"
+        required: true
+        type: choice
+        default: "keep"
+        options: ["keep", "local", "azure-blob"]
+      container:
+        description: "Azure Blob 容器"
+        required: true
+        type: string
+        default: "onbrand-media"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: admin-write-media-env-${{ inputs.target }}
+  cancel-in-progress: false
+
+jobs:
+  write-dev:
+    if: inputs.target == 'dev'
+    environment: dev
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Write media env and restart
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          AZURE_STORAGE_CONNECTION_STRING: ${{ secrets.AZURE_STORAGE_CONNECTION_STRING }}
+          MEDIA_STORAGE_INPUT: ${{ inputs.media_storage }}
+          MEDIA_CONTAINER_INPUT: ${{ inputs.container }}
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 120s
+          envs: AZURE_STORAGE_CONNECTION_STRING,MEDIA_STORAGE_INPUT,MEDIA_CONTAINER_INPUT
+          script: |
+            set +x
+            set -euo pipefail
+            umask 077
+            export MEDIA_ENV_FILE=/opt/onbrand/shared/.env
+            python3 - <<'PYENV'
+            import os
+            import pathlib
+            import re
+            import shutil
+            import time
+
+            path = pathlib.Path(os.environ["MEDIA_ENV_FILE"])
+            if not path.is_file():
+                raise SystemExit("Media environment file not found")
+            backend = os.environ["MEDIA_STORAGE_INPUT"]
+            container = os.environ["MEDIA_CONTAINER_INPUT"]
+            connection = os.environ.get("AZURE_STORAGE_CONNECTION_STRING", "")
+            if backend not in ("keep", "local", "azure-blob"):
+                raise SystemExit("Invalid media storage choice")
+            if not re.fullmatch(r"[a-z0-9](?:[a-z0-9]|-(?!-)){1,61}[a-z0-9]", container):
+                raise SystemExit("Invalid Azure container name")
+            if not connection.strip():
+                raise SystemExit("AZURE_STORAGE_CONNECTION_STRING secret is empty")
+            updates = {
+                "AZURE_STORAGE_CONNECTION_STRING": connection,
+                "AZURE_BLOB_CONTAINER": container,
+            }
+            if backend != "keep":
+                updates["MEDIA_STORAGE"] = backend
+            # Validate everything before backup/write. Values stay out of logs and argv.
+            for value in updates.values():
+                if any(char in value for char in ("\n", "\r", "'", "\x00")):
+                    raise SystemExit("Invalid environment value")
+            lines = [line for line in path.read_text().splitlines()
+                     if not any(re.match(r"^\s*(?:export\s+)?" + key + r"\s*=", line) for key in updates)]
+            lines.extend(key + "='" + value + "'" for key, value in updates.items())
+            shutil.copy2(path, str(path) + ".bak.media." + str(time.time_ns()))
+            # In-place write preserves the existing permissions and symlink target.
+            path.write_text("\n".join(lines) + "\n")
+            PYENV
+            pm2 restart onbrand-dev --update-env >/dev/null 2>&1
+            if ! timeout 60 bash -c 'until curl --fail --silent --max-time 5 http://127.0.0.1:3101/health >/dev/null; do sleep 3; done'; then
+              echo "❌ Restart health check failed."; exit 1
+            fi
+            echo "✓ Media env written; restart health OK"
+
+  write-prod:
+    if: inputs.target == 'prod'
+    runs-on: [self-hosted, linux, vm-onbrand]
+    timeout-minutes: 5
+    steps:
+      - name: Write media env and restart
+        shell: bash
+        env:
+          AZURE_STORAGE_CONNECTION_STRING: ${{ secrets.AZURE_STORAGE_CONNECTION_STRING }}
+          MEDIA_STORAGE_INPUT: ${{ inputs.media_storage }}
+          MEDIA_CONTAINER_INPUT: ${{ inputs.container }}
+        run: |
+          set +x
+          set -euo pipefail
+          umask 077
+          export MEDIA_ENV_FILE=/opt/onbrand/app/skills/ai-talent/.env
+          python3 - <<'PYENV'
+          import os
+          import pathlib
+          import re
+          import shutil
+          import time
+
+          path = pathlib.Path(os.environ["MEDIA_ENV_FILE"])
+          if not path.is_file():
+              raise SystemExit("Media environment file not found")
+          backend = os.environ["MEDIA_STORAGE_INPUT"]
+          container = os.environ["MEDIA_CONTAINER_INPUT"]
+          connection = os.environ.get("AZURE_STORAGE_CONNECTION_STRING", "")
+          if backend not in ("keep", "local", "azure-blob"):
+              raise SystemExit("Invalid media storage choice")
+          if not re.fullmatch(r"[a-z0-9](?:[a-z0-9]|-(?!-)){1,61}[a-z0-9]", container):
+              raise SystemExit("Invalid Azure container name")
+          if not connection.strip():
+              raise SystemExit("AZURE_STORAGE_CONNECTION_STRING secret is empty")
+          updates = {
+              "AZURE_STORAGE_CONNECTION_STRING": connection,
+              "AZURE_BLOB_CONTAINER": container,
+          }
+          if backend != "keep":
+              updates["MEDIA_STORAGE"] = backend
+          # Validate everything before backup/write. Values stay out of logs and argv.
+          for value in updates.values():
+              if any(char in value for char in ("\n", "\r", "'", "\x00")):
+                  raise SystemExit("Invalid environment value")
+          lines = [line for line in path.read_text().splitlines()
+                   if not any(re.match(r"^\s*(?:export\s+)?" + key + r"\s*=", line) for key in updates)]
+          lines.extend(key + "='" + value + "'" for key, value in updates.items())
+          shutil.copy2(path, str(path) + ".bak.media." + str(time.time_ns()))
+          # In-place write preserves the existing permissions and symlink target.
+          path.write_text("\n".join(lines) + "\n")
+          PYENV
+          pm2 restart onbrand --update-env >/dev/null 2>&1
+          if ! timeout 60 bash -c 'until curl --fail --silent --max-time 5 http://127.0.0.1:3101/health >/dev/null; do sleep 3; done'; then
+            echo "❌ Restart health check failed."; exit 1
+          fi
+          echo "✓ Media env written; restart health OK"
