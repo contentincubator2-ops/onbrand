@@ -95,7 +95,63 @@ export type ZernioAnalyticsDeps = {
   now?: () => Date;
 };
 
+export const AUTO_SYNC_STALE_HOURS = 6;
+const AUTO_SYNC_RETRY_MS = 10 * 60_000;
+const inFlightBrands = new Set<number>();
+const activeSyncCounts = new Map<number, number>();
+const lastAttemptMs = new Map<number, number>();
+
+/** 開頁只等待新鮮度檢查，不等待同步；手動同步仍可隨時執行。 */
+export async function ensureFreshZernioAnalytics(brandId: number, deps: ZernioAnalyticsDeps = {}): Promise<{
+  started: boolean; reason: "disabled" | "no_connection" | "fresh" | "in_flight" | "started";
+}> {
+  if (!zernioAnalyticsEnabled()) return { started: false, reason: "disabled" };
+  // 優先回報執行中，避免新寫入的 facts 或嘗試窗口讓前端提早停止輪詢。
+  if (inFlightBrands.has(brandId)) return { started: false, reason: "in_flight" };
+  const pool = deps.pool ?? (await import("../../localDb")).default;
+  const connections = await listConnectedByBrand(pool, brandId, "zernio");
+  if (!connections.some(c => isAnalyticsPlatform(c.platform))) return { started: false, reason: "no_connection" };
+  const [rows] = await pool.execute(
+    "SELECT MAX(updatedAt) AS lastSync FROM perf_facts WHERE brandId = ? AND source IN (?, ?, ?, ?)",
+    [brandId, ...Object.values(SOURCE_BY_PLATFORM)],
+  );
+  // await 查詢期間可能有另一個開頁或手動同步先啟動；檢查與啟動之間不能再 await。
+  if (inFlightBrands.has(brandId)) return { started: false, reason: "in_flight" };
+  const now = (deps.now ?? (() => new Date()))().getTime();
+  const lastSync = rows[0]?.lastSync;
+  const lastAttempt = lastAttemptMs.get(brandId);
+  if ((lastSync != null && now - new Date(lastSync).getTime() < AUTO_SYNC_STALE_HOURS * 3_600_000)
+    || (lastAttempt !== undefined && now - lastAttempt < AUTO_SYNC_RETRY_MS)) {
+    return { started: false, reason: "fresh" };
+  }
+  lastAttemptMs.set(brandId, now);
+  // syncBrand 的共用追蹤器在第一個 await 前加進 Set，並在 finally 清除。
+  void syncBrandZernioAnalytics(brandId, 120, deps).catch(async () => {
+    try {
+      const log = deps.log ?? (await import("../../platform/routers/opsRouter")).logError;
+      await log({ source: "zernio.analytics", level: "warn", message: "社群成效開頁同步失敗，請稍後重試。", meta: { brandId } });
+    } catch { /* 記錄失敗也不能形成未處理的背景 rejection。 */ }
+  });
+  return { started: true, reason: "started" };
+}
+
 export async function syncBrandZernioAnalytics(brandId: number, days = 120, deps: ZernioAnalyticsDeps = {}): Promise<ZernioAnalyticsSyncResult> {
+  inFlightBrands.add(brandId);
+  activeSyncCounts.set(brandId, (activeSyncCounts.get(brandId) ?? 0) + 1);
+  try {
+    return await runBrandZernioAnalytics(brandId, days, deps);
+  } finally {
+    // 手動同步不受限制；重疊的同步全部結束後才清掉品牌狀態。
+    const remaining = activeSyncCounts.get(brandId)! - 1;
+    if (remaining) activeSyncCounts.set(brandId, remaining);
+    else {
+      activeSyncCounts.delete(brandId);
+      inFlightBrands.delete(brandId);
+    }
+  }
+}
+
+async function runBrandZernioAnalytics(brandId: number, days: number, deps: ZernioAnalyticsDeps): Promise<ZernioAnalyticsSyncResult> {
   if (!zernioAnalyticsEnabled()) throw new ZernioAnalyticsSyncError("此環境尚未啟用社群成效同步。");
   if (!Number.isInteger(days) || days < 1 || days > 365) throw new ZernioAnalyticsSyncError("同步天數須介於 1 至 365 天。");
   const pool = deps.pool ?? (await import("../../localDb")).default;

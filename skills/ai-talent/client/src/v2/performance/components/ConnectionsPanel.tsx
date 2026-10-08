@@ -32,6 +32,7 @@ type Conn = {
   howZh: string;
   howEn: string;
   selfServe: boolean;
+  syncing?: boolean;
 };
 
 const META: Record<Conn["id"], { zh: string; en: string; icon: React.ReactNode }> = {
@@ -54,10 +55,21 @@ export default function ConnectionsPanel({ brandId }: { brandId: number | null }
     },
   });
   React.useEffect(() => { sync.reset(); }, [brandId]);
-  const q = (trpc as any).performance?.connections?.useQuery
-    ? (trpc as any).performance.connections.useQuery({ brandId: brandId ?? 0 }, { enabled: !!brandId, refetchOnWindowFocus: false })
-    : { data: undefined };
+  const q = trpc.performance.connections.useQuery({ brandId: brandId ?? 0 }, {
+    enabled: !!brandId, refetchOnWindowFocus: false,
+    refetchInterval: query => query.state.data?.some(c => c.id === "meta_page" && c.syncing) ? 8000 : false,
+  });
   const conns = (q.data ?? []) as Conn[];
+  const syncing = conns.find(c => c.id === "meta_page")?.syncing;
+  const previousSync = React.useRef<{ brandId: number | null; syncing: boolean | undefined }>({ brandId, syncing: undefined });
+  React.useEffect(() => {
+    if (previousSync.current.brandId === brandId && previousSync.current.syncing && syncing === false) {
+      void utils.performance.workspace.invalidate();
+      void utils.performance.report.invalidate();
+      void utils.performance.campaignReport.invalidate();
+    }
+    previousSync.current = { brandId, syncing };
+  }, [brandId, syncing, utils]);
   const connected = conns.filter((c) => c.status === "connected").length;
 
   return (
@@ -81,7 +93,7 @@ export default function ConnectionsPanel({ brandId }: { brandId: number | null }
 
       <div className="mt-3 grid gap-3 md:grid-cols-3">
         {(conns.length ? conns : (["meta_page", "meta_ads", "commerce"] as Conn["id"][]).map((id) => ({
-          id, status: "not_connected" as const, label: null, connectedAt: null, howZh: "", howEn: "", selfServe: false,
+          id, status: "not_connected" as const, label: null, connectedAt: null, howZh: "", howEn: "", selfServe: false, syncing: false,
         }))).map((c) => {
           const on = c.status === "connected";
           return (
@@ -98,6 +110,9 @@ export default function ConnectionsPanel({ brandId }: { brandId: number | null }
                 {c.label && <span className="ml-1 truncate text-neutral-500">· {c.label}</span>}
               </div>
               <p className="mt-2 text-[13px] leading-5 text-neutral-600">{isEn ? c.howEn : c.howZh}</p>
+              {c.id === "meta_page" && c.syncing && (
+                <p role="status" className="mt-2 text-[12px] text-neutral-500">{isEn ? "Updating performance…" : "成效更新中…"}</p>
+              )}
               {c.id === "meta_page" && !on && brandId && (
                 <button type="button" onClick={() => navigate(publishSettingsUrl(brandId))}
                   className="mt-2 rounded-md border border-neutral-300 px-2 py-1 text-[13px] text-neutral-700 disabled:opacity-50">
