@@ -467,7 +467,7 @@ async function publishScheduledPostInner(args: {
 
   // Load scheduled_post + verify ownership
   const [rows]: any = await localPool.execute(
-    `SELECT sp.id, sp.outputId, sp.variantIndex, sp.contentKind, sp.contentIndex,
+    `SELECT sp.id, sp.userId AS ownerId, sp.outputId, sp.variantIndex, sp.contentKind, sp.contentIndex,
             sp.planningConfirmed, sp.platform, sp.status, sp.brandId, sp.attempts,
             o.content AS outputContent, o.metadata AS outputMetadata,
             m.squadSlug AS missionSquadSlug,
