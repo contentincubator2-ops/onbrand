@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { basisLabel, fromText, toText, shortTitle, briefFromBasis } from "./campaignBasis";
+import { basisLabel, fromText, toText, shortTitle, briefFromBasis, briefFromEvent } from "./campaignBasis";
 import { describeProposal, isEmptyProposal } from "./campaignChat";
 
 describe("策略依據的標籤與值", () => {
@@ -30,5 +30,17 @@ describe("活動定位 → 排企劃用的那段話", () => {
     expect(briefFromBasis(null)).toBe("");
     expect(briefFromBasis({ brief: { briefSummary: 123 }, smp: null })).toBe("");
     expect(briefFromBasis({ brief: { briefSummary: "字".repeat(900) } }).length).toBe(600);
+  });
+});
+
+describe("新增活動時填的內容 → 排企劃用的那段話", () => {
+  it("活動名稱加上當時寫的主題；主題已經含名稱就不重複", () => {
+    expect(briefFromEvent({ name: "中秋檔期", note: "牛排組合早鳥 8 折" })).toBe("中秋檔期\n牛排組合早鳥 8 折");
+    expect(briefFromEvent({ name: "中秋檔期", note: "中秋檔期牛排組合早鳥 8 折" })).toBe("中秋檔期牛排組合早鳥 8 折");
+  });
+  it("沒寫主題就只有名稱；什麼都沒有回空字串；長度不超過上限", () => {
+    expect(briefFromEvent({ name: " 母親節 ", note: "" })).toBe("母親節");
+    expect(briefFromEvent(null)).toBe("");
+    expect(briefFromEvent({ name: "活動", note: "字".repeat(900) }).length).toBe(600);
   });
 });
