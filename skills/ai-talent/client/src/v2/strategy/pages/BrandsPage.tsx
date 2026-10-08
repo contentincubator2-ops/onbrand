@@ -2526,7 +2526,10 @@ export default function BrandsPage() {
               活動先建進來」「建議節點也可以讓用戶自己增加」）：上面是 12 個月時間軸（節慶＋自建
               節點＋活動橫條），下面是照 BrandCard 版型的活動卡。點卡片／橫條都進宣傳企劃。
               2026-09-25 的決定不變：活動的落點是宣傳企劃（cat=campaign），不是得獎 brief。
-              2026-07-28 的教訓也還在：p/e/cat 必須一次 setSearchParams 寫完，分兩次會互蓋。 */}
+              2026-07-28 的教訓也還在：p/e/cat 必須一次 setSearchParams 寫完，分兩次會互蓋。
+              2026-10-08（CJ「按了某一個活動以後，再按上一頁，應該要回到活動總覽頁，但目前回到
+              品牌定位頁」）：進活動要在瀏覽紀錄多留一筆（不能 replace），不然活動總覽這一頁被
+              蓋掉，上一頁就跳回更早的那一頁。 */}
           {derivedCategory === "events" && scopeMode === "brand" && (() => {
             const openEvent = (id: number) => {
               setSearchParams((prev) => {
@@ -2535,7 +2538,7 @@ export default function BrandsPage() {
                 sp.set("e", String(id));
                 sp.set("cat", "campaign");
                 return sp;
-              }, { replace: true });
+              });
             };
             const todayYmd = toYmd(new Date())!;
             return (
@@ -2658,7 +2661,8 @@ export default function BrandsPage() {
             nextParams.set("cat", "campaign");
             nextParams.delete("p");
             nextParams.set("e", String(id));
-            setSearchParams(nextParams, { replace: true });
+            // 不 replace：上一頁要回到活動總覽（同 openEvent）。
+            setSearchParams(nextParams);
           }
           else if (kind === "product") {
             void id;
