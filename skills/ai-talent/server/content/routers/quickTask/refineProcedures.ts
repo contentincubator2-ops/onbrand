@@ -38,11 +38,23 @@ export const refineProcedures = {
         role: z.enum(["user", "assistant"]),
         content: z.string().max(3000),
       })).max(12).optional(),
+      // 2026-10-08：這是哪一篇成品的哪個版本——帶了就讀回先前提過的修改意見、
+      // 並把這一句記下來（refineNotes.ts）。沒帶＝一次性的改寫，照舊只看 history。
+      outputId: z.number().int().positive().optional(),
+      variantIndex: z.number().int().min(0).optional(),
+      contentKind: z.enum(["planning", "public"]).optional(),
+      contentIndex: z.number().int().min(0).optional(),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
       const { callModel } = await import("../../../platform/core/llm/multiModelRouter");
       const { buildBrandPrefix } = await import("../../../strategy/core/brand/brandContext");
       const { loadAgentKnowledge } = await import("../../../platform/core/agents/agentKnowledge");
+      const notesStore = await import("../../core/engine/refineNotes");
+      // 不是自己的成品就當作沒帶：照樣改寫，但不讀也不記別人的意見。
+      const noteOutputId = input.outputId && await notesStore.ownsOutput(input.outputId, ctx.user!.id).catch(() => false)
+        ? input.outputId : null;
+      const noteKey = notesStore.variantKeyOf(input);
+      const priorNotes = noteOutputId ? await notesStore.listRefineNotes(noteOutputId, noteKey) : [];
       // 2026-10-03：改寫也要讀這張卡所在平台的「通路角色」（沒帶 taskId 就不注入）。
       const { roleChannelOfTaskId } = await import("../../../strategy/core/brand/channelRoles");
       const brandPrefix = await buildBrandPrefix(
@@ -85,43 +97,49 @@ export const refineProcedures = {
 
       const system =
         `你是 ${agentName}（${agentTitle}），正在跟用戶討論這篇文案的修改方向。\n` +
-        `任務：根據用戶的修改意見，**重寫**整篇文案。輸出格式：\n` +
-        `1. 第一段：1-2 句說明你怎麼理解用戶的意見、改了什麼\n` +
-        `2. 接著 3 個 newline 分隔\n` +
-        `3. 最後是完整的**修改後文案**（不要省略，不要寫 "如下"，直接給完整版）\n\n` +
+        `任務：根據用戶的修改意見，**重寫**整篇文案。\n` +
+        contract.replyFormatBlock() + `\n\n` +
         `重要：保留原本能用的部分，只動用戶提到的地方。語氣自然口語。\n` +
         (agentKnowledge ? `\n【此 agent 的工作守則與專業能力】\n${agentKnowledge}\n` : "") +
         brandPrefix +
+        // 先前的意見接在品牌資料之後、格式合約之前：越後面越有力，但字數與形式仍然最大。
+        notesStore.priorNotesBlock(priorNotes) +
         // 合約接在最後：最後讀到的最有力，換人時個人風格不能蓋過這張卡的形式。
         contract.rewriteContractBlock(spec);
 
       const messages: Array<{ role: "system" | "user" | "assistant"; content: string }> = [
         { role: "system", content: system },
         { role: "user", content: `這是目前的文案：\n\n${input.currentCaption}` },
-        ...(input.history ?? []),
+        // 有存下來的意見就以它為準（已經在 system 裡）；畫面傳來的那串是同一批話，不重複放。
+        ...(priorNotes.length ? [] : (input.history ?? [])),
         { role: "user", content: input.userFeedback },
       ];
       try {
         // 2026-05-17: was "qwen" (Chinese model, zh-TW policy violation)
         // → anthropic for Taiwan-correct output.
-        const parse = (raw: string) => {
-          const text = (raw ?? "").trim();
-          // Split on triple newline to separate explanation from rewritten caption
-          let parts = text.split(/\n\n\n+/);
-          // 2026-07-07 (verified live on /run/2887): models sometimes use a
-          // markdown horizontal rule as the separator instead of blank lines —
-          // the triple-newline split then fails and the explanation + '---'
-          // leak into the published caption. Fall back to splitting on the hr.
-          if (parts.length === 1) {
-            parts = text.split(/\n+[-—_*]{3,}\s*\n+/);
-          }
-          const explanation = parts.length > 1 ? (parts[0] ?? "").trim() : "";
-          let rewritten = parts.length > 1 ? parts.slice(1).join("\n\n").trim() : text;
-          rewritten = rewritten.replace(/^(?:[-—_*]{3,}\s*\n+)+/, "").replace(/\n+(?:[-—_*]{3,}\s*)+$/, "").trim();
-          return { explanation, rewritten: contract.stripMarkdown(rewritten) };
-        };
+        const parse = contract.parseRewriteReply;
         const r = await callModel(messages, undefined, "anthropic");
         let { explanation, rewritten } = parse(r.content ?? "");
+        // 2026-10-08：文案段是在跟用戶講話（反問／清單）→ 要求直接改完，重試一次。
+        // 還是不行就不回文案：呼叫端不覆蓋本文，那段話只進對話。
+        if (contract.looksLikeReplyToUser(rewritten, input.currentCaption)) {
+          const retry = await callModel([
+            ...messages,
+            { role: "assistant", content: r.content ?? "" },
+            { role: "user", content: contract.copyOnlyRequest() },
+          ], undefined, "anthropic").catch(() => null);
+          const second = retry ? parse(retry.content ?? "") : null;
+          if (second && !contract.looksLikeReplyToUser(second.rewritten, input.currentCaption)) {
+            explanation = second.explanation || explanation;
+            rewritten = second.rewritten;
+          } else {
+            console.warn(`[refineCaption] reply was not publishable copy (task=${input.taskId ?? "-"}) — caption left untouched`);
+            return {
+              explanation: [explanation, rewritten].filter(Boolean).join("\n\n"),
+              rewritten: "", ok: true, noRewrite: true as const, regulationCompliance: null,
+            };
+          }
+        }
         // 驗證重試：超過這張卡的字數上限 25% → 帶著實際字數要求濃縮一次。還是太長就照給，不硬截斷。
         if (contract.isOverLimit(rewritten, spec)) {
           const r2 = await callModel([
@@ -145,10 +163,38 @@ export const refineProcedures = {
           rewritten = checked.text;
           regulationCompliance = checked.record;
         } catch { /* fail-safe */ }
+        if (noteOutputId && rewritten) {
+          await notesStore.addRefineNote({
+            outputId: noteOutputId, variantKey: noteKey, userId: ctx.user!.id,
+            feedback: input.userFeedback, explanation,
+          });
+        }
         return { explanation, rewritten, ok: true, regulationCompliance };
       } catch (e: any) {
         return { explanation: "", rewritten: "", ok: false, error: e?.message ?? String(e) };
       }
+    }),
+
+  // 2026-10-08：這個版本先前提過、還有效的修改意見（畫面列在輸入框下面）。
+  refineNotes: protectedProcedure
+    .input(z.object({
+      outputId: z.number().int().positive(),
+      variantIndex: z.number().int().min(0).optional(),
+      contentKind: z.enum(["planning", "public"]).optional(),
+      contentIndex: z.number().int().min(0).optional(),
+    }))
+    .query(async ({ ctx, input }) => {
+      const store = await import("../../core/engine/refineNotes");
+      if (!(await store.ownsOutput(input.outputId, ctx.user!.id))) return { notes: [] };
+      return { notes: await store.listRefineNotes(input.outputId, store.variantKeyOf(input)) };
+    }),
+
+  // 拿掉一條意見：之後的改寫不再照它（已經改好的文案不會變）。
+  removeRefineNote: protectedProcedure
+    .input(z.object({ noteId: z.number().int().positive() }))
+    .mutation(async ({ ctx, input }) => {
+      const store = await import("../../core/engine/refineNotes");
+      return { ok: await store.removeRefineNote(input.noteId, ctx.user!.id) };
     }),
 
   // 2026-05-18 (CJ「建立任務時加 AI 潤稿，潤完直接改寫輸入框」): a

@@ -18,13 +18,15 @@
 import { useState, useEffect } from "react";
 import { trpc } from "../../../lib/trpc";
 import { useLang } from "../../../lib/i18n";
-import { Modal, ModalBody, ModalContent, ModalFooter, ModalHeader, Button, Input, Textarea, Select, SelectItem, Autocomplete, AutocompleteItem } from "@heroui/react";
+import { Modal, ModalBody, ModalContent, ModalFooter, ModalHeader, Button, Chip, Input, Textarea, Select, SelectItem, Autocomplete, AutocompleteItem } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faRocket, faCubes, faCalendarDays } from "@fortawesome/free-solid-svg-icons";
 // 2026-09-10 (CJ 市場收斂): 見 BrandOnboardingWizard 的同一則說明。
 import { marketOptions, getCountry } from "../../../lib/countries";
 import EventProductScopePicker from "./events/EventProductScopePicker";
 import { UNDECIDED_SCOPE, type ProductScopeValue } from "../lib/eventProductScope";
+import { CAMPAIGN_CHANNELS, CAMPAIGN_TYPES } from "../lib/campaign/campaignSchema";
+import { CHANNEL_META, channelLabel } from "../../platform/lib/channelMeta";
 
 // 2026-07-18 (CJ 多市場): same list as BrandOnboardingWizard — common
 // languages first; the selected country's native language is auto-added.
@@ -142,6 +144,12 @@ export function AddEntityModal({ isOpen, onClose, initialTab = "brand", defaultB
   // 2026-09-30（CJ「新增活動的過程中，要讓用戶可以選擇…搭配哪個產品、好幾個產品聯合
   // 或純品牌活動」）。沒選也能建立——宣傳企劃頁的第一步會再問一次同一題。
   const [evScope, setEvScope] = useState<ProductScopeValue>(UNDECIDED_SCOPE);
+  // 2026-10-08（CJ「本來確認類型和通路的那一格的內容，都要出現在新建活動的選項」）：宣傳企劃頁
+  // 原本「下一步」之後才確認的類型、通路、線下活動的地點／場次／報名連結，都在這裡選。有選就
+  // 照選的，沒選的才由 AI 依那段話判斷；三樣（類型、通路、那段話）都有就直接排，不推斷。
+  const [evType, setEvType] = useState("");
+  const [evChannels, setEvChannels] = useState<string[]>([]);
+  const [evOffline, setEvOffline] = useState({ venue: "", sessions: "", signupUrl: "" });
   const evBrandProducts: Array<{ id: number; name: string }> =
     (((scopeOptions.data as any)?.products ?? []) as any[])
       .filter((p) => Number(p.brandId) === Number(evBrandId))
@@ -161,6 +169,9 @@ export function AddEntityModal({ isOpen, onClose, initialTab = "brand", defaultB
     setEvEnd(eventPrefill?.endAt ?? "");
     setEvNote("");
     setEvScope(UNDECIDED_SCOPE);
+    setEvChannels([]);
+    setEvType("");
+    setEvOffline({ venue: "", sessions: "", signupUrl: "" });
   }, [isOpen, defaultBrandId, eventPrefill]);
 
   const [busy, setBusy] = useState(false);
@@ -239,6 +250,17 @@ export function AddEntityModal({ isOpen, onClose, initialTab = "brand", defaultB
     if (!evName.trim() || !upsertEventMut) return;
     setBusy(true); setErrorMsg(null);
     try {
+      const note = evNote.trim();
+      const campaign: Record<string, unknown> = {
+        ...(evScope.scope ? { productScope: evScope.scope } : {}),
+        ...(evType ? { type: evType } : {}),
+        ...(evChannels.length ? { channels: evChannels } : {}),
+        // 那段話就是優惠機制（宣傳企劃頁的同一題）；上限跟設定欄位一樣是 600 字。
+        ...(note ? { mechanic: note.slice(0, 600) } : {}),
+        ...(evType === "offline"
+          ? Object.fromEntries(Object.entries(evOffline).map(([k, v]) => [k, v.trim()]).filter(([, v]) => v))
+          : {}),
+      };
       const r = await upsertEventMut.mutateAsync({
         brandId: evBrandId,
         slug: autoSlug(evName, "event"),
@@ -248,11 +270,8 @@ export function AddEntityModal({ isOpen, onClose, initialTab = "brand", defaultB
         // 搭配的產品寫進 event_products；「純品牌」沒有產品可寫，所以記在
         // positioning.campaign.productScope（語意見 server/strategy/core/entities/eventProductScope.ts）。
         ...(evScope.scope ? { productIds: evScope.productIds } : {}),
-        positioning: (evNote.trim() || evScope.scope)
-          ? {
-              ...(evNote.trim() ? { note: evNote.trim() } : {}),
-              ...(evScope.scope ? { campaign: { productScope: evScope.scope } } : {}),
-            }
+        positioning: (note || Object.keys(campaign).length)
+          ? { ...(note ? { note } : {}), ...(Object.keys(campaign).length ? { campaign } : {}) }
           : undefined,
       });
       const newId = Number(r?.id ?? 0);
@@ -461,8 +480,59 @@ export function AddEntityModal({ isOpen, onClose, initialTab = "brand", defaultB
                 />
               )}
               <div>
-                <label className="text-xs font-medium text-default-700 block mb-1">{lang === "en" ? "Theme / hooks (optional)" : "活動主題 / 重點（可選）"}</label>
-                <Textarea value={evNote} onValueChange={setEvNote} placeholder={lang === "en" ? "What's the angle, theme, or perks" : "活動的訴求 / 主題 / 配套"} minRows={2} />
+                <label className="text-xs font-medium text-default-700 block mb-1.5">
+                  {lang === "en" ? "Type" : "活動類型"}
+                  <span className="ml-1.5 font-normal text-default-400">{lang === "en" ? "Leave empty and we'll work it out from what you write" : "沒選就依下面寫的內容判斷"}</span>
+                </label>
+                <div className="flex gap-1.5 flex-wrap">
+                  {CAMPAIGN_TYPES.map((t) => (
+                    <Chip key={t.id} size="sm" color="default" className="cursor-pointer"
+                      variant={evType === t.id ? "solid" : "flat"}
+                      onClick={() => { if (!busy) setEvType(evType === t.id ? "" : t.id); }}>
+                      {lang === "en" ? t.en : t.zh}
+                    </Chip>
+                  ))}
+                </div>
+              </div>
+              {evType === "offline" && (
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  {([["venue", "地點", "Venue"], ["sessions", "場次", "Sessions"], ["signupUrl", "報名連結", "Sign-up URL"]] as const).map(([k, zh, e2]) => (
+                    <div key={k}>
+                      <label className="text-xs font-medium text-default-700 block mb-1">{lang === "en" ? e2 : zh}</label>
+                      <Input value={evOffline[k]} onValueChange={(v) => setEvOffline((o) => ({ ...o, [k]: v }))} />
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div>
+                <label className="text-xs font-medium text-default-700 block mb-1.5">
+                  {lang === "en" ? "Channels" : "要發的通路"}
+                  <span className="ml-1.5 font-normal text-default-400">{lang === "en" ? "Leave empty and we'll pick from what you write" : "沒選就依下面寫的內容判斷"}</span>
+                </label>
+                <div className="flex gap-1.5 flex-wrap">
+                  {CAMPAIGN_CHANNELS.filter((c) => CHANNEL_META[c]).map((c) => {
+                    const on = evChannels.includes(c);
+                    return (
+                      <Chip key={c} size="sm" variant={on ? "solid" : "flat"} color="default" className="cursor-pointer"
+                        startContent={<FontAwesomeIcon icon={CHANNEL_META[c]!.icon} className={`text-tiny ml-1 ${on ? "" : "text-default-500"}`} />}
+                        onClick={() => { if (!busy) setEvChannels(on ? evChannels.filter((x) => x !== c) : [...evChannels, c]); }}>
+                        {channelLabel(c, lang === "en")}
+                      </Chip>
+                    );
+                  })}
+                </div>
+              </div>
+              <div>
+                {/* 2026-10-08（CJ「新增活動時，直接寫滿我們需要進行活動定位的內容，不需要再跳一個步驟」）：
+                    這一格就是宣傳企劃頁原本第一步問的那一題。在這裡寫完，建立後直接排第一版企劃。 */}
+                <label className="text-xs font-medium text-default-700 block mb-1">{lang === "en" ? "What's on offer?" : "這檔活動在賣什麼、優惠是什麼？"}</label>
+                <Textarea value={evNote} onValueChange={setEvNote} minRows={3} maxRows={6} maxLength={800}
+                  placeholder={lang === "en" ? "e.g. Mid-Autumn bundle, 20% off early bird, 9/20–9/28, limited stock" : "例：中秋檔期，橫膈牛排＋厚切牛舌組合早鳥 8 折，9/20–9/28，數量有限"} />
+                <p className="text-tiny text-default-400 mt-1">
+                  {lang === "en"
+                    ? "Create it and we build the first draft plan from this, your brand and the products you picked — no second form. Wrong guesses can be fixed by chatting."
+                    : "建立後會用這段話、品牌資料與搭配的產品直接排出第一版企劃，不會再問一次；排出來不對可以用對話改。"}
+                </p>
               </div>
             </div>
           )}

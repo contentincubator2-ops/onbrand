@@ -62,3 +62,16 @@ export function briefFromBasis(raw: Record<string, any> | null | undefined): str
   ].filter(Boolean);
   return [...new Set(parts)].join("\n").slice(0, 600).trim();
 }
+
+/**
+ * 新增活動視窗填的內容 → 排企劃用的那一段話（2026-10-08 CJ「當我跳出視窗輸入後，下一步又要我
+ * 輸入一次」）：活動名稱＋當時寫的主題／重點。一樣只抄不加；日期不用抄，伺服器推斷設定與排
+ * 企劃時自己讀活動的起訖日，品牌大腦與搭配的產品也是伺服器那邊帶。
+ */
+export function briefFromEvent(ev: { name?: unknown; note?: unknown } | null | undefined): string {
+  const str = (v: unknown) => (typeof v === "string" ? v.trim() : "");
+  const name = str(ev?.name);
+  const note = str(ev?.note);
+  const parts = note.includes(name) ? [note] : [name, note];
+  return parts.filter(Boolean).join("\n").slice(0, 600).trim();
+}
