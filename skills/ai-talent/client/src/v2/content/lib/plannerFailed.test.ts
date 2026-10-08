@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { failedNote, isFailedScheduled } from "./plannerFailed";
+import { failedNote, isFailedScheduled, isNotConnectedError } from "./plannerFailed";
 
 describe("plannerFailed", () => {
   it("detects only failed scheduled rows", () => {
@@ -17,5 +17,15 @@ describe("plannerFailed", () => {
     const n = failedNote({ lastError: "x".repeat(500) }, true);
     expect(n.length).toBeLessThan(200);
     expect(n).toContain("xxx");
+  });
+});
+
+describe("isNotConnectedError", () => {
+  it("recognizes the missing connection message including prefixes", () => {
+    expect(isNotConnectedError("此品牌尚未連接此平台，請先到品牌設定完成連接。")).toBe(true);
+    expect(isNotConnectedError("發布失敗：此品牌尚未連接此平台。")).toBe(true);
+  });
+  it("does not offer a connection action for other errors", () => {
+    for (const msg of ["", "發布失敗，請稍後重試。", "帳號授權已過期"]) expect(isNotConnectedError(msg)).toBe(false);
   });
 });

@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { analyticsFact, analyticsFormatOf, syncBrandZernioAnalytics, tickZernioAnalyticsSync,
+import { analyticsFact, analyticsFormatOf, ensureFreshZernioAnalytics, AUTO_SYNC_STALE_HOURS, syncBrandZernioAnalytics, tickZernioAnalyticsSync,
   zernioAnalyticsEnabled, ZERNIO_ANALYTICS_PLATFORMS, SOURCE_BY_PLATFORM, type AnalyticsPlatform } from "./zernioAnalyticsSync";
 import { ZernioApiError, type ZernioAnalyticsPost, type ZernioAnalyticsPage } from "../../platform/core/connectors/zernio";
 
@@ -19,10 +19,11 @@ const externalPost = (platform: AnalyticsPlatform): ZernioAnalyticsPost => ({
   platform, platformPostId: "456", platformPostUrl: "https://www.facebook.com/my-page/posts/pfbidExample",
   content: "External post", publishedAt: "2026-10-07T17:00:00Z", mediaType: "image", analytics: metrics,
 });
-function setup(platforms: string[] = [...ZERNIO_ANALYTICS_PLATFORMS], existing = false) {
+function setup(platforms: string[] = [...ZERNIO_ANALYTICS_PLATFORMS], existing = false, lastSync: Date | string | null = null) {
   const pool = { execute: vi.fn().mockImplementation(async (sql: string) => {
     if (sql.includes("FROM brand_publish_connections")) return [platforms.map(platform => ({ platform, accountId: `${platform}-account` }))];
     if (sql.includes("FROM scheduled_posts")) return [[{ externalPostId: "456", metadata: JSON.stringify({ perfTags: { ta: "owners" } }) }]];
+    if (sql.includes("MAX(updatedAt)")) return [[{ lastSync }]];
     if (sql.includes("FROM perf_facts")) return [existing ? [{ exists: 1 }] : []];
     throw new Error("Unexpected query");
   }) };
@@ -285,5 +286,121 @@ describe("Zernio analytics tick", () => {
     deps.pool.execute.mockResolvedValueOnce([[{ brandId: 8 }]]);
     await tickZernioAnalyticsSync(deps);
     expect(deps.sync).toHaveBeenCalledOnce();
+  });
+});
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (error: Error) => void;
+  const promise = new Promise<T>((yes, no) => { resolve = yes; reject = no; });
+  return { promise, resolve, reject };
+}
+const flushBackground = () => new Promise<void>(resolve => setTimeout(resolve, 0));
+
+describe("ensureFreshZernioAnalytics", () => {
+  let brandId = 100;
+  beforeEach(() => { brandId++; });
+  it.each(["SOCIAL_PUBLISH_ENABLED", "ZERNIO_API_KEY"])("returns disabled without IO when %s is disabled", async variable => {
+    vi.stubEnv(variable, variable === "SOCIAL_PUBLISH_ENABLED" ? "false" : "");
+    const deps = setup();
+    expect(await ensureFreshZernioAnalytics(brandId, deps)).toEqual({ started: false, reason: "disabled" });
+    expect(deps.pool.execute).not.toHaveBeenCalled();
+  });
+  it.each([{ platforms: [] }, { platforms: ["youtube", "tiktok", "x"] }])("requires a supported Zernio connection: %j", async ({ platforms }) => {
+    const deps = setup(platforms);
+    expect(await ensureFreshZernioAnalytics(brandId, deps)).toEqual({ started: false, reason: "no_connection" });
+    expect(deps.client.listAnalytics).not.toHaveBeenCalled();
+    expect(deps.pool.execute).toHaveBeenCalledWith(expect.stringContaining("status = 'connected'"), [brandId, "zernio"]);
+  });
+  it("uses the latest update across the four sources, with a six-hour freshness window", async () => {
+    const now = setup().now().getTime();
+    expect(AUTO_SYNC_STALE_HOURS).toBe(6);
+    const deps = setup(["threads"], false, new Date(now - 6 * 3_600_000 + 1));
+    expect(await ensureFreshZernioAnalytics(brandId, deps)).toEqual({ started: false, reason: "fresh" });
+    expect(deps.pool.execute).toHaveBeenCalledWith(
+      "SELECT MAX(updatedAt) AS lastSync FROM perf_facts WHERE brandId = ? AND source IN (?, ?, ?, ?)",
+      [brandId, ...Object.values(SOURCE_BY_PLATFORM)],
+    );
+    expect(deps.client.listAnalytics).not.toHaveBeenCalled();
+  });
+  it.each([null, "2026-10-07T11:00:00Z"])("starts without awaiting sync when last update is %s", async lastSync => {
+    const deps = setup(["threads"], false, lastSync);
+    const pending = deferred<ZernioAnalyticsPage>();
+    deps.client.listAnalytics.mockReturnValueOnce(pending.promise);
+    expect(await ensureFreshZernioAnalytics(brandId, deps)).toEqual({ started: true, reason: "started" });
+    await vi.waitFor(() => expect(deps.client.listAnalytics).toHaveBeenCalledOnce());
+    expect(deps.upsert).not.toHaveBeenCalled();
+    expect(await ensureFreshZernioAnalytics(brandId, deps)).toEqual({ started: false, reason: "in_flight" });
+    pending.resolve(pageOf([post("threads")]));
+    await flushBackground();
+    expect(deps.upsert).toHaveBeenCalledOnce();
+  });
+  it("starts only one sync for concurrent openings of the same brand", async () => {
+    const deps = setup(["threads"]);
+    const pending = deferred<ZernioAnalyticsPage>();
+    deps.client.listAnalytics.mockReturnValue(pending.promise);
+    const results = await Promise.all(Array.from({ length: 5 }, () => ensureFreshZernioAnalytics(brandId, deps)));
+    expect(results.filter(r => r.reason === "started")).toHaveLength(1);
+    expect(results.filter(r => r.reason === "in_flight")).toHaveLength(4);
+    await vi.waitFor(() => expect(deps.client.listAnalytics).toHaveBeenCalledOnce());
+    pending.resolve(pageOf([post("threads")]));
+    await flushBackground();
+  });
+  it("throttles empty accounts for ten minutes, then permits another attempt", async () => {
+    const deps = setup(["threads"]);
+    let now = deps.now().getTime();
+    deps.now = () => new Date(now);
+    deps.client.listAnalytics.mockResolvedValue(pageOf([]));
+    expect((await ensureFreshZernioAnalytics(brandId, deps)).reason).toBe("started");
+    await flushBackground();
+    now += 10 * 60_000 - 1;
+    expect(await ensureFreshZernioAnalytics(brandId, deps)).toEqual({ started: false, reason: "fresh" });
+    expect(deps.client.syncExternalPosts).toHaveBeenCalledOnce();
+    now++;
+    expect((await ensureFreshZernioAnalytics(brandId, deps)).reason).toBe("started");
+    await flushBackground();
+    expect(deps.client.syncExternalPosts).toHaveBeenCalledTimes(2);
+  });
+  it("clears in-flight state and safely logs a rejected background sync", async () => {
+    const deps = setup(["threads"]);
+    const execute = deps.pool.execute.getMockImplementation()!;
+    let connectionReads = 0;
+    deps.pool.execute.mockImplementation(async (sql: string) => {
+      if (sql.includes("FROM brand_publish_connections") && ++connectionReads % 2 === 0) throw new Error("private provider details");
+      return execute(sql);
+    });
+    expect((await ensureFreshZernioAnalytics(brandId, deps)).reason).toBe("started");
+    await flushBackground();
+    expect(deps.log).toHaveBeenCalledWith(expect.objectContaining({ level: "warn", meta: { brandId } }));
+    expect(JSON.stringify(deps.log.mock.calls)).not.toContain("private provider details");
+    expect((await ensureFreshZernioAnalytics(brandId, deps)).reason).toBe("fresh");
+    connectionReads = 0;
+    deps.now = () => new Date("2026-10-07T17:10:00Z");
+    expect((await ensureFreshZernioAnalytics(brandId, deps)).reason).toBe("started");
+    await flushBackground();
+  });
+  it("tracks overlapping manual syncs without throttling them or clearing state early", async () => {
+    const deps = setup(["threads"], false, "2026-10-07T17:00:00Z");
+    const first = deferred<ZernioAnalyticsPage>(), second = deferred<ZernioAnalyticsPage>();
+    deps.client.listAnalytics.mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise);
+    const one = syncBrandZernioAnalytics(brandId, 120, deps);
+    const two = syncBrandZernioAnalytics(brandId, 120, deps);
+    expect((await ensureFreshZernioAnalytics(brandId, deps)).reason).toBe("in_flight");
+    await vi.waitFor(() => expect(deps.client.listAnalytics).toHaveBeenCalledTimes(2));
+    first.resolve(pageOf([post("threads")]));
+    await one;
+    expect((await ensureFreshZernioAnalytics(brandId, deps)).reason).toBe("in_flight");
+    second.resolve(pageOf([post("threads")]));
+    await two;
+    expect((await ensureFreshZernioAnalytics(brandId, deps)).reason).toBe("fresh");
+  });
+  it("does not block another brand or manual sync during the automatic cooldown", async () => {
+    const deps = setup(["threads"]);
+    expect((await ensureFreshZernioAnalytics(brandId, deps)).reason).toBe("started");
+    await flushBackground();
+    await syncBrandZernioAnalytics(brandId, 120, deps);
+    expect((await ensureFreshZernioAnalytics(brandId + 1000, deps)).reason).toBe("started");
+    await flushBackground();
+    expect(deps.client.listAnalytics).toHaveBeenCalledTimes(3);
   });
 });

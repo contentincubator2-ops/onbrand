@@ -5,18 +5,19 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   lang: "zh", conns: [] as any[], mutate: vi.fn(), reset: vi.fn(), pending: false,
   data: undefined as any, error: null as any, options: {} as any,
-  connections: vi.fn(), workspace: vi.fn(), report: vi.fn(), campaignReport: vi.fn(),
+  navigate: vi.fn(), queryOptions: {} as any, connections: vi.fn(), workspace: vi.fn(), report: vi.fn(), campaignReport: vi.fn(),
 }));
 vi.mock("../../../lib/trpc", () => ({ trpc: {
   useUtils: () => ({ performance: Object.fromEntries(["connections", "workspace", "report", "campaignReport"].map(key => [key, { invalidate: (mocks as any)[key] }])) }),
   performance: {
-    connections: { useQuery: () => ({ data: mocks.conns }) },
+    connections: { useQuery: (_input: any, options: any) => { mocks.queryOptions = options; return { data: mocks.conns }; } },
     syncSocial: { useMutation: (options: any) => {
       mocks.options = options;
       return { mutate: mocks.mutate, reset: mocks.reset, isPending: mocks.pending, data: mocks.data, error: mocks.error };
     } },
   },
 } }));
+vi.mock("react-router-dom", () => ({ useNavigate: () => mocks.navigate }));
 vi.mock("../../../lib/i18n", () => ({ useLang: () => ({ lang: mocks.lang }) }));
 vi.mock("../../platform/components/HelpTip", () => ({ HelpTip: () => null }));
 vi.mock("../../platform/components/icons", () => Object.fromEntries(
@@ -63,10 +64,12 @@ describe("ConnectionsPanel social performance", () => {
     expect(container.querySelector('[role="status"]')?.textContent).toContain("Backfilled 2 posts.");
     expect(container.querySelector('[role="status"]')?.textContent).toContain("facebook: Reauthorize");
   });
-  it("hides sync without a connected account or selected brand", async () => {
+  it("offers a connection link without a connected account or selected brand", async () => {
     mocks.conns[0].status = "not_connected";
     await act(async () => root.render(<ConnectionsPanel brandId={7} />));
-    expect(container.querySelector("button")).toBeNull();
+    expect(container.querySelector("button")?.textContent).toBe("前往連接社群帳號");
+    await act(async () => container.querySelector("button")!.click());
+    expect(mocks.navigate).toHaveBeenCalledWith("/brands/edit?b=7&cat=publish");
     mocks.conns[0].status = "connected";
     await act(async () => root.render(<ConnectionsPanel brandId={null} />));
     expect(container.querySelector("button")).toBeNull();
@@ -79,4 +82,40 @@ describe("ConnectionsPanel social performance", () => {
     await act(async () => root.render(<ConnectionsPanel brandId={8} />));
     expect(mocks.reset).toHaveBeenCalledOnce();
   });
+  it("polls while syncing and refreshes reports once when it finishes", async () => {
+    mocks.conns[0].syncing = true;
+    await act(async () => root.render(<ConnectionsPanel brandId={7} />));
+    expect(container.textContent).toContain("成效更新中…");
+    expect(mocks.queryOptions.refetchInterval({ state: { data: mocks.conns } })).toBe(8000);
+    mocks.lang = "en";
+    await act(async () => root.render(<ConnectionsPanel brandId={7} />));
+    expect(container.textContent).toContain("Updating performance…");
+    mocks.conns[0].syncing = false;
+    await act(async () => root.render(<ConnectionsPanel brandId={7} />));
+    expect(container.textContent).not.toContain("Updating performance…");
+    expect(mocks.queryOptions.refetchInterval({ state: { data: mocks.conns } })).toBe(false);
+    expect(mocks.queryOptions.refetchInterval({ state: {} })).toBe(false);
+    await act(async () => root.render(<ConnectionsPanel brandId={7} />));
+    for (const invalidate of [mocks.workspace, mocks.report, mocks.campaignReport]) expect(invalidate).toHaveBeenCalledOnce();
+    expect(mocks.connections).not.toHaveBeenCalled();
+  });
+  it("does not treat switching brands as sync completion", async () => {
+    mocks.conns[0].syncing = true;
+    await act(async () => root.render(<ConnectionsPanel brandId={7} />));
+    mocks.conns[0].syncing = false;
+    await act(async () => root.render(<ConnectionsPanel brandId={8} />));
+    for (const invalidate of [mocks.workspace, mocks.report, mocks.campaignReport]) expect(invalidate).not.toHaveBeenCalled();
+  });
+  it("shows the English connection action only for unconnected social accounts with a brand", async () => {
+    mocks.lang = "en";
+    mocks.conns[0].status = "not_connected";
+    await act(async () => root.render(<ConnectionsPanel brandId={7} />));
+    expect(container.querySelector("button")?.textContent).toBe("Connect social accounts");
+    await act(async () => root.render(<ConnectionsPanel brandId={null} />));
+    expect(container.querySelector("button")).toBeNull();
+    mocks.conns[0].status = "connected";
+    await act(async () => root.render(<ConnectionsPanel brandId={7} />));
+    expect(container.textContent).not.toContain("Connect social accounts");
+  });
+
 });
