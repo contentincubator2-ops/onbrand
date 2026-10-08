@@ -6,6 +6,8 @@
  * 「整個設計要更像 Tesla UI」「每個風格寫上參考哪一類、什麼量級的網紅」）。
  *
  * 版面照 Tesla 官網的兩種畫面做，只取做法，不使用它的字體、標誌或素材：
+ * 色系跟著平台標誌（inspire public relations，CJ 2026-10-08 提供）：主色 #E9004A 取自標誌底色，
+ * 只用在主按鈕、選取外框與進行中的狀態；其餘維持白底與灰階。
  *   · 首頁＝全螢幕深色主視覺：標題在上、兩顆並排按鈕在最下面。
  *   · 設定頁＝訂車設定器：上面一塊「目前的設定」預覽，下面一段一段置中的小標（議題／平台／說話風格），
  *     平台用圓形色票式的選鈕，選取＝外圈；最底下固定一條「摘要＋主按鈕」。
@@ -23,7 +25,7 @@ import {
 import { faFacebookF, faInstagram, faTiktok, faYoutube } from "@fortawesome/free-brands-svg-icons";
 import { trpc } from "../../../lib/trpc";
 
-const INK = "#171A20", SUB = "#5C5E62", FAINT = "#8E8E8E", PANEL = "#F4F4F4", LINE = "#D0D1D2", BLUE = "#3E6AE1";
+const INK = "#171A20", SUB = "#5C5E62", FAINT = "#8E8E8E", PANEL = "#F4F4F4", LINE = "#D0D1D2", BRAND = "#E9004A";
 const OK = "#12BB00", WARN = "#B45309";
 const FONT = `system-ui, -apple-system, "Segoe UI", "PingFang TC", "Noto Sans TC", "Microsoft JhengHei", sans-serif`;
 const GLASS = { background: "rgba(255,255,255,0.86)", backdropFilter: "blur(16px)", WebkitBackdropFilter: "blur(16px)" } as const;
@@ -60,8 +62,9 @@ function Frame({ children, dark }: { children: React.ReactNode; dark?: boolean }
   );
 }
 
+/** 平台標誌：用 CJ 提供的原檔，不重畫。 */
 function Wordmark() {
-  return <span className="text-[15px] font-medium uppercase" style={{ letterSpacing: "0.32em" }}>onBrand</span>;
+  return <img src="/static/inspire/logo.png" alt="inspire public relations" width={54} height={36} style={{ height: 36, width: "auto", borderRadius: 2 }} />;
 }
 
 function Nav({ onBack, right }: { onBack?: () => void; right?: React.ReactNode }) {
@@ -106,7 +109,7 @@ function Btn({ kind = "primary", disabled, onClick, children, type = "button" }:
   return (
     <button type={type} disabled={disabled} onClick={onClick}
       className="flex h-11 w-full items-center justify-center gap-2 rounded px-4 text-[14px] font-medium"
-      style={{ background: disabled ? PANEL : primary ? BLUE : PANEL, color: disabled ? FAINT : primary ? "#fff" : "#393C41" }}>
+      style={{ background: disabled ? PANEL : primary ? BRAND : PANEL, color: disabled ? FAINT : primary ? "#fff" : "#393C41" }}>
       {children}
     </button>
   );
@@ -117,7 +120,7 @@ function Option({ on, disabled, onClick, children }: { on: boolean; disabled?: b
   return (
     <button type="button" aria-pressed={on} disabled={disabled} onClick={onClick}
       className="w-full rounded px-4 py-3.5 text-left disabled:opacity-40"
-      style={{ background: "#fff", boxShadow: on ? `inset 0 0 0 3px ${BLUE}` : `inset 0 0 0 1px ${LINE}` }}>
+      style={{ background: "#fff", boxShadow: on ? `inset 0 0 0 3px ${BRAND}` : `inset 0 0 0 1px ${LINE}` }}>
       {children}
     </button>
   );
@@ -149,7 +152,7 @@ function Hero({ onDone, onBasis }: { onDone: (name: string) => void; onBasis: ()
   const ok = v.trim().length >= 1;
   return (
     <Frame dark>
-      <div className="absolute inset-0" style={{ background: "radial-gradient(120% 70% at 50% 45%, #2A2D34 0%, #101114 55%, #000 100%)" }} />
+      <div className="absolute inset-0" style={{ background: "radial-gradient(120% 70% at 50% 45%, #3A1622 0%, #14090D 55%, #000 100%)" }} />
       <header className="relative z-10 flex h-14 items-center px-6"><Wordmark /></header>
       <div className="relative z-10 px-6 pt-10 text-center">
         <h1 className="text-[40px] font-medium leading-[1.15]" style={{ letterSpacing: "-0.02em" }}>換一種說法</h1>
@@ -164,7 +167,7 @@ function Hero({ onDone, onBasis }: { onDone: (name: string) => void; onBasis: ()
           <span className="shrink-0 text-[14px]" style={{ color: "rgba(255,255,255,0.7)" }}>醫師</span>
         </div>
         <div className="mt-3 flex gap-3">
-          <button type="submit" disabled={!ok} className="h-11 flex-1 rounded text-[14px] font-medium text-white" style={{ background: BLUE, opacity: ok ? 1 : 0.5 }}>開始設定</button>
+          <button type="submit" disabled={!ok} className="h-11 flex-1 rounded text-[14px] font-medium text-white" style={{ background: BRAND, opacity: ok ? 1 : 0.5 }}>開始設定</button>
           <button type="button" onClick={onBasis} className="h-11 flex-1 rounded text-[14px] font-medium" style={{ background: "rgba(244,244,244,0.9)", color: "#393C41" }}>審查依據</button>
         </div>
         <p className="mt-3 text-center text-[11px]" style={{ color: "rgba(255,255,255,0.5)" }}>名字只用來署名，存在這支手機上，不需要註冊。</p>
@@ -176,7 +179,7 @@ function Hero({ onDone, onBasis }: { onDone: (name: string) => void; onBasis: ()
 // ── 條文清單 ──
 
 function StatusMark({ status }: { status: string }) {
-  if (status === "checking") return <FontAwesomeIcon icon={faCircleNotch} spin style={{ color: BLUE }} />;
+  if (status === "checking") return <FontAwesomeIcon icon={faCircleNotch} spin style={{ color: BRAND }} />;
   if (status === "pass") return <FontAwesomeIcon icon={faCheck} style={{ color: OK }} />;
   if (status === "issue") return <FontAwesomeIcon icon={faTriangleExclamation} style={{ color: WARN }} />;
   if (status === "skipped") return <FontAwesomeIcon icon={faMinus} style={{ color: FAINT }} />;
@@ -191,7 +194,7 @@ function RegulationList({ groups, statusOf, issues }: { groups: RegGroup[]; stat
       {groups.map((g) => {
         const st = statusOf?.(g.id);
         return (
-          <div key={g.id} className="rounded p-4" style={{ background: PANEL, boxShadow: st === "checking" ? `inset 0 0 0 2px ${BLUE}` : undefined }}>
+          <div key={g.id} className="rounded p-4" style={{ background: PANEL, boxShadow: st === "checking" ? `inset 0 0 0 2px ${BRAND}` : undefined }}>
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <div className="text-[14px] font-medium">{g.label}</div>
@@ -362,7 +365,7 @@ function DraftSheet({ doctor, idea, persona, groups, onClose }: { doctor: string
 
       {!hasDraft && stage !== "failed" ? (
         <div className="flex items-center gap-3 rounded p-4 text-[14px] font-medium" style={{ background: PANEL }}>
-          <FontAwesomeIcon icon={faCircleNotch} spin style={{ color: BLUE }} />{stage === "writing" ? "正在寫成稿" : "正在逐條審查"}
+          <FontAwesomeIcon icon={faCircleNotch} spin style={{ color: BRAND }} />{stage === "writing" ? "正在寫成稿" : "正在逐條審查"}
         </div>
       ) : null}
 
@@ -370,7 +373,7 @@ function DraftSheet({ doctor, idea, persona, groups, onClose }: { doctor: string
         <div>
           {reviewing ? (
             <div className="mb-4 flex items-center gap-3 rounded px-4 py-3 text-[13px] font-medium" style={{ background: PANEL }}>
-              <FontAwesomeIcon icon={faCircleNotch} spin style={{ color: BLUE }} />正在重新審查
+              <FontAwesomeIcon icon={faCircleNotch} spin style={{ color: BRAND }} />正在重新審查
             </div>
           ) : dirty ? (
             <div className="mb-4 rounded px-4 py-3 text-[13px] leading-relaxed" style={{ background: PANEL, color: WARN }}>內容改過了，下面的審查結果是改之前的。可以按最下面的按鈕重新審查。</div>
@@ -383,7 +386,7 @@ function DraftSheet({ doctor, idea, persona, groups, onClose }: { doctor: string
 
           {editing ? (
             <textarea value={text} onChange={(e) => setText(e.target.value)} rows={16}
-              className="w-full rounded p-4 text-[16px] leading-[1.8] outline-none" style={{ background: PANEL, color: INK, boxShadow: `inset 0 0 0 3px ${BLUE}` }} />
+              className="w-full rounded p-4 text-[16px] leading-[1.8] outline-none" style={{ background: PANEL, color: INK, boxShadow: `inset 0 0 0 3px ${BRAND}` }} />
           ) : <MarkedText text={text} quotes={openAdvice.map((a) => a.quote)} />}
           <button type="button" onClick={() => setEditing((v) => !v)} className="mt-3 text-[13px] font-medium underline decoration-[#D0D1D2] underline-offset-4" style={{ color: "#393C41" }}>
             {editing ? "完成修改" : "自己修改內容"}
@@ -415,7 +418,7 @@ function DraftSheet({ doctor, idea, persona, groups, onClose }: { doctor: string
                     </div>
                   ) : (
                     <div className="mt-3 flex gap-2">
-                      <button type="button" onClick={() => apply(a)} className="h-10 flex-1 rounded text-[13px] font-medium text-white" style={{ background: BLUE }}>{a.suggestion ? "照建議修改" : "拿掉這一句"}</button>
+                      <button type="button" onClick={() => apply(a)} className="h-10 flex-1 rounded text-[13px] font-medium text-white" style={{ background: BRAND }}>{a.suggestion ? "照建議修改" : "拿掉這一句"}</button>
                       <button type="button" onClick={() => keep(a)} className="h-10 flex-1 rounded text-[13px] font-medium" style={{ background: "#fff", color: "#393C41" }}>維持原句</button>
                     </div>
                   )}
@@ -570,7 +573,7 @@ export default function InspireDemoPage() {
                 </Option>
               ))}
             </div>
-            <div className="mt-2 rounded px-4" style={{ background: PANEL, boxShadow: custom.trim() ? `inset 0 0 0 3px ${BLUE}` : undefined }}>
+            <div className="mt-2 rounded px-4" style={{ background: PANEL, boxShadow: custom.trim() ? `inset 0 0 0 3px ${BRAND}` : undefined }}>
               <input value={custom} onChange={(e) => setCustom(e.target.value)} maxLength={60} placeholder="自己寫一個跟血壓有關的題目"
                 className="h-11 w-full bg-transparent text-center text-[14px] outline-none" style={{ color: INK }} />
             </div>
@@ -584,11 +587,11 @@ export default function InspireDemoPage() {
                 return (
                   <button key={pf} type="button" role="tab" aria-selected={on} aria-label={pf} onClick={() => setPlatform(pf)}
                     className="relative flex h-14 w-14 items-center justify-center rounded-full"
-                    style={{ boxShadow: on ? `0 0 0 3px #fff, 0 0 0 5px ${BLUE}` : undefined }}>
+                    style={{ boxShadow: on ? `0 0 0 3px #fff, 0 0 0 5px ${BRAND}` : undefined }}>
                     <span className="flex h-full w-full items-center justify-center rounded-full text-[18px]" style={{ background: on ? INK : PANEL, color: on ? "#fff" : INK }}>
                       <FontAwesomeIcon icon={PLATFORM_ICON[pf]} />
                     </span>
-                    {n ? <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-[11px] font-medium text-white" style={{ background: BLUE }}>{n}</span> : null}
+                    {n ? <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-[11px] font-medium text-white" style={{ background: BRAND }}>{n}</span> : null}
                   </button>
                 );
               })}
@@ -634,7 +637,7 @@ export default function InspireDemoPage() {
               <div className="truncate text-[12px]" style={{ color: SUB }}>{topicLabel || "還沒選議題"}</div>
             </div>
             <button type="button" disabled={busy || !ready} onClick={() => run(picked)}
-              className="h-11 shrink-0 rounded px-6 text-[14px] font-medium" style={{ background: ready && !busy ? BLUE : PANEL, color: ready && !busy ? "#fff" : FAINT }}>
+              className="h-11 shrink-0 rounded px-6 text-[14px] font-medium" style={{ background: ready && !busy ? BRAND : PANEL, color: ready && !busy ? "#fff" : FAINT }}>
               產生靈感
             </button>
           </div>
@@ -652,7 +655,7 @@ export default function InspireDemoPage() {
             {notice ? <div className="rounded px-4 py-3 text-center text-[13px]" style={{ background: PANEL, color: WARN }}>{notice}</div> : null}
             {pending.map((k) => (
               <div key={`p-${k}`} className="flex items-center justify-center gap-3 rounded py-10 text-[14px] font-medium" style={{ background: PANEL, color: SUB }}>
-                <FontAwesomeIcon icon={faCircleNotch} spin style={{ color: BLUE }} />{personaOf(k)?.label}正在想
+                <FontAwesomeIcon icon={faCircleNotch} spin style={{ color: BRAND }} />{personaOf(k)?.label}正在想
               </div>
             ))}
             {!ideas.length && !pending.length && !notice ? <div className="py-10 text-center text-[13px]" style={{ color: FAINT }}>還沒有點子。</div> : null}
@@ -672,7 +675,7 @@ export default function InspireDemoPage() {
                     { value: p ? MARKET_LABEL[p.market] : "", label: "風格市場" },
                   ]} />
                   <div className="mt-5 flex gap-3">
-                    <button type="button" onClick={() => setOpen(i)} className="h-11 flex-1 rounded text-[14px] font-medium text-white" style={{ background: BLUE }}>採用並寫成稿</button>
+                    <button type="button" onClick={() => setOpen(i)} className="h-11 flex-1 rounded text-[14px] font-medium text-white" style={{ background: BRAND }}>採用並寫成稿</button>
                     <button type="button" disabled={busy} onClick={() => run([i.persona], { subject: i.subject, topicLabel: i.topicLabel })}
                       className="h-11 flex-1 rounded text-[14px] font-medium disabled:opacity-40" style={{ background: "#fff", color: "#393C41" }}>請他再想</button>
                   </div>
