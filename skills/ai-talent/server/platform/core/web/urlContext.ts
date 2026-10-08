@@ -123,7 +123,7 @@ export function findFirstUrl(input: string): string | null {
 }
 
 /** Strip common HTML noise; return clean text. */
-function htmlToText(html: string): string {
+export function htmlToText(html: string): string {
   return html
     // Remove script / style / nav / footer / aside / header blocks (with content)
     .replace(/<(script|style|nav|footer|aside|header|noscript|svg|template)[^>]*>[\s\S]*?<\/\1>/gi, " ")

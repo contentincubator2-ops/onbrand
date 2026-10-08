@@ -612,6 +612,11 @@ async function runStartupMigrations() {
     await migrateCampaignChat();
     console.log("[migrate] campaign_chat_messages / campaign_chat_threads: OK");
 
+    // 2026-10-05（CJ「對話要能讀取官網連結、或是上傳檔案解析」）：對話的參考資料。
+    const { CAMPAIGN_CHAT_SOURCES_DDL } = await import("./content/core/campaign/campaignChatSources");
+    await db.execute(sql.raw(CAMPAIGN_CHAT_SOURCES_DDL));
+    console.log("[migrate] campaign_chat_sources: OK");
+
     const { BRAND_NAV_PREFS_DDL } = await import("./platform/routers/navPrefsRouter");
     await db.execute(sql.raw(BRAND_NAV_PREFS_DDL));
     console.log("[migrate] brand_nav_prefs: OK");

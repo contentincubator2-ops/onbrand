@@ -37,11 +37,16 @@
  *     一段放超過一天，下次打開從新的一段開始，上一段留一張卡可一鍵接回。
  *   · 版面：新的一段才顯示企劃檢查；一段超過 14 則只顯示最後 10 則；修改卡收成一行，只有最新那次展開。
  *   · 模型只讀這一段，前面幾段用摘要補（伺服器 recentSummaries）。
+ *
+ * 2026-10-05（CJ「活動企劃當中的對話，要能讀取官網連結、或是上傳檔案解析」）：
+ *   · 話裡貼網址，伺服器去讀；輸入框左邊的迴紋針上傳檔案（走既有的 extract-text 抽文字）。
+ *   · 讀進來的資料跟著這檔活動，列在輸入框上方，團隊每一位、每一段討論都讀得到，可以移除。
+ *   · 讀不到的連結在那一則底下直接標出來，不靠模型轉述（server/content/core/campaign/campaignChatSources.ts）。
  */
 import React from "react";
 import { Avatar } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faArrowUp, faCheck, faRotateLeft, faUpRightAndDownLeftFromCenter, faDownLeftAndUpRightToCenter, faRightLeft, faRotateRight, faPenToSquare, faClockRotateLeft, faChevronDown } from "@fortawesome/free-solid-svg-icons";
+import { faArrowUp, faCheck, faRotateLeft, faUpRightAndDownLeftFromCenter, faDownLeftAndUpRightToCenter, faRightLeft, faRotateRight, faPenToSquare, faClockRotateLeft, faChevronDown, faPaperclip, faXmark, faLink, faFileLines } from "@fortawesome/free-solid-svg-icons";
 import { trpc } from "../../../../lib/trpc";
 import type { CampaignPhaseId, CampaignPlan } from "../../../strategy/lib/campaign/campaignSchema";
 import type { StageNote } from "../../../strategy/lib/campaign/campaignStage";
@@ -75,7 +80,15 @@ interface Msg {
   beforeBasis?: BasisPatch;
   undone?: boolean;
   truncated?: boolean;
+  /** 這一句裡讀不到的連結（只在當下顯示，不存資料庫）。 */
+  linkFailed?: string[];
 }
+
+/** 這檔活動的參考資料（伺服器 campaignChatSources.SourceMeta）。 */
+interface Source { id: number; kind: "url" | "file"; name: string; url: string | null; chars: number; partial: boolean }
+/** 上傳檔案走的抽取端點最多回這麼多字（server positioningDocRoute.EXTRACT_TEXT_MAX_CHARS）。 */
+const FILE_TEXT_MAX = 20_000;
+const FILE_ACCEPT = ".pdf,.docx,.doc,.pptx,.ppt,.xlsx,.md,.markdown,.txt,.html,.htm";
 
 interface Thread { id: number; title: string; summary: string | null; status: "open" | "closed"; messageCount: number; changeCount: number; updatedAt: string }
 
@@ -213,6 +226,52 @@ export default function CampaignChatCard({ eventId, brandId, plan, phase, notes,
   const undoneMut = (trpc as any).campaign.chatUndone.useMutation();
   const closeMut = (trpc as any).campaign.chatCloseThread.useMutation();
   const reopenMut = (trpc as any).campaign.chatReopenThread.useMutation();
+
+  // ── 參考資料：貼的連結、上傳的檔案（campaign.chatSources／chatAddSource／chatRemoveSource）──
+  const sourcesQ = (trpc as any).campaign.chatSources.useQuery({ eventId }, { refetchOnWindowFocus: false });
+  const addSourceMut = (trpc as any).campaign.chatAddSource.useMutation();
+  const removeSourceMut = (trpc as any).campaign.chatRemoveSource.useMutation();
+  const sources: Source[] = sourcesQ.data?.sources ?? [];
+  const refreshSources = () => utils?.campaign?.chatSources?.invalidate?.({ eventId });
+  const fileRef = React.useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = React.useState("");
+  const [fileNote, setFileNote] = React.useState<{ text: string; bad: boolean } | null>(null);
+  const onFile = async (file: File) => {
+    if (!brandId || uploading) return;
+    setFileNote(null);
+    setUploading(file.name);
+    try {
+      const r = await fetch("/api/positioning-doc/extract-text", {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "content-type": "application/octet-stream",
+          "x-brand-id": String(brandId),
+          "x-scope": "event",
+          "x-scope-id": String(eventId),
+          "x-filename": encodeURIComponent(file.name),
+        },
+        body: file,
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(j?.detail ? `${j.error}：${j.detail}` : (j?.error ?? `HTTP ${r.status}`));
+      const raw = String(j.text ?? "").trim();
+      if (!raw) throw new Error(L("這份檔案讀不出文字", "No text could be read from this file"));
+      const total = Math.max(Number(j.chars) || 0, raw.length);
+      await addSourceMut.mutateAsync({ eventId, name: file.name.slice(0, 200), text: raw.slice(0, FILE_TEXT_MAX), chars: total });
+      refreshSources();
+      // 明講被切掉了，不要讓人以為整份都讀進來了。
+      setFileNote(total > FILE_TEXT_MAX
+        ? { text: L(`${file.name} 約 ${total.toLocaleString()} 字，只讀進前 ${FILE_TEXT_MAX.toLocaleString()} 字。`, `${file.name} has about ${total.toLocaleString()} characters — only the first ${FILE_TEXT_MAX.toLocaleString()} were read.`), bad: false }
+        : { text: L(`已讀進 ${file.name}，團隊現在讀得到。`, `${file.name} is now available to the team.`), bad: false });
+      requestAnimationFrame(() => inputRef.current?.focus());
+    } catch (e: any) {
+      setFileNote({ text: String(e?.message ?? e).slice(0, 200), bad: true });
+    } finally {
+      setUploading("");
+    }
+  };
+  const removeSource = (id: number) => removeSourceMut.mutate({ eventId, id }, { onSettled: refreshSources });
   const threads: Thread[] = threadsQ.data?.threads ?? [];
   /** 目前這段（null＝還沒說話的新一段，第一句送出時伺服器開）。 */
   const [threadId, setThreadId] = React.useState<number | null>(null);
@@ -334,6 +393,8 @@ export default function CampaignChatCard({ eventId, brandId, plan, phase, notes,
   const onReply = (who: Speaker, hops: number, r: any) => {
     const team = byRoleRef.current;
     const name = r?.agent?.name ?? team.get(who)?.name ?? "";
+    const linkFailed: string[] = Array.isArray(r?.links?.failed) ? r.links.failed.map(String) : [];
+    if (r?.links?.read?.length || linkFailed.length) refreshSources();
     const proposal: CampaignProposal | undefined = isEmptyProposal(r?.proposal) ? undefined : r.proposal;
     let before: CampaignPlan | undefined;
     let beforeBasis: BasisPatch | undefined;
@@ -352,6 +413,7 @@ export default function CampaignChatCard({ eventId, brandId, plan, phase, notes,
     const reply: Msg = mk({
       role: "assistant", content: String(r?.reply ?? ""), speaker: who, name,
       ...(proposal ? { proposal, before, beforeBasis } : {}), truncated: !!r?.truncated,
+      ...(linkFailed.length ? { linkFailed } : {}),
     });
     const next = [...msgsRef.current, reply];
     // 交棒：名冊上任何一位都能把話轉給另一位；同一張卡裡接著回答，之後使用者的話也由接手的那位回答。
@@ -625,6 +687,12 @@ export default function CampaignChatCard({ eventId, brandId, plan, phase, notes,
                 {m.content && (
                   <p className={`text-small leading-relaxed whitespace-pre-line ${m.role === "user" ? "bg-background/15 rounded-xl px-3 py-1.5" : ""}`}>{m.content}</p>
                 )}
+                {m.linkFailed?.length ? (
+                  <p className="text-[11px] opacity-70 break-all">
+                    <FontAwesomeIcon icon={faLink} className="text-[9px] mr-1" />
+                    {L(`這個連結讀不到：${m.linkFailed.join("、")}。可以改上傳檔案，或把重點貼進來。`, `Couldn’t read this link: ${m.linkFailed.join(", ")}. Upload a file or paste the key points instead.`)}
+                  </p>
+                ) : null}
                 {m.proposal && (
                   <ChangeCard
                     lines={describeProposal(m.before ?? plan, m.proposal, en)}
@@ -677,7 +745,33 @@ export default function CampaignChatCard({ eventId, brandId, plan, phase, notes,
               ))}
             </div>
           )}
+          {(sources.length > 0 || uploading) && (
+            <div className="flex gap-1.5 flex-wrap items-center" aria-label={L("團隊讀得到的參考資料", "Reference material the team can read")}>
+              {sources.map((s) => (
+                <span key={s.id} className="max-w-[220px] flex items-center gap-1.5 text-[11.5px] bg-background/10 rounded-full pl-2.5 pr-1 py-0.5"
+                  title={[s.name, s.url, s.partial ? L("只讀到標題與描述", "Only the title and description could be read") : L(`${s.chars.toLocaleString()} 字`, `${s.chars.toLocaleString()} characters`)].filter(Boolean).join("｜")}>
+                  <FontAwesomeIcon icon={s.kind === "url" ? faLink : faFileLines} className="text-[10px] opacity-70 shrink-0" />
+                  <span className="truncate">{s.name || s.url}</span>
+                  {s.partial && <span className="opacity-60 shrink-0">{L("（只有摘要）", "(summary only)")}</span>}
+                  <button type="button" onClick={() => removeSource(s.id)} aria-label={L(`移除 ${s.name}`, `Remove ${s.name}`)}
+                    className="w-4 h-4 grid place-items-center rounded-full opacity-60 hover:opacity-100 hover:bg-background/15 shrink-0">
+                    <FontAwesomeIcon icon={faXmark} className="text-[9px]" />
+                  </button>
+                </span>
+              ))}
+              {uploading && <span className="text-[11.5px] opacity-70 truncate max-w-[220px]">{L(`正在讀 ${uploading}…`, `Reading ${uploading}…`)}</span>}
+            </div>
+          )}
+          {fileNote && <p className={`text-[11.5px] ${fileNote.bad ? "text-danger-300" : "opacity-70"}`}>{fileNote.text}</p>}
           <form className="flex items-end gap-2" onSubmit={(e) => { e.preventDefault(); send(text); }}>
+            <input ref={fileRef} type="file" accept={FILE_ACCEPT} className="hidden"
+              onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) void onFile(f); }} />
+            <button type="button" onClick={() => fileRef.current?.click()} disabled={!brandId || !!uploading}
+              aria-label={L("上傳檔案給團隊讀", "Upload a file for the team to read")}
+              title={L("上傳檔案給團隊讀（PDF、Word、PowerPoint、Excel、文字檔）；網址直接貼在話裡就會讀", "Upload a file for the team to read (PDF, Word, PowerPoint, Excel, text). Paste a link in your message and it will be read too.")}
+              className="w-8 h-8 rounded-full bg-background/10 hover:bg-background/20 grid place-items-center disabled:opacity-40 shrink-0">
+              <FontAwesomeIcon icon={faPaperclip} className="text-tiny" />
+            </button>
             <textarea
               ref={inputRef}
               value={text} rows={1} maxLength={800}
@@ -685,7 +779,7 @@ export default function CampaignChatCard({ eventId, brandId, plan, phase, notes,
               onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); send(text); } }}
               placeholder={busy
                 ? L("可以先打下一句，回完就送出", "Type your next message — it sends when this reply finishes")
-                : cur ? L(`跟${dn(cur)}說…（打 @名字 找團隊裡其他人）`, `Message ${dn(cur)}… (@name to ask someone else)`)
+                : cur ? L(`跟${dn(cur)}說…（@名字 找其他人；可貼官網連結）`, `Message ${dn(cur)}… (@name for someone else; links are read)`)
                   : L("跟團隊說…", "Message the team…")}
               aria-label={L(`跟${roleName(speaker)}說`, `Message the ${roleName(speaker)}`)}
               style={{ fieldSizing: "content" } as React.CSSProperties}
