@@ -169,6 +169,10 @@ jobs:
           rm -rf "$ai/public/static/covers"
           ln -s "$app_root/shared/covers" "$ai/public/static/covers"
 
+          # 任務卡上傳影片要用 ffmpeg 抽聲音與畫面（server/platform/core/media/mediaToText.ts）。
+          # 機器上沒有就裝一次；裝不起來不擋部署——影片會退回「24MB 以內直接轉錄」並在畫面上說明。
+          command -v ffmpeg >/dev/null 2>&1             || (sudo timeout 300 apt-get update -qq && sudo DEBIAN_FRONTEND=noninteractive timeout 300 apt-get install -y -qq ffmpeg)             || echo "WARN: ffmpeg not installed — video uploads will be limited"
+
           cd "$ai"
           ./node_modules/.bin/tsx scripts/migrate.ts
 

@@ -31,6 +31,7 @@ import { createContext } from "./platform/core/trpc";
 import { authRouter } from "./platform/auth/authRouter";
 import { reportTemplateRouter } from "./performance/routes/reportTemplateRoute";
 import { positioningDocRouter } from "./strategy/routes/positioningDocRoute";
+import { taskAttachmentRouter } from "./content/routes/taskAttachmentRoute";
 import { assetPhotoRouter as assetPhotoUploadRoute, STORAGE_ROOT as ASSET_PHOTO_STORAGE_ROOT } from "./strategy/routes/assetPhotoRoute";
 import { slackOAuthRouter } from "./platform/routes/slackOAuthRoute";
 import { cloudOAuthRouter } from "./platform/routes/cloudOAuthRoute";
@@ -345,6 +346,7 @@ const healthLimiter = rateLimit({ windowMs: 60_000, max: 60, standardHeaders: tr
 app.use("/api/auth", authRouter);
 app.use("/api/report-template", reportTemplateRouter);
 app.use("/api/positioning-doc", positioningDocRouter);
+app.use("/api/task-attachment", taskAttachmentRouter);
 app.use("/api/asset-photo", assetPhotoUploadRoute);
 
 // ─── Slack OAuth + Events ─────────────────────────────────────────────────────
