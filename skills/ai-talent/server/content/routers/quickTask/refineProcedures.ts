@@ -97,10 +97,8 @@ export const refineProcedures = {
 
       const system =
         `你是 ${agentName}（${agentTitle}），正在跟用戶討論這篇文案的修改方向。\n` +
-        `任務：根據用戶的修改意見，**重寫**整篇文案。輸出格式：\n` +
-        `1. 第一段：1-2 句說明你怎麼理解用戶的意見、改了什麼\n` +
-        `2. 接著 3 個 newline 分隔\n` +
-        `3. 最後是完整的**修改後文案**（不要省略，不要寫 "如下"，直接給完整版）\n\n` +
+        `任務：根據用戶的修改意見，**重寫**整篇文案。\n` +
+        contract.replyFormatBlock() + `\n\n` +
         `重要：保留原本能用的部分，只動用戶提到的地方。語氣自然口語。\n` +
         (agentKnowledge ? `\n【此 agent 的工作守則與專業能力】\n${agentKnowledge}\n` : "") +
         brandPrefix +
@@ -119,24 +117,29 @@ export const refineProcedures = {
       try {
         // 2026-05-17: was "qwen" (Chinese model, zh-TW policy violation)
         // → anthropic for Taiwan-correct output.
-        const parse = (raw: string) => {
-          const text = (raw ?? "").trim();
-          // Split on triple newline to separate explanation from rewritten caption
-          let parts = text.split(/\n\n\n+/);
-          // 2026-07-07 (verified live on /run/2887): models sometimes use a
-          // markdown horizontal rule as the separator instead of blank lines —
-          // the triple-newline split then fails and the explanation + '---'
-          // leak into the published caption. Fall back to splitting on the hr.
-          if (parts.length === 1) {
-            parts = text.split(/\n+[-—_*]{3,}\s*\n+/);
-          }
-          const explanation = parts.length > 1 ? (parts[0] ?? "").trim() : "";
-          let rewritten = parts.length > 1 ? parts.slice(1).join("\n\n").trim() : text;
-          rewritten = rewritten.replace(/^(?:[-—_*]{3,}\s*\n+)+/, "").replace(/\n+(?:[-—_*]{3,}\s*)+$/, "").trim();
-          return { explanation, rewritten: contract.stripMarkdown(rewritten) };
-        };
+        const parse = contract.parseRewriteReply;
         const r = await callModel(messages, undefined, "anthropic");
         let { explanation, rewritten } = parse(r.content ?? "");
+        // 2026-10-08：文案段是在跟用戶講話（反問／清單）→ 要求直接改完，重試一次。
+        // 還是不行就不回文案：呼叫端不覆蓋本文，那段話只進對話。
+        if (contract.looksLikeReplyToUser(rewritten, input.currentCaption)) {
+          const retry = await callModel([
+            ...messages,
+            { role: "assistant", content: r.content ?? "" },
+            { role: "user", content: contract.copyOnlyRequest() },
+          ], undefined, "anthropic").catch(() => null);
+          const second = retry ? parse(retry.content ?? "") : null;
+          if (second && !contract.looksLikeReplyToUser(second.rewritten, input.currentCaption)) {
+            explanation = second.explanation || explanation;
+            rewritten = second.rewritten;
+          } else {
+            console.warn(`[refineCaption] reply was not publishable copy (task=${input.taskId ?? "-"}) — caption left untouched`);
+            return {
+              explanation: [explanation, rewritten].filter(Boolean).join("\n\n"),
+              rewritten: "", ok: true, noRewrite: true as const, regulationCompliance: null,
+            };
+          }
+        }
         // 驗證重試：超過這張卡的字數上限 25% → 帶著實際字數要求濃縮一次。還是太長就照給，不硬截斷。
         if (contract.isOverLimit(rewritten, spec)) {
           const r2 = await callModel([
