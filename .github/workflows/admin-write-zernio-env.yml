@@ -59,6 +59,13 @@ on:
         # YAML 1.1 會把未加引號的 on／off 解析成布林值 true／false，GitHub 就只接受 "true"／"false"。
         options: ["keep", "on", "off"]
 
+      autopublish:
+        description: "AUTOPUBLISH_SCHEDULED 排程到時自動發布（keep 保留現值）"
+        required: true
+        type: choice
+        default: keep
+        options: ["keep", "on", "off"]
+
 permissions:
   contents: read
 
@@ -84,12 +91,13 @@ jobs:
           PROVIDER_YOUTUBE: ${{ inputs.youtube }}
           PROVIDER_TIKTOK: ${{ inputs.tiktok }}
           SOCIAL_PUBLISH: ${{ inputs.social_publish }}
+          AUTOPUBLISH: ${{ inputs.autopublish }}
         with:
           host: ${{ secrets.VM_HOST }}
           username: ${{ secrets.VM_USER }}
           key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
           command_timeout: 120s
-          envs: ZERNIO_API_KEY,PROVIDER_FACEBOOK,PROVIDER_INSTAGRAM,PROVIDER_LINKEDIN,PROVIDER_THREADS,PROVIDER_YOUTUBE,PROVIDER_TIKTOK,SOCIAL_PUBLISH
+          envs: ZERNIO_API_KEY,PROVIDER_FACEBOOK,PROVIDER_INSTAGRAM,PROVIDER_LINKEDIN,PROVIDER_THREADS,PROVIDER_YOUTUBE,PROVIDER_TIKTOK,SOCIAL_PUBLISH,AUTOPUBLISH
           script: |
             set +x
             set -euo pipefail
@@ -151,6 +159,11 @@ jobs:
               keep|"") echo "  ⊘ SOCIAL_PUBLISH_ENABLED (kept)" ;;
               *) echo "❌ Invalid social_publish choice."; exit 1 ;;
             esac
+            case "${AUTOPUBLISH:-keep}" in
+              on|off) upsert AUTOPUBLISH_SCHEDULED "$AUTOPUBLISH" ;;
+              keep|"") echo "  ⊘ AUTOPUBLISH_SCHEDULED (kept)" ;;
+              *) echo "❌ Invalid autopublish choice."; exit 1 ;;
+            esac
 
             pm2 restart onbrand-dev --update-env >/dev/null 2>&1
             if ! timeout 60 bash -c 'until curl --fail --silent --max-time 5 http://127.0.0.1:3101/health >/dev/null; do sleep 3; done'; then
@@ -174,6 +187,7 @@ jobs:
           PROVIDER_YOUTUBE: ${{ inputs.youtube }}
           PROVIDER_TIKTOK: ${{ inputs.tiktok }}
           SOCIAL_PUBLISH: ${{ inputs.social_publish }}
+          AUTOPUBLISH: ${{ inputs.autopublish }}
         run: |
           set +x
           set -euo pipefail
@@ -234,6 +248,11 @@ jobs:
             on|off) upsert SOCIAL_PUBLISH_ENABLED "$SOCIAL_PUBLISH" ;;
             keep|"") echo "  ⊘ SOCIAL_PUBLISH_ENABLED (kept)" ;;
             *) echo "❌ Invalid social_publish choice."; exit 1 ;;
+          esac
+          case "${AUTOPUBLISH:-keep}" in
+            on|off) upsert AUTOPUBLISH_SCHEDULED "$AUTOPUBLISH" ;;
+            keep|"") echo "  ⊘ AUTOPUBLISH_SCHEDULED (kept)" ;;
+            *) echo "❌ Invalid autopublish choice."; exit 1 ;;
           esac
 
           pm2 restart onbrand --update-env >/dev/null 2>&1
