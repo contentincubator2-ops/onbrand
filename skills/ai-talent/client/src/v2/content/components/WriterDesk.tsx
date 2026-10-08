@@ -36,7 +36,7 @@ export function writerAvatar(w: Pick<DeskWriter, "name" | "avatarUrl">): string 
 
 export default function WriterDesk({
   en, lead, others, activeKey, draftKeys, busyKey, onPick,
-  leadReason, chatHistory, chatBusy, onSend, canUndo, onUndo, onHandoffLanded,
+  leadReason, chatHistory, notes, chatBusy, onSend, canUndo, onUndo, onHandoffLanded,
 }: {
   en: boolean;
   lead: DeskWriter;
@@ -48,6 +48,8 @@ export default function WriterDesk({
   /** 主筆為什麼這樣寫 —— 卡片登記的出處區塊 */
   leadReason: React.ReactNode;
   chatHistory: Array<{ role: "user" | "assistant"; content: string }>;
+  /** 這個版本先前提過、還有效的修改意見（存在伺服器；RunPage 給 RefineNotesList）。 */
+  notes?: React.ReactNode;
   chatBusy: boolean;
   onSend: (text: string) => Promise<boolean>;
   canUndo: boolean;
@@ -158,6 +160,7 @@ export default function WriterDesk({
           onChange={(e) => setDraft(e.target.value)}
           minRows={2}
         />
+        {notes}
         <div className="flex gap-2">
           <Button
             className="flex-1 bg-default-900 font-medium text-white"

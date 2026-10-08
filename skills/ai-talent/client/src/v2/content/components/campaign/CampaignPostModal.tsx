@@ -36,6 +36,7 @@ import { showToastGlobal } from "../../../platform/components/Toast";
 import { toastWithUpgrade } from "../../../platform/lib/upgradeToast";
 import { TASK_MODAL_CLASSNAMES, TASK_MODAL_HEADER } from "../../../platform/components/taskModalStyle";
 import { PlatformMockup } from "../PlatformMockup";
+import RefineNotesList from "../RefineNotesList";
 import type { MockupVariant } from "../../lib/inferMockup";
 import { getIgPublicVariantImageSize, getRunContentMutationLocator, resolveRunContent, type RunContentKind } from "../../lib/strategyContentEnvelope";
 import { CHANNEL_META, channelLabel } from "../../../platform/lib/channelMeta";
@@ -157,6 +158,7 @@ export default function CampaignPostModal({
       setAsk("");
       onType(tidy(r.rewritten));
       flush();
+      utils?.quickTask?.refineNotes?.invalidate?.({ outputId });
     },
     onError: (e: any) => toastWithUpgrade(e?.message ?? L("改寫失敗", "Rewrite failed"), en),
   });
@@ -388,6 +390,8 @@ export default function CampaignPostModal({
                       onPress={() => refineMut.mutate(refinePayload())}>{L("改", "Rewrite")}</Button>
                   </div>
                 )}
+                {/* 先前提過的修改意見：AI 每次改寫都照著（審核中／已發布只看不動）。 */}
+                {!cards && <RefineNotesList outputId={outputId} locator={getRunContentMutationLocator(resolved.kind, idx)} en={en} canRemove={editable} />}
                 {canMakeImage && (
                   <Button size="sm" radius="lg" variant="flat" className="self-start" isLoading={!!imgStep}
                     startContent={!imgStep && <FontAwesomeIcon icon={faImage} />}
@@ -495,6 +499,8 @@ export default function CampaignPostModal({
       brandId: brandId ?? data?.mission?.brandId ?? undefined,
       eventId,
       taskId: String(data?.mission?.taskId ?? item.taskId) || undefined,
+      // 帶上是哪一篇的哪個版本：伺服器讀回先前的意見，這一句也記下來。
+      outputId, ...getRunContentMutationLocator(resolved.kind, idx),
     };
   }
 }

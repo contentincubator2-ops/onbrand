@@ -70,6 +70,7 @@ import { fireNudge } from "../../platform/components/mia/miaNudges";
 import ReviewBar from "../../platform/components/review/ReviewBar";
 import PerfTagPicker from "../components/PerfTagPicker";
 import WriterDesk, { type DeskWriter } from "../components/WriterDesk";
+import RefineNotesList from "../components/RefineNotesList";
 import { agentLabel, agentTitle } from "../../platform/lib/agentName";
 import { friendlyError } from "../../platform/lib/friendlyError";
 import BrandConsistencyNote, { pickBrandRecord } from "../components/BrandConsistencyNote";
@@ -1216,6 +1217,8 @@ export default function RunPage() {
         agentId: w.agentId, agentName: w.name, agentTitle: w.title,
         ...deskScope,
         history: chatHistory.slice(-12),
+        // 2026-10-08：帶上是哪一篇的哪個版本——先前的修改意見存在伺服器，重新整理也還在。
+        outputId: id, ...locator,
       });
       if (!r.ok) {
         showToastGlobal(lang === "en"
@@ -1230,6 +1233,7 @@ export default function RunPage() {
       ]);
       setDeskUndo({ key: activeSelectionKey, caption: before });
       await commitDeskCaption(r.rewritten, undefined, r.regulationCompliance);
+      (utils as any)?.quickTask?.refineNotes?.invalidate?.({ outputId: id });
       return true;
     } catch (e: any) {
       showToastGlobal(lang === "en" ? `Error: ${friendlyErr(e, true)}` : `錯誤：${friendlyErr(e, false)}`);
@@ -2656,6 +2660,7 @@ export default function RunPage() {
                   onPick={pickDeskWriter}
                   leadReason={renderWhyWritten()}
                   chatHistory={chatHistory}
+                  notes={<RefineNotesList outputId={id} locator={getRunContentMutationLocator(selectedContentKind, activeIdx)} en={lang === "en"} />}
                   chatBusy={deskChatBusy}
                   onSend={sendDeskChat}
                   canUndo={!!deskUndo && deskUndo.key === activeSelectionKey}
@@ -2716,7 +2721,9 @@ export default function RunPage() {
                           productId: (data as any)?.metadata?.productId ?? undefined,
                           eventId: (data as any)?.metadata?.eventId ?? undefined,
                           history: chatHistory,
+                          outputId: id, ...locator,
                         });
+                        (utils as any)?.quickTask?.refineNotes?.invalidate?.({ outputId: id });
                         if (r.ok) {
                           if (shouldApplyMutationPreview(activeSelectionKeyRef.current, locator)) {
                             setChatHistory(h => [
