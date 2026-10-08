@@ -369,6 +369,23 @@ describe("活動日期可以在對話裡改", () => {
     expect(moved.has("w")).toBe(false);
   });
 
+  it("開始日挪到今天以前：範圍從開始日起算，還沒寫的篇跟著往前（不會全擠在今天）", () => {
+    const now = "2026-10-08";
+    expect(chatWindow("2026-09-18", "2026-10-19", now)).toEqual({ from: "2026-09-18", to: "2026-10-26" });
+    const items = [
+      { id: "a", date: "2026-10-08", outputId: null },
+      { id: "b", date: "2026-10-15", outputId: null },
+      { id: "c", date: "2026-10-19", outputId: null },
+      { id: "d", date: "2026-10-20", outputId: null },
+    ];
+    const dates = { startAt: "2026-09-18", endAt: "2026-10-19", from: { startAt: "2026-10-08", endAt: "2026-10-19" } };
+    const moved = reflowForDates(items, dates, chatWindow(dates.startAt, dates.endAt, now));
+    expect(moved.get("a")).toBe("2026-09-18");
+    expect(moved.get("b")).toBe("2026-10-08");
+    expect(moved.has("c")).toBe(false);
+    expect(moved.has("d")).toBe(false);
+  });
+
   it("超出範圍的日期不再無聲消失：記下來，回覆會講", () => {
     const { out, report } = go({ ops: [
       { op: "add", phase: "teaser", date: "2026-09-01", platform: "facebook", taskId: "fb-a", angle: "太早的一篇排不進去" },
