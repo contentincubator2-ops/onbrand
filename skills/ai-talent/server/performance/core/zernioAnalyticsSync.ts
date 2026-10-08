@@ -100,7 +100,7 @@ export async function syncBrandZernioAnalytics(brandId: number, days = 120, deps
   const write = deps.upsert ?? upsertFacts;
   const log = deps.log ?? (await import("../../platform/routers/opsRouter")).logError;
   const connections = (await listConnectedByBrand(pool, brandId, "zernio")).filter(c => isAnalyticsPlatform(c.platform));
-  const tags = await ownTagsFor(brandId, pool);
+  const { tags } = await ownTagsFor(brandId, pool);
   const now = (deps.now ?? (() => new Date()))();
   const toDate = taipeiDate(now.toISOString());
   const fromDate = taipeiDate(new Date(now.getTime() - days * 86_400_000).toISOString());
