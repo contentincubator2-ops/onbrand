@@ -225,6 +225,7 @@ async function main(): Promise<void> {
     console.log("\n=== 4. 確認 → 上架＋寫進品牌大腦 ===");
     const early = await call("brandVoice.finish", { brandId: brand.id });
     check(!early.ok, "一類都沒按像，不能完成", early.err ?? "");
+    // 失敗狀態的卡不能按像（否則沒驗過的寫法會被上架）。這裡用還在 review 的卡驗正常路徑。
     for (const id of mine) {
       const like = await call("brandVoice.feedback", { brandId: brand.id, cardId: id, verdict: "like" });
       check(like.ok, `${id} 按像`, like.err ?? "");

@@ -697,7 +697,7 @@ async function runOrchestraInner(args: {
     // 2026-07-17 多市場: zh-TW-only gate — voiceSanitizeZhTW converts to
     // Traditional Chinese / Taiwan wording, strips emoji, ！→。 — it would
     // corrupt English / Japanese output. Non-zh-TW brands skip this block.
-    if (brandMarket.isZhTW && Array.isArray(captions) && captions.length &&
+    if (brandMarket.isZhTW && !args.template.keepOwnVoice && Array.isArray(captions) && captions.length &&
         (isTikTokBodyTask(args.template) || isYouTubeBodyTask(args.template) ||
          isKOLBodyTask(args.template))) {
       // L1 deterministic: 高信心、零成本、一律套用（hoisted 共用函式）。
@@ -1068,7 +1068,8 @@ async function runOrchestraInner(args: {
     // caption ONE more time here, the last point before persistence.
     // 2026-07-17 多市場: gate on zh-TW too — the sanitizer would corrupt
     // non-Chinese output (emoji strip / ！→。 / straight→「」quotes).
-    const _voiceGated = brandMarket.isZhTW && (isTikTokBodyTask(args.template) ||
+    // 2026-10-08：寫法學自品牌自己文章的卡（keepOwnVoice）不過這道守門——見 FBTaskTemplate。
+    const _voiceGated = brandMarket.isZhTW && !args.template.keepOwnVoice && (isTikTokBodyTask(args.template) ||
       isYouTubeBodyTask(args.template) || isKOLBodyTask(args.template));
     // 2026-07-20 (CJ QA「產出文案有斷字/漏字」— original text was gone so the
     // corrupting layer couldn't be identified): keep the writer's RAW caption

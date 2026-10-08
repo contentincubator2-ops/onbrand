@@ -2,7 +2,7 @@
  * duplicateCard —— 把自建卡複製一份（可換通路）。2026-10-04「我的任務卡」的「複製到…」。
  */
 import { describe, expect, it } from "vitest";
-import { duplicateCard, CARD_ID_RE, type BrandTaskCard } from "./brandTaskCards";
+import { duplicateCard, cardTemplate, CARD_ID_RE, type BrandTaskCard } from "./brandTaskCards";
 
 const source: BrandTaskCard = {
   id: "u7-promo", brandId: 7, name: "促購文", channel: "facebook",
@@ -61,5 +61,27 @@ describe("duplicateCard", () => {
     c.askFields[0]!.label = "改過";
     expect(source.samples).toHaveLength(1);
     expect(source.askFields[0]!.label).toBe("售價");
+  });
+});
+
+describe("keepOwnVoice —— 寫法學自品牌自己文章的卡，產出不過移除 emoji 的那道守門", () => {
+  const voice: BrandTaskCard = { ...source, id: "u7-voice-chat", origin: "voice" };
+
+  it("voice 卡的 template 帶 keepOwnVoice；一般自建卡沒有", () => {
+    expect(cardTemplate(voice).keepOwnVoice).toBe(true);
+    expect(cardTemplate(source).keepOwnVoice).toBeUndefined();
+  });
+
+  it("voice 卡複製到別的通路：副本是一般自建卡（照算額度），但寫法的豁免跟著走", () => {
+    const copy = duplicateCard(voice, [voice], { channel: "tiktok", userId: 1 });
+    expect(copy.origin).toBeUndefined();
+    expect(copy.keepOwnVoice).toBe(true);
+    expect(cardTemplate(copy).keepOwnVoice).toBe(true);
+    // 副本再複製一次也還在
+    expect(duplicateCard(copy, [voice, copy], { channel: "youtube", userId: 1 }).keepOwnVoice).toBe(true);
+  });
+
+  it("一般自建卡複製不會憑空多出豁免", () => {
+    expect(duplicateCard(source, [source], { channel: "tiktok", userId: 1 }).keepOwnVoice).toBeUndefined();
   });
 });

@@ -107,6 +107,12 @@ export interface BrandTaskCard {
    * 沒有＝用戶自己開的卡。voice 卡不佔方案的自建卡額度。
    */
   origin?: "voice";
+  /**
+   * 寫法是從品牌自己的文章學來的，產出不過「移除 emoji／改寫開場」那道聲音守門
+   * （2026-10-08 CJ「表情符號可以例外」）。跟 origin 分開存：voice 卡複製到別的通路
+   * 之後是一張一般的自建卡（照算額度），但寫法還是品牌自己的，這個要跟著走。
+   */
+  keepOwnVoice?: boolean;
   /** 學寫法流程的狀態（只有 origin === "voice" 的卡有）。 */
   voice?: import("./brandVoice").VoiceState;
 }
@@ -173,6 +179,7 @@ export function duplicateCard(
     variants: source.variants,
     agentId: source.agentId,
     scene: source.scene ?? null,
+    ...(source.keepOwnVoice || source.origin === "voice" ? { keepOwnVoice: true } : {}),
     createdAt: now, updatedAt: now, createdBy: opts.userId,
     lastDryRun: null,
   };
@@ -544,6 +551,7 @@ export function cardTemplate(card: BrandTaskCard): FBTaskTemplate {
     primary_question: card.primaryQuestion,
     scene: card.scene ?? undefined,
     illustration_url: card.illustrationStatus === "ready" && card.illustrationUrl ? card.illustrationUrl : undefined,
+    keepOwnVoice: card.keepOwnVoice || card.origin === "voice" ? true : undefined,
     primary_input: {
       key: "topic",
       placeholder: card.primaryPlaceholder,
