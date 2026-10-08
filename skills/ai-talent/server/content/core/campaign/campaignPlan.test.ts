@@ -11,7 +11,7 @@
  */
 import { describe, it, expect } from "vitest";
 import {
-  planBeats, reconcileItems, reconcilePhaseMessages, candidateCards, isPartCard, kolBlock, cobrandBlock,
+  planBeats, reconcileItems, reconcilePhaseMessages, candidateCards, campaignCards, toSingleCardItems, isPartCard, kolBlock, cobrandBlock,
   CAMPAIGN_PHASE_IDS,
 } from "./campaignPlan";
 import type { CatalogTask } from "../catalog/taskCatalogIndex";
@@ -154,6 +154,42 @@ describe("candidateCards", () => {
       expect(r?.template, c.id).toBeTruthy();
       expect(r?.config, c.id).toBeTruthy();
     }
+  });
+});
+
+// 2026-10-08（CJ「活動企劃當中的任務卡，都只要是單篇貼文的，不需要四篇貼文的活動組合」）
+describe("campaignCards：活動企劃只排單篇", () => {
+  it.each(["facebook", "instagram", "threads", "line", "tiktok", "email", "website", "kol", "cobrand"])(
+    "%s 有卡可排，而且全部是單篇", (platform) => {
+      const cards = campaignCards([platform]);
+      expect(cards.length).toBeGreaterThan(0);
+      expect(cards.every((c) => c.tier === "30s")).toBe(true);
+    });
+
+  it("多篇組合不進活動企劃（本週企劃那條路不受影響）", () => {
+    const ids = campaignCards(["facebook", "instagram"]).map((c) => c.id);
+    for (const pack of ["fb-60-launch-kit", "fb-60-countdown-5day", "fb-60-pinned-suite", "ig-60-serial-3", "ig-60-countdown-5day"]) {
+      expect(ids, pack).not.toContain(pack);
+    }
+    expect(candidateCards(["facebook"]).map((c) => c.id)).toContain("fb-60-launch-kit");
+  });
+
+  it("舊企劃：還沒寫的套組格換成單篇預設卡，寫好的與自建卡不動", () => {
+    const base = { phase: "launch" as const, date: "2026-11-11", platform: "facebook", angle: "開賣", enabled: true, scheduledAt: null };
+    const out = toSingleCardItems([
+      { ...base, id: "a", taskId: "fb-60-launch-kit", taskLabel: "FB 活動上線包（4 篇）", outputId: null },
+      { ...base, id: "b", taskId: "fb-60-launch-kit", taskLabel: "FB 活動上線包（4 篇）", outputId: 123 },
+      { ...base, id: "c", taskId: "brand-card-999", taskLabel: "自建卡", outputId: null },
+      { ...base, id: "d", taskId: "fb-30-caption-short", taskLabel: "x", outputId: null },
+    ] as any);
+    const single = new Set(campaignCards(["facebook"]).map((c) => c.id));
+    expect(single.has(out[0]!.taskId)).toBe(true);
+    expect(out[0]!.repaired).toBe(true);
+    expect(out[0]!.taskLabel).not.toContain("4 篇");
+    expect(out[1]!.taskId).toBe("fb-60-launch-kit");
+    expect(out[2]!.taskId).toBe("brand-card-999");
+    expect(out[3]).toEqual(expect.objectContaining({ taskId: "fb-30-caption-short" }));
+    expect(out[3]!.repaired).toBeUndefined();
   });
 });
 

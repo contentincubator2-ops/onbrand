@@ -47,6 +47,22 @@ export function postStateBorder(s: CampaignPostState): string {
   }
 }
 
+/**
+ * 活動地圖上那一個點的填色（Tailwind class）。2026-10-08（CJ：「綠色點點看不懂」——原本只要寫了就是
+ * 綠圈，草稿跟核准分不出來）：一關一個樣子，跟 Chip 同一套狀態色，地圖下方有圖例對照。
+ * 未產出＝黑色空心、草稿＝灰色實心、待審＝黃、退回＝紅、核准＝綠色空心、發布＝綠色實心。
+ */
+export function postStateDot(s: CampaignPostState): string {
+  switch (s) {
+    case "unwritten": return "bg-content1 border-foreground";
+    case "draft":     return "bg-default-400 border-default-400";
+    case "in_review": return "bg-warning border-warning";
+    case "revision":  return "bg-danger border-danger";
+    case "approved":  return "bg-content1 border-success";
+    case "published": return "bg-success border-success";
+  }
+}
+
 /** 伺服器回的 state（可能缺、可能是舊版沒有這欄）→ 這一篇的狀態。 */
 export function postStateOf(outputId: number | null | undefined, serverState: string | null | undefined): CampaignPostState {
   if (!outputId) return "unwritten";
