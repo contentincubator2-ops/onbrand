@@ -4,7 +4,8 @@
 import React from "react";
 import { isStrategyPreviewEmail, isPersonaPreviewEmail } from "../../platform/lib/shellContext";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { ICON } from "../../platform/components/icons";
+import { ICON, ShareIcon } from "../../platform/components/icons";
+import { publishSettingsUrl } from "../../platform/lib/publishSettingsUrl";
 import { faBoxOpen, faFont, faPaintBrush, faMicrophone, faCircleInfo, faChartLine, faDatabase, faFileLines, faCalendarDays, faFolderOpen, faBullhorn, faEnvelope, faGlobe, faBookBookmark } from "@fortawesome/free-solid-svg-icons";
 import { faFacebook, faInstagram, faThreads, faLine, faTiktok } from "@fortawesome/free-brands-svg-icons";
 
@@ -123,6 +124,8 @@ export function buildNavItems(lang: "zh-TW" | "en", userEmail?: string | null, c
       ] : []),
       { to: "/brands/edit?cat=info", catKey: "info", label: en ? "Info" : "基本資料", icon: <FontAwesomeIcon icon={faCircleInfo} />,
         tooltip: en ? "Name / industry / market" : "名稱 / 產業 / 市場" },
+      { to: publishSettingsUrl(null), catKey: "publish", label: en ? "Platform auth" : "平台授權", icon: <ShareIcon />,
+        tooltip: en ? "Connect social accounts" : "連接社群帳號" },
     ];
   }
 
