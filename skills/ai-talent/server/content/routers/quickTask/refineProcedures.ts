@@ -38,11 +38,23 @@ export const refineProcedures = {
         role: z.enum(["user", "assistant"]),
         content: z.string().max(3000),
       })).max(12).optional(),
+      // 2026-10-08：這是哪一篇成品的哪個版本——帶了就讀回先前提過的修改意見、
+      // 並把這一句記下來（refineNotes.ts）。沒帶＝一次性的改寫，照舊只看 history。
+      outputId: z.number().int().positive().optional(),
+      variantIndex: z.number().int().min(0).optional(),
+      contentKind: z.enum(["planning", "public"]).optional(),
+      contentIndex: z.number().int().min(0).optional(),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
       const { callModel } = await import("../../../platform/core/llm/multiModelRouter");
       const { buildBrandPrefix } = await import("../../../strategy/core/brand/brandContext");
       const { loadAgentKnowledge } = await import("../../../platform/core/agents/agentKnowledge");
+      const notesStore = await import("../../core/engine/refineNotes");
+      // 不是自己的成品就當作沒帶：照樣改寫，但不讀也不記別人的意見。
+      const noteOutputId = input.outputId && await notesStore.ownsOutput(input.outputId, ctx.user!.id).catch(() => false)
+        ? input.outputId : null;
+      const noteKey = notesStore.variantKeyOf(input);
+      const priorNotes = noteOutputId ? await notesStore.listRefineNotes(noteOutputId, noteKey) : [];
       // 2026-10-03：改寫也要讀這張卡所在平台的「通路角色」（沒帶 taskId 就不注入）。
       const { roleChannelOfTaskId } = await import("../../../strategy/core/brand/channelRoles");
       const brandPrefix = await buildBrandPrefix(
@@ -92,13 +104,16 @@ export const refineProcedures = {
         `重要：保留原本能用的部分，只動用戶提到的地方。語氣自然口語。\n` +
         (agentKnowledge ? `\n【此 agent 的工作守則與專業能力】\n${agentKnowledge}\n` : "") +
         brandPrefix +
+        // 先前的意見接在品牌資料之後、格式合約之前：越後面越有力，但字數與形式仍然最大。
+        notesStore.priorNotesBlock(priorNotes) +
         // 合約接在最後：最後讀到的最有力，換人時個人風格不能蓋過這張卡的形式。
         contract.rewriteContractBlock(spec);
 
       const messages: Array<{ role: "system" | "user" | "assistant"; content: string }> = [
         { role: "system", content: system },
         { role: "user", content: `這是目前的文案：\n\n${input.currentCaption}` },
-        ...(input.history ?? []),
+        // 有存下來的意見就以它為準（已經在 system 裡）；畫面傳來的那串是同一批話，不重複放。
+        ...(priorNotes.length ? [] : (input.history ?? [])),
         { role: "user", content: input.userFeedback },
       ];
       try {
@@ -145,10 +160,38 @@ export const refineProcedures = {
           rewritten = checked.text;
           regulationCompliance = checked.record;
         } catch { /* fail-safe */ }
+        if (noteOutputId && rewritten) {
+          await notesStore.addRefineNote({
+            outputId: noteOutputId, variantKey: noteKey, userId: ctx.user!.id,
+            feedback: input.userFeedback, explanation,
+          });
+        }
         return { explanation, rewritten, ok: true, regulationCompliance };
       } catch (e: any) {
         return { explanation: "", rewritten: "", ok: false, error: e?.message ?? String(e) };
       }
+    }),
+
+  // 2026-10-08：這個版本先前提過、還有效的修改意見（畫面列在輸入框下面）。
+  refineNotes: protectedProcedure
+    .input(z.object({
+      outputId: z.number().int().positive(),
+      variantIndex: z.number().int().min(0).optional(),
+      contentKind: z.enum(["planning", "public"]).optional(),
+      contentIndex: z.number().int().min(0).optional(),
+    }))
+    .query(async ({ ctx, input }) => {
+      const store = await import("../../core/engine/refineNotes");
+      if (!(await store.ownsOutput(input.outputId, ctx.user!.id))) return { notes: [] };
+      return { notes: await store.listRefineNotes(input.outputId, store.variantKeyOf(input)) };
+    }),
+
+  // 拿掉一條意見：之後的改寫不再照它（已經改好的文案不會變）。
+  removeRefineNote: protectedProcedure
+    .input(z.object({ noteId: z.number().int().positive() }))
+    .mutation(async ({ ctx, input }) => {
+      const store = await import("../../core/engine/refineNotes");
+      return { ok: await store.removeRefineNote(input.noteId, ctx.user!.id) };
     }),
 
   // 2026-05-18 (CJ「建立任務時加 AI 潤稿，潤完直接改寫輸入框」): a

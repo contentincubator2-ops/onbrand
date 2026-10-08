@@ -612,6 +612,11 @@ async function runStartupMigrations() {
     await migrateCampaignChat();
     console.log("[migrate] campaign_chat_messages / campaign_chat_threads: OK");
 
+    // 2026-10-08（CJ「他似乎沒有辦法記錄我前幾次的意見」）：請 AI 改的歷史修改意見。
+    const { CAPTION_REFINE_NOTES_DDL } = await import("./content/core/engine/refineNotes");
+    await db.execute(sql.raw(CAPTION_REFINE_NOTES_DDL));
+    console.log("[migrate] caption_refine_notes: OK");
+
     const { BRAND_NAV_PREFS_DDL } = await import("./platform/routers/navPrefsRouter");
     await db.execute(sql.raw(BRAND_NAV_PREFS_DDL));
     console.log("[migrate] brand_nav_prefs: OK");
