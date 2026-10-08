@@ -17,6 +17,8 @@
  * 單色、13–14px，照全站紀律。
  */
 import React from "react";
+import { useNavigate } from "react-router-dom";
+import { publishSettingsUrl } from "../../platform/lib/publishSettingsUrl";
 import { trpc } from "../../../lib/trpc";
 import { useLang } from "../../../lib/i18n";
 import { HelpTip } from "../../platform/components/HelpTip";
@@ -39,6 +41,7 @@ const META: Record<Conn["id"], { zh: string; en: string; icon: React.ReactNode }
 };
 
 export default function ConnectionsPanel({ brandId }: { brandId: number | null }) {
+  const navigate = useNavigate();
   const { lang } = useLang();
   const isEn = lang === "en";
   const utils = trpc.useUtils();
@@ -95,6 +98,12 @@ export default function ConnectionsPanel({ brandId }: { brandId: number | null }
                 {c.label && <span className="ml-1 truncate text-neutral-500">· {c.label}</span>}
               </div>
               <p className="mt-2 text-[13px] leading-5 text-neutral-600">{isEn ? c.howEn : c.howZh}</p>
+              {c.id === "meta_page" && !on && brandId && (
+                <button type="button" onClick={() => navigate(publishSettingsUrl(brandId))}
+                  className="mt-2 rounded-md border border-neutral-300 px-2 py-1 text-[13px] text-neutral-700 disabled:opacity-50">
+                  {isEn ? "Connect social accounts" : "前往連接社群帳號"}
+                </button>
+              )}
               {c.id === "meta_page" && on && brandId && (
                 <>
                   <button type="button" disabled={sync.isPending}
