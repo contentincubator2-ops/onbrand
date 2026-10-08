@@ -56,7 +56,8 @@ on:
         required: true
         type: choice
         default: keep
-        options: [keep, on, off]
+        # YAML 1.1 會把未加引號的 on／off 解析成布林值 true／false，GitHub 就只接受 "true"／"false"。
+        options: ["keep", "on", "off"]
 
 permissions:
   contents: read
