@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { pivot, resolveTag, judgeValue, funnelOf, slugCode, UNTAGGED, type Fact, type Dimension, type TagRule } from "./perfPivot";
+import { pivot, resolveTag, labelFor, BUILTIN_DIMS, SOURCE_LABELS, judgeValue, funnelOf, slugCode, UNTAGGED, type Fact, type Dimension, type TagRule } from "./perfPivot";
 
 const dims: Dimension[] = [
   { key: "ta", label: "族群", values: [{ code: "family", label: "雙薪家庭" }, { code: "office", label: "上班族" }] },
@@ -10,6 +10,51 @@ const f = (id: number, tags: Record<string, string>, metrics: Record<string, num
 });
 
 describe("perfPivot", () => {
+  it("exposes origin as a builtin dimension", () => {
+    expect(BUILTIN_DIMS.origin).toEqual({ label: "發布來源", labelEn: "Published by" });
+  });
+
+  it("resolves only stored origin and never guesses from text or rules", () => {
+    const rules: TagRule[] = [{ dimKey: "origin", valueCode: "onbrand", pattern: "onBrand" }];
+    for (const origin of ["onbrand", "external"]) {
+      expect(resolveTag(f(1, { origin }, {}), "origin", rules)).toBe(origin);
+    }
+    for (const tags of [{}, { origin: "" }]) {
+      expect(resolveTag(f(1, tags, {}, { entityLabel: "onBrand", source: "fb_page" }), "origin", rules)).toBe(UNTAGGED);
+    }
+  });
+
+  it.each([
+    ["onbrand", "onBrand 發布", "Published via onBrand"],
+    ["external", "原本自行發布", "Published elsewhere"],
+    [UNTAGGED, "未歸類", "未歸類"],
+  ])("labels origin %s in Chinese and English", (code, zh, en) => {
+    expect(labelFor("origin", code, [])).toBe(zh);
+    expect(labelFor("origin", code, [], "en")).toBe(en);
+  });
+
+  it("groups origin in rows and columns while keeping legacy facts unclassified", () => {
+    const facts = [f(1, { origin: "onbrand" }, { reach: 10 }), f(2, { origin: "external" }, { reach: 20 }), f(3, {}, { reach: 5 })];
+    const rows = [
+      { code: "external", label: "原本自行發布" }, { code: "onbrand", label: "onBrand 發布" },
+      { code: UNTAGGED, label: "未歸類" },
+    ];
+    const result = pivot(facts, { rowDim: "origin", stages: [], judge: "reach" }, [], []);
+    expect(result.rows).toEqual(rows);
+    expect(result.coverage).toEqual({ tagged: 2, total: 3 });
+    expect(result.rowTotals.onbrand.totals.reach).toBe(10);
+    expect(result.rowTotals[UNTAGGED].count).toBe(1);
+    expect(pivot(facts, { rowDim: "month", colDim: "origin", stages: [], judge: "reach" }, [], []).cols).toEqual(rows);
+  });
+
+  it.each([
+    ["ig_account", "Instagram 貼文"], ["threads_account", "Threads 貼文"],
+    ["linkedin_page", "LinkedIn 貼文"], ["fb_page", "粉專貼文"],
+  ])("labels social source %s", (source, label) => {
+    expect(SOURCE_LABELS[source]).toBe(label);
+    expect(pivot([f(1, {}, {}, { source })], { rowDim: "source", stages: [], judge: "reach" }, [], []).rows)
+      .toEqual([{ code: source, label }]);
+  });
   it("groups by row × col and computes ROAS per cell", () => {
     const facts = [
       f(1, { ta: "family", usp: "nomess" }, { spend: 100, revenue: 460 }),

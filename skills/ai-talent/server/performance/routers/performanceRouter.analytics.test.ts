@@ -20,12 +20,19 @@ beforeEach(() => {
   mocks.execute.mockResolvedValue([[]]);
   mocks.summary.mockResolvedValue({});
   mocks.page.mockResolvedValue(null);
-  mocks.social.mockResolvedValue({ platforms: [{ platform: "threads", posts: 2, tagged: 1 }] });
+  mocks.social.mockResolvedValue({ platforms: [{ platform: "threads", posts: 2, tagged: 1, onbrand: 2, skipped: 0 }] });
   mocks.facebook.mockResolvedValue({ pageId: "123", pageName: "Page", posts: 3, tagged: 1, metricsUsed: ["reach"] });
 });
 afterEach(() => vi.unstubAllEnvs());
 
 describe("performance social connections", () => {
+  it("includes the origin builtin dimension and social source labels in the workspace", async () => {
+    const workspace = await caller().workspace({ brandId: 7, tray: "fanpage_monthly" });
+    expect(workspace.builtinDims).toContainEqual({ key: "origin", label: "發布來源" });
+    expect(workspace.sourceLabels).toMatchObject({
+      fb_page: "粉專貼文", ig_account: "Instagram 貼文", threads_account: "Threads 貼文", linkedin_page: "LinkedIn 貼文",
+    });
+  });
   it("reports Zernio-only connections, account names and the sum of four fact sources", async () => {
     mocks.execute.mockImplementation(async (sql: string) => sql.includes("FROM brand_publish_connections") ? [[
       { platform: "facebook", accountLabel: "SoWork 粉專", connectedAt: "2026-10-08T01:00:00Z" },
@@ -58,13 +65,13 @@ describe("performance social connections", () => {
 });
 describe("performance social sync routes", () => {
   it("syncSocial defaults to 120 days and forwards platform outcomes", async () => {
-    expect(await caller().syncSocial({ brandId: 7 })).toEqual({ platforms: [{ platform: "threads", posts: 2, tagged: 1 }] });
+    expect(await caller().syncSocial({ brandId: 7 })).toEqual({ platforms: [{ platform: "threads", posts: 2, tagged: 1, onbrand: 2, skipped: 0 }] });
     expect(mocks.social).toHaveBeenCalledWith(7, 120);
     expect(mocks.facebook).not.toHaveBeenCalled();
   });
   it("routes the legacy endpoint through Zernio when Facebook uses it", async () => {
     vi.stubEnv("PUBLISH_PROVIDER_FACEBOOK", "zernio");
-    expect(await caller().syncFacebook({ brandId: 7, days: 180 })).toEqual({ platforms: [{ platform: "threads", posts: 2, tagged: 1 }] });
+    expect(await caller().syncFacebook({ brandId: 7, days: 180 })).toEqual({ platforms: [{ platform: "threads", posts: 2, tagged: 1, onbrand: 2, skipped: 0 }] });
     expect(mocks.social).toHaveBeenCalledWith(7, 180);
     expect(mocks.facebook).not.toHaveBeenCalled();
   });
