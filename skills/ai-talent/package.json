@@ -67,6 +67,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@azure/storage-blob": "^12.34.0",
     "@napi-rs/canvas": "^1.0.10",
     "@sendgrid/mail": "^8.1.6",
     "@tesseract.js-data/chi_tra": "^1.0.0",
