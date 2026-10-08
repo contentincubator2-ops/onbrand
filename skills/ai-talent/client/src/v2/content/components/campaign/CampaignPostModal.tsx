@@ -7,6 +7,8 @@
  *     打開就是初稿，不是空白框。一篇一篇點、一篇一篇寫，不做整期一鍵。
  *   · 左邊是貼文的樣子，右邊是本文（直接打字，停手自動存）＋一句話請 AI 改。
  *     換圖、換人重寫等完整功能在成品頁，這裡給一個入口，不再複製一份。
+ *     （2026-10-08 CJ「按了進階修改後，直接在該彈跳視窗展開」→ 入口改成就地展開
+ *     CampaignPostAdvanced：換人重寫、換圖設定、切回之前的圖；不再跳到成品頁。）
  *   · 狀態由系統走，按鈕只有下一步：
  *       個人版：草稿 →「定稿」→ 已核准 →「標記已發布」→ 已發布
  *       團隊版：草稿 →「送審」→ 待審核 →（主管在審核佇列放行／退回）→ 已核准 → 已發布
@@ -21,7 +23,7 @@
  * 2026-10-02（CJ「這邊可以讓它也可直接生成圖嗎？」）：點預覽的圖片區或「做圖」，直接在這裡做：
  * 從本文產生圖片指令（image.promptFromCaption）→ 用預設模型產圖（image.generate，gpt-image-2，
  * 兩模型政策：失敗不自動換模型）→ 存回這一篇（output.updateVariantImage，舊圖留版本可切回）。
- * 自己寫指令、改用 Nano Banana、用真實產品照，還是在成品頁。多張卡片的貼文每張各有圖，也在成品頁做。
+ * 自己寫指令、改用 Nano Banana、用真實產品照，在展開的「進階修改」裡（2026-10-08 起不用去成品頁）。多張卡片的貼文每張各有圖，也在成品頁做。
  *
  * 放行為什麼不在這裡：活動屬於建立它的帳號（events.userId），主管開不了別人的活動頁；
  * 放行一律在審核佇列（/review），那裡本來就是主管的入口。
@@ -30,7 +32,7 @@ import React from "react";
 import { useNavigate } from "react-router-dom";
 import { Button, Chip, Input, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader, Spinner, Textarea } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faArrowUpRightFromSquare, faImage, faPenNib, faWandMagicSparkles } from "@fortawesome/free-solid-svg-icons";
+import { faChevronDown, faChevronUp, faImage, faPenNib, faWandMagicSparkles } from "@fortawesome/free-solid-svg-icons";
 import { trpc } from "../../../../lib/trpc";
 import { showToastGlobal } from "../../../platform/components/Toast";
 import { toastWithUpgrade } from "../../../platform/lib/upgradeToast";
@@ -43,6 +45,7 @@ import { phaseShort } from "../../../strategy/lib/campaign/campaignStage";
 import type { CampaignPlanItem } from "../../../strategy/lib/campaign/campaignSchema";
 import { postStateChip, postStateLabel, postStateOf, type CampaignPostState } from "../../../strategy/lib/campaign/campaignPostStatus";
 import type { ItemThumb } from "./CampaignMap";
+import CampaignPostAdvanced, { type AdvancedImageOpts } from "./CampaignPostAdvanced";
 
 const md = (s: string) => s.slice(5).replace("-", "/");
 /** ISO → 台北的日期與時間（本週企劃一律用台北時間）。 */
@@ -148,6 +151,23 @@ export default function CampaignPostModal({
   flushRef.current = flush;
   React.useEffect(() => () => { flushRef.current(); }, []);
   const close = () => { flush(); onClose(); };
+  /** 換人重寫之前，等還沒存的手改存完——伺服器要拿它當上一位的稿。 */
+  const flushTyping = async () => {
+    const p = pending.current;
+    if (!p) return;
+    clearTimeout(p.timer);
+    pending.current = null;
+    await saveMut.mutateAsync({ id: outputId, ...getRunContentMutationLocator(resolved.kind, idx), caption: p.value });
+  };
+  /** 一段文字成為本文（進階修改的換人重寫用）；extra 帶 writer／合規紀錄。 */
+  const applyCaption = async (next: string, extra?: Record<string, unknown>) => {
+    const v = tidy(next);
+    if (pending.current) { clearTimeout(pending.current.timer); pending.current = null; }
+    setText(v);
+    if (state === "approved" && !team && !statusMut.isPending) statusMut.mutate({ id: outputId, status: "draft" });
+    await saveMut.mutateAsync({ id: outputId, ...getRunContentMutationLocator(resolved.kind, idx), caption: v, ...(extra ?? {}) });
+  };
+  const [advanced, setAdvanced] = React.useState(false);
 
   // ── 一句話請 AI 改 ──
   const [ask, setAsk] = React.useState("");
@@ -168,29 +188,34 @@ export default function CampaignPostModal({
   const [imgStep, setImgStep] = React.useState<"" | "prompt" | "draw" | "save">("");
   /** 活動的通路 → image.generate 的通路代碼（不認得就不帶，伺服器用預設尺寸）。 */
   const imgChannel = ({ facebook: "fb", instagram: "ig", tiktok: "tiktok", email: "email" } as Record<string, string>)[item.platform];
-  const makeImage = async () => {
+  const makeImage = async (opts?: AdvancedImageOpts) => {
     const brandIdOf = Number(data?.brand?.id ?? brandId ?? 0);
     if (!brandIdOf || !variant || imgStep) return;
     if (!caption.trim()) { showToastGlobal(L("先寫好本文，才知道要畫什麼。", "Write the post first.")); return; }
     flush();
     const size = getIgPublicVariantImageSize(resolved.kind, variant?.format);
     try {
-      setImgStep("prompt");
-      const p = await promptMut.mutateAsync({
-        brandId: brandIdOf, caption: caption.slice(0, 6000),
-        ...(imgChannel ? { channel: imgChannel } : {}), ...(size ? { size } : {}),
-        ...(variant?.imageStyle ? { imageStyle: String(variant.imageStyle).slice(0, 3000) } : {}),
-      });
-      const promptZh = String(p?.promptZh || p?.prompt || "").trim();
+      // 進階修改帶了自己的指令就不再從本文想一次。
+      let promptZh = (opts?.prompt ?? "").trim();
+      if (!promptZh) {
+        setImgStep("prompt");
+        const p = await promptMut.mutateAsync({
+          brandId: brandIdOf, caption: caption.slice(0, 6000),
+          ...(imgChannel ? { channel: imgChannel } : {}), ...(size ? { size } : {}),
+          ...(variant?.imageStyle ? { imageStyle: String(variant.imageStyle).slice(0, 3000) } : {}),
+        });
+        promptZh = String(p?.promptZh || p?.prompt || "").trim();
+      }
       if (!promptZh) throw new Error(L("這次沒產生出圖片指令", "No image prompt came back"));
       setImgStep("draw");
       const r = await genMut.mutateAsync({
-        brandId: brandIdOf, prompt: promptZh, modelChoice: "gpt-image-2",
+        brandId: brandIdOf, prompt: promptZh, modelChoice: opts?.model ?? "gpt-image-2",
         ...(imgChannel ? { channel: imgChannel } : {}), ...(size ? { size } : {}),
+        ...(opts?.subjectImageUrl ? { subjectImageUrl: opts.subjectImageUrl } : {}),
       });
       if (r?.status === "failed" || !r?.url) {
         showToastGlobal(r?.canSwitchTo
-          ? L("這次沒有產出圖。可以再試一次，或到成品頁改用 Nano Banana。", "No image this time — try again, or switch model in the full editor.")
+          ? L("這次沒有產出圖。可以再試一次，或在「進階修改」改用 Nano Banana。", "No image this time — try again, or switch model under Advanced edit.")
           : L("這次沒有產出圖，請再試一次。", "No image this time — please try again."));
         return;
       }
@@ -202,7 +227,7 @@ export default function CampaignPostModal({
       });
       utils?.output?.getById?.invalidate?.({ id: outputId });
       utils?.campaign?.itemThumbs?.invalidate?.({ eventId });
-      showToastGlobal(L("圖做好了（前一張有保留，在成品頁可以切回去）。", "Image ready (the previous one is kept in the full editor)."));
+      showToastGlobal(L("圖做好了（前一張有保留，在「進階修改」可以切回去）。", "Image ready (the previous one is kept under Advanced edit)."));
     } catch (e: any) {
       toastWithUpgrade(e?.message ?? L("做圖失敗", "Image failed"), en);
     } finally {
@@ -291,6 +316,18 @@ export default function CampaignPostModal({
   const busy = working || statusMut.isPending || publishMut.isPending;
 
   const chip = postStateChip(state);
+  const imgSize = getIgPublicVariantImageSize(resolved.kind, variant?.format);
+  /** 主筆＝一開始寫這篇的那位（output.metadata.captionAgent），跟成品頁主筆桌同一個來源。 */
+  const leadWriter = (() => {
+    const ca: any = data?.metadata?.captionAgent;
+    const n = Number(typeof ca === "object" ? ca?.id : NaN);
+    return {
+      key: "lead",
+      name: String((typeof ca === "object" ? (en ? ca?.nameEn || ca?.name : ca?.name) : ca) || L("主筆", "Lead writer")),
+      title: String((typeof ca === "object" ? (en ? ca?.titleEn || ca?.title : ca?.title) : "") ?? "") || undefined,
+      agentId: Number.isFinite(n) && n > 0 ? n : undefined,
+    };
+  })();
   const imageUrl = variant?.imageUrl ?? variant?.image?.url ?? undefined;
   const imageStatus = variant?.imageStatus ?? variant?.image?.status ?? undefined;
 
@@ -395,11 +432,34 @@ export default function CampaignPostModal({
                     {imageUrl ? L("重做這張圖", "Redo the image") : L("幫這篇做圖", "Make an image")}
                   </Button>
                 )}
-                <button type="button" className="self-start text-tiny text-default-500 hover:text-foreground flex items-center gap-1.5"
-                  onClick={() => { flush(); navigate(`/run/${outputId}`); }}>
-                  <FontAwesomeIcon icon={faArrowUpRightFromSquare} className="text-[10px]" />
-                  {L("進階修改（換圖、換人重寫、排程）", "Advanced edit (images, writers, scheduling)")}
-                </button>
+                {editable ? (
+                  <>
+                    <button type="button" aria-expanded={advanced}
+                      className="self-start text-tiny text-default-500 hover:text-foreground flex items-center gap-1.5"
+                      onClick={() => setAdvanced((v) => !v)}>
+                      <FontAwesomeIcon icon={advanced ? faChevronUp : faChevronDown} className="text-[10px]" />
+                      {L("進階修改（換人重寫、換圖）", "Advanced edit (writers, images)")}
+                    </button>
+                    {advanced && (
+                      <CampaignPostAdvanced
+                        en={en} outputId={outputId} variant={variant} caption={caption}
+                        locator={getRunContentMutationLocator(resolved.kind, idx)}
+                        brandId={Number(data?.brand?.id ?? brandId ?? 0)}
+                        scope={{ brandId: brandId ?? data?.mission?.brandId ?? undefined, eventId, taskId: String(data?.mission?.taskId ?? item.taskId) || undefined }}
+                        lead={leadWriter}
+                        imgBusy={!!imgStep}
+                        imgArgs={{ ...(imgChannel ? { channel: imgChannel } : {}), ...(imgSize ? { size: imgSize } : {}) }}
+                        flushTyping={flushTyping} applyCaption={applyCaption} makeImage={makeImage}
+                        onOpenFull={() => { flush(); navigate(`/run/${outputId}`); }}
+                      />
+                    )}
+                  </>
+                ) : cards && (state === "draft" || state === "revision") && (
+                  <button type="button" className="self-start text-tiny text-default-500 hover:text-foreground underline"
+                    onClick={() => navigate(`/run/${outputId}`)}>
+                    {L("到完整編輯頁改這幾張卡片", "Edit these cards in the full editor")}
+                  </button>
+                )}
               </div>
             </div>
           )}
