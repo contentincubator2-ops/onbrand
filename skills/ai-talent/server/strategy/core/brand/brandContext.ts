@@ -12,6 +12,7 @@ import { sql } from "drizzle-orm";
 import { getDb } from "../../../db";
 import { buildMarketContext } from "./marketProfiles";
 import { loadEventProducts, productScopeBrief, resolveProductScope, type ScopedProduct } from "../entities/eventProductScope";
+import { readEventIntake } from "../entities/eventIntake";
 import { loadActiveRegulations, regulationLine, REG_DIGEST_MAX, REGULATION_BLOCK_HEADER } from "./brandRegulations";
 import { normalizeRoleChannel, channelRolesOf, channelRoleBody, CHANNEL_LABEL_ZH, CHANNEL_ROLE_PROMPT_MAX } from "./channelRoles";
 
@@ -123,7 +124,8 @@ const DISPLAY: Record<string, Display> = {
   "event|活動定位摘要":          { category: "event", group: "戰略 Brief", label: "活動定位摘要" },
   "event|活動類型":              { category: "event", group: "戰略 Brief", label: "活動類型" },
   "event|核心問題":              { category: "event", group: "背景與問題", label: "核心問題" },
-  "event|活動核心受眾":          { category: "event", group: "目標受眾", label: "核心受眾" },
+  "event|活動指定受眾":          { category: "event", group: "目標受眾", label: "新增活動時指定的受眾" },
+  "event|活動核心受眾":         { category: "event", group: "目標受眾", label: "核心受眾" },
   "event|關鍵洞察":              { category: "event", group: "目標受眾", label: "關鍵洞察" },
   "event|行銷目標":              { category: "event", group: "活動目標", label: "行銷目標" },
   "event|SMP 單一主張":          { category: "event", group: "單一核心命題（SMP）", label: "SMP" },
@@ -866,6 +868,9 @@ export async function buildBrandBrain(
           const ep = e.positioning ? (typeof e.positioning === "string" ? safeParse(e.positioning) : e.positioning) : null;
           const productScope = resolveProductScope((ep as any)?.campaign?.productScope, eventProducts.length);
           if (productScope) c.add("event", "event", "活動搭配", productScopeBrief(productScope, eventProducts), 900);
+          // 2026-10-08：新增活動時使用者指定的受眾。活動定位還沒跑完（或沒跑）時，寫的人也要知道對誰說。
+          const intakeAudience = readEventIntake(ep).audience;
+          if (intakeAudience) c.add("event", "event", "活動指定受眾", intakeAudience, 300);
           // 2026-09-30（活動頁定稿交接）：策略層排好的一句話訴求與每一段的訊息，內容層寫每一篇
           // 時都要讀得到——不然交接單只存在畫面上，寫的人（模型）根本沒看過。
           const cp = (ep as any)?.campaignPlan;

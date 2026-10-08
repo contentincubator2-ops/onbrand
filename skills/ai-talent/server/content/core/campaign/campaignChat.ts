@@ -23,7 +23,7 @@
  *   · 日期超出範圍的改法以前是靜靜丟掉；現在回覆最後會說哪幾天沒排進去、最早能排到哪天。
  */
 import { PAID_CHANNELS } from "./campaignKpi.js";
-import { candidateCards, eventFacts, safeJSON, PLANNABLE_CHANNELS, PARTNER_CHANNELS, CAMPAIGN_PHASE_IDS, type CampaignPlan, type CampaignPhaseId, type PlanItem } from "./campaignPlan.js";
+import { campaignCards, eventFacts, safeJSON, PLANNABLE_CHANNELS, PARTNER_CHANNELS, CAMPAIGN_PHASE_IDS, type CampaignPlan, type CampaignPhaseId, type PlanItem } from "./campaignPlan.js";
 import type { CatalogTask } from "../catalog/taskCatalogIndex.js";
 import { brandIndustry, type TeamAgent } from "./campaignTeam.js";
 import { buildCampaignRoster, isCampaignRole, ROLES, type CampaignRole, type RosterMember } from "./campaignRoster.js";
@@ -122,12 +122,17 @@ const daysBetween = (a: string, b: string) => Math.round((new Date(b).getTime() 
 export const CHAT_LEAD_DAYS = 60;
 export const CHAT_TAIL_DAYS = 7;
 
-/** 對話裡可以排的日期範圍：活動開始前 60 天（不早於今天）～結束後 7 天。純函式。 */
+/**
+ * 對話裡可以排的日期範圍：活動開始前 60 天（不早於今天）～結束後 7 天。純函式。
+ * 活動的開始日已經過了（使用者把檔期往前挪到今天以前），就從開始日起算——不然還沒寫的篇
+ * 全被擠在今天，地圖的時間軸也不會跟著往前。
+ */
 export function chatWindow(startAt: string | null, endAt: string | null, today: string): { from: string; to: string } {
   const start = startAt ?? today;
   const end = endAt ?? addDays(start, 30);
   const lead = addDays(start, -CHAT_LEAD_DAYS);
-  return { from: lead > today ? lead : today, to: addDays(end, CHAT_TAIL_DAYS) };
+  const floor = start < today ? start : today;
+  return { from: lead > floor ? lead : floor, to: addDays(end, CHAT_TAIL_DAYS) };
 }
 
 /**
@@ -538,7 +543,7 @@ const SYSTEM = `你是這檔活動的內容企劃。策略（一句話訴求、�
 鐵則：
 - 只能用操作改企劃：add（加一篇）、update（改一篇）、remove（刪一篇）。不要重寫整份。
 - taskId 必須逐字抄自候選任務卡清單，而且要是那個通路的卡。
-- 日期格式 YYYY-MM-DD，而且要在允許的日期範圍內（活動開始前 ${CHAT_LEAD_DAYS} 天～結束後 ${CHAT_TAIL_DAYS} 天，不早於今天）。使用者要的日期超出範圍時，不要默默換成別天：reply 說最早能排到哪一天，並問要不要把活動日期往前挪。
+- 日期格式 YYYY-MM-DD，而且要在允許的日期範圍內（活動開始前 ${CHAT_LEAD_DAYS} 天～結束後 ${CHAT_TAIL_DAYS} 天，不早於今天；活動已經開始的話從開始日起）。實際範圍以下面【允許的日期範圍】為準。使用者要的日期超出範圍時，不要默默換成別天：reply 說最早能排到哪一天，並問要不要把活動日期往前挪。
 - 使用者要整檔活動提早、延後、拉長或縮短（改的是活動的開始／結束日，不是某一篇）：填 dates，startAt 與 endAt 都要給；使用者沒說要動的那一頭照原本的。還沒寫的篇會自動跟著新日期挪，不用一篇一篇 update；允許的日期範圍也跟著新日期算。結束日不能早於今天。只是某幾篇要提早，就 update 那幾篇的 date，不要動活動日期。
 - 標了（已寫）的那幾篇不能改、不能刪。
 - 不准編使用者沒給的數字、成效、顧客見證、名額限制或網址。
@@ -656,6 +661,8 @@ export async function runCampaignChat(args: {
    * 企劃本身（切角、訴求、各段訊息、策略依據）照品牌原本的語言，不跟著介面換。
    */
   lang?: "zh" | "en";
+  /** 使用者貼的連結、上傳的檔案讀出來的那一段（campaignChatSources.formatSourcesForPrompt，已排版）。 */
+  sources?: string;
 }): Promise<{ reply: string; proposal: CampaignProposal; askDirector: string | null; handoff: { to: CampaignSpeaker; question: string } | null; truncated: boolean; agent: TeamAgent | null; speaker: CampaignSpeaker }> {
   const facts = await eventFacts(args.eventId, args.userId);
   if (!facts) throw new Error("找不到這個活動");
@@ -677,7 +684,7 @@ export async function runCampaignChat(args: {
     today: ymd(new Date()),
   };
   const window = chatWindow(event.startAt, event.endAt, event.today);
-  const cards = candidateCards([...PLANNABLE_CHANNELS]);
+  const cards = campaignCards([...PLANNABLE_CHANNELS]);
   // 候選卡清單很長（每通路 30 張），只有會加篇換卡的內容企劃需要——其他人少讀一大段，回得快。
   // 這段討論裡使用者親口說的話：只有他點名的通路才會在活動選的通路之外放行（轉手的指示不算）。
   const userSaid = [
@@ -748,6 +755,7 @@ export async function runCampaignChat(args: {
     can.basis ? `【策略依據（路徑｜欄位｜目前寫的）】\n${basisLines(args.positioning ?? {})}` : "",
     thread ? `【你之前在右下角跟使用者談過（最近幾則）】\n${thread}` : "",
     args.earlier?.length ? `【之前幾段討論的結論（已經做完的事，不用重做）】\n${args.earlier.map((e) => `- ${e.slice(0, 300)}`).join("\n")}` : "",
+    args.sources || "",
     history ? `【這段討論前面說過的】\n${history}` : "",
     args.handoff && from ? `【${label(from)}轉給你的問題】${args.message.trim()}` : `【使用者現在說】${args.message.trim()}`,
     args.lang === "en"

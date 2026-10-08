@@ -45,14 +45,16 @@ import { runCampaignChat, pickCampaignDirector, chatWindow, draftManualItem } fr
 import { retuneItemAngle } from "../core/campaign/campaignRetune";
 import { validateBasis, applyBasis, basisSnapshot } from "../core/campaign/campaignBasis";
 import { cleanKolBrief } from "../core/campaign/campaignKolBrief";
-import { laneItems, candidateCards, planBeats, KOL_CHANNEL, COBRAND_CHANNEL, PLANNABLE_CHANNELS } from "../core/campaign/campaignPlan";
+import { laneItems, campaignCards, toSingleCardItems, planBeats, KOL_CHANNEL, COBRAND_CHANNEL, PLANNABLE_CHANNELS } from "../core/campaign/campaignPlan";
 import { BRIEF_CHANNELS, CHANNEL_BRIEF_SPECS, cleanChannelBrief, cleanChannelBriefs, briefPartners, type BriefChannel } from "../core/campaign/campaignChannelBrief";
 import { KPI_METRICS, pickKpiAgent, runKpiPlan } from "../core/campaign/campaignKpi";
 import { brandIndustry, pickPlannerAgent } from "../core/campaign/campaignTeam";
 import { buildCampaignRoster, CAMPAIGN_ROLES, ROLES } from "../core/campaign/campaignRoster";
 import { appendChat, closeThread, listChat, listThreads, markUndone, recentSummaries, reopenThread } from "../core/campaign/campaignChatStore";
+import { addSource, formatSourcesForPrompt, listSources, loadSourceDocs, readLinks, readLinksInMessage, removeSource, MAX_STORED_CHARS, type LinkRead } from "../core/campaign/campaignChatSources";
 import { isHiddenContentPlatform, isHiddenHistoryItem } from "../../platform/core/billing/planGate";
 import { ownedProductIds, resolveProductScope } from "../../strategy/core/entities/eventProductScope";
+import { readEventIntake, cleanLinks, INTAKE_LINKS_MAX } from "../../strategy/core/entities/eventIntake";
 import { invalidateBrandPrefix } from "../../strategy/core/brand/brandContext";
 import { campaignPostState, canMarkPublished, type CampaignPostState } from "../core/campaign/campaignPostStatus";
 import { cleanSavedSections, draftCampaignProposal, loadWrittenPosts, planMark, type CampaignProposal } from "../core/campaign/campaignProposal";
@@ -183,7 +185,7 @@ async function productIdsOf(eventId: number): Promise<number[]> {
 const isHiddenPlanItem = (i: any) => isHiddenHistoryItem({ platform: i?.platform, taskId: i?.taskId });
 function visiblePlan(plan: CampaignPlan | null): CampaignPlan | null {
   if (!plan || !Array.isArray(plan.items)) return plan;
-  return { ...plan, items: plan.items.filter((i) => !isHiddenPlanItem(i)) };
+  return { ...plan, items: toSingleCardItems(plan.items.filter((i) => !isHiddenPlanItem(i))) };
 }
 function visibleSettings(settings: any): any {
   if (!settings || !Array.isArray(settings.channels)) return settings ?? null;
@@ -206,7 +208,7 @@ function replanLane(pos: any, row: any, channel: string, who: Pick<Parameters<ty
   const written = plan.items.filter((i) => i.platform === channel && i.outputId);
   const fresh = laneItems(channel, {
     launch, end: end ?? launch, today, mechanic: String(pos.campaign?.mechanic ?? ""),
-    cards: candidateCards([channel]), ...who,
+    cards: campaignCards([channel]), ...who,
   }).filter((n) => !written.some((w) => w.taskId === n.taskId && (w.partner ?? "") === (n.partner ?? "")));
   plan.items = [...plan.items.filter((i) => i.platform !== channel || i.outputId), ...fresh]
     .sort((a, b) => a.date.localeCompare(b.date));
@@ -240,6 +242,8 @@ export const campaignRouter = router({
           endAt: row.endAt ? new Date(row.endAt).toISOString().slice(0, 10) : null,
           /** 新增活動視窗裡寫的「活動主題／重點」——排企劃的那段話先帶這個，不請使用者重寫一次。 */
           note: typeof pos?.note === "string" ? pos.note.trim().slice(0, 800) : "",
+          /** 新增活動時指定的目標受眾（eventIntake.ts）。 */
+          targetAudience: readEventIntake(pos).audience,
         },
         settings: visibleSettings(pos.campaign),
         plan: visiblePlan((pos.campaignPlan ?? null) as CampaignPlan | null),
@@ -370,14 +374,14 @@ export const campaignRouter = router({
 
   /**
    * 手動加一篇的選單（2026-10-05 CJ「在某通路欄位底下，自己在該日期按+」）：日期範圍跟
-   * 對話加篇同一條（chatWindow），任務卡是那個通路整篇可以發的卡（candidateCards）。
+   * 對話加篇同一條（chatWindow），任務卡是那個通路整篇可以發的卡（campaignCards）。
    */
   addOptions: protectedProcedure
     .input(z.object({ eventId: z.number().int().positive() }))
     .query(async ({ ctx, input }) => {
       const row = await loadEvent(input.eventId, ctx.user!.id);
       const cards: Record<string, Array<{ id: string; labelZh: string; labelEn: string; tier: string }>> = {};
-      for (const c of candidateCards([...PLANNABLE_CHANNELS])) {
+      for (const c of campaignCards([...PLANNABLE_CHANNELS])) {
         (cards[c.platform] ??= []).push({ id: c.id, labelZh: c.labelZh || c.labelEn || c.id, labelEn: c.labelEn || c.labelZh || c.id, tier: c.tier });
       }
       return {
@@ -402,7 +406,7 @@ export const campaignRouter = router({
       assertUnlocked(pos);
       if (!pos.campaignPlan) throw new TRPCError({ code: "BAD_REQUEST", message: "還沒有企劃，先排出企劃再加" });
       const window = eventWindow(row);
-      const r = draftManualItem({ input, cards: candidateCards([input.platform]), window });
+      const r = draftManualItem({ input, cards: campaignCards([input.platform]), window });
       if (!r.ok) {
         const why: Record<typeof r.reason, string> = {
           phase: "找不到這一段",
@@ -516,8 +520,14 @@ export const campaignRouter = router({
       assertUnlocked(pos);
       const plan = visiblePlan((pos.campaignPlan ?? null) as CampaignPlan | null);
       if (!plan?.items?.length) throw new TRPCError({ code: "BAD_REQUEST", message: "還沒有企劃，先排出企劃再來討論" });
+      // 2026-10-05：使用者這句話裡的連結先去讀（另一位轉過來的話不是使用者打的，不讀）；
+      // 讀到的跟之前上傳的檔案一起給模型，讀不到的也照實告訴它（見 core/campaignChatSources.ts）。
+      const none: { read: LinkRead[]; failed: string[] } = { read: [], failed: [] };
+      const links = input.handoff ? none : await readLinksInMessage(input.eventId, ctx.user!.id, input.message).catch(() => none);
+      const sources = formatSourcesForPrompt(await loadSourceDocs(input.eventId, ctx.user!.id).catch(() => []), links.failed);
       try {
-        return await runCampaignChat({
+        const out = await runCampaignChat({
+          sources,
           eventId: input.eventId, userId: ctx.user!.id, plan,
           message: input.message, phase: input.phase ?? null, history: input.history,
           speaker: input.speaker ?? "planner", directorAgentId: input.directorAgentId ?? null, handoff: !!input.handoff, from: input.from ?? null, hops: input.hops,
@@ -525,6 +535,7 @@ export const campaignRouter = router({
           lang: input.lang ?? "zh",
           earlier: await recentSummaries(input.eventId, ctx.user!.id, input.threadId ?? null).catch(() => []),
         });
+        return { ...out, links };
       } catch (e: any) {
         throw new TRPCError({ code: "BAD_REQUEST", message: String(e?.message ?? e).slice(0, 300) });
       }
@@ -547,6 +558,59 @@ export const campaignRouter = router({
     .query(async ({ ctx, input }) => {
       await loadEvent(input.eventId, ctx.user!.id);
       return { messages: await listChat(input.eventId, ctx.user!.id, input.threadId) };
+    }),
+
+  /**
+   * 這檔活動的對話讀得到的參考資料（2026-10-05，見 core/campaignChatSources.ts）。
+   * 連結由 chat 自己讀；檔案由畫面先抽成文字（/api/positioning-doc/extract-text）再存進來。
+   */
+  chatSources: protectedProcedure
+    .input(z.object({ eventId: z.number().int().positive() }))
+    .query(async ({ ctx, input }) => {
+      await loadEvent(input.eventId, ctx.user!.id);
+      return { sources: await listSources(input.eventId, ctx.user!.id) };
+    }),
+
+  chatAddSource: protectedProcedure
+    .input(z.object({
+      eventId: z.number().int().positive(),
+      name: z.string().min(1).max(200),
+      text: z.string().min(1).max(MAX_STORED_CHARS),
+      /** 原檔的總字數（比 text 長＝只讀進前面一段，畫面會說）。 */
+      chars: z.number().int().min(0).max(50_000_000).optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await loadEvent(input.eventId, ctx.user!.id);
+      try {
+        return await addSource(input.eventId, ctx.user!.id, { kind: "file", name: input.name, text: input.text, chars: input.chars });
+      } catch (e: any) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: String(e?.message ?? e).slice(0, 300) });
+      }
+    }),
+
+  /**
+   * 新增活動視窗裡填的活動連結（2026-10-08 CJ「新建活動時，要增加可以提供連結的功能」）：伺服器去讀，
+   * 讀到的存成這檔活動的參考資料，跟上傳的檔案同一張表——排企劃、活動定位、之後的對話都讀得到。
+   * 讀不到的回在 failed，畫面要講。
+   */
+  chatAddLinks: protectedProcedure
+    .input(z.object({
+      eventId: z.number().int().positive(),
+      urls: z.array(z.string().max(1000)).min(1).max(20),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await loadEvent(input.eventId, ctx.user!.id);
+      const urls = cleanLinks(input.urls, INTAKE_LINKS_MAX);
+      if (!urls.length) return { read: [] as LinkRead[], failed: [] as string[] };
+      return readLinks(input.eventId, ctx.user!.id, urls);
+    }),
+
+  chatRemoveSource: protectedProcedure
+    .input(z.object({ eventId: z.number().int().positive(), id: z.number().int().positive() }))
+    .mutation(async ({ ctx, input }) => {
+      await loadEvent(input.eventId, ctx.user!.id);
+      await removeSource(input.eventId, ctx.user!.id, input.id);
+      return { ok: true };
     }),
 
   chatAppend: protectedProcedure

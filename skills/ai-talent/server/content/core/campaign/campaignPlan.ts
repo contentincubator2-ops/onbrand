@@ -28,6 +28,7 @@ import { buildTaskCatalogIndex, type CatalogTask } from "../catalog/taskCatalogI
 import { influencerLabel, cleanKolBrief, type KolInfluencer, type KolBrief } from "./campaignKolBrief.js";
 import { cleanChannelBriefs, channelBriefText, briefPartners, isBriefChannel, type BriefChannel, type ChannelBrief } from "./campaignChannelBrief.js";
 import { isHiddenContentPlatform } from "../../../platform/core/billing/planGate.js";
+import { readEventIntake, type EventIntake } from "../../../strategy/core/entities/eventIntake.js";
 import {
   loadEventProducts, productScopeBrief, resolveProductScope,
   type ProductScope, type ScopedProduct,
@@ -204,11 +205,40 @@ export function candidateCards(channels: string[]): CatalogTask[] {
   );
 }
 
+/**
+ * 活動企劃用的卡：只有單篇。
+ *
+ * 2026-10-08（CJ「活動企劃當中的任務卡，都只要是單篇貼文的，不需要四篇貼文的活動
+ * 組合。因為，我們都設定好是哪一天要發甚麼文章了」）：活動企劃的每一格已經是
+ * 「這一天發這一篇」，再排一張「活動上線包（4 篇）」「5 天倒數系列」進去，等於在
+ * 一格裡面又塞了一份時間表。本週企劃／靈感舞台仍走 candidateCards，不受影響。
+ */
+export function campaignCards(channels: string[]): CatalogTask[] {
+  return candidateCards(channels).filter((c) => c.tier === "30s");
+}
+
 /** 驗證失敗時的確定性修補：這個通路的第一張 30s 卡。 */
 function defaultCardFor(platform: string, cards: CatalogTask[]): CatalogTask | null {
   return cards.find((c) => c.platform === platform && c.tier === "30s")
     ?? cards.find((c) => c.platform === platform)
     ?? null;
+}
+
+/**
+ * 舊企劃裡還沒寫的格子若排的是套組／企劃級的卡，換成那個通路的單篇預設卡。
+ * 已經寫好的（有 outputId）不動——那篇產出是照原本的卡寫的。不在目錄裡的卡
+ * （品牌自建卡、任務包）也不動，這裡只認得出目錄卡的層級。
+ */
+export function toSingleCardItems(items: PlanItem[], catalog: CatalogTask[] = buildTaskCatalogIndex()): PlanItem[] {
+  const tierOf = new Map(catalog.map((c) => [c.id, c.tier]));
+  const singles = catalog.filter((c) => c.tier === "30s" && !isPartCard(c.id));
+  return items.map((i) => {
+    const tier = tierOf.get(i.taskId);
+    if (i.outputId || !tier || tier === "30s") return i;
+    const card = defaultCardFor(i.platform, singles);
+    if (!card) return i;
+    return { ...i, taskId: card.id, taskLabel: card.labelZh || card.labelEn || card.id, repaired: true };
+  });
 }
 
 /**
@@ -333,6 +363,8 @@ export async function eventFacts(eventId: number, userId: number): Promise<{
   kolBrief: KolBrief;
   /** 其他通路的任務說明單（campaignChannelBrief.ts）。 */
   channelBriefs: Partial<Record<BriefChannel, ChannelBrief>>;
+  /** 新增活動時使用者指定的目標受眾（eventIntake.ts）。 */
+  intake: EventIntake;
 } | null> {
   const [rows]: any = await localPool.execute(
     `SELECT e.id, e.name, e.brandId, e.startAt, e.endAt, e.positioning, b.name AS brandName
@@ -356,7 +388,18 @@ export async function eventFacts(eventId: number, userId: number): Promise<{
     settings, products,
     kolBrief: cleanKolBrief(pos?.kolBrief),
     channelBriefs: cleanChannelBriefs(pos?.channelBriefs),
+    intake: readEventIntake(pos),
   };
+}
+
+/** 使用者指定的受眾 → prompt 的一行。沒寫回空字串。 */
+const audienceLine = (intake: EventIntake) =>
+  intake.audience ? `【這檔活動的目標受眾（使用者指定，照這群人排，不要換成別的客群）】${intake.audience}` : "";
+
+/** 這檔活動的參考資料（新增活動時給的連結與檔案、對話裡貼的）→ prompt 的那一段。讀不到回空字串。 */
+async function eventSourceBlock(eventId: number, userId: number): Promise<string> {
+  const { loadSourceDocs, formatSourcesForPrompt } = await import("./campaignChatSources.js");
+  return formatSourcesForPrompt(await loadSourceDocs(eventId, userId).catch(() => []));
 }
 
 /** 可以排進企劃的通路——推斷結果只能落在這裡面。 */
@@ -511,7 +554,8 @@ const INFER_SYSTEM = `你在幫行銷人員把一段隨手寫的活動說明，�
 
 鐵則：
 - **只整理，不發明**。使用者沒寫的優惠內容、折數、期限，一個字都不要加。
-- mechanic 要盡量逐字保留使用者寫的機制（折數、門檻、期限、限量）；他沒寫就留空字串。
+- mechanic 要盡量逐字保留使用者寫的機制（折數、門檻、期限、限量）；他沒寫、但【參考資料】
+  （他給的連結、上傳的檔案）裡有寫，就照參考資料整理；兩邊都沒有就留空字串。
 - channels 只能從提供的清單裡挑，挑 2–3 個最合理的。
 - productIds 只能從提供的產品清單裡挑，挑使用者明確提到或明顯對應的；不確定就回空陣列。
   活動講的是整個品牌、或沒有指向任何一個產品時，也回空陣列（代表純品牌活動）。
@@ -554,6 +598,8 @@ export async function inferCampaignSettings(args: {
     `【活動名稱】${facts.name}`,
     facts.startAt ? `【期間】${facts.startAt.toISOString().slice(0, 10)} ~ ${facts.endAt ? facts.endAt.toISOString().slice(0, 10) : "?"}` : "",
     `【使用者寫的活動說明】\n${args.brief.trim() || "（沒有寫）"}`,
+    audienceLine(facts.intake),
+    await eventSourceBlock(args.eventId, args.userId),
     `【可選的活動類型】\n${typeList}`,
     `【可選的通路】\n${PLANNABLE_CHANNELS.map((c) => `- ${c}${c === KOL_CHANNEL ? "（網紅合作：使用者提到網紅、KOL、創作者、團購主合作才選）" : c === COBRAND_CHANNEL ? "（異業合作：使用者提到聯名、異業、跨品牌、合作夥伴才選）" : ""}`).join("\n")}`,
     `【這個品牌的產品】\n${productList}`,
@@ -633,8 +679,8 @@ export async function buildCampaignPlan(args: {
   // 合作類的線（網紅、異業合作）是固定的幾件事（laneItems），不佔模型的檔期格子；模型只排貼文通路。
   const partnerLanes = s.channels.filter((c) => PARTNER_CHANNELS.includes(c));
   const postChannels = s.channels.filter((c) => !PARTNER_CHANNELS.includes(c));
-  const partnerCards = partnerLanes.length ? candidateCards(partnerLanes) : [];
-  const cards = candidateCards(postChannels);
+  const partnerCards = partnerLanes.length ? campaignCards(partnerLanes) : [];
+  const cards = campaignCards(postChannels);
   if (cards.length === 0 && partnerCards.length === 0) throw new Error("你選的通路目前沒有可用的任務卡，換一個通路再試");
   const today = ymd(args.today ?? new Date());
   const launchDate = beats.find((b) => b.phase === "launch")?.date ?? (facts.startAt ? ymd(facts.startAt) : today);
@@ -664,6 +710,10 @@ export async function buildCampaignPlan(args: {
   const scope = resolveProductScope(s.productScope, facts.products.length);
   const productBlock = productScopeBrief(scope, facts.products);
 
+  // 2026-10-08（CJ「新建活動時…可上傳過往資料參考」）：這檔活動的參考資料（新增活動時上傳的
+  // 過往資料、對話裡貼的連結與檔案）排企劃時也要讀，不是只有對話讀得到。讀不到不擋排企劃。
+  const sourceBlock = await eventSourceBlock(args.eventId, args.userId);
+
   const user = [
     `【品牌】${facts.brandName}`,
     `【活動】${facts.name}`,
@@ -673,10 +723,12 @@ export async function buildCampaignPlan(args: {
     s.venue ? `【地點】${s.venue}` : "",
     s.sessions ? `【場次】${s.sessions}` : "",
     s.signupUrl ? `【報名連結】${s.signupUrl}` : "",
+    audienceLine(facts.intake),
     `【活動搭配】\n${productBlock}`,
     `【要排的檔期格子】\n${beatList}`,
     `【候選任務卡（只能從這裡挑）】\n${cardMenu}`,
     channelBriefBlock ? `【各通路任務說明單（使用者填的；有清單的通路，angle 要對準清單裡的某一列，盡量每一列都排到）】\n${channelBriefBlock}` : "",
+    sourceBlock,
     "",
     "請為每一格挑一張卡並寫出這一篇要講什麼，再為每一個階段寫一句這段要讓人記住的訊息。只輸出 JSON，鍵名固定如下：",
     `{"smp":"這檔活動的一句話訴求（25字內）","phases":[{"phase":"階段 id","message":"這一段要讓人記住的一句話（20字內）"}],"items":[{"beat":0,"platform":"facebook","taskId":"逐字抄自候選清單","angle":"這一篇要講什麼（20-45字）"}]}`,

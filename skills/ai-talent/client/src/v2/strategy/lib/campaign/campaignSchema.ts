@@ -194,3 +194,5 @@ export interface CampaignPlan {
   settingsHash?: string;
 }
 
+/** 活動可以選的通路（新增活動視窗與調整設定用同一份；順序＝畫面上的順序）。 */
+export const CAMPAIGN_CHANNELS = ["facebook", "instagram", "threads", "line", "tiktok", "email", "website", "kol", "cobrand"] as const;

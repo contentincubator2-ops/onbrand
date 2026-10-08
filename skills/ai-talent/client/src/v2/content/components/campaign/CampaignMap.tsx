@@ -45,14 +45,14 @@ import React from "react";
 import { useNavigate } from "react-router-dom";
 import { Button, Chip, Input } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faArrowLeft, faEllipsis, faPen, faPenNib, faPlus, faTrashCan } from "@fortawesome/free-solid-svg-icons";
+import { faArrowLeft, faClock, faEllipsis, faPen, faPenNib, faPlus, faTrashCan } from "@fortawesome/free-solid-svg-icons";
 import { CHANNEL_META, channelLabel } from "../../../platform/lib/channelMeta";
 import { phaseOf, type CampaignPhaseId, type CampaignPlanItem } from "../../../strategy/lib/campaign/campaignSchema";
 import { phaseShort, phaseLabel, phaseLabelLong, addDateRange, dateInPhase, type PhaseNames, type StagePhase } from "../../../strategy/lib/campaign/campaignStage";
 import { money, metricLine, PAID_CHANNELS, type PhaseKpi } from "../../../strategy/lib/campaign/campaignKpi";
 import { TaskIllustration } from "../../../platform/components/TaskIllustration";
 import { tierLabel } from "../../../platform/lib/tierVocabulary";
-import { isPostDone, postStateBorder, postStateChip, postStateLabel, postStateOf } from "../../../strategy/lib/campaign/campaignPostStatus";
+import { POST_STATES, isPostDone, postStateBorder, postStateChip, postStateDot, postStateLabel, postStateOf } from "../../../strategy/lib/campaign/campaignPostStatus";
 
 /** 寫好的那一篇的縮圖＋走到哪一關（campaign.itemThumbs）。 */
 export interface ItemThumb {
@@ -368,7 +368,12 @@ export default function CampaignMap({
                 onPointerUp={() => dragEnd(it)} onPointerCancel={() => { dragRef.current = null; setDrag(null); }}
                 onKeyDown={(e) => pinKey(it, e)}
                 onClick={() => { if (justDragged.current) return; setHover(null); onPick(it.phase); }}>
-                <span className={`block w-3.5 h-3.5 border-[3px] transition-transform ${hover === it.id ? "scale-150" : ""} ${it.paid ? "rounded-[3px]" : "rounded-full"} ${it.outputId ? (isPostDone(postStateOf(it.outputId, thumbs[it.id]?.state)) ? "bg-success border-success" : "bg-content1 border-success") : it.paid ? "bg-foreground border-foreground" : "bg-content1 border-foreground"} ${past && hover !== it.id ? "opacity-35" : ""}`} />
+                {/* 點的顏色＝這一篇走到哪一關（postStateDot，下方圖例對照）；右上小時鐘＝已排進行事曆。 */}
+                <span className={`relative block w-3.5 h-3.5 border-[3px] transition-transform ${hover === it.id ? "scale-150" : ""} ${it.paid ? "rounded-[3px]" : "rounded-full"} ${!it.outputId && it.paid ? "bg-foreground border-foreground" : postStateDot(postStateOf(it.outputId, thumbs[it.id]?.state))} ${past && hover !== it.id ? "opacity-35" : ""}`}>
+                  {thumbs[it.id]?.schedule && postStateOf(it.outputId, thumbs[it.id]?.state) !== "published" && (
+                    <FontAwesomeIcon icon={faClock} className="absolute -right-2 -top-2 text-[9px] text-foreground bg-content1 rounded-full" />
+                  )}
+                </span>
               </button>
               {dragging ? (
                 <span className="absolute -translate-x-1/2 text-[10.5px] tabular-nums bg-foreground text-background rounded px-1.5 py-0.5 whitespace-nowrap z-[3] pointer-events-none"
@@ -416,7 +421,8 @@ export default function CampaignMap({
             </React.Fragment>
           );
         })}
-        <div className="absolute left-4 bottom-4 bg-content1 rounded-2xl shadow-small px-4 py-2.5 flex items-center gap-6">
+        <div className="absolute left-4 right-4 bottom-4 flex items-end justify-between gap-3 flex-wrap pointer-events-none">
+        <div className="bg-content1 rounded-2xl shadow-small px-4 py-2.5 flex items-center gap-6 pointer-events-auto">
           {[
             [String(live.length), L("篇", "posts")],
             [String(new Set(live.map((i) => i.platform)).size), L("個通路", "channels")],
@@ -428,6 +434,32 @@ export default function CampaignMap({
           ].map(([v, k]) => (
             <div key={k}><b className="block text-medium font-black leading-tight tabular-nums">{v}</b><span className="text-[11px] text-default-500">{k}</span></div>
           ))}
+        </div>
+        {/* 圖例＋篇數：每一關幾篇、幾篇已排程。拖曳時讓位給垃圾桶。 */}
+        {!drag && live.length > 0 && (
+          <ul className="bg-content1 rounded-2xl shadow-small px-4 py-2.5 flex items-center gap-x-4 gap-y-1.5 flex-wrap text-[11.5px] pointer-events-auto" aria-label={L("每一關幾篇", "Posts by status")}>
+            {POST_STATES.map((s) => {
+              const n = live.filter((i) => postStateOf(i.outputId, thumbs[i.id]?.state) === s).length;
+              return (
+                <li key={s} className={`flex items-center gap-1.5 whitespace-nowrap ${n ? "" : "text-default-400"}`}>
+                  <span className={`block w-3 h-3 rounded-full border-[3px] ${postStateDot(s)} ${n ? "" : "opacity-50"}`} aria-hidden />
+                  {postStateLabel(s, en)}
+                  <b className="font-semibold tabular-nums">{n}</b>
+                </li>
+              );
+            })}
+            {(() => {
+              const n = live.filter((i) => thumbs[i.id]?.schedule && postStateOf(i.outputId, thumbs[i.id]?.state) !== "published").length;
+              return (
+                <li className={`flex items-center gap-1.5 whitespace-nowrap border-l border-default-200 pl-4 ${n ? "" : "text-default-400"}`}>
+                  <FontAwesomeIcon icon={faClock} className="text-[11px]" aria-hidden />
+                  {L("已排程", "Scheduled")}
+                  <b className="font-semibold tabular-nums">{n}</b>
+                </li>
+              );
+            })()}
+          </ul>
+        )}
         </div>
         {/* 拖曳中才出現的垃圾桶（寫好的那一篇不能刪，所以拖它的時候不出現）。 */}
         {drag && onRemoveItem && !items.find((i) => i.id === drag.id)?.outputId && (
