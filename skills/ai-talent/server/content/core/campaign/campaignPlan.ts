@@ -104,6 +104,8 @@ export interface CampaignPlan {
    * 的訊息，放大到某一段時是那一段的主軸）。舊企劃沒有這個欄位，畫面就不顯示。
    */
   phaseMessages?: Partial<Record<CampaignPhaseId, string>>;
+  /** 使用者替階段取的名稱（2026-10-08）；沒取的那一段用預設的「預熱／開賣…」。 */
+  phaseNames?: Partial<Record<CampaignPhaseId, string>>;
   kol?: PartnerBlock | null;
   cobrand?: PartnerBlock | null;
   generatedAt: string;

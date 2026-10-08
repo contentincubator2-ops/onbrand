@@ -9,7 +9,7 @@ import { campaignRouter } from "./campaignRouter";
 describe("campaignRouter", () => {
   it("router 建得起來，procedure 名稱如預期", () => {
     const names = Object.keys((campaignRouter as any)._def.procedures).sort();
-    expect(names).toEqual(["addOptions", "briefSpecs", "chat", "chatAddLinks", "chatAddSource", "chatAppend", "chatCloseThread", "chatHistory", "chatRemoveSource", "chatReopenThread", "chatSources", "chatThreads", "chatUndone", "draftItem", "generate", "get", "infer", "itemThumbs", "kpiAgent", "markPublished", "markWritten", "planKpi", "retuneItem", "saveBasis", "saveChannelBrief", "saveKolBrief", "savePlan", "saveSettings", "setDates", "setInPlanner", "setLock", "team", "trayList"]);
+    expect(names).toEqual(["addOptions", "briefSpecs", "chat", "chatAddLinks", "chatAddSource", "chatAppend", "chatCloseThread", "chatHistory", "chatRemoveSource", "chatReopenThread", "chatSources", "chatThreads", "chatUndone", "draftItem", "draftProposal", "generate", "get", "infer", "itemThumbs", "kpiAgent", "markPublished", "markWritten", "planKpi", "proposalPosts", "retuneItem", "saveBasis", "saveChannelBrief", "saveKolBrief", "savePlan", "saveProposal", "saveSettings", "setDates", "setInPlanner", "setLock", "team", "trayList"]);
   });
 
   it("procedure 名稱不可以撞 Function.prototype 上的東西", () => {

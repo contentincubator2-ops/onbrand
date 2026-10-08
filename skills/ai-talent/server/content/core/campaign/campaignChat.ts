@@ -701,7 +701,10 @@ export async function runCampaignChat(args: {
     .map((i) => `- ${i.id}｜${PHASE_ZH[i.phase] ?? i.phase}｜${i.date}｜${i.platform}｜${i.taskLabel}｜${i.angle}${i.outputId ? "（已寫）" : ""}${i.enabled ? "" : "（這篇不做）"}${i.paid ? "（廣告）" : ""}${i.partner ? `（給：${i.partner}）` : ""}`)
     .join("\n");
   const pm = args.plan.phaseMessages ?? {};
-  const pmLines = CAMPAIGN_PHASE_IDS.filter((id) => pm[id]).map((id) => `- ${PHASE_ZH[id]}（${id}）：${pm[id]}`).join("\n");
+  // 使用者替階段取了名字（2026-10-08）：模型要認得他口中的那個名字是哪一段。
+  const pn = args.plan.phaseNames ?? {};
+  const pmLines = CAMPAIGN_PHASE_IDS.filter((id) => pm[id] || pn[id])
+    .map((id) => `- ${PHASE_ZH[id]}（${id}${pn[id] ? `，使用者把這一段叫做「${pn[id]}」` : ""}）：${pm[id] ?? "（還沒寫）"}`).join("\n");
   // 同一串對話好幾個人都在講：標清楚是誰說的，「你」只指這次回答的人。
   // 名字用現在的名冊，不用畫面送來的 h.name——那可能是換人之前的舊名字，模型會照著叫錯人。
   const who = (h: CampaignChatTurn) => {

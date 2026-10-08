@@ -27,6 +27,9 @@
  *   setInPlanner— 內容層決定某一篇要不要排進本週企劃（定稿後也能改，它是排程不是企劃內容）
  *   itemThumbs  — 寫好的那幾篇的縮圖＋走到哪一關（草稿／待審／退回／核准／已發布，core/campaignPostStatus.ts）
  *   markPublished— 某一篇發出去了（核准過才能標），可附貼文連結
+ *   draftProposal— 草擬提案：從改好的企劃回頭寫背景／目標／族群／策略…（core/campaignProposal.ts）
+ *   saveProposal — 使用者逐段改過的提案
+ *   proposalPosts— 提案後半段要附的每一篇全文（不經過模型，直接讀成品）
  *
  * 定稿之後 saveSettings／generate／savePlan 一律拒絕——鎖的是整份，不是只鎖
  * 畫面。markWritten 不受影響：內容層本來就是在定稿之後寫。
@@ -54,6 +57,7 @@ import { ownedProductIds, resolveProductScope } from "../../strategy/core/entiti
 import { readEventIntake, cleanLinks, INTAKE_LINKS_MAX } from "../../strategy/core/entities/eventIntake";
 import { invalidateBrandPrefix } from "../../strategy/core/brand/brandContext";
 import { campaignPostState, canMarkPublished, type CampaignPostState } from "../core/campaign/campaignPostStatus";
+import { cleanSavedSections, draftCampaignProposal, loadWrittenPosts, planMark, type CampaignProposal } from "../core/campaign/campaignProposal";
 
 /** 地圖上一篇寫好的：縮圖＋走到哪一關。 */
 interface ItemThumbRow {
@@ -105,6 +109,8 @@ const planInput = z.object({
   smp: z.string().max(200),
   items: z.array(planItemInput).max(60),
   phaseMessages: z.record(z.enum(PHASE_KEYS), z.string().max(60)).optional(),
+  /** 使用者替階段取的名稱（2026-10-08）。 */
+  phaseNames: z.record(z.enum(PHASE_KEYS), z.string().max(12)).optional(),
   kpi: z.any().nullable().optional(),
   kol: z.any().nullable().optional(),
   cobrand: z.any().nullable().optional(),
@@ -210,6 +216,14 @@ function replanLane(pos: any, row: any, channel: string, who: Pick<Parameters<ty
   return plan;
 }
 
+/** 存著的提案，加上「草擬之後企劃有沒有再改過」。 */
+function proposalOf(pos: Record<string, any>): (CampaignProposal & { stale: boolean }) | null {
+  const p = pos.campaignProposal as CampaignProposal | undefined;
+  if (!p || !Array.isArray(p.sections) || !p.sections.length) return null;
+  const plan = visiblePlan((pos.campaignPlan ?? null) as CampaignPlan | null);
+  return { ...p, stale: !!plan && planMark(plan) !== p.planMark };
+}
+
 export const campaignRouter = router({
   /** 設定 + 企劃 + 活動基本資料。策略層的企劃頁與內容層的 tray 都讀這支。 */
   get: protectedProcedure
@@ -252,6 +266,8 @@ export const campaignRouter = router({
         channelBriefs: cleanChannelBriefs(pos.channelBriefs),
         /** 活動定位（舊的 11 段）裡寫的核心受眾——策略畫面的「對象」。 */
         audience: typeof pos?.audience?.primaryAudience === "string" ? pos.audience.primaryAudience.slice(0, 120) : "",
+        /** 草擬過的提案（core/campaignProposal.ts）。stale＝草擬之後企劃又改過。 */
+        proposal: proposalOf(pos),
       };
     }),
 
@@ -348,6 +364,7 @@ export const campaignRouter = router({
         ...input.plan,
         // 畫面沒有送回來就沿用存著的，不要因為舊畫面少送一個欄位就洗掉。
         phaseMessages: input.plan.phaseMessages ?? stored?.phaseMessages,
+        phaseNames: input.plan.phaseNames ?? stored?.phaseNames,
         kpi: input.plan.kpi !== undefined ? input.plan.kpi : stored?.kpi,
         items: [...incoming, ...hidden],
         lockedAt: null,
@@ -859,6 +876,58 @@ export const campaignRouter = router({
       const lockedAt = input.locked ? new Date().toISOString() : null;
       await patchPositioning(input.eventId, ctx.user!.id, "campaignPlan", { ...plan, lockedAt });
       return { lockedAt };
+    }),
+
+  /**
+   * 草擬提案（2026-10-08，見 core/campaignProposal.ts）：從使用者改好的標語、階段與每一篇，回頭
+   * 寫出背景、目標、族群、策略…。定稿後也可以按——提案是在描述企劃，不會改到企劃。
+   * 失敗不寫入，原本那一份還在。
+   */
+  draftProposal: protectedProcedure
+    .input(z.object({ eventId: z.number().int().positive(), lang: z.enum(["zh", "en"]).optional() }))
+    .mutation(async ({ ctx, input }) => {
+      const row = await loadEvent(input.eventId, ctx.user!.id);
+      const pos = parsePositioning(row.positioning);
+      const plan = visiblePlan((pos.campaignPlan ?? null) as CampaignPlan | null);
+      if (!plan?.items?.some((i) => i.enabled)) throw new TRPCError({ code: "BAD_REQUEST", message: "還沒有企劃，先排出企劃再草擬提案" });
+      let proposal: CampaignProposal;
+      try {
+        proposal = await draftCampaignProposal({ eventId: input.eventId, userId: ctx.user!.id, plan, positioning: pos, lang: input.lang ?? "zh" });
+      } catch (e: any) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: String(e?.message ?? e).slice(0, 300) });
+      }
+      // 寫的時候重讀一次：草擬要幾十秒，這段時間使用者可能又存了企劃。
+      await patchPositioning(input.eventId, ctx.user!.id, "campaignProposal", proposal);
+      return { ...proposal, stale: false };
+    }),
+
+  /** 存使用者改過的提案段落。只收草擬時就有的那幾段（標題與內文都可以改）。 */
+  saveProposal: protectedProcedure
+    .input(z.object({
+      eventId: z.number().int().positive(),
+      sections: z.array(z.object({ id: z.string().max(40), title: z.string().max(80), body: z.string().max(8000) })).min(1).max(12),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const row = await loadEvent(input.eventId, ctx.user!.id);
+      const prev = parsePositioning(row.positioning).campaignProposal as CampaignProposal | undefined;
+      if (!prev?.sections?.length) throw new TRPCError({ code: "BAD_REQUEST", message: "還沒有提案，先按「草擬提案」" });
+      const sections = cleanSavedSections(input.sections, prev.sections);
+      const text = sections.map((s) => s.body).join("\n");
+      // 使用者把那個數字改掉了，提醒就跟著消失。
+      const unsourced = (prev.unsourced ?? []).filter((n) => text.includes(n.replace("%", "")));
+      const { unsourced: _drop, ...rest } = prev;
+      const next: CampaignProposal = { ...rest, sections, editedAt: new Date().toISOString(), ...(unsourced.length ? { unsourced } : {}) };
+      await patchPositioning(input.eventId, ctx.user!.id, "campaignProposal", next);
+      return { ok: true, editedAt: next.editedAt, unsourced };
+    }),
+
+  /** 提案後半段的每一篇全文（itemId → 標題＋文字）。還沒寫的那幾篇不會在裡面。 */
+  proposalPosts: protectedProcedure
+    .input(z.object({ eventId: z.number().int().positive() }))
+    .query(async ({ ctx, input }) => {
+      const row = await loadEvent(input.eventId, ctx.user!.id);
+      const plan = visiblePlan((parsePositioning(row.positioning).campaignPlan ?? null) as CampaignPlan | null);
+      return await loadWrittenPosts(plan, ctx.user!.id);
     }),
 
   /**

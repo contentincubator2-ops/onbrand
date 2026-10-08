@@ -122,6 +122,21 @@ export function phaseShort(id: CampaignPhaseId, en: boolean): string {
   return p ? (en ? p.en : p.zh) : id;
 }
 
+export type PhaseNames = Partial<Record<CampaignPhaseId, string>> | null | undefined;
+
+/**
+ * 階段顯示的名稱（2026-10-08 CJ「右邊的每個階段的名稱，都可以新增和修改」）：使用者取的優先，
+ * 沒取就是預設的短名。
+ */
+export function phaseLabel(names: PhaseNames, id: CampaignPhaseId, en: boolean): string {
+  return names?.[id]?.trim() || phaseShort(id, en);
+}
+
+/** 句子裡用的名稱：預設的短名中文要加「期」（預熱期），使用者自己取的照他寫的。 */
+export function phaseLabelLong(names: PhaseNames, id: CampaignPhaseId, en: boolean): string {
+  return names?.[id]?.trim() || (en ? phaseShort(id, true) : `${phaseShort(id, false)}期`);
+}
+
 /**
  * 手動在某一段加一篇時，日期可以選的範圍（2026-10-05）：伺服器允許的範圍（campaign.addOptions
  * 的 window），再夾在前一段的最後一篇與下一段的第一篇之間——不然加在預熱期的一篇落到開賣日

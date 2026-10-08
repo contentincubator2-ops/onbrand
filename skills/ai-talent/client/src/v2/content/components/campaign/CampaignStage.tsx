@@ -28,22 +28,30 @@
  * 2026-10-02（CJ「看到這些文章，想要真實產出」）：放大到某一段後，每一篇可以直接在這裡寫——
  * 「寫這篇」開任務視窗並直接開寫（PlatformTaskModal autoRun），寫好接著開 CampaignPostModal
  * （改字、定稿／送審、標記已發布）。不用先跳到內容層找同一篇。
+ *
+ * 2026-10-08（CJ「用戶的習慣，其實不太看策略依據…是直接進去改每一篇文章」）：流程倒過來——
+ * 使用者先改每一篇、左邊的標語、右邊每個階段的名稱與訊息（都可以直接在畫面上改），再按控制列的
+ * 「草擬提案」：照他改好的內容回頭寫出背景、目標、族群、策略…，連同每天的排程與每一篇的全文，
+ * 成為一份可以改、可以存、可以下載的提案（CampaignProposalPanel），取代右邊原本的策略依據。
+ * 策略依據沒有刪，入口縮到提案頁的標題列；總監在對話裡改策略依據時，右邊還是會切過去。
  */
 import React from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Button, Modal, ModalContent, ModalHeader, ModalBody, Spinner } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faMap, faPenNib, faSliders, faLockOpen, faLock, faArrowRight, faBookOpen, faExpand, faCompress, faBullseye } from "@fortawesome/free-solid-svg-icons";
+import { faMap, faPenNib, faSliders, faLockOpen, faLock, faArrowRight, faFileLines, faExpand, faCompress, faBullseye } from "@fortawesome/free-solid-svg-icons";
 import { trpc } from "../../../../lib/trpc";
 import { useLang } from "../../../../lib/i18n";
 import { CHANNEL_META, channelLabel, channelRoute } from "../../../platform/lib/channelMeta";
 import { phaseOf, type CampaignPhaseId, type CampaignPlan, type CampaignPlanItem } from "../../../strategy/lib/campaign/campaignSchema";
-import { stagePhases, stageLanes, countdown, stageNotes, phaseShort, type StagePhase } from "../../../strategy/lib/campaign/campaignStage";
+import { stagePhases, stageLanes, countdown, stageNotes, phaseLabel, phaseLabelLong, type PhaseNames, type StagePhase } from "../../../strategy/lib/campaign/campaignStage";
 import { LockToggle } from "../../../strategy/components/positioning/LockToggle";
 import CampaignMap, { type NewItemInput } from "./CampaignMap";
 import CampaignSetupForm from "./CampaignSetupForm";
 import CampaignChatCard from "./CampaignChatCard";
 import CampaignBasisPanel from "../../../strategy/components/events/CampaignBasisPanel";
+import CampaignProposalPanel, { DraftProposalButton, useDraftProgress } from "../../../strategy/components/events/CampaignProposalPanel";
+import type { CampaignProposal, ProposalSection } from "../../../strategy/lib/campaign/campaignProposal";
 import KolBriefForm from "./KolBriefForm";
 import ChannelBriefForm, { type ChannelBriefSpec } from "./ChannelBriefForm";
 import { briefFromBasis, briefFromEvent, type BasisPatch, type BasisValue } from "../../../strategy/lib/campaign/campaignBasis";
@@ -96,7 +104,7 @@ export default function CampaignStage({ eventId, brandId }: { eventId: number; b
    * 右邊看什麼：企劃地圖或策略依據（2026-09-30 CJ「策略依據…可以替代右邊的行事曆，讓用戶
    * 還是可以透過跟總監的互動，進行修改和討論…位置移到最上方的企劃草稿」）。
    */
-  const [view, setView] = React.useState<"map" | "basis">("map");
+  const [view, setView] = React.useState<"map" | "basis" | "proposal">("map");
   /** 策略依據目前的值（存檔前先改畫面）與剛被總監改過的格子。 */
   const [basisLocal, setBasisLocal] = React.useState<Record<string, BasisValue | null>>({});
   const [basisRecent, setBasisRecent] = React.useState<Set<string>>(new Set());
@@ -196,7 +204,29 @@ export default function CampaignStage({ eventId, brandId }: { eventId: number; b
   const patchItem = (id: string, next: Partial<CampaignPlanItem>) => {
     const p = planRef.current;
     if (!p) return;
-    const updated = { ...p, items: p.items.map((i) => (i.id === id ? { ...i, ...next } : i)) };
+    queueSave({ ...p, items: p.items.map((i) => (i.id === id ? { ...i, ...next } : i)) });
+  };
+  /** 直接在畫面上改標語、階段的名稱與訊息（2026-10-08）：跟改一篇同一條存檔的路。 */
+  const patchPlan = (next: Partial<Pick<CampaignPlan, "smp" | "phaseNames" | "phaseMessages">>) => {
+    const p = planRef.current;
+    if (!p) return;
+    queueSave({ ...p, ...next });
+  };
+  /** 階段的名稱清空＝用回預設的；訊息清空＝這一段沒有訊息。 */
+  const patchPhase = (id: CampaignPhaseId, next: { name?: string; message?: string }) => {
+    const p = planRef.current;
+    if (!p) return;
+    const set = (cur: Partial<Record<CampaignPhaseId, string>> | undefined, v: string) => {
+      const out = { ...(cur ?? {}) };
+      if (v.trim()) out[id] = v; else delete out[id];
+      return out;
+    };
+    patchPlan({
+      ...(next.name !== undefined ? { phaseNames: set(p.phaseNames, next.name.slice(0, 12)) } : {}),
+      ...(next.message !== undefined ? { phaseMessages: set(p.phaseMessages, next.message.slice(0, 60)) } : {}),
+    });
+  };
+  const queueSave = (updated: CampaignPlan) => {
     planRef.current = updated;
     setPlan(updated);
     dirtyRef.current = true;
@@ -275,6 +305,40 @@ export default function CampaignStage({ eventId, brandId }: { eventId: number; b
   };
   /** 拖到另一段之後照那一段的策略改寫（使用者說好才叫）：只回新的一句，套用由地圖走 patchItem。 */
   const retuneMut = (trpc as any).campaign.retuneItem.useMutation();
+  /**
+   * 草擬提案（2026-10-08）：先把手上還沒存的企劃存進去（伺服器讀的是存著的那一份），再請
+   * 伺服器照企劃與每一篇的內容寫。寫好右邊換成提案。失敗時原本那一份還在。
+   */
+  const draftMut = (trpc as any).campaign.draftProposal.useMutation();
+  const saveProposalMut = (trpc as any).campaign.saveProposal.useMutation();
+  const [draftErr, setDraftErr] = React.useState("");
+  const proposalPct = useDraftProgress(draftMut.isPending);
+  const postsQ = (trpc as any).campaign.proposalPosts.useQuery({ eventId }, { enabled: view === "proposal", refetchOnWindowFocus: false });
+  const draftProposal = async () => {
+    if (draftMut.isPending) return;
+    setDraftErr("");
+    try {
+      const p = planRef.current;
+      if (p && dirtyRef.current && !p.lockedAt) {
+        if (timer.current) clearTimeout(timer.current);
+        const { lockedAt: _l, ...body } = p as any;
+        const seq = editSeq.current;
+        await savePlanMut.mutateAsync({ eventId, plan: body });
+        if (seq === editSeq.current) { dirtyRef.current = false; setSaveState("saved"); }
+      }
+      await draftMut.mutateAsync({ eventId, lang: en ? "en" : "zh" });
+      await utils?.campaign?.get?.invalidate?.({ eventId });
+      postsQ.refetch?.();
+      setView("proposal");
+    } catch (e: any) {
+      setDraftErr(e?.message || L("這一次沒有寫成，請再按一次", "Drafting failed — try again"));
+    }
+  };
+  const saveProposal = async (sections: ProposalSection[]) => {
+    await saveProposalMut.mutateAsync({ eventId, sections });
+    utils?.campaign?.get?.invalidate?.({ eventId });
+  };
+
   const retuneItem = async (it: CampaignPlanItem, from: CampaignPhaseId): Promise<string> => {
     const r = await retuneMut.mutateAsync({
       eventId, itemId: it.id, phase: it.phase, fromPhase: from, date: it.date,
@@ -323,6 +387,10 @@ export default function CampaignStage({ eventId, brandId }: { eventId: number; b
   const done = live.filter((i) => !!i.outputId).length;
   const cur = current && phases.some((p) => p.id === current) ? current : null;
   const curPhase = cur ? phases.find((p) => p.id === cur)! : null;
+  const names: PhaseNames = plan?.phaseNames;
+  const proposal: CampaignProposal | null = data.proposal ?? null;
+  // 提案還沒有卻停在提案那一頁：回地圖。
+  const showing = view === "proposal" && !proposal ? "map" : view;
   const cd = countdown(ev.startAt ?? null, ev.endAt ?? null, ymd(new Date()));
   const notes = plan ? stageNotes(items, settings.channels ?? [], cur) : [];
   const brandProducts = (((productsQ.data as any[]) ?? []) as any[]).map((p) => ({ id: Number(p.id), name: String(p.name) }));
@@ -349,16 +417,16 @@ export default function CampaignStage({ eventId, brandId }: { eventId: number; b
         <div className="border-b border-divider px-4 py-2.5 flex items-center gap-x-4 gap-y-2 flex-wrap shrink-0">
           {full && <p className="text-medium font-bold mr-1 truncate max-w-[260px]" title={ev.name}>{ev.name}</p>}
           <div className="flex items-center gap-1 flex-wrap" role="group" aria-label={L("階段", "Phases")}>
-            <button type="button" onClick={() => { setCurrent(null); setView("map"); }} aria-pressed={!cur && view === "map"}
-              className={`flex items-center gap-1.5 text-tiny font-semibold rounded-lg border px-2.5 py-1 mr-1 transition ${!cur && view === "map" ? "bg-foreground text-background border-foreground" : "border-default-300 text-default-600 hover:border-foreground"}`}>
+            <button type="button" onClick={() => { setCurrent(null); setView("map"); }} aria-pressed={!cur && showing === "map"}
+              className={`flex items-center gap-1.5 text-tiny font-semibold rounded-lg border px-2.5 py-1 mr-1 transition ${!cur && showing === "map" ? "bg-foreground text-background border-foreground" : "border-default-300 text-default-600 hover:border-foreground"}`}>
               <FontAwesomeIcon icon={faMap} />{L("總覽", "Overview")}
             </button>
             {phases.map((p) => {
-              const on = cur === p.id && view === "map";
+              const on = cur === p.id && showing === "map";
               return (
                 <button key={p.id} type="button" onClick={() => { setCurrent(p.id); setView("map"); }} aria-pressed={on}
                   className={`text-tiny font-semibold px-2 py-1 border-b-2 transition ${on ? "text-foreground border-foreground" : "text-default-400 border-transparent hover:text-default-700"}`}>
-                  {phaseShort(p.id, en)}
+                  {phaseLabel(names, p.id, en)}
                 </button>
               );
             })}
@@ -375,13 +443,15 @@ export default function CampaignStage({ eventId, brandId }: { eventId: number; b
                 ? L(`已定稿 ${new Date(plan!.lockedAt!).toLocaleDateString("zh-TW")}`, `Locked ${new Date(plan!.lockedAt!).toLocaleDateString("en-US")}`)
                 : plan ? L("企劃草稿", "Draft") : L("尚未排企劃", "No plan yet")}
             </span>
-            {plan && (
-              <button type="button" onClick={() => setView((v) => (v === "basis" ? "map" : "basis"))} aria-pressed={view === "basis"}
-                title={L("右邊換成策略依據（活動定位 11 段），左邊照常跟總監談", "Show the strategy basis on the right")}
-                className={`flex items-center gap-1.5 text-tiny font-semibold rounded-lg border px-2 py-0.5 transition ${view === "basis" ? "bg-foreground text-background border-foreground" : "border-default-300 text-default-600 hover:border-foreground"}`}>
-                <FontAwesomeIcon icon={faBookOpen} className="text-[10px]" />{L("策略依據", "Basis")}
-              </button>
-            )}
+            {draftErr && showing !== "proposal" && <span className="text-tiny text-danger max-w-[240px] truncate" title={draftErr}>{draftErr}</span>}
+            {plan && live.length > 0 && (proposal ? (
+              <DraftProposalButton en={en} icon={faFileLines} label={L("提案", "Proposal")} progress={proposalPct} pressed={showing === "proposal"}
+                onPress={() => setView((v) => (v === "proposal" ? "map" : "proposal"))}
+                title={L("右邊換成提案：策略段落、排程與每一篇的全文", "Show the proposal on the right")} />
+            ) : (
+              <DraftProposalButton en={en} icon={faFileLines} label={L("草擬提案", "Draft proposal")} progress={proposalPct} onPress={draftProposal}
+                title={L("照你改好的標語、階段與每一篇，寫出背景、目標、族群、策略，並附上每天的排程與全文", "Write the background, goals, audience and strategy from your plan and posts, with the full schedule")} />
+            ))}
             <span className="w-px h-5 bg-divider" />
             <div className="flex gap-1.5" aria-label={L("通路", "Channels")}>
               {DOCK_CHANNELS.map((c) => {
@@ -434,8 +504,8 @@ export default function CampaignStage({ eventId, brandId }: { eventId: number; b
                 </p>
                 <p className="text-tiny text-default-500 mt-2">
                   {curPhase
-                    ? L(`篇　·　${phaseShort(curPhase.id, false)}期 ${md(curPhase.from)}${curPhase.to !== curPhase.from ? ` – ${md(curPhase.to)}` : ""}`,
-                        `posts · ${phaseShort(curPhase.id, true)}`)
+                    ? L(`篇　·　${phaseLabelLong(names, curPhase.id, false)} ${md(curPhase.from)}${curPhase.to !== curPhase.from ? ` – ${md(curPhase.to)}` : ""}`,
+                        `posts · ${phaseLabelLong(names, curPhase.id, true)}`)
                     : (en ? cd.unitEn : cd.unitZh)}
                 </p>
               </div>
@@ -466,7 +536,18 @@ export default function CampaignStage({ eventId, brandId }: { eventId: number; b
               ) : plan ? (
                 <>
                   <p className="text-[11px] tracking-widest text-default-500">{L("一句話訴求", "CORE MESSAGE")}</p>
-                  <p className="text-xl font-bold leading-snug text-balance">{plan.smp}</p>
+                  {locked ? (
+                    <p className="text-xl font-bold leading-snug text-balance">{plan.smp}</p>
+                  ) : (
+                    // 標語直接在這裡改（2026-10-08）：停手就存，跟改一篇同一條路。
+                    <textarea value={plan.smp} rows={1} maxLength={200}
+                      onChange={(e) => patchPlan({ smp: e.target.value.replace(/[\r\n]+/g, "") })}
+                      style={{ fieldSizing: "content" } as React.CSSProperties}
+                      placeholder={L("寫下這檔活動的標語", "Write the campaign tagline")}
+                      aria-label={L("標語（一句話訴求）", "Tagline")}
+                      title={L("點一下直接改", "Click to edit")}
+                      className="w-full text-xl font-bold leading-snug bg-transparent resize-none outline-none rounded-lg px-1.5 -mx-1.5 hover:bg-default-200/60 focus:bg-content1 focus:shadow-small" />
+                  )}
                   {data.audience && <p className="text-small text-default-600 line-clamp-3" title={data.audience}>{L("對象：", "Audience: ")}{data.audience}</p>}
                   {settings.mechanic && <p className="text-small text-default-600">{L("機制：", "Offer: ")}{settings.mechanic}</p>}
                   {plan.kpi && (plan.kpi.budget || plan.kpi.goals?.length) ? (
@@ -488,12 +569,12 @@ export default function CampaignStage({ eventId, brandId }: { eventId: number; b
               )}
             </div>
 
-            <div className="shrink-0"><ReachFan phases={phases} lanes={lanes} items={items} current={cur} en={en} /></div>
+            <div className="shrink-0"><ReachFan phases={phases} lanes={lanes} items={items} current={cur} en={en} names={names} /></div>
             </>)}
 
             {plan && (
               <CampaignChatCard eventId={eventId} brandId={brandId} plan={plan} phase={cur} notes={notes} locked={locked} en={en} onApply={applyPlan} grow
-                basis={basisLocal} onApplyBasis={(p) => applyBasis(p, true)} onApplyDates={applyDates} view={view}
+                basis={basisLocal} onApplyBasis={(p) => applyBasis(p, true)} onApplyDates={applyDates} view={showing === "basis" ? "basis" : "map"}
                 expanded={chatExpanded} onToggleExpand={() => setChatExpanded((v) => !v)} />
             )}
 
@@ -502,12 +583,19 @@ export default function CampaignStage({ eventId, brandId }: { eventId: number; b
 
           {/* ── 右：策略地圖（撐滿這一欄的高度） ───────────────────── */}
           <section className="min-w-0 min-h-0 relative bg-default-100 overflow-hidden">
-            {plan && view === "basis" ? (
+            {plan && showing === "proposal" && proposal ? (
+              <CampaignProposalPanel proposal={proposal} plan={plan} posts={postsQ.data ?? {}} postsLoading={!!postsQ.isLoading}
+                eventName={String(ev.name ?? "")} range={ev.startAt ? `${ev.startAt} → ${ev.endAt ?? "?"}` : ""} en={en}
+                drafting={proposalPct} draftError={draftErr} onRedraft={draftProposal}
+                onSave={saveProposal} saving={saveProposalMut.isPending}
+                onOpenItem={openItem} onOpenBasis={() => setView("basis")} />
+            ) : plan && showing === "basis" ? (
               <CampaignBasisPanel raw={data.basis?.raw ?? {}} editable={basisLocal} recent={basisRecent} locked={locked} en={en}
                 onSave={(p) => applyBasis(p)} onOpenFull={goStrategyBasis} />
             ) : plan ? (
               <CampaignMap
                 items={items} phases={phases} lanes={lanes} phaseMessages={plan.phaseMessages ?? {}}
+                phaseNames={plan.phaseNames ?? {}} onPatchPhase={patchPhase}
                 current={cur} onPick={setCurrent} locked={locked} en={en} onPatchItem={patchItem}
                 fill
                 phaseKpi={plan.kpi?.phases ?? {}}
@@ -614,7 +702,7 @@ export default function CampaignStage({ eventId, brandId }: { eventId: number; b
           camp={{ eventId, itemId: writing.id }} topic={writing.angle || undefined} slotDate={writing.date}
           autoRun
           onWritten={(oid) => { setOpenPost({ itemId: writing.id, outputId: oid }); }}
-          onClose={() => { setWriting(null); thumbsQ.refetch?.(); }} />
+          onClose={() => { setWriting(null); thumbsQ.refetch?.(); if (view === "proposal") postsQ.refetch?.(); }} />
       )}
       {openPost && (() => {
         const base = items.find((i) => i.id === openPost.itemId);
@@ -625,7 +713,7 @@ export default function CampaignStage({ eventId, brandId }: { eventId: number; b
             item={{ ...base, outputId: base.outputId ?? openPost.outputId }}
             thumb={(thumbsQ.data ?? {})[openPost.itemId] ?? null}
             phaseMessage={plan?.phaseMessages?.[base.phase] ?? ""}
-            en={en} onClose={() => setOpenPost(null)} />
+            en={en} onClose={() => { setOpenPost(null); if (view === "proposal") postsQ.refetch?.(); }} />
         );
       })()}
     </div>
@@ -636,8 +724,8 @@ export default function CampaignStage({ eventId, brandId }: { eventId: number; b
  * 傳播圈：中心是主角，一圈是一個階段（由內往外＝時間往後），扇區是通路，點是一篇。
  * 取代畫面稿裡的汽車道路——它畫的是這份企劃本身，不是裝飾。
  */
-function ReachFan({ phases, lanes, items, current, en }: {
-  phases: StagePhase[]; lanes: string[]; items: CampaignPlanItem[]; current: CampaignPhaseId | null; en: boolean;
+function ReachFan({ phases, lanes, items, current, en, names }: {
+  phases: StagePhase[]; lanes: string[]; items: CampaignPlanItem[]; current: CampaignPhaseId | null; en: boolean; names?: PhaseNames;
 }) {
   const VW = 360, VH = 196, CX = 180, CY = 178;
   const n = Math.max(1, phases.length || 5);
@@ -664,7 +752,7 @@ function ReachFan({ phases, lanes, items, current, en }: {
                 className={on ? "text-foreground" : current ? "text-default-200" : "text-default-300"} />
               <text x={CX - r(i)} y={CY + 14} textAnchor="middle" fontSize={10}
                 className={on ? "fill-foreground font-bold" : "fill-default-400"}>
-                {phaseShort(id, en)}
+                {phaseLabel(names, id, en)}
               </text>
             </g>
           );
