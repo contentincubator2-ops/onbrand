@@ -9,6 +9,35 @@ function setup(body: unknown, status = 200) {
 }
 describe("Zernio client", () => {
   afterEach(() => { vi.useRealTimers(); });
+  it("sends analytics filters and preserves each page and its pagination", async () => {
+    const { client, fetchImpl } = setup({});
+    for (const page of [1, 2]) {
+      const body = { posts: [{ _id: `external-${page}`, platforms: [{ platformPostId: `native-${page}` }] }],
+        pagination: { page, limit: 100, total: 101, pages: 2 } };
+      fetchImpl.mockResolvedValueOnce(new Response(JSON.stringify(body)));
+      expect(await client.listAnalytics({ accountId: "account & one", fromDate: "2026-06-10", toDate: "2026-10-08",
+        source: "all", page, limit: 100 })).toEqual(body);
+      const [rawUrl, options] = fetchImpl.mock.calls[page - 1]!;
+      const url = new URL(rawUrl as string);
+      expect(url.pathname).toBe("/api/v1/analytics");
+      expect(Object.fromEntries(url.searchParams)).toEqual({ accountId: "account & one", fromDate: "2026-06-10",
+        toDate: "2026-10-08", source: "all", page: String(page), limit: "100" });
+      expect(options?.method).toBe("GET");
+    }
+  });
+  it.each([undefined, "late", "external"] as const)("passes analytics source %s (default all)", async source => {
+    const { client, fetchImpl } = setup({ posts: [], pagination: { pages: 0 } });
+    await client.listAnalytics({ accountId: "a", fromDate: "2026-10-01", toDate: "2026-10-08", source, page: 1, limit: 50 });
+    expect(new URL(fetchImpl.mock.calls[0]![0] as string).searchParams.get("source")).toBe(source ?? "all");
+  });
+  it("syncs external posts using the current documented path and account body", async () => {
+    const { client, fetchImpl } = setup({ synced: { postsFound: 1, postsSynced: 1 } });
+    await client.syncExternalPosts({ accountId: "account & one" });
+    const [url, options] = fetchImpl.mock.calls[0]!;
+    expect(url).toBe("https://zernio.com/api/v1/posts/sync-external");
+    expect(options?.method).toBe("POST");
+    expect(JSON.parse(options!.body as string)).toEqual({ accountId: "account & one" });
+  });
   it("sends Bearer auth, profile payload and idempotency header", async () => {
     const { client, credential, fetchImpl } = setup({ profile: { _id: "profile" } }, 201);
     expect(await client.createProfile({ name: "Brand", idempotencyKey: "onbrand-brand-3" })).toEqual({ _id: "profile" });
