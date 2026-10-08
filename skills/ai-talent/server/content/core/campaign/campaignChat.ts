@@ -23,7 +23,7 @@
  *   · 日期超出範圍的改法以前是靜靜丟掉；現在回覆最後會說哪幾天沒排進去、最早能排到哪天。
  */
 import { PAID_CHANNELS } from "./campaignKpi.js";
-import { candidateCards, eventFacts, safeJSON, PLANNABLE_CHANNELS, PARTNER_CHANNELS, CAMPAIGN_PHASE_IDS, type CampaignPlan, type CampaignPhaseId, type PlanItem } from "./campaignPlan.js";
+import { campaignCards, eventFacts, safeJSON, PLANNABLE_CHANNELS, PARTNER_CHANNELS, CAMPAIGN_PHASE_IDS, type CampaignPlan, type CampaignPhaseId, type PlanItem } from "./campaignPlan.js";
 import type { CatalogTask } from "../catalog/taskCatalogIndex.js";
 import { brandIndustry, type TeamAgent } from "./campaignTeam.js";
 import { buildCampaignRoster, isCampaignRole, ROLES, type CampaignRole, type RosterMember } from "./campaignRoster.js";
@@ -677,7 +677,7 @@ export async function runCampaignChat(args: {
     today: ymd(new Date()),
   };
   const window = chatWindow(event.startAt, event.endAt, event.today);
-  const cards = candidateCards([...PLANNABLE_CHANNELS]);
+  const cards = campaignCards([...PLANNABLE_CHANNELS]);
   // 候選卡清單很長（每通路 30 張），只有會加篇換卡的內容企劃需要——其他人少讀一大段，回得快。
   // 這段討論裡使用者親口說的話：只有他點名的通路才會在活動選的通路之外放行（轉手的指示不算）。
   const userSaid = [

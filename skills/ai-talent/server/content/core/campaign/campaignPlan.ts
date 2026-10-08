@@ -202,11 +202,40 @@ export function candidateCards(channels: string[]): CatalogTask[] {
   );
 }
 
+/**
+ * 活動企劃用的卡：只有單篇。
+ *
+ * 2026-10-08（CJ「活動企劃當中的任務卡，都只要是單篇貼文的，不需要四篇貼文的活動
+ * 組合。因為，我們都設定好是哪一天要發甚麼文章了」）：活動企劃的每一格已經是
+ * 「這一天發這一篇」，再排一張「活動上線包（4 篇）」「5 天倒數系列」進去，等於在
+ * 一格裡面又塞了一份時間表。本週企劃／靈感舞台仍走 candidateCards，不受影響。
+ */
+export function campaignCards(channels: string[]): CatalogTask[] {
+  return candidateCards(channels).filter((c) => c.tier === "30s");
+}
+
 /** 驗證失敗時的確定性修補：這個通路的第一張 30s 卡。 */
 function defaultCardFor(platform: string, cards: CatalogTask[]): CatalogTask | null {
   return cards.find((c) => c.platform === platform && c.tier === "30s")
     ?? cards.find((c) => c.platform === platform)
     ?? null;
+}
+
+/**
+ * 舊企劃裡還沒寫的格子若排的是套組／企劃級的卡，換成那個通路的單篇預設卡。
+ * 已經寫好的（有 outputId）不動——那篇產出是照原本的卡寫的。不在目錄裡的卡
+ * （品牌自建卡、任務包）也不動，這裡只認得出目錄卡的層級。
+ */
+export function toSingleCardItems(items: PlanItem[], catalog: CatalogTask[] = buildTaskCatalogIndex()): PlanItem[] {
+  const tierOf = new Map(catalog.map((c) => [c.id, c.tier]));
+  const singles = catalog.filter((c) => c.tier === "30s" && !isPartCard(c.id));
+  return items.map((i) => {
+    const tier = tierOf.get(i.taskId);
+    if (i.outputId || !tier || tier === "30s") return i;
+    const card = defaultCardFor(i.platform, singles);
+    if (!card) return i;
+    return { ...i, taskId: card.id, taskLabel: card.labelZh || card.labelEn || card.id, repaired: true };
+  });
 }
 
 /**
@@ -631,8 +660,8 @@ export async function buildCampaignPlan(args: {
   // 合作類的線（網紅、異業合作）是固定的幾件事（laneItems），不佔模型的檔期格子；模型只排貼文通路。
   const partnerLanes = s.channels.filter((c) => PARTNER_CHANNELS.includes(c));
   const postChannels = s.channels.filter((c) => !PARTNER_CHANNELS.includes(c));
-  const partnerCards = partnerLanes.length ? candidateCards(partnerLanes) : [];
-  const cards = candidateCards(postChannels);
+  const partnerCards = partnerLanes.length ? campaignCards(partnerLanes) : [];
+  const cards = campaignCards(postChannels);
   if (cards.length === 0 && partnerCards.length === 0) throw new Error("你選的通路目前沒有可用的任務卡，換一個通路再試");
   const today = ymd(args.today ?? new Date());
   const launchDate = beats.find((b) => b.phase === "launch")?.date ?? (facts.startAt ? ymd(facts.startAt) : today);
