@@ -111,8 +111,8 @@ export default function RefundPage() {
             </li>
             <li>
               {isEn
-                ? "Extra costs charged by third-party services (Anthropic / PiAPI / Pipedream, etc.) caused by your misuse."
-                : "第三方服務（Anthropic / PiAPI / Pipedream 等）因您濫用導致額外費用。"}
+                ? "Extra costs charged by third-party services (Anthropic / PiAPI / Zernio, etc.) caused by your misuse."
+                : "第三方服務（Anthropic / PiAPI / Zernio 等）因您濫用導致額外費用。"}
             </li>
             <li>
               {isEn
