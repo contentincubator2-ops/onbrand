@@ -662,6 +662,11 @@ export async function buildCampaignPlan(args: {
   const scope = resolveProductScope(s.productScope, facts.products.length);
   const productBlock = productScopeBrief(scope, facts.products);
 
+  // 2026-10-08（CJ「新建活動時…可上傳過往資料參考」）：這檔活動的參考資料（新增活動時上傳的
+  // 過往資料、對話裡貼的連結與檔案）排企劃時也要讀，不是只有對話讀得到。讀不到不擋排企劃。
+  const { loadSourceDocs, formatSourcesForPrompt } = await import("./campaignChatSources.js");
+  const sourceBlock = formatSourcesForPrompt(await loadSourceDocs(args.eventId, args.userId).catch(() => []));
+
   const user = [
     `【品牌】${facts.brandName}`,
     `【活動】${facts.name}`,
@@ -675,6 +680,7 @@ export async function buildCampaignPlan(args: {
     `【要排的檔期格子】\n${beatList}`,
     `【候選任務卡（只能從這裡挑）】\n${cardMenu}`,
     channelBriefBlock ? `【各通路任務說明單（使用者填的；有清單的通路，angle 要對準清單裡的某一列，盡量每一列都排到）】\n${channelBriefBlock}` : "",
+    sourceBlock,
     "",
     "請為每一格挑一張卡並寫出這一篇要講什麼，再為每一個階段寫一句這段要讓人記住的訊息。只輸出 JSON，鍵名固定如下：",
     `{"smp":"這檔活動的一句話訴求（25字內）","phases":[{"phase":"階段 id","message":"這一段要讓人記住的一句話（20字內）"}],"items":[{"beat":0,"platform":"facebook","taskId":"逐字抄自候選清單","angle":"這一篇要講什麼（20-45字）"}]}`,
