@@ -52,17 +52,29 @@ export function personaOf(key: string): InspirePersona | undefined {
 const norm = (s: string) => s.toLowerCase().replace(/[\s·・\-_.'’@]/g, "");
 
 /**
- * 產出裡有沒有露出這位創作者的名字、帳號或招牌口頭禪。回傳命中的字串；沒有回 null。
- * 太短的別名（中文 1 字、英數 3 字以內）與太短的口頭禪不比對，免得誤擋一般用字。
+ * 研究資料裡的別名有些是一般用字（頻道名的一部分、綽號剛好是食物或物品）。照擋的話，點子只要提到
+ * 洋蔥、雪碧、筆電就整個被丟掉——2026-10-08 CJ 回報「會產不出靈感」就是這類誤擋造成的。
  */
-export function leaksPersona(text: string, p: Pick<InspirePersona, "name" | "aliases" | "catchphrases">): string | null {
+const GENERIC_ALIASES = new Set(["筆電", "洋蔥", "麻糬", "雪碧", "小陳", "小象", "大牛", "很煩", "speed"].map(norm));
+
+/** 研究資料沒列、但實跑時被寫進成稿的家人與固定班底名字（key → 名字）。 */
+const EXTRA_NAMES: Record<string, string[]> = {
+  "tw-fb-02": ["妮妮"],
+};
+
+/**
+ * 產出裡有沒有露出這位創作者的名字、帳號或招牌口頭禪。回傳命中的字串；沒有回 null。
+ * 太短的別名（中文 1 字、英數 3 字以內）與一般用字的別名不比對。口頭禪只擋夠長、夠獨特的
+ * （中文 8 字、英數 15 字以上）：「留言告訴我」「真的假的」這種誰都會說的話，擋了等於不准寫字。
+ */
+export function leaksPersona(text: string, p: Pick<InspirePersona, "name" | "aliases" | "catchphrases"> & { key?: string }): string | null {
   const hay = norm(String(text ?? ""));
   const hit = (raw: string, minAscii: number, minCjk: number): boolean => {
     const n = norm(String(raw ?? ""));
     return n.length >= (/^[\x00-\x7f]+$/.test(n) ? minAscii : minCjk) && hay.includes(n);
   };
-  for (const raw of [p.name, ...p.aliases]) if (hit(raw, 4, 2)) return String(raw);
-  // 口頭禪常是一般用語（「大家好」），短的不擋。
-  for (const raw of p.catchphrases) if (hit(raw, 8, 4)) return String(raw);
+  const names = [p.name, ...p.aliases, ...(p.key ? EXTRA_NAMES[p.key] ?? [] : [])];
+  for (const raw of names) if (!GENERIC_ALIASES.has(norm(String(raw ?? ""))) && hit(raw, 4, 2)) return String(raw);
+  for (const raw of p.catchphrases) if (hit(raw, 15, 8)) return String(raw);
   return null;
 }

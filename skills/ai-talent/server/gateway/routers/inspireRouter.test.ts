@@ -40,9 +40,9 @@ describe("inspireRouter", () => {
     await expect(caller.reviewStart({ text: "太短" })).rejects.toThrow();
   });
 
-  it("每個 IP 每分鐘 6 次，超過就擋；別的 IP 不受影響", () => {
+  it("每個 IP 每分鐘 30 次，超過就擋；別的 IP 不受影響", () => {
     const now = Date.UTC(2026, 9, 7, 3);
-    for (let i = 0; i < 6; i++) checkInspireRate("9.9.9.9", now + i);
+    for (let i = 0; i < 30; i++) checkInspireRate("9.9.9.9", now + i);
     expect(() => checkInspireRate("9.9.9.9", now + 10)).toThrow(/太快/);
     expect(() => checkInspireRate("8.8.8.8", now + 10)).not.toThrow();
     expect(() => checkInspireRate("9.9.9.9", now + 61_000)).not.toThrow();
@@ -91,6 +91,18 @@ describe("100 位創作者 agent", () => {
     expect(leaksPersona("大家好，我是醫師", p)).toBeNull();
     expect(leaksPersona("今天也要好好量血壓喔！", p)).toBe("今天也要好好量血壓喔");
     expect(leaksPersona("bm 值", p)).toBeNull();
+  });
+
+  it("一般用語不會被當成口頭禪或別名擋掉；實跑漏出的家人名字擋得住", () => {
+    const p = { key: "tw-fb-02", name: "某對夫妻", aliases: ["洋蔥", "雪碧", "筆電"], catchphrases: ["留言告訴我", "真的假的", "Wait for it"] };
+    expect(leaksPersona("少鹽料理可以多用洋蔥提味，別配雪碧。看完留言告訴我，真的假的？wait for it", p)).toBeNull();
+    expect(leaksPersona("妮妮從旁邊走過", p)).toBe("妮妮");
+  });
+
+  it("每一位 agent 的擋字清單都不會擋掉一段普通的衛教點子", () => {
+    const ordinary = "門診常被問到在家怎麼量血壓。先生說他每天都有量，太太把血壓計推過去。連續量七天、早晚各一次、每次量兩遍取平均。"
+      + "少鹽、少油、多運動，看完留言告訴我你家的狀況，真的假的都歡迎。今天也要開心，一起出門走走。";
+    for (const p of INSPIRE_PERSONAS) expect(leaksPersona(ordinary, p), p.key).toBeNull();
   });
 });
 

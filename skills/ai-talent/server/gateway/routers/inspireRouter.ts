@@ -36,7 +36,7 @@ import {
 
 const WRITE_MODEL = process.env.INSPIRE_MODEL || "claude-sonnet-4-6";
 const REVIEW_MODEL = process.env.INSPIRE_REVIEW_MODEL || WRITE_MODEL;
-const DAILY_CAP = Math.max(1, Number(process.env.INSPIRE_DAILY_CAP) || 800);
+const DAILY_CAP = Math.max(1, Number(process.env.INSPIRE_DAILY_CAP) || 3000);
 export const MAX_PERSONAS = 4;
 /** 每位 agent 一輪想幾個點子。 */
 export const IDEAS_PER_PERSONA = 3;
@@ -46,14 +46,20 @@ export const IDEAS_PER_PERSONA = 3;
 const hitsByIp = new Map<string, number[]>();
 let day = ""; let dayCount = 0;
 
-/** 每個 IP 每分鐘 6 次、每小時 40 次（想點子、寫成稿、重審合計）；全站每日 DAILY_CAP 次。 */
+const IP_PER_MIN = Math.max(1, Number(process.env.INSPIRE_IP_PER_MIN) || 30);
+const IP_PER_HOUR = Math.max(1, Number(process.env.INSPIRE_IP_PER_HOUR) || 600);
+
+/**
+ * 每個 IP 每分鐘 IP_PER_MIN 次、每小時 IP_PER_HOUR 次（想點子、寫成稿、重審合計）；全站每日 DAILY_CAP 次。
+ * 2026-10-08：原本是 6／40，但活動現場與辦公室是很多人共用一個對外 IP，幾分鐘就全部被擋，所以放寬並可用 env 調整。
+ */
 export function checkInspireRate(ip: string, now = Date.now()): void {
   const today = new Date(now).toISOString().slice(0, 10);
   if (today !== day) { day = today; dayCount = 0; hitsByIp.clear(); }
   if (dayCount >= DAILY_CAP) throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: "今天的示範名額用完了，明天再來試試。" });
   const hits = (hitsByIp.get(ip) ?? []).filter((t) => now - t < 3_600_000);
-  if (hits.filter((t) => now - t < 60_000).length >= 6) throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: "按太快了，等一下再試。" });
-  if (hits.length >= 40) throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: "這一小時用太多次了，晚點再來。" });
+  if (hits.filter((t) => now - t < 60_000).length >= IP_PER_MIN) throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: "按太快了，等一下再試。" });
+  if (hits.length >= IP_PER_HOUR) throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: "這一小時用太多次了，晚點再來。" });
   hits.push(now);
   hitsByIp.set(ip, hits);
   dayCount++;
@@ -116,10 +122,14 @@ async function runIdeate(job: IdeateJob, args: IdeateArgs): Promise<void> {
   await Promise.all(job.keys.map(async (key) => {
     const persona = personaOf(key)!;
     let got: InspireIdea[] = [];
-    try {
-      got = parseIdeas(await ask(personaIdeationPrompt({ ...args, persona }), "請開始想。", WRITE_MODEL), persona, args.count);
-    } catch (e) {
-      console.warn(`[inspire] ideate ${key} failed:`, (e as Error)?.message?.slice(0, 160));
+    // 一個都沒交出來（呼叫失敗、格式壞掉、或全部露出名字被濾掉）就再請他想一次，不讓一位 agent 整輪落空。
+    for (let attempt = 0; attempt < 2 && !got.length; attempt++) {
+      try {
+        got = parseIdeas(await ask(personaIdeationPrompt({ ...args, persona }), "請開始想。", WRITE_MODEL), persona, args.count);
+        if (!got.length) console.warn(`[inspire] ideate ${key}: no usable ideas (attempt ${attempt + 1})`);
+      } catch (e) {
+        console.warn(`[inspire] ideate ${key} failed:`, (e as Error)?.message?.slice(0, 160));
+      }
     }
     if (got.length) job.ideas = [...job.ideas, ...got].sort((x, y) => job.keys.indexOf(x.persona) - job.keys.indexOf(y.persona));
     else job.failed.push(key);
