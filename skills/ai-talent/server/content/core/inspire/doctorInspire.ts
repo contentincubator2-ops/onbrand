@@ -6,7 +6,7 @@
  *
  * 跟靈感舞台（planning/inspirationStage.ts）的差別：
  *   · 沒有品牌、沒有帳號：主體是「醫師本人＋一個體重管理議題」（2026-10-09 CJ：提案對象是肥胖症領域的藥廠專案，不是高血壓——
- *     議題與白名單整組換掉；因為贊助方是處方藥藥廠，內容一律不出現任何藥品名、成分名或俗稱），事實只來自 inspireRegulations 的白名單。
+ *     議題與白名單整組換掉；同日再補：範圍是體重管理、糖尿病、脂肪肝三個領域，議題依領域分組；因為贊助方是處方藥藥廠，內容一律不出現任何藥品名、成分名或俗稱），事實只來自 inspireRegulations 的白名單。
  *   · 「誰來想」是 100 位創作者 agent（inspirePersonas.ts），每位帶自己的完整人設各呼叫一次。
  *   · 採用後不排進本週企劃，直接寫成該平台的成稿，再逐條過法規審查。
  *   · 審查只提建議（哪一句、為什麼、建議怎麼改），要不要改由醫師決定。
@@ -16,30 +16,51 @@ import { leaksPersona, type InspirePersona, type InspirePlatform } from "./inspi
 
 // ─── 議題 ──────────────────────────────────────────────────────────────
 
-export interface InspireTopic { id: string; label: string; hint: string }
+export type InspireArea = "weight" | "diabetes" | "liver";
+
+/** 議題分三個領域（2026-10-09 CJ：「適應症包括糖尿病、脂肪肝」）。畫面先選領域，再選議題。 */
+export const INSPIRE_AREAS: Array<{ id: InspireArea; label: string }> = [
+  { id: "weight", label: "體重管理" },
+  { id: "diabetes", label: "糖尿病" },
+  { id: "liver", label: "脂肪肝" },
+];
+
+export interface InspireTopic { id: string; area: InspireArea; label: string; hint: string }
 
 export const INSPIRE_TOPICS: InspireTopic[] = [
-  { id: "bmi", label: "我算胖嗎？BMI 與腰圍怎麼看", hint: "BMI 24 過重、27 肥胖；腰圍男 90、女 80 公分" },
-  { id: "disease", label: "肥胖是一種慢性疾病", hint: "不是意志力的問題，也不只是外表的事" },
-  { id: "waist", label: "體重正常，肚子卻很大", hint: "為什麼除了 BMI 還要量腰圍" },
-  { id: "five-percent", label: "先減 5% 就有幫助", hint: "不用一次瘦很多，健康就會有感" },
-  { id: "calories", label: "少吃多少才會瘦？", hint: "每天少 500 大卡，一週約 0.5 公斤" },
-  { id: "exercise", label: "運動要做到多少才夠", hint: "每週 150 分鐘；想減重要 250 到 300 分鐘" },
-  { id: "yoyo", label: "為什麼瘦了又胖回來", hint: "復胖不是你不夠努力" },
-  { id: "diet-myth", label: "不吃澱粉、極端節食的迷思", hint: "每日熱量不應低於 1,200 大卡" },
-  { id: "risk", label: "胖久了，身體會怎樣", hint: "糖尿病、高血壓、心血管與關節的風險" },
-  { id: "plate", label: "外食族怎麼吃", hint: "全穀、蔬果、優質蛋白質，少油少鹽少糖" },
-  { id: "when-doctor", label: "什麼時候該找醫師談體重", hint: "體重影響到健康時，可以討論有哪些做法" },
-  { id: "stigma", label: "別再說「你就是懶」", hint: "體重汙名怎麼讓人更不敢求助" },
+  { id: "bmi", area: "weight", label: "我算胖嗎？BMI 與腰圍怎麼看", hint: "BMI 24 過重、27 肥胖；腰圍男 90、女 80 公分" },
+  { id: "disease", area: "weight", label: "肥胖是一種慢性疾病", hint: "不是意志力的問題，也不只是外表的事" },
+  { id: "waist", area: "weight", label: "體重正常，肚子卻很大", hint: "為什麼除了 BMI 還要量腰圍" },
+  { id: "five-percent", area: "weight", label: "先減 5% 就有幫助", hint: "不用一次瘦很多，健康就會有感" },
+  { id: "calories", area: "weight", label: "少吃多少才會瘦？", hint: "每天少 500 大卡，一週約 0.5 公斤" },
+  { id: "exercise", area: "weight", label: "運動要做到多少才夠", hint: "每週 150 分鐘；想減重要 250 到 300 分鐘" },
+  { id: "yoyo", area: "weight", label: "為什麼瘦了又胖回來", hint: "復胖不是你不夠努力" },
+  { id: "diet-myth", area: "weight", label: "不吃澱粉、極端節食的迷思", hint: "每日熱量不應低於 1,200 大卡" },
+  { id: "risk", area: "weight", label: "胖久了，身體會怎樣", hint: "糖尿病、高血壓、心血管與關節的風險" },
+  { id: "plate", area: "weight", label: "外食族怎麼吃", hint: "全穀、蔬果、優質蛋白質，少油少鹽少糖" },
+  { id: "when-doctor", area: "weight", label: "什麼時候該找醫師談體重", hint: "體重影響到健康時，可以討論有哪些做法" },
+  { id: "stigma", area: "weight", label: "別再說「你就是懶」", hint: "體重汙名怎麼讓人更不敢求助" },
+  { id: "dm-pre", area: "diabetes", label: "血糖偏高，還不算糖尿病？", hint: "空腹血糖 100 到 125、糖化血色素 5.7% 到 6.4% 是糖尿病前期" },
+  { id: "dm-silent", area: "diabetes", label: "沒有症狀，不代表沒事", hint: "糖尿病前期要抽血才知道" },
+  { id: "dm-reverse", area: "diabetes", label: "糖尿病前期可以逆轉", hint: "改善生活型態，風險可以降低五成以上" },
+  { id: "dm-habits", area: "diabetes", label: "穩血糖的日常", hint: "低油、低鹽、低糖、高纖；每週運動 150 分鐘" },
+  { id: "dm-metabolic", area: "diabetes", label: "代謝症候群是警訊", hint: "血糖異常加上腹部肥胖、血壓或血脂過高任兩項" },
+  { id: "dm-comp", area: "diabetes", label: "血糖沒顧好，身體會怎樣", hint: "心血管、腎臟、視網膜都會受影響" },
+  { id: "liver-what", area: "liver", label: "脂肪肝是怎麼來的", hint: "肥胖、三高、飲酒與生活型態" },
+  { id: "liver-silent", area: "liver", label: "脂肪肝沒感覺，為什麼要管", hint: "可能一路走到肝硬化、肝癌" },
+  { id: "liver-common", area: "liver", label: "脂肪肝比你想的更常見", hint: "研究指出臺灣的脂肪肝盛行率約 33.3%" },
+  { id: "liver-weight", area: "liver", label: "顧肝，從體重和腰圍開始", hint: "認識 BMI、聰明吃、快樂動、天天量體重" },
+  { id: "liver-myth", area: "liver", label: "保肝偏方的迷思", hint: "不要相信偏方，接受正規的追蹤與治療" },
+  { id: "liver-follow", area: "liver", label: "有脂肪肝，要追蹤什麼", hint: "定期追蹤肝指數與腹部超音波" },
 ];
 
 export function topicOf(id: string): InspireTopic | undefined {
   return INSPIRE_TOPICS.find((t) => t.id === id);
 }
 
-/** 自訂議題必須跟體重管理有關——這頁的白名單與法規只涵蓋這個範圍。 */
+/** 自訂議題必須跟體重管理、糖尿病或脂肪肝有關——這頁的白名單與法規只涵蓋這個範圍。 */
 export function isOnTopic(text: string): boolean {
-  return /肥胖|體重|減重|減肥|瘦|胖|BMI|腰圍|體脂|體位|復胖|熱量|卡路里|代謝症候群|obes|weight/i.test(String(text ?? ""));
+  return /肥胖|體重|減重|減肥|瘦|胖|BMI|腰圍|體脂|體位|復胖|熱量|卡路里|代謝症候群|血糖|糖尿病|糖化血色素|脂肪肝|肝指數|肝硬化|obes|weight|diabet|liver/i.test(String(text ?? ""));
 }
 
 /** 自訂議題不可以談藥品或業配——贊助方是處方藥藥廠，題目本身就不能往藥品帶。 */
@@ -83,14 +104,15 @@ const factsBlock = () => INSPIRE_FACTS.map((f) => `- ${f.text}`).join("\n");
 
 const GROUND_RULES = [
   `- 這是衛教內容，不是醫療廣告：不提院所名稱、不邀請掛號或預約、不提價格與優惠、不講治療成果、不用病人見證或減重前後對比。`,
-  `- 不提任何藥品的商品名、成分名、廠牌或俗稱（包含瘦瘦針、減肥針、GLP-1 這類說法），也不暗示有某種藥、某種針可以解決；需要提到醫療協助時，只說「可以和醫師討論適合自己的做法」。`,
-  `- 不說任何食物、飲品、保健食品、偏方、器材能減重、燃脂或取代正規治療。`,
+  `- 不提任何藥品的商品名、成分名、廠牌或俗稱（包含瘦瘦針、減肥針、GLP-1、降血糖藥、保肝藥這類說法），也不暗示有某種藥、某種針可以解決；需要提到醫療協助時，只說「可以和醫師討論適合自己的做法」。`,
+  `- 不說任何食物、飲品、保健食品、偏方、器材能減重、燃脂、降血糖、保肝、排毒或取代正規治療。`,
+  `- 不叫讀者自己停藥、減藥或調整藥量；不說糖尿病或脂肪肝可以「根治」「不用再吃藥」。`,
   `- 不保證效果，不用「保證瘦、快速瘦、躺著瘦、不復胖、幾天瘦幾公斤、一定、最有效」這類說法。`,
   `- 不嘲笑體型、不做身材羞辱、不把胖歸咎於懶或沒意志力；幽默只能對著情境與迷思，不能對著人的身體。`,
   `- 不寫認得出是誰的病人故事；要舉例就用「門診常被問到」「很多人以為」這種泛稱。`,
   `- 數字、統計、標準值只能用白名單裡的，而且要寫對；白名單沒有的事，用不帶數字的說法。`,
-  `- 不給個人化的熱量、體重目標或用藥建議；個人狀況一律請讀者與自己的醫師討論。`,
-  `- 挑戰、實驗、整人這類形式只能用在安全、人人做得到的事（量腰圍、算 BMI、記錄飲食、看營養標示、走路），不能做節食、斷食、極端運動或比誰瘦得快的挑戰，也不能拿病情開玩笑。`,
+  `- 不給個人化的熱量、體重目標、血糖目標或用藥建議；個人狀況一律請讀者與自己的醫師討論。`,
+  `- 挑戰、實驗、整人這類形式只能用在安全、人人做得到的事（量腰圍、算 BMI、記錄飲食、看營養標示、走路、看懂健檢報告），不能做節食、斷食、極端運動或比誰瘦得快的挑戰，也不能拿病情開玩笑。`,
 ].join("\n");
 
 export const PLATFORM_LABEL: Record<InspirePlatform, string> = {
@@ -262,7 +284,7 @@ export function reviewPrompt(items: InspireRegulation[], hits: RiskHit[]): strin
   const ids = items.map((r) => r.id);
   const own = hits.filter((h) => ids.includes(h.regulationId));
   return [
-    `你是醫療內容的法規審查。這是一篇醫師寫給民眾的體重管理（肥胖症）衛教內容。你只判斷它有沒有落在下面這幾條的禁止範圍，不評文筆、不管風格。`,
+    `你是醫療內容的法規審查。這是一篇醫師寫給民眾的衛教內容，主題是體重管理、糖尿病或脂肪肝。你只判斷它有沒有落在下面這幾條的禁止範圍，不評文筆、不管風格。`,
     ``,
     ...items.map((r) => `■ ${r.id}｜${r.law} ${r.article}｜${r.title}\n  條文重點：${r.gist}\n  判斷標準：${r.check}`),
     items.some((r) => r.id === "facts") ? `\n【白名單】\n${factsBlock()}` : "",

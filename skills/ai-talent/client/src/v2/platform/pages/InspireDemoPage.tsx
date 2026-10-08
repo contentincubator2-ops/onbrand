@@ -24,7 +24,7 @@ import {
   faArrowUpRightFromSquare, faBookOpen, faCamera, faCheck, faChevronLeft, faCircleNotch,
   faClapperboard, faComments, faCopy, faDumbbell, faFaceLaughBeam, faFlask, faGamepad, faHeartPulse, faLayerGroup,
   faLightbulb, faMagnifyingGlass, faMasksTheater, faMinus, faMusic, faPaw, faPenNib, faPeopleRoof, faPersonRunning, faPlane,
-  faBan, faFire, faHandHoldingHeart, faPercent, faRotate, faRuler, faScaleBalanced, faWeightScale, faShirt, faStethoscope, faTowerBroadcast, faTriangleExclamation, faTrophy,
+  faBan, faDroplet, faFire, faHandHoldingHeart, faPercent, faRotate, faRuler, faScaleBalanced, faWeightScale, faShirt, faStethoscope, faTowerBroadcast, faTriangleExclamation, faTrophy,
   faUserDoctor, faUsers, faUtensils, faWandMagicSparkles, faXmark,
 } from "@fortawesome/free-solid-svg-icons";
 import { faFacebookF, faInstagram, faTiktok, faYoutube } from "@fortawesome/free-brands-svg-icons";
@@ -44,6 +44,8 @@ const MARKET_LABEL: Record<string, string> = { tw: "台灣", us: "美國" };
 const TOPIC_ICON: Record<string, any> = {
   bmi: faWeightScale, disease: faStethoscope, waist: faRuler, "five-percent": faPercent, calories: faFire, exercise: faPersonRunning,
   yoyo: faRotate, "diet-myth": faBan, risk: faHeartPulse, plate: faUtensils, "when-doctor": faUserDoctor, stigma: faHandHoldingHeart,
+  "dm-pre": faDroplet, "dm-silent": faTriangleExclamation, "dm-reverse": faRotate, "dm-habits": faUtensils, "dm-metabolic": faRuler, "dm-comp": faHeartPulse,
+  "liver-what": faStethoscope, "liver-silent": faTriangleExclamation, "liver-common": faUsers, "liver-weight": faWeightScale, "liver-myth": faBan, "liver-follow": faUserDoctor,
 };
 
 /** 風格圖示：從風格名的關鍵字判斷內容類型（100 位不逐一手配；判斷不出來用燈泡）。 */
@@ -58,7 +60,7 @@ const STYLE_ICON_RULES: Array<[RegExp, any]> = [
 ];
 const styleIcon = (label?: string) => STYLE_ICON_RULES.find(([re]) => re.test(label ?? ""))?.[1] ?? faLightbulb;
 
-interface Topic { id: string; label: string; hint: string }
+interface Topic { id: string; area?: string; label: string; hint: string }
 interface Persona { key: string; platform: string; platformLabel: string; market: string; label: string; reference: string; pitch: string; format: string }
 interface RegItem { id: string; law: string; article: string; title: string; gist: string; url: string; amended: string; secondary: boolean }
 interface RegGroup { id: string; label: string; note: string; items: RegItem[] }
@@ -165,7 +167,7 @@ function PulseArt() {
       </defs>
       {[60, 110, 160, 210].map((y) => <line key={y} x1="0" x2="480" y1={y} y2={y} stroke="#fff" strokeOpacity="0.18" />)}
       <path d="M0 150 H120 l14 -8 l12 8 h20 l10 26 l18 -130 l18 150 l12 -46 h26 l16 -22 l18 22 H480" fill="none" stroke="url(#inspire-pulse)" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
-      <text x="240" y="236" textAnchor="middle" fill="#fff" fillOpacity="0.9" fontSize="12" letterSpacing="4">BMI 24 ｜ 27</text>
+      <text x="240" y="236" textAnchor="middle" fill="#fff" fillOpacity="0.9" fontSize="12" letterSpacing="4">體重 ｜ 血糖 ｜ 脂肪肝</text>
     </svg>
   );
 }
@@ -179,7 +181,7 @@ function Hero({ onDone, onBasis }: { onDone: (name: string) => void; onBasis: ()
       <header className="relative z-10 flex h-20 items-center px-6"><Wordmark height={56} /></header>
       <div className="relative z-10 px-6 pt-10 text-center">
         <h1 className="text-[40px] font-medium leading-[1.15]" style={{ letterSpacing: "-0.02em" }}>換一種說法</h1>
-        <p className="mt-2 text-[15px]" style={{ color: "rgba(255,255,255,0.95)" }}>體重管理衛教 × 各平台熱門創作者的說話風格</p>
+        <p className="mt-2 text-[15px]" style={{ color: "rgba(255,255,255,0.95)" }}>體重管理・糖尿病・脂肪肝衛教 × 各平台熱門創作者的說話風格</p>
       </div>
       <div className="relative z-10 flex flex-1 items-center"><PulseArt /></div>
       <form className="relative z-10 px-6" style={{ paddingBottom: "max(24px, env(safe-area-inset-bottom))" }} onSubmit={(e) => { e.preventDefault(); if (ok) onDone(v.trim()); }}>
@@ -528,6 +530,8 @@ export default function InspireDemoPage() {
 
   const [view, setView] = React.useState<View>("studio");
   const [topicId, setTopicId] = React.useState<string>("");
+  const areas: Array<{ id: string; label: string }> = cfg.data?.areas ?? [];
+  const [area, setArea] = React.useState<string>("weight");
   const [custom, setCustom] = React.useState("");
   const [platform, setPlatform] = React.useState<string>("facebook");
   const [market, setMarket] = React.useState<string>("all");
@@ -618,9 +622,19 @@ export default function InspireDemoPage() {
             </div>
           </div>
 
-          <Section title="議題" caption={custom.trim() ? "自訂議題" : topic?.hint ?? "選一個體重管理議題，或在下面自己寫"}>
+          <Section title="議題" caption={custom.trim() ? "自訂議題" : topic?.hint ?? "先選領域，再選一個議題，或在下面自己寫"}>
+            {areas.length > 1 && (
+              <div className="mb-3 flex rounded p-1" style={{ background: PANEL }}>
+                {areas.map((a) => (
+                  <button key={a.id} type="button" aria-pressed={area === a.id} onClick={() => setArea(a.id)}
+                    className="h-9 flex-1 rounded text-[13px] font-medium" style={{ background: area === a.id ? "#fff" : "transparent", color: area === a.id ? INK : SUB }}>
+                    {a.label}
+                  </button>
+                ))}
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-2">
-              {topics.map((t) => (
+              {topics.filter((t) => !t.area || t.area === area).map((t) => (
                 <Option key={t.id} on={!custom.trim() && topicId === t.id} onClick={() => { setTopicId(t.id); setCustom(""); }}>
                   <div className="flex items-center gap-3">
                     <FontAwesomeIcon icon={TOPIC_ICON[t.id] ?? faStethoscope} className="w-5 shrink-0 text-[18px]" style={{ color: !custom.trim() && topicId === t.id ? BRAND : "#393C41" }} />
@@ -630,7 +644,7 @@ export default function InspireDemoPage() {
               ))}
             </div>
             <div className="mt-2 rounded px-4" style={{ background: PANEL, boxShadow: custom.trim() ? `inset 0 0 0 3px ${BRAND}` : undefined }}>
-              <input value={custom} onChange={(e) => setCustom(e.target.value)} maxLength={60} placeholder="自己寫一個跟體重管理有關的題目"
+              <input value={custom} onChange={(e) => setCustom(e.target.value)} maxLength={60} placeholder="自己寫一個體重、血糖或脂肪肝的題目"
                 className="h-11 w-full bg-transparent text-center text-[14px] outline-none" style={{ color: INK }} />
             </div>
           </Section>

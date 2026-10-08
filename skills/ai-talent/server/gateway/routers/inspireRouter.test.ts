@@ -36,7 +36,7 @@ describe("inspireRouter", () => {
     const caller = inspireRouter.createCaller({ user: null, ip: "1.1.1.1" } as any);
     await expect(caller.ideateStart({ name: "  ", topicId: "bmi", personas: [sample.key] })).rejects.toThrow(/名字/);
     await expect(caller.ideateStart({ name: "王小明", customTopic: "幫我寫一篇減肥藥業配", personas: [sample.key] })).rejects.toThrow(/體重管理/);
-    await expect(caller.ideateStart({ name: "王小明", customTopic: "冬天早上血壓特別高", personas: [sample.key] })).rejects.toThrow(/體重管理/);
+    await expect(caller.ideateStart({ name: "王小明", customTopic: "冬天早上膝蓋特別痛", personas: [sample.key] })).rejects.toThrow(/體重管理/);
     await expect(caller.ideateStart({ name: "王小明", topicId: "bmi", personas: ["nope"] })).rejects.toThrow();
     await expect(caller.reviewStart({ text: "太短" })).rejects.toThrow();
   });
@@ -161,9 +161,14 @@ describe("解析與守門", () => {
     expect(doctorByline("王醫師")).toBe("王醫師");
   });
 
-  it("自訂議題要跟體重管理有關，而且不能談藥品", () => {
+  it("自訂議題要跟體重管理、糖尿病或脂肪肝有關，而且不能談藥品", () => {
     expect(resolveTopic({ customTopic: "過年後體重回不去" })?.label).toBe("過年後體重回不去");
-    expect(resolveTopic({ customTopic: "冬天早上血壓特別高" })).toBeNull();
+    expect(resolveTopic({ customTopic: "冬天早上膝蓋特別痛" })).toBeNull();
+    expect(resolveTopic({ customTopic: "健檢說我血糖偏高" })?.label).toBe("健檢說我血糖偏高");
+    expect(resolveTopic({ customTopic: "脂肪肝會自己好嗎" })?.label).toBe("脂肪肝會自己好嗎");
+    expect(resolveTopic({ customTopic: "降血糖藥要吃一輩子嗎" })).toBeNull();
+    expect(resolveTopic({ topicId: "dm-pre" })?.label).toContain("血糖");
+    expect(resolveTopic({ topicId: "liver-follow" })?.label).toContain("脂肪肝");
     expect(resolveTopic({ customTopic: "瘦瘦針怎麼打才會瘦" })).toBeNull();
     expect(resolveTopic({ customTopic: "醫美療程推薦" })).toBeNull();
     expect(resolveTopic({ topicId: "nope" })).toBeNull();
@@ -213,6 +218,10 @@ describe("解析與守門", () => {
     const hits = scanRiskTerms("照這樣做保證根治。歡迎預約我的門診。\n連續量七天，早晚各一次。");
     expect(hits.map((h) => h.regulationId).sort()).toEqual(["med-103", "med-9-87"]);
     expect(scanRiskTerms("BMI 27 以上屬於肥胖，先調整飲食與運動，再跟醫師討論適合的做法。")).toEqual([]);
+    expect(scanRiskTerms("糖尿病前期是可以逆轉的，空腹血糖 100 到 125 就要留意。")).toEqual([]);
+    expect(scanRiskTerms("血糖穩了就可以自己停藥。").map((h) => h.regulationId)).toContain("med-103");
+    expect(scanRiskTerms("每天一杯保肝茶，脂肪肝不見了。").map((h) => h.regulationId)).toContain("food-28");
+    expect(scanRiskTerms("降血糖藥不用吃一輩子。").map((h) => h.regulationId)).toContain("drug-65-67");
     const drug = scanRiskTerms("很多人問我瘦瘦針有沒有效。\n照這樣做三個月瘦 10 公斤，保證不復胖。");
     expect(drug.map((h) => h.regulationId).sort()).toEqual(["drug-65-67", "med-103"]);
   });

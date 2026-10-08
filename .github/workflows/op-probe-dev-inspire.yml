@@ -8,6 +8,7 @@ name: Ops (DEV) — probe doctor inspire demo end to end (read-only)
 # 100 位的人設檔很大，只把這次要跑的幾位打包上去（PROBE_KEYS）。
 # 第 2 次跑：改成每位 agent 各自呼叫＋審查附建議之後。
 # 第 3 次跑：CJ 補了 DEV 的模型額度之後（確認實際回覆的是哪個模型）。
+# 第 6 次跑：加上糖尿病與脂肪肝兩個領域之後（一半的 agent 跑糖尿病前期、一半跑脂肪肝）。
 # 第 5 次跑：議題從高血壓換成體重管理（肥胖症），規則加上不提任何藥品名之後。
 # 第 4 次跑：審查每組上限 6→20、同一句一組只報一次之後（上一次漏了「私訊我預約」那一句）。
 # 花費：約 20 次模型呼叫。
@@ -91,18 +92,19 @@ jobs:
             };
             (async () => {
               const doctor = "王小明";
-              const topic = resolveTopic({ topicId: "five-percent" })!;
+              const topics = [resolveTopic({ topicId: "dm-reverse" })!, resolveTopic({ topicId: "liver-weight" })!];
               console.log(`agents: ${INSPIRE_PERSONAS.map((p) => `${p.key}(${p.agentPrompt.length}字)`).join(" ")}`);
-              const rounds = await Promise.all(INSPIRE_PERSONAS.map(async (p) => {
+              const rounds = await Promise.all(INSPIRE_PERSONAS.map(async (p, i) => {
+                const topic = topics[i % 2]!;
                 const r = await ask(personaIdeationPrompt({ doctor, topic, persona: p, count: 3 }), "請開始想。");
-                return { p, r, ideas: parseIdeas(r.text, p, 3) };
+                return { p, r, topic, ideas: parseIdeas(r.text, p, 3) };
               }));
-              for (const { p, r, ideas } of rounds) {
-                console.log(`\n=== ${p.key}｜${p.label}｜${p.reference}（${r.s}s，${r.via}）${ideas.length}/3`);
+              for (const { p, r, topic, ideas } of rounds) {
+                console.log(`\n=== 議題：${topic.label}｜${p.key}｜${p.label}｜${p.reference}（${r.s}s，${r.via}）${ideas.length}/3`);
                 if (!ideas.length) console.log(`NO USABLE IDEAS. raw:\n${r.text.slice(0, 600)}`);
                 for (const a of ideas) console.log(`・${a.title}\n    開場：${a.hook}\n    怎麼做：${a.concept}\n    為什麼：${a.why}`);
               }
-              for (const { p, ideas } of rounds.filter((x) => x.ideas.length).slice(0, 2)) {
+              for (const { p, ideas, topic } of rounds.filter((x) => x.ideas.length).slice(0, 2)) {
                 const a = ideas[0]!;
                 const w = await ask(inspireWritePrompt({ doctor, topic, persona: p, idea: a }), "請開始寫。");
                 const text = finalizeDraft(w.text);
@@ -114,6 +116,8 @@ jobs:
                 "我的門診有一套獨門療程，搭配瘦瘦針，保證三個月瘦 10 公斤，而且不復胖。",
                 "上個月 38 歲、在內湖科學園區當工程師的陳小姐，三個月從 82 公斤瘦到 65 公斤，她說這是她遇過最有效的方法。",
                 "研究顯示每天喝兩杯黑咖啡可以多燃燒 30% 的脂肪，比運動還有用。",
+                "血糖穩定之後就可以自己停藥，降血糖藥不用吃一輩子。",
+                "每天一杯保肝茶，三個月脂肪肝消失。",
                 "現在私訊我預約，本月前十名免費諮詢。",
               ].join("\n"));
               console.log(`\n=== 對照組：故意違規的稿子\n${bad}\n--- 逐條審查（只提建議）`);

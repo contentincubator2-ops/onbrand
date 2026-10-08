@@ -135,7 +135,7 @@ export const INSPIRE_REGULATIONS: InspireRegulation[] = [
 export interface InspireFact { id: string; text: string }
 
 export const FACT_SOURCE = {
-  label: "衛生福利部國民健康署：成人健康體位標準、肥胖防治新聞稿（107 年、115 年）",
+  label: "衛生福利部國民健康署：成人健康體位標準，以及肥胖、糖尿病、脂肪肝防治新聞稿",
   url: "https://www.hpa.gov.tw/Pages/Detail.aspx?nodeid=542&pid=9737",
 };
 
@@ -144,6 +144,10 @@ export const FACT_SOURCES: Array<{ label: string; url: string }> = [
   { label: "國民健康署「成人健康體位標準」", url: "https://www.hpa.gov.tw/Pages/Detail.aspx?nodeid=542&pid=9737" },
   { label: "衛福部新聞稿「肥胖是慢性疾病！調整飲食及運動生活是最佳處方」（107 年 7 月 4 日，109 年更新）", url: "https://mohw.gov.tw/cp-16-42429-1.html" },
   { label: "衛福部新聞稿「響應世界肥胖日 兩招啟動健康管理」（115 年 3 月 4 日）", url: "https://mohw.gov.tw/cp-16-85702-1.html" },
+  { label: "國民健康署新聞稿「代謝症候群是警訊 穩糖5招預防糖尿病」（2025 年 11 月 13 日）", url: "https://www.hpa.gov.tw/Pages/Detail.aspx?nodeid=4878&pid=19581" },
+  { label: "國民健康署新聞稿「您是糖尿病高危險群嗎？要小心糖尿病默默上身！」（2023 年 4 月 24 日）", url: "https://www.hpa.gov.tw/Pages/Detail.aspx?nodeid=4705&pid=16913" },
+  { label: "國民健康署新聞稿「遠離脂肪肝 從良好的生活習慣做起」（2023 年 1 月 18 日）", url: "https://www.hpa.gov.tw/Pages/Detail.aspx?nodeid=4705&pid=16578" },
+  { label: "衛福部新聞稿「遠離脂肪肝 聰明吃 規律動 守護您的肝」（111 年 4 月 8 日）", url: "https://www.mohw.gov.tw/cp-5267-67970-1.html" },
 ];
 
 /** 文案裡可以出現的數字與統計，只有這幾條。 */
@@ -157,13 +161,26 @@ export const INSPIRE_FACTS: InspireFact[] = [
   { id: "calories", text: "每天減少 500 大卡的熱量，每週約可減重 0.5 公斤；控制體重時，每日攝取熱量不應低於 1,200 大卡。" },
   { id: "exercise", text: "成人每週累計 150 分鐘中等強度運動（稍微喘但還能說話）；過重或肥胖者建議每週累計 250 到 300 分鐘，並搭配飲食調整。" },
   { id: "diet", text: "飲食原則：多選全穀及未精製雜糧、攝取多樣蔬果、補充優質蛋白質，避免高油、高鹽、高糖的食物。" },
+  { id: "dm-prevalence", text: "2017–2020 年國民營養健康狀況變遷調查：18 歲以上國人糖尿病盛行率為 11.1%，約有 218 萬人罹患糖尿病。" },
+  { id: "dm-high", text: "2019–2023 年國民營養健康調查：20 歲以上國人高血糖盛行率為 12.8%。" },
+  { id: "dm-pre", text: "糖尿病前期：空腹血糖值介於 100 到 125 mg/dL，或糖化血色素介於 5.7% 到 6.4%；空腹血糖的正常範圍是 70 到 99 mg/dL。糖尿病前期沒有任何症狀，需要透過血液檢查才能確認。" },
+  { id: "dm-reverse", text: "糖尿病前期是可以逆轉的；改善不良的生活型態，可以降低五成以上糖尿病的發生風險。" },
+  { id: "dm-risk", text: "肥胖、缺乏運動、高血壓、高血脂、吸菸、飲酒過量、遺傳，都是糖尿病的危險因子；血糖長期控制不好，會導致心血管疾病、腎臟病、視網膜病變等合併症。" },
+  { id: "dm-metabolic", text: "血糖異常，再加上腹部肥胖、血壓偏高、血脂異常其中任兩項，即為代謝症候群。" },
+  { id: "dm-habits", text: "穩定血糖的生活習慣：低油、低鹽、低糖、高纖的均衡飲食，避免精緻糖類；每次運動至少 30 分鐘，每週累積 150 分鐘；定期檢查與量測血糖。" },
+  { id: "liver-prevalence", text: "研究指出臺灣的脂肪肝盛行率約為 33.3%。" },
+  { id: "liver-cancer", text: "肝癌約有 8 成由 B 型或 C 型肝炎引起，另約有 2 成由脂肪肝引起。" },
+  { id: "liver-course", text: "脂肪肝沒有症狀；肝臟堆積過多脂肪會造成慢性發炎與肝細胞受損，可能演變成慢性肝病、肝硬化，甚至肝癌。" },
+  { id: "liver-causes", text: "常見造成脂肪肝的原因：肥胖、高血壓、高血脂、過度飲酒、糖尿病控制不良；BMI 越高，罹患脂肪肝的機率也越高。" },
+  { id: "liver-habits", text: "遠離脂肪肝的四個訣竅：認識自己的 BMI、聰明吃、快樂動、天天量體重，並定期量腰圍；體重過重或肥胖者每天少攝取 300 大卡、多消耗 200 大卡，每週約可減重 0.5 公斤。" },
+  { id: "liver-follow", text: "已有脂肪肝的人應遵從醫囑、定期追蹤肝指數及腹部超音波，不要相信偏方。" },
 ];
 
 export const FACTS_REGULATION: InspireRegulation = {
-  id: "facts", group: "facts", law: "衛教事實白名單", article: "國民健康署肥胖防治資料",
+  id: "facts", group: "facts", law: "衛教事實白名單", article: "國民健康署肥胖、糖尿病、脂肪肝防治資料",
   title: "數字與統計的出處",
   gist: "文案裡的數字、統計、標準值只能來自白名單；白名單沒有的，只能用不帶數字的說法。",
-  check: "文案是否出現白名單以外的數字、百分比、統計、研究結論、標準值、熱量或減重幅度；是否把白名單的數字寫錯（例如 BMI 24 與 27、腰圍 90 與 80、5%、500 大卡、150 分鐘）。",
+  check: "文案是否出現白名單以外的數字、百分比、統計、研究結論、標準值、熱量或減重幅度；是否把白名單的數字寫錯（例如 BMI 24 與 27、腰圍 90 與 80、5%、500 大卡、150 分鐘、空腹血糖 100 到 125、糖化血色素 5.7% 到 6.4%、脂肪肝盛行率 33.3%）。",
   url: FACT_SOURCE.url, amended: "115 年 3 月 4 日",
 };
 
@@ -182,9 +199,11 @@ export const RISK_TERMS: Array<{ re: RegExp; regulationId: string; why: string }
   { re: /(?:歡迎|快來|立即|馬上)?(?:預約|掛號)(?:我的|門診|諮詢)?|私訊(?:我)?(?:預約|諮詢|看診)|來(?:我的)?門診找我/, regulationId: "med-9-87", why: "招徠病人就醫" },
   { re: /優惠|折扣|免費(?:諮詢|檢測|體驗)|團購|限時|名額有限|贈送/, regulationId: "med-86-7", why: "促銷說法" },
   { re: /治療前後|術前術後|見證|親身分享/, regulationId: "med-86-7", why: "前後比較或見證" },
-  { re: /瘦瘦針|減肥針|減重針|週纖達|胰妥讚|善纖達|猛健樂|wegovy|ozempic|saxenda|mounjaro|rybelsus|semaglutide|tirzepatide|liraglutide|司美格魯|GLP-?1|腸泌素|減肥藥|減重藥/i, regulationId: "drug-65-67", why: "出現藥品名稱、成分或俗稱" },
+  { re: /瘦瘦針|減肥針|減重針|週纖達|胰妥讚|善纖達|猛健樂|wegovy|ozempic|saxenda|mounjaro|rybelsus|semaglutide|tirzepatide|liraglutide|司美格魯|GLP-?1|腸泌素|減肥藥|減重藥|降血糖藥|血糖藥|排糖藥|保肝藥|肝藥|二甲雙胍|metformin/i, regulationId: "drug-65-67", why: "出現藥品名稱、成分或俗稱" },
   { re: /保證瘦|快速瘦|躺著瘦|不復胖|不會復胖|(?:\d+|幾|一|兩|三)\s*(?:天|週|周|個月|月)(?:內)?(?:就)?(?:瘦|減|甩)(?:掉|了)?\s*(?:\d+|幾)\s*公斤/, regulationId: "med-103", why: "保證或誇大減重效果" },
   { re: /減重前後|瘦身前後|前後對比|before\s*(?:and|&)?\s*after/i, regulationId: "med-86-7", why: "減重前後比較" },
+  { re: /(?:自行|自己|可以|就能|不用再?)(?:停藥|減藥|停掉藥)|根治糖尿病|糖尿病(?:會|可以|就)?(?:好|痊癒)|脂肪肝(?:消失|痊癒|根治)/, regulationId: "med-103", why: "暗示可以停藥或根治" },
+  { re: /(?:保肝|護肝|養肝|排毒|降血糖|穩糖)(?:茶|丸|錠|粉|飲|產品|保健食品|聖品|神器)/, regulationId: "food-28", why: "食品宣稱療效" },
   { re: /祖傳|秘方|獨門/, regulationId: "med-86", why: "秘方宣傳" },
 ];
 
