@@ -42,7 +42,7 @@ import { runCampaignChat, pickCampaignDirector, chatWindow, draftManualItem } fr
 import { retuneItemAngle } from "../core/campaign/campaignRetune";
 import { validateBasis, applyBasis, basisSnapshot } from "../core/campaign/campaignBasis";
 import { cleanKolBrief } from "../core/campaign/campaignKolBrief";
-import { laneItems, candidateCards, planBeats, KOL_CHANNEL, COBRAND_CHANNEL, PLANNABLE_CHANNELS } from "../core/campaign/campaignPlan";
+import { laneItems, campaignCards, toSingleCardItems, planBeats, KOL_CHANNEL, COBRAND_CHANNEL, PLANNABLE_CHANNELS } from "../core/campaign/campaignPlan";
 import { BRIEF_CHANNELS, CHANNEL_BRIEF_SPECS, cleanChannelBrief, cleanChannelBriefs, briefPartners, type BriefChannel } from "../core/campaign/campaignChannelBrief";
 import { KPI_METRICS, pickKpiAgent, runKpiPlan } from "../core/campaign/campaignKpi";
 import { brandIndustry, pickPlannerAgent } from "../core/campaign/campaignTeam";
@@ -177,7 +177,7 @@ async function productIdsOf(eventId: number): Promise<number[]> {
 const isHiddenPlanItem = (i: any) => isHiddenHistoryItem({ platform: i?.platform, taskId: i?.taskId });
 function visiblePlan(plan: CampaignPlan | null): CampaignPlan | null {
   if (!plan || !Array.isArray(plan.items)) return plan;
-  return { ...plan, items: plan.items.filter((i) => !isHiddenPlanItem(i)) };
+  return { ...plan, items: toSingleCardItems(plan.items.filter((i) => !isHiddenPlanItem(i))) };
 }
 function visibleSettings(settings: any): any {
   if (!settings || !Array.isArray(settings.channels)) return settings ?? null;
@@ -200,7 +200,7 @@ function replanLane(pos: any, row: any, channel: string, who: Pick<Parameters<ty
   const written = plan.items.filter((i) => i.platform === channel && i.outputId);
   const fresh = laneItems(channel, {
     launch, end: end ?? launch, today, mechanic: String(pos.campaign?.mechanic ?? ""),
-    cards: candidateCards([channel]), ...who,
+    cards: campaignCards([channel]), ...who,
   }).filter((n) => !written.some((w) => w.taskId === n.taskId && (w.partner ?? "") === (n.partner ?? "")));
   plan.items = [...plan.items.filter((i) => i.platform !== channel || i.outputId), ...fresh]
     .sort((a, b) => a.date.localeCompare(b.date));
@@ -353,14 +353,14 @@ export const campaignRouter = router({
 
   /**
    * 手動加一篇的選單（2026-10-05 CJ「在某通路欄位底下，自己在該日期按+」）：日期範圍跟
-   * 對話加篇同一條（chatWindow），任務卡是那個通路整篇可以發的卡（candidateCards）。
+   * 對話加篇同一條（chatWindow），任務卡是那個通路整篇可以發的卡（campaignCards）。
    */
   addOptions: protectedProcedure
     .input(z.object({ eventId: z.number().int().positive() }))
     .query(async ({ ctx, input }) => {
       const row = await loadEvent(input.eventId, ctx.user!.id);
       const cards: Record<string, Array<{ id: string; labelZh: string; labelEn: string; tier: string }>> = {};
-      for (const c of candidateCards([...PLANNABLE_CHANNELS])) {
+      for (const c of campaignCards([...PLANNABLE_CHANNELS])) {
         (cards[c.platform] ??= []).push({ id: c.id, labelZh: c.labelZh || c.labelEn || c.id, labelEn: c.labelEn || c.labelZh || c.id, tier: c.tier });
       }
       return {
@@ -385,7 +385,7 @@ export const campaignRouter = router({
       assertUnlocked(pos);
       if (!pos.campaignPlan) throw new TRPCError({ code: "BAD_REQUEST", message: "還沒有企劃，先排出企劃再加" });
       const window = eventWindow(row);
-      const r = draftManualItem({ input, cards: candidateCards([input.platform]), window });
+      const r = draftManualItem({ input, cards: campaignCards([input.platform]), window });
       if (!r.ok) {
         const why: Record<typeof r.reason, string> = {
           phase: "找不到這一段",
