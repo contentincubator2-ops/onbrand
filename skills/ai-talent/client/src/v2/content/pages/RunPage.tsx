@@ -64,7 +64,9 @@ import { findValidRunProductSelection, type RunProductImage } from "../lib/runPr
 import { pickImagePromptSeed } from "../lib/imagePromptSeed";
 import { buildAllDayIcs, downloadIcs } from "../lib/ics";
 import { parseRunOfShow } from "../lib/runOfShow";
-import { sourceLabel, sourceWhy } from "../../platform/lib/sourceVocabulary";
+import { sourceLabel, sourceWhy, isFrontVisibleCard } from "../../platform/lib/sourceVocabulary";
+import { buildRestyleOptions, isRestyleKey, type RestyleOption } from "../lib/restyleCards";
+import { taskPlatformOf } from "../lib/taskTrayClient";
 import { useLang } from "../../../lib/i18n";
 import { fireNudge } from "../../platform/components/mia/miaNudges";
 import ReviewBar from "../../platform/components/review/ReviewBar";
@@ -1101,6 +1103,27 @@ export default function RunPage() {
     })), [lang, deskLeadAgentId]);
   const deskActiveKey = slide?.activeWriter ?? "lead";
   const deskDrafts = slide?.writerDrafts ?? {};
+  // ── 2026-10-09 換個寫法（CJ「旁邊可以找其他範本參考…用任務卡，先顯示用戶自訂或常用的」）──
+  // 同通路的任務卡：自建 → 加了星號的 → 其他。照卡片結構改寫的稿跟換人寫的稿放同一個
+  // writerDrafts（key＝card:<taskId>），所以點回去一樣是原樣、不重寫。
+  const deskBrandId: number | undefined = data?.mission?.brandId ?? data?.brand?.id ?? undefined;
+  const deskTaskId = String(data?.mission?.taskId ?? "");
+  const deskCardListQ = trpc.quickTask.listFB.useQuery(
+    { brandId: deskBrandId, brandName: data?.brand?.name ?? undefined } as any,
+    { enabled: writerDesk && !!deskBrandId, refetchOnWindowFocus: false, staleTime: 5 * 60_000 },
+  );
+  const deskPlatform = taskPlatformOf(((deskCardListQ.data as any[]) ?? []).find((t) => t?.id === deskTaskId) ?? { id: deskTaskId });
+  const deskTraysQ = (trpc as any).quickTask.trays.useQuery(
+    { brandId: deskBrandId ?? 0, platforms: [deskPlatform] },
+    { enabled: writerDesk && !!deskBrandId && !!deskTaskId && deskCardListQ.isSuccess, refetchOnWindowFocus: false, staleTime: 5 * 60_000 },
+  );
+  const deskCards: RestyleOption[] = useMemo(() => {
+    if (!deskTaskId) return [];
+    const tasks = ((deskCardListQ.data as any[]) ?? []).filter(isFrontVisibleCard);
+    const stored: Record<string, string[] | null> = {};
+    for (const [p, v] of Object.entries((deskTraysQ.data?.byPlatform ?? {}) as Record<string, { stored: string[] | null }>)) stored[p] = v?.stored ?? null;
+    return buildRestyleOptions({ tasks, currentTaskId: deskTaskId, storedByPlatform: stored, en: lang === "en" });
+  }, [deskCardListQ.data, deskTraysQ.data, deskTaskId, lang]);
   const [deskBusyKey, setDeskBusyKey] = useState<string | null>(null);
   const [deskChatBusy, setDeskChatBusy] = useState(false);
   const [deskUndo, setDeskUndo] = useState<{ key: string; caption: string } | null>(null);
@@ -1121,8 +1144,18 @@ export default function RunPage() {
     setDeskView("text");
   }, [id, activeSelectionKey]);
 
-  const deskWriterRef = (key: string): { key: string; name: string; title?: string; agentId?: number; instruction?: string } => {
+  const deskWriterRef = (key: string): { key: string; name: string; title?: string; agentId?: number; instruction?: string; restyleTaskId?: string } => {
     if (key === "lead") return { key, name: deskLead.name, title: deskLead.title || undefined, agentId: deskLeadAgentId };
+    if (isRestyleKey(key)) {
+      // 照任務卡改寫：寫的人還是主筆，只是換了結構。稿子記在這張卡的名字底下。
+      const card = deskCards.find((c) => c.key === key);
+      const savedName = deskDrafts[key]?.name;
+      return {
+        key, name: (card?.name ?? savedName ?? key).slice(0, 80),
+        title: lang === "en" ? "Task card" : "任務卡",
+        agentId: deskLeadAgentId, restyleTaskId: card?.taskId,
+      };
+    }
     const a = REWRITE_AGENTS.find((x) => String(x.agentId) === key);
     if (!a) return { key, name: key };
     return {
@@ -1182,7 +1215,17 @@ export default function RunPage() {
       // 沒寫過的：以主筆的稿（含用戶手改）為底，用這位的寫法重寫。
       const base = deskActiveKey === "lead" ? (slide?.caption ?? "") : (deskDrafts.lead?.caption ?? slide?.caption ?? "");
       if (!base.trim()) { showToastGlobal(lang === "en" ? "Nothing to rewrite yet" : "還沒有文案可以改寫"); return; }
-      const r = await refineMut.mutateAsync({
+      if (isRestyleKey(key) && !w.restyleTaskId) { showToastGlobal(lang === "en" ? "That task card is no longer available." : "這張任務卡目前不能用。"); return; }
+      const r = await refineMut.mutateAsync(w.restyleTaskId ? {
+        currentCaption: base,
+        userFeedback: lang === "en"
+          ? `Rewrite this post to follow the "${w.name}" task card.`
+          : `請照「${w.name}」這張任務卡的寫法，把這篇重寫一次。`,
+        // 換結構不換人：還是主筆寫，只是照另一張卡的規則。
+        agentId: deskLeadAgentId, agentName: deskLead.name, agentTitle: deskLead.title || undefined,
+        ...deskScope,
+        restyleTaskId: w.restyleTaskId,
+      } : {
         currentCaption: base,
         userFeedback: w.instruction ?? (lang === "en" ? "Rewrite this in your own style." : "請用你的寫法重寫這篇。"),
         agentId: w.agentId, agentName: w.name, agentTitle: w.title,
@@ -1216,8 +1259,12 @@ export default function RunPage() {
       const before = slide?.caption ?? "";
       const r = await refineMut.mutateAsync({
         currentCaption: before, userFeedback: text,
-        agentId: w.agentId, agentName: w.name, agentTitle: w.title,
+        ...(isRestyleKey(w.key)
+          ? { agentId: deskLeadAgentId, agentName: deskLead.name, agentTitle: deskLead.title || undefined }
+          : { agentId: w.agentId, agentName: w.name, agentTitle: w.title }),
         ...deskScope,
+        // 目前是照另一張卡改寫的稿 → 字數與形式跟那張卡走，不然一改就被壓回原卡的長度。
+        ...(w.restyleTaskId ? { taskId: w.restyleTaskId } : {}),
         history: chatHistory.slice(-12),
         // 2026-10-08：帶上是哪一篇的哪個版本——先前的修改意見存在伺服器，重新整理也還在。
         outputId: id, ...locator,
@@ -2664,6 +2711,7 @@ export default function RunPage() {
                   en={lang === "en"}
                   lead={deskLead}
                   others={deskOthers}
+                  cards={deskCards}
                   activeKey={deskActiveKey}
                   draftKeys={Object.keys(deskDrafts)}
                   busyKey={deskBusyKey}

@@ -203,7 +203,7 @@ export const outputRouter = router({
        * 所以每一位寫過的版本都留著、點回去就是原樣，不必重寫。不帶＝一般存檔。
        */
       writer: z.object({
-        key: z.string().min(1).max(40),
+        key: z.string().min(1).max(100),
         name: z.string().max(80),
         title: z.string().max(80).optional(),
         agentId: z.number().int().positive().optional(),
