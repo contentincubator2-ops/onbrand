@@ -60,7 +60,7 @@ export function topicOf(id: string): InspireTopic | undefined {
 
 /** 自訂議題必須跟體重管理、糖尿病或脂肪肝有關——這頁的白名單與法規只涵蓋這個範圍。 */
 export function isOnTopic(text: string): boolean {
-  return /肥胖|體重|減重|減肥|瘦|胖|BMI|腰圍|體脂|體位|復胖|熱量|卡路里|代謝症候群|血糖|糖尿病|糖化血色素|脂肪肝|肝指數|肝硬化|obes|weight|diabet|liver/i.test(String(text ?? ""));
+  return /肥胖|體重|減重|減肥|減脂|瘦|胖|BMI|腰圍|體脂|體位|復胖|熱量|卡路里|代謝症候群|血糖|糖尿病|糖化血色素|脂肪肝|肝指數|肝硬化|obes|weight|diabet|liver/i.test(String(text ?? ""));
 }
 
 /** 自訂議題不可以談藥品或業配——贊助方是處方藥藥廠，題目本身就不能往藥品帶。 */
