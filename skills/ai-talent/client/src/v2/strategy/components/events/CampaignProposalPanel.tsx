@@ -104,6 +104,8 @@ const CampaignProposalPanel = React.forwardRef<ProposalPanelHandle, {
   /** 剛被改過的段落（標出來幾秒）。 */
   recent: Set<string>;
   aligning: boolean;
+  /** 伺服器正在重啟、畫面在自動重送：說一聲。 */
+  waitingServer?: boolean;
   alignError: string;
   onAlign: () => void;
   alignResult: AlignResult | null;
@@ -129,7 +131,7 @@ const CampaignProposalPanel = React.forwardRef<ProposalPanelHandle, {
   onOpenBasis: () => void;
 }>(function CampaignProposalPanel({
   proposal, plan, posts, postsLoading, eventName, range, en, drafting, draftError, onRedraft, onSave, saving, onOpenItem, onOpenBasis,
-  writerName, canAsk, onQuote, recent, aligning, alignError, onAlign, alignResult, onUndoAlign, onCloseAlign,
+  writerName, canAsk, onQuote, recent, aligning, waitingServer, alignError, onAlign, alignResult, onUndoAlign, onCloseAlign,
 }, ref) {
   const L = (zh: string, e: string) => (en ? e : zh);
   /** 使用者在哪一段反白了哪幾句。 */
@@ -290,6 +292,7 @@ const CampaignProposalPanel = React.forwardRef<ProposalPanelHandle, {
           </div>
         )}
         {draftError && !busy && <p className="basis-full text-tiny text-danger">{draftError}</p>}
+        {waitingServer && <p className="basis-full text-tiny text-default-600" role="status">{L("系統正在更新，會自動再送一次，不用重按。你的內容都還在。", "The server is updating — this will retry by itself. Nothing is lost.")}</p>}
       </div>
 
       <div className="flex-1 min-h-0 overflow-y-auto px-5 py-4">

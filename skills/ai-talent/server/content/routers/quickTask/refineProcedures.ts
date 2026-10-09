@@ -33,6 +33,9 @@ export const refineProcedures = {
       eventId: z.number().optional(),
       // 2026-09-29：這篇是哪張卡 —— 帶了就套這張卡的字數與形式（rewriteContract.ts）。
       taskId: z.string().max(80).optional(),
+      // 2026-10-09：換個寫法 —— 照另一張任務卡的結構改寫這一篇（restyleContract.ts）。
+      // 帶了就用那張卡的規則與字數；事實仍然只能用原稿裡有的。
+      restyleTaskId: z.string().max(80).optional(),
       // Conversation history (optional) — last 6 turns
       history: z.array(z.object({
         role: z.enum(["user", "assistant"]),
@@ -79,11 +82,18 @@ export const refineProcedures = {
 
       const contract = await import("../../core/engine/rewriteContract");
       let spec: import("../../core/engine/rewriteContract").RewriteSpec = {};
-      if (input.taskId) {
+      const restyle = await import("../../core/engine/restyleContract");
+      if (input.restyleTaskId && !restyle.canRestyleWith(input.restyleTaskId, input.brandId)) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "This task card belongs to another brand." });
+      }
+      // 換個寫法時，字數與形式跟著「要套的那張卡」走，不是原本那張。
+      const specTaskId = input.restyleTaskId ?? input.taskId;
+      let restyleCard: import("../../core/engine/restyleContract").RestyleCard | null = null;
+      if (specTaskId) {
         const { resolveOrchestraConfig } = await import("../../core/catalog/taskRegistry");
         const [tpl, cfg]: any = await Promise.all([
-          resolveTaskTemplate(input.taskId).catch(() => null),
-          resolveOrchestraConfig(input.taskId).catch(() => null),
+          resolveTaskTemplate(specTaskId).catch(() => null),
+          resolveOrchestraConfig(specTaskId).catch(() => null),
         ]);
         const label = tpl?.label;
         spec = {
@@ -91,19 +101,29 @@ export const refineProcedures = {
           minChars: cfg?.captionMinChars ?? null,
           maxChars: cfg?.captionMaxChars ?? null,
         };
+        if (input.restyleTaskId) {
+          if (!tpl?.systemPrompt) throw new TRPCError({ code: "BAD_REQUEST", message: "Selected task card is unavailable." });
+          const { ALL_CRAFT_REFS } = await import("../../core/catalog/craftSource");
+          restyleCard = { label: spec.label, rules: tpl.systemPrompt, reference: ALL_CRAFT_REFS[input.restyleTaskId] ?? null };
+        }
       }
 
 
 
       const system =
         `你是 ${agentName}（${agentTitle}），正在跟用戶討論這篇文案的修改方向。\n` +
-        `任務：根據用戶的修改意見，**重寫**整篇文案。\n` +
+        (restyleCard
+          ? `任務：把這篇文案**改寫成另一張任務卡的寫法**（規則在下面）。\n`
+          : `任務：根據用戶的修改意見，**重寫**整篇文案。\n`) +
         contract.replyFormatBlock() + `\n\n` +
-        `重要：保留原本能用的部分，只動用戶提到的地方。語氣自然口語。\n` +
+        (restyleCard
+          ? `重要：結構照新的任務卡，事實照原稿。語氣自然口語。\n`
+          : `重要：保留原本能用的部分，只動用戶提到的地方。語氣自然口語。\n`) +
         (agentKnowledge ? `\n【此 agent 的工作守則與專業能力】\n${agentKnowledge}\n` : "") +
         brandPrefix +
         // 先前的意見接在品牌資料之後、格式合約之前：越後面越有力，但字數與形式仍然最大。
         notesStore.priorNotesBlock(priorNotes) +
+        (restyleCard ? restyle.restyleBlock(restyleCard) : "") +
         // 合約接在最後：最後讀到的最有力，換人時個人風格不能蓋過這張卡的形式。
         contract.rewriteContractBlock(spec);
 
