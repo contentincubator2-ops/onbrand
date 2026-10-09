@@ -34,7 +34,7 @@ describe("addEditLog", () => {
     await addEditLog({ outputId: 1, variantKey: "legacy:0", actorId: 9, kind: "restyle", ask: "反差開場", before: "舊稿", after: "新稿" });
     const insert = exec.mock.calls[1]!;
     expect(String(insert[0])).toContain("INSERT INTO caption_edit_log");
-    expect(insert[1]).toEqual([1, "legacy:0", 9, "CJ", "restyle", "反差開場", null, "舊稿", "新稿"]);
+    expect(insert[1]).toEqual([1, "legacy:0", 9, "CJ", "restyle", null, "反差開場", null, "舊稿", "新稿"]);
   });
   it("寫入失敗不往外丟（存檔不能因為紀錄壞掉而失敗）", async () => {
     exec.mockClear();

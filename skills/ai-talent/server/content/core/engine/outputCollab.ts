@@ -24,6 +24,7 @@ export const CAPTION_EDIT_LOG_DDL = `
     actorId        INT            NOT NULL,
     actorName      VARCHAR(80)    NULL,
     kind           VARCHAR(16)    NOT NULL,
+    ref            VARCHAR(400)   NULL,
     ask            VARCHAR(1000)  NULL,
     explanation    VARCHAR(600)   NULL,
     captionBefore  MEDIUMTEXT     NULL,
@@ -49,8 +50,14 @@ export const OUTPUT_COMMENTS_DDL = `
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
 `;
 
-/** chat＝請他改；restyle＝換個寫法；voice＝換口氣；comment＝照留言改；restore＝還原到某次修改之前。 */
-export const EDIT_KINDS = ["chat", "restyle", "voice", "comment", "restore"] as const;
+/**
+ * chat＝請他改；restyle＝換個寫法；voice＝換口氣；comment＝照留言改；restore＝還原到某次修改之前；
+ * rebuild＝只保留勾選的幾筆、從原稿重新整理（CJ「我想要開頭短一點，但不要反差開場了」）。
+ *
+ * ref：restyle＝那張任務卡的 taskId；voice＝那位寫手的 key；rebuild＝{"kept":[留下的紀錄 id]}。
+ * 重新整理時靠它知道要重套哪張卡、哪一位，以及之後哪幾筆還算數。
+ */
+export const EDIT_KINDS = ["chat", "restyle", "voice", "comment", "restore", "rebuild"] as const;
 export type EditKind = (typeof EDIT_KINDS)[number];
 
 /** 畫面一次列幾筆（新的在前）。 */
@@ -64,6 +71,7 @@ export interface EditLogRow {
   kind: EditKind;
   ask: string | null;
   explanation: string | null;
+  ref: string | null;
   /** 改之前的全文；還原用。 */
   captionBefore: string;
   createdAt: string;
@@ -104,15 +112,16 @@ export async function actorNameOf(userId: number): Promise<string | null> {
 
 export async function addEditLog(args: {
   outputId: number; variantKey: string; actorId: number; kind: EditKind;
-  ask?: string | null; explanation?: string | null; before: string; after: string;
+  ask?: string | null; explanation?: string | null; ref?: string | null; before: string; after: string;
 }): Promise<void> {
   if (!isRealChange(args.before, args.after)) return;
   try {
     await localPool.execute(
-      `INSERT INTO caption_edit_log (outputId, variantKey, actorId, actorName, kind, ask, explanation, captionBefore, captionAfter)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO caption_edit_log (outputId, variantKey, actorId, actorName, kind, ref, ask, explanation, captionBefore, captionAfter)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         args.outputId, args.variantKey, args.actorId, await actorNameOf(args.actorId), args.kind,
+        (args.ref ?? "").slice(0, 400) || null,
         (args.ask ?? "").slice(0, 1000) || null, (args.explanation ?? "").slice(0, 600) || null,
         args.before, args.after,
       ],
@@ -126,7 +135,7 @@ export async function addEditLog(args: {
 export async function listEditLog(outputId: number, variantKey: string): Promise<EditLogRow[]> {
   try {
     const [rows]: any = await localPool.execute(
-      `SELECT id, actorName, kind, ask, explanation, captionBefore, createdAt FROM caption_edit_log
+      `SELECT id, actorName, kind, ref, ask, explanation, captionBefore, createdAt FROM caption_edit_log
         WHERE outputId = ? AND variantKey = ? ORDER BY id DESC LIMIT ${MAX_LOG_ROWS}`,
       [outputId, variantKey],
     );
@@ -136,12 +145,27 @@ export async function listEditLog(outputId: number, variantKey: string): Promise
       kind: (EDIT_KINDS as readonly string[]).includes(r.kind) ? r.kind : "chat",
       ask: r.ask ? String(r.ask) : null,
       explanation: r.explanation ? String(r.explanation) : null,
+      ref: r.ref ? String(r.ref) : null,
       captionBefore: String(r.captionBefore ?? ""),
       createdAt: iso(r.createdAt),
     }));
   } catch (e) {
     console.warn("[outputCollab] edit log list failed:", (e as Error).message);
     return [];
+  }
+}
+
+/** AI 第一次動這個版本之前的全文（＝原稿）。沒有任何紀錄就回 null。重新整理從這裡開始。 */
+export async function originalCaption(outputId: number, variantKey: string): Promise<string | null> {
+  try {
+    const [rows]: any = await localPool.execute(
+      `SELECT captionBefore FROM caption_edit_log WHERE outputId = ? AND variantKey = ? ORDER BY id ASC LIMIT 1`,
+      [outputId, variantKey],
+    );
+    const v = rows?.[0]?.captionBefore;
+    return typeof v === "string" && v.trim() ? v : null;
+  } catch {
+    return null;
   }
 }
 

@@ -229,7 +229,8 @@ export const outputRouter = router({
        * 帶了就在 caption_edit_log 留一列（含改之前的全文），右欄「紀錄」分頁讀它。
        */
       edit: z.object({
-        kind: z.enum(["chat", "restyle", "voice", "comment", "restore"]),
+        kind: z.enum(["chat", "restyle", "voice", "comment", "restore", "rebuild"]),
+        ref: z.string().max(400).optional(),
         ask: z.string().max(1000).optional(),
         explanation: z.string().max(600).optional(),
       }).optional(),
@@ -296,7 +297,7 @@ export const outputRouter = router({
         const { actorIdOf } = await import("../../platform/core/trpc");
         await collab.addEditLog({
           outputId: input.id, variantKey: variantKeyOf(input), actorId: actorIdOf(ctx), kind: input.edit.kind,
-          ask: input.edit.ask, explanation: input.edit.explanation,
+          ask: input.edit.ask, explanation: input.edit.explanation, ref: input.edit.ref,
           before: outputItemCaption(updated.resolved.item), after: input.caption,
         });
       }
@@ -314,8 +315,10 @@ export const outputRouter = router({
     .query(async ({ ctx, input }) => {
       const collab = await import("../core/engine/outputCollab");
       const notes = await import("../core/engine/refineNotes");
-      if (!(await notes.ownsOutput(input.id, ctx.user.id))) return { rows: [] };
-      return { rows: await collab.listEditLog(input.id, notes.variantKeyOf(input)) };
+      if (!(await notes.ownsOutput(input.id, ctx.user.id))) return { rows: [], original: null };
+      const key = notes.variantKeyOf(input);
+      const [rows, original] = await Promise.all([collab.listEditLog(input.id, key), collab.originalCaption(input.id, key)]);
+      return { rows, original };
     }),
 
   comments: protectedProcedure

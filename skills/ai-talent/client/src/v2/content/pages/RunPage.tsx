@@ -67,6 +67,8 @@ import { parseRunOfShow } from "../lib/runOfShow";
 import { sourceLabel, sourceWhy, isFrontVisibleCard } from "../../platform/lib/sourceVocabulary";
 import { buildRestyleOptions, isRestyleKey, type RestyleOption } from "../lib/restyleCards";
 import { taskPlatformOf } from "../lib/taskTrayClient";
+import { rebuildRef, rebuildRequest, type RebuildPlan } from "../lib/editLogSelection";
+import { restyleKeyOf } from "../lib/restyleCards";
 import { useLang } from "../../../lib/i18n";
 import { fireNudge } from "../../platform/components/mia/miaNudges";
 import ReviewBar from "../../platform/components/review/ReviewBar";
@@ -1204,14 +1206,14 @@ export default function RunPage() {
     writer?: { key: string; name: string; title?: string; agentId?: number },
     compliance?: any,
     /** 這次是 AI 做的修改 → 在「紀錄」分頁留一筆（含改之前的全文）。 */
-    edit?: { kind: EditLogRow["kind"]; ask?: string; explanation?: string },
+    edit?: { kind: EditLogRow["kind"]; ask?: string; explanation?: string; ref?: string },
   ) => {
     const locator = getRunContentMutationLocator(selectedContentKind, activeIdx);
     setOverrides((o) => ({ ...o, [getMutationLocatorSelectionKey(locator)]: { caption: text } }));
     const w = writer ? { key: writer.key, name: writer.name, title: writer.title, agentId: writer.agentId } : undefined;
     // 2026-09-30：AI 改寫回來的合規紀錄跟著存（見 RegulationComplianceNote）。
     await saveCaptionQuietMut.mutateAsync({ id, ...locator, caption: text, ...(w ? { writer: w } : {}), ...(compliance ? { regulationCompliance: toComplianceInput(compliance) } : {}),
-      ...(edit ? { edit: { kind: edit.kind, ask: edit.ask?.slice(0, 1000), explanation: edit.explanation?.slice(0, 600) } } : {}) });
+      ...(edit ? { edit: { kind: edit.kind, ask: edit.ask?.slice(0, 1000), explanation: edit.explanation?.slice(0, 600), ...(edit.ref ? { ref: edit.ref.slice(0, 400) } : {}) } } : {}) });
     if (edit) (utils as any)?.output?.editLog?.invalidate?.({ id });
     if (w || compliance) await utils.output.getById.invalidate({ id });
   };
@@ -1260,6 +1262,8 @@ export default function RunPage() {
       setDeskUndo(null); setChatHistory([]);
       await commitDeskCaption(r.rewritten, w, r.regulationCompliance, {
         kind: w.restyleTaskId ? "restyle" : "voice", ask: w.name, explanation: r.explanation || undefined,
+        // 之後在紀錄分頁只保留某幾筆時，靠它知道要重套哪張卡／哪一位。
+        ref: w.restyleTaskId ?? w.key,
       });
     } catch (e: any) {
       showToastGlobal(lang === "en" ? `Error: ${friendlyErr(e, true)}` : `錯誤：${friendlyErr(e, false)}`);
@@ -1328,6 +1332,75 @@ export default function RunPage() {
     const prev = deskUndo.caption;
     setDeskUndo(null);
     await commitDeskCaption(prev, undefined, undefined, { kind: "restore", ask: lang === "en" ? "Undid the last change" : "復原上一次修改" });
+  };
+  const removeNoteMut = (trpc as any).quickTask.removeRefineNote.useMutation();
+  /**
+   * 紀錄分頁：只保留勾選的那幾筆（CJ「我想要開頭短一點，但不要反差開場了」）。
+   * 回到原稿，把留下的任務卡／口氣／意見一次重套；拿掉的意見也從「AI 之後都會照著」的清單移除。
+   */
+  const rebuildDeskLog = async ({ plan, dropped, original }: { plan: RebuildPlan; dropped: EditLogRow[]; original: string }) => {
+    if (!refineMut) { showToastGlobal(lang === "en" ? "AI rewrite is unavailable" : "AI 改寫服務暫不可用"); return; }
+    const locator = getRunContentMutationLocator(selectedContentKind, activeIdx);
+    setDeskChatBusy(true);
+    try {
+      await flushDeskTyping();
+      const keptCount = plan.keptIds.length;
+      const label = keptCount === 0
+        ? (lang === "en" ? "Dropped every change — back to the original draft" : "全部取消，回到原稿")
+        : (lang === "en" ? `Kept ${keptCount}, dropped ${dropped.length}` : `保留 ${keptCount} 筆，拿掉 ${dropped.length} 筆`);
+      const edit = { kind: "rebuild" as const, ask: label, ref: rebuildRef(plan.keptIds) };
+      const leadRef = deskWriterRef("lead");
+      let text = original;
+      let writer = leadRef;
+      let compliance: any;
+      let explanation: string | undefined;
+      if (keptCount > 0) {
+        const card = plan.restyleTaskId ? deskCards.find((c) => c.taskId === plan.restyleTaskId) : null;
+        if (plan.restyleTaskId && !card) {
+          showToastGlobal(lang === "en" ? "That task card is no longer available — untick it and try again." : "勾選的那張任務卡現在不能用了，取消勾選後再試一次。");
+          return;
+        }
+        const voice = plan.voiceKey ? deskWriterRef(plan.voiceKey) : null;
+        const who = voice?.agentId ? voice : leadRef;
+        const r = await refineMut.mutateAsync({
+          currentCaption: original,
+          userFeedback: plan.asks.length || card
+            ? rebuildRequest({ asks: plan.asks, restyleName: card?.name ?? null }, lang === "en")
+            : (voice?.instruction ?? rebuildRequest({ asks: [], restyleName: null }, lang === "en")),
+          agentId: who.agentId, agentName: who.name, agentTitle: who.title,
+          ...deskScope,
+          ...(card ? { restyleTaskId: card.taskId } : {}),
+        });
+        if (!r.ok || !r.rewritten) {
+          showToastGlobal(lang === "en" ? "The rebuild didn't come back — nothing was changed. Try again." : "這次沒整理成，本文沒有動，再試一次。");
+          return;
+        }
+        if (!shouldApplyMutationPreview(activeSelectionKeyRef.current, locator)) return;
+        text = r.rewritten;
+        compliance = r.regulationCompliance;
+        explanation = r.explanation || undefined;
+        writer = card ? deskWriterRef(restyleKeyOf(card.taskId)) : (voice ?? leadRef);
+      }
+      setDeskUndo(null); setChatHistory([]);
+      await commitDeskCaption(text, writer, compliance, { ...edit, explanation });
+      // 拿掉的那幾句不能再留在「AI 每次改寫都會照著」的清單裡，不然下一次請他改又寫回來。
+      const droppedAsks = new Set(dropped.filter((d) => d.kind === "chat" || d.kind === "comment").map((d) => (d.ask ?? "").trim()).filter(Boolean));
+      if (droppedAsks.size) {
+        try {
+          const res = await (utils as any).quickTask.refineNotes.fetch({ outputId: id, ...locator });
+          for (const n of (res?.notes ?? []) as Array<{ id: number; feedback: string }>) {
+            if (droppedAsks.has(String(n.feedback ?? "").trim())) await removeNoteMut.mutateAsync({ noteId: n.id });
+          }
+        } catch { /* 清單沒清到不影響這次整理 */ }
+        (utils as any)?.quickTask?.refineNotes?.invalidate?.({ outputId: id });
+      }
+      await utils.output.getById.invalidate({ id });
+      showToastGlobal(lang === "en" ? "Rebuilt from the original draft." : "已從原稿重新整理。");
+    } catch (e: any) {
+      showToastGlobal(lang === "en" ? `Error: ${friendlyErr(e, true)}` : `錯誤：${friendlyErr(e, false)}`);
+    } finally {
+      setDeskChatBusy(false);
+    }
   };
   /** 紀錄分頁：回到某一次修改之前的文字。還原本身也留一筆，所以不會改丟。 */
   const restoreDeskLog = async (row: EditLogRow) => {
@@ -2778,6 +2851,7 @@ export default function RunPage() {
                       outputId={id} locator={deskLocator} en={lang === "en"}
                       busy={deskChatBusy || !!deskBusyKey}
                       onRestore={restoreDeskLog}
+                      onRebuild={rebuildDeskLog}
                       top={<RefineNotesList outputId={id} locator={deskLocator} en={lang === "en"} />}
                     />
                   }
