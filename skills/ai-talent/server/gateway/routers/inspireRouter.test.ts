@@ -32,11 +32,12 @@ describe("inspireRouter", () => {
     expect(out.regulationGroups.flatMap((g) => g.items)).toHaveLength(ALL_REVIEW_ITEMS.length);
   });
 
-  it("沒有名字、議題跟血壓無關、或不認得的 agent，不會開始", async () => {
+  it("沒有名字、議題跟體重管理無關或談到藥品、或不認得的 agent，不會開始", async () => {
     const caller = inspireRouter.createCaller({ user: null, ip: "1.1.1.1" } as any);
-    await expect(caller.ideateStart({ name: "  ", topicId: "722", personas: [sample.key] })).rejects.toThrow(/名字/);
-    await expect(caller.ideateStart({ name: "王小明", customTopic: "幫我寫一篇減肥藥業配", personas: [sample.key] })).rejects.toThrow(/高血壓/);
-    await expect(caller.ideateStart({ name: "王小明", topicId: "722", personas: ["nope"] })).rejects.toThrow();
+    await expect(caller.ideateStart({ name: "  ", topicId: "bmi", personas: [sample.key] })).rejects.toThrow(/名字/);
+    await expect(caller.ideateStart({ name: "王小明", customTopic: "幫我寫一篇減肥藥業配", personas: [sample.key] })).rejects.toThrow(/體重管理/);
+    await expect(caller.ideateStart({ name: "王小明", customTopic: "冬天早上膝蓋特別痛", personas: [sample.key] })).rejects.toThrow(/體重管理/);
+    await expect(caller.ideateStart({ name: "王小明", topicId: "bmi", personas: ["nope"] })).rejects.toThrow();
     await expect(caller.reviewStart({ text: "太短" })).rejects.toThrow();
   });
 
@@ -97,6 +98,7 @@ describe("100 位創作者 agent", () => {
     const p = { key: "tw-fb-02", name: "某對夫妻", aliases: ["洋蔥", "雪碧", "筆電"], catchphrases: ["留言告訴我", "真的假的", "Wait for it"] };
     expect(leaksPersona("少鹽料理可以多用洋蔥提味，別配雪碧。看完留言告訴我，真的假的？wait for it", p)).toBeNull();
     expect(leaksPersona("妮妮從旁邊走過", p)).toBe("妮妮");
+    expect(leaksPersona("地表最強小三的腰圍大挑戰", { name: "x", aliases: [], catchphrases: ["地表最強小三"] })).toBe("地表最強小三");
   });
 
   it("每一位 agent 的擋字清單都不會擋掉一段普通的衛教點子", () => {
@@ -118,7 +120,7 @@ describe("條文資料", () => {
 });
 
 describe("提示詞", () => {
-  const topic = resolveTopic({ topicId: "722" })!;
+  const topic = resolveTopic({ topicId: "bmi" })!;
 
   it("想點子：帶著這一位的完整人設、他的問題、白名單與規則，並交代名字不能外露", () => {
     const p = personaIdeationPrompt({ doctor: "王小明", topic, persona: sample, count: IDEAS_PER_PERSONA, avoid: ["已經有的點子"] });
@@ -140,14 +142,15 @@ describe("提示詞", () => {
     expect(w).not.toContain("王醫師醫師");
   });
 
-  it("審查：只列這一組的條文、要求附建議而不改稿；白名單只在事實查核那一組出現", () => {
+  it("審查：只列這一組的條文、要求附建議而不改稿；每一組都帶白名單，照白名單寫的不算違規", () => {
     const med = reviewPrompt(itemsOfGroup("medical-ad"), []);
     expect(med).toContain("med-103");
     expect(med).not.toContain("drug-68");
-    expect(med).not.toContain("【白名單】");
+    expect(med).toContain("糖尿病前期是可以逆轉的");
+    expect(med).toContain("不算違規");
     expect(med).toContain("suggestion");
     expect(med).toContain("你不要改成稿，只提建議");
-    expect(reviewPrompt(itemsOfGroup("facts"), [])).toContain("【白名單】");
+    expect(reviewPrompt(itemsOfGroup("facts"), [])).toContain("白名單）】");
   });
 });
 
@@ -159,8 +162,15 @@ describe("解析與守門", () => {
     expect(doctorByline("王醫師")).toBe("王醫師");
   });
 
-  it("自訂議題要跟血壓有關", () => {
-    expect(resolveTopic({ customTopic: "冬天早上血壓特別高" })?.label).toBe("冬天早上血壓特別高");
+  it("自訂議題要跟體重管理、糖尿病或脂肪肝有關，而且不能談藥品", () => {
+    expect(resolveTopic({ customTopic: "過年後體重回不去" })?.label).toBe("過年後體重回不去");
+    expect(resolveTopic({ customTopic: "冬天早上膝蓋特別痛" })).toBeNull();
+    expect(resolveTopic({ customTopic: "健檢說我血糖偏高" })?.label).toBe("健檢說我血糖偏高");
+    expect(resolveTopic({ customTopic: "脂肪肝會自己好嗎" })?.label).toBe("脂肪肝會自己好嗎");
+    expect(resolveTopic({ customTopic: "降血糖藥要吃一輩子嗎" })).toBeNull();
+    expect(resolveTopic({ topicId: "dm-pre" })?.label).toContain("血糖");
+    expect(resolveTopic({ topicId: "liver-follow" })?.label).toContain("脂肪肝");
+    expect(resolveTopic({ customTopic: "瘦瘦針怎麼打才會瘦" })).toBeNull();
     expect(resolveTopic({ customTopic: "醫美療程推薦" })).toBeNull();
     expect(resolveTopic({ topicId: "nope" })).toBeNull();
   });
@@ -208,6 +218,12 @@ describe("解析與守門", () => {
   it("關鍵字掃描：抓得到保證療效與招徠就醫，一般衛教句子不誤抓", () => {
     const hits = scanRiskTerms("照這樣做保證根治。歡迎預約我的門診。\n連續量七天，早晚各一次。");
     expect(hits.map((h) => h.regulationId).sort()).toEqual(["med-103", "med-9-87"]);
-    expect(scanRiskTerms("血壓超過 130/80，先調整飲食與運動，再跟醫師討論。")).toEqual([]);
+    expect(scanRiskTerms("BMI 27 以上屬於肥胖，先調整飲食與運動，再跟醫師討論適合的做法。")).toEqual([]);
+    expect(scanRiskTerms("糖尿病前期是可以逆轉的，空腹血糖 100 到 125 就要留意。")).toEqual([]);
+    expect(scanRiskTerms("血糖穩了就可以自己停藥。").map((h) => h.regulationId)).toContain("med-103");
+    expect(scanRiskTerms("每天一杯保肝茶，脂肪肝不見了。").map((h) => h.regulationId)).toContain("food-28");
+    expect(scanRiskTerms("降血糖藥不用吃一輩子。").map((h) => h.regulationId)).toContain("drug-65-67");
+    const drug = scanRiskTerms("很多人問我瘦瘦針有沒有效。\n照這樣做三個月瘦 10 公斤，保證不復胖。");
+    expect(drug.map((h) => h.regulationId).sort()).toEqual(["drug-65-67", "med-103"]);
   });
 });

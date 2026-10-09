@@ -57,6 +57,17 @@ const norm = (s: string) => s.toLowerCase().replace(/[\s·・\-_.'’@]/g, "");
  */
 const GENERIC_ALIASES = new Set(["筆電", "洋蔥", "麻糬", "雪碧", "小陳", "小象", "大牛", "很煩", "speed"].map(norm));
 
+/**
+ * 研究資料裡被列成「招牌口頭禪」、其實誰都會說的話。口頭禪中文 5 字以上才擋，但這幾句不擋。
+ * 2026-10-09：門檻一度放寬到 8 字，結果實跑時頻道的招牌稱號（6 個字）被寫進點子標題——所以改回較短的門檻，
+ * 一般用語另外列在這裡放行。新增 agent 時，口頭禪若是日常用語要補進來。
+ */
+const GENERIC_PHRASES = new Set([
+  "留言告訴我", "今天也要開心", "不要再問了", "我真的不會", "你們吃飯了嗎", "猜猜我在哪", "也太好吃了吧", "真的不誇張",
+  "老師跟你講", "我的邏輯是", "我真的會瘋掉", "不要問很可怕", "誰要跟我去", "我要開動了", "跟我一起出門", "前三秒是關鍵",
+  "跳脫舒適圈", "嗯嗯嗯嗯嗯", "真的假的啦", "標記那個朋友", "週一三五更新", "一週只吃",
+].map(norm));
+
 /** 研究資料沒列、但實跑時被寫進成稿的家人與固定班底名字（key → 名字）。 */
 const EXTRA_NAMES: Record<string, string[]> = {
   "tw-fb-02": ["妮妮"],
@@ -65,7 +76,7 @@ const EXTRA_NAMES: Record<string, string[]> = {
 /**
  * 產出裡有沒有露出這位創作者的名字、帳號或招牌口頭禪。回傳命中的字串；沒有回 null。
  * 太短的別名（中文 1 字、英數 3 字以內）與一般用字的別名不比對。口頭禪只擋夠長、夠獨特的
- * （中文 8 字、英數 15 字以上）：「留言告訴我」「真的假的」這種誰都會說的話，擋了等於不准寫字。
+ * （中文 5 字、英數 15 字以上，且不在一般用語清單裡）：「留言告訴我」「真的假的」這種誰都會說的話，擋了等於不准寫字。
  */
 export function leaksPersona(text: string, p: Pick<InspirePersona, "name" | "aliases" | "catchphrases"> & { key?: string }): string | null {
   const hay = norm(String(text ?? ""));
@@ -75,6 +86,6 @@ export function leaksPersona(text: string, p: Pick<InspirePersona, "name" | "ali
   };
   const names = [p.name, ...p.aliases, ...(p.key ? EXTRA_NAMES[p.key] ?? [] : [])];
   for (const raw of names) if (!GENERIC_ALIASES.has(norm(String(raw ?? ""))) && hit(raw, 4, 2)) return String(raw);
-  for (const raw of p.catchphrases) if (hit(raw, 15, 8)) return String(raw);
+  for (const raw of p.catchphrases) if (!GENERIC_PHRASES.has(norm(String(raw ?? ""))) && hit(raw, 15, 5)) return String(raw);
   return null;
 }

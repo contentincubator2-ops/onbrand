@@ -15,7 +15,7 @@
  * 呼叫失敗的那一組標成 skipped，不假裝審過。
  *
  * 免登入＝任何人都能呼叫，所以：每個 IP 有每分鐘與每小時上限、全站有每日上限
- * （INSPIRE_DAILY_CAP），自訂議題必須跟血壓有關，回傳內容不含提示詞、創作者的名字與出處。
+ * （INSPIRE_DAILY_CAP），自訂議題必須跟體重管理、糖尿病或脂肪肝有關、而且不能談藥品，回傳內容不含提示詞、創作者的名字與出處。
  * 伺服器是單一 pm2 process（同 inspirationRouter 的說明），進度與計數放記憶體。
  */
 import { randomUUID } from "node:crypto";
@@ -24,13 +24,13 @@ import { TRPCError } from "@trpc/server";
 import { router, publicProcedure } from "../../platform/core/trpc";
 import { callModel } from "../../platform/core/llm/multiModelRouter";
 import {
-  INSPIRE_TOPICS, PLATFORM_FORMAT, PLATFORM_LABEL, cleanDoctorName, finalizeDraft, inspireWritePrompt,
+  INSPIRE_AREAS, INSPIRE_TOPICS, PLATFORM_FORMAT, PLATFORM_LABEL, cleanDoctorName, finalizeDraft, inspireWritePrompt,
   parseIdeas, parseReviewIssues, personaIdeationPrompt, resolveTopic, reviewPrompt,
   type InspireIdea, type ReviewIssue,
 } from "../../content/core/inspire/doctorInspire";
 import { INSPIRE_PERSONAS, PERSONA_KEYS, leaksPersona, personaOf, type InspirePersona } from "../../content/core/inspire/inspirePersonas";
 import {
-  FACT_SOURCE, INSPIRE_FACTS, REGULATIONS_CHECKED_AT, REGULATION_GROUPS, itemsOfGroup, scanRiskTerms,
+  FACT_SOURCE, FACT_SOURCES, INSPIRE_FACTS, REGULATIONS_CHECKED_AT, REGULATION_GROUPS, itemsOfGroup, scanRiskTerms,
   type RegulationGroupId,
 } from "../../content/core/inspire/inspireRegulations";
 
@@ -216,12 +216,13 @@ function subjectOf(input: z.infer<typeof subjectZ>) {
   const doctor = cleanDoctorName(input.name);
   if (!doctor) throw new TRPCError({ code: "BAD_REQUEST", message: "請先輸入名字。" });
   const topic = resolveTopic(input);
-  if (!topic) throw new TRPCError({ code: "BAD_REQUEST", message: "這個示範只做高血壓相關的議題，請換一個跟血壓有關的題目。" });
+  if (!topic) throw new TRPCError({ code: "BAD_REQUEST", message: "這個示範只做體重管理、糖尿病、脂肪肝的衛教議題，而且不談藥品，請換一個題目。" });
   return { doctor, topic };
 }
 
 export const inspireRouter = router({
   config: publicProcedure.query(() => ({
+    areas: INSPIRE_AREAS,
     topics: INSPIRE_TOPICS,
     maxPersonas: MAX_PERSONAS,
     ideasPerPersona: IDEAS_PER_PERSONA,
@@ -238,6 +239,7 @@ export const inspireRouter = router({
     })),
     facts: INSPIRE_FACTS,
     factSource: FACT_SOURCE,
+    factSources: FACT_SOURCES,
     checkedAt: REGULATIONS_CHECKED_AT,
   })),
 
