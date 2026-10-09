@@ -22,16 +22,36 @@
 import localPool from "../../../localDb";
 import { BASIS_FIELDS, basisValue } from "./campaignBasis";
 import { CAMPAIGN_PHASE_IDS, PHASE_PURPOSE, eventFacts, safeJSON, type CampaignPhaseId, type CampaignPlan } from "./campaignPlan";
+import { KPI_METRIC_ZH, PAID_CHANNELS } from "./campaignKpi";
 
+/**
+ * 提案的段落，順序就是提案的順序（2026-10-09 CJ「缺乏提案最後會有的結尾，主要是整體回顧…
+ * 缺乏廣告預算分配的部分，這部分寫出來，讓用戶填。中間還缺乏一個 creative idea。還有缺少
+ * 競爭者的分析」）。照得獎案例報告的故事線排：挑戰 → 洞察 → 概念 → 執行 → 成果 → 回顧。
+ *
+ *   kind "ai"   ＝模型寫。資料不夠就回空字串，畫面上是一格空的讓使用者自己寫
+ *                 （CJ「不確定的空位，就請空著」）。
+ *   kind "fill" ＝不經過模型的填空表：有設定的數字帶進來，沒有的留「＿＿」讓使用者填。
+ *                 重新草擬時，使用者填過的不會被洗掉。
+ *   tail        ＝排在「內容排程／每一篇全文」後面的段落（排程與全文不存在提案裡，畫面現讀）。
+ *   needs       ＝要有那份資料才有這一段（沒選得獎案例的活動就沒有「借鏡」）。
+ */
 export const PROPOSAL_SECTIONS = [
-  { id: "background", zh: "活動背景", en: "Background", ask: "為什麼現在做這檔活動：品牌與產品的現況、這檔活動的由來與內容（機制、期間）。100–200 字。" },
-  { id: "objective", zh: "活動目標", en: "Objectives", ask: "這檔活動要達成什麼。有使用者填的目標、KPI、預算就照寫；沒有數字就不要寫數字。60–150 字。" },
-  { id: "audience", zh: "目標族群", en: "Target audience", ask: "對誰說：從每一篇實際在跟誰說話推回來，講清楚這群人是誰、現在的處境。80–180 字。" },
-  { id: "insight", zh: "關鍵洞察", en: "Key insight", ask: "這群人心裡的那個想法，以及這檔活動為什麼接得住。60–150 字。" },
-  { id: "strategy", zh: "傳播策略", en: "Strategy", ask: "一句話訴求是什麼、為什麼是這句，整檔怎麼從第一段推進到最後一段。120–250 字。" },
-  { id: "phases", zh: "階段規劃", en: "Phases", ask: "每一段一小段：用使用者取的階段名稱，寫日期、這一段要做到什麼、要讓人記住的那句話、這一段的貼文各自在做什麼。段與段之間空一行。" },
-  { id: "channels", zh: "通路分工", en: "Channel roles", ask: "每個通路在這檔活動裡負責什麼、排了幾篇、為什麼這樣分。每個通路一行，開頭用「・」。" },
-] as const;
+  { id: "summary", kind: "ai", zh: "一頁摘要", en: "Executive summary", ask: "整份提案的五句話版本：挑戰、對象與洞察、概念、做法、要看的成果。最後才寫，只重述其他段落寫過的事。120–200 字。" },
+  { id: "background", kind: "ai", zh: "背景與挑戰", en: "Background & challenge", ask: "為什麼現在做這檔活動：品牌與產品的現況、這檔活動的內容（機制、期間），最後一句點出這檔要解決的那一個問題。100–220 字。" },
+  { id: "competitors", kind: "ai", zh: "競爭者分析", en: "Competitor analysis", ask: "只寫資料裡提到的競爭對手：他們怎麼說、我們這檔活動跟他們不一樣在哪。每個對手一行，開頭用「・」。資料裡沒有提到任何競爭對手，就給空字串，不要自己舉例。" },
+  { id: "objective", kind: "ai", zh: "活動目標", en: "Objectives", ask: "這檔活動要達成什麼：商業目標、行銷目標、希望對方做的行為。有使用者填的目標就照寫；沒有數字就不要寫數字。60–160 字。" },
+  { id: "audience", kind: "ai", zh: "目標族群與洞察", en: "Audience & insight", ask: "對誰說：從每一篇實際在跟誰說話推回來，這群人是誰、現在的處境；接著寫他們心裡的那個想法，以及這檔活動為什麼接得住。分兩段。140–280 字。" },
+  { id: "reference", kind: "ai", needs: "cases", zh: "參考案例與借鏡", en: "Reference case", ask: "只用【參考的得獎案例】裡寫的內容：那個案例做了什麼、我們借了哪一點、哪裡不一樣。不要補獎項、年份、成效數字。沒有提供案例就給空字串。" },
+  { id: "concept", kind: "ai", zh: "核心概念", en: "Core idea", ask: "標語（一句話訴求）原文照抄一次，接著寫為什麼是這一句：它回應了哪個洞察、跟競爭對手的說法差在哪。80–180 字。" },
+  { id: "creative", kind: "ai", zh: "創意概念（Creative idea）", en: "Creative idea", ask: "這檔活動的創意點子：用什麼比喻、畫面或說故事的方式，把核心概念變成看得見的內容。從每一篇實際的寫法歸納，有舊策略依據的創意主題／核心比喻可以參考。120–240 字。" },
+  { id: "strategy", kind: "ai", zh: "傳播策略", en: "Communication strategy", ask: "整檔怎麼從第一段推進到最後一段，每一段在整體裡扮演什麼角色。120–250 字。" },
+  { id: "phases", kind: "ai", zh: "階段規劃", en: "Phases", ask: "每一段一小段：用使用者取的階段名稱，寫日期、這一段要做到什麼、要讓人記住的那句話、這一段的貼文各自在做什麼。段與段之間空一行。" },
+  { id: "channels", kind: "ai", zh: "通路分工", en: "Channel roles", ask: "每個通路在這檔活動裡負責什麼、排了幾篇、為什麼這樣分。每個通路一行，開頭用「・」。" },
+  { id: "budget", kind: "fill", tail: true, zh: "預算與 KPI", en: "Budget & KPIs" },
+  { id: "adBudget", kind: "fill", tail: true, zh: "廣告預算分配", en: "Ad budget allocation" },
+  { id: "recap", kind: "ai", tail: true, zh: "整體回顧", en: "Overall recap", ask: "提案的結尾：把整條線重講一次——要解決的挑戰、看到的洞察、提出的概念與創意、怎麼執行、預期看到什麼成果（只能寫使用者填過的目標；沒有就寫要觀察哪些指標，不寫數字）。每一項一行，開頭用「・」，最後一句收尾。只重述前面寫過的，不加新東西。" },
+] as const satisfies ReadonlyArray<{ id: string; kind: "ai" | "fill"; zh: string; en: string; ask?: string; tail?: boolean; needs?: "cases" }>;
 export type ProposalSectionId = (typeof PROPOSAL_SECTIONS)[number]["id"];
 
 export interface ProposalSection { id: string; title: string; body: string }
@@ -44,6 +64,13 @@ export interface CampaignProposal {
   planMark: string;
   /** 模型寫了、但資料裡找不到的數字（給使用者確認；改掉就會消失）。 */
   unsourced?: string[];
+  /** 誰寫的（這檔活動的內容企劃，跟左邊對話是同一位）。 */
+  by?: { name: string; title: string } | null;
+  /**
+   * 草擬（或上一次梳理）之後被改過的段落 id——使用者自己改的、或反白請內容企劃改的。
+   * 有東西就問使用者要不要照這些修改梳理整份提案與貼文方向（alignCampaignProposal）。
+   */
+  touched?: string[];
 }
 
 const PHASE_ZH: Record<CampaignPhaseId, string> = { teaser: "預熱", launch: "開賣", sustain: "加溫", lastcall: "倒數", encore: "返場" };
@@ -120,6 +147,75 @@ export function unsourcedNumbers(text: string, source: string): string[] {
   return out;
 }
 
+/** 填空的地方長這樣（使用者一看就知道要填）。 */
+export const BLANK = "＿＿";
+
+/**
+ * 活動定位裡注入的得獎參考案例（creative.referenceCases 的每一列）。每一列的欄位照存的樣子
+ * 接成一行——這裡不挑欄位，存了什麼就給什麼；沒有就回空陣列。純函式。
+ */
+export function referenceCaseLines(positioning: Record<string, any>): string[] {
+  const rows = positioning?.creative?.referenceCases;
+  if (!Array.isArray(rows)) return [];
+  return rows.map((r) => (r && typeof r === "object"
+    ? Object.values(r).filter((v) => typeof v === "string" || typeof v === "number").map((v) => String(v).replace(/\s+/g, " ").trim()).filter(Boolean).join("｜")
+    : String(r ?? "").trim())).filter((l) => l.length >= 4).map((l) => `- ${l.slice(0, 500)}`).slice(0, 4);
+}
+
+const amount = (n: number | null | undefined) => (n ? `NT$${Number(n).toLocaleString("en-US")}` : `NT$${BLANK}`);
+
+/**
+ * 「預算與 KPI」填空表：使用者在 KPI 視窗填過的帶進來，沒有的留空格。不經過模型——
+ * 模型在這一段最會編數字。純函式。
+ */
+export function budgetTemplate(plan: PlanLike): string {
+  const k = plan.kpi;
+  const phases = CAMPAIGN_PHASE_IDS.filter((id) => plan.items.some((i) => i.enabled && i.phase === id));
+  const goals = (k?.goals ?? []).map((g) => `・${KPI_METRIC_ZH[g.metric] ?? g.metric}：${Number(g.target).toLocaleString("en-US")}`);
+  return [
+    `・總預算：${amount(k?.budget)}`,
+    ...(goals.length ? goals : [`・主要 KPI：${BLANK}`, `・次要 KPI：${BLANK}`]),
+    "",
+    "各階段要看的指標",
+    ...phases.map((id) => {
+      const p = k?.phases?.[id];
+      const metrics = (p?.metrics ?? []).map((m) => `${KPI_METRIC_ZH[m.metric] ?? m.metric}${m.target != null ? ` ${Number(m.target).toLocaleString("en-US")}` : ""}`).join("、");
+      return `・${phaseNameOf(plan, id)}：${metrics || BLANK}`;
+    }),
+  ].join("\n");
+}
+
+/**
+ * 「廣告預算分配」填空表：依通路、依階段、要下廣告的貼文各列好，金額留給使用者填。
+ * KPI 視窗拆過各階段預算的話帶進來。純函式。
+ */
+export function adBudgetTemplate(plan: PlanLike): string {
+  const k = plan.kpi;
+  const items = plan.items.filter((i) => i.enabled).sort((a, b) => a.date.localeCompare(b.date));
+  const phases = CAMPAIGN_PHASE_IDS.filter((id) => items.some((i) => i.phase === id));
+  const paidChannels = [...new Set(items.map((i) => i.platform))].filter((c) => (PAID_CHANNELS as readonly string[]).includes(c));
+  const paid = items.filter((i) => i.paid);
+  return [
+    `廣告總預算：${amount(k?.budget)}`,
+    "",
+    "依通路",
+    ...(paidChannels.length
+      ? paidChannels.map((c) => `・${CHANNEL_ZH[c] ?? c}：NT$${BLANK}（${BLANK}%）`)
+      : [`・${BLANK}：NT$${BLANK}（${BLANK}%）`]),
+    "",
+    "依階段",
+    ...phases.map((id) => {
+      const p = k?.phases?.[id];
+      return `・${phaseNameOf(plan, id)}：${amount(p?.budget)}（${p?.share != null ? p.share : BLANK}%）`;
+    }),
+    "",
+    "要下廣告的貼文",
+    ...(paid.length
+      ? paid.map((i) => `・${md(i.date)} ${CHANNEL_ZH[i.platform] ?? i.platform}｜${i.angle.slice(0, 40)}：NT$${BLANK}`)
+      : [`・（企劃上還沒有標記要下廣告的貼文——可以在那一篇的「⋯」裡標記，或直接寫在這裡）`]),
+  ].join("\n");
+}
+
 export interface WrittenPost { title: string; text: string }
 
 /** 寫好的那幾篇的全文（itemId → 標題＋文字）。只讀這個帳號自己的成品。 */
@@ -153,7 +249,9 @@ const SYSTEM = `你是資深行銷企劃。有一檔活動已經排好、內容�
 
 鐵則：
 - 以【實際排的內容】為準：標語、各階段的名稱與訊息、每一篇要講什麼與寫好的全文，是使用者定案的東西。【舊的策略依據】只是參考，跟實際內容不一致時，照實際內容寫。
-- 只寫資料裡有的事實。市場數據、成長率、調查結果、顧客見證、競品的說法、預算與 KPI 數字，資料沒給就不要寫；不要用「根據調查」「研究顯示」「數據指出」。資料不夠的段落就寫短一點，寧可少寫，不要編。
+- 只寫資料裡有的事實。市場數據、成長率、調查結果、顧客見證、競品的名字與說法、得獎案例的細節、預算與 KPI 數字，資料沒給就不要寫；不要用「根據調查」「研究顯示」「數據指出」。
+- 不確定的就空著：某一段的資料不夠寫，那個鍵就給空字串 ""，使用者會自己填。寧可空著，不要編，也不要寫「資料不足」這種說明。
+- 預算、KPI、廣告預算分配不用你寫——系統會另外列成填空表讓使用者填。
 - 日期、通路、篇數照資料寫，不要自己加一篇、挪日期或多一個通路。階段用使用者取的名稱。
 - 給客戶看的提案語氣：直述句，不喊口號、不用驚嘆號、不堆形容詞，不要「我們將」「本提案旨在」這種開場。
 - 不要用 Markdown 記號（#、**、表格）。要條列就每行開頭用「・」。
@@ -167,6 +265,8 @@ export function proposalPrompt(args: {
   plan: PlanLike;
   posts: Record<string, WrittenPost>;
   positioning: Record<string, any>;
+  /** 只要活動與企劃的資料那一大段，不要最後「請寫出…」的指示（改一段、梳理整份時共用）。 */
+  contextOnly?: boolean;
 }): string {
   const { facts, plan, posts } = args;
   const items = plan.items.filter((i) => i.enabled).sort((a, b) => a.date.localeCompare(b.date));
@@ -195,6 +295,7 @@ export function proposalPrompt(args: {
     return `- ${spec.label}：${(Array.isArray(v) ? v.join("／") : v).replace(/\s+/g, " ").slice(0, 260)}`;
   }).filter(Boolean);
   const k = plan.kpi;
+  const cases = referenceCaseLines(args.positioning);
   const kpi = k && (k.budget || k.goals?.length)
     ? [k.budget ? `總預算 NT$${k.budget}` : "", ...(k.goals ?? []).map((g) => `${g.metric} 目標 ${g.target}`)].filter(Boolean).join("、")
     : "";
@@ -218,23 +319,47 @@ export function proposalPrompt(args: {
     "",
     basis.length ? `═══ 舊的策略依據（只是參考；跟上面不一致時以上面為準） ═══\n${basis.join("\n")}` : "",
     "",
-    "請寫出提案的策略段落。只輸出一個 JSON 物件，鍵名固定、值都是字串（同一段裡分段用 \\n\\n）：",
-    `{${PROPOSAL_SECTIONS.map((s) => `"${s.id}":"${s.zh}——${s.ask}"`).join(",")}}`,
+    cases.length ? `═══ 參考的得獎案例（「參考案例與借鏡」只能用這裡寫的） ═══\n${cases.join("\n")}` : "",
+    ...(args.contextOnly ? [] : [
+      "",
+      "請寫出提案的策略段落。只輸出一個 JSON 物件，鍵名固定、值都是字串（同一段裡分段用 \\n\\n）：",
+      `{${aiSections(cases.length > 0).map((s) => `"${s.id}":"${s.zh}——${s.ask}"`).join(",")}}`,
+    ]),
   ].filter((l, i, a) => l !== "" || a[i - 1] !== "").join("\n");
 }
 
-/** 模型回的東西 → 提案的段落。讀不出來、或主要段落都是空的就回 null。純函式。 */
-export function cleanProposalSections(text: string, en: boolean): ProposalSection[] | null {
+/** 這一次要請模型寫的段落（沒有得獎案例就沒有「借鏡」）。 */
+export function aiSections(hasCases: boolean) {
+  return PROPOSAL_SECTIONS.filter((s) => s.kind === "ai" && (!("needs" in s) || hasCases)) as ReadonlyArray<{ id: string; zh: string; en: string; ask: string }>;
+}
+
+const tidyBody = (v: unknown) => (typeof v === "string" ? v : Array.isArray(v) ? v.map(String).join("\n") : "")
+  .replace(/\r/g, "").replace(/^\s*#{1,6}\s*/gm, "").replace(/\*\*/g, "").replace(/^\s*[-*]\s+/gm, "・")
+  .replace(/\n{3,}/g, "\n\n").trim().slice(0, 4000);
+
+/**
+ * 模型回的東西＋填空表 → 提案的每一段，照固定順序。模型給空字串的那一段照樣留著（空的，
+ * 使用者自己填）。讀不出來、或有寫的段落太少就回 null。
+ * prev＝上一份提案：填空表使用者填過的沿用，不被新的空白表洗掉。純函式。
+ */
+export function cleanProposalSections(text: string, en: boolean, opts: { plan?: PlanLike; hasCases?: boolean; prev?: ProposalSection[] } = {}): ProposalSection[] | null {
   const parsed = safeJSON<any>(text, null);
   if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null;
-  const sections = PROPOSAL_SECTIONS.map((s) => {
-    const v = parsed[s.id];
-    const body = (typeof v === "string" ? v : Array.isArray(v) ? v.map(String).join("\n") : "")
-      .replace(/\r/g, "").replace(/^\s*#{1,6}\s*/gm, "").replace(/\*\*/g, "").replace(/^\s*[-*]\s+/gm, "・")
-      .replace(/\n{3,}/g, "\n\n").trim().slice(0, 4000);
-    return { id: s.id, title: en ? s.en : s.zh, body };
-  });
-  if (sections.filter((s) => s.body.length >= 20).length < 4) return null;
+  const prev = new Map((opts.prev ?? []).map((s) => [s.id, s]));
+  const sections: ProposalSection[] = [];
+  for (const s of PROPOSAL_SECTIONS) {
+    if ("needs" in s && !opts.hasCases) continue;
+    const title = en ? s.en : s.zh;
+    if (s.kind === "fill") {
+      const kept = prev.get(s.id)?.body?.trim();
+      const fresh = opts.plan ? (s.id === "budget" ? budgetTemplate(opts.plan) : adBudgetTemplate(opts.plan)) : "";
+      sections.push({ id: s.id, title, body: kept || fresh });
+    } else {
+      sections.push({ id: s.id, title, body: tidyBody(parsed[s.id]) });
+    }
+  }
+  const written = sections.filter((s) => PROPOSAL_SECTIONS.some((d) => d.id === s.id && d.kind === "ai") && s.body.length >= 20);
+  if (written.length < 4) return null;
   return sections;
 }
 
@@ -248,12 +373,16 @@ export function cleanSavedSections(input: Array<{ id: string; title: string; bod
   });
 }
 
-/** 草擬一份提案（問模型一次）。失敗就丟，不存半成品——原本那一份還在。 */
-export async function draftCampaignProposal(args: {
-  eventId: number; userId: number;
-  plan: PlanLike; positioning: Record<string, any>;
-  lang: "zh" | "en";
-}): Promise<CampaignProposal> {
+/**
+ * 寫提案的人＝這檔活動的內容企劃（跟左邊對話、名冊上是同一位），帶著他的專業知識寫。
+ * 2026-10-09（CJ「目前是匹配哪個 agent 在寫活動企劃？」）：原本提案是一段通用提示詞寫的，
+ * 畫面上沒有署名、也沒有人可以問。這裡把活動資料、品牌大腦、寫的人一次備好，草擬、改一段、
+ * 梳理整份都從這裡拿。
+ */
+async function writerContext(args: {
+  eventId: number; userId: number; plan: PlanLike; positioning: Record<string, any>;
+  directorAgentId?: number | null; source: string; contextOnly?: boolean;
+}) {
   const facts = await eventFacts(args.eventId, args.userId);
   if (!facts) throw new Error("找不到這個活動");
   const posts = await loadWrittenPosts(args.plan, args.userId);
@@ -265,25 +394,220 @@ export async function draftCampaignProposal(args: {
       products: facts.products.map((p: any) => String(p.name ?? "")).filter(Boolean),
       note: typeof args.positioning?.note === "string" ? args.positioning.note.trim().slice(0, 800) : "",
     },
-    plan: args.plan, posts, positioning: args.positioning,
+    plan: args.plan, posts, positioning: args.positioning, contextOnly: args.contextOnly,
   });
   const { buildBrandPrefix } = await import("../../../strategy/core/brand/brandContext");
   const brain = await buildBrandPrefix(facts.brandId, null, args.eventId, "full").catch(() => "");
-  const { invokeLLM } = await import("../../../platform/core/llm/llm.js");
-  const r = await invokeLLM({
-    messages: [
-      { role: "system", content: brain ? `${SYSTEM}\n\n# 品牌大腦（背景與族群可以引用這裡寫的事實）${brain}` : SYSTEM },
-      { role: "user", content: user },
-    ],
-    maxTokens: 5000,
-  });
+  // 內容企劃是誰：跟 campaign.team 同一條挑法（避開跟策略總監同名的人）。挑不到就沒有署名，照寫。
+  const agent = await (async () => {
+    const { brandIndustry, pickPlannerAgent } = await import("./campaignTeam.js");
+    const { pickCampaignDirector } = await import("./campaignChat.js");
+    const director = await pickCampaignDirector(facts.brandId, args.directorAgentId ?? null).catch(() => null);
+    return pickPlannerAgent(await brandIndustry(facts.brandId), director?.name ?? null);
+  })().catch(() => null);
+  const invoke = async (system: string, userText: string, maxTokens: number) => {
+    let sys = system;
+    if (agent) {
+      const { loadAgentKnowledge, withAgentKnowledge } = await import("../../../platform/core/agents/agentKnowledge.js");
+      const knowledge = await loadAgentKnowledge(agent.id, { source: args.source }).catch(() => "");
+      sys = withAgentKnowledge(`你是${agent.name}（${agent.title}），這檔活動的內容企劃。\n\n${system}`, knowledge);
+    }
+    const { invokeLLM } = await import("../../../platform/core/llm/llm.js");
+    return invokeLLM({
+      messages: [
+        { role: "system", content: brain ? `${sys}\n\n# 品牌大腦（背景與族群可以引用這裡寫的事實）${brain}` : sys },
+        { role: "user", content: userText },
+      ],
+      maxTokens,
+    });
+  };
+  return { facts, posts, user, brain, agent, invoke };
+}
+
+/** 草擬一份提案（問模型一次）。失敗就丟，不存半成品——原本那一份還在。 */
+export async function draftCampaignProposal(args: {
+  eventId: number; userId: number;
+  plan: PlanLike; positioning: Record<string, any>;
+  lang: "zh" | "en";
+  /** 上一份提案（有的話）：填空表裡使用者填過的沿用。 */
+  prev?: ProposalSection[];
+  directorAgentId?: number | null;
+}): Promise<CampaignProposal> {
+  const w = await writerContext({ ...args, source: "campaign.draftProposal" });
+  const { user, brain } = w;
+  const r = await w.invoke(SYSTEM, user, 7000);
   const text = String(r.choices?.[0]?.message?.content ?? "");
-  const sections = cleanProposalSections(text, args.lang === "en");
+  const hasCases = referenceCaseLines(args.positioning).length > 0;
+  const sections = cleanProposalSections(text, args.lang === "en", { plan: args.plan, hasCases, prev: args.prev });
   if (!sections) throw new Error("這一次沒有寫成（模型的回覆讀不出完整的提案），請再按一次");
-  const unsourced = unsourcedNumbers(sections.map((s) => s.body).join("\n"), `${user}\n${brain}`);
+  // 填空表的數字是從設定帶進來的，不用查；只查模型寫的那幾段。
+  const aiIds = new Set(aiSections(true).map((s) => s.id));
+  const unsourced = unsourcedNumbers(sections.filter((s) => aiIds.has(s.id)).map((s) => s.body).join("\n"), `${user}\n${brain}`);
   return {
     sections, generatedAt: new Date().toISOString(), editedAt: null,
     planMark: planMark(args.plan),
+    by: w.agent ? { name: w.agent.name, title: w.agent.title } : null,
     ...(unsourced.length ? { unsourced } : {}),
   };
+}
+
+// ── 反白一段，請內容企劃改 ─────────────────────────────────────────────
+
+const REVISE_SYSTEM = `使用者在看你寫的活動提案，反白了其中幾句，跟你說要怎麼改。你只改那一段。
+
+鐵則：
+- 只動跟反白那幾句有關的地方；這一段其他句子逐字保留，不要順手潤飾。
+- 使用者說的事實（數字、名字、日期）照他說的寫；他沒說的不要自己補。資料裡沒有的市場數據、競品說法、成效數字一樣不准編。
+- 使用者是要你刪掉，就刪掉；要你空著，就給空字串。
+- 語氣跟這一段原本一樣：直述句，不用 Markdown 記號，條列用「・」。
+- reply 用一句話說你改了什麼（口語，不要重抄全文）；使用者的要求做不到或需要他補資料，就在 reply 裡說，body 給原文。
+- 只輸出一個 JSON 物件：{"reply":"…","body":"這一段改好後的全文"}`;
+
+/** 給模型的那一段（改一段）。純函式，有測試。 */
+export function revisePrompt(args: { context: string; section: ProposalSection; quote: string; instruction: string }): string {
+  return [
+    args.context,
+    "",
+    `═══ 要改的這一段：${args.section.title} ═══`,
+    args.section.body || "（這一段目前是空的）",
+    "",
+    args.quote.trim() ? `【使用者反白的那幾句】「${args.quote.trim().slice(0, 800)}」` : "【使用者沒有反白，指的是整段】",
+    `【使用者說】${args.instruction.trim().slice(0, 800)}`,
+    "",
+    `只輸出一個 JSON 物件：{"reply":"一句話說改了什麼","body":"這一段改好後的全文"}`,
+  ].join("\n");
+}
+
+/** 模型回的東西 → 改好的那一段。讀不出來回 null。純函式。 */
+export function cleanRevised(text: string): { reply: string; body: string } | null {
+  const parsed = safeJSON<any>(text, null);
+  if (!parsed || typeof parsed !== "object" || typeof parsed.body !== "string") return null;
+  return { reply: String(parsed.reply ?? "").replace(/\s+/g, " ").trim().slice(0, 400), body: tidyBody(parsed.body) };
+}
+
+/** 請內容企劃改提案的一段。只回改好的那一段，不寫入——畫面套用後送 saveProposal。 */
+export async function reviseProposalSection(args: {
+  eventId: number; userId: number; plan: PlanLike; positioning: Record<string, any>;
+  section: ProposalSection; quote: string; instruction: string; directorAgentId?: number | null;
+}): Promise<{ sectionId: string; body: string; reply: string; changed: boolean; unsourced: string[]; agent: { name: string; title: string } | null }> {
+  const w = await writerContext({ ...args, source: "campaign.reviseProposal", contextOnly: true });
+  const r = await w.invoke(REVISE_SYSTEM, revisePrompt({ context: w.user, section: args.section, quote: args.quote, instruction: args.instruction }), 3000);
+  const out = cleanRevised(String(r.choices?.[0]?.message?.content ?? ""));
+  if (!out) throw new Error("這一次沒有改成，原本的內容還在；可以再說一次，或直接改字");
+  const changed = out.body !== args.section.body.trim();
+  // 新出現的數字：使用者自己說的、原本就有的、資料裡有的都算有出處。
+  const unsourced = changed ? unsourcedNumbers(out.body, `${w.user}\n${w.brain}\n${args.section.body}\n${args.instruction}`) : [];
+  return {
+    sectionId: args.section.id, body: out.body, changed, unsourced,
+    reply: out.reply || (changed ? "改好了。" : "這一段我沒有動。"),
+    agent: w.agent ? { name: w.agent.name, title: w.agent.title } : null,
+  };
+}
+
+// ── 改完之後：照這些修改梳理整份提案與貼文方向 ─────────────────────────
+
+const ALIGN_SYSTEM = `使用者改了你寫的活動提案裡的幾段。你要照他改的內容，把整份提案的邏輯重新梳理一次，並檢查企劃裡每一篇貼文還對不對得上。
+
+鐵則：
+- 標【使用者定案】的段落是他改過的，一個字都不能動，其他段落要去配合它。
+- 只改「真的對不上」的段落：前後矛盾、還在講他已經改掉的說法、漏了他新加的重點。對得上的段落不要給，不要順手重寫。
+- 一頁摘要與整體回顧要跟改過的內容一致，通常要跟著改。
+- 改過的段落如果動到標語（一句話訴求）或某一段要讓人記住的訊息，才給 smp／phaseMessages；沒有就不要給。
+- 貼文：【還沒寫的】方向（要講什麼）對不上新的提案，就給新的方向（20–45 字，給寫手看的內容方向，不是文案）。【已寫好的】你不能改，只列出哪幾篇需要重寫、一句話說要怎麼改。對得上的不要列。
+- 不要新增或刪除貼文，不要改日期與通路。
+- 只寫資料裡有的事實，不准編數字。預算與 KPI 那兩張填空表不歸你管。
+- reply 用兩三句口語說：你照什麼調了哪些地方。
+- 只輸出一個 JSON 物件。`;
+
+export interface ProposalAlignment {
+  reply: string;
+  /** 要跟著改的段落（id → 新的全文）。 */
+  sections: Record<string, string>;
+  smp?: string;
+  phaseMessages?: Partial<Record<CampaignPhaseId, string>>;
+  /** 還沒寫的貼文：新的「要講什麼」。 */
+  items: Array<{ id: string; angle: string }>;
+  /** 已寫好、建議重寫的貼文。 */
+  rewrite: Array<{ id: string; reason: string }>;
+}
+
+/** 給模型的那一段（梳理整份）。純函式，有測試。 */
+export function alignPrompt(args: { context: string; sections: ProposalSection[]; touched: string[]; plan: PlanLike; locked: boolean }): string {
+  const fill = new Set(PROPOSAL_SECTIONS.filter((s) => s.kind === "fill").map((s) => s.id as string));
+  const body = args.sections.filter((s) => !fill.has(s.id)).map((s) =>
+    `【${s.id}｜${s.title}${args.touched.includes(s.id) ? "｜使用者定案" : ""}】\n${s.body || "（空的）"}`).join("\n\n");
+  const items = args.plan.items.filter((i) => i.enabled).sort((a, b) => a.date.localeCompare(b.date));
+  const line = (i: PlanLike["items"][number]) => `- ${i.id}｜${md(i.date)}｜${CHANNEL_ZH[i.platform] ?? i.platform}｜${i.angle}`;
+  const open = items.filter((i) => !i.outputId).map(line);
+  const done = items.filter((i) => i.outputId).map(line);
+  return [
+    args.context,
+    "",
+    "═══ 目前的提案 ═══",
+    body,
+    "",
+    open.length ? `【還沒寫的貼文（可以改方向，id 逐字抄）】\n${open.join("\n")}` : "",
+    done.length ? `【已寫好的貼文（只能建議重寫，id 逐字抄；全文在上面「每一篇」）】\n${done.join("\n")}` : "",
+    args.locked ? "【企劃已定稿】標語、各段訊息、貼文方向都不能改：smp、phaseMessages、items 不要給，只梳理提案的段落與建議重寫的清單。" : "",
+    "",
+    "只輸出一個 JSON 物件，鍵名固定；沒有要改的就給空的：",
+    `{"reply":"兩三句","sections":{"段落 id":"改好後的全文（只給要改的）"},"smp":"要改才給","phaseMessages":{"launch":"要改才給"},"items":[{"id":"還沒寫的那篇 id","angle":"新的方向"}],"rewrite":[{"id":"已寫好的那篇 id","reason":"一句話：為什麼要改、怎麼改"}]}`,
+  ].filter((l, i, a) => l !== "" || a[i - 1] !== "").join("\n");
+}
+
+/**
+ * 模型回的東西 → 可以套用的梳理結果。只留認得的段落（不含使用者定案的、不含填空表）、
+ * 真的有變的內容；貼文只留企劃裡有的、寫了沒寫分對邊的。定稿後企劃那一半全部丟掉。純函式。
+ */
+export function cleanAlignment(text: string, args: { sections: ProposalSection[]; touched: string[]; plan: PlanLike; locked: boolean }): ProposalAlignment | null {
+  const parsed = safeJSON<any>(text, null);
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null;
+  const fill = new Set(PROPOSAL_SECTIONS.filter((s) => s.kind === "fill").map((s) => s.id as string));
+  const sections: Record<string, string> = {};
+  for (const s of args.sections) {
+    if (fill.has(s.id) || args.touched.includes(s.id)) continue;
+    const v = parsed.sections?.[s.id];
+    if (typeof v !== "string") continue;
+    const body = tidyBody(v);
+    if (body.length >= 10 && body !== s.body.trim()) sections[s.id] = body;
+  }
+  const byId = new Map(args.plan.items.filter((i) => i.enabled).map((i) => [i.id, i]));
+  const str = (v: unknown, max: number) => (typeof v === "string" ? v.replace(/\s+/g, " ").trim().slice(0, max) : "");
+  const items: ProposalAlignment["items"] = [];
+  const rewrite: ProposalAlignment["rewrite"] = [];
+  const out: ProposalAlignment = { reply: str(parsed.reply, 500), sections, items, rewrite };
+  if (!args.locked) {
+    for (const it of Array.isArray(parsed.items) ? parsed.items : []) {
+      const cur = byId.get(String(it?.id ?? ""));
+      const angle = str(it?.angle, 200);
+      if (cur && !cur.outputId && angle.length >= 4 && angle !== cur.angle.trim() && !items.some((x) => x.id === cur.id)) items.push({ id: cur.id, angle });
+    }
+    const smp = str(parsed.smp, 60);
+    if (smp && smp !== (args.plan.smp ?? "").trim()) out.smp = smp;
+    const pm: Partial<Record<CampaignPhaseId, string>> = {};
+    for (const id of CAMPAIGN_PHASE_IDS) {
+      const m = str(parsed.phaseMessages?.[id], 60);
+      if (m && m !== args.plan.phaseMessages?.[id] && args.plan.items.some((i) => i.enabled && i.phase === id)) pm[id] = m;
+    }
+    if (Object.keys(pm).length) out.phaseMessages = pm;
+  }
+  for (const it of Array.isArray(parsed.rewrite) ? parsed.rewrite : []) {
+    const cur = byId.get(String(it?.id ?? ""));
+    const reason = str(it?.reason, 200);
+    if (cur && cur.outputId && reason.length >= 4 && !rewrite.some((x) => x.id === cur.id)) rewrite.push({ id: cur.id, reason });
+  }
+  return out;
+}
+
+/** 照使用者改過的段落梳理整份提案與貼文方向。只回提案，不寫入——畫面套用後送 saveProposal／savePlan。 */
+export async function alignCampaignProposal(args: {
+  eventId: number; userId: number; plan: PlanLike & { lockedAt?: string | null }; positioning: Record<string, any>;
+  sections: ProposalSection[]; touched: string[]; directorAgentId?: number | null;
+}): Promise<ProposalAlignment & { agent: { name: string; title: string } | null }> {
+  const locked = !!args.plan.lockedAt;
+  const w = await writerContext({ ...args, source: "campaign.alignProposal", contextOnly: true });
+  const r = await w.invoke(ALIGN_SYSTEM, alignPrompt({ context: w.user, sections: args.sections, touched: args.touched, plan: args.plan, locked }), 7000);
+  const out = cleanAlignment(String(r.choices?.[0]?.message?.content ?? ""), { sections: args.sections, touched: args.touched, plan: args.plan, locked });
+  if (!out) throw new Error("這一次沒有梳理成，提案與貼文都沒有動；可以再按一次");
+  return { ...out, agent: w.agent ? { name: w.agent.name, title: w.agent.title } : null };
 }

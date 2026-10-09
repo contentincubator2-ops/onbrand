@@ -74,8 +74,10 @@ function mockupFor(platform: string, hasCards: boolean): MockupVariant {
 }
 
 export default function CampaignPostModal({
-  eventId, brandId, item, thumb, phaseMessage, en, onClose,
+  eventId, brandId, item, thumb, phaseMessage, en, onClose, initialAsk,
 }: {
+  /** 打開時先填進「請 AI 改」那一格的話（提案梳理後建議重寫的那幾篇）。使用者看過再按送出。 */
+  initialAsk?: string;
   eventId: number;
   brandId: number | null;
   item: CampaignPlanItem;
@@ -171,7 +173,7 @@ export default function CampaignPostModal({
   const [advanced, setAdvanced] = React.useState(false);
 
   // ── 一句話請 AI 改 ──
-  const [ask, setAsk] = React.useState("");
+  const [ask, setAsk] = React.useState(initialAsk ?? "");
   const refineMut = (trpc as any).quickTask.refineCaption.useMutation({
     onSuccess: (r: any) => {
       if (!r?.ok || !r?.rewritten) { showToastGlobal(L("AI 這次沒改成，再試一次。", "The rewrite didn't come back — try again.")); return; }

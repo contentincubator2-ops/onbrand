@@ -6,7 +6,7 @@
  * 不存，每次都從企劃與成品現讀——使用者之後再改某一篇，提案後半段就是新的。
  */
 import { channelLabel } from "../../../platform/lib/channelMeta";
-import type { CampaignPhaseId, CampaignPlan } from "./campaignSchema";
+import type { CampaignPhaseId, CampaignPlan, CampaignPlanItem } from "./campaignSchema";
 import { phaseLabel } from "./campaignStage";
 
 export interface ProposalSection { id: string; title: string; body: string }
@@ -18,7 +18,72 @@ export interface CampaignProposal {
   stale?: boolean;
   /** 模型寫了、但資料裡找不到的數字。 */
   unsourced?: string[];
+  /** 誰寫的（這檔活動的內容企劃）。 */
+  by?: { name: string; title: string } | null;
+  /** 草擬或上次梳理之後改過的段落 id：有東西就問要不要梳理整份。 */
+  touched?: string[];
 }
+
+/** 使用者在提案上反白、要帶進對話的那幾句（text 空＝指整段）。 */
+export interface ProposalQuote { sectionId: string; title: string; text: string }
+
+/** 伺服器回的梳理結果（campaign.alignProposal）。 */
+export interface ProposalAlignment {
+  reply: string;
+  sections: Record<string, string>;
+  smp?: string;
+  phaseMessages?: Partial<Record<CampaignPhaseId, string>>;
+  items: Array<{ id: string; angle: string }>;
+  rewrite: Array<{ id: string; reason: string }>;
+  agent?: { name: string; title: string } | null;
+}
+
+/** 梳理完畫面要講的：改了哪幾段、幾篇的方向、哪幾篇寫好的建議重寫。 */
+export interface AlignResult {
+  reply: string;
+  name: string;
+  sectionTitles: string[];
+  itemCount: number;
+  planChanged: boolean;
+  rewrite: Array<{ item: CampaignPlanItem; reason: string }>;
+}
+
+/** 梳理結果有沒有任何要動的地方。 */
+export const alignmentIsEmpty = (a: ProposalAlignment) =>
+  !Object.keys(a.sections).length && !a.items.length && !a.rewrite.length && !a.smp && !Object.keys(a.phaseMessages ?? {}).length;
+
+/** 把梳理結果裡企劃的那一半（標語、各段訊息、還沒寫的貼文方向）套進企劃。純函式。 */
+export function applyAlignmentToPlan(plan: CampaignPlan, a: ProposalAlignment): CampaignPlan {
+  const angle = new Map(a.items.map((i) => [i.id, i.angle]));
+  return {
+    ...plan,
+    ...(a.smp ? { smp: a.smp } : {}),
+    ...(a.phaseMessages && Object.keys(a.phaseMessages).length ? { phaseMessages: { ...(plan.phaseMessages ?? {}), ...a.phaseMessages } } : {}),
+    // 寫好的那一篇不動：成品已經照原本的方向寫了。
+    items: plan.items.map((i) => (angle.has(i.id) && !i.outputId ? { ...i, angle: angle.get(i.id)! } : i)),
+  };
+}
+
+/** 把梳理結果裡提案的那一半套進段落。純函式。 */
+export function applyAlignmentToSections(sections: ProposalSection[], a: ProposalAlignment): ProposalSection[] {
+  return sections.map((s) => (typeof a.sections[s.id] === "string" ? { ...s, body: a.sections[s.id]! } : s));
+}
+/**
+ * 排在「內容排程／每一篇全文」後面的段落（2026-10-09：預算與 KPI、廣告預算分配、整體回顧）。
+ * 段落的定義在 server 的 PROPOSAL_SECTIONS（tail），server 側的測試比對兩邊。
+ */
+export const PROPOSAL_TAIL_IDS = ["budget", "adBudget", "recap"];
+/** 不經過模型的填空表：空格（＿＿）是留給使用者填的。 */
+export const PROPOSAL_FILL_IDS = ["budget", "adBudget"];
+
+/** 提案的段落分成排程前、排程後兩半（順序不變）。 */
+export function splitSections<T extends { id: string }>(sections: T[]): { head: T[]; tail: T[] } {
+  return {
+    head: sections.filter((s) => !PROPOSAL_TAIL_IDS.includes(s.id)),
+    tail: sections.filter((s) => PROPOSAL_TAIL_IDS.includes(s.id)),
+  };
+}
+
 /** 寫好的那一篇的全文（campaign.proposalPosts）。 */
 export interface ProposalPost { title: string; text: string }
 
@@ -65,7 +130,7 @@ const md = (s: string) => s.slice(5).replace("-", "/");
 export function proposalDocHtml(args: {
   eventName: string; range: string; smp: string;
   sections: ProposalSection[];
-  /** 預算與 KPI 的幾行（沒有設定就是空的，那一段不出現）。 */
+  /** 舊提案（沒有「預算與 KPI」那一段）才用：照 KPI 設定列的幾行。 */
   kpiLines: string[];
   rows: ScheduleRow[];
   en: boolean;
@@ -84,16 +149,20 @@ export function proposalDocHtml(args: {
   const posts = args.rows.map((r) => `<h3>${esc(`${md(r.date)}　${r.channel}・${r.phaseName}｜${r.taskLabel}`)}</h3>`
     + `<p style="color:#666">${esc(L("這一篇要講什麼：", "What it says: ") + r.angle)}</p>`
     + (r.text ? paras(r.text) : `<p style="color:#999">${esc(L("（尚未撰寫）", "(Not written yet)"))}</p>`)).join("");
+  // 空的段落不印（使用者沒填的那一段，交出去的檔案裡不留一個空標題）。
+  const { head: front, tail: back } = splitSections(args.sections);
+  const block = (list: ProposalSection[]) => list.filter((s) => s.body.trim()).map((s) => `<h2>${esc(s.title)}</h2>${paras(s.body)}`).join("");
   return `﻿<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">`
     + `<head><meta charset="utf-8"><title>${esc(args.eventName)}</title>`
     + `<style>body{font-family:"Microsoft JhengHei","PingFang TC",sans-serif;font-size:11pt;line-height:1.7}h1{font-size:22pt}h2{font-size:15pt;margin-top:22pt}h3{font-size:12pt;margin-top:14pt}td,th{font-size:10pt}</style></head><body>`
     + `<h1>${esc(args.eventName)}${esc(L("　宣傳提案", " — campaign proposal"))}</h1>`
     + (args.range ? `<p style="color:#666">${esc(L("活動期間：", "Dates: ") + args.range)}</p>` : "")
     + (args.smp ? `<p style="font-size:14pt"><b>${esc(args.smp)}</b></p>` : "")
-    + args.sections.filter((s) => s.body.trim()).map((s) => `<h2>${esc(s.title)}</h2>${paras(s.body)}`).join("")
-    + (args.kpiLines.length ? `<h2>${esc(L("預算與 KPI", "Budget & KPIs"))}</h2>${args.kpiLines.map((l) => `<p>${esc(l)}</p>`).join("")}` : "")
+    + block(front)
+    + (args.kpiLines.length && !back.some((s) => s.id === "budget") ? `<h2>${esc(L("預算與 KPI", "Budget & KPIs"))}</h2>${args.kpiLines.map((l) => `<p>${esc(l)}</p>`).join("")}` : "")
     + `<h2>${esc(L("內容排程", "Content schedule"))}</h2>${table}`
     + `<h2>${esc(L("每一篇的內容", "Every post in full"))}</h2>${posts}`
+    + block(back)
     + `</body></html>`;
 }
 
