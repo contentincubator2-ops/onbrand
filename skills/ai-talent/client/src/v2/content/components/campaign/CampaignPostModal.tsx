@@ -35,7 +35,7 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faChevronDown, faChevronUp, faImage, faPenNib, faWandMagicSparkles } from "@fortawesome/free-solid-svg-icons";
 import { trpc } from "../../../../lib/trpc";
 import { showToastGlobal } from "../../../platform/components/Toast";
-import OwnImagePicker, { USER_SUPPLIED_IMAGE_MODEL } from "../OwnImagePicker";
+import { useOwnImageEntries, USER_SUPPLIED_IMAGE_MODEL } from "../OwnImagePicker";
 import { toastWithUpgrade } from "../../../platform/lib/upgradeToast";
 import { TASK_MODAL_CLASSNAMES, TASK_MODAL_HEADER } from "../../../platform/components/taskModalStyle";
 import { PlatformMockup } from "../PlatformMockup";
@@ -257,6 +257,8 @@ export default function CampaignPostModal({
       setImgStep("");
     }
   };
+  // 2026-10-10：入口疊在預覽的圖片格上（PlatformMockup imageActions）。
+  const ownImage = useOwnImageEntries({ brandId: Number(data?.brand?.id ?? brandId ?? 0), lang: en ? "en" : "zh-TW", onPick: useOwnImage });
   // 審核中、已發布的不動圖（跟本文同一條規則）；多張卡片的貼文到成品頁做。
   const canMakeImage = !!variant && !cards && editable;
 
@@ -398,7 +400,12 @@ export default function CampaignPostModal({
                   liveImageStatus={imageStatus as any}
                   liveCards={cards as any}
                   onGenerateImage={canMakeImage && !imgStep ? () => { void makeImage(); } : undefined}
+                  imageActions={canMakeImage ? [
+                    { id: "ai", icon: "generate", label: L("AI 生成", "AI image"), onClick: () => { void makeImage(); }, busy: imgStep === "prompt" || imgStep === "draw" },
+                    ...ownImage.entries.map((e) => ({ ...e, busy: e.busy || !!imgStep })),
+                  ] : undefined}
                 />
+                {ownImage.portal}
                 {imgStep && (
                   <p className="text-tiny text-default-500 mt-2 flex items-center gap-2"><Spinner size="sm" />
                     {imgStep === "prompt" ? L("從本文想畫面…", "Working out the picture from the text…")
@@ -457,10 +464,6 @@ export default function CampaignPostModal({
                     onPress={() => { void makeImage(); }}>
                     {imageUrl ? L("重做這張圖", "Redo the image") : L("幫這篇做圖", "Make an image")}
                   </Button>
-                )}
-                {canMakeImage && Number(data?.brand?.id ?? brandId ?? 0) > 0 && (
-                  <OwnImagePicker brandId={Number(data?.brand?.id ?? brandId ?? 0)} lang={en ? "en" : "zh-TW"}
-                    disabled={!!imgStep} onPick={useOwnImage} />
                 )}
                 {editable ? (
                   <>

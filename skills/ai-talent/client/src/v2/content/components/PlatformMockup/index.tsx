@@ -58,11 +58,18 @@ import { PinterestPin, PinterestBoard, PinterestStoryPin } from "./pinterest";
 import { PodcastEpisode, PodcastShow, PodcastAudiogram } from "./podcast";
 import { UnsupportedVariantPlaceholder } from "./unsupported";
 import AiImageNotice from "../../../platform/components/AiImageNotice";
+import React from "react";
+import { ImageActionBar, ImageActionsContext, useImageCorner, type ImageAction } from "./imageActions";
 
 export interface PlatformMockupProps extends MockupFields {
   variant: MockupVariant;
   /** 圖是用戶自己的照片（沒經 AI）時不掛「AI 生成」小警語。 */
   noAiNotice?: boolean;
+  /**
+   * 這張圖從哪來的入口（AI 生成／上傳／素材庫／Canva）。有給就疊在圖片格上：沒圖時排在格子
+   * 正中間，有圖時縮在圖的右上角。不給（唯讀、審核中、客戶核准頁）就什麼都不疊。
+   */
+  imageActions?: ImageAction[];
 }
 
 /**
@@ -70,8 +77,20 @@ export interface PlatformMockupProps extends MockupFields {
  * 預覽下方放 AI 生成的小警語（AiImageNotice）。放在外框這一層，不用改 27 個平台外框裡的 <img>；
  * 警語不會被「帶版型下載」截進圖裡。
  */
-export function PlatformMockup({ noAiNotice, ...props }: PlatformMockupProps) {
-  const inner = <PlatformMockupFrame {...props} />;
+export function PlatformMockup({ noAiNotice, imageActions, ...props }: PlatformMockupProps) {
+  const actions = imageActions?.length ? imageActions : null;
+  const frameRef = React.useRef<HTMLDivElement>(null);
+  const singleImage = props.liveImageStatus === "ready" || props.liveImageStatus === undefined ? props.liveImageUrl : null;
+  const showBar = !!actions && !!singleImage;
+  const corner = useImageCorner(frameRef, singleImage, showBar);
+  const inner = actions ? (
+    <ImageActionsContext.Provider value={actions}>
+      <div ref={frameRef} className="relative">
+        <PlatformMockupFrame {...props} />
+        {showBar && <ImageActionBar actions={actions} style={{ top: corner.top, right: corner.right }} />}
+      </div>
+    </ImageActionsContext.Provider>
+  ) : <PlatformMockupFrame {...props} />;
   const hasImage = !!props.liveImageUrl || (props.liveCards ?? []).some((c) => !!c?.image?.url);
   if (!hasImage || noAiNotice) return inner;
   return (

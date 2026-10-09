@@ -1,20 +1,24 @@
 /**
- * OwnImagePicker — 「這篇用我自己的圖」：上傳／素材庫／Canva 三個入口，挑好回一個網址。
+ * useOwnImageEntries — 「這篇用我自己的圖」的三個入口：上傳／素材庫／Canva，挑好回一個網址。
  *
  * 2026-10-09（CJ「直接導入用戶在 CANVA 做好的圖…用戶就可以圖文一起送給客戶審查」）。
  * 在這之前，一篇貼文的圖只能是 AI 畫的；設計師在 Canva 做好的成品沒有地方放，
  * 送審時客戶只看得到文字或一張 AI 示意圖。
  *
+ * 2026-10-10（CJ「圖示直接做在圖像示意的旁邊」）：入口不再是右欄的一列文字，改成疊在預覽的
+ * 圖片格上（PlatformMockup 的 imageActions）。這支只負責三個入口「按下去做什麼」，以及它們
+ * 需要的隱藏檔案輸入與兩個視窗（portal）——呼叫端把 entries 交給預覽、把 portal 放在頁面任一處。
+ *
  * 三個入口最後都落在素材庫（asset_photos），回傳的一律是本站的 /static/asset-photos/ 網址——
  * 呼叫端拿去存進貼文（output.updateVariantImage，modelId 帶 USER_SUPPLIED_IMAGE_MODEL）。
  */
 import React from "react";
-import { Modal, ModalBody, ModalContent, ModalHeader, Spinner } from "@heroui/react";
-import { Icon, type IconName } from "../../platform/components/icons";
+import { Modal, ModalBody, ModalContent, ModalHeader } from "@heroui/react";
 import { showToastGlobal } from "../../platform/components/Toast";
 import { uploadBrandPhoto, IMAGE_ACCEPT } from "../../strategy/lib/uploadBrandPhoto";
 import BrandLibrary from "../../strategy/components/assets/BrandLibrary";
 import CanvaImportModal from "../../strategy/components/assets/CanvaImportModal";
+import type { ImageAction } from "./PlatformMockup/imageActions";
 
 /**
  * 存進貼文時記在圖上的「模型」：這張不是 AI 畫的，是用戶自己給的。
@@ -22,14 +26,13 @@ import CanvaImportModal from "../../strategy/components/assets/CanvaImportModal"
  */
 export const USER_SUPPLIED_IMAGE_MODEL = "user-supplied";
 
-export default function OwnImagePicker({
-  brandId, lang, disabled, onPick,
+export function useOwnImageEntries({
+  brandId, lang, onPick,
 }: {
   brandId: number;
   lang: "zh-TW" | "en";
-  disabled?: boolean;
   onPick: (url: string) => void | Promise<void>;
-}) {
+}): { entries: ImageAction[]; portal: React.ReactNode } {
   const en = lang === "en";
   const L = (zh: string, e: string) => (en ? e : zh);
   const fileRef = React.useRef<HTMLInputElement>(null);
@@ -52,22 +55,14 @@ export default function OwnImagePicker({
     }
   }
 
-  const entries: Array<{ id: string; icon: IconName; label: string; click: () => void }> = [
-    { id: "upload", icon: "upload", label: L("上傳", "Upload"), click: () => fileRef.current?.click() },
-    { id: "library", icon: "images", label: L("素材庫", "Library"), click: () => setLibraryOpen(true) },
-    { id: "canva", icon: "link", label: "Canva", click: () => setCanvaOpen(true) },
-  ];
+  const entries: ImageAction[] = brandId > 0 ? [
+    { id: "upload", icon: "upload", label: L("上傳", "Upload"), onClick: () => fileRef.current?.click(), busy: uploading },
+    { id: "library", icon: "images", label: L("素材庫", "Library"), onClick: () => setLibraryOpen(true) },
+    { id: "canva", icon: "link", label: "Canva", onClick: () => setCanvaOpen(true) },
+  ] : [];
 
-  return (
-    <div className="flex flex-wrap items-center gap-1.5">
-      <span className="text-tiny text-default-500">{L("用自己的圖：", "Use your own image:")}</span>
-      {entries.map((b) => (
-        <button key={b.id} type="button" onClick={b.click} disabled={disabled || uploading}
-          className="inline-flex items-center gap-1.5 rounded-full border border-divider px-2.5 py-1 text-tiny text-default-700 hover:border-default-500 disabled:opacity-50 transition">
-          {b.id === "upload" && uploading ? <Spinner size="sm" classNames={{ wrapper: "w-3 h-3" }} /> : <Icon name={b.icon} size={12} />}
-          {b.label}
-        </button>
-      ))}
+  const portal = brandId > 0 ? (
+    <>
       <input ref={fileRef} type="file" hidden accept={IMAGE_ACCEPT} onChange={(e) => void upload(e.target.files)} />
 
       <Modal isOpen={libraryOpen} onClose={() => setLibraryOpen(false)} size="4xl" scrollBehavior="inside">
@@ -90,6 +85,8 @@ export default function OwnImagePicker({
           }
           void onPick(first.url);
         }} />
-    </div>
-  );
+    </>
+  ) : null;
+
+  return { entries, portal };
 }

@@ -18,11 +18,13 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 import { type MockupFields, MockupHeader, MarkdownText, dicebear, ImageGenSlot, SHOW_IMAGE_STYLE_OVERLAY } from "./shared";
 import { useLang } from "../../../../lib/i18n";
+import { useImageActions } from "./imageActions";
 import { parseAdCopy, shortenAdCta } from "../../lib/parseAdCopy";
 
 /* ─────────────── FB Feed ─────────────── */
 
 export function FBFeed({ title, brandName, brandLogoUrl, variantLabel, liveCaption, liveImageDesc, liveImageStyle, liveImageUrl, liveImageStatus, liveHashtags, ogCard, pinned, onGenerateImage }: MockupFields) {
+  const imageActions = useImageActions();
   const { lang } = useLang();
   // 2026-05-05: liveImageStyle takes priority over liveImageDesc — it's the
   // "style direction" the quick-task agent produced, kept inside the image
@@ -149,6 +151,9 @@ export function FBFeed({ title, brandName, brandLogoUrl, variantLabel, liveCapti
                 </div>
               )}
             </div>
+          ) : imageActions ? (
+            // 2026-10-10：有「這張圖從哪來」的入口時，改用共用的圖片格（圖示排在正中間）。
+            <ImageGenSlot brief={liveImageStyle} status={liveImageStatus} onGenerate={onGenerateImage} />
           ) : (
             <div
               role={onGenerateImage ? "button" : undefined}
@@ -483,6 +488,7 @@ function GhostSlot({ label, lines = 2 }: { label: string; lines?: number }) {
 }
 
 export function FBAd({ title, brandName, variantLabel, liveCaption, liveImageUrl, liveImageStatus, liveHashtags, onGenerateImage, componentSlot }: MockupFields) {
+  const imageActions = useImageActions();
   const { lang } = useLang();
   // 2026-05-18 (CJ): FBAd ignored the generated headline — showed the
   // run title (same for every pill). Use the variant's caption (the
@@ -563,6 +569,9 @@ export function FBAd({ title, brandName, variantLabel, liveCaption, liveImageUrl
               <img src={liveImageUrl} alt={lang === "en" ? "Ad image" : "廣告主圖"}
                 className="w-full h-auto object-contain" style={{ maxHeight: 420 }} />
             </div>
+          ) : imageActions ? (
+            // 2026-10-10：有「這張圖從哪來」的入口時，改用共用的圖片格（圖示排在正中間）。
+            <ImageGenSlot status={liveImageStatus} onGenerate={onGenerateImage} />
           ) : (
             <div
               role={onGenerateImage ? "button" : undefined}
