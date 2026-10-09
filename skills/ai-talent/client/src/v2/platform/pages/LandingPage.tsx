@@ -52,7 +52,7 @@ const C = {
   white: "#FFFFFF",
 };
 
-/** 首頁上的七個通路。順序＝產品裡通路列的順序。 */
+/** 首頁「規格圖卡」那一段列的通路（有圖片規格的七個；YouTube、新聞稿沒有規格圖卡，不列）。 */
 const CHANNELS: { id: string; icon: IconName; zh: string; en: string }[] = [
   { id: "facebook", icon: "facebook", zh: "Facebook", en: "Facebook" },
   { id: "instagram", icon: "instagram", zh: "Instagram", en: "Instagram" },
@@ -102,8 +102,8 @@ export default function LandingPage() {
     m.setAttribute(
       "content",
       en
-        ? "onBrand Studio is a trained, certified AI marketing team: it knows your Brand Brain, carries a task library refreshed monthly, and can take on your company's own AI skills. Copy and images for 7 channels, done by one team. 7-day free trial, no card."
-        : "onBrand Studio 是經過訓練與認證的 AI 行銷團隊：懂你的品牌大腦、擁有每月更新的任務庫，還能整合貴公司自己的 AI 技能。FB、IG、Threads、LINE、TikTok、電子報、官網七個通路的文案與圖片，一支團隊完成。7 天免費試用，免綁卡。",
+        ? "onBrand Studio is a trained, certified AI marketing team: it knows your Brand Brain, carries a task library refreshed monthly, and can take on your company's own AI skills. Copy and images for 9 channels, done by one team. 7-day free trial, no card."
+        : "onBrand Studio 是經過訓練與認證的 AI 行銷團隊：懂你的品牌大腦、擁有每月更新的任務庫，還能整合貴公司自己的 AI 技能。FB、IG、Threads、LINE、TikTok、電子報、官網、YouTube、新聞稿九個通路的文案與圖片，一支團隊完成。7 天免費試用，免綁卡。",
     );
     return () => {
       dead = true;
@@ -441,12 +441,12 @@ function PainSection({ en }: { en: boolean }) {
     ? [
         ["Starts from a blank page every time — you re-explain your brand again and again.", "The team reads your Brand Brain first: positioning, voice and banned words are already known."],
         ["Doesn't know what is actually working this month.", "Every month we break down posts that really spread, with the numbers and sources attached."],
-        ["After writing, you still schedule it and make the images yourself.", "The weekly plan lays out all seven channels; images are generated to each platform's specs."],
+        ["After writing, you still schedule it and make the images yourself.", "The weekly plan lays out every channel you use; images are generated to each platform's specs."],
       ]
     : [
         ["每次都從空白開始，品牌要重新交代一遍。", "團隊先讀過品牌大腦，定位、語氣、禁用詞都記得。"],
         ["不知道這個月什麼寫法真的有效。", "每月拆解真實傳開的貼文，附數字與出處。"],
-        ["寫完還要自己排程、自己配圖。", "本週企劃一次排好七個通路，圖片照各平台規格生成。"],
+        ["寫完還要自己排程、自己配圖。", "本週企劃一次排好你用的每個通路，圖片照各平台規格生成。"],
       ];
   return (
     <section className="py-16 lg:py-20" style={{ background: C.creamDeep, borderTop: `1px solid ${C.borderSoft}` }}>
@@ -630,7 +630,7 @@ function ChannelsSection({ en, specs }: { en: boolean; specs: ImageSpec[] | unde
     <section id="channels" className="py-16 lg:py-24" style={{ borderTop: `1px solid ${C.borderSoft}` }}>
       <div className="max-w-[1100px] mx-auto px-6 lg:px-12">
         <SectionHead
-          chip={en ? `${CATALOG.channels} channels` : `${CATALOG.channels} 個通路`}
+          chip={en ? `${CHANNELS.length} channels` : `${CHANNELS.length} 個通路`}
           title={en ? "Copy and images, to each platform's spec." : "文案和圖片，照各平台的規格做。"}
           sub={total > 0
             ? (en
@@ -824,7 +824,7 @@ function FAQSection({ en }: { en: boolean }) {
         },
         {
           q: "Which channels are supported?",
-          a: `Facebook, Instagram, Threads, LINE, TikTok, Email and your website — ${CATALOG.channels} channels, with image spec cards for each platform.`,
+          a: `Facebook, Instagram, Threads, LINE, TikTok, Email, your website, YouTube and press releases — ${CATALOG.channels} channels, with image spec cards for the social platforms.`,
         },
         {
           q: "How long does it take to get started?",
@@ -854,7 +854,7 @@ function FAQSection({ en }: { en: boolean }) {
         },
         {
           q: "支援哪些平台？",
-          a: `Facebook、Instagram、Threads、LINE、TikTok、電子報、官網，共 ${CATALOG.channels} 個通路，每個平台都有對應尺寸的規格圖卡。`,
+          a: `Facebook、Instagram、Threads、LINE、TikTok、電子報、官網、YouTube、新聞稿，共 ${CATALOG.channels} 個通路，社群平台都有對應尺寸的規格圖卡。`,
         },
         {
           q: "我需要多久時間才能上手？",

@@ -6,8 +6,8 @@ import { isStrategyPreviewEmail, isPersonaPreviewEmail } from "../../platform/li
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { ICON, ShareIcon } from "../../platform/components/icons";
 import { publishSettingsUrl } from "../../platform/lib/publishSettingsUrl";
-import { faBoxOpen, faFont, faPaintBrush, faMicrophone, faCircleInfo, faChartLine, faDatabase, faFileLines, faCalendarDays, faFolderOpen, faBullhorn, faEnvelope, faGlobe, faBookBookmark } from "@fortawesome/free-solid-svg-icons";
-import { faFacebook, faInstagram, faThreads, faLine, faTiktok } from "@fortawesome/free-brands-svg-icons";
+import { faBoxOpen, faFont, faPaintBrush, faMicrophone, faCircleInfo, faChartLine, faDatabase, faFileLines, faCalendarDays, faFolderOpen, faBullhorn, faEnvelope, faGlobe, faBookBookmark, faNewspaper } from "@fortawesome/free-solid-svg-icons";
+import { faFacebook, faInstagram, faThreads, faLine, faTiktok, faYoutube } from "@fortawesome/free-brands-svg-icons";
 
 export interface NavItem {
   to: string;
@@ -35,6 +35,8 @@ export interface NavItem {
   /** 2026-09-30：記憶空間快滿／超載時，圖示右上角亮狀態點。 */
   /** near／over：記憶快滿／超載；review：有東西等用戶回來確認（法規審查重點萃取好了）。 */
   alert?: "near" | "over" | "review";
+  /** 2026-10-10：AI 搜尋讀得到的通路（官網／YouTube／新聞稿），挑選清單上標出來。 */
+  aeo?: boolean;
 }
 
 // 2026-05-26 (CJ「左欄改成平台優先」): replace tier-first nav (30s/60s/99s)
@@ -184,8 +186,8 @@ export function buildNavItems(lang: "zh-TW" | "en", userEmail?: string | null, c
 export function navCatalog(lang: "zh-TW" | "en", allowedTaskRoutes?: Set<string> | null, customChannels?: { id: string; name: string; preset?: string | null }[]): NavItem[] {
   const en = lang === "en";
   // 2026-09-29 CJ：內容通路只留 FB／IG／Threads／LINE／TikTok／電子報／官網。LinkedIn／
-  // YouTube／新聞稿／X 拿掉（server planGate.HIDDEN_CONTENT_PLATFORMS 同一份決定）；
-  // Threads、LINE 是為台灣市場加的。
+  // X 拿掉（server planGate.HIDDEN_CONTENT_PLATFORMS 同一份決定）；
+  // Threads、LINE 是為台灣市場加的。YouTube／新聞稿 10/10 開回來。
   const all: NavItem[] = [
     { id: "fb", kind: "channel", to: "/tasks/fb", label: "Facebook", short: "FB", icon: <FontAwesomeIcon icon={faFacebook} />, matchPrefix: "/tasks/fb",
       tooltip: en ? "Facebook posts, ads, stories, live copy" : "Facebook 貼文 / 廣告 / 限時 / 直播文案" },
@@ -199,8 +201,14 @@ export function navCatalog(lang: "zh-TW" | "en", allowedTaskRoutes?: Set<string>
       tooltip: en ? "TikTok hooks, scripts, hashtags, bio" : "TikTok 開場鉤子 / 腳本 / 主題標籤" },
     { id: "email", kind: "channel", to: "/tasks/email", label: en ? "Email" : "電子報", icon: <FontAwesomeIcon icon={faEnvelope} />, matchPrefix: "/tasks/email",
       tooltip: en ? "Email newsletters, welcome series, promo emails" : "電子報 / 歡迎信 / 促銷郵件序列" },
-    { id: "web", kind: "channel", to: "/tasks/web", label: en ? "Website" : "官網", icon: <FontAwesomeIcon icon={faGlobe} />, matchPrefix: "/tasks/web",
+    { id: "web", kind: "channel", aeo: true, to: "/tasks/web", label: en ? "Website" : "官網", icon: <FontAwesomeIcon icon={faGlobe} />, matchPrefix: "/tasks/web",
       tooltip: en ? "Long-form articles, brand columns, case studies, product page copy" : "官網長文 / 品牌專欄 / 案例深度 / 產品頁文案" },
+    // 2026-10-10 CJ「一定要將官網文章，還有 youtube 加回來」：YouTube、新聞稿開回來。
+    // 這兩個加官網是 AI 搜尋引擎實際讀得到的地方（FB／IG／Threads 幾乎不會被引用）。
+    { id: "yt", kind: "channel", aeo: true, to: "/tasks/yt", label: "YouTube", short: "YT", icon: <FontAwesomeIcon icon={faYoutube} />, matchPrefix: "/tasks/yt",
+      tooltip: en ? "Video titles, descriptions, chapters, full copy pack" : "影片標題 / 說明欄 / 章節 / 完整文案包" },
+    { id: "pr", kind: "channel", aeo: true, to: "/tasks/pr", label: en ? "Press" : "新聞稿", icon: <FontAwesomeIcon icon={faNewspaper} />, matchPrefix: "/tasks/pr",
+      tooltip: en ? "Press releases, fact sheets, company boilerplate" : "完整新聞稿 / 事實資料表 / 公司簡介段落" },
     { id: "case", kind: "tool", to: "/tasks/case", label: en ? "Cases" : "案例", icon: <FontAwesomeIcon icon={faBookBookmark} />, matchPrefix: "/tasks/case",
       tooltip: en ? "Case library, filed by standard" : "依標準建檔的案例庫" },
     // 2026-09-30 CJ：靈感舞台改成固定入口（＋ 下方），不再是可自選項目；

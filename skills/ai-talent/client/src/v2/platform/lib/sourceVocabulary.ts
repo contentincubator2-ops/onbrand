@@ -189,8 +189,30 @@ export function sourcePillText(s: unknown, lang: string): string {
  *           那是替這個品牌做的卡）
  *   viral ＝ 爆款結構（只算近 3 個月量測的，見 isRecentViral）
  */
-export type FrontCardKind = "viral" | "own";
-export const FRONT_CARD_KINDS: readonly FrontCardKind[] = ["viral", "own"];
+export type FrontCardKind = "viral" | "own" | "aeo";
+export const FRONT_CARD_KINDS: readonly FrontCardKind[] = ["viral", "own", "aeo"];
+
+/**
+ * 2026-10-10 CJ「一定要將官網文章，還有 youtube 加回來」：第三類＝AI 搜尋。
+ *
+ * AI 搜尋（ChatGPT／Perplexity／Google AI 摘要）引用的是公開網頁、YouTube 與新聞，
+ * 社群貼文幾乎不會被引用。產出這三種內容的卡都是通用卡（evergreen／channel-spec），
+ * 照「前台只列爆款＋自建」的規則一張都看不到——YouTube、新聞稿開回來會是空頁，
+ * 官網也只剩當季那一兩張爆款卡。
+ *
+ * 所以這裡是一份**刻意挑過的短名單**，不是把通用卡整批放回來：只收「產出本身就是
+ * AI 讀得到的那一頁」的卡（問答、長文、產品頁、影片標題／說明／章節、新聞稿、
+ * 事實表、公司簡介）。YouTube 的鉤子、縮圖、留言回覆之類不算。要加卡就加在這裡。
+ */
+export const AEO_CARD_IDS: ReadonlySet<string> = new Set([
+  "web-30-product-faq", "web-30-longform", "web-30-product-desc",
+  "yt-30-title-strategies", "yt-30-description-seo", "yt-30-chapter-timeline", "yt-60-video-package",
+  "pr-60-news-release-full", "pr-30-fact-sheet", "pr-30-boilerplate",
+]);
+export function isAeoCard(task: unknown): boolean {
+  const id = (task as any)?.id;
+  return typeof id === "string" && AEO_CARD_IDS.has(id);
+}
 
 /**
  * 2026-09-29 CJ「爆款結構，至少要是當月的，不能太久以前的」，後來因為當月 FB 案例太少改成
@@ -221,6 +243,7 @@ export function frontCardKind(task: unknown, now: Date = new Date()): FrontCardK
   const t = task as any;
   if (t?.ownCardId || t?.source?.type === "brand-method") return "own";
   if (isRecentViral(t?.source, now)) return "viral";
+  if (isAeoCard(t)) return "aeo";
   return null;
 }
 
@@ -230,5 +253,13 @@ export function isFrontVisibleCard(task: unknown): boolean {
 
 export function frontCardKindLabel(k: FrontCardKind, lang: string): string {
   const en = lang === "en";
+  if (k === "aeo") return en ? "AI search" : "AI 搜尋";
   return k === "viral" ? (en ? "Viral structure" : "爆款結構") : (en ? "Brand-built" : "品牌自建");
+}
+
+/** 篩選 chip 與卡片 pill 的 hover 說明。只講我們做得到的：這類內容 AI 讀得到，不保證被引用。 */
+export function aeoWhy(lang: string): string {
+  return lang === "en"
+    ? "Content that AI search engines can read: website pages, YouTube text and press releases. Being cited is not guaranteed."
+    : "AI 搜尋讀得到的內容：官網頁面、YouTube 文字與新聞稿。讀得到不等於一定被引用。";
 }

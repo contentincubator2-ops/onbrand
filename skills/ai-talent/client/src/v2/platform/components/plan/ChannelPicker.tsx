@@ -24,8 +24,10 @@ const LABEL_ZH: Record<string, string> = {
   threads: "Threads", line: "LINE",
   tiktok: "TikTok", email: "電子報",
   website: "官網",
+  // 2026-10-10：YouTube、新聞稿開回來。
+  youtube: "YouTube", pr: "新聞稿",
 };
-const LABEL_EN: Record<string, string> = { ...LABEL_ZH, email: "Email", website: "Website" };
+const LABEL_EN: Record<string, string> = { ...LABEL_ZH, email: "Email", website: "Website", pr: "Press" };
 const ALL = Object.keys(LABEL_ZH);
 
 export default function ChannelPicker({ brandId }: { brandId: number }) {
