@@ -1,0 +1,61 @@
+name: Ops (DEV) — write Canva credentials + probe the connect route
+
+# 「從 Canva 匯入」要用 Canva Developer Portal 的 integration 憑證
+# （server/platform/routes/cloudOAuthRoute.ts 的 /api/oauth/canva/*）。這支做兩件事：
+#   1. 把 repo secret CANVA_CLIENT_ID／CANVA_CLIENT_SECRET 寫進 DEV VM 的 .env 並重啟 onbrand-dev。
+#      憑證只從 secret 來，不從 workflow input（input 會明碼留在執行紀錄）；全程不印出來。
+#   2. 印出要登記在 Canva 那邊的 redirect URL，並確認連接路由活著。
+# secret 還沒設就什麼都不動、直接結束（綠燈）——設好之後到 Actions 重跑這一支。
+# Path-scoped push，跟 ops-dev-apify-setup.yml 同一個做法（environment: dev 才會連到 DEV VM）。
+on:
+  push:
+    paths:
+      - '.github/workflows/ops-dev-canva-setup.yml'
+  workflow_dispatch:
+
+jobs:
+  setup:
+    runs-on: ubuntu-24.04
+    environment: dev
+    timeout-minutes: 5
+    steps:
+      - name: Write credentials to DEV .env, restart, probe
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          CANVA_CLIENT_ID: ${{ secrets.CANVA_CLIENT_ID }}
+          CANVA_CLIENT_SECRET: ${{ secrets.CANVA_CLIENT_SECRET }}
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 4m
+          envs: CANVA_CLIENT_ID,CANVA_CLIENT_SECRET
+          script: |
+            set +e
+            ENV=/opt/onbrand/shared/.env
+            echo "host=$(hostname)  app=$(readlink -f /opt/onbrand/current)  now=$(date -u +%FT%TZ)"
+            if [ ! -f "$ENV" ]; then echo "x .env not found at $ENV"; exit 1; fi
+            APP_URL=$(grep '^APP_URL=' "$ENV" | tail -1 | cut -d= -f2- | tr -d '"' | sed 's:/*$::')
+            echo "redirect URL to register in Canva: ${APP_URL}/api/oauth/canva/callback"
+            if [ -z "$CANVA_CLIENT_ID" ] || [ -z "$CANVA_CLIENT_SECRET" ]; then
+              echo "- secrets CANVA_CLIENT_ID / CANVA_CLIENT_SECRET not set yet — nothing written. Add them, then re-run."
+              exit 0
+            fi
+            echo "client id length=${#CANVA_CLIENT_ID}  secret length=${#CANVA_CLIENT_SECRET}"
+
+            # 1) 寫進 .env（原地改寫，保留檔案權限；先備份）
+            cp -p "$ENV" "${ENV}.bak.canva"
+            grep -v -e '^CANVA_CLIENT_ID=' -e '^CANVA_CLIENT_SECRET=' "$ENV" > "${ENV}.tmp.canva"
+            printf 'CANVA_CLIENT_ID=%s\n' "$CANVA_CLIENT_ID" >> "${ENV}.tmp.canva"
+            printf 'CANVA_CLIENT_SECRET=%s\n' "$CANVA_CLIENT_SECRET" >> "${ENV}.tmp.canva"
+            cat "${ENV}.tmp.canva" > "$ENV"
+            rm -f "${ENV}.tmp.canva"
+            echo "env: written ($(grep -c '^CANVA_CLIENT_' "$ENV") lines)"
+
+            # 2) 重啟讓站台吃到新的環境變數
+            pm2 restart onbrand-dev --update-env >/dev/null 2>&1
+            timeout 60 bash -c 'until curl --fail --silent http://127.0.0.1:3101/health >/dev/null; do sleep 3; done' \
+              && echo "restart: health OK" || echo "x restart: health check FAILED"
+
+            # 3) 連接路由：沒登入應該回 401（＝路由在、憑證有讀到之前就先擋身分）。404＝這個版本還沒部署到 DEV。
+            echo "install route (no session): HTTP $(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:3101/api/oauth/canva/install)"

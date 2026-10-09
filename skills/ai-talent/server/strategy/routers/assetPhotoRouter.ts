@@ -13,6 +13,9 @@ import { canRemovePhoto, REMOVE_OTHERS_PHOTO_DENIED } from "../../platform/core/
 import localPool from "../../localDb";
 import { listPhotos, listBrandLibrary, setPrimaryPhoto, removePhoto, savePhotoFromUrl, photoUploaderId, type PhotoScope } from "../core/brand/assetPhotos";
 import { STORAGE_ROOT } from "../routes/assetPhotoRoute";
+import { importCanvaDesign, MAX_CANVA_PAGES } from "../core/brand/canvaImport";
+import { getValidAccessToken, CANVA_ACCOUNT_SCOPE } from "../../platform/core/connectors/cloudTokens";
+import { canvaErrorMessage } from "../../platform/core/connectors/canvaClient";
 
 const scopeInput = z.object({
   brandId: z.number(),
@@ -109,6 +112,46 @@ export const assetPhotoRouter = router({
       // 存不進去是「結果」不是例外（檔案太大、張數滿了…），訊息要原樣帶回前端顯示。
       if ("error" in saved) throw new TRPCError({ code: "BAD_REQUEST", message: saved.error });
       return saved;
+    }),
+
+  /**
+   * 把一份 Canva 設計匯出成圖，存進這個品牌的素材庫（2026-10-09）。
+   *
+   * 收的是設計的 **id**，不是網址——跟 saveGeneratedImage 同一個理由：不開「叫伺服器
+   * 抓任意網址」的入口。下載網址由 Canva 的匯出工作回給我們，且只認 canva.com 網域。
+   * Canva 連接用的是按下按鈕的那個人（actorIdOf），圖存在品牌擁有者名下。
+   */
+  importCanvaDesign: protectedProcedure
+    .input(z.object({
+      brandId: z.number().int().positive(),
+      designId: z.string().min(1).max(128).regex(/^[A-Za-z0-9_-]+$/),
+      title: z.string().max(255).optional(),
+      pages: z.array(z.number().int().min(1).max(500)).max(MAX_CANVA_PAGES).optional(),
+      lang: z.enum(["zh-TW", "en"]).optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertScopeOwner(ctx.user!.id, input.brandId, "brand", input.brandId);
+      const en = input.lang === "en";
+      let accessToken: string;
+      try {
+        accessToken = await getValidAccessToken(actorIdOf(ctx), CANVA_ACCOUNT_SCOPE, "canva");
+      } catch {
+        throw new TRPCError({ code: "PRECONDITION_FAILED", message: en ? "Connect Canva first." : "請先連接 Canva。" });
+      }
+      try {
+        const result = await importCanvaDesign({
+          accessToken, designId: input.designId, title: input.title ?? "", pages: input.pages,
+          userId: ctx.user!.id, brandId: input.brandId, uploadedBy: actorIdOf(ctx), storageRoot: STORAGE_ROOT,
+        });
+        if (result.photos.length === 0) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: result.skippedReason ?? canvaErrorMessage(null, en) });
+        }
+        return result;
+      } catch (e) {
+        if (e instanceof TRPCError) throw e;
+        console.warn("[canva] import failed:", (e as any)?.code ?? "", (e as Error)?.message ?? e);
+        throw new TRPCError({ code: "BAD_REQUEST", message: canvaErrorMessage(e, en) });
+      }
     }),
 
   remove: protectedProcedure

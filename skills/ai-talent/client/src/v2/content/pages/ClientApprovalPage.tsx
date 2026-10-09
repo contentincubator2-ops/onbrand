@@ -29,7 +29,7 @@ type Filter = "all" | Decision;
 interface Ev { id: number; kind: string; authorType: string; authorName: string; body: string | null; beforeText: string | null; afterText: string | null; createdAt: string | null }
 interface Post {
   id: number; platform: string; scheduledAt: string | null; title: string; available: boolean; label: string; caption: string;
-  imageUrls: string[]; videoUrl: string | null; cards: Array<{ headline: string; body: string; imageUrl: string | null }>;
+  imageUrls: string[]; aiImages?: boolean; videoUrl: string | null; cards: Array<{ headline: string; body: string; imageUrl: string | null }>;
   published: boolean; editable: boolean; decision: Decision; decidedBy: string | null; decidedAt: string | null; events: Ev[];
 }
 
@@ -156,7 +156,7 @@ function PostCard({ post, en, token, name, needName, onChanged }: {
                   </a>
                 ))}
               </div>
-              <div className="flex justify-end pt-1"><AiImageNotice /></div>
+              {post.aiImages !== false && <div className="flex justify-end pt-1"><AiImageNotice /></div>}
             </div>
           )}
           {post.videoUrl && <video src={post.videoUrl} controls className="mt-4 max-h-[420px] w-full rounded-xl border" style={{ borderColor: LINE }} />}

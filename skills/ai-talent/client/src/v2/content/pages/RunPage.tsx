@@ -35,6 +35,7 @@ import VendorFinder, { vendorKindOf } from "../components/VendorFinder";
 import { trpc } from "../../../lib/trpc";
 import { useVariantLabel } from "../lib/variantLabelEn";
 import { showToastGlobal } from "../../platform/components/Toast";
+import OwnImagePicker, { USER_SUPPLIED_IMAGE_MODEL } from "../components/OwnImagePicker";
 import { PlatformMockup } from "../components/PlatformMockup";
 import ImageCardOffer, { IMAGE_CARD_OFFER_ID } from "../components/imageCard/ImageCardOffer";
 import type { MockupVariant } from "../lib/inferMockup";
@@ -435,6 +436,19 @@ export default function RunPage() {
         },
       })
     : null;
+  // 2026-10-09：用自己的圖（上傳／素材庫／Canva 匯入）——不經 AI，直接存成目前這一則的圖。
+  const useOwnImage = async (url: string) => {
+    if (!updateImageMut) return;
+    try {
+      await updateImageMut.mutateAsync({
+        id, ...getRunContentMutationLocator(selectedContentKind, activeIdx),
+        imageUrl: url, modelId: USER_SUPPLIED_IMAGE_MODEL, requestedModelId: USER_SUPPLIED_IMAGE_MODEL,
+      });
+      showToastGlobal(lang === "en"
+        ? "Your image is on this post (the previous image is kept — switch back anytime)"
+        : "已換成你的圖（前一張圖有保留，隨時可以切回去）");
+    } catch { /* updateImageMut.onError 已經顯示原因 */ }
+  };
   // Scheduling stays in Calendar; platform authorization lives in brand settings.
   const scheduleToCalMut = (trpc as any).calendar?.schedule?.useMutation?.({
     onSuccess: (_r: any) => {
@@ -2122,6 +2136,7 @@ export default function RunPage() {
                 liveImageUrl={slide.imageUrl ?? undefined}
                 liveImageStatus={slide.imageStatus as any}
                 liveCards={slide.cards as any}
+                noAiNotice={!slide.cards?.length && slide.imageModelId === USER_SUPPLIED_IMAGE_MODEL}
                 overlayTitle={mockupVariant?.platform === "youtube" ? overlayTitle : undefined}
                 onGenerateImage={isStrategyPlanning
                   ? undefined
@@ -2824,6 +2839,10 @@ export default function RunPage() {
                       />
                     </div>
                   )}
+                  {!slide?.cards?.length && Number((data as any)?.brand?.id) > 0 && (
+                    <OwnImagePicker brandId={Number((data as any).brand.id)} lang={lang === "en" ? "en" : "zh-TW"}
+                      disabled={!!updateImageMut?.isPending} onPick={useOwnImage} />
+                  )}
                   {/* 2026-05-11 (CJ feedback「應該要先給用戶指令」):
                       明確分兩步 — Step 1 寫指令 → Step 2 產圖。
                       底下圖片變成「目前的圖」獨立區塊，不混在 prompt 裡 */}
@@ -3082,7 +3101,9 @@ export default function RunPage() {
                   {slide?.imageModelId && (
                     <p className="text-[12px] text-default-500">
                       {lang === "en" ? "Current image model: " : "目前這張圖的模型："}
-                      <span className="font-mono">{slide.imageModelId}</span>
+                      {slide.imageModelId === USER_SUPPLIED_IMAGE_MODEL
+                        ? <span>{lang === "en" ? "your own image (not AI)" : "你自己的圖（不是 AI 生成）"}</span>
+                        : <span className="font-mono">{slide.imageModelId}</span>}
                     </p>
                   )}
                   <div className="mt-2 flex items-center gap-1.5 text-[12px] text-default-600">

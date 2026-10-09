@@ -5,6 +5,7 @@
  * 呼叫端（approvalRouter）負責先確認連結有效、這一篇屬於這條連結。
  */
 import { TRPCError } from "@trpc/server";
+import { USER_SUPPLIED_IMAGE_MODEL } from "../image/variantImageUpdate";
 import {
   outputItemCaption, outputItemMedia, resolveOutputContent, updateOutputContent, type ContentSelector,
 } from "../engine/outputContentEnvelope";
@@ -55,13 +56,24 @@ export interface ApprovalPostView {
   label: string;
   caption: string;
   imageUrls: string[];
+  /** 這篇的圖有沒有 AI 生成的（全是用戶自己給的圖就是 false，不掛 AI 警語）。 */
+  aiImages: boolean;
   videoUrl: string | null;
   cards: Array<{ headline: string; body: string; imageUrl: string | null }>;
 }
 
+/** 這篇顯示出來的圖是不是全都由用戶自己提供（輪播看每張卡，單圖看封面）。 */
+function allImagesUserSupplied(item: Record<string, any>): boolean {
+  const cardImages = Array.isArray(item.cards)
+    ? item.cards.map((c: any) => c?.image).filter((img: any) => img && typeof img.url === "string" && img.url.trim())
+    : [];
+  if (cardImages.length > 0) return cardImages.every((img: any) => img.modelId === USER_SUPPLIED_IMAGE_MODEL);
+  return (item.image?.modelId ?? item.imageModelId) === USER_SUPPLIED_IMAGE_MODEL;
+}
+
 /** 一篇貼文給客戶看的樣子：只有文字與素材，不帶 prompt、metadata 或任何內部欄位。 */
 export function approvalPostView(content: unknown, selector: ContentSelector): ApprovalPostView {
-  const empty: ApprovalPostView = { available: false, label: "", caption: "", imageUrls: [], videoUrl: null, cards: [] };
+  const empty: ApprovalPostView = { available: false, label: "", caption: "", imageUrls: [], aiImages: false, videoUrl: null, cards: [] };
   if (content == null) return empty;
   try {
     const { item } = resolveOutputContent(content, selector);
@@ -78,6 +90,7 @@ export function approvalPostView(content: unknown, selector: ContentSelector): A
       label: str(item.label),
       caption: outputItemCaption(item),
       imageUrls: media.imageUrls,
+      aiImages: media.imageUrls.length > 0 && !allImagesUserSupplied(item),
       videoUrl: media.videoUrl,
       cards,
     };
