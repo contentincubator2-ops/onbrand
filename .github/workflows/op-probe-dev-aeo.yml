@@ -6,6 +6,7 @@ name: Ops (DEV) — probe AI-search version end to end (read-only)
 # 所以合併前就能看真實產出。不寫資料庫。
 # 另外丟一則沒有任何事實的貼文，確認它會老實回「無法轉換」而不是硬編。
 # 花費：每則貼文 2–4 次模型呼叫，共 4 則。
+# 第 2 次跑：taskId 在 mission_outputs.metadata，不在 missions。
 # Path-scoped push，跟 op-probe-dev-influencer.yml 同一個做法（environment: dev 才會連到 DEV VM）。
 on:
   push:
@@ -86,7 +87,7 @@ jobs:
 
             (async () => {
               const [rows]: any = await localPool.execute(
-                `SELECT o.id, o.content, m.brandId, m.workspace, m.taskId
+                `SELECT o.id, o.content, m.brandId, m.workspace, JSON_UNQUOTE(JSON_EXTRACT(o.metadata, '$.taskId')) AS taskId
                    FROM mission_outputs o JOIN missions m ON m.id = o.missionId
                   WHERE m.workspace IN ('facebook','instagram') AND m.brandId IS NOT NULL
                   ORDER BY (m.brandId = 2977) DESC, o.id DESC LIMIT 60`);
