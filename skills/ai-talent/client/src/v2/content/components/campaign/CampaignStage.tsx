@@ -56,6 +56,7 @@ import {
   type AlignResult, type CampaignProposal, type ProposalAlignment, type ProposalQuote, type ProposalSection,
 } from "../../../strategy/lib/campaign/campaignProposal";
 import { readStoredDirector } from "../../../strategy/lib/strategistDirectors";
+import { gatewayMessage, retryOnGateway } from "../../../platform/lib/gatewayRetry";
 import type { QuoteReply } from "./CampaignChatCard";
 import KolBriefForm from "./KolBriefForm";
 import ChannelBriefForm, { type ChannelBriefSpec } from "./ChannelBriefForm";
@@ -319,10 +320,20 @@ export default function CampaignStage({ eventId, brandId }: { eventId: number; b
   const draftMut = (trpc as any).campaign.draftProposal.useMutation();
   const saveProposalMut = (trpc as any).campaign.saveProposal.useMutation();
   const [draftErr, setDraftErr] = React.useState("");
-  const proposalPct = useDraftProgress(draftMut.isPending);
+  // 進度條跟著「這一次草擬」走，不是跟著單一次請求：伺服器重啟時會安靜地重送（gatewayRetry），
+  // 中間那幾秒進度條不能歸零。
+  const [draftBusy, setDraftBusy] = React.useState(false);
+  const draftBusyRef = React.useRef(false);
+  const [alignBusy, setAlignBusy] = React.useState(false);
+  /** 正在等伺服器回來（部署重啟的那幾十秒）：畫面說一聲，不讓人以為卡住。 */
+  const [waitingServer, setWaitingServer] = React.useState(false);
+  const withRetry = <T,>(fn: () => Promise<T>) =>
+    retryOnGateway(fn, { onWait: () => setWaitingServer(true) }).finally(() => setWaitingServer(false));
+  const proposalPct = useDraftProgress(draftBusy);
   const postsQ = (trpc as any).campaign.proposalPosts.useQuery({ eventId }, { enabled: view === "proposal", refetchOnWindowFocus: false });
   const draftProposal = async () => {
-    if (draftMut.isPending) return;
+    if (draftBusyRef.current) return;
+    draftBusyRef.current = true; setDraftBusy(true);
     setDraftErr("");
     try {
       const p = planRef.current;
@@ -330,20 +341,24 @@ export default function CampaignStage({ eventId, brandId }: { eventId: number; b
         if (timer.current) clearTimeout(timer.current);
         const { lockedAt: _l, ...body } = p as any;
         const seq = editSeq.current;
-        await savePlanMut.mutateAsync({ eventId, plan: body });
+        await withRetry(() => savePlanMut.mutateAsync({ eventId, plan: body }));
         if (seq === editSeq.current) { dirtyRef.current = false; setSaveState("saved"); }
       }
-      await draftMut.mutateAsync({ eventId, lang: en ? "en" : "zh", directorAgentId });
+      await withRetry(() => draftMut.mutateAsync({ eventId, lang: en ? "en" : "zh", directorAgentId }));
       setAlignResult(null);
       await utils?.campaign?.get?.invalidate?.({ eventId });
       postsQ.refetch?.();
       setView("proposal");
     } catch (e: any) {
-      setDraftErr(e?.message || L("這一次沒有寫成，請再按一次", "Drafting failed — try again"));
+      setDraftErr(gatewayMessage(e, L("這一次沒有寫成，原本那一份還在，請再按一次", "Drafting failed — your current proposal is unchanged. Please try again."), en));
+    } finally {
+      draftBusyRef.current = false; setDraftBusy(false);
     }
   };
   const saveProposal = async (sections: ProposalSection[], opts: { aligned?: boolean; touched?: string[] } = {}) => {
-    await saveProposalMut.mutateAsync({ eventId, sections, ...opts });
+    // 存檔是整份覆寫，重送一次結果一樣；伺服器重啟時不要讓使用者改的字存不進去。
+    await withRetry(() => saveProposalMut.mutateAsync({ eventId, sections, ...opts }))
+      .catch((e: any) => { throw new Error(gatewayMessage(e, L("沒有存成，請再試一次", "Couldn't save — try again"), en)); });
     await utils?.campaign?.get?.invalidate?.({ eventId });
   };
 
@@ -362,7 +377,8 @@ export default function CampaignStage({ eventId, brandId }: { eventId: number; b
   const reviseMut = (trpc as any).campaign.reviseProposal.useMutation();
   const reviseQuote = async (q: ProposalQuote, instruction: string): Promise<QuoteReply> => {
     const before = panelRef.current?.sections().find((s) => s.id === q.sectionId)?.body ?? "";
-    const r = await reviseMut.mutateAsync({ eventId, sectionId: q.sectionId, body: before, quote: q.text, instruction, directorAgentId });
+    const r: any = await withRetry<any>(() => reviseMut.mutateAsync({ eventId, sectionId: q.sectionId, body: before, quote: q.text, instruction, directorAgentId }))
+      .catch((e: any) => { throw new Error(gatewayMessage(e, L("這次沒有改成，原本的內容還在", "Couldn't change it — the original is unchanged"), en)); });
     if (r.changed) {
       await panelRef.current?.replace(q.sectionId, String(r.body));
       setView("proposal");
@@ -385,11 +401,12 @@ export default function CampaignStage({ eventId, brandId }: { eventId: number; b
   const [alignResult, setAlignResult] = React.useState<AlignResult | null>(null);
   const alignUndo = React.useRef<{ sections: ProposalSection[]; touched: string[]; plan: CampaignPlan | null } | null>(null);
   const alignProposal = async () => {
-    if (alignMut.isPending) return;
+    if (alignBusy) return;
+    setAlignBusy(true);
     setAlignErr(""); setAlignResult(null);
     try {
       await panelRef.current?.flush();
-      const a: ProposalAlignment = await alignMut.mutateAsync({ eventId, directorAgentId });
+      const a: ProposalAlignment = await withRetry(() => alignMut.mutateAsync({ eventId, directorAgentId }));
       const cur = panelRef.current?.sections() ?? [];
       const p = planRef.current;
       const planNext = p && !p.lockedAt ? applyAlignmentToPlan(p, a) : p;
@@ -409,7 +426,9 @@ export default function CampaignStage({ eventId, brandId }: { eventId: number; b
       });
       if (alignmentIsEmpty(a)) alignUndo.current = null;
     } catch (e: any) {
-      setAlignErr(e?.message || L("這一次沒有梳理成，提案與貼文都沒有動", "Realigning failed — nothing was changed"));
+      setAlignErr(gatewayMessage(e, L("這一次沒有梳理成，提案與貼文都沒有動", "Realigning failed — nothing was changed"), en));
+    } finally {
+      setAlignBusy(false);
     }
   };
   const undoAlign = async () => {
@@ -421,7 +440,7 @@ export default function CampaignStage({ eventId, brandId }: { eventId: number; b
       await saveProposal(u.sections, { touched: u.touched });
       if (u.plan && !planRef.current?.lockedAt) applyPlan(u.plan);
     } catch (e: any) {
-      setAlignErr(e?.message || L("沒有復原成功，請再試一次", "Undo failed — try again"));
+      setAlignErr(gatewayMessage(e, L("沒有復原成功，請再試一次", "Undo failed — try again"), en));
     }
   };
 
@@ -530,6 +549,7 @@ export default function CampaignStage({ eventId, brandId }: { eventId: number; b
                 : plan ? L("企劃草稿", "Draft") : L("尚未排企劃", "No plan yet")}
             </span>
             {draftErr && showing !== "proposal" && <span className="text-tiny text-danger max-w-[240px] truncate" title={draftErr}>{draftErr}</span>}
+            {waitingServer && <span className="text-tiny text-default-500" role="status">{L("系統更新中，自動重試…", "Server updating — retrying…")}</span>}
             {plan && live.length > 0 && (proposal ? (
               <DraftProposalButton en={en} icon={faFileLines} label={L("提案", "Proposal")} progress={proposalPct} pressed={showing === "proposal"}
                 onPress={() => setView((v) => (v === "proposal" ? "map" : "proposal"))}
@@ -674,7 +694,7 @@ export default function CampaignStage({ eventId, brandId }: { eventId: number; b
               <CampaignProposalPanel ref={panelRef} proposal={proposal} plan={plan} posts={postsQ.data ?? {}} postsLoading={!!postsQ.isLoading}
                 writerName={(() => { const m = teamQ.data?.planner; return (en && m?.nameEn ? m.nameEn : m?.name) || proposal.by?.name || L("內容企劃", "the planner"); })()}
                 canAsk onQuote={setQuote} recent={recentSections}
-                aligning={alignMut.isPending} alignError={alignErr} onAlign={alignProposal}
+                aligning={alignBusy} alignError={alignErr} onAlign={alignProposal} waitingServer={waitingServer}
                 alignResult={alignResult} onUndoAlign={undoAlign} onCloseAlign={() => { setAlignResult(null); alignUndo.current = null; }}
                 eventName={String(ev.name ?? "")} range={ev.startAt ? `${ev.startAt} → ${ev.endAt ?? "?"}` : ""} en={en}
                 drafting={proposalPct} draftError={draftErr} onRedraft={draftProposal}
