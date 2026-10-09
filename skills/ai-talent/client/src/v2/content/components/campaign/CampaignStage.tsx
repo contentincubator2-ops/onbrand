@@ -50,8 +50,13 @@ import CampaignMap, { type NewItemInput } from "./CampaignMap";
 import CampaignSetupForm from "./CampaignSetupForm";
 import CampaignChatCard from "./CampaignChatCard";
 import CampaignBasisPanel from "../../../strategy/components/events/CampaignBasisPanel";
-import CampaignProposalPanel, { DraftProposalButton, useDraftProgress } from "../../../strategy/components/events/CampaignProposalPanel";
-import type { CampaignProposal, ProposalSection } from "../../../strategy/lib/campaign/campaignProposal";
+import CampaignProposalPanel, { DraftProposalButton, useDraftProgress, type ProposalPanelHandle } from "../../../strategy/components/events/CampaignProposalPanel";
+import {
+  alignmentIsEmpty, applyAlignmentToPlan, applyAlignmentToSections,
+  type AlignResult, type CampaignProposal, type ProposalAlignment, type ProposalQuote, type ProposalSection,
+} from "../../../strategy/lib/campaign/campaignProposal";
+import { readStoredDirector } from "../../../strategy/lib/strategistDirectors";
+import type { QuoteReply } from "./CampaignChatCard";
 import KolBriefForm from "./KolBriefForm";
 import ChannelBriefForm, { type ChannelBriefSpec } from "./ChannelBriefForm";
 import { briefFromBasis, briefFromEvent, type BasisPatch, type BasisValue } from "../../../strategy/lib/campaign/campaignBasis";
@@ -141,9 +146,9 @@ export default function CampaignStage({ eventId, brandId }: { eventId: number; b
 
   /** 「寫這篇」開的任務視窗，以及寫好之後開的那一篇（itemId＋outputId）。 */
   const [writing, setWriting] = React.useState<CampaignPlanItem | null>(null);
-  const [openPost, setOpenPost] = React.useState<{ itemId: string; outputId: number } | null>(null);
-  const openItem = (it: CampaignPlanItem) => {
-    if (it.outputId) setOpenPost({ itemId: it.id, outputId: Number(it.outputId) });
+  const [openPost, setOpenPost] = React.useState<{ itemId: string; outputId: number; ask?: string } | null>(null);
+  const openItem = (it: CampaignPlanItem, ask?: string) => {
+    if (it.outputId) setOpenPost({ itemId: it.id, outputId: Number(it.outputId), ask });
     else setWriting(it);
   };
   React.useEffect(() => {
@@ -309,6 +314,8 @@ export default function CampaignStage({ eventId, brandId }: { eventId: number; b
    * 草擬提案（2026-10-08）：先把手上還沒存的企劃存進去（伺服器讀的是存著的那一份），再請
    * 伺服器照企劃與每一篇的內容寫。寫好右邊換成提案。失敗時原本那一份還在。
    */
+  const directorAgentId = React.useMemo(() => (brandId ? readStoredDirector(brandId, "brand") : null), [brandId]);
+  const teamQ = (trpc as any).campaign.team.useQuery({ eventId, directorAgentId }, { refetchOnWindowFocus: false, staleTime: 10 * 60_000 });
   const draftMut = (trpc as any).campaign.draftProposal.useMutation();
   const saveProposalMut = (trpc as any).campaign.saveProposal.useMutation();
   const [draftErr, setDraftErr] = React.useState("");
@@ -326,7 +333,8 @@ export default function CampaignStage({ eventId, brandId }: { eventId: number; b
         await savePlanMut.mutateAsync({ eventId, plan: body });
         if (seq === editSeq.current) { dirtyRef.current = false; setSaveState("saved"); }
       }
-      await draftMut.mutateAsync({ eventId, lang: en ? "en" : "zh" });
+      await draftMut.mutateAsync({ eventId, lang: en ? "en" : "zh", directorAgentId });
+      setAlignResult(null);
       await utils?.campaign?.get?.invalidate?.({ eventId });
       postsQ.refetch?.();
       setView("proposal");
@@ -334,9 +342,87 @@ export default function CampaignStage({ eventId, brandId }: { eventId: number; b
       setDraftErr(e?.message || L("這一次沒有寫成，請再按一次", "Drafting failed — try again"));
     }
   };
-  const saveProposal = async (sections: ProposalSection[]) => {
-    await saveProposalMut.mutateAsync({ eventId, sections });
-    utils?.campaign?.get?.invalidate?.({ eventId });
+  const saveProposal = async (sections: ProposalSection[], opts: { aligned?: boolean; touched?: string[] } = {}) => {
+    await saveProposalMut.mutateAsync({ eventId, sections, ...opts });
+    await utils?.campaign?.get?.invalidate?.({ eventId });
+  };
+
+  /**
+   * 反白提案的一段帶進左邊的對話（2026-10-09）：內容企劃只改那一段，改好的直接換到右邊、
+   * 標「剛改」幾秒；對話裡那一則可以復原。那一段的內文拿畫面上現在的（可能還沒存）。
+   */
+  const panelRef = React.useRef<ProposalPanelHandle>(null);
+  const [quote, setQuote] = React.useState<ProposalQuote | null>(null);
+  const [recentSections, setRecentSections] = React.useState<Set<string>>(new Set());
+  React.useEffect(() => {
+    if (!recentSections.size) return;
+    const t = setTimeout(() => setRecentSections(new Set()), 6000);
+    return () => clearTimeout(t);
+  }, [recentSections]);
+  const reviseMut = (trpc as any).campaign.reviseProposal.useMutation();
+  const reviseQuote = async (q: ProposalQuote, instruction: string): Promise<QuoteReply> => {
+    const before = panelRef.current?.sections().find((s) => s.id === q.sectionId)?.body ?? "";
+    const r = await reviseMut.mutateAsync({ eventId, sectionId: q.sectionId, body: before, quote: q.text, instruction, directorAgentId });
+    if (r.changed) {
+      await panelRef.current?.replace(q.sectionId, String(r.body));
+      setView("proposal");
+      setRecentSections(new Set([q.sectionId]));
+    }
+    return {
+      reply: String(r.reply ?? ""), name: r.agent?.name, changed: !!r.changed,
+      unsourced: Array.isArray(r.unsourced) ? r.unsourced.map(String) : [],
+      undo: () => { void panelRef.current?.replace(q.sectionId, before); setRecentSections(new Set([q.sectionId])); },
+    };
+  };
+
+  /**
+   * 提案改過之後梳理整份（2026-10-09 CJ「要不要根據這個調整，進行整份文件的邏輯梳理…實際上的
+   * 貼文等等，也要調整」）：伺服器回要跟著改的段落、標語／各段訊息、還沒寫的貼文方向，以及
+   * 寫好的哪幾篇建議重寫。段落與企劃各自存；整個可以復原（放回梳理前的那一份）。
+   */
+  const alignMut = (trpc as any).campaign.alignProposal.useMutation();
+  const [alignErr, setAlignErr] = React.useState("");
+  const [alignResult, setAlignResult] = React.useState<AlignResult | null>(null);
+  const alignUndo = React.useRef<{ sections: ProposalSection[]; touched: string[]; plan: CampaignPlan | null } | null>(null);
+  const alignProposal = async () => {
+    if (alignMut.isPending) return;
+    setAlignErr(""); setAlignResult(null);
+    try {
+      await panelRef.current?.flush();
+      const a: ProposalAlignment = await alignMut.mutateAsync({ eventId, directorAgentId });
+      const cur = panelRef.current?.sections() ?? [];
+      const p = planRef.current;
+      const planNext = p && !p.lockedAt ? applyAlignmentToPlan(p, a) : p;
+      const planChanged = !!p && !!planNext && JSON.stringify(planNext) !== JSON.stringify(p);
+      alignUndo.current = { sections: cur, touched: (q.data?.proposal?.touched ?? []) as string[], plan: planChanged ? p : null };
+      // 沒有要動的也存一次（aligned）：這一批修改已經對過了，不用再問。
+      await saveProposal(applyAlignmentToSections(cur, a), { aligned: true });
+      if (planChanged && planNext) applyPlan(planNext);
+      setRecentSections(new Set(Object.keys(a.sections)));
+      const byId = new Map((planNext ?? p)?.items.map((i) => [i.id, i]) ?? []);
+      setAlignResult({
+        reply: a.reply, name: a.agent?.name || L("內容企劃", "The planner"),
+        sectionTitles: cur.filter((s) => typeof a.sections[s.id] === "string").map((s) => s.title),
+        itemCount: planChanged ? a.items.length : 0,
+        planChanged: planChanged && (!!a.smp || !!Object.keys(a.phaseMessages ?? {}).length),
+        rewrite: a.rewrite.flatMap((r) => (byId.get(r.id) ? [{ item: byId.get(r.id)!, reason: r.reason }] : [])),
+      });
+      if (alignmentIsEmpty(a)) alignUndo.current = null;
+    } catch (e: any) {
+      setAlignErr(e?.message || L("這一次沒有梳理成，提案與貼文都沒有動", "Realigning failed — nothing was changed"));
+    }
+  };
+  const undoAlign = async () => {
+    const u = alignUndo.current;
+    alignUndo.current = null;
+    setAlignResult(null);
+    if (!u) return;
+    try {
+      await saveProposal(u.sections, { touched: u.touched });
+      if (u.plan && !planRef.current?.lockedAt) applyPlan(u.plan);
+    } catch (e: any) {
+      setAlignErr(e?.message || L("沒有復原成功，請再試一次", "Undo failed — try again"));
+    }
   };
 
   const retuneItem = async (it: CampaignPlanItem, from: CampaignPhaseId): Promise<string> => {
@@ -575,7 +661,8 @@ export default function CampaignStage({ eventId, brandId }: { eventId: number; b
             {plan && (
               <CampaignChatCard eventId={eventId} brandId={brandId} plan={plan} phase={cur} notes={notes} locked={locked} en={en} onApply={applyPlan} grow
                 basis={basisLocal} onApplyBasis={(p) => applyBasis(p, true)} onApplyDates={applyDates} view={showing === "basis" ? "basis" : "map"}
-                expanded={chatExpanded} onToggleExpand={() => setChatExpanded((v) => !v)} />
+                expanded={chatExpanded} onToggleExpand={() => setChatExpanded((v) => !v)}
+                quote={showing === "proposal" ? quote : null} onClearQuote={() => setQuote(null)} onReviseQuote={reviseQuote} />
             )}
 
             </div>
@@ -584,7 +671,11 @@ export default function CampaignStage({ eventId, brandId }: { eventId: number; b
           {/* ── 右：策略地圖（撐滿這一欄的高度） ───────────────────── */}
           <section className="min-w-0 min-h-0 relative bg-default-100 overflow-hidden">
             {plan && showing === "proposal" && proposal ? (
-              <CampaignProposalPanel proposal={proposal} plan={plan} posts={postsQ.data ?? {}} postsLoading={!!postsQ.isLoading}
+              <CampaignProposalPanel ref={panelRef} proposal={proposal} plan={plan} posts={postsQ.data ?? {}} postsLoading={!!postsQ.isLoading}
+                writerName={(() => { const m = teamQ.data?.planner; return (en && m?.nameEn ? m.nameEn : m?.name) || proposal.by?.name || L("內容企劃", "the planner"); })()}
+                canAsk onQuote={setQuote} recent={recentSections}
+                aligning={alignMut.isPending} alignError={alignErr} onAlign={alignProposal}
+                alignResult={alignResult} onUndoAlign={undoAlign} onCloseAlign={() => { setAlignResult(null); alignUndo.current = null; }}
                 eventName={String(ev.name ?? "")} range={ev.startAt ? `${ev.startAt} → ${ev.endAt ?? "?"}` : ""} en={en}
                 drafting={proposalPct} draftError={draftErr} onRedraft={draftProposal}
                 onSave={saveProposal} saving={saveProposalMut.isPending}
@@ -708,7 +799,7 @@ export default function CampaignStage({ eventId, brandId }: { eventId: number; b
         const base = items.find((i) => i.id === openPost.itemId);
         if (!base) return null;
         return (
-          <CampaignPostModal key={`post-${openPost.itemId}-${openPost.outputId}`}
+          <CampaignPostModal key={`post-${openPost.itemId}-${openPost.outputId}`} initialAsk={openPost.ask}
             eventId={eventId} brandId={brandId}
             item={{ ...base, outputId: base.outputId ?? openPost.outputId }}
             thumb={(thumbsQ.data ?? {})[openPost.itemId] ?? null}

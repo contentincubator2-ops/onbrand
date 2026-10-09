@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { draftProgress, proposalDocHtml, proposalFilename, scheduleRows, splitSections } from "./campaignProposal";
+import { alignmentIsEmpty, applyAlignmentToPlan, applyAlignmentToSections, draftProgress, proposalDocHtml, proposalFilename, scheduleRows, splitSections } from "./campaignProposal";
 
 const item = (over: Record<string, any> = {}) => ({
   id: "a", phase: "teaser" as const, date: "2026-10-08", platform: "facebook", taskId: "t", taskLabel: "單篇貼文",
@@ -75,5 +75,24 @@ describe("proposalFilename／draftProgress", () => {
     expect(draftProgress(0)).toBe(0);
     expect(draftProgress(10_000)).toBeLessThan(draftProgress(30_000));
     expect(draftProgress(600_000)).toBe(94);
+  });
+});
+
+describe("套用梳理結果", () => {
+  const plan = { smp: "舊標語", phaseMessages: { teaser: "舊訊息" }, items: [item({ id: "a" }), item({ id: "b", outputId: 9 })] } as any;
+  const a = { reply: "", sections: { summary: "新摘要" }, smp: "新標語", phaseMessages: { launch: "新訊息" }, items: [{ id: "a", angle: "新方向" }, { id: "b", angle: "不該套用" }], rewrite: [] };
+  it("企劃：標語、各段訊息合併，還沒寫的貼文換方向；寫好的那一篇不動", () => {
+    const next = applyAlignmentToPlan(plan, a);
+    expect(next.smp).toBe("新標語");
+    expect(next.phaseMessages).toEqual({ teaser: "舊訊息", launch: "新訊息" });
+    expect(next.items.map((i: any) => i.angle)).toEqual(["新方向", "用冷知識口吻切入"]);
+  });
+  it("提案：只換有給的段落", () => {
+    expect(applyAlignmentToSections([{ id: "summary", title: "摘要", body: "舊" }, { id: "recap", title: "回顧", body: "不動" }], a))
+      .toEqual([{ id: "summary", title: "摘要", body: "新摘要" }, { id: "recap", title: "回顧", body: "不動" }]);
+  });
+  it("什麼都沒有要動", () => {
+    expect(alignmentIsEmpty({ reply: "都對得上", sections: {}, items: [], rewrite: [] })).toBe(true);
+    expect(alignmentIsEmpty(a)).toBe(false);
   });
 });

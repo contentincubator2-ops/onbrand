@@ -54,6 +54,7 @@ import { phaseShort } from "../../../strategy/lib/campaign/campaignStage";
 import { applyProposal, describeProposal, isEmptyProposal, routeMention, type CampaignProposal } from "../../../strategy/lib/campaign/campaignChat";
 import { agentLabel } from "../../../platform/lib/agentName";
 import { readStoredDirector } from "../../../strategy/lib/strategistDirectors";
+import type { ProposalQuote } from "../../../strategy/lib/campaign/campaignProposal";
 import type { BasisPatch, BasisValue } from "../../../strategy/lib/campaign/campaignBasis";
 
 /** 名冊上的角色 id（伺服器 campaignRoster.CAMPAIGN_ROLES）。 */
@@ -82,7 +83,12 @@ interface Msg {
   truncated?: boolean;
   /** 這一句裡讀不到的連結（只在當下顯示，不存資料庫）。 */
   linkFailed?: string[];
+  /** 這一則改了提案的哪一段（只在當下顯示與復原，不存資料庫）。 */
+  proposalEdit?: { title: string };
 }
+
+/** 帶著提案的反白來問，內容企劃回的東西（父層已經把改好的那一段換上去）。 */
+export interface QuoteReply { reply: string; name?: string; changed: boolean; unsourced: string[]; undo: () => void }
 
 /** 這檔活動的參考資料（伺服器 campaignChatSources.SourceMeta）。 */
 interface Source { id: number; kind: "url" | "file"; name: string; url: string | null; chars: number; partial: boolean }
@@ -123,7 +129,14 @@ const newKey = () => `m${Date.now().toString(36)}${(seq++).toString(36)}${Math.r
 /** 新的一則一律經過這裡，才有 key。 */
 const mk = (m: Msg): Msg => ({ ...m, key: m.key ?? newKey() });
 
-export default function CampaignChatCard({ eventId, brandId, plan, phase, notes, locked, en, onApply, basis, onApplyBasis, onApplyDates, view, grow, expanded, onToggleExpand }: {
+export default function CampaignChatCard({ eventId, brandId, plan, phase, notes, locked, en, onApply, basis, onApplyBasis, onApplyDates, view, grow, expanded, onToggleExpand, quote, onClearQuote, onReviseQuote }: {
+  /**
+   * 使用者在右邊提案上反白的那幾句（2026-10-09 CJ「反白一段文字後，直接帶入顧問對話中」）。
+   * 有的時候輸入框上方掛著引用，這一句送出去是請內容企劃改提案的那一段，不走一般的對話。
+   */
+  quote?: ProposalQuote | null;
+  onClearQuote?: () => void;
+  onReviseQuote?: (q: ProposalQuote, instruction: string) => Promise<QuoteReply>;
   eventId: number;
   brandId: number | null;
   plan: CampaignPlan;
@@ -526,10 +539,37 @@ export default function CampaignChatCard({ eventId, brandId, plan, phase, notes,
     dispatch(first);
   };
 
+  /** 這一則對提案的修改怎麼復原（只在這次開著的時候有）。 */
+  const quoteUndo = React.useRef(new Map<string, () => void>());
+  const [, bump] = React.useState(0);
+  React.useEffect(() => { if (quote) requestAnimationFrame(() => inputRef.current?.focus()); }, [quote]);
+  const sendQuote = async (q: ProposalQuote, m: string) => {
+    onClearQuote?.();
+    const excerpt = q.text ? `「${q.text.length > 90 ? `${q.text.slice(0, 90)}…` : q.text}」\n` : "";
+    const asked = [...msgsRef.current, mk({ role: "user", content: `${L("提案", "Proposal")}・${q.title}\n${excerpt}${m}` })];
+    msgsRef.current = asked; setMsgs(asked);
+    setErr(""); setBusy("planner"); setBusyAt(Date.now());
+    try {
+      const r = await onReviseQuote!(q, m);
+      const note = r.unsourced.length
+        ? L(`\n（請確認這幾個數字，資料裡沒有：${r.unsourced.join("、")}）`, `\n(Please check these numbers — they aren't in your data: ${r.unsourced.join(", ")})`) : "";
+      const reply = mk({ role: "assistant", speaker: "planner", name: r.name ?? byRoleRef.current.get("planner")?.name ?? "", content: `${r.reply}${note}`, ...(r.changed ? { proposalEdit: { title: q.title } } : {}) });
+      if (r.changed && reply.key) quoteUndo.current.set(reply.key, r.undo);
+      const next = [...msgsRef.current, reply];
+      msgsRef.current = next; setMsgs(next);
+    } catch (e: any) {
+      setErr(String(e?.message ?? "").slice(0, 160) || L("這次沒有改成，原本的內容還在", "Couldn't change it — the original is unchanged"));
+    } finally {
+      setBusy(null);
+      drainRef.current();
+    }
+  };
+
   const send = (message: string) => {
     const m = message.trim();
     if (!m) return;
     setText("");
+    if (quote && onReviseQuote && !busy) { void sendQuote(quote, m); return; }
     // 有人正在回：先排隊，這一串回完就送。
     if (busy) { setQueued((q) => [...q, m].slice(0, 3)); return; }
     dispatch(m);
@@ -693,6 +733,16 @@ export default function CampaignChatCard({ eventId, brandId, plan, phase, notes,
                     {L(`這個連結讀不到：${m.linkFailed.join("、")}。可以改上傳檔案，或把重點貼進來。`, `Couldn’t read this link: ${m.linkFailed.join(", ")}. Upload a file or paste the key points instead.`)}
                   </p>
                 ) : null}
+                {m.proposalEdit && (
+                  <p className="text-[11.5px] rounded-xl border border-background/35 px-3 py-1.5 flex items-center gap-2">
+                    <FontAwesomeIcon icon={faCheck} className="text-[9px]" />
+                    <span className="flex-1 min-w-0 truncate">{L(`已改提案・${m.proposalEdit.title}`, `Proposal updated · ${m.proposalEdit.title}`)}</span>
+                    {m.key && quoteUndo.current.has(m.key) && (
+                      <button type="button" className="underline opacity-80 hover:opacity-100 shrink-0"
+                        onClick={() => { quoteUndo.current.get(m.key!)?.(); quoteUndo.current.delete(m.key!); bump((n) => n + 1); }}>{L("復原", "Undo")}</button>
+                    )}
+                  </p>
+                )}
                 {m.proposal && (
                   <ChangeCard
                     lines={describeProposal(m.before ?? plan, m.proposal, en)}
@@ -733,7 +783,7 @@ export default function CampaignChatCard({ eventId, brandId, plan, phase, notes,
         )}
       </div>
 
-      {locked ? (
+      {locked && !quote ? (
         <p className="text-tiny opacity-60">{L("企劃已定稿。要再調整，先按標題旁的鎖頭解鎖。", "The plan is locked. Unlock it by the title to change it.")}</p>
       ) : (
         <>
@@ -763,6 +813,20 @@ export default function CampaignChatCard({ eventId, brandId, plan, phase, notes,
             </div>
           )}
           {fileNote && <p className={`text-[11.5px] ${fileNote.bad ? "text-danger-300" : "opacity-70"}`}>{fileNote.text}</p>}
+          {quote && (
+            <div className="flex items-start gap-2 rounded-xl bg-background/15 px-3 py-2">
+              <div className="flex-1 min-w-0">
+                <p className="text-[11px] opacity-70">{L(`改提案・${quote.title}`, `Editing the proposal · ${quote.title}`)}</p>
+                <p className="text-[12px] leading-snug line-clamp-3 border-l-2 border-background/50 pl-2 mt-0.5">
+                  {quote.text || L("（整段）", "(the whole section)")}
+                </p>
+              </div>
+              <button type="button" onClick={onClearQuote} aria-label={L("取消引用", "Remove the quote")}
+                className="w-5 h-5 grid place-items-center rounded-full opacity-60 hover:opacity-100 hover:bg-background/15 shrink-0">
+                <FontAwesomeIcon icon={faXmark} className="text-[10px]" />
+              </button>
+            </div>
+          )}
           <form className="flex items-end gap-2" onSubmit={(e) => { e.preventDefault(); send(text); }}>
             <input ref={fileRef} type="file" accept={FILE_ACCEPT} className="hidden"
               onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) void onFile(f); }} />
@@ -777,7 +841,9 @@ export default function CampaignChatCard({ eventId, brandId, plan, phase, notes,
               value={text} rows={1} maxLength={800}
               onChange={(e) => setText(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); send(text); } }}
-              placeholder={busy
+              placeholder={quote && !busy
+                ? L("這幾句要怎麼改？例如：太長了，縮成兩句", "How should this change? e.g. too long — cut it to two sentences")
+                : busy
                 ? L("可以先打下一句，回完就送出", "Type your next message — it sends when this reply finishes")
                 : cur ? L(`跟${dn(cur)}說…（@名字 找其他人；可貼官網連結）`, `Message ${dn(cur)}… (@name for someone else; links are read)`)
                   : L("跟團隊說…", "Message the team…")}

@@ -30,6 +30,8 @@
  *   draftProposal— 草擬提案：從改好的企劃回頭寫背景／目標／族群／策略…（core/campaignProposal.ts）
  *   saveProposal — 使用者逐段改過的提案
  *   proposalPosts— 提案後半段要附的每一篇全文（不經過模型，直接讀成品）
+ *   reviseProposal— 反白提案的一段，請內容企劃照一句話改（只回那一段，不寫入）
+ *   alignProposal— 提案改過之後，照改的內容梳理整份提案與貼文方向（只回提案，不寫入）
  *
  * 定稿之後 saveSettings／generate／savePlan 一律拒絕——鎖的是整份，不是只鎖
  * 畫面。markWritten 不受影響：內容層本來就是在定稿之後寫。
@@ -57,7 +59,7 @@ import { ownedProductIds, resolveProductScope } from "../../strategy/core/entiti
 import { readEventIntake, cleanLinks, INTAKE_LINKS_MAX } from "../../strategy/core/entities/eventIntake";
 import { invalidateBrandPrefix } from "../../strategy/core/brand/brandContext";
 import { campaignPostState, canMarkPublished, type CampaignPostState } from "../core/campaign/campaignPostStatus";
-import { cleanSavedSections, draftCampaignProposal, loadWrittenPosts, planMark, type CampaignProposal } from "../core/campaign/campaignProposal";
+import { alignCampaignProposal, cleanSavedSections, draftCampaignProposal, loadWrittenPosts, planMark, reviseProposalSection, type CampaignProposal } from "../core/campaign/campaignProposal";
 
 /** 地圖上一篇寫好的：縮圖＋走到哪一關。 */
 interface ItemThumbRow {
@@ -884,7 +886,7 @@ export const campaignRouter = router({
    * 失敗不寫入，原本那一份還在。
    */
   draftProposal: protectedProcedure
-    .input(z.object({ eventId: z.number().int().positive(), lang: z.enum(["zh", "en"]).optional() }))
+    .input(z.object({ eventId: z.number().int().positive(), lang: z.enum(["zh", "en"]).optional(), directorAgentId: z.number().int().positive().nullable().optional() }))
     .mutation(async ({ ctx, input }) => {
       const row = await loadEvent(input.eventId, ctx.user!.id);
       const pos = parsePositioning(row.positioning);
@@ -895,6 +897,7 @@ export const campaignRouter = router({
         proposal = await draftCampaignProposal({
           eventId: input.eventId, userId: ctx.user!.id, plan, positioning: pos, lang: input.lang ?? "zh",
           prev: (pos.campaignProposal as CampaignProposal | undefined)?.sections,
+          directorAgentId: input.directorAgentId ?? null,
         });
       } catch (e: any) {
         throw new TRPCError({ code: "BAD_REQUEST", message: String(e?.message ?? e).slice(0, 300) });
@@ -909,6 +912,10 @@ export const campaignRouter = router({
     .input(z.object({
       eventId: z.number().int().positive(),
       sections: z.array(z.object({ id: z.string().max(40), title: z.string().max(80), body: z.string().max(8000) })).min(1).max(20),
+      /** 這次存的是梳理後的結果：改過的記號清掉，不用再問一次要不要梳理。 */
+      aligned: z.boolean().optional(),
+      /** 直接指定改過的段落（復原梳理時放回原本那幾段）。 */
+      touched: z.array(z.string().max(40)).max(20).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const row = await loadEvent(input.eventId, ctx.user!.id);
@@ -918,10 +925,72 @@ export const campaignRouter = router({
       const text = sections.map((s) => s.body).join("\n");
       // 使用者把那個數字改掉了，提醒就跟著消失。
       const unsourced = (prev.unsourced ?? []).filter((n) => text.includes(n.replace("%", "")));
-      const { unsourced: _drop, ...rest } = prev;
-      const next: CampaignProposal = { ...rest, sections, editedAt: new Date().toISOString(), ...(unsourced.length ? { unsourced } : {}) };
+      // 哪幾段的內文改了：記下來，畫面會問要不要照這些修改梳理整份。
+      const before = new Map(prev.sections.map((s) => [s.id, s.body]));
+      const touched = input.aligned ? [] : input.touched ? input.touched.filter((id) => before.has(id)) : [...new Set([...(prev.touched ?? []), ...sections.filter((s) => s.body !== before.get(s.id)).map((s) => s.id)])];
+      const { unsourced: _drop, touched: _t, ...rest } = prev;
+      const next: CampaignProposal = {
+        ...rest, sections, editedAt: new Date().toISOString(),
+        ...(unsourced.length ? { unsourced } : {}), ...(touched.length ? { touched } : {}),
+      };
       await patchPositioning(input.eventId, ctx.user!.id, "campaignProposal", next);
-      return { ok: true, editedAt: next.editedAt, unsourced };
+      return { ok: true, editedAt: next.editedAt, unsourced, touched };
+    }),
+
+  /**
+   * 反白提案的一段，請內容企劃照一句話改（2026-10-09 CJ「反白一段文字後，直接帶入顧問對話中，
+   * 然後，用戶可以針對那一段話，進行修改」）。只回改好的那一段、不寫入——畫面套用後送 saveProposal。
+   * 那一段的內文由畫面送來：使用者剛打的字可能還沒存。
+   */
+  reviseProposal: protectedProcedure
+    .input(z.object({
+      eventId: z.number().int().positive(),
+      sectionId: z.string().max(40),
+      body: z.string().max(8000),
+      quote: z.string().max(1200),
+      instruction: z.string().min(1).max(800),
+      directorAgentId: z.number().int().positive().nullable().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const row = await loadEvent(input.eventId, ctx.user!.id);
+      const pos = parsePositioning(row.positioning);
+      const plan = visiblePlan((pos.campaignPlan ?? null) as CampaignPlan | null);
+      const section = (pos.campaignProposal as CampaignProposal | undefined)?.sections?.find((s) => s.id === input.sectionId);
+      if (!plan || !section) throw new TRPCError({ code: "BAD_REQUEST", message: "找不到提案的這一段" });
+      try {
+        return await reviseProposalSection({
+          eventId: input.eventId, userId: ctx.user!.id, plan, positioning: pos,
+          section: { ...section, body: input.body }, quote: input.quote, instruction: input.instruction,
+          directorAgentId: input.directorAgentId ?? null,
+        });
+      } catch (e: any) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: String(e?.message ?? e).slice(0, 300) });
+      }
+    }),
+
+  /**
+   * 提案改過之後，照改的內容梳理整份提案與貼文方向（2026-10-09 CJ「要問用戶，要不要根據這個
+   * 調整，進行整份文件的邏輯梳理…實際上的貼文等等，也要調整」）。讀存著的那一份（畫面先存再叫）。
+   * 只回提案、不寫入：段落走 saveProposal（aligned）、標語與貼文方向走 savePlan，使用者可以復原。
+   * 已寫好的貼文不會被改，只列出建議重寫的。
+   */
+  alignProposal: protectedProcedure
+    .input(z.object({ eventId: z.number().int().positive(), directorAgentId: z.number().int().positive().nullable().optional() }))
+    .mutation(async ({ ctx, input }) => {
+      const row = await loadEvent(input.eventId, ctx.user!.id);
+      const pos = parsePositioning(row.positioning);
+      const plan = visiblePlan((pos.campaignPlan ?? null) as CampaignPlan | null);
+      const proposal = pos.campaignProposal as CampaignProposal | undefined;
+      if (!plan || !proposal?.sections?.length) throw new TRPCError({ code: "BAD_REQUEST", message: "還沒有提案，先按「草擬提案」" });
+      if (!proposal.touched?.length) throw new TRPCError({ code: "BAD_REQUEST", message: "提案在上次整理之後沒有改過" });
+      try {
+        return await alignCampaignProposal({
+          eventId: input.eventId, userId: ctx.user!.id, plan, positioning: pos,
+          sections: proposal.sections, touched: proposal.touched, directorAgentId: input.directorAgentId ?? null,
+        });
+      } catch (e: any) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: String(e?.message ?? e).slice(0, 300) });
+      }
     }),
 
   /** 提案後半段的每一篇全文（itemId → 標題＋文字）。還沒寫的那幾篇不會在裡面。 */
