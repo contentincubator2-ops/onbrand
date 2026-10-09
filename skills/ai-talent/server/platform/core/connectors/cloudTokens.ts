@@ -29,6 +29,14 @@ import {
 } from "../tokenEncryption";
 
 export type CloudProvider = "google_drive" | "onedrive";
+/**
+ * 2026-10-09：Canva 也存在同一張表、同一種加密 blob，但它不是「雲端檔案」——
+ * cloudDriveClient 的列檔／下載只認 CloudProvider，所以另外開一個較寬的型別給儲存層用。
+ * Canva 的連接跟著「人」不跟著品牌（同一個人的設計不分品牌），brandId 一律存
+ * CANVA_ACCOUNT_SCOPE。
+ */
+export type IntegrationProvider = CloudProvider | "canva";
+export const CANVA_ACCOUNT_SCOPE = 0;
 
 interface TokenPayload {
   access: string;
@@ -44,7 +52,7 @@ interface IntegrationRow {
   authorizedResources: any;
 }
 
-async function loadRow(userId: number, brandId: number, provider: CloudProvider): Promise<IntegrationRow | null> {
+async function loadRow(userId: number, brandId: number, provider: IntegrationProvider): Promise<IntegrationRow | null> {
   const [rows]: any = await localPool.execute(
     `SELECT id, status, accessToken, authorizedResources
        FROM brand_integrations
@@ -66,7 +74,7 @@ function decodePayload(serialized: string): TokenPayload {
 
 /** Called from the OAuth callback once tokens are exchanged. */
 export async function saveConnection(
-  userId: number, brandId: number, provider: CloudProvider, payload: TokenPayload,
+  userId: number, brandId: number, provider: IntegrationProvider, payload: TokenPayload,
 ): Promise<void> {
   const existing = await loadRow(userId, brandId, provider);
   const encoded = encodePayload(payload);
@@ -88,7 +96,7 @@ export async function saveConnection(
   }
 }
 
-export async function disconnectCloud(userId: number, brandId: number, provider: CloudProvider): Promise<void> {
+export async function disconnectCloud(userId: number, brandId: number, provider: IntegrationProvider): Promise<void> {
   await localPool.execute(
     `UPDATE brand_integrations SET status = 'disconnected', accessToken = NULL
       WHERE userId = ? AND brandId = ? AND integrationType = ?`,
@@ -97,7 +105,7 @@ export async function disconnectCloud(userId: number, brandId: number, provider:
 }
 
 export async function getConnectionStatus(
-  userId: number, brandId: number, provider: CloudProvider,
+  userId: number, brandId: number, provider: IntegrationProvider,
 ): Promise<{ connected: boolean; accountEmail: string | null }> {
   const row = await loadRow(userId, brandId, provider);
   if (!row || row.status !== "connected" || !row.accessToken) return { connected: false, accountEmail: null };
@@ -143,12 +151,31 @@ async function refreshMicrosoftToken(refreshToken: string): Promise<{ access: st
 }
 
 export class CloudNotConnectedError extends Error {
-  constructor(provider: CloudProvider) { super(`${provider} not connected for this brand`); this.name = "CloudNotConnectedError"; }
+  constructor(provider: IntegrationProvider) { super(`${provider} not connected for this brand`); this.name = "CloudNotConnectedError"; }
 }
 
 /** Returns a valid (non-expired) access token, refreshing and persisting a
  *  new one first if the stored token is within 2 minutes of expiry. */
-export async function getValidAccessToken(userId: number, brandId: number, provider: CloudProvider): Promise<string> {
+export async function getValidAccessToken(userId: number, brandId: number, provider: IntegrationProvider): Promise<string> {
+  if (provider === "canva") return dedupeRefresh(`${userId}:${brandId}`, () => validAccessToken(userId, brandId, provider));
+  return validAccessToken(userId, brandId, provider);
+}
+
+/**
+ * Canva 的 refresh token 只能用一次。挑選視窗一打開會同時問「連接狀態」和「設計清單」，
+ * 兩個請求各自去換就會有一個拿著已作廢的 refresh token——連接被標成 error，用戶得重新授權。
+ * 同一個人同一時間只讓一個換 token 的動作在跑，其餘等它的結果。
+ */
+const refreshInFlight = new Map<string, Promise<string>>();
+function dedupeRefresh(key: string, run: () => Promise<string>): Promise<string> {
+  const running = refreshInFlight.get(key);
+  if (running) return running;
+  const p = run().finally(() => refreshInFlight.delete(key));
+  refreshInFlight.set(key, p);
+  return p;
+}
+
+async function validAccessToken(userId: number, brandId: number, provider: IntegrationProvider): Promise<string> {
   const row = await loadRow(userId, brandId, provider);
   if (!row || row.status !== "connected" || !row.accessToken) throw new CloudNotConnectedError(provider);
   const payload = decodePayload(row.accessToken);
@@ -157,7 +184,14 @@ export async function getValidAccessToken(userId: number, brandId: number, provi
   if (!payload.refresh) throw new CloudNotConnectedError(provider);
 
   try {
-    if (provider === "google_drive") {
+    if (provider === "canva") {
+      const { refreshCanvaToken } = await import("./canvaClient");
+      const fresh = await refreshCanvaToken(
+        { clientId: ENV.CANVA_CLIENT_ID ?? "", clientSecret: ENV.CANVA_CLIENT_SECRET ?? "" }, payload.refresh,
+      );
+      await saveConnection(userId, brandId, provider, { ...payload, ...fresh });
+      return fresh.access;
+    } else if (provider === "google_drive") {
       const { access, expiresAt } = await refreshGoogleToken(payload.refresh);
       const next: TokenPayload = { ...payload, access, expiresAt };
       await saveConnection(userId, brandId, provider, next);

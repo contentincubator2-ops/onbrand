@@ -44,6 +44,7 @@ import { competitorRouter } from "../strategy/routers/competitorRouter";
 import { brandKnowledgeRouter } from "../strategy/routers/brandKnowledgeRouter";
 import { personaAgentRouter } from "../strategy/routers/personaAgentRouter";
 import { cloudDriveRouter } from "../platform/routers/cloudDriveRouter";
+import { canvaRouter } from "../platform/routers/canvaRouter";
 import { billingRouter } from "../platform/routers/billingRouter";
 import { addonRouter } from "../platform/routers/addonRouter";
 import { opsRouter } from "../platform/routers/opsRouter";
@@ -132,6 +133,7 @@ export const appRouter = router({
   brandKnowledge:  brandKnowledgeRouter,
   personaAgent:    personaAgentRouter,
   cloudDrive:      cloudDriveRouter,
+  canva:           canvaRouter,
   billing:         billingRouter,
   addon:           addonRouter,
   ops:             opsRouter,

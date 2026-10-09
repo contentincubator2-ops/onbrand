@@ -35,6 +35,7 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faChevronDown, faChevronUp, faImage, faPenNib, faWandMagicSparkles } from "@fortawesome/free-solid-svg-icons";
 import { trpc } from "../../../../lib/trpc";
 import { showToastGlobal } from "../../../platform/components/Toast";
+import OwnImagePicker, { USER_SUPPLIED_IMAGE_MODEL } from "../OwnImagePicker";
 import { toastWithUpgrade } from "../../../platform/lib/upgradeToast";
 import { TASK_MODAL_CLASSNAMES, TASK_MODAL_HEADER } from "../../../platform/components/taskModalStyle";
 import { PlatformMockup } from "../PlatformMockup";
@@ -238,6 +239,24 @@ export default function CampaignPostModal({
       setImgStep("");
     }
   };
+  // 2026-10-09：用自己的圖（上傳／素材庫／Canva 匯入）——不經 AI，直接存成這一篇的圖。
+  const useOwnImage = async (url: string) => {
+    if (!variant || imgStep) return;
+    setImgStep("save");
+    try {
+      await saveImgMut.mutateAsync({
+        id: outputId, ...getRunContentMutationLocator(resolved.kind, idx),
+        imageUrl: url, modelId: USER_SUPPLIED_IMAGE_MODEL, requestedModelId: USER_SUPPLIED_IMAGE_MODEL,
+      });
+      utils?.output?.getById?.invalidate?.({ id: outputId });
+      utils?.campaign?.itemThumbs?.invalidate?.({ eventId });
+      showToastGlobal(L("已換成你的圖（前一張有保留，在「進階修改」可以切回去）。", "Your image is on this post (the previous one is kept under Advanced edit)."));
+    } catch (e: any) {
+      showToastGlobal(String(e?.message ?? L("圖片沒有存成功", "Couldn't save the image")).slice(0, 200), "error");
+    } finally {
+      setImgStep("");
+    }
+  };
   // 審核中、已發布的不動圖（跟本文同一條規則）；多張卡片的貼文到成品頁做。
   const canMakeImage = !!variant && !cards && editable;
 
@@ -375,6 +394,7 @@ export default function CampaignPostModal({
                   liveCaption={caption}
                   liveHashtags={variant?.hashtags ?? []}
                   liveImageUrl={imageUrl ?? undefined}
+                  noAiNotice={!cards && (variant?.image?.modelId ?? variant?.imageModelId) === USER_SUPPLIED_IMAGE_MODEL}
                   liveImageStatus={imageStatus as any}
                   liveCards={cards as any}
                   onGenerateImage={canMakeImage && !imgStep ? () => { void makeImage(); } : undefined}
@@ -437,6 +457,10 @@ export default function CampaignPostModal({
                     onPress={() => { void makeImage(); }}>
                     {imageUrl ? L("重做這張圖", "Redo the image") : L("幫這篇做圖", "Make an image")}
                   </Button>
+                )}
+                {canMakeImage && Number(data?.brand?.id ?? brandId ?? 0) > 0 && (
+                  <OwnImagePicker brandId={Number(data?.brand?.id ?? brandId ?? 0)} lang={en ? "en" : "zh-TW"}
+                    disabled={!!imgStep} onPick={useOwnImage} />
                 )}
                 {editable ? (
                   <>

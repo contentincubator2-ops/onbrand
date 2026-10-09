@@ -1,3 +1,10 @@
+/**
+ * 這張不是 AI 畫的，是用戶自己給的（上傳／素材庫／Canva 匯入）——記在圖的 modelId 上。
+ * 給客戶看的核准頁靠它決定要不要掛「AI 生成」警語：把客戶設計師做的圖標成 AI 生成是錯的。
+ * 鏡像：client/src/v2/content/components/OwnImagePicker.tsx。
+ */
+export const USER_SUPPLIED_IMAGE_MODEL = "user-supplied";
+
 export interface VariantImageUpdateInput {
   imageUrl: string;
   style?: string;

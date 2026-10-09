@@ -6,6 +6,8 @@
  *   GET /api/oauth/google-drive/callback           → exchange code, store
  *   GET /api/oauth/onedrive/install?brandId=X      → redirect to Microsoft
  *   GET /api/oauth/onedrive/callback               → exchange code, store
+ *   GET /api/oauth/canva/install                   → redirect to Canva（PKCE）
+ *   GET /api/oauth/canva/callback                  → exchange code, store
  *
  * The client opens /install in a popup (not a full-page redirect) — we
  * don't know BrandsPage's brand-selection URL scheme from here, and a popup
@@ -19,7 +21,10 @@ import { Router, type Request, type Response } from "express";
 import crypto from "node:crypto";
 import { jwtVerify } from "jose";
 import { getJwtSecret, ENV } from "../core/env";
-import { saveConnection, type CloudProvider } from "../core/connectors/cloudTokens";
+import { saveConnection, CANVA_ACCOUNT_SCOPE, type IntegrationProvider } from "../core/connectors/cloudTokens";
+import { buildAuthorizeUrl, exchangeCanvaCode, getCanvaDisplayName, newCodeVerifier } from "../core/connectors/canvaClient";
+
+type CloudProvider = IntegrationProvider;
 
 export const cloudOAuthRouter = Router();
 
@@ -35,10 +40,10 @@ async function verifyUser(req: Request): Promise<number | null> {
 }
 
 // ─── CSRF state store (mirrors slackOAuthRoute.ts's in-memory approach) ─────
-const pendingStates = new Map<string, { userId: number; brandId: number; provider: CloudProvider }>();
-function putState(userId: number, brandId: number, provider: CloudProvider): string {
+const pendingStates = new Map<string, { userId: number; brandId: number; provider: CloudProvider; codeVerifier?: string }>();
+function putState(userId: number, brandId: number, provider: CloudProvider, codeVerifier?: string): string {
   const state = crypto.randomBytes(16).toString("hex");
-  pendingStates.set(state, { userId, brandId, provider });
+  pendingStates.set(state, { userId, brandId, provider, codeVerifier });
   setTimeout(() => pendingStates.delete(state), 10 * 60 * 1000);
   return state;
 }
@@ -204,5 +209,44 @@ cloudOAuthRouter.get("/onedrive/callback", async (req: Request, res: Response) =
   } catch (e: any) {
     console.error("[cloud-oauth] onedrive callback error:", e?.message ?? e);
     res.send(popupResultPage(false, "onedrive", String(e?.message ?? e)));
+  }
+});
+
+// ─── Canva（2026-10-09 從 Canva 匯入設計）────────────────────────────────────
+// 連接跟著人、不跟著品牌，所以不收 brandId。Canva 規定 PKCE：code_verifier 只留在
+// 伺服器的 pendingStates 裡，不放進 state（Canva 文件明講不要這樣做）。
+
+const canvaRedirectUri = () => `${appUrl()}/api/oauth/canva/callback`;
+
+cloudOAuthRouter.get("/canva/install", async (req: Request, res: Response) => {
+  const userId = await verifyUser(req);
+  if (!userId) { res.status(401).send("請先登入"); return; }
+  if (!ENV.CANVA_CLIENT_ID || !ENV.CANVA_CLIENT_SECRET) { res.status(500).send("Canva 連接尚未設定"); return; }
+
+  const codeVerifier = newCodeVerifier();
+  const state = putState(userId, CANVA_ACCOUNT_SCOPE, "canva", codeVerifier);
+  res.redirect(buildAuthorizeUrl({ clientId: ENV.CANVA_CLIENT_ID, redirectUri: canvaRedirectUri(), state, codeVerifier }));
+});
+
+cloudOAuthRouter.get("/canva/callback", async (req: Request, res: Response) => {
+  const { code, state, error } = req.query as Record<string, string>;
+  if (error) { res.send(popupResultPage(false, "canva", "使用者取消授權")); return; }
+  const ctx = state ? pendingStates.get(state) : null;
+  if (!state || !ctx || ctx.provider !== "canva" || !ctx.codeVerifier) { res.status(400).send(popupResultPage(false, "canva", "無效的狀態，請重新連接")); return; }
+  pendingStates.delete(state);
+  if (!code) { res.send(popupResultPage(false, "canva", "缺少授權碼")); return; }
+
+  try {
+    const tokens = await exchangeCanvaCode(
+      { clientId: ENV.CANVA_CLIENT_ID ?? "", clientSecret: ENV.CANVA_CLIENT_SECRET ?? "" },
+      { code, codeVerifier: ctx.codeVerifier, redirectUri: canvaRedirectUri() },
+    );
+    // 表裡這格叫 accountEmail；Canva 不給 email，存顯示名稱，用途一樣是「已連接：某某」。
+    const accountEmail = await getCanvaDisplayName(tokens.access);
+    await saveConnection(ctx.userId, CANVA_ACCOUNT_SCOPE, "canva", { ...tokens, accountEmail });
+    res.send(popupResultPage(true, "canva"));
+  } catch (e: any) {
+    console.error("[cloud-oauth] canva callback error:", e?.message ?? e);
+    res.send(popupResultPage(false, "canva", "Canva 授權沒有完成，請再試一次"));
   }
 });

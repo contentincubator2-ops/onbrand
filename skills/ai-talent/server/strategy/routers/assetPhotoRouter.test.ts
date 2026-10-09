@@ -11,7 +11,8 @@ describe("assetPhotoRouter", () => {
     const names = Object.keys((assetPhotoRouter as any)._def.procedures).sort();
     // 2026-09-25：加了 saveGeneratedImage（把 AI 生成圖存進產品照片庫／設為主圖）。
     // 2026-09-30：加了 library（素材庫：全站上傳過的圖一次列出來）。
-    expect(names).toEqual(["library", "list", "remove", "saveGeneratedImage", "setPrimary"]);
+    // 2026-10-09：加了 importCanvaDesign（把 Canva 設計匯出成圖存進素材庫）。
+    expect(names).toEqual(["importCanvaDesign", "library", "list", "remove", "saveGeneratedImage", "setPrimary"]);
   });
 
   it("procedure 名稱不可以撞 Function.prototype 上的東西", () => {

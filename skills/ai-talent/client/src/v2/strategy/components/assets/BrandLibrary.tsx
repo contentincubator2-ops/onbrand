@@ -21,6 +21,8 @@ import { trpc } from "../../../../lib/trpc";
 import { showToastGlobal } from "../../../platform/components/Toast";
 import { IllustratedEmpty } from "../../../platform/components/EmptyIllustration";
 import { uploadBrandPhoto, IMAGE_ACCEPT } from "../../lib/uploadBrandPhoto";
+import CanvaImportModal from "./CanvaImportModal";
+import { Icon } from "../../../platform/components/icons";
 import { imageCardHref, saveImageSubjectHandoff } from "../../../platform/lib/imageCardHandoff";
 import type { ImageCardInfo } from "../../../platform/lib/imageCardHandoff";
 
@@ -77,6 +79,7 @@ export default function BrandLibrary({
   const [uploading, setUploading] = React.useState(false);
   const [dragOver, setDragOver] = React.useState(false);
   const [chooserFor, setChooserFor] = React.useState<LibraryItem | null>(null);
+  const [canvaOpen, setCanvaOpen] = React.useState(false);
   const fileRef = React.useRef<HTMLInputElement>(null);
 
   const refresh = () => {
@@ -176,6 +179,29 @@ export default function BrandLibrary({
           <input ref={fileRef} type="file" hidden multiple accept={IMAGE_ACCEPT}
             onChange={(e) => void uploadFiles(e.target.files)} />
         </div>
+      )}
+
+      {/* 2026-10-09：設計師在 Canva 做好的成品直接拿進來，不用先下載再上傳。 */}
+      {!readOnly && (
+        <button type="button" onClick={() => setCanvaOpen(true)}
+          className="self-start inline-flex items-center gap-2 rounded-medium border border-divider px-3 py-1.5 text-small text-default-700 hover:border-default-500 transition">
+          <Icon name="link" size={13} />
+          {L("從 Canva 匯入", "Import from Canva")}
+        </button>
+      )}
+      {!readOnly && (
+        <CanvaImportModal brandId={brandId} lang={lang} isOpen={canvaOpen} onClose={() => setCanvaOpen(false)}
+          onImported={(photos) => {
+            refresh();
+            // 挑選模式下只匯入一張，就是要用這張——不必再點一次。
+            const only = photos.length === 1 ? photos[0] : null;
+            if (mode === "pick" && only) {
+              onPick?.({
+                key: only.id, photoId: only.id, url: only.url, filename: only.filename,
+                source: "brand", sourceLabel: L("品牌", "Brand"), scope: "brand", scopeId: brandId, isLogo: false, createdAt: null,
+              });
+            }
+          }} />
       )}
 
       <p className="text-tiny text-default-500">

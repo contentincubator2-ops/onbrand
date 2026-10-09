@@ -65,6 +65,10 @@ const envSchema = z.object({
   // redirect URI whitelisted) plus a new Microsoft Entra app registration.
   MICROSOFT_CLIENT_ID:     z.string().optional(),
   MICROSOFT_CLIENT_SECRET: z.string().optional(),
+  // 2026-10-09（從 Canva 匯入設計）：Canva Developer Portal 的 integration 憑證。
+  // redirect URL 要在那邊登記 `${APP_URL}/api/oauth/canva/callback`。
+  CANVA_CLIENT_ID:     z.string().optional(),
+  CANVA_CLIENT_SECRET: z.string().optional(),
 
   // External services — optional
   RESEND_API_KEY:    z.string().optional(),

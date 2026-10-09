@@ -84,7 +84,7 @@ export function brandAllowed(role: string, restrictedTo: readonly number[], bran
  */
 const PERSONAL_NAMESPACES = new Set([
   "credits", "notifications", "support", "navPrefs", "billing", "addon", "ops", "adminStats",
-  "review", "tenant", "stripe", "festival", "promptTemplate", "landing", "agent", "cloudDrive", "proactive",
+  "review", "tenant", "stripe", "festival", "promptTemplate", "landing", "agent", "cloudDrive", "proactive", "canva",
 ]);
 /** Brand procedures that are about "my brands", not about one brand's data. */
 const PERSONAL_PATHS = new Set([
@@ -107,7 +107,7 @@ const PUBLISH_PATHS = new Set(["calendar.schedule", "calendar.reschedule", "cale
  * strategy permission a member removes only what they uploaded themselves.
  * Changing the main photo still needs the strategy permission.
  */
-const WRITE_PATHS = new Set(["assetPhoto.saveGeneratedImage", "assetPhoto.remove"]);
+const WRITE_PATHS = new Set(["assetPhoto.saveGeneratedImage", "assetPhoto.remove", "assetPhoto.importCanvaDesign"]);
 /**
  * Leaving a comment on a post is feedback, not editing: a view-only member
  * (a client, a boss) is exactly who needs to do it. Deleting stays author-only
