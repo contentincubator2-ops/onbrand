@@ -38,6 +38,12 @@ describe("repairAeo", () => {
     expect(f.body).toBe("x");
   });
 
+  it("Markdown 符號拿掉——貼進官網後台會變成一堆星號", () => {
+    const f = repairAeo("web-qa", { question: "Q？", answer: "**禾木香氛**的擴香", body: "## 小標\n**重點**一句\n- 條列一\n\n\n\n下一段" });
+    expect(f.answer).toBe("禾木香氛的擴香");
+    expect(f.body).toBe("小標\n重點一句\n條列一\n\n下一段");
+  });
+
   it("說明欄的時間軸整行拿掉——我們不知道影片怎麼剪", () => {
     const f = repairAeo("yt-description", { title: "t", description: "重點\n00:00 開場\n・01:20 示範\n・藤枝一週翻一次" });
     expect(f.description).toBe("重點\n・藤枝一週翻一次");
@@ -60,6 +66,24 @@ describe("validateAeo", () => {
     const out = validateAeo("web-qa", { question: "", answer: "太短", body: "" });
     expect(out).toEqual(expect.arrayContaining(["缺【問題】"]));
     expect(out.some((p) => p.includes("太短"))).toBe(true);
+  });
+
+  // 2026-10-10 DEV 實測：規定展開至少 150 字，原稿只有 175 字的貼文就被補出一堆原稿沒有的玩法。
+  it("展開沒有下限——原稿事實少就該短；太長才抓", () => {
+    expect(validateAeo("web-qa", { ...ok, body: "" }, { brandName: "禾木香氛" })).toEqual([]);
+    expect(validateAeo("web-qa", { ...ok, body: "字".repeat(500) }).some((p) => p.includes("【展開】太長"))).toBe(true);
+  });
+
+  it("原稿沒有的數字會被抓出來", () => {
+    const src = ["雪松擴香瓶 200ml，可以用大約三個月。售價 1,280 元。"];
+    expect(validateAeo("web-qa", { ...ok, body: "200ml 一瓶 1280 元。" }, { sources: src })).toEqual([]);
+    const out = validateAeo("web-qa", { ...ok, body: "可以省下 60–70% 的時間，２４小時都香。" }, { sources: src });
+    expect(out.some((p) => p.includes("60、70、24"))).toBe(true);
+  });
+
+  it("會過期的時間會被抓出來", () => {
+    const out = validateAeo("web-qa", { ...ok, answer: `${ANSWER}活動今日正式開跑。` });
+    expect(out.some((p) => p.includes("「今日」"))).toBe(true);
   });
 
   it("YouTube 標題超過平台上限會被抓", () => {

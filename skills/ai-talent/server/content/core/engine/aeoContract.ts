@@ -36,7 +36,7 @@ export const AEO_LIMITS = {
   questionMax: 45,
   answerMin: 30,
   answerMax: 140,
-  bodyMin: 80,
+  bodyMax: 300,
   ytTitleMax: 70,
   ytDescriptionMin: 100,
 } as const;
@@ -68,8 +68,12 @@ export function aeoContractBlock(target: AeoTarget, opts: { brandName?: string |
     : "一定要寫出品牌或產品的名字，不要用「我們」「本產品」代稱。";
   const facts = [
     "【事實規則 —— 勝過其他任何一句】",
-    "- 原稿與上面的品牌資料是唯一的事實來源：產品、價格、數字、日期、成分、功效只能用裡面有的。",
+    "- 原稿是唯一的事實來源：產品、功能、流程、玩法、價格、數字、日期、成分、功效，只能用原稿裡寫到的。",
+    "- 上面的品牌資料只用來確認品牌與產品的正式名稱、一句話的定位。原稿沒提到的功能、做法、數字，就算品牌資料裡有、就算你本來就知道，也不要寫進來。",
     "- 不補案例、不補數據、不補見證、不寫「第一」「最」這類原稿沒有的比較。",
+    "- 原稿事實不多就寫短。寧可只有兩三句真的，不要為了湊長度多寫一句原稿沒有的。",
+    "- 不寫會過期的時間（今天、今日、明天、本週、這個月）。原稿有確切日期才寫日期，沒有就不提時間。",
+    target === "web-qa" ? "- 純文字，不要 Markdown 符號（**、#、-），不要 emoji。" : "- 不要 Markdown 粗體與小標題，不要 emoji。",
     `- 原稿只是情緒、迷因或互動貼文，抽不出任何可以回答顧客問題的事實時，只回一行：${NO_CONVERT}＋一句原因。不要硬寫。`,
   ];
   if (target === "web-qa") {
@@ -81,11 +85,13 @@ export function aeoContractBlock(target: AeoTarget, opts: { brandName?: string |
       "只輸出下面三段，標記照抄，不要加其他說明：",
       "【問題】",
       `一個顧客真的會拿去問 AI 的問題。用顧客的話，不是品牌的話；${AEO_LIMITS.questionMax} 字以內；以問號結尾。`,
+      "這個問題必須只靠原稿就答得完整。原稿沒寫的事（怎麼參加、多少錢、哪裡買）不要問。",
       "【直接答案】",
       `${AEO_LIMITS.answerMin}–${AEO_LIMITS.answerMax} 字，一到兩句，不看問題也讀得懂。${brandRule}`,
       "先講結論，不要鋪陳、不要反問、不要 emoji、不要 hashtag。",
       "【展開】",
-      "150–400 字，分 2–4 小段，補上原稿裡支持這個答案的細節（規格、做法、適合誰、怎麼買）。平鋪直敘，不要社群口吻。",
+      `原稿裡支持這個答案的其他細節，最多 ${AEO_LIMITS.bodyMax} 字、最多 3 小段。平鋪直敘，不要社群口吻、不要小標題。`,
+      "原稿沒有更多可以補的，這一段就只寫一兩句，或整段留空。",
       "",
       ...facts,
     ].join("\n");
@@ -133,14 +139,51 @@ export function parseAeoReply(target: AeoTarget, raw: string): AeoParsed {
   return { fields, noConvert: false, reason: "" };
 }
 
-const TIMESTAMP_LINE = /^\s*(?:[・\-*•]\s*)?\d{1,2}:\d{2}(?::\d{2})?\b.*$/;
+/** Markdown 殘留：貼進官網後台會變成一堆星號與井字號。 */
+function stripMarkdown(s: string): string {
+  return s
+    .replace(/\*\*(.+?)\*\*/g, "$1")
+    .replace(/^\s{0,3}#{1,6}\s+/gm, "")
+    .replace(/^\s*[-*]\s+/gm, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+/** 全形數字與百分號轉半形、拿掉千分位，比對用。 */
+const normalizeDigits = (s: string) => s
+  .replace(/[０-９]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xfee0))
+  .replace(/％/g, "%")
+  .replace(/(\d)[，,](?=\d{3}(?!\d))/g, "$1");
+
+/**
+ * 產出裡出現、但來源（原稿＋品牌資料）裡找不到的數字。
+ * 編出來的內容裡最傷的就是數字（「省下 60–70% 時間」）——而數字剛好是程式驗得出來的。
+ * 只比對數字本身，不管單位；單一個 1–9 不算（「一到兩句」「3 個重點」太容易誤判）。
+ */
+export function foreignNumbers(text: string, sources: string[]): string[] {
+  const known = new Set(normalizeDigits(sources.join("\n")).match(/\d+(?:\.\d+)?/g) ?? []);
+  const out: string[] = [];
+  for (const n of normalizeDigits(text).match(/\d+(?:\.\d+)?/g) ?? []) {
+    if (n.length === 1 && n !== "0") continue;
+    if (!known.has(n) && !out.includes(n)) out.push(n);
+  }
+  return out;
+}
+
+const RELATIVE_TIME = /今天|今日|明天|明日|昨天|本週|這週|本周|這周|這個月|本月|下週|下周/;
+
+const TIMESTAMP_LINE =/^\s*(?:[・\-*•]\s*)?\d{1,2}:\d{2}(?::\d{2})?\b.*$/;
 
 /** 確定性修補：不需要再問模型就能修好的格式問題。 */
 export function repairAeo(target: AeoTarget, fields: AeoFields): AeoFields {
   if (target === "web-qa") {
     let q = (fields.question ?? "").replace(/\s+/g, " ").trim();
     if (q && !/[？?]$/.test(q)) q = `${q.replace(/[。.！!]+$/, "")}？`;
-    return { ...fields, question: q, answer: (fields.answer ?? "").replace(/\s*\n+\s*/g, "").trim(), body: (fields.body ?? "").trim() };
+    return {
+      ...fields, question: q,
+      answer: stripMarkdown(fields.answer ?? "").replace(/\s*\n+\s*/g, ""),
+      body: stripMarkdown(fields.body ?? ""),
+    };
   }
   const description = (fields.description ?? "")
     .split(/\r?\n/).filter((l) => !TIMESTAMP_LINE.test(l)).join("\n")
@@ -151,9 +194,19 @@ export function repairAeo(target: AeoTarget, fields: AeoFields): AeoFields {
 const len = (s: string | undefined) => [...(s ?? "")].length;
 
 /** 回傳還沒達標的地方（空陣列＝通過）。訊息直接拿去當重試指示，也會顯示給用戶。 */
-export function validateAeo(target: AeoTarget, fields: AeoFields, opts: { brandName?: string | null } = {}): string[] {
+export function validateAeo(
+  target: AeoTarget, fields: AeoFields,
+  opts: { brandName?: string | null; /** 原稿＋品牌資料；帶了才查數字。 */ sources?: string[] } = {},
+): string[] {
   const out: string[] = [];
   const brand = (opts.brandName ?? "").trim();
+  const all = Object.values(fields).filter(Boolean).join("\n");
+  if (opts.sources?.length) {
+    const nums = foreignNumbers(all, opts.sources);
+    if (nums.length) out.push(`出現原稿沒有的數字：${nums.join("、")}。原稿沒有就拿掉`);
+  }
+  const rel = RELATIVE_TIME.exec(all);
+  if (rel) out.push(`寫了會過期的時間「${rel[0]}」。原稿有確切日期才寫日期，沒有就不提時間`);
   if (target === "web-qa") {
     if (!fields.question) out.push("缺【問題】");
     else if (len(fields.question) > AEO_LIMITS.questionMax + 10) out.push(`【問題】太長（${len(fields.question)} 字），要在 ${AEO_LIMITS.questionMax} 字以內`);
@@ -164,7 +217,8 @@ export function validateAeo(target: AeoTarget, fields: AeoFields, opts: { brandN
       if (n > AEO_LIMITS.answerMax + 30) out.push(`【直接答案】太長（${n} 字），要在 ${AEO_LIMITS.answerMax} 字以內`);
       if (brand && !fields.answer.includes(brand)) out.push(`【直接答案】沒有出現品牌名「${brand}」`);
     }
-    if (len(fields.body) < AEO_LIMITS.bodyMin) out.push(`【展開】太短（${len(fields.body)} 字），至少 ${AEO_LIMITS.bodyMin} 字`);
+    // 展開沒有下限：原稿事實少就該短，逼它湊字數只會逼出編的內容（10/10 DEV 實測）。
+    if (len(fields.body) > AEO_LIMITS.bodyMax + 120) out.push(`【展開】太長（${len(fields.body)} 字），最多 ${AEO_LIMITS.bodyMax} 字；只留原稿有的`);
     return out;
   }
   if (!fields.title) out.push("缺【標題】");

@@ -59,6 +59,9 @@ export const aeoProcedures = {
         { role: "user", content: `這是原稿：\n\n${input.caption}` },
       ];
 
+      // 數字只認原稿裡有的（品牌名本身可能帶數字）。品牌資料不算：合約不准拿它補原稿沒提到的事實。
+      const checkOpts = { brandName, sources: [input.caption, brandName ?? ""] };
+
       try {
         const r = await callModel(messages, undefined, "anthropic");
         let parsed = parseAeoReply(target, r.content ?? "");
@@ -66,7 +69,7 @@ export const aeoProcedures = {
           return { ok: true as const, noConvert: true as const, reason: parsed.reason, target, fields: {} as AeoFields, problems: [] as string[], html: null, regulationCompliance: null };
         }
         let fields = repairAeo(target, parsed.fields);
-        let problems = validateAeo(target, fields, { brandName });
+        let problems = validateAeo(target, fields, checkOpts);
         // 驗證重試一次：帶著沒達標的地方請它修。還是沒過就照給，問題列給用戶看，不硬擋。
         if (problems.length) {
           const retry = await callModel([
@@ -77,7 +80,7 @@ export const aeoProcedures = {
           const second = retry ? parseAeoReply(target, retry.content ?? "") : null;
           if (second && !second.noConvert) {
             const f2 = repairAeo(target, second.fields);
-            const p2 = validateAeo(target, f2, { brandName });
+            const p2 = validateAeo(target, f2, checkOpts);
             if (p2.length < problems.length) { fields = f2; problems = p2; parsed = second; }
           }
         }
@@ -88,9 +91,9 @@ export const aeoProcedures = {
           const checked = await enforceBrandAndRegulations(input.brandId, serializeAeo(target, fields));
           regulationCompliance = checked.record;
           const back = repairAeo(target, parseAeoReply(target, checked.text).fields);
-          if (!validateAeo(target, back, { brandName }).some((p) => p.startsWith("缺"))) {
+          if (!validateAeo(target, back, checkOpts).some((p) => p.startsWith("缺"))) {
             fields = back;
-            problems = validateAeo(target, fields, { brandName });
+            problems = validateAeo(target, fields, checkOpts);
           }
         } catch { /* fail-safe */ }
         return {
