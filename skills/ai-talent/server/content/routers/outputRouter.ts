@@ -15,6 +15,13 @@ import {
 import { applyVariantImageUpdate, selectVariantImageVersion } from "../core/image/variantImageUpdate";
 import { switchWriter } from "../core/engine/writerDrafts";
 
+/** 右欄紀錄／留言指的是哪個版本：跟 refineNotes 同一套（不給預設值，沒帶就是第 0 個一般版本）。 */
+const collabSelector = {
+  variantIndex: z.number().int().min(0).optional(),
+  contentKind: z.enum(["planning", "public"]).optional(),
+  contentIndex: z.number().int().min(0).optional(),
+};
+
 /** Escape HTML special characters to prevent stored XSS in previewHtml */
 function escapeHtml(s: string): string {
   return s
@@ -203,7 +210,7 @@ export const outputRouter = router({
        * 所以每一位寫過的版本都留著、點回去就是原樣，不必重寫。不帶＝一般存檔。
        */
       writer: z.object({
-        key: z.string().min(1).max(40),
+        key: z.string().min(1).max(100),
         name: z.string().max(80),
         title: z.string().max(80).optional(),
         agentId: z.number().int().positive().optional(),
@@ -217,6 +224,15 @@ export const outputRouter = router({
         issues: z.array(z.object({ regulation: z.string().max(80), quote: z.string().max(200), detail: z.string().max(160) })).max(8),
         regulationCount: z.number().int().min(0).max(100),
       }).nullable().optional(),
+      /**
+       * 2026-10-09：這次存檔是 AI 做的一次修改（請他改／換個寫法／換口氣／照留言改／還原）。
+       * 帶了就在 caption_edit_log 留一列（含改之前的全文），右欄「紀錄」分頁讀它。
+       */
+      edit: z.object({
+        kind: z.enum(["chat", "restyle", "voice", "comment", "restore"]),
+        ask: z.string().max(1000).optional(),
+        explanation: z.string().max(600).optional(),
+      }).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       // 2026-05-09 cleanup: localPool (drizzle.execute row shape was buggy).
@@ -248,7 +264,7 @@ export const outputRouter = router({
       // text differs from what was stored is a human edit.
       try {
         const { isHumanEdit, applyEditMarker } = await import("../../platform/core/ops/editTracking");
-        if (isHumanEdit(input)) {
+        if (isHumanEdit(input) && !input.edit) {
           const marked = applyEditMarker(nextMd ?? md, String(updated.resolved.item?.caption ?? ""), input.caption);
           if (marked) nextMd = marked;
         }
@@ -274,12 +290,81 @@ export const outputRouter = router({
           before: outputItemCaption(updated.resolved.item), after: input.caption, actorId: actorIdOf(ctx),
         });
       }
+      if (input.edit) {
+        const collab = await import("../core/engine/outputCollab");
+        const { variantKeyOf } = await import("../core/engine/refineNotes");
+        const { actorIdOf } = await import("../../platform/core/trpc");
+        await collab.addEditLog({
+          outputId: input.id, variantKey: variantKeyOf(input), actorId: actorIdOf(ctx), kind: input.edit.kind,
+          ask: input.edit.ask, explanation: input.edit.explanation,
+          before: outputItemCaption(updated.resolved.item), after: input.caption,
+        });
+      }
       return {
         ok: true,
         variantIndex: input.variantIndex,
         contentKind: updated.resolved.kind,
         contentIndex: updated.resolved.index,
       };
+    }),
+
+  // ── 2026-10-09 右欄「紀錄」「留言」分頁（outputCollab.ts）──
+  editLog: protectedProcedure
+    .input(z.object({ id: z.number().int().positive(), ...collabSelector }))
+    .query(async ({ ctx, input }) => {
+      const collab = await import("../core/engine/outputCollab");
+      const notes = await import("../core/engine/refineNotes");
+      if (!(await notes.ownsOutput(input.id, ctx.user.id))) return { rows: [] };
+      return { rows: await collab.listEditLog(input.id, notes.variantKeyOf(input)) };
+    }),
+
+  comments: protectedProcedure
+    .input(z.object({ id: z.number().int().positive(), ...collabSelector }))
+    .query(async ({ ctx, input }) => {
+      const collab = await import("../core/engine/outputCollab");
+      const notes = await import("../core/engine/refineNotes");
+      const { actorIdOf } = await import("../../platform/core/trpc");
+      if (!(await notes.ownsOutput(input.id, ctx.user.id))) return { rows: [], me: actorIdOf(ctx) };
+      return { rows: await collab.listComments(input.id, notes.variantKeyOf(input)), me: actorIdOf(ctx) };
+    }),
+
+  addComment: protectedProcedure
+    .input(z.object({ id: z.number().int().positive(), ...collabSelector, body: z.string().trim().min(1).max(2000) }))
+    .mutation(async ({ ctx, input }) => {
+      const collab = await import("../core/engine/outputCollab");
+      const notes = await import("../core/engine/refineNotes");
+      const { actorIdOf } = await import("../../platform/core/trpc");
+      if (!(await notes.ownsOutput(input.id, ctx.user.id))) throw new TRPCError({ code: "NOT_FOUND", message: "Output not found or not yours" });
+      const commentId = await collab.addComment({
+        outputId: input.id, variantKey: notes.variantKeyOf(input), authorId: actorIdOf(ctx), body: input.body,
+      });
+      return { ok: true, commentId };
+    }),
+
+  resolveComment: protectedProcedure
+    .input(z.object({ commentId: z.number().int().positive(), resolved: z.boolean() }))
+    .mutation(async ({ ctx, input }) => {
+      const collab = await import("../core/engine/outputCollab");
+      const notes = await import("../core/engine/refineNotes");
+      const { actorIdOf } = await import("../../platform/core/trpc");
+      const c = await collab.commentOutputId(input.commentId);
+      if (!c || !(await notes.ownsOutput(c.outputId, ctx.user.id))) throw new TRPCError({ code: "NOT_FOUND", message: "Comment not found" });
+      await collab.setCommentResolved(input.commentId, input.resolved, actorIdOf(ctx));
+      return { ok: true };
+    }),
+
+  /** 刪除只有留言的人自己能做；別人的留言只能標成已處理。 */
+  removeComment: protectedProcedure
+    .input(z.object({ commentId: z.number().int().positive() }))
+    .mutation(async ({ ctx, input }) => {
+      const collab = await import("../core/engine/outputCollab");
+      const notes = await import("../core/engine/refineNotes");
+      const { actorIdOf } = await import("../../platform/core/trpc");
+      const c = await collab.commentOutputId(input.commentId);
+      if (!c || !(await notes.ownsOutput(c.outputId, ctx.user.id))) throw new TRPCError({ code: "NOT_FOUND", message: "Comment not found" });
+      if (c.authorId !== actorIdOf(ctx)) throw new TRPCError({ code: "FORBIDDEN", message: "Only the author can delete this comment." });
+      await collab.deleteComment(input.commentId);
+      return { ok: true };
     }),
 
   /**
