@@ -453,10 +453,6 @@ export default function RunPage() {
         : "已換成你的圖（前一張圖有保留，隨時可以切回去）");
     } catch { /* updateImageMut.onError 已經顯示原因 */ }
   };
-  // 2026-10-10：入口疊在預覽的圖片格上（PlatformMockup imageActions），不再是右欄的一列文字。
-  const ownImage = useOwnImageEntries({
-    brandId: Number((data as any)?.brand?.id ?? 0), lang: lang === "en" ? "en" : "zh-TW", onPick: useOwnImage,
-  });
   // Scheduling stays in Calendar; platform authorization lives in brand settings.
   const scheduleToCalMut = (trpc as any).calendar?.schedule?.useMutation?.({
     onSuccess: (_r: any) => {
@@ -1775,6 +1771,18 @@ export default function RunPage() {
     if (/\bLINE\b/i.test(lbl)) return v("line", "broadcast");
     return mockupVariant;
   }, [mockupVariant, slide?.label, slide?.format, isStrategyEnvelope, selectedContentKind, data?.mission?.taskId]);
+
+  // （hook：要排在下面幾個提早 return 之前。）
+  // 2026-10-10：圖片入口疊在預覽的圖片格上（PlatformMockup imageActions）；多一顆「在 Canva 編輯」。
+  const ownImage = useOwnImageEntries({
+    brandId: Number((data as any)?.brand?.id ?? 0), lang: lang === "en" ? "en" : "zh-TW", onPick: useOwnImage,
+    canvaEdit: slide && !slide.cards?.length ? {
+      outputId: id, locator: getRunContentMutationLocator(selectedContentKind, activeIdx),
+      imageUrl: slide.imageStatus === "ready" || slide.imageStatus === undefined ? slide.imageUrl : null,
+      platform: mockupVariant?.platform, title: (data as any)?.title,
+    } : null,
+    onCanvaSynced: () => utils.output.getById.invalidate({ id }),
+  });
 
   if (!id || isNaN(id)) {
     return <div className="p-12 text-center text-default-500">{lang === "en" ? "Invalid run ID" : "無效的 run ID"}</div>;

@@ -1,0 +1,130 @@
+# Canva 憑證與 scope 寫進 VM 的 .env（「從 Canva 匯入」「在 Canva 編輯」用）。
+#
+# dev 與 prod 用不同的 Canva integration：
+#   dev  → secrets CANVA_CLIENT_ID / CANVA_CLIENT_SECRET          （和 Marketing Claw 共用的草稿版）
+#   prod → secrets CANVA_CLIENT_ID_PROD / CANVA_CLIENT_SECRET_PROD （onBrand 專用、要送審的那一個）
+# 憑證只從 secrets 取得，不接受 input（input 會明碼留在執行紀錄）；全程不印出來。
+#
+# scopes：
+#   read        只讀三個（匯入、編輯既有設計）
+#   read+write  多 design:content:write、asset:write（開新設計、把 onBrand 的圖送進 Canva）
+#               ——integration 在 Developer Portal 勾了這兩個才選，否則用戶連接 Canva 會整個失敗。
+# 換了 scope 之後，已經連接過的用戶要中斷再重新連接才拿得到新的授權。
+name: Admin — Write Canva env vars to VM
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: "目標環境"
+        required: true
+        type: choice
+        default: dev
+        options: [dev, prod]
+      scopes:
+        description: "授權範圍（integration 勾了寫入類 scope 才選 read+write）"
+        required: true
+        type: choice
+        default: read
+        options: [read, read+write]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: admin-write-canva-env-${{ inputs.target }}
+  cancel-in-progress: false
+
+jobs:
+  write-dev:
+    if: inputs.target == 'dev'
+    environment: dev
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Write Canva env and restart
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          CANVA_CLIENT_ID: ${{ secrets.CANVA_CLIENT_ID }}
+          CANVA_CLIENT_SECRET: ${{ secrets.CANVA_CLIENT_SECRET }}
+          SCOPE_MODE: ${{ inputs.scopes }}
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 120s
+          envs: CANVA_CLIENT_ID,CANVA_CLIENT_SECRET,SCOPE_MODE
+          script: |
+            set +x
+            set -euo pipefail
+            umask 077
+            ENV=/opt/onbrand/shared/.env
+            PM2_NAME=onbrand-dev
+            if [ ! -f "$ENV" ]; then echo "x .env not found at $ENV"; exit 1; fi
+            if [ -z "${CANVA_CLIENT_ID:-}" ] || [ -z "${CANVA_CLIENT_SECRET:-}" ]; then echo "x Canva secrets are empty."; exit 1; fi
+            case "$SCOPE_MODE" in
+              read) SCOPES="" ;;
+              read+write) SCOPES="design:meta:read design:content:read design:content:write asset:write profile:read" ;;
+              *) echo "x invalid scopes choice"; exit 1 ;;
+            esac
+            cp -p "$ENV" "${ENV}.bak.canva"
+            grep -v -e '^CANVA_CLIENT_ID=' -e '^CANVA_CLIENT_SECRET=' -e '^CANVA_SCOPES=' "$ENV" > "${ENV}.tmp.canva" || true
+            printf 'CANVA_CLIENT_ID=%s\n' "$CANVA_CLIENT_ID" >> "${ENV}.tmp.canva"
+            printf 'CANVA_CLIENT_SECRET=%s\n' "$CANVA_CLIENT_SECRET" >> "${ENV}.tmp.canva"
+            if [ -n "$SCOPES" ]; then printf "CANVA_SCOPES='%s'\n" "$SCOPES" >> "${ENV}.tmp.canva"; fi
+            cat "${ENV}.tmp.canva" > "$ENV"
+            rm -f "${ENV}.tmp.canva"
+            echo "written: client id (${#CANVA_CLIENT_ID} chars), secret (${#CANVA_CLIENT_SECRET} chars), scopes=${SCOPE_MODE}"
+            APP_URL=$(grep '^APP_URL=' "$ENV" | tail -1 | cut -d= -f2- | tr -d "\"'" | sed 's:/*$::')
+            echo "redirect URL: ${APP_URL}/api/oauth/canva/callback"
+            echo "return URL:   ${APP_URL}/api/oauth/canva/return"
+            pm2 restart "$PM2_NAME" --update-env >/dev/null 2>&1
+            if ! timeout 60 bash -c 'until curl --fail --silent --max-time 5 http://127.0.0.1:3101/health >/dev/null; do sleep 3; done'; then
+              echo "x Restart health check failed."; exit 1
+            fi
+            echo "restart: health OK"
+            echo "install route (no session): HTTP $(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:3101/api/oauth/canva/install)"
+
+  write-prod:
+    if: inputs.target == 'prod'
+    runs-on: [self-hosted, linux, vm-onbrand]
+    timeout-minutes: 5
+    steps:
+      - name: Write Canva env and restart
+        shell: bash
+        env:
+          CANVA_CLIENT_ID: ${{ secrets.CANVA_CLIENT_ID_PROD }}
+          CANVA_CLIENT_SECRET: ${{ secrets.CANVA_CLIENT_SECRET_PROD }}
+          SCOPE_MODE: ${{ inputs.scopes }}
+        run: |
+          set +x
+          set -euo pipefail
+          umask 077
+          ENV=/opt/onbrand/app/skills/ai-talent/.env
+          PM2_NAME=onbrand
+          if [ ! -f "$ENV" ]; then echo "x .env not found at $ENV"; exit 1; fi
+          if [ -z "${CANVA_CLIENT_ID:-}" ] || [ -z "${CANVA_CLIENT_SECRET:-}" ]; then
+            echo "x secrets CANVA_CLIENT_ID_PROD / CANVA_CLIENT_SECRET_PROD are empty."; exit 1
+          fi
+          case "$SCOPE_MODE" in
+            read) SCOPES="" ;;
+            read+write) SCOPES="design:meta:read design:content:read design:content:write asset:write profile:read" ;;
+            *) echo "x invalid scopes choice"; exit 1 ;;
+          esac
+          cp -p "$ENV" "${ENV}.bak.canva"
+          grep -v -e '^CANVA_CLIENT_ID=' -e '^CANVA_CLIENT_SECRET=' -e '^CANVA_SCOPES=' "$ENV" > "${ENV}.tmp.canva" || true
+          printf 'CANVA_CLIENT_ID=%s\n' "$CANVA_CLIENT_ID" >> "${ENV}.tmp.canva"
+          printf 'CANVA_CLIENT_SECRET=%s\n' "$CANVA_CLIENT_SECRET" >> "${ENV}.tmp.canva"
+          if [ -n "$SCOPES" ]; then printf "CANVA_SCOPES='%s'\n" "$SCOPES" >> "${ENV}.tmp.canva"; fi
+          cat "${ENV}.tmp.canva" > "$ENV"
+          rm -f "${ENV}.tmp.canva"
+          echo "written: client id (${#CANVA_CLIENT_ID} chars), secret (${#CANVA_CLIENT_SECRET} chars), scopes=${SCOPE_MODE}"
+          APP_URL=$(grep '^APP_URL=' "$ENV" | tail -1 | cut -d= -f2- | tr -d "\"'" | sed 's:/*$::')
+          echo "redirect URL: ${APP_URL}/api/oauth/canva/callback"
+          echo "return URL:   ${APP_URL}/api/oauth/canva/return"
+          pm2 restart "$PM2_NAME" --update-env >/dev/null 2>&1
+          if ! timeout 60 bash -c 'until curl --fail --silent --max-time 5 http://127.0.0.1:3101/health >/dev/null; do sleep 3; done'; then
+            echo "x Restart health check failed."; exit 1
+          fi
+          echo "restart: health OK"
+          echo "install route (no session): HTTP $(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:3101/api/oauth/canva/install)"

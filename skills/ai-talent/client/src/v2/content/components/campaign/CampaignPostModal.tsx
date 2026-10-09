@@ -258,7 +258,14 @@ export default function CampaignPostModal({
     }
   };
   // 2026-10-10：入口疊在預覽的圖片格上（PlatformMockup imageActions）。
-  const ownImage = useOwnImageEntries({ brandId: Number(data?.brand?.id ?? brandId ?? 0), lang: en ? "en" : "zh-TW", onPick: useOwnImage });
+  const ownImage = useOwnImageEntries({
+    brandId: Number(data?.brand?.id ?? brandId ?? 0), lang: en ? "en" : "zh-TW", onPick: useOwnImage,
+    canvaEdit: variant && !cards && editable ? {
+      outputId, locator: getRunContentMutationLocator(resolved.kind, idx),
+      imageUrl: variant?.imageUrl ?? variant?.image?.url ?? null, platform: item.platform, title: data?.title,
+    } : null,
+    onCanvaSynced: () => { utils?.output?.getById?.invalidate?.({ id: outputId }); utils?.campaign?.itemThumbs?.invalidate?.({ eventId }); },
+  });
   // 審核中、已發布的不動圖（跟本文同一條規則）；多張卡片的貼文到成品頁做。
   const canMakeImage = !!variant && !cards && editable;
 

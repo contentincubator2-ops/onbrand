@@ -107,7 +107,9 @@ const PUBLISH_PATHS = new Set(["calendar.schedule", "calendar.reschedule", "cale
  * strategy permission a member removes only what they uploaded themselves.
  * Changing the main photo still needs the strategy permission.
  */
-const WRITE_PATHS = new Set(["assetPhoto.saveGeneratedImage", "assetPhoto.remove", "assetPhoto.importCanvaDesign"]);
+const WRITE_PATHS = new Set(["assetPhoto.saveGeneratedImage", "assetPhoto.remove", "assetPhoto.importCanvaDesign",
+  "assetPhoto.startCanvaEdit", "assetPhoto.syncCanvaEdit",
+]);
 /**
  * Leaving a comment on a post is feedback, not editing: a view-only member
  * (a client, a boss) is exactly who needs to do it. Deleting stays author-only
