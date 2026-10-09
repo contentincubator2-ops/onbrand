@@ -108,6 +108,12 @@ const PUBLISH_PATHS = new Set(["calendar.schedule", "calendar.reschedule", "cale
  * Changing the main photo still needs the strategy permission.
  */
 const WRITE_PATHS = new Set(["assetPhoto.saveGeneratedImage", "assetPhoto.remove"]);
+/**
+ * Leaving a comment on a post is feedback, not editing: a view-only member
+ * (a client, a boss) is exactly who needs to do it. Deleting stays author-only
+ * inside outputRouter.
+ */
+const COMMENT_PATHS = new Set(["output.addComment", "output.resolveComment", "output.removeComment"]);
 /** What the upload route (assetPhotoRoute.ts) asks for — kept here so both entrances agree. */
 export const PHOTO_UPLOAD_NEED = "write" as const;
 
@@ -122,6 +128,7 @@ export type Need = "view" | "write" | "strategy" | "publish" | "manage";
 /** What a call needs. Queries only read; everything else is a write of some kind. */
 export function permissionNeeded(path: string, type: string): Need {
   if (type === "query") return "view";
+  if (COMMENT_PATHS.has(path)) return "view";
   const ns = namespaceOf(path);
   if (MANAGE_NAMESPACES.has(ns)) return "manage";
   if (PUBLISH_PATHS.has(path)) return "publish";

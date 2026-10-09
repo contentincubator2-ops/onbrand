@@ -624,6 +624,12 @@ async function runStartupMigrations() {
     await db.execute(sql.raw(CAPTION_REFINE_NOTES_DDL));
     console.log("[migrate] caption_refine_notes: OK");
 
+    // 2026-10-09（CJ「缺乏每次對話修改紀錄，還有其他人的意見區」）：作品頁右欄的紀錄與留言。
+    const { CAPTION_EDIT_LOG_DDL, OUTPUT_COMMENTS_DDL } = await import("./content/core/engine/outputCollab");
+    await db.execute(sql.raw(CAPTION_EDIT_LOG_DDL));
+    await db.execute(sql.raw(OUTPUT_COMMENTS_DDL));
+    console.log("[migrate] caption_edit_log / output_comments: OK");
+
     const { BRAND_NAV_PREFS_DDL } = await import("./platform/routers/navPrefsRouter");
     await db.execute(sql.raw(BRAND_NAV_PREFS_DDL));
     console.log("[migrate] brand_nav_prefs: OK");

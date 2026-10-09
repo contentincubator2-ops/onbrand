@@ -71,7 +71,9 @@ import { useLang } from "../../../lib/i18n";
 import { fireNudge } from "../../platform/components/mia/miaNudges";
 import ReviewBar from "../../platform/components/review/ReviewBar";
 import PerfTagPicker from "../components/PerfTagPicker";
-import WriterDesk, { type DeskWriter } from "../components/WriterDesk";
+import WriterDesk, { type DeskWriter, type DeskTab } from "../components/WriterDesk";
+import EditLogList, { useEditLog, type EditLogRow } from "../components/EditLogList";
+import OutputCommentsPanel, { useOutputComments, type OutputComment } from "../components/OutputCommentsPanel";
 import RefineNotesList from "../components/RefineNotesList";
 import { agentLabel, agentTitle } from "../../platform/lib/agentName";
 import { friendlyError } from "../../platform/lib/friendlyError";
@@ -1124,6 +1126,13 @@ export default function RunPage() {
     for (const [p, v] of Object.entries((deskTraysQ.data?.byPlatform ?? {}) as Record<string, { stored: string[] | null }>)) stored[p] = v?.stored ?? null;
     return buildRestyleOptions({ tasks, currentTaskId: deskTaskId, storedByPlatform: stored, en: lang === "en" });
   }, [deskCardListQ.data, deskTraysQ.data, deskTaskId, lang]);
+  // ── 2026-10-09 右欄三個分頁：修改／留言／紀錄（CJ「缺每次對話修改紀錄，還有其他人的意見區」）──
+  const [deskTab, setDeskTab] = useState<DeskTab>("edit");
+  const deskLocator = getRunContentMutationLocator(selectedContentKind, activeIdx);
+  const deskCommentsQ = useOutputComments(id, deskLocator, writerDesk);
+  const deskLogQ = useEditLog(id, deskLocator, writerDesk);
+  const deskOpenComments = ((deskCommentsQ.data?.rows ?? []) as OutputComment[]).filter((c) => !c.resolved).length;
+  const deskLogCount = ((deskLogQ.data?.rows ?? []) as EditLogRow[]).length;
   const [deskBusyKey, setDeskBusyKey] = useState<string | null>(null);
   const [deskChatBusy, setDeskChatBusy] = useState(false);
   const [deskUndo, setDeskUndo] = useState<{ key: string; caption: string } | null>(null);
@@ -1190,12 +1199,20 @@ export default function RunPage() {
     await saveCaptionQuietMut.mutateAsync({ id, ...getRunContentMutationLocator(selectedContentKind, activeIdx), caption: p.text });
   };
   /** 一段文字成為本文。帶 writer＝換人寫。 */
-  const commitDeskCaption = async (text: string, writer?: { key: string; name: string; title?: string; agentId?: number }, compliance?: any) => {
+  const commitDeskCaption = async (
+    text: string,
+    writer?: { key: string; name: string; title?: string; agentId?: number },
+    compliance?: any,
+    /** 這次是 AI 做的修改 → 在「紀錄」分頁留一筆（含改之前的全文）。 */
+    edit?: { kind: EditLogRow["kind"]; ask?: string; explanation?: string },
+  ) => {
     const locator = getRunContentMutationLocator(selectedContentKind, activeIdx);
     setOverrides((o) => ({ ...o, [getMutationLocatorSelectionKey(locator)]: { caption: text } }));
     const w = writer ? { key: writer.key, name: writer.name, title: writer.title, agentId: writer.agentId } : undefined;
     // 2026-09-30：AI 改寫回來的合規紀錄跟著存（見 RegulationComplianceNote）。
-    await saveCaptionQuietMut.mutateAsync({ id, ...locator, caption: text, ...(w ? { writer: w } : {}), ...(compliance ? { regulationCompliance: toComplianceInput(compliance) } : {}) });
+    await saveCaptionQuietMut.mutateAsync({ id, ...locator, caption: text, ...(w ? { writer: w } : {}), ...(compliance ? { regulationCompliance: toComplianceInput(compliance) } : {}),
+      ...(edit ? { edit: { kind: edit.kind, ask: edit.ask?.slice(0, 1000), explanation: edit.explanation?.slice(0, 600) } } : {}) });
+    if (edit) (utils as any)?.output?.editLog?.invalidate?.({ id });
     if (w || compliance) await utils.output.getById.invalidate({ id });
   };
   const pickDeskWriter = async (key: string) => {
@@ -1241,7 +1258,9 @@ export default function RunPage() {
       if (!r.rewritten) { showToastGlobal(lang === "en" ? "The rewrite didn't come back — try again." : "這次沒改成，再試一次。"); return; }
       if (!shouldApplyMutationPreview(activeSelectionKeyRef.current, locator)) return;
       setDeskUndo(null); setChatHistory([]);
-      await commitDeskCaption(r.rewritten, w, r.regulationCompliance);
+      await commitDeskCaption(r.rewritten, w, r.regulationCompliance, {
+        kind: w.restyleTaskId ? "restyle" : "voice", ask: w.name, explanation: r.explanation || undefined,
+      });
     } catch (e: any) {
       showToastGlobal(lang === "en" ? `Error: ${friendlyErr(e, true)}` : `錯誤：${friendlyErr(e, false)}`);
     } finally {
@@ -1249,7 +1268,7 @@ export default function RunPage() {
     }
   };
   /** 跟目前那位說哪裡要改：改完直接進本文，可復原一步。回傳是否成功（成功才清輸入框）。 */
-  const sendDeskChat = async (text: string): Promise<boolean> => {
+  const sendDeskChat = async (text: string, from: "chat" | "comment" = "chat"): Promise<boolean> => {
     if (!refineMut) { showToastGlobal(lang === "en" ? "AI rewrite is unavailable" : "AI 改寫服務暫不可用"); return false; }
     const w = deskWriterRef(deskActiveKey);
     const locator = getRunContentMutationLocator(selectedContentKind, activeIdx);
@@ -1282,6 +1301,11 @@ export default function RunPage() {
           { role: "user", content: text },
           { role: "assistant", content: r.explanation || (lang === "en" ? "I didn't change the draft — tell me which part to change." : "這次沒有動本文，再跟我說要改哪裡。") },
         ]);
+        // 從留言交過來的：沒改成就不能把那則留言標成已處理。
+        if (from === "comment") {
+          showToastGlobal(lang === "en" ? "The AI didn't change the post for this comment — see the Edit tab." : "AI 這次沒有照這則留言改動本文，說明在「修改」分頁。");
+          return false;
+        }
         return true;
       }
       setChatHistory((h) => [...h,
@@ -1289,7 +1313,7 @@ export default function RunPage() {
         { role: "assistant", content: r.explanation || (lang === "en" ? "Done — updated the draft." : "改好了，已更新本文。") },
       ]);
       setDeskUndo({ key: activeSelectionKey, caption: before });
-      await commitDeskCaption(r.rewritten, undefined, r.regulationCompliance);
+      await commitDeskCaption(r.rewritten, undefined, r.regulationCompliance, { kind: from, ask: text, explanation: r.explanation || undefined });
       (utils as any)?.quickTask?.refineNotes?.invalidate?.({ outputId: id });
       return true;
     } catch (e: any) {
@@ -1303,7 +1327,27 @@ export default function RunPage() {
     if (!deskUndo || deskUndo.key !== activeSelectionKey) return;
     const prev = deskUndo.caption;
     setDeskUndo(null);
-    await commitDeskCaption(prev);
+    await commitDeskCaption(prev, undefined, undefined, { kind: "restore", ask: lang === "en" ? "Undid the last change" : "復原上一次修改" });
+  };
+  /** 紀錄分頁：回到某一次修改之前的文字。還原本身也留一筆，所以不會改丟。 */
+  const restoreDeskLog = async (row: EditLogRow) => {
+    if (!row.captionBefore.trim()) return;
+    setDeskChatBusy(true);
+    try {
+      await flushDeskTyping();
+      const what = row.ask ? row.ask.slice(0, 60) : "";
+      setDeskUndo(null);
+      await commitDeskCaption(row.captionBefore, undefined, undefined, {
+        kind: "restore",
+        ask: lang === "en" ? `Went back to before: ${what}` : `回到「${what}」之前`,
+      });
+      await utils.output.getById.invalidate({ id });
+      showToastGlobal(lang === "en" ? "Restored." : "已回到那次修改之前。");
+    } catch (e: any) {
+      showToastGlobal(lang === "en" ? `Error: ${friendlyErr(e, true)}` : `錯誤：${friendlyErr(e, false)}`);
+    } finally {
+      setDeskChatBusy(false);
+    }
   };
 
   /* 2026-08-20 (CJ「IG 留言回覆（一般）… 為什麼沒有產出內容」): reply-type
@@ -2718,7 +2762,25 @@ export default function RunPage() {
                   onPick={pickDeskWriter}
                   leadReason={renderWhyWritten()}
                   chatHistory={chatHistory}
-                  notes={<RefineNotesList outputId={id} locator={getRunContentMutationLocator(selectedContentKind, activeIdx)} en={lang === "en"} />}
+                  tab={deskTab}
+                  onTab={setDeskTab}
+                  openComments={deskOpenComments}
+                  logCount={deskLogCount}
+                  commentsSlot={
+                    <OutputCommentsPanel
+                      outputId={id} locator={deskLocator} en={lang === "en"}
+                      busy={deskChatBusy || !!deskBusyKey}
+                      onHandToAi={(c) => sendDeskChat(c.body.slice(0, 1000), "comment")}
+                    />
+                  }
+                  logSlot={
+                    <EditLogList
+                      outputId={id} locator={deskLocator} en={lang === "en"}
+                      busy={deskChatBusy || !!deskBusyKey}
+                      onRestore={restoreDeskLog}
+                      top={<RefineNotesList outputId={id} locator={deskLocator} en={lang === "en"} />}
+                    />
+                  }
                   chatBusy={deskChatBusy}
                   onSend={sendDeskChat}
                   canUndo={!!deskUndo && deskUndo.key === activeSelectionKey}
