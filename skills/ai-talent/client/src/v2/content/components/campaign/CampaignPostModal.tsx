@@ -163,6 +163,8 @@ export default function CampaignPostModal({
   /** 一段文字成為本文（進階修改的換人重寫用）；extra 帶 writer／合規紀錄。 */
   const applyCaption = async (next: string, extra?: Record<string, unknown>) => {
     const v = tidy(next);
+    // AI 改的這一次要進紀錄（extra.edit）：還沒存的手改先存掉，紀錄裡「改之前」才是用戶真的看到的那一版。
+    if (extra?.edit) await flushTyping().catch(() => {});
     if (pending.current) { clearTimeout(pending.current.timer); pending.current = null; }
     setText(v);
     if (state === "approved" && !team && !statusMut.isPending) statusMut.mutate({ id: outputId, status: "draft" });
@@ -173,12 +175,24 @@ export default function CampaignPostModal({
   // ── 一句話請 AI 改 ──
   const [ask, setAsk] = React.useState("");
   const refineMut = (trpc as any).quickTask.refineCaption.useMutation({
-    onSuccess: (r: any) => {
+    onSuccess: async (r: any, vars: any) => {
       if (!r?.ok || !r?.rewritten) { showToastGlobal(L("AI 這次沒改成，再試一次。", "The rewrite didn't come back — try again.")); return; }
       setAsk("");
-      onType(tidy(r.rewritten));
-      flush();
+      // 2026-10-09：這裡請 AI 改的每一次也寫進成品頁「紀錄」分頁讀的同一份紀錄
+      //（不然在那邊「只保留勾選的」重新整理時，這裡做的修改會被洗掉又沒得勾）。
+      try {
+        await applyCaption(String(r.rewritten), {
+          edit: {
+            kind: "chat",
+            ask: String(vars?.userFeedback ?? "").slice(0, 1000) || undefined,
+            explanation: String(r.explanation ?? "").slice(0, 600) || undefined,
+          },
+        });
+      } catch (e: any) {
+        showToastGlobal(e?.message ?? L("沒有存成，再試一次。", "Couldn't save — try again."));
+      }
       utils?.quickTask?.refineNotes?.invalidate?.({ outputId });
+      utils?.output?.editLog?.invalidate?.({ id: outputId });
     },
     onError: (e: any) => toastWithUpgrade(e?.message ?? L("改寫失敗", "Rewrite failed"), en),
   });

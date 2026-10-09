@@ -79,6 +79,8 @@ export default function CampaignPostAdvanced({
       if (!r?.ok || !r?.rewritten) { showToastGlobal(L("這次沒改成，再試一次。", "The rewrite didn't come back — try again.")); return; }
       await applyCaption(String(r.rewritten), {
         writer, ...(r.regulationCompliance ? { regulationCompliance: toComplianceInput(r.regulationCompliance) } : {}),
+        // 換口氣也進成品頁的「紀錄」；ref＝這位的 key，之後重新整理時知道要重套哪一位。
+        edit: { kind: "voice", ask: w.name, ref: w.key, explanation: String(r.explanation ?? "").slice(0, 600) || undefined },
       });
     } catch (e: any) {
       toastWithUpgrade(e?.message ?? L("改寫失敗", "Rewrite failed"), en);
