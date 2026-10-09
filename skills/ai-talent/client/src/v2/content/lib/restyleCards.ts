@@ -12,7 +12,7 @@ export const RESTYLE_KEY_PREFIX = "card:";
 /** 沒展開時先擺幾張。 */
 export const RESTYLE_PREVIEW_COUNT = 3;
 
-export type RestyleTag = "own" | "favorite" | "viral";
+export type RestyleTag = "own" | "favorite" | "viral" | "aeo";
 
 export interface RestyleCardLite {
   id: string;
@@ -45,6 +45,7 @@ export function isRestyleKey(key: string | null | undefined): boolean {
 export function restyleTagLabel(tag: RestyleTag, en: boolean): string {
   if (tag === "own") return en ? "Yours" : "自建";
   if (tag === "favorite") return en ? "Favorite" : "常用";
+  if (tag === "aeo") return en ? "AI search" : "AI 搜尋";
   return en ? "Viral" : "爆款結構";
 }
 
@@ -80,6 +81,7 @@ export function buildRestyleOptions(args: {
       key: restyleKeyOf(t.id),
       taskId: t.id,
       name: (en ? t.label_en : t.label_zh) || t.label,
-      tag: r[0] === 0 ? "own" : r[0] === 1 ? "favorite" : "viral",
+      // 2026-10-10：官網／YouTube／新聞稿的 AI 搜尋卡不是爆款結構，標籤不能印錯。
+      tag: r[0] === 0 ? "own" : r[0] === 1 ? "favorite" : frontCardKind(t) === "aeo" ? "aeo" : "viral",
     }));
 }

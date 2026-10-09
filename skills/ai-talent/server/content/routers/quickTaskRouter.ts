@@ -38,6 +38,7 @@ import { catalogProcedures } from "./quickTask/catalogProcedures";
 import { runProcedures } from "./quickTask/runProcedures";
 import { refineProcedures } from "./quickTask/refineProcedures";
 import { squadAutoProcedures } from "./quickTask/squadAutoProcedures";
+import { aeoProcedures } from "./quickTask/aeoProcedures";
 export { RUN_SQUAD_AUTO_SINGLE_FLIGHT_TTL_MS, RUN_SQUAD_AUTO_MAX_CONCURRENT_PER_USER } from "./quickTask/runSquadAutoGuard";
 
 /* ──────────────────────────── ROUTER ───────────────────────────────────── */
@@ -61,6 +62,9 @@ export const quickTaskRouter = router({
 
 
   ...squadAutoProcedures,
+
+  // 2026-10-10：轉成 AI 搜尋版（官網問答／YouTube 標題＋說明欄）。
+  ...aeoProcedures,
 
 
 

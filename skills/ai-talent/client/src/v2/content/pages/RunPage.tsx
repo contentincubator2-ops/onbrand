@@ -30,7 +30,7 @@ import { faRotateRight, faXmark, faCalendarPlus, faFolderOpen } from "@fortaweso
 import {
 } from "@fortawesome/free-brands-svg-icons";
 import { HelpTip } from "../../platform/components/HelpTip";
-import { CommentIcon, CopyIcon, EditIcon, ImageIcon, LibraryIcon, RegenerateIcon, RewriteAsIcon, PuzzleIcon, WaitingIcon, UserIcon, TextIcon, CheckIcon, BundleIcon, WarningIcon, DoneIcon, ErrorIcon, WorkingIcon, LinkIcon, PartnerIcon } from "../../platform/components/icons";
+import { SearchIcon, CommentIcon, CopyIcon, EditIcon, ImageIcon, LibraryIcon, RegenerateIcon, RewriteAsIcon, PuzzleIcon, WaitingIcon, UserIcon, TextIcon, CheckIcon, BundleIcon, WarningIcon, DoneIcon, ErrorIcon, WorkingIcon, LinkIcon, PartnerIcon } from "../../platform/components/icons";
 import VendorFinder, { vendorKindOf } from "../components/VendorFinder";
 import { trpc } from "../../../lib/trpc";
 import { useVariantLabel } from "../lib/variantLabelEn";
@@ -73,6 +73,7 @@ import { fireNudge } from "../../platform/components/mia/miaNudges";
 import ReviewBar from "../../platform/components/review/ReviewBar";
 import PerfTagPicker from "../components/PerfTagPicker";
 import WriterDesk, { type DeskWriter, type DeskTab } from "../components/WriterDesk";
+import AeoVersionModal, { canConvertToAeo } from "../components/AeoVersionModal";
 import EditLogList, { useEditLog, type EditLogRow } from "../components/EditLogList";
 import OutputCommentsPanel, { useOutputComments, type OutputComment } from "../components/OutputCommentsPanel";
 import RefineNotesList from "../components/RefineNotesList";
@@ -712,6 +713,8 @@ export default function RunPage() {
   const [emailRecipients, setEmailRecipients] = useState("");
   const [emailNote, setEmailNote] = useState("");
   const [scheduleDialogOpen, setScheduleDialogOpen] = useState(false);
+  // 2026-10-10：轉成 AI 搜尋版（官網問答／YouTube 標題＋說明欄）。
+  const [aeoOpen, setAeoOpen] = useState(false);
   // schedMode: which action triggered the schedule dialog
   //   "ics"      → download .ics only, no redirect
   //   "calendar" → write to scheduled_posts + navigate /calendar
@@ -3631,12 +3634,31 @@ export default function RunPage() {
               </div>
               </>)}
 
+              {/* 2026-10-10（CJ「將所有 onbrand 產出的內容，都增加 AI SEO 的作法」）：社群貼文 AI 搜尋
+                  幾乎讀不到——同一件事多做一份官網問答或 YouTube 說明欄。官網／YouTube／新聞稿
+                  的產出本身就讀得到，不出這顆。 */}
+              {!!deskBrandId && !!slide?.caption && canConvertToAeo(effectiveVariant?.platform as any, deskTaskId) && (
+                <Button fullWidth variant="bordered" className="border-neutral-300 font-medium text-neutral-800"
+                  startContent={<SearchIcon size={13} />} onPress={() => setAeoOpen(true)}>
+                  {lang === "en" ? "Make an AI-search version" : "轉成 AI 搜尋版"}
+                </Button>
+              )}
+
             </CardBody>
           </Card>
           </>
           )}
         </aside>
       </div>
+
+      {aeoOpen && !!deskBrandId && (
+        <AeoVersionModal
+          brandId={deskBrandId} productId={deskScope.productId ?? null} eventId={deskScope.eventId ?? null}
+          caption={String(slide?.caption ?? "")} fromOutputId={Number(id) || null} en={lang === "en"}
+          onClose={() => setAeoOpen(false)}
+          onOpenOutput={(oid) => { setAeoOpen(false); navigate(`/run/${oid}`); }}
+        />
+      )}
 
       {/* ── EMAIL DIALOG ────────────────────────────────────────────── */}
       <Modal isOpen={emailDialogOpen} onClose={() => setEmailDialogOpen(false)} size="md">
