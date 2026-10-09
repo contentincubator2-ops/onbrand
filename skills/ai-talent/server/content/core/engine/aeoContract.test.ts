@@ -44,6 +44,12 @@ describe("repairAeo", () => {
     expect(f.body).toBe("小標\n重點一句\n條列一\n\n下一段");
   });
 
+  it("展開裡在講「原稿」的段落拿掉——那是寫給我們的說明，不是內容", () => {
+    const f = repairAeo("web-qa", { question: "Q？", answer: "A", body: "活動邀請各地訓練家一起探索。\n\n原稿聚焦於情感邀請，未提供具體玩法。" });
+    expect(f.body).toBe("活動邀請各地訓練家一起探索。");
+    expect(repairAeo("web-qa", { question: "Q？", answer: "A", body: "原稿未提供細節。" }).body).toBe("");
+  });
+
   it("說明欄的時間軸整行拿掉——我們不知道影片怎麼剪", () => {
     const f = repairAeo("yt-description", { title: "t", description: "重點\n00:00 開場\n・01:20 示範\n・藤枝一週翻一次" });
     expect(f.description).toBe("重點\n・藤枝一週翻一次");

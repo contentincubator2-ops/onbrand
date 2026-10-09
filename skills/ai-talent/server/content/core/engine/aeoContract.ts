@@ -92,6 +92,7 @@ export function aeoContractBlock(target: AeoTarget, opts: { brandName?: string |
       "【展開】",
       `原稿裡支持這個答案的其他細節，最多 ${AEO_LIMITS.bodyMax} 字、最多 3 小段。平鋪直敘，不要社群口吻、不要小標題。`,
       "原稿沒有更多可以補的，這一段就只寫一兩句，或整段留空。",
+      "這三段都是要刊在官網上的內容，不是寫給我看的說明：不要出現「原稿」兩個字，不要解釋原稿缺什麼。",
       "",
       ...facts,
     ].join("\n");
@@ -170,7 +171,15 @@ export function foreignNumbers(text: string, sources: string[]): string[] {
   return out;
 }
 
-const RELATIVE_TIME = /今天|今日|明天|明日|昨天|本週|這週|本周|這周|這個月|本月|下週|下周/;
+/**
+ * 拿掉在講「原稿」的段落。那是模型寫給我們的說明（「原稿未提供具體玩法…」），不是內容——
+ * 10/10 DEV 實測：不逼它湊字數之後，它改成在展開裡解釋為什麼沒東西可寫。
+ */
+function dropNotesAboutSource(s: string): string {
+  return s.split("\n").filter((line) => !line.includes("原稿")).join("\n").replace(/\n{3,}/g, "\n\n").trim();
+}
+
+const RELATIVE_TIME =/今天|今日|明天|明日|昨天|本週|這週|本周|這周|這個月|本月|下週|下周/;
 
 const TIMESTAMP_LINE =/^\s*(?:[・\-*•]\s*)?\d{1,2}:\d{2}(?::\d{2})?\b.*$/;
 
@@ -182,7 +191,7 @@ export function repairAeo(target: AeoTarget, fields: AeoFields): AeoFields {
     return {
       ...fields, question: q,
       answer: stripMarkdown(fields.answer ?? "").replace(/\s*\n+\s*/g, ""),
-      body: stripMarkdown(fields.body ?? ""),
+      body: dropNotesAboutSource(stripMarkdown(fields.body ?? "")),
     };
   }
   const description = (fields.description ?? "")

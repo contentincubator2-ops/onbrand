@@ -7,6 +7,7 @@ name: Ops (DEV) — probe AI-search version end to end (read-only)
 # 另外丟一則沒有任何事實的貼文，確認它會老實回「無法轉換」而不是硬編。
 # 花費：每則貼文 2–4 次模型呼叫，共 4 則。
 # 第 2 次跑：taskId 在 mission_outputs.metadata，不在 missions。
+# 第 4 次跑：展開裡在講「原稿」的說明句拿掉。
 # 第 3 次跑：展開不設下限、品牌資料不能拿來補事實、數字只認原稿有的、不寫會過期的時間、去掉 Markdown。
 # Path-scoped push，跟 op-probe-dev-influencer.yml 同一個做法（environment: dev 才會連到 DEV VM）。
 on:
