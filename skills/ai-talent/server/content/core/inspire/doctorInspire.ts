@@ -100,9 +100,9 @@ export interface InspireIdea {
   format: string;
 }
 
-const factsBlock = () => INSPIRE_FACTS.map((f) => `- ${f.text}`).join("\n");
+export const factsBlock = () => INSPIRE_FACTS.map((f) => `- ${f.text}`).join("\n");
 
-const GROUND_RULES = [
+export const GROUND_RULES = [
   `- 這是衛教內容，不是醫療廣告：不提院所名稱、不邀請掛號或預約、不提價格與優惠、不講治療成果、不用病人見證或減重前後對比。`,
   `- 不提任何藥品的商品名、成分名、廠牌或俗稱（包含瘦瘦針、減肥針、GLP-1、降血糖藥、保肝藥這類說法），也不暗示有某種藥、某種針可以解決；需要提到醫療協助時，只說「可以和醫師討論適合自己的做法」。`,
   `- 不說任何食物、飲品、保健食品、偏方、器材能減重、燃脂、降血糖、保肝、排毒或取代正規治療。`,
@@ -124,7 +124,7 @@ export const PLATFORM_FORMAT: Record<InspirePlatform, string> = {
 };
 
 /** 寫給每一位 agent 的共同交代：身分不外露、主角是醫師。接在 agentPrompt 後面。 */
-function agentFrame(p: InspirePersona, doctor: string): string {
+export function agentFrame(p: InspirePersona, doctor: string): string {
   return [
     p.agentPrompt,
     ``,
@@ -219,7 +219,7 @@ export function parseIdeas(raw: string, persona: InspirePersona, max: number): I
 
 // ─── 成稿 ──────────────────────────────────────────────────────────────
 
-const PLATFORM_SPEC: Record<InspirePlatform, string> = {
+export const PLATFORM_SPEC: Record<InspirePlatform, string> = {
   facebook: "Facebook 貼文：350–500 字。第一句就是開場句；短段落、每段 1–3 句、段落之間空一行；結尾留一個讓人想留言的問題；最後 2–3 個 hashtag。",
   instagram: "Instagram 輪播：先寫 6 張卡的文字，每張一行，格式「第 1 張｜…」到「第 6 張｜…」，每張 30 字內，第 1 張是開場句、第 6 張是一句帶得走的結論；空一行後寫說明文字 120–180 字；最後 5–8 個 hashtag。",
   youtube: "YouTube 影片腳本（約 4–6 分鐘）：依序寫「標題｜」（30 字內）、「開場 15 秒｜」（照開場句說）、「第一段｜」「第二段｜」「第三段｜」（每段 120–180 字的口白，段首用一句話說這段的重點）、「結尾｜」（一句總結＋請觀眾留言想聽的主題）。口語、像對著鏡頭說話。",

@@ -1,0 +1,127 @@
+name: op-probe-dev-inspire-voice
+# 醫師示範頁第二版的實跑：先照醫師的口吻寫成文章，再套流量密碼（doctorVoice.ts）。
+# 在 DEV VM 用真模型跑這個分支的檔案，不需要先合併。改這支檔案並 push 就會跑。
+# 口述是我寫的替身（沒有真的醫師素材），只用來驗流程：內容有沒有守在口述裡、包裝有沒有偷加東西。
+# 同時用舊流程跑同一題當對照。花費：約 15 次模型呼叫。
+on:
+  push:
+    paths:
+      - '.github/workflows/op-probe-dev-inspire-voice.yml'
+
+env:
+  PROBE_KEYS: "tw-fb-02,tw-tt-13,us-tt-12"
+
+jobs:
+  probe:
+    runs-on: ubuntu-24.04
+    environment: dev
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Pack this branch's inspire core files (only the probed agents)
+        run: |
+          D=skills/ai-talent/server/content/core/inspire
+          mkdir -p /tmp/pack && cp "$D/doctorInspire.ts" "$D/doctorVoice.ts" "$D/inspirePersonas.ts" "$D/inspireRegulations.ts" /tmp/pack/
+          cat > /tmp/slim.mts <<'TS'
+          import { writeFileSync } from "node:fs";
+          const { PERSONA_DATA } = await import(process.cwd() + "/skills/ai-talent/server/content/core/inspire/inspirePersonaData.ts");
+          const keys = String(process.env.PROBE_KEYS).split(",");
+          const picked = PERSONA_DATA.filter((p: any) => keys.includes(p.key));
+          console.log(`total=${PERSONA_DATA.length} picked=${picked.map((p: any) => p.key).join(",")}`);
+          writeFileSync("/tmp/pack/inspirePersonaData.ts", `export const PERSONA_DATA: any[] = ${JSON.stringify(picked)};\n`);
+          TS
+          npx --yes tsx /tmp/slim.mts
+          echo "CORE_B64=$(tar -czf - -C /tmp/pack . | base64 -w0)" >> "$GITHUB_ENV"
+      - name: Voice article, remix, review
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          CORE_B64: ${{ env.CORE_B64 }}
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 12m
+          envs: CORE_B64
+          script: |
+            set +e
+            cd /opt/onbrand/current/skills/ai-talent
+            set -a; source .env 2>/dev/null; set +a
+            echo "host=$(hostname)  app=$(readlink -f /opt/onbrand/current)  now=$(date -u +%FT%TZ)"
+            D=server/content/core/_probe_inspire
+            mkdir -p "$D"
+            echo "$CORE_B64" | base64 -d | tar -xzf - -C "$D"
+            cat > "$D/_probe_tmp.ts" <<'TS'
+            import { invokeLLM } from "../../../platform/core/llm/llm";
+            import { finalizeDraft, inspireWritePrompt, parseIdeas, parseReviewIssues, personaIdeationPrompt, resolveTopic, reviewPrompt } from "./doctorInspire";
+            import { INTERVIEW_QUESTIONS, addedNumbers, interviewIsThin, parseRemix, parseVoiceArticle, questionOf, trafficRemixPrompt, voiceArticlePrompt } from "./doctorVoice";
+            import { INSPIRE_PERSONAS, leaksPersona } from "./inspirePersonas";
+            import { REGULATION_GROUPS, itemsOfGroup, scanRiskTerms } from "./inspireRegulations";
+
+            const MODEL = process.env.INSPIRE_MODEL || "claude-sonnet-4-6";
+            const ask = async (system: string, user: string) => {
+              const t0 = Date.now();
+              const r: any = await invokeLLM({ provider: "anthropic", model: MODEL, messages: [{ role: "system", content: system }, { role: "user", content: user }] } as any);
+              const c = r?.choices?.[0]?.message?.content;
+              return { text: typeof c === "string" ? c : "", s: ((Date.now() - t0) / 1000).toFixed(1), via: String(r?.model ?? "?") };
+            };
+            const review = async (text: string) => {
+              const hits = scanRiskTerms(text);
+              let n = 0;
+              for (const g of REGULATION_GROUPS) {
+                const items = itemsOfGroup(g.id);
+                const r = await ask(reviewPrompt(items, hits), `# 待審查的成稿\n${text}`);
+                const issues = parseReviewIssues(r.text, { ids: items.map((x) => x.id), text });
+                console.log(`  [${g.label}] ${r.s}s → ${issues === null ? "PARSE FAILED" : issues.length ? "有疑慮" : "通過"}`);
+                for (const i of issues ?? []) console.log(`      ${i.regulationId}｜原句：${i.quote}\n        原因：${i.detail}\n        建議：${i.suggestion || "（拿掉這一句）"}`);
+                n += (issues ?? []).length;
+              }
+              return n;
+            };
+            (async () => {
+              const doctor = "王小明";
+              const specialty = "新陳代謝科";
+              const q = questionOf("w-muscle")!;
+              // 替身口述：不是真的醫師講的，只用來驗流程。
+              const answers = [
+                "最常聽到的是「醫師，我體重有掉，可是怎麼覺得越來越沒力、臉也垮了？」還有人會直接問「我是不是蛋白質吃不夠？要不要去買高蛋白？」",
+                "我通常先不回答蛋白質，我會先問他兩件事：這陣子怎麼吃、有沒有在動。很多人是靠少吃一餐、只吃菜在瘦，那掉的不只是脂肪，肌肉也一起掉。我會跟他說，體重計上的數字是脂肪加肌肉加水，你要瘦的是脂肪，肌肉是你的存款。所以我請他做兩件事：第一，每一餐都要有一份蛋白質，豆魚蛋肉都可以，不用特別買粉；第二，每個禮拜要有阻力訓練，深蹲、彈力帶、提水桶都算，不是只有走路。至於要吃到多少，每個人腎功能、體重、活動量不一樣，我會看他的抽血再講，不會給一個通用的數字。",
+                "最常誤會的是「體重掉越快越好」。掉太快通常掉的是肌肉和水，之後反而更容易胖回來。第二個誤會是「我有走路就是有運動」，走路對心肺好，但留不住肌肉。還有長輩以為年紀大了不能做重訓，其實年紀越大越需要，只是要從輕的開始、有人在旁邊看。",
+                "我會說「肌肉是存款，脂肪是負債，減重是還債，不是把存款領光」。回家先做一件事：連續一個禮拜把每一餐拍下來，回診給我看，我們一起數有幾餐沒有蛋白質。",
+              ];
+              console.log(`題目：${q.label}（聲量 ${q.volume}）\n口述太短？${interviewIsThin(answers)}`);
+              for (let i = 0; i < answers.length; i++) console.log(`問：${INTERVIEW_QUESTIONS[i]}\n醫師（替身）：${answers[i]}`);
+
+              const v = await ask(voiceArticlePrompt({ doctor, specialty, question: q.label, answers }), "請開始整理。");
+              const art = parseVoiceArticle(v.text);
+              if (!art) { console.log(`VOICE ARTICLE PARSE FAILED. raw:\n${v.text.slice(0, 800)}`); process.exit(1); }
+              console.log(`\n=== 第一步：照醫師口吻的底稿（${v.s}s，${v.via}，${art.article.length} 字）\n標題：${art.title}\n${art.article}\n— 編輯想問醫師的：${art.gaps.length ? art.gaps.join("／") : "（沒有）"}\n— 底稿多出來的數字（口述與白名單都沒有）：${addedNumbers(answers.join("\n"), art.article).join("、") || "沒有"}`);
+              console.log("--- 底稿審查");
+              await review(finalizeDraft(art.article));
+
+              for (const p of INSPIRE_PERSONAS) {
+                const r = await ask(trafficRemixPrompt({ doctor, title: art.title, article: art.article, persona: p }), "請開始包裝。");
+                const m = parseRemix(r.text);
+                if (!m) { console.log(`\n=== ${p.key} REMIX PARSE FAILED. raw:\n${r.text.slice(0, 500)}`); continue; }
+                const text = finalizeDraft(m.draft);
+                console.log(`\n=== 第二步：套流量密碼｜${p.label}｜${p.reference}（${r.s}s，${text.length} 字）\n用了哪一招：${m.move}\n${text}\n— 多出來的數字：${addedNumbers(art.article, m.draft).join("、") || "沒有"}　露出人名：${leaksPersona(text, p) ?? "沒有"}`);
+                if (p.key === "tw-tt-13") { console.log("--- 這一版的審查"); await review(text); }
+              }
+
+              // 對照：舊流程（創作者 agent 直接想點子再寫），同一題、同一位 agent。
+              const topic = resolveTopic({ customTopic: "減脂怎麼不掉肌肉" })!;
+              const p0 = INSPIRE_PERSONAS.find((x) => x.key === "tw-tt-13") ?? INSPIRE_PERSONAS[0]!;
+              const ir = await ask(personaIdeationPrompt({ doctor, topic, persona: p0, count: 3 }), "請開始想。");
+              const idea = parseIdeas(ir.text, p0, 3)[0];
+              if (idea) {
+                const w = await ask(inspireWritePrompt({ doctor, topic, persona: p0, idea }), "請開始寫。");
+                console.log(`\n=== 對照：舊流程｜${p0.label}｜點子「${idea.title}」\n${finalizeDraft(w.text)}`);
+              } else console.log("\n=== 對照：舊流程沒有產出可用的點子");
+              process.exit(0);
+            })().catch((e) => { console.log("probe failed:", e?.message); process.exit(1); });
+            TS
+            timeout 660 ./node_modules/.bin/tsx "$D/_probe_tmp.ts"
+            echo "probe exit=$?"
+            rm -rf "$D"
