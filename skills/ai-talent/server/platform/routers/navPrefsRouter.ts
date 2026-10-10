@@ -30,7 +30,8 @@ export const BRAND_NAV_PREFS_DDL = `
 // 2026-09-29 CJ：內容通路只留 FB／IG／Threads／LINE／TikTok／電子報／官網（見
 // planGate.HIDDEN_CONTENT_PLATFORMS）。存過不在這份清單上的 id 的品牌，
 // sanitizeNavItems 讀出來時就會濾掉。
-export const NAV_ITEM_IDS = ["fb", "ig", "threads", "line", "tt", "email", "web", "case", "theater"] as const;
+// 2026-10-10：YouTube（yt）、新聞稿（pr）開回來。
+export const NAV_ITEM_IDS = ["fb", "ig", "threads", "line", "tt", "email", "web", "yt", "pr", "case", "theater"] as const;
 export type NavItemId = (typeof NAV_ITEM_IDS)[number];
 export const DEFAULT_NAV_ITEMS: NavItemId[] = ["fb", "ig"];
 

@@ -26,7 +26,7 @@ import { matchTaskWithSynonyms } from "../lib/taskSearchSynonyms";
 import {
   resolveSource, sourceAccent, sourceWhy,
   sourcePillText, sourceTooltip,
-  FRONT_CARD_KINDS, frontCardKind, frontCardKindLabel, isFrontVisibleCard, type FrontCardKind,
+  FRONT_CARD_KINDS, frontCardKind, frontCardKindLabel, isFrontVisibleCard, aeoWhy, type FrontCardKind,
 } from "../../platform/lib/sourceVocabulary";
 import {
   FB_FORMAT_TABS as FORMAT_TABS,
@@ -1579,7 +1579,7 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
           {(() => {
             // 2026-09-29 CJ「已經沒有品牌自建和爆款結構兩個 chips」：兩類一律列出並附張數，
             // 就算其中一類是 0 張——0 張的「品牌自建」正是要引導用戶去建卡的入口。
-            const counts: Record<FrontCardKind, number> = { viral: 0, own: 0 };
+            const counts: Record<FrontCardKind, number> = { viral: 0, own: 0, aeo: 0 };
             for (const t of shownTasks) {
               if (inferPlatform(t) !== platform) continue;
               const k = frontCardKind(t);
@@ -1587,7 +1587,9 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
             }
             // 圖片卡沒有「爆款結構／品牌自建」之分——看圖片時這列收起來。
             if (imageMode) return null;
-            const tabs: Array<FrontCardKind | "all"> = ["all", ...FRONT_CARD_KINDS];
+            // 2026-10-10：「AI 搜尋」只在有這類卡的通路出現（官網／YouTube／新聞稿）——
+            // FB、IG 上掛一個永遠 0 張的 chip，等於暗示這些通路也有 AI 搜尋的卡。
+            const tabs: Array<FrontCardKind | "all"> = ["all", ...FRONT_CARD_KINDS.filter((k) => k !== "aeo" || counts.aeo > 0)];
             return (
               <div className="mt-3 flex items-center gap-1.5 flex-wrap justify-center">
                 {tabs.map((id) => {
@@ -1597,7 +1599,7 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                     <button
                       key={id}
                       onClick={() => setActiveSource(id)}
-                      title={id === "all" ? undefined : id === "viral" ? sourceWhy("viral", lang) : (lang === "en" ? "Cards you built for this brand." : "你替這個品牌自己建的卡。")}
+                      title={id === "all" ? undefined : id === "viral" ? sourceWhy("viral", lang) : id === "aeo" ? aeoWhy(lang) : (lang === "en" ? "Cards you built for this brand." : "你替這個品牌自己建的卡。")}
                       className="flex items-center gap-1.5 px-3 py-1 rounded-full text-tiny font-medium transition-all"
                       style={
                         active
@@ -1929,6 +1931,7 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                         const acc = sourceAccent(src.type);
                         // 自建卡沒有 source，resolveSource 會退回「長青公式」—— 印成品牌自建。
                         const isOwn = frontCardKind(task) === "own";
+                        const isAeo = frontCardKind(task) === "aeo";
                         // 2026-09-06：改為單色。原本是彩色圓點＋彩色文字＋淡色底，
                         // 249 張卡每張都有 —— 違反「不要彩色」的紀律。現在只用
                         // 墨色深淺與邊框，字級也從 10px 提到 12px。
@@ -1938,7 +1941,7 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                             tabIndex={0}
                             className="inline-flex items-center self-start rounded-full border px-2 py-0.5 max-w-full cursor-pointer hover:border-neutral-800"
                             style={{ borderColor: "#E5E5E5", background: "#FFFFFF" }}
-                            title={isOwn ? frontCardKindLabel("own", lang) : sourceTooltip(src, lang)}
+                            title={isOwn ? frontCardKindLabel("own", lang) : isAeo ? aeoWhy(lang) : sourceTooltip(src, lang)}
                             // 2026-09-08 (CJ「在 dev 還看不到出處說明」)：出處 pill 本身就能點開詳情，
                             // 不必找下面那行小字。
                             onClick={(e) => { e.stopPropagation(); setDetailTaskId(task.id); }}
@@ -1955,7 +1958,9 @@ function PlatformTaskPageInner({ embed }: { embed?: TaskEmbed } = {}) {
                                 ? frontCardKindLabel("own", lang)
                                 : frontCardKind(task) === "viral"
                                   ? `${lang === "en" ? "Reference: " : "參考貼文："}${sourcePillText(src, lang)}`
-                                  : sourcePillText(src, lang)}
+                                  : isAeo
+                                    ? (lang === "en" ? "Readable by AI search" : "AI 搜尋讀得到")
+                                    : sourcePillText(src, lang)}
                             </span>
                           </span>
                         );

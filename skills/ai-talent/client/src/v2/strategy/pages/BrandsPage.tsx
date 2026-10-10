@@ -34,6 +34,7 @@ import { InfoTab as BrandInfoTab, DangerTab as BrandDangerTab, PublishTab as Bra
 import BrainPanel from "../components/brain/BrainPanel";
 import { BrainHelpTip } from "../components/brain/BrainHelpTip";
 import RegulationsPanel from "../components/regulations/RegulationsPanel";
+import AeoBoardPanel from "../components/aeo/AeoBoardPanel";
 import BrandOnboardingWizard from "../components/onboarding/BrandOnboardingWizard";
 import AIBriefPanel from "../components/positioning/AIBriefPanel";
 import StrategyAlertsPanel from "../components/director/StrategyAlertsPanel";
@@ -674,7 +675,7 @@ export default function BrandsPage() {
   // 2026-05-07 Path A simplification: 3 main tiles only (定位/文字/知識).
   // "visual" is kept in the type for legacy lock-state code paths, but
   // is no longer exposed as a tile — its contents live in Settings.
-  const category: "positioning" | "copy" | "visual" | "knowledge" | "info" | "publish" | "settings" | "products" | "events" | "regulations" | "channels" | "brain" | "persona" | "campaign" =
+  const category: "positioning" | "copy" | "visual" | "knowledge" | "info" | "publish" | "settings" | "products" | "events" | "regulations" | "channels" | "aisearch" | "brain" | "persona" | "campaign" =
     urlCat === "copy" ? "copy"
     : urlCat === "knowledge" ? "knowledge"
     : urlCat === "visual" ? "visual"
@@ -685,6 +686,7 @@ export default function BrandsPage() {
     : urlCat === "events" ? "events"
     : urlCat === "regulations" ? "regulations"
     : urlCat === "channels" ? "channels"
+    : urlCat === "aisearch" ? "aisearch"
     : urlCat === "brain" ? "brain"
     : urlCat === "persona" ? "persona"
     // 2026-09-25（CJ「應該要在活動的 mission tray 當中，增加這個活動的任務卡」）：
@@ -701,7 +703,7 @@ export default function BrandsPage() {
   // version clobbered it with a snapshot from BEFORE that write, dropping
   // `e` and silently falling back to brand-level positioning. Functional
   // form fixes it for every caller, not just this one site.
-  const setCategory = (next: "positioning" | "copy" | "knowledge" | "info" | "visual" | "publish" | "products" | "events" | "regulations" | "channels" | "brain" | "persona") => {
+  const setCategory = (next: "positioning" | "copy" | "knowledge" | "info" | "visual" | "publish" | "products" | "events" | "regulations" | "channels" | "aisearch" | "brain" | "persona") => {
     setSearchParams((prev) => {
       const nextParams = new URLSearchParams(prev);
       nextParams.set("cat", next);
@@ -2464,6 +2466,15 @@ export default function BrandsPage() {
                 brandId={activeBrandIdForLocks}
                 focusId={memoryFocus?.startsWith("reg:") ? Number(memoryFocus.slice(4)) || null : null}
               />
+            </div>
+          )}
+
+          {/* ── AI 搜尋 (aisearch) — 顧客問題地圖與覆蓋率 ──
+               2026-10-10（CJ「我需要有 AEO 專區嗎？我整個動線，不知道該如何調整」）：看進度的板，不是
+               另一個寫內容的地方。回答來自作品頁的「轉成 AI 搜尋版」。品牌層。 */}
+          {derivedCategory === "aisearch" && activeBrandIdForLocks && (
+            <div style={{ padding: "8px 0 32px" }}>
+              <AeoBoardPanel brandId={activeBrandIdForLocks} />
             </div>
           )}
 

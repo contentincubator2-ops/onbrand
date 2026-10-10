@@ -93,7 +93,7 @@ const PERSONAL_PATHS = new Set([
 ]);
 
 const STRATEGY_NAMESPACES = new Set([
-  "brand", "brandBrain", "assetPhoto", "strategyMonitor", "brandRegulation", "eventCalendar", "touchpoints",
+  "brand", "brandBrain", "assetPhoto", "strategyMonitor", "brandRegulation", "aeoQuestion", "eventCalendar", "touchpoints",
   "competitor", "entity", "product", "event", "scope", "pipeline", "tabLock", "positioningJobs",
   "positioningDocs", "channelRole", "workbench", "strategistChat", "brandKnowledge", "personaAgent",
   "brandColors", "campaign", "vendor", "customChannel",

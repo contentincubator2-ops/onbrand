@@ -150,7 +150,7 @@ export default function PricingPage() {
   const faq: [string, string][] = isEn ? [
     ["What is the difference between Basic and Professional?", `Capability, not volume. Both tiers have unlimited runs and campaign tasks. The difference is channels (2 vs 5), monthly viral-structure cards (Professional only), product and campaign positioning, own task cards (3 vs 10) and seats (2 vs 5).`],
     ["Why does Professional come with 5 seats?", "Because of the review workflow. The person producing and the person approving must be different people, otherwise review is a formality: marketer, ads specialist, performance analyst, mid-level manager (approves), owner (dashboard)."],
-    ["Can I change my channels?", `Yes, once a month. You pick from ${CATALOG.channels} channels: Facebook, Instagram, Threads, LINE, TikTok, Email and Website (Basic 2, Professional 5).`],
+    ["Can I change my channels?", `Yes, once a month. You pick from ${CATALOG.channels} channels: Facebook, Instagram, Threads, LINE, TikTok, Email, Website, YouTube and Press (Basic 2, Professional 5).`],
     ["What is an own task card?", "Paste the output you actually want (say, 10 of your best promo posts); the AI reverse-engineers it into a SKILL, you approve a test write, and it goes into your Brand Task Library. Length, rhythm, opening and CTA placement are measured from your samples and later used as acceptance criteria."],
     ["Do add-ons require the Professional plan?", "Yes. Both the strategy-consultant onboarding and the e-commerce operations report require an active onBrand Studio Professional (NT$9,000 / month) subscription."],
     ["Why are viral-structure cards refreshed monthly?", "Viral structures expire: only 27% of TikTok trends survive two weeks. Every viral card carries its spread metric and the month it was measured, and the set is refreshed monthly."],
@@ -162,7 +162,7 @@ export default function PricingPage() {
   ] : [
     ["基礎和專業差在哪？", `差在能力，不在用量。執行次數兩級都不限、企劃任務兩級都開放；差別是通路數（2 vs 5）、爆款結構卡（每月更新，專業才有）、產品與活動定位、自建卡張數（3 vs 10）、席次（2 vs 5）。`],
     ["為什麼專業方案是 5 席？", "因為有審核工作流。產出的人與放行的人必須分開，否則審核只是形式：行銷人員、廣告人員、成效人員、中階主管（審核放行）、負責人（看整體看板）。"],
-    ["通路選了可以換嗎？", `可以，每月可更換一次，從 ${CATALOG.channels} 個通路（Facebook、Instagram、Threads、LINE、TikTok、電子報、官網）裡選：基礎 2 個、專業 5 個。`],
+    ["通路選了可以換嗎？", `可以，每月可更換一次，從 ${CATALOG.channels} 個通路（Facebook、Instagram、Threads、LINE、TikTok、電子報、官網、YouTube、新聞稿）裡選：基礎 2 個、專業 5 個。`],
     ["自建任務卡是什麼？", "把你自己理想中的成品（例如 10 篇促購文）貼上來，AI 反推成 SKILL，試寫確認後上架，存入品牌任務庫。字數上下限、節奏、開場方式、CTA 位置全部從你貼的成品量出來，之後回頭當驗收標準。"],
     ["加購一定要搭配專業方案嗎？", "是。策略顧問導入與電商營運報告都必須搭配 onBrand Studio 專業版（NT$9,000／月）訂閱。"],
     ["爆款結構卡為什麼要每月更新？", "爆款結構會過期：TikTok 只有 27% 的趨勢活過兩週。所以每張爆款卡都印著傳播數字與量測年月，並每月更新。"],

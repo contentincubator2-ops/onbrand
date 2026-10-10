@@ -45,6 +45,7 @@ function categoryLabel(cat: string, scope: CrumbInput["scopeMode"], en: boolean)
     case "info": return T(en, "基本資料", "Info");
     case "regulations": return T(en, "法規", "Regulations");
     case "channels": return T(en, "通路", "Channels");
+    case "aisearch": return T(en, "AI 搜尋", "AI search");
     case "brain": return T(en, "記憶", "Memory");
     case "products": return T(en, "產品", "Products");
     case "events": return T(en, "活動", "Campaigns");

@@ -24,7 +24,7 @@ function readClientFigures(): Record<string, number> {
 
 describe("catalogFigures 對得上真實任務卡目錄", () => {
   // 2026-09-29：爆款卡只列當月、每月換，張數不再寫進文案；這裡只鎖通路數。
-  const FRONT_CHANNELS = new Set(["facebook", "instagram", "threads", "line", "tiktok", "email", "website"]);
+  const FRONT_CHANNELS = new Set(["facebook", "instagram", "threads", "line", "tiktok", "email", "website", "youtube", "pr"]);
   const all = buildTaskCatalogIndex().filter((t) => FRONT_CHANNELS.has(t.platform));
 
   it("2026-07 起量測的爆款卡都附參考文章", () => {

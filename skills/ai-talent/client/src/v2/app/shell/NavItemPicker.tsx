@@ -23,6 +23,8 @@ export interface PickerItem {
   kind?: "channel" | "tool";
   /** 2026-10-04：用戶自己加的通路（可以刪）。 */
   custom?: boolean;
+  /** 2026-10-10：AI 搜尋讀得到的通路。 */
+  aeo?: boolean;
 }
 
 /** 「＋」裡列的平台範本（server customChannel.presets 給的資料）。 */
@@ -190,6 +192,12 @@ export default function NavItemPicker({ open, en, brandName, catalog, selected, 
                 <span className="min-w-0 flex-1">
                   <span className="block text-[13.5px] font-semibold text-neutral-900">{c.label}</span>
                   {c.tooltip && <span className="mt-0.5 block text-[12px] leading-snug text-neutral-500">{c.tooltip}</span>}
+                  {c.aeo && (
+                    <span className="mt-1 inline-block rounded border border-neutral-200 px-1.5 py-px text-[11px] text-neutral-500"
+                      title={en ? "AI search engines mostly cite public web pages, YouTube and news — not social posts." : "AI 搜尋主要引用公開網頁、YouTube 與新聞，社群貼文幾乎不會被引用。"}>
+                      {en ? "Readable by AI search" : "AI 搜尋讀得到"}
+                    </span>
+                  )}
                 </span>
                 <span className={`mt-1 flex h-4 w-4 shrink-0 items-center justify-center rounded border text-[11px] ${on ? "border-neutral-900 bg-neutral-900 text-white" : "border-neutral-300"}`}>{on ? <CheckIcon size={9} /> : null}</span>
               </button>

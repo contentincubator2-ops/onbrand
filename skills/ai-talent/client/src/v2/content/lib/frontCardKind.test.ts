@@ -20,12 +20,22 @@ describe("frontCardKind", () => {
     expect(isRecentViral({ type: "award", asOf: "2026-09" }, now)).toBe(false);
   });
 
-  it("只有兩類會出現在前台", () => {
+  it("爆款、自建之外的通用卡不出現在前台", () => {
     expect(frontCardKind({ source: { type: "viral", asOf: "2026-08" } }, now)).toBe("viral");
     expect(frontCardKind({ source: { type: "viral", asOf: "2012-03" } }, now)).toBeNull();
     expect(frontCardKind({ ownCardId: "abc" }, now)).toBe("own");
     expect(frontCardKind({ source: { type: "brand-method" } }, now)).toBe("own");
     expect(frontCardKind({ source: { type: "award" } }, now)).toBeNull();
     expect(frontCardKind({ source: { type: "evergreen" } }, now)).toBeNull();
+  });
+
+  // 2026-10-10：第三類＝AI 搜尋，一份挑過的短名單（官網／YouTube／新聞稿）。
+  it("AI 搜尋短名單上的卡會列出來；同通路的其他通用卡不會", () => {
+    expect(frontCardKind({ id: "web-30-product-faq", source: { type: "evergreen" } }, now)).toBe("aeo");
+    expect(frontCardKind({ id: "yt-30-description-seo", source: { type: "channel-spec" } }, now)).toBe("aeo");
+    expect(frontCardKind({ id: "pr-60-news-release-full" }, now)).toBe("aeo");
+    expect(frontCardKind({ id: "yt-30-comment-reply", source: { type: "evergreen" } }, now)).toBeNull();
+    // 自建與近期爆款的分類優先，不被 AI 搜尋蓋掉
+    expect(frontCardKind({ id: "web-30-product-faq", ownCardId: "abc" }, now)).toBe("own");
   });
 });

@@ -585,6 +585,10 @@ async function runStartupMigrations() {
     // strategy_meetings／strategy_meeting_runs／strategy_positioning_versions 不再建立，
     // 已經存在的留著不砍（砍表是另一個決定）。
 
+    // 2026-10-10：策略層「AI 搜尋」tray 的顧客問題地圖。
+    const { BRAND_AEO_QUESTIONS_DDL } = await import("./strategy/core/brand/aeoQuestions");
+    await db.execute(sql.raw(BRAND_AEO_QUESTIONS_DDL));
+
     // 2026-09-30（CJ「策略層加一個 mission tray，是法規……agent 寫文章前要審查」）。
     const { BRAND_REGULATIONS_DDL } = await import("./strategy/core/brand/brandRegulations");
     await db.execute(sql.raw(BRAND_REGULATIONS_DDL));

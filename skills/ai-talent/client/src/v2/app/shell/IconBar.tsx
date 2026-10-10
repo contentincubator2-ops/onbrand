@@ -477,7 +477,7 @@ export function IconBar({
         open={pickerOpen}
         en={isEn}
         brandName={brandName}
-        catalog={catalog.map((c) => ({ id: c.id!, label: c.label, tooltip: c.tooltip, icon: c.icon, kind: c.kind, custom: customChannels.some((cc) => cc.id === c.id) }))}
+        catalog={catalog.map((c) => ({ id: c.id!, label: c.label, tooltip: c.tooltip, icon: c.icon, kind: c.kind, aeo: c.aeo, custom: customChannels.some((cc) => cc.id === c.id) }))}
         presets={(presetsQ.data as ChannelPresetLite[] | null) ?? []}
         createdPresets={customChannels.map((c) => c.preset).filter(Boolean) as string[]}
         onCreateChannel={onCreateChannel}

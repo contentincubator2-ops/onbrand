@@ -183,7 +183,7 @@ export default function TaskPicker({
                           {t.label ?? t.id}
                         </span>
                         <span className="mt-0.5 block truncate text-[13px] text-neutral-500">
-                          {type === "own" ? frontCardKindLabel("own", lang) : sourcePillText(src, lang)}
+                          {type === "own" ? frontCardKindLabel("own", lang) : type === "aeo" ? (lang === "en" ? "Readable by AI search" : "AI 搜尋讀得到") : sourcePillText(src, lang)}
                         </span>
                         {onDetail && (
                           <span

@@ -6,5 +6,5 @@
  * 並鎖住兩邊一致。文案裡不要再手寫這些數字，一律引用這裡。
  */
 export const CATALOG = {
-  channels: 7,
+  channels: 9,
 } as const;

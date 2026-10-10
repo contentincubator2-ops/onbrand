@@ -24,8 +24,12 @@ import { isCustomChannelId } from "../customChannelId";
  * 2026-09-29 CJ「內容任務卡只要留下 Facebook、Instagram、TikTok、電子報、官網
  * 這五個類別」。這四個通路的卡片與程式碼都還在，只是不再列出、不能再被選為
  * 啟用通路——任務目錄、任務托盤、通路選擇、側欄都從這裡讀。要開回來就從這裡拿掉。
+ *
+ * 2026-10-10 CJ「一定要將官網文章，還有 youtube 加回來」：YouTube 與新聞稿開回來——
+ * 這兩個加官網是 AI 搜尋讀得到的通路（見 client sourceVocabulary 的 AEO_CARD_IDS）。
+ * LinkedIn、X 維持下架。
  */
-export const HIDDEN_CONTENT_PLATFORMS: ReadonlySet<string> = new Set(["linkedin", "youtube", "x", "pr"]);
+export const HIDDEN_CONTENT_PLATFORMS: ReadonlySet<string> = new Set(["linkedin", "x"]);
 
 export function isHiddenContentPlatform(platform: string | null | undefined): boolean {
   return !!platform && HIDDEN_CONTENT_PLATFORMS.has(platform);
@@ -37,9 +41,9 @@ export function isHiddenContentPlatform(platform: string | null | undefined): bo
  * CJ 2026-09-29「前台隱藏，資料保留」—— 讀歷史的地方一律過這支。
  */
 const HIDDEN_PLATFORM_ALIASES: ReadonlySet<string> = new Set([
-  ...HIDDEN_CONTENT_PLATFORMS, "press", "li", "yt", "twitter",
+  ...HIDDEN_CONTENT_PLATFORMS, "li", "twitter",
 ]);
-const HIDDEN_TASK_ID_PREFIXES = ["li-", "yt-", "pr-", "x-"];
+const HIDDEN_TASK_ID_PREFIXES = ["li-", "x-"];
 
 export function isHiddenTaskId(taskId: string | null | undefined): boolean {
   return !!taskId && HIDDEN_TASK_ID_PREFIXES.some((p) => taskId.startsWith(p));
@@ -52,14 +56,18 @@ export function isHiddenHistoryItem(item: { platform?: string | null; taskId?: s
 
 /** 沒選過通路時的預設。FB / IG 是產品主場，排前面。 */
 const DEFAULT_PLATFORM_ORDER = [
-  "facebook", "instagram", "youtube", "tiktok", "linkedin",
+  "facebook", "instagram", "tiktok", "linkedin",
   // 2026-09-10 X 通路加在社群段的末尾，不動前五個 —— 這個陣列的順序決定
   // 「沒選過通路的品牌預設開哪幾個」，把 x 插到前面會讓既有品牌的預設值
   // 悄悄改變（基礎方案只取前 2 個）。
   "x",
-  "email", "website", "pr",
+  "email", "website",
   // 2026-09-29 CJ：台灣市場加 Threads、LINE。接在內容通路最後，不動前面的順序。
   "threads", "line",
+  // 2026-10-10 YouTube、新聞稿開回來。刻意排在最後而不是放回原位——下架期間
+  // 「沒選過通路」的專業方案品牌預設是 FB／IG／TikTok／電子報／官網，放回第三位
+  // 會把 YouTube 擠進去、官網擠出來。
+  "youtube", "pr",
   "brand", "audience", "kol",
 ];
 

@@ -1,0 +1,126 @@
+name: Ops (DEV) — probe AI-search version end to end (read-only)
+
+# 「轉成 AI 搜尋版」在 DEV VM 上實跑一次，不經過瀏覽器、不需要登入：
+#   拿資料庫裡真的 FB／IG 貼文 → 官網問答、YouTube 標題＋說明欄 → 解析 → 驗證（不過就重試一次）→ 印出來。
+# 用「這個分支」的 aeoContract.ts（提示詞、解析、驗證）＋ VM 上已部署的品牌資料與模型路由，
+# 所以合併前就能看真實產出。不寫資料庫。
+# 另外丟一則沒有任何事實的貼文，確認它會老實回「無法轉換」而不是硬編。
+# 花費：每則貼文 2–4 次模型呼叫，共 4 則。
+# 第 2 次跑：taskId 在 mission_outputs.metadata，不在 missions。
+# 第 4 次跑：展開裡在講「原稿」的說明句拿掉。
+# 第 3 次跑：展開不設下限、品牌資料不能拿來補事實、數字只認原稿有的、不寫會過期的時間、去掉 Markdown。
+# Path-scoped push，跟 op-probe-dev-influencer.yml 同一個做法（environment: dev 才會連到 DEV VM）。
+on:
+  push:
+    paths:
+      - '.github/workflows/op-probe-dev-aeo.yml'
+
+jobs:
+  probe:
+    runs-on: ubuntu-24.04
+    environment: dev
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Pack this branch's aeoContract.ts
+        run: |
+          echo "PATCH_B64=$(gzip -c skills/ai-talent/server/content/core/engine/aeoContract.ts | base64 -w0)" >> "$GITHUB_ENV"
+      - name: Convert real posts
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          PATCH_B64: ${{ env.PATCH_B64 }}
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 10m
+          envs: PATCH_B64
+          script: |
+            set +e
+            cd /opt/onbrand/current/skills/ai-talent
+            set -a; source .env 2>/dev/null; set +a
+            echo "host=$(hostname)  app=$(readlink -f /opt/onbrand/current)  now=$(date -u +%FT%TZ)"
+            D=server/content/core/engine
+            echo "$PATCH_B64" | base64 -d | gunzip > "$D/_probeAeo.ts"
+            cat > "$D/_probe_tmp.ts" <<'TS'
+            import localPool from "../../../localDb";
+            import { buildBrandPrefix } from "../../../strategy/core/brand/brandContext";
+            import { callModel } from "../../../platform/core/llm/multiModelRouter";
+            import * as aeo from "./_probeAeo";
+
+            const captionOf = (content: string): string => {
+              try {
+                const j = JSON.parse(content);
+                const first = Array.isArray(j) ? j[0] : null;
+                return typeof first?.caption === "string" ? first.caption.trim() : "";
+              } catch { return ""; }
+            };
+
+            async function run(brandId: number, brandName: string, brandPrefix: string, target: aeo.AeoTarget, caption: string) {
+              const system =
+                `你是替品牌整理官方內容的編輯。手上有一篇已經寫好的社群貼文，要把同一件事改成 AI 搜尋引擎讀得到、可以單獨引用的版本。\n` +
+                brandPrefix + aeo.aeoContractBlock(target, { brandName });
+              const messages: any[] = [{ role: "system", content: system }, { role: "user", content: `這是原稿：\n\n${caption}` }];
+              const t0 = Date.now();
+              const r = await callModel(messages, undefined, "anthropic");
+              const parsed = aeo.parseAeoReply(target, r.content ?? "");
+              const secs = ((Date.now() - t0) / 1000).toFixed(1);
+              if (parsed.noConvert) { console.log(`\n--- ${target} (${secs}s) 無法轉換：${parsed.reason}`); return; }
+              let fields = aeo.repairAeo(target, parsed.fields);
+              let problems = aeo.validateAeo(target, fields, { brandName, sources: [caption, brandName] });
+              console.log(`\n--- ${target} (${secs}s) 第一輪檢查: ${problems.length ? problems.join(" | ") : "過關"}`);
+              if (problems.length) {
+                const r2 = await callModel([...messages, { role: "assistant", content: r.content ?? "" }, { role: "user", content: aeo.aeoRetryRequest(problems) }], undefined, "anthropic").catch(() => null);
+                const second = r2 ? aeo.parseAeoReply(target, r2.content ?? "") : null;
+                if (second && !second.noConvert) {
+                  const f2 = aeo.repairAeo(target, second.fields);
+                  const p2 = aeo.validateAeo(target, f2, { brandName, sources: [caption, brandName] });
+                  console.log(`重試後檢查: ${p2.length ? p2.join(" | ") : "過關"}`);
+                  if (p2.length < problems.length) { fields = f2; problems = p2; }
+                }
+              }
+              if (!Object.values(fields).some(Boolean)) { console.log(`PARSE FAILED. raw:\n${(r.content ?? "").slice(0, 600)}`); return; }
+              console.log(aeo.serializeAeo(target, fields));
+              if (target === "web-qa") {
+                const json = aeo.faqJsonLd(fields);
+                try { JSON.parse(json); console.log(`[結構化資料] 合法 JSON，${json.length} 字`); } catch { console.log("[結構化資料] 不是合法 JSON"); }
+              }
+            }
+
+            (async () => {
+              const [rows]: any = await localPool.execute(
+                `SELECT o.id, o.content, m.brandId, m.workspace, JSON_UNQUOTE(JSON_EXTRACT(o.metadata, '$.taskId')) AS taskId
+                   FROM mission_outputs o JOIN missions m ON m.id = o.missionId
+                  WHERE m.workspace IN ('facebook','instagram') AND m.brandId IS NOT NULL
+                  ORDER BY (m.brandId = 2977) DESC, o.id DESC LIMIT 60`);
+              const picked: any[] = [];
+              const seen = new Set<number>();
+              for (const r of rows as any[]) {
+                const caption = captionOf(String(r.content ?? ""));
+                if (caption.length < 80 || seen.has(r.brandId)) continue;
+                seen.add(r.brandId);
+                picked.push({ ...r, caption });
+                if (picked.length >= 3) break;
+              }
+              console.log(`picked ${picked.length} real posts from ${(rows as any[]).length} rows`);
+              for (const p of picked) {
+                const [b]: any = await localPool.execute("SELECT name FROM brands WHERE id = ? LIMIT 1", [p.brandId]);
+                const brandName = String(b[0]?.name ?? "");
+                const prefix = await buildBrandPrefix(p.brandId, null, null, "full").catch(() => "");
+                console.log(`\n================ output ${p.id}  brand ${p.brandId}「${brandName}」 ${p.workspace} ${p.taskId}  brandCtx=${prefix.length} 字\n原稿（${p.caption.length} 字）：\n${p.caption.slice(0, 700)}`);
+                await run(p.brandId, brandName, prefix, "web-qa", p.caption);
+                await run(p.brandId, brandName, prefix, "yt-description", p.caption);
+              }
+              // 沒有任何事實的貼文：應該回「無法轉換」，不該硬編出一則問答。
+              const first = picked[0];
+              if (first) {
+                const [b]: any = await localPool.execute("SELECT name FROM brands WHERE id = ? LIMIT 1", [first.brandId]);
+                console.log(`\n================ 沒有事實的貼文（預期：無法轉換）`);
+                await run(first.brandId, String(b[0]?.name ?? ""), "", "web-qa", "週一了！！大家早安☀️ 今天也要元氣滿滿喔，留言跟我們說你週末去哪裡玩吧～");
+              }
+              process.exit(0);
+            })().catch((e) => { console.log("probe failed:", e?.message); process.exit(1); });
+            TS
+            timeout 540 ./node_modules/.bin/tsx "$D/_probe_tmp.ts"
+            echo "probe exit=$?"
+            rm -f "$D/_probe_tmp.ts" "$D/_probeAeo.ts"
