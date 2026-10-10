@@ -14,6 +14,7 @@ import { buildMarketContext } from "./marketProfiles";
 import { loadEventProducts, productScopeBrief, resolveProductScope, type ScopedProduct } from "../entities/eventProductScope";
 import { readEventIntake } from "../entities/eventIntake";
 import { loadActiveRegulations, regulationLine, REG_DIGEST_MAX, REGULATION_BLOCK_HEADER } from "./brandRegulations";
+import { bookPromptCards } from "../positioning/positioningBook";
 import { normalizeRoleChannel, channelRolesOf, channelRoleBody, CHANNEL_LABEL_ZH, CHANNEL_ROLE_PROMPT_MAX } from "./channelRoles";
 
 function safeParse(s: string): any {
@@ -35,7 +36,7 @@ function safeParse(s: string): any {
 /** 內部分層：決定容量不夠時誰先被擠掉（見 PRIORITY）。不給使用者看。 */
 type BrainTier =
   | "market" | "identity" | "voice" | "rules" | "context" | "custom" | "doc"
-  | "product" | "event" | "legacy" | "regulation" | "channel";
+  | "product" | "event" | "legacy" | "regulation" | "channel" | "book";
 
 /**
  * 大腦畫面的分類——跟策略層 rail 同一套名字（2026-09-29 CJ「用詞跟策略層沒對上，
@@ -137,7 +138,7 @@ const DISPLAY: Record<string, Display> = {
 /** 自訂卡片、定位文件、舊版 brand_brain 條目這些沒有固定標籤的，依所在的頁決定分類。 */
 const SECTION_CATEGORY: Record<SectionKey, BrainCategoryKey> = {
   locked: "brand", voice: "brand", assets: "copy", context: "brand",
-  legacy: "legacy", product: "product", event: "event", regulation: "regulation", channel: "brand",
+  legacy: "legacy", product: "product", event: "event", regulation: "regulation", channel: "brand", book: "brand",
 };
 
 /** 固定標籤的出處（見 BrainItem.source）。pushFrom 與動態標籤在呼叫端自己帶。 */
@@ -188,6 +189,7 @@ function displayOf(section: SectionKey, tier: BrainTier, promptLabel: string): D
   if (tier === "legacy") return { category: "legacy", group: "舊版品牌大腦", label: promptLabel };
   if (tier === "regulation") return { category: "regulation", group: "法規", label: promptLabel };
   if (tier === "channel") return { category: "brand", group: "通路角色", label: promptLabel };
+  if (tier === "book") return { category: "brand", group: "品牌定位書", label: promptLabel };
   if (tier === "voice" && promptLabel.startsWith("語氣範例")) {
     return { category: "brand", group: "品牌個性與溝通風格", label: promptLabel.replace("語氣範例", "溝通範例對比") };
   }
@@ -204,11 +206,11 @@ export const BRAIN_CAPACITY = 16_000;
 
 /** 割捨順序：數字越大越先被擠掉。市場設定與法規永遠保留（見 NEVER_DROP）。 */
 const PRIORITY: Record<BrainTier, number> = {
-  regulation: -1, market: 0, identity: 1, voice: 2, channel: 2.5, rules: 3, product: 4, event: 5,
+  regulation: -1, market: 0, identity: 1, book: 1.5, voice: 2, channel: 2.5, rules: 3, product: 4, event: 5,
   context: 6, custom: 7, doc: 8, legacy: 9,
 };
 
-type SectionKey = "locked" | "voice" | "assets" | "context" | "legacy" | "product" | "event" | "regulation" | "channel";
+type SectionKey = "locked" | "voice" | "assets" | "context" | "legacy" | "product" | "event" | "regulation" | "channel" | "book";
 
 /**
  * 容量不夠時也不割捨的類別。法規（2026-09-30）：寫文前的審查依據，被擠掉就等於沒審——
@@ -902,6 +904,13 @@ export async function buildBrandBrain(
       } catch {/* non-fatal */}
     }
 
+    // ── 品牌定位書（顧問在卡片牆上寫過、存下來的卡）──
+    // 2026-10-10：只帶有人寫過的卡；還沒寫的卡畫面上顯示的是從上面那些欄位整理出來的字，
+    // 那些欄位本來就會被讀到，不重複帶。
+    for (const card of bookPromptCards(positioning)) {
+      c.add("book", "book", card.title, card.body, card.max, undefined, { source: `book:${card.id}` });
+    }
+
     // ── 通路角色（這個平台要扮演什麼、對誰說、主打哪句話）──
     // 2026-10-03：只注入這次任務所在平台的那一張；其他平台的不進 prompt。
     if (roleChannel) {
@@ -945,6 +954,7 @@ export async function buildBrandBrain(
       block("voice",   "[品牌聲音指南 — 嚴格遵守，這是品牌的「人聲」]", false) +
       block("assets",  "[寫手指引 — 用詞 / CTA / Hook / 範本 / 受眾規範]") +
       block("context", "[補充脈絡 — 品牌故事 / 受眾 / 差異化]") +
+      block("book",    "[品牌定位書 — 策略顧問定稿的定位；跟上面的鎖定屬性、聲音指南或補充脈絡說法不一致時，以這裡為準]") +
       block("legacy",  "[品牌大腦補充條目]") +
       block("product", "[本次產出聚焦的產品 — 必須圍繞此產品撰寫]") +
       block("event",   "[本次產出對應的活動 — 必須提及活動 / 時程 / 主軸]") +
