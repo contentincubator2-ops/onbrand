@@ -69,6 +69,9 @@ const envSchema = z.object({
   // redirect URL 要在那邊登記 `${APP_URL}/api/oauth/canva/callback`。
   CANVA_CLIENT_ID:     z.string().optional(),
   CANVA_CLIENT_SECRET: z.string().optional(),
+  // 授權時要求的 scope（空白分隔）。沒設＝只讀三個；integration 勾了寫入類 scope 才設，
+  // 否則 Canva 會讓整個授權失敗。見 canvaClient.canvaScopes。
+  CANVA_SCOPES:        z.string().optional(),
 
   // External services — optional
   RESEND_API_KEY:    z.string().optional(),

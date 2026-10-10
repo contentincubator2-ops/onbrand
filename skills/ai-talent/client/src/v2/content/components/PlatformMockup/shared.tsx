@@ -5,6 +5,7 @@
  * P0: added MarkdownText for Markdown-formatted social post output.
  */
 import React from "react";
+import { ImageActionTiles, useImageActions } from "./imageActions";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Skeleton } from "@heroui/react";
@@ -62,7 +63,8 @@ export function ImageGenSlot({
   className?: string;
 }) {
   const { lang } = useLang();
-  const clickable = !!onGenerate;
+  const actions = useImageActions();
+  const clickable = !!onGenerate && !actions;
   const failed = status === "timeout" || status === "failed";
   const ctaText = failed
     ? (lang === "en" ? "Image failed · tap to retry" : "圖片生成失敗 · 點此重試")
@@ -72,13 +74,22 @@ export function ImageGenSlot({
       role={clickable ? "button" : undefined}
       tabIndex={clickable ? 0 : undefined}
       aria-label={clickable ? ctaText : undefined}
-      onClick={onGenerate}
+      onClick={clickable ? onGenerate : undefined}
       onKeyDown={clickable ? (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onGenerate!(); } } : undefined}
       className={`relative flex flex-col items-center justify-center text-center px-5 py-6 gap-2 ${aspectClass} ${
         dark ? "bg-black/30" : "bg-default-100"
       } ${clickable ? `cursor-pointer transition ${dark ? "hover:bg-black/40" : "hover:bg-default-200"}` : ""} ${className}`}
     >
-      {clickable ? (
+      {actions ? (
+        <>
+          {failed && (
+            <span className={`relative z-20 text-tiny font-medium ${dark ? "text-white/80" : "text-default-600"}`}>
+              {lang === "en" ? "The image didn't come out — try again, or use your own" : "這次沒有產出圖，可以再試一次，或用自己的圖"}
+            </span>
+          )}
+          <ImageActionTiles actions={actions} dark={dark} />
+        </>
+      ) : clickable ? (
         // Keep the actionable control above script/caption overlays. The slot
         // root deliberately does not create its own stacking context.
         <span className={`relative z-20 inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-tiny font-semibold shadow-sm ${

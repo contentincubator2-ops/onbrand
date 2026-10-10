@@ -14,14 +14,15 @@ import { ENV } from "../core/env";
 import {
   getConnectionStatus, disconnectCloud, getValidAccessToken, CloudNotConnectedError, CANVA_ACCOUNT_SCOPE,
 } from "../core/connectors/cloudTokens";
-import { listCanvaDesigns, canvaErrorMessage } from "../core/connectors/canvaClient";
+import { listCanvaDesigns, canvaErrorMessage, canvaCanWrite } from "../core/connectors/canvaClient";
 
 export const canvaRouter = router({
   status: protectedProcedure.query(async ({ ctx }) => {
     const configured = !!ENV.CANVA_CLIENT_ID && !!ENV.CANVA_CLIENT_SECRET;
-    if (!configured) return { configured, connected: false, accountName: null as string | null };
+    if (!configured) return { configured, connected: false, accountName: null as string | null, canCreate: false };
     const s = await getConnectionStatus(ctx.user!.id, CANVA_ACCOUNT_SCOPE, "canva");
-    return { configured, connected: s.connected, accountName: s.accountEmail };
+    // canCreate：這個環境的 integration 有沒有開「替用戶開新設計」的 scope（CANVA_SCOPES）。
+    return { configured, connected: s.connected, accountName: s.accountEmail, canCreate: canvaCanWrite() };
   }),
 
   disconnect: protectedProcedure.mutation(async ({ ctx }) => {

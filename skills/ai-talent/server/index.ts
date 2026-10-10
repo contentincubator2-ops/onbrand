@@ -571,6 +571,12 @@ async function runStartupMigrations() {
     }
     console.log("[migrate] asset_photos: OK");
 
+    // 2026-10-10：在 Canva 編輯的來回（哪張圖來自哪份設計、每次來回的鑰匙）。
+    const { CANVA_DESIGN_REFS_DDL, CANVA_EDIT_SESSIONS_DDL } = await import("./strategy/core/brand/canvaEdit");
+    await db.execute(sql.raw(CANVA_DESIGN_REFS_DDL));
+    await db.execute(sql.raw(CANVA_EDIT_SESSIONS_DDL));
+    console.log("[migrate] canva_design_refs / canva_edit_sessions: OK");
+
     const { POST_FORMAT_CANDIDATES_DDL } = await import("./content/core/catalog/postFormatStore");
     await db.execute(sql.raw(POST_FORMAT_CANDIDATES_DDL));
     console.log("[migrate] post_format_candidates: OK");
