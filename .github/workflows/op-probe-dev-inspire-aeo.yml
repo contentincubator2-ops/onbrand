@@ -1,0 +1,129 @@
+name: op-probe-dev-inspire-aeo
+# AI 搜尋現狀的基準線：把民眾在問的 16 個問題拿去問幾個會上網查的 AI，
+# 記錄答案裡提到哪些藥廠的品牌／成分、引用了哪些網站。只讀不寫，用 DEV VM 上現有的金鑰。
+# 2026-10-10（CJ：「可以先看到現狀，看客戶被不同 AI 提及的比例有多少？跟競爭者相比是怎麼樣」）。
+# 改這支檔案並 push 就會跑。花費：約 64 次模型呼叫（都帶網路搜尋）。
+# 限制：API 的回答不等於一般人在 App 裡看到的回答；每題只問一次，單次結果會浮動。
+on:
+  push:
+    paths:
+      - '.github/workflows/op-probe-dev-inspire-aeo.yml'
+
+jobs:
+  probe:
+    runs-on: ubuntu-24.04
+    environment: dev
+    timeout-minutes: 20
+    steps:
+      - name: Ask the engines
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 18m
+          script: |
+            set +e
+            cd /opt/onbrand/current/skills/ai-talent
+            set -a; source .env 2>/dev/null; set +a
+            echo "host=$(hostname) now=$(date -u +%FT%TZ)"
+            cat > /tmp/_aeo_probe.mjs <<'JS'
+            const QUESTIONS = [
+              ["w-muscle", "weight", "減脂要怎麼吃、怎麼練才不會掉肌肉？"],
+              ["w-choose", "weight", "瘦瘦針有哪幾種？哪一種比較適合我？劑量怎麼調？"],
+              ["w-choose-branded", "weight", "猛健樂和週纖達怎麼選？"],
+              ["w-side", "weight", "打瘦瘦針會噁心、掉頭髮嗎？副作用怎麼處理？"],
+              ["w-liver", "weight", "脂肪肝減重會好嗎？有針劑可以改善脂肪肝嗎？"],
+              ["w-rebound", "weight", "瘦瘦針停藥之後會復胖嗎？"],
+              ["d-drug", "diabetes", "第二型糖尿病的藥怎麼選？哪些藥可以保護心臟和腎臟？"],
+              ["d-diet", "diabetes", "糖尿病飲食，澱粉到底要怎麼吃？"],
+              ["d-reverse", "diabetes", "第二型糖尿病可以逆轉嗎？可以減藥或停藥嗎？"],
+              ["d-insulin", "diabetes", "打胰島素會低血糖嗎？劑量怎麼調才安全？"],
+              ["d-food", "diabetes", "糖尿病可以吃保健食品嗎？哪些食物不能吃？"],
+              ["g-rate", "growth", "小孩一年應該長高幾公分？長太慢什麼時候要看醫生？"],
+              ["g-habit", "growth", "小孩長高要吃什麼？睡眠和運動有用嗎？"],
+              ["g-short", "growth", "小孩比同學矮很多怎麼辦？"],
+              ["g-bone", "growth", "骨齡檢查是什麼？預估身高準嗎？"],
+              ["g-gh", "growth", "生長激素什麼情況可以打？效果和風險是什麼？"],
+            ];
+            // 品牌名（商品名）與成分名分開算。中文商品名只列我有把握的；其餘用英文名比對。
+            const TERMS = {
+              novo_brand: ["週纖達", "wegovy", "胰妥讚", "ozempic", "善纖達", "saxenda", "瑞倍適", "rybelsus", "胰妥善", "victoza", "norditropin", "sogroya", "novomix", "novorapid", "tresiba", "ryzodeg", "fiasp"],
+              novo_company: ["諾和諾德", "novo nordisk"],
+              novo_ingredient: ["semaglutide", "司美格魯", "liraglutide", "利拉魯", "somapacitan"],
+              lilly_brand: ["猛健樂", "mounjaro", "zepbound", "易週糖", "trulicity", "humalog", "humatrope", "basaglar"],
+              lilly_company: ["禮來", "eli lilly"],
+              lilly_ingredient: ["tirzepatide", "替爾泊", "dulaglutide", "度拉糖"],
+              other_brand: ["forxiga", "福適佳", "jardiance", "恩排糖", "羅氏鮮", "羅鮮子", "xenical", "康纖芙", "contrave", "genotropin", "saizen", "ngenla", "omnitrope", "lantus", "toujeo", "januvia", "佳糖維"],
+              drug_class: ["glp-1", "glp1", "腸泌素", "瘦瘦針", "sglt", "排糖藥", "生長激素", "胰島素"],
+            };
+            const count = (text) => {
+              const t = String(text || "").toLowerCase();
+              const out = {};
+              for (const [k, list] of Object.entries(TERMS)) out[k] = list.filter((w) => t.includes(w.toLowerCase()));
+              return out;
+            };
+            const host = (u) => { try { return new URL(u).hostname.replace(/^www\./, ""); } catch { return String(u || "").slice(0, 60); } };
+            const post = async (url, headers, body) => {
+              const ctl = new AbortController(); const timer = setTimeout(() => ctl.abort(), 90000);
+              try {
+                const r = await fetch(url, { method: "POST", headers: { "content-type": "application/json", ...headers }, body: JSON.stringify(body), signal: ctl.signal });
+                const j = await r.json().catch(() => ({}));
+                if (!r.ok) throw new Error(`${r.status} ${JSON.stringify(j).slice(0, 200)}`);
+                return j;
+              } finally { clearTimeout(timer); }
+            };
+            const ENGINES = {
+              perplexity: async (q) => {
+                if (!process.env.PERPLEXITY_API_KEY) throw new Error("no key");
+                const j = await post("https://api.perplexity.ai/chat/completions", { authorization: `Bearer ${process.env.PERPLEXITY_API_KEY}` },
+                  { model: "sonar", messages: [{ role: "user", content: q }], web_search_options: { user_location: { country: "TW" } } });
+                const urls = (j.citations ?? (j.search_results ?? []).map((s) => s.url)) ?? [];
+                return { text: j.choices?.[0]?.message?.content ?? "", urls };
+              },
+              openai: async (q) => {
+                if (!process.env.OPENAI_API_KEY) throw new Error("no key");
+                const j = await post("https://api.openai.com/v1/responses", { authorization: `Bearer ${process.env.OPENAI_API_KEY}` },
+                  { model: "gpt-4.1-mini", input: q, tools: [{ type: "web_search_preview", user_location: { type: "approximate", country: "TW" } }] });
+                let text = ""; const urls = [];
+                for (const o of j.output ?? []) for (const c of o.content ?? []) { text += c.text ?? ""; for (const a of c.annotations ?? []) if (a.url) urls.push(a.url); }
+                return { text, urls };
+              },
+              anthropic: async (q) => {
+                if (!process.env.ANTHROPIC_API_KEY) throw new Error("no key");
+                const j = await post("https://api.anthropic.com/v1/messages", { "x-api-key": process.env.ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01" },
+                  { model: process.env.INSPIRE_MODEL || "claude-sonnet-4-6", max_tokens: 2000, messages: [{ role: "user", content: q }],
+                    tools: [{ type: "web_search_20250305", name: "web_search", max_uses: 3, user_location: { type: "approximate", country: "TW", timezone: "Asia/Taipei" } }] });
+                let text = ""; const urls = [];
+                for (const b of j.content ?? []) {
+                  if (b.type === "text") { text += b.text ?? ""; for (const c of b.citations ?? []) if (c.url) urls.push(c.url); }
+                }
+                return { text, urls };
+              },
+              gemini: async (q) => {
+                const key = process.env.GEMINI_API_KEY || process.env.GOOGLE_AI_API_KEY;
+                if (!key) throw new Error("no key");
+                const j = await post("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent", { "x-goog-api-key": key },
+                  { contents: [{ parts: [{ text: q }] }], tools: [{ google_search: {} }] });
+                const c = j.candidates?.[0];
+                const text = (c?.content?.parts ?? []).map((p) => p.text ?? "").join("");
+                const urls = (c?.groundingMetadata?.groundingChunks ?? []).map((g) => g.web?.title || g.web?.uri).filter(Boolean);
+                return { text, urls };
+              },
+            };
+            for (const [id, area, q] of QUESTIONS) {
+              const rows = await Promise.all(Object.entries(ENGINES).map(async ([name, fn]) => {
+                const t0 = Date.now();
+                try {
+                  const r = await fn(q);
+                  const domains = Array.from(new Set((r.urls ?? []).map(host)));
+                  return { id, area, engine: name, ok: true, s: ((Date.now() - t0) / 1000).toFixed(1), chars: r.text.length, hits: count(r.text), domains, head: r.text.replace(/\s+/g, " ").slice(0, 160) };
+                } catch (e) { return { id, area, engine: name, ok: false, err: String(e?.message ?? e).slice(0, 160) }; }
+              }));
+              for (const row of rows) console.log("AEOJSON " + JSON.stringify(row));
+            }
+            console.log("aeo probe done");
+            JS
+            timeout 1000 node /tmp/_aeo_probe.mjs
+            echo "probe exit=$?"
+            rm -f /tmp/_aeo_probe.mjs
