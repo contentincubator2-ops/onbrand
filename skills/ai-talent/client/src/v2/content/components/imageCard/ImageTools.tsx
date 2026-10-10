@@ -59,7 +59,7 @@ export const STYLE_FROM_REFS = "__refs";
 
 /**
  * 風格參考圖（2026-10-10 CJ「大家的習慣，就是自己上傳幾張圖給 AI，請 AI 學那張圖」）：
- * 上傳 1–3 張喜歡的圖，AI 只學畫風（色調、光線、質感），畫面內容仍照文案與方向。
+ * 上傳 1–3 張喜歡的圖，AI 照它的畫法、配色與構圖來畫（CJ「就是要學得很像啊」），只把內容換成文案與方向。
  * 上傳走素材庫同一支（asset_photos），所以之後也能在素材庫找到。
  */
 export function StyleRefStrip({ lang, brandId, refs, setRefs, disabled }: {
@@ -119,8 +119,8 @@ export function StyleRefStrip({ lang, brandId, refs, setRefs, disabled }: {
       </div>
       <p className="text-[11px] text-default-400 leading-relaxed mt-1.5">
         {en
-          ? "AI learns the look only — colours, lighting, texture — and draws your own content. It will be similar, not identical. Use images you have the right to use."
-          : "AI 只學這幾張的色調、光線與畫風，畫面內容仍照你的文案；會像，但不會一模一樣。請用你有權使用的圖。"}
+          ? "AI follows these closely — medium, colours, layout — and swaps in your own content. Use images you have the right to use."
+          : "AI 會照這幾張的畫法、配色與構圖來畫，內容換成你的。請用你有權使用的圖。"}
       </p>
     </div>
   );

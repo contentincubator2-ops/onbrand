@@ -172,8 +172,13 @@ export function buildImageCardPrompt(args: {
       "paper cut-out, watercolour, 3D render or film photography, the output must be that too, not a default photograph), " +
       "the same colour palette, lighting, texture, level of detail, shapes and mood. This overrides any style words in the " +
       "scene and any brand imagery guidance below. " +
-      `Take ONLY the look: do NOT copy ${nRef === 1 ? "its" : "their"} subject, people, faces, products, logos, text or exact ` +
-      "composition — the content must be the scene described below." +
+      // 2026-10-10 CJ「就是要學得很像啊」：構圖、版面、人物畫法也跟著學，只把內容換成這次的場景。
+      (args.reference === "restyle" ? "" :
+        `Follow ${nRef === 1 ? "it" : "them"} CLOSELY, the way a designer makes the next piece of the same campaign: also match the ` +
+        "composition and layout (where the subject sits, how much empty space, framing, camera angle and distance), the way people, " +
+        "objects and backgrounds are drawn or photographed, and recurring graphic elements and shapes. ") +
+      "Only the subject matter changes: show the scene described below instead of what the references depict. " +
+      "Do not reproduce any logo, watermark, signature or written text from the references." +
       (args.withProduct
         ? " The product/subject from image 1 stays exactly as photographed (shape, colours, label); render everything around it — " +
           "background, props, surfaces, lighting and overall palette — in the look of the style references."
@@ -239,7 +244,7 @@ export function buildImageCardPrompt(args: {
     lines.push(
       "",
       "FINAL CHECK — style: placed next to the style reference" + (nRef === 1 ? "" : "s") + ", the result must clearly belong to the same series " +
-      "(same medium, palette and texture)" + (args.withProduct ? ", with the real product unchanged." : "."),
+      "(same medium, palette, texture and layout feel) — a viewer should assume the same person made both" + (args.withProduct ? ", with the real product unchanged." : "."),
     );
   }
   return lines.join("\n");
