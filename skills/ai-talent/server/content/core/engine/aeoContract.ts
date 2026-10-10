@@ -56,13 +56,19 @@ export interface AeoParsed {
   /** 模型判斷原稿沒有可以回答的事實。 */
   noConvert: boolean;
   reason: string;
+  /** 對到問題地圖上的第幾題（1 起算）；沒對到或沒給清單＝0。 */
+  matchIndex: number;
 }
 
 const NO_CONVERT = "【無法轉換】";
 
 /** 接在 system prompt 最後的格式合約。 */
-export function aeoContractBlock(target: AeoTarget, opts: { brandName?: string | null } = {}): string {
+export function aeoContractBlock(
+  target: AeoTarget,
+  opts: { brandName?: string | null; /** 問題地圖上還沒回答的題目（只有官網問答會用）。 */ candidates?: string[] } = {},
+): string {
   const brand = (opts.brandName ?? "").trim();
+  const candidates = (opts.candidates ?? []).filter(Boolean);
   const brandRule = brand
     ? `一定要出現品牌名「${brand}」，不要用「我們」「本品牌」「本產品」代稱——這一句會被單獨摘走，代稱就沒有人知道在講誰。`
     : "一定要寫出品牌或產品的名字，不要用「我們」「本產品」代稱。";
@@ -86,6 +92,14 @@ export function aeoContractBlock(target: AeoTarget, opts: { brandName?: string |
       "【問題】",
       `一個顧客真的會拿去問 AI 的問題。用顧客的話，不是品牌的話；${AEO_LIMITS.questionMax} 字以內；以問號結尾。`,
       "這個問題必須只靠原稿就答得完整。原稿沒寫的事（怎麼參加、多少錢、哪裡買）不要問。",
+      // 2026-10-10：問題地圖。對得上就用清單上的那一句，覆蓋率才算得準；對不上不要硬湊。
+      ...(candidates.length ? [
+        "下面是這個品牌還沒回答的顧客問題。原稿如果能完整回答其中一題，【問題】就一字不改照抄那一題；",
+        "只是沾到邊、要靠原稿沒有的事實才答得完整的，不算，自己另寫問題。",
+        ...candidates.map((q, i) => `${i + 1}. ${q}`),
+        "【對應】",
+        "用了清單上的哪一題就寫它的編號（只寫數字）；沒有用清單上的題目就寫 0。",
+      ] : []),
       "【直接答案】",
       `${AEO_LIMITS.answerMin}–${AEO_LIMITS.answerMax} 字，一到兩句，不看問題也讀得懂。${brandRule}`,
       "先講結論，不要鋪陳、不要反問、不要 emoji、不要 hashtag。",
@@ -129,15 +143,17 @@ function section(raw: string, name: string, others: string[]): string {
 export function parseAeoReply(target: AeoTarget, raw: string): AeoParsed {
   const text = String(raw ?? "").trim();
   const no = text.indexOf(NO_CONVERT);
-  const names = target === "web-qa" ? ["問題", "直接答案", "展開"] : ["標題", "說明欄"];
-  const got = names.map((n) => section(text, n, names.filter((x) => x !== n)));
-  if (no !== -1 && got.every((g) => !g)) {
-    return { fields: {}, noConvert: true, reason: text.slice(no + NO_CONVERT.length).replace(/^[\s:：，,]+/, "").trim() };
+  const names = target === "web-qa" ? ["問題", "對應", "直接答案", "展開"] : ["標題", "說明欄"];
+  const by = new Map(names.map((n) => [n, section(text, n, names.filter((x) => x !== n))] as const));
+  const content = names.filter((n) => n !== "對應").map((n) => by.get(n) ?? "");
+  if (no !== -1 && content.every((g) => !g)) {
+    return { fields: {}, noConvert: true, reason: text.slice(no + NO_CONVERT.length).replace(/^[\s:：，,]+/, "").trim(), matchIndex: 0 };
   }
   const fields: AeoFields = target === "web-qa"
-    ? { question: got[0], answer: got[1], body: got[2] }
-    : { title: got[0], description: got[1] };
-  return { fields, noConvert: false, reason: "" };
+    ? { question: content[0], answer: content[1], body: content[2] }
+    : { title: content[0], description: content[1] };
+  const m = /\d+/.exec(by.get("對應") ?? "");
+  return { fields, noConvert: false, reason: "", matchIndex: m ? Number(m[0]) : 0 };
 }
 
 /** Markdown 殘留：貼進官網後台會變成一堆星號與井字號。 */

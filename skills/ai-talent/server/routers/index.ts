@@ -34,6 +34,7 @@ import { campaignRouter } from "../content/routers/campaignRouter";
 import { vendorRouter } from "../content/routers/vendorRouter";
 import { strategyMonitorRouter } from "../strategy/routers/strategyMonitorRouter";
 import { brandRegulationRouter } from "../strategy/routers/brandRegulationRouter";
+import { aeoQuestionRouter } from "../strategy/routers/aeoQuestionRouter";
 import { eventCalendarRouter } from "../strategy/routers/eventCalendarRouter";
 import { touchpointsRouter } from "../platform/routers/touchpointsRouter";
 import { navPrefsRouter } from "../platform/routers/navPrefsRouter";
@@ -90,6 +91,8 @@ export const appRouter = router({
   strategyMonitor: strategyMonitorRouter,
   // 2026-09-30（CJ「策略層加一個 mission tray，是法規」）：用戶自己加的法規，寫文前審查。
   brandRegulation: brandRegulationRouter,
+  // 2026-10-10：策略層「AI 搜尋」tray——顧客問題地圖與覆蓋率。
+  aeoQuestion: aeoQuestionRouter,
   eventCalendar: eventCalendarRouter,
   touchpoints:   touchpointsRouter,
   navPrefs:      navPrefsRouter,

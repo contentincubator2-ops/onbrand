@@ -144,3 +144,25 @@ describe("合約與目錄", () => {
     for (const p of ["facebook", "instagram", "threads", "line", null]) expect(isAeoNativePlatform(p)).toBe(false);
   });
 });
+
+// 2026-10-10：問題地圖。轉換時對得上地圖上的題目就用那一題，覆蓋率才算得準。
+describe("對應問題地圖", () => {
+  it("給了清單，合約才會列題目與【對應】", () => {
+    expect(aeoContractBlock("web-qa", { brandName: "禾木香氛" })).not.toContain("【對應】");
+    const block = aeoContractBlock("web-qa", { brandName: "禾木香氛", candidates: ["擴香可以用多久？", "放臥室安全嗎？"] });
+    expect(block).toContain("1. 擴香可以用多久？");
+    expect(block).toContain("2. 放臥室安全嗎？");
+    expect(block).toContain("【對應】");
+    // YouTube 版沒有問題地圖
+    expect(aeoContractBlock("yt-description", { candidates: ["擴香可以用多久？"] })).not.toContain("【對應】");
+  });
+
+  it("解析出對到第幾題；沒寫或寫 0 就是沒對到，而且不混進問題或答案", () => {
+    const hit = parseAeoReply("web-qa", `【問題】\n擴香可以用多久？\n【對應】\n1\n【直接答案】\n${ANSWER}\n【展開】\n${BODY}`);
+    expect(hit.matchIndex).toBe(1);
+    expect(hit.fields.question).toBe("擴香可以用多久？");
+    expect(hit.fields.answer).toBe(ANSWER);
+    expect(parseAeoReply("web-qa", `【問題】\nQ？\n【對應】\n0\n【直接答案】\n${ANSWER}`).matchIndex).toBe(0);
+    expect(parseAeoReply("web-qa", `【問題】\nQ？\n【直接答案】\n${ANSWER}`).matchIndex).toBe(0);
+  });
+});

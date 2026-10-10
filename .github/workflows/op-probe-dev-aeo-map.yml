@@ -1,0 +1,111 @@
+name: Ops (DEV) — probe AI-search question map (read-only)
+
+# 策略層「AI 搜尋」的兩段模型行為在 DEV VM 上實跑一次，不經過瀏覽器、不需要登入、不寫資料庫：
+#   1. 請 AI 依品牌定位建議顧客問題（suggestPrompt → parseSuggestedQuestions）
+#   2. 轉換貼文時對應問題地圖：把建議出來的題目當清單，拿同品牌的真實貼文轉官網問答，看【對應】
+#      對得準不準；再拿別的品牌的貼文配同一份清單，預期對不上（0）。
+# 用「這個分支」的 aeoQuestions.ts 與 aeoContract.ts。brand_aeo_questions 表在 DEV 還不存在也沒關係——
+# 這支不碰那張表。
+# 花費：1 次建議＋每則貼文 1 次轉換，共約 4 次模型呼叫。
+on:
+  push:
+    paths:
+      - '.github/workflows/op-probe-dev-aeo-map.yml'
+
+jobs:
+  probe:
+    runs-on: ubuntu-24.04
+    environment: dev
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Pack this branch's files
+        run: |
+          echo "Q_B64=$(gzip -c skills/ai-talent/server/strategy/core/brand/aeoQuestions.ts | base64 -w0)" >> "$GITHUB_ENV"
+          echo "C_B64=$(gzip -c skills/ai-talent/server/content/core/engine/aeoContract.ts | base64 -w0)" >> "$GITHUB_ENV"
+      - name: Suggest questions, then match real posts
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          Q_B64: ${{ env.Q_B64 }}
+          C_B64: ${{ env.C_B64 }}
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 8m
+          envs: Q_B64,C_B64
+          script: |
+            set +e
+            cd /opt/onbrand/current/skills/ai-talent
+            set -a; source .env 2>/dev/null; set +a
+            echo "host=$(hostname)  app=$(readlink -f /opt/onbrand/current)  now=$(date -u +%FT%TZ)"
+            QD=server/strategy/core/brand
+            CD=server/content/core/engine
+            echo "$Q_B64" | base64 -d | gunzip > "$QD/_probeAeoQ.ts"
+            echo "$C_B64" | base64 -d | gunzip > "$CD/_probeAeo.ts"
+            cat > "$CD/_probe_tmp.ts" <<'TS'
+            import localPool from "../../../localDb";
+            import { buildBrandPrefix } from "../../../strategy/core/brand/brandContext";
+            import { callModel } from "../../../platform/core/llm/multiModelRouter";
+            import * as aeo from "./_probeAeo";
+            import * as q from "../../../strategy/core/brand/_probeAeoQ";
+
+            const BRAND = 2977;
+            const captionOf = (content: string): string => {
+              try { const j = JSON.parse(content); const f = Array.isArray(j) ? j[0] : null; return typeof f?.caption === "string" ? f.caption.trim() : ""; }
+              catch { return ""; }
+            };
+            const pickPost = async (where: string, params: any[]) => {
+              const [rows]: any = await localPool.execute(
+                `SELECT o.id, o.content, m.brandId FROM mission_outputs o JOIN missions m ON m.id = o.missionId
+                  WHERE m.workspace IN ('facebook','instagram') AND ${where} ORDER BY o.id DESC LIMIT 40`, params);
+              for (const r of rows as any[]) { const c = captionOf(String(r.content ?? "")); if (c.length >= 150) return { ...r, caption: c }; }
+              return null;
+            };
+
+            (async () => {
+              const [b]: any = await localPool.execute("SELECT name FROM brands WHERE id = ? LIMIT 1", [BRAND]);
+              const brandName = String(b[0]?.name ?? "");
+              const prefix = await buildBrandPrefix(BRAND, null, null, "full").catch(() => "");
+              console.log(`brand ${BRAND}「${brandName}」 brandCtx=${prefix.length} 字`);
+
+              // 1. 建議題目
+              let t0 = Date.now();
+              const r = await callModel([
+                { role: "system", content: `你是熟悉這個品牌與它的顧客的行銷研究員。\n${prefix}${q.suggestPrompt({ brandName, existing: [] })}` },
+                { role: "user", content: "請開始。" },
+              ], undefined, "anthropic");
+              const questions = q.parseSuggestedQuestions(r.content ?? "", []);
+              const withBrand = questions.filter((x) => x.toLowerCase().includes(brandName.toLowerCase())).length;
+              console.log(`\n--- 建議題目 (${((Date.now() - t0) / 1000).toFixed(1)}s)：${questions.length} 題，其中帶品牌名 ${withBrand} 題`);
+              questions.forEach((x, i) => console.log(`${i + 1}. ${x}`));
+              if (!questions.length) { console.log(`PARSE FAILED. raw:\n${(r.content ?? "").slice(0, 600)}`); process.exit(1); }
+
+              // 2. 對應
+              const own = await pickPost("m.brandId = ?", [BRAND]);
+              const other = await pickPost("m.brandId IS NOT NULL AND m.brandId <> ?", [BRAND]);
+              for (const [tag, post] of [["同品牌貼文（可能對得上）", own], ["別的品牌的貼文（預期對不上，0）", other]] as const) {
+                if (!post) { console.log(`\n--- ${tag}：找不到貼文`); continue; }
+                const [pb]: any = await localPool.execute("SELECT name FROM brands WHERE id = ? LIMIT 1", [post.brandId]);
+                const pName = String(pb[0]?.name ?? "");
+                const pPrefix = await buildBrandPrefix(post.brandId, null, null, "full").catch(() => "");
+                t0 = Date.now();
+                const rr = await callModel([
+                  { role: "system", content: `你是替品牌整理官方內容的編輯。手上有一篇已經寫好的社群貼文，要把同一件事改成 AI 搜尋引擎讀得到、可以單獨引用的版本。\n` + pPrefix + aeo.aeoContractBlock("web-qa", { brandName: pName, candidates: questions }) },
+                  { role: "user", content: `這是原稿：\n\n${post.caption}` },
+                ], undefined, "anthropic");
+                const parsed = aeo.parseAeoReply("web-qa", rr.content ?? "");
+                console.log(`\n--- ${tag}  output ${post.id} brand「${pName}」 (${((Date.now() - t0) / 1000).toFixed(1)}s)\n原稿開頭：${post.caption.slice(0, 120).replace(/\n/g, " ")}`);
+                if (parsed.noConvert) { console.log(`無法轉換：${parsed.reason}`); continue; }
+                const f = aeo.repairAeo("web-qa", parsed.fields);
+                const hit = questions[parsed.matchIndex - 1] ?? null;
+                console.log(`【對應】${parsed.matchIndex}${hit ? ` → 清單第 ${parsed.matchIndex} 題：${hit}` : "（沒有用清單上的題目）"}`);
+                console.log(`模型寫的問題：${f.question}\n直接答案：${f.answer}`);
+                console.log(`檢查：${aeo.validateAeo("web-qa", f, { brandName: pName, sources: [post.caption, pName] }).join(" | ") || "過關"}`);
+              }
+              process.exit(0);
+            })().catch((e) => { console.log("probe failed:", e?.message); process.exit(1); });
+            TS
+            timeout 420 ./node_modules/.bin/tsx "$CD/_probe_tmp.ts"
+            echo "probe exit=$?"
+            rm -f "$CD/_probe_tmp.ts" "$CD/_probeAeo.ts" "$QD/_probeAeoQ.ts"

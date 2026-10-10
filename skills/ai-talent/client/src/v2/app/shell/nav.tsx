@@ -108,6 +108,10 @@ export function buildNavItems(lang: "zh-TW" | "en", userEmail?: string | null, c
       // 七個平台各自的角色（對誰說、說什麼、不說什麼）；只有發在該平台的任務會讀。
       { to: "/brands/edit?cat=channels", catKey: "channels", label: en ? "Channels" : "通路", icon: <FontAwesomeIcon icon={ICON.message} />,
         tooltip: en ? "Each platform's role in the brand" : "每個平台在品牌裡的角色" },
+      // 2026-10-10（CJ「我需要有 AEO 專區嗎？」）：不是另一個寫內容的地方，是看進度的板——
+      // 顧客會拿去問 AI 的問題，哪幾題已經有回答、哪幾題已經貼上官網。
+      { to: "/brands/edit?cat=aisearch", catKey: "aisearch", label: en ? "AI search" : "AI 搜尋", short: en ? "AI search" : "AI 搜尋", icon: <FontAwesomeIcon icon={ICON.search} />,
+        tooltip: en ? "Questions customers ask AI, and which ones you've answered" : "顧客會問 AI 的問題，回答了哪幾題" },
       // 2026-09-29（CJ「在策略端增加一個 mission tray，是檢查大腦」）：品牌大腦記住了
       // 什麼、還能記多少——跟每篇產文讀的是同一份。
       // 2026-09-30（CJ「重新想這個 mission tray 的名字，目的在管理記憶」→「名稱就叫做『記憶』」）：

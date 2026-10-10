@@ -49,23 +49,30 @@ export default function AeoVersionModal({ brandId, productId, eventId, caption, 
   const [problems, setProblems] = React.useState<string[]>([]);
   const [noConvert, setNoConvert] = React.useState<string | null>(null);
   const [savedId, setSavedId] = React.useState<number | null>(null);
+  /** 這則問答對到問題地圖（策略層「AI 搜尋」）上的哪一題；沒對到＝null，存檔時會補一題。 */
+  const [matchedId, setMatchedId] = React.useState<number | null>(null);
 
   const onErr = (e: any) => showToastGlobal(friendlyError(e, en ? "That didn't go through. Please try again." : "剛剛沒成功，再試一次。"), "error");
   const gen = T.quickTask.aeoVersion.useMutation({
     onSuccess: (r: any) => {
       if (!r?.ok) { onErr(new Error(r?.error || "failed")); setTarget(null); return; }
       if (r.noConvert) { setNoConvert(r.reason || (en ? "This post has no fact a customer question could be answered with." : "這篇沒有可以拿來回答顧客問題的事實。")); return; }
-      setFields(r.fields); setProblems(r.problems ?? []);
+      setFields(r.fields); setProblems(r.problems ?? []); setMatchedId(r.matchedQuestionId ?? null);
     },
     onError: (e: any) => { onErr(e); setTarget(null); },
   });
   const save = T.quickTask.aeoSave.useMutation({
-    onSuccess: (r: any) => { setSavedId(r.outputId); showToastGlobal(en ? "Saved to Projects" : "已存到專案", "success"); },
+    onSuccess: (r: any) => {
+      setSavedId(r.outputId);
+      showToastGlobal(en ? "Saved to Projects" : "已存到專案", "success");
+      // 策略層「AI 搜尋」的覆蓋率跟著變。
+      try { utils.aeoQuestion.list.invalidate(); } catch { /* noop */ }
+    },
     onError: onErr,
   });
 
   const start = (t: AeoTarget) => {
-    setTarget(t); setFields(null); setProblems([]); setNoConvert(null); setSavedId(null);
+    setTarget(t); setFields(null); setProblems([]); setNoConvert(null); setSavedId(null); setMatchedId(null);
     gen.mutate({ brandId, target: t, caption, ...(productId ? { productId } : {}), ...(eventId ? { eventId } : {}) });
   };
   const back = () => { setTarget(null); setFields(null); setNoConvert(null); setSavedId(null); };
@@ -140,7 +147,9 @@ export default function AeoVersionModal({ brandId, productId, eventId, caption, 
             <section className="space-y-3">
               {target === "web-qa" ? (
                 <>
-                  {area("question", "問題", "Question", 1)}
+                  {area("question", "問題", "Question", 1,
+                    matchedId ? "這是你問題清單上的一題" : undefined,
+                    matchedId ? "This is one of the questions on your list" : undefined)}
                   {area("answer", "直接答案", "Direct answer", 3, "AI 會摘走的那一句：要有品牌名，單獨讀也懂", "The sentence AI lifts: names the brand, reads on its own")}
                   {area("body", "展開", "Details", 7)}
                 </>
@@ -170,7 +179,7 @@ export default function AeoVersionModal({ brandId, productId, eventId, caption, 
                   <button type="button" className={pill} style={{ borderColor: INK, color: INK }} onClick={() => onOpenOutput(savedId)}>{en ? "Saved. Open it" : "已存到專案，打開"}</button>
                 ) : (
                   <button type="button" className={`${pill} text-white`} style={{ borderColor: INK, background: INK }} disabled={save.isPending}
-                    onClick={() => save.mutate({ brandId, target, fields, ...(fromOutputId ? { fromOutputId } : {}) })}>
+                    onClick={() => save.mutate({ brandId, target, fields, ...(fromOutputId ? { fromOutputId } : {}), ...(matchedId ? { questionId: matchedId } : {}) })}>
                     {save.isPending ? (en ? "Saving…" : "儲存中…") : (en ? "Save to Projects" : "存到專案")}
                   </button>
                 )}
