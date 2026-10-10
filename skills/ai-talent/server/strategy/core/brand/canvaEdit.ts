@@ -23,8 +23,6 @@ import {
   uploadCanvaAsset, withCorrelationState, type CanvaDesignDetail,
 } from "../../../platform/core/connectors/canvaClient";
 import { fetchImageBuffer } from "../../../platform/core/media/imageFetch";
-import { updateOutputContent, type ContentSelector } from "../../../content/core/engine/outputContentEnvelope";
-import { applyVariantImageUpdate, USER_SUPPLIED_IMAGE_MODEL } from "../../../content/core/image/variantImageUpdate";
 import { MAX_UPLOAD_BYTES, storePhotoBytes, type AssetPhoto } from "./assetPhotos";
 
 export const CANVA_DESIGN_REFS_DDL = `
@@ -57,7 +55,19 @@ export const CANVA_EDIT_SESSIONS_DDL = `
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
 `;
 
-type Queryable = { execute: (sql: string, params?: any[]) => Promise<any> };
+export type Queryable = { execute: (sql: string, params?: any[]) => Promise<any> };
+
+/**
+ * 要寫回哪一篇的哪一格。形狀跟內容層的 ContentSelector 一樣，但這裡（策略層）只存、只轉交，不解讀——
+ * 真正把圖寫進貼文的是內容層（content/core/image/canvaOutputImage.ts），由組裝層（server/routers/index.ts）
+ * 註冊進來。策略層不能引用內容層（ARCHITECTURE.md：platform < strategy < content）。
+ */
+export interface CanvaEditLocator { variantIndex: number; contentKind?: "planning" | "public"; contentIndex?: number }
+export type CanvaOutputWriter = (
+  args: { ownerId: number; outputId: number; locator: CanvaEditLocator; imageUrl: string }, pool?: Queryable,
+) => Promise<boolean>;
+let outputWriter: CanvaOutputWriter | null = null;
+export function registerCanvaOutputWriter(fn: CanvaOutputWriter): void { outputWriter = fn; }
 
 export interface CanvaRef { designId: string; pageNo: number; actorId: number }
 
@@ -83,7 +93,7 @@ export async function findCanvaRef(brandId: number, photoUrl: string, pool: Quer
 
 export interface CanvaEditSession {
   skey: string; actorId: number; ownerId: number; brandId: number; designId: string; pageNo: number;
-  title: string; outputId: number | null; locator: ContentSelector | null; syncedUpdatedAt: number;
+  title: string; outputId: number | null; locator: CanvaEditLocator | null; syncedUpdatedAt: number;
 }
 
 export function newSessionKey(): string {
@@ -101,7 +111,7 @@ export async function loadSession(skey: string, pool: Queryable = localPool): Pr
     skey: String(r.skey), actorId: Number(r.actorId), ownerId: Number(r.ownerId), brandId: Number(r.brandId),
     designId: String(r.designId), pageNo: Number(r.pageNo) || 1, title: String(r.title ?? ""),
     outputId: r.outputId == null ? null : Number(r.outputId),
-    locator: locator && typeof locator === "object" ? locator as ContentSelector : null,
+    locator: locator && typeof locator === "object" ? locator as CanvaEditLocator : null,
     syncedUpdatedAt: Number(r.syncedUpdatedAt) || 0,
   };
 }
@@ -115,22 +125,6 @@ async function ownsOutput(ownerId: number, outputId: number, pool: Queryable): P
   return (rows as any[]).length > 0;
 }
 
-/** 把一張用戶自己的圖存成某一篇某一格的圖（前一張留版本可切回）。跟 output.updateVariantImage 同一段邏輯。 */
-export async function setOutputOwnImage(
-  args: { ownerId: number; outputId: number; locator: ContentSelector; imageUrl: string }, pool: Queryable = localPool,
-): Promise<boolean> {
-  const [rows]: any = await pool.execute(
-    `SELECT o.content FROM mission_outputs o JOIN missions m ON m.id = o.missionId WHERE o.id = ? AND m.userId = ? LIMIT 1`,
-    [args.outputId, args.ownerId],
-  );
-  const row = (rows as any[])[0];
-  if (!row) return false;
-  const input = { ...args.locator, imageUrl: args.imageUrl, modelId: USER_SUPPLIED_IMAGE_MODEL, requestedModelId: USER_SUPPLIED_IMAGE_MODEL };
-  const updated = updateOutputContent(row.content, args.locator, (item) => applyVariantImageUpdate(item, input as any));
-  await pool.execute(`UPDATE mission_outputs SET content = ?, updatedAt = NOW() WHERE id = ?`, [updated.content, args.outputId]);
-  return true;
-}
-
 export interface StartCanvaEditArgs {
   accessToken: string;
   actorId: number; ownerId: number; brandId: number;
@@ -138,7 +132,7 @@ export interface StartCanvaEditArgs {
   imageUrl?: string | null;
   /** 要寫回哪一篇的哪一格；從素材庫發起的不帶。 */
   outputId?: number | null;
-  locator?: ContentSelector | null;
+  locator?: CanvaEditLocator | null;
   /** 開新設計用的尺寸與標題。 */
   width?: number; height?: number; title?: string;
 }
@@ -152,6 +146,7 @@ interface Deps {
   fetchBytes?: (url: string) => Promise<Buffer>;
   store?: typeof storePhotoBytes;
   canWrite?: () => boolean;
+  setOutputImage?: CanvaOutputWriter;
 }
 
 const defaultFetchBytes = async (url: string) =>
@@ -262,7 +257,10 @@ export async function syncCanvaEdit(
 
     let outputUpdated = false;
     if (session.outputId != null && session.locator) {
-      outputUpdated = await setOutputOwnImage(
+      const setOutputImage = deps.setOutputImage ?? outputWriter;
+      // 沒註冊＝組裝點漏接；圖已經進素材庫，只是沒寫回貼文——留紀錄，不讓整次同步失敗。
+      if (!setOutputImage) console.error("[canva] output writer not registered — image saved to library only");
+      else outputUpdated = await setOutputImage(
         { ownerId: session.ownerId, outputId: session.outputId, locator: session.locator, imageUrl: stored.url }, pool,
       );
     }
