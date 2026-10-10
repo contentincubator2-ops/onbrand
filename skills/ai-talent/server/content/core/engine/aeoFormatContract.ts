@@ -45,6 +45,7 @@ export function aeoFormatOf(taskId: string | null | undefined): AeoFormatProfile
 export const AEO_SUMMARY_MARK = "【重點摘要】";
 export const AEO_FAQ_MARK = "【常見問答】";
 export const AEO_FACTS_MARK = "【重點事實】";
+export const AEO_QUESTIONS_MARK = "【這支影片回答的問題】";
 
 const HEAD = "\n\n【AI 搜尋格式合約 — 最高優先，與上方規則衝突時以這裡為準】\n" +
   "AI 搜尋引擎（ChatGPT、Perplexity、Google 的 AI 答案）回答問題時，會從頁面上摘一小段能單獨成立的文字。" +
@@ -78,7 +79,7 @@ export function buildAeoFormatRule(profile: AeoFormatProfile, brandName?: string
       lines.push(
         "- 【主標】要同時說出產品名與它是哪一類東西（品類詞），讓只看到這一行的人知道這是什麼。",
         `- 【副標】之後加一段 ${AEO_SUMMARY_MARK}：2 句、50–120 字，說清楚這是什麼、給誰用、最主要的差別，出現${named}與產品名。`,
-        "- 【價值段落】的三個小標，至少兩個寫成買的人會問的問句；小標下面第一句直接回答。",
+        "- 【價值段落】的三個小標，至少兩個直接寫成買的人會問的問句、以問號結尾（例：「需要自己整理報表嗎？」「多久可以拿到結果？」），不要寫成「功能＋好處」的陳述句。小標下面第一句直接回答。",
         `- 【行動呼籲】之前加 ${AEO_FAQ_MARK}：3 則，一行「Q：問句」、下一行「A：答案」，答案先講結論。只問正文答得出來的。`,
       );
       break;
@@ -92,8 +93,9 @@ export function buildAeoFormatRule(profile: AeoFormatProfile, brandName?: string
     case "yt-description":
       lines.push(
         `- 說明欄最前面兩行不是鉤子，是摘要：這支影片回答什麼問題、答案是什麼，出現${named}。收合時只看得到這兩行，AI 讀的也是這兩行。`,
-        "- 摘要之後加一小段「這支影片回答的問題」，列 3 個觀眾會搜尋的問句，一行一個。",
-        "- 上方規則要的其他內容（重點、連結位置、hashtag）接在後面，照舊。",
+        `- 摘要之後空一行，加一段 ${AEO_QUESTIONS_MARK}：下面列 3 個觀眾會拿去搜尋的問句，一行一個、每行以問號結尾。這一段不能省。`,
+        "- 上方規則要的其他內容（重點、章節、hashtag）接在後面，照舊。",
+        "- 不要編網址。輸入沒有提供的連結，寫【待補：連結】，不要自己湊一個看起來像的網址。",
       );
       break;
     case "yt-title":
@@ -200,7 +202,9 @@ export function validateAeoFormat(profile: AeoFormatProfile, caption: string, br
     case "yt-description": {
       const head = ls.slice(0, 2).join(" ");
       if (!has(head, brand)) return issue("head-no-brand", `說明欄最前面兩行沒有出現品牌名「${brand}」`);
-      if (ls.filter(isQuestion).length < 2) return issue("no-questions", "要列出這支影片回答的問題（至少 2 個問句，一行一個）");
+      if (ls.filter(isQuestion).length < 2) {
+        return issue("no-questions", `缺少 ${AEO_QUESTIONS_MARK} 這一段（下面列 3 個問句，一行一個、以問號結尾）`);
+      }
       return null;
     }
     case "yt-title":
