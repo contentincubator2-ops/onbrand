@@ -1,0 +1,55 @@
+name: Ops — probe AI search engines with the app's own module (read-only, no VM)
+
+# 策略層「AI 搜尋」每一題會拿去問五家（Google／ChatGPT／Gemini／Claude／Perplexity）。
+# 這支用**產品實際跑的那個模組**（server/strategy/core/brand/aeoEngines.ts）直接在 GitHub runner 上
+# 問兩題，確認五家的呼叫、金鑰輪替、解析、品牌辨識都是通的。不連 VM、不碰資料庫。
+# 金鑰從 secrets 帶進環境變數，模組只拿來當 header，這裡不印。
+# 第 3 次跑：改用產品的模組（前兩次是探測用的獨立腳本，已經據此把模組寫出來）。
+# 花費：2 題 × 5 家。
+on:
+  push:
+    paths:
+      - '.github/workflows/op-probe-ai-search-engines.yml'
+
+jobs:
+  probe:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Ask the five engines through aeoEngines.ts
+        env:
+          AEO_PERPLEXITY_KEYS: ${{ secrets.PERPLEXITY_API_KEY_1 }},${{ secrets.PERPLEXITY_API_KEY_2 }},${{ secrets.PERPLEXITY_API_KEY_3 }},${{ secrets.PERPLEXITY_API_KEY_4 }}
+          AEO_OPENAI_KEYS: ${{ secrets.OPEN_API_KEY }},${{ secrets.OPENAI_API_KEY }},${{ secrets.OPENAI_API_KEY_1 }},${{ secrets.OPENAI_API_KEY_2 }}
+          AEO_GEMINI_KEYS: ${{ secrets.GEMINI_API_KEY }},${{ secrets.GOOGLE_API_KEY_1 }},${{ secrets.GOOGLE_API_KEY_2 }},${{ secrets.GOOGLE_API_KEY_3 }}
+          AEO_CLAUDE_KEYS: ${{ secrets.CLAUDE_API_KEY_DEFAULT }},${{ secrets.CLAUDE_API_KEY_1 }},${{ secrets.CLAUDE_API_KEY_2 }},${{ secrets.CLAUDE_API_KEY_3 }},${{ secrets.CLAUDE_API_KEY_4 }},${{ secrets.CLAUDE_API_KEY_5 }},${{ secrets.CLAUDE_API_KEY_6 }},${{ secrets.CLAUDE_API_KEY_7 }}
+          AEO_SERP_KEYS: ${{ secrets.SERP_API_KEY }}
+        run: |
+          cat > /tmp/probe.mts <<'TS'
+          import { AEO_ENGINE_LABEL, askAllEngines, brandTermsOf, keysFor, AEO_ENGINES } from "/home/runner/work/onbrand/onbrand/skills/ai-talent/server/strategy/core/brand/aeoEngines.ts";
+
+          const terms = brandTermsOf("SoWork", "https://sowork.ai");
+          console.log(`品牌辨識字串：${terms.join("、")}`);
+          console.log(`各家金鑰把數：${AEO_ENGINES.map((e) => `${e}=${keysFor(e).length}`).join("  ")}`);
+          const QUESTIONS = ["有哪些 AI 行銷工具？", "小公司行銷團隊要怎麼自動整合 Meta、Google、Shopline 的廣告報表？"];
+          let ok = 0, total = 0;
+          for (const q of QUESTIONS) {
+            const t0 = Date.now();
+            const results = await askAllEngines(q, terms);
+            console.log(`\n################ ${q}（${((Date.now() - t0) / 1000).toFixed(0)}s）`);
+            for (const r of results) {
+              total += 1; if (r.status === "ok") ok += 1;
+              console.log(`\n--- ${AEO_ENGINE_LABEL[r.engine].zh}｜${r.status}${r.error ? `（${r.error}）` : ""}｜提到品牌：${r.mentioned ? "有" : "沒有"}`);
+              if (r.queries.length) console.log(`它查了：${r.queries.join(" ｜ ")}`);
+              if (r.related.length) console.log(`其他人也問：${r.related.join(" ｜ ")}`);
+              console.log(`它引用（${r.domains.length}）：${r.domains.slice(0, 10).join("、") || "（無）"}`);
+              console.log(`回答開頭：${r.excerpt.slice(0, 120)}`);
+            }
+          }
+          console.log(`\n==== 合計：${ok}/${total} 次有結果`);
+          process.exit(ok === total ? 0 : 1);
+          TS
+          npx --yes tsx@4 /tmp/probe.mts

@@ -11,7 +11,7 @@
  * 板上只有我們自己掌握的數字（幾題、幾題有回答、幾題上架），沒有「被 AI 引用幾次」——那個量不到。
  * 規則在 server strategy/core/brand/aeoQuestions.ts。
  */
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { trpc } from "../../../../lib/trpc";
 import { useLang } from "../../../../lib/i18n";
@@ -22,10 +22,17 @@ import { IllustratedEmpty } from "../../../platform/components/EmptyIllustration
 import { AddIcon, CheckIcon, CloseIcon, ExternalIcon, GenerateIcon } from "../../../platform/components/icons";
 
 type Status = "open" | "answered" | "published";
-interface Row {
-  id: number; question: string; source: "ai" | "user" | "post"; status: Status;
-  answerOutputId: number | null; publishedUrl: string | null;
+interface Scan {
+  engine: string; status: "ok" | "failed" | "unconfigured"; error: string | null; mentioned: boolean;
+  queries: string[]; related: string[]; domains: string[]; excerpt: string; scannedAt: string | null;
 }
+interface Row {
+  id: number; question: string; source: "ai" | "user" | "post" | "search"; status: Status;
+  answerOutputId: number | null; publishedUrl: string | null;
+  scanStatus: "idle" | "running" | "done" | "failed";
+  scans: Scan[]; mentions: { answered: number; mentioned: number };
+}
+interface EngineInfo { id: string; zh: string; en: string; configured: boolean }
 type Filter = "all" | Status;
 
 const btnGhost = "inline-flex items-center gap-1.5 rounded-full border border-neutral-300 bg-white px-3.5 py-1.5 text-[13px] font-medium text-neutral-800 transition hover:border-neutral-900 disabled:opacity-40";
@@ -53,8 +60,15 @@ export default function AeoBoardPanel({ brandId }: { brandId: number }) {
   /** 正在填上架網址的那一題。 */
   const [publishing, setPublishing] = useState<{ id: number; url: string } | null>(null);
 
-  const listQ = T.aeoQuestion.list.useQuery({ brandId }, { refetchOnWindowFocus: true });
+  /** 展開看各家 AI 結果的那一題。 */
+  const [openId, setOpenId] = useState<number | null>(null);
+  /** 有題目正在查的時候每幾秒重抓一次（五家要幾十秒）。 */
+  const [polling, setPolling] = useState(false);
+
+  const listQ = T.aeoQuestion.list.useQuery({ brandId }, { refetchOnWindowFocus: true, refetchInterval: polling ? 4000 : false });
   const refresh = () => { try { utils.aeoQuestion.list.invalidate({ brandId }); } catch { /* noop */ } };
+  const anyRunning = ((listQ.data?.questions ?? []) as Row[]).some((r) => r.scanStatus === "running");
+  useEffect(() => { setPolling(anyRunning); }, [anyRunning]);
   const onErr = (e: any) => showToastGlobal(friendlyError(e, en ? "That didn't go through. Please try again." : "剛剛沒成功，再試一次。"), "error");
 
   const suggest = T.aeoQuestion.suggest.useMutation({
@@ -66,6 +80,12 @@ export default function AeoBoardPanel({ brandId }: { brandId: number }) {
     onError: onErr,
   });
   const add = T.aeoQuestion.add.useMutation({ onSuccess: () => { setDraft(""); refresh(); }, onError: onErr });
+  const scan = T.aeoQuestion.scan.useMutation({ onSuccess: () => { setPolling(true); refresh(); }, onError: onErr });
+  const engines: EngineInfo[] = listQ.data?.engines ?? [];
+  const engineName = (id: string) => { const e = engines.find((x) => x.id === id); return e ? (en ? e.en : e.zh) : id; };
+  const quota = listQ.data?.scanQuota ?? { used: 0, perDay: 0 };
+  const noEngine = engines.length > 0 && !engines.some((e) => e.configured);
+  const existingKeys = useMemo(() => new Set(((listQ.data?.questions ?? []) as Row[]).map((r) => r.question.replace(/[\s?？]/g, "").toLowerCase())), [listQ.data]);
   const archive = T.aeoQuestion.archive.useMutation({ onSuccess: refresh, onError: onErr });
   const setPublished = T.aeoQuestion.setPublished.useMutation({
     onSuccess: () => { setPublishing(null); refresh(); },
@@ -164,6 +184,16 @@ export default function AeoBoardPanel({ brandId }: { brandId: number }) {
             })}
           </div>
 
+          {/* 2026-10-10（CJ「應該是會顯示出不同顧客問題中，不同 AI 的搜尋結果」）：每一題可以拿去問五家，
+              看它查了什麼、引用誰、有沒有提到品牌。每題打五家是有成本的，所以一天有上限。 */}
+          <p className="m-0 text-[12.5px] leading-relaxed text-neutral-500">
+            {noEngine
+              ? (en ? "Asking the AI engines isn't enabled in this environment yet." : "這個環境還沒有啟用「問各家 AI」。")
+              : (en
+                ? `Press "See what AI says" on any question to ask Google, ChatGPT, Gemini, Claude and Perplexity. ${quota.used} of ${quota.perDay} used today.`
+                : `每一題都可以按「看 AI 怎麼答」，拿去問 Google、ChatGPT、Gemini、Claude、Perplexity。今天已查 ${quota.used}／${quota.perDay} 題。`)}
+          </p>
+
           {shown.length === 0 ? (
             <p className="rounded-2xl border border-neutral-200 px-5 py-8 text-center text-[14px] text-neutral-500">{en ? "Nothing in this group." : "這一類目前沒有題目。"}</p>
           ) : (
@@ -177,6 +207,21 @@ export default function AeoBoardPanel({ brandId }: { brandId: number }) {
                       <p className="m-0 mt-1 text-[12.5px] text-neutral-500">
                         {statusLabel(r.status, en)}
                         {r.source === "post" && <span>{en ? " · added from a post" : "・從貼文補上的"}</span>}
+                        {r.source === "search" && <span>{en ? " · people also ask on Google" : "・Google 上其他人也問"}</span>}
+                        {r.source === "ai" && <span>{en ? " · suggested by AI" : "・AI 推測"}</span>}
+                        {/* 各家 AI 的結果：一句摘要，點了展開。 */}
+                        <span className="ml-2">
+                          {r.scanStatus === "running" ? (
+                            <span aria-live="polite">{en ? "Asking the AI engines…" : "正在問各家 AI…"}</span>
+                          ) : r.mentions.answered > 0 ? (
+                            <button type="button" className="underline underline-offset-2 hover:text-neutral-900" aria-expanded={openId === r.id}
+                              onClick={() => setOpenId(openId === r.id ? null : r.id)}>
+                              {en ? `${r.mentions.mentioned} of ${r.mentions.answered} AI engines mention you` : `${r.mentions.answered} 家 AI 裡有 ${r.mentions.mentioned} 家提到你`}
+                            </button>
+                          ) : r.scanStatus === "failed" ? (
+                            <span>{en ? "Couldn't reach the AI engines" : "這次沒問到任何一家"}</span>
+                          ) : null}
+                        </span>
                         {r.status === "published" && r.publishedUrl && (
                           <a href={r.publishedUrl} target="_blank" rel="noopener noreferrer" className="ml-2 inline-flex items-center gap-1 underline underline-offset-2 hover:text-neutral-900">
                             <ExternalIcon size={10} />{en ? "View page" : "看頁面"}
@@ -185,6 +230,13 @@ export default function AeoBoardPanel({ brandId }: { brandId: number }) {
                       </p>
                     </div>
                     <div className="flex shrink-0 items-center gap-3 pt-0.5">
+                      {!noEngine && r.scanStatus !== "running" && (
+                        <button type="button" className={linkBtn} disabled={scan.isPending}
+                          title={en ? "Ask Google, ChatGPT, Gemini, Claude and Perplexity this question" : "拿這一題去問 Google、ChatGPT、Gemini、Claude、Perplexity"}
+                          onClick={() => { setOpenId(r.id); scan.mutate({ id: r.id }); }}>
+                          {r.mentions.answered > 0 ? (en ? "Ask again" : "重新查") : (en ? "See what AI says" : "看 AI 怎麼答")}
+                        </button>
+                      )}
                       {r.answerOutputId != null && (
                         <button type="button" className={linkBtn} onClick={() => navigate(`/run/${r.answerOutputId}`)}>{en ? "Open answer" : "打開回答"}</button>
                       )}
@@ -202,6 +254,61 @@ export default function AeoBoardPanel({ brandId }: { brandId: number }) {
                         }}><CloseIcon size={12} /></button>
                     </div>
                   </div>
+                  {openId === r.id && r.scans.length > 0 && (
+                    <div className="ml-5 mt-3 overflow-hidden rounded-xl border border-neutral-200">
+                      {r.scans.map((s) => (
+                        <div key={s.engine} className="border-b border-neutral-100 px-4 py-3 last:border-b-0">
+                          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                            <span className="text-[13.5px] font-semibold text-neutral-900">{engineName(s.engine)}</span>
+                            {s.status === "ok" ? (
+                              <span className={`text-[12.5px] ${s.mentioned ? "font-semibold text-neutral-900" : "text-neutral-500"}`}>
+                                {s.mentioned ? (en ? "Mentions you" : "有提到你") : (en ? "Doesn't mention you" : "沒有提到你")}
+                              </span>
+                            ) : s.status === "unconfigured" ? (
+                              <span className="text-[12.5px] text-neutral-400">{en ? "Not enabled here" : "這個環境尚未啟用"}</span>
+                            ) : (
+                              <span className="text-[12.5px] text-neutral-500">{en ? "No result this time" : `這次沒查到${s.error ? `（${s.error}）` : ""}`}</span>
+                            )}
+                          </div>
+                          {s.status === "ok" && (
+                            <dl className="m-0 mt-1.5 space-y-1 text-[13px] leading-relaxed text-neutral-600">
+                              {s.queries.length > 0 && (
+                                <div className="flex gap-2"><dt className="shrink-0 text-neutral-400">{en ? "It searched" : "它查了"}</dt><dd className="m-0">{s.queries.join("｜")}</dd></div>
+                              )}
+                              {s.domains.length > 0 && (
+                                <div className="flex gap-2"><dt className="shrink-0 text-neutral-400">{en ? "It cited" : "它引用"}</dt>
+                                  <dd className="m-0">{s.domains.slice(0, 8).join("、")}{s.domains.length > 8 ? (en ? ` and ${s.domains.length - 8} more` : ` 等 ${s.domains.length} 個網站`) : ""}</dd></div>
+                              )}
+                              {s.queries.length === 0 && s.domains.length === 0 && (
+                                <div className="text-neutral-400">{en ? "Answered without citing any source." : "這次回答沒有引用任何來源。"}</div>
+                              )}
+                              {s.related.length > 0 && (
+                                <div className="flex gap-2"><dt className="shrink-0 text-neutral-400">{en ? "People also ask" : "其他人也問"}</dt>
+                                  <dd className="m-0 flex flex-wrap gap-1.5">
+                                    {s.related.map((q) => {
+                                      const has = existingKeys.has(q.replace(/[\s?？]/g, "").toLowerCase());
+                                      return (
+                                        <button key={q} type="button" disabled={has || add.isPending}
+                                          title={has ? (en ? "Already on your list" : "已經在清單上") : (en ? "Add to your list" : "加進清單")}
+                                          onClick={() => add.mutate({ brandId, question: q, fromSearch: true })}
+                                          className="inline-flex items-center gap-1 rounded-full border border-neutral-200 bg-white px-2.5 py-0.5 text-[12.5px] text-neutral-700 transition hover:border-neutral-900 disabled:opacity-50">
+                                          {!has && <AddIcon size={9} />}{q}
+                                        </button>
+                                      );
+                                    })}
+                                  </dd></div>
+                              )}
+                            </dl>
+                          )}
+                        </div>
+                      ))}
+                      <p className="m-0 bg-neutral-50 px-4 py-2 text-[12px] leading-relaxed text-neutral-500">
+                        {en
+                          ? `What each engine returned when asked this question${r.scans[0]?.scannedAt ? ` on ${new Date(r.scans[0].scannedAt).toLocaleDateString("en-US")}` : ""}. Answers vary between runs.`
+                          : `這是${r.scans[0]?.scannedAt ? ` ${new Date(r.scans[0].scannedAt).toLocaleDateString("zh-TW")} ` : ""}拿這一題去問時各家回的結果。每次問的結果會有些不同。`}
+                      </p>
+                    </div>
+                  )}
                   {publishing?.id === r.id && (
                     <div className="ml-5 mt-2.5 flex flex-wrap items-center gap-2">
                       <input autoFocus value={publishing.url} maxLength={500} onChange={(e) => setPublishing({ id: r.id, url: e.target.value })}

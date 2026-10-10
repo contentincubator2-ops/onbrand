@@ -1,0 +1,92 @@
+name: Ops (DEV) — write AI-search engine keys + probe the five engines
+
+# 策略層「AI 搜尋」每一題會拿去問五家（Google／ChatGPT／Gemini／Claude／Perplexity，
+# server/strategy/core/brand/aeoEngines.ts）。CJ 2026-10-11 同意把金鑰放到 DEV 主機。
+# 這支做兩件事：
+#   1. 把 repo secrets 裡各家的金鑰組成 AEO_*_KEYS（逗號分隔、可輪替）寫進 DEV VM 的 .env，重啟 onbrand-dev。
+#      金鑰只從 secret 來，不從 workflow input；全程不印出來，只印每一家有幾把。
+#   2. 用這個分支的 aeoEngines.ts 在 VM 上實際問一題，確認五家從 DEV 主機打得出去。
+# 只動 DEV（environment: dev）。先備份 .env；只改寫 AEO_ 開頭的五行，其他行不動。
+# 花費：一題 × 五家。
+# Path-scoped push，跟 ops-dev-apify-setup.yml 同一個做法。
+on:
+  push:
+    paths:
+      - '.github/workflows/ops-dev-aeo-keys.yml'
+
+jobs:
+  setup:
+    runs-on: ubuntu-24.04
+    environment: dev
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Pack this branch's aeoEngines.ts
+        run: echo "PATCH_B64=$(gzip -c skills/ai-talent/server/strategy/core/brand/aeoEngines.ts | base64 -w0)" >> "$GITHUB_ENV"
+      - name: Write keys to DEV .env, probe, restart
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          AEO_PERPLEXITY_KEYS: ${{ secrets.PERPLEXITY_API_KEY_1 }},${{ secrets.PERPLEXITY_API_KEY_2 }},${{ secrets.PERPLEXITY_API_KEY_3 }},${{ secrets.PERPLEXITY_API_KEY_4 }}
+          AEO_OPENAI_KEYS: ${{ secrets.OPEN_API_KEY }},${{ secrets.OPENAI_API_KEY }},${{ secrets.OPENAI_API_KEY_1 }},${{ secrets.OPENAI_API_KEY_2 }}
+          AEO_GEMINI_KEYS: ${{ secrets.GEMINI_API_KEY }},${{ secrets.GOOGLE_API_KEY_1 }},${{ secrets.GOOGLE_API_KEY_2 }},${{ secrets.GOOGLE_API_KEY_3 }}
+          AEO_CLAUDE_KEYS: ${{ secrets.CLAUDE_API_KEY_DEFAULT }},${{ secrets.CLAUDE_API_KEY_1 }},${{ secrets.CLAUDE_API_KEY_2 }},${{ secrets.CLAUDE_API_KEY_3 }},${{ secrets.CLAUDE_API_KEY_4 }},${{ secrets.CLAUDE_API_KEY_5 }},${{ secrets.CLAUDE_API_KEY_6 }},${{ secrets.CLAUDE_API_KEY_7 }}
+          AEO_SERP_KEYS: ${{ secrets.SERP_API_KEY }}
+          PATCH_B64: ${{ env.PATCH_B64 }}
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 8m
+          envs: AEO_PERPLEXITY_KEYS,AEO_OPENAI_KEYS,AEO_GEMINI_KEYS,AEO_CLAUDE_KEYS,AEO_SERP_KEYS,PATCH_B64
+          script: |
+            set +e
+            ENV=/opt/onbrand/shared/.env
+            echo "host=$(hostname)  app=$(readlink -f /opt/onbrand/current)  now=$(date -u +%FT%TZ)"
+            if [ ! -f "$ENV" ]; then echo "x .env not found at $ENV"; exit 1; fi
+            NAMES="AEO_PERPLEXITY_KEYS AEO_OPENAI_KEYS AEO_GEMINI_KEYS AEO_CLAUDE_KEYS AEO_SERP_KEYS"
+            # 只印每一家有幾把（逗號分隔、去掉空的），不印內容。
+            for n in $NAMES; do
+              v="${!n}"
+              c=$(printf '%s' "$v" | tr ',' '\n' | grep -c .)
+              echo "$n: $c key(s)"
+              if [ "$c" = "0" ]; then echo "x $n is empty — nothing written"; exit 1; fi
+            done
+
+            # 1) 寫進 .env：先備份，只換掉這五行（原地改寫，保留檔案權限）。
+            cp -p "$ENV" "${ENV}.bak.aeo"
+            grep -v -E '^AEO_(PERPLEXITY|OPENAI|GEMINI|CLAUDE|SERP)_KEYS=' "$ENV" > "${ENV}.tmp.aeo"
+            for n in $NAMES; do printf '%s=%s\n' "$n" "${!n}" >> "${ENV}.tmp.aeo"; done
+            cat "${ENV}.tmp.aeo" > "$ENV"
+            rm -f "${ENV}.tmp.aeo"
+            echo "env: $(grep -c -E '^AEO_(PERPLEXITY|OPENAI|GEMINI|CLAUDE|SERP)_KEYS=' "$ENV") AEO_*_KEYS line(s) written; total lines $(wc -l < "$ENV") (backup had $(wc -l < "${ENV}.bak.aeo"))"
+
+            # 2) 用這個分支的模組，從 DEV 主機實際問一題。
+            cd /opt/onbrand/current/skills/ai-talent
+            P=server/strategy/core/brand__probe
+            rm -rf "$P"; mkdir -p "$P"
+            echo "$PATCH_B64" | base64 -d | gunzip > "$P/aeoEngines.ts"
+            cat > "$P/_probe.ts" <<'TS'
+            import { AEO_ENGINES, AEO_ENGINE_LABEL, askAllEngines, brandTermsOf, keysFor } from "./aeoEngines";
+            (async () => {
+              console.log(`keys seen by the module: ${AEO_ENGINES.map((e) => `${e}=${keysFor(e).length}`).join("  ")}`);
+              const t0 = Date.now();
+              const results = await askAllEngines("有哪些 AI 行銷工具？", brandTermsOf("SoWork", "https://sowork.ai"));
+              console.log(`asked in ${((Date.now() - t0) / 1000).toFixed(0)}s`);
+              let ok = 0;
+              for (const r of results) {
+                if (r.status === "ok") ok += 1;
+                console.log(`[${AEO_ENGINE_LABEL[r.engine].zh}] ${r.status}${r.error ? `（${r.error}）` : ""}  queries=${r.queries.length}  related=${r.related.length}  domains=${r.domains.length}  mentioned=${r.mentioned}`);
+              }
+              console.log(`==== ${ok}/${results.length} engines answered from this host`);
+              process.exit(ok > 0 ? 0 : 1);
+            })().catch((e) => { console.log("probe failed:", e?.message); process.exit(1); });
+            TS
+            set -a; source "$ENV" 2>/dev/null; set +a
+            timeout 300 ./node_modules/.bin/tsx "$P/_probe.ts" 2>&1 | grep -v "^\[env\]"
+            echo "probe exit=${PIPESTATUS[0]}"
+            rm -rf "$P"
+
+            # 3) 重啟讓站台讀到新的環境變數。
+            pm2 restart onbrand-dev --update-env >/dev/null 2>&1
+            timeout 60 bash -c 'until curl --fail --silent http://127.0.0.1:3101/health >/dev/null; do sleep 3; done' \
+              && echo "restart: health OK" || echo "x restart: health check FAILED"
