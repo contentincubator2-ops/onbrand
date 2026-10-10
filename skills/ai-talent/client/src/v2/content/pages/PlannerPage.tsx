@@ -15,7 +15,7 @@ import React from "react";
 import { useNavigate, useOutletContext, useSearchParams } from "react-router-dom";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
-  faEnvelope, faBullhorn, faGlobe, faArrowUp, faChevronLeft, faChevronRight, faEllipsis,
+  faEnvelope, faBullhorn, faGlobe, faArrowUp, faChevronLeft, faChevronRight, faEllipsis, faTrashCan,
 } from "@fortawesome/free-solid-svg-icons";
 import {
   faFacebook, faInstagram, faLinkedin, faYoutube, faTiktok, faXTwitter, faThreads, faLine,
@@ -180,6 +180,12 @@ export default function PlannerPage() {
     onSuccess: () => { setOpen(null); refresh(); showToastGlobal(en ? "Published" : "已發布", "success"); }, onError: onPublishError,
   });
   const [moveAt, setMoveAt] = React.useState("");
+  // 2026-10-11 CJ：貼文可以拖到另一天；卡片上直接刪除。
+  const moveSlot = T.planner?.moveSlot?.useMutation?.({ onSuccess: () => refresh(), onError: onErr });
+  const moveCamp = T.planner?.moveCampaignItem?.useMutation?.({ onSuccess: () => refresh(), onError: onErr });
+  const dropFromPlanner = T.campaign?.setInPlanner?.useMutation?.({ onSuccess: () => { setOpen(null); refresh(); }, onError: onErr });
+  const [dragKey, setDragKey] = React.useState<string | null>(null);
+  const [overDate, setOverDate] = React.useState<string | null>(null);
 
   const messages: Array<{ id: number; role: string; content: string; choices: string[]; fork: ForkView | null }> = data?.messages ?? [];
   React.useEffect(() => { chatEnd.current?.scrollIntoView({ block: "end" }); }, [messages.length, pending]);
@@ -301,6 +307,39 @@ export default function PlannerPage() {
     return null;
   };
 
+  /** 能拖的：還沒發布的規劃格子、活動企劃那一篇、排好還沒發的排程。 */
+  const movable = (it: Item) =>
+    it.kind === "slot" || it.kind === "campaign" ||
+    (it.kind === "scheduled" && (it.cal.status === "pending" || isFailedScheduled(it.cal)));
+  const deletable = (it: Item) => it.kind === "slot" || it.kind === "campaign" || (it.kind === "scheduled" && it.cal.status === "pending");
+  const moveTo = (it: Item, date: string) => {
+    if (!brandId || it.date === date) return;
+    if (it.kind === "slot") moveSlot?.mutate?.({ brandId, id: it.slot.id, date });
+    else if (it.kind === "campaign") moveCamp?.mutate?.({ brandId, eventId: it.camp.eventId, itemId: it.camp.itemId, date });
+    else if (it.kind === "scheduled") {
+      // 只換日子、時間照原本（台北時間）。
+      const hhmm = new Date(it.cal.at).toLocaleTimeString("en-GB", { timeZone: "Asia/Taipei", hourCycle: "h23", hour: "2-digit", minute: "2-digit" });
+      reschedule?.mutate?.({ id: it.cal.id, scheduledAt: new Date(`${date}T${hhmm}:00+08:00`).toISOString() });
+    }
+  };
+  const deleteItem = (it: Item) => {
+    if (!brandId) return;
+    const written = (it.kind === "slot" && it.slot.status === "written") || (it.kind === "campaign" && !!it.camp.outputId) || it.kind === "scheduled";
+    if (written || it.kind === "campaign") {
+      const msg = it.kind === "scheduled" ? (en ? "Unschedule this post? The written post stays in your projects." : "取消這篇的排程？寫好的成品會留在專案裡。")
+        : it.kind === "campaign" ? (en ? "Remove this post from the weekly plan? The campaign plan itself stays." : "把這篇從本週企劃拿掉？活動企劃本身會保留。")
+        : (en ? "Delete this post from the plan? The written post stays in your projects." : "從本週企劃刪除這篇？寫好的成品會留在專案裡。");
+      if (!window.confirm(msg)) return;
+    }
+    if (it.kind === "slot") removeSlot?.mutate?.({ brandId, id: it.slot.id });
+    else if (it.kind === "campaign") dropFromPlanner?.mutate?.({ eventId: it.camp.eventId, itemId: it.camp.itemId, inPlanner: false });
+    else if (it.kind === "scheduled") cancelSched?.mutate?.({ id: it.cal.id });
+  };
+  const events: Array<{ eventId: number; name: string; startAt: string; endAt: string; total: number; written: number }> = data?.events ?? [];
+  const eventsOn = (date: string) => events.filter((e) => e.startAt <= date && date <= e.endAt);
+  const isMade = (it: Item) =>
+    (it.kind === "slot" && it.slot.status === "written") || (it.kind === "campaign" && !!it.camp.outputId) || it.kind === "scheduled" || it.kind === "published";
+
   if (!brandId) {
     return <div className="p-10 text-[14px] text-neutral-500">{en ? "Pick a brand first." : "先選一個品牌。"}</div>;
   }
@@ -418,25 +457,62 @@ export default function PlannerPage() {
             </p>
           )}
 
+          {events.length > 0 && (
+            <ul aria-label={en ? "Campaign periods this week" : "這週的活動檔期"} className="m-0 flex list-none flex-col gap-1.5 p-0">
+              {events.map((e) => {
+                // 檔期內、這週已經做好的貼文（活動企劃的、其他任務卡寫的、已排程／已發布的）。
+                const made = items.filter((it) => isMade(it) && it.date >= e.startAt && it.date <= e.endAt && (it.kind !== "campaign" || it.camp.eventId === e.eventId)).length;
+                return (
+                  <li key={e.eventId} className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 rounded-xl border bg-white px-3.5 py-2 text-[13px]" style={{ borderColor: LINE }}>
+                    <span className="font-semibold" style={{ color: INK }}>{en ? "Campaign" : "活動"}・{e.name}</span>
+                    <span className="tabular-nums" style={{ color: META }}>{md(e.startAt)} – {md(e.endAt)}</span>
+                    <span style={{ color: META }}>
+                      {en ? `${made} made this week` : `本週已做 ${made} 篇`}
+                      {e.total > 0 ? (en ? ` · plan ${e.written}/${e.total} written` : `・企劃 ${e.written}/${e.total} 篇已寫`) : ""}
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
             {days.map((d) => {
               const dayItems = items.filter((it) => it.date === d.date);
               const [wd, dt] = (d.label || "").split(" ");
               return (
-                <div key={d.date} className="flex flex-col gap-2.5">
+                <div key={d.date} className="flex flex-col gap-2.5 rounded-xl"
+                  style={overDate === d.date && dragKey ? { outline: `1.5px dashed ${INK}`, outlineOffset: 4 } : undefined}
+                  onDragOver={(e) => { if (!dragKey) return; e.preventDefault(); e.dataTransfer.dropEffect = "move"; if (overDate !== d.date) setOverDate(d.date); }}
+                  onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setOverDate((cur) => (cur === d.date ? null : cur)); }}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    const it = items.find((x) => x.key === dragKey);
+                    setDragKey(null); setOverDate(null);
+                    if (it && movable(it)) moveTo(it, d.date);
+                  }}>
                   <p className="m-0 flex items-baseline gap-1.5">
                     <span className="text-[13px] font-semibold" style={{ color: INK }}>{wd?.replace("週", "") || ""}</span>
                     <span className="text-[12px]" style={{ color: META }}>{dt || md(d.date)}</span>
+                    {eventsOn(d.date).length > 0 && (
+                      <span className="min-w-0 truncate rounded-full px-1.5 py-px text-[10.5px]" style={{ background: SOFT, color: "#525252" }}
+                        title={eventsOn(d.date).map((e) => e.name).join("、")}>
+                        {eventsOn(d.date)[0]!.name}{eventsOn(d.date).length > 1 ? ` +${eventsOn(d.date).length - 1}` : ""}
+                      </span>
+                    )}
                   </p>
                   {dayItems.map((it) => {
                     const isDraft = it.kind === "slot" && it.slot.status === "draft";
                     const isTouched = (it.kind === "slot" && touched.includes(it.slot.id)) || (hlOutput > 0 && outputOf(it) === hlOutput);
                     const border = isTouched ? `1.5px solid ${ORANGE}` : isDraft ? `1.5px dashed #D4D4D4` : `1px solid ${LINE}`;
                     return (
-                      <div key={it.key} className="relative">
+                      <div key={it.key} className="group relative" style={{ opacity: dragKey === it.key ? 0.4 : 1 }}
+                        draggable={movable(it)}
+                        onDragStart={(e) => { if (!movable(it)) return; setDragKey(it.key); e.dataTransfer.effectAllowed = "move"; try { e.dataTransfer.setData("text/plain", it.key); } catch { /* noop */ } }}
+                        onDragEnd={() => { setDragKey(null); setOverDate(null); }}>
                       <button type="button" onClick={() => (it.kind === "review" ? navigate("/review") : canWrite(it) ? startWriting(it) : setOpen(it))}
                         className="flex w-full flex-col gap-2.5 rounded-xl bg-white p-3.5 text-left transition hover:border-neutral-400" style={{ border }}>
-                        <span className={`flex w-full items-center justify-between ${canWrite(it) ? "pr-6" : ""}`}>
+                        <span className={`flex w-full items-center justify-between ${canWrite(it) && deletable(it) ? "pr-14" : canWrite(it) || deletable(it) ? "pr-6" : ""}`}>
                           <span className="flex h-6 w-6 items-center justify-center rounded-[7px] text-[12px]" style={{ background: SOFT, color: "#404040" }}>
                             <FontAwesomeIcon icon={PLATFORM_ICON[it.platform] ?? faGlobe} />
                           </span>
@@ -451,12 +527,21 @@ export default function PlannerPage() {
                             return <span className="rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ background: c.bg, color: c.fg }}>{tag.text}</span>;
                           })()}
                           {it.meta}
+                          {it.kind !== "campaign" && isMade(it) && eventsOn(it.date)[0] && (
+                            <span className="truncate">・{en ? "Campaign " : "活動 "}{eventsOn(it.date)[0]!.name}</span>
+                          )}
                         </span>
                       </button>
                       {canWrite(it) && (
                         <button type="button" aria-label={en ? "More" : "更多"} onClick={() => setOpen(it)}
-                          className="absolute right-2 top-2.5 flex h-7 w-7 items-center justify-center rounded-full text-[13px] text-neutral-500 transition hover:bg-neutral-100 hover:text-neutral-900">
+                          className={`absolute ${deletable(it) ? "right-9" : "right-2"} top-2.5 flex h-7 w-7 items-center justify-center rounded-full text-[13px] text-neutral-500 transition hover:bg-neutral-100 hover:text-neutral-900`}>
                           <FontAwesomeIcon icon={faEllipsis} />
+                        </button>
+                      )}
+                      {deletable(it) && (
+                        <button type="button" aria-label={en ? "Delete" : "刪除"} title={en ? "Delete" : "刪除"} onClick={() => deleteItem(it)}
+                          className="absolute right-2 top-2.5 flex h-7 w-7 items-center justify-center rounded-full text-[12px] text-neutral-500 transition hover:bg-neutral-100 hover:text-neutral-900">
+                          <FontAwesomeIcon icon={faTrashCan} />
                         </button>
                       )}
                       </div>
@@ -516,6 +601,16 @@ export default function PlannerPage() {
                       </button>
                     )}
                   </p>
+                )}
+                {movable(open) && (
+                  <label className="mt-2 flex items-center gap-2 text-[12px]" style={{ color: META }}>
+                    <span className="shrink-0">{en ? "Move to" : "移到"}</span>
+                    <select value={open.date} disabled={!!(moveSlot?.isPending || moveCamp?.isPending || reschedule?.isPending)} aria-label={en ? "Move to another day" : "移到另一天"}
+                      onChange={(e) => { const it = open; setOpen(null); moveTo(it, e.target.value); }}
+                      className="min-w-0 flex-1 rounded-lg border bg-white px-2 py-1.5 text-[12.5px]" style={{ borderColor: LINE, color: INK }}>
+                      {days.map((d) => <option key={d.date} value={d.date}>{d.label || md(d.date)}</option>)}
+                    </select>
+                  </label>
                 )}
                 <div className="mt-4 flex flex-wrap gap-2">
                   {outputOf(open) ? (

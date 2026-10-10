@@ -325,6 +325,31 @@ export async function loadWeekCampaignItems(brandId: number, weekStart: string):
   return out.sort((a, b) => a.date.localeCompare(b.date));
 }
 
+export interface WeekEvent {
+  eventId: number; name: string; startAt: string; endAt: string;
+  /** 企劃裡共幾篇（含未定稿的企劃）／已寫幾篇——檔期橫條上顯示進度。 */
+  total: number; written: number;
+}
+/**
+ * 這一週跟哪些活動檔期重疊（2026-10-11 CJ「顯示活動企劃中已經有的檔期」）。
+ * 檔期＝events.startAt～endAt；沒填的話退回企劃裡最早／最晚那一篇的日期。完全沒日期的活動不列。
+ */
+export async function loadWeekEvents(brandId: number, weekStart: string): Promise<WeekEvent[]> {
+  const [rows]: any = await localPool.execute(`SELECT id, name, startAt, endAt, positioning FROM events WHERE brandId = ?`, [brandId]);
+  const weekEnd = addDays(weekStart, 6);
+  const day = (d: any) => { if (!d) return null; const t = new Date(d); return Number.isNaN(t.getTime()) ? null : t.toISOString().slice(0, 10); };
+  const out: WeekEvent[] = [];
+  for (const e of rows as any[]) {
+    const items: any[] = (() => { const a = parse(e.positioning)?.campaignPlan?.items; return Array.isArray(a) ? a.filter((i) => i?.enabled !== false && !isHiddenHistoryItem({ platform: i?.platform, taskId: i?.taskId })) : []; })();
+    const dates = items.map((i) => String(i?.date ?? "")).filter(isYmd).sort();
+    const startAt = day(e.startAt) ?? dates[0] ?? null;
+    const endAt = day(e.endAt) ?? dates[dates.length - 1] ?? null;
+    if (!startAt || !endAt || endAt < weekStart || startAt > weekEnd) continue;
+    out.push({ eventId: Number(e.id), name: String(e.name ?? ""), startAt, endAt, total: items.length, written: items.filter((i) => i?.outputId).length });
+  }
+  return out.sort((a, b) => a.startAt.localeCompare(b.startAt));
+}
+
 /**
  * 側欄的「儀表」（2026-09-30 CJ 參考 Tesla：本週企劃像電量、平台圖示顯示待處理數）。
  * 只算已排定的：草稿格子（總監提案、還沒按排定）不算；已寫＝slot written 或活動格子有 outputId。
