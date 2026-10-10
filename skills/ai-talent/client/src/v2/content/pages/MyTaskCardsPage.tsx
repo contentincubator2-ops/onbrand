@@ -35,7 +35,7 @@ import { resolveTrayIds, toggleTrayId, taskPlatformOf, isDefaultTray, type TrayD
 import { buildMyCardRows, type MyCardRow, type OwnCardLite } from "../lib/myTaskCards";
 
 /** 這一頁列哪些通路、照什麼順序：內容層的七個發文通路。 */
-const CHANNEL_ROUTES = ["fb", "ig", "threads", "line", "tt", "email", "web", "yt", "pr"] as const;
+const CHANNEL_ROUTES = ["fb", "ig", "threads", "line", "tt", "email", "web", "pr"] as const;
 
 export default function MyTaskCardsPage() {
   const { lang } = useLang();

@@ -206,7 +206,8 @@ export const FRONT_CARD_KINDS: readonly FrontCardKind[] = ["viral", "own", "aeo"
  */
 export const AEO_CARD_IDS: ReadonlySet<string> = new Set([
   "web-30-product-faq", "web-30-longform", "web-30-product-desc",
-  "yt-30-title-strategies", "yt-30-description-seo", "yt-30-chapter-timeline", "yt-60-video-package",
+  // YouTube 四張（yt-30-title-strategies／description-seo／chapter-timeline、yt-60-video-package）
+  // 2026-10-10 稍晚拿掉：CJ「先隱藏 youtube，因為影音還沒有好的解決方案」。
   "pr-60-news-release-full", "pr-30-fact-sheet", "pr-30-boilerplate",
 ]);
 export function isAeoCard(task: unknown): boolean {
@@ -260,6 +261,6 @@ export function frontCardKindLabel(k: FrontCardKind, lang: string): string {
 /** 篩選 chip 與卡片 pill 的 hover 說明。只講我們做得到的：這類內容 AI 讀得到，不保證被引用。 */
 export function aeoWhy(lang: string): string {
   return lang === "en"
-    ? "Content that AI search engines can read: website pages, YouTube text and press releases. Being cited is not guaranteed."
-    : "AI 搜尋讀得到的內容：官網頁面、YouTube 文字與新聞稿。讀得到不等於一定被引用。";
+    ? "Content that AI search engines can read: website pages and press releases. Being cited is not guaranteed."
+    : "AI 搜尋讀得到的內容：官網頁面與新聞稿。讀得到不等於一定被引用。";
 }

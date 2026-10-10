@@ -29,10 +29,10 @@ export const AEO_FORMAT_BY_TASK: Readonly<Record<string, AeoFormatProfile>> = {
   "web-30-longform": "article",
   "web-30-product-desc": "product",
   "web-30-product-faq": "faq",
-  "yt-30-description-seo": "yt-description",
-  "yt-60-video-package": "yt-description",
-  "yt-30-title-strategies": "yt-title",
-  "yt-30-chapter-timeline": "yt-chapters",
+  // 2026-10-10 稍晚 CJ「先隱藏 youtube，因為影音還沒有好的解決方案」：YouTube 四張先拿掉。
+  // 三種 yt-* 格式的規則與驗證留著（DEV 實跑過），開回來時把這四行加回去：
+  //   "yt-30-description-seo": "yt-description", "yt-60-video-package": "yt-description",
+  //   "yt-30-title-strategies": "yt-title",      "yt-30-chapter-timeline": "yt-chapters",
   "pr-60-news-release-full": "press",
   "pr-30-fact-sheet": "factsheet",
   "pr-30-boilerplate": "boilerplate",

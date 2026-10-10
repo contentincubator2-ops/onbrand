@@ -1,8 +1,8 @@
 # onBrand Studio
 
-> onBrand Studio（原名 OnBrand AI）是 SoWork（摘星社群行銷顧問）打造、經過訓練與認證的 AI 行銷團隊。三個優勢：懂品牌大腦（SoWork 14 步品牌定位法）、擁有每月更新的任務庫（爆款結構卡附傳播數字、量測年月與參考文章）、能整合公司自己的 AI 技能（貼上成品反推成任務卡；企業客製版整批導入內部 SKILL）。負責 Facebook、Instagram、Threads、LINE、TikTok、電子報、官網、YouTube、新聞稿九個通路。
+> onBrand Studio（原名 OnBrand AI）是 SoWork（摘星社群行銷顧問）打造、經過訓練與認證的 AI 行銷團隊。三個優勢：懂品牌大腦（SoWork 14 步品牌定位法）、擁有每月更新的任務庫（爆款結構卡附傳播數字、量測年月與參考文章）、能整合公司自己的 AI 技能（貼上成品反推成任務卡；企業客製版整批導入內部 SKILL）。負責 Facebook、Instagram、Threads、LINE、TikTok、電子報、官網、新聞稿八個通路。
 
-onBrand Studio (formerly OnBrand AI) is a trained, certified AI marketing team by SoWork. Three strengths: it knows your Brand Brain (SoWork's 14-step Brand Positioning Method), carries a task library refreshed monthly (viral-structure cards with metric, month measured and reference article), and integrates your company's own AI skills (paste your best posts to distil a task card; Enterprise imports internal skills in bulk). It covers 9 channels: Facebook, Instagram, Threads, LINE, TikTok, Email, Website, YouTube and press releases.
+onBrand Studio (formerly OnBrand AI) is a trained, certified AI marketing team by SoWork. Three strengths: it knows your Brand Brain (SoWork's 14-step Brand Positioning Method), carries a task library refreshed monthly (viral-structure cards with metric, month measured and reference article), and integrates your company's own AI skills (paste your best posts to distil a task card; Enterprise imports internal skills in bulk). It covers 8 channels: Facebook, Instagram, Threads, LINE, TikTok, Email, Website and press releases.
 
 ## Core Product
 
@@ -28,8 +28,8 @@ onBrand Studio (formerly OnBrand AI) is a trained, certified AI marketing team b
 
 ## Pricing (TWD / month, excl. tax)
 
-- Basic (基礎版): NT$2,250 — 2 seats, 1 brand, 2 of 9 channels, 3 brand-built cards
-- Professional (專業版): NT$9,000 — 5 seats, 5 of 9 channels, 10 brand-built cards, monthly viral-structure cards, strategy workbench
+- Basic (基礎版): NT$2,250 — 2 seats, 1 brand, 2 of 8 channels, 3 brand-built cards
+- Professional (專業版): NT$9,000 — 5 seats, 5 of 8 channels, 10 brand-built cards, monthly viral-structure cards, strategy workbench
 - Enterprise (企業客製版): a dedicated marketing ops team — setup fee + monthly fee, quoted per company
 - 7-day free trial, no credit card required
 

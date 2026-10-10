@@ -30,8 +30,8 @@ describe("AI 搜尋卡名單", () => {
     expect(ids.filter((id) => !byId.has(id))).toEqual([]);
   });
 
-  it("只落在 AI 搜尋讀得到的三個通路，而且沒有一個是下架的", () => {
-    const AEO_PLATFORMS = new Set(["website", "youtube", "pr"]);
+  it("只落在 AI 搜尋讀得到的通路，而且沒有一個是下架的（YouTube 目前下架，所以不在名單上）", () => {
+    const AEO_PLATFORMS = new Set(["website", "pr"]);
     for (const id of ids) {
       const p = byId.get(id)!.platform;
       expect(AEO_PLATFORMS.has(p), `${id} → ${p}`).toBe(true);
@@ -39,8 +39,8 @@ describe("AI 搜尋卡名單", () => {
     }
   });
 
-  it("三個通路各自至少有一張，不會開出空頁", () => {
+  it("每個通路各自至少有一張，不會開出空頁", () => {
     const platforms = new Set(ids.map((id) => byId.get(id)!.platform));
-    expect([...platforms].sort()).toEqual(["pr", "website", "youtube"]);
+    expect([...platforms].sort()).toEqual(["pr", "website"]);
   });
 });

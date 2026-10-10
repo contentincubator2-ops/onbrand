@@ -52,7 +52,7 @@ const C = {
   white: "#FFFFFF",
 };
 
-/** 首頁「規格圖卡」那一段列的通路（有圖片規格的七個；YouTube、新聞稿沒有規格圖卡，不列）。 */
+/** 首頁「規格圖卡」那一段列的通路（有圖片規格的七個；新聞稿沒有規格圖卡，不列）。 */
 const CHANNELS: { id: string; icon: IconName; zh: string; en: string }[] = [
   { id: "facebook", icon: "facebook", zh: "Facebook", en: "Facebook" },
   { id: "instagram", icon: "instagram", zh: "Instagram", en: "Instagram" },
@@ -102,8 +102,8 @@ export default function LandingPage() {
     m.setAttribute(
       "content",
       en
-        ? "onBrand Studio is a trained, certified AI marketing team: it knows your Brand Brain, carries a task library refreshed monthly, and can take on your company's own AI skills. Copy and images for 9 channels, done by one team. 7-day free trial, no card."
-        : "onBrand Studio 是經過訓練與認證的 AI 行銷團隊：懂你的品牌大腦、擁有每月更新的任務庫，還能整合貴公司自己的 AI 技能。FB、IG、Threads、LINE、TikTok、電子報、官網、YouTube、新聞稿九個通路的文案與圖片，一支團隊完成。7 天免費試用，免綁卡。",
+        ? "onBrand Studio is a trained, certified AI marketing team: it knows your Brand Brain, carries a task library refreshed monthly, and can take on your company's own AI skills. Copy and images for 8 channels, done by one team. 7-day free trial, no card."
+        : "onBrand Studio 是經過訓練與認證的 AI 行銷團隊：懂你的品牌大腦、擁有每月更新的任務庫，還能整合貴公司自己的 AI 技能。FB、IG、Threads、LINE、TikTok、電子報、官網、新聞稿八個通路的文案與圖片，一支團隊完成。7 天免費試用，免綁卡。",
     );
     return () => {
       dead = true;
@@ -824,7 +824,7 @@ function FAQSection({ en }: { en: boolean }) {
         },
         {
           q: "Which channels are supported?",
-          a: `Facebook, Instagram, Threads, LINE, TikTok, Email, your website, YouTube and press releases — ${CATALOG.channels} channels, with image spec cards for the social platforms.`,
+          a: `Facebook, Instagram, Threads, LINE, TikTok, Email, your website and press releases — ${CATALOG.channels} channels, with image spec cards for the social platforms.`,
         },
         {
           q: "How long does it take to get started?",
@@ -854,7 +854,7 @@ function FAQSection({ en }: { en: boolean }) {
         },
         {
           q: "支援哪些平台？",
-          a: `Facebook、Instagram、Threads、LINE、TikTok、電子報、官網、YouTube、新聞稿，共 ${CATALOG.channels} 個通路，社群平台都有對應尺寸的規格圖卡。`,
+          a: `Facebook、Instagram、Threads、LINE、TikTok、電子報、官網、新聞稿，共 ${CATALOG.channels} 個通路，社群平台都有對應尺寸的規格圖卡。`,
         },
         {
           q: "我需要多久時間才能上手？",

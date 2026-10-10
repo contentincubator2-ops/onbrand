@@ -22,6 +22,8 @@ describe("哪些卡套 AI 搜尋格式", () => {
     for (const id of Object.keys(AEO_FORMAT_BY_TASK)) expect(resolveTaskTemplateSync(id), id).toBeTruthy();
     expect(aeoFormatOf("fb-30-single-post")).toBeNull();
     expect(aeoFormatOf("yt-30-comment-reply")).toBeNull();
+    // YouTube 目前下架，四張都不套（格式規則留著，見 AEO_FORMAT_BY_TASK 的註解）。
+    expect(aeoFormatOf("yt-30-description-seo")).toBeNull();
     expect(aeoFormatOf(null)).toBeNull();
   });
 });

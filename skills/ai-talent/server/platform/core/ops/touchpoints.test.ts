@@ -66,19 +66,19 @@ describe("touchpoints registry", () => {
   });
 
   // 2026-09-29（CJ）：內容通路只剩 FB／IG／TikTok／電子報／官網。
-  // 2026-10-10：YouTube、新聞稿開回來；LinkedIn、X 維持下架。
-  it("hides linkedin / x from coverage (registry keeps them)", async () => {
+  // 2026-10-10：新聞稿開回來；LinkedIn、YouTube、X 維持下架。
+  it("hides linkedin / youtube / x from coverage (registry keeps them)", async () => {
     executeMock.mockResolvedValueOnce([[{ industry: null, targetCountry: null }]]).mockResolvedValueOnce([[]]);
 
     const coverage = await getTouchpointCoverage(42);
     const ids = coverage.touchpoints.map((t) => t.id);
 
-    for (const hidden of ["linkedin", "x"]) {
+    for (const hidden of ["linkedin", "youtube", "x"]) {
       expect(ids).not.toContain(hidden);
       expect(TOUCHPOINTS.some((t) => t.id === hidden)).toBe(true);
     }
-    expect(ids).toEqual(["facebook", "instagram", "youtube", "tiktok", "email", "pr", "website", "brand-agent"]);
-    expect(coverage.totalCount).toBe(8);
+    expect(ids).toEqual(["facebook", "instagram", "tiktok", "email", "pr", "website", "brand-agent"]);
+    expect(coverage.totalCount).toBe(7);
   });
 
   it("falls back to defaults when the brand row is missing", async () => {
