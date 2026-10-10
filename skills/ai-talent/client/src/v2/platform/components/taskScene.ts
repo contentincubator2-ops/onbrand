@@ -83,7 +83,7 @@ export const SCENE_OPTIONS: Array<{ scene: TaskScene; zh: string; en: string }> 
   { scene: "calendar", zh: "月曆", en: "Calendar" },
   { scene: "photo", zh: "照片", en: "Photo" },
   { scene: "hashtag", zh: "標籤", en: "Hashtag" },
-  { scene: "web", zh: "AEO 文", en: "AEO articles" },
+  { scene: "web", zh: "AI 搜尋", en: "AI search" },
   { scene: "rewrite", zh: "改寫", en: "Rewrite" },
   { scene: "strategy", zh: "策略", en: "Strategy" },
 ];

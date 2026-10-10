@@ -23,11 +23,11 @@ const LABEL_ZH: Record<string, string> = {
   facebook: "Facebook", instagram: "Instagram",
   threads: "Threads", line: "LINE",
   tiktok: "TikTok", email: "電子報",
-  website: "AEO 文",
+  website: "AI 搜尋",
   // 2026-10-10：新聞稿開回來（YouTube 仍下架）。
   pr: "新聞稿",
 };
-const LABEL_EN: Record<string, string> = { ...LABEL_ZH, email: "Email", website: "AEO articles", pr: "Press" };
+const LABEL_EN: Record<string, string> = { ...LABEL_ZH, email: "Email", website: "AI search", pr: "Press" };
 const ALL = Object.keys(LABEL_ZH);
 
 export default function ChannelPicker({ brandId }: { brandId: number }) {

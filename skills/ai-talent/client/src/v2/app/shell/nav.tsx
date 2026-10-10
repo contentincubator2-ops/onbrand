@@ -205,9 +205,9 @@ export function navCatalog(lang: "zh-TW" | "en", allowedTaskRoutes?: Set<string>
       tooltip: en ? "TikTok hooks, scripts, hashtags, bio" : "TikTok 開場鉤子 / 腳本 / 主題標籤" },
     { id: "email", kind: "channel", to: "/tasks/email", label: en ? "Email" : "電子報", icon: <FontAwesomeIcon icon={faEnvelope} />, matchPrefix: "/tasks/email",
       tooltip: en ? "Email newsletters, welcome series, promo emails" : "電子報 / 歡迎信 / 促銷郵件序列" },
-    // 2026-10-10 CJ「官網兩個字，改成 AEO 文」：內容層這個入口的名字改了；路由與平台代號（web／website）不變。
+    // 2026-10-10 CJ「官網兩個字，改成 AEO 文」→ 同日定案叫「AI 搜尋」（跟策略層那一顆同名）：內容層這個入口的名字改了；路由與平台代號（web／website）不變。
     // 文案裡講「貼上官網」「官網網址」那種指網站本身的地方照舊叫官網。
-    { id: "web", kind: "channel", aeo: true, to: "/tasks/web", label: en ? "AEO articles" : "AEO 文", short: en ? "AEO" : "AEO 文", icon: <FontAwesomeIcon icon={faGlobe} />, matchPrefix: "/tasks/web",
+    { id: "web", kind: "channel", aeo: true, to: "/tasks/web", label: en ? "AI search" : "AI 搜尋", short: en ? "AI" : "AI 搜尋", icon: <FontAwesomeIcon icon={faGlobe} />, matchPrefix: "/tasks/web",
       tooltip: en ? "Articles for your website that AI search can read: Q&A, long-form, product pages" : "放在官網、AI 搜尋讀得到的文章：問答 / 長文 / 產品頁" },
     // 2026-10-10：新聞稿開回來——它跟官網是 AI 搜尋引擎實際讀得到的地方（FB／IG／Threads 幾乎不會被引用）。
     // YouTube 當天也開過，CJ 稍晚「我還是想先隱藏 youtube，因為影音還沒有好的解決方案」又收起來。
