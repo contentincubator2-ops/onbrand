@@ -103,7 +103,7 @@ jobs:
               gemini: async (q) => {
                 const key = process.env.GEMINI_API_KEY || process.env.GOOGLE_AI_API_KEY;
                 if (!key) throw new Error("no key");
-                const j = await post("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent", { "x-goog-api-key": key },
+                const j = await post("https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent", { "x-goog-api-key": key },
                   { contents: [{ parts: [{ text: q }] }], tools: [{ google_search: {} }] });
                 const c = j.candidates?.[0];
                 const text = (c?.content?.parts ?? []).map((p) => p.text ?? "").join("");
@@ -112,7 +112,8 @@ jobs:
               },
             };
             for (const [id, area, q] of QUESTIONS) {
-              const rows = await Promise.all(Object.entries(ENGINES).map(async ([name, fn]) => {
+              // 第 2 次跑：只補跑第一次失敗的 Gemini（換成 latest 別名）；其他引擎第一次已有結果，不重花。
+              const rows = await Promise.all(Object.entries(ENGINES).filter(([name]) => name === "gemini").map(async ([name, fn]) => {
                 const t0 = Date.now();
                 try {
                   const r = await fn(q);
