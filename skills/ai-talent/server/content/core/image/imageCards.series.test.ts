@@ -141,7 +141,9 @@ describe("畫面樣式與純色底（CJ「底圖的樣式要多點選擇」）",
     expect(one).toContain("The attached image is a STYLE REFERENCE");
     expect(one.indexOf("STYLE REFERENCE")).toBeLessThan(one.indexOf("CANVAS"));
     expect(one).toContain("FINAL CHECK — style");
-    expect(one).toContain("do NOT copy its subject");
+    expect(one).toContain("Follow it CLOSELY");
+    expect(one).toContain("composition and layout");
+    expect(one).toContain("Do not reproduce any logo, watermark");
     expect(one).not.toContain("ART STYLE (applies");
     // 有產品照時要講清楚哪一張是主體、哪幾張是風格參考。
     const withPhoto = buildImageCardPrompt({ ...base, withProduct: true, styleRefCount: 2 });
@@ -152,6 +154,8 @@ describe("畫面樣式與純色底（CJ「底圖的樣式要多點選擇」）",
     const restyle = buildImageCardPrompt({ ...base, reference: "restyle", styleRefCount: 1 });
     expect(restyle).toContain("Image 1 is the current visual. Image 2 is a STYLE REFERENCE");
     expect(restyle).toContain("change only how it is rendered");
+    // 重畫現有的圖：構圖是這張圖自己的，不跟參考圖走。
+    expect(restyle).not.toContain("CLOSELY");
   });
   it("帶產品照時樣式要提醒主體保真", () => {
     const p = buildImageCardPrompt({ spec, scenePromptEn: "s", brand: {} as any, withProduct: true, styleId: "illustration" });
