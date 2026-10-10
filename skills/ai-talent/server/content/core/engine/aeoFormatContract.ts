@@ -81,6 +81,7 @@ export function buildAeoFormatRule(profile: AeoFormatProfile, brandName?: string
         `- 【副標】之後加一段 ${AEO_SUMMARY_MARK}：2 句、50–120 字，說清楚這是什麼、給誰用、最主要的差別，出現${named}與產品名。`,
         "- 【價值段落】的三個小標，至少兩個直接寫成買的人會問的問句、以問號結尾（例：「需要自己整理報表嗎？」「多久可以拿到結果？」），不要寫成「功能＋好處」的陳述句。小標下面第一句直接回答。",
         `- 【行動呼籲】之前加 ${AEO_FAQ_MARK}：3 則，一行「Q：問句」、下一行「A：答案」，答案先講結論。只問正文答得出來的。`,
+        `- 完整順序共七段，一段都不能少：主標 → 副標 → ${AEO_SUMMARY_MARK} → 價值段落 → 規格重點 → ${AEO_FAQ_MARK} → 行動呼籲。`,
       );
       break;
     case "faq":
@@ -133,6 +134,14 @@ export function buildAeoFormatRule(profile: AeoFormatProfile, brandName?: string
   return HEAD + lines.join("\n") + "\n" + TAIL(brand);
 }
 
+/**
+ * 模型有時把換行寫成字面的「反斜線 n」（JSON 逸出沒還原）。10/10 DEV 實測：問句清單整段擠成一行，
+ * 用戶看到的是「…的問題】：\n1. …\n2. …」。驗證與出貨都先還原成真的換行。
+ */
+export function normalizeAeoCaption(caption: string): string {
+  return String(caption ?? "").replace(/\\r\\n|\\n/g, "\n");
+}
+
 export interface AeoFormatIssue { reason: string; detail: string }
 
 const issue = (reason: string, detail: string): AeoFormatIssue => ({ reason, detail });
@@ -167,7 +176,7 @@ const PRONOUN_OPENERS = /^(我們|它|本產品|本品牌|這款|這個產品|�
  * 寫得好不好不在這裡判斷。
  */
 export function validateAeoFormat(profile: AeoFormatProfile, caption: string, brandName?: string | null): AeoFormatIssue | null {
-  const text = String(caption ?? "");
+  const text = normalizeAeoCaption(caption);
   const brand = (brandName ?? "").trim();
   const ls = linesOf(text);
   if (!ls.length) return null; // 空的交給別的閘門
@@ -208,7 +217,8 @@ export function validateAeoFormat(profile: AeoFormatProfile, caption: string, br
       return null;
     }
     case "yt-title":
-      return ls.some(isQuestion) ? null : issue("no-question-title", "至少一個標題要寫成完整問句（以問號結尾）");
+      // 這張卡每個標題後面接一句策略說明，問號不會在行尾——有問號就算。
+      return /[？?]/.test(text) ? null : issue("no-question-title", "至少一個標題要寫成完整問句（帶問號）");
     case "yt-chapters": {
       const searchable = ls.filter((l) => isQuestion(l) || /怎麼|為什麼|如何|怎樣|哪/.test(l)).length;
       return searchable >= 2 ? null : issue("generic-chapters", "章節標題至少兩個要寫成問句，或用「怎麼／為什麼／如何」的說法");

@@ -7,7 +7,7 @@ import { isAdCopyTemplate, buildAdCopyRule, validateAdCopy, repairAdCopy } from 
 import { adSlotOf, buildAdSlotRule, validateAdSlot, repairAdSlot } from "../adSlotContract";
 import { isWuganVoiceTemplate, validateWuganVoice, buildWuganVoiceReminder, repairWuganVoice } from "../wuganVoiceContract";
 import { isShotListTemplate, buildShotListRule, normalizeShotList, validateShotList, repairShotList } from "../shotListContract";
-import { aeoFormatOf, buildAeoFormatRule, validateAeoFormat, aeoFormatRetryReminder } from "../aeoFormatContract";
+import { aeoFormatOf, buildAeoFormatRule, validateAeoFormat, aeoFormatRetryReminder, normalizeAeoCaption } from "../aeoFormatContract";
 import { isListingTemplate, buildListingRule, normalizeListing, validateListing, repairListing, listingRetryReminder } from "../listingContract";
 import { pickOwnAngleBlock, angleWritingBlock, sanitizeAngleLabel, checkAngle, dedupeAngleLabels, angleVisualLens } from "../variantAngles";
 import { isEmailBodyTask, EDM_CRAFT_RUBRIC, edmPlaybookFor } from "../../catalog/edmCraft";
@@ -666,7 +666,7 @@ export async function callOneVariant(args: {
           // dev 2026-08: strip draft-leak lines / internal snake_case keys
           // from the shipped caption. Only on this path — the contract
           // branches above return formats whose markers this would eat.
-          return { label: effectiveLabel, caption: sanitizeCaption(caption), hashtags: out.hashtags };
+          return { label: effectiveLabel, caption: sanitizeCaption(aeoFormat ? normalizeAeoCaption(caption) : caption), hashtags: out.hashtags };
         }
         lastErr = new Error(`non-deliverable caption for ${label} (${sanity.reason}) — raw[0:200]: ${lastRaw.slice(0, 200)}`);
         console.warn(`[callOneVariant] attempt ${attempt} rejected for ${label} (${sanity.reason}): ${lastRaw.slice(0, 300)}`);

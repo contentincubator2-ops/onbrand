@@ -3,7 +3,7 @@ import { join, resolve } from "path";
 import { describe, expect, it } from "vitest";
 import {
   AEO_FAQ_MARK, AEO_FACTS_MARK, AEO_FORMAT_BY_TASK, AEO_SUMMARY_MARK,
-  aeoFormatOf, buildAeoFormatRule, validateAeoFormat,
+  aeoFormatOf, buildAeoFormatRule, normalizeAeoCaption, validateAeoFormat,
 } from "./aeoFormatContract";
 import { resolveTaskTemplateSync } from "../catalog/taskRegistry";
 
@@ -119,6 +119,14 @@ describe("validateAeoFormat — 其他格式", () => {
     expect(validateAeoFormat("yt-description", ok, BRAND)).toBeNull();
     expect(validateAeoFormat("yt-description", ok.replace(BRAND, "這個牌子"), BRAND)?.reason).toBe("head-no-brand");
     expect(validateAeoFormat("yt-description", `${BRAND}的擴香開箱。\n重點一次看。\n・好聞\n・耐用`, BRAND)?.reason).toBe("no-questions");
+  });
+
+  // 2026-10-10 DEV 實測的兩個誤判：標題後面接了策略說明（問號不在行尾）、換行被寫成字面的反斜線 n。
+  it("標題後面接說明也認得出問句；字面的反斜線 n 先還原再驗", () => {
+    expect(validateAeoFormat("yt-title", `1. ${BRAND}的擴香可以用多久？這個標題兼顧關鍵字。\n2. 我以為都一樣，結果差很多。用反差吸引注意。`, BRAND)).toBeNull();
+    const escaped = `這支影片說明${BRAND}的擴香怎麼放。\\n結論：通風但不直吹。\\n【這支影片回答的問題】\\n擴香要放哪裡？\\n多久翻一次藤枝？`;
+    expect(validateAeoFormat("yt-description", escaped, BRAND)).toBeNull();
+    expect(normalizeAeoCaption(escaped).split("\n")).toHaveLength(5);
   });
 
   it("YouTube 標題與章節", () => {

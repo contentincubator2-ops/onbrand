@@ -5,6 +5,7 @@ name: Ops (DEV) — probe AI-search format on the 10 cards, before vs after (rea
 #   新＝這個分支的 stageCalls＋aeoFormatContract（合約接在最後＋驗證重試）
 # 同一個品牌（2977 SoWork）、同一份輸入、各只寫 1 個版本。只跑寫文案那一段（callCaptionWriter），
 # 不產圖、不寫資料庫、不存成產出。
+# 第 3 次跑：標題問號不必在行尾、字面的反斜線 n 先還原、產品頁明列七段順序。
 # 第 2 次跑：產品頁小標給了問句範例、YT 說明欄的問句清單改成有標記的一段、不准編網址。
 # 花費：10 張卡 × 2 次，加上新版不合格時的重試，約 20–30 次模型呼叫。
 on:
