@@ -36,6 +36,7 @@ import {
 } from "../core/perfStore";
 import { pivot, resolveTag, judgeValue, BUILTIN_DIMS, METRIC_LABELS, JUDGE_LABELS, SOURCE_LABELS, UNTAGGED, type LensConfig } from "../core/perfPivot";
 import { deriveDimensions, proposeLens, autoTag } from "../core/perfAI";
+import { planQuestion, applyFilters, buildAnswer, buildExplain, periodRange, type AskPlan } from "../core/perfAsk";
 import { parseTable, guessSource, guessMapping, buildFacts, IMPORT_SOURCES, ROWCOUNT } from "../core/perfImport";
 import { ensureFreshZernioAnalytics, syncBrandZernioAnalytics, ZernioAnalyticsSyncError, zernioAnalyticsEnabled, isAnalyticsPlatform, SOURCE_BY_PLATFORM } from "../core/zernioAnalyticsSync";
 import { listConnectedByBrand } from "../../platform/core/connectors/publish/connectionStore";
@@ -256,7 +257,61 @@ export const performanceRouter = router({
       const lens = await findLens(input.brandId, input.lensId);
       const [dims, rules] = await Promise.all([listDimensions(input.brandId), listRules(input.brandId)]);
       const facts = await loadFacts(input.brandId, input.from, input.to, lens.config.sources);
-      return { lens, result: pivot(facts, lens.config, dims, rules) };
+      const result = pivot(facts, lens.config, dims, rules);
+      // 「怎麼算」：用了哪些資料、資料到哪天、排除了幾筆，讓每個數字都有出處。
+      const explain = buildExplain({ facts, from: input.from, to: input.to, config: lens.config, filters: [], result });
+      return { lens, result, explain };
+    }),
+
+  /**
+   * 2026-10-11 用一句話問過去的成效。模型只把問題翻成視角設定，數字全由 pivot 算；
+   * 回傳 plan（可存成視角）＋ answer（排名）＋ explain（怎麼算）。
+   * previous：用戶接著調整（「只看 Meta」「改成每月」）時帶上一個 plan。
+   */
+  ask: protectedProcedure
+    .input(z.object({
+      brandId: z.number().int().positive(), tray: trayInput,
+      question: z.string().trim().min(2).max(300),
+      defaultDays: z.number().int().min(1).max(730).default(90),
+      previous: z.object({
+        title: z.string().max(40),
+        config: lensConfigInput,
+        filters: z.array(z.object({ dimKey: z.string().max(40), code: z.string().max(40) })).max(3),
+        period: z.union([
+          z.object({ kind: z.literal("days"), days: z.number().int().min(1).max(730) }),
+          z.object({ kind: z.literal("month"), month: z.string().regex(/^\d{4}-\d{2}$/) }),
+        ]),
+      }).optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertBrandAccess(ctx.user!.id, input.brandId);
+      const [dims, rules] = await Promise.all([listDimensions(input.brandId), listRules(input.brandId)]);
+      const traySources = TRAY_SOURCES[input.tray] ?? [];
+      const today = new Date();
+      const planned = await planQuestion({
+        question: input.question, dims, traySources, today, fallbackDays: input.defaultDays,
+        previous: (input.previous as AskPlan | undefined) ?? null,
+      }).catch(() => ({ ok: false as const, reason: "" }));
+      if (!planned.ok) return { ok: false as const, reason: planned.reason };
+
+      const { plan } = planned;
+      const range = periodRange(plan.period, today);
+      const loaded = await loadFacts(input.brandId, range.from, range.to, plan.config.sources);
+      const facts = applyFilters(loaded, plan.filters, rules);
+      const result = pivot(facts, plan.config, dims, rules);
+      return {
+        ok: true as const,
+        plan, range,
+        result,
+        answer: buildAnswer(result, plan.config.judge),
+        explain: buildExplain({ facts, from: range.from, to: range.to, config: plan.config, filters: plan.filters, result }),
+        // 篩選條件的人話名稱，給前端顯示「只看：家庭」。
+        filterLabels: plan.filters.map((f) => ({
+          dimKey: f.dimKey,
+          dimLabel: dims.find((d) => d.key === f.dimKey)?.label ?? BUILTIN_DIMS[f.dimKey]?.label ?? f.dimKey,
+          valueLabel: dims.find((d) => d.key === f.dimKey)?.values.find((v) => v.code === f.code)?.label ?? f.code,
+        })),
+      };
     }),
 
   /** 點格子：這個組合底下的事實（貼文／廣告／流量），照判讀指標排序。 */
