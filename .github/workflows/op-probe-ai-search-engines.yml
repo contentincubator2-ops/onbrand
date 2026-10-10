@@ -8,7 +8,9 @@ name: Ops — probe what AI search engines look up and cite (read-only, no VM)
 # 五個來源並排：Perplexity、OpenAI（網路搜尋）、Gemini（Google 搜尋接地）、Claude（網路搜尋）、
 # SerpApi（Google 的「其他人也問了」與 AI 摘要）。
 # 直接在 GitHub runner 上跑，不連 VM、不碰資料庫。金鑰只當 header 用，不印出來。
-# 花費：3 個起始問題 × 5 個來源 = 15 次呼叫。
+# 第 2 次跑：同一家有好幾把金鑰，第一把沒額度就換下一把；Gemini 換新模型；OpenAI 強制上網查；
+# Google 的 AI 摘要補第二次請求；加兩個短的關鍵字型問題（長句很少有「其他人也問了」）。
+# 花費：5 個起始問題 × 5 個來源，加上換金鑰的重試。
 on:
   push:
     paths:
@@ -17,27 +19,30 @@ on:
 jobs:
   probe:
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 12
     steps:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
       - name: Ask each engine the same seed questions
         env:
-          PERPLEXITY_KEY: ${{ secrets.PERPLEXITY_API_KEY_1 }}
-          OPENAI_KEY: ${{ secrets.OPEN_API_KEY }}
-          GEMINI_KEY: ${{ secrets.GEMINI_API_KEY }}
-          CLAUDE_KEY: ${{ secrets.CLAUDE_API_KEY_DEFAULT }}
+          PERPLEXITY_KEYS: ${{ secrets.PERPLEXITY_API_KEY_1 }},${{ secrets.PERPLEXITY_API_KEY_2 }},${{ secrets.PERPLEXITY_API_KEY_3 }},${{ secrets.PERPLEXITY_API_KEY_4 }}
+          OPENAI_KEYS: ${{ secrets.OPEN_API_KEY }},${{ secrets.OPENAI_API_KEY }},${{ secrets.OPENAI_API_KEY_1 }},${{ secrets.OPENAI_API_KEY_2 }}
+          GEMINI_KEYS: ${{ secrets.GEMINI_API_KEY }},${{ secrets.GOOGLE_API_KEY_1 }},${{ secrets.GOOGLE_API_KEY_2 }},${{ secrets.GOOGLE_API_KEY_3 }}
+          CLAUDE_KEYS: ${{ secrets.CLAUDE_API_KEY_DEFAULT }},${{ secrets.CLAUDE_API_KEY_1 }},${{ secrets.CLAUDE_API_KEY_2 }},${{ secrets.CLAUDE_API_KEY_3 }},${{ secrets.CLAUDE_API_KEY_4 }},${{ secrets.CLAUDE_API_KEY_5 }},${{ secrets.CLAUDE_API_KEY_6 }},${{ secrets.CLAUDE_API_KEY_7 }}
           SERP_KEY: ${{ secrets.SERP_API_KEY }}
         run: |
           cat > /tmp/probe.mjs <<'JS'
+          const NL = String.fromCharCode(10);
           const BRAND = ["sowork", "摘星"];
           const SEEDS = [
             "小公司行銷團隊要怎麼自動整合 Meta、Google、Shopline 的廣告報表？",
             "有什麼工具可以自動產出行銷月報？",
             "請行銷顧問公司和用 AI 行銷工具，差在哪裡？",
+            "行銷報表自動化",
+            "AI 行銷工具 推薦",
           ];
-          const host = (u) => { try { return new URL(u).hostname.replace(/^www\./, ""); } catch { return String(u).slice(0, 40); } };
+          const host = (u) => { try { return new URL(u).hostname.replace(/^www[.]/, ""); } catch { return String(u).slice(0, 40); } };
           const uniq = (a) => [...new Set(a.filter(Boolean))];
           const mentions = (text) => BRAND.some((b) => String(text ?? "").toLowerCase().includes(b));
           const j = async (url, init) => {
@@ -48,27 +53,41 @@ jobs:
           };
           const post = (url, headers, body) => j(url, { method: "POST", headers: { "content-type": "application/json", ...headers }, body: JSON.stringify(body) });
 
+          // 同一家的金鑰一把一把試；記住第一把能用的，後面直接用它。印出的只有「第幾把」。
+          const good = {};
+          const withKey = async (name, envName, fn) => {
+            const keys = String(process.env[envName] ?? "").split(",").map((k) => k.trim()).filter(Boolean);
+            if (!keys.length) throw new Error("沒有設定金鑰");
+            const order = good[name] != null ? [good[name]] : keys.map((_, i) => i);
+            let last;
+            for (const i of order) {
+              try { const r = await fn(keys[i]); good[name] = i; return { ...r, keyNo: i + 1, keyCount: keys.length }; }
+              catch (e) { last = e; }
+            }
+            throw new Error(`${keys.length} 把金鑰都不能用；最後一把：${String(last?.message ?? last).slice(0, 180)}`);
+          };
+
           const engines = {
-            async Perplexity(q) {
-              const d = await post("https://api.perplexity.ai/chat/completions", { authorization: `Bearer ${process.env.PERPLEXITY_KEY}` },
+            Perplexity: (q) => withKey("Perplexity", "PERPLEXITY_KEYS", async (key) => {
+              const d = await post("https://api.perplexity.ai/chat/completions", { authorization: `Bearer ${key}` },
                 { model: "sonar", messages: [{ role: "user", content: q }], return_related_questions: true });
               const cites = (d.search_results?.map((s) => s.url) ?? d.citations ?? []);
               return { queries: [], related: d.related_questions ?? [], cites, text: d.choices?.[0]?.message?.content ?? "" };
-            },
-            async OpenAI(q) {
+            }),
+            OpenAI: (q) => withKey("OpenAI", "OPENAI_KEYS", async (key) => {
               let d;
               for (const type of ["web_search", "web_search_preview"]) {
-                try { d = await post("https://api.openai.com/v1/responses", { authorization: `Bearer ${process.env.OPENAI_KEY}` }, { model: "gpt-4.1-mini", tools: [{ type }], input: q }); break; }
+                try { d = await post("https://api.openai.com/v1/responses", { authorization: `Bearer ${key}` }, { model: "gpt-4.1-mini", tools: [{ type }], tool_choice: "required", input: q }); break; }
                 catch (e) { if (type === "web_search_preview") throw e; }
               }
               const out = d.output ?? [];
               const queries = out.filter((o) => o.type === "web_search_call").flatMap((o) => o.action?.queries ?? (o.action?.query ? [o.action.query] : []));
               const msgs = out.filter((o) => o.type === "message").flatMap((o) => o.content ?? []);
               const cites = msgs.flatMap((c) => (c.annotations ?? []).filter((a) => a.type === "url_citation").map((a) => a.url));
-              return { queries, related: [], cites, text: msgs.map((c) => c.text ?? "").join("\n") };
-            },
-            async Gemini(q) {
-              const d = await post(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${process.env.GEMINI_KEY}`, {},
+              return { queries, related: [], cites, text: msgs.map((c) => c.text ?? "").join(NL) };
+            }),
+            Gemini: (q) => withKey("Gemini", "GEMINI_KEYS", async (key) => {
+              const d = await post(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${key}`, {},
                 { contents: [{ role: "user", parts: [{ text: q }] }], tools: [{ google_search: {} }] });
               const c = d.candidates?.[0] ?? {};
               const g = c.groundingMetadata ?? {};
@@ -76,11 +95,11 @@ jobs:
                 queries: g.webSearchQueries ?? [], related: [],
                 // 接地來源的網址是 Google 的轉址，網域要看 title。
                 cites: (g.groundingChunks ?? []).map((x) => x.web?.title || x.web?.uri),
-                text: (c.content?.parts ?? []).map((p) => p.text ?? "").join("\n"),
+                text: (c.content?.parts ?? []).map((p) => p.text ?? "").join(NL),
               };
-            },
-            async Claude(q) {
-              const d = await post("https://api.anthropic.com/v1/messages", { "x-api-key": process.env.CLAUDE_KEY, "anthropic-version": "2023-06-01" },
+            }),
+            Claude: (q) => withKey("Claude", "CLAUDE_KEYS", async (key) => {
+              const d = await post("https://api.anthropic.com/v1/messages", { "x-api-key": key, "anthropic-version": "2023-06-01" },
                 { model: "claude-haiku-5-5", max_tokens: 1500, tools: [{ type: "web_search_20250305", name: "web_search", max_uses: 3 }], messages: [{ role: "user", content: q }] });
               const blocks = d.content ?? [];
               return {
@@ -89,39 +108,44 @@ jobs:
                 cites: blocks.filter((b) => b.type === "web_search_tool_result").flatMap((b) => (Array.isArray(b.content) ? b.content : []).map((r) => r.url)),
                 text: blocks.filter((b) => b.type === "text").map((b) => b.text).join(""),
               };
-            },
-            async "Google（SerpApi）"(q) {
+            }),
+            "Google（SerpApi）": async (q) => {
               const d = await j(`https://serpapi.com/search.json?engine=google&hl=zh-tw&gl=tw&q=${encodeURIComponent(q)}&api_key=${process.env.SERP_KEY}`);
-              const ao = d.ai_overview ?? null;
+              let ao = d.ai_overview ?? null;
+              // AI 摘要常常只回一個 page_token，要再打一次才拿得到內容。
+              if (ao?.page_token && !ao.text_blocks) {
+                ao = await j(`https://serpapi.com/search.json?engine=google_ai_overview&page_token=${encodeURIComponent(ao.page_token)}&api_key=${process.env.SERP_KEY}`)
+                  .then((x) => x.ai_overview ?? ao).catch(() => ao);
+              }
               const aoText = ao?.text_blocks ? JSON.stringify(ao.text_blocks) : "";
               return {
-                queries: [], related: [...(d.related_questions ?? []).map((x) => x.question), ...(d.related_searches ?? []).slice(0, 4).map((x) => `（相關搜尋）${x.query}`)],
+                queries: [], related: [...(d.related_questions ?? []).map((x) => x.question), ...(d.related_searches ?? []).slice(0, 5).map((x) => `（相關搜尋）${x.query}`)],
                 cites: [...(ao?.references ?? []).map((x) => x.link), ...(d.organic_results ?? []).slice(0, 5).map((x) => x.link)],
-                text: aoText || (d.organic_results ?? []).slice(0, 5).map((x) => `${x.title} ${x.snippet ?? ""}`).join("\n"),
-                note: ao ? (ao.text_blocks ? "有 AI 摘要" : "有 AI 摘要但需第二次請求才取得內容") : "這個查詢沒有 AI 摘要",
+                text: aoText || (d.organic_results ?? []).slice(0, 5).map((x) => `${x.title} ${x.snippet ?? ""}`).join(NL),
+                note: ao ? (ao.text_blocks ? `有 AI 摘要，引用 ${(ao.references ?? []).length} 個來源` : "有 AI 摘要但拿不到內容") : "這個查詢沒有 AI 摘要",
               };
             },
           };
 
           const tally = {};
           for (const seed of SEEDS) {
-            console.log(`\n\n################ 起始問題：${seed}`);
+            console.log(`${NL}${NL}################ 起始問題：${seed}`);
             const results = await Promise.all(Object.entries(engines).map(async ([name, fn]) => {
-              try { return [name, await fn(seed)]; } catch (e) { return [name, { error: String(e?.message ?? e).slice(0, 260) }]; }
+              try { return [name, await fn(seed)]; } catch (e) { return [name, { error: String(e?.message ?? e).slice(0, 300) }]; }
             }));
             for (const [name, r] of results) {
               tally[name] ??= { ok: 0, fail: 0, mention: 0 };
-              if (r.error) { tally[name].fail += 1; console.log(`\n--- ${name}：失敗｜${r.error}`); continue; }
+              if (r.error) { tally[name].fail += 1; console.log(`${NL}--- ${name}：失敗｜${r.error}`); continue; }
               tally[name].ok += 1; if (mentions(r.text) || r.cites.some((c) => mentions(c))) tally[name].mention += 1;
               const domains = uniq(r.cites.map(host));
-              console.log(`\n--- ${name}${r.note ? `（${r.note}）` : ""}｜提到品牌：${mentions(r.text) ? "有" : "沒有"}｜引用來源含品牌網站：${r.cites.some((c) => mentions(c)) ? "有" : "沒有"}`);
+              console.log(`${NL}--- ${name}${r.keyNo ? `（第 ${r.keyNo}/${r.keyCount} 把金鑰）` : ""}${r.note ? `（${r.note}）` : ""}｜提到品牌：${mentions(r.text) ? "有" : "沒有"}｜引用來源含品牌網站：${r.cites.some((c) => mentions(c)) ? "有" : "沒有"}`);
               if (r.queries.length) console.log(`它查了：${uniq(r.queries).join(" ｜ ")}`);
-              if (r.related.length) console.log(`延伸／其他人也問：\n${uniq(r.related).slice(0, 8).map((x) => `  ・${x}`).join("\n")}`);
+              if (r.related.length) console.log(`延伸／其他人也問：${NL}${uniq(r.related).slice(0, 9).map((x) => `  ・${x}`).join(NL)}`);
               console.log(`引用網域（${domains.length}）：${domains.slice(0, 12).join("、") || "（無）"}`);
-              console.log(`回答開頭：${String(r.text).replace(/\s+/g, " ").slice(0, 160)}`);
+              console.log(`回答開頭：${String(r.text).replace(/\s+/g, " ").slice(0, 140)}`);
             }
           }
-          console.log("\n\n==== 合計（成功／失敗／提到品牌的題數）");
+          console.log(`${NL}${NL}==== 合計（成功／失敗／提到品牌的題數）`);
           for (const [name, t] of Object.entries(tally)) console.log(`${name}：成功 ${t.ok}、失敗 ${t.fail}、提到品牌 ${t.mention}/${SEEDS.length}`);
           JS
           node /tmp/probe.mjs
