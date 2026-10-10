@@ -29,6 +29,7 @@ import PositioningDocPanel from "../components/positioning/PositioningDocPanel";
 import CustomCardEditor, { type EditableCard } from "../components/assets/CustomCardEditor";
 import ChannelRoleModal from "../components/positioning/ChannelRoleModal";
 import ChannelRolesTray from "./brands/ChannelRolesTray";
+import PositioningBookTray from "./brands/PositioningBookTray";
 import { type ChannelId } from "../lib/channelRoles";
 import { InfoTab as BrandInfoTab, DangerTab as BrandDangerTab, PublishTab as BrandPublishTab } from "../components/positioning/BrandSettingsSheet";
 import BrainPanel from "../components/brain/BrainPanel";
@@ -2141,7 +2142,27 @@ export default function BrandsPage() {
                       {activeStrategyTool === "monitor" && scopeMode === "brand" && activeBrandIdForLocks ? (
                         <StrategyAlertsPanel brandId={activeBrandIdForLocks} />
                       ) : null}
-                      {!(activeStrategyTool === "monitor" && scopeMode === "brand" && activeBrandIdForLocks) && (
+                      {/* 2026-10-10（CJ「無法讓顧問拿來做一份品牌定位的提案，很多欄位反而變成很不想閱讀」）：
+                          品牌定位改成「品牌定位書」卡片牆——每張卡一章、點進去跟顧問寫、可以加減與排序、
+                          右上草擬提案。產品／活動定位照舊用 PositioningGrid。 */}
+                      {scopeMode === "brand" && activeBrandIdForLocks && activeStrategyTool !== "monitor" && (
+                        <PositioningBookTray
+                          brandId={activeBrandIdForLocks}
+                          brandName={scopeName ?? ""}
+                          customSegments={customPositioningSegments}
+                          onOpenSegment={(segId) => setSection(`seg:${segId}` as any)}
+                          onDeleteCustomSegment={(segmentId) => {
+                            const msg = lang === "en" ? "Delete this card?" : "確定要刪除這張卡片嗎？";
+                            if (!confirm(msg)) return;
+                            removeCustomSegmentMut?.mutate({ scope: "brand", scopeId: activeBrandIdForLocks, segmentId });
+                          }}
+                          onEditCustomSegment={(segmentId) => {
+                            const seg = (customPositioningSegments ?? []).find((x: any) => x.id === segmentId);
+                            if (seg) setEditingCard({ id: seg.id, title: seg.title, fields: seg.fields.map((f: any) => ({ label: f.label, value: f.value })) });
+                          }}
+                        />
+                      )}
+                      {scopeMode !== "brand" && (
                       <PositioningGrid
                         scopeMode={scopeMode}
                         segments={segments}

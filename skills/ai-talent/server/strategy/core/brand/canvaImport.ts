@@ -18,6 +18,8 @@ export const MAX_CANVA_PAGES = 10;
 
 export interface CanvaImportResult {
   photos: AssetPhoto[];
+  /** 跟 photos 一一對應：每張是設計的第幾頁（「在 Canva 編輯」回來時要知道該重抓哪一頁）。 */
+  pageNos: number[];
   /** 這份設計還有沒匯入的頁（超過 MAX_CANVA_PAGES）。 */
   truncated: boolean;
   /** 有幾頁抓到了卻存不進去（素材庫滿了、單張過大），附最後一個原因。 */
@@ -47,6 +49,7 @@ export async function importCanvaDesign(
   const base = (args.title || "Canva").trim().slice(0, 80) || "Canva";
 
   const photos: AssetPhoto[] = [];
+  const pageNos: number[] = [];
   let skipped = 0;
   let skippedReason: string | null = null;
   for (const [i, url] of take.entries()) {
@@ -61,6 +64,7 @@ export async function importCanvaDesign(
     });
     if ("error" in stored) { skipped += 1; skippedReason = stored.error; continue; }
     photos.push(stored);
+    pageNos.push(pageNo);
   }
-  return { photos, truncated: urls.length > take.length, skipped, skippedReason };
+  return { photos, pageNos, truncated: urls.length > take.length, skipped, skippedReason };
 }

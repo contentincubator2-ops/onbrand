@@ -12,7 +12,8 @@ describe("assetPhotoRouter", () => {
     // 2026-09-25：加了 saveGeneratedImage（把 AI 生成圖存進產品照片庫／設為主圖）。
     // 2026-09-30：加了 library（素材庫：全站上傳過的圖一次列出來）。
     // 2026-10-09：加了 importCanvaDesign（把 Canva 設計匯出成圖存進素材庫）。
-    expect(names).toEqual(["importCanvaDesign", "library", "list", "remove", "saveGeneratedImage", "setPrimary"]);
+    // 2026-10-10：加了 canvaRef／startCanvaEdit／syncCanvaEdit（在 Canva 編輯的來回）。
+    expect(names).toEqual(["canvaRef", "importCanvaDesign", "library", "list", "remove", "saveGeneratedImage", "setPrimary", "startCanvaEdit", "syncCanvaEdit"]);
   });
 
   it("procedure 名稱不可以撞 Function.prototype 上的東西", () => {

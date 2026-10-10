@@ -23,6 +23,7 @@ import { tabLockRouter } from "../strategy/routers/tabLockRouter";
 import { positioningJobsRouter } from "../strategy/routers/positioningJobsRouter";
 import { positioningDocsRouter } from "../strategy/routers/positioningDocsRouter";
 import { channelRoleRouter } from "../strategy/routers/channelRoleRouter";
+import { positioningBookRouter } from "../strategy/routers/positioningBookRouter";
 import { brandTaskCardRouter } from "../content/routers/brandTaskCardRouter";
 import { brandVoiceRouter } from "../content/routers/brandVoiceRouter";
 import { customChannelRouter } from "../content/routers/customChannelRouter";
@@ -30,6 +31,8 @@ import { listingBatchRouter } from "../content/routers/listingBatchRouter";
 import { workbenchRouter } from "../strategy/routers/workbenchRouter";
 import { strategistChatRouter } from "../strategy/routers/strategistChatRouter";
 import { assetPhotoRouter } from "../strategy/routers/assetPhotoRouter";
+import { registerCanvaOutputWriter } from "../strategy/core/brand/canvaEdit";
+import { setOutputOwnImage } from "../content/core/image/canvaOutputImage";
 import { campaignRouter } from "../content/routers/campaignRouter";
 import { vendorRouter } from "../content/routers/vendorRouter";
 import { strategyMonitorRouter } from "../strategy/routers/strategyMonitorRouter";
@@ -75,6 +78,9 @@ import { inspireRouter } from "../gateway/routers/inspireRouter";
 // mediaHub, playbook, positioning, feedback, squadLead. Together with
 // their two helper files (_core/auditAgent.ts + _core/scouts/credTesters.ts)
 // this is ~7,000 LOC of dead server code removed.
+
+// 「在 Canva 編輯」帶回來的圖要寫進貼文：流程在策略層、寫貼文在內容層，在這裡接起來。
+registerCanvaOutputWriter(setOutputOwnImage);
 
 export const appRouter = router({
   brand:         brandRouter,
@@ -124,6 +130,7 @@ export const appRouter = router({
   positioningDocs: positioningDocsRouter,
   // 2026-10-03：每個平台各自的定位（通路角色）。
   channelRole:     channelRoleRouter,
+  positioningBook: positioningBookRouter,
   brandTaskCard:   brandTaskCardRouter,
   // 2026-10-07（CJ）：建品牌時丟參考文章，學成品牌自己的寫法（每類一張任務卡＋語氣進大腦）。
   brandVoice:      brandVoiceRouter,

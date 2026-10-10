@@ -26,7 +26,7 @@ import {
   type PlatformImageSpec,
 } from "../../platform/core/media/platformImageSpecs";
 import { loadBrandPositioning } from "../../platform/core/billing/planGate";
-import { proposeImageDirections, planSeriesSlides, renderImageCard, saveTitledImage, fitPhotoToCard, solidBackgroundForCard, MAX_SERIES } from "../core/image/imageCards";
+import { proposeImageDirections, planSeriesSlides, renderImageCard, saveTitledImage, fitPhotoToCard, solidBackgroundForCard, MAX_SERIES, MAX_STYLE_REFS } from "../core/image/imageCards";
 import { IMAGE_STYLES, IMAGE_STYLE_IDS } from "../core/image/imageStyles";
 import { contentSelectorFields, updateOutputContent } from "../core/engine/outputContentEnvelope";
 import { applyVariantImageUpdate } from "../core/image/variantImageUpdate";
@@ -210,6 +210,8 @@ export const imageCardRouter = router({
       /** 畫面樣式（imageStyles 的 id）；不傳＝不指定。 */
       styleId: z.enum(IMAGE_STYLE_IDS).optional(),
       instruction: z.string().max(600).optional(),
+      /** 用戶上傳的風格參考圖（素材庫裡的圖）：只學畫風，不照抄內容。 */
+      styleReferenceUrls: z.array(z.string().max(2048)).max(MAX_STYLE_REFS).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED" });
@@ -220,6 +222,11 @@ export const imageCardRouter = router({
       }
       if (input.productImageUrl && !(await productPhotoAllowed(input.brandId, input.productImageUrl))) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "這張產品照不屬於這個品牌。" });
+      }
+      for (const u of input.styleReferenceUrls ?? []) {
+        if (!(await brandOwnsLibraryPhoto(input.brandId, u))) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "風格參考圖不在這個品牌的素材庫裡，請重新上傳。" });
+        }
       }
 
       const { assertPoints, deductPoints } = await import("../../platform/core/billing/pointsService");
@@ -238,6 +245,7 @@ export const imageCardRouter = router({
           referenceImageUrl: input.referenceImageUrl,
           referenceMode: input.referenceMode,
           styleId: input.styleId,
+          styleReferenceUrls: input.styleReferenceUrls,
           instruction: input.instruction?.trim() || undefined,
         });
       } catch (e) {

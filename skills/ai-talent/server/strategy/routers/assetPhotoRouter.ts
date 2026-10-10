@@ -15,7 +15,15 @@ import { listPhotos, listBrandLibrary, setPrimaryPhoto, removePhoto, savePhotoFr
 import { STORAGE_ROOT } from "../routes/assetPhotoRoute";
 import { importCanvaDesign, MAX_CANVA_PAGES } from "../core/brand/canvaImport";
 import { getValidAccessToken, CANVA_ACCOUNT_SCOPE } from "../../platform/core/connectors/cloudTokens";
-import { canvaErrorMessage } from "../../platform/core/connectors/canvaClient";
+import { canvaErrorMessage, canvaCanWrite } from "../../platform/core/connectors/canvaClient";
+import { findCanvaRef, recordCanvaRef, startCanvaEdit, syncCanvaEdit } from "../core/brand/canvaEdit";
+
+/** 要寫回貼文的哪一格（CanvaEditLocator）。這裡只收下來轉交；解讀與檢查在內容層寫回時做。 */
+const canvaLocatorInput = z.object({
+  variantIndex: z.number().int().min(0).default(0),
+  contentKind: z.enum(["planning", "public"]).optional(),
+  contentIndex: z.number().int().min(0).optional(),
+});
 
 const scopeInput = z.object({
   brandId: z.number(),
@@ -146,10 +154,88 @@ export const assetPhotoRouter = router({
         if (result.photos.length === 0) {
           throw new TRPCError({ code: "BAD_REQUEST", message: result.skippedReason ?? canvaErrorMessage(null, en) });
         }
+        // 記下每張圖來自哪份設計的第幾頁——之後才能「在 Canva 編輯」。記不成不擋匯入。
+        for (const [i, p] of result.photos.entries()) {
+          await recordCanvaRef({
+            brandId: input.brandId, actorId: actorIdOf(ctx), designId: input.designId, pageNo: result.pageNos[i] ?? i + 1, photoUrl: p.url,
+          }).catch((e) => console.warn("[canva] ref not recorded:", (e as Error)?.message ?? e));
+        }
         return result;
       } catch (e) {
         if (e instanceof TRPCError) throw e;
         console.warn("[canva] import failed:", (e as any)?.code ?? "", (e as Error)?.message ?? e);
+        throw new TRPCError({ code: "BAD_REQUEST", message: canvaErrorMessage(e, en) });
+      }
+    }),
+
+  /**
+   * 這張圖能不能「在 Canva 編輯」：它是這個人從 Canva 匯入的（開原設計），或這個環境可以替用戶
+   * 開新設計（把圖送進 Canva）。前端靠它決定要不要顯示那顆按鈕。
+   */
+  canvaRef: protectedProcedure
+    .input(z.object({ brandId: z.number().int().positive(), imageUrl: z.string().max(500) }))
+    .query(async ({ ctx, input }) => {
+      await assertScopeOwner(ctx.user!.id, input.brandId, "brand", input.brandId);
+      const ref = input.imageUrl ? await findCanvaRef(input.brandId, input.imageUrl).catch(() => null) : null;
+      return { fromCanva: !!ref && ref.actorId === actorIdOf(ctx), canCreate: canvaCanWrite() };
+    }),
+
+  /**
+   * 開始一次「在 Canva 編輯」的來回，回編輯連結（前端開新分頁）。
+   * 圖是從 Canva 來的就開原設計；不是就把它送進用戶的 Canva 開新設計；沒有圖就開空白設計。
+   * imageUrl 只收本站自己的圖（/static/…）——不開「叫伺服器抓任意網址再轉送出去」的入口。
+   */
+  startCanvaEdit: protectedProcedure
+    .input(z.object({
+      brandId: z.number().int().positive(),
+      imageUrl: z.string().max(500).refine((s) => s === "" || s.startsWith("/static/"), { message: "imageUrl must be a site image" }).optional(),
+      outputId: z.number().int().positive().optional(),
+      locator: canvaLocatorInput.optional(),
+      width: z.number().int().min(40).max(8000).optional(),
+      height: z.number().int().min(40).max(8000).optional(),
+      title: z.string().max(255).optional(),
+      lang: z.enum(["zh-TW", "en"]).optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertScopeOwner(ctx.user!.id, input.brandId, "brand", input.brandId);
+      const en = input.lang === "en";
+      let accessToken: string;
+      try {
+        accessToken = await getValidAccessToken(actorIdOf(ctx), CANVA_ACCOUNT_SCOPE, "canva");
+      } catch {
+        throw new TRPCError({ code: "PRECONDITION_FAILED", message: en ? "Connect Canva first." : "請先連接 Canva。" });
+      }
+      try {
+        return await startCanvaEdit({
+          accessToken, actorId: actorIdOf(ctx), ownerId: ctx.user!.id, brandId: input.brandId,
+          imageUrl: input.imageUrl, outputId: input.outputId, locator: input.outputId ? (input.locator ?? { variantIndex: 0 }) : null,
+          width: input.width, height: input.height, title: input.title,
+        });
+      } catch (e) {
+        console.warn("[canva] start edit failed:", (e as any)?.code ?? "", (e as Error)?.message ?? e);
+        throw new TRPCError({ code: "BAD_REQUEST", message: canvaErrorMessage(e, en) });
+      }
+    }),
+
+  /**
+   * 用戶切回 onBrand 的分頁時呼叫：Canva 那邊改過就把最新版帶回來，沒改就什麼都不做。
+   * Canva 的返回按鈕走 /api/oauth/canva/return，做的是同一件事——哪一個先到都可以。
+   */
+  syncCanvaEdit: protectedProcedure
+    .input(z.object({
+      brandId: z.number().int().positive(),
+      skey: z.string().min(16).max(40).regex(/^[A-Za-z0-9_-]+$/),
+      lang: z.enum(["zh-TW", "en"]).optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertScopeOwner(ctx.user!.id, input.brandId, "brand", input.brandId);
+      const en = input.lang === "en";
+      try {
+        const accessToken = await getValidAccessToken(actorIdOf(ctx), CANVA_ACCOUNT_SCOPE, "canva");
+        const r = await syncCanvaEdit({ skey: input.skey, actorId: actorIdOf(ctx), accessToken, storageRoot: STORAGE_ROOT });
+        return { changed: r.changed, url: r.photo?.url ?? null, outputId: r.outputId, outputUpdated: r.outputUpdated };
+      } catch (e) {
+        console.warn("[canva] sync failed:", (e as any)?.code ?? "", (e as Error)?.message ?? e);
         throw new TRPCError({ code: "BAD_REQUEST", message: canvaErrorMessage(e, en) });
       }
     }),

@@ -8,6 +8,7 @@
  *   GET /api/oauth/onedrive/callback               → exchange code, store
  *   GET /api/oauth/canva/install                   → redirect to Canva（PKCE）
  *   GET /api/oauth/canva/callback                  → exchange code, store
+ *   GET /api/oauth/canva/return                    → 用戶在 Canva 按「返回」：把最新版帶回貼文
  *
  * The client opens /install in a popup (not a full-page redirect) — we
  * don't know BrandsPage's brand-selection URL scheme from here, and a popup
@@ -19,9 +20,9 @@
  */
 import { Router, type Request, type Response } from "express";
 import crypto from "node:crypto";
-import { jwtVerify } from "jose";
+import { jwtVerify, createRemoteJWKSet } from "jose";
 import { getJwtSecret, ENV } from "../core/env";
-import { saveConnection, CANVA_ACCOUNT_SCOPE, type IntegrationProvider } from "../core/connectors/cloudTokens";
+import { saveConnection, getValidAccessToken, CANVA_ACCOUNT_SCOPE, type IntegrationProvider } from "../core/connectors/cloudTokens";
 import { buildAuthorizeUrl, exchangeCanvaCode, getCanvaDisplayName, newCodeVerifier } from "../core/connectors/canvaClient";
 
 type CloudProvider = IntegrationProvider;
@@ -248,5 +249,63 @@ cloudOAuthRouter.get("/canva/callback", async (req: Request, res: Response) => {
   } catch (e: any) {
     console.error("[cloud-oauth] canva callback error:", e?.message ?? e);
     res.send(popupResultPage(false, "canva", "Canva 授權沒有完成，請再試一次"));
+  }
+});
+
+// ─── Canva 返回導覽（2026-10-10 在 Canva 編輯的來回）─────────────────────────
+// 用戶在 Canva 編輯器按「返回」，Canva 把他帶到這裡，網址帶一個簽過名的 correlation_jwt：
+// 裡面有我們當初交出去的鑰匙（correlation_state）與設計 id。驗簽用 Canva 公開的金鑰。
+// 驗過之後做的事跟「切回分頁自動同步」一樣（syncCanvaEdit）——這裡只是另一個入口。
+
+/**
+ * 返回後真正做的事（把最新版帶回素材庫與貼文）在策略／內容層；基礎層不能引用它們，
+ * 所以由組裝層（server/index.ts）註冊進來。
+ */
+export type CanvaReturnHandler = (args: { skey: string; actorId: number; accessToken: string }) => Promise<{ changed: boolean; outputId: number | null }>;
+let canvaReturnHandler: CanvaReturnHandler | null = null;
+export function registerCanvaReturnHandler(fn: CanvaReturnHandler): void { canvaReturnHandler = fn; }
+
+const canvaJwks = createRemoteJWKSet(new URL("https://api.canva.com/rest/v1/connect/keys"));
+
+function returnPage(message: string, backHref: string): string {
+  const esc = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
+  return `<!doctype html><html><head><meta charset="utf-8"><title>onBrand Studio</title></head>
+<body style="font-family:sans-serif;padding:32px;color:#333;line-height:1.7">
+<p>${esc(message)}</p>
+<p><a href="${esc(backHref)}" style="color:#333">回到 onBrand Studio</a></p>
+<script>
+  // 這個分頁是從 onBrand 開出來的：原本那個分頁還在，回到它就會看到新圖。關不掉就留著連結。
+  setTimeout(function () { window.close(); }, 1500);
+</script>
+</body></html>`;
+}
+
+cloudOAuthRouter.get("/canva/return", async (req: Request, res: Response) => {
+  const userId = await verifyUser(req);
+  if (!userId) { res.redirect("/auth/login"); return; }
+  const token = String(req.query.correlation_jwt ?? "");
+  let skey = "";
+  try {
+    const { payload } = await jwtVerify(token, canvaJwks, { audience: ENV.CANVA_CLIENT_ID ?? "" });
+    if (payload.type !== "rti") throw new Error("unexpected token type");
+    skey = String(payload.correlation_state ?? "");
+  } catch (e: any) {
+    console.warn("[canva] return jwt rejected:", e?.message ?? e);
+    res.status(400).send(returnPage("這個返回連結無效或已過期。請回到貼文，切回分頁時會自動帶回最新版。", "/"));
+    return;
+  }
+  try {
+    if (!canvaReturnHandler) throw new Error("canva return handler not registered");
+    const accessToken = await getValidAccessToken(userId, CANVA_ACCOUNT_SCOPE, "canva");
+    const r = await canvaReturnHandler({ skey, actorId: userId, accessToken });
+    const back = r.outputId ? `/run/${r.outputId}` : "/";
+    res.send(returnPage(
+      r.changed ? "已把 Canva 的最新版本帶回 onBrand Studio。這個分頁會自動關閉。" : "Canva 那邊沒有新的修改。這個分頁會自動關閉。",
+      back,
+    ));
+  } catch (e: any) {
+    console.error("[canva] return sync failed:", e?.code ?? "", e?.message ?? e);
+    const { canvaErrorMessage } = await import("../core/connectors/canvaClient");
+    res.send(returnPage(canvaErrorMessage(e), "/"));
   }
 });

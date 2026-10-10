@@ -35,7 +35,7 @@ import VendorFinder, { vendorKindOf } from "../components/VendorFinder";
 import { trpc } from "../../../lib/trpc";
 import { useVariantLabel } from "../lib/variantLabelEn";
 import { showToastGlobal } from "../../platform/components/Toast";
-import OwnImagePicker, { USER_SUPPLIED_IMAGE_MODEL } from "../components/OwnImagePicker";
+import { useOwnImageEntries, USER_SUPPLIED_IMAGE_MODEL } from "../components/OwnImagePicker";
 import { PlatformMockup } from "../components/PlatformMockup";
 import ImageCardOffer, { IMAGE_CARD_OFFER_ID } from "../components/imageCard/ImageCardOffer";
 import type { MockupVariant } from "../lib/inferMockup";
@@ -1095,6 +1095,14 @@ export default function RunPage() {
     return ov ? { ...base, caption: ov.caption } : base;
   }, [variants, activeIdx, overrides, selectedContentKind]);
 
+  // 2026-09-29（CJ「要生圖嗎？要的話會打開生圖的任務卡」）：純文字任務點預覽圖區，
+  // 帶到下方的圖片任務卡清單（選尺寸 → 開卡、帶入文案）；有該通路圖片卡才這樣走。
+  const openImageGen = () => {
+    const offer = slide?.imageStatus === "skipped" && document.getElementById(IMAGE_CARD_OFFER_ID);
+    if (offer) { offer.scrollIntoView({ behavior: "smooth", block: "center" }); return; }
+    manualImageRef.current = true; setMode("image");
+  };
+
   // ── 2026-09-29 主筆桌（CJ「只有一個版本；右邊是主筆＋這樣寫的原因＋換人寫；要改就跟那位對話」）──
   // 左邊本文可以直接打字（自動存），右邊換人寫／請主筆改，改完直接進本文。
   // 每位寫過的稿由伺服器留在 item.writerDrafts（server/content/core/engine/writerDrafts.ts）。
@@ -1768,6 +1776,18 @@ export default function RunPage() {
     return mockupVariant;
   }, [mockupVariant, slide?.label, slide?.format, isStrategyEnvelope, selectedContentKind, data?.mission?.taskId]);
 
+  // （hook：要排在下面幾個提早 return 之前。）
+  // 2026-10-10：圖片入口疊在預覽的圖片格上（PlatformMockup imageActions）；多一顆「在 Canva 編輯」。
+  const ownImage = useOwnImageEntries({
+    brandId: Number((data as any)?.brand?.id ?? 0), lang: lang === "en" ? "en" : "zh-TW", onPick: useOwnImage,
+    canvaEdit: slide && !slide.cards?.length ? {
+      outputId: id, locator: getRunContentMutationLocator(selectedContentKind, activeIdx),
+      imageUrl: slide.imageStatus === "ready" || slide.imageStatus === undefined ? slide.imageUrl : null,
+      platform: mockupVariant?.platform, title: (data as any)?.title,
+    } : null,
+    onCanvaSynced: () => utils.output.getById.invalidate({ id }),
+  });
+
   if (!id || isNaN(id)) {
     return <div className="p-12 text-center text-default-500">{lang === "en" ? "Invalid run ID" : "無效的 run ID"}</div>;
   }
@@ -2233,17 +2253,14 @@ export default function RunPage() {
                 liveCards={slide.cards as any}
                 noAiNotice={!slide.cards?.length && slide.imageModelId === USER_SUPPLIED_IMAGE_MODEL}
                 overlayTitle={mockupVariant?.platform === "youtube" ? overlayTitle : undefined}
-                onGenerateImage={isStrategyPlanning
-                  ? undefined
-                  : () => {
-                      // 2026-09-29（CJ「要生圖嗎？要的話會打開生圖的任務卡」）：純文字任務點預覽圖區，
-                      // 帶到下方的圖片任務卡清單（選尺寸 → 開卡、帶入文案）；有該通路圖片卡才這樣走。
-                      const offer = slide.imageStatus === "skipped" && document.getElementById(IMAGE_CARD_OFFER_ID);
-                      if (offer) { offer.scrollIntoView({ behavior: "smooth", block: "center" }); return; }
-                      manualImageRef.current = true; setMode("image");
-                    }}
+                onGenerateImage={isStrategyPlanning ? undefined : openImageGen}
+                imageActions={isStrategyPlanning || isComponentTask || slide.cards?.length ? undefined : [
+                  { id: "ai", icon: "generate", label: lang === "en" ? "AI image" : "AI 生成", onClick: openImageGen, busy: !!imageGenMut?.isPending },
+                  ...ownImage.entries.map((e) => ({ ...e, busy: e.busy || !!updateImageMut?.isPending })),
+                ]}
                 componentSlot={componentSlot}
               />
+              {ownImage.portal}
               {!isStrategyPlanning && !isComponentTask && (
                 <ImageCardOffer
                   platform={mockupVariant?.platform}
@@ -2952,10 +2969,6 @@ export default function RunPage() {
                         className="w-full text-sm border border-default-300 rounded-md px-2.5 py-1.5 bg-white focus:outline-none focus:border-default-500"
                       />
                     </div>
-                  )}
-                  {!slide?.cards?.length && Number((data as any)?.brand?.id) > 0 && (
-                    <OwnImagePicker brandId={Number((data as any).brand.id)} lang={lang === "en" ? "en" : "zh-TW"}
-                      disabled={!!updateImageMut?.isPending} onPick={useOwnImage} />
                   )}
                   {/* 2026-05-11 (CJ feedback「應該要先給用戶指令」):
                       明確分兩步 — Step 1 寫指令 → Step 2 產圖。

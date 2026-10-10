@@ -152,8 +152,41 @@ export function buildImageCardPrompt(args: {
   instruction?: string;
   /** 畫面樣式（imageStyles.ts 的 id）。 */
   styleId?: string | null;
+  /** 用戶上傳的風格參考圖張數（排在產品照／上一版之後一起送給模型）。 */
+  styleRefCount?: number;
 }): string {
   const lines: string[] = [];
+  const nRef = Math.max(0, args.styleRefCount ?? 0);
+  // 風格參考圖放在最前面講：實測（2026-10-10 dev）放在中段時 gpt-image-2 只學到配色、畫法仍是照片，
+  // 帶產品照時更是整段被產品保真那一塊蓋過去。所以先講清楚「哪張是什麼」，結尾再提醒一次。
+  if (nRef > 0) {
+    const lead = args.withProduct || !!args.reference;
+    const refs = nRef === 1 ? "STYLE REFERENCE" : "STYLE REFERENCES";
+    const which = lead
+      ? `Image 1 is ${args.reference ? "the current visual" : "the REAL product/subject photo"}. ${nRef === 1 ? "Image 2 is a" : `Images 2–${nRef + 1} are`} ${refs} supplied by the user`
+      : `The attached ${nRef === 1 ? "image is a" : `${nRef} images are`} ${refs} supplied by the user`;
+    lines.push(
+      `ATTACHED IMAGES — ${which}.`,
+      `STYLE REFERENCE (top priority for how the image looks): the new image must look as if it was made by the same ` +
+      `artist or photographer as the ${refs.toLowerCase()} — the SAME MEDIUM (if ${nRef === 1 ? "it is" : "they are"} flat illustration, ` +
+      "paper cut-out, watercolour, 3D render or film photography, the output must be that too, not a default photograph), " +
+      "the same colour palette, lighting, texture, level of detail, shapes and mood. This overrides any style words in the " +
+      "scene and any brand imagery guidance below. " +
+      // 2026-10-10 CJ「就是要學得很像啊」：構圖、版面、人物畫法也跟著學，只把內容換成這次的場景。
+      (args.reference === "restyle" ? "" :
+        `Follow ${nRef === 1 ? "it" : "them"} CLOSELY, the way a designer makes the next piece of the same campaign: also match the ` +
+        "composition and layout (where the subject sits, how much empty space, framing, camera angle and distance), the way people, " +
+        "objects and backgrounds are drawn or photographed, and recurring graphic elements and shapes. ") +
+      "Only the subject matter changes: show the scene described below instead of what the references depict. " +
+      "Do not reproduce any logo, watermark, signature or written text from the references." +
+      (args.withProduct
+        ? " The product/subject from image 1 stays exactly as photographed (shape, colours, label); render everything around it — " +
+          "background, props, surfaces, lighting and overall palette — in the look of the style references."
+        : "") +
+      (args.reference === "restyle" ? " Keep the subject, content and composition of the current visual; change only how it is rendered." : ""),
+      "",
+    );
+  }
   if (args.withProduct) { lines.push(PRODUCT_FAITHFUL_PROMPT_BLOCK, ""); }
   const bb = brandBlock({ ...args.brand, ...(args.withProduct ? { brandName: undefined } : {}) });
   if (bb) { lines.push(bb, ""); }
@@ -177,11 +210,12 @@ export function buildImageCardPrompt(args: {
   if (args.reference === "restyle") {
     lines.push(
       "REFERENCE IMAGE: the attached image is the current version. Keep the same subject, scene content and composition, " +
-      "but re-render the WHOLE image in the ART STYLE below (colours may shift to suit the style).",
+      "but re-render the WHOLE image in the ART STYLE / STYLE REFERENCE given in this prompt (colours may shift to suit the style).",
       "",
     );
   }
-  const style = getImageStyle(args.styleId);
+  // 用戶給了自己的風格參考圖時，預設樣式不再疊上去（兩種風格指令會互相打架）。
+  const style = nRef > 0 ? null : getImageStyle(args.styleId);
   if (style) {
     lines.push(
       `ART STYLE (applies to the whole image): ${style.promptEn}` +
@@ -205,6 +239,13 @@ export function buildImageCardPrompt(args: {
     lines.push(NO_MIRROR_PROMPT_BLOCK);
   } else {
     lines.push(NO_TEXT_PROMPT_BLOCK, "", NO_MIRROR_PROMPT_BLOCK);
+  }
+  if (nRef > 0) {
+    lines.push(
+      "",
+      "FINAL CHECK — style: placed next to the style reference" + (nRef === 1 ? "" : "s") + ", the result must clearly belong to the same series " +
+      "(same medium, palette, texture and layout feel) — a viewer should assume the same person made both" + (args.withProduct ? ", with the real product unchanged." : "."),
+    );
   }
   return lines.join("\n");
 }
@@ -379,6 +420,9 @@ export async function solidBackgroundForCard(args: {
   return { ok: true, url: await saveFinal(fin.buffer, spec), bytes: fin.bytes };
 }
 
+/** 一次最多帶幾張風格參考圖（再多模型也分不清每張要學什麼，時間與費用也跟著漲）。 */
+export const MAX_STYLE_REFS = 3;
+
 export async function renderImageCard(args: {
   spec: PlatformImageSpec;
   scenePromptEn: string;
@@ -392,6 +436,8 @@ export async function renderImageCard(args: {
   referenceMode?: "previous" | "style" | "restyle";
   instruction?: string;
   styleId?: string;
+  /** 用戶上傳的風格參考圖（只學畫風，不照抄內容）；最多 MAX_STYLE_REFS 張。 */
+  styleReferenceUrls?: string[];
 }): Promise<RenderOutcome> {
   const modelId = resolveStillImageModel(args.modelChoice);
   const gen = generationSize(args.spec);
@@ -405,6 +451,8 @@ export async function renderImageCard(args: {
   const { w, h } = gptSizeFor(gen.width, gen.height);
   // 參考圖只能帶一張：有上一版就用上一版（它已經含產品），否則用產品照。
   const imageUrl = args.referenceImageUrl ?? args.productImageUrl;
+  // 風格參考圖是另外幾張，排在後面；每張代表什麼由 prompt 說明。
+  const styleRefs = (args.styleReferenceUrls ?? []).filter(Boolean).slice(0, MAX_STYLE_REFS);
   const prompt = buildImageCardPrompt({
     spec: args.spec,
     scenePromptEn: args.scenePromptEn,
@@ -413,6 +461,7 @@ export async function renderImageCard(args: {
     reference: args.referenceImageUrl ? (args.referenceMode ?? "previous") : null,
     instruction: args.instruction,
     styleId: args.styleId,
+    styleRefCount: styleRefs.length,
   });
   const outcome = await generateStillImage(modelId, {
     prompt,
@@ -420,6 +469,7 @@ export async function renderImageCard(args: {
     aspectRatio: nano ?? undefined,
     strictAspect: true,
     imageUrl,
+    extraImageUrls: styleRefs.length ? styleRefs : undefined,
     brandId: args.brandId,
   }, { attemptTimeoutMs: 120_000 });
 

@@ -72,6 +72,12 @@ export interface GenOptions {
    *  garment try-on (piapi/kling-try-on) — see garmentImageUrl below. */
   imageUrl?: string;
   /**
+   * 2026-10-10（CJ「上傳幾張圖給 AI，請 AI 學那張圖」）：額外的參考圖，排在 imageUrl 之後
+   * 一起送給模型（gpt-image-2 edits 的 image[]／Nano Banana 的 inline parts 都收多張）。
+   * 每張圖代表什麼由 prompt 說明；這裡只管送。
+   */
+  extraImageUrls?: string[];
+  /**
    * 2026-09-10（CJ「model 跟衣服要分開的」）：服飾上身用——衣服的照片，跟
    * 上面 imageUrl（真人模特照）是兩張分開的圖，不是同一張裁出來的。
    * 只有 piapi/kling-try-on 用得到。
@@ -160,7 +166,7 @@ async function genOpenAIImage(opts: GenOptions): Promise<GenResult> {
   // 2026-09-21（CJ「不論是否有產品圖，都只用 gpt image 2 生成」）：有參考圖（產品照）就走
   // /images/edits，沒有才是 /images/generations。dev VM 上用同一張香水瓶照片實測過：
   // gpt-image-2 編輯端點 24 秒、標籤文字完整；不吃 input_fidelity（400），也不需要。
-  if (opts.imageUrl) return genOpenAIImageEdit(opts, key, size);
+  if (opts.imageUrl || opts.extraImageUrls?.length) return genOpenAIImageEdit(opts, key, size);
   const resp = await fetch("https://api.openai.com/v1/images/generations", {
     method: "POST",
     headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
@@ -198,14 +204,20 @@ async function genOpenAIImage(opts: GenOptions): Promise<GenResult> {
  * input_fidelity（gpt-image-2 回 400 不支援）。
  */
 async function genOpenAIImageEdit(opts: GenOptions, key: string, size: string): Promise<GenResult> {
-  const { buffer, mime } = await fetchImageBuffer(opts.imageUrl!, { timeoutMs: 30_000 });
-  let bytes: Buffer = buffer;
-  let type = mime;
-  try {
-    const sharp = (await import("sharp")).default;
-    bytes = await sharp(buffer).rotate().resize(2048, 2048, { fit: "inside", withoutEnlargement: true }).png().toBuffer();
-    type = "image/png";
-  } catch { /* 保留原始位元組 */ }
+  const sharp = await import("sharp").then((m) => m.default).catch(() => null);
+  const images: Array<{ bytes: Buffer; type: string }> = [];
+  for (const url of [opts.imageUrl, ...(opts.extraImageUrls ?? [])]) {
+    if (!url) continue;
+    const { buffer, mime } = await fetchImageBuffer(url, { timeoutMs: 30_000 });
+    let bytes: Buffer = buffer;
+    let type = mime;
+    try {
+      if (!sharp) throw new Error("no sharp");
+      bytes = await sharp(buffer).rotate().resize(2048, 2048, { fit: "inside", withoutEnlargement: true }).png().toBuffer();
+      type = "image/png";
+    } catch { /* 保留原始位元組 */ }
+    images.push({ bytes, type });
+  }
 
   const form = new FormData();
   form.append("model", OPENAI_IMAGE_MODEL);
@@ -213,8 +225,10 @@ async function genOpenAIImageEdit(opts: GenOptions, key: string, size: string): 
   form.append("size", size);
   form.append("n", "1");
   if (opts.quality) form.append("quality", opts.quality);
-  const ext = type === "image/png" ? "png" : type === "image/webp" ? "webp" : "jpg";
-  form.append("image[]", new Blob([new Uint8Array(bytes)], { type }), `reference.${ext}`);
+  images.forEach(({ bytes, type }, i) => {
+    const ext = type === "image/png" ? "png" : type === "image/webp" ? "webp" : "jpg";
+    form.append("image[]", new Blob([new Uint8Array(bytes)], { type }), `reference${i ? `-${i + 1}` : ""}.${ext}`);
+  });
 
   const resp = await fetch("https://api.openai.com/v1/images/edits", {
     method: "POST",
@@ -242,8 +256,9 @@ async function genNanoBanana(opts: GenOptions): Promise<GenResult> {
   const model = process.env.NANO_BANANA_MODEL ?? "gemini-2.5-flash-image";
 
   const parts: any[] = [];
-  if (opts.imageUrl) {
-    const { buffer, mime } = await fetchImageBuffer(opts.imageUrl, { timeoutMs: 30_000 });
+  for (const refUrl of [opts.imageUrl, ...(opts.extraImageUrls ?? [])]) {
+    if (!refUrl) continue;
+    const { buffer, mime } = await fetchImageBuffer(refUrl, { timeoutMs: 30_000 });
     const b64 = buffer.toString("base64");
     parts.push({ inline_data: { mime_type: mime, data: b64 } });
   }
