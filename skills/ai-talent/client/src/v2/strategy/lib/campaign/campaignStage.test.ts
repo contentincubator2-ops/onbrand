@@ -62,7 +62,7 @@ describe("stageNotes", () => {
   });
   it("某一段：只看那一段", () => {
     const n = stageNotes(plan, ["facebook", "instagram", "website"], "teaser").map((x) => x.zh);
-    expect(n).toEqual(["這一段沒有排 官網。"]);
+    expect(n).toEqual(["這一段沒有排 AEO 文。"]);
   });
   it("沒有問題時講一句狀態，不硬擠提醒", () => {
     const n = stageNotes(plan, ["facebook"], "launch").map((x) => x.zh);

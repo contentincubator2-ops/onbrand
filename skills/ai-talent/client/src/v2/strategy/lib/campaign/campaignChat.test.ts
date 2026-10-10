@@ -37,7 +37,7 @@ describe("describeProposal", () => {
     ], phaseMessages: { launch: "新訊息" } }, false);
     expect(lines).toEqual([
       "開賣的訊息改成「新訊息」",
-      "＋ 11/10 官網：官網公告頁",
+      "＋ 11/10 AEO 文：官網公告頁",
       "✎ 11/01 Facebook：這篇不做",
       "－ 刪掉 11/01 Facebook：上市公告",
     ]);
