@@ -13,7 +13,7 @@ import { callModel } from "../../platform/core/llm/multiModelRouter";
 import localPool from "../../localDb";
 import {
   addDays, applyOps, brandPlatforms, cardsFor, isYmd, loadWeekCampaignItems, loadWeekSlots,
-  PLANNER_FALLBACK, parsePlannerReply, plannerContext, plannerHistory, plannerSystemPrompt, railStatusOf, validateOps, weekDays,
+  PLANNER_FALLBACK, loadWeekEvents, parsePlannerReply, plannerContext, plannerHistory, plannerSystemPrompt, railStatusOf, validateOps, weekDays,
   type Card, type PlannerCtxArgs, type SlotRow,
 } from "../core/planning/weeklyPlanner";
 import {
@@ -136,13 +136,14 @@ export const plannerRouter = router({
     .query(async ({ ctx, input }) => {
       const userId = ctx.user!.id;
       await assertBrandAccess(userId, input.brandId);
-      const [slots, campaign, messages, platforms] = await Promise.all([
+      const [slots, campaign, messages, platforms, events] = await Promise.all([
         loadWeekSlots(input.brandId, input.weekStart),
         loadWeekCampaignItems(input.brandId, input.weekStart).catch(() => []),
         loadMessages(input.brandId, userId),
         brandPlatforms(input.brandId),
+        loadWeekEvents(input.brandId, input.weekStart).catch(() => []),
       ]);
-      return { days: weekDays(input.weekStart), slots, campaign, messages, platforms, cards: cardsFor(platforms), hasDrafts: slots.some((s) => s.status === "draft") };
+      return { days: weekDays(input.weekStart), slots, campaign, events, messages, platforms, cards: cardsFor(platforms), hasDrafts: slots.some((s) => s.status === "draft") };
     }),
 
   /** 側欄儀表：這週排了幾篇、寫好幾篇、各平台還有幾篇沒寫。 */
@@ -303,9 +304,53 @@ export const plannerRouter = router({
     .mutation(async ({ ctx, input }) => {
       await assertBrandAccess(ctx.user!.id, input.brandId);
       await localPool.execute(
-        `UPDATE planned_slots SET status = 'dismissed' WHERE id = ? AND brandId = ? AND status IN ('draft','planned')`,
+        // 已寫好的格子也能刪（2026-10-11）：只是從本週企劃拿掉，產出還留在專案裡。
+        `UPDATE planned_slots SET status = 'dismissed' WHERE id = ? AND brandId = ? AND status IN ('draft','planned','written')`,
         [input.id, input.brandId],
       );
+      return { ok: true };
+    }),
+
+  /** 拖到另一天（2026-10-11 CJ「貼文可以拖拉，切換到不同時間」）：只改日期，其他欄位不動。 */
+  moveSlot: protectedProcedure
+    .input(z.object({ brandId: z.number().int().positive(), id: z.number().int().positive(), date: z.string().refine(isYmd, "date 要是 YYYY-MM-DD") }))
+    .mutation(async ({ ctx, input }) => {
+      await assertBrandAccess(ctx.user!.id, input.brandId);
+      await localPool.execute(
+        `UPDATE planned_slots SET slotDate = ? WHERE id = ? AND brandId = ? AND status IN ('draft','planned','written')`,
+        [input.date, input.id, input.brandId],
+      );
+      return { ok: true };
+    }),
+
+  /**
+   * 活動企劃的一篇拖到另一天。只改那一篇的 date，企劃本身的定稿狀態不動（跟 setInPlanner 一樣是排程）。
+   * 已發布的不能搬；不能搬出活動檔期（有填開始／結束日時）。
+   */
+  moveCampaignItem: protectedProcedure
+    .input(z.object({
+      brandId: z.number().int().positive(), eventId: z.number().int().positive(),
+      itemId: z.string().min(1).max(80), date: z.string().refine(isYmd, "date 要是 YYYY-MM-DD"),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertBrandAccess(ctx.user!.id, input.brandId);
+      const [rows]: any = await localPool.execute(
+        `SELECT startAt, endAt, positioning FROM events WHERE id = ? AND brandId = ? LIMIT 1`, [input.eventId, input.brandId],
+      );
+      const row = (rows as any[])[0];
+      if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "找不到這個活動" });
+      let pos: any = row.positioning;
+      if (typeof pos === "string") { try { pos = JSON.parse(pos); } catch { pos = null; } }
+      const item = pos?.campaignPlan?.items?.find((i: any) => String(i?.id) === input.itemId);
+      if (!item) throw new TRPCError({ code: "NOT_FOUND", message: "企劃上找不到這一篇" });
+      if (item.publishedUrl) throw new TRPCError({ code: "BAD_REQUEST", message: "已經發布的不能改日期" });
+      const day = (d: any) => (d ? new Date(d).toISOString().slice(0, 10) : null);
+      const s = day(row.startAt), e = day(row.endAt);
+      if ((s && input.date < s) || (e && input.date > e)) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: `這一篇要排在活動檔期內（${s ?? "…"} ～ ${e ?? "…"}）` });
+      }
+      item.date = input.date;
+      await localPool.execute(`UPDATE events SET positioning = ? WHERE id = ? AND brandId = ?`, [JSON.stringify(pos), input.eventId, input.brandId]);
       return { ok: true };
     }),
 
