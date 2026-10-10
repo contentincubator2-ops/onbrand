@@ -59,7 +59,7 @@ describe("prompt", () => {
     const base = { spec, scenePromptEn: "a new scene", brand: {} as any, withProduct: false };
     const style = buildImageCardPrompt({ ...base, reference: "style" });
     expect(style).toContain("slide 1 of a multi-image set");
-    expect(style).toContain("do NOT copy its subject");
+    expect(style).toContain("Do NOT copy its subject");
     const prev = buildImageCardPrompt({ ...base, reference: "previous" });
     expect(prev).toContain("previous version");
     expect(prev).not.toContain("multi-image set");
