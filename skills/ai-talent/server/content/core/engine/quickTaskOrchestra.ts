@@ -20,6 +20,7 @@ import { detectNonDeliverable } from "./captionSanity";
 import { isAdCopyTemplate, extractRequestedUrl, validateAdCopy, repairAdCopy } from "./adCopyContract";
 import { adSlotOf, repairAdSlot } from "./adSlotContract";
 import { isShotListTemplate, normalizeShotList, validateShotList, repairShotList } from "./shotListContract";
+import { aeoFormatOf } from "./aeoFormatContract";
 import { isListingTemplate, normalizeListing, repairListing } from "./listingContract";
 // 2026-08-31 五感十築：正向直述句型合約（skill 01 Hard Rule 1）。
 import { extractYouTubeId, fetchYouTubeContext, formatYouTubeContextForPrompt } from "../../../platform/core/web/youtubeContext";
@@ -489,6 +490,13 @@ async function runOrchestraInner(args: {
       ? stage("brief", `${imageLoad.meta?.name ?? "Mandy Cheng"} 寫 ${args.config.images} 條視覺 brief`)
       : null;
 
+    // AI 搜尋格式合約要驗「摘要裡有沒有品牌名」。只有那 10 張卡會多查這一次。
+    const aeoBrandName = aeoFormatOf((args.template as any)?.id) && args.brandId
+      ? await import("../../../localDb")
+          .then(({ default: pool }) => pool.execute(`SELECT name FROM brands WHERE id = ? LIMIT 1`, [args.brandId as number]))
+          .then(([rows]: any) => String(rows?.[0]?.name ?? "").trim() || null).catch(() => null)
+      : null;
+
     const [captions, briefs] = await Promise.all([
       callCaptionWriter({
         template: args.template,
@@ -504,6 +512,7 @@ async function runOrchestraInner(args: {
         market: brandMarket.marketCode, // 2026-07-17 多市場
         isZhTW: brandMarket.isZhTW,
         requestedUrl,
+        brandName: aeoBrandName,
       }).then((c) => { stCap.status = "done"; stCap.completedAt = Date.now() - startedAt; return c; }).catch((e) => {
         stCap.status = "failed";
         stCap.completedAt = Date.now() - startedAt;
