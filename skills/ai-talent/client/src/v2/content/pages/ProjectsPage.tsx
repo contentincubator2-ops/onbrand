@@ -52,7 +52,7 @@ const PLATFORM_META: Record<string, { icon: any; zh: string; en: string }> = {
   line:      { icon: faLine,      zh: "LINE",     en: "LINE" },
   tiktok:    { icon: faTiktok,    zh: "TikTok",   en: "TikTok" },
   email:     { icon: faEnvelope,  zh: "電子報",    en: "Newsletter" },
-  website:   { icon: faGlobe,     zh: "官網",      en: "Website" },
+  website:   { icon: faGlobe,     zh: "AEO 文",    en: "AEO articles" },
   other:     { icon: faPenNib,    zh: "其他",      en: "Other" },
 };
 

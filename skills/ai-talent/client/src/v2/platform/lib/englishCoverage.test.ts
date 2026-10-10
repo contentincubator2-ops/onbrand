@@ -53,7 +53,7 @@ const ALLOW: Record<string, RegExp[]> = {
   // 已與英文表成對的中文表／分支（距離 en 標記太遠，行級啟發式看不到）
   "v2/content/lib/taskContextResolver.ts": [/^\s*"brand\.[A-Za-z.]+":\s*"/],
   "v2/content/pages/ImageCardPage.tsx": [/email: "電子報"/, /\["暖一點"|\["光線更明亮"/],
-  "v2/platform/components/plan/ChannelPicker.tsx": [/email: "電子報"|website: "官網"|pr: "新聞稿"/],
+  "v2/platform/components/plan/ChannelPicker.tsx": [/email: "電子報"|website: "AEO 文"|pr: "新聞稿"/],
   "v2/platform/pages/WorkspaceSettingsPage.tsx": [/viewer: "Viewer \(僅查看\)"/],
   "v2/strategy/pages/BrandsPage.tsx": [/ASSET_LABEL|視覺規範|圖表風格|console\.warn/],
   "v2/platform/pages/LandingPage.tsx": [/摘星社群行銷顧問股份有限公司/, /^\s*(q|a): [`"]/], // 中文 FAQ 分支

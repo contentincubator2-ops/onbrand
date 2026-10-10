@@ -88,7 +88,7 @@ export const PLATFORM_META: Record<string, PlatformMeta> = {
     label: "Content Calendar", labelZh: "行事曆", icon: faCalendarDays, bg: "#18181b",
   },
   website: {
-    label: "Website", labelZh: "官網", icon: faGlobe, bg: "#18181b",
+    label: "AEO articles", labelZh: "AEO 文", icon: faGlobe, bg: "#18181b",
   },
   kol: {
     label: "Influencers", labelZh: "網紅", icon: faUserGroup, bg: "#18181b",

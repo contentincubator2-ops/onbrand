@@ -45,7 +45,7 @@ const PLATFORM_EN: Record<string, string> = {
 };
 const PLATFORM_ZH: Record<string, string> = {
   facebook: "Facebook", instagram: "Instagram", linkedin: "LinkedIn", youtube: "YouTube", tiktok: "TikTok",
-  email: "電子報", pr: "新聞稿", x: "X", website: "官網", threads: "Threads", line: "LINE",
+  email: "電子報", pr: "新聞稿", x: "X", website: "AEO 文", threads: "Threads", line: "LINE",
 };
 const STARTERS = ["幫我排這週內容", "給我十個題目", "把進行中的活動拆成這週貼文", "我這週只有 3 小時"];
 
