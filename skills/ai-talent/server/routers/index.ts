@@ -23,6 +23,7 @@ import { tabLockRouter } from "../strategy/routers/tabLockRouter";
 import { positioningJobsRouter } from "../strategy/routers/positioningJobsRouter";
 import { positioningDocsRouter } from "../strategy/routers/positioningDocsRouter";
 import { channelRoleRouter } from "../strategy/routers/channelRoleRouter";
+import { positioningBookRouter } from "../strategy/routers/positioningBookRouter";
 import { brandTaskCardRouter } from "../content/routers/brandTaskCardRouter";
 import { brandVoiceRouter } from "../content/routers/brandVoiceRouter";
 import { customChannelRouter } from "../content/routers/customChannelRouter";
@@ -124,6 +125,7 @@ export const appRouter = router({
   positioningDocs: positioningDocsRouter,
   // 2026-10-03：每個平台各自的定位（通路角色）。
   channelRole:     channelRoleRouter,
+  positioningBook: positioningBookRouter,
   brandTaskCard:   brandTaskCardRouter,
   // 2026-10-07（CJ）：建品牌時丟參考文章，學成品牌自己的寫法（每類一張任務卡＋語氣進大腦）。
   brandVoice:      brandVoiceRouter,

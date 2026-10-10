@@ -49,7 +49,8 @@ function checkRate(userId: number): boolean {
   return true;
 }
 
-async function guard(userId: number): Promise<void> {
+/** positioningBookRouter 也用同一套限流與額度檢查。 */
+export async function guard(userId: number): Promise<void> {
   if (!checkRate(userId)) {
     throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: "問得太快了，稍等一下再繼續討論" });
   }
@@ -60,20 +61,22 @@ async function guard(userId: number): Promise<void> {
   } catch (e) { if (e instanceof TRPCError) throw e; /* guard optional */ }
 }
 
-function extractJson(text: string): any | null {
+export function extractJson(text: string): any | null {
   const start = text.indexOf("{");
   const end = text.lastIndexOf("}");
   if (start < 0 || end <= start) return null;
   try { return JSON.parse(text.slice(start, end + 1)); } catch { return null; }
 }
 
-async function callJson(system: string, messages: { role: "user" | "assistant"; content: string }[], maxTokens: number): Promise<string> {
+export async function callJson(
+  system: string, messages: { role: "user" | "assistant"; content: string }[], maxTokens: number, timeoutMs = 90_000,
+): Promise<string> {
   const r = await Promise.race([
     invokeLLM({
       messages: [{ role: "system", content: system }, ...messages],
       maxTokens,
     }),
-    new Promise<never>((_, rej) => setTimeout(() => rej(new Error("LLM timeout")), 90_000)),
+    new Promise<never>((_, rej) => setTimeout(() => rej(new Error("LLM timeout")), timeoutMs)),
   ]);
   const raw = r.choices[0]?.message?.content;
   return typeof raw === "string" ? raw : "";
