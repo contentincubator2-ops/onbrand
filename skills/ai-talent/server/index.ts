@@ -588,6 +588,9 @@ async function runStartupMigrations() {
     // 2026-10-10：策略層「AI 搜尋」tray 的顧客問題地圖。
     const { BRAND_AEO_QUESTIONS_DDL } = await import("./strategy/core/brand/aeoQuestions");
     await db.execute(sql.raw(BRAND_AEO_QUESTIONS_DDL));
+    // 每一題 × 各家 AI 搜尋引擎的結果。
+    const { BRAND_AEO_SCANS_DDL } = await import("./strategy/core/brand/aeoQuestions");
+    await db.execute(sql.raw(BRAND_AEO_SCANS_DDL));
 
     // 2026-09-30（CJ「策略層加一個 mission tray，是法規……agent 寫文章前要審查」）。
     const { BRAND_REGULATIONS_DDL } = await import("./strategy/core/brand/brandRegulations");

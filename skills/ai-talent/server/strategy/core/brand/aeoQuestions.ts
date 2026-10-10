@@ -20,6 +20,7 @@
  * 板上的數字全部是我們自己掌握的事實，沒有「被引用次數」這種我們量不到的東西。
  */
 import localPool from "../../../localDb";
+import { AEO_ENGINES, askAllEngines, brandTermsOf, type AeoEngine, type AeoEngineResult } from "./aeoEngines";
 
 export const BRAND_AEO_QUESTIONS_DDL = `
   CREATE TABLE IF NOT EXISTS brand_aeo_questions (
@@ -33,6 +34,8 @@ export const BRAND_AEO_QUESTIONS_DDL = `
     publishedUrl    VARCHAR(500) NULL,
     publishedAt     DATETIME(3)  NULL,
     archivedAt      DATETIME(3)  NULL,
+    scanStatus      VARCHAR(12)  NULL,
+    scanStartedAt   DATETIME(3)  NULL,
     createdAt       DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     updatedAt       DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
     KEY idx_brand_aeo_questions_brand (brandId)
@@ -49,7 +52,53 @@ export const AEO_SUGGEST_COUNT = 12;
 /** 轉換貼文時，最多拿幾題還沒回答的給模型對照。 */
 export const AEO_MATCH_CANDIDATES = 30;
 
-export type AeoQuestionSource = "ai" | "user" | "post";
+/** search＝掃描時 Google「其他人也問了」帶回來、用戶按了加入的題目（唯一由真人問出來的來源）。 */
+export type AeoQuestionSource = "ai" | "user" | "post" | "search";
+const SOURCES: readonly AeoQuestionSource[] = ["ai", "user", "post", "search"];
+
+/**
+ * 各家 AI 搜尋引擎對每一題的結果（aeoEngines.ts）。一題一家只留最新一筆。
+ * 每次問的結果會波動——這裡記的是「最近一次看到的」。
+ */
+export const BRAND_AEO_SCANS_DDL = `
+  CREATE TABLE IF NOT EXISTS brand_aeo_scans (
+    id          INT          NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    brandId     INT          NOT NULL,
+    questionId  INT          NOT NULL,
+    engine      VARCHAR(16)  NOT NULL,
+    status      VARCHAR(16)  NOT NULL,
+    error       VARCHAR(60)  NULL,
+    mentioned   TINYINT(1)   NOT NULL DEFAULT 0,
+    queries     JSON         NULL,
+    related     JSON         NULL,
+    domains     JSON         NULL,
+    excerpt     VARCHAR(400) NULL,
+    scannedAt   DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    UNIQUE KEY uq_brand_aeo_scans_q_engine (questionId, engine),
+    KEY idx_brand_aeo_scans_brand (brandId)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+`;
+
+/** 一個品牌一天最多掃幾題（每題會打五家，是有成本的）。 */
+export const AEO_SCANS_PER_DAY = 20;
+/** 掃描超過這麼久還沒回來，當作失敗（行程重啟、對方卡住）。 */
+export const AEO_SCAN_STALE_MS = 5 * 60_000;
+
+export type AeoScanStatus = "idle" | "running" | "done" | "failed";
+
+/** 資料庫裡的狀態 → 畫面上的狀態；卡太久的 running 視為失敗。 */
+export function scanStatusOf(status: unknown, startedAt: unknown, now: Date = new Date()): AeoScanStatus {
+  if (status === "done" || status === "failed") return status;
+  if (status !== "running") return "idle";
+  const t = startedAt ? new Date(startedAt as any).getTime() : NaN;
+  return Number.isFinite(t) && now.getTime() - t < AEO_SCAN_STALE_MS ? "running" : "failed";
+}
+
+/** 幾家有結果、幾家提到品牌（沒設定金鑰與失敗的不算進分母）。 */
+export function mentionSummary(scans: Array<{ status: string; mentioned: boolean }>): { answered: number; mentioned: number } {
+  const ok = scans.filter((s) => s.status === "ok");
+  return { answered: ok.length, mentioned: ok.filter((s) => s.mentioned).length };
+}
 export type AeoQuestionStatus = "open" | "answered" | "published";
 
 export interface AeoQuestion {
@@ -62,6 +111,7 @@ export interface AeoQuestion {
   publishedUrl: string | null;
   publishedAt: string | null;
   createdAt: string | null;
+  scanStatus: AeoScanStatus;
 }
 
 // ── 純函式 ───────────────────────────────────────────────────────────────
@@ -175,13 +225,14 @@ export function cleanPublishedUrl(raw: string | null | undefined): string | null
 const iso = (v: unknown): string | null => (v ? new Date(v as any).toISOString() : null);
 const toRow = (r: any): AeoQuestion => ({
   id: Number(r.id), brandId: Number(r.brandId), question: String(r.question ?? ""),
-  source: (["ai", "user", "post"].includes(r.source) ? r.source : "user") as AeoQuestionSource,
+  source: (SOURCES.includes(r.source) ? r.source : "user") as AeoQuestionSource,
+  scanStatus: scanStatusOf(r.scanStatus, r.scanStartedAt),
   answerOutputId: r.answerOutputId == null ? null : Number(r.answerOutputId),
   answeredAt: iso(r.answeredAt), publishedUrl: r.publishedUrl ?? null, publishedAt: iso(r.publishedAt),
   createdAt: iso(r.createdAt),
 });
 
-const COLS = "id, brandId, question, source, answerOutputId, answeredAt, publishedUrl, publishedAt, createdAt";
+const COLS = "id, brandId, question, source, answerOutputId, answeredAt, publishedUrl, publishedAt, createdAt, scanStatus, scanStartedAt";
 
 /** 地圖上的題目（不含封存）。還沒回答的排前面，同狀態新的在前。 */
 export async function listAeoQuestions(brandId: number): Promise<AeoQuestion[]> {
@@ -223,6 +274,7 @@ export async function addAeoQuestions(
     added.push({
       id: Number(res.insertId), brandId, question: q, source,
       answerOutputId: null, answeredAt: null, publishedUrl: null, publishedAt: null, createdAt: new Date().toISOString(),
+      scanStatus: "idle",
     });
     room -= 1;
   }
@@ -292,4 +344,103 @@ export async function openAeoQuestions(brandId: number, limit = AEO_MATCH_CANDID
     const rows = await listAeoQuestions(brandId);
     return rows.filter((r) => !r.answerOutputId).slice(0, limit).map((r) => ({ id: r.id, question: r.question }));
   } catch { return []; }
+}
+
+// ── 各家 AI 的搜尋結果 ───────────────────────────────────────────────────
+
+export interface AeoScanRow {
+  questionId: number;
+  engine: AeoEngine;
+  status: "ok" | "failed" | "unconfigured";
+  error: string | null;
+  mentioned: boolean;
+  queries: string[];
+  related: string[];
+  domains: string[];
+  excerpt: string;
+  scannedAt: string | null;
+}
+
+const arr = (v: unknown): string[] => {
+  let x: unknown = v;
+  if (typeof x === "string") { try { x = JSON.parse(x); } catch { return []; } }
+  return Array.isArray(x) ? x.map((i) => String(i)) : [];
+};
+
+/** 這個品牌所有題目的掃描結果，依題目分組；每題裡照 AEO_ENGINES 的順序。 */
+export async function listAeoScans(brandId: number): Promise<Map<number, AeoScanRow[]>> {
+  const out = new Map<number, AeoScanRow[]>();
+  let rows: any[] = [];
+  try {
+    const [r]: any = await localPool.execute(
+      `SELECT questionId, engine, status, error, mentioned, queries, related, domains, excerpt, scannedAt
+         FROM brand_aeo_scans WHERE brandId = ?`, [brandId]);
+    rows = r as any[];
+  } catch { return out; }
+  for (const r of rows) {
+    if (!(AEO_ENGINES as readonly string[]).includes(r.engine)) continue;
+    const row: AeoScanRow = {
+      questionId: Number(r.questionId), engine: r.engine, status: r.status, error: r.error ?? null,
+      mentioned: !!Number(r.mentioned), queries: arr(r.queries), related: arr(r.related), domains: arr(r.domains),
+      excerpt: String(r.excerpt ?? ""), scannedAt: iso(r.scannedAt),
+    };
+    out.set(row.questionId, [...(out.get(row.questionId) ?? []), row]);
+  }
+  for (const list of out.values()) list.sort((a, b) => AEO_ENGINES.indexOf(a.engine) - AEO_ENGINES.indexOf(b.engine));
+  return out;
+}
+
+async function saveAeoScan(brandId: number, questionId: number, r: AeoEngineResult): Promise<void> {
+  await localPool.execute(
+    `INSERT INTO brand_aeo_scans (brandId, questionId, engine, status, error, mentioned, queries, related, domains, excerpt, scannedAt)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(3))
+     ON DUPLICATE KEY UPDATE status = VALUES(status), error = VALUES(error), mentioned = VALUES(mentioned),
+       queries = VALUES(queries), related = VALUES(related), domains = VALUES(domains), excerpt = VALUES(excerpt), scannedAt = NOW(3)`,
+    [brandId, questionId, r.engine, r.status, r.error ?? null, r.mentioned ? 1 : 0,
+      JSON.stringify(r.queries), JSON.stringify(r.related), JSON.stringify(r.domains), r.excerpt.slice(0, 400)],
+  );
+}
+
+/** 今天（台北時間）這個品牌已經掃了幾題。 */
+export async function aeoScansToday(brandId: number): Promise<number> {
+  const [rows]: any = await localPool.execute(
+    `SELECT COUNT(*) AS n FROM brand_aeo_questions
+      WHERE brandId = ? AND scanStartedAt >= CONVERT_TZ(DATE(CONVERT_TZ(NOW(), '+00:00', '+08:00')), '+08:00', '+00:00')`,
+    [brandId],
+  );
+  return Number((rows as any[])[0]?.n ?? 0);
+}
+
+/** 品牌的辨識字串來源：名稱與官網（沒有 website 欄位的環境只用名稱）。 */
+export async function brandIdentity(brandId: number): Promise<{ name: string; website: string | null }> {
+  try {
+    const [rows]: any = await localPool.execute(`SELECT name, website FROM brands WHERE id = ? LIMIT 1`, [brandId]);
+    const r = (rows as any[])[0];
+    return { name: String(r?.name ?? "").trim(), website: r?.website ? String(r.website) : null };
+  } catch {
+    const [rows]: any = await localPool.execute(`SELECT name FROM brands WHERE id = ? LIMIT 1`, [brandId]);
+    return { name: String((rows as any[])[0]?.name ?? "").trim(), website: null };
+  }
+}
+
+/**
+ * 開始掃一題：先標成 running 就回傳，五家在背景問（要幾十秒），問完寫回結果。
+ * 前端看到 running 會自己輪詢。行程在中途重啟的話，scanStatusOf 會在五分鐘後把它視為失敗。
+ */
+export async function startAeoScan(q: Pick<AeoQuestion, "id" | "brandId" | "question">): Promise<void> {
+  await localPool.execute(
+    `UPDATE brand_aeo_questions SET scanStatus = 'running', scanStartedAt = NOW(3) WHERE id = ?`, [q.id],
+  );
+  void (async () => {
+    let status = "failed";
+    try {
+      const who = await brandIdentity(q.brandId);
+      const results = await askAllEngines(q.question, brandTermsOf(who.name, who.website));
+      for (const r of results) await saveAeoScan(q.brandId, q.id, r).catch((e) => console.warn(`[aeoScan] save ${r.engine} failed: ${e?.message ?? e}`));
+      status = results.some((r) => r.status === "ok") ? "done" : "failed";
+    } catch (e: any) {
+      console.warn(`[aeoScan] question ${q.id} failed: ${e?.message ?? e}`);
+    }
+    await localPool.execute(`UPDATE brand_aeo_questions SET scanStatus = ? WHERE id = ?`, [status, q.id]).catch(() => {});
+  })();
 }

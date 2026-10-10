@@ -6,6 +6,7 @@
  *   add           自己加一題
  *   archive       拿掉一題（封存，不刪）
  *   setPublished  標記「貼上官網了」／取消
+ *   scan          拿一題去問各家 AI 搜尋引擎（Google／ChatGPT／Gemini／Claude／Perplexity），背景執行
  *
  * 回答是在作品頁「轉成 AI 搜尋版」存檔時連上來的（quickTask.aeoSave），不在這裡。
  * 不走方案閘門：建議題目是偶爾按一次的事，不是每篇產文的成本。
@@ -18,8 +19,10 @@ import localPool from "../../localDb";
 import {
   AEO_MAX_QUESTIONS, AEO_QUESTION_MAX, addAeoQuestions, archiveAeoQuestion, cleanQuestion, coverageOf,
   getAeoQuestion, listAeoQuestions, parseSuggestedQuestions, setAeoPublished, statusOf, suggestPrompt,
-  type AeoQuestion,
+  AEO_SCANS_PER_DAY, aeoScansToday, listAeoScans, mentionSummary, startAeoScan,
+  type AeoQuestion, type AeoScanRow,
 } from "../core/brand/aeoQuestions";
+import { AEO_ENGINES, AEO_ENGINE_LABEL, keysFor } from "../core/brand/aeoEngines";
 
 async function loadOwned(userId: number, id: number): Promise<AeoQuestion> {
   const q = await getAeoQuestion(id);
@@ -28,15 +31,25 @@ async function loadOwned(userId: number, id: number): Promise<AeoQuestion> {
   return q;
 }
 
-const view = (q: AeoQuestion) => ({ ...q, status: statusOf(q) });
+const view = (q: AeoQuestion, scans: AeoScanRow[] = []) => ({
+  ...q, status: statusOf(q), scans, mentions: mentionSummary(scans),
+});
 
 export const aeoQuestionRouter = router({
   list: protectedProcedure
     .input(z.object({ brandId: z.number().int().positive() }))
     .query(async ({ ctx, input }) => {
       await assertBrandAccess(ctx.user!.id, input.brandId);
-      const rows = await listAeoQuestions(input.brandId);
-      return { questions: rows.map(view), coverage: coverageOf(rows), max: AEO_MAX_QUESTIONS };
+      const [rows, scans, usedToday] = await Promise.all([
+        listAeoQuestions(input.brandId), listAeoScans(input.brandId), aeoScansToday(input.brandId).catch(() => 0),
+      ]);
+      return {
+        questions: rows.map((q) => view(q, scans.get(q.id) ?? [])),
+        coverage: coverageOf(rows), max: AEO_MAX_QUESTIONS,
+        // 各家 AI 搜尋：哪幾家這個環境有設金鑰（沒設的畫面上標「尚未啟用」，不當成失敗）。
+        engines: AEO_ENGINES.map((id) => ({ id, ...AEO_ENGINE_LABEL[id], configured: keysFor(id).length > 0 })),
+        scanQuota: { used: usedToday, perDay: AEO_SCANS_PER_DAY },
+      };
     }),
 
   suggest: protectedProcedure
@@ -64,20 +77,44 @@ export const aeoQuestionRouter = router({
         throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "這次沒有產出可用的題目，請再試一次。" });
       }
       const added = await addAeoQuestions(input.brandId, ctx.user!.id, questions, "ai");
-      return { added: added.map(view) };
+      return { added: added.map((q) => view(q)) };
     }),
 
   add: protectedProcedure
-    .input(z.object({ brandId: z.number().int().positive(), question: z.string().min(2).max(AEO_QUESTION_MAX * 2) }))
+    .input(z.object({
+      brandId: z.number().int().positive(), question: z.string().min(2).max(AEO_QUESTION_MAX * 2),
+      /** 這一題是掃描時 Google「其他人也問了」帶回來的。 */
+      fromSearch: z.boolean().optional(),
+    }))
     .mutation(async ({ ctx, input }) => {
       await assertBrandAccess(ctx.user!.id, input.brandId);
       if (!cleanQuestion(input.question)) throw new TRPCError({ code: "BAD_REQUEST", message: "請寫下一個問題。" });
-      const added = await addAeoQuestions(input.brandId, ctx.user!.id, [input.question], "user");
+      const added = await addAeoQuestions(input.brandId, ctx.user!.id, [input.question], input.fromSearch ? "search" : "user");
       if (!added.length) {
         const full = (await listAeoQuestions(input.brandId)).length >= AEO_MAX_QUESTIONS;
         throw new TRPCError({ code: "BAD_REQUEST", message: full ? `一個品牌最多 ${AEO_MAX_QUESTIONS} 題。` : "這一題已經在清單上了。" });
       }
       return view(added[0]!);
+    }),
+
+  /**
+   * 拿這一題去問各家 AI 搜尋引擎。先回傳、背景執行（五家要幾十秒），前端輪詢 list。
+   * 一天有上限：每題打五家，是有成本的。
+   */
+  scan: protectedProcedure
+    .input(z.object({ id: z.number().int().positive() }))
+    .mutation(async ({ ctx, input }) => {
+      const q = await loadOwned(ctx.user!.id, input.id);
+      if (q.scanStatus === "running") return { ok: true as const, already: true };
+      if (!AEO_ENGINES.some((e) => keysFor(e).length > 0)) {
+        throw new TRPCError({ code: "PRECONDITION_FAILED", message: "這個環境還沒有設定任何 AI 搜尋的金鑰。" });
+      }
+      const used = await aeoScansToday(q.brandId);
+      if (used >= AEO_SCANS_PER_DAY) {
+        throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: `今天已經查了 ${used} 題（每個品牌一天 ${AEO_SCANS_PER_DAY} 題）。明天再查，或先看已經查好的。` });
+      }
+      await startAeoScan(q);
+      return { ok: true as const, already: false };
     }),
 
   archive: protectedProcedure
