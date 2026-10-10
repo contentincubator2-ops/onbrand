@@ -34,7 +34,7 @@ import { positioningDocRouter } from "./strategy/routes/positioningDocRoute";
 import { taskAttachmentRouter } from "./content/routes/taskAttachmentRoute";
 import { assetPhotoRouter as assetPhotoUploadRoute, STORAGE_ROOT as ASSET_PHOTO_STORAGE_ROOT } from "./strategy/routes/assetPhotoRoute";
 import { slackOAuthRouter } from "./platform/routes/slackOAuthRoute";
-import { cloudOAuthRouter } from "./platform/routes/cloudOAuthRoute";
+import { cloudOAuthRouter, registerCanvaReturnHandler } from "./platform/routes/cloudOAuthRoute";
 import { manusRouter } from "./platform/routers/manusRouter";
 import { mosAgentsMcpRouter } from "./platform/routers/mosAgentsMcpRouter";
 import { wellKnownRouter, mcpOAuthRouter } from "./gateway/mcp/oauthRoutes";
@@ -352,6 +352,11 @@ app.use("/api/asset-photo", assetPhotoUploadRoute);
 // ─── Slack OAuth + Events ─────────────────────────────────────────────────────
 app.use("/slack", slackOAuthRouter);
 // /api/chat removed 2026-05-14 — only v1 MissionChatCore consumed it.
+// Canva 編輯器的「返回」：基礎層的路由收到後，交給策略層把最新版帶回來。
+registerCanvaReturnHandler(async (args) => {
+  const { syncCanvaEdit } = await import("./strategy/core/brand/canvaEdit");
+  return syncCanvaEdit({ ...args, storageRoot: ASSET_PHOTO_STORAGE_ROOT });
+});
 app.use("/api/oauth", cloudOAuthRouter);
 app.use("/api/manus", manusRouter);
 // 2026-09-23：內部用的遠端 MCP 端點（見 mosAgentsMcpRouter.ts 檔頭）——

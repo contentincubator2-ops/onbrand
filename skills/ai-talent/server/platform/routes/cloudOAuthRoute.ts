@@ -257,6 +257,14 @@ cloudOAuthRouter.get("/canva/callback", async (req: Request, res: Response) => {
 // 裡面有我們當初交出去的鑰匙（correlation_state）與設計 id。驗簽用 Canva 公開的金鑰。
 // 驗過之後做的事跟「切回分頁自動同步」一樣（syncCanvaEdit）——這裡只是另一個入口。
 
+/**
+ * 返回後真正做的事（把最新版帶回素材庫與貼文）在策略／內容層；基礎層不能引用它們，
+ * 所以由組裝層（server/index.ts）註冊進來。
+ */
+export type CanvaReturnHandler = (args: { skey: string; actorId: number; accessToken: string }) => Promise<{ changed: boolean; outputId: number | null }>;
+let canvaReturnHandler: CanvaReturnHandler | null = null;
+export function registerCanvaReturnHandler(fn: CanvaReturnHandler): void { canvaReturnHandler = fn; }
+
 const canvaJwks = createRemoteJWKSet(new URL("https://api.canva.com/rest/v1/connect/keys"));
 
 function returnPage(message: string, backHref: string): string {
@@ -287,10 +295,9 @@ cloudOAuthRouter.get("/canva/return", async (req: Request, res: Response) => {
     return;
   }
   try {
-    const { syncCanvaEdit } = await import("../../strategy/core/brand/canvaEdit");
-    const { STORAGE_ROOT } = await import("../../strategy/routes/assetPhotoRoute");
+    if (!canvaReturnHandler) throw new Error("canva return handler not registered");
     const accessToken = await getValidAccessToken(userId, CANVA_ACCOUNT_SCOPE, "canva");
-    const r = await syncCanvaEdit({ skey, actorId: userId, accessToken, storageRoot: STORAGE_ROOT });
+    const r = await canvaReturnHandler({ skey, actorId: userId, accessToken });
     const back = r.outputId ? `/run/${r.outputId}` : "/";
     res.send(returnPage(
       r.changed ? "已把 Canva 的最新版本帶回 onBrand Studio。這個分頁會自動關閉。" : "Canva 那邊沒有新的修改。這個分頁會自動關閉。",

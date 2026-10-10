@@ -2,11 +2,15 @@ import { describe, expect, it, vi } from "vitest";
 
 vi.mock("../../../localDb", () => ({ default: { execute: vi.fn(async () => [[]]) } }));
 
-import { newSessionKey, startCanvaEdit, syncCanvaEdit } from "./canvaEdit";
+import { newSessionKey, registerCanvaOutputWriter, startCanvaEdit, syncCanvaEdit } from "./canvaEdit";
 import {
   CanvaApiError, canvaCanWrite, canvaScopes, clampCanvaSize, createCanvaDesign, uploadCanvaAsset, withCorrelationState,
 } from "../../../platform/core/connectors/canvaClient";
 import { USER_SUPPLIED_IMAGE_MODEL } from "../../../content/core/image/variantImageUpdate";
+import { setOutputOwnImage } from "../../../content/core/image/canvaOutputImage";
+
+// 正式環境由組裝層（server/routers/index.ts）接上；測試裡自己接。
+registerCanvaOutputWriter(setOutputOwnImage);
 import { permissionNeeded } from "../../../platform/core/teamAccess";
 
 /** 兩張表＋mission_outputs 的極簡假資料庫：只認這支會下的那幾句 SQL。 */

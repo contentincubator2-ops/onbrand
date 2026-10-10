@@ -16,8 +16,14 @@ import { STORAGE_ROOT } from "../routes/assetPhotoRoute";
 import { importCanvaDesign, MAX_CANVA_PAGES } from "../core/brand/canvaImport";
 import { getValidAccessToken, CANVA_ACCOUNT_SCOPE } from "../../platform/core/connectors/cloudTokens";
 import { canvaErrorMessage, canvaCanWrite } from "../../platform/core/connectors/canvaClient";
-import { contentSelectorFields } from "../../content/core/engine/outputContentEnvelope";
 import { findCanvaRef, recordCanvaRef, startCanvaEdit, syncCanvaEdit } from "../core/brand/canvaEdit";
+
+/** 要寫回貼文的哪一格（CanvaEditLocator）。這裡只收下來轉交；解讀與檢查在內容層寫回時做。 */
+const canvaLocatorInput = z.object({
+  variantIndex: z.number().int().min(0).default(0),
+  contentKind: z.enum(["planning", "public"]).optional(),
+  contentIndex: z.number().int().min(0).optional(),
+});
 
 const scopeInput = z.object({
   brandId: z.number(),
@@ -184,7 +190,7 @@ export const assetPhotoRouter = router({
       brandId: z.number().int().positive(),
       imageUrl: z.string().max(500).refine((s) => s === "" || s.startsWith("/static/"), { message: "imageUrl must be a site image" }).optional(),
       outputId: z.number().int().positive().optional(),
-      locator: z.object(contentSelectorFields).optional(),
+      locator: canvaLocatorInput.optional(),
       width: z.number().int().min(40).max(8000).optional(),
       height: z.number().int().min(40).max(8000).optional(),
       title: z.string().max(255).optional(),
