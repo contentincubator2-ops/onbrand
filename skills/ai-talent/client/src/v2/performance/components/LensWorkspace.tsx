@@ -18,7 +18,7 @@ import React from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faTableCellsLarge, faFileArrowUp, faComments, faArrowsRotate, faFileImport, faXmark,
-  faWandMagicSparkles, faPen, faPlus, faArrowUpRightFromSquare, faTrash,
+  faWandMagicSparkles, faPen, faPlus, faArrowUpRightFromSquare, faTrash, faPaperPlane, faCircleInfo, faBookmark,
 } from "@fortawesome/free-solid-svg-icons";
 import { trpc } from "../../../lib/trpc";
 import { tr, useLang } from "../../../lib/i18n";
@@ -33,6 +33,23 @@ type Proposal = {
   name: string; rationale: string; unmapped: string[];
   rowDim: Dim & { isNew: boolean }; colDim: (Dim & { isNew: boolean }) | null; config: LensConfig;
 };
+
+type AskPeriod = { kind: "days"; days: number } | { kind: "month"; month: string };
+type AskPlan = { title: string; config: LensConfig; filters: { dimKey: string; code: string }[]; period: AskPeriod };
+type RankedCell = { row: DimValue; col: DimValue | null; judge: number; count: number };
+type Explain = {
+  from: string; to: string; factCount: number;
+  sources: { source: string; label: string; facts: number; latest: string }[];
+  filters: { dimKey: string; code: string }[]; judge: string; formula: { zh: string; en: string };
+  excluded: { untaggedFacts: number; thinCells: number; noValueCells: number }; minCount: number;
+};
+type AskResult =
+  | { ok: false; reason: string }
+  | {
+    ok: true; plan: AskPlan; range: { from: string; to: string }; explain: Explain;
+    answer: { kind: "ranking" | "thin" | "nodata"; judge: string; total: { judge: number | null; count: number }; best: RankedCell | null; worst: RankedCell | null; ranked: RankedCell[] };
+    filterLabels: { dimKey: string; dimLabel: string; valueLabel: string }[];
+  };
 
 const UNTAGGED = "__untagged";
 const api = () => (trpc as any).performance;
@@ -111,6 +128,184 @@ const inputCls = "w-full rounded-lg border border-neutral-300 px-2.5 py-1.5 text
 const primaryBtn = "rounded-lg bg-neutral-900 px-3 py-1.5 text-[13px] font-medium text-white disabled:opacity-50";
 const ghostBtn = "rounded-lg border border-neutral-300 px-3 py-1.5 text-[13px] text-neutral-700 hover:border-neutral-900";
 
+/* ───────────────────────── 問答：一句話問過去的成效 ───────────────────────── */
+
+const shortDate = (ymdStr: string) => ymdStr.slice(5).replace("-", "/");
+const cellName = (c: RankedCell) => (c.col ? `${c.row.label} × ${c.col.label}` : c.row.label);
+
+/** 每個數字的出處：資料來源、資料到哪天、公式、排除了什麼。 */
+function ExplainBox({ explain, filterLabels }: { explain: Explain; filterLabels?: { dimLabel: string; valueLabel: string }[] }) {
+  useLang();
+  const [open, setOpen] = React.useState(false);
+  const newest = explain.sources.map((s) => s.latest).sort().at(-1);
+  return (
+    <div className="mt-2 text-[12px] text-neutral-500">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+        <span>
+          {explain.sources.length
+            ? tr("Source: ", "資料來源：") + explain.sources.map((s) => s.label).join("、") + (newest ? tr(` · data through ${shortDate(newest)}`, `・資料到 ${shortDate(newest)}`) : "")
+            : tr("No data in this period", "這段期間沒有資料")}
+        </span>
+        <button type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open}
+          className="inline-flex items-center gap-1 text-neutral-600 underline-offset-2 hover:text-neutral-900 hover:underline">
+          <FontAwesomeIcon icon={faCircleInfo} /> {tr("How it's calculated", "怎麼算")}
+        </button>
+      </div>
+      {open && (
+        <ul className="mt-2 space-y-1 rounded-lg bg-neutral-50 px-3 py-2 text-[12px] leading-relaxed text-neutral-700">
+          <li>{tr("Period: ", "期間：")}{explain.from} ～ {explain.to}</li>
+          <li>
+            {tr("Rows used: ", "用了：")}
+            {explain.sources.length
+              ? explain.sources.map((s) => tr(`${s.label} ${s.facts.toLocaleString()} rows (through ${shortDate(s.latest)})`, `${s.label} ${s.facts.toLocaleString()} 筆（到 ${shortDate(s.latest)}）`)).join("；")
+              : tr("none", "無")}
+          </li>
+          {!!filterLabels?.length && <li>{tr("Only: ", "只看：")}{filterLabels.map((f) => `${f.dimLabel}＝${f.valueLabel}`).join("、")}</li>}
+          <li>{tr("Formula: ", "算法：")}{tr(explain.formula.en, explain.formula.zh)}{tr(" (summed across rows, then divided — not an average of averages)", "（先加總再相除，不是各筆比值的平均）")}</li>
+          <li>
+            {tr("Left out: ", "沒算進排名：")}
+            {tr(
+              `${explain.excluded.untaggedFacts} untagged rows, ${explain.excluded.thinCells} groups with fewer than ${explain.minCount} rows, ${explain.excluded.noValueCells} groups with no value`,
+              `未歸類 ${explain.excluded.untaggedFacts} 筆、不足 ${explain.minCount} 筆的組別 ${explain.excluded.thinCells} 個、算不出值的組別 ${explain.excluded.noValueCells} 個`,
+            )}
+          </li>
+        </ul>
+      )}
+    </div>
+  );
+}
+
+function AskPanel({ brandId, tray, days, judgeLabels, onSaved }: {
+  brandId: number; tray: string; days: number; judgeLabels: Record<string, string>; onSaved: (id: number) => void;
+}) {
+  useLang();
+  const [q, setQ] = React.useState("");
+  const [res, setRes] = React.useState<AskResult | null>(null);
+  const [err, setErr] = React.useState<string | null>(null);
+  const [saved, setSaved] = React.useState(false);
+  // 換 tray／品牌就清掉上一題，不然「接著調整」會帶著別的 tray 的設定。
+  React.useEffect(() => { setRes(null); setErr(null); setSaved(false); }, [tray, brandId]);
+  const ask = api().ask.useMutation({
+    onSuccess: (r: AskResult) => { setRes(r); setErr(null); setSaved(false); },
+    onError: (e: any) => setErr(e?.message || tr("Something went wrong. Try again.", "出了點問題，再試一次。")),
+  });
+  const save = api().saveLens.useMutation({
+    onSuccess: (r: { id: number }) => { setSaved(true); onSaved(r.id); },
+    onError: (e: any) => setErr(e?.message),
+  });
+  const answered = res && res.ok ? res : null;
+  const submit = () => {
+    const text = q.trim();
+    if (text.length < 2 || ask.isPending) return;
+    ask.mutate({
+      brandId, tray, question: text, defaultDays: days,
+      previous: answered ? answered.plan : undefined,
+    });
+    setQ("");
+  };
+
+  const judgeName = (k: string) => judgeLabels[k] ?? k;
+  const fmt = (k: string, v: number | null) => fmtJudge(k, v);
+  const a = answered?.answer;
+  const periodText = answered
+    ? (answered.plan.period.kind === "days" ? rangeLabel(answered.plan.period.days) : answered.plan.period.month)
+    : "";
+
+  return (
+    <div className="mt-4">
+      <form onSubmit={(e) => { e.preventDefault(); submit(); }} className="flex items-center gap-2">
+        <input
+          value={q} onChange={(e) => setQ(e.target.value)} maxLength={300}
+          placeholder={answered
+            ? tr("Adjust it, e.g. “only Meta”, “last month”, “by format instead”", "接著調整，例如「只看 Meta」「改看上個月」「改成依貼文形式」")
+            : tr("Ask about your past results, e.g. “which audience converted worst last month?”", "問問過去的成效，例如「上個月哪個族群轉換最差？」")}
+          className={inputCls}
+          aria-label={tr("Ask about your results", "問問過去的成效")}
+        />
+        <button type="submit" disabled={ask.isPending || q.trim().length < 2} className={`${primaryBtn} inline-flex items-center gap-1.5 whitespace-nowrap`}>
+          <FontAwesomeIcon icon={faPaperPlane} className={ask.isPending ? "animate-pulse" : ""} />
+          {ask.isPending ? tr("Reading…", "計算中…") : tr("Ask", "問")}
+        </button>
+        {(res || err) && !ask.isPending && (
+          <button type="button" onClick={() => { setRes(null); setErr(null); }} className={ghostBtn}>{tr("Clear", "清除")}</button>
+        )}
+      </form>
+
+      {err && <p className="mt-2 text-[13px] text-red-700">{err}</p>}
+      {res && !res.ok && (
+        <p className="mt-2 rounded-lg bg-neutral-50 px-3 py-2 text-[13px] text-neutral-700">
+          {res.reason || tr("I couldn't turn that into a question the data can answer. Name the audience, channel or metric you want to compare.", "這個問題我沒辦法對應到資料。換個問法，指出想比較的族群、通路或指標。")}
+        </p>
+      )}
+
+      {answered && a && (
+        <div className="mt-3 rounded-lg border border-neutral-200 p-3">
+          <div className="text-[12px] text-neutral-500">
+            {answered.plan.title || tr("Answer", "回答")}・{periodText}
+            {answered.filterLabels.length > 0 && `・${answered.filterLabels.map((f) => `${f.dimLabel}＝${f.valueLabel}`).join("、")}`}
+          </div>
+
+          {a.kind === "nodata" && (
+            <p className="mt-1 text-[14px] text-neutral-900">
+              {tr("There's no data for this period yet, so there's nothing to compare. Sync your page or import a back-office file, then ask again.", "這段期間還沒有數據，沒辦法比較。先同步粉專或匯入後台檔，再問一次。")}
+            </p>
+          )}
+          {a.kind === "thin" && (
+            <p className="mt-1 text-[14px] text-neutral-900">
+              {tr(`No group has ${answered.explain.minCount}+ rows yet, so I can't rank them. Overall ${judgeName(a.judge)}: ${fmt(a.judge, a.total.judge)}.`,
+                `每一組都還不到 ${answered.explain.minCount} 筆，不足以排名。整體 ${judgeName(a.judge)}：${fmt(a.judge, a.total.judge)}。`)}
+            </p>
+          )}
+          {a.kind === "ranking" && a.best && (
+            <>
+              <p className="mt-1 text-[14px] leading-relaxed text-neutral-900">
+                {tr(
+                  `${judgeName(a.judge)}: best is “${cellName(a.best)}” (${fmt(a.judge, a.best.judge)}, ${a.best.count} rows)`,
+                  `${judgeName(a.judge)} 表現最好的是「${cellName(a.best)}」（${fmt(a.judge, a.best.judge)}，${a.best.count} 筆）`,
+                )}
+                {a.worst && tr(
+                  `; weakest is “${cellName(a.worst)}” (${fmt(a.judge, a.worst.judge)}, ${a.worst.count} rows)`,
+                  `；最弱的是「${cellName(a.worst)}」（${fmt(a.judge, a.worst.judge)}，${a.worst.count} 筆）`,
+                )}
+                {tr(`. Overall ${fmt(a.judge, a.total.judge)}.`, `。整體 ${fmt(a.judge, a.total.judge)}。`)}
+              </p>
+              {a.ranked.length > 1 && (
+                <table className="mt-2 w-full border-separate border-spacing-y-1 text-[13px]">
+                  <tbody>
+                    {a.ranked.map((c, i) => (
+                      <tr key={`${c.row.code}|${c.col?.code ?? "*"}`}>
+                        <td className="w-6 tabular-nums text-neutral-400">{i + 1}</td>
+                        <td className="text-neutral-800">{cellName(c)}</td>
+                        <td className="w-24 text-right tabular-nums text-neutral-900">{fmt(a.judge, c.judge)}</td>
+                        <td className="w-16 text-right text-[11px] tabular-nums text-neutral-400">{tr(`${c.count} rows`, `${c.count} 筆`)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </>
+          )}
+
+          <ExplainBox explain={answered.explain} filterLabels={answered.filterLabels} />
+
+          {a.kind === "ranking" && answered.plan.filters.length === 0 && (
+            <div className="mt-3">
+              <button type="button" disabled={save.isPending || saved}
+                onClick={() => save.mutate({
+                  brandId, tray, name: answered.plan.title || tr("My question", "我的提問"), config: answered.plan.config,
+                })}
+                className={`${ghostBtn} inline-flex items-center gap-1.5 disabled:opacity-60`}>
+                <FontAwesomeIcon icon={faBookmark} />
+                {saved ? tr("Saved as a lens", "已存成視角") : tr("Keep as a lens", "存成視角，之後直接看")}
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ───────────────────────── 主元件 ───────────────────────── */
 
 export default function LensWorkspace({ brandId, tray }: { brandId: number | null; tray: string }) {
@@ -182,6 +377,9 @@ export default function LensWorkspace({ brandId, tray }: { brandId: number | nul
           </select>
         </div>
       </div>
+
+      <AskPanel brandId={brandId} tray={tray} days={days} judgeLabels={data?.judgeLabels ?? {}}
+        onSaved={(id) => { setActiveId(id); refresh(); }} />
 
       {notice && (
         <div className="mt-3 flex items-start gap-2 rounded-lg bg-neutral-50 px-3 py-2 text-[13px] text-neutral-700">
@@ -312,6 +510,7 @@ function LensReport({ lens, dims, data, report, loading, onCell, onAutoTag, auto
           </span>
         )}
       </div>
+      {report?.explain && <div className="mb-2"><ExplainBox explain={report.explain} /></div>}
       <div className="overflow-x-auto">
         {/* 值的名稱常常是一整句（「5到10分鐘加熱即可上桌」）：欄寬至少 96px、表頭最多兩行，
             完整名稱放 title，免得窄欄把字擠成直排。 */}
