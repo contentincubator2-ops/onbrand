@@ -212,5 +212,12 @@ export function addedNumbers(source: string, remix: string): string[] {
     .replace(/第\s*\d+\s*[張段點招關天步]/g, "")
     .replace(/\d+\s*[–\-~到至]\s*\d+\s*秒/g, "").replace(/\d+\s*秒/g, "")
     .replace(/#\S+/g, "");
-  return Array.from(numbersIn(body)).filter((n) => !allowed.has(n));
+  const digits = Array.from(numbersIn(body)).filter((n) => !allowed.has(n));
+  // 2026-10-10 實跑：包裝時多了一句「你說你瘦了五公斤」，底稿沒有這個數字，但國字數字沒被抓到。
+  // 國字數字只看後面接度量單位的（公斤、公分、成、倍、歲、大卡、克），「兩件事」「一個禮拜」這種不算。
+  const zh = (t: string) => String(t ?? "").match(/[一二兩三四五六七八九十百千半]+(?:點[一二三四五六七八九])?\s*(?:公斤|公分|公克|毫克|大卡|成|倍|歲|克)/g) ?? [];
+  const src = `${source}
+${factsBlock()}`;
+  const words = Array.from(new Set(zh(body))).filter((w) => !src.includes(w));
+  return [...digits, ...words];
 }

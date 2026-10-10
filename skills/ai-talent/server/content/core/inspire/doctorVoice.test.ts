@@ -96,6 +96,8 @@ describe("第二步：套流量密碼", () => {
     const src = "每一餐都要有一份蛋白質。";
     expect(addedNumbers(src, "0–3 秒｜開場\n第 1 張｜肌肉是存款\n15 秒內講完 #減重")).toEqual([]);
     expect(addedNumbers(src, "BMI 27 以上屬於肥胖。")).toEqual([]);
+    expect(addedNumbers(src, "你說你瘦了五公斤，可是臉垮了。回家先做兩件事，連續一個禮拜。")).toEqual(["五公斤"]);
+    expect(addedNumbers("我瘦了五公斤。", "他說瘦了五公斤。")).toEqual([]);
     expect(addedNumbers(src, "每公斤體重吃 1.6 克蛋白質，可以多留住 45% 的肌肉。").sort()).toEqual(["1.6", "45"]);
   });
   it("解析：沒有成稿算失敗", () => {
