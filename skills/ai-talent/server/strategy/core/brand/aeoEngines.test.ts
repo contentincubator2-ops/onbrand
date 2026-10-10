@@ -51,6 +51,12 @@ describe("各家回應的解析", () => {
     }, q);
     expect(p.queries).toEqual(["marketing report automation tools"]);
     expect(p.domains).toEqual(["admetry.app"]);
+    // 實測：中文檢索詞回來是字面的 \uXXXX。還原後跟原句一樣就不列；不一樣的要看得懂。
+    const escaped = parseOpenAi({ output: [
+      { type: "web_search_call", action: { query: "\\u884c\\u92b7\\u5831\\u8868\\u81ea\\u52d5\\u5316" } },
+      { type: "web_search_call", action: { query: "\\u884c\\u92b7 \\u5de5\\u5177" } },
+    ] }, q);
+    expect(escaped.queries).toEqual(["行銷 工具"]);
   });
 
   it("Gemini：檢索詞在 webSearchQueries；引用的網域要看 title（uri 是 Google 的轉址）", () => {

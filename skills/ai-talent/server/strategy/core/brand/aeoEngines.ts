@@ -100,6 +100,8 @@ export function parseOpenAi(d: any, question: string): Parsed {
   const out: any[] = d?.output ?? [];
   const queries = out.filter((o) => o?.type === "web_search_call")
     .flatMap((o) => o?.action?.queries ?? (o?.action?.query ? [o.action.query] : []))
+    // 實測它回的中文檢索詞是字面的 \uXXXX（多逸出了一層），要還原才看得懂、也才比得出是不是原句。
+    .map((q: string) => String(q).replace(/\\u([0-9a-fA-F]{4})/g, (_m, h) => String.fromCharCode(parseInt(h, 16))))
     // 它常常把原句照搬當檢索詞——那不是「它怎麼拆問題」，不列。
     .filter((q: string) => String(q).trim() !== question.trim());
   const parts = out.filter((o) => o?.type === "message").flatMap((o) => o?.content ?? []);
