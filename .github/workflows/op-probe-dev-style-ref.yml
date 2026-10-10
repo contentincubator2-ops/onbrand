@@ -7,7 +7,7 @@ name: Ops (DEV) — probe style reference images end to end
 # 用「這個分支」的 mediaGen.ts（多張參考圖怎麼送）與 imageCards.ts（提示詞），所以合併前就能看成品。
 # 參考圖是腳本現場畫的幾何色塊（深藍綠＋芥末黃＋磚紅），成品有沒有學到一眼看得出來。
 # 不寫資料庫、不扣點；只在 dev 的媒體儲存留下幾張 probe 圖。成品縮圖以 base64 印在 log 裡。
-# 花費：三次生圖。
+# 花費：三次生圖。第 2 次跑：風格參考圖移到提示詞最前面＋結尾再提醒一次。
 # Path-scoped push，跟 op-probe-dev-influencer.yml 同一個做法（environment: dev 才會連到 DEV VM）。
 on:
   push:
@@ -85,7 +85,7 @@ jobs:
                   spec, scenePromptEn: c.lead ? "The product box standing on a doctor's tidy desk beside a laptop and a small plant, near a window." : SCENE,
                   brand: {} as any, withProduct: !!c.lead, styleRefCount: refs.length,
                 });
-                if (c.id.startsWith("A")) console.log(`\n--- prompt (case A)\n${prompt}\n---`);
+                if (c.id.startsWith("B")) console.log(`\n--- prompt (case B)\n${prompt}\n---`);
                 const t0 = Date.now();
                 try {
                   const r = await dispatchGenerate(c.model, { prompt, imageUrl: c.lead, extraImageUrls: refs, brandId: 0, ...c.opts });

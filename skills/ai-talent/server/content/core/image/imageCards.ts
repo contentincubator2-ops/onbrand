@@ -156,6 +156,32 @@ export function buildImageCardPrompt(args: {
   styleRefCount?: number;
 }): string {
   const lines: string[] = [];
+  const nRef = Math.max(0, args.styleRefCount ?? 0);
+  // 風格參考圖放在最前面講：實測（2026-10-10 dev）放在中段時 gpt-image-2 只學到配色、畫法仍是照片，
+  // 帶產品照時更是整段被產品保真那一塊蓋過去。所以先講清楚「哪張是什麼」，結尾再提醒一次。
+  if (nRef > 0) {
+    const lead = args.withProduct || !!args.reference;
+    const refs = nRef === 1 ? "STYLE REFERENCE" : "STYLE REFERENCES";
+    const which = lead
+      ? `Image 1 is ${args.reference ? "the current visual" : "the REAL product/subject photo"}. ${nRef === 1 ? "Image 2 is a" : `Images 2–${nRef + 1} are`} ${refs} supplied by the user`
+      : `The attached ${nRef === 1 ? "image is a" : `${nRef} images are`} ${refs} supplied by the user`;
+    lines.push(
+      `ATTACHED IMAGES — ${which}.`,
+      `STYLE REFERENCE (top priority for how the image looks): the new image must look as if it was made by the same ` +
+      `artist or photographer as the ${refs.toLowerCase()} — the SAME MEDIUM (if ${nRef === 1 ? "it is" : "they are"} flat illustration, ` +
+      "paper cut-out, watercolour, 3D render or film photography, the output must be that too, not a default photograph), " +
+      "the same colour palette, lighting, texture, level of detail, shapes and mood. This overrides any style words in the " +
+      "scene and any brand imagery guidance below. " +
+      `Take ONLY the look: do NOT copy ${nRef === 1 ? "its" : "their"} subject, people, faces, products, logos, text or exact ` +
+      "composition — the content must be the scene described below." +
+      (args.withProduct
+        ? " The product/subject from image 1 stays exactly as photographed (shape, colours, label); render everything around it — " +
+          "background, props, surfaces, lighting and overall palette — in the look of the style references."
+        : "") +
+      (args.reference === "restyle" ? " Keep the subject, content and composition of the current visual; change only how it is rendered." : ""),
+      "",
+    );
+  }
   if (args.withProduct) { lines.push(PRODUCT_FAITHFUL_PROMPT_BLOCK, ""); }
   const bb = brandBlock({ ...args.brand, ...(args.withProduct ? { brandName: undefined } : {}) });
   if (bb) { lines.push(bb, ""); }
@@ -179,24 +205,7 @@ export function buildImageCardPrompt(args: {
   if (args.reference === "restyle") {
     lines.push(
       "REFERENCE IMAGE: the attached image is the current version. Keep the same subject, scene content and composition, " +
-      "but re-render the WHOLE image in the ART STYLE / STYLE REFERENCE below (colours may shift to suit the style).",
-      "",
-    );
-  }
-  const nRef = Math.max(0, args.styleRefCount ?? 0);
-  if (nRef > 0) {
-    const lead = args.withProduct || !!args.reference;
-    const which = lead
-      ? `the LAST ${nRef === 1 ? "attached image is a STYLE REFERENCE" : `${nRef} attached images are STYLE REFERENCES`} (the first attached image is ${args.reference ? "the visual described above" : "the real product/subject photo"})`
-      : `the attached ${nRef === 1 ? "image is a STYLE REFERENCE" : `${nRef} images are STYLE REFERENCES`}`;
-    lines.push(
-      `STYLE REFERENCE supplied by the user: ${which}. Learn the look from ${nRef === 1 ? "it" : "them"}: medium ` +
-      "(photo, illustration, 3D…), colour palette, lighting, texture, level of detail, framing feel and mood, and render " +
-      "the new image in that same look. Where this conflicts with style words in the scene or with the brand imagery " +
-      "guidance above, the style reference wins. " +
-      `Do NOT copy ${nRef === 1 ? "its" : "their"} subject, people, faces, products, logos, text or exact composition — ` +
-      "the result must be an original image of the scene below" +
-      (args.reference === "restyle" ? ", keeping the subject, content and composition of the current version." : "."),
+      "but re-render the WHOLE image in the ART STYLE / STYLE REFERENCE given in this prompt (colours may shift to suit the style).",
       "",
     );
   }
@@ -225,6 +234,13 @@ export function buildImageCardPrompt(args: {
     lines.push(NO_MIRROR_PROMPT_BLOCK);
   } else {
     lines.push(NO_TEXT_PROMPT_BLOCK, "", NO_MIRROR_PROMPT_BLOCK);
+  }
+  if (nRef > 0) {
+    lines.push(
+      "",
+      "FINAL CHECK — style: placed next to the style reference" + (nRef === 1 ? "" : "s") + ", the result must clearly belong to the same series " +
+      "(same medium, palette and texture)" + (args.withProduct ? ", with the real product unchanged." : "."),
+    );
   }
   return lines.join("\n");
 }

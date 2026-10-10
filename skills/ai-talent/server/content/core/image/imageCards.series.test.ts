@@ -59,7 +59,7 @@ describe("prompt", () => {
     const base = { spec, scenePromptEn: "a new scene", brand: {} as any, withProduct: false };
     const style = buildImageCardPrompt({ ...base, reference: "style" });
     expect(style).toContain("slide 1 of a multi-image set");
-    expect(style).toContain("Do NOT copy its subject");
+    expect(style).toContain("do NOT copy its subject");
     const prev = buildImageCardPrompt({ ...base, reference: "previous" });
     expect(prev).toContain("previous version");
     expect(prev).not.toContain("multi-image set");
@@ -136,19 +136,22 @@ describe("畫面樣式與純色底（CJ「底圖的樣式要多點選擇」）",
   });
   it("用戶的風格參考圖：只學畫風、不照抄內容，且不再疊預設樣式", () => {
     const base = { spec, scenePromptEn: "a doctor at a desk", brand: {} as any, withProduct: false };
-    expect(buildImageCardPrompt(base)).not.toContain("STYLE REFERENCE supplied by the user");
+    expect(buildImageCardPrompt(base)).not.toContain("STYLE REFERENCE");
     const one = buildImageCardPrompt({ ...base, styleRefCount: 1, styleId: "watercolor" });
-    expect(one).toContain("the attached image is a STYLE REFERENCE");
-    expect(one).toContain("Do NOT copy its subject");
+    expect(one).toContain("The attached image is a STYLE REFERENCE");
+    expect(one.indexOf("STYLE REFERENCE")).toBeLessThan(one.indexOf("CANVAS"));
+    expect(one).toContain("FINAL CHECK — style");
+    expect(one).toContain("do NOT copy its subject");
     expect(one).not.toContain("ART STYLE (applies");
     // 有產品照時要講清楚哪一張是主體、哪幾張是風格參考。
     const withPhoto = buildImageCardPrompt({ ...base, withProduct: true, styleRefCount: 2 });
-    expect(withPhoto).toContain("the LAST 2 attached images are STYLE REFERENCES");
-    expect(withPhoto).toContain("real product/subject photo");
+    expect(withPhoto).toContain("Images 2–3 are STYLE REFERENCES");
+    expect(withPhoto).toContain("Image 1 is the REAL product/subject photo");
+    expect(withPhoto).toContain("stays exactly as photographed");
     // 照參考圖重畫：內容與構圖留著，只換畫風。
     const restyle = buildImageCardPrompt({ ...base, reference: "restyle", styleRefCount: 1 });
-    expect(restyle).toContain("the LAST attached image is a STYLE REFERENCE");
-    expect(restyle).toContain("keeping the subject, content and composition of the current version");
+    expect(restyle).toContain("Image 1 is the current visual. Image 2 is a STYLE REFERENCE");
+    expect(restyle).toContain("change only how it is rendered");
   });
   it("帶產品照時樣式要提醒主體保真", () => {
     const p = buildImageCardPrompt({ spec, scenePromptEn: "s", brand: {} as any, withProduct: true, styleId: "illustration" });
