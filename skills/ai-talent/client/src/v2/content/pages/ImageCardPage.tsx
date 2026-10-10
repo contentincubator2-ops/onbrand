@@ -28,7 +28,7 @@ import { uploadBrandPhoto, IMAGE_ACCEPT } from "../../strategy/lib/uploadBrandPh
 import { Icon } from "../../platform/components/icons";
 import AiImageNotice from "../../platform/components/AiImageNotice";
 import { PlatformMockup } from "../components/PlatformMockup";
-import { ToolTabs, StylePanel, BasePanel, type ToolId, type PickedPhoto } from "../components/imageCard/ImageTools";
+import { ToolTabs, StylePanel, BasePanel, StyleRefStrip, STYLE_FROM_REFS, type ToolId, type PickedPhoto } from "../components/imageCard/ImageTools";
 import { imageCardMockup } from "../lib/imageCardMockup";
 
 type Model = "gpt-image-2" | "nano-banana";
@@ -212,6 +212,8 @@ export default function ImageCardPage() {
   const [tool, setTool] = useState<ToolId | null>("edit");
   const [styleSel, setStyleSel] = useState<string | null>(null);
   const [styleScope, setStyleScope] = useState<"slide" | "all">("all");
+  /** 用戶上傳的風格參考圖（素材庫網址）：初稿、換場景、「照參考圖重畫」會帶給模型，只學畫風。 */
+  const [styleRefs, setStyleRefs] = useState<string[]>([]);
   const [basePending, setBasePending] = useState<PickedPhoto | null>(null);
   const [baseFit, setBaseFit] = useState<"cover" | "contain">("cover");
   /** 素材庫視窗是替「主體照片」挑，還是替「某一張的底圖」挑。 */
@@ -325,7 +327,7 @@ export default function ImageCardPage() {
     }
   }
 
-  async function render(opts: { reference?: string; referenceMode?: "previous" | "style" | "restyle"; instruction?: string; scene?: string; targetCard?: ImageCardInfo; useModel?: Model; styleId?: string; photo?: string }) {
+  async function render(opts: { reference?: string; referenceMode?: "previous" | "style" | "restyle"; instruction?: string; scene?: string; targetCard?: ImageCardInfo; useModel?: Model; styleId?: string; photo?: string; withStyleRefs?: boolean }) {
     const scene = opts.scene ?? scenePrompt;
     if (!brandId || !scene) return null;
     const target = opts.targetCard ?? card!;
@@ -334,6 +336,7 @@ export default function ImageCardPage() {
       brandId, cardId: target.id, scenePromptEn: scene, modelChoice: m,
       productImageUrl: opts.reference ? undefined : (opts.photo ?? product?.imageUrl),
       referenceImageUrl: opts.reference, referenceMode: opts.referenceMode, instruction: opts.instruction, styleId: opts.styleId,
+      styleReferenceUrls: opts.withStyleRefs && styleRefs.length ? styleRefs : undefined,
     });
     return r;
   }
@@ -341,7 +344,7 @@ export default function ImageCardPage() {
   async function generateFirst(useModel?: Model) {
     setFailure(null);
     try {
-      const r = await render({ useModel, scene: sceneFor(0), instruction: noteOf(0) });
+      const r = await render({ useModel, scene: sceneFor(0), instruction: noteOf(0), withStyleRefs: true });
       if (r?.status === "ready" && r.url) {
         setSlots([{ versions: [{ url: r.url, note: lang === "en" ? "First draft" : "初稿" }], active: 0 }]);
         setActiveSlot(0);
@@ -401,7 +404,7 @@ export default function ImageCardPage() {
     setFailure(null);
     try {
       const r = await render({
-        scene, reference: styleRef, referenceMode: styleRef ? "style" : undefined,
+        scene, reference: styleRef, referenceMode: styleRef ? "style" : undefined, withStyleRefs: !styleRef,
         instruction: t ? undefined : "Create a clearly different composition, camera angle and setting from the previous version of this slide.",
       });
       if (r?.status === "ready" && r.url) pushVersion(i, { url: r.url, note: lang === "en" ? "New scene" : "新場景" });
@@ -443,15 +446,17 @@ export default function ImageCardPage() {
     if (idxs.length > 1 && !window.confirm(lang === "en"
       ? `This regenerates ${idxs.length} images, one charge each. Continue?`
       : `會重新生成 ${idxs.length} 張，每張各扣一次點數。確定嗎？`)) return;
+    const fromRefs = styleSel === STYLE_FROM_REFS;
+    if (fromRefs && !styleRefs.length) return;
     const info = styleList.find((x) => x.id === styleSel);
-    const note = info ? (lang === "en" ? info.labelEn : info.labelZh) : styleSel;
+    const note = fromRefs ? (lang === "en" ? "My reference style" : "照參考圖") : info ? (lang === "en" ? info.labelEn : info.labelZh) : styleSel;
     setFailure(null); setRestBusy(true);
     try {
       for (const i of idxs) {
         const cur = slots[i]?.versions[slots[i]!.active];
         if (!cur) continue;
         setRestAt(i + 1);
-        const r = await render({ scene: sceneFor(i) || KEEP_PHOTO_SCENE, reference: cur.url, referenceMode: "restyle", styleId: styleSel });
+        const r = await render({ scene: sceneFor(i) || KEEP_PHOTO_SCENE, reference: cur.url, referenceMode: "restyle", ...(fromRefs ? { withStyleRefs: true } : { styleId: styleSel }) });
         if (r?.status === "ready" && r.url) pushVersion(i, { url: r.url, note });
         else { setFailure({ msg: r?.errorMsg ?? "", canNano: false }); break; }
       }
@@ -816,6 +821,7 @@ export default function ImageCardPage() {
                   </option>
                 </select>
               </div>
+              {!asisActive && <StyleRefStrip lang={lang} brandId={brandId} refs={styleRefs} setRefs={setStyleRefs} disabled={busy} />}
               <p className="text-[11px] text-default-400">
                 {lang === "en" ? "Brand colours and imagery style are applied automatically." : "品牌色與圖像風格會自動套用（在品牌視覺頁設定）。"}
               </p>
@@ -961,7 +967,7 @@ export default function ImageCardPage() {
               {tool === "style" && (
                 <StylePanel lang={lang} styles={styleList} selected={styleSel} onSelect={setStyleSel}
                   scope={styleScope} setScope={setStyleScope} slideNo={activeSlot + 1} total={series ? slots.length : 1}
-                  busy={busy} onApply={applyStyle} />
+                  busy={busy} onApply={applyStyle} brandId={brandId} refs={styleRefs} setRefs={setStyleRefs} />
               )}
 
               {tool === "title" && (

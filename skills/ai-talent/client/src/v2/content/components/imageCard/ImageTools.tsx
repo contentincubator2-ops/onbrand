@@ -50,19 +50,108 @@ export function ToolTabs({ lang, tool, setTool, badges }: {
   );
 }
 
+// ── 風格參考圖 ─────────────────────────────────────────────────────────
+
+/** 一次最多幾張（伺服器 imageCards.MAX_STYLE_REFS 的鏡像；伺服器才是準的）。 */
+export const MAX_STYLE_REFS = 3;
+/** 樣式面板裡「照我的參考圖」這個選項的 id（不是伺服器的樣式 id）。 */
+export const STYLE_FROM_REFS = "__refs";
+
+/**
+ * 風格參考圖（2026-10-10 CJ「大家的習慣，就是自己上傳幾張圖給 AI，請 AI 學那張圖」）：
+ * 上傳 1–3 張喜歡的圖，AI 只學畫風（色調、光線、質感），畫面內容仍照文案與方向。
+ * 上傳走素材庫同一支（asset_photos），所以之後也能在素材庫找到。
+ */
+export function StyleRefStrip({ lang, brandId, refs, setRefs, disabled }: {
+  lang: string; brandId: number | null; refs: string[]; setRefs: (r: string[]) => void; disabled?: boolean;
+}) {
+  const en = lang === "en";
+  const [uploading, setUploading] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const room = MAX_STYLE_REFS - refs.length;
+
+  async function upload(files: FileList | null) {
+    const picked = Array.from(files ?? []).filter((x) => x.type.startsWith("image/") || !x.type);
+    if (!picked.length || !brandId) return;
+    if (picked.length > room) showToastGlobal(en ? `Up to ${MAX_STYLE_REFS} reference images.` : `風格參考圖最多 ${MAX_STYLE_REFS} 張。`);
+    setUploading(true);
+    const next = [...refs];
+    try {
+      for (const f of picked.slice(0, room)) {
+        const up = await uploadBrandPhoto(brandId, f);
+        if (!next.includes(up.url)) next.push(up.url);
+      }
+    } catch (e: any) {
+      showToastGlobal(String(e?.message ?? e).slice(0, 200), "error");
+    } finally {
+      setRefs(next);
+      setUploading(false);
+      if (fileRef.current) fileRef.current.value = "";
+    }
+  }
+
+  return (
+    <div>
+      <p className="text-tiny text-default-500 mb-1.5">
+        {en ? "Style reference images (optional)" : "風格參考圖（選填）"}
+        {refs.length > 0 && <span className="ml-1.5 text-default-700 tabular-nums">· {refs.length}/{MAX_STYLE_REFS}</span>}
+      </p>
+      <div className="flex flex-wrap gap-2">
+        {refs.map((u) => (
+          <div key={u} className="relative w-16 h-16 rounded-lg overflow-hidden border-2 border-default-900 bg-white">
+            <img src={u} alt="" className="w-full h-full object-cover" />
+            <button type="button" disabled={disabled} onClick={() => setRefs(refs.filter((x) => x !== u))}
+              title={en ? "Remove" : "移除"} aria-label={en ? "Remove reference image" : "移除這張參考圖"}
+              className="absolute top-0.5 right-0.5 w-4 h-4 rounded-full bg-default-900 text-white flex items-center justify-center">
+              <Icon name="close" size={9} />
+            </button>
+          </div>
+        ))}
+        {room > 0 && brandId && (
+          <button type="button" onClick={() => fileRef.current?.click()} disabled={uploading || disabled}
+            title={en ? "Upload images whose look you like" : "上傳你喜歡的圖，讓 AI 學它的畫風"}
+            className="w-16 h-16 rounded-lg border-2 border-dashed border-default-300 bg-white text-default-500 hover:border-default-500 hover:text-default-800 flex flex-col items-center justify-center gap-1 disabled:opacity-50">
+            {uploading ? <Spinner size="sm" /> : <Icon name="upload" size={18} />}
+            <span className="text-[10px] leading-none">{en ? "Upload" : "上傳"}</span>
+          </button>
+        )}
+        <input ref={fileRef} type="file" hidden multiple accept={IMAGE_ACCEPT} onChange={(e) => void upload(e.target.files)} />
+      </div>
+      <p className="text-[11px] text-default-400 leading-relaxed mt-1.5">
+        {en
+          ? "AI learns the look only — colours, lighting, texture — and draws your own content. It will be similar, not identical. Use images you have the right to use."
+          : "AI 只學這幾張的色調、光線與畫風，畫面內容仍照你的文案；會像，但不會一模一樣。請用你有權使用的圖。"}
+      </p>
+    </div>
+  );
+}
+
 // ── 樣式 ───────────────────────────────────────────────────────────────
 
 export interface StyleInfo { id: string; labelZh: string; labelEn: string }
 
-export function StylePanel({ lang, styles, selected, onSelect, scope, setScope, slideNo, total, busy, onApply }: {
-  lang: string; styles: StyleInfo[]; selected: string | null; onSelect: (id: string) => void;
+export function StylePanel({ lang, styles, selected, onSelect, scope, setScope, slideNo, total, busy, onApply, brandId, refs, setRefs }: {
+  lang: string; styles: StyleInfo[]; selected: string | null; onSelect: (id: string | null) => void;
   scope: "slide" | "all"; setScope: (s: "slide" | "all") => void;
   slideNo: number; total: number; busy: boolean; onApply: () => void;
+  brandId: number | null; refs: string[]; setRefs: (r: string[]) => void;
 }) {
   const en = lang === "en";
   const eff = total > 1 ? scope : "slide";
+  const fromRefs = selected === STYLE_FROM_REFS;
+  // 參考圖全移掉了，「照我的參考圖」就不能再是選中的樣式。
+  useEffect(() => { if (fromRefs && !refs.length) onSelect(null); }, [fromRefs, refs.length]); // eslint-disable-line react-hooks/exhaustive-deps
   return (
     <div className="space-y-2.5">
+      <StyleRefStrip lang={lang} brandId={brandId} refs={refs} disabled={busy}
+        setRefs={(r) => { setRefs(r); if (r.length) onSelect(STYLE_FROM_REFS); }} />
+      {refs.length > 0 && (
+        <button type="button" role="radio" aria-checked={fromRefs} onClick={() => onSelect(STYLE_FROM_REFS)}
+          className={`w-full h-10 flex-row gap-2 ${tile(fromRefs)}`}>
+          <Icon name="images" size={16} />
+          <span className="text-tiny leading-none">{en ? "Follow my reference images" : "照我的參考圖"}</span>
+        </button>
+      )}
       {total > 1 && (
         <div className="flex gap-1.5 text-tiny">
           {([["slide", en ? `This slide (${slideNo})` : `這一張（第 ${slideNo} 張）`], ["all", en ? `Whole set (${total})` : `整組（${total} 張）`]] as const).map(([k, label]) => (
@@ -87,7 +176,7 @@ export function StylePanel({ lang, styles, selected, onSelect, scope, setScope, 
             : (en ? "Regenerates this image in the chosen style — one charge." : "用選的樣式重新生成這一張，扣一次點數。")}
       </p>
       <Button size="sm" color="primary" className="w-full" onPress={onApply} isDisabled={!selected || busy} isLoading={busy}>
-        {en ? "Apply style" : "套用樣式"}
+        {fromRefs ? (en ? "Redraw in my reference style" : "照參考圖重畫") : (en ? "Apply style" : "套用樣式")}
       </Button>
     </div>
   );

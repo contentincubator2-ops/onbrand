@@ -1,0 +1,108 @@
+name: Ops (DEV) — probe style reference images end to end
+
+# 風格參考圖（2026-10-10 CJ「大家的習慣，就是自己上傳幾張圖給 AI，請 AI 學那張圖」）在 DEV VM 上實跑：
+#   A. 只帶兩張風格參考圖 → gpt-image-2
+#   B. 一張「產品照」＋兩張風格參考圖 → gpt-image-2（驗證模型分得清哪張是主體、哪兩張只學畫風）
+#   C. 只帶兩張風格參考圖 → Nano Banana
+# 用「這個分支」的 mediaGen.ts（多張參考圖怎麼送）與 imageCards.ts（提示詞），所以合併前就能看成品。
+# 參考圖是腳本現場畫的幾何色塊（深藍綠＋芥末黃＋磚紅），成品有沒有學到一眼看得出來。
+# 不寫資料庫、不扣點；只在 dev 的媒體儲存留下幾張 probe 圖。成品縮圖以 base64 印在 log 裡。
+# 花費：三次生圖。第 2 次跑：風格參考圖移到提示詞最前面＋結尾再提醒一次。
+# Path-scoped push，跟 op-probe-dev-influencer.yml 同一個做法（environment: dev 才會連到 DEV VM）。
+on:
+  push:
+    paths:
+      - '.github/workflows/op-probe-dev-style-ref.yml'
+
+jobs:
+  probe:
+    runs-on: ubuntu-24.04
+    environment: dev
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Pack this branch's mediaGen.ts and imageCards.ts
+        run: |
+          echo "GEN_B64=$(gzip -c skills/ai-talent/server/platform/core/media/mediaGen.ts | base64 -w0)" >> "$GITHUB_ENV"
+          echo "CARDS_B64=$(gzip -c skills/ai-talent/server/content/core/image/imageCards.ts | base64 -w0)" >> "$GITHUB_ENV"
+      - name: Generate with style references
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          GEN_B64: ${{ env.GEN_B64 }}
+          CARDS_B64: ${{ env.CARDS_B64 }}
+          PROBE_OPENAI_KEY: ${{ secrets.OPEN_API_KEY }}
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 12m
+          envs: GEN_B64,CARDS_B64,PROBE_OPENAI_KEY
+          script: |
+            set +e
+            cd /opt/onbrand/current/skills/ai-talent
+            set -a; source .env 2>/dev/null; set +a
+            if [ -n "$PROBE_OPENAI_KEY" ]; then export OPENAI_API_KEY="$PROBE_OPENAI_KEY"; echo "openai key: GitHub secret"; else echo "openai key: VM .env"; fi
+            echo "host=$(hostname)  app=$(readlink -f /opt/onbrand/current)  now=$(date -u +%FT%TZ)"
+            G=server/platform/core/media
+            C=server/content/core/image
+            echo "$GEN_B64" | base64 -d | gunzip > "$G/_probeMediaGen.ts"
+            echo "$CARDS_B64" | base64 -d | gunzip > "$C/_probeImageCards.ts"
+            cat > "$C/_probe_tmp.ts" <<'TS'
+            import sharp from "sharp";
+            import { getMediaStore } from "../../../platform/core/media/mediaStore";
+            import { getImageSpec, generationSize, gptSizeFor } from "../../../platform/core/media/platformImageSpecs";
+            import { fetchImageBuffer } from "../../../platform/core/media/imageFetch";
+            import { dispatchGenerate } from "../../../platform/core/media/_probeMediaGen";
+            import { buildImageCardPrompt } from "./_probeImageCards";
+
+            const svg = (shapes: string) => `<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024"><rect width="1024" height="1024" fill="#0F4C5C"/>${shapes}</svg>`;
+            const REFS = [
+              svg(`<circle cx="720" cy="300" r="190" fill="#E3B23C"/><rect x="0" y="640" width="1024" height="384" fill="#9A3B2E"/><polygon points="120,640 360,260 600,640" fill="#F2E8CF"/><polygon points="420,640 620,380 820,640" fill="#E3B23C"/>`),
+              svg(`<rect x="120" y="180" width="320" height="620" fill="#F2E8CF"/><rect x="180" y="250" width="80" height="120" fill="#9A3B2E"/><rect x="300" y="250" width="80" height="120" fill="#E3B23C"/><circle cx="760" cy="620" r="210" fill="#9A3B2E"/><rect x="0" y="860" width="1024" height="164" fill="#E3B23C"/>`),
+            ];
+            // 「產品照」：白底上一個亮綠色、印著 X7 的方盒——顏色刻意跟參考圖不同，看主體有沒有被保住。
+            const PRODUCT = `<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024"><rect width="1024" height="1024" fill="#FFFFFF"/><rect x="312" y="262" width="400" height="500" rx="24" fill="#3DDC84"/><text x="512" y="560" font-family="Arial" font-weight="700" font-size="150" text-anchor="middle" fill="#FFFFFF">X7</text></svg>`;
+            const SCENE = "A friendly middle-aged doctor in a white coat working on a laptop at a tidy desk beside a window, books and a small plant on the desk. Leave the left third calm and uncluttered.";
+
+            (async () => {
+              const store = getMediaStore();
+              console.log(`media store: ${store.backend}`);
+              const stamp = Date.now();
+              const put = async (name: string, s: string) => store.put(`probe-styleref-${stamp}-${name}.png`, await sharp(Buffer.from(s)).png().toBuffer(), "image/png");
+              const refs = [await put("r1", REFS[0]!), await put("r2", REFS[1]!)];
+              const product = await put("product", PRODUCT);
+              const spec = getImageSpec("web-img-og")!;
+              const gen = generationSize(spec);
+              const { w, h } = gptSizeFor(gen.width, gen.height);
+
+              const cases: Array<{ id: string; model: string; lead?: string; opts: any }> = [
+                { id: "A-gpt-refs-only", model: "openai/gpt-image-2", opts: { size: `${w}x${h}` } },
+                { id: "B-gpt-product-plus-refs", model: "openai/gpt-image-2", lead: product, opts: { size: `${w}x${h}` } },
+                { id: "C-nano-refs-only", model: "google/nano-banana", opts: { aspectRatio: "16:9", strictAspect: true } },
+              ];
+              for (const c of cases) {
+                const prompt = buildImageCardPrompt({
+                  spec, scenePromptEn: c.lead ? "The product box standing on a doctor's tidy desk beside a laptop and a small plant, near a window." : SCENE,
+                  brand: {} as any, withProduct: !!c.lead, styleRefCount: refs.length,
+                });
+                if (c.id.startsWith("B")) console.log(`\n--- prompt (case B)\n${prompt}\n---`);
+                const t0 = Date.now();
+                try {
+                  const r = await dispatchGenerate(c.model, { prompt, imageUrl: c.lead, extraImageUrls: refs, brandId: 0, ...c.opts });
+                  const s = ((Date.now() - t0) / 1000).toFixed(1);
+                  if (r.status !== "ready" || !r.url) { console.log(`\n${c.id}: FAILED (${s}s) ${String(r.errorMsg ?? "").slice(0, 300)}`); continue; }
+                  const { buffer } = await fetchImageBuffer(r.url, { timeoutMs: 30_000 });
+                  const meta = await sharp(buffer).metadata();
+                  const thumb = await sharp(buffer).resize(560).jpeg({ quality: 60 }).toBuffer();
+                  console.log(`\n${c.id}: OK (${s}s) ${meta.width}x${meta.height}`);
+                  console.log(`THUMB ${c.id} ${thumb.toString("base64")}`);
+                } catch (e: any) {
+                  console.log(`\n${c.id}: THREW ${String(e?.message ?? e).replace(/sk-[A-Za-z0-9_-]{8,}|AIza[A-Za-z0-9_-]{8,}/g, "[REDACTED]").slice(0, 300)}`);
+                }
+              }
+              process.exit(0);
+            })().catch((e) => { console.log("probe failed:", e?.message); process.exit(1); });
+            TS
+            timeout 660 ./node_modules/.bin/tsx "$C/_probe_tmp.ts"
+            echo "probe exit=$?"
+            rm -f "$C/_probe_tmp.ts" "$C/_probeImageCards.ts" "$G/_probeMediaGen.ts"
