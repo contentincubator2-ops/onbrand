@@ -134,6 +134,22 @@ describe("畫面樣式與純色底（CJ「底圖的樣式要多點選擇」）",
     expect(buildImageCardPrompt({ ...base, styleId: "film", reference: "restyle" })).toContain("Keep the same subject, scene content and composition");
     expect(buildImageCardPrompt({ ...base, styleId: "不存在的樣式" })).not.toContain("ART STYLE");
   });
+  it("用戶的風格參考圖：只學畫風、不照抄內容，且不再疊預設樣式", () => {
+    const base = { spec, scenePromptEn: "a doctor at a desk", brand: {} as any, withProduct: false };
+    expect(buildImageCardPrompt(base)).not.toContain("STYLE REFERENCE supplied by the user");
+    const one = buildImageCardPrompt({ ...base, styleRefCount: 1, styleId: "watercolor" });
+    expect(one).toContain("the attached image is a STYLE REFERENCE");
+    expect(one).toContain("Do NOT copy its subject");
+    expect(one).not.toContain("ART STYLE (applies");
+    // 有產品照時要講清楚哪一張是主體、哪幾張是風格參考。
+    const withPhoto = buildImageCardPrompt({ ...base, withProduct: true, styleRefCount: 2 });
+    expect(withPhoto).toContain("the LAST 2 attached images are STYLE REFERENCES");
+    expect(withPhoto).toContain("real product/subject photo");
+    // 照參考圖重畫：內容與構圖留著，只換畫風。
+    const restyle = buildImageCardPrompt({ ...base, reference: "restyle", styleRefCount: 1 });
+    expect(restyle).toContain("the LAST attached image is a STYLE REFERENCE");
+    expect(restyle).toContain("keeping the subject, content and composition of the current version");
+  });
   it("帶產品照時樣式要提醒主體保真", () => {
     const p = buildImageCardPrompt({ spec, scenePromptEn: "s", brand: {} as any, withProduct: true, styleId: "illustration" });
     expect(p).toContain("faithful");

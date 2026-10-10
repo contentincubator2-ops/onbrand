@@ -152,6 +152,8 @@ export function buildImageCardPrompt(args: {
   instruction?: string;
   /** 畫面樣式（imageStyles.ts 的 id）。 */
   styleId?: string | null;
+  /** 用戶上傳的風格參考圖張數（排在產品照／上一版之後一起送給模型）。 */
+  styleRefCount?: number;
 }): string {
   const lines: string[] = [];
   if (args.withProduct) { lines.push(PRODUCT_FAITHFUL_PROMPT_BLOCK, ""); }
@@ -177,11 +179,29 @@ export function buildImageCardPrompt(args: {
   if (args.reference === "restyle") {
     lines.push(
       "REFERENCE IMAGE: the attached image is the current version. Keep the same subject, scene content and composition, " +
-      "but re-render the WHOLE image in the ART STYLE below (colours may shift to suit the style).",
+      "but re-render the WHOLE image in the ART STYLE / STYLE REFERENCE below (colours may shift to suit the style).",
       "",
     );
   }
-  const style = getImageStyle(args.styleId);
+  const nRef = Math.max(0, args.styleRefCount ?? 0);
+  if (nRef > 0) {
+    const lead = args.withProduct || !!args.reference;
+    const which = lead
+      ? `the LAST ${nRef === 1 ? "attached image is a STYLE REFERENCE" : `${nRef} attached images are STYLE REFERENCES`} (the first attached image is ${args.reference ? "the visual described above" : "the real product/subject photo"})`
+      : `the attached ${nRef === 1 ? "image is a STYLE REFERENCE" : `${nRef} images are STYLE REFERENCES`}`;
+    lines.push(
+      `STYLE REFERENCE supplied by the user: ${which}. Learn the look from ${nRef === 1 ? "it" : "them"}: medium ` +
+      "(photo, illustration, 3D…), colour palette, lighting, texture, level of detail, framing feel and mood, and render " +
+      "the new image in that same look. Where this conflicts with style words in the scene or with the brand imagery " +
+      "guidance above, the style reference wins. " +
+      `Do NOT copy ${nRef === 1 ? "its" : "their"} subject, people, faces, products, logos, text or exact composition — ` +
+      "the result must be an original image of the scene below" +
+      (args.reference === "restyle" ? ", keeping the subject, content and composition of the current version." : "."),
+      "",
+    );
+  }
+  // 用戶給了自己的風格參考圖時，預設樣式不再疊上去（兩種風格指令會互相打架）。
+  const style = nRef > 0 ? null : getImageStyle(args.styleId);
   if (style) {
     lines.push(
       `ART STYLE (applies to the whole image): ${style.promptEn}` +
@@ -379,6 +399,9 @@ export async function solidBackgroundForCard(args: {
   return { ok: true, url: await saveFinal(fin.buffer, spec), bytes: fin.bytes };
 }
 
+/** 一次最多帶幾張風格參考圖（再多模型也分不清每張要學什麼，時間與費用也跟著漲）。 */
+export const MAX_STYLE_REFS = 3;
+
 export async function renderImageCard(args: {
   spec: PlatformImageSpec;
   scenePromptEn: string;
@@ -392,6 +415,8 @@ export async function renderImageCard(args: {
   referenceMode?: "previous" | "style" | "restyle";
   instruction?: string;
   styleId?: string;
+  /** 用戶上傳的風格參考圖（只學畫風，不照抄內容）；最多 MAX_STYLE_REFS 張。 */
+  styleReferenceUrls?: string[];
 }): Promise<RenderOutcome> {
   const modelId = resolveStillImageModel(args.modelChoice);
   const gen = generationSize(args.spec);
@@ -405,6 +430,8 @@ export async function renderImageCard(args: {
   const { w, h } = gptSizeFor(gen.width, gen.height);
   // 參考圖只能帶一張：有上一版就用上一版（它已經含產品），否則用產品照。
   const imageUrl = args.referenceImageUrl ?? args.productImageUrl;
+  // 風格參考圖是另外幾張，排在後面；每張代表什麼由 prompt 說明。
+  const styleRefs = (args.styleReferenceUrls ?? []).filter(Boolean).slice(0, MAX_STYLE_REFS);
   const prompt = buildImageCardPrompt({
     spec: args.spec,
     scenePromptEn: args.scenePromptEn,
@@ -413,6 +440,7 @@ export async function renderImageCard(args: {
     reference: args.referenceImageUrl ? (args.referenceMode ?? "previous") : null,
     instruction: args.instruction,
     styleId: args.styleId,
+    styleRefCount: styleRefs.length,
   });
   const outcome = await generateStillImage(modelId, {
     prompt,
@@ -420,6 +448,7 @@ export async function renderImageCard(args: {
     aspectRatio: nano ?? undefined,
     strictAspect: true,
     imageUrl,
+    extraImageUrls: styleRefs.length ? styleRefs : undefined,
     brandId: args.brandId,
   }, { attemptTimeoutMs: 120_000 });
 
