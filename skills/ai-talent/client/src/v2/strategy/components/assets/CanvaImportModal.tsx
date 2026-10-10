@@ -102,6 +102,19 @@ export default function CanvaImportModal({
     } finally { setConnecting(false); }
   };
 
+  // 2026-10-11：Canva 的授權頁會切斷彈出視窗和這一頁的關聯——這一頁會誤以為視窗一開就關了，
+  // 授權完成的通知也傳不回來（DEV 紀錄：按下連接 1.4 秒後就重讀狀態）。所以不靠通知：
+  // 還沒連上時，每次回到這一頁就重讀一次連接狀態。
+  const needsConnect = isOpen && configured && !statusQ.isLoading && !connected;
+  React.useEffect(() => {
+    if (!needsConnect) return;
+    const recheck = () => { if (document.visibilityState === "visible") void utils.canva.invalidate(); };
+    window.addEventListener("focus", recheck);
+    document.addEventListener("visibilitychange", recheck);
+    return () => { window.removeEventListener("focus", recheck); document.removeEventListener("visibilitychange", recheck); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [needsConnect]);
+
   const disconnect = async () => {
     try { await disconnectMut.mutateAsync(); } catch { /* 下面重新讀狀態就知道結果 */ }
     setDesigns([]);
