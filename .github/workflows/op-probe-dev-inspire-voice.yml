@@ -2,7 +2,8 @@ name: op-probe-dev-inspire-voice
 # 醫師示範頁第二版的實跑：先照醫師的口吻寫成文章，再套流量密碼（doctorVoice.ts）。
 # 在 DEV VM 用真模型跑這個分支的檔案，不需要先合併。改這支檔案並 push 就會跑。
 # 口述是我寫的替身（沒有真的醫師素材），只用來驗流程：內容有沒有守在口述裡、包裝有沒有偷加東西。
-# 同時用舊流程跑同一題當對照。花費：約 15 次模型呼叫。
+# 第 2 次跑：加上從 70 篇醫師文章歸納的寫作規範（doctorWritingStyle.ts）之後，同一份口述新舊寫法並排。
+# 花費：約 25 次模型呼叫。
 on:
   push:
     paths:
@@ -24,7 +25,7 @@ jobs:
       - name: Pack this branch's inspire core files (only the probed agents)
         run: |
           D=skills/ai-talent/server/content/core/inspire
-          mkdir -p /tmp/pack && cp "$D/doctorInspire.ts" "$D/doctorVoice.ts" "$D/inspirePersonas.ts" "$D/inspireRegulations.ts" /tmp/pack/
+          mkdir -p /tmp/pack && cp "$D/doctorInspire.ts" "$D/doctorVoice.ts" "$D/doctorWritingStyle.ts" "$D/doctorWritingStyleData.ts" "$D/inspirePersonas.ts" "$D/inspireRegulations.ts" /tmp/pack/
           cat > /tmp/slim.mts <<'TS'
           import { writeFileSync } from "node:fs";
           const { PERSONA_DATA } = await import(process.cwd() + "/skills/ai-talent/server/content/core/inspire/inspirePersonaData.ts");
@@ -57,6 +58,7 @@ jobs:
             import { invokeLLM } from "../../../platform/core/llm/llm";
             import { finalizeDraft, inspireWritePrompt, parseIdeas, parseReviewIssues, personaIdeationPrompt, resolveTopic, reviewPrompt } from "./doctorInspire";
             import { INTERVIEW_QUESTIONS, addedNumbers, interviewIsThin, parseRemix, parseVoiceArticle, questionOf, trafficRemixPrompt, voiceArticlePrompt } from "./doctorVoice";
+            import { specialtyStyle } from "./doctorWritingStyle";
             import { INSPIRE_PERSONAS, leaksPersona } from "./inspirePersonas";
             import { REGULATION_GROUPS, itemsOfGroup, scanRiskTerms } from "./inspireRegulations";
 
@@ -101,12 +103,26 @@ jobs:
               console.log("--- 底稿審查");
               await review(finalizeDraft(art.article));
 
-              for (const p of INSPIRE_PERSONAS) {
-                const r = await ask(trafficRemixPrompt({ doctor, title: art.title, article: art.article, persona: p }), "請開始包裝。");
+              // 新寫法：同一份口述，加上醫師寫作規範。兩種類型各寫一版。
+              const sp = specialtyStyle("metabolism")!;
+              let best = art;
+              for (const type of [sp.types.find((t) => t.name.includes("病例開場")) ?? sp.types[0]!, sp.types.find((t) => t.name.includes("糾正迷思")) ?? sp.types[1]!]) {
+                const r2 = await ask(voiceArticlePrompt({ doctor, specialty, question: q.label, answers, style: { specialtyId: "metabolism", typeId: type.id } }), "請開始整理。");
+                const a2 = parseVoiceArticle(r2.text);
+                if (!a2) { console.log(`\n=== 新寫法｜${type.name} PARSE FAILED. raw:\n${r2.text.slice(0, 500)}`); continue; }
+                const plain = finalizeDraft(a2.article, { note: false });
+                console.log(`\n=== 新寫法｜${sp.label}｜${type.name}（${r2.s}s，${plain.length} 字）\n標題：${a2.title}\n${plain}\n— 編輯想問醫師的：${a2.gaps.join("／") || "（沒有）"}\n— 多出來的數字：${addedNumbers(answers.join("\n"), a2.article).join("、") || "沒有"}`);
+                console.log("--- 這一版的審查（沒有補免責聲明）");
+                await review(plain);
+                if (type.name.includes("病例開場")) best = a2;
+              }
+
+              for (const p of INSPIRE_PERSONAS.filter((x) => x.key === "us-tt-12")) {
+                const r = await ask(trafficRemixPrompt({ doctor, title: best.title, article: best.article, persona: p }), "請開始包裝。");
                 const m = parseRemix(r.text);
                 if (!m) { console.log(`\n=== ${p.key} REMIX PARSE FAILED. raw:\n${r.text.slice(0, 500)}`); continue; }
                 const text = finalizeDraft(m.draft);
-                console.log(`\n=== 第二步：套流量密碼｜${p.label}｜${p.reference}（${r.s}s，${text.length} 字）\n用了哪一招：${m.move}\n${text}\n— 多出來的數字：${addedNumbers(art.article, m.draft).join("、") || "沒有"}　露出人名：${leaksPersona(text, p) ?? "沒有"}`);
+                console.log(`\n=== 第二步：套流量密碼｜${p.label}｜${p.reference}（${r.s}s，${text.length} 字）\n用了哪一招：${m.move}\n${text}\n— 多出來的數字：${addedNumbers(best.article, m.draft).join("、") || "沒有"}　露出人名：${leaksPersona(text, p) ?? "沒有"}`);
                 if (p.key === "tw-tt-13") { console.log("--- 這一版的審查"); await review(text); }
               }
 

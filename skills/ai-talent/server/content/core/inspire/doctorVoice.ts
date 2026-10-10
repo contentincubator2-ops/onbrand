@@ -15,6 +15,7 @@
  */
 import { GROUND_RULES, PLATFORM_SPEC, agentFrame, doctorByline, factsBlock } from "./doctorInspire";
 import type { InspirePersona } from "./inspirePersonas";
+import { writingStyleBlock } from "./doctorWritingStyle";
 
 // ─── 民眾在問的問題 ────────────────────────────────────────────────────
 
@@ -85,8 +86,14 @@ export interface VoiceArticle {
   gaps: string[];
 }
 
+/**
+ * style 有給就用研究歸納的醫師寫作規範（doctorWritingStyle.ts）；沒給就是第一天的簡版，留著當對照。
+ * 帶 style 時另外放寬一條規則：不再要求每個建議都接「請與醫師討論」——那正是 AI 衛教文的特徵。
+ * 藥品的規則沒有動，等藥廠法務決定。
+ */
 export function voiceArticlePrompt(args: {
   doctor: string; specialty?: string; question: string; answers: string[]; sample?: string;
+  style?: { specialtyId?: string; typeId?: string };
 }): string {
   const specialty = clip(args.specialty, 20);
   const qa = INTERVIEW_QUESTIONS.map((q, i) => {
@@ -110,19 +117,29 @@ export function voiceArticlePrompt(args: {
     `- 口述裡若有認得出是誰的病人細節（年齡加職業加地點這類組合），改成泛稱。`,
     `- 你覺得文章缺了什麼（例如沒講什麼情況該回診、某個說法需要出處），不要自己補，列在 gaps 裡問醫師，最多 3 條。`,
     ``,
-    `【醫師寫東西的習慣——照這個寫】`,
-    `- 第一段用 2 到 3 句直接回答問題，結論先講；這一段要能單獨被引用。`,
-    `- 接著依序是：診間裡病人怎麼問（情境）→ 我怎麼回答、為什麼（理由或機轉，用醫師自己的比喻）→ 常見的誤會 → 什麼情況要找醫師。口述沒有的段落就略過，不要硬湊。`,
-    `- 第一人稱。保留醫師的口頭用語、比喻與講話順序，讀起來要像他本人。`,
-    `- 判斷留餘地：用「多數」「通常」「依每個人的狀況」，不用「一定」「保證」「最有效」。`,
-    `- 不賣關子、不用驚嘆號堆情緒、不用網路流行語。這一版是底稿，包裝是下一步的事。`,
+    ...(args.style ? [
+      writingStyleBlock(args.style),
+      ``,
+      `【這一篇另外要做到】`,
+      `- 前兩段之內要有 2 到 3 句直接回答問題的話，能單獨被引用。`,
+      `- 第一人稱。保留醫師的口頭用語、比喻與講話順序，讀起來要像他本人。`,
+      `- 不用「一定」「保證」「最有效」這類絕對的說法；除此之外，醫師講得肯定的地方就寫得肯定。`,
+      `- 不賣關子、不用驚嘆號堆情緒、不用網路流行語。這一版是底稿，包裝是下一步的事。`,
+    ] : [
+      `【醫師寫東西的習慣——照這個寫】`,
+      `- 第一段用 2 到 3 句直接回答問題，結論先講；這一段要能單獨被引用。`,
+      `- 接著依序是：診間裡病人怎麼問（情境）→ 我怎麼回答、為什麼（理由或機轉，用醫師自己的比喻）→ 常見的誤會 → 什麼情況要找醫師。口述沒有的段落就略過，不要硬湊。`,
+      `- 第一人稱。保留醫師的口頭用語、比喻與講話順序，讀起來要像他本人。`,
+      `- 判斷留餘地：用「多數」「通常」「依每個人的狀況」，不用「一定」「保證」「最有效」。`,
+      `- 不賣關子、不用驚嘆號堆情緒、不用網路流行語。這一版是底稿，包裝是下一步的事。`,
+    ]),
     `- 標題用民眾會直接拿去問的問句。全文 500 到 800 字；口述內容少就寫短一點，不要灌水。`,
     `- 最後一行署名：「文／${doctorByline(args.doctor)}${specialty ? `（${specialty}）` : ""}」。不要編學經歷、院所或看診年資。`,
     ``,
     `【白名單（可以引用的公開數字）】\n${factsBlock()}`,
     ``,
-    `【一定要守的規則】\n${GROUND_RULES}`,
-    `- 不要用 Markdown 的標題、粗體或項目符號。不要自己加免責聲明，系統會補。`,
+    `【一定要守的規則】\n${args.style ? GROUND_RULES.replace("個人狀況一律請讀者與自己的醫師討論。", "需要醫師依個人狀況判斷的地方，照醫師口述的說法寫，全篇提醒一次就好，不要每段都加。") : GROUND_RULES}`,
+    `- 不要用 Markdown 的標題、粗體或項目符號。不要自己加免責聲明。`,
     ``,
     `只輸出 JSON，不要前言：{"title":"…","article":"…","gaps":["…"]}`,
   ].filter((l) => l !== "").join("\n");

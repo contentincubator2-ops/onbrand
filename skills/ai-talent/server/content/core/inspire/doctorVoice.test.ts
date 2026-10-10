@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { INSPIRE_PERSONAS } from "./inspirePersonas";
+import { finalizeDraft, EDUCATION_NOTE } from "./doctorInspire";
+import { COMMON_DOCTOR_HABITS, DOCTOR_SPECIALTIES, specialtyStyle, writingStyleBlock, writingType } from "./doctorWritingStyle";
 import {
   INSPIRE_QUESTIONS, INTERVIEW_QUESTIONS, QUESTION_AREAS, addedNumbers, interviewIsThin, parseRemix, parseVoiceArticle,
   questionOf, trafficRemixPrompt, voiceArticlePrompt,
@@ -44,6 +46,41 @@ describe("第一步：照醫師口吻寫", () => {
     const ok = parseVoiceArticle("```json\n" + JSON.stringify({ title: "減脂怎麼不掉肌肉？", article: "內".repeat(200), gaps: ["a", "b", "c", "d"] }) + "\n```");
     expect(ok?.title).toBe("減脂怎麼不掉肌肉？");
     expect(ok?.gaps).toHaveLength(3);
+  });
+});
+
+describe("醫師寫作規範", () => {
+  it("五個專科都有習慣與類型；帶招攬意味的類型沒有收進來", () => {
+    expect(DOCTOR_SPECIALTIES.map((s) => s.id).sort()).toEqual(["bariatric", "family", "hepatology", "metabolism", "pediatric_endo"]);
+    for (const s of DOCTOR_SPECIALTIES) {
+      expect(s.habits.length, s.id).toBeGreaterThanOrEqual(6);
+      expect(s.types.length, s.id).toBeGreaterThanOrEqual(4);
+      for (const t of s.types) { expect(t.structure.length, t.id).toBeGreaterThanOrEqual(3); expect(t.rules.length, t.id).toBeGreaterThanOrEqual(4); }
+    }
+    const names = DOCTOR_SPECIALTIES.flatMap((s) => s.types.map((t) => t.name)).join("｜");
+    expect(names).not.toMatch(/資深外科自述|中心網頁條列/);
+    // 規則裡不該有網址。
+    expect(JSON.stringify(DOCTOR_SPECIALTIES)).not.toMatch(/https?:\/\//);
+  });
+  it("帶 style 的提示詞有共同習慣、專科習慣與選定類型；沒帶就是簡版", () => {
+    const type = specialtyStyle("metabolism")!.types[0]!;
+    const withStyle = voiceArticlePrompt({ doctor: "王小明", question: "x", answers, style: { specialtyId: "metabolism", typeId: type.id } });
+    expect(withStyle).toContain(COMMON_DOCTOR_HABITS[0]);
+    expect(withStyle).toContain(specialtyStyle("metabolism")!.habits[0]);
+    expect(withStyle).toContain(`這一篇照「${type.name}」寫`);
+    expect(withStyle).toContain("全篇提醒一次就好");
+    expect(withStyle).not.toContain("個人狀況一律請讀者與自己的醫師討論");
+    // 藥品的規則沒有因為放寬而不見。
+    expect(withStyle).toContain("不提任何藥品的商品名");
+    const plain = voiceArticlePrompt({ doctor: "王小明", question: "x", answers });
+    expect(plain).not.toContain(COMMON_DOCTOR_HABITS[0]);
+    expect(plain).toContain("個人狀況一律請讀者與自己的醫師討論");
+    expect(writingType("nope")).toBeUndefined();
+    expect(writingStyleBlock({})).toContain(COMMON_DOCTOR_HABITS[1]);
+  });
+  it("免責聲明預設補上，可以關", () => {
+    expect(finalizeDraft("內文")).toContain(EDUCATION_NOTE);
+    expect(finalizeDraft("內文", { note: false })).toBe("內文");
   });
 });
 

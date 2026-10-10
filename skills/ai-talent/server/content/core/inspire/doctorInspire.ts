@@ -254,11 +254,13 @@ export function inspireWritePrompt(args: {
 }
 
 /** 模型偶爾還是會包程式碼框或加 Markdown 粗體；清掉後補上固定提醒。 */
-export function finalizeDraft(raw: string): string {
+export function finalizeDraft(raw: string, opts: { note?: boolean } = {}): string {
   const body = String(raw ?? "")
     .replace(/^```[a-z]*\s*/i, "").replace(/\s*```\s*$/i, "")
     .replace(/\*\*(.+?)\*\*/g, "$1").replace(/^#{1,6}\s+/gm, "")
     .replace(/[ \t]+$/gm, "").replace(/\n{3,}/g, "\n\n").trim();
+  // 2026-10-10：醫師自己寫的文章很少用制式免責句；底稿可以選擇不補（note: false），由審查把關。預設照舊補上。
+  if (opts.note === false) return body;
   return body.includes(EDUCATION_NOTE) ? body : `${body}\n\n${EDUCATION_NOTE}`;
 }
 
