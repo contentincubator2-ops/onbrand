@@ -59,7 +59,7 @@ export const aeoQuestionRouter = router({
         { role: "system", content: `你是熟悉這個品牌與它的顧客的行銷研究員。\n${brandPrefix}${suggestPrompt({ brandName, existing: existing.map((q) => q.question) })}` },
         { role: "user", content: "請開始。" },
       ], undefined, "anthropic");
-      const questions = parseSuggestedQuestions(r.content ?? "", existing.map((q) => q.question));
+      const questions = parseSuggestedQuestions(r.content ?? "", existing.map((q) => q.question), { brandName });
       if (!questions.length) {
         throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "這次沒有產出可用的題目，請再試一次。" });
       }

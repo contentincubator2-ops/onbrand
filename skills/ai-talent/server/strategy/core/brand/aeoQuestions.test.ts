@@ -57,7 +57,22 @@ describe("parseSuggestedQuestions", () => {
 
   it("最多給到上限", () => {
     const raw = Array.from({ length: 30 }, (_, i) => `第 ${i + 1} 個顧客會問的問題是什麼？`).join("\n");
-    expect(parseSuggestedQuestions(raw, [], 5)).toHaveLength(5);
+    expect(parseSuggestedQuestions(raw, [], { limit: 5 })).toHaveLength(5);
+  });
+
+  // 2026-10-10 DEV 實測：開場白被當成第一題、題目寫成一段自述、12 題裡 7 題帶品牌名。
+  it("以冒號結尾的開場白不是題目；太長的不收", () => {
+    const raw = `根據品牌定位，列出顧客最可能問 AI 的 12 個問題：
+小公司沒預算請顧問，行銷研究可以怎麼做？
+${"我們公司很小只有兩三個行銷人".repeat(3)}怎麼辦？`;
+    expect(parseSuggestedQuestions(raw, [])).toEqual(["小公司沒預算請顧問，行銷研究可以怎麼做？"]);
+  });
+
+  it("帶品牌名的題目最多一半，多的丟掉、順序不變", () => {
+    const raw = ["禾木香氛的擴香可以用多久？", "禾木香氛適合送禮嗎？", "禾木香氛哪裡買得到？", "擴香瓶放臥室安全嗎？", "怎麼挑適合小坪數的擴香？"].join("\n");
+    expect(parseSuggestedQuestions(raw, [], { limit: 4, brandName: "禾木香氛" })).toEqual([
+      "禾木香氛的擴香可以用多久？", "禾木香氛適合送禮嗎？", "擴香瓶放臥室安全嗎？", "怎麼挑適合小坪數的擴香？",
+    ]);
   });
 });
 
@@ -65,7 +80,8 @@ describe("suggestPrompt", () => {
   it("帶品牌名、要求一半不帶品牌名、列出不要重複的題目", () => {
     const p = suggestPrompt({ brandName: "禾木香氛", existing: ["擴香可以用多久？"] });
     expect(p).toContain("「禾木香氛」");
-    expect(p).toContain("至少一半是不帶品牌名的品類問題");
+    expect(p).toContain("一半以上是不帶品牌名的品類問題");
+    expect(p).toContain("不可以出現其他品牌");
     expect(p).toContain("- 擴香可以用多久？");
   });
 });

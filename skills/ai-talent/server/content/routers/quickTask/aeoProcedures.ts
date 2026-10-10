@@ -9,7 +9,7 @@ import localPool from "../../../localDb";
 import { assertBrandAccess } from "../../../platform/core/brandAuth";
 import { openAeoQuestions, recordAeoAnswer } from "../../../strategy/core/brand/aeoQuestions";
 import {
-  AEO_TARGETS, AEO_TARGET_TASK, aeoContractBlock, aeoPlainText, aeoRetryRequest, faqHtmlSnippet,
+  AEO_TARGETS, AEO_TARGET_TASK, acceptedMatch, aeoContractBlock, aeoPlainText, aeoRetryRequest, faqHtmlSnippet,
   parseAeoReply, repairAeo, serializeAeo, validateAeo, type AeoFields, type AeoTarget,
 } from "../../core/engine/aeoContract";
 
@@ -52,7 +52,9 @@ export const aeoProcedures = {
 
       // 2026-10-10：問題地圖上還沒回答的題目。這篇能回答其中一題就用那一題，覆蓋率才算得準。
       const candidates = target === "web-qa" ? await openAeoQuestions(input.brandId) : [];
-      const matchOf = (p: { matchIndex: number }) => candidates[p.matchIndex - 1] ?? null;
+      // 只有模型真的照抄了那一題才算對到（acceptedMatch）；回了編號卻改寫問題的不算。
+      const matchOf = (p: { matchIndex: number; fields: AeoFields }) =>
+        candidates[acceptedMatch(p, candidates.map((c) => c.question))] ?? null;
 
       const system =
         `你是替品牌整理官方內容的編輯。手上有一篇已經寫好的社群貼文，要把同一件事改成 AI 搜尋引擎讀得到、可以單獨引用的版本。\n` +

@@ -6,6 +6,7 @@ name: Ops (DEV) — probe AI-search question map (read-only)
 #      對得準不準；再拿別的品牌的貼文配同一份清單，預期對不上（0）。
 # 用「這個分支」的 aeoQuestions.ts 與 aeoContract.ts。brand_aeo_questions 表在 DEV 還不存在也沒關係——
 # 這支不碰那張表。
+# 第 2 次跑：開場白不當題目、題目限 40 字、帶品牌名最多一半、不點名其他品牌；對應要照抄才算。
 # 花費：1 次建議＋每則貼文 1 次轉換，共約 4 次模型呼叫。
 on:
   push:
@@ -75,7 +76,7 @@ jobs:
                 { role: "system", content: `你是熟悉這個品牌與它的顧客的行銷研究員。\n${prefix}${q.suggestPrompt({ brandName, existing: [] })}` },
                 { role: "user", content: "請開始。" },
               ], undefined, "anthropic");
-              const questions = q.parseSuggestedQuestions(r.content ?? "", []);
+              const questions = q.parseSuggestedQuestions(r.content ?? "", [], { brandName });
               const withBrand = questions.filter((x) => x.toLowerCase().includes(brandName.toLowerCase())).length;
               console.log(`\n--- 建議題目 (${((Date.now() - t0) / 1000).toFixed(1)}s)：${questions.length} 題，其中帶品牌名 ${withBrand} 題`);
               questions.forEach((x, i) => console.log(`${i + 1}. ${x}`));
@@ -98,8 +99,9 @@ jobs:
                 console.log(`\n--- ${tag}  output ${post.id} brand「${pName}」 (${((Date.now() - t0) / 1000).toFixed(1)}s)\n原稿開頭：${post.caption.slice(0, 120).replace(/\n/g, " ")}`);
                 if (parsed.noConvert) { console.log(`無法轉換：${parsed.reason}`); continue; }
                 const f = aeo.repairAeo("web-qa", parsed.fields);
-                const hit = questions[parsed.matchIndex - 1] ?? null;
-                console.log(`【對應】${parsed.matchIndex}${hit ? ` → 清單第 ${parsed.matchIndex} 題：${hit}` : "（沒有用清單上的題目）"}`);
+                const said = questions[parsed.matchIndex - 1] ?? null;
+                const accepted = aeo.acceptedMatch({ matchIndex: parsed.matchIndex, fields: f }, questions);
+                console.log(`【對應】模型回 ${parsed.matchIndex}${said ? `（清單第 ${parsed.matchIndex} 題：${said}）` : ""} → ${accepted >= 0 ? "採用（問題照抄了）" : "不採用"}`);
                 console.log(`模型寫的問題：${f.question}\n直接答案：${f.answer}`);
                 console.log(`檢查：${aeo.validateAeo("web-qa", f, { brandName: pName, sources: [post.caption, pName] }).join(" | ") || "過關"}`);
               }

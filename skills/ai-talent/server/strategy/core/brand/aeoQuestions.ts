@@ -40,6 +40,8 @@ export const BRAND_AEO_QUESTIONS_DDL = `
 `;
 
 export const AEO_QUESTION_MAX = 60;
+/** AI 建議的題目比這個長就不收：人問 AI 是一句話，不是一段自述。 */
+export const AEO_SUGGEST_MAX_CHARS = 40;
 /** 一個品牌地圖上最多幾題（封存的不算）。 */
 export const AEO_MAX_QUESTIONS = 150;
 /** 請 AI 建議一次給幾題。 */
@@ -97,16 +99,36 @@ export function cleanQuestion(raw: string): string {
 }
 
 /** 模型回的建議清單 → 乾淨、不重複、不跟現有重複的題目。 */
-export function parseSuggestedQuestions(raw: string, existing: string[], limit = AEO_SUGGEST_COUNT): string[] {
+export function parseSuggestedQuestions(
+  raw: string, existing: string[],
+  opts: { limit?: number; /** 帶了就確保帶品牌名的題目不超過一半。 */ brandName?: string | null } = {},
+): string[] {
+  const limit = opts.limit ?? AEO_SUGGEST_COUNT;
+  const brand = (opts.brandName ?? "").trim().toLowerCase();
   const seen = new Set(existing.map(questionKey));
-  const out: string[] = [];
+  const picked: string[] = [];
   for (const line of String(raw ?? "").split(/\r?\n/)) {
+    // 以冒號結尾的是開場白（「…列出 12 個問題：」），不是題目（10/10 DEV 實測被當成第一題）。
+    if (/[:：]\s*$/.test(line)) continue;
     const q = cleanQuestion(line);
-    // 太短的多半是標題或雜訊（「常見問題？」）。
-    if ([...q].length < 8) continue;
+    const n = [...q].length;
+    // 太短的多半是標題或雜訊（「常見問題？」）；太長的不是人會拿去問 AI 的一句話。
+    if (n < 8 || n > AEO_SUGGEST_MAX_CHARS) continue;
     const k = questionKey(q);
     if (seen.has(k)) continue;
     seen.add(k);
+    picked.push(q);
+  }
+  if (!brand) return picked.slice(0, limit);
+  // 帶品牌名的題目最多一半：顧客還不認識品牌時問的品類問題，才是 AI 搜尋裡搶得到新客的地方。
+  const cap = Math.floor(limit / 2);
+  let branded = 0;
+  const out: string[] = [];
+  for (const q of picked) {
+    if (q.toLowerCase().includes(brand)) {
+      if (branded >= cap) continue;
+      branded += 1;
+    }
     out.push(q);
     if (out.length >= limit) break;
   }
@@ -122,17 +144,19 @@ export function suggestPrompt(args: { brandName: string; existing: string[]; cou
     "根據上面的品牌資料，列出他們最可能問的問題。",
     "",
     "規則：",
-    "- 用顧客的話，不是品牌的話。顧客不會用品牌自己的術語與標語發問。",
-    `- 至少一半是不帶品牌名的品類問題（顧客還不認識品牌時問的），其餘可以帶「${args.brandName}」。`,
+    "- 用顧客的話，不是品牌的話。顧客不會用品牌自己的術語、標語、功能名稱或內部數字發問。",
+    "- 寫成一句直接的問句，像打在搜尋框裡的那種（例：「小公司沒預算請顧問，行銷研究可以怎麼做？」）。不要先自我介紹處境再問。",
+    `- 一半以上是不帶品牌名的品類問題（顧客還不認識品牌時問的）；帶「${args.brandName}」的最多 ${Math.floor(n / 2)} 題。`,
     "- 涵蓋不同階段：這是什麼、適合誰、怎麼選、跟別的做法差在哪、怎麼用、價格與購買、常見疑慮。",
     "- 每題要是這個品牌答得出來的——品牌資料裡完全沒有線索的題目不要列。",
-    "- 不點名其他品牌，不問需要即時資訊（今天的價格、現在的庫存）的問題。",
-    `- 每題 ${AEO_QUESTION_MAX} 字以內，以問號結尾。`,
+    "- 不可以出現其他品牌、其他產品或其他公司的名字（要比較就說「其他工具」「一般做法」）。",
+    "- 不問需要即時資訊（今天的價格、現在的庫存）的問題。",
+    `- 每題 ${AEO_SUGGEST_MAX_CHARS - 10} 字以內，最長不超過 ${AEO_SUGGEST_MAX_CHARS} 字，以問號結尾。`,
     ...(args.existing.length
       ? ["", "下面這些已經在清單上，不要重複、也不要只換個說法：", ...args.existing.slice(0, 80).map((q) => `- ${q}`)]
       : []),
     "",
-    "只輸出問題，一行一題，不要編號、不要分類標題、不要其他說明。",
+    `多列幾題備用（${n + 6} 題），只輸出問題，一行一題，不要開場白、不要編號、不要分類標題、不要其他說明。`,
   ].join("\n");
 }
 

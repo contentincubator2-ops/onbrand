@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  AEO_TARGET_TASK, aeoContractBlock, aeoPlainText, faqHtmlSnippet, faqJsonLd, isAeoNativePlatform,
+  AEO_TARGET_TASK, acceptedMatch, aeoContractBlock, aeoPlainText, faqHtmlSnippet, faqJsonLd, isAeoNativePlatform,
   parseAeoReply, repairAeo, serializeAeo, validateAeo,
 } from "./aeoContract";
 import { buildTaskCatalogIndex } from "../catalog/taskCatalogIndex";
@@ -164,5 +164,14 @@ describe("對應問題地圖", () => {
     expect(hit.fields.answer).toBe(ANSWER);
     expect(parseAeoReply("web-qa", `【問題】\nQ？\n【對應】\n0\n【直接答案】\n${ANSWER}`).matchIndex).toBe(0);
     expect(parseAeoReply("web-qa", `【問題】\nQ？\n【直接答案】\n${ANSWER}`).matchIndex).toBe(0);
+  });
+
+  // 2026-10-10 DEV 實測：回了編號 4，卻把問題改寫成另一件事。
+  it("只有照抄了那一題才算對到；回了編號卻改寫問題的不算", () => {
+    const list = ["擴香可以用多久？", "不知道這些數字在告訴我什麼，怎麼辦？"];
+    expect(acceptedMatch({ matchIndex: 1, fields: { question: "擴香可以用多久?" } }, list)).toBe(0);
+    expect(acceptedMatch({ matchIndex: 2, fields: { question: "報表格式都不一樣，怎麼加快整理？" } }, list)).toBe(-1);
+    expect(acceptedMatch({ matchIndex: 0, fields: { question: "擴香可以用多久？" } }, list)).toBe(-1);
+    expect(acceptedMatch({ matchIndex: 9, fields: { question: "擴香可以用多久？" } }, list)).toBe(-1);
   });
 });

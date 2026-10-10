@@ -95,7 +95,8 @@ export function aeoContractBlock(
       // 2026-10-10：問題地圖。對得上就用清單上的那一句，覆蓋率才算得準；對不上不要硬湊。
       ...(candidates.length ? [
         "下面是這個品牌還沒回答的顧客問題。原稿如果能完整回答其中一題，【問題】就一字不改照抄那一題；",
-        "只是沾到邊、要靠原稿沒有的事實才答得完整的，不算，自己另寫問題。",
+        "判斷方式：把那一題單獨拿去問，你寫的【直接答案】要完全對題。只是主題相近、沾到邊，",
+        "或要靠原稿沒有的事實才答得完整的，都不算——那就自己另寫問題。寧可不用清單，不要硬湊。",
         ...candidates.map((q, i) => `${i + 1}. ${q}`),
         "【對應】",
         "用了清單上的哪一題就寫它的編號（只寫數字）；沒有用清單上的題目就寫 0。",
@@ -154,6 +155,24 @@ export function parseAeoReply(target: AeoTarget, raw: string): AeoParsed {
     : { title: content[0], description: content[1] };
   const m = /\d+/.exec(by.get("對應") ?? "");
   return { fields, noConvert: false, reason: "", matchIndex: m ? Number(m[0]) : 0 };
+}
+
+const sameQuestion = (a: string, b: string) => {
+  const key = (s: string) => String(s ?? "").toLowerCase().replace(/[\s\p{P}\p{S}]/gu, "");
+  return !!key(a) && key(a) === key(b);
+};
+
+/**
+ * 模型說對到了地圖上的第幾題——要不要信。
+ * 只有它寫的【問題】真的就是那一題（照抄）才算。10/10 DEV 實測：它會回一個編號，卻把問題改寫成
+ * 另一件事（清單是「不知道這些數字在告訴我什麼」，它寫的是「報表格式不一樣怎麼加快整理」）。
+ * 那種情況把清單上的題目硬套上去，等於拿一則答非所問的回答去算覆蓋率。
+ * 回傳對到的索引（0 起算），不算就回 -1。
+ */
+export function acceptedMatch(parsed: Pick<AeoParsed, "matchIndex" | "fields">, candidates: string[]): number {
+  const i = parsed.matchIndex - 1;
+  const c = candidates[i];
+  return c && sameQuestion(parsed.fields.question ?? "", c) ? i : -1;
 }
 
 /** Markdown 殘留：貼進官網後台會變成一堆星號與井字號。 */
