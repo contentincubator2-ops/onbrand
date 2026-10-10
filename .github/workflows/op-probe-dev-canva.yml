@@ -1,0 +1,62 @@
+name: Ops (DEV) — probe the Canva connection (read-only)
+
+# 「連接 Canva」失敗時用來看原因。只讀，不改任何東西：
+#   1. .env 與執行中的行程各自有沒有 Canva 憑證與 scope（只印長度，不印值）
+#   2. 拿憑證去問 Canva 的 token 端點（帶一個假的授權碼）：
+#        invalid_client → client id／secret 不對
+#        invalid_grant  → 憑證是對的（假的授權碼本來就該被拒）
+#   3. 站台實際送給 Canva 的授權網址帶了哪些 scope、哪個 redirect_uri
+#   4. 最近的 Canva 相關伺服器紀錄
+# Path-scoped push（environment: dev 才會連到 DEV VM）。
+on:
+  push:
+    paths:
+      - '.github/workflows/op-probe-dev-canva.yml'
+
+jobs:
+  probe:
+    runs-on: ubuntu-24.04
+    environment: dev
+    timeout-minutes: 5
+    steps:
+      - name: Read-only look at Canva config and logs on DEV
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 4m
+          script: |
+            set +e
+            ENV=/opt/onbrand/shared/.env
+            echo "host=$(hostname)  app=$(readlink -f /opt/onbrand/current)  now=$(date -u +%FT%TZ)"
+            val() { grep "^$1=" "$ENV" | tail -1 | cut -d= -f2- | sed -e "s/^['\"]//" -e "s/['\"]\$//"; }
+            ID="$(val CANVA_CLIENT_ID)"; SEC="$(val CANVA_CLIENT_SECRET)"; SCOPES="$(val CANVA_SCOPES)"; APP_URL="$(val APP_URL | sed 's:/*$::')"
+            echo "--- .env ---"
+            echo "CANVA_CLIENT_ID length=${#ID} prefix=${ID:0:3}  lines=$(grep -c '^CANVA_CLIENT_ID=' "$ENV")"
+            echo "CANVA_CLIENT_SECRET length=${#SEC} prefix=${SEC:0:5}  lines=$(grep -c '^CANVA_CLIENT_SECRET=' "$ENV")  has-whitespace=$(printf '%s' "$SEC" | grep -c '[[:space:]]')"
+            echo "CANVA_SCOPES=${SCOPES:-(not set → read-only three)}"
+            echo "APP_URL=${APP_URL}"
+
+            echo "--- running process ---"
+            pm2 jlist 2>/dev/null | node -e "
+              let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{
+                try{ for(const p of JSON.parse(s)){ if(p.name!=='onbrand-dev') continue;
+                  const e=(p.pm2_env||{}); const v=e.env||e;
+                  console.log(p.name,'status='+e.status,'uptime_s='+Math.round((Date.now()-e.pm_uptime)/1000),
+                    'id_len='+String(v.CANVA_CLIENT_ID||'').length,'secret_len='+String(v.CANVA_CLIENT_SECRET||'').length,
+                    'scopes='+(v.CANVA_SCOPES||'(unset)'));
+                } }catch(x){ console.log('pm2 parse failed', x.message) } })"
+
+            echo "--- token endpoint with a fake code (invalid_grant = credentials OK) ---"
+            curl -s -m 20 -u "${ID}:${SEC}" -X POST https://api.canva.com/rest/v1/oauth/token \
+              -H 'Content-Type: application/x-www-form-urlencoded' \
+              --data-urlencode 'grant_type=authorization_code' --data-urlencode 'code=probe-not-a-real-code' \
+              --data-urlencode 'code_verifier=probe-probe-probe-probe-probe-probe-probe-probe-probe' \
+              --data-urlencode "redirect_uri=${APP_URL}/api/oauth/canva/callback" -w '\nHTTP %{http_code}\n' | cut -c1-400
+
+            echo "--- recent Canva lines in the app log ---"
+            for f in ~/.pm2/logs/onbrand-dev-out*.log ~/.pm2/logs/onbrand-dev-error*.log; do
+              [ -f "$f" ] && { echo "# $f"; grep -a -i 'canva' "$f" | tail -25 | cut -c1-400; }
+            done
+            echo "--- done ---"
