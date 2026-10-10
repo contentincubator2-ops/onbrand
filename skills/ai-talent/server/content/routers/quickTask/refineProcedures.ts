@@ -110,6 +110,9 @@ export const refineProcedures = {
 
 
 
+      const { aeoFormatOf, buildAeoFormatRule } = await import("../../core/engine/aeoFormatContract");
+      const aeoFormat = aeoFormatOf(specTaskId);
+
       const system =
         `你是 ${agentName}（${agentTitle}），正在跟用戶討論這篇文案的修改方向。\n` +
         (restyleCard
@@ -125,7 +128,9 @@ export const refineProcedures = {
         notesStore.priorNotesBlock(priorNotes) +
         (restyleCard ? restyle.restyleBlock(restyleCard) : "") +
         // 合約接在最後：最後讀到的最有力，換人時個人風格不能蓋過這張卡的形式。
-        contract.rewriteContractBlock(spec);
+        contract.rewriteContractBlock(spec) +
+        // 2026-10-10：AI 搜尋那幾張卡，改寫後摘要／問句小標／文末問答要還在。
+        (aeoFormat ? buildAeoFormatRule(aeoFormat, null) : "");
 
       const messages: Array<{ role: "system" | "user" | "assistant"; content: string }> = [
         { role: "system", content: system },

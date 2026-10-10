@@ -32,9 +32,9 @@ const TARGETS: { id: AeoTarget; icon: "website" | "youtube"; zh: string; en: str
   { id: "web-qa", icon: "website", zh: "官網問答", en: "Website Q&A",
     noteZh: "一個顧客會問的問題，加一句可以單獨被引用的答案。附可貼上官網的網頁碼。",
     noteEn: "One question a customer would ask, with an answer that stands on its own. Includes page code for your site." },
-  { id: "yt-description", icon: "youtube", zh: "YouTube 標題＋說明欄", en: "YouTube title + description",
-    noteZh: "同一個主題拍成影片時，上傳要貼的標題與說明文字。",
-    noteEn: "The title and description to paste when this topic becomes a video." },
+  // 2026-10-10 稍晚 CJ「先隱藏 youtube，因為影音還沒有好的解決方案」：YouTube 標題＋說明欄先不給選。
+  // server 的 yt-description 目標與畫面上對應的欄位都留著，開回來時把這一項加回 TARGETS 即可：
+  //   { id: "yt-description", icon: "youtube", zh: "YouTube 標題＋說明欄", en: "YouTube title + description", … }
 ];
 
 export default function AeoVersionModal({ brandId, productId, eventId, caption, fromOutputId, en, onClose, onOpenOutput }: {
@@ -76,6 +76,9 @@ export default function AeoVersionModal({ brandId, productId, eventId, caption, 
     gen.mutate({ brandId, target: t, caption, ...(productId ? { productId } : {}), ...(eventId ? { eventId } : {}) });
   };
   const back = () => { setTarget(null); setFields(null); setNoConvert(null); setSavedId(null); };
+  // 只有一種可選時（目前只有官網問答）不用再挑一次，打開就開始寫。
+  const single = TARGETS.length === 1;
+  React.useEffect(() => { if (single) start(TARGETS[0]!.id); /* 只在打開時跑一次 */ }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const edit = (k: keyof Fields, v: string) => { setFields((f) => ({ ...(f ?? {}), [k]: v })); setSavedId(null); };
 
   const copy = async (text: string, okZh: string, okEn: string) => {
@@ -183,7 +186,9 @@ export default function AeoVersionModal({ brandId, productId, eventId, caption, 
                     {save.isPending ? (en ? "Saving…" : "儲存中…") : (en ? "Save to Projects" : "存到專案")}
                   </button>
                 )}
-                <button type="button" className="ml-auto text-[13px] underline underline-offset-2" style={{ color: META }} onClick={back}>{en ? "Make the other kind" : "換另一種"}</button>
+                {single
+                  ? <button type="button" className="ml-auto text-[13px] underline underline-offset-2" style={{ color: META }} onClick={() => start(TARGETS[0]!.id)}>{en ? "Write it again" : "重寫一次"}</button>
+                  : <button type="button" className="ml-auto text-[13px] underline underline-offset-2" style={{ color: META }} onClick={back}>{en ? "Make the other kind" : "換另一種"}</button>}
               </div>
               <p className="m-0 text-[12.5px] leading-relaxed" style={{ color: META }}>
                 {target === "web-qa"

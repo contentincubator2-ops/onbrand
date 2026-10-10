@@ -41,8 +41,7 @@ export const ROUTE_TO_PLATFORM: Record<string, string> = {
   // 2026-09-29 CJ：台灣市場加 Threads、LINE（目前只有品牌自建卡）。
   threads: "threads",
   line:    "line",
-  // 2026-10-10：YouTube、新聞稿開回來（AI 搜尋讀得到的通路）。li／x 仍下架。
-  yt:      "youtube",
+  // 2026-10-10：新聞稿開回來（AI 搜尋讀得到的通路）。li／yt／x 仍下架。
   pr:      "pr",
   // 2026-10-01：活動企劃的網紅那條線（kl- 卡）從這裡開卡。
   kol:     "kol",

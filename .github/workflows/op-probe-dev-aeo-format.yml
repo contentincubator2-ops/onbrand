@@ -1,0 +1,113 @@
+name: Ops (DEV) — probe AI-search format on the 10 cards, before vs after (read-only)
+
+# 前台標成「AI 搜尋」的 10 張任務卡，在 DEV VM 上各寫一篇，新舊對照：
+#   舊＝VM 上已部署的 stageCalls（沒有 AI 搜尋格式合約）
+#   新＝這個分支的 stageCalls＋aeoFormatContract（合約接在最後＋驗證重試）
+# 同一個品牌（2977 SoWork）、同一份輸入、各只寫 1 個版本。只跑寫文案那一段（callCaptionWriter），
+# 不產圖、不寫資料庫、不存成產出。
+# 第 3 次跑：標題問號不必在行尾、字面的反斜線 n 先還原、產品頁明列七段順序。
+# 第 2 次跑：產品頁小標給了問句範例、YT 說明欄的問句清單改成有標記的一段、不准編網址。
+# 花費：10 張卡 × 2 次，加上新版不合格時的重試，約 20–30 次模型呼叫。
+on:
+  push:
+    paths:
+      - '.github/workflows/op-probe-dev-aeo-format.yml'
+
+jobs:
+  probe:
+    runs-on: ubuntu-24.04
+    environment: dev
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Pack this branch's files
+        run: |
+          echo "S_B64=$(gzip -c skills/ai-talent/server/content/core/engine/orchestra/stageCalls.ts | base64 -w0)" >> "$GITHUB_ENV"
+          echo "F_B64=$(gzip -c skills/ai-talent/server/content/core/engine/aeoFormatContract.ts | base64 -w0)" >> "$GITHUB_ENV"
+      - name: Write each card once, old vs new
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          S_B64: ${{ env.S_B64 }}
+          F_B64: ${{ env.F_B64 }}
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          command_timeout: 14m
+          envs: S_B64,F_B64
+          script: |
+            set +e
+            cd /opt/onbrand/current/skills/ai-talent
+            set -a; source .env 2>/dev/null; set +a
+            echo "host=$(hostname)  app=$(readlink -f /opt/onbrand/current)  now=$(date -u +%FT%TZ)"
+            E=server/content/core/engine
+            CREATED_F=0
+            if [ ! -f "$E/aeoFormatContract.ts" ]; then echo "$F_B64" | base64 -d | gunzip > "$E/aeoFormatContract.ts"; CREATED_F=1; fi
+            echo "$S_B64" | base64 -d | gunzip > "$E/orchestra/_probeStageCalls.ts"
+            cat > "$E/orchestra/_probe_tmp.ts" <<'TS'
+            import localPool from "../../../../localDb";
+            import { buildBrandPrefix } from "../../../../strategy/core/brand/brandContext";
+            import { resolveTaskTemplate, resolveOrchestraConfig } from "../../catalog/taskRegistry";
+            import { callCaptionWriter as writeOld } from "./stageCalls";
+            import { callCaptionWriter as writeNew } from "./_probeStageCalls";
+            import { AEO_FORMAT_BY_TASK, validateAeoFormat } from "../aeoFormatContract";
+
+            const BRAND = 2977;
+            const TOPIC = "AI Reporting：連接 Meta、Google、Shopline 帳號，自動彙整三個平台的數據、找出最值得關注的變化、產出可以直接提案的報告敘事。過去兩到三天的月報整理，早上連接帳號、下午就能出報告。";
+            const INPUT: Record<string, string> = {
+              "web-30-longform": `小公司行銷團隊每個月花最多時間的是整理報表，不是做判斷。以 AI Reporting 為例，帶到「把時間還給判斷」這個角度。${TOPIC}`,
+              "yt-30-chapter-timeline": `（沒有影片網址，請依這個主題規劃章節）${TOPIC}`,
+              "pr-60-news-release-full": `SoWork 推出 AI Reporting。${TOPIC}`,
+            };
+            const cut = (s: string, n: number) => (s.length > n ? `${s.slice(0, n)}…（共 ${s.length} 字）` : s);
+
+            (async () => {
+              const [b]: any = await localPool.execute("SELECT name FROM brands WHERE id = ? LIMIT 1", [BRAND]);
+              const brandName = String(b[0]?.name ?? "");
+              const brandPrefix = await buildBrandPrefix(BRAND, null, null, "full").catch(() => "");
+              console.log(`brand ${BRAND}「${brandName}」 brandCtx=${brandPrefix.length} 字`);
+              const ids = Object.keys(AEO_FORMAT_BY_TASK);
+              const tally = { oldPass: 0, newPass: 0, total: 0 };
+              const runOne = async (id: string) => {
+                const template: any = await resolveTaskTemplate(id);
+                const cfg: any = await resolveOrchestraConfig(id);
+                const config = { ...cfg, variants: 1, variantLabels: [cfg.variantLabels?.[0] ?? "版本"] };
+                const key = template.primary_input?.key ?? template.inputs?.[0]?.key ?? "topic";
+                const labels = new Map((template.inputs ?? []).map((i: any) => [i.key, String(i.label ?? "").trim()]));
+                const inputs: Record<string, string> = { [key]: INPUT[id] ?? TOPIC };
+                const userMsg = Object.entries(inputs).map(([k, v]) => `[${labels.get(k) || k}] ${v}`).join("\n");
+                const base = {
+                  template, config, captionPersona: "你是資深品牌內容編輯，文字清楚、不浮誇。", brandPrefix,
+                  urlContext: "", userMsg, inputKeys: Object.keys(inputs), isZhTW: true,
+                };
+                const t0 = Date.now();
+                const [o, n] = await Promise.all([
+                  writeOld(base as any).then((r: any) => String(r?.[0]?.caption ?? "")).catch((e: any) => `ERROR ${e?.message}`),
+                  writeNew({ ...base, brandName } as any).then((r: any) => String(r?.[0]?.caption ?? "")).catch((e: any) => `ERROR ${e?.message}`),
+                ]);
+                const profile = AEO_FORMAT_BY_TASK[id]!;
+                const vo = o ? validateAeoFormat(profile, o, brandName) : { reason: "empty", detail: "沒有產出" };
+                const vn = n ? validateAeoFormat(profile, n, brandName) : { reason: "empty", detail: "沒有產出" };
+                return { id, label: template.label?.zh ?? template.label, profile, o, n, vo, vn, secs: ((Date.now() - t0) / 1000).toFixed(0) };
+              };
+              // 三張一批，避免一次打太多。
+              for (let i = 0; i < ids.length; i += 3) {
+                const batch = await Promise.all(ids.slice(i, i + 3).map(runOne));
+                for (const r of batch) {
+                  tally.total += 1; if (!r.vo) tally.oldPass += 1; if (!r.vn) tally.newPass += 1;
+                  console.log(`\n================ ${r.id}｜${r.label}｜格式 ${r.profile}（${r.secs}s）`);
+                  console.log(`舊：${r.o.length} 字，檢查＝${r.vo ? `不合（${r.vo.detail}）` : "合格"}`);
+                  console.log(`新：${r.n.length} 字，檢查＝${r.vn ? `不合（${r.vn.detail}）` : "合格"}`);
+                  console.log(`--- 舊版開頭\n${cut(r.o, 260)}`);
+                  console.log(`--- 新版${r.id === "web-30-longform" ? "全文" : "開頭"}\n${r.id === "web-30-longform" ? r.n : cut(r.n, 700)}`);
+                  if (r.id !== "web-30-longform" && r.n.length > 700) console.log(`--- 新版結尾\n…${r.n.slice(-380)}`);
+                }
+              }
+              console.log(`\n==== 合計：舊版合格 ${tally.oldPass}/${tally.total}，新版合格 ${tally.newPass}/${tally.total}`);
+              process.exit(0);
+            })().catch((e) => { console.log("probe failed:", e?.message); process.exit(1); });
+            TS
+            timeout 800 ./node_modules/.bin/tsx "$E/orchestra/_probe_tmp.ts" 2>&1 | grep -v "^\[callOneVariant\] attempt\|^\[env\]"
+            echo "probe exit=${PIPESTATUS[0]}"
+            rm -f "$E/orchestra/_probe_tmp.ts" "$E/orchestra/_probeStageCalls.ts"
+            if [ "$CREATED_F" = "1" ]; then rm -f "$E/aeoFormatContract.ts"; fi

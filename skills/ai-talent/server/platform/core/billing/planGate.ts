@@ -29,7 +29,9 @@ import { isCustomChannelId } from "../customChannelId";
  * 這兩個加官網是 AI 搜尋讀得到的通路（見 client sourceVocabulary 的 AEO_CARD_IDS）。
  * LinkedIn、X 維持下架。
  */
-export const HIDDEN_CONTENT_PLATFORMS: ReadonlySet<string> = new Set(["linkedin", "x"]);
+// 2026-10-10 稍晚 CJ「我還是想先隱藏 youtube，因為影音還沒有好的解決方案」：YouTube 再收起來，
+// 新聞稿留著。影音有解法之後，從這裡與 client 的 navCatalog／AEO_CARD_IDS 一起開回來。
+export const HIDDEN_CONTENT_PLATFORMS: ReadonlySet<string> = new Set(["linkedin", "youtube", "x"]);
 
 export function isHiddenContentPlatform(platform: string | null | undefined): boolean {
   return !!platform && HIDDEN_CONTENT_PLATFORMS.has(platform);
@@ -41,9 +43,9 @@ export function isHiddenContentPlatform(platform: string | null | undefined): bo
  * CJ 2026-09-29「前台隱藏，資料保留」—— 讀歷史的地方一律過這支。
  */
 const HIDDEN_PLATFORM_ALIASES: ReadonlySet<string> = new Set([
-  ...HIDDEN_CONTENT_PLATFORMS, "li", "twitter",
+  ...HIDDEN_CONTENT_PLATFORMS, "li", "yt", "twitter",
 ]);
-const HIDDEN_TASK_ID_PREFIXES = ["li-", "x-"];
+const HIDDEN_TASK_ID_PREFIXES = ["li-", "yt-", "x-"];
 
 export function isHiddenTaskId(taskId: string | null | undefined): boolean {
   return !!taskId && HIDDEN_TASK_ID_PREFIXES.some((p) => taskId.startsWith(p));

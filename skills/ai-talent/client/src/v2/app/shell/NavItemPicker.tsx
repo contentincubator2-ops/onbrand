@@ -194,7 +194,7 @@ export default function NavItemPicker({ open, en, brandName, catalog, selected, 
                   {c.tooltip && <span className="mt-0.5 block text-[12px] leading-snug text-neutral-500">{c.tooltip}</span>}
                   {c.aeo && (
                     <span className="mt-1 inline-block rounded border border-neutral-200 px-1.5 py-px text-[11px] text-neutral-500"
-                      title={en ? "AI search engines mostly cite public web pages, YouTube and news — not social posts." : "AI 搜尋主要引用公開網頁、YouTube 與新聞，社群貼文幾乎不會被引用。"}>
+                      title={en ? "AI search engines mostly cite public web pages and news — not social posts." : "AI 搜尋主要引用公開網頁與新聞，社群貼文幾乎不會被引用。"}>
                       {en ? "Readable by AI search" : "AI 搜尋讀得到"}
                     </span>
                   )}

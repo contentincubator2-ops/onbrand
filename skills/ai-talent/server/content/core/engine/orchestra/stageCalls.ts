@@ -7,6 +7,7 @@ import { isAdCopyTemplate, buildAdCopyRule, validateAdCopy, repairAdCopy } from 
 import { adSlotOf, buildAdSlotRule, validateAdSlot, repairAdSlot } from "../adSlotContract";
 import { isWuganVoiceTemplate, validateWuganVoice, buildWuganVoiceReminder, repairWuganVoice } from "../wuganVoiceContract";
 import { isShotListTemplate, buildShotListRule, normalizeShotList, validateShotList, repairShotList } from "../shotListContract";
+import { aeoFormatOf, buildAeoFormatRule, validateAeoFormat, aeoFormatRetryReminder, normalizeAeoCaption } from "../aeoFormatContract";
 import { isListingTemplate, buildListingRule, normalizeListing, validateListing, repairListing, listingRetryReminder } from "../listingContract";
 import { pickOwnAngleBlock, angleWritingBlock, sanitizeAngleLabel, checkAngle, dedupeAngleLabels, angleVisualLens } from "../variantAngles";
 import { isEmailBodyTask, EDM_CRAFT_RUBRIC, edmPlaybookFor } from "../../catalog/edmCraft";
@@ -64,6 +65,8 @@ export async function callOneVariant(args: {
   siblingLabels?: readonly string[];
   /** 2026-10-04：當次主題上網查到的案例與說法（已格式化的 prompt 區塊）。獨立於 urlContext —— 不能觸發「主題看 URL、品牌只取語氣」那套覆寫。 */
   researchContext?: string;
+  /** 2026-10-10：品牌名。AI 搜尋格式合約要驗「摘要裡有沒有品牌」；沒帶就只驗結構。 */
+  brandName?: string | null;
 }): Promise<{ label: string; caption: string; hashtags?: string[] }> {
   const { template, config, label, captionPersona, brandPrefix, urlContext, userMsg, inputKeys, agentAiModel, strategistAnchor, market, isZhTW } = args;
   const adCopy = isAdCopyTemplate(template);
@@ -77,6 +80,9 @@ export async function callOneVariant(args: {
   // 2026-10-04：商品頁（電商／開店平台 tray 底下的卡）交付的是一組欄位，不是貼文。
   const listingSpec = isListingTemplate(template) ? template.listingSpec! : null;
   const requestedUrl = adCopy ? (args.requestedUrl ?? null) : null;
+  // 2026-10-10（CJ「目前的寫法，似乎沒有套用 AEO 的重點，包括一開始的摘要」）：前台標成
+  // 「AI 搜尋」的卡要真的照 AEO 格式寫（開頭摘要、問句小標、主詞寫全、文末問答）。
+  const aeoFormat = aeoFormatOf((template as any)?.id);
   // Multi-post / labeled-slot tasks reference {label} in template.systemPrompt;
   // substitute the actual post slot before sending to LLM.
   // {today} → market-appropriate date format so PR datelines / calendar
@@ -397,7 +403,8 @@ export async function callOneVariant(args: {
     + (adCopy ? buildAdCopyRule(requestedUrl) : "")
     + (adSlot ? buildAdSlotRule(adSlot) : "")
     + (shotList ? buildShotListRule() : "")
-    + (listingSpec ? buildListingRule(listingSpec) : "");
+    + (listingSpec ? buildListingRule(listingSpec) : "")
+    + (aeoFormat ? buildAeoFormatRule(aeoFormat, args.brandName) : "");
 
   // Provider + model selection priority:
   //   1. Agent's aiModel (from JSON-assigned real-person agent) — uses both
@@ -506,6 +513,7 @@ export async function callOneVariant(args: {
   let shotListIssue = ""; // shot-list contract violation from the previous attempt
   let listingIssue = ""; // 商品頁欄位合約：上一次的違反內容
   let angleIssue = ""; // 版本切角違反（目前只驗數據版有數字）
+  let aeoFormatIssue = ""; // AI 搜尋格式合約：上一次缺了什麼
   while (attempt < 2) {
     attempt++;
     try {
@@ -513,7 +521,7 @@ export async function callOneVariant(args: {
       // creativity and forcing strict JSON.
       const reminderJsonShape = config.pickOwnAngle ? `{"label":"...","caption":"...","hashtags":[]}` : `{"caption":"...","hashtags":[]}`;
       const userMsgWithReminder = attempt === 2
-        ? `${userMsg}\n\n[REMINDER] ${listingIssue ? listingRetryReminder(listingIssue) : shotListIssue ?`上次回應違反分格腳本合約：${shotListIssue}。請照【分格腳本合約】重寫：至少 3 格，每格四行「畫面/動作/聲音/字卡」齊全，全篇不要 hashtag。` : adCopyIssue ? `上次回應違反廣告格式合約：${adCopyIssue}。請照【廣告格式合約】重寫。` : wuganVoiceIssue ? wuganVoiceIssue : angleIssue ? `上次回應不符合你選的切角設計：${angleIssue}。請照【版本切角】重寫（可以沿用同一個 label，也可以換一個更貼切的）。` : "上次回應沒給可解析、可交付的 caption。"}請嚴格回覆 ${reminderJsonShape} JSON，第一個字元就是 {，不要任何 markdown / 前言 / 解釋。不得要求澄清，不得輸出審議過程、選項評估、自述工作原則、處理步驟或輸入欄位內部名稱；來源抓不到內容時就依 URL 標題、描述與主題直接寫，絕不說明抓取失敗。caption 只能放最終成品。`
+        ? `${userMsg}\n\n[REMINDER] ${listingIssue ? listingRetryReminder(listingIssue) : aeoFormatIssue ? aeoFormatRetryReminder(aeoFormatIssue) : shotListIssue ?`上次回應違反分格腳本合約：${shotListIssue}。請照【分格腳本合約】重寫：至少 3 格，每格四行「畫面/動作/聲音/字卡」齊全，全篇不要 hashtag。` : adCopyIssue ? `上次回應違反廣告格式合約：${adCopyIssue}。請照【廣告格式合約】重寫。` : wuganVoiceIssue ? wuganVoiceIssue : angleIssue ? `上次回應不符合你選的切角設計：${angleIssue}。請照【版本切角】重寫（可以沿用同一個 label，也可以換一個更貼切的）。` : "上次回應沒給可解析、可交付的 caption。"}請嚴格回覆 ${reminderJsonShape} JSON，第一個字元就是 {，不要任何 markdown / 前言 / 解釋。不得要求澄清，不得輸出審議過程、選項評估、自述工作原則、處理步驟或輸入欄位內部名稱；來源抓不到內容時就依 URL 標題、描述與主題直接寫，絕不說明抓取失敗。caption 只能放最終成品。`
         : userMsg;
       const r = await Promise.race([
         callModel(
@@ -643,10 +651,22 @@ export async function callOneVariant(args: {
             console.warn(`[callOneVariant] attempt ${attempt} angle miss for ${effectiveLabel}: ${angleMiss}`);
             continue;
           }
+          // AI 搜尋格式合約：缺摘要／問答／問句小標就帶著原因重寫一次；最後一次照實出貨
+          // （內容本身是好的，只是少了格式，不為此把整篇弄成空白）。
+          if (aeoFormat) {
+            const miss = validateAeoFormat(aeoFormat, caption, args.brandName);
+            if (miss && attempt < 2) {
+              lastErr = new Error(`aeo format miss for ${label} (${miss.reason}): ${miss.detail}`);
+              aeoFormatIssue = miss.detail;
+              console.warn(`[callOneVariant] attempt ${attempt} aeo format miss for ${label} (${miss.reason})`);
+              continue;
+            }
+            if (miss) console.warn(`[callOneVariant] aeo format still unmet for ${label} (${miss.reason}) — shipping as-is`);
+          }
           // dev 2026-08: strip draft-leak lines / internal snake_case keys
           // from the shipped caption. Only on this path — the contract
           // branches above return formats whose markers this would eat.
-          return { label: effectiveLabel, caption: sanitizeCaption(caption), hashtags: out.hashtags };
+          return { label: effectiveLabel, caption: sanitizeCaption(aeoFormat ? normalizeAeoCaption(caption) : caption), hashtags: out.hashtags };
         }
         lastErr = new Error(`non-deliverable caption for ${label} (${sanity.reason}) — raw[0:200]: ${lastRaw.slice(0, 200)}`);
         console.warn(`[callOneVariant] attempt ${attempt} rejected for ${label} (${sanity.reason}): ${lastRaw.slice(0, 300)}`);
@@ -677,6 +697,7 @@ export async function callCaptionWriter(args: {
   isZhTW: boolean;
   requestedUrl?: string | null;
   researchContext?: string;
+  brandName?: string | null;
 }): Promise<Array<{ label: string; caption: string; hashtags?: string[] }>> {
   const labels = args.config.variantLabels.slice(0, args.config.variants);
   // Parallel fanout — each variant in its own LLM call.

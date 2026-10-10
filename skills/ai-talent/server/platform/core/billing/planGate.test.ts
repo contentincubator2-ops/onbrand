@@ -59,9 +59,9 @@ describe("通路選擇", () => {
   it("無限方案拿得到全部（下架的通路除外）", () => {
     const all = resolveChannels(null, Q({ platforms: -1 })).platforms;
     expect(all).toEqual(expect.arrayContaining(["facebook", "instagram", "tiktok", "email", "website"]));
-    for (const p of ["linkedin", "x"]) expect(all).not.toContain(p);
-    // 2026-10-10 開回來的兩個排在最後，不擠掉下架期間的預設順序。
-    expect(all).toEqual(expect.arrayContaining(["youtube", "pr"]));
+    for (const p of ["linkedin", "youtube", "x"]) expect(all).not.toContain(p);
+    // 2026-10-10 開回來的新聞稿排在最後，不擠掉下架期間的預設順序。
+    expect(all).toEqual(expect.arrayContaining(["pr"]));
     expect(resolveChannels(null, Q({ platforms: 5 })).platforms).toEqual(["facebook", "instagram", "tiktok", "email", "website"]);
   });
 
@@ -76,7 +76,7 @@ describe("通路選擇", () => {
   it("任務目錄不列下架通路的卡（不論方案）", () => {
     const tasks = [{ platform: "facebook" }, { platform: "linkedin" }, { platform: "youtube" }, { platform: "x" }, { platform: "pr" }, { platform: "website" }];
     const out = filterTasksByPlan(tasks, Q({ platforms: -1 }), { platforms: [], swappedAt: null });
-    expect(out.map((t) => t.platform)).toEqual(["facebook", "youtube", "pr", "website"]);
+    expect(out.map((t) => t.platform)).toEqual(["facebook", "pr", "website"]);
   });
 });
 
@@ -255,7 +255,7 @@ describe("策略監測閘門", () => {
 
 describe("下架通路（2026-09-29）", () => {
   it("歷史資料的各種寫法都認得：platform 別名與 task id 前綴", () => {
-    for (const platform of ["linkedin", "x", "li", "twitter", "LinkedIn"]) {
+    for (const platform of ["linkedin", "youtube", "x", "li", "yt", "twitter", "LinkedIn"]) {
       expect(isHiddenHistoryItem({ platform })).toBe(true);
     }
     // X 的產出記成 generic，只能靠 task id
@@ -263,12 +263,12 @@ describe("下架通路（2026-09-29）", () => {
     expect(isHiddenTaskId("li-post")).toBe(true);
   });
 
-  it("2026-10-10 YouTube、新聞稿開回來：平台各種寫法與 task id 都不再被藏", () => {
-    for (const platform of ["youtube", "yt", "pr", "press"]) {
+  it("2026-10-10 新聞稿開回來：平台各種寫法與 task id 都不再被藏；YouTube 仍然藏著", () => {
+    for (const platform of ["pr", "press"]) {
       expect(isHiddenHistoryItem({ platform })).toBe(false);
     }
-    expect(isHiddenTaskId("yt-30-description-seo")).toBe(false);
     expect(isHiddenTaskId("pr-60-news-release-full")).toBe(false);
+    expect(isHiddenTaskId("yt-30-description-seo")).toBe(true);
   });
 
   it("五個保留通路不誤殺", () => {

@@ -41,7 +41,7 @@ const TOUCHPOINT_ICON: Record<string, any> = {
 };
 const TOUCHPOINT_ROUTE: Record<string, string> = {
   facebook: "/tasks/fb", instagram: "/tasks/ig", tiktok: "/tasks/tt",
-  email: "/tasks/email", website: "/tasks/web", youtube: "/tasks/yt", pr: "/tasks/pr",
+  email: "/tasks/email", website: "/tasks/web", pr: "/tasks/pr",
 };
 
 const LAYER_COLORS = { strategy: "#18181b", content: "#18181b", performance: "#18181b" };
